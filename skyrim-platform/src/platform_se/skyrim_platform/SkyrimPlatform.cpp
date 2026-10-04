@@ -20,6 +20,7 @@
 #include "MpClientPluginApi.h"
 #include "ObjectReferenceApi.h"
 #include "OverlayMenuApi.h"
+#include "PresetFileApi.h"
 #include "Sp3Api.h"
 #include "TextApi.h"
 #include "ThreadPoolWrapper.h"
@@ -288,6 +289,7 @@ private:
       OverlayMenuApi::Register(env, e);
       Win32Api::Register(env, e);
       FileInfoApi::Register(env, e);
+      PresetFileApi::Register(env, e);
       TextApi::Register(env, e);
       InventoryApi::Register(env, e);
       MagicApi::Register(env, e);
