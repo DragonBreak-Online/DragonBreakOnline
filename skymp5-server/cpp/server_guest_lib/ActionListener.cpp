@@ -11,6 +11,7 @@
 #include "MpObjectReference.h"
 #include "MsgType.h"
 #include "Overloaded.h"
+#include "WeaponHitGate.h"
 #include "WorldState.h"
 #include "gamemode_events/CustomEvent.h"
 #include "gamemode_events/EatItemEvent.h"
@@ -1803,17 +1804,14 @@ bool IsDistanceValid(const MpActor& actor, const MpActor& targetActor,
   return reach * reach > sqrDistance;
 }
 
-bool CanHit(const MpActor& actor, const HitData& hitData,
-            const std::chrono::duration<float>& timePassed)
+double GetSwingInterval(const MpActor& actor, const HitData& hitData)
 {
   WorldState* espmProvider = actor.GetParent();
   auto weapDNAM =
     espm::GetData<espm::WEAP>(hitData.source, espmProvider).weapDNAM;
 
   if (weapDNAM) {
-    float speedMult = weapDNAM->speed;
-    return timePassed.count() >= (1.1 * (1 / speedMult)) -
-      (1.1 * (1 / speedMult) * (speedMult <= 0.75 ? 0.45 : 0.3));
+    return WeaponHitGate::SwingInterval(weapDNAM->speed);
   }
 
   throw std::runtime_error(
@@ -2560,54 +2558,47 @@ void ActionListener::OnWeaponHit(MpActor* aggressor,
 
   auto& targetActor = *targetActorPtr;
 
-  const auto lastHitTimeAnyTarget = aggressor->GetLastHitTime(std::nullopt);
-  const std::chrono::duration<float> timePassedAnyTarget =
-    currentHitTime - lastHitTimeAnyTarget;
+  // Weapon hits are gated per aggressor on one clock, in seconds
+  const double now =
+    std::chrono::duration<double>(currentHitTime.time_since_epoch()).count();
+  auto& hitMemory = weaponHitMemory[aggressor->GetFormId()];
 
-  constexpr float kSplashTimeWindow = 0.1f;
-  constexpr size_t kMaxSplashTargets = 4;
-
-  // Splash attack detection. Non-vanilla feature, fixes anticheat-vs-mod
-  // issues
-  const bool isSplash = timePassedAnyTarget.count() < kSplashTimeWindow;
-
-  if (isSplash) {
+  if (hitMemory.InSplashWindow(now)) {
     spdlog::info("Splash attack detected from aggressor {:x} to target {:x}",
                  aggressor->GetFormId(), targetActor.GetFormId());
+  }
 
-    // Check if THIS specific target was hit recently
-    auto lastHitSpecific = aggressor->GetLastHitTime(targetActor.GetFormId());
-    std::chrono::duration<float> timeSinceSpecific =
-      currentHitTime - lastHitSpecific;
+  std::optional<double> swingInterval;
+  const auto verdict =
+    hitMemory.Judge(targetActor.GetFormId(), now, [&] {
+      if (!swingInterval) {
+        swingInterval = GetSwingInterval(*aggressor, hitData);
+      }
+      return *swingInterval;
+    });
 
-    // If the specific target was hit faster than the splash window
-    if (timeSinceSpecific.count() < kSplashTimeWindow) {
+  switch (verdict) {
+    case WeaponHitGate::Verdict::Land:
+    case WeaponHitGate::Verdict::Splash:
+      break;
+    case WeaponHitGate::Verdict::Duplicate:
       spdlog::warn("Splash attack from {:x} to {:x} ignored, target hit "
                    "too recently",
                    aggressor->GetFormId(), targetActor.GetFormId());
       return;
-    }
-
-    if (aggressor->CountRecentHits(std::chrono::duration<float>(
-          kSplashTimeWindow)) >= kMaxSplashTargets) {
+    case WeaponHitGate::Verdict::TooManyTargets:
       spdlog::warn("Splash attack from {:x} to {:x} ignored, too many "
                    "targets hit recently",
                    aggressor->GetFormId(), targetActor.GetFormId());
       return;
-    }
-  } else if (!CanHit(*aggressor, hitData, timePassedAnyTarget)) {
-    WorldState* espmProvider = targetActor.GetParent();
-    auto weapDNAM =
-      espm::GetData<espm::WEAP>(hitData.source, espmProvider).weapDNAM;
-    float expectedAttackTime = (1.1 * (1 / weapDNAM->speed)) -
-      (1.1 * (1 / weapDNAM->speed) * (weapDNAM->speed <= 0.75 ? 0.45 : 0.3));
-    spdlog::debug(
-      "OnWeaponHit - Target {0:x} is not available for attack due to fast "
-      "attack speed. Weapon: {1:x}. Elapsed time: {2}. Expected attack time: "
-      "{3}",
-      hitData.target, hitData.source, timePassedAnyTarget.count(),
-      expectedAttackTime);
-    return;
+    case WeaponHitGate::Verdict::TooFast:
+      spdlog::debug(
+        "OnWeaponHit - Target {0:x} is not available for attack due to fast "
+        "attack speed. Weapon: {1:x}. Elapsed time: {2}. Expected attack "
+        "time: {3}",
+        hitData.target, hitData.source, now - hitMemory.LastHitTime(),
+        swingInterval.value_or(0.0));
+      return;
   }
 
   // if (IsDistanceValid(*aggressor, targetActor, hitData) == false) {
@@ -2771,6 +2762,13 @@ void ActionListener::OnWeaponHit(MpActor* aggressor,
     currentActorValues, aggressor,
     std::vector<espm::ActorValue>{ espm::ActorValue::Health });
   aggressor->SetLastHitTime(targetActor.GetFormId(), currentHitTime);
+  weaponHitMemory[aggressor->GetFormId()].Record(targetActor.GetFormId(), now,
+                                                verdict);
+  if (weaponHitMemory.size() > 4096) {
+    std::erase_if(weaponHitMemory, [&](const auto& entry) {
+      return now - entry.second.LastHitTime() > 10.0;
+    });
+  }
 
   spdlog::debug(
     "OnWeaponHit - Target {0:x} is hit by {1} damage. Percentage was: {3}, "

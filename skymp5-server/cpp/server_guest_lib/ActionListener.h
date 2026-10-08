@@ -9,6 +9,7 @@
 #include "RawMessageData.h"
 #include "SpellCastData.h"
 #include "SweetHidePlayerNamesService.h"
+#include "WeaponHitGate.h"
 #include "libespm/Loader.h"
 #include <chrono>
 #include <memory>
@@ -226,6 +227,8 @@ private:
   std::unordered_map<uint64_t, StaffVolley> staffVolleys;
   bool TakeStaffHit(uint32_t casterId, uint32_t enchantmentId,
                     uint32_t targetId);
+  // Landed weapon hits per aggressor, for the swing and splash gate in OnWeaponHit
+  std::unordered_map<uint32_t, WeaponHitGate::Memory> weaponHitMemory;
   // Last power attack or bash per (attacker << 32 | target), for the stagger floor in OnWeaponHit
   static constexpr std::chrono::milliseconds kForcefulHitInterval{ 700 };
   std::unordered_map<uint64_t, std::chrono::steady_clock::time_point>
