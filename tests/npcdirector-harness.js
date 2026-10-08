@@ -44,6 +44,15 @@ check('a host that no longer has it loaded loses it', hosters.get(WOLF) === P1, 
 hosters.set(DEER, OLD); sets.length = 0;
 now += 4000; sight(P1, [[DEER, 50]]); sight(P2, [[DEER, 60]]); tick();
 check('an older client that does not report keeps what it hosts', hosters.get(DEER) === OLD && !sets.some(([id]) => id === DEER));
+// 8 Oct (dungeon-perf-1008): a host that reports but whose last report went stale (a hitch, a loading screen) was taken
+// for an older client and kept its NPCs; only a client that never reported keeps them now
+hosters.set(DEER, P2); sets.length = 0;
+now += 1000; sight(P2, [[DEER, 60]]);
+now += 4000; sight(P1, [[DEER, 50]]); tick();
+check('a host whose report went stale (it did report) loses the NPC to a fresh reporter', hosters.get(DEER) === P1 && sets.some(([id, h]) => id === DEER && h === P1), [...hosters]);
+hosters.set(DEER, OLD); sets.length = 0;
+now += 4000; sight(P1, [[DEER, 50]]); tick();
+check('...while a client that never reported still keeps what it hosts', hosters.get(DEER) === OLD && !sets.length);
 now += 4000; sight(P1, [[ATRONACH, 10], [BODY, 10]]); tick();
 check('companions and dead NPCs are left alone', !hosters.has(ATRONACH) && !hosters.has(BODY));
 sight(P1, [[WOLF, 100], [ATRONACH, 10]]);

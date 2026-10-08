@@ -29,7 +29,6 @@ module.exports = (api) => {
   const S = globalThis.__dboNpcDirector || (globalThis.__dboNpcDirector = { sight: new Map(), changedAt: new Map(), told: new Map() });
 
   const fresh = (p, now) => { const s = S.sight.get(p); return s && now - s.at <= C.freshMs ? s : null; };
-  const reports = (p) => !!fresh(p, Date.now());
   const reported = (p, npc) => { const s = fresh(p, Date.now()); return !!s && s.dist.has(npc >>> 0); };
   const built = () => typeof mp.setHoster === 'function' && typeof mp.getHoster === 'function';
   // The server's verdict on player p driving npc: { ok, dist } from gamemode.js's host policy
@@ -145,7 +144,9 @@ module.exports = (api) => {
       if (current === best) continue;
       // The raider's own GM gives it up to anyone near it, however near the GM is
       if (current && online.has(current) && current !== avoid) {
-        if (!reports(current)) continue;                       // an older client keeps what it hosts
+        // An older client that never reports keeps what it hosts; one whose report went stale (8 Oct: a hitch or a
+        // loading screen) is no longer seen to have it, and it goes to a player who does
+        if (!S.sight.has(current)) continue;
         const mine = seers.find(([p]) => p === current);
         if (mine && mine[1] <= bestD * C.holdFactor + C.holdUnits) continue;   // still has it, nobody clearly nearer
       }
