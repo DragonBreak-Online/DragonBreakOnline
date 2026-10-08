@@ -62,6 +62,9 @@ public:
   void UpdateNextRestorationTime(espm::ActorValue av,
                                  std::chrono::seconds duration);
 
+  void NoteHealthRaise(float from, float to);
+  bool IsStaleHealthReport(float reported, float current) const;
+
   void SetRaceMenuOpen(bool isOpen);
   void SetAppearance(const Appearance* newAppearance);
   void SetEquipment(const Equipment& newEquipment);

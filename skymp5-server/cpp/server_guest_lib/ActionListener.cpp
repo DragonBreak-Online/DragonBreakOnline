@@ -1615,7 +1615,9 @@ void ActionListener::OnChangeValues(const RawMessageData& rawMsgData,
     }
 
     // Echo a freshly restored value, the client's report predates it
-    if (actor->ShouldSkipRestoration(av)) {
+    if (actor->ShouldSkipRestoration(av) ||
+        (av == espm::ActorValue::Health &&
+         actor->IsStaleHealthReport(*inputVal, currentVal))) {
       outVal = currentVal;
       sendOutMsg = true;
       actor->SetLastPercentageUpdate(av, now);

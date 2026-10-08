@@ -14,6 +14,7 @@
 #include "ServerState.h"
 #include "SpSnippet.h"
 #include "SpSnippetFunctionGen.h"
+#include "StaleHealthReport.h"
 #include "TempleRespawn.h"
 #include "WorldState.h"
 #include "gamemode_events/DeathEvent.h"
@@ -90,6 +91,8 @@ struct MpActor::Impl
   std::unordered_map<espm::ActorValue, std::chrono::system_clock::time_point>
     nextRestorationTimes;
 
+  StaleHealthReport::Memory healthRaises;
+
   std::optional<std::chrono::steady_clock::time_point> potionCooldownStart;
   uint32_t potionCooldownBaseId = 0;
 };
@@ -112,6 +115,17 @@ void MpActor::UpdateNextRestorationTime(espm::ActorValue av,
 {
   pImpl->nextRestorationTimes[av] =
     std::chrono::system_clock::now() + duration;
+}
+
+void MpActor::NoteHealthRaise(float from, float to)
+{
+  pImpl->healthRaises.Note(from, to, std::chrono::steady_clock::now());
+}
+
+bool MpActor::IsStaleHealthReport(float reported, float current) const
+{
+  return pImpl->healthRaises.IsStale(reported, current,
+                                     std::chrono::steady_clock::now());
 }
 
 bool MpActor::ShouldSkipRestoration(espm::ActorValue av) const noexcept

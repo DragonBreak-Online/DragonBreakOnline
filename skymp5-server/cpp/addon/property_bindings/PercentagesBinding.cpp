@@ -112,5 +112,10 @@ void PercentagesBinding::Set(Napi::Env env, ScampServer& scampServer,
     avFilter.push_back(espm::ActorValue::Stamina);
   }
 
+  if (actorValues.healthPercentage > oldActorValues.healthPercentage) {
+    actor.NoteHealthRaise(oldActorValues.healthPercentage,
+                          actorValues.healthPercentage);
+  }
+
   actor.NetSetPercentages(actorValues, nullptr, avFilter);
 }
