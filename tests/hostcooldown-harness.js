@@ -35,6 +35,20 @@ H = make({}, now, state);
 check('a hot reload keeps the timers (the caller keeps the state)', H.holds(NPC, B, A, true) === 'in a fight');
 check('enabled: false holds nothing', make({ enabled: false }, now, state).holds(NPC, B, A, true) === null);
 check('the windows come from config', make({ fightMs: 100000 }, now, state).config.fightMs === 100000);
+// A fight renewed by every blow is held at most fightMaxMs (30 s) from its first blow (8 Oct, dungeon-perf-1008)
+{
+  const st = {}, F = 0xff000200, start = t;
+  const h = make({}, now, st);
+  for (; t < start + 29000; t += 1000) h.noteFight(F);   // a blow every second, the last at start + 28 s
+  h.noteFight(F);                                         // and one at start + 29 s
+  check('a fight hit every second is held through its first 30 s', h.holds(F, B, A, true) === 'in a fight');
+  t = start + 30000; h.noteFight(F);
+  check('...and released at 30 s from the first blow, though blows keep landing', h.holds(F, B, A, true) === null);
+  t += 6000;
+  h.noteFight(F);
+  check('a new fight after a quiet spell (fightMs without a blow) is held again', h.holds(F, B, A, true) === 'in a fight');
+  check('the ceiling comes from config', make({ fightMaxMs: 60000 }, now, {}).config.fightMaxMs === 60000);
+}
 
 // ---- 2. the director (npcdirector.js) asks it before it moves an NPC ----
 const sets = [];
