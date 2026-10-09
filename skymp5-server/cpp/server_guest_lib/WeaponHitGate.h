@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <limits>
+#include <optional>
 #include <vector>
 
 // Whether a weapon hit may land, judged from the aggressor's recent landed hits (ActionListener::OnWeaponHit).
@@ -70,13 +71,29 @@ public:
       targets.clear();
     }
     targets.push_back(target);
+    lastRecorded = now;
   }
+
+  // Restarts the memory from a last hit recorded elsewhere (the actor's own record): a swing that started then, on target if known
+  void Seed(double lastHit, std::optional<uint32_t> target)
+  {
+    swingStart = lastHit;
+    targets.clear();
+    if (target) {
+      targets.push_back(*target);
+    }
+    lastRecorded = lastHit;
+  }
+
+  // When the last hit this memory saw landed, to tell whether the actor's record moved without it
+  double LastRecorded() const { return lastRecorded; }
 
   // When the current swing started, for the log and pruning
   double LastHitTime() const { return swingStart; }
 
 private:
   double swingStart = -std::numeric_limits<double>::infinity();
+  double lastRecorded = -std::numeric_limits<double>::infinity();
   std::vector<uint32_t> targets;
 };
 

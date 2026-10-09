@@ -89,3 +89,22 @@ TEST_CASE("The splash window is shorter than the fastest vanilla swing",
   REQUIRE(WeaponHitGate::kSplashTimeWindow <
           WeaponHitGate::SwingInterval(1.3f)); // daggers
 }
+
+TEST_CASE("A last hit recorded outside the gate re-seeds it, as the actor's "
+          "record says",
+          "[WeaponHitGate]")
+{
+  WeaponHitGate::Memory m;
+  REQUIRE(Hit(m, kA, 100.0) == Verdict::Land);
+  REQUIRE(m.LastRecorded() == 100.0);
+  // The actor's record says kA was hit 0.3 s ago: a hit now is too fast
+  m.Seed(200.0 - 0.3, kA);
+  REQUIRE(m.LastRecorded() == 200.0 - 0.3);
+  REQUIRE(Hit(m, kA, 200.0 + 0.001) == Verdict::TooFast);
+  // The record moved back 3 s: the next hit lands
+  m.Seed(200.0 - 3.0, kA);
+  REQUIRE(Hit(m, kA, 200.0) == Verdict::Land);
+  // No hit on record at all: anything lands
+  m.Seed(-std::numeric_limits<double>::infinity(), std::nullopt);
+  REQUIRE(Hit(m, kB, 200.1) == Verdict::Land);
+}

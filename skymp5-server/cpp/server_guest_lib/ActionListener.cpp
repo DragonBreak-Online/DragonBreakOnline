@@ -2563,6 +2563,20 @@ void ActionListener::OnWeaponHit(MpActor* aggressor,
     std::chrono::duration<double>(currentHitTime.time_since_epoch()).count();
   auto& hitMemory = weaponHitMemory[aggressor->GetFormId()];
 
+  // The actor's last-hit record is the source of truth: a write that did not come through here (a test, a reused form id) re-seeds the memory
+  const auto lastAny = aggressor->GetLastHitTime(std::nullopt);
+  const double lastAnySec = lastAny == std::chrono::steady_clock::time_point()
+    ? -std::numeric_limits<double>::infinity()
+    : std::chrono::duration<double>(lastAny.time_since_epoch()).count();
+  if (lastAnySec != hitMemory.LastRecorded()) {
+    const bool sameTarget =
+      aggressor->GetLastHitTime(targetActor.GetFormId()) == lastAny;
+    hitMemory.Seed(lastAnySec,
+                   sameTarget
+                     ? std::optional<uint32_t>(targetActor.GetFormId())
+                     : std::nullopt);
+  }
+
   if (hitMemory.InSplashWindow(now)) {
     spdlog::info("Splash attack detected from aggressor {:x} to target {:x}",
                  aggressor->GetFormId(), targetActor.GetFormId());
