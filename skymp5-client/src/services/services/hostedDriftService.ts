@@ -32,6 +32,7 @@ const SINK_MAX_DXY = 64;
 // The first hosted move this long by a creature base is reported once with its locomotion variables
 const LOCOMOTION_UNITS = 100;
 const REPORT_EVERY_MS = 30000;
+const FRAME_STALL_MS = 2000;
 // Node limit of the root nodes; COM (450) sits above the feet and gives no body height
 const ROOT_LIMIT = 250;
 const FAR_UNITS = 4096;
@@ -105,6 +106,7 @@ export class HostedDriftService extends ClientListener {
 
   private onUpdate(): void {
     const now = Date.now();
+    this.trackFrame(now);
     this.trackPacketGaps();
     if (now < this.nextPoll) return;
     this.nextPoll = now + POLL_MS;
@@ -203,6 +205,7 @@ export class HostedDriftService extends ClientListener {
       const report: Record<string, unknown> = {
         kind: "heartbeat", hosted: ids.length, checked, split, live: resolved, loaded, far,
         remote: { on: driftConfig.remote, tracked: this.remote.size, sent: this.remoteSent, capped: this.remoteCapped },
+        fr: this.frameReport(),
       };
       this.remoteSent = 0;
       this.remoteCapped = 0;
@@ -606,6 +609,39 @@ export class HostedDriftService extends ClientListener {
     this.send(report);
   }
 
+  // Frame gaps between updates; a gap of FRAME_STALL_MS or more (loading screen, alt-tab) is counted apart
+  private trackFrame(now: number): void {
+    const gap = this.frameAt ? now - this.frameAt : 0;
+    this.frameAt = now;
+    if (gap <= 0) return;
+    if (gap >= FRAME_STALL_MS) { this.frameStalls++; return; }
+    this.frames++;
+    this.frameMs += gap;
+    if (gap > this.frameMax) this.frameMax = gap;
+    if (gap >= 50) this.frames50++;
+    if (gap >= 100) this.frames100++;
+  }
+
+  // Frame time since the last heartbeat, where the player stood and how many server forms the client updates each frame
+  private frameReport(): Record<string, unknown> {
+    let where = "?";
+    let forms = -1;
+    try {
+      const pc = Game.getPlayer();
+      const world = pc ? pc.getWorldSpace() : null;
+      const place = world || (pc ? pc.getParentCell() : null);
+      if (place) where = (world ? "w" : "c") + (place.getFormID() >>> 0).toString(16);
+    } catch (e) { /* unreadable */ }
+    try { forms = this.controller.lookupListener(RemoteServer).getWorldModel().forms.filter((f) => !!f).length; } catch (e) { /* unreadable */ }
+    const n = this.frames;
+    const report = {
+      n, ms: n ? Math.round(this.frameMs / n * 10) / 10 : -1, max: this.frameMax, s50: this.frames50, s100: this.frames100,
+      stalls: this.frameStalls, at: where, forms,
+    };
+    this.frames = 0; this.frameMs = 0; this.frameMax = 0; this.frames50 = 0; this.frames100 = 0; this.frameStalls = 0;
+    return report;
+  }
+
   // Drops the animation list first when a report would be cut in the log
   private send(report: Record<string, unknown>): void {
     if (report.anims && JSON.stringify(report).length > REPORT_MAX_CHARS) delete report.anims;
@@ -640,4 +676,11 @@ export class HostedDriftService extends ClientListener {
   private remoteTimes: number[] = [];
   private remoteSent = 0;
   private remoteCapped = 0;
+  private frameAt = 0;
+  private frames = 0;
+  private frameMs = 0;
+  private frameMax = 0;
+  private frames50 = 0;
+  private frames100 = 0;
+  private frameStalls = 0;
 }
