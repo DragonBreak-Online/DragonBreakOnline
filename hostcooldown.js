@@ -19,14 +19,23 @@ module.exports = (cfg, now = () => Date.now(), state = {}) => {
   const prune = (m, ms) => { if (m.size > 4096) { const t = now(); for (const [k, v] of m) if (t - v > ms) m.delete(k); } };
   return {
     config: C,
-    noteHandover: (npc) => { S.handedAt.set(npc >>> 0, now()); prune(S.handedAt, C.handoverMs); },
+    // A hand-over during a fight starts the new host's fightMaxMs, so a long fight changes hands at most once per fightMaxMs
+    noteHandover: (npc) => {
+      npc = npc >>> 0;
+      const t = now();
+      S.handedAt.set(npc, t);
+      if (t - (S.foughtAt.get(npc) || -Infinity) < C.fightMs) S.fightSince.set(npc, t);
+      prune(S.handedAt, C.handoverMs);
+    },
     noteFight: (npc) => {
       npc = npc >>> 0;
       const t = now();
-      if (!(t - (S.foughtAt.get(npc) || -Infinity) < C.fightMs)) S.fightSince.set(npc, t);
+      // a new fight, or one whose start was lost (state from before fightSince existed)
+      if (!(t - (S.foughtAt.get(npc) || -Infinity) < C.fightMs) || !S.fightSince.has(npc)) S.fightSince.set(npc, t);
       S.foughtAt.set(npc, t);
       prune(S.foughtAt, C.fightMs);
-      prune(S.fightSince, C.fightMaxMs);
+      // a fight's start goes with its last blow
+      if (S.fightSince.size > 4096) for (const k of S.fightSince.keys()) if (!(t - (S.foughtAt.get(k) || -Infinity) < C.fightMs)) S.fightSince.delete(k);
     },
     // null when the hand-over may go ahead, else the reason it waits
     //   current: the NPC's host now (0 = none); requester: who would take it; hostCanDrive: current is online and in reach

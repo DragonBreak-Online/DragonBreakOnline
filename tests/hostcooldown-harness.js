@@ -49,6 +49,45 @@ check('the windows come from config', make({ fightMs: 100000 }, now, state).conf
   check('a new fight after a quiet spell (fightMs without a blow) is held again', h.holds(F, B, A, true) === 'in a fight');
   check('the ceiling comes from config', make({ fightMaxMs: 60000 }, now, {}).config.fightMaxMs === 60000);
 }
+{
+  // A hand-over during a fight starts the new host's 30 s: one host change per fightMaxMs, not one every handoverMs
+  const st = {}, F = 0xff000300, start = t;
+  const h = make({}, now, st);
+  for (; t <= start + 30000; t += 1000) h.noteFight(F);
+  t -= 1000;
+  check('a 30 s fight is free to change hands', h.holds(F, B, A, true) === null);
+  h.noteHandover(F);
+  const handed = t;
+  for (const end = t + 7000; t < end; t += 1000) h.noteFight(F);
+  check('...and after the hand-over the new host keeps it past handoverMs while blows land', h.holds(F, A, B, true) === 'in a fight');
+  for (const end = handed + 29000; t <= end; t += 1000) h.noteFight(F);
+  t -= 1000;
+  check('...through its own 30 s', h.holds(F, A, B, true) === 'in a fight');
+  t = handed + 30000; h.noteFight(F);
+  check('...and is released 30 s after the hand-over', h.holds(F, A, B, true) === null);
+  h.noteHandover(0xff000301);
+  check('a hand-over out of a fight starts no fight', !st.fightSince.has(0xff000301));
+}
+{
+  // State from before fightSince (a hot reload onto a running fight) starts its 30 s at the next blow
+  const F = 0xff000400, start = t;
+  const st = { handedAt: new Map(), foughtAt: new Map([[F, t - 1000]]) };
+  const h = make({}, now, st);
+  h.noteFight(F);
+  check('a fight already running at a hot reload gets a start at its next blow', st.fightSince.get(F) === start);
+  for (; t < start + 29000; t += 1000) h.noteFight(F);
+  check('...and is held its 30 s from there', h.holds(F, B, A, true) === 'in a fight');
+  t = start + 30000; h.noteFight(F);
+  check('...and released at 30 s', h.holds(F, B, A, true) === null);
+}
+{
+  // fightSince is pruned with its fight: an entry goes once its NPC has had no blow for fightMs
+  const st = {}, h = make({}, now, st);
+  for (let i = 0; i < 4097; i++) h.noteFight(0xff100000 + i);
+  t += 6000;
+  h.noteFight(0xff200000);
+  check('past 4096 fights, the starts of finished fights are dropped', st.fightSince.size === 1 && st.fightSince.has(0xff200000), st.fightSince.size);
+}
 
 // ---- 2. the director (npcdirector.js) asks it before it moves an NPC ----
 const sets = [];
