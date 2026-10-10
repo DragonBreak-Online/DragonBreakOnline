@@ -36,6 +36,7 @@ const refs = { [DOOR]: { pos: [0, 0, 0], where: 'bruma' }, [FAR_DOOR]: { pos: [9
 const houses = { [DOOR]: { owner: 0, ownerName: '' } };
 const treasury = {};
 const said = [];
+const audits = [];
 let online = [STEWARD, RENTER, OTHER];
 globalThis.__dboHousing = {
   primaryOf: (r) => (houses[r] ? r : 0),
@@ -57,7 +58,7 @@ require(MODULE)({
       return undefined;
     },
   },
-  log: () => {}, personal: (a, t) => said.push([a, t]), audit: () => {}, who: (a) => chars[a].name, display: (a) => chars[a].name,
+  log: () => {}, personal: (a, t) => said.push([a, t]), audit: (t) => audits.push(t), who: (a) => chars[a].name, display: (a) => chars[a].name,
   tagOf: (a) => chars[a].tag, profileOf: (a) => chars[a].profile, onlineActors: () => online, every: (n, ms, fn) => { tick = fn; },
   registerChatCommand: (n, fn) => { commands[n] = fn; }, cfg: {},
   takeGold: (a, n) => { if (chars[a].gold < n) return false; chars[a].gold -= n; return true; },
@@ -126,6 +127,18 @@ check('an offer on a house someone owns now cannot be accepted', /has an owner n
 houses[DOOR].owner = 0; houses[DOOR].ownerName = '';
 check('once the tenancy ends housing may hand the house on again', globalThis.__dboTenancyRented(DOOR) === false);
 check('the steward can take it off the market', /Taken off the market/.test(run(STEWARD, 'unlist')));
+
+// A fief's holder (nobility.js, Nate 10 Oct) rents out the houses of their own fief, audited, and nothing else
+globalThis.__dboHousing.isFiefHolder = (a, r) => a === OTHER && r === DOOR;
+audits.length = 0;
+r = run(OTHER, 'list 50 10');
+check('the holder of the fief a door stands in lists it for rent', /Listed for rent: 50 gold deposit and 10/.test(r) && audits.some((t) => /Other acts as the fief holder at 5000/.test(t)), r);
+said.length = 0; commands.properties(OTHER);
+check('...sees it among the properties they manage', said.some(([a, t]) => a === OTHER && /5000: for rent/.test(t)));
+check('...and takes it off the market again', /Taken off the market/.test(run(OTHER, 'unlist')));
+check('a player who holds no fief still cannot', /Only the officials/.test(run(RENTER, 'list 100 20')));
+delete globalThis.__dboHousing.isFiefHolder;
+check('without the fief holder question only the hold\'s managers rent', /Only the officials/.test(run(OTHER, 'list 50 10')));
 
 // The 3.5-minute freeze (5-9 Oct): the doors come from doors-pos.json, never from the engine
 const T = globalThis.__dboTenancy;

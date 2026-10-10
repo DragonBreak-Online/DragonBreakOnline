@@ -405,7 +405,9 @@ module.exports = (api) => {
     const ref = Number(args[1]) >>> 0; const gold = Math.floor(Number(args[2]));
     const H = housing();
     if (!H || !H.primaryOf(ref)) return reply(a, false, 'That is not a property.');
-    if (!H.isManager(a, ref)) return reply(a, false, 'Only the officials who manage this property assess it.');
+    // The hold's officials, or the holder of the fief it stands in (nobility.js, Nate 10 Oct), there only
+    const fiefHolder = !H.isManager(a, ref) && typeof H.isFiefHolder === 'function' && !!H.isFiefHolder(a, ref);
+    if (!H.isManager(a, ref) && !fiefHolder) return reply(a, false, 'Only the officials who manage this property assess it.');
     if (!Number.isFinite(gold) || gold < 0 || gold > C.maxPropertyValue) return reply(a, false, `A value is a whole number of gold from 0 to ${C.maxPropertyValue}.`);
     const key = String(H.primaryOf(ref));
     const last = data().assessed[key];
@@ -416,7 +418,7 @@ module.exports = (api) => {
     const lo = Math.floor(prev / step), hi = Math.min(C.maxPropertyValue, Math.max(prev * step, C.defaultPropertyValue));
     if (gold < lo || gold > hi) return reply(a, false, `An assessment moves a value by at most ${step} times at once: from ${lo} to ${hi} gold for this property (now ${prev}).`);
     data().values[key] = gold; data().assessed[key] = { at: Date.now(), by: who(a), from: prev }; save();
-    audit(`ECONOMY ${who(a)} assessed property ${ref.toString(16)} at ${gold} gold (was ${prev})`);
+    audit(`ECONOMY ${who(a)}${fiefHolder ? ' (fief holder)' : ''} assessed property ${ref.toString(16)} at ${gold} gold (was ${prev})`);
     const rec = H.recordOf(Number(key));
     if (rec && rec.owner) for (const x of accountActors(rec.owner)) if (onlineActors().includes(x)) personal(x, `Your property has been assessed at ${gold} gold (it was ${prev}). Property tax is a share of that value each week.`);
     reply(a, true, `Assessed at ${gold} gold.`);

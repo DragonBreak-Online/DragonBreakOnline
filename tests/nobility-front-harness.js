@@ -49,6 +49,8 @@ ok('...and the button waits for a name', /<button[^>]*disabled=""[^>]*>Proclaim/
 const allHeld = hold({ isRuler: true, fiefs: [{ id: 'mountain-watch', name: 'Mountain Watch', buildings: 4, holder: elion, treasury: 50 }], titles: ruler.titles });
 t = text(renderToStaticMarkup(createElement(GrantForm, { hold: allHeld, busy: false, act: () => {} })));
 ok('with every fief held, the form says so', /Every fief is held\. Revoke a title to free one\./.test(t), t);
+t = text(render(sec({ holds: [hold({ canRevoke: true })] })));
+ok('a Lead GM sees Revoke on each noble, and no grant form', (t.match(/Revoke/g) || []).length === 2 && !/Grant a title/.test(t) && !/gold/.test(t), t);
 t = text(render(sec({ holds: [], mine: [] })));
 ok('no hold with nobles yet', /No hold keeps a roll of nobles yet\./.test(t), t);
 const src = fs.readFileSync(bundle, 'utf8');

@@ -34,6 +34,8 @@ FIEFS = {
     'applewatch': ('Applewatch', 'CYRApplewatchLocation', 'bruma'),
     'aleswell': ('Aleswell', 'CYRAleswellLocation', 'bruma'),
     'mountain-watch': ('Mountain Watch', 'CYRMountainwatchLocation', 'bruma'),
+    # Nate, 10 Oct ("go with your recommendations"): the fourth town inside the Bruma lock
+    'greenwood': ('Greenwood', 'CYRGreenwoodLocation', 'bruma'),
 }
 CELL = 4096
 TOWNISH = ('LocTypeTown', 'LocTypeCity', 'LocTypeSettlement', 'LocTypeHabitation')

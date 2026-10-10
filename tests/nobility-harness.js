@@ -97,6 +97,7 @@ const api = {
   onUi: (ev, f) => handlers.set(ev, f), onlineActors: online, profileOf, cfg: {}, zoneById, readOfficials: () => JSON.parse(JSON.stringify(officials)), ranksOf,
   accountActors: (pid) => mp.getActorsByProfileId(pid), officialTarget, every: (n, ms, f) => timers.set(n, f),
   personal: (a, t) => told.push({ a, t }), announce: (t) => announced.push(t), registerChatCommand: (n, f) => commands.set(n, f),
+  isLeadStaff: (a) => a === ADMIN,
 };
 // The journal: every action answers at once, with the text it returned
 const answers = [];
@@ -122,7 +123,7 @@ ok('on: the tab is registered as Nobility', !!globalThis.__dboJournalSections.no
 
 // ---- where a fief is ----------------------------------------------------------------------------------------------------
 const N = globalThis.__dboNobility;
-ok('the fiefs are the three towns Nate named, all Bruma\'s', FIEFS.map((f) => f.id).sort().join() === 'aleswell,applewatch,mountain-watch' && FIEFS.every((f) => f.hold === 'bruma' && f.cells.length && f.grid.length));
+ok('the fiefs are the four towns of the Bruma lock (Greenwood since Nate\'s go), all Bruma\'s', FIEFS.map((f) => f.id).sort().join() === 'aleswell,applewatch,greenwood,mountain-watch' && FIEFS.every((f) => f.hold === 'bruma' && f.cells.length && f.grid.length));
 ok('a house door inside Mountain Watch\'s interiors is in the fief', N.fiefOf([MW_DOOR]) === 'mountain-watch');
 ok('a chest in the same interior, its desc in another case, too', N.fiefOf([MW_CHEST]) === 'mountain-watch');
 ok('a door outside in the town\'s worldspace cells is in it', N.fiefOf([MW_OUT]) === 'mountain-watch');
@@ -179,6 +180,16 @@ ok('the fief is vacant again', N.holderOf('applewatch') === null && !N.holdsFief
 ok('revoking someone with no title here is refused', /holds no title here/.test(ui('nobilityRevoke', COUNTESS, 'bruma', DAME.toString(16)).text));
 ok('every change is audited', audits.filter((t) => /^NOBILITY /.test(t)).length === 5, audits.filter((t) => /^NOBILITY /.test(t)));
 
+// ---- a Lead GM's emergency revoke (Nate, 10 Oct: revoke only, announced plainly) ------------------------------------
+ui('nobilityGrant', COUNTESS, 'bruma', 'Kesta', 'knight');
+announced.length = 0;
+ok('a Lead GM still cannot grant', /Only the Count or Countess/.test(ui('nobilityGrant', ADMIN, 'bruma', 'Outsider', 'knight').text));
+ok('a GM below Lead cannot revoke', /Only the Count or Countess/.test(ui('nobilityRevoke', STEWARD, 'bruma', DAME.toString(16)).text));
+const sv = ui('nobilityRevoke', ADMIN, 'bruma', DAME.toString(16));
+ok('a Lead GM revokes in an emergency, announced as the staff\'s act, not a decree', sv.kind === 'ok' && announced[0] === 'A title was revoked by the staff: Kesta is no longer Dame of Bruma.', [sv, announced]);
+ok('...audited as STAFF', audits.some((t) => /^NOBILITY STAFF Admin \(profile 1\): revoked Kesta/.test(t)));
+ok('...and the staff view offers Revoke but no titles to grant', (() => { const h = globalThis.__dboJournalSections.nobility.view(ADMIN).holds.find((x) => x.id === 'bruma'); return h.canRevoke && !h.isRuler && h.titles.length === 0; })());
+
 // ---- a Count, and the hold faction's leader ----------------------------------------------------------------------------
 chars.get(COUNTESS).female = false;
 announced.length = 0;
@@ -214,7 +225,7 @@ const SEC = globalThis.__dboJournalSections.nobility;
 const vOut = SEC.view(OUT), vC = SEC.view(COUNTESS), vE = SEC.view(ELION);
 const brumaOf = (v) => v.holds.find((h) => h.id === 'bruma');
 ok('everyone sees the roll', SEC.visible(OUT) === true && brumaOf(vOut).roll.map((n) => n.label).join('|') === 'Baron of Mountain Watch|Dame of Bruma|Knight of Bruma', brumaOf(vOut).roll.map((n) => n.label));
-ok('and the fiefs with their holders, but no treasury and no titles to grant', brumaOf(vOut).fiefs.length === 3 && brumaOf(vOut).fiefs.every((f) => f.treasury === null) && brumaOf(vOut).titles.length === 0 && !brumaOf(vOut).isRuler);
+ok('and the fiefs with their holders, but no treasury and no titles to grant', brumaOf(vOut).fiefs.length === 4 && brumaOf(vOut).fiefs.every((f) => f.treasury === null) && brumaOf(vOut).titles.length === 0 && !brumaOf(vOut).isRuler);
 ok('the ruler sees every fief treasury and the titles she grants', brumaOf(vC).isRuler && brumaOf(vC).titles.map((t) => `${t.id}:${t.needs}`).join() === 'baron:fief,lord:estate,knight:' && brumaOf(vC).fiefs.every((f) => f.treasury === 0));
 ok('the ruler is named with her style', brumaOf(vOut).ruler.name === 'Narina Carvain' && brumaOf(vOut).ruler.style === 'Countess of Bruma', brumaOf(vOut).ruler);
 const mine = vE.mine[0];
@@ -257,6 +268,24 @@ ok('the hold keeps the rest of it and all of Bruma city\'s, less the tithe on wh
 ok('the fief treasury balance shows in the noble\'s tab', SEC.view(ELION).mine[0].fief.treasury === 50);
 const notice = audits.find((t) => /BANK fief treasury of mountain-watch received 50/.test(t));
 ok('the deposit is audited', !!notice, audits.slice(-6));
+
+// ---- a Baron assesses property in his own fief only (Nate, 10 Oct), through the court's own path ----------------------
+const econUi = new Map();
+delete require.cache[ECON];
+require(ECON)({ mp, log: () => {}, personal: () => {}, audit: (t) => audits.push(t), who, cfg: { economy: { enabled: true } }, onUi: (e, f) => econUi.set(e, f), onlineActors: online,
+  every: () => {}, readOfficials: () => ({}), zoneById });
+const econReplies = [];
+globalThis.__dboFactionNonceOk = () => true;
+globalThis.__dboFactionRefresh = (a, text, ok) => { econReplies.push({ text, ok }); return true; };
+globalThis.__dboHousing.primaryOf = (r) => r;
+globalThis.__dboHousing.isManager = (a) => a === STEWARD;
+globalThis.__dboHousing.isFiefHolder = (a, r) => globalThis.__dboNobility.holdsFiefAt(a, [r]);
+econUi.get('econValue')(ELION, ['n', MW_DOOR, 1500]);
+ok('the Baron assesses a building of his fief', econReplies[0] && econReplies[0].ok && JSON.parse(fs.readFileSync('economy.json', 'utf8')).values[String(MW_DOOR)] === 1500, econReplies);
+ok('...audited as a fief holder\'s', audits.some((t) => /^ECONOMY Lord Elion \(profile 49\) \(fief holder\) assessed property 500 at 1500/.test(t)));
+econReplies.length = 0;
+econUi.get('econValue')(ELION, ['n', BRUMA_DOOR, 1500]);
+ok('...but not one outside it', econReplies[0] && !econReplies[0].ok && /Only the officials/.test(econReplies[0].text), econReplies);
 
 // ---- a deleted character's title lapses -------------------------------------------------------------------------------------
 announced.length = 0;

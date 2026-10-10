@@ -101,7 +101,11 @@ module.exports = (api) => {
     data().owed.push({ tag: party.tag, gold, why });
   };
   const tell = (party, text) => { const a = actorOfTag(party.tag); if (a) personal(a, text); };
-  const managersOnline = (door) => onlineActors().filter((x) => { try { return housing().isManager(x, door); } catch (e) { return false; } });
+  // Who manages a door's renting: a hold's property managers, or the holder of the fief it stands in (nobility.js, Nate
+  // 10 Oct), there only. A fief holder's use of it is audited; the rent and deposits still go to the hold's treasury
+  const fiefHolderAt = (x, door) => { const H = housing(); try { return !!H && typeof H.isFiefHolder === 'function' && !!H.isFiefHolder(x, door); } catch (e) { return false; } };
+  const manages = (x, door) => { try { if (housing().isManager(x, door)) return true; } catch (e) { return false; } return fiefHolderAt(x, door); };
+  const managersOnline = (door) => onlineActors().filter((x) => manages(x, door));
   const due = (L) => new Date(L.paidUntil).toISOString().slice(0, 10);
 
   // The property at the door the actor stands at: { door, key, L (listing or undefined), rec (housing record) }
@@ -112,7 +116,12 @@ module.exports = (api) => {
     if (!d) return { err: 'Stand at the door of the property.' };
     const primary = H.primaryOf(d);
     if (!primary) return { err: 'That door is no property.' };
-    return { door: primary, key: hex(primary), L: data().listings[hex(primary)], rec: H.recordOf(primary) || { owner: 0 }, manager: (x) => H.isManager(x, primary) };
+    return { door: primary, key: hex(primary), L: data().listings[hex(primary)], rec: H.recordOf(primary) || { owner: 0 }, manager: (x) => {
+      if (H.isManager(x, primary)) return true;
+      if (!fiefHolderAt(x, primary)) return false;
+      audit(`PROPERTY ${who(x)} acts as the fief holder at ${hex(primary)}`);
+      return true;
+    } };
   };
 
   const info = (a) => {
@@ -291,7 +300,7 @@ module.exports = (api) => {
   };
 
   const overview = (a) => {
-    const all = Object.entries(data().listings).filter(([, L]) => { try { return housing() && housing().isManager(a, L.door); } catch (e) { return false; } });
+    const all = Object.entries(data().listings).filter(([, L]) => manages(a, L.door));
     if (!all.length) return ['No property you manage is listed for rent.'];
     return all.map(([k, L]) => L.tenant
       ? `${k}: let to ${L.tenant.name}, ${L.weekly}/week, paid until ${due(L)}${L.overdueSince ? ', OVERDUE' : ''}`

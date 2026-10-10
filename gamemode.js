@@ -6694,7 +6694,7 @@ try {
 try {
   const NOBILITY_JS = path.resolve('nobility.js');
   delete require.cache[NOBILITY_JS];
-  require(NOBILITY_JS)({ mp, log, personal, registerChatCommand, audit, who, display, nameOf, tagOf, onUi, onlineActors, profileOf, cfg, every,
+  require(NOBILITY_JS)({ mp, log, personal, registerChatCommand, audit, who, display, nameOf, tagOf, onUi, onlineActors, profileOf, cfg, every, isLeadStaff,
     zoneById, readOfficials, ranksOf, accountActors, officialTarget, announce: (text) => broadcast(`[[S]]#{${C.SYS}}${text}`) });
 } catch (e) { log('nobility.js failed to load:', e.stack || e.message); for (const k of ['__dboNobility', '__dboNobilityFiefCut']) globalThis[k] = null; if (globalThis.__dboJournalSections) delete globalThis.__dboJournalSections.nobility; }
 

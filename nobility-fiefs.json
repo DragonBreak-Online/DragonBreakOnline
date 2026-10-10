@@ -201,6 +201,45 @@
      ]
     }
    ]
+  },
+  {
+   "id": "greenwood",
+   "name": "Greenwood",
+   "hold": "bruma",
+   "location": "6df32:BSHeartland.esm",
+   "edid": "CYRGreenwoodLocation",
+   "county": "CYRBrumaCountyLocation",
+   "world": "a764b:BSHeartland.esm",
+   "center": [
+    75776,
+    174080
+   ],
+   "grid": [
+    [
+     18,
+     42
+    ]
+   ],
+   "cells": [
+    "64c4b:BSHeartland.esm",
+    "66ae9:BSHeartland.esm"
+   ],
+   "buildings": [
+    {
+     "id": "49b3a:BSHeartland.esm",
+     "name": "CYRGreenwoodAfersHouse",
+     "doors": [
+      "49b3a:BSHeartland.esm"
+     ]
+    },
+    {
+     "id": "49b39:BSHeartland.esm",
+     "name": "CYRGreenwoodMeadery",
+     "doors": [
+      "49b39:BSHeartland.esm"
+     ]
+    }
+   ]
   }
  ]
 }
