@@ -10,6 +10,7 @@
 #include "MovementValidation.h"
 #include "MpObjectReference.h"
 #include "MsgType.h"
+#include "NpcSelfHeal.h"
 #include "Overloaded.h"
 #include "WeaponHitGate.h"
 #include "WorldState.h"
@@ -78,6 +79,12 @@ bool IsRegenRateAV(espm::ActorValue av)
     av == espm::ActorValue::StaminaRateMult;
 }
 
+bool IsRestoreAV(espm::ActorValue av)
+{
+  return av == espm::ActorValue::Health || av == espm::ActorValue::Magicka ||
+    av == espm::ActorValue::Stamina;
+}
+
 // Non-hostile Health/Magicka/Stamina effects; areaOnly keeps those a self cast
 // spreads to others. withRegenRates also keeps non-hostile timed boosts to the
 // regeneration rates, which MpActor::ApplyMagicEffect applies with a timer and
@@ -110,9 +117,7 @@ std::vector<espm::Effects::Effect> GetRestorativeEffects(
       continue;
     }
     const auto av = magicEffect.data.primaryAV;
-    const bool restores = av == espm::ActorValue::Health ||
-      av == espm::ActorValue::Magicka || av == espm::ActorValue::Stamina;
-    if (!restores && !(withRegenRates && IsRegenRateAV(av))) {
+    if (!IsRestoreAV(av) && !(withRegenRates && IsRegenRateAV(av))) {
       continue;
     }
     espm::Effects::Effect converted;
@@ -2275,6 +2280,22 @@ void ActionListener::OnSpellCast(const RawMessageData& rawMsgData,
       spellData.spellItem->castType == espm::SPEL::CastType::Concentration);
   auto restoreEffects = GetRestorativeEffects(
     &partOne.worldState, spellCastData.spell, false, ownSelfCast);
+
+  // A hosted NPC heals itself at npcSelfHealMult of the spell (enemy mages healed to full on Adept+)
+  if (NpcSelfHeal::Applies(caster == myActor, targetActor == caster)) {
+    const float mult = partOne.worldState.GetNpcSelfHealMult();
+    const size_t scaled = NpcSelfHeal::ScaleRestores(
+      restoreEffects, mult, [this](const espm::Effects::Effect& effect) {
+        return IsRestoreAV(
+          espm::GetData<espm::MGEF>(effect.effectId, &partOne.worldState)
+            .data.primaryAV);
+      });
+    if (scaled > 0 && !spellCastData.keepAlive) {
+      spdlog::debug("ActionListener::OnSpellCast - NPC {:x} self heal of "
+                    "spell {:x} scaled by {} ({} effect(s))",
+                    caster->GetFormId(), spellCastData.spell, mult, scaled);
+    }
+  }
 
   if (!restoreEffects.empty()) {
     const bool hasSweetpie = HasSweetPie(partOne.worldState);

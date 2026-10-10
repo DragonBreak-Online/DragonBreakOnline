@@ -483,6 +483,15 @@ ScampServer::ScampServer(const Napi::CallbackInfo& info)
       partOne->worldState.SetCastRelayBlockedRaces(races);
     }
 
+    // npcSelfHealMult: share of a restoration spell a hosted NPC heals on itself (0..1, default 0.35)
+    auto npcSelfHealIt = serverSettings.find("npcSelfHealMult");
+    if (npcSelfHealIt != serverSettings.end() &&
+        (*npcSelfHealIt).is_number()) {
+      partOne->worldState.SetNpcSelfHealMult((*npcSelfHealIt).get<double>());
+    }
+    spdlog::info("npcSelfHealMult: {}",
+                 partOne->worldState.GetNpcSelfHealMult());
+
     // movementValidation: per-actor speed ceilings for player movement
     // packets, in units per second
     auto movementIt = serverSettings.find("movementValidation");

@@ -263,6 +263,9 @@ public:
   void SetCastRelayBlockedRaces(const std::set<uint32_t>& races);
   [[nodiscard]] bool HasCastRelayBlockedRaces() const noexcept;
   [[nodiscard]] bool IsCastRelayBlockedRace(uint32_t raceId) const noexcept;
+  // npcSelfHealMult, clamped to 0..1 by NpcSelfHeal::SanitizeMult
+  void SetNpcSelfHealMult(double mult);
+  [[nodiscard]] float GetNpcSelfHealMult() const noexcept;
   void SetPlayersInheritBaseSpells(bool enable);
   [[nodiscard]] bool PlayersInheritBaseSpells() const noexcept;
   void SetEnableConsoleCommandsForAllSetting(bool enable);

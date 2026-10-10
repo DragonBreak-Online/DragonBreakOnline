@@ -6,6 +6,7 @@
 #include "MpActor.h"
 #include "MpChangeForms.h"
 #include "MpObjectReference.h"
+#include "NpcSelfHeal.h"
 #include "libespm/GroupUtils.h"
 #include "papyrus-vm/Reader.h"
 #include "papyrus-vm/Utils.h"
@@ -59,6 +60,7 @@ struct WorldState::Impl
   std::set<std::string> forbiddenRelootTypes;
   std::set<uint32_t> blockedSpells;
   std::set<uint32_t> castRelayBlockedRaces;
+  float npcSelfHealMult = NpcSelfHeal::kDefaultMult;
   bool playersInheritBaseSpells = true;
   std::vector<std::unique_ptr<IPapyrusClassBase>> classes;
   std::array<std::shared_ptr<std::vector<uint32_t>>, 0x100>
@@ -1392,6 +1394,16 @@ bool WorldState::HasCastRelayBlockedRaces() const noexcept
 bool WorldState::IsCastRelayBlockedRace(uint32_t raceId) const noexcept
 {
   return pImpl->castRelayBlockedRaces.count(raceId) > 0;
+}
+
+void WorldState::SetNpcSelfHealMult(double mult)
+{
+  pImpl->npcSelfHealMult = NpcSelfHeal::SanitizeMult(mult);
+}
+
+float WorldState::GetNpcSelfHealMult() const noexcept
+{
+  return pImpl->npcSelfHealMult;
 }
 
 void WorldState::SetPlayersInheritBaseSpells(bool enable)
