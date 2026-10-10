@@ -1240,14 +1240,14 @@ export class HousingSystem implements System {
 
   private isFiefHolder(ctx: SystemContext, actorId: number, primary: number): boolean {
     const n = (globalThis as any).__dboNobility;
-    if (!actorId || !n || typeof n.holdsFiefAt !== "function") return false;
+    if (!actorId || !n || typeof n.holdsFiefAt !== "function" || (typeof n.enabled === "function" && !n.enabled())) return false;
     try { return n.holdsFiefAt(actorId, this.fiefRefs(ctx, primary)) === true; } catch { return false; }
   }
 
   // The character holding the fief a property stands in, or null
   private fiefHolderOf(ctx: SystemContext, primary: number): { actor: number; profile: number } | null {
     const n = (globalThis as any).__dboNobility;
-    if (!n || typeof n.fiefOf !== "function" || typeof n.holderOf !== "function") return null;
+    if (!n || typeof n.fiefOf !== "function" || typeof n.holderOf !== "function" || (typeof n.enabled === "function" && !n.enabled())) return null;
     try {
       const id = n.fiefOf(this.fiefRefs(ctx, primary));
       const h = id ? n.holderOf(id) : null;
