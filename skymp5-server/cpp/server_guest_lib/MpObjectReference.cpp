@@ -10,8 +10,8 @@
 #include "MpActor.h"
 #include "MpChangeForms.h"
 #include "MsgType.h"
-#include "Primitive.h"
 #include "ScriptVariablesHolder.h"
+#include "TriggerPrimitive.h"
 #include "UpdatePropertyMessage.h"
 #include "WorldState.h"
 #include "gamemode_events/ActivateEvent.h"
@@ -177,7 +177,7 @@ struct ScriptState
 struct PrimitiveData
 {
   NiPoint3 boundsDiv2;
-  GeoProc::GeoPolygonProc polygonProc;
+  uint32_t shape = TriggerPrimitive::kBox;
 };
 
 struct MpObjectReference::Impl
@@ -228,7 +228,7 @@ MpChangeForm MakeChangeForm(const LocationalData& locationalData)
 MpObjectReference::MpObjectReference(
   const LocationalData& locationalData_, const FormCallbacks& callbacks_,
   uint32_t baseId_, std::string baseType_,
-  std::optional<NiPoint3> primitiveBoundsDiv2)
+  std::optional<NiPoint3> primitiveBoundsDiv2, uint32_t primitiveShape)
   : callbacks(new FormCallbacks(callbacks_))
   , baseId(baseId_)
   , baseType(baseType_)
@@ -238,7 +238,7 @@ MpObjectReference::MpObjectReference(
   asObjectReference = this;
 
   if (primitiveBoundsDiv2)
-    SetPrimitive(*primitiveBoundsDiv2);
+    SetPrimitive(*primitiveBoundsDiv2, primitiveShape);
 }
 
 const NiPoint3& MpObjectReference::GetPos() const
@@ -347,7 +347,9 @@ bool MpObjectReference::GetAnimationVariableBool(const char* name) const
 bool MpObjectReference::IsPointInsidePrimitive(const NiPoint3& point) const
 {
   if (pImpl->primitive) {
-    return Primitive::IsInside(point, pImpl->primitive->polygonProc);
+    return TriggerPrimitive::IsInside(point, GetPos(), GetAngle(),
+                                      pImpl->primitive->boundsDiv2,
+                                      pImpl->primitive->shape);
   }
   return false;
 }
@@ -792,11 +794,10 @@ void MpObjectReference::ForceSubscriptionsUpdate()
   everSubscribedOrListened = true;
 }
 
-void MpObjectReference::SetPrimitive(const NiPoint3& boundsDiv2)
+void MpObjectReference::SetPrimitive(const NiPoint3& boundsDiv2,
+                                     uint32_t shape)
 {
-  auto vertices = Primitive::GetVertices(GetPos(), GetAngle(), boundsDiv2);
-  pImpl->primitive =
-    PrimitiveData{ boundsDiv2, Primitive::CreateGeoPolygonProc(vertices) };
+  pImpl->primitive = PrimitiveData{ boundsDiv2, shape };
 }
 
 void MpObjectReference::UpdateHoster(uint32_t newHosterId)

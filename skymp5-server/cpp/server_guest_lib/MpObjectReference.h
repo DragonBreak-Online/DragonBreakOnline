@@ -90,7 +90,8 @@ public:
   MpObjectReference(
     const LocationalData& locationalData, const FormCallbacks& callbacks,
     uint32_t baseId, std::string baseType,
-    std::optional<NiPoint3> primitiveBoundsDiv2 = std::nullopt);
+    std::optional<NiPoint3> primitiveBoundsDiv2 = std::nullopt,
+    uint32_t primitiveShape = 1);
 
   const NiPoint3& GetPos() const;
   const NiPoint3& GetAngle() const;
@@ -137,7 +138,8 @@ public:
                                 bool value);
   void SetActivationBlocked(bool blocked);
   void ForceSubscriptionsUpdate();
-  void SetPrimitive(const NiPoint3& boundsDiv2);
+  // shape is the XPRM type: 1 box, 2 sphere
+  void SetPrimitive(const NiPoint3& boundsDiv2, uint32_t shape = 1);
   void UpdateHoster(uint32_t newHosterId);
   void SetPropertyValueDump(const std::string& propertyName,
                             const std::string& valueDump,
