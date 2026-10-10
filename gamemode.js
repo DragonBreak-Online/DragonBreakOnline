@@ -5949,8 +5949,13 @@ const hostAttemptHook = (requesterId, actorId) => {
   }
   const held = hostHold(req, act);
   if (held) return false;
-  if (HOST_COOLDOWN) HOST_COOLDOWN.noteHandover(act);
-  // C++ can still refuse after this (a hoster whose movement is under 2 s old keeps the actor)
+  // C++ can still refuse after this (a hoster whose movement is under 2 s old keeps the actor), and a refused ask stamped
+  // the hand-over hold anyway, so the old host kept it 5 s more (8 Oct). C++ makes or refuses the grant in the same native
+  // call, right after this returns, and a microtask cannot run before that call is over: the stamp is made then, and only
+  // if this requester now hosts it
+  if (HOST_COOLDOWN && typeof mp.getHoster === 'function') {
+    queueMicrotask(() => { try { if ((mp.getHoster(act) >>> 0) === req) HOST_COOLDOWN.noteHandover(act); } catch (e) { /* the NPC is gone */ } });
+  }
   console.log(`[hostAttempt] Host of act=${act.toString(16)} for req=${req.toString(16)} passed policy`);
   return true;
 };

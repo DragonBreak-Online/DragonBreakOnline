@@ -72,8 +72,26 @@ delete globalThis.__dboHostCooldown; delete globalThis.__dboFormExists; delete g
 // ---- 3. the gamemode wiring ----
 const gm = fs.readFileSync(path.join(SERVER, 'gamemode.js'), 'utf8');
 const hook = gm.slice(gm.indexOf('const hostAttemptHook = '), gm.indexOf('hostAttemptHook.__dbo = true;'));
-check('hostAttemptHook refuses a held hand-over after the policy, and notes a granted one',
-  /const held = hostHold\(req, act\);\s*if \(held\) return false;\s*if \(HOST_COOLDOWN\) HOST_COOLDOWN\.noteHandover\(act\);/.test(hook) && hook.indexOf('hostPolicy(req, act)') < hook.indexOf('hostHold(req, act)'));
+check('hostAttemptHook refuses a held hand-over after the policy',
+  /const held = hostHold\(req, act\);\s*if \(held\) return false;/.test(hook) && hook.indexOf('hostPolicy(req, act)') < hook.indexOf('hostHold(req, act)'));
+// 8 Oct (dungeon-perf-1008): the hand-over was stamped before C++ decided, so an ask C++ refused (the host moved it in
+// the last 2 s) held the NPC with its old host 5 s more. The hook runs here, then C++ grants or not; the stamp must follow
+// the grant (a microtask runs only once that native call is over). The hook is cut out of gamemode.js and run against a stub mp.
+{
+  const start = hook.indexOf('const hostAttemptHook = ');
+  const body = hook.slice(start).replace('const hostAttemptHook = ', 'return ');
+  const notes = [], timers = [];
+  let hosterNow = A;
+  const HC = { noteHandover: (n) => notes.push(n) };
+  const fn = new Function('mp', 'HOST_COOLDOWN', 'hostPolicy', 'hostHold', 'globalThis', 'console', 'queueMicrotask', body)(
+    { getHoster: () => hosterNow }, HC, () => ({ ok: true }), () => null, { __dboPrevHostAttempt: null }, { log: () => {} }, (f) => timers.push(f));
+  check('a passed ask is answered true', fn(B, NPC) === true);
+  timers.splice(0).forEach((f) => f());
+  check('...and when C++ then keeps the NPC with its moving host, no hand-over is stamped', notes.length === 0, notes);
+  fn(B, NPC); hosterNow = B;
+  timers.splice(0).forEach((f) => f());
+  check('...when C++ grants it, the hand-over is stamped for the new host', notes.length === 1 && notes[0] === NPC, notes);
+}
 check('the hold asks whether the current host can still drive the NPC by the same host policy',
   /const canDrive = !!current && hostPolicy\(current, act\)\.ok;/.test(gm) && /HOST_COOLDOWN\.holds\(act, req, current, canDrive\)/.test(gm));
 check('every landed blow on or by an NPC starts its fight hold', /if \(profileOf\(agg\) < 0\) globalThis\.__dboHostCooldown\.noteFight\(agg\); if \(profileOf\(tgt\) < 0\) globalThis\.__dboHostCooldown\.noteFight\(tgt\);/.test(gm));
