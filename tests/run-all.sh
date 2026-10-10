@@ -90,6 +90,7 @@ declare -A NEEDS=(
   [housing-places-migrate]=server:skymp5-server/ts/systems/housingSystem.ts
   [housing-places-building]=server:skymp5-server/ts/systems/housingSystem.ts
   [housing-fief]=server:skymp5-server/ts/systems/housingSystem.ts
+  [housing-owner-character]=server:skymp5-server/ts/systems/housingSystem.ts
   [mastery-melee]=server:skymp5-server/ts/systems/masterySystem.ts
   [mastery-shadow]=server:skymp5-server/ts/systems/masterySystem.ts
   [mastery-values]=server:skymp5-server/ts/systems/masterySystem.ts
