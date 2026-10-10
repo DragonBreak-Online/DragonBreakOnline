@@ -18,6 +18,9 @@
 //   - When a home changes hands, is given up or is seized, its racked weapons go back to the previous owner (the home's owner
 //     when each was racked, whoever of the household racked it): into that owner's pending list, delivered to their character
 //     straight away when online, else within a sweep of their next login (Nate, 10 Oct).
+//   - A hold's managers (jarl, baron, steward, chieftain, bane, count of the building's own hold, as housingSystem.ts manages
+//     property) may take racked weapons down into their own hands; each such take is audited with who, rank and hold. Staff
+//     have no override.
 //   - Raids never take racked weapons: raids.js takes only from a home's containers, the weapons are not in one, and a raider
 //     activating a rack or a copy is refused here like any other stranger (this hook runs before the raid hook).
 //
@@ -193,6 +196,34 @@ module.exports = (api) => {
     return entries.some((e) => (Number(e.baseId) >>> 0) === KEY_BASE_ID && typeof e.name === 'string' && (issued.includes(e.name) || e.name.endsWith(credential)));
   };
 
+  // A hold's managers (housingSystem.ts MANAGER_RANKS, officials.json by zone and the backend's "hold:<zone>:<rank>" rows) may
+  // take racked weapons down in a building of their own hold, into their own hands: the hold's authority decides where they
+  // go (Nate, 10 Oct: "hold leadership is fine for the racked weapons and who owns them"). Staff get no override here.
+  const MANAGER_RANKS = ['jarl', 'baron', 'steward', 'chieftain', 'bane', 'count'];
+  const OFFICIALS = path.resolve('officials.json');
+  const officials = () => {
+    let st = null; try { st = fs.statSync(OFFICIALS); } catch (e) { return {}; }
+    if (S.officials && S.officialsAt === st.mtimeMs) return S.officials;
+    try { S.officials = JSON.parse(fs.readFileSync(OFFICIALS, 'utf8')) || {}; S.officialsAt = st.mtimeMs; } catch (e) { log(`weaponracks: officials.json unreadable: ${e.message}`); return S.officials || {}; }
+    return S.officials;
+  };
+  // The managing rank a caster holds in hold, or ''
+  const managerRank = (a, hold) => {
+    if (!hold) return '';
+    const p = profileOf(a); if (p < 0) return '';
+    const table = officials()[hold] || {};
+    for (const rank of MANAGER_RANKS) if ((table[rank] || []).map(Number).includes(p)) return rank;
+    try {
+      const access = mp.get(a, 'private.skympAccess');
+      for (const row of (access && Array.isArray(access.factions) ? access.factions : [])) {
+        const parts = String((row && row.requirementId) || '').split(':');
+        if (parts.length === 3 && parts[0] === 'hold' && parts[1] === hold && MANAGER_RANKS.includes(parts[2])) return parts[2];
+      }
+    } catch (e) { /* no access rows */ }
+    return '';
+  };
+  const holdOfHome = (home) => { const H = housing(); try { return H && typeof H.holdOf === 'function' ? String(H.holdOf(home.primary) || '') : ''; } catch (e) { return ''; } };
+
   // ---- the rack a reference belongs to ---------------------------------------------------------------------------------
   // { act, mesh, rackType, start } for an activator or a rack mesh, else null
   const rackOf = (ref) => {
@@ -325,13 +356,19 @@ module.exports = (api) => {
     personal(a, `You set your ${itemName(entry)} on the rack.`);
     return '';
   };
-  const take = (a, act, slot) => {
+  // as: { rank, hold } when a hold manager takes it down rather than the household
+  const take = (a, act, slot, as) => {
     const st = state();
     delete st.racks[act];
     queue(profileOf(a), slot.entry, `rack ${act}`);
     if (!save()) { st.racks[act] = slot; const k = String(profileOf(a)); st.pending[k].pop(); if (!st.pending[k].length) delete st.pending[k]; return 'Something went wrong there. Try again in a moment.'; }
     removeDisplay(slot.display);
     deliver(a, true);
+    if (as) {
+      audit(`WEAPONRACK hold manager ${who(a)} took ${itemName(slot.entry)} (${hex(slot.entry.baseId)}) down from ${act} in home ${slot.home} (owner profile ${slot.owner}, racked by ${slot.by}): as ${as.rank} of ${as.hold}`);
+      personal(a, `As ${as.rank} of the hold, you take the ${itemName(slot.entry)} down from the rack.`);
+      return '';
+    }
     audit(`WEAPONRACK ${who(a)} took ${itemName(slot.entry)} (${hex(slot.entry.baseId)}) from ${act}`);
     personal(a, `You take your ${itemName(slot.entry)} from the rack.`);
     return '';
@@ -367,8 +404,11 @@ module.exports = (api) => {
     const slot = state().racks[act];
     const home = homeOf(rack.act);
     if (slot) {
-      if (!home || !mayUse(caster, home)) { notice(caster, 'That is not yours to take.'); return true; }
-      notice(caster, take(caster, act, slot));
+      if (home && mayUse(caster, home)) { notice(caster, take(caster, act, slot)); return true; }
+      const hold = home ? holdOfHome(home) : '';
+      const rank = hold ? managerRank(caster, hold) : '';
+      if (!rank) { notice(caster, 'That is not yours to take.'); return true; }
+      notice(caster, take(caster, act, slot, { rank, hold }));
       return true;
     }
     if (startingWeaponThere(rack)) { notice(caster, "This rack's weapon is only for show."); return true; }

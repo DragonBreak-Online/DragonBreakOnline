@@ -61,7 +61,7 @@ ref(DOOR, 0x31897, TAMRIEL_WORLD, [0, 0, 0], [0, 0, 0]); ref(INNER, 0x31897, NA_
 fs.writeFileSync('housing.json', JSON.stringify([DOOR]));
 const home = { owner: 1, ownerName: 'Brunhild', name: 'Northern Arms', locked: false, serial: 1, partner: INNER, containers: [bsh(0x2000)], issued: ['Key to the Northern Arms'] };
 let housingReadable = true;
-globalThis.__dboHousing = { primaryOf: (r) => ((r >>> 0) === DOOR || (r >>> 0) === INNER ? DOOR : 0), recordOf: (r) => { if (!housingReadable) throw new Error('not loaded'); return (r >>> 0) === DOOR || (r >>> 0) === INNER ? Object.assign({}, home) : null; } };
+globalThis.__dboHousing = { holdOf: (r) => ((r >>> 0) === DOOR || (r >>> 0) === INNER ? 'bruma' : ''), primaryOf: (r) => ((r >>> 0) === DOOR || (r >>> 0) === INNER ? DOOR : 0), recordOf: (r) => { if (!housingReadable) throw new Error('not loaded'); return (r >>> 0) === DOOR || (r >>> 0) === INNER ? Object.assign({}, home) : null; } };
 
 // Players: 1 the owner, 2 a key holder, 3 a stranger (a raider), an NPC
 const OWNER = 0xff000014, KEYHOLDER = 0xff000015, STRANGER = 0xff000016, NPC = 0xff000099;
@@ -303,10 +303,39 @@ globalThis.__dboWeaponRackSweep(); clock += 61000; globalThis.__dboWeaponRackSwe
 check('given up with the owner online: the bow is back in their hands at once', has(OWNER, BOW) === 1 && !st().racks[SECOND.toString(16)] && !st().pending['1']);
 home.owner = 1;
 
+// ---- hold managers -------------------------------------------------------------------------------------------------------------
+// Bruma's Count (5), a Steward by the backend's faction row (8), Cheydinhal's Count (6), Bruma's Captain (7, not a managing rank)
+fs.writeFileSync('officials.json', JSON.stringify({ bruma: { count: [5], captain: [7] }, cheydinhal: { count: [6] } }));
+const COUNT = 0xff000021, STEWARD = 0xff000022, OTHER_COUNT = 0xff000023, CAPTAIN = 0xff000024;
+player(COUNT, 5, []); player(OTHER_COUNT, 6, []); player(CAPTAIN, 7, []); player(STEWARD, 8, []);
+refs.get(STEWARD)['private.skympAccess'] = { factions: [{ requirementId: 'hold:bruma:steward' }] };
+refs.get(CAPTAIN)['private.skympAccess'] = { factions: [{ requirementId: 'hold:cheydinhal:steward' }] };
+online = [OWNER, KEYHOLDER, STRANGER, COUNT, OTHER_COUNT, CAPTAIN, STEWARD];
+holdOnly(OWNER, BOW); tick();
+check('(the owner racks the bow for the managers\' turn)', use(SECOND, OWNER) === true && !!st().racks[SECOND.toString(16)] && has(OWNER, BOW) === 0);
+tick();
+check('a Count of another hold may not take it down', use(SECOND, OTHER_COUNT) === true && lastSaid(OTHER_COUNT) === 'That is not yours to take.' && has(OTHER_COUNT, BOW) === 0 && !!st().racks[SECOND.toString(16)]);
+tick();
+check('a Captain of the hold (not a managing rank, and a Steward elsewhere) may not', use(SECOND, CAPTAIN) === true && lastSaid(CAPTAIN) === 'That is not yours to take.' && has(CAPTAIN, BOW) === 0);
+tick();
+check('a hold manager cannot rack in a home that is not theirs', (() => { refs.get(COUNT).inventory.entries.push({ baseId: SWORD, count: 1, worn: true }); const r = use(EMPTY, COUNT); return r === true && lastSaid(COUNT) === 'Only the household can use this rack.' && has(COUNT, SWORD) === 1; })());
+tick();
+const dispBow = parseInt(st().racks[SECOND.toString(16)].display, 16) >>> 0;
+audits.length = 0;
+check('Bruma\'s Count takes the bow down, from its display', use(dispBow, COUNT) === true && lastSaid(COUNT) === 'As count of the hold, you take the LongBow down from the rack.', lastSaid(COUNT));
+check('it goes to the Count\'s own inventory, and the slot and display are gone', has(COUNT, BOW) === 1 && has(OWNER, BOW) === 0 && !st().racks[SECOND.toString(16)] && !refs.has(dispBow) && !st().pending['5']);
+check('the take is audited with who, rank, hold and whose it was', /^WEAPONRACK hold manager actor ff000021 took LongBow \(3b562\) down from 800f011 in home 8000efc \(owner profile 1, racked by 1\): as count of bruma$/.test(audits[audits.length - 1]), audits);
+holdOnly(OWNER, SWORD); tick(); use(EMPTY, OWNER);
+check('(the owner racks the sword)', !!st().racks[EMPTY.toString(16)]);
+tick();
+check('a Steward by the backend\'s hold row takes it down too', use(EMPTY, STEWARD) === true && has(STEWARD, SWORD) === 1 && inv(STEWARD).find((e) => e.baseId === SWORD).enchantmentId === 0x4b27f && !st().racks[EMPTY.toString(16)]);
+check('and that take is audited as steward of bruma', /as steward of bruma$/.test(audits[audits.length - 1]), audits[audits.length - 1]);
+check('weaponracks.js gives staff no override (no admin or tier check in it)', !/isAdmin|tierOf|adminTier/.test(fs.readFileSync(MODULE, 'utf8')));
+
 // ---- an unreadable state file is never overwritten ------------------------------------------------------------------------------
 fs.writeFileSync(STATE, '{ broken');
 load(true);
-refs.get(OWNER).inventory.entries.find((e) => e.baseId === BOW).worn = true;
+refs.get(OWNER).inventory.entries.push({ baseId: BOW, count: 1 }); holdOnly(OWNER, BOW);
 tick();
 check('a corrupt state file: racking is refused and the file is kept for repair', use(SECOND, OWNER) === true && has(OWNER, BOW) === 1 && fs.readFileSync(STATE, 'utf8') === '{ broken');
 
