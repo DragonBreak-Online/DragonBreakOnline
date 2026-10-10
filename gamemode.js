@@ -1298,6 +1298,9 @@ mp.onActivate = (targetId, casterId) => {
     const q = mp.get(target, 'pos');
     if (Array.isArray(q) && mp.get(caster, 'type') === 'MpActor' && distanceMeters(caster, target) > 6.5) return false;
   } catch (e) { }
+  // A home's weapon rack (weaponracks.js): owner and key holders rack and take; anyone else, raiders too, is refused. Before
+  // the raid hook, and before blockPlacedPickup, which would hand a racked display copy to whoever touched it
+  if (globalThis.__dboWeaponRack && globalThis.__dboWeaponRack(target, caster)) return false;
   // A raider breaking into a home or its container during a raid (raids.js); the take comes straight out, no lock opens
   if (globalThis.__dboRaidActivate && globalThis.__dboRaidActivate(target, caster)) return false;
   // Study Magic and the Class Lectern (schools.js): their own panels, before a book on the shelf can start a reading
@@ -6610,6 +6613,12 @@ try {
   require(ECONOMY_JS)({ mp, log, personal, audit, who, cfg, onUi, onlineActors, every, readOfficials, zoneById });
 } catch (e) { log('economy.js failed to load:', e.stack || e.message); globalThis.__dboEconomyView = null; }
 
+// ---- weapon racks in homes (server\weaponracks.js, weapon-racks.json from Nat's PC, config "weaponRacks") ------------------
+try {
+  const WEAPONRACKS_JS = path.resolve('weaponracks.js');
+  delete require.cache[WEAPONRACKS_JS];
+  require(WEAPONRACKS_JS)({ mp, log, personal, audit, who, cfg, recordOf, every, onlineActors });
+} catch (e) { log('weaponracks.js failed to load:', e.stack || e.message); globalThis.__dboWeaponRack = null; globalThis.__dboWeaponRackSweep = null; }
 // ---- raids and pillage (server\raids.js, WAR_DESIGN.md section 5) -----------------------------------------------------------
 try {
   const RAIDS_JS = path.resolve('raids.js');

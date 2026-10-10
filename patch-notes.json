@@ -1,5 +1,23 @@
 [
   {
+    "title": "Weapon racks in homes",
+    "date": "2026-10-10",
+    "version": "Server update",
+    "tag": "Feature",
+    "sections": [
+      {
+        "heading": "Weapon racks",
+        "items": [
+          "Weapon racks in homes now hold weapons. Hold the weapon you want to show and use an empty rack to hang it there; use the rack again to take it back. Shield racks take the shield you carry, and dagger displays take daggers.",
+          "Only a home's owner and the people holding its key can put weapons on its racks or take them down. Raiders never take weapons from a rack.",
+          "A weapon on a rack keeps its enchantment, its tempering and its name.",
+          "If a home changes hands or is given up, the weapons on its racks go back to the previous owner, at once if they are online or when they next log in.",
+          "Racks that came with a weapon on them keep it as decoration. You cannot take it, and it does not make room for one of yours."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Learning by making something new",
     "date": "SHIP_DATE",
     "version": "Server update",
