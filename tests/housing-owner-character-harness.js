@@ -94,6 +94,17 @@ sys.claimed.push(OTHER);
 ok(/between them, the most one account may/.test(sys.overCap(ctx, 60, THIRD, true, true)), 'on: a third character of an account already holding two houses is refused, with its own line', sys.overCap(ctx, 60, THIRD, true, true));
 ok(sys.overCap(ctx, 60, THIRD, true, false) === '', '...a loose chest or room is no house and is not refused');
 ok(sys.isStaff(ctx, 60, THIRD) === false && (() => { const was = sys.isStaff; sys.isStaff = () => true; const r = sys.overCap(ctx, 60, THIRD, true, true); sys.isStaff = was; return r === ''; })(), '...staff are exempt');
+fs.writeFileSync('gamemode-config.json', JSON.stringify({ housingPlaces: { uncappedProfiles: [60] } }));
+ok(typeof sys.uncappedProfiles !== 'function' || sys.overCap(ctx, 60, THIRD, true, true) === '', '...an uncapped profile (housingPlaces.uncappedProfiles, Lord Elion) skips both caps');
+fs.unlinkSync('gamemode-config.json');
+// A fief's holder is not capped in their own fief (fork-nobility fiefExempt, once merged): neither cap counts there
+if (typeof sys.fiefExempt === 'function') {
+  const FIEF_DOOR = H(0x500);
+  globalThis.__dboNobility = { enabled: () => true, fiefOf: (refs) => (refs.includes(FIEF_DOOR) ? 'mountain-watch' : ''), holderOf: () => ({ actor: THIRD, profile: 60 }), holdsFiefAt: () => false };
+  ok(sys.overCap(ctx, 60, THIRD, true, true, FIEF_DOOR) === '' && /between them/.test(sys.overCap(ctx, 60, THIRD, true, true, H(0x501))), "...a fief's holder takes a building of their own fief past both caps, and only there");
+  ok(/between them/.test(sys.overCap(ctx, 60, ALT, true, true, FIEF_DOOR)) || /one each/.test(sys.overCap(ctx, 60, ALT, true, true, FIEF_DOOR)), '...another character of the holder\'s account is not exempt');
+  delete globalThis.__dboNobility;
+}
 sys.placeCapPerAccount = 3;
 ok(sys.overCap(ctx, 60, THIRD, true, true) === '', '...housingPlaceCapPerAccount 3 lets it through');
 sys.placeCapPerAccount = 2;
