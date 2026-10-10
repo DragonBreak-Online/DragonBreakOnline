@@ -17,17 +17,19 @@ type Reporter = (where: unknown, err: unknown, urgent?: boolean) => void;
 // Observe only: uncaughtExceptionMonitor leaves Node's own handling as it is, and SkyrimPlatform starts Node with no
 // --unhandled-rejections flag, so an unhandled rejection reaches it too (origin "unhandledRejection")
 const installProcessHook = (): void => {
-  const g = globalThis as any;
-  if (g.__dboProcessHookInstalled) return;
-  const proc = g.process;
-  if (!proc || typeof proc.on !== "function") return;
-  g.__dboProcessHookInstalled = true;
-  proc.on("uncaughtExceptionMonitor", (err: unknown, origin: unknown) => {
-    try {
-      const report = g.__dboReportError as Reporter | undefined;
-      if (typeof report === "function") report(origin === "unhandledRejection" ? "rejection" : "uncaught", err, true);
-    } catch (e) { /* never in the way of the runtime's own handling */ }
-  });
+  try {
+    const g = globalThis as any;
+    if (g.__dboProcessHookInstalled) return;
+    const proc = g.process;
+    if (!proc || typeof proc.on !== "function") return;
+    proc.on("uncaughtExceptionMonitor", (err: unknown, origin: unknown) => {
+      try {
+        const report = g.__dboReportError as Reporter | undefined;
+        if (typeof report === "function") report(origin === "unhandledRejection" ? "rejection" : "uncaught", err, true);
+      } catch (e) { /* never in the way of the runtime's own handling */ }
+    });
+    g.__dboProcessHookInstalled = true;
+  } catch (e) { /* a runtime without it: no uncaught or rejection reports, the client starts as before */ }
 };
 
 export class ClientDiagService extends ClientListener {

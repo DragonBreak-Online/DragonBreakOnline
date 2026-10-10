@@ -180,6 +180,18 @@ const bundle = async (rel, dir, plugins) => {
   const burstSent = H.sentAt.reduce((a, [, p]) => a.concat(p.lines.filter((l) => / m=Error: burst \d+ /.test(l))), []);
   check('...and every one of them goes out in full within 4 minutes', burstSent.length === 25, burstSent.length);
 
+  {
+    // A runtime whose process.on throws: the service still starts
+    const realOn = process.on;
+    delete globalThis.__dboProcessHookInstalled;
+    process.on = () => { throw new Error('no process events here'); };
+    let threw = null;
+    try { new S.ClientDiagService(sp, Object.assign({}, controller, { on: () => {}, emitter: { on: () => {} } })); } catch (e) { threw = e; }
+    process.on = realOn;
+    check('a runtime whose process.on throws: the service starts anyway (the client must start)', threw === null && !globalThis.__dboProcessHookInstalled, threw && threw.message);
+    globalThis.__dboProcessHookInstalled = true;
+  }
+
   // ---- the controller's on/once ----
   Date.now = realNow;
   const reported = [];
