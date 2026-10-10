@@ -239,6 +239,9 @@ const regeneratePlayerHead = (appearance: Appearance): void => {
 // The look last put on the player, for later read-backs
 let lastOwnLook: Appearance | null = null;
 const RECHECK_AFTER_S = 8;
+// The creator applies a preview on every slider move: one traced in this long
+const PREVIEW_TRACE_MS = 30000;
+let previewTracedAt = 0;
 
 const playerBase = (): ActorBase | null => {
   const player = Game.getPlayer();
@@ -252,6 +255,11 @@ const traceOwnLook = (event: string, appearance: Appearance): void => {
   try {
     lastOwnLook = appearance;
     if (!hasTraceSink()) return;
+    if (event === "preview") {
+      const now = Date.now();
+      if (now - previewTracedAt < PREVIEW_TRACE_MS) return;
+      previewTracedAt = now;
+    }
     const base = playerBase();
     if (!base) return;
     trace(lookTraceLine(event, appearance, readLook(base)));

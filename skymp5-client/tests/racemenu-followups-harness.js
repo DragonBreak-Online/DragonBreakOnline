@@ -385,6 +385,18 @@ const bundle = async (rel, dir) => {
     check('extras: an unchanged close that matches what the server holds sends nothing', sets().length === 0, W.packets);
   }
 
+  // a server that never answers (no racemenupresets.js): the ask is traced twice, not every 15 s
+  {
+    clear();
+    W.me = ME;
+    const before = TR.length;
+    const Q = make(M.RacemenuPresetService, natives);
+    step(Q, 1100, 80);
+    const asks = TR.slice(before).filter((l) => /^rmp ask/.test(l));
+    check('trace: a server that never answers: 6 asks in 88 s, traced on the first and the fifth', selfGets().length === 6
+      && asks.join('|') === 'rmp ask have=-|rmp ask have=- n=5 noanswer', [selfGets().length, asks]);
+  }
+
   // ---- the trace: each step as codes, numbers and hashes ----
   const has = (line) => TR.includes(line);
   const like = (rx) => TR.some((l) => rx.test(l));
@@ -392,7 +404,8 @@ const bundle = async (rel, dir) => {
   check('trace: the server\'s answer: face hash, chunks, size, sliders, sculpt, race', has(`rmp ans face h=${SERVER.hash} n=1 chars=${SERVER.text.length} cu=1 sc=1 race=13746`), TR.filter((l) => /ans face/.test(l)));
   check('trace: an answer of none, and the off switch', has('rmp ans none off=0') && has('rmp ans none off=1') && has('rmp off'));
   check('trace: the load on the player: hash, head parts, sculpt hosts dropped', has(`rmp apply ok h=${SERVER.hash} hp=1 drop=0`), TR.filter((l) => /apply/.test(l)));
-  check('trace: a gate holding the load names it', has(`rmp apply wait=combat h=${SERVER.hash}`));
+  check('trace: a gate holding the load names it, once while it holds', TR.filter((l) => l === `rmp apply wait=combat h=${SERVER.hash}`).length === 1,
+    TR.filter((l) => /apply wait/.test(l)));
   check('trace: a load skee refused', has(`rmp apply fail h=${SERVER.hash}`));
   check('trace: the load asks the look trace for a read-back now and 3 s later', RECHECKS.includes('rmface') && RECHECKS.includes('rmface+3'), RECHECKS.slice(0, 4));
   check('trace: captures held, with a code each', has('rmp cap held=noanswer') && has('rmp cap held=notyet-combat') && has('rmp cap held=loadfail'), TR.filter((l) => /held/.test(l)));

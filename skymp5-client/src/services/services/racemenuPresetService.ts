@@ -103,6 +103,8 @@ export class RacemenuPresetService extends ClientListener {
     this.lastSentHash = undefined;
     this.serverSelf = null;
     this.sentUpload = null;
+    this.selfAsks = 0;
+    this.selfWait = "";
     this.off = false;
   }
 
@@ -119,6 +121,16 @@ export class RacemenuPresetService extends ClientListener {
     if (this.selfRemoteId) delete this.cache[this.selfRemoteId];
     delete this.getSentAt[0];
     this.serverSelf = null;
+    this.selfAsks = 0;
+    this.selfWait = "";
+  }
+
+  // A gate holding the player's own load is traced when it changes, not every second it holds
+  private traceSelfWait(gate: string, hash: string): void {
+    const key = `${gate}|${hash}`;
+    if (key === this.selfWait) return;
+    this.selfWait = key;
+    trace(`rmp apply wait=${gate} h=${hash}`);
   }
 
   private raceMenuSettling(now: number): boolean {
@@ -261,7 +273,7 @@ export class RacemenuPresetService extends ClientListener {
       // The server's switch (racemenuPresets.enabled false): nothing more is sent, saved or loaded this session
       if (content["off"] === true && !this.off) { this.off = true; this.upload = null; this.sentUpload = null; this.diag("preset: switched off by the server"); trace("rmp off"); }
       this.store(actor, { hash: "", race: 0, face: null, at: now });
-      if (this.isSelfAnswer(content, actor)) { this.serverSelf = this.cache[actor]; trace(`rmp ans none off=${content["off"] === true ? 1 : 0}`); }
+      if (this.isSelfAnswer(content, actor)) { this.serverSelf = this.cache[actor]; this.selfAsks = 0; trace(`rmp ans none off=${content["off"] === true ? 1 : 0}`); }
     } else if (type === "dboPresetMeta") {
       const hash = String(content["hash"] || "");
       const known = this.cache[actor];
@@ -278,6 +290,7 @@ export class RacemenuPresetService extends ClientListener {
       this.store(actor, { hash: chunk.hash, race: Number(content["race"]) >>> 0, face, at: now });
       if (self) {
         this.serverSelf = this.cache[actor];
+        this.selfAsks = 0;
         trace(`rmp ans face h=${chunk.hash} n=${chunk.n} chars=${text.length} cu=${face.custom.length} sc=${face.sculpt.length} race=${hex(content["race"])}`);
       }
     } else if (type === "dboPresetRev") {
@@ -338,7 +351,8 @@ export class RacemenuPresetService extends ClientListener {
     this.getSentAt[key] = now;
     const known = remoteId ? this.cache[remoteId] : undefined;
     sendCustomPacket(this.controller, { customPacketType: "dboPresetGet", actor: self ? 0 : remoteId, have: known ? known.hash : "" });
-    if (self) trace(`rmp ask have=${known ? known.hash || "empty" : "-"}`);
+    // The first ask of a spawn, and once more if a minute brings no answer (a server without racemenupresets.js never answers)
+    if (self && (++this.selfAsks === 1 || this.selfAsks === 5)) trace(`rmp ask have=${known ? known.hash || "empty" : "-"}${this.selfAsks > 1 ? ` n=${this.selfAsks} noanswer` : ""}`);
   }
 
   // ---- putting faces on ----
@@ -459,7 +473,7 @@ export class RacemenuPresetService extends ClientListener {
     const player = Game.getPlayer();
     if (!player || !entry.face || this.selfQueued) return;
     const gate = this.gateFor(player, entry, now);
-    if (gate) { trace(`rmp apply wait=${gate} h=${entry.hash}`); return; }
+    if (gate) { this.traceSelfWait(gate, entry.hash); return; }
     const base = ActorBase.from(player.getBaseObject());
     if (!base) return;
     const ids: number[] = [];
@@ -478,11 +492,12 @@ export class RacemenuPresetService extends ClientListener {
     queuePlayerNiNodeWork((p) => {
       this.selfQueued = false;
       const late = this.gateFor(p, entry, Date.now());
-      if (late) { trace(`rmp apply wait=${late} h=${hash}`); return false; }
+      if (late) { this.traceSelfWait(late, hash); return false; }
       // Once per face either way: a load skee refuses is not retried every second
       this.selfAppliedHash = hash;
       if (!this.load(p, presetFileName("self"), jslot, natives)) { trace(`rmp apply fail h=${hash}`); return false; }
       this.selfLoadedHash = hash;
+      this.selfWait = "";
       this.afterLoad(PLAYER_ID, `own face back on, ${hash}, ${headParts.length} head parts`);
       trace(`rmp apply ok h=${hash} hp=${headParts.length} drop=${drop}`);
       this.recheckOwnLook();
@@ -549,6 +564,8 @@ export class RacemenuPresetService extends ClientListener {
   // The server's face for the player this session: its answer, or an upload it did not refuse
   private serverSelf: CacheEntry | null = null;
   private sentUpload: { hash: string; entry: CacheEntry; doneAt: number } | null = null;
+  private selfAsks = 0;
+  private selfWait = "";
   private noNativesNoted = false;
   private off = false;
   private diagLines = 0;

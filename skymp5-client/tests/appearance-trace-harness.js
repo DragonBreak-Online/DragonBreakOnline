@@ -131,6 +131,9 @@ const makeBase = (opts = {}) => {
   setup();
   M.applyAppearanceToPlayer(look, false, 'preview');
   check('a creator preview is traced but schedules no read-back', A.traces.length === 1 && /^own preview /.test(A.traces[0]) && eights() === 0, A.waits.map(([s]) => s));
+  M.applyAppearanceToPlayer(look, false, 'preview');
+  M.applyAppearanceToPlayer(look, false, 'preview');
+  check('previews (one per slider move) are traced once in 30 s', A.traces.length === 1, A.traces.length);
 
   // ---- mismatches ----
   setup({ ignoreMorph: 7 });
