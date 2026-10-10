@@ -62,7 +62,7 @@ module.exports = (api) => {
       const inside = [cellOf(door), cellOf(partner)].filter(isInterior);
       if (inside.length !== 1) continue;
       const rooms = rec.place && Array.isArray(rec.place.cells) ? rec.place.cells.map(idOf).filter(isInterior) : [];
-      if (inside.concat(rooms).map(groupOf).includes(g)) return { primary: door, partner, owner: Number(rec.owner), ownerName: String(rec.ownerName || '') };
+      if (inside.concat(rooms).map(groupOf).includes(g)) return { primary: door, partner, owner: Number(rec.owner), ownerChar: Number(rec.ownerChar) >>> 0, ownerName: String(rec.ownerName || '') };
     }
     return null;
   };
@@ -74,6 +74,9 @@ module.exports = (api) => {
   };
   const exists = (a) => { if (!a) return false; try { mp.get(a >>> 0, 'type'); return true; } catch (e) { return false; } };
   const accountActors = (pid) => { try { return (mp.getActorsByProfileId(Number(pid)) || []).map((x) => Number(x) >>> 0).filter(exists); } catch (e) { return []; } };
+  // The claim's character once property is per character (housingSystem.ts ownerActorsOf), else its account's characters
+  const ownerActors = (claim) => { try { const h = globalThis.__dboHousing; if (h && typeof h.ownerActorsOf === 'function') return h.ownerActorsOf(claim).map((x) => Number(x) >>> 0).filter(exists); } catch (e) { /* the account's */ } return accountActors(claim.owner); };
+  const ownerCharOf = (claim) => { try { const h = globalThis.__dboHousing; return h && typeof h.perCharacter === 'function' && h.perCharacter() ? claim.ownerChar || 0 : 0; } catch (e) { return 0; } };
   const credit = (a, n) => { const had = Math.max(0, Math.floor(Number(get(a, BALANCE, 0)) || 0)); try { mp.set(a, BALANCE, had + n); return true; } catch (e) { log('ledgersale: bank credit failed', e.message); return false; } };
   const faction = (fid) => { try { return typeof globalThis.__dboGuildInfo === 'function' ? globalThis.__dboGuildInfo(fid) : null; } catch (e) { return null; } };
 
@@ -93,9 +96,9 @@ module.exports = (api) => {
     const claim = claimAt(idOf(cellDesc));
     if (claim) {
       let halls = [];
-      try { halls = typeof globalThis.__dboHallOf === 'function' ? globalThis.__dboHallOf([claim.primary, claim.partner], claim.owner) || [] : []; } catch (e) { halls = []; }
+      try { halls = typeof globalThis.__dboHallOf === 'function' ? globalThis.__dboHallOf([claim.primary, claim.partner], claim.owner, ownerCharOf(claim)) || [] : []; } catch (e) { halls = []; }
       if (halls.length) return { kind: 'faction', fid: String(halls[0]), name: (faction(halls[0]) || {}).name || String(halls[0]), claim };
-      const actor = accountActors(claim.owner)[0] || 0;
+      const actor = ownerActors(claim)[0] || 0;
       if (actor) return { kind: 'bank', actor, name: claim.ownerName || who(actor), claim };
       return { kind: 'hold', why: 'its owner has no character left', claim };
     }
@@ -122,7 +125,7 @@ module.exports = (api) => {
     const text = `${s.price} gold for ${o.what || 'goods'}: tax ${taxPaid}/${s.tax} to ${zone || 'no hold'} (rate ${Math.round(rate * 1000) / 10}%), sink ${s.sink}, owner ${ownerPaid}/${s.owner} to ${ownerTo || 'nobody'}${lost > 0 ? `, ${lost} had nowhere to go` : ''}`;
     audit(`LEDGERSALE ${who(buyer)} paid ${text}`);
     if (r.kind === 'bank' && ownerPaid > 0) {
-      try { const on = new Set(onlineActors().map((x) => x >>> 0)); const here = accountActors(r.claim.owner).find((x) => on.has(x)); if (here && here !== buyer) personal(here, `Your ledger sold ${o.what || 'goods'}: ${ownerPaid} gold went into your bank account.`); } catch (e) { /* offline */ }
+      try { const on = new Set(onlineActors().map((x) => x >>> 0)); const here = ownerActors(r.claim).find((x) => on.has(x)); if (here && here !== buyer) personal(here, `Your ledger sold ${o.what || 'goods'}: ${ownerPaid} gold went into your bank account.`); } catch (e) { /* offline */ }
     }
     return { split: s, rate, zone, tax: taxPaid, owner: { kind: r.kind, name: r.name || '', paid: ownerPaid }, text };
   };

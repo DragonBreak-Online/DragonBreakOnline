@@ -94,14 +94,18 @@ module.exports = (api) => {
   // An account that controls a faction's treasury is never on its payroll (review B2)
   const accountLeads = (pid, fid) => pid >= 0 && (fn('__dboRealmLeadsAccount') ? !!fn('__dboRealmLeadsAccount')(pid, fid) : false);
 
-  // Takes n gold from the bank accounts of an account's characters, richest first; all or nothing
-  const chargeAccount = (pid, n) => {
-    const actors = accountActors(pid).map((a) => ({ a, b: balanceOf(a) })).sort((x, y) => y.b - x.b);
+  // Takes n gold from the bank accounts of these characters, richest first; all or nothing
+  const chargeActors = (ids, n) => {
+    const actors = ids.map((a) => ({ a, b: balanceOf(a) })).sort((x, y) => y.b - x.b);
     if (actors.reduce((s, x) => s + x.b, 0) < n) return false;
     let left = n;
     for (const x of actors) { if (left <= 0) break; const off = Math.min(x.b, left); mp.set(x.a, BALANCE, x.b - off); left -= off; }
     return true;
   };
+  const chargeAccount = (pid, n) => chargeActors(accountActors(pid), n);
+  // Who a claim's tax and notices go to: its character once property is per character (housingSystem.ts), else the account
+  const ownerActors = (H, rec) => { try { if (H && typeof H.ownerActorsOf === 'function') return H.ownerActorsOf(rec).map((x) => Number(x) >>> 0); } catch (e) { /* the account's */ } return accountActors(rec.owner); };
+  const ownerKey = (H, rec) => { try { if (H && typeof H.ownerKeyOf === 'function') return String(H.ownerKeyOf(rec)); } catch (e) { /* the account's */ } return String(rec.owner); };
 
   // ---- the next reckoning ------------------------------------------------------------------------------------------
   const nextAfter = (t) => {
@@ -136,7 +140,7 @@ module.exports = (api) => {
         // A chest or an inner door is no property and pays no tax (Nate, 5 Oct)
         if (typeof H.isBuilding === 'function' && !H.isBuilding(ref)) { delete d.overdue[String(ref)]; continue; }
         const inside = [ref, Number(rec.partner) >>> 0].filter(Boolean).map(interiorOf).find(Boolean);
-        const key = inside ? `${rec.owner}|${inside}` : `ref|${ref}`;
+        const key = inside ? `${ownerKey(H, rec)}|${inside}` : `ref|${ref}`;
         const had = groups.get(key);
         if (!had) { groups.set(key, { ref, rec }); continue; }
         const keep = !(String(had.ref) in d.values) && String(ref) in d.values ? { ref, rec } : had;
@@ -259,7 +263,8 @@ module.exports = (api) => {
           const rate = Math.min(C.maxTaxRate, Math.max(0, Number(d.rates[fid]) || 0)); if (!rate) continue;
           const tax = Math.floor(valueOf(ref) * rate); if (tax <= 0) continue;
           const r = report(fid);
-          const charged = chargeAccount(rec.owner, tax);
+          const payers = ownerActors(H, rec);
+          const charged = chargeActors(payers, tax);
           // A building in a fief: the fief's share goes to its treasury, the rest to the faction (nobility.js)
           const cut = charged ? fiefCut(ref, rec, tax) : null;
           const held = cut ? tax - cut.share : tax;
@@ -268,21 +273,21 @@ module.exports = (api) => {
             if (cut && !FT().deposit(cut.id, cut.share, `property tax on ${ref.toString(16)}`)) {
               // The fief's treasury refused it: the faction takes the whole tax, as before fiefs
               if (T.deposit(fid, cut.share, `property tax on ${ref.toString(16)}: the fief's share it could not take`)) kept = tax;
-              else { const back = accountActors(rec.owner)[0]; if (back) credit(back, cut.share); }
+              else { const back = payers[0]; if (back) credit(back, cut.share); }
             } else if (cut) r.fiefShares = (r.fiefShares || 0) + cut.share;
             r.income += kept; r.taxed++;
             delete d.overdue[String(ref)];
             if (tithedLand(t)) titheBases[fid] = (titheBases[fid] || 0) + kept;
           } else if (charged) {
             // The treasury refused it: the owner gets the tax back and owes nothing this week (review m1)
-            const back = accountActors(rec.owner)[0];
+            const back = payers[0];
             if (back) credit(back, tax);
             log(`economy: ${nameOfFaction(fid)}'s treasury could not take ${tax} gold of tax on ${ref.toString(16)}; refunded`);
           } else {
             const o = d.overdue[String(ref)] = d.overdue[String(ref)] || { weeks: 0, gold: 0, owner: rec.owner, ownerName: rec.ownerName, faction: fid };
             o.weeks++; o.gold += tax; o.faction = fid;
             r.overdue.push({ ref: ref.toString(16), owner: rec.ownerName || `profile ${rec.owner}`, weeks: o.weeks, gold: o.gold, where: t.name });
-            for (const a of accountActors(rec.owner)) if (onlineActors().includes(a)) personal(a, `Your property tax of ${tax} gold to ${nameOfFaction(fid)} could not be paid from your bank account. It is overdue (${o.weeks} week${o.weeks > 1 ? 's' : ''}).`);
+            for (const a of payers) if (onlineActors().includes(a)) personal(a, `Your property tax of ${tax} gold to ${nameOfFaction(fid)} could not be paid from your bank account. It is overdue (${o.weeks} week${o.weeks > 1 ? 's' : ''}).`);
           }
         } catch (e) { log(`economy: the tax on ${Number(ref).toString(16)} failed, skipped this week`, e.message); }
       }
@@ -420,7 +425,7 @@ module.exports = (api) => {
     data().values[key] = gold; data().assessed[key] = { at: Date.now(), by: who(a), from: prev }; save();
     audit(`ECONOMY ${who(a)}${fiefHolder ? ' (fief holder)' : ''} assessed property ${ref.toString(16)} at ${gold} gold (was ${prev})`);
     const rec = H.recordOf(Number(key));
-    if (rec && rec.owner) for (const x of accountActors(rec.owner)) if (onlineActors().includes(x)) personal(x, `Your property has been assessed at ${gold} gold (it was ${prev}). Property tax is a share of that value each week.`);
+    if (rec && rec.owner) for (const x of ownerActors(H, rec)) if (onlineActors().includes(x)) personal(x, `Your property has been assessed at ${gold} gold (it was ${prev}). Property tax is a share of that value each week.`);
     reply(a, true, `Assessed at ${gold} gold.`);
   });
 
