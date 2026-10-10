@@ -1,0 +1,20 @@
+[
+  {
+    "title": "The nobility of Bruma",
+    "date": "SHIP_DATE",
+    "version": "Server update",
+    "tag": "New",
+    "sections": [
+      {
+        "heading": "Nobility",
+        "items": [
+          "The County of Bruma is divided into fiefs: the towns of Applewatch, Aleswell and Mountain Watch. The Count or Countess of Bruma, and nobody else, grants and takes back titles: a Baron or Baroness holds a fief, a Lord or Lady an estate, and a Knight or Dame an honour. Every grant and every revocation is proclaimed by decree.",
+          "A Baron or Baroness looks after the houses of their own town as a steward does: granting a house, taking it back, and assigning its rooms and chests. Their own houses in their town do not count against the one-house limit. They have no say outside it, and no seat at the court.",
+          "A quarter of the weekly property tax on the houses of a fief goes into that fief's own treasury, which nobody can take gold out of. The rest goes to the County as before.",
+          "Your journal (F3) has a Nobility tab: everyone sees the county's roll of nobles and its fiefs; a noble sees their title, their fief's houses and its treasury; the ruler grants and revokes titles there.",
+          "Lord Elion, who bought Mountain Watch from the Countess, is its Baron."
+        ]
+      }
+    ]
+  }
+]

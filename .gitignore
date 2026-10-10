@@ -127,3 +127,6 @@ gift-ledger.json
 # Thalmor informant reports and dossiers (thalmor.js)
 thalmor-intel.json
 thalmor-intel.json.tmp
+
+# Titles granted and the migration's seeds done (nobility.js)
+/nobility.json

@@ -6690,6 +6690,13 @@ try {
     zoneList, zoneById, readOfficials, rankTitle, appointCap, appointCheck, appointFrom, seatOfficial, unseatOfficial, officialTarget,
     officialName, accountActors, ranksOf, APPOINT_RULES });
 } catch (e) { log('court.js failed to load:', e.stack || e.message); globalThis.__dboCourtOffer = null; globalThis.__dboCourtOfficeSync = null; if (globalThis.__dboJournalSections) delete globalThis.__dboJournalSections.court; }
+// ---- the nobility: fiefs, titles granted by the hold's ruler, the fief's tax share (server\nobility.js, config "nobility") --
+try {
+  const NOBILITY_JS = path.resolve('nobility.js');
+  delete require.cache[NOBILITY_JS];
+  require(NOBILITY_JS)({ mp, log, personal, registerChatCommand, audit, who, display, nameOf, tagOf, onUi, onlineActors, profileOf, cfg, every,
+    zoneById, readOfficials, ranksOf, accountActors, officialTarget, announce: (text) => broadcast(`[[S]]#{${C.SYS}}${text}`) });
+} catch (e) { log('nobility.js failed to load:', e.stack || e.message); for (const k of ['__dboNobility', '__dboNobilityFiefCut']) globalThis[k] = null; if (globalThis.__dboJournalSections) delete globalThis.__dboJournalSections.nobility; }
 
 // ---- the Thalmor: Concordat arrests, informants, dossiers and the journal's Thalmor tab (server\thalmor.js, config "thalmor") --
 try {

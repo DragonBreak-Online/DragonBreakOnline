@@ -9,6 +9,8 @@
 //           defaultPropertyValue). The tax comes out of the property owner's bank accounts (any of their characters)
 //           into the faction's treasury (bank.js __dboTreasury). Unpaid tax is overdue: the owner is told, the count of
 //           weeks grows, and the faction's report lists it; the hold's officials act on it (grace or seizure) as with rent.
+//           A building in a fief (nobility.js, Nate 10 Oct) sends nobility.fiefShare of its tax to the fief's treasury
+//           (bank.js __dboFiefTreasury, deposits only); the faction keeps the rest, and the tithe counts what it kept.
 //   wages   each faction's leader sets a wage per rank. A hold faction pays its officials by their rank in the hold; any
 //           other faction pays the members on its roster by rank title. Wages go from the treasury into the member's bank
 //           account (a hold official's first character), so nobody has to be online. What the treasury cannot pay is owed
@@ -144,6 +146,9 @@ module.exports = (api) => {
     }
     return [...groups.values()];
   };
+  // The fief's share of a building's tax (nobility.js; null without one or with the nobility off), and the fief treasuries
+  const FT = () => globalThis.__dboFiefTreasury || null;
+  const fiefCut = (ref, rec, tax) => { try { const c = fn('__dboNobilityFiefCut') ? fn('__dboNobilityFiefCut')(ref, rec, tax) : null; return c && FT() && c.share > 0 && c.share < tax ? c : null; } catch (e) { return null; } };
   const valueOf = (ref) => { const v = Number(data().values[String(ref)]); return Number.isFinite(v) && v >= 0 ? v : C.defaultPropertyValue; };
 
   // ---- the Imperial tithe ------------------------------------------------------------------------------------------------
@@ -255,10 +260,19 @@ module.exports = (api) => {
           const tax = Math.floor(valueOf(ref) * rate); if (tax <= 0) continue;
           const r = report(fid);
           const charged = chargeAccount(rec.owner, tax);
-          if (charged && T.deposit(fid, tax, `property tax on ${ref.toString(16)}`)) {
-            r.income += tax; r.taxed++;
+          // A building in a fief: the fief's share goes to its treasury, the rest to the faction (nobility.js)
+          const cut = charged ? fiefCut(ref, rec, tax) : null;
+          const held = cut ? tax - cut.share : tax;
+          if (charged && T.deposit(fid, held, `property tax on ${ref.toString(16)}${cut ? ` (${cut.share} to the fief of ${cut.name})` : ''}`)) {
+            let kept = held;
+            if (cut && !FT().deposit(cut.id, cut.share, `property tax on ${ref.toString(16)}`)) {
+              // The fief's treasury refused it: the faction takes the whole tax, as before fiefs
+              if (T.deposit(fid, cut.share, `property tax on ${ref.toString(16)}: the fief's share it could not take`)) kept = tax;
+              else { const back = accountActors(rec.owner)[0]; if (back) credit(back, cut.share); }
+            } else if (cut) r.fiefShares = (r.fiefShares || 0) + cut.share;
+            r.income += kept; r.taxed++;
             delete d.overdue[String(ref)];
-            if (tithedLand(t)) titheBases[fid] = (titheBases[fid] || 0) + tax;
+            if (tithedLand(t)) titheBases[fid] = (titheBases[fid] || 0) + kept;
           } else if (charged) {
             // The treasury refused it: the owner gets the tax back and owes nothing this week (review m1)
             const back = accountActors(rec.owner)[0];
@@ -327,7 +341,7 @@ module.exports = (api) => {
       d.balanceAfter[fid] = r.balance;
       d.reports[fid] = r;
       audit(`ECONOMY ${nameOfFaction(fid)}: taxes ${r.income} gold from ${r.taxed} properties, ${r.overdue.length} overdue;${r.stipend ? ` stipend ${r.stipend} from ${r.stipendFrom};` : ''} wages ${r.wagesPaid} paid, ${r.owed} owed; treasury ${r.balance}`);
-      for (const a of onlineActors()) if (leads(a, fid)) personal(a, `The week's reckoning for ${nameOfFaction(fid)}: ${r.income} gold in taxes${r.tithesIn ? `, ${r.tithesIn} gold in Imperial tithes` : ''}${r.tithe || r.titheOwed ? `, ${r.tithe} gold Imperial tithe to ${r.titheTo}${r.titheOwed ? ` (${r.titheOwed} gold still owed)` : ''}` : ''}${r.stipend ? `, ${r.stipend} gold stipend from ${r.stipendFrom}` : ''}, ${r.wagesPaid} gold in wages${r.owed ? `, ${r.owed} gold of wages owed` : ''}${r.capped ? ` (wages take at most ${Math.round(C.wageIncomeShare * 100)}% of the week's income and ${Math.round(C.wageShare * 100)}% of the treasury: ${r.wageBudget} gold this week)` : ''}${r.overdue.length ? `, ${r.overdue.length} properties overdue` : ''}. The treasury holds ${r.balance} gold.`);
+      for (const a of onlineActors()) if (leads(a, fid)) personal(a, `The week's reckoning for ${nameOfFaction(fid)}: ${r.income} gold in taxes${r.fiefShares ? ` (and ${r.fiefShares} gold to its fiefs' treasuries)` : ''}${r.tithesIn ? `, ${r.tithesIn} gold in Imperial tithes` : ''}${r.tithe || r.titheOwed ? `, ${r.tithe} gold Imperial tithe to ${r.titheTo}${r.titheOwed ? ` (${r.titheOwed} gold still owed)` : ''}` : ''}${r.stipend ? `, ${r.stipend} gold stipend from ${r.stipendFrom}` : ''}, ${r.wagesPaid} gold in wages${r.owed ? `, ${r.owed} gold of wages owed` : ''}${r.capped ? ` (wages take at most ${Math.round(C.wageIncomeShare * 100)}% of the week's income and ${Math.round(C.wageShare * 100)}% of the treasury: ${r.wageBudget} gold this week)` : ''}${r.overdue.length ? `, ${r.overdue.length} properties overdue` : ''}. The treasury holds ${r.balance} gold.`);
     }
     save();
     return reports;

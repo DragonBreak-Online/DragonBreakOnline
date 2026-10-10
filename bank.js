@@ -208,6 +208,22 @@ module.exports = (api) => {
     },
   };
 
+  // A fief's treasury (nobility.js, Nate 10 Oct): its share of the property tax, in bank.json under fiefs. Deposits only:
+  // nobody withdraws from it, and only the game will spend it
+  const fiefGold = () => { const d = data(); if (!d.fiefs || typeof d.fiefs !== 'object') d.fiefs = {}; return d.fiefs; };
+  globalThis.__dboFiefTreasury = {
+    balance: (id) => Math.floor(Number(fiefGold()[String(id || '')]) || 0),
+    deposit: (id, n, why) => {
+      n = Math.floor(Number(n) || 0); const key = String(id || '');
+      if (!/^[a-z0-9-]{1,40}$/.test(key) || n <= 0) return false;
+      const have = Math.floor(Number(fiefGold()[key]) || 0);
+      fiefGold()[key] = have + n;
+      try { save(); } catch (e) { fiefGold()[key] = have; log('bank: bank.json write failed', e.message); return false; }
+      audit(`BANK fief treasury of ${key} received ${n} gold (${why || 'unspecified'})`);
+      return true;
+    },
+  };
+
   // ---- being at a bank -----------------------------------------------------------------------------------------------
   const atBank = (a) => {
     const s = S.at.get(a >>> 0);
