@@ -64,7 +64,8 @@ module.exports = (api) => {
     const housing = globalThis.__dboHousing;
     if (!C.atHome || !housing || !here || isWorldspace(here.where)) return false;
     const me = Number(profileOf(a));
-    return (cellDoors().get(here.where) || []).some((d) => { try { const r = housing.recordOf(d); return !!r && Number(r.owner) === me; } catch (e) { return false; } });
+    const mine = (r) => (typeof housing.ownsRecord === 'function' ? housing.ownsRecord(r, a) === true : Number(r.owner) === me);
+    return (cellDoors().get(here.where) || []).some((d) => { try { const r = housing.recordOf(d); return !!r && mine(r); } catch (e) { return false; } });
   };
 
   // The ledger point the character stands at, as a short name, or '' when there is none

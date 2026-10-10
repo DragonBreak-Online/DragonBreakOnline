@@ -134,7 +134,7 @@ module.exports = (api) => {
       for (const ref of Array.isArray(refs) ? refs : []) {
         try {
           const r = housing.recordOf(ref);
-          if (!r || Number(r.owner) !== me) continue;
+          if (!r || !(typeof housing.ownsRecord === 'function' ? housing.ownsRecord(r, a) === true : Number(r.owner) === me)) continue;
           // A chest or an inner door is no home (Nate, 5 Oct)
           if (typeof housing.isBuilding === 'function' && !housing.isBuilding(ref)) continue;
           const hold = housing.holdOf(ref);

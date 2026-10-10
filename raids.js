@@ -131,7 +131,8 @@ module.exports = (api) => {
     const parts = []; if (r.gold) parts.push(`${r.gold} gold`); parts.push(...r.items);
     const what = parts.length > 1 ? `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}` : parts[0];
     personal(caster, what ? `You break in and take ${what}.` : 'You break in, but there is nothing worth taking.');
-    const ownerChars = (() => { try { return (mp.getActorsByProfileId(home.rec.owner) || []).map((x) => Number(x) >>> 0); } catch (e) { return []; } })();
+    // The home's character once property is per character (housingSystem.ts ownerActorsOf), else every character of the account
+    const ownerChars = (() => { try { return (typeof H.ownerActorsOf === 'function' ? H.ownerActorsOf(home.rec) : mp.getActorsByProfileId(home.rec.owner) || []).map((x) => Number(x) >>> 0); } catch (e) { return []; } })();
     for (const o of ownerChars) if (onlineActors().includes(o)) system(o, `Raiders have broken into ${home.rec.name || 'your home'}${what ? ` and taken ${what}` : ''}.`);
     audit(`RAID break-in by ${who(caster)} (${nameOfFaction(raid.raider)}) at ${container ? `container ${container.toString(16)} of ` : ''}home ${home.ref.toString(16)} (${home.rec.ownerName || home.rec.owner}): ${what || 'nothing'}`);
     return true;

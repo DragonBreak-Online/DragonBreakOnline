@@ -286,7 +286,10 @@ module.exports = (api) => {
     const rec = H.recordOf(ref);
     if (!ref || !rec || !rec.owner) return { error: 'That is no one\'s property. A seat is a house a founding member owns.' };
     const place = rec.name || `${rec.ownerName || 'someone'}'s property`;
-    if (!accountsOf(c).includes(Number(rec.owner))) return { error: `A faction may only take a building it owns: ${place} belongs to ${rec.ownerName || 'someone else'}, who is not a founding member of ${c.name}.` };
+    // Once property is per character the seat must be a founding character's own, not an alt's (housingSystem.ts)
+    const perChar = typeof H.perCharacter === 'function' && H.perCharacter() === true && Number(rec.ownerChar) > 0;
+    const founderChars = [c.founder.actor].concat(c.founders.map((f) => f.actor)).map((x) => Number(x) >>> 0);
+    if (perChar ? !founderChars.includes(Number(rec.ownerChar) >>> 0) : !accountsOf(c).includes(Number(rec.owner))) return { error: `A faction may only take a building it owns: ${place} belongs to ${rec.ownerName || 'someone else'}, who is not a founding member of ${c.name}.` };
     return { seat: { ref: (typeof H.primaryOf === 'function' && H.primaryOf(ref)) || ref, name: place, owner: Number(rec.owner), ownerName: rec.ownerName || '' } };
   };
   const seatProblem = (c) => {
