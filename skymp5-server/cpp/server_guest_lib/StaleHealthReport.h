@@ -11,6 +11,9 @@ using Clock = std::chrono::steady_clock;
 constexpr std::chrono::milliseconds kWindow{ 1500 };
 // The client's own regeneration between the two messages, as a fraction of full health
 constexpr float kTolerance = 0.02f;
+// Only a raise this big is remembered: a hit's give-back. Regen ticks and racial gifts stay smaller, so a damage-over-time,
+// fall or trap report during them is never mistaken for a stale one
+constexpr float kMinRaise = 2 * kTolerance;
 
 struct Raise
 {
@@ -26,7 +29,7 @@ public:
   // The server raised the player's health from `from` to `to` (fractions of full health)
   void Note(float from, float to, Clock::time_point now) noexcept
   {
-    if (!(to > from)) {
+    if (!(to - from > kMinRaise)) {
       return;
     }
     raises[next] = Raise{ from, to, now, true };
@@ -43,7 +46,9 @@ public:
       if (!r.set || now - r.at > kWindow || now < r.at) {
         continue;
       }
-      if (reported >= r.from - kTolerance && reported <= r.from + kTolerance) {
+      const float fromGap = reported > r.from ? reported - r.from : r.from - reported;
+      const float toGap = reported > r.to ? reported - r.to : r.to - reported;
+      if (fromGap <= kTolerance && fromGap < toGap) {
         return true;
       }
     }

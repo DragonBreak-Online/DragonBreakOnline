@@ -58,3 +58,23 @@ TEST_CASE("Never without a raise, never for a report at or above the server's va
   REQUIRE_FALSE(m.IsStale(kScaledAfter, kScaledAfter, kT0 + 100ms));
   REQUIRE_FALSE(m.IsStale(kBefore, kScaledAfter, kT0 + 100ms));
 }
+
+TEST_CASE("A small raise (a regen tick or a racial gift) is not remembered, so damage over time during it counts",
+          "[StaleHealthReport]")
+{
+  StaleHealthReport::Memory m;
+  // an Argonian's gift payment of about 1.2% of the bar, then a poison tick of 1% reported 300 ms later
+  m.Note(0.300f, 0.312f, kT0);
+  REQUIRE_FALSE(m.IsStale(0.302f, 0.312f, kT0 + 300ms));
+  // a blessing tick of 3%: still below the 4% a give-back must exceed
+  m.Note(0.500f, 0.530f, kT0);
+  REQUIRE_FALSE(m.IsStale(0.505f, 0.530f, kT0 + 300ms));
+}
+
+TEST_CASE("A stale report must sit nearer the raise's start than its end", "[StaleHealthReport]")
+{
+  StaleHealthReport::Memory m;
+  m.Note(0.40f, 0.45f, kT0); // a 5% give-back
+  REQUIRE(m.IsStale(0.41f, 0.45f, kT0 + 200ms));        // near where it started: written before the give-back
+  REQUIRE_FALSE(m.IsStale(0.43f, 0.45f, kT0 + 200ms));  // nearer where it ended: the client's own small damage after it
+}
