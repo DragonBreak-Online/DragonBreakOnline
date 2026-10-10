@@ -160,8 +160,10 @@ const applyAppearanceCommon = (appearance: Appearance, npc: ActorBase): void => 
   headparts.forEach((v, i) => npc.setNthHeadPart(v, i));
   npc.setFaceTextureSet(TextureSet.from(Game.getFormEx(appearance.headTextureSetId))); // setFaceTextureSet supports null argument
   npc.setVoiceType(VoiceType.from(Game.getFormEx(silentVoiceTypeId)));
-  appearance.options.forEach((v, i) => npc.setFaceMorph(v, i));
+  // Presets first, then the fine face sliders (options): setFacePreset after setFaceMorph overwrote the sliders, so a
+  // saved face came back changed after a relog (f765ca25 on main, 6 Oct; never reached a client package until now)
   appearance.presets.forEach((v, i) => npc.setFacePreset(v, i));
+  appearance.options.forEach((v, i) => npc.setFaceMorph(v, i));
   if (appearance.name) {
     npc.setName(appearance.name);
   } else {
