@@ -35,10 +35,26 @@ H = make({}, now, state);
 check('a hot reload keeps the timers (the caller keeps the state)', H.holds(NPC, B, A, true) === 'in a fight');
 check('enabled: false holds nothing', make({ enabled: false }, now, state).holds(NPC, B, A, true) === null);
 check('the windows come from config', make({ fightMs: 100000 }, now, state).config.fightMs === 100000);
-// A fight renewed by every blow is held at most fightMaxMs (30 s) from its first blow (8 Oct, dungeon-perf-1008)
+// The live config (10 Oct): handoverMs 10 s, fightMs 30 s, no fightMaxMs. The ceiling ships off: a fight hit every second
+// stays with its host however long it lasts and however near another player stands (Nate's minotaur, 9 Oct)
+{
+  const LIVE = { handoverMs: 10000, fightMs: 30000 };
+  check('fightMaxMs is off by default', make(LIVE, now, {}).config.fightMaxMs === Infinity);
+  const st = {}, F = 0xff000250, start = t;
+  const h = make(LIVE, now, st);
+  let kept = true;
+  for (; t <= start + 60000; t += 1000) { h.noteFight(F); if (h.holds(F, B, A, true) !== 'in a fight') kept = false; }
+  check('under the live config, a fight hit every second for 60 s stays with its host', kept);
+  t += 28000;   // the last blow was at start + 60 s, t is one second past it
+  check('...and 29 s after the last blow it is still held', h.holds(F, B, A, true) === 'in a fight');
+  t += 1000;
+  check('...and at 30 s (fightMs) it is free to move', h.holds(F, B, A, true) === null);
+}
+// With a ceiling set (not live), a fight renewed by every blow is held at most fightMaxMs from its first blow
+const CAP = { fightMaxMs: 30000 };
 {
   const st = {}, F = 0xff000200, start = t;
-  const h = make({}, now, st);
+  const h = make(CAP, now, st);
   for (; t < start + 29000; t += 1000) h.noteFight(F);   // a blow every second, the last at start + 28 s
   h.noteFight(F);                                         // and one at start + 29 s
   check('a fight hit every second is held through its first 30 s', h.holds(F, B, A, true) === 'in a fight');
@@ -52,7 +68,7 @@ check('the windows come from config', make({ fightMs: 100000 }, now, state).conf
 {
   // A hand-over during a fight starts the new host's 30 s: one host change per fightMaxMs, not one every handoverMs
   const st = {}, F = 0xff000300, start = t;
-  const h = make({}, now, st);
+  const h = make(CAP, now, st);
   for (; t <= start + 30000; t += 1000) h.noteFight(F);
   t -= 1000;
   check('a 30 s fight is free to change hands', h.holds(F, B, A, true) === null);
@@ -72,7 +88,7 @@ check('the windows come from config', make({ fightMs: 100000 }, now, state).conf
   // State from before fightSince (a hot reload onto a running fight) starts its 30 s at the next blow
   const F = 0xff000400, start = t;
   const st = { handedAt: new Map(), foughtAt: new Map([[F, t - 1000]]) };
-  const h = make({}, now, st);
+  const h = make(CAP, now, st);
   h.noteFight(F);
   check('a fight already running at a hot reload gets a start at its next blow', st.fightSince.get(F) === start);
   for (; t < start + 29000; t += 1000) h.noteFight(F);
@@ -82,7 +98,7 @@ check('the windows come from config', make({ fightMs: 100000 }, now, state).conf
 }
 {
   // fightSince is pruned with its fight: an entry goes once its NPC has had no blow for fightMs
-  const st = {}, h = make({}, now, st);
+  const st = {}, h = make(CAP, now, st);
   for (let i = 0; i < 4097; i++) h.noteFight(0xff100000 + i);
   t += 6000;
   h.noteFight(0xff200000);

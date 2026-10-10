@@ -4,14 +4,15 @@
 // npcdirector.js ask it, and the harness drives it with its own clock.
 // A hand-over is held back only while the current host can still drive the NPC (online, same world, in reach, by the
 // caller's own host policy); an NPC without a host, or whose host left or is out of reach, is never held.
-// A fight holds its NPC fightMs after the last blow, but never longer than fightMaxMs from the fight's first blow: every hit
-// renewed the hold, so a long fight kept a host however far a nearer player stood (8 Oct, dungeon-perf-1008).
+// A fight holds its NPC fightMs after the last blow. fightMaxMs can cap that at so long from the fight's first blow (or from
+// a hand-over during it); it is off by default (Infinity), because a cap at or under fightMs stops blows extending the hold
+// at all and brought back the mid-fight host swap (Nate's minotaur, 9 Oct). A cap must be well above fightMs; 1e12 = off.
 // Config "hostCooldown": { enabled, handoverMs, fightMs, fightMaxMs }.
 'use strict';
 
 // state: kept by the caller across a hot reload ({ handedAt, foughtAt, fightSince })
 module.exports = (cfg, now = () => Date.now(), state = {}) => {
-  const C = Object.assign({ enabled: true, handoverMs: 5000, fightMs: 5000, fightMaxMs: 30000 }, cfg || {});
+  const C = Object.assign({ enabled: true, handoverMs: 5000, fightMs: 5000, fightMaxMs: Infinity }, cfg || {});
   const S = state;
   if (!(S.handedAt instanceof Map)) S.handedAt = new Map();
   if (!(S.foughtAt instanceof Map)) S.foughtAt = new Map();
