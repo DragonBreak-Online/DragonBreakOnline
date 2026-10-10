@@ -96,6 +96,8 @@ const NOT_GRANTED = "Property here is granted by its ruler (Jarl, Baron or Count
 // over the surrounding hold, so hold officials have no say inside it and vice versa.
 // Managers claim, revoke, rename, transfer, re-key and cut keys for any property there.
 // The Count of Bruma (zones.json region "bruma") manages property the way a Jarl does.
+// A fief's holder (a Baron or Baroness, a Skyrim Lord or Lady of a holding; gameplay nobility.js) manages the property of
+// their own fief the same way, and nowhere else; their own buildings there are not counted by the one-building cap.
 const MANAGER_RANKS = ["jarl", "baron", "steward", "chieftain", "bane", "count"];
 // Actions on any door or chest of a place that act on the whole place (its root)
 const PLACE_WIDE = ["abandon", "revoke", "rename", "createkey", "revokekeys", "transfer", "assign", "unassign", "share", "unshare"];
@@ -271,7 +273,9 @@ export class HousingSystem implements System {
       },
       // What a load door's prompt should call it, or "" to keep the destination's name (gamemode.js dboDoorName)
       doorName: (ref: unknown): string => { try { return this.doorName(ctx, Number(ref) >>> 0); } catch { return ""; } },
-      isManager: (actorId: unknown, ref: unknown) => { const p = primary(ref); return !!p && this.isManager(ctx, Number(actorId) >>> 0, p); },
+      // Hold-wide managers only (staff, a hold's officials): what assesses, rents and taxes; a fief's holder is isFiefHolder
+      isManager: (actorId: unknown, ref: unknown) => { const p = primary(ref); return !!p && (this.isAdmin(ctx, Number(actorId) >>> 0) || this.isHoldManager(ctx, Number(actorId) >>> 0, p)); },
+      isFiefHolder: (actorId: unknown, ref: unknown) => { const p = primary(ref); return !!p && this.isFiefHolder(ctx, Number(actorId) >>> 0, p); },
       grant: (ref: unknown, actorId: unknown): string => {
         const p = primary(ref); if (!p) return "That is not a property.";
         const actor = Number(actorId) >>> 0;
@@ -279,9 +283,9 @@ export class HousingSystem implements System {
         const rec = this.read(ctx, p) || emptyRecord();
         if (this.ownsAs(rec, profileId, actor)) return "";
         if (!this.placesOn()) {
-          if (this.countClaims(ctx, profileId, actor) >= this.maxClaims) return `They already hold ${this.maxClaims} properties.`;
+          if (!this.fiefExempt(ctx, p, profileId, actor) && this.countClaims(ctx, profileId, actor) >= this.maxClaims) return `They already hold ${this.maxClaims} properties.`;
         } else {
-          const full = this.overCap(ctx, profileId, actor, false, this.isBuilding(ctx, p, { ...rec, partner: this.partnerOf(ctx, p) }));
+          const full = this.overCap(ctx, profileId, actor, false, this.isBuilding(ctx, p, { ...rec, partner: this.partnerOf(ctx, p) }), p);
           if (full) return full;
         }
         if (rec.owner !== 0) this.reKey(ctx, p, rec);
@@ -482,7 +486,8 @@ export class HousingSystem implements System {
     const isManager = this.isManager(ctx, actorId, primary) && !this.sharesByOffice(ctx, primary, rec, actorId);
     // Every staff override of someone else's property goes to the admin log (review A3-1)
     if (!isOwner && rec.owner !== 0 && isManager && !this.isHoldManager(ctx, actorId, primary) && STAFF_LOGGED.indexOf(String(action)) !== -1) {
-      try { (globalThis as any).__alduinakAdminLog?.(`HOUSING staff override: actor ${actorId.toString(16)} (profile ${this.profileOf(ctx, actorId)}) ${action} on ${primary.toString(16)}, owner profile ${rec.owner}${rec.ownerChar ? ` character ${rec.ownerChar.toString(16)}` : ""}`); } catch { /* no log */ }
+      const fief = !this.isAdmin(ctx, actorId);
+      try { (globalThis as any).__alduinakAdminLog?.(`HOUSING ${fief ? "fief holder" : "staff override"}: actor ${actorId.toString(16)} (profile ${this.profileOf(ctx, actorId)}) ${action} on ${primary.toString(16)}, owner profile ${rec.owner}${rec.ownerChar ? ` character ${rec.ownerChar.toString(16)}` : ""}`); } catch { /* no log */ }
     }
 
     this.aimedAt = target;
@@ -528,7 +533,7 @@ export class HousingSystem implements System {
       return;
     }
     // Officials claim to hand the property on, so the cap is the recipient's, checked at the hand-over
-    const full = this.placesOn() && isManager ? "" : this.overCap(ctx, profileId, actorId, true, this.isBuilding(ctx, primary, { ...rec, partner: this.partnerOf(ctx, primary) }));
+    const full = this.placesOn() && isManager ? "" : this.overCap(ctx, profileId, actorId, true, this.isBuilding(ctx, primary, { ...rec, partner: this.partnerOf(ctx, primary) }), primary);
     if (full) {
       this.notice(ctx, userId, full);
       return;
@@ -665,7 +670,7 @@ export class HousingSystem implements System {
       this.notice(ctx, userId, "They already own it.");
       return;
     }
-    const full = this.overCap(ctx, recipientProfile, recipientActor, false, this.isBuilding(ctx, primary, { ...rec, partner: this.partnerOf(ctx, primary) }));
+    const full = this.overCap(ctx, recipientProfile, recipientActor, false, this.isBuilding(ctx, primary, { ...rec, partner: this.partnerOf(ctx, primary) }), primary);
     if (full) {
       this.notice(ctx, userId, full);
       return;
@@ -894,6 +899,7 @@ export class HousingSystem implements System {
     if (v.admin) return true;
     const hold = this.holdOf(ctx, primary);
     if (hold && v.ranks.some((r) => r.hold === hold && MANAGER_RANKS.indexOf(r.rank) !== -1)) return true;
+    if (this.isFiefHolder(ctx, v.actorId, primary)) return true;
     if (this.inHall(ctx, primary, rec, v)) return true;
     if (this.keyOpensWith(ctx, primary, rec, v)) return true;
     if (!this.placesOn()) return false;
@@ -924,6 +930,7 @@ export class HousingSystem implements System {
     if (this.ownsAs(rec, v.profileId, v.actorId)) return true;
     if (v.admin) return true;
     if (this.inHall(ctx, primary, rec, v)) return true;
+    if (this.isFiefHolder(ctx, v.actorId, primary)) return true;
     const hold = this.holdOf(ctx, primary);
     return !!hold && v.ranks.some((r) => r.hold === hold && MANAGER_RANKS.indexOf(r.rank) !== -1);
   }
@@ -1290,7 +1297,43 @@ export class HousingSystem implements System {
   }
 
   private isManager(ctx: SystemContext, actorId: number, primary: number): boolean {
-    return this.isAdmin(ctx, actorId) || this.isHoldManager(ctx, actorId, primary);
+    return this.isAdmin(ctx, actorId) || this.isHoldManager(ctx, actorId, primary) || this.isFiefHolder(ctx, actorId, primary);
+  }
+
+  // ── Fiefs (gameplay nobility.js __dboNobility; off there, nobody holds one) ──
+
+  // What a property answers to for its fief: itself, its teleport partner and its place's root
+  private fiefRefs(ctx: SystemContext, primary: number): number[] {
+    const rec = this.read(ctx, primary);
+    const out = [primary];
+    const partner = (rec && rec.partner) || this.partnerOf(ctx, primary);
+    if (partner) out.push(partner);
+    if (rec && rec.memberOf && rec.memberOf !== primary) out.push(rec.memberOf);
+    return out;
+  }
+
+  private isFiefHolder(ctx: SystemContext, actorId: number, primary: number): boolean {
+    const n = (globalThis as any).__dboNobility;
+    if (!actorId || !n || typeof n.holdsFiefAt !== "function" || (typeof n.enabled === "function" && !n.enabled())) return false;
+    try { return n.holdsFiefAt(actorId, this.fiefRefs(ctx, primary)) === true; } catch { return false; }
+  }
+
+  // The character holding the fief a property stands in, or null
+  private fiefHolderOf(ctx: SystemContext, primary: number): { actor: number; profile: number } | null {
+    const n = (globalThis as any).__dboNobility;
+    if (!n || typeof n.fiefOf !== "function" || typeof n.holderOf !== "function" || (typeof n.enabled === "function" && !n.enabled())) return null;
+    try {
+      const id = n.fiefOf(this.fiefRefs(ctx, primary));
+      const h = id ? n.holderOf(id) : null;
+      return h && Number(h.actor) ? { actor: Number(h.actor) >>> 0, profile: Number(h.profile) || 0 } : null;
+    } catch { return null; }
+  }
+
+  // A building in the fief this character holds: the one-building cap never counts it
+  private fiefExempt(ctx: SystemContext, primary: number, profileId: number, actorId: number): boolean {
+    if (!primary) return false;
+    const h = this.fiefHolderOf(ctx, primary);
+    return !!h && h.profile === profileId && (!actorId || h.actor === (actorId >>> 0));
   }
 
   // A jarl, steward or other manager rank of the hold the property stands in
@@ -2259,7 +2302,8 @@ export class HousingSystem implements System {
   // housingPlaces.staffProfiles / housingStaffProfiles, and anyone online with an admin tier (the roles the gear swap's
   // staff exemption reads). Without the place rules the old per-claim limit stands for everything.
   // Returns the refusal, or "" when they may take this one.
-  private overCap(ctx: SystemContext, profileId: number, actorId: number, self: boolean, building = true): string {
+  private overCap(ctx: SystemContext, profileId: number, actorId: number, self: boolean, building = true, primary = 0): string {
+    if (building && this.fiefExempt(ctx, primary, profileId, actorId)) return "";
     if (!this.placesOn()) {
       if (this.countClaims(ctx, profileId, actorId) < this.maxClaims) return "";
       return self ? `You already hold ${this.maxClaims} properties.` : "They hold too much property already.";
@@ -2293,7 +2337,7 @@ export class HousingSystem implements System {
     let n = 0;
     for (const primary of this.claimed) {
       const rec = this.read(ctx, primary);
-      if (rec && (wholeAccount ? !!profileId && rec.owner === profileId : this.ownsAs(rec, profileId, actorId)) && this.isBuilding(ctx, primary, rec)) n++;
+      if (rec && (wholeAccount ? !!profileId && rec.owner === profileId : this.ownsAs(rec, profileId, actorId)) && this.isBuilding(ctx, primary, rec) && !this.fiefExempt(ctx, primary, rec.owner, this.ownerCharOf(rec))) n++;
     }
     return n;
   }
@@ -2312,7 +2356,7 @@ export class HousingSystem implements System {
     let n = 0;
     for (const primary of this.claimed) {
       const rec = this.read(ctx, primary);
-      if (rec && this.ownsAs(rec, profileId, actorId)) n++;
+      if (rec && this.ownsAs(rec, profileId, actorId) && !this.fiefExempt(ctx, primary, rec.owner, this.ownerCharOf(rec))) n++;
     }
     return n;
   }
