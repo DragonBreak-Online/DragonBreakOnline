@@ -5,7 +5,7 @@ Nate's decisions of 10 October 2026, built behind `gamemode-config.json` `nobili
 | Layer | Branch | What it carries |
 |---|---|---|
 | Gameplay | server `nobility` | `nobility.js`, `nobility-fiefs.json` (+ `tools/nobility_fiefs.py`), the tax share in `economy.js`, the fief treasury in `bank.js`, config, harnesses, pending patch note |
-| Server systems | fork `fork-nobility` (off `main`) | `housingSystem.ts`: a fief holder's powers and cap exemption |
+| Server systems | fork `fork-nobility` (off `main`; 423d9b376, 061e6d909) | `housingSystem.ts`: a fief holder's powers and cap exemption |
 | Front | fork `client-nobility-front` (off client line `26a4c137e`) | `features/nobility`: the F3 Nobility tab |
 
 The fork branch is `fork-nobility`, not `nobility`, because the two repos share one remote and its branch names.

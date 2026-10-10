@@ -42,6 +42,7 @@ const mp = {
 const ctx = { svr: mp };
 globalThis.__alduinakAdminLog = (t) => adminLog.push(t);
 const nobility = {
+  enabled: () => true,
   fiefOf: (refs) => (refs.some((r) => FIEF.has(r >>> 0)) ? 'mountain-watch' : ''),
   holderOf: (id) => (id === 'mountain-watch' ? { actor: BARON, profile: 70, name: 'Lord Elion' } : null),
   holdsFiefAt: (a, refs) => (a >>> 0) === BARON && nobility.fiefOf(refs) === 'mountain-watch',
@@ -129,6 +130,13 @@ try {
   sys.exposeTenancy(ctx);
   ok(globalThis.__dboHousing.grant(MW_FREE, BARON) === '', 'dryrun: a fief building is granted to him past housingMaxClaims');
   ok(globalThis.__dboHousing.grant(CITY_FREE, BARON) === 'They already hold 1 properties.', 'dryrun: one outside is refused as before');
+
+  // ---- the switch off in the gameplay: __dboNobility is there and says no ----------------------------------------------
+  seed();
+  sys = build('apply');
+  nobility.enabled = () => false;
+  ok(!sys.isManager(ctx, BARON, MW_TOWN) && sys.countPlaces(ctx, 70) === 3, 'with nobility.enabled false the holder has no powers and every building counts');
+  nobility.enabled = () => true;
 } finally {
   process.chdir(home);
   fs.rmSync(dir, { recursive: true, force: true });
