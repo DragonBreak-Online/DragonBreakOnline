@@ -1,5 +1,19 @@
 [
   {
+    "title": "Waning skills give back every point",
+    "date": "SHIP_DATE",
+    "version": "Server update",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Skills",
+        "items": [
+          "A skill you let wane now falls all the way to 0 when it is a trade you can take up again just by doing it; skills that need a tome or a rite to open stop at 1."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Weapon racks in homes",
     "date": "2026-10-10",
     "version": "Server update",

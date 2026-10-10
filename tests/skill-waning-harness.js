@@ -91,6 +91,37 @@ ok('...taking the level from the Waning skill', sp.skinner.level < 60 && notices
 ok('...and never from a Held one', sp.blacksmith.level === 90 && sp.cook.level === 75 && sp.alchemist.level === 65, [sp.blacksmith.level, sp.cook.level, sp.alchemist.level]);
 ok('the Wheel stays within 300', Object.values(sp).reduce((n, s) => n + s.level, 0) <= 300, Object.values(sp).map((s) => s.level));
 
+// 5. A skill taken up again by doing it falls to 0 (pointSystem.waningFloorBySkill; Rocco, 10 Oct: "Skills put on waning at
+// one dont remove themselves to zero leaving wasted left over skill points"); one with a special opening stops at 1.
+// A fork without the per-skill floor skips this part.
+if (/waningFloorBySkill/.test(require('fs').readFileSync(path.resolve(bundle), 'utf8'))) {
+  sys.points.waningFloor = 1;
+  sys.points.waningFloorBySkill = { skinner: 0, blade: 0, blacksmith: 0, cook: 0 };   // alchemist left out: the configured 1
+  notices[3].length = 0;
+  // A Wheel of 30 to keep the numbers small: 20 + 2 + 1 + 7, full. Blade rises; Skinner (floor 0) and Alchemist (floor 1) give way
+  const keep = { pool: sys.points.pool, bucketBurst: sys.points.bucketBurst };
+  Object.assign(sys.points, { pool: 30, bucketBurst: 1e6 });
+  mp.set(SPENDER, 'private.mastery', { v: 2, skills: {
+    blacksmith: { level: 20, xp: 0, lock: 'hold' }, alchemist: { level: 2, xp: 0, lock: 'lower' },
+    skinner: { level: 1, xp: 0, lock: 'lower' }, blade: { level: 7, xp: 0, lock: 'raise' } } });
+  for (let i = 0; i < 60; i++) sys.award(ctx, SPENDER, 'blade', 3, 0x9000 + i);
+  let r = mp.get(SPENDER, 'private.mastery');
+  ok('a waning trade falls to 0 on a full Wheel', r.skills.skinner.level === 0 && r.skills.skinner.xp === 0, r.skills.skinner);
+  ok('...leaves the order', !r.order.includes('skinner'), r.order);
+  ok('...and the player is told it was let go', notices[3].some((t) => /You have let Skinner go/.test(t)), notices[3]);
+  ok('a waning skill with a special opening stops at 1', r.skills.alchemist.level === 1 && r.order.includes('alchemist'), r.skills.alchemist);
+  ok('the rising skill took every freed point', r.skills.blade.level === 9, r.skills.blade);
+  ok('the Wheel stays within 30', Object.values(r.skills).reduce((n, s) => n + s.level, 0) <= 30, Object.values(r.skills).map((s) => s.level));
+  const menu = sys.menuFor(ctx, SPENDER);
+  ok('the menu no longer lists it as held', !menu.points.held.some((h) => h.id === 'skinner') && menu.points.held.find((h) => h.id === 'alchemist').waningFloor === 1, menu.points.held);
+  // taken up again (the gameplay first touch runs the same P.firstTouch as the station's), with a point free for it
+  r.skills.blade.level = 8; mp.set(SPENDER, 'private.mastery', r);
+  ok('it is taken up again by its first touch', sys.firstTouchFromGameplay(ctx, SPENDER, 'skinner') === 'ok', mp.get(SPENDER, 'private.mastery').skills.skinner);
+  r = mp.get(SPENDER, 'private.mastery');
+  ok('...at 1, rising, back in the order', r.skills.skinner.level === 1 && r.skills.skinner.lock === 'raise' && r.order.includes('skinner'), r.skills.skinner);
+  Object.assign(sys.points, keep);
+} else console.log('SKIP  this fork has no per-skill waning floor (pointSystem.waningFloorBySkill)');
+
 Date.now = realNow;
 console.log(fails ? `${fails} failure(s)` : 'all checks passed');
 process.exit(fails ? 1 : 0);

@@ -46,7 +46,7 @@ check('the unopened branch does not gate on category',
 
 // The station loop is the other branch.
 check('the activate loop still calls firstTouch on a gated station',
-  /gated && !has\(k\.id\)/.test(MASTERY_TS) && /P\.firstTouch\(rec as unknown as P\.PointRecord, k\.id/.test(MASTERY_TS));
+  /gated && !has\(k\.id\)/.test(MASTERY_TS) && /(P\.firstTouch\(rec as unknown as P\.PointRecord|this\.touchFirst\(ctx, casterId, userId, rec), k\.id/.test(MASTERY_TS));
 
 // ── weightOf and unitsForLevel, lifted from the TS so the numbers below are the shipped ones ──────
 
@@ -140,6 +140,22 @@ for (const { sk, kinds } of stationless) {
   check(`${sk.id}'s real kinds are among its candidates`, real.every((k) => kinds.has(k)));
   const parts = real.map((k) => `${Math.ceil(OFFER_AT / weights[k])} x ${k} (weight ${weights[k]})`);
   console.log(`  ${sk.id.padEnd(13)} ${parts.join('  or  ')}`);
+}
+
+// ── How low a waning skill falls (pointSystem.waningFloorBySkill, 10 Oct) ──────────────────────────────────────
+// 0 only for a skill taken up again by doing it, the two branches above; a skill opened by a Novice tome at a study point
+// (studyAt) must keep the floor of 1, or a waned Priest would need its tome and study point all over again.
+{
+  const floors = (SKILLS.pointSystem && SKILLS.pointSystem.waningFloorBySkill) || {};
+  const ids = new Set(SKILLS.skills.map((k) => k.id));
+  const listed = Object.keys(floors).filter((k) => !k.startsWith('_'));
+  check('waningFloorBySkill names only real skills', listed.every((k) => ids.has(k)), listed.filter((k) => !ids.has(k)).join(', '));
+  const special = SKILLS.skills.filter((k) => k.studyAt);
+  check('a skill opened by a tome at a study point keeps the floor of 1', special.every((k) => Number(floors[k.id] ?? 1) !== 0),
+    special.map((k) => `${k.id}=${floors[k.id] ?? 'default'}`).join(', '));
+  const byUse = SKILLS.skills.filter((k) => !k.studyAt);
+  check('every skill opened by doing it falls to 0', byUse.every((k) => floors[k.id] === 0),
+    byUse.filter((k) => floors[k.id] !== 0).map((k) => k.id).join(', ') || `${byUse.length} skills`);
 }
 
 console.log('');
