@@ -1624,7 +1624,15 @@ const DIAG_SEEN = globalThis.__dboDiagSeen || (globalThis.__dboDiagSeen = new Ma
 // sends were dropped (2026-09-29). A connection's allowance now starts fresh with each connect; a player's own, counted
 // under their actor once they have one, still lasts the whole run.
 const diagConnectionKey = (userId) => `u${userId}`;
-const resetDiagForConnection = (userId) => { DIAG_SEEN.delete(diagConnectionKey(userId)); };
+// The client's appearance trace ("apr ...") and error reports ("cerr ...", client 0.3.91) each have their own allowance, so
+// they neither use up nor are starved by the shared one (most players spend all 60 on page and world lines)
+const DIAG_KIND_MAX = { apr: 400, cerr: 120 };
+const diagKindOf = (text) => { const k = text.slice(0, text.indexOf(' ')); return Object.prototype.hasOwnProperty.call(DIAG_KIND_MAX, k) ? k : null; };
+const resetDiagForConnection = (userId) => {
+  const key = diagConnectionKey(userId);
+  DIAG_SEEN.delete(key);
+  for (const kind of Object.keys(DIAG_KIND_MAX)) DIAG_SEEN.delete(`${key}:${kind}`);
+};
 // Each player's last few voice lines, kept past the log allowance: a /bug from anyone near them carries them (debugsnap.js)
 const VOICE_LINES = globalThis.__dboVoiceLines || (globalThis.__dboVoiceLines = new Map());
 const VOICE_LINES_KEPT = 4;
@@ -1645,6 +1653,15 @@ const writeDiagLines = (userId, lines) => {
   for (const raw of (Array.isArray(lines) ? lines.slice(0, DIAG_LINES_PER_PACKET) : [])) {
     const text = String(raw).slice(0, 500);
     if (a && text.startsWith('voice ')) keepVoiceLine(a, text);
+    const kind = diagKindOf(text);
+    if (kind) {
+      const k = `${key}:${kind}`;
+      const m = DIAG_SEEN.get(k) || 0;
+      if (m >= DIAG_KIND_MAX[kind]) continue;
+      DIAG_SEEN.set(k, m + 1);
+      log(`[dboDiag] ${who} ${text}`);
+      continue;
+    }
     if (n >= DIAG_MAX_PER_PLAYER) continue;
     n++;
     log(`[dboDiag] ${who} ${text}`);

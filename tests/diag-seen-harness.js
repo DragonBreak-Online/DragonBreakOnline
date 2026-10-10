@@ -61,10 +61,10 @@ const sandbox = {
   out: {},
 };
 vm.createContext(sandbox);
-for (const name of ['DIAG_MAX_PER_PLAYER', 'DIAG_LINES_PER_PACKET', 'diagConnectionKey', 'resetDiagForConnection', 'writeDiagLines']) {
+for (const name of ['DIAG_MAX_PER_PLAYER', 'DIAG_LINES_PER_PACKET', 'diagConnectionKey', 'DIAG_KIND_MAX', 'diagKindOf', 'resetDiagForConnection', 'writeDiagLines']) {
   vm.runInContext(`${declOf(name)}\nout.${name} = ${name};`, sandbox);
 }
-const { DIAG_MAX_PER_PLAYER, resetDiagForConnection, writeDiagLines } = sandbox.out;
+const { DIAG_MAX_PER_PLAYER, DIAG_KIND_MAX, resetDiagForConnection, writeDiagLines } = sandbox.out;
 
 let failures = 0;
 const check = (label, ok) => { if (!ok) failures++; console.log(`${ok ? 'ok  ' : 'FAIL'} ${label}`); };
@@ -86,6 +86,20 @@ check('reconnecting does not refill a player\'s own allowance', count(() => writ
 check('an actor line names the profile', logged.some((l) => l.startsWith('[dboDiag] profile 30 Purr #7DJT actor 0')));
 check('a packet without a line list writes nothing', count(() => writeDiagLines(8, undefined)) === 0);
 check('each line is cut at 500 characters', count(() => writeDiagLines(9, ['x'.repeat(900)])) === 1 && logged[logged.length - 1].length === '[dboDiag] user 9 '.length + 500);
+
+// The client's appearance trace and error reports (client 0.3.91) have their own allowances
+actors.set(10, 0xff000300);
+check('a player who spent the shared 60 lines', count(() => writeDiagLines(10, lines(70, 'page'))) === 60);
+check('...still gets appearance trace lines, written as before', count(() => writeDiagLines(10, ['apr own spawn r=13746 mm=-'])) === 1
+  && logged[logged.length - 1] === '[dboDiag] profile 30 Purr #7DJT apr own spawn r=13746 mm=-');
+check('...and client error lines', count(() => writeDiagLines(10, ['cerr v=0.3.91 id=1a2b3c4d at=on:update n=1 m=Error: x'])) === 1);
+check('the trace allowance is 400 a player, errors 120', DIAG_KIND_MAX.apr === 400 && DIAG_KIND_MAX.cerr === 120);
+check('apr lines stop at 400', count(() => { for (let i = 0; i < 6; i++) writeDiagLines(10, lines(100, 'apr x').map((l) => l.replace(/^apr x/, 'apr x'))); }) === 399);
+check('cerr lines stop at 120', count(() => { for (let i = 0; i < 2; i++) writeDiagLines(10, lines(100, 'cerr y')); }) === 119);
+check('a word that only starts like a kind is a shared line ("aprx", "cerrors")', count(() => writeDiagLines(10, ['aprx 1', 'cerrors 2'])) === 0);
+check('trace lines before an actor count under the connection, and a reconnect resets that too',
+  count(() => writeDiagLines(11, lines(450, 'apr c'))) === 200 && count(() => { writeDiagLines(11, lines(200, 'apr c')); writeDiagLines(11, lines(200, 'apr c')); }) === 200
+  && count(() => writeDiagLines(11, lines(5, 'apr c'))) === 0 && (resetDiagForConnection(11), count(() => writeDiagLines(11, lines(5, 'apr c')))) === 5);
 
 const connectLine = src.split('\n').find((l) => l.startsWith('globalThis.__dboHandlers.connect = '));
 check('the connect handler resets the connection\'s allowance', !!connectLine && connectLine.includes('resetDiagForConnection(userId)'));
