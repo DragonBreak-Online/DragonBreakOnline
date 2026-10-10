@@ -33,20 +33,44 @@ const MACE = 0x13982;
 const SWORD = 0x12eb7, DAGGER = 0x1397e, BOW = 0x3b562, SHIELD = 0x12eb6, TORCH = 0x1d4ec, KEY = 0xdb0e2, ODD = 0x99999;
 rec(SWORD, 'WEAP', 'IronSword', [kwda(0x1e711, 0x1e718)]); rec(DAGGER, 'WEAP', 'IronDagger', [kwda(0x1e713)]);
 rec(BOW, 'WEAP', 'LongBow', [kwda(0x1e715)]); rec(SHIELD, 'ARMO', 'IronShield', [kwda(0x965b2)]); rec(TORCH, 'LIGH', 'Torch01');
-rec(ODD, 'WEAP', 'OddThing', [kwda(0x12345)]); rec(MACE, 'WEAP', 'IronMace', [kwda(0x1e714)]); rec(KEY, 'KEYM', 'HouseKey');
-// Northern Arms, as BSHeartland.esm places it (dumped 10 Oct): three WeaponRackMid with a mace, a sword and a war axe, and a
-// COA set (shield, two swords) at one spot
+rec(ODD, 'WEAP', 'OddThing', [kwda(0x12345)]);
+const dnam = (anim) => ({ type: 'DNAM', data: new Uint8Array([anim, 0, 0, 0]) });
+const CROSSBOW = 0x0200f19e; rec(CROSSBOW, 'WEAP', 'DLC1CrossBowEnhanced', [kwda(0x1e715, 0x1e719), dnam(9)]);
+records.get(BOW).record.fields.push(dnam(7)); rec(MACE, 'WEAP', 'IronMace', [kwda(0x1e714)]); rec(KEY, 'KEYM', 'HouseKey');
+// Northern Arms as DragonBreak Online Edits fb7f0c0e has it (read 10 Oct): three WeaponRackMid and a COA set (shield rack,
+// left and right) at one spot; the starting weapons' keyword-less links are gone and the weapons are Initially Disabled
 const refs = new Map();
 const ref = (id, base, cell, pos, angle, fields = []) => { refs.set(id >>> 0, { baseDesc: descOf(base), worldOrCellDesc: descOf(cell), pos, angle, isDisabled: false }); rec(id, 'REFR', '', fields); };
 const NA_RACKS = [[0x109c, 0x1096, 0x109a], [0x109d, 0x1099, 0x109b], [0x1097, 0x1098, 0x1095]];
+const NA_POS = { 0x109c: [-326.3, -96.3, -336.5], 0x109d: [-326.3, -32.3, -336.5], 0x1097: [-326.3, -64.3, -336.5] };
 for (const [act, mesh, start] of NA_RACKS) {
-  ref(bsh(act), 0x8af59, NA_CELL, [-326.3, -64.3, -336.5], [0, 0, 89.9], [xlkr(0x6d95e, bsh(mesh)), xlkr(0, bsh(start))]);
-  ref(bsh(mesh), 0x8af5b, NA_CELL, [-326.3, -64.3, -336.5], [0, 0, 89.9], [xlkr(0x6d95f, bsh(act))]);
-  ref(bsh(start), SWORD, NA_CELL, [-297.1, -64.3, -265.3], [91.2, 90, 181]);
+  ref(bsh(act), 0x8af59, NA_CELL, NA_POS[act], [0, 0, 89.9], [xlkr(0x6d95e, bsh(mesh))]);
+  ref(bsh(mesh), 0x8af5b, NA_CELL, NA_POS[act], [0, 0, 89.9], [xlkr(0x6d95f, bsh(act))]);
+  ref(bsh(start), SWORD, NA_CELL, [-297.1, -64.3, -265.3], [91.2, 90, 181]); refs.get(bsh(start)).isDisabled = true;
 }
-ref(bsh(0x7bb5f), 0x7400c, NA_CELL, [-289.7, -239.1, -178.3], [0, 360, 89.9], [xlkr(0x6d95e, bsh(0x7bb60)), xlkr(0, bsh(0x7bb5a))]);
-ref(bsh(0x7bb60), 0x7400d, NA_CELL, [-289.7, -239.1, -178.3], [0, 360, 89.9], [xlkr(0x6d95f, bsh(0x7bb5f))]);
-ref(bsh(0x7bb5a), SHIELD, NA_CELL, [-272.9, -233.9, -325.9], [185, 7.6, 167.6]);
+rec(0xe49ba, 'ACTI', 'WeaponRackCOALeft'); rec(0xe49bb, 'ACTI', 'WeaponRackCOALeftACTIVATOR');
+const NA_COA = [-289.7, -239.1, -178.3], NA_COA_ANG = [0, 360, 89.9];
+ref(bsh(0x7bb5f), 0x7400c, NA_CELL, NA_COA, NA_COA_ANG, [xlkr(0x6d95e, bsh(0x7bb60))]);
+ref(bsh(0x7bb60), 0x7400d, NA_CELL, NA_COA, NA_COA_ANG, [xlkr(0x6d95f, bsh(0x7bb5f))]);
+ref(bsh(0x7bb5d), 0xe49bb, NA_CELL, NA_COA, NA_COA_ANG, [xlkr(0x6d95e, bsh(0x7bb61))]);
+ref(bsh(0x7bb61), 0xe49ba, NA_CELL, NA_COA, NA_COA_ANG, [xlkr(0x6d95f, bsh(0x7bb5d))]);
+ref(bsh(0x7bb5a), SHIELD, NA_CELL, [-272.9, -233.9, -325.9], [185, 7.6, 167.6]); refs.get(bsh(0x7bb5a)).isDisabled = true;
+// A rack that still has its starting weapon (a building the DLE left alone), and one whose weapon is linked but disabled
+const DECO = bsh(0xf021), DECO_MESH = bsh(0xf022), DECO_WEAPON = bsh(0xf023), DIMMED = bsh(0xf024), DIMMED_MESH = bsh(0xf025), DIMMED_WEAPON = bsh(0xf026);
+ref(DECO, 0x8af59, NA_CELL, [0, 0, 0], [0, 0, 0], [xlkr(0x6d95e, DECO_MESH), xlkr(0, DECO_WEAPON)]);
+ref(DECO_MESH, 0x8af5b, NA_CELL, [0, 0, 0], [0, 0, 0], [xlkr(0x6d95f, DECO)]);
+ref(DECO_WEAPON, SWORD, NA_CELL, [0, 0, 0], [0, 0, 0]);
+ref(DIMMED, 0x8af59, NA_CELL, [50, 0, 0], [0, 0, 0], [xlkr(0x6d95e, DIMMED_MESH), xlkr(0, DIMMED_WEAPON)]);
+ref(DIMMED_MESH, 0x8af5b, NA_CELL, [50, 0, 0], [0, 0, 0], [xlkr(0x6d95f, DIMMED)]);
+ref(DIMMED_WEAPON, SWORD, NA_CELL, [0, 0, 0], [0, 0, 0]); refs.get(DIMMED_WEAPON).isDisabled = true;
+// A rack mesh the table does not know (WeaponRackPlaqueNor), and a COA left player-house rack (no bow pivot)
+rec(0x1019bc, 'ACTI', 'WeaponRackPlaqueNor'); rec(0x84cf1, 'ACTI', 'WeaponRackPlaqueACTIVATOR');
+rec(0xe49c8, 'ACTI', 'WeaponRackCOALeftPlayerHouse'); rec(0xe49c9, 'ACTI', 'WeaponRackCOALeftACTIVATORPlayerHouse');
+const NOR = bsh(0xf031), NOR_MESH = bsh(0xf032), COAPH = bsh(0xf033), COAPH_MESH = bsh(0xf034);
+ref(NOR, 0x84cf1, NA_CELL, [0, 0, 0], [0, 0, 0], [xlkr(0x6d95e, NOR_MESH)]);
+ref(NOR_MESH, 0x1019bc, NA_CELL, [0, 0, 0], [0, 0, 0], [xlkr(0x6d95f, NOR)]);
+ref(COAPH, 0xe49c9, NA_CELL, [0, 0, 0], [0, 0, 0], [xlkr(0x6d95e, COAPH_MESH)]);
+ref(COAPH_MESH, 0xe49c8, NA_CELL, [0, 0, 0], [0, 0, 0], [xlkr(0x6d95f, COAPH)]);
 // Fixture racks with no starting weapon, in the same cell: a weapon rack, a shield rack and a dagger display
 const EMPTY = bsh(0xf001), EMPTY_MESH = bsh(0xf002), SHIELD_RACK = bsh(0xf003), SHIELD_MESH = bsh(0xf004), DAGGER_RACK = bsh(0xf005), DAGGER_MESH = bsh(0xf006);
 ref(EMPTY, 0x8af59, NA_CELL, [100, 200, 300], [0, 0, 90], [xlkr(0x6d95e, EMPTY_MESH)]);
@@ -106,7 +130,18 @@ const mp = {
 const said = [], logs = [], audits = [];
 let clock = 1_800_000_000_000;
 let online = [OWNER, KEYHOLDER, STRANGER];
-const POSES = { _comment: 'fixture', WeaponRackMid: { SwordPivot01: { pos: [10, 0, 20], rot: [0, 90, 0] }, BowPivot01: { pos: [0, 5, 30], rot: [0, 0, 0] } }, WeaponRackCOAMid: { ShieldPivot01: { pos: [0, 0, 0], rot: [0, 0, 0] } } };
+// The real pivot table (Nat's PC, b249f7a6, from the rack NIFs) and an independent check of the module's pose against it
+const TABLE_FILE = path.resolve(__dirname, '..', 'weapon-racks.json');
+const TABLE = JSON.parse(fs.readFileSync(TABLE_FILE, 'utf8'));
+const PM = require(MODULE).poseMath;
+const close = (a, b, eps) => a.every((x, i) => (Array.isArray(x) ? close(x, b[i], eps) : Math.abs(x - b[i]) <= eps));
+// Where a weapon on pivot node of rack mesh meshId must stand: P + R @ pos, its matrix R @ m (R = SetEulerAnglesXYZ of the rack)
+const poseIs = (dispId, meshId, edid, node) => {
+  const d = refs.get(dispId), r = refs.get(meshId), p = TABLE[edid][node];
+  const R = PM.fromEuler(r.angle.map((x) => x * Math.PI / 180));
+  const want = PM.apply(R, p.pos).map((v, i) => r.pos[i] + v);
+  return !!d && close(d.pos, want, 1e-4) && close(PM.fromEuler(d.angle.map((x) => x * Math.PI / 180)), PM.mul(R, p.m), 1e-5);
+};
 const STATE = path.join(scratch, 'weapon-racks-state.json');
 const load = (fresh) => {
   if (fresh) delete globalThis.__dboWeaponRacks;
@@ -141,18 +176,51 @@ check('activating a rack is ours: the chain ends, so the vanilla tutorial box ne
 check('without weapon-racks.json the rack refuses to take a weapon', lastSaid(OWNER) === 'This rack is not ready yet.' && has(OWNER, SWORD) === 1 && !fs.existsSync(STATE), lastSaid(OWNER));
 check('an unrelated reference is not ours', use(DOOR, OWNER) === false && use(bsh(0x7bb5a), OWNER) === false);
 
-// ---- Northern Arms as the plugin has it: every slot holds decoration --------------------------------------------------------
-tick();
-for (const [act, mesh] of NA_RACKS) {
-  check(`Northern Arms rack ${act.toString(16)}: its starting weapon makes it full, decoration only`, use(bsh(act), OWNER) === true && lastSaid(OWNER) === "This rack's weapon is only for show." && has(OWNER, SWORD) === 1);
-  tick();
-  check(`and its mesh ${mesh.toString(16)} answers as the same rack`, use(bsh(mesh), OWNER) === true && lastSaid(OWNER) === "This rack's weapon is only for show.");
-  tick();
-}
-check('the COA shield rack 7bb5f is decoration too (its hide shield)', use(bsh(0x7bb5f), OWNER) === true && lastSaid(OWNER) === "This rack's weapon is only for show.");
-
 // ---- with the table ------------------------------------------------------------------------------------------------------------
-fs.writeFileSync('weapon-racks.json', JSON.stringify(POSES));
+fs.copyFileSync(TABLE_FILE, 'weapon-racks.json');
+{
+  const entries = Object.entries(TABLE).filter(([k]) => !k.startsWith('_'));
+  let worst = 0, n = 0;
+  for (const [, nodes] of entries) for (const p of Object.values(nodes)) { n++; const m = PM.fromEuler(p.rot); for (let a = 0; a < 3; a++) for (let b = 0; b < 3; b++) worst = Math.max(worst, Math.abs(m[a][b] - p.m[a][b])); }
+  check(`the table: SetEulerAnglesXYZ(rot) reproduces every pivot's m (${n} pivots in ${entries.length} entries, worst ${worst.toExponential(1)})`, n > 100 && worst < 1e-5);
+  let rt = 0;
+  for (const [, nodes] of entries) for (const p of Object.values(nodes)) rt = Math.max(rt, ...PM.toEuler(p.m).map((x, i2) => Math.abs(Math.atan2(Math.sin(x - p.rot[i2]), Math.cos(x - p.rot[i2])))));
+  check('ToEulerAnglesXYZ(m) gives back every rot', rt < 1e-5, rt);
+  const fwd = PM.compose([0, 0, 0], [0, 0, 90], 1, [0, 1, 0], PM.fromEuler([0, 0, 0]));
+  check('a rack turned 90 on Z puts its local forward (+Y) on +X, the server systems\' heading rule (forward = sin z, cos z)', close(fwd.pos, [1, 0, 0], 1e-9) && close(fwd.rot, [0, 0, 90], 1e-9), fwd);
+  check('every pivot is turned about 90 degrees on X: the weapon is not just the rack heading plus a Z offset', Math.abs(Math.abs(TABLE.WeaponRackMid.SwordPivot01.rot[0]) - Math.PI / 2) < 0.1);
+}
+tick();
+check('a rack that still has its starting weapon is full, decoration only', use(DECO, OWNER) === true && lastSaid(OWNER) === "This rack's weapon is only for show." && has(OWNER, SWORD) === 1);
+tick();
+check('and its mesh answers as the same rack', use(DECO_MESH, OWNER) === true && lastSaid(OWNER) === "This rack's weapon is only for show.");
+// Northern Arms with the new DLE: the racks are free
+for (const [act, mesh] of NA_RACKS) {
+  tick();
+  check(`Northern Arms ${act.toString(16)} (its weapon unlinked and disabled): the owner racks the sword, from the mesh ${mesh.toString(16)}`, use(bsh(mesh), OWNER) === true && has(OWNER, SWORD) === 0 && !!st().racks[bsh(act).toString(16)], lastSaid(OWNER));
+  const sl = st().racks[bsh(act).toString(16)];
+  check(`  on WeaponRackMid's SwordPivot01, at the matrix-composed pose`, sl.node === 'SwordPivot01' && sl.mesh === bsh(mesh).toString(16) && poseIs(parseInt(sl.display, 16) >>> 0, bsh(mesh), 'WeaponRackMid', 'SwordPivot01'), refs.get(parseInt(sl.display, 16) >>> 0));
+  tick();
+  check('  and takes it back', use(bsh(act), OWNER) === true && has(OWNER, SWORD) === 1 && !st().racks[bsh(act).toString(16)] && inv(OWNER).find((e) => e.baseId === SWORD).enchantmentId === 0x4b27f);
+  refs.get(OWNER).inventory.entries.find((e) => e.baseId === SWORD).worn = true;
+}
+tick();
+check('Northern Arms COA left 7bb5d takes the sword on WeaponRackCOALeft\'s SwordPivot01 (rack Y 360 = 0)', use(bsh(0x7bb5d), OWNER) === true && (() => { const sl = st().racks[bsh(0x7bb5d).toString(16)]; return !!sl && poseIs(parseInt(sl.display, 16) >>> 0, bsh(0x7bb61), 'WeaponRackCOALeft', 'SwordPivot01'); })(), lastSaid(OWNER));
+tick(); use(bsh(0x7bb5d), OWNER); refs.get(OWNER).inventory.entries.find((e) => e.baseId === SWORD).worn = true;
+check('(taken back)', has(OWNER, SWORD) === 1 && !st().racks[bsh(0x7bb5d).toString(16)]);
+refs.get(OWNER).inventory.entries.find((e) => e.baseId === SWORD).worn = false;
+refs.get(OWNER).inventory.entries.push({ baseId: SHIELD, count: 1, worn: true });
+tick();
+check('Northern Arms shield rack 7bb5f takes the shield on ShieldPivot01', use(bsh(0x7bb5f), OWNER) === true && (() => { const sl = st().racks[bsh(0x7bb5f).toString(16)]; return !!sl && sl.node === 'ShieldPivot01' && poseIs(parseInt(sl.display, 16) >>> 0, bsh(0x7bb60), 'WeaponRackCOAMid', 'ShieldPivot01'); })(), lastSaid(OWNER));
+tick(); use(bsh(0x7bb5f), OWNER);
+check('(taken back; the shield goes into the pack, not worn)', has(OWNER, SHIELD) === 1 && !st().racks[bsh(0x7bb5f).toString(16)]);
+refs.get(OWNER).inventory.entries = refs.get(OWNER).inventory.entries.filter((e) => e.baseId !== SHIELD);
+refs.get(OWNER).inventory.entries.find((e) => e.baseId === SWORD).worn = true;
+tick();
+check('a rack whose starting weapon is linked but disabled is free', use(DIMMED, OWNER) === true && !!st().racks[DIMMED.toString(16)] && has(OWNER, SWORD) === 0);
+tick(); use(DIMMED, OWNER); refs.get(OWNER).inventory.entries.find((e) => e.baseId === SWORD).worn = true;
+check('(taken back)', has(OWNER, SWORD) === 1 && !st().racks[DIMMED.toString(16)]);
+fs.rmSync(STATE);
 tick();
 check('a stranger may not use the household\'s rack', use(EMPTY, STRANGER) === true && lastSaid(STRANGER) === 'Only the household can use this rack.' && has(STRANGER, SWORD) === 1);
 check('an NPC activating a rack is refused and changes nothing', use(EMPTY, NPC) === true && !fs.existsSync(STATE));
@@ -171,8 +239,7 @@ check('the sword was unequipped through Actor.UnequipItem', papyrusCalls.some((c
 const disp = parseInt(slot.display, 16) >>> 0;
 const d = refs.get(disp);
 check('a display copy hangs on the rack, tagged to it', !!d && d.baseDesc === descOf(SWORD) && d['private.dboRackDisplay'] && d['private.dboRackDisplay'].rack === EMPTY.toString(16));
-// heading 90: local (10, 0, 20) -> (+10 cos 90 + 0, -10 sin 90 + 0, +20) = (0, -10, +20) from the mesh at (100, 200, 300)
-check('at the slot\'s pivot, turned with the rack (heading 90)', d && Math.abs(d.pos[0] - 100) < 1e-6 && Math.abs(d.pos[1] - 190) < 1e-6 && d.pos[2] === 320 && d.angle[0] === 0 && d.angle[1] === 90 && d.angle[2] === 90, d && [d.pos, d.angle]);
+check('at SwordPivot01 of the rack mesh, composed with the rack\'s rotation (heading 90)', poseIs(disp, EMPTY_MESH, 'WeaponRackMid', 'SwordPivot01'), d && [d.pos, d.angle]);
 check('and re-sent with a disable/enable, like a placement', d && d.isDisabled === false);
 check('it is audited', /^WEAPONRACK actor ff000014 racked Brunhild's Bite \(12eb7\) on 800f001 in home 8000efc \(owner 1\)$/.test(audits[audits.length - 1]), audits[audits.length - 1]);
 
@@ -205,10 +272,18 @@ const holdOnly = (a, base) => { for (const e of refs.get(a).inventory.entries) e
 refs.get(KEYHOLDER).inventory.entries.push({ baseId: ODD, count: 1 }, { baseId: MACE, count: 1 });
 holdOnly(KEYHOLDER, ODD); tick();
 check('a weapon with no weapon-type keyword is refused', use(SECOND, KEYHOLDER) === true && lastSaid(KEYHOLDER) === 'That will not sit on a weapon rack.' && has(KEYHOLDER, ODD) === 1, lastSaid(KEYHOLDER));
-holdOnly(KEYHOLDER, MACE); tick();
-check('a slot node missing from the table is refused, not guessed', use(SECOND, KEYHOLDER) === true && lastSaid(KEYHOLDER) === 'A mace will not fit on this rack.' && has(KEYHOLDER, MACE) === 1, lastSaid(KEYHOLDER));
+holdOnly(KEYHOLDER, BOW); tick();
+check('a slot node missing from the table is refused, not guessed (no BowPivot01 on a COA left rack)', use(COAPH, KEYHOLDER) === true && lastSaid(KEYHOLDER) === 'A bow will not fit on this rack.' && has(KEYHOLDER, BOW) === 1, lastSaid(KEYHOLDER));
 holdOnly(OWNER, DAGGER); tick();
-check('a rack mesh missing from the table is not ready', use(DAGGER_RACK, OWNER) === true && lastSaid(OWNER) === 'This rack is not ready yet.' && has(OWNER, DAGGER) === 2, lastSaid(OWNER));
+check('a rack mesh missing from the table is not ready (WeaponRackPlaqueNor)', use(NOR, OWNER) === true && lastSaid(OWNER) === 'This rack is not ready yet.' && has(OWNER, DAGGER) === 2, lastSaid(OWNER));
+tick();
+check('the dagger display takes a dagger on its DaggerPivot01', use(DAGGER_RACK, OWNER) === true && has(OWNER, DAGGER) === 1 && (() => { const sl = st().racks[DAGGER_RACK.toString(16)]; return !!sl && sl.node === 'DaggerPivot01' && poseIs(parseInt(sl.display, 16) >>> 0, DAGGER_MESH, 'WeaponRackDaggerDisplayPlayerHouse', 'DaggerPivot01'); })(), lastSaid(OWNER));
+tick(); use(DAGGER_RACK, OWNER);
+check('(taken back: the dagger rejoins its plain stack)', has(OWNER, DAGGER) === 2 && inv(OWNER).filter((e) => e.baseId === DAGGER).length === 1 && !st().racks[DAGGER_RACK.toString(16)]);
+refs.get(KEYHOLDER).inventory.entries.push({ baseId: CROSSBOW, count: 1 }); holdOnly(KEYHOLDER, CROSSBOW); tick();
+check('a crossbow (bow keyword, animation type 9) goes on CrossbowPivot01', use(SECOND, KEYHOLDER) === true && (() => { const sl = st().racks[SECOND.toString(16)]; return !!sl && sl.node === 'CrossbowPivot01' && poseIs(parseInt(sl.display, 16) >>> 0, SECOND_MESH, 'WeaponRackMid', 'CrossbowPivot01'); })(), lastSaid(KEYHOLDER));
+tick(); use(SECOND, KEYHOLDER);
+check('(taken back)', has(KEYHOLDER, CROSSBOW) === 1 && !st().racks[SECOND.toString(16)]);
 for (const e of refs.get(OWNER).inventory.entries) e.worn = false;
 holdOnly(KEYHOLDER, BOW);
 tick();
@@ -227,7 +302,7 @@ globalThis.__dboWeaponRackSweep();
 const slot2 = st().racks[EMPTY.toString(16)];
 const disp2 = parseInt(slot2.display, 16) >>> 0;
 check('after a restart a lost display is put back from the state file', disp2 !== disp && refs.has(disp2) && refs.get(disp2)['private.dboRackDisplay'].rack === EMPTY.toString(16) && slot2.entry.name === "Brunhild's Bite");
-check('the new copy stands at the same pivot', Math.abs(refs.get(disp2).pos[1] - 190) < 1e-6 && refs.get(disp2).angle[2] === 90);
+check('the new copy stands at the same pivot', poseIs(disp2, EMPTY_MESH, 'WeaponRackMid', 'SwordPivot01'));
 // A display that a crash left behind (its rack points elsewhere) is removed when touched, never given
 const STRAY = nextDyn++;
 refs.set(STRAY, { baseDesc: descOf(SWORD), worldOrCellDesc: descOf(NA_CELL), pos: [0, 0, 0], angle: [0, 0, 0], 'private.dboRackDisplay': { rack: EMPTY.toString(16) } });

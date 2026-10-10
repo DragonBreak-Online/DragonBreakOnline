@@ -27,13 +27,16 @@
 // Every change is written to the state file BEFORE the inventory changes, so a failure in between can lose a weapon to the
 // pending list but never makes a second one.
 //
-// Slot poses come from weapon-racks.json (Nat's PC: per rack mesh editor id, per *Pivot01 node, { pos, rot } local to the mesh
-// root, rot in degrees as SetAngle takes them). The server has no meshes, so without that table, or without the slot's node in
+// Slot poses come from weapon-racks.json (Nat's PC, read from the rack NIFs: per rack mesh and activator editor id, per pivot
+// node, { pos, rot, m }: pos in the mesh root's space, rot in radians (NiMatrix3::ToEulerAnglesXYZ), m the same rotation as a
+// row-major 3x3, used when present). The server has no meshes, so without that table, or without the slot's node in
 // it, a rack refuses to take a weapon ("This rack is not ready yet") rather than guess a pose. Taking back always works.
 //
-// Pose maths (UNVERIFIED in game, check with the first placement): only racks turned about Z are placed (every rack in Bruma
-// is); a local point (x, y) turns by the rack's heading h as x cos h + y sin h, -x sin h + y cos h (heading 0 faces +Y, 90 faces
-// +X), and the slot's own rotation keeps its X and Y and adds h to Z, which holds if the engine applies Z outermost.
+// Pose maths (M below). The rack's angles become its matrix with NiMatrix3::SetEulerAnglesXYZ, the slot is
+// P + scale * (M_rack @ pos), and the weapon's angles are ToEulerAnglesXYZ(M_rack @ m_node), the angles MoveToNode itself
+// writes (Nat's PC, from CommonLibSSE e3626d22). Units: the server keeps reference angles in DEGREES (LocationalDataUtils::GetRot
+// turns a REFR's radians into degrees; the 'angle' property returns them; SetAngle stores its arguments as given; the client
+// hands them to ObjectReference.setAngle), so radians are only used inside the maths.
 //
 // Config "weaponRacks": { enabled, sweepMs, ownerChangeConfirmMs, bootGraceMs, poseFile, stateFile }.
 
@@ -70,6 +73,34 @@ const accepts = (rackType, kind) => {
   if (kind === 'shield') return 'Shields hang on a shield rack.';
   if (rackType === 3 && (kind === 'dagger' || kind === 'bow')) return 'Daggers and bows do not hang on this rack.';
   return '';
+};
+
+// ---- pose maths, NiMatrix3 conventions (row-major, p_parent = m @ p_child) ----------------------------------------------------
+const M = {
+  // NiMatrix3::SetEulerAnglesXYZ(x, y, z), radians
+  fromEuler: ([x, y, z]) => {
+    const cx = Math.cos(x), sx = Math.sin(x), cy = Math.cos(y), sy = Math.sin(y), cz = Math.cos(z), sz = Math.sin(z);
+    return [[cy * cz, cy * sz, -sy], [sx * sy * cz - cx * sz, sx * sy * sz + cx * cz, sx * cy], [cx * sy * cz + sx * sz, cx * sy * sz - sx * cz, cx * cy]];
+  },
+  // NiMatrix3::ToEulerAnglesXYZ, radians
+  toEuler: (e) => [-Math.atan2(-e[1][2], e[2][2]), -Math.asin(Math.max(-1, Math.min(1, e[0][2]))), -Math.atan2(-e[0][1], e[0][0])],
+  mul: (a, b) => a.map((row) => [0, 1, 2].map((j) => row[0] * b[0][j] + row[1] * b[1][j] + row[2] * b[2][j])),
+  apply: (m, v) => m.map((row) => row[0] * v[0] + row[1] * v[1] + row[2] * v[2]),
+  deg: (r) => { const d = (r * 180) / Math.PI; return ((d % 360) + 360) % 360; },
+  rad: (d) => (Number(d) || 0) * Math.PI / 180,
+  // A table entry's rotation: m when it is a 3x3 of numbers, else rot (radians)
+  nodeMatrix: (p) => {
+    if (!p || !Array.isArray(p.pos) || p.pos.length !== 3 || !p.pos.every(Number.isFinite)) return null;
+    if (Array.isArray(p.m) && p.m.length === 3 && p.m.every((r) => Array.isArray(r) && r.length === 3 && r.every(Number.isFinite))) return p.m.map((r) => r.map(Number));
+    if (Array.isArray(p.rot) && p.rot.length === 3 && p.rot.every(Number.isFinite)) return M.fromEuler(p.rot.map(Number));
+    return null;
+  },
+  // A rack at pos with angles in degrees and scale s; a pivot at local pos with matrix m -> world pos and SetAngle degrees
+  compose: (rackPos, rackAngleDeg, s, localPos, m) => {
+    const R = M.fromEuler(rackAngleDeg.map(M.rad));
+    const d = M.apply(R, localPos);
+    return { pos: [0, 1, 2].map((i) => Number(rackPos[i]) + s * d[i]), rot: M.toEuler(M.mul(R, m)).map(M.deg) };
+  },
 };
 
 module.exports = (api) => {
@@ -112,6 +143,7 @@ module.exports = (api) => {
   const papyrus = (cls, fn, self, args) => mp.callPapyrusFunction('method', cls, fn, { type: 'form', desc: mp.getDescFromId(self) }, args);
 
   // ---- the pose table (weapon-racks.json, Nat's PC) -------------------------------------------------------------------
+  // { "<rack or activator edid>": { "<Pivot node>": { pos: [x,y,z] (mesh root space), rot: [x,y,z] radians, m: 3x3, scale? } } }
   const POSE_FILE = path.resolve(C.poseFile);
   const poses = () => {
     let st = null; try { st = fs.statSync(POSE_FILE); } catch (e) { S.poses = null; S.posesAt = 0; return null; }
@@ -123,28 +155,43 @@ module.exports = (api) => {
       for (const [edid, nodes] of Object.entries(table || {})) {
         if (edid.startsWith('_') || !nodes || typeof nodes !== 'object') continue;
         for (const [node, p] of Object.entries(nodes)) {
-          const ok = p && Array.isArray(p.pos) && p.pos.length === 3 && p.pos.every(Number.isFinite) && Array.isArray(p.rot) && p.rot.length === 3 && p.rot.every(Number.isFinite);
-          if (!ok) { log(`weaponracks: ${C.poseFile} ${edid}.${node} is not { pos: [x,y,z], rot: [x,y,z] }; left out`); continue; }
-          (out[edid.toLowerCase()] = out[edid.toLowerCase()] || {})[node.toLowerCase()] = { pos: p.pos.map(Number), rot: p.rot.map(Number) };
+          const m = M.nodeMatrix(p);
+          if (!m) { log(`weaponracks: ${C.poseFile} ${edid}.${node} has no usable pos and rot/m; left out`); continue; }
+          (out[edid.toLowerCase()] = out[edid.toLowerCase()] || {})[node.toLowerCase()] = { pos: p.pos.map(Number), m };
         }
       }
       S.poses = out; S.posesAt = st.mtimeMs;
-      log(`weaponracks: ${Object.keys(out).length} rack meshes in ${C.poseFile}`);
+      log(`weaponracks: ${Object.keys(out).length} rack entries in ${C.poseFile}`);
       return out;
     } catch (e) { log(`weaponracks: ${C.poseFile} unreadable: ${e.message}`); S.poses = null; S.posesAt = 0; return null; }
   };
-  const near0 = (deg) => { const d = ((Number(deg) % 360) + 360) % 360; return d < 0.5 || d > 359.5; };
-  // The slot's world pose, or null when the table or the rack cannot give one
-  const slotPose = (mesh, node) => {
-    const table = poses(); if (!table) return null;
-    const p = (table[edidOf(baseOf(mesh)).toLowerCase()] || {})[node.toLowerCase()]; if (!p) return null;
+  const pivotsOf = (ref) => { const t = poses(); return t ? (t[edidOf(baseOf(ref)).toLowerCase()] || null) : null; };
+  // A plugin reference's own scale (XSCL), 1 without one
+  const scaleOf = (ref) => {
+    if (ref >= 0xff000000) return 1;
+    const f = fields(recordOf(ref), 'XSCL')[0];
+    if (!f || f.data.byteLength < 4) return 1;
+    const v = new DataView(f.data.buffer, f.data.byteOffset, 4).getFloat32(0, true);
+    return Number.isFinite(v) && v > 0 ? v : 1;
+  };
+  // The slot's world pose { where, pos, rot (degrees, for SetAngle) }, or null when the table or the rack cannot give one.
+  // Weapons are posed from the rack mesh (WRackTrigger's target), as the vanilla script's MoveToNode(TriggerMarker, node)
+  // does; an activator with no mesh link falls back to itself (its edid carries the same pivots).
+  const slotPose = (poseRef, node) => {
+    const pivots = pivotsOf(poseRef); if (!pivots) return null;
+    const p = pivots[String(node).toLowerCase()]; if (!p) return null;
     let pos, ang, where;
-    try { pos = mp.get(mesh, 'pos'); ang = mp.get(mesh, 'angle') || [0, 0, 0]; where = String(mp.get(mesh, 'worldOrCellDesc') || ''); } catch (e) { return null; }
-    if (!Array.isArray(pos) || !where) return null;
-    if (!near0(ang[0]) || !near0(ang[1])) return null; // a tilted rack: the composition is not verified
-    const h = (Number(ang[2]) || 0) * Math.PI / 180, c = Math.cos(h), s = Math.sin(h);
-    const [x, y, z] = p.pos;
-    return { where, pos: [pos[0] + x * c + y * s, pos[1] - x * s + y * c, pos[2] + z], rot: [p.rot[0], p.rot[1], (((p.rot[2] + Number(ang[2] || 0)) % 360) + 360) % 360] };
+    try { pos = mp.get(poseRef, 'pos'); ang = mp.get(poseRef, 'angle') || [0, 0, 0]; where = String(mp.get(poseRef, 'worldOrCellDesc') || ''); } catch (e) { return null; }
+    if (!Array.isArray(pos) || !where || !Array.isArray(ang)) return null;
+    return Object.assign({ where }, M.compose(pos, ang, scaleOf(poseRef), p.pos, p.m));
+  };
+  // The pivot a weapon goes to: the vanilla script's node for its type; a crossbow (a bow by keyword, animation type 9 in
+  // its DNAM) takes CrossbowPivot01 where the rack has one. The variant nodes (StaffPivot02/03, StaffPivotFalmer and
+  // the other named staves, ShieldPivotDaedric and the other named shields, CrossbowPivot02, BogusPivot) are not used.
+  const animTypeOf = (baseId) => { const f = fields(recordOf(baseId), 'DNAM')[0]; return f && f.data.byteLength >= 1 ? f.data[0] : -1; };
+  const nodeFor = (kind, baseId, poseRef) => {
+    if (kind === 'bow' && animTypeOf(baseId) === 9) { const pv = pivotsOf(poseRef); if (pv && pv.crossbowpivot01) return 'CrossbowPivot01'; }
+    return NODE[kind];
   };
 
   // ---- state: { racks: { activatorHex: slot }, pending: { profileId: [{ entry, from, at }] } } ---------------------------
@@ -332,13 +379,15 @@ module.exports = (api) => {
     const kind = kindOf(held.baseId);
     if (!kind) return 'That will not sit on a weapon rack.';
     const no = accepts(rack.rackType, kind); if (no) return no;
-    if (!rack.mesh || !poses()) return 'This rack is not ready yet.';
-    if (!slotPose(rack.mesh, NODE[kind])) return poses() && (poses()[edidOf(baseOf(rack.mesh)).toLowerCase()]) ? `A ${NAMES[kind]} will not fit on this rack.` : 'This rack is not ready yet.';
+    const poseRef = rack.mesh || rack.act;
+    if (!poses() || !pivotsOf(poseRef)) return 'This rack is not ready yet.';
+    const node = nodeFor(kind, held.baseId, poseRef);
+    if (!slotPose(poseRef, node)) return pivotsOf(poseRef)[node.toLowerCase()] ? 'This rack is not ready yet.' : `A ${NAMES[kind]} will not fit on this rack.`;
     const src = held.inv[held.at];
     const entry = Object.assign({}, src, { count: 1 }); delete entry.worn; delete entry.wornLeft;
     const act = hex(rack.act);
     const st = state();
-    st.racks[act] = { entry, kind, node: NODE[kind], mesh: hex(rack.mesh), home: hex(home.primary), owner: Number(home.rec.owner), by: profileOf(a), at: new Date(now()).toISOString(), display: null };
+    st.racks[act] = { entry, kind, node, mesh: hex(poseRef), home: hex(home.primary), owner: Number(home.rec.owner), by: profileOf(a), at: new Date(now()).toISOString(), display: null };
     if (!save()) { delete st.racks[act]; return 'Something went wrong there. Try again in a moment.'; }
     try { papyrus('Actor', 'UnequipItem', a, [{ type: 'espm', desc: mp.getDescFromId(held.baseId) }, false, true]); } catch (e) { /* the inventory change below unequips it anyway */ }
     try {
@@ -456,3 +505,4 @@ module.exports = (api) => {
   const st = state();
   log(`weaponracks ${C.enabled === false ? 'off' : 'on'}: ${Object.keys(st.racks).length} racked, ${Object.keys(st.pending).length} owner(s) with weapons to return, pose table ${poses() ? 'loaded' : 'missing (racks refuse to take weapons)'}`);
 };
+module.exports.poseMath = M;
