@@ -144,10 +144,13 @@ module.exports = (api) => {
       if (current === best) continue;
       // The raider's own GM gives it up to anyone near it, however near the GM is
       if (current && online.has(current) && current !== avoid) {
-        // An older client that never reports keeps what it hosts; one whose report went stale (8 Oct: a hitch or a
-        // loading screen) is no longer seen to have it, and it goes to a player who does
-        if (!S.sight.has(current)) continue;
-        const mine = seers.find(([p]) => p === current);
+        // An older client that never reports keeps what it hosts. One whose report went stale (8 Oct: a hitch or a
+        // loading screen) is measured as the others are if its last report had the NPC, so a short pause does not hand
+        // it over and back; if the last report did not have it, it goes to a player who does
+        const last = S.sight.get(current);
+        if (!last) continue;
+        let mine = seers.find(([p]) => p === current);
+        if (!mine && last.dist.has(npc)) { const v = policy(current, npc); if (v.ok) mine = [current, Number(v.dist) || 0]; }
         if (mine && mine[1] <= bestD * C.holdFactor + C.holdUnits) continue;   // still has it, nobody clearly nearer
       }
       // A live host keeps an NPC that just changed hands or is fighting (gamemode.js hostcooldown)

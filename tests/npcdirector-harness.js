@@ -45,11 +45,19 @@ hosters.set(DEER, OLD); sets.length = 0;
 now += 4000; sight(P1, [[DEER, 50]]); sight(P2, [[DEER, 60]]); tick();
 check('an older client that does not report keeps what it hosts', hosters.get(DEER) === OLD && !sets.some(([id]) => id === DEER));
 // 8 Oct (dungeon-perf-1008): a host that reports but whose last report went stale (a hitch, a loading screen) was taken
-// for an older client and kept its NPCs; only a client that never reported keeps them now
+// for an older client and kept its NPCs whoever stood nearer. Now it is measured by the server like the others, with the
+// same hysteresis, if its last report had the NPC (a 3-5 s pause is not two hand-overs); else it loses it
 hosters.set(DEER, P2); sets.length = 0;
 now += 1000; sight(P2, [[DEER, 60]]);
-now += 4000; sight(P1, [[DEER, 50]]); tick();
-check('a host whose report went stale (it did report) loses the NPC to a fresh reporter', hosters.get(DEER) === P1 && sets.some(([id, h]) => id === DEER && h === P1), [...hosters]);
+now += 4000; sight(P1, [[DEER, 50]]); tick();   // server distances: P2 1350, P1 1750
+check('a host whose report went stale keeps the NPC while the fresh reporter is not clearly nearer', hosters.get(DEER) === P2 && !sets.length, [...hosters]);
+now += 1000; pos[P1] = [1900, 0, 0]; sight(P1, [[DEER, 100]]); tick();   // P1 now 100 away, P2 still 1350
+check('...and loses it once the fresh reporter is clearly nearer', hosters.get(DEER) === P1 && sets.some(([id, h]) => id === DEER && h === P1), [...hosters]);
+pos[P1] = [250, 0, 0];
+hosters.set(DEER, P2); sets.length = 0;
+now += 4000; sight(P2, [[WOLF, 60]]);
+now += 4000; sight(P1, [[DEER, 50]]); tick();   // P2 nearer, but its last report did not have the deer
+check('a host whose stale report did not have the NPC loses it to a fresh reporter', hosters.get(DEER) === P1, [...hosters]);
 hosters.set(DEER, OLD); sets.length = 0;
 now += 4000; sight(P1, [[DEER, 50]]); tick();
 check('...while a client that never reported still keeps what it hosts', hosters.get(DEER) === OLD && !sets.length);
