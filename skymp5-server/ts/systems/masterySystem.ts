@@ -226,6 +226,12 @@ const emptyRecord = (): MasteryRecord => ({ skills: {}, order: [], respecs: 0 })
 const emptyProgress = (): SkillProgress => ({ level: 0, lastPointAt: 0, rank: 0, granted: [] });
 const stringList = (v: unknown): string[] => Array.isArray(v) ? v.filter((x) => typeof x === "string" && x) : [];
 const numberList = (v: unknown): number[] => Array.isArray(v) ? v.map(Number).filter((x) => Number.isFinite(x) && x >= 0) : [];
+// pointSystem.waningFloorBySkill: { skillId: 0 | n }, 0 kept (num() above treats 0 as unset); keys starting "_" are comments
+const floorsBySkill = (v: any): Record<string, number> => {
+  const out: Record<string, number> = {};
+  if (v && typeof v === "object") for (const [k, n] of Object.entries(v)) if (!k.startsWith("_") && Number.isFinite(Number(n)) && Number(n) >= 0) out[k] = Math.floor(Number(n));
+  return out;
+};
 const craftWeightsOf = (v: any): P.CraftWeights | null => {
   if (!v || typeof v !== "object") return null;
   const w = { byTier: numberList(v.byTier), byIngredients: numberList(v.byIngredients) };
@@ -302,6 +308,7 @@ export class MasterySystem implements System {
         expertAbove: num(ps.expertAbove, 75), expertCount: num(ps.expertCount, 3),
         transferFloor: num(ps.transferFloor, 25), firstTouchCost: num(ps.firstTouchCost, 1),
         waningFloor: num(ps.waningFloor, num(ps.transferFloor, 25)),
+        waningFloorBySkill: floorsBySkill(ps.waningFloorBySkill),
         bucketBurst: num(ps.bucketBurst, 20), bucketPerHour: num(ps.bucketPerHour, 30),
         dailyCaps: { low: num(caps.low, 360), expert: num(caps.expert, 180), master: num(caps.master, 60) },
         characterDaily: num(ps.characterDaily, 1080),
@@ -555,7 +562,7 @@ export class MasterySystem implements System {
       const gated = (r.gateStations.size && Array.from(r.gateStations).some((kw) => keywords.has(kw))) || r.gatePrefixes.some((p) => edid.startsWith(p));
       if (gated && !has(k.id)) {
         if (this.points) {
-          if (P.firstTouch(rec as unknown as P.PointRecord, k.id, this.points)) {
+          if (this.touchFirst(ctx, casterId, userId, rec, k.id)) {
             this.write(ctx, casterId, rec);
             this.notice(ctx, userId, `You set your hand to the ${k.label.toLowerCase()}'s work for the first time.`);
             this.syncRank(ctx, casterId, rec, k.id, userId);
@@ -681,7 +688,7 @@ export class MasterySystem implements System {
     }
     for (const taken of out.tookFrom) {
       if (taken.levels <= 0) continue;
-      this.notice(ctx, userId, `Your ${this.labelOf(taken.id)} slips to ${rec.skills[taken.id].level}.`);
+      this.noticeFell(ctx, userId, taken.id, rec.skills[taken.id].level);
       this.syncRank(ctx, actorId, rec, taken.id, userId);
     }
     return out.units;
@@ -1024,7 +1031,7 @@ export class MasterySystem implements System {
     const prog = rec.skills[id];
     if (prog && prog.level >= 1) return;                      // already held
     if (!prog || !prog.offered) return;                       // no offer stands for this skill
-    if (!P.firstTouch(rec as unknown as P.PointRecord, id, cfg)) {
+    if (!this.touchFirst(ctx, actorId, userId, rec, id)) {
       this.notice(ctx, userId, "Your hands are full. Mark a skill to fall (K) before taking up a new trade.");
       return;
     }
@@ -1036,9 +1043,30 @@ export class MasterySystem implements System {
     const rec = this.read(ctx, actorId) || emptyRecord();
     const prog = rec.skills[id];
     if (prog && prog.level >= 1) return "held";
-    if (!P.firstTouch(rec as unknown as P.PointRecord, id, cfg)) return "full";
+    if (!this.touchFirst(ctx, actorId, this.userOf(ctx, actorId), rec, id)) return "full";
     this.completeTakeUp(ctx, actorId, this.userOf(ctx, actorId), rec, id, Math.max(0, Number(prog?.shadow) || 0));
     return "ok";
+  }
+
+  // P.firstTouch, then the same notices and rank sync for every waning skill it took the level from as a gain gives
+  // (before, a donor here fell silently and kept its tier spells until its next change)
+  private touchFirst(ctx: SystemContext, actorId: number, userId: number, rec: MasteryRecord, id: string): boolean {
+    const cfg = this.points; if (!cfg) return false;
+    const before: Record<string, number> = {};
+    for (const [k, v] of Object.entries(rec.skills)) before[k] = v.level;
+    if (!P.firstTouch(rec as unknown as P.PointRecord, id, cfg)) return false;
+    for (const [k, v] of Object.entries(rec.skills)) {
+      if (k === id || !(k in before) || v.level >= before[k]) continue;
+      this.noticeFell(ctx, userId, k, v.level);
+      this.syncRank(ctx, actorId, rec, k, userId);
+    }
+    return true;
+  }
+
+  private noticeFell(ctx: SystemContext, userId: number, id: string, level: number): void {
+    this.notice(ctx, userId, level < 1
+      ? `You have let ${this.labelOf(id)} go. Its points are free for other work; take it up again by doing it.`
+      : `Your ${this.labelOf(id)} slips to ${level}.`);
   }
 
   // After P.firstTouch has spent the pool point: settle the new entry, credit the banked units, write, and sync
@@ -1127,7 +1155,7 @@ export class MasterySystem implements System {
         .filter(([, pr]) => pr.level < 1 && pr.offered)
         .map(([id, pr]) => ({ id, banked: Math.round(pr.shadow || 0) })),
       held: Object.entries(rec.skills).filter(([, pr]) => pr.level >= 1)
-        .map(([id, pr]) => ({ id, level: pr.level, xp: Math.round(pr.xp || 0), tier: pr.rank, lock: pr.lock || "raise" }))
+        .map(([id, pr]) => ({ id, level: pr.level, xp: Math.round(pr.xp || 0), tier: pr.rank, lock: pr.lock || "raise", waningFloor: P.waningFloorOf(cfg, id) }))
         .sort((a, b) => b.level - a.level),
     } : undefined;
     const first = chosen[0];
@@ -1168,6 +1196,14 @@ export class MasterySystem implements System {
 
   private syncRank(ctx: SystemContext, actorId: number, rec: MasteryRecord, id: string, userId: number): void {
     const prog = rec.skills[id]; if (!prog) return;
+    // Waned to 0 (pointSystem.waningFloorBySkill): out of the order, so its tier spells and actor values go as if never held
+    if (this.points && prog.level < 1) {
+      if (!Array.isArray(prog.granted)) prog.granted = [];
+      this.revokeAbove(ctx, actorId, prog, id, -1);
+      prog.rank = 0;
+      this.applyActorValues(ctx, actorId, id, -1, rec);
+      return;
+    }
     const oldRank = prog.rank; const newRank = this.rankFor(prog.level);
     if (newRank < oldRank) this.revokeAbove(ctx, actorId, prog, id, newRank);
     prog.rank = newRank;
