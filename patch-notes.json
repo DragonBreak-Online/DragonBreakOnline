@@ -1,5 +1,19 @@
 [
   {
+    "title": "Mountain Watch's storage",
+    "date": "SHIP_DATE",
+    "version": "Server update",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Property",
+        "items": [
+          "The lord of Mountain Watch now owns the chests and inner rooms of his buildings too, so he can assign them to his people."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Waning skills give back every point",
     "date": "SHIP_DATE",
     "version": "Server update",

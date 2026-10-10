@@ -89,6 +89,9 @@ try {
   ok(sys.overCap(ctx, 60, OVER, false) !== '' && rec(BARREL).owner === 60 && rec(H(0x5c0d7)).owner === 60, 'an owner over the cap keeps both places and can take no new one');
   ok(sys.overCap(ctx, 4, AKATOSH, false) === '' && sys.countPlaces(ctx, 4) === 3, 'staff (profile 4 in housingPlaces.staffProfiles) are exempt with their 3 claims');
   ok(sys.overCap(ctx, 21, GM, false) === '' , 'anyone online with an admin tier is exempt too (the gear swap reads the same roles)');
+  // uncappedProfiles (Nate, 10 Oct: Lord Elion): the cap never counts them, though they are no staff (a bundle without it skips)
+  fs.writeFileSync('gamemode-config.json', JSON.stringify({ housingPlaces: { staffProfiles: [], uncappedProfiles: [4] } }));
+  if (typeof HousingSystem.prototype.uncappedProfiles === 'function') ok(sys.overCap(ctx, 4, AKATOSH, false) === '' && !sys.staffProfiles().has(4), 'an uncapped profile (housingPlaces.uncappedProfiles) passes the cap without being staff');
   fs.writeFileSync('gamemode-config.json', JSON.stringify({ housingPlaces: { staffProfiles: [] } }));
   ok(sys.overCap(ctx, 4, 0, false) !== '', 'a profile struck from the list is capped again (read when asked, no restart)');
   fs.writeFileSync('gamemode-config.json', JSON.stringify({ housingPlaces: { staffProfiles: [4] } }));
