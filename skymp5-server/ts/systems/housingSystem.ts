@@ -6,7 +6,7 @@ import { AdminRoleConfig, readAdminRoleConfig, adminTierOf, TIER_CAPS } from "./
 import { getZones, Zones } from "./zones";
 import { PlaceClaim, PlannedPlace, planPlaces } from "./housingPlaces";
 import { LEGACY_KEY_BASE_ID, allocateKeyBase, isPropertyKeyBase, refreshKeyPool } from "./houseKeys";
-import { OwnerCandidate, OwnerRecord, planOwners } from "./housingOwners";
+import { OwnerCandidate, OwnerRecord, UNNAMED, nameKey, planOwners } from "./housingOwners";
 
 // The ScampServer / `mp` API is untyped here, same convention as spawn.ts.
 type Mp = any;
@@ -213,6 +213,9 @@ export class HousingSystem implements System {
 
     const placeCap = Number(all?.["housingPlaceCap"]);
     if (Number.isFinite(placeCap) && placeCap >= 1) this.placeCap = Math.floor(placeCap);
+    // With property per character, the houses all of an account's characters may hold between them (Nate, 10 Oct: two)
+    const accountCap = Number(all?.["housingPlaceCapPerAccount"]);
+    if (Number.isFinite(accountCap) && accountCap >= 1) this.placeCapPerAccount = Math.floor(accountCap);
     const maxClaims = Number(all?.["housingMaxClaims"]);
     if (Number.isFinite(maxClaims) && maxClaims > 0) this.maxClaims = maxClaims;
     const maxDistance = Number(all?.["housingMaxDistance"]);
@@ -307,6 +310,12 @@ export class HousingSystem implements System {
       ownerActorsOf: (rec: unknown): number[] => {
         const r = rec as { owner?: unknown; ownerChar?: unknown } | null;
         return r ? this.ownerActorsOf(ctx, { owner: Number(r.owner) || 0, ownerChar: Number(r.ownerChar) >>> 0 }) : [];
+      },
+      // Whether a key this actor carries opens the property (any key record, the vanilla one or the pool's), as a door does
+      keyOpens: (ref: unknown, actorId: unknown): boolean => {
+        const p = primary(ref); const rec = p ? this.read(ctx, p) : null;
+        if (!p || !rec || rec.owner === 0) return false;
+        return this.keyOpensWith(ctx, p, rec, this.viewerAccess(ctx, Number(actorId) >>> 0));
       },
       // What a claim's owner is keyed by in gameplay stores: "c<actor hex>" for a character, else the profile id
       ownerKeyOf: (rec: unknown): string => {
@@ -469,7 +478,7 @@ export class HousingSystem implements System {
       else if (place && (action === "lock" || ownKey)) rec = this.adopted(ctx, primary, rec, place);
       else if (place && action === "unlock") { this.notice(ctx, userId, "That is not locked."); return; }
     }
-    const isOwner = this.ownsAs(rec, this.profileOf(ctx, actorId), actorId);
+    const isOwner = this.ownsAs(rec, this.profileOf(ctx, actorId), actorId) || this.leadsHall(ctx, primary, rec, actorId);
     const isManager = this.isManager(ctx, actorId, primary) && !this.sharesByOffice(ctx, primary, rec, actorId);
     // Every staff override of someone else's property goes to the admin log (review A3-1)
     if (!isOwner && rec.owner !== 0 && isManager && !this.isHoldManager(ctx, actorId, primary) && STAFF_LOGGED.indexOf(String(action)) !== -1) {
@@ -710,7 +719,7 @@ export class HousingSystem implements System {
     }
     const owned = !!rec && rec.owner !== 0;
     const profileId = this.profileOf(ctx, actorId);
-    const isOwner = owned && this.ownsAs(rec!, profileId, actorId);
+    const isOwner = owned && (this.ownsAs(rec!, profileId, actorId) || this.leadsHall(ctx, primary, rec!, actorId));
     const isManager = !!primary && this.isManager(ctx, actorId, primary) && !(owned && this.sharesByOffice(ctx, primary, rec!, actorId));
 
     const holdsKey = owned && !isOwner && !isManager && this.hasAccess(ctx, primary, rec!, actorId);
@@ -886,12 +895,8 @@ export class HousingSystem implements System {
     const hold = this.holdOf(ctx, primary);
     if (hold && v.ranks.some((r) => r.hold === hold && MANAGER_RANKS.indexOf(r.rank) !== -1)) return true;
     if (this.inHall(ctx, primary, rec, v)) return true;
-    const credential = this.keyCredential(primary, rec);
-    const names = this.acceptedKeyNames(ctx, primary, rec);
-    if (Array.from(v.keys).some((n) => this.isKeyFor(n, credential, names))) return true;
+    if (this.keyOpensWith(ctx, primary, rec, v)) return true;
     if (!this.placesOn()) return false;
-    // A place's root also answers to the key names its members had before the migration
-    if (rec.keyAliases && Array.from(v.keys).some((n) => rec.keyAliases!.some((a) => this.aliasOpens(n, a)))) return true;
     // A member of a place: its assignee, and whoever may open the place itself; a chest only for the household when shared
     if (!rec.memberOf || rec.memberOf === primary) return false;
     const root = this.read(ctx, rec.memberOf);
@@ -903,6 +908,14 @@ export class HousingSystem implements System {
     // Only an exterior door answers to the place's key; an inner door or chest to its own (Nate, 5 Oct)
     if (!this.isEntrance(ctx, primary, rec) && !this.isPlaceContainer(ctx, primary, rec)) return this.ownsOrManages(ctx, rec.memberOf, root, v);
     return this.hasAccessWith(ctx, rec.memberOf, root, v);
+  }
+
+  // A key the viewer carries opens this lock: one cut for it, or (a place's root) a key name its members had before the migration
+  private keyOpensWith(ctx: SystemContext, primary: number, rec: PropertyRecord, v: ViewerAccess): boolean {
+    const credential = this.keyCredential(primary, rec);
+    const names = this.acceptedKeyNames(ctx, primary, rec);
+    if (Array.from(v.keys).some((n) => this.isKeyFor(n, credential, names))) return true;
+    return this.placesOn() && !!rec.keyAliases && Array.from(v.keys).some((n) => rec.keyAliases!.some((a) => this.aliasOpens(n, a)));
   }
 
   // The owner, staff (Lead GM and above) and the managers of the hold: never a key holder
@@ -923,6 +936,17 @@ export class HousingSystem implements System {
     const member = (globalThis as any).__dboHallMember;
     if (typeof member !== "function") return false;
     try { return member([root, rootRec.partner].filter(Boolean), rootRec.owner, v.actorId, this.ownerCharOf(rootRec)) === true; } catch { return false; }
+  }
+
+  // A faction's hall follows the faction's current leader, whoever owns the building (Nate, 10 Oct): the leader's character
+  // holds the owner's powers over it (guilds.js __dboHallLeader), and a new leader takes them over at once
+  private leadsHall(ctx: SystemContext, primary: number, rec: PropertyRecord, actorId: number): boolean {
+    if (!this.placesOn() || rec.owner === 0 || !actorId) return false;
+    const root = rec.place ? primary : rec.memberOf || 0;
+    const rootRec = root ? (root === primary ? rec : this.read(ctx, root)) : null;
+    const leader = (globalThis as any).__dboHallLeader;
+    if (!rootRec || !rootRec.place || typeof leader !== "function") return false;
+    try { return leader([root, rootRec.partner].filter(Boolean), actorId) === true; } catch { return false; }
   }
 
   // An office holder a building names as sharing it (Nate, 4 Oct: Castle Bruma's Steward; guilds.js __dboHallOffice) uses it as
@@ -2232,9 +2256,16 @@ export class HousingSystem implements System {
       if (this.countLoose(ctx, profileId, actorId) < this.maxClaims) return "";
       return self ? `You already hold ${this.maxClaims} chests and rooms of your own.` : `They already hold ${this.maxClaims} chests and rooms of their own.`;
     }
-    if (this.countPlaces(ctx, profileId, actorId) < this.placeCap) return "";
-    const n = this.placeCap === 1 ? "a property" : `${this.placeCap} properties`;
-    return self ? `You already hold ${n}; one each.` : `They already hold ${n}; one each.`;
+    if (this.countPlaces(ctx, profileId, actorId) >= this.placeCap) {
+      const n = this.placeCap === 1 ? "a property" : `${this.placeCap} properties`;
+      return self ? `You already hold ${n}; one each.` : `They already hold ${n}; one each.`;
+    }
+    // Holdings already past it are kept; only a new one is refused
+    if (this.perCharacter && this.countPlaces(ctx, profileId, 0, true) >= this.placeCapPerAccount) {
+      const n = this.placeCapPerAccount === 1 ? "a property" : `${this.placeCapPerAccount} properties`;
+      return self ? `Your characters already hold ${n} between them, the most one account may.` : `Their characters already hold ${n} between them, the most one account may.`;
+    }
+    return "";
   }
 
   private isStaff(ctx: SystemContext, profileId: number, actorId: number): boolean {
@@ -2244,11 +2275,11 @@ export class HousingSystem implements System {
 
   // Properties held: the buildings (a place, or a way in that is no member of one)
   // Counted per character with housingOwnerPerCharacter (a claim not yet migrated counts for every character of its account)
-  private countPlaces(ctx: SystemContext, profileId: number, actorId = 0): number {
+  private countPlaces(ctx: SystemContext, profileId: number, actorId = 0, wholeAccount = false): number {
     let n = 0;
     for (const primary of this.claimed) {
       const rec = this.read(ctx, primary);
-      if (rec && this.ownsAs(rec, profileId, actorId) && this.isBuilding(ctx, primary, rec)) n++;
+      if (rec && (wholeAccount ? !!profileId && rec.owner === profileId : this.ownsAs(rec, profileId, actorId)) && this.isBuilding(ctx, primary, rec)) n++;
     }
     return n;
   }
@@ -2470,7 +2501,12 @@ export class HousingSystem implements System {
     try { return Number((ctx.svr as Mp).get(actorId, "profileId")) || 0; } catch { return 0; }
   }
 
+  // The character's own name: under a mask the real one it keeps (gameplay playermenu.js maskName), not what others see
   private nameOf(ctx: SystemContext, actorId: number): string {
+    try {
+      const real = (ctx.svr as Mp).get(actorId, "maskName");
+      if (typeof real === "string" && !UNNAMED.includes(nameKey(real))) return real;
+    } catch { /* never masked */ }
     try {
       const appearance = (ctx.svr as Mp).get(actorId, "appearance");
       return String((appearance && appearance.name) || "Someone");
@@ -2512,6 +2548,7 @@ export class HousingSystem implements System {
   private zoneCache = new Map<number, string | null>();
   private maxClaims = DEFAULT_MAX_CLAIMS;
   private placeCap = 1;
+  private placeCapPerAccount = 2;
   private placeRestore = "";
   private placeMigration: "off" | "dryrun" | "apply" = "dryrun";
   private staffSetting: number[] = [];
