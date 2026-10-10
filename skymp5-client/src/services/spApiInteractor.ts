@@ -3,6 +3,21 @@ import { ClientListener, ClientListenerConstructor, CombinedController } from ".
 import * as sp from "skyrimPlatform";
 import { LATE_LABEL, perfDiagEnabled, updateTiming } from "./services/perfDiag";
 
+type Handler = (...args: unknown[]) => unknown;
+
+// A handler that throws is reported to ClientDiagService (__dboReportError) and the error goes on to SkyrimPlatform as before
+const reporting = (kind: string, event: unknown, handler: Handler): Handler => function (this: unknown, ...args: unknown[]) {
+    try {
+        return handler.apply(this, args);
+    } catch (e) {
+        try {
+            const report = (globalThis as any).__dboReportError;
+            if (typeof report === "function") report(`${kind}:${String(event)}`, e);
+        } catch (x) { /* never in the way of the error itself */ }
+        throw e;
+    }
+};
+
 export class SpApiInteractor {
     static setup(listeners: ClientListener[]) {
         listeners.forEach(listener => SpApiInteractor.registerListenerForLookup(listener.constructor, listener));
@@ -13,10 +28,12 @@ export class SpApiInteractor {
         if (SpApiInteractor.controller) {
             return SpApiInteractor.controller;
         }
+        // Every handler is wrapped by reporting (a throw is reported, then rethrown); update handlers are also timed (perfDiag)
+        const perfOn = perfDiagEnabled((sp.settings && sp.settings["skymp5-client"]) as Record<string, unknown> | undefined);
         SpApiInteractor.controller = {
-            // TODO: handle errors in event handlers. will output to game console by default
-            on: perfDiagEnabled(sp.settings["skymp5-client"] as Record<string, unknown>) ? SpApiInteractor.timedOn : sp.on,
-            once: sp.once,
+            on: ((event: unknown, handler: Handler) =>
+                ((perfOn ? SpApiInteractor.timedOn : sp.on) as any)(event, reporting("on", event, handler))) as unknown as typeof sp.on,
+            once: ((event: unknown, handler: Handler) => (sp.once as any)(event, reporting("once", event, handler))) as unknown as typeof sp.once,
             emitter: EventEmitterFactory.makeEventEmitter(),
             lookupListener<T extends ClientListener>(constructor: ClientListenerConstructor<T>): T {
                 const listener = SpApiInteractor.listenersForLookupByName.get(constructor);
