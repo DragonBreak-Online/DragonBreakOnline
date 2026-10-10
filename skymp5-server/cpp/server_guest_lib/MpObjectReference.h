@@ -109,6 +109,7 @@ public:
   bool GetAnimationVariableBool(const char* name) const;
   bool IsPointInsidePrimitive(const NiPoint3& point) const;
   bool HasPrimitive() const;
+  bool IsFurnitureInUse() const;
   FormCallbacks GetCallbacks() const;
   bool HasScript(const char* name) const;
   bool IsActivationBlocked() const;
@@ -243,6 +244,8 @@ private:
   bool CheckIfObjectCanStartOccupyThis(MpObjectReference& activationSource,
                                        float occupationReach);
   bool TryOccupyFurniture(MpActor& actor, float occupationReach);
+  // The seated actor, or nullptr once it walked off, was disabled or destroyed
+  MpActor* SeatHolder(uint32_t occupantId, float occupationReach) const;
 
   bool everSubscribedOrListened = false;
   std::unique_ptr<std::set<MpObjectReference*>> listeners;

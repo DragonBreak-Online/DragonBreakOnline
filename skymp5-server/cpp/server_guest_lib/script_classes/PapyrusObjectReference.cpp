@@ -1027,6 +1027,32 @@ VarValue PapyrusObjectReference::GetDistance(
   return VarValue(0.f);
 }
 
+// Actors standing in this trigger's primitive, by the test OnTriggerEnter/Leave use
+VarValue PapyrusObjectReference::GetTriggerObjectCount(
+  VarValue self, const std::vector<VarValue>&)
+{
+  int count = 0;
+  auto selfRefr = GetFormPtr<MpObjectReference>(self);
+  if (selfRefr && selfRefr->HasPrimitive()) {
+    for (MpActor* actor : selfRefr->GetActorListeners()) {
+      if (!actor->IsDisabled() &&
+          actor->GetCellOrWorld() == selfRefr->GetCellOrWorld() &&
+          selfRefr->IsPointInsidePrimitive(actor->GetPos())) {
+        ++count;
+      }
+    }
+  }
+  return VarValue(count);
+}
+
+// abIgnoreReserved is ignored: the server has no furniture reservations
+VarValue PapyrusObjectReference::IsFurnitureInUse(
+  VarValue self, const std::vector<VarValue>&)
+{
+  auto selfRefr = GetFormPtr<MpObjectReference>(self);
+  return VarValue(selfRefr && selfRefr->IsFurnitureInUse());
+}
+
 VarValue PapyrusObjectReference::GetTotalItemWeight(
   VarValue self, const std::vector<VarValue>& arguments)
 {
@@ -1088,6 +1114,9 @@ void PapyrusObjectReference::Register(
   AddMethod(vm, "GetDistance", &PapyrusObjectReference::GetDistance);
   AddMethod(vm, "GetTotalItemWeight",
             &PapyrusObjectReference::GetTotalItemWeight);
+  AddMethod(vm, "GetTriggerObjectCount",
+            &PapyrusObjectReference::GetTriggerObjectCount);
+  AddMethod(vm, "IsFurnitureInUse", &PapyrusObjectReference::IsFurnitureInUse);
   // Havok, favors and destruction are the clients'
   AddStubMethod(vm, "SetMotionType", VarValue::None());
   AddStubMethod(vm, "SetNoFavorAllowed", VarValue::None());

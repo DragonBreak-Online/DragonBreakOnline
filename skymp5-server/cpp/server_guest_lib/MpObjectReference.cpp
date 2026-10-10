@@ -155,6 +155,8 @@ private:
 };
 
 namespace {
+constexpr float kFurnitureOccupationReach = 256.f;
+
 std::pair<int16_t, int16_t> GetGridPos(const NiPoint3& pos) noexcept
 {
   return { int16_t(pos.x / 4096), int16_t(pos.y / 4096) };
@@ -1641,10 +1643,7 @@ void MpObjectReference::ProcessActivateNormal(
     // TODO: rename SendOpenContainer to SendActivate
     activationSource.SendOpenContainer(GetFormId());
   } else if (t == "FURN" && actorActivator) {
-
-    constexpr float kOccupationReach = 256.f;
-
-    if (TryOccupyFurniture(*actorActivator, kOccupationReach)) {
+    if (TryOccupyFurniture(*actorActivator, kFurnitureOccupationReach)) {
       // SendOpenContainer being used to activate the object
       // TODO: rename SendOpenContainer to SendActivate
       activationSource.SendOpenContainer(GetFormId());
@@ -1819,19 +1818,14 @@ bool MpObjectReference::TryOccupyFurniture(MpActor& actor,
 
   // Seats freed without a closing activation (walked off, disabled, destroyed)
   auto isStale = [&](uint32_t occupantId) {
-    auto& form = worldState->LookupFormById(occupantId);
-    MpActor* occupantActor = form ? form->AsActor() : nullptr;
-    if (!occupantActor) {
-      return true;
+    if (SeatHolder(occupantId, occupationReach)) {
+      return false;
     }
-    bool stale = occupantActor->IsDisabled() ||
-      occupantActor->GetCellOrWorld() != GetCellOrWorld() ||
-      (occupantActor->GetPos() - GetPos()).SqrLength() >
-        occupationReach * occupationReach;
-    if (stale) {
+    auto& form = worldState->LookupFormById(occupantId);
+    if (MpActor* occupantActor = form ? form->AsActor() : nullptr) {
       occupantActor->RemoveEventSink(furnitureDisableSink);
     }
-    return stale;
+    return true;
   };
   occupants.erase(std::remove_if(occupants.begin(), occupants.end(), isStale),
                   occupants.end());
@@ -1893,6 +1887,29 @@ bool MpObjectReference::TryOccupyFurniture(MpActor& actor,
                "{}/{} markers used",
                GetFormId(), actor.GetFormId(), occupants.size(), capacity);
   return true;
+}
+
+MpActor* MpObjectReference::SeatHolder(uint32_t occupantId,
+                                       float occupationReach) const
+{
+  auto& form = GetParent()->LookupFormById(occupantId);
+  MpActor* occupantActor = form ? form->AsActor() : nullptr;
+  if (!occupantActor || occupantActor->IsDisabled() ||
+      occupantActor->GetCellOrWorld() != GetCellOrWorld() ||
+      (occupantActor->GetPos() - GetPos()).SqrLength() >
+        occupationReach * occupationReach) {
+    return nullptr;
+  }
+  return occupantActor;
+}
+
+bool MpObjectReference::IsFurnitureInUse() const
+{
+  return std::any_of(furnitureOccupantIds.begin(), furnitureOccupantIds.end(),
+                     [this](uint32_t occupantId) {
+                       return SeatHolder(occupantId,
+                                         kFurnitureOccupationReach) != nullptr;
+                     });
 }
 
 void MpObjectReference::RemoveFromGridAndUnsubscribeAll()
