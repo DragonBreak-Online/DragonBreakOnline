@@ -1251,6 +1251,19 @@ export class HousingSystem implements System {
     return out;
   }
 
+  // Profiles the one-place cap never counts but whose claims are otherwise ordinary: places are built and their chests
+  // joined, unlike staffProfiles (Nate, 10 Oct: Lord Elion owns every building of Mountain Watch, and as staff his
+  // chests were never joined to his buildings). gamemode-config.json housingPlaces.uncappedProfiles, read on each ask.
+  private uncappedProfiles(): Set<number> {
+    const out = new Set<number>();
+    try {
+      const cfg = JSON.parse(fs.readFileSync(GAMEMODE_CONFIG_FILE, "utf8"));
+      const list = cfg && cfg.housingPlaces && Array.isArray(cfg.housingPlaces.uncappedProfiles) ? cfg.housingPlaces.uncappedProfiles : [];
+      for (const p of list) if (Number(p) > 0) out.add(Number(p));
+    } catch { /* no gamemode config here */ }
+    return out;
+  }
+
   // The place rules (N3) apply only once Nate sets housingPlaceMigration "apply"
   private placesOn(): boolean {
     return this.placeMigration === "apply";
@@ -2252,6 +2265,7 @@ export class HousingSystem implements System {
       return self ? `You already hold ${this.maxClaims} properties.` : "They hold too much property already.";
     }
     if (this.isStaff(ctx, profileId, actorId)) return "";
+    if (profileId && this.uncappedProfiles().has(profileId)) return "";
     if (!building) {
       if (this.countLoose(ctx, profileId, actorId) < this.maxClaims) return "";
       return self ? `You already hold ${this.maxClaims} chests and rooms of your own.` : `They already hold ${this.maxClaims} chests and rooms of their own.`;
