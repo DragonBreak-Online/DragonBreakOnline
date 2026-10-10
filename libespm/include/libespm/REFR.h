@@ -42,6 +42,8 @@ public:
     const LocationalData* loc = nullptr;
     const DoorTeleport* teleport = nullptr;
     const float* boundsDiv2 = nullptr;
+    // XPRM shape: 1 box, 2 sphere, 3 portal box, 4 plane
+    uint32_t primitiveType = 0;
     uint32_t count = 0;
     uint8_t isParentActivationOnly = 0;
     std::vector<ActivationParentInfo> activationParents;
