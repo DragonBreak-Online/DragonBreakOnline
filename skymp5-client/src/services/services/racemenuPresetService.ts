@@ -30,6 +30,8 @@ const UPLOAD_CHUNK_MS = 250;
 // A copy's preset is asked for again after this long unless a rev notice says it changed sooner
 const CACHE_FRESH_MS = 10 * 60 * 1000;
 const GET_RETRY_MS = 15000;
+// An upload not refused this long after its last chunk is taken as kept by the server
+const UPLOAD_CONFIRM_MS = 15000;
 const MAX_CACHED = 64;
 const DIAG_LOG = "dbo-diag";
 const DIAG_MAX_LINES = 60;
@@ -55,6 +57,8 @@ interface Upload {
   race: number;
   chunks: string[];
   next: number;
+  // The player's own cache entry once the server keeps it
+  entry: CacheEntry;
 }
 
 interface CopyInfo {
@@ -85,6 +89,7 @@ export class RacemenuPresetService extends ClientListener {
     return s as PresetNatives;
   }
 
+  // On connect and disconnect; `off` too, as the server repeats it on every answer while it is off
   private reset(): void {
     this.upload = null;
     this.cache = {};
@@ -93,15 +98,26 @@ export class RacemenuPresetService extends ClientListener {
     this.selfRemoteId = 0;
     this.selfSpawnAt = 0;
     this.selfAppliedHash = "";
+    this.selfLoadedHash = "";
     this.lastSentHash = undefined;
+    this.serverSelf = null;
+    this.sentUpload = null;
+    this.off = false;
   }
 
-  // A load reverts every skee map; the player and each copy need their faces again
+  // A load reverts every skee map; the player's own face is asked of the server again (it marks it sent for this spawn)
   private onGameLoad(): void {
     this.ledger.clear();
     this.selfAppliedHash = "";
-    delete this.getSentAt[0];
+    this.selfLoadedHash = "";
+    this.forgetSelfFace();
     this.selfSpawnAt = Date.now();
+  }
+
+  private forgetSelfFace(): void {
+    if (this.selfRemoteId) delete this.cache[this.selfRemoteId];
+    delete this.getSentAt[0];
+    this.serverSelf = null;
   }
 
   private raceMenuSettling(now: number): boolean {
@@ -119,6 +135,11 @@ export class RacemenuPresetService extends ClientListener {
         this.capture();
       }
       if (this.upload && now - this.lastChunkAt >= UPLOAD_CHUNK_MS) this.pumpUpload(now);
+      if (this.sentUpload && now - this.sentUpload.doneAt >= UPLOAD_CONFIRM_MS) {
+        // Not refused: the server keeps this face
+        this.serverSelf = this.sentUpload.entry;
+        this.sentUpload = null;
+      }
       if (now - this.lastScanAt >= SCAN_MS) {
         this.lastScanAt = now;
         this.scan(now);
@@ -131,7 +152,13 @@ export class RacemenuPresetService extends ClientListener {
   private watchRaceMenu(now: number): void {
     let open = false;
     try { open = Ui.isMenuOpen(RACE_MENU); } catch { return; }
-    if (open) { this.raceMenuWasOpen = true; this.captureAt = 0; return; }
+    if (open) {
+      // Each editor close may send once, so a refused face or another character's identical face goes up again
+      if (!this.raceMenuWasOpen) this.lastSentHash = undefined;
+      this.raceMenuWasOpen = true;
+      this.captureAt = 0;
+      return;
+    }
     if (this.raceMenuWasOpen) {
       this.raceMenuWasOpen = false;
       this.captureAt = now + CAPTURE_DELAY_MS;
@@ -140,11 +167,27 @@ export class RacemenuPresetService extends ClientListener {
 
   // ---- the player's own face, after RaceMenu ----
 
+  // Why the face may not be sent yet: before the server's face is on the player, a capture would replace the saved sculpt with a stripped one
+  private captureHeldBy(player: Actor, now: number): string | null {
+    if (!this.selfRemoteId) return "no character yet";
+    const own = this.cache[this.selfRemoteId];
+    if (!own) return "the server's face for this character is not in yet";
+    if (!own.face || own.hash === this.selfLoadedHash) return null;
+    if (own.hash === this.selfAppliedHash) return "the server's face did not load on this character";
+    return `the server's face is not back on yet${this.gateReason(player, own, now)}`;
+  }
+
+  private gateReason(actor: Actor, entry: CacheEntry, now: number): string {
+    try { const g = this.gateFor(actor, entry, now); return g ? ` (${g})` : ""; } catch { return ""; }
+  }
+
   private capture(): void {
     const natives = this.natives();
     const player = Game.getPlayer();
     if (!natives || !player) return;
     if (isGuardedActor(player)) return;
+    const held = this.captureHeldBy(player, Date.now());
+    if (held) { this.diag(`preset: capture held, ${held}`); return; }
     const race = (player.getRace()?.getFormID() ?? 0) >>> 0;
     const name = presetFileName("self");
     let text: string | undefined;
@@ -164,12 +207,18 @@ export class RacemenuPresetService extends ClientListener {
     const encoded = isEmptyFace(face) ? "" : encodeFace(face);
     if (encoded.length > PRESET_MAX_CHARS) { this.diag(`preset: own preset too big (${encoded.length} chars)`); return; }
     const hash = encoded ? hashText(encoded) : "";
-    // What the player sees now is this face; a login re-apply must not put an older one back
+    // What the player sees now is this face; a login re-apply must not put an older one back, a refusal puts serverSelf back
+    const entry: CacheEntry = { hash, race, face: encoded ? face : null, at: Date.now() };
     this.selfAppliedHash = hash;
-    if (this.selfRemoteId) this.cache[this.selfRemoteId] = { hash, race, face: encoded ? face : null, at: Date.now() };
+    this.selfLoadedHash = hash;
+    if (this.selfRemoteId) this.cache[this.selfRemoteId] = entry;
     if (hash === this.lastSentHash) return;
+    if (this.serverSelf && this.serverSelf.hash === hash && !this.sentUpload && !this.upload) {
+      this.diag(`preset: own face unchanged, ${hash || "empty"}, not sent`);
+      return;
+    }
     this.lastSentHash = hash;
-    this.upload = { seq: ++this.uploadSeq, hash, race, chunks: encoded ? chunkText(encoded) : [], next: 0 };
+    this.upload = { seq: ++this.uploadSeq, hash, race, chunks: encoded ? chunkText(encoded) : [], next: 0, entry };
     this.diag(`preset: own face saved, ${face.custom.length} sliders, ${face.sculpt.length} sculpted parts, ${encoded.length} chars, ${hash || "empty"}`);
   }
 
@@ -180,7 +229,10 @@ export class RacemenuPresetService extends ClientListener {
     const n = u.chunks.length;
     sendCustomPacket(this.controller, { customPacketType: "dboPresetPut", up: u.seq, i: u.next, n, hash: u.hash, race: u.race, data: n ? u.chunks[u.next] : "" });
     u.next++;
-    if (u.next >= Math.max(1, n)) this.upload = null;
+    if (u.next >= Math.max(1, n)) {
+      this.upload = null;
+      this.sentUpload = { hash: u.hash, entry: u.entry, doneAt: now };
+    }
   }
 
   // ---- what the server sends ----
@@ -190,14 +242,19 @@ export class RacemenuPresetService extends ClientListener {
     const type = content ? content["customPacketType"] : undefined;
     if (!content || typeof type !== "string" || type.indexOf("dboPreset") !== 0) return;
     const now = Date.now();
+    if (type === "dboPresetRefused") {
+      this.onRefused(String(content["hash"] ?? ""), String(content["reason"] ?? ""), now);
+      return;
+    }
     const sent = Number(content["actor"]) >>> 0;
     if (!sent) return;
     // An answer about the player is kept under the id remoteServer gives the player
     const actor = content["self"] === true && this.selfRemoteId ? this.selfRemoteId : sent;
     if (type === "dboPresetNone") {
       // The server's switch (racemenuPresets.enabled false): nothing more is sent, saved or loaded this session
-      if (content["off"] === true && !this.off) { this.off = true; this.upload = null; this.diag("preset: switched off by the server"); }
+      if (content["off"] === true && !this.off) { this.off = true; this.upload = null; this.sentUpload = null; this.diag("preset: switched off by the server"); }
       this.store(actor, { hash: "", race: 0, face: null, at: now });
+      if (this.isSelfAnswer(content, actor)) this.serverSelf = this.cache[actor];
     } else if (type === "dboPresetMeta") {
       const hash = String(content["hash"] || "");
       const known = this.cache[actor];
@@ -210,10 +267,43 @@ export class RacemenuPresetService extends ClientListener {
       const face = decodeFace(text);
       if (!face) { this.diag(`preset: the face of ${actor.toString(16)} is refused here`); return; }
       this.store(actor, { hash: chunk.hash, race: Number(content["race"]) >>> 0, face, at: now });
+      if (this.isSelfAnswer(content, actor)) this.serverSelf = this.cache[actor];
     } else if (type === "dboPresetRev") {
       const known = this.cache[actor];
       if (known && known.hash !== String(content["hash"] || "")) { delete this.cache[actor]; delete this.getSentAt[actor]; }
     }
+  }
+
+  private isSelfAnswer(content: Record<string, unknown>, actor: number): boolean {
+    return content["self"] === true && !!this.selfRemoteId && actor === this.selfRemoteId;
+  }
+
+  // The server refused an upload and charged nothing (hash "" is an empty face or not known): send again, put its face back
+  private onRefused(hash: string, reasonRaw: string, now: number): void {
+    const reason = /^[A-Za-z0-9_.:-]{1,40}$/.test(reasonRaw) ? reasonRaw : "other";
+    const ours = hash === this.lastSentHash || (!!this.upload && hash === this.upload.hash)
+      || (!!this.sentUpload && hash === this.sentUpload.hash) || hash === "";
+    if (this.off || !ours) {
+      this.diag(`preset: refusal for ${hash || "empty"} (${reason}) ignored, not the last upload`);
+      return;
+    }
+    this.lastSentHash = undefined;
+    if (this.upload && (hash === "" || this.upload.hash === hash)) this.upload = null;
+    this.sentUpload = null;
+    let restore = "none";
+    if (this.selfRemoteId) {
+      if (this.serverSelf) {
+        this.cache[this.selfRemoteId] = { hash: this.serverSelf.hash, race: this.serverSelf.race, face: this.serverSelf.face, at: now };
+        restore = this.serverSelf.face ? "the server's face" : "no face (the server has none)";
+      } else {
+        delete this.cache[this.selfRemoteId];
+        restore = "asking the server again";
+      }
+      delete this.getSentAt[0];
+      this.selfAppliedHash = "";
+      this.selfLoadedHash = "";
+    }
+    this.diag(`preset: the server refused ${hash || "the empty face"} (${reason}); ${restore}`);
   }
 
   private store(actor: number, entry: CacheEntry): void {
@@ -241,10 +331,20 @@ export class RacemenuPresetService extends ClientListener {
     const remoteServer = this.controller.lookupListener(RemoteServer);
     const me = normalizeRemote(remoteServer.getMyRemoteRefrId() || 0);
     if (me !== this.selfRemoteId && me) {
+      // Another character on this connection: nothing of the last one's carries over, a part-sent upload would land on this one
+      if (this.selfRemoteId) {
+        this.forgetSelfFace();
+        if (this.upload) this.diag("preset: upload dropped, the character changed");
+        this.upload = null;
+        this.sentUpload = null;
+        this.lastSentHash = undefined;
+      }
       this.selfRemoteId = me;
+      delete this.cache[me];
       this.selfSpawnAt = now;
       delete this.getSentAt[0];
       this.selfAppliedHash = "";
+      this.selfLoadedHash = "";
     }
     if (!me) return;
     const settling = this.raceMenuSettling(now);
@@ -361,6 +461,7 @@ export class RacemenuPresetService extends ClientListener {
       // Once per face either way: a load skee refuses is not retried every second
       this.selfAppliedHash = hash;
       if (!this.load(p, presetFileName("self"), jslot, natives)) return false;
+      this.selfLoadedHash = hash;
       this.afterLoad(PLAYER_ID, `own face back on, ${hash}, ${headParts.length} head parts`);
       return true;
     });
@@ -411,7 +512,12 @@ export class RacemenuPresetService extends ClientListener {
   private selfRemoteId = 0;
   private selfSpawnAt = 0;
   private selfQueued = false;
+  // The face last tried on the player (loaded or not) and the face really on it (loaded or captured)
   private selfAppliedHash = "";
+  private selfLoadedHash = "";
+  // The server's face for the player this session: its answer, or an upload it did not refuse
+  private serverSelf: CacheEntry | null = null;
+  private sentUpload: { hash: string; entry: CacheEntry; doneAt: number } | null = null;
   private noNativesNoted = false;
   private off = false;
   private diagLines = 0;

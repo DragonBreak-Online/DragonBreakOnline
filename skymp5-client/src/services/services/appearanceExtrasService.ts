@@ -47,6 +47,8 @@ export class AppearanceExtrasService extends ClientListener {
       this.askedSelf = false;
       this.gotSelf = false;
       this.capturing = false;
+      // A new spawn (maybe another character) sends its own extras even if they equal the last upload
+      this.lastSent = null;
       this.runner.drop(PLAYER_ID);
     });
     this.controller.on("update", () => this.onUpdate());
@@ -137,8 +139,17 @@ export class AppearanceExtrasService extends ClientListener {
     }
   }
 
+  // Each editor close may send once, even if it equals the last upload (the server may have refused that one)
+  private watchMenu(): void {
+    let open = false;
+    try { open = Ui.isMenuOpen("RaceSex Menu"); } catch (e) { return; }
+    if (open && !this.menuWasOpen) this.lastSent = null;
+    this.menuWasOpen = open;
+  }
+
   private onUpdate(): void {
     const now = Date.now();
+    this.watchMenu();
     if (!this.spawnAt) return;
     if (this.raceMenuSettling()) return;
     if (!this.available()) return;
@@ -302,6 +313,7 @@ export class AppearanceExtrasService extends ClientListener {
   private selfApplied = false;
   private selfAppliedAt = 0;
   private lastSent: Extras | null = null;
+  private menuWasOpen = false;
   private capturedFor = 0;
   private capturing = false;
   private selfReadAt = 0;

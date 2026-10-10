@@ -274,10 +274,10 @@ export class SendInputsService extends ClientListener {
         }
     }
 
-    private preMenuHead: { race: number; baseRace: number; face: number } | null = null;
+    private preMenuHead: { race: number; baseRace: number; sex: number; face: number } | null = null;
 
-    // The player's race, its base form's race and the Face head part (HeadPart type 1)
-    private headState(): { race: number; baseRace: number; face: number } {
+    // The player's race, its base form's race, the base's sex and the Face head part (HeadPart type 1)
+    private headState(): { race: number; baseRace: number; sex: number; face: number } {
         const player = this.sp.Game.getPlayer() as Actor;
         const base = ActorBase.from(player.getBaseObject());
         const race = player.getRace();
@@ -288,7 +288,7 @@ export class SendInputsService extends ClientListener {
             const part = base ? base.getNthHeadPart(i) : null;
             if (part && part.getType() === 1) { face = part.getFormID(); break; }
         }
-        return { race: race ? race.getFormID() : 0, baseRace: baseRace ? baseRace.getFormID() : 0, face };
+        return { race: race ? race.getFormID() : 0, baseRace: baseRace ? baseRace.getFormID() : 0, sex: base ? base.getSex() : -1, face };
     }
 
     // Data\Platform\Logs\dbo-diag-logs.txt, which Report a Problem sends
@@ -316,11 +316,10 @@ export class SendInputsService extends ClientListener {
                 const appearance = getAppearance(this.sp.Game.getPlayer() as Actor);
                 const after = this.headState();
                 this.diag(`racemenu close: ${JSON.stringify(after)}`);
-                // Race unchanged but the Face part replaced by another one: put the pre-menu face back (9 characters got the Nord head)
+                // The look goes as the editor left it; the server's guardHead (appearance.js) puts back another race's default head
                 const before = this.preMenuHead;
-                if (before && before.face && after.face !== before.face && after.race === before.race && before.race !== 0) {
-                    appearance.headpartIds = appearance.headpartIds.filter((id) => id !== after.face).concat([before.face]);
-                    this.diag(`racemenu: kept the pre-menu face ${before.face.toString(16)} (the menu swapped in ${after.face.toString(16)})`);
+                if (before && before.face && after.face !== before.face) {
+                    this.diag(`racemenu: Face part ${before.face.toString(16)} -> ${after.face.toString(16)} sent as the editor left it (race ${before.race === after.race ? "same" : "changed"}, sex ${before.sex === after.sex ? "same" : "changed"}); the server's head guard decides`);
                 }
                 this.preMenuHead = null;
                 const message: MessageWithRefrId<UpdateAppearanceMessage> = {
