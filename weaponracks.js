@@ -233,14 +233,36 @@ module.exports = (api) => {
     S.homes.set(cell, { primary: found, at: now() });
     return found ? pick(found) : null;
   };
-  // housingSystem.ts hasAccessWith, owner and keys: a key named as issued, or ending in "(PRIMARY[-serial])"
+  // Property per character (fork housingSystem.ts housingOwnerPerCharacter): a home is its owning character's, and what is
+  // kept for an owner is keyed "c<actor hex>"; with the switch off (or an older fork) the account's, keyed by profile
+  const housingFn = (name) => { const H = housing(); return H && typeof H[name] === 'function' ? H[name] : null; };
+  const perChar = () => { try { const f = housingFn('perCharacter'); return !!f && f() === true; } catch (e) { return false; } };
+  const keyOfActor = (a) => (perChar() ? `c${hex(a)}` : String(profileOf(a)));
+  const keysOfActor = (a) => [`c${hex(a)}`, String(profileOf(a))];
+  const ownerKeyOf = (rec) => { try { const f = housingFn('ownerKeyOf'); if (f) return String(f(rec)); } catch (e) { /* the account's */ } return String(Number(rec.owner) || 0); };
+  const owns = (a, rec) => { try { const f = housingFn('ownsRecord'); if (f) return f(rec, a) === true; } catch (e) { /* the account's */ } return profileOf(a) === Number(rec.owner); };
+  // Property keys are the vanilla key or a record of house-keys.json's pool (fork houseKeys.ts), re-read when it changes
+  const KEY_POOL_FILE = path.resolve('house-keys.json');
+  const keyBases = () => {
+    let at = -1; try { at = fs.statSync(KEY_POOL_FILE).mtimeMs; } catch (e) { /* no pool */ }
+    if (S.keyPoolAt !== at || !S.keyPool) {
+      const ids = new Set([KEY_BASE_ID]);
+      try { for (const d of (JSON.parse(fs.readFileSync(KEY_POOL_FILE, 'utf8')) || {}).pool || []) { try { const id = mp.getIdFromDesc(String(d)) >>> 0; if (id) ids.add(id); } catch (e) { /* not in this load order */ } } } catch (e) { /* no pool */ }
+      S.keyPool = ids; S.keyPoolAt = at;
+    }
+    return S.keyPool;
+  };
+  // housingSystem.ts hasAccessWith, owner and keys (its keyOpens when the fork has it): a key named as issued, or ending in
+  // "(PRIMARY[-serial])"
   const mayUse = (a, home) => {
     const rec = home.rec;
-    if (profileOf(a) === Number(rec.owner)) return true;
+    if (owns(a, rec)) return true;
+    try { const f = housingFn('keyOpens'); if (f) return f(home.primary, a) === true; } catch (e) { /* the check below */ }
     const credential = rec.serial > 1 ? `(${home.primary.toString(16).toUpperCase()}-${rec.serial})` : `(${home.primary.toString(16).toUpperCase()})`;
     const issued = Array.isArray(rec.issued) ? rec.issued : [];
     let entries = []; try { const inv = mp.get(a, 'inventory'); entries = inv && Array.isArray(inv.entries) ? inv.entries : []; } catch (e) { return false; }
-    return entries.some((e) => (Number(e.baseId) >>> 0) === KEY_BASE_ID && typeof e.name === 'string' && (issued.includes(e.name) || e.name.endsWith(credential)));
+    const bases = keyBases();
+    return entries.some((e) => bases.has(Number(e.baseId) >>> 0) && typeof e.name === 'string' && (issued.includes(e.name) || e.name.endsWith(credential)));
   };
 
   // A hold's managers (housingSystem.ts MANAGER_RANKS, officials.json by zone and the backend's "hold:<zone>:<rank>" rows) may
@@ -352,16 +374,22 @@ module.exports = (api) => {
   };
 
   // ---- pending returns ---------------------------------------------------------------------------------------------------
-  const queue = (profile, entry, from) => {
-    const st = state(); const k = String(profile);
+  // key: the owner's character ("c<hex>") or profile (keyOfActor, ownerKeyOf)
+  const queue = (key, entry, from) => {
+    const st = state(); const k = String(key);
     (st.pending[k] = st.pending[k] || []).push({ entry, from, at: new Date(now()).toISOString() });
   };
   // Pending list cleared and written first, then given; a give that fails goes back on the list
   const deliver = (a, quiet) => {
-    const st = state(); const k = String(profileOf(a));
-    const list = st.pending[k]; if (!Array.isArray(list) || !list.length) return 0;
-    delete st.pending[k];
-    if (!save()) { st.pending[k] = list; return 0; }
+    const st = state();
+    // Kept for this character, and for its account before property was per character
+    const keys = keysOfActor(a).filter((k) => Array.isArray(st.pending[k]) && st.pending[k].length);
+    if (!keys.length) return 0;
+    const list = [].concat(...keys.map((k) => st.pending[k]));
+    const was = keys.map((k) => [k, st.pending[k]]);
+    for (const k of keys) delete st.pending[k];
+    const k = keys[0];
+    if (!save()) { for (const [key, l] of was) st.pending[key] = l; return 0; }
     const given = [], failed = [];
     for (const p of list) { try { giveEntry(a, p.entry); given.push(p); } catch (e) { failed.push(p); log(`weaponracks: return to ${who(a)} failed: ${e.message}`); } }
     if (failed.length) { st.pending[k] = (st.pending[k] || []).concat(failed); save(); }
@@ -387,7 +415,7 @@ module.exports = (api) => {
     const entry = Object.assign({}, src, { count: 1 }); delete entry.worn; delete entry.wornLeft;
     const act = hex(rack.act);
     const st = state();
-    st.racks[act] = { entry, kind, node, mesh: hex(poseRef), home: hex(home.primary), owner: Number(home.rec.owner), by: profileOf(a), at: new Date(now()).toISOString(), display: null };
+    st.racks[act] = { entry, kind, node, mesh: hex(poseRef), home: hex(home.primary), owner: Number(home.rec.owner), ownerKey: ownerKeyOf(home.rec), by: perChar() ? keyOfActor(a) : profileOf(a), at: new Date(now()).toISOString(), display: null };
     if (!save()) { delete st.racks[act]; return 'Something went wrong there. Try again in a moment.'; }
     try { papyrus('Actor', 'UnequipItem', a, [{ type: 'espm', desc: mp.getDescFromId(held.baseId) }, false, true]); } catch (e) { /* the inventory change below unequips it anyway */ }
     try {
@@ -409,8 +437,8 @@ module.exports = (api) => {
   const take = (a, act, slot, as) => {
     const st = state();
     delete st.racks[act];
-    queue(profileOf(a), slot.entry, `rack ${act}`);
-    if (!save()) { st.racks[act] = slot; const k = String(profileOf(a)); st.pending[k].pop(); if (!st.pending[k].length) delete st.pending[k]; return 'Something went wrong there. Try again in a moment.'; }
+    queue(keyOfActor(a), slot.entry, `rack ${act}`);
+    if (!save()) { st.racks[act] = slot; const k = keyOfActor(a); st.pending[k].pop(); if (!st.pending[k].length) delete st.pending[k]; return 'Something went wrong there. Try again in a moment.'; }
     removeDisplay(slot.display);
     deliver(a, true);
     if (as) {
@@ -477,16 +505,23 @@ module.exports = (api) => {
         try { rec = H.recordOf(parseInt(slot.home, 16) >>> 0); } catch (e) { readable = false; }
         if (!readable) continue;
         const owner = rec && rec.owner ? Number(rec.owner) : 0;
-        if (owner === Number(slot.owner)) { S.suspect.delete(act); continue; }
+        // The same account, and the same character where both name one (a hand-over to an alt is a change of hands)
+        const was = String(slot.ownerKey || slot.owner), nowKey = owner ? ownerKeyOf(rec) : '';
+        if (owner === Number(slot.owner) && !(was[0] === 'c' && nowKey[0] === 'c' && was !== nowKey)) {
+          S.suspect.delete(act);
+          // A slot racked before the switch learns its character, so a later hand-over to an alt is seen
+          if (nowKey[0] === 'c' && was[0] !== 'c') { slot.ownerKey = nowKey; changed = true; }
+          continue;
+        }
         // Housing records can read as unowned for a moment (boot, a write in flight): two sweeps a while apart must agree
         const first = S.suspect.get(act);
         if (!first) { S.suspect.set(act, now()); continue; }
         if (now() - first < C.ownerChangeConfirmMs) continue;
         S.suspect.delete(act);
         delete st.racks[act];
-        queue(slot.owner, slot.entry, `rack ${act}, home ${slot.home} ${owner ? `now owned by ${owner}` : 'given up'}`);
+        queue(was, slot.entry, `rack ${act}, home ${slot.home} ${owner ? `now owned by ${nowKey || owner}` : 'given up'}`);
         changed = true;
-        audit(`WEAPONRACK home ${slot.home} changed hands (${slot.owner} -> ${owner || 'nobody'}): ${itemName(slot.entry)} from ${act} goes back to profile ${slot.owner}`);
+        audit(`WEAPONRACK home ${slot.home} changed hands (${was} -> ${nowKey || 'nobody'}): ${itemName(slot.entry)} from ${act} goes back to ${was}`);
         S.dropDisplays = (S.dropDisplays || []).concat(slot.display ? [slot.display] : []);
       }
     }
@@ -497,7 +532,7 @@ module.exports = (api) => {
     for (const [act, slot] of Object.entries(st.racks)) if (!displayOk(slot, act)) { if (slot.display) removeDisplay(slot.display); slot.display = null; if (spawnDisplay(act, slot)) respawned = true; }
     if (respawned) save();
     const online = typeof api.onlineActors === 'function' ? api.onlineActors() : [];
-    for (const a of online) if (st.pending[String(profileOf(a))]) deliver(a >>> 0, false);
+    for (const a of online) if (keysOfActor(a).some((k) => st.pending[k])) deliver(a >>> 0, false);
   };
   globalThis.__dboWeaponRackSweep = sweep;
   if (typeof api.every === 'function') api.every('weaponRacks', C.sweepMs, sweep);

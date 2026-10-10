@@ -407,6 +407,64 @@ check('a Steward by the backend\'s hold row takes it down too', use(EMPTY, STEWA
 check('and that take is audited as steward of bruma', /as steward of bruma$/.test(audits[audits.length - 1]), audits[audits.length - 1]);
 check('weaponracks.js gives staff no override (no admin or tier check in it)', !/isAdmin|tierOf|adminTier/.test(fs.readFileSync(MODULE, 'utf8')));
 
+// ---- property per character (fork housingSystem.ts housingOwnerPerCharacter, Nate 10 Oct) ------------------------------------
+// The owner's alt (same account, profile 1) is no household once the home names its character; what is kept for an owner is
+// keyed by that character; a hand-over to the alt is a change of hands
+const ALT = 0xff000030;
+player(ALT, 1, [{ baseId: MACE, count: 1, worn: true }]);
+refs.get(OWNER).inventory.entries.push({ baseId: SWORD, count: 1 });
+online = [OWNER, KEYHOLDER, STRANGER, ALT];
+home.owner = 1; home.ownerChar = OWNER;
+const H0 = Object.assign({}, globalThis.__dboHousing);
+let perCharOn = true, keyOpensFor = null;
+const ownerCharOf = (r) => (perCharOn && r.ownerChar ? r.ownerChar >>> 0 : 0);
+Object.assign(globalThis.__dboHousing, {
+  perCharacter: () => perCharOn,
+  ownsRecord: (r, a) => (ownerCharOf(r) ? ownerCharOf(r) === (a >>> 0) : Number(refs.get(a >>> 0).profileId) === Number(r.owner)),
+  ownerKeyOf: (r) => (ownerCharOf(r) ? `c${ownerCharOf(r).toString(16)}` : String(r.owner)),
+  keyOpens: (ref, a) => (keyOpensFor ? keyOpensFor(a) : false),
+});
+tick();
+check('per character: the owner\'s alt is no household', use(EMPTY, ALT) === true && lastSaid(ALT) === 'Only the household can use this rack.' && has(ALT, MACE) === 1, lastSaid(ALT));
+perCharOn = false; tick();
+check('...with the switch off the account is, as before', use(EMPTY, ALT) === true && has(ALT, MACE) === 0 && !!st().racks[EMPTY.toString(16)]);
+tick(); use(EMPTY, ALT); perCharOn = true;
+check('(the alt takes the mace back down)', has(ALT, MACE) === 1 && !st().racks[EMPTY.toString(16)]);
+holdOnly(OWNER, SWORD); tick(); use(EMPTY, OWNER);
+const sw = st().racks[EMPTY.toString(16)];
+check('per character: the slot names the home\'s character and who racked it', !!sw && sw.ownerKey === `c${OWNER.toString(16)}` && sw.by === `c${OWNER.toString(16)}` && sw.owner === 1, sw);
+online = [KEYHOLDER, STRANGER, ALT];
+home.ownerChar = ALT;
+globalThis.__dboWeaponRackSweep(); clock += 61000; globalThis.__dboWeaponRackSweep();
+check('handed to the alt (same account): a change of hands, the sword waits for the character that owned the home', !st().racks[EMPTY.toString(16)] && (st().pending[`c${OWNER.toString(16)}`] || []).length === 1 && has(ALT, SWORD) === 0, st().pending);
+check('...and is audited', audits.some((a) => new RegExp(`changed hands \\(c${OWNER.toString(16)} -> c${ALT.toString(16)}\\)`).test(a)), audits.slice(-2));
+online = [OWNER, KEYHOLDER, STRANGER, ALT];
+globalThis.__dboWeaponRackSweep();
+check('when that character logs in it gets the sword back, the alt never does', has(OWNER, SWORD) === 1 && has(ALT, SWORD) === 0 && !st().pending[`c${OWNER.toString(16)}`]);
+// A slot racked before the switch (owner key a profile) learns its character instead of being returned
+home.ownerChar = OWNER; perCharOn = false;
+holdOnly(OWNER, SWORD); tick(); use(EMPTY, OWNER);
+check('(racked with the switch off: keyed by profile)', st().racks[EMPTY.toString(16)].ownerKey === '1');
+perCharOn = true;
+globalThis.__dboWeaponRackSweep(); clock += 61000; globalThis.__dboWeaponRackSweep();
+check('switching on keeps it on the rack and names its character', !!st().racks[EMPTY.toString(16)] && st().racks[EMPTY.toString(16)].ownerKey === `c${OWNER.toString(16)}`, st().racks[EMPTY.toString(16)]);
+tick(); use(EMPTY, OWNER);
+// Keys: the fork's keyOpens decides (any key record); without it, a key cut on a house-keys.json pool record also works
+holdOnly(STRANGER, SWORD); keyOpensFor = (a) => a === STRANGER; tick();
+check('per character: a key the fork says opens the home lets its holder use the rack', use(EMPTY, STRANGER) === true && has(STRANGER, SWORD) === 0 && !!st().racks[EMPTY.toString(16)]);
+tick(); use(EMPTY, STRANGER); keyOpensFor = null;
+delete globalThis.__dboHousing.keyOpens;
+const POOL_KEY = 0x3c172000; rec(POOL_KEY, 'KEYM', 'DBO_HouseKey01');
+fs.writeFileSync('house-keys.json', JSON.stringify({ pool: ['172000:DragonBreak Online Edits.esp'] }));
+const idOf0 = mp.getIdFromDesc; mp.getIdFromDesc = (d) => (d === '172000:DragonBreak Online Edits.esp' ? POOL_KEY : idOf0(d));
+refs.get(STRANGER).inventory.entries.push({ baseId: POOL_KEY, count: 1, name: 'Key to the Northern Arms No. 2' });
+home.issued = ['Key to the Northern Arms', 'Key to the Northern Arms No. 2'];
+holdOnly(STRANGER, SWORD); tick();
+check('without the fork\'s keyOpens, a key on a pool record (not only 0xdb0e2) opens the rack', use(EMPTY, STRANGER) === true && has(STRANGER, SWORD) === 0, lastSaid(STRANGER));
+tick(); use(EMPTY, STRANGER);
+mp.getIdFromDesc = idOf0;
+globalThis.__dboHousing = H0; delete home.ownerChar;
+
 // ---- an unreadable state file is never overwritten ------------------------------------------------------------------------------
 fs.writeFileSync(STATE, '{ broken');
 load(true);
