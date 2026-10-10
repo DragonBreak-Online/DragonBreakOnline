@@ -8,8 +8,9 @@ import { remoteIdToLocalId } from "../../view/worldViewMisc";
 import { isGuardedActor, isGuardedRace } from "../../sync/beastRaces";
 import {
   PACKET_GET, PACKET_INDEX, PACKET_REV, PACKET_SET, CopyInfo, Extras, Job, JobRunner, NativeCall, RemoteTracker,
-  applyJob, captureJob, clearRef, isEmpty, readExtras, sameExtras,
+  applyJob, canonical, captureJob, clearRef, isEmpty, readExtras, sameExtras,
 } from "./appearanceExtrasPlan";
+import { hash8, trace } from "../../lib/clientDiag";
 
 // RaceMenu extras, part 1 (see appearanceExtrasPlan.ts): the player's overlays, node scales and body morphs are read
 // after RaceMenu closes and kept by the server (appearanceextras.js), put back on the player at every spawn (a SkyMP login
@@ -35,6 +36,14 @@ const CALL_BUDGET = 24;
 const SELF_READ_MS = 250;
 const DIAG_LINES = 40;
 const PLAYER_ID = 0x14;
+
+// Counts and a hash of the canonical extras, for the appearance trace
+const extrasTrace = (x: Extras | null): string => {
+  if (!x) return "ov=0 tr=0 mo=0 h=-";
+  let h = "?";
+  try { h = hash8(JSON.stringify(canonical(x))); } catch (e) { /* unreadable */ }
+  return `ov=${x.ov.length} tr=${x.tr.length} mo=${x.mo.length} h=${h}`;
+};
 
 export class AppearanceExtrasService extends ClientListener {
   constructor(private sp: Sp, private controller: CombinedController) {
@@ -104,6 +113,7 @@ export class AppearanceExtrasService extends ClientListener {
       const rev = Number(content["rev"]) >>> 0;
       if (content["self"]) {
         const changed = !sameExtras(this.selfExtras, extras);
+        trace(`rmx ans ${extrasTrace(extras)} rev=${rev} vs=${!this.lastSent ? "-" : sameExtras(this.lastSent, extras) ? "kept" : "other"}`);
         this.selfExtras = extras;
         // The server's answer to our own capture: only a clamped value differs from what the player already shows
         if (changed && !(this.lastSent && sameExtras(this.lastSent, extras))) this.selfApplied = false;
@@ -159,6 +169,7 @@ export class AppearanceExtrasService extends ClientListener {
     if (!this.askedSelf && now - this.spawnAt >= SPAWN_APPLY_AFTER_MS && this.loadedSelf) {
       this.askedSelf = true;
       sendCustomPacket(this.controller, { customPacketType: PACKET_GET, self: true, index: true });
+      trace("rmx ask self");
     }
 
     this.maybeCapture(now);
@@ -171,6 +182,7 @@ export class AppearanceExtrasService extends ClientListener {
       if (this.selfExtras && !isEmpty(this.selfExtras)) {
         this.runner.put(PLAYER_ID, applyJob(this.femaleSelf, this.selfExtras, { player: true }));
         this.note(`own extras applied: ${this.selfExtras.ov.length} overlay values, ${this.selfExtras.tr.length} scales, ${this.selfExtras.mo.length} morphs`);
+        trace(`rmx apply ${extrasTrace(this.selfExtras)}`);
       }
     }
 
@@ -225,11 +237,12 @@ export class AppearanceExtrasService extends ClientListener {
       this.capturing = false;
       this.selfApplied = true;
       this.selfAppliedAt = Date.now();
-      if (this.lastSent && sameExtras(this.lastSent, x)) return;
-      if (!this.lastSent && this.selfExtras && sameExtras(this.selfExtras, x)) return;
+      if (this.lastSent && sameExtras(this.lastSent, x)) { trace(`rmx cap ${extrasTrace(x)} send=same`); return; }
+      if (!this.lastSent && this.selfExtras && sameExtras(this.selfExtras, x)) { trace(`rmx cap ${extrasTrace(x)} send=unchanged`); return; }
       this.lastSent = x;
       this.selfExtras = x;
       sendCustomPacket(this.controller, { customPacketType: PACKET_SET, f: x.f, ov: x.ov, tr: x.tr, mo: x.mo });
+      trace(`rmx cap ${extrasTrace(x)} send=1`);
       this.note(`own extras sent: ${x.ov.length} overlay values, ${x.tr.length} scales, ${x.mo.length} morphs`);
     }));
   }

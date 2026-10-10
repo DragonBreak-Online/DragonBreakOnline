@@ -14,6 +14,8 @@ import {
   writeLogs,
 } from "skyrimPlatform";
 import { queuePlayerNiNodeUpdate } from "../view/niNodeQueue";
+import { trace } from "../lib/clientDiag";
+import { lookRecheckLine, lookTraceLine, readLook } from "./appearanceTrace";
 
 export interface Tint {
   texturePath: string;
@@ -199,7 +201,8 @@ let lastEyesId = 0;
 // The live head keeps its eyes when only the base's head part list changes, so a vampire's tells came and went at relog only.
 // Swapped only on a look change in session (liveEyes) and only when the eyes differ: rebuilding the head during a load is
 // the same risk as the torch put-out that crashed logins (9 Oct)
-export const applyAppearanceToPlayer = (appearance: Appearance, liveEyes = false): void => {
+// event names the caller in the appearance trace: spawn, load, update, preview
+export const applyAppearanceToPlayer = (appearance: Appearance, liveEyes = false, event = "apply"): void => {
   applyAppearanceCommon(
     appearance,
     ActorBase.from((Game.getPlayer() as Actor).getBaseObject()) as ActorBase,
@@ -212,6 +215,7 @@ export const applyAppearanceToPlayer = (appearance: Appearance, liveEyes = false
   if (eyesId) lastEyesId = eyesId;
   applyTints(null, appearance);
   regeneratePlayerHead(appearance);
+  traceOwnLook(event, appearance);
   queuePlayerNiNodeUpdate();
   Utility.wait(0.0625).then(() => {
     once("update", () => {
@@ -230,4 +234,47 @@ const regeneratePlayerHead = (appearance: Appearance): void => {
     const matched = appearance.options.filter((v, i) => Math.abs(base.getFaceMorph(i) - v) < 1e-3).length;
     writeLogs("dbo-diag", `face apply: regenerateHead ${ran ? "ran" : "unavailable"}, ${matched}/${appearance.options.length} sliders on the base match`);
   } catch { /* no writeLogs on this platform build */ }
+};
+
+// The look last put on the player, for later read-backs
+let lastOwnLook: Appearance | null = null;
+const RECHECK_AFTER_S = 8;
+
+const playerBase = (): ActorBase | null => {
+  const player = Game.getPlayer();
+  return player ? ActorBase.from(player.getBaseObject()) : null;
+};
+
+const hasTraceSink = (): boolean => typeof (globalThis as any).__dboTrace === "function";
+
+// What went on the base and what it reads back, now and RECHECK_AFTER_S later if no newer look went on meanwhile
+const traceOwnLook = (event: string, appearance: Appearance): void => {
+  try {
+    lastOwnLook = appearance;
+    if (!hasTraceSink()) return;
+    const base = playerBase();
+    if (!base) return;
+    trace(lookTraceLine(event, appearance, readLook(base)));
+    if (event === "preview") return;
+    Utility.wait(RECHECK_AFTER_S).then(() => once("update", () => {
+      if (lastOwnLook === appearance) recheckOwnLook(`${event}+${RECHECK_AFTER_S}s`);
+    }));
+  } catch (e) { /* diagnostics never break the apply */ }
+};
+
+export const recheckOwnLook = (event: string): void => {
+  try {
+    if (!lastOwnLook || !hasTraceSink()) return;
+    const base = playerBase();
+    if (base) trace(lookRecheckLine(event, lastOwnLook, readLook(base)));
+  } catch (e) { /* diagnostics only */ }
+};
+
+// RaceMenu's face load (racemenuPresetService) reads the player's base back at once and a few seconds later
+(globalThis as any).__dboAppearanceRecheck = (event: string, delaySeconds?: number) => {
+  try {
+    const name = String(event).replace(/[^a-z0-9+]/gi, "").slice(0, 16) || "recheck";
+    if (!delaySeconds) { recheckOwnLook(name); return; }
+    Utility.wait(Number(delaySeconds)).then(() => once("update", () => recheckOwnLook(`${name}+${Number(delaySeconds)}s`)));
+  } catch (e) { /* diagnostics only */ }
 };

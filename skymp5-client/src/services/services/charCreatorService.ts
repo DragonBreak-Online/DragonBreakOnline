@@ -228,7 +228,7 @@ export class CharCreatorService extends ClientListener {
     this.controller.once("update", () => {
       if (!this.menuOpen) return;
       try {
-        applyAppearanceToPlayer(appearance);
+        applyAppearanceToPlayer(appearance, false, "preview");
         logTrace(this, 'applied preview appearance');
       } catch (e) {
         logError(this, `failed to apply preview appearance: ${e}`);

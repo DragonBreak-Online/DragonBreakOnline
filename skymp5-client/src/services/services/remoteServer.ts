@@ -783,7 +783,7 @@ export class RemoteServer extends ClientListener {
           Utility.wait(1.3).then(applyPcInv);
           // Note: appearance part was copy-pasted
           if (msg.appearance) {
-            applyAppearanceToPlayer(msg.appearance);
+            applyAppearanceToPlayer(msg.appearance, false, "spawn");
           }
         }
 
@@ -868,7 +868,7 @@ export class RemoteServer extends ClientListener {
               Utility.wait(0.3).then(applyPcInv);
               // Note: appearance part was copy-pasted
               if (msg.appearance) {
-                applyAppearanceToPlayer(msg.appearance);
+                applyAppearanceToPlayer(msg.appearance, false, "load");
               }
             });
           }
@@ -1001,7 +1001,7 @@ export class RemoteServer extends ClientListener {
         return;
       }
       this.controller.once("update", () => {
-        applyAppearanceToPlayer(newAppearance, true);
+        applyAppearanceToPlayer(newAppearance, true, "update");
         logTrace(this, "Applied appearance to the player");
       });
     }

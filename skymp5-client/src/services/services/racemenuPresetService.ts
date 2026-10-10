@@ -13,6 +13,7 @@ import {
   facePresetFrom, formIdentifierOf, hashText, isEmptyFace, presetFileName, readChunkPacket, PRESET_MAX_CHARS,
 } from "../../sync/racemenuPresetPlan";
 import { logError, logTrace } from "../../logging";
+import { hex, trace } from "../../lib/clientDiag";
 
 // RaceMenu's face sliders, expressions and sculpt (skee) travel only as a .jslot: saved after RaceSexMenu closes and sent to
 // the server (racemenupresets.js), then loaded onto each copy and onto the player after a login, face only (flags 0).
@@ -168,17 +169,18 @@ export class RacemenuPresetService extends ClientListener {
   // ---- the player's own face, after RaceMenu ----
 
   // Why the face may not be sent yet: before the server's face is on the player, a capture would replace the saved sculpt with a stripped one
-  private captureHeldBy(player: Actor, now: number): string | null {
-    if (!this.selfRemoteId) return "no character yet";
+  private captureHeldBy(player: Actor, now: number): { code: string; text: string } | null {
+    if (!this.selfRemoteId) return { code: "noself", text: "no character yet" };
     const own = this.cache[this.selfRemoteId];
-    if (!own) return "the server's face for this character is not in yet";
+    if (!own) return { code: "noanswer", text: "the server's face for this character is not in yet" };
     if (!own.face || own.hash === this.selfLoadedHash) return null;
-    if (own.hash === this.selfAppliedHash) return "the server's face did not load on this character";
-    return `the server's face is not back on yet${this.gateReason(player, own, now)}`;
+    if (own.hash === this.selfAppliedHash) return { code: "loadfail", text: "the server's face did not load on this character" };
+    const gate = this.gateReason(player, own, now);
+    return { code: `notyet${gate ? `-${gate}` : ""}`, text: `the server's face is not back on yet${gate ? ` (${gate})` : ""}` };
   }
 
   private gateReason(actor: Actor, entry: CacheEntry, now: number): string {
-    try { const g = this.gateFor(actor, entry, now); return g ? ` (${g})` : ""; } catch { return ""; }
+    try { return this.gateFor(actor, entry, now) || ""; } catch { return ""; }
   }
 
   private capture(): void {
@@ -187,7 +189,7 @@ export class RacemenuPresetService extends ClientListener {
     if (!natives || !player) return;
     if (isGuardedActor(player)) return;
     const held = this.captureHeldBy(player, Date.now());
-    if (held) { this.diag(`preset: capture held, ${held}`); return; }
+    if (held) { this.diag(`preset: capture held, ${held.text}`); trace(`rmp cap held=${held.code}`); return; }
     const race = (player.getRace()?.getFormID() ?? 0) >>> 0;
     const name = presetFileName("self");
     let text: string | undefined;
@@ -196,29 +198,33 @@ export class RacemenuPresetService extends ClientListener {
       text = natives.readPresetFile(name);
     } catch (e) {
       this.diag(`preset: save failed: ${e}`);
+      trace("rmp cap err=save");
       return;
     } finally {
       try { natives.removePresetFile(name); } catch { /* the next save overwrites it */ }
     }
-    if (!text) { this.diag("preset: save wrote no file (RaceMenu missing?)"); return; }
+    if (!text) { this.diag("preset: save wrote no file (RaceMenu missing?)"); trace("rmp cap err=nofile"); return; }
     let face: FacePreset | null = null;
     try { face = facePresetFrom(JSON.parse(text)); } catch { face = null; }
-    if (!face) { this.diag(`preset: own preset refused (${text.length} chars)`); return; }
+    if (!face) { this.diag(`preset: own preset refused (${text.length} chars)`); trace(`rmp cap err=parse chars=${text.length}`); return; }
     const encoded = isEmptyFace(face) ? "" : encodeFace(face);
-    if (encoded.length > PRESET_MAX_CHARS) { this.diag(`preset: own preset too big (${encoded.length} chars)`); return; }
+    if (encoded.length > PRESET_MAX_CHARS) { this.diag(`preset: own preset too big (${encoded.length} chars)`); trace(`rmp cap err=big chars=${encoded.length}`); return; }
     const hash = encoded ? hashText(encoded) : "";
     // What the player sees now is this face; a login re-apply must not put an older one back, a refusal puts serverSelf back
     const entry: CacheEntry = { hash, race, face: encoded ? face : null, at: Date.now() };
     this.selfAppliedHash = hash;
     this.selfLoadedHash = hash;
     if (this.selfRemoteId) this.cache[this.selfRemoteId] = entry;
-    if (hash === this.lastSentHash) return;
+    const capLine = `rmp cap chars=${encoded.length} h=${hash || "empty"} cu=${face.custom.length} sc=${face.sculpt.length} race=${hex(race)}`;
+    if (hash === this.lastSentHash) { trace(`${capLine} send=same`); return; }
     if (this.serverSelf && this.serverSelf.hash === hash && !this.sentUpload && !this.upload) {
       this.diag(`preset: own face unchanged, ${hash || "empty"}, not sent`);
+      trace(`${capLine} send=unchanged`);
       return;
     }
     this.lastSentHash = hash;
     this.upload = { seq: ++this.uploadSeq, hash, race, chunks: encoded ? chunkText(encoded) : [], next: 0, entry };
+    trace(`${capLine} send=${Math.max(1, this.upload.chunks.length)}`);
     this.diag(`preset: own face saved, ${face.custom.length} sliders, ${face.sculpt.length} sculpted parts, ${encoded.length} chars, ${hash || "empty"}`);
   }
 
@@ -232,6 +238,7 @@ export class RacemenuPresetService extends ClientListener {
     if (u.next >= Math.max(1, n)) {
       this.upload = null;
       this.sentUpload = { hash: u.hash, entry: u.entry, doneAt: now };
+      trace(`rmp up done h=${u.hash || "empty"} n=${Math.max(1, n)}`);
     }
   }
 
@@ -252,22 +259,27 @@ export class RacemenuPresetService extends ClientListener {
     const actor = content["self"] === true && this.selfRemoteId ? this.selfRemoteId : sent;
     if (type === "dboPresetNone") {
       // The server's switch (racemenuPresets.enabled false): nothing more is sent, saved or loaded this session
-      if (content["off"] === true && !this.off) { this.off = true; this.upload = null; this.sentUpload = null; this.diag("preset: switched off by the server"); }
+      if (content["off"] === true && !this.off) { this.off = true; this.upload = null; this.sentUpload = null; this.diag("preset: switched off by the server"); trace("rmp off"); }
       this.store(actor, { hash: "", race: 0, face: null, at: now });
-      if (this.isSelfAnswer(content, actor)) this.serverSelf = this.cache[actor];
+      if (this.isSelfAnswer(content, actor)) { this.serverSelf = this.cache[actor]; trace(`rmp ans none off=${content["off"] === true ? 1 : 0}`); }
     } else if (type === "dboPresetMeta") {
       const hash = String(content["hash"] || "");
       const known = this.cache[actor];
       if (known && known.hash === hash) known.at = now;
+      if (this.isSelfAnswer(content, actor)) trace(`rmp ans meta h=${/^[0-9a-f]{8}$/.test(hash) ? hash : "bad"} known=${known && known.hash === hash ? 1 : 0}`);
     } else if (type === "dboPresetChunk") {
       const chunk = readChunkPacket(content);
       if (!chunk) return;
       const text = this.assembler.push(chunk, now);
       if (text === null) return;
       const face = decodeFace(text);
-      if (!face) { this.diag(`preset: the face of ${actor.toString(16)} is refused here`); return; }
+      const self = this.isSelfAnswer(content, actor);
+      if (!face) { this.diag(`preset: the face of ${actor.toString(16)} is refused here`); if (self) trace(`rmp ans bad h=${chunk.hash} n=${chunk.n} chars=${text.length}`); return; }
       this.store(actor, { hash: chunk.hash, race: Number(content["race"]) >>> 0, face, at: now });
-      if (this.isSelfAnswer(content, actor)) this.serverSelf = this.cache[actor];
+      if (self) {
+        this.serverSelf = this.cache[actor];
+        trace(`rmp ans face h=${chunk.hash} n=${chunk.n} chars=${text.length} cu=${face.custom.length} sc=${face.sculpt.length} race=${hex(content["race"])}`);
+      }
     } else if (type === "dboPresetRev") {
       const known = this.cache[actor];
       if (known && known.hash !== String(content["hash"] || "")) { delete this.cache[actor]; delete this.getSentAt[actor]; }
@@ -283,27 +295,32 @@ export class RacemenuPresetService extends ClientListener {
     const reason = /^[A-Za-z0-9_.:-]{1,40}$/.test(reasonRaw) ? reasonRaw : "other";
     const ours = hash === this.lastSentHash || (!!this.upload && hash === this.upload.hash)
       || (!!this.sentUpload && hash === this.sentUpload.hash) || hash === "";
+    const h = /^[0-9a-f]{8}$/.test(hash) ? hash : (hash ? "bad" : "empty");
     if (this.off || !ours) {
       this.diag(`preset: refusal for ${hash || "empty"} (${reason}) ignored, not the last upload`);
+      trace(`rmp refused h=${h} why=${reason} restore=ignored`);
       return;
     }
     this.lastSentHash = undefined;
     if (this.upload && (hash === "" || this.upload.hash === hash)) this.upload = null;
     this.sentUpload = null;
-    let restore = "none";
+    let restore = "none", code = "noself";
     if (this.selfRemoteId) {
       if (this.serverSelf) {
         this.cache[this.selfRemoteId] = { hash: this.serverSelf.hash, race: this.serverSelf.race, face: this.serverSelf.face, at: now };
         restore = this.serverSelf.face ? "the server's face" : "no face (the server has none)";
+        code = this.serverSelf.face ? "face" : "none";
       } else {
         delete this.cache[this.selfRemoteId];
         restore = "asking the server again";
+        code = "ask";
       }
       delete this.getSentAt[0];
       this.selfAppliedHash = "";
       this.selfLoadedHash = "";
     }
     this.diag(`preset: the server refused ${hash || "the empty face"} (${reason}); ${restore}`);
+    trace(`rmp refused h=${h} why=${reason} restore=${code}`);
   }
 
   private store(actor: number, entry: CacheEntry): void {
@@ -321,6 +338,7 @@ export class RacemenuPresetService extends ClientListener {
     this.getSentAt[key] = now;
     const known = remoteId ? this.cache[remoteId] : undefined;
     sendCustomPacket(this.controller, { customPacketType: "dboPresetGet", actor: self ? 0 : remoteId, have: known ? known.hash : "" });
+    if (self) trace(`rmp ask have=${known ? known.hash || "empty" : "-"}`);
   }
 
   // ---- putting faces on ----
@@ -334,7 +352,7 @@ export class RacemenuPresetService extends ClientListener {
       // Another character on this connection: nothing of the last one's carries over, a part-sent upload would land on this one
       if (this.selfRemoteId) {
         this.forgetSelfFace();
-        if (this.upload) this.diag("preset: upload dropped, the character changed");
+        if (this.upload) { this.diag("preset: upload dropped, the character changed"); trace(`rmp up drop=character h=${this.upload.hash || "empty"}`); }
         this.upload = null;
         this.sentUpload = null;
         this.lastSentHash = undefined;
@@ -418,7 +436,7 @@ export class RacemenuPresetService extends ClientListener {
     const blocked = this.gateFor(actor, entry, Date.now());
     if (blocked) return;
     const headParts = this.headPartsOf(c.appearance.headpartIds || []);
-    if (!headParts) { this.ledger.markDone(c.localId, entry.hash); this.diag(`preset: ${c.remoteId.toString(16)} head parts unresolved, face skipped`); return; }
+    if (!headParts) { this.ledger.markDone(c.localId, entry.hash); this.diag(`preset: ${c.remoteId.toString(16)} head parts unresolved, face skipped`); trace(`rmp copy unresolved id=${hex(c.remoteId)} h=${entry.hash}`); return; }
     const { face, dropped } = boundSculpt(entry.face, (host) => natives.getTriVertexCount(host));
     if (dropped.length) this.diag(`preset: ${c.remoteId.toString(16)} sculpt not applied to ${dropped.join(", ")}`);
     if (isEmptyFace(face)) { this.ledger.markDone(c.localId, entry.hash); return; }
@@ -431,7 +449,7 @@ export class RacemenuPresetService extends ClientListener {
       // The id must still be this player's copy, and the face still theirs: a destroyed copy's id can be reused
       if (!this.stillOwns(localId, remoteId, hash)) return false;
       if (this.gateFor(copy, entry, Date.now())) { this.ledger.forget(localId); return false; }
-      if (!this.load(copy, name, jslot, natives)) return false;
+      if (!this.load(copy, name, jslot, natives)) { trace(`rmp copy fail id=${hex(remoteId)} h=${hash}`); return false; }
       this.afterLoad(localId, `${remoteId.toString(16)} face on ${localId.toString(16)}, ${hash}`);
       return true;
     });
@@ -440,7 +458,8 @@ export class RacemenuPresetService extends ClientListener {
   private applyToPlayer(entry: CacheEntry, natives: PresetNatives, now: number): void {
     const player = Game.getPlayer();
     if (!player || !entry.face || this.selfQueued) return;
-    if (this.gateFor(player, entry, now)) return;
+    const gate = this.gateFor(player, entry, now);
+    if (gate) { trace(`rmp apply wait=${gate} h=${entry.hash}`); return; }
     const base = ActorBase.from(player.getBaseObject());
     if (!base) return;
     const ids: number[] = [];
@@ -449,20 +468,24 @@ export class RacemenuPresetService extends ClientListener {
       if (p) ids.push(p.getFormID());
     }
     const headParts = this.headPartsOf(ids);
-    if (!headParts) { this.selfAppliedHash = entry.hash; this.diag("preset: own head parts unresolved, face skipped"); return; }
+    if (!headParts) { this.selfAppliedHash = entry.hash; this.diag("preset: own head parts unresolved, face skipped"); trace(`rmp apply unresolved h=${entry.hash}`); return; }
     const { face, dropped } = boundSculpt(entry.face, (host) => natives.getTriVertexCount(host));
     if (dropped.length) this.diag(`preset: own sculpt not applied to ${dropped.join(", ")}`);
+    const drop = dropped.length;
     const jslot = buildJslot(face, headParts, base.getWeight());
     const hash = entry.hash;
     this.selfQueued = true;
     queuePlayerNiNodeWork((p) => {
       this.selfQueued = false;
-      if (this.gateFor(p, entry, Date.now())) return false;
+      const late = this.gateFor(p, entry, Date.now());
+      if (late) { trace(`rmp apply wait=${late} h=${hash}`); return false; }
       // Once per face either way: a load skee refuses is not retried every second
       this.selfAppliedHash = hash;
-      if (!this.load(p, presetFileName("self"), jslot, natives)) return false;
+      if (!this.load(p, presetFileName("self"), jslot, natives)) { trace(`rmp apply fail h=${hash}`); return false; }
       this.selfLoadedHash = hash;
       this.afterLoad(PLAYER_ID, `own face back on, ${hash}, ${headParts.length} head parts`);
+      trace(`rmp apply ok h=${hash} hp=${headParts.length} drop=${drop}`);
+      this.recheckOwnLook();
       return true;
     });
   }
@@ -480,6 +503,14 @@ export class RacemenuPresetService extends ClientListener {
       try { natives.removePresetFile(name); } catch { /* overwritten next time */ }
     }
     return ok;
+  }
+
+  // skee's load must leave the vanilla sliders alone: the look trace reads the base back now and 3 s later
+  private recheckOwnLook(): void {
+    try {
+      const recheck = (globalThis as any).__dboAppearanceRecheck;
+      if (typeof recheck === "function") { recheck("rmface"); recheck("rmface", 3); }
+    } catch (e) { /* diagnostics only */ }
   }
 
   private afterLoad(localId: number, line: string): void {

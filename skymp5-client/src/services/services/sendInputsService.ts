@@ -25,6 +25,7 @@ import { RemoteServer } from "./remoteServer";
 import { DeathService } from "./deathService";
 import { RestraintService } from "./restraintService";
 import { logTrace } from "../../logging";
+import { hex, trace } from "../../lib/clientDiag";
 
 const playerFormId = 0x14;
 
@@ -307,6 +308,7 @@ export class SendInputsService extends ClientListener {
                 // The head the character had before the menu: RaceMenu swaps in its race's default face on a non-Nord re-edit
                 this.preMenuHead = this.headState();
                 this.diag(`racemenu open: ${JSON.stringify(this.preMenuHead)}`);
+                trace(`rm open r=${hex(this.preMenuHead.race)} s=${this.preMenuHead.sex} face=${hex(this.preMenuHead.face)}`);
             }
             if (!shown) {
                 this.sp.printConsole('Exited from race menu');
@@ -318,6 +320,8 @@ export class SendInputsService extends ClientListener {
                 this.diag(`racemenu close: ${JSON.stringify(after)}`);
                 // The look goes as the editor left it; the server's guardHead (appearance.js) puts back another race's default head
                 const before = this.preMenuHead;
+                trace(`rm close r=${hex(after.race)} s=${after.sex} face=${hex(after.face)} race=${before && before.race === after.race ? "same" : "changed"}`
+                    + ` sex=${before && before.sex === after.sex ? "same" : "changed"} facepart=${before && before.face === after.face ? "same" : "changed"} hp=${appearance.headpartIds.length}`);
                 if (before && before.face && after.face !== before.face) {
                     this.diag(`racemenu: Face part ${before.face.toString(16)} -> ${after.face.toString(16)} sent as the editor left it (race ${before.race === after.race ? "same" : "changed"}, sex ${before.sex === after.sex ? "same" : "changed"}); the server's head guard decides`);
                 }

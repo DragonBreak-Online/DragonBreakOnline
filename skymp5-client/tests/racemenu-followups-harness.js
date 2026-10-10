@@ -1,4 +1,4 @@
-// Scripted test for the RaceMenu client follow-ups (client 0.3.91): the head the editor left is sent as it is (no same-race
+// Scripted test for the RaceMenu client follow-ups and their trace lines (client 0.3.91): the head the editor left is sent as it is (no same-race
 // revert); the player's face is captured and sent only once the server's face is on the player or the server has none;
 // a dboPresetRefused {hash, reason} resets the dedupe and puts the server's face back; every editor close may send once;
 // `off` ends with the connection; the player's own face is asked of the server again after a game load and after a
@@ -33,6 +33,11 @@ const W = {
   playerParts: [0x0001a2b3, 0x00024238], loadResult: true, savedJslot: null, sex: 0, look: null, extras: null, applied: [],
 };
 globalThis.__rmW = W;
+// The appearance trace (client 0.3.91): every line the services hand to ClientDiagService, and the read-backs they ask for
+const TR = [];
+const RECHECKS = [];
+globalThis.__dboTrace = (t) => TR.push(String(t));
+globalThis.__dboAppearanceRecheck = (event, delay) => RECHECKS.push(delay ? `${event}+${delay}` : event);
 
 const SP_STUB = `
 const W = globalThis.__rmW;
@@ -379,6 +384,29 @@ const bundle = async (rel, dir) => {
     close();
     check('extras: an unchanged close that matches what the server holds sends nothing', sets().length === 0, W.packets);
   }
+
+  // ---- the trace: each step as codes, numbers and hashes ----
+  const has = (line) => TR.includes(line);
+  const like = (rx) => TR.some((l) => rx.test(l));
+  check('trace: the own ask, with nothing claimed', has('rmp ask have=-'), TR.slice(0, 5));
+  check('trace: the server\'s answer: face hash, chunks, size, sliders, sculpt, race', has(`rmp ans face h=${SERVER.hash} n=1 chars=${SERVER.text.length} cu=1 sc=1 race=13746`), TR.filter((l) => /ans face/.test(l)));
+  check('trace: an answer of none, and the off switch', has('rmp ans none off=0') && has('rmp ans none off=1') && has('rmp off'));
+  check('trace: the load on the player: hash, head parts, sculpt hosts dropped', has(`rmp apply ok h=${SERVER.hash} hp=1 drop=0`), TR.filter((l) => /apply/.test(l)));
+  check('trace: a gate holding the load names it', has(`rmp apply wait=combat h=${SERVER.hash}`));
+  check('trace: a load skee refused', has(`rmp apply fail h=${SERVER.hash}`));
+  check('trace: the load asks the look trace for a read-back now and 3 s later', RECHECKS.includes('rmface') && RECHECKS.includes('rmface+3'), RECHECKS.slice(0, 4));
+  check('trace: captures held, with a code each', has('rmp cap held=noanswer') && has('rmp cap held=notyet-combat') && has('rmp cap held=loadfail'), TR.filter((l) => /held/.test(l)));
+  check('trace: a capture sent: size, hash, sliders, sculpt, race, chunks', has(`rmp cap chars=${EDIT.text.length} h=${EDIT.hash} cu=1 sc=1 race=13746 send=1`), TR.filter((l) => /cap chars/.test(l)).slice(0, 3));
+  check('trace: an unchanged capture is not sent and says so', like(new RegExp(`^rmp cap chars=\\d+ h=${EDIT.hash} cu=1 sc=1 race=13746 send=unchanged$`)));
+  check('trace: the upload\'s last chunk', has(`rmp up done h=${EDIT.hash} n=1`));
+  check('trace: a refusal: hash, reason, what went back', has(`rmp refused h=${EDIT.hash} why=gold restore=face`) && has('rmp refused h=deadbeef why=gold restore=ignored')
+    && has(`rmp refused h=${EDIT.hash} why=other restore=face`) && has(`rmp refused h=${EDIT.hash} why=notLoaded restore=none`), TR.filter((l) => /refused/.test(l)));
+  check('trace: an upload dropped by a character change', like(/^rmp up drop=character h=[0-9a-f]{8}$/));
+  check('trace: RaceMenu open and close: race, sex, Face part, what changed', has('rm open r=13746 s=0 face=1a2b3') && has('rm close r=13746 s=0 face=1a2b4 race=same sex=same facepart=changed hp=2'), TR.filter((l) => /^rm /.test(l)));
+  check('trace: extras: ask, answer with counts and hash, apply, capture sent / unchanged, a refusal seen as other',
+    has('rmx ask self') && like(/^rmx ans ov=0 tr=1 mo=0 h=[0-9a-f]{8} rev=1 vs=-$/) && like(/^rmx apply ov=0 tr=1 mo=0 h=[0-9a-f]{8}$/)
+    && like(/^rmx cap ov=0 tr=1 mo=0 h=[0-9a-f]{8} send=1$/) && like(/^rmx cap ov=0 tr=1 mo=0 h=[0-9a-f]{8} send=unchanged$/) && like(/^rmx ans .* vs=other$/), TR.filter((l) => /^rmx/.test(l)));
+  check('trace: no path, quote or name in any line', TR.length > 30 && !TR.some((l) => /[\\"']|Actors|Character|\.tri|NPC Head/.test(l)), TR.filter((l) => /[\\"']|Actors|\.tri|NPC/.test(l)));
 
   console.log(failures ? `${failures} FAILED` : 'all passed');
   process.exit(failures ? 1 : 0);
