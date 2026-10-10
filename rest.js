@@ -108,7 +108,7 @@ module.exports = (api) => {
   const set = (id, prop, v) => { try { mp.set(id, prop, v); return true; } catch (e) { log(`rest: set ${prop} failed`, e.message); return false; } };
 
   // ---- players ----------------------------------------------------------------------------------------
-  // Housing claims, rents and sleep belong to the player's profile, not to one character.
+  // Rents and sleep belong to the player's profile; a housing claim to one character once property is per character (owns).
   const profileOf = (a) => { const p = Number(get(a, 'profileId', -1)); return Number.isFinite(p) && p >= 0 ? p : -1; };
   const charactersOf = (a) => {
     const p = profileOf(a);
@@ -119,7 +119,7 @@ module.exports = (api) => {
 
   // ---- houses ---------------------------------------------------------------------------------------
   // Every claim with the interior cells it covers. housing.json is only the index of claimed doors; the
-  // owner is a profile id. Only a door pair between the outside and an interior makes a house or an inn
+  // owner is a profile id (ownerChar its character). Only a door pair between the outside and an interior makes a house or an inn
   // yours: a container, or a room door inside, is not the building. An exterior door's place is its
   // worldspace, which must not count, or owning a house would make every bed outdoors yours. A building the
   // housing system has made a place (fork housingSystem.ts, housingPlaceMigration "apply") covers every
@@ -144,15 +144,19 @@ module.exports = (api) => {
       const inside = [cellOf(door), cellOf(partner)].filter(isInterior);
       if (inside.length !== 1) continue;
       const rooms = rec.place && Array.isArray(rec.place.cells) ? rec.place.cells.map(idOf).filter(isInterior) : [];
-      out.push({ primary: door, partner, owner: Number(rec.owner), ownerName: String(rec.ownerName || ''), cells: new Set(inside.concat(rooms).map(groupOf)) });
+      out.push({ primary: door, partner, owner: Number(rec.owner), ownerChar: Number(rec.ownerChar) >>> 0, ownerName: String(rec.ownerName || ''), cells: new Set(inside.concat(rooms).map(groupOf)) });
     }
     return out;
   };
   // A claim on an inn's door covers every cell of that inn (its beds.json group). Claims are sorted by id, so
   // an inn with two claimed entrances always pays the same one.
   // A faction's hall (guilds.js __dboHallMember): its members sleep in its beds as its owner does (Nate, 4 Oct)
-  const hallMember = (c, a) => { try { return typeof globalThis.__dboHallMember === 'function' && globalThis.__dboHallMember([c.primary, c.partner], c.owner, a) === true; } catch (e) { return false; } };
-  const ownsCell = (a, cell) => { const p = profileOf(a); return p >= 0 && claims().some((c) => c.cells.has(groupOf(cell)) && (c.owner === p || hallMember(c, a))); };
+  // A claim is one character's once property is per character (housingSystem.ts ownsRecord), else the account's
+  const H = () => globalThis.__dboHousing || null;
+  const owns = (a, c) => { try { const h = H(); if (h && typeof h.ownsRecord === 'function') return h.ownsRecord(c, a) === true; } catch (e) { /* the account's */ } const p = profileOf(a); return p >= 0 && c.owner === p; };
+  const ownerCharOf = (c) => { try { const h = H(); return h && typeof h.perCharacter === 'function' && h.perCharacter() ? c.ownerChar || 0 : 0; } catch (e) { return 0; } };
+  const hallMember = (c, a) => { try { return typeof globalThis.__dboHallMember === 'function' && globalThis.__dboHallMember([c.primary, c.partner], c.owner, a, ownerCharOf(c)) === true; } catch (e) { return false; } };
+  const ownsCell = (a, cell) => profileOf(a) >= 0 && claims().some((c) => c.cells.has(groupOf(cell)) && (owns(a, c) || hallMember(c, a)));
   const innOwner = (cell) => claims().find((x) => x.cells.has(groupOf(cell))) || null;
   const innClaims = (cell) => { const g = groupOf(cell); return claims().filter((c) => c.cells.has(g)); };
   // The bed this claim's owner keeps as their own. It carries the profile that chose it, so a claim released
@@ -162,13 +166,15 @@ module.exports = (api) => {
   // The owner's share goes to a character of theirs who is online, else it waits on the claim for their next login.
   const payOwner = (claim, n) => {
     const online = new Set(onlineActors().map((x) => x >>> 0));
-    let ids = []; try { ids = (mp.getActorsByProfileId(claim.owner) || []).map((x) => Number(x) >>> 0); } catch (e) { /* none */ }
+    const char = ownerCharOf(claim);
+    let ids = char ? [char] : []; if (!char) { try { ids = (mp.getActorsByProfileId(claim.owner) || []).map((x) => Number(x) >>> 0); } catch (e) { /* none */ } }
     const here = ids.find((x) => online.has(x));
     if (here && giveItem(here, GOLD, n)) return `${n} to ${display(here)}`;
-    // Held under the owner's profile, so a claim that changes hands before they log in still pays them, not the next
-    // holder (business.js does the same with owedTo, review A2-4)
+    // Held under the owner (its character, "c<hex>", or its profile), so a claim that changes hands before they log in
+    // still pays them, not the next holder (business.js does the same with owedTo, review A2-4)
     const by = Object.assign({}, get(claim.primary, 'private.dboRestOwedBy', null) || {});
-    by[claim.owner] = (Number(by[claim.owner]) || 0) + n;
+    const k = char ? `c${char.toString(16)}` : claim.owner;
+    by[k] = (Number(by[k]) || 0) + n;
     if (set(claim.primary, 'private.dboRestOwedBy', by)) return `${n} held for ${claim.ownerName || 'profile ' + claim.owner}`;
     return null;
   };
@@ -179,14 +185,17 @@ module.exports = (api) => {
   // Every claimed door is looked at, not only the ones this player owns now: rent held for them stays theirs
   const collectOwed = (a) => {
     const p = profileOf(a); if (p < 0) return;
+    // Rent held for this character, and rent held for its account before property was per character
+    const keys = [`c${(a >>> 0).toString(16)}`, String(p)];
     for (const c of claims()) {
-      const by = get(c.primary, 'private.dboRestOwedBy', null);
-      const mine = by ? Number(by[p]) || 0 : 0;
-      if (mine > 0) {
-        const rest = Object.assign({}, by); delete rest[p];
-        if (set(c.primary, 'private.dboRestOwedBy', rest)) payHeld(a, c.primary, mine, () => { const now = Object.assign({}, get(c.primary, 'private.dboRestOwedBy', null) || {}); now[p] = (Number(now[p]) || 0) + mine; set(c.primary, 'private.dboRestOwedBy', now); });
+      for (const k of keys) {
+        const by = get(c.primary, 'private.dboRestOwedBy', null);
+        const mine = by ? Number(by[k]) || 0 : 0;
+        if (mine <= 0) continue;
+        const rest = Object.assign({}, by); delete rest[k];
+        if (set(c.primary, 'private.dboRestOwedBy', rest)) payHeld(a, c.primary, mine, () => { const now = Object.assign({}, get(c.primary, 'private.dboRestOwedBy', null) || {}); now[k] = (Number(now[k]) || 0) + mine; set(c.primary, 'private.dboRestOwedBy', now); });
       }
-      if (c.owner !== p) continue;
+      if (!owns(a, c)) continue;
       const legacy = Number(get(c.primary, 'private.dboRestOwed', 0)) || 0;
       if (legacy <= 0 || !set(c.primary, 'private.dboRestOwed', 0)) continue;
       payHeld(a, c.primary, legacy, () => set(c.primary, 'private.dboRestOwed', legacy));
@@ -210,10 +219,10 @@ module.exports = (api) => {
     const cell = cellOf(bed);
     if (!INNS.has(cell)) return ownsCell(a, cell) ? 'own' : null;
     if (!rentable(bed, cell)) return null;
-    const p = profileOf(a), here = innClaims(cell);
+    const here = innClaims(cell);
     const keeper = here.find((c) => keptBed(c) === (bed >>> 0));
-    if (keeper) return p >= 0 && keeper.owner === p ? 'own' : 'kept';
-    return p >= 0 && here.some((c) => c.owner === p) ? 'keep' : 'inn';
+    if (keeper) return owns(a, keeper) ? 'own' : 'kept';
+    return here.some((c) => owns(a, c)) ? 'keep' : 'inn';
   };
   // The other bed this player still rents with any of their characters. Read from the characters, which are
   // always loaded: the bed's cell may not be.
@@ -331,7 +340,7 @@ module.exports = (api) => {
   // bed of their inn. Should they hold two of its doors, the choice lives on the first and the others are cleared,
   // so there is never more than one.
   const keepBed = (a, bed) => {
-    const p = profileOf(a), mine = innClaims(cellOf(bed)).filter((c) => c.owner === p);
+    const p = profileOf(a), mine = innClaims(cellOf(bed)).filter((c) => owns(a, c));
     if (!mine.length) return false;
     const before = mine.map(keptBed).find(Boolean) || 0;
     mine.slice(1).forEach((c) => { if (keptBed(c)) set(c.primary, 'private.dboInnOwnerBed', null); });
@@ -341,8 +350,7 @@ module.exports = (api) => {
     return true;
   };
   const unkeepBed = (a, bed) => {
-    const p = profileOf(a);
-    const c = innClaims(cellOf(bed)).find((x) => x.owner === p && keptBed(x) === (bed >>> 0));
+    const c = innClaims(cellOf(bed)).find((x) => owns(a, x) && keptBed(x) === (bed >>> 0));
     if (!c || !set(c.primary, 'private.dboInnOwnerBed', null)) return;
     audit(`REST ${who(a)} no longer keeps bed ${bedDesc(bed)}${where(bed)}`);
     personal(a, 'This bed is for rent again.');

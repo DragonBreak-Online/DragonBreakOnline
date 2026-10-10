@@ -9,7 +9,7 @@
 //
 // State in tenancy.json: { listings: { <primary hex>: { door, zone, deposit, weekly, listedBy, listedAt,
 //   interest: [party], offer?: { party, until }, tenant?: party, deposit held in depositHeld, paidUntil, overdueSince? } },
-//   owed: [{ tag, gold, why }] }, a party being { profile, tag, name }.
+//   owed: [{ tag, gold, why }] }, a party being { profile, char (its actor, from 10 Oct), tag, name }.
 
 const fs = require('fs');
 const path = require('path');
@@ -91,7 +91,10 @@ module.exports = (api) => {
     return best ? idOf(best) : 0;
   };
 
-  const me = (a) => ({ profile: Number(profileOf(a)), tag: tagOf(a), name: display(a) });
+  const me = (a) => ({ profile: Number(profileOf(a)), char: a >>> 0, tag: tagOf(a), name: display(a) });
+  // A claim is one character's once property is per character (housingSystem.ts ownsRecord), else the account's
+  const owns = (a, rec) => { try { const H = housing(); if (H && typeof H.ownsRecord === 'function') return H.ownsRecord(rec, a) === true; } catch (e) { /* the account's */ } return Number(rec.owner) === Number(profileOf(a)); };
+  const perChar = () => { try { const H = housing(); return !!H && typeof H.perCharacter === 'function' && H.perCharacter() === true; } catch (e) { return false; } };
   const actorOfTag = (tag) => onlineActors().find((x) => tagOf(x) === tag) || 0;
   const hex = (id) => (Number(id) >>> 0).toString(16);
   const pay = (party, gold, why) => {
@@ -192,7 +195,7 @@ module.exports = (api) => {
     const p = me(a);
     if (!L || !L.offer || L.offer.party.tag !== p.tag || Date.now() > L.offer.until) return 'Nobody has offered you this property.';
     // grant takes a house from whoever holds it, so a listing that outlived a change of owner would seize it
-    if (h.rec && h.rec.owner && h.rec.owner !== p.profile) return 'This property has an owner now, so the offer no longer stands. Ask the officials here.';
+    if (h.rec && h.rec.owner && !owns(a, h.rec)) return 'This property has an owner now, so the offer no longer stands. Ask the officials here.';
     const cost = L.deposit + L.weekly;
     if (!takeGold(a, cost)) return `Moving in takes the ${L.deposit} gold deposit and the first week's ${L.weekly}. You do not have ${cost} gold.`;
     const err = housing().grant(h.door, a);
@@ -231,8 +234,16 @@ module.exports = (api) => {
   // fork housingSystem doTransfer asks before a house changes hands: a rented house stays the hold's until the tenancy
   // ends, or a tenant could sell it and keep the price (economy review, 2026-09-29)
   globalThis.__dboTenancyRented = (door) => { try { const L = data().listings[hex(door)]; return !!(L && L.tenant); } catch (e) { return false; } };
-  const ownerOf = (L) => { try { return Number((housing().recordOf(L.door) || {}).owner) || 0; } catch (e) { return 0; } };
-  const stillTenants = (L) => { const owner = ownerOf(L); return !owner || !L.tenant || !(Number(L.tenant.profile) >= 0) || owner === Number(L.tenant.profile); };
+  const recOf = (L) => { try { return housing().recordOf(L.door) || {}; } catch (e) { return {}; } };
+  const ownerOf = (L) => Number(recOf(L).owner) || 0;
+  // The tenant still holds it: their account, and their character once property is per character (a tenancy older than
+  // the character field goes by the account)
+  const stillTenants = (L) => {
+    const rec = recOf(L), owner = Number(rec.owner) || 0;
+    if (!owner || !L.tenant || !(Number(L.tenant.profile) >= 0)) return true;
+    if (owner !== Number(L.tenant.profile)) return false;
+    return !(perChar() && Number(rec.ownerChar) && Number(L.tenant.char)) || (Number(rec.ownerChar) >>> 0) === (Number(L.tenant.char) >>> 0);
+  };
   const end = (L, returnDeposit, why) => {
     const owner = ownerOf(L), theirs = stillTenants(L);
     if (theirs) housing().release(L.door);

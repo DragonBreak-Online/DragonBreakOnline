@@ -20,7 +20,7 @@
 // The gamemode's stand-in (businessFailClosed) already counts every record.
 //
 // State: businesses.json { businesses: { <claim door hex>: record } } and taxes.json { <zone id>: { rate, by, at, log } },
-// both runtime (gitignored). A record: { name, owner (profile), ownerName, zone, rentGold, staff: [{ profile, name }],
+// both runtime (gitignored). A record: { name, owner (profile), ownerChar (its character, per-character property), ownerName, zone, rentGold, staff: [{ profile, name }],
 // chests: { <ref hex>: { price, renter?, renterName?, until?, lapsed? } }, owed, log: [{ at, text }], notes: [{ at, by, text }] }.
 
 const fs = require('fs');
@@ -76,7 +76,7 @@ module.exports = (api) => {
     if (!rec || !(Number(rec.owner) > 0) || !partner) return null;
     const inside = [cellOf(primary), cellOf(partner)].filter(isInterior);
     if (inside.length !== 1) return null;
-    return { primary: primary >>> 0, owner: Number(rec.owner), ownerName: String(rec.ownerName || ''), group: groupOf(inside[0]) };
+    return { primary: primary >>> 0, owner: Number(rec.owner), ownerChar: Number(rec.ownerChar) >>> 0, ownerName: String(rec.ownerName || ''), group: groupOf(inside[0]) };
   };
   const claims = () => {
     let ids = [];
@@ -85,6 +85,12 @@ module.exports = (api) => {
   };
   const claimAt = (cell) => { const g = groupOf(cell); return claims().find((c) => c.group === g) || null; };
 
+  // A claim, and the business on it, is one character's once property is per character (housingSystem.ts), else the account's
+  const perChar = () => { try { const h = globalThis.__dboHousing; return !!h && typeof h.perCharacter === 'function' && h.perCharacter() === true; } catch (e) { return false; } };
+  const ownsClaim = (a, c) => { try { const h = globalThis.__dboHousing; if (h && typeof h.ownsRecord === 'function') return h.ownsRecord(c, a) === true; } catch (e) { /* the account's */ } return !!c && c.owner === profileOf(a); };
+  const ownerCharOf = (b) => (perChar() && Number(b.ownerChar) ? Number(b.ownerChar) >>> 0 : 0);
+  const heldKey = (b) => (ownerCharOf(b) ? `c${ownerCharOf(b).toString(16)}` : String(b.owner));
+
   // ---- businesses -------------------------------------------------------------------------------------
   // A business stays only while its owner still holds the claim; a claim that changed hands closes it
   const bizOf = (primary) => {
@@ -92,11 +98,14 @@ module.exports = (api) => {
     if (!b) return null;
     const c = claimOf(primary);
     if (!c || c.owner !== Number(b.owner)) return null;
+    // A business opened before property was per character follows its claim's character
+    if (perChar() && !Number(b.ownerChar) && c.ownerChar) b.ownerChar = c.ownerChar;
+    if (ownerCharOf(b) && c.ownerChar && c.ownerChar !== ownerCharOf(b)) return null;
     return b;
   };
   const bizAt = (cell) => { const c = claimAt(cell); return c ? { claim: c, biz: bizOf(c.primary) } : { claim: null, biz: null }; };
   const bizHere = (a) => bizAt(cellOf(a));
-  const isOwner = (a, b) => !!b && profileOf(a) === Number(b.owner);
+  const isOwner = (a, b) => !!b && (ownerCharOf(b) ? ownerCharOf(b) === (a >>> 0) : profileOf(a) === Number(b.owner));
   const isStaff = (a, b) => !!b && (isOwner(a, b) || (b.staff || []).some((s) => Number(s.profile) === profileOf(a)));
   const stamp = (ms) => new Date(ms).toISOString().slice(0, 16).replace('T', ' ') + ' UTC';
   const note = (b, text) => { b.log = (b.log || []).concat([{ at: Date.now(), text }]).slice(-C.logKeep); };
@@ -104,7 +113,7 @@ module.exports = (api) => {
   // Gold to any online character of the owner's profile, else held for /business collect or their next login
   const payOwner = (b, n) => {
     if (!(n > 0)) return '';
-    let ids = []; try { ids = (mp.getActorsByProfileId(Number(b.owner)) || []).map((x) => Number(x) >>> 0); } catch (e) { /* none */ }
+    let ids = ownerCharOf(b) ? [ownerCharOf(b)] : []; if (!ids.length) { try { ids = (mp.getActorsByProfileId(Number(b.owner)) || []).map((x) => Number(x) >>> 0); } catch (e) { /* none */ } }
     const online = new Set(onlineActors().map((x) => x >>> 0));
     const here = ids.find((x) => online.has(x));
     if (here && giveGold(here, n)) return `${n} to ${display(here)}`;
@@ -144,13 +153,16 @@ module.exports = (api) => {
   globalThis.__dboBusinessLog = (cell, text, ownerGold) => { const { biz } = bizAt(cell); if (biz) { note(biz, text); earned(biz, Number(ownerGold) || 0); save(); } };
   globalThis.__dboBusinessLogin = (a) => {
     for (const b of Object.values(data().businesses)) {
-      if (Number(b.owner) !== profileOf(a) || !(Number(b.owed) > 0)) continue;
+      if (!isOwner(a, b) || !(Number(b.owed) > 0)) continue;
       const n = Number(b.owed);
       if (giveGold(a, n)) { b.owed = 0; note(b, `${display(a)} collected ${n} gold of takings`); save(); personal(a, `${b.name} took ${n} gold while you were away.`); }
     }
     // Takings held for a business whose claim has since passed to someone else (review A2-4)
-    const d = data(); const pid = String(profileOf(a)); const held = Number((d.owedTo || {})[pid]) || 0;
-    if (held > 0 && giveGold(a, held)) { delete d.owedTo[pid]; save(); audit(`BUSINESS ${who(a)} collected ${held} gold of takings held from a business they no longer own`); personal(a, `${held} gold of takings from your old business was held for you.`); }
+    const d = data();
+    for (const pid of [`c${(a >>> 0).toString(16)}`, String(profileOf(a))]) {
+      const held = Number((d.owedTo || {})[pid]) || 0;
+      if (held > 0 && giveGold(a, held)) { delete d.owedTo[pid]; save(); audit(`BUSINESS ${who(a)} collected ${held} gold of takings held from a business they no longer own`); personal(a, `${held} gold of takings from your old business was held for you.`); }
+    }
   };
 
   // ---- rented chests ----------------------------------------------------------------------------------
@@ -519,7 +531,7 @@ module.exports = (api) => {
     const sub = (words.shift() || '').toLowerCase(), rest = words.join(' ').trim();
     const { claim, biz } = bizHere(a);
     if (sub === 'open') {
-      if (!claim || claim.owner !== profileOf(a)) return personal(a, 'Stand inside a property you own to open it as a business.');
+      if (!claim || !ownsClaim(a, claim)) return personal(a, 'Stand inside a property you own to open it as a business.');
       if (biz) return personal(a, `This is already ${biz.name}.`);
       const name = rest.slice(0, 40);
       if (!name) return personal(a, 'Name it: /business open <name>');
@@ -532,12 +544,12 @@ module.exports = (api) => {
       if (old) {
         const d = data(); d.archived = d.archived || {};
         const owed = Number(old.owed) || 0;
-        if (owed > 0) { d.owedTo = d.owedTo || {}; d.owedTo[String(old.owner)] = (Number(d.owedTo[String(old.owner)]) || 0) + owed; }
+        if (owed > 0) { d.owedTo = d.owedTo || {}; d.owedTo[heldKey(old)] = (Number(d.owedTo[heldKey(old)]) || 0) + owed; }
         for (const [ref, c] of Object.entries(old.chests || {})) { const st = chestState(c); if (st === 'rented' || st === 'grace') carried[ref] = Object.assign({}, c); }
-        d.archived[`${hex(claim.primary)}@${Date.now()}`] = Object.assign({}, old, { owed: 0, owedMovedTo: owed > 0 ? String(old.owner) : undefined });
+        d.archived[`${hex(claim.primary)}@${Date.now()}`] = Object.assign({}, old, { owed: 0, owedMovedTo: owed > 0 ? heldKey(old) : undefined });
         audit(`BUSINESS ${who(a)} opened a business on claim ${hex(claim.primary)}; the previous record (${old.name}, owner ${old.owner}) was archived, ${owed} gold held for its owner's next login, ${Object.keys(carried).length} rented chest(s) carried over`);
       }
-      data().businesses[hex(claim.primary)] = { name, owner: profileOf(a), ownerName: display(a), zone: zoneOfActor(a), rentGold: 0, staff: [], chests: carried, owed: 0, log: [], notes: [] };
+      data().businesses[hex(claim.primary)] = { name, owner: profileOf(a), ownerChar: a >>> 0, ownerName: display(a), zone: zoneOfActor(a), rentGold: 0, staff: [], chests: carried, owed: 0, log: [], notes: [] };
       if (Object.keys(carried).length) note(data().businesses[hex(claim.primary)], `${Object.keys(carried).length} chest(s) still rented from the previous business, kept for their renters`);
       const b = data().businesses[hex(claim.primary)]; note(b, `${display(a)} opened ${name}`); save();
       audit(`BUSINESS ${who(a)} opened ${name} (claim ${hex(claim.primary)}, ${zoneName(b.zone)})`);
@@ -546,7 +558,7 @@ module.exports = (api) => {
       if (hasPanel(a)) return sendPanel(a, claim, b, placed.ok ? R(true, `${name} is open. Set the ledger on the counter with the arrows.`) : placed);
       return personal(a, `${name} is open. ${placed.ok ? 'Its ledger is in front of you; activate it to run the business.' : placed.text + ' /business ledger places it.'}`);
     }
-    if (!biz) return personal(a, claim && claim.owner === profileOf(a) ? 'This property is not a business yet: /business open <name>' : 'There is no business ledger here. Stand inside a business.');
+    if (!biz) return personal(a, claim && ownsClaim(a, claim) ? 'This property is not a business yet: /business open <name>' : 'There is no business ledger here. Stand inside a business.');
     if (!isStaff(a, biz) && !isAdmin(a)) return personal(a, publicLine(biz));
     switch (sub) {
       case '': return hasPanel(a) ? sendPanel(a, claim, biz) : summary(a, claim, biz);
