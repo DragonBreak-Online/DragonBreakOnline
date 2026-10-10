@@ -540,21 +540,21 @@ module.exports = (api) => {
     for (const [fid, m] of Object.entries(marks)) if (FACTIONS.has(fid) && ((m || {}).doors || []).includes(desc)) out.add(fid);
     return [...out];
   };
-  const leadsAccount = (pid, fid) => { let ids = []; try { ids = (mp.getActorsByProfileId(Number(pid)) || []).map((x) => Number(x) >>> 0); } catch (e) { return false; } return ids.some((x) => (rankOf(fid, x) || {}).role === 'leader'); };
-  // A hall is shared while its owner leads the faction: the owning character once property is per character (ownerChar from
-  // housingSystem.ts), else any character of the account
-  const leadsOwner = (owner, ownerChar, fid) => (Number(ownerChar) ? (rankOf(fid, Number(ownerChar) >>> 0) || {}).role === 'leader' : leadsAccount(owner, fid));
-  const ownerCharOfRec = (rec) => { try { const H = globalThis.__dboHousing; return H && typeof H.perCharacter === 'function' && H.perCharacter() ? Number(rec.ownerChar) >>> 0 : 0; } catch (e) { return 0; } };
-  // refs: the building's door ids (its record's half and the far half); owner: the profile holding the claim; ownerChar: its character
-  const hallFactionsOf = (refs, owner, ownerChar) => {
+  // A hall follows its faction's current leader, whoever owns the building (Nate, 10 Oct): shared with its members while the
+  // faction has a leader, and the leader's character holds the owner's powers over it (housingSystem.ts __dboHallLeader)
+  const leaderOf = (fid) => { const f = FACTIONS.get(fid); if (!f) return 0; const hit = Object.entries(ST.members[fid] || {}).find(([, e]) => e && (f.ranks[e.rank] || {}).role === 'leader'); return hit ? Number(hit[0]) >>> 0 : 0; };
+  // refs: the building's door ids (its record's half and the far half); the factions whose hall it is and that have a leader
+  const hallFactionsOf = (refs) => {
     const out = new Set();
     for (const r of Array.isArray(refs) ? refs : []) {
       let desc = ''; try { desc = String(mp.getDescFromId(Number(r) >>> 0) || '').toLowerCase(); } catch (e) { continue; }
-      for (const fid of hallFactionsAt(desc)) if (leadsOwner(owner, ownerChar, fid)) out.add(fid);
+      for (const fid of hallFactionsAt(desc)) if (leaderOf(fid)) out.add(fid);
     }
     return [...out];
   };
-  globalThis.__dboHallOf = (refs, owner, ownerChar) => hallFactionsOf(refs, owner, ownerChar);
+  // The owner arguments are kept for the callers (housingSystem.ts, rest.js, ledgersale.js) and no longer decide
+  globalThis.__dboHallOf = (refs) => hallFactionsOf(refs);
+  globalThis.__dboHallLeader = (refs, actor) => { const a = Number(actor) >>> 0; return !!a && hallFactionsOf(refs).some((fid) => (rankOf(fid, a) || {}).role === 'leader'); };
   // A building may also name offices whose holders share it, "<zone>:<office>" (Nate, 4 Oct: Castle Bruma and Bruma's
   // Steward, whoever holds it): gamemode-config.json housingPlaces.shares { door desc: [office] } and the staff marks
   // ("@offices", "@officesOff" in faction-halls.json). Read live from officials.json, so a new Steward takes over at once.
@@ -570,7 +570,7 @@ module.exports = (api) => {
   const descsOf = (refs) => (Array.isArray(refs) ? refs : []).map((r) => { try { return String(mp.getDescFromId(Number(r) >>> 0) || '').toLowerCase(); } catch (e) { return ''; } }).filter(Boolean);
   const officeShare = (refs, a) => descsOf(refs).some((d) => officesAt(d).some((k) => holdsOffice(a, k)));
   globalThis.__dboHallOffice = (refs, owner, actor) => { const a = Number(actor) >>> 0; return !!a && officeShare(refs, a); };
-  globalThis.__dboHallMember = (refs, owner, actor, ownerChar) => { const a = Number(actor) >>> 0; return !!a && (hallFactionsOf(refs, owner, ownerChar).some((fid) => !!entryOf(fid, a)) || officeShare(refs, a)); };
+  globalThis.__dboHallMember = (refs, owner, actor, ownerChar) => { const a = Number(actor) >>> 0; return !!a && (hallFactionsOf(refs).some((fid) => !!entryOf(fid, a)) || officeShare(refs, a)); };
   // charters.js: a faction founded by charter goes live at once (charters.js has already written player-factions.json, so a
   // reload keeps it). The founder takes the leader rank, and each co-founder ({ actor, role }) the rank of their role, or
   // the rank below the leader without one. An error string, or null.
@@ -972,9 +972,9 @@ module.exports = (api) => {
       try { fs.writeFileSync(MARKS_PATH + '.tmp', JSON.stringify(marks, null, 1)); fs.renameSync(MARKS_PATH + '.tmp', MARKS_PATH); }
       catch (e) { log('faction-halls.json write failed', e.message); return personal(a, 'The mark could not be saved. Try again later.'); }
       audit(`FACTION ${who(a)} ${s === 'hallmark' ? 'marked' : 'unmarked'} ${place} (${doors.join(', ')}, owner profile ${rec.owner}) as the hall of ${f.name}`);
-      const leads = leadsOwner(rec.owner, ownerCharOfRec(rec), f.id);
+      const leads = !!leaderOf(f.id);
       if (s === 'hallunmark') return personal(a, `${place} is no longer the hall of ${f.name}.`);
-      return personal(a, `${place} is the hall of ${f.name}.` + (leads ? ' Its members use it as its owner does.' : ` It is shared only while its owner, ${rec.ownerName || 'someone'}, leads ${f.name}.`));
+      return personal(a, `${place} is the hall of ${f.name}.` + (leads ? ' Its members use it as its owner does, and its leader holds it.' : ` It is shared once ${f.name} has a leader.`));
     }
     if (s === 'hall' || s === 'halls') {
       const one = rest[0] && FACTIONS.get(String(rest[0]).toLowerCase());

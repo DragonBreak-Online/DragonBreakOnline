@@ -112,7 +112,14 @@ setMemberLow('college-of-whispers', MEMBER);
 ok(JSON.stringify(globalThis.__dboHallOf([SPIRE], 501)) === '["college-of-whispers"]', "Frostcrag Spire's door, claimed by the College's leader, is the College's hall", globalThis.__dboHallOf([SPIRE], 501));
 ok(globalThis.__dboHallMember([SPIRE], 501, MEMBER) === true && globalThis.__dboHallMember([SPIRE], 501, LEADER) === true, '...its members use it, the leader too');
 ok(globalThis.__dboHallMember([SPIRE], 501, OUTSIDER) === false, '...someone outside the College does not');
-ok(globalThis.__dboHallMember([SPIRE], 502, MEMBER) === false && globalThis.__dboHallOf([SPIRE], 502).length === 0, 'held by someone who does not lead the College it is no hall');
+// The hall follows the faction's current leader, whoever owns the building (Nate, 10 Oct)
+ok(globalThis.__dboHallMember([SPIRE], 502, MEMBER) === true && globalThis.__dboHallOf([SPIRE], 502).length === 1, 'held by someone who does not lead the College it is still its hall while the College has a leader');
+ok(globalThis.__dboHallLeader([SPIRE], LEADER) === true && globalThis.__dboHallLeader([SPIRE], MEMBER) === false, "...and the leader's character holds the owner's powers over it, a member does not");
+setMemberLow('college-of-whispers', LEADER);
+ok(globalThis.__dboHallMember([SPIRE], 501, MEMBER) === false && globalThis.__dboHallOf([SPIRE], 501).length === 0 && globalThis.__dboHallLeader([SPIRE], LEADER) === false, 'with no leader the College shares no hall, and its old leader has no hall powers');
+setLeader('college-of-whispers', MEMBER);
+ok(globalThis.__dboHallLeader([SPIRE], MEMBER) === true && globalThis.__dboHallMember([SPIRE], 501, LEADER) === true, 'a new leader takes the hall over at once; the old one uses it as a member');
+setMemberLow('college-of-whispers', MEMBER); setLeader('college-of-whispers', LEADER);
 ok(globalThis.__dboHallMember([SHOP], 501, MEMBER) === false, "a house of the leader's that is not the hall is not shared");
 
 // ---- staff mark a hall in game, and unmark one (faction-halls.json, never tracked) ----
