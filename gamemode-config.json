@@ -880,11 +880,11 @@
   "_dominionStipend": "Nate, 11 Oct: the Aldmeri Dominion pays its Thalmor in the Empire a stipend each weekly reckoning (economy.js), into the dominionStipendTo treasury before wages, in the faction report as stipend. It is NEW gold, made by no one's work, so it is kept modest; 0 turns it off. Hot reload.",
   "dominionStipend": 300, "dominionStipendTo": "thalmor" },
  "nobility": {
-  "_comment": "Fiefs and titles (nobility.js, docs/nobility/DESIGN.md; Nate, 10 Oct). Off until Nate switches it on: no F3 Nobility tab, no fief powers in the fork's housing, no tax share. The hold's ruler grants titles; a fief's holder manages its buildings like a steward and their own there are not capped; fiefShare of the weekly property tax on a fief's buildings goes to the fief's treasury (deposit only). realms: zone id -> cyrodiil (Baron, Lord, Knight under a Count) or skyrim (Lord, Thane under a Jarl), Skyrim when not listed.",
+  "_comment": "Fiefs and titles (nobility.js, docs/nobility/DESIGN.md; Nate, 10 Oct). Off until Nate switches it on: no F3 Nobility tab, no fief powers in the fork's housing, no tax share. The hold's ruler grants titles (a Lead GM may only revoke, in an emergency); a fief's holder manages, assesses and rents out its buildings like a steward and their own there are not capped; fiefShare of the weekly property tax on a fief's buildings goes to the fief's treasury (deposit only). realms: zone id -> cyrodiil (Baron, Lord, Knight under a Count) or skyrim (Lord, Thane under a Jarl), Skyrim when not listed.",
   "enabled": false,
   "fiefShare": 0.25,
   "realms": { "bruma": "cyrodiil" },
-  "_seed": "Applied once each when the switch is on, to the account's character carrying the name, and only to a vacant fief: Lord Elion (profile 49) bought Mountain Watch from the Countess and replaces the housingPlaces uncapped/staff entry for 49, which goes in the same release.",
+  "_seed": "Applied once each when the switch is on, to the account's character carrying the name, and only to a vacant fief: Lord Elion (profile 49) bought Mountain Watch from the Countess; once his seed has run, housingPlaces.uncappedProfiles 49 (the interim fix) is removed.",
   "seed": [ { "fief": "mountain-watch", "title": "baron", "profile": 49, "name": "Elion" } ]
  },
  "contracts": {
