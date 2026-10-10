@@ -23,10 +23,10 @@ const CELLS = { [HOUSE]: WORLD, [HOUSE_IN]: INSIDE, [CHEST]: INSIDE, [ROOM]: INS
 const TYPES = { [HOUSE]: 'DOOR', [HOUSE_IN]: 'DOOR', [CHEST]: 'CONT', [ROOM]: 'DOOR', [OTHER]: 'DOOR', [OTHER_IN]: 'DOOR', [LOOSE]: 'CONT' };
 const PARTNER = { [HOUSE]: HOUSE_IN, [HOUSE_IN]: HOUSE, [OTHER]: OTHER_IN, [OTHER_IN]: OTHER };
 // Account 60: Kojus (0xff000060, slot 0, owns the house) and his alt Pesrae (0xff000061, slot 1); a key holder, a stranger
-const KOJUS = 0xff000060, ALT = 0xff000061, KEYHOLDER = 0xff000063, STRANGER = 0xff000062, ADMIN = 0xff000064, MASKED = 0xff000065, LONE = 0xff000066;
-const PROFILE = { [KOJUS]: 60, [ALT]: 60, [KEYHOLDER]: 63, [STRANGER]: 62, [ADMIN]: 64, [MASKED]: 70, [LONE]: 71 };
-const NAME = { [KOJUS]: 'Kojus Animus', [ALT]: 'Pesrae Animus', [KEYHOLDER]: 'Holder', [STRANGER]: 'Stranger One', [ADMIN]: 'Staff', [MASKED]: 'Masked Person', [LONE]: 'Renamed Now' };
-const SLOT = { [KOJUS]: 0, [ALT]: 1, [KEYHOLDER]: 0, [STRANGER]: 0, [ADMIN]: 0, [MASKED]: 0, [LONE]: 0 };
+const KOJUS = 0xff000060, ALT = 0xff000061, THIRD = 0xff000067, KEYHOLDER = 0xff000063, STRANGER = 0xff000062, ADMIN = 0xff000064, MASKED = 0xff000065, LONE = 0xff000066;
+const PROFILE = { [KOJUS]: 60, [ALT]: 60, [THIRD]: 60, [KEYHOLDER]: 63, [STRANGER]: 62, [ADMIN]: 64, [MASKED]: 70, [LONE]: 71 };
+const NAME = { [KOJUS]: 'Kojus Animus', [ALT]: 'Pesrae Animus', [THIRD]: 'Third Animus', [KEYHOLDER]: 'Holder', [STRANGER]: 'Stranger One', [ADMIN]: 'Staff', [MASKED]: 'Masked Person', [LONE]: 'Renamed Now' };
+const SLOT = { [KOJUS]: 0, [ALT]: 1, [THIRD]: 2, [KEYHOLDER]: 0, [STRANGER]: 0, [ADMIN]: 0, [MASKED]: 0, [LONE]: 0 };
 const props = new Map();
 const keyItem = (name) => ({ baseId: 0xdb0e2, count: 1, name });
 const inventories = { [KEYHOLDER]: [keyItem('Key to Kojus Hall')] };
@@ -88,6 +88,16 @@ const assignedToKojusAccount = base({ ownerChar: KOJUS, partner: HOUSE_IN, place
 ok(sys.placeRefAccess(ctx, HOUSE, assignedToKojusAccount, ROOM, sys.viewerAccess(ctx, ALT)) === false, 'on: a room assigned to another character is not the alt\'s');
 ok(sys.overCap(ctx, 60, KOJUS, true, true) !== '', 'on: the owning character cannot take a second property');
 ok(sys.overCap(ctx, 60, ALT, true, true) === '', 'on: his alt may hold one of her own (the cap counts per character)');
+// At most two houses an account (Nate, 10 Oct): with the alt holding one too, a third character of the account is refused
+props.set(`${OTHER}:private.housing`, base({ ownerChar: ALT, ownerName: 'Pesrae Animus', partner: OTHER_IN, place: { cells: [INSIDE2], builtAt: 1 } }));
+sys.claimed.push(OTHER);
+ok(/between them, the most one account may/.test(sys.overCap(ctx, 60, THIRD, true, true)), 'on: a third character of an account already holding two houses is refused, with its own line', sys.overCap(ctx, 60, THIRD, true, true));
+ok(sys.overCap(ctx, 60, THIRD, true, false) === '', '...a loose chest or room is no house and is not refused');
+ok(sys.isStaff(ctx, 60, THIRD) === false && (() => { const was = sys.isStaff; sys.isStaff = () => true; const r = sys.overCap(ctx, 60, THIRD, true, true); sys.isStaff = was; return r === ''; })(), '...staff are exempt');
+sys.placeCapPerAccount = 3;
+ok(sys.overCap(ctx, 60, THIRD, true, true) === '', '...housingPlaceCapPerAccount 3 lets it through');
+sys.placeCapPerAccount = 2;
+sys.claimed.pop(); props.delete(`${OTHER}:private.housing`);
 // A record the migration has not named yet is still the account's
 props.set(`${HOUSE}:private.housing`, Object.assign(rec(HOUSE), { ownerChar: undefined }));
 ok(access(HOUSE, ALT) === true, 'on: a claim not yet migrated (no ownerChar) stays the account\'s');
@@ -98,8 +108,9 @@ sys.exposeTenancy(ctx);
 const V = globalThis.__dboHousing;
 ok(V.perCharacter() === true && V.ownsRecord(rec(HOUSE), KOJUS) === true && V.ownsRecord(rec(HOUSE), ALT) === false, '__dboHousing.ownsRecord: the character, not the account');
 ok(JSON.stringify(V.ownerActorsOf(rec(HOUSE))) === JSON.stringify([KOJUS]) && V.ownerKeyOf(rec(HOUSE)) === `c${KOJUS.toString(16)}`, '__dboHousing.ownerActorsOf / ownerKeyOf: the owning character');
+ok(V.keyOpens(HOUSE, KEYHOLDER) === true && V.keyOpens(HOUSE, STRANGER) === false && V.keyOpens(HOUSE, KOJUS) === false, '__dboHousing.keyOpens: a key the actor carries, and only that');
 sys.perCharacter = false;
-ok(V.ownerActorsOf(rec(HOUSE)).length === 2 && V.ownerKeyOf(rec(HOUSE)) === '60' && V.ownsRecord(rec(HOUSE), ALT) === true, '...off: the account\'s characters and its profile id');
+ok(V.ownerActorsOf(rec(HOUSE)).length === 3 && V.ownerKeyOf(rec(HOUSE)) === '60' && V.ownsRecord(rec(HOUSE), ALT) === true, '...off: the account\'s characters and its profile id');
 sys.perCharacter = true;
 
 // ---- claims and hand-overs write the character ------------------------------------------------------------------------
@@ -117,6 +128,27 @@ sys.perCharacter = true;
 sys.lastRequestMs = new Map();
 sys.onPropertyRequest(ctx, KOJUS, { target: LOOSE, action: 'abandon' });
 ok(rec(LOOSE).owner === 0 && rec(LOOSE).ownerChar === undefined, 'giving it up clears the character with the owner', rec(LOOSE));
+
+// ---- a masked claim records the real name --------------------------------------------------------------------------
+sys.lastRequestMs = new Map();
+sys.onPropertyRequest(ctx, MASKED, { target: LOOSE, action: 'claim' });
+ok(rec(LOOSE).ownerName === 'Raven The Shield' && rec(LOOSE).ownerChar === MASKED, 'a masked character\'s claim records the real name, not "Masked Person"', rec(LOOSE));
+
+// ---- a faction's hall follows its current leader (guilds.js __dboHallLeader) ---------------------------------------
+sys.isBuilding = HousingSystem.prototype.isBuilding;
+let hallLeader = STRANGER;
+globalThis.__dboHallLeader = (refs, a) => refs.includes(HOUSE) && a === hallLeader;
+sys.lastRequestMs = new Map();
+sys.onPropertyRequest(ctx, STRANGER, { target: HOUSE, action: 'rename', name: 'Guild House' });
+ok(rec(HOUSE).name === 'Guild House', "the faction's leader has the owner's powers over its hall (renames it), whoever owns the building", rec(HOUSE).name);
+hallLeader = KEYHOLDER; sys.lastRequestMs = new Map();
+sys.onPropertyRequest(ctx, STRANGER, { target: HOUSE, action: 'rename', name: 'Old Leader' });
+ok(rec(HOUSE).name === 'Guild House', '...a leader who has stepped down has them no more');
+sys.lastRequestMs = new Map();
+sys.onPropertyRequest(ctx, KEYHOLDER, { target: HOUSE, action: 'rename', name: 'New Leader' });
+ok(rec(HOUSE).name === 'New Leader', '...the new leader has them at once');
+delete globalThis.__dboHallLeader;
+reset();
 
 // ---- the owner migration ----------------------------------------------------------------------------------------------
 const fixture = () => {
