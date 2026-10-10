@@ -1,6 +1,6 @@
 'use strict'
 // Settings, server hotkeys: each takes a mouse button (middle, back, forward) as well as a key, stored as 256 + the
-// DirectInput button like the Skyrim Platform client's DxScanCode; the game hotkeys (controlmap) stay keyboard only.
+// DirectInput button like the Skyrim Platform client's DxScanCode; the game hotkeys too (controlmap mouse column).
 // Runs the renderer's hotkey table and press-to-bind capture on a stub window and document.
 const test = require('node:test')
 const assert = require('node:assert')
@@ -69,16 +69,15 @@ test('left and right click do not bind and leave the capture running', () => {
   assert.strictEqual(t.getKey('hk-voice-ptt'), 34)
 })
 
-test('the game hotkeys (controlmap keyboard column) never listen for the mouse', () => {
+test('the game hotkeys (controlmap) bind the middle, back and forward buttons too', () => {
   for (const id of ['ghk-activate', 'ghk-jump', 'ghk-sprint', 'ghk-sneak', 'ghk-shout', 'ghk-pov']) {
-    const { t, el, fire, listeners } = load()
+    const { t, el, fire } = load()
     const btn = el(id)
     t.setKey(id, 57)
     t.startCapture(btn, false)
-    assert.ok(!listeners.some((l) => l.type === 'mousedown'), id)
-    assert.doesNotMatch(btn.textContent, /mouse/)
-    fire('mousedown', { button: 3 })
-    assert.strictEqual(t.getKey(id), 57, id)
+    assert.match(btn.textContent, /key or mouse button/, id)
+    assert.ok(fire('mousedown', { button: 3 }).prevented, id)
+    assert.strictEqual(t.getKey(id), 259, id)
   }
 })
 

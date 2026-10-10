@@ -101,8 +101,9 @@ function getKey(id) { const el = document.getElementById(id); return el ? (parse
 // drops code 0, so an unbound game key would silently keep its old binding.
 const SERVER_HOTKEY_IDS = ['hk-chat', 'hk-cursor', 'hk-housing', 'hk-personal', 'hk-faction', 'hk-voice-ptt', 'hk-admin', 'hk-hide-ui', 'hk-skills', 'hk-emote', 'hk-nametag', 'hk-voice-mode', 'hk-mask']
 const GAME_HOTKEY_IDS = ['ghk-activate', 'ghk-jump', 'ghk-sprint', 'ghk-sneak', 'ghk-shout', 'ghk-pov']
-// The server hotkeys take a mouse button too (client mouseKeys.ts); the game hotkeys edit the controlmap's keyboard column
-const MOUSE_HOTKEY_IDS = SERVER_HOTKEY_IDS
+// Every hotkey takes a mouse button too: the server hotkeys through the client (mouseKeys.ts), the game hotkeys through
+// the controlmap's mouse column (gameHotkeys.js)
+const MOUSE_HOTKEY_IDS = [...SERVER_HOTKEY_IDS, ...GAME_HOTKEY_IDS]
 
 let activeCapture = null
 
@@ -224,7 +225,7 @@ async function loadGameSettingsTab() {
     if (gh && gh.ok) {
       for (const [id, ev] of Object.entries(GHK_MAP)) {
         const code = gh.keys ? gh.keys[ev] : null
-        if (typeof code === 'number' && code > 0 && code <= 0xff) setKey(id, code)
+        if (typeof code === 'number' && ((code > 0 && code < 0xff) || (code >= 258 && code <= 263))) setKey(id, code)
       }
     }
     const h = await window.electronAPI.hotkeysLoad()

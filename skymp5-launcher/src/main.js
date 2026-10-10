@@ -25,6 +25,7 @@ const nexus  = require('./nexus')
 const ini    = require('./ini')
 const prefsSeed = require('./prefsSeed')
 const controlmapCheck = require('./controlmapCheck')
+const { GAME_HOTKEY_EVENTS, gameHotkeyCode, setGameHotkey } = require('./gameHotkeys')
 const gameversion = require('./gameversion')
 const downgrade = require('./downgrade')
 const report = require('./report')
@@ -685,10 +686,7 @@ ipcMain.handle('hotkeys:save', (_e, h) => {
   }
 })
 
-// Game hotkeys edit the keyboard column of the game's controlmap.txt.
-// Values are DirectInput scan codes, the same space the renderer's KEY_TABLE uses.
-const GAME_HOTKEY_EVENTS = ['Activate', 'Jump', 'Sprint', 'Sneak', 'Shout', 'Toggle POV']
-
+// Game hotkeys edit the keyboard and mouse columns of the game's controlmap.txt (gameHotkeys.js)
 function controlmapPath() {
   const gp = effectiveGamePath()
   return gp ? path.join(gp, 'Data', 'Interface', 'Controls', 'PC', 'controlmap.txt') : ''
@@ -702,11 +700,6 @@ function readControlmapText() {
   return { path: p, text: controlmapCheck.toCrlf(fs.readFileSync(CONTROLMAP_SEED, 'utf8')), exists: false }
 }
 
-function controlmapEventRe(ev) {
-  const escaped = ev.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-  return new RegExp('^(' + escaped + '[ \\t]+)(0x[0-9a-fA-F]+)', 'm')
-}
-
 // Stale launcher copies lack the AE Creations Menu context or still bind Wait on the gamepad
 function isStaleLauncherControlmap(text) {
   if (!/launcher controlmap override/.test(text)) return false
@@ -714,13 +707,13 @@ function isStaleLauncherControlmap(text) {
   return !/^PurchaseCredits[ \t]/m.test(text) || (!!wait && wait[1].toLowerCase() !== '0xff')
 }
 
-// Rebuilds a stale launcher copy from the seed, keeping the keyboard rebinds the Settings tab manages
+// Rebuilds a stale launcher copy from the seed, keeping the key and mouse rebinds the Settings tab manages
 function upgradeControlmapText(text) {
   if (!isStaleLauncherControlmap(text)) return text
   let upgraded = fs.readFileSync(CONTROLMAP_SEED, 'utf8')
   for (const ev of GAME_HOTKEY_EVENTS) {
-    const m = text.match(controlmapEventRe(ev))
-    if (m) upgraded = upgraded.replace(controlmapEventRe(ev), (_m, head) => head + m[2])
+    const code = gameHotkeyCode(text, ev)
+    if (code !== null) upgraded = setGameHotkey(upgraded, ev, code)
   }
   return upgraded
 }
@@ -756,10 +749,7 @@ ipcMain.handle('gameHotkeys:load', () => {
   try {
     const cm = readControlmapText()
     const keys = {}
-    for (const ev of GAME_HOTKEY_EVENTS) {
-      const m = cm.text.match(controlmapEventRe(ev))
-      keys[ev] = m ? parseInt(m[2], 16) : null
-    }
+    for (const ev of GAME_HOTKEY_EVENTS) keys[ev] = gameHotkeyCode(cm.text, ev)
     return { ok: true, path: cm.path, exists: cm.exists, hasGamePath: !!cm.path, keys }
   } catch (err) {
     return { ok: false, error: err.message }
@@ -772,9 +762,7 @@ ipcMain.handle('gameHotkeys:save', (_e, keys) => {
     if (!p) return { ok: false, error: 'Skyrim path is not configured yet' }
     let { text } = readControlmapText()
     for (const [ev, code] of Object.entries(keys || {})) {
-      if (!GAME_HOTKEY_EVENTS.includes(ev) || typeof code !== 'number' || code <= 0 || code > 0xff) continue
-      const hex = '0x' + code.toString(16)
-      text = text.replace(controlmapEventRe(ev), (_m, head) => head + hex)
+      if (GAME_HOTKEY_EVENTS.includes(ev) && Number.isInteger(code)) text = setGameHotkey(text, ev, code)
     }
     fs.mkdirSync(path.dirname(p), { recursive: true })
     fs.writeFileSync(p, controlmapCheck.toCrlf(text))
