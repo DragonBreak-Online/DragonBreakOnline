@@ -1,5 +1,22 @@
 [
   {
+    "title": "The Imperial Cult",
+    "date": "2026-10-11",
+    "version": "Server update",
+    "tag": "New",
+    "sections": [
+      {
+        "heading": "Magic",
+        "items": [
+          "Priests now have their own institution: the Imperial Cult, with its seat in the Cathedral of St Martin in Bruma. Its ranks are Initiate, Acolyte, Adept, Disciple, Oracle, Invoker, Theurgist and Primate.",
+          "At the Cathedral's Scholars' Ledger the Cult sells Restoration and Alteration tomes to its own members, by rank as the colleges do, and its Senior ranks (Oracle and up) teach those spells there.",
+          "At the end of a sermon, everyone who stayed is offered the sermon's spell, as at a college class. You can also change your prepared spells in the Cathedral.",
+          "Like the colleges, the Imperial Cult counts as your one guild, and its faithful cannot also serve a Daedric cult."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Mages' colleges: tomes by rank, teaching and classes for beginners",
     "date": "SHIP_DATE",
     "version": "Server update",

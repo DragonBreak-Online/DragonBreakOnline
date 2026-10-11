@@ -500,6 +500,26 @@ ui('lecternCancel', TEACHER, [lastWidget(TEACHER, 'classLectern').nonce]);
   load();
 }
 
+// ---- the Imperial Cult at the Cathedral of St Martin (Nate, 11 Oct: temples like the colleges) ------------------------
+{
+  const CATHEDRAL = '12cb:BSHeartland.esm';
+  const PRIESTLY = 0x30, MAGE = 0x31; NAMES[PRIESTLY] = 'Priestly'; NAMES[MAGE] = 'Mageling';
+  for (const a of [PRIESTLY, MAGE]) { put(a, 'profileId', a); if (typeof online !== 'undefined' && Array.isArray(online)) online.push(a); }
+  member(PRIESTLY, 'imperial-cult', 'Adept'); skillAt(PRIESTLY, 'priest', 40); skillAt(PRIESTLY, 'arcane', 40); gold(PRIESTLY, 5000); at(PRIESTLY, CATHEDRAL);
+  let w = shop(PRIESTLY);
+  check('a Cult Adept in the Cathedral may buy, and is offered only Restoration and Alteration', w && w.canBuy === true && w.tomes.length > 0 && w.tomes.every((t) => t.school === 'Restoration' || t.school === 'Alteration'), w && [w.whyNot, w.tomes.map((t) => t.school)]);
+  check('...up to Apprentice, as a college student', w.tomes.every((t) => t.rank <= 1), w.tomes.map((t) => t.rankName));
+  at(PRIESTLY, SYNOD);
+  check('the Cult Adept at the Synod is refused: the Synod sells to the colleges', shop(PRIESTLY).canBuy === false && /court mage sells tomes only to members of the Synod or a College/.test(shop(PRIESTLY).whyNot), shop(PRIESTLY).whyNot);
+  member(MAGE, 'synod', 'Associate'); skillAt(MAGE, 'priest', 40); skillAt(MAGE, 'arcane', 40); gold(MAGE, 5000); at(MAGE, CATHEDRAL);
+  check('a Synod Associate in the Cathedral is refused: the Cult sells to its own', shop(MAGE).canBuy === false && /The Imperial Cult sells its tomes only to its own/.test(shop(MAGE).whyNot), shop(MAGE).whyNot);
+  member(PRIESTLY, 'imperial-cult', 'Initiate'); at(PRIESTLY, CATHEDRAL);
+  check('a Cult Initiate buys none, as a college Initiate', shop(PRIESTLY).canBuy === false, shop(PRIESTLY).whyNot);
+  member(PRIESTLY, 'imperial-cult', 'Oracle'); skillAt(PRIESTLY, 'priest', 60); skillAt(PRIESTLY, 'arcane', 60);
+  w = shop(PRIESTLY);
+  check('a Cult Oracle is a Senior: Adept tomes of its schools too', w.tomes.some((t) => t.rank === 2) && w.tomes.every((t) => t.school === 'Restoration' || t.school === 'Alteration'), w.tomes.map((t) => t.school + ' ' + t.rankName));
+}
+
 console.log(`\n${checks - failures}/${checks} passed`);
 process.chdir(os.tmpdir());
 fs.rmSync(dir, { recursive: true, force: true });

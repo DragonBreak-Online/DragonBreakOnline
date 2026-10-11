@@ -1740,6 +1740,8 @@ module.exports = (api) => {
       save(st, s);
       const w = wheel(st, idOf(k.spell.desc), P.wheelValue, Math.max(1, Math.round(P.wheelEvents * f)));
       personal(st, `${display(k.teacher)}'s sermon on ${k.spell.name} is over. You took ${sermonWords.gainWords(f)}; it counts toward Priest.`);
+      // The sermon's spell is offered as a class's is (Nate, 11 Oct: temples teach like the colleges), one tome per sermon
+      if (P.offerSpell !== false && typeof globalThis.__dboSpellsClassOffer === 'function') { try { globalThis.__dboSpellsClassOffer(k.teacher, st, idOf(k.spell.desc), `${k.ref}:${k.startedAt}`); } catch (e) { log('schools: sermon spell offer failed', e.message); } }
       return `${who(st)} x${f} (wheel ${w})`;
     },
   });

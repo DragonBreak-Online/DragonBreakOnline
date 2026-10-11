@@ -683,6 +683,54 @@
       "note": "Nate 9 Oct 2026: the Mede dynasty's own eyes, sword and shield (UESP Lore:Penitus Oculatus; ranks Commander, Inspector, Agent, Recruit are attested). Answers to the Emperor, not the Civil Commission: a Magistrate may request the Oculatus, never order it. Wears the Penitus Oculatus set beside the Legion. Staff seat the Commander."
     },
     {
+      "id": "imperial-cult",
+      "name": "The Imperial Cult",
+      "kind": "guild",
+      "ranks": [
+        {
+          "title": "Primate",
+          "role": "leader"
+        },
+        {
+          "title": "Theurgist",
+          "role": "officer"
+        },
+        {
+          "title": "Invoker",
+          "role": "officer"
+        },
+        {
+          "title": "Oracle",
+          "role": "sergeant"
+        },
+        {
+          "title": "Disciple",
+          "role": "mage"
+        },
+        {
+          "title": "Adept",
+          "role": "member"
+        },
+        {
+          "title": "Acolyte",
+          "role": "member"
+        },
+        {
+          "title": "Initiate",
+          "role": "member"
+        }
+      ],
+      "hall": {
+        "name": "the Cathedral of St Martin",
+        "zone": "bruma",
+        "doors": [
+          "7a815:BSHeartland.esm",
+          "7a816:BSHeartland.esm"
+        ]
+      },
+      "note": "Nate 11 Oct 2026: the Empire's official worship of the Divines, the priests' answer to the colleges. Its Cathedral of St Martin in Bruma sells Restoration and Alteration tomes to its own by rank, its Senior ranks (Oracle and up) teach those schools there, and its sermons offer their spell. Titles are the Imperial Cult's own ladder (Morrowind: Initiate, Acolyte, Adept, Disciple, Oracle, Invoker, Theurgist, Primate; a chapel is led by a Primate in Oblivion). The Eight Divines: Talos worship is outlawed under the White-Gold Concordat (4E 211). Staff seat the Primate."
+    },
+    {
       "id": "stormcloaks",
       "name": "Stormcloaks",
       "kind": "guild",
