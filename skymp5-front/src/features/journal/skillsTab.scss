@@ -32,5 +32,15 @@
   &__lore { margin: 12px 0 0; color: $dbo-text; font-family: $dbo-book-font; font-style: italic; font-size: 17px; line-height: 1.5; }
   &__rules { margin: 12px 0 0; color: $dbo-text; font-family: $dbo-book-font; font-size: 16px; line-height: 1.5; }
   &__link { margin: 12px 0 0; color: $dbo-text-dim; font-size: 15px; display: flex; align-items: center; gap: 12px; }
+  &__schools { margin: 12px 0 0; display: flex; flex-wrap: wrap; gap: 8px; }
+  &__school { display: flex; flex-direction: column; gap: 2px; min-width: 130px; padding: 6px 10px; border: 1px solid $dbo-border; background: rgba(0, 0, 0, 0.22); }
+  &__school--primary, &__school--secondary { border-color: $dbo-border-strong; }
+  &__school--resting { opacity: 0.85; border-style: dashed; }
+  &__school--closed { opacity: 0.55; }
+  &__school-name { font-size: 15px; color: $dbo-text; }
+  &__school-role { font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: $dbo-text-dim; }
+  &__school--resting &__school-role { color: dbo-accent(1); }
+  &__school-cast { font-size: 12px; color: $dbo-text-dim; }
+  &__school-note { flex-basis: 100%; margin: 4px 0 0; font-size: 13px; color: $dbo-text-dim; }
   &__foot { margin-top: auto; padding-top: 16px; display: grid; place-items: center; }
 }
