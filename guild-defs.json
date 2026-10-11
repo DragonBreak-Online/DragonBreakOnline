@@ -799,6 +799,7 @@
       "id": "blades",
       "name": "The Blades",
       "kind": "guild",
+      "secret": true,
       "ranks": [
         {
           "title": "Grandmaster",
