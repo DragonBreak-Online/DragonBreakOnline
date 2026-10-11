@@ -1763,6 +1763,8 @@ function watchGameExit() {
       { ...note, launcherVersion: app.getVersion(), filesVersion: store.get('filesVersion') || '' },
       { 'x-session': store.get('gameSession') || session }),
   }).then(note => {
+    // Report a Problem reads it later: a crash in the first 2 minutes sends the spawn save the load may have crashed on
+    if (note) store.set('lastGameEnd', { outcome: note.outcome, startedAt: note.startedAt, endedAt: note.endedAt })
     if (note && note.outcome !== 'crash') afterSuccessfulLaunch()
     return offerCrashReport(note)
   }).catch(err => log(`[crashWatch] ${err.message}`))
@@ -1791,14 +1793,14 @@ async function offerCrashReport(note) {
       type: 'warning', buttons: ['Send', 'Not now'], defaultId: 0, cancelId: 1, noLink: true,
       title: 'DragonBreak Online',
       message: 'Skyrim closed unexpectedly. Send the crash report to the DragonBreak team?',
-      detail: 'It sends the crash log and the game log. Folder paths and anything said in chat are removed first.',
+      detail: 'It sends the crash log and the game logs, and after a crash at login the login save the game was loading. Folder paths and anything said in chat are removed first.',
     }
     const { response } = win ? await dialog.showMessageBox(win, opts) : await dialog.showMessageBox(opts)
     if (response !== 0) {
       log('[crashPrompt] the player chose Not now')
       return
     }
-    const res = await submitReport({ note: 'Crash report offered by the launcher after the game closed unexpectedly.' })
+    const res = await submitReport({ note: 'Crash report offered by the launcher after the game closed unexpectedly.', gameEnd: note })
     log(`[crashPrompt] ${res && res.ok ? 'sent' : `not sent: ${res && res.error}`}`)
     if (!(res && res.ok) && win) {
       dialog.showMessageBox(win, { type: 'info', buttons: ['OK'], noLink: true, title: 'DragonBreak Online',
@@ -1920,10 +1922,13 @@ async function hardwareExtras(gameDir) {
 }
 
 // Both Report a Problem and the after-a-crash prompt file the same report through here.
-async function submitReport({ note, private: keepPrivate, bugId } = {}) {
+async function submitReport({ note, private: keepPrivate, bugId, gameEnd } = {}) {
   const user    = store.get('discordUser') || null
   const session = store.get('gameSession')
   try {
+    const docs = documentsDirOrNull()
+    const crashDirs = [...MYGAMES_VARIANTS.map(v => path.join(docs || path.join(os.homedir(), 'Documents'), 'My Games', v, 'SKSE')),
+      ...(mo2.getRoot() ? [path.join(mo2.getRoot(), 'overwrite', 'SKSE')] : [])]
     const payload = report.collect({
       userDataDir:     app.getPath('userData'),
       installDir:      store.get('skyrimPath') || '',
@@ -1933,6 +1938,8 @@ async function submitReport({ note, private: keepPrivate, bugId } = {}) {
       mo2Root:         mo2.getRoot(),
       // The client's dbo-diag log is written where the game runs: the isolated copy when there is one
       gameDirs:        [effectiveGamePath()],
+      // SkyrimPlatform's cef_debug.log is under %TEMP% (GetTempPath reads TMP first, Node's tmpdir TEMP first)
+      tempDirs:        [process.env.TMP, process.env.TEMP, os.tmpdir()],
       context: {
         launcherVersion: app.getVersion(),
         filesVersion:    store.get('filesVersion') || '',
@@ -1959,6 +1966,18 @@ async function submitReport({ note, private: keepPrivate, bugId } = {}) {
     if (previous && !payload.launcherLog) payload.launcherLog = report.redact(previous)
     if (!payload.launcherLog) return { ok: false, error: 'No launcher log to send yet.' }
 
+    // A crash at login leaves the spawn save the load read past its end (VCRUNTIME140+1C12A, crashes-1010 §2). It is too big
+    // for the report's 2 MB, so it follows in its own request once the report is filed
+    let save = null
+    try {
+      save = await report.platformSaveFor({ documentsDir: docs, crashDirs, gameEnd: gameEnd || store.get('lastGameEnd') || null, log })
+    } catch (err) { log(`[report] could not read the spawn save: ${err.message}`) }
+    if (save) {
+      payload.clientLog = (payload.clientLog ? payload.clientLog + '\n\n' : '') + '== spawn save ==\n' + (save.skipped
+        ? `not sent: ${report.redact(save.skipped)}`
+        : `${save.name}, ${save.size} bytes, sha256 ${save.sha256.slice(0, 16)}, written ${save.writtenMinutesAgo} min before this report (${save.reason}); sent separately`)
+    }
+
     // The id is kept until a send succeeds, so a retry of a report the server did file is not filed twice; a /bug's is its own
     if (bugId) {
       payload.bugId = bugId
@@ -1972,6 +1991,7 @@ async function submitReport({ note, private: keepPrivate, bugId } = {}) {
                                session ? { 'x-session': session } : {}, 30_000)
     log(`[report] filed ${payload.reportId}${res && res.thread ? ` as thread ${res.thread}` : ''}`)
     if (!bugId) pendingReportId = null
+    if (save && !save.skipped) await sendReportAttachment(payload.reportId, save, session)
     return { ok: true }
   } catch (err) {
     log(`[report] failed: ${err.statusCode || ''} ${err.message}`)
@@ -1981,6 +2001,19 @@ async function submitReport({ note, private: keepPrivate, bugId } = {}) {
     if (err.statusCode === 413) return { ok: false, error: 'The report is too large to send.' }
     if (err.statusCode === 502) return { ok: false, error: 'The report could not be filed just now. Try again in a minute.' }
     return { ok: false, error: 'Could not reach the server. Tell a staff member directly.' }
+  }
+}
+
+// The report is already filed, so a refusal here is only logged. The backend takes it at /api/files/report-attachment (a
+// signed-in sender, a report id it filed for them); a backend without the route answers 404
+async function sendReportAttachment(reportId, save, session) {
+  if (!session) { log(`[report] ${save.name} not sent: attachments need a signed-in player`); return }
+  try {
+    const { skipped, ...body } = save
+    const res = await postJSON(`${config.apiUrl}/api/files/report-attachment`, { reportId, ...body }, { 'x-session': session }, 60_000)
+    log(`[report] ${save.name} attached to ${reportId}${res && res.thread ? ` (thread ${res.thread})` : ''}`)
+  } catch (err) {
+    log(`[report] ${save.name} not attached: ${err.statusCode === 404 ? 'the server does not take attachments yet' : `${err.statusCode || ''} ${err.message}`}`)
   }
 }
 
