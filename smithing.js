@@ -11,6 +11,7 @@
 // apprenticeRange, has the craft tier, and (Orcish) the supervisorRace; apprenticeCrafts such crafts teach it for good.
 // Upgrade cap (craftedExtrasSystem.ts asks __dboTemperCap): an item of family tier T improves to at most
 // min(T+2, 5, the smith's craft tier) tier steps, one improvement level per step; T5-T7 items never improve.
+// Faction gear (faction-gear.json) instead improves one level per craft tier of the smith's, up to Legendary.
 // The F3 Blacksmith tab reads __dboSmithView(actorId) (shape agreed with Worker G, 9 Oct).
 'use strict';
 const fs = require('fs');
@@ -131,8 +132,14 @@ module.exports = (api) => {
 
   // ---- upgrade caps (craftedExtrasSystem.ts) ------------------------------------------------------------------------
   // The highest health step a temper of this item may reach: 10 + allowed improvement levels; 16 (no rule) when off
+  // Faction gear (every item in faction-gear.json) has no family cap (Nate, 11 Oct: war parity tempers like the rest of
+  // the faction's gear): one improvement level per craft tier of the smith's own, Fine at T1 to Legendary at T6. Before,
+  // the Legion's swords were classed Steel (T2, so Superior at most) or Ebony (T6, never) and only the Imperial family
+  // was exempt, and that exemption meant no cap at all
+  const FACTION_TEMPER_LEVELS = 6;
   globalThis.__dboTemperCap = (actorId, baseId) => {
     if (!C.enabled) return 16;
+    if (FACTION_GEAR.has(normDesc(descOf(baseId)))) return 10 + Math.max(0, Math.min(FACTION_TEMPER_LEVELS, craftTier(actorId >>> 0)));
     const fam = familyOfItem(baseId);
     if (!fam) return 16;
     if (fam.tier >= 5) return 10;

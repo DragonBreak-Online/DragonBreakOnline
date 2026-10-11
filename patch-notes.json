@@ -33,7 +33,8 @@
         "heading": "Crafting",
         "items": [
           "Brewing potions now gets the Alchemist's craft bonus and the first-craft bonus, as intended.",
-          "A Dark Elf or Orc smith keeps a schematic for a technique they already know by birth instead of using it up."
+          "A Dark Elf or Orc smith keeps a schematic for a technique they already know by birth instead of using it up.",
+          "Faction gear now tempers as far as your own Blacksmith craft tier allows, one improvement level per tier, up to Legendary. The Officer's Sword, the Penitus Oculatus Sword and the General's Sword no longer stop at Superior (or refuse to improve at all), and the same goes for every other faction piece. Other gear tempers as before."
         ]
       }
     ]

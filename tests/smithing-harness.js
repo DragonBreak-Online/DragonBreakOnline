@@ -180,7 +180,7 @@ ok(craft(A, ANC_SHIELD, R_ANC2) === false, '...each piece of the family');
 ok(craft(A, LEGION_HELM, R_LEGION) !== false, 'plain Imperial (Legion faction gear) is not gated here');
 ok(craft(A, COLOVIAN_BOW, R_COLOVIAN) === false && /Steel technique/.test(lastTold(A)), 'an Imperial piece that is not faction gear (a Colovian bow) needs the Steel technique', lastTold(A));
 props.set(`${A}|private.dboManuals`, { ancient_imperial: { at: 1, how: 'book' } });
-ok(craft(A, ANC_HELM, R_ANC) !== false && globalThis.__dboTemperCap(A, ANC_HELM) === 10 && globalThis.__dboTemperCap(A, LEGION_HELM) === 16, 'with the technique: crafted; tempered as T2 (no level at smith tier 2), the Legion piece unruled');
+ok(craft(A, ANC_HELM, R_ANC) !== false && globalThis.__dboTemperCap(A, ANC_HELM) === 10 && globalThis.__dboTemperCap(A, LEGION_HELM) === 12, 'with the technique: crafted; tempered as T2 (no level at smith tier 2); the Legion piece, faction gear, one level per craft tier (11 Oct)');
 const ai = globalThis.__dboSmithView(A).families.find((f) => f.id === 'ancient_imperial');
 ok(ai && ai.tier === 2 && ai.recipes.includes('Ancient Imperial Shield') && !ai.recipes.includes('Imperial Helmet'), 'the view lists Ancient Imperial at T2 with its own recipes', ai);
 rec(0xb0004, 'BOOK', 'DBO_SchematicsAncientImperial', [{ type: 'DATA', data: bookData() }]);
