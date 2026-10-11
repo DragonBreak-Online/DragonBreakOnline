@@ -1,5 +1,19 @@
 [
   {
+    "title": "The Blades work in secret",
+    "date": "SHIP_DATE",
+    "version": "Server update",
+    "tag": "Change",
+    "sections": [
+      {
+        "heading": "Factions",
+        "items": [
+          "The Blades are now a secret order: their members are hidden from others like the other secret orders, and a Blade can also serve a hold, the Legion or a guild. The Thalmor still never take a Blade."
+        ]
+      }
+    ]
+  },
+  {
     "title": "A faith for the Maormer",
     "date": "SHIP_DATE",
     "version": "Server update",

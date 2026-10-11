@@ -31,7 +31,11 @@ ok('every category and conflict id is a faction in guild-defs.json', placed.conc
 ok('no faction sits in two categories', new Set(placed).size === placed.length);
 ok('every Daedric cult is secret', DEFS.factions.filter((f) => f.kind === 'cult').every((f) => L.categories.secret.ids.includes(f.id)));
 ok('every hold and the county are allegiance, officials only', DEFS.factions.filter((f) => f.kind === 'hold').every((f) => L.categories.allegiance.ids.includes(f.id) && L.categories.allegiance.officialsOnly.includes(f.id)));
-ok('the Legion (kind "guild") and the Blades are allegiance', ['imperial-legion', 'blades'].every((id) => L.categories.allegiance.ids.includes(id)));
+ok('the Legion (kind "guild") is allegiance', L.categories.allegiance.ids.includes('imperial-legion'));
+// Nate, 11 Oct: the Blades are a secret order, so a Blade may also serve an allegiance and a guild (infiltration)
+ok('the Blades are secret, not allegiance', !L.categories.allegiance.ids.includes('blades') && L.categories.secret.ids.includes('blades'));
+ok('the Blades are marked secret in guild-defs', !!(JSON.parse(fs.readFileSync(path.join(path.dirname(GUILDS), 'guild-defs.json'), 'utf8')).factions.find((f) => f.id === 'blades') || {}).secret);
+ok('the Thalmor still never take a Blade', L.conflicts.some((c) => (c.a || []).includes('thalmor') && (c.b || []).includes('blades')));
 
 // ---- the stub server ------------------------------------------------------------------------------------------------
 const LEAD = 0x10, GM = 0x11;

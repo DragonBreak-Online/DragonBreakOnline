@@ -1043,7 +1043,6 @@
        "imperial-legion",
        "stormcloaks",
        "thalmor",
-       "blades",
        "house-hlaalu",
        "house-redoran",
        "house-telvanni",
@@ -1081,6 +1080,7 @@
      },
      "secret": {
       "ids": [
+       "blades",
        "thieves-guild",
        "dark-brotherhood",
        "cult-azura",
