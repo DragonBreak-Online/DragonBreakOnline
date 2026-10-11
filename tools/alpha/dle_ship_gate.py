@@ -6,7 +6,7 @@
 --live defaults to the installed /opt/skyrim-data copy. Exit 0 with "ok" lines, or 1 with one line per failure.
 The PC's source esp has repeatedly come without patches made on CT 115 (memory pc-dle-builds-drop-server-side-patches),
 so each check is one of those, or an anchor a player in Bruma cannot do without (docs/alpha/bruma-anchors.md):
-  border      the border REGN 0B0CBCDD override is there at 214 bytes (18 points) and the live polygon (the same points
+  border      the border REGN 0B0CBCDD override is there at 230 bytes (20 points, border A+B of 7 Oct) and the live polygon (the same points
               in either winding; every other field byte-identical), and the set
               of border cells (WRLD cells whose XCLR names it) is the live set: any added or removed cell is listed
   spawns      the 21 living ACHRs the server spawns itself (Dusk Thorn goblins, the v5 boars) are Initially Disabled
@@ -27,7 +27,7 @@ sys.path.insert(0, os.environ.get('ESPLIB_DIR', os.path.expanduser('~nate/dragon
 import esplib  # noqa: E402
 
 BORDER = ('bsheartland.esm', 0xCBCDD)
-BORDER_SIZE = 214
+BORDER_SIZE = 230
 DELETED, DISABLED = 0x20, 0x800
 CHEST = 0x154079
 LIVING = [0x154071, 0x154072, 0x154073, 0x154074, 0x154075, 0x154076, 0x154077, 0x154078,          # goblins
@@ -46,7 +46,7 @@ ANCHORS = [
     (0x125BFB, 'DBO_ShrineOfBoethiah', 'Boethiah'), (0x125BCB, 'DBO_ShrineOfMephala', 'Mephala'),
     (0x125BE2, 'DBO_ShrineOfMehrunesDagon', 'Mehrunes Dagon'), (0x125BCC, 'DBO_ShrineOfMolagBal', 'Molag Bal'),
     (0x125BD2, 'DBO_ShrineOfNocturnal', 'Nocturnal'), (0x125BCA, 'DBO_ShrineOfHircine', 'Hircine'),
-    (0x125BF8, 'DA09MeridiaStatue', 'Meridia'), (0x125BD4, 'DBO_ShrineOfSanguine', 'Sanguine'),
+    (0x125BF8, 'DBO_ShrineOfMeridia', 'Meridia'), (0x125BD4, 'DBO_ShrineOfSanguine', 'Sanguine'),
     (0x125BD5, 'DBO_ShrineOfSheogorath', 'Sheogorath'), (0x125BF9, 'DA03ClavicusVileShrine', 'Clavicus Vile'),
     (0x125BCD, 'DBO_ShrineOfHermaeusMora', 'Hermaeus Mora'), (0x125BCF, 'DBO_ShrineOfNamira', 'Namira'),
     (0x125BD3, 'DBO_ShrineOfPeryite', 'Peryite'), (0x125BD6, 'DBO_ShrineOfVaermina', 'Vaermina')]]
@@ -141,7 +141,7 @@ def main():
         fails.append('border: REGN 0B0CBCDD is deleted')
     else:
         if r[3] != BORDER_SIZE:
-            fails.append(f'border: REGN 0B0CBCDD is {r[3]} bytes, want {BORDER_SIZE} (border v4, 18 points)')
+            fails.append(f'border: REGN 0B0CBCDD is {r[3]} bytes, want {BORDER_SIZE} (border A+B, 20 points)')
         if BORDER in live.rec and not same_region(new.subs(BORDER), live.subs(BORDER)):
             fails.append('border: REGN 0B0CBCDD is not the live border (points, or another field, differ)')
     bn, bl = new.border_cells(), live.border_cells()
