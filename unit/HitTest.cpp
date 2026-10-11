@@ -502,6 +502,7 @@ TEST_CASE("A paralysed actor cannot attack or move", "[Hit]")
   paralyze.data.aggressor = 0x14;
   paralyze.data.target = kVictim;
   paralyze.data.source = kParalyze;
+  DoMessage(p, 0, MakeSpellCastMessage(kParalyze, false));
   p.GetActionListener().OnHit(casterMsgData, paralyze);
 
   REQUIRE(casterHealthAfterStab() == 1.f);
