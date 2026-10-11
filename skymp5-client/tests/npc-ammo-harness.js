@@ -20,12 +20,13 @@ const check = (name, ok, got) => { console.log(`${ok ? 'ok  ' : 'FAIL'} ${name}$
 
 // Forms by id: weapons carry a weapon type (7 bow, 9 crossbow), ammo is flagged
 const DRAUGR_BOW = 0x302ca, CROSSBOW = 0x200f19f, IRON_SWORD = 0x12eb7, IRON_ARROW = 0x1397d, DRAUGR_ARROW = 0x34182;
-const DLC1_BOLT = 0x2000bb3, HIDE_ARMOR = 0x13911;
+const DLC1_BOLT = 0x2000bb3, HIDE_ARMOR = 0x13911, DRAUGR_SWORD = 0x2c66f, BONEMAN_SUMMON = 0x20045b9, BANDIT = 0x3df1e;
 const STUBS = {
   sp: `
     const forms = {
       ${DRAUGR_BOW}: { weaponType: 7 }, ${CROSSBOW}: { weaponType: 9 }, ${IRON_SWORD}: { weaponType: 1 },
       ${IRON_ARROW}: { ammo: true }, ${DRAUGR_ARROW}: { ammo: true }, ${DLC1_BOLT}: { ammo: true }, ${HIDE_ARMOR}: {},
+      ${DRAUGR_SWORD}: { weaponType: 1 }, ${BONEMAN_SUMMON}: {}, ${BANDIT}: {},
     };
     const formOf = (id) => (forms[id] ? { id, ...forms[id], getFormID: () => id } : null);
     const files = { 'Skyrim.esm': 0x00, 'Dawnguard.esm': 0x02 };
@@ -45,8 +46,9 @@ const STUBS = {
 };
 const STUB_OF = { skyrimPlatform: 'sp', './inventory': 'inventory' };
 
-const actor = (formId, dead = false) => ({
+const actor = (formId, dead = false, base = BONEMAN_SUMMON) => ({
   getFormID: () => formId, isDead: () => dead, removeAllItems() {}, unequipAll() {},
+  getBaseObject: () => ({ getFormID: () => base }),
   getEquippedSpell: () => null, unequipSpell() {}, equipSpell() {},
 });
 const eqOf = (...entries) => ({ inv: { entries }, numChanges: 2 });
@@ -100,9 +102,20 @@ async function main() {
     const local = ammoIn(run(actor(0x14), eqOf({ baseId: DRAUGR_BOW, count: 1, worn: true }), { npcAmmo: true }));
     check('the local player never gets ammo from this', local.length === 0, local);
 
+    const sidearmOf = (entries) => (entries || []).filter((e) => e.baseId === DRAUGR_SWORD);
+    const bonemanSword = sidearmOf(boneman);
+    check('a Conjure Boneman copy carries an Ancient Nord Sword', bonemanSword.length === 1, boneman);
+    check('...unworn, so the bow stays in hand until its AI switches', bonemanSword.length === 1 && !bonemanSword[0].worn && !bonemanSword[0].wornLeft, bonemanSword);
+    const banditSword = sidearmOf(run(actor(0xff0015c8, false, BANDIT), eqOf({ baseId: DRAUGR_BOW, count: 1, worn: true }), { npcAmmo: true }));
+    check('another archer gets no sidearm', banditSword.length === 0, banditSword);
+    const deadSword = sidearmOf(run(actor(BONEMAN, true), eqOf({ baseId: DRAUGR_BOW, count: 1, worn: true }), { npcAmmo: true }));
+    check("a dead Boneman's copy gets no sword", deadSword.length === 0, deadSword);
+
     const formView = fs.readFileSync(path.resolve(__dirname, '../src/view/formView.ts'), 'utf8');
     check('formView asks for NPC ammo on every copy that is not a player character',
       /applyEquipment\(ac, model\.equipment, \{ npcAmmo: !this\.isPlayerCharacter\(\) \}\)/.test(formView));
+    check('formView does not force the server weapon back while the sidearm is in hand',
+      /npcSidearmFor\(ac\)[\s\S]{0,120}getEquippedWeapon\(false\)\?\.getFormID\(\) === sidearmId\) \{\s*return;/.test(formView));
   } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
   console.log(failures ? `${failures} FAILED` : 'all passed');
   process.exit(failures ? 1 : 0);

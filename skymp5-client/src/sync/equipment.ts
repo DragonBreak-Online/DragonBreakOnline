@@ -140,6 +140,21 @@ export const npcAmmoFor = (worn: Inventory): number => {
   return 0;
 };
 
+// Server companionSystem SUMMON_SIDEARMS: the summon carries this weapon unworn, and its blows count (OnHit, NPC aggressor)
+const SUMMON_SIDEARMS: [number, string, number, string][] = [
+  [0x0045b9, 'Dawnguard.esm', 0x02c66f, 'Skyrim.esm'], // DLC1SoulCairnBonemanSummon: DraugrSword, Ancient Nord Sword
+];
+
+export const npcSidearmFor = (ac: Actor): number => {
+  const baseId = ac.getBaseObject()?.getFormID();
+  for (const [npc, npcFile, weapon, weaponFile] of SUMMON_SIDEARMS) {
+    if (baseId !== undefined && baseId === Game.getFormFromFile(npc, npcFile)?.getFormID()) {
+      return Game.getFormFromFile(weapon, weaponFile)?.getFormID() ?? 0;
+    }
+  }
+  return 0;
+};
+
 export const applyEquipment = (ac: Actor, eq: Equipment, opts?: { npcAmmo?: boolean }): boolean => {
   ac.removeAllItems(null, false, true);
 
@@ -160,6 +175,10 @@ export const applyEquipment = (ac: Actor, eq: Equipment, opts?: { npcAmmo?: bool
     const ammoId = npcAmmoFor(worn);
     if (ammoId) {
       worn.entries.push({ baseId: ammoId, count: 1, worn: true });
+    }
+    const sidearmId = npcSidearmFor(ac);
+    if (sidearmId) {
+      worn.entries.push({ baseId: sidearmId, count: 1, worn: false });
     }
   }
   const newInventory = removeUnnecessaryExtra(worn, isPlayer);

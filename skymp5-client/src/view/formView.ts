@@ -6,7 +6,7 @@ import { TAKEOVER_RECHECK_SECONDS, isHostileTakeover, takeoverLine } from "./tak
 import { setDefaultAnimsDisabled, applyAnimation, restoreSitCollisionIfMoving, isInSitPose, clearSitPose, setRefrCollision } from "../sync/animation";
 import { isVampireLordRace, noteVampireLordAnim } from "../sync/vampireLordAnimDiag";
 import { Appearance, applyAppearance } from "../sync/appearance";
-import { isBadMenuShown, applyEquipment } from "../sync/equipment";
+import { isBadMenuShown, applyEquipment, npcSidearmFor } from "../sync/equipment";
 import { RespawnNeededError } from "../lib/errors";
 import { FormModel } from "./model";
 import { applyMovement, forgetLocalCopy, getApplyState, settleTranslation } from "../sync/movementApply";
@@ -975,6 +975,10 @@ export class FormView {
     }
     const held = (left: boolean) => ac.getEquippedWeapon(left)?.getFormID() === baseId;
     if (held(false) || held(true)) {
+      return;
+    }
+    const sidearmId = npcSidearmFor(ac);
+    if (sidearmId && ac.getEquippedWeapon(false)?.getFormID() === sidearmId) {
       return;
     }
     const form = Game.getFormEx(baseId);
