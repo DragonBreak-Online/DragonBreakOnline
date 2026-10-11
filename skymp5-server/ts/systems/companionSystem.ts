@@ -48,6 +48,9 @@ interface Companion extends CompanionInfo {
   ownerAwaySince: number;
   // Holds its ground instead of following until ordered to follow again
   staying: boolean;
+  // Command Daedra: the owner it goes back to, and when (0: never)
+  lentBy: number;
+  returnAt: number;
 }
 
 interface Stored {
@@ -287,6 +290,8 @@ export class CompanionSystem implements System {
       lastRetargetAt: 0,
       ownerAwaySince: 0,
       staying: false,
+      lentBy: 0,
+      returnAt: 0,
     });
     this.log(`CompanionSystem: ${kind} ${hex(id)} (${baseDesc}) spawned for ${hex(ownerId)}${opts.source ? ` by ${hex(opts.source)}` : ""}`);
     this.save();
@@ -369,6 +374,23 @@ export class CompanionSystem implements System {
       changed = true;
     }
     if (changed) this.sendState(ownerId);
+  }
+
+  // Command Daedra: another player takes the companion over, and after durationSec (0: for the rest of its life) it goes back
+  command(companionId: number, newOwnerId: number, durationSec = 0): boolean {
+    const c = this.companions.get(companionId >>> 0);
+    const owner = newOwnerId >>> 0;
+    if (!c || !owner || c.ownerId === owner) return false;
+    if (c.lentBy === owner) {
+      c.lentBy = 0;
+      c.returnAt = 0;
+    } else {
+      if (!c.lentBy) c.lentBy = c.ownerId;
+      c.returnAt = durationSec > 0 ? Date.now() + durationSec * 1000 : 0;
+    }
+    this.log(`CompanionSystem: ${c.kind} ${hex(c.id)} of ${hex(c.ownerId)} commanded by ${hex(owner)}${c.returnAt ? ` for ${durationSec}s` : ""}`);
+    this.changeOwner(c, owner);
+    return true;
   }
 
   // A companion let go into the world where it stands: no owner, no longer hosted by one, hostile to players or not.
@@ -487,13 +509,46 @@ export class CompanionSystem implements System {
     this.pvpFought.set(CompanionSystem.pairKey(aggId, side), Date.now());
   }
 
+  private commandLimit(ownerId: number): number {
+    return this.twinSouls.has(ownerId) ? TWIN_SOULS_LIMIT : COMMAND_LIMIT;
+  }
+
   // The newest commanded actor replaces the oldest
   private makeRoom(ownerId: number): void {
-    const limit = this.twinSouls.has(ownerId) ? TWIN_SOULS_LIMIT : COMMAND_LIMIT;
+    const limit = this.commandLimit(ownerId);
     const commanded = this.ownedBy(ownerId)
       .filter((c) => KIND_RULES[c.kind].commanded)
       .sort((a, b) => a.createdAt - b.createdAt);
     while (commanded.length >= limit) this.end(commanded.shift() as Companion, "replaced", false);
+  }
+
+  // Watchers rebuild the copy, which the old owner's client had set up as its teammate, and the new owner hosts it
+  private changeOwner(c: Companion, ownerId: number): void {
+    const mp = this.mp;
+    const previous = c.ownerId;
+    c.ownerId = ownerId;
+    c.targetId = 0;
+    c.staying = false;
+    c.ownerAwaySince = 0;
+    c.lastRetargetAt = 0;
+    try { mp.set(c.id, COMPANION_OF_PROP, ownerId); } catch { }
+    try { mp.set(c.id, "isDisabled", true); mp.set(c.id, "isDisabled", false); } catch { }
+    try { mp.setHoster(c.id, ownerId); } catch (e) { this.log(`CompanionSystem: setHoster ${hex(c.id)} to ${hex(ownerId)} failed: ${e}`); }
+    this.save();
+    this.sendState(previous);
+    this.sendState(ownerId);
+  }
+
+  // A commanded summon goes back to its owner, or ends when they are gone or already have a full command
+  private giveBack(c: Companion): void {
+    const lender = c.lentBy;
+    c.lentBy = 0;
+    c.returnAt = 0;
+    if (!lender || userOf(this.mp, lender) < 0 || !isAlive(this.mp, lender)) return this.end(c, "command ended, owner gone", false);
+    const held = this.ownedBy(lender).filter((x) => KIND_RULES[x.kind].commanded).length;
+    if (held >= this.commandLimit(lender)) return this.end(c, "command ended, owner has a full command", false);
+    this.log(`CompanionSystem: ${c.kind} ${hex(c.id)} goes back from ${hex(c.ownerId)} to ${hex(lender)}`);
+    this.changeOwner(c, lender);
   }
 
   // distance > 0 is in front of the owner, < 0 behind
@@ -523,6 +578,7 @@ export class CompanionSystem implements System {
     }
     if (dead) return this.end(c, "died", true);
     if (c.expiresAt && now >= c.expiresAt) return this.end(c, "expired", false);
+    if (c.returnAt && now >= c.returnAt) return this.giveBack(c);
     if (userOf(mp, c.ownerId) < 0) {
       c.ownerAwaySince = c.ownerAwaySince || now;
       if (now - c.ownerAwaySince >= OWNER_GONE_MS) this.release(c);
