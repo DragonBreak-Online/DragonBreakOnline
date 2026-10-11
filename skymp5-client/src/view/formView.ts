@@ -984,6 +984,11 @@ export class FormView {
     if (ac.getItemCount(form) < 1) {
       ac.addItem(form, 1, true);
     }
+    // Marked worn but not in a hand (setInventory on a summoned Boneman): equipItem alone does nothing, so take it off first
+    const flagged = ac.isEquipped(form);
+    if (flagged) {
+      ac.unequipItem(form, false, true);
+    }
     ac.equipItem(form, true, true);
     if (Date.now() - this.weaponReportAt < FormView.weaponReportMs) {
       return;
@@ -991,7 +996,7 @@ export class FormView {
     this.weaponReportAt = Date.now();
     sendCustomPacket(SpApiInteractor.getControllerInstance(), {
       customPacketType: "dbo", event: "npcDrift",
-      args: [{ kind: "weaponEquip", remoteId: (this.remoteRefrId ?? 0).toString(16), baseId: baseId.toString(16), held: !!ac.getEquippedWeapon(false) }],
+      args: [{ kind: "weaponEquip", remoteId: (this.remoteRefrId ?? 0).toString(16), baseId: baseId.toString(16), held: !!ac.getEquippedWeapon(false), flagged }],
     });
   }
 
