@@ -101,6 +101,16 @@
   "forgeNever": {
     "_comment": "Products no recipe makes or improves, for anyone, staff and the item's own faction included (regions.js craftHook, before every other rule; applied on save). Key: product desc or editor id; value: { name shown, why }. Audit lines: FORGENEVER craft refused.",
     "f0d:JK's Fort Dawnguard.esp": { "name": "The Dawnguard War Axe SPR", "why": "XJKFDDLC1DawnguardAxe base damage 111 (the Dawnguard War Axe has 13); 11 Oct audit, until the PC sets it to 13" },
-    "f0e:JK's Fort Dawnguard.esp": { "name": "The Enhanced Crossbow SPR", "why": "XJKFDDLC1CrossBowEnhanced base damage 119 (the Enhanced Crossbow has 19); 11 Oct audit, until the PC sets it to 19" }
+    "f0e:JK's Fort Dawnguard.esp": { "name": "The Enhanced Crossbow SPR", "why": "XJKFDDLC1CrossBowEnhanced base damage 119 (the Enhanced Crossbow has 19); 11 Oct audit, until the PC sets it to 19" },
+    "a42:[Kirax] Lost Ark Reborn Paladin Legendary.esp": { "name": "The Lost Ark Reborn Paladin Legendary Main", "why": "LoARPalLegendaryMain armour rating 95 (the Daedric cuirass has 49); far stronger than intended (11 Oct audit)" },
+    "a46:[Kirax] Lost Ark Reborn Paladin Legendary.esp": { "name": "The Lost Ark Reborn Paladin Legendary Hands", "why": "LoARPalLegendaryHands armour rating 45 (Daedric gauntlets have 18); far stronger than intended (11 Oct audit)" },
+    "a47:[Kirax] Lost Ark Reborn Paladin Legendary.esp": { "name": "The Lost Ark Reborn Paladin Legendary Shoes", "why": "LoARPalLegendaryShoes armour rating 45 (Daedric boots have 18); far stronger than intended (11 Oct audit)" },
+    "a48:[Kirax] Lost Ark Reborn Paladin Legendary.esp": { "name": "The Lost Ark Reborn Paladin Legendary Helm", "why": "LoARPalLegendaryHelm armour rating 45 (the Daedric helmet has 23); far stronger than intended (11 Oct audit)" },
+    "a5e:[Kirax] Lost Ark Reborn Paladin Legendary.esp": { "name": "The Lost Ark Reborn Paladin Legendary Cloak", "why": "LoARPalLegendaryCloak armour rating 45 (a cloak normally has none); far stronger than intended (11 Oct audit)" },
+    "b90:[Kirax] Lost Ark Reborn Paladin Legendary.esp": { "name": "The Lost Ark Reborn Paladin Legendary Alt Main", "why": "LoARPalLegendaryAltMain armour rating 95 (the Daedric cuirass has 49); far stronger than intended (11 Oct audit)" },
+    "b91:[Kirax] Lost Ark Reborn Paladin Legendary.esp": { "name": "The Lost Ark Reborn Paladin Legendary Alt Hands", "why": "LoARPalLegendaryAltHands armour rating 45 (Daedric gauntlets have 18); far stronger than intended (11 Oct audit)" },
+    "b92:[Kirax] Lost Ark Reborn Paladin Legendary.esp": { "name": "The Lost Ark Reborn Paladin Legendary Alt Shoes", "why": "LoARPalLegendaryAltShoes armour rating 45 (Daedric boots have 18); far stronger than intended (11 Oct audit)" },
+    "b93:[Kirax] Lost Ark Reborn Paladin Legendary.esp": { "name": "The Lost Ark Reborn Paladin Legendary Alt Helm", "why": "LoARPalLegendaryAltHelm armour rating 45 (the Daedric helmet has 23); far stronger than intended (11 Oct audit)" },
+    "b94:[Kirax] Lost Ark Reborn Paladin Legendary.esp": { "name": "The Lost Ark Reborn Paladin Legendary Alt Cloak", "why": "LoARPalLegendaryAltCloak armour rating 45 (a cloak normally has none); far stronger than intended (11 Oct audit)" }
   }
 }

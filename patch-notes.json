@@ -1,6 +1,6 @@
 [
   {
-    "title": "The SPR Dawnguard axe and crossbow can no longer be forged",
+    "title": "Overpowered gear can no longer be forged or looted",
     "date": "2026-10-11",
     "version": "Server update",
     "tag": "Fix",
@@ -8,7 +8,9 @@
       {
         "heading": "Smithing",
         "items": [
-          "The Dawnguard War Axe SPR and the Enhanced Crossbow SPR can no longer be forged or improved by anyone, Dawnguard smiths included: they were far stronger than intended. Your materials stay with you if you try. Neither one drops as loot."
+          "The Dawnguard War Axe SPR and the Enhanced Crossbow SPR can no longer be forged or improved by anyone, Dawnguard smiths included: they were far stronger than intended. Your materials stay with you if you try.",
+          "The same goes for the armour of the Lost Ark Reborn Paladin Legendary set, both the normal and the Alt version (body, helm, hands, shoes and cloak): each piece gave far more protection than Daedric armour. The set's swords are unchanged.",
+          "None of these drop as loot, and neither does the frost giant's club, which hit far harder than any weapon a player should carry."
         ]
       }
     ]

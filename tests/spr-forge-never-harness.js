@@ -1,5 +1,6 @@
 // JK's Fort Dawnguard's SPR war axe (f0d, base damage 111) and Enhanced Crossbow (f0e, 119) are neither forged nor loot
-// (audit, 11 Oct 2026; the plugin fix to 13 / 19 is a PC job). regions-overrides.json forgeNever makes regions.js craftHook
+// (audit, 11 Oct 2026; the plugin fix to 13 / 19 is a PC job). So are the ten Lost Ark Reborn Paladin Legendary armour
+// pieces (armour 95 / 45, Daedric 49 / 18-23; its swords stay), and the frost giant club (80) is never loot. regions-overrides.json forgeNever makes regions.js craftHook
 // refuse them to everyone, staff and Dawnguard smiths included, tempering too, before the chain (materials kept, no
 // credit); loot-overrides.json never keeps them out of every loot path even if faction-gear.json stops listing them.
 // Loads the real regions.js and loottiers.js with the real data files against fake records.
@@ -21,7 +22,7 @@ for (const f of ['regions.json', 'regions-overrides.json', 'dragon-materials.jso
 }
 
 // Fake ids: Skyrim.esm plain, Dawnguard.esm 0x02, JK's Fort Dawnguard.esp 0x3d (any index will do: descs carry the plugin)
-const PLUG = { 0x00: 'Skyrim.esm', 0x02: 'Dawnguard.esm', 0x3d: "JK's Fort Dawnguard.esp" };
+const PLUG = { 0x00: 'Skyrim.esm', 0x02: 'Dawnguard.esm', 0x3d: "JK's Fort Dawnguard.esp", 0x50: '[Kirax] Lost Ark Reborn Paladin Legendary.esp' };
 const desc = (id) => `${(id & 0xffffff).toString(16)}:${PLUG[id >>> 24] || 'Skyrim.esm'}`;
 const idOfDesc = (d) => { const [h, p] = String(d).split(':'); const ix = Object.keys(PLUG).find((k) => PLUG[k].toLowerCase() === String(p).toLowerCase()); return ((Number(ix || 0) << 24) | parseInt(h, 16)) >>> 0; };
 const recs = new Map();
@@ -30,6 +31,10 @@ const rec = (id, type, editorId, fields = []) => recs.set(id >>> 0, { record: { 
 const KW_FORGE = 0x88105, KW_WHEEL = 0x88108, KW_DG = 0x02000000 | 0xf7fc;
 rec(KW_FORGE, 'KYWD', 'CraftingSmithingForge'); rec(KW_WHEEL, 'KYWD', 'CraftingSmithingSharpeningWheel'); rec(KW_DG, 'KYWD', 'DLC1CraftingDawnguard');
 const SPR_AXE = 0x3d000f0d, SPR_XBOW = 0x3d000f0e, DG_AXE = 0x0200d098;
+// The Lost Ark Paladin Legendary armour (armour 95 / 45 against Daedric 49 / 18-23) and the set's swords (25 / 30, kept)
+const LOAR_ARMOR = ['a42', 'a46', 'a47', 'a48', 'a5e', 'b90', 'b91', 'b92', 'b93', 'b94'].map((h) => (0x50000000 | parseInt(h, 16)) >>> 0);
+const LOAR_SWORDS = ['b75', 'b8a', 'b97', 'b98'].map((h) => (0x50000000 | parseInt(h, 16)) >>> 0);
+LOAR_ARMOR.forEach((id, i) => rec(id, 'ARMO', `LoARPalLegendaryPiece${i}`)); LOAR_SWORDS.forEach((id, i) => rec(id, 'WEAP', `LoARPalLegendarySword${i}`));
 rec(SPR_AXE, 'WEAP', 'XJKFDDLC1DawnguardAxe'); rec(SPR_XBOW, 'WEAP', 'XJKFDDLC1CrossBowEnhanced'); rec(DG_AXE, 'WEAP', 'DLC1DawnguardAxe');
 const R_FORGE = 0xa1001, R_WHEEL = 0xa1002, R_DG = 0xa1003;
 rec(R_FORGE, 'COBJ', 'DBOSM_XJKFDDLC1DawnguardAxe', [{ type: 'BNAM', data: u32(KW_FORGE) }]);
@@ -70,16 +75,23 @@ ok(craft(PLAYER, SPR_AXE, R_WHEEL) === false && !chain.length, 'tempering one al
 ok(craft(DAWNGUARD_SMITH2, SPR_XBOW, R_DG) === false && !chain.length, 'the SPR Enhanced Crossbow is refused at the Dawnguard bench');
 ok(said.some(([, t]) => /Enhanced Crossbow SPR/.test(t)), '...naming the crossbow', said);
 ok(craft(DAWNGUARD_SMITH, DG_AXE, R_FORGE) !== false && chain.includes(R_FORGE), "the Dawnguard's own War Axe (Dawnguard.esm d098, damage 13) is untouched");
+const refusedAll = LOAR_ARMOR.filter((id) => { const a = 0xff000300 + (id & 0xfff); props.set(a + '|worldOrCellDesc', 'a764b:BSHeartland.esm'); return craft(a, id, R_FORGE) !== false || chain.length; }).map(desc);
+ok(!refusedAll.length, `all ${LOAR_ARMOR.length} Lost Ark Paladin Legendary armour pieces (normal and Alt) are refused at the forge`, refusedAll);
+ok(craft(STAFF, LOAR_ARMOR[0], R_WHEEL) === false && !chain.length, '...to staff too, and tempering one is refused');
+ok(craft(0xff000400, LOAR_ARMOR[5], R_FORGE) === false && said.some(([, t]) => /Lost Ark Reborn Paladin Legendary/.test(t) && /stronger than intended/.test(t)), '...naming the piece', said);
+const swordsOpen = LOAR_SWORDS.filter((id) => !(craft(PLAYER, id, R_FORGE) !== false && chain.includes(R_FORGE))).map(desc);
+ok(!swordsOpen.length, "the set's swords (damage 25 / 30) still forge", swordsOpen);
 
 // ---- loot: never on any path, even if faction-gear.json stops naming them --------------------------------------------
 const tiersOf = (factionGear) => { delete require.cache[path.join(SERVER, 'loottiers.js')]; return require(path.join(SERVER, 'loottiers.js'))({ materials: readJson('loot-materials.json'), factionGear, overrides: readJson('loot-overrides.json'), swap: readJson('gear-swap.json'), cfg: {} }); };
 for (const [label, fg] of [['with faction-gear.json', readJson('faction-gear.json')], ['without faction-gear.json', { items: {} }]]) {
   const T = tiersOf(fg);
-  for (const d of ["f0d:JK's Fort Dawnguard.esp", "f0e:JK's Fort Dawnguard.esp"]) {
+  for (const d of ["f0d:JK's Fort Dawnguard.esp", "f0e:JK's Fort Dawnguard.esp", '12d14:Dawnguard.esm'].concat(LOAR_ARMOR.map(desc))) {
     const c = T.classOf(d);
     ok(c.kind === 'never' && !T.lootable(d), `${d} is never loot ${label}`, c);
   }
 }
+ok(!/12d14:dawnguard\.esm/i.test(JSON.stringify(readJson('regions.json').recipes || {})), 'no recipe makes the frost giant club (so loot is its only way in)');
 // No hand-written pool names them either
 const pools = ['loot.json', 'dungeon-pools.json', 'expeditions.json', 'ayleid-loot.json', 'weapon-racks.json', 'starter-grants.json', 'depths.json', 'owned-spawns.json'];
 const named = pools.filter((f) => { try { return /f0[de]:jk's fort dawnguard\.esp|XJKFDDLC1(DawnguardAxe|CrossBowEnhanced)/i.test(fs.readFileSync(path.join(SERVER, f), 'utf8')); } catch (e) { return false; } });
