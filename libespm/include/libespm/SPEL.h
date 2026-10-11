@@ -89,6 +89,8 @@ public:
   {
     uint32_t effectFormId = 0;
     const EFIT* effectItem = nullptr;
+    // CTDA after the effect's EFIT, which only the engine evaluates
+    bool hasConditions = false;
   };
 
   struct Data

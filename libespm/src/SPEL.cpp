@@ -20,6 +20,8 @@ SPEL::Data SPEL::GetData(
       } else if (!std::memcmp(type, "EFIT", 4) && !result.effects.empty() &&
                  dataSize >= sizeof(EFIT)) {
         result.effects.back().effectItem = reinterpret_cast<const EFIT*>(data);
+      } else if (!std::memcmp(type, "CTDA", 4) && !result.effects.empty()) {
+        result.effects.back().hasConditions = true;
       }
     },
     compressedFieldsCache);

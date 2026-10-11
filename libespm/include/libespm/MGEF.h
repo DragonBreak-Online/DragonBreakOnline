@@ -95,7 +95,7 @@ public:
     uint32_t projectile = 0;
     // Raw (file-local) EXPL id
     uint32_t explosion = 0;
-    // CTDA on the effect itself (Turn Undead's IsUndead, perk riders' HasPerk), which only the engine evaluates
+    // CTDA on the effect (Turn Undead's IsUndead, perk riders' HasPerk), which only the engine evaluates
     bool hasConditions = false;
 
     [[nodiscard]] inline bool IsFlagSet(Flags flag) const
