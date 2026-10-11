@@ -234,3 +234,17 @@ TEST_CASE("Spell riders need a recent cast of the spell and land once a "
   REQUIRE(scene.Hit(kCalm, SpellSyncScene::kNpc, 1.f, false).empty());
   REQUIRE(scene.Hit(kCalm, SpellSyncScene::kNpc).empty());
 }
+
+TEST_CASE("A player gets a spell's stagger from the clone replay, not a "
+          "second time from the server",
+          "[SpellSync][espm]")
+{
+  PartOne& p = GetPartOne();
+  // Turn Lesser Undead: Turn Undead and a stagger push, no damage
+  constexpr uint32_t kTurnLesserUndead = 0x0004b146;
+  SpellSyncScene scene(p);
+
+  REQUIRE(scene.Hit(kTurnLesserUndead, SpellSyncScene::kHost).empty());
+  REQUIRE(Has(scene.Hit(kTurnLesserUndead, SpellSyncScene::kNpc),
+              "DoCombatSpellApply"));
+}
