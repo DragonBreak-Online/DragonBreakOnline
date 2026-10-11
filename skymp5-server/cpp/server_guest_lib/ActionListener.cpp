@@ -3031,7 +3031,6 @@ void ActionListener::ApplySpellRiders(MpActor& aggressor, MpActor& target,
   auto* worldState = &partOne.worldState;
   const SpellRiders riders = GetSpellRiders(worldState, spellId);
   const bool ridersOn = worldState->spellSync.riders;
-  // The base game applies AI effects to NPCs only
   const bool isPlayer = target.GetUserId() != Networking::InvalidUserId;
   // A rune's paralysis sits on its explosion's enchantment (Ash Rune), which DoCombatSpellApply cannot apply: an NPC
   // is held on the server and kept still on its host. Players get dboParalyse from the gamemode
@@ -3048,11 +3047,12 @@ void ActionListener::ApplySpellRiders(MpActor& aggressor, MpActor& target,
   const uint32_t spellHoldSeconds =
     riders.damagesHealth ? 0 : riders.paralysisSeconds;
   const uint32_t holdSeconds = std::max(spellHoldSeconds, explosionHoldSeconds);
-  // Replaying a spell that also damages Health on the target's game would damage it twice
+  // Replaying a spell that also damages Health on the target's game would damage it twice. A player's own client
+  // takes the stagger and slow from the clone replay already, and the base game applies AI effects to NPCs only
   const bool replaySpell = !riders.damagesHealth && !riders.commands &&
     (spellHoldSeconds > 0 ||
-     (ridersOn &&
-      (riders.staggerAny || riders.slowAny || (riders.ai && !isPlayer))));
+     (ridersOn && !isPlayer &&
+      (riders.staggerAny || riders.slowAny || riders.ai)));
   // Such a spell's unconditional stagger and slow go to an NPC's host on their own
   const bool applyApart = ridersOn && riders.damagesHealth && !isPlayer &&
     (riders.stagger || riders.slow > 0.f);
