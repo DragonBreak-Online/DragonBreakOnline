@@ -221,7 +221,11 @@ module.exports = (api) => {
   const addSpell = (a, id) => id && papyrus(a, 'AddSpell', [spell(id), false]);
   const removeSpell = (a, id) => id && papyrus(a, 'RemoveSpell', [spell(id)]);
   const health = (a) => { try { return mp.get(a, 'percentages') || null; } catch (e) { return null; } };
-  const setHealth = (a, h) => { const p = health(a); if (!p) return; try { mp.set(a, 'percentages', { health: Math.max(0, Math.min(1, h)), magicka: p.magicka, stamina: p.stamina }); } catch (e) { /* offline */ } };
+  // A vampire's health held against healing magic (vampireRestoration, below): actor -> { cap, until, hardUntil, channel }
+  const healGuards = globalThis.__dboVampHealGuards instanceof Map ? globalThis.__dboVampHealGuards : (globalThis.__dboVampHealGuards = new Map());
+  const writeHealth = (a, h, p) => { try { mp.set(a, 'percentages', { health: Math.max(0, Math.min(1, h)), magicka: p.magicka, stamina: p.stamina }); return true; } catch (e) { return false; /* offline */ } };
+  // What this module gives (a drain's share) is never taken back by a hold on the same actor
+  const setHealth = (a, h) => { const p = health(a); if (!p) return; if (writeHealth(a, h, p)) { const g = healGuards.get(a >>> 0); if (g && h > g.cap) g.cap = Math.min(1, h); } };
   const isOutdoors = (a) => { try { return isWorldspace(String(mp.get(a, 'worldOrCellDesc') || '')); } catch (e) { return false; } };
   const distance = (a, b) => { try { if (mp.get(a, 'worldOrCellDesc') !== mp.get(b, 'worldOrCellDesc')) return Infinity; const p = mp.get(a, 'pos'), q = mp.get(b, 'pos'); return Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]); } catch (e) { return Infinity; } };
   // The name a viewer knows a player by (playermenu.js: introduced, else Stranger or the mask name); an NPC keeps its own
@@ -520,7 +524,102 @@ module.exports = (api) => {
   const VAMP_DRAIN_SET = new Set(VAMP_DRAIN.filter(Boolean));
   // PlayerWerewolfFeedVictimSpell: a werewolf's feeding hold on a body is its feed (wolfFeedHold, below)
   const WW_FEED_HOLD = idOf('106396:Skyrim.esm');
+  // ---- Restoration's healing and the undead (Nate, 11 Oct; a house rule, not TES canon) ----------------------
+  // A vampire (any stage, Vampire Lord too) cannot cast Restoration's healing spells: the light of Arkay and Stendarr
+  // rejects them. Healing magic cast by anyone else does nothing for a vampire, and the caster is told once. A vampire
+  // cannot read, buy or be taught a healing tome (spells.js asks __dboVampHealRefusal); one already known stays in the
+  // spellbook. Potions still heal. Restoration's spells against the undead (Turn Undead, Sun Fire, Vampire's Bane,
+  // Stendarr's Aura, Bane of the Undead) are hostile effects, not healing, and burn a vampire as before: nothing here
+  // touches them.
+  // The healing spells: restoration-healing.json (tools/spells/healing_spells.py, from the load order's SPEL/MGEF records).
+  // How a heal is stopped, as the fork's C++ does it (ActionListener.cpp): the server applies every heal itself, the
+  // caster's own and a concentration channel's in OnSpellCast and Heal Other's and an area share in OnSpellHit, right
+  // after it fires the gamemode's onSpellCast / onSpellHit. Neither can refuse it (FireGamemodeEvent's verdict is not read
+  // there, and onHitDamageAttempt never fires for a hit without damage), and the client relays the cast before the server
+  // sees it. So the heal is taken back: the target's health is held at what it was before the heal (at once, then every
+  // tick while a channel keeps healing). A client's own local heal does not stick either: the server crops a reported rise
+  // to natural regeneration (CropHealthRegeneration) and sends the corrected value back. Refusing the cast in the caster's
+  // game (no spell effects, no animation) needs the client (magicSyncService's blocked-powers path, a list from the server).
+  const VR = Object.assign({ enabled: true, holdMs: 1500, channelMs: 2500, channelMaxMs: 35000, castTellMs: 15000, mendTellMs: 300000, revive: true },
+    C.vampireRestoration || {});
+  // Read again at every load (24 rows), so a regenerated list takes effect with the reload
+  const HEALING = (() => {
+    const file = path.join(__dirname, 'restoration-healing.json'), m = new Map();
+    try {
+      for (const x of JSON.parse(fs.readFileSync(file, 'utf8')).spells || []) {
+        const i = String(x.id || '').lastIndexOf(':');
+        let id = 0; try { id = i > 0 ? mp.getIdFromDesc(`${parseInt(x.id.slice(i + 1), 16).toString(16)}:${x.id.slice(0, i)}`) >>> 0 : 0; } catch (e) { id = 0; }
+        if (id) m.set(id, { name: String(x.name || ''), channel: x.castType === 'concentration', self: x.delivery === 'self' });
+      }
+    } catch (e) { log('supernatural: restoration-healing.json unreadable', e.message); }
+    return m;
+  })();
+  const healingSpell = (id) => (VR.enabled ? HEALING.get(Number(id) >>> 0) || null : null);
+  const isUndead = (a) => kindOf(a >>> 0) === 'vampire';
+  const UNDEAD_CAST_LINE = 'The light of Arkay and Stendarr will not answer the undead. Your healing spell fails.';
+  const UNDEAD_MEND_LINE = 'Your healing finds nothing to mend in the undead.';
+  const healToldAt = globalThis.__dboVampHealTold instanceof Map ? globalThis.__dboVampHealTold : (globalThis.__dboVampHealTold = new Map());
+  const tellOnce = (a, key, ms, line) => {
+    const now = Date.now();
+    if (now - (healToldAt.get(key) || 0) < ms) return;
+    healToldAt.set(key, now);
+    if (healToldAt.size > 512) for (const [k, at] of healToldAt) if (now - at > VR.mendTellMs) healToldAt.delete(k);
+    personal(a, line);
+  };
+  // Takes back whatever rose above the hold; a fall (a blow) lowers the hold. A channel's hold lasts while it still heals.
+  const settleHold = (t, now) => {
+    const g = healGuards.get(t); if (!g) return;
+    const p = health(t);
+    if (!p || !(Number(p.health) > 0)) { healGuards.delete(t); return; }
+    if (Number(p.health) > g.cap + 1e-6) {
+      writeHealth(t, g.cap, p); g.taken++;
+      if (g.channel) g.until = Math.min(g.hardUntil, Math.max(g.until, now + VR.channelMs));
+    } else g.cap = Number(p.health);
+    if (now >= g.until) { healGuards.delete(t); if (g.taken) log(`supernatural: held ${display(t)}'s health against healing magic (${g.taken} heal${g.taken === 1 ? '' : 's'} taken back)`); }
+  };
+  // Called before the C++ applies the heal, so the health read now is the health before it
+  const holdHealth = (t, channel) => {
+    t >>>= 0;
+    const p = health(t); if (!p || !(Number(p.health) > 0)) return false;
+    const now = Date.now(), g = healGuards.get(t);
+    const ms = channel ? VR.channelMs : VR.holdMs;
+    if (g) { g.cap = Math.min(g.cap, Number(p.health)); g.until = Math.max(g.until, now + ms); g.channel = g.channel || channel; }
+    else healGuards.set(t, { cap: Number(p.health), until: now + ms, hardUntil: now + Math.max(ms, VR.channelMaxMs), channel: !!channel, taken: 0 });
+    setTimeout(() => { try { settleHold(t, Date.now()); } catch (e) { log('supernatural: heal hold failed', e.message); } }, 0);
+    return true;
+  };
+  every('vampHealHold', 200, () => { if (!healGuards.size) return; const now = Date.now(); for (const t of [...healGuards.keys()]) settleHold(t, now); });
+  // spells.js: why this character may not take this spell (a tome read, the shop, a lesson), or null
+  globalThis.__dboVampHealRefusal = (a, spellId) => (healingSpell(spellId) && isUndead(a) ? 'the light of Arkay and Stendarr will not pass into undead hands.' : null);
+  // gamemode.js onSpellCast: a vampire's healing cast. The heal on the caster (a self spell, or a channel, which heals the
+  // caster until its beam finds someone) is held; a heal on another is held at its hit (vampHealHit)
+  globalThis.__dboVampHealCast = (caster, spellId) => {
+    const sp = healingSpell(spellId); caster >>>= 0;
+    if (!sp || !isUndead(caster)) return false;
+    if (sp.self || sp.channel) holdHealth(caster, sp.channel);
+    if (isPlayer(caster)) tellOnce(caster, `cast:${caster}`, VR.castTellMs, UNDEAD_CAST_LINE);
+    return true;
+  };
+  // onSpellHit: a vampire's heal on anyone, or anyone's heal on a vampire, mends nothing
+  const vampHealHit = (agg, tgt, spellId) => {
+    agg >>>= 0; tgt >>>= 0;
+    const sp = agg === tgt ? null : healingSpell(spellId);
+    if (!sp) return false;
+    const undeadCaster = isUndead(agg), undeadTarget = isUndead(tgt);
+    if (!undeadCaster && !undeadTarget) return false;
+    holdHealth(tgt, sp.channel);
+    if (undeadTarget && !undeadCaster && isPlayer(agg)) tellOnce(agg, `mend:${agg}:${tgt}`, VR.mendTellMs, UNDEAD_MEND_LINE);
+    return true;
+  };
+  // downed.js: a healing spell raises no fallen vampire, and a vampire's raises nobody (the Draught of Revival still does)
+  globalThis.__dboVampHealBlocks = (caster, t, spellId) => {
+    if (!VR.revive || !healingSpell(spellId)) return false;
+    const undeadCaster = isUndead(caster), undeadTarget = isUndead(t);
+    if (undeadTarget && !undeadCaster && isPlayer(caster)) tellOnce(caster >>> 0, `mend:${caster >>> 0}:${t >>> 0}`, VR.mendTellMs, UNDEAD_MEND_LINE);
+    return undeadCaster || undeadTarget;
+  };
   globalThis.__dboSuperSpellHit = (agg, tgt, spellId) => {
+    try { vampHealHit(Number(agg) >>> 0, Number(tgt) >>> 0, Number(spellId) >>> 0); } catch (e) { log('supernatural: healing check failed', e.message); }
     if (WW_FEED_HOLD && (Number(spellId) >>> 0) === WW_FEED_HOLD) { wolfFeedHold(Number(agg) >>> 0, Number(tgt) >>> 0); return; }
     if (agg === tgt || !VAMP_DRAIN_SET.has(Number(spellId) >>> 0)) return;
     const p = health(agg); if (p && p.health > 0) setHealth(agg, p.health + 0.03);
@@ -1960,6 +2059,10 @@ module.exports = (api) => {
         label: 'Silver', value: Number(C.vampireSilverWeakness) > 0 ? `${Math.round(Number(C.vampireSilverWeakness) * 100)}% worse` : 'Shunned',
         hint: `${Number(C.vampireSilverWeakness) > 0 ? `Silver strikes you ${Math.round(Number(C.vampireSilverWeakness) * 100)}% harder, and you` : 'You'} can neither wear it nor wield it.`,
       },
+      ...(VR.enabled ? [{
+        label: 'Restoration', value: 'Healing rejects you',
+        hint: "The light of Arkay and Stendarr will not answer the undead: you cannot cast Restoration's healing spells, and healing magic does nothing for you. Potions still heal. Restoration's spells against the undead still burn you.",
+      }] : []),
       {
         label: 'Bloodline', value: s.pure ? 'Pure-blood' : 'Turned',
         hint: s.pure ? "Molag Bal's own Embrace made you." : 'Sanguinare Vampiris turned you. A pure-blood is made by Molag Bal\'s Embrace at his shrine.',

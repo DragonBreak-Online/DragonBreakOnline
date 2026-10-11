@@ -733,6 +733,8 @@ module.exports = (api) => {
       return Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]);
     } catch (e) { return Infinity; }
   };
+  // supernatural.js vampireRestoration: healing magic raises no fallen vampire, and a vampire's healing raises nobody
+  const undeadHeal = (caster, t, spell) => { try { return typeof globalThis.__dboVampHealBlocks === 'function' && globalThis.__dboVampHealBlocks(caster, t, spell) === true; } catch (e) { return false; } };
   {
     const inner = mp.onSpellHit;
     if (typeof inner === 'function') {
@@ -748,8 +750,8 @@ module.exports = (api) => {
           }
           if (AIMED.has(spell) && S.downed.has(t) && isDead(t)) {
             const pc = pendingCast.get(caster); if (pc) { clearTimeout(pc); pendingCast.delete(caster); castStop.delete(caster); }
-            if (canRaise(caster)) revive(t, caster, 'healing');
-          } else if (AIMED.has(spell) && canLift(caster, t)) {
+            if (canRaise(caster) && !undeadHeal(caster, t, spell)) revive(t, caster, 'healing');
+          } else if (AIMED.has(spell) && canLift(caster, t) && !undeadHeal(caster, t, spell)) {
             liftChill(t, caster);
           }
         } catch (e) { log(`downed: spell revive failed: ${e.message}`); }
@@ -764,11 +766,11 @@ module.exports = (api) => {
         const caster = Number(casterId) >>> 0, spell = Number(spellId) >>> 0;
         try {
           if (AREA.has(spell)) {
-            for (const t of chilledNear(caster, C.groupReviveRange)) if (canLift(caster, t)) liftChill(t, caster);
+            for (const t of chilledNear(caster, C.groupReviveRange)) if (canLift(caster, t) && !undeadHeal(caster, t, spell)) liftChill(t, caster);
           }
           if (S.downed.size && AREA.has(spell)) {
             const near = downedNear(caster, C.groupReviveRange, 0);
-            if (near.length && canRaise(caster)) for (const t of near) revive(t, caster, 'Grand Healing');
+            if (near.length && canRaise(caster)) for (const t of near) if (!undeadHeal(caster, t, spell)) revive(t, caster, 'Grand Healing');
           } else if (S.downed.size && AIMED.has(spell)) {
             // A hit on a body does not always arrive (the same as Reanimate): the nearest fallen in front of the caster
             const old = pendingCast.get(caster); if (old) clearTimeout(old);
@@ -778,7 +780,7 @@ module.exports = (api) => {
               const stop = castStop.has(caster) ? castStop.get(caster) : Infinity;
               castStop.delete(caster);
               const t = downedNear(caster, Math.min(C.reviveRange, stop), C.reviveConeDeg)[0];
-              if (t && canRaise(caster)) { log(`downed: ${display(caster)} healing reached ${display(t)} without a hit, by aim`); revive(t, caster, 'healing'); }
+              if (t && canRaise(caster) && !undeadHeal(caster, t, spell)) { log(`downed: ${display(caster)} healing reached ${display(t)} without a hit, by aim`); revive(t, caster, 'healing'); }
             }, C.reviveFallbackMs));
           }
         } catch (e) { log(`downed: spell cast revive failed: ${e.message}`); }

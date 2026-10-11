@@ -210,6 +210,7 @@
    "_comment": "Overrides for supernatural.js defaults. huntMarkChance: the chance that surviving Hircine's Great Hunt (/rite) gives Sanies Lupinus; an unmarked survivor waits riteFailCooldownHours to run it again. infectWerewolf: a werewolf's bite's chance to pass it on. Nate, 2026-09-27: werewolf harder to come by than vampirism, 0.5 -> 0.25 and 0.05 -> 0.02. Nate, 2026-10-03: both rarer, lycanthropy rarest: 0.25 -> 0.1 and 0.02 -> 0.005 (infectVampire 0.03 and infectFeed 0.05 are the supernatural.js defaults).",
    "huntMarkChance": 0.1,
    "infectWerewolf": 0.005,
+   "vampireRestoration": { "_comment": "Nate, 11 Oct (a house rule): a vampire cannot cast Restoration's healing spells (restoration-healing.json) nor read, buy or be taught one, and healing magic does nothing for a vampire. Potions still heal; the anti-undead spells still burn. false turns it all off.", "enabled": true },
    "feedPair": { "_comment": "The standing bite played for both players (client 0.3.71). Off until Nate has seen it in game; the release checks it is written here as false.", "enabled": false },
    "rite": {
     "_comment": "The rite mini-game (Blood Fever, Hircine's Hunt, Molag Bal's Embrace, the Great Hunt). Merged key by key with supernatural.js RITE_DEFAULTS, so a partial block like this one keeps rounds, need and leadMs.",
