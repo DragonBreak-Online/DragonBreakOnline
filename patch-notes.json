@@ -1,5 +1,44 @@
 [
   {
+    "title": "Fixes for study, copying, masks and brewing",
+    "date": "2026-10-11",
+    "version": "Server update",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Server",
+        "items": [
+          "A pause of several seconds that froze the server about every six hours is fixed."
+        ]
+      },
+      {
+        "heading": "Priest Studies",
+        "items": [
+          "Priest Studies now tells you when your Wheel of Skills has no room for Priest (the day's limit, the hourly limit, Priest marked to fall, or the higher places held by your other skills), instead of letting you study for nothing. A sitting that reaches one of those limits ends and says when study pays again."
+        ]
+      },
+      {
+        "heading": "Copying",
+        "items": [
+          "Copies of manuals and schematics at the Scholars' Ledger now have their own daily count. Books you copy while reading no longer use it up, and the message tells you how many you have copied today."
+        ]
+      },
+      {
+        "heading": "Masks",
+        "items": [
+          "Putting on a mask can no longer leave you stuck as a Masked Person. If it happened to you, send a /bug and staff will give your name back."
+        ]
+      },
+      {
+        "heading": "Crafting",
+        "items": [
+          "Brewing potions now gets the Alchemist's craft bonus and the first-craft bonus, as intended.",
+          "A Dark Elf or Orc smith keeps a schematic for a technique they already know by birth instead of using it up."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Overpowered gear can no longer be forged or looted",
     "date": "2026-10-11",
     "version": "Server update",
@@ -50,7 +89,7 @@
           "Busy areas stutter less when many NPCs appear or leave at once: the game now places them a few at a time.",
           "Wolves around Bruma stand and fight again instead of running off; deer, foxes, hares and other prey still flee.",
           "Werewolves and Vampire Lords can use their Shout and Sneak powers from a mouse button.",
-          "The key settings in the journal (F3) accept the back and forward mouse buttons (Mouse 4 and Mouse 5).",
+          "Mouse buttons for the menu keys, the back and forward buttons (Mouse 4 and Mouse 5) included, are set in the launcher's settings (launcher 2.1.46). The key settings in the journal (F3) take keyboard keys and the middle mouse button only.",
           "Pigeon coops can send and collect parcels of gold and goods, and have a new Supply orders tab.",
           "A new journal tab for those who serve the Dominion: Thalmor.",
           "Switching characters no longer leaves your old character's body standing in the world.",
