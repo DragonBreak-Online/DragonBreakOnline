@@ -157,3 +157,27 @@ TEST_CASE("Absorb Health restores the caster by what the target lost",
   REQUIRE(health(SpellSyncScene::kCaster) == 0.5f);
   p.worldState.spellSync.absorb = true;
 }
+
+TEST_CASE("A rune explosion's paralysis holds an NPC on the server and its "
+          "host",
+          "[SpellSync][espm]")
+{
+  PartOne& p = GetPartOne();
+  // Dragonborn.esm Ash Rune: its paralysis is on the projectile's explosion's enchantment
+  constexpr uint32_t kAshRune = 0x040177af;
+  SpellSyncScene scene(p);
+
+  p.worldState.spellSync.explosionRiders = false;
+  REQUIRE(scene.Hit(kAshRune, SpellSyncScene::kNpc).empty());
+  p.worldState.spellSync.explosionRiders = true;
+
+  // The gamemode's dboParalyse holds a player
+  REQUIRE(scene.Hit(kAshRune, SpellSyncScene::kHost).empty());
+
+  auto functions = scene.Hit(kAshRune, SpellSyncScene::kNpc);
+  REQUIRE(Has(functions, "SetDontMove"));
+  REQUIRE(!Has(functions, "DoCombatSpellApply"));
+
+  // Held: a second rune while it lasts sends nothing
+  REQUIRE(scene.Hit(kAshRune, SpellSyncScene::kNpc).empty());
+}

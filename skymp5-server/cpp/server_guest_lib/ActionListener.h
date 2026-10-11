@@ -12,6 +12,7 @@
 #include "WeaponHitGate.h"
 #include "libespm/Loader.h"
 #include <chrono>
+#include <map>
 #include <memory>
 #include <unordered_map>
 #include <vector>
@@ -135,9 +136,18 @@ private:
 
   // Paralysis, AI, stagger and slow riders of a spell hit: held on the server, applied on the target's game
   void ApplySpellRiders(MpActor& aggressor, MpActor& target, uint32_t spellId);
-  void SlowOnHost(MpActor& executor, MpActor& target, float magnitude,
-                  uint32_t seconds);
-  void EndHostSlow(uint32_t targetId);
+  // A timed change sent to the client hosting a target: a SpeedMult slow, or a hold (SetDontMove) for paralysis the
+  // spell cannot be replayed for
+  enum class HostEffect
+  {
+    Slow,
+    Hold,
+  };
+  void StartHostEffect(HostEffect effect, MpActor& executor, MpActor& target,
+                       float magnitude, uint32_t seconds);
+  void EndHostEffect(uint32_t targetId, HostEffect effect);
+  void SendHostEffect(HostEffect effect, MpActor& executor, uint32_t targetId,
+                      float magnitude, bool start);
   bool IsParalyzed(const MpActor& actor);
 
   void TickRestorationChannel(uint32_t casterId, uint32_t generation);
@@ -256,14 +266,14 @@ private:
                                   std::chrono::steady_clock::time_point now);
   std::unordered_map<uint32_t, std::chrono::steady_clock::time_point>
     paralyzedUntil;
-  // A SpeedMult slow sent to the client hosting each target, taken back there when it ends
-  struct HostSlow
+  // Timed host effects by (target, effect), taken back on the same client when they end
+  struct TimedHostEffect
   {
     uint32_t executorId = 0;
     float magnitude = 0.f;
     std::chrono::steady_clock::time_point until{};
   };
-  std::unordered_map<uint32_t, HostSlow> hostSlows;
+  std::map<std::pair<uint32_t, HostEffect>, TimedHostEffect> hostEffects;
 
   MovementValidation::Tracker movementTracker;
 

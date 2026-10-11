@@ -93,6 +93,8 @@ public:
     // Raw (file-local) ids: cloak spell, bound weapon, summoned NPC_ or hazard
     uint32_t associatedItem = 0;
     uint32_t projectile = 0;
+    // Raw (file-local) EXPL id
+    uint32_t explosion = 0;
     // CTDA on the effect itself (Turn Undead's IsUndead, perk riders' HasPerk), which only the engine evaluates
     bool hasConditions = false;
 
