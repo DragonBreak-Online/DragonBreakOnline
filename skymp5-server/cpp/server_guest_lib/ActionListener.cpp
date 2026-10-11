@@ -140,31 +140,40 @@ std::vector<uint32_t> GetKnownSpells(const MpActor& actor)
   return spells;
 }
 
-// Calls callback(effectItem, mgefData, mgefLookup) for each effect of a SPEL, effectItem may be null
+// Calls callback(effectItem, mgefData, mgefLookup) for each effect of a SPEL, SCRL or ENCH, effectItem may be null
 template <class Callback>
-void ForEachSpellEffectData(WorldState* worldState, uint32_t spellId,
-                            const Callback& callback)
+void ForEachEffectData(WorldState* worldState,
+                       const espm::LookupResult& itemLookup,
+                       const Callback& callback)
 {
   auto& browser = worldState->GetEspm().GetBrowser();
-  const auto spellLookup = browser.LookupById(spellId);
-  // A scroll's effects work like its spell's (SCRL carries the same SPIT and EFID/EFIT)
-  if (!espm::IsSpellItem(spellLookup.rec)) {
-    return;
-  }
-  const auto spellData =
-    espm::GetSpellItemData(spellLookup.rec, worldState->GetEspmCache());
-  for (const auto& effect : spellData.effects) {
+  const auto itemData =
+    espm::GetSpellItemData(itemLookup.rec, worldState->GetEspmCache());
+  for (const auto& effect : itemData.effects) {
     if (effect.effectFormId == 0) {
       continue;
     }
     const auto mgefLookup =
-      browser.LookupById(spellLookup.ToGlobalId(effect.effectFormId));
+      browser.LookupById(itemLookup.ToGlobalId(effect.effectFormId));
     const auto mgef = espm::Convert<espm::MGEF>(mgefLookup.rec);
     if (!mgef) {
       continue;
     }
     callback(effect.effectItem, mgef->GetData(worldState->GetEspmCache()).data,
              mgefLookup);
+  }
+}
+
+// ForEachEffectData for a SPEL or SCRL only
+template <class Callback>
+void ForEachSpellEffectData(WorldState* worldState, uint32_t spellId,
+                            const Callback& callback)
+{
+  const auto spellLookup =
+    worldState->GetEspm().GetBrowser().LookupById(spellId);
+  // A scroll's effects work like its spell's (SCRL carries the same SPIT and EFID/EFIT)
+  if (espm::IsSpellItem(spellLookup.rec)) {
+    ForEachEffectData(worldState, spellLookup, callback);
   }
 }
 
@@ -270,6 +279,55 @@ SpellRiders GetSpellRiders(WorldState* worldState, uint32_t spellId)
         const espm::LookupResult&) {
       if (effectItem) {
         AddSpellRider(riders, *effectItem, data);
+      }
+    });
+  return riders;
+}
+
+// Riders of the enchantments a spell's explosions apply: on the effect, or on its projectile (a rune's)
+SpellRiders GetExplosionRiders(WorldState* worldState, uint32_t spellId)
+{
+  SpellRiders riders;
+  auto& browser = worldState->GetEspm().GetBrowser();
+  auto& cache = worldState->GetEspmCache();
+  auto addExplosion = [&](const espm::LookupResult& owner, uint32_t rawId) {
+    if (!rawId) {
+      return;
+    }
+    const auto explosionLookup = browser.LookupById(owner.ToGlobalId(rawId));
+    const auto explosion = espm::Convert<espm::EXPL>(explosionLookup.rec);
+    const uint32_t enchantment =
+      explosion ? explosion->GetData(cache).enchantment : 0;
+    if (!enchantment) {
+      return;
+    }
+    const auto enchantmentLookup =
+      browser.LookupById(explosionLookup.ToGlobalId(enchantment));
+    if (!espm::Convert<espm::ENCH>(enchantmentLookup.rec)) {
+      return;
+    }
+    ForEachEffectData(
+      worldState, enchantmentLookup,
+      [&](const espm::SPEL::EFIT* effectItem, const espm::MGEF::DATA& data,
+          const espm::LookupResult&) {
+        if (effectItem) {
+          AddSpellRider(riders, *effectItem, data);
+        }
+      });
+  };
+  ForEachSpellEffectData(
+    worldState, spellId,
+    [&](const espm::SPEL::EFIT*, const espm::MGEF::DATA& data,
+        const espm::LookupResult& mgefLookup) {
+      addExplosion(mgefLookup, data.explosion);
+      if (!data.projectile) {
+        return;
+      }
+      const auto projectileLookup =
+        browser.LookupById(mgefLookup.ToGlobalId(data.projectile));
+      if (const auto projectile =
+            espm::Convert<espm::PROJ>(projectileLookup.rec)) {
+        addExplosion(projectileLookup, projectile->GetData(cache).explosion);
       }
     });
   return riders;
@@ -2967,16 +3025,24 @@ void ActionListener::ApplySpellRiders(MpActor& aggressor, MpActor& target,
   const bool ridersOn = worldState->spellSync.riders;
   // The base game applies AI effects to NPCs only
   const bool isPlayer = target.GetUserId() != Networking::InvalidUserId;
-  const uint32_t holdSeconds = riders.damagesHealth ? 0 : riders.paralysisSeconds;
+  // A rune's paralysis sits on its explosion's enchantment (Ash Rune), which DoCombatSpellApply cannot apply: an NPC
+  // is held on the server and kept still on its host. Players get dboParalyse from the gamemode
+  const uint32_t explosionHoldSeconds =
+    worldState->spellSync.explosionRiders && !isPlayer
+    ? GetExplosionRiders(worldState, spellId).paralysisSeconds
+    : 0;
+  const uint32_t spellHoldSeconds =
+    riders.damagesHealth ? 0 : riders.paralysisSeconds;
+  const uint32_t holdSeconds = std::max(spellHoldSeconds, explosionHoldSeconds);
   // Replaying a spell that also damages Health on the target's game would damage it twice
   const bool replaySpell = !riders.damagesHealth && !riders.commands &&
-    (holdSeconds > 0 ||
+    (spellHoldSeconds > 0 ||
      (ridersOn &&
       (riders.staggerAny || riders.slowAny || (riders.ai && !isPlayer))));
   // Such a spell's unconditional stagger and slow go to an NPC's host on their own
   const bool applyApart = ridersOn && riders.damagesHealth && !isPlayer &&
     (riders.stagger || riders.slow > 0.f);
-  if (!replaySpell && !applyApart) {
+  if (!replaySpell && !applyApart && explosionHoldSeconds == 0) {
     return;
   }
   if (holdSeconds > 0 && IsParalyzed(target)) {
@@ -3010,6 +3076,10 @@ void ActionListener::ApplySpellRiders(MpActor& aggressor, MpActor& target,
     return;
   }
 
+  if (explosionHoldSeconds > 0) {
+    StartHostEffect(HostEffect::Hold, executor, target, 0.f,
+                    explosionHoldSeconds);
+  }
   if (applyApart) {
     if (riders.stagger) {
       SnippetArgs args;
@@ -3020,13 +3090,17 @@ void ActionListener::ApplySpellRiders(MpActor& aggressor, MpActor& target,
         .Execute(&executor, SpSnippetMode::kNoReturnResult);
     }
     if (riders.slow > 0.f) {
-      SlowOnHost(executor, target, riders.slow, riders.slowSeconds);
+      StartHostEffect(HostEffect::Slow, executor, target, riders.slow,
+                      riders.slowSeconds);
     }
     spdlog::info("OnSpellHit - riders of spell {:x} of {:x} sent to {:x} for "
                  "{:x} (stagger {}, slow {} for {} s)",
                  spellId, aggressor.GetFormId(), executor.GetFormId(),
                  target.GetFormId(), riders.stagger, riders.slow,
                  riders.slowSeconds);
+    return;
+  }
+  if (!replaySpell) {
     return;
   }
 
@@ -3052,37 +3126,52 @@ void ActionListener::ApplySpellRiders(MpActor& aggressor, MpActor& target,
                target.GetFormId());
 }
 
-void ActionListener::SlowOnHost(MpActor& executor, MpActor& target,
-                                float magnitude, uint32_t seconds)
+void ActionListener::StartHostEffect(HostEffect effect, MpActor& executor,
+                                     MpActor& target, float magnitude,
+                                     uint32_t seconds)
 {
-  const uint32_t targetId = target.GetFormId();
+  const auto key = std::make_pair(target.GetFormId(), effect);
   const auto until =
     std::chrono::steady_clock::now() + std::chrono::seconds(seconds);
-  auto it = hostSlows.find(targetId);
-  if (it != hostSlows.end()) {
+  auto it = hostEffects.find(key);
+  if (it != hostEffects.end()) {
     it->second.until = std::max(it->second.until, until);
   } else {
-    hostSlows[targetId] = { executor.GetFormId(), magnitude, until };
-    ModSpeedMultOn(executor, targetId, -magnitude);
+    hostEffects[key] = { executor.GetFormId(), magnitude, until };
+    SendHostEffect(effect, executor, target.GetFormId(), magnitude, true);
   }
   partOne.worldState.SetTimer(std::chrono::seconds(seconds))
-    .Then([this, targetId](Viet::Void) { EndHostSlow(targetId); });
+    .Then([this, key](Viet::Void) { EndHostEffect(key.first, key.second); });
 }
 
-// The slow ends on the client that took it, which keeps its copy of the target slowed until then
-void ActionListener::EndHostSlow(uint32_t targetId)
+// The effect ends on the client that took it, which keeps its copy of the target changed until then
+void ActionListener::EndHostEffect(uint32_t targetId, HostEffect effect)
 {
-  auto it = hostSlows.find(targetId);
-  if (it == hostSlows.end() ||
+  auto it = hostEffects.find(std::make_pair(targetId, effect));
+  if (it == hostEffects.end() ||
       std::chrono::steady_clock::now() < it->second.until) {
     return;
   }
-  const HostSlow slow = it->second;
-  hostSlows.erase(it);
-  auto executorForm = partOne.worldState.LookupFormById(slow.executorId);
+  const TimedHostEffect ended = it->second;
+  hostEffects.erase(it);
+  auto executorForm = partOne.worldState.LookupFormById(ended.executorId);
   if (auto executor = executorForm ? executorForm->AsActor() : nullptr) {
-    ModSpeedMultOn(*executor, targetId, slow.magnitude);
+    SendHostEffect(effect, *executor, targetId, ended.magnitude, false);
   }
+}
+
+void ActionListener::SendHostEffect(HostEffect effect, MpActor& executor,
+                                    uint32_t targetId, float magnitude,
+                                    bool start)
+{
+  if (effect == HostEffect::Slow) {
+    ModSpeedMultOn(executor, targetId, start ? -magnitude : magnitude);
+    return;
+  }
+  SnippetArgs args;
+  args.push_back(start);
+  SpSnippet("Actor", "SetDontMove", args, targetId)
+    .Execute(&executor, SpSnippetMode::kNoReturnResult);
 }
 
 bool ActionListener::IsParalyzed(const MpActor& actor)

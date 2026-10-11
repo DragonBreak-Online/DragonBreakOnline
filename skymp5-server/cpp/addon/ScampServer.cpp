@@ -329,6 +329,7 @@ ScampServer::ScampServer(const Napi::CallbackInfo& info)
         { "riders", &target.riders },
         { "damageOverTime", &target.damageOverTime },
         { "absorb", &target.absorb },
+        { "explosionRiders", &target.explosionRiders },
       };
       for (const auto& [key, flag] : flags) {
         if (!spellSync.is_object() || !spellSync.contains(key)) {

@@ -302,6 +302,8 @@ public:
     bool damageOverTime = true;
     // Absorb Health restores the caster by what the target lost
     bool absorb = true;
+    // A rune explosion's paralysis holds an NPC (Ash Rune)
+    bool explosionRiders = true;
   } spellSync;
 
   bool disableVanillaScriptsInExterior = true;
