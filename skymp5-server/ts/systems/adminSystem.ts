@@ -1,6 +1,6 @@
 import { Settings } from "../settings";
 import { System, Log, SystemContext, Content } from "./system";
-import { AdminTier, AdminRoleConfig, TIER_CAPS, readAdminRoleConfig, adminTierOf } from "./adminRoles";
+import { AdminTier, AdminRoleConfig, TIER_CAPS, readAdminRoleConfig, adminTierOf, isTrialGm, TRIAL_GM_ACTIONS, TRIAL_GM_MODES, TRIAL_GM_TABS } from "./adminRoles";
 import { NpcSpawnSystem } from "./npcSpawnSystem";
 import { MasterySystem, MAX_GRANT } from "./masterySystem";
 import { kickWithReason } from "./kickUtil";
@@ -27,6 +27,8 @@ type Mp = any;
 // Admins resolve to a tier (senior | developer | gm) via adminRoles.ts from "adminRoles", the legacy "adminRoleIds" and "adminProfileIds".
 // Every tier gets the server console (consoleCommandsAllowed per assign; keep enableConsoleCommandsForAll OFF) and the tabbed admin panel (client AdminMenuService, Insert key).
 // Only tiers with TIER_CAPS.ban may ban; the refusal is enforced here, never in the client.
+// A Trial GM (adminRoles.trialgm, no admin tier) gets the menu without addresses or hardware ids, TP to a player, Rename
+// and the Invisible mode (TRIAL_GM_ACTIONS / TRIAL_GM_MODES); anything else is refused here and logged.
 // Bans post to the backend (master key + auth token), which snapshots discordId/hwid/ip into bans.json; connection-check then refuses the player permanently.
 //
 // Wire protocol (CustomPacket JSON):
@@ -142,10 +144,11 @@ export class AdminSystem implements System {
         const actorId = mp.getUserActor(userId);
         if (!actorId) return;
         const tier = this.tierOf(mp, actorId);
-        // The console can spawn anything: a GM (base tier) has none
+        // The console can spawn anything: a GM (base tier) has none, nor a Trial GM
         mp.set(actorId, "consoleCommandsAllowed", tier !== null && TIER_CAPS[tier].spawn);
         if (tier) this.log(`AdminSystem: console granted to actor ${actorId.toString(16)} (${tier})`);
-        this.resyncModes(mp, userId, actorId, tier !== null);
+        const trial = tier === null && isTrialGm(mp, actorId, this.roleCfg);
+        this.resyncModes(mp, userId, actorId, tier !== null || trial, trial);
         // Shouts live only in the client's game, so a character given all shouts is taught them again at every login
         let shouts = false;
         try { shouts = mp.get(actorId, "private.dboAllShouts") === true; } catch { }
@@ -157,7 +160,7 @@ export class AdminSystem implements System {
     });
 
     const { tierRoles, adminRoleIds, adminProfileIds } = this.roleCfg;
-    this.log(`AdminSystem: tier roles senior ${tierRoles.senior.length} / developer ${tierRoles.developer.length} / gm ${tierRoles.gm.length}, ${adminRoleIds.length} legacy admin role(s), ${adminProfileIds.length} admin profile(s), ${this.locations.length} teleport location(s)`);
+    this.log(`AdminSystem: tier roles senior ${tierRoles.senior.length} / developer ${tierRoles.developer.length} / gm ${tierRoles.gm.length} / trial gm ${this.roleCfg.trialRoles.length}, ${adminRoleIds.length} legacy admin role(s), ${adminProfileIds.length} admin profile(s), ${this.locations.length} teleport location(s)`);
   }
 
   // Validated like npcSpawnSystem zones; bad descs are dropped at boot
@@ -389,7 +392,19 @@ export class AdminSystem implements System {
     const mp = ctx.svr as Mp;
     let myActorId = 0;
     try { myActorId = mp.getUserActor(userId); } catch { }
-    if (!myActorId || !this.isAdminActor(mp, myActorId)) {
+    // A Trial GM passes for the menu and the actions in TRIAL_GM_ACTIONS / TRIAL_GM_MODES alone
+    const trial = !!myActorId && !this.isAdminActor(mp, myActorId) && isTrialGm(mp, myActorId, this.roleCfg);
+    if (trial && !this.trialMay(type, content)) {
+      let profile = 0;
+      try { profile = Number(mp.get(myActorId, "profileId")) || 0; } catch { }
+      if (type === "adminAction") {
+        const what = String(content["action"] ?? "");
+        this.adminLog(`profile ${profile} (trialgm) was refused ${what === "toggleMode" ? `the ${String(content["mode"] ?? "")} mode` : what} (not a Trial GM tool)`);
+        this.reply(mp, userId, false, "That is not one of a Trial GM's tools");
+      }
+      return;
+    }
+    if (!myActorId || (!trial && !this.isAdminActor(mp, myActorId))) {
       if (type === "adminMenuRequest" && myActorId) {
         if (this.menuRefusalLogged.has(userId)) return;
         this.menuRefusalLogged.add(userId);
@@ -400,8 +415,9 @@ export class AdminSystem implements System {
       this.log(`AdminSystem: refused '${type}' from actor ${myActorId.toString(16)} (not an admin). Their roles: ${JSON.stringify(roles)}. Configured: ${JSON.stringify({ ...this.roleCfg.tierRoles, legacy: this.roleCfg.adminRoleIds })}`);
       return;
     }
-    const tier = this.tierOf(mp, myActorId) as AdminTier;
-    const caps = TIER_CAPS[tier];
+    // A Trial GM goes on as a GM with no ban and no spawn; only what trialMay let through reaches the code below
+    const tier = (trial ? "gm" : this.tierOf(mp, myActorId)) as AdminTier;
+    const caps = trial ? { ban: false, spawn: false } : TIER_CAPS[tier];
 
     let adminProfile = 0;
     try { adminProfile = Number(mp.get(myActorId, "profileId")) || 0; } catch { }
@@ -411,6 +427,7 @@ export class AdminSystem implements System {
         try {
           // The fetch outlives the packet handler; the slot must still belong to the same admin
           if (mp.getUserActor(userId) !== myActorId) return;
+          if (trial) { this.sendTrialMenu(ctx, mp, userId, myActorId, adminProfile, backendPlayers); return; }
           mp.sendCustomPacket(userId, JSON.stringify({
             customPacketType: "adminMenu",
             players: this.buildRoster(ctx, myActorId, adminProfile, backendPlayers),
@@ -599,6 +616,34 @@ export class AdminSystem implements System {
       this.log(`AdminSystem: action '${action}' by profile ${adminProfile} failed: ${e}`);
       this.reply(mp, userId, false, "Action failed, see server log");
     }
+  }
+
+  // What a Trial GM may ask of the panel: the menu, a teleport to an online player, a rename, the Invisible mode
+  private trialMay(type: string, content: Content): boolean {
+    if (type === "adminMenuRequest") return true;
+    if (type !== "adminAction") return false;
+    const action = String(content["action"] ?? "");
+    if (action === "toggleMode") return TRIAL_GM_MODES.has(String(content["mode"] ?? ""));
+    return TRIAL_GM_ACTIONS.has(action);
+  }
+
+  // The menu for a Trial GM: who is playing, with no addresses, hardware ids, bans, zones, locations or mastery, and the
+  // tabs they may use (caps.tabs; the panel shows those alone)
+  private sendTrialMenu(ctx: SystemContext, mp: Mp, userId: number, myActorId: number, adminProfile: number, backendPlayers: any[]): void {
+    const players = this.buildRoster(ctx, myActorId, adminProfile, backendPlayers)
+      .map((r) => Object.assign({}, r, { ip: "", hwid: "", m: undefined, b: undefined }));
+    mp.sendCustomPacket(userId, JSON.stringify({
+      customPacketType: "adminMenu",
+      players,
+      locations: [],
+      modes: this.modesFor(adminProfile).filter((m) => TRIAL_GM_MODES.has(m.id)),
+      npcZones: [],
+      tier: "trialgm",
+      caps: { ban: false, spawn: false, trial: true, tabs: TRIAL_GM_TABS, actions: Array.from(TRIAL_GM_ACTIONS) },
+      mastery: null,
+      bans: [],
+      me: { a: myActorId.toString(16) },
+    }));
   }
 
   // The Skills tab's detail, with the five schools from server\schools.js (__dboMagicView) when it is loaded
@@ -906,10 +951,12 @@ export class AdminSystem implements System {
   }
 
   // Modes live in memory per profile but the mirror persists on the actor; re-push them on reconnect and clear a stale mirror
-  private resyncModes(mp: Mp, userId: number, actorId: number, isAdmin: boolean): void {
+  // A Trial GM keeps only the modes they may use (a GM moved down to Trial GM loses the rest at the next login)
+  private resyncModes(mp: Mp, userId: number, actorId: number, isAdmin: boolean, trial = false): void {
     const profileId = this.profileOf(mp, actorId);
     if (!isAdmin) this.modesByProfile.delete(profileId);
     const state = this.modesByProfile.get(profileId) ?? {};
+    if (trial) for (const m of Object.keys(state)) if (!TRIAL_GM_MODES.has(m)) delete state[m];
     let mirror: Record<string, unknown> | null = null;
     try { mirror = mp.get(actorId, "ff_adminModes") ?? null; } catch { }
     if (MIRRORED_MODES.some(m => !!mirror?.[m] !== !!state[m])) this.writeModeMirror(mp, actorId, state);

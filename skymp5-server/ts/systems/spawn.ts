@@ -8,6 +8,7 @@ import { filterAccessForSlot } from "../backendFactionApi";
 import { validateResult, CharCreatorConfig } from "./charCreatorData";
 import { scanModHair, ModHairCatalog } from "./hairCatalog";
 import { guidOf } from "./actorUtil";
+import { AdminRoleConfig, readAdminRoleConfig, isTrialGmFrom } from "./adminRoles";
 
 const NAME_INDEX_PROP = "private.indexed.charName";
 
@@ -133,6 +134,7 @@ export class Spawn implements System {
   private deferRaceMenu = false;
   private modHair: ModHairCatalog | null = null;
   private settingsObject!: Settings;
+  private roleCfg: AdminRoleConfig = readAdminRoleConfig(null);
   // userId -> auth context awaiting a character selection
   private pending = new Map<number, { profileId: number; roles: string[]; discordId?: string; access?: unknown }>();
   // userId -> last resolved auth context, kept for the whole connection so the menu can reopen after a mid-session quit to main menu
@@ -150,6 +152,7 @@ export class Spawn implements System {
     const all = this.settingsObject.allSettings as Record<string, unknown> | null;
     const rawMax = Number(all && all["characterSelectMaxCharacters"]);
     if (Number.isInteger(rawMax) && rawMax >= 1 && rawMax <= 10) this.maxCharacters = rawMax;
+    this.roleCfg = readAdminRoleConfig(all);
     const parsedItems = parseStartingItems(all?.["startingItems"]);
     if (parsedItems) this.startingItems = parsedItems;
     const rawGrace = Number(all?.["logoutGraceMs"]);
@@ -339,10 +342,25 @@ export class Spawn implements System {
     } catch { return ""; }
   }
 
-  // Base slots from characterSelectMaxCharacters plus the Patreon tier's extra slots (patron-tiers.json)
+  // Base slots from characterSelectMaxCharacters plus the Patreon tier's extra slots (patron-tiers.json), and a Trial GM's
+  // staff slot after them
   private slotsFor(userId: number): number {
     const auth = this.authCache.get(userId);
+    return Math.min(10, this.playerSlotsFor(userId) + (auth && this.staffSlotOf(auth) >= 0 ? 1 : 0));
+  }
+
+  private playerSlotsFor(userId: number): number {
+    const auth = this.authCache.get(userId);
     return Math.min(10, this.maxCharacters + (auth ? extraSlotsFor(auth.roles) : 0));
+  }
+
+  // A Trial GM (adminRoles.trialgm, Nate 11 Oct) has one slot more than their roles give, for staff work alone: the slot
+  // after the player slots, -1 for anyone else. A character created there is marked private.dboStaffChar. GMs and above
+  // keep their slots from patron-tiers.json as before. Losing the role hides the slot like a lapsed tier's.
+  private staffSlotOf(auth: { profileId: number; roles: string[] }): number {
+    if (!isTrialGmFrom(auth.profileId, auth.roles || [], this.roleCfg)) return -1;
+    const n = Math.min(10, this.maxCharacters + extraSlotsFor(auth.roles));
+    return n < 10 ? n : -1;
   }
 
   // Characters past a lapsed tier's slots are not deleted, only left off the list until the slots return
@@ -435,6 +453,7 @@ export class Spawn implements System {
       const tag = mp.get(actorId, "private.charTag");
       if (typeof tag === "string" && tag.length === 4) parts.push(`#${tag}`);
     } catch { /* untagged */ }
+    try { if (mp.get(actorId, "private.dboStaffChar") === true) parts.push("GM character"); } catch { /* not marked */ }
     return parts.join(" · ");
   }
 
@@ -494,6 +513,10 @@ export class Spawn implements System {
       actorId = ctx.svr.createActor(0, startPoints[idx].pos, startPoints[idx].angleZ,
         +startPoints[idx].worldOrCell, auth.profileId);
       mp.set(actorId, "private.charSlot", slot);
+      if (slot === this.staffSlotOf(auth)) {
+        mp.set(actorId, "private.dboStaffChar", true);
+        this.log("Character", actorId.toString(16), "in slot", slot, "is a Trial GM's staff character");
+      }
       this.giveStartingItems(mp, actorId, auth.profileId, slot);
       mp.set(actorId, "private.kitPending", true);
       mp.set(actorId, "private.creationPending", true);
