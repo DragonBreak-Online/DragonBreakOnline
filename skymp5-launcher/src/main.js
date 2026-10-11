@@ -34,6 +34,7 @@ const bugLogs = require('./bugLogs')
 const debloat = require('./debloat')
 const selfRepair = require('./selfRepair')
 const downloadLib = require('./download')
+const selfUpdate = require('./selfUpdate')
 const nxmLinks = require('./nxm')
 const legalLib = require('./legal')
 const installProgress = require('./renderer/installProgress')
@@ -332,6 +333,9 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  // The start after a self-update says whether the new version is the one running
+  const updated = selfUpdate.startupResult(store, app.getVersion(), compareVersions)
+  if (updated) log(updated)
   ensureSkyrimPath()
   createWindow()
   // No install waits yet: links left with us by a crash, or by a launcher up to 2.1.29, go back
@@ -2030,15 +2034,18 @@ async function sendReportAttachment(reportId, save, session) {
 
 ipcMain.handle('report:send', (_e, args) => submitReport(args))
 
-// Launcher update check
+// Launcher update check (the window asks every 10 s; install.log hears the first answer and each change)
+const logUpdateCheck = selfUpdate.createCheckLogger(log)
 ipcMain.handle('app:checkUpdate', async () => {
   const current = app.getVersion()
   try {
     const data = await fetchJSON(`${config.apiUrl}/api/version`)
     const latest    = data.version
     const hasUpdate = compareVersions(latest, current) > 0
+    logUpdateCheck({ current, latest, hasUpdate })
     return { current, latest, hasUpdate, downloadUrl: data.downloadUrl || '' }
-  } catch {
+  } catch (err) {
+    logUpdateCheck(null, err)
     return { current, latest: null, hasUpdate: false, downloadUrl: '' }
   }
 })
@@ -2069,34 +2076,68 @@ function assertSecureDownloadUrl(url) {
 // The download server answers 503 when it is full; the bar says why it waits
 const queuedNote = (seconds) => send('install:progress', { phase: 'download', file: `Waiting in the download queue... (${seconds} s)`, index: 0, total: 0, skipped: false })
 
+// download.js's resume, queue, redirect and retry lines. A redirect line repeats for every per-file download from the
+// same host, so each host is named once per run; the rest are rare and always logged.
+const loggedRedirectHosts = new Set()
+function downloadLog(line) {
+  const m = / served by (\S+)$/.exec(line)
+  if (m) {
+    if (loggedRedirectHosts.has(m[1])) return
+    loggedRedirectHosts.add(m[1])
+    return log(`[download] ${line} (later downloads from that host are not logged)`)
+  }
+  log(`[download] ${line}`)
+}
+
 function downloadToFile(url, dest, onProgress) {
-  return downloadLib.download(url, dest, { validate: assertSecureDownloadUrl, onProgress, onQueued: queuedNote, timeoutMs: 120_000 })
+  return downloadLib.download(url, dest, { validate: assertSecureDownloadUrl, onProgress, onQueued: queuedNote, onLog: downloadLog, timeoutMs: 120_000 })
 }
 
 // In-app launcher update: download the new installer, run it silently, and let
 // it relaunch us (--force-run). Replaces the "open the download page" flow.
 ipcMain.handle('app:installUpdate', async () => {
+  const current = app.getVersion()
+  if (installGate.running()) log(`[self-update] ${current}: not started, an install is running`)
   if (installGate.running()) return { ok: false, error: installGate.refusal() }
+  const started = Date.now()
+  let latest = '?'
   try {
     const data = await fetchJSON(`${config.apiUrl}/api/version`)
-    if (!data.downloadUrl) return { ok: false, error: 'No download URL is configured on the server.' }
+    latest = data.version || '?'
+    if (!data.downloadUrl) { log(`[self-update] ${current} -> ${latest}: not started, the server has no download url`); return { ok: false, error: 'No download URL is configured on the server.' } }
     // The installer is executed with the user's privileges, so refuse to fetch
     // it over anything but HTTPS (no plain-http, no redirect downgrade).
     if (!/^https:/i.test(data.downloadUrl)) {
+      log(`[self-update] ${current} -> ${latest}: refused, the download url is not https`)
       return { ok: false, error: 'Refusing to install an update from a non-HTTPS URL.' }
     }
 
     const dest = path.join(os.tmpdir(), 'DragonBreakLauncher-update.exe')
+    log(`[self-update] ${current} -> ${latest}: downloading the installer from ${selfUpdate.describeSource(data.downloadUrl)}`)
     send('update:progress', { phase: 'download', received: 0, total: 0 })
     await downloadToFile(data.downloadUrl, dest, (received, total) =>
       send('update:progress', { phase: 'download', received, total }))
+    let size = 0
+    try { size = fs.statSync(dest).size } catch { /* reported as 0 */ }
+    let sha = '?'
+    try { sha = (await mo2.sha256FileAsync(dest)).toLowerCase() } catch { /* the line still says it arrived */ }
+    log(`[self-update] ${current} -> ${latest}: installer downloaded, ${size} bytes, sha256 ${sha}, in ${Math.round((Date.now() - started) / 1000)} s`)
 
     send('update:progress', { phase: 'install' })
+    // The installer replaces us and starts the new launcher; that start logs the result
+    selfUpdate.markPending(store, current, latest)
     // /S silent + --force-run: NSIS replaces our files and relaunches the app.
-    spawn(dest, ['/S', '--force-run'], { detached: true, stdio: 'ignore' }).unref()
+    const child = spawn(dest, ['/S', '--force-run'], { detached: true, stdio: 'ignore' })
+    child.on('error', err => {
+      log(`[self-update] ${current} -> ${latest}: the installer did not start (${selfUpdate.errorText(err)})`)
+      selfUpdate.clearPending(store)
+    })
+    child.unref()
+    log(`[self-update] ${current} -> ${latest}: applying, the installer runs silently and the launcher quits`)
     setTimeout(() => app.quit(), 1200)   // release our files so the installer can overwrite
     return { ok: true }
   } catch (err) {
+    log(`[self-update] ${current} -> ${latest}: failed (${selfUpdate.errorText(err)})`)
     return { ok: false, error: err.message }
   }
 })
@@ -3358,7 +3399,7 @@ async function perFileClientUpdate(skyrimPath, version, files, directRun) {
     const tmpFile = `${full}.dbo-new`
     try {
       await downloadLib.download(url, tmpFile, {
-        headers: { 'X-DBO-Accept-Redirect': '1' }, validate: assertSecureDownloadUrl, onQueued: queuedNote,
+        headers: { 'X-DBO-Accept-Redirect': '1' }, validate: assertSecureDownloadUrl, onQueued: queuedNote, onLog: downloadLog,
         onProgress: (r, tot) => send('install:progress', { phase: 'download', file: `Downloading ${path.basename(f.path)} (${done + 1}/${changed.length})… ${(r / 1048576).toFixed(1)} MB`, index: r, total: tot, skipped: false }),
       })
       if ((await mo2.sha256FileAsync(tmpFile)).toLowerCase() !== String(f.sha256).toLowerCase()) throw new Error(`${f.path}: checksum mismatch`)
@@ -3388,7 +3429,7 @@ function clearStaleZipParts(keepZip) {
 // The backend sends the zip to R2 only when asked (X-DBO-Accept-Redirect), so an old launcher keeps the disk copy
 async function downloadClientZip(tempPath, onProgress) {
   try {
-    await downloadLib.download(`${config.apiUrl}/api/files/zip`, tempPath, { headers: { 'X-DBO-Accept-Redirect': '1' }, validate: assertSecureDownloadUrl, onProgress, onQueued: queuedNote })
+    await downloadLib.download(`${config.apiUrl}/api/files/zip`, tempPath, { headers: { 'X-DBO-Accept-Redirect': '1' }, validate: assertSecureDownloadUrl, onProgress, onQueued: queuedNote, onLog: downloadLog })
   } catch (err) {
     if (err.statusCode === 404) throw new Error('Update package not found on server. Run npm run merge on the backend.')
     throw err
