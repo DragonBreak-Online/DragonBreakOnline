@@ -87,8 +87,10 @@ export interface AdminPanelData {
   debug?: DebugData | null;
   npcZones?: PanelNpcZone[]; // absent on older clients
   npcZonesAt?: number; // Date.now() when npcZones arrived, the countdown base
-  caps?: { ban?: boolean; spawn?: boolean }; // server-resolved tier capabilities, absent on older servers
-  tier?: string; // "senior" | "developer" | "leadgm" | "gm", absent on older servers
+  // server-resolved tier capabilities, absent on older servers. A Trial GM's carry trial, tabs (the tabs they may open)
+  // and actions (the Players tab actions they may use); the server refuses everything else either way
+  caps?: { ban?: boolean; spawn?: boolean; trial?: boolean; tabs?: string[]; actions?: string[] };
+  tier?: string; // "senior" | "developer" | "leadgm" | "gm" | "trialgm", absent on older servers
   mastery?: PanelMastery | null; // the admin's own standing, absent on older servers
   bans?: PanelBan[]; // admin-bans.json entries (temp and ip bans)
   itemsVersion?: number; // bumped when window.__dboAdminItems arrives
@@ -268,17 +270,18 @@ const AdminPanel = ({ data }: { data: AdminPanelData }) => {
     return () => clearInterval(timer);
   }, [tab]);
 
-  // A demoted or not yet confirmed admin never stays on a hidden tab
+  // A demoted or not yet confirmed admin, or a Trial GM, never stays on a hidden tab
+  const allowedTabs = data.caps && Array.isArray(data.caps.tabs) ? data.caps.tabs : null;
   useEffect(() => {
-    if (!data.admin && tab !== 'debug') setTab('debug');
-  }, [data.admin, tab]);
+    if (tab !== 'debug' && (!data.admin || (allowedTabs && allowedTabs.indexOf(tab) === -1))) setTab('debug');
+  }, [data.admin, allowedTabs, tab]);
 
   const ev = data.events || {};
   const players = data.players || [];
   const modes = data.modes || [];
   const npcZones = data.npcZones || [];
   const debug = data.debug || null;
-  const shownTabs = data.admin ? TABS : TABS.filter((t) => t.id === 'debug');
+  const shownTabs = data.admin ? TABS.filter((t) => !allowedTabs || t.id === 'debug' || allowedTabs.indexOf(t.id) !== -1) : TABS.filter((t) => t.id === 'debug');
   // Seconds since the client gathered the debug block, added to each effect's elapsed time
   const debugDrift = debug ? Math.max(0, Math.round((now - (debug.updatedAt || now)) / 1000)) : 0;
 
@@ -300,6 +303,10 @@ const AdminPanel = ({ data }: { data: AdminPanelData }) => {
   const actionsEnabled = !!(selectedPlayer && selectedPlayer.online && selectedPlayer.a);
   // Hidden rather than greyed so a tier without ban never sees a dead button; the server enforces it anyway
   const canBan = !data.caps || data.caps.ban !== false;
+  // A Trial GM's actions (caps.actions: TP to and Rename); everyone else sees every button
+  const allowedActions = data.caps && Array.isArray(data.caps.actions) ? data.caps.actions : null;
+  const canDo = (action: string): boolean => !allowedActions || allowedActions.indexOf(action) !== -1;
+  const trial = !!(data.caps && data.caps.trial);
   // Lead GM and above (TIER_CAPS.spawn): the grants a GM is refused, hidden the same way
   const canSpawn = !data.caps || data.caps.spawn !== false;
 
@@ -404,7 +411,7 @@ const AdminPanel = ({ data }: { data: AdminPanelData }) => {
           <div className="admin-panel__strip">
             <span className="admin-panel__strip-text">Acting on: <b>{acting ? acting.label : 'You'}</b></span>
             <TargetPicker targets={targets} value={actingOn} onChange={setActingOn} label="Change" />
-            {!canSpawn ? <span className="admin-panel__hint">GM: you observe; changes are for a Lead GM and above</span> : null}
+            {!canSpawn ? <span className="admin-panel__hint">{trial ? 'Trial GM: TP to, Rename and the Invisible mode' : 'GM: you observe; changes are for a Lead GM and above'}</span> : null}
           </div>
         ) : null}
 
@@ -448,12 +455,12 @@ const AdminPanel = ({ data }: { data: AdminPanelData }) => {
         {tab === 'players' ? (
           <div className="admin-panel__body">
             <div className="admin-panel__actions">
-              <Button text="TP to" width={104} height={32} disabled={!actionsEnabled} onClick={() => act(ev.tp)} />
-              <Button text="Summon" width={104} height={32} disabled={!actionsEnabled} onClick={() => act(ev.summon)} />
-              <Button text="Kick" width={104} height={32} disabled={!actionsEnabled} onClick={() => act(ev.kick)} />
+              {canDo('teleportTo') ? <Button text="TP to" width={104} height={32} disabled={!actionsEnabled} onClick={() => act(ev.tp)} /> : null}
+              {canDo('summon') ? <Button text="Summon" width={104} height={32} disabled={!actionsEnabled} onClick={() => act(ev.summon)} /> : null}
+              {canDo('kick') ? <Button text="Kick" width={104} height={32} disabled={!actionsEnabled} onClick={() => act(ev.kick)} /> : null}
               {canBan ? <Button text="Ban" width={104} height={32} disabled={!actionsEnabled} onClick={() => act(ev.ban)} /> : null}
             </div>
-            {ev.action ? (
+            {ev.action && canDo('rename') ? (
               <div className="admin-panel__actions">
                 <input
                   className="admin-panel__input"
@@ -468,7 +475,7 @@ const AdminPanel = ({ data }: { data: AdminPanelData }) => {
                 <Button text="Rename" width={104} height={32} disabled={!actionsEnabled || !renameName} onClick={rename} />
               </div>
             ) : null}
-            {ev.action ? (
+            {ev.action && !trial ? (
               <PlayerPunish
                 events={ev}
                 target={actionsEnabled && selectedPlayer && selectedPlayer.a ? selectedPlayer.a : null}
@@ -478,10 +485,10 @@ const AdminPanel = ({ data }: { data: AdminPanelData }) => {
                 bans={data.bans || []}
               />
             ) : null}
-            {ev.request ? (
+            {ev.request && !trial ? (
               <PlayerCare events={ev} who={actingOn} selfId={selfId} name={acting ? acting.label : ''} masteryTarget={data.masteryTarget || null} canSpawn={canSpawn} />
             ) : null}
-            {selectedPlayer ? (
+            {selectedPlayer && !trial ? (
               <DeityReset actor={selectedPlayer.online && selectedPlayer.a ? selectedPlayer.a : null} name={selectedPlayer.n || ''} profile={selectedPlayer.p} canSpawn={canSpawn} />
             ) : null}
             {canSpawn && ev.masteryGrant && data.mastery ? (
