@@ -93,6 +93,9 @@ public:
   // Drops what is kept per actor for a form that is being destroyed
   void ForgetForm(uint32_t formId);
 
+  // A new host of target takes the timed slows and holds still running on it
+  void ResendHostEffects(uint32_t targetId, MpActor& newHost);
+
   // A caster that left or was destroyed: its scroll reads and last-read times go
   void ForgetScrollReads(uint32_t casterId);
 
@@ -150,8 +153,17 @@ private:
     Slow,
     Hold,
   };
+  struct TimedHostEffect
+  {
+    // Every client sent the start (hosts in turn), each sent the end
+    std::vector<uint32_t> executorIds;
+    float magnitude = 0.f;
+    std::chrono::steady_clock::time_point until{};
+  };
   void StartHostEffect(HostEffect effect, MpActor& executor, MpActor& target,
                        float magnitude, uint32_t seconds);
+  void SendHostEffectTo(HostEffect effect, TimedHostEffect& timed,
+                        MpActor& executor, uint32_t targetId);
   void EndHostEffect(uint32_t targetId, HostEffect effect);
   void SendHostEffect(HostEffect effect, MpActor& executor, uint32_t targetId,
                       float magnitude, bool start);
@@ -273,13 +285,7 @@ private:
                                   std::chrono::steady_clock::time_point now);
   std::unordered_map<uint32_t, std::chrono::steady_clock::time_point>
     paralyzedUntil;
-  // Timed host effects by (target, effect), taken back on the same client when they end
-  struct TimedHostEffect
-  {
-    uint32_t executorId = 0;
-    float magnitude = 0.f;
-    std::chrono::steady_clock::time_point until{};
-  };
+  // Timed host effects by (target, effect), taken back on the clients that took them when they end
   std::map<std::pair<uint32_t, HostEffect>, TimedHostEffect> hostEffects;
   using SteadyTime = std::chrono::steady_clock::time_point;
   // Each caster's recent casts (spell, when), newest last

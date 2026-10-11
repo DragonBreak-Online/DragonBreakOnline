@@ -138,13 +138,25 @@ TEST_CASE("A damaging spell's slow and stagger reach the NPC's host without "
   auto iceSpike = scene.Hit(kIceSpike, SpellSyncScene::kNpc);
   REQUIRE(!Has(iceSpike, "DoCombatSpellApply"));
   REQUIRE(!Has(iceSpike, "SendAnimationEvent"));
-  REQUIRE(std::count(iceSpike.begin(), iceSpike.end(), "ModActorValue") == 3);
+  REQUIRE(std::count(iceSpike.begin(), iceSpike.end(), "DamageActorValue") ==
+          1);
+  REQUIRE(std::count(iceSpike.begin(), iceSpike.end(), "ModActorValue") == 2);
   REQUIRE(scene.Actor(SpellSyncScene::kNpc)
             .GetChangeForm()
             .actorValues.healthPercentage < 1.f);
 
   // A second hit this soon sends nothing
-  REQUIRE(!Has(scene.Hit(kIceSpike, SpellSyncScene::kNpc), "ModActorValue"));
+  REQUIRE(!Has(scene.Hit(kIceSpike, SpellSyncScene::kNpc), "DamageActorValue"));
+
+  // A new host takes the running slow
+  p.Messages().clear();
+  p.AssignHoster(SpellSyncScene::kNpc, SpellSyncScene::kCaster);
+  p.Tick();
+  REQUIRE(std::any_of(
+    p.Messages().begin(), p.Messages().end(), [](PartOne::Message& m) {
+      return m.userId == 0 && m.j["t"] == MsgType::SpSnippet &&
+        m.j["function"] == "DamageActorValue";
+    }));
 
   auto arrow = scene.Hit(kSpectralArrow, SpellSyncScene::kNpc);
   REQUIRE(Has(arrow, "SendAnimationEvent"));
