@@ -12,7 +12,7 @@
           "Goods can go to a settlement's drop point around Bruma (Aleswell, Greenwood, Mountain Watch and Applewatch), where they wait in the recipient's mailbox, or to the recipient in person: the courier finds them and offers the parcel, and they take it into their pack or have it left in their mailbox.",
           "Anyone can take a courier job at the board where it was posted. You carry one Sealed Courier's Parcel, which cannot be dropped, stored or traded until it is delivered. Deliver it within three days of game time to be paid; if time runs out, the parcel goes back and the goods return to the sender.",
           "Bandits beware, and couriers too: robbing a courier may take their parcel. The robber gets a Broken Courier's Parcel to open at a notice board, and the courier is not paid.",
-          "Senders can insure a parcel for up to the goods' value, for 10% of that value. If it is robbed, the hold's treasury pays the sender, as far as the treasury allows. Insurance does not pay out when the robber is the sender, the courier, or one of their party or faction, and a sender can claim at most twice a week."
+          "Senders can insure a parcel for up to the goods' value, for 10% of that value. If it is robbed, the hold's treasury pays the sender, as far as the treasury allows. Insurance does not pay out when the robber is the sender, the courier or the recipient, or shares a party or faction with the sender or the courier, and a sender can claim at most twice a week."
         ]
       }
     ]
