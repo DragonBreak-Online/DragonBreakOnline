@@ -113,6 +113,7 @@ export class AdminSystem implements System {
   private bans!: AdminBans;
   private lastBanSweep = 0;
   private itemCatalog: Array<{ id: string; label: string; items: Array<[string, string]> }> | null = null;
+  private itemCatalogMtime = 0;
   private markerLocations: Array<TeleportLocation & { region: string; worldName: string }> | null = null;
 
   async initAsync(ctx: SystemContext): Promise<void> {
@@ -765,14 +766,19 @@ export class AdminSystem implements System {
   // Item categories for the spawn tab: admin-items.json (every playable item of every plugin) when present,
   // otherwise loot.json pools plus the spell tomes and scrolls from readables.json
   private items(): Array<{ id: string; label: string; items: Array<[string, string]> }> {
-    if (this.itemCatalog) return this.itemCatalog;
+    // Re-read when admin-items.json changes (Nate, 10 Oct: new items in the panel always, without waiting for a restart)
+    let mtime = 0;
+    try { mtime = fs.statSync(path.resolve("admin-items.json")).mtimeMs; } catch { mtime = 0; }
+    if (this.itemCatalog && mtime === this.itemCatalogMtime) return this.itemCatalog;
     try {
       const full = JSON.parse(fs.readFileSync(path.resolve("admin-items.json"), "utf8"));
       if (Array.isArray(full.categories) && full.categories.length) {
         this.itemCatalog = full.categories;
+        this.itemCatalogMtime = mtime;
         return full.categories;
       }
-    } catch { /* not generated: fall back to the loot pools */ }
+    } catch { /* not generated or mid-write: keep the last good catalogue, else fall back to the loot pools */ }
+    if (this.itemCatalog) return this.itemCatalog;
     const LABELS: Record<string, string> = {
       weapons: "Weapons", ench_weapons: "Enchanted Weapons", armor: "Armor", ench_armor: "Enchanted Armor", arrows: "Arrows",
       potions: "Potions", food: "Food", ingredients: "Ingredients", materials: "Materials", gems: "Gems", soulgems: "Soul Gems", lockpicks: "Misc",
