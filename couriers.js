@@ -390,6 +390,8 @@ module.exports = (api) => {
     if (!(j.insured > 0)) return 'not insured';
     if (sameAccount(robber, j.sender, j.senderAccount, j.senderProfile)) return 'the robber shares an account with the sender';
     if (sameAccount(robber, j.courier, j.courierAccount, j.courierProfile)) return 'the robber shares an account with the courier';
+    // Not in the design's list, but the same fraud: the goods reach the recipient by the road and the sender is paid as well
+    if (sameAccount(robber, j.recipient, discord(j.recipient), profileOf(j.recipient))) return 'the robber is the recipient';
     if (sameParty(robber, j.courier) || sameParty(robber, j.sender)) return 'the robber is in a party with the courier or the sender';
     if (sameFaction(robber, j.courier) || sameFaction(robber, j.sender)) return 'the robber shares a faction with the courier or the sender';
     const week = (data().payouts[accountKey(j)] || []).filter((t) => Date.now() - t < 7 * DAY);
@@ -447,6 +449,8 @@ module.exports = (api) => {
           backToSender(j, late ? 'expired' : 'returned', late ? `was not delivered in time by ${j.courierName}` : 'lost its courier');
           if (late && online(j.courier)) personal(j.courier, `Your time to deliver the parcel for ${destText(j)} has run out. It is taken back, unpaid.`);
         } else if (j.state === 'robbed' && now - (j.robbedAt || 0) >= C.brokenDays * DAY) {
+          // The broken copy the robber kept goes too, when it can be found (else it is only a worthless sack)
+          try { if (j.holder && !gone(j.holder)) takeOne(j.holder, BROKEN, BROKEN_NAME); } catch (e) { /* offline: it stays */ }
           if (j.payout > 0) { commit(j, { state: 'lost', items: [], closedAt: now }); audit(`COURIER #${j.id}: the robbed parcel was never opened; the insurance paid, the goods are lost`); }
           else backToSender(j, 'recovered', 'was found unopened on the roadside');
         } else if (j.copyOwed && j.courier && online(j.courier)) {

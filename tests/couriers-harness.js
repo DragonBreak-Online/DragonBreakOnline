@@ -332,6 +332,10 @@ rid = insuredJob(90);
 robWith(MATE, K, 0.1);
 check('no payout when the robber is in the courier\'s party', job(rid).state === 'robbed' && !job(rid).payout);
 reset(); treasury.bruma = 1000;
+rid = insuredJob(90);
+robWith(R, K, 0.1);
+check('no payout when the robber is the recipient', job(rid).state === 'robbed' && !job(rid).payout);
+reset(); treasury.bruma = 1000;
 guilds = { [T]: ['g1'], [K]: ['g1'] };
 rid = insuredJob(90);
 robWith(T, K, 0.1);
@@ -360,6 +364,7 @@ ui('courierPost', S, 'drop:aleswell', R, 50, 0, JSON.stringify([[INGOT, 3]]));
 rid = lastId(); ui('courierTake', K, rid); robWith(T, K, 0.1);
 clock += 7 * 24 * HOUR + 1; timers.get('courierSweep')();
 check('an uninsured robbed parcel never opened comes back to the sender', job(rid).state === 'recovered' && lettersFor(S).some((l) => l.parcel && l.parcel.items.some((t) => t.baseId === INGOT)));
+check('...and the robber\'s broken copy is taken away', named(T, 'Broken Courier\'s Parcel') === 0, inv(T));
 check('...and opening it after that is refused', ui('courierOpen', T, rid).kind === 'refused');
 
 // ---- robbery.js lists and takes the parcel ----
