@@ -827,18 +827,22 @@ module.exports = (api) => {
   // Before the first spell a sitting pays Arcane Arts through the Wheel's award, so a Wheel with no room for it pays +0
   // (Masked Person #QYPM, 9 Oct 23:11-23:32Z: three sittings, 12 minutes and more, nothing). gamemode.js wheelRoom reads the
   // limits the award meets (the Scholar check of aa387026). null = room, or { why, line }
-  const arcaneNoRoom = (a, now = Date.now()) => {
+  // The same check for any held skill a sitting pays through the Wheel: Arcane Arts here, Priest at Priest Studies (whose
+  // refusal only knew its study window until 11 Oct, so a Priest at a Wheel limit sat for nothing). `name` is the skill as
+  // the player reads it
+  const wheelNoRoom = (a, skill, name, now = Date.now()) => {
     let f = null;
-    try { f = typeof globalThis.__dboWheelRoom === 'function' ? globalThis.__dboWheelRoom(a, C.arcaneSkill, now) : null; } catch (e) { log('schools: wheel room failed', e.message); }
+    try { f = typeof globalThis.__dboWheelRoom === 'function' ? globalThis.__dboWheelRoom(a, skill, now) : null; } catch (e) { log('schools: wheel room failed', e.message); }
     if (!f || !f.why) return null;
-    const line = f.why === 'lower' ? 'Arcane Arts is marked to fall on your Wheel (K), so study cannot raise it. Set it to rise or hold first.'
+    const line = f.why === 'lower' ? `${name} is marked to fall on your Wheel (K), so study cannot raise it. Set it to rise or hold first.`
       : f.why === 'bucket' ? `You have studied all you can take in for now. Rest your mind: you can study again in about ${f.minutes || 1} minutes.`
-      : f.why === 'daily' ? 'You have learned all you can of Arcane Arts today. Study pays again after midnight (UTC).'
+      : f.why === 'daily' ? `You have learned all you can of ${name} today. Study pays again after midnight (UTC).`
       : f.why === 'character' ? 'You have trained as much as one day allows. Come back to the books after midnight (UTC).'
-      : f.why === 'peak' ? 'Your Arcane Arts is at its peak; the books have nothing more to teach you.'
-      : `Your Arcane Arts can rise no further than ${f.cap} while your other skills hold the higher places on the Wheel.`;
+      : f.why === 'peak' ? `Your ${name} is at its peak; the books have nothing more to teach you.`
+      : `Your ${name} can rise no further than ${f.cap} while your other skills hold the higher places on the Wheel.`;
     return { why: f.why, line };
   };
+  const arcaneNoRoom = (a, now = Date.now()) => wheelNoRoom(a, C.arcaneSkill, 'Arcane Arts', now);
   // Why `a` cannot study now, or ''
   const studyRefusal = (a, s) => {
     if (!C.enabled || !C.study.enabled) return 'Study is closed.';
@@ -1214,6 +1218,7 @@ module.exports = (api) => {
   };
   // A Restoration spell studied through Priest: the race's own Healing is no study
   const firstPriestSpell = (a) => bookOf(a).find((sp) => sp && sp.school === PS.school && sp.book === PS.skill) || null;
+  const priestNoRoom = (a, now = Date.now()) => (priestOf(a).held ? wheelNoRoom(a, PS.skill, 'Priest', now) : null);
   const priestRefusal = (a, s) => {
     if (!C.enabled || !PS.enabled) return 'Study is closed.';
     // As for the schools: a Restoration tome read before Priest firstSpellAt leaves the shelves open until then (Nate, 5 Oct)
@@ -1221,6 +1226,10 @@ module.exports = (api) => {
     if (first && priestOf(a).level >= PICK_AT) return `You have learned ${first.name}; the shelves have nothing more to teach you. Priest grows now by casting and in prayer.`;
     const b = studyBudget(s, PS, 'priestStudy');
     if (b.leftMs <= 0) return `You've done enough studying for the day. Come back in ${inWords(b.resetsIn || windowMs(PS))}.`;
+    // Priest Studies pays only through the Wheel's cast credit: with no room on the Wheel a sitting pays nothing. Priest not
+    // taken up yet is banked, so it has room
+    const full = priestNoRoom(a);
+    if (full) return full.line;
     return '';
   };
   const openPriest = (a, ref, result, resultKind, focus = true) => {
@@ -1256,7 +1265,7 @@ module.exports = (api) => {
     audit(`SCHOOLS ${who(a)} began Priest Studies at ${descOf(ref)}`);
     openPriest(a, ref, `You open the books on ${PS.school}.`, 'ok');
   };
-  const stopPriest = (a, why) => {
+  const stopPriest = (a, why, line) => {
     const ses = S.priestStudying.get(a >>> 0);
     if (!ses) return;
     S.priestStudying.delete(a >>> 0);
@@ -1266,7 +1275,8 @@ module.exports = (api) => {
     save(a, s);
     // Study time in tick units as before, then what Priest was paid (a credit from this very tick is not drained yet)
     audit(`SCHOOLS ${who(a)} stopped Priest Studies (${why}): ${Math.round(ses.gained * 10) / 10} units, Priest +${priestPaid(a, ses)} units`);
-    if (why !== 'offline' && why !== 'closed') personal(a, why === 'budget' ? `You've done enough studying for the day. Come back in ${inWords(studyBudget(s, PS, 'priestStudy').resetsIn || windowMs(PS))}.` : 'You close the books.');
+    if (line) personal(a, line);
+    else if (why !== 'offline' && why !== 'closed') personal(a, why === 'budget' ? `You've done enough studying for the day. Come back in ${inWords(studyBudget(s, PS, 'priestStudy').resetsIn || windowMs(PS))}.` : 'You close the books.');
   };
   const priestTick = () => {
     const now = Date.now();
@@ -1288,6 +1298,16 @@ module.exports = (api) => {
       ses.lastTick += paid * tickMs;
       if (paid > 0 && PS.wheelEverySeconds > 0 && now - ses.lastWheel >= PS.wheelEverySeconds * 1000) {
         ses.lastWheel = now;
+        // No room on the Wheel: the sitting ends, saying when it pays again. An empty hourly bucket ends it only once the
+        // last credit paid nothing, since it refills a little each minute (Study Magic's rule)
+        const full = priestNoRoom(a, now);
+        const units = priestOf(a).units;
+        if (full && (full.why !== 'bucket' || (Number.isFinite(ses.wheelMark) && units <= ses.wheelMark))) {
+          stopPriest(a, 'wheel', full.line);
+          if (priestAt.get(a) === ses.ref) openPriest(a, ses.ref, full.line, 'refused', false);
+          continue;
+        }
+        ses.wheelMark = units;
         wheel(a, idOf(PRIEST_SPELL), PS.wheelValue, 1);
       }
       if (paid < ticks) { stopPriest(a, 'budget'); closeWidget(a, PRIEST_PANEL_ID); continue; }
