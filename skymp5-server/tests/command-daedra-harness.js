@@ -33,7 +33,8 @@ const STUBS = {
     exports.npcLevel = (mp, id) => mp.get(id, 'level');
     exports.keywordConditionsPass = (mp, mgef, id) => mp.get(id, 'daedra') === true;
     exports.turnsToAsh = () => false;
-    exports.pickSummon = () => null;`,
+    exports.pickSummon = () => null;
+    exports.explosionPlacedNpc = () => 0;`,
 };
 
 (async () => {

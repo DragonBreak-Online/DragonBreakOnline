@@ -24,7 +24,8 @@ const STUBS = {
     exports.npcLevel = (mp, id) => mp.get(id, 'level') || 1;
     exports.keywordConditionsPass = () => true;
     exports.turnsToAsh = () => true;
-    exports.pickSummon = () => null;`,
+    exports.pickSummon = () => null;
+    exports.explosionPlacedNpc = () => 0;`,
   './actorUtil': `
     exports.isPlayerActor = (mp, id) => Number(mp.get(id, 'profileId')) >= 0;
     exports.isNear = () => true;
