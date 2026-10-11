@@ -131,7 +131,9 @@ module.exports = (api) => {
     const worn = wornCounts(victim);
     const held = new Map();
     for (const e of entries) { const id = Number(e.baseId) >>> 0; held.set(id, (held.get(id) || 0) + (Number(e.count) || 0)); }
-    const spare = (id) => { if (!worn) return 0; const w = worn.get(id) || 0; if (w > 0 && typeOf(id) === 'AMMO') return 0; return Math.max(0, (held.get(id) || 0) - w); };
+    // A sealed courier's parcel is never one of the things (couriers.js takes it, at its own chance, after the take)
+    const sealed = (id) => { try { return typeof globalThis.__dboCourierSealed === 'function' ? Number(globalThis.__dboCourierSealed(victim, id)) || 0 : 0; } catch (e) { return 0; } };
+    const spare = (id) => { if (!worn) return 0; const w = worn.get(id) || 0; if (w > 0 && typeOf(id) === 'AMMO') return 0; return Math.max(0, (held.get(id) || 0) - w - sealed(id)); };
     const items = [];
     const pockets = shuffle(entries.filter((e) => { const id = Number(e.baseId) >>> 0; return id && id !== GOLD && !e.worn && !e.wornLeft && (Number(e.count) || 0) > 0 && spare(id) >= 1 && STEALABLE.has(typeOf(id)); }));
     const taken = new Set();
@@ -160,16 +162,19 @@ module.exports = (api) => {
     const rname = nameFor ? nameFor(victim, robber) : 'Someone';
     const vname = nameFor ? nameFor(robber, victim) : 'them';
     if (r.error) { log(`robbery: ${who(robber)} -> ${who(victim)} failed: ${r.error}`); personal(robber, 'The robbery goes wrong; nothing changes hands.'); return r; }
+    // A courier's parcel, at couriers.js robChance: it changes hands broken, and loses its protection
+    try { if (typeof globalThis.__dboCourierRobbed === 'function') r.parcel = globalThis.__dboCourierRobbed(robber, victim) || null; } catch (e) { log('robbery: the courier parcel check failed', e.message); }
     const parts = [];
     if (r.gold) parts.push(`${r.gold} gold`);
     parts.push(...r.items);
     if (r.key) parts.push(r.key);
+    if (r.parcel) parts.push(r.parcel);
     const what = parts.length > 1 ? `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}` : parts[0];
     personal(robber, what ? `You take ${what} from ${vname}.` : `${vname} had nothing on them to take.`);
     personal(victim, what ? `${rname} takes ${what} from you.` : `${rname} finds nothing on you to take.`);
     S.robberAt.set(robber >>> 0, Date.now()); S.victimAt.set(victim >>> 0, Date.now()); S.contests.delete(victim >>> 0);
     try { if (globalThis.__dboStatsAdd) { globalThis.__dboStatsAdd(victim, 'timesRobbed'); globalThis.__dboStatsAdd(robber, 'peopleRobbed'); } } catch (e) { /* journal stats only */ }
-    audit(`ROBBERY ${who(robber)} robbed ${who(victim)}: ${r.gold} gold of ${r.carried}; items [${r.items.join(', ')}]${r.key ? `; key ${r.key}` : ''}`);
+    audit(`ROBBERY ${who(robber)} robbed ${who(victim)}: ${r.gold} gold of ${r.carried}; items [${r.items.join(', ')}]${r.key ? `; key ${r.key}` : ''}${r.parcel ? '; a courier parcel' : ''}`);
     return r;
   };
 
@@ -207,7 +212,9 @@ module.exports = (api) => {
     audit(`ROBBERY ${who(p.robber)} -> ${who(p.victim)}: ${why === 'timeout' ? 'no answer (resists)' : why === 'nopanel' ? 'no panel on their UI (resists)' : 'fight or flee'}`);
   };
 
-  globalThis.__dboRobEntries = (a, t) => (refusal(a >>> 0, t >>> 0, true) === '' ? [{ id: 'rob', label: 'Rob' }] : []);
+  // A courier's sealed parcel shows on the entry (couriers.js): a robbery may take it, at its own chance
+  const parcelsOn = (t) => { try { return typeof globalThis.__dboCourierSealed === 'function' && typeof globalThis.__dboCourierParcelBase === 'function' ? Number(globalThis.__dboCourierSealed(t, globalThis.__dboCourierParcelBase())) || 0 : 0; } catch (e) { return 0; } };
+  globalThis.__dboRobEntries = (a, t) => (refusal(a >>> 0, t >>> 0, true) === '' ? [{ id: 'rob', label: parcelsOn(t >>> 0) ? 'Rob (carries a courier\'s parcel)' : 'Rob' }] : []);
   globalThis.__dboRobAction = (a, id, t, nameFor) => {
     if (id !== 'rob') return false;
     a >>>= 0; t >>>= 0;
@@ -220,7 +227,7 @@ module.exports = (api) => {
       robberName: nameFor ? nameFor(t, a) : 'Someone', victimName: nameFor ? nameFor(a, t) : 'They' };
     if (!hasPanel(t)) { finish(p, 'fight', 'nopanel'); return true; }
     S.pending.set(t, p);
-    openWidget(t, { type: 'robPrompt', id: WIDGET_ID, nonce, robber: p.robberName, seconds: C.answerSeconds, goldShare: C.goldShare }, true);
+    openWidget(t, { type: 'robPrompt', id: WIDGET_ID, nonce, robber: p.robberName, seconds: C.answerSeconds, goldShare: C.goldShare, parcels: parcelsOn(t) }, true);
     personal(a, `You demand ${p.victimName === 'They' ? 'their' : `${p.victimName}'s`} coin. They have ${C.answerSeconds} seconds to answer.`);
     audit(`ROBBERY ${who(a)} demands from ${who(t)}`);
     return true;

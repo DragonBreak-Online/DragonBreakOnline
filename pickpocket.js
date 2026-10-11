@@ -137,7 +137,9 @@ module.exports = (api) => {
       if (!worn) return 0;
       const w = worn.get(id) || 0;
       if (w > 0 && typeOf(id) === 'AMMO') return 0;
-      return Math.max(0, (held.get(id) || 0) - w);
+      // A sealed courier's parcel stays in the courier's pack (couriers.js); only a robbery can take one
+      let sealed = 0; try { sealed = typeof globalThis.__dboCourierSealed === 'function' ? Number(globalThis.__dboCourierSealed(t, id)) || 0 : 0; } catch (e) { sealed = 0; }
+      return Math.max(0, (held.get(id) || 0) - w - sealed);
     };
     const pockets = entries.filter((e) => {
       const id = Number(e.baseId) >>> 0;
