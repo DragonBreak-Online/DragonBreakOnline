@@ -189,6 +189,9 @@ module.exports = (api) => {
   globalThis.__dboSmithBookNeeds = (familyId) => { const f = BY_FAMILY.get(familyId); return f ? { tier: f.tier, scholar: Number(C.scholarForBook[f.tier]) || 0 } : null; };
   globalThis.__dboSmithScholarTier = scholarTier;
   globalThis.__dboSmithCraftTier = craftTier;
+  // manuals.js: a technique this smith knows by birth (Bonemold and Chitin for a Dunmer, Orcish for an Orc), so its book
+  // is not read and used up for nothing (live 11 Oct: a Dunmer spent a Bonemold schematic)
+  globalThis.__dboSmithRaceKnows = (actorId, familyId) => { const f = BY_FAMILY.get(familyId); return !!f && raceKnows(actorId >>> 0, f); };
 
   // ---- carry-over (Nate, 10 Oct): smiths from before the techniques keep what their tier allows --------------------------
   // Nobody's crafts were recorded before smithing went on, so a character with the Blacksmith skill learns, once, every

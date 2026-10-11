@@ -123,7 +123,9 @@ module.exports = (api) => {
     } catch (e) { return null; }
   };
   const recordOf = (a) => { const r = get(a, REC, null); return r && typeof r === 'object' ? r : {}; };
-  const knows = (a, m) => !!recordOf(a)[m.key];
+  // Learned, or known by birth (smithing.js raceFree: a Dunmer's Bonemold and Chitin, an Orc's Orcish), so the book is kept
+  const raceKnows = (a, m) => { try { return SMITH && typeof globalThis.__dboSmithRaceKnows === 'function' && globalThis.__dboSmithRaceKnows(a, m.key) === true; } catch (e) { return false; } };
+  const knows = (a, m) => !!recordOf(a)[m.key] || raceKnows(a, m);
 
   // Takes one of a stack the player is not wearing
   const takeOne = (a, baseId) => {

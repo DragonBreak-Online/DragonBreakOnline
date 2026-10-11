@@ -278,6 +278,7 @@ ok(!globalThis.__dboManualsShop(A).some((x) => /Brass|Adamantium/.test(x.label))
   ok(craft(B, STEEL, R_STEEL) === true, 'live: Steel needs no technique at tier 2', lastTold(B));
   const v2 = globalThis.__dboSmithView(B), f2 = (id) => v2.families.find((f) => f.id === id);
   ok(['steel', 'imperial', 'guard', 'brass', 'goblin'].every((id) => f2(id).known) && !f2('ancient_nord').known && !f2('ancient_imperial').known, 'live: every T2 family is known by default but Ancient Nord and Ancient Imperial', ['steel', 'imperial', 'guard', 'goblin', 'ancient_nord'].map((id) => [id, f2(id).known]));
+  const NORD_READER = () => { const n = 0x14b1f; smith(n, 35, { scholar: 1 }); props.set(`${n}|private.dboManuals`, {}); props.set(`${n}|profileId`, 19); put(n, 'appearance', { raceId: NORD_RACE }); put(n, 'inventory', { entries: [] }); return n; };
   // Bonemold and Chitin are the Dunmer's own crafts (Nate, 11 Oct): every Dark Elf smith knows them, vampire or not
   rec(0x13742, 'RACE', 'DarkElfRace'); rec(0x8883a, 'RACE', 'DarkElfRaceVampire');
   const DUN = 0x14b0c; smith(DUN, 20); props.set(`${DUN}|private.dboManuals`, {}); props.set(`${DUN}|profileId`, 10); put(DUN, 'appearance', { raceId: 0x13742 });
@@ -287,6 +288,13 @@ ok(!globalThis.__dboManualsShop(A).some((x) => /Brass|Adamantium/.test(x.label))
   put(DUN, 'appearance', { raceId: 0x8883a });
   ok(globalThis.__dboSmithView(DUN).families.find((f) => f.id === 'chitin').known, 'live: a Dunmer vampire keeps it');
   ok(vd.tier === 2 && fd('bonemold').tier === 3 && fd('bonemold').canMake === 0, 'live: the craft tier still gates it (T3 work at tier 2)', [vd.tier, fd('bonemold').canMake]);
+  // ...and a Dunmer reading the Bonemold schematic keeps the book (live 11 Oct: Mike Morethi, a Dunmer, "learned Bonemold
+  // from a book" and the book was used up, though he knew it by birth)
+  smith(DUN, 35, { scholar: 1 }); put(DUN, 'appearance', { raceId: 0x8883a }); told.length = 0;
+  const dr = globalThis.__dboManualsRead(DUN, BOOKS.bonemold);
+  ok(dr !== false && !(props.get(`${DUN}|private.dboManuals`) || {}).bonemold && /already know how to work Bonemold/.test(lastTold(DUN)), 'live: a Dunmer (vampire too) reading Bonemold is told he knows it; nothing learned, the book stays', [dr, props.get(`${DUN}|private.dboManuals`), lastTold(DUN)]);
+  { const n = NORD_READER(); globalThis.__dboManualsRead(n, BOOKS.bonemold); ok(!!(props.get(`${n}|private.dboManuals`) || {}).bonemold, 'live: a Nord at the same tiers still learns it from the book', props.get(`${n}|private.dboManuals`)); }
+  smith(DUN, 20); put(DUN, 'appearance', { raceId: 0x13742 });
   // Orcish is every Orc smith's own (Nate, 11 Oct: "give orcs orcish by default too"); others still apprentice under an Orc
   const ORCN = 0x14b0e; smith(ORCN, 35); props.set(`${ORCN}|private.dboManuals`, {}); props.set(`${ORCN}|profileId`, 12); put(ORCN, 'appearance', { raceId: ORC_RACE });
   const fo = (who, id) => globalThis.__dboSmithView(who).families.find((f) => f.id === id);
