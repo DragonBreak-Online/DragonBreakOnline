@@ -31,7 +31,8 @@
 //   Browser -> server (the coop window's nonce first):
 //     dbo:courierPost [nonce, destKey, recipientId, pay, insured, itemsJson]   destKey 'board:<id>' | 'drop:<id>' | 'person'
 //     dbo:courierTake | courierDeliver | courierOpen | courierCancel [nonce, jobId]
-//     dbo:courierDropIn [nonce, jobId]          dbo:courierAnswer [nonce, 'take' | 'mailbox']   (widget 81)
+//     dbo:courierDropIn [nonce, jobId]  dbo:courierDismiss [nonce]  dbo:courierAnswer [nonce, 'take' | 'mailbox']   (widget 81,
+//     front features/courierHandover; shown only to a UI that says 'courierHandover' in dbo:uiCaps, else chat)
 // State in couriers.json: { next, jobs: [job], payouts: { <account>: [at] } }.
 'use strict';
 const fs = require('fs');
@@ -54,7 +55,7 @@ module.exports = (api) => {
     // Without the clock: fallbackHoursPerGameDay real hours a game day
     limitGameDays: 3, fallbackHoursPerGameDay: 4,
     robChance: 0.5,
-    handoverDistance: 300, handoverSeconds: 30, dropRadius: 500, dropAskSeconds: 60,
+    handoverDistance: 300, handoverSeconds: 30, dropRadius: 500, dropAskSeconds: 60, dropSnoozeSeconds: 600,
     // Board places: zones with a treasury, plus named board groups { id, name, zone, boards: [ref desc] }
     places: [], boardZones: null, lockZones: ['bruma'],
     dropPoints: [],
@@ -534,12 +535,22 @@ module.exports = (api) => {
     const d = left.length ? drops.find((x) => left.some((j) => j.dest === x.id) && distance(posOf(a), x.world, x.pos) <= x.radius) : null;
     if (d) askDrop(a, left.filter((j) => j.dest === d.id), d); else { S.nonces.delete(a >>> 0); closeWidget(a, WIDGET_ID); }
   });
+  // Not now at a drop point (or Escape): the panel closes and is not asked again for dropSnoozeSeconds there
+  const snoozeDrops = (a) => {
+    const until = Date.now() + Math.max(0, Number(C.dropSnoozeSeconds) || 600) * 1000 - C.dropAskSeconds * 1000;
+    for (const d of drops) if (distance(posOf(a), d.world, d.pos) <= d.radius) S.dropAsked.set(`${a >>> 0}:${d.id}`, until);
+  };
+  onUi('courierDismiss', (a, args) => {
+    if (String((args || [])[0]) !== S.nonces.get(a >>> 0)) return;
+    S.nonces.delete(a >>> 0); snoozeDrops(a); closeWidget(a, WIDGET_ID);
+  });
   onUi('uiCaps', (a, args) => { S.caps.set(a >>> 0, new Set((args || []).map(String))); });
+  // Escape: in person it is an answer (the mailbox); at a drop point it is Not now
   onUi('close', (a, args, widgetId) => {
     if (widgetId !== WIDGET_ID) return;
     const h = S.hand.get(a >>> 0);
     if (h) finishHand(h, 'mailbox');
-    S.nonces.delete(a >>> 0);
+    else if (S.nonces.has(a >>> 0)) { S.nonces.delete(a >>> 0); snoozeDrops(a); closeWidget(a, WIDGET_ID); }
   });
 
   // ---- protections (itemguards.js, gamemode.js trade veto, robbery.js, pickpocket.js) -------------------------------
