@@ -278,8 +278,9 @@ const lowerFloorOf = (cfg: PointConfig) => (id: string): number => waningFloorOf
  */
 export const applyGain = (rec: PointRecord, id: string, rawUnits: number, cfg: PointConfig, now: number, boost = 1, rate = 1): GainOutcome => {
   const s = rec.skills[id] || (rec.skills[id] = { level: 0, xp: 0, lock: "raise" });
-  // A Waning skill does not rise (SKILLS_DESIGN.md 3.6): refused before the bucket and the day's caps, so nothing is charged
-  if (s.lock === "lower") return { gained: 0, units: 0, tookFrom: [], refused: "lock" };
+  // A Waning skill does not rise (SKILLS_DESIGN.md 3.6), nor a Held one (Nate, 11 Oct: Hold is "don't rise or lose"):
+  // refused before the bucket and the day's caps, so nothing is charged
+  if (s.lock === "lower" || s.lock === "hold") return { gained: 0, units: 0, tookFrom: [], refused: "lock" };
   const today = dayKey(now);
   if (s.day !== today) { s.day = today; s.spentToday = 0; }
   if (rec.day !== today) { rec.day = today; rec.spentToday = 0; }

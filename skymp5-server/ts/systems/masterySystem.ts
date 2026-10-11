@@ -190,6 +190,7 @@ interface ResolvedRules {
 }
 
 const POINT_REFUSE_NOTICE_MS = 600000;
+const HELD_NOTICE_MS = 3600000;
 
 // "mine", "chop" and "read" are activations that finished a mini-game rather than a bare touch: they
 // are matched exactly like "activate" (same reach, same prefix and type rules) but weighed higher,
@@ -688,6 +689,7 @@ export class MasterySystem implements System {
     // Phase 0 measures units, not levels: a level is far too rare to tune weights against.
     if (out.units > 0) this.creditStats.credits.set(id, (this.creditStats.credits.get(id) || 0) + out.units);
     if (out.refused === "pool") this.noticeRefused(ctx, userId, actorId);
+    if (out.refused === "lock" && prog.lock === "hold") this.noticeHeld(ctx, userId, actorId, id);
     if (out.gained > 0) {
       this.notice(ctx, userId, `Your ${this.labelOf(id)} rises to ${prog.level}.`);
       this.syncRank(ctx, actorId, rec, id, userId);
@@ -731,6 +733,15 @@ export class MasterySystem implements System {
     if (now - last < POINT_REFUSE_NOTICE_MS) return;
     this.lastRefuseMs.set(actorId, now);
     this.notice(ctx, userId, "Your hands are full. Mark a skill to fall (K) before this one can rise further.");
+  }
+
+  // Work on a Held skill earns nothing (it neither rises nor falls): said once an hour per skill, so nobody trains it unaware
+  private noticeHeld(ctx: SystemContext, userId: number, actorId: number, id: string): void {
+    const key = `${actorId}:${id}`;
+    const now = Date.now();
+    if (now - (this.lastHeldMs.get(key) || 0) < HELD_NOTICE_MS) return;
+    this.lastHeldMs.set(key, now);
+    this.notice(ctx, userId, `Your ${this.labelOf(id)} is set to Hold: it neither rises nor falls. Set it to Raise in your skills (K) to train it.`);
   }
 
   private creditActivity(ctx: SystemContext, ev: ActivityEvent): void {
@@ -1760,6 +1771,7 @@ export class MasterySystem implements System {
   private points: P.PointConfig | null = null;      // set only when skills.json turns the point system on
   private candidates = new Map<string, string[]>();  // event kind -> the skills that could possibly match it
   private lastRefuseMs = new Map<number, number>();
+  private lastHeldMs = new Map<string, number>();
   private skills: SkillDef[] = [];
   private shapeCache = new Map<number, { parts: number; tier: number; tierSkill: string }>();
   private categories: Array<{ id: string; label: string }> = [];
