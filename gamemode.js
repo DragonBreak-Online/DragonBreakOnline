@@ -4735,6 +4735,7 @@ const hitDamageHook = (aggressorId, targetId, sourceId, damage, ...rest) => {
   try { if (globalThis.__dboSuperHit && dealt > 0) globalThis.__dboSuperHit(agg, tgt); } catch (e) { log('supernatural hit failed', e.message); }
   try { if (globalThis.__dboAggroHit && dealt > 0) globalThis.__dboAggroHit(agg, tgt); } catch (e) { log('aggro hit failed', e.message); }
   try { if (globalThis.__dboCompanionHitLanded) globalThis.__dboCompanionHitLanded(agg, tgt); } catch (e) { log('companion hit log failed', e.message); }
+  try { if (globalThis.__dboNpcMoodHit) globalThis.__dboNpcMoodHit(agg, tgt, Number(sourceId) >>> 0); } catch (e) { log('npc mood hit failed', e.message); }
   const prev = globalThis.__dboPrevHitDamage;
   if (prev) { try { return prev(aggressorId, targetId, sourceId, dealt, ...rest); } catch (e) { log('hit damage chain failed', e.message); } }
   return undefined;
@@ -6407,6 +6408,13 @@ try {
   delete require.cache[NPCDIRECTOR_JS];
   require(NPCDIRECTOR_JS)({ mp, log, every, onUi, onlineActors, display, profileOf, cfg });
 } catch (e) { log('npcdirector.js failed to load:', e.stack || e.message); globalThis.__dboNpcDirectorRefuses = null; }
+
+// ---- Harmony and Mayhem: an NPC hit is calmed or frenzied by its host's game (server\npcmood.js, config "npcMood") --------
+try {
+  const NPCMOOD_JS = path.resolve('npcmood.js');
+  delete require.cache[NPCMOOD_JS];
+  require(NPCMOOD_JS)({ mp, log, every, profileOf, userOf, sendPacket, cfg });
+} catch (e) { log('npcmood.js failed to load:', e.stack || e.message); globalThis.__dboNpcMoodHit = null; }
 
 // ---- GM warbands and raids: catalog NPCs that follow the GM (server\warband.js; companionSystem.ts __dboCompanions) ------
 try {
