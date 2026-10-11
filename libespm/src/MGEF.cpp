@@ -12,7 +12,8 @@ MGEF::Data MGEF::GetData(
   RecordHeaderAccess::IterateFields(
     this,
     [&](const char* type, uint32_t size, const char* data) {
-      if (!std::memcmp(type, "DATA", 4)) {
+      // Short subrecords are skipped rather than read past their end
+      if (!std::memcmp(type, "DATA", 4) && size >= 0x50) {
         result.data.flags = *reinterpret_cast<const Flags*>(data);
         result.data.associatedItem =
           *reinterpret_cast<const uint32_t*>(data + 0x08);
