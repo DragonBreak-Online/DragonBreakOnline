@@ -44,14 +44,15 @@ struct SpellSyncScene
   }
 
   // Casts spellId at target from full health and returns the snippets user 1 was sent, by function name
-  std::vector<std::string> Hit(uint32_t spellId, uint32_t target)
+  std::vector<std::string> Hit(uint32_t spellId, uint32_t target,
+                               float casterHealth = 1.f)
   {
     p.worldState.hosters[kNpc] = kHost;
     Equipment equipment;
     equipment.leftSpell = spellId;
     Actor(kCaster).SetEquipment(equipment);
     Actor(target).SetPercentages({ 1.f, 1.f, 1.f });
-    Actor(kCaster).SetPercentages({ 1.f, 1.f, 1.f });
+    Actor(kCaster).SetPercentages({ casterHealth, 1.f, 1.f });
 
     RawMessageData rawMsgData;
     rawMsgData.userId = 0;
@@ -127,4 +128,32 @@ TEST_CASE("A damaging spell's slow and stagger reach the NPC's host without "
 
   // Players get these through the clone replay
   REQUIRE(scene.Hit(kSpectralArrow, SpellSyncScene::kHost).empty());
+}
+
+TEST_CASE("Absorb Health restores the caster by what the target lost",
+          "[SpellSync][espm]")
+{
+  PartOne& p = GetPartOne();
+  // CrVampireDrain01: crVampireAbsorbHealthConcAimed 5
+  constexpr uint32_t kVampireDrain = 0x000f5b58;
+  SpellSyncScene scene(p);
+  auto health = [&](uint32_t formId) {
+    return scene.Actor(formId).GetChangeForm().actorValues.healthPercentage;
+  };
+
+  scene.Hit(kVampireDrain, SpellSyncScene::kNpc, 0.5f);
+  const float lost = 1.f - health(SpellSyncScene::kNpc);
+  REQUIRE(lost > 0.f);
+  // Both actors share a base, so the same share of health moves across
+  REQUIRE_THAT(health(SpellSyncScene::kCaster),
+               Catch::Matchers::WithinAbs(0.5f + lost, 0.0001f));
+
+  // A full caster stays full
+  scene.Hit(kVampireDrain, SpellSyncScene::kNpc, 1.f);
+  REQUIRE(health(SpellSyncScene::kCaster) == 1.f);
+
+  p.worldState.spellSync.absorb = false;
+  scene.Hit(kVampireDrain, SpellSyncScene::kNpc, 0.5f);
+  REQUIRE(health(SpellSyncScene::kCaster) == 0.5f);
+  p.worldState.spellSync.absorb = true;
 }

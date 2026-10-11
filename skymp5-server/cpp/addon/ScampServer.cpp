@@ -328,6 +328,7 @@ ScampServer::ScampServer(const Napi::CallbackInfo& info)
       const std::pair<const char*, bool*> flags[] = {
         { "riders", &target.riders },
         { "damageOverTime", &target.damageOverTime },
+        { "absorb", &target.absorb },
       };
       for (const auto& [key, flag] : flags) {
         if (!spellSync.is_object() || !spellSync.contains(key)) {
