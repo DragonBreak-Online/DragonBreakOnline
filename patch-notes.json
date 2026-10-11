@@ -1,5 +1,19 @@
 [
   {
+    "title": "Force Rune pushes",
+    "date": "2026-10-11",
+    "version": "Server update",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Magic",
+        "items": [
+          "Force Rune now throws back the player it catches, as it should, instead of only making them stagger. Creatures and NPCs it catches are thrown back too once every player has the next client update."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Overpowered gear can no longer be forged or looted",
     "date": "2026-10-11",
     "version": "Server update",
