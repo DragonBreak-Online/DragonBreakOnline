@@ -29,6 +29,8 @@ ENCH::SpellData ENCH::GetSpellData(
                  size >= sizeof(SPEL::EFIT)) {
         result.effects.back().effectItem =
           reinterpret_cast<const SPEL::EFIT*>(data);
+      } else if (!std::memcmp(type, "CTDA", 4) && !result.effects.empty()) {
+        result.effects.back().hasConditions = true;
       }
     },
     compressedFieldsCache);

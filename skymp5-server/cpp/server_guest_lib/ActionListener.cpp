@@ -165,8 +165,9 @@ void ForEachEffectData(WorldState* worldState,
     if (!mgef) {
       continue;
     }
-    callback(effect.effectItem, mgef->GetData(worldState->GetEspmCache()).data,
-             mgefLookup);
+    auto data = mgef->GetData(worldState->GetEspmCache()).data;
+    data.hasConditions = data.hasConditions || effect.hasConditions;
+    callback(effect.effectItem, data, mgefLookup);
   }
 }
 
