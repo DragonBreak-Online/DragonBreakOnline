@@ -105,7 +105,7 @@
   "teachAtStudyPoint": false,
   "offerSeconds": 60,
   "shopCells": ["20ff:BSHeartland.esm", "6c152:BSHeartland.esm"],
-  "shopFactions": ["synod", "college-of-winterhold", "college-of-whispers", "imperial-cult"],
+  "shopFactions": ["synod", "college-of-winterhold", "college-of-whispers", "great-faiths"],
   "shopMinTier": 1,
   "shopMaxRank": 3,
   "shopPriceMultiplier": 1,
@@ -1077,7 +1077,8 @@
        "synod",
        "vigil-of-stendarr",
        "dawnguard",
-       "imperial-cult"
+       "imperial-cult",
+       "great-faiths"
       ]
      },
      "secret": {
@@ -1134,7 +1135,8 @@
      {
       "a": [
        "vigil-of-stendarr",
-       "imperial-cult"
+       "imperial-cult",
+       "great-faiths"
       ],
       "b": [
        "cult-azura",

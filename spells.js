@@ -57,11 +57,14 @@ module.exports = (api) => {
     // How long a class's spell stays offered to its students after the class (schools.js classes.offerSpell)
     classOfferSeconds: 180,
     shopCells: ['20ff:BSHeartland.esm', '6c152:BSHeartland.esm'],
-    shopFactions: ['synod', 'college-of-winterhold', 'college-of-whispers', 'imperial-cult'],
-    // A temple sells and teaches like a college, only its own schools and only to its own faith (Nate, 11 Oct: "Priests in
-    // the temples ... the same/similar abilities as the Colleges"). A place not listed is the Synod's: the colleges, every school.
+    shopFactions: ['synod', 'college-of-winterhold', 'college-of-whispers', 'great-faiths'],
+    // A faith's temple or a college's own hall sells like the Synod's ledger (Nate, 11 Oct: "Priests in the temples ... the
+    // same/similar abilities as the Colleges"; the College of Whispers at its own Frostcrag Spire). schools: what it stocks
+    // and teaches (none: every school); exclusive: its factions buy only there, not at the Synod. A cell not listed in a
+    // place is the Synod's: every shop faction no exclusive place holds, every school.
     shopPlaces: [
-      { name: 'The Imperial Cult', cells: ['12cb:BSHeartland.esm', '5f78c:BSHeartland.esm', '5f78d:BSHeartland.esm'], factions: ['imperial-cult'], schools: ['Restoration', 'Alteration'] },  // the Cathedral of St Martin, Bruma
+      { name: 'The Great Faiths', cells: ['12cb:BSHeartland.esm', '5f78c:BSHeartland.esm', '5f78d:BSHeartland.esm'], factions: ['great-faiths'], schools: ['Restoration', 'Alteration'], exclusive: true },  // the Cathedral of St Martin, Bruma
+      { name: 'The College of Whispers', cells: ['781ad:BSHeartland.esm', '6ff7d:BSHeartland.esm'], factions: ['college-of-whispers'] },  // Frostcrag Spire
     ],
     shopMinTier: 1,
     shopMaxRank: 3,
@@ -656,8 +659,8 @@ module.exports = (api) => {
   const regions = () => { const R = globalThis.__dboRegions; return R && R.tomesOn() ? R : null; };
   const soldHere = (R, t) => !R || R.tomeOk(t.bookId, CFG.shopProvince);
   const soldIn = (R, t) => { const w = R ? R.tomeWhere(t.bookId) : null; return w && w.length ? R.listNames(w) : ''; };
-  const PLACES = (CFG.shopPlaces || []).map((p) => ({ name: String(p.name || ''), cells: new Set((p.cells || []).map(norm)), factions: (p.factions || []).map(String), schools: Array.isArray(p.schools) && p.schools.length ? p.schools.map(String) : null }));
-  const PLACE_FACTIONS = new Set([].concat(...PLACES.map((p) => p.factions)));
+  const PLACES = (CFG.shopPlaces || []).map((p) => ({ name: String(p.name || ''), cells: new Set((p.cells || []).map(norm)), factions: (p.factions || []).map(String), schools: Array.isArray(p.schools) && p.schools.length ? p.schools.map(String) : null, exclusive: p.exclusive === true }));
+  const PLACE_FACTIONS = new Set([].concat(...PLACES.filter((p) => p.exclusive).map((p) => p.factions)));
   // The shop the buyer stands in: a listed place (a temple), else the Synod's for every faction no place claims
   const placeOf = (a) => {
     const cell = norm(get(a, 'worldOrCellDesc', ''));
@@ -666,7 +669,7 @@ module.exports = (api) => {
     return SHOP_CELLS.has(cell) ? { name: '', factions: (CFG.shopFactions || []).filter((f) => !PLACE_FACTIONS.has(f)), schools: null } : null;
   };
   // A school a faction teaches: a temple's own schools, every school for a college
-  const factionSchools = (fid) => { const p = PLACES.find((x) => x.factions.includes(String(fid))); return p ? p.schools : null; };
+  const factionSchools = (fid) => { const p = PLACES.find((x) => x.schools && x.factions.includes(String(fid))); return p ? p.schools : null; };
   const inShop = (a) => !!placeOf(a);
   const isMember = (a) => { const g = get(a, 'private.dboGuilds', []); const p = placeOf(a); const fs = p ? p.factions : (CFG.shopFactions || []); return Array.isArray(g) && g.some((m) => m && fs.includes(String(m.id))); };
   const placeStocks = (a, t) => { const p = placeOf(a); return !p || !p.schools || p.schools.includes(t.school); };
