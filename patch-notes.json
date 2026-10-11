@@ -1,5 +1,21 @@
 [
   {
+    "title": "Client update 0.3.93",
+    "date": "2026-10-11",
+    "version": "Client 0.3.93",
+    "tag": "Update",
+    "sections": [
+      {
+        "heading": "Client",
+        "items": [
+          "The emote wheel (B) opens and closes smoothly: it no longer bogs the screen down on large monitors, B now closes it, and a wheel left without a cursor closes by itself.",
+          "Sitting on a chair or bench while carrying house keys no longer causes hitches.",
+          "The key settings in the journal (F3) now say that Mouse 4 and Mouse 5 are set in the launcher's settings."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Client update 0.3.92",
     "date": "2026-10-11",
     "version": "Client 0.3.92",
