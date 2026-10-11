@@ -2029,6 +2029,16 @@ void ActionListener::OnHit(const RawMessageData& rawMsgData,
     return;
   }
 
+  // An NPC switches weapons in its host's game, which never reports it: any weapon it carries may hit
+  const bool isNpc = partOne.serverState.UserByActor(aggressor) ==
+    Networking::InvalidUserId;
+  if (isNpc && sourceInEspm.rec &&
+      sourceInEspm.rec->GetType() == espm::WEAP::kType &&
+      aggressor->GetInventory().HasItem(hitData.source)) {
+    OnWeaponHit(aggressor, targetRef, hitData, false);
+    return;
+  }
+
   if (aggressor->GetInventory().HasItem(hitData.source) == false) {
     spdlog::debug("{:x} actor has no {:x} weapon and can't attack",
                   hitData.aggressor, hitData.source);
