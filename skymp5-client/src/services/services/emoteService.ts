@@ -11,6 +11,7 @@ import { CustomPacketMessage } from "../messages/customPacketMessage";
 import { BrowserMessageEvent, ButtonEvent, DxScanCode, InputDeviceType } from "skyrimPlatform";
 import { logTrace } from "../../logging";
 import { MIN_IDLE_SECONDS, MAX_IDLE_SECONDS, idleRequest, stopsIdle } from "./idleControl";
+import { wheelWatch, wheelKeyAction } from "./emoteWheelWatch";
 
 // for the browser-side widget setter (executed inside the CEF browser)
 declare const window: any;
@@ -169,7 +170,9 @@ export class EmoteService extends ClientListener {
     this.controller.emitter.on("customPacketMessage", (e) => this.onCustomPacketMessage(e));
     // A front reload drops the widget without an emote:close message.
     this.controller.emitter.on("browserWindowLoaded", () => { this.menuOpen = false; });
-    this.controller.emitter.on("uiHiddenChanged", (e) => { if (e.hidden && this.menuOpen) this.closeMenu(); });
+    this.controller.emitter.on("uiHiddenChanged", (e) => { if (e.hidden && this.menuOpen) this.closeMenu("interface hidden"); });
+    // A wheel still drawn after the browser lost the cursor is taken down (emoteWheelWatch.ts)
+    this.controller.on("update", () => this.watchWheel());
 
     this.menuKey = readMenuKeyCode(this.sp, "emoteWheelKeyCode", DxScanCode.B);
 
@@ -208,14 +211,19 @@ export class EmoteService extends ClientListener {
     const code = buttonKeyCode(e);
     if (code === null) return;
     if (code === DxScanCode.Escape && e.isDown && this.menuOpen) {
-      this.closeMenu();
+      this.closeMenu("escape");
       return;
     }
     // Movement is real gameplay even with the interface hidden
     if (e.isDown && this.activeEmote && CANCEL_KEYS.includes(code) && !isGameInputBlocked(this.sp, this.controller)) {
       this.stopActiveEmote(false, `movement key ${code}`);
     }
-    if (code !== this.menuKey || !e.isDown || this.menuOpen) {
+    if (code !== this.menuKey || !e.isDown) {
+      return;
+    }
+    // The wheel's key takes it away again; it was ignored while open, so a wheel left without its cursor stayed up
+    if (wheelKeyAction(this.menuOpen) === "close") {
+      this.closeMenu("its key");
       return;
     }
     if (isMenuKeyPressBlocked(this.sp, this.controller, e)) {
@@ -232,7 +240,7 @@ export class EmoteService extends ClientListener {
     const key = e.arguments[0];
     // Escape pressed inside the browser closes the menu on the first press.
     if (key === "menu:escape") {
-      if (this.menuOpen) this.closeMenu();
+      if (this.menuOpen) this.closeMenu("escape in the page");
       return;
     }
     if (typeof key !== "string" || !key.startsWith("emote:")) {
@@ -244,13 +252,14 @@ export class EmoteService extends ClientListener {
     // wheel then sat there ignoring every click and its own Cancel button, silently, because each message was
     // dropped here (Nat, 2026-09-28: "the wheel opens but nothing happens ... cancel doesnt work either").
     // Trusting the message rather than the flag removes the dependency on getting that flag right.
+    if (!this.menuOpen) { this.openedAt = Date.now(); this.unfocusedSince = 0; }
     this.menuOpen = true;
     if (key === events.close) {
-      this.closeMenu();
+      this.closeMenu("the page");
       return;
     }
     if (key === events.stop) {
-      this.closeMenu();
+      this.closeMenu("the wheel's stop");
       this.stopActiveEmote(true, "the wheel's stop");
       return;
     }
@@ -258,7 +267,7 @@ export class EmoteService extends ClientListener {
       const anim = typeof e.arguments[1] === "string" ? (e.arguments[1] as string) : "";
       // The player's own choice is never the server's idle, even when it is the same clip
       this.serverIdle = "";
-      this.closeMenu();
+      this.closeMenu(`a choice (${anim || "?"})`);
       emoteNote(`play ${anim || "?"} (active ${this.activeEmote || "none"})`);
       if (!this.allowedAnims.has(anim)) {
         logTrace(this, `Emote not in the catalog`, anim);
@@ -544,12 +553,34 @@ export class EmoteService extends ClientListener {
 
   private openMenu(): void {
     this.menuOpen = true;
+    this.openedAt = Date.now();
+    this.unfocusedSince = 0;
     openFormMenu(this.sp, this.emoteWidgetSetter, { GROUPS, events, WIDGET_ID }, this.controller);
+    emoteNote("wheel open");
   }
 
-  private closeMenu(): void {
+  private closeMenu(why = "closed"): void {
+    const wasOpen = this.menuOpen;
     this.menuOpen = false;
+    this.unfocusedSince = 0;
     closeFormMenu(this.sp, WIDGET_ID);
+    // How long it was up, and what took it down: the server log's [dboDiag] emote lines
+    if (wasOpen && this.openedAt) emoteNote(`wheel closed after ${Date.now() - this.openedAt} ms by ${why}`);
+    this.openedAt = 0;
+  }
+
+  // Four times a second while the wheel is up: drawn without the cursor for UNFOCUSED_CLOSE_MS, it is taken down
+  private watchWheel(): void {
+    if (!this.menuOpen) return;
+    const now = Date.now();
+    if (now - this.lastWatch < 250) return;
+    this.lastWatch = now;
+    let focused = true;
+    try { focused = this.sp.browser.isFocused(); } catch { return; }
+    // A front reload sets menuOpen false through browserWindowLoaded; a message from the wheel sets it true again
+    const r = wheelWatch({ menuOpen: this.menuOpen, focused, openedAt: this.openedAt || now, unfocusedSince: this.unfocusedSince, now });
+    this.unfocusedSince = r.unfocusedSince;
+    if (r.action === "close") this.closeMenu("losing the cursor");
   }
 
   // Runs inside the CEF browser. Only injected vars + window are available.
@@ -566,6 +597,9 @@ export class EmoteService extends ClientListener {
 
   private menuKey: DxScanCode = DxScanCode.B;
   private menuOpen = false;
+  private openedAt = 0;
+  private unfocusedSince = 0;
+  private lastWatch = 0;
   // The idle a dboIdle began, the only one a dboIdleStop may end
   private serverIdle = "";
   private activeEmote = "";
