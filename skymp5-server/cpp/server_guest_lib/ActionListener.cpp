@@ -334,9 +334,13 @@ SpellRiders GetExplosionRiders(WorldState* worldState, uint32_t spellId)
   return riders;
 }
 
-// Absorb Health's part of a spell's damage, counted like the damage formula counts it (visible effects first)
-float AbsorbHealthShare(WorldState* worldState, uint32_t spellId)
+// Absorb Health's part of a spell's damage on target, counted like the damage formula counts it (visible effects
+// first, damage over time whole on an NPC)
+float AbsorbHealthShare(WorldState* worldState, uint32_t spellId,
+                        const MpActor& target)
 {
+  const bool wholeDamageOverTime = CountsWholeDamageOverTime(
+    worldState, espm::GetSpellItemData(spellId, worldState).spellItem, target);
   float absorbVisible = 0.f, absorbTotal = 0.f, visible = 0.f, total = 0.f;
   ForEachSpellEffectData(
     worldState, spellId,
@@ -350,10 +354,12 @@ float AbsorbHealthShare(WorldState* worldState, uint32_t spellId)
       const bool isVisible = !data.IsFlagSet(espm::MGEF::Flags::HideInUI);
       const bool isAbsorb =
         data.effectType == espm::MGEF::EffectType::Absorb;
-      total += effectItem->magnitude;
-      absorbTotal += isAbsorb ? effectItem->magnitude : 0.f;
-      visible += isVisible ? effectItem->magnitude : 0.f;
-      absorbVisible += isVisible && isAbsorb ? effectItem->magnitude : 0.f;
+      const float magnitude =
+        EffectDamageMagnitude(*effectItem, data, wholeDamageOverTime);
+      total += magnitude;
+      absorbTotal += isAbsorb ? magnitude : 0.f;
+      visible += isVisible ? magnitude : 0.f;
+      absorbVisible += isVisible && isAbsorb ? magnitude : 0.f;
     });
   if (visible > 0.f) {
     return absorbVisible / visible;
@@ -2646,7 +2652,8 @@ void ActionListener::OnSpellHit(MpActor* aggressor,
     const float dealt = (healthBefore - targetActorValues.healthPercentage) *
       targetBaseHealth;
     const float absorbed =
-      dealt * AbsorbHealthShare(&partOne.worldState, hitData.source);
+      dealt *
+      AbsorbHealthShare(&partOne.worldState, hitData.source, *targetActorPtr);
     if (absorbed > 0.f) {
       aggressor->RestoreActorValue(espm::ActorValue::Health, absorbed);
       // The caster's next report predates the gain
