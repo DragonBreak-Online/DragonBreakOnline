@@ -300,6 +300,8 @@ public:
     bool riders = true;
     // A fire-and-forget damage over time hits an NPC for magnitude x duration
     bool damageOverTime = true;
+    // Absorb Health restores the caster by what the target lost
+    bool absorb = true;
   } spellSync;
 
   bool disableVanillaScriptsInExterior = true;

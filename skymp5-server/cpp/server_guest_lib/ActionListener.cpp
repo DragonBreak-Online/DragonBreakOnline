@@ -275,6 +275,33 @@ SpellRiders GetSpellRiders(WorldState* worldState, uint32_t spellId)
   return riders;
 }
 
+// Absorb Health's part of a spell's damage, counted like the damage formula counts it (visible effects first)
+float AbsorbHealthShare(WorldState* worldState, uint32_t spellId)
+{
+  float absorbVisible = 0.f, absorbTotal = 0.f, visible = 0.f, total = 0.f;
+  ForEachSpellEffectData(
+    worldState, spellId,
+    [&](const espm::SPEL::EFIT* effectItem, const espm::MGEF::DATA& data,
+        const espm::LookupResult&) {
+      if (!effectItem || data.primaryAV != espm::ActorValue::Health ||
+          !(data.IsFlagSet(espm::MGEF::Flags::Hostile) ||
+            data.IsFlagSet(espm::MGEF::Flags::Detrimental))) {
+        return;
+      }
+      const bool isVisible = !data.IsFlagSet(espm::MGEF::Flags::HideInUI);
+      const bool isAbsorb =
+        data.effectType == espm::MGEF::EffectType::Absorb;
+      total += effectItem->magnitude;
+      absorbTotal += isAbsorb ? effectItem->magnitude : 0.f;
+      visible += isVisible ? effectItem->magnitude : 0.f;
+      absorbVisible += isVisible && isAbsorb ? effectItem->magnitude : 0.f;
+    });
+  if (visible > 0.f) {
+    return absorbVisible / visible;
+  }
+  return total > 0.f ? absorbTotal / total : 0.f;
+}
+
 // The argument naming target in a snippet run by executor: its own player is 0x14 there
 SpSnippetObjectArgument SnippetActorArgument(WorldState* worldState,
                                              const MpActor& executor,
@@ -2528,8 +2555,10 @@ void ActionListener::OnSpellHit(MpActor* aggressor,
       nlohmann::json::array({ targetActorPtr->GetFormId(), hitData.source }));
   }
 
+  const float healthBefore = targetActorValues.healthPercentage;
+  float targetBaseHealth = 0.f;
   targetActorValues.healthPercentage = CalculateCurrentHealthPercentage(
-    *targetActorPtr, damage, targetActorValues.healthPercentage, nullptr);
+    *targetActorPtr, damage, healthBefore, &targetBaseHealth);
 
   static const auto kHealthAvFilter =
     std::vector<espm::ActorValue>{ espm::ActorValue::Health };
@@ -2544,6 +2573,24 @@ void ActionListener::OnSpellHit(MpActor* aggressor,
 
   FireHitDamageEvent("onHitDamage", aggressor, targetActorPtr, hitData.source,
                      damage, false, &spellFlags);
+
+  // Absorb Health gives the caster what the target lost; the caster's own game gained it locally only
+  if (partOne.worldState.spellSync.absorb && targetActorPtr != aggressor &&
+      !aggressor->IsDead()) {
+    const float dealt = (healthBefore - targetActorValues.healthPercentage) *
+      targetBaseHealth;
+    const float absorbed =
+      dealt * AbsorbHealthShare(&partOne.worldState, hitData.source);
+    if (absorbed > 0.f) {
+      aggressor->RestoreActorValue(espm::ActorValue::Health, absorbed);
+      // The caster's next report predates the gain
+      aggressor->UpdateNextRestorationTime(espm::ActorValue::Health,
+                                           std::chrono::seconds{ 5 });
+      spdlog::info("OnSpellHit - {:x} absorbed {} health from {:x} with {:x}",
+                   aggressor->GetFormId(), absorbed,
+                   targetActorPtr->GetFormId(), hitData.source);
+    }
+  }
 
   if (!wardBlocked) {
     ApplySpellRiders(*aggressor, *targetActorPtr, hitData.source);
