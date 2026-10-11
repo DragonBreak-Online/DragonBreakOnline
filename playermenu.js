@@ -45,6 +45,12 @@ module.exports = (api) => {
   const get = (a, prop, fallback) => { try { const v = mp.get(a, prop); return v === undefined || v === null ? fallback : v; } catch (e) { return fallback; } };
   const isOnline = (a) => onlineActors().includes(a);
   const knownBy = (a) => { const v = get(a, KNOWN_PROP, []); return Array.isArray(v) ? v.map((x) => Number(x) >>> 0) : []; };
+  // The real name kept while masked. The mask's own name is never a real name: mask() once stored "Masked Person" as the
+  // real name when the name shown already was the mask's (its maskName lost, e.g. a crash), and every unmask after
+  // put the mask name back, locking it (#7DJT, 10-11 Oct). Such a stored name counts as no real name; the mask is still
+  // on (isMasked), so H runs unmask, which clears it and takes the lent mask back
+  const isMaskName = (n) => String(n || '').trim().toLowerCase() === String(C.maskName || '').trim().toLowerCase();
+  const realName = (a) => { const v = String(get(a, MASK_PROP, '') || ''); return v && !isMaskName(v) ? v : ''; };
   const isMasked = (a) => !!String(get(a, MASK_PROP, '') || '');
   // Court Mages, Shamans and Wisewomen hold office without guard powers
   const UNLAWFUL_RANKS = new Set(['courtmage', 'shaman', 'wisewoman']);
@@ -276,6 +282,11 @@ module.exports = (api) => {
     if (lost && !holds(a, lost)) return personal(a, 'Your mask is not on you. Find it, or get it back, to wear it again.');
     const itemId = lost || maskItemFor(a);
     const real = nameOf(a);
+    // The name shown is the mask's already: there is no real name to keep, so none is stored over it
+    if (isMaskName(real)) {
+      log(`playermenu: ${display(a)} shows the mask name with no real name kept; mask refused, staff can /rename`);
+      return personal(a, 'Your own name was lost behind a mask. Please send a /bug so staff can give it back to you.');
+    }
     if (!setAppearanceName(a, C.maskName)) return personal(a, 'Could not put the mask on.');
     try { mp.set(a, MASK_PROP, real); } catch (e) { /* kept in memory only */ }
     try { mp.set(a, 'private.maskItemId', itemId); } catch (e) { /* unmask falls back to the race item */ }
@@ -289,9 +300,12 @@ module.exports = (api) => {
       : 'You pull your mask up. Others see a Masked Person. Press H to take it off.');
   };
   const unmask = (a, quiet) => {
-    const real = String(get(a, MASK_PROP, '') || '');
-    if (!real) return;
-    setAppearanceName(a, real);
+    const stored = String(get(a, MASK_PROP, '') || '');
+    if (!stored) return;
+    const real = realName(a);
+    // A stored mask name is no real name: the name is left as it is (staff /rename), never set to the mask's again
+    if (real) setAppearanceName(a, real);
+    else log(`playermenu: ${display(a)} had the mask name kept as the real name; cleared, staff can /rename`);
     try { mp.set(a, MASK_PROP, ''); } catch (e) { /* ignore */ }
     const itemId = (Number(get(a, 'private.maskItemId', 0)) >>> 0) || maskItemFor(a);
     if (itemId) {
@@ -299,6 +313,7 @@ module.exports = (api) => {
       setTimeout(() => { if (!removeOne(a, itemId)) { try { mp.set(a, 'private.maskLost', itemId); } catch (e) { log('mask loss not recorded', e.message); } } }, 1500);
     }
     if (!quiet) personal(a, itemId ? 'You take the borrowed mask off and hand it back.' : 'You take your mask off.');
+    if (!real && !quiet) personal(a, 'Your own name was lost behind the mask. Please send a /bug so staff can give it back to you.');
   };
   // A mask taken off is removed 1.5 s later; toggling again inside that let a burst of H hand out a mask each time
   const MASK_TOGGLE_MS = 2000;
