@@ -322,6 +322,27 @@ ScampServer::ScampServer(const Napi::CallbackInfo& info)
       }
     }
 
+    if (serverSettings.contains("spellSync")) {
+      const auto& spellSync = serverSettings["spellSync"];
+      auto& target = partOne->worldState.spellSync;
+      const std::pair<const char*, bool*> flags[] = {
+        { "riders", &target.riders },
+      };
+      for (const auto& [key, flag] : flags) {
+        if (!spellSync.is_object() || !spellSync.contains(key)) {
+          continue;
+        }
+        if (spellSync[key].is_boolean()) {
+          *flag = spellSync[key].get<bool>();
+          spdlog::info("spellSync.{} is explicitly set to {}", key, *flag);
+        } else {
+          spdlog::error("Unexpected value of spellSync.{}, should be true or "
+                        "false",
+                        key);
+        }
+      }
+    }
+
     partOne->worldState.isPapyrusHotReloadEnabled =
       serverSettings.count("isPapyrusHotReloadEnabled") != 0 &&
       serverSettings.at("isPapyrusHotReloadEnabled").get<bool>();

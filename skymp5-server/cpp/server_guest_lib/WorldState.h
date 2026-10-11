@@ -296,6 +296,13 @@ public:
   float regenerationMultiplier = 1.f;
   MovementLimits movementLimits;
 
+  // server-settings spellSync: what of a spell the server delivers beyond its Health damage
+  struct SpellSyncSettings
+  {
+    // Paralysis, AI, stagger and slow riders on the target's own game
+    bool riders = true;
+  } spellSync;
+
   bool disableVanillaScriptsInExterior = true;
 
   // Vanilla scripts exterior refs keep despite disableVanillaScriptsInExterior

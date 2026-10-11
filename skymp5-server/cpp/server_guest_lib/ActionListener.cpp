@@ -204,29 +204,113 @@ bool IsWardSpell(WorldState* worldState, uint32_t spellId)
   return isWard;
 }
 
-// Longest visible Paralysis effect in seconds, hidden perk riders need conditions the server does not evaluate
-uint32_t GetParalysisSeconds(WorldState* worldState, uint32_t spellId)
+// What a spell does to its target beyond Health, which only the game hosting the target applies
+struct SpellRiders
 {
-  uint32_t seconds = 0;
+  // Longest visible Paralysis, hidden perk riders need conditions the server does not evaluate
+  uint32_t paralysisSeconds = 0;
+  // Calm, Demoralize, Frenzy, Turn Undead, Rally
+  bool ai = false;
+  bool staggerAny = false;
+  bool slowAny = false;
+  // Unconditional stagger and SpeedMult slow, which the server may apply apart from the spell
+  bool stagger = false;
+  float slow = 0.f;
+  uint32_t slowSeconds = 0;
   bool damagesHealth = false;
+  // Command Daedra: companionSystem owns a summon's master
+  bool commands = false;
+};
+
+void AddSpellRider(SpellRiders& riders, const espm::SPEL::EFIT& effectItem,
+                   const espm::MGEF::DATA& data)
+{
+  using Type = espm::MGEF::EffectType;
+  riders.damagesHealth = riders.damagesHealth ||
+    ((data.IsFlagSet(espm::MGEF::Flags::Hostile) ||
+      data.IsFlagSet(espm::MGEF::Flags::Detrimental)) &&
+     data.primaryAV == espm::ActorValue::Health);
+  switch (data.effectType) {
+    case Type::Paralysis:
+      if (!data.IsFlagSet(espm::MGEF::Flags::HideInUI)) {
+        riders.paralysisSeconds =
+          std::max(riders.paralysisSeconds, effectItem.duration);
+      }
+      break;
+    case Type::Calm:
+    case Type::Demoralize:
+    case Type::Frenzy:
+    case Type::TurnUndead:
+    case Type::Rally:
+      riders.ai = true;
+      break;
+    case Type::Stagger:
+      riders.staggerAny = true;
+      riders.stagger = riders.stagger || !data.hasConditions;
+      break;
+    case Type::PeakValueMod:
+      if (data.primaryAV != espm::ActorValue::SpeedMult ||
+          !data.IsFlagSet(espm::MGEF::Flags::Detrimental)) {
+        break;
+      }
+      riders.slowAny = true;
+      if (!data.hasConditions && effectItem.magnitude > riders.slow) {
+        riders.slow = effectItem.magnitude;
+        riders.slowSeconds = effectItem.duration;
+      }
+      break;
+    case Type::CommandSummoned:
+      riders.commands = true;
+      break;
+    default:
+      break;
+  }
+}
+
+SpellRiders GetSpellRiders(WorldState* worldState, uint32_t spellId)
+{
+  SpellRiders riders;
   ForEachSpellEffectData(
     worldState, spellId,
     [&](const espm::SPEL::EFIT* effectItem, const espm::MGEF::DATA& data,
         const espm::LookupResult&) {
-      if (!effectItem) {
-        return;
-      }
-      damagesHealth = damagesHealth ||
-        ((data.IsFlagSet(espm::MGEF::Flags::Hostile) ||
-          data.IsFlagSet(espm::MGEF::Flags::Detrimental)) &&
-         data.primaryAV == espm::ActorValue::Health);
-      if (data.effectType == espm::MGEF::EffectType::Paralysis &&
-          !data.IsFlagSet(espm::MGEF::Flags::HideInUI)) {
-        seconds = std::max(seconds, effectItem->duration);
+      if (effectItem) {
+        AddSpellRider(riders, *effectItem, data);
       }
     });
-  // Replaying a damaging spell on the target's client would damage it twice
-  return damagesHealth ? 0 : seconds;
+  return riders;
+}
+
+// The argument naming target in a snippet run by executor: its own player is 0x14 there
+SpSnippetObjectArgument SnippetActorArgument(WorldState* worldState,
+                                             const MpActor& executor,
+                                             const MpActor& target,
+                                             const char* type)
+{
+  SpSnippetObjectArgument argument;
+  argument.formId = &executor == &target
+    ? 0x14
+    : SpSnippet::MakeLongFormId(worldState, target.GetFormId());
+  argument.type = type;
+  return argument;
+}
+
+using SnippetArgs = std::vector<std::optional<
+  std::variant<bool, double, std::string, SpSnippetObjectArgument>>>;
+
+// The engine re-reads movement speed only after a carry weight change (paralysisService.ts)
+void ModSpeedMultOn(MpActor& executor, uint32_t targetId, double delta)
+{
+  const std::pair<const char*, double> changes[] = {
+    { "SpeedMult", delta }, { "CarryWeight", 0.1 }, { "CarryWeight", -0.1 }
+  };
+  for (const auto& [actorValue, amount] : changes) {
+    SnippetArgs args;
+    args.push_back(std::string(actorValue));
+    args.push_back(amount);
+    SpSnippet("Actor", "ModActorValue", args, targetId)
+      .Execute(&executor, SpSnippetMode::kNoReturnResult);
+  }
 }
 
 // Bound weapon spells equip a weapon (and the bound arrow) the inventory never holds
@@ -2517,7 +2601,7 @@ void ActionListener::OnSpellHit(MpActor* aggressor,
                      damage, false, &spellFlags);
 
   if (!wardBlocked) {
-    ApplyParalysis(*aggressor, *targetActorPtr, hitData.source);
+    ApplySpellRiders(*aggressor, *targetActorPtr, hitData.source);
   }
 
   // Heal Other and the area share of self heals (Grand Healing) restore their target here, the caster heals on cast
@@ -2894,61 +2978,133 @@ bool ActionListener::IsWardBlocking(const MpActor& aggressor,
 }
 
 // The caster's engine paralyses only its own copy of the target, so the target's client applies the spell too
-void ActionListener::ApplyParalysis(MpActor& aggressor, MpActor& target,
-                                    uint32_t spellId)
+void ActionListener::ApplySpellRiders(MpActor& aggressor, MpActor& target,
+                                      uint32_t spellId)
 {
-  if (&aggressor == &target || target.IsDead() || IsParalyzed(target)) {
+  if (&aggressor == &target || target.IsDead()) {
     return;
   }
-  const uint32_t seconds = GetParalysisSeconds(&partOne.worldState, spellId);
-  // God mode refuses paralysis like it refuses damage
-  if (seconds == 0 ||
+  auto* worldState = &partOne.worldState;
+  const SpellRiders riders = GetSpellRiders(worldState, spellId);
+  const bool ridersOn = worldState->spellSync.riders;
+  // The base game applies AI effects to NPCs only
+  const bool isPlayer = target.GetUserId() != Networking::InvalidUserId;
+  const uint32_t holdSeconds = riders.damagesHealth ? 0 : riders.paralysisSeconds;
+  // Replaying a spell that also damages Health on the target's game would damage it twice
+  const bool replaySpell = !riders.damagesHealth && !riders.commands &&
+    (holdSeconds > 0 ||
+     (ridersOn &&
+      (riders.staggerAny || riders.slowAny || (riders.ai && !isPlayer))));
+  // Such a spell's unconditional stagger and slow go to an NPC's host on their own
+  const bool applyApart = ridersOn && riders.damagesHealth && !isPlayer &&
+    (riders.stagger || riders.slow > 0.f);
+  if (!replaySpell && !applyApart) {
+    return;
+  }
+  if (holdSeconds > 0 && IsParalyzed(target)) {
+    return;
+  }
+  // God mode refuses paralysis like it refuses damage; a damaging spell's hit already asked
+  if (!riders.damagesHealth &&
       !FireHitDamageEvent("onHitDamageAttempt", &aggressor, &target, spellId,
                           0.f, true)) {
     return;
   }
 
-  const auto now = std::chrono::steady_clock::now();
-  std::erase_if(paralyzedUntil,
-                [&](const auto& entry) { return entry.second <= now; });
-  paralyzedUntil[target.GetFormId()] = now + std::chrono::seconds(seconds);
-  // Paralysis lowers a raised shield and ends a ward
-  target.SetIsBlockActive(false);
-  wardChannels.erase(target.GetFormId());
-  spdlog::info("OnSpellHit - spell {:x} of {:x} paralyses {:x} for {} s",
-               spellId, aggressor.GetFormId(), target.GetFormId(), seconds);
+  if (holdSeconds > 0) {
+    const auto now = std::chrono::steady_clock::now();
+    std::erase_if(paralyzedUntil,
+                  [&](const auto& entry) { return entry.second <= now; });
+    paralyzedUntil[target.GetFormId()] =
+      now + std::chrono::seconds(holdSeconds);
+    // Paralysis lowers a raised shield and ends a ward
+    target.SetIsBlockActive(false);
+    wardChannels.erase(target.GetFormId());
+    spdlog::info("OnSpellHit - spell {:x} of {:x} paralyses {:x} for {} s",
+                 spellId, aggressor.GetFormId(), target.GetFormId(),
+                 holdSeconds);
+  }
 
   // A player's own client, or the host of an NPC
   MpActor& executor = target.GetActorToSendTo();
-  // The client that reported the hit already paralysed its real actor
+  // The client that reported the hit already applied the spell to its real actor
   if (&executor == &aggressor.GetActorToSendTo()) {
     return;
   }
-  // DoCombatSpellApply takes a Spell; a Scroll is another form type in Papyrus, so a scroll's paralysis is kept on the
+
+  if (applyApart) {
+    if (riders.stagger) {
+      SnippetArgs args;
+      args.push_back(
+        SnippetActorArgument(worldState, executor, target, "ObjectReference"));
+      args.push_back(std::string("staggerStart"));
+      SpSnippet("Debug", "SendAnimationEvent", args)
+        .Execute(&executor, SpSnippetMode::kNoReturnResult);
+    }
+    if (riders.slow > 0.f) {
+      SlowOnHost(executor, target, riders.slow, riders.slowSeconds);
+    }
+    spdlog::info("OnSpellHit - riders of spell {:x} of {:x} sent to {:x} for "
+                 "{:x} (stagger {}, slow {} for {} s)",
+                 spellId, aggressor.GetFormId(), executor.GetFormId(),
+                 target.GetFormId(), riders.stagger, riders.slow,
+                 riders.slowSeconds);
+    return;
+  }
+
+  // DoCombatSpellApply takes a Spell; a Scroll is another form type in Papyrus, so a scroll's riders are kept on the
   // server only (review SCH1-R4)
-  const auto sourceLookup =
-    partOne.GetEspm().GetBrowser().LookupById(spellId);
+  const auto sourceLookup = partOne.GetEspm().GetBrowser().LookupById(spellId);
   if (!espm::Convert<espm::SPEL>(sourceLookup.rec)) {
-    spdlog::info("OnSpellHit - paralysis of {:x} from {:x} is not replayed on "
+    spdlog::info("OnSpellHit - riders of {:x} on {:x} are not replayed on "
                  "{:x}'s client (not a SPEL)",
-                 target.GetFormId(), spellId, executor.GetFormId());
+                 spellId, target.GetFormId(), executor.GetFormId());
     return;
   }
   SpSnippetObjectArgument spellArg;
   spellArg.formId = spellId;
   spellArg.type = "Spell";
-  SpSnippetObjectArgument targetArg;
-  targetArg.formId = &executor == &target
-    ? 0x14
-    : SpSnippet::MakeLongFormId(&partOne.worldState, target.GetFormId());
-  targetArg.type = "Actor";
-  std::vector<std::optional<
-    std::variant<bool, double, std::string, SpSnippetObjectArgument>>>
-    args;
+  SnippetArgs args;
   args.push_back(spellArg);
-  args.push_back(targetArg);
+  args.push_back(SnippetActorArgument(worldState, executor, target, "Actor"));
   SpSnippet("Actor", "DoCombatSpellApply", args, aggressor.GetFormId())
     .Execute(&executor, SpSnippetMode::kNoReturnResult);
+  spdlog::info("OnSpellHit - spell {:x} of {:x} replayed on {:x} for {:x}",
+               spellId, aggressor.GetFormId(), executor.GetFormId(),
+               target.GetFormId());
+}
+
+void ActionListener::SlowOnHost(MpActor& executor, MpActor& target,
+                                float magnitude, uint32_t seconds)
+{
+  const uint32_t targetId = target.GetFormId();
+  const auto until =
+    std::chrono::steady_clock::now() + std::chrono::seconds(seconds);
+  auto it = hostSlows.find(targetId);
+  if (it != hostSlows.end()) {
+    it->second.until = std::max(it->second.until, until);
+  } else {
+    hostSlows[targetId] = { executor.GetFormId(), magnitude, until };
+    ModSpeedMultOn(executor, targetId, -magnitude);
+  }
+  partOne.worldState.SetTimer(std::chrono::seconds(seconds))
+    .Then([this, targetId](Viet::Void) { EndHostSlow(targetId); });
+}
+
+// The slow ends on the client that took it, which keeps its copy of the target slowed until then
+void ActionListener::EndHostSlow(uint32_t targetId)
+{
+  auto it = hostSlows.find(targetId);
+  if (it == hostSlows.end() ||
+      std::chrono::steady_clock::now() < it->second.until) {
+    return;
+  }
+  const HostSlow slow = it->second;
+  hostSlows.erase(it);
+  auto executorForm = partOne.worldState.LookupFormById(slow.executorId);
+  if (auto executor = executorForm ? executorForm->AsActor() : nullptr) {
+    ModSpeedMultOn(*executor, targetId, slow.magnitude);
+  }
 }
 
 bool ActionListener::IsParalyzed(const MpActor& actor)

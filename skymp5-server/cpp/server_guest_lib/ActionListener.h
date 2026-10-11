@@ -133,7 +133,11 @@ private:
                          const SpellCastData& spellCastData);
   bool IsWardBlocking(const MpActor& aggressor, const MpActor& target);
 
-  void ApplyParalysis(MpActor& aggressor, MpActor& target, uint32_t spellId);
+  // Paralysis, AI, stagger and slow riders of a spell hit: held on the server, applied on the target's game
+  void ApplySpellRiders(MpActor& aggressor, MpActor& target, uint32_t spellId);
+  void SlowOnHost(MpActor& executor, MpActor& target, float magnitude,
+                  uint32_t seconds);
+  void EndHostSlow(uint32_t targetId);
   bool IsParalyzed(const MpActor& actor);
 
   void TickRestorationChannel(uint32_t casterId, uint32_t generation);
@@ -252,6 +256,14 @@ private:
                                   std::chrono::steady_clock::time_point now);
   std::unordered_map<uint32_t, std::chrono::steady_clock::time_point>
     paralyzedUntil;
+  // A SpeedMult slow sent to the client hosting each target, taken back there when it ends
+  struct HostSlow
+  {
+    uint32_t executorId = 0;
+    float magnitude = 0.f;
+    std::chrono::steady_clock::time_point until{};
+  };
+  std::unordered_map<uint32_t, HostSlow> hostSlows;
 
   MovementValidation::Tracker movementTracker;
 
