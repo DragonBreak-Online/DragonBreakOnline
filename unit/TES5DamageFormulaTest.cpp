@@ -188,6 +188,8 @@ TEST_CASE("A fire-and-forget damage over time hits an NPC for magnitude x "
   // The player's own client takes the ticks from the clone replay
   REQUIRE(damageOf(player, kChaurusSpit) == 5.f);
   REQUIRE(damageOf(npc, kFirebolt) == 25.f);
+  // TGNightingaleStrifeMercer: Absorb Health 15 a second for 10 s, which the caster absorbs whole too
+  REQUIRE(damageOf(npc, 0x000fdbc7) == 150.f);
 
   p.worldState.spellSync.damageOverTime = false;
   REQUIRE(damageOf(npc, kChaurusSpit) == 5.f);
