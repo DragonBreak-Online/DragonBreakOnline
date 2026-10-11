@@ -54,10 +54,15 @@ const TEMPLATE_USE_TRAITS = 0x0001;
 const TEMPLATE_USE_STATS = 0x0002;
 const TEMPLATE_USE_KEYWORDS = 0x1000;
 const MAX_TEMPLATE_DEPTH = 16;
+// MGEF DATA projectile, PROJ DATA explosion, EXPL DATA placed object
+const MGEF_PROJECTILE = 0x48;
+const PROJ_EXPLOSION = 0x24;
+const EXPL_PLACED = 0x10;
 
 const effectCache = new Map<number, SpellEffect[]>();
 const conditionCache = new Map<number, KeywordCondition[]>();
 const ashCache = new Map<number, boolean>();
+const placedCache = new Map<number, number>();
 
 const fieldData = (lookup: any, type: string): Uint8Array | null => {
   const fields = lookup?.record?.fields;
@@ -186,6 +191,21 @@ export const turnsToAsh = (mp: Mp, spellId: number): boolean => {
   if (cached !== undefined) return cached;
   const result = spellEffects(mp, spellId).some((e) => readVmadScripts(lookup(mp, e.mgefId)).has(ASH_PILE_SCRIPT));
   ashCache.set(spellId, result);
+  return result;
+};
+
+// The NPC_ an effect's projectile explosion places (Conjure Ash Guardian), 0 for none
+export const explosionPlacedNpc = (mp: Mp, mgefId: number): number => {
+  const cached = placedCache.get(mgefId);
+  if (cached !== undefined) return cached;
+  const linked = (rec: any, type: string, offset: number): number => {
+    const data = rec?.record?.type === type ? fieldData(rec, "DATA") : null;
+    return data && data.byteLength >= offset + 4 ? toGlobal(rec, view(data).getUint32(offset, true)) : 0;
+  };
+  const explosion = lookup(mp, linked(lookup(mp, linked(lookup(mp, mgefId), "MGEF", MGEF_PROJECTILE)), "PROJ", PROJ_EXPLOSION));
+  const placedId = linked(explosion, "EXPL", EXPL_PLACED);
+  const result = lookup(mp, placedId)?.record?.type === "NPC_" ? placedId : 0;
+  placedCache.set(mgefId, result);
   return result;
 };
 

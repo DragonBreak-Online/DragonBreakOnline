@@ -1,7 +1,7 @@
 import { Settings } from "../settings";
 import { System, Log, SystemContext } from "./system";
 import { CompanionSystem } from "./companionSystem";
-import { spellEffects, SpellEffect, MgefArchetype, npcLevel, keywordConditionsPass, turnsToAsh, pickSummon } from "./espmMagic";
+import { spellEffects, SpellEffect, MgefArchetype, npcLevel, keywordConditionsPass, turnsToAsh, pickSummon, explosionPlacedNpc } from "./espmMagic";
 import { isPlayerActor, isNear, baseIdOf, hex } from "./actorUtil";
 
 // The ScampServer / `mp` API is untyped here, same convention as spawn.ts.
@@ -9,7 +9,7 @@ type Mp = any;
 
 // Server-side Conjuration fed by the onSpellCast / onSpellHit gamemode events (ActionListener.cpp):
 // SummonCreature spells place a summon, Reanimate spells raise a dead NPC within the level cap, Banish sends a summoned daedra away,
-// Command Daedra takes another player's summoned daedra over.
+// Command Daedra takes another player's summoned daedra over, an explosion that places an NPC (Conjure Ash Guardian) places a summon.
 
 // Effects lasting this long are "until killed" (the Thralls)
 const PERMANENT_SEC = 1e7;
@@ -24,6 +24,16 @@ const REANIMATE_HIT_FIRST_MS = 1000;
 // One refusal notice per caster this often, and the user id getUserByActor reports for none (Networking::InvalidUserId)
 const REFUSAL_NOTICE_MS = 3000;
 const INVALID_USER_ID = 65535;
+// A cast whose explosion hits no actor places its summon in front of the caster after this long
+const PLACE_FALLBACK_MS = 1500;
+const PLACE_HIT_FIRST_MS = 1000;
+const PLACE_LIFT = 16;
+
+interface PendingPlace {
+  spellId: number;
+  baseId: number;
+  timer: ReturnType<typeof setTimeout>;
+}
 
 interface PendingReanimate {
   spellId: number;
@@ -41,11 +51,19 @@ export class ConjurationSystem implements System {
   private lastRefusalNotice = new Map<number, number>();
   // server-settings "commandDaedraEnabled"
   private commandDaedraOn = true;
+  // server-settings "explosionSummonEnabled", and "explosionSummonSeconds" (0: until killed, as vanilla's Ash Guardian)
+  private explosionSummonOn = true;
+  private explosionSummonSec = 0;
+  private pendingPlace = new Map<number, PendingPlace>();
+  private lastPlaceHit = new Map<number, number>();
 
   async initAsync(ctx: SystemContext): Promise<void> {
     this.mp = ctx.svr as Mp;
     const all = (await Settings.get()).allSettings as Record<string, unknown> | null;
     this.commandDaedraOn = all?.["commandDaedraEnabled"] !== false;
+    this.explosionSummonOn = all?.["explosionSummonEnabled"] !== false;
+    const placeSec = Number(all?.["explosionSummonSeconds"]);
+    if (Number.isFinite(placeSec) && placeSec > 0) this.explosionSummonSec = placeSec;
     this.hook("onSpellCast", (casterId, spellId) => this.onSpellCast(casterId, spellId));
     this.hook("onSpellHit", (aggressorId, targetId, spellId) => this.onSpellHit(aggressorId, targetId, spellId));
   }
@@ -54,7 +72,9 @@ export class ConjurationSystem implements System {
     let actorId = 0;
     try { actorId = ctx.svr.getUserActor(userId) >>> 0; } catch { return; }
     this.clearPending(actorId);
+    this.clearPlace(actorId);
     this.lastReanimateHit.delete(actorId);
+    this.lastPlaceHit.delete(actorId);
     this.lastRefusalNotice.delete(actorId);
   }
 
@@ -91,6 +111,14 @@ export class ConjurationSystem implements System {
       this.companions.spawn(casterId, pick.effect.assocId, { kind: "summon", durationSec: this.duration(pick.timed, casterId, "summon"), source: spellId });
       return;
     }
+    const placed = this.placedNpc(effects);
+    if (placed) {
+      if (Date.now() - (this.lastPlaceHit.get(casterId) ?? 0) <= PLACE_HIT_FIRST_MS) return;
+      this.clearPlace(casterId);
+      const timer = setTimeout(() => this.placeFallback(casterId), PLACE_FALLBACK_MS);
+      this.pendingPlace.set(casterId, { spellId, baseId: placed, timer });
+      return;
+    }
     const reanimate = effects.find((e) => e.archetype === MgefArchetype.Reanimate);
     if (reanimate && Date.now() - (this.lastReanimateHit.get(casterId) ?? 0) > REANIMATE_HIT_FIRST_MS) {
       this.clearPending(casterId);
@@ -100,6 +128,8 @@ export class ConjurationSystem implements System {
   }
 
   private onSpellHit(aggressorId: number, targetId: number, spellId: number): void {
+    const placed = this.placedNpc(spellEffects(this.mp, spellId));
+    if (placed && isPlayerActor(this.mp, aggressorId)) this.placeAtHit(aggressorId, targetId, spellId, placed);
     for (const effect of spellEffects(this.mp, spellId)) {
       if (effect.archetype === MgefArchetype.Banish) {
         this.banish(aggressorId, targetId, spellId, effect);
@@ -255,5 +285,52 @@ export class ConjurationSystem implements System {
     if (this.companions.command(targetId, casterId, this.duration(effect))) {
       this.log(`ConjurationSystem: ${hex(casterId)} commands ${hex(targetId)} with ${hex(spellId)}`);
     }
+  }
+
+  // The NPC_ the spell's explosion places in the caster's own game only, which the server places for everyone instead
+  private placedNpc(effects: SpellEffect[]): number {
+    if (!this.explosionSummonOn) return 0;
+    for (const e of effects) {
+      const id = explosionPlacedNpc(this.mp, e.mgefId);
+      if (id) return id;
+    }
+    return 0;
+  }
+
+  private clearPlace(casterId: number): void {
+    const p = this.pendingPlace.get(casterId);
+    if (!p) return;
+    clearTimeout(p.timer);
+    this.pendingPlace.delete(casterId);
+  }
+
+  // The first actor the explosion hits marks where it went off; the rest of the same blast place nothing
+  private placeAtHit(casterId: number, targetId: number, spellId: number, baseId: number): void {
+    const now = Date.now();
+    const pending = this.pendingPlace.has(casterId);
+    if (!pending && now - (this.lastPlaceHit.get(casterId) ?? 0) <= PLACE_HIT_FIRST_MS) return;
+    this.clearPlace(casterId);
+    this.lastPlaceHit.set(casterId, now);
+    let pos: number[] | undefined;
+    try {
+      const p = this.mp.getActorPos(targetId);
+      if (Array.isArray(p) && isNear(this.mp, casterId, targetId, REANIMATE_RANGE)) pos = [p[0], p[1], p[2] + PLACE_LIFT];
+    } catch { }
+    this.placeSummon(casterId, baseId, spellId, pos);
+  }
+
+  private placeFallback(casterId: number): void {
+    const p = this.pendingPlace.get(casterId);
+    if (!p) return;
+    this.pendingPlace.delete(casterId);
+    this.placeSummon(casterId, p.baseId, p.spellId);
+  }
+
+  // It guards where it was placed until ordered to follow
+  private placeSummon(casterId: number, baseId: number, spellId: number, pos?: number[]): void {
+    const id = this.companions.spawn(casterId, baseId, { kind: "summon", pos, durationSec: this.explosionSummonSec, source: spellId });
+    if (id === null) return;
+    this.companions.orderStay(id);
+    this.log(`ConjurationSystem: ${hex(casterId)} placed ${hex(id)} with ${hex(spellId)}${pos ? " where it hit" : " in front of them"}`);
   }
 }
