@@ -105,10 +105,10 @@
       {
         "heading": "Property",
         "items": [
-          "Houses, rooms and businesses now belong to the character who owns them, not to your whole account. Property tax comes from that character's bank, rent and takings go to that character, and only that character (and the people holding its keys) can use it.",
+          "New houses, rooms and businesses now belong to the character who buys them, not to your whole account: property tax comes from that character's bank, rent and takings go to that character, and only that character (and the people holding its keys) can use it.",
           "Each character can own one home, and each account up to two.",
           "A faction's hall now follows the faction's current leader, whoever owns the building.",
-          "Property you already own has been given to the character it was bought for."
+          "Property you already owned before this update still belongs to your whole account for now. It moves to the character it was bought for in a later update, and nobody loses anything."
         ]
       }
     ]
