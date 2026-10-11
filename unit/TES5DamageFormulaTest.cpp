@@ -159,3 +159,41 @@ TEST_CASE("A staff enchantment's damage is its visible damage effects",
   p.DestroyActor(0xff000000);
   DoDisconnect(p, 0);
 }
+
+TEST_CASE("A fire-and-forget damage over time hits an NPC for magnitude x "
+          "duration and a player for its magnitude",
+          "[TES5DamageFormula]")
+{
+  PartOne& p = GetPartOne();
+  DoConnect(p, 0);
+  p.CreateActor(0xff000000, { 0, 0, 0 }, 0, 0x3c);
+  p.CreateActor(0xff000001, { 0, 0, 0 }, 0, 0x3c);
+  p.SetUserActor(0, 0xff000000);
+  auto& player = p.worldState.GetFormAt<MpActor>(0xff000000);
+  auto& npc = p.worldState.GetFormAt<MpActor>(0xff000001);
+
+  TES5DamageFormula formula{};
+  const auto damageOf = [&](MpActor& target, uint32_t spellId) {
+    return formula.CalculateDamage(
+      player, target,
+      SpellCastData{ 0xff000000, target.GetFormId(), spellId, false, false,
+                     SpellType::Left });
+  };
+  // crChaurusPoisonSpit01: 5 a second for 5 s
+  constexpr uint32_t kChaurusSpit = 0x0006f6fe;
+  // FireboltRightHand: FireDamageFFAimed 25, no duration
+  constexpr uint32_t kFirebolt = 0x000c969b;
+
+  REQUIRE(damageOf(npc, kChaurusSpit) == 25.f);
+  // The player's own client takes the ticks from the clone replay
+  REQUIRE(damageOf(player, kChaurusSpit) == 5.f);
+  REQUIRE(damageOf(npc, kFirebolt) == 25.f);
+
+  p.worldState.spellSync.damageOverTime = false;
+  REQUIRE(damageOf(npc, kChaurusSpit) == 5.f);
+  p.worldState.spellSync.damageOverTime = true;
+
+  p.DestroyActor(0xff000001);
+  p.DestroyActor(0xff000000);
+  DoDisconnect(p, 0);
+}
