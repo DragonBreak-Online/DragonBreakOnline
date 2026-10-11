@@ -1,5 +1,23 @@
 [
   {
+    "title": "Couriers",
+    "date": "SHIP_DATE",
+    "version": "Server update",
+    "tag": "New",
+    "sections": [
+      {
+        "heading": "Couriers",
+        "items": [
+          "You can now hire a courier to carry goods for you. At a notice board, open the pigeon coop and choose Couriers: pick up to six kinds of goods, where they go and who receives them, and the pay you offer. The board holds the goods and the pay, and a small posting fee goes to the hold's treasury.",
+          "Goods can go to a settlement's drop point around Bruma (Aleswell, Greenwood, Mountain Watch and Applewatch), where they wait in the recipient's mailbox, or to the recipient in person: the courier finds them and offers the parcel, and they take it into their pack or have it left in their mailbox.",
+          "Anyone can take a courier job at the board where it was posted. You carry one Sealed Courier's Parcel, which cannot be dropped, stored, traded or sold until it is delivered. Deliver it within three days of game time to be paid; if time runs out, the parcel goes back and the goods return to the sender.",
+          "Bandits beware, and couriers too: robbing a courier may take their parcel. The robber gets a Broken Courier's Parcel to open at a notice board, and the courier is not paid.",
+          "Senders can insure a parcel for up to the goods' value, for 10% of that value. If it is robbed, the hold's treasury pays the sender, as far as the treasury allows. Insurance does not pay out when the robber is the sender, the courier, or one of their party or faction, and a sender can claim at most twice a week."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Pigeons carry gold only",
     "date": "2026-10-11",
     "version": "Server update",
