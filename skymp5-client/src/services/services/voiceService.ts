@@ -22,6 +22,9 @@ const MIC_SHAPE = /^mics \d{1,2}(, [a-z]{2,4} [a-z?]{1,12}){1,6}$/;
 
 const PEERS_INTERVAL_MS = 400;
 const TOKEN_RETRY_MS = 5000;
+// Voice trace (/voicediag): the front reports every 5 s; anything larger or faster is dropped here
+const VOICE_DIAG_MAX_CHARS = 8000;
+const VOICE_DIAG_MIN_MS = 4000;
 const AFK_PING_INTERVAL_MS = 60000;
 const PLAYER_ID_SPACE = 0xff000000;
 
@@ -96,6 +99,8 @@ export class VoiceService extends ClientListener {
   private nextTokenAttemptAt = 0;
   private nextPeersAt = 0;
   private nextAfkPingAt = 0;
+  private voiceDiagUntil = 0;
+  private voiceDiagSentAt = 0;
 
   // A throw here would abort the shared event dispatch chain, taking input and movement processing down with it; voice must never do that
   private onButtonEvent(e: ButtonEvent) {
@@ -276,6 +281,15 @@ export class VoiceService extends ClientListener {
       logTrace(this, `voice ${line}`);
       const note = (globalThis as any).__dboDiagNote;
       if (typeof note === "function") note("voice", line);
+    } else if (kind === "voice::diag") {
+      const raw = String(e.arguments[1] ?? "");
+      const now = Date.now();
+      if (now > this.voiceDiagUntil || now - this.voiceDiagSentAt < VOICE_DIAG_MIN_MS || raw.length > VOICE_DIAG_MAX_CHARS) return;
+      let report: unknown;
+      try { report = JSON.parse(raw); } catch (err) { return; }
+      if (!report || typeof report !== "object" || Array.isArray(report)) return;
+      this.voiceDiagSentAt = now;
+      sendCustomPacket(this.controller, { customPacketType: "dbo", event: "voiceDiag", args: [report] });
     } else if (kind === "voice::error") {
       // Room dropped: forget the session and ask for a fresh token shortly
       this.connectedForRefrId = 0;
@@ -308,6 +322,14 @@ export class VoiceService extends ClientListener {
       const op = String(content["op"] ?? "");
       const label = String(content["name"] ?? "");
       if (id && op) this.sp.browser.executeJavaScript(`window.__alduinakVoice && window.__alduinakVoice.adjustPeer(${JSON.stringify(id)}, ${JSON.stringify(op)}, ${JSON.stringify(label)})`);
+      return;
+    }
+    // Staff voice trace: the server opened a window, the front reports the mix every 5 s for it
+    if (content["customPacketType"] === "dboVoiceDiag") {
+      const seconds = Math.min(300, Math.max(30, Math.round(Number(content["seconds"])) || 120));
+      this.voiceDiagUntil = Date.now() + seconds * 1000 + 5000;
+      this.sp.browser.executeJavaScript(`window.__alduinakVoice && window.__alduinakVoice.startDiag && window.__alduinakVoice.startDiag(${seconds})`);
+      logTrace(this, `voice trace open for ${seconds} s`);
       return;
     }
     // Sent whenever the room's players change; the map only ever grows more accurate, so a late one is harmless
