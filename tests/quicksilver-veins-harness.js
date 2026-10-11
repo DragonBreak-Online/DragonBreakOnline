@@ -116,7 +116,7 @@ const bandOf = (ore) => MINER.oreByTier.findIndex((t) => (t || []).some((o) => S
 const yieldOf = (ore, rank) => Math.max(1, Math.round(({ iron: 5, quicksilver: 2 })[ore] * MINER.yieldMultiplierByTier[rank]));
 
 // ---- 1. the data ----
-check('the boot line counts ten veins by reference (3 meteoric, 4 quicksilver, 3 adamantium)', /10 veins by reference/.test(boot), boot);
+check('the boot line counts thirteen veins by reference (3 meteoric, 4 quicksilver, 3 adamantium, 3 Bleak Mine geodes)', /13 veins by reference/.test(boot), boot);
 check('skills.json: quicksilver is a Miner tier 2 (Apprentice) ore', bandOf('quicksilver') === 1, MINER.oreByTier);
 check('the four quicksilver refs are iron veins of the mine by their base', QUICK.every((r) => /^MineOreIron/.test(VEINS[r])));
 

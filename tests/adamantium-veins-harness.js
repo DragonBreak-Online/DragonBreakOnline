@@ -119,7 +119,7 @@ const bandOf = (ore) => (ore === 'adamantium' ? Number(/adamantium: (\d)/.exec(L
 const yieldOf = (ore, rank) => Math.max(1, Math.round(({ silver: 2, adamantium: 1 })[ore] * MINER.yieldMultiplierByTier[rank]));
 
 // ---- 1. the data ----
-check('the boot line counts ten veins by reference (3 meteoric, 4 quicksilver, 3 adamantium) and the adamantium rest', /10 veins by reference/.test(boot) && /adamantium 60/.test(boot), boot);
+check('the boot line counts thirteen veins by reference (3 meteoric, 4 quicksilver, 3 adamantium, 3 Bleak Mine geodes) and the adamantium rest', /13 veins by reference/.test(boot) && /adamantium 60/.test(boot), boot);
 check('labour.js: adamantium is a Miner tier 4 (Expert) ore, with malachite', bandOf('adamantium') === 3 && bandOf('malachite') === 3);
 check('the three adamantium refs are silver veins of the Gutted Mine', QUICK.every((r) => /^MineOreSilver/.test(VEINS[r])));
 

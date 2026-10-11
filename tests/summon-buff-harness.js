@@ -75,6 +75,6 @@ ok(near(F.summonTakenMult(BOAR, FAMILIAR, 30), 0.9), 'a shorter list holds its l
 const cfgFile = JSON.parse(fs.readFileSync(path.join(SERVER, 'gamemode-config.json'), 'utf8')).summonBuff;
 ok(cfgFile && JSON.stringify(cfgFile.takenByTier) === JSON.stringify(TAKEN) && JSON.stringify(cfgFile.dealtByTier) === JSON.stringify(DEALT), 'gamemode-config.json carries the tiers');
 const SC = fs.readFileSync(path.join(SERVER, 'schools.js'), 'utf8');
-ok(/globalThis\.__dboSchoolRank = \(a, school\) =>/.test(SC) && /'__dboSchoolRank'\]\) globalThis\[k\] = null/.test(GM), 'schools.js gives the rank read-only, and a failed load clears it');
+ok(/globalThis\.__dboSchoolRank = \(a, school\) =>/.test(SC) && /'__dboSchoolRank'[^\]]*\]\) globalThis\[k\] = null/.test(GM), 'schools.js gives the rank read-only, and a failed load clears it');
 console.log(fails ? `\n${fails} FAILED` : '\nall passed');
 process.exit(fails ? 1 : 0);
