@@ -22,7 +22,34 @@ export interface SkillsSection {
   epigraph?: string;
   // Blacksmithing's craft tiers and recipes (gameplay smithing.js), for a Blacksmith while smithing is on
   smith?: SmithView | null;
+  // Arcane Arts' schools: state, level and today's casting (gameplay schools.js __dboSchoolsBrief)
+  magicSchools?: MagicSchools | null;
 }
+
+interface MagicSchools { castCap: number; chosen: boolean; firstAt: number; schools: Array<{ name: string; role: string; level: number; castToday: number }> }
+const ROLE_WORD: Record<string, string> = { primary: 'Primary', secondary: 'Secondary', resting: 'Resting', closed: 'Closed' };
+
+// One line per school: casting trains only the primary and secondary, and each has its own daily casting limit
+const SchoolStrip = ({ m }: { m: MagicSchools }) => (
+  <div className="journal-skills__schools">
+    {m.schools.map((x) => {
+      const on = x.role === 'primary' || x.role === 'secondary';
+      const full = on && x.castToday >= m.castCap;
+      return (
+        <span key={x.name} className={'journal-skills__school journal-skills__school--' + x.role}>
+          <span className="journal-skills__school-name">{x.name}</span>
+          <span className="journal-skills__school-role">{ROLE_WORD[x.role] || x.role}{x.level > 0 ? ' · ' + x.level : ''}</span>
+          {on ? <span className="journal-skills__school-cast">{full ? 'Casting limit reached today' : 'Casting today ' + Math.floor(x.castToday) + ' / ' + m.castCap}</span> : null}
+        </span>
+      );
+    })}
+    <p className="journal-skills__school-note">
+      {m.chosen
+        ? 'Casting trains only your primary and secondary schools. A resting or closed school\'s spells train Arcane Arts alone. Study Magic and classes still count after the casting limit.'
+        : 'Your schools of magic open at Arcane Arts ' + m.firstAt + '. Until then, casting trains Arcane Arts alone.'}
+    </p>
+  </div>
+);
 
 const EPIGRAPH = 'Time broke over Nirn, and every life you might have lived is true at once. Only one of them can be mastered.';
 // The spell skills: their schools are on the Magic tab
@@ -68,6 +95,7 @@ export const SkillsTab = ({ section, busy, act, openTab }: JournalTabProps<Skill
         <h2 className="journal-skills__name">{current.label}{current.title ? <span className="journal-skills__epithet">, {current.title}</span> : null}</h2>
         {current.lore ? <p className="journal-skills__lore">{current.lore}</p> : null}
         <p className="journal-skills__rules">{current.description}</p>
+        {current.id === 'arcane' && s.magicSchools ? <SchoolStrip m={s.magicSchools} /> : null}
         {MAGIC_SKILLS.has(current.id) && canDrawTab('magic') ? (
           <p className="journal-skills__link">
             Your schools of magic are on the Magic tab. <button type="button" className="journal__button" onClick={() => openTab('magic')}>Open Magic</button>
