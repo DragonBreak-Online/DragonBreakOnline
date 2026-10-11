@@ -197,18 +197,22 @@ export const poolUsed = (skills: PoolSkill[]): number => skills.reduce((n, s) =>
  * Donors for `units` of overflow, in the order the design sets: everything marked to fall first, highest
  * level first; then the lowest ▲ skill still above the floor. Never ■, never below its floor, never the
  * skill that is gaining. A skill marked to fall stops at `lowerFloor` (Nate, 8 Oct: below 25), the rest at
- * `floor`. Returns the deductions to apply and whatever it could not cover.
+ * `floor`. `lowerFloor` may be a function of the skill id: a trade taken up again just by doing it falls to 0, a skill
+ * with a tome or a rite for its opening stops at 1 (waningFloorOf). Returns the deductions to apply and whatever it could not cover.
  */
+export type LowerFloor = number | ((id: string) => number);
 export const floorOf = (lock: Lock, floor: number, lowerFloor: number): number => (lock === "lower" ? lowerFloor : floor);
-export const chooseDonors = (skills: PoolSkill[], gainingId: string, units: number, floor: number, lowerFloor = floor): { from: Array<{ id: string; units: number }>; short: number } => {
-  const able = (s: PoolSkill) => s.id !== gainingId && s.lock !== "hold" && s.level > floorOf(s.lock, floor, lowerFloor);
+const floorFor = (s: { id: string; lock: Lock }, floor: number, lowerFloor: LowerFloor): number =>
+  floorOf(s.lock, floor, typeof lowerFloor === "function" ? lowerFloor(s.id) : lowerFloor);
+export const chooseDonors = (skills: PoolSkill[], gainingId: string, units: number, floor: number, lowerFloor: LowerFloor = floor): { from: Array<{ id: string; units: number }>; short: number } => {
+  const able = (s: PoolSkill) => s.id !== gainingId && s.lock !== "hold" && s.level > floorFor(s, floor, lowerFloor);
   const lower = skills.filter((s) => able(s) && s.lock === "lower").sort((a, b) => b.level - a.level);
   const raise = skills.filter((s) => able(s) && s.lock === "raise").sort((a, b) => a.level - b.level);
   const out: Array<{ id: string; units: number }> = [];
   let left = units;
   for (const s of lower.concat(raise)) {
     if (left <= 0) break;
-    const available = unitsForLevel(s.level) + (s.xp / xpPerUnitAt(s.level)) - unitsForLevel(floorOf(s.lock, floor, lowerFloor));
+    const available = unitsForLevel(s.level) + (s.xp / xpPerUnitAt(s.level)) - unitsForLevel(floorFor(s, floor, lowerFloor));
     const take = Math.min(left, Math.max(0, available));
     if (take <= 0) continue;
     out.push({ id: s.id, units: take });
@@ -235,6 +239,9 @@ export type PointConfig = {
   transferFloor: number; firstTouchCost: number;
   // How low a skill marked to fall may go; 1 keeps it taken up (derivedOrder, firstTouch). Raised and held skills keep transferFloor
   waningFloor?: number;
+  // Per skill: 0 for a skill taken up again just by doing it (a trade at its station, a fight, a book), so a waning one
+  // falls out of the order and gives back every point; a skill missing here, or set above 0, keeps waningFloor (min 1)
+  waningFloorBySkill?: Record<string, number>;
   bucketBurst: number; bucketPerHour: number;
   dailyCaps: { low: number; expert: number; master: number }; characterDaily: number;
 };
@@ -251,9 +258,16 @@ export type GainOutcome = {
 
 const dayKey = (now: number): string => new Date(now).toISOString().slice(0, 10);
 
-// Never below 1 (a skill at 0 leaves the order and would cost its first touch again), never above the transfer floor
-export const waningFloorOf = (cfg: PointConfig): number =>
-  Math.max(1, Math.min(cfg.transferFloor, Math.floor(Number(cfg.waningFloor ?? cfg.transferFloor) || 1)));
+// How low a waning skill falls. A skill at 0 leaves the order and costs its first touch again, which is right for a
+// skill whose opening is just doing it (skills.json pointSystem.waningFloorBySkill 0: Rocco, 10 Oct, a skill waning at 1
+// held a point that could go nowhere) and wrong for one opened by a Novice tome at a study point or a rite, so the
+// rest never go below 1. Never above the transfer floor. Without `id`, the configured floor for those.
+export const waningFloorOf = (cfg: PointConfig, id?: string): number => {
+  const base = Math.max(1, Math.min(cfg.transferFloor, Math.floor(Number(cfg.waningFloor ?? cfg.transferFloor) || 1)));
+  const own = id !== undefined && cfg.waningFloorBySkill ? cfg.waningFloorBySkill[id] : undefined;
+  return own !== undefined && Number(own) === 0 ? 0 : base;
+};
+const lowerFloorOf = (cfg: PointConfig) => (id: string): number => waningFloorOf(cfg, id);
 
 /**
  * Apply `rawUnits` of validated work to one skill. Meters it through the token bucket, the per-skill and
@@ -301,13 +315,14 @@ export const applyGain = (rec: PointRecord, id: string, rawUnits: number, cfg: P
     const overflowLevels = used - cfg.pool;
     const donorUnits = unitsForLevel(grown.level) - unitsForLevel(Math.max(0, grown.level - overflowLevels));
     const pool = Object.entries(rec.skills).map(([k, v]) => ({ id: k, level: v.level, xp: v.xp, lock: v.lock, lastPointAt: v.lastPointAt }));
-    const donors = chooseDonors(pool, id, donorUnits, cfg.transferFloor, waningFloorOf(cfg));
+    const donors = chooseDonors(pool, id, donorUnits, cfg.transferFloor, lowerFloorOf(cfg));
     if (donors.short > 0 && !donors.from.length) return { gained: 0, units, tookFrom: [], refused: "pool" };
     for (const d of donors.from) {
       const t = rec.skills[d.id];
       const wasLevel = t.level;
-      const after = removeUnits(t.level, t.xp, d.units, floorOf(t.lock, cfg.transferFloor, waningFloorOf(cfg)));
-      t.level = after.level; t.xp = after.xp;
+      const after = removeUnits(t.level, t.xp, d.units, floorOf(t.lock, cfg.transferFloor, waningFloorOf(cfg, d.id)));
+      // A skill that falls to 0 has left the order: nothing of it is kept, so its next first touch starts clean
+      t.level = after.level; t.xp = after.level < 1 ? 0 : after.xp;
       tookFrom.push({ id: d.id, units: after.taken, levels: wasLevel - after.level });
     }
     // whatever the donors could not cover is simply not gained
@@ -334,16 +349,16 @@ export const firstTouch = (rec: PointRecord, id: string, cfg: PointConfig): bool
   let over = poolUsed(pool()) + cfg.firstTouchCost - cfg.pool;
   if (over > 0) {
     const falling = Object.entries(rec.skills)
-      .filter(([k, v]) => k !== id && v.lock === "lower" && v.level > waningFloorOf(cfg))
+      .filter(([k, v]) => k !== id && v.lock === "lower" && v.level > waningFloorOf(cfg, k))
       .sort((x, y) => y[1].level - x[1].level);
-    const room = falling.reduce((n, [, v]) => n + (v.level - waningFloorOf(cfg)), 0);
+    const room = falling.reduce((n, [k, v]) => n + (v.level - waningFloorOf(cfg, k)), 0);
     if (room < over) return false;
-    for (const [, v] of falling) {
+    for (const [k, v] of falling) {
       if (over <= 0) break;
-      const levels = Math.min(over, v.level - waningFloorOf(cfg));
-      const after = removeUnits(v.level, v.xp, unitsForLevel(v.level) - unitsForLevel(v.level - levels), waningFloorOf(cfg));
+      const levels = Math.min(over, v.level - waningFloorOf(cfg, k));
+      const after = removeUnits(v.level, v.xp, unitsForLevel(v.level) - unitsForLevel(v.level - levels), waningFloorOf(cfg, k));
       over -= v.level - after.level;
-      v.level = after.level; v.xp = after.xp;
+      v.level = after.level; v.xp = after.level < 1 ? 0 : after.xp;
     }
     if (over > 0) return false;
   }
