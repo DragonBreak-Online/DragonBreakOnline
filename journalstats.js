@@ -361,8 +361,10 @@ module.exports = (api) => {
       return found.some((x) => { const who = identityOf(x); return !!who && who.account === d.account && who.tag === d.tag; });
     } catch (e) { return true; }
   };
-  const orphans = () => {
-    let names = []; try { names = fs.readdirSync(DIR); } catch (e) { return []; }
+  // names: only these file names (the journal's sweep checks a few a tick); none: every file in the folder
+  const orphans = (names) => {
+    if (Array.isArray(names)) names = names.map(String);
+    else { names = []; try { names = fs.readdirSync(DIR); } catch (e) { return []; } }
     const out = [];
     for (const n of names) {
       const m = /^([0-9a-f]{16})\.json$/.exec(n); if (!m) continue;

@@ -49,7 +49,7 @@ module.exports = (api) => {
   const { mp, log, display, nameOf, openWidget, closeWidget, onUi, sendPacket, every, onlineActors, hasCap, skills, cfg } = api;
   const personal = typeof api.personal === 'function' ? api.personal : () => {};
   const isAdmin = typeof api.isAdmin === 'function' ? api.isAdmin : () => false;
-  const C = Object.assign({ enabled: true, backstoryMax: 4000, originMax: 1000, saveEveryMs: 3000, combatSeconds: 8, watchSeconds: 1, sweepHours: 6, sweepAfterBootMinutes: 30 },
+  const C = Object.assign({ enabled: true, backstoryMax: 4000, originMax: 1000, saveEveryMs: 3000, combatSeconds: 8, watchSeconds: 1, sweepHours: 6, sweepAfterBootMinutes: 30, sweepChunk: 4, sweepStepMs: 1000 },
     (cfg && cfg.journal) || {});
   const WIDGET_ID = 50;
   const TIER_FLOORS = [1, 25, 50, 75, 90];
@@ -695,14 +695,26 @@ module.exports = (api) => {
   // asks journalstats for the files no character carries the key of any more (orphans()): listed on two sweeps running,
   // the file is moved aside to removed/ (forget()). Not in the first minutes after a boot, when reads can come back
   // empty, and if most files are listed at once the check itself is suspect and nothing is moved.
-  const sweep = () => {
+  // The check reads each file and asks after its character, about 25 ms a file on live: one tick over all 249 froze the
+  // main loop for 5.1 s (10 Oct) and 6.3 s (11 Oct). So the 6 h timer only lists the files, and journalSweepStep checks
+  // C.sweepChunk of them each C.sweepStepMs; the run lives in J.sweepRun, so a hot reload carries on with it.
+  const FILE_RX = /^[0-9a-f]{16}\.json$/;
+  const sweepDoc = () => {
     const d = globalThis.__dboJournalDoc;
-    if (!d || typeof d.orphans !== 'function' || typeof d.forget !== 'function' || !d.dir) return 0;
-    if (process.uptime() < C.sweepAfterBootMinutes * 60) return 0;
-    let total = 0, keys = [];
-    try { total = fs.readdirSync(d.dir).filter((f) => /^[0-9a-f]{16}\.json$/.test(f)).length; keys = d.orphans(); }
-    catch (e) { log(`journal: the orphan check failed: ${e.message}`); return 0; }
-    if (!Array.isArray(keys)) return 0;
+    return d && typeof d.orphans === 'function' && typeof d.forget === 'function' && d.dir ? d : null;
+  };
+  const sweepStart = () => {
+    if (J.sweepRun) return J.sweepRun;
+    const d = sweepDoc();
+    if (!d || process.uptime() < C.sweepAfterBootMinutes * 60) return null;
+    let names;
+    try { names = fs.readdirSync(d.dir).filter((f) => FILE_RX.test(f)); }
+    catch (e) { log(`journal: the orphan check failed: ${e.message}`); return null; }
+    J.sweepRun = { names, i: 0, keys: [], total: names.length, at: Date.now() };
+    return J.sweepRun;
+  };
+  const sweepFinish = (d, run) => {
+    const keys = [...new Set(run.keys)], total = run.total;
     const listed = new Set(keys);
     for (const k of [...J.gone.keys()]) if (!listed.has(k)) J.gone.delete(k);
     if (total > 3 && keys.length * 2 > total) { log(`journal: ${keys.length} of ${total} files look orphaned at once; the check is suspect, nothing moved`); return 0; }
@@ -716,7 +728,32 @@ module.exports = (api) => {
     }
     return moved;
   };
-  every('journalSweep', C.sweepHours * 3600000, sweep);
+  // Checks the next few files of the sweep under way; the moved count when this step ends it, else 0
+  const sweepStep = (chunk = C.sweepChunk) => {
+    const run = J.sweepRun;
+    if (!run) return 0;
+    const d = sweepDoc();
+    if (!d) { J.sweepRun = null; return 0; }
+    const part = run.names.slice(run.i, run.i + Math.max(1, chunk | 0));
+    run.i += part.length;
+    let keys = [];
+    try { keys = part.length ? d.orphans(part) : []; }
+    catch (e) { J.sweepRun = null; log(`journal: the orphan check failed: ${e.message}`); return 0; }
+    if (!Array.isArray(keys)) { J.sweepRun = null; return 0; }
+    for (const k of keys) run.keys.push(k);
+    if (run.i < run.names.length) return 0;
+    J.sweepRun = null;
+    return sweepFinish(d, run);
+  };
+  // A whole sweep at once (the old harness, a staff check): never from a timer
+  const sweep = () => {
+    if (!sweepStart()) return 0;
+    let moved = 0;
+    while (J.sweepRun) moved = sweepStep(Number.MAX_SAFE_INTEGER);
+    return moved;
+  };
+  every('journalSweep', C.sweepHours * 3600000, () => { sweepStart(); });
+  every('journalSweepStep', C.sweepStepMs, () => sweepStep());
 
   log(`journal ${C.enabled ? 'on' : 'off'}: widget ${WIDGET_ID}, ${(TITLES.classes || []).length} title classes, ${J.open.size} open`);
   return { titlesFor, clockView, profileView, statsView, payload, hubPayload, tabsFor, open, proseProblem, sweep, busyReason };
