@@ -140,9 +140,8 @@ const namesEqual = (a: Entry, b: Entry): boolean => {
   return false;
 };
 
-// Property keys (housing system) are identified by their name extra, so name
-// blindness would merge distinct keys and desync against the server.
-export const PROPERTY_KEY_BASE_ID = 0x000DB0E2; // TODO: Replace with mod key when ESP is made
+import { PROPERTY_KEY_BASE_ID } from "./propertyKey";
+export { PROPERTY_KEY_BASE_ID };
 
 // Server floats pass through C++ float storage
 const sameFloat = (a: number, b: number): boolean => Math.abs(a - b) <= 1e-3 * Math.max(1, Math.abs(a));
@@ -605,7 +604,27 @@ const withKeysRebuilt = (refr: ObjectReference, target: Inventory, diff: Entry[]
     return diff;
   }
   refr.removeItem(key, held, true, null);
+  if (refr.getFormID() === 0x14) noteKeysRebuilt(diff, target);
   return diff.filter((e) => !isPropertyKey(e)).concat(target.entries.filter(isPropertyKey).map((e) => ({ ...e })));
+};
+
+// The first few rebuilds of a session say which keys disagreed: a rebuild every apply (5 s) means a key the engine
+// gives back differently from the server's copy, and these lines are how to tell which (diagnostics only)
+const KEY_NOTES_PER_SESSION = 3;
+let keyNotes = 0;
+const keyList = (entries: Entry[]): string =>
+  entries.slice(0, 6).map((e) => `${JSON.stringify(String(e.name || "").slice(0, 40))} x${Math.abs(e.count)}`).join(", ") +
+  (entries.length > 6 ? ` +${entries.length - 6} more` : "");
+const noteKeysRebuilt = (diff: Entry[], target: Inventory): void => {
+  if (keyNotes >= KEY_NOTES_PER_SESSION) return;
+  keyNotes++;
+  const note = (globalThis as { __dboDiagNote?: (kind: string, text: string) => void }).__dboDiagNote;
+  try {
+    if (typeof note === "function") {
+      note("invKeys", `keys rebuilt (${keyNotes}/${KEY_NOTES_PER_SESSION}): held, not on the server [${keyList(diff.filter((e) => isPropertyKey(e) && e.count < 0))}]; ` +
+        `server, not held [${keyList(diff.filter((e) => isPropertyKey(e) && e.count > 0))}]; server holds ${target.entries.filter(isPropertyKey).length} key entr(ies)`);
+    }
+  } catch { /* diagnostics only */ }
 };
 
 const applyInventoryInner = (

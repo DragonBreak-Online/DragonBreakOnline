@@ -4,6 +4,7 @@ import { localIdToRemoteId } from "../../view/worldViewMisc";
 import { Actor, ContainerChangedEvent, MenuCloseEvent } from "skyrimPlatform";
 import { ClientListener, CombinedController, Sp } from "./clientListener";
 import { Inventory } from "../../sync/inventory";
+import { PROPERTY_KEY_BASE_ID } from "../../sync/propertyKey";
 import { MsgType } from "../../messages";
 import { logTrace, logError } from "../../logging";
 
@@ -73,6 +74,12 @@ export class CraftService extends ClientListener {
         const newContainerId = e.newContainer ? e.newContainer.getFormID() : 0;
         const baseObjId = e.baseObj ? e.baseObj.getFormID() : 0;
         if (oldContainerId !== 0x14 && newContainerId !== 0x14) {
+          return;
+        }
+
+        // No recipe takes or makes a property key (the housing system cuts them), and the periodic inventory apply takes
+        // every key off and adds the server's set back (inventory.ts withKeysRebuilt): seated, that read as a craft
+        if ((baseObjId >>> 0) === PROPERTY_KEY_BASE_ID) {
           return;
         }
 
