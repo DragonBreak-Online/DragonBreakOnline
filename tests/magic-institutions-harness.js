@@ -168,6 +168,7 @@ const api = {
 const MODULES = ['spells.js', 'schools.js', 'salvage.js', 'skillrates.js'].map(F);
 const load = (cfg) => { api.cfg = cfg || baseCfg(); handlers.clear(); commands.clear(); for (const f of MODULES) delete require.cache[f]; for (const f of MODULES) require(f)(api); };
 load();
+check('the default Senior allowance is two tomes a week (Nate, 11 Oct)', (() => { const s = fs.readFileSync(path.join(SERVER, 'spells.js'), 'utf8'); return /shopSeniorPerWindow: 2,/.test(s) && /shopSeniorWindowDays: 7,/.test(s); })());
 const ui = (ev, a, args, widgetId) => (handlers.get(ev) || []).forEach((fn) => fn(a, args || [], widgetId || 0));
 const lastWidget = (a, type) => { const l = out.widgets.filter((w) => w.a === (a >>> 0) && (!type || w.w.type === type)); return l.length ? l[l.length - 1].w : null; };
 const said = (a) => { const l = out.said.filter((p) => p[0] === (a >>> 0)); return l.length ? l[l.length - 1][1] : ''; };
@@ -204,7 +205,7 @@ put(ASSOC, 'private.dboSchools', { v: 1, primary: 'Destruction', secondary: null
 w = shop(ASSOC);
 check('the shelf leads with the primary school and keeps to the rank: 4 tomes, 3+ Destruction, none above Apprentice', w.tomes.length === 4 && w.tomes.filter((t) => t.school === 'Destruction').length >= 3 && w.tomes.every((t) => t.rank <= 1), w.tomes.map((t) => [t.school, t.rank]));
 ui('uiCaps', ASSOC, ['spellbook']); put(ASSOC, 'private.dboSchools', undefined);
-load();
+load(Object.assign(baseCfg(), { spells: Object.assign({}, baseCfg().spells, { shopSeniorWindowDays: 1, shopSeniorPerWindow: 1 }) }));   // Worker E's one-a-day mode, still a valid setting
 
 // ---- 2. two a week for a Senior (rolling 7 days), one a week for the rest (Nate, 11 Oct) ----------------------------
 const t0 = wallClock;
@@ -241,7 +242,7 @@ check('...and buys one', w.resultKind === 'ok' && count(SENIOR, idOf(REANIMATE.b
 put(SENIOR, 'private.dboTomeBoughtAt', 0);
 load(Object.assign(baseCfg(), { spells: Object.assign({}, baseCfg().spells, { seniorOnlyTomes: [] }) }));
 check('an empty seniorOnlyTomes opens them to every member', hasTome(shop(ASSOC), RAISE));
-load();
+load(Object.assign(baseCfg(), { spells: Object.assign({}, baseCfg().spells, { shopSeniorWindowDays: 1, shopSeniorPerWindow: 1 }) }));   // Worker E's one-a-day mode, still a valid setting
 
 // ---- 4. teaching at a college's ledger ---------------------------------------------------------------------------------
 for (const a of online) put(a, 'private.dboTomeBoughtAt', 0);

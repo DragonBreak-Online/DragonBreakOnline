@@ -71,8 +71,8 @@ module.exports = (api) => {
     // A Senior rank or above has shopSeniorPerWindow tomes in any rolling shopSeniorWindowDays, bought or taught with (below,
     // a class's spell too); everyone else one in shopCooldownDays (Nate, 11 Oct: one a day for Seniors, so a college with
     // several students can be taught, while every spell taught still costs a tome)
-    shopSeniorPerWindow: 1,
-    shopSeniorWindowDays: 1,
+    shopSeniorPerWindow: 2,
+    shopSeniorWindowDays: 7,
     // Restricted arts, sold (and taught) only to Senior ranks and above: raising the dead and calling the Daedra lords, and
     // the spells that banish or command Daedra. Tome editor ids from spell-tomes.json; the shop's own filters (shopMaxRank,
     // the province, shopExcludePattern) still apply on top, so some are listed only so that they stay restricted.
