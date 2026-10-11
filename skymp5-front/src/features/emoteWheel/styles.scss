@@ -51,7 +51,10 @@ $text-muted: rgba(215, 227, 227, 0.62);
     grid-template-columns: minmax(570px, 1fr) 340px;
     align-items: center;
     gap: clamp(24px, calc(4 * var(--dbo-vw)), 58px);
-    filter: drop-shadow(0 30px 46px rgba(0, 0, 0, 0.84));
+    // No filter here (11 Oct, "every time I click on B the UI freezes"): a drop-shadow on the whole stage is re-rastered
+    // for every frame of the preview gif inside it. Headless Chrome, software raster, while hovering the ring: 623 ms of
+    // raster per second at 1920x1080, 1560 at 2560x1440, 2968 at 3840x2160 with it; about 8x less without it. The ring
+    // keeps its own shadow (&__svg) and the preview its box-shadow, so the look barely changes.
   }
 
   &__wheel-section {
