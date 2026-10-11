@@ -14,6 +14,7 @@
 //   releaseDomPtt()           the game side saw the talk key go up (the page had lost the keyboard): stop the page's own
 //                             push-to-talk; cfg.pttScanCode in connect() names the launcher's talk key (DirectInput code,
 //                             256 + the button for a mouse button)
+//   startDiag(seconds)        /voicediag: report the mix every 5 s for that long ('voice::diag' <json>)
 // Events back to the game (window.skyrimPlatform.sendMessage):
 //   'voice::ready', 'voice::micDenied', 'voice::error' <text>,
 //   'voice::speaking' <json array of {id, level}: own voice plus audible speakers, every 150 ms while anyone talks, [] once when quiet>
@@ -39,6 +40,9 @@ const PEERS_KEY = 'dboVoicePeers';
 const DEFAULT_PREFS = { inputLabel: '', outputLabel: '', micGain: 1, outputVolume: 1, activation: 'ptt', vadThreshold: 0.06 };
 
 const LOADING_SETTLE_MS = 2000;  // after a loading screen, before the mic state is read again
+const DIAG_SAMPLE_MS = 250;      // voice trace (/voicediag): level sampling cadence
+const DIAG_REPORT_MS = 5000;
+const DIAG_MAX_PEERS = 24;
 
 // Connects two local peer connections to each other; munge may rewrite each SDP
 const pairUp = async (a, b, munge = (sdp) => sdp) => {
@@ -56,6 +60,13 @@ const pairUp = async (a, b, munge = (sdp) => sdp) => {
 
 const readPeers = () => { try { return JSON.parse(window.localStorage.getItem(PEERS_KEY)) || {}; } catch (e) { return {}; } };
 const clampNum = (v, lo, hi, def) => { const n = Number(v); return Number.isFinite(n) ? Math.min(hi, Math.max(lo, n)) : def; };
+const round = (v, dp) => (Number.isFinite(v) ? Math.round(v * 10 ** dp) / 10 ** dp : null);
+const rmsOf = (analyser, buf) => {
+  analyser.getFloatTimeDomainData(buf);
+  let sum = 0;
+  for (let i = 0; i < buf.length; i++) sum += buf[i] * buf[i];
+  return Math.sqrt(sum / buf.length);
+};
 const MODE_IMG = { whisper: whisperImg, talk: talkImg, shout: shoutImg };
 // Fallbacks; the server sends the real list in connect()
 const DEFAULT_MODES = [
@@ -481,11 +492,7 @@ class VoiceManager {
 
   micLevel() {
     const m = this.mic;
-    if (!m) return 0;
-    m.analyser.getFloatTimeDomainData(m.buf);
-    let sum = 0;
-    for (let i = 0; i < m.buf.length; i++) sum += m.buf[i] * m.buf[i];
-    return Math.sqrt(sum / m.buf.length);
+    return m ? rmsOf(m.analyser, m.buf) : 0;
   }
 
   // Open while push-to-talk is held, or while voice activation hears you (and briefly after)
@@ -761,6 +768,76 @@ class VoiceManager {
         }
       });
     });
+  }
+
+  // ---- voice trace (/voicediag): the mix and the levels heard, reported to the game every 5 s while the window is open ----
+  startDiag(seconds) {
+    this.diagUntil = Date.now() + clampNum(seconds, 30, 300, 120) * 1000;
+    this.diagStats = new Map();
+    this.diagSentAt = Date.now();
+    if (!this.diagTimer) this.diagTimer = setInterval(() => this.diagTick(), DIAG_SAMPLE_MS);
+  }
+
+  stopDiag() {
+    if (this.diagTimer) clearInterval(this.diagTimer);
+    this.diagTimer = null;
+    this.diagUntil = 0;
+    this.diagStats = null;
+    this.peerNodes.forEach((n) => {
+      if (!n.analyser) return;
+      try { n.source.disconnect(n.analyser); } catch (e) { /* gone */ }
+      n.analyser = null;
+    });
+  }
+
+  // The peer's voice as received, before distance and volume are applied
+  peerLevel(n) {
+    if (!n.analyser) {
+      if (!this.mix) return null;
+      n.analyser = this.mix.ctx.createAnalyser();
+      n.analyser.fftSize = 512;
+      n.buf = new Float32Array(n.analyser.fftSize);
+      n.source.connect(n.analyser);
+    }
+    return rmsOf(n.analyser, n.buf);
+  }
+
+  diagTick() {
+    const now = Date.now();
+    if (!this.diagUntil || now > this.diagUntil) { this.stopDiag(); return; }
+    const sample = (key, level) => {
+      if (typeof level !== 'number') return;
+      const st = this.diagStats.get(key) || { sum: 0, n: 0, pk: 0 };
+      st.sum += level; st.n++; st.pk = Math.max(st.pk, level);
+      this.diagStats.set(key, st);
+    };
+    try {
+      if (this.mic) sample('', this.micLevel());
+      this.peerNodes.forEach((n, id) => sample(id, this.peerLevel(n)));
+    } catch (e) { /* a node went away mid-sample */ }
+    if (now - this.diagSentAt < DIAG_REPORT_MS) return;
+    this.diagSentAt = now;
+    sendToGame('voice::diag', JSON.stringify(this.diagReport()));
+    this.diagStats = new Map();
+  }
+
+  diagReport() {
+    const stat = (key) => { const st = this.diagStats && this.diagStats.get(key); return st && st.n ? [round(st.sum / st.n, 3), round(st.pk, 3)] : [null, null]; };
+    const peers = [];
+    if (this.room) {
+      this.room.remoteParticipants.forEach((p) => {
+        const id = p.identity;
+        const v = this.vectors[id];
+        const d = v && typeof v.d === 'number' ? v.d : this.distances[id];
+        const [rms, pk] = stat(id);
+        peers.push({ id, n: (v && v.n) || '', d: typeof d === 'number' ? Math.round(d) : null, r: this.rangeFor(id), m: this.modeKeyFor(id) || '',
+          g: round(this.gainFor(id), 3), f: round(this.peerFactor(id), 2), rms, pk, lk: round(p.audioLevel || 0, 3), sub: this.peerNodes.has(id) || this.audioEls.has(id) });
+      });
+    }
+    peers.sort((a, b) => (a.d === null ? Infinity : a.d) - (b.d === null ? Infinity : b.d));
+    const [mic, micPk] = stat('');
+    return { mode: this.mode, vol: round(this.prefs.outputVolume, 2), mg: round(this.prefs.micGain, 2), mic, micPk, tx: this.transmitting,
+      echo: this.echo, room: !!this.room, peers: peers.slice(0, DIAG_MAX_PEERS) };
   }
 
   // ── Mode banner (bottom left, flashed when Alt+V changes the mode) ─────────
