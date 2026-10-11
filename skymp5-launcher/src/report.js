@@ -6,6 +6,8 @@
 const fs   = require('fs')
 const os   = require('os')
 const path = require('path')
+const zlib = require('zlib')
+const crypto = require('crypto')
 
 const PER_FILE_BYTES = 160 * 1024   // the proxy caps the whole request at 2 MB
 const REDACTIONS = [
@@ -248,10 +250,115 @@ function diagLog(gameDirs, mo2Root, now) {
     + text.replace(/\s+$/, '')
 }
 
+// SkyrimPlatform's CEF writes %TEMP%\Skyrim Platform\CEFTemp<hash of the game folder>\cef_debug.log (MyChromiumApp.cpp); a libcef
+// crash leaves its last lines there. Page console lines can carry chat, so they are counted, not sent
+const CEF_LOG_BYTES = 32 * 1024
+const CEF_CONSOLE = /:CONSOLE\(\d+\)\]/
+
+function cefLogCandidates(tempDirs) {
+  const out = []
+  for (const temp of [...new Set(tempDirs.filter(Boolean))]) {
+    const root = path.join(temp, 'Skyrim Platform')
+    let names = []
+    try { names = fs.readdirSync(root) } catch { continue }
+    for (const name of names) if (/^CEFTemp\d*$/i.test(name)) out.push(path.join(root, name, 'cef_debug.log'))
+  }
+  return out
+}
+
+function dropConsoleLines(text) {
+  let dropped = 0
+  const kept = text.split('\n').filter(l => (CEF_CONSOLE.test(l) ? (dropped++, false) : true))
+  return (dropped ? `[${dropped} page console line(s) left out]\n` : '') + kept.join('\n')
+}
+
+// The newest cef_debug.log, its end, for clientLog (on the backend's fixed field list, so no backend change)
+function cefLog(tempDirs, now) {
+  const found = []
+  for (const file of cefLogCandidates(tempDirs)) {
+    try { found.push({ file, mtime: fs.statSync(file).mtimeMs }) } catch { /* not there */ }
+  }
+  if (!found.length) return null
+  found.sort((a, b) => b.mtime - a.mtime)
+  const text = tail(found[0].file, 4 * CEF_LOG_BYTES)
+  if (!text) return null
+  const minutes = Math.max(0, Math.round((now - found[0].mtime) / 60000))
+  return `== CEF debug log (${found[0].file}, written ${minutes} min before this report${found.length > 1 ? `, newest of ${found.length}` : ''}) ==\n`
+    + keepEnd(dropConsoleLines(text), CEF_LOG_BYTES).replace(/\s+$/, '')
+}
+
+// SkyrimPlatform writes its spawn save as Documents\My Games\Skyrim Special Edition\Saves\TESMODPLATFORM-<guid>.ess whatever the
+// edition (LoadGame.cpp) and deletes them all only once a load has finished, so one left over is the save a load crashed on
+const PLATFORM_SAVE = /^TESMODPLATFORM-[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\.ess$/i
+const SAVE_MAGIC = 'TESV_SAVEGAME'
+const SAVE_CRASH_WINDOW_MS = 2 * 60 * 1000
+const SAVE_MAX_AGE_MS = 24 * 60 * 60 * 1000
+const SAVE_RAW_MAX = 16 * 1024 * 1024
+// Compressed, so its base64 stays under the proxy's 2 MB request cap (the template save is 4.4 MB, 1.3 MB in brotli)
+const SAVE_SEND_MAX = 1400 * 1024
+
+function platformSaveDir(documentsDir) {
+  return path.join(documentsDir || path.join(os.homedir(), 'Documents'), 'My Games', 'Skyrim Special Edition', 'Saves')
+}
+
+function newestPlatformSave(dir, now = Date.now()) {
+  let best = null
+  let names = []
+  try { names = fs.readdirSync(dir) } catch { return null }
+  for (const name of names) {
+    if (!PLATFORM_SAVE.test(name)) continue
+    try {
+      const file = path.join(dir, name)
+      const st = fs.statSync(file)
+      if (!st.isFile() || now - st.mtimeMs > SAVE_MAX_AGE_MS) continue
+      if (!best || st.mtimeMs > best.mtimeMs) best = { file, name, mtimeMs: st.mtimeMs, size: st.size }
+    } catch { /* gone */ }
+  }
+  return best
+}
+
+// Why the save goes with this report, or null. gameEnd: crashWatch's note of the last session; crash: newestCrashLog's find
+function saveReason(save, { gameEnd, crash } = {}) {
+  if (!save) return null
+  if (gameEnd && gameEnd.outcome === 'crash' && Number(gameEnd.endedAt) - Number(gameEnd.startedAt) <= SAVE_CRASH_WINDOW_MS
+      && save.mtimeMs >= Number(gameEnd.startedAt) - 60_000 && save.mtimeMs <= Number(gameEnd.endedAt) + 5000) {
+    return `the game crashed ${Math.round((gameEnd.endedAt - gameEnd.startedAt) / 1000)} s after it started`
+  }
+  if (crash) {
+    const gap = crash.mtimeMs - save.mtimeMs
+    if (gap >= -5000 && gap <= SAVE_CRASH_WINDOW_MS) return `the crash log was written ${Math.max(0, Math.round(gap / 1000))} s after the save`
+  }
+  return null
+}
+
+// The save as a brotli-compressed base64 attachment, or { skipped } saying why not. Async: compressing it takes seconds
+async function platformSaveFor({ documentsDir, crashDirs = [], gameEnd = null, now = Date.now(), log = () => {} }) {
+  const save = newestPlatformSave(platformSaveDir(documentsDir), now)
+  if (!save) return null
+  const reason = saveReason(save, { gameEnd, crash: newestCrashLog(crashDirs, now) })
+  if (!reason) return { skipped: `${save.name} was not written within 2 min before a crash` }
+  if (save.size > SAVE_RAW_MAX) return { skipped: `${save.name} is ${save.size} bytes` }
+  let raw
+  try { raw = fs.readFileSync(save.file) } catch (err) { return { skipped: `${save.name} unreadable: ${err.message}` } }
+  if (raw.subarray(0, SAVE_MAGIC.length).toString('latin1') !== SAVE_MAGIC) return { skipped: `${save.name} is not a save file` }
+  const started = Date.now()
+  const packed = await new Promise((resolve, reject) => zlib.brotliCompress(raw, { params: {
+    [zlib.constants.BROTLI_PARAM_QUALITY]: 11, [zlib.constants.BROTLI_PARAM_LGWIN]: 24, [zlib.constants.BROTLI_PARAM_SIZE_HINT]: raw.length,
+  } }, (err, out) => (err ? reject(err) : resolve(out))))
+  log(`[report] ${save.name}: ${raw.length} bytes, ${packed.length} compressed in ${Date.now() - started} ms (${reason})`)
+  if (packed.length > SAVE_SEND_MAX) return { skipped: `${save.name} is ${packed.length} bytes compressed` }
+  return {
+    kind: 'platformSave', name: save.name, encoding: 'br', size: raw.length,
+    sha256: crypto.createHash('sha256').update(raw).digest('hex'),
+    writtenMinutesAgo: Math.max(0, Math.round((now - save.mtimeMs) / 60000)), reason,
+    data: packed.toString('base64'),
+  }
+}
+
 // context: whatever the launcher already knows (versions, install dir, the step that failed)
 // gameDirs: the folders the game may have run from (the isolated copy first); installDir is tried after them
 function collect({ userDataDir, installDir, documentsDir, myGamesVariants = ['Skyrim Special Edition'], mo2Root = null,
-  gameDirs = [], context = {}, now = Date.now() }) {
+  gameDirs = [], tempDirs = [], context = {}, now = Date.now() }) {
   const files = {}
   const launcher = tail(path.join(userDataDir, 'install.log'))
   if (launcher) files.launcherLog = redact(launcher)
@@ -288,6 +395,9 @@ function collect({ userDataDir, installDir, documentsDir, myGamesVariants = ['Sk
   const diag = diagLog([...gameDirs, installDir], mo2Root, now)
   if (diag) files.clientLog = redact(diag)
 
+  const cef = cefLog(tempDirs, now)
+  if (cef) files.clientLog = (files.clientLog ? files.clientLog + '\n\n' : '') + redact(cef)
+
   if (installDir) {
     // A directory listing is often the whole answer: a foreign modlist or a missing Data folder shows up here
     try {
@@ -311,4 +421,5 @@ function collect({ userDataDir, installDir, documentsDir, myGamesVariants = ['Sk
   }
 }
 
-module.exports = { collect, redact, tail, ends, dropUiLines, gameLogEnds, condenseCrashLog, newestCrashLog, cpuSummary }
+module.exports = { collect, redact, tail, ends, dropUiLines, gameLogEnds, condenseCrashLog, newestCrashLog, cpuSummary,
+  cefLog, newestPlatformSave, saveReason, platformSaveFor, platformSaveDir, SAVE_SEND_MAX }
