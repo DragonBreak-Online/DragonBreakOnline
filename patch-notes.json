@@ -1,5 +1,19 @@
 [
   {
+    "title": "The SPR Dawnguard axe and crossbow can no longer be forged",
+    "date": "2026-10-11",
+    "version": "Server update",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Smithing",
+        "items": [
+          "The Dawnguard War Axe SPR and the Enhanced Crossbow SPR can no longer be forged or improved by anyone, Dawnguard smiths included: they were far stronger than intended. Your materials stay with you if you try. Neither one drops as loot."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Spell tomes from reading follow your college rank",
     "date": "2026-10-11",
     "version": "Server update",

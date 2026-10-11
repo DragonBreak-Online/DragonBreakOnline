@@ -1,6 +1,8 @@
 {
   "_comment": "Hand overrides for the dungeon loot tiers (loottiers.js), checked before loot-materials.json, so a regeneration of that map keeps them. never: items that are never loot on any path, with the reason. Keys are mp descs.",
   "never": {
+    "f0d:JK's Fort Dawnguard.esp": "XJKFDDLC1DawnguardAxe (Dawnguard War Axe SPR): base damage 111 against the Dawnguard War Axe's 13 (audit 11 Oct 2026); never loot, and no forge makes it (regions-overrides.json forgeNever) until the PC fixes the plugin",
+    "f0e:JK's Fort Dawnguard.esp": "XJKFDDLC1CrossBowEnhanced (Enhanced Crossbow SPR): base damage 119 against the Enhanced Crossbow's 19 (audit 11 Oct 2026); never loot, and no forge makes it (regions-overrides.json forgeNever) until the PC fixes the plugin",
     "81dfc:BSHeartland.esm": "CYRIronFalchion: untextured model in Beyond Skyrim Bruma (#bugs \"Iron Falchion Missing Textures\", 1 Oct 2026)",
     "6173c:BSHeartland.esm": "CYRBloodscaleHelmet: its armor addons cover only Argonians and Khajiit, so every other race wears it bald (#bugs \"Bloodscales Bone Helmet\", 5 Oct 2026; Nate: out of every loot pool until the PC adds the addons)",
     "602974:BSAssets.esm": "CYR_ColovianNobleClothes01 (the red Colovian Fine Clothes in BSAssets.esm): its armor addon 602976 gives a first-person mesh (1stPerson_nobleF_0.nif) as the female world model, so a woman wearing it is mostly invisible (#bugs \"As much as i dont want it reported cause its hilarious\", 7 Oct 2026); the BSHeartland twin CYRColovianNobleClothes01 (877b8) looks the same and stays loot. Out until a plugin override fixes the addon",

@@ -54,12 +54,12 @@ module.exports = (api) => {
       if (mtime !== S.ovrMtime) {
         try {
           const raw = mtime ? JSON.parse(fs.readFileSync(OVR_FILE, 'utf8')) : {};
-          S.ovr = { aliases: lowerKeys(raw.aliases), families: lowerKeys(raw.families), benches: lowerKeys(raw.benches), items: lowerKeys(raw.items), recipes: lowerKeys(raw.recipes), tomes: lowerKeys(raw.tomes), places: lowerKeys(raw.places) };
+          S.ovr = { aliases: lowerKeys(raw.aliases), families: lowerKeys(raw.families), benches: lowerKeys(raw.benches), items: lowerKeys(raw.items), recipes: lowerKeys(raw.recipes), tomes: lowerKeys(raw.tomes), places: lowerKeys(raw.places), forgeNever: lowerKeys(raw.forgeNever) };
           S.ovrMtime = mtime;
         } catch (e) { log(`regions: ${OVR_FILE} unreadable (${e.message})${S.ovr ? ', keeping the last good copy' : ''}`); S.ovrMtime = mtime; }
       }
     }
-    return S.ovr || { aliases: {}, families: {}, benches: {}, items: {}, recipes: {}, tomes: {}, places: {} };
+    return S.ovr || { aliases: {}, families: {}, benches: {}, items: {}, recipes: {}, tomes: {}, places: {}, forgeNever: {} };
   };
   const hand = (table, desc, edid) => { const t = O()[table]; const a = desc ? t[norm(desc)] : undefined; return a !== undefined ? a : (edid ? t[String(edid).toLowerCase()] : undefined); };
 
@@ -324,12 +324,36 @@ module.exports = (api) => {
     const fromWood = swap && wood ? short : 0;
     return { need: (per && wood ? per * n : 0) + fromWood * swap, have: wood ? heldOf(a, wood) : 0, wood, per, coal, coalPer, coalNeed: coalNeed - fromWood, coalHave, swapped: fromWood, swap };
   };
+  // { desc, name, why } when regions-overrides.json forgeNever lists the product (by desc, else its editor id), else null
+  const forgeNever = (itemId) => {
+    const t = O().forgeNever || {};
+    if (!Object.keys(t).length) return null;
+    const desc = descOf(itemId); const edid = edidOf(desc);
+    const why = t[norm(desc)] !== undefined ? t[norm(desc)] : (edid ? t[edid.toLowerCase()] : undefined);
+    if (why === undefined || why === null || why === false) return null;
+    const w = typeof why === 'object' ? why : { why: String(why) };
+    return { desc: norm(desc), name: String(w.name || edid || 'That'), why: String(w.why || '') };
+  };
   const artifactCraft = (itemId, recipeId) => {
     const product = edidOf(descOf(itemId));
     return !!product && ARTIFACT.test(product) && !isTemper(recipeId);
   };
   const craftHook = function (actorId, itemId, count, recipeId, ...rest) {
     const a = Number(actorId) >>> 0;
+    // Gear no forge makes, for anyone, staff and the item's own faction too (regions-overrides.json forgeNever: product desc
+    // or editor id -> why; 11 Oct: JK's Fort Dawnguard's SPR war axe and crossbow carry base damage 111 and 119 until the
+    // PC fixes the plugin). Tempering is refused as well: it is the same item. Re-read with the overrides file, no reload
+    const never = forgeNever(Number(itemId) >>> 0);
+    if (never) {
+      if (Date.now() - (dragonToldAt.get(a) || 0) > 3000) {
+        dragonToldAt.set(a, Date.now());
+        const text = `${never.name} can no longer be forged or improved: it was far stronger than intended. Your materials come back when you close the menu.`;
+        personal(a, text);
+        try { sendPacket(a, { customPacketType: 'dboNotice', text }); } catch (e) { /* the chat line is enough */ }
+        audit(`FORGENEVER craft refused ${who(a)} recipe ${edidOf(descOf(Number(recipeId) >>> 0)) || (Number(recipeId) >>> 0).toString(16)} -> ${never.desc} (${never.why})`);
+      }
+      return false;
+    }
     if (artifactCraft(Number(itemId) >>> 0, Number(recipeId) >>> 0)) {
       if (Date.now() - (dragonToldAt.get(a) || 0) > 3000) {
         dragonToldAt.set(a, Date.now());

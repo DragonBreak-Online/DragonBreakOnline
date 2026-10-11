@@ -97,5 +97,10 @@
     "ccBGSSSE025_SpellTomeConjureDarkSeducerArcher": ["skyrim"],
     "ccBGSSSE025_SpellTomeConjureDarkSeducerWarrior": ["skyrim"]
   },
-  "places": { "RealmofLorkhan": "none", "130040:DragonBreak Online Edits.esp": "cyrodiil" }
+  "places": { "RealmofLorkhan": "none", "130040:DragonBreak Online Edits.esp": "cyrodiil" },
+  "forgeNever": {
+    "_comment": "Products no recipe makes or improves, for anyone, staff and the item's own faction included (regions.js craftHook, before every other rule; applied on save). Key: product desc or editor id; value: { name shown, why }. Audit lines: FORGENEVER craft refused.",
+    "f0d:JK's Fort Dawnguard.esp": { "name": "The Dawnguard War Axe SPR", "why": "XJKFDDLC1DawnguardAxe base damage 111 (the Dawnguard War Axe has 13); 11 Oct audit, until the PC sets it to 13" },
+    "f0e:JK's Fort Dawnguard.esp": { "name": "The Enhanced Crossbow SPR", "why": "XJKFDDLC1CrossBowEnhanced base damage 119 (the Enhanced Crossbow has 19); 11 Oct audit, until the PC sets it to 19" }
+  }
 }
