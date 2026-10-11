@@ -21,7 +21,7 @@
 //     T5 (Daedric, dragon: staff-granted with /manual grant, audit-logged, like artifacts); never outside the provinces
 //     its material belongs to (provinces, from regions-overrides.json's families);
 //   Scholars: at the Scholars' Ledger, a Scholar at or above a manual's tier copies any manual they have learned, for
-//     copy.paper paper, inside the reading copies' daily cap (reading.bookDailyCap, private.scholarCopies).
+//     copy.paper paper, inside a daily cap of their own (copy.dailyCap, else reading.bookDailyCap; private.dboManualCopies).
 // Smithing skill books (BOOK DATA "teaches skill" with actor value 10: the five vanilla and the five Beyond Skyrim ones)
 // are Blacksmith work once per book per character, read from the inventory or won at the reading of a placed one:
 // masterySystem's award (__alduinakMasteryAward) credits a Blacksmith inside the Wheel's caps.
@@ -70,7 +70,7 @@ module.exports = (api) => {
   const WITHHELD = new Set((Array.isArray(SMC.withheldBooks) ? SMC.withheldBooks : ['chitin']).map(String));
   const scholarNeed = (tier) => Number((SMC.scholarForBook || { 2: 1, 3: 1, 4: 1, 5: 2, 6: 3, 7: 3 })[tier]) || 0;
   const scholarTier = (a) => (typeof globalThis.__dboSmithScholarTier === 'function' ? Number(globalThis.__dboSmithScholarTier(a)) || 0 : rankIn(a, C.scholarSkill) + 1);
-  const REC = 'private.dboManuals', BOOKS_READ = 'private.dboSkillBooks', COPIES = 'private.scholarCopies', OWED = 'private.dboManualsOwed';
+  const REC = 'private.dboManuals', BOOKS_READ = 'private.dboSkillBooks', COPIES = 'private.dboManualCopies', OWED = 'private.dboManualsOwed';
 
   const get = (id, prop, dflt) => { try { const v = mp.get(id, prop); return v === undefined || v === null ? dflt : v; } catch (e) { return dflt; } };
   const set = (id, prop, v) => { try { mp.set(id, prop, v); return true; } catch (e) { log(`manuals: set ${prop} failed`, e.message); return false; } };
@@ -390,7 +390,10 @@ module.exports = (api) => {
     try { if (typeof notify === 'function') notify(a, `${m.title} added`); } catch (e) { /* offline */ }
     return { ok: true, text: `You buy ${m.title} for ${price} gold. Read it to learn it; the book is used up as you learn.` };
   };
-  const dayCap = () => Math.max(0, Number(((cfg.reading || {}).bookDailyCap)) || 6);
+  // Copies at the ledger have their own count: they shared private.scholarCopies with the books copied while reading, so
+  // "You have copied 6 books today" came after two schematics (misfit_panda, #bugs 1558637439399231548, 11 Oct). The cap
+  // is copy.dailyCap, else reading.bookDailyCap as before
+  const dayCap = () => Math.max(0, Number(C.copy.dailyCap != null ? C.copy.dailyCap : ((cfg.reading || {}).bookDailyCap)) || 6);
   const today = () => new Date(Date.now()).toISOString().slice(0, 10);
   const copiesToday = (a) => { const c = get(a, COPIES, null); return c && c.day === today() ? Number(c.n) || 0 : 0; };
   // The manuals this Scholar may copy: learned, at or above its tier; each { bookId, label }
@@ -406,7 +409,7 @@ module.exports = (api) => {
   globalThis.__dboManualsCopyRefusal = (a) => {
     if (!C.enabled || !C.copy.enabled) return 'Manuals are not copied here.';
     if (rankIn(a, C.scholarSkill) < 0) return 'Only a Scholar copies manuals.';
-    if (copiesToday(a) >= dayCap()) return `You have copied ${dayCap()} books today. Rest your hand until tomorrow.`;
+    if (copiesToday(a) >= dayCap()) return `You have copied ${copiesToday(a)} manuals and schematics today, the most one day allows. Rest your hand until tomorrow.`;
     if (!globalThis.__dboManualsCopyList(a).length) return 'You know no manual you are learned enough to copy.';
     return '';
   };
