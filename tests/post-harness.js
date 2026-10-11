@@ -36,7 +36,7 @@ const api = {
   log: () => {}, personal: (a, t) => told.push([a, t]), audit: (t) => audits.push(t), who: (a) => `who${(a >>> 0).toString(16)}`,
   nameOf: (a) => ({ [A]: 'Ari', [B]: 'Bel', [C]: 'Cal' })[a >>> 0] || 'X', tagOf: (a) => ({ [A]: 'AAAA', [B]: 'BBBB', [C]: 'CCCC' })[a >>> 0] || '????',
   profileOf: (a) => a & 0xfff, discordOf: (a) => ({ [A]: 'acct1', [B]: 'acct2', [C]: 'acct1' })[a >>> 0] || '',
-  onlineActors: () => [A, B, C], every: () => {}, cfg: { post: {} }, onUi: (ev, fn) => handlers.set(ev, fn),
+  onlineActors: () => [A, B, C], every: () => {}, cfg: { post: { goldOnly: false } }, onUi: (ev, fn) => handlers.set(ev, fn),
   takeGold: (a, n) => { const g = count(a, GOLD); if (g < n) return false; const e = inv(a).map((x) => ((x.baseId >>> 0) === GOLD ? Object.assign({}, x, { count: x.count - n }) : x)).filter((x) => x.count > 0); set(a, 'inventory', { entries: e }); return true; },
   giveItem: (a, base, n) => { const e = inv(a); const h = e.find((x) => (x.baseId >>> 0) === base && Object.keys(x).length === 2); if (h) h.count += n; else e.push({ baseId: base, count: n }); set(a, 'inventory', { entries: e }); return true; },
   goldOf: (a) => count(a, GOLD), GOLD_BASE: GOLD,
@@ -208,6 +208,19 @@ check('gamemode: a letter with a parcel is never pruned', /m\.read && !m\.parcel
 check('gamemode: a letter with a parcel cannot be burnt before collecting', /change === 'delete' && box\[i\]\.parcel/.test(gm));
 check('gamemode: pigeonSend passes the parcel arguments', /sendPigeon\(a, Number\(args\[1\]\) >>> 0, args\[2\], zoneId, args\[3\], args\[4\]\)/.test(gm));
 check('gamemode: post.js is loaded', /require\(POST_JS\)/.test(gm));
+
+// ---- gold only (Nate, 11 Oct: "only make it so people can send gold through letters"): the shipped default ----
+api.cfg = { post: {} };
+delete globalThis.__dboPost;
+require(path.join(SERVER, 'post.js'))(api);
+const G = globalThis.__dboPostApi;
+reset();
+r = G.prepare(A, 100, JSON.stringify([[SWORD, 2]]));
+check('gold only: goods in a letter are refused', !r.ok && /gold only/i.test(r.text), r);
+r = G.prepare(A, 100, '[]');
+check('gold only: 100 gold still goes, tax 10, no stack fee', r.ok && r.gold === 100 && r.tax === 10 && r.fee === 0, r);
+const gv = typeof G.view === 'function' ? G.view(A) : null;
+check('gold only: the window offers no goods and says so', !gv || ((gv.sendable || []).length === 0 && gv.parcel && gv.parcel.maxStacks === 0 && gv.parcel.goldOnly === true), gv && gv.parcel);
 
 Date.now = realNow;
 process.chdir(cwd);

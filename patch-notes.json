@@ -1,5 +1,19 @@
 [
   {
+    "title": "Pigeons carry gold only",
+    "date": "2026-10-11",
+    "version": "Server update",
+    "tag": "Change",
+    "sections": [
+      {
+        "heading": "Pigeon post",
+        "items": [
+          "A pigeon letter can now carry gold, but no goods. Goods will travel with player couriers, coming soon. Parcels already on their way can still be collected at any notice board."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Fixes for study, copying, masks and brewing",
     "date": "2026-10-11",
     "version": "Server update",

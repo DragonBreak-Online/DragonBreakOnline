@@ -39,6 +39,8 @@ module.exports = (api) => {
     enabled: true,
     // Parcels: a tenth of the gold sent, 5 gold a stack of goods, at most 6 stacks and 50,000 gold a letter
     taxRate: 0.1, itemFee: 5, maxStacks: 6, maxGold: 50000,
+    // Nate, 11 Oct: "only make it so people can send gold through letters"; goods go by courier (couriers.js, to come)
+    goldOnly: true,
     // Supply orders: 10% of the reward to post (never below the parcel tax, or orders would move gold cheaper), at least
     // 10 gold; 3 open orders per account; a week; 1..100 of an item; no more reward than a parcel carries
     feeShare: 0.1, minFee: 10, maxOpen: 3, openDays: 7, maxCount: 100, minPerUnit: 1, maxReward: 50000,
@@ -126,6 +128,7 @@ module.exports = (api) => {
       if (!id || !(n > 0)) return { ok: false, text: 'The parcel could not be read.' };
       want.set(id, (want.get(id) || 0) + n);
     }
+    if (C.goldOnly && want.size) return { ok: false, text: 'Pigeons carry gold only. Goods travel with a courier.' };
     if (want.size > C.maxStacks) return { ok: false, text: `A pigeon carries at most ${C.maxStacks} kinds of goods.` };
     for (const [id, n] of want) {
       if (!sendableBase(id)) return { ok: false, text: `${nameOfItem(id)} cannot go by pigeon.` };
@@ -322,7 +325,7 @@ module.exports = (api) => {
     const sendable = [];
     const counts = new Map();
     for (const e of entriesOf(a)) if (loose(e)) counts.set(Number(e.baseId) >>> 0, (counts.get(Number(e.baseId) >>> 0) || 0) + Number(e.count));
-    for (const [id, n] of counts) if (sendableBase(id)) sendable.push({ baseId: id, name: nameOfItem(id), count: n });
+    if (!C.goldOnly) for (const [id, n] of counts) if (sendableBase(id)) sendable.push({ baseId: id, name: nameOfItem(id), count: n });
     sendable.sort((x, y) => x.name.localeCompare(y.name));
     const row = (o) => ({ id: o.id, name: o.name, count: o.count, filled: o.filled, reward: o.reward, perUnit: Math.floor(o.reward / o.count),
       held: o.held, poster: `${o.posterName} #${o.posterTag}`, hoursLeft: hours(o), zone: o.zoneName, state: o.state,
@@ -330,7 +333,7 @@ module.exports = (api) => {
     const s = S.search.get(a >>> 0) || { query: '', results: [] };
     return {
       sendable: sendable.slice(0, 200),
-      parcel: { enabled: !!C.enabled, taxRate: Number(C.taxRate) || 0, itemFee: int(C.itemFee) || 0, maxStacks: C.maxStacks, maxGold: C.maxGold },
+      parcel: { enabled: !!C.enabled, taxRate: Number(C.taxRate) || 0, itemFee: int(C.itemFee) || 0, maxStacks: C.goldOnly ? 0 : C.maxStacks, maxGold: C.maxGold, goldOnly: !!C.goldOnly },
       supply: {
         enabled: !!C.enabled, zone: zone ? zone.name : '', feeShare: Number(C.feeShare) || 0, minFee: int(C.minFee) || 0, maxCount: C.maxCount, maxOpen: C.maxOpen, openDays: C.openDays,
         orders: zone ? data().orders.filter((o) => open(o) && o.zone === zone.id && o.expiresAt > Date.now()).map(row) : [],
