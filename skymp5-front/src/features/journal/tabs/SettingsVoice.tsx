@@ -23,7 +23,7 @@ const PeerRow = ({ identity, name, meters, focused }: { identity: string; name: 
   return (
     <div ref={el} className={'jset__peer' + (focused ? ' jset__peer--focus' : '')}>
       <span className="jset__peer-name">{name}{typeof meters === 'number' ? <span className="jset__hint"> {meters} m</span> : null}</span>
-      <Range value={Math.round(p.gain * 100)} min={0} max={200} step={5} onChange={(n) => op('set', n / 100)} format={pct} />
+      <Range value={Math.round(p.gain * 100)} min={0} max={400} step={5} onChange={(n) => op('set', n / 100)} format={pct} />
       <button type="button" className={'journal__button' + (p.muted ? ' journal__button--primary' : '')} onClick={() => op(p.muted ? 'unmute' : 'mute')}>{p.muted ? 'Unmute' : 'Mute'}</button>
       <button type="button" className="journal__button" disabled={!p.muted && p.gain === 1} onClick={() => op('reset')}>Reset</button>
     </div>
@@ -68,7 +68,7 @@ const VoicePart = ({ section }: SettingsPartProps) => {
           <Range value={Math.round(prefs.micGain * 100)} min={0} max={200} step={5} onChange={(n) => set({ micGain: n / 100 })} format={pct} />
         </Row>
         <Row label="Other players' volume">
-          <Range value={Math.round(prefs.outputVolume * 100)} min={0} max={200} step={5} onChange={(n) => set({ outputVolume: n / 100 })} format={pct} />
+          <Range value={Math.round(prefs.outputVolume * 100)} min={0} max={300} step={5} onChange={(n) => set({ outputVolume: n / 100 })} format={pct} />
         </Row>
         <Row label="Transmit">
           <Chips<string> label="Transmit" value={prefs.activation} onChange={(v) => set({ activation: v === 'vad' ? 'vad' : 'ptt' })} options={[['ptt', 'Push to talk'], ['vad', 'Voice activity']]} />
