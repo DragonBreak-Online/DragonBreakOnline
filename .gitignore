@@ -122,3 +122,7 @@ gearswap-restore-metals.json
 # Staff gifts (gifts.js, tools/gift.js): the queue and the ledger name characters, live data only
 gifts-inbox/
 gift-ledger.json
+
+# Thalmor informant reports and dossiers (thalmor.js)
+thalmor-intel.json
+thalmor-intel.json.tmp

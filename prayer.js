@@ -854,9 +854,13 @@ module.exports = (api) => {
       setFaith(casterId, faith);
       const why = String(d.unlawfulWhere || '').trim();
       personal(casterId, d.kind === 'divine'
-        ? 'You kneel to Talos in an Imperial county. The Concordat calls that a crime, and the Thalmor keep a Justiciar in Bruma. Nobody stops you.'
+        ? 'You kneel to Talos in an Imperial county. The White-Gold Concordat calls that a crime, and the Thalmor keep a Justiciar in Bruma. While you follow Talos in the Empire, a Justiciar may lawfully arrest you for it.'
         : `You kneel to ${d.name} in an Imperial county.${why ? ' ' + why : ` ${d.name} is proscribed here, and the shrine is hidden for a reason.`} Nobody stops you.`);
     }
+    // The Thalmor's informants see who kneels at a proscribed shrine and report the place and the hour, never the name
+    // (thalmor.js, Nate 11 Oct). Told on kneeling, whether or not the prayer holds.
+    try { if (typeof globalThis.__dboThalmorInformant === 'function') globalThis.__dboThalmorInformant(casterId, targetId, d, shrineNameOf(baseId, d)); }
+    catch (e) { log('prayer: informant report failed', e.message); }
     return startRound(casterId, roundFor(casterId, d, targetId, shrineNameOf(baseId, d)));
   };
 

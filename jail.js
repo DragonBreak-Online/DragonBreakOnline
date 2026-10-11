@@ -14,7 +14,12 @@
 //
 // State, on changeforms:
 //   door      private.dboCell      { prisoner, name, picked }
-//   prisoner  private.dboSentence  { door, cell, totalMs, servedMs, by, at }
+//   prisoner  private.dboSentence  { door, cell, totalMs, servedMs, by, at, concordat? }
+//
+// The White-Gold Concordat (thalmor.js, Nate 11 Oct): a Thalmor who arrested a Talos worshipper in the Empire is offered
+// the Concordat's sentence at the cell door (globalThis.__dboConcordatWarrant). That sentence is lawful: it carries
+// concordat { by, at }, and only the Thalmor's arresting ranks or a Lead GM may release it early or add to it
+// (__dboConcordatMayRelease); the hold's own guards and officials leave it be.
 
 const fs = require('fs');
 const path = require('path');
@@ -91,6 +96,15 @@ module.exports = (api) => {
     return { prisoner: Number(c.prisoner) >>> 0, name: String(c.name || 'a prisoner'), picked: !!c.picked, sentence: s };
   };
   const lawful = (a) => get(a, 'private.dboLawful', false) === true || isLeadStaff(a);
+  // A Concordat sentence is the Thalmor's: anyone else is refused its release and extension (thalmor.js decides who)
+  const concordatHeld = (a, s) => {
+    if (!s || !s.concordat || isLeadStaff(a)) return false;
+    try { return typeof globalThis.__dboConcordatMayRelease === 'function' && !globalThis.__dboConcordatMayRelease(a); } catch (e) { return false; }
+  };
+  // The Concordat sentence this guard may pass on this prisoner here: { minutes } or null
+  const concordatWarrant = (guard, prisoner, door) => {
+    try { return typeof globalThis.__dboConcordatWarrant === 'function' ? globalThis.__dboConcordatWarrant(guard >>> 0, prisoner >>> 0, cellOf(door), get(door, 'worldOrCellDesc', '')) || null : null; } catch (e) { log('jail: concordat check failed', e.message); return null; }
+  };
 
   // ---- the menu ---------------------------------------------------------------------------------------
   // Kept across hot reloads: a reload with the menu open refused the guard's choice (2026-09-29)
@@ -174,13 +188,14 @@ module.exports = (api) => {
     if (lawful(caster) && !isPrisoner) {
       if (occ) {
         const left = minutes(leftOf(occ.sentence));
-        const actions = [
+        const held = concordatHeld(caster, occ.sentence);
+        const actions = held ? [] : [
           { id: 'release', label: `Release ${occ.name} now` },
           { id: 'extend', label: `Add ${CFG.extendMinutes} minutes` },
         ];
         if (occ.picked) actions.push({ id: 'relock', label: 'Lock it again' });
         actions.push({ id: 'open', label: 'Open the door' });
-        openMenu(caster, target, `${occ.name}: ${plural(left, 'minute')} left`, actions);
+        openMenu(caster, target, `${occ.name}: ${plural(left, 'minute')} left${held ? ', held under the Concordat' : ''}`, actions);
         return true;
       }
       const near = candidates(caster, target);
@@ -193,23 +208,25 @@ module.exports = (api) => {
     return !tryPick(caster, target, occ);
   };
 
-  const imprison = (guard, prisoner, door, mins) => {
+  const imprison = (guard, prisoner, door, mins, concordat) => {
     if (!lawful(guard)) return;
     if (sentenceOf(prisoner)) return personal(guard, `${display(prisoner)} is already serving a sentence.`);
     if (!onlineActors().includes(prisoner) || distanceMeters(prisoner, door) > CFG.reachMeters) return personal(guard, `${display(prisoner)} is no longer at the cell.`);
     if (occupantOf(door)) return personal(guard, 'Someone is already locked in that cell.');
     const cell = cellOf(door);
     const now = Date.now();
-    set(prisoner, 'private.dboSentence', { door: door >>> 0, cell, totalMs: mins * MIN, servedMs: 0, by: display(guard), at: now });
+    set(prisoner, 'private.dboSentence', Object.assign({ door: door >>> 0, cell, totalMs: mins * MIN, servedMs: 0, by: display(guard), at: now },
+      concordat ? { concordat: { by: who(guard), at: now } } : {}));
     set(door, 'private.dboCell', { prisoner: prisoner >>> 0, name: display(prisoner), picked: false });
     set(door, 'isOpen', false);
     lastSeen.delete(prisoner >>> 0);
     // The capture system frees their hands when it offers the hook; older server builds leave it to the guard
     let unbound = false;
     try { unbound = typeof globalThis.__dboUncuff === 'function' && globalThis.__dboUncuff(prisoner) === true; } catch (e) { log(`jail: uncuff failed: ${e.message}`); }
-    system(prisoner, `${display(guard)} sentences you to ${plural(mins, 'minute')} in ${jailName(cell)}.${unbound ? ' Your bonds are taken off as the door locks.' : ''} Time counts only while you are online and in the jail. /sentence shows what is left.`);
+    system(prisoner, `${display(guard)} sentences you to ${plural(mins, 'minute')} in ${jailName(cell)}${concordat ? ' under the White-Gold Concordat, for the worship of Talos in the Empire. It is a lawful sentence: the guards will not set you free' : ''}.${unbound ? ' Your bonds are taken off as the door locks.' : ''} Time counts only while you are online and in the jail. /sentence shows what is left.`);
     personal(guard, `${display(prisoner)} is locked in for ${plural(mins, 'minute')}. The door opens when the time is served.${unbound ? ' Their bonds came off at the door.' : get(prisoner, 'private.restrained', null) ? ' Their hands are still bound: uncuff them through the bars.' : ''}`);
-    audit(`JAIL ${who(guard)} imprisoned ${who(prisoner)} for ${mins} min in ${jailName(cell)} (door ${mp.getDescFromId(door >>> 0)})`);
+    audit(`JAIL ${who(guard)} imprisoned ${who(prisoner)} for ${mins} min in ${jailName(cell)} (door ${mp.getDescFromId(door >>> 0)})${concordat ? ' under the Concordat' : ''}`);
+    if (concordat) { try { if (typeof globalThis.__dboConcordatJailed === 'function') globalThis.__dboConcordatJailed(guard >>> 0, prisoner >>> 0, mins, jailName(cell)); } catch (e) { log('jail: concordat record failed', e.message); } }
   };
 
   // Ends a sentence, served or released; the door's record goes with it
@@ -237,8 +254,11 @@ module.exports = (api) => {
     if (choice.startsWith('who:')) {
       const prisoner = parseInt(choice.slice(4), 16) >>> 0;
       pending.set(a >>> 0, { door, candidate: prisoner });
+      const w = concordatWarrant(a, prisoner, door);
+      const lengths = (m) => (m >= 60 && m % 60 === 0 ? plural(m / 60, 'hour') : plural(m, 'minute'));
       openWidget(a, { type: 'contextMenu', id: WIDGET_ID, mode: 'menu', targetName: `Sentence ${display(prisoner)}`,
-        actions: (CFG.minutes || []).map((m) => ({ id: `time:${prisoner.toString(16)}:${m}`, label: m >= 60 && m % 60 === 0 ? plural(m / 60, 'hour') : plural(m, 'minute') })),
+        actions: (w ? [{ id: `concordat:${prisoner.toString(16)}`, label: `The Concordat's sentence: ${lengths(Number(w.minutes))}` }] : [])
+          .concat((CFG.minutes || []).map((m) => ({ id: `time:${prisoner.toString(16)}:${m}`, label: lengths(m) }))),
         events: { action: 'dbo:jailChoose', close: 'dbo:jailClose' } }, true);
       return;
     }
@@ -248,8 +268,15 @@ module.exports = (api) => {
       if (!(CFG.minutes || []).includes(mins)) return;
       return imprison(a, parseInt(who16, 16) >>> 0, door, mins);
     }
+    if (choice.startsWith('concordat:')) {
+      const prisoner = parseInt(choice.slice(10), 16) >>> 0;
+      const w = concordatWarrant(a, prisoner, door);
+      if (!w || !(Number(w.minutes) > 0)) return personal(a, `You hold no Concordat arrest of ${display(prisoner)} that this jail can take.`);
+      return imprison(a, prisoner, door, Math.floor(Number(w.minutes)), true);
+    }
     const occ = occupantOf(door);
     if (!occ) return personal(a, 'Nobody is serving time in that cell now.');
+    if ((choice === 'release' || choice === 'extend') && concordatHeld(a, occ.sentence)) return personal(a, `${occ.name} is held under the White-Gold Concordat. Only the Thalmor may release them early.`);
     if (choice === 'release') {
       finish(occ.prisoner, `released early by ${display(a)}`);
       system(occ.prisoner, `${display(a)} releases you. The cell door is unlocked.`);

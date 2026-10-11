@@ -243,9 +243,66 @@ module.exports = (api) => {
   const theName = (n) => (/^The /.test(String(n)) || /^(Clan|House) |^\S+'s /.test(String(n)) ? lowerThe(n) : `the ${n}`);
   const TheName = (n) => theName(n).replace(/^the /, 'The ');
   const holds = (fid) => ((catDef(CAT_OF.get(fid)).officialsOnly || []).includes(fid) ? `hold office in ${/^County /.test(FACTIONS.get(fid).name) ? 'the ' : ''}${lowerThe(FACTIONS.get(fid).name)}` : `serve ${theName(FACTIONS.get(fid).name)}`);
+  // ---- race rules (Nate, 11 Oct: the Thalmor take only the Dominion's peoples and are Altmer-led) ------------------
+  // config factions.raceRules: { enabled, rules: { fid: { races, notRp, leadRoles, leadRaces, refuse, refuseLead } } }.
+  // races / leadRaces are RACE editor id prefixes (HighElfRace matches HighElfRaceVampire, as smithing.js raceFree does);
+  // notRp: creator race keys (spawn.ts private.rp.race) refused even on an allowed record: the Maormer stand on the High
+  // Elf record until the DLE's MaormerRace resolves, and the Maormer are the Dominion's enemies. A character in a beast
+  // form is judged by the race they return to (beastform.js). Checked on every new membership and on a rank change into
+  // a leadRoles rank; a member who joined before the rule keeps their place and rank and may move between the other
+  // ranks, and is never removed. The Lead GM override (/faction override) lifts it once like any other limit. Applies
+  // whether or not factions.limits is enabled.
+  const RACE_DEFAULTS = {
+    thalmor: {
+      races: ['HighElfRace', 'WoodElfRace', 'KhajiitRace'], notRp: ['maormer'],
+      leadRoles: ['leader', 'officer'], leadRaces: ['HighElfRace'],
+      refuse: 'The Thalmor take only the peoples of the Aldmeri Dominion: the Altmer, the Bosmer and the Khajiit.',
+      refuseLead: 'The Thalmor are led by the Altmer. Only a High Elf may hold that rank.',
+    },
+  };
+  const RR = Object.assign({ enabled: true }, (cfg.factions || {}).raceRules || {});
+  const RACE_RULES = RR.rules && typeof RR.rules === 'object' ? RR.rules : RACE_DEFAULTS;
+  const raceEdidOf = (t) => {
+    let id = 0;
+    try { if (typeof globalThis.__dboBeastOriginalRace === 'function') id = Number(globalThis.__dboBeastOriginalRace(t)) >>> 0; } catch (e) { id = 0; }
+    if (!id) { try { const app = mp.get(t, 'appearance'); id = app && app.raceId ? Number(app.raceId) >>> 0 : 0; } catch (e) { id = 0; } }
+    if (!id) return '';
+    try { const r = mp.lookupEspmRecordById(id); return r && r.record ? String(r.record.editorId || '') : ''; } catch (e) { return ''; }
+  };
+  const rpRaceOf = (t) => { try { const rp = mp.get(t, 'private.rp'); return rp && rp.race ? String(rp.race).toLowerCase() : ''; } catch (e) { return ''; } };
+  const racePrefixed = (edid, list) => !!edid && (list || []).some((p) => p && edid.toLowerCase().startsWith(String(p).toLowerCase()));
+  const leadRank = (fid, rank) => { const r = RACE_RULES[fid]; const f = FACTIONS.get(fid); return !!(r && f && (r.leadRoles || []).includes((f.ranks[rank] || {}).role)); };
+  // Which part of a faction's race rule a character breaks at that rank: 'race', 'lead' or '' (no rule, or it fits).
+  // An unreadable race (no appearance yet) is refused: membership is never given on a guess.
+  const raceBreak = (t, fid, rank) => {
+    if (RR.enabled === false) return '';
+    const r = RACE_RULES[fid];
+    if (!r || !FACTIONS.get(fid)) return '';
+    const edid = raceEdidOf(t >>> 0);
+    const notRp = (r.notRp || []).map((x) => String(x).toLowerCase()).includes(rpRaceOf(t >>> 0));
+    if (Array.isArray(r.races) && r.races.length && (!racePrefixed(edid, r.races) || notRp)) return 'race';
+    if (leadRank(fid, rank) && Array.isArray(r.leadRaces) && r.leadRaces.length && (!racePrefixed(edid, r.leadRaces) || notRp)) return 'lead';
+    return '';
+  };
+  const raceProblem = (t, fid, rank, viewer) => {
+    const why = raceBreak(t, fid, rank);
+    if (!why) return null;
+    const had = entryOf(fid, t >>> 0);
+    if (had && had.rank === rank) return null;
+    // A member from before the rule: only a move into a leading rank is refused
+    if (had && !leadRank(fid, rank)) return null;
+    const r = RACE_RULES[fid];
+    const lead = why === 'lead' || !!had;
+    const line = String((lead ? r.refuseLead : r.refuse) || 'That faction will not take them.');
+    const self = viewer !== null && viewer !== undefined && (viewer >>> 0) === (t >>> 0);
+    return { text: self ? line : `${nameOf(t)} cannot ${lead ? 'take that rank' : `join ${FACTIONS.get(fid).name}`}. ${line}`, hidden: false, race: lead ? 'lead' : 'race' };
+  };
+  // For thalmor.js and staff: '' when the character fits the faction's race rule at that rank
+  globalThis.__dboFactionRaceBreak = (t, fid, rank) => raceBreak(Number(t) >>> 0, String(fid), Number(rank));
   // { text, hidden } or null. viewer: who reads the refusal; hidden when it would tell them of a secret membership or of
   // the character's nature (an invite then goes out, and the character is refused at accept, in their own words).
   const limitProblem = (t, fid, rank, viewer) => {
+    { const rp = raceProblem(t, fid, rank, viewer); if (rp) return rp; }
     if (LIM.enabled !== true) return null;
     const f = FACTIONS.get(fid); if (!f) return null;
     t = t >>> 0;
@@ -316,6 +373,8 @@ module.exports = (api) => {
     for (const t of ids) {
       const mine = membershipsOf(t);
       for (const m of mine) {
+        // The race rules too (grandfathered: listed for staff, never removed)
+        { const rb = raceBreak(t, m.fid, m.e.rank); if (rb) out.push({ actor: t, name: m.e.name, tag: m.e.tag, factions: [m.fid], why: rb === 'lead' ? 'race (leading rank)' : 'race' }); }
         const rest = mine.filter((x) => x.fid !== m.fid);
         const cat = CAT_OF.get(m.fid);
         const clash = cat && takesSlot(m.fid, m.e.rank) && rest.find((x) => x.fid > m.fid && CAT_OF.get(x.fid) === cat && takesSlot(x.fid, x.e.rank));
