@@ -2,6 +2,7 @@
 
 #include "HitData.h"
 #include "MpActor.h"
+#include "NetworkingInterface.h"
 #include "SpellCastData.h"
 #include "WorldState.h"
 #include "libespm/espm.h"
@@ -195,6 +196,14 @@ float TES5DamageFormulaImpl::CalculateDamage() const
   return damage;
 }
 
+// Effects that change a value each second of their duration; a Peak Value Modifier lowers the maximum once
+bool IsTickingEffect(espm::MGEF::EffectType effectType)
+{
+  return effectType == espm::MGEF::EffectType::ValueMod ||
+    effectType == espm::MGEF::EffectType::Dual ||
+    effectType == espm::MGEF::EffectType::Absorb;
+}
+
 class TES5SpellDamageFormulaImpl
 {
   using Effects = std::vector<espm::Effects::Effect>;
@@ -245,6 +254,13 @@ float TES5SpellDamageFormulaImpl::GetBaseSpellDamage() const
   float visibleDamage = 0.f;
   float totalDamage = 0.f;
 
+  // A fire-and-forget damage over time deals its magnitude each second (Searing Poison 20 x 7 s). A player victim
+  // takes the ticks through the clone replay on their own client (cloneSpellGuardService), an NPC only here
+  const bool wholeDamageOverTime = espmProvider->spellSync.damageOverTime &&
+    spellData.spellItem &&
+    spellData.spellItem->castType == espm::SPEL::CastType::FireAndForget &&
+    target.GetUserId() == Networking::InvalidUserId;
+
   for (const auto& effect : spellData.effects) {
 
     if (!effect.effectItem || effect.effectFormId == 0) {
@@ -261,9 +277,14 @@ float TES5SpellDamageFormulaImpl::GetBaseSpellDamage() const
     if (needAddDamage &&
         magicEffect.data.primaryAV == espm::ActorValue::Health) {
 
-      totalDamage += effect.effectItem->magnitude;
+      float magnitude = effect.effectItem->magnitude;
+      if (wholeDamageOverTime && effect.effectItem->duration > 1 &&
+          IsTickingEffect(magicEffect.data.effectType)) {
+        magnitude *= static_cast<float>(effect.effectItem->duration);
+      }
+      totalDamage += magnitude;
       if (!magicEffect.data.IsFlagSet(espm::MGEF::Flags::HideInUI)) {
-        visibleDamage += effect.effectItem->magnitude;
+        visibleDamage += magnitude;
       }
     }
   }

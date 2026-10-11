@@ -298,6 +298,8 @@ public:
   {
     // Paralysis, AI, stagger and slow riders on the target's own game
     bool riders = true;
+    // A fire-and-forget damage over time hits an NPC for magnitude x duration
+    bool damageOverTime = true;
   } spellSync;
 
   bool disableVanillaScriptsInExterior = true;
