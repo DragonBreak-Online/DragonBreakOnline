@@ -136,6 +136,8 @@ declare -A NEEDS=(
   [racial-power-front]=front:skymp5-front/src/features/journal/index.tsx
   [maormer-race-front]=front:skymp5-front/src/features/charCreator/appearanceBuilder.js
   [thalmor-tab-front]=front:skymp5-front/src/features/journal/index.tsx
+  [courier-tab-front]=front:skymp5-front/src/features/pigeon/index.tsx
+  [courier-handover-front]=front:skymp5-front/src/features/courierHandover/index.tsx
 )
 bundle() {
   local side=${1%%:*} entry=${1#*:}
