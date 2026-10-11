@@ -103,6 +103,10 @@ const PVP_RULE_HOOK = "__dboCompanionMayFight";
 // The kinds these rules cover: a player's summons and raised corpses. Other kinds (GM warbands, server/warband.js, and later
 // pets) target players as before, and are no player's side when another companion picks a target.
 const PVP_KINDS: ReadonlySet<CompanionKind> = new Set<CompanionKind>(["summon", "reanimated"]);
+// A summon's extra weapon, carried but not worn: its host's engine switches to it in close combat (Nate, 11 Oct)
+const SUMMON_SIDEARMS: Record<string, string> = {
+  "45b9:Dawnguard.esm": "2c66f:Skyrim.esm", // DLC1SoulCairnBonemanSummon: DraugrSword, Ancient Nord Sword
+};
 
 // A container holds nothing worn: worn flags are dropped and stacks that become equal are merged, so every stack stays takeable
 const looseEntries = (inventory: any): Record<string, unknown>[] => {
@@ -228,6 +232,19 @@ export class CompanionSystem implements System {
 
   // ── Public API ───────────────────────────────────────────────────────────────
 
+  private addSidearm(id: number, desc: string): void {
+    try {
+      const baseId = this.mp.getIdFromDesc(desc) >>> 0;
+      const inv = this.mp.get(id, "inventory") || { entries: [] };
+      const entries = Array.isArray(inv.entries) ? inv.entries.map((e: any) => Object.assign({}, e)) : [];
+      if (!baseId || entries.some((e: any) => (Number(e?.baseId) >>> 0) === baseId)) return;
+      entries.push({ baseId, count: 1 });
+      this.mp.set(id, "inventory", { entries });
+    } catch (e) {
+      this.log(`CompanionSystem: no sidearm ${desc} for ${hex(id)}: ${e}`);
+    }
+  }
+
   spawn(ownerId: number, baseId: number, opts: CompanionOptions = {}): number | null {
     const mp = this.mp;
     const kind: CompanionKind = opts.kind ?? "companion";
@@ -252,6 +269,7 @@ export class CompanionSystem implements System {
       // Survives in the change form, so a crash cannot leave a summon behind as an ordinary hostile npc
       try { mp.set(id, COMPANION_PROP, kind); } catch { }
       try { mp.set(id, COMPANION_OF_PROP, ownerId); } catch { }
+      if (SUMMON_SIDEARMS[baseDesc]) this.addSidearm(id, SUMMON_SIDEARMS[baseDesc]);
     } catch (e) {
       this.log(`CompanionSystem: failed to spawn ${baseDesc} for ${hex(ownerId)}: ${e}`);
       return null;
