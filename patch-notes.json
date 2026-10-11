@@ -1,5 +1,22 @@
 [
   {
+    "title": "Harmony and Mayhem",
+    "date": "SHIP_DATE",
+    "version": "Server update",
+    "tag": "New",
+    "sections": [
+      {
+        "heading": "Weapons",
+        "items": [
+          "Two new one-handed swords that staff can grant: Harmony and Mayhem.",
+          "A creature or NPC struck by Harmony calms down and will not fight anyone for 20 seconds. One struck by Mayhem flies into a frenzy and attacks anything near it for 20 seconds.",
+          "Striking again starts the 20 seconds over, and a strike from the other blade turns calm into frenzy or frenzy into calm.",
+          "Neither blade's effect works on other players: against adventurers they are ordinary swords."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Vampires and healing magic",
     "date": "SHIP_DATE",
     "version": "Server update",
