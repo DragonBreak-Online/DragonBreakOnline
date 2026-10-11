@@ -6,6 +6,7 @@ import { AdminRoleConfig, readAdminRoleConfig, adminTierOf, TIER_CAPS } from "./
 import { getZones, Zones } from "./zones";
 import { PlaceClaim, PlannedPlace, planPlaces } from "./housingPlaces";
 import { LEGACY_KEY_BASE_ID, allocateKeyBase, isPropertyKeyBase, refreshKeyPool } from "./houseKeys";
+import { OwnerCandidate, OwnerRecord, UNNAMED, nameKey, planOwners } from "./housingOwners";
 
 // The ScampServer / `mp` API is untyped here, same convention as spawn.ts.
 type Mp = any;
@@ -48,6 +49,9 @@ const HOUSING_PROP = "private.housing";
 // N3 places: the migration plan written by the dry run, for review (runtime, beside housing.json)
 const PLACE_PLAN_FILE = "./housing-places-plan.json";
 const PLACE_BACKUP_PREFIX = "./housing-places-backup-";
+// Property per character: the owner migration's plan, for review, and its backups (runtime, beside housing.json)
+const OWNER_PLAN_FILE = "./housing-owners-plan.json";
+const OWNER_BACKUP_PREFIX = "./housing-owners-backup-";
 const GAMEMODE_CONFIG_FILE = "./gamemode-config.json";
 const TENANCY_FILE = "./tenancy.json";
 // The map of whole buildings, generated from the load order by the gameplay's tools/buildings_build.py (Nate, 4 Oct)
@@ -92,6 +96,8 @@ const NOT_GRANTED = "Property here is granted by its ruler (Jarl, Baron or Count
 // over the surrounding hold, so hold officials have no say inside it and vice versa.
 // Managers claim, revoke, rename, transfer, re-key and cut keys for any property there.
 // The Count of Bruma (zones.json region "bruma") manages property the way a Jarl does.
+// A fief's holder (a Baron or Baroness, a Skyrim Lord or Lady of a holding; gameplay nobility.js) manages the property of
+// their own fief the same way, and nowhere else; their own buildings there are not counted by the one-building cap.
 const MANAGER_RANKS = ["jarl", "baron", "steward", "chieftain", "bane", "count"];
 // Actions on any door or chest of a place that act on the whole place (its root)
 const PLACE_WIDE = ["abandon", "revoke", "rename", "createkey", "revokekeys", "transfer", "assign", "unassign", "share", "unshare"];
@@ -130,7 +136,10 @@ const HOLD_CELLS: Record<number, string> = {
 // One claimed property. Stored on the primary reference. owner 0 is an
 // ownerless stub kept only to carry `serial` forward.
 interface PropertyRecord {
+  // The account (profile id); the character is ownerChar
   owner: number;
+  // The owning character's actor id (housingOwners.ts), written on every claim; it decides only with housingOwnerPerCharacter
+  ownerChar?: number;
   ownerName: string;
   name: string | null;
   locked: boolean;
@@ -143,7 +152,7 @@ interface PropertyRecord {
   // Written by the migration and the place rules only with housingPlaceMigration "apply"; always read back as they are, so
   // a write under any mode keeps them.
   place?: { cells: string[]; builtAt: number };
-  assigned?: Record<string, { profile: number; name: string }>;
+  assigned?: Record<string, { profile: number; name: string; char?: number }>;
   // Refs (hex primaries) in the place whose chest the household may open: anyone who may open the place itself
   shared?: string[];
   keyAliases?: string[];
@@ -169,6 +178,9 @@ interface PlaceDetail {
   innerDoors: number[];
   notApplied: string;
 }
+
+// Who holds a claim: the account, and the character once the owner migration has named it
+type OwnerRef = { owner: number; ownerChar?: number };
 
 // The far half of a teleport pair just points at the primary.
 interface PrimaryPointer {
@@ -203,6 +215,9 @@ export class HousingSystem implements System {
 
     const placeCap = Number(all?.["housingPlaceCap"]);
     if (Number.isFinite(placeCap) && placeCap >= 1) this.placeCap = Math.floor(placeCap);
+    // With property per character, the houses all of an account's characters may hold between them (Nate, 10 Oct: two)
+    const accountCap = Number(all?.["housingPlaceCapPerAccount"]);
+    if (Number.isFinite(accountCap) && accountCap >= 1) this.placeCapPerAccount = Math.floor(accountCap);
     const maxClaims = Number(all?.["housingMaxClaims"]);
     if (Number.isFinite(maxClaims) && maxClaims > 0) this.maxClaims = maxClaims;
     const maxDistance = Number(all?.["housingMaxDistance"]);
@@ -215,6 +230,11 @@ export class HousingSystem implements System {
     this.placeMigration = mode === "off" ? "off" : mode === "apply" ? "apply" : "dryrun";
     // A migration backup to put back at the plan's tick, instead of the plan (S3 of the review)
     this.placeRestore = typeof all?.["housingPlaceRestore"] === "string" ? String(all!["housingPlaceRestore"]) : "";
+    // Property per character (Nate, 10 Oct): off (the default) keeps it the account's; the owner migration names each claim's
+    // character, "dryrun" (the default) writes only its plan, "apply" writes ownerChar into the records once, after a backup
+    this.perCharacter = all?.["housingOwnerPerCharacter"] === true;
+    const ownerMode = String(all?.["housingOwnerMigration"] ?? "dryrun");
+    this.ownerMigration = ownerMode === "off" ? "off" : ownerMode === "apply" ? "apply" : "dryrun";
     this.initAtMs = Date.now();
 
     this.roleCfg = readAdminRoleConfig(all);
@@ -224,7 +244,7 @@ export class HousingSystem implements System {
     this.installActivationHook(ctx);
     ctx.gm.on("userAssignActor", (userId: number) => this.onActorAssigned(ctx, userId));
     this.exposeTenancy(ctx);
-    this.log(`[housing] ready, ${this.claimed.length} claimed refs in the registry`);
+    this.log(`[housing] ready, ${this.claimed.length} claimed refs in the registry; property belongs to ${this.perCharacter ? "one character" : "the account"}, owner migration ${this.ownerMigration}`);
   }
 
   // server/tenancy.js rents property out through these, under the same rules as the menu: the claim limit, re-keying
@@ -253,23 +273,24 @@ export class HousingSystem implements System {
       },
       // What a load door's prompt should call it, or "" to keep the destination's name (gamemode.js dboDoorName)
       doorName: (ref: unknown): string => { try { return this.doorName(ctx, Number(ref) >>> 0); } catch { return ""; } },
-      isManager: (actorId: unknown, ref: unknown) => { const p = primary(ref); return !!p && this.isManager(ctx, Number(actorId) >>> 0, p); },
+      // Hold-wide managers only (staff, a hold's officials): what assesses, rents and taxes; a fief's holder is isFiefHolder
+      isManager: (actorId: unknown, ref: unknown) => { const p = primary(ref); return !!p && (this.isAdmin(ctx, Number(actorId) >>> 0) || this.isHoldManager(ctx, Number(actorId) >>> 0, p)); },
+      isFiefHolder: (actorId: unknown, ref: unknown) => { const p = primary(ref); return !!p && this.isFiefHolder(ctx, Number(actorId) >>> 0, p); },
       grant: (ref: unknown, actorId: unknown): string => {
         const p = primary(ref); if (!p) return "That is not a property.";
         const actor = Number(actorId) >>> 0;
         const profileId = this.profileOf(ctx, actor); if (!profileId) return "That is nobody.";
         const rec = this.read(ctx, p) || emptyRecord();
-        if (rec.owner === profileId) return "";
+        if (this.ownsAs(rec, profileId, actor)) return "";
         if (!this.placesOn()) {
-          if (this.countClaims(ctx, profileId) >= this.maxClaims) return `They already hold ${this.maxClaims} properties.`;
+          if (!this.fiefExempt(ctx, p, profileId, actor) && this.countClaims(ctx, profileId, actor) >= this.maxClaims) return `They already hold ${this.maxClaims} properties.`;
         } else {
-          const full = this.overCap(ctx, profileId, actor, false, this.isBuilding(ctx, p, { ...rec, partner: this.partnerOf(ctx, p) }));
+          const full = this.overCap(ctx, profileId, actor, false, this.isBuilding(ctx, p, { ...rec, partner: this.partnerOf(ctx, p) }), p);
           if (full) return full;
         }
         if (rec.owner !== 0) this.reKey(ctx, p, rec);
         if (rec.place) { delete rec.assigned; delete rec.shared; }
-        rec.owner = profileId;
-        rec.ownerName = this.nameOf(ctx, actor);
+        this.setOwner(ctx, rec, actor, profileId);
         rec.partner = this.partnerOf(ctx, p);
         if (rec.issued === null) rec.issued = [];
         if (!this.write(ctx, p, rec)) return CHANGE_FAILED;
@@ -280,6 +301,32 @@ export class HousingSystem implements System {
         const p = primary(ref); if (!p) return false;
         const rec = this.read(ctx, p); if (!rec || rec.owner === 0) return true;
         return this.release(ctx, p, rec);
+      },
+      // Property per character (Nate, 10 Oct): the gameplay asks these instead of comparing rec.owner with a profile
+      perCharacter: (): boolean => this.perCharacter,
+      ownsRecord: (rec: unknown, actorId: unknown): boolean => {
+        const r = rec as { owner?: unknown; ownerChar?: unknown } | null;
+        if (!r || !(Number(r.owner) > 0)) return false;
+        const a = Number(actorId) >>> 0;
+        return this.ownsAs({ owner: Number(r.owner), ownerChar: Number(r.ownerChar) >>> 0 }, this.profileOf(ctx, a), a);
+      },
+      // The characters a claim's money and notices go to: its character, or every character of the account
+      ownerActorsOf: (rec: unknown): number[] => {
+        const r = rec as { owner?: unknown; ownerChar?: unknown } | null;
+        return r ? this.ownerActorsOf(ctx, { owner: Number(r.owner) || 0, ownerChar: Number(r.ownerChar) >>> 0 }) : [];
+      },
+      // Whether a key this actor carries opens the property (any key record, the vanilla one or the pool's), as a door does
+      keyOpens: (ref: unknown, actorId: unknown): boolean => {
+        const p = primary(ref); const rec = p ? this.read(ctx, p) : null;
+        if (!p || !rec || rec.owner === 0) return false;
+        return this.keyOpensWith(ctx, p, rec, this.viewerAccess(ctx, Number(actorId) >>> 0));
+      },
+      // What a claim's owner is keyed by in gameplay stores: "c<actor hex>" for a character, else the profile id
+      ownerKeyOf: (rec: unknown): string => {
+        const r = rec as { owner?: unknown; ownerChar?: unknown } | null;
+        if (!r) return "";
+        const c = this.ownerCharOf({ owner: Number(r.owner) || 0, ownerChar: Number(r.ownerChar) >>> 0 });
+        return c ? `c${c.toString(16)}` : String(Number(r.owner) || 0);
       },
     };
   }
@@ -360,6 +407,13 @@ export class HousingSystem implements System {
         else this.placePlanDone = this.dryRunPlaces(ctx, this.placePlanTries + 1 >= PLACE_PLAN_MAX_TRIES) || ++this.placePlanTries >= PLACE_PLAN_MAX_TRIES;
       } catch (e) { this.placePlanDone = true; this.log(`[housing] place plan failed: ${e}`); }
     }
+    // The owner migration plans after the place plan, so it sees the places that plan built
+    const placesSettled = this.placePlanDone || (this.placeMigration === "off" && !this.placeRestore);
+    if (this.ownerMigration !== "off" && !this.ownerPlanDone && placesSettled && now - this.initAtMs >= PLACE_PLAN_DELAY_MS && now - this.ownerPlanTriedMs >= PLACE_PLAN_DELAY_MS) {
+      this.ownerPlanTriedMs = now;
+      try { this.ownerPlanDone = this.dryRunOwners(ctx, this.ownerPlanTries + 1 >= PLACE_PLAN_MAX_TRIES) || ++this.ownerPlanTries >= PLACE_PLAN_MAX_TRIES; }
+      catch (e) { this.ownerPlanDone = true; this.log(`[housing] owner plan failed: ${e}`); }
+    }
     if (now - this.lastDecorMs < DECOR_PUSH_INTERVAL_MS) return;
     this.lastDecorMs = now;
     if (!this.decorDirty) return;
@@ -428,11 +482,12 @@ export class HousingSystem implements System {
       else if (place && (action === "lock" || ownKey)) rec = this.adopted(ctx, primary, rec, place);
       else if (place && action === "unlock") { this.notice(ctx, userId, "That is not locked."); return; }
     }
-    const isOwner = rec.owner !== 0 && rec.owner === this.profileOf(ctx, actorId);
+    const isOwner = this.ownsAs(rec, this.profileOf(ctx, actorId), actorId) || this.leadsHall(ctx, primary, rec, actorId);
     const isManager = this.isManager(ctx, actorId, primary) && !this.sharesByOffice(ctx, primary, rec, actorId);
     // Every staff override of someone else's property goes to the admin log (review A3-1)
     if (!isOwner && rec.owner !== 0 && isManager && !this.isHoldManager(ctx, actorId, primary) && STAFF_LOGGED.indexOf(String(action)) !== -1) {
-      try { (globalThis as any).__alduinakAdminLog?.(`HOUSING staff override: actor ${actorId.toString(16)} (profile ${this.profileOf(ctx, actorId)}) ${action} on ${primary.toString(16)}, owner profile ${rec.owner}`); } catch { /* no log */ }
+      const fief = !this.isAdmin(ctx, actorId);
+      try { (globalThis as any).__alduinakAdminLog?.(`HOUSING ${fief ? "fief holder" : "staff override"}: actor ${actorId.toString(16)} (profile ${this.profileOf(ctx, actorId)}) ${action} on ${primary.toString(16)}, owner profile ${rec.owner}${rec.ownerChar ? ` character ${rec.ownerChar.toString(16)}` : ""}`); } catch { /* no log */ }
     }
 
     this.aimedAt = target;
@@ -478,13 +533,12 @@ export class HousingSystem implements System {
       return;
     }
     // Officials claim to hand the property on, so the cap is the recipient's, checked at the hand-over
-    const full = this.placesOn() && isManager ? "" : this.overCap(ctx, profileId, actorId, true, this.isBuilding(ctx, primary, { ...rec, partner: this.partnerOf(ctx, primary) }));
+    const full = this.placesOn() && isManager ? "" : this.overCap(ctx, profileId, actorId, true, this.isBuilding(ctx, primary, { ...rec, partner: this.partnerOf(ctx, primary) }), primary);
     if (full) {
       this.notice(ctx, userId, full);
       return;
     }
-    rec.owner = profileId;
-    rec.ownerName = this.nameOf(ctx, actorId);
+    this.setOwner(ctx, rec, actorId, profileId);
     rec.partner = this.partnerOf(ctx, primary);
     // A stub released before rec.issued existed has no keys at this serial
     if (rec.issued === null) rec.issued = [];
@@ -612,19 +666,18 @@ export class HousingSystem implements System {
       this.notice(ctx, userId, "That is nobody.");
       return;
     }
-    if (recipientProfile === rec.owner) {
+    if (this.ownsAs(rec, recipientProfile, recipientActor)) {
       this.notice(ctx, userId, "They already own it.");
       return;
     }
-    const full = this.overCap(ctx, recipientProfile, recipientActor, false, this.isBuilding(ctx, primary, { ...rec, partner: this.partnerOf(ctx, primary) }));
+    const full = this.overCap(ctx, recipientProfile, recipientActor, false, this.isBuilding(ctx, primary, { ...rec, partner: this.partnerOf(ctx, primary) }), primary);
     if (full) {
       this.notice(ctx, userId, full);
       return;
     }
     // Old keys must not open a new owner's door.
     this.reKey(ctx, primary, rec);
-    rec.owner = recipientProfile;
-    rec.ownerName = this.nameOf(ctx, recipientActor);
+    this.setOwner(ctx, rec, recipientActor, recipientProfile);
     rec.partner = this.partnerOf(ctx, primary);
     // A new owner's place: the old owner's assignments do not come with it
     if (rec.place) { delete rec.assigned; delete rec.shared; }
@@ -671,7 +724,7 @@ export class HousingSystem implements System {
     }
     const owned = !!rec && rec.owner !== 0;
     const profileId = this.profileOf(ctx, actorId);
-    const isOwner = owned && rec!.owner === profileId;
+    const isOwner = owned && (this.ownsAs(rec!, profileId, actorId) || this.leadsHall(ctx, primary, rec!, actorId));
     const isManager = !!primary && this.isManager(ctx, actorId, primary) && !(owned && this.sharesByOffice(ctx, primary, rec!, actorId));
 
     const holdsKey = owned && !isOwner && !isManager && this.hasAccess(ctx, primary, rec!, actorId);
@@ -693,20 +746,20 @@ export class HousingSystem implements System {
       hasKeys: owned,
       canGrantContainers: (isOwner || isManager) && owned && this.baseTypeOf(ctx, primary) === "CONT" && !(this.placesOn() && rec!.memberOf),
       ownerName: owned ? (rec!.ownerName || "Someone") : null,
-      ...(owned && this.placesOn() ? this.placeMenu(ctx, primary, rec!, isOwner || isManager, profileId, here) : {}),
+      ...(owned && this.placesOn() ? this.placeMenu(ctx, primary, rec!, isOwner || isManager, profileId, here, actorId) : {}),
     });
   }
 
   // The place part of the menu (N3): for its owner and the managers, the Rooms and chests panel; for anyone else, whether
   // what they look at is assigned to them
-  private placeMenu(ctx: SystemContext, primary: number, rec: PropertyRecord, manages: boolean, profileId: number, here: number): Record<string, unknown> {
+  private placeMenu(ctx: SystemContext, primary: number, rec: PropertyRecord, manages: boolean, profileId: number, here: number, actorId = 0): Record<string, unknown> {
     const root = rec.place ? primary : rec.memberOf || 0;
     if (!root) return {};
     const rootRec = root === primary ? rec : this.read(ctx, root);
     if (!rootRec || rootRec.owner === 0 || !rootRec.place) return {};
     const lookedAt = here || primary;
     const mine = rootRec.assigned && rootRec.assigned[lookedAt.toString(16)];
-    if (!manages) return { place: null, placeName: rootRec.name, assignedToYou: !!mine && !!profileId && mine.profile === profileId };
+    if (!manages) return { place: null, placeName: rootRec.name, assignedToYou: !!mine && this.isAssignee(mine, profileId, actorId) };
     const rooms = this.roomsOf(ctx, root, rootRec);
     // What the owner looks at comes first
     rooms.sort((a, b) => (b.ref === lookedAt ? 1 : 0) - (a.ref === lookedAt ? 1 : 0));
@@ -799,8 +852,8 @@ export class HousingSystem implements System {
       const recipientActor = toFormId(rawRecipient);
       const profile = recipientActor ? this.profileOf(ctx, recipientActor) : 0;
       if (!profile) { this.notice(ctx, userId, "That is nobody."); return; }
-      if (profile === rec.owner) { delete assigned[hex]; said = `${room.label} is yours alone again.`; }
-      else { assigned[hex] = { profile, name: this.nameOf(ctx, recipientActor) }; said = `${room.label} is ${assigned[hex].name}'s now.`; }
+      if (this.ownsAs(rec, profile, recipientActor)) { delete assigned[hex]; said = `${room.label} is yours alone again.`; }
+      else { assigned[hex] = { profile, name: this.nameOf(ctx, recipientActor), char: recipientActor >>> 0 }; said = `${room.label} is ${assigned[hex].name}'s now.`; }
       if (Object.keys(assigned).length > MAX_ROOMS_LISTED * 2) { this.notice(ctx, userId, "Too many rooms are assigned already."); return; }
     } else if (action === "unassign") {
       delete assigned[hex];
@@ -842,36 +895,42 @@ export class HousingSystem implements System {
 
   private hasAccessWith(ctx: SystemContext, primary: number, rec: PropertyRecord, v: ViewerAccess): boolean {
     if (rec.owner === 0) return true;
-    if (v.profileId && v.profileId === rec.owner) return true;
+    if (this.ownsAs(rec, v.profileId, v.actorId)) return true;
     if (v.admin) return true;
     const hold = this.holdOf(ctx, primary);
     if (hold && v.ranks.some((r) => r.hold === hold && MANAGER_RANKS.indexOf(r.rank) !== -1)) return true;
+    if (this.isFiefHolder(ctx, v.actorId, primary)) return true;
     if (this.inHall(ctx, primary, rec, v)) return true;
-    const credential = this.keyCredential(primary, rec);
-    const names = this.acceptedKeyNames(ctx, primary, rec);
-    if (Array.from(v.keys).some((n) => this.isKeyFor(n, credential, names))) return true;
+    if (this.keyOpensWith(ctx, primary, rec, v)) return true;
     if (!this.placesOn()) return false;
-    // A place's root also answers to the key names its members had before the migration
-    if (rec.keyAliases && Array.from(v.keys).some((n) => rec.keyAliases!.some((a) => this.aliasOpens(n, a)))) return true;
     // A member of a place: its assignee, and whoever may open the place itself; a chest only for the household when shared
     if (!rec.memberOf || rec.memberOf === primary) return false;
     const root = this.read(ctx, rec.memberOf);
     if (!root || root.owner === 0) return false;
     const hex = primary.toString(16);
     const assigned = root.assigned && root.assigned[hex];
-    if (assigned) return (!!v.profileId && assigned.profile === v.profileId) || this.ownsOrManages(ctx, rec.memberOf, root, v);
+    if (assigned) return this.isAssignee(assigned, v.profileId, v.actorId) || this.ownsOrManages(ctx, rec.memberOf, root, v);
     if (this.isPlaceContainer(ctx, primary, rec) && !(root.shared || []).includes(hex)) return this.ownsOrManages(ctx, rec.memberOf, root, v);
     // Only an exterior door answers to the place's key; an inner door or chest to its own (Nate, 5 Oct)
     if (!this.isEntrance(ctx, primary, rec) && !this.isPlaceContainer(ctx, primary, rec)) return this.ownsOrManages(ctx, rec.memberOf, root, v);
     return this.hasAccessWith(ctx, rec.memberOf, root, v);
   }
 
+  // A key the viewer carries opens this lock: one cut for it, or (a place's root) a key name its members had before the migration
+  private keyOpensWith(ctx: SystemContext, primary: number, rec: PropertyRecord, v: ViewerAccess): boolean {
+    const credential = this.keyCredential(primary, rec);
+    const names = this.acceptedKeyNames(ctx, primary, rec);
+    if (Array.from(v.keys).some((n) => this.isKeyFor(n, credential, names))) return true;
+    return this.placesOn() && !!rec.keyAliases && Array.from(v.keys).some((n) => rec.keyAliases!.some((a) => this.aliasOpens(n, a)));
+  }
+
   // The owner, staff (Lead GM and above) and the managers of the hold: never a key holder
   private ownsOrManages(ctx: SystemContext, primary: number, rec: PropertyRecord, v: ViewerAccess): boolean {
     if (rec.owner === 0) return true;
-    if (v.profileId && v.profileId === rec.owner) return true;
+    if (this.ownsAs(rec, v.profileId, v.actorId)) return true;
     if (v.admin) return true;
     if (this.inHall(ctx, primary, rec, v)) return true;
+    if (this.isFiefHolder(ctx, v.actorId, primary)) return true;
     const hold = this.holdOf(ctx, primary);
     return !!hold && v.ranks.some((r) => r.hold === hold && MANAGER_RANKS.indexOf(r.rank) !== -1);
   }
@@ -883,7 +942,18 @@ export class HousingSystem implements System {
     if (!this.placesOn() || !rootRec.place || !v.actorId || rootRec.owner === 0) return false;
     const member = (globalThis as any).__dboHallMember;
     if (typeof member !== "function") return false;
-    try { return member([root, rootRec.partner].filter(Boolean), rootRec.owner, v.actorId) === true; } catch { return false; }
+    try { return member([root, rootRec.partner].filter(Boolean), rootRec.owner, v.actorId, this.ownerCharOf(rootRec)) === true; } catch { return false; }
+  }
+
+  // A faction's hall follows the faction's current leader, whoever owns the building (Nate, 10 Oct): the leader's character
+  // holds the owner's powers over it (guilds.js __dboHallLeader), and a new leader takes them over at once
+  private leadsHall(ctx: SystemContext, primary: number, rec: PropertyRecord, actorId: number): boolean {
+    if (!this.placesOn() || rec.owner === 0 || !actorId) return false;
+    const root = rec.place ? primary : rec.memberOf || 0;
+    const rootRec = root ? (root === primary ? rec : this.read(ctx, root)) : null;
+    const leader = (globalThis as any).__dboHallLeader;
+    if (!rootRec || !rootRec.place || typeof leader !== "function") return false;
+    try { return leader([root, rootRec.partner].filter(Boolean), actorId) === true; } catch { return false; }
   }
 
   // An office holder a building names as sharing it (Nate, 4 Oct: Castle Bruma's Steward; guilds.js __dboHallOffice) uses it as
@@ -894,7 +964,7 @@ export class HousingSystem implements System {
     const rootRec = root ? (root === primary ? rec : this.read(ctx, root)) : null;
     const office = (globalThis as any).__dboHallOffice;
     if (!rootRec || !rootRec.place || typeof office !== "function") return false;
-    try { return office([root, rootRec.partner].filter(Boolean), rootRec.owner, actorId) === true; } catch { return false; }
+    try { return office([root, rootRec.partner].filter(Boolean), rootRec.owner, actorId, this.ownerCharOf(rootRec)) === true; } catch { return false; }
   }
 
   // ── Places (N3): access ─────────────────────────────────────────────────────
@@ -921,7 +991,7 @@ export class HousingSystem implements System {
     if (this.ownsOrManages(ctx, root, rootRec, v)) return true;
     const hex = primary.toString(16);
     const assigned = rootRec.assigned && rootRec.assigned[hex];
-    if (assigned) return !!v.profileId && assigned.profile === v.profileId;
+    if (assigned) return this.isAssignee(assigned, v.profileId, v.actorId);
     if (this.baseTypeOf(ctx, primary) !== "CONT") return true;
     return (rootRec.shared || []).includes(hex) && this.hasAccessWith(ctx, root, rootRec, v);
   }
@@ -947,7 +1017,7 @@ export class HousingSystem implements System {
   // A door or chest nobody claimed inside a place, as a member of it (written only when its lock is set): the owner's, under
   // the place's keys and assignments
   private adopted(ctx: SystemContext, primary: number, rec: PropertyRecord, place: { root: number; rec: PropertyRecord }): PropertyRecord {
-    return { ...rec, owner: place.rec.owner, ownerName: place.rec.ownerName, partner: this.partnerOf(ctx, primary), issued: rec.issued || [], memberOf: place.root };
+    return { ...rec, owner: place.rec.owner, ...(place.rec.ownerChar ? { ownerChar: place.rec.ownerChar } : {}), ownerName: place.rec.ownerName, partner: this.partnerOf(ctx, primary), issued: rec.issued || [], memberOf: place.root };
   }
 
   // A door pair between the world and an interior: a way into a building
@@ -1016,8 +1086,8 @@ export class HousingSystem implements System {
   // is another building and stops the walk; so does a door someone else holds (staff included), and a cell any of whose
   // doors someone else holds, which is theirs (an inn room claimed off a granted hall, review H); more than
   // MAX_PLACE_CELLS (a dungeon below) keeps the first interior alone
-  private placeCellsFrom(ctx: SystemContext, inner: string, owner: number): string[] {
-    const others = (ref: number) => { const p = this.primaryOf(ctx, ref); const r = p ? this.read(ctx, p) : null; return !!r && r.owner !== 0 && r.owner !== owner; };
+  private placeCellsFrom(ctx: SystemContext, inner: string, owner: OwnerRef): string[] {
+    const others = (ref: number) => { const p = this.primaryOf(ctx, ref); const r = p ? this.read(ctx, p) : null; return !!r && r.owner !== 0 && !this.sameOwner(r, owner); };
     // A building in the map is whole as the map says, but for a room behind a door someone else holds (a dungeon or an
     // oversized one is walked as before)
     const mapped = this.buildingOf(inner);
@@ -1068,14 +1138,14 @@ export class HousingSystem implements System {
     if (!near || !far || nearWorld === farWorld) return;
     const inner = nearWorld ? far : near;
     const index = this.placeIndex(ctx);
-    const taken = (c: string) => (index.has(c) && index.get(c) !== primary) || !!this.otherOwnerAt(ctx, c, rec.owner, primary);
+    const taken = (c: string) => (index.has(c) && index.get(c) !== primary) || !!this.otherOwnerAt(ctx, c, rec, primary);
     // An interior another owner (staff included) also has a door to the world into is nobody's place (review G)
     if (taken(inner)) {
-      const o = this.otherOwnerAt(ctx, inner, rec.owner, primary);
+      const o = this.otherOwnerAt(ctx, inner, rec, primary);
       this.log(`[housing] ${primary.toString(16)} builds no place: ${inner} is ${o ? `also behind ${o.name}'s door ${o.ref.toString(16)}` : `part of ${index.get(inner)!.toString(16)}`}`);
       return;
     }
-    const cells = this.placeCellsFrom(ctx, inner, rec.owner).filter((c) => c === inner || !taken(c));
+    const cells = this.placeCellsFrom(ctx, inner, rec).filter((c) => c === inner || !taken(c));
     rec.place = { cells, builtAt: Date.now() };
     if (!this.write(ctx, primary, rec)) { delete rec.place; return; }
     const joined = this.joinEntrances(ctx, primary, rec);
@@ -1083,7 +1153,7 @@ export class HousingSystem implements System {
     for (const other of this.claimed.slice()) {
       if (other === primary) continue;
       const r = this.read(ctx, other);
-      if (!r || r.owner !== rec.owner || r.memberOf || r.place) continue;
+      if (!r || !r.owner || !this.sameOwner(r, rec) || r.memberOf || r.place) continue;
       if (cells.indexOf(this.cellDescOf(ctx, other)) === -1 && !(r.partner && cells.indexOf(this.cellDescOf(ctx, r.partner)) !== -1)) continue;
       r.memberOf = primary;
       if (this.write(ctx, other, r)) own++;
@@ -1093,19 +1163,19 @@ export class HousingSystem implements System {
 
   // Doors to the world in a place's cells that nobody else holds become members, locked as the root is
   // A door to the world in this cell held by someone other than this owner (and not part of this place): the cell is shared
-  private otherOwnerAt(ctx: SystemContext, cell: string, owner: number, root: number): { ref: number; owner: number; name: string } | null {
+  private otherOwnerAt(ctx: SystemContext, cell: string, owner: OwnerRef, root: number): { ref: number; owner: number; name: string } | null {
     for (const d of this.doorsOut(ctx, cell)) {
       if (!this.isWorldDesc(ctx, d.farCell)) continue;
       const p = this.primaryOf(ctx, d.ref);
       if (!p || p === root) continue;
       const m = this.read(ctx, p);
-      if (m && m.owner !== 0 && m.owner !== owner) return { ref: p, owner: m.owner, name: m.ownerName || String(m.owner) };
+      if (m && m.owner !== 0 && !this.sameOwner(m, owner)) return { ref: p, owner: m.owner, name: m.ownerName || String(m.owner) };
     }
     return null;
   }
 
   // The doors to the world in these cells that nobody holds (primaries), which join a place built there
-  private unclaimedEntrances(ctx: SystemContext, root: number, owner: number, cells: string[]): number[] {
+  private unclaimedEntrances(ctx: SystemContext, root: number, owner: OwnerRef, cells: string[]): number[] {
     const out: number[] = [];
     for (const cell of cells) {
       for (const d of this.doorsOut(ctx, cell)) {
@@ -1114,7 +1184,7 @@ export class HousingSystem implements System {
         if (!p || p === root || out.indexOf(p) !== -1) continue;
         const m = this.read(ctx, p);
         if (m && m.owner !== 0) {
-          if (m.owner !== owner) this.log(`[housing] place ${root.toString(16)}: entrance ${p.toString(16)} is ${m.ownerName || m.owner}'s and stays theirs`);
+          if (!this.sameOwner(m, owner)) this.log(`[housing] place ${root.toString(16)}: entrance ${p.toString(16)} is ${m.ownerName || m.owner}'s and stays theirs`);
           continue;
         }
         out.push(p);
@@ -1125,12 +1195,11 @@ export class HousingSystem implements System {
 
   private joinEntrances(ctx: SystemContext, root: number, rec: PropertyRecord, list?: number[]): number[] {
     const joined: number[] = [];
-    for (const p of list || this.unclaimedEntrances(ctx, root, rec.owner, rec.place ? rec.place.cells : [])) {
+    for (const p of list || this.unclaimedEntrances(ctx, root, rec, rec.place ? rec.place.cells : [])) {
       const m = this.read(ctx, p);
       if (m && m.owner !== 0) continue;
       const member = m || emptyRecord();
-      member.owner = rec.owner;
-      member.ownerName = rec.ownerName;
+      this.copyOwner(member, rec);
       member.partner = this.partnerOf(ctx, p);
       member.locked = rec.locked;
       member.memberOf = root;
@@ -1153,8 +1222,7 @@ export class HousingSystem implements System {
   // A place handed over or granted: every member goes with its root (the root's re-key already re-keyed them)
   private carryPlace(ctx: SystemContext, root: number, rec: PropertyRecord): void {
     for (const m of this.membersOf(ctx, root)) {
-      m.rec.owner = rec.owner;
-      m.rec.ownerName = rec.ownerName;
+      this.copyOwner(m.rec, rec);
       this.write(ctx, m.ref, m.rec);
     }
   }
@@ -1190,6 +1258,19 @@ export class HousingSystem implements System {
     return out;
   }
 
+  // Profiles the one-place cap never counts but whose claims are otherwise ordinary: places are built and their chests
+  // joined, unlike staffProfiles (Nate, 10 Oct: Lord Elion owns every building of Mountain Watch, and as staff his
+  // chests were never joined to his buildings). gamemode-config.json housingPlaces.uncappedProfiles, read on each ask.
+  private uncappedProfiles(): Set<number> {
+    const out = new Set<number>();
+    try {
+      const cfg = JSON.parse(fs.readFileSync(GAMEMODE_CONFIG_FILE, "utf8"));
+      const list = cfg && cfg.housingPlaces && Array.isArray(cfg.housingPlaces.uncappedProfiles) ? cfg.housingPlaces.uncappedProfiles : [];
+      for (const p of list) if (Number(p) > 0) out.add(Number(p));
+    } catch { /* no gamemode config here */ }
+    return out;
+  }
+
   // The place rules (N3) apply only once Nate sets housingPlaceMigration "apply"
   private placesOn(): boolean {
     return this.placeMigration === "apply";
@@ -1216,7 +1297,43 @@ export class HousingSystem implements System {
   }
 
   private isManager(ctx: SystemContext, actorId: number, primary: number): boolean {
-    return this.isAdmin(ctx, actorId) || this.isHoldManager(ctx, actorId, primary);
+    return this.isAdmin(ctx, actorId) || this.isHoldManager(ctx, actorId, primary) || this.isFiefHolder(ctx, actorId, primary);
+  }
+
+  // ── Fiefs (gameplay nobility.js __dboNobility; off there, nobody holds one) ──
+
+  // What a property answers to for its fief: itself, its teleport partner and its place's root
+  private fiefRefs(ctx: SystemContext, primary: number): number[] {
+    const rec = this.read(ctx, primary);
+    const out = [primary];
+    const partner = (rec && rec.partner) || this.partnerOf(ctx, primary);
+    if (partner) out.push(partner);
+    if (rec && rec.memberOf && rec.memberOf !== primary) out.push(rec.memberOf);
+    return out;
+  }
+
+  private isFiefHolder(ctx: SystemContext, actorId: number, primary: number): boolean {
+    const n = (globalThis as any).__dboNobility;
+    if (!actorId || !n || typeof n.holdsFiefAt !== "function" || (typeof n.enabled === "function" && !n.enabled())) return false;
+    try { return n.holdsFiefAt(actorId, this.fiefRefs(ctx, primary)) === true; } catch { return false; }
+  }
+
+  // The character holding the fief a property stands in, or null
+  private fiefHolderOf(ctx: SystemContext, primary: number): { actor: number; profile: number } | null {
+    const n = (globalThis as any).__dboNobility;
+    if (!n || typeof n.fiefOf !== "function" || typeof n.holderOf !== "function" || (typeof n.enabled === "function" && !n.enabled())) return null;
+    try {
+      const id = n.fiefOf(this.fiefRefs(ctx, primary));
+      const h = id ? n.holderOf(id) : null;
+      return h && Number(h.actor) ? { actor: Number(h.actor) >>> 0, profile: Number(h.profile) || 0 } : null;
+    } catch { return null; }
+  }
+
+  // A building in the fief this character holds: the one-building cap never counts it
+  private fiefExempt(ctx: SystemContext, primary: number, profileId: number, actorId: number): boolean {
+    if (!primary) return false;
+    const h = this.fiefHolderOf(ctx, primary);
+    return !!h && h.profile === profileId && (!actorId || h.actor === (actorId >>> 0));
   }
 
   // A jarl, steward or other manager rank of the hold the property stands in
@@ -1761,6 +1878,7 @@ export class HousingSystem implements System {
       const r = raw as Partial<PropertyRecord>;
       return {
         owner: Number(r.owner) || 0,
+        ...(Number(r.ownerChar) ? { ownerChar: Number(r.ownerChar) >>> 0 } : {}),
         ownerName: String(r.ownerName || ""),
         name: typeof r.name === "string" && r.name ? r.name : null,
         locked: r.locked === true,
@@ -1827,6 +1945,7 @@ export class HousingSystem implements System {
     delete rec.memberOf; delete rec.ownerOnly;
     this.reKey(ctx, primary, rec);
     rec.owner = 0;
+    delete rec.ownerChar;
     rec.ownerName = "";
     rec.name = null;
     rec.locked = false;
@@ -1941,7 +2060,7 @@ export class HousingSystem implements System {
       const inner = c ? (c.cell && !this.isWorldDesc(ctx, c.cell) ? c.cell : c.partnerCell) : "";
       inners.set(p.root, inner);
       const listed = cellsOf.get(p.root);
-      const cells = !inner ? [] : listed ? [inner, ...listed.filter((c) => c !== inner)] : this.placeCellsFrom(ctx, inner, p.owner);
+      const cells = !inner ? [] : listed ? [inner, ...listed.filter((c) => c !== inner)] : this.placeCellsFrom(ctx, inner, { owner: p.owner });
       walks.set(p.root, cells);
       for (const cell of cells) note(cell, p.owner);
     }
@@ -1953,7 +2072,7 @@ export class HousingSystem implements System {
       const cells: string[] = [];
       for (const cell of walked) {
         const others = [...(owners.get(cell) || [])].filter((o) => o !== p.owner);
-        const door = others.length ? null : this.otherOwnerAt(ctx, cell, p.owner, p.root);
+        const door = others.length ? null : this.otherOwnerAt(ctx, cell, { owner: p.owner }, p.root);
         if (others.length) skipped.push({ cell, why: `also opens onto profile ${others.join("/")}'s place` });
         else if (door) skipped.push({ cell, why: `also behind ${door.name}'s door ${door.ref.toString(16)}` });
         else cells.push(cell);
@@ -1966,7 +2085,7 @@ export class HousingSystem implements System {
       const d: PlaceDetail = { root: p.root, owner: p.owner, cells: notApplied ? [] : cells, members: notApplied ? [] : members, outside, skippedCells: skipped,
         openChests: notApplied ? [] : p.openChests.filter((r) => members.indexOf(r) !== -1), entrances: [], unclaimedChests: [], innerDoors: [], notApplied };
       if (!notApplied) {
-        d.entrances = this.unclaimedEntrances(ctx, p.root, p.owner, cells);
+        d.entrances = this.unclaimedEntrances(ctx, p.root, { owner: p.owner }, cells);
         const seen = new Set<number>();
         for (const cell of cells) for (const ref of this.refsInCell(ctx, cell)) {
           const pr = this.primaryOf(ctx, ref);
@@ -2183,19 +2302,28 @@ export class HousingSystem implements System {
   // housingPlaces.staffProfiles / housingStaffProfiles, and anyone online with an admin tier (the roles the gear swap's
   // staff exemption reads). Without the place rules the old per-claim limit stands for everything.
   // Returns the refusal, or "" when they may take this one.
-  private overCap(ctx: SystemContext, profileId: number, actorId: number, self: boolean, building = true): string {
+  private overCap(ctx: SystemContext, profileId: number, actorId: number, self: boolean, building = true, primary = 0): string {
+    if (building && this.fiefExempt(ctx, primary, profileId, actorId)) return "";
     if (!this.placesOn()) {
-      if (this.countClaims(ctx, profileId) < this.maxClaims) return "";
+      if (this.countClaims(ctx, profileId, actorId) < this.maxClaims) return "";
       return self ? `You already hold ${this.maxClaims} properties.` : "They hold too much property already.";
     }
     if (this.isStaff(ctx, profileId, actorId)) return "";
+    if (profileId && this.uncappedProfiles().has(profileId)) return "";
     if (!building) {
-      if (this.countLoose(ctx, profileId) < this.maxClaims) return "";
+      if (this.countLoose(ctx, profileId, actorId) < this.maxClaims) return "";
       return self ? `You already hold ${this.maxClaims} chests and rooms of your own.` : `They already hold ${this.maxClaims} chests and rooms of their own.`;
     }
-    if (this.countPlaces(ctx, profileId) < this.placeCap) return "";
-    const n = this.placeCap === 1 ? "a property" : `${this.placeCap} properties`;
-    return self ? `You already hold ${n}; one each.` : `They already hold ${n}; one each.`;
+    if (this.countPlaces(ctx, profileId, actorId) >= this.placeCap) {
+      const n = this.placeCap === 1 ? "a property" : `${this.placeCap} properties`;
+      return self ? `You already hold ${n}; one each.` : `They already hold ${n}; one each.`;
+    }
+    // Holdings already past it are kept; only a new one is refused
+    if (this.perCharacter && this.countPlaces(ctx, profileId, 0, true) >= this.placeCapPerAccount) {
+      const n = this.placeCapPerAccount === 1 ? "a property" : `${this.placeCapPerAccount} properties`;
+      return self ? `Your characters already hold ${n} between them, the most one account may.` : `Their characters already hold ${n} between them, the most one account may.`;
+    }
+    return "";
   }
 
   private isStaff(ctx: SystemContext, profileId: number, actorId: number): boolean {
@@ -2204,32 +2332,168 @@ export class HousingSystem implements System {
   }
 
   // Properties held: the buildings (a place, or a way in that is no member of one)
-  private countPlaces(ctx: SystemContext, profileId: number): number {
+  // Counted per character with housingOwnerPerCharacter (a claim not yet migrated counts for every character of its account)
+  private countPlaces(ctx: SystemContext, profileId: number, actorId = 0, wholeAccount = false): number {
     let n = 0;
     for (const primary of this.claimed) {
       const rec = this.read(ctx, primary);
-      if (rec && rec.owner === profileId && this.isBuilding(ctx, primary, rec)) n++;
+      if (rec && (wholeAccount ? !!profileId && rec.owner === profileId : this.ownsAs(rec, profileId, actorId)) && this.isBuilding(ctx, primary, rec) && !this.fiefExempt(ctx, primary, rec.owner, this.ownerCharOf(rec))) n++;
     }
     return n;
   }
 
   // Chests and room doors claimed on their own, outside any place
-  private countLoose(ctx: SystemContext, profileId: number): number {
+  private countLoose(ctx: SystemContext, profileId: number, actorId = 0): number {
     let n = 0;
     for (const primary of this.claimed) {
       const rec = this.read(ctx, primary);
-      if (rec && rec.owner === profileId && (!rec.memberOf || rec.memberOf === primary) && !this.isBuilding(ctx, primary, rec)) n++;
+      if (rec && this.ownsAs(rec, profileId, actorId) && (!rec.memberOf || rec.memberOf === primary) && !this.isBuilding(ctx, primary, rec)) n++;
     }
     return n;
   }
 
-  private countClaims(ctx: SystemContext, profileId: number): number {
+  private countClaims(ctx: SystemContext, profileId: number, actorId = 0): number {
     let n = 0;
     for (const primary of this.claimed) {
       const rec = this.read(ctx, primary);
-      if (rec && rec.owner === profileId) n++;
+      if (rec && this.ownsAs(rec, profileId, actorId) && !this.fiefExempt(ctx, primary, rec.owner, this.ownerCharOf(rec))) n++;
     }
     return n;
+  }
+
+
+  // ── Owners: one character, or the account ──────────────────────────────────
+  //
+  // With housingOwnerPerCharacter a claim whose record names its character (ownerChar) is that character's alone; one the
+  // owner migration has not named yet stays the account's. Off, every claim is the account's, as before 10 Oct.
+
+  private ownsAs(rec: OwnerRef, profileId: number, actorId: number): boolean {
+    if (!rec.owner) return false;
+    if (this.perCharacter && rec.ownerChar) return !!actorId && (rec.ownerChar >>> 0) === (actorId >>> 0);
+    return !!profileId && rec.owner === profileId;
+  }
+
+  private sameOwner(a: OwnerRef, b: OwnerRef): boolean {
+    if (this.perCharacter && a.ownerChar && b.ownerChar) return (a.ownerChar >>> 0) === (b.ownerChar >>> 0);
+    return a.owner === b.owner;
+  }
+
+  private ownerCharOf(rec: OwnerRef): number {
+    return this.perCharacter && rec.ownerChar ? rec.ownerChar >>> 0 : 0;
+  }
+
+  private isAssignee(a: { profile: number; char?: number }, profileId: number, actorId: number): boolean {
+    if (this.perCharacter && a.char) return !!actorId && (a.char >>> 0) === (actorId >>> 0);
+    return !!profileId && Number(a.profile) === profileId;
+  }
+
+  private ownerActorsOf(ctx: SystemContext, rec: OwnerRef): number[] {
+    const c = this.ownerCharOf(rec);
+    if (c) return [c];
+    if (!rec.owner) return [];
+    try { return Array.from(((ctx.svr as Mp).getActorsByProfileId(rec.owner) || []) as ArrayLike<number>, (x) => Number(x) >>> 0); } catch { return []; }
+  }
+
+  private setOwner(ctx: SystemContext, rec: PropertyRecord, actorId: number, profileId: number): void {
+    rec.owner = profileId;
+    if (actorId) rec.ownerChar = actorId >>> 0; else delete rec.ownerChar;
+    rec.ownerName = this.nameOf(ctx, actorId);
+  }
+
+  private copyOwner(to: PropertyRecord, from: PropertyRecord): void {
+    to.owner = from.owner;
+    if (from.ownerChar) to.ownerChar = from.ownerChar; else delete to.ownerChar;
+    to.ownerName = from.ownerName;
+  }
+
+  // An account's characters as the owner migration weighs them; a deleted one (its slot unreadable) is left out, as the
+  // character list leaves it out (spawn.ts slotMap)
+  private charsOf(ctx: SystemContext, profileId: number): OwnerCandidate[] {
+    const mp = ctx.svr as Mp;
+    let ids: number[] = [];
+    try { ids = Array.from((mp.getActorsByProfileId(profileId) || []) as ArrayLike<number>, (x) => Number(x) >>> 0); } catch { return []; }
+    const out: OwnerCandidate[] = [];
+    for (const actor of ids) {
+      let slot: unknown;
+      try { slot = mp.get(actor, "private.charSlot"); } catch { continue; }
+      const names: string[] = [];
+      try { const app = mp.get(actor, "appearance"); if (app && app.name) names.push(String(app.name)); } catch { /* no look */ }
+      try { const real = mp.get(actor, "maskName"); if (typeof real === "string" && real) names.push(real); } catch { /* never masked */ }
+      let dead = false;
+      try { dead = mp.get(actor, "private.permaDead") === true; } catch { /* alive */ }
+      out.push({ actor, names, slot: Number.isInteger(slot) ? Number(slot) : 99, dead });
+    }
+    return out;
+  }
+
+  // The owner migration (housingOwnerMigration): names each claim's character and each assigned room's, and writes the plan
+  // to the log and OWNER_PLAN_FILE for Nate. "apply" also writes ownerChar (and assigned[].char) into the records, once,
+  // after a backup of every record it changes; a record that already names its character is left alone, so a rerun changes
+  // nothing. Undo: housingOwnerPerCharacter false (the names are then unread); the backup holds the records as they were.
+  // Returns false (to be tried again) while a claim is unreadable; on the last try it plans anyway and applies nothing.
+  private dryRunOwners(ctx: SystemContext, lastTry = false): boolean {
+    const records: OwnerRecord[] = [];
+    const unreadable: number[] = [];
+    for (const primary of this.claimed) {
+      const rec = this.read(ctx, primary);
+      if (!rec) { unreadable.push(primary); continue; }
+      if (!rec.owner) continue;
+      records.push({ ref: primary, owner: rec.owner, ownerName: rec.ownerName, ownerChar: rec.ownerChar, memberOf: rec.memberOf, assigned: rec.assigned });
+    }
+    if (unreadable.length && !lastTry) return false;
+    const cache = new Map<number, OwnerCandidate[]>();
+    const chars = (p: number) => { let c = cache.get(p); if (!c) { c = this.charsOf(ctx, p); cache.set(p, c); } return c; };
+    const decisions = planOwners(records, chars);
+    const hex = (n: number) => (n >>> 0).toString(16);
+    const counts: Record<string, number> = {};
+    for (const d of decisions) counts[d.how] = (counts[d.how] || 0) + 1;
+    const apply = this.ownerMigration === "apply" && !unreadable.length;
+    this.log(`[housing] owner plan (${apply ? "apply" : "dry run, nothing changed"}): ${records.length} owned claims, ${decisions.length} decisions: ${Object.entries(counts).map(([k, v]) => `${k} ${v}`).join(", ")}${unreadable.length ? `; ${unreadable.length} claim(s) unreadable: ${unreadable.map(hex).join(",")}` : ""}`);
+    for (const d of decisions) {
+      if (d.how === "kept" || d.how === "root" || d.how === "name") continue;
+      this.log(`[housing] owner plan: ${hex(d.ref)}${d.room ? ` room ${d.room}` : ""} profile ${d.profile} "${d.recordName}" -> ${d.char ? `${hex(d.char)} "${d.charName}"` : "nobody"} (${d.how}${d.note ? `: ${d.note}` : ""})`);
+    }
+    const out = { at: new Date().toISOString(), mode: this.ownerMigration, perCharacter: this.perCharacter, unreadable: unreadable.map(hex), counts,
+      decisions: decisions.map((d) => ({ ...d, ref: hex(d.ref), char: d.char ? hex(d.char) : "" })) };
+    try { fs.writeFileSync(OWNER_PLAN_FILE, JSON.stringify(out, null, 1)); } catch (e) { this.log(`[housing] ${OWNER_PLAN_FILE} write failed: ${e}`); }
+    if (this.ownerMigration === "apply" && unreadable.length) this.log(`[housing] owner migration NOT applied: ${unreadable.length} of ${this.claimed.length} claims are still unreadable`);
+    if (apply) this.applyOwners(ctx, decisions);
+    return true;
+  }
+
+  private applyOwners(ctx: SystemContext, decisions: ReturnType<typeof planOwners>): void {
+    const mp = ctx.svr as Mp;
+    const hex = (n: number) => (n >>> 0).toString(16);
+    const todo = new Map<number, Array<ReturnType<typeof planOwners>[number]>>();
+    for (const d of decisions) {
+      if (!d.char || d.how === "kept") continue;
+      const list = todo.get(d.ref) || [];
+      list.push(d);
+      todo.set(d.ref, list);
+    }
+    if (!todo.size) { this.log(`[housing] owner migration: nothing to apply`); return; }
+    const backup: Record<string, unknown> = {};
+    for (const ref of todo.keys()) { let v: unknown = null; try { v = mp.get(ref, HOUSING_PROP); } catch { v = null; } backup[hex(ref)] = v === undefined ? null : v; }
+    const file = `${OWNER_BACKUP_PREFIX}${new Date().toISOString().replace(/[:.]/g, "-")}.json`;
+    try { fs.writeFileSync(file, JSON.stringify({ version: 1, records: backup }, null, 1)); } catch (e) { this.log(`[housing] owner migration NOT applied: the backup ${file} could not be written: ${e}`); return; }
+    let owners = 0, rooms = 0, failed = 0;
+    for (const [ref, list] of todo) {
+      const rec = this.read(ctx, ref);
+      if (!rec || !rec.owner) { failed++; continue; }
+      let changed = false;
+      for (const d of list) {
+        if (!d.room) {
+          if (rec.ownerChar || rec.owner !== d.profile) continue;
+          rec.ownerChar = d.char >>> 0; changed = true; owners++;
+        } else {
+          const a = rec.assigned && rec.assigned[d.room];
+          if (!a || a.char || Number(a.profile) !== d.profile) continue;
+          rec.assigned![d.room] = { ...a, char: d.char >>> 0 }; changed = true; rooms++;
+        }
+      }
+      if (changed && !this.write(ctx, ref, rec)) failed++;
+    }
+    this.log(`[housing] owner migration applied: ${owners} claim(s) and ${rooms} assigned room(s) now name their character${failed ? `, ${failed} write(s) failed` : ""}; backup ${file}`);
   }
 
   // ── Registry file ───────────────────────────────────────────────────────────
@@ -2295,7 +2559,12 @@ export class HousingSystem implements System {
     try { return Number((ctx.svr as Mp).get(actorId, "profileId")) || 0; } catch { return 0; }
   }
 
+  // The character's own name: under a mask the real one it keeps (gameplay playermenu.js maskName), not what others see
   private nameOf(ctx: SystemContext, actorId: number): string {
+    try {
+      const real = (ctx.svr as Mp).get(actorId, "maskName");
+      if (typeof real === "string" && !UNNAMED.includes(nameKey(real))) return real;
+    } catch { /* never masked */ }
     try {
       const appearance = (ctx.svr as Mp).get(actorId, "appearance");
       return String((appearance && appearance.name) || "Someone");
@@ -2337,6 +2606,7 @@ export class HousingSystem implements System {
   private zoneCache = new Map<number, string | null>();
   private maxClaims = DEFAULT_MAX_CLAIMS;
   private placeCap = 1;
+  private placeCapPerAccount = 2;
   private placeRestore = "";
   private placeMigration: "off" | "dryrun" | "apply" = "dryrun";
   private staffSetting: number[] = [];
@@ -2349,6 +2619,11 @@ export class HousingSystem implements System {
   private placeCellsDirty = true;
   private maxDistance = DEFAULT_MAX_DISTANCE;
   private openClaims = false;
+  private perCharacter = false;
+  private ownerMigration: "off" | "dryrun" | "apply" = "dryrun";
+  private ownerPlanDone = false;
+  private ownerPlanTriedMs = 0;
+  private ownerPlanTries = 0;
   private decorDirty = false;
   private lastDecorMs = 0;
 }
