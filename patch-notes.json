@@ -1,7 +1,123 @@
 [
   {
+    "title": "Client update 0.3.91",
+    "date": "2026-10-11",
+    "version": "Client 0.3.91",
+    "tag": "Update",
+    "sections": [
+      {
+        "heading": "Client",
+        "items": [
+          "Other players and NPCs are outlined again when a glow should show on them, and a Racial Power's look (such as Roaring Tempest's shock cloak) shows to everyone nearby.",
+          "Busy areas stutter less when many NPCs appear or leave at once: the game now places them a few at a time.",
+          "Wolves around Bruma stand and fight again instead of running off; deer, foxes, hares and other prey still flee.",
+          "Werewolves and Vampire Lords can use their Shout and Sneak powers from a mouse button.",
+          "The key settings in the journal (F3) accept the back and forward mouse buttons (Mouse 4 and Mouse 5).",
+          "Pigeon coops can send and collect parcels of gold and goods, and have a new Supply orders tab.",
+          "A new journal tab for those who serve the Dominion: Thalmor.",
+          "Switching characters no longer leaves your old character's body standing in the world.",
+          "A werewolf or vampire lord who is downed and revived wakes in their own shape.",
+          "A crash when someone near you was downed or died while talking is fixed.",
+          "A filled soul gem no longer pops its notice up over and over.",
+          "The Maormer can be made in the character creator.",
+          "The client now sends the server a short performance report every 30 seconds, so we can track down lag."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "World and item fixes",
+    "date": "2026-10-11",
+    "version": "Plugin update",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Items",
+        "items": [
+          "Backpacks, satchels and pouches now show on your character when worn, and they add to what you can carry: a backpack +50, a satchel +25, a pouch +10. A cape can be worn with a backpack or satchel.",
+          "The Officer's Sword, the General's Sword and the Penitus Oculatus Sword now have the same base damage (12).",
+          "Zahkrii do Bormahu shows its real colours again (gold guard, dark blade, leather grip) instead of a pale glassy look.",
+          "The weapons that came on the racks in player buildings are gone, so those racks are free to hold your own."
+        ]
+      },
+      {
+        "heading": "Maormer",
+        "items": [
+          "New sea-blue and sea-green skin colours for the Maormer. New characters pick from them in the creator, and an existing Maormer can choose one of the new colours with /appearance."
+        ]
+      },
+      {
+        "heading": "The world",
+        "items": [
+          "The carrot plant now gives carrots, not leeks.",
+          "Bruma's statue of Meridia now shows a prayer prompt. In Underpall, the low-hanging icicles that players walked into are gone.",
+          "Fingerbowl Cave has been rebuilt where its rooms were out of place, and it now has a map marker.",
+          "Scamps cast fire again."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Parcels and supply orders by pigeon",
+    "date": "2026-10-11",
+    "version": "Server update",
+    "tag": "New",
+    "sections": [
+      {
+        "heading": "Pigeon post",
+        "items": [
+          "A pigeon letter can now carry a parcel: gold and up to six kinds of goods. The town whose board it flies from takes a tenth of the gold and 5 gold for each kind of goods. The one you send it to collects it at any notice board.",
+          "Players can post supply orders at a notice board: ask for a number of one item and set a reward. The board holds the reward, and posting costs a tenth of it (at least 10 gold). Anyone else can bring the goods to a board in the same hold and is paid at once for what they hand in, and the goods go to the poster's mailbox.",
+          "An order stays open for a week. Whatever reward is left when it ends or is cancelled goes back to the poster's mailbox; the posting fee is kept. Each account can have three orders open at once."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Dragons can be skinned",
+    "date": "2026-10-11",
+    "version": "Server update",
+    "tag": "Change",
+    "sections": [
+      {
+        "heading": "Skinning",
+        "items": [
+          "Dragons can now be skinned, but only by a Master Skinner: their bones and scales come off the body through skinning. Their gold and gems can still be looted as before."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Spell tomes from reading",
+    "date": "2026-10-11",
+    "version": "Server update",
+    "tag": "Change",
+    "sections": [
+      {
+        "heading": "Reading",
+        "items": [
+          "Spell tomes from reading no longer stop at two a day. They're a rare chance on every reading, rarer after each one you find that day, and still guaranteed after 100 readings without one."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Racial smithing",
+    "date": "2026-10-11",
+    "version": "Server update",
+    "tag": "Change",
+    "sections": [
+      {
+        "heading": "Smithing",
+        "items": [
+          "Every Dark Elf smith knows Bonemold and Chitin, and every Orc smith knows Orcish, once they reach the craft tier. Both can teach it to others."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Mountain Watch's storage",
-    "date": "SHIP_DATE",
+    "date": "2026-10-11",
     "version": "Server update",
     "tag": "Fix",
     "sections": [
@@ -15,7 +131,7 @@
   },
   {
     "title": "Waning skills give back every point",
-    "date": "SHIP_DATE",
+    "date": "2026-10-11",
     "version": "Server update",
     "tag": "Fix",
     "sections": [
@@ -29,7 +145,7 @@
   },
   {
     "title": "Weapon racks in homes",
-    "date": "2026-10-10",
+    "date": "2026-10-11",
     "version": "Server update",
     "tag": "Feature",
     "sections": [
@@ -48,7 +164,7 @@
   },
   {
     "title": "Learning by making something new",
-    "date": "SHIP_DATE",
+    "date": "2026-10-11",
     "version": "Server update",
     "tag": "Change",
     "sections": [
@@ -85,14 +201,14 @@
   },
   {
     "title": "Harmony and Mayhem",
-    "date": "SHIP_DATE",
+    "date": "2026-10-11",
     "version": "Server update",
     "tag": "New",
     "sections": [
       {
         "heading": "Weapons",
         "items": [
-          "Two new one-handed swords that staff can grant: Harmony and Mayhem.",
+          "Two artifact swords have come into the world: Harmony and Mayhem.",
           "A creature or NPC struck by Harmony calms down and will not fight anyone for 20 seconds. One struck by Mayhem flies into a frenzy and attacks anything near it for 20 seconds.",
           "Striking again starts the 20 seconds over, and a strike from the other blade turns calm into frenzy or frenzy into calm.",
           "Neither blade's effect works on other players: against adventurers they are ordinary swords."
@@ -102,7 +218,7 @@
   },
   {
     "title": "Vampires and healing magic",
-    "date": "SHIP_DATE",
+    "date": "2026-10-11",
     "version": "Server update",
     "tag": "Change",
     "sections": [
@@ -116,7 +232,7 @@
   },
   {
     "title": "The Thalmor enforce the Concordat",
-    "date": "SHIP_DATE",
+    "date": "2026-10-11",
     "version": "Server update",
     "tag": "New",
     "sections": [
@@ -127,7 +243,7 @@
           "A Concordat arrest is lawful. At a cell door in the jail the Thalmor can pass the Concordat's sentence of 30 minutes, and only the Thalmor can let the prisoner out early; the guards will not.",
           "In Skyrim the Thalmor have no arrest powers at all: the Holds rule themselves and the Concordat binds only the Empire. A Thalmor rank no longer lets anyone restrain or jail people in Skyrim; it works again on returning to Cyrodiil.",
           "The Thalmor have informants. When anyone kneels at a shrine of Talos in Cyrodiil, the First Emissary, Justiciars and Inquisitors who are online hear of it: which shrine, where and when, but never who.",
-          "The Thalmor keep dossiers: notes on named characters, written by the First Emissary and Justiciars and read by Inquisitors too. The reports and dossiers are in a new Thalmor tab of the journal (F3), which only those ranks see. The tab arrives with the next client update.",
+          "The Thalmor keep dossiers: notes on named characters, written by the First Emissary and Justiciars and read by Inquisitors too. The reports and dossiers are in a new Thalmor tab of the journal (F3), which only those ranks see.",
           "The Aldmeri Dominion pays the Thalmor a stipend of 300 gold into their treasury at every weekly reckoning.",
           "Only High Elves, Wood Elves and Khajiit (the Dominion's peoples, vampires among them) can join the Thalmor, and only High Elves can be First Emissary or Justiciar. The Maormer are the Dominion's enemies and are not taken. Nobody already in the Thalmor is removed."
         ]
@@ -135,22 +251,8 @@
     ]
   },
   {
-    "title": "The Blades work in secret",
-    "date": "SHIP_DATE",
-    "version": "Server update",
-    "tag": "Change",
-    "sections": [
-      {
-        "heading": "Factions",
-        "items": [
-          "The Blades are now a secret order: their members are hidden from others like the other secret orders, and a Blade can also serve a hold, the Legion or a guild. The Thalmor still never take a Blade."
-        ]
-      }
-    ]
-  },
-  {
     "title": "A faith for the Maormer",
-    "date": "SHIP_DATE",
+    "date": "2026-10-11",
     "version": "Server update",
     "tag": "New",
     "sections": [
@@ -192,7 +294,7 @@
   },
   {
     "title": "Mages' colleges: tomes by rank, teaching and classes for beginners",
-    "date": "SHIP_DATE",
+    "date": "2026-10-11",
     "version": "Server update",
     "tag": "Change",
     "sections": [
@@ -216,7 +318,7 @@
         "items": [
           "A mage can now hold classes at a Class Lectern with Arcane Arts at 75, as well as with Expert study in a school.",
           "Students who have not reached their first spell yet (Arcane Arts below 25, no school chosen) can now join a Novice or Apprentice class. They learn Arcane Arts while they stay in the classroom, at about twice the pace of studying alone. The usual hourly and daily skill limits still apply.",
-          "When the teacher ends a class, everyone who stayed to the end is offered the class's spell to learn (Learn or Decline, for three minutes). The usual rules apply: you need the skill and school of magic for it, it must be within the rank you could buy, and the restricted arts are only for Senior ranks. A class's spell costs the teacher one tome of it, or their tome purchase for the day, once for the whole class."
+          "When the teacher ends a class, everyone who stayed to the end is offered the class's spell to learn (Learn or Decline, for three minutes). The usual rules apply: you need the skill and school of magic for it, it must be within the rank you could buy, and the restricted arts are only for Senior ranks. A class's spell costs the teacher one tome of it, or one of their tome purchases for the week, once for the whole class."
         ]
       },
       {
@@ -250,7 +352,7 @@
       {
         "heading": "Factions",
         "items": [
-          "The Officer's Sword, the General's Sword and the Penitus Oculatus Sword now get the same damage bonus as the other faction weapons (a Glass weapon's). Their own base damage still differs a little; evening that out comes with a later plugin update.",
+          "The Officer's Sword, the General's Sword and the Penitus Oculatus Sword now get the same damage bonus as the other faction weapons (a Glass weapon's). All three now have the same base damage too (12).",
           "Only smiths of the Imperial Legion can forge the Officer's Sword and the General's Sword. The Penitus Oculatus Sword is made by smiths of the Penitus Oculatus or the Legion."
         ]
       }

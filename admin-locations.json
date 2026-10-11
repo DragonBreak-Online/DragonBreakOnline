@@ -306,6 +306,22 @@
 ]
 },
 {
+"name": "Fingerbowl Cave",
+"region": "Cyrodiil",
+"world": "a764b:BSHeartland.esm",
+"worldName": "Heartland",
+"pos": [
+57839.31,
+164919.31,
+-3102.9
+],
+"rot": [
+0,
+0,
+140.37
+]
+},
+{
 "name": "Forester Outpost",
 "region": "Cyrodiil",
 "world": "a764b:BSHeartland.esm",
@@ -767,6 +783,22 @@
 0,
 0,
 325.62349056
+]
+},
+{
+"name": "Serpent Stone (the Deep Serpents)",
+"region": "Cyrodiil",
+"world": "a764b:BSHeartland.esm",
+"worldName": "Heartland",
+"pos": [
+80532.17,
+221811.35,
+2584.0
+],
+"rot": [
+0,
+0,
+167.8
 ]
 },
 {

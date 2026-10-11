@@ -1,0 +1,17 @@
+{
+  "title": "Property belongs to your character",
+  "date": "SHIP_DATE",
+  "version": "Server update",
+  "tag": "Change",
+  "sections": [
+    {
+      "heading": "Property",
+      "items": [
+        "Houses, rooms and businesses now belong to the character who owns them, not to your whole account. Property tax comes from that character's bank, rent and takings go to that character, and only that character (and the people holding its keys) can use it.",
+        "Each character can own one home, and each account up to two.",
+        "A faction's hall now follows the faction's current leader, whoever owns the building.",
+        "Property you already own has been given to the character it was bought for."
+      ]
+    }
+  ]
+}
