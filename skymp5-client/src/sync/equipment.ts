@@ -5,6 +5,8 @@ import {
   ObjectReference,
   Spell,
   Ui,
+  Weapon,
+  WeaponType,
   setInventory,
 } from 'skyrimPlatform';
 
@@ -115,7 +117,30 @@ export const syncSpellEquipment = (
   }
 };
 
-export const applyEquipment = (ac: Actor, eq: Equipment): boolean => {
+// An NPC's bow comes from the server without its arrows: MpActor::EquipBestWeapon marks only the weapon worn, and the
+// worn-only inventory below then took away the arrows the copy had from its base. The engine puts a bow away when it is
+// drawn with nothing to shoot, so a Conjure Boneman stood in fights empty-handed (Nate, 11 Oct; the npcDrift reports show
+// its right hand 302ca DraugrBow while sheathed and 0 once drawn, every time). Such a copy gets arrows or bolts to go with it.
+const NPC_ARROW: [number, string] = [0x01397d, 'Skyrim.esm']; // IronArrow
+const NPC_BOLT: [number, string] = [0x000bb3, 'Dawnguard.esm']; // DLC1BoltSteel
+
+export const npcAmmoFor = (worn: Inventory): number => {
+  if (worn.entries.some((x) => Ammo.from(Game.getFormEx(x.baseId)))) {
+    return 0;
+  }
+  for (const x of worn.entries) {
+    const weapon = Weapon.from(Game.getFormEx(x.baseId));
+    const type = weapon ? weapon.getWeaponType() : -1;
+    const ammo = type === WeaponType.Bow ? NPC_ARROW : type === WeaponType.Crossbow ? NPC_BOLT : null;
+    if (ammo) {
+      const form = Game.getFormFromFile(ammo[0], ammo[1]);
+      return form ? form.getFormID() : 0;
+    }
+  }
+  return 0;
+};
+
+export const applyEquipment = (ac: Actor, eq: Equipment, opts?: { npcAmmo?: boolean }): boolean => {
   ac.removeAllItems(null, false, true);
 
   ac.unequipAll();
@@ -130,6 +155,12 @@ export const applyEquipment = (ac: Actor, eq: Equipment): boolean => {
       const form = Game.getFormEx(x.baseId);
       return !form || !isBoundItem(form);
     });
+  }
+  if (!isPlayer && opts?.npcAmmo && !ac.isDead()) {
+    const ammoId = npcAmmoFor(worn);
+    if (ammoId) {
+      worn.entries.push({ baseId: ammoId, count: 1, worn: true });
+    }
   }
   const newInventory = removeUnnecessaryExtra(worn, isPlayer);
 

@@ -822,7 +822,7 @@ export class FormView {
           !this.isSettlingCopy(model)
         ) {
           //if (this.spawnMoment > 0 && Date.now() - this.spawnMoment > 5000) {
-          if (applyEquipment(ac, model.equipment)) {
+          if (applyEquipment(ac, model.equipment, { npcAmmo: !this.isPlayerCharacter() })) {
             this.eqState.lastNumChanges = model.equipment.numChanges;
             this.weaponWanted = this.isPlayerCharacter() ? undefined : FormView.wornWeapon(model.equipment.inv.entries);
             this.weaponCheckAt = Date.now() + FormView.weaponCheckMs;
