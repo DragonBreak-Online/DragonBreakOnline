@@ -1871,6 +1871,16 @@ export class HousingSystem implements System {
     cache.set(refrId, value);
   }
 
+  // A reference a plugin update deleted throws "doesn't exist"; a record not yet loaded after boot reads as null instead
+  private formGone(ctx: SystemContext, refrId: number): boolean {
+    try {
+      (ctx.svr as Mp).get(refrId, HOUSING_PROP);
+      return false;
+    } catch (e) {
+      return /doesn't exist/.test(String((e as Error)?.message ?? e));
+    }
+  }
+
   private read(ctx: SystemContext, primary: number): PropertyRecord | null {
     try {
       const raw = (ctx.svr as Mp).get(primary, HOUSING_PROP);
@@ -1963,9 +1973,10 @@ export class HousingSystem implements System {
     const isWorld = (desc: string): boolean => this.isWorldDesc(ctx, desc);
     const claims: PlaceClaim[] = [];
     const unreadable: number[] = [];
+    const gone: number[] = [];
     for (const primary of this.claimed) {
       const rec = this.read(ctx, primary);
-      if (!rec) { unreadable.push(primary); continue; }
+      if (!rec) { (this.formGone(ctx, primary) ? gone : unreadable).push(primary); continue; }
       if (!rec.owner) continue;
       claims.push({ ref: primary, owner: rec.owner, ownerName: rec.ownerName, name: rec.name, locked: rec.locked, door: rec.partner !== 0,
         cell: cellOf(primary), partnerCell: rec.partner ? cellOf(rec.partner) : "" });
@@ -1979,7 +1990,7 @@ export class HousingSystem implements System {
     const cellsOf = new Map<number, string[]>(grants.filter((g) => !!g.cells && !/^NOT/.test(g.why)).map((g) => [g.ref, g.cells!]));
     const details = this.refinePlaces(ctx, plan.places, claims, cellsOf);
     const hex = (n: number) => (n >>> 0).toString(16);
-    this.log(`[housing] place plan (${this.placeMigration === "apply" ? "apply" : "dry run, nothing changed"}): ${claims.length} owned claims -> ${plan.places.length} places${unreadable.length ? `; ${unreadable.length} claim(s) unreadable: ${unreadable.map(hex).join(",")}` : ""}`);
+    this.log(`[housing] place plan (${this.placeMigration === "apply" ? "apply" : "dry run, nothing changed"}): ${claims.length} owned claims -> ${plan.places.length} places${unreadable.length ? `; ${unreadable.length} claim(s) unreadable: ${unreadable.map(hex).join(",")}` : ""}${gone.length ? `; ${gone.length} claim(s) on a reference the load order no longer has, left out: ${gone.map(hex).join(",")}` : ""}`);
     for (const p of plan.places) {
       const d = details.get(p.root);
       this.log(`[housing] place plan: ${p.ownerName} (${p.owner}) ${p.kind} ${hex(p.root)} "${p.name || ""}" cells=${(d ? d.cells : p.cells).join(",")} members=${(d ? d.members : p.members).map(hex).join(",") || "-"}`
@@ -1997,7 +2008,7 @@ export class HousingSystem implements System {
     const tenancy = this.listingsOnMembers(details);
     for (const t of tenancy) this.log(`[housing] place plan: the tenancy listing at ${t.door} would sit on a member of ${t.root}; move it to the place's root before apply`);
     const grantsOut = grants.map((g) => ({ door: g.door, ref: g.ref, profile: g.profile, ownerName: g.ownerName, granted: !!g.claim, why: g.why, ...(g.cells ? { cells: g.cells } : {}) }));
-    const out = { at: new Date().toISOString(), mode: this.placeMigration, unreadable: unreadable.map(hex), ...plan, details: [...details.values()], tenancyListingsOnMembers: tenancy, grants: grantsOut };
+    const out = { at: new Date().toISOString(), mode: this.placeMigration, unreadable: unreadable.map(hex), gone: gone.map(hex), ...plan, details: [...details.values()], tenancyListingsOnMembers: tenancy, grants: grantsOut };
     try { fs.writeFileSync(PLACE_PLAN_FILE, JSON.stringify(out, null, 1)); } catch (e) { this.log(`[housing] ${PLACE_PLAN_FILE} write failed: ${e}`); }
     if (this.placeMigration === "apply") {
       if (unreadable.length) this.log(`[housing] place migration NOT applied: ${unreadable.length} of ${this.claimed.length} claims are still unreadable`);
@@ -2434,9 +2445,10 @@ export class HousingSystem implements System {
   private dryRunOwners(ctx: SystemContext, lastTry = false): boolean {
     const records: OwnerRecord[] = [];
     const unreadable: number[] = [];
+    const gone: number[] = [];
     for (const primary of this.claimed) {
       const rec = this.read(ctx, primary);
-      if (!rec) { unreadable.push(primary); continue; }
+      if (!rec) { (this.formGone(ctx, primary) ? gone : unreadable).push(primary); continue; }
       if (!rec.owner) continue;
       records.push({ ref: primary, owner: rec.owner, ownerName: rec.ownerName, ownerChar: rec.ownerChar, memberOf: rec.memberOf, assigned: rec.assigned });
     }
@@ -2448,12 +2460,12 @@ export class HousingSystem implements System {
     const counts: Record<string, number> = {};
     for (const d of decisions) counts[d.how] = (counts[d.how] || 0) + 1;
     const apply = this.ownerMigration === "apply" && !unreadable.length;
-    this.log(`[housing] owner plan (${apply ? "apply" : "dry run, nothing changed"}): ${records.length} owned claims, ${decisions.length} decisions: ${Object.entries(counts).map(([k, v]) => `${k} ${v}`).join(", ")}${unreadable.length ? `; ${unreadable.length} claim(s) unreadable: ${unreadable.map(hex).join(",")}` : ""}`);
+    this.log(`[housing] owner plan (${apply ? "apply" : "dry run, nothing changed"}): ${records.length} owned claims, ${decisions.length} decisions: ${Object.entries(counts).map(([k, v]) => `${k} ${v}`).join(", ")}${unreadable.length ? `; ${unreadable.length} claim(s) unreadable: ${unreadable.map(hex).join(",")}` : ""}${gone.length ? `; ${gone.length} claim(s) on a reference the load order no longer has, left out: ${gone.map(hex).join(",")}` : ""}`);
     for (const d of decisions) {
       if (d.how === "kept" || d.how === "root" || d.how === "name") continue;
       this.log(`[housing] owner plan: ${hex(d.ref)}${d.room ? ` room ${d.room}` : ""} profile ${d.profile} "${d.recordName}" -> ${d.char ? `${hex(d.char)} "${d.charName}"` : "nobody"} (${d.how}${d.note ? `: ${d.note}` : ""})`);
     }
-    const out = { at: new Date().toISOString(), mode: this.ownerMigration, perCharacter: this.perCharacter, unreadable: unreadable.map(hex), counts,
+    const out = { at: new Date().toISOString(), mode: this.ownerMigration, perCharacter: this.perCharacter, unreadable: unreadable.map(hex), gone: gone.map(hex), counts,
       decisions: decisions.map((d) => ({ ...d, ref: hex(d.ref), char: d.char ? hex(d.char) : "" })) };
     try { fs.writeFileSync(OWNER_PLAN_FILE, JSON.stringify(out, null, 1)); } catch (e) { this.log(`[housing] ${OWNER_PLAN_FILE} write failed: ${e}`); }
     if (this.ownerMigration === "apply" && unreadable.length) this.log(`[housing] owner migration NOT applied: ${unreadable.length} of ${this.claimed.length} claims are still unreadable`);
