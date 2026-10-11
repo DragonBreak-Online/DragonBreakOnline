@@ -6,6 +6,7 @@ type Mp = any;
 
 // MGEF DATA archetypes (offset 0x40)
 export const MgefArchetype = {
+  CommandSummoned: 10,
   SummonCreature: 18,
   Reanimate: 22,
   Banish: 42,

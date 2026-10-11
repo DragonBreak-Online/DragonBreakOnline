@@ -1,3 +1,4 @@
+import { Settings } from "../settings";
 import { System, Log, SystemContext } from "./system";
 import { CompanionSystem } from "./companionSystem";
 import { spellEffects, SpellEffect, MgefArchetype, npcLevel, keywordConditionsPass, turnsToAsh, pickSummon } from "./espmMagic";
@@ -7,7 +8,8 @@ import { isPlayerActor, isNear, baseIdOf, hex } from "./actorUtil";
 type Mp = any;
 
 // Server-side Conjuration fed by the onSpellCast / onSpellHit gamemode events (ActionListener.cpp):
-// SummonCreature spells place a summon, Reanimate spells raise a dead NPC within the level cap, Banish sends a summoned daedra away.
+// SummonCreature spells place a summon, Reanimate spells raise a dead NPC within the level cap, Banish sends a summoned daedra away,
+// Command Daedra takes another player's summoned daedra over.
 
 // Effects lasting this long are "until killed" (the Thralls)
 const PERMANENT_SEC = 1e7;
@@ -37,9 +39,13 @@ export class ConjurationSystem implements System {
   private pending = new Map<number, PendingReanimate>();
   private lastReanimateHit = new Map<number, number>();
   private lastRefusalNotice = new Map<number, number>();
+  // server-settings "commandDaedraEnabled"
+  private commandDaedraOn = true;
 
   async initAsync(ctx: SystemContext): Promise<void> {
     this.mp = ctx.svr as Mp;
+    const all = (await Settings.get()).allSettings as Record<string, unknown> | null;
+    this.commandDaedraOn = all?.["commandDaedraEnabled"] !== false;
     this.hook("onSpellCast", (casterId, spellId) => this.onSpellCast(casterId, spellId));
     this.hook("onSpellHit", (aggressorId, targetId, spellId) => this.onSpellHit(aggressorId, targetId, spellId));
   }
@@ -105,6 +111,8 @@ export class ConjurationSystem implements System {
           this.log(`ConjurationSystem: ${hex(aggressorId)} cannot reanimate ${hex(targetId)} with ${hex(spellId)}: ${refusal}`);
           this.tellRefusal(aggressorId, refusal);
         } else this.reanimate(aggressorId, targetId, spellId, effect);
+      } else if (effect.archetype === MgefArchetype.CommandSummoned && this.commandDaedraOn && isPlayerActor(this.mp, aggressorId)) {
+        this.command(aggressorId, targetId, spellId, effect);
       }
     }
   }
@@ -226,5 +234,26 @@ export class ConjurationSystem implements System {
     if (!keywordConditionsPass(this.mp, effect.mgefId, targetId)) return;
     if (npcLevel(this.mp, targetId) > effect.magnitude) return;
     this.companions.dismiss(targetId, `banished by ${hex(casterId)} with ${hex(spellId)}`);
+  }
+
+  // Vanilla Command Daedra: another's summoned daedra within the magnitude's level serves the caster for the effect's duration
+  // (0: the rest of its life); another player's only while the PvP rules let the caster fight them
+  private command(casterId: number, targetId: number, spellId: number, effect: SpellEffect): void {
+    const info = this.companions.info(targetId);
+    if (!info || info.kind !== "summon" || info.ownerId === casterId) return;
+    if (!keywordConditionsPass(this.mp, effect.mgefId, targetId)) return;
+    const level = npcLevel(this.mp, targetId);
+    if (level > effect.magnitude) {
+      this.log(`ConjurationSystem: ${hex(casterId)} cannot command ${hex(targetId)}: level ${level} over ${effect.magnitude}`);
+      return;
+    }
+    const side = this.companions.playerSideOf(targetId);
+    if (side && !this.companions.mayFightPlayer(casterId, side)) {
+      this.log(`ConjurationSystem: ${hex(casterId)} cannot command ${hex(targetId)} of ${hex(side)}: PvP not allowed`);
+      return;
+    }
+    if (this.companions.command(targetId, casterId, this.duration(effect))) {
+      this.log(`ConjurationSystem: ${hex(casterId)} commands ${hex(targetId)} with ${hex(spellId)}`);
+    }
   }
 }
