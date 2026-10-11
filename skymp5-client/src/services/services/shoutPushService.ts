@@ -14,6 +14,7 @@ import { SpellCastMsgData } from "../messages/spellCastMessage";
 //
 // Server -> client: { customPacketType: "dboPush", from: <server actor id>, force }  force 0 = a stagger only
 //                   { customPacketType: "dboShoutFx", data: <SpellCastMsgData> }   another player's shout to show
+//                   { customPacketType: "dboPushNpc", from, target, force }        push an NPC this game hosts (Force Rune, a shout)
 // A shout's wave, breath or projectile never reached anyone else: the server does not relay a player's shout word as
 // a cast (review A4-1). The gamemode now checks it against the shout gate and sends it here, and it is replayed through
 // the very path a relayed cast takes (RemoteServer.onSpellCastMessage: castSpellImmediate on the shouter's clone, with
@@ -27,6 +28,7 @@ export class ShoutPushService extends ClientListener {
   private onCustomPacketMessage(event: ConnectionMessage<CustomPacketMessage>): void {
     const content = parseCustomPacket(event);
     if (content && content["customPacketType"] === "dboShoutFx") { this.onShoutFx(content); return; }
+    if (content && content["customPacketType"] === "dboPushNpc") { this.onPushNpc(content); return; }
     if (!content || content["customPacketType"] !== "dboPush") return;
     const from = Number(content["from"]) >>> 0;
     const force = Math.max(0, Math.min(20, Number(content["force"]) || 0));
@@ -46,6 +48,28 @@ export class ShoutPushService extends ClientListener {
       }
       source.pushActorAway(player, force);
       logTrace(this, `pushed by ${from.toString(16)} with force ${force}`);
+    });
+  }
+
+  // A push cast by someone else on an NPC this game hosts: only the host's game moves it, and the others see it through the
+  // host's movement (the caster's own push never reaches an NPC hosted elsewhere)
+  private onPushNpc(content: Record<string, unknown>): void {
+    const from = Number(content["from"]) >>> 0;
+    const target = Number(content["target"]) >>> 0;
+    const force = Math.max(0, Math.min(20, Number(content["force"]) || 0));
+    if (!target) return;
+    this.controller.once("update", () => {
+      let npc: Actor | null = null;
+      try { npc = Actor.from(Game.getFormEx(remoteIdToLocalId(target))); } catch { npc = null; }
+      if (!npc || npc.isDead() || !npc.is3DLoaded()) return;
+      let source: ObjectReference | null = null;
+      try { source = ObjectReference.from(Game.getFormEx(remoteIdToLocalId(from))); } catch { source = null; }
+      if (force <= 0 || !source || !Actor.from(source)?.is3DLoaded()) {
+        Debug.sendAnimationEvent(npc, "staggerStart");
+        return;
+      }
+      source.pushActorAway(npc, force);
+      logTrace(this, `pushed npc ${target.toString(16)} for ${from.toString(16)} with force ${force}`);
     });
   }
 
