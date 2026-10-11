@@ -1,5 +1,19 @@
 [
   {
+    "title": "A faith for the Maormer",
+    "date": "SHIP_DATE",
+    "version": "Server update",
+    "tag": "New",
+    "sections": [
+      {
+        "heading": "Religion",
+        "items": [
+          "The Maormer have a faith of their own: the Deep Serpents, the great sea serpents their people ride. Pray at the Serpent Stone on the lake shore north-east of Bruma for the Blessing of the Deep Serpents: water breathing and resistance to poison."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Legion swords join the faction balance",
     "date": "2026-10-11",
     "version": "Server update",

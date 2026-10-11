@@ -47,8 +47,8 @@ const MEASURED = {
   peryite: ['DBO_BlessingOfPeryite', 0, 1, 0, [28800, 0]], vaermina: ['DBO_BlessingOfVaermina', 0, 1, 0, [28800, 0]],
   dragoncult: ['AltarTalosSpell', 0, 1, 0, [28800, 0]],
   riddlethar: ['DBO_BlessingOfVaermina', 0, 1, 0, [28800, 0]],
-  // Orgnum (11 Oct, PC session): Water Breathing and Resist Poison 25, both 8 hours
-  orgnum: ['DBO_BlessingOfOrgnum', 0, 1, 0, [28800, 28800]],
+  // The Deep Serpents, the Maormer faith (11 Oct, PC session; Nate: sea serpents, not Orgnum): Water Breathing and Resist Poison 25, both 8 hours
+  "deep-serpents": ['DBO_BlessingOfOrgnum', 0, 1, 0, [28800, 28800]],
   trinimac: ['doomLordAbility', 4, 0, 0, [0, 0]], wormcult: ['doomApprenticeAbility', 4, 0, 0, [0]],
 };
 const CAST = Object.keys(MEASURED).filter((k) => MEASURED[k][1] === 0 && MEASURED[k][2] === 1);
