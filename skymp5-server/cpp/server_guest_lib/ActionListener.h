@@ -13,6 +13,7 @@
 #include <chrono>
 #include <map>
 #include <memory>
+#include <tuple>
 #include <unordered_map>
 #include <vector>
 
@@ -108,6 +109,12 @@ public:
   static constexpr std::chrono::milliseconds kStaffVolleyInterval{ 750 };
   static constexpr std::chrono::milliseconds kStaffVolleySpread{ 150 };
   static constexpr size_t kStaffTargetsPerVolley = 12;
+
+  // Spell riders (ApplySpellRiders) need a cast of the spell, or of a cloak or hazard granting it, this recent, and
+  // land once per (caster, spell, target) each kRiderHitInterval; a rune's hold re-arms after kExplosionHoldCooldown
+  static constexpr std::chrono::seconds kRiderCastWindow{ 90 };
+  static constexpr std::chrono::milliseconds kRiderHitInterval{ 1000 };
+  static constexpr std::chrono::seconds kExplosionHoldCooldown{ 10 };
 
 private:
   struct RestorationChannel
@@ -271,6 +278,16 @@ private:
     std::chrono::steady_clock::time_point until{};
   };
   std::map<std::pair<uint32_t, HostEffect>, TimedHostEffect> hostEffects;
+  using SteadyTime = std::chrono::steady_clock::time_point;
+  // Each caster's recent casts (spell, when), newest last
+  std::unordered_map<uint32_t, std::vector<std::pair<uint32_t, SteadyTime>>>
+    recentCasts;
+  std::map<std::tuple<uint32_t, uint32_t, uint32_t>, SteadyTime> riderHits;
+  // (caster << 32 | target): when that caster's explosion may hold that target again
+  std::unordered_map<uint64_t, SteadyTime> explosionHoldReady;
+  void RecordSpellCast(uint32_t casterId, uint32_t spellId);
+  bool CastRecently(uint32_t casterId, uint32_t spellId);
+  bool TakeRiderHit(uint32_t casterId, uint32_t spellId, uint32_t targetId);
 
   MovementValidation::Tracker movementTracker;
 

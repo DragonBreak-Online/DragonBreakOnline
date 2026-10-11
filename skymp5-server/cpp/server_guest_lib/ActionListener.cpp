@@ -918,6 +918,7 @@ void ActionListener::ForgetForm(uint32_t formId)
 {
   npcJumps.erase(formId);
   ForgetScrollReads(formId);
+  recentCasts.erase(formId);
 }
 
 void ActionListener::ForgetScrollReads(uint32_t casterId)
@@ -2331,6 +2332,8 @@ void ActionListener::OnSpellCast(const RawMessageData& rawMsgData,
     return;
   }
 
+  RecordSpellCast(caster->GetFormId(), spellCastData.spell);
+
   // Decided before any handler runs, which could take or unequip the scroll
   const bool scrollCast =
     !caster->GetEquipment().IsSpellEquipped(spellCastData.spell) &&
@@ -3028,8 +3031,14 @@ void ActionListener::ApplySpellRiders(MpActor& aggressor, MpActor& target,
   const bool isPlayer = target.GetUserId() != Networking::InvalidUserId;
   // A rune's paralysis sits on its explosion's enchantment (Ash Rune), which DoCombatSpellApply cannot apply: an NPC
   // is held on the server and kept still on its host. Players get dboParalyse from the gamemode
+  const uint64_t explosionKey =
+    (static_cast<uint64_t>(aggressor.GetFormId()) << 32) | target.GetFormId();
+  const auto now = std::chrono::steady_clock::now();
+  const auto readyIt = explosionHoldReady.find(explosionKey);
+  const bool explosionReady =
+    readyIt == explosionHoldReady.end() || now >= readyIt->second;
   const uint32_t explosionHoldSeconds =
-    worldState->spellSync.explosionRiders && !isPlayer
+    worldState->spellSync.explosionRiders && !isPlayer && explosionReady
     ? GetExplosionRiders(worldState, spellId).paralysisSeconds
     : 0;
   const uint32_t spellHoldSeconds =
@@ -3049,6 +3058,14 @@ void ActionListener::ApplySpellRiders(MpActor& aggressor, MpActor& target,
   if (holdSeconds > 0 && IsParalyzed(target)) {
     return;
   }
+  // Only a hit of a spell the caster cast lately, at most once a kRiderHitInterval per target
+  if (!CastRecently(aggressor.GetFormId(), spellId) ||
+      !TakeRiderHit(aggressor.GetFormId(), spellId, target.GetFormId())) {
+    spdlog::info("OnSpellHit - riders of spell {:x} of {:x} on {:x} refused "
+                 "(no recent cast, or too soon)",
+                 spellId, aggressor.GetFormId(), target.GetFormId());
+    return;
+  }
   // God mode refuses paralysis like it refuses damage; a damaging spell's hit already asked
   if (!riders.damagesHealth &&
       !FireHitDamageEvent("onHitDamageAttempt", &aggressor, &target, spellId,
@@ -3057,7 +3074,6 @@ void ActionListener::ApplySpellRiders(MpActor& aggressor, MpActor& target,
   }
 
   if (holdSeconds > 0) {
-    const auto now = std::chrono::steady_clock::now();
     std::erase_if(paralyzedUntil,
                   [&](const auto& entry) { return entry.second <= now; });
     paralyzedUntil[target.GetFormId()] =
@@ -3068,6 +3084,14 @@ void ActionListener::ApplySpellRiders(MpActor& aggressor, MpActor& target,
     spdlog::info("OnSpellHit - spell {:x} of {:x} paralyses {:x} for {} s",
                  spellId, aggressor.GetFormId(), target.GetFormId(),
                  holdSeconds);
+  }
+  if (explosionHoldSeconds > 0) {
+    if (explosionHoldReady.size() > 1024) {
+      std::erase_if(explosionHoldReady,
+                    [&](const auto& entry) { return entry.second <= now; });
+    }
+    explosionHoldReady[explosionKey] = now +
+      std::chrono::seconds(explosionHoldSeconds) + kExplosionHoldCooldown;
   }
 
   // A player's own client, or the host of an NPC
@@ -3173,6 +3197,55 @@ void ActionListener::SendHostEffect(HostEffect effect, MpActor& executor,
   args.push_back(start);
   SpSnippet("Actor", "SetDontMove", args, targetId)
     .Execute(&executor, SpSnippetMode::kNoReturnResult);
+}
+
+void ActionListener::RecordSpellCast(uint32_t casterId, uint32_t spellId)
+{
+  constexpr size_t kCastsKept = 16;
+  const auto now = std::chrono::steady_clock::now();
+  auto& casts = recentCasts[casterId];
+  std::erase_if(casts, [&](const auto& cast) {
+    return cast.first == spellId || now - cast.second > kRiderCastWindow;
+  });
+  if (casts.size() >= kCastsKept) {
+    casts.erase(casts.begin());
+  }
+  casts.emplace_back(spellId, now);
+}
+
+bool ActionListener::CastRecently(uint32_t casterId, uint32_t spellId)
+{
+  const auto it = recentCasts.find(casterId);
+  if (it == recentCasts.end()) {
+    return false;
+  }
+  const auto now = std::chrono::steady_clock::now();
+  return std::any_of(
+    it->second.begin(), it->second.end(), [&](const auto& cast) {
+      return now - cast.second <= kRiderCastWindow &&
+        (cast.first == spellId ||
+         IsSpellGrantedBy(&partOne.worldState, cast.first, spellId));
+    });
+}
+
+bool ActionListener::TakeRiderHit(uint32_t casterId, uint32_t spellId,
+                                  uint32_t targetId)
+{
+  const auto now = std::chrono::steady_clock::now();
+  if (riderHits.size() > 1024) {
+    std::erase_if(riderHits, [&](const auto& entry) {
+      return now - entry.second > kRiderHitInterval;
+    });
+  }
+  auto [it, inserted] =
+    riderHits.try_emplace(std::make_tuple(casterId, spellId, targetId), now);
+  if (!inserted) {
+    if (now - it->second < kRiderHitInterval) {
+      return false;
+    }
+    it->second = now;
+  }
+  return true;
 }
 
 bool ActionListener::IsParalyzed(const MpActor& actor)

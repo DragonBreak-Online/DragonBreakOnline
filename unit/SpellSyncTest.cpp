@@ -10,6 +10,27 @@ PartOne& GetPartOne();
 using namespace std::chrono_literals;
 
 namespace {
+nlohmann::json MakeCast(uint32_t spell)
+{
+  return nlohmann::json{
+    { "t", MsgType::SpellCast },
+    { "data",
+      { { "caster", 0x14 },
+        { "target", 0x14 },
+        { "spell", spell },
+        { "isDualCasting", false },
+        { "interruptCast", false },
+        { "castingSource", 0 },
+        { "aimAngle", 0.f },
+        { "aimHeading", 0.f },
+        { "actorAnimationVariables",
+          { { "booleans", nlohmann::json::array() },
+            { "floats", nlohmann::json::array() },
+            { "integers", nlohmann::json::array() } } },
+        { "keepAlive", false } } }
+  };
+}
+
 // A caster (user 0) and a player (user 1) hosting an NPC beside them
 struct SpellSyncScene
 {
@@ -43,9 +64,9 @@ struct SpellSyncScene
     return p.worldState.GetFormAt<MpActor>(formId);
   }
 
-  // Casts spellId at target from full health and returns the snippets user 1 was sent, by function name
+  // Casts spellId (unless cast is false) and hits target from full health; returns the snippets user 1 was sent
   std::vector<std::string> Hit(uint32_t spellId, uint32_t target,
-                               float casterHealth = 1.f)
+                               float casterHealth = 1.f, bool cast = true)
   {
     p.worldState.hosters[kNpc] = kHost;
     Equipment equipment;
@@ -60,6 +81,9 @@ struct SpellSyncScene
     hit.data.aggressor = 0x14;
     hit.data.target = target;
     hit.data.source = spellId;
+    if (cast) {
+      DoMessage(p, 0, MakeCast(spellId));
+    }
     p.Messages().clear();
     p.GetActionListener().OnHit(rawMsgData, hit);
     p.Tick();
@@ -119,7 +143,7 @@ TEST_CASE("A damaging spell's slow and stagger reach the NPC's host without "
             .GetChangeForm()
             .actorValues.healthPercentage < 1.f);
 
-  // A second hit while slowed only extends the slow
+  // A second hit this soon sends nothing
   REQUIRE(!Has(scene.Hit(kIceSpike, SpellSyncScene::kNpc), "ModActorValue"));
 
   auto arrow = scene.Hit(kSpectralArrow, SpellSyncScene::kNpc);
@@ -180,4 +204,21 @@ TEST_CASE("A rune explosion's paralysis holds an NPC on the server and its "
 
   // Held: a second rune while it lasts sends nothing
   REQUIRE(scene.Hit(kAshRune, SpellSyncScene::kNpc).empty());
+}
+
+TEST_CASE("Spell riders need a recent cast of the spell and land once a "
+          "second per target",
+          "[SpellSync][espm]")
+{
+  PartOne& p = GetPartOne();
+  constexpr uint32_t kCalm = 0x0004dee9;
+  SpellSyncScene scene(p);
+
+  // A hit packet with no cast behind it
+  REQUIRE(scene.Hit(kCalm, SpellSyncScene::kNpc, 1.f, false).empty());
+
+  REQUIRE(Has(scene.Hit(kCalm, SpellSyncScene::kNpc), "DoCombatSpellApply"));
+  // Replayed hit packets within the interval
+  REQUIRE(scene.Hit(kCalm, SpellSyncScene::kNpc, 1.f, false).empty());
+  REQUIRE(scene.Hit(kCalm, SpellSyncScene::kNpc).empty());
 }
