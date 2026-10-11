@@ -326,6 +326,13 @@ module.exports = (api) => {
     catch (e) { log('spells: school check failed', e.message); return null; }
   };
 
+  // A vampire takes no Restoration healing spell (supernatural.js vampireRestoration; Nate, 11 Oct): not from a tome, the
+  // shop or a lesson. One already in the spellbook stays there; casting it is refused. The lore line, or null
+  const undeadRefusal = (a, spellId) => {
+    try { return typeof globalThis.__dboVampHealRefusal === 'function' ? globalThis.__dboVampHealRefusal(a >>> 0, spellId >>> 0) || null : null; }
+    catch (e) { log('spells: undead check failed', e.message); return null; }
+  };
+
   // ---- reading a tome --------------------------------------------------------------------------------
   // { refuse } or { commit } for the read, or null to leave it to the engine
   const judgeRead = (a, bookId) => {
@@ -343,6 +350,8 @@ module.exports = (api) => {
       personal(a, `${tome.name} is already in your spellbook. You keep the tome. ${COLLEGE_HINT}`);
       return { refuse: true };
     }
+    const undead = undeadRefusal(a, tome.spellId);
+    if (undead) return refuse(undead);
     // A school tome is refused before it can take a skill up: no pool point is spent on a read the school would refuse
     const paths = pathsOf(a, tome.school);
     if (paths.length === 1 && paths[0].id === 'arcane') { const noSchool = schoolRefusal(a, tome, 'You'); if (noSchool) return refuse(noSchool); }
@@ -541,6 +550,7 @@ module.exports = (api) => {
     if (!taught.some((skill) => tierOf(teacher, skill.id) >= CFG.teacherMinTier)) return `Teaching ${sp.school} takes ${taught.map((skill) => skill.label).join(' or ')} at ${TIER_NAMES[CFG.teacherMinTier]}.`;
     if (!learning.some((skill) => tierOf(student, skill.id) >= CFG.studentMinTier)) return `${display(student)} needs ${learning.map((skill) => skill.label).join(' or ')} at ${TIER_NAMES[CFG.studentMinTier]} or higher to be taught.`;
     if (knows(student, sp.id) || inBook(student, sp.id)) return `${display(student)} already knows ${sp.name}.`;
+    if (undeadRefusal(student, sp.id)) return `${sp.name} will not take in ${display(student)}: the light of Arkay and Stendarr will not pass into undead hands.`;
     return slotRefusal(student, sp, `${display(student)} has`);
   };
   const offers = globalThis.__dboSpellOffers instanceof Map ? globalThis.__dboSpellOffers : (globalThis.__dboSpellOffers = new Map()); // student -> offer
@@ -638,6 +648,7 @@ module.exports = (api) => {
   // An Arcane Arts tome also needs the buyer's study of its school, as reading it does (slotRefusal): the shop sold an
   // Adept Conjuration tome to an Apprentice of Conjuration, who could not learn it (ticket #0059, 5 Oct)
   const tomeBlock = (a, t) => {
+    if (undeadRefusal(a, t.spellId)) return 'The light of Arkay and Stendarr will not pass into undead hands';
     const paths = pathsOf(a, t.school);
     const tierOk = (skill) => tierOf(a, skill.id) >= tierFor(skill.id, t.rank);
     if (paths.some((skill) => tierOk(skill) && (skill.id !== 'arcane' || !schoolRefusal(a, t, 'You')))) return '';

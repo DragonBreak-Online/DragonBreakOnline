@@ -1,5 +1,19 @@
 [
   {
+    "title": "Vampires and healing magic",
+    "date": "SHIP_DATE",
+    "version": "Server update",
+    "tag": "Change",
+    "sections": [
+      {
+        "heading": "Vampires",
+        "items": [
+          "Vampires cannot use Restoration's healing spells, and healing magic does nothing for them. Restoration's spells against the undead still burn them."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Legion swords join the faction balance",
     "date": "2026-10-11",
     "version": "Server update",
