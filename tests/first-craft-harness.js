@@ -77,6 +77,25 @@ ok('...credited this time: marked, and the player told', JSON.stringify(props.ge
 ok('...and from then on x1', craft(rate, 'cook', 0x100) === 1);
 globalThis.__dboSkillRateCredited(A, 'cook', 'craft', { recipeId: 0x100 }, 1);
 ok('a credit with nothing pending changes nothing', props.get(`${A}|private.dboCraftedKinds`).cook.length === 1 && told.length === 1);
+
+// ---- a brew: alchemy.js credits it as an award (kind "award", detail.key = the potion), as the lab has no recipe ----
+// Live 11 Oct: 21 characters had first crafts marked by 19Z and none for the Alchemist; "alchemist { craft: 2 }" never
+// applied either (skillrates.js craftAwards)
+props.delete(`${A}|private.dboCraftedKinds`); told.length = 0;
+const LIVE_RATES = (CONFIG.skillRates || {}).rates || {};
+rate = load({ enabled: true, rates: LIVE_RATES, firstCraft: F });
+const POTION = 0x3eb15, POTION2 = 0x3eb16;
+const brew = (key) => rate(A, 'alchemist', 'award', { key });
+ok('a brew of a potion never made before: the live craft rate x2, then the bonus x3 = 6', brew(POTION) === 6, brew(POTION));
+globalThis.__dboSkillRateCredited(A, 'alchemist', 'award', { key: POTION }, 1);
+ok('...credited: marked as made by the potion, and the player told', JSON.stringify((props.get(`${A}|private.dboCraftedKinds`) || {}).alchemist) === '["3eb15:skyrim.esm"]' && told.length === 1, props.get(`${A}|private.dboCraftedKinds`));
+ok('...the same potion again: x2 only', brew(POTION) === 2);
+ok('...another potion: x6 again', brew(POTION2) === 6);
+globalThis.__dboSkillRateCredited(A, 'alchemist', 'award', { key: POTION2 }, 0);
+ok('...a brew the meter kept nothing of stays new', brew(POTION2) === 6);
+ok('an award of another skill (a smith\'s skill book) is no craft: no bonus', rate(A, 'blacksmith', 'award', { key: 0x1afce }) === ((typeof LIVE_RATES.blacksmith === 'number') ? LIVE_RATES.blacksmith : 1) && !(props.get(`${A}|private.dboCraftedKinds`) || {}).blacksmith);
+const asrc = fs.readFileSync(path.join(SERVER, 'alchemy.js'), 'utf8');
+ok('alchemy.js reports what a brew credited to skillrates.js', /__dboSkillRateCredited\(a, 'alchemist', 'award', \{ key: Number\(potionId\) >>> 0 \}, units\)/.test(asrc));
 delete globalThis.__dboMasteryCreditsHook;
 
 console.log(fails ? `${fails} failed` : 'all passed');

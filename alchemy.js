@@ -99,7 +99,12 @@ module.exports = (api) => {
   const creditBrew = (a, potionId, tier) => {
     const award = globalThis.__alduinakMasteryAward;
     if (typeof award !== 'function') return 0;
-    try { return Number(award(a, 'alchemist', Math.min(3, 1 + 0.5 * Math.max(0, (Number(tier) || 1) - 1)), Number(potionId) >>> 0)) || 0; } catch (e) { log(`alchemy: mastery award failed for ${display(a)}: ${e.message}`); return 0; }
+    let units = 0;
+    try { units = Number(award(a, 'alchemist', Math.min(3, 1 + 0.5 * Math.max(0, (Number(tier) || 1) - 1)), Number(potionId) >>> 0)) || 0; } catch (e) { log(`alchemy: mastery award failed for ${display(a)}: ${e.message}`); return 0; }
+    // masterySystem reports what a craft event credited, never an award: tell skillrates.js, so a first brew of a potion is
+    // marked made only when it earned something (skillrates.js craftAwards)
+    try { if (typeof globalThis.__dboSkillRateCredited === 'function') globalThis.__dboSkillRateCredited(a, 'alchemist', 'award', { key: Number(potionId) >>> 0 }, units); } catch (e) { /* the bonus waits */ }
+    return units;
   };
   const potionName = (potion) => potion.edid.replace(/([a-z])([A-Z0-9])/g, '$1 $2').replace(/\s+0?(\d+)$/, ' $1');
   // The F7 catalog's display name (gamemode adminItemName), else the editor id spaced out

@@ -17,6 +17,11 @@
 // kept on the character (private.dboCraftedKinds: { <skill>: [desc...] }), so a relog resets nothing. With masterySystem's
 // credit report (__dboSkillRateCredited) an item is marked only when its craft credited something, so a craft at a spent
 // hourly bucket or day's cap keeps the bonus for next time.
+// craftAwards: skills whose craft reaches masterySystem as an award, not a craft event: alchemy.js credits each brew through
+// __alduinakMasteryAward (kind "award", detail.key = the potion), as the lab has no COBJ recipe. For them an award is the
+// craft: the skill's "craft" rate and the first-craft bonus apply to it (the potion is the item made). Found live 11 Oct:
+// "alchemist { craft: 2 }" (Nate's economy scan, x2) and the first-craft bonus never reached a brew, as both waited for a
+// kind "craft" that alchemy never sends; 21 characters had first crafts marked by 19Z, none for the Alchemist.
 // craftByTier rates a craft by the recipe's tier: the recipe's own DBO_Skill_<skill>_T<n> gate when it carries one,
 // otherwise the highest materialTiers entry among its ingredients (editor ids; anything not listed is tier 1: iron,
 // copper, bronze, leather, hide, wood). salvageLoop rates a craft of a product the same character broke down at a
@@ -30,6 +35,9 @@ module.exports = (api) => {
   const LOOP = Object.assign({ enabled: false, windowMinutes: 60, rate: 0 }, C.salvageLoop || {});
   const FIRST = Object.assign({ enabled: false, rate: 3, fullFor: 25, skills: ['cook', 'blacksmith', 'alchemist', 'tailor'], maxKept: 3000,
     noBenches: ['CraftingSmithingArmorTable', 'CraftingSmithingSharpeningWheel'] }, C.firstCraft || {});
+  const CRAFT_AWARDS = Array.isArray(C.craftAwards) ? C.craftAwards.map(String) : ['alchemist'];
+  // The kind a rate is looked up as: an award of a craftAwards skill is its craft
+  const kindOf = (skillId, kind) => (kind === 'award' && CRAFT_AWARDS.includes(skillId) ? 'craft' : kind);
   const TIERS = {};
   for (const [k, v] of Object.entries(C.materialTiers || {})) if (!k.startsWith('_') && Number(v) >= 1) TIERS[k.toLowerCase()] = Math.min(5, Math.floor(Number(v)));
 
@@ -76,11 +84,12 @@ module.exports = (api) => {
     if (kind !== 'award' && typeof inBeastForm === 'function' && inBeastForm(actorId >>> 0)) return num(C.beastRate) ?? 0;
     if (!C.enabled) return 1;
     const spec = (C.rates || {})[skillId];
+    const as = kindOf(skillId, kind);
     let rate = 1;
     if (num(spec) !== undefined) rate = spec;
     else if (spec && typeof spec === 'object') {
       rate = num(spec.default) !== undefined ? spec.default : 1;
-      if (num(spec[kind]) !== undefined) rate = spec[kind];
+      if (num(spec[as]) !== undefined) rate = spec[as];
       if (kind === 'craft' && Array.isArray(spec.craftByTier) && detail && detail.recipeId) {
         const marked = Number(detail[`tier:${skillId}`]) || 0;
         const tier = marked >= 1 ? Math.min(5, marked) : recipeOf(detail.recipeId).tier;
@@ -104,7 +113,7 @@ module.exports = (api) => {
     if (typeof globalThis.__dboRaceSkillRate === 'function') {
       try { const r = Number(globalThis.__dboRaceSkillRate(actorId >>> 0, skillId, kind)); if (Number.isFinite(r) && r > 0) rate *= r; } catch (e) { /* no race boost */ }
     }
-    if (kind === 'craft' && rate > 0) rate *= firstCraftRate(actorId, skillId, detail);
+    if (as === 'craft' && rate > 0) rate *= firstCraftRate(actorId, skillId, detail, kind);
     return rate;
   };
 
@@ -120,9 +129,11 @@ module.exports = (api) => {
 
   // The first-time bonus for this craft (1 when it is not one), noting the item as made
   const KINDS = 'private.dboCraftedKinds';
-  const firstCraftRate = (actorId, skillId, detail) => {
-    if (FIRST.enabled !== true || !detail || !detail.recipeId || !(FIRST.skills || []).includes(skillId) || !mp) return 1;
-    const { product, bench } = recipeOf(detail.recipeId);
+  const firstCraftRate = (actorId, skillId, detail, kind) => {
+    // An award-made craft (a brew) names its product as detail.key; a craft event names its recipe
+    const viaAward = kind === 'award' && CRAFT_AWARDS.includes(skillId);
+    if (FIRST.enabled !== true || !detail || !(viaAward ? detail.key : detail.recipeId) || !(FIRST.skills || []).includes(skillId) || !mp) return 1;
+    const { product, bench } = viaAward ? { product: Number(detail.key) >>> 0, bench: '' } : recipeOf(detail.recipeId);
     if (!product || (FIRST.noBenches || []).includes(bench)) return 1;
     let desc = ''; try { desc = String(mp.getDescFromId(product >>> 0)).toLowerCase(); } catch (e) { return 1; }
     if (!desc) return 1;
@@ -155,7 +166,7 @@ module.exports = (api) => {
     const p = S.firstPending.get(key);
     if (!p) return;
     S.firstPending.delete(key);
-    if (kind === 'craft' && Number(units) > 0) markMade(actorId, skillId, p.desc, p.mult);
+    if (kindOf(skillId, kind) === 'craft' && Number(units) > 0) markMade(actorId, skillId, p.desc, p.mult);
   };
 
   const noteBreakdown = (actorId, baseId) => {
