@@ -10,6 +10,8 @@ export interface RobPromptData {
   robber: string;
   seconds: number;
   goldShare: number;
+  // Sealed courier's parcels the victim carries (server couriers.js): a robbery may take one
+  parcels?: number;
 }
 
 const send = (key: string, ...args: unknown[]): void => {
@@ -51,6 +53,7 @@ const RobPrompt = ({ data }: { data: RobPromptData }) => {
         <p className="robPrompt__text">
           Hand them over and they take {share}% of the gold you carry and three of your things. Refuse, and it comes to a fight,
           or a chase. Gold in the bank is safe.
+          {Number(data.parcels) > 0 ? ' The courier\'s parcel you carry may be taken too.' : ''}
         </p>
         <div className="robPrompt__clock"><div className="robPrompt__fill" style={{ width: `${(left / total) * 100}%` }} /></div>
         <div className="robPrompt__choices">
