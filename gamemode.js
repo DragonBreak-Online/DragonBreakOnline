@@ -1101,12 +1101,13 @@ const openPigeonCoop = (a, result, resultKind, view) => {
     letters: lettersOf(a).sort((x, y) => (y.at || 0) - (x.at || 0)).map((m) => ({ id: m.id, from: m.from, text: m.text, at: m.at || 0, read: !!m.read,
       parcel: m.parcel ? { gold: Number(m.parcel.gold) || 0, items: (m.parcel.items || []).map((t) => ({ name: postItemName(t.baseId), count: Number(t.count) || 0 })) } : undefined })),
     view: view || (pigeonsWaiting(a) ? 'letters' : 'send'), result, resultKind,
-    ...postView(a),
+    ...postView(a), ...courierView(a),
   }, true);
 };
 globalThis.__dboOpenPigeonCoop = openPigeonCoop;
 // Parcels and supply orders for the coop window (post.js); nothing when it is not loaded
 const postView = (a) => { try { return globalThis.__dboPostApi ? globalThis.__dboPostApi.view(a) : {}; } catch (e) { log('post view failed', e.message); return {}; } };
+const courierView = (a) => { try { return globalThis.__dboCourierApi ? globalThis.__dboCourierApi.view(a) : {}; } catch (e) { log('courier view failed', e.message); return {}; } };
 const postItemName = (baseId) => { try { return adminItemName(mp.getDescFromId(Number(baseId) >>> 0)) || (Number(baseId) >>> 0).toString(16); } catch (e) { return String(baseId); } };
 registerChatCommand('pigeonblock', (a, args) => {
   const t = findAnyByName(args.trim()); if (!t || t < 0) return personal(a, 'No such character (use their #TAG).');
@@ -2956,7 +2957,7 @@ registerChatCommand('driftset', (a, args) => {
   audit(`GM ${who(a)} set the drift switch ${key} to ${value}`);
 }, { admin: true, help: '<key> <value|default> a client drift switch; no key lists them' });
 const refusePigeon = (a) => { pigeonNonces.delete(a); closeWidget(a, PIGEON_WIDGET_ID); personal(a, 'Pigeons are sent from a notice board. Walk up to one and use it.'); };
-onUi('pigeonOpen', (a, args) => { if (!boardZoneNear(a)) return refusePigeon(a); openPigeonCoop(a, undefined, undefined, ['letters', 'send', 'supply'].includes(args[0]) ? args[0] : undefined); });
+onUi('pigeonOpen', (a, args) => { if (!boardZoneNear(a)) return refusePigeon(a); openPigeonCoop(a, undefined, undefined, ['letters', 'send', 'supply', 'courier'].includes(args[0]) ? args[0] : undefined); });
 // Letters: opening one marks it read, and a letter can be thrown away; both answer with a fresh Letters tab
 const updateLetter = (a, args, change) => {
   if (String(args[0]) !== pigeonNonces.get(a)) return;
@@ -4903,7 +4904,11 @@ try {
 } catch (e) { log('gearswap.js failed to load:', e.stack || e.message); }
 // The trade window (fork tradeSystem.ts) asks before an item changes hands: a reason for the player, or null
 globalThis.__dboTradeItemVeto = (a, baseId, count) => {
-  try { return typeof globalThis.__dboManualsOwedMove === 'function' ? globalThis.__dboManualsOwedMove(Number(a) >>> 0, Number(baseId) >>> 0, Number(count)) || null : null; } catch (e) { return null; }
+  let why = null;
+  try { why = typeof globalThis.__dboManualsOwedMove === 'function' ? globalThis.__dboManualsOwedMove(Number(a) >>> 0, Number(baseId) >>> 0, Number(count)) || null : null; } catch (e) { why = null; }
+  // A sealed courier's parcel (couriers.js) never changes hands in a trade
+  if (!why) { try { why = typeof globalThis.__dboCourierMove === 'function' ? globalThis.__dboCourierMove(Number(a) >>> 0, Number(baseId) >>> 0, Number(count)) || null : null; } catch (e) { why = null; } }
+  return why;
 };
 // ---- dragon bone and scales come only from a slain dragon (dragon-materials.json; Nate, 2026-09-30) ----------------
 // The dragon's own body is the source (the server adds its death item when it dies). A container whose record the
@@ -6406,6 +6411,16 @@ try {
   require(POST_JS)({ mp, log, personal, audit, who, nameOf, tagOf, profileOf, discordOf, onlineActors, every, cfg, onUi, takeGold, giveItem,
     goldOf, GOLD_BASE, recordOf, depositToTreasury, zoneById, boardZoneNear, lettersOf, saveLetters, sendMailState, itemName: (d) => adminItemName(d) });
 } catch (e) { log('post.js failed to load:', e.stack || e.message); globalThis.__dboPostApi = null; }
+// ---- couriers: goods carried board to board, to a drop point or in person (server\couriers.js, config "couriers") ----
+try {
+  const COURIERS_JS = path.resolve('couriers.js');
+  delete require.cache[COURIERS_JS];
+  require(COURIERS_JS)({ mp, log, personal, audit, who, nameOf, tagOf, profileOf, discordOf, onlineActors, every, cfg, onUi, takeGold, giveItem,
+    goldOf, GOLD_BASE, recordOf, depositToTreasury, zoneById, zoneList, boardZoneNear, metOf, isAdmin, registerChatCommand, openWidget, closeWidget });
+} catch (e) {
+  log('couriers.js failed to load:', e.stack || e.message);
+  for (const k of ['__dboCourierApi', '__dboCourierEntries', '__dboCourierAction', '__dboCourierSealed', '__dboCourierMove', '__dboCourierRobbed', '__dboCourierParcelBase']) globalThis[k] = null;
+}
 
 // ---- renting property out at its door (server\tenancy.js, config "tenancy"; housingSystem.ts __dboHousing) --------
 try {
