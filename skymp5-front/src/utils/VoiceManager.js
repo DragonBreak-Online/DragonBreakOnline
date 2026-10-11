@@ -8,7 +8,7 @@
 //   setPeers({ identityHex: distanceUnits })  refresh distances ~every 400ms; peers absent from the map are out of range
 //   setPrefs({ inputLabel, outputLabel, micGain, outputVolume, activation: 'ptt'|'vad', vadThreshold })  launcher Voice tab
 //   adjustPeer(identityHex, 'louder'|'quieter'|'mute'|'unmute'|'reset'|'set', label?, gain?)  X menu and F3; remembered
-//                             per character on this PC ('set' takes an absolute gain, 0 to 2)
+//                             per character on this PC ('set' takes an absolute gain, 0 to 4)
 //   setPrefsInGame(patch)      F3, Settings, Voice: kept in the chat-settings file's ui.voice with the launcher's value of
 //                             the moment, and dropped key by key once the launcher's value differs (uiSettings.ts)
 //   releaseDomPtt()           the game side saw the talk key go up (the page had lost the keyboard): stop the page's own
@@ -33,7 +33,8 @@ const SPEAKING_TICK_MS = 150;    // lip sync report cadence while someone talks
 const VAD_TICK_MS = 50;
 const VAD_HOLD_MS = 400;         // voice activation stays open this long after the level drops
 const PEER_STEP = 0.25;
-const PEER_MAX = 2;
+const PEER_MAX = 4;
+const OUTPUT_MAX = 3;
 const PEERS_KEY = 'dboVoicePeers';
 const DEFAULT_PREFS = { inputLabel: '', outputLabel: '', micGain: 1, outputVolume: 1, activation: 'ptt', vadThreshold: 0.06 };
 
@@ -196,7 +197,7 @@ class VoiceManager {
       inputLabel: typeof p.inputLabel === 'string' ? p.inputLabel : prev.inputLabel,
       outputLabel: typeof p.outputLabel === 'string' ? p.outputLabel : prev.outputLabel,
       micGain: clampNum(p.micGain, 0, 2, prev.micGain),
-      outputVolume: clampNum(p.outputVolume, 0, 2, prev.outputVolume),
+      outputVolume: clampNum(p.outputVolume, 0, OUTPUT_MAX, prev.outputVolume),
       activation: p.activation === 'vad' ? 'vad' : p.activation === 'ptt' ? 'ptt' : prev.activation,
       vadThreshold: clampNum(p.vadThreshold, 0.005, 0.5, prev.vadThreshold),
     };
@@ -703,7 +704,7 @@ class VoiceManager {
     const r = this.rangeFor(identity);
     if (d === undefined || d > r) return 0;
 
-    // Full inside a fifth of the speaker's range, then inverse distance, fading out over the last quarter (voiceFalloff.js)
+    // Full inside 40% of the speaker's range, then inverse distance, fading out over the last quarter (voiceFalloff.js)
     let g = voiceFalloff(d, r);
 
     // A whisper only carries to whoever it is aimed at: full inside a 60 degree

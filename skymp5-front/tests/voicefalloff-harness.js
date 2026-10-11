@@ -1,5 +1,6 @@
 // Scripted test for voiceFalloff.js (VoiceManager.gainFor): talk is heard as talk and shout as shout at the same
-// distance (#bugs 4 Oct: "normal talk is like whispering, yelling is like normal talking"). Run from skymp5-front:
+// distance (#bugs 4 Oct: "normal talk is like whispering, yelling is like normal talking"), and talk is full out to about
+// 5 m (11 Oct). Run from skymp5-front:
 //
 //   node tests/voicefalloff-harness.js [path to esbuild's package dir]
 'use strict';
@@ -47,6 +48,9 @@ function run({ voiceFalloff }) {
   check('the reported case: talk at 3 m was a quarter of full (old curve)', old(3 * M, T) < 0.3, old(3 * M, T));
   check('talk at 3 m is now at least two thirds of full', voiceFalloff(3 * M, T) >= 0.66, voiceFalloff(3 * M, T));
   check('talk is full at 2 m, as close conversation', voiceFalloff(2 * M, T) === 1);
+  check('talk is full out to about 5 m (11 Oct: most voices still too quiet)', voiceFalloff(4.8 * M, T) === 1 && voiceFalloff(5 * M, T) > 0.95, voiceFalloff(5 * M, T));
+  check('talk at 8 m is still more than half', voiceFalloff(8 * M, T) > 0.5, voiceFalloff(8 * M, T));
+  check('shout is full out to 40% of its range', voiceFalloff(0.4 * S, S) === 1 && voiceFalloff(0.45 * S, S) < 1);
   check('shout at 3 m is full', voiceFalloff(3 * M, S) === 1);
   check('shout at 12 m is louder than talk at 12 m (talk is silent there)', voiceFalloff(12 * M, S) > 0.5 && voiceFalloff(12 * M, T) === 0, [voiceFalloff(12 * M, S), voiceFalloff(12 * M, T)]);
   check('shout at 8 m is louder than talk at 8 m', voiceFalloff(8 * M, S) > voiceFalloff(8 * M, T) + 0.3, [voiceFalloff(8 * M, S), voiceFalloff(8 * M, T)]);
@@ -66,6 +70,10 @@ function run({ voiceFalloff }) {
   const vm = fs.readFileSync(path.resolve(__dirname, '../src/utils/VoiceManager.js'), 'utf8');
   check('VoiceManager.gainFor uses voiceFalloff', /let g = voiceFalloff\(d, r\);/.test(vm) && /import \{ voiceFalloff \} from '\.\/voiceFalloff';/.test(vm));
   check('the old 8% core is gone from VoiceManager', !/r \* 0\.08/.test(vm));
+  check('one voice can be turned up to 400%', /const PEER_MAX = 4;/.test(vm));
+  check('master volume is clamped to 300%', /const OUTPUT_MAX = 3;/.test(vm) && /outputVolume: clampNum\(p\.outputVolume, 0, OUTPUT_MAX,/.test(vm));
+  const sv = fs.readFileSync(path.resolve(__dirname, '../src/features/journal/tabs/SettingsVoice.tsx'), 'utf8');
+  check('F3 sliders: a voice to 400%, master to 300%', /p\.gain \* 100\)\} min=\{0\} max=\{400\}/.test(sv) && /prefs\.outputVolume \* 100\)\} min=\{0\} max=\{300\}/.test(sv));
   check('mic capture still has automatic gain control off', /MIC_CAPTURE = Object\.freeze\(\{[^}]*autoGainControl: false/.test(vm));
 
   console.log(failures ? `\n${failures} FAILED` : '\nall passed');
