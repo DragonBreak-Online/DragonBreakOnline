@@ -232,7 +232,7 @@ check('the same spell again within the hour is worth less', nine < 9 * 1 && nine
 globalThis.__dboSchoolsCast(MAGE, idOf(T.courage[1]));
 check('an Illusion cast (a closed school) adds nothing', !rec(MAGE).levels.Illusion);
 // 7 Oct (four "magic does not level" reports): a cast that trains no school says why, once a login (and after 4 hours)
-check('...and says why: it trains Arcane Arts only', said(MAGE) === 'Illusion is not one of your schools of magic: casting it trains Arcane Arts only, not Illusion.', said(MAGE));
+check('...and says why: it trains Arcane Arts only', said(MAGE) === 'Illusion is not one of your schools of magic: casting it trains Arcane Arts only, not Illusion. Your schools: Destruction.', said(MAGE));
 {
   const told = () => out.said.filter((x) => x[0] === MAGE && /^Illusion is not one of your schools/.test(x[1])).length;
   advance(31 * MIN); globalThis.__dboSchoolsCast(MAGE, idOf(T.courage[1]));
@@ -286,7 +286,7 @@ check('...and the K menu no longer shows the cap', !/casting done/.test(progress
   ui('schoolChoose', REST, [progress(REST).nonce, 'Conjuration', 'primary']);
   setLevel(REST, 'Destruction', 50);
   globalThis.__dboSchoolsCast(REST, idOf(T.flames[1]));
-  check('a resting school: told it rests and trains Arcane Arts only', level(REST, 'Destruction') === 50 && said(REST) === 'Destruction is resting: casting it trains Arcane Arts only, not Destruction.', said(REST));
+  check('a resting school: told it rests and trains Arcane Arts only', level(REST, 'Destruction') === 50 && said(REST) === 'Destruction is resting: casting it trains Arcane Arts only, not Destruction. Your schools: Conjuration.', said(REST));
 }
 
 // ---- Study Magic ----
@@ -878,6 +878,21 @@ check('scale: Master full, none below', S[4].join() === '0,0,0,0,1');
   globalThis.__dboSchoolsCast(NOARC, idOf(T.flames[1]));
   check('...but someone who never took up Arcane Arts is not told', said(NOARC) === '', said(NOARC));
   load();
+}
+
+// The Skills tab's Arcane Arts page shows each school (Nate, 11 Oct: a resting school went unnoticed)
+{
+  load();
+  const b = globalThis.__dboSchoolsBrief(MAGE);
+  const by = Object.fromEntries((b && b.schools || []).map((x) => [x.name, x]));
+  check('the brief lists the four schools with their state: Destruction primary, the rest closed', b && b.chosen === true && by.Destruction.role === 'primary' && by.Illusion.role === 'closed' && b.schools.length === 4, b);
+  const before = by.Destruction.castToday;
+  globalThis.__dboSchoolsCast(MAGE, idOf(T.flames[1]));
+  const after = globalThis.__dboSchoolsBrief(MAGE).schools.find((x) => x.name === 'Destruction').castToday;
+  check('...with today\'s casting against the daily limit (a cast adds to it)', b.castCap === 40 && after > before, [before, after]);
+  const r = rec(MAGE); r.levels.Conjuration = { level: 30, xp: 0 }; put(MAGE, 'private.dboSchools', r);
+  check('...a school with a level that is not one of the two shows as resting', globalThis.__dboSchoolsBrief(MAGE).schools.find((x) => x.name === 'Conjuration').role === 'resting');
+  check('...nothing for someone without Arcane Arts', globalThis.__dboSchoolsBrief(0x7777) === null);
 }
 
 console.log(`\n${checks - failures}/${checks} passed`);
