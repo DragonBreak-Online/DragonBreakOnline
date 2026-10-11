@@ -73,7 +73,28 @@ When the game or the launcher runs into an error, it may send an automatic error
 * Short excerpts of the game and launcher logs, with personal file paths removed
 * Your DragonBreak account
 
-Automatic error reports are used only to find and fix bugs. You can turn them off in the launcher where that option is available, and reports about a game crash ask for your agreement before they are sent.
+For a short time after certain events, such as being downed, the game may also record which movement keys are held and which panels are open, to find input problems. It never records what you type.
+
+Automatic error reports and these input records are used only to find and fix bugs. You can turn them off in the launcher where that option is available, and reports about a game crash ask for your agreement before they are sent.
+
+### Character statistics and journal
+
+The game keeps long-term statistics for each character, which you can see in your character journal. These may include:
+
+* Play time and session lengths
+* Distance travelled
+* Combat counts, such as players downed and defeated, deaths caused by players, and creatures defeated
+* Counts of robberies, pickpocketing and time spent in jail
+* Trades, dungeons and expeditions completed
+* Your character's creation date, and when your account first signed in
+
+These are counts only. They don't record who you traded with or fought.
+
+If you write a backstory, origin or other journal text for your character, we store it with your character. It is filtered for slurs, and staff read it only when a report or ticket involves it.
+
+### Accepting these documents
+
+When you accept the Terms of Service and this Privacy Policy in the launcher, we record your account, the version you accepted, the time, and your launcher version.
 
 ### Thalmor dossiers
 
@@ -167,6 +188,8 @@ Our current target retention periods are:
 | Launcher session and problem reports | 180 days |
 | Bug-report snapshots                 | 180 days |
 | Thalmor dossier notes                | Until struck in game, or by staff |
+| Character statistics and journal text | While the character exists |
+| Records of accepting these documents | While your account exists |
 | Support and moderation records       | 2 years |
 | Ban records                          | For the duration of the ban and as reasonably necessary to prevent ban evasion |
 | Discord posts                        | According to Discord and server moderation practices |

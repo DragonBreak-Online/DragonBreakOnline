@@ -2,7 +2,11 @@
   "version": "2026-10-11",
   "effective": "2026-10-11",
   "changes": [
-    "The Privacy Policy now describes Thalmor dossiers: notes that Thalmor characters of certain ranks write about named characters in game. They are stored on the game server, can be read by those ranks and by staff, and are kept until they are struck."
+    "The Privacy Policy now describes Thalmor dossiers: notes that Thalmor characters of certain ranks write about named characters in game. They are stored on the game server, can be read by those ranks and by staff, and are kept until they are struck.",
+    "The Privacy Policy now describes the statistics kept for each character in the character journal (counts only), and the backstory and journal text you write.",
+    "The Privacy Policy now says that for a short time after being downed the game may record which movement keys are held and which panels are open, never what you type.",
+    "The Privacy Policy now says we record which version of these documents you accepted, and when.",
+    "The Terms of Service now say that text you write in the game, such as a backstory, journal entry or faction report, must follow the Server Rules and may be removed."
   ],
   "files": {
     "terms": "terms.md",

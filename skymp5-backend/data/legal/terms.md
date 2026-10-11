@@ -124,6 +124,8 @@ Do not submit material you do not have permission to share or material containin
 
 Suggestions and ideas may be used without payment or credit.
 
+Text you write in the game, such as a character backstory, journal entry or faction report, must follow the Server Rules. We may remove it if it doesn't.
+
 ## 12. Privacy
 
 We collect and process information necessary to operate, secure, troubleshoot, and moderate DragonBreak Online. This may include account information, connection information, gameplay information, and diagnostic reports.
