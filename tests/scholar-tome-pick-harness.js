@@ -1,5 +1,6 @@
 // Nate, 10 Oct: the reading's tome pick (gamemode.js scholarTomePick): ranks by tier, no known or carried tome,
-// the reader's own schools weighted. Lifts the function out of gamemode.js with stubs.
+// the reader's own schools weighted; and (11 Oct) the college rank's cap (spells.js __dboSpellsReadRankCap) and the
+// restricted arts (__dboSpellsReadRestricted). Lifts the function out of gamemode.js with stubs.
 //   node tests/scholar-tome-pick-harness.js   (from server/)
 'use strict';
 const fs = require('fs'); const path = require('path');
@@ -17,6 +18,10 @@ let inv = [], known = [], order = ['priest'];
 const mp = { get: (a, k) => (k === 'inventory' ? { entries: inv } : null), getIdFromDesc: (d) => parseInt(d.split(':')[0], 16) };
 globalThis.__dboSpellsKnown = () => known.map((id) => ({ id }));
 globalThis.__dboSpellsTomeSpell = (b) => SPELL[b] || 0;
+// The college rank's cap: 4 (a gate off) for the Scholar-tier checks, then the gate's own cases below
+let collegeCap = 4, restrictedBooks = new Set();
+globalThis.__dboSpellsReadRankCap = () => collegeCap;
+globalThis.__dboSpellsReadRestricted = (a, id) => restrictedBooks.has(id);
 const SKILLS_DEF = { skills: [{ id: 'arcane', vanillaSkills: ['Destruction', 'Conjuration', 'Illusion'] }, { id: 'priest', vanillaSkills: ['Restoration', 'Alteration'] }] };
 const make = (READ) => new Function('mp', 'READABLES', 'READ', 'SKILLS_DEF', 'masteryOf', `${src.slice(start, end)}; return scholarTomePick;`)(mp, { tomes: TOMES }, READ, SKILLS_DEF, () => ({ order }));
 const pick = make({ tomeSchoolWeight: 3 });
@@ -28,4 +33,17 @@ c = draw(1); ok('a Priest draws Restoration about 3x as often as Illusion', c.A2
 known = [0x1a2]; c = draw(1); ok('a known spell is never handed out', !c.A2 && c.A1 > 0, c);
 known = []; inv = [{ baseId: 0xa1, count: 1 }]; c = draw(1); ok('a carried tome is never handed out', !c.A1 && c.A2 > 0, c);
 known = [0x1a2]; inv = [{ baseId: 0xa1, count: 1 }]; ok('nothing left: null (the day is not spent)', pick(1, 1) === null);
+// ---- the college rank gate (Nate, 11 Oct) ----
+known = []; inv = [];
+collegeCap = 1; c = draw(4); ok('gate: a Master Scholar with no college rank (cap Apprentice) never draws the Adept tome', !c.A4 && c.A3 > 0 && c.A1 > 0, c);
+let none = 0; for (let i = 0; i < 2000; i++) if (!pick(1, 4)) none++;
+ok('gate: ...and always gets one of the allowed tomes instead (the find is not lost)', none === 0, none);
+collegeCap = 3; c = draw(4); ok('gate: a Senior (cap Expert) at Master Scholar draws the Adept tome again', c.A4 > 0, c);
+collegeCap = 3; c = draw(1); ok('gate: the Scholar tier still caps under a high college rank (Apprentice Scholar: Novice only)', !c.A3 && !c.A4, c);
+collegeCap = 0; c = draw(4); ok('gate: a cap of Novice keeps to Novice', !c.A3 && !c.A4 && c.A1 > 0, c);
+collegeCap = 1; delete globalThis.__dboSpellsReadRankCap; c = draw(4); ok('gate: without spells.js the cap is Apprentice', !c.A4 && c.A3 > 0, c);
+globalThis.__dboSpellsReadRankCap = () => collegeCap;
+collegeCap = 4; restrictedBooks = new Set([0xa2]); c = draw(1); ok('gate: a restricted art (for one below Senior) is passed over', !c.A2 && c.A1 > 0, c);
+restrictedBooks = new Set([0xa1, 0xa2]); ok('gate: nothing allowed left: null (the day is not spent)', pick(1, 1) === null);
+restrictedBooks = new Set();
 console.log(fails ? `${fails} FAILED` : 'all checks passed'); process.exit(fails ? 1 : 0);

@@ -1,5 +1,6 @@
 // Scripted test for the magic institutions rules (Elion and Aldemar's proposal for the College of Whispers, approved by
-// Nate 11 Oct): tomes by college rank (spells.shopRankByRole), a Senior's two tomes a week (shopSeniorPerWeek), the
+// Nate 11 Oct): tomes by college rank (spells.shopRankByRole), a Senior's one tome in any 3 days (shopSeniorPerWindow,
+// shopSeniorWindowDays; was two a week), the reading's tomes by college rank (spells.readGate), the
 // restricted arts sold only to Senior ranks (spells.seniorOnlyTomes), teaching a spell at a college's own ledger or
 // lectern (spells.collegeTeach), a Class Lectern teacher qualified by Arcane Arts 75, and a class paying students short
 // of their first spell Arcane Arts through the Wheel's award at the class's rate (schools.classes.first*, skillrates.js).
@@ -168,7 +169,8 @@ const api = {
 const MODULES = ['spells.js', 'schools.js', 'salvage.js', 'skillrates.js'].map(F);
 const load = (cfg) => { api.cfg = cfg || baseCfg(); handlers.clear(); commands.clear(); for (const f of MODULES) delete require.cache[f]; for (const f of MODULES) require(f)(api); };
 load();
-check('the default Senior allowance is two tomes a week (Nate, 11 Oct)', (() => { const s = fs.readFileSync(path.join(SERVER, 'spells.js'), 'utf8'); return /shopSeniorPerWindow: 2,/.test(s) && /shopSeniorWindowDays: 7,/.test(s); })());
+check('the default Senior allowance is one tome in any 3 days (Nate, 11 Oct; was two a week)', (() => { const s = fs.readFileSync(path.join(SERVER, 'spells.js'), 'utf8'); return /shopSeniorPerWindow: 1,/.test(s) && /shopSeniorWindowDays: 3,/.test(s); })());
+check('...and gamemode-config.json says the same', CONFIG.spells.shopSeniorPerWindow === 1 && CONFIG.spells.shopSeniorWindowDays === 3, [CONFIG.spells.shopSeniorPerWindow, CONFIG.spells.shopSeniorWindowDays]);
 const ui = (ev, a, args, widgetId) => (handlers.get(ev) || []).forEach((fn) => fn(a, args || [], widgetId || 0));
 const lastWidget = (a, type) => { const l = out.widgets.filter((w) => w.a === (a >>> 0) && (!type || w.w.type === type)); return l.length ? l[l.length - 1].w : null; };
 const said = (a) => { const l = out.said.filter((p) => p[0] === (a >>> 0)); return l.length ? l[l.length - 1][1] : ''; };
@@ -226,6 +228,29 @@ check('shopSeniorWindowDays 7 with shopSeniorPerWindow 2 is the two-a-week rule'
 put(SENIOR, 'private.dboTomeBoughtAt', 0); put(SENIOR, 'private.dboTomeBuys', []);
 load();
 
+// ---- 2b. one tome in any 3 days for a Senior, with gamemode-config.json's own settings (Nate, 11 Oct) -----------------
+{
+  const s0 = wallClock;
+  gold(SENIOR, 100000); gold(ASSOC, 100000);
+  for (const a of [SENIOR, ASSOC]) { put(a, 'private.dboTomeBoughtAt', 0); put(a, 'private.dboTomeBuys', []); }
+  w = buy(SENIOR, FIREBALL.book);
+  const goldAfter = count(SENIOR, GOLD);
+  check('3 days: a Senior buys a tome and the next is 3 days away', w.resultKind === 'ok' && w.canBuy === false && w.nextPurchaseAt === s0 + 3 * DAY && /Your next tome is 3 days away/.test(w.result), [w.result, w.nextPurchaseAt - s0]);
+  wallClock = s0 + 2 * DAY;
+  w = buy(SENIOR, FIREBOLT.book);
+  check('3 days: ...a second two days later is refused, said "these 3 days", no gold taken', w.resultKind === 'refused' && count(SENIOR, idOf(FIREBOLT.book)) === 0 && count(SENIOR, GOLD) === goldAfter && goldAfter < 100000 && /You have had your tome these 3 days \(bought, or taught with\)/.test(w.whyNot || w.result), [w.result, w.whyNot]);
+  w = buy(ASSOC, FIREBOLT.book);
+  check('3 days: an Associate is unchanged: one tome, then a week', w.resultKind === 'ok' && w.nextPurchaseAt === wallClock + 7 * DAY, [w.result, w.nextPurchaseAt - wallClock]);
+  wallClock = s0 + 3 * DAY - MIN;
+  check('3 days: a minute short of 3 days the Senior still waits', shop(SENIOR).canBuy === false, shop(SENIOR).whyNot);
+  wallClock = s0 + 3 * DAY + MIN;
+  w = buy(SENIOR, FIREBOLT.book);
+  check('3 days: 3 days after the first, the Senior buys again (rolling, not by calendar)', w.resultKind === 'ok' && count(SENIOR, idOf(FIREBOLT.book)) === 1, w.result);
+  check('3 days: ...the Associate still waits the week', shop(ASSOC).canBuy === false && /this week/.test(shop(ASSOC).whyNot), shop(ASSOC).whyNot);
+  wallClock = s0;
+  for (const a of [SENIOR, ASSOC]) { put(a, 'private.dboTomeBoughtAt', 0); put(a, 'private.dboTomeBuys', []); gold(a, 100000); }
+}
+
 // ---- 3. the restricted arts ------------------------------------------------------------------------------------------
 put(ASSOC, 'private.dboTomeBoughtAt', 0);
 w = shop(ASSOC);
@@ -243,6 +268,42 @@ put(SENIOR, 'private.dboTomeBoughtAt', 0);
 load(Object.assign(baseCfg(), { spells: Object.assign({}, baseCfg().spells, { seniorOnlyTomes: [] }) }));
 check('an empty seniorOnlyTomes opens them to every member', hasTome(shop(ASSOC), RAISE));
 load(Object.assign(baseCfg(), { spells: Object.assign({}, baseCfg().spells, { shopSeniorWindowDays: 1, shopSeniorPerWindow: 1 }) }));   // Worker E's one-a-day mode, still a valid setting
+
+// ---- 3b. the reading's tomes by college rank (spells.readGate; Nate, 11 Oct: "RP gate-keep the high tiers") -----------
+{
+  load();
+  const cap = (a) => globalThis.__dboSpellsReadRankCap(a);
+  const LEADER = 0x30, MAGISTER = 0x31, NOBODY = 0x32, WIZARD = 0x33;
+  member(LEADER, 'synod', 'Chancellor of the Synod'); member(MAGISTER, 'synod', 'Magister'); member(WIZARD, 'college-of-winterhold', 'Wizard');
+  check('gate: config is on, floor Apprentice, top Expert, restricted arts gated', CONFIG.spells.readGate && CONFIG.spells.readGate.enabled === true && CONFIG.spells.readGate.floorRank === 1 && CONFIG.spells.readGate.maxRank === 3 && CONFIG.spells.readGate.restricted === true, CONFIG.spells.readGate);
+  check('gate: no college at all reads up to Apprentice', cap(NOBODY) === 1, cap(NOBODY));
+  check('gate: an Initiate and a Synod Artificer read up to Apprentice (the floor)', cap(INITIATE) === 1 && cap(SMITH) === 1, [cap(INITIATE), cap(SMITH)]);
+  check('gate: an Associate, a Whisperer and a Wizard read up to Apprentice, what they may buy', cap(ASSOC) === 1 && cap(WHISPER) === 1 && cap(WIZARD) === 1, [cap(ASSOC), cap(WHISPER), cap(WIZARD)]);
+  check('gate: a Senior Magister, a Magister and the Chancellor read up to Expert, never Master', cap(SENIOR) === 3 && cap(MAGISTER) === 3 && cap(LEADER) === 3, [cap(SENIOR), cap(MAGISTER), cap(LEADER)]);
+  check('gate: the restricted arts are passed over for an Associate (Raise Zombie, Conjure Boneman), not an atronach', globalThis.__dboSpellsReadRestricted(ASSOC, idOf(RAISE.book)) === true && globalThis.__dboSpellsReadRestricted(ASSOC, idOf(BONEMAN.book)) === true && globalThis.__dboSpellsReadRestricted(ASSOC, idOf(ATRONACH.book)) === false);
+  check('gate: ...and not for a Senior', globalThis.__dboSpellsReadRestricted(SENIOR, idOf(RAISE.book)) === false);
+  // readGate.byRole replaces shopRankByRole for reading only (a mage reading Adept), the shop unchanged
+  load(Object.assign(baseCfg(), { spells: Object.assign({}, baseCfg().spells, { readGate: Object.assign({}, CONFIG.spells.readGate, { byRole: { leader: 3, officer: 3, sergeant: 3, mage: 2, member: 1 } }) }) }));
+  check('gate: byRole set: a Whisperer reads Adept, an Associate Apprentice, the shop still sells the Whisperer Apprentice', cap(WHISPER) === 2 && cap(ASSOC) === 1 && ranksOn(shop(WHISPER)) === '0,1', [cap(WHISPER), cap(ASSOC)]);
+  load(Object.assign(baseCfg(), { spells: Object.assign({}, baseCfg().spells, { readGate: Object.assign({}, CONFIG.spells.readGate, { enabled: false }) }) }));
+  check('gate: enabled false: no college cap (4) and nothing restricted', cap(NOBODY) === 4 && globalThis.__dboSpellsReadRestricted(ASSOC, idOf(RAISE.book)) === false);
+  load();
+  // End to end: gamemode.js's own scholarTomePick over readables.json, with these spells.js answers, for a Master Scholar
+  const gsrc = fs.readFileSync(F('gamemode.js'), 'utf8');
+  const gs = gsrc.indexOf('const scholarTomePick = '), ge = gsrc.indexOf('const masteryOf = ', gs);
+  const READABLES = JSON.parse(fs.readFileSync(F('readables.json'), 'utf8'));
+  const SKILLS_DEF = JSON.parse(fs.readFileSync(F('skills.json'), 'utf8'));
+  const rmp = { get: (a, k) => (k === 'inventory' ? { entries: [] } : null), getIdFromDesc: (d) => { try { return idOf(d); } catch (e) { return 0; } } };
+  const pickOf = new Function('mp', 'READABLES', 'READ', 'SKILLS_DEF', 'masteryOf', `${gsrc.slice(gs, ge)}; return scholarTomePick;`)(rmp, READABLES, { tomeSchoolWeight: 3 }, SKILLS_DEF, () => ({ order: ['scholar'] }));
+  const RESTRICTED_EDIDS = new Set((CONFIG.spells.seniorOnlyTomes || []).map((e) => e.toLowerCase()));
+  const drawRanks = (a) => { const seen = new Set(); let restricted = 0, none = 0; for (let i = 0; i < 3000; i++) { const t = pickOf(a, 4); if (!t) { none++; continue; } seen.add(Number(t.rank)); if (RESTRICTED_EDIDS.has(String(t.name).toLowerCase())) restricted++; } return { ranks: [...seen].sort().join(), restricted, none }; };
+  const dn = drawRanks(NOBODY), da = drawRanks(ASSOC), ds = drawRanks(SENIOR);
+  check('gate end to end: a Master Scholar with no college finds Novice and Apprentice tomes only, never restricted', dn.ranks === '0,1' && dn.restricted === 0 && dn.none === 0, dn);
+  check('gate end to end: ...an Associate the same', da.ranks === '0,1' && da.restricted === 0, da);
+  check('gate end to end: a Senior Magister finds Adept too (the Scholar tier stops it there): never Expert or Master', ds.ranks === '0,1,2' && ds.none === 0, ds);
+  for (const a of [LEADER, MAGISTER, NOBODY, WIZARD]) delete MEMBERS[a];
+  load(Object.assign(baseCfg(), { spells: Object.assign({}, baseCfg().spells, { shopSeniorWindowDays: 1, shopSeniorPerWindow: 1 }) }));   // back to section 4's one-a-day mode
+}
 
 // ---- 4. teaching at a college's ledger ---------------------------------------------------------------------------------
 for (const a of online) put(a, 'private.dboTomeBoughtAt', 0);

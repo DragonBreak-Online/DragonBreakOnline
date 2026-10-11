@@ -19,10 +19,10 @@
 // tome missing from it is read from its records at runtime. The shop stocks only the tomes regions.js sells in
 // shopProvince; /teach carries a spell anywhere.
 // By college rank (Elion and Aldemar's proposal, Nate 11 Oct): plain members above Initiate buy up to Apprentice tomes,
-// Senior ranks and above up to Expert (shopRankByRole), two a week for a Senior, one for the rest; the restricted arts
+// Senior ranks and above up to Expert (shopRankByRole), one in any 3 days for a Senior, one a week for the rest; the restricted arts
 // (seniorOnlyTomes: raising the dead, the Daedra lords, banishing Daedra) only from Senior up. A Senior at their own
 // college's Scholars' Ledger or Class Lectern teaches a spell to a member standing by (collegeTeach), spending a tome of
-// it they carry or one of their two purchases of the week; audited TEACH.
+// it they carry or their tome purchase of the window; audited TEACH.
 // When a Class Lectern class ends, its spell is offered to each student paid for it (__dboSpellsClassOffer), under the
 // same student rules. The class costs its teacher one lesson credit (a tome of the spell, else the day's tome purchase),
 // spent when the first student accepts; the rest of that class learn it on the same credit (Nate, 11 Oct: "fix the hole").
@@ -73,9 +73,18 @@ module.exports = (api) => {
     seniorRoles: ['sergeant', 'officer', 'leader'],
     // A Senior rank or above has shopSeniorPerWindow tomes in any rolling shopSeniorWindowDays, bought or taught with (below,
     // a class's spell too); everyone else one in shopCooldownDays (Nate, 11 Oct: one a day for Seniors, so a college with
-    // several students can be taught, while every spell taught still costs a tome)
-    shopSeniorPerWindow: 2,
-    shopSeniorWindowDays: 7,
+    // several students can be taught, while every spell taught still costs a tome; later on 11 Oct: one in any 3 days,
+    // was two in 7)
+    shopSeniorPerWindow: 1,
+    shopSeniorWindowDays: 3,
+    // Spell tomes from a Scholar's reading (gamemode.js scholarTomePick), by college rank (Nate, 11 Oct: "RP gate-keep the
+    // high tiers"): a reader gets tomes up to the rank their college rank buys (shopRankByRole, or byRole when set, for
+    // reading only), never below floorRank (Apprentice: no college, an Initiate or a smith still reads Novice and Apprentice
+    // tomes) and never above maxRank (Expert: Master tomes come only through a college, never from reading). The
+    // Scholar tier's own cap (reading.tomeRankByTier) still applies on top. restricted: the restricted arts
+    // (seniorOnlyTomes) come from reading only to Senior ranks and above, as at the shop. enabled false: the Scholar
+    // tier alone decides, as before.
+    readGate: { enabled: true, floorRank: 1, maxRank: 3, byRole: null, restricted: true },
     // Restricted arts, sold (and taught) only to Senior ranks and above: raising the dead and calling the Daedra lords, and
     // the spells that banish or command Daedra. Tome editor ids from spell-tomes.json; the shop's own filters (shopMaxRank,
     // the province, shopExcludePattern) still apply on top, so some are listed only so that they stay restricted.
@@ -811,8 +820,9 @@ module.exports = (api) => {
   const seniorWindow = (a) => !!a && isSenior(a) && Number(CFG.shopSeniorWindowDays) > 0;
   const windowMs = (a) => (seniorWindow(a) ? Number(CFG.shopSeniorWindowDays) : Number(CFG.shopCooldownDays) || 0) * DAY;
   const quotaOf = (a) => Math.max(1, Math.floor(isSenior(a) ? Number(CFG.shopSeniorPerWindow) || 1 : 1));
-  // "today" or "this week", by the buyer's window
-  const period = (a) => (windowMs(a) <= DAY ? 'today' : 'this week');
+  // "today", "this week" or "these 3 days", by the buyer's window
+  const windowDays = (a) => Math.max(1, Math.round(windowMs(a) / DAY));
+  const period = (a) => (windowMs(a) <= DAY ? 'today' : windowDays(a) === 7 ? 'this week' : `these ${windowDays(a)} days`);
   const buysOf = (a) => {
     const last = Number(get(a, BOUGHT, 0)) || 0;
     if (!last) return [];
@@ -910,7 +920,7 @@ module.exports = (api) => {
     const paid = payForTome(a, t, price);
     recordBuy(a);
     audit(`SPELL ${who(a)} bought tome ${descOf(t.bookId)} ${t.title} for ${price} gold (${paid})`);
-    return { ok: true, text: `You buy ${t.title} for ${price} gold. Read it at a spell study point. ${buysLeft(a) > 0 ? `You may have ${plural(buysLeft(a), 'more tome')} ${period(a)}, bought or taught with.` : nextBuyAt(a) ? `Your next tome is ${waitText(nextBuyAt(a) - Date.now())} away.` : `Your next tome is ${period(a) === 'today' ? 'a day' : 'a week'} away.`}` };
+    return { ok: true, text: `You buy ${t.title} for ${price} gold. Read it at a spell study point. ${buysLeft(a) > 0 ? `You may have ${plural(buysLeft(a), 'more tome')} ${period(a)}, bought or taught with.` : nextBuyAt(a) ? `Your next tome is ${waitText(nextBuyAt(a) - Date.now())} away.` : `Your next tome is ${period(a) === 'today' ? 'a day' : period(a) === 'this week' ? 'a week' : `${windowDays(a)} days`} away.`}` };
   };
   const freshShop = (a, args) => shopNonces.get(a >>> 0) === String(args[0] || '');
   onUi('tomeBuy', (a, args) => {
@@ -1176,6 +1186,29 @@ module.exports = (api) => {
       known: book.map((id) => entryOf(id, prep.includes(id))).sort((x, y) => x.school.localeCompare(y.school) || x.rank - y.rank || x.name.localeCompare(y.name)),
       outside,
     };
+  };
+  // The highest tome rank a Scholar's reading may give `a` (readGate, above): the college rank's, between floorRank and
+  // maxRank; 4 (no gate) when readGate is off. Without guilds.js no college rank is known, so the floor.
+  const READ_GATE = Object.assign({ enabled: true, floorRank: 1, maxRank: 3, byRole: null, restricted: true }, CFG.readGate || {});
+  const readCapIn = (m) => {
+    const by = READ_GATE.byRole && typeof READ_GATE.byRole === 'object' ? READ_GATE.byRole : null;
+    if (!by) return rankCapIn(m);
+    if (!m || CRAFT_ROLES.has(String(m.role || '')) || isInitiate(m)) return -1;
+    const v = Number(by[String(m.role || '')] !== undefined ? by[String(m.role || '')] : by.member);
+    return Number.isFinite(v) ? v : -1;
+  };
+  globalThis.__dboSpellsReadRankCap = (a) => {
+    if (!READ_GATE.enabled) return 4;
+    const floor = Number(READ_GATE.floorRank) || 0, top = Number.isFinite(Number(READ_GATE.maxRank)) ? Number(READ_GATE.maxRank) : 3;
+    const mine = collegesOf(a);
+    const rank = mine ? mine.reduce((n, m) => Math.max(n, readCapIn(m)), -1) : -1;
+    return Math.min(top, Math.max(floor, rank));
+  };
+  // Whether a Scholar's reading must pass over this tome for `a`: a restricted art (seniorOnlyTomes) for one below Senior
+  globalThis.__dboSpellsReadRestricted = (a, bookId) => {
+    if (!READ_GATE.enabled || READ_GATE.restricted === false) return false;
+    let t = null; try { t = tomeOf(Number(bookId) >>> 0); } catch (e) { t = null; }
+    return !!t && restrictedTome(t) && !isSenior(a);
   };
   // The highest spell rank `skillId`'s tier lets `a` learn, -1 when the skill is not taken up
   globalThis.__dboSpellsRankCap = (a, skillId) => maxRankFor(String(skillId), tierOf(a, String(skillId)));

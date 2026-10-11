@@ -3492,13 +3492,21 @@ globalThis.__dboScholarNoRoom = scholarNoRoom;
 // The tome a reading presses between the pages (Nate, 10 Oct, #suggestions: "5 courage tomes", "10 lesser wards"):
 // - ranks by Scholar tier: Novice to Apprentice readers Novice tomes, Adept and Expert up to Apprentice, Master up to
 //   Adept (READ.tomeRankByTier, was Adept still Novice-only);
+// - and by college rank (Nate, 11 Oct: "RP gate-keep the high tiers"; spells.js readGate, __dboSpellsReadRankCap): no
+//   college rank reads up to Apprentice, a rank only up to what it may buy at the colleges, never a Master tome; a tome
+//   above the cap is simply not in the pool, so the chance of a tome is unchanged and the find comes from the ranks
+//   allowed; the restricted arts only for Senior ranks (__dboSpellsReadRestricted). Without spells.js: Apprentice;
 // - never a tome whose spell the reader already knows, nor one they are carrying;
 // - a tome of a school the reader's own magic skills cover (arcane: Destruction, Conjuration, Illusion; priest:
 //   Restoration, Alteration, from skills.json vanillaSkills) is READ.tomeSchoolWeight times as likely.
 // null when nothing is left to give (the day's tome count is then not spent).
 const scholarTomePick = (a, tier) => {
   const caps = Array.isArray(READ.tomeRankByTier) ? READ.tomeRankByTier : [0, 0, 1, 1, 2];
-  const maxRank = Number(caps[Math.max(0, Math.min(tier, caps.length - 1))]) || 0;
+  const tierRank = Number(caps[Math.max(0, Math.min(tier, caps.length - 1))]) || 0;
+  let collegeRank = 1;
+  try { if (typeof globalThis.__dboSpellsReadRankCap === 'function') collegeRank = Number(globalThis.__dboSpellsReadRankCap(a)); } catch (e) { collegeRank = 1; }
+  const maxRank = Math.min(tierRank, Number.isFinite(collegeRank) ? collegeRank : 1);
+  const restricted = typeof globalThis.__dboSpellsReadRestricted === 'function' ? globalThis.__dboSpellsReadRestricted : () => false;
   let carried = new Set();
   try { const inv = mp.get(a, 'inventory'); carried = new Set(((inv && inv.entries) || []).filter((e) => Number(e.count) > 0).map((e) => Number(e.baseId) >>> 0)); } catch (e) { /* none known */ }
   let known = new Set();
@@ -3514,6 +3522,7 @@ const scholarTomePick = (a, tier) => {
     if (!id || carried.has(id)) continue;
     const spell = typeof globalThis.__dboSpellsTomeSpell === 'function' ? globalThis.__dboSpellsTomeSpell(id) : 0;
     if (spell && known.has(spell)) continue;
+    try { if (restricted(a, id)) continue; } catch (e) { /* not restricted */ }
     pool.push({ t, w: schools.has(String(t.school)) ? weight : 1 });
   }
   if (!pool.length) return null;

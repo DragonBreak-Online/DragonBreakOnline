@@ -498,5 +498,41 @@ console.log('client-judged:');
   Math.random = realRandom;
   for (const k of ['scholarCopies', 'scholarScrolls', 'scholarTomes', 'scholarReads', 'scholarTomeDry']) props.delete(READER + '|private.' + k);
 }
+// The college rank gate (Nate, 11 Oct; spells.js __dboSpellsReadRankCap): a Master Scholar whose college rank reads only
+// up to Apprentice is pressed a tome of those ranks; the chance is unchanged (the pity reading still brings one)
+{
+  READ.clientJudged = true;
+  const realRandom = Math.random;
+  const RANK = new Map(JSON.parse(fs.readFileSync(path.join(SERVER, 'readables.json'), 'utf8')).tomes.map((t) => [parseInt(String(t.id).split(':')[1], 16) >>> 0, Number(t.rank)]));
+  // The same line twice (Math.random 0 while the book opens), the pick at random
+  const readOnce = () => {
+    Math.random = () => 0;
+    wallClock += 31 * 60000; let r = open(SKYRIM_BOOK);
+    wallClock += r.endsInMs + 3000; ui('reading', [r.nonce, '[]']);
+    const answer = last().answer.split(' ');
+    wallClock += 31 * 60000; r = open(SKYRIM_BOOK); wallClock += 5000; // a Master's line is up to 12 words: no faster than minMsPerWord each
+    Math.random = realRandom;
+    ui('reading', [r.nonce, JSON.stringify(solve(r, answer))]);
+  };
+  const tomeRanks = (cap, n) => {
+    globalThis.__dboSpellsReadRankCap = () => cap;
+    const seen = []; let missed = 0;
+    for (let i = 0; i < n; i++) {
+      for (const k of ['scholarCopies', 'scholarScrolls', 'scholarTomes', 'scholarReads', 'scholarTomeDry']) props.delete(READER + '|private.' + k);
+      out.given.length = 0; props.set(READER + '|private.scholarTomeDry', Number(READ.tomePityReads) - 1); readOnce(); // the pity reading: a sure tome, picked at random
+      const got = out.given.filter((id) => RANK.has(id));
+      if (!got.length) missed++; else seen.push(...got.map((id) => RANK.get(id)));
+    }
+    return { max: Math.max(-1, ...seen), missed };
+  };
+  props.set(READER + '|private.mastery', { order: ['scholar'], skills: { scholar: { rank: 4 } } });
+  let g = tomeRanks(1, 30);
+  check('gate: a Master Scholar capped at Apprentice by college rank is pressed Novice or Apprentice tomes, every time', g.max === 1 && g.missed === 0, g);
+  g = tomeRanks(3, 60);
+  check('gate: ...a Senior (cap Expert) can be pressed an Adept tome (the Scholar tier stops it there)', g.max === 2 && g.missed === 0, g);
+  delete globalThis.__dboSpellsReadRankCap;
+  props.set(READER + '|private.mastery', { order: ['scholar'], skills: { scholar: { rank: 0 } } });
+  for (const k of ['scholarCopies', 'scholarScrolls', 'scholarTomes', 'scholarReads', 'scholarTomeDry']) props.delete(READER + '|private.' + k);
+}
 console.log(`\n${checks - failures}/${checks} passed`);
 process.exit(failures ? 1 : 0);
