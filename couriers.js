@@ -618,7 +618,8 @@ module.exports = (api) => {
 
   // ---- chat: a fallback for a UI without the panel, and the staff's view -------------------------------------------
   if (typeof registerChatCommand === 'function') {
-    registerChatCommand('courier', (a, args) => {
+    // Only while couriers are on, so /help and the U menu never offer it before the client's tab ships
+    if (C.enabled) registerChatCommand('courier', (a, args) => {
       const words = String(args || '').trim().split(/\s+/);
       const mine = carriedBy(a);
       if (words[0] === 'deliver') {

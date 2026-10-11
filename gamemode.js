@@ -623,7 +623,7 @@ const HELP_GROUPS = [
   { key: 'beast', title: 'The beast in you', names: ['beast', 'forms', 'hunt', 'blood', 'feed'], role: 'beast',
     hints: ['Your curse and its powers: F3, the Supernatural tab.',
       'Silver and fire hurt a vampire more; silver and poison spells hurt a werewolf more in beast form.'] },
-  { key: 'work', title: 'Work and the world', names: ['time', 'property'],
+  { key: 'work', title: 'Work and the world', names: ['time', 'property', 'courier'],
     hints: ['Hunting work: the Contracts tab of the expedition board (Synod Conclave, Fighters Guild, Frostcrag Spire).', 'Other work for pay: a notice board, then /commission.',
       'Mining and woodcutting: an ore vein or a chopping block. Richer ores need a higher Miner tier.',
       'The Bleak-Frost Mine, west of Bruma: iron, corundum and gold, and meteoric iron for Adept miners.',
@@ -697,7 +697,7 @@ const STAFF_HELP = [
   { key: 'law', title: 'Law', items: ['jail', ['concordat', '[races]: Concordat arrests standing, or the Thalmor outside the race rule'],
     ['dossier', 'list | read <name|#TAG> | reports | add <name|#TAG> <text> | strike <name|#TAG> <n>: the Thalmor dossiers and informant reports (add and strike: Lead GM)']] },
   { key: 'world', title: 'World', items: ['settime', 'setweather', 'timescale', 'region', ['dungeon end', '<dungeon id|name>: end a dungeon claim now'],
-    'placed', 'placeundo', 'placeexport', 'masktest'] },
+    'placed', 'placeundo', 'placeexport', 'masktest', 'couriers'] },
   { key: 'debug', title: 'Server and debugging', items: ['monitor', 'load', 'selftest', 'npc', 'mv', 'driftset', 'driftspawn', 'driftrepair',
     'staffdiag', 'staffstats', 'gearswap', 'factiongear'] },
 ];
