@@ -1,5 +1,19 @@
 [
   {
+    "title": "Voices carry better",
+    "date": "2026-10-11",
+    "version": "Client update",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Voice chat",
+        "items": [
+          "Voices carry better: someone talking is at full volume out to about 5 metres, and you can turn a single person up to 400%."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Overpowered gear can no longer be forged or looted",
     "date": "2026-10-11",
     "version": "Server update",
