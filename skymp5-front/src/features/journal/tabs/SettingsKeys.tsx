@@ -126,7 +126,7 @@ const GeneralPart = ({ section }: SettingsPartProps) => {
       <section className="jset__group">
         <h2 className="journal__heading">View and voice</h2>
         {rows.filter((r) => r.group === 'view').map(keyRow)}
-        <p className="jset__note">{note || (pending ? 'Saved. Takes effect when you next start the game.' : 'Click a key, then press the new one, or the middle, back (Mouse 4) or forward (Mouse 5) mouse button. Escape cancels; Backspace puts the launcher\'s key back.')}</p>
+        <p className="jset__note">{note || (pending ? 'Saved. Takes effect when you next start the game.' : 'Click a key, then press the new one: a keyboard key or the middle mouse button. Mouse 4 and Mouse 5 are set in the launcher\'s settings. Escape cancels; Backspace puts the launcher\'s key back.')}</p>
       </section>
     </div>
   );
