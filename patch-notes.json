@@ -37,7 +37,8 @@
           "Backpacks, satchels and pouches now show on your character when worn, and they add to what you can carry: a backpack +50, a satchel +25, a pouch +10. A cape can be worn with a backpack or satchel.",
           "The Officer's Sword, the General's Sword and the Penitus Oculatus Sword now have the same base damage (12).",
           "Zahkrii do Bormahu shows its real colours again (gold guard, dark blade, leather grip) instead of a pale glassy look.",
-          "The weapons that came on the racks in player buildings are gone, so those racks are free to hold your own."
+          "The weapons that came on the racks in player buildings are gone, so those racks are free to hold your own.",
+          "Malacath's Band of Brutality has a new look, and its enchantment now works: it raises your armor rating by 30."
         ]
       },
       {
@@ -53,6 +54,23 @@
           "Bruma's statue of Meridia now shows a prayer prompt. In Underpall, the low-hanging icicles that players walked into are gone.",
           "Fingerbowl Cave has been rebuilt where its rooms were out of place, and it now has a map marker.",
           "Scamps cast fire again."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Property belongs to your character",
+    "date": "2026-10-11",
+    "version": "Server update",
+    "tag": "Change",
+    "sections": [
+      {
+        "heading": "Property",
+        "items": [
+          "Houses, rooms and businesses now belong to the character who owns them, not to your whole account. Property tax comes from that character's bank, rent and takings go to that character, and only that character (and the people holding its keys) can use it.",
+          "Each character can own one home, and each account up to two.",
+          "A faction's hall now follows the faction's current leader, whoever owns the building.",
+          "Property you already own has been given to the character it was bought for."
         ]
       }
     ]
