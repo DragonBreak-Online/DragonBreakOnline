@@ -115,7 +115,7 @@ const bf = read('services/services/beastFormService.ts');
 check('beastFormService hands dboBeastBody to the list', /const bodies = parseBeastBodies\(content\);\s*if \(bodies\) \{ setBeastBodies\(bodies\); return; \}/.test(bf));
 check('...and forgets the list on a new connection', /"connectionAccepted", \(\) => \{[^}]*setBeastBodies\(\[\]\);/.test(bf));
 const hud = fs.readFileSync(path.resolve(__dirname, '..', '..', 'skymp5-front', 'src', 'features', 'hud', 'index.tsx'), 'utf8');
-check('the front announces the beastBody capability with the rest (dbo:uiCaps)', /const UI_CAPS = \[[^\]]*'beastBody'\];/.test(hud));
+check('the front announces the beastBody capability with the rest (dbo:uiCaps)', /const UI_CAPS = \[[^\]]*'beastBody'[^\]]*\];/.test(hud));
 
 console.log(failures ? `\n${failures} FAILED` : '\nall checks passed');
 process.exit(failures ? 1 : 0);
