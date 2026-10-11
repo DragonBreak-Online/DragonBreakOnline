@@ -1,8 +1,8 @@
 {
-  "version": "2026-10-01",
-  "effective": "2026-10-01",
+  "version": "2026-10-11",
+  "effective": "2026-10-11",
   "changes": [
-    "The first Terms of Service and Privacy Policy of DragonBreak Online, for the alpha that opens on 1 October 2026."
+    "The Privacy Policy now describes Thalmor dossiers: notes that Thalmor characters of certain ranks write about named characters in game. They are stored on the game server, can be read by those ranks and by staff, and are kept until they are struck."
   ],
   "files": {
     "terms": "terms.md",

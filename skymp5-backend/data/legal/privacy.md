@@ -75,6 +75,10 @@ When the game or the launcher runs into an error, it may send an automatic error
 
 Automatic error reports are used only to find and fix bugs. You can turn them off in the launcher where that option is available, and reports about a game crash ask for your agreement before they are sent.
 
+### Thalmor dossiers
+
+Characters who hold certain ranks in the Thalmor faction can keep dossiers: notes they write about named characters, as part of roleplay. A note is stored on the game server with the character it is about, the character who wrote it and the time. Other Thalmor characters of those ranks can read the dossiers in game, and staff can read them when they moderate or investigate a report. Notes are filtered for slurs, and every note written or struck is logged for staff. A note is kept until a Thalmor of a writing rank or staff strike it.
+
 ### Bug reports and support
 
 When you submit a `/bug` report, support ticket, or other report, we may receive the information you choose to provide. A `/bug` report may include a snapshot of your character or game state at the time of the report.
@@ -162,6 +166,7 @@ Our current target retention periods are:
 | Server activity and connection logs  | 90 days |
 | Launcher session and problem reports | 180 days |
 | Bug-report snapshots                 | 180 days |
+| Thalmor dossier notes                | Until struck in game, or by staff |
 | Support and moderation records       | 2 years |
 | Ban records                          | For the duration of the ban and as reasonably necessary to prevent ban evasion |
 | Discord posts                        | According to Discord and server moderation practices |
