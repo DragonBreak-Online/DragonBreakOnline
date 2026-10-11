@@ -1,6 +1,9 @@
 import React, { useEffect, useState } from 'react';
 
 import './styles.scss';
+import Courier, { CourierData, CourierHint } from './courier';
+// The tab on its own, for a harness that renders a selected job (run-all bundles this file)
+export { Courier };
 
 // Sending a pigeon from a notice board, opened by the gamemode through the dbo relay
 // (widget type "pigeon"). The recipients are the characters this one has met, each
@@ -14,6 +17,7 @@ import './styles.scss';
 //   Letters tab:                 sendMessage('dbo:pigeonRead' | 'dbo:pigeonDelete' | 'dbo:pigeonCollect', nonce, letterId)
 //   Supply tab:                  sendMessage('dbo:supplySearch', nonce, query) | ('dbo:supplyPost', nonce, desc, count, reward)
 //                                | ('dbo:supplyDeliver', nonce, orderId, count) | ('dbo:supplyCancel', nonce, orderId)
+//   Courier tab (courier.tsx):   sendMessage('dbo:courierPost' | 'dbo:courierTake' | ..., nonce, ...)
 //   Close:                       sendMessage('dbo:pigeonClose', nonce)
 export interface PigeonContact {
   id: number;
@@ -82,12 +86,13 @@ export interface PigeonData {
   cooldownMinutes: number;
   maxText: number;
   letters?: PigeonLetter[];
-  view?: 'letters' | 'send' | 'supply';
+  view?: 'letters' | 'send' | 'supply' | 'courier';
   result?: string;
   resultKind?: 'sent' | 'refused';
   sendable?: PigeonSendable[];
   parcel?: { enabled: boolean; taxRate: number; itemFee: number; maxStacks: number; maxGold: number };
   supply?: SupplyData;
+  courier?: CourierData;
 }
 
 const send = (key: string, ...args: unknown[]): void => {
@@ -131,7 +136,7 @@ const Pigeon = ({ data }: { data: PigeonData }) => {
   const [busy, setBusy] = useState(false);
   const letters = data.letters || [];
   const waitingCount = letters.filter((l) => !l.read || l.parcel).length;
-  const [view, setView] = useState<'letters' | 'send' | 'supply'>(data.view || 'send');
+  const [view, setView] = useState<'letters' | 'send' | 'supply' | 'courier'>(data.view || 'send');
   const [letterId, setLetterId] = useState<string | null>(null);
   // The parcel being packed: gold, and goods by base id
   const parcelRules = data.parcel && data.parcel.enabled ? data.parcel : null;
@@ -255,6 +260,13 @@ const Pigeon = ({ data }: { data: PigeonData }) => {
             <button className={'pigeon__tab' + (view === 'supply' ? ' pigeon__tab--active' : '')} onClick={() => setView('supply')}>Supply orders</button>
               )
             : null}
+          {data.courier
+            ? (
+            <button className={'pigeon__tab' + (view === 'courier' ? ' pigeon__tab--active' : '')} onClick={() => setView('courier')}>
+              Couriers{data.courier.carrying.length ? <span className="pigeon__badge">{data.courier.carrying.length}</span> : null}
+            </button>
+              )
+            : null}
         </div>
         {data.result && (
           <p className={'pigeon__result pigeon__result--' + (data.resultKind || 'sent')}>{data.result}</p>
@@ -299,8 +311,12 @@ const Pigeon = ({ data }: { data: PigeonData }) => {
             </div>
           </div>
             )
-          : view === 'send'
+          : view === 'courier' && data.courier
             ? (
+          <Courier c={data.courier} nonce={data.nonce} gold={data.gold} contacts={contacts} busy={busy} act={act} />
+              )
+            : view === 'send'
+              ? (
         <div className="pigeon__body">
           <div className="pigeon__contacts">
             {contacts.length
@@ -366,9 +382,9 @@ const Pigeon = ({ data }: { data: PigeonData }) => {
               : null}
           </div>
         </div>
-              )
-            : supply
-              ? (
+                )
+              : supply
+                ? (
         <div className="pigeon__body">
           <div className="pigeon__contacts">
             <div className="pigeon__section">Your orders ({supply.mine.filter((o) => o.state === 'open').length} of {supply.maxOpen})</div>
@@ -438,11 +454,11 @@ const Pigeon = ({ data }: { data: PigeonData }) => {
                 )}
           </div>
         </div>
-                )
-              : null}
+                  )
+                : null}
 
         <div className="pigeon__footer">
-          <span className="pigeon__hint">{view === 'letters' ? (waitingCount ? waitingCount + ' letter' + (waitingCount === 1 ? '' : 's') + ' waiting.' : 'All letters read.') : view === 'supply' ? supplyHint : hint}</span>
+          <span className="pigeon__hint">{view === 'letters' ? (waitingCount ? waitingCount + ' letter' + (waitingCount === 1 ? '' : 's') + ' waiting.' : 'All letters read.') : view === 'supply' ? supplyHint : view === 'courier' ? CourierHint(data.courier) : hint}</span>
           <div className="pigeon__actions">
             {view === 'send' && <button className="pigeon__button pigeon__button--primary" disabled={!canSend} onClick={submit}>{sendLabel}</button>}
             <button className="pigeon__button" onClick={() => send('dbo:pigeonClose', data.nonce)}>Close</button>

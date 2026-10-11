@@ -46,6 +46,7 @@ import TomeShop from './features/tomeShop';
 import Bank from './features/bank';
 import BusinessLedger from './features/businessLedger';
 import RobPrompt from './features/robPrompt';
+import CourierHandover from './features/courierHandover';
 import FeedPrompt from './features/feedPrompt';
 import Downed from './features/downed';
 import PlayerMenu from './features/playerMenu';
@@ -317,6 +318,8 @@ const Constructor = props => {
       return <RobPrompt data={rend} />;
     case 'feedPrompt':
       return <FeedPrompt data={rend} />;
+    case 'courierHandover':
+      return <CourierHandover data={rend} />;
     case 'downed':
       return <Downed data={rend} />;
     case 'playerMenu':
@@ -341,7 +344,7 @@ const DOMAINS = {
   prayer: 'aedric', deityPicker: 'aedric', shrinePanel: 'aedric',
   rite: 'lorkhan', bountyBoard: 'lorkhan', expeditionBoard: 'lorkhan', dungeonGate: 'lorkhan', death: 'lorkhan', robPrompt: 'lorkhan', feedPrompt: 'lorkhan', downed: 'lorkhan',
   mastery: 'dragonbreak', journal: 'dragonbreak', namePrompt: 'dragonbreak', reading: 'dragonbreak', tomeShop: 'dragonbreak', spellbook: 'dragonbreak', studyMagic: 'dragonbreak', classLectern: 'dragonbreak',
-  labour: 'bronze', skinning: 'bronze', housing: 'bronze', pigeon: 'bronze', mailMarkers: 'bronze', trade: 'bronze', bank: 'bronze',
+  labour: 'bronze', skinning: 'bronze', housing: 'bronze', pigeon: 'bronze', courierHandover: 'bronze', mailMarkers: 'bronze', trade: 'bronze', bank: 'bronze',
 };
 
 // Each panel also carries its own size (utils/PanelScale.js): Ctrl + wheel over it
