@@ -61,7 +61,7 @@ export interface PointState {
 // Plain words (Nate, 8 Oct: "people are getting too confused"); the moon glyphs stay
 export const LOCKS: Array<{ mode: LockMode; glyph: string; label: string; hint: string }> = [
   { mode: 'raise', glyph: '◒', label: 'Raise', hint: 'Goes up when you use it, and gives up points only if no skill is set to Lower.' },
-  { mode: 'hold', glyph: '●', label: 'Hold', hint: 'Goes up when you use it, and never gives up points.' },
+  { mode: 'hold', glyph: '●', label: 'Hold', hint: 'Never goes up, and never gives up points: it stays where it is.' },
   { mode: 'lower', glyph: '◓', label: 'Lower', hint: 'Never goes up, and gives its points first when another skill needs room.' },
 ];
 
@@ -136,7 +136,11 @@ export const SkillThread = ({ skill, points, tierNames, busy, onLock, onTakeUp }
           <p className="mastery__played--muted mastery__played--hint">
             {ceiling < points.capPerSkill
               ? `Another hand already holds the ${ceiling === points.seatAbove ? 'Seat' : 'mastery'} above ${ceiling}. This craft rises no further until it is given up.`
-              : `Using it raises it. When the Wheel is full, points come from a skill set to Lower (down to ${points.waningFloor ?? points.transferFloor}), then from a raised skill (down to ${points.transferFloor}).`}
+              : h.lock === 'hold'
+                ? 'Held: it neither rises nor falls. Set it to Raise to train it.'
+                : h.lock === 'lower'
+                  ? 'Set to Lower: it does not rise, and gives its points first when another skill needs room.'
+                  : `Using it raises it. When the Wheel is full, points come from a skill set to Lower (down to ${points.waningFloor ?? points.transferFloor}), then from a raised skill (down to ${points.transferFloor}).`}
           </p>
         </>
       ) : offer ? (
