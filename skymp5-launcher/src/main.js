@@ -1718,13 +1718,24 @@ function gameWindowTitle() {
 // the player's input, and that was the launcher (the game starts through MO2 and the SKSE loader), so the game showed
 // in front while the launcher kept the keys: players could not move until they tabbed out (2026-09-27). Minimizing the
 // launcher hands the keyboard to the window behind it, the game. Gives up after two minutes.
+// Each step is logged with its time since the launch: a focus change in the game's first seconds is the suspect in the
+// keyboard crash at startup (SkyrimSE+0CDE0A2, crashes-1010 §3)
 function stepAsideForGame() {
   if (process.platform !== 'win32') return
   const started = Date.now()
+  const since = () => `+${Date.now() - started} ms`
   const tick = async () => {
-    if (!win || win.isDestroyed() || win.isMinimized()) return
-    if (await gameWindowTitle()) { if (!win.isDestroyed() && !win.isMinimized()) win.minimize(); return }
+    if (!win || win.isDestroyed()) return
+    if (win.isMinimized()) { log(`[launch] not stepping aside at ${since()}: the launcher is already minimized`); return }
+    const title = await gameWindowTitle()
+    if (title) {
+      if (win.isDestroyed() || win.isMinimized()) { log(`[launch] game window up at ${since()}; the launcher was minimized meanwhile`); return }
+      win.minimize()
+      log(`[launch] stepped aside at ${since()}: the game window is up, the launcher minimized itself`)
+      return
+    }
     if (Date.now() - started < 120_000) setTimeout(tick, 1500)
+    else log(`[launch] gave up stepping aside at ${since()}: no game window`)
   }
   setTimeout(tick, 1500)
 }
