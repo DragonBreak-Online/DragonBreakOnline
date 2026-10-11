@@ -6,7 +6,7 @@
 //    arrestRoles: by default leader, officer, sergeant = First Emissary, Justiciar, Inquisitor) may arrest a character
 //    whose god is Talos (prayer.js private.dboDeity.id, concordat.heresies) while they stand in concordat.provinces
 //    (Cyrodiil, by regions.js). Skyrim's Holds are independent and the Concordat binds only the Empire, so there it
-//    gives nothing. X on the worshipper: "Arrest under the Concordat" (playermenu.js asks __dboConcordatEntries and
+//    gives nothing, and playermenu.js (playerMenu.lawfulFactionRegions) takes the Thalmor's general lawful rank away there too. X on the worshipper: "Arrest under the Concordat" (playermenu.js asks __dboConcordatEntries and
 //    hands the choice to __dboConcordatAction). The arrest is a warrant for warrantMinutes: the arrested player is told
 //    why in plain words; the Justiciar restrains them as any lawful rank does (captureSystem, instant for them) and
 //    takes them to a cell door in a jail of the Empire, where jail.js offers "The Concordat's sentence"
@@ -16,7 +16,7 @@
 //    never logged as an assault, and __dboConcordatLawful(captor, target) answers for any later crime system.
 //    Every attempt, refused or not, is audited (CONCORDAT). A refused "no charge" waits retrySeconds per pair, so the
 //    entry cannot be used to sweep a crowd for Talos worshippers.
-// 2. Informants and dossiers. (a) When anyone kneels at a shrine of a proscribed god (informants.heresies; prayer.js
+// 2. Informants and dossiers. (a) When anyone kneels at a shrine of a proscribed god in informants.provinces (Cyrodiil) (informants.heresies; prayer.js
 //    calls __dboThalmorInformant on kneeling), every online Thalmor of informants.roles is told the shrine, the place
 //    and the hour, never the name, and the report is kept (the last informants.keep). (b) Dossiers: notes on named
 //    characters, read by dossiers.readRoles and written or struck by dossiers.writeRoles (default leader, officer:
@@ -48,7 +48,7 @@ module.exports = (api) => {
     enabled: true, heresies: ['talos'], provinces: ['cyrodiil'], arrestRoles: ['leader', 'officer', 'sergeant'],
     releaseRoles: ['leader', 'officer', 'sergeant'], sentenceMinutes: 30, warrantMinutes: 60, retrySeconds: 600,
   }, RAW.concordat || {});
-  C.informants = Object.assign({ enabled: true, heresies: ['talos'], provinces: [], roles: ['leader', 'officer', 'sergeant'], keep: 50, repeatSeconds: 120 }, RAW.informants || {});
+  C.informants = Object.assign({ enabled: true, heresies: ['talos'], provinces: ['cyrodiil'], roles: ['leader', 'officer', 'sergeant'], keep: 50, repeatSeconds: 120 }, RAW.informants || {});
   C.dossiers = Object.assign({ enabled: true, readRoles: ['leader', 'officer', 'sergeant'], writeRoles: ['leader', 'officer'], noteMax: 500, notesPer: 20, max: 150, maxBytes: 1000000 }, RAW.dossiers || {});
   const FID = String(C.faction);
   const FILE = path.resolve(String(C.file));

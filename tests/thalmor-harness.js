@@ -38,6 +38,7 @@ const TR = DEFS.factions.find((f) => f.id === 'thalmor').ranks;
 ok('the Thalmor ranks are as the rule names them', TR.map((r) => `${r.title}/${r.role}`).join(',') === 'First Emissary/leader,Justiciar/officer,Inquisitor/sergeant,Thalmor Wizard/mage,Thalmor Smith/blacksmith,Robe-Maker/tailor,Thalmor Soldier/member,Agent/member', TR);
 ok('thalmor-intel.json is gitignored', /^thalmor-intel\.json$/m.test(SRC('.gitignore')));
 ok('gamemode.js loads thalmor.js', /require\(THALMOR_JS\)\(\{[^}]*findAnyByName, zoneOfActor/.test(SRC('gamemode.js')));
+ok('playermenu.js limits the Thalmor\'s lawful rank to Cyrodiil (lawfulFactionRegions)', /lawfulFactionRegions/.test(SRC('playermenu.js')) && /inFactionLand\(g\.id, a\)/.test(SRC('playermenu.js')));
 ok('playermenu.js offers and dispatches the Concordat entry', /__dboConcordatEntries\(a, t\)/.test(SRC('playermenu.js')) && /__dboConcordatAction\(a, id, t, nameFor\)/.test(SRC('playermenu.js')));
 ok('prayer.js tells the informants on kneeling', /__dboThalmorInformant\(casterId, targetId, d, shrineNameOf\(baseId, d\)\)[\s\S]{0,120}return startRound/.test(SRC('prayer.js')));
 ok('thalmor.js registers no mp.on listener', !/mp\.on\(|\bmp\.on[A-Z]\w*\s*=/.test(SRC('thalmor.js')));
@@ -221,6 +222,10 @@ ok('to the arresting ranks online, with shrine, place and hour', /someone knelt 
 ok('never the name', !told.some((x) => x.t && /informant/.test(x.t) && /Heimskr/.test(x.t)));
 ok('not to Agents, Soldiers or anyone else', ![KHA_V, OLDNORD, GUARD, PIOUS].some((a) => said(a).some((t) => /informant/.test(t))));
 ok('not twice for the same kneeling within two minutes', globalThis.__dboThalmorInformant(HERETIC, 0x1234, TALOS, 'Shrine of Talos') === false);
+ok('config: informants report from Cyrodiil only', JSON.stringify(T.informants.provinces) === '["cyrodiil"]');
+at(HERETIC, SKYRIM);
+ok('a kneeling at a Talos shrine in Skyrim is not reported', globalThis.__dboThalmorInformant(HERETIC, 0x1299, TALOS, 'Shrine of Talos') === false);
+at(HERETIC, BRUMA);
 ok('nothing for another god', globalThis.__dboThalmorInformant(PIOUS, 0x1235, { id: 'akatosh', name: 'Akatosh' }, 'Shrine of Akatosh') === false);
 now += 3 * MIN;
 for (let i = 0; i < 60; i++) { now += 1000; globalThis.__dboThalmorInformant(HERETIC, 0x2000 + i, TALOS, 'Shrine of Talos'); }

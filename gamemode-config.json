@@ -816,6 +816,8 @@
   "channelId": "1552157689466060850"
  },
  "playerMenu": {
+  "_lawfulFactionRegions": "Nate, 11 Oct: a lawful faction rank (restrain and jail) counts only in these provinces (regions.js). The Thalmor arrest only in the Empire, by the White-Gold Concordat: in Skyrim's independent Holds they have no arrest powers at all. A faction not listed is lawful everywhere. Hot reload; the lawful flag follows within 15 s.",
+  "lawfulFactionRegions": { "thalmor": ["cyrodiil"] },
   "maskItemByRace": {
    "ArgonianRace": "849:Sentinel.esp",
    "KhajiitRace": "849:Sentinel.esp",
@@ -1178,10 +1180,10 @@
    }
   },
  "thalmor": {
-  "_comment": "The Thalmor's lore advantages (server\\thalmor.js, Nate 11 Oct: the playerbase is against them). concordat: under the White-Gold Concordat a Thalmor of arrestRoles (leader, officer, sergeant: First Emissary, Justiciar, Inquisitor) may arrest a character whose god is one of heresies (Talos) while standing in provinces (Cyrodiil; the Concordat binds the Empire, and Skyrim's Holds are independent in 4E 211). The arrest is a warrant for warrantMinutes; at a cell door of a jail in those provinces the Justiciar passes the Concordat's sentence of sentenceMinutes, which only releaseRoles or a Lead GM may release early. retrySeconds: the wait after a 'no charge' refusal on the same character. informants: a kneeling at a shrine of heresies (all provinces when provinces is empty) is reported to every online member of roles, with the shrine, place and hour, never the name; the last keep are kept. dossiers: notes on characters, read by readRoles, written and struck by writeRoles (leader, officer: First Emissary and Justiciar), noteMax characters, notesPer per dossier, max dossiers, maxBytes for the file (thalmor-intel.json, runtime). Every arrest, jailing and note is audited. The F3 journal's Thalmor tab shows the reports and dossiers to those ranks. Hot reload.",
+  "_comment": "The Thalmor's lore advantages (server\\thalmor.js, Nate 11 Oct: the playerbase is against them). concordat: under the White-Gold Concordat a Thalmor of arrestRoles (leader, officer, sergeant: First Emissary, Justiciar, Inquisitor) may arrest a character whose god is one of heresies (Talos) while standing in provinces (Cyrodiil; the Concordat binds the Empire, and Skyrim's Holds are independent in 4E 211). The arrest is a warrant for warrantMinutes; at a cell door of a jail in those provinces the Justiciar passes the Concordat's sentence of sentenceMinutes, which only releaseRoles or a Lead GM may release early. retrySeconds: the wait after a 'no charge' refusal on the same character. informants: a kneeling at a shrine of heresies in provinces (Cyrodiil, Nate 11 Oct; empty = everywhere) is reported to every online member of roles, with the shrine, place and hour, never the name; the last keep are kept. dossiers: notes on characters, read by readRoles, written and struck by writeRoles (leader, officer: First Emissary and Justiciar), noteMax characters, notesPer per dossier, max dossiers, maxBytes for the file (thalmor-intel.json, runtime). Every arrest, jailing and note is audited. The F3 journal's Thalmor tab shows the reports and dossiers to those ranks. Hot reload.",
   "enabled": true,
   "concordat": { "enabled": true, "heresies": ["talos"], "provinces": ["cyrodiil"], "arrestRoles": ["leader", "officer", "sergeant"], "releaseRoles": ["leader", "officer", "sergeant"], "sentenceMinutes": 30, "warrantMinutes": 60, "retrySeconds": 600 },
-  "informants": { "enabled": true, "heresies": ["talos"], "provinces": [], "roles": ["leader", "officer", "sergeant"], "keep": 50, "repeatSeconds": 120 },
+  "informants": { "enabled": true, "heresies": ["talos"], "provinces": ["cyrodiil"], "roles": ["leader", "officer", "sergeant"], "keep": 50, "repeatSeconds": 120 },
   "dossiers": { "enabled": true, "readRoles": ["leader", "officer", "sergeant"], "writeRoles": ["leader", "officer"], "noteMax": 500, "notesPer": 20, "max": 150, "maxBytes": 1000000 }
  },
  "smithing": { "_comment": "Nate, 10 Oct: smithing rework ON at launch (craft tiers, techniques, upgrade caps; smithing.json). false turns it all off.", "enabled": true,
