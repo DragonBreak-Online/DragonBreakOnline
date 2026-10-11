@@ -61,9 +61,9 @@ mp.set(OLD, 'appearance', { name: 'Chad Borick' }); mp.set(OLD, 'private.indexed
 mp.set(OTHER, 'appearance', { name: 'Tara Dicoft' }); mp.set(OTHER, 'private.indexed.charName', key('Tara Dicoft'));
 const byName = { chad: OLD, tara: OTHER };
 const indexed = [];
-new Function('mp', 'registerChatCommand', 'findByName', 'personal', 'system', 'audit', 'who', 'tagOf', 'profileOf', 'indexName', 'isAdmin', gm.slice(from, to))(
+new Function('mp', 'registerChatCommand', 'findByName', 'personal', 'system', 'audit', 'who', 'tagOf', 'profileOf', 'indexName', 'isAdmin', 'staffCan', gm.slice(from, to))(
   mp, (n, fn) => commands.set(n, fn), (q) => byName[String(q).toLowerCase()] || 0, (a, t) => said.push(t), () => {}, () => {}, String,
-  () => 'ABCD', () => 1, (t) => indexed.push(t), (a) => a === 1);
+  () => 'ABCD', () => 1, (t) => indexed.push(t), (a) => a === 1, (a, what) => a === 1 && what === 'rename');
 const rename = commands.get('rename');
 check('/rename is registered from the lifted code', typeof rename === 'function');
 rename(1, 'chad Tara Dicoft');

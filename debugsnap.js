@@ -8,15 +8,23 @@
 // name them or an NPC near them, into /var/lib/dbo-monitor/bugs/<time>-<tag>.json (0600: it can hold private log text),
 // and logs a BUGREPORT line that dbo-monitor posts as a thread in #bug-tracker (the old #error-report, same channel).
 // One per player per BUG_EVERY_MS.
+//
+// /bugs [n]: staff and Trial GMs (gamemode staffCan 'bugs'). The newest n reports (5, at most 15): when, who and what they
+// wrote, nothing of the saved log. Kept in memory as they come; after a restart the newest files are read once, off the
+// game loop.
 'use strict';
 const fs = require('fs');
 const path = require('path');
 
 module.exports = (api) => {
   const { mp, log, every, personal, registerChatCommand, onlineActors, display, tagOf, profileOf, isAdmin, cfg } = api;
+  const staffCan = typeof api.staffCan === 'function' ? api.staffCan : (a) => isAdmin(a);
   const C = Object.assign({ dir: '/var/lib/dbo-monitor', snapMs: 5000, bugEveryMs: 60000, logFile: '/var/log/skymp-server.log',
     logTailBytes: 400000, maxNpcs: 40, voiceRange: 4000 }, cfg.debugSnap || {});
   const S = globalThis.__dboDebugSnap || (globalThis.__dboDebugSnap = { bugAt: new Map(), writing: false });
+  // The newest reports, newest last: { at, by, text }. null until the files have been read once since the restart
+  const RECENT_MAX = 15;
+  if (!Array.isArray(S.recent)) S.recent = null;
   const hex = (id) => (Number(id) >>> 0).toString(16);
   const r = (v) => Math.round(Number(v));
   const terrainDz = (desc, pos) => { try { return typeof globalThis.__dboTerrainDz === 'function' ? globalThis.__dboTerrainDz(desc, pos) : null; } catch (e) { return null; } };
@@ -123,9 +131,51 @@ module.exports = (api) => {
     const ok = write(file, { at: new Date().toISOString(), by: display(a), profileId: profileOf(a), text: text.slice(0, 500), view, log: recentLog(needles), voice: voiceNear(a, view) });
     // The whole text as saved (500): dbo-monitor copies this line into the #bug-tracker thread, which allows 1500
     log(`BUGREPORT ${display(a)} ${path.basename(file)}: ${text.slice(0, 500)}`);
+    if (ok) noteRecent({ at: Date.now(), by: display(a), text: text.slice(0, 500) });
     return { ok, text: ok ? 'Thanks, the staff team has your report. To add a screenshot, use Report a Problem on the website and mention the time of your /bug.' : 'The report could not be saved; please tell staff.' };
   };
   globalThis.__dboBugReport = (a, text) => fileBug(a, text);
+
+  const noteRecent = (e) => {
+    if (!Array.isArray(S.recent)) S.pending = (S.pending || []).concat([e]);
+    else { S.recent.push(e); if (S.recent.length > RECENT_MAX) S.recent.splice(0, S.recent.length - RECENT_MAX); }
+  };
+  // Once per restart: the newest files' names sort by time (<ISO time>-<tag>.json); each read is async
+  const loadRecent = async () => {
+    if (S.loading) return S.loading;
+    S.loading = (async () => {
+      const dir = path.join(C.dir, 'bugs');
+      let names = [];
+      try { names = (await fs.promises.readdir(dir)).filter((n) => n.endsWith('.json')).sort().slice(-RECENT_MAX); } catch (e) { names = []; }
+      const out = [];
+      for (const n of names) {
+        try {
+          const v = JSON.parse(await fs.promises.readFile(path.join(dir, n), 'utf8'));
+          out.push({ at: Date.parse(v.at) || 0, by: String(v.by || '?'), text: String(v.text || '').replace(/\s+/g, ' ').slice(0, 500) });
+        } catch (e) { /* half-written or unreadable: left out */ }
+      }
+      const seen = new Set(out.map((e) => `${e.at}|${e.by}`));
+      for (const e of S.pending || []) if (!seen.has(`${e.at}|${e.by}`)) out.push(e);
+      S.pending = null;
+      out.sort((x, y) => x.at - y.at);
+      S.recent = out.slice(-RECENT_MAX);
+    })();
+    return S.loading;
+  };
+  const ago = (ms) => { const m = Math.max(0, Math.round((Date.now() - ms) / 60000)); return m < 60 ? `${m} min ago` : m < 2880 ? `${Math.floor(m / 60)} h ago` : `${Math.floor(m / 1440)} days ago`; };
+  const showRecent = (a, n) => {
+    const list = (S.recent || []).slice(-n).reverse();
+    if (!list.length) return personal(a, 'No /bug reports yet.');
+    personal(a, `The newest ${list.length} /bug report(s); the full ones are in #bug-tracker:`);
+    // A player's words in a staff member's chat: no colour codes
+    for (const e of list) personal(a, `${ago(e.at)}, ${e.by}: ${e.text.split('#{').join('# {')}`);
+  };
+  registerChatCommand('bugs', (a, args) => {
+    if (!staffCan(a, 'bugs')) return personal(a, 'Admins only.');
+    const n = Math.max(1, Math.min(RECENT_MAX, Math.floor(Number(String(args || '').trim()) || 5)));
+    if (Array.isArray(S.recent)) return showRecent(a, n);
+    loadRecent().then(() => showRecent(a, n), (e) => { log('debugsnap: reading the reports failed:', e.message); personal(a, 'The reports could not be read.'); });
+  }, { admin: true, help: '[n]: the newest /bug reports (5, up to 15): when, who and what they wrote' });
   registerChatCommand('bug', (a, args) => {
     personal(a, fileBug(a, args).text);
   }, { help: '<what went wrong>: report a bug; where you are and what is around you are saved with it' });

@@ -27,9 +27,9 @@ const actors = {
 };
 const audits = [], told = [], kicked = [];
 const timers = [];
-const T = new Function('ADMIN_PROFILES', 'TIERS', 'tierRoles', 'legacyAdminRoles', 'profileOf', 'rolesOf', 'idList', 'audit', 'who', 'personal', 'userOf', 'mp', 'log', 'setTimeout',
+const T = new Function('ADMIN_PROFILES', 'TIERS', 'tierRoles', 'trialRoles', 'legacyAdminRoles', 'profileOf', 'rolesOf', 'idList', 'audit', 'who', 'personal', 'userOf', 'mp', 'log', 'setTimeout',
   code + '\nreturn { tierFrom, tierOf, staffRolesSeen };')(
-  new Set([1]), ['senior', 'developer', 'leadgm', 'gm'], { senior: [ROLE.senior], developer: [ROLE.developer], leadgm: [ROLE.leadgm], gm: [ROLE.gm] }, [ROLE.legacy],
+  new Set([1]), ['senior', 'developer', 'leadgm', 'gm'], { senior: [ROLE.senior], developer: [ROLE.developer], leadgm: [ROLE.leadgm], gm: [ROLE.gm] }, [], [ROLE.legacy],
   (x) => actors[x].profile, (x) => actors[x].roles, (v) => (Array.isArray(v) ? v.map(String) : []),
   (t) => audits.push(t), (x) => `#${x.toString(16)}`, (x, t) => told.push([x, t]), (x) => actors[x].user,
   { kick: (u) => kicked.push(u) }, () => {}, (fn) => timers.push(fn));
@@ -57,7 +57,26 @@ check('a player who is not staff is never logged out by this', kicked.length ===
 T.staffRolesSeen(0x11, [ROLE.legacy]); run();
 check('the legacy admin role still counts (as Senior)', kicked.length === 0);
 
-check('discordroles.js is given isStaff and staffRolesSeen', /require\(DISCORDROLES_JS\)\(\{[\s\S]*?isStaff: \(a\) => tierOf\(a\) !== null, staffRolesSeen \}\)/.test(src));
+// Trial GM (11 Oct): a fifth rank below GM, so losing the Trial role logs out and a promotion to GM does not
+{
+  const tActors = { 0x20: { profile: 30, roles: ['t1'], user: 7 }, 0x21: { profile: 31, roles: ['t1'], user: 8 }, 0x22: { profile: 32, roles: ['t1'], user: 9 } };
+  const k2 = [], a2 = [], tm = [];
+  const T2 = new Function('ADMIN_PROFILES', 'TIERS', 'tierRoles', 'trialRoles', 'legacyAdminRoles', 'profileOf', 'rolesOf', 'idList', 'audit', 'who', 'personal', 'userOf', 'mp', 'log', 'setTimeout',
+    code + '\nreturn { staffRolesSeen, staffTierOf };')(
+    new Set(), ['senior', 'developer', 'leadgm', 'gm'], { senior: [], developer: [], leadgm: [], gm: [ROLE.gm] }, ['t1'], [],
+    (x) => tActors[x].profile, (x) => tActors[x].roles, (v) => (Array.isArray(v) ? v.map(String) : []),
+    (t) => a2.push(t), (x) => `#${x.toString(16)}`, () => {}, (x) => tActors[x].user, { kick: (u) => k2.push(u) }, () => {}, (fn) => tm.push(fn));
+  const run2 = () => { while (tm.length) tm.shift()(); };
+  check('a Trial GM is seen as staff by the role sync (trialgm)', T2.staffTierOf(0x20) === 'trialgm', T2.staffTierOf(0x20));
+  T2.staffRolesSeen(0x20, []); run2();
+  check('a Trial GM whose Trial role is gone is logged out', k2.includes(7) && /was trialgm/.test(a2[0] || ''), a2);
+  T2.staffRolesSeen(0x21, ['t1', ROLE.gm]); run2();
+  check('...one promoted to GM is not', !k2.includes(8), k2);
+  T2.staffRolesSeen(0x22, ['t1']); run2();
+  check('...nor one whose roles are unchanged', !k2.includes(9), k2);
+}
+
+check('discordroles.js is given isStaff and staffRolesSeen', /require\(DISCORDROLES_JS\)\(\{[\s\S]*?isStaff: \(a\) => staffTierOf\(a\) !== null, staffRolesSeen \}\)/.test(src));
 
 console.log(failures ? `\n${failures} FAILED` : '\nall passed');
 process.exit(failures ? 1 : 0);
