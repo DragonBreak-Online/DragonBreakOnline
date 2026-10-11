@@ -905,6 +905,9 @@ void PartOne::AssignHoster(uint32_t remoteId, uint32_t newHosterId)
     HostStartMessage message;
     message.target = longFormId;
     GetSendTarget().Send(newUser, message, true);
+    if (auto newHoster = worldState.LookupFormById(newHosterId)->AsActor()) {
+      GetActionListener().ResendHostEffects(remoteId, *newHoster);
+    }
 
     // Otherwise, health percentage would remain unsynced until someone hits npc
     if (remoteAsActor) {

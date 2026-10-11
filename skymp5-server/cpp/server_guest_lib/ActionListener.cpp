@@ -378,17 +378,21 @@ SpSnippetObjectArgument SnippetActorArgument(WorldState* worldState,
 using SnippetArgs = std::vector<std::optional<
   std::variant<bool, double, std::string, SpSnippetObjectArgument>>>;
 
-// The engine re-reads movement speed only after a carry weight change (paralysisService.ts)
-void ModSpeedMultOn(MpActor& executor, uint32_t targetId, double delta)
+// Damage at the start, restore at the end: a restore never lifts SpeedMult past its base, so a copy that never took
+// the slow is left as it was. The engine re-reads movement speed only after a carry weight change (paralysisService.ts)
+void ChangeSpeedMultOn(MpActor& executor, uint32_t targetId, double amount,
+                       bool slow)
 {
-  const std::pair<const char*, double> changes[] = {
-    { "SpeedMult", delta }, { "CarryWeight", 0.1 }, { "CarryWeight", -0.1 }
+  const std::tuple<const char*, const char*, double> changes[] = {
+    { slow ? "DamageActorValue" : "RestoreActorValue", "SpeedMult", amount },
+    { "ModActorValue", "CarryWeight", 0.1 },
+    { "ModActorValue", "CarryWeight", -0.1 }
   };
-  for (const auto& [actorValue, amount] : changes) {
+  for (const auto& [function, actorValue, value] : changes) {
     SnippetArgs args;
     args.push_back(std::string(actorValue));
-    args.push_back(amount);
-    SpSnippet("Actor", "ModActorValue", args, targetId)
+    args.push_back(value);
+    SpSnippet("Actor", function, args, targetId)
       .Execute(&executor, SpSnippetMode::kNoReturnResult);
   }
 }
@@ -3158,18 +3162,40 @@ void ActionListener::StartHostEffect(HostEffect effect, MpActor& executor,
   const auto key = std::make_pair(target.GetFormId(), effect);
   const auto until =
     std::chrono::steady_clock::now() + std::chrono::seconds(seconds);
-  auto it = hostEffects.find(key);
-  if (it != hostEffects.end()) {
-    it->second.until = std::max(it->second.until, until);
-  } else {
-    hostEffects[key] = { executor.GetFormId(), magnitude, until };
-    SendHostEffect(effect, executor, target.GetFormId(), magnitude, true);
+  auto [it, inserted] = hostEffects.try_emplace(key);
+  auto& timed = it->second;
+  if (inserted) {
+    timed.magnitude = magnitude;
   }
+  timed.until = std::max(timed.until, until);
+  SendHostEffectTo(effect, timed, executor, target.GetFormId());
   partOne.worldState.SetTimer(std::chrono::seconds(seconds))
     .Then([this, key](Viet::Void) { EndHostEffect(key.first, key.second); });
 }
 
-// The effect ends on the client that took it, which keeps its copy of the target changed until then
+void ActionListener::SendHostEffectTo(HostEffect effect,
+                                      TimedHostEffect& timed,
+                                      MpActor& executor, uint32_t targetId)
+{
+  auto& ids = timed.executorIds;
+  if (std::find(ids.begin(), ids.end(), executor.GetFormId()) != ids.end()) {
+    return;
+  }
+  ids.push_back(executor.GetFormId());
+  SendHostEffect(effect, executor, targetId, timed.magnitude, true);
+}
+
+void ActionListener::ResendHostEffects(uint32_t targetId, MpActor& newHost)
+{
+  const auto now = std::chrono::steady_clock::now();
+  for (auto& [key, timed] : hostEffects) {
+    if (key.first == targetId && now < timed.until) {
+      SendHostEffectTo(key.second, timed, newHost, targetId);
+    }
+  }
+}
+
+// The effect ends on every client that took it, which kept its copy of the target changed until then
 void ActionListener::EndHostEffect(uint32_t targetId, HostEffect effect)
 {
   auto it = hostEffects.find(std::make_pair(targetId, effect));
@@ -3179,9 +3205,11 @@ void ActionListener::EndHostEffect(uint32_t targetId, HostEffect effect)
   }
   const TimedHostEffect ended = it->second;
   hostEffects.erase(it);
-  auto executorForm = partOne.worldState.LookupFormById(ended.executorId);
-  if (auto executor = executorForm ? executorForm->AsActor() : nullptr) {
-    SendHostEffect(effect, *executor, targetId, ended.magnitude, false);
+  for (uint32_t executorId : ended.executorIds) {
+    auto executorForm = partOne.worldState.LookupFormById(executorId);
+    if (auto executor = executorForm ? executorForm->AsActor() : nullptr) {
+      SendHostEffect(effect, *executor, targetId, ended.magnitude, false);
+    }
   }
 }
 
@@ -3190,7 +3218,7 @@ void ActionListener::SendHostEffect(HostEffect effect, MpActor& executor,
                                     bool start)
 {
   if (effect == HostEffect::Slow) {
-    ModSpeedMultOn(executor, targetId, start ? -magnitude : magnitude);
+    ChangeSpeedMultOn(executor, targetId, magnitude, start);
     return;
   }
   SnippetArgs args;
