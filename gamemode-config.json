@@ -816,6 +816,8 @@
   "channelId": "1552157689466060850"
  },
  "playerMenu": {
+  "_lawfulFactionRegions": "Nate, 11 Oct: a lawful faction rank (restrain and jail) counts only in these provinces (regions.js). The Thalmor arrest only in the Empire, by the White-Gold Concordat: in Skyrim's independent Holds they have no arrest powers at all. A faction not listed is lawful everywhere. Hot reload; the lawful flag follows within 15 s.",
+  "lawfulFactionRegions": { "thalmor": ["cyrodiil"] },
   "maskItemByRace": {
    "ArgonianRace": "849:Sentinel.esp",
    "KhajiitRace": "849:Sentinel.esp",
@@ -872,7 +874,9 @@
   }
  },
  "raids": { "enabled": false },
- "economy": { "_comment": "Weekly taxes and wages (economy.js). On from 2026-09-28 (Nate: \"economy needs to fully be turned on\"); the review B2 guards are in economy.js.", "enabled": true },
+ "economy": { "_comment": "Weekly taxes and wages (economy.js). On from 2026-09-28 (Nate: \"economy needs to fully be turned on\"); the review B2 guards are in economy.js.", "enabled": true,
+  "_dominionStipend": "Nate, 11 Oct: the Aldmeri Dominion pays its Thalmor in the Empire a stipend each weekly reckoning (economy.js), into the dominionStipendTo treasury before wages, in the faction report as stipend. It is NEW gold, made by no one's work, so it is kept modest; 0 turns it off. Hot reload.",
+  "dominionStipend": 300, "dominionStipendTo": "thalmor" },
  "contracts": {
   "_comment": "Hunting contracts (server\\contracts.js). Off 2026-09-28 to 2026-09-30 (claude-jake review A1-1: officials could post and take their own contracts and drain the hold treasury). On again (Nate, 2026-09-30) with the poster, cap and escrow rules in place, kills counted only in the notice's own hold, and players taking work on the Contracts tab of the expedition board.",
   "enabled": true,
@@ -1024,6 +1028,18 @@
   "goldMax": 12
  },
  "factions": {
+   "raceRules": {
+    "_comment": "Who a faction takes by race (server\\guilds.js, Nate 11 Oct). races and leadRaces: RACE editor id prefixes (HighElfRace matches HighElfRaceVampire); notRp: creator race keys refused even on an allowed record (the Maormer, the Dominion's enemies, stand on the High Elf record until the DLE's MaormerRace resolves); leadRoles: the ranks only leadRaces may hold. The Thalmor: High Elves, Wood Elves and Khajiit (the Aldmeri Dominion's peoples), vampires of them too, and Altmer-led (First Emissary and Justiciar High Elves only). Checked at invite, accept, Add member, /faction leader and rank changes; nobody is removed, and a member from before the rule keeps their rank (/concordat races lists them). A Lead GM lifts it once with /faction override. enabled false turns it off. Hot reload.",
+    "enabled": true,
+    "rules": {
+     "thalmor": {
+      "races": ["HighElfRace", "WoodElfRace", "KhajiitRace"], "notRp": ["maormer"],
+      "leadRoles": ["leader", "officer"], "leadRaces": ["HighElfRace"],
+      "refuse": "The Thalmor take only the peoples of the Aldmeri Dominion: the Altmer, the Bosmer and the Khajiit.",
+      "refuseLead": "The Thalmor are led by the Altmer. Only a High Elf may hold that rank."
+     }
+    }
+   },
    "limits": {
     "_comment": "Faction membership limits (server\\guilds.js, Nate 6 Oct): at most one faction per category, per character; ids listed by name, never from guild-defs kind. allegiance counts a hold's or county's court officials only (officialsOnly + exemptRoles: a Citizen or Guard takes no slot), so a Legion soldier may live in a hold but not sit in its court. conflicts: refused whatever the category (supernatural: refused for that kind too, supernatural.js). Unplaced, so unlimited: the six Orc clans, the Silver Hand, the four vampire clans, the two Hircine packs, charter factions. Checked on a new membership or a rank that newly takes a slot; nobody is removed. A Lead GM lifts it once with /faction override <player> <id> (audited).",
     "enabled": true,
@@ -1163,6 +1179,13 @@
     ]
    }
   },
+ "thalmor": {
+  "_comment": "The Thalmor's lore advantages (server\\thalmor.js, Nate 11 Oct: the playerbase is against them). concordat: under the White-Gold Concordat a Thalmor of arrestRoles (leader, officer, sergeant: First Emissary, Justiciar, Inquisitor) may arrest a character whose god is one of heresies (Talos) while standing in provinces (Cyrodiil; the Concordat binds the Empire, and Skyrim's Holds are independent in 4E 211). The arrest is a warrant for warrantMinutes; at a cell door of a jail in those provinces the Justiciar passes the Concordat's sentence of sentenceMinutes, which only releaseRoles or a Lead GM may release early. retrySeconds: the wait after a 'no charge' refusal on the same character. informants: a kneeling at a shrine of heresies in provinces (Cyrodiil, Nate 11 Oct; empty = everywhere) is reported to every online member of roles, with the shrine, place and hour, never the name; the last keep are kept. dossiers: notes on characters, read by readRoles, written and struck by writeRoles (leader, officer: First Emissary and Justiciar), noteMax characters, notesPer per dossier, max dossiers, maxBytes for the file (thalmor-intel.json, runtime). Every arrest, jailing and note is audited. The F3 journal's Thalmor tab shows the reports and dossiers to those ranks. Hot reload.",
+  "enabled": true,
+  "concordat": { "enabled": true, "heresies": ["talos"], "provinces": ["cyrodiil"], "arrestRoles": ["leader", "officer", "sergeant"], "releaseRoles": ["leader", "officer", "sergeant"], "sentenceMinutes": 30, "warrantMinutes": 60, "retrySeconds": 600 },
+  "informants": { "enabled": true, "heresies": ["talos"], "provinces": ["cyrodiil"], "roles": ["leader", "officer", "sergeant"], "keep": 50, "repeatSeconds": 120 },
+  "dossiers": { "enabled": true, "readRoles": ["leader", "officer", "sergeant"], "writeRoles": ["leader", "officer"], "noteMax": 500, "notesPer": 20, "max": 150, "maxBytes": 1000000 }
+ },
  "smithing": { "_comment": "Nate, 10 Oct: smithing rework ON at launch (craft tiers, techniques, upgrade caps; smithing.json). false turns it all off.", "enabled": true,
   "drops": {"_comment":"Schematics found as loot (Nate, 11 Oct: recipe rarity; a big chest rolls each rule in turn). Very rare: Ancient Nord, Ancient Imperial and Ayleid in their own ruins at 0.5%. Rare: Nordic in barrows, Silver, Scaled, Elven and Steel Plate in boss chests. Glass and Mithril: 1% in Master boss chests only (Nate). Never as loot (smithing.json noLoot): Glacial Crystal, Ebony, Stalhrim, Daedric, Madness, Dragon (found only by reading, smithing.discovery), Bonemold and Chitin (Dunmer crafts: read about, never in a Cyrodiil chest), Orcish (Orc smiths), Aetherium and artifacts (staff). Steel and Goblin are free. Hot reload.","fort":{"story":{"chance":0.005,"families":["ancient_imperial"]},"normal":{"chance":0.005,"families":["ancient_imperial"]},"hard":{"chance":0.005,"families":["ancient_imperial"]},"nightmare":{"chance":0.005,"families":["ancient_imperial"]}},"nordRuin":{"story":[{"chance":0.005,"families":["ancient_nord","ancient_nord_honed"]},{"chance":0.01,"families":["nordic"]}],"normal":[{"chance":0.005,"families":["ancient_nord","ancient_nord_honed"]},{"chance":0.01,"families":["nordic"]}],"hard":[{"chance":0.005,"families":["ancient_nord","ancient_nord_honed"]},{"chance":0.01,"families":["nordic"]}],"nightmare":[{"chance":0.005,"families":["ancient_nord","ancient_nord_honed"]},{"chance":0.01,"families":["nordic"]}]},"dwemerRuin":{"story":{"chance":0.02,"families":["dwarven"]},"normal":{"chance":0.03,"families":["dwarven"]},"hard":{"chance":0.04,"families":["dwarven"]},"nightmare":{"chance":0.05,"families":["dwarven"]}},"falmerRuin":{"story":{"chance":0.02,"families":["falmer"]},"normal":{"chance":0.03,"families":["falmer","falmer_honed"]},"hard":{"chance":0.04,"families":["falmer","falmer_honed"]},"nightmare":{"chance":0.05,"families":["falmer","falmer_honed"]}},"ayleidRuin":{"normal":{"chance":0.005,"families":["ayleid"]},"hard":{"chance":0.005,"families":["ayleid"]},"nightmare":{"chance":0.005,"families":["ayleid"]}},"boss":{"story":{"chance":0.01,"families":["silver"]},"normal":{"chance":0.02,"families":["silver","scaled","elven"]},"hard":{"chance":0.02,"families":["silver","scaled","elven","steelplate"]},"nightmare":[{"chance":0.03,"families":["silver","scaled","elven","steelplate"]},{"chance":0.01,"families":["glass","mithril"]}]}},
   "discovery": {"_comment":"Schematics found by reading (manuals.js __dboSchematicFind; Nate, 11 Oct). Every won reading rolls the rows in turn, rarest first; a hit hands over one of the row's schematic books, picked evenly. chance is per reading for the whole row; where: only read inside that ruin kind (dungeons.js); minScholar: the reader's Scholar tier (5 = Master). Measured 1-10 Oct: ~3,300 won readings a day server-wide. Hot reload.","enabled":true,"rows":[{"id":"mythic","chance":6.66667e-05,"families":["DAEDRIC","madness","DRAGON"]},{"id":"glacial","chance":0.0002,"families":["glacial_crystal"]},{"id":"extremelyRare","chance":0.000333333,"minScholar":5,"families":["EBONY","stalhrim"]},{"id":"veryRare","chance":0.0004,"families":["glass","mithril"]},{"id":"ayleid","chance":0.001,"where":"ayleidRuin","families":["ayleid"]},{"id":"rare","chance":0.002,"families":["nordic","scaled","bonemold","chitin","silver","elven","steelplate"]},{"id":"ancientNord","chance":0.004,"where":"nordRuin","families":["ancient_nord","ancient_nord_honed"]},{"id":"ancientImperial","chance":0.004,"where":"fort","families":["ancient_imperial"]}]} }

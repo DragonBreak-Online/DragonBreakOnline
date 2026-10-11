@@ -237,6 +237,8 @@ const LEAD_ONLY = new Set(['beastform', 'vlremote', 'wwremote', 'feedpair', 'cha
   'masktest', 'faction leader', 'faction remove',
   // Marking a hall shares a building's chests and beds with a faction (guilds.js, Nate 4 Oct)
   'faction hallmark', 'faction hallunmark',
+  // Writing in the Thalmor's dossiers is writing as their record (thalmor.js)
+  'dossier add', 'dossier strike',
   // A skill boost is progress handed out (playtesterboost.js)
   'boost grant', 'boost extend',
   // Opens a client trace that writes to the server log
@@ -692,7 +694,8 @@ const STAFF_HELP = [
     ['property', 'at a door, as an official: list <deposit> <weekly> | unlist | offer <name> | remind | grace | evict']] },
   { key: 'beasts', title: 'Beasts and the supernatural', items: ['beastform', 'curse', 'vlremote', 'wwremote', 'feedpair', 'raid', 'warband'] },
   { key: 'magic', title: 'Magic and crafts', items: ['schools', 'classteacher', 'preacher', 'manual', 'smithing'] },
-  { key: 'law', title: 'Law', items: ['jail'] },
+  { key: 'law', title: 'Law', items: ['jail', ['concordat', '[races]: Concordat arrests standing, or the Thalmor outside the race rule'],
+    ['dossier', 'list | read <name|#TAG> | reports | add <name|#TAG> <text> | strike <name|#TAG> <n>: the Thalmor dossiers and informant reports (add and strike: Lead GM)']] },
   { key: 'world', title: 'World', items: ['settime', 'setweather', 'timescale', 'region', ['dungeon end', '<dungeon id|name>: end a dungeon claim now'],
     'placed', 'placeundo', 'placeexport', 'masktest'] },
   { key: 'debug', title: 'Server and debugging', items: ['monitor', 'load', 'selftest', 'npc', 'mv', 'driftset', 'driftspawn', 'driftrepair',
@@ -6644,6 +6647,18 @@ try {
     zoneList, zoneById, readOfficials, rankTitle, appointCap, appointCheck, appointFrom, seatOfficial, unseatOfficial, officialTarget,
     officialName, accountActors, ranksOf, APPOINT_RULES });
 } catch (e) { log('court.js failed to load:', e.stack || e.message); globalThis.__dboCourtOffer = null; globalThis.__dboCourtOfficeSync = null; if (globalThis.__dboJournalSections) delete globalThis.__dboJournalSections.court; }
+
+// ---- the Thalmor: Concordat arrests, informants, dossiers and the journal's Thalmor tab (server\thalmor.js, config "thalmor") --
+try {
+  const THALMOR_JS = path.resolve('thalmor.js');
+  delete require.cache[THALMOR_JS];
+  require(THALMOR_JS)({ mp, log, personal, system, audit, who, display, nameOf, tagOf, cfg, onUi, onlineActors, registerChatCommand, isAdmin, isLeadStaff,
+    findAnyByName, zoneOfActor });
+} catch (e) {
+  log('thalmor.js failed to load:', e.stack || e.message);
+  for (const k of ['__dboConcordatEntries', '__dboConcordatAction', '__dboConcordatWarrant', '__dboConcordatJailed', '__dboConcordatMayRelease', '__dboConcordatLawful', '__dboThalmorInformant']) globalThis[k] = null;
+  if (globalThis.__dboJournalSections) delete globalThis.__dboJournalSections.thalmor;
+}
 
 // ---- werewolf beast form and Vampire Lord (server\beastform.js) ----------------------------------
 try {

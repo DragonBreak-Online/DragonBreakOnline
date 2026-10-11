@@ -94,6 +94,29 @@ delete M['hold-whiterun'][String(GUARD)];
 tick();
 ok('a Guard who leaves the hold is not lawful at the next refresh', !lawful(GUARD));
 
+// The Thalmor's authority stops at the Empire's border (Nate, 11 Oct: playerMenu.lawfulFactionRegions)
+const JUST = 0x50, JTARGET = 0x51;
+Object.assign(names, { [JUST]: 'Justiciar', [JTARGET]: 'Nord' });
+put('thalmor', JUST, 'Justiciar');
+put('imperial-legion', OFFICER, 'Legate');
+const where = {};
+globalThis.__dboRegions = { provinceAt: (a) => ({ province: where[a] || 'cyrodiil' }) };
+ok('config: the Thalmor are lawful only in Cyrodiil', JSON.stringify((CFG.playerMenu || {}).lawfulFactionRegions) === '{"thalmor":["cyrodiil"]}');
+tick();
+ok('a Justiciar in Cyrodiil is lawful', lawful(JUST));
+ok('...and restrains at once there', globalThis.__dboInstantRestraint(JUST, JTARGET) === true);
+where[JUST] = 'skyrim'; where[OFFICER] = 'skyrim';
+tick();
+ok('a Justiciar in Skyrim is not lawful', !lawful(JUST));
+ok('...and restrains nobody without their yes', globalThis.__dboInstantRestraint(JUST, JTARGET) === false);
+ok('a Legate in Skyrim is still lawful (no region rule for the Legion)', lawful(OFFICER));
+where[JUST] = 'solstheim'; tick();
+ok('nor on Solstheim', !lawful(JUST));
+delete globalThis.__dboRegions; tick();
+ok('with no regions.js the Thalmor power fails closed', !lawful(JUST));
+where[JUST] = 'cyrodiil'; globalThis.__dboRegions = { provinceAt: (a) => ({ province: where[a] || 'cyrodiil' }) }; tick();
+ok('back in Cyrodiil the next refresh gives it back', lawful(JUST));
+
 fs.rmSync(dir, { recursive: true, force: true });
 console.log(fails ? `${fails} FAILED` : 'all ok');
 process.exit(fails ? 1 : 0);

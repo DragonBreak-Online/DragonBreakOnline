@@ -12,6 +12,7 @@
 //   whoever carries the target: Put down
 //   while sneaking:            Pickpocket (pickpocket.js)
 //   when the target can answer: Rob (robbery.js; the target answers in a panel)
+//   a Thalmor of an arresting rank in the Empire: Arrest under the Concordat (thalmor.js)
 // Trade, Search, Restrain, Uncuff, Carry and Put down go from the client straight to the server systems,
 // which check private.dboLawful themselves; Introduce, Inspect and Invite come back here as dbo events.
 // Restrain is instant for an admin or anyone holding a lawful rank, wherever they stand
@@ -55,9 +56,16 @@ module.exports = (api) => {
   const GUARD_FACTIONS = new Set(C.guardFactions || ['hold-whiterun', 'hold-riften', 'hold-solitude', 'hold-windhelm', 'hold-markarth',
     'hold-falkreath', 'hold-morthal', 'hold-dawnstar', 'hold-winterhold', 'county-bruma']);
   const GUARD_TITLES = new Set((C.guardTitles || ['Guard', 'Guard Sergeant', 'Guard Captain']).map((t) => String(t).toLowerCase()));
+  // A faction whose authority stops at a border (Nate, 11 Oct): the Thalmor arrest only in the Empire, by the White-Gold
+  // Concordat, and have no arrest powers at all in Skyrim's independent Holds. { factionId: [province] } by regions.js;
+  // an unknown place (no regions.js) counts as outside, so the power fails closed. The 15 s refresh below drops the
+  // power within 15 s of crossing out.
+  const FACTION_REGIONS = C.lawfulFactionRegions && typeof C.lawfulFactionRegions === 'object' ? C.lawfulFactionRegions : { thalmor: ['cyrodiil'] };
+  const provinceHere = (a) => { const R = globalThis.__dboRegions; try { return R && typeof R.provinceAt === 'function' ? String((R.provinceAt(a) || {}).province || '') : ''; } catch (e) { return ''; } };
+  const inFactionLand = (fid, a) => { const list = FACTION_REGIONS[fid]; return !Array.isArray(list) || list.includes(provinceHere(a)); };
   const lawfulByFaction = (a) => {
     if (typeof globalThis.__dboGuildsOf !== 'function') return false;
-    return (globalThis.__dboGuildsOf(a) || []).some((g) => (LAWFUL_FACTIONS.has(g.id) && LAWFUL_ROLES.has(g.role))
+    return (globalThis.__dboGuildsOf(a) || []).some((g) => (LAWFUL_FACTIONS.has(g.id) && LAWFUL_ROLES.has(g.role) && inFactionLand(g.id, a))
       || (GUARD_FACTIONS.has(g.id) && GUARD_TITLES.has(String(g.title || '').toLowerCase())));
   };
   const isLawful = (a) => { try { return isLeadStaff(a) || ranksOf(profileOf(a)).some((m) => !UNLAWFUL_RANKS.has(m.rank)) || lawfulByFaction(a); } catch (e) { return false; } };
@@ -171,6 +179,7 @@ module.exports = (api) => {
     // Pickpocket, only while the viewer sneaks (pickpocket.js reads the server's sneak flag)
     try { if (typeof globalThis.__dboPickpocketEntries === 'function') entries.push(...globalThis.__dboPickpocketEntries(a, t)); } catch (e) { /* pickpocket not loaded */ }
     try { if (typeof globalThis.__dboRobEntries === 'function') entries.push(...globalThis.__dboRobEntries(a, t)); } catch (e) { /* robbery not loaded */ }
+    try { if (typeof globalThis.__dboConcordatEntries === 'function') entries.push(...globalThis.__dboConcordatEntries(a, t)); } catch (e) { /* thalmor.js not loaded */ }
     try { if (typeof globalThis.__dboSuperMenuEntries === 'function') entries.push(...globalThis.__dboSuperMenuEntries(a, t)); } catch (e) { /* no curses */ }
     try { if (typeof globalThis.__dboFactionMenuEntries === 'function') entries.push(...globalThis.__dboFactionMenuEntries(a, t)); } catch (e) { /* factions not loaded */ }
     const r = get(t, RESTRAINED_PROP, null) || {};
@@ -225,6 +234,7 @@ module.exports = (api) => {
     if (id.startsWith('voice:')) return sendPacket(a, { customPacketType: 'dboVoicePeer', identity: (t >>> 0).toString(16), op: id.slice(6), name: nameFor(a, t) });
     if (typeof globalThis.__dboPickpocketAction === 'function' && globalThis.__dboPickpocketAction(a, id, t, nameFor)) return;
     if (typeof globalThis.__dboRobAction === 'function' && globalThis.__dboRobAction(a, id, t, nameFor)) return;
+    if (typeof globalThis.__dboConcordatAction === 'function' && globalThis.__dboConcordatAction(a, id, t, nameFor)) return;
     if (typeof globalThis.__dboSuperMenuAction === 'function' && globalThis.__dboSuperMenuAction(a, id, t, nameFor)) return;
     if (typeof globalThis.__dboFactionMenuAction === 'function' && globalThis.__dboFactionMenuAction(a, id, t)) return;
     if (typeof globalThis.__dboRopeMenuAction === 'function' && globalThis.__dboRopeMenuAction(a, id, t)) return;

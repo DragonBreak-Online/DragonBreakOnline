@@ -18,6 +18,10 @@
 //           land marker's worldspace in regions.js) goes to the titheTo faction's treasury (the Imperial Legion), which
 //           pays none on its own land. Skyrim's Holds are independent (4E 211) and pay nothing. What a treasury cannot
 //           pay is arrears, taken first the next week. titheRate 0 turns it off.
+//   stipend the Aldmeri Dominion pays its Thalmor in the Empire (Nate, 11 Oct: lore advantages for the Thalmor, whom the
+//           playerbase is against): dominionStipend gold (default 300) into the dominionStipendTo treasury each reckoning,
+//           before wages. It is NEW gold, not taken from anyone, so it is kept modest; 0 turns it off. In the report as
+//           stipend, and in the leader's reckoning line.
 //   report  each faction keeps its last reckoning (income, wages paid, owed, overdue, balance), shown in the faction panel.
 //
 // Settings come from the faction panel (F3): dbo:econRate, dbo:econWage (leaders) and dbo:econValue (a property's
@@ -51,7 +55,8 @@ module.exports = (api) => {
   const { mp, log, personal, audit, who, cfg, onUi, onlineActors, every, readOfficials, zoneById } = api;
   const C = Object.assign({ enabled: false, maxTaxRate: 0.30, defaultPropertyValue: 2000, maxPropertyValue: 1000000, maxWage: 100000, reckonDay: 0, reckonHour: 0,
     wageShare: 0.25, wageIncomeShare: 0.75, assessEveryDays: 7, assessMaxStep: 2,
-    titheRate: 0.10, titheTo: 'imperial-legion', titheProvinces: ['cyrodiil'] }, cfg.economy || {});
+    titheRate: 0.10, titheTo: 'imperial-legion', titheProvinces: ['cyrodiil'],
+    dominionStipend: 300, dominionStipendTo: 'thalmor', dominionStipendFrom: 'the Aldmeri Dominion' }, cfg.economy || {});
   const FILE = path.resolve('economy.json');
   const WEEK = 7 * 86400000;
   const BALANCE = 'private.bankGold';
@@ -173,6 +178,21 @@ module.exports = (api) => {
     }
   };
 
+  // ---- the Dominion's stipend (Nate, 11 Oct) ------------------------------------------------------------------------------
+  // New gold into one faction's treasury each reckoning; a treasury that refuses it is logged and nothing is paid
+  const stipendGold = () => { const n = Math.floor(Number(C.dominionStipend)); return Number.isFinite(n) ? Math.min(100000, Math.max(0, n)) : 0; };
+  const payStipend = (T, report) => {
+    const n = stipendGold(); const to = String(C.dominionStipendTo || '');
+    if (!n || !to) return;
+    try {
+      if (!info(to) || !T.keyOf || !T.keyOf(to)) { log(`economy: no treasury for ${to}, no Dominion stipend paid`); return; }
+      const from = String(C.dominionStipendFrom || 'the Aldmeri Dominion');
+      if (!T.deposit(to, n, `stipend from ${from}`)) { log(`economy: ${nameOfFaction(to)}'s treasury refused the stipend of ${n} gold`); return; }
+      const r = report(to); r.stipend = (r.stipend || 0) + n; r.stipendFrom = from;
+      audit(`ECONOMY ${nameOfFaction(to)}: stipend of ${n} gold from ${from} (new gold)`);
+    } catch (e) { log('economy: the Dominion stipend failed, skipped this week', e.message); }
+  };
+
   // ---- wages -----------------------------------------------------------------------------------------------------------
   // [{ key: owed key, actor: character to pay (0 if none), rank, name }] for one faction
   const payroll = (fid) => {
@@ -255,6 +275,8 @@ module.exports = (api) => {
     }
     // The Empire's share comes out before wages, so the week's wage budget counts the income left after it
     if (T && titheRate() > 0) payTithes(T, titheBases, report);
+    // The Dominion's stipend, before wages so they can be paid from it
+    if (T) payStipend(T, report);
     // Wages: owed first, then this week's
     if (T) {
       const factions = new Set(Object.keys(d.wages).concat(Object.keys(d.owed)));
@@ -275,7 +297,7 @@ module.exports = (api) => {
           // wageShare of the balance (A1-3). A treasury's first reckoning counts only this week's taxes and tithes as income.
           const balance = T.balance(fid);
           const last = Number(d.balanceAfter[fid]);
-          const income = Number.isFinite(last) && fid in d.balanceAfter ? Math.max(0, balance - last) : Math.max(0, r.income - (r.tithe || 0) + (r.tithesIn || 0));
+          const income = Number.isFinite(last) && fid in d.balanceAfter ? Math.max(0, balance - last) : Math.max(0, r.income - (r.tithe || 0) + (r.tithesIn || 0) + (r.stipend || 0));
           let budget = Math.floor(Math.min(Math.max(0, Number(C.wageIncomeShare) || 0) * income, Math.max(0, Number(C.wageShare) || 0) * balance));
           r.wageBudget = budget;
           const fresh = {};
@@ -304,8 +326,8 @@ module.exports = (api) => {
       r.balance = T ? T.balance(fid) : 0;
       d.balanceAfter[fid] = r.balance;
       d.reports[fid] = r;
-      audit(`ECONOMY ${nameOfFaction(fid)}: taxes ${r.income} gold from ${r.taxed} properties, ${r.overdue.length} overdue; wages ${r.wagesPaid} paid, ${r.owed} owed; treasury ${r.balance}`);
-      for (const a of onlineActors()) if (leads(a, fid)) personal(a, `The week's reckoning for ${nameOfFaction(fid)}: ${r.income} gold in taxes${r.tithesIn ? `, ${r.tithesIn} gold in Imperial tithes` : ''}${r.tithe || r.titheOwed ? `, ${r.tithe} gold Imperial tithe to ${r.titheTo}${r.titheOwed ? ` (${r.titheOwed} gold still owed)` : ''}` : ''}, ${r.wagesPaid} gold in wages${r.owed ? `, ${r.owed} gold of wages owed` : ''}${r.capped ? ` (wages take at most ${Math.round(C.wageIncomeShare * 100)}% of the week's income and ${Math.round(C.wageShare * 100)}% of the treasury: ${r.wageBudget} gold this week)` : ''}${r.overdue.length ? `, ${r.overdue.length} properties overdue` : ''}. The treasury holds ${r.balance} gold.`);
+      audit(`ECONOMY ${nameOfFaction(fid)}: taxes ${r.income} gold from ${r.taxed} properties, ${r.overdue.length} overdue;${r.stipend ? ` stipend ${r.stipend} from ${r.stipendFrom};` : ''} wages ${r.wagesPaid} paid, ${r.owed} owed; treasury ${r.balance}`);
+      for (const a of onlineActors()) if (leads(a, fid)) personal(a, `The week's reckoning for ${nameOfFaction(fid)}: ${r.income} gold in taxes${r.tithesIn ? `, ${r.tithesIn} gold in Imperial tithes` : ''}${r.tithe || r.titheOwed ? `, ${r.tithe} gold Imperial tithe to ${r.titheTo}${r.titheOwed ? ` (${r.titheOwed} gold still owed)` : ''}` : ''}${r.stipend ? `, ${r.stipend} gold stipend from ${r.stipendFrom}` : ''}, ${r.wagesPaid} gold in wages${r.owed ? `, ${r.owed} gold of wages owed` : ''}${r.capped ? ` (wages take at most ${Math.round(C.wageIncomeShare * 100)}% of the week's income and ${Math.round(C.wageShare * 100)}% of the treasury: ${r.wageBudget} gold this week)` : ''}${r.overdue.length ? `, ${r.overdue.length} properties overdue` : ''}. The treasury holds ${r.balance} gold.`);
     }
     save();
     return reports;
