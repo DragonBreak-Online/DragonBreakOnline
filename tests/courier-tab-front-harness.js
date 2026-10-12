@@ -49,6 +49,14 @@ check('the form: destinations, Yourself and the people met, the goods with count
 check('the rules line: fee, insurance, kinds and the days', /10% of the pay to post \(at least 10\)/.test(t) && /insurance 10% of the value/.test(t) && /Up to 6 kinds; the courier has 3 days/.test(t), t);
 check('the post button waits for the goods', /Choose the goods/.test(t), t);
 check('the footer says what couriers do', /Couriers carry goods for pay/.test(t), t);
+// The courier's rank (couriers.js tiers, 12 Oct); a front or server without ranks shows none
+t = tab(COURIER);
+const ranked = /Novice courier/.test(t) || /Apprentice courier/.test(t);
+if (/rank\?:|c\.rank/.test(String(Courier))) {
+  t = tab(Object.assign({}, COURIER, { rank: { name: 'Apprentice', delivered: 7, carry: 2, maxValue: 0, boards: true, line: '2 parcels at once, jobs worth any amount, routes to other holds', next: { name: 'Journeyman', at: 15 } } }));
+  check('the rank line: Apprentice, 7 deliveries, Journeyman at 15, and what the rank allows', /Apprentice courier · 7 deliveries · Journeyman at 15/.test(t) && /2 parcels at once, jobs worth any amount, routes to other holds/.test(t), t);
+  check('...and no rank line when the server sends none', !ranked);
+} else console.log('ok   skipped: this front shows no courier rank');
 t = render(pigeon({ courier: Object.assign({}, COURIER, { enabled: false }), view: 'courier' }));
 check('couriers off on the server: no form, a plain line', /No courier takes work here yet/.test(t) && !/Post the job/.test(t), t);
 
