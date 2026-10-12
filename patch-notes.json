@@ -1,5 +1,19 @@
 [
   {
+    "title": "Buying a house",
+    "date": "2026-10-12",
+    "version": "Client 0.3.94",
+    "tag": "New",
+    "sections": [
+      {
+        "heading": "Property",
+        "items": [
+          "Houses can be bought: a hold's Count or Steward puts an empty house up for sale from its door's property menu, and the first to pay the price owns it. The gold goes to the hold's treasury, and the house pays the weekly property tax on its price. Renting moved into the same panel."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Report a GM",
     "date": "2026-10-12",
     "version": "Server update",
