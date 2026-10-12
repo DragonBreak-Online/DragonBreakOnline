@@ -150,7 +150,8 @@ async function openTicket(interaction, typeId, summary) {
     name: (type.ownersOnly ? `${type.id}-${number}` : `${type.id}-${number}-${interaction.user.username}`).slice(0, 90),
     type: ChannelType.GuildText,
     parent: category.id,
-    topic: `${type.label} | opened by ${interaction.user.tag} (${interaction.user.id})`,
+    // Discord's Audit Log keeps the topic, so an owners-only ticket's names no reporter (the embed below does)
+    topic: type.ownersOnly ? type.label : `${type.label} | opened by ${interaction.user.tag} (${interaction.user.id})`,
     permissionOverwrites: overwrites,
   })
 

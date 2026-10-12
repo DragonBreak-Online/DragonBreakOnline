@@ -217,3 +217,46 @@ test('a Report a GM channel an Owner renamed still closes as owners-only, found 
   assert.strictEqual((await close('rep-0006-someone', '1554000000000000311')).fileOnly, false)
   assert.strictEqual((await close('chat', undefined)).fileOnly, false)
 })
+
+// A guild whose channel cache answers find() by its predicate, as discord.js does, and keeps the channels it creates
+const { ChannelType } = require('discord.js')
+function ticketGuild() {
+  const made = []
+  const sent = []
+  const channels = [
+    { id: '1554000000000000320', type: ChannelType.GuildCategory, name: 'GM Reports' },
+    { id: '1554000000000000321', type: ChannelType.GuildCategory, name: 'Player Reports' },
+  ]
+  const guild = {
+    roles: { everyone: { id: '1' } },
+    channels: {
+      cache: { get: id => channels.find(c => c.id === id), find: fn => channels.find(fn) },
+      fetch: async () => null,
+      create: async opts => {
+        made.push(opts)
+        const c = { id: String(1554000000000000500n + BigInt(made.length)), name: opts.name, type: opts.type, parentId: opts.parent,
+          permissionOverwrites: { cache: new Map(opts.permissionOverwrites.map(o => [o.id, o])) }, send: async p => { sent.push(p) } }
+        channels.push(c)
+        return c
+      },
+    },
+  }
+  const submit = async (typeId, id, name) => {
+    let reply
+    await tickets.handleInteraction({
+      guild, user: { id, username: name, tag: name }, customId: `ticket:submit:${typeId}`, isButton: () => false, isModalSubmit: () => true,
+      deferReply: async () => {}, editReply: async r => { reply = r }, fields: { getTextInputValue: () => 'A GM teleported me into a wall' },
+    })
+    return reply
+  }
+  return { made, sent, submit }
+}
+
+test('a Report a GM channel topic names no reporter, since Discord\'s Audit Log keeps the topic (review, 12 Oct)', async () => {
+  const { made, submit } = ticketGuild()
+  await submit('gmr', '1554000000000000406', 'reporter')
+  assert.strictEqual(made.length, 1)
+  assert.strictEqual(made[0].topic, 'Report a GM')
+  await submit('rep', '1554000000000000407', 'player')
+  assert.strictEqual(made[1].topic, 'Report Player | opened by player (1554000000000000407)')
+})
