@@ -5,8 +5,16 @@ import { RemoteServer } from "./remoteServer";
 import { SinglePlayerService } from "./singlePlayerService";
 import { getInventory } from "../../sync/inventory";
 import { MAP_MARKER_REFS } from "../../data/mapMarkerRefs";
+import { parseCustomPacket, sendCustomPacket } from "./customPacketUtil";
+import { ConnectionMessage } from "../events/connectionMessage";
+import { CustomPacketMessage } from "../messages/customPacketMessage";
 
-// Per-character local replay of discovered map markers and learned ingredient effects, keyed by server and actor id
+// Per-character local replay of discovered map markers and learned ingredient effects, keyed by server and actor id.
+// The server keeps the map markers too (mapprogress.js, Nate 12 Oct: "make sure map data ... stays synced"): the local
+// file alone was lost with a new server address, a reinstall or another PC. Once a character's restore begins, every
+// marker the file holds is reported with dboMapSync, the last batch asking for the whole list back (want); the server's
+// dboMapMarkers answer adds what this PC never saw. Each later discovery is reported within REPORT_MS, and at once on a
+// disconnect or the main menu.
 
 const PLUGIN_NAME = "character-progress-no-load";
 const FILE_VERSION = 1;
@@ -25,6 +33,8 @@ const MAX_MARKERS = 3000;
 const MAX_INGREDIENTS = 1500;
 const MAX_EFFECTS = 4;
 const PLAYER_FORM_ID = 0x14;
+const REPORT_MS = 3000;
+const REPORT_BATCH = 400;
 const LIGHT_MOD_HIGH = 0xfe;
 
 interface CharacterEntry {
@@ -54,6 +64,9 @@ interface State {
   queue: RestoreItem[];
   restored: boolean;
   dirty: boolean;
+  // Markers to report to the server, and whether the last report should ask for the whole list back
+  report?: string[];
+  want?: boolean;
 }
 
 export class CharacterProgressService extends ClientListener {
@@ -67,6 +80,7 @@ export class CharacterProgressService extends ClientListener {
     });
     this.controller.emitter.on("connectionDisconnect", () => this.flush());
     this.controller.on("update", () => this.onUpdate());
+    this.controller.emitter.on("customPacketMessage", (e) => this.onServerMarkers(e));
     this.controller.on("locationDiscovery", () => this.scanSoon());
     this.controller.on("cellFullyLoaded", () => this.scanSoon());
     this.controller.on("equip", (e) => this.onEquip(e));
@@ -81,6 +95,7 @@ export class CharacterProgressService extends ClientListener {
   }
 
   private restoreArmed = false;
+  private reportAt = 0;
   private spawnGen = 0;
   private scanCursor = MAP_MARKER_REFS.length;
   private nextScanAt = 0;
@@ -101,6 +116,9 @@ export class CharacterProgressService extends ClientListener {
   }
 
   private onMySpawn(): void {
+    // A report still waiting belongs to the character before: never send it as this one's (the next restore reports
+    // everything the file holds again)
+    this.dropReport();
     this.flush();
     const s = this.state;
     s.key = null;
@@ -118,6 +136,7 @@ export class CharacterProgressService extends ClientListener {
   }
 
   private onMyDespawn(): void {
+    this.dropReport();
     this.flush();
     const s = this.state;
     s.key = null;
@@ -144,6 +163,7 @@ export class CharacterProgressService extends ClientListener {
       const s = this.state;
       if (this.restoreArmed && !s.key) this.beginRestore();
       if (!s.key) return;
+      this.sendReport(Date.now(), false);
       if (s.queue.length || !s.restored) {
         this.drainRestore();
         return;
@@ -175,6 +195,8 @@ export class CharacterProgressService extends ClientListener {
     s.queue = [];
     s.restored = false;
     this.restoreArmed = false;
+    s.report = [];
+    s.want = true;
     const entry = this.readDoc().characters[s.key];
     if (entry) {
       if (Array.isArray(entry.markers)) {
@@ -193,7 +215,52 @@ export class CharacterProgressService extends ClientListener {
         }
       }
     }
+    // Everything this PC kept goes to the server once (it merges), and the server's list comes back
+    s.report = Object.keys(s.markers);
+    this.reportAt = 0;
     logTrace(this, `Restoring ${s.queue.length} items for ${s.key}`);
+  }
+
+  // The server's list of this character's markers (dboMapMarkers): those this PC never saw are restored and kept
+  private onServerMarkers(event: ConnectionMessage<CustomPacketMessage>): void {
+    const content = parseCustomPacket(event);
+    if (!content || content["customPacketType"] !== "dboMapMarkers") return;
+    const s = this.state;
+    if (!s.key || !Array.isArray(content["markers"])) return;
+    let added = 0;
+    for (const desc of (content["markers"] as unknown[]).slice(0, MAX_MARKERS)) {
+      if (typeof desc !== "string" || s.markers[desc] || Object.keys(s.markers).length >= MAX_MARKERS) continue;
+      s.markers[desc] = true;
+      s.queue.push({ desc });
+      added++;
+    }
+    if (!added) return;
+    s.restored = false;
+    this.markDirty();
+    logTrace(this, `The server added ${added} map marker(s) for ${s.key}`);
+  }
+
+  private dropReport(): void {
+    const s = this.state;
+    s.report = [];
+    s.want = false;
+  }
+
+  // Sends what is waiting to be reported; force sends it now (a disconnect, the main menu)
+  private sendReport(now: number, force: boolean): void {
+    const s = this.state;
+    if (!s.key || (!force && now < this.reportAt)) return;
+    const report = s.report || [];
+    if (!report.length && !s.want) return;
+    this.reportAt = now + REPORT_MS;
+    const batch = report.splice(0, REPORT_BATCH);
+    const want = !!s.want && !report.length;
+    try {
+      sendCustomPacket(this.controller, { customPacketType: "dboMapSync", markers: batch, ...(want ? { want: true } : {}) });
+      if (want) s.want = false;
+    } catch (err) {
+      report.unshift(...batch);
+    }
   }
 
   private drainRestore(): void {
@@ -264,6 +331,7 @@ export class CharacterProgressService extends ClientListener {
       }
       if (Object.keys(s.markers).length >= MAX_MARKERS) return;
       s.markers[desc] = true;
+      (s.report = s.report || []).push(desc);
       this.markDirty();
     }
   }
@@ -343,6 +411,7 @@ export class CharacterProgressService extends ClientListener {
 
   private flush(): void {
     if (this.state.dirty) this.write();
+    try { this.sendReport(Date.now(), true); } catch (err) { /* disconnected */ }
   }
 
   private ownerName(): string {
