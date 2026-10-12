@@ -254,6 +254,22 @@
     ]
   },
   {
+    "title": "Launcher 2.1.48",
+    "date": "2026-10-12",
+    "version": "Launcher 2.1.48",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Launcher",
+        "items": [
+          "A failed launcher update no longer locks the Play button, and updates retry when Windows briefly holds the file.",
+          "A game started right after closing the last one is watched for crashes too.",
+          "The top bar labels its Discord and Nexus buttons."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Launcher 2.1.47",
     "date": "2026-10-12",
     "version": "Launcher 2.1.47",
