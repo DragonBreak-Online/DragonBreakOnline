@@ -163,7 +163,7 @@ const noteTold = (actorId, text) => {
   if (toldCounts.size > 5000) for (const k of toldCounts.keys()) { if (toldCounts.size <= 4000) break; toldCounts.delete(k); }
   if (n === 1 || n === 5 || n % 10 === 0) log(`told ${display(actorId)} (x${n}): ${t.slice(0, 200)}`);
 };
-const personal = (actorId, text) => { try { noteTold(actorId, text); } catch (e) { /* the log line is optional */ } const cap = globalThis.__dboTellCapture; if (cap && cap.a === (actorId >>> 0)) cap.lines.push(String(text)); deliver(actorId, `[[PM]]System|${text}`); };
+const personal = (actorId, text) => { try { noteTold(actorId, text); } catch (e) { /* the log line is optional */ } const cap = globalThis.__dboTellCapture; if (cap && cap.a === (actorId >>> 0)) { cap.lines.push(String(text)); if (cap.quiet) return; } deliver(actorId, `[[PM]]System|${text}`); };
 
 // Survives gamemode hot reloads so players who connected before a reload stay known.
 if (!(globalThis.__dboConnected instanceof Set)) globalThis.__dboConnected = new Set();
@@ -568,10 +568,11 @@ const commands = new Map();
 const registerChatCommand = (name, fn, opts) => commands.set(name.toLowerCase(), { fn, admin: !!(opts && opts.admin), hidden: !!(opts && opts.hidden), help: (opts && opts.help) || '' });
 // The journal's Profile buttons run the chat command itself (journal.js journalAction): the same handler, refusals and
 // cooldowns, the same admin rule. What it tells the player still goes to chat, and comes back here for the journal footer.
-globalThis.__dboRunCommand = (a, name, args) => {
+// quiet: what the command says is kept for the caller and never reaches chat (a journal page reading /players)
+globalThis.__dboRunCommand = (a, name, args, quiet) => {
   const c = commands.get(String(name || '').toLowerCase());
   if (!c || (c.admin && !isAdmin(a))) return null;
-  const cap = { a: a >>> 0, lines: [] };
+  const cap = { a: a >>> 0, lines: [], quiet: !!quiet };
   const prev = globalThis.__dboTellCapture;
   globalThis.__dboTellCapture = cap;
   try { c.fn(a, String(args || '')); } catch (e) { log(`command /${name} from the journal failed`, e.message); cap.lines.push('That did not work. Try the chat command instead.'); }
@@ -2800,6 +2801,32 @@ onUi('menuRun', (a, args) => {
   closePlayerMenu(a);
   handleChat(userOf(a), `/${name}${text ? ' ' + text : ''}`);
 });
+// ---- the Character Journal's World and Help tabs (F3; journal.js section registry) -------------------------------------
+// World: what the read-only commands say about the world, as one page, read quietly so nothing reaches chat. Each group
+// is a command's own lines (colour codes taken out); a command that is not loaded, or says nothing, leaves its group out.
+const WORLD_GROUPS = [['players', 'Who is about'], ['officials', 'Who rules'], ['playtest', 'The open world'], ['time', 'The time'],
+  ['champions', 'Named beasts abroad'], ['wildlife', 'What roams the wilds']];
+const plainLine = (t) => String(t).replace(/#\{[0-9a-fA-F]{6}\}/g, '').replace(/\[\[[A-Z]+\]\]/g, '').trim();
+const worldView = (a) => ({
+  groups: WORLD_GROUPS.map(([cmd, name]) => {
+    const lines = commands.has(cmd) ? (globalThis.__dboRunCommand(a, cmd, '', true) || []).map(plainLine).filter(Boolean) : [];
+    return lines.length ? { name, command: cmd, lines } : null;
+  }).filter(Boolean),
+});
+// Help: the panel's trouble topics, each opened in the panel (U) itself, which already asks for the words
+const helpView = () => ({
+  actions: [
+    { tab: 'trouble', label: 'Report a bug, call a GM, open a ticket', desc: 'The help topics: what went wrong, a GM to you, or a private ticket with staff.' },
+    { tab: '', label: 'Every command', desc: 'Search everything you can do, by a word or two. A lone / in chat opens it too.' },
+  ],
+  hints: ['Stuck in the world? /unstuck, under Trouble and help.', 'Keys: F3 this journal, U every command, X a person you look at, B emotes, H your face.'],
+});
+{
+  const SECTIONS = globalThis.__dboJournalSections && typeof globalThis.__dboJournalSections === 'object'
+    ? globalThis.__dboJournalSections : (globalThis.__dboJournalSections = {});
+  SECTIONS.world = { visible: () => true, view: (a) => worldView(a), label: 'World' };
+  SECTIONS.help = { visible: () => true, view: () => helpView(), label: 'Help' };
+}
 globalThis.__dboPanelLeave = (a) => { panelState.caps.delete(a >>> 0); panelState.nonces.delete(a >>> 0); };
 
 // ---- meals: eating takes time (Nate, 2026-09-27, from athny's and dunthril's reports) ----------------------------------

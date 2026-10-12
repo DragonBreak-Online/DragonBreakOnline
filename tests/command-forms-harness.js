@@ -55,10 +55,13 @@ const opened = [];
 const ui = new Map();
 const tiers = { [GM]: 'gm', [LEAD]: 'senior' };
 globalThis.__dboNameFor = (viewer, t) => (viewer === PLAYER && t === OTHER ? 'Dagny Holt' : 'Stranger');
+const chat = [];
+// gamemode's personal, as far as the capture goes: a quiet capture keeps the line out of chat
+const personalStub = (a, t) => { const cap = globalThis.__dboTellCapture; if (cap && cap.a === (a >>> 0)) { cap.lines.push(String(t)); if (cap.quiet) return; } chat.push([a, t]); };
 const run = new Function('personal', 'isAdmin', 'deliver', 'C', 'profileOf', 'ranksOf', 'openWidget', 'closeWidget', 'onUi', 'userOf', 'handleChat',
   'require', 'path', 'log', 'LEAD_ONLY', 'isLeadStaff', 'onlineActors', 'display', 'tagOf',
-  section + panel + '\nreturn { registerChatCommand, panelTabsFor, openPlayerMenu };')(
-  () => {}, (a) => !!tiers[a], () => {}, { WHITE: 'fafafa', SYS: 'eda841' }, (a) => a, () => [], (a, w) => opened.push({ a, w }), () => {},
+  section + panel + '\nreturn { registerChatCommand, panelTabsFor, openPlayerMenu, say: personal };')(
+  personalStub, (a) => !!tiers[a], () => {}, { WHITE: 'fafafa', SYS: 'eda841' }, (a) => a, () => [], (a, w) => opened.push({ a, w }), () => {},
   (e, fn) => { const l = ui.get(e) || []; l.push(fn); ui.set(e, l); }, (a) => a, () => {},
   require, { resolve: (x) => path.resolve(SERVER, x) }, () => {}, new Set(['curse', 'warband']), (a) => tiers[a] === 'senior',
   () => [PLAYER, GM, LEAD, OTHER, MASKED], (a) => `Name${a} #T${a}`, (a) => `T${a}`);
@@ -97,6 +100,20 @@ opened.length = 0; run.openPlayerMenu(GM, '', 'par');
 w = opened[0].w;
 ok(w.people.length === 4 && w.people.every((p) => /^#T\d$/.test(p.value)) && !w.people.some((p) => p.value === '#T2'), 'staff see everyone else online, picked by #TAG', w.people);
 ok(w.search === 'par', 'the panel opens at a search when asked to', w.search);
+
+// ---- F3: the World and Help tabs ----
+const S = globalThis.__dboJournalSections;
+ok(S && S.world && S.help && S.world.label === 'World' && S.help.label === 'Help', 'the journal registry has a World and a Help tab');
+run.registerChatCommand('time', (a) => run.say(a, '#{eda841}It is the 4th hour of Morndas, 12th of Frostfall, 4E 211.'), { help: 'the time' });
+run.registerChatCommand('playtest', (a) => run.say(a, 'Bruma and the lands around it are open.'), { help: 'what part of the world is open' });
+run.registerChatCommand('players', (a) => { run.say(a, '3 online:'); run.say(a, 'Dagny Holt, Strangers x2'); }, { help: 'who is online' });
+chat.length = 0;
+const world = S.world.view(PLAYER);
+ok(world.groups.map((g) => g.name).join() === 'Who is about,The open world,The time', 'World reads the loaded commands, in order, leaving out the silent and the missing', world.groups.map((g) => g.name));
+ok(world.groups[2].lines[0] === 'It is the 4th hour of Morndas, 12th of Frostfall, 4E 211.', '...with colour codes taken out', world.groups[2].lines);
+ok(chat.length === 0, '...and nothing it reads reaches chat', chat);
+const help = S.help.view(PLAYER);
+ok(help.actions.some((x) => x.tab === 'trouble') && help.actions.some((x) => x.tab === ''), 'Help offers the trouble topics and the whole panel (U)', help.actions);
 
 // ---- the chat handler: a lone "/" opens the panel ----
 ok(/if \(!cmd && hasPlayerMenu\(a\)\) return openPlayerMenu\(a, '', ''\);/.test(src), 'a lone "/" in chat opens the panel at its search (handleChat)');
