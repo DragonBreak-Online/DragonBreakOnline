@@ -40,8 +40,8 @@ check('...but is a Trial GM, logged as trialgm', T.isTrialStaff(TRIAL) === true 
 check('GM and Trial GM roles together give GM', T.tierOf(BOTH) === 'gm' && T.isAdmin(BOTH) && !T.isTrialStaff(BOTH) && T.staffTierOf(BOTH) === 'gm', [T.tierOf(BOTH), T.isTrialStaff(BOTH)]);
 check('a GM, a Lead GM, an Owner and a player are unchanged', T.tierOf(GM) === 'gm' && T.tierOf(LEAD) === 'leadgm' && T.tierOf(OWNER) === 'senior' && T.tierOf(PLAYER) === null && !T.isTrialStaff(PLAYER));
 check('the rank sits below GM', T.TIER_RANK.trialgm > 0 && T.TIER_RANK.trialgm < T.TIER_RANK.gm);
-const ALLOWED = ['rename', 'chargen', 'gmcall', 'tp', 'invis', 'playerinfo', 'bugs', 'adminchat', 'ghost', 'unstuck'];
-check('exactly the ten rights are on the allowlist (adminchat: #gm-chat 12 Oct; ghost, unstuck: Nate 12 Oct)', [...T.TRIAL_CAN].sort().join() === ALLOWED.slice().sort().join(), [...T.TRIAL_CAN]);
+const ALLOWED = ['rename', 'chargen', 'gmcall', 'tp', 'invis', 'playerinfo', 'bugs', 'adminchat', 'unstuck'];
+check('exactly the nine rights are on the allowlist (adminchat: #gm-chat 12 Oct; unstuck: Nate 12 Oct)', [...T.TRIAL_CAN].sort().join() === ALLOWED.slice().sort().join(), [...T.TRIAL_CAN]);
 check('a Trial GM has each of them', ALLOWED.every((w) => T.staffCan(TRIAL, w)));
 const FORBIDDEN = ['kick', 'ban', 'items', 'gold', 'skills', 'stats', 'housing', 'faction', 'nobility', 'world', 'spawn', 'summon', 'console', 'jail', ''];
 check('...and none of the others', FORBIDDEN.every((w) => !T.staffCan(TRIAL, w)), FORBIDDEN.filter((w) => T.staffCan(TRIAL, w)));
@@ -183,8 +183,8 @@ process.chdir(tmp);
 
   process.chdir(cwd);
   // ---- /ghost and /unstuck (Nate, 12 Oct) --------------------------------------------------------------------------
-  check('a Trial GM may ghost and unstuck, a player may not', T.staffCan(TRIAL, 'ghost') && T.staffCan(TRIAL, 'unstuck') && !T.staffCan(PLAYER, 'ghost') && !T.staffCan(PLAYER, 'unstuck') && T.staffCan(GM, 'ghost'));
-  check('/ghost sends the admin panel\'s ghost packet and mirror, only for staff', /registerChatCommand\('ghost'[\s\S]{0,120}if \(!staffCan\(a, 'ghost'\)\)[\s\S]{0,400}mp\.set\(a, 'ff_adminModes', Object\.assign\(\{\}, m, \{ ghost: on \}\)\)[\s\S]{0,250}sendPacket\(a, \{ customPacketType: 'adminMode', mode: 'ghost', on \}\)/.test(src));
+  check('a Trial GM may unstuck, a player may not', T.staffCan(TRIAL, 'unstuck') && !T.staffCan(PLAYER, 'unstuck') && T.staffCan(GM, 'unstuck'));
+  check('there is no gameplay /ghost: Ghost is the panel\'s mode (Nate 12 Oct)', !/registerChatCommand\('ghost'/.test(src));
   check('/unstuck: staff skip the waits and may name a player; a player names nobody', /const admin = staffCan\(by, 'unstuck'\);/.test(src) && /if \(!name \|\| !staffCan\(a, 'unstuck'\)\) return unstuckActor\(a, a\);/.test(src) && /if \(by === a\) mp\.set\(a, 'private\.unstuckAt', Date\.now\(\)\);/.test(src));
   fs.rmSync(tmp, { recursive: true, force: true });
   console.log('');

@@ -1,6 +1,7 @@
 // Trial GM in the fork's AdminSystem (the F7 panel; Nate, 11 Oct): a Trial GM gets the menu (the player list with no
-// addresses or hardware ids, only the Invisible mode, the Debug, Players and Modes tabs), TP to a player, Rename and the
-// Invisible mode. Every other panel action is refused with a reply, every other request ignored; a player is ignored as
+// addresses or hardware ids, the Invisible and Ghost modes, the Debug, Players, Teleport and Modes tabs), TP to a player or a
+// location, Rename and the Invisible and Ghost modes (Teleport and Ghost: Nate 12 Oct). Every other panel action is refused
+// with a reply, every request but the locations list ignored; a player is ignored as
 // before and a GM is unchanged.
 //   node tests/trial-gm-panel-harness.js <bundled adminSystem.js>
 // A fork without the Trial GM tier has nothing to test, which is said and not failed unless a gate expects it.
@@ -64,7 +65,7 @@ const result = (out) => (out.find((x) => x.p.customPacketType === 'adminActionRe
   const rows = (menu && menu.players) || [];
   ok('...the player list, everyone online but them', rows.length === 3 && rows.every((r) => r.online && r.n), rows.map((r) => r.n));
   ok('...without addresses, hardware ids, mastery or beast rows', rows.every((r) => r.ip === '' && r.hwid === '' && r.m === undefined && r.b === undefined), rows[0]);
-  ok('...only the Invisible and Ghost modes (12 Oct), and no zones, locations, bans or mastery', menu.modes.map((m) => m.id).join() === 'invis,ghost' && menu.npcZones.length === 0
+  ok('...only the Invisible and Ghost modes, and no zones, locations, bans or mastery', menu.modes.map((m) => m.id).join() === 'invis,ghost' && menu.npcZones.length === 0
     && menu.locations.length === 0 && menu.bans.length === 0 && menu.mastery === null, menu.modes);
 
   // What they may do
@@ -74,9 +75,6 @@ const result = (out) => (out.find((x) => x.p.customPacketType === 'adminActionRe
   globalThis.__dboAdminRename = (a, t, name) => { renamed = [a, t, name]; return { ok: true, text: 'Renamed' }; };
   out = packet(1, 'adminAction', { action: 'rename', target: PLAYER.toString(16), name: 'Mira Valen' });
   ok('Rename reaches the gameplay\'s rename (which checks staffCan itself)', renamed && renamed[0] === TRIAL && renamed[1] === PLAYER && result(out).ok === true, renamed);
-  out = packet(1, 'adminAction', { action: 'toggleMode', mode: 'ghost' });
-  ok('the Ghost mode goes on, mirrored for neighbours (Nate 12 Oct: "so people can see them as a ghost")', (props.get(`${TRIAL}|ff_adminModes`) || {}).ghost === true, props.get(`${TRIAL}|ff_adminModes`));
-  packet(1, 'adminAction', { action: 'toggleMode', mode: 'ghost' });
   out = packet(1, 'adminAction', { action: 'toggleMode', mode: 'invis' });
   ok('the Invisible mode goes on, mirrored for neighbours', (props.get(`${TRIAL}|ff_adminModes`) || {}).invis === true && out.some((x) => x.p.customPacketType === 'adminMode' && x.p.on === true), props.get(`${TRIAL}|ff_adminModes`));
 
@@ -103,7 +101,13 @@ const result = (out) => (out.find((x) => x.p.customPacketType === 'adminActionRe
     out = packet(1, type, { targetName: 'Mira' });
     if (out.length) leaked.push([type, out]);
   }
-  ok('the item, zone and mastery lists are not sent (the Teleport tab\'s locations are, since 12 Oct)', leaked.length === 0, leaked);
+  ok('the item, zone and mastery lists are not sent', leaked.length === 0, leaked);
+  out = packet(1, 'adminLocationsRequest', {});
+  ok('...but the Teleport tab\'s locations are', out.some((x) => x.p.customPacketType === 'adminLocations' && Array.isArray(x.p.locations)), out.map((x) => x.p.customPacketType));
+  out = packet(1, 'adminAction', { action: 'teleportLoc', target: 'Nowhere At All' });
+  ok('...and teleportLoc reaches the teleport, not the Trial GM refusal', result(out) && result(out).ok === false && /Unknown location/.test(result(out).text), result(out));
+  out = packet(1, 'adminAction', { action: 'toggleMode', mode: 'ghost' });
+  ok('the Ghost mode goes on, mirrored for neighbours', (props.get(`${TRIAL}|ff_adminModes`) || {}).ghost === true && out.some((x) => x.p.customPacketType === 'adminMode' && x.p.mode === 'ghost' && x.p.on === true), props.get(`${TRIAL}|ff_adminModes`));
 
   // Everyone else as before
   packet(3, 'adminMenuRequest'); await settle();
@@ -120,9 +124,9 @@ const result = (out) => (out.find((x) => x.p.customPacketType === 'adminActionRe
   ok('GM and Trial GM roles together get the GM\'s menu', both && both.tier === 'gm' && !both.caps.trial, both && both.tier);
 
   // A Trial GM keeps only Invisible at the next login (a GM moved down loses the rest)
-  sys.modesByProfile.set(9, { invis: true, god: true, noclip: true });
+  sys.modesByProfile.set(9, { invis: true, ghost: true, god: true, noclip: true });
   sys.resyncModes(mp, 1, TRIAL, true, true);
-  ok('at login a Trial GM keeps Invisible and loses the other modes', JSON.stringify(sys.modesByProfile.get(9)) === '{"invis":true}', sys.modesByProfile.get(9));
+  ok('at login a Trial GM keeps Invisible and Ghost and loses the other modes', JSON.stringify(sys.modesByProfile.get(9)) === '{"invis":true,"ghost":true}', sys.modesByProfile.get(9));
 
   // Without the settings key the Trial role is a player's
   sys.roleCfg = { tierRoles: { senior: [], developer: [], leadgm: [], gm: ['g1'] }, trialRoles: [], adminRoleIds: [], adminProfileIds: [] };
