@@ -10,6 +10,8 @@ recipe's product name, recipe editor id and plugin against the SETS below. Ammun
 the Skyforge, the Dawnguard forge, a loom or a tanning rack is left out. The result lists items, not recipes: some items
 have recipes in several mods, and the gate is on what is made.
   python3 tools/faction_gear.py            (from server/, writes faction-gear.json)
+  python3 tools/faction_gear.py --check    what it would change, writing nothing
+  python3 tools/faction_gear.py --prune    also delete the entries the SETS no longer produce (177 of them today)
 """
 import json, re, sys, os
 
@@ -100,19 +102,46 @@ for item, (name, recipe) in HAND_ITEMS.items():
     cur = items.setdefault(item, {'name': name, 'set': 'College of Whispers', 'factions': ['college-of-whispers'], 'role': 'blacksmith', 'recipes': []})
     if recipe not in cur['recipes']: cur['recipes'].append(recipe)
 
+# Merge, never overwrite. Most of faction-gear.json is no longer reproducible from the SETS above: 177 of its items are
+# there by hand, among them every Morrowind house guard, the Orcish Clan (no recipe at all; staff hand it out), Bruma
+# Guard and the Synod, and some whose recipe regions.json no longer lists. Overwriting the file dropped all of them
+# silently, which is how a rerun could have quietly opened 17 sets to any smith. An entry this run produces wins, so
+# editing the SETS still works; an entry it does not produce is kept and counted. --prune is the only way to delete.
+PRUNE = '--prune' in sys.argv
+CHECK = '--check' in sys.argv
+try:
+    was = json.load(open(os.path.join(SERVER, 'faction-gear.json')))['items']
+except (OSError, ValueError, KeyError):
+    was = {}
+kept = {k: v for k, v in was.items() if k not in items}
+added = sorted(k for k in items if k not in was)
+changed = sorted(k for k in items if k in was and was[k] != items[k])
+merged = dict(items) if PRUNE else {**kept, **items}
+
 out = {
     '_comment': 'Faction gear (server/factiongear.js; built by tools/faction_gear.py from regions.json, edit the SETS there '
                 'and re-run, or edit an entry here by hand). An item listed here may be crafted only by a member of one of '
                 'its factions whose rank role is its role (blacksmith for forge work, tailor for the loom and tanning rack) '
-                'or leader. Nate, 2026-09-28: faction armor and weapons. The Orcish Clan set (no recipe; staff hand it out) and '
-                'later sets were added here by hand: this script no longer reproduces the file, so edit the file.',
-    'items': dict(sorted(items.items(), key=lambda kv: (kv[1]['set'], kv[1]['name']))),
+                'or leader. Nate, 2026-09-28: faction armor and weapons. Most of this file is no longer reproducible from the '
+                "script's SETS: a rerun keeps every entry it does not produce and only --prune deletes them, so a hand-added "
+                'set (the Orcish Clan, the Morrowind house guards, Bruma Guard, the Synod) survives a rerun.',
+    'items': dict(sorted(merged.items(), key=lambda kv: (kv[1]['set'], kv[1]['name']))),
     '_uniformsComment': 'War uniforms (realm.js, config war.uniforms): in a battle only fighters wearing a body piece of their '
                         "faction's uniform count at a standard. A faction's uniform is its items above plus these worn-only "
                         'extras; a faction with neither (the Fighters Guild today) is not held to it.',
     'uniforms': UNIFORM_EXTRA,
 }
-json.dump(out, open(os.path.join(SERVER, 'faction-gear.json'), 'w'), indent=1, ensure_ascii=False)
+if not CHECK:
+    json.dump(out, open(os.path.join(SERVER, 'faction-gear.json'), 'w'), indent=1, ensure_ascii=False)
 from collections import Counter
-print(len(items), 'items')
-for s, n in sorted(Counter(v['set'] for v in items.values()).items()): print(' %-26s %d' % (s, n))
+print('%d items: %d from the rules, %d kept%s' % (len(merged), len(items), len(kept), ' (DELETED by --prune)' if PRUNE else ''))
+if kept:
+    label = 'deleted' if PRUNE else 'kept, not reproducible from the SETS above'
+    print(' %d %s:' % (len(kept), label))
+    for st, n in sorted(Counter(v['set'] for v in kept.values()).items()): print('   %-26s %d' % (st, n))
+# A rerun gates items that were not gated before, which is a decision, not housekeeping: say so rather than do it quietly.
+if added: print(' %d item(s) this run ADDS to the gate: %s' % (len(added), ', '.join(items[k]['name'] for k in added[:8]) + (' ...' if len(added) > 8 else '')))
+if changed: print(' %d item(s) this run CHANGES: %s' % (len(changed), ', '.join(items[k]['name'] for k in changed[:8]) + (' ...' if len(changed) > 8 else '')))
+print(' %s; --prune would delete the %d kept entr%s' % ('--check: nothing was written' if CHECK else 'written; --check shows this without writing',
+                                                         len(kept), 'y' if len(kept) == 1 else 'ies'))
+for st, n in sorted(Counter(v['set'] for v in merged.values()).items()): print(' %-26s %d' % (st, n))
