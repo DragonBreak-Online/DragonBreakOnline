@@ -82,6 +82,19 @@ ok(globalThis.__dboEnchLearnedResend(P) === packets[0]?.[1].sent && packets.leng
 ok(!!(S && S.get(P >>> 0) && S.get(P >>> 0).ench.size), "...and leaves this session's disenchants in place", S && S.get(P >>> 0));
 ok(logs.some((l) => new RegExp(`asked for their learned enchantments: ${packets[0][1].sent} effect\\(s\\) sent`).test(l)), '...and logs the ask', logs.filter((l) => /asked for/.test(l)));
 ok(globalThis.__dboEnchLearnedResend(Q) === 0, '...0 for a character with nothing recorded');
+// Using an Arcane Enchanter resends by itself (Nate, 12 Oct: no /syncenchant needed), at most once a minute
+packets.length = 0;
+const realNow = Date.now; let touchClock = realNow();
+Date.now = () => touchClock;
+globalThis.__dboEnchanterTouched(ENCHANTER, P);
+ok(packets.length === 1 && packets[0][1].customPacketType === 'dboEnchLearned' && packets[0][1].effects.length === 3, 'using an enchanter resends the learned list', packets);
+globalThis.__dboEnchanterTouched(ENCHANTER, P);
+ok(packets.length === 1, '...not again within the minute');
+touchClock += 61000; globalThis.__dboEnchanterTouched(ENCHANTER, P);
+ok(packets.length === 2, '...and again after it');
+touchClock += 61000; globalThis.__dboEnchanterTouched(DAGGER, P);
+ok(packets.length === 2, 'touching anything else sends nothing');
+Date.now = realNow;
 globalThis.__dboEnchLearnedLogin(P);
 ok(!S.get(P >>> 0), 'the login itself still starts a new session');
 // Bounded: max keeps the newest
@@ -113,5 +126,6 @@ ok(/__dboEnchLearnedResend\(a\)/.test(sync) && !/__dboEnchLearnedLogin/.test(syn
   ok(awards.length === 1 && awards[0][0] === P && awards[0][1] === 'enchanter' && awards[0][2] === 1, 'disenchanting credits the Enchanter, 1 for the enchantment', awards);
   globalThis.setTimeout = realTimeout; delete globalThis.__alduinakMasteryAward;
 }
+ok(/globalThis\.__dboEnchanterTouched\(targetId >>> 0, casterId >>> 0\)/.test(gm), 'gamemode.js tells alchemy.js about every activation');
 console.log(fails ? `\n${fails} FAILED` : '\nall passed');
 process.exit(fails ? 1 : 0);

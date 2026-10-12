@@ -1329,6 +1329,7 @@ mp.onActivate = (targetId, casterId) => {
     if (refused) return false;
   }
   if (globalThis.__dboSalvageActivate && globalThis.__dboSalvageActivate(targetId >>> 0, casterId >>> 0)) return false;
+  try { if (globalThis.__dboEnchanterTouched) globalThis.__dboEnchanterTouched(targetId >>> 0, casterId >>> 0); } catch (e) { log('enchanter resend failed', e.message); }
   // An alchemy lab also shows what the pack can brew (alchemy.js); the lab's own menu still opens
   if (globalThis.__dboAlchemyLab) { try { if (globalThis.__dboAlchemyLab(targetId >>> 0, casterId >>> 0) === true) return false; } catch (e) { log('alchemy lab panel failed', e.message); } }
   if (globalThis.__dboEmptyWorldContainer) globalThis.__dboEmptyWorldContainer(targetId >>> 0);
@@ -2496,7 +2497,8 @@ registerChatCommand('whereami', (a) => personal(a, `server thinks: cell/world ${
 
 // What a playtest actually costs: players, live npcs, the spawn poll and the packets we send
 
-// Resends only (alchemy.js __dboEnchLearnedResend), and says what happened in words (6 Oct: "sent=false" read as broken)
+// Resends only (alchemy.js __dboEnchLearnedResend), and says what happened in words (6 Oct: "sent=false" read as broken).
+// Using an Arcane Enchanter now resends by itself (__dboEnchanterTouched); this stays for a list that still looks short.
 registerChatCommand('syncenchant', (a) => {
   if (typeof globalThis.__dboEnchLearnedResend !== 'function') return personal(a, 'Enchanting is not ready yet. Try again in a minute.');
   const n = globalThis.__dboEnchLearnedResend(a);
@@ -6920,7 +6922,7 @@ try {
   const ALCHEMY_JS = path.resolve('alchemy.js');
   delete require.cache[ALCHEMY_JS];
   require(ALCHEMY_JS)({ mp, log, personal, audit, display, who, openWidget, closeWidget, every, itemName: (d) => adminItemName(d), cfg, sendPacket, onUi });
-} catch (e) { log('alchemy.js failed to load:', e.stack || e.message); mp.onCraftUnmatched = null; }
+} catch (e) { log('alchemy.js failed to load:', e.stack || e.message); mp.onCraftUnmatched = null; globalThis.__dboEnchanterTouched = null; }
 
 // ---- playtest region lock (server\playtest.js, config "playtest") ------------------------------
 try {
