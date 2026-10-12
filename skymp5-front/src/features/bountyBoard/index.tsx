@@ -183,6 +183,10 @@ const BountyBoard = ({ data }: { data: BountyBoardData }) => {
               {postLabel}
             </button>
             <button className="bountyBoard__button" onClick={() => { send('dbo:pigeonOpen', 'send'); send(ev.close); }}>Send a pigeon</button>
+            {/* Supply orders and couriers were only reachable by opening the coop and finding their tabs behind Letters
+                (Nate, 12 Oct: hard to find). The coop opens straight onto a view, so each gets its own way in here. */}
+            <button className="bountyBoard__button" onClick={() => { send('dbo:pigeonOpen', 'supply'); send(ev.close); }}>Supply orders</button>
+            <button className="bountyBoard__button" onClick={() => { send('dbo:pigeonOpen', 'courier'); send(ev.close); }}>Couriers</button>
             <button className="bountyBoard__button" onClick={() => send(ev.close)}>Close</button>
           </div>
         </div>

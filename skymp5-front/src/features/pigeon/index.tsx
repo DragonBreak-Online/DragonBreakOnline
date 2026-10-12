@@ -148,6 +148,9 @@ const Pigeon = ({ data }: { data: PigeonData }) => {
   const [packed, setPacked] = useState<Record<number, string>>({});
   // Supply: the order chosen, how many to hand over, and the new order's form
   const supply = data.supply && data.supply.enabled ? data.supply : null;
+  // A view asked for from outside (the notice board's buttons) may not exist at this board, and its tab is then not
+  // drawn: fall back rather than show a panel with nothing under it.
+  const shown = (view === 'supply' && !supply) || (view === 'courier' && !data.courier) ? 'letters' : view;
   const [orderId, setOrderId] = useState<number | null>(null);
   const [handCount, setHandCount] = useState('');
   const [query, setQuery] = useState(supply ? supply.search : '');
@@ -254,18 +257,18 @@ const Pigeon = ({ data }: { data: PigeonData }) => {
       <div className="pigeon__panel">
         <h1 className="pigeon__title">{data.boardName} Pigeon Coop</h1>
         <div className="pigeon__tabs">
-          <button className={'pigeon__tab' + (view === 'letters' ? ' pigeon__tab--active' : '')} onClick={() => setView('letters')}>
+          <button className={'pigeon__tab' + (shown === 'letters' ? ' pigeon__tab--active' : '')} onClick={() => setView('letters')}>
             Letters{waitingCount ? <span className="pigeon__badge">{waitingCount}</span> : null}
           </button>
-          <button className={'pigeon__tab' + (view === 'send' ? ' pigeon__tab--active' : '')} onClick={() => setView('send')}>Send a pigeon</button>
+          <button className={'pigeon__tab' + (shown === 'send' ? ' pigeon__tab--active' : '')} onClick={() => setView('send')}>Send a pigeon</button>
           {supply
             ? (
-            <button className={'pigeon__tab' + (view === 'supply' ? ' pigeon__tab--active' : '')} onClick={() => setView('supply')}>Supply orders</button>
+            <button className={'pigeon__tab' + (shown === 'supply' ? ' pigeon__tab--active' : '')} onClick={() => setView('supply')}>Supply orders</button>
               )
             : null}
           {data.courier
             ? (
-            <button className={'pigeon__tab' + (view === 'courier' ? ' pigeon__tab--active' : '')} onClick={() => setView('courier')}>
+            <button className={'pigeon__tab' + (shown === 'courier' ? ' pigeon__tab--active' : '')} onClick={() => setView('courier')}>
               Couriers{data.courier.carrying.length ? <span className="pigeon__badge">{data.courier.carrying.length}</span> : null}
             </button>
               )
@@ -275,7 +278,7 @@ const Pigeon = ({ data }: { data: PigeonData }) => {
           <p className={'pigeon__result pigeon__result--' + (data.resultKind || 'sent')}>{data.result}</p>
         )}
 
-        {view === 'letters'
+        {shown === 'letters'
           ? (
           <div className="pigeon__body">
             <div className="pigeon__contacts">
@@ -316,11 +319,11 @@ const Pigeon = ({ data }: { data: PigeonData }) => {
             </div>
           </div>
             )
-          : view === 'courier' && data.courier
+          : shown === 'courier' && data.courier
             ? (
           <Courier c={data.courier} nonce={data.nonce} gold={data.gold} contacts={contacts} busy={busy} act={act} />
               )
-            : view === 'send'
+            : shown === 'send'
               ? (
         <div className="pigeon__body">
           <div className="pigeon__contacts">
@@ -470,9 +473,9 @@ const Pigeon = ({ data }: { data: PigeonData }) => {
                 : null}
 
         <div className="pigeon__footer">
-          <span className="pigeon__hint">{view === 'letters' ? (waitingCount ? waitingCount + ' letter' + (waitingCount === 1 ? '' : 's') + ' waiting.' : 'All letters read.') : view === 'supply' ? supplyHint : view === 'courier' ? CourierHint(data.courier) : hint}</span>
+          <span className="pigeon__hint">{shown === 'letters' ? (waitingCount ? waitingCount + ' letter' + (waitingCount === 1 ? '' : 's') + ' waiting.' : 'All letters read.') : shown === 'supply' ? supplyHint : shown === 'courier' ? CourierHint(data.courier) : hint}</span>
           <div className="pigeon__actions">
-            {view === 'send' && <button className="pigeon__button pigeon__button--primary" disabled={!canSend} onClick={submit}>{sendLabel}</button>}
+            {shown === 'send' && <button className="pigeon__button pigeon__button--primary" disabled={!canSend} onClick={submit}>{sendLabel}</button>}
             <button className="pigeon__button" onClick={() => send('dbo:pigeonClose', data.nonce)}>Close</button>
           </div>
         </div>
