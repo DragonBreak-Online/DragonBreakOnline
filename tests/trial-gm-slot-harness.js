@@ -93,6 +93,100 @@ sys.roleCfg = { tierRoles: { senior: [], developer: [], leadgm: [], gm: [role('g
 sys.authCache.set(1, users[1]);
 ok('without the settings key the Trial role gives no slot', sys.slotsFor(1) === 1 && sys.staffSlotOf(users[1]) === -1);
 
+// The staff slot is anchored (claude-jake's review of 5fe6a458, 12 Oct; cases A1-A4 of its probe): the staff slot holds
+// the staff character alone and the staff character follows it when the player slots grow or shrink. A spawn.ts without
+// the anchor (slotMap has no staffSlot parameter) skips these.
+if (!/staffSlot/.test(String(Spawn.prototype.slotMap))) {
+  require('./expect')('trial-gm-slot-anchor', 'this spawn.ts has no staff-slot anchor');
+  console.log('ok   skipped: this spawn.ts has no staff-slot anchor');
+} else {
+  const ROLES_PROFILE = globalThis.__alduinakRolesProfile;
+  let EARNED = 0;
+  const world = (maxChars) => {
+    const s = new Spawn(() => {});
+    s.maxCharacters = maxChars;
+    s.roleCfg = { tierRoles: { senior: [], developer: [], leadgm: [], gm: [role('gm')] }, trialRoles: [TRIAL], adminRoleIds: [], adminProfileIds: [] };
+    const pr = new Map();
+    let nx = 0xff000100;
+    const byP = new Map();
+    const sent = [];
+    const m = {
+      get: (id, k) => pr.get(`${id}|${k}`), set: (id, k, v) => pr.set(`${id}|${k}`, v),
+      createActor: (b, p, a, c, profileId) => { const id = nx++; if (!byP.has(profileId)) byP.set(profileId, []); byP.get(profileId).push(id); return id; },
+      getActorsByProfileId: (p) => (byP.get(p) || []).slice(),
+      destroyActor: (id) => { for (const l of byP.values()) { const i = l.indexOf(id); if (i >= 0) l.splice(i, 1); } },
+      setEnabled: () => {}, setUserActor: () => {}, getUserActor: () => 0, getUserByActor: () => -1, setRaceMenuOpen: () => {},
+      sendCustomPacket: (u, x) => sent.push(JSON.parse(x)), getActorName: (id) => `C${id - 0xff000100}`, lookupEspmRecordById: () => null,
+      findFormsByPropertyValue: () => [],
+    };
+    const c = { svr: m, gm: { emit: () => {} } };
+    s.settingsObject = { startPoints: [{ pos: [0, 0, 0], angleZ: 0, worldOrCell: '0x3c' }], allSettings: {} };
+    s.startingItems = [];
+    const login = (u, auth) => { s.authCache.set(u, auth); s.pending.set(u, auth); };
+    const make = (u, slot) => { const a = s.authCache.get(u); s.pending.set(u, a); s.onSelectCharacter(c, u, slot); return (byP.get(a.profileId) || []).slice(-1)[0]; };
+    const cards = (u) => { sent.length = 0; s.sendCharacterList(c, u, s.authCache.get(u).profileId); const l = sent.filter((x) => x.customPacketType === 'characterSelectMenu').slice(-1)[0]; return l.characters.map((x) => x ? `${x.name}${/GM character/.test(x.info) ? '*' : ''}` : null); };
+    const name = (a) => `C${a - 0xff000100}`;
+    const staffCount = (p) => (byP.get(p) || []).filter((a) => pr.get(`${a}|private.dboStaffChar`) === true).length;
+    return { pr, byP, login, make, cards, name, staffCount };
+  };
+  {
+    const w = world(3);
+    w.login(1, { profileId: 11, roles: [TRIAL] });
+    w.make(1, 0);
+    const staff = w.make(1, 3);
+    w.login(1, { profileId: 11, roles: [] });
+    w.cards(1);
+    ok('A1 role lost: the staff character is kept', w.byP.get(11).includes(staff), w.byP.get(11));
+    w.login(1, { profileId: 11, roles: [TRIAL] });
+    const back = w.cards(1);
+    ok('A1 role back: the staff character is in the staff slot again', back[3] === `${w.name(staff)}*`, back);
+    ok('A1 role back: slot 1 is an empty player slot again', back[1] === null, back);
+    ok('A1 role back: still one staff character', w.staffCount(11) === 1, w.staffCount(11));
+  }
+  {
+    const w = world(1);
+    w.login(1, { profileId: 11, roles: [TRIAL] });
+    w.make(1, 0);
+    const staff = w.make(1, 1);
+    w.login(1, { profileId: 11, roles: [TRIAL, role('traveler')] });
+    const v = w.cards(1);
+    ok('A2 tier added: the staff character sits in the new staff slot (2)', v[2] === `${w.name(staff)}*` && w.pr.get(`${staff}|private.charSlot`) === 2, v);
+    const plain = w.make(1, 1);
+    ok('A2 tier added: a character made in slot 1 (the new player slot) is a player character', w.pr.get(`${plain}|private.dboStaffChar`) !== true, w.cards(1));
+    ok('A2 one staff character', w.staffCount(11) === 1, w.staffCount(11));
+  }
+  {
+    const w = world(1);
+    w.login(1, { profileId: 11, roles: [TRIAL, role('traveler')] });
+    w.make(1, 0);
+    const plain = w.make(1, 1);
+    const staff = w.make(1, 2);
+    w.login(1, { profileId: 11, roles: [TRIAL] });
+    const v = w.cards(1);
+    ok('A3 tier lapsed: the staff slot (1) holds the staff character', v[1] === `${w.name(staff)}*`, v);
+    ok('A3 tier lapsed: the lapsed slot\'s player character is hidden, not deleted', !v.includes(w.name(plain)) && w.byP.get(11).includes(plain), v);
+    w.login(1, { profileId: 11, roles: [TRIAL, role('traveler')] });
+    const back = w.cards(1);
+    ok('A3 tier back: all three characters shown again, the staff one last', back.filter(Boolean).length === 3 && back[2] === `${w.name(staff)}*`, back);
+  }
+  {
+    globalThis.__dboEarnedSlots = () => EARNED;
+    EARNED = 0;
+    const w = world(3);
+    const roles = [TRIAL];
+    if (ROLES_PROFILE instanceof WeakMap) ROLES_PROFILE.set(roles, 44);
+    w.login(1, { profileId: 44, roles });
+    w.make(1, 0);
+    const staff = w.make(1, 3);
+    EARNED = 1;
+    const v = w.cards(1);
+    ok('A4 earned slot: the staff character moves to slot 4 with the staff slot', v[4] === `${w.name(staff)}*`, v);
+    const c = w.make(1, 3);
+    ok('A4 earned slot: the character made in the earned slot (3) is a player character', w.pr.get(`${c}|private.dboStaffChar`) !== true, w.cards(1));
+    delete globalThis.__dboEarnedSlots;
+  }
+}
+
 process.chdir(cwd);
 fs.rmSync(tmp, { recursive: true, force: true });
 console.log('');
