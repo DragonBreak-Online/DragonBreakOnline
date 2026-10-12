@@ -1352,6 +1352,8 @@ mp.onActivate = (targetId, casterId) => {
   if (globalThis.__dboGuildWorkshop && globalThis.__dboGuildWorkshop(target, caster)) return false;
   if (globalThis.__dboReadBook && globalThis.__dboReadBook(target, caster)) return false;
   if (globalThis.__dboLabour && globalThis.__dboLabour(targetId >>> 0, casterId >>> 0)) return false;
+  // The chopping block (execution.js): false refuses the seat, anything else lets the engine seat the player
+  if (globalThis.__dboExecutionActivate && globalThis.__dboExecutionActivate(targetId >>> 0, casterId >>> 0) === false) return false;
   if (globalThis.__dboPrayerActivate && globalThis.__dboPrayerActivate(targetId >>> 0, casterId >>> 0)) return false;
   if (globalThis.__dboJailActivate && globalThis.__dboJailActivate(targetId >>> 0, casterId >>> 0)) return false;
   if (globalThis.__dboRestActivate && globalThis.__dboRestActivate(targetId >>> 0, casterId >>> 0)) return false;
@@ -6947,6 +6949,13 @@ try {
   delete require.cache[MAPPROGRESS_JS];
   require(MAPPROGRESS_JS)({ mp, log, sendPacket, cfg });
 } catch (e) { log('mapprogress.js failed to load:', e.stack || e.message); globalThis.__dboMapSync = null; globalThis.__dboMapMarkersOf = null; }
+// ---- execution at the chopping block, a GM-approved PK (server\execution.js, config "execution"; Nate, 12 Oct) ----
+try {
+  const EXECUTION_JS = path.resolve('execution.js');
+  delete require.cache[EXECUTION_JS];
+  require(EXECUTION_JS)({ mp, log, personal, audit, who, display, cfg, isAdmin, isPlayer: (a) => profileOf(a) >= 0, sendPacket, openWidget, closeWidget,
+    onUi, onlineActors, distanceMeters, every, staffLog });
+} catch (e) { log('execution.js failed to load:', e.stack || e.message); globalThis.__dboExecutionActivate = null; }
 // ---- the Dawnguard War Axe SPR taken back, its smith refunded (server\sprstrip.js, config "sprStrip"; Nate, 11 Oct) ----------
 try {
   const SPRSTRIP_JS = path.resolve('sprstrip.js');
