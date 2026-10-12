@@ -11,7 +11,9 @@ const { hostOf, errorText } = require('./download')
 // Each attempt downloads the installer to a file of its own. One fixed name failed a player on 2.1.45 (11 Oct, "Update
 // failed: EPERM: operation not permitted, rename ...\Temp\..."): a copy an earlier attempt left there can still be held
 // open by an antivirus scan or an installer that is still running, and Windows refuses to replace a file held open
-const INSTALLER_RE = /^DragonBreakLauncher-update(?:-[\w.-]+)?\.exe$/i
+// The partial download (<installer>.part, about 100 MB) goes too: with a new name per attempt, a cut or refused one
+// is never resumed, and nothing else clears it from the temp folder
+const INSTALLER_RE = /^DragonBreakLauncher-update(?:-[\w.-]+)?\.exe(?:\.part)?$/i
 function installerPath(dir, version, now = Date.now()) {
   const v = String(version || 'next').replace(/[^\w.]/g, '_').slice(0, 32)
   return path.join(dir, `DragonBreakLauncher-update-${v}-${now}.exe`)

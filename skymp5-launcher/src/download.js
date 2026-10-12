@@ -128,9 +128,31 @@ async function download(url, dest, opts = {}) {
       if (++cuts > o.retries) throw new Error('Download interrupted')
       continue
     }
-    try { fs.rmSync(dest, { force: true }) } catch {}
-    fs.renameSync(part, dest)
+    await moveIntoPlace(part, dest, o)
     return dest
+  }
+}
+
+// Windows refuses a rename while another program holds either file without sharing it: an antivirus scanning the
+// installer or zip the moment it is written, an indexer, a backup tool. Those holds last seconds, so a refused move is
+// tried again for about 8 s before the error goes through (graceful-fs does the same on Windows). 11 Oct, mod-0137:
+// "Update failed: EPERM: operation not permitted, rename 'C:\Users\...\AppData\Local\Temp\...'" on every try.
+const MOVE_RETRY_CODES = new Set(['EPERM', 'EACCES', 'EBUSY'])
+const MOVE_TRIES = 7
+async function moveIntoPlace(part, dest, o) {
+  for (let tried = 1; ; tried++) {
+    try { fs.rmSync(dest, { force: true }) } catch {}
+    try {
+      fs.renameSync(part, dest)
+      return
+    } catch (err) {
+      if (!MOVE_RETRY_CODES.has(err && err.code) || tried >= MOVE_TRIES) throw err
+      if (o.signal && o.signal.aborted) throw err
+      const backoff = Math.min(2000, 250 * 2 ** (tried - 1))
+      // The code only: the error's message names both paths, and so the Windows user name
+      o.note(`moving the finished download into place was refused (${err.code}); try ${tried + 1} of ${MOVE_TRIES} in ${backoff / 1000} s`)
+      await o.wait(backoff)
+    }
   }
 }
 
