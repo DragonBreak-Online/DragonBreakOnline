@@ -82,7 +82,7 @@
     &:disabled { opacity: 0.4; cursor: default; }
   }
 
-  &__desc { color: $dbo-text-dim; font-size: 13px; line-height: 1.4; }
+  &__desc { min-width: 0; overflow-wrap: anywhere; color: $dbo-text-dim; font-size: 13px; line-height: 1.4; }
 
   &__ask {
     display: flex;
@@ -97,6 +97,7 @@
   &__field { display: flex; flex-direction: column; gap: 4px; }
 
   &__label {
+    overflow-wrap: anywhere;
     color: $dbo-text-dim;
     font-size: 12px;
     letter-spacing: 0.08em;
@@ -129,6 +130,55 @@
   &__hint { color: $dbo-text-dim; font-size: 13px; line-height: 1.4; }
 
   &__empty { font-size: 13px; color: $dbo-text-dim; }
+
+  &__search { width: 100%; box-sizing: border-box; }
+
+  &__heading {
+    margin: 8px 0 0;
+    color: $dbo-gold;
+    font-size: 12px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  &__tag {
+    margin-right: 6px;
+    padding: 1px 6px;
+    border: 1px solid $dbo-border;
+    border-radius: 3px;
+    font-size: 11px;
+    letter-spacing: 0.05em;
+  }
+
+  &__chips { display: flex; flex-wrap: wrap; gap: 6px; }
+
+  &__chip {
+    @include dbo-button;
+    padding: 4px 10px;
+    font-size: 13px;
+    opacity: 0.75;
+
+    &--on { opacity: 1; border-color: $dbo-border-strong; }
+  }
+
+  &__more {
+    @include dbo-button;
+    flex: none;
+    width: 28px;
+    padding: 4px 0;
+    font-size: 14px;
+  }
+
+  &__runRow { display: flex; align-items: center; gap: 10px; }
+
+  &__preview {
+    flex: 1;
+    min-width: 0;
+    overflow-wrap: anywhere;
+    color: $dbo-text;
+    font-family: monospace;
+    font-size: 13px;
+  }
 
   &__foot {
     display: flex;
