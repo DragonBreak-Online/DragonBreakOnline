@@ -14,6 +14,7 @@ const fs     = require('fs')
 const { rateLimit, ipKeyGenerator } = require('express-rate-limit')
 const config = require('../config')
 const problemReport = require('../sources/problemReport')
+const reportAttachment = require('../sources/reportAttachment')
 const bugLogs = require('../sources/bugLogs')
 const sessionEnds = require('../sources/sessionEnds')
 const autoReport = require('../sources/autoReport')
@@ -146,6 +147,30 @@ router.post('/report', identifyReporter, reportLimiter, anonymousCeiling, proble
   }
   return problemReport.respond(res, req.reporter, { ...body, source: body.source === 'game' ? 'game' : 'launcher' })
 })
+
+// POST /api/files/report-attachment - launcher 2.1.46: after a crash at login, the spawn save the game was loading, sent
+// once its report is filed (sources/reportAttachment.js). Headers first: a signed-in sender within their limit, then the
+// body of up to 2 MB (a save packs to at most 1400 KiB, base64 in JSON)
+const attachmentLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  limit: 12,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: req => `p:${req.reporter.profileId}`,
+  message: { error: 'Too many attachments from this launcher.' },
+})
+router.post('/report-attachment', identifyReporter,
+  (req, res, next) => (req.reporter.verified ? next() : res.status(401).json({ error: 'sign in first' })),
+  attachmentLimiter, problemReport.parseReport, async (req, res) => {
+    try {
+      const body = req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? req.body : {}
+      const result = await reportAttachment.attach(req.reporter, body)
+      res.status(result.status).json(result.json)
+    } catch (err) {
+      console.error('[report-attachment] unexpected error:', err.message)
+      res.status(500).json({ error: 'Could not attach the save.' })
+    }
+  })
 // POST /api/files/session-end - the launcher says how the game closed: crashed, closed normally, or ended some other way
 // (sources/sessionEnds.js). Only a signed-in player's launcher is heard: a crash note names someone in #server-monitor.
 const sessionEndLimiter = rateLimit({
@@ -171,3 +196,6 @@ router.post('/session-end', identifyReporter, (req, res, next) => (req.reporter.
 router.use(problemReport.bodyErrors)
 
 module.exports = router
+// The routes here that parse their own body after the sender checks, as mounted by server.js: it leaves them out of its
+// global JSON parser, whose 100 kB limit would refuse a report or a spawn save with a 413 before the route ran
+module.exports.OWN_PARSER_PATHS = ['/api/files/report', '/api/files/report-attachment']

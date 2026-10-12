@@ -10,10 +10,12 @@ const config = require('../../config')
 const REQUEST_TIMEOUT_MS = 15 * 1000
 // Everything one report does with Discord, retries included, ends inside this, under the launcher's 30 s wait
 const REPORT_DEADLINE_MS = 25 * 1000
+// A report's attachment (a spawn save, up to 8 MiB) goes up the home uplink in one request, inside the launcher's 60 s wait
+const ATTACHMENT_DEADLINE_MS = 45 * 1000
 
-function request(method, path, { json, multipart, deadline } = {}) {
+function request(method, path, { json, multipart, deadline, timeout = REQUEST_TIMEOUT_MS } = {}) {
   return new Promise((resolve, reject) => {
-    const allowed = Math.min(REQUEST_TIMEOUT_MS, deadline ? deadline - Date.now() : REQUEST_TIMEOUT_MS)
+    const allowed = Math.min(timeout, deadline ? deadline - Date.now() : timeout)
     if (allowed <= 0) return reject(new Error(`discord ${method} ${path} skipped: report deadline passed`))
     let body
     const headers = { Authorization: `Bot ${config.discordBotToken}` }
@@ -178,4 +180,18 @@ async function postBugLogs({ snapshotFile, title, summary, files = [], tags = []
   return thread
 }
 
-module.exports = { postReport, postBugLogs, tagIds }
+// One message with files in a thread a report already opened (its attachment). Returns the message id.
+async function postToThread({ thread, content, files = [] }) {
+  if (!config.discordBotToken) throw new Error('no bot token')
+  if (!/^\d{5,25}$/.test(String(thread))) throw new Error('not a thread id')
+  const payload = {
+    content: String(content || '').slice(0, 1900),
+    allowed_mentions: { parse: [] },
+    attachments: files.map((f, i) => ({ id: i, filename: f.name })),
+  }
+  const message = await request('POST', `/channels/${thread}/messages`, { multipart: buildMultipart(payload, files),
+    deadline: Date.now() + ATTACHMENT_DEADLINE_MS, timeout: ATTACHMENT_DEADLINE_MS })
+  return message && message.id
+}
+
+module.exports = { postReport, postBugLogs, postToThread, tagIds }

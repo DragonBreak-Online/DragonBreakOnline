@@ -37,6 +37,7 @@ const MAX_IMAGE_BASE64 = Math.ceil(MAX_IMAGE_BYTES / 3) * 4 + 8
 const NOTE_CHARS = 600
 const DEDUPE_MS = 60 * 60 * 1000
 const seenReports = new Map()
+const REPORT_ID = /^[A-Za-z0-9-]{8,64}$/
 
 // Compressed bodies are refused: inflating one would let a 2 kB request cost a 2 MB parse
 const parseReport = express.json({ limit: '2mb', inflate: false })
@@ -62,6 +63,9 @@ function cleanName(value, max = 64) {
 const escapeMarkdown = s => s.replace(/[\\*_~`|<>#[\]():]/g, '\\$&')
 
 // Keyed per sender, so one sender can never mark another sender's report as a duplicate
+const senderKey = reporter => (reporter.discordId ? `d:${reporter.discordId}`
+  : reporter.profileId != null ? `p:${reporter.profileId}` : 'anon')
+
 function seenReport(key) {
   const now = Date.now()
   for (const [id, entry] of seenReports) if (entry.state === 'done' && now - entry.at > DEDUPE_MS) seenReports.delete(id)
@@ -113,10 +117,9 @@ async function submit(reporter, body) {
   const note = text(body.note).trim().slice(0, NOTE_CHARS)
   if (!files.length && !note) return { status: 400, json: { error: 'The report has no logs, screenshot or description.' } }
 
-  const reportId = typeof body.reportId === 'string' && /^[A-Za-z0-9-]{8,64}$/.test(body.reportId)
+  const reportId = typeof body.reportId === 'string' && REPORT_ID.test(body.reportId)
     ? body.reportId : crypto.randomUUID()
-  const who = reporter.discordId ? `d:${reporter.discordId}` : reporter.profileId != null ? `p:${reporter.profileId}` : 'anon'
-  const dedupeKey = `${who}:${reportId}`
+  const dedupeKey = `${senderKey(reporter)}:${reportId}`
   const seen = seenReport(dedupeKey)
   if (seen && seen.state === 'done') return { status: 200, json: { ok: true, reportId, duplicate: true } }
   // A copy sent while the first is still posting gets the first one's real outcome, not a hopeful answer
@@ -158,6 +161,8 @@ async function submit(reporter, body) {
       if (bugId) bugLogs.markSent(bugId, thread)
       entry.state = 'done'
       entry.at = Date.now()
+      // Where the report's attachment goes (claimAttachment)
+      entry.thread = thread || null
       audit.log(`REPORT problem ${SOURCES[source]} from ${name}`
                 + `${reporter.discordId ? ` (discord ${reporter.discordId})` : ''}`
                 + `${reporter.profileId != null ? ` (profile ${reporter.profileId})` : ''}${thread ? ` -> thread ${thread}` : ''}`)
@@ -183,6 +188,21 @@ async function respond(res, reporter, body) {
   }
 }
 
+// A report's one attachment (sources/reportAttachment.js): only a signed-in sender, only a report that same sender filed
+// within the hour it is remembered, and once. Returns { thread, done, release }, or the HTTP reply to send instead.
+async function claimAttachment(reporter, reportId) {
+  if (!reporter || !reporter.verified) return { status: 401, json: { error: 'sign in first' } }
+  if (typeof reportId !== 'string' || !REPORT_ID.test(reportId)) return { status: 400, json: { error: 'The report id is not valid.' } }
+  const entry = seenReport(`${senderKey(reporter)}:${reportId}`)
+  // Still posting: its outcome decides
+  if (entry && entry.state !== 'done') await entry.promise
+  if (!entry || entry.state !== 'done') return { status: 410, json: { error: 'No report of yours with that id is waiting for an attachment.' } }
+  if (!entry.thread) return { status: 503, json: { error: 'That report has no thread to attach to.' } }
+  if (entry.attachment) return { status: 409, json: { error: 'That report already has its attachment.' } }
+  entry.attachment = 'pending'
+  return { thread: entry.thread, done: () => { entry.attachment = 'done' }, release: () => { entry.attachment = null } }
+}
+
 // The parser on every path but those whose own route parses the body after its checks; paths match as Express decodes them
 function parserExcept(paths, parser) {
   const own = new Set(paths)
@@ -203,4 +223,5 @@ function bodyErrors(err, _req, res, next) {
   res.status(status).json({ error })
 }
 
-module.exports = { submit, respond, bodyErrors, parserExcept, parseReport, cleanName, escapeMarkdown, MAX_IMAGE_BYTES, UNSAFE_CHARS }
+module.exports = { submit, respond, claimAttachment, bodyErrors, parserExcept, parseReport, cleanName, escapeMarkdown, MAX_IMAGE_BYTES,
+  UNSAFE_CHARS }

@@ -69,7 +69,7 @@ const globalJson = express.json({
   verify: (req, _res, buf) => { req.rawBody = buf },
 })
 // Problem reports and the server controls are parsed by their own routes, only after the sender checks and rate limits
-const OWN_PARSER_PATHS = ['/api/files/report', '/api/site/report',
+const OWN_PARSER_PATHS = [...filesRoute.OWN_PARSER_PATHS, '/api/site/report',
   ...require('./sources/serverControl').ACTIONS.map(a => `/api/site/staff/server/actions/${a}`)]
 app.use(require('./sources/problemReport').parserExcept(OWN_PARSER_PATHS, globalJson))
 

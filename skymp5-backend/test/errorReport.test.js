@@ -38,7 +38,7 @@ https.request = (opts, onResponse) => {
   }
   return req
 }
-const { postReport, postBugLogs, tagIds } = require('../sources/discord/errorReport')
+const { postReport, postBugLogs, postToThread, tagIds } = require('../sources/discord/errorReport')
 
 const report = tags => postReport({ title: 'Tester', summary: 'hi', files: [{ name: 'launcher.log', text: 'x' }], tags })
 test.beforeEach(() => { answers = []; sent = []; fs.rmSync(tagsFile, { force: true }) })
@@ -182,3 +182,17 @@ test('a /bug whose thread is not found gets a report thread of its own', async (
   assert.strictEqual(sent[2].payload.name, 'Purr: logs for /bug')
 })
 
+// A report's attachment (sources/reportAttachment.js): one message in the report's own thread, nobody pinged
+test('a report attachment is one message with the file in the report\'s thread', async () => {
+  answers = [[200, { id: 'M1' }]]
+  const save = Buffer.concat([Buffer.from('TESV_SAVEGAME'), Buffer.alloc(32)])
+  const message = await postToThread({ thread: id(9), content: 'Spawn save', files: [{ name: 'x.ess', data: save, type: 'application/octet-stream' }] })
+  assert.strictEqual(message, 'M1')
+  assert.strictEqual(sent.length, 1)
+  assert.strictEqual(sent[0].method, 'POST')
+  assert.strictEqual(sent[0].path, `/api/v10/channels/${id(9)}/messages`)
+  assert.deepStrictEqual(sent[0].payload.attachments, [{ id: 0, filename: 'x.ess' }])
+  assert.deepStrictEqual(sent[0].payload.allowed_mentions, { parse: [] })
+  await assert.rejects(postToThread({ thread: '../guilds/1', content: 'x', files: [] }), /not a thread id/)
+  assert.strictEqual(sent.length, 1)
+})
