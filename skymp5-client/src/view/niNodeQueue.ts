@@ -1,6 +1,7 @@
 import { Actor, Game, on, printConsole } from "skyrimPlatform";
 import { NiNodeQueuePlan } from "./niNodeQueuePlan";
 import { isBeastRaceId } from "../sync/beastRaceIds";
+import * as faceSync from "./faceSyncDiag";
 
 // Every NiNode (3D) update goes through here; see niNodeQueuePlan.ts for why and the rules
 const plan = new NiNodeQueuePlan();
@@ -39,7 +40,7 @@ const runWork = (work: NiNodeWork, actor: Actor): boolean => {
 const flush = (): void => {
   const id = plan.next(frame, (formId) => {
     const state = loadedNow(formId);
-    if (state === null) { copyWork.delete(formId); plainWanted.delete(formId); }
+    if (state === null) { copyWork.delete(formId); plainWanted.delete(formId); faceSync.dropped(formId, actorOf(formId) ? "beast" : "gone"); }
     return state;
   });
   if (!id) return;
@@ -50,7 +51,9 @@ const flush = (): void => {
   plainWanted.delete(id);
   if (!actor) return;
   const queued = work ? runWork(work, actor) : false;
+  if (work) faceSync.preset(id, queued ? "loadedInSlot" : "refusedInSlot");
   if (!queued && plain) actor.queueNiNodeUpdate();
+  faceSync.sent(id, Date.now());
 };
 
 const sendPlayer = (): void => {
