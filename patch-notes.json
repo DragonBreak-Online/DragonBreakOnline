@@ -1,7 +1,7 @@
 [
   {
     "title": "Couriers",
-    "date": "SHIP_DATE",
+    "date": "2026-10-12",
     "version": "Server update",
     "tag": "New",
     "sections": [
@@ -13,6 +13,35 @@
           "Anyone can take a courier job at the board where it was posted. You carry one Sealed Courier's Parcel, which cannot be dropped, stored or traded until it is delivered. Deliver it within three days of game time to be paid; if time runs out, the parcel goes back and the goods return to the sender.",
           "Bandits beware, and couriers too: robbing a courier may take their parcel. The robber gets a Broken Courier's Parcel to open at a notice board, and the courier is not paid.",
           "Senders can insure a parcel for up to the goods' value, for 10% of that value. If it is robbed, the hold's treasury pays the sender, as far as the treasury allows. Insurance does not pay out when the robber is the sender, the courier or the recipient, or shares a party or faction with the sender or the courier, and a sender can claim at most twice a week."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "World and weapon fixes",
+    "date": "2026-10-12",
+    "version": "Plugin update",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Weapons",
+        "items": [
+          "The Stormcloak Sword, War Axe, Bearded Axe, Greatsword and Battleaxe now have the same base damage as the other factions' weapons (12, 13, 13, 21 and 22).",
+          "The Dawnguard War Axe SPR and the Enhanced Crossbow SPR no longer deal many times the damage they should: they now have 13 and 19."
+        ]
+      },
+      {
+        "heading": "Great House cloaks",
+        "items": [
+          "The Rhino Beetle Cloak, the Bonesaint Cloak and the Redoran Watchman Cloak can no longer be made at the Loom or the forge. They looked the same as the Great Houses' own cloaks, which stay faction gear."
+        ]
+      },
+      {
+        "heading": "The world",
+        "items": [
+          "The Cathedral of St. Martin in Bruma now has a Scholars' Ledger.",
+          "Frost-Iron Mine near Mountain Watch and Bleak-Frost Mine behind Bruma each have their own entrance again: their doors no longer lead into the wrong mine.",
+          "The Bandit Ringleader who kept appearing in Silorn but could not be hurt is gone."
         ]
       }
     ]
