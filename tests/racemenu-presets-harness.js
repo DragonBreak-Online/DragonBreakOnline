@@ -507,6 +507,36 @@ const upload = (userId, t, up, size) => {
   await settle(); pumpAll();
   check('a recipient who left gets nothing and the queue is dropped', take().length === 0 && M.state.queues.size === 0);
 
+  // Upload gap (12 Oct, claude-jake): every finished upload leaves one log line. An empty face with none stored and an
+  // unchanged face were dropped without one, so the live log could not tell a client that sent an empty face from one that
+  // sent nothing (Elaava #Z63J 06:14:56, Foratus #553K 08:11:16: /appearance closes with no 'racemenu presets' line)
+  const C3 = 0xff000c03;
+  users[3] = C3; props[C3] = { profileId: 77, appearance: { raceId: 0x13742, headpartIds: [0x5161c] } };
+  online = [A, B, C3];
+  M = load();
+  take();
+  globalThis.__dboRaceMenuSaveWindows = new Map([[C3, { at: Date.now(), until: Date.now() + 90000, kind: 'appearance', charge: true, headswap: true }]]);
+  const gapLines = () => logs.filter((l) => /^racemenu presets: ff000c03 /.test(l));
+  packet(3, { customPacketType: 'dboPresetPut', up: 1, i: 0, n: 0, hash: '', race: 1, data: '' });
+  await settle();
+  check('upload gap: an empty face with none stored is logged, with the editor window it came from',
+    gapLines().length === 1 && /^racemenu presets: ff000c03 \(profile 77\) empty face \(no RaceMenu slider or sculpt\), none stored: nothing to save \(appearance window, priced, head swapped\)$/.test(gapLines()[0]), gapLines());
+  check('upload gap: ...and nothing is written, refused or sent for it', !fs.existsSync(fileOf(C3)) && take().length === 0);
+  const c3face = Object.assign({}, face, { custom: [{ name: 'EFM_Ears', value: 0.5 }], sculpt: [], sculptDivisor: 10000 });
+  const c3text = P.encodeFace(c3face);
+  upload(3, c3text, 2);
+  await settle();
+  check('upload gap: a first face from that window is saved as before (one face saved line)', fs.existsSync(fileOf(C3)) && gapLines().length === 2 && /face saved/.test(gapLines()[1]), gapLines());
+  M.state.selfSent.set(C3, { at: 0, conn: 0 });
+  upload(3, c3text, 3);
+  await settle();
+  check('upload gap: the same face again is logged as unchanged, nothing written', gapLines().length === 3 && /^racemenu presets: ff000c03 \(profile 77\) face unchanged \([0-9a-f]{8}\), nothing written \(appearance window, priced, head swapped\)$/.test(gapLines()[2]), gapLines());
+  for (let k = 0; k < 6; k++) packet(3, { customPacketType: 'dboPresetPut', up: 'x', i: 0, n: 1, hash: 'zz', data: 'a' });
+  const dropped = gapLines().filter((l) => /upload chunk dropped: bad header \(up "x", n 1, 1 chars\)$/.test(l));
+  check('upload gap: a malformed chunk is logged, at most 3 lines a minute per character', dropped.length === 3, gapLines().slice(3));
+  globalThis.__dboRaceMenuSaveWindows = new Map();
+  online = [B];
+
   fs.rmSync(TMP, { recursive: true, force: true });
   console.log(failures ? `${failures} FAILED` : 'all passed');
   process.exit(failures ? 1 : 0);
