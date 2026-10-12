@@ -1,4 +1,4 @@
-// Scripted test for the client diagnostics (client 0.3.91, shipped as 0.3.94): lib/clientDiag.ts (the trace gate, the error digest, path
+// Scripted test for the client diagnostics (client 0.3.91, shipped as 0.3.95): lib/clientDiag.ts (the trace gate, the error digest, path
 // scrubbing, stack frames), services/services/clientDiagService.ts (the dboDiag queue, the process hook) and the controller's
 // on/once error reporting in services/spApiInteractor.ts. Nothing may throw, errors are deduplicated with counts and sent
 // at most 10 lines a minute, trace lines are rate-limited and size-capped. Run from skymp5-client:
@@ -192,7 +192,7 @@ const bundle = async (rel, dir, plugins) => {
   NOW += 1000; tick();
   check('the rest next second, with the client line (version and platform)', H.packets.length === 2
     && H.packets[1].lines.some((l) => l === `apr client v=${D.DBO_CLIENT_VERSION} sp=2.9.0`), H.packets[1]);
-  check('the client version in every apr client and cerr line is the package version, 0.3.94', D.DBO_CLIENT_VERSION === '0.3.94', D.DBO_CLIENT_VERSION);
+  check('the client version in every apr client and cerr line is the package version, 0.3.95', D.DBO_CLIENT_VERSION === '0.3.95', D.DBO_CLIENT_VERSION);
   H.packets = [];
   const e1 = new RangeError('bad index'); e1.stack = 'RangeError: bad index\n    at g (C:\\Users\\P\\skymp5-client.js:5:6)';
   globalThis.__dboReportError('on:update', e1);
