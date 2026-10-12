@@ -20,12 +20,12 @@ const path = require('path');
 
 const MAX_CUSTOM_MORPHS = 1024;
 const MAX_MORPH_NAME = 128;
-// RaceMenu's ranges (skee FaceMorphInterface.cpp): a slider runs -1..1 times fSliderMultiplier (1.0 unless skee64.ini
-// changes it) and is applied once per whole unit past 1; a preset slider is a whole number 0..its preset count
-const MAX_SLIDER = 1;
-const MAX_PRESET_INDEX = 32;
-const morphValueOk = (v) => typeof v === 'number' && Number.isFinite(v) && (Number.isInteger(v) ? v >= -MAX_SLIDER && v <= MAX_PRESET_INDEX : Math.abs(v) <= MAX_SLIDER);
-// A sculpt moves a vertex at most this many units (a head is about 20 across)
+// skee's ranges (FaceMorphInterface.cpp:963-968, 1318-1354): a preset index 0..255 is kept, any other value clamped to +-MAX_SLIDER
+const MAX_SLIDER = 10;
+const MAX_PRESET_INDEX = 255;
+// skee applies a slider once per whole unit of its value on every watcher (FaceMorphInterface.cpp:1156-1167): a face's limit
+const MAX_MORPH_REPEATS = 4096;
+// A sculpt moves a vertex at most this many units (a head is about 20 across); an offset past it is clamped
 const MAX_SCULPT_UNITS = 30;
 const MAX_SCULPT_HOSTS = 16;
 const MAX_VERTICES = 65535;
@@ -34,6 +34,11 @@ const MAX_SCULPT_DIVISOR = 1000000;
 const MAX_MOD_NAMES = 512;
 const MAX_MOD_NAME = 260;
 const MAX_TRI_PATH = 200;
+// The client's PRESET_MAX_CHARS: a face the rules give is never longer (the largest sculpted parts go first)
+const PRESET_MAX_CHARS = 1000000;
+// skee's PresetHeader (PresetInterface.cpp:300-305): "SKSE" byte-swapped, format 3; its loader needs both (:932-946)
+const SKEE_SIGNATURE = 0x45534b53;
+const SKEE_FORMAT_VERSION = 3;
 const HASH_RX = /^[0-9a-f]{8}$/;
 const KEY_RX = /^[0-9a-f]{8}$/;
 
@@ -41,8 +46,10 @@ const isObject = (x) => !!x && typeof x === 'object' && !Array.isArray(x);
 const isUint32 = (x) => typeof x === 'number' && Number.isInteger(x) && x >= 0 && x <= 0xffffffff;
 const isIntIn = (x, lo, hi) => typeof x === 'number' && Number.isInteger(x) && x >= lo && x <= hi;
 const isCleanString = (x, max) => typeof x === 'string' && x.length > 0 && x.length <= max && !/[\u0000-\u001f\u007f]/.test(x);
-// The platform's rule (fork skyrim-platform PresetFiles.cpp ValidateTriPath)
-const isTriPath = (x) => typeof x === 'string' && x.length > 0 && x.length <= MAX_TRI_PATH && /^[A-Za-z0-9_\-. \\/]+$/.test(x)
+// skee's names compare as _stricmp does (StringTable.h SKEEFixedString): ASCII letters only
+const asciiLower = (s) => s.replace(/[A-Z]/g, (c) => c.toLowerCase());
+// ValidateTriPath's rule (platform PresetFiles.cpp) plus the apostrophe of KS Hairdo's; the platform answers -1 there, so that sculpt is dropped
+const isTriPath = (x) => typeof x === 'string' && x.length > 0 && x.length <= MAX_TRI_PATH && /^[A-Za-z0-9_\-. \\/']+$/.test(x)
   && !/^[\\/ ]/.test(x) && x.indexOf('..') === -1 && /\.tri$/i.test(x);
 
 // FNV-1a over UTF-16 code units, 8 hex digits, as the client's hashText
@@ -52,44 +59,112 @@ const hashText = (text) => {
   return ('0000000' + h.toString(16)).slice(-8);
 };
 
-// The client's facePresetFrom over its own encoded form: null when any rule is broken
-const faceFrom = (raw) => {
+// The client's morphValueOf: a whole number 0..MAX_PRESET_INDEX as it is, else clamped; null for no finite number
+const morphValueOf = (v) => {
+  if (typeof v !== 'number' || !Number.isFinite(v)) return null;
+  if (Number.isInteger(v) && v >= 0 && v <= MAX_PRESET_INDEX) return v;
+  return Math.min(MAX_SLIDER, Math.max(-MAX_SLIDER, v));
+};
+
+// The client's encodedAtMost: an upper bound of encodeFace's length, so most faces skip the encode
+const encodedAtMost = (f) => {
+  let n = 400;
+  for (const m of f.modNames) n += m.length * 6 + 3;
+  for (const m of f.custom) n += m.name.length * 6 + 50;
+  for (const h of f.sculpt) n += h.host.length * 6 + 60 + h.data.length * 40;
+  return n;
+};
+
+// The client's facePresetFixed rule for rule, over its encoded form: { face, fixes }, each bad entry dropped or clamped, null if no object
+const faceFixed = (raw) => {
   if (!isObject(raw)) return null;
+  const fixes = [];
+  const fix = (code, first, n = 1) => { const f = fixes.find((x) => x.code === code); if (f) f.n += n; else fixes.push({ code, n, first: String(first()).slice(0, 120) }); };
   const v = raw.version;
-  if (!isObject(v) || !isUint32(v.signature) || !isUint32(v.formatVersion) || v.formatVersion < 1) return null;
-  const version = { signature: v.signature, formatVersion: v.formatVersion, skseVersion: isUint32(v.skseVersion) ? v.skseVersion : 0, runtimeVersion: isUint32(v.runtimeVersion) ? v.runtimeVersion : 0 };
+  let version = isObject(v) && isUint32(v.signature) && isUint32(v.formatVersion) && v.formatVersion >= 1
+    ? { signature: v.signature, formatVersion: v.formatVersion, skseVersion: isUint32(v.skseVersion) ? v.skseVersion : 0, runtimeVersion: isUint32(v.runtimeVersion) ? v.runtimeVersion : 0 }
+    : null;
+  if (!version) { fix('version', () => 'version'); version = { signature: SKEE_SIGNATURE, formatVersion: SKEE_FORMAT_VERSION, skseVersion: 0, runtimeVersion: 0 }; }
   const modNames = [];
   for (const n of Array.isArray(raw.modNames) ? raw.modNames : []) if (isCleanString(n, MAX_MOD_NAME) && modNames.length < MAX_MOD_NAMES && !modNames.includes(n)) modNames.push(n);
   if (!modNames.length) modNames.push('Skyrim.esm');
-  const customIn = raw.custom === undefined || raw.custom === null ? [] : raw.custom;
-  if (!Array.isArray(customIn) || customIn.length > MAX_CUSTOM_MORPHS) return null;
+  // Sliders: one value per name (any case), the last one set, as skee's ValueSet (FaceMorphInterface.cpp:450-457)
   const custom = [];
-  for (const m of customIn) {
-    if (!isObject(m) || !isCleanString(m.name, MAX_MORPH_NAME)) return null;
-    if (!morphValueOk(m.value)) return null;
-    if (m.value !== 0) custom.push({ name: m.name, value: m.value });
-  }
-  const sculptIn = raw.sculpt === undefined || raw.sculpt === null ? [] : raw.sculpt;
-  if (!Array.isArray(sculptIn) || sculptIn.length > MAX_SCULPT_HOSTS) return null;
-  const hasSculpt = sculptIn.some((h) => isObject(h) && Array.isArray(h.data) && h.data.length > 0);
-  if (hasSculpt && !isIntIn(raw.sculptDivisor, 1, MAX_SCULPT_DIVISOR)) return null;
-  const sculptDivisor = hasSculpt ? raw.sculptDivisor : 10000;
-  const maxOffset = Math.min(MAX_SCULPT_OFFSET, MAX_SCULPT_UNITS * sculptDivisor);
-  const sculpt = [];
-  for (const h of sculptIn) {
-    if (!isObject(h) || !isTriPath(h.host) || !isIntIn(h.vertices, 1, MAX_VERTICES)) return null;
-    const data = h.data === undefined || h.data === null ? [] : h.data;
-    if (!Array.isArray(data) || data.length > h.vertices) return null;
-    const out = [];
-    for (const e of data) {
-      if (!Array.isArray(e) || e.length !== 4 || !isIntIn(e[0], 0, h.vertices - 1)) return null;
-      for (let k = 1; k < 4; k++) if (!isIntIn(e[k], -maxOffset, maxOffset)) return null;
-      out.push([e[0], e[1], e[2], e[3]]);
+  const customIn = raw.custom;
+  if (customIn !== undefined && customIn !== null && !Array.isArray(customIn)) fix('custom-list', () => typeof customIn);
+  else if (Array.isArray(customIn)) {
+    const byName = new Map();
+    for (let i = 0; i < customIn.length; i++) {
+      const m = customIn[i];
+      if (!isObject(m) || !isCleanString(m.name, MAX_MORPH_NAME)) { fix('custom-name', () => `#${i}`); continue; }
+      const value = morphValueOf(m.value);
+      if (value === null) { fix('custom-value', () => `${m.name}=${String(m.value)}`); continue; }
+      if (value !== m.value) fix('custom-clamp', () => `${m.name}=${String(m.value)}`);
+      const key = asciiLower(m.name);
+      const had = byName.get(key);
+      if (had) { fix('custom-dup', () => m.name); had.value = value; } else byName.set(key, { name: m.name, value });
     }
-    if (out.length && !sculpt.some((o) => o.host.toLowerCase() === h.host.toLowerCase())) sculpt.push({ host: h.host, vertices: h.vertices, data: out });
+    let repeats = MAX_MORPH_REPEATS;
+    for (const m of byName.values()) {
+      if (m.value === 0) continue;
+      if (custom.length >= MAX_CUSTOM_MORPHS) { fix('custom-count', () => m.name); continue; }
+      const cost = Math.floor(Math.abs(m.value));
+      if (cost > repeats) { fix('custom-budget', () => `${m.name}=${m.value}`); continue; }
+      repeats -= cost;
+      custom.push({ name: m.name, value: m.value });
+    }
   }
-  return { version, modNames, custom, sculptDivisor: sculpt.length ? sculptDivisor : 10000, sculpt };
+  // Sculpt: a broken host or vertex is dropped, an offset clamped, a repeated vertex kept once with its last offsets (force_insert)
+  const sculptIn = raw.sculpt;
+  const hasSculpt = Array.isArray(sculptIn) && sculptIn.some((h) => isObject(h) && Array.isArray(h.data) && h.data.length > 0);
+  let sculpt = [];
+  if (hasSculpt && !isIntIn(raw.sculptDivisor, 1, MAX_SCULPT_DIVISOR)) fix('sculpt-divisor', () => String(raw.sculptDivisor));
+  else if (sculptIn !== undefined && sculptIn !== null && !Array.isArray(sculptIn)) fix('sculpt-list', () => typeof sculptIn);
+  else if (Array.isArray(sculptIn)) {
+    const maxOffset = Math.min(MAX_SCULPT_OFFSET, MAX_SCULPT_UNITS * (hasSculpt ? raw.sculptDivisor : 10000));
+    for (let i = 0; i < sculptIn.length; i++) {
+      const h = sculptIn[i];
+      if (!isObject(h) || !isTriPath(h.host)) { fix('sculpt-host', () => (isObject(h) ? String(h.host) : `#${i}`)); continue; }
+      const host = h.host;
+      const data = h.data === undefined || h.data === null ? [] : h.data;
+      if (!Array.isArray(data)) { fix('sculpt-data', () => host); continue; }
+      // Empty, or a second entry for a host already taken (any case): left out
+      if (!data.length || sculpt.some((o) => o.host.toLowerCase() === host.toLowerCase())) continue;
+      if (!isIntIn(h.vertices, 1, MAX_VERTICES)) { fix('sculpt-vertices', () => `${host} ${String(h.vertices)}`); continue; }
+      const vertices = h.vertices;
+      const byIndex = new Map();
+      let clamped = 0;
+      for (const e of data) {
+        if (!Array.isArray(e) || e.length !== 4 || !isIntIn(e[0], 0, vertices - 1)
+          || !Number.isInteger(e[1]) || !Number.isInteger(e[2]) || !Number.isInteger(e[3])) { fix('sculpt-vertex', () => host); continue; }
+        const out = [e[0]];
+        let c = false;
+        for (let k = 1; k < 4; k++) { const b = Math.min(maxOffset, Math.max(-maxOffset, e[k])); if (b !== e[k]) c = true; out.push(b); }
+        if (c) clamped++;
+        if (byIndex.has(out[0])) fix('sculpt-dupvertex', () => host);
+        byIndex.set(out[0], out);
+      }
+      if (clamped) fix('sculpt-offset', () => host, clamped);
+      if (!byIndex.size) continue;
+      if (sculpt.length >= MAX_SCULPT_HOSTS) { fix('sculpt-count', () => host); continue; }
+      sculpt.push({ host, vertices, data: Array.from(byIndex.values()) });
+    }
+  }
+  const face = { version, modNames, custom, sculptDivisor: sculpt.length ? raw.sculptDivisor : 10000, sculpt };
+  // Too long to send or keep: the largest sculpted parts go first, the sliders stay
+  while (face.sculpt.length && encodedAtMost(face) > PRESET_MAX_CHARS && encodeFace(face).length > PRESET_MAX_CHARS) {
+    let big = 0;
+    for (let i = 1; i < face.sculpt.length; i++) if (face.sculpt[i].data.length > face.sculpt[big].data.length) big = i;
+    const gone = face.sculpt[big];
+    fix('sculpt-size', () => gone.host);
+    face.sculpt = face.sculpt.filter((_, i) => i !== big);
+    if (!face.sculpt.length) face.sculptDivisor = 10000;
+  }
+  return { face, fixes };
 };
+const faceFrom = (raw) => { const t = faceFixed(raw); return t ? t.face : null; };
+// "code:n,code:n", as the client's trace (no names or paths)
+const fixesText = (fixes) => fixes.map((f) => `${f.code}:${f.n}`).join(',');
 
 // The client's encodeFace: one face is always one text
 const encodeFace = (f) => JSON.stringify({
@@ -446,13 +521,19 @@ module.exports = (api) => {
     // the 500 gold it may have cost) against the look's head parts in the same line
     let hosts = [];
     let sculptHosts = [];   // the same heads in lower case, for E5 below
+    let fixedText = '';     // what the rules dropped or clamped here, for the same line
     if (u.n > 0) {
       const text = u.parts.join('');
       if (text.length > Number(C.maxChars) || hashText(text) !== u.hash) return refuse('hash', `${k} upload does not match its hash, refused`);
-      let face = null;
-      try { face = faceFrom(JSON.parse(text)); } catch (e) { face = null; }
-      if (!face) return refuse('rules', `${k} upload breaks the preset rules, refused`);
+      let taken = null;
+      try { taken = faceFixed(JSON.parse(text)); } catch (e) { taken = null; }
+      // Only what is not a JSON object is refused: a bad entry is dropped or clamped on its own
+      if (!taken) return refuse('rules', `${k} upload breaks the preset rules, refused`);
+      const face = taken.face;
       const encoded = encodeFace(face);
+      fixedText = fixesText(taken.fixes);
+      // Every client sends a face these rules keep as it is, so a change here is a mismatch to look into; the fixed face is kept
+      if (encoded !== text) log(`racemenu presets: ${k} (profile ${profileOf(me)}) client/server rule mismatch: upload ${u.hash} changed by the rules here (${fixedText ? `fixed ${fixedText}` : 'not in their text form'}), kept as ${hashText(encoded)}`);
       if (face.custom.length || face.sculpt.length) doc = { v: 1, actor: k, profile: profileOf(me), race, hash: hashText(encoded), content: contentOf(face), at: new Date().toISOString(), face: encoded };
       hosts = face.sculpt.map((h) => `${h.host} (${h.data.length})`);
       sculptHosts = face.sculpt.map((h) => h.host.toLowerCase());
@@ -502,7 +583,7 @@ module.exports = (api) => {
         settle(true);
         // A newer face replaced this one before it was written: that one is logged and announced
         if (written !== doc) return;
-        log(`racemenu presets: ${k} (profile ${profileOf(me)}) ${doc ? `face saved, ${doc.face.length} chars, ${doc.hash}, sculpt hosts [${hosts.join(', ')}], headpartIds [${partsOf(me)}]` : `face cleared${keptAs ? `, kept as ${keptAs}` : ''}`}`);
+        log(`racemenu presets: ${k} (profile ${profileOf(me)}) ${doc ? `face saved, ${doc.face.length} chars, ${doc.hash}, sculpt hosts [${hosts.join(', ')}], headpartIds [${partsOf(me)}]${fixedText ? `, fixed [${fixedText}]` : ''}` : `face cleared${keptAs ? `, kept as ${keptAs}` : ''}`}`);
         const rev = { customPacketType: 'dboPresetRev', actor: me >>> 0, hash: doc ? doc.hash : '' };
         for (const b of onlineActors()) if ((b >>> 0) !== (me >>> 0)) sendPacket(b, rev);
       });
@@ -632,9 +713,12 @@ module.exports = (api) => {
   // What runs, in the log at every load (10 Oct review S4: the module said nothing, so the log could not show it was on)
   log(`racemenupresets ${C.enabled ? 'on' : 'off'}${C.enabled && TEST ? `, staff test only (${TEST.size} profile(s))` : C.enabled ? ', every player' : ''}, `
     + `requireEditor ${C.requireEditor === false ? 'off' : 'on'}, ${FAMILY.size} race ids in vampire families`);
-  return { faceFrom, encodeFace, hashText, contentOf, isTriPath, state: S, dir: DIR, pump, sameFamily };
+  return { faceFrom, faceFixed, fixesText, encodeFace, hashText, contentOf, isTriPath, state: S, dir: DIR, pump, sameFamily };
 };
 module.exports.faceFrom = faceFrom;
 module.exports.encodeFace = encodeFace;
 module.exports.hashText = hashText;
 module.exports.contentOf = contentOf;
+module.exports.faceFixed = faceFixed;
+module.exports.fixesText = fixesText;
+module.exports.isTriPath = isTriPath;

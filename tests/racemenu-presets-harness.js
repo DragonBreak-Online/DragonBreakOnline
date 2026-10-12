@@ -53,9 +53,10 @@ globalThis.__dboRaceMenuOpenedAt = new Map();
 const editorOpen = () => { globalThis.__dboRaceMenuOpenedAt.set(0xff000a01, Date.now()); globalThis.__dboRaceMenuOpenedAt.set(0xff000b02, Date.now()); };
 
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'claude-nate-rmpresets-'));
-const A = 0xff000a01, B = 0xff000b02, NPC = 0xff00c003;
-const users = { 1: A, 2: B };
-const props = { [A]: { profileId: 61, appearance: { raceId: 0x13746, headpartIds: [0x51623, 0x1a2b3, 0x07000d62] } }, [B]: { profileId: 7, appearance: { raceId: 0x13741 } }, [NPC]: { profileId: -1 } };
+const A = 0xff000a01, B = 0xff000b02, NPC = 0xff00c003, C = 0xff000c04;
+const users = { 1: A, 2: B, 3: C };
+const props = { [A]: { profileId: 61, appearance: { raceId: 0x13746, headpartIds: [0x51623, 0x1a2b3, 0x07000d62] } }, [B]: { profileId: 7, appearance: { raceId: 0x13741 } }, [NPC]: { profileId: -1 },
+  [C]: { profileId: 9, appearance: { raceId: 0x13746, headpartIds: [0x51623] } } };
 let online = [A, B];
 const sent = [];
 const logs = [];
@@ -147,14 +148,34 @@ const upload = (userId, t, up, size) => {
   packet(2, { customPacketType: 'dboPresetPut', up: 1, i: 0, n: 1, hash: '00000000', race: 1, data: text });
   await settle();
   check('an upload that does not match its hash is refused', !fs.existsSync(fileOf(B)) && logs.some((l) => /does not match its hash/.test(l)));
-  const evil = JSON.parse(text); evil.sculpt[0].data[0][0] = 65000;
+  const evil = [JSON.parse(text)];
   upload(2, JSON.stringify(evil), 2);
   await settle();
-  check('an upload whose sculpt index is past its vertex count is refused', !fs.existsSync(fileOf(B)) && logs.some((l) => /breaks the preset rules/.test(l)));
+  check('an upload that is not a JSON object is refused (rules)', !fs.existsSync(fileOf(B)) && logs.some((l) => /breaks the preset rules/.test(l)));
   s = take().filter((x) => x.p.customPacketType === 'dboPresetRefused');
   check('S3: both are named to the uploader (dboPresetRefused: actor, self, the upload\'s hash, reason hash / rules)',
     s.length === 2 && s.every((x) => x.to === B && x.p.actor === B && x.p.self === true) && s[0].p.hash === '00000000' && s[0].p.reason === 'hash'
     && s[1].p.hash === P.hashText(JSON.stringify(evil)) && s[1].p.reason === 'rules', s.map((x) => x.p));
+  // 12 Oct: one entry past the rules is dropped or clamped on its own, never the whole face; a client with these rules never
+  // sends one, so the change is logged as a rule mismatch and the face as the rules take it is kept
+  {
+    const odd = JSON.parse(text);
+    odd.sculpt[0].data[0][0] = 65000;
+    odd.sculpt[0].data[1][3] = 400000;
+    odd.custom.push({ name: 'Wide', value: 1.5 });
+    upload(3, JSON.stringify(odd), 5);
+    await settle();
+    const kept = fs.existsSync(fileOf(C)) ? JSON.parse(fs.readFileSync(fileOf(C), 'utf8')) : null;
+    const want = P.encodeFace(P.faceFrom(odd));
+    check('an upload with a vertex past its count and an offset past 30 units is kept, that vertex dropped and the offset clamped',
+      !!kept && kept.face === want && kept.hash === P.hashText(want) && JSON.parse(want).sculpt[0].data.join('|') === '17,0,0,300000' && JSON.parse(want).custom[1].value === 1.5, kept && kept.face);
+    check('...the change is logged as a client/server rule mismatch with the fixes, and the face saved line carries them',
+      logs.some((l) => l === `racemenu presets: ff000c04 (profile 9) client/server rule mismatch: upload ${P.hashText(JSON.stringify(odd))} changed by the rules here (fixed sculpt-vertex:1,sculpt-offset:1), kept as ${P.hashText(want)}`)
+      && logs.some((l) => /^racemenu presets: ff000c04 \(profile 9\) face saved, .*, fixed \[sculpt-vertex:1,sculpt-offset:1\]$/.test(l)), logs.filter((l) => /ff000c04/.test(l)));
+    check('...nothing refused to the uploader, and the rules change nothing on the kept face', !sent.some((x) => x.to === C && x.p.customPacketType === 'dboPresetRefused')
+      && P.faceFixed(JSON.parse(kept.face)).fixes.length === 0 && P.encodeFace(P.faceFixed(JSON.parse(kept.face)).face) === kept.face);
+    take();
+  }
   packet(2, { customPacketType: 'dboPresetPut', up: 3, i: 0, n: 999, hash, race: 1, data: 'x' });
   packet(2, { customPacketType: 'dboPresetPut', up: 3, i: 0, n: 1, hash, race: 1, data: 'x'.repeat(12001) });
   check('silly chunk counts and oversize chunks are ignored', !M.state.uploads.has(B));
