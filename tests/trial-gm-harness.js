@@ -40,8 +40,8 @@ check('...but is a Trial GM, logged as trialgm', T.isTrialStaff(TRIAL) === true 
 check('GM and Trial GM roles together give GM', T.tierOf(BOTH) === 'gm' && T.isAdmin(BOTH) && !T.isTrialStaff(BOTH) && T.staffTierOf(BOTH) === 'gm', [T.tierOf(BOTH), T.isTrialStaff(BOTH)]);
 check('a GM, a Lead GM, an Owner and a player are unchanged', T.tierOf(GM) === 'gm' && T.tierOf(LEAD) === 'leadgm' && T.tierOf(OWNER) === 'senior' && T.tierOf(PLAYER) === null && !T.isTrialStaff(PLAYER));
 check('the rank sits below GM', T.TIER_RANK.trialgm > 0 && T.TIER_RANK.trialgm < T.TIER_RANK.gm);
-const ALLOWED = ['rename', 'chargen', 'gmcall', 'tp', 'invis', 'playerinfo', 'bugs', 'adminchat'];
-check('exactly the eight rights are on the allowlist (adminchat: #gm-chat 12 Oct)', [...T.TRIAL_CAN].sort().join() === ALLOWED.slice().sort().join(), [...T.TRIAL_CAN]);
+const ALLOWED = ['rename', 'chargen', 'gmcall', 'tp', 'invis', 'playerinfo', 'bugs', 'adminchat', 'ghost', 'unstuck'];
+check('exactly the ten rights are on the allowlist (adminchat: #gm-chat 12 Oct; ghost, unstuck: Nate 12 Oct)', [...T.TRIAL_CAN].sort().join() === ALLOWED.slice().sort().join(), [...T.TRIAL_CAN]);
 check('a Trial GM has each of them', ALLOWED.every((w) => T.staffCan(TRIAL, w)));
 const FORBIDDEN = ['kick', 'ban', 'items', 'gold', 'skills', 'stats', 'housing', 'faction', 'nobility', 'world', 'spawn', 'summon', 'console', 'jail', ''];
 check('...and none of the others', FORBIDDEN.every((w) => !T.staffCan(TRIAL, w)), FORBIDDEN.filter((w) => T.staffCan(TRIAL, w)));
@@ -92,10 +92,14 @@ check('without the settings key a Trial GM role opens nothing', !chatNoKey(TRIAL
   check('/chargen and /tp do not ask isAdmin themselves', !/isAdmin|isLeadStaff/.test(chargenCode) && !/isAdmin|isLeadStaff/.test(tpCode));
   const cmds = new Map(); const out = []; const sets = []; const menus = [];
   const mp = { setRaceMenuOpen: (t, on) => menus.push([t, on]), set: (a, k, v) => sets.push([a, k, v]), get: (a, k) => (k === 'worldOrCellDesc' ? '3c:Skyrim.esm' : k === 'pos' ? [1, 2, 3] : [0, 0, 0]) };
-  new Function('registerChatCommand', 'findByName', 'personal', 'system', 'audit', 'who', 'display', 'nameOf', 'mp', 'log', chargenCode + tpCode)(
-    (n, fn) => cmds.set(n, fn), (q) => (q === 'Mira' ? PLAYER : 0), (a, t) => out.push(t), () => {}, () => {}, String, String, () => 'Mira', mp, () => {});
+  new Function('registerChatCommand', 'findByName', 'personal', 'system', 'audit', 'who', 'display', 'nameOf', 'mp', 'log', 'staffTierOf', chargenCode + tpCode)(
+    (n, fn) => cmds.set(n, fn), (q) => (q === 'Mira' ? PLAYER : 0), (a, t) => out.push(t), () => {}, () => {}, String, String, () => 'Mira', mp, () => {}, (x) => T.staffTierOf(x));
   cmds.get('chargen')(TRIAL, 'Mira');
-  check('/chargen by a Trial GM opens character creation for the player', menus.length === 1 && menus[0][0] === PLAYER && menus[0][1] === true, menus);
+  check('/chargen by a Trial GM for another player is refused (their own character only, Nate 12 Oct)', menus.length === 0 && /own character only/.test(out.join()), [menus, out]);
+  cmds.get('chargen')(TRIAL, '');
+  check('...and with no name opens character creation for themselves', menus.length === 1 && menus[0][0] === TRIAL && menus[0][1] === true, menus);
+  cmds.get('chargen')(GM, 'Mira');
+  check('a GM still opens it for anyone', menus.length === 2 && menus[1][0] === PLAYER, menus);
   cmds.get('tp')(TRIAL, 'Mira');
   check('/tp by a Trial GM moves them to the player', sets.some(([a, k, v]) => a === TRIAL && k === 'locationalData' && v.cellOrWorldDesc === '3c:Skyrim.esm'), sets);
 }
@@ -178,6 +182,10 @@ process.chdir(tmp);
   check('a report filed since is first, and n limits the list', out.length === 2 && /Mira #MIRA: my horse is on the roof/.test(out[1][1]), out);
 
   process.chdir(cwd);
+  // ---- /ghost and /unstuck (Nate, 12 Oct) --------------------------------------------------------------------------
+  check('a Trial GM may ghost and unstuck, a player may not', T.staffCan(TRIAL, 'ghost') && T.staffCan(TRIAL, 'unstuck') && !T.staffCan(PLAYER, 'ghost') && !T.staffCan(PLAYER, 'unstuck') && T.staffCan(GM, 'ghost'));
+  check('/ghost sends the admin panel\'s ghost packet and mirror, only for staff', /registerChatCommand\('ghost'[\s\S]{0,120}if \(!staffCan\(a, 'ghost'\)\)[\s\S]{0,400}mp\.set\(a, 'ff_adminModes', Object\.assign\(\{\}, m, \{ ghost: on \}\)\)[\s\S]{0,250}sendPacket\(a, \{ customPacketType: 'adminMode', mode: 'ghost', on \}\)/.test(src));
+  check('/unstuck: staff skip the waits and may name a player; a player names nobody', /const admin = staffCan\(by, 'unstuck'\);/.test(src) && /if \(!name \|\| !staffCan\(a, 'unstuck'\)\) return unstuckActor\(a, a\);/.test(src) && /if \(by === a\) mp\.set\(a, 'private\.unstuckAt', Date\.now\(\)\);/.test(src));
   fs.rmSync(tmp, { recursive: true, force: true });
   console.log('');
   console.log(failures ? `${failures} FAILURES` : 'all checks passed');

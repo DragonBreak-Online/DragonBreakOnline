@@ -261,7 +261,9 @@ const isTrialStaff = (actorId) => trialFrom(profileOf(actorId), rolesOf(actorId)
 // rename: /rename and the panel's Rename; chargen: /chargen; gmcall: /gm list|take|goto|release|close|quiet;
 // tp: /tp and the panel's TP to (to a player only); invis: the panel's Invisible mode; playerinfo: the panel's player
 // list and /charstats; bugs: /bugs; adminchat: the chat's Admin tab and /admin (#gm-chat 12 Oct: trials had no admin tab)
-const TRIAL_CAN = new Set(['rename', 'chargen', 'gmcall', 'tp', 'invis', 'playerinfo', 'bugs', 'adminchat']);
+// ghost: /ghost, the ethereal half-seen form; unstuck: /unstuck without the cooldown, jail or PvP wait, and on a named player
+// (Nate, 12 Oct)
+const TRIAL_CAN = new Set(['rename', 'chargen', 'gmcall', 'tp', 'invis', 'playerinfo', 'bugs', 'adminchat', 'ghost', 'unstuck']);
 const staffCan = (actorId, what) => isAdmin(actorId) || (TRIAL_CAN.has(what) && isTrialStaff(actorId));
 // The tier for logs and the role sync: an admin tier, 'trialgm', or null
 const staffTierFrom = (profile, roles) => tierFrom(profile, roles) || (trialFrom(profile, roles) ? 'trialgm' : null);
@@ -871,7 +873,10 @@ registerChatCommand('kick', (a, args) => {
 }, { admin: true, help: '<player>' });
 // Players cannot reopen character creation themselves; an admin does it for them by tag.
 registerChatCommand('chargen', (a, args) => {
-  const t = findByName(args.trim()); if (!t) return personal(a, 'No such player. Use their name or #TAG.');
+  // A Trial GM opens it for their own character only (Nate, 12 Oct); a GM and above for anyone. No name: oneself
+  const trialOnly = staffTierOf(a) === 'trialgm';
+  const t = args.trim() ? findByName(args.trim()) : a; if (!t) return personal(a, 'No such player. Use their name or #TAG.');
+  if (trialOnly && (t >>> 0) !== (a >>> 0)) return personal(a, 'As a Trial GM you can open character creation for your own character only: /chargen');
   try {
     mp.setRaceMenuOpen(t, true);
     // An existing character's look as it stands, so the close can undo the editor's swapped-in head (appearance.js). Once
@@ -881,7 +886,7 @@ registerChatCommand('chargen', (a, args) => {
     system(t, `${nameOf(a)} opened character creation for you.`);
     audit(`GM ${who(a)} opened chargen for ${who(t)}`);
   } catch (e) { personal(a, 'Failed: ' + e.message); }
-}, { admin: true, help: '<player|#TAG> reopen character creation for someone' });
+}, { admin: true, help: '[player|#TAG] reopen character creation for someone (a Trial GM: yourself only)' });
 const NAME_RE = /^[A-Za-z][A-Za-z' \-]{1,30}$/;
 // A staff rename, for /rename and the F7 panel's Rename (fork adminSystem.ts calls __dboAdminRename): { ok, text }
 const renameCharacter = (a, t, rawName) => {
@@ -4495,30 +4500,54 @@ const inLoginGrace = (a) => {
   loginGrace.delete(a >>> 0);
   return false;
 };
-registerChatCommand('unstuck', (a) => {
-  const admin = isAdmin(a);
-  try { if (mp.get(a, 'isDead')) return personal(a, 'You cannot use /unstuck while dead.'); } catch (e) { /* alive */ }
-  try { const r = mp.get(a, 'private.restrained'); if (r && (r.boundHands || r.carried || r.captorActorId)) return personal(a, 'You cannot use /unstuck while restrained or carried.'); } catch (e) { /* free */ }
+// Staff (admins, and Trial GMs since 12 Oct: TRIAL_CAN unstuck) skip the cooldown, the jail and the PvP wait, and may name
+// a player to send back: by is who typed it, a is who moves
+const unstuckActor = (a, by) => {
+  const admin = staffCan(by, 'unstuck');
+  try { if (mp.get(a, 'isDead')) return personal(by, 'You cannot use /unstuck while dead.'); } catch (e) { /* alive */ }
+  try { const r = mp.get(a, 'private.restrained'); if (r && (r.boundHands || r.carried || r.captorActorId)) return personal(by, 'You cannot use /unstuck while restrained or carried.'); } catch (e) { /* free */ }
   // No walking out of a jail, or out of a sentence (jail.js)
-  if (!admin && globalThis.__dboJailUnstuck) { const why = globalThis.__dboJailUnstuck(a); if (why) return personal(a, why); }
+  if (!admin && globalThis.__dboJailUnstuck) { const why = globalThis.__dboJailUnstuck(a); if (why) return personal(by, why); }
   const fought = Date.now() - (pvpAt.get(a) || 0);
-  if (!admin && fought < UNSTUCK.pvpCombatSeconds * 1000) return personal(a, `You are in combat with another player. Try again in ${Math.ceil((UNSTUCK.pvpCombatSeconds * 1000 - fought) / 1000)} seconds.`);
+  if (!admin && fought < UNSTUCK.pvpCombatSeconds * 1000) return personal(by, `You are in combat with another player. Try again in ${Math.ceil((UNSTUCK.pvpCombatSeconds * 1000 - fought) / 1000)} seconds.`);
   const last = Number(mp.get(a, 'private.unstuckAt')) || 0;
   const wait = last + UNSTUCK.cooldownMinutes * 60000 - Date.now();
-  if (!admin && wait > 0) return personal(a, `/unstuck is ready again in ${Math.ceil(wait / 60000)} minute${Math.ceil(wait / 60000) === 1 ? '' : 's'}.`);
+  if (!admin && wait > 0) return personal(by, `/unstuck is ready again in ${Math.ceil(wait / 60000)} minute${Math.ceil(wait / 60000) === 1 ? '' : 's'}.`);
   const zone = zoneOfActor(a) || 'bruma';
   const t = templeFor(zone) || templeFor('bruma');
-  if (!t) return personal(a, 'There is no respawn point for this area. Ask a GM for help.');
+  if (!t) return personal(by, 'There is no respawn point for this area. Ask a GM for help.');
   // Read before the move: read after it, every line named the respawn's world (the Bleak-Frost Mine report, 4 Oct)
   let from = '?';
   try { const p = mp.get(a, 'pos'); from = `${JSON.stringify(mp.get(a, 'worldOrCellDesc'))} at ${Array.isArray(p) ? p.map((v) => Math.round(v)).join(',') : '?'}`; } catch (e) { /* where is unknown */ }
   try {
     mp.set(a, 'locationalData', { cellOrWorldDesc: t.world, pos: t.pos, rot: [0, 0, Number(t.rotZ) || 0] });
-    mp.set(a, 'private.unstuckAt', Date.now());
-  } catch (e) { log('unstuck failed', e.message); return personal(a, 'That did not work. Ask a GM for help.'); }
-  personal(a, `You find your way back to safety. /unstuck is ready again in ${UNSTUCK.cooldownMinutes} minutes.`);
-  audit(`UNSTUCK ${who(a)} from ${from} to the ${zone} respawn`);
-}, { help: `move to the respawn point of your area (every ${UNSTUCK.cooldownMinutes} min, not in PvP combat)` });
+    if (by === a) mp.set(a, 'private.unstuckAt', Date.now());
+  } catch (e) { log('unstuck failed', e.message); return personal(by, 'That did not work. Ask a GM for help.'); }
+  personal(a, by === a ? `You find your way back to safety. /unstuck is ready again in ${UNSTUCK.cooldownMinutes} minutes.` : `${display(by)} brings you back to safety.`);
+  if (by !== a) personal(by, `${display(a)} is back at the ${zone} respawn.`);
+  audit(`UNSTUCK ${who(a)} from ${from} to the ${zone} respawn${by !== a ? ` by staff ${who(by)}` : ''}`);
+};
+registerChatCommand('unstuck', (a, args) => {
+  const name = String(args || '').trim();
+  if (!name || !staffCan(a, 'unstuck')) return unstuckActor(a, a);
+  const t = findByName(name);
+  if (!t) return personal(a, `No player online called ${name}.`);
+  return unstuckActor(t, a);
+}, { help: `move to the respawn point of your area (every ${UNSTUCK.cooldownMinutes} min, not in PvP combat); staff: [player]` });
+// Staff (admins and Trial GMs, Nate 12 Oct): the admin panel's Ghost mode as a command. The client makes its player
+// ghostly on the adminMode packet (adminModeService: setGhost, the ethereal shader, half alpha) and everyone else sees it
+// through the ff_adminModes mirror (formView), the same two things AdminSystem sends. /ghost toggles; on|off sets.
+// AdminSystem keeps its own mode state, so a relog, or a mode toggled in the panel, sets the mirror back to its state.
+registerChatCommand('ghost', (a, args) => {
+  if (!staffCan(a, 'ghost')) return personal(a, 'Unknown command /ghost. Type /help.');
+  const arg = String(args || '').trim().toLowerCase();
+  const m = adminModesOf(a);
+  const on = arg === 'on' ? true : arg === 'off' ? false : m.ghost !== true;
+  try { mp.set(a, 'ff_adminModes', Object.assign({}, m, { ghost: on })); } catch (e) { log('ghost mirror failed', e.message); return personal(a, 'That did not work.'); }
+  sendPacket(a, { customPacketType: 'adminMode', mode: 'ghost', on });
+  personal(a, on ? 'You are a ghost: half seen and untouchable. /ghost again to take form.' : 'You take form again.');
+  staffNote(a, '/ghost', on ? 'ghost on' : 'ghost off');
+}, { hidden: true, help: '[on|off] staff: the ethereal Ghost form' });
 const setDeathTemple = (a) => {
   try { if (!(Number(mp.get(a, 'profileId')) >= 0)) return; } catch (e) { return; }
   const zone = zoneOfActor(a);
