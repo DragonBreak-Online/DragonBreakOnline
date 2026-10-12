@@ -50,6 +50,8 @@ export interface CourierData {
     feeShare: number; minFee: number; premiumRate: number; maxStacks: number; minPay: number; maxPay: number;
     limitGameDays: number; openDays: number; maxCarried: number; maxOpen: number; maxPayoutsPerWeek: number;
   };
+  // The courier's rank (server couriers.js tiers): absent from a server without ranks
+  rank?: { name: string; delivered: number; carry: number; maxValue: number; boards: boolean; line: string; next: { name: string; at: number } | null };
   open: CourierJob[];
   carrying: CourierJob[];
   broken: CourierJob[];
@@ -143,6 +145,12 @@ const Courier = ({ c, nonce, gold, contacts, busy, act, select }: {
   return (
     <div className="pigeon__body">
       <div className="pigeon__contacts">
+        {c.rank ? (
+          <div className="pigeon__section" title={c.rank.line}>
+            {c.rank.name} courier · {c.rank.delivered} {c.rank.delivered === 1 ? 'delivery' : 'deliveries'}{c.rank.next ? ` · ${c.rank.next.name} at ${c.rank.next.at}` : ''}
+          </div>
+        ) : null}
+        {c.rank ? <div className="pigeon__contact-meta">{c.rank.line}</div> : null}
         {c.carrying.length ? <div className="pigeon__section">You carry ({c.carrying.length} of {c.rules.maxCarried})</div> : null}
         {c.carrying.map(row)}
         {c.broken.length ? <div className="pigeon__section">Broken parcels</div> : null}
