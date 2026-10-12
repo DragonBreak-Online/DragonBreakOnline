@@ -592,6 +592,9 @@ module.exports = (api) => {
     audit(`TAX ${byWho} set ${zoneName(zone)} tax to ${Math.round(rate * 100)}% (was ${was}%)`);
     return rate;
   };
+  // Who may set it: the hold's taxRanks (Jarl, Count, Steward) and staff, from /tax, the Court tab and the faction panel
+  globalThis.__dboCanSetHoldTax = (a, zone) => !!zone && canTax(a, zone);
+  globalThis.__dboHoldTaxMax = () => C.maxTax;
   globalThis.__dboSetHoldTax = (zone, pct, byName, byWho) => {
     if (!zone || !Number.isFinite(Number(pct)) || pct < 0 || pct > C.maxTax * 100) return null;
     return setHoldTax(zone, Number(pct), byName, byWho);
