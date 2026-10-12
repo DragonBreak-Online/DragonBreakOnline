@@ -1,4 +1,4 @@
-// Scripted test for the client diagnostics (client 0.3.91): lib/clientDiag.ts (the trace gate, the error digest, path
+// Scripted test for the client diagnostics (client 0.3.91, shipped as 0.3.94): lib/clientDiag.ts (the trace gate, the error digest, path
 // scrubbing, stack frames), services/services/clientDiagService.ts (the dboDiag queue, the process hook) and the controller's
 // on/once error reporting in services/spApiInteractor.ts. Nothing may throw, errors are deduplicated with counts and sent
 // at most 10 lines a minute, trace lines are rate-limited and size-capped. Run from skymp5-client:
@@ -154,13 +154,15 @@ const bundle = async (rel, dir, plugins) => {
   check('...and not again within a second', H.packets.length === 1);
   NOW += 1000; tick();
   check('the rest next second, with the client line (version and platform)', H.packets.length === 2
-    && H.packets[1].lines.some((l) => l === 'apr client v=0.3.91 sp=2.9.0'), H.packets[1]);
+    && H.packets[1].lines.some((l) => l === `apr client v=${D.DBO_CLIENT_VERSION} sp=2.9.0`), H.packets[1]);
+  check('the client version in every apr client and cerr line is the package version, 0.3.94', D.DBO_CLIENT_VERSION === '0.3.94', D.DBO_CLIENT_VERSION);
   H.packets = [];
   const e1 = new RangeError('bad index'); e1.stack = 'RangeError: bad index\n    at g (C:\\Users\\P\\skymp5-client.js:5:6)';
   globalThis.__dboReportError('on:update', e1);
   NOW += 1000; tick();
   check('a reported error goes out as one cerr line with the client version', H.packets.length === 1 && H.packets[0].lines.length === 1
-    && /^cerr v=0\.3\.91 id=[0-9a-f]{8} at=on:update n=1 m=RangeError: bad index f=g@b:5:6$/.test(H.packets[0].lines[0]), H.packets);
+    && H.packets[0].lines[0] === `cerr v=${D.DBO_CLIENT_VERSION} id=${H.packets[0].lines[0].replace(/^.* id=([0-9a-f]{8}) .*$/, '$1')} at=on:update n=1 m=RangeError: bad index f=g@b:5:6`
+    && /^cerr v=\S+ id=[0-9a-f]{8} at=on:update n=1 m=RangeError: bad index f=g@b:5:6$/.test(H.packets[0].lines[0]), H.packets);
   check('...and is written to the local dbo-diag log too, without the user name', H.logs.some((l) => /^cerr .* m=RangeError: bad index/.test(l)) && !H.logs.some((l) => /Users/.test(l)));
   H.packets = [];
   const e2 = new Error('async boom'); e2.stack = 'Error: async boom\n    at h (skymp5-client.js:9:9)';
