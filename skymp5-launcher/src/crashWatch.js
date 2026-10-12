@@ -16,6 +16,7 @@ const FIND_EVERY_MS  = 3000
 const FIND_FOR_MS    = 3 * 60 * 1000   // MO2 can take a while to boot the game
 const CRASHLOG_FOR_MS = 20_000          // Crash Logger writes its log as the game dies; give it time to finish
 const CRASHLOG_EVERY_MS = 2000
+const CRASHLOG_LATE_MS = 10_000         // a log written this long after the exit belongs to the next launch
 
 // The pid of SkyrimSE.exe from `tasklist /FO CSV /NH`, or 0
 function parsePid(stdout) {
@@ -32,15 +33,15 @@ function parseExitCode(stdout) {
   return n >= -(2 ** 31) && n < 2 ** 32 ? n >>> 0 : null
 }
 
-// A Crash Logger log written since the launch, in any of the SKSE folders, and no longer growing
-function crashLogSince(dirs, since) {
+// A Crash Logger log written since the launch (and not after until), in any of the SKSE folders, and no longer growing
+function crashLogSince(dirs, since, until = Infinity) {
   const found = []
   for (const dir of dirs) {
     let names = []
     try { names = fs.readdirSync(dir) } catch { continue }
     for (const name of names) {
       if (!/^crash-.*\.log$/i.test(name)) continue
-      try { const st = fs.statSync(path.join(dir, name)); if (st.mtimeMs >= since - 2000) found.push(`${dir}|${name}|${st.size}`) } catch { /* gone */ }
+      try { const st = fs.statSync(path.join(dir, name)); if (st.mtimeMs >= since - 2000 && st.mtimeMs <= until) found.push(`${dir}|${name}|${st.size}`) } catch { /* gone */ }
     }
   }
   return found.sort().join(',')
@@ -56,8 +57,8 @@ function classify(exitCode, crashLog) {
 
 const sleep = (ms) => new Promise(r => setTimeout(r, ms))
 
-// run(file, args) resolves to stdout (rejects on failure); send(note) posts it. Everything is passed in for the tests.
-async function watchGame({ run, send, crashDirs, launchedAt = Date.now(), log = () => {}, now = Date.now, wait = sleep }) {
+// run(file, args) resolves to stdout (rejects on failure); send(note) posts it; onExit() runs once the game has ended.
+async function watchGame({ run, send, crashDirs, launchedAt = Date.now(), log = () => {}, now = Date.now, wait = sleep, onExit = () => {} }) {
   let pid = 0
   for (const started = now(); !pid && now() - started < FIND_FOR_MS; ) {
     try { pid = parsePid(await run('tasklist', ['/FI', 'IMAGENAME eq SkyrimSE.exe', '/FO', 'CSV', '/NH'])) } catch { /* try again */ }
@@ -73,11 +74,13 @@ async function watchGame({ run, send, crashDirs, launchedAt = Date.now(), log = 
       `$p = Get-Process -Id ${pid} -ErrorAction Stop; $null = $p.Handle; $p.WaitForExit(); $p.ExitCode`]))
   } catch (err) { log(`[crashWatch] could not wait on the game: ${err.message}`) }
   const endedAt = now()
+  const lateLog = Date.now() + CRASHLOG_LATE_MS
+  try { onExit() } catch (err) { log(`[crashWatch] onExit: ${err.message}`) }
 
   // Wait for a crash log to appear and stop growing, up to 20 s
   let crashLog = false
   for (let seen = '', t = now(); now() - t < CRASHLOG_FOR_MS; ) {
-    const logs = crashLogSince(crashDirs, launchedAt)
+    const logs = crashLogSince(crashDirs, launchedAt, lateLog)
     if (logs && logs === seen) { crashLog = true; break }
     seen = logs
     await wait(CRASHLOG_EVERY_MS)
@@ -91,4 +94,4 @@ async function watchGame({ run, send, crashDirs, launchedAt = Date.now(), log = 
   return note
 }
 
-module.exports = { watchGame, parsePid, parseExitCode, crashLogSince, classify }
+module.exports = { watchGame, parsePid, parseExitCode, crashLogSince, classify, CRASHLOG_LATE_MS }
