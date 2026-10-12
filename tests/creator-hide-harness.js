@@ -138,8 +138,7 @@ const toArrival = gm.slice(gm.indexOf('const sendToArrival = '), gm.indexOf('con
 check('sendToArrival shows them again right after the move out', /mp\.set\(a, 'locationalData', arrivalLocFor\(a\)\);[\s\S]{0,120}setCreatorHidden\(a, false\);/.test(toArrival));
 const lr = gm.slice(gm.indexOf('const leftRealm = '), gm.indexOf('const sendToArrival = '));
 check('leftRealm (a staff teleport out) shows them again', /setCreatorHidden\(a, false\);/.test(lr));
-// The creator's three writers, and /ghost's (Nate 12 Oct: staff ghost form, which sets only ghost and keeps every other mode)
-check('nothing else in the gamemode writes ff_adminModes', (gm.match(/'ff_adminModes', /g) || []).length === 4 && /mp\.set\(a, 'ff_adminModes', Object\.assign\(\{\}, m, \{ ghost: on \}\)\)/.test(gm), (gm.match(/'ff_adminModes', /g) || []).length);
+check('nothing else in the gamemode writes ff_adminModes', (gm.match(/'ff_adminModes', /g) || []).length === 3, (gm.match(/'ff_adminModes', /g) || []).length);
 check('the property is registered neighbour-visible', /makeProp\('ff_adminModes', true\)/.test(gm));
 check('the creator spots never include the marker everyone spawns on', /const CREATOR_SPOTS = \[\]\.concat\(/.test(gm));
 

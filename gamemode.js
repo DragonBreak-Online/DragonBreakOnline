@@ -261,9 +261,9 @@ const isTrialStaff = (actorId) => trialFrom(profileOf(actorId), rolesOf(actorId)
 // rename: /rename and the panel's Rename; chargen: /chargen; gmcall: /gm list|take|goto|release|close|quiet;
 // tp: /tp and the panel's TP to (to a player only); invis: the panel's Invisible mode; playerinfo: the panel's player
 // list and /charstats; bugs: /bugs; adminchat: the chat's Admin tab and /admin (#gm-chat 12 Oct: trials had no admin tab)
-// ghost: /ghost, the ethereal half-seen form; unstuck: /unstuck without the cooldown, jail or PvP wait, and on a named player
-// (Nate, 12 Oct)
-const TRIAL_CAN = new Set(['rename', 'chargen', 'gmcall', 'tp', 'invis', 'playerinfo', 'bugs', 'adminchat', 'ghost', 'unstuck']);
+// unstuck: /unstuck without the cooldown, jail or PvP wait, and on a named player (Nate, 12 Oct). Ghost is the panel's mode
+// (fork TRIAL_GM_MODES), not a gameplay command
+const TRIAL_CAN = new Set(['rename', 'chargen', 'gmcall', 'tp', 'invis', 'playerinfo', 'bugs', 'adminchat', 'unstuck']);
 const staffCan = (actorId, what) => isAdmin(actorId) || (TRIAL_CAN.has(what) && isTrialStaff(actorId));
 // The tier for logs and the role sync: an admin tier, 'trialgm', or null
 const staffTierFrom = (profile, roles) => tierFrom(profile, roles) || (trialFrom(profile, roles) ? 'trialgm' : null);
@@ -4534,20 +4534,6 @@ registerChatCommand('unstuck', (a, args) => {
   if (!t) return personal(a, `No player online called ${name}.`);
   return unstuckActor(t, a);
 }, { help: `move to the respawn point of your area (every ${UNSTUCK.cooldownMinutes} min, not in PvP combat); staff: [player]` });
-// Staff (admins and Trial GMs, Nate 12 Oct): the admin panel's Ghost mode as a command. The client makes its player
-// ghostly on the adminMode packet (adminModeService: setGhost, the ethereal shader, half alpha) and everyone else sees it
-// through the ff_adminModes mirror (formView), the same two things AdminSystem sends. /ghost toggles; on|off sets.
-// AdminSystem keeps its own mode state, so a relog, or a mode toggled in the panel, sets the mirror back to its state.
-registerChatCommand('ghost', (a, args) => {
-  if (!staffCan(a, 'ghost')) return personal(a, 'Unknown command /ghost. Type /help.');
-  const arg = String(args || '').trim().toLowerCase();
-  const m = adminModesOf(a);
-  const on = arg === 'on' ? true : arg === 'off' ? false : m.ghost !== true;
-  try { mp.set(a, 'ff_adminModes', Object.assign({}, m, { ghost: on })); } catch (e) { log('ghost mirror failed', e.message); return personal(a, 'That did not work.'); }
-  sendPacket(a, { customPacketType: 'adminMode', mode: 'ghost', on });
-  personal(a, on ? 'You are a ghost: half seen and untouchable. /ghost again to take form.' : 'You take form again.');
-  staffNote(a, '/ghost', on ? 'ghost on' : 'ghost off');
-}, { hidden: true, help: '[on|off] staff: the ethereal Ghost form' });
 const setDeathTemple = (a) => {
   try { if (!(Number(mp.get(a, 'profileId')) >= 0)) return; } catch (e) { return; }
   const zone = zoneOfActor(a);
