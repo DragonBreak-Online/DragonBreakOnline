@@ -713,7 +713,7 @@ const STAFF_HELP = [
     ['appoint', '<player|#TAG|profile id> <zone> <rank> [override]: make someone an official, online or offline. A Jarl must be a Nord or an Imperial; only the Owners may add override. /appoint alone lists the zone ids; a wrong rank lists that zone\'s ranks. Rulers name 5 Stewards, 2 Court Mages, a Guard Captain and any number of Guards; Chieftains 5 Banes, a Shaman, a Wise-Woman, a Guard Commander and any number of Guards; captains name Guards'],
     ['dismiss', '<player|#TAG|profile id> <zone>: remove an official, online or offline (told if online). Officials may dismiss the ranks they may appoint'],
     ['officials', '[zone]: who holds which rank where'],
-    ['property', 'at a door, as an official: list <deposit> <weekly> | unlist | offer <name> | remind | grace | evict']] },
+    ['property', 'at a door, as an official: sell <price> | list <deposit> <weekly> | unlist | offer <name> | remind | grace | evict']] },
   { key: 'beasts', title: 'Beasts and the supernatural', items: ['beastform', 'curse', 'vlremote', 'wwremote', 'feedpair', 'raid', 'warband'] },
   { key: 'magic', title: 'Magic and crafts', items: ['schools', 'classteacher', 'preacher', 'manual', 'smithing', 'tailoring'] },
   { key: 'law', title: 'Law', items: ['jail', ['concordat', '[races]: Concordat arrests standing, or the Thalmor outside the race rule'],

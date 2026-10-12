@@ -1,5 +1,36 @@
 [
   {
+    "title": "Spells on creatures and people",
+    "date": "2026-10-12",
+    "version": "Server update",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Magic",
+        "items": [
+          "Ash Rune's paralysis now holds creatures and NPCs in place too, not only players.",
+          "Spells that burn, freeze or drain over time now deal their full damage to creatures and NPCs.",
+          "Slows and staggers from spells now reach creatures and NPCs reliably, wear off properly, and stay on when another player's game takes over the creature."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Masks, beast forms and a freeze",
+    "date": "2026-10-12",
+    "version": "Server update",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Fixes",
+        "items": [
+          "Logging out in Beast Form while wearing a mask no longer loses your character's name. Before, the character came back named \"Masked Person\" for good. If this happened to you, open a ticket and staff will put your name back.",
+          "Fixed a freeze of the whole server, up to 30 seconds, when someone made a new character soon after a restart."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Your map remembers",
     "date": "2026-10-12",
     "version": "Client 0.3.94",
@@ -91,7 +122,10 @@
       {
         "heading": "Property",
         "items": [
-          "Houses can be bought: a hold's Count or Steward puts an empty house up for sale from its door's property menu, and the first to pay the price owns it. The gold goes to the hold's treasury, and the house pays the weekly property tax on its price. Renting moved into the same panel."
+          "Houses can be bought: a hold's Count or Steward puts an empty house up for sale from its door's property menu, and the first to pay the price owns it. The gold goes to the hold's treasury. Renting moved into the same panel.",
+          "You pay the price the panel showed you. If an official changes the price while your panel is open, nothing is paid and the panel shows the new price. From chat, say /property buy <price> at the door to buy it at the price you name.",
+          "A bought house pays the weekly property tax on its sale price. A sale far below the house's value halves its tax value at most, so a house sold for a token price is not taxed on that price.",
+          "Houses can be sold only in a hold that keeps a treasury."
         ]
       }
     ]

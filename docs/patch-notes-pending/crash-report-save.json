@@ -1,0 +1,14 @@
+{
+  "title": "Crash reports carry the save",
+  "date": "2026-10-12",
+  "version": "Server update",
+  "tag": "Fix",
+  "sections": [
+    {
+      "heading": "Support",
+      "items": [
+        "If the game crashes while it loads your character, pressing Send on the launcher's crash prompt now also sends us the save it was loading (launcher 2.1.46 or newer). Staff need that save to find the cause of these crashes."
+      ]
+    }
+  ]
+}
