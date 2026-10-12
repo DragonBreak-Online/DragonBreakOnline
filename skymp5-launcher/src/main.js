@@ -1759,8 +1759,8 @@ const bugLogPoller = bugLogs.createBugLogPoller({
   log,
 })
 
-// After a launch, watch the game and tell the server how it closed (src/crashWatch.js). One watcher at a time; it
-// only speaks for a signed-in player, and a failure here never touches the game.
+// After a launch, watch the game and tell the server how it closed (src/crashWatch.js). One watcher per running game,
+// free again once that game exits; it only speaks for a signed-in player, and a failure here never touches the game.
 let gameWatchRunning = false
 function watchGameExit() {
   if (process.platform !== 'win32' || gameWatchRunning) return
@@ -1768,6 +1768,15 @@ function watchGameExit() {
   if (!session) return
   gameWatchRunning = true
   const bugTimer = setInterval(() => { bugLogPoller.poll() }, bugLogs.POLL_MS)
+  let watching = true
+  // A launch during the crash log wait, the note or the crash prompt gets its own watcher
+  const gameEnded = () => {
+    if (!watching) return
+    watching = false
+    gameWatchRunning = false
+    clearInterval(bugTimer)
+    bugLogPoller.poll()
+  }
   const docs = documentsDirOrNull()
   const run = (file, args) => new Promise((resolve, reject) =>
     require('child_process').execFile(file, args, { windowsHide: true, maxBuffer: 64 * 1024 }, (err, stdout) => (err ? reject(err) : resolve(stdout))))
@@ -1779,13 +1788,16 @@ function watchGameExit() {
     send: note => postJSON(`${config.apiUrl}/api/files/session-end`,
       { ...note, launcherVersion: app.getVersion(), filesVersion: store.get('filesVersion') || '' },
       { 'x-session': store.get('gameSession') || session }),
+    onExit: gameEnded,
   }).then(note => {
     // Report a Problem reads it later: a crash in the first 2 minutes sends the spawn save the load may have crashed on
-    if (note) store.set('lastGameEnd', { outcome: note.outcome, startedAt: note.startedAt, endedAt: note.endedAt })
+    const last = store.get('lastGameEnd')
+    const newest = note && !(last && Number(last.endedAt) > note.endedAt)
+    if (newest) store.set('lastGameEnd', { outcome: note.outcome, startedAt: note.startedAt, endedAt: note.endedAt })
     if (note && note.outcome !== 'crash') afterSuccessfulLaunch()
     return offerCrashReport(note)
   }).catch(err => log(`[crashWatch] ${err.message}`))
-    .finally(() => { gameWatchRunning = false; clearInterval(bugTimer); bugLogPoller.poll(); tidyDisk() })
+    .finally(() => { gameEnded(); tidyDisk() })
 }
 
 // After a crash, offer the report there and then. crashWatch has already found the crash log and the player should
