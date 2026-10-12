@@ -440,7 +440,8 @@ module.exports = (api) => {
       default: r = 'Usage: /property [mine|buy|interest|accept|pay [weeks]|leave]; officials: sell <price>|list <deposit> <weekly>|unlist|offer <name>|remind|grace|evict';
     }
     for (const t of [].concat(r)) personal(a, t);
-  }, { hidden: true, help: 'at a door: buying and renting property, for clients without the property panel' });
+  // kept in the player menu until every player has the property panel (front propertyMarket, widget 82, client 0.3.94+)
+  }, { help: 'at a door: buying and renting property (mine, buy, interest, accept, pay, leave; officials sell, list, offer, remind, grace, evict)' });
   registerChatCommand('properties', (a) => { for (const t of overview(a)) personal(a, t); }, { hidden: true, help: 'the property you manage; now /property mine' });
 
   // Rent falling due, offers running out, notices and money for people who come back online
