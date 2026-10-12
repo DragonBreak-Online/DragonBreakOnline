@@ -447,6 +447,19 @@ const bundle = async (rel, dir) => {
   runWorks();
   step(S, 100);
   check('notice: none when the editor opened with the saved face on (a refusal puts the face back, the server tells why)', W.notes.length === 0 && loads().length >= 1, W.notes);
+  S = spawned('face');
+  W.notes = [];
+  editor(S);
+  W.calls = [];
+  W.menuOpen = true; step(S, 100);
+  deliver(S, { customPacketType: 'dboPresetRefused', hash: EDIT.hash, reason: 'gold' });
+  step(S, 100);
+  W.menuOpen = false; globalThis.__dboRaceMenuClosedAt = NOW;
+  step(S, 1000, 5);
+  runWorks();
+  step(S, 100);
+  check('notice: a refusal that lands while the editor is open: the face goes back on after it closes and the player is told', loads().length === 1
+    && W.notes.length === 1 && W.notes[0] === NOTE_EARLY, [loads().length, W.notes]);
   S = spawned('none');
   W.loadResult = false;
   clear();

@@ -408,6 +408,8 @@ export class RacemenuPresetService extends ClientListener {
       delete this.getSentAt[0];
       this.selfAppliedHash = "";
       this.selfLoadedHash = "";
+      // An editor open now loses its edit when this face goes back on after it closes: the player is told then
+      if (this.raceMenuWasOpen) this.earlyEditor = true;
     }
     this.diag(`preset: the server refused ${hash || "the empty face"} (${reason}); ${restore}`);
     trace(`rmp refused h=${h} why=${reason} restore=${code}${lateTag}`);
