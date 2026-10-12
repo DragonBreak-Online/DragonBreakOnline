@@ -6920,6 +6920,12 @@ try {
   delete require.cache[SMITHING_JS];
   require(SMITHING_JS)({ mp, log, personal, audit, who, cfg, registerChatCommand, onlineActors, findByName, isAdmin, sendPacket, itemName: (d) => adminItemName(d) });
 } catch (e) { log('smithing.js failed to load:', e.stack || e.message); for (const k of ['__dboSmithCraft', '__dboTemperCap', '__dboSmithView', '__dboSmithBookNeeds', '__dboSmithScholarTier', '__dboSmithCraftTier']) globalThis[k] = null; }
+// ---- the Tailor's ranks gate what a loom makes (server\tailoring.js, config "tailoring"; Nate, 12 Oct): after smithing.js ----
+try {
+  const TAILORING_JS = path.resolve('tailoring.js');
+  delete require.cache[TAILORING_JS];
+  require(TAILORING_JS)({ mp, log, personal, audit, who, cfg, isAdmin, sendPacket, registerChatCommand });
+} catch (e) { log('tailoring.js failed to load:', e.stack || e.message); for (const k of ['__dboTailorCraft', '__dboTailorTierOf']) globalThis[k] = null; }
 // ---- the schools of magic, Study Magic and the Class Lectern (server\schools.js, config "schools"): after spells.js, whose spellbook it reads ----
 try {
   const SCHOOLS_JS = path.resolve('schools.js');
