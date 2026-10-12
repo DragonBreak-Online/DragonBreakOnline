@@ -1,5 +1,20 @@
 [
   {
+    "title": "One tax for everything a hold owns",
+    "date": "2026-10-12",
+    "version": "Server update",
+    "tag": "Change",
+    "sections": [
+      {
+        "heading": "Taxes",
+        "items": [
+          "A hold's tax rate now covers property as well as rents. The rate a Count, Jarl or Steward sets with /tax (or the ruler sets in the faction panel, F3) is charged each Sunday on every owned house, shop and storage building on the hold's land, from the owner's bank account into the hold's treasury.",
+          "/tax and the faction panel set the same rate, from 0% to 30%. Bruma's rate is up to its officials: it stays 0% until they set one."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Launcher 2.1.47",
     "date": "2026-10-12",
     "version": "Launcher 2.1.47",
