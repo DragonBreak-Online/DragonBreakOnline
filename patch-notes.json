@@ -1,5 +1,35 @@
 [
   {
+    "title": "Holding a skill",
+    "date": "2026-10-12",
+    "version": "Server update",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Skills",
+        "items": [
+          "Hold now means a skill neither rises nor falls. If you set a skill to Hold to protect it and still want to train it, set it to Raise in your skills (K).",
+          "While you train a held skill you are reminded once an hour, and reading or study refuses to raise it."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Command Daedra and the Ash Guardian",
+    "date": "2026-10-12",
+    "version": "Server update",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Conjuration",
+        "items": [
+          "Command Daedra can now take control of another player's summoned daedra for the spell's duration, where the PvP rules allow it.",
+          "Conjure Ash Guardian now raises a guardian that everyone can see. It guards its spot until it is destroyed."
+        ]
+      }
+    ]
+  },
+  {
     "title": "The nobility of Bruma",
     "date": "2026-10-12",
     "version": "Server update",
@@ -90,7 +120,7 @@
       {
         "heading": "World",
         "items": [
-          "Cleared the wall torches that had multiplied in dungeons: every server restart had added another torch to each sconce, up to 57 on one wall (the bright bulbs, the roaring fire sound and the lag in Red Ruby Cave, Bruma Caverns, Fort Cutpurse and others). Every sconce is back to one torch."
+          "Fixed wall torches multiplying in dungeons: every server restart added another torch to each sconce, up to 57 on one wall (the bright bulbs, the roaring fire sound and the lag in Red Ruby Cave, Bruma Caverns, Fort Cutpurse and others)."
         ]
       }
     ]
