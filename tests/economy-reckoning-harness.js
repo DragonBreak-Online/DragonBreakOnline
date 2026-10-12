@@ -83,7 +83,7 @@ globalThis.__dboFactionRefresh = (a, text, ok) => { replies.push({ a, text, ok }
 require(ECON)({
   mp, log: (...x) => logs.push(x.join(' ')), personal: noop, who: (a) => `P${a.toString(16)}`,
   audit: (t) => { audits.push(t); if (auditThrows && /^ECONOMY /.test(t)) throw new Error('audit channel down'); },
-  cfg: { economy: { enabled: true } }, onUi: (ev, f) => handlers.set(ev, f), onlineActors: () => [], every: (n, ms, f) => timers.set(n, f),
+  cfg: { economy: { enabled: true, wageSavingsShare: 0, defaultWages: {} } }, onUi: (ev, f) => handlers.set(ev, f), onlineActors: () => [], every: (n, ms, f) => timers.set(n, f),
   readOfficials: () => ({ bruma: { Count: [1], Guard: [13] } }),
   zoneById: (id) => (id === 'bruma' ? { id: 'bruma', name: 'Bruma' } : null),
 });

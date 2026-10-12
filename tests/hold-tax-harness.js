@@ -21,9 +21,9 @@ Date.now = () => now;
 // Houses: BRUMA_HOUSE on county-bruma land (Lydia), GUILD_HOUSE on fighters-guild land (Olaf), WR_HOUSE on Whiterun's
 // land (Ulf; Whiterun never set a /tax rate)
 const BRUMA_HOUSE = 0x100, GUILD_HOUSE = 0x101, WR_HOUSE = 0x102;
-const LYDIA = 0x20, OLAF = 0x21, ULF = 0x22, COUNT = 0x30;
-const PROFILE = { [LYDIA]: 11, [OLAF]: 12, [ULF]: 14, [COUNT]: 10 };
-const NAME = { [LYDIA]: 'Lydia', [OLAF]: 'Olaf', [ULF]: 'Ulf', [COUNT]: 'Count Carvain' };
+const LYDIA = 0x20, OLAF = 0x21, ULF = 0x22, COUNT = 0x30, STEWARD = 0x31;
+const PROFILE = { [LYDIA]: 11, [OLAF]: 12, [ULF]: 14, [COUNT]: 10, [STEWARD]: 15 };
+const NAME = { [LYDIA]: 'Lydia', [OLAF]: 'Olaf', [ULF]: 'Ulf', [COUNT]: 'Count Carvain', [STEWARD]: 'Steward Mira' };
 const OWNER_OF = { [BRUMA_HOUSE]: [11, 'Lydia'], [GUILD_HOUSE]: [12, 'Olaf'], [WR_HOUSE]: [14, 'Ulf'] };
 const LAND = { [BRUMA_HOUSE]: 'bruma', [GUILD_HOUSE]: 'greenwood', [WR_HOUSE]: 'whiterun' };
 const OWNER_FACTION = { bruma: 'county-bruma', greenwood: 'fighters-guild', whiterun: 'hold-whiterun' };
@@ -76,7 +76,7 @@ require(path.join(ROOT, 'business.js'))(Object.assign({}, base, {
   onUi: (n, f) => { ui[n] = f; }, registerChatCommand: (n, f) => { cmds[n] = f; },
   findByName: () => 0, takeGold: () => true, giveGold: () => true, depositToTreasury: (z, n) => n,
   zoneOfActor: () => 'bruma', zoneById: (id) => ({ id, name: id === 'bruma' ? 'Bruma' : id }),
-  ranksOf: (p) => (p === 10 ? [{ zone: { id: 'bruma' }, rank: 'count' }] : []), distanceMeters: () => 1,
+  ranksOf: (p) => (p === 10 ? [{ zone: { id: 'bruma' }, rank: 'count' }] : p === 15 ? [{ zone: { id: 'bruma' }, rank: 'steward' }] : []), distanceMeters: () => 1,
 }));
 require(path.join(ROOT, 'guilds.js'))(Object.assign({}, base, {
   system: noop, registerChatCommand: noop, onUi: noop, openWidget: noop, closeWidget: noop,
@@ -86,8 +86,8 @@ globalThis.__dboFactionNonceOk = () => true;
 globalThis.__dboFactionRefresh = (a, text, ok) => { replies.push({ a, text, ok }); return true; };
 const timers = new Map();
 require(path.join(ROOT, 'economy.js'))(Object.assign({}, base, {
-  cfg: { economy: { enabled: true } }, onUi: (ev, f) => ui[ev] = f, every: (n, ms, f) => timers.set(n, f),
-  readOfficials: () => ({ bruma: { count: [10] } }),
+  cfg: { economy: { enabled: true, defaultWages: {} } }, onUi: (ev, f) => ui[ev] = f, every: (n, ms, f) => timers.set(n, f),
+  readOfficials: () => ({ bruma: { count: [10], steward: [15] } }),
   zoneById: (id) => (id === 'bruma' ? { id: 'bruma', name: 'Bruma', officials: ['count', 'steward'] } : null),
 }));
 
@@ -122,6 +122,21 @@ cmds.tax(COUNT, '0');
 reckonAt(SUNDAY + 14 * 86400000);
 ok(bank(LYDIA) === 4500 && treasuries['county-bruma'] === 500, '/tax 0 taxes no property', [bank(LYDIA), treasuries['county-bruma']]);
 ok(globalThis.__dboSetHoldTax('bruma', 31, 'X', 'X') === null && taxes().bruma.rate === 0, 'the shared setter refuses a rate over 30%', taxes().bruma.rate);
+
+// ---- a Steward keeps the books from the faction panel too: the rate and the wages ----
+const stewardView = globalThis.__dboEconomyView(STEWARD).factions.find((f) => f.id === 'county-bruma');
+ok(stewardView && stewardView.ranks.includes('steward') && stewardView.rate >= 0, "the Steward's panel lists Bruma with its rate and offices", stewardView);
+ui.econRate(STEWARD, ['nonce', 'county-bruma', 8]);
+ok(taxes().bruma.rate === 0.08 && /Steward Mira set the tax to 8%/.test(taxes().bruma.log.slice(-1)[0].text), 'the Steward sets 8% from the panel', taxes().bruma);
+ui.econWage(STEWARD, ['nonce', 'county-bruma', 'steward', 900]);
+ok(!((globalThis.__dboEconomy.data.wages['county-bruma'] || {}).steward), 'the Steward cannot set their own wage', globalThis.__dboEconomy.data.wages);
+ui.econWage(STEWARD, ['nonce', 'county-bruma', 'guard', 60]);
+ok((globalThis.__dboEconomy.data.wages['county-bruma'] || {}).guard === 60, "the Steward sets the guards' wage", globalThis.__dboEconomy.data.wages);
+ui.econWage(ULF, ['nonce', 'county-bruma', 'guard', 999]);
+ok(globalThis.__dboEconomy.data.wages['county-bruma'].guard === 60, 'someone with no office there cannot');
+ui.econRate(ULF, ['nonce', 'county-bruma', 1]);
+ok(taxes().bruma.rate === 0.08, 'someone with no office there cannot set it');
+ok(!globalThis.__dboEconomyView(ULF).factions.some((f) => f.id === 'county-bruma'), 'and does not see it');
 
 // ---- a house bought from the hold is taxed on its price ----
 ok(globalThis.__dboEconomySaleValue(BRUMA_HOUSE, 5000, 'Lydia') === true, 'a sale sets the value');
