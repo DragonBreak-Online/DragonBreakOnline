@@ -75,6 +75,31 @@ ok(audits.filter((l) => /config k1/.test(l)).length === 1 && said.some(([a, t]) 
 // Ticket #0141 (12 Oct): Lady Dyer's 0138 strike is taken off; a listed record is re-given at load, so it must stay unlisted
 const shipped = (CFG.discipline.record || []).find((r) => r.key === '0138-dyer');
 ok(!shipped, 'shipped: no 0138-dyer record (overturned by ticket #0141)');
+
+// ---- overturn (ticket #0141): a record given for something the game allowed ----------------------------------------
+said.length = 0; audits.length = 0;
+cmd(1, '#AAAA overturn 2 wrong call'); ok(/Only a Lead GM/.test(last(1)), 'a GM cannot overturn');
+cmd(2, '#AAAA overturn'); ok(/Which record/.test(last(2)), 'the record number is required');
+cmd(2, '#AAAA overturn 99 it was not her'); ok(/no record #99/.test(last(2)), 'an unknown number is refused');
+cmd(2, '#AAAA overturn 2 x'); ok(/Give a reason/.test(last(2)), 'a reason is required');
+const strikesBefore = require(MOD).activeStrikes(JSON.parse(fs.readFileSync(FILE, 'utf8')).profiles[20], Date.now(), 90);
+cmd(2, '#AAAA overturn 2 the barrel was unlocked, the game allowed it');
+const rec20 = JSON.parse(fs.readFileSync(FILE, 'utf8')).profiles[20];
+const undone = rec20.find((e) => e.n === 2);
+ok(undone && undone.overturned && undone.overturned.by === 'c2' && /unlocked/.test(undone.overturned.reason), 'the record is marked, not deleted', undone);
+ok(rec20.some((e) => e.kind === 'overturn' && e.undid === 2), 'and an overturn entry records who undid what');
+ok(require(MOD).activeStrikes(rec20, Date.now(), 90) === strikesBefore - 1, 'an overturned strike stops counting', [strikesBefore, require(MOD).activeStrikes(rec20, Date.now(), 90)]);
+ok(audits.some((l) => /^DISCIPLINE overturn #\d+ on w3 \(profile 20\) of #2 \(strike by c1\) by w2: the barrel was unlocked/.test(l)), 'audited with the record it undid and who gave it', audits.slice(-2));
+ok(said.some(([a, t]) => a === 3 && /A staff decision against you was overturned: the barrel was unlocked/.test(t)), 'the player is told');
+cmd(2, '#AAAA overturn 2 again'); ok(/already overturned by c2/.test(last(2)), 'it cannot be overturned twice');
+const ovN = rec20.find((e) => e.kind === 'overturn').n;
+cmd(2, `#AAAA overturn ${ovN} undo the undo`); ok(/itself an overturn/.test(last(2)), 'an overturn entry cannot itself be overturned');
+// An overturned suspension frees the account, the way lift does
+cmd(2, '#BBBB'); const sus = JSON.parse(fs.readFileSync(FILE, 'utf8')).profiles[20].find((e) => e.kind === 'suspend');
+cmd(2, `#BBBB overturn ${sus.n} the evidence did not hold up`);
+const after = JSON.parse(fs.readFileSync(FILE, 'utf8')).profiles[20];
+ok(!require(MOD).activeSuspension(after, Date.now()), 'an overturned suspension no longer holds the account out');
+kicked.length = 0; ok(globalThis.__dboDisciplineLogin(4) !== true && !kicked.length, 'and that account can log in again');
 global.setTimeout = realTimeout;
 fs.rmSync(tmp, { recursive: true, force: true });
 console.log(fails ? `\n${fails} FAILED` : '\nall passed');
