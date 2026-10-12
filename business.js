@@ -581,13 +581,29 @@ module.exports = (api) => {
   }, { help: 'the business ledger where you stand (its book opens the same panel): open, log, notes, note, rent, chest, staff, ledger, collect, rename, close' });
 
   // ---- /tax ------------------------------------------------------------------------------------------
+  // One hold rate (Nate, 12 Oct: "everything in bruma that can be owned"): every rent here, and economy.js's weekly property
+  // tax on the hold's land, so /tax and the faction panel (F3) set the same number
+  const setHoldTax = (zone, pct, byName, byWho) => {
+    const t = taxes()[zone];
+    const was = Math.round(taxRate(zone) * 100), rate = Math.round(pct) / 100;
+    const entry = { at: Date.now(), text: `${byName} set the tax to ${Math.round(rate * 100)}% (was ${was}%)` };
+    taxes()[zone] = { rate, by: byName, at: Date.now(), log: ((t && t.log) || []).concat([entry]).slice(-50) };
+    saveTaxes();
+    audit(`TAX ${byWho} set ${zoneName(zone)} tax to ${Math.round(rate * 100)}% (was ${was}%)`);
+    return rate;
+  };
+  globalThis.__dboSetHoldTax = (zone, pct, byName, byWho) => {
+    if (!zone || !Number.isFinite(Number(pct)) || pct < 0 || pct > C.maxTax * 100) return null;
+    return setHoldTax(zone, Number(pct), byName, byWho);
+  };
+
   registerChatCommand('tax', (a, args) => {
     const zone = zoneOfActor(a);
     if (!zone) return personal(a, 'You are not in any hold.');
     const t = taxes()[zone];
     const arg = String(args || '').trim().replace('%', '');
     if (!arg) {
-      personal(a, `${zoneName(zone)} takes ${Math.round(taxRate(zone) * 100)}% of every rent (inn beds and storage)${t && t.by ? `, set by ${t.by} on ${stamp(t.at)}` : ', the standard rate'}.`);
+      personal(a, `${zoneName(zone)} takes ${Math.round(taxRate(zone) * 100)}% of every rent (inn beds and storage) and, each week, of every property's value${t && t.by ? `, set by ${t.by} on ${stamp(t.at)}` : ', the standard rate'}.`);
       (t && t.log ? t.log.slice(-3).reverse() : []).forEach((e) => personal(a, `  ${stamp(e.at)}  ${e.text}`));
       if (canTax(a, zone)) personal(a, `As an official of ${zoneName(zone)}: /tax <percent> sets it, 0 to ${Math.round(C.maxTax * 100)}.`);
       return;
@@ -595,12 +611,8 @@ module.exports = (api) => {
     if (!canTax(a, zone)) return personal(a, `Only the ${C.taxRanks.join(', ')} of ${zoneName(zone)} set its tax.`);
     const pct = Number(arg);
     if (!Number.isFinite(pct) || pct < 0 || pct > C.maxTax * 100) return personal(a, `Set a rate from 0 to ${Math.round(C.maxTax * 100)}: /tax <percent>`);
-    const was = Math.round(taxRate(zone) * 100), rate = Math.round(pct) / 100;
-    const entry = { at: Date.now(), text: `${display(a)} set the rent tax to ${Math.round(rate * 100)}% (was ${was}%)` };
-    taxes()[zone] = { rate, by: display(a), at: Date.now(), log: ((t && t.log) || []).concat([entry]).slice(-50) };
-    saveTaxes();
-    audit(`TAX ${who(a)} set ${zoneName(zone)} rent tax to ${Math.round(rate * 100)}% (was ${was}%)`);
-    personal(a, `${zoneName(zone)} now takes ${Math.round(rate * 100)}% of every rent.`);
+    const rate = setHoldTax(zone, pct, display(a), who(a));
+    personal(a, `${zoneName(zone)} now takes ${Math.round(rate * 100)}% of every rent, and of every property's value at the weekly reckoning.`);
   }, { help: "the hold's tax on rents where you stand; officials: /tax <percent>" });
 
   log(`business ledgers ${C.enabled ? 'on' : 'off'}: ${Object.keys(data().businesses).length} business(es), ${Object.keys(taxes()).length} hold tax rate(s) set`);
