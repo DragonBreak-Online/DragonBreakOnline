@@ -72,6 +72,9 @@ module.exports = (api) => {
     // A silver weapon strikes a vampire this much harder (#bugs, 1 Oct: vampires could not wear silver, yet it did them
     // no harm). Flat, not by stage, since fire is the vampire's real bane; 0 turns it off
     vampireSilverWeakness: 0.25,
+    // Nate, 12 Oct: a werewolf or vampire cannot hold silver either: silver in the pack is mailed to their own mailbox at the
+    // notice boards (post.js), from silverMailFrom's board. false turns it off
+    silverCarry: true, silverMailFrom: 'Bruma',
     // Silver beyond the keyword: form descs ("10aa19:Skyrim.esm") of weapons that are silver but lack WeapMaterialSilver.
     // The keyword covers all 41 silver weapons of the 105-plugin load order (vanilla, Dawnguard, Dragonborn, Beyond Skyrim,
     // Immersive Weapons, Sentinel, WindhelmSSE, DragonBreak.esp; scan 4 Oct). Only IWSilverHawkBow is named silver
@@ -659,6 +662,28 @@ module.exports = (api) => {
     silverCache.set(id, v); return v;
   };
   const silverWarned = new Map();
+  // Silver they carry goes to their own mailbox: what the post can send, never a worn piece (the pass above takes it off first)
+  const carrySilver = (a, s) => {
+    const P = globalThis.__dboPostApi;
+    if (!P || typeof P.takeParcel !== 'function' || typeof P.boardLetter !== 'function') return;
+    let inv = null; try { inv = mp.get(a, 'inventory'); } catch (e) { return; }
+    const want = new Map();
+    for (const e of (inv && Array.isArray(inv.entries) ? inv.entries : [])) {
+      const id = Number(e && e.baseId) >>> 0;
+      if (!id || e.worn || e.wornLeft || !(Number(e.count) > 0) || !isSilverItem(id) || !P.sendableBase(id)) continue;
+      want.set(id, (want.get(id) || 0) + Number(e.count));
+    }
+    if (!want.size) return;
+    let items = null;
+    try { items = P.takeParcel(a, { items: [...want] }); } catch (e) { log('supernatural: silver could not be taken from the pack', e.message); return; }
+    if (!items || !items.length) return;
+    const what = P.itemsText(items);
+    try { P.boardLetter(a, C.silverMailFrom || 'Bruma', `Silver you could not bear to carry: ${what}.`, { gold: 0, items }); }
+    catch (e) { try { P.giveEntries(a, items); } catch (x) { /* logged below */ } log('supernatural: the silver letter failed; the silver was put back', e.message); return; }
+    personal(a, s.kind === 'vampire' ? `The silver sears you through the pack. You cannot carry it; it waits in your mailbox at the notice boards: ${what}.`
+      : `The silver burns even through the pack. The beast will not carry it; it waits in your mailbox at the notice boards: ${what}.`);
+    audit(`SILVER ${who(a)} (${s.kind}) could not carry ${what}; mailed to their own mailbox`);
+  };
   every('superSilver', 2000, () => {
     for (const a of onlineActors()) {
       const s = stateOf(a); if (!s || !s.kind) continue;
@@ -670,6 +695,7 @@ module.exports = (api) => {
         const last = silverWarned.get(a) || 0;
         if (Date.now() - last > 10000) { silverWarned.set(a, Date.now()); personal(a, s.kind === 'vampire' ? 'The silver sears your cold skin, and you tear it off.' : 'The silver burns like fire. The beast in you will not bear it.'); }
       }
+      if (C.silverCarry !== false) carrySilver(a, s);
     }
   });
   // The gamemode sets its hit hook on every reload before this module loads, so this wrapper never stacks
