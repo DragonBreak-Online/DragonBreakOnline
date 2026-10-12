@@ -36,6 +36,9 @@ module.exports = (api) => {
   // Lead GM and above: an emergency revoke only, never a grant (Nate, 10 Oct)
   const isLeadStaff = typeof api.isLeadStaff === 'function' ? api.isLeadStaff : () => false;
   const announce = typeof api.announce === 'function' ? api.announce : () => {};
+  // The roll and the ruler name people by their own name, never a mask's or a beast's (gamemode.js ownNameOf; tracker
+  // 1559074270959640676: a ruler in a beast form was listed as the beast)
+  const ownNameOf = typeof api.ownNameOf === 'function' ? api.ownNameOf : nameOf;
   const C = Object.assign({
     enabled: false, fiefShare: 0.25, maxEstateName: 40,
     // zone id -> 'cyrodiil' | 'skyrim': which titles its ruler grants; a zone not listed is a Skyrim hold
@@ -161,7 +164,7 @@ module.exports = (api) => {
     const pid = top ? Number((((readOfficials() || {})[z.id] || {})[top] || [])[0]) : NaN;
     if (!Number.isFinite(pid)) return null;
     const a = onlineActors().find((x) => profileOf(x) === pid) || accountActors(pid).find(exists) || 0;
-    return { name: a ? String(nameOf(a)) : '', style: rulerStyle(zid, a).replace(/^the /, '') };
+    return { name: a ? String(ownNameOf(a)) : '', style: rulerStyle(zid, a).replace(/^the /, '') };
   };
 
   // ---- the decrees ---------------------------------------------------------------------------------------------------------
@@ -196,7 +199,7 @@ module.exports = (api) => {
     if (def.estate) { const e = estateName(extra); if (e.error) return e; estate = e.name; }
     const before = nobleOf(actor, z.id);
     const was = before ? labelOf(before) : '';
-    const entry = { actor, profile: Number(tg.pid) || profileOf(actor), name: String(nameOf(actor) || tg.label || ''), female: isFemale(actor), hold: z.id, title: def.id,
+    const entry = { actor, profile: Number(tg.pid) || profileOf(actor), name: String(ownNameOf(actor) || tg.label || ''), female: isFemale(actor), hold: z.id, title: def.id,
       fief: fief || undefined, estate: estate || undefined, at: Date.now(), by: by ? who(by) : String(how || 'migration') };
     if (before && labelOf(entry) === was) return { error: `${entry.name} is already ${was}.` };
     data().nobles = data().nobles.filter((n) => n !== before).concat([entry]);
@@ -266,7 +269,7 @@ module.exports = (api) => {
     }
     return out.sort((x, y) => x.name.localeCompare(y.name));
   };
-  const nobleView = (n) => ({ actor: hex(n.actor), name: isOnline(n.actor) ? String(nameOf(n.actor)) : n.name, tag: tagSafe(n.actor), online: isOnline(n.actor),
+  const nobleView = (n) => ({ actor: hex(n.actor), name: isOnline(n.actor) ? String(ownNameOf(n.actor)) : n.name, tag: tagSafe(n.actor), online: isOnline(n.actor),
     title: n.title, label: labelOf(n), fief: n.fief || '', estate: n.estate || '', since: n.at });
   const holdIds = (a) => {
     const ids = new Set(Object.keys(C.realms || {}));

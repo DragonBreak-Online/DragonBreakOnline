@@ -18,6 +18,8 @@ const path = require('path');
 module.exports = (api) => {
   const { mp, log, personal, audit, who, display, tagOf, profileOf, onlineActors, every, registerChatCommand,
     takeGold, giveGold, depositToTreasury, boardZoneNear, zoneById, ranksOf, cfg } = api;
+  // A commission names its parties by their own name, never a mask's or a beast's (gamemode.js ownDisplay)
+  const ownDisplay = typeof api.ownDisplay === 'function' ? api.ownDisplay : display;
 
   const C = Object.assign({
     minReward: 5, maxReward: 5000, feeShare: 0.05, dutyShare: 0.05,
@@ -39,7 +41,7 @@ module.exports = (api) => {
     catch (e) { log('commissions: saving failed', e.message); }
   };
 
-  const me = (a) => ({ profile: Number(profileOf(a)), tag: tagOf(a), name: display(a) });
+  const me = (a) => ({ profile: Number(profileOf(a)), tag: tagOf(a), name: ownDisplay(a) });
   const actorOfTag = (tag) => onlineActors().find((x) => tagOf(x) === tag) || 0;
   const byId = (id) => data().list.find((c) => c.id === Number(String(id).replace(/^#/, '')));
   const live = (c) => c.state === 'open' || c.state === 'taken' || c.state === 'refused';

@@ -54,12 +54,13 @@ const PLAYER = 1, GM = 2, LEAD = 3, OTHER = 4, MASKED = 5, TRIAL = 6;
 const opened = [];
 const ui = new Map();
 const tiers = { [GM]: 'gm', [LEAD]: 'senior' };
-globalThis.__dboNameFor = (viewer, t) => (viewer === PLAYER && t === OTHER ? 'Dagny Holt' : 'Stranger');
+// PLAYER knows OTHER, and knows MASKED only as the mask (playermenu.js nameFor); MASKED's own name is Rhea Vane
+globalThis.__dboNameFor = (viewer, t) => (viewer === PLAYER && t === OTHER ? 'Dagny Holt' : viewer === PLAYER && t === MASKED ? 'Masked Person' : 'Stranger');
 const chat = [];
 // gamemode's personal, as far as the capture goes: a quiet capture keeps the line out of chat
 const personalStub = (a, t) => { const cap = globalThis.__dboTellCapture; if (cap && cap.a === (a >>> 0)) { cap.lines.push(String(t)); if (cap.quiet) return; } chat.push([a, t]); };
 const run = new Function('personal', 'isAdmin', 'deliver', 'C', 'profileOf', 'ranksOf', 'openWidget', 'closeWidget', 'onUi', 'userOf', 'handleChat',
-  'require', 'path', 'log', 'LEAD_ONLY', 'isLeadStaff', 'onlineActors', 'display', 'tagOf', 'mp', 'isTrialStaff', 'staffCan', 'TRIAL_COMMANDS',
+  'require', 'path', 'log', 'LEAD_ONLY', 'isLeadStaff', 'onlineActors', 'display', 'tagOf', 'mp', 'isTrialStaff', 'staffCan', 'TRIAL_COMMANDS', 'ownNameOf',
   section + panel + '\nreturn { registerChatCommand, panelTabsFor, openPlayerMenu, say: personal };')(
   personalStub, (a) => !!tiers[a], () => {}, { WHITE: 'fafafa', SYS: 'eda841' }, (a) => a, () => [], (a, w) => opened.push({ a, w }), () => {},
   (e, fn) => { const l = ui.get(e) || []; l.push(fn); ui.set(e, l); }, (a) => a, () => {},
@@ -68,7 +69,9 @@ const run = new Function('personal', 'isAdmin', 'deliver', 'C', 'profileOf', 'ra
   { get: (a, k) => (k === 'private.restrained' && a === PLAYER && globalThis.__bound ? { boundHands: true } : undefined) },
   // a Trial GM (gamemode.js trialFrom/staffCan): no admin tier, a short allowlist of rights and commands
   (a) => a === TRIAL, (a, what) => !!tiers[a] || (a === TRIAL && ['rename', 'chargen', 'gmcall', 'tp', 'invis', 'playerinfo', 'bugs'].includes(what)),
-  { rename: 'rename', chargen: 'chargen', tp: 'tp', charstats: 'playerinfo', bugs: 'bugs' });
+  { rename: 'rename', chargen: 'chargen', tp: 'tp', charstats: 'playerinfo', bugs: 'bugs' },
+  // gamemode.js ownNameOf: the own name behind a mask
+  (a) => (a === OTHER ? 'Dagny Holt' : a === MASKED ? 'Rhea Vane' : `Name${a}`));
 run.registerChatCommand('party', () => {}, { help: 'invite|accept|decline|leave|kick: group up for dungeons' });
 run.registerChatCommand('pigeonblock', () => {}, { help: '<name|#TAG> toggle ignoring someone\'s pigeons' });
 run.registerChatCommand('level', () => {}, { help: 'your character level and progress; /level <health|magicka|stamina> [n] spends points' });
@@ -115,7 +118,7 @@ ok(!opened[0].w.searchOnly.some((e) => commands_admin.has(e.name)), 'a Trial GM\
 
 opened.length = 0; run.openPlayerMenu(PLAYER, '', '');
 let w = opened[0].w;
-ok(JSON.stringify(w.people) === JSON.stringify([{ label: 'Dagny Holt', value: 'Dagny Holt' }]), 'a player\'s name list holds only the people they were introduced to, by the name they know', w.people);
+ok(JSON.stringify(w.people) === JSON.stringify([{ label: 'Dagny Holt', value: 'Dagny Holt' }]), 'a player\'s name list holds only the people they were introduced to, by the name they know; a mask\'s name, which finds no one, is left out', w.people);
 opened.length = 0; run.openPlayerMenu(GM, '', 'par');
 w = opened[0].w;
 ok(w.people.length === 4 && w.people.every((p) => /^#T\d$/.test(p.value)) && !w.people.some((p) => p.value === '#T2'), 'staff see everyone else online, picked by #TAG', w.people);

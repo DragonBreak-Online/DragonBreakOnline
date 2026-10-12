@@ -34,6 +34,9 @@ module.exports = (api) => {
     zoneList, zoneById, readOfficials, rankTitle, appointCap, appointCheck, appointFrom, seatOfficial, unseatOfficial,
     officialTarget, officialName, accountActors, ranksOf, APPOINT_RULES, findByName } = api;
   const personal = typeof api.personal === 'function' ? api.personal : () => {};
+  // Rosters and offers name people by their own name, never a mask's or a beast's (gamemode.js ownNameOf)
+  const ownNameOf = typeof api.ownNameOf === 'function' ? api.ownNameOf : nameOf;
+  const ownDisplay = typeof api.ownDisplay === 'function' ? api.ownDisplay : display;
   const C = Object.assign({
     enabled: true, offerHours: 24,
     // office -> the household rank titles it maps to, the first the faction has ('@leader': the faction's leader rank).
@@ -102,18 +105,18 @@ module.exports = (api) => {
     if (tg.pid === profileOf(a)) return { error: 'You cannot offer a post to yourself.' };
     const others = live().filter((o) => !(o.zone === z.id && o.pid === tg.pid));
     const offer = { id: `c${Date.now().toString(36)}${(++S.seq).toString(36)}`, zone: z.id, rank, pid: tg.pid, actor: tg.actor >>> 0, name: tg.label,
-      by: a >>> 0, byPid: profileOf(a), byWho: who(a), byName: display(a), staff: isAdmin(a), overridden: chk && chk.overridden ? chk.overridden : '', at: Date.now() };
+      by: a >>> 0, byPid: profileOf(a), byWho: who(a), byName: ownDisplay(a), staff: isAdmin(a), overridden: chk && chk.overridden ? chk.overridden : '', at: Date.now() };
     S.offers = others.concat([offer]);
     saveOffers();
     redrawCourt(tg.online);
-    if (tg.online) system(tg.online, `${display(a)} offers you the post of ${rankTitle(rank, z.id)} of ${z.name}. Open your journal (F3), Court, to accept or decline, or type /court accept.`);
+    if (tg.online) system(tg.online, `${ownDisplay(a)} offers you the post of ${rankTitle(rank, z.id)} of ${z.name}. Open your journal (F3), Court, to accept or decline, or type /court accept.`);
     audit(`${isAdmin(a) ? 'GM' : 'OFFICIAL'} ${who(a)} offered ${tg.who} the post of ${rankTitle(rank, z.id)} of ${z.name}${tg.online ? '' : ' (offline)'}`);
     return { text: `You offered ${tg.label} the post of ${rankTitle(rank, z.id)} of ${z.name}. They accept it in their journal.` };
   };
   // gamemode.js /appoint (appointFrom): a ruler's appointment becomes an offer
   globalThis.__dboCourtOffer = (a, z, rank, tg, chk) => (C.enabled ? offerTo(a >>> 0, z, rank, tg, chk) : seatOfficial(z, rank, tg, { who: who(a), staff: isAdmin(a), overridden: chk && chk.overridden }));
 
-  const selfTarget = (a) => ({ pid: profileOf(a), actor: a >>> 0, online: a >>> 0, label: display(a), who: who(a) });
+  const selfTarget = (a) => ({ pid: profileOf(a), actor: a >>> 0, online: a >>> 0, label: ownDisplay(a), who: who(a) });
   const answerOffer = (a, id, yes) => {
     const o = live().find((x) => x.id === String(id));
     if (!o || o.pid !== profileOf(a)) return { error: 'That offer has expired or was withdrawn.' };
@@ -121,7 +124,7 @@ module.exports = (api) => {
     S.offers = live().filter((x) => x.id !== o.id);
     if (!yes || !z) {
       saveOffers();
-      if (isOnline(o.by)) system(o.by, `${display(a)} declined the post of ${rankTitle(o.rank, o.zone)}${z ? ` of ${z.name}` : ''}.`);
+      if (isOnline(o.by)) system(o.by, `${ownDisplay(a)} declined the post of ${rankTitle(o.rank, o.zone)}${z ? ` of ${z.name}` : ''}.`);
       audit(`OFFICIAL ${who(a)} declined the post of ${rankTitle(o.rank, o.zone)} of ${z ? z.name : o.zone} offered by ${o.byWho}`);
       return { text: 'You declined the post.' };
     }
@@ -132,7 +135,7 @@ module.exports = (api) => {
     if (chk.error) { saveOffers(); return { error: `The offer no longer stands. ${chk.error}` }; }
     const r = seatOfficial(z, o.rank, tg, { who: o.byWho, staff: o.staff, overridden: chk.overridden, via: ', offered and accepted' });
     saveOffers();
-    if (!r.error && isOnline(o.by) && o.by !== (a >>> 0)) system(o.by, `${display(a)} accepted the post of ${rankTitle(o.rank, z.id)} of ${z.name}.`);
+    if (!r.error && isOnline(o.by) && o.by !== (a >>> 0)) system(o.by, `${ownDisplay(a)} accepted the post of ${rankTitle(o.rank, z.id)} of ${z.name}.`);
     return r.error ? r : { text: `You are now ${rankTitle(o.rank, z.id)} of ${z.name}.` };
   };
   const withdraw = (a, id) => {
@@ -167,7 +170,9 @@ module.exports = (api) => {
     const actor = on || ids[0] || 0;
     let tag = '';
     try { tag = actor ? String(tagOf(actor) || '') : ''; } catch (e) { tag = ''; }
-    return { pid: Number(pid), name: on ? nameOf(on) : officialName(pid), tag, online: !!on };
+    // The own name: the live one was "Werewolf" or "Vampire Lord" while the official was in a beast form, telling anyone who
+    // read the roster who the beast was (tracker 1559074270959640676), and "Masked Person" behind a mask
+    return { pid: Number(pid), name: on ? ownNameOf(on) : officialName(pid), tag, online: !!on };
   };
   // The ruler's office (its household rank is the leader's) is never paid a wage (economy.js payroll)
   const isRulerOffice = (rank) => ((C.factionRanks || {})[rank] || []).includes('@leader');
@@ -263,7 +268,7 @@ module.exports = (api) => {
     const z = zoneFor(a, args[1]); if (!z) return NO_COURT;
     if (!globalThis.__dboSetHoldTax || !globalThis.__dboCanSetHoldTax || !globalThis.__dboCanSetHoldTax(a, z.id)) return { error: `Only those who set ${z.name}'s tax may change it.` };
     const pct = Math.round(Number(args[2]));
-    const rate = Number.isFinite(pct) ? globalThis.__dboSetHoldTax(z.id, pct, display(a), who(a)) : null;
+    const rate = Number.isFinite(pct) ? globalThis.__dboSetHoldTax(z.id, pct, ownDisplay(a), who(a)) : null;
     if (rate == null) return { error: `A tax rate is a whole number from 0 to ${Math.round(Number(globalThis.__dboHoldTaxMax ? globalThis.__dboHoldTaxMax() : 0.3) * 100)}.` };
     return { text: `${z.name} now taxes ${Math.round(rate * 100)}% of every rent and, each week, of every property's value.` };
   };

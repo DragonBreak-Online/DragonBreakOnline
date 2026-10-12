@@ -90,6 +90,7 @@ const body = gm.slice(gm.indexOf('const sendPigeon = (a, to, rawText, zoneId, go
 const mk = new Function('S', `const { mp, takeGold, giveItem, depositToTreasury, profileOf, nameOf, tagOf, who, audit, log, onlineActors, zoneById, GOLD_BASE, lettersOf, saveLetters, sendMailState, personal } = S;
   const PIGEON_MAX_TEXT = 240, PIGEON_COOLDOWN_MS = 35 * 60000, PIGEON_MAX_UNREAD = 20; const pigeonLastSent = new Map(); const nextSignature = new Map(); const FORGE = { tellChance: {} };
   const isAdmin = () => false; const metOf = () => [${A}, ${B}, ${C}]; const pigeonFee = () => 7; const notePigeonSent = (p) => pigeonLastSent.set(p, Date.now()); const display = (a) => nameOf(a) + ' #' + tagOf(a);
+  const ownNameOf = nameOf, ownDisplay = display;   // gamemode.js: the own name behind a mask or a beast form; none here
   ${body}; return sendPigeon;`);
 const sendPigeon = () => mk(Object.assign({}, api, { GOLD_BASE: GOLD }));
 reset();

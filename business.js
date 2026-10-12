@@ -29,6 +29,9 @@ const path = require('path');
 module.exports = (api) => {
   const { mp, log, personal, audit, who, display, cfg, openWidget, closeWidget, onUi, registerChatCommand, onlineActors,
     profileOf, findByName, takeGold, giveGold, depositToTreasury, zoneOfActor, zoneById, ranksOf, distanceMeters, isAdmin } = api;
+  // The owner, the staff, a chest's renter and who set the tax are kept by their own name, never a mask's or a beast's
+  // (gamemode.js ownDisplay; tracker 1559074270959640676): "kept by Werewolf #TAG" told every visitor who the beast was
+  const ownDisplay = typeof api.ownDisplay === 'function' ? api.ownDisplay : display;
   const C = Object.assign({
     enabled: true, minRent: 1, maxRent: 200, maxChestPrice: 200, chestGraceHours: 72, maxTax: 0.3,
     taxRanks: ['jarl', 'count', 'steward'], maxStaff: 12, maxNote: 300, logKeep: 300, notesKeep: 200, perPage: 8,
@@ -286,7 +289,7 @@ module.exports = (api) => {
     const price = dayPrice(c) * days;
     if (price > 0 && !takeGold(a, price)) return personal(a, `You need ${price} gold.`);
     const from = mine && Number(c.until) > Date.now() ? Number(c.until) : Date.now();
-    Object.assign(c, { renter: profileOf(a), renterName: display(a), until: from + days * 24 * HOUR, lapsed: false });
+    Object.assign(c, { renter: profileOf(a), renterName: ownDisplay(a), until: from + days * 24 * HOUR, lapsed: false });
     const split = splitRent(b, b.zone, price);
     note(b, `${display(a)} ${mine ? 'extended' : 'rented'} a chest for ${days} day${days > 1 ? 's' : ''}, ${price} gold (${split})`); save();
     audit(`BUSINESS ${who(a)} ${mine ? 'extended' : 'rented'} chest ${hex(chest)} at ${b.name} for ${days}d, ${price} gold: ${split}`);
@@ -389,7 +392,7 @@ module.exports = (api) => {
     const byProfile = (b.staff || []).find((s) => String(s.profile) === String(q));
     if (byProfile) return { profile: Number(byProfile.profile), name: byProfile.name, actor: 0 };
     const t = q ? findByName(String(q)) : 0;
-    return t ? { profile: profileOf(t), name: display(t), actor: t } : null;
+    return t ? { profile: profileOf(t), name: ownDisplay(t), actor: t } : null;
   };
   const ACTIONS = {
     rent: (a, claim, b, v) => {
@@ -549,7 +552,7 @@ module.exports = (api) => {
         d.archived[`${hex(claim.primary)}@${Date.now()}`] = Object.assign({}, old, { owed: 0, owedMovedTo: owed > 0 ? heldKey(old) : undefined });
         audit(`BUSINESS ${who(a)} opened a business on claim ${hex(claim.primary)}; the previous record (${old.name}, owner ${old.owner}) was archived, ${owed} gold held for its owner's next login, ${Object.keys(carried).length} rented chest(s) carried over`);
       }
-      data().businesses[hex(claim.primary)] = { name, owner: profileOf(a), ownerChar: a >>> 0, ownerName: display(a), zone: zoneOfActor(a), rentGold: 0, staff: [], chests: carried, owed: 0, log: [], notes: [] };
+      data().businesses[hex(claim.primary)] = { name, owner: profileOf(a), ownerChar: a >>> 0, ownerName: ownDisplay(a), zone: zoneOfActor(a), rentGold: 0, staff: [], chests: carried, owed: 0, log: [], notes: [] };
       if (Object.keys(carried).length) note(data().businesses[hex(claim.primary)], `${Object.keys(carried).length} chest(s) still rented from the previous business, kept for their renters`);
       const b = data().businesses[hex(claim.primary)]; note(b, `${display(a)} opened ${name}`); save();
       audit(`BUSINESS ${who(a)} opened ${name} (claim ${hex(claim.primary)}, ${zoneName(b.zone)})`);
@@ -614,7 +617,7 @@ module.exports = (api) => {
     if (!canTax(a, zone)) return personal(a, `Only the ${C.taxRanks.join(', ')} of ${zoneName(zone)} set its tax.`);
     const pct = Number(arg);
     if (!Number.isFinite(pct) || pct < 0 || pct > C.maxTax * 100) return personal(a, `Set a rate from 0 to ${Math.round(C.maxTax * 100)}: /tax <percent>`);
-    const rate = setHoldTax(zone, pct, display(a), who(a));
+    const rate = setHoldTax(zone, pct, ownDisplay(a), who(a));
     personal(a, `${zoneName(zone)} now takes ${Math.round(rate * 100)}% of every rent, and of every property's value at the weekly reckoning.`);
   }, { help: "the hold's tax on rents where you stand; officials: /tax <percent>" });
 

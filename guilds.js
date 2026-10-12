@@ -20,6 +20,10 @@ module.exports = (api) => {
     onlineActors, isAdmin, findByName, audit, who, cfg, profileOf } = api;
   // Online first, then offline characters too (Add member); an older gamemode passes only findByName
   const findAnyByName = typeof api.findAnyByName === 'function' ? api.findAnyByName : findByName;
+  // Rosters, invitations and the news of who joined or leads name people by their own name, never a mask's or a beast's
+  // (gamemode.js ownNameOf; tracker 1559074270959640676): a pack's leader won by a challenge was written in as "Werewolf"
+  const ownNameOf = typeof api.ownNameOf === 'function' ? api.ownNameOf : nameOf;
+  const ownDisplay = typeof api.ownDisplay === 'function' ? api.ownDisplay : display;
   // A GM observes; the powers below are for a Lead GM and above (claude-jake's review A3). Fails closed with an old gamemode.
   const isLeadStaff = typeof api.isLeadStaff === 'function' ? api.isLeadStaff : () => false;
 
@@ -208,7 +212,7 @@ module.exports = (api) => {
     if (cap && (!had || (f.ranks[had.rank] || {}).role !== role) && roleCount(fid, role) >= cap) return `${f.name} already has ${cap} ${shownAt(f, rank)}${cap === 1 ? '' : 's'}.`;
     const lim = limitProblem(a, fid, rank, by === undefined ? a : by);
     if (lim && !useOverride(a, fid, lim)) return lim.text;
-    rosterOf(fid)[String(a >>> 0)] = { rank, name: nameOf(a), tag: tagOf(a), since: had ? had.since : Date.now() };
+    rosterOf(fid)[String(a >>> 0)] = { rank, name: ownNameOf(a), tag: tagOf(a), since: had ? had.since : Date.now() };
     save(); mirror(a);
     return null;
   };
@@ -402,7 +406,7 @@ module.exports = (api) => {
     const list = invitesOf(t).filter((i) => i.fid !== fid);
     list.push({ fid, from: a >>> 0, at: Date.now() });
     ST.invites.set(t >>> 0, list);
-    system(t, `${display(a)} invites you to join ${f.name}. Open your factions (F3) or type /faction accept ${fid}.`);
+    system(t, `${ownDisplay(a)} invites you to join ${f.name}. Open your factions (F3) or type /faction accept ${fid}.`);
     audit(`FACTION ${who(a)} invited ${who(t)} to ${f.name}`);
     return `You invited ${nameOf(t)} to ${f.name}.`;
   };
@@ -415,7 +419,7 @@ module.exports = (api) => {
     const err = setMember(fid, t, lowestRank(fid));
     if (err) return err;
     const title = shownAt(f, lowestRank(fid));
-    for (const m of Object.keys(rosterOf(fid)).map(Number)) if (m !== (t >>> 0) && isOnline(m)) system(m, `${display(t)} has joined ${f.name}.`);
+    for (const m of Object.keys(rosterOf(fid)).map(Number)) if (m !== (t >>> 0) && isOnline(m)) system(m, `${ownDisplay(t)} has joined ${f.name}.`);
     audit(`FACTION ${who(t)} joined ${f.name} as ${title}`);
     return `You are now ${title} of ${f.name}.`;
   };
@@ -452,7 +456,7 @@ module.exports = (api) => {
     // cults and everyone else see only their own. Members of a faction outside your own stay hidden (factionView).
     const circles = new Set(mine.map(circleOf).filter(Boolean));
     const list = isAdmin(a) ? [...FACTIONS.keys()] : mine.concat([...FACTIONS.keys()].filter((fid) => !mine.includes(fid) && circles.has(circleOf(fid))));
-    const invites = invitesOf(a).map((i) => ({ factionId: i.fid, name: FACTIONS.get(i.fid).name, from: display(i.from) }));
+    const invites = invitesOf(a).map((i) => ({ factionId: i.fid, name: FACTIONS.get(i.fid).name, from: ownDisplay(i.from) }));
     return {
       type: 'faction', id: WIDGET_ID, nonce, admin: isLeadStaff(a), staff: isAdmin(a), self: a >>> 0,
       roles: Object.keys(ROLES), rankTitleMax: RANK_TITLE_MAX, ranksMax: RANKS_MAX,
@@ -845,7 +849,7 @@ module.exports = (api) => {
     const view = factionView(a >>> 0, f.id);
     // The invitations the household has out, for those who may invite
     const pending = !view.canInvite ? [] : [...ST.invites.entries()].flatMap(([t, list]) => (list || [])
-      .filter((i) => i.fid === f.id && Date.now() - i.at < INVITE_MS).map((i) => ({ actorId: Number(t) >>> 0, name: nameOf(Number(t) >>> 0), from: nameOf(i.from), at: i.at })));
+      .filter((i) => i.fid === f.id && Date.now() - i.at < INVITE_MS).map((i) => ({ actorId: Number(t) >>> 0, name: ownNameOf(Number(t) >>> 0), from: ownNameOf(i.from), at: i.at })));
     return Object.assign(view, { pending, mine: invitesOf(a).some((i) => i.fid === f.id) });
   };
   // The office is the source of truth (Nate, 3 Oct, Q3): seating someone sets their household rank to the office's
@@ -1031,7 +1035,7 @@ module.exports = (api) => {
       if (!ev || !ek || ev.rank !== lead) continue;
       ev.rank = Math.min(lead + 1, lowestRank(f.id));
       const err = setMember(f.id, killer, lead); if (err) { log(`pack challenge: ${err}`); continue; }
-      for (const m of Object.keys(rosterOf(f.id)).map(Number)) if (isOnline(m)) personal(m, `${nameOf(killer)} has brought down ${nameOf(victim)} and leads ${f.name} now.`);
+      for (const m of Object.keys(rosterOf(f.id)).map(Number)) if (isOnline(m)) personal(m, `${ownNameOf(killer)} has brought down ${ownNameOf(victim)} and leads ${f.name} now.`);
       audit(`FACTION ${who(killer)} took ${f.name} from ${who(victim)} by challenge`);
     }
   };
@@ -1039,7 +1043,8 @@ module.exports = (api) => {
   // Names and tags follow a character across renames and masks being taken off
   globalThis.__dboFactionLogin = (a) => {
     let changed = false;
-    for (const m of membershipsOf(a)) { if (m.e.name !== nameOf(a) || m.e.tag !== tagOf(a)) { m.e.name = nameOf(a); m.e.tag = tagOf(a); changed = true; } }
+    const own = ownNameOf(a);
+    for (const m of membershipsOf(a)) { if (m.e.name !== own || m.e.tag !== tagOf(a)) { m.e.name = own; m.e.tag = tagOf(a); changed = true; } }
     if (changed) save();
     mirror(a);
   };

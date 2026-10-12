@@ -24,6 +24,10 @@ const path = require('path');
 
 module.exports = (api) => {
   const { mp, log, personal, system, registerChatCommand, onUi, openWidget, closeWidget, sendPacket, findByName, display, who, audit, profileOf, nameOf, onlineActors, isAdmin, giveItem, cfg, every } = api;
+  // The party's roster names its members by their own name, never a mask's or a beast's (gamemode.js ownNameOf; tracker
+  // 1559074270959640676)
+  const ownNameOf = typeof api.ownNameOf === 'function' ? api.ownNameOf : nameOf;
+  const ownDisplay = typeof api.ownDisplay === 'function' ? api.ownDisplay : display;
   // goldChance/goldMult: coin used to be in EVERY container - chestLoot always added some, smallLoot
   // added some half the time, and smallLoot's "nothing rolled" fallback added some again. With ~88
   // containers in a lease that is a flood. Now a chest carries coin goldChance of the time and the
@@ -1559,13 +1563,13 @@ module.exports = (api) => {
       // Every member's rest counts, not only the claimer's: a fresh leader brought the last run's party back to a refill
       const resting = partyMembers(pid).filter((x) => x !== pid && restingUntil(x, d.id) > Date.now());
       if (resting.length) {
-        const names = resting.map((x) => { const m = actorByProfile(x); return m ? nameOf(m) : 'a member who is away'; });
+        const names = resting.map((x) => { const m = actorByProfile(x); return m ? ownNameOf(m) : 'a member who is away'; });
         const until = Math.max(...resting.map((x) => restingUntil(x, d.id)));
         return deny(casterId, `${d.name} still rests for ${names.join(', ')}. Claim it without them, or come back in ${minutesLeft(until)} minutes.`, `${d.id} rests for party member(s) ${resting.join(', ')}`);
       }
       const nonce = `${casterId.toString(16)}-${Date.now().toString(36)}`;
       ST.pending.set(casterId, { nonce, dungeonId: d.id, entrance, at: Date.now() });
-      const partyNames = partyMembers(pid).filter((x) => x !== pid).map((x) => { const a = actorByProfile(x); return a ? nameOf(a) : `#${x}`; });
+      const partyNames = partyMembers(pid).filter((x) => x !== pid).map((x) => { const a = actorByProfile(x); return a ? ownNameOf(a) : `#${x}`; });
       // A boss dungeon is built for a party, not a raid (Nate, 2026-09-28); config dungeons.raid.bossDungeonMax (0: no cap)
       const cap = d.expedition && !isRaidRuin(d) ? Number(RAID.bossDungeonMax) || 0 : 0;
       if (cap && partyNames.length + 1 > cap) { ST.pending.delete(casterId); return deny(casterId, `${d.name} is a boss dungeon, built for up to ${cap}; your group is ${partyNames.length + 1}. A raid ruin takes up to ${C.raidMax}.`, `${d.id} boss dungeon, group of ${partyNames.length + 1} over ${cap}`); }
@@ -2012,7 +2016,7 @@ module.exports = (api) => {
   const setRaidMult = (pid, on) => { const x = actorByProfile(pid); if (!x) return; const v = on ? C.raidXpMult : 1; try { if (mp.get(x, 'private.partyXpMult') !== v) mp.set(x, 'private.partyXpMult', v); } catch (e) { /* offline */ } };
   const refreshRaidMults = () => { for (const p of ST.parties.values()) if (isRaid(p)) for (const m of p.members) setRaidMult(m, !insideRaidRuin(m)); };
   const pushParty = (p) => {
-    const members = p ? [...p.members].map((m) => { const x = actorByProfile(m); return x ? { id: x, name: nameOf(x), leader: m === p.leader } : null; }).filter(Boolean) : [];
+    const members = p ? [...p.members].map((m) => { const x = actorByProfile(m); return x ? { id: x, name: ownNameOf(x), leader: m === p.leader } : null; }).filter(Boolean) : [];
     if (p) for (const m of p.members) { const x = actorByProfile(m); setRaidMult(m, isRaid(p) && !insideRaidRuin(m)); if (x && globalThis.__dboSetParty) globalThis.__dboSetParty(x, members); }
   };
   // Parties outlive a restart or a crash: every change is written to parties.json (runtime, gitignored, beside the
@@ -2062,7 +2066,7 @@ module.exports = (api) => {
     if (leader === pid) {
       const next = [...p.members][0];
       const na = actorByProfile(next);
-      p.leader = next; p.leaderName = na ? display(na) : `#${next}`;
+      p.leader = next; p.leaderName = na ? ownDisplay(na) : `#${next}`;
       ST.parties.delete(leader); ST.parties.set(next, p);
       for (const m of p.members) ST.memberOf.set(m, next);
       handedTo = p.leaderName;
@@ -2070,7 +2074,7 @@ module.exports = (api) => {
     }
     pushParty(p);
     if (quiet) return;
-    const name = (() => { const a = actorByProfile(pid); return a ? display(a) : `#${pid}`; })();
+    const name = (() => { const a = actorByProfile(pid); return a ? ownDisplay(a) : `#${pid}`; })();
     for (const m of p.members) { const a = actorByProfile(m); if (a) system(a, `${name} left the party.${handedTo ? ` ${handedTo} now leads it.` : ''}`); }
   };
   const leaveCommand = (a) => {
@@ -2103,12 +2107,12 @@ module.exports = (api) => {
         if (partyOf(pid)) return personal(a, 'Leave your party first.');
         let lp = ST.parties.get(inv.from);
         const leaderActor = actorByProfile(inv.from); if (!leaderActor) return personal(a, 'They are gone.');
-        if (!lp) { lp = { leader: inv.from, leaderName: display(leaderActor), members: new Set([inv.from]) }; ST.parties.set(inv.from, lp); ST.memberOf.set(inv.from, inv.from); }
+        if (!lp) { lp = { leader: inv.from, leaderName: ownDisplay(leaderActor), members: new Set([inv.from]) }; ST.parties.set(inv.from, lp); ST.memberOf.set(inv.from, inv.from); }
         if (lp.members.size >= C.raidMax) return personal(a, 'That raid is full.');
         const wasRaid = isRaid(lp);
         lp.members.add(pid); ST.memberOf.set(pid, inv.from);
         saveParties();
-        for (const m of lp.members) { const x = actorByProfile(m); if (x) system(x, `${display(a)} joined the ${isRaid(lp) ? 'raid' : 'party'} (${lp.members.size}/${isRaid(lp) ? C.raidMax : C.partyMax}).`); }
+        for (const m of lp.members) { const x = actorByProfile(m); if (x) system(x, `${ownDisplay(a)} joined the ${isRaid(lp) ? 'raid' : 'party'} (${lp.members.size}/${isRaid(lp) ? C.raidMax : C.partyMax}).`); }
         if (isRaid(lp) && !wasRaid) for (const m of lp.members) { const x = actorByProfile(m); if (x) personal(x, `More than ${C.partyMax} makes this a raid: skill gain is halved while it lasts, except inside a raid ruin.`); }
         pushParty(lp);
         return;
@@ -2122,7 +2126,7 @@ module.exports = (api) => {
       }
       default: {
         if (!p) return personal(a, 'Not in a party. /party invite <name|#TAG>, /party accept, /party leave, /party kick <name>.');
-        const names = [...p.members].map((m) => { const x = actorByProfile(m); return (x ? display(x) : `#${m}`) + (m === p.leader ? ' (leader)' : ''); });
+        const names = [...p.members].map((m) => { const x = actorByProfile(m); return (x ? ownDisplay(x) : `#${m}`) + (m === p.leader ? ' (leader)' : ''); });
         return personal(a, `${isRaid(p) ? 'Raid' : 'Party'} (${p.members.size}/${isRaid(p) ? C.raidMax : C.partyMax}): ${names.join(', ')}. /leave to leave it.`);
       }
     }
