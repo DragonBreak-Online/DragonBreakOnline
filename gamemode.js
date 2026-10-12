@@ -1700,6 +1700,12 @@ globalThis.__dboHandlers.customPacket = (userId, rawContent) => {
       return;
     }
     // Measurement for the gliding beast: what the beast's own client reads for its locomotion (every 2 s in form)
+    // The map locations this character discovered (mapprogress.js): reported by the client, kept on the character
+    if (content.customPacketType === 'dboMapSync') {
+      const a = actorOf(userId);
+      if (a && typeof globalThis.__dboMapSync === 'function') { try { globalThis.__dboMapSync(a, content); } catch (e) { log('map sync failed', e.message); } }
+      return;
+    }
     if (content.customPacketType === 'dboBeastDiag') {
       const a = actorOf(userId);
       if (a) logCapped(`beastdiag:${userId}`, 40, `beastdiag ${display(a)} speedSampled=${Number(content.speedSampled).toFixed(1)} running=${!!content.running} sprinting=${!!content.sprinting}`);
@@ -6879,6 +6885,12 @@ try {
   delete require.cache[WEAPONRACKS_JS];
   require(WEAPONRACKS_JS)({ mp, log, personal, audit, who, cfg, recordOf, every, onlineActors });
 } catch (e) { log('weaponracks.js failed to load:', e.stack || e.message); globalThis.__dboWeaponRack = null; globalThis.__dboWeaponRackSweep = null; }
+// ---- discovered map locations, kept per character (server\mapprogress.js, config "mapProgress"; Nate, 12 Oct) ----
+try {
+  const MAPPROGRESS_JS = path.resolve('mapprogress.js');
+  delete require.cache[MAPPROGRESS_JS];
+  require(MAPPROGRESS_JS)({ mp, log, sendPacket, cfg });
+} catch (e) { log('mapprogress.js failed to load:', e.stack || e.message); globalThis.__dboMapSync = null; globalThis.__dboMapMarkersOf = null; }
 // ---- the Dawnguard War Axe SPR taken back, its smith refunded (server\sprstrip.js, config "sprStrip"; Nate, 11 Oct) ----------
 try {
   const SPRSTRIP_JS = path.resolve('sprstrip.js');
