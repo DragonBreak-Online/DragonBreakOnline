@@ -56,9 +56,12 @@ const path = require('path');
 module.exports = (api) => {
   const { mp, log, personal, audit, who, display, cfg, onUi, onlineActors, every, readOfficials, zoneById } = api;
   const C = Object.assign({ enabled: false, maxTaxRate: 0.30, defaultPropertyValue: 2000, maxPropertyValue: 1000000, maxWage: 100000, reckonDay: 0, reckonHour: 0,
-    wageShare: 0.25, wageIncomeShare: 0.75, assessEveryDays: 7, assessMaxStep: 2,
+    wageShare: 0.25, wageIncomeShare: 0.75, wageSavingsShare: 0.25, assessEveryDays: 7, assessMaxStep: 2,
     titheRate: 0.10, titheTo: 'imperial-legion', titheProvinces: ['cyrodiil'],
-    dominionStipend: 300, dominionStipendTo: 'thalmor', dominionStipendFrom: 'the Aldmeri Dominion' }, cfg.economy || {});
+    dominionStipend: 300, dominionStipendTo: 'thalmor', dominionStipendFrom: 'the Aldmeri Dominion',
+    // A hold's offices are paid these each week until its ruler or Steward sets another (Nate, 12 Oct); rulers are never paid
+    defaultWages: { guard: 50, strongholdguard: 50, captain: 100, guardcaptain: 100, commander: 100, strongholdcommander: 100,
+      courtmage: 100, shaman: 100, wisewoman: 100, steward: 150, bane: 150 } }, cfg.economy || {});
   const FILE = path.resolve('economy.json');
   const WEEK = 7 * 86400000;
   const BALANCE = 'private.bankGold';
@@ -156,6 +159,8 @@ module.exports = (api) => {
   // A hold's land pays the hold's own rate (business.js /tax, Nate 12 Oct: "everything in bruma that can be owned"); any other
   // faction, or a hold that never set one, its rate from the faction panel
   const holdZoneOf = (fid) => { const f = info(fid); return f && f.kind === 'hold' && f.zone ? f.zone : null; };
+  // The hold's tax-setting officials (business.js taxRanks: a Steward too) set its rate here as well; wages stay the leader's
+  const setsHoldTax = (a, fid) => { const zone = holdZoneOf(fid); try { return !!zone && !!fn('__dboCanSetHoldTax') && !!fn('__dboCanSetHoldTax')(a, zone); } catch (e) { return false; } };
   const rateOf = (fid) => {
     const own = Number(data().rates[fid]) || 0;
     const zone = holdZoneOf(fid);
@@ -213,9 +218,18 @@ module.exports = (api) => {
   };
 
   // ---- wages -----------------------------------------------------------------------------------------------------------
+  // A faction's wage per rank: what its leader or Steward set, over the default for a hold's offices
+  const wageTable = (fid) => {
+    const set = data().wages[fid] || {};
+    const f = info(fid);
+    if (!(f && f.kind === 'hold' && f.zone)) return Object.assign({}, set);
+    const z = zoneById(f.zone); const dflt = {};
+    for (const r of (z && z.officials) || []) if (Number(C.defaultWages && C.defaultWages[r]) > 0) dflt[r] = Math.floor(Number(C.defaultWages[r]));
+    return Object.assign(dflt, set);
+  };
   // [{ key: owed key, actor: character to pay (0 if none), rank, name }] for one faction
   const payroll = (fid) => {
-    const f = info(fid); const table = data().wages[fid] || {};
+    const f = info(fid); const table = wageTable(fid);
     const out = [];
     if (f && f.kind === 'hold' && f.zone) {
       const o = (readOfficials() || {})[f.zone] || {};
@@ -308,7 +322,9 @@ module.exports = (api) => {
     if (T) payStipend(T, report);
     // Wages: owed first, then this week's
     if (T) {
-      const factions = new Set(Object.keys(d.wages).concat(Object.keys(d.owed)));
+      const holds = [];
+      try { for (const zone of Object.keys(readOfficials() || {})) { const fid = fn('__dboHoldFactionOf') ? fn('__dboHoldFactionOf')(zone) : null; if (fid) holds.push(fid); } } catch (e) { /* no officials */ }
+      const factions = new Set(Object.keys(d.wages).concat(Object.keys(d.owed), holds));
       for (const fid of factions) {
         try {
           const r = report(fid);
@@ -322,12 +338,15 @@ module.exports = (api) => {
             due.push({ key, actor: o.actor, wage: o.gold, rank: o.rank, back: true });
           }
           for (const p of payroll(fid)) due.push(p);
-          // The week's wages take at most wageIncomeShare of what came in since the last reckoning, and never more than
-          // wageShare of the balance (A1-3). A treasury's first reckoning counts only this week's taxes and tithes as income.
+          // The week's wages take at most wageIncomeShare of what came in since the last reckoning, never more than wageShare of
+          // the balance (A1-3), plus wageSavingsShare of the savings before it (Nate, 12 Oct: wages may come from the treasury
+          // too), never more than the balance. A treasury's first reckoning counts only this week's taxes and tithes as income.
           const balance = T.balance(fid);
           const last = Number(d.balanceAfter[fid]);
           const income = Number.isFinite(last) && fid in d.balanceAfter ? Math.max(0, balance - last) : Math.max(0, r.income - (r.tithe || 0) + (r.tithesIn || 0) + (r.stipend || 0));
-          let budget = Math.floor(Math.min(Math.max(0, Number(C.wageIncomeShare) || 0) * income, Math.max(0, Number(C.wageShare) || 0) * balance));
+          const savings = Math.max(0, balance - income);
+          const fromIncome = Math.min(Math.max(0, Number(C.wageIncomeShare) || 0) * income, Math.max(0, Number(C.wageShare) || 0) * balance);
+          let budget = Math.floor(Math.min(balance, fromIncome + Math.max(0, Number(C.wageSavingsShare) || 0) * savings));
           r.wageBudget = budget;
           const fresh = {};
           const owe = (p, actor) => { fresh[p.key] = { actor, gold: ((fresh[p.key] || {}).gold || 0) + p.wage, rank: p.rank }; r.owed += p.wage; r.unpaid.push(p.key); };
@@ -385,7 +404,7 @@ module.exports = (api) => {
   onUi('econRate', (a, args) => {
     if (!fromPanel(a, args)) return;
     const fid = String(args[1] || ''); const pct = Number(args[2]);
-    if (!leads(a, fid)) return reply(a, false, 'Only the leader sets the tax rate.');
+    if (!leads(a, fid) && !setsHoldTax(a, fid)) return reply(a, false, 'Only the leader, or a hold official who sets its tax, sets the tax rate.');
     if (!Number.isFinite(pct) || pct < 0 || pct > C.maxTaxRate * 100) return reply(a, false, `The tax rate is from 0% to ${Math.round(C.maxTaxRate * 100)}%.`);
     data().rates[fid] = Math.round(pct) / 100; save();
     const zone = holdZoneOf(fid);
@@ -393,15 +412,23 @@ module.exports = (api) => {
     audit(`ECONOMY ${who(a)} set ${nameOfFaction(fid)}'s tax rate to ${Math.round(pct)}%`);
     reply(a, true, `${nameOfFaction(fid)} taxes property at ${Math.round(pct)}% from the next reckoning.`);
   });
-  onUi('econWage', (a, args) => {
-    if (!fromPanel(a, args)) return;
-    const fid = String(args[1] || ''); const rank = String(args[2] || '').slice(0, 64); const gold = Math.floor(Number(args[3]));
-    if (!leads(a, fid)) return reply(a, false, 'Only the leader sets wages.');
-    if (!rank || !Number.isFinite(gold) || gold < 0 || gold > C.maxWage) return reply(a, false, `A wage is a whole number of gold from 0 to ${C.maxWage}.`);
-    if (gold > 0 && holdsRank(a, fid, rank)) return reply(a, false, `You hold the rank of ${rank} yourself, and nobody sets their own wage.`);
+  // The leader, or a hold's tax-setting official (a Steward too), sets a rank's wage; nobody sets their own
+  const setWage = (a, fid, rank, gold) => {
+    rank = String(rank || '').slice(0, 64); gold = Math.floor(Number(gold));
+    if (!leads(a, fid) && !setsHoldTax(a, fid)) return { ok: false, text: 'Only the leader, or a hold official who keeps its books, sets wages.' };
+    if (!rank || !Number.isFinite(gold) || gold < 0 || gold > C.maxWage) return { ok: false, text: `A wage is a whole number of gold from 0 to ${C.maxWage}.` };
+    if (gold > 0 && holdsRank(a, fid, rank)) return { ok: false, text: `You hold the rank of ${rank} yourself, and nobody sets their own wage.` };
     data().wages[fid] = data().wages[fid] || {}; data().wages[fid][rank] = gold; save();
     audit(`ECONOMY ${who(a)} set ${nameOfFaction(fid)}'s weekly wage for ${rank} to ${gold}`);
-    reply(a, true, `${rank}: ${gold} gold a week.`);
+    return { ok: true, text: `${rank}: ${gold} gold a week.` };
+  };
+  globalThis.__dboEconomySetWage = setWage;
+  globalThis.__dboEconomyWages = (fid) => wageTable(fid);
+  globalThis.__dboEconomyKeepsBooks = (a, fid) => leads(a, fid) || setsHoldTax(a, fid);
+  onUi('econWage', (a, args) => {
+    if (!fromPanel(a, args)) return;
+    const r = setWage(a, String(args[1] || ''), args[2], args[3]);
+    reply(a, r.ok, r.text);
   });
   // The leader forgives what the treasury owes: one payee (its owed key) or everyone (no key)
   onUi('econForgive', (a, args) => {
@@ -469,9 +496,17 @@ module.exports = (api) => {
   // What the faction panel shows: for each faction this character leads, its rate, wages by rank, and the last reckoning
   globalThis.__dboEconomyView = (a) => {
     const led = fn('__dboRealmFactionsLedBy') ? fn('__dboRealmFactionsLedBy')(a) : [];
+    // Holds whose books this official keeps without leading them (a Steward): the rate and the wages
+    const keeps = [];
+    try {
+      for (const zone of Object.keys(readOfficials() || {})) {
+        const fid = fn('__dboHoldFactionOf') ? fn('__dboHoldFactionOf')(zone) : null;
+        if (fid && !led.includes(fid) && !keeps.includes(fid) && setsHoldTax(a, fid)) keeps.push(fid);
+      }
+    } catch (e) { /* no officials yet */ }
     return {
       enabled: !!C.enabled, maxTaxRate: C.maxTaxRate, nextReckoning: nextAfter(data().lastReckoning || Date.now()),
-      factions: led.map((fid) => {
+      factions: led.concat(keeps).map((fid) => {
         const f = info(fid) || {};
         let ranks = [];
         // labels: each wage key (an office id, or a rank's own title) as people read it, staff names included (rolenames.js)
@@ -483,7 +518,7 @@ module.exports = (api) => {
           ranks = fn('__dboGuildRanks')(fid);
           try { labels = fn('__dboGuildRankShown') ? fn('__dboGuildRankShown')(fid) || {} : {}; } catch (e) { labels = {}; }
         }
-        return { id: fid, name: nameOfFaction(fid), rate: rateOf(fid), wages: Object.assign({}, data().wages[fid] || {}), ranks, labels, report: data().reports[fid] || null };
+        return { id: fid, name: nameOfFaction(fid), rate: rateOf(fid), wages: wageTable(fid), ranks, labels, report: data().reports[fid] || null };
       }),
     };
   };
