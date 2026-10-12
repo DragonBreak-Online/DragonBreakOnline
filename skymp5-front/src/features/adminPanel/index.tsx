@@ -411,7 +411,7 @@ const AdminPanel = ({ data }: { data: AdminPanelData }) => {
           <div className="admin-panel__strip">
             <span className="admin-panel__strip-text">Acting on: <b>{acting ? acting.label : 'You'}</b></span>
             <TargetPicker targets={targets} value={actingOn} onChange={setActingOn} label="Change" />
-            {!canSpawn ? <span className="admin-panel__hint">{trial ? 'Trial GM: TP to, Rename and the Invisible mode' : 'GM: you observe; changes are for a Lead GM and above'}</span> : null}
+            {!canSpawn ? <span className="admin-panel__hint">{trial ? 'Trial GM: TP to a player or a location, Rename, and the Invisible and Ghost modes' : 'GM: you observe; changes are for a Lead GM and above'}</span> : null}
           </div>
         ) : null}
 
