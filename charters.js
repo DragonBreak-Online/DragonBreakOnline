@@ -40,6 +40,12 @@ module.exports = (api) => {
   const path = require('path');
   const { mp, log, personal, audit, who, display, nameOf, cfg, registerChatCommand, onlineActors, isAdmin, findByName,
     profileOf, takeGold, giveItem, every } = api;
+  // A charter names its founders by their own name, never a beast's, and a mask's only while rosterPrivacy.masks is off
+  // (gamemode.js ownNameOf)
+  const ownNameOf = typeof api.ownNameOf === 'function' ? api.ownNameOf : nameOf;
+  // An answer about someone /charter invite found names a beast or a mask as the asker sees them, with no #TAG
+  // (gamemode.js displayFor): "Werewolf #TAG" gave away the tag the client hides over a beast
+  const displayFor = typeof api.displayFor === 'function' ? api.displayFor : (viewer, t) => display(t);
   const isLeadStaff = typeof api.isLeadStaff === 'function' ? api.isLeadStaff : () => false;
   const staffNote = typeof api.staffNote === 'function' ? api.staffNote : () => {};
   const approvalForum = typeof api.approvalForum === 'function' ? api.approvalForum : () => {};
@@ -261,7 +267,7 @@ module.exports = (api) => {
     const now = Date.now();
     s.charters[String(n)] = {
       n, status: 'gathering', name: chk.name, kind: k, pitch: '', seat: null,
-      founder: { actor: a >>> 0, profile: prof, name: nameOf(a) }, founders: [], invited: {},
+      founder: { actor: a >>> 0, profile: prof, name: ownNameOf(a) }, founders: [], invited: {},
       createdAt: now, windowEndsAt: now + C.founderWindowHours * HOUR, flags: chk.flags, fee: { held: 0 }, edits: [],
     };
     save();
@@ -329,16 +335,16 @@ module.exports = (api) => {
     if (!role) role = REQUIRED.find((x) => !c.founders.some((f) => f.role === x) && !Object.values(c.invited).some((i) => i && i.role === x)) || 'member';
     const t = findByName(words.join(' '));
     if (!t || !isOnline(t)) return 'They must be online. Usage: /charter invite <player|#TAG> [officer|sergeant|mage|blacksmith|tailor|member]';
-    if ((t >>> 0) === c.founder.actor || c.founders.some((f) => f.actor === (t >>> 0))) return `${display(t)} is already a founder.`;
+    if ((t >>> 0) === c.founder.actor || c.founders.some((f) => f.actor === (t >>> 0))) return `${displayFor(a, t)} is already a founder.`;
     if (c.founders.length + 1 >= C.maxFounders) return `A charter has at most ${C.maxFounders} founders.`;
     const prof = profile(t);
-    if (prof < 0) return `${display(t)} is not fully logged in.`;
+    if (prof < 0) return `${displayFor(a, t)} is not fully logged in.`;
     if (C.distinctAccounts && accountsOf(c).includes(prof)) return 'Founders must be different players, not characters of one account.';
-    if (openFor(prof)) return `${display(t)} is already on an open charter.`;
+    if (openFor(prof)) return `${displayFor(a, t)} is already on an open charter.`;
     c.invited[String(t >>> 0)] = { at: Date.now(), role }; save();
-    personal(t, `${display(a)} asks you to co-found ${c.name} (charter #${c.n}) as its ${titleOf(role)}. Type /charter confirm ${c.n} to agree, before ${new Date(c.windowEndsAt).toISOString().slice(0, 16).replace('T', ' ')} UTC.`);
+    personal(t, `${displayFor(t, a)} asks you to co-found ${c.name} (charter #${c.n}) as its ${titleOf(role)}. Type /charter confirm ${c.n} to agree, before ${new Date(c.windowEndsAt).toISOString().slice(0, 16).replace('T', ' ')} UTC.`);
     audit(`CHARTER #${c.n} ${who(a)} invited ${who(t)} as ${titleOf(role)}`);
-    return `You asked ${display(t)} to co-found ${c.name} as its ${titleOf(role)}.`;
+    return `You asked ${displayFor(a, t)} to co-found ${c.name} as its ${titleOf(role)}.`;
   };
   const confirm = (a, n) => {
     const c = charter(n);
@@ -351,7 +357,7 @@ module.exports = (api) => {
     const inv = c.invited[String(a >>> 0)];
     const role = COFOUNDER_ROLES.includes(inv && inv.role) ? inv.role : 'member';
     delete c.invited[String(a >>> 0)];
-    c.founders.push({ actor: a >>> 0, profile: prof, name: nameOf(a), role, at: Date.now() });
+    c.founders.push({ actor: a >>> 0, profile: prof, name: ownNameOf(a), role, at: Date.now() });
     save();
     audit(`CHARTER #${c.n} ${who(a)} confirmed as its ${titleOf(role)}`);
     const left = missing(c);
@@ -515,7 +521,7 @@ module.exports = (api) => {
     if (pendingDisband(g.id)) return `The GMs already have ${g.name}'s request to disband.`;
     const def = playerFactions().find((f) => f.id === g.id);
     const c = def && charter(def.charter);
-    const d = { n: (store().disbandNext = (Number(store().disbandNext) || 0) + 1), fid: g.id, name: g.name, by: a >>> 0, byName: nameOf(a), reason: why, at: Date.now(), status: 'pending' };
+    const d = { n: (store().disbandNext = (Number(store().disbandNext) || 0) + 1), fid: g.id, name: g.name, by: a >>> 0, byName: ownNameOf(a), reason: why, at: Date.now(), status: 'pending' };
     store().disbands.push(d);
     save();
     const treasury = globalThis.__dboTreasury ? globalThis.__dboTreasury.balance(g.id) : 0;

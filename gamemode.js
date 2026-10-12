@@ -196,6 +196,41 @@ const tagOf = (actorId) => {
   } catch (e) { return '????'; }
 };
 const display = (actorId) => `${nameOf(actorId)} #${tagOf(actorId)}`;
+// Names for lists and answers (tracker 1559074270959640676: the Court tab listed a Jarl in werewolf form as "Werewolf", so
+// anyone who looked learnt who the beast was; playermenu.js keeps the mask and beast rules). What is said and done in the
+// world keeps the name shown (nameOf, display, playermenu.js nameFor).
+// - realNameOf: the own name behind a mask and a beast form ("Stranger" for a beast whose own name is lost).
+// - publicNameOf: the name that goes with the #TAG the world sees. The client hides the #TAG over a beast, so a beast is
+//   its own name; it draws the #TAG under "Masked Person", so a mask stays the mask. /players and the answer to a lookup
+//   (/appoint, a court offer, a title, a staff hire, an invitation, a dossier) use it.
+// - ownNameOf: rosters and records (offices, factions, titles, the party, contacts, letters, jobs). Never the beast's
+//   name; behind a mask the mask's name, as before 12 Oct, unless gamemode-config.json rosterPrivacy.masks is true (off
+//   as shipped, and a missing key is off). True names a masked character by their own name beside the #TAG the client
+//   draws under the mask, so a roster's reader can tell who is behind it, and a title's decree names them to the whole
+//   server (re-verify of 12 Oct). Nate's call.
+const ROSTER_MASKS = (cfg.rosterPrivacy || {}).masks === true;
+const namedBy = (fn, actorId) => {
+  try { const f = globalThis[fn]; const n = typeof f === 'function' ? String(f(actorId) || '') : ''; if (n) return n; } catch (e) { /* the name shown */ }
+  return nameOf(actorId);
+};
+const realNameOf = (actorId) => namedBy('__dboOwnName', actorId);
+const publicNameOf = (actorId) => namedBy('__dboPublicName', actorId);
+const ownNameOf = (actorId) => (ROSTER_MASKS ? realNameOf(actorId) : publicNameOf(actorId));
+const ownDisplay = (actorId) => `${ownNameOf(actorId)} #${tagOf(actorId)}`;
+const publicDisplay = (actorId) => `${publicNameOf(actorId)} #${tagOf(actorId)}`;
+// Behind a mask or in a beast form: no name finds them (findByName), only the #TAG or the profile id
+const disguisedOf = (actorId) => {
+  try { const f = globalThis.__dboDisguised; if (typeof f === 'function') return f(actorId) === true; } catch (e) { /* below */ }
+  return realNameOf(actorId) !== nameOf(actorId);
+};
+// Someone a lookup found, as the reply names them to the viewer: the name and #TAG, but a beast or a mask as the viewer
+// sees them in the world, with no #TAG (X > Invite to Party on a beast answered "Werewolf #TAG": the tag the client hides
+// over a beast, which /players and the rosters pair with the own name)
+const displayFor = (viewer, t) => {
+  if (!disguisedOf(t)) return display(t);
+  try { const f = globalThis.__dboNameFor; const n = typeof f === 'function' ? String(f(viewer, t) || '') : ''; if (n) return n; } catch (e) { /* the name shown */ }
+  return nameOf(t);
+};
 // A character made in a Trial GM's extra slot (fork spawn.ts writes it at creation): for staff work only
 const staffCharOf = (actorId) => { try { return mp.get(actorId, 'private.dboStaffChar') === true; } catch (e) { return false; } };
 const who = (actorId) => { const d = discordOf(actorId); return `${display(actorId)} (profile ${profileOf(actorId)}${d ? `, <@${d}>` : ''})`; };
@@ -335,8 +370,12 @@ const findByName = (query) => {
     q = q.slice(0, tagMatch.index).trim();
   }
   const byId = all.find(a => a.toString(16) === q || String(profileOf(a)) === q); if (byId) return byId;
-  const exact = all.filter(a => nameOf(a).toLowerCase() === q); if (exact.length === 1) return exact[0];
-  const prefix = all.filter(a => nameOf(a).toLowerCase().startsWith(q)); return prefix.length === 1 ? prefix[0] : 0;
+  // No name finds one behind a mask or in a beast form (disguisedOf), only the #TAG or the profile id: "Werewolf" or
+  // "Masked Person" found whoever wore it and the answer gave away their #TAG, and the own name was answered with the
+  // beast or the mask beside it (tracker 1559074270959640676)
+  const named = all.filter((a) => !disguisedOf(a)).map((a) => [a, nameOf(a).toLowerCase()]);
+  const exact = named.filter(([, n]) => n === q); if (exact.length === 1) return exact[0][0];
+  const prefix = named.filter(([, n]) => n.startsWith(q)); return prefix.length === 1 ? prefix[0][0] : 0;
 };
 
 // ---- Discord audit log -----------------------------------------------------------------------
@@ -590,7 +629,9 @@ const resyncAdminFlag = (userId, a) => {
 const watchPlayers = () => {
   for (const a of onlineActors()) {
     const p = profileOf(a); if (!(p > 0)) continue;
-    const now = { name: nameOf(a), tier: tierOf(a), roles: rolesOf(a).sort().join(',') };
+    // The own name behind a mask: a mask put on is not a rename, and /officials and the Court tab read this for an
+    // official who is offline (logging out unmasks)
+    const now = { name: realNameOf(a), tier: tierOf(a), roles: rolesOf(a).sort().join(',') };
     const prev = seen.get(p);
     if (!adminResyncing(a)) { try { if ((mp.get(a, ADMIN_PROP) === true) !== (now.tier !== null)) mp.set(a, ADMIN_PROP, now.tier !== null); } catch (e) { /* ignore */ } }
     // A beast form's name (beastform.js) is not a rename; seen keeps the real one until the revert
@@ -818,7 +859,9 @@ registerChatCommand('help', (a, args) => {
   personal(a, `No command or topic "${want}". Type /help for the list.`);
 }, { help: '[topic|command] this list, a topic, or one command explained' });
 registerChatCommand('adminhelp', (a, args) => staffHelp(a, String(args || '').trim().toLowerCase()), { admin: true, help: '[topic] staff commands by topic, in the admin tab' });
-registerChatCommand('players', (a) => { const n = onlineActors().map(display); personal(a, `${n.length} online: ${n.join(', ')}`); }, { help: 'who is online' });
+// A beast by its own name, a mask as the mask (publicDisplay): the #TAG drawn under a mask beside the own name here took
+// the mask off for anyone who typed /players
+registerChatCommand('players', (a) => { const n = onlineActors().map(publicDisplay); personal(a, `${n.length} online: ${n.join(', ')}`); }, { help: 'who is online' });
 registerChatCommand('whoami', (a) => personal(a, `${display(a)}  actor ff${a.toString(16)}  profile ${profileOf(a)}${discordOf(a) ? '  discord ' + discordOf(a) : ''}  tier ${staffTierOf(a) || 'player'}`), { help: 'your name, tag and ids' });
 registerChatCommand('ping', (a) => personal(a, 'Pong!'), { help: 'connection test' });
 registerChatCommand('kick', (a, args) => {
@@ -916,7 +959,8 @@ const notePigeonSent = (p) => {
   for (const [k, v] of pigeonLastSent) if (Date.now() - v > PIGEON_COOLDOWN_MS) pigeonLastSent.delete(k);
   saveSoon(PIGEON_COOLDOWN_FILE, () => JSON.stringify(Object.fromEntries(pigeonLastSent)));
 };
-// Two characters have met once they stood within speaking range in the same place, recorded on both
+// Two characters have met once they stood within speaking range in the same place, recorded on both (but never with
+// someone in disguise, below)
 const MEET_TICK_MS = 5000;
 const MAX_MET = 500;
 const metOf = (a) => { try { const r = mp.get(a, 'private.metActors'); return Array.isArray(r) ? r : []; } catch (e) { return []; } };
@@ -941,7 +985,7 @@ every('meet', MEET_TICK_MS, () => {
     try {
       const w = String(mp.get(a, 'worldOrCellDesc') || ''); const p = mp.get(a, 'pos');
       if (!w || !Array.isArray(p)) continue;
-      const me = { a, p, w, i: all.length, cx: Math.floor(p[0] / reach), cy: Math.floor(p[1] / reach) };
+      const me = { a, p, w, i: all.length, cx: Math.floor(p[0] / reach), cy: Math.floor(p[1] / reach), d: disguisedOf(a) };
       all.push(me);
       const key = `${w}|${me.cx}|${me.cy}`; const cell = grid.get(key); if (cell) cell.push(me); else grid.set(key, [me]);
     } catch (e) { /* between cells */ }
@@ -952,7 +996,11 @@ every('meet', MEET_TICK_MS, () => {
       for (const o of grid.get(`${me.w}|${me.cx + dx}|${me.cy + dy}`) || []) {
         if (o.i <= me.i) continue;
         if (Math.hypot(me.p[0] - o.p[0], me.p[1] - o.p[1], me.p[2] - o.p[2]) > reach) continue;
-        noteMet(me.a, o.a, changed); noteMet(o.a, me.a, changed);
+        // Nobody meets someone behind a mask or in a beast form: the ledger and the pigeon coop list each contact by name
+        // and #TAG, so a stranger who only stood near them would learn who they are (re-verify of 12 Oct). Someone in
+        // disguise still meets the people they see; met once undisguised, they stay met.
+        if (!o.d) noteMet(me.a, o.a, changed);
+        if (!me.d) noteMet(o.a, me.a, changed);
       }
     }
   }
@@ -1011,7 +1059,10 @@ const findAnyByName = (query) => {
     // A deleted character stays in the name and tag indexes until a restart (naming.js __dboFormGone)
     const live = (ids) => (Array.isArray(ids) ? ids.filter((id) => !(typeof globalThis.__dboFormGone === 'function' && globalThis.__dboFormGone(id))) : []);
     if (tagMatch) { const r = live(mp.findFormsByPropertyValue('private.indexed.tagKey', tagMatch[1])); if (r.length) return Number(r[0]); }
-    const r = live(mp.findFormsByPropertyValue('private.indexed.nameKey', q.replace(/\s*#[a-z0-9]{4}$/, '')));
+    // The index keeps the own name: one online behind a mask or in a beast form is not found by it either (findByName)
+    const on = new Set(onlineActors().map((x) => x >>> 0));
+    const r = live(mp.findFormsByPropertyValue('private.indexed.nameKey', q.replace(/\s*#[a-z0-9]{4}$/, '')))
+      .filter((id) => !(on.has(Number(id) >>> 0) && disguisedOf(Number(id) >>> 0)));
     if (Array.isArray(r) && r.length === 1) return Number(r[0]);
     if (Array.isArray(r) && r.length > 1) return -r.length; // ambiguous
   } catch (e) { log('name lookup failed', e.message); }
@@ -1109,7 +1160,7 @@ const sendPigeon = (a, to, rawText, zoneId, goldRaw, itemsRaw) => {
     const price = admin ? 0 : pigeonFee(a, to);
     const charges = prep ? prep.gold + prep.tax + prep.fee : 0;
     if (price + charges > 0 && !takeGold(a, price + charges)) {
-      return { ok: false, text: prep ? `The flight costs ${price} gold, the parcel's tax ${prep.tax + prep.fee}${prep.gold ? `, and you send ${prep.gold}` : ''}: ${price + charges} gold in all, and you do not have it.` : `A pigeon to ${nameOf(to)} costs ${price} gold, and you do not have it.` };
+      return { ok: false, text: prep ? `The flight costs ${price} gold, the parcel's tax ${prep.tax + prep.fee}${prep.gold ? `, and you send ${prep.gold}` : ''}: ${price + charges} gold in all, and you do not have it.` : `A pigeon to ${ownNameOf(to)} costs ${price} gold, and you do not have it.` };
     }
     let items = [];
     if (prep && prep.items.length) {
@@ -1122,7 +1173,9 @@ const sendPigeon = (a, to, rawText, zoneId, goldRaw, itemsRaw) => {
     const at = Date.now();
     const sig = nextSignature.get(a);
     nextSignature.delete(a);
-    let from = display(a);
+    // Signed with the own name, never a beast's, and a mask's only while rosterPrivacy.masks is off; /sign leaves a
+    // letter unsigned or forges one
+    let from = ownDisplay(a);
     if (sig && sig.unsigned) from = 'Unsigned';
     else if (sig && sig.name) from = sig.name + (Math.random() < (Number(FORGE.tellChance[sig.tier]) || 0) ? ' (the hand does not quite match)' : '');
     const letter = { id: `${at.toString(36)}${Math.floor(Math.random() * 1296).toString(36)}`, from, fromProfile: p, text, at, read: false };
@@ -1139,7 +1192,7 @@ const sendPigeon = (a, to, rawText, zoneId, goldRaw, itemsRaw) => {
     if (online) { personal(to, prep ? 'A pigeon has brought you a letter with a parcel. Collect it at any notice board.' : 'A pigeon has brought you a letter. Read it at any notice board.'); sendMailState(to); }
     const zone = zoneId ? zoneById(zoneId) : null;
     log(`pigeon ${who(a)} -> ${nameOf(to)} #${tagOf(to)}${taxed > 0 ? ` (${taxed} gold, ${paid ? zoneId + ' treasury' : 'no treasury'})` : ''}: ${text}`);
-    return { ok: true, text: `Your pigeon flies to ${nameOf(to)}, who will ${prep ? 'collect it' : 'read it'} at a notice board${taxed > 0 ? `. ${taxed} gold${zone ? ` to the ${zone.name} treasury` : ''}` : ''}.` };
+    return { ok: true, text: `Your pigeon flies to ${ownNameOf(to)}, who will ${prep ? 'collect it' : 'read it'} at a notice board${taxed > 0 ? `. ${taxed} gold${zone ? ` to the ${zone.name} treasury` : ''}` : ''}.` };
   } catch (e) { return { ok: false, text: 'The pigeon refused to fly: ' + e.message }; }
 };
 const openPigeonCoop = (a, result, resultKind, view) => {
@@ -1150,7 +1203,8 @@ const openPigeonCoop = (a, result, resultKind, view) => {
   const contacts = [];
   for (const id of metOf(a)) {
     try { if (!mp.get(id, 'appearance')) continue; } catch (e) { continue; }
-    contacts.push({ id, name: nameOf(id), tag: tagOf(id), online: online.includes(id), price: admin ? 0 : pigeonFee(a, id) });
+    // Who they met: a contact behind a mask or in a beast form keeps their own name here
+    contacts.push({ id, name: ownNameOf(id), tag: tagOf(id), online: online.includes(id), price: admin ? 0 : pigeonFee(a, id) });
   }
   contacts.sort((x, y) => x.name.localeCompare(y.name));
   const left = PIGEON_COOLDOWN_MS - (Date.now() - (pigeonLastSent.get(profileOf(a)) || 0));
@@ -2891,7 +2945,8 @@ const panelPeople = (a) => {
     if ((t >>> 0) === (a >>> 0)) continue;
     if (staff) { out.push({ label: display(t), value: '#' + tagOf(t) }); continue; }
     const known = nameFor ? nameFor(a, t) : '';
-    if (known && known !== 'Stranger' && !out.some((p) => p.value === known)) out.push({ label: known, value: known });
+    // No name finds one behind a mask or in a beast form (findByName): they are left out
+    if (known && known !== 'Stranger' && !disguisedOf(t) && !out.some((p) => p.value === known)) out.push({ label: known, value: known });
     if (out.length >= 120) break;
   }
   return out.sort((x, y) => x.label.localeCompare(y.label));
@@ -3404,11 +3459,15 @@ const officialTarget = (query) => {
     if (!(pid >= 0)) return { error: 'That character has no profile id.' };
   }
   return { pid, actor, online: onlineActors().find((x) => profileOf(x) === pid) || 0,
-    label: actor ? display(actor) : `profile ${pid}`, who: actor ? who(actor) : `profile ${pid}` };
+    // The answer names a masked character as the mask shows them: the #TAG asked for may be the one drawn under the mask
+    label: actor ? publicDisplay(actor) : `profile ${pid}`, who: actor ? who(actor) : `profile ${pid}` };
 };
+// An official as the rosters name them (ownNameOf), never by a beast's name: online by the live character, offline by the
+// own name the name watch kept (watchPlayers, seen)
 const officialName = (pid) => {
+  const on = onlineActors().find((x) => profileOf(x) === Number(pid)); if (on) return ownNameOf(on);
   const s = seen.get(Number(pid)); if (s) return s.name;
-  const ids = accountActors(Number(pid)); return ids.length ? nameOf(ids[0]) : `profile ${pid}`;
+  const ids = accountActors(Number(pid)); return ids.length ? ownNameOf(ids[0]) : `profile ${pid}`;
 };
 // Skyrim's law in the server's lore (4E 211, the Discord lore-archives): only a Nord or an Imperial sits as Jarl. The
 // Owners may seat anyone else by adding "override" (Nate, 2026-09-27). The race is the character's own, under any beast
@@ -4127,7 +4186,7 @@ log(`scholar reading ${READ.enabled ? 'on' : 'off'}: ${READ_LINES.length} Skyrim
 try {
   const DUNGEONS_JS = path.resolve('dungeons.js'); // gamemode.js is evaluated outside the bundle's module tree, so resolve by cwd
   delete require.cache[DUNGEONS_JS];
-  require(DUNGEONS_JS)({ mp, log, personal, system, registerChatCommand, onUi, openWidget, closeWidget, sendPacket, findByName, display, who, audit, profileOf, nameOf, onlineActors, isAdmin, giveItem, cfg, every });
+  require(DUNGEONS_JS)({ mp, log, ownNameOf, ownDisplay, displayFor, personal, system, registerChatCommand, onUi, openWidget, closeWidget, sendPacket, findByName, display, who, audit, profileOf, nameOf, onlineActors, isAdmin, giveItem, cfg, every });
 } catch (e) { log('dungeons.js failed to load:', e.stack || e.message); globalThis.__dboDungeonActivate = null; globalThis.__dboAggroHit = null; globalThis.__dboSpellUnlock = null; }
 
 // ---- coin purses: Harvesting nodes that pay gold ------------------------------------------------
@@ -6685,7 +6744,7 @@ businessFailClosed.failClosed = true;
 try {
   const BUSINESS_JS = path.resolve('business.js');
   delete require.cache[BUSINESS_JS];
-  require(BUSINESS_JS)({ mp, log, personal, audit, who, display, cfg, openWidget, closeWidget, onUi, registerChatCommand, onlineActors,
+  require(BUSINESS_JS)({ mp, log, ownNameOf, ownDisplay, publicDisplay, personal, audit, who, display, cfg, openWidget, closeWidget, onUi, registerChatCommand, onlineActors,
     profileOf, findByName, takeGold, giveGold: (a, n) => giveItem(a, GOLD_BASE, n) !== false, depositToTreasury, zoneOfActor, zoneById,
     ranksOf, distanceMeters, isAdmin });
 } catch (e) { log('business.js failed to load:', e.stack || e.message); globalThis.__dboBusinessActivate = businessFailClosed; globalThis.__dboBusinessLogin = null; globalThis.__dboBusinessRent = null; globalThis.__dboHoldTax = null; globalThis.__dboBusinessLog = null; }
@@ -6730,7 +6789,7 @@ try {
 try {
   const COMMISSIONS_JS = path.resolve('commissions.js');
   delete require.cache[COMMISSIONS_JS];
-  require(COMMISSIONS_JS)({ mp, log, personal, audit, who, display, tagOf, profileOf, onlineActors, every, registerChatCommand, cfg,
+  require(COMMISSIONS_JS)({ mp, log, ownNameOf, ownDisplay, personal, audit, who, display, tagOf, profileOf, onlineActors, every, registerChatCommand, cfg,
     takeGold, giveGold: (a, n) => giveItem(a, GOLD_BASE, n) !== false, depositToTreasury, boardZoneNear, zoneById, ranksOf });
 } catch (e) { log('commissions.js failed to load:', e.stack || e.message); }
 
@@ -6738,14 +6797,14 @@ try {
 try {
   const POST_JS = path.resolve('post.js');
   delete require.cache[POST_JS];
-  require(POST_JS)({ mp, log, personal, audit, who, nameOf, tagOf, profileOf, discordOf, onlineActors, every, cfg, onUi, takeGold, giveItem,
+  require(POST_JS)({ mp, log, ownNameOf, ownDisplay, personal, audit, who, nameOf, tagOf, profileOf, discordOf, onlineActors, every, cfg, onUi, takeGold, giveItem,
     goldOf, GOLD_BASE, recordOf, depositToTreasury, zoneById, boardZoneNear, lettersOf, saveLetters, sendMailState, itemName: (d) => adminItemName(d) });
 } catch (e) { log('post.js failed to load:', e.stack || e.message); globalThis.__dboPostApi = null; }
 // ---- couriers: goods carried board to board, to a drop point or in person (server\couriers.js, config "couriers") ----
 try {
   const COURIERS_JS = path.resolve('couriers.js');
   delete require.cache[COURIERS_JS];
-  require(COURIERS_JS)({ mp, log, personal, audit, who, nameOf, tagOf, profileOf, discordOf, onlineActors, every, cfg, onUi, takeGold, giveItem,
+  require(COURIERS_JS)({ mp, log, ownNameOf, ownDisplay, personal, audit, who, nameOf, tagOf, profileOf, discordOf, onlineActors, every, cfg, onUi, takeGold, giveItem,
     goldOf, GOLD_BASE, recordOf, depositToTreasury, zoneById, zoneList, boardZoneNear, metOf, isAdmin, registerChatCommand, openWidget, closeWidget });
 } catch (e) {
   log('couriers.js failed to load:', e.stack || e.message);
@@ -6756,7 +6815,7 @@ try {
 try {
   const TENANCY_JS = path.resolve('tenancy.js');
   delete require.cache[TENANCY_JS];
-  require(TENANCY_JS)({ mp, log, personal, audit, who, display, tagOf, profileOf, onlineActors, every, registerChatCommand, cfg,
+  require(TENANCY_JS)({ mp, log, ownNameOf, ownDisplay, personal, audit, who, display, tagOf, profileOf, onlineActors, every, registerChatCommand, cfg,
     takeGold, giveGold: (a, n) => giveItem(a, GOLD_BASE, n) !== false, depositToTreasury, zoneById, openWidget, closeWidget, onUi });
 } catch (e) { log('tenancy.js failed to load:', e.stack || e.message); }
 
@@ -6764,7 +6823,7 @@ try {
 try {
   const LEDGER_JS = path.resolve('ledger.js');
   delete require.cache[LEDGER_JS];
-  require(LEDGER_JS)({ mp, log, personal, audit, who, nameOf, tagOf, profileOf, onlineActors, registerChatCommand, isAdmin, isWorldspace,
+  require(LEDGER_JS)({ mp, log, ownNameOf, ownDisplay, personal, audit, who, nameOf, tagOf, profileOf, onlineActors, registerChatCommand, isAdmin, isWorldspace,
     metOf, forgetMet, sendPigeon, boardZoneNear, zoneOfActor, cfg });
 } catch (e) { log('ledger.js failed to load:', e.stack || e.message); }
 
@@ -6958,7 +7017,7 @@ try {
 try {
   const GUILDS_JS = path.resolve('guilds.js');
   delete require.cache[GUILDS_JS];
-  require(GUILDS_JS)({ mp, log, personal, system, registerChatCommand, onUi, openWidget, closeWidget, display, nameOf, tagOf, onlineActors, isAdmin, isLeadStaff, findByName, findAnyByName, audit, who, cfg, profileOf, readOfficials });
+  require(GUILDS_JS)({ mp, log, ownNameOf, ownDisplay, publicNameOf, personal, system, registerChatCommand, onUi, openWidget, closeWidget, display, nameOf, tagOf, onlineActors, isAdmin, isLeadStaff, findByName, findAnyByName, audit, who, cfg, profileOf, readOfficials });
 } catch (e) { log('guilds.js failed to load:', e.stack || e.message); globalThis.__dboFactionMenu = null; globalThis.__dboFactionMenuEntries = null; globalThis.__dboFactionMenuAction = null; globalThis.__dboFactionLogin = null; }
 
 // ---- territories, land markers and official war (server\realm.js, territories.json, WAR_DESIGN.md) ---------------------
@@ -6973,7 +7032,7 @@ try {
 try {
   const ECONOMY_JS = path.resolve('economy.js');
   delete require.cache[ECONOMY_JS];
-  require(ECONOMY_JS)({ mp, log, personal, audit, who, display, cfg, onUi, onlineActors, every, readOfficials, zoneById });
+  require(ECONOMY_JS)({ mp, log, ownNameOf, ownDisplay, personal, audit, who, display, cfg, onUi, onlineActors, every, readOfficials, zoneById });
 } catch (e) { log('economy.js failed to load:', e.stack || e.message); globalThis.__dboEconomyView = null; }
 
 // ---- weapon racks in homes (server\weaponracks.js, weapon-racks.json from Nat's PC, config "weaponRacks") ------------------
@@ -7080,7 +7139,7 @@ try {
 try {
   const COURT_JS = path.resolve('court.js');
   delete require.cache[COURT_JS];
-  require(COURT_JS)({ mp, log, system, personal, registerChatCommand, audit, who, display, nameOf, tagOf, onUi, onlineActors, isAdmin, profileOf, cfg, findByName,
+  require(COURT_JS)({ mp, log, ownNameOf, ownDisplay, system, personal, registerChatCommand, audit, who, display, nameOf, tagOf, onUi, onlineActors, isAdmin, profileOf, cfg, findByName,
     zoneList, zoneById, readOfficials, rankTitle, appointCap, appointCheck, appointFrom, seatOfficial, unseatOfficial, officialTarget,
     officialName, accountActors, ranksOf, APPOINT_RULES });
 } catch (e) { log('court.js failed to load:', e.stack || e.message); globalThis.__dboCourtOffer = null; globalThis.__dboCourtOfficeSync = null; if (globalThis.__dboJournalSections) delete globalThis.__dboJournalSections.court; }
@@ -7088,7 +7147,7 @@ try {
 try {
   const NOBILITY_JS = path.resolve('nobility.js');
   delete require.cache[NOBILITY_JS];
-  require(NOBILITY_JS)({ mp, log, personal, registerChatCommand, audit, who, display, nameOf, tagOf, onUi, onlineActors, profileOf, cfg, every, isLeadStaff,
+  require(NOBILITY_JS)({ mp, log, ownNameOf, ownDisplay, publicNameOf, personal, registerChatCommand, audit, who, display, nameOf, tagOf, onUi, onlineActors, profileOf, cfg, every, isLeadStaff,
     zoneById, readOfficials, ranksOf, accountActors, officialTarget, announce: (text) => broadcast(`[[S]]#{${C.SYS}}${text}`) });
 } catch (e) { log('nobility.js failed to load:', e.stack || e.message); for (const k of ['__dboNobility', '__dboNobilityFiefCut']) globalThis[k] = null; if (globalThis.__dboJournalSections) delete globalThis.__dboJournalSections.nobility; }
 
@@ -7096,7 +7155,7 @@ try {
 try {
   const THALMOR_JS = path.resolve('thalmor.js');
   delete require.cache[THALMOR_JS];
-  require(THALMOR_JS)({ mp, log, personal, system, audit, who, display, nameOf, tagOf, cfg, onUi, onlineActors, registerChatCommand, isAdmin, isLeadStaff,
+  require(THALMOR_JS)({ mp, log, ownNameOf, ownDisplay, publicNameOf, personal, system, audit, who, display, nameOf, tagOf, cfg, onUi, onlineActors, registerChatCommand, isAdmin, isLeadStaff,
     findAnyByName, zoneOfActor });
 } catch (e) {
   log('thalmor.js failed to load:', e.stack || e.message);
@@ -7222,7 +7281,7 @@ try {
 try {
   const CHARTERS_JS = path.resolve('charters.js');
   delete require.cache[CHARTERS_JS];
-  require(CHARTERS_JS)({ mp, log, personal, audit, who, display, nameOf, cfg, registerChatCommand, onlineActors, isAdmin, isLeadStaff,
+  require(CHARTERS_JS)({ mp, log, ownNameOf, ownDisplay, displayFor, personal, audit, who, display, nameOf, cfg, registerChatCommand, onlineActors, isAdmin, isLeadStaff,
     findByName, profileOf, takeGold, giveItem, every, staffNote, approvalForum });
 } catch (e) { log('charters.js failed to load:', e.stack || e.message); }
 // ---- alchemy at the ordinary labs: the nearest vanilla potion for a client-side mix (server alchemy.js) ------------

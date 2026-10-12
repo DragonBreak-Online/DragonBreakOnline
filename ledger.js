@@ -16,6 +16,10 @@ const path = require('path');
 module.exports = (api) => {
   const { mp, log, personal, audit, who, nameOf, tagOf, profileOf, onlineActors, registerChatCommand, isAdmin, isWorldspace,
     metOf, forgetMet, sendPigeon, boardZoneNear, zoneOfActor, cfg } = api;
+  // The book names everyone by their own name, never a beast's, and a mask's only while rosterPrivacy.masks is off: a
+  // contact listed as "Werewolf" beside their #TAG and factions told the reader who the beast was (gamemode.js
+  // ownNameOf; tracker 1559074270959640676)
+  const ownNameOf = typeof api.ownNameOf === 'function' ? api.ownNameOf : nameOf;
 
   const C = Object.assign({ atBoards: true, atHome: true, pointReach: 300, perPage: 15, maxNote: 160, maxGroup: 24 }, cfg.ledger || {});
   const POINTS_FILE = path.resolve('ledger-points.json');
@@ -97,13 +101,13 @@ module.exports = (api) => {
   const contactsOf = (a) => {
     const online = new Set(onlineActors());
     const mine = new Map(guildsOf(a).map((g) => [g.id, g]));
-    const myFamily = familyName(nameOf(a));
+    const myFamily = familyName(ownNameOf(a));
     const b = book(a);
     const out = [];
     for (const id of metOf(a)) {
       try { if (!mp.get(id, 'appearance')) continue; } catch (e) { continue; }
       const e = b[id] || {};
-      const name = nameOf(id);
+      const name = ownNameOf(id);
       const shared = guildsOf(id).filter((g) => mine.has(g.id)).map((g) => ({ name: g.name, title: g.shown || g.title }));
       let group = e.group || '';
       if (!group && myFamily && familyName(name) === myFamily) group = 'Family';

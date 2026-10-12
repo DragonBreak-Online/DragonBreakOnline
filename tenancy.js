@@ -22,6 +22,9 @@ const path = require('path');
 module.exports = (api) => {
   const { mp, log, personal, audit, who, display, tagOf, profileOf, onlineActors, every, registerChatCommand,
     takeGold, giveGold, depositToTreasury, zoneById, cfg } = api;
+  // A lease names landlord and tenant by their own name, never a beast's, and a mask's only while rosterPrivacy.masks
+  // is off (gamemode.js ownDisplay)
+  const ownDisplay = typeof api.ownDisplay === 'function' ? api.ownDisplay : display;
   const openWidget = api.openWidget || (() => false), closeWidget = api.closeWidget || (() => false), onUi = api.onUi || (() => {});
 
   const C = Object.assign({ reach: 400, maxDeposit: 20000, maxWeekly: 5000, offerHours: 48, maxPrice: 1000000 }, cfg.tenancy || {});
@@ -97,7 +100,7 @@ module.exports = (api) => {
     return best ? idOf(best) : 0;
   };
 
-  const me = (a) => ({ profile: Number(profileOf(a)), char: a >>> 0, tag: tagOf(a), name: display(a) });
+  const me = (a) => ({ profile: Number(profileOf(a)), char: a >>> 0, tag: tagOf(a), name: ownDisplay(a) });
   // A claim is one character's once property is per character (housingSystem.ts ownsRecord), else the account's
   const owns = (a, rec) => { try { const H = housing(); if (H && typeof H.ownsRecord === 'function') return H.ownsRecord(rec, a) === true; } catch (e) { /* the account's */ } return Number(rec.owner) === Number(profileOf(a)); };
   const perChar = () => { try { const H = housing(); return !!H && typeof H.perCharacter === 'function' && H.perCharacter() === true; } catch (e) { return false; } };

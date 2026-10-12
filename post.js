@@ -34,6 +34,9 @@ const path = require('path');
 module.exports = (api) => {
   const { mp, log, personal, audit, who, nameOf, tagOf, profileOf, discordOf, onlineActors, every, cfg, onUi, takeGold, giveItem,
     goldOf, GOLD_BASE, recordOf, depositToTreasury, zoneById, boardZoneNear, lettersOf, saveLetters, sendMailState, itemName } = api;
+  // A notice names whoever posted it by their own name, never a beast's, and a mask's only while rosterPrivacy.masks is
+  // off (gamemode.js ownNameOf; tracker 1559074270959640676)
+  const ownNameOf = typeof api.ownNameOf === 'function' ? api.ownNameOf : nameOf;
 
   const C = Object.assign({
     enabled: true,
@@ -244,7 +247,7 @@ module.exports = (api) => {
     if (data().orders.filter((o) => open(o) && (o.poster === (a >>> 0) || (o.account && o.account === accountOf(a)) || o.posterProfile === profileOf(a))).length >= C.maxOpen) return { ok: false, text: `You already have ${C.maxOpen} supply orders up. Cancel one or wait for them to fill.` };
     const fee = feeFor(reward);
     if (!takeGold(a, reward + fee)) return { ok: false, text: `The order needs ${reward} gold for the reward and ${fee} to post. You carry ${goldOf(a)}.` };
-    const o = { id: data().next++, zone: zone.id, zoneName: zone.name, poster: a >>> 0, posterName: nameOf(a), posterTag: tagOf(a), posterProfile: profileOf(a),
+    const o = { id: data().next++, zone: zone.id, zoneName: zone.name, poster: a >>> 0, posterName: ownNameOf(a), posterTag: tagOf(a), posterProfile: profileOf(a),
       account: accountOf(a), baseId: id, desc: String(desc), name: nameOfItem(id), count, filled: 0, reward, held: reward, fee,
       postedAt: Date.now(), expiresAt: Date.now() + C.openDays * DAY, state: 'open' };
     data().orders.push(o);
@@ -281,7 +284,7 @@ module.exports = (api) => {
       giveEntries(a, items);
       return { ok: false, text: 'The board could not take the goods just now. They are yours again.' };
     }
-    try { supplyLetter(o, nameOf(a), n, items); }
+    try { supplyLetter(o, ownNameOf(a), n, items); }
     catch (e) { log(`post: the goods of order #${o.id} could not reach ${o.posterName}: ${e.message}`); }
     if (pay > 0) giveItem(a, GOLD_BASE, pay);
     audit(`SUPPLY ${who(a)} delivered ${n}x ${o.name} to #${o.id} of ${o.posterName} #${o.posterTag} for ${pay} gold${o.state === 'done' ? ' (filled)' : ''}`);

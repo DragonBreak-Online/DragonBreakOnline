@@ -80,23 +80,45 @@ module.exports = (api) => {
   const nameFor = (viewer, a) => beastName(a) || (isMasked(a) ? C.maskName : knownBy(viewer).includes(a >>> 0) ? nameOf(a) : 'Stranger');
   // Other modules name players the same way (downed.js: who raised you); a name must never skip the introductions
   globalThis.__dboNameFor = nameFor;
-  // For staff eyes only (debugsnap.js: a /bug report's #bug-tracker thread and snapshot), never for a player: the name
-  // shown is the mask's or the beast's, so a /bug from behind a mask reached staff as "Masked Person #TAG" and they had
-  // to work out who sent it (D15: #VKRS, #8KWH and #LLX8, 11 Oct). '' when the name shown is the character's own; else
-  // their own name and why it is hidden, "Raven (masked)". A beast keeps the look from before the change in
-  // private.beast.original (beastform.js); a mask on at the change holds the name in maskName, as any mask does.
-  globalThis.__dboStaffName = (a) => {
-    const masked = isMasked(a), beast = beastName(a), shown = nameOf(a);
-    if (!masked && !beast && !isMaskName(shown)) return '';
+  // The character's own name behind a mask or a beast form, '' when it is lost. A beast keeps the look from before the
+  // change in private.beast.original (beastform.js); a mask on at the change holds the name in maskName, as any mask does.
+  const ownBehind = (a, beast) => {
     let own = realName(a);
     if (!own && beast) {
       const s = get(a, 'private.beast', null);
       const n = String((s && s.original && s.original.name) || '').trim();
       if (n && !isMaskName(n)) own = n;
     }
+    return own;
+  };
+  // For staff eyes only (debugsnap.js: a /bug report's #bug-tracker thread and snapshot), never for a player: the name
+  // shown is the mask's or the beast's, so a /bug from behind a mask reached staff as "Masked Person #TAG" and they had
+  // to work out who sent it (D15: #VKRS, #8KWH and #LLX8, 11 Oct). '' when the name shown is the character's own; else
+  // their own name and why it is hidden, "Raven (masked)".
+  globalThis.__dboStaffName = (a) => {
+    const masked = isMasked(a), beast = beastName(a), shown = nameOf(a);
+    if (!masked && !beast && !isMaskName(shown)) return '';
+    const own = ownBehind(a, beast);
     const why = [masked ? 'masked' : '', beast ? `${beast} form` : '', own ? '' : 'own name lost'].filter(Boolean);
     return `${own || shown} (${why.join(', ')})`;
   };
+  // The character's own name behind a mask and a beast form (gamemode.js realNameOf; rosters read it through ownNameOf,
+  // which keeps a mask's name while gamemode-config.json rosterPrivacy.masks is off; tracker 1559074270959640676: the Court
+  // tab listed a transformed Jarl as "Werewolf", so anyone who looked learnt who the beast was). What is said and done in
+  // the world keeps the name shown (nameFor above). A beast whose own name is lost is "Stranger", never the beast's name.
+  const ownName = (a) => {
+    const beast = beastName(a), shown = nameOf(a);
+    if (!isMasked(a) && !beast) return shown;
+    return ownBehind(a, beast) || (beast ? 'Stranger' : shown);
+  };
+  globalThis.__dboOwnName = ownName;
+  // The name that goes with the #TAG the world sees (gamemode.js publicNameOf; /players and every answer to a lookup). The
+  // client hides the #TAG over a beast, so a beast is named by its own name; it draws the #TAG under "Masked Person", so a
+  // mask stays the mask: the own name beside that #TAG would take the mask off (verify of 12 Oct)
+  globalThis.__dboPublicName = (a) => (beastName(a) ? ownName(a) : nameOf(a));
+  // Behind a mask or in a beast form, or showing the mask's name with no name kept: a name never finds them (gamemode.js
+  // findByName), the #TAG does
+  globalThis.__dboDisguised = (a) => !!beastName(a) || isMasked(a) || isMaskName(nameOf(a));
   const distance = (a, b) => {
     const la = get(a, 'locationalData', null), lb = get(b, 'locationalData', null);
     if (!la || !lb || la.cellOrWorldDesc !== lb.cellOrWorldDesc) return Infinity;
@@ -137,9 +159,14 @@ module.exports = (api) => {
   const inspectLines = (viewer, t) => {
     const lines = [];
     const app = get(t, 'appearance', {}) || {};
-    lines.push(`${app.isFemale ? 'Woman' : 'Man'}${app.raceId ? `, ${raceName(app.raceId)}` : ''}`);
-    if (isMasked(t)) lines.push('Face hidden behind a mask');
-    if (!isMasked(t) && knownBy(viewer).includes(t >>> 0)) {
+    // A beast keeps the mortal race and sex in its appearance (beastform.js), and is no one others know: it shows the
+    // beast only, and no office, as a mask hides the offices (tracker 1559074270959640676)
+    const beast = beastName(t);
+    if (beast) lines.push(beast);
+    else lines.push(`${app.isFemale ? 'Woman' : 'Man'}${app.raceId ? `, ${raceName(app.raceId)}` : ''}`);
+    // A mask kept from before the change is not on the beast's face: it would tie the beast to the masked one
+    if (isMasked(t) && !beast) lines.push('Face hidden behind a mask');
+    if (!isMasked(t) && !beast && knownBy(viewer).includes(t >>> 0)) {
       const ranks = ranksOf(profileOf(t));
       for (const r of ranks.slice(0, 3)) lines.push(`${rankTitle(r)} of ${r.zone.name}`);
     }

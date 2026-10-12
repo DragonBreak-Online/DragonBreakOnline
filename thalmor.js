@@ -40,6 +40,11 @@ module.exports = (api) => {
   const isAdmin = typeof api.isAdmin === 'function' ? api.isAdmin : () => false;
   const isLeadStaff = typeof api.isLeadStaff === 'function' ? api.isLeadStaff : () => false;
   const findAnyByName = typeof api.findAnyByName === 'function' ? api.findAnyByName : () => 0;
+  // A dossier names the agent who wrote each note as the rosters do (gamemode.js ownNameOf), and its subject as the agent
+  // asked for them (publicNameOf): a beast by the own name, a mask looked up by the #TAG drawn under it as the mask
+  // (tracker 1559074270959640676)
+  const ownNameOf = typeof api.ownNameOf === 'function' ? api.ownNameOf : nameOf;
+  const publicNameOf = typeof api.publicNameOf === 'function' ? api.publicNameOf : nameOf;
   const zoneOfActor = typeof api.zoneOfActor === 'function' ? api.zoneOfActor : () => null;
 
   const RAW = (cfg && cfg.thalmor) || {};
@@ -224,15 +229,15 @@ module.exports = (api) => {
     if (!sys) { const bad = proseProblem(text); if (bad) return { ok: false, text: `The journal does not take the word "${bad}". Change it and write again.` }; }
     const D = data().dossiers; const key = keyOf(t);
     if (!D[key] && Object.keys(D).length >= Math.max(1, Number(C.dossiers.max) || 150)) return { ok: false, text: `The Thalmor keep at most ${C.dossiers.max} dossiers. Strike an old one first.` };
-    const doc = D[key] || { actor: t >>> 0, name: String(nameOf(t) || ''), tag: String(tagOf(t) || ''), notes: [] };
+    const doc = D[key] || { actor: t >>> 0, name: String(publicNameOf(t) || ''), tag: String(tagOf(t) || ''), notes: [] };
     const per = Math.max(1, Math.floor(Number(C.dossiers.notesPer) || 20));
     if (doc.notes.length >= per) {
       if (!sys) return { ok: false, text: `This dossier is full (${per} notes). Strike an old note first.` };
       doc.notes.splice(0, doc.notes.length - per + 1);
     }
-    const note = { at: Date.now(), by: sys ? '' : who(by), byName: sys ? 'Concordat record' : String(nameOf(by) || ''), text };
+    const note = { at: Date.now(), by: sys ? '' : who(by), byName: sys ? 'Concordat record' : String(ownNameOf(by) || ''), text };
     doc.notes.push(note);
-    doc.name = String(nameOf(t) || doc.name); doc.tag = String(tagOf(t) || doc.tag);
+    doc.name = String(publicNameOf(t) || doc.name); doc.tag = String(tagOf(t) || doc.tag);
     D[key] = doc;
     if (JSON.stringify(data()).length > Math.max(10000, Number(C.dossiers.maxBytes) || 1000000)) {
       doc.notes.pop(); if (!doc.notes.length) delete D[key];

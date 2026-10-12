@@ -81,6 +81,8 @@ const onUi = (ev, fn) => { (handlers[ev] = handlers[ev] || []).push(fn); };
 const base = {
   mp, log: () => {}, personal: (a, t) => said.push(t), system: (a, text) => told.push({ a, text }), audit: (t) => audits.push(t), cfg: {},
   isAdmin, isLeadStaff: isAdmin, tierOf, profileOf, nameOf, tagOf, display, who, findByName, findAnyByName, onUi,
+  // gamemode.js: the own name behind a mask or a beast form; nobody here wears one (tests/roster-privacy-harness.js does)
+  ownNameOf: nameOf, ownDisplay: display, publicNameOf: nameOf, publicDisplay: display, disguisedOf: () => false,
   onlineActors: online, userOf: (a) => (chars.has(a) && chars.get(a).online ? 1 : -1), seen: new Map(),
   zoneList, zoneById, ranksOf, rankTitle: (r) => TITLES[r] || r,
   readOfficials: () => JSON.parse(JSON.stringify(officials)), writeOfficials: (o) => { officials = JSON.parse(JSON.stringify(o)); },

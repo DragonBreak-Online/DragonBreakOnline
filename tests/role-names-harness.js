@@ -80,6 +80,7 @@ const base = {
   mp, log: (...x) => logs.push(x.join(' ')), personal: (a, t) => said.push(t), system: (a, text) => told.push({ a, text }), audit: (t) => audits.push(t), cfg: {},
   isAdmin: (a) => a === LEAD || a === GM, isLeadStaff: (a) => a === LEAD, tierOf: (a) => (a === LEAD ? 'developer' : a === GM ? 'gm' : null),
   profileOf, nameOf, tagOf, display, who, findByName, findAnyByName: findByName, onlineActors: online,
+  ownNameOf: nameOf, ownDisplay: display, publicNameOf: nameOf, publicDisplay: display, disguisedOf: () => false,   // gamemode.js: the own name behind a mask or a beast form; none here
   onUi: (ev, fn) => { (handlers[ev] = handlers[ev] || []).push(fn); },
   userOf: (a) => (chars.has(a) && chars.get(a).online ? 1 : -1), seen: new Map(),
   zoneList, zoneById, ranksOf, rankTitle, defaultTitles: ZONES.rankTitles,

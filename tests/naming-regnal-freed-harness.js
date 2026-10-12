@@ -98,7 +98,8 @@ check('...but not a living character\'s', /already carries that name/.test(N.sai
 const src = fs.readFileSync(path.join(SERVER, 'gamemode.js'), 'utf8');
 const from = src.indexOf('const findAnyByName = (query) => {'), to = src.indexOf('\n};\n', from) + 3;
 check('findAnyByName is found in gamemode.js', from > 0 && to > from);
-const findAnyByName = new Function('mp', 'findByName', 'log', `${src.slice(from, to)}\nreturn findAnyByName;`)(mp, () => 0, () => {});
+// onlineActors/disguisedOf: nobody here is online behind a mask or in a beast form (tests/roster-privacy-harness.js)
+const findAnyByName = new Function('mp', 'findByName', 'log', 'onlineActors', 'disguisedOf', `${src.slice(from, to)}\nreturn findAnyByName;`)(mp, () => 0, () => {}, () => [], () => false);
 setp(DELETED, 'private.indexed.nameKey', 'aela stone');
 check('a name a deleted character shared with a living one finds the living one, not "ambiguous"', findAnyByName('Aela Stone') === LIVE, findAnyByName('Aela Stone'));
 setp(DELETED, 'private.indexed.tagKey', 'ab12');

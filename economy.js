@@ -55,6 +55,9 @@ const path = require('path');
 
 module.exports = (api) => {
   const { mp, log, personal, audit, who, display, cfg, onUi, onlineActors, every, readOfficials, zoneById } = api;
+  // Who set the hold's tax is kept by their own name, never a beast's, and a mask's only while rosterPrivacy.masks is
+  // off (gamemode.js ownDisplay)
+  const ownDisplay = typeof api.ownDisplay === 'function' ? api.ownDisplay : display;
   const C = Object.assign({ enabled: false, maxTaxRate: 0.30, defaultPropertyValue: 2000, maxPropertyValue: 1000000, maxWage: 100000, reckonDay: 0, reckonHour: 0,
     wageShare: 0.25, wageIncomeShare: 0.75, wageSavingsShare: 0.25, assessEveryDays: 7, assessMaxStep: 2,
     titheRate: 0.10, titheTo: 'imperial-legion', titheProvinces: ['cyrodiil'],
@@ -408,7 +411,7 @@ module.exports = (api) => {
     if (!Number.isFinite(pct) || pct < 0 || pct > C.maxTaxRate * 100) return reply(a, false, `The tax rate is from 0% to ${Math.round(C.maxTaxRate * 100)}%.`);
     data().rates[fid] = Math.round(pct) / 100; save();
     const zone = holdZoneOf(fid);
-    if (zone && fn('__dboSetHoldTax')) fn('__dboSetHoldTax')(zone, Math.round(pct), display(a), who(a));
+    if (zone && fn('__dboSetHoldTax')) fn('__dboSetHoldTax')(zone, Math.round(pct), ownDisplay(a), who(a));
     audit(`ECONOMY ${who(a)} set ${nameOfFaction(fid)}'s tax rate to ${Math.round(pct)}%`);
     reply(a, true, `${nameOfFaction(fid)} taxes property at ${Math.round(pct)}% from the next reckoning.`);
   });

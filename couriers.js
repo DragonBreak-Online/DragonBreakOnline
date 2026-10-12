@@ -46,6 +46,10 @@ module.exports = (api) => {
   const { mp, log, personal, audit, who, nameOf, tagOf, profileOf, discordOf, onlineActors, every, cfg, onUi, takeGold, giveItem,
     goldOf, GOLD_BASE, recordOf, depositToTreasury, zoneById, zoneList, boardZoneNear, metOf, isAdmin, registerChatCommand,
     openWidget, closeWidget } = api;
+  // A job names its sender, recipient and courier by their own name, never a beast's, and a mask's only while
+  // rosterPrivacy.masks is off (gamemode.js ownNameOf; tracker 1559074270959640676). A robber keeps the name they were
+  // seen by.
+  const ownNameOf = typeof api.ownNameOf === 'function' ? api.ownNameOf : nameOf;
   const C = Object.assign({
     enabled: false,
     // Klimmek's Supplies (Skyrim.esm FFI04Sack, MiscPouch.nif, value 0, weight 0) until the PC adds a dedicated record
@@ -336,8 +340,8 @@ module.exports = (api) => {
     const now = Date.now();
     const j = { id: data().next++, state: 'open', kind: dest.kind, origin: origin.id, originName: origin.name, originZone: origin.zone,
       dest: dest.kind === 'board' ? dest.place.id : dest.kind === 'drop' ? dest.drop.id : null, destName: dest.kind === 'board' ? dest.place.name : dest.kind === 'drop' ? dest.drop.name : '',
-      sender: a >>> 0, senderName: nameOf(a), senderTag: tagOf(a), senderProfile: profileOf(a), senderAccount: discord(a),
-      recipient: to, recipientName: nameOf(to), recipientTag: tagOf(to),
+      sender: a >>> 0, senderName: ownNameOf(a), senderTag: tagOf(a), senderProfile: profileOf(a), senderAccount: discord(a),
+      recipient: to, recipientName: ownNameOf(to), recipientTag: tagOf(to),
       items, value, pay, held: pay, fee, insured, premium, postedAt: now, expiresAt: now + C.openDays * DAY };
     data().jobs.push(j);
     try { save(); } catch (e) {
@@ -364,7 +368,7 @@ module.exports = (api) => {
     if (gone(j.sender)) { backToSender(j, 'cancelled', 'was taken down'); return { ok: false, text: 'Whoever posted that job is gone. The notice comes down.' }; }
     const now = Date.now();
     const day = clockDays();
-    try { commit(j, { state: 'carried', courier: a >>> 0, courierName: nameOf(a), courierTag: tagOf(a), courierProfile: profileOf(a), courierAccount: discord(a), takenAt: now,
+    try { commit(j, { state: 'carried', courier: a >>> 0, courierName: ownNameOf(a), courierTag: tagOf(a), courierProfile: profileOf(a), courierAccount: discord(a), takenAt: now,
       dueDay: day !== null ? day + limitDays() : null, dueAt: now + fallbackMs() }); }
     catch (e) { return { ok: false, text: 'The board could not hand it over just now.' }; }
     if (!giveNamed(a, PARCEL, SEALED_NAME)) {
