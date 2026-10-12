@@ -55,6 +55,8 @@ export interface FactionData {
   economy?: EconomyData | null;
   result?: string;
   resultKind?: 'ok' | 'refused' | '';
+  // Charters are open (guilds.js): Found a faction opens /charter in the panel (U)
+  charters?: boolean;
   // Staff (any GM) get the staff view in the journal; admin is a Lead GM, who may change things
   staff?: boolean;
   roles?: string[];
@@ -107,6 +109,12 @@ export const FactionContent = ({ data, embedded, readOnly }: { data: FactionData
           </p>
         )}
         {data.result && <p className={'faction__result faction__result--' + (data.resultKind || 'ok')}>{data.result}</p>}
+        {data.charters && !staffView && (
+          <button className="faction__tab" onClick={() => {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            try { (window as any).skyrimPlatform.sendMessage('dbo:menuFind', 'charter'); } catch (e) { /* outside the game */ }
+          }}>Found a faction</button>
+        )}
 
         <div className="faction__tabs">
           <button className={'faction__tab' + (tab === 'members' ? ' faction__tab--on' : '')} onClick={() => setTab('members')}>Members</button>

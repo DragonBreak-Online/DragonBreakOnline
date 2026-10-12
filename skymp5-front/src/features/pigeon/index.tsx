@@ -14,6 +14,7 @@ export { Courier };
 // the goods is paid, and the goods go to the poster's mailbox.
 //
 //   Browser -> client -> server: sendMessage('dbo:pigeonSend', nonce, recipientId, text, gold, itemsJson)
+//                                sendMessage('dbo:pigeonBlockLetter', nonce, letterId), sendMessage('dbo:pigeonSign', nonce, how)
 //   Letters tab:                 sendMessage('dbo:pigeonRead' | 'dbo:pigeonDelete' | 'dbo:pigeonCollect', nonce, letterId)
 //   Supply tab:                  sendMessage('dbo:supplySearch', nonce, query) | ('dbo:supplyPost', nonce, desc, count, reward)
 //                                | ('dbo:supplyDeliver', nonce, orderId, count) | ('dbo:supplyCancel', nonce, orderId)
@@ -133,6 +134,8 @@ const Pigeon = ({ data }: { data: PigeonData }) => {
   const maxText = Math.max(1, Number(data.maxText) || 240);
   const [selectedId, setSelectedId] = useState<number | null>(contacts.length ? contacts[0].id : null);
   const [text, setText] = useState('');
+  // Sign as: another's name for the next letter (/sign; a Scholar's forgery), or '' for none typed yet
+  const [signAs, setSignAs] = useState('');
   const [busy, setBusy] = useState(false);
   const letters = data.letters || [];
   const waitingCount = letters.filter((l) => !l.read || l.parcel).length;
@@ -302,6 +305,8 @@ const Pigeon = ({ data }: { data: PigeonData }) => {
                       : (
                       <button className="pigeon__button" disabled={busy} onClick={() => { setBusy(true); send('dbo:pigeonDelete', data.nonce, letter.id); }}>Burn this letter</button>
                         )}
+                    <button className="pigeon__button" disabled={busy} title="Pigeons from whoever wrote this letter are ignored; again lets them through"
+                      onClick={() => act('dbo:pigeonBlockLetter', letter.id)}>Ignore this sender</button>
                   </div>
                 </>
                   )
@@ -348,6 +353,13 @@ const Pigeon = ({ data }: { data: PigeonData }) => {
               onChange={(e) => setText(e.target.value)}
             />
             <span className="pigeon__count">{trimmed.length} / {maxText}</span>
+            <div className="pigeon__parcel-row pigeon__sign">
+              <span className="pigeon__parcel-label">Sign as</span>
+              <button className="pigeon__button" disabled={busy} onClick={() => act('dbo:pigeonSign', 'clear')}>Your name</button>
+              <button className="pigeon__button" disabled={busy} onClick={() => act('dbo:pigeonSign', 'unsigned')}>Unsigned</button>
+              <Field value={signAs} onChange={setSignAs} onEnter={() => signAs.trim() && act('dbo:pigeonSign', signAs.trim())} placeholder="Another name" className="pigeon__field--search" />
+              <button className="pigeon__button" disabled={busy || !signAs.trim()} onClick={() => act('dbo:pigeonSign', signAs.trim())}>Use it</button>
+            </div>
             {parcelRules
               ? (
               <div className="pigeon__parcel">

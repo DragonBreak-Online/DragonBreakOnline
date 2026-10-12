@@ -6,7 +6,7 @@ import './styles.scss';
 // Rite behind its warning. What cannot be done says why in a quiet line instead of a button. Every word comes from the
 // server; this only lays it out.
 //   Browser -> client -> server: sendMessage('dbo:shrinePray' | 'dbo:shrineRite' | 'dbo:shrineConfirm' | 'dbo:shrineCancel'
-//                                | 'dbo:shrineLeave', nonce)
+//                                | 'dbo:shrineLeave', nonce), sendMessage('dbo:shrineOffer', nonce, gold)
 //   Escape closes it, and the relay tells the server.
 interface ShrineChoice {
   label: string;
@@ -26,6 +26,8 @@ export interface ShrinePanelData {
   leave: string;
   result?: string;
   resultKind?: string;
+  // An offering to this shrine's god, for its follower (prayer.js /offer); absent from an older server
+  offer?: { god: string; min: number; max: number } | null;
 }
 
 const send = (key: string, ...args: unknown[]): void => {
@@ -56,12 +58,13 @@ const ShrinePanel = ({ data }: { data: ShrinePanelData }) => {
     const t = window.setTimeout(() => setBusy(false), CONFIRM_HOLD_MS);
     return () => window.clearTimeout(t);
   }, [data.nonce, !!data.confirm, data.result]);
+  const [gold, setGold] = useState('');
   const releaseRef = useRef(0);
   useEffect(() => () => window.clearTimeout(releaseRef.current), []);
-  const press = (key: string) => {
+  const press = (key: string, ...args: unknown[]) => {
     if (busy) return;
     setBusy(true);
-    send(key, data.nonce);
+    send(key, data.nonce, ...args);
     window.clearTimeout(releaseRef.current);
     releaseRef.current = window.setTimeout(() => setBusy(false), PRESS_RELEASE_MS);
   };
@@ -96,6 +99,26 @@ const ShrinePanel = ({ data }: { data: ShrinePanelData }) => {
           <div className="shrine__choices">
             {choice(data.pray || NONE, 'dbo:shrinePray', true)}
             {choice(data.rite || NONE, 'dbo:shrineRite', false)}
+            {data.offer
+              ? (
+              <div className="shrine__offer">
+                <span className="shrine__reason-label">An offering to {data.offer.god}</span>
+                <span className="shrine__offer-row">
+                  <input
+                    className="shrine__offer-input"
+                    inputMode="numeric"
+                    placeholder={`${data.offer.min} to ${data.offer.max} gold`}
+                    value={gold}
+                    maxLength={6}
+                    onChange={(e) => setGold(e.target.value.replace(/[^0-9]/g, ''))}
+                    onKeyDown={(e) => { e.stopPropagation(); if (e.key === 'Enter' && gold) press('dbo:shrineOffer', Number(gold)); }}
+                  />
+                  <button className="shrine__button" disabled={busy || !gold} onClick={() => press('dbo:shrineOffer', Number(gold))}>Offer</button>
+                </span>
+                <span className="shrine__button-sub">Half goes to the town for the temple; for an hour your prayers are heard more closely.</span>
+              </div>
+                )
+              : null}
           </div>
         )}
         {data.result ? <p className={'shrine__result shrine__result--' + (data.resultKind === 'refused' ? 'refused' : 'ok')}>{data.result}</p> : null}

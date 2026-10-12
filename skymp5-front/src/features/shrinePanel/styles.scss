@@ -131,6 +131,25 @@
     &--refused { color: $dbo-text-dim; }
   }
 
+  &__offer { display: flex; flex-direction: column; gap: 6px; }
+
+  &__offer-row { display: flex; gap: 8px; align-items: stretch; }
+
+  &__offer-input {
+    flex: 1;
+    min-width: 0;
+    padding: 6px 10px;
+    border: 1px solid $dbo-border;
+    border-radius: 4px;
+    background: rgba(0, 0, 0, 0.35);
+    color: $dbo-text;
+    font-family: $dbo-ui-font;
+    font-size: 15px;
+    outline: none;
+
+    &:focus { border-color: $dbo-border-strong; }
+  }
+
   &__leave {
     align-self: center;
     font-family: $dbo-ui-font;

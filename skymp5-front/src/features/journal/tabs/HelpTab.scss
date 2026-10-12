@@ -1,8 +1,0 @@
-// The F3 hub's Help tab: a button per topic with a line of what it opens
-.jhelp {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-
-  &__row { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
-}

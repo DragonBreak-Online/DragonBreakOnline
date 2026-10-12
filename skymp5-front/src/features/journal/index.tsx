@@ -38,6 +38,8 @@ export interface JournalProfile {
   skills: JournalSkill[];
   // Every /status line and the dungeons resting for you (journal.js statusView); absent from an older server
   status?: { label: string; value: string; hint?: string }[];
+  // An identity reroll can be started (patrons.js); absent from an older server
+  canReroll?: boolean;
   // Level points waiting to be spent (charlevel.js); the +1 buttons show while there are any
   levelPoints?: number;
   // The race's once-a-day power (racial.js powerView), absent without one or from an older server. activeMs and waitMs are
@@ -274,8 +276,19 @@ export const RacialPowerBox = ({ power, busy, act }: { power: JournalRacialPower
   );
 };
 
-export const ActionsBox = ({ points, busy, act }: { points: number; busy: boolean; act: (key: string, ...args: unknown[]) => void }) => {
+// The panel (U) at a topic ('' for all of it): the journal gives way to it with the cursor kept (gamemode.js menuOpen)
+const openPanel = (tab: string): void => {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (window as any).skyrimPlatform.sendMessage('dbo:menuOpen', tab);
+  } catch (e) { /* outside the game */ }
+};
+
+export const ActionsBox = ({ points, busy, act, canReroll }: {
+  points: number; busy: boolean; act: (key: string, ...args: unknown[]) => void; canReroll?: boolean;
+}) => {
   const [confirm, setConfirm] = useState(false);
+  const [reroll, setReroll] = useState(false);
   return (
     <section className="journal__actions">
       <h2 className="journal__heading">Help</h2>
@@ -306,6 +319,33 @@ export const ActionsBox = ({ points, busy, act }: { points: number; busy: boolea
                 onClick={() => { setConfirm(false); act('journalAction', 'unstuck'); }}>Move me</button>
             </>
           ) : <button type="button" className="journal__button" disabled={busy} onClick={() => setConfirm(true)}>Unstuck</button>}
+        </div>
+      </div>
+      {canReroll
+        ? (
+        <div className="journal__action">
+          <h3 className="journal__action-head">Identity reroll</h3>
+          <p className="journal__hint">Reopens the character creator for a new race, look and name; your skills and gear stay. It spends one reroll, as /reroll does.</p>
+          <div className="journal__editor-actions">
+            {reroll
+              ? (
+              <>
+                <span className="journal__hint">Spend a reroll now?</span>
+                <button type="button" className="journal__button" disabled={busy} onClick={() => setReroll(false)}>Not now</button>
+                <button type="button" className="journal__button journal__button--primary" disabled={busy}
+                  onClick={() => { setReroll(false); act('journalAction', 'reroll'); }}>Reroll</button>
+              </>
+                )
+              : <button type="button" className="journal__button" disabled={busy} onClick={() => setReroll(true)}>Reroll</button>}
+          </div>
+        </div>
+          )
+        : null}
+      <div className="journal__action">
+        <h3 className="journal__action-head">More</h3>
+        <div className="journal__editor-actions">
+          <button type="button" className="journal__button" onClick={() => openPanel('trouble')}>Open a ticket with staff</button>
+          <button type="button" className="journal__button" onClick={() => openPanel('')}>Every command (U)</button>
         </div>
       </div>
     </section>
@@ -383,7 +423,7 @@ export const ProfileTab = ({ data, editing, setEditing, busy, act, openSkill }: 
         <SkillMeters skills={p.skills || []} onOpen={openSkill} />
         {p.status ? <StatusBox rows={p.status} /> : null}
         {p.racialPower ? <RacialPowerBox power={p.racialPower} busy={busy} act={act} /> : null}
-        {p.status ? <ActionsBox points={p.levelPoints || 0} busy={busy} act={act} /> : null}
+        {p.status ? <ActionsBox points={p.levelPoints || 0} busy={busy} act={act} canReroll={!!p.canReroll} /> : null}
       </aside>
     </div>
   );
