@@ -561,7 +561,7 @@ export class CompanionSystem implements System {
       if (c.ashPile) this.ashing.add(c.id);
       this.corpses.set(c.id, Date.now() + (c.ashPile ? ASH_DELAY_MS : (rules.corpseSec ?? this.corpseSec) * 1000));
     } else {
-      try { mp.destroyActor(c.id); } catch { }
+      try { mp.destroyActor(c.id); } catch (e) { this.log(`CompanionSystem: destroyActor ${hex(c.id)} failed after the end: ${e}`); }
     }
     this.save();
     this.sendState(c.ownerId);
@@ -572,7 +572,7 @@ export class CompanionSystem implements System {
     if (!c.persistent) return this.end(c, "owner left", false);
     this.companions.delete(c.id);
     this.stored.push({ ownerId: c.ownerId, baseDesc: c.baseDesc, kind: c.kind });
-    try { this.mp.destroyActor(c.id); } catch { }
+    try { this.mp.destroyActor(c.id); } catch (e) { this.log(`CompanionSystem: destroyActor ${hex(c.id)} failed when stored: ${e}`); }
     this.log(`CompanionSystem: ${hex(c.id)} stored until ${hex(c.ownerId)} logs in again`);
     this.save();
   }
