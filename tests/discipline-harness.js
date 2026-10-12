@@ -61,6 +61,19 @@ cmd(2, '#LEAD warn myself'); ok(/your own account/.test(last(2)), 'nobody discip
 load(); cmd(1, '#AAAA'); ok(said.some(([a, t]) => a === 1 && /6 entries/.test(t)), 'records survive a reload');
 const rec = JSON.parse(fs.readFileSync(FILE, 'utf8')).profiles['20'];
 ok(rec.length === 6 && rec[4].lifted === true && rec[4].by === 'c2', 'the file holds the account record', rec.map((e) => e.kind));
+// a strike decided outside the game, from config, added once by key
+said.length = 0; audits.length = 0;
+const cfgRecord = [{ key: 'k1', tag: 'OFFL', kind: 'strike', by: 'Nate', reason: 'took goods from a barrel' }];
+const loadWith = (record) => { delete require.cache[MOD]; const realCfg = CFG.discipline; CFG.discipline = Object.assign({}, realCfg, { record }); require(MOD)({
+  mp: { kick: () => {} }, log: () => {}, personal: (a, t) => said.push([a, t]), audit: (t) => audits.push(t), who: (a) => `w${a}`, display: (a) => `c${a}`,
+  profileOf: (a) => prof[a], onlineActors: () => online.slice(), registerChatCommand: () => {}, isAdmin: (a) => !!tier[a], isLeadStaff: () => false,
+  findAnyByName: (q) => tags[q] || 0, sendPacket: () => {}, userOf: () => -1, every: () => {}, cfg: { discipline: Object.assign({}, CFG.discipline, { file: FILE }) } }); CFG.discipline = realCfg; };
+loadWith(cfgRecord); loadWith(cfgRecord);
+const r21 = JSON.parse(fs.readFileSync(FILE, 'utf8')).profiles['21'];
+ok(r21.filter((e) => e.key === 'k1').length === 1 && r21.find((e) => e.key === 'k1').by === 'Nate' && r21.find((e) => e.key === 'k1').kind === 'strike', 'a config strike is added once, by Nate, across reloads', r21);
+ok(audits.filter((l) => /config k1/.test(l)).length === 1 && said.some(([a, t]) => a === 6 && /A strike from staff: took goods/.test(t)), 'audited once; the player, online, is told');
+const shipped = (CFG.discipline.record || []).find((r) => r.key === '0138-dyer');
+ok(shipped && shipped.tag === 'MTK7' && shipped.kind === 'strike' && /#0138/.test(shipped.reason), 'shipped: a strike for Lady Dyer #MTK7, ticket #0138');
 global.setTimeout = realTimeout;
 fs.rmSync(tmp, { recursive: true, force: true });
 console.log(fails ? `\n${fails} FAILED` : '\nall passed');
