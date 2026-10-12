@@ -378,24 +378,30 @@ export class Spawn implements System {
     }
   }
 
-  private slotMap(ctx: SystemContext, profileId: number, max: number): (number | undefined)[] {
+  // staffSlot: a Trial GM's staff slot (staffSlotOf), -1 for everyone else (then nothing below changes). That slot holds the
+  // staff character alone and the staff character no other slot, so it follows the slot when the player slots grow or shrink
+  private slotMap(ctx: SystemContext, profileId: number, max: number, staffSlot = -1): (number | undefined)[] {
     const mp = ctx.svr as unknown as Mp;
     const slots: (number | undefined)[] = new Array(max).fill(undefined);
     const unassigned: number[] = [];
+    const staffOf = (a: number): boolean => { try { return mp.get(a, "private.dboStaffChar") === true; } catch { return false; } };
     for (const a of ctx.svr.getActorsByProfileId(profileId)) {
       // Crash handle for deleting characters
       let s: unknown;
       try { s = mp.get(a, "private.charSlot"); }
       catch { continue; }
-      if (Number.isInteger(s) && (s as number) >= 0 && (s as number) < max && slots[s as number] === undefined) {
+      if (Number.isInteger(s) && (s as number) >= 0 && (s as number) < max && slots[s as number] === undefined &&
+        (staffSlot < 0 || staffOf(a) === (s === staffSlot))) {
         slots[s as number] = a;
       } else {
         unassigned.push(a);
       }
     }
     for (const a of unassigned) {
-      const free = slots.indexOf(undefined);
-      if (free < 0) break;
+      const free = staffSlot < 0 ? slots.indexOf(undefined)
+        : staffOf(a) ? (slots[staffSlot] === undefined ? staffSlot : -1)
+          : slots.findIndex((x, i) => x === undefined && i !== staffSlot);
+      if (free < 0) { if (staffSlot < 0) break; continue; }
       slots[free] = a;
       try { mp.set(a, "private.charSlot", free); } catch { /* form vanished */ }
     }
@@ -476,7 +482,8 @@ export class Spawn implements System {
   private sendCharacterList(ctx: SystemContext, userId: number, profileId: number): void {
     const mp = ctx.svr as unknown as Mp;
     const max = this.slotsFor(userId);
-    const characters = this.slotMap(ctx, profileId, max).map((actorId, i) =>
+    const auth = this.authCache.get(userId);
+    const characters = this.slotMap(ctx, profileId, max, auth ? this.staffSlotOf(auth) : -1).map((actorId, i) =>
       actorId !== undefined
         ? {
           name: this.characterName(ctx, actorId) || `Character ${i + 1}`,
@@ -496,7 +503,8 @@ export class Spawn implements System {
     if (!auth || !Number.isInteger(slot) || slot < 0 || slot >= this.slotsFor(userId)) return;
 
     const mp = ctx.svr as unknown as Mp;
-    const slots = this.slotMap(ctx, auth.profileId, this.slotsFor(userId));
+    const staffSlot = this.staffSlotOf(auth);
+    const slots = this.slotMap(ctx, auth.profileId, this.slotsFor(userId), staffSlot);
     let actorId = slots[slot];
     const isNew = actorId === undefined;
 
@@ -513,7 +521,7 @@ export class Spawn implements System {
       actorId = ctx.svr.createActor(0, startPoints[idx].pos, startPoints[idx].angleZ,
         +startPoints[idx].worldOrCell, auth.profileId);
       mp.set(actorId, "private.charSlot", slot);
-      if (slot === this.staffSlotOf(auth)) {
+      if (slot === staffSlot) {
         mp.set(actorId, "private.dboStaffChar", true);
         this.log("Character", actorId.toString(16), "in slot", slot, "is a Trial GM's staff character");
       }
@@ -781,7 +789,7 @@ export class Spawn implements System {
     const auth = this.pending.get(userId);
     if (!auth || !Number.isInteger(slot) || slot < 0 || slot >= this.slotsFor(userId)) return;
 
-    const actorId = this.slotMap(ctx, auth.profileId, this.slotsFor(userId))[slot];
+    const actorId = this.slotMap(ctx, auth.profileId, this.slotsFor(userId), this.staffSlotOf(auth))[slot];
     if (actorId !== undefined) {
       // Perma-dead characters may be deleted too (destroying the body) so a perma-death cannot lock the slot forever
       this.cancelPark(actorId);
