@@ -81,7 +81,8 @@ ok(craft(PLAYER, VAN, R_GRIND) === false && !chain.length, 'tempering a giant cl
 // ---- gearstrip ------------------------------------------------------------------------------------------------------
 const MOD = path.join(SERVER, 'gearstrip.js');
 const IRON = 0x5ace4, STEEL = 0x5ace5, STRIPS = 0x800e4, OTHER = 0x12eb7, CHORROL_HELM = 0x080ddbf8;
-const DESC = { '5ace4:Skyrim.esm': IRON, '5ace5:Skyrim.esm': STEEL, '800e4:Skyrim.esm': STRIPS, 'db5d2:Skyrim.esm': 0xdb5d2 };
+const WARHAMMER = 0x1398a;
+const DESC = { '5ace4:Skyrim.esm': IRON, '5ace5:Skyrim.esm': STEEL, '800e4:Skyrim.esm': STRIPS, 'db5d2:Skyrim.esm': 0xdb5d2, '1398a:Skyrim.esm': WARHAMMER };
 for (const it of G.items) { try { DESC[it.item] = idOfDesc(it.item); } catch (e) { /* not in the fake order */ } }
 const P = new Map(), told = [];
 const set = (id, k, v) => { if (!P.has(id)) P.set(id, {}); P.get(id)[k] = JSON.parse(JSON.stringify(v)); };
@@ -101,13 +102,25 @@ set(B, 'profileId', 2); set(B, 'inventory', { entries: [{ baseId: VAN, count: 1 
 set(C, 'profileId', 3); set(C, 'inventory', { entries: [{ baseId: SURWR, count: 1 }, { baseId: CHORROL_HELM, count: 1 }] });
 set(BOX, 'inventory', { entries: [{ baseId: SURWR, count: 1 }, { baseId: OTHER, count: 3 }] });
 globalThis.__dboGearStripLogin(A); globalThis.__dboGearStripLogin(B); globalThis.__dboGearStripLogin(C); globalThis.__dboGearStripContainer(BOX);
+// Nate, 12 Oct: "swap the clubs for steel": each club becomes a Steel Warhammer (swapTo), no materials
 ok(count(A, SURWR) === 0 && count(A, OTHER) === 1, 'a holder loses both clubs, nothing else');
-ok(count(A, IRON) === 2 && count(A, STEEL) === 4 && count(A, STRIPS) === 2, '...and gets the recipe back twice: 2 Iron, 4 Steel, 2 Leather Strips', [count(A, IRON), count(A, STEEL), count(A, STRIPS)]);
-ok(told.some(([a, t]) => a === A && /Giant Club/.test(t) && /giant's club was far too strong/.test(t) && !/Bruma/.test(t)), '...and is told the club reason', told);
-ok(count(B, VAN) === 0 && count(B, IRON) === 0, 'a vanilla club is taken with no refund');
+ok(count(A, WARHAMMER) === 2 && count(A, IRON) === 0 && count(A, STEEL) === 0, '...and gets 2 Steel Warhammers, no materials', [count(A, WARHAMMER), count(A, IRON), count(A, STEEL)]);
+ok(told.some(([a, t]) => a === A && /Your 2 Giant Clubs have been exchanged for 2 Steel Warhammers: a giant's club was far too strong/.test(t) && !/Bruma/.test(t)), '...and is told the swap and the club reason', told);
+ok(count(B, VAN) === 0 && count(B, WARHAMMER) === 1 && count(B, IRON) === 0, 'a vanilla club becomes a Steel Warhammer too');
 ok(told.some(([a, t]) => a === C && /far too strong/.test(t) === false && /it has been withdrawn|Bruma/.test(t)) || told.some(([a, t]) => a === C), 'a holder of a club and a guard piece is told one line');
-ok(count(C, SURWR) === 0 && count(C, CHORROL_HELM) === 0, '...and loses both');
-ok(count(BOX, SURWR) === 0 && count(BOX, OTHER) === 3, 'a container loses its club, nothing else');
+ok(count(C, SURWR) === 0 && count(C, CHORROL_HELM) === 0 && count(C, WARHAMMER) === 1, '...loses both, and the club comes back as a Steel Warhammer');
+ok(count(BOX, SURWR) === 0 && count(BOX, OTHER) === 3 && count(BOX, WARHAMMER) === 1, 'a container\'s club becomes a Steel Warhammer in it; the rest stays');
+// owed: the 4 characters and the sack stripped at 16:15Z with a materials refund get a Steel Warhammer, once
+ok(Array.isArray(G.owed) && G.owed.length === 5 && G.owed.every((o) => o.give === '1398a:Skyrim.esm'), 'the config owes 5 Steel Warhammers', G.owed);
+const OWED_A = 0xff00215e, SACK = 0x08068155;
+set(OWED_A, 'profileId', 88); set(OWED_A, 'inventory', { entries: [{ baseId: IRON, count: 1 }] });
+told.length = 0;
+globalThis.__dboGearStripLogin(OWED_A); globalThis.__dboGearStripLogin(OWED_A);
+ok(count(OWED_A, WARHAMMER) === 1 && count(OWED_A, IRON) === 1, 'an owed character gets one Steel Warhammer, once, and keeps the materials', [count(OWED_A, WARHAMMER)]);
+ok(told.some(([a, t]) => a === OWED_A && /given a Steel Warhammer for the giant's club taken from you/.test(t)), '...and is told', told);
+set(SACK, 'inventory', { entries: [{ baseId: 0x80aeb00, count: 1 }] });
+globalThis.__dboGearStripContainer(SACK); globalThis.__dboGearStripContainer(SACK);
+ok(count(SACK, WARHAMMER) === 1 && count(SACK, 0x80aeb00) === 1, 'the sack gets one Steel Warhammer back, once');
 
 console.log(fails ? `${fails} failed` : 'all passed');
 process.exit(fails ? 1 : 0);
