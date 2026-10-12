@@ -75,6 +75,16 @@ w = act('report', 'the wolf near me is floating');
 ok(reports[0] === 'the wolf near me is floating' && /report is sent/.test(w.result), 'Report a problem is /bug\'s report (debugsnap.js)', reports);
 w = act('kick', 'x');
 ok(w.resultKind === 'refused' && /Unknown action/.test(w.result), 'nothing but these actions can be run from the journal', w.result);
+// Reroll (Nate, 12 Oct): the Profile offers it while patrons.js says one can be started, and runs /reroll confirm
+let rerolls = [];
+commands.set('reroll', { fn: (a, args) => { rerolls.push(args); personal(a, 'The character creator opens.'); } });
+globalThis.__dboCanReroll = () => false;
+ok(globalThis.__dboJournalOpenTab(A, 'profile') !== false && last().profile.canReroll === false, 'no Reroll button without a reroll to spend');
+globalThis.__dboCanReroll = () => true;
+ok(globalThis.__dboJournalOpenTab(A, 'profile') !== false && last().profile.canReroll === true, '...and one when patrons.js says a reroll can start');
+w = act('reroll');
+ok(JSON.stringify(rerolls) === JSON.stringify(['confirm']) && w.result === 'The character creator opens.', 'Reroll runs /reroll confirm (the Profile asked first)', [rerolls, w.result]);
+delete globalThis.__dboCanReroll;
 const n = widgets.length; fire('journalAction', A, ['stale', 'unstuck']); later(4000);
 ok(widgets.length === n, 'a stale nonce does nothing');
 console.log(fails ? `${fails} failed` : 'all passed');

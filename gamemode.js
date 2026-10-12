@@ -2703,10 +2703,15 @@ const PANEL_FORM = {
     ...['health', 'magicka', 'stamina'].map((w) => ({ word: w, args: [{ label: 'points', kind: 'number', optional: true }] }))] },
   offer: { variants: [{ word: null, args: [{ label: 'gold', kind: 'number', optional: false }] }] },
 };
+// Usages written only in a command's refusal, read like any other
+const PANEL_USAGE = {
+  charter: '[status | found <name> | cult <name> | kind company|cult | pitch <text> | seat here|none | invite <player> [role] | confirm <n> | leave | submit | withdraw | disband <reason>]',
+};
 // The panel itself is /help, and its search is how a topic or a command is found
 const PANEL_HIDE = new Set(['help']);
 const formFor = (n, help) => {
   if (PANEL_FORM[n]) return Object.assign({ desc: help }, PANEL_FORM[n]);
+  if (PANEL_USAGE[n]) { const u = formOfHelp(PANEL_USAGE[n]); if (u) return { variants: u.variants, usage: u.usage, desc: help }; }
   const f = formOfHelp(help);
   return f ? { variants: f.variants, usage: f.usage, desc: f.desc || help } : null;
 };
@@ -2787,7 +2792,15 @@ const openPlayerMenu = (a, tab, search) => {
 };
 const closePlayerMenu = (a) => { panelState.nonces.delete(a >>> 0); closeWidget(a, PANEL_WIDGET_ID); };
 onUi('uiCaps', (a, args) => { panelState.caps.set(a >>> 0, new Set((args || []).map(String))); });
-onUi('menuOpen', (a, args) => { if (hasPlayerMenu(a)) openPlayerMenu(a, String((args || [])[0] || '')); });
+onUi('menuOpen', (a, args) => {
+  if (!hasPlayerMenu(a)) return;
+  let tab = String((args || [])[0] || '');
+  // Bound hands: the panel opens where Struggle is
+  if (!tab) { try { const r = mp.get(a, 'private.restrained'); if (r && r.boundHands) tab = 'trouble'; } catch (e) { /* not an actor */ } }
+  openPlayerMenu(a, tab);
+});
+// Another panel's button opens this one searching for a command (the Faction panel's Found a faction: "charter")
+onUi('menuFind', (a, args) => { if (hasPlayerMenu(a)) openPlayerMenu(a, '', String((args || [])[0] || '').replace(/[^a-z0-9 -]/gi, '').slice(0, 40)); });
 onUi('menuClose', (a) => closePlayerMenu(a));
 // Escape inside the panel closes it through the relay's own path, which sends "close" rather than our event
 onUi('close', (a, args, widgetId) => { if (widgetId === PANEL_WIDGET_ID) panelState.nonces.delete(a >>> 0); });
@@ -2801,7 +2814,7 @@ onUi('menuRun', (a, args) => {
   closePlayerMenu(a);
   handleChat(userOf(a), `/${name}${text ? ' ' + text : ''}`);
 });
-// ---- the Character Journal's World and Help tabs (F3; journal.js section registry) -------------------------------------
+// ---- the Character Journal's World tab (F3; journal.js section registry) ---------------------------------------------
 // World: what the read-only commands say about the world, as one page, read quietly so nothing reaches chat. Each group
 // is a command's own lines (colour codes taken out); a command that is not loaded, or says nothing, leaves its group out.
 const WORLD_GROUPS = [['players', 'Who is about'], ['officials', 'Who rules'], ['playtest', 'The open world'], ['time', 'The time'],
@@ -2813,19 +2826,10 @@ const worldView = (a) => ({
     return lines.length ? { name, command: cmd, lines } : null;
   }).filter(Boolean),
 });
-// Help: the panel's trouble topics, each opened in the panel (U) itself, which already asks for the words
-const helpView = () => ({
-  actions: [
-    { tab: 'trouble', label: 'Report a bug, call a GM, open a ticket', desc: 'The help topics: what went wrong, a GM to you, or a private ticket with staff.' },
-    { tab: '', label: 'Every command', desc: 'Search everything you can do, by a word or two. A lone / in chat opens it too.' },
-  ],
-  hints: ['Stuck in the world? /unstuck, under Trouble and help.', 'Keys: F3 this journal, U every command, X a person you look at, B emotes, H your face.'],
-});
 {
   const SECTIONS = globalThis.__dboJournalSections && typeof globalThis.__dboJournalSections === 'object'
     ? globalThis.__dboJournalSections : (globalThis.__dboJournalSections = {});
   SECTIONS.world = { visible: () => true, view: (a) => worldView(a), label: 'World' };
-  SECTIONS.help = { visible: () => true, view: () => helpView(), label: 'Help' };
 }
 globalThis.__dboPanelLeave = (a) => { panelState.caps.delete(a >>> 0); panelState.nonces.delete(a >>> 0); };
 
@@ -3071,6 +3075,27 @@ const updateLetter = (a, args, change) => {
 };
 onUi('pigeonRead', (a, args) => updateLetter(a, args, 'read'));
 onUi('pigeonDelete', (a, args) => updateLetter(a, args, 'delete'));
+// pigeonBlockLetter [nonce, letter id]: /pigeonblock for whoever sent that letter. The panel is never told who it was, nor
+// whether two letters share a hand: an unsigned or forged letter stays so.
+onUi('pigeonBlockLetter', (a, args) => {
+  if (String(args[0]) !== pigeonNonces.get(a)) return;
+  const m = lettersOf(a).find((x) => x.id === String(args[1] || ''));
+  if (!m || !m.fromProfile) return openPigeonCoop(a, 'That letter carries no sender to ignore.', 'refused', 'letters');
+  let list = [];
+  try { list = Array.isArray(mp.get(a, 'private.pigeonBlock')) ? mp.get(a, 'private.pigeonBlock') : []; } catch (e) { list = []; }
+  const i = list.indexOf(m.fromProfile);
+  if (i >= 0) list.splice(i, 1); else list.push(m.fromProfile);
+  try { mp.set(a, 'private.pigeonBlock', list); } catch (e) { return openPigeonCoop(a, 'That did not work. Try again.', 'refused', 'letters'); }
+  openPigeonCoop(a, i >= 0 ? 'Pigeons from the hand that wrote this letter are let through again.' : 'Pigeons from the hand that wrote this letter will be ignored. Do it again to let them through.', 'sent', 'letters');
+});
+// pigeonSign [nonce, how]: /sign as if typed ('', 'unsigned', 'clear' or a name), its answer on the panel
+onUi('pigeonSign', (a, args) => {
+  if (String(args[0]) !== pigeonNonces.get(a)) return;
+  const how = String(args[1] || '').replace(/[\r\n]+/g, ' ').slice(0, 40);
+  const lines = typeof globalThis.__dboRunCommand === 'function' ? globalThis.__dboRunCommand(a, 'sign', how, true) : null;
+  const text = (lines || []).join(' ') || 'That did not work. Try again.';
+  openPigeonCoop(a, text, /^Your next letter/.test(text) ? 'sent' : 'refused', 'send');
+});
 onUi('pigeonSend', (a, args) => {
   if (String(args[0]) !== pigeonNonces.get(a)) return;
   const zoneId = boardZoneNear(a);

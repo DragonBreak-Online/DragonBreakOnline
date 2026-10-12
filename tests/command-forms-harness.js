@@ -59,12 +59,13 @@ const chat = [];
 // gamemode's personal, as far as the capture goes: a quiet capture keeps the line out of chat
 const personalStub = (a, t) => { const cap = globalThis.__dboTellCapture; if (cap && cap.a === (a >>> 0)) { cap.lines.push(String(t)); if (cap.quiet) return; } chat.push([a, t]); };
 const run = new Function('personal', 'isAdmin', 'deliver', 'C', 'profileOf', 'ranksOf', 'openWidget', 'closeWidget', 'onUi', 'userOf', 'handleChat',
-  'require', 'path', 'log', 'LEAD_ONLY', 'isLeadStaff', 'onlineActors', 'display', 'tagOf',
+  'require', 'path', 'log', 'LEAD_ONLY', 'isLeadStaff', 'onlineActors', 'display', 'tagOf', 'mp',
   section + panel + '\nreturn { registerChatCommand, panelTabsFor, openPlayerMenu, say: personal };')(
   personalStub, (a) => !!tiers[a], () => {}, { WHITE: 'fafafa', SYS: 'eda841' }, (a) => a, () => [], (a, w) => opened.push({ a, w }), () => {},
   (e, fn) => { const l = ui.get(e) || []; l.push(fn); ui.set(e, l); }, (a) => a, () => {},
   require, { resolve: (x) => path.resolve(SERVER, x) }, () => {}, new Set(['curse', 'warband']), (a) => tiers[a] === 'senior',
-  () => [PLAYER, GM, LEAD, OTHER, MASKED], (a) => `Name${a} #T${a}`, (a) => `T${a}`);
+  () => [PLAYER, GM, LEAD, OTHER, MASKED], (a) => `Name${a} #T${a}`, (a) => `T${a}`,
+  { get: (a, k) => (k === 'private.restrained' && a === PLAYER && globalThis.__bound ? { boundHands: true } : undefined) });
 run.registerChatCommand('party', () => {}, { help: 'invite|accept|decline|leave|kick: group up for dungeons' });
 run.registerChatCommand('pigeonblock', () => {}, { help: '<name|#TAG> toggle ignoring someone\'s pigeons' });
 run.registerChatCommand('level', () => {}, { help: 'your character level and progress; /level <health|magicka|stamina> [n] spends points' });
@@ -101,9 +102,23 @@ w = opened[0].w;
 ok(w.people.length === 4 && w.people.every((p) => /^#T\d$/.test(p.value)) && !w.people.some((p) => p.value === '#T2'), 'staff see everyone else online, picked by #TAG', w.people);
 ok(w.search === 'par', 'the panel opens at a search when asked to', w.search);
 
-// ---- F3: the World and Help tabs ----
+// ---- buttons in other panels reach the palette ----
+const fireUi = (ev, a, args) => (ui.get(ev) || []).forEach((fn) => fn(a, args));
+fireUi('uiCaps', PLAYER, ['playerMenu']);
+opened.length = 0; fireUi('menuFind', PLAYER, ['charter<script>']);
+ok(opened.length === 1 && opened[0].w.search === 'charterscript', 'menuFind opens the panel searching for a command, its word cleaned', opened[0] && opened[0].w.search);
+globalThis.__bound = true; opened.length = 0; fireUi('menuOpen', PLAYER, ['']);
+ok(opened[0] && opened[0].w.tab === 'trouble', 'bound hands: U opens the panel at Trouble and help, where Struggle is', opened[0] && opened[0].w.tab);
+globalThis.__bound = false; opened.length = 0; fireUi('menuOpen', PLAYER, ['']);
+ok(opened[0] && opened[0].w.tab === '', '...and at its first tab otherwise');
+run.registerChatCommand('charter', () => {}, { help: 'found a faction: a charter the GMs approve' });
+opened.length = 0; run.openPlayerMenu(PLAYER, '', '');
+const charter = entries(PLAYER).find((e) => e.name === 'charter') || opened[0].w.searchOnly.find((e) => e.name === 'charter');
+ok(charter && charter.form && ['status', 'found', 'cult', 'invite', 'submit', 'disband'].every((w) => charter.form.variants.some((v) => v.word === w)), '/charter, whose usage is only in its refusal, gets a form from it', charter && charter.form && charter.form.variants.map((v) => v.word));
+
+// ---- F3: the World tab ----
 const S = globalThis.__dboJournalSections;
-ok(S && S.world && S.help && S.world.label === 'World' && S.help.label === 'Help', 'the journal registry has a World and a Help tab');
+ok(S && S.world && S.world.label === 'World' && !S.help, 'the journal registry has a World tab (help lives in the Profile tab)');
 run.registerChatCommand('time', (a) => run.say(a, '#{eda841}It is the 4th hour of Morndas, 12th of Frostfall, 4E 211.'), { help: 'the time' });
 run.registerChatCommand('playtest', (a) => run.say(a, 'Bruma and the lands around it are open.'), { help: 'what part of the world is open' });
 run.registerChatCommand('players', (a) => { run.say(a, '3 online:'); run.say(a, 'Dagny Holt, Strangers x2'); }, { help: 'who is online' });
@@ -112,8 +127,6 @@ const world = S.world.view(PLAYER);
 ok(world.groups.map((g) => g.name).join() === 'Who is about,The open world,The time', 'World reads the loaded commands, in order, leaving out the silent and the missing', world.groups.map((g) => g.name));
 ok(world.groups[2].lines[0] === 'It is the 4th hour of Morndas, 12th of Frostfall, 4E 211.', '...with colour codes taken out', world.groups[2].lines);
 ok(chat.length === 0, '...and nothing it reads reaches chat', chat);
-const help = S.help.view(PLAYER);
-ok(help.actions.some((x) => x.tab === 'trouble') && help.actions.some((x) => x.tab === ''), 'Help offers the trouble topics and the whole panel (U)', help.actions);
 
 // ---- the chat handler: a lone "/" opens the panel ----
 ok(/if \(!cmd && hasPlayerMenu\(a\)\) return openPlayerMenu\(a, '', ''\);/.test(src), 'a lone "/" in chat opens the panel at its search (handleChat)');

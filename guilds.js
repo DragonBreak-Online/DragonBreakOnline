@@ -442,7 +442,7 @@ module.exports = (api) => {
   };
   // The panel's content, also the Character Journal's Faction tab (journal.js); keepNonce: a journal redraw keeps the
   // nonce the front already holds
-  const CHARTER_HINT = 'To found a faction or a cult of your own, type /charter found <name> or /charter cult <name> in chat. Your co-founders confirm it, then a GM approves it.';
+  const CHARTER_HINT = 'To found a faction or a cult of your own, use Found a faction (or /charter found <name>). Your co-founders confirm it, then a GM approves it.';
   // readOnly: a staff member reading `a`'s journal; no nonce is made or kept for `a`, so nothing in it can act for them
   const menuPayload = (a, result, resultKind, focusFid, keepNonce, readOnly) => {
     const nonce = readOnly ? '' : keepNonce && ST.nonces.get(a >>> 0) ? ST.nonces.get(a >>> 0) : `${(a >>> 0).toString(16)}-${Date.now().toString(36)}`;
@@ -460,7 +460,8 @@ module.exports = (api) => {
       // The Realm and War tabs (realm.js): territories and their owners, wars, and what this character leads
       realm: typeof globalThis.__dboRealmView === 'function' ? globalThis.__dboRealmView(a >>> 0) : null,
       economy: typeof globalThis.__dboEconomyView === 'function' ? globalThis.__dboEconomyView(a >>> 0) : null,
-      // The panel has no founding control yet (charters.js is chat only), so with nothing else to say it says how
+      // Charters open: the panel's Found a faction button opens /charter in the panel (U); with nothing else to say it says how
+      charters: !!(cfg.charters || {}).enabled,
       ...(result || !((cfg.charters || {}).enabled) ? { result: result || '', resultKind: resultKind || '' } : { result: CHARTER_HINT, resultKind: 'info' }),
     };
   };

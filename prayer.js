@@ -957,6 +957,13 @@ module.exports = (api) => {
     audit(`OFFERING ${who(a)} offered ${gold} gold to ${d.name}${kept ? ` (${kept} to the town for the temple)` : ''}`);
     personal(a, `You leave ${gold} gold for ${d.name}. For the next hour, ${d.name} listens more closely.`);
   }, { help: 'make an offering of gold to your god before praying' });
+  // The shrine panel (supernatural.js) offers an offering at the shrine of the player's own god: its bounds, or null
+  globalThis.__dboOfferInfo = (a, deityId) => {
+    const faith = faithOf(a);
+    const d = faith ? deityById(faith.id) : null;
+    const here = deityById(deityId);
+    return d && here && sameFaith(here, d) ? { god: d.name, min: OFFER.min, max: OFFER.max } : null;
+  };
 
   // ── judging ─────────────────────────────────────────────────────────────────────────────────
   // The report is a list of [down, up] spans on the widget's clock, in ms from the moment it

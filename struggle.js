@@ -297,8 +297,8 @@ module.exports = (api) => {
     if (!CFG.enabled) return;
     const wait = nextOf(captive) - Date.now();
     personal(captive, rope === true
-      ? `Your hands are tied with rope. Type /struggle to try to break free${wait > 0 ? ` (you can in ${waitText(wait)})` : ''}. It is hard while your captor is near; left alone, the knots loosen.`
-      : `Your hands are bound. Type /struggle to try to break free${wait > 0 ? ` (you can in ${waitText(wait)})` : ''}. It is hard: one slip and the bonds hold.`);
+      ? `Your hands are tied with rope. Press U and choose Struggle (or type /struggle) to try to break free${wait > 0 ? ` (you can in ${waitText(wait)})` : ''}. It is hard while your captor is near; left alone, the knots loosen.`
+      : `Your hands are bound. Press U and choose Struggle (or type /struggle) to try to break free${wait > 0 ? ` (you can in ${waitText(wait)})` : ''}. It is hard: one slip and the bonds hold.`);
   };
 
   const spend = (a, round) => {

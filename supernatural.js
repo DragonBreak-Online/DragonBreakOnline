@@ -1232,6 +1232,8 @@ module.exports = (api) => {
       rite: offer.type ? { label: 'Perform the Rite', title: offer.title, available: true, reason: '' } : { label: 'Perform the Rite', title: '', available: false, reason: offer.reason },
       confirm: confirming ? { title: offer.title, warning: offer.warning, confirm: offer.confirm, cancel: 'Cancel' } : null,
       leave: 'Leave', result: result || '', resultKind: resultKind || '',
+      // An offering to this shrine's god, for a follower of it (prayer.js /offer, its own checks and words)
+      offer: typeof globalThis.__dboOfferInfo === 'function' ? globalThis.__dboOfferInfo(a, st.deity) : null,
     }, true);
   };
   globalThis.__dboShrinePanel = (a, targetId, shrine) => {
@@ -1250,6 +1252,15 @@ module.exports = (api) => {
     if (Date.now() - st.at > CONFIRM_MS) { closeShrinePanel(a); personal(a, 'You have stepped away from the shrine. Touch it again.'); return null; }
     return st;
   };
+  // shrineOffer [nonce, gold]: /offer as if typed, its answer on the panel instead of in chat
+  onUi('shrineOffer', (a, args) => {
+    const st = panelFor(a, args); if (!st) return;
+    const gold = Math.floor(Number((args || [])[1]));
+    if (!Number.isFinite(gold) || gold <= 0) return showShrinePanel(a, st, 'Say how much gold to offer.', 'refused');
+    const lines = typeof globalThis.__dboRunCommand === 'function' ? globalThis.__dboRunCommand(a, 'offer', String(gold), true) : null;
+    const text = (lines || []).join(' ') || 'The offering could not be made just now.';
+    showShrinePanel(a, st, text, /^You leave /.test(text) ? 'ok' : 'refused');
+  });
   onUi('shrinePray', (a, args) => {
     const st = panelFor(a, args); if (!st) return;
     const warnedBefore = prayWarned.get(a >>> 0);

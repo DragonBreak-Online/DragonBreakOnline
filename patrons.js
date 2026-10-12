@@ -95,6 +95,8 @@ module.exports = (api) => {
     open(a);
   }, { help: 'change this character\'s race, look and name (Patreon tiers)' });
 
+  // The journal's Profile offers Reroll while one is left and nothing blocks it (journal.js canReroll)
+  globalThis.__dboCanReroll = (a) => { try { return !blocker(a) && (pending(a) || rerollsLeft(a).left > 0); } catch (e) { return false; } };
   const addStatus = (key, order, fn) => { try { if (typeof globalThis.__dboRegisterStatus === 'function') globalThis.__dboRegisterStatus(key, order, fn); } catch (e) { /* gamemode older than /status */ } };
   addStatus('rerolls', 60, (a) => { const r = rerollsLeft(a); return r && r.text ? `Rerolls ${r.text}` : null; });
   registerChatCommand('tokens', (a, args) => {
