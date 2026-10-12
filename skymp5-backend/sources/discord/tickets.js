@@ -167,6 +167,9 @@ async function openTicket(interaction, typeId, summary) {
 }
 
 const closing = new Set()
+// A ticket refused for attachments too large to keep, and when: a second Close within LARGE_CONFIRM_MS keeps what fits
+const largeRefused = new Map()
+const LARGE_CONFIRM_MS = 2 * 60 * 1000
 
 // The channel is deleted only once its transcript is kept somewhere; otherwise it stays open
 async function closeTicket(interaction, { wait = 5000, transcripts = transcript } = {}) {
@@ -177,10 +180,13 @@ async function closeTicket(interaction, { wait = 5000, transcripts = transcript 
     await interaction.reply({ content: 'Closing in 5 seconds.' })
     audit.log(`TICKET closed #${channel.name} by ${interaction.user.tag} (${interaction.user.id})`)
     await new Promise(resolve => setTimeout(resolve, wait))
+    const keepWhatFits = Date.now() - (largeRefused.get(channel.id) || 0) < LARGE_CONFIRM_MS
     try {
-      audit.log(`TICKET transcript of #${channel.name} ${await transcripts.save(channel, interaction.user)}`)
+      audit.log(`TICKET transcript of #${channel.name} ${await transcripts.save(channel, interaction.user, keepWhatFits ? { keepWhatFits } : undefined)}`)
+      largeRefused.delete(channel.id)
     } catch (err) {
       console.error(`[tickets] transcript of #${channel.name} failed, channel kept:`, err.message)
+      if (err.code === 'TOO_LARGE') largeRefused.set(channel.id, Date.now())
       await channel.send(err.channelNote || 'The transcript could not be saved, so this channel stays open. Tell a staff member.').catch(() => {})
       return
     }
