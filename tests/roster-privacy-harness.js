@@ -11,8 +11,11 @@
 // that finds no one behind a mask or a beast by any name (the own name, its start, "Werewolf", "Masked Person"), only by
 // the #TAG or the profile id; the answers to a lookup by #TAG, which keep the mask (/appoint, a court offer, a title, the
 // household's invitations); X > Invite to Party and /charter invite, which answer without the #TAG the client hides over a
-// beast; the switch gamemode-config.json rosterPrivacy.masks (off: rosters keep the mask); and every other roster and
-// record that keeps a name.
+// beast; the switch gamemode-config.json rosterPrivacy.masks (shipped false, and a missing key is false: rosters keep the
+// mask, and a title's decree to the whole server names a mask granted a title as the mask; the checks marked "masks on"
+// run with it set true); the meet tick, which never notes a meeting with someone in disguise, so a stranger who stood near
+// a mask or a beast gains no ledger or pigeon contact (re-verify P6, P7); and every other roster and record that keeps a
+// name.
 //
 //   node tests/roster-privacy-harness.js   (from server/)
 //   ROSTER_ROOT=<another copy of server/> runs the same checks against that copy (origin/server and 9899e6e0a fail some)
@@ -104,7 +107,12 @@ const namesFor = (cfg) => (helperSrc
       disguisedOf: typeof disguisedOf === 'function' ? disguisedOf : () => false,
       displayFor: typeof displayFor === 'function' ? displayFor : (v, t) => display(t) };`)(cfg, nameOf, tagOf, display)
   : { ownNameOf: nameOf, ownDisplay: display, realNameOf: nameOf, publicNameOf: nameOf, publicDisplay: display, disguisedOf: () => false, displayFor: (v, t) => display(t) });
-const { ownNameOf, ownDisplay, realNameOf, publicNameOf, publicDisplay, disguisedOf, displayFor } = namesFor({});
+// The checks marked "masks on" run with the switch set true; the shipped value is checked under "the switch" below
+const MASKS_ON = { rosterPrivacy: { masks: true } };
+const { ownNameOf, ownDisplay, realNameOf, publicNameOf, publicDisplay, disguisedOf, displayFor } = namesFor(MASKS_ON);
+// gamemode-config.json as shipped, and the names under it
+const shippedCfg = JSON.parse(src('gamemode-config.json'));
+const shipped = namesFor(shippedCfg);
 
 // ---- playermenu.js ------------------------------------------------------------------------------------------------------
 // X menu actions run chat commands (runCommand): /party lands in dungeons.js, loaded below
@@ -124,7 +132,7 @@ beast(LOST, 'werewolf', '');
 mask(MIRA);
 ok('a plain character: the name shown', ownNameOf(VIEW) === 'Vilja Ashford', ownNameOf(VIEW));
 ok('in werewolf form: the own name, not "Werewolf"', ownNameOf(RAVEN) === 'Raven Stormbrow', ownNameOf(RAVEN));
-ok('behind a mask: the own name, not "Masked Person"', ownNameOf(QUILL) === 'Quill Varro', ownNameOf(QUILL));
+ok('masks on: behind a mask, the own name, not "Masked Person"', ownNameOf(QUILL) === 'Quill Varro', ownNameOf(QUILL));
 ok('masked, then a Vampire Lord: the name kept behind the mask', ownNameOf(THANE) === 'Tova Hale', ownNameOf(THANE));
 ok('a beast whose own name is lost is "Stranger", never the beast', ownNameOf(LOST) === 'Stranger', ownNameOf(LOST));
 ok('ownDisplay keeps the #TAG', ownDisplay(RAVEN) === 'Raven Stormbrow #RVN1', ownDisplay(RAVEN));
@@ -185,11 +193,11 @@ ok('the Guard sees the Court tab', sec.visible(GUARD) === true);
 let h = holders(GUARD, 'jarl');
 ok('THE BUG: the Court roster names the Jarl in werewolf form by her own name, not "Werewolf"', h.length === 1 && h[0].name === 'Raven Stormbrow' && h[0].online === true, h);
 h = holders(GUARD, 'steward');
-ok('the Court roster names the masked Steward by his own name, not "Masked Person"', h.length === 1 && h[0].name === 'Quill Varro', h);
-ok('no Court roster entry is a mask\'s or a beast\'s name', !/Werewolf|Vampire Lord|Masked Person/.test(JSON.stringify(sec.view(GUARD))), JSON.stringify(sec.view(GUARD)).match(/.{40}(Werewolf|Masked Person).{20}/));
+ok('masks on: the Court roster names the masked Steward by his own name, not "Masked Person"', h.length === 1 && h[0].name === 'Quill Varro', h);
+ok('masks on: no Court roster entry is a mask\'s or a beast\'s name', !/Werewolf|Vampire Lord|Masked Person/.test(JSON.stringify(sec.view(GUARD))), JSON.stringify(sec.view(GUARD)).match(/.{40}(Werewolf|Masked Person).{20}/));
 const roll = (fid) => (globalThis.__dboGuildState.members[fid] || {});
 ok('the household roll written while she was a werewolf names her, not "Werewolf" (guilds.js setMember)', (roll('hold-whiterun')[String(RAVEN)] || {}).name === 'Raven Stormbrow', roll('hold-whiterun')[String(RAVEN)]);
-ok('the household roll written behind the mask names him (guilds.js setMember)', (roll('hold-whiterun')[String(QUILL)] || {}).name === 'Quill Varro', roll('hold-whiterun')[String(QUILL)]);
+ok('masks on: the household roll written behind the mask names him (guilds.js setMember)', (roll('hold-whiterun')[String(QUILL)] || {}).name === 'Quill Varro', roll('hold-whiterun')[String(QUILL)]);
 
 // The name watch (gamemode.js watchPlayers) keeps the name an offline official is listed by
 const watchSrc = slice('const watchPlayers = () => {', "\nevery('watch'");
@@ -207,7 +215,7 @@ chars.get(QUILL).online = false;   // logs out; the watch kept what it saw last
 h = holders(GUARD, 'steward');
 ok('offline, the Steward who left behind his mask is listed by his own name (officialName, seen)', h.length === 1 && h[0].name === 'Quill Varro' && h[0].online === false, h);
 const officialsLine = () => { said.length = 0; commands.get('officials')(GUARD, 'whiterun'); return said.map((s) => s.t).join(' | '); };
-ok('/officials whiterun names them by their own names', /Jarl: Raven Stormbrow/.test(officialsLine()) && /Steward: Quill Varro/.test(officialsLine()), officialsLine());
+ok('masks on: /officials whiterun names them by their own names', /Jarl: Raven Stormbrow/.test(officialsLine()) && /Steward: Quill Varro/.test(officialsLine()), officialsLine());
 chars.get(QUILL).online = true;
 
 // A ruler in a beast form offers a post: the offer and its notices carry her own name
@@ -277,18 +285,36 @@ ok('Inspect on someone plain is as it was', /^Man, Nord$/.test(gl[0] || ''), gl)
 
 // ---- the Nobility tab (nobility.js) -------------------------------------------------------------------------------------
 globalThis.__dboCourtFaction = (zid) => (zid === 'whiterun' ? 'hold-whiterun' : null);
-require(path.join(ROOT, 'nobility.js'))(Object.assign({}, base, O, { every: () => {}, announce: () => {}, cfg: { nobility: { enabled: true, realms: { whiterun: 'skyrim' } } } }));
+const decrees = [];
+const NOBILITY_CFG = { nobility: { enabled: true, realms: { whiterun: 'skyrim' } } };
+require(path.join(ROOT, 'nobility.js'))(Object.assign({}, base, O, { every: () => {}, announce: (t) => decrees.push(t), cfg: NOBILITY_CFG }));
 const nsec = globalThis.__dboJournalSections.nobility;
 r = ev('nobilityGrant', RAVEN, 'N', 'whiterun', '#QVR1', 'thane', '');
 ok('the werewolf Jarl names the masked Steward a Thane', r && r.kind === 'ok', r);
 ok('the answer to a grant by the #TAG under the mask names the mask, never his own name', r && /Masked Person/.test(r.text || '') && !/Quill Varro/.test(JSON.stringify(r)), r);
 const hold = (nsec.view(VIEW).holds || []).find((x) => x.id === 'whiterun') || {};
 ok('the Nobility tab names the ruler by her own name, not "Werewolf"', hold.ruler && hold.ruler.name === 'Raven Stormbrow', hold.ruler);
-ok('the roll names the Thane by his own name, not "Masked Person"', (hold.roll || []).length === 1 && hold.roll[0].name === 'Quill Varro', hold.roll);
+ok('masks on: the roll names the Thane by his own name, not "Masked Person"', (hold.roll || []).length === 1 && hold.roll[0].name === 'Quill Varro', hold.roll);
 chars.get(QUILL).online = false;
 const hold2 = (nsec.view(VIEW).holds || []).find((x) => x.id === 'whiterun') || {};
 ok('offline, the roll keeps the own name written at the grant', (hold2.roll || [])[0] && hold2.roll[0].name === 'Quill Varro', hold2.roll);
 chars.get(QUILL).online = true;
+// As shipped (rosterPrivacy.masks false): the decree that announce() sends to every player names the mask granted a title
+// by the #TAG drawn under it as the mask (re-verify P1: with true it read "Quill Varro is named Thane of Whiterun", and the
+// Nobility tab, which every player sees, listed him by name beside #QVR1). The title is taken back first, then granted
+// again through a nobility.js given the shipped names.
+ev('nobilityRevoke', RAVEN, 'N', 'whiterun', QUILL.toString(16));
+const handlers2 = {};
+const ev2 = (name, a, ...args) => { answers.length = 0; told.length = 0; for (const f of handlers2[name] || []) f(a, args); return answers[answers.length - 1] || null; };
+require(path.join(ROOT, 'nobility.js'))(Object.assign({}, base, shipped, officialsWith(Object.assign({}, base, shipped)), {
+  onUi: (e, fn) => { (handlers2[e] = handlers2[e] || []).push(fn); }, every: () => {}, announce: (t) => decrees.push(t), cfg: NOBILITY_CFG,
+}));
+decrees.length = 0;
+r = ev2('nobilityGrant', RAVEN, 'N', 'whiterun', '#QVR1', 'thane', '');
+ok('as shipped: the decree after a grant to #QVR1 names the mask, never his own name', r && r.kind === 'ok' && decrees.length === 1
+  && /Masked Person is named Thane/.test(decrees[0]) && !/Quill Varro/.test(decrees.join(' ')), { r, decrees });
+const hold3 = (globalThis.__dboJournalSections.nobility.view(VIEW).holds || []).find((x) => x.id === 'whiterun') || {};
+ok('as shipped: the Nobility roll names the masked Thane as the mask', (hold3.roll || []).length === 1 && hold3.roll[0].name === 'Masked Person', hold3.roll);
 
 // ---- the household's invitations (guilds.js, the Court tab) -----------------------------------------------------------
 r = globalThis.__dboGuildInvite(ADMIN, MIRA, 'hold-whiterun');
@@ -297,19 +323,19 @@ ok('a mask invited into the household by the #TAG under it is listed as the mask
 
 // ---- the ledger of contacts (ledger.js) ---------------------------------------------------------------------------------
 const lcmd = {};
-const ledgerWith = (names) => {
+const ledgerWith = (names, viewer = VIEW, metOf = (a) => (a === VIEW ? [RAVEN, QUILL, GUARD] : [])) => {
   require(path.join(ROOT, 'ledger.js'))({
     mp: Object.assign({}, mp, { get: (id, k) => (k === 'pos' ? [0, 0, 0] : k === 'worldOrCellDesc' ? 'tamriel' : mp.get(id, k)) }),
     log: () => {}, personal: (a, t) => said.push({ a, t }), audit: () => {}, who, nameOf, tagOf, profileOf, onlineActors: online, ownNameOf: names.ownNameOf,
-    registerChatCommand: (n, f) => { lcmd[n] = f; }, isAdmin, isWorldspace: (w) => w === 'tamriel', metOf: (a) => (a === VIEW ? [RAVEN, QUILL, GUARD] : []),
+    registerChatCommand: (n, f) => { lcmd[n] = f; }, isAdmin, isWorldspace: (w) => w === 'tamriel', metOf,
     forgetMet: () => {}, sendPigeon: () => ({ ok: true, text: '' }), boardZoneNear: () => 'whiterun', zoneOfActor: () => ({ id: 'whiterun' }), cfg: {},
   });
-  said.length = 0; lcmd.ledger(VIEW, '');
+  said.length = 0; lcmd.ledger(viewer, '');
   return said.map((s) => s.t).join('\n');
 };
 globalThis.__dboGuildsOf = () => [];
 const book = ledgerWith({ ownNameOf });
-ok('the ledger lists contacts by their own names, not the beast\'s or the mask\'s', /Raven Stormbrow #RVN1/.test(book) && /Quill Varro #QVR1/.test(book) && !/Werewolf|Masked Person/.test(book), book);
+ok('masks on: the ledger lists contacts by their own names, not the beast\'s or the mask\'s', /Raven Stormbrow #RVN1/.test(book) && /Quill Varro #QVR1/.test(book) && !/Werewolf|Masked Person/.test(book), book);
 
 // ---- /party (dungeons.js) and X > Invite to Party (playermenu.js) -------------------------------------------------------
 require(path.join(ROOT, 'dungeons.js'))(Object.assign({}, base, {
@@ -348,7 +374,11 @@ ok('/charter invite by a werewolf\'s #TAG answers with the beast and no #TAG', /
 
 // ---- the switch: gamemode-config.json rosterPrivacy.masks --------------------------------------------------------------
 const off = namesFor({ rosterPrivacy: { masks: false } });
-ok('rosterPrivacy.masks is on unless set false: a roster names a mask by the own name', namesFor({ rosterPrivacy: {} }).ownNameOf(QUILL) === 'Quill Varro' && ownNameOf(QUILL) === 'Quill Varro');
+ok('the shipped gamemode-config.json sets rosterPrivacy.masks false (masks as on origin/server until Nate rules)', (shippedCfg.rosterPrivacy || {}).masks === false, shippedCfg.rosterPrivacy);
+ok('as shipped: a roster names a mask as the mask', shipped.ownNameOf(QUILL) === 'Masked Person' && shipped.ownDisplay(QUILL) === 'Masked Person #QVR1', shipped.ownDisplay(QUILL));
+ok('rosterPrivacy.masks is off unless set true: no key, or no section, keeps the mask in rosters',
+  namesFor({ rosterPrivacy: {} }).ownNameOf(QUILL) === 'Masked Person' && namesFor({}).ownNameOf(QUILL) === 'Masked Person', [namesFor({ rosterPrivacy: {} }).ownNameOf(QUILL), namesFor({}).ownNameOf(QUILL)]);
+ok('masks on: a roster names a mask by the own name', ownNameOf(QUILL) === 'Quill Varro', ownNameOf(QUILL));
 ok('masks off: a roster names a mask as the mask', off.ownNameOf(QUILL) === 'Masked Person' && off.ownDisplay(QUILL) === 'Masked Person #QVR1', off.ownDisplay(QUILL));
 ok('masks off: a roster still never names a beast by the beast', off.ownNameOf(RAVEN) === 'Raven Stormbrow' && off.ownNameOf(THANE) === 'Tova Hale' && off.ownNameOf(LOST) === 'Stranger',
   [RAVEN, THANE, LOST].map(off.ownNameOf));
@@ -366,6 +396,49 @@ chars.get(QUILL).online = false;
 ok('masks off: an official offline is named by the own name the watch kept (logging out unmasks)', Ooff.officialName(22) === 'Quill Varro', Ooff.officialName(22));
 chars.get(QUILL).online = true;
 ok('either way no name finds a mask, only the #TAG', findByName('Quill') === 0 && findByName('Masked Person') === 0 && findByName('#QVR1') === QUILL);
+
+// ---- the meet tick (gamemode.js): nobody meets someone in disguise -------------------------------------------------------
+// Every 5 s each pair within say range (20 m) was written into both private.metActors, with no introduction, and the
+// ledger and the pigeon coop list those contacts by name and #TAG. A stranger who stood near masked Mira read "Mira Quell
+// #MQL1" (re-verify P6, with masks on), the #TAG the client draws under her mask; one who stood near the werewolf gained
+// "Raven Stormbrow #RVN1" (P7; "Werewolf #RVN1" on origin/server). The real tick runs here, everyone at one spot.
+const meetSrc = slice("every('meet', MEET_TICK_MS, () => {", '\n});\n');
+const noteSrc = slice('const noteMet = (a, b, changed) => {', '\n};\n');
+const metLine = (GM.match(/^const metOf = .*$/m) || [''])[0];
+ok('gamemode.js\'s meet tick is found', !!(meetSrc && noteSrc && metLine));
+const metList = (a) => props.get(`${a}|private.metActors`) || [];
+// A fresh tick (its own cache of met lists) over these characters, all online at one spot
+const meetTick = (...who) => {
+  for (const a of who) P(a, 'private.metActors', []);
+  let tick = () => {};
+  if (meetSrc && noteSrc && metLine) {
+    const mpHere = Object.assign({}, mp, { get: (id, k) => (k === 'pos' ? [0, 0, 0] : k === 'worldOrCellDesc' ? 'tamriel' : mp.get(id, k)) });
+    new Function('every', 'MEET_TICK_MS', 'cfg', 'UNITS_PER_METER', 'onlineActors', 'mp', 'disguisedOf',
+      `const MAX_MET = 500;\n${metLine}\nconst metCache = new Map();\n${noteSrc}\n};\n${meetSrc}\n});`)(
+      (n, ms, f) => { tick = f; }, 5000, {}, 70, () => who, mpHere, disguisedOf);
+  }
+  tick();
+  return tick;
+};
+const metBook = (viewer) => ledgerWith({ ownNameOf }, viewer, metList);   // masks on: the ledger names a mask by the own name
+let tickVM = meetTick(VIEW, MIRA);
+let mb = metBook(VIEW);
+ok('P6: a stranger who stood near masked Mira gains no contact: not in her met list, and the ledger has neither her name nor her #TAG',
+  !metList(VIEW).includes(MIRA) && !/Mira Quell|MQL1|Masked Person/.test(mb), { met: metList(VIEW), ledger: mb });
+ok('the masked one still meets the plain stranger she stood beside', metList(MIRA).includes(VIEW), metList(MIRA));
+meetTick(GUARD, RAVEN);
+mb = metBook(GUARD);
+ok('P7: a stranger who stood near the werewolf gains no contact: not in his met list, no name, beast or #TAG in the ledger',
+  !metList(GUARD).includes(RAVEN) && !/Raven|RVN1|Werewolf/.test(mb), { met: metList(GUARD), ledger: mb });
+ok('the werewolf still meets the plain stranger', metList(RAVEN).includes(GUARD), metList(RAVEN));
+meetTick(VIEW, GUARD);
+ok('two plain characters still meet, both ways', metList(VIEW).includes(GUARD) && metList(GUARD).includes(VIEW), [metList(VIEW), metList(GUARD)]);
+// Mira takes the mask off by Vilja: the next tick notes the meeting, and it stays when the mask goes back on
+P(VIEW, 'private.metActors', []); tickVM = meetTick(VIEW, MIRA);
+P(MIRA, 'appearance', Object.assign({}, props.get(`${MIRA}|appearance`), { name: 'Mira Quell' })); P(MIRA, 'maskName', '');
+tickVM();
+mask(MIRA);
+ok('unmasked, she is met by the next tick, and stays met behind the mask again', metList(VIEW).includes(MIRA), metList(VIEW));
 
 // ---- every other roster and record that keeps a name -------------------------------------------------------------------
 // Each line names people as the rosters do (ownNameOf/ownDisplay) or, for someone looked up, as the asker asked for them

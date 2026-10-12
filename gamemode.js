@@ -204,10 +204,11 @@ const display = (actorId) => `${nameOf(actorId)} #${tagOf(actorId)}`;
 //   its own name; it draws the #TAG under "Masked Person", so a mask stays the mask. /players and the answer to a lookup
 //   (/appoint, a court offer, a title, a staff hire, an invitation, a dossier) use it.
 // - ownNameOf: rosters and records (offices, factions, titles, the party, contacts, letters, jobs). Never the beast's
-//   name; behind a mask the own name while gamemode-config.json rosterPrivacy.masks is on (the default), else the mask's.
-//   On, a roster names a masked character beside the #TAG the client draws under the mask, so its reader can tell who is
-//   behind it; off, no roster names them. Nate's call.
-const ROSTER_MASKS = (cfg.rosterPrivacy || {}).masks !== false;
+//   name; behind a mask the mask's name, as before 12 Oct, unless gamemode-config.json rosterPrivacy.masks is true (off
+//   as shipped, and a missing key is off). True names a masked character by their own name beside the #TAG the client
+//   draws under the mask, so a roster's reader can tell who is behind it, and a title's decree names them to the whole
+//   server (re-verify of 12 Oct). Nate's call.
+const ROSTER_MASKS = (cfg.rosterPrivacy || {}).masks === true;
 const namedBy = (fn, actorId) => {
   try { const f = globalThis[fn]; const n = typeof f === 'function' ? String(f(actorId) || '') : ''; if (n) return n; } catch (e) { /* the name shown */ }
   return nameOf(actorId);
@@ -935,7 +936,8 @@ const notePigeonSent = (p) => {
   for (const [k, v] of pigeonLastSent) if (Date.now() - v > PIGEON_COOLDOWN_MS) pigeonLastSent.delete(k);
   saveSoon(PIGEON_COOLDOWN_FILE, () => JSON.stringify(Object.fromEntries(pigeonLastSent)));
 };
-// Two characters have met once they stood within speaking range in the same place, recorded on both
+// Two characters have met once they stood within speaking range in the same place, recorded on both (but never with
+// someone in disguise, below)
 const MEET_TICK_MS = 5000;
 const MAX_MET = 500;
 const metOf = (a) => { try { const r = mp.get(a, 'private.metActors'); return Array.isArray(r) ? r : []; } catch (e) { return []; } };
@@ -960,7 +962,7 @@ every('meet', MEET_TICK_MS, () => {
     try {
       const w = String(mp.get(a, 'worldOrCellDesc') || ''); const p = mp.get(a, 'pos');
       if (!w || !Array.isArray(p)) continue;
-      const me = { a, p, w, i: all.length, cx: Math.floor(p[0] / reach), cy: Math.floor(p[1] / reach) };
+      const me = { a, p, w, i: all.length, cx: Math.floor(p[0] / reach), cy: Math.floor(p[1] / reach), d: disguisedOf(a) };
       all.push(me);
       const key = `${w}|${me.cx}|${me.cy}`; const cell = grid.get(key); if (cell) cell.push(me); else grid.set(key, [me]);
     } catch (e) { /* between cells */ }
@@ -971,7 +973,11 @@ every('meet', MEET_TICK_MS, () => {
       for (const o of grid.get(`${me.w}|${me.cx + dx}|${me.cy + dy}`) || []) {
         if (o.i <= me.i) continue;
         if (Math.hypot(me.p[0] - o.p[0], me.p[1] - o.p[1], me.p[2] - o.p[2]) > reach) continue;
-        noteMet(me.a, o.a, changed); noteMet(o.a, me.a, changed);
+        // Nobody meets someone behind a mask or in a beast form: the ledger and the pigeon coop list each contact by name
+        // and #TAG, so a stranger who only stood near them would learn who they are (re-verify of 12 Oct). Someone in
+        // disguise still meets the people they see; met once undisguised, they stay met.
+        if (!o.d) noteMet(me.a, o.a, changed);
+        if (!me.d) noteMet(o.a, me.a, changed);
       }
     }
   }
