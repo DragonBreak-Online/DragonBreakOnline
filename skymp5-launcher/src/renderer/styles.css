@@ -1598,6 +1598,13 @@ html, body {
   border: 1px solid rgba(var(--accent-rgb), 0.35);
 }
 
+.topbar-service {
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  opacity: 0.7;
+  margin-right: 4px;
+}
+
 .nexus-topbar-user .discord-topbar-name,
 #nexus-topbar-slot .discord-topbar-name {
   color: rgba(var(--accent-rgb), 0.92);
