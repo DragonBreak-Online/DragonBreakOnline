@@ -79,13 +79,15 @@ module.exports = (api) => {
   };
   const entriesOf = (a) => { try { const inv = mp.get(a, 'inventory'); return Array.isArray(inv && inv.entries) ? inv.entries.map((e) => Object.assign({}, e)) : []; } catch (e) { return []; } };
   const loose = (e) => e && !e.worn && !e.wornLeft && (Number(e.count) || 0) > 0;
-  const looseCount = (a, id) => entriesOf(a).reduce((n, e) => n + (loose(e) && (Number(e.baseId) >>> 0) === (id >>> 0) ? Number(e.count) : 0), 0);
+  // id: one base, or a test on the base (an order takes every item of its name: supplyMatch)
+  const isIt = (id, base) => (typeof id === 'function' ? id(base) : base === (id >>> 0));
+  const looseCount = (a, id) => entriesOf(a).reduce((n, e) => n + (loose(e) && isIt(id, Number(e.baseId) >>> 0) ? Number(e.count) : 0), 0);
 
   // Take count of an item out of a's pack, plain stacks first, and return the entries taken (enchantments and tempering
   // go with them); null if a does not have that many loose
   const takeItems = (a, id, count) => {
     const entries = entriesOf(a);
-    const mine = entries.filter((e) => loose(e) && (Number(e.baseId) >>> 0) === (id >>> 0));
+    const mine = entries.filter((e) => loose(e) && isIt(id, Number(e.baseId) >>> 0));
     if (mine.reduce((n, e) => n + Number(e.count), 0) < count) return null;
     const plain = (e) => Object.keys(e).every((k) => k === 'baseId' || k === 'count' || k === 'worn' || k === 'wornLeft' || e[k] === undefined || e[k] === null);
     mine.sort((x, y) => (plain(y) ? 1 : 0) - (plain(x) ? 1 : 0));
@@ -261,6 +263,12 @@ module.exports = (api) => {
     return { ok: true, text: `Posted: ${count} ${o.name} for ${reward} gold. ${fee} gold went to ${zone.name} for the notice. The goods come to your mailbox.` };
   };
 
+  // What fills an order: its own base, or any sendable item of the same name. The search keeps one record per name, and
+  // two records can share one (#bugs 12 Oct: an order for Charcoal bfb09 refused the woodcutters' Charcoal 33760)
+  const supplyMatch = (o) => {
+    const name = String(o.name || '').trim().toLowerCase();
+    return (base) => base === (o.baseId >>> 0) || (!!name && sendableBase(base) && String(nameOfItem(base) || '').trim().toLowerCase() === name);
+  };
   const deliver = (a, zoneId, orderId, countRaw) => {
     if (!C.enabled || (data() && S.broken)) return { ok: false, text: 'Supply orders are closed for now.' };
     const o = byId(orderId);
@@ -270,10 +278,11 @@ module.exports = (api) => {
     // The poster's character is gone: the notice comes down and nothing is taken
     if (gone(o.poster)) { o.state = 'cancelled'; o.closedAt = Date.now(); save(); audit(`SUPPLY #${o.id} of ${o.posterName} #${o.posterTag} taken down: the character is gone, ${o.held} gold held`); return { ok: false, text: 'Whoever posted that order is gone. The notice comes down.' }; }
     const want = Math.min(left(o), int(countRaw) > 0 ? int(countRaw) : left(o));
-    const have = looseCount(a, o.baseId);
+    const fits = supplyMatch(o);
+    const have = looseCount(a, fits);
     const n = Math.min(want, have);
     if (n < 1) return { ok: false, text: `You carry no ${o.name} you are not wearing.` };
-    const items = takeItems(a, o.baseId, n);
+    const items = takeItems(a, fits, n);
     if (!items) return { ok: false, text: `You do not carry ${n} ${o.name}.` };
     // The last delivery takes what is left, so rounding never strands coin on the board
     const pay = n === left(o) ? o.held : Math.floor(o.reward * n / o.count);
@@ -332,7 +341,7 @@ module.exports = (api) => {
     sendable.sort((x, y) => x.name.localeCompare(y.name));
     const row = (o) => ({ id: o.id, name: o.name, count: o.count, filled: o.filled, reward: o.reward, perUnit: Math.floor(o.reward / o.count),
       held: o.held, poster: `${o.posterName} #${o.posterTag}`, hoursLeft: hours(o), zone: o.zoneName, state: o.state,
-      mine: o.poster === (a >>> 0), have: looseCount(a, o.baseId) });
+      mine: o.poster === (a >>> 0), have: looseCount(a, supplyMatch(o)) });
     const s = S.search.get(a >>> 0) || { query: '', results: [] };
     return {
       sendable: sendable.slice(0, 200),

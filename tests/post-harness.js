@@ -12,9 +12,12 @@ const check = (label, ok, got) => { console.log(`${ok ? 'PASS' : 'FAIL'}  ${labe
 
 const GOLD = 0xf;
 const SWORD = 0x12eb7, DAGGER = 0x1397e, KEY = 0x2000, ROBE = 0x3000, POTION = 0x4000;
+// Two records of one name (Skyrim's Charcoal bfb09 and 33760, the woodcutters'), #bugs 12 Oct
+const COAL_A = 0xbfb09, COAL_B = 0x33760;
 const RECORDS = { [SWORD]: { type: 'WEAP', flags: 0, editorId: 'SteelSword' }, [DAGGER]: { type: 'WEAP', flags: 0, editorId: 'IronDagger' },
-  [KEY]: { type: 'KEYM', flags: 0, editorId: 'HouseKey' }, [ROBE]: { type: 'ARMO', flags: 0x4, editorId: 'VampireLordRobe' }, [POTION]: { type: 'ALCH', flags: 0, editorId: 'PotionHealing' } };
-const NAMES = { [SWORD]: 'Steel Sword', [DAGGER]: 'Iron Dagger', [POTION]: 'Potion of Healing' };
+  [KEY]: { type: 'KEYM', flags: 0, editorId: 'HouseKey' }, [ROBE]: { type: 'ARMO', flags: 0x4, editorId: 'VampireLordRobe' }, [POTION]: { type: 'ALCH', flags: 0, editorId: 'PotionHealing' },
+  [COAL_A]: { type: 'MISC', flags: 0, editorId: 'Charcoal' }, [COAL_B]: { type: 'MISC', flags: 0, editorId: 'BYOHMaterialCharcoal' } };
+const NAMES = { [SWORD]: 'Steel Sword', [DAGGER]: 'Iron Dagger', [POTION]: 'Potion of Healing', [COAL_A]: 'Charcoal', [COAL_B]: 'Charcoal' };
 const A = 0xff000101, B = 0xff000202, C = 0xff000303;   // A and C share an account
 const props = new Map();
 const set = (id, k, v) => props.set(`${id >>> 0}|${k}`, JSON.parse(JSON.stringify(v)));
@@ -51,7 +54,7 @@ const api = {
 };
 const cwd = process.cwd();
 process.chdir(TMP);
-fs.writeFileSync('admin-items.json', JSON.stringify({ categories: [{ items: [[`${SWORD.toString(16)}:Skyrim.esm`, 'Steel Sword'], [`${DAGGER.toString(16)}:Skyrim.esm`, 'Iron Dagger'], [`${KEY.toString(16)}:Skyrim.esm`, 'House Key Steel']] }] }));
+fs.writeFileSync('admin-items.json', JSON.stringify({ categories: [{ items: [[`${COAL_A.toString(16)}:Skyrim.esm`, 'Charcoal'], [`${COAL_B.toString(16)}:Skyrim.esm`, 'Charcoal'], [`${SWORD.toString(16)}:Skyrim.esm`, 'Steel Sword'], [`${DAGGER.toString(16)}:Skyrim.esm`, 'Iron Dagger'], [`${KEY.toString(16)}:Skyrim.esm`, 'House Key Steel']] }] }));
 delete globalThis.__dboPost;
 require(path.join(SERVER, 'post.js'))(api);
 const P = globalThis.__dboPostApi;
@@ -191,6 +194,16 @@ clock = now0;
 reset();
 o = ui('supplyPost', A, `${SWORD.toString(16)}:Skyrim.esm`, 1, 60000);
 check('post: a reward above 50,000 is refused', o.kind === 'refused', o);
+// ---- an order fills with any item of its name (#bugs 12 Oct: Charcoal bfb09 refused the woodcutters' Charcoal 33760) ----
+reset();
+o = ui('supplyPost', A, `${COAL_A.toString(16)}:Skyrim.esm`, 10, 50);
+const coal = P.view(A).supply.orders.find((x) => x.name === 'Charcoal');
+check('charcoal: the order is posted for Charcoal', o.kind !== 'refused' && !!coal, o);
+api.giveItem(B, COAL_B, 12);
+check('charcoal: the board counts the woodcutters\' Charcoal as Charcoal', P.view(B).supply.orders.find((x) => x.id === coal.id).have === 12, P.view(B).supply.orders.find((x) => x.id === coal.id));
+o = ui('supplyDeliver', B, coal.id, 10);
+check('charcoal: ten of it fill the order', o.kind !== 'refused' && count(B, COAL_B) === 2 && /hand over 10 Charcoal/.test(o.text), o);
+
 // an unreadable orders file switches orders off instead of being overwritten
 fs.writeFileSync('supply-orders.json', '{broken');
 delete globalThis.__dboPost;
