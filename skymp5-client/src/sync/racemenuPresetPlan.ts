@@ -134,6 +134,43 @@ export const facePresetFrom = (jslot: unknown): FacePreset | null => {
   return { version, modNames: modNamesFrom(jslot), custom, sculptDivisor, sculpt };
 };
 
+// The first rule facePresetFrom finds broken, null when it takes the face; detail (names, paths) is for the diag file only
+export interface PresetRefusal { code: string; at: number; value: string; detail: string }
+const numText = (v: unknown): string => (typeof v === "number" && Number.isFinite(v) ? String(Math.round(v * 1e4) / 1e4) : typeof v);
+export const facePresetRefusal = (jslot: unknown): PresetRefusal | null => {
+  const r = (code: string, at: number, value: unknown, detail: string): PresetRefusal => ({ code, at, value: numText(value), detail });
+  if (!isObject(jslot)) return r("notobject", -1, 0, "not an object");
+  if (!versionFrom(jslot.version)) return r("version", -1, 0, "version");
+  const morphs = isObject(jslot.morphs) ? jslot.morphs : {};
+  const custom = morphs.custom;
+  if (custom !== undefined && custom !== null) {
+    if (!Array.isArray(custom) || custom.length > MAX_CUSTOM_MORPHS) return r("custom-count", -1, Array.isArray(custom) ? custom.length : 0, "custom list");
+    for (let i = 0; i < custom.length; i++) {
+      const m = custom[i];
+      if (!isObject(m) || !isCleanString(m.name, MAX_MORPH_NAME)) return r("custom-name", i, 0, `custom ${i}: name`);
+      if (!morphValueOk(m.value)) return r("custom-value", i, m.value, `custom ${m.name}=${String(m.value)}`);
+    }
+  }
+  const sculpt = morphs.sculpt;
+  const hasSculpt = Array.isArray(sculpt) && sculpt.some((h) => isObject(h) && Array.isArray(h.data) && h.data.length > 0);
+  if (hasSculpt && !isIntIn(morphs.sculptDivisor, 1, MAX_SCULPT_DIVISOR)) return r("sculpt-divisor", -1, morphs.sculptDivisor, `sculptDivisor ${String(morphs.sculptDivisor)}`);
+  if (sculpt === undefined || sculpt === null) return null;
+  if (!Array.isArray(sculpt) || sculpt.length > MAX_SCULPT_HOSTS) return r("sculpt-count", -1, Array.isArray(sculpt) ? sculpt.length : 0, "sculpt list");
+  const maxOffset = Math.min(MAX_SCULPT_OFFSET, MAX_SCULPT_UNITS * (hasSculpt ? (morphs.sculptDivisor as number) : 10000));
+  for (let i = 0; i < sculpt.length; i++) {
+    const h = sculpt[i];
+    if (!isObject(h) || !isTriPath(h.host)) return r("sculpt-host", i, 0, `sculpt ${i}: host ${isObject(h) ? String(h.host).slice(0, 120) : "?"}`);
+    if (!isIntIn(h.vertices, 1, MAX_VERTICES)) return r("sculpt-vertices", i, h.vertices, `sculpt ${h.host}: vertices ${String(h.vertices)}`);
+    const raw = h.data === undefined || h.data === null ? [] : h.data;
+    if (!Array.isArray(raw) || raw.length > h.vertices) return r("sculpt-data", i, Array.isArray(raw) ? raw.length : 0, `sculpt ${h.host}: data`);
+    for (const v of raw) {
+      if (!Array.isArray(v) || v.length !== 4 || !isIntIn(v[0], 0, h.vertices - 1)) return r("sculpt-vertex", i, Array.isArray(v) ? v[0] : 0, `sculpt ${h.host}: vertex ${JSON.stringify(v).slice(0, 60)}`);
+      for (let k = 1; k < 4; k++) if (!isIntIn(v[k], -maxOffset, maxOffset)) return r("sculpt-offset", i, v[k], `sculpt ${h.host}: offset ${JSON.stringify(v).slice(0, 60)} (max ${maxOffset})`);
+    }
+  }
+  return null;
+};
+
 export const isEmptyFace = (f: FacePreset): boolean => !f.custom.length && !f.sculpt.length;
 
 // Fixed key order, so one face is always one text and one hash

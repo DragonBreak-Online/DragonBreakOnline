@@ -10,7 +10,7 @@ import { isGuardedActor, isGuardedRace } from "../../sync/beastRaces";
 import { Appearance } from "../../sync/appearance";
 import {
   ApplyLedger, ChunkAssembler, FacePreset, applyBlockedBy, boundSculpt, buildJslot, chunkText, decodeFace, encodeFace,
-  facePresetFrom, formIdentifierOf, hashText, isEmptyFace, otherRaceFamily, presetFileName, readChunkPacket, PRESET_MAX_CHARS,
+  facePresetFrom, facePresetRefusal, formIdentifierOf, hashText, isEmptyFace, otherRaceFamily, presetFileName, readChunkPacket, PRESET_MAX_CHARS,
 } from "../../sync/racemenuPresetPlan";
 import { logError, logTrace } from "../../logging";
 import { hex, trace } from "../../lib/clientDiag";
@@ -238,8 +238,14 @@ export class RacemenuPresetService extends ClientListener {
   private capture(): void {
     const natives = this.natives();
     const player = Game.getPlayer();
-    if (!natives || !player) return;
-    if (isGuardedActor(player)) return;
+    // Every way out of a capture leaves a trace line, so a close that sent nothing says why
+    if (!natives || !player) { trace(`rmp cap err=${natives ? "noplayer" : "natives"}`); return; }
+    if (isGuardedActor(player)) {
+      let raceNow = 0;
+      try { raceNow = (player.getRace()?.getFormID() ?? 0) >>> 0; } catch { raceNow = 0; }
+      trace(`rmp cap skip=guarded race=${hex(raceNow)}`);
+      return;
+    }
     const held = this.captureHeldBy(player, Date.now());
     this.heldForAnswerAt = held && held.code === "noanswer" ? Date.now() : 0;
     if (held) {
@@ -264,8 +270,16 @@ export class RacemenuPresetService extends ClientListener {
     }
     if (!text) { this.diag("preset: save wrote no file (RaceMenu missing?)"); trace("rmp cap err=nofile"); return; }
     let face: FacePreset | null = null;
-    try { face = facePresetFrom(JSON.parse(text)); } catch { face = null; }
-    if (!face) { this.diag(`preset: own preset refused (${text.length} chars)`); trace(`rmp cap err=parse chars=${text.length}`); return; }
+    let raw: unknown = undefined;
+    try { raw = JSON.parse(text); } catch { raw = undefined; }
+    if (raw !== undefined) face = facePresetFrom(raw);
+    if (!face) {
+      // The broken rule: named in the diag file, as a code, index and value in the trace
+      const why = raw === undefined ? null : facePresetRefusal(raw);
+      this.diag(`preset: own preset refused (${text.length} chars): ${raw === undefined ? "not JSON" : why ? why.detail : "unknown"}`);
+      trace(`rmp cap err=parse chars=${text.length} why=${raw === undefined ? "json" : why ? `${why.code} at=${why.at} v=${why.value}` : "unknown"}`);
+      return;
+    }
     const encoded = isEmptyFace(face) ? "" : encodeFace(face);
     if (encoded.length > PRESET_MAX_CHARS) { this.diag(`preset: own preset too big (${encoded.length} chars)`); trace(`rmp cap err=big chars=${encoded.length}`); return; }
     const hash = encoded ? hashText(encoded) : "";

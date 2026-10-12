@@ -561,6 +561,46 @@ const bundle = async (rel, dir) => {
       && asks.join('|') === 'rmp ask have=-|rmp ask have=- n=5 noanswer', [selfGets().length, asks]);
   }
 
+  // ---- upload gap (12 Oct): every way out of a capture is traced, and a refused capture names the rule it broke ----
+  {
+    // a RaceMenu slider past the validator's range (a fraction beyond 1): refused here, nothing sent, the rule named
+    let Q = spawned('none');
+    W.savedJslot = jslotWith(1.5, false);
+    let before = TR.length;
+    editor(Q);
+    check('upload gap: a capture with a slider at 1.5 is refused, nothing sent', puts().length === 0 && saves().length === 1, puts());
+    check('upload gap: ...traced with the rule, index and value (no name or path)', TR.slice(before).some((l) => /^rmp cap err=parse chars=\d+ why=custom-value at=0 v=1\.5$/.test(l)), TR.slice(before));
+    check('upload gap: ...and the diag file names the slider', W.diag.some((l) => /^preset: own preset refused \(\d+ chars\): custom NoseBridge=1\.5$/.test(l)), W.diag);
+    // a sculpt offset past 30 units
+    Q = spawned('none');
+    W.savedJslot = jslotWith(0.2, false);
+    W.savedJslot.morphs.sculpt = [{ host: HEAD, vertices: 9001, data: [[3, 10, 20, 400000]] }];
+    before = TR.length;
+    editor(Q);
+    check('upload gap: a sculpt offset past 30 units is refused and traced as sculpt-offset', puts().length === 0 && TR.slice(before).some((l) => /^rmp cap err=parse chars=\d+ why=sculpt-offset at=0 v=400000$/.test(l)), TR.slice(before));
+    // the platform without the preset natives
+    clear();
+    W.me = ME;
+    Q = make(M.RacemenuPresetService, {});
+    step(Q, 1100, 7);
+    W.savedJslot = jslotWith(0.2, false);
+    before = TR.length;
+    editor(Q);
+    check('upload gap: no preset natives: nothing saved or sent, traced err=natives', saves().length === 0 && puts().length === 0 && TR.slice(before).includes('rmp cap err=natives'), TR.slice(before));
+    // a guarded race (a werewolf) at the capture
+    Q = spawned('none');
+    W.actors[0x14].race = 0x000cdd84;
+    W.savedJslot = jslotWith(0.2, false);
+    before = TR.length;
+    editor(Q);
+    check('upload gap: a guarded race at the capture: nothing saved or sent, traced skip=guarded with the race', saves().length === 0 && puts().length === 0 && TR.slice(before).includes('rmp cap skip=guarded race=cdd84'), TR.slice(before));
+    W.actors[0x14].race = RACE;
+    // the rule finder agrees with facePresetFrom: null exactly when the face is taken
+    const agree = [jslotWith(0.4, true), jslotWith(-1, false), jslotWith(32, false), jslotWith(1.5, false), jslotWith(-1.01, false), jslotWith(33, false), { version: {} }, 7]
+      .every((j) => (P.facePresetFrom(j) === null) === (P.facePresetRefusal(j) !== null));
+    check('upload gap: facePresetRefusal is null exactly when facePresetFrom takes the face', agree);
+  }
+
   // ---- the trace: each step as codes, numbers and hashes ----
   const has = (line) => TR.includes(line);
   const like = (rx) => TR.some((l) => rx.test(l));
