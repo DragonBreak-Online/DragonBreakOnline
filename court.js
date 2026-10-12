@@ -23,6 +23,8 @@
 //   courtKick    [nonce, zoneId, actorId]
 //   courtInvite  [nonce, zoneId, nameOrTag]
 //   courtRename  [nonce, zoneId, 'office'|'rank', officeId|rankIndex, name]   a Lead GM's name for it ('' = the default)
+//   courtTax     [nonce, zoneId, percent]          the hold's one tax rate (business.js /tax), by Jarl, Count, Steward or staff
+//   courtWage    [nonce, zoneId, office, gold]     an office's weekly wage (economy.js), by the ruler or Steward
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -167,16 +169,24 @@ module.exports = (api) => {
     try { tag = actor ? String(tagOf(actor) || '') : ''; } catch (e) { tag = ''; }
     return { pid: Number(pid), name: on ? nameOf(on) : officialName(pid), tag, online: !!on };
   };
+  // The ruler's office (its household rank is the leader's) is never paid a wage (economy.js payroll)
+  const isRulerOffice = (rank) => ((C.factionRanks || {})[rank] || []).includes('@leader');
+  const holdFactionOf = (zone) => (typeof globalThis.__dboHoldFactionOf === 'function' ? globalThis.__dboHoldFactionOf(zone) : null);
   const zoneView = (a, z, mine) => {
     const zo = readOfficials()[z.id] || {};
     const staff = isAdmin(a);
+    // Each office's weekly wage (economy.js: the hold's default unless its ruler or Steward set one), and who may change it
+    const fid = holdFactionOf(z.id);
+    let wages = null, keepsBooks = false;
+    try { if (fid && globalThis.__dboEconomyWages) { wages = globalThis.__dboEconomyWages(fid) || {}; keepsBooks = !!(globalThis.__dboEconomyKeepsBooks && globalThis.__dboEconomyKeepsBooks(a, fid)); } } catch (e) { wages = null; }
     // Staff who rename offices and the household's ranks here (rolenames.js; a Lead GM and above)
     const canName = !!(RN() && RN().canName(a));
     const offices = (z.officials || []).map((rank) => {
       const cap = appointCap(a, z, rank);
       // default, only on an office staff renamed (rolenames.js): what zones.json calls it
       const named = RN() && RN().officeName(z.id, rank) ? { named: true, default: RN().officeDefault(rank) } : {};
-      return Object.assign({ rank, title: rankTitle(rank, z.id), seats: seatsOf(z, rank), holders: (zo[rank] || []).map(holderView), canAppoint: cap > 0 }, named);
+      return Object.assign({ rank, title: rankTitle(rank, z.id), seats: seatsOf(z, rank), holders: (zo[rank] || []).map(holderView), canAppoint: cap > 0 }, named,
+        wages && !isRulerOffice(rank) ? { wage: Math.floor(Number(wages[rank]) || 0) } : {});
     });
     const pid = profileOf(a);
     const outgoing = live().filter((o) => o.zone === z.id && (staff || o.byPid === pid))
@@ -185,7 +195,13 @@ module.exports = (api) => {
     const holdsOffice = offices.some((o) => o.holders.some((h) => h.pid === pid));
     let treasury = null;
     try { if (z.treasury && (staff || holdsOffice) && globalThis.__dboTreasuryZone) treasury = Number(globalThis.__dboTreasuryZone.balance(z.id)) || 0; } catch (e) { treasury = null; }
-    return { id: z.id, name: z.name, kind: z.center ? 'stronghold' : z.capital ? 'hold' : 'region', mine: !!mine, offices, outgoing, household, treasury,
+    // The hold's one tax rate (business.js /tax): every rent and the weekly property tax on its land
+    let tax = null;
+    try {
+      if (globalThis.__dboHoldTax) tax = { pct: Math.round(Number(globalThis.__dboHoldTax(z.id)) * 100), max: Math.round(Number(globalThis.__dboHoldTaxMax ? globalThis.__dboHoldTaxMax() : 0.3) * 100),
+        canSet: !!(globalThis.__dboCanSetHoldTax && globalThis.__dboCanSetHoldTax(a, z.id)) };
+    } catch (e) { tax = null; }
+    return { id: z.id, name: z.name, kind: z.center ? 'stronghold' : z.capital ? 'hold' : 'region', mine: !!mine, offices, outgoing, household, treasury, tax, keepsBooks,
       appointable: offices.filter((o) => o.canAppoint).map((o) => ({ rank: o.rank, title: o.title })), canName };
   };
   const visible = (a) => {
@@ -242,6 +258,28 @@ module.exports = (api) => {
     const chk = appointCheck(a, z, rank, tg, false);
     return chk.error ? chk : offerTo(a, z, rank, tg, chk);
   };
+  // courtTax [nonce, zoneId, percent]: the hold's tax, by those /tax allows (Jarl, Count, Steward, staff)
+  const setTax = (a, args) => {
+    const z = zoneFor(a, args[1]); if (!z) return NO_COURT;
+    if (!globalThis.__dboSetHoldTax || !globalThis.__dboCanSetHoldTax || !globalThis.__dboCanSetHoldTax(a, z.id)) return { error: `Only those who set ${z.name}'s tax may change it.` };
+    const pct = Math.round(Number(args[2]));
+    const rate = Number.isFinite(pct) ? globalThis.__dboSetHoldTax(z.id, pct, display(a), who(a)) : null;
+    if (rate == null) return { error: `A tax rate is a whole number from 0 to ${Math.round(Number(globalThis.__dboHoldTaxMax ? globalThis.__dboHoldTaxMax() : 0.3) * 100)}.` };
+    return { text: `${z.name} now taxes ${Math.round(rate * 100)}% of every rent and, each week, of every property's value.` };
+  };
+  onUi('courtTax', (a, args) => { if (fresh(a, args)) answer(a, () => setTax(a, args)); });
+  // courtWage [nonce, zoneId, office, gold]: economy.js's rules (the ruler or Steward; nobody sets their own)
+  onUi('courtWage', (a, args) => {
+    if (!fresh(a, args)) return;
+    answer(a, () => {
+      const z = zoneFor(a, args[1]); if (!z) return NO_COURT;
+      const rank = rankIn(z, args[2]); if (!rank) return { error: `${z.name} has no such office.` };
+      const fid = holdFactionOf(z.id);
+      if (!fid || !globalThis.__dboEconomySetWage) return { error: `${z.name} pays no wages.` };
+      const r = globalThis.__dboEconomySetWage(a, fid, rank, args[3]);
+      return r.ok ? { text: `${rankTitle(rank, z.id)} of ${z.name}: ${Math.floor(Number(args[3]))} gold a week.` } : { error: r.text };
+    });
+  });
   onUi('courtAppoint', (a, args) => { if (fresh(a, args)) answer(a, () => appointLike(a, args, false)); });
   onUi('courtOffer', (a, args) => { if (fresh(a, args)) answer(a, () => appointLike(a, args, true)); });
   onUi('courtDismiss', (a, args) => {
