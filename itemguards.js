@@ -178,10 +178,12 @@ module.exports = (api) => {
   const owedManual = (actor, baseId, count) => {
     let text = null;
     try { if (typeof globalThis.__dboManualsOwedMove === 'function') text = globalThis.__dboManualsOwedMove(Number(actor) >>> 0, Number(baseId) >>> 0, Number(count)); } catch (e) { text = null; }
+    // A sealed courier's parcel its courier still carries (couriers.js) is held the same way
+    if (!text) { try { if (typeof globalThis.__dboCourierMove === 'function') text = globalThis.__dboCourierMove(Number(actor) >>> 0, Number(baseId) >>> 0, Number(count)); } catch (e) { text = null; } }
     if (!text) return null;
     const key = `told:${Number(actor) >>> 0}`; const now = Date.now();
     if (MODE === 'on' && now - (S.warned.get(key) || 0) >= 3000) { S.warned.set(key, now); try { personal(Number(actor) >>> 0, text); } catch (e) { /* offline */ } }
-    return 'owed manual';
+    return 'owed manual or sealed parcel';
   };
   install('onDropItem', (actor, baseId, count) => { const why = check(baseId, count, actor) || owedManual(actor, baseId, count); return why ? refuse('drop', actor, baseId, count, why) : undefined; });
   install('onPutItem', (container, actor, baseId, count) => { const why = check(baseId, count, actor) || owedManual(actor, baseId, count); return why ? refuse('put', actor, baseId, count, why) : undefined; },

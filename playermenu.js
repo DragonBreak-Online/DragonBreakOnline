@@ -185,6 +185,7 @@ module.exports = (api) => {
     // Pickpocket, only while the viewer sneaks (pickpocket.js reads the server's sneak flag)
     try { if (typeof globalThis.__dboPickpocketEntries === 'function') entries.push(...globalThis.__dboPickpocketEntries(a, t)); } catch (e) { /* pickpocket not loaded */ }
     try { if (typeof globalThis.__dboRobEntries === 'function') entries.push(...globalThis.__dboRobEntries(a, t)); } catch (e) { /* robbery not loaded */ }
+    try { if (typeof globalThis.__dboCourierEntries === 'function') entries.push(...globalThis.__dboCourierEntries(a, t)); } catch (e) { /* couriers not loaded */ }
     try { if (typeof globalThis.__dboConcordatEntries === 'function') entries.push(...globalThis.__dboConcordatEntries(a, t)); } catch (e) { /* thalmor.js not loaded */ }
     try { if (typeof globalThis.__dboSuperMenuEntries === 'function') entries.push(...globalThis.__dboSuperMenuEntries(a, t)); } catch (e) { /* no curses */ }
     try { if (typeof globalThis.__dboFactionMenuEntries === 'function') entries.push(...globalThis.__dboFactionMenuEntries(a, t)); } catch (e) { /* factions not loaded */ }
@@ -240,6 +241,7 @@ module.exports = (api) => {
     if (id.startsWith('voice:')) return sendPacket(a, { customPacketType: 'dboVoicePeer', identity: (t >>> 0).toString(16), op: id.slice(6), name: nameFor(a, t) });
     if (typeof globalThis.__dboPickpocketAction === 'function' && globalThis.__dboPickpocketAction(a, id, t, nameFor)) return;
     if (typeof globalThis.__dboRobAction === 'function' && globalThis.__dboRobAction(a, id, t, nameFor)) return;
+    if (typeof globalThis.__dboCourierAction === 'function' && globalThis.__dboCourierAction(a, id, t, nameFor)) return;
     if (typeof globalThis.__dboConcordatAction === 'function' && globalThis.__dboConcordatAction(a, id, t, nameFor)) return;
     if (typeof globalThis.__dboSuperMenuAction === 'function' && globalThis.__dboSuperMenuAction(a, id, t, nameFor)) return;
     if (typeof globalThis.__dboFactionMenuAction === 'function' && globalThis.__dboFactionMenuAction(a, id, t)) return;
