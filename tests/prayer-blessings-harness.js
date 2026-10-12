@@ -156,8 +156,8 @@ check('the measured table covers every blessing spell in skills.json',
   SKILLS.deities.choices.filter((c) => /^[0-9a-f]+:/i.test(String(c.blessing))).every((c) => MEASURED[c.id]) && Object.keys(MEASURED).length === 27,
   `${Object.keys(MEASURED).length} measured`);
 const boot = out.logs.find((l) => /^prayer on:/.test(l)) || '';
-check('the boot line counts 25 blessings cast on the worshipper, 2 learned and 7 kept by the server',
-  /27 resolved \(25 cast on the worshipper, 2 learned\), 7 server-side, 0 broken/.test(boot), boot.replace(/^.*blessings /, ''));
+check('the boot line counts 25 blessings cast on the worshipper, 2 learned and 8 kept by the server (Ithelia, 12 Oct)',
+  /27 resolved \(25 cast on the worshipper, 2 learned\), 8 server-side, 0 broken/.test(boot), boot.replace(/^.*blessings /, ''));
 
 // ---- 2. every blessing, granted for real -------------------------------------------------------------------------
 const rows = [];
