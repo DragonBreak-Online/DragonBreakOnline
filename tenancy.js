@@ -440,7 +440,7 @@ module.exports = (api) => {
       default: r = 'Usage: /property [mine|buy|interest|accept|pay [weeks]|leave]; officials: sell <price>|list <deposit> <weekly>|unlist|offer <name>|remind|grace|evict';
     }
     for (const t of [].concat(r)) personal(a, t);
-  }, { hidden: true, help: 'at a door: buying and renting property, for clients without the property panel' });
+  }, { help: 'at a door: buy, rent or sell property (the door\'s property menu opens the property panel)' });
   registerChatCommand('properties', (a) => { for (const t of overview(a)) personal(a, t); }, { hidden: true, help: 'the property you manage; now /property mine' });
 
   // Rent falling due, offers running out, notices and money for people who come back online
