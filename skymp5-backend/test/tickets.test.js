@@ -184,3 +184,19 @@ test('a Report a GM ticket is read and pinged by the Owners only, and logs no re
   assert.doesNotMatch(sent[0].content, /1554000000000000902/)
   assert.ok(audits.length && audits.every(l => !/reporter|1554000000000000402/.test(l)), audits.join('\n'))
 })
+
+test('closing a Report a GM ticket logs no closer, since the reporter can press Close (review, 12 Oct)', async () => {
+  const close = async (name, user) => {
+    let opts
+    const channel = { id: '1554000000000000203', name, delete: async () => {}, send: async () => {} }
+    await tickets.closeTicket({ channel, user, reply: async () => {} },
+      { wait: 0, transcripts: { save: async (_c, _u, o) => { opts = o; return `saved as ${name}.json` } } })
+    return opts
+  }
+  audits.length = 0
+  assert.strictEqual((await close('gmr-0004', { id: '1554000000000000403', tag: 'reporter' })).fileOnly, true)
+  assert.ok(audits.length && audits.every(l => !/reporter|1554000000000000403/.test(l)), audits.join('\n'))
+  audits.length = 0
+  assert.strictEqual((await close('rep-0005-someone', { id: '1554000000000000404', tag: 'staffer' })).fileOnly, false)
+  assert.ok(audits.some(l => /closed #rep-0005-someone by staffer \(1554000000000000404\)/.test(l)), audits.join('\n'))
+})

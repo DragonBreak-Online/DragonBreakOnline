@@ -184,7 +184,9 @@ async function closeTicket(interaction, { wait = 5000, transcripts = transcript 
   closing.add(channel.id)
   try {
     await interaction.reply({ content: 'Closing in 5 seconds.' })
-    audit.log(`TICKET closed #${channel.name} by ${interaction.user.tag} (${interaction.user.id})`)
+    // GMs read the audit channel, and the reporter can press Close, so an owners-only ticket logs no closer
+    audit.log(isOwnersOnly(channel) ? `TICKET closed #${channel.name} (Owners only)`
+      : `TICKET closed #${channel.name} by ${interaction.user.tag} (${interaction.user.id})`)
     await new Promise(resolve => setTimeout(resolve, wait))
     try {
       audit.log(`TICKET transcript of #${channel.name} ${await transcripts.save(channel, interaction.user, { fileOnly: isOwnersOnly(channel) })}`)
