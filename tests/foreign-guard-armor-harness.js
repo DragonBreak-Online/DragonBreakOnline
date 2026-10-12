@@ -127,13 +127,15 @@ ok(!named.length, `no loot pool, grant or vendor file names them (${pools.length
 // ---- gearstrip.js: shipped on (12 Oct); on, it strips the 35 and refunds the iron recipe --------------------------------------
 const CFG = readJson('gamemode-config.json');
 const G = CFG.gearStrip || { items: [] };
+// The guard pieces: the items that are taken back (the Giant's Club, swapTo, is exchanged instead)
+const GUARD = G.items.filter((it) => !it.swapTo);
 ok(G && G.enabled === true, 'gamemode-config gearStrip ships enabled true (Nate, 12 Oct: "yes strip and refund")');
-ok(G && G.items.length === 35 && FOREIGN.every((p) => G.items.some((it) => it.item === p.desc)) && !G.items.some((it) => Object.values(BRUMA).some((h) => it.item === `${h}:BSHeartland.esm`)), 'gearStrip lists the 35, never Bruma');
+ok(G && GUARD.length === 35 && FOREIGN.every((p) => GUARD.some((it) => it.item === p.desc)) && !G.items.some((it) => Object.values(BRUMA).some((h) => it.item === `${h}:BSHeartland.esm`)), 'gearStrip lists the 35, never Bruma');
 const refundOf = (h) => JSON.stringify(((G.items.find((it) => it.item === `${h}:BSHeartland.esm`) || {}).refund || []).map((r) => [r[0], r[1]]));
 ok(refundOf('ddbf0') === JSON.stringify([['800e4:Skyrim.esm', 3], ['db5d2:Skyrim.esm', 4]]), "the Chorrol Armor's refund is DBOSM_CYRArmorGuardCuirassChorrol: 3 Leather Strips, 4 Leather", refundOf('ddbf0'));
 ok(refundOf('ddbf8') === JSON.stringify([['5ace4:Skyrim.esm', 2], ['800e4:Skyrim.esm', 1]]), "the Chorrol Helmet's refund is DBOSM_CYRArmorGuardHelmetChorrol: 2 Iron Ingots, 1 Leather Strips", refundOf('ddbf8'));
 ok(refundOf('ddbf2') === '[]' && refundOf('ddc2c') === '[]', 'boots and gauntlets (no recipe) refund nothing');
-ok(G.items.filter((it) => it.refund.length).length === 14, '14 pieces have a forge recipe to refund');
+ok(GUARD.filter((it) => it.refund.length).length === 14, '14 pieces have a forge recipe to refund');
 const gm = fs.readFileSync(path.join(SERVER, 'gamemode.js'), 'utf8');
 ok(/__dboSprStripLogin\(a\);[^\n]*\n\s*try \{ if \(globalThis\.__dboGearStripLogin\) globalThis\.__dboGearStripLogin\(a\)/.test(gm), 'gamemode.js: login hook after the SPR strip');
 ok(/__dboSprStripContainer\(targetId >>> 0\);[^\n]*\n\s*try \{ if \(globalThis\.__dboGearStripContainer\) globalThis\.__dboGearStripContainer\(targetId >>> 0\)/.test(gm), 'gamemode.js: container hook in the activate chain');
@@ -206,6 +208,23 @@ ok(st.refunded === 5 && count(W, ROLAND, IRON) === 6, 'refunds stop at maxRefund
 load(W, [], { enabled: true, refundTo: 'none' });
 W.set(OTHERP, 'inventory', { entries: [{ baseId: CHORROL_ARMOR, count: 1 }] }); globalThis.__dboGearStripLogin(OTHERP);
 ok(count(W, OTHERP, CHORROL_ARMOR) === 0 && count(W, OTHERP, LEATHER) === 0, "refundTo 'none' removes with no refund");
+// Nate, 12 Oct: "swap the clubs for steel": the Giant's Club (swapTo) is exchanged one for one for a Steel Warhammer, for any
+// holder and in containers, outside crafters and maxRefunds
+const CLUB = 0x162f7067, WARHAMMER = 0x1398a;
+DESC['2f7067:SurWR.esp'] = CLUB; DESC['1398a:Skyrim.esm'] = WARHAMMER;
+ok(G.items.some((it) => it.item === '2f7067:SurWR.esp' && it.swapTo === '1398a:Skyrim.esm'), 'the config lists the Giant\'s Club with swapTo the Steel Warhammer');
+const P4 = 0xff000800; W.set(P4, 'profileId', 171); W.set(P4, 'inventory', { entries: [{ baseId: CLUB, count: 1, worn: true }, { baseId: OTHER, count: 1 }] });
+W.told.length = 0;
+const before = JSON.parse(fs.readFileSync(stateFile, 'utf8')).refunded;
+load(W, [], { enabled: true, crafters: [25], maxRefunds: 0 }); globalThis.__dboGearStripLogin(P4);
+ok(count(W, P4, CLUB) === 0 && count(W, P4, WARHAMMER) === 1 && count(W, P4, OTHER) === 1, 'a club is exchanged for one Steel Warhammer, crafters and maxRefunds notwithstanding', W.get(P4, 'inventory'));
+ok(W.papyrus.some((c) => c[2] === 'UnequipItem' && c[3].desc === P4.toString(16)), 'the worn club is unequipped first');
+ok(W.told.some(([a, t]) => a === P4 && /Your Giant's Club has been exchanged for a Steel Warhammer: a giant's club was far stronger/.test(t)), 'the holder is told', W.told);
+ok(JSON.parse(fs.readFileSync(stateFile, 'utf8')).refunded === before, 'a swap is no refund');
+const BOX3 = 0x08068155; W.set(BOX3, 'inventory', { entries: [{ baseId: CLUB, count: 1 }, { baseId: 0x80aeb00, count: 1 }] });
+globalThis.__dboGearStripContainer(BOX3);
+ok(count(W, BOX3, CLUB) === 0 && count(W, BOX3, WARHAMMER) === 1 && count(W, BOX3, 0x80aeb00) === 1, 'a container\'s club becomes a Steel Warhammer in the container; the rest stays', W.get(BOX3, 'inventory'));
+ok(W.audit.some((t) => /GEARSTRIP removed 1 x Giant's Club from container 8068155; swapped for 1 Steel Warhammer/.test(t)), 'audited');
 const { without } = require(MOD);
 const w = without([{ baseId: 1, count: 2, wornLeft: true }, { baseId: 2, count: 1 }, { baseId: 3, count: 1 }], new Set([1, 3]));
 ok(w.removed.get(1) === 2 && w.removed.get(3) === 1 && w.worn.has(1) && w.entries.length === 1, 'without(): several ids, a left-hand worn copy, the rest kept');

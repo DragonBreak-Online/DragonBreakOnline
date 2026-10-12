@@ -11,6 +11,8 @@
 // container is removed with no refund. Give only, never take, apart from the listed items themselves.
 // State (gearstrip-state.json beside world/, never in git): { removed: { desc: n }, refunded, log: [] }. It is written
 // before an inventory changes, and put back if the change throws, so a reload never counts a copy twice.
+// An item with swapTo is exchanged, not refunded (Nate, 12 Oct: "swap the clubs for steel"): each copy taken from a player
+// or a container is replaced there by one swapTo, whoever holds it and outside maxRefunds; its own reason, if any, is told.
 // Config "gearStrip" in gamemode-config.json, read at load; it ships enabled false (Nate decides).
 const fs = require('fs');
 const path = require('path');
@@ -50,14 +52,16 @@ module.exports = (api) => {
   if (C.enabled !== true) { off(); if (typeof api.stopTimer === 'function') api.stopTimer('gearStrip'); log('gearstrip: off'); return; }
 
   const idOf = (desc) => { try { return mp.getIdFromDesc(desc) >>> 0; } catch (e) { return 0; } };
-  // id -> { desc, name, refund: [[id, n, name]] }; items not in the load order are skipped (logged)
+  // id -> { desc, name, refund: [[id, n, name]], swap: { id, name } | null, reason }; items not in the load order are skipped (logged)
   const ITEMS = new Map();
   for (const it of C.items || []) {
     if (!it || !it.item) continue;
     const id = idOf(it.item);
     if (!id) { log(`gearstrip: ${it.item} is not in the load order; skipped`); continue; }
     const refund = (it.refund || []).map(([d, n, name]) => [idOf(d), Number(n), String(name || d)]).filter(([rid, n]) => rid && n > 0);
-    ITEMS.set(id, { desc: String(it.item), name: String(it.name || it.item), refund });
+    const swapId = it.swapTo ? idOf(it.swapTo) : 0;
+    if (it.swapTo && !swapId) { log(`gearstrip: ${it.item}'s swapTo ${it.swapTo} is not in the load order; skipped`); continue; }
+    ITEMS.set(id, { desc: String(it.item), name: String(it.name || it.item), refund, swap: swapId ? { id: swapId, name: String(it.swapName || it.swapTo) } : null, reason: it.reason ? String(it.reason) : '' });
   }
   if (!ITEMS.size) { off(); log('gearstrip: no listed item is in the load order; off'); return; }
   const IDS = new Set(ITEMS.keys());
@@ -103,9 +107,12 @@ module.exports = (api) => {
     // The refund, copy by copy, up to maxRefunds in all; written with the removal before anything changes
     const give = new Map(); let copies = 0, total = 0;
     const can = mayRefund(a);
+    const swapped = new Map();
     for (const [id, n] of p.removed) {
       total += n;
       st.removed[ITEMS.get(id).desc] = (st.removed[ITEMS.get(id).desc] || 0) + n;
+      const sw = ITEMS.get(id).swap;
+      if (sw) { const g = swapped.get(sw.id) || { n: 0, name: sw.name }; g.n += n; swapped.set(sw.id, g); continue; }
       const refund = ITEMS.get(id).refund;
       if (!can || !refund.length) continue;
       const k = Math.max(0, Math.min(n, MAX_REFUNDS - st.refunded));
@@ -113,7 +120,8 @@ module.exports = (api) => {
       st.refunded += k; copies += k;
       for (const [rid, per, rname] of refund) { const g = give.get(rid) || { n: 0, name: rname }; g.n += per * k; give.set(rid, g); }
     }
-    st.log.push({ at: new Date().toISOString(), where: `actor ${a.toString(16)} profile ${mp.get(a, 'profileId')}`, items: Object.fromEntries([...p.removed].map(([id, n]) => [ITEMS.get(id).desc, n])), refunded: copies });
+    st.log.push({ at: new Date().toISOString(), where: `actor ${a.toString(16)} profile ${mp.get(a, 'profileId')}`, items: Object.fromEntries([...p.removed].map(([id, n]) => [ITEMS.get(id).desc, n])), refunded: copies,
+      swapped: Object.fromEntries([...swapped].map(([sid, g]) => [g.name, g.n])) });
     if (!save()) { S.state = snap; log('gearstrip: state not saved; nothing removed'); return 0; }
     try {
       for (const id of p.worn) unequip(a, id);
@@ -124,10 +132,17 @@ module.exports = (api) => {
       if (Array.isArray(lw)) mp.set(a, 'private.lastWorn', lw.filter((it) => !IDS.has(Number(Array.isArray(it) ? it[0] : it) >>> 0)));
     } catch (e) { /* no outfit remembered */ }
     for (const [rid, g] of give) giveItem(a, rid, g.n);
+    for (const [sid, g] of swapped) giveItem(a, sid, g.n);
     const back = [...give.values()].map((g) => `${g.n} ${g.name}`).join(', ');
-    audit(`GEARSTRIP removed ${names(p.removed)} from ${who(a)}${p.worn.size ? ' (worn)' : ''}${copies ? `; refunded ${copies} cop${copies === 1 ? 'y' : 'ies'}: ${back}` : ''}`);
+    const got = [...swapped.values()].map((g) => `${g.n} ${g.name}`).join(', ');
+    audit(`GEARSTRIP removed ${names(p.removed)} from ${who(a)}${p.worn.size ? ' (worn)' : ''}${copies ? `; refunded ${copies} cop${copies === 1 ? 'y' : 'ies'}: ${back}` : ''}${got ? `; swapped for ${got}` : ''}`);
     try {
-      personal(a, `Your ${[...p.removed.keys()].map((id) => ITEMS.get(id).name).join(', ')} ${total === 1 ? 'has' : 'have'} been taken back: ${C.reason}.${copies ? ` You have been given the materials back: ${back}.` : ''}`);
+      for (const [id, n] of p.removed) {
+        const it = ITEMS.get(id);
+        if (it.swap) personal(a, `Your ${it.name} ${n === 1 ? 'has' : 'have'} been exchanged for ${n === 1 ? 'a' : n} ${it.swap.name}${it.reason ? `: ${it.reason}` : ''}.`);
+      }
+      const plain = [...p.removed.keys()].filter((id) => !ITEMS.get(id).swap);
+      if (plain.length) personal(a, `Your ${plain.map((id) => ITEMS.get(id).name).join(', ')} ${plain.length === 1 && p.removed.get(plain[0]) === 1 ? 'has' : 'have'} been taken back: ${C.reason}.${copies ? ` You have been given the materials back: ${back}.` : ''}`);
     } catch (e) { /* offline */ }
     return total;
   };
@@ -140,12 +155,17 @@ module.exports = (api) => {
     if (!p.removed.size) return 0;
     const snap = snapshot();
     const st = state(); let total = 0;
-    for (const [id, n] of p.removed) { total += n; st.removed[ITEMS.get(id).desc] = (st.removed[ITEMS.get(id).desc] || 0) + n; }
-    st.log.push({ at: new Date().toISOString(), where: `container ${ref.toString(16)}`, items: Object.fromEntries([...p.removed].map(([id, n]) => [ITEMS.get(id).desc, n])), refunded: 0 });
+    const swapIn = [];
+    for (const [id, n] of p.removed) {
+      total += n; st.removed[ITEMS.get(id).desc] = (st.removed[ITEMS.get(id).desc] || 0) + n;
+      const sw = ITEMS.get(id).swap; if (sw) swapIn.push({ baseId: sw.id, count: n, name: sw.name });
+    }
+    st.log.push({ at: new Date().toISOString(), where: `container ${ref.toString(16)}`, items: Object.fromEntries([...p.removed].map(([id, n]) => [ITEMS.get(id).desc, n])), refunded: 0,
+      swapped: Object.fromEntries(swapIn.map((x) => [x.name, x.count])) });
     if (!save()) { S.state = snap; return 0; }
-    try { mp.set(ref, 'inventory', { entries: p.entries }); }
+    try { mp.set(ref, 'inventory', { entries: p.entries.concat(swapIn.map((x) => ({ baseId: x.baseId, count: x.count }))) }); }
     catch (e) { restore(snap); log('gearstrip: container removal failed, state put back', e.message); return 0; }
-    audit(`GEARSTRIP removed ${names(p.removed)} from container ${ref.toString(16)} (no refund)`);
+    audit(`GEARSTRIP removed ${names(p.removed)} from container ${ref.toString(16)}${swapIn.length ? `; swapped for ${swapIn.map((x) => `${x.count} ${x.name}`).join(', ')}` : ' (no refund)'}`);
     return total;
   };
 
