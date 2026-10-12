@@ -35,6 +35,10 @@ const GET_RETRY_MS = 15000;
 const UPLOAD_CONFIRM_MS = 15000;
 // A capture held for the server's answer is made again if it comes this soon (appearance.js keeps a save window 90 s)
 const HELD_RETRY_MS = 45000;
+// The player is told at most this often, on the HUD
+const NOTICE_MIN_MS = 60000;
+const NOTICE_EARLY = "Your saved face finished loading over the editor: reopen /appearance to make your change again.";
+const NOTICE_LOADFAIL = "Your saved face could not be loaded: face changes will not be saved this session. Please relog.";
 const MAX_CACHED = 64;
 const DIAG_LOG = "dbo-diag";
 const DIAG_MAX_LINES = 60;
@@ -108,6 +112,7 @@ export class RacemenuPresetService extends ClientListener {
     this.selfAsks = 0;
     this.selfWait = "";
     this.heldForAnswerAt = 0;
+    this.earlyEditor = false;
     this.off = false;
   }
 
@@ -127,6 +132,7 @@ export class RacemenuPresetService extends ClientListener {
     this.selfAsks = 0;
     this.selfWait = "";
     this.heldForAnswerAt = 0;
+    this.earlyEditor = false;
   }
 
   // A gate holding the player's own load is traced when it changes, not every second it holds
@@ -145,6 +151,11 @@ export class RacemenuPresetService extends ClientListener {
   private onUpdate(): void {
     const now = Date.now();
     if (this.off) return;
+    if (this.pendingNotice) {
+      const text = this.pendingNotice;
+      this.pendingNotice = "";
+      try { this.sp.Debug.notification(text); } catch { /* no hud */ }
+    }
     try {
       this.watchRaceMenu(now);
       if (this.captureAt && now >= this.captureAt && !this.raceMenuSettling(now)) {
@@ -171,7 +182,7 @@ export class RacemenuPresetService extends ClientListener {
     try { open = Ui.isMenuOpen(RACE_MENU); } catch { return; }
     if (open) {
       // Each editor close may send once, so a refused face or another character's identical face goes up again
-      if (!this.raceMenuWasOpen) this.lastSentHash = undefined;
+      if (!this.raceMenuWasOpen) { this.lastSentHash = undefined; this.earlyEditor = !this.selfFaceOn(); }
       this.raceMenuWasOpen = true;
       this.captureAt = 0;
       return;
@@ -183,6 +194,21 @@ export class RacemenuPresetService extends ClientListener {
   }
 
   // ---- the player's own face, after RaceMenu ----
+
+  // The server's face for this character is in and on the player, or the server has none
+  private selfFaceOn(): boolean {
+    const own = this.selfRemoteId ? this.cache[this.selfRemoteId] : undefined;
+    return !!own && (!own.face || own.hash === this.selfLoadedHash);
+  }
+
+  // One short HUD line, at most once a minute; shown from the next update (Debug.notification is a Papyrus call)
+  private notice(code: string, text: string): void {
+    const now = Date.now();
+    if (this.noticeAt && now - this.noticeAt < NOTICE_MIN_MS) { trace(`rmp note=${code} skip=rate`); return; }
+    this.noticeAt = now;
+    this.pendingNotice = text;
+    trace(`rmp note=${code}`);
+  }
 
   // Why the face may not be sent yet: before the server's face is on the player, a capture would replace the saved sculpt with a stripped one
   private captureHeldBy(player: Actor, now: number): { code: string; text: string } | null {
@@ -216,7 +242,13 @@ export class RacemenuPresetService extends ClientListener {
     if (isGuardedActor(player)) return;
     const held = this.captureHeldBy(player, Date.now());
     this.heldForAnswerAt = held && held.code === "noanswer" ? Date.now() : 0;
-    if (held) { this.diag(`preset: capture held, ${held.text}`); trace(`rmp cap held=${held.code}`); return; }
+    if (held) {
+      this.diag(`preset: capture held, ${held.text}`);
+      trace(`rmp cap held=${held.code}`);
+      if (held.code === "loadfail") this.notice("loadfail", NOTICE_LOADFAIL);
+      return;
+    }
+    this.earlyEditor = false;
     const race = (player.getRace()?.getFormID() ?? 0) >>> 0;
     const name = presetFileName("self");
     let text: string | undefined;
@@ -291,6 +323,7 @@ export class RacemenuPresetService extends ClientListener {
       if (this.isSelfAnswer(content, actor)) {
         this.serverSelf = this.cache[actor];
         this.selfAsks = 0;
+        this.earlyEditor = false;
         trace(`rmp ans none off=${content["off"] === true ? 1 : 0}`);
         this.retryHeldCapture(now);
       }
@@ -544,6 +577,7 @@ export class RacemenuPresetService extends ClientListener {
       this.selfWait = "";
       this.afterLoad(PLAYER_ID, `own face back on, ${hash}, ${headParts.length} head parts`);
       trace(`rmp apply ok h=${hash} hp=${headParts.length} drop=${drop}`);
+      if (this.earlyEditor) { this.earlyEditor = false; this.notice("early", NOTICE_EARLY); }
       this.recheckOwnLook();
       return true;
     });
@@ -612,6 +646,10 @@ export class RacemenuPresetService extends ClientListener {
   private selfWait = "";
   // When a capture was held for want of the server's answer (0: none waiting)
   private heldForAnswerAt = 0;
+  // An editor opened before the server's face was on the player; its edit is lost if that face loads
+  private earlyEditor = false;
+  private noticeAt = 0;
+  private pendingNotice = "";
   private noNativesNoted = false;
   private off = false;
   private diagLines = 0;

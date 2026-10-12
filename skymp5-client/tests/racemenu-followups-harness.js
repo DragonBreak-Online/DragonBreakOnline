@@ -3,7 +3,9 @@
 // a dboPresetRefused {hash, reason} resets the dedupe and puts the server's face back; every editor close may send once;
 // `off` ends with the connection; the player's own face is asked of the server again after a game load and after a
 // character change; a part-sent upload is dropped when the character changes; the extras service sends again after a
-// menu open and after a new spawn. Run from skymp5-client:
+// menu open and after a new spawn. The 0.3.94 fix round (10 Oct reviews): another race family's face does not hold a
+// capture (G6), late and in-flight refusals, a capture held for the server's answer is retried, and the two HUD notices.
+// Run from skymp5-client:
 //
 //   node tests/racemenu-followups-harness.js [path to esbuild's package dir]
 'use strict';
@@ -419,6 +421,50 @@ const bundle = async (rel, dir) => {
   deliver(S, { customPacketType: 'dboPresetNone', actor: 0xff0000aa, self: true });
   step(S, 1000, 2);
   check('retry: an answer more than 45 s after the hold (the server\'s save window is closing): not retried, traced', puts().length === 0 && TR.includes('rmp cap retry=late'), puts());
+
+  // ---- the player is told when the saved face loads over an editor opened early, and when it could not load ----
+  const NOTE_EARLY = 'Your saved face finished loading over the editor: reopen /appearance to make your change again.';
+  const NOTE_LOADFAIL = 'Your saved face could not be loaded: face changes will not be saved this session. Please relog.';
+  natives.Debug = { notification: (t) => W.notes.push(String(t)) };
+  clear();
+  W.notes = [];
+  S = make(M.RacemenuPresetService, natives);
+  step(S, 1100, 2);
+  editor(S);
+  step(S, 1100, 4);
+  serverFace(S);
+  step(S, 1100, 2);
+  runWorks();
+  step(S, 100);
+  check('notice: the saved face loaded over an editor opened before it was on: one HUD line', W.notes.length === 1 && W.notes[0] === NOTE_EARLY, W.notes);
+  check('notice: ...the edit itself is not sent (the saved face was not on when the editor opened)', puts().length === 0 && loads().length === 1, [puts().length, loads().length]);
+  check('notice: ...traced', TR.includes('rmp note=early'), TR.slice(-4));
+  S = spawned('face');
+  W.notes = [];
+  editor(S);
+  deliver(S, { customPacketType: 'dboPresetRefused', hash: EDIT.hash, reason: 'gold' });
+  step(S, 1100);
+  runWorks();
+  step(S, 100);
+  check('notice: none when the editor opened with the saved face on (a refusal puts the face back, the server tells why)', W.notes.length === 0 && loads().length >= 1, W.notes);
+  S = spawned('none');
+  W.loadResult = false;
+  clear();
+  W.notes = [];
+  serverFace(S);
+  step(S, 1100);
+  runWorks();
+  editor(S);
+  step(S, 100);
+  check('notice: a capture held for loadfail: one HUD line', W.notes.length === 1 && W.notes[0] === NOTE_LOADFAIL, W.notes);
+  editor(S);
+  step(S, 100);
+  check('notice: ...not again within a minute', W.notes.length === 1 && TR.includes('rmp note=loadfail skip=rate'), W.notes);
+  step(S, 1000, 60);
+  editor(S);
+  step(S, 100);
+  check('notice: ...and again after a minute', W.notes.length === 2, W.notes);
+  W.loadResult = true;
 
   // ---- C1: the head the editor left is sent as it is ----
   {
