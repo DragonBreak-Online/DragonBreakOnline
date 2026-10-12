@@ -247,6 +247,40 @@ ok('/court decline <number> declines that one', /declined/.test(line) && sec.vie
   ok('...dismissed, back to the lowest rank (Blood-Kin)', !seated('largashbur', 'bane').includes(15) && clanTitle(OUT) === 'Blood-Kin', [r, clanTitle(OUT)]);
 }
 
+// ---- the hold's tax from the Court tab (business.js hooks, stood in here; the real ones are in hold-tax-harness) ----------
+{
+  const rates = { bruma: 0 }, setBy = [];
+  globalThis.__dboHoldTax = (z) => rates[z] || 0;
+  globalThis.__dboHoldTaxMax = () => 0.3;
+  globalThis.__dboCanSetHoldTax = (a, z) => z === 'bruma' && (a === ADMIN || a === COUNT);
+  globalThis.__dboSetHoldTax = (z, pct, byName) => { if (pct < 0 || pct > 30) return null; rates[z] = pct / 100; setBy.push(byName); return rates[z]; };
+  const bruma = (a) => sec.view(a).courts.find((c) => c.id === 'bruma');
+  ok('the Court tab shows Bruma\'s tax, settable by staff', bruma(ADMIN).tax && bruma(ADMIN).tax.pct === 0 && bruma(ADMIN).tax.canSet === true && bruma(ADMIN).tax.max === 30, bruma(ADMIN).tax);
+  r = ev('courtTax', OUT, 'N', 'bruma', 10);
+  ok('an outsider cannot set it', rates.bruma === 0 && r && r.kind === 'refused', r);
+  r = ev('courtTax', ADMIN, 'N', 'bruma', 40);
+  ok('a rate over the cap is refused', rates.bruma === 0 && r.kind === 'refused' && /from 0 to 30/.test(r.text), r);
+  r = ev('courtTax', ADMIN, 'N', 'bruma', 12);
+  ok('staff set it to 12%, and the tab shows it', rates.bruma === 0.12 && r.kind === 'ok' && /12% of every rent/.test(r.text) && bruma(ADMIN).tax.pct === 12, [r, bruma(ADMIN).tax]);
+  r = ev('courtTax', ADMIN, 'stale', 'bruma', 5);
+  ok('a stale journal nonce does nothing', rates.bruma === 0.12 && r === null, r);
+  // Office wages (economy.js hooks, stood in here; the real ones are in hold-wages-harness)
+  const wages = { guard: 50, steward: 150 };
+  globalThis.__dboEconomyWages = () => Object.assign({}, wages);
+  globalThis.__dboEconomyKeepsBooks = (a) => a === ADMIN;
+  globalThis.__dboEconomySetWage = (a, fid, rank, gold) => (a === ADMIN && fid === 'county-bruma' ? ((wages[rank] = Number(gold)), { ok: true, text: 'ok' }) : { ok: false, text: 'Only the leader, or a hold official who keeps its books, sets wages.' });
+  const guardRow = (a) => bruma(a).offices.find((o) => o.rank === 'guard');
+  ok('each office shows its weekly wage, and who keeps the books', guardRow(ADMIN).wage === 50 && bruma(ADMIN).offices.find((o) => o.rank === 'steward').wage === 150 && bruma(ADMIN).keepsBooks === true, [guardRow(ADMIN), bruma(ADMIN).keepsBooks]);
+  ok("the Count's office shows no wage: the ruler is never paid", bruma(ADMIN).offices.find((o) => o.rank === 'count').wage === undefined);
+  r = ev('courtWage', ADMIN, 'N', 'bruma', 'guard', 75);
+  ok("setting the guards' wage from the Court tab", wages.guard === 75 && r.kind === 'ok' && /Guard of Bruma: 75 gold a week/.test(r.text), [r, wages]);
+  r = ev('courtWage', ADMIN, 'N', 'bruma', 'nosuch', 75);
+  ok('an office the court lacks is refused', r.kind === 'refused', r);
+  r = ev('courtWage', OUT, 'N', 'bruma', 'guard', 1);
+  ok('an outsider cannot set wages', wages.guard === 75 && r.kind === 'refused', r);
+  for (const k of ['__dboHoldTax', '__dboHoldTaxMax', '__dboCanSetHoldTax', '__dboSetHoldTax', '__dboEconomyWages', '__dboEconomyKeepsBooks', '__dboEconomySetWage']) delete globalThis[k];
+}
+
 // ---- expiry -------------------------------------------------------------------------------------------------------------
 const realNow = Date.now;
 Date.now = () => realNow() + 25 * 3600000;

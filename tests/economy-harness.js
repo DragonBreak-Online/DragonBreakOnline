@@ -52,7 +52,7 @@ const out = { personal: [], audits: [] };
 const handlers = new Map(); const timers = new Map();
 const api = {
   mp: { get, set, getActorsByProfileId: (pid) => chars[pid] || [] },
-  log: () => {}, personal: (a, t) => out.personal.push({ a, t }), audit: (t) => out.audits.push(t), who: (a) => `P${a.toString(16)}`, cfg: { economy: { enabled: true } },
+  log: () => {}, personal: (a, t) => out.personal.push({ a, t }), audit: (t) => out.audits.push(t), who: (a) => `P${a.toString(16)}`, cfg: { economy: { enabled: true, wageSavingsShare: 0, defaultWages: {} } },
   onUi: (ev, f) => handlers.set(ev, f), onlineActors: () => [1, 100, 0x20], every: (n, ms, f) => timers.set(n, f),
   readOfficials: () => JSON.parse(JSON.stringify(officials)), zoneById: (id) => (id === 'bruma' ? { id: 'bruma', name: 'Bruma', officials: ['count', 'steward', 'guard'] } : null),
 };
@@ -66,7 +66,7 @@ timers.get('economy')();
 const offRan = fs.existsSync('economy.json') && !!JSON.parse(fs.readFileSync('economy.json', 'utf8')).lastReckoning;
 // The flow below predates the B2 guards (economy-guards-harness.js): a wage cap as large as the treasury and a wider
 // assessment step keep its numbers
-api.cfg = { economy: { enabled: true, wageShare: 1, assessMaxStep: 3 } };
+api.cfg = { economy: { enabled: true, wageShare: 1, assessMaxStep: 3, wageSavingsShare: 0, defaultWages: {} } };
 load();
 
 let failures = 0;
