@@ -185,7 +185,7 @@ module.exports = (api) => {
       if (!save()) { S.state = snap; return; }
       try {
         if (isActor) { giveItem(target, o.give, o.n); personal(target, `You have been given ${o.n === 1 ? 'a' : o.n} ${o.name} for the giant's club taken from you.`); }
-        else { const inv = mp.get(target, 'inventory'); mp.set(target, 'inventory', { entries: ((inv && inv.entries) || []).concat([{ baseId: o.give, count: o.n }]) }); }
+        else { const inv = mp.get(target, 'inventory'); if (!inv || !Array.isArray(inv.entries)) throw new Error('container inventory not readable'); mp.set(target, 'inventory', { entries: inv.entries.concat([{ baseId: o.give, count: o.n }]) }); }
       } catch (e) { restore(snap); log('gearstrip: an owed replacement failed, it waits', e.message); continue; }
       audit(`GEARSTRIP owed ${o.n} ${o.name} given to ${isActor ? who(target) : `container ${(target >>> 0).toString(16)}`}`);
     }
