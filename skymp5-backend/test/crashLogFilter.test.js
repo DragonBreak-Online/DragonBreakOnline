@@ -255,7 +255,7 @@ test('a kept line whose string holds quotes of its own is cut at its first quote
     '\tType: (char*) ""',
     '',
     'POSSIBLE RELEVANT OBJECTS:',
-    '\tRSI: (Character*) ""',
+    '\tRSI: (Character*) "" [0xFF000D2E] (DragonBreak.esp)',
     '\tRBX: (PlayerCharacter*) "" [0x00000014] (Skyrim.esm)',
     '\t\tFile: "DragonBreak.esp"',
   ].join('\n'))

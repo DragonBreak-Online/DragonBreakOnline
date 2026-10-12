@@ -61,6 +61,20 @@ const quotes = line => line.split('"').length - 1
 // Quotes Crash Logger writes around its own text: a plugin file name and the exception name
 const PROTECTED = /\bFile:[ \t]*"[^"\n]*"|"(?:EXCEPTION_[A-Z_]{3,40}|C\+\+ Exception)"/g
 
+// An object's header ends `[0xFORMID] ("Plugin.esp")` (Introspection.cpp F4Polymorphic::name, File quoted as read)
+const OBJECT_TAIL = / \[0x[0-9A-F]{8}\](?: \((?:"[\w .'&+,!()[\]-]{1,96}\.es[mpl]"|[\w .'&+,!-]{1,96}\.es[mpl])\))?$/i
+// A form object's line, `\tRSP+5D8: (Character*) "Name"` or `\tRSI: (TESObjectREFR*)`; strings are not objects
+const OBJECT_HEAD = /^\t[^\t"()]{1,24}: \(([^()"\n]{1,200})\*\)(?: "[^\n]*")?$/
+const STRING_TYPE = /^(?:const )?(?:(?:un)?signed )?(?:char|wchar_t|char8_t|char16_t|char32_t)$|string/i
+
+// The form id and plugin Crash Logger writes after an object's name, or '': kept whatever the name holds
+function objectTail(line) {
+  const tail = OBJECT_TAIL.exec(line)
+  if (!tail) return ''
+  const head = OBJECT_HEAD.exec(line.slice(0, tail.index))
+  return head && !STRING_TYPE.test(head[1]) && quotes(line.slice(0, tail.index)) % 2 === 0 ? tail[0] : ''
+}
+
 // Crash Logger leaves quotes inside a string unescaped (a JSON packet), so a line with more than two is cut at its first
 function cutQuotedText(line, counted) {
   const bare = line.replace(PROTECTED, m => ' '.repeat(m.length))
@@ -162,7 +176,9 @@ function filterCrashLog(input) {
       if (PARTIAL[section] && PARTIAL[section].test(line)) { out.push(line); blanks = 0 }
       else if (line.trim()) { leftOut++; blanks = 0 } else blanks++
     } else if (section === OBJECTS) {
-      const kept = SECTION_FILTERS.relevantObjects(cutQuotedText(line, counted).replace(NAME_VALUE, '$1<name>'))
+      const tail = objectTail(line)
+      const head = line.slice(0, line.length - tail.length)
+      const kept = SECTION_FILTERS.relevantObjects(cutQuotedText(head, counted).replace(NAME_VALUE, '$1<name>')) + tail
       if (kept !== line) counted.n++
       out.push(kept)
     } else if (section === REGISTERS) {
