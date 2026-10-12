@@ -50,14 +50,15 @@ module.exports = (api) => {
   if (C.enabled !== true) { off(); if (typeof api.stopTimer === 'function') api.stopTimer('gearStrip'); log('gearstrip: off'); return; }
 
   const idOf = (desc) => { try { return mp.getIdFromDesc(desc) >>> 0; } catch (e) { return 0; } };
-  // id -> { desc, name, refund: [[id, n, name]] }; items not in the load order are skipped (logged)
+  // id -> { desc, name, refund: [[id, n, name]], reason }; items not in the load order are skipped (logged). An item's own
+  // reason (12 Oct, the giant's clubs) replaces C.reason in the line its holder is told when every removed item gives it.
   const ITEMS = new Map();
   for (const it of C.items || []) {
     if (!it || !it.item) continue;
     const id = idOf(it.item);
     if (!id) { log(`gearstrip: ${it.item} is not in the load order; skipped`); continue; }
     const refund = (it.refund || []).map(([d, n, name]) => [idOf(d), Number(n), String(name || d)]).filter(([rid, n]) => rid && n > 0);
-    ITEMS.set(id, { desc: String(it.item), name: String(it.name || it.item), refund });
+    ITEMS.set(id, { desc: String(it.item), name: String(it.name || it.item), refund, reason: it.reason ? String(it.reason) : '' });
   }
   if (!ITEMS.size) { off(); log('gearstrip: no listed item is in the load order; off'); return; }
   const IDS = new Set(ITEMS.keys());
@@ -127,7 +128,7 @@ module.exports = (api) => {
     const back = [...give.values()].map((g) => `${g.n} ${g.name}`).join(', ');
     audit(`GEARSTRIP removed ${names(p.removed)} from ${who(a)}${p.worn.size ? ' (worn)' : ''}${copies ? `; refunded ${copies} cop${copies === 1 ? 'y' : 'ies'}: ${back}` : ''}`);
     try {
-      personal(a, `Your ${[...p.removed.keys()].map((id) => ITEMS.get(id).name).join(', ')} ${total === 1 ? 'has' : 'have'} been taken back: ${C.reason}.${copies ? ` You have been given the materials back: ${back}.` : ''}`);
+      personal(a, `Your ${[...p.removed.keys()].map((id) => ITEMS.get(id).name).join(', ')} ${total === 1 ? 'has' : 'have'} been taken back: ${(() => { const r = [...new Set([...p.removed.keys()].map((id) => ITEMS.get(id).reason || C.reason))]; return r.length === 1 ? r[0] : C.reason; })()}.${copies ? ` You have been given the materials back: ${back}.` : ''}`);
     } catch (e) { /* offline */ }
     return total;
   };

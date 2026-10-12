@@ -128,12 +128,13 @@ ok(!named.length, `no loot pool, grant or vendor file names them (${pools.length
 const CFG = readJson('gamemode-config.json');
 const G = CFG.gearStrip || { items: [] };
 ok(G && G.enabled === true, 'gamemode-config gearStrip ships enabled true (Nate, 12 Oct: "yes strip and refund")');
-ok(G && G.items.length === 35 && FOREIGN.every((p) => G.items.some((it) => it.item === p.desc)) && !G.items.some((it) => Object.values(BRUMA).some((h) => it.item === `${h}:BSHeartland.esm`)), 'gearStrip lists the 35, never Bruma');
+const CLUBS = ['2f7067:SurWR.esp', '461da:Skyrim.esm', 'c334f:Skyrim.esm', '12d14:Dawnguard.esm']; // 12 Oct: the giant's clubs share the list
+ok(G && G.items.filter((it) => !CLUBS.includes(it.item)).length === 35 && FOREIGN.every((p) => G.items.some((it) => it.item === p.desc)) && !G.items.some((it) => Object.values(BRUMA).some((h) => it.item === `${h}:BSHeartland.esm`)), 'gearStrip lists the 35, never Bruma');
 const refundOf = (h) => JSON.stringify(((G.items.find((it) => it.item === `${h}:BSHeartland.esm`) || {}).refund || []).map((r) => [r[0], r[1]]));
 ok(refundOf('ddbf0') === JSON.stringify([['800e4:Skyrim.esm', 3], ['db5d2:Skyrim.esm', 4]]), "the Chorrol Armor's refund is DBOSM_CYRArmorGuardCuirassChorrol: 3 Leather Strips, 4 Leather", refundOf('ddbf0'));
 ok(refundOf('ddbf8') === JSON.stringify([['5ace4:Skyrim.esm', 2], ['800e4:Skyrim.esm', 1]]), "the Chorrol Helmet's refund is DBOSM_CYRArmorGuardHelmetChorrol: 2 Iron Ingots, 1 Leather Strips", refundOf('ddbf8'));
 ok(refundOf('ddbf2') === '[]' && refundOf('ddc2c') === '[]', 'boots and gauntlets (no recipe) refund nothing');
-ok(G.items.filter((it) => it.refund.length).length === 14, '14 pieces have a forge recipe to refund');
+ok(G.items.filter((it) => it.refund.length && !CLUBS.includes(it.item)).length === 14, '14 pieces have a forge recipe to refund');
 const gm = fs.readFileSync(path.join(SERVER, 'gamemode.js'), 'utf8');
 ok(/__dboSprStripLogin\(a\);[^\n]*\n\s*try \{ if \(globalThis\.__dboGearStripLogin\) globalThis\.__dboGearStripLogin\(a\)/.test(gm), 'gamemode.js: login hook after the SPR strip');
 ok(/__dboSprStripContainer\(targetId >>> 0\);[^\n]*\n\s*try \{ if \(globalThis\.__dboGearStripContainer\) globalThis\.__dboGearStripContainer\(targetId >>> 0\)/.test(gm), 'gamemode.js: container hook in the activate chain');
