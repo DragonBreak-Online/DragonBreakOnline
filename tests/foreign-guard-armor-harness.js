@@ -124,10 +124,10 @@ const pools = ['loot.json', 'dungeon-pools.json', 'expeditions.json', 'ayleid-lo
 const named = pools.filter((f) => { try { const s = fs.readFileSync(path.join(SERVER, f), 'utf8').toLowerCase(); return FOREIGN.some((p) => s.includes(p.desc.toLowerCase()) || s.includes(p.edid.toLowerCase())); } catch (e) { return false; } });
 ok(!named.length, `no loot pool, grant or vendor file names them (${pools.length} files)`, named);
 
-// ---- gearstrip.js: shipped off; on, it strips the 35 and refunds the iron recipe --------------------------------------
+// ---- gearstrip.js: shipped on (12 Oct); on, it strips the 35 and refunds the iron recipe --------------------------------------
 const CFG = readJson('gamemode-config.json');
 const G = CFG.gearStrip || { items: [] };
-ok(G && G.enabled === false, 'gamemode-config gearStrip ships enabled false (Nate decides)');
+ok(G && G.enabled === true, 'gamemode-config gearStrip ships enabled true (Nate, 12 Oct: "yes strip and refund")');
 ok(G && G.items.length === 35 && FOREIGN.every((p) => G.items.some((it) => it.item === p.desc)) && !G.items.some((it) => Object.values(BRUMA).some((h) => it.item === `${h}:BSHeartland.esm`)), 'gearStrip lists the 35, never Bruma');
 const refundOf = (h) => JSON.stringify(((G.items.find((it) => it.item === `${h}:BSHeartland.esm`) || {}).refund || []).map((r) => [r[0], r[1]]));
 ok(refundOf('ddbf0') === JSON.stringify([['800e4:Skyrim.esm', 3], ['db5d2:Skyrim.esm', 4]]), "the Chorrol Armor's refund is DBOSM_CYRArmorGuardCuirassChorrol: 3 Leather Strips, 4 Leather", refundOf('ddbf0'));
@@ -167,8 +167,8 @@ const load = (W, online, over) => {
 const count = (W, id, base) => ((W.get(id, 'inventory') || { entries: [] }).entries.filter((e) => e.baseId === base).reduce((n, e) => n + e.count, 0));
 
 let W = world();
-load(W, []);
-ok(globalThis.__dboGearStripLogin === null && globalThis.__dboGearStripContainer === null, 'as shipped (off) it installs no hooks');
+load(W, [], { enabled: false });
+ok(globalThis.__dboGearStripLogin === null && globalThis.__dboGearStripContainer === null, 'off (the rollback) it installs no hooks');
 
 // Roland's case: worn Chorrol Armor + Helmet, a Bruma cuirass and an iron ingot of his own
 const ROLAND = 0xff002a82, OTHERP = 0xff000601, BOX = 0x0800118c;
@@ -209,7 +209,7 @@ ok(count(W, OTHERP, CHORROL_ARMOR) === 0 && count(W, OTHERP, LEATHER) === 0, "re
 const { without } = require(MOD);
 const w = without([{ baseId: 1, count: 2, wornLeft: true }, { baseId: 2, count: 1 }, { baseId: 3, count: 1 }], new Set([1, 3]));
 ok(w.removed.get(1) === 2 && w.removed.get(3) === 1 && w.worn.has(1) && w.entries.length === 1, 'without(): several ids, a left-hand worn copy, the rest kept');
-load(W, []);
+load(W, [], { enabled: false });
 
 console.log(fails ? `${fails} failed` : 'all passed');
 process.exit(fails ? 1 : 0);

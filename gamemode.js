@@ -6734,7 +6734,7 @@ try {
   delete require.cache[SPRSTRIP_JS];
   require(SPRSTRIP_JS)({ mp, log, personal, audit, who, cfg, every, stopTimer, onlineActors, giveItem });
 } catch (e) { log('sprstrip.js failed to load:', e.stack || e.message); globalThis.__dboSprStripLogin = null; globalThis.__dboSprStripContainer = null; }
-// ---- listed gear taken back, its materials refunded (server\gearstrip.js, config "gearStrip", off by default; Nate, 12 Oct) ----
+// ---- listed gear taken back, its materials refunded (server\gearstrip.js, config "gearStrip", on from release 1012; Nate, 12 Oct) ----
 try {
   const GEARSTRIP_JS = path.resolve('gearstrip.js');
   delete require.cache[GEARSTRIP_JS];
