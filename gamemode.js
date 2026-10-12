@@ -600,6 +600,25 @@ const aliasChatCommand = (oldName, newName, note) => {
 // command is left out of the menu without a reason.
 // TODO(playtime, L-slot150): add 'playtime' to the character topic when playtime.js ships, once its help no longer
 // promises the 150-hour slot while config playtimeSlot.enabled is false (the command is registered either way).
+// spells.js owns the teaching gate (CFG.teacherMinTier); this hint only repeats it. It said "Expert" while the gate
+// was Master, which is how a player learns the rule from Discord instead of /help, so it is read rather than written
+// out. tests/teach-tier-hint-harness.js fails if the two disagree again.
+// Both reads are guarded: help-harness and gmcall-harness splice this range of the file into a new Function with only
+// a few names injected, so cfg, fs and path are not defined there and the defaults below have to stand on their own.
+const TEACH_TIER_NAME = (() => {
+  let tiers = ['Novice', 'Apprentice', 'Adept', 'Expert', 'Master'];
+  let tier = 4;                                   // the teacherMinTier spells.js defaults to
+  try {
+    const named = JSON.parse(fs.readFileSync(path.resolve('skills.json'), 'utf8')).tierNames;
+    if (Array.isArray(named) && named.length) tiers = named;
+  } catch (e) { /* the defaults above */ }
+  try {
+    const want = (cfg.spells || {}).teacherMinTier;
+    if (Number.isInteger(want)) tier = want;
+  } catch (e) { /* the default above */ }
+  return tiers[tier] || tiers[tiers.length - 1];
+})();
+
 const HELP_GROUPS = [
   { key: 'people', title: 'Chat and people', names: ['players'],
     hints: ['Talking: type in chat (T). /low /whisper /wide /shout set how far you carry; /me /my /do emote; /looc is out of character.',
@@ -615,7 +634,7 @@ const HELP_GROUPS = [
       'Your spells: /spells, or F3 Magic. Prepared spells are changed at a Scholars\' Ledger or a magic college.',
       'Changing a school of magic: a Scholars\' Ledger or a Study Magic shelf, once every 7 days.',
       'Spell tomes: bought in the Synod Conclave, read at a study spot there or in Frost Crag Spire.',
-      'Classes: a Class Lectern. At Expert in Arcane Arts or Priest you can /teach a spell to someone beside you.'] },
+      `Classes: a Class Lectern. At ${TEACH_TIER_NAME} in Arcane Arts or Priest you can /teach a spell to someone beside you.`] },
   { key: 'faith', title: 'Faith and the unseen', names: ['pray'],
     hints: ['Your god, and turning to another: F3, the Deity tab, or /deity.',
       'Offerings and rites: a shrine. Molag Bal gives the Embrace, Hircine the Great Hunt; Arkay or Stendarr lift a curse for a filled black soul gem.',
