@@ -14,7 +14,8 @@
 //   2. Another player uses it: the headsman. A GM (an admin tier; a Trial GM is not one) must be within gmRangeMeters,
 //      or nothing happens. Every GM in range gets a panel: approve or refuse.
 //   3. Approved, the headsman confirms in a panel of their own.
-//   4. Every player within watchMeters is sent dboExecute; chopMs later the victim's character ends for good
+//   4. Every player within watchMeters is sent dboExecute (each plays the pair on its copies: the victim's clip takes the
+//      head at 11.8 s); chopMs (16.7 s, the clip's KillActor) later the victim's character ends for good
 //      (supernatural.js __dboPermaKill), audited and posted to the staff log.
 // Anything that breaks it - the victim or headsman stepping away or leaving, a refusal, approvalSeconds passing - ends
 // the attempt, and everyone in it is told. Config "execution": { enabled, blockBases, idle, gmRangeMeters, reachMeters,
@@ -26,10 +27,16 @@ module.exports = (api) => {
     distanceMeters, every, staffLog } = api;
   const C = Object.assign({
     enabled: true,
-    blockBases: ['fe549:Skyrim.esm', '2e8eb:Skyrim.esm'],
+    // The DLE's DBO_ExecutionBlock (fe549 without its script) placed in front of Castle Bruma, and vanilla's two
+    blockBases: ['1ac980:DragonBreak Online Edits.esp', 'fe549:Skyrim.esm', '2e8eb:Skyrim.esm'],
+    // Read from Skyrim - Animations.bsa on the PC (12 Oct): IdleHeadChop (74ec5) plays AOExecutionerChop.hkx on the
+    // headsman (impact sound at 11.9 s); IdleExecutioneeChop (70c09) plays AOExecutioneeChop.hkx on the victim, whose
+    // Decapitate trigger (11.839 s) takes the head and KillActor (16.606 s) drops the body. Both start on one frame
+    victimIdle: '70c09:Skyrim.esm',
     idle: '74ec5:Skyrim.esm',
     gmRangeMeters: 20, reachMeters: 3, watchMeters: 120,
-    chopMs: 2600, approvalSeconds: 120,
+    // The server's death just after the clip's own KillActor (16.606 s), so the body falls as vanilla's does
+    chopMs: 16700, approvalSeconds: 120,
   }, (cfg && cfg.execution) || {});
   const PANEL_ID = 81;
   const S = globalThis.__dboExecState || (globalThis.__dboExecState = { blocks: new Map(), baseOf: new Map() });
@@ -101,7 +108,7 @@ module.exports = (api) => {
   const chop = (block, st) => {
     st.phase = 'chopping';
     const watchers = onlineActors().filter((p) => near(p, block, Number(C.watchMeters)) || p === st.victim || p === st.executioner);
-    for (const p of watchers) { try { sendPacket(p, { customPacketType: 'dboExecute', victim: st.victim, executioner: st.executioner, idle: C.idle }); } catch (e) { /* offline */ } }
+    for (const p of watchers) { try { sendPacket(p, { customPacketType: 'dboExecute', victim: st.victim, executioner: st.executioner, idle: C.idle, victimIdle: C.victimIdle }); } catch (e) { /* offline */ } }
     audit(`EXECUTION started: ${who(st.executioner)} beheads ${who(st.victim)}, approved by ${who(st.approvedBy)}, ${watchers.length} watcher(s)`);
     setTimeout(() => {
       const now = S.blocks.get(block);

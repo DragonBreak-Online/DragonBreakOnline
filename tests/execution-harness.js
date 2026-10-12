@@ -14,7 +14,7 @@ const ok = (c, name, got) => { if (!c) fails++; console.log(`${c ? 'ok  ' : 'FAI
   const said = [], audits = [], packets = [], widgets = [], closed = [], killed = [], staff = [];
   let timers = [];
   const ui = new Map();
-  const mp = { getIdFromDesc: (d) => ({ 'fe549:skyrim.esm': 0xfe549, '2e8eb:skyrim.esm': 0x2e8eb, '74ec5:skyrim.esm': 0x74ec5 }[String(d).toLowerCase()] || 0),
+  const mp = { getIdFromDesc: (d) => ({ '1ac980:dragonbreak online edits.esp': 0x3c1ac980, 'fe549:skyrim.esm': 0xfe549, '2e8eb:skyrim.esm': 0x2e8eb, '74ec5:skyrim.esm': 0x74ec5 }[String(d).toLowerCase()] || 0),
     get: (id, k) => (k === 'baseDesc' ? (id === BLOCK ? 'fe549:Skyrim.esm' : '1:Skyrim.esm') : undefined) };
   globalThis.__dboPermaKill = (a, why) => killed.push([a, why]);
   const load = (cfg) => {
@@ -56,7 +56,7 @@ const ok = (c, name, got) => { if (!c) fails++; console.log(`${c ? 'ok  ' : 'FAI
   ok(audits.some((t) => /EXECUTION approved by #ff000203/.test(t)), '...audited');
   choose(X, hp.actions[0].id);
   ok(packets.filter(([, p]) => p.customPacketType === 'dboExecute').map(([a]) => a).sort().join() === [V, X, GM, TRIAL].sort().join(), 'dboExecute goes to everyone watching, both included', packets.map(([a]) => a.toString(16)));
-  ok(packets[0][1].victim === V && packets[0][1].executioner === X && packets[0][1].idle === '74ec5:Skyrim.esm', '...naming the victim, the headsman and IdleHeadChop');
+  ok(packets[0][1].victim === V && packets[0][1].executioner === X && packets[0][1].idle === '74ec5:Skyrim.esm' && packets[0][1].victimIdle === '70c09:Skyrim.esm', '...naming the victim, the headsman, IdleHeadChop and IdleExecutioneeChop');
   await new Promise((r) => setTimeout(r, 5));
   ok(killed.length === 1 && killed[0][0] === V && /executed at the chopping block by Headsman, approved by GM Gm/.test(killed[0][1]), 'chopMs later the victim\'s character ends for good', killed);
   ok(!globalThis.__dboExecutionState().length && staff.length === 1, 'the block is free again; the staff log has it');
@@ -88,6 +88,9 @@ const ok = (c, name, got) => { if (!c) fails++; console.log(`${c ? 'ok  ' : 'FAI
   ok(act(BLOCK, V) === undefined && !globalThis.__dboExecutionState().length, 'enabled false: the block is plain furniture');
   const gm = fs.readFileSync(path.join(SERVER, 'gamemode.js'), 'utf8');
   ok(/__dboExecutionActivate\(targetId >>> 0, casterId >>> 0\) === false\) return false;/.test(gm) && /require\(EXECUTION_JS\)/.test(gm), 'gamemode.js loads it and asks it in the activate chain');
+  // The live defaults: the Bruma block counts, and the death waits for the clip's KillActor
+  const src = fs.readFileSync(path.join(SERVER, 'execution.js'), 'utf8');
+  ok(/blockBases: \['1ac980:DragonBreak Online Edits\.esp'/.test(src) && /chopMs: 16700/.test(src) && /victimIdle: '70c09:Skyrim\.esm'/.test(src), 'defaults: the DLE block, IdleExecutioneeChop on the victim, the death at 16.7 s');
   console.log(fails ? `${fails} failed` : 'all passed');
   process.exit(fails ? 1 : 0);
 })();
