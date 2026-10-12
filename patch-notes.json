@@ -1,5 +1,49 @@
 [
   {
+    "title": "The nobility of Bruma",
+    "date": "2026-10-12",
+    "version": "Server update",
+    "tag": "New",
+    "sections": [
+      {
+        "heading": "Nobility",
+        "items": [
+          "The County of Bruma is divided into fiefs: the towns of Applewatch, Aleswell, Greenwood and Mountain Watch. The Count or Countess of Bruma, and nobody else, grants and takes back titles: a Baron or Baroness holds a fief, a Lord or Lady an estate, and a Knight or Dame an honour. Every grant and every revocation is proclaimed by decree.",
+          "A Baron or Baroness looks after the houses of their own town as a steward does: granting a house, taking it back, assigning its rooms and chests, renting houses out and setting their value for tax. Their own houses in their town do not count against the one-house limit. They have no say outside it, and no seat at the court.",
+          "A quarter of the weekly property tax on the houses of a fief goes into that fief's own treasury, which nobody can take gold out of. The rest goes to the County as before.",
+          "Your journal (F3) has a Nobility tab: everyone sees the county's roll of nobles and its fiefs; a noble sees their title, their fief's houses and its treasury; the ruler grants and revokes titles there.",
+          "Lord Elion, who bought Mountain Watch from the Countess, is its Baron."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Racial powers",
+    "date": "2026-10-12",
+    "version": "Server update",
+    "tag": "New",
+    "sections": [
+      {
+        "heading": "Racial Powers",
+        "items": [
+          "Every race now has a Racial Power, called once a real day from the Profile tab of your journal (F3). Waiting out the day survives a relog.",
+          "Altmer, Highborn: magicka regenerates 50% faster for 60 seconds. Argonian, Histskin: health regenerates 50% faster and physical blows do 15% less for 60 seconds. Bosmer, Wild Hunt: bows deal 20% more and stamina regenerates 50% faster for 30 seconds. Breton, Dragonskin: 25% more magic resistance for 60 seconds. Dunmer, Ancestor's Wrath: your fire deals 25% more for 60 seconds.",
+          "Imperial, Voice of the Emperor: health and stamina regenerate 50% faster for 60 seconds. Nord, Battle Cry: 15% more melee damage for 60 seconds. Orc, Berserker Rage: 25% more melee damage and 25% less damage taken for 30 seconds. Redguard, Adrenaline Rush: stamina regenerates 50% faster for 60 seconds. Maormer, Roaring Tempest: 25% more magic resistance and a ward that absorbs 60 points of spell damage for 60 seconds.",
+          "The Khajiit's Night Eye comes with a later update of the game.",
+          "However many gifts, blessings and powers you stack, no hit is ever reduced by more than 75%."
+        ]
+      },
+      {
+        "heading": "Racial gifts",
+        "items": [
+          "Each race learns one skill 15% faster: Altmer and Dunmer Arcane Arts, Argonians Harvesting, Bosmer Archery, Bretons Priest, Imperials Defense, Khajiit Martial Arts, Nords, Redguards and Maormer Blade, Orcs Blacksmith. It speeds the skill up; the hourly and daily limits stay the same.",
+          "The Maormer have their own gifts instead of the Altmer's: 50% resistance to shock, and they swim faster.",
+          "Argonians: the Hist keeps out half of the curses a vampire's or werewolf's attack, or a vampire's feeding, would pass on."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Voices carry better",
     "date": "2026-10-12",
     "version": "Client 0.3.94",

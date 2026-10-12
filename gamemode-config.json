@@ -887,11 +887,11 @@
   "_dominionStipend": "Nate, 11 Oct: the Aldmeri Dominion pays its Thalmor in the Empire a stipend each weekly reckoning (economy.js), into the dominionStipendTo treasury before wages, in the faction report as stipend. It is NEW gold, made by no one's work, so it is kept modest; 0 turns it off. Hot reload.",
   "dominionStipend": 300, "dominionStipendTo": "thalmor" },
  "nobility": {
-  "_comment": "Fiefs and titles (nobility.js, docs/nobility/DESIGN.md; Nate, 10 Oct). Off until Nate switches it on: no F3 Nobility tab, no fief powers in the fork's housing, no tax share. The hold's ruler grants titles (a Lead GM may only revoke, in an emergency); a fief's holder manages, assesses and rents out its buildings like a steward and their own there are not capped; fiefShare of the weekly property tax on a fief's buildings goes to the fief's treasury (deposit only). realms: zone id -> cyrodiil (Baron, Lord, Knight under a Count) or skyrim (Lord, Thane under a Jarl), Skyrim when not listed.",
-  "enabled": false,
+  "_comment": "Fiefs and titles (nobility.js, docs/nobility/DESIGN.md; Nate, 10 Oct). On from release 1012 (Nate, 12 Oct: built features ship enabled). Rollback: enabled false (hot reload): no F3 Nobility tab, no fief powers in the fork's housing, no tax share; titles stay in nobility.json. The hold's ruler grants titles (a Lead GM may only revoke, in an emergency); a fief's holder manages, assesses and rents out its buildings like a steward and their own there are not capped; fiefShare of the weekly property tax on a fief's buildings goes to the fief's treasury (deposit only). realms: zone id -> cyrodiil (Baron, Lord, Knight under a Count) or skyrim (Lord, Thane under a Jarl), Skyrim when not listed.",
+  "enabled": true,
   "fiefShare": 0.25,
   "realms": { "bruma": "cyrodiil" },
-  "_seed": "Applied once each when the switch is on, to the account's character carrying the name, and only to a vacant fief: Lord Elion (profile 49) bought Mountain Watch from the Countess; once his seed has run, housingPlaces.uncappedProfiles 49 (the interim fix) is removed.",
+  "_seed": "Applied once each when the switch is on, to the account's character carrying the name, and only to a vacant fief: Lord Elion (profile 49) bought Mountain Watch from the Countess; housingPlaces.uncappedProfiles 49 (the interim fix) was removed in release 1012, which switches nobility on: his buildings are all in Mountain Watch (the four houses and the Frost-Iron Mine by its outer door), so the fief exempts them as soon as the seed has run; the cap never takes away what he holds. If the log shows the seed waiting or refused, put 49 back (hot reload).",
   "seed": [ { "fief": "mountain-watch", "title": "baron", "profile": 49, "name": "Elion" } ]
  },
  "contracts": {
@@ -940,8 +940,8 @@
  },
  "racial": {
   "_comment": "One passive gift per race (racial.js; Nate approved all ten and the rules, 3 Oct 2026). Resistances, damage and the Orc's low-health rage go through the hit path; reductionCap caps Defense x blessing x race together (0.75 = never more than 75% off a hit). Regeneration is added server-side like a blessing's: alwaysRegenCap bounds an always-on factor, conditionalRegenCap a conditional one; for combatSeconds after a landed blow the extra is slowed by the game's own combat regen GMSTs (argonian.inCombat true keeps Hist-Blooded's full extra in a fight). Off in beast forms, players only. Imperial goldBonus counts lease chests and bodies, camp chests and contract pay only. altmer.elementalWeakness is Nate's optional price (0 = off). nord.coldAreas: the Jerall Mountains around Bruma and the Pale Pass road. castHoldSeconds: no server-side regeneration (race, blessing, Ayleid well) is written for that long after the player's last cast, since the server's bars still predate the spell then (5 Oct: casts cost no magicka). channelHoldSeconds: after a concentration cast the hold lasts until the client's report moves the server's magicka, at most that long (8 Oct: a Flames channel past 3 s cost nothing).",
-  "_overhaul": "The racial overhaul (racial.js, Nate 10 Oct; specs/racial-overhaul.md): the Maormer on the High Elf record, one +15% XP boost per race, the Argonian's disease resistance, a Racial Power once a real day from the Journal. false: every number stays the 3 Oct one. Switching it on is Nate's call.",
-  "overhaul": false,
+  "_overhaul": "The racial overhaul (racial.js, Nate 10 Oct; specs/racial-overhaul.md): the Maormer on the High Elf record, one +15% XP boost per race, the Argonian's disease resistance, a Racial Power once a real day from the Journal. false: every number stays the 3 Oct one. On from release 1012 (Nate, 12 Oct: built features ship enabled); rollback: overhaul false (hot reload).",
+  "overhaul": true,
   "enabled": true,
   "castHoldSeconds": 3,
   "channelHoldSeconds": 30,
@@ -974,7 +974,7 @@
  "housingPlaces": {
   "_comment": "Places (N3, fork housingSystem.ts): staff profiles whose claims the place migration leaves exactly as they are and the one-place cap never counts (Nate, 3 Oct: storage lent to players). Read when the migration plan runs; no restart needed.",
   "staffProfiles": [4],
-  "uncappedProfiles": [49],
+  "uncappedProfiles": [],
   "_uncapped": "Owners the one-place cap never counts, otherwise ordinary: their buildings become places and their chests join them (fork housingSystem.ts overCap; Nate, 10 Oct: Lord Elion, who bought Mountain Watch from the Countess). Read on each ask.",
   "_grants": "Buildings the place migration gives whole (fork housingSystem.ts placeGrants, Nate 4 Oct): a way in nobody holds becomes the profile's and their claims inside join it; cells, when given, are all the building's interior cells (more rooms than the walk takes). Refused and listed for a door someone else holds or a staff profile. Read when the migration plan runs.",
   "grants": [

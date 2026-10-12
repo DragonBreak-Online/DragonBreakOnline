@@ -307,7 +307,7 @@ ok('the patch note is pending (the switch is off), dated SHIP_DATE', !!note && n
 const live = JSON.parse(fs.readFileSync(path.join(ROOT, 'patch-notes.json'), 'utf8'));
 ok('and not in the live patch notes', !live.some((n) => /nobility|Baron/i.test(JSON.stringify(n.sections || [])) && /fief/i.test(JSON.stringify(n))));
 const gcfg = JSON.parse(fs.readFileSync(path.join(ROOT, 'gamemode-config.json'), 'utf8'));
-ok('gamemode-config ships it off, with Elion\'s seed', gcfg.nobility && gcfg.nobility.enabled === false && gcfg.nobility.fiefShare === 0.25 && gcfg.nobility.seed[0].fief === 'mountain-watch');
+ok('gamemode-config ships it on (release 1012), with Elion\'s seed and without the interim uncapped 49', gcfg.nobility && gcfg.nobility.enabled === true && !((gcfg.housingPlaces || {}).uncappedProfiles || []).includes(49) && gcfg.nobility.fiefShare === 0.25 && gcfg.nobility.seed[0].fief === 'mountain-watch');
 
 console.log(fails ? `\n${fails} FAILED` : '\nall passed');
 process.exit(fails ? 1 : 0);

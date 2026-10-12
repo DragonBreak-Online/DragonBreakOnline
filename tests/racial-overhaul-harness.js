@@ -222,8 +222,8 @@ check('supernatural.js: MaormerRace <-> MaormerRaceVampire beside the vanilla pa
 check('appearance.js: both guarded as the High Elf\'s heads', /HEADS\.raceOf\.set\(r, 'HighElfRace'\); HEADS\.raceOf\.set\(v, 'HighElfRace'\)/.test(app2));
 const gc = JSON.parse(fs.readFileSync(path.join(SERVER, 'gamemode-config.json'), 'utf8'));
 check('gamemode-config.json: maormerRace is the final DLE\'s (ec2de1a0) MaormerRace 192ede and MaormerRaceVampire 192edf', gc.maormerRace && gc.maormerRace.race === '192ede:DragonBreak Online Edits.esp' && gc.maormerRace.vampire === '192edf:DragonBreak Online Edits.esp');
-check('...the Seafarer ability 192ee1 and the Tempest ward look 192ee3; the power block whole, the overhaul still off', gc.racial.maormer.seafarerSpell === '192ee1:DragonBreak Online Edits.esp' && gc.racial.maormer.power.wardSpell === '192ee3:DragonBreak Online Edits.esp'
-  && gc.racial.maormer.power.name === 'Roaring Tempest' && gc.racial.maormer.power.seconds === 60 && gc.racial.maormer.power.buffs.resistMagic === 0.25 && gc.racial.maormer.power.buffs.wardPoints === 60 && gc.racial.overhaul === false);
+check('...the Seafarer ability 192ee1 and the Tempest ward look 192ee3; the power block whole, the overhaul on (release 1012)', gc.racial.maormer.seafarerSpell === '192ee1:DragonBreak Online Edits.esp' && gc.racial.maormer.power.wardSpell === '192ee3:DragonBreak Online Edits.esp'
+  && gc.racial.maormer.power.name === 'Roaring Tempest' && gc.racial.maormer.power.seconds === 60 && gc.racial.maormer.power.buffs.resistMagic === 0.25 && gc.racial.maormer.power.buffs.wardPoints === 60 && gc.racial.overhaul === true);
 // the live config, as racial.js merges it: the Maormer as in the code's defaults but for the two spells
 const RL = make(gc.racial, { cfg: { racial: Object.assign({}, gc.racial, { overhaul: true }), maormerRace: gc.maormerRace } });
 check('...merged: the Maormer keep shock 50%, Blade +15% and the ward', RL.config.maormer.resistShock === 0.5 && RL.config.maormer.xp.blade === 1.15 && RL.config.maormer.power.buffs.wardPoints === 60);
