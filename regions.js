@@ -387,6 +387,8 @@ module.exports = (api) => {
     }
     // The Blacksmith's craft tier and techniques (smithing.js; off unless smithing.enabled)
     if (typeof globalThis.__dboSmithCraft === 'function' && globalThis.__dboSmithCraft(actorId, itemId, recipeId) === false) return false;
+    // The Tailor's rank and the loom recipe's tier (tailoring.js; Nate, 12 Oct)
+    if (typeof globalThis.__dboTailorCraft === 'function' && globalThis.__dboTailorCraft(actorId, itemId, recipeId) === false) return false;
     // Faction gear first (factiongear.js): a faction's own work is refused to anyone but its smiths and tailors
     if (typeof globalThis.__dboFactionCraft === 'function' && globalThis.__dboFactionCraft(actorId, itemId) === false) return false;
     // A faction's own gear, made by its own smith or leader, is not held to the province: the Dawnguard's recipes are Skyrim's
