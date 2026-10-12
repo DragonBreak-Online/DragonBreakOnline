@@ -75,7 +75,7 @@ export function isTrialGm(mp: any, actorId: number, cfg: AdminRoleConfig): boole
 }
 
 // The F7 panel for a Trial GM: the menu (the player list, without addresses or hardware ids), going to a player, the
-// Invisible mode and a rename. Every other request and action is refused (AdminSystem.customPacket)
+// Invisible and Ghost modes and a rename. Every other request and action is refused (AdminSystem.customPacket)
 export const TRIAL_GM_ACTIONS = new Set(["teleportTo", "rename"]);
-export const TRIAL_GM_MODES = new Set(["invis"]);
+export const TRIAL_GM_MODES = new Set(["invis", "ghost"]);
 export const TRIAL_GM_TABS = ["debug", "players", "modes"];

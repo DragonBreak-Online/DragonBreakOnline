@@ -28,7 +28,8 @@ type Mp = any;
 // Every tier gets the server console (consoleCommandsAllowed per assign; keep enableConsoleCommandsForAll OFF) and the tabbed admin panel (client AdminMenuService, Insert key).
 // Only tiers with TIER_CAPS.ban may ban; the refusal is enforced here, never in the client.
 // A Trial GM (adminRoles.trialgm, no admin tier) gets the menu without addresses or hardware ids, TP to a player, Rename
-// and the Invisible mode (TRIAL_GM_ACTIONS / TRIAL_GM_MODES); anything else is refused here and logged.
+// and the Invisible and Ghost modes (TRIAL_GM_ACTIONS / TRIAL_GM_MODES; Ghost from 12 Oct, Nate: "trial gms need to use
+// the ghost form button in the admin panel"); anything else is refused here and logged.
 // Bans post to the backend (master key + auth token), which snapshots discordId/hwid/ip into bans.json; connection-check then refuses the player permanently.
 //
 // Wire protocol (CustomPacket JSON):
