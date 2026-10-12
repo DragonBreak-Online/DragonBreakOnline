@@ -147,6 +147,8 @@ const before = bank(LYDIA), tBefore = treasuries['county-bruma'];
 reckonAt(SUNDAY + 21 * 86400000);
 ok(bank(LYDIA) === before - 500 && treasuries['county-bruma'] === tBefore + 500, 'the next reckoning taxes 10% of 5,000', [before - bank(LYDIA), treasuries['county-bruma'] - tBefore]);
 ok(globalThis.__dboEconomySaleValue(0x999, 100, 'X') === false, 'no value for something that is no property');
+ok(globalThis.__dboEconomySaleValue(BRUMA_HOUSE, 1, 'Token') === true && st.values[String(BRUMA_HOUSE)] === 2500, 'a token price lowers the value one assessment step at most (5,000 to 2,500)', st.values);
+ok(globalThis.__dboEconomySaleValue(BRUMA_HOUSE, 9000, 'Dear') === true && st.values[String(BRUMA_HOUSE)] === 9000, 'a higher price stands as the value (2,500 to 9,000)', st.values);
 
 console.log(fails ? `\n${fails} FAILED` : '\nall passed');
 process.exit(fails ? 1 : 0);

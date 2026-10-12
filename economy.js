@@ -450,10 +450,13 @@ module.exports = (api) => {
     const H = housing(); const primary = H && H.primaryOf(Number(ref) >>> 0);
     gold = Math.floor(Number(gold));
     if (!primary || !Number.isFinite(gold) || gold < 0) return false;
-    gold = Math.min(C.maxPropertyValue, gold);
     const key = String(Number(primary) >>> 0); const prev = valueOf(Number(key));
-    data().values[key] = gold; data().assessed[key] = { at: Date.now(), by: `sale to ${byWho}`, from: prev }; delete data().overdue[key]; save();
-    audit(`ECONOMY property ${(Number(key) >>> 0).toString(16)} sold for ${gold} gold to ${byWho}; its value is now ${gold} (was ${prev})`);
+    // A sale lowers the value no further than an assessment may (assessMaxStep), so a house sold for a token price is not
+    // taxed on that price for months (claude-jake review, 12 Oct); a higher price stands, as the buyer agreed to it
+    const step = Math.max(1, Number(C.assessMaxStep) || 1);
+    const value = Math.min(C.maxPropertyValue, Math.max(gold, Math.floor(prev / step)));
+    data().values[key] = value; data().assessed[key] = { at: Date.now(), by: `sale to ${byWho}`, from: prev }; delete data().overdue[key]; save();
+    audit(`ECONOMY property ${(Number(key) >>> 0).toString(16)} sold for ${gold} gold to ${byWho}; its value is now ${value} (was ${prev})`);
     return true;
   };
   onUi('econValue', (a, args) => {
