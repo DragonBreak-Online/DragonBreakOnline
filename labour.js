@@ -395,6 +395,18 @@ module.exports = (api) => {
     return true;
   };
 
+  // The refusal when the ore is above the miner's tier. A vein oreByRef gives another ore still looks and is named like its
+  // base, so "Quicksilver is beyond your skill" at what the game calls an Iron Ore Vein read as a wrong label (Misfit_Panda,
+  // #bugs 12 Oct: "an iron ore node in Frost-Iron Mine ... says I can't mine Quick-Silver"): name both, and the rank that opens it
+  const an = (w) => (/^[aeiou]/i.test(w) ? 'an' : 'a');
+  const beyondSkill = (ore, own) => {
+    const head = `${oreName(ore)} is beyond your skill.`;
+    if (!own || own === ore) return `${head} Work the seams you know first.`;
+    const rank = (skills.tierNames || [])[oreBand(ore)];
+    const holds = ore === 'geode' ? 'is a Geode Vein' : `holds ${oreName(ore).toLowerCase()}`;
+    return `${head} This vein looks like ${oreName(own).toLowerCase()} but ${holds}${rank ? `, which takes ${an(rank)} ${rank} Miner` : ''}. Work the seams you know first.`;
+  };
+
   const mine = (targetId, casterId, rec) => {
     const own = oreOf(String(rec.record.editorId || '')) || nodeOf(targetId, String(rec.record.editorId || ''));
     if (!own) return false;
@@ -406,7 +418,7 @@ module.exports = (api) => {
     if (tier < 0) return false;
     { const live = liveRound(casterId); if (live) return reshow(casterId, live); }
     if (ore !== 'geode' && !ITEMS[ore]) return deny(casterId, 'You do not know what to do with this seam.');
-    if (oresUpTo(tier).indexOf(ore) === -1) return deny(casterId, `${oreName(ore)} is beyond your skill. Work the seams you know first.`);
+    if (oresUpTo(tier).indexOf(ore) === -1) return deny(casterId, beyondSkill(ore, own));
     const rests = restsOf(casterId, 'private.minedVeins');
     const until = Math.max(Number(rests[restKey(targetId)]) || 0, sharedRest(targetId, ore));
     if (until > Date.now()) return deny(casterId, `This seam is worked out for now. Come back in ${Math.ceil((until - Date.now()) / 60000)} minutes.`);

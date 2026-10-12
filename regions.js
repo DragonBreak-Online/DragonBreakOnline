@@ -286,9 +286,11 @@ module.exports = (api) => {
     charcoalDefault: 0,
     firewoodPerCharcoal: 3,
   }, cfg.smelting || {});
+  // The longest metal name in the editor id wins: 'silver' is inside IngotQuicksilver, and the first match in the table's
+  // order charged quicksilver silver's 1 charcoal, not its own 2 (website fact-check, 12 Oct; the 7 Oct patch note says 2)
   const charcoalPerIngot = (itemId) => {
     const e = String(edidOf(descOf(itemId)) || '').toLowerCase();
-    const hit = Object.keys(SMELT.charcoalByMetal || {}).find((m) => e.includes(m));
+    const hit = Object.keys(SMELT.charcoalByMetal || {}).filter((m) => e.includes(m)).sort((x, y) => y.length - x.length)[0];
     return Math.max(0, Math.floor(Number(hit ? SMELT.charcoalByMetal[hit] : SMELT.charcoalDefault) || 0));
   };
   const heldOf = (a, baseId) => {
