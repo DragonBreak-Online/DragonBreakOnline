@@ -1828,6 +1828,29 @@ module.exports = (api) => {
     audit(`SUPERNATURAL ${who(t)} given ${disease} by GM ${gm}`);
     return `${display(t)} now carries ${disease}. The fever peaks after ${C.incubationDays} game days of their play.`;
   };
+  // Staff (Nate, 12 Oct): the whole curse at once, not the fever and not only the form. /makesuper vampire|werewolf
+  // [pure|blessed] [player]: on the admin by default; a character under the other curse or carrying a fever is refused
+  const giveCurse = (t, kind, extra, gm) => {
+    const s = stateOf(t); if (!s) return 'No such character.';
+    if (s.kind === kind) return `${display(t)} is already a ${kind}.`;
+    if (s.kind) return `${display(t)} is a ${s.kind}. Lift that curse first.`;
+    if (s.disease) return `${display(t)} carries a fever. Cure it first.`;
+    if (kind === 'vampire') becomeVampire(t, extra); else becomeWerewolf(t, extra);
+    audit(`SUPERNATURAL ${who(t)} made a ${extra ? (kind === 'vampire' ? 'pure-blood ' : 'Hircine-blessed ') : ''}${kind} by GM ${gm}`);
+    return `${display(t)} is now a ${extra ? (kind === 'vampire' ? 'pure-blood ' : 'Hircine-blessed ') : ''}${kind}.`;
+  };
+  registerChatCommand('makesuper', (a, args) => {
+    if (!isAdmin(a)) return;
+    const words = String(args || '').trim().split(/\s+/).filter(Boolean);
+    const kind = String(words.shift() || '').toLowerCase();
+    if (kind !== 'vampire' && kind !== 'werewolf') return personal(a, 'Usage: /makesuper vampire|werewolf [pure|blessed] [player]');
+    const extra = !!words.length && /^(pure|blessed)$/i.test(words[0]);
+    if (extra) words.shift();
+    const name = words.join(' ');
+    const t = name ? findByName(name) : a;
+    if (!t) return personal(a, `No player online called ${name}.`);
+    personal(a, giveCurse(t >>> 0, kind, extra, display(a)));
+  }, { admin: true, help: 'vampire|werewolf [pure|blessed] [player] the whole curse at once (default: you)' });
   globalThis.__dboSuperAdminInfect = (t, kind, gm) => (kind === 'vampire' || kind === 'werewolf' ? giveDisease(t >>> 0, kind, String(gm || 'unknown')) : `There is no ${kind} disease.`);
   // Staff (Nate, 8 Oct): an admin's X menu on a cursed or feverish player lifts the curse or the fever, as the shrine rite
   // and a Cure Disease would; audited with the admin's name
