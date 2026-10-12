@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 
 import './styles.scss';
 
-// Buying and renting a property (server tenancy.js, widget 81), opened from the door's property menu. It always shows the
+// Buying and renting a property (server tenancy.js, widget 82), opened from the door's property menu. It always shows the
 // door the player stands at. Actions go to the server as dbo:propertyMarketAct with the window's nonce, the action and its
 // arguments; the server answers by sending the panel again with a result line.
 export interface MarketInterest { tag: string; name: string }
