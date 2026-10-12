@@ -483,6 +483,14 @@ const mo2StatusText   = document.getElementById('mo2-status-text')
 
 // Discord auth state (kept in module scope for PLAY check)
 let discordUser         = null
+
+// Capitals, as in the top menu: at this size a lowercase i in Barlow Condensed reads as a capital I
+function serviceLabel(text) {
+  const label = document.createElement('span')
+  label.className   = 'topbar-service'
+  label.textContent = text
+  return label
+}
 let serverLocked        = false
 // Whether the current user is allowed to join (session-aware: set after login
 // by re-fetching /api/serverinfo with X-Session).  Defaults true so unauthed
@@ -608,7 +616,7 @@ function renderTopbarDiscord() {
 
     const name = document.createElement('span')
     name.className   = 'discord-topbar-name'
-    name.textContent = `Discord: ${discordUser.tag || discordUser.username}`
+    name.append(serviceLabel('Discord'), discordUser.tag || discordUser.username)
     wrap.appendChild(name)
 
     const logoutBtn = document.createElement('button')
@@ -691,7 +699,7 @@ function renderTopbarNexus() {
 
     const name = document.createElement('span')
     name.className   = 'discord-topbar-name'
-    name.textContent = `Nexus: ${nexusUser.name}${nexusUser.isPremium ? ' \u2605' : ''}`
+    name.append(serviceLabel('Nexus'), `${nexusUser.name}${nexusUser.isPremium ? ' \u2605' : ''}`)
     name.title       = nexusUser.isPremium
       ? 'Nexus Premium - automatic mod downloads enabled'
       : 'Nexus free account - downloads open in the browser'
