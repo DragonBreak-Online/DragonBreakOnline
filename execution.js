@@ -38,7 +38,7 @@ module.exports = (api) => {
     // The server's death just after the clip's own KillActor (16.606 s), so the body falls as vanilla's does
     chopMs: 16700, approvalSeconds: 120,
   }, (cfg && cfg.execution) || {});
-  const PANEL_ID = 81;
+  const PANEL_ID = 83; // 81 is the couriers board (widget-ids-harness)
   const S = globalThis.__dboExecState || (globalThis.__dboExecState = { blocks: new Map(), baseOf: new Map() });
 
   const idOf = (desc) => { try { return mp.getIdFromDesc(String(desc)) >>> 0; } catch (e) { return 0; } };

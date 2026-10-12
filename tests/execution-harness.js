@@ -44,7 +44,7 @@ const ok = (c, name, got) => { if (!c) fails++; console.log(`${c ? 'ok  ' : 'FAI
   onlineSet.add(GM);
   ok(act(BLOCK, X) === undefined, 'with a GM near, the headsman takes the axe');
   const gp = lastPanel(GM);
-  ok(gp && gp.type === 'contextMenu' && gp.id === 81 && /Headsman would behead Victim/.test(gp.targetName) && gp.actions.length === 2, 'the GM in range gets the approval panel', gp);
+  ok(gp && gp.type === 'contextMenu' && gp.id === 83 && /Headsman would behead Victim/.test(gp.targetName) && gp.actions.length === 2, 'the GM in range gets the approval panel', gp);
   ok(!widgets.some(([a]) => a === FAR_GM), 'a GM out of range is not asked');
   ok(!packets.length && !killed.length, 'nothing happens before the approval');
   // Someone other than the GM cannot approve
