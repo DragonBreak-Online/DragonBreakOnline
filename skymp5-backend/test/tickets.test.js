@@ -4,6 +4,7 @@ const assert = require('node:assert')
 const fs = require('fs')
 const os = require('os')
 const path = require('path')
+const { ChannelType } = require('discord.js')
 
 // Discord is a fake client and interaction; config and the audit log are stubbed
 const stub = (rel, exports) => {
@@ -164,7 +165,7 @@ test('a Report a GM ticket is read and pinged by the Owners only, and logs no re
   const channel = { id: '1554000000000000202', name: 'gmr-0003', send: async p => { sent.push(p) } }
   const guild = {
     roles: { everyone: { id: '1' } },
-    channels: { cache: { get: () => null, find: () => ({ id: '1554000000000000302' }) }, fetch: async () => null,
+    channels: { cache: { get: () => null, find: fn => [{ id: '1554000000000000302', type: ChannelType.GuildCategory, name: 'GM Reports' }].find(fn) }, fetch: async () => null,
       create: async opts => { made = opts; return channel } },
   }
   audits.length = 0
@@ -219,7 +220,6 @@ test('a Report a GM channel an Owner renamed still closes as owners-only, found 
 })
 
 // A guild whose channel cache answers find() by its predicate, as discord.js does, and keeps the channels it creates
-const { ChannelType } = require('discord.js')
 function ticketGuild() {
   const made = []
   const sent = []
@@ -259,4 +259,23 @@ test('a Report a GM channel topic names no reporter, since Discord\'s Audit Log 
   assert.strictEqual(made[0].topic, 'Report a GM')
   await submit('rep', '1554000000000000407', 'player')
   assert.strictEqual(made[1].topic, 'Report Player | opened by player (1554000000000000407)')
+})
+
+test('one open Report a GM ticket per user: pressing it again points back there, with no new channel or ping (review, 12 Oct)', async () => {
+  const { made, sent, submit } = ticketGuild()
+  const first = await submit('gmr', '1554000000000000408', 'reporter')
+  assert.match(first, /^Ticket opened: <#\d+>$/)
+  const counter = JSON.parse(fs.readFileSync(realState, 'utf8')).counter
+  audits.length = 0
+  const again = await submit('gmr', '1554000000000000408', 'reporter')
+  assert.strictEqual(made.length, 1)
+  assert.strictEqual(sent.length, 1)
+  assert.match(again, new RegExp(`already have a Report a GM ticket open: <#${first.match(/<#(\d+)>/)[1]}>`))
+  assert.strictEqual(JSON.parse(fs.readFileSync(realState, 'utf8')).counter, counter)
+  assert.deepStrictEqual(audits, [])
+  // Another user can still report a GM, and the other kinds are not limited
+  await submit('gmr', '1554000000000000409', 'other')
+  await submit('rep', '1554000000000000408', 'reporter')
+  await submit('rep', '1554000000000000408', 'reporter')
+  assert.strictEqual(made.length, 4)
 })

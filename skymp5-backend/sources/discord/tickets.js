@@ -129,6 +129,11 @@ async function openTicket(interaction, typeId, summary) {
   const state = readState()
   const guild = interaction.guild
   const category = await categoryFor(guild, type, state)
+  // One open GM report per user, since each one pings the Owners
+  if (type.ownersOnly) {
+    const open = guild.channels.cache.find(c => c.parentId === category.id && c.permissionOverwrites?.cache?.has(interaction.user.id))
+    if (open) return { channel: open, number: null, type }
+  }
 
   state.counter += 1
   writeState(state)
@@ -264,9 +269,9 @@ async function handleInteraction(interaction) {
       const typeId = id.slice('ticket:submit:'.length)
       await interaction.deferReply({ ephemeral: true })
       const result = await openTicket(interaction, typeId, interaction.fields.getTextInputValue('summary'))
-      await interaction.editReply(result
-        ? `Ticket opened: <#${result.channel.id}>`
-        : `That ticket type is gone. To report a bug:\n${frontDoor()}`)
+      await interaction.editReply(!result ? `That ticket type is gone. To report a bug:\n${frontDoor()}`
+        : result.number === null ? `You already have a ${result.type.label} ticket open: <#${result.channel.id}>. Add anything new there.`
+        : `Ticket opened: <#${result.channel.id}>`)
       return true
     }
 
