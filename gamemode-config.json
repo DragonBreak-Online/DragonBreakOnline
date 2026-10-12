@@ -868,8 +868,8 @@
   "trace": { "perMinute": 20, "perHour": 1500 }
  },
  "war": {
-  "_comment": "War and raids: on from release 1012 (Nate, 12 Oct: \"turn them all on\"; closed during the alpha from 2026-09-26). Rollback: enabled false (hot reload) closes declarations and battles; the map, owners and treaties work either way; raids.enabled the same for raids. colours: the Realm map's lore colour per faction (Nate's picks; the cults' and the Vigil's chosen by the Prince's or the order's motif); \"base/stripe\" draws a stripe (the Companions). seats: where a faction that is not a hold musters to declare, { id: { name, world, pos, radius, cells } }.",
-  "enabled": true,
+  "_comment": "War and raids stay off (Nate, 12 Oct 04:12Z: \"war and raids needs to be turned off. it's too early\"; closed during the alpha from 2026-09-26). enabled true opens declarations and battles (hot reload); the map, owners and treaties work either way; raids.enabled the same for raids. colours: the Realm map's lore colour per faction (Nate's picks; the cults' and the Vigil's chosen by the Prince's or the order's motif); \"base/stripe\" draws a stripe (the Companions). seats: where a faction that is not a hold musters to declare, { id: { name, world, pos, radius, cells } }.",
+  "enabled": false,
   "seats": {},
   "colours": {
    "hold-whiterun": "#e8e4d8", "hold-riften": "#6b3fa0", "hold-solitude": "#7a1616", "hold-windhelm": "#2f5fb3", "hold-markarth": "#1f8a57",
@@ -884,7 +884,7 @@
    "cult-nocturnal": "#1b1f3a", "cult-peryite": "#9bb33c", "cult-sanguine": "#7b1e3a", "cult-sheogorath": "#b0308f", "cult-vaermina": "#5d4b8a"
   }
  },
- "raids": { "_comment": "Raids and pillage (raids.js, WAR_DESIGN.md section 5): on from release 1012 with war (Nate, 12 Oct: \"turn them all on\"). Rollback: enabled false (hot reload). The 3-day cooldown is kept in memory only: a restart resets it.", "enabled": true },
+ "raids": { "_comment": "Raids and pillage (raids.js, WAR_DESIGN.md section 5): off with war (Nate, 12 Oct 04:12Z: \"too early\"). enabled true opens them (hot reload). The 3-day cooldown is kept in memory only: a restart resets it.", "enabled": false },
  "economy": { "_comment": "Weekly taxes and wages (economy.js). On from 2026-09-28 (Nate: \"economy needs to fully be turned on\"); the review B2 guards are in economy.js.", "enabled": true,
   "_dominionStipend": "Nate, 11 Oct: the Aldmeri Dominion pays its Thalmor in the Empire a stipend each weekly reckoning (economy.js), into the dominionStipendTo treasury before wages, in the faction report as stipend. It is NEW gold, made by no one's work, so it is kept modest; 0 turns it off. Hot reload.",
   "dominionStipend": 300, "dominionStipendTo": "thalmor" },
