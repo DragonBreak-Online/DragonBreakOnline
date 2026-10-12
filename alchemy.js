@@ -590,6 +590,26 @@ module.exports = (api) => {
     if (n > 0) log(`disenchant: ${display(a)} used an enchanter: ${n} learned effect(s) resent`);
   };
 
+  // A soul captured in a gem (fork soulTrapSystem) is a little Enchanter work, a few times an hour at most (SMJ, 12 Oct: ten
+  // gems for one level). size 1..5 petty to grand, 0 black. Config "soulTrapXp": { enabled, weightBySize, perHour }
+  const TRAP_XP = Object.assign({ enabled: true, weightBySize: [0.8, 0.4, 0.5, 0.6, 0.7, 0.8], perHour: 10 }, (api.cfg || {}).soulTrapXp || {});
+  const trapsAt = globalThis.__dboSoulTrapXpAt || (globalThis.__dboSoulTrapXpAt = new Map()); // actorId -> [ms]
+  globalThis.__dboSoulCaptured = (caster, target, size) => {
+    const a = caster >>> 0;
+    if (!TRAP_XP.enabled || typeof globalThis.__alduinakMasteryAward !== 'function') return 0;
+    const now = Date.now();
+    const recent = (trapsAt.get(a) || []).filter((t) => now - t < 3600000);
+    if (recent.length >= TRAP_XP.perHour) { trapsAt.set(a, recent); return 0; }
+    const weight = Number(TRAP_XP.weightBySize[Number(size) || 0]) || 0;
+    if (!(weight > 0)) return 0;
+    let units = 0;
+    try { units = Number(globalThis.__alduinakMasteryAward(a, 'enchanter', weight, target >>> 0)) || 0; } catch (e) { log(`soul trap award failed for ${display(a)}: ${e.message}`); return 0; }
+    // Only a credited capture uses the hour's room, so one before Enchanter is taken up costs nothing
+    if (units > 0) recent.push(now);
+    trapsAt.set(a, recent);
+    return units;
+  };
+
   // CustomEvent prepends the actor: (actor, workbench, result, inputs)
   mp.onCraftUnmatched = (actorId, workbenchId, resultId, inputs) => {
     const a = Number(actorId) >>> 0, wb = Number(workbenchId) >>> 0;
