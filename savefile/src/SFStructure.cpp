@@ -9,13 +9,9 @@ SaveFile_::RefID SaveFile_::RefID::CreateRefId(SaveFile& parentSaveFile,
   RefID res;
 
   const auto countWas = parentSaveFile.formIDArrayCount;
-  const size_t n = countWas + 1;
-  uint32_t* newFormIDArray = new uint32_t[n];
 
-  memcpy(newFormIDArray, parentSaveFile.formIDArray.data(), countWas);
-  newFormIDArray[countWas] = formId;
-
-  parentSaveFile.formIDArray = { newFormIDArray, newFormIDArray + n };
+  parentSaveFile.formIDArray.resize(countWas);
+  parentSaveFile.formIDArray.push_back(formId);
   parentSaveFile.formIDArrayCount = countWas + 1;
 
   // fix offset
