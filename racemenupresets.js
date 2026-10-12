@@ -168,6 +168,7 @@ module.exports = (api) => {
   if (!(S.selfSent instanceof Map)) S.selfSent = new Map();
   if (!(S.selfLast instanceof WeakSet)) S.selfLast = new WeakSet();   // the last packet of an answer to the owner
   if (!(S.gen instanceof Map)) S.gen = new Map();   // key -> how many face writes were asked for (see readDoc)
+  if (!(S.logRates instanceof Map)) S.logRates = new Map();   // log-only limiters, kept apart from S.rates so they never trip its 5000-key clear
 
   const keyOf = (a) => ((Number(a) >>> 0).toString(16)).padStart(8, '0');
   const fileOf = (k) => path.join(DIR, `${k}.json`);
@@ -394,14 +395,14 @@ module.exports = (api) => {
   };
 
   // ---- rate limits ----
-  const allow = (kind, who, perWindow, windowMs) => {
+  const allow = (kind, who, perWindow, windowMs, m = S.rates) => {
     const k = `${kind}:${who}`;
     const now = Date.now();
-    const r = (S.rates.get(k) || []).filter((t) => now - t < windowMs);
-    if (r.length >= perWindow) { S.rates.set(k, r); return false; }
+    const r = (m.get(k) || []).filter((t) => now - t < windowMs);
+    if (r.length >= perWindow) { m.set(k, r); return false; }
     r.push(now);
-    S.rates.set(k, r);
-    if (S.rates.size > 5000) S.rates.clear();
+    m.set(k, r);
+    if (m.size > 5000) m.clear();
     return true;
   };
 
@@ -515,7 +516,7 @@ module.exports = (api) => {
     const hash = typeof content.hash === 'string' ? content.hash : '';
     const data = typeof content.data === 'string' ? content.data : '';
     // A chunk dropped here, or an upload left unfinished, is logged too (at most 3 lines a minute per character)
-    const dropTold = (why) => { if (allow('dropTold', me, 3, 60000)) log(`racemenu presets: ${keyOf(me)} (profile ${profileOf(me)}) upload chunk dropped: ${why()}`); };
+    const dropTold = (why) => { if (allow('dropTold', me, 3, 60000, S.logRates)) log(`racemenu presets: ${keyOf(me)} (profile ${profileOf(me)}) upload chunk dropped: ${why()}`); };
     const shown = (x) => (typeof x === 'number' || typeof x === 'boolean' || x === null || x === undefined ? String(x) : typeof x === 'string' ? JSON.stringify(x.slice(0, 16)) : typeof x);
     if (!Number.isInteger(up) || !isIntIn(n, 0, MAX_CHUNKS) || data.length > Number(C.chunkChars)) return dropTold(() => `bad header (up ${shown(content.up)}, n ${shown(content.n)}, ${data.length} chars)`);
     // Told (a log line and a packet) at most 3 times a minute per character: past the hourly limit every new upload start was

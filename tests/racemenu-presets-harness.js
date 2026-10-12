@@ -537,6 +537,33 @@ const upload = (userId, t, up, size) => {
   globalThis.__dboRaceMenuSaveWindows = new Map();
   online = [B];
 
+  // Upload gap review (12 Oct): the dropped-chunk log limiter is kept out of the rate counters. They are cleared whole past
+  // 5000 keys, so a malformed chunk's 'dropTold' key could be the one that clears them and hand a character past the hourly
+  // upload limit a fresh allowance. 4998 other keys held, D's 30 uploads an hour used up and the 'rateTold' key added
+  // (5000 keys): one malformed chunk must leave the limit standing, D's next face refused 'rate' and nothing written
+  const D = 0xff000d04;
+  users[4] = D; props[D] = { profileId: 88, appearance: { raceId: 0x13743 } };
+  online = [B, D];
+  M = load();
+  take();
+  globalThis.__dboPresetState.rates.clear();
+  for (let k = 0; k < 4998; k++) globalThis.__dboPresetState.rates.set(`get:${0xff100000 + k}`, [Date.now()]);
+  for (let up = 1; up <= 30; up++) packet(4, { customPacketType: 'dboPresetPut', up, i: 0, n: 0, hash: '', race: 1, data: '' });
+  packet(4, { customPacketType: 'dboPresetPut', up: 31, i: 0, n: 0, hash: '', race: 1, data: '' });   // refused rate: adds 'rateTold'
+  await settle();
+  const rateKeys = globalThis.__dboPresetState.rates.size;
+  take(); logs.length = 0;
+  packet(4, { customPacketType: 'dboPresetPut', up: 'x', i: 0, n: 1, hash: 'zz', race: 1, data: 'a' });
+  const dFace = P.encodeFace({ ...face, custom: [{ name: 'NoseBridge', value: 0.33 }] });
+  upload(4, dFace, 32);
+  await settle();
+  s = take().filter((x) => x.p.customPacketType === 'dboPresetRefused');
+  check('upload gap review: a malformed chunk at 5000 rate keys (hourly limit used up, rateTold held) does not clear the limit: the next face is refused rate, nothing written',
+    rateKeys === 5000 && globalThis.__dboPresetState.rates.has(`rateTold:${D}`) && logs.some((l) => /^racemenu presets: ff000d04 \(profile 88\) upload chunk dropped: bad header/.test(l))
+    && !fs.existsSync(fileOf(D)) && s.length === 1 && s[0].to === D && s[0].p.reason === 'rate' && s[0].p.hash === P.hashText(dFace),
+    [rateKeys, globalThis.__dboPresetState.rates.size, fs.existsSync(fileOf(D)), s.map((x) => x.p), logs]);
+  online = [B];
+
   fs.rmSync(TMP, { recursive: true, force: true });
   console.log(failures ? `${failures} FAILED` : 'all passed');
   process.exit(failures ? 1 : 0);
