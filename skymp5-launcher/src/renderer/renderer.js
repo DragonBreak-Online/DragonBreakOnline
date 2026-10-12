@@ -1270,6 +1270,11 @@ let playBusy        = false
 let isoReady        = true   // isolation disabled, or the game copy exists
 let updateAvailable = false  // server has newer client files than installed
 let launcherUpdateReady = false  // a newer launcher build is published
+// The launcher update failed in this session: Play then starts the game on this launcher, and the next start tries
+// the update again (12 Oct: a player on 2.1.45 got "Update failed: EPERM" on every try, and Play only ever retried
+// the update, so the game started from Settings > Troubleshooting alone)
+let launcherUpdateFailed = false
+const launcherUpdateFirst = () => launcherUpdateReady && !launcherUpdateFailed
 let launchStartedAt = 0  // set after a successful launch until Skyrim shows up or the launch times out
 let launchPollTimer = null
 let gamePollInFlight = false
@@ -1305,7 +1310,7 @@ function updatePlayButton() {
 
   // The launcher updates itself first: a client update run by an outdated
   // launcher would be replaced by the restart anyway.
-  if (launcherUpdateReady) {
+  if (launcherUpdateFirst()) {
     btnConnect.disabled    = false
     btnConnect.textContent = '\u2913 UPDATE LAUNCHER'
     btnConnect.title       = 'Installs the launcher update and restarts.'
@@ -1417,8 +1422,8 @@ btnConnect.addEventListener('click', async () => {
   if (gameRunning || launchStartedAt || playBusy) return
   if (repairRunning) { showWarning('A repair is running, wait for it to finish.'); return }
 
-  // Launcher update takes priority over everything: it replaces this process.
-  if (launcherUpdateReady) {
+  // Launcher update takes priority over everything: it replaces this process. Once it has failed, Play plays.
+  if (launcherUpdateFirst()) {
     await runLauncherUpdate()
     return
   }
@@ -1662,6 +1667,7 @@ async function runLauncherUpdate() {
     launcherVersionEl.textContent = '⬆ UPDATE AVAILABLE'
     delete launcherVersionEl.dataset.updating
     playBusy = false
+    launcherUpdateFailed = true
     showWarning(`Update failed: ${r.error}`)
     // The installer by hand: it installs over this launcher and keeps the game files (11 Oct, an EPERM in the temp folder)
     // The strip is one line with an ellipsis, so the button goes first and the full error is in the tooltip
