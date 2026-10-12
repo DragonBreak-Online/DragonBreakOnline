@@ -1683,6 +1683,11 @@ globalThis.__dboHandlers.customPacket = (userId, rawContent) => {
       writeDiagLines(userId, content.lines);
       return;
     }
+    // RaceMenu face presets: uploads after RaceSexMenu and requests for a copy's face (racemenupresets.js)
+    if (typeof content.customPacketType === 'string' && content.customPacketType.startsWith('dboPreset')) {
+      if (typeof globalThis.__dboPresetPacket === 'function') globalThis.__dboPresetPacket(userId, content);
+      return;
+    }
     // Front widgets driven by this file talk back through the client's DboRelayService.
     if (content.customPacketType === 'dbo') {
       const a = actorOf(userId); const hs = (globalThis.__dboUiEvents && globalThis.__dboUiEvents.get(String(content.event))) || [];
@@ -1715,6 +1720,12 @@ globalThis.__dboHandlers.customPacket = (userId, rawContent) => {
     if (content.customPacketType === 'dboBeastPower') {
       const a = actorOf(userId); const spell = Number(content.spell) >>> 0;
       if (a && spell && typeof globalThis.__dboBeastPower === 'function') { try { globalThis.__dboBeastPower(a, spell); } catch (e) { log('beast power failed', e.message); } }
+      return;
+    }
+    // RaceMenu extras (client AppearanceExtrasService): appearanceextras.js checks, keeps and serves them
+    if (content.customPacketType === 'dboAppearanceExtras' || content.customPacketType === 'dboAppearanceExtrasGet') {
+      const h = globalThis.__dboAppearanceExtrasPacket; const a = actorOf(userId);
+      if (a && typeof h === 'function') { try { h(a, content); } catch (e) { logCapped(`rmx:${userId}`, 6, 'appearance extras packet failed', e.message); } }
       return;
     }
     // A player's shout, to be seen by the players around them (client MagicSyncService -> ShoutPushService dboShoutFx):
@@ -1885,6 +1896,8 @@ const openCreator = (a) => {
     setFade(a, false);
     mp.setRaceMenuOpen(a, false);
     mp.setRaceMenuOpen(a, true);
+    // appearance.js / racemenupresets.js: when the editor opened, against when a saved face was put back
+    if (globalThis.__dboRaceMenuOpenedAt instanceof Map) globalThis.__dboRaceMenuOpenedAt.set(a >>> 0, Date.now());
     log(`opened character creation for ${display(a)}`);
   } catch (e) { log('creator open failed', e.message); }
 };
@@ -2050,6 +2063,16 @@ const appearanceHook = (actorId, appearance, isAllowed) => {
   if (isAllowed) {
     try { if (globalThis.__dboAppearanceEdit && typeof globalThis.__dboAppearanceEdit.chargenFinish === 'function') globalThis.__dboAppearanceEdit.chargenFinish(actorId >>> 0, appearance); } catch (e) { log('chargen look check failed', e.message); }
   }
+  // What skee keeps (racemenupresets.js, appearanceextras.js) arrives a few seconds after this close: an editor the server
+  // opened (creation, a reroll, a GM's /chargen) may save it, free; the console's showracemenu may not (appearance.js)
+  try {
+    const ed = globalThis.__dboAppearanceEdit;
+    if (ed && typeof ed.raceMenuClosed === 'function') {
+      const a = actorId >>> 0;
+      const kind = !isAllowed ? '' : creationPending(a) ? 'creation' : mp.get(a, 'private.rerollPending') === true ? 'reroll' : 'chargen';
+      ed.raceMenuClosed(a, !!isAllowed, kind);
+    }
+  } catch (e) { log('racemenu save window failed', e.message); }
   // An editor the server did not open (the console's showracemenu): the engine kept the stored look, and a real change
   // is explained to the player, since it is gone at their next login (appearance.js refused)
   if (!isAllowed) {
@@ -2691,7 +2714,7 @@ try {
   const APPEARANCE_JS = path.resolve('appearance.js');
   delete require.cache[APPEARANCE_JS];
   require(APPEARANCE_JS)({ mp, log, personal, system, audit, who, registerChatCommand, cfg, userOf, profileOf });
-} catch (e) { log('appearance.js failed to load:', e.stack || e.message); globalThis.__dboAppearanceEdit = null; }
+} catch (e) { log('appearance.js failed to load:', e.stack || e.message); globalThis.__dboAppearanceEdit = null; globalThis.__dboRaceMenuSaveGate = null; }
 try {
   const NAMING_JS = path.resolve('naming.js');
   delete require.cache[NAMING_JS];
@@ -5145,6 +5168,12 @@ try {
   delete require.cache[GEARSWAP_JS];
   require(GEARSWAP_JS)({ mp, log, audit, who, personal, onlineActors, every, recordOf, cfg, registerChatCommand, findByName, isStaff: isAdmin });
 } catch (e) { log('gearswap.js failed to load:', e.stack || e.message); }
+// ---- RaceMenu face sliders, expressions and sculpt per character (server\racemenupresets.js; config "racemenuPresets") ----
+try {
+  const RACEMENU_PRESETS_JS = path.resolve('racemenupresets.js');
+  delete require.cache[RACEMENU_PRESETS_JS];
+  require(RACEMENU_PRESETS_JS)({ mp, log, sendPacket, onlineActors, actorOf, profileOf, every, cfg });
+} catch (e) { log('racemenupresets.js failed to load:', e.stack || e.message); globalThis.__dboPresetPacket = null; }
 // The trade window (fork tradeSystem.ts) asks before an item changes hands: a reason for the player, or null
 globalThis.__dboTradeItemVeto = (a, baseId, count) => {
   let why = null;
@@ -6823,6 +6852,13 @@ try {
   const runCommand = (a, name, argStr) => { const c = commands.get(name); if (c && (!c.admin || isAdmin(a))) c.fn(a, argStr); };
   require(PLAYERMENU_JS)({ mp, log, personal, system, registerChatCommand, onUi, sendPacket, display, nameOf, tagOf, profileOf, onlineActors, isAdmin, isLeadStaff, ranksOf, giveItem, makeProp, runCommand, zones: ZONES, zoneOfActor, cfg, every });
 } catch (e) { log('playermenu.js failed to load:', e.stack || e.message); globalThis.__dboPlayerMenuLeave = null; globalThis.__dboPlayerMenuReady = null; globalThis.__dboInstantRestraint = null; }
+
+// ---- RaceMenu extras: overlays, body scales and morphs kept per character (server\appearanceextras.js) ----
+try {
+  const APPEARANCEEXTRAS_JS = path.resolve('appearanceextras.js');
+  delete require.cache[APPEARANCEEXTRAS_JS];
+  require(APPEARANCEEXTRAS_JS)({ mp, log, cfg, sendPacket, onlineActors, profileOf, display });
+} catch (e) { log('appearanceextras.js failed to load:', e.stack || e.message); globalThis.__dboAppearanceExtrasPacket = null; }
 
 // ---- Pickpocket in the X menu while sneaking (server\pickpocket.js) --------------------------------
 try {

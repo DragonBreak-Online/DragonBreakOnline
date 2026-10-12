@@ -64,7 +64,7 @@ ok(opened === 1 && /again in/.test(said.at(-1)), 'a second use within 24 hours i
 
 // 3. Closing unchanged costs nothing
 m = reset(800); run(); finish(look());
-ok(gold() === 800 && /unchanged, so nothing was charged/.test(sys.at(-1)) && !props.get(`${A}|private.dboAppearanceAt`), 'an unchanged look costs nothing and starts no cooldown', sys.at(-1));
+ok(gold() === 800 && /^Your standard look is unchanged\. RaceMenu-only changes \(extra sliders, sculpt, overlays\) cost 500 gold and are charged when they are saved\./.test(sys.at(-1)) && !props.get(`${A}|private.dboAppearanceAt`), 'an unchanged look costs nothing and starts no cooldown', sys.at(-1));
 
 // 4. Race and sex are kept: the old look goes back, nothing charged
 m = reset(800); run(); finish(Object.assign(look(), { raceId: 0x13745, hairColor: 9 }));
@@ -120,7 +120,7 @@ const swapOnly = char(0x13741, false, [0x51631, 0x8555f, 0x220064cb, 0x24238, 0x
 edit(bretonM(), swapOnly);
 ok(gold() === 800 && !props.get(`${A}|private.dboAppearanceAt`), 'a head-only swap costs nothing and starts no cooldown', gold());
 ok(JSON.stringify(stored()) === JSON.stringify(bretonM()), 'the look from before is stored, head in its old slot', parts(stored()));
-ok(/unchanged, so nothing was charged/.test(sys.at(-1)) && /another race's face; your own was kept/.test(sys.at(-1)), 'the player is told the look is unchanged and why', sys.at(-1));
+ok(/^Your standard look is unchanged\. RaceMenu-only changes \(extra sliders, sculpt, overlays\) cost 500 gold and are charged when they are saved\./.test(sys.at(-1)) && /another race's face; your own was kept/.test(sys.at(-1)), 'the player is told the look is unchanged and why', sys.at(-1));
 ok(audits.some((t) => t === "APPEARANCE Brand editor swapped in Nord's default head; kept their own"), 'audited', audits);
 ok(retakes.length === 0, 'an unchanged look is no new look for the tells');
 // The settle window: the corrected look again once the client applies echoes
@@ -175,7 +175,7 @@ noFire('a race not in the table (Falmer) is never guarded', char(0x131f4, false,
 const hiPoly = () => char(0x13741, false, [0x37000800, 0x51631, 0x8555f], { skinColor: 13021352 });
 edit(hiPoly(), char(0x13741, false, [0x51631, 0x8555f, NORD_M], { skinColor: 13021352 }));
 ok(JSON.stringify(stored()) === JSON.stringify(hiPoly()) && gold() === 800 && !props.get(`${A}|private.dboAppearanceAt`), 'a high-poly head swapped for the Nord one: their own back in its slot, unchanged, free', parts(stored()));
-ok(/unchanged, so nothing was charged/.test(sys.at(-1)) && /your own was kept/.test(sys.at(-1)) && !stored().headpartIds.includes(0x51633), 'told the truth: their own head was kept (not the Breton vanilla one)', sys.at(-1));
+ok(/^Your standard look is unchanged\. RaceMenu-only changes \(extra sliders, sculpt, overlays\) cost 500 gold and are charged when they are saved\./.test(sys.at(-1)) && /your own was kept/.test(sys.at(-1)) && !stored().headpartIds.includes(0x51633), 'told the truth: their own head was kept (not the Breton vanilla one)', sys.at(-1));
 edit(hiPoly(), char(0x13741, false, [0x37000800, 0x51631, 0x8555f, NORD_M], { skinColor: 13021352 }));
 ok(JSON.stringify(stored()) === JSON.stringify(hiPoly()) && gold() === 800, 'the Nord head only added beside their own: it goes, no second face, free', parts(stored()));
 edit(hiPoly(), char(0x13741, false, [0x51631, 0x8555f, NORD_M], { skinColor: 13021352, hairColor: 9 }));

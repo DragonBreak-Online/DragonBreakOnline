@@ -124,6 +124,15 @@ gearswap-restore-metals.json
 gifts-inbox/
 gift-ledger.json
 
+# RaceMenu extras kept per character (appearanceextras.js)
+appearance-extras.json
+appearance-extras.json.tmp
+appearance-extras.json.exit.tmp
+appearance-extras.json.bad-*
+
+# RaceMenu face presets, one file per character (racemenupresets.js)
+racemenu-presets/
+
 # Thalmor informant reports and dossiers (thalmor.js)
 thalmor-intel.json
 thalmor-intel.json.tmp

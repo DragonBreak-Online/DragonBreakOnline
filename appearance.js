@@ -151,6 +151,14 @@ module.exports = (api) => {
     mp.set(a, 'inventory', { entries: entries.filter((e) => Number(e.count) > 0) });
     return true;
   };
+  // Gives n gold back (a RaceMenu charge whose face could not be written, raceMenuSaveGate's settle)
+  const giveGold = (a, n) => {
+    if (!(n > 0)) return;
+    const entries = entriesOf(a).map((e) => Object.assign({}, e));
+    const stack = entries.find((e) => (Number(e.baseId) >>> 0) === GOLD);
+    if (stack) stack.count = (Number(stack.count) || 0) + n; else entries.push({ baseId: GOLD, count: n });
+    mp.set(a, 'inventory', { entries });
+  };
   const normDesc = (d) => {
     const s = String(d || ''); const i = s.indexOf(':'); if (i < 0) return s.toLowerCase();
     const n = parseInt(s.slice(0, i), 16);
@@ -200,6 +208,7 @@ module.exports = (api) => {
     try {
       mp.set(a, EDIT, { at: Date.now(), before: copy(before) });
       mp.setRaceMenuOpen(a, true);
+      noteEditorOpened(a);
     } catch (e) {
       try { mp.set(a, EDIT, null); } catch (e2) { /* nothing more to undo */ }
       log('appearance: could not open the editor for', who(a), e.message);
@@ -302,6 +311,153 @@ module.exports = (api) => {
     if (g && !g.look) audit(`APPEARANCE ${who(a)} editor swapped in ${raceName(g.from)}'s default head, but their own could not be told from the other parts changed; saved as made, check it${how ? ` (${how})` : ''}`);
     return g && g.look ? g : null;
   };
+  // ---- The RaceMenu save window (9 Oct) ----
+  // What skee keeps and SkyMP does not (face sliders and sculpt: racemenupresets.js; overlays, node scales, body morphs:
+  // appearanceextras.js) reaches the server a few seconds after the editor closes (the client captures 3-3.5 s after the
+  // close, then uploads), so after finish() below has settled the look. Both modules ask __dboRaceMenuSaveGate before they
+  // store a change, so it keeps the look's rules: only an editor the server opened (creation, /appearance, a GM's /chargen,
+  // a patron's /reroll), not one whose look was put back (race or sex changed, gold short), nor the console's
+  // showracemenu (isAllowed false). An /appearance closed with the vanilla look unchanged would otherwise save a
+  // RaceMenu-only change for free and start no cooldown, so that change is paid for when it arrives. A character's first
+  // save of each kind is free (config appearance.raceMenuFirstSaveFree, default on): before these modules ran nothing of
+  // it was ever kept, so a player putting back a face they already made (and maybe paid for) is not charged again.
+  // Kept across a hot reload; config appearance.raceMenuSaveWindowSeconds (default 90: a full sculpt upload is about 25 s).
+  const SAVE_WINDOW_MS = Math.max(10, Number(C.raceMenuSaveWindowSeconds) || 90) * 1000;
+  // When each editor the server opened was opened (racemenupresets.js takes a change to a saved face only from an editor
+  // opened after that face was put back on the player); creation in gamemode.js writes it too
+  const editorOpenedAt = globalThis.__dboRaceMenuOpenedAt instanceof Map ? globalThis.__dboRaceMenuOpenedAt : (globalThis.__dboRaceMenuOpenedAt = new Map());
+  function noteEditorOpened(a) {
+    const now = Date.now();
+    editorOpenedAt.set(a >>> 0, now);
+    if (editorOpenedAt.size > 512) for (const [k, t] of editorOpenedAt) if (now - t > 3600000) editorOpenedAt.delete(k);
+  }
+  const saveWindows = globalThis.__dboRaceMenuSaveWindows instanceof Map ? globalThis.__dboRaceMenuSaveWindows : (globalThis.__dboRaceMenuSaveWindows = new Map());
+  // headswap: the head guard put the player's own head back in place of another race's that the editor had swapped in
+  // (finish() below). A sculpt made in that editor was made on the other head, whose .tri skee keys it by, so it would not
+  // show on the player's own (10 Oct review 2-e2e G8, E5): a face from that close with a sculpt on a head its stored face
+  // has none on (racemenupresets.js opts.newSculpt) is not taken, and nothing is charged for it. Slider changes, and a
+  // sculpt the stored face already had, are taken as from any other close (12 Oct re-review, server-data 4)
+  const openSaveWindow = (a, kind, charge, headswap) => {
+    const now = Date.now();
+    saveWindows.set(a >>> 0, Object.assign({ at: now, until: now + SAVE_WINDOW_MS, kind: String(kind || 'editor'), charge: !!charge }, headswap ? { headswap: true } : {}));
+    if (saveWindows.size > 256) for (const [k, w] of saveWindows) if (now > w.until) saveWindows.delete(k);
+  };
+  const closeSaveWindow = (a) => { saveWindows.delete(a >>> 0); };
+  // what: 'face' or 'extras'; first: nothing of that kind is stored for the character yet; opts.clear: the change empties
+  // what is stored; opts.otherRace: the stored face was saved on a race that is neither the player's nor its vampire or
+  // mortal variant; opts.hold: the change is kept only once a file write lands (racemenupresets.js), see settle below;
+  // opts.newSculpt: the face carries a sculpt on a head the stored face has no sculpt on (racemenupresets.js, E5).
+  // { ok, reason?, code?, paid?, settle? }; code is the short reason the modules hand on (racemenupresets.js sends it to
+  // the client in dboPresetRefused)
+  const raceMenuSaveGate = (a, what, first, opts) => {
+    a = a >>> 0;
+    const w = saveWindows.get(a);
+    if (!w) return { ok: false, reason: 'no editor the server opened', code: 'noeditor' };
+    if (Date.now() > w.until) { saveWindows.delete(a); return { ok: false, reason: 'the editor closed too long ago', code: 'late' }; }
+    // /appearance keeps the race, so a face stored on another race was never on the player in it: what the editor hands
+    // back is not that face changed, and it is not taken (10 Oct review R2). Creation, a reroll and a GM's /chargen may
+    // change the race, so they may replace it
+    if (opts && opts.otherRace && w.kind === 'appearance') return { ok: false, reason: 'the saved face is for another race', code: 'otherrace' };
+    // A clear is never paid for: in a priced window (an unchanged /appearance) it is refused. A face is not cleared in any
+    // /appearance window, paid or not: an empty capture is what every face that was not put back sends (10 Oct review R5),
+    // so only creation, a reroll and a GM's /chargen clear one. Extras may be cleared after a paid look change
+    if (opts && opts.clear) {
+      if (w.charge) return { ok: false, reason: 'a clear is never paid for', code: 'clear' };
+      if (what === 'face' && w.kind === 'appearance') return { ok: false, reason: 'a RaceMenu face is cleared only by staff or a reroll', code: 'clear' };
+      return { ok: true, kind: w.kind };
+    }
+    // A sculpt made on a head the guard swapped back (see openSaveWindow): refused before any price, first save or not
+    if (what === 'face' && w.headswap && opts && opts.newSculpt) return { ok: false, reason: 'made on another race\'s head the editor swapped in (own head kept)', code: 'headswap' };
+    if (!w.charge) return { ok: true, kind: w.kind };
+    if (first && C.raceMenuFirstSaveFree !== false) {
+      audit(`APPEARANCE ${who(a)} kept their RaceMenu ${what} for the first time (free)`);
+      return { ok: true, kind: w.kind, free: true };
+    }
+    if (!takeGold(a, cost)) {
+      system(a, `Your RaceMenu changes weren't saved: they cost ${cost} gold and you don't have it. They are gone when you log out.`);
+      audit(`APPEARANCE ${who(a)} changed only RaceMenu details (${what}) without ${cost} gold: not saved`);
+      return { ok: false, reason: 'gold', code: 'gold' };
+    }
+    // One charge covers the face and the extras of the same close
+    w.charge = false;
+    const lastBefore = get(a, LAST);
+    const chargedAt = Date.now();
+    mp.set(a, LAST, chargedAt);
+    const paidTold = () => {
+      system(a, `Your RaceMenu changes are saved. ${cost} gold paid.`);
+      audit(`APPEARANCE ${who(a)} changed only RaceMenu details (${what}) for ${cost} gold`);
+    };
+    if (!(opts && opts.hold)) { paidTold(); return { ok: true, kind: w.kind, paid: cost }; }
+    // opts.hold: the gold is taken now, so it cannot be spent meanwhile, but the charge stands only once the change is on
+    // disk (10 Oct review 2, a: a face write that failed kept the gold, and the face was gone at the next restart). The
+    // caller runs settle once: settle(true) tells the player it is saved and paid; settle(false) gives the gold back, puts
+    // the cooldown back as it was and the price back on this window (the caller tells the player it was not saved)
+    let settled = false;
+    const settle = (saved) => {
+      if (settled) return;
+      settled = true;
+      if (saved) { paidTold(); return; }
+      giveGold(a, cost);
+      if (Number(get(a, LAST)) === chargedAt) mp.set(a, LAST, lastBefore === undefined ? 0 : lastBefore);
+      if (saveWindows.get(a) === w) w.charge = true;
+      audit(`APPEARANCE ${who(a)} RaceMenu ${what} could not be written: ${cost} gold given back`);
+    };
+    return { ok: true, kind: w.kind, paid: cost, settle };
+  };
+  // gamemode.js appearanceHook, for a close finish() does not take: an editor the server opened (creation, a reroll, a GM's
+  // /chargen) may save what skee keeps, free; one it did not (isAllowed false, the console's showracemenu) may not
+  const raceMenuClosed = (a, isAllowed, kind) => { if (isAllowed) openSaveWindow(a, kind || 'editor', false); else closeSaveWindow(a); };
+  globalThis.__dboRaceMenuSaveGate = raceMenuSaveGate;
+  // A RaceMenu-only change racemenupresets.js or appearanceextras.js did not keep: the player is told, with nothing charged
+  // for it (10 Oct review S5: the refusals were silent, so a player saw "my face didn't save" with no reason). code is the
+  // gate's or the module's own; 'gold' is told by the gate above. Each reason at most once a minute per player and kind.
+  // Kept across a hot reload. True when the player was told.
+  const toldAt = globalThis.__dboRaceMenuRefusedToldAt instanceof Map ? globalThis.__dboRaceMenuRefusedToldAt : (globalThis.__dboRaceMenuRefusedToldAt = new Map());
+  const NOT_CHARGED = 'You were not charged for them.';
+  const FACE_TOLD = {
+    notloaded: `Your RaceMenu face changes weren't saved because your saved face was still loading. ${NOT_CHARGED} Wait a moment, then reopen /appearance and redo them.`,
+    otherrace: `Your RaceMenu face changes weren't saved: your saved face was made for another race, and /appearance can't replace it. ${NOT_CHARGED} Ask a GM if it needs changing.`,
+    clear: 'Your saved RaceMenu face was kept: /appearance doesn\'t remove it. You were not charged. If it isn\'t showing on you, relog. A GM can remove it if you want.',
+    unreadable: `Your RaceMenu face changes weren't saved: your saved face couldn't be read just now. ${NOT_CHARGED} Try again in a few minutes.`,
+    write: `Your RaceMenu face changes weren't saved: the server couldn't store them. ${NOT_CHARGED} Try again later, and tell a GM if it keeps happening.`,
+    headswap: `Your RaceMenu face changes weren't saved: the editor had given you another race's head, and sculpting done on it wouldn't show on your own head, which was kept. ${NOT_CHARGED} Slider changes without sculpting save as usual.`,
+  };
+  const EXTRAS_TOLD = {
+    clear: 'Your saved RaceMenu overlays and body sliders were kept. You were not charged. To remove all of them, change your standard look in /appearance as well, or ask a GM.',
+    unreadable: `Your RaceMenu overlays and body sliders weren't saved: the saved ones couldn't be read. ${NOT_CHARGED} Tell a GM.`,
+  };
+  const ANY_TOLD = {
+    noeditor: `Your RaceMenu changes weren't saved: only /appearance (or a GM) can change your saved look, and edits made with the console's showracemenu are lost when you log out.`,
+    late: `Your RaceMenu changes arrived too late to be saved. ${NOT_CHARGED} Reopen /appearance and redo them.`,
+  };
+  const raceMenuRefused = (a, what, code) => {
+    a = a >>> 0;
+    code = String(code || 'gate');
+    if (code === 'gold') return false;
+    const now = Date.now();
+    // The console's showracemenu: guard 2 below has just told them, for the look
+    if (code === 'noeditor' && now - (refusedAt.get(a) || 0) < REFUSED_EVERY_MS) return false;
+    const key = `${a}|${what}|${code}`;
+    if (now - (toldAt.get(key) || 0) < REFUSED_EVERY_MS) return false;
+    toldAt.set(key, now);
+    if (toldAt.size > 512) for (const [k, t] of toldAt) if (now - t >= REFUSED_EVERY_MS) toldAt.delete(k);
+    const text = (what === 'extras' ? EXTRAS_TOLD : FACE_TOLD)[code] || ANY_TOLD[code]
+      || `Your RaceMenu ${what === 'extras' ? 'overlays and body sliders' : 'face changes'} weren't saved. ${NOT_CHARGED}`;
+    system(a, text);
+    return true;
+  };
+  globalThis.__dboRaceMenuRefused = raceMenuRefused;
+  // Whether racemenupresets.js or appearanceextras.js keeps this player's RaceMenu-only changes: each module's own switch
+  // and staff test list (a missing block is on, as in the modules). While neither does (both off, or on for a staff test
+  // this player is not in), a close says those changes are not kept, instead of naming a price for a save that never comes
+  const raceMenuKept = (a) => ['racemenuPresets', 'appearanceExtras'].some((k) => {
+    const m = (cfg && cfg[k]) || {};
+    if (m.enabled === false) return false;
+    const test = Array.isArray(m.testProfiles) && m.testProfiles.length ? m.testProfiles.map(Number) : null;
+    return !test || test.includes(Number(profileOf(a)));
+  });
+  const NOT_KEPT_NOTE = ' RaceMenu-only details (extra sliders, sculpt, overlays) are not saved yet and are gone when you log out.';
+
   // The editor closed with this appearance (gamemode.js appearanceHook, the engine has already applied it). True when it
   // was ours to handle.
   const finish = (a, appearance) => {
@@ -313,6 +469,7 @@ module.exports = (api) => {
     if (get(a, CHARGEN)) mp.set(a, CHARGEN, null);
     const before = e.before;
     const after = appearance && typeof appearance === 'object' ? copy(appearance) : null;
+    closeSaveWindow(a);
     if (!after) return true;
     const raceChanged = C.allowRace !== true && Number(after.raceId) !== Number(before.raceId);
     const sexChanged = C.allowSex !== true && !!after.isFemale !== !!before.isFemale;
@@ -331,7 +488,14 @@ module.exports = (api) => {
     if (nameKept) look.name = before.name;
     if (sameLook(look, before)) {
       if (nameKept || guarded) { mp.set(a, 'appearance', before); resendAfterSettle(a, appearance); }
-      system(a, `Your look is unchanged, so nothing was charged.${headNote}${nameKept ? ' Your name stays the same: a GM can rename you.' : ''}`);
+      if (!raceMenuKept(a)) {
+        system(a, `Your look is unchanged, so nothing was charged.${headNote}${nameKept ? ' Your name stays the same: a GM can rename you.' : ''}${NOT_KEPT_NOTE}`);
+        return true;
+      }
+      // A RaceMenu-only change (sliders, sculpt, overlays) arrives after this and is paid for then (raceMenuSaveGate); a
+      // face made on a swapped-in head is not taken (E5)
+      openSaveWindow(a, 'appearance', true, !!guarded);
+      system(a, `Your standard look is unchanged. RaceMenu-only changes (extra sliders, sculpt, overlays) cost ${cost} gold and are charged when they are saved.${headNote}${nameKept ? ' Your name stays the same: a GM can rename you.' : ''}`);
       return true;
     }
     if (!takeGold(a, cost)) {
@@ -343,9 +507,11 @@ module.exports = (api) => {
     }
     if (nameKept || guarded) mp.set(a, 'appearance', look);
     mp.set(a, LAST, Date.now());
+    // Paid: what skee keeps from this close is saved with it, but for a face made on a swapped-in head (E5)
+    openSaveWindow(a, 'appearance', false, !!guarded);
     retakeTells(a, before);
     resendAfterSettle(a, appearance);
-    system(a, `Your new look is saved. ${cost} gold paid.${headNote}${nameKept ? ' Your name stays the same: a GM can rename you.' : ''}`);
+    system(a, `Your new look is saved. ${cost} gold paid.${headNote}${nameKept ? ' Your name stays the same: a GM can rename you.' : ''}${raceMenuKept(a) ? '' : NOT_KEPT_NOTE}`);
     audit(`APPEARANCE ${who(a)} changed their look for ${cost} gold${nameKept ? ' (a name change in the editor was undone)' : ''}`);
     return true;
   };
@@ -358,6 +524,7 @@ module.exports = (api) => {
   // to open leaves none behind. True when a snapshot was taken.
   const chargenOpened = (t, kind) => {
     t = t >>> 0;
+    noteEditorOpened(t);
     const reroll = kind === 'reroll';
     if (!reroll && get(t, 'private.rerollPending') === true) return false;
     const look = get(t, 'appearance');
@@ -418,7 +585,7 @@ module.exports = (api) => {
     return true;
   };
 
-  globalThis.__dboAppearanceEdit = { pending, finish, blocked, chargenOpened, chargenFinish, refused };
+  globalThis.__dboAppearanceEdit = { pending, finish, blocked, chargenOpened, chargenFinish, refused, raceMenuClosed };
   log(`appearance ${C.enabled ? 'on' : 'off'}: /appearance costs ${cost} gold, every ${Number(C.cooldownHours) || 0} h, race ${C.allowRace === true ? 'free' : 'kept'}, sex ${C.allowSex === true ? 'free' : 'kept'}, head guard ${C.headGuard === false ? 'off' : `on (${HEADS.raceOf.size} race ids)`}`);
-  return { pending, finish, blocked, goldOf, takeGold, C, chargenOpened, chargenFinish, refused, guardHead, sameLook, SETTLE_RESEND_MS };
+  return { pending, finish, blocked, goldOf, takeGold, C, chargenOpened, chargenFinish, refused, guardHead, sameLook, SETTLE_RESEND_MS, raceMenuClosed, raceMenuSaveGate, raceMenuRefused };
 };
