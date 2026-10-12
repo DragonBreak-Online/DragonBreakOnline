@@ -1642,16 +1642,19 @@ module.exports = (api) => {
     // Arcane Arts has reached the first spell: the choice opens (firstCheck), and the class has nothing more for them
     if (FIRST_AT && arcaneOf(st).level >= FIRST_AT) { try { firstCheck(st, 'class'); } catch (err) { log('schools: first check after class failed', err.message); } }
   };
+  // The lectern's own rule for a teacher (beyond the staff's list): a member of a teacherGuilds faction with Expert study
+  // in a school or Arcane Arts at teacherArcaneLevel. The X menu's "Name class teacher" asks it too.
+  const classQualified = (a) => {
+    const guilds = Array.isArray(C.classes.teacherGuilds) ? C.classes.teacherGuilds : [];
+    if (guilds.length && !guildsOf(a).some((g) => guilds.includes(g))) return `A class here is held by a member of ${schoolHouse(a)}, or of another college.`;
+    const s = stateOf(a);
+    if (!byArcane(a) && !SCHOOLS.some((n) => schoolRank(s, n) >= C.classes.teacherMinRank)) return `Teaching a class takes Arcane Arts at ${C.classes.teacherArcaneLevel} or ${RANKS[C.classes.teacherMinRank]} study in one of your schools.`;
+    return '';
+  };
   const CLASSES = makeLectern({
     conf: C.classes, refs: LECTERN_REFS, runsKey: 'classes', openKey: 'lecternOpen', listKey: 'teacher', teacherAtKey: 'classAt', paidAtKey: 'paidAt',
     panelId: CLASS_PANEL_ID, events: 'lectern', nonceKind: 'l', words: classWords,
-    qualified: (a) => {
-      const guilds = Array.isArray(C.classes.teacherGuilds) ? C.classes.teacherGuilds : [];
-      if (guilds.length && !guildsOf(a).some((g) => guilds.includes(g))) return `A class here is held by a member of ${schoolHouse(a)}, or of another college.`;
-      const s = stateOf(a);
-      if (!byArcane(a) && !SCHOOLS.some((n) => schoolRank(s, n) >= C.classes.teacherMinRank)) return `Teaching a class takes Arcane Arts at ${C.classes.teacherArcaneLevel} or ${RANKS[C.classes.teacherMinRank]} study in one of your schools.`;
-      return '';
-    },
+    qualified: (a) => classQualified(a),
     // Spells `a` may set a class by: known, of a school where they are qualified (Expert study, or any active school for a
     // teacher qualified by Arcane Arts), no higher than their study of it
     spellsOf: (a) => {
@@ -1899,6 +1902,39 @@ module.exports = (api) => {
 
   // ---- staff ---------------------------------------------------------------------------------------------------------
   const argList = (args) => (Array.isArray(args) ? args.map(String) : String(args || '').trim().split(/\s+/)).filter(Boolean);
+  // Naming or removing a class teacher: /classteacher and the X menu's staff entries share it (one record, one audit line)
+  const setClassTeacher = (by, t, on) => {
+    const s = stateOf(t);
+    s.teacher = on ? { by: who(by), at: Date.now() } : null;
+    save(t, s);
+    audit(`SCHOOLS ${who(by)} ${s.teacher ? 'named' : 'removed'} ${who(t)} as a class teacher`);
+    personal(by, `${display(t)} ${s.teacher ? 'may now hold classes at a Class Lectern' : 'may no longer hold classes'}.`);
+    if (t !== by) personal(t, s.teacher ? 'You have been named a teacher: you may hold classes at a Class Lectern.' : 'You may no longer hold classes.');
+  };
+  // The X menu on a player (playermenu.js), for staff (isAdmin; not Trial GMs) while classes need the list: "Name class
+  // teacher" for one the lectern would let teach, or the same entry marked "(not eligible)" that says why; "Remove as class
+  // teacher" for one already named (Nate, 12 Oct: "Teachers need to be in the panel. I hate commands.")
+  const staffOnly = (a) => { try { return typeof isAdmin === 'function' && !!isAdmin(a); } catch (e) { return false; } };
+  globalThis.__dboSchoolsMenuEntries = (a, t) => {
+    if (!staffOnly(a) || !C.enabled || !C.classes.enabled) return [];
+    if (listed(t)) return [{ id: 'schools:teacheroff', label: 'Remove as class teacher' }];
+    if (!C.classes.requireList) return [];
+    return [classQualified(t) ? { id: 'schools:teacherwhy', label: 'Name class teacher (not eligible)' } : { id: 'schools:teacheron', label: 'Name class teacher' }];
+  };
+  globalThis.__dboSchoolsMenuAction = (a, id, t, nameFor) => {
+    if (id !== 'schools:teacheron' && id !== 'schools:teacheroff' && id !== 'schools:teacherwhy') return false;
+    if (!staffOnly(a)) return true;
+    if (id === 'schools:teacheroff') {
+      if (!listed(t)) { personal(a, `${display(t)} is not a named class teacher.`); return true; }
+      setClassTeacher(a, t, false);
+      return true;
+    }
+    if (listed(t)) { personal(a, `${display(t)} is already a named class teacher.`); return true; }
+    const why = classQualified(t);
+    if (why) { personal(a, `${display(t)} cannot be named a class teacher yet: ${why.replace(/\byour\b/g, 'their').replace(/^Teaching/, 'teaching').replace(/^A class/, 'a class')}`); return true; }
+    setClassTeacher(a, t, true);
+    return true;
+  };
   registerChatCommand('classteacher', (a, args) => {
     const [verb, ...rest] = argList(args);
     if (!verb || !['add', 'remove', 'list'].includes(verb.toLowerCase())) return personal(a, 'Usage: /classteacher add|remove <player>, or /classteacher list (players online).');
@@ -1908,12 +1944,7 @@ module.exports = (api) => {
     }
     const t = findByName(rest.join(' '));
     if (!t) return personal(a, `Nobody online answers to "${rest.join(' ')}".`);
-    const s = stateOf(t);
-    s.teacher = verb.toLowerCase() === 'add' ? { by: who(a), at: Date.now() } : null;
-    save(t, s);
-    audit(`SCHOOLS ${who(a)} ${s.teacher ? 'named' : 'removed'} ${who(t)} as a class teacher`);
-    personal(a, `${display(t)} ${s.teacher ? 'may now hold classes at a Class Lectern' : 'may no longer hold classes'}.`);
-    if (t !== a) personal(t, s.teacher ? 'You have been named a teacher: you may hold classes at a Class Lectern.' : 'You may no longer hold classes.');
+    setClassTeacher(a, t, verb.toLowerCase() === 'add');
   }, { admin: true, help: 'name or remove a class teacher (Class Lectern)' });
   // Named preachers matter only with preach.requireList (off by default: a follower of a Divine at Priest rank may preach)
   registerChatCommand('preacher', (a, args) => {
