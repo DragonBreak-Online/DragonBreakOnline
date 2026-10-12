@@ -37,6 +37,8 @@ async function main() {
     const fv = fs.readFileSync(path.resolve(__dirname, '../src/view/formView.ts'), 'utf8');
     const getter = (fv.match(/private getAppearanceBasedBase\(\): number \{[\s\S]*?\n  \}/) || [''])[0];
     check('formView\'s base getter asks needsFreshBase with the player\'s base id', /needsFreshBase\(/.test(getter) && /getPlayer\(\)/.test(getter), getter);
+    const tag = (fv.match(/const isVisibleByPlayer = [\s\S]*?;\n/) || [''])[0];
+    check('a name tag stays off someone under an Invisibility spell (#bugs 1 Oct)', /!this\.spellInvisible\(refr\)/.test(tag), tag);
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }
