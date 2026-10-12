@@ -6512,7 +6512,7 @@ try {
   const TENANCY_JS = path.resolve('tenancy.js');
   delete require.cache[TENANCY_JS];
   require(TENANCY_JS)({ mp, log, personal, audit, who, display, tagOf, profileOf, onlineActors, every, registerChatCommand, cfg,
-    takeGold, giveGold: (a, n) => giveItem(a, GOLD_BASE, n) !== false, depositToTreasury, zoneById });
+    takeGold, giveGold: (a, n) => giveItem(a, GOLD_BASE, n) !== false, depositToTreasury, zoneById, openWidget, closeWidget, onUi });
 } catch (e) { log('tenancy.js failed to load:', e.stack || e.message); }
 
 // ---- the ledger of contacts, read at boards, homes and placed ledgers (server\ledger.js, config "ledger") ----------
