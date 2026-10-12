@@ -28,6 +28,11 @@ const KEYWORD_NO_SOUL_TRAP = 0x00103ad2;
 const FLAG_CAN_HOLD_NPC_SOUL = 0x20000;
 // ACBS flag: the level is a multiple of the player's.
 const FLAG_PC_LEVEL_MULT = 0x80;
+// WEAP DNAM animation type of a staff, ENCH ENIT flag "No Auto-Calc".
+const ANIM_TYPE_STAFF = 8;
+const ENCH_NO_AUTO_CALC = 0x1;
+// craftedExtras keeps a copy run down to zero at 0.01, and clients only report charge changes of 1 or more.
+const MIN_HIT_COST = 1;
 // GMST iLesserSoulActorLevel, iCommonSoulActorLevel, iGreaterSoulActorLevel, iGrandSoulActorLevel.
 const SOUL_ACTOR_LEVELS = [4, 16, 28, 38];
 const SOUL_GRAND = 5;
@@ -61,6 +66,13 @@ interface Gem {
   capacity: number;
   empty: boolean;
   black: boolean;
+}
+
+interface RecordEffect {
+  id: number;
+  magnitude: number;
+  seconds: number;
+  conditioned: boolean;
 }
 
 interface GemEntry {
@@ -136,7 +148,7 @@ export class SoulTrapSystem implements System {
     const mp = ctx.svr as Mp;
     const sourceId = this.idOf(mp, source);
     const casterId = this.idOf(mp, aggressor);
-    const seconds = Math.max(this.trapSeconds(ctx, sourceId), this.heldTrapSeconds(ctx, casterId, sourceId));
+    const seconds = this.hitTrapSeconds(ctx, casterId, sourceId);
     if (!seconds) return;
     if (!casterId || casterId === targetId) return;
     // Summons and reanimated corpses give no soul, so none can be farmed or taken twice
@@ -280,56 +292,117 @@ export class SoulTrapSystem implements System {
     if (!sourceId) return 0;
     const hit = this.trapSecondsCache.get(sourceId);
     if (hit !== undefined) return hit;
-    let res = this.lookup(ctx, sourceId);
-    if (res && res.record.type === "WEAP") res = this.lookup(ctx, espmFieldFormIds(res, "EITM")[0] || 0);
     let seconds = 0;
-    if (res && ["SPEL", "SCRL", "ENCH"].includes(String(res.record.type))) {
-      const effects: Array<{ id: number; seconds: number; conditioned: boolean }> = [];
-      for (const f of res.record.fields || []) {
-        if (!(f.data instanceof Uint8Array)) continue;
-        const current = effects[effects.length - 1];
-        if (f.type === "EFID" && f.data.byteLength >= 4) {
-          let id = 0;
-          try { id = res.toGlobalRecordId(viewOf(f.data).getUint32(0, true)) >>> 0; } catch { /* unmapped master */ }
-          effects.push({ id, seconds: 0, conditioned: false });
-        } else if (f.type === "EFIT" && current && f.data.byteLength >= 12) {
-          current.seconds = viewOf(f.data).getUint32(8, true);
-        } else if (f.type === "CTDA" && current) {
-          // Conditions (the Soul Stealer perk on bound weapons) are not evaluated server-side
-          current.conditioned = true;
-        }
-      }
-      for (const e of effects) {
-        if (!e.conditioned && this.isSoulTrapEffect(ctx, e.id)) seconds = Math.max(seconds, e.seconds);
-      }
+    for (const e of this.recordEffects(ctx, sourceId)) {
+      if (!e.conditioned && this.isSoulTrapEffect(ctx, e.id)) seconds = Math.max(seconds, e.seconds);
     }
     this.trapSecondsCache.set(sourceId, seconds);
     return seconds;
   }
 
-  // A weapon's own copy can carry soul trap the record lacks: a player-made enchantment or one kept as extra data
-  private heldTrapSeconds(ctx: SystemContext, casterId: number, weaponId: number): number {
-    if (!casterId || !weaponId) return 0;
-    const res = this.lookup(ctx, weaponId);
-    if (!res || res.record.type !== "WEAP") return 0;
+  // Effects of a spell, scroll or enchantment record, or of a weapon's base enchantment
+  private recordEffects(ctx: SystemContext, sourceId: number): RecordEffect[] {
+    let res = this.lookup(ctx, sourceId);
+    if (res && res.record.type === "WEAP") res = this.lookup(ctx, espmFieldFormIds(res, "EITM")[0] || 0);
+    const effects: RecordEffect[] = [];
+    if (!res || !["SPEL", "SCRL", "ENCH"].includes(String(res.record.type))) return effects;
+    for (const f of res.record.fields || []) {
+      if (!(f.data instanceof Uint8Array)) continue;
+      const current = effects[effects.length - 1];
+      if (f.type === "EFID" && f.data.byteLength >= 4) {
+        let id = 0;
+        try { id = res.toGlobalRecordId(viewOf(f.data).getUint32(0, true)) >>> 0; } catch { /* unmapped master */ }
+        effects.push({ id, magnitude: 0, seconds: 0, conditioned: false });
+      } else if (f.type === "EFIT" && current && f.data.byteLength >= 12) {
+        current.magnitude = viewOf(f.data).getFloat32(0, true);
+        current.seconds = viewOf(f.data).getUint32(8, true);
+      } else if (f.type === "CTDA" && current) {
+        // Conditions (the Soul Stealer perk on bound weapons) are not evaluated server-side
+        current.conditioned = true;
+      }
+    }
+    return effects;
+  }
+
+  // A player's weapon casts its enchantment only while the copy used has a hit's worth of charge; NPC weapons never run dry
+  private hitTrapSeconds(ctx: SystemContext, casterId: number, sourceId: number): number {
+    const recordSeconds = this.trapSeconds(ctx, sourceId);
+    const weapon = this.lookup(ctx, sourceId);
+    if (!casterId || !weapon || weapon.record.type !== "WEAP") return recordSeconds;
+    const copies = this.heldCopies(ctx, casterId, sourceId);
+    if (!copies.length) return recordSeconds;
+    // A staff only hits when it casts, and the engine casts nothing from an empty one
+    const drains = this.isPlayer(ctx.svr as Mp, casterId) && this.fieldData(weapon, "DNAM")?.[0] !== ANIM_TYPE_STAFF;
+    let seconds = 0;
+    for (const e of copies) {
+      const copySeconds = Math.max(recordSeconds, this.copyTrapSeconds(ctx, e, sourceId));
+      if (copySeconds && !(drains && this.isSpent(ctx, e, sourceId))) seconds = Math.max(seconds, copySeconds);
+    }
+    return seconds;
+  }
+
+  // The copies in either hand, or with none marked held, every carried copy of that weapon
+  private heldCopies(ctx: SystemContext, casterId: number, weaponId: number): InventoryEntry[] {
     let entries: InventoryEntry[];
     try {
       const inv = (ctx.svr as Mp).get(casterId, "inventory");
       entries = (inv && Array.isArray(inv.entries) ? inv.entries : [])
         .filter((e: InventoryEntry) => (Number(e.baseId) >>> 0) === weaponId && (Number(e.count) || 0) > 0);
     } catch {
-      return 0;
+      return [];
     }
     const held = entries.filter((e) => e.worn || e.wornLeft);
+    return held.length ? held : entries;
+  }
+
+  // A weapon's own copy can carry soul trap the record lacks: a player-made enchantment or one kept as extra data
+  private copyTrapSeconds(ctx: SystemContext, e: InventoryEntry, weaponId: number): number {
     let seconds = 0;
-    for (const e of held.length ? held : entries) {
-      for (const x of Array.isArray(e.enchantmentEffects) ? e.enchantmentEffects : []) {
-        if (this.isSoulTrapEffect(ctx, Number(x.effectId) >>> 0)) seconds = Math.max(seconds, Number(x.duration) || 0);
-      }
-      const ench = Number(e.enchantmentId) >>> 0;
-      if (ench && ench !== weaponId) seconds = Math.max(seconds, this.trapSeconds(ctx, ench));
+    for (const x of Array.isArray(e.enchantmentEffects) ? e.enchantmentEffects : []) {
+      if (this.isSoulTrapEffect(ctx, Number(x.effectId) >>> 0)) seconds = Math.max(seconds, Number(x.duration) || 0);
     }
+    const ench = Number(e.enchantmentId) >>> 0;
+    if (ench && ench !== weaponId) seconds = Math.max(seconds, this.trapSeconds(ctx, ench));
     return seconds;
+  }
+
+  // The engine stops casting once less than one hit's cost is left and keeps that remainder, which craftedExtras records
+  private isSpent(ctx: SystemContext, e: InventoryEntry, weaponId: number): boolean {
+    const charge = e.chargePercent;
+    if (typeof charge !== "number" || !Number.isFinite(charge)) return false;
+    return charge < Math.max(this.hitCost(ctx, e, weaponId), MIN_HIT_COST);
+  }
+
+  // Most one hit of this copy's enchantment can cost; live drains measured 0.72 to 0.88 of it, lower per wielder
+  private hitCost(ctx: SystemContext, e: InventoryEntry, weaponId: number): number {
+    const effects = Array.isArray(e.enchantmentEffects) ? e.enchantmentEffects : [];
+    if (effects.length) {
+      return effects.reduce((sum, x) =>
+        sum + this.effectCost(ctx, Number(x.effectId) >>> 0, Number(x.magnitude) || 0, Number(x.duration) || 0), 0);
+    }
+    const ench = Number(e.enchantmentId) >>> 0;
+    return this.enchantmentCost(ctx, ench && ench !== weaponId ? ench : weaponId);
+  }
+
+  // ENIT cost when the record opts out of auto-calc, otherwise the sum of its effects' costs
+  private enchantmentCost(ctx: SystemContext, sourceId: number): number {
+    const hit = this.costCache.get(sourceId);
+    if (hit !== undefined) return hit;
+    let res = this.lookup(ctx, sourceId);
+    if (res && res.record.type === "WEAP") res = this.lookup(ctx, espmFieldFormIds(res, "EITM")[0] || 0);
+    const enit = res && res.record.type === "ENCH" ? this.fieldData(res, "ENIT") : null;
+    const cost = enit && enit.byteLength >= 8 && (viewOf(enit).getUint32(4, true) & ENCH_NO_AUTO_CALC)
+      ? viewOf(enit).getInt32(0, true)
+      : this.recordEffects(ctx, sourceId).reduce((sum, x) => sum + this.effectCost(ctx, x.id, x.magnitude, x.seconds), 0);
+    this.costCache.set(sourceId, cost);
+    return cost;
+  }
+
+  // Auto-calc: base cost x magnitude^1.1 x (duration / 10)^1.1
+  private effectCost(ctx: SystemContext, mgefId: number, magnitude: number, seconds: number): number {
+    const data = this.fieldData(this.lookup(ctx, mgefId), "DATA");
+    const baseCost = data && data.byteLength >= 8 ? viewOf(data).getFloat32(4, true) : 0;
+    return baseCost * Math.pow(Math.max(magnitude, 1), 1.1) * (seconds > 0 ? Math.pow(seconds / 10, 1.1) : 1);
   }
 
   private isSoulTrapEffect(ctx: SystemContext, mgefId: number): boolean {
@@ -415,6 +488,7 @@ export class SoulTrapSystem implements System {
   private traps = new Map<number, Trap>();
   private nextPollAt = 0;
   private trapSecondsCache = new Map<number, number>();
+  private costCache = new Map<number, number>();
   private effectCache = new Map<number, boolean>();
   private gemCache = new Map<number, Gem | null>();
   private keywordCache = new Map<number, number[]>();
