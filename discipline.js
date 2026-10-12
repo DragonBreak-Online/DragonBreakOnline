@@ -17,7 +17,7 @@ const fs = require('fs');
 const path = require('path');
 
 const DEFAULTS = { enabled: true, strikeDays: 90, strikesForReview: 3, maxSuspendDays: 30, file: '' };
-const KINDS = ['warn', 'strike', 'suspend', 'lift'];
+const KINDS = ['warn', 'strike', 'suspend', 'lift', 'overturn'];
 
 // Pure: '12h' or '3d' -> ms, else 0
 const lengthMs = (s, maxDays) => {
@@ -27,8 +27,10 @@ const lengthMs = (s, maxDays) => {
   return ms > 0 && ms <= maxDays * 86400000 ? Math.round(ms) : 0;
 };
 // Pure: the suspension running at `now`, or null
-const activeSuspension = (entries, now) => (entries || []).filter((e) => e.kind === 'suspend' && !e.lifted && e.until > now).sort((a, b) => b.until - a.until)[0] || null;
-const activeStrikes = (entries, now, days) => (entries || []).filter((e) => e.kind === 'strike' && now - Date.parse(e.at) < days * 86400000).length;
+const activeSuspension = (entries, now) => (entries || []).filter((e) => e.kind === 'suspend' && !e.lifted && !e.overturned && e.until > now).sort((a, b) => b.until - a.until)[0] || null;
+// An overturned record is kept for the history and counts for nothing: a strike given for something the game allowed
+// had to be cut out of discipline.json by hand before this existed (ticket #0141, 12 Oct).
+const activeStrikes = (entries, now, days) => (entries || []).filter((e) => e.kind === 'strike' && !e.overturned && now - Date.parse(e.at) < days * 86400000).length;
 const stamp = (ms) => new Date(ms).toISOString().replace('T', ' ').slice(0, 16) + ' UTC';
 
 module.exports = (api) => {
@@ -58,14 +60,15 @@ module.exports = (api) => {
   const suspendedText = (s) => `Your account is suspended until ${stamp(s.until)}. Reason: ${s.reason}`;
   const tell = (a, e) => personal(a, e.kind === 'warn' ? `A warning from staff: ${e.reason}`
     : e.kind === 'strike' ? `A strike from staff: ${e.reason}. Strikes count against your account for ${C.strikeDays} days.`
-      : e.kind === 'lift' ? `Your suspension was lifted: ${e.reason}` : e.reason);
+      : e.kind === 'lift' ? `Your suspension was lifted: ${e.reason}`
+        : e.kind === 'overturn' ? `A staff decision against you was overturned: ${e.reason}` : e.reason);
 
   // Unseen warnings and strikes are shown at login; a suspended account is logged out
   globalThis.__dboDisciplineLogin = (a) => {
     const p = profileOf(a); const list = recordOf(p);
     const s = activeSuspension(list, Date.now());
     if (s) { kickWithReason(a, suspendedText(s)); audit(`DISCIPLINE refused ${who(a)}: suspended until ${stamp(s.until)} (#${s.n})`); return true; }
-    const unseen = list.filter((e) => !e.seen && (e.kind === 'warn' || e.kind === 'strike' || e.kind === 'lift'));
+    const unseen = list.filter((e) => !e.seen && (e.kind === 'warn' || e.kind === 'strike' || e.kind === 'lift' || e.kind === 'overturn'));
     if (!unseen.length) return false;
     for (const e of unseen) { tell(a, e); e.seen = true; }
     save();
@@ -89,13 +92,13 @@ module.exports = (api) => {
     if (!list.length) return personal(a, `${display(target)} (profile ${p}): no record.`);
     const s = activeSuspension(list, now);
     personal(a, `${display(target)} (profile ${p}): ${list.length} entr${list.length === 1 ? 'y' : 'ies'}, ${activeStrikes(list, now, C.strikeDays)} strike(s) in ${C.strikeDays} days${s ? `, suspended until ${stamp(s.until)}` : ''}.`);
-    for (const e of list.slice(-10)) personal(a, `#${e.n} ${e.at.slice(0, 10)} ${e.kind}${e.until ? ` until ${stamp(e.until)}` : ''}${e.lifted ? ' (lifted)' : ''} by ${e.by}: ${e.reason}`);
+    for (const e of list.slice(-10)) personal(a, `#${e.n} ${e.at.slice(0, 10)} ${e.kind}${e.until ? ` until ${stamp(e.until)}` : ''}${e.lifted ? ' (lifted)' : ''}${e.overturned ? ` (overturned by ${e.overturned.by})` : ''} by ${e.by}: ${e.reason}`);
   };
 
   const command = (a, args) => {
     if (!isAdmin(a)) return personal(a, 'Only staff can use /discipline.');
     const parts = String(args || '').trim().split(/\s+/).filter(Boolean);
-    if (!parts.length) return personal(a, 'Use: /discipline #TAG [warn|strike|suspend <12h|3d>|lift] <reason>, or /discipline list');
+    if (!parts.length) return personal(a, 'Use: /discipline #TAG [warn|strike|suspend <12h|3d>|lift|overturn <n>] <reason>, or /discipline list');
     if (parts[0].toLowerCase() === 'list') {
       const now = Date.now(); let n = 0;
       for (const [p, list] of Object.entries(D.profiles)) { const s = activeSuspension(list, now); if (s) { n++; personal(a, `profile ${p} ${s.char}: until ${stamp(s.until)} by ${s.by}: ${s.reason}`); } }
@@ -107,21 +110,40 @@ module.exports = (api) => {
     if (profileOf(target) === profileOf(a)) return personal(a, 'You cannot discipline your own account.');
     const kind = (parts[1] || '').toLowerCase();
     if (!kind) return show(a, target);
-    if (!KINDS.includes(kind)) return personal(a, `Unknown action "${kind}": warn, strike, suspend or lift.`);
+    if (!KINDS.includes(kind)) return personal(a, `Unknown action "${kind}": warn, strike, suspend, lift or overturn.`);
     if (isAdmin(target) && !isLeadStaff(a)) return personal(a, 'Only a Lead GM or above can discipline staff. Owners take reports about GMs through the Report a GM ticket.');
     if ((kind === 'suspend' || kind === 'lift') && !isLeadStaff(a)) return personal(a, 'Suspensions are for Lead GMs and above. Give a strike and tell a Lead GM.');
+    // Overturning undoes another staff member's decision, so it sits with suspensions rather than with warnings
+    if (kind === 'overturn' && !isLeadStaff(a)) return personal(a, 'Only a Lead GM or above can overturn a record. Ask one, with what you found.');
     const ms = kind === 'suspend' ? lengthMs(parts[2], C.maxSuspendDays) : 0;
     if (kind === 'suspend' && !ms) return personal(a, `Give a length from 1h to ${C.maxSuspendDays}d, like 12h or 3d.`);
-    const reason = parts.slice(kind === 'suspend' ? 3 : 2).join(' ').slice(0, 300);
+    const nth = kind === 'overturn' ? Number(String(parts[2] || '').replace(/^#/, '')) : 0;
+    if (kind === 'overturn' && !(nth > 0)) return personal(a, 'Which record? /discipline #TAG overturn <n> <reason>, with the number from their record.');
+    const reason = parts.slice(kind === 'suspend' || kind === 'overturn' ? 3 : 2).join(' ').slice(0, 300);
     if (reason.length < 5) return personal(a, 'Give a reason; the player is shown it.');
     if (kind === 'lift') {
       const s = activeSuspension(recordOf(profileOf(target)), Date.now());
       if (!s) return personal(a, `${display(target)} is not suspended.`);
       s.lifted = true;
     }
+    // The record is marked, never deleted: staff keep the history of what was decided and of its being undone.
+    let undone = null;
+    if (kind === 'overturn') {
+      const list = recordOf(profileOf(target));
+      undone = list.find((e) => e.n === nth);
+      if (!undone) return personal(a, `${display(target)} has no record #${nth}. /discipline ${parts[0]} shows them.`);
+      if (undone.kind === 'overturn') return personal(a, 'That entry is itself an overturn; overturn the record it undid.');
+      if (undone.overturned) return personal(a, `#${nth} was already overturned by ${undone.overturned.by}.`);
+      undone.overturned = { by: display(a), byProfile: profileOf(a), at: new Date().toISOString(), reason };
+      if (!save()) { delete undone.overturned; return personal(a, 'The record could not be saved; nothing was done.'); }
+    }
     const e = add(a, target, kind, reason, ms ? Date.now() + ms : 0);
-    if (!e) return personal(a, 'The record could not be saved; nothing was done.');
-    const extra = kind === 'suspend' ? ` until ${stamp(e.until)}` : '';
+    if (!e) {
+      if (undone) { delete undone.overturned; save(); }
+      return personal(a, 'The record could not be saved; nothing was done.');
+    }
+    if (undone) e.undid = nth;
+    const extra = kind === 'suspend' ? ` until ${stamp(e.until)}` : undone ? ` of #${nth} (${undone.kind} by ${undone.by})` : '';
     audit(`DISCIPLINE ${kind} #${e.n} on ${who(target)} (profile ${profileOf(target)})${extra} by ${who(a)}: ${reason}`);
     personal(a, `Recorded: ${kind} #${e.n} on ${display(target)}${extra}.${online(target) || kind === 'suspend' ? '' : ' They are told at their next login.'}`);
     if (kind === 'suspend') { for (const x of onlineActors()) if (profileOf(x) === profileOf(target)) kickWithReason(x, suspendedText(e)); }
@@ -134,7 +156,7 @@ module.exports = (api) => {
       }
     }
   };
-  registerChatCommand('discipline', command, { admin: true, help: '#TAG [warn|strike|suspend <12h|3d>|lift] <reason>: a player\'s record, or list' });
+  registerChatCommand('discipline', command, { admin: true, help: '#TAG [warn|strike|suspend <12h|3d>|lift|overturn <n>] <reason>: a player\'s record, or list' });
 
   for (const r of Array.isArray(C.record) ? C.record : []) {
     if (!r || !r.key || !['warn', 'strike'].includes(r.kind) || String(r.reason || '').length < 5) { log(`discipline: record entry ${r && r.key} refused`); continue; }
