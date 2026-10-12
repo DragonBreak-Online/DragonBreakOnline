@@ -78,6 +78,7 @@ declare -A NEEDS=(
   [client-calendar]=client:skymp5-client/src/services/services/calendar.ts
   [input-diag-request]=client:skymp5-client/src/services/services/inputDiagRequest.ts
   [aggro-window]=client:skymp5-client/src/view/aggroWindow.ts
+  [face-sync]=client:skymp5-client/src/view/faceSyncDiag.ts
   [housing-keys]=server:skymp5-server/ts/systems/housingSystem.ts
   [housing-staff]=server:skymp5-server/ts/systems/housingSystem.ts
   [housing-places]=server:skymp5-server/ts/systems/housingSystem.ts
