@@ -26,6 +26,8 @@ export interface Tome {
 export interface TomeShopData {
   id: number;
   nonce: string | number;
+  // Who sells here (server spells.js sellerName): the Synod, a college or the Great Faiths; absent from an older server
+  seller?: string;
   title: string;
   gold: number;
   canBuy: boolean;
@@ -233,7 +235,7 @@ const TomeShop = ({ data }: { data: TomeShopData }) => {
 
         <div className="tomeShop__list">
           {!tomes.length ? (
-            <p className="tomeShop__empty">The Synod has no tomes on its shelves for you.</p>
+            <p className="tomeShop__empty">{data.seller || 'The Synod'} has no tomes on its shelves for you.</p>
           ) : !groups.length ? (
             <p className="tomeShop__empty">No tomes match.</p>
           ) : groups.map((g) => (
