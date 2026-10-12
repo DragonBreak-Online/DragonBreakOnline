@@ -417,6 +417,18 @@ module.exports = (api) => {
     audit(`ECONOMY ${who(a)} forgave ${gold} gold of wages ${nameOfFaction(fid)} owed (${keys.join(', ')})`);
     reply(a, true, `Forgiven: ${gold} gold of owed wages.`);
   });
+  // A house bought from the hold (tenancy.js /property buy, Nate 12 Oct) is worth what it sold for: the price becomes its
+  // value for the weekly tax, stamped as an assessment, so a steward reassesses it within the usual limits after assessEveryDays
+  globalThis.__dboEconomySaleValue = (ref, gold, byWho) => {
+    const H = housing(); const primary = H && H.primaryOf(Number(ref) >>> 0);
+    gold = Math.floor(Number(gold));
+    if (!primary || !Number.isFinite(gold) || gold < 0) return false;
+    gold = Math.min(C.maxPropertyValue, gold);
+    const key = String(Number(primary) >>> 0); const prev = valueOf(Number(key));
+    data().values[key] = gold; data().assessed[key] = { at: Date.now(), by: `sale to ${byWho}`, from: prev }; delete data().overdue[key]; save();
+    audit(`ECONOMY property ${(Number(key) >>> 0).toString(16)} sold for ${gold} gold to ${byWho}; its value is now ${gold} (was ${prev})`);
+    return true;
+  };
   onUi('econValue', (a, args) => {
     if (!fromPanel(a, args)) return;
     const ref = Number(args[1]) >>> 0; const gold = Math.floor(Number(args[2]));
