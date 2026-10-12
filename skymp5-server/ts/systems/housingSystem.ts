@@ -65,6 +65,8 @@ const PLACE_PLAN_MAX_TRIES = 10;
 const GRANT_SERIAL = 1000;
 const OWNER_INDEX_PROP = "private.indexed.housingOwner";
 const REGISTRY_FILE = "./housing.json";
+// Written once the claimed storage that was open on 12 Oct is locked, listing it, so the lock never runs twice
+const STORAGE_LOCK_FILE = "./housing-storage-locked.json";
 
 // A key credential, "(80B5EAC)" or "(80B5EAC-2)": the only alias matched as a suffix
 const CREDENTIAL_RE = /^\([0-9A-F]+(-\d+)?\)$/;
@@ -414,6 +416,11 @@ export class HousingSystem implements System {
       try { this.ownerPlanDone = this.dryRunOwners(ctx, this.ownerPlanTries + 1 >= PLACE_PLAN_MAX_TRIES) || ++this.ownerPlanTries >= PLACE_PLAN_MAX_TRIES; }
       catch (e) { this.ownerPlanDone = true; this.log(`[housing] owner plan failed: ${e}`); }
     }
+    if (!this.storageLockDone && placesSettled && now - this.initAtMs >= PLACE_PLAN_DELAY_MS && now - this.storageLockTriedMs >= PLACE_PLAN_DELAY_MS) {
+      this.storageLockTriedMs = now;
+      try { this.storageLockDone = this.lockOpenStorage(ctx, ++this.storageLockTries >= PLACE_PLAN_MAX_TRIES); }
+      catch (e) { this.storageLockDone = true; this.log(`[housing] storage lock failed: ${e}`); }
+    }
     if (now - this.lastDecorMs < DECOR_PUSH_INTERVAL_MS) return;
     this.lastDecorMs = now;
     if (!this.decorDirty) return;
@@ -540,11 +547,14 @@ export class HousingSystem implements System {
     }
     this.setOwner(ctx, rec, actorId, profileId);
     rec.partner = this.partnerOf(ctx, primary);
+    // Storage starts locked (Nate, 12 Oct: an unlocked chest opens for anyone, and owners took that for safe)
+    if (!rec.partner) rec.locked = true;
     // A stub released before rec.issued existed has no keys at this serial
     if (rec.issued === null) rec.issued = [];
     if (!this.commit(ctx, userId, primary, rec)) return;
     this.ensurePlace(ctx, primary, rec);
-    this.notice(ctx, userId, rec.place ? `This is yours now, with everything behind its door${rec.place.cells.length > 1 ? "s" : ""}.` : "This is yours now.");
+    this.notice(ctx, userId, rec.place ? `This is yours now, with everything behind its door${rec.place.cells.length > 1 ? "s" : ""}.`
+      : rec.partner ? "This is yours now." : "This is yours now, and locked. Unlock it from this menu to let others use it.");
     this.sendMenu(ctx, userId, actorId, primary);
   }
 
@@ -590,6 +600,7 @@ export class HousingSystem implements System {
     }
     rec.locked = locked;
     if (!this.commit(ctx, userId, primary, rec)) return;
+    this.log(`[housing] ${locked ? "LOCK" : "UNLOCK"} ${primary.toString(16)} "${rec.name || ""}" owner ${rec.owner} by ${this.nameOf(ctx, actorId)} (profile ${this.profileOf(ctx, actorId)})`);
     // Every way in to a place locks with any one of them; its inner doors and chests keep their own locks
     const doors = this.placesOn() && rec.partner && this.isEntrance(ctx, primary, rec) ? this.placeDoorsWith(ctx, primary, rec).filter((d) => this.isEntrance(ctx, d.ref, d.rec)) : [];
     for (const d of doors) { d.rec.locked = locked; this.write(ctx, d.ref, d.rec); }
@@ -2500,6 +2511,29 @@ export class HousingSystem implements System {
   //
   // Only an index of which refs to touch on boot; the changeform holds the data.
 
+  // Locks every claimed chest outside a place that is open, once. Waits while a claim reads as null after boot unless `last`
+  lockOpenStorage(ctx: SystemContext, last: boolean): boolean {
+    const open: number[] = [];
+    let unreadable = 0;
+    for (const ref of this.claimed) {
+      const rec = this.read(ctx, ref);
+      if (!rec) { unreadable++; continue; }
+      if (rec.owner !== 0 && !rec.partner && !rec.memberOf && !rec.locked) open.push(ref);
+    }
+    if (unreadable && !last) return false;
+    const done: string[] = [];
+    for (const ref of open) {
+      const rec = this.read(ctx, ref)!;
+      rec.locked = true;
+      if (this.write(ctx, ref, rec)) done.push(ref.toString(16));
+    }
+    try { fs.writeFileSync(STORAGE_LOCK_FILE, JSON.stringify({ at: new Date().toISOString(), unreadable, locked: done }, null, 1)); }
+    catch (e) { this.log(`[housing] ${STORAGE_LOCK_FILE} write failed, the lock may run again: ${e}`); }
+    if (done.length) this.decorDirty = true;
+    this.log(`[housing] storage lock: ${done.length} open chest(s) locked${unreadable ? `, ${unreadable} claim(s) unreadable and left` : ""}: ${done.join(" ")}`);
+    return true;
+  }
+
   private loadRegistry(): number[] {
     let raw: string;
     try {
@@ -2624,6 +2658,9 @@ export class HousingSystem implements System {
   private ownerPlanDone = false;
   private ownerPlanTriedMs = 0;
   private ownerPlanTries = 0;
+  private storageLockDone = fs.existsSync(STORAGE_LOCK_FILE);
+  private storageLockTriedMs = 0;
+  private storageLockTries = 0;
   private decorDirty = false;
   private lastDecorMs = 0;
 }
