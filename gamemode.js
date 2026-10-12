@@ -263,7 +263,7 @@ const LEAD_ONLY = new Set(['beastform', 'vlremote', 'wwremote', 'feedpair', 'set
   // A skill boost is progress handed out (playtesterboost.js)
   'boost grant', 'boost extend',
   // Opens a client trace that writes to the server log
-  'staffdiag']);
+  'staffdiag', 'voicediag']);
 
 const onlineActors = () => {
   try { const v = mp.get(0, 'onlinePlayers'); if (Array.isArray(v) && v.length) return v.map(Number).filter(Boolean); } catch (e) { /* fall through */ }
@@ -720,7 +720,7 @@ const STAFF_HELP = [
   { key: 'world', title: 'World', items: ['settime', 'setweather', 'timescale', 'region', ['dungeon end', '<dungeon id|name>: end a dungeon claim now'],
     'placed', 'placeundo', 'placeexport', 'masktest', 'couriers'] },
   { key: 'debug', title: 'Server and debugging', items: ['monitor', 'load', 'selftest', 'npc', 'mv', 'driftset', 'driftspawn', 'driftrepair',
-    'staffdiag', 'staffstats', 'gearswap', 'factiongear'] },
+    'staffdiag', 'voicediag', 'staffstats', 'gearswap', 'factiongear'] },
 ];
 const staffSay = (a, text) => deliver(a, `[[A]]#{${C.SYS}}${text}`);
 const staffTopics = () => {
@@ -2948,6 +2948,47 @@ registerChatCommand('staffdiag', (a, args) => {
   audit(`STAFF ${who(a)} /staffdiag ${display(t)} for ${s} s`);
   personal(a, `Staff hit trace open for ${display(t)} for ${s} s: grep "staff shot" in the server log. A client before 0.3.75 ignores it.`);
 }, { admin: true, help: '<player> [seconds] trace a player\'s staff hits to the server log (Lead GM and above)' });
+// The voice trace (front VoiceManager.js startDiag): /voicediag opens a window on one player's client, which reports its
+// voice mix every 5 s; each report is one log line, only inside a window and at most one per 4 s
+const VOICE_DIAG_MAX_PEERS = 24;
+const voiceDiagWindows = globalThis.__dboVoiceDiag instanceof Map ? globalThis.__dboVoiceDiag : (globalThis.__dboVoiceDiag = new Map());
+const voiceDiagSeconds = (s) => { const n = Math.round(Number(s)); return Number.isFinite(n) && n > 0 ? Math.min(300, Math.max(30, n)) : 120; };
+const vdNum = (v, hi, dp) => (typeof v === 'number' && Number.isFinite(v) ? String(Math.round(Math.min(hi, Math.max(0, v)) * 10 ** dp) / 10 ** dp) : '-');
+const vdWord = (v, max) => (typeof v === 'string' ? v.replace(/[^A-Za-z0-9 _'-]/g, '').trim().slice(0, max) : '') || '-';
+const vdId = (v) => (typeof v === 'string' && /^[0-9a-fA-F]{1,64}$/.test(v) ? v.slice(0, 12).toLowerCase() : '?');
+const vdFlag = (v) => (v === true ? 'y' : v === false ? 'n' : '-');
+const voiceDiagLine = (r) => {
+  if (!r || typeof r !== 'object' || Array.isArray(r)) return null;
+  const peers = (Array.isArray(r.peers) ? r.peers : []).slice(0, VOICE_DIAG_MAX_PEERS).filter((p) => p && typeof p === 'object');
+  const head = `mode ${vdWord(r.mode, 12)} vol ${vdNum(r.vol, 4, 2)} micGain ${vdNum(r.mg, 4, 2)} mic ${vdNum(r.mic, 1, 3)}/${vdNum(r.micPk, 1, 3)}`
+    + ` tx ${vdFlag(r.tx)} echo ${vdWord(r.echo, 12)} room ${vdFlag(r.room)}`;
+  const body = peers.map((p) => `${vdId(p.id)} ${vdWord(p.n, 32)} d ${vdNum(p.d, 1e6, 0)} r ${vdNum(p.r, 1e6, 0)} ${vdWord(p.m, 12)}`
+    + ` g ${vdNum(p.g, 1, 3)} f ${vdNum(p.f, 4, 2)} rms ${vdNum(p.rms, 1, 3)}/${vdNum(p.pk, 1, 3)} lk ${vdNum(p.lk, 1, 3)} sub ${vdFlag(p.sub)}`);
+  return `${head} | ${body.length} peer(s)${body.length ? ': ' + body.join('; ') : ''}`;
+};
+onUi('voiceDiag', (a, args) => {
+  const w = voiceDiagWindows.get(a >>> 0);
+  const now = Date.now();
+  if (!w || now > w.until + 5000 || now - w.last < 4000) return;
+  const line = voiceDiagLine(args[0]);
+  if (!line) return;
+  w.last = now;
+  log(`voicediag ${display(a)}: ${line}`);
+});
+registerChatCommand('voicediag', (a, args) => {
+  const parts = String(args || '').trim().split(/\s+/);
+  const last = parts[parts.length - 1];
+  const seconds = parts.length > 1 && /^\d+$/.test(last) ? parts.pop() : undefined;
+  const name = parts.join(' ');
+  if (!name) return personal(a, 'Usage: /voicediag <player> [seconds 30-300]');
+  const t = findByName(name);
+  if (!t) return personal(a, `No player matches "${name}".`);
+  const s = voiceDiagSeconds(seconds);
+  voiceDiagWindows.set(t >>> 0, { until: Date.now() + s * 1000, last: 0 });
+  sendPacket(t, { customPacketType: 'dboVoiceDiag', seconds: s });
+  audit(`STAFF ${who(a)} /voicediag ${display(t)} for ${s} s`);
+  personal(a, `Voice trace open for ${display(t)} for ${s} s, a report every 5 s: grep "voicediag" in the server log. A client before this build ignores it.`);
+}, { admin: true, help: '<player> [seconds] log a player\'s voice mix (distances, gains, levels) every 5 s (Lead GM and above)' });
 // How hosts repair a split body, and the client drift switches (client sync\driftConfig.ts, same checks there);
 // kept across reloads and sent at every join so a test needs no client build
 const DRIFT_REPAIRS = ['setPosition', 'none', 'moveTo', 'disableEnable'];
