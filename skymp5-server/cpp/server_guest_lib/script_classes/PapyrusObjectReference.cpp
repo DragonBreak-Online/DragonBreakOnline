@@ -403,6 +403,44 @@ VarValue PapyrusObjectReference::PlaceAtMe(
   FormCallbacks callbacks = selfRefr->GetCallbacks();
   std::string type = akFormToPlace.rec->GetType().ToString();
 
+  // A script that places a world object at its own spot in OnInit/OnCellLoad/OnLoad runs again every server run (the
+  // "sent" flag lives in memory, script variables are not saved), and each placement is a saved form. The vanilla torch
+  // sconce (RemovableTorchSconce01SCRIPT) put one more torch on its sconce at every restart: 3,414 by 12 Oct 2026, up to
+  // 57 on one sconce. So an activator, light, static or moveable static placed exactly where a live (not disabled, not
+  // deleted) placed copy of the same base already stands returns that copy instead of a new one. Actors, items and
+  // anything placed abForcePersist or more than once are made as before.
+  const bool reusable = aiCount <= 1 && !abInitiallyDisabled &&
+    (type == "ACTI" || type == "LIGH" || type == "STAT" || type == "MSTT");
+  if (reusable) {
+    auto worldState = selfRefr->GetParent();
+    const auto cellOrWorld =
+      selfRefr->GetCellOrWorld().ToFormId(worldState->espmFiles);
+    const NiPoint3 at = selfRefr->GetPos();
+    const bool interior = worldState->IsInteriorCell(cellOrWorld);
+    const auto gridX = interior ? int16_t(0) : int16_t(at.x / 4096);
+    const auto gridY = interior ? int16_t(0) : int16_t(at.y / 4096);
+    for (auto* other :
+         worldState->GetNeighborsByPosition(cellOrWorld, gridX, gridY)) {
+      if (!other || other == selfRefr || other->IsEspmForm() ||
+          other->AsActor() || other->GetBaseId() != baseId ||
+          other->IsDisabled() || other->IsDeleted()) {
+        continue;
+      }
+      if (other->GetCellOrWorld() != selfRefr->GetCellOrWorld()) {
+        continue;
+      }
+      const NiPoint3 p = other->GetPos();
+      const float dx = p.x - at.x, dy = p.y - at.y, dz = p.z - at.z;
+      if (dx * dx + dy * dy + dz * dz > 1.f) {
+        continue;
+      }
+      spdlog::info("PapyrusObjectReference::PlaceAtMe - {:x} reuses {:x} "
+                   "(base {:x}) already placed at its spot",
+                   selfRefr->GetFormId(), other->GetFormId(), baseId);
+      return VarValue(std::make_shared<MpFormGameObject>(other));
+    }
+  }
+
   std::unique_ptr<MpObjectReference> newRefr;
 
   if (akFormToPlace.rec->GetType() == "NPC_") {

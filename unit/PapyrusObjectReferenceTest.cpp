@@ -284,3 +284,48 @@ TEST_CASE("DisableLinkChain and EnableLinkChain walk one keyword",
                                            { LinkCustom01(p) });
   REQUIRE(!lockB.IsDisabled());
 }
+
+TEST_CASE("PlaceAtMe reuses a placed world object already standing at the "
+          "spot",
+          "[Papyrus][ObjectReference][espm]")
+{
+  // The vanilla torch sconce (Skyrim.esm ACTI RemovableTorchSconce01, 9151e)
+  // places RemovableTorch01 (ACTI 9151f) in OnCellLoad, which the server runs
+  // again every run; each run used to add one more saved torch (12 Oct 2026)
+  constexpr uint32_t kSconce = 0x9151e, kTorch = 0x9151f, kIronSword = 0x12eb7;
+  auto& p = GetPartOne();
+  auto& br = p.worldState.GetEspm().GetBrowser();
+  LocationalData at = { { 1000, 2000, 300 },
+                        { 0, 0, 0 },
+                        FormDesc::Tamriel() };
+  p.worldState.AddForm(std::make_unique<MpObjectReference>(
+                         at, FormCallbacks::DoNothing(), kSconce, "ACTI"),
+                       0xff00f001);
+  auto& sconce = p.worldState.GetFormAt<MpObjectReference>(0xff00f001);
+  auto place = [&](uint32_t baseId) {
+    auto res = PapyrusObjectReference().PlaceAtMe(
+      sconce.ToVarValue(),
+      { VarValue(std::make_shared<EspmGameObject>(br.LookupById(baseId))),
+        VarValue(1), VarValue(false), VarValue(false) });
+    auto refr = GetFormPtr<MpObjectReference>(res);
+    return refr ? refr->GetFormId() : 0u;
+  };
+
+  const auto first = place(kTorch);
+  REQUIRE(first != 0);
+  REQUIRE(place(kTorch) == first);
+  REQUIRE(place(kTorch) == first);
+
+  // A torch taken off the sconce (disabled) is not reused: the sconce gets one
+  // new torch
+  p.worldState.GetFormAt<MpObjectReference>(first).Disable();
+  const auto second = place(kTorch);
+  REQUIRE(second != 0);
+  REQUIRE(second != first);
+  REQUIRE(place(kTorch) == second);
+
+  // Items are made every time, as before
+  const auto swordA = place(kIronSword), swordB = place(kIronSword);
+  REQUIRE(swordA != 0);
+  REQUIRE(swordA != swordB);
+}
