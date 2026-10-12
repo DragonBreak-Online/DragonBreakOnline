@@ -59,12 +59,22 @@ const F = require('./racemenu-face-rules-fixtures');
 let S = null;
 try { S = require(path.resolve('racemenupresets.js')); } catch (e) { S = null; }
 check('racemenupresets.js loads from the repo root', !!S && typeof S.faceFixed === 'function', S && Object.keys(S));
+// A client bundle from before these rules (0.3.94 and older): its half skips, and every face it takes must reach the server unchanged
+const NEWRULES = typeof P.facePresetFixed === 'function';
+if (!NEWRULES) { require('./expect')('racemenu-face-rules', 'this client bundle has no facePresetFixed'); console.log('ok   skipped: the client half of the face rules (this client bundle predates them)'); }
 for (const c of F.cases) {
   const want = c.out() ? F.encode(c.out()) : null;
-  const cl = P.facePresetFixed(c.input());
   const sv = S && typeof S.faceFixed === 'function' ? S.faceFixed(F.faceForm(c.input())) : undefined;
-  check(`client: ${c.name}`, (cl ? F.encode(cl.face) : null) === want && F.fixesOf(cl && cl.fixes) === c.fixes, cl && F.fixesOf(cl.fixes));
   check(`server: ${c.name}`, sv !== undefined && (sv ? F.encode(sv.face) : null) === want && F.fixesOf(sv && sv.fixes) === c.fixes, sv && F.fixesOf(sv.fixes));
+  if (!NEWRULES) {
+    const old = P.facePresetFrom(c.input());
+    const text = old ? P.encodeFace(old) : '';
+    const back = old && sv !== undefined && text.length <= P.PRESET_MAX_CHARS && !/given twice/.test(c.name) ? S.faceFixed(JSON.parse(text)) : null;
+    if (back) check('  ...the server keeps what this older client sends as it is', S.encodeFace(back.face) === text && back.fixes.length === 0, F.fixesOf(back.fixes));
+    continue;
+  }
+  const cl = P.facePresetFixed(c.input());
+  check(`client: ${c.name}`, (cl ? F.encode(cl.face) : null) === want && F.fixesOf(cl && cl.fixes) === c.fixes, cl && F.fixesOf(cl.fixes));
   // The owner's capture (tri counts from the game) is what goes up: the server keeps it as it is, with no fix
   const tri = c.tri || {};
   const cap = P.facePresetFixed(c.input(), (h) => (tri[h] === undefined ? -1 : tri[h]));
@@ -93,7 +103,7 @@ check('FNV-1a of "" and "a" (reference values)', P.hashText('') === '811c9dc5' &
 check('decode refuses junk, empty and oversize text', P.decodeFace('{') === null && P.decodeFace('') === null && P.decodeFace('x'.repeat(P.PRESET_MAX_CHARS + 1)) === null && P.decodeFace(42) === null);
 const bad = JSON.parse(enc); bad.sculpt[0].data[0][0] = 99999;
 const dbad = P.decodeFace(JSON.stringify(bad));
-check('decode applies the same rules (the vertex past the count dropped, the rest kept)', !!dbad && JSON.stringify(dbad.sculpt[0].data) === '[[17,0,0,10000]]' && dbad.sculpt.length === 2 && dbad.custom.length === 2, dbad);
+if (NEWRULES) check('decode applies the same rules (the vertex past the count dropped, the rest kept)', !!dbad && JSON.stringify(dbad.sculpt[0].data) === '[[17,0,0,10000]]' && dbad.sculpt.length === 2 && dbad.custom.length === 2, dbad);
 
 // ---- the sculpt bound: skee writes offsets with no bounds check ----
 const counts = { [HEAD]: 9001, [EYES]: 48 };
@@ -183,16 +193,19 @@ check('host rule matches the platform rule', P.isTriPath(HEAD) && P.isTriPath('a
 if (S) {
   check('server and client hash alike', S.hashText(big) === P.hashText(big) && S.hashText('') === P.hashText(''));
   check('server re-encodes a client face to the same text', S.encodeFace(S.faceFrom(JSON.parse(enc))) === enc);
-  check('server and client drop the same broken vertex', S.encodeFace(S.faceFrom(bad)) === P.encodeFace(P.decodeFace(JSON.stringify(bad))));
+  check('server and client drop the same broken vertex', !NEWRULES || (S.encodeFace(S.faceFrom(bad)) === P.encodeFace(P.decodeFace(JSON.stringify(bad)))));
   const huge = JSON.parse(enc); huge.custom[0].value = 1e9;
-  check('server and client clamp a huge slider alike (to 10)', S.faceFrom(huge).custom[0].value === 10 && P.decodeFace(JSON.stringify(huge)).custom[0].value === 10);
+  check('server and client clamp a huge slider alike (to 10)', S.faceFrom(huge).custom[0].value === 10 && (!NEWRULES || P.decodeFace(JSON.stringify(huge)).custom[0].value === 10));
   for (const v of [1.5, -2, 33, 0.999, 32, -1, 255, 256, -10.5, 12.25, 1e-7]) {
     const t = JSON.parse(enc); t.custom[0].value = v;
-    check(`server and client agree on slider value ${v}`, S.encodeFace(S.faceFrom(t)) === P.encodeFace(P.decodeFace(JSON.stringify(t))));
+    const c = P.decodeFace(JSON.stringify(t));
+    // An older client takes a subset: what it takes, the server keeps as it is
+    check(`server and client agree on slider value ${v}`, NEWRULES ? S.encodeFace(S.faceFrom(t)) === P.encodeFace(c) : !c || S.encodeFace(S.faceFrom(t)) === P.encodeFace(c));
   }
   const far = JSON.parse(enc); far.sculpt[0].data[0][1] = 300001;
-  check('server and client clamp a sculpt past 30 units alike', S.faceFrom(far).sculpt[0].data[0][1] === 300000 && P.decodeFace(JSON.stringify(far)).sculpt[0].data[0][1] === 300000);
-  check('server and client share the host rule (KS Hairdo\'s apostrophe taken)', [F.KS, HEAD, 'a..b.tri', ' a.tri', 'C:\\a.tri', 'a"b.tri', 'x'.repeat(197) + '.tri'].every((h) => S.isTriPath(h) === P.isTriPath(h)) && S.isTriPath(F.KS));
+  check('server and client clamp a sculpt past 30 units alike', S.faceFrom(far).sculpt[0].data[0][1] === 300000 && (!NEWRULES || P.decodeFace(JSON.stringify(far)).sculpt[0].data[0][1] === 300000));
+  check('server and client share the host rule (KS Hairdo\'s apostrophe taken)', S.isTriPath(F.KS) && [HEAD, 'a..b.tri', ' a.tri', 'C:\\a.tri', 'a"b.tri', 'x'.repeat(197) + '.tri'].every((h) => S.isTriPath(h) === P.isTriPath(h))
+    && (!NEWRULES || P.isTriPath(F.KS)));
 }
 
 console.log(failures ? `${failures} FAILED` : 'all passed');
