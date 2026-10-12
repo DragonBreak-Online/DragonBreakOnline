@@ -22,6 +22,8 @@ const esbuildDir = [process.env.FORK_SERVER, FORK].filter(Boolean).map((f) => pa
 const esbuild = require(esbuildDir);
 const NM = [path.join(FORK, 'skymp5-front', 'node_modules'), path.join(process.env.HOME, 'dragonbreak', 'fork', 'skymp5-front', 'node_modules')].find((p) => fs.existsSync(p));
 
+// The per-player ceiling is the front's own PEER_MAX: 2 (200%) up to client 0.3.93, 4 (400%) from 0.3.94 (front voice 405ef1fd)
+const PEER_MAX = Number((/const PEER_MAX = (\d+(?:\.\d+)?)/.exec(fs.readFileSync(SRC, 'utf8')) || [])[1]) || 2;
 let failures = 0;
 const check = (label, ok, got) => { console.log(`${ok ? 'ok  ' : 'FAIL'} ${label}${!ok && got !== undefined ? '   ' + JSON.stringify(got).slice(0, 500) : ''}`); if (!ok) failures++; };
 
@@ -90,9 +92,9 @@ global.setInterval = () => 0;
   vm.adjustPeer('FF000040', 'set', 'Ria', 1.65);
   check('adjustPeer set: an absolute volume, kept on this PC (identity in lower case)', vm.peerSetting('ff000040').gain === 1.65 && JSON.parse(window.localStorage.getItem('dboVoicePeers')).ff000040.gain === 1.65);
   vm.adjustPeer('ff000040', 'set', 'Ria', 7);
-  check('...held to 0-200%', vm.peerSetting('ff000040').gain === 2);
+  check(`...held to 0-${PEER_MAX * 100}%`, vm.peerSetting('ff000040').gain === PEER_MAX, vm.peerSetting('ff000040'));
   vm.adjustPeer('ff000040', 'mute', 'Ria');
-  check('...mute keeps the volume for when they are unmuted', vm.peerSetting('ff000040').muted === true && vm.peerSetting('ff000040').gain === 2);
+  check('...mute keeps the volume for when they are unmuted', vm.peerSetting('ff000040').muted === true && vm.peerSetting('ff000040').gain === PEER_MAX);
   vm.adjustPeer('ff000040', 'reset', 'Ria');
   check('...reset forgets them', !('ff000040' in JSON.parse(window.localStorage.getItem('dboVoicePeers'))));
   check('...the old steps still work (louder from the X menu of an older server)', vm.adjustPeer('ff000041', 'louder', 'X') === '125%');

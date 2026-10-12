@@ -300,12 +300,12 @@ ok('a reload keeps the titles', globalThis.__dboNobility.holderOf('mountain-watc
 load({ nobility: { enabled: false } });
 ok('switched off again: the tab goes and the fork is told nothing', !globalThis.__dboJournalSections.nobility && globalThis.__dboNobility.holdsFiefAt(ELION, [MW_DOOR]) === false);
 
-// ---- the patch note waits for the switch ---------------------------------------------------------------------------------------
+// ---- the patch note ships with the switch (release 1012) ------------------------------------------------------------------------
 const pending = path.join(ROOT, 'docs', 'patch-notes-pending', 'nobility.json');
-const note = fs.existsSync(pending) ? JSON.parse(fs.readFileSync(pending, 'utf8'))[0] : null;
-ok('the patch note is pending (the switch is off), dated SHIP_DATE', !!note && note.date === 'SHIP_DATE' && note.version === 'Server update' && /Baron/.test(JSON.stringify(note)));
+ok('the pending copy is gone', !fs.existsSync(pending));
 const live = JSON.parse(fs.readFileSync(path.join(ROOT, 'patch-notes.json'), 'utf8'));
-ok('and not in the live patch notes', !live.some((n) => /nobility|Baron/i.test(JSON.stringify(n.sections || [])) && /fief/i.test(JSON.stringify(n))));
+const note = live.find((n) => n.title === 'The nobility of Bruma');
+ok('the note is in the live patch notes, dated, a Server update, with the Barons and Elion', !!note && /^\d{4}-\d{2}-\d{2}$/.test(note.date) && note.version === 'Server update' && /Baron/.test(JSON.stringify(note)) && /Elion/.test(JSON.stringify(note)), note && note.date);
 const gcfg = JSON.parse(fs.readFileSync(path.join(ROOT, 'gamemode-config.json'), 'utf8'));
 ok('gamemode-config ships it on (release 1012), with Elion\'s seed and without the interim uncapped 49', gcfg.nobility && gcfg.nobility.enabled === true && !((gcfg.housingPlaces || {}).uncappedProfiles || []).includes(49) && gcfg.nobility.fiefShare === 0.25 && gcfg.nobility.seed[0].fief === 'mountain-watch');
 
