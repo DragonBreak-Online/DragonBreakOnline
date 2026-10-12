@@ -54,7 +54,7 @@ const handlers = new Map(); const timers = new Map();
 const api = {
   mp: { get, set, getActorsByProfileId: (pid) => chars[pid] || [] },
   log: () => {}, personal: (a, t) => out.personal.push({ a, t }), audit: (t) => out.audits.push(t), who: (a) => `P${a.toString(16)}`,
-  cfg: { economy: { enabled: true } }, onUi: (ev, f) => handlers.set(ev, f), onlineActors: () => [0x10, 0x40, 0x20], every: (n, ms, f) => timers.set(n, f),
+  cfg: { economy: { enabled: true, wageSavingsShare: 0, defaultWages: {} } }, onUi: (ev, f) => handlers.set(ev, f), onlineActors: () => [0x10, 0x40, 0x20], every: (n, ms, f) => timers.set(n, f),
   readOfficials: () => JSON.parse(JSON.stringify(officials)), zoneById: (id) => (id === 'bruma' ? { id: 'bruma', name: 'Bruma', officials: ['count', 'steward', 'guard'] } : null),
 };
 delete globalThis.__dboEconomy;
