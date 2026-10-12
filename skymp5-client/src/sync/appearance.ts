@@ -127,6 +127,12 @@ export const applyTints = (actor: Actor | null, appearance: Appearance): void =>
     TESModPlatform.setFormIdUnsafe(actor.getBaseObject(), playerBaseId);
 };
 
+// True when a copy's stored base can no longer be placed: gone, or aliased by applyTints to the player's own id, which
+// then resolves to the LOCAL player's base, so a copy rebuilt from it wore the watcher's look (#gm-chat 12 Oct: a GM
+// back from invisible looked like each player watching; re-entering a cell built a fresh base)
+export const needsFreshBase = (baseFormId: number | null, playerBaseFormId: number): boolean =>
+  !baseFormId || (baseFormId >>> 0) === (playerBaseFormId >>> 0);
+
 // True for a reference other than the player whose base resolves to the player's own (a copy after applyTints): a
 // write through its base would land on the player (a crash log of 2026-09-30 named Flo'Riahn's character after the
 // werewolf "Dar Ra'jhir", renamed through formView's name-only update)
