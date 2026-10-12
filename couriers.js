@@ -33,7 +33,11 @@
 //     dbo:courierTake | courierDeliver | courierOpen | courierCancel [nonce, jobId]
 //     dbo:courierDropIn [nonce, jobId]  dbo:courierDismiss [nonce]  dbo:courierAnswer [nonce, 'take' | 'mailbox']   (widget 81,
 //     front features/courierHandover; shown only to a UI that says 'courierHandover' in dbo:uiCaps, else chat)
-// State in couriers.json: { next, jobs: [job], payouts: { <account>: [at] } }.
+// Ranks (Nate, 12 Oct: courier tiers): a character's deliveries raise their rank (config tiers, by deliveries). A rank sets
+// how many parcels they carry at once, the largest job they may take (the goods' value), the chance a robbery takes their
+// parcel, and whether they carry to other holds' boards. A delivery counts only at countMinPay or more, and at most
+// countPerSenderPerDay from one sender's account, so friends cannot rank each other up with cheap jobs.
+// State in couriers.json: { next, jobs: [job], payouts: { <account>: [at] }, ranks: { <courier char>: { delivered, name, counted: { <account>: [at] } } } }.
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -59,6 +63,15 @@ module.exports = (api) => {
     // Board places: zones with a treasury, plus named board groups { id, name, zone, boards: [ref desc] }
     places: [], boardZones: null, lockZones: ['bruma'],
     dropPoints: [],
+    // maxValue 0: no limit; boards: may carry to other holds' notice boards
+    tiers: [
+      { name: 'Novice', deliveries: 0, carry: 1, maxValue: 500, robChance: 0.5, boards: false },
+      { name: 'Apprentice', deliveries: 5, carry: 2, maxValue: 1500, robChance: 0.45, boards: false },
+      { name: 'Journeyman', deliveries: 15, carry: 3, maxValue: 4000, robChance: 0.4, boards: true },
+      { name: 'Expert', deliveries: 40, carry: 4, maxValue: 10000, robChance: 0.32, boards: true },
+      { name: 'Master', deliveries: 100, carry: 5, maxValue: 0, robChance: 0.25, boards: true },
+    ],
+    countMinPay: 20, countPerSenderPerDay: 3,
   }, cfg.couriers || {});
   const FILE = path.resolve('couriers.json');
   const SPOTS = path.resolve('notice-board-spots.json');
@@ -157,6 +170,7 @@ module.exports = (api) => {
     if (!S.data || typeof S.data !== 'object') S.data = {};
     if (!Array.isArray(S.data.jobs)) S.data.jobs = [];
     if (!S.data.payouts || typeof S.data.payouts !== 'object') S.data.payouts = {};
+    if (!S.data.ranks || typeof S.data.ranks !== 'object') S.data.ranks = {};
     if (!(int(S.data.next) >= 1)) S.data.next = 1 + S.data.jobs.reduce((m, j) => Math.max(m, int(j.id) || 0), 0);
     return S.data;
   };
@@ -224,6 +238,36 @@ module.exports = (api) => {
     return out.filter(reachable);
   };
   const destText = (j) => (j.kind === 'person' ? `${j.recipientName} in person` : j.kind === 'drop' ? j.destName : `the ${j.destName} notice boards`);
+
+  // ---- ranks --------------------------------------------------------------------------------------------------------
+  const tiers = () => (Array.isArray(C.tiers) && C.tiers.length ? C.tiers : [{ name: 'Courier', deliveries: 0, carry: C.maxCarried, maxValue: 0, robChance: C.robChance, boards: true }])
+    .slice().sort((x, y) => (int(x.deliveries) || 0) - (int(y.deliveries) || 0));
+  const deliveredBy = (a) => int(((data().ranks || {})[String(a >>> 0)] || {}).delivered) || 0;
+  const tierAt = (n) => { const t = tiers(); let i = 0; while (i + 1 < t.length && n >= (int(t[i + 1].deliveries) || 0)) i++; return { i, t: t[i], next: t[i + 1] || null }; };
+  const tierOf = (a) => tierAt(deliveredBy(a)).t;
+  const carryOf = (a) => Math.max(1, int(tierOf(a).carry) || 1);
+  const valueCap = (a) => Math.max(0, int(tierOf(a).maxValue) || 0);
+  const goldText = (n) => Number(n).toLocaleString('en-US');
+  const tierLine = (t) => `${int(t.carry) || 1} parcel${(int(t.carry) || 1) === 1 ? '' : 's'} at once, jobs worth ${int(t.maxValue) > 0 ? `up to ${goldText(int(t.maxValue))} gold` : 'any amount'}${t.boards ? ', routes to other holds' : ''}`;
+  // A finished delivery: counted toward the courier's rank unless it paid too little or its sender already counted enough today
+  const countDelivery = (j) => {
+    const a = j.courier >>> 0; if (!a) return;
+    if ((int(j.pay) || 0) < (int(C.countMinPay) || 0)) return;
+    const r = data().ranks[String(a)] = data().ranks[String(a)] || { delivered: 0, name: '', counted: {} };
+    const acct = String(j.senderAccount || `p${j.senderProfile}`);
+    const since = Date.now() - DAY;
+    const recent = ((r.counted || {})[acct] || []).filter((t) => t > since);
+    if (recent.length >= (int(C.countPerSenderPerDay) || 0)) return;
+    r.counted = Object.assign({}, r.counted || {}, { [acct]: recent.concat(Date.now()) });
+    const before = tierAt(int(r.delivered) || 0).i;
+    r.delivered = (int(r.delivered) || 0) + 1; r.name = j.courierName;
+    const now = tierAt(r.delivered);
+    try { save(); } catch (e) { log(`couriers: the rank of ${j.courierName} could not be saved: ${e.message}`); }
+    if (now.i > before) {
+      if (online(a)) personal(a, `You are now ${/^[AEIOU]/.test(now.t.name) ? 'an' : 'a'} ${now.t.name} courier: ${tierLine(now.t)}.`);
+      audit(`COURIER ${j.courierName} #${j.courierTag} reached ${now.t.name} after ${r.delivered} deliveries`);
+    }
+  };
 
   // ---- letters ------------------------------------------------------------------------------------------------------
   const letter = (to, from, text, parcel) => {
@@ -313,7 +357,10 @@ module.exports = (api) => {
     if (!j || j.state !== 'open' || j.expiresAt <= Date.now()) return { ok: false, text: 'That job is no longer on the board.' };
     if (j.origin !== origin.id) return { ok: false, text: `That parcel waits at ${j.originName}. Take it there.` };
     if (sameAccount(a, j.sender, j.senderAccount, j.senderProfile)) return { ok: false, text: 'You cannot carry your own parcel.' };
-    if (carriedBy(a).length >= C.maxCarried) return { ok: false, text: `You already carry ${C.maxCarried} parcels. Deliver one first.` };
+    const t = tierOf(a);
+    if (carriedBy(a).length >= carryOf(a)) return { ok: false, text: `As ${/^[AEIOU]/.test(t.name) ? 'an' : 'a'} ${t.name} courier you carry ${carryOf(a)} parcel${carryOf(a) === 1 ? '' : 's'} at once. Deliver one first.` };
+    if (valueCap(a) > 0 && (int(j.value) || 0) > valueCap(a)) return { ok: false, text: `Those goods are worth ${goldText(int(j.value) || 0)} gold. ${t.name} couriers carry jobs worth up to ${goldText(valueCap(a))}; deliver more to rise.` };
+    if (j.kind === 'board' && !t.boards) { const first = tiers().find((x) => x.boards); return { ok: false, text: `Routes to other holds are for ${first ? `${first.name} couriers and above` : 'seasoned couriers'}.` }; }
     if (gone(j.sender)) { backToSender(j, 'cancelled', 'was taken down'); return { ok: false, text: 'Whoever posted that job is gone. The notice comes down.' }; }
     const now = Date.now();
     const day = clockDays();
@@ -344,6 +391,7 @@ module.exports = (api) => {
     if (pay > 0) giveItem(a, GOLD_BASE, pay);
     if (to !== j.sender) letter(j.sender, where, `Your parcel for ${j.recipientName} was delivered by ${j.courierName}.`, undefined);
     audit(`COURIER ${who(a)} delivered #${j.id} to ${j.recipientName} #${j.recipientTag} ${how || `at ${where}`} (${packed ? 'into the pack' : 'to the mailbox'}): ${itemsText(items)}, paid ${pay}`);
+    countDelivery(j);
     return { ok: true, text: `You hand over the parcel and are paid ${pay} gold.` };
   };
   const deliver = (a, place, jobId) => {
@@ -416,7 +464,8 @@ module.exports = (api) => {
   const robbed = (robber, victim) => {
     robber >>>= 0; victim >>>= 0;
     const mine = carriedBy(victim);
-    if (!mine.length || !PARCEL || !(Math.random() < Number(C.robChance))) return null;
+    const chance = Number(tierOf(victim).robChance);
+    if (!mine.length || !PARCEL || !(Math.random() < (Number.isFinite(chance) ? chance : Number(C.robChance)))) return null;
     const j = mine[Math.floor(Math.random() * mine.length)];
     if (owned(victim, PARCEL) < 1) { log(`couriers: ${who(victim)} carries #${j.id} but holds no parcel`); return null; }
     const pay = Math.max(0, int(j.held) || 0);
@@ -591,7 +640,9 @@ module.exports = (api) => {
         destinations: here.map((d) => ({ key: d.key, kind: d.kind, name: d.name, hint: d.hint || '' })),
         goods: goods.slice(0, 200),
         rules: { feeShare: Number(C.feeShare) || 0, minFee: int(C.minFee) || 0, premiumRate: Number(C.premiumRate) || 0, maxStacks: C.maxStacks, minPay: C.minPay, maxPay: C.maxPay,
-          limitGameDays: limitDays(), openDays: C.openDays, maxCarried: C.maxCarried, maxOpen: C.maxOpen, maxPayoutsPerWeek: C.maxPayoutsPerWeek },
+          limitGameDays: limitDays(), openDays: C.openDays, maxCarried: carryOf(a), maxOpen: C.maxOpen, maxPayoutsPerWeek: C.maxPayoutsPerWeek },
+        rank: (() => { const n = deliveredBy(a), r = tierAt(n); return { name: r.t.name, delivered: n, carry: carryOf(a), maxValue: valueCap(a), boards: !!r.t.boards,
+          line: tierLine(r.t), next: r.next ? { name: r.next.name, at: int(r.next.deliveries) || 0 } : null }; })(),
         open: place ? data().jobs.filter((j) => j.state === 'open' && j.origin === place.id && j.expiresAt > Date.now()).map((j) => row(a, j)) : [],
         carrying: carriedBy(a).map((j) => Object.assign(row(a, j), { here: !!place && j.kind === 'board' && j.dest === place.id })),
         broken: data().jobs.filter((j) => j.state === 'robbed' && j.holder === a).map((j) => row(a, j)),
