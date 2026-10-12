@@ -1,5 +1,20 @@
 [
   {
+    "title": "Guard armour",
+    "date": "SHIP_DATE",
+    "version": "Server update",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Smithing",
+        "items": [
+          "Only Bruma's guard armour can be forged in Cyrodiil for now. The guard armour of Anvil, Bravil, Cheydinhal, Chorrol, Kvatch, Leyawiin and Skingrad (armour, helmet, boots, gauntlets and shield) does not show in game, so whoever wore it looked invisible or bald. It can no longer be forged or improved, and your materials stay with you if you try.",
+          "None of these pieces drop as loot either. Bruma's guard armour is unchanged."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Client update 0.3.93",
     "date": "2026-10-11",
     "version": "Client 0.3.93",
