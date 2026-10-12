@@ -1,5 +1,5 @@
 // Scripted test for selling a hold's empty house (tenancy.js, Nate 12 Oct) and the property panel (front propertyMarket,
-// widget 81) that drives buying and renting. Loads the real tenancy.js in a scratch folder against a mock housing system,
+// widget 82) that drives buying and renting. Loads the real tenancy.js in a scratch folder against a mock housing system,
 // doors, gold, treasury and the economy's sale-value hook. Run from this folder's parent:
 //
 //   node tests/property-sale-harness.js
@@ -63,7 +63,7 @@ const act = (a, name, ...args) => fire('propertyMarketAct', a, [panelOf(a).nonce
 // ---- the panel opens on the door the player stands at ----
 fire('propertyMarket', BUYER);
 let w = panelOf(BUYER);
-ok(w && w.type === 'propertyMarket' && w.id === 81 && widgets[widgets.length - 1].focus === true, 'the panel opens with focus', w);
+ok(w && w.type === 'propertyMarket' && w.id === 82 && widgets[widgets.length - 1].focus === true, 'the panel opens with focus', w);
 ok(w.state === 'none' && !w.owned && w.name === 'Snowpeak House' && w.hold === 'Bruma' && w.taxPct === 10, 'an empty house shows as neither for sale nor for rent, with the hold tax', w);
 ok(w.manager === false, 'a player is no manager');
 fire('propertyMarket', STEWARD);
@@ -127,7 +127,7 @@ const stale = panelOf(BUYER).nonce;
 chars[BUYER].pos = [3000, 0, 0];
 const n = widgets.length;
 fire('propertyMarketAct', BUYER, [stale, 'buy']);
-ok(closed.some((c) => c.a === BUYER && c.id === 81) && widgets.length === n, 'walking to another door closes the panel instead of acting there');
+ok(closed.some((c) => c.a === BUYER && c.id === 82) && widgets.length === n, 'walking to another door closes the panel instead of acting there');
 fire('propertyMarketAct', LATE, ['wrong-nonce', 'leave']);
 ok(houses[OTHER_DOOR].owner === 30, 'a wrong nonce does nothing');
 ok(commands.property && /for sale|Usage/.test((() => { said.length = 0; commands.property(STEWARD, 'nonsense'); return said.map((x) => x[1]).join(' '); })()), 'the chat fallback still answers');
