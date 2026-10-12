@@ -51,7 +51,7 @@
       {
         "heading": "Appearance",
         "items": [
-          "Changes made with the RaceMenu sliders (face shape, expressions, sizes, body and overlays) are now saved and shown to other players, after /appearance or a GM's /chargen, and they stay after a relog."
+          "Changes made with the RaceMenu sliders (face shape, expressions, sizes, body and overlays) when creating a character are now saved and shown to other players, and they stay after a relog. Saving slider changes from /appearance on an existing character is still being fixed."
         ]
       }
     ]
