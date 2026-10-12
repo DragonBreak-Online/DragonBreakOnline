@@ -851,7 +851,8 @@ module.exports = (api) => {
     let f = null;
     try { f = typeof globalThis.__dboWheelRoom === 'function' ? globalThis.__dboWheelRoom(a, skill, now) : null; } catch (e) { log('schools: wheel room failed', e.message); }
     if (!f || !f.why) return null;
-    const line = f.why === 'lower' ? `${name} is marked to fall on your Wheel (K), so study cannot raise it. Set it to rise or hold first.`
+    const line = f.why === 'lower' ? `${name} is marked to fall on your Wheel (K), so study cannot raise it. Set it to Raise first.`
+      : f.why === 'hold' ? `${name} is set to Hold on your Wheel (K): it neither rises nor falls, so study cannot raise it. Set it to Raise first.`
       : f.why === 'bucket' ? `You have studied all you can take in for now. Rest your mind: you can study again in about ${f.minutes || 1} minutes.`
       : f.why === 'daily' ? `You have learned all you can of ${name} today. Study pays again after midnight (UTC).`
       : f.why === 'character' ? 'You have trained as much as one day allows. Come back to the books after midnight (UTC).'

@@ -3537,16 +3537,18 @@ const readDeny = new Map();
 const scholarNoRoom = (a, now = Date.now()) => {
   const f = wheelRoom(a, 'scholar', now);
   if (!f) return null;
-  if (f.why === 'lower') return 'Scholar is marked to fall on your Wheel (K), so reading cannot raise it. Set it to rise or hold first.';
+  if (f.why === 'lower') return 'Scholar is marked to fall on your Wheel (K), so reading cannot raise it. Set it to Raise first.';
+  if (f.why === 'hold') return 'Scholar is set to Hold on your Wheel (K): it neither rises nor falls, so reading cannot raise it. Set it to Raise first.';
   if (f.why === 'bucket') return `You have studied all you can take in for now. Rest your eyes: you can read again in about ${f.minutes} minutes.`;
   if (f.why === 'daily') return 'You have learned all you can from books today. Your Scholar rises again after midnight (UTC).';
   if (f.why === 'character') return 'You have trained as much as one day allows. Come back to your books after midnight (UTC).';
   return f.why === 'peak' ? 'Your Scholar is at its peak; books have nothing more to teach you.' : `Your Scholar can rise no further than ${f.cap} while your other skills hold the higher places on the Wheel.`;
 };
 // Whether one held skill can earn anything on the Wheel right now: the same limits skillPoints.applyGain applies, read
-// from private.mastery: a skill marked to fall, the hourly bucket, the skill's and the character's daily caps (UTC day),
-// and the structural cap (one Seat above seatAbove, expertCount above expertAbove). null = room to earn, or the skill is
-// not held (its work is banked); otherwise { why: 'lower'|'bucket'|'daily'|'character'|'cap'|'peak', minutes, cap }.
+// from private.mastery: a skill marked to fall or set to Hold (neither rises nor falls), the hourly bucket, the skill's and
+// the character's daily caps (UTC day), and the structural cap (one Seat above seatAbove, expertCount above expertAbove).
+// null = room to earn, or the skill is not held (its work is banked); otherwise
+// { why: 'lower'|'hold'|'bucket'|'daily'|'character'|'cap'|'peak', minutes, cap }.
 // schools.js asks it for Arcane Arts before the first spell (Study Magic pays through the Wheel's award; #QYPM, 9 Oct:
 // three sittings at +0).
 const wheelRoom = (a, skill, now = Date.now()) => {
@@ -3555,7 +3557,7 @@ const wheelRoom = (a, skill, now = Date.now()) => {
   const s = r.skills && r.skills[skill]; if (!s) return null;
   const ps = (SKILLS_DEF && SKILLS_DEF.pointSystem) || {}; if (ps.enabled === false) return null;
   const lvl = Number(s.level != null ? s.level : s.points) || 0;
-  if (s.lock === 'lower') return { why: 'lower' };
+  if (s.lock === 'lower' || s.lock === 'hold') return { why: s.lock };
   const perHour = Number(ps.bucketPerHour) || 20, burst = Number(ps.bucketBurst) || 13;
   const b = s.bucket && Number.isFinite(Number(s.bucket.tokens)) ? s.bucket : null;
   const tokens = b ? Math.min(burst, Number(b.tokens) + ((now - Number(b.at)) / 3600000) * perHour) : burst;

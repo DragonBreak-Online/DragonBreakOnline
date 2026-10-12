@@ -23,6 +23,9 @@ const make = (s, extra = {}, others = {}) => ({ order: ['scholar', 'blade'], day
 rec = make({}); ok('room to earn: reading allowed', fn(1, NOW) === null, fn(1, NOW));
 rec = { order: ['blade'], skills: { blade: { level: 10 } } }; ok('not a Scholar: never refused (work is banked)', fn(1, NOW) === null);
 rec = make({ lock: 'lower' }); ok('Scholar marked to fall: refused', /marked to fall/.test(fn(1, NOW) || ''));
+ok('...and told to set it to Raise', /Set it to Raise first\.$/.test(fn(1, NOW) || ''), fn(1, NOW));
+// Hold neither rises nor falls (skill-hold-freeze, 12 Oct), so a held Scholar earns nothing from a reading
+rec = make({ lock: 'hold' }); ok('Scholar on Hold: refused, saying why', fn(1, NOW) === 'Scholar is set to Hold on your Wheel (K): it neither rises nor falls, so reading cannot raise it. Set it to Raise first.', fn(1, NOW));
 rec = make({ bucket: { tokens: 0, at: NOW } }); ok('bucket empty: refused with minutes', /read again in about \d+ minutes/.test(fn(1, NOW) || ''), fn(1, NOW));
 rec = make({ bucket: { tokens: 0, at: NOW - 3600000 } }); ok('...an hour later the bucket has refilled', fn(1, NOW) === null);
 rec = make({ spentToday: ps.dailyCaps.low }); ok('skill daily cap reached: refused until midnight', /after midnight/.test(fn(1, NOW) || ''));

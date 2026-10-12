@@ -184,6 +184,9 @@ for (const a of online) ui('uiCaps', a, ['bank', 'spellbook', 'schools']);
   setPriest(FALLING, { lock: 'lower' });
   globalThis.__dboSchoolsActivate(PSTUDY, FALLING);
   check('Priest marked to fall: refused', refusedWith(FALLING, /Priest is marked to fall on your Wheel/), panel(FALLING));
+  setPriest(FALLING, { lock: 'hold' });
+  globalThis.__dboSchoolsActivate(PSTUDY, FALLING);
+  check('Priest on Hold (it neither rises nor falls, 12 Oct): refused, saying why', refusedWith(FALLING, /Priest is set to Hold on your Wheel \(K\): it neither rises nor falls, so study cannot raise it\. Set it to Raise first\./), panel(FALLING));
 
   globalThis.__dboSchoolsActivate(PSTUDY, SEATED);
   check('the Expert places held by other skills: refused, naming the cap', refusedWith(SEATED, /Your Priest can rise no further than 75/), panel(SEATED));

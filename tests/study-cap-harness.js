@@ -221,6 +221,13 @@ arcane(ILLUSIONIST, 5); setArc(ILLUSIONIST, { lock: 'lower' });
 activate(BOOKCASE, ILLUSIONIST);
 w = lastWidget(ILLUSIONIST, 'studyMagic');
 check('Arcane Arts marked to fall: refused', !studying(ILLUSIONIST) && /marked to fall/.test(w.whyNot || w.result || ''), w);
+check('...and told to set it to Raise', /so study cannot raise it\. Set it to Raise first\./.test(w.whyNot || w.result || ''), w);
+
+// On Hold: it neither rises nor falls (skill-hold-freeze, 12 Oct), so a sitting would pay nothing
+setArc(ILLUSIONIST, { lock: 'hold' });
+activate(BOOKCASE, ILLUSIONIST);
+w = lastWidget(ILLUSIONIST, 'studyMagic');
+check('Arcane Arts on Hold: refused, saying why', !studying(ILLUSIONIST) && /Arcane Arts is set to Hold on your Wheel \(K\): it neither rises nor falls, so study cannot raise it\. Set it to Raise first\./.test(w.whyNot || w.result || ''), w);
 
 // The hourly bucket: empty refuses with minutes; refilled after an hour
 arcane(OLDMAGE, 5); setArc(OLDMAGE, { bucket: { tokens: 0, at: wallClock } });
