@@ -874,8 +874,9 @@ class VoiceManager {
 
 window.__alduinakVoice = new VoiceManager();
 // The chat-settings file arrives with the chat's mount, which can be after the launcher's push: lay the in-game choices
-// over it then
-window.addEventListener(UI_EVENT, () => { const vm = window.__alduinakVoice; if (vm && vm.launcherPrefs) vm.applyPrefs(Object.assign({}, vm.launcherPrefs, vm.inGamePrefs())); });
+// over it then. With no launcher Voice settings at all there is no push, so the choices go over the defaults (#bugs 12 Oct:
+// Other players' volume set in F3 was lost at every game start for a player who never opened the launcher's Voice tab)
+window.addEventListener(UI_EVENT, () => { const vm = window.__alduinakVoice; if (vm) vm.applyPrefs(Object.assign({}, vm.launcherPrefs || DEFAULT_PREFS, vm.inGamePrefs())); });
 
 // Push-to-talk while a game window has the keyboard (the trade window, a menu): the game side never sees the key then,
 // because the page takes the keyboard, and players could not talk while trading (Nate, 2026-09-25). A text field keeps
