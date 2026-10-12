@@ -129,6 +129,7 @@ check('the three meteoric refs are iron veins by their base', METEORIC.every((r)
 for (const [i, local] of METEORIC.entries()) {
   const low = work(local, 1, 0x100 + i);
   check(`${local}: an Apprentice miner is refused (meteoric iron is beyond them)`, !low.opened && low.said.some((t) => /^Meteoric Iron is beyond your skill/.test(t)), low.said);
+  check(`${local}: ...told the iron-looking vein holds meteoric iron, for an Adept Miner`, low.said.includes('Meteoric Iron is beyond your skill. This vein looks like iron but holds meteoric iron, which takes an Adept Miner. Work the seams you know first.'), low.said);
   const r = work(local, 2);
   check(`${local}: an Adept miner works a Meteoric Iron Seam`, r.opened && r.title === 'Meteoric Iron Seam', r.title);
   check(`${local}: ...and wins ${yieldOf('meteoriciron', 2)} Meteoric Iron Ore (BSAssets 601c92), no iron`, r.items.length === 1 && r.items[0][0] === ORE_ITEM.meteoriciron && r.items[0][1] === yieldOf('meteoriciron', 2), r.items);
@@ -178,6 +179,7 @@ const workHeartland = (local, rank, actor) => {
 for (const [i, local] of ['f0076', 'f0071', 'f0073'].entries()) {
   const low = workHeartland(local, 0, 0x200 + i);
   check(`${local}: a Novice miner is refused the geode`, !low.opened && low.said.some((t) => /^Geode is beyond your skill/.test(t)), low.said);
+  check(`${local}: ...told the silver-looking vein is a Geode Vein, for an Apprentice Miner`, low.said.includes('Geode is beyond your skill. This vein looks like silver but is a Geode Vein, which takes an Apprentice Miner. Work the seams you know first.'), low.said);
   const r = workHeartland(local, 1);
   check(`${local}: an Apprentice works a Geode and wins one empty soul gem, no silver`, r.opened && r.title === 'Geode' && r.items.length === 1 && SOUL_GEMS.includes(r.items[0][0]) && r.items[0][1] === 1, r);
   check(`${local}: ...told so`, /^The geode cracks open: /.test(r.result), r.result);

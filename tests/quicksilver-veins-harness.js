@@ -3,6 +3,8 @@
 // as the Bleak-Frost Mine's three give Meteoric Iron (tests/meteoric-veins-harness.js, whose mock this reuses). Works
 // the mine's 12 iron veins (CYRFrostironmine01: 6 BSHeartland refs, 6 DLE v13 refs) and checks:
 //   - the four refs give Quicksilver Ore (Skyrim 5ace2) from Miner tier 2 (Apprentice), not to a Novice
+//   - the Novice's refusal says the iron-looking vein holds quicksilver and that an Apprentice can work it (#bugs, 12 Oct);
+//     a vein that looks like quicksilver keeps the short refusal
 //   - the other eight iron veins still give iron
 //   - gearswap.js leaves quicksilver ore alone (mined, never loot to swap)
 //   node tests/quicksilver-veins-harness.js   (from server/)
@@ -113,6 +115,7 @@ const work = (local, rank, actor) => {
 const oreOfBase = (edid) => /^MineOre([A-Za-z]+?)\d/.exec(edid)[1].toLowerCase();
 const MINER = SKILLS.skills.find((k) => k.id === 'miner');
 const bandOf = (ore) => MINER.oreByTier.findIndex((t) => (t || []).some((o) => String(o).toLowerCase() === ore));
+const QUICK_REFUSAL = `Quicksilver is beyond your skill. This vein looks like iron but holds quicksilver, which takes an Apprentice Miner. Work the seams you know first.`;
 const yieldOf = (ore, rank) => Math.max(1, Math.round(({ iron: 5, quicksilver: 2 })[ore] * MINER.yieldMultiplierByTier[rank]));
 
 // ---- 1. the data ----
@@ -124,9 +127,21 @@ check('the four quicksilver refs are iron veins of the mine by their base', QUIC
 for (const [i, ref] of QUICK.entries()) {
   const low = work(ref, 0, 0x100 + i);
   check(`${ref}: a Novice is refused (quicksilver is beyond them)`, !low.opened && low.said.some((t) => /^Quicksilver is beyond your skill/.test(t)), low.said);
+  // The vein still looks like iron and the game names it Iron Ore Vein, so the refusal says why it is quicksilver and
+  // who can work it (Misfit_Panda, #bugs 12 Oct: "an iron ore node in Frost-Iron Mine ... says I can't mine Quick-Silver")
+  check(`${ref}: ...told the iron-looking vein holds quicksilver, for an Apprentice Miner`, low.said.includes(QUICK_REFUSAL), low.said);
   const r = work(ref, 1);
   check(`${ref}: an Apprentice works a Quicksilver Seam`, r.opened && r.title === 'Quicksilver Seam', r.title);
   check(`${ref}: ...and wins ${yieldOf('quicksilver', 1)} Quicksilver Ore (Skyrim 5ace2), no iron`, r.items.length === 1 && r.items[0][0] === ORE_ITEM.quicksilver && r.items[0][1] === yieldOf('quicksilver', 1), r.items);
+}
+
+// A quicksilver vein that looks like one (a stand-in ref and base: the mine has none) keeps the short refusal
+{
+  const base = idOfDesc('fff01:Skyrim.esm'), ref = 'fff02:Skyrim.esm';
+  records.set(base, { record: { type: 'ACTI', editorId: 'MineOreQuicksilver01' } });
+  props.set(idOfDesc(ref) + '|baseDesc', 'fff01:Skyrim.esm');
+  const low = work(ref, 0, 0x180);
+  check('a real quicksilver vein: a Novice is told only that quicksilver is beyond them', !low.opened && low.said.length === 1 && low.said[0] === 'Quicksilver is beyond your skill. Work the seams you know first.', low.said);
 }
 
 // ---- 3. the other iron veins are as they were ----

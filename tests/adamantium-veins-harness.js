@@ -127,6 +127,7 @@ check('the three adamantium refs are silver veins of the Gutted Mine', QUICK.eve
 for (const [i, ref] of QUICK.entries()) {
   const low = work(ref, 2, 0x100 + i);
   check(`${ref}: an Adept is refused (adamantium is beyond them)`, !low.opened && low.said.some((t) => /^Adamantium is beyond your skill/.test(t)), low.said);
+  check(`${ref}: ...told the silver-looking vein holds adamantium, for an Expert Miner`, low.said.includes('Adamantium is beyond your skill. This vein looks like silver but holds adamantium, which takes an Expert Miner. Work the seams you know first.'), low.said);
   const r = work(ref, 3);
   check(`${ref}: an Expert works an Adamantium Seam`, r.opened && r.title === 'Adamantium Seam', r.title);
   check(`${ref}: ...and wins ${yieldOf('adamantium', 3)} Adamantium Ore (BSAssets 601c87), no silver`, r.items.length === 1 && r.items[0][0] === ORE_ITEM.adamantium && r.items[0][1] === yieldOf('adamantium', 3), r.items);
