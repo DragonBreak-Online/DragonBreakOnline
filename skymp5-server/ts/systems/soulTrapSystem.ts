@@ -164,6 +164,8 @@ export class SoulTrapSystem implements System {
       this.notify(ctx, targetId, "Your soul was trapped in a black soul gem.");
     }
     this.log(`[soultrap] ${hex(casterId)} trapped the ${kind} soul of ${hex(targetId)} in gem ${hex(gemId)}`);
+    // The gameplay credits the capture as Enchanter work (alchemy.js); size 0 is a black soul
+    try { (globalThis as any).__dboSoulCaptured?.(casterId, targetId, soul.black ? 0 : soul.size, player); } catch (e) { this.log(`[soultrap] capture hook failed: ${e}`); }
   }
 
   // The engine reads the respawn point right after this hook, so the Soul Cairn stands in for this one respawn only
