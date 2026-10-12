@@ -156,6 +156,13 @@ export const bucketAfterRefill = (b: Bucket | undefined, now: number, perHour: n
   return { tokens: Math.max(0, Math.min(burst, b.tokens + gained)), at: now };
 };
 
+/** How long until a bucket holds one whole unit again: 0 when it already does, Infinity when it never will. */
+export const msUntilOneToken = (b: Bucket, perHour: number): number => {
+  if (b.tokens >= 1) return 0;
+  if (!(perHour > 0)) return Infinity;
+  return Math.ceil(((1 - b.tokens) / perHour) * 3600000);
+};
+
 /** Spend up to `want` units; returns what the bucket could actually pay for. */
 export const bucketSpend = (b: Bucket, want: number): { bucket: Bucket; spent: number } => {
   const spent = Math.max(0, Math.min(want, b.tokens));
@@ -254,6 +261,7 @@ export type GainOutcome = {
   units: number;               // units the bucket and the caps actually allowed
   tookFrom: Array<{ id: string; units: number; levels: number }>;
   refused?: "bucket" | "daily" | "cap" | "pool" | "lock";
+  retryInMs?: number;          // on a "bucket" refusal, how long until the bucket can pay for one unit again
 };
 
 const dayKey = (now: number): string => new Date(now).toISOString().slice(0, 10);
@@ -288,7 +296,11 @@ export const applyGain = (rec: PointRecord, id: string, rawUnits: number, cfg: P
   const bucket = bucketAfterRefill(s.bucket, now, cfg.bucketPerHour, cfg.bucketBurst);
   const spend = bucketSpend(bucket, Math.max(0, rawUnits));
   s.bucket = spend.bucket;
-  if (spend.spent <= 0) return { gained: 0, units: 0, tookFrom: [], refused: "bucket" };
+  // The wait comes back with the refusal so the player can be given a number. Without one this is silent, and
+  // "how long is the cooldown" is the question it produces.
+  if (spend.spent <= 0) {
+    return { gained: 0, units: 0, tookFrom: [], refused: "bucket", retryInMs: msUntilOneToken(spend.bucket, cfg.bucketPerHour) };
+  }
 
   // 2. the daily ceilings, tighter the higher the skill already is
   const skillLeft = Math.max(0, dailyCapForLevel(s.level, cfg.dailyCaps) - (s.spentToday || 0));

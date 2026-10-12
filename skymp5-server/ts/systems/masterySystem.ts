@@ -687,7 +687,17 @@ export class MasterySystem implements System {
     const out = P.applyGain(rec as unknown as P.PointRecord, id, units, cfg, now, boost, rate);
     // Phase 0 measures units, not levels: a level is far too rare to tune weights against.
     if (out.units > 0) this.creditStats.credits.set(id, (this.creditStats.credits.get(id) || 0) + out.units);
+    // A bucket or daily refusal used to be silent: the work simply stopped counting and the player was told nothing,
+    // which is what sends them to Discord asking how long the cooldown is.
     if (out.refused === "pool") this.noticeRefused(ctx, userId, actorId);
+    else if (out.refused === "bucket") {
+      this.noticeRefused(ctx, userId, actorId, "bucket",
+        `Your ${this.labelOf(id)} has learned all it can this hour. It counts again ${MasterySystem.waitPhrase(out.retryInMs ?? 0)}.`);
+    } else if (out.refused === "daily") {
+      const hours = MasterySystem.hoursToDailyReset(now);
+      this.noticeRefused(ctx, userId, actorId, "daily",
+        `Your ${this.labelOf(id)} has learned all it can today. It counts again in about ${hours} hour${hours === 1 ? "" : "s"}.`);
+    }
     if (out.gained > 0) {
       this.notice(ctx, userId, `Your ${this.labelOf(id)} rises to ${prog.level}.`);
       this.syncRank(ctx, actorId, rec, id, userId);
@@ -725,12 +735,31 @@ export class MasterySystem implements System {
     return (Number(raw) >>> 0) ^ (ev.kind.charCodeAt(0) << 24);
   }
 
-  private noticeRefused(ctx: SystemContext, userId: number, actorId: number): void {
+  // Throttled per actor AND per reason, so being at the hourly limit does not swallow the message that says the day
+  // is done. Without a reason the key stays the bare actor id, as it was.
+  private noticeRefused(ctx: SystemContext, userId: number, actorId: number, reason = "pool", text?: string): void {
     const now = Date.now();
-    const last = this.lastRefuseMs.get(actorId) || 0;
+    const key = `${actorId}:${reason}`;
+    const last = this.lastRefuseNoticeMs.get(key) || 0;
     if (now - last < POINT_REFUSE_NOTICE_MS) return;
-    this.lastRefuseMs.set(actorId, now);
-    this.notice(ctx, userId, "Your hands are full. Mark a skill to fall (K) before this one can rise further.");
+    this.lastRefuseNoticeMs.set(key, now);
+    this.notice(ctx, userId, text || "Your hands are full. Mark a skill to fall (K) before this one can rise further.");
+  }
+
+  /** "in 4 minutes", "in about an hour"; the bucket wait is minutes, so the hour case is only a guard. */
+  private static waitPhrase(ms: number): string {
+    if (!Number.isFinite(ms) || ms <= 0) return "shortly";
+    const mins = Math.max(1, Math.round(ms / 60000));
+    if (mins < 60) return `in about ${mins} minute${mins === 1 ? "" : "s"}`;
+    const hours = Math.round(mins / 60);
+    return `in about ${hours} hour${hours === 1 ? "" : "s"}`;
+  }
+
+  /** Whole hours until the daily caps roll over. They are keyed off the UTC date, so this is UTC midnight. */
+  private static hoursToDailyReset(now: number): number {
+    const d = new Date(now);
+    const next = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + 1);
+    return Math.max(1, Math.round((next - now) / 3600000));
   }
 
   private creditActivity(ctx: SystemContext, ev: ActivityEvent): void {
@@ -1759,7 +1788,7 @@ export class MasterySystem implements System {
 
   private points: P.PointConfig | null = null;      // set only when skills.json turns the point system on
   private candidates = new Map<string, string[]>();  // event kind -> the skills that could possibly match it
-  private lastRefuseMs = new Map<number, number>();
+  private lastRefuseNoticeMs = new Map<string, number>();
   private skills: SkillDef[] = [];
   private shapeCache = new Map<number, { parts: number; tier: number; tierSkill: string }>();
   private categories: Array<{ id: string; label: string }> = [];
