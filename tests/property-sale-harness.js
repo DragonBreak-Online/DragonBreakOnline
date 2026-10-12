@@ -27,7 +27,7 @@ const chars = {
   [POOR]: { profile: 40, tag: 'POOR', name: 'Poor', gold: 100, pos: [70, 0, 0] },
 };
 const houses = { [DOOR]: { owner: 0, ownerName: '', name: 'Snowpeak House' }, [OTHER_DOOR]: { owner: 0, ownerName: '' } };
-let grantErr = '';
+let grantErr = '', shortDeposit = false;
 globalThis.__dboHousing = {
   primaryOf: (r) => (houses[r] ? r : 0), recordOf: (r) => houses[r] || null, holdOf: () => 'bruma',
   isManager: (a) => a === STEWARD,
@@ -48,8 +48,9 @@ require(MODULE)({
   registerChatCommand: (n, fn) => { commands[n] = fn; }, cfg: {},
   takeGold: (a, n) => { if (chars[a].gold < n) return false; chars[a].gold -= n; return true; },
   giveGold: (a, n) => { chars[a].gold += n; return true; },
-  depositToTreasury: (z, n) => { treasury[z] = (treasury[z] || 0) + n; return n; },
-  zoneById: (id) => ({ id, name: 'Bruma' }),
+  // as bank.js: a zone with no treasury takes nothing and says 0; shortDeposit stands for a bank write that failed
+  depositToTreasury: (z, n) => { if (shortDeposit || z !== 'bruma') return 0; treasury[z] = (treasury[z] || 0) + n; return n; },
+  zoneById: (id) => (id === 'bruma' ? { id, name: 'Bruma', treasury: '1:x' } : id === 'dawnstar' ? { id, name: 'Dawnstar' } : null),
   openWidget: (a, w, focus) => widgets.push({ a, w, focus }), closeWidget: (a, id) => closed.push({ a, id }),
   onUi: (ev, fn) => { (ui[ev] = ui[ev] || []).push(fn); },
 });
@@ -130,6 +131,60 @@ fire('propertyMarketAct', BUYER, [stale, 'buy']);
 ok(closed.some((c) => c.a === BUYER && c.id === 82) && widgets.length === n, 'walking to another door closes the panel instead of acting there');
 fire('propertyMarketAct', LATE, ['wrong-nonce', 'leave']);
 ok(houses[OTHER_DOOR].owner === 30, 'a wrong nonce does nothing');
+// ---- the price a buyer pays is the one they were shown (claude-jake review, 12 Oct) ----
+houses[DOOR].owner = 0; houses[DOOR].ownerName = '';
+chars[BUYER].pos = [50, 0, 0]; chars[STEWARD].pos = [0, 0, 0]; chars[BUYER].gold = 60000;
+fire('propertyMarket', STEWARD); act(STEWARD, 'sell', '500');
+fire('propertyMarket', BUYER);
+act(STEWARD, 'sell', '50000');
+act(BUYER, 'buy');
+ok(chars[BUYER].gold === 60000 && houses[DOOR].owner === 0 && panelOf(BUYER).price === 50000 && /price is now 50000/.test(panelOf(BUYER).result),
+  'a price changed under an open panel takes nothing and shows the new one', [chars[BUYER].gold, panelOf(BUYER).result]);
+act(BUYER, 'buy', '1');
+ok(chars[BUYER].gold === 10000 && houses[DOOR].owner === 20, 'Buy again pays the price now shown, never one in the packet', chars[BUYER].gold);
+houses[DOOR].owner = 0; houses[DOOR].ownerName = '';
+said.length = 0; commands.property(STEWARD, 'sell 900'); commands.property(BUYER, 'buy');
+ok(houses[DOOR].owner === 0 && said.some(([a, t]) => a === BUYER && /property buy 900/.test(t)), '/property buy names the price first');
+said.length = 0; commands.property(BUYER, 'buy 800');
+ok(houses[DOOR].owner === 0 && chars[BUYER].gold === 10000, '/property buy with another price buys nothing');
+commands.property(BUYER, 'buy 900');
+ok(houses[DOOR].owner === 20 && chars[BUYER].gold === 9100, '/property buy <the price> buys it');
+const holdOf = globalThis.__dboHousing.holdOf; globalThis.__dboHousing.holdOf = () => 'dawnstar';
+houses[DOOR].owner = 0; houses[DOOR].ownerName = '';
+fire('propertyMarket', STEWARD); act(STEWARD, 'sell', '700');
+ok(panelOf(STEWARD).state === 'none' && /keeps no treasury/.test(panelOf(STEWARD).result), 'a hold with no treasury cannot sell (the gold would be lost)', panelOf(STEWARD).result);
+globalThis.__dboHousing.holdOf = holdOf;
+// a listing made in a hold with no treasury (before this check, or by hand): Buy takes nothing and grants nothing
+const hex = (r) => (r >>> 0).toString(16);
+globalThis.__dboTenancy.data.listings[hex(DOOR)] = { door: DOOR, zone: 'dawnstar', sale: true, price: 100, listedBy: { profile: 10, char: STEWARD, tag: 'STEW', name: 'Steward' }, listedAt: now };
+fire('propertyMarket', BUYER);
+act(BUYER, 'buy');
+ok(chars[BUYER].gold === 9100 && houses[DOOR].owner === 0 && /keeps no treasury/.test(panelOf(BUYER).result), 'Buy re-checks the treasury before taking gold', [chars[BUYER].gold, panelOf(BUYER).result]);
+delete globalThis.__dboTenancy.data.listings[hex(DOOR)];
+// double click and replay: the second Buy, with the same nonce, takes nothing and pays the treasury nothing more
+fire('propertyMarket', STEWARD); act(STEWARD, 'sell', '300');
+fire('propertyMarket', BUYER);
+const t0 = treasury.bruma, nonce = panelOf(BUYER).nonce;
+fire('propertyMarketAct', BUYER, [nonce, 'buy']); fire('propertyMarketAct', BUYER, [nonce, 'buy']);
+ok(houses[DOOR].owner === 20 && chars[BUYER].gold === 8800 && treasury.bruma === t0 + 300, 'a double click pays once and the treasury is paid once', [chars[BUYER].gold, treasury.bruma - t0]);
+// a panel opened before a reload of the older tenancy.js has no remembered price: its first Buy pays nothing and shows the price
+houses[DOOR].owner = 0; houses[DOOR].ownerName = '';
+fire('propertyMarket', STEWARD); act(STEWARD, 'sell', '200');
+fire('propertyMarket', BUYER);
+delete globalThis.__dboTenancy.panels.get(BUYER).shown;
+act(BUYER, 'buy');
+ok(chars[BUYER].gold === 8800 && houses[DOOR].owner === 0 && panelOf(BUYER).price === 200 && /price is now 200/.test(panelOf(BUYER).result), 'an older panel with no price pays nothing and is sent again', panelOf(BUYER).result);
+act(BUYER, 'buy');
+ok(chars[BUYER].gold === 8600 && houses[DOOR].owner === 20, '...and its next Buy pays the price it now shows', chars[BUYER].gold);
+// a deposit the bank could not write is logged and audited for staff
+houses[DOOR].owner = 0; houses[DOOR].ownerName = '';
+fire('propertyMarket', STEWARD); act(STEWARD, 'sell', '150');
+fire('propertyMarket', BUYER);
+shortDeposit = true; audits.length = 0;
+act(BUYER, 'buy');
+shortDeposit = false;
+ok(houses[DOOR].owner === 20 && audits.some((t) => /treasury of bruma took 0 of the 150 gold/.test(t)), 'a short deposit to the treasury is audited', audits);
+
 ok(commands.property && /for sale|Usage/.test((() => { said.length = 0; commands.property(STEWARD, 'nonsense'); return said.map((x) => x[1]).join(' '); })()), 'the chat fallback still answers');
 
 console.log(fails ? `\n${fails} FAILED` : '\nall passed');

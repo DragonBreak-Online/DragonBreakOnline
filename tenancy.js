@@ -137,7 +137,7 @@ module.exports = (api) => {
     const h = here(a); if (h.err) return h.err;
     const { L, rec } = h;
     if (!L) return rec.owner ? `This property belongs to ${rec.ownerName || 'someone'}. It is not for rent.` : 'This property stands empty and is not for rent.';
-    if (L.sale) return rec.owner ? `This property belongs to ${rec.ownerName || 'someone'}.` : `For sale: ${L.price} gold, paid to ${zoneName(L.zone)}. Say /property buy here to buy it; the first to pay owns it.`;
+    if (L.sale) return rec.owner ? `This property belongs to ${rec.ownerName || 'someone'}.` : `For sale: ${L.price} gold, paid to ${zoneName(L.zone)}. Say /property buy ${L.price} here to buy it at that price; the first to pay owns it.`;
     if (L.tenant) return `Let to ${L.tenant.name} for ${L.weekly} gold a week, paid until ${due(L)}${L.overdueSince ? ' (rent overdue)' : ''}.`;
     return `For rent: ${L.deposit} gold deposit and ${L.weekly} gold a week. ${L.interest.length} ${L.interest.length === 1 ? 'person has' : 'people have'} asked for it. Say /property interest to put your name down.`;
   };
@@ -171,7 +171,7 @@ module.exports = (api) => {
   const interest = (a) => {
     const h = here(a); if (h.err) return h.err;
     const L = h.L;
-    if (L && L.sale) return 'It is for sale, not for rent: /property buy pays the price.';
+    if (L && L.sale) return `It is for sale, not for rent: /property buy ${L.price} pays the price.`;
     if (!L || L.tenant) return 'That property is not for rent.';
     const p = me(a);
     if (L.interest.some((x) => x.tag === p.tag)) return 'Your name is already down for it.';
@@ -182,6 +182,9 @@ module.exports = (api) => {
     return `Your name is down. The officials will offer it to someone; if it is you, come back and say /property accept.`;
   };
   const zoneName = (id) => { const z = id ? zoneById(id) : null; return z ? z.name : (id || 'this hold'); };
+  // A sale's price goes to the hold's treasury (gamemode.js depositToTreasury, bank.js): a hold with none (Dawnstar, the
+  // strongholds, a place in no hold) would take the buyer's gold and keep nothing (claude-jake review, 12 Oct)
+  const hasTreasury = (id) => { const z = id ? zoneById(id) : null; return !!(z && z.treasury); };
 
   const offer = (a, whom) => {
     const h = here(a); if (h.err) return h.err;
@@ -203,7 +206,7 @@ module.exports = (api) => {
     const h = here(a); if (h.err) return h.err;
     const L = h.L;
     const p = me(a);
-    if (L && L.sale) return 'It is for sale: /property buy pays the price.';
+    if (L && L.sale) return `It is for sale: /property buy ${L.price} pays the price.`;
     if (!L || !L.offer || L.offer.party.tag !== p.tag || Date.now() > L.offer.until) return 'Nobody has offered you this property.';
     // grant takes a house from whoever holds it, so a listing that outlived a change of owner would seize it
     if (h.rec && h.rec.owner && !owns(a, h.rec)) return 'This property has an owner now, so the offer no longer stands. Ask the officials here.';
@@ -232,24 +235,34 @@ module.exports = (api) => {
     price = Math.floor(Number(price));
     if (!(price >= 1 && price <= C.maxPrice)) return `Usage: /property sell <price 1-${C.maxPrice}>`;
     const zone = housing().holdOf(h.door) || '';
+    if (!hasTreasury(zone)) return `${zoneName(zone)} keeps no treasury for the price, so its property cannot be sold.`;
     if (h.L && h.L.interest && h.L.interest.length) for (const p of h.L.interest) tell(p, `A property you asked to rent in ${zoneName(zone)} is now for sale instead, at ${price} gold.`);
     data().listings[h.key] = { door: h.door, zone, sale: true, price, listedBy: me(a), listedAt: Date.now() };
     save();
     audit(`PROPERTY ${who(a)} put ${h.key} in ${zone} up for sale at ${price} gold`);
-    return `For sale at ${price} gold. The first to pay it at this door (/property buy) owns it; the gold goes to ${zoneName(zone)}.`;
+    return `For sale at ${price} gold. The first to pay it at this door (/property buy ${price}) owns it; the gold goes to ${zoneName(zone)}.`;
   };
 
-  const buy = (a) => {
+  // seen: the price the buyer was shown (the panel's last one) or named (/property buy <price>). An official may change the
+  // price while a buyer's panel is open; the buyer then pays nothing and is shown the new one (claude-jake review, 12 Oct)
+  const buy = (a, seen, viaChat) => {
     const h = here(a); if (h.err) return h.err;
     const L = h.L;
     if (!L || !L.sale) return 'This property is not for sale.';
     // An owner since it was listed (a grant from the property menu): the sale no longer stands
     if (h.rec && h.rec.owner) { delete data().listings[h.key]; save(); return 'This property has an owner now, so it is no longer for sale.'; }
     const price = Math.floor(Number(L.price));
+    const named = String(seen == null ? '' : seen).trim() === '' ? NaN : Math.floor(Number(seen));
+    if (named !== price) {
+      return viaChat ? `It costs ${price} gold. Say /property buy ${price} to buy it at that price.`
+        : `The price is now ${price} gold. Nothing was paid: buy it again at this price if you still want it.`;
+    }
+    if (!hasTreasury(L.zone)) return `${zoneName(L.zone)} keeps no treasury for the price, so this property cannot be sold.`;
     if (!takeGold(a, price)) return `It costs ${price} gold, and you do not have it.`;
     const err = housing().grant(h.door, a);
     if (err) { giveGold(a, price); return err; }
-    depositToTreasury(L.zone, price);
+    const paidIn = depositToTreasury(L.zone, price);
+    if (paidIn !== price) { log(`tenancy: the treasury of ${L.zone} took ${paidIn} of a ${price} gold sale (${h.key})`); audit(`PROPERTY the treasury of ${L.zone} took ${paidIn} of the ${price} gold paid for ${h.key}`); }
     const p = me(a);
     try { if (globalThis.__dboEconomySaleValue) globalThis.__dboEconomySaleValue(h.door, price, p.name); } catch (e) { log('tenancy: setting the sale value failed', e.message); }
     delete data().listings[h.key];
@@ -392,7 +405,10 @@ module.exports = (api) => {
   const sendPanel = (a, h, text) => {
     let p = panels.get(a >>> 0);
     if (!p || p.key !== h.key) { p = { key: h.key, nonce: `${(a >>> 0).toString(36)}-${Date.now().toString(36)}` }; panels.set(a >>> 0, p); }
-    openWidget(a, Object.assign({ type: 'propertyMarket', id: PANEL_ID, nonce: p.nonce, result: text || '' }, panelModel(a, h)), true);
+    const m = panelModel(a, h);
+    // The price this panel shows is the only one its Buy button pays
+    p.shown = m.state === 'sale' ? m.price : null;
+    openWidget(a, Object.assign({ type: 'propertyMarket', id: PANEL_ID, nonce: p.nonce, result: text || '' }, m), true);
   };
   const closePanel = (a) => { panels.delete(a >>> 0); closeWidget(a, PANEL_ID); };
   onUi('propertyMarket', (a) => {
@@ -401,7 +417,7 @@ module.exports = (api) => {
     sendPanel(a, h);
   });
   const ACTIONS = {
-    buy: (a) => buy(a), sell: (a, x) => sell(a, x), list: (a, d, w) => list(a, d, w), unlist: (a) => unlist(a),
+    buy: (a) => buy(a, (panels.get(a >>> 0) || {}).shown), sell: (a, x) => sell(a, x), list: (a, d, w) => list(a, d, w), unlist: (a) => unlist(a),
     interest: (a) => interest(a), offer: (a, tag) => offer(a, tag), accept: (a) => accept(a), pay: (a, w) => payRent(a, w),
     leave: (a) => leave(a), evict: (a) => evict(a), grace: (a) => grace(a), remind: (a) => remind(a),
   };
@@ -430,18 +446,19 @@ module.exports = (api) => {
       case 'interest': r = interest(a); break;
       case 'offer': r = offer(a, rest.join(' ')); break;
       case 'accept': r = accept(a); break;
-      case 'buy': r = buy(a); break;
+      case 'buy': r = buy(a, rest[0], true); break;
       case 'sell': r = sell(a, rest[0]); break;
       case 'pay': r = payRent(a, rest[0]); break;
       case 'leave': r = leave(a); break;
       case 'evict': r = evict(a); break;
       case 'grace': r = grace(a); break;
       case 'remind': r = remind(a); break;
-      default: r = 'Usage: /property [mine|buy|interest|accept|pay [weeks]|leave]; officials: sell <price>|list <deposit> <weekly>|unlist|offer <name>|remind|grace|evict';
+      default: r = 'Usage: /property [mine|buy <price>|interest|accept|pay [weeks]|leave]; officials: sell <price>|list <deposit> <weekly>|unlist|offer <name>|remind|grace|evict';
     }
     for (const t of [].concat(r)) personal(a, t);
-  // kept in the player menu until every player has the property panel (front propertyMarket, widget 82, client 0.3.94+)
-  }, { help: 'at a door: buying and renting property (mine, buy, interest, accept, pay, leave; officials sell, list, offer, remind, grace, evict)' });
+  // kept in the player menu until every player has the property panel (front propertyMarket, widget 82, client 0.3.94+);
+  // buy names the price the buyer agrees to pay (claude-jake review, 12 Oct)
+  }, { help: 'at a door: buying and renting property (mine, buy <price>, interest, accept, pay, leave; officials sell <price>, list, offer, remind, grace, evict)' });
   registerChatCommand('properties', (a) => { for (const t of overview(a)) personal(a, t); }, { hidden: true, help: 'the property you manage; now /property mine' });
 
   // Rent falling due, offers running out, notices and money for people who come back online
