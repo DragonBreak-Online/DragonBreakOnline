@@ -3484,6 +3484,127 @@
     "824:DragonBreak Nexus Patches.esp"
    ]
   },
+  "8ef:Sentinel.esp": {
+   "name": "Vigil Boots",
+   "set": "Vigilants of Stendarr",
+   "factions": [
+    "vigil-of-stendarr"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "ab3:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "8f0:Sentinel.esp": {
+   "name": "Vigil Greaves",
+   "set": "Vigilants of Stendarr",
+   "factions": [
+    "vigil-of-stendarr"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "ab4:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "8f1:Sentinel.esp": {
+   "name": "Vigil Mail",
+   "set": "Vigilants of Stendarr",
+   "factions": [
+    "vigil-of-stendarr"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "ab5:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "8f2:Sentinel.esp": {
+   "name": "Vigil Armor",
+   "set": "Vigilants of Stendarr",
+   "factions": [
+    "vigil-of-stendarr"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "ab6:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "8f3:Sentinel.esp": {
+   "name": "Vigil Keeper Armor",
+   "set": "Vigilants of Stendarr",
+   "factions": [
+    "vigil-of-stendarr"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "ab7:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "8f4:Sentinel.esp": {
+   "name": "Vigil Gauntlets",
+   "set": "Vigilants of Stendarr",
+   "factions": [
+    "vigil-of-stendarr"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "ab8:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "8f5:Sentinel.esp": {
+   "name": "Vigil Coif",
+   "set": "Vigilants of Stendarr",
+   "factions": [
+    "vigil-of-stendarr"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "ab9:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "8f7:Sentinel.esp": {
+   "name": "Vigil Great Helm",
+   "set": "Vigilants of Stendarr",
+   "factions": [
+    "vigil-of-stendarr"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "aba:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "8f8:Sentinel.esp": {
+   "name": "Vigil Shield",
+   "set": "Vigilants of Stendarr",
+   "factions": [
+    "vigil-of-stendarr"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "abb:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "b35:Sentinel.esp": {
+   "name": "Vigilant Mace",
+   "set": "Vigilants of Stendarr",
+   "factions": [
+    "vigil-of-stendarr"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "ad5:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "b36:Sentinel.esp": {
+   "name": "Vigilant Warhammer",
+   "set": "Vigilants of Stendarr",
+   "factions": [
+    "vigil-of-stendarr"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "ad6:DragonBreak Nexus Patches.esp"
+   ]
+  },
   "df7:Sentinel.esp": {
    "name": "Vigil Plate Armor",
    "set": "Vigilants of Stendarr",

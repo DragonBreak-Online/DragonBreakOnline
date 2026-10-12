@@ -34,7 +34,27 @@ check('an Elven cuirass (light) becomes a leather cuirass', target('ArmorElvenCu
 check('Cyrodiil pieces stay Cyrodiil: an Elven sword to CYR steel, an Elven cuirass to CYR leather', target('CYRElvenSword') === 'CYRSteelSword' && target('CYRArmorElvenCuirass') === 'CYRArmorLeatherCuirassA');
 const targets = Object.values(SWAP.replacements).map((r) => r.to);
 check('every replacement is loot under the cap itself (loottiers says gear)', targets.every((d) => TIERS.classOf(d).kind === 'gear'), targets.filter((d) => TIERS.classOf(d).kind !== 'gear'));
-check('every mapped item is above the cap by loottiers', Object.keys(SWAP.items).every((d) => { const c = TIERS.classOf(d); return c.kind === 'capped' || c.kind === 'never'; }));
+// A faction uniform may be mapped on purpose: the crafting gate and the war parity are different questions, and the
+// map wins where it names one (Nate, 12 Oct: the Vigil kit is theirs to make and still swaps to vanilla Steel Plate).
+check('every mapped item is above the cap by loottiers, or is a uniform the map names',
+  Object.keys(SWAP.items).every((d) => { const c = TIERS.classOf(d); return c.kind === 'capped' || c.kind === 'never' || c.kind === 'uniform'; }),
+  Object.keys(SWAP.items).filter((d) => !['capped', 'never', 'uniform'].includes(TIERS.classOf(d).kind)));
+
+// The Vigil's six heavy pieces: gated to the faction for crafting, still swapped for a war.
+{
+  const vigil = ['8f0:Sentinel.esp', '8f2:Sentinel.esp', '8f3:Sentinel.esp', '8f4:Sentinel.esp', '8f7:Sentinel.esp', '8f8:Sentinel.esp'];
+  check('the Vigil heavy pieces are faction uniforms', vigil.every((d) => TIERS.classOf(d).kind === 'uniform'),
+    vigil.map((d) => TIERS.classOf(d).kind));
+  check('...and the parity map still names each of them', vigil.every((d) => !!SWAP.items[d.toLowerCase()]));
+  const ids = Object.fromEntries(vigil.map((d, i) => [d, 0x7000 + i]));
+  const descOfV = (id) => Object.keys(ids).find((d) => ids[d] === id) || '';
+  const p = G.plan({ entries: vigil.map((d) => ({ baseId: ids[d], count: 1 })), descOf: descOfV, classOf: TIERS.classOf,
+    swap: SWAP, idOf: (d) => 0x9000 + Object.keys(SWAP.items).indexOf(String(d).toLowerCase()), isArtifact: () => false,
+    edidOf: () => '', worn: null });
+  check('...so a war swaps all six, none kept', p.swaps.length === 6 && p.keep.length === 0,
+    { swapped: p.swaps.length, kept: p.keep.length, to: p.swaps.map((s) => s.toEdid) });
+  check('...to vanilla Steel Plate', p.swaps.every((s) => /^ArmorSteel/.test(s.toEdid)), p.swaps.map((s) => s.toEdid));
+}
 check('Stalhrim (no ore a player may mine) becomes a steel ingot; Adamantium, mined in the Gutted Mine since 9 Oct, and Dwarven ingots, smelted from scrap, are off the list (Nate, 4 Oct: "Keep them (crafted, like mined ores)")', SWAP.metals['2b06b:dragonborn.esm'].toEdid === 'IngotSteel' && !SWAP.metals['602099:bsassets.esm'] && !SWAP.metals['601c87:bsassets.esm'] && !SWAP.metals['db8a2:skyrim.esm']);
 check('the metals players mine and their ingots are not on the list (Nate, 4 Oct: "Keep mined ores, swap only gear")', !Object.values(SWAP.metals).some((m) => /^(Ingot|Ore)I?(Moonstone|Malachite|Ebony|Quicksilver|Orichalcum)$|MeteoricIron/.test(m.edid)));
 check('corundum, silver and gold ingots are not on the metals list', !Object.values(SWAP.metals).some((m) => /^(Ingot|Ore)(Corundum|Silver|Gold)$|^ingotSilver$/i.test(m.edid)));
@@ -60,8 +80,14 @@ p = G.plan({ entries: [{ baseId: ID.GlassSword, count: 1 }], descOf, classOf: TI
 check('a replacement whose plugin is not loaded keeps the original', p.swaps.length === 0 && p.skipped.unmapped === 1 && p.entries[0].baseId === ID.GlassSword);
 p = G.plan({ entries: [{ baseId: ID.GlassSword, count: 1 }], descOf, classOf: () => ({ kind: 'never', family: 'EBONY', why: 'hand override' }), swap: SWAP, idOf, isArtifact: () => false });
 check('a hand override (loot-overrides.json) is not swapped', p.swaps.length === 0);
+// Until 12 Oct no uniform was ever swapped. Now the parity map decides: a uniform it names goes to steel in a war
+// (the Vigil kit, gated to its faction for crafting), one it does not name is worn as it is.
+p = G.plan({ entries: [{ baseId: ID.GlassSword, count: 1 }], descOf, classOf: () => ({ kind: 'uniform', family: 'guard' }), swap: { items: {}, replacements: SWAP.replacements, metals: {}, ammo: {} }, idOf, isArtifact: () => false });
+check('a uniform the parity map does not name is kept', p.swaps.length === 0);
+p = G.plan({ entries: [{ baseId: ID.GlassSword, count: 1 }], descOf, classOf: () => ({ kind: 'trinket', family: 'jewellery' }), swap: SWAP, idOf, isArtifact: () => false });
+check('a trinket is never swapped, mapped or not', p.swaps.length === 0);
 p = G.plan({ entries: [{ baseId: ID.GlassSword, count: 1 }], descOf, classOf: () => ({ kind: 'uniform', family: 'guard' }), swap: SWAP, idOf, isArtifact: () => false });
-check('uniforms and trinkets are not swapped', p.swaps.length === 0);
+check('a uniform the parity map names is swapped', p.swaps.length === 1, p.swaps.map((x) => x.toEdid));
 p = planOf([{ baseId: ID.ElvenArrow, count: 40 }, { baseId: ID.IronArrow, count: 10 }, { baseId: ID.SteelArrow, count: 5 }]);
 check('arrows above the cap become iron arrows count for count; iron and steel arrows stay', p.entries.some((e) => e.baseId === ID.IronArrow && e.count === 50) && p.entries.some((e) => e.baseId === ID.SteelArrow && e.count === 5) && p.swaps[0].family === 'ammo', p.entries);
 check('the ammo list names the vanilla iron arrow and Dawnguard\'s steel bolt only', Object.values(SWAP.ammo).every((m) => m.to === '1397d:Skyrim.esm' || m.to === 'bb3:Dawnguard.esm') && !Object.values(SWAP.ammo).some((m) => /^(IronArrow|SteelArrow|ForswornArrow|FalmerArrow|DraugrArrow|MQ101SteelArrow|boundArrow|DLC1ElvenArrow(Blessed|Blood))$/.test(m.edid)));

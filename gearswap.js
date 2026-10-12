@@ -103,7 +103,11 @@ const plan = ({ entries, descOf, classOf, swap, idOf, isArtifact, edidOf, worn, 
     const arrows = ammo.get(desc);
     const metal = metals.get(desc) || arrows;
     const c = metal ? null : classOf(desc);
-    const above = !!metal || (c && (c.kind === 'capped' || (c.kind === 'never' && NEVER_SWAP.has(c.family) && !c.why)));
+    // A faction uniform is normally worn as it is, but the parity map wins where it names one: who may CRAFT a set
+    // (faction-gear.json) is a different question from what may be worn in a war (Nate, 12 Oct). The Vigil kit is
+    // gated to the Vigil of Stendarr and still goes to vanilla Steel Plate when a war is on.
+    const above = !!metal || (c && (c.kind === 'capped' || (c.kind === 'uniform' && items.has(desc))
+      || (c.kind === 'never' && NEVER_SWAP.has(c.family) && !c.why)));
     if (!above) { out.keep.push(e); continue; }
     const edid = (edidOf && edidOf(baseId)) || (metal || items.get(desc) || {}).edid || '';
     if (isArtifact && isArtifact(edid)) { out.skipped.artifact += count; out.keep.push(e); continue; }
