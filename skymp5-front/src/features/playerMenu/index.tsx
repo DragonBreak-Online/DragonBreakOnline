@@ -231,14 +231,15 @@ const FormBody = ({ entry, form, people, busy, run }: {
   );
 };
 
-const Entry = ({ entry, nonce, busy, setBusy, people, tag }: {
-  entry: MenuEntry; nonce: string; busy: boolean; setBusy: (b: boolean) => void; people: MenuPerson[]; tag?: string;
+const Entry = ({ entry, nonce, busy, setBusy, people, tag, autoOpen }: {
+  entry: MenuEntry; nonce: string; busy: boolean; setBusy: (b: boolean) => void; people: MenuPerson[]; tag?: string; autoOpen?: boolean;
 }) => {
   const fields = entry.ask || [];
   const form = entry.form && entry.form.variants && entry.form.variants.length ? entry.form : null;
   // A form with one choice and nothing to fill in is a plain button
   const plainForm = !!form && form.variants.length === 1 && !form.variants[0].args.length;
-  const [open, setOpen] = useState(false);
+  // Another panel's button opened this one on a command by name (dbo:menuFind): its form is open at once
+  const [open, setOpen] = useState(!!autoOpen);
   const [words, setWords] = useState<string[]>(fields.map(() => ''));
   const [extra, setExtra] = useState('');
   const ready = fields.every((f, i) => (words[i] || '').trim().length > 0);
@@ -367,8 +368,9 @@ const PlayerMenu = ({ data }: { data: PlayerMenuData }) => {
     return out.slice(0, MAX_RESULTS);
   }, [query, data]);
 
+  const exact = (data.search || '').trim().toLowerCase();
   const entryOf = (e: MenuEntry, tag?: string) => (
-    <Entry key={e.name} entry={e} nonce={data.nonce} busy={busy} setBusy={setBusy} people={people} tag={tag} />
+    <Entry key={e.name} entry={e} nonce={data.nonce} busy={busy} setBusy={setBusy} people={people} tag={tag} autoOpen={!!exact && e.name === exact} />
   );
 
   return (

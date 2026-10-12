@@ -286,6 +286,8 @@
     background: rgba(0, 0, 0, 0.22);
   }
 
+  &__sign { flex-wrap: wrap; margin-top: 6px; .pigeon__parcel-label { flex: none; } }
+
   &__parcel-row {
     display: flex;
     align-items: center;

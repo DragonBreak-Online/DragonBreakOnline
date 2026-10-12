@@ -7,7 +7,6 @@ import './tabs/SettingsTab';
 import './tabs/SettingsKeys';
 import './tabs/SettingsVoice';
 import './tabs/WorldTab';
-import './tabs/HelpTab';
 import './skillsTab';
 import '../court';
 import '../nobility';
