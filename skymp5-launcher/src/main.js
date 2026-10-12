@@ -336,6 +336,8 @@ app.whenReady().then(() => {
   // The start after a self-update says whether the new version is the one running
   const updated = selfUpdate.startupResult(store, app.getVersion(), compareVersions)
   if (updated) log(updated)
+  // Installers earlier updates left in the temp folder (selfUpdate.installerPath)
+  try { const n = selfUpdate.pruneInstallers(os.tmpdir()); if (n) log(`[self-update] removed ${n} old installer file(s) from the temp folder`) } catch { /* next start */ }
   ensureSkyrimPath()
   createWindow()
   // No install waits yet: links left with us by a crash, or by a launcher up to 2.1.29, go back
@@ -2101,6 +2103,8 @@ ipcMain.handle('app:installUpdate', async () => {
   if (installGate.running()) return { ok: false, error: installGate.refusal() }
   const started = Date.now()
   let latest = '?'
+  // Where the installer can be fetched by hand, offered when this update fails
+  let manualUrl = ''
   try {
     const data = await fetchJSON(`${config.apiUrl}/api/version`)
     latest = data.version || '?'
@@ -2112,7 +2116,9 @@ ipcMain.handle('app:installUpdate', async () => {
       return { ok: false, error: 'Refusing to install an update from a non-HTTPS URL.' }
     }
 
-    const dest = path.join(os.tmpdir(), 'DragonBreakLauncher-update.exe')
+    manualUrl = data.downloadUrl
+    const dest = selfUpdate.installerPath(os.tmpdir(), latest)
+    selfUpdate.pruneInstallers(os.tmpdir(), dest)
     log(`[self-update] ${current} -> ${latest}: downloading the installer from ${selfUpdate.describeSource(data.downloadUrl)}`)
     send('update:progress', { phase: 'download', received: 0, total: 0 })
     await downloadToFile(data.downloadUrl, dest, (received, total) =>
@@ -2138,7 +2144,7 @@ ipcMain.handle('app:installUpdate', async () => {
     return { ok: true }
   } catch (err) {
     log(`[self-update] ${current} -> ${latest}: failed (${selfUpdate.errorText(err)})`)
-    return { ok: false, error: err.message }
+    return { ok: false, error: err.message, manualUrl }
   }
 })
 

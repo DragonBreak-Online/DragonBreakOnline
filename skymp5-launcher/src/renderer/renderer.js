@@ -1391,12 +1391,14 @@ function endLaunchWatch() {
 
 function showWarning(text) {
   connectWarning.textContent = text
+  connectWarning.removeAttribute('title')
   connectWarning.classList.add('visible')
 }
 
 function clearWarning() {
   connectWarning.classList.remove('visible')
   connectWarning.textContent = ''
+  connectWarning.removeAttribute('title')
 }
 
 // Run the installer (auto mode) and resolve with its completion result,
@@ -1661,6 +1663,18 @@ async function runLauncherUpdate() {
     delete launcherVersionEl.dataset.updating
     playBusy = false
     showWarning(`Update failed: ${r.error}`)
+    // The installer by hand: it installs over this launcher and keeps the game files (11 Oct, an EPERM in the temp folder)
+    // The strip is one line with an ellipsis, so the button goes first and the full error is in the tooltip
+    if (r.manualUrl && /^https:\/\//i.test(r.manualUrl)) {
+      connectWarning.textContent = 'Update failed.'
+      connectWarning.title = String(r.error || '')
+      const btn = document.createElement('button')
+      btn.type = 'button'
+      btn.className = 'warning-action'
+      btn.textContent = 'Download the update yourself'
+      btn.addEventListener('click', () => window.electronAPI.openExternal(r.manualUrl))
+      connectWarning.append(' ', btn, ` ${r.error || ''}`)
+    }
     updatePlayButton()
   }
   // On success the installer restarts the launcher, so leave the UI as is.

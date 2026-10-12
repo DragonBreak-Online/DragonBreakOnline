@@ -813,6 +813,17 @@ html, body {
 
 .connect-warning.visible { display: block; }
 
+/* "Download the update yourself" after a failed launcher update (renderer.js runLauncherUpdate) */
+.connect-warning .warning-action {
+  font: inherit;
+  color: rgba(var(--accent-rgb), 0.95);
+  background: none;
+  border: none;
+  padding: 0 2px;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
 /* The PLAY button - solid red, prominent */
 .btn-play {
   height: 100%;

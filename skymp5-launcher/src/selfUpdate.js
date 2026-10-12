@@ -4,7 +4,31 @@
 // the launcher quits before it finishes, so the result can only be read by the launcher that starts afterwards; a marker
 // in the store carries the attempt across. Lines name versions and a host only, never a url (release links are signed).
 
+const fs = require('fs')
+const path = require('path')
 const { hostOf, errorText } = require('./download')
+
+// Each attempt downloads the installer to a file of its own. One fixed name failed a player on 2.1.45 (11 Oct, "Update
+// failed: EPERM: operation not permitted, rename ...\Temp\..."): a copy an earlier attempt left there can still be held
+// open by an antivirus scan or an installer that is still running, and Windows refuses to replace a file held open
+const INSTALLER_RE = /^DragonBreakLauncher-update(?:-[\w.-]+)?\.exe$/i
+function installerPath(dir, version, now = Date.now()) {
+  const v = String(version || 'next').replace(/[^\w.]/g, '_').slice(0, 32)
+  return path.join(dir, `DragonBreakLauncher-update-${v}-${now}.exe`)
+}
+// Removes the installers earlier attempts left in dir, except keep; one still held open stays for the next start
+function pruneInstallers(dir, keep = '', fsMod = fs) {
+  let removed = 0
+  let names = []
+  try { names = fsMod.readdirSync(dir) } catch { return 0 }
+  for (const name of names) {
+    if (!INSTALLER_RE.test(name)) continue
+    const full = path.join(dir, name)
+    if (keep && path.resolve(full) === path.resolve(keep)) continue
+    try { fsMod.unlinkSync(full); removed++ } catch { /* held open: next time */ }
+  }
+  return removed
+}
 
 const PENDING_KEY = 'pendingSelfUpdate'
 // A marker older than this did not come from the run that just ended (the player declined a UAC prompt, the installer
@@ -52,4 +76,4 @@ function startupResult(store, current, compareVersions, now = Date.now()) {
 
 const describeSource = (url) => hostOf(url)
 
-module.exports = { errorText, createCheckLogger, markPending, clearPending, startupResult, describeSource, PENDING_KEY, STALE_MS }
+module.exports = { errorText, createCheckLogger, markPending, clearPending, startupResult, describeSource, installerPath, pruneInstallers, PENDING_KEY, STALE_MS }
