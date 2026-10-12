@@ -1865,6 +1865,30 @@
     "prayAnywhere": true,
     "blessingChanceMult": 0.5,
     "blessingHoursMult": 0.5
+   },
+   {
+    "id": "ithelia",
+    "name": "Ithelia",
+    "note": "Faction Inquiry #0144 (captain_v0c1, 12 Oct): an order of knights in her service. Nate, 12 Oct: add her as a faith with no shrine, prayed to anywhere like the other shrine-less cults; the order is a player charter (cult). Lore: she comes from ESO Gold Road (2E 582), where her very existence had been erased from memory; no 4E source mentions her worship, so a following in 4E 211 is server lore, a rediscovered secret cult. She is kind faith, not daedra, so the sixteen shrine Princes and their rules stay as they are.",
+    "blessing": "",
+    "blessingRegen": {
+     "MagickaRateMult": 50
+    },
+    "lawful": true,
+    "sphere": "A Daedric Prince once written out of all memory, her name found again only in the Second Era. Few in Tamriel know it; those who do keep it close.",
+    "boon": "Magicka regenerates 50% faster while the blessing lasts.",
+    "blessingDesign": "Server regeneration (prayer.js blessingRegen), as the Hist and the Yokudan gods: no record to author. Magicka, half the Worm Cult's doubling, as the faiths' blessings run rarer and shorter than the Princes'.",
+    "blessingImplemented": true,
+    "alsoKnownAs": [],
+    "shrines": [],
+    "placements": 0,
+    "inPlaytest": 0,
+    "inBruma": 0,
+    "blessingSource": "server",
+    "kind": "faith",
+    "prayAnywhere": true,
+    "blessingChanceMult": 0.5,
+    "blessingHoursMult": 0.5
    }
   ],
   "_placements": "Measured, not assumed: server\\shrine-placements.json, regenerate with py ck-mcp\\shrines.py. placements = every reference of this deity's shrine bases in the load order; inPlaytest = those inside the region lock; inBruma = those in Bruma county, the only released and walkable part of Beyond Skyrim Cyrodiil. A deity with inBruma 0 cannot be prayed to until Skyrim opens.",
