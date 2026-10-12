@@ -1,5 +1,19 @@
 [
   {
+    "title": "A new faith: Ithelia",
+    "date": "2026-10-12",
+    "version": "Server update",
+    "tag": "New",
+    "sections": [
+      {
+        "heading": "Religion",
+        "items": [
+          "A new faith: Ithelia, a Daedric Prince once erased from memory. Her followers pray to her anywhere; there is no shrine. Her blessing quickens the return of magicka."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Fewer chat commands: everything from a panel",
     "date": "2026-10-12",
     "version": "Client 0.3.94",
