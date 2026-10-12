@@ -1,6 +1,6 @@
 import { Settings } from "../settings";
 import { System, Log, SystemContext, Content } from "./system";
-import { AdminTier, AdminRoleConfig, TIER_CAPS, readAdminRoleConfig, adminTierOf, isTrialGm, TRIAL_GM_ACTIONS, TRIAL_GM_MODES, TRIAL_GM_TABS } from "./adminRoles";
+import { AdminTier, AdminRoleConfig, TIER_CAPS, readAdminRoleConfig, adminTierOf, isTrialGm, TRIAL_GM_ACTIONS, TRIAL_GM_MODES, TRIAL_GM_TABS, TRIAL_GM_REQUESTS } from "./adminRoles";
 import { NpcSpawnSystem } from "./npcSpawnSystem";
 import { MasterySystem, MAX_GRANT } from "./masterySystem";
 import { kickWithReason } from "./kickUtil";
@@ -27,8 +27,8 @@ type Mp = any;
 // Admins resolve to a tier (senior | developer | gm) via adminRoles.ts from "adminRoles", the legacy "adminRoleIds" and "adminProfileIds".
 // Every tier gets the server console (consoleCommandsAllowed per assign; keep enableConsoleCommandsForAll OFF) and the tabbed admin panel (client AdminMenuService, Insert key).
 // Only tiers with TIER_CAPS.ban may ban; the refusal is enforced here, never in the client.
-// A Trial GM (adminRoles.trialgm, no admin tier) gets the menu without addresses or hardware ids, TP to a player, Rename
-// and the Invisible mode (TRIAL_GM_ACTIONS / TRIAL_GM_MODES); anything else is refused here and logged.
+// A Trial GM (adminRoles.trialgm, no admin tier) gets the menu without addresses or hardware ids, TP to a player or a
+// location, Rename and the Invisible mode (TRIAL_GM_ACTIONS / TRIAL_GM_MODES); anything else is refused here and logged.
 // Bans post to the backend (master key + auth token), which snapshots discordId/hwid/ip into bans.json; connection-check then refuses the player permanently.
 //
 // Wire protocol (CustomPacket JSON):
@@ -618,9 +618,10 @@ export class AdminSystem implements System {
     }
   }
 
-  // What a Trial GM may ask of the panel: the menu, a teleport to an online player, a rename, the Invisible mode
+  // What a Trial GM may ask of the panel: the menu, the teleport locations, a teleport to an online player or a location,
+  // a rename, the Invisible mode
   private trialMay(type: string, content: Content): boolean {
-    if (type === "adminMenuRequest") return true;
+    if (type === "adminMenuRequest" || TRIAL_GM_REQUESTS.has(type)) return true;
     if (type !== "adminAction") return false;
     const action = String(content["action"] ?? "");
     if (action === "toggleMode") return TRIAL_GM_MODES.has(String(content["mode"] ?? ""));
