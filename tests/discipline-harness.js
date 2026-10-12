@@ -72,8 +72,9 @@ loadWith(cfgRecord); loadWith(cfgRecord);
 const r21 = JSON.parse(fs.readFileSync(FILE, 'utf8')).profiles['21'];
 ok(r21.filter((e) => e.key === 'k1').length === 1 && r21.find((e) => e.key === 'k1').by === 'Nate' && r21.find((e) => e.key === 'k1').kind === 'strike', 'a config strike is added once, by Nate, across reloads', r21);
 ok(audits.filter((l) => /config k1/.test(l)).length === 1 && said.some(([a, t]) => a === 6 && /A strike from staff: took goods/.test(t)), 'audited once; the player, online, is told');
+// Ticket #0141 (12 Oct): Lady Dyer's 0138 strike is taken off; a listed record is re-given at load, so it must stay unlisted
 const shipped = (CFG.discipline.record || []).find((r) => r.key === '0138-dyer');
-ok(shipped && shipped.tag === 'MTK7' && shipped.kind === 'strike' && /#0138/.test(shipped.reason), 'shipped: a strike for Lady Dyer #MTK7, ticket #0138');
+ok(!shipped, 'shipped: no 0138-dyer record (overturned by ticket #0141)');
 global.setTimeout = realTimeout;
 fs.rmSync(tmp, { recursive: true, force: true });
 console.log(fails ? `\n${fails} FAILED` : '\nall passed');
