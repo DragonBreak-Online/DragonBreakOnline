@@ -1,85 +1,30 @@
 [
   {
-    "title": "Every blessing in Active Effects",
+    "title": "The 12 October update",
     "date": "2026-10-12",
-    "version": "Server update",
-    "tag": "New",
+    "version": "Client 0.3.94",
+    "tag": "Update",
     "sections": [
       {
-        "heading": "Religion",
+        "heading": "Relaunch through the launcher",
+        "items": [
+          "This update brings client 0.3.94: relaunch through the launcher to get it. You will be asked to accept the updated Terms and Privacy Policy once if you have not yet."
+        ]
+      },
+      {
+        "heading": "Every blessing in Active Effects",
         "items": [
           "Every blessing now shows under Active Effects, including those of Sanguine, Hermaeus Mora, the Hist, the Ancestors, the Yokudan Gods and Ithelia."
         ]
-      }
-    ]
-  },
-  {
-    "title": "Spells on creatures and people",
-    "date": "2026-10-12",
-    "version": "Server update",
-    "tag": "Fix",
-    "sections": [
+      },
       {
-        "heading": "Magic",
-        "items": [
-          "Ash Rune's paralysis now holds creatures and NPCs in place too, not only players.",
-          "Spells that burn, freeze or drain over time now deal their full damage to creatures and NPCs.",
-          "Slows and staggers from spells now reach creatures and NPCs reliably, wear off properly, and stay on when another player's game takes over the creature."
-        ]
-      }
-    ]
-  },
-  {
-    "title": "Masks, beast forms and a freeze",
-    "date": "2026-10-12",
-    "version": "Server update",
-    "tag": "Fix",
-    "sections": [
-      {
-        "heading": "Fixes",
-        "items": [
-          "Logging out in Beast Form while wearing a mask no longer loses your character's name. Before, the character came back named \"Masked Person\" for good. If this happened to you, open a ticket and staff will put your name back.",
-          "Fixed a freeze of the whole server, up to 30 seconds, when someone made a new character soon after a restart."
-        ]
-      }
-    ]
-  },
-  {
-    "title": "Your map remembers",
-    "date": "2026-10-12",
-    "version": "Client 0.3.94",
-    "tag": "Fix",
-    "sections": [
-      {
-        "heading": "Map",
-        "items": [
-          "Discovered map locations are now saved on the server for each character, so they stay after a logout, a game repair or on another PC."
-        ]
-      }
-    ]
-  },
-  {
-    "title": "A new faith: Ithelia",
-    "date": "2026-10-12",
-    "version": "Server update",
-    "tag": "New",
-    "sections": [
-      {
-        "heading": "Religion",
+        "heading": "A new faith: Ithelia",
         "items": [
           "A new faith: Ithelia, the Daedric Prince of Paths, once erased from memory. Her followers pray to her anywhere; there is no shrine. Her blessing keeps them on the road: stamina returns 50% faster."
         ]
-      }
-    ]
-  },
-  {
-    "title": "Fewer chat commands: everything from a panel",
-    "date": "2026-10-12",
-    "version": "Client 0.3.94",
-    "tag": "New",
-    "sections": [
+      },
       {
-        "heading": "Every command in one place",
+        "heading": "Fewer chat commands: everything from a panel: Every command in one place",
         "items": [
           "Press U, or type / on its own in chat, to open every command you can use. Search it by a word or two: party, bank, pigeon, bug.",
           "Commands that need more than a click now ask for it on the panel: a choice of words, a box for a number or a message, and a list of the people you know to pick a name from. The panel shows the exact line it will send before you run it.",
@@ -87,7 +32,7 @@
         ]
       },
       {
-        "heading": "Buttons where you need them",
+        "heading": "Fewer chat commands: everything from a panel: Buttons where you need them",
         "items": [
           "At a shrine of your own god, leave an offering from the shrine's panel.",
           "In the pigeon coop: ignore whoever sent a letter, without learning who it was, and choose how your next letter is signed.",
@@ -96,156 +41,24 @@
           "With your hands bound, press U to struggle.",
           "Using an Arcane Enchanter now brings back every enchantment you have learned by itself; /syncenchant is no longer needed."
         ]
-      }
-    ]
-  },
-  {
-    "title": "Locked storage",
-    "date": "2026-10-12",
-    "version": "Server update",
-    "tag": "Fix",
-    "sections": [
+      },
       {
-        "heading": "Property",
-        "items": [
-          "A chest you claim now starts locked. Claimed chests that had been left open outside a place were locked once; their owners can unlock them again from the menu."
-        ]
-      }
-    ]
-  },
-  {
-    "title": "The Court tab",
-    "date": "2026-10-12",
-    "version": "Client 0.3.94",
-    "tag": "New",
-    "sections": [
-      {
-        "heading": "Holds",
+        "heading": "The Court tab",
         "items": [
           "The Court tab (F3) now sets the hold's tax rate and each office's weekly wage."
         ]
-      }
-    ]
-  },
-  {
-    "title": "Buying a house",
-    "date": "2026-10-12",
-    "version": "Client 0.3.94",
-    "tag": "New",
-    "sections": [
+      },
       {
-        "heading": "Property",
+        "heading": "Buying a house",
         "items": [
           "Houses can be bought: a hold's Count or Steward puts an empty house up for sale from its door's property menu, and the first to pay the price owns it. The gold goes to the hold's treasury. Renting moved into the same panel.",
           "You pay the price the panel showed you. If an official changes the price while your panel is open, nothing is paid and the panel shows the new price. From chat, say /property buy <price> at the door to buy it at the price you name.",
           "A bought house pays the weekly property tax on its sale price. A sale far below the house's value halves its tax value at most, so a house sold for a token price is not taxed on that price.",
           "Houses can be sold only in a hold that keeps a treasury."
         ]
-      }
-    ]
-  },
-  {
-    "title": "Report a GM",
-    "date": "2026-10-12",
-    "version": "Server update",
-    "tag": "Fix",
-    "sections": [
-      {
-        "heading": "Support",
-        "items": [
-          "Discord tickets have a new Report a GM button. Only the server owners can read these tickets."
-        ]
-      }
-    ]
-  },
-  {
-    "title": "Hold taxes and wages",
-    "date": "2026-10-12",
-    "version": "Server update",
-    "tag": "Change",
-    "sections": [
-      {
-        "heading": "Taxes",
-        "items": [
-          "A hold's tax rate now covers property as well as rents. The rate its Count, Jarl or Steward sets (with /tax, or on the Treasury page of the faction panel, F3) is charged each Sunday on every owned house, shop and storage building on the hold's land, from the owner's bank account into the hold's treasury.",
-          "The rate is from 0% to 30%. Bruma's rate is up to its officials: it stays 0% until they set one."
-        ]
       },
       {
-        "heading": "Wages",
-        "items": [
-          "A hold's officials and guards are now paid every Sunday, into their bank account, without having to be online: Guard 50 gold a week, Guard Captain and Court Mage 100, Steward 150, until the ruler or the Steward sets other wages on the Treasury page (F3). The ruler is never paid, and nobody sets their own wage.",
-          "Wages come from what the hold took in that week and, when that is not enough, from up to a quarter of its savings. What the treasury cannot pay is owed and paid first the next week."
-        ]
-      }
-    ]
-  },
-  {
-    "title": "Tailor ranks at the loom",
-    "date": "2026-10-12",
-    "version": "Server update",
-    "tag": "Fix",
-    "sections": [
-      {
-        "heading": "Tailoring",
-        "items": [
-          "Tailor ranks now count at the loom: Fine clothes need an Apprentice Tailor, Noble an Adept, Scaled an Expert and Masterwork a Master."
-        ]
-      }
-    ]
-  },
-  {
-    "title": "First person after a beast form",
-    "date": "2026-10-12",
-    "version": "Client 0.3.94",
-    "tag": "Fix",
-    "sections": [
-      {
-        "heading": "Beast forms",
-        "items": [
-          "First person works again after you change back from a werewolf or Vampire Lord."
-        ]
-      }
-    ]
-  },
-  {
-    "title": "Holding a skill",
-    "date": "2026-10-12",
-    "version": "Server update",
-    "tag": "Fix",
-    "sections": [
-      {
-        "heading": "Skills",
-        "items": [
-          "Hold now means a skill neither rises nor falls. If you set a skill to Hold to protect it and still want to train it, set it to Raise in your skills (K).",
-          "While you train a held skill you are reminded once an hour, and reading or study refuses to raise it."
-        ]
-      }
-    ]
-  },
-  {
-    "title": "Command Daedra and the Ash Guardian",
-    "date": "2026-10-12",
-    "version": "Server update",
-    "tag": "Fix",
-    "sections": [
-      {
-        "heading": "Conjuration",
-        "items": [
-          "Command Daedra can now take control of another player's summoned daedra for the spell's duration, where the PvP rules allow it.",
-          "Conjure Ash Guardian now raises a guardian that everyone can see. It guards its spot until it is destroyed."
-        ]
-      }
-    ]
-  },
-  {
-    "title": "The nobility of Bruma",
-    "date": "2026-10-12",
-    "version": "Server update",
-    "tag": "New",
-    "sections": [
-      {
-        "heading": "Nobility",
+        "heading": "The nobility of Bruma",
         "items": [
           "The County of Bruma is divided into fiefs: the towns of Applewatch, Aleswell, Greenwood and Mountain Watch. The Count or Countess of Bruma, and nobody else, grants and takes back titles: a Baron or Baroness holds a fief, a Lord or Lady an estate, and a Knight or Dame an honour. Every grant and every revocation is proclaimed by decree.",
           "A Baron or Baroness looks after the houses of their own town as a steward does: granting a house, taking it back, assigning its rooms and chests, renting houses out and setting their value for tax. Their own houses in their town do not count against the one-house limit. They have no say outside it, and no seat at the court.",
@@ -253,17 +66,9 @@
           "Your journal (F3) has a Nobility tab: everyone sees the county's roll of nobles and its fiefs; a noble sees their title, their fief's houses and its treasury; the ruler grants and revokes titles there.",
           "Lord Elion, who bought Mountain Watch from the Countess, is its Baron."
         ]
-      }
-    ]
-  },
-  {
-    "title": "Racial powers",
-    "date": "2026-10-12",
-    "version": "Server update",
-    "tag": "New",
-    "sections": [
+      },
       {
-        "heading": "Racial Powers",
+        "heading": "Racial powers: Racial Powers",
         "items": [
           "Every race now has a Racial Power, called once a real day from the Profile tab of your journal (F3). Waiting out the day survives a relog.",
           "Altmer, Highborn: magicka regenerates 50% faster for 60 seconds. Argonian, Histskin: health regenerates 50% faster and physical blows do 15% less for 60 seconds. Bosmer, Wild Hunt: bows deal 20% more and stamina regenerates 50% faster for 30 seconds. Breton, Dragonskin: 25% more magic resistance for 60 seconds. Dunmer, Ancestor's Wrath: your fire deals 25% more for 60 seconds.",
@@ -273,93 +78,27 @@
         ]
       },
       {
-        "heading": "Racial gifts",
+        "heading": "Racial powers: Racial gifts",
         "items": [
           "Each race learns one skill 15% faster: Altmer and Dunmer Arcane Arts, Argonians Harvesting, Bosmer Archery, Bretons Priest, Imperials Defense, Khajiit Martial Arts, Nords, Redguards and Maormer Blade, Orcs Blacksmith. It speeds the skill up; the hourly and daily limits stay the same.",
           "The Maormer have their own gifts instead of the Altmer's: 50% resistance to shock, and they swim faster.",
           "Argonians: the Hist keeps out half of the curses a vampire's or werewolf's attack, or a vampire's feeding, would pass on."
         ]
-      }
-    ]
-  },
-  {
-    "title": "The vampire's bite",
-    "date": "2026-10-12",
-    "version": "Server update",
-    "tag": "New",
-    "sections": [
+      },
       {
-        "heading": "Vampires",
+        "heading": "The vampire's bite",
         "items": [
           "When a vampire feeds on a standing player, the two now play the bite together, and everyone nearby sees it."
         ]
-      }
-    ]
-  },
-  {
-    "title": "Dungeon torches",
-    "date": "2026-10-12",
-    "version": "Server update",
-    "tag": "Fix",
-    "sections": [
+      },
       {
-        "heading": "World",
-        "items": [
-          "Fixed wall torches multiplying in dungeons: every server restart added another torch to each sconce, up to 57 on one wall (the bright bulbs, the roaring fire sound and the lag in Red Ruby Cave, Bruma Caverns, Fort Cutpurse and others)."
-        ]
-      }
-    ]
-  },
-  {
-    "title": "Armour for the College of Whispers",
-    "date": "2026-10-12",
-    "version": "Server update",
-    "tag": "New",
-    "sections": [
-      {
-        "heading": "Factions",
+        "heading": "Armour for the College of Whispers",
         "items": [
           "The College of Whispers has its own armour: Witchplate with red runes, forged by the College's Artificer."
         ]
-      }
-    ]
-  },
-  {
-    "title": "Voices carry better",
-    "date": "2026-10-12",
-    "version": "Client 0.3.94",
-    "tag": "Fix",
-    "sections": [
+      },
       {
-        "heading": "Voice chat",
-        "items": [
-          "Voices carry better: someone talking is at full volume out to about 5 metres, and you can turn a single person up to 400%."
-        ]
-      }
-    ]
-  },
-  {
-    "title": "Vampires fear fire",
-    "date": "2026-10-12",
-    "version": "Server update",
-    "tag": "Fix",
-    "sections": [
-      {
-        "heading": "Combat",
-        "items": [
-          "Vampire creatures and NPCs now take 50% more damage from fire and 25% more from silver. Before, only vampire players had these weaknesses."
-        ]
-      }
-    ]
-  },
-  {
-    "title": "The Great Faiths and the College of Whispers",
-    "date": "2026-10-12",
-    "version": "Server update",
-    "tag": "New",
-    "sections": [
-      {
-        "heading": "Magic",
+        "heading": "The Great Faiths and the College of Whispers",
         "items": [
           "The Great Faiths, the order of the Eight Divines at the Cathedral of St Martin in Bruma, are now a faction with ranks from Novice to High Priest. At the Cathedral's Scholars' Ledger they sell Restoration and Alteration tomes to their own members, by rank as the colleges do, and their Senior ranks (Priest and up) teach those spells there.",
           "At the end of a sermon, everyone who stayed is offered the sermon's spell, as at a college class. You can also change your prepared spells in the Cathedral.",
@@ -367,31 +106,9 @@
           "The Imperial Cult, the Empire's own worship of the Divines, is now a faction too. Its chapel, tome shop and teaching come later.",
           "The Great Faiths and the Imperial Cult each count as your one guild, and their faithful cannot also serve a Daedric cult."
         ]
-      }
-    ]
-  },
-  {
-    "title": "Force Rune pushes",
-    "date": "2026-10-12",
-    "version": "Server update",
-    "tag": "Fix",
-    "sections": [
+      },
       {
-        "heading": "Magic",
-        "items": [
-          "Force Rune now throws back the player it catches, as it should, instead of only making them stagger. Creatures and NPCs it catches are thrown back too once every player has the next client update."
-        ]
-      }
-    ]
-  },
-  {
-    "title": "Couriers",
-    "date": "2026-10-12",
-    "version": "Server update",
-    "tag": "New",
-    "sections": [
-      {
-        "heading": "Couriers",
+        "heading": "Couriers: Couriers",
         "items": [
           "You can now hire a courier to carry goods for you. At a notice board, open the pigeon coop and choose Couriers: pick up to six kinds of goods, where they go and who receives them, and the pay you offer. The board holds the goods and the pay, and a small posting fee goes to the hold's treasury.",
           "Goods can go to a settlement's drop point around Bruma (Aleswell, Greenwood, Mountain Watch and Applewatch), where they wait in the recipient's mailbox, or to the recipient in person: the courier finds them and offers the parcel, and they take it into their pack or have it left in their mailbox.",
@@ -401,52 +118,133 @@
         ]
       },
       {
-        "heading": "Courier ranks",
+        "heading": "Couriers: Courier ranks",
         "items": [
           "Couriers rise in rank with their deliveries. A Novice carries one parcel at a time and takes jobs worth up to 500 gold; an Apprentice (5 deliveries) two parcels and up to 1,500; a Journeyman (15) three and up to 4,000, and may carry to other holds; an Expert (40) four and up to 10,000; a Master (100) five, of any value.",
           "The higher your rank, the less often a robbery takes your parcel: one in two for a Novice, one in four for a Master.",
           "A delivery counts toward your rank when it pays at least 20 gold, and at most three a day count from the same sender. Your rank shows at the top of the Couriers tab."
         ]
-      }
-    ]
-  },
-  {
-    "title": "Guard armour",
-    "date": "2026-10-12",
-    "version": "Server update",
-    "tag": "Fix",
-    "sections": [
+      },
       {
-        "heading": "Smithing",
+        "heading": "Hold taxes and wages: Taxes",
+        "items": [
+          "A hold's tax rate now covers property as well as rents. The rate its Count, Jarl or Steward sets (with /tax, or on the Treasury page of the faction panel, F3) is charged each Sunday on every owned house, shop and storage building on the hold's land, from the owner's bank account into the hold's treasury.",
+          "The rate is from 0% to 30%. Bruma's rate is up to its officials: it stays 0% until they set one."
+        ]
+      },
+      {
+        "heading": "Hold taxes and wages: Wages",
+        "items": [
+          "A hold's officials and guards are now paid every Sunday, into their bank account, without having to be online: Guard 50 gold a week, Guard Captain and Court Mage 100, Steward 150, until the ruler or the Steward sets other wages on the Treasury page (F3). The ruler is never paid, and nobody sets their own wage.",
+          "Wages come from what the hold took in that week and, when that is not enough, from up to a quarter of its savings. What the treasury cannot pay is owed and paid first the next week."
+        ]
+      },
+      {
+        "heading": "Spells on creatures and people",
+        "items": [
+          "Ash Rune's paralysis now holds creatures and NPCs in place too, not only players.",
+          "Spells that burn, freeze or drain over time now deal their full damage to creatures and NPCs.",
+          "Slows and staggers from spells now reach creatures and NPCs reliably, wear off properly, and stay on when another player's game takes over the creature."
+        ]
+      },
+      {
+        "heading": "Masks, beast forms and a freeze",
+        "items": [
+          "Logging out in Beast Form while wearing a mask no longer loses your character's name. Before, the character came back named \"Masked Person\" for good. If this happened to you, open a ticket and staff will put your name back.",
+          "Fixed a freeze of the whole server, up to 30 seconds, when someone made a new character soon after a restart."
+        ]
+      },
+      {
+        "heading": "Your map remembers",
+        "items": [
+          "Discovered map locations are now saved on the server for each character, so they stay after a logout, a game repair or on another PC."
+        ]
+      },
+      {
+        "heading": "Locked storage",
+        "items": [
+          "A chest you claim now starts locked. Claimed chests that had been left open outside a place were locked once; their owners can unlock them again from the menu."
+        ]
+      },
+      {
+        "heading": "Report a GM",
+        "items": [
+          "Discord tickets have a new Report a GM button. Only the server owners can read these tickets."
+        ]
+      },
+      {
+        "heading": "Tailor ranks at the loom",
+        "items": [
+          "Tailor ranks now count at the loom: Fine clothes need an Apprentice Tailor, Noble an Adept, Scaled an Expert and Masterwork a Master."
+        ]
+      },
+      {
+        "heading": "First person after a beast form",
+        "items": [
+          "First person works again after you change back from a werewolf or Vampire Lord."
+        ]
+      },
+      {
+        "heading": "Holding a skill",
+        "items": [
+          "Hold now means a skill neither rises nor falls. If you set a skill to Hold to protect it and still want to train it, set it to Raise in your skills (K).",
+          "While you train a held skill you are reminded once an hour, and reading or study refuses to raise it."
+        ]
+      },
+      {
+        "heading": "Command Daedra and the Ash Guardian",
+        "items": [
+          "Command Daedra can now take control of another player's summoned daedra for the spell's duration, where the PvP rules allow it.",
+          "Conjure Ash Guardian now raises a guardian that everyone can see. It guards its spot until it is destroyed."
+        ]
+      },
+      {
+        "heading": "Dungeon torches",
+        "items": [
+          "Fixed wall torches multiplying in dungeons: every server restart added another torch to each sconce, up to 57 on one wall (the bright bulbs, the roaring fire sound and the lag in Red Ruby Cave, Bruma Caverns, Fort Cutpurse and others)."
+        ]
+      },
+      {
+        "heading": "Voices carry better",
+        "items": [
+          "Voices carry better: someone talking is at full volume out to about 5 metres, and you can turn a single person up to 400%."
+        ]
+      },
+      {
+        "heading": "Vampires fear fire",
+        "items": [
+          "Vampire creatures and NPCs now take 50% more damage from fire and 25% more from silver. Before, only vampire players had these weaknesses."
+        ]
+      },
+      {
+        "heading": "Force Rune pushes",
+        "items": [
+          "Force Rune now throws back the player it catches, as it should, instead of only making them stagger. Creatures and NPCs it catches are thrown back too once every player has the next client update."
+        ]
+      },
+      {
+        "heading": "Guard armour",
         "items": [
           "Only Bruma's guard armour can be forged in Cyrodiil for now. The guard armour of Anvil, Bravil, Cheydinhal, Chorrol, Kvatch, Leyawiin and Skingrad (armour, helmet, boots, gauntlets and shield) does not show in game, so whoever wore it looked invisible or bald. It can no longer be forged or improved, and your materials stay with you if you try.",
           "None of these pieces drop as loot either. Bruma's guard armour is unchanged.",
           "Any of these pieces already made are taken back, and whoever held one gets the materials for forging it returned (boots and gauntlets have no forging recipe, so they return nothing)."
         ]
-      }
-    ]
-  },
-  {
-    "title": "World and weapon fixes",
-    "date": "2026-10-12",
-    "version": "Plugin update",
-    "tag": "Fix",
-    "sections": [
+      },
       {
-        "heading": "Weapons",
+        "heading": "World and weapon fixes: Weapons",
         "items": [
           "The Stormcloak Sword, War Axe, Bearded Axe, Greatsword and Battleaxe now have the same base damage as the other factions' weapons (12, 13, 13, 21 and 22).",
           "The Dawnguard War Axe SPR and the Enhanced Crossbow SPR no longer deal many times the damage they should: they now have 13 and 19."
         ]
       },
       {
-        "heading": "Great House cloaks",
+        "heading": "World and weapon fixes: Great House cloaks",
         "items": [
           "The Rhino Beetle Cloak, the Bonesaint Cloak and the Redoran Watchman Cloak can no longer be made at the Loom or the forge. They looked the same as the Great Houses' own cloaks, which stay faction gear."
         ]
       },
       {
-        "heading": "The world",
+        "heading": "World and weapon fixes: The world",
         "items": [
           "The Cathedral of St. Martin in Bruma now has a Scholars' Ledger.",
           "Frost-Iron Mine near Mountain Watch and Bleak-Frost Mine behind Bruma each have their own entrance again: their doors no longer lead into the wrong mine.",

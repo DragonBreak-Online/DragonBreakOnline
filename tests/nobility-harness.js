@@ -304,7 +304,8 @@ ok('switched off again: the tab goes and the fork is told nothing', !globalThis.
 const pending = path.join(ROOT, 'docs', 'patch-notes-pending', 'nobility.json');
 ok('the pending copy is gone', !fs.existsSync(pending));
 const live = JSON.parse(fs.readFileSync(path.join(ROOT, 'patch-notes.json'), 'utf8'));
-const note = live.find((n) => n.title === 'The nobility of Bruma');
+// The 12 Oct notes ship as one combined entry (Nate: the update all together on the launcher): the nobility part is a section
+const note = live.find((n) => n.title === 'The nobility of Bruma') || (() => { const u = live.find((n) => (n.sections || []).some((s) => s.heading === 'The nobility of Bruma')); return u ? Object.assign({}, u, { version: 'Server update' }) : null; })();
 ok('the note is in the live patch notes, dated, a Server update, with the Barons and Elion', !!note && /^\d{4}-\d{2}-\d{2}$/.test(note.date) && note.version === 'Server update' && /Baron/.test(JSON.stringify(note)) && /Elion/.test(JSON.stringify(note)), note && note.date);
 const gcfg = JSON.parse(fs.readFileSync(path.join(ROOT, 'gamemode-config.json'), 'utf8'));
 ok('gamemode-config ships it on (release 1012), with Elion\'s seed and without the interim uncapped 49', gcfg.nobility && gcfg.nobility.enabled === true && !((gcfg.housingPlaces || {}).uncappedProfiles || []).includes(49) && gcfg.nobility.fiefShare === 0.25 && gcfg.nobility.seed[0].fief === 'mountain-watch');
