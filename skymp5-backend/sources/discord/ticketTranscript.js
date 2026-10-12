@@ -85,6 +85,8 @@ function toText(t) {
     `Closed by ${t.closedBy.name} (${t.closedBy.id}) at ${t.closedAt}`, `${t.messages.length} message(s), ${t.files || 0} file(s)`]
   if (t.truncated) lines.push(`Longer than ${MAX_MESSAGES} messages: the oldest are not in this transcript.`)
   if (t.blank) lines.push(`${t.blank} message(s) from people came back empty: the bot may lack the Message Content intent.`)
+  const left = new Map((t.omitted || []).map(o => [o.file, o.size]))
+  if (left.size) lines.push(`${left.size} file(s) too large to keep (closed with Close twice), listed below as not kept.`)
   const body = (m, pad) => {
     if (m.content) lines.push(pad + m.content.split('\n').join(`\n${pad}`))
     for (const e of m.embeds) {
@@ -92,7 +94,9 @@ function toText(t) {
       for (const f of e.fields) lines.push(`${pad}  ${f.name}: ${f.value}`)
       if (e.footer) lines.push(`${pad}  ${e.footer}`)
     }
-    for (const a of m.attachments) lines.push(`${pad}  [file] ${a.name} kept as ${a.file}`)
+    for (const a of m.attachments) {
+      lines.push(left.has(a.file) ? `${pad}  [file] ${a.name} (${mib(left.get(a.file))} MiB) not kept: too large` : `${pad}  [file] ${a.name} kept as ${a.file}`)
+    }
     if (m.stickers) lines.push(`${pad}  [${m.stickers} sticker(s)]`)
   }
   for (const m of t.messages) {
@@ -107,6 +111,16 @@ function toText(t) {
   return lines.join('\n') + '\n'
 }
 
+const mib = bytes => Math.max(1, Math.ceil(bytes / 1048576))
+// Too much to keep: the channel stays open, and a second Close within tickets.js's window keeps what fits
+function tooLarge(bytes) {
+  const err = new Error(`attachments too large to keep (${mib(bytes)} MiB)`)
+  err.code = 'TOO_LARGE'
+  err.channelNote = `This ticket's attachments are too large to keep in full (${mib(bytes)} MiB), so it is still open. ` +
+    'Press Close again within 2 minutes to close it anyway: every message and the files that fit are kept, and the rest are listed by name.'
+  return err
+}
+
 // Only Discord's own CDN is fetched, so a crafted attachment url cannot make the bot call anything else
 async function download({ url }) {
   let host = ''
@@ -117,7 +131,9 @@ async function download({ url }) {
   return Buffer.from(await res.arrayBuffer())
 }
 
-async function build(channel, closer, fetchFile) {
+// keepWhatFits (a staff member's second Close, tickets.js): attachments past MAX_FILE_BYTES are left out and listed by
+// name and size instead of keeping the whole ticket open. Without it, too much refuses with code TOO_LARGE.
+async function build(channel, closer, fetchFile, { keepWhatFits = false } = {}) {
   const { messages: raw, truncated } = await fetchMessages(channel)
   const wanted = []
   const messages = raw.map(m => record(m, wanted))
@@ -128,14 +144,21 @@ async function build(channel, closer, fetchFile) {
     throw new Error(`all ${blank} message(s) from people came back empty: the bot lacks the Message Content intent`)
   }
   const declared = wanted.reduce((n, w) => n + w.size, 0)
-  if (declared > MAX_FILE_BYTES) throw new Error(`attachments too large to keep (${Math.ceil(declared / 1048576)} MiB)`)
+  if (declared > MAX_FILE_BYTES && !keepWhatFits) throw tooLarge(declared)
   // Attachment links expire and die with the channel, so every file is downloaded now or the ticket stays open
   const files = []
+  const omitted = []
   let total = 0
   for (const w of wanted) {
+    // Kept in the order they were posted while they fit; a file whose declared size would pass the cap is not fetched
+    if (keepWhatFits && total + w.size > MAX_FILE_BYTES) { omitted.push({ file: w.file, size: w.size }); continue }
     const data = await fetchFile(w)
+    if (total + data.length > MAX_FILE_BYTES) {
+      if (!keepWhatFits) throw tooLarge(total + data.length)
+      omitted.push({ file: w.file, size: data.length })
+      continue
+    }
     total += data.length
-    if (total > MAX_FILE_BYTES) throw new Error('attachments too large to keep')
     files.push({ file: w.file, data })
   }
   const t = {
@@ -143,6 +166,7 @@ async function build(channel, closer, fetchFile) {
     closedBy: { id: closer.id, name: clean(closer.tag || closer.username) }, closedAt: new Date().toISOString(),
     blank, truncated, files: files.length, messages,
   }
+  if (omitted.length) t.omitted = omitted
   return { t, files }
 }
 
@@ -219,8 +243,8 @@ function saveFile(t, files, base, dir) {
 
 // Returns where the transcript went; throws when it was kept nowhere, or was kept but the channel must stay open
 // fileOnly keeps a ticket out of the staff channel, for tickets GMs must not read
-async function save(channel, closer, { client = channel.client, dir = DIR, fetchFile = download, fileOnly = false } = {}) {
-  const { t, files } = await build(channel, closer, fetchFile)
+async function save(channel, closer, { client = channel.client, dir = DIR, fetchFile = download, fileOnly = false, keepWhatFits = false } = {}) {
+  const { t, files } = await build(channel, closer, fetchFile, { keepWhatFits })
   const base = String(channel.name || '').toLowerCase().replace(/[^a-z0-9-]+/g, '-').slice(0, 80) || `ticket-${channel.id}`
   let where = ''
   if (config.discordTicketTranscriptChannelId && !fileOnly) {
@@ -232,6 +256,7 @@ async function save(channel, closer, { client = channel.client, dir = DIR, fetch
     }
   }
   if (!where) where = `saved as ${saveFile(t, files, base, dir)}`
+  if (t.omitted) where += `; ${t.omitted.length} file(s) too large, left out and listed`
   if (t.truncated) {
     const err = new Error(`longer than ${MAX_MESSAGES} messages, the newest ${where}; the channel stays open`)
     err.channelNote = 'This ticket is too long to keep in full, so this channel stays open. Tell a staff member.'

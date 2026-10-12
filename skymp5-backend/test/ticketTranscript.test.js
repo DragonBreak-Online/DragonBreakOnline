@@ -287,3 +287,66 @@ test('a fileOnly transcript never reaches the staff channel, even when one is se
   assert.strictEqual(posts.length, 0)
   assert.strictEqual(fs.existsSync(path.join(dir, 'pk-g0012-arvel.json')), true)
 })
+
+// 12 Oct: tickets with video clips stayed open for good ("attachments too large to keep (377 MiB)": pk-0104, rep-0096,
+// mod-0048). The first Close still refuses and says how to go on; a second within 2 minutes keeps what fits.
+const MIB = 1024 * 1024
+const clipTicket = () => ticketChannel({ more: { 4: message(4, { attachments: file('clip.mp4', 70 * MIB) }),
+  5: message(5, { attachments: file('note.png', 32) }) } })
+
+test('attachments past the cap refuse with TOO_LARGE and a note saying Close twice keeps what fits', async () => {
+  config.discordTicketTranscriptChannelId = ''
+  const f = files()
+  await assert.rejects(save(clipTicket(), closer, { client: staffClient().client, dir: path.join(root, 'clip-1'), ...f }), err => {
+    assert.strictEqual(err.code, 'TOO_LARGE')
+    assert.match(err.message, /attachments too large to keep \(71 MiB\)/)
+    assert.match(err.channelNote, /Press Close again within 2 minutes to close it anyway/)
+    return true
+  })
+  assert.strictEqual(f.fetched.length, 0, 'nothing downloaded when it is refused up front')
+})
+
+test('keepWhatFits keeps every message and the files that fit, and lists the clip left out', async () => {
+  config.discordTicketTranscriptChannelId = ''
+  const dir = path.join(root, 'clip-2')
+  const f = files()
+  const where = await save(clipTicket(), closer, { client: staffClient().client, dir, ...f, keepWhatFits: true })
+  assert.match(where, /^saved as pk-g0012-arvel\.json with 2 file\(s\) in pk-g0012-arvel-files; 1 file\(s\) too large, left out and listed$/)
+  assert.ok(!f.fetched.some(u => u.includes('clip.mp4')), 'the clip is never downloaded')
+  const t = JSON.parse(fs.readFileSync(path.join(dir, 'pk-g0012-arvel.json'), 'utf8'))
+  assert.strictEqual(t.messages.length, 150)
+  assert.deepStrictEqual(t.omitted.map(o => o.size), [70 * MIB])
+  const { toText } = require('../sources/discord/ticketTranscript')
+  const text = toText(t)
+  assert.match(text, /1 file\(s\) too large to keep \(closed with Close twice\)/)
+  assert.match(text, /\[file\] clip\.mp4 \(70 MiB\) not kept: too large/)
+  assert.match(text, /\[file\] note\.png kept as /)
+})
+
+test('Close on a too-large ticket keeps it open; Close again within 2 minutes closes it with what fits', async () => {
+  const channel = clipTicket()
+  const calls = []
+  const transcripts = { save: async (c, who, opts) => {
+    calls.push(opts || null)
+    if (opts && opts.keepWhatFits) return 'saved as x.json; 1 file(s) too large, left out and listed'
+    const err = new Error('attachments too large to keep (70 MiB)'); err.code = 'TOO_LARGE'
+    err.channelNote = 'This ticket\'s attachments are too large to keep in full (70 MiB), so it is still open. Press Close again within 2 minutes to close it anyway.'
+    throw err
+  } }
+  await closeTicket(closeClick(channel).interaction, { wait: 0, transcripts })
+  assert.strictEqual(channel.deleted, false)
+  assert.match(channel.sent[0], /Press Close again within 2 minutes/)
+  await closeTicket(closeClick(channel).interaction, { wait: 0, transcripts })
+  assert.deepStrictEqual(calls, [{ fileOnly: false }, { fileOnly: false, keepWhatFits: true }])
+  assert.strictEqual(channel.deleted, true)
+})
+
+test('any other failure never arms the second-Close override', async () => {
+  const channel = ticketChannel()
+  const calls = []
+  const transcripts = { save: async (c, who, opts) => { calls.push(opts || null); throw new Error('disk full') } }
+  await closeTicket(closeClick(channel).interaction, { wait: 0, transcripts })
+  await closeTicket(closeClick(channel).interaction, { wait: 0, transcripts })
+  assert.deepStrictEqual(calls, [{ fileOnly: false }, { fileOnly: false }])
+  assert.strictEqual(channel.deleted, false)
+})
