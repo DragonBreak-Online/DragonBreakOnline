@@ -49,9 +49,9 @@ const mp = {
   set: (a, k, v) => { props.set(k, v); if (k === 'isAdmin') sent.push({ at: now, v }); },
 };
 let tier = 'senior';
-const fns = new Function('mp', 'onlineActors', 'profileOf', 'nameOf', 'tierOf', 'rolesOf', 'audit', 'who', 'actorOf', 'isAdmin', 'ADMIN_PROP', 'setTimeout', 'globalThis',
+const fns = new Function('mp', 'onlineActors', 'profileOf', 'nameOf', 'realNameOf', 'tierOf', 'rolesOf', 'audit', 'who', 'actorOf', 'isAdmin', 'ADMIN_PROP', 'setTimeout', 'globalThis',
   block + '\nreturn { watchPlayers, resyncAdminFlag: typeof resyncAdminFlag === "function" ? resyncAdminFlag : null };')(
-  mp, () => [A], () => 2, () => 'GM Nate', () => tier, () => ['1'], () => {}, () => 'GM Nate #DTTM', (u) => (u === USER ? A : 0),
+  mp, () => [A], () => 2, () => 'GM Nate', () => 'GM Nate', () => tier, () => ['1'], () => {}, () => 'GM Nate #DTTM', (u) => (u === USER ? A : 0),
   () => tier !== null, 'isAdmin', fakeSetTimeout, {});
 
 // The client: the owner model follows every isAdmin the server sends; chatService writes the page when it differs from

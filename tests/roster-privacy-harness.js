@@ -202,8 +202,8 @@ ok('masks on: the household roll written behind the mask names him (guilds.js se
 // The name watch (gamemode.js watchPlayers) keeps the name an offline official is listed by
 const watchSrc = slice('const watchPlayers = () => {', "\nevery('watch'");
 ok('gamemode.js watchPlayers is found', !!watchSrc);
-const watchWith = (names) => new Function('seen', 'onlineActors', 'profileOf', 'nameOf', 'ownNameOf', 'realNameOf', 'tierOf', 'rolesOf', 'mp', 'ADMIN_PROP', 'audit', 'who', `${watchSrc}\nreturn watchPlayers;`)(
-  seen, online, profileOf, nameOf, names.ownNameOf, names.realNameOf, base.tierOf, () => [], mp, 'private.dboAdmin', base.audit, who);
+const watchWith = (names) => new Function('seen', 'onlineActors', 'profileOf', 'nameOf', 'ownNameOf', 'realNameOf', 'tierOf', 'rolesOf', 'mp', 'ADMIN_PROP', 'audit', 'who', 'adminResyncing', `${watchSrc}\nreturn watchPlayers;`)(
+  seen, online, profileOf, nameOf, names.ownNameOf, names.realNameOf, base.tierOf, () => [], mp, 'private.dboAdmin', base.audit, who, () => false);
 const watchPlayers = watchWith({ ownNameOf, realNameOf });
 P(QUILL, 'appearance', Object.assign({}, props.get(`${QUILL}|appearance`), { name: 'Quill Varro' })); P(QUILL, 'maskName', '');
 watchPlayers();

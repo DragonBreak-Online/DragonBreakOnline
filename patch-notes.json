@@ -1,5 +1,48 @@
 [
   {
+    "title": "Teaching, privacy and mining fixes",
+    "date": "2026-10-12",
+    "version": "Server update",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Teaching and the halls",
+        "items": [
+          "Teaching a spell at a faction's Scholars' Ledger or Class Lectern works again at the Cathedral of St Martin, the Synod Conclave and Frostcrag Spire. Priests and up teach Restoration and Alteration at the Cathedral's ledger, Senior Magisters at the Synod's ledger and Class Lectern, and Senior Whisperers at Frostcrag Spire. The College of Winterhold is not covered yet.",
+          "Spell tomes bought at the Cathedral now show the Great Faiths' name and pay into their treasury."
+        ]
+      },
+      {
+        "heading": "Privacy",
+        "items": [
+          "The Court roster and other lists (factions, nobility, party, ledger, pigeon contacts, letters and more) no longer show \"Werewolf\" or \"Vampire Lord\" for someone in beast form.",
+          "Typing a name no longer finds someone in beast form or behind a mask; use their #TAG.",
+          "Standing near someone masked or in beast form no longer adds them to your ledger or pigeon contacts."
+        ]
+      },
+      {
+        "heading": "Mining and smelting",
+        "items": [
+          "Four iron-looking veins in Frost-Iron Mine hold quicksilver. They now say so, and which Miner rank opens them, instead of only \"Quicksilver is beyond your skill\".",
+          "A Quicksilver Ingot now costs 2 charcoal, as announced on 7 October."
+        ]
+      },
+      {
+        "heading": "Logging in",
+        "items": [
+          "If your game loads into the wrong place at login (for example Riverwood's Sleeping Giant Inn), the server now keeps your outfit and favourites, puts you back where you were and tells you to restart your game."
+        ]
+      },
+      {
+        "heading": "Staff",
+        "items": [
+          "The Admin chat tab now appears reliably for staff after a reconnect or character switch.",
+          "Several waiting GM calls are now reminded in one line instead of one line each."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Character creator sliders save",
     "date": "2026-10-12",
     "version": "Server update",
