@@ -152,7 +152,7 @@ const read = async (a, tome) => {
 (async () => {
 
 // ---- boot ----
-check('boot line counts the tomes and both study points', out.logs.some((l) => /spells on: \d+ tomes known, 2 study point\(s\), \d+ tomes in the Synod shop, 3 prepared, changed in 7 college cell\(s\)/.test(l)), out.logs);
+check('boot line counts the tomes and both study points', out.logs.some((l) => /spells on: \d+ tomes known, 2 study point\(s\), \d+ tomes in the Synod shop, 3 prepared, changed in 10 college cell\(s\)/.test(l)), out.logs);
 check('the read hook wraps the handler that was there', mp.onReadBook.__dboSpellsInner === original);
 load();
 check('a reload unwraps its own wrapper instead of stacking', mp.onReadBook.__dboSpellsInner === original);

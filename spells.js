@@ -47,6 +47,7 @@ module.exports = (api) => {
     // never sold, read, taught or given, and taken from anyone who knows them at their next login
     removedSpells: ['109111:Skyrim.esm'],
     prepareCells: ['20ff:BSHeartland.esm', '6c152:BSHeartland.esm',                             // the Synod Conclave, Bruma
+      '12cb:BSHeartland.esm', '5f78c:BSHeartland.esm', '5f78d:BSHeartland.esm',                 // the Cathedral of St Martin, Bruma
       '1380e:Skyrim.esm', '1380f:Skyrim.esm', 'cab91:Skyrim.esm', '13810:Skyrim.esm', 'cab92:Skyrim.esm'], // College of Winterhold halls
     teachMeters: 5,
     // Only a Master teaches, and only spells of Adept rank and above (Nate, 2026-10-06); the student must be able to learn
@@ -59,7 +60,15 @@ module.exports = (api) => {
     // How long a class's spell stays offered to its students after the class (schools.js classes.offerSpell)
     classOfferSeconds: 180,
     shopCells: ['20ff:BSHeartland.esm', '6c152:BSHeartland.esm'],
-    shopFactions: ['synod', 'college-of-winterhold', 'college-of-whispers'],
+    shopFactions: ['synod', 'college-of-winterhold', 'college-of-whispers', 'great-faiths'],
+    // A faith's temple or a college's own hall sells like the Synod's ledger (Nate, 11 Oct: "Priests in the temples ... the
+    // same/similar abilities as the Colleges"; the College of Whispers at its own Frostcrag Spire). schools: what it stocks
+    // and teaches (none: every school); exclusive: its factions buy only there, not at the Synod. A cell not listed in a
+    // place is the Synod's: every shop faction no exclusive place holds, every school.
+    shopPlaces: [
+      { name: 'The Great Faiths', cells: ['12cb:BSHeartland.esm', '5f78c:BSHeartland.esm', '5f78d:BSHeartland.esm'], factions: ['great-faiths'], schools: ['Restoration', 'Alteration'], exclusive: true },  // the Cathedral of St Martin, Bruma
+      { name: 'The College of Whispers', cells: ['781ad:BSHeartland.esm', '6ff7d:BSHeartland.esm'], factions: ['college-of-whispers'] },  // Frostcrag Spire
+    ],
     shopMinTier: 1,
     shopMaxRank: 3,
     shopPriceMultiplier: 1,
@@ -694,8 +703,20 @@ module.exports = (api) => {
   const regions = () => { const R = globalThis.__dboRegions; return R && R.tomesOn() ? R : null; };
   const soldHere = (R, t) => !R || R.tomeOk(t.bookId, CFG.shopProvince);
   const soldIn = (R, t) => { const w = R ? R.tomeWhere(t.bookId) : null; return w && w.length ? R.listNames(w) : ''; };
-  const inShop = (a) => SHOP_CELLS.has(norm(get(a, 'worldOrCellDesc', '')));
-  const isMember = (a) => { const g = get(a, 'private.dboGuilds', []); return Array.isArray(g) && g.some((m) => m && (CFG.shopFactions || []).includes(String(m.id))); };
+  const PLACES = (CFG.shopPlaces || []).map((p) => ({ name: String(p.name || ''), cells: new Set((p.cells || []).map(norm)), factions: (p.factions || []).map(String), schools: Array.isArray(p.schools) && p.schools.length ? p.schools.map(String) : null, exclusive: p.exclusive === true }));
+  const PLACE_FACTIONS = new Set([].concat(...PLACES.filter((p) => p.exclusive).map((p) => p.factions)));
+  // The shop the buyer stands in: a listed place (a temple), else the Synod's for every faction no place claims
+  const placeOf = (a) => {
+    const cell = norm(get(a, 'worldOrCellDesc', ''));
+    const p = PLACES.find((x) => x.cells.has(cell));
+    if (p) return p;
+    return SHOP_CELLS.has(cell) ? { name: '', factions: (CFG.shopFactions || []).filter((f) => !PLACE_FACTIONS.has(f)), schools: null } : null;
+  };
+  // A school a faction teaches: a temple's own schools, every school for a college
+  const factionSchools = (fid) => { const p = PLACES.find((x) => x.schools && x.factions.includes(String(fid))); return p ? p.schools : null; };
+  const inShop = (a) => !!placeOf(a);
+  const isMember = (a) => { const g = get(a, 'private.dboGuilds', []); const p = placeOf(a); const fs = p ? p.factions : (CFG.shopFactions || []); return Array.isArray(g) && g.some((m) => m && fs.includes(String(m.id))); };
+  const placeStocks = (a, t) => { const p = placeOf(a); return !p || !p.schools || p.schools.includes(t.school); };
   // A mage of a college above its joining rank (Nate, 10 Oct: buying tomes is earned by roleplay, from the second rank up; the
   // lowest rank, Initiate, and the crafting posts buy none). guilds.js: the member's title, its index in the rank list
   const CRAFT_ROLES = new Set(['blacksmith', 'tailor']);
@@ -807,7 +828,7 @@ module.exports = (api) => {
     const learned = new Set(learnedIds(a) || []), book = new Set(knownIds(a));
     const mine = schoolsOf(a);
     const rankOf = (t) => (mine && t.school === mine.primary ? 0 : mine && t.school === mine.secondary ? 1 : 2);
-    const open = shelfOrder(weekNo(Date.now())).filter((t) => (soldFor(a, R, t) || admin) && !learned.has(t.spellId >>> 0) && !book.has(t.spellId >>> 0) && !tomeBlock(a, t) && !rankBlock(a, t));
+    const open = shelfOrder(weekNo(Date.now())).filter((t) => placeStocks(a, t) && (soldFor(a, R, t) || admin) && !learned.has(t.spellId >>> 0) && !book.has(t.spellId >>> 0) && !tomeBlock(a, t) && !rankBlock(a, t));
     const sorted = open.map((t, i) => [t, i]).sort((x, y) => rankOf(x[0]) - rankOf(y[0]) || x[1] - y[1]).map(([t]) => t);
     const size = stockSize(a);
     const first = sorted.filter((t) => rankOf(t) === 0), rest = sorted.filter((t) => rankOf(t) !== 0);
@@ -839,7 +860,7 @@ module.exports = (api) => {
   const shopRefusal = (a) => {
     if (!CFG.enabled) return 'The tome shop is closed.';
     if (!inShop(a)) return 'Tomes are sold inside the Synod Conclave in Bruma.';
-    if (!isMember(a)) return 'The court mage sells tomes only to members of the Synod or a College.';
+    if (!isMember(a)) return placeOf(a) && placeOf(a).name ? `${placeOf(a).name} sells its tomes only to its own.` : 'The court mage sells tomes only to members of the Synod or a College.';
     if (CFG.shopAboveInitiate !== false && !aboveInitiate(a)) return 'The court mage sells tomes to mages of the Synod or a College above Initiate, and not to its smiths or robe-makers. Ask your college\'s leaders about promotion.';
     if (!SPELL_SKILLS.some((s) => tierOf(a, s.id) >= CFG.shopMinTier)) return `Tomes are sold to those with ${SPELL_SKILLS.map((s) => s.label).join(' or ')} at ${TIER_NAMES[CFG.shopMinTier]} or higher.`;
     const next = nextBuyAt(a);
@@ -998,6 +1019,7 @@ module.exports = (api) => {
     if (String(c.m.id) !== String(fid)) return "A spell is taught at your own college's ledger or lectern.";
     if (!inRoomOf(place, teacher)) return `${display(teacher)} must stay within ${TEACH.radiusMeters} m of the ledger or lectern.`;
     if (!collegeTeachable(teacher).some((x) => x.id === sp.id)) return `${display(teacher)} cannot teach ${sp.name}.`;
+    if (factionSchools(fid) && !factionSchools(fid).includes(sp.school)) return `${c.name} teaches ${factionSchools(fid).join(' and ')}, not ${sp.school}.`;
     if ((student >>> 0) === (teacher >>> 0)) return 'You cannot teach yourself.';
     if (!inRoomOf(place, student)) return `${display(student)} must stand within ${TEACH.radiusMeters} m of the ledger or lectern.`;
     const cap = studentCap(student, fid);
@@ -1031,7 +1053,7 @@ module.exports = (api) => {
     return true;
   };
   const spellsMenuFor = (a, student, p, note) => {
-    const rows = collegeTeachable(a).map((sp) => {
+    const rows = collegeTeachable(a).filter((sp) => !factionSchools(p.fid) || factionSchools(p.fid).includes(sp.school)).map((sp) => {
       const tome = heldTomeOf(a, sp.id);
       return { id: `clesson:${student.toString(16)}:${descOf(sp.id)}`, label: `${spellLabel(sp)}${tome ? ' (uses your tome of it)' : ''}` };
     });

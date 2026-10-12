@@ -26,7 +26,9 @@ module.exports = (api) => {
       // Blacksmithing's page shows the craft tiers and recipes (smithing.js __dboSmithView; null without the skill or with
       // smithing off, and then the page keeps its usual tier cards)
       const smith = smithOf(a);
-      return out && smith ? Object.assign({}, out, { smith }) : out;
+      // Arcane Arts' page shows each school's state and today's casting (schools.js __dboSchoolsBrief)
+      let magic = null; try { magic = typeof globalThis.__dboSchoolsBrief === 'function' ? globalThis.__dboSchoolsBrief(a >>> 0) : null; } catch (e) { magic = null; }
+      return out && (smith || magic) ? Object.assign({}, out, smith ? { smith } : {}, magic ? { magicSchools: magic } : {}) : out;
     },
   };
 

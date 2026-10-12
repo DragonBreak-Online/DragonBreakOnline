@@ -561,6 +561,34 @@ ui('lecternCancel', TEACHER, [lastWidget(TEACHER, 'classLectern').nonce]);
   load();
 }
 
+// ---- the Great Faiths at the Cathedral of St Martin, the College of Whispers at Frostcrag (Nate, 11 Oct) -----------------
+{
+  const CATHEDRAL = '12cb:BSHeartland.esm';
+  const PRIESTLY = 0x30, MAGE = 0x31; NAMES[PRIESTLY] = 'Priestly'; NAMES[MAGE] = 'Mageling';
+  for (const a of [PRIESTLY, MAGE]) { put(a, 'profileId', a); online.push(a); }
+  member(PRIESTLY, 'great-faiths', 'Acolyte'); skillAt(PRIESTLY, 'priest', 40); skillAt(PRIESTLY, 'arcane', 40); gold(PRIESTLY, 5000); at(PRIESTLY, CATHEDRAL);
+  let w = shop(PRIESTLY);
+  check('a Great Faiths Acolyte in the Cathedral may buy, and is offered only Restoration and Alteration', w && w.canBuy === true && w.tomes.length > 0 && w.tomes.every((t) => t.school === 'Restoration' || t.school === 'Alteration'), w && [w.whyNot, w.tomes.map((t) => t.school)]);
+  check('...up to Apprentice, as a college student', w.tomes.every((t) => t.rank <= 1), w.tomes.map((t) => t.rankName));
+  at(PRIESTLY, SYNOD);
+  check('the Acolyte at the Synod is refused: the Great Faiths buy only at their Cathedral', shop(PRIESTLY).canBuy === false && /court mage sells tomes only to members of the Synod or a College/.test(shop(PRIESTLY).whyNot), shop(PRIESTLY).whyNot);
+  member(MAGE, 'synod', 'Associate'); skillAt(MAGE, 'priest', 40); skillAt(MAGE, 'arcane', 40); gold(MAGE, 5000); at(MAGE, CATHEDRAL);
+  check('a Synod Associate in the Cathedral is refused: the Great Faiths sell to their own', shop(MAGE).canBuy === false && /The Great Faiths sells its tomes only to its own/.test(shop(MAGE).whyNot), shop(MAGE).whyNot);
+  member(PRIESTLY, 'great-faiths', 'Novice'); at(PRIESTLY, CATHEDRAL);
+  check('a Great Faiths Novice (the joining rank) buys none', shop(PRIESTLY).canBuy === false, shop(PRIESTLY).whyNot);
+  member(PRIESTLY, 'great-faiths', 'Priest'); skillAt(PRIESTLY, 'priest', 60); skillAt(PRIESTLY, 'arcane', 60);
+  w = shop(PRIESTLY);
+  check('a Great Faiths Priest is a Senior: Adept tomes of its schools too', w.tomes.some((t) => t.rank === 2) && w.tomes.every((t) => t.school === 'Restoration' || t.school === 'Alteration'), w.tomes.map((t) => t.school + ' ' + t.rankName));
+  // The College of Whispers buys at its own Frostcrag Spire, every school, and still at the Synod
+  member(MAGE, 'college-of-whispers', 'Whisperer'); put(MAGE, 'private.dboTomeBoughtAt', 0); put(MAGE, 'private.dboTomeBuys', []); at(MAGE, FROSTCRAG);
+  w = shop(MAGE);
+  check('a Whisperer at Frostcrag Spire may buy, any school', w && w.canBuy === true && w.tomes.some((t) => t.school !== 'Restoration' && t.school !== 'Alteration'), w && [w.whyNot, w.tomes.map((t) => t.school)]);
+  at(MAGE, SYNOD);
+  check('...and still at the Synod', shop(MAGE).canBuy === true, shop(MAGE).whyNot);
+  member(MAGE, 'synod', 'Associate'); at(MAGE, FROSTCRAG);
+  check('a Synod Associate at Frostcrag is refused: Frostcrag sells to the College of Whispers', shop(MAGE).canBuy === false && /The College of Whispers sells its tomes only to its own/.test(shop(MAGE).whyNot), shop(MAGE).whyNot);
+}
+
 console.log(`\n${checks - failures}/${checks} passed`);
 process.chdir(os.tmpdir());
 fs.rmSync(dir, { recursive: true, force: true });

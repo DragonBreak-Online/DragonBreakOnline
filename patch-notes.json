@@ -1,5 +1,23 @@
 [
   {
+    "title": "The Great Faiths and the College of Whispers",
+    "date": "2026-10-12",
+    "version": "Server update",
+    "tag": "New",
+    "sections": [
+      {
+        "heading": "Magic",
+        "items": [
+          "The Great Faiths, the order of the Eight Divines at the Cathedral of St Martin in Bruma, are now a faction with ranks from Novice to High Priest. At the Cathedral's Scholars' Ledger they sell Restoration and Alteration tomes to their own members, by rank as the colleges do, and their Senior ranks (Priest and up) teach those spells there.",
+          "At the end of a sermon, everyone who stayed is offered the sermon's spell, as at a college class. You can also change your prepared spells in the Cathedral.",
+          "The College of Whispers now has its own tome shop at the Scholars' Ledger in Frostcrag Spire. Its members can still buy at the Synod Conclave too.",
+          "The Imperial Cult, the Empire's own worship of the Divines, is now a faction too. Its chapel, tome shop and teaching come later.",
+          "The Great Faiths and the Imperial Cult each count as your one guild, and their faithful cannot also serve a Daedric cult."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Force Rune pushes",
     "date": "2026-10-12",
     "version": "Server update",

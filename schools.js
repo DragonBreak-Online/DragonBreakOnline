@@ -620,6 +620,22 @@ module.exports = (api) => {
   // The shop's shelf puts these schools' tomes first (spells.js stockFor); null for a player the schools do not apply to yet
   globalThis.__dboSchoolsActive = (a) => { if (!ready(a)) return null; try { const s = stateOf(a); return { primary: s.primary || null, secondary: s.secondary || null }; } catch (e) { return null; } };
 
+  // The Skills tab's Arcane Arts page (journalskills.js): each school's state, level and today's casting, so a resting or
+  // capped school is plain to see (Nate, 11 Oct)
+  globalThis.__dboSchoolsBrief = (a) => {
+    if (!ready(a) || !isPlayer(a)) return null;
+    const s = stateOf(a);
+    if (!arcaneOf(a).held) return null;
+    const today = s.cast && s.cast.day === new Date(Date.now()).toISOString().slice(0, 10) ? s.cast.units || {} : {};
+    return {
+      castCap: C.castDailyUnits, chosen: !!s.primary, firstAt: FIRST_AT,
+      schools: SCHOOLS.map((school) => {
+        const role = active(s, school) ? roleOf(s, school) : resting(s, school) ? 'resting' : 'closed';
+        return { name: school, role, level: levelOf(s, school), castToday: Math.round((Number(today[school]) || 0) * 10) / 10 };
+      }),
+    };
+  };
+
   // ---- Alteration, both Priest's and Arcane Arts' ------------------------------------------------------------------
   // spells.js asks which rule holds for this character: an old client keeps Priest's alone, as before the schools
   globalThis.__dboSchoolsAlteration = (a) => (ready(a) ? ALTERATION : 'priest');
@@ -657,7 +673,8 @@ module.exports = (api) => {
       // Only a mage is told: a priest casting Oakflesh is on their own path
       if (sp.school === 'Alteration' && ALTERATION === 'both') { if (s.primary) castNotice(casterId, 'alt', 'Alteration is not one of your schools of magic, so this spell trains Priest, not Arcane Arts or a school.'); }
       else if (beforeFirst(casterId, s) && arcaneOf(casterId).held) castNotice(casterId, 'first', `Your schools of magic open at Arcane Arts ${FIRST_AT}; until then casting trains Arcane Arts only.`);
-      else if (s.primary) castNotice(casterId, `off:${sp.school}`, `${sp.school} is ${resting(s, sp.school) ? 'resting' : 'not one of your schools of magic'}: casting it trains Arcane Arts only, not ${sp.school}.`);
+      // Said every hour, not every four (Nate, 11 Oct: a mage trained a resting Conjuration all day without knowing)
+      else if (s.primary) castNotice(casterId, `off:${sp.school}`, `${sp.school} is ${resting(s, sp.school) ? 'resting' : 'not one of your schools of magic'}: casting it trains Arcane Arts only, not ${sp.school}. Your schools: ${[s.primary, s.secondary].filter(Boolean).join(' and ')}.`, HOUR);
       return;
     }
     if (s.cast.day !== today()) s.cast = { day: today(), units: {} };
@@ -1743,6 +1760,8 @@ module.exports = (api) => {
       save(st, s);
       const w = wheel(st, idOf(k.spell.desc), P.wheelValue, Math.max(1, Math.round(P.wheelEvents * f)));
       personal(st, `${display(k.teacher)}'s sermon on ${k.spell.name} is over. You took ${sermonWords.gainWords(f)}; it counts toward Priest.`);
+      // The sermon's spell is offered as a class's is (Nate, 11 Oct: temples teach like the colleges), one tome per sermon
+      if (P.offerSpell !== false && typeof globalThis.__dboSpellsClassOffer === 'function') { try { globalThis.__dboSpellsClassOffer(k.teacher, st, idOf(k.spell.desc), `${k.ref}:${k.startedAt}`); } catch (e) { log('schools: sermon spell offer failed', e.message); } }
       return `${who(st)} x${f} (wheel ${w})`;
     },
   });
