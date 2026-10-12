@@ -115,6 +115,17 @@ for (const [src, what] of [[SILVER_SWORD, 'silver'], [SPIDER_SPIT, 'poison'], [F
   ok(mult(MORTAL, src) === 1, `a mortal takes no ${what} extra`, mult(MORTAL, src));
 }
 ok(mult(NPC_VAMP, FIREBOLT) === 1 && mult(NPC_VAMP, SILVER_SWORD) === 1, 'players only: an NPC carrying the state takes nothing extra');
+// A vampire NPC by its race's Vampire keyword (Nate, 11 Oct: Flames did little to a dungeon's vampires): fire x1.5, silver x1.25
+RECORDS[0x9000] = { type: 'RACE', editorId: 'NordRaceVampire', fields: [{ type: 'KWDA', data: u32(0xa82bb) }] };
+RECORDS[0x9100] = { type: 'NPC_', editorId: 'EncVampire01NordM', fields: [{ type: 'RNAM', data: u32(0x9000) }] };
+RECORDS[0x9200] = { type: 'NPC_', editorId: 'EncBandit01NordM', fields: [{ type: 'RNAM', data: u32(0x9300) }] };
+RECORDS[0x9300] = { type: 'RACE', editorId: 'NordRace', fields: [] };
+const NPC_V = 0x1002, NPC_B = 0x1003;
+store.set(`${NPC_V}|baseDesc`, '9100:x'); store.set(`${NPC_B}|baseDesc`, '9200:x');
+ok(near(mult(NPC_V, FIREBOLT), 1.5), 'a vampire NPC takes 50% more from fire', mult(NPC_V, FIREBOLT));
+ok(near(mult(NPC_V, SILVER_SWORD), 1.25), '...and 25% more from silver', mult(NPC_V, SILVER_SWORD));
+ok(mult(NPC_V, FROSTBITE) === 1 && mult(NPC_V, STEEL_SWORD) === 1, '...nothing extra from frost or steel');
+ok(mult(NPC_B, FIREBOLT) === 1, 'a bandit NPC takes fire as before', mult(NPC_B, FIREBOLT));
 
 // ---- 4. silver: the keyword, the curated list, the wear and wield ban
 ok(mult(WOLF_BEAST, CURATED_BOW) === 1, 'a weapon named silver without the keyword is not silver by default');

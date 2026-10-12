@@ -1,5 +1,19 @@
 [
   {
+    "title": "Vampires fear fire",
+    "date": "2026-10-12",
+    "version": "Server update",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Combat",
+        "items": [
+          "Vampire creatures and NPCs now take 50% more damage from fire and 25% more from silver. Before, only vampire players had these weaknesses."
+        ]
+      }
+    ]
+  },
+  {
     "title": "The Great Faiths and the College of Whispers",
     "date": "2026-10-12",
     "version": "Server update",

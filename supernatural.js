@@ -62,6 +62,10 @@ module.exports = (api) => {
     // half for a pure-blood. The server's damage formula reads no resistance (TES5DamageFormula reads DamageResist only),
     // so it is made here; the vampire races themselves carry no fire weakness.
     fireWeaknessPerStage: 0.25,
+    // A vampire NPC (its race carries the Vampire keyword) takes this much more from fire and from silver: the damage
+    // formula reads no resistance, so without it a dungeon's vampires shrugged off Flames (Nate, 11 Oct). 0 turns it off
+    npcVampireFireWeakness: 0.5,
+    npcVampireSilverWeakness: 0.25,
     // Nate, 4 Oct: a silver weapon and poison strike a werewolf 25% harder, and only in beast form (silver was 50% in
     // every form before). 0 turns either off
     silverWeakness: 0.25, poisonWeakness: 0.25,
@@ -1360,6 +1364,11 @@ module.exports = (api) => {
   globalThis.__dboSuperDamageMult = (agg, tgt, src) => {
     const beast = beastMeleeMult(agg, src);
     const s = isPlayer(tgt) ? stateOf(tgt) : null;
+    if (!s && npcKind(tgt) === 'vampire') {
+      if (isFireSource(src)) return beast * (1 + Math.max(0, Number(C.npcVampireFireWeakness) || 0));
+      if (isSilverSource(src)) return beast * (1 + Math.max(0, Number(C.npcVampireSilverWeakness) || 0));
+      return beast;
+    }
     if (!s || !s.kind) return beast;
     const share = (v) => Math.max(0, Number(v) || 0);
     if (s.kind === 'vampire') {
