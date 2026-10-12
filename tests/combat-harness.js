@@ -18,7 +18,9 @@ const mp = {
   set: (a, k, v) => { if (k === 'percentages') P[a] = v; },
   getDescFromId: (a) => `${a.toString(16)}:x`,
   callPapyrusFunction: (...args) => calls.push(args),
+  getHoster: (a) => HOSTS[a] || 0,
 };
+let HOSTS = {}; const npcPushes = [];
 const API = {
   mp, log: () => {}, profileOf: (a) => (a === 1 || a === 2 ? a : -1),
   masteryOf: (a) => MAST[a] || null,
@@ -26,7 +28,7 @@ const API = {
   recordOf: (id) => (RECS[id] ? { record: RECS[id] } : null),
   fieldsOf: (lr, t) => ((lr && lr.record.fields) || []).filter((f) => f.type === t),
   weaponSkillOf: (src) => (src === SWORD ? 'blade' : ''), display: String, cfg,
-  sendPacket: (a, p) => { if (p.customPacketType === 'dboPush') pushes.push([a, p]); if (p.customPacketType === 'dboStatus') statuses.push([a, p]); },
+  sendPacket: (a, p) => { if (p.customPacketType === 'dboPushNpc') npcPushes.push([a, p]); if (p.customPacketType === 'dboPush') pushes.push([a, p]); if (p.customPacketType === 'dboStatus') statuses.push([a, p]); },
 };
 const load = () => require(path.join(__dirname, '..', 'combat.js'))(API);
 let pass = 0, fail = 0;
@@ -75,15 +77,24 @@ reset(); ok(load().onAttempt(1, 9, SWORD, 20, { power: true }, 1) === 1 && stagg
 reset(); ok(load().onAttempt(1, 2, SWORD, 20, undefined, 1) === 1, 'no flags, no change');
 reset(); load().onAttempt(1, 2, SWORD, 0, { blocked: true, unblockedDamage: 40 }, 1);
 ok(near(P[2].health, 1) && near(P[2].stamina, 1), 'no maxima: chip and stamina skipped');
-// Force Rune staggers a player it hits; other spells, NPC targets and the cooldown do not
-reset(); load().onSpellHit(1, 2, RUNE);
-ok(staggers() === 1, 'Force Rune staggers a player');
+// Force Rune pushes a player it hits at force 10, as the base game's script does (Nate, 11 Oct: it pushed nobody); the
+// cooldown holds, other spells do not push
+reset(); pushes.length = 0; load().onSpellHit(1, 2, RUNE);
+ok(pushes.length === 1 && pushes[0][0] === 2 && pushes[0][1].force === 10 && pushes[0][1].from === 1 && staggers() === 0, 'Force Rune pushes the player it hits, force 10');
 load().onSpellHit(1, 2, RUNE);
-ok(staggers() === 1, 'a second rune inside the cooldown does not');
-reset(); load().onSpellHit(1, 2, FIREBALL);
-ok(staggers() === 0, 'Fireball does not stagger');
-reset(); load().onSpellHit(1, 9, RUNE);
-ok(staggers() === 0, 'an NPC target is left alone');
+ok(pushes.length === 1, 'a second rune inside the cooldown does not');
+reset(); pushes.length = 0; load().onSpellHit(1, 2, FIREBALL);
+ok(staggers() === 0 && pushes.length === 0, 'Fireball does not stagger or push');
+// An NPC is pushed in the game that hosts it: another player's is told with dboPushNpc, the caster's own game pushes its own
+reset(); HOSTS = { 9: 2 }; npcPushes.length = 0; load().onSpellHit(1, 9, RUNE);
+ok(npcPushes.length === 1 && npcPushes[0][0] === 2 && npcPushes[0][1].target === 9 && npcPushes[0][1].force === 10 && npcPushes[0][1].from === 1, 'an NPC hosted by another player: its host is told to push it');
+reset(); HOSTS = { 9: 1 }; npcPushes.length = 0; load().onSpellHit(1, 9, RUNE);
+ok(npcPushes.length === 0, 'an NPC the caster hosts: the caster\'s own push covers it, nothing is sent');
+reset(); HOSTS = {}; npcPushes.length = 0; load().onSpellHit(1, 9, RUNE);
+ok(npcPushes.length === 0 && staggers() === 0, 'an NPC nobody hosts is left alone');
+reset(); HOSTS = { 9: 2 }; npcPushes.length = 0; load().onSpellHit(1, 9, FIREBALL);
+ok(npcPushes.length === 0, 'a Fireball on an NPC sends no push');
+HOSTS = {};
 reset(); load().onSpellHit(2, 2, RUNE);
 ok(staggers() === 0, 'your own rune does not stagger you');
 // An NPC's power attack or rune never staggers a player (playersOnly)

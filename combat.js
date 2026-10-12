@@ -260,8 +260,23 @@ module.exports = (api) => {
     };
   };
 
+  // A push on an NPC (a shout or Force Rune) happens in the game that hosts it: the caster's own push covers an NPC the caster
+  // hosts, and any other host is told with dboPushNpc, which an older client ignores (Nate, 11 Oct: Force Rune pushed nobody)
+  const pushNpc = (agg, tgt, spellId) => {
+    const force = pushForceOf(spellId);
+    if (force < 0 || C.pushNpcs === false || typeof sendPacket !== 'function' || !shoutAllowed(agg, spellId)) return;
+    let host = 0; try { host = typeof mp.getHoster === 'function' ? mp.getHoster(tgt) >>> 0 : 0; } catch (e) { host = 0; }
+    if (!host || host === (agg >>> 0)) return;
+    const s = st(tgt), now = Date.now();
+    if (now - (s.pushedAt || 0) < C.pushCooldownSeconds * 1000) return;
+    s.pushedAt = now;
+    try { sendPacket(host, { customPacketType: 'dboPushNpc', from: agg >>> 0, target: tgt >>> 0, force }); } catch (e) { /* host offline */ }
+    if (C.log) log(`combat ${display(agg)} -> npc ${(tgt >>> 0).toString(16)}: push ${force} via its host ${display(host)} (spell ${spellId.toString(16)})`);
+  };
+
   const onSpellHit = (agg, tgt, spellId) => {
-    if (!C.enabled || agg === tgt || !isPlayer(tgt)) return;
+    if (!C.enabled || agg === tgt) return;
+    if (!isPlayer(tgt)) return pushNpc(agg, tgt, spellId);
     const force = pushForceOf(spellId);
     const disarms = isDisarm(spellId), dismay = dismaySecondsOf(spellId);
     if ((force >= 0 || disarms || dismay) && !shoutAllowed(agg, spellId)) return;
