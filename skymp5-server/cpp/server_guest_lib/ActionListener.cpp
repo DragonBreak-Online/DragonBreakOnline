@@ -2029,13 +2029,37 @@ void ActionListener::OnHit(const RawMessageData& rawMsgData,
     return;
   }
 
-  // An NPC switches weapons in its host's game, which never reports it: any weapon it carries may hit
-  const bool isNpc = partOne.serverState.UserByActor(aggressor) ==
-    Networking::InvalidUserId;
+  // An NPC switches weapons in its host's game, which never reports it: a weapon it carries may hit too. Never for a
+  // player's character, online or logged out (base 0x7: a host of an offline body must not swing its whole inventory),
+  // and never a weapon whose base damage is above every weapon the server has the NPC wearing, so a host cannot arm a
+  // hosted NPC with the loot it carries (review 12 Oct; the Conjure Boneman's sword and bow are both 8)
+  const bool isNpc = !aggressor->IsCreatedAsPlayer() &&
+    partOne.serverState.UserByActor(aggressor) == Networking::InvalidUserId;
   if (isNpc && sourceInEspm.rec &&
       sourceInEspm.rec->GetType() == espm::WEAP::kType &&
       aggressor->GetInventory().HasItem(hitData.source)) {
-    OnWeaponHit(aggressor, targetRef, hitData, false);
+    WorldState* espmProvider = &partOne.worldState;
+    const auto* carried =
+      espm::GetData<espm::WEAP>(hitData.source, espmProvider).weapData;
+    int wornMax = -1;
+    for (auto& entry : equipment.inv.entries) {
+      auto worn = partOne.GetEspm().GetBrowser().LookupById(entry.baseId);
+      if (!worn.rec || worn.rec->GetType() != espm::WEAP::kType) {
+        continue;
+      }
+      const auto* wornData =
+        espm::GetData<espm::WEAP>(entry.baseId, espmProvider).weapData;
+      if (wornData && wornData->damage > wornMax) {
+        wornMax = wornData->damage;
+      }
+    }
+    if (carried && wornMax >= 0 && carried->damage <= wornMax) {
+      OnWeaponHit(aggressor, targetRef, hitData, false);
+      return;
+    }
+    spdlog::debug("{:x} NPC's carried weapon {:x} outdamages its worn ones "
+                  "({}) and cannot be used",
+                  hitData.aggressor, hitData.source, wornMax);
     return;
   }
 
