@@ -1,5 +1,19 @@
 [
   {
+    "title": "The Court tab",
+    "date": "2026-10-12",
+    "version": "Client 0.3.94",
+    "tag": "New",
+    "sections": [
+      {
+        "heading": "Holds",
+        "items": [
+          "The Court tab (F3) now sets the hold's tax rate and each office's weekly wage."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Buying a house",
     "date": "2026-10-12",
     "version": "Client 0.3.94",
@@ -28,7 +42,7 @@
     ]
   },
   {
-    "title": "One tax for everything a hold owns",
+    "title": "Hold taxes and wages",
     "date": "2026-10-12",
     "version": "Server update",
     "tag": "Change",
@@ -36,8 +50,15 @@
       {
         "heading": "Taxes",
         "items": [
-          "A hold's tax rate now covers property as well as rents. The rate a Count, Jarl or Steward sets with /tax (or the ruler sets in the faction panel, F3) is charged each Sunday on every owned house, shop and storage building on the hold's land, from the owner's bank account into the hold's treasury.",
-          "/tax and the faction panel set the same rate, from 0% to 30%. Bruma's rate is up to its officials: it stays 0% until they set one."
+          "A hold's tax rate now covers property as well as rents. The rate its Count, Jarl or Steward sets (with /tax, or on the Treasury page of the faction panel, F3) is charged each Sunday on every owned house, shop and storage building on the hold's land, from the owner's bank account into the hold's treasury.",
+          "The rate is from 0% to 30%. Bruma's rate is up to its officials: it stays 0% until they set one."
+        ]
+      },
+      {
+        "heading": "Wages",
+        "items": [
+          "A hold's officials and guards are now paid every Sunday, into their bank account, without having to be online: Guard 50 gold a week, Guard Captain and Court Mage 100, Steward 150, until the ruler or the Steward sets other wages on the Treasury page (F3). The ruler is never paid, and nobody sets their own wage.",
+          "Wages come from what the hold took in that week and, when that is not enough, from up to a quarter of its savings. What the treasury cannot pay is owed and paid first the next week."
         ]
       }
     ]
