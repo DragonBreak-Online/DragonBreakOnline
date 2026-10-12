@@ -13,13 +13,23 @@ const CHAT_MSG_PROP = 'ff_chatMsg';
 // Skyrim world units per meter ~69.99.
 const UNITS_PER_METER = 70;
 
+// The chat page's admin flag (the Admin tab, the /system gate). Written only when it differs, with an event so the
+// tab row redraws at once instead of at the next chat line (front chat/channels CHAT_ADMIN_EVENT)
+const adminSyncJs = (isAdmin: boolean) =>
+  `(function(){var v=${isAdmin ? "true" : "false"};if(window.__alduinakAdmin!==v){window.__alduinakAdmin=v;try{window.dispatchEvent(new CustomEvent('dbo:chatAdmin'));}catch(e){}}})();`;
+// How often the flag is written again whether or not it changed: a page that missed a write (12 Oct, 0.3.94: senior
+// staff with no Admin tab) catches up within this, where before it waited for the next change that never came
+const ADMIN_RESYNC_MS = 10000;
+
 const buildMountJs = (name: string, isAdmin: boolean, settingsJson: string, chatHidden: boolean) => `(function(){
   try {
     if (!window.skyrimPlatform || !window.skyrimPlatform.widgets) return;
+    // Before the early return below: the caller records this value as written (chatService lastAdmin), so a mount that
+    // finds the chat still there must still write it, or the page keeps an older value until isAdmin changes again
+    ${adminSyncJs(isAdmin)}
     // A reconnect or character switch wipes every widget on the same page, so mount again unless the chat is still there
     if (window.__alduinakChatReady && (window.skyrimPlatform.widgets.get()||[]).some(function(w){ return w && w.type==='chat'; })) return;
     window.__alduinakChatReady = true;
-    window.__alduinakAdmin = ${isAdmin ? 'true' : 'false'};
     window.__dboChatHidden = ${chatHidden ? 'true' : 'false'};
     if (!window.chatMessages) window.chatMessages = [];
 
@@ -439,6 +449,7 @@ export class ChatService extends ClientListener {
       this.mounted = true;
       const name = appearance?.name || "You";
       this.lastAdmin = owner["isAdmin"] === true;
+      this.lastAdminSyncAt = Date.now();
       logTrace(this, "Mounting chat widget (local parse + render)");
       this.sp.browser.executeJavaScript(buildMountJs(name, this.lastAdmin, this.readChatSettings(), this.chatHidden));
       // Chat mounts at login, which is exactly when the race menu is open on a new character.
@@ -449,11 +460,14 @@ export class ChatService extends ClientListener {
     }
 
     // The server syncs isAdmin a few seconds after spawn; keep the CEF global
-    // live so the Admin tab and /system unlock without a relog.
+    // live so the Admin tab and /system unlock without a relog. Written again every ADMIN_RESYNC_MS as well, since
+    // nothing else would ever correct a page that missed a write
     const isAdminNow = owner["isAdmin"] === true;
-    if (isAdminNow !== this.lastAdmin) {
+    const nowMs = Date.now();
+    if (isAdminNow !== this.lastAdmin || nowMs - this.lastAdminSyncAt >= ADMIN_RESYNC_MS) {
       this.lastAdmin = isAdminNow;
-      this.sp.browser.executeJavaScript(`window.__alduinakAdmin = ${isAdminNow ? "true" : "false"};`);
+      this.lastAdminSyncAt = nowMs;
+      this.sp.browser.executeJavaScript(adminSyncJs(isAdminNow));
     }
 
     const liveName = appearance?.name;
@@ -551,6 +565,7 @@ export class ChatService extends ClientListener {
   private lastMsg: string | null = null;
   private lastName: string | null = null;
   private lastAdmin = false;
+  private lastAdminSyncAt = 0;
   private lastOwner: unknown = null;
   private bubbles: { id: number; expiresAt: number }[] = [];
   private systemOverlay: { id: number; expiresAt: number } | null = null;

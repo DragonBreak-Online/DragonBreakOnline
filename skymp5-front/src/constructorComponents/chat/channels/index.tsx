@@ -25,6 +25,11 @@ export const CHAT_CHANNELS: ChatChannel[] = [
 // Tabs only admins may see/use.
 export const ADMIN_ONLY_CHANNELS = ['admin'];
 
+// The client's chatService sets window.__alduinakAdmin and fires this whenever it changes. The tab row listens, so the
+// Admin tab comes and goes at once rather than at the next render the chat happens to do (12 Oct, 0.3.94)
+export const CHAT_ADMIN_EVENT = 'dbo:chatAdmin';
+const pageIsAdmin = () => !!(window as any).__alduinakAdmin;
+
 // The read-only notifications tab.
 export const SYSTEM_CHANNEL = 'system';
 
@@ -67,10 +72,18 @@ const Channels = (props: {
   onSelect: (id: string) => void,
   unread?: Record<string, boolean>,
 }) => {
+  // The flag lives on the page; this only redraws the row when it changes
+  const [, redraw] = React.useReducer((n: number) => n + 1, 0);
+  React.useEffect(() => {
+    const onAdmin = () => redraw();
+    window.addEventListener(CHAT_ADMIN_EVENT, onAdmin);
+    onAdmin(); // a change between the first render and this listener
+    return () => window.removeEventListener(CHAT_ADMIN_EVENT, onAdmin);
+  }, []);
   return (
     <div className="chat-channels">
       {CHAT_CHANNELS
-        .filter((channel) => !ADMIN_ONLY_CHANNELS.includes(channel.id) || (window as any).__alduinakAdmin)
+        .filter((channel) => !ADMIN_ONLY_CHANNELS.includes(channel.id) || pageIsAdmin())
         .map((channel) => (
           <button
             key={channel.id}
