@@ -2123,8 +2123,8 @@ const onCharacterReady = (userId, a) => {
     try { mp.set(a, ADMIN_PROP, isAdmin(a)); } catch (e) { /* ignore */ }
     if (cfg.welcome) system(a, cfg.welcome);
     audit(`JOIN ${who(a)}${staffTierOf(a) ? ' as ' + staffTierOf(a) : ''}${staffCharOf(a) ? ' (staff character)' : ''}`);
-    if (staffCharOf(a)) personal(a, 'This is your GM character, made in your Trial GM slot: for staff work only, not for play.');
     startLoginGrace(a);
+    if (staffCharOf(a)) personal(a, 'This is your GM character, made in your Trial GM slot: for staff work only, not for play.');
     sendDriftConfig(a);
     sendConsoleRights(a, true);
     if (creationPending(a)) startCreationInHub(a);

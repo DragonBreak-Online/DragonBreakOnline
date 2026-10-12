@@ -40,9 +40,10 @@ const uiHandlers = new Map();
 const onUi = (event, fn) => { const l = uiHandlers.get(event) || []; l.push(fn); uiHandlers.set(event, l); };
 const userOf = (a) => a;
 const handleChat = (userId, text) => chatted.push({ userId, text });
-const args = ['personal', 'isAdmin', 'deliver', 'C', 'profileOf', 'ranksOf', 'openWidget', 'closeWidget', 'onUi', 'userOf', 'handleChat'];
+const isTrialStaff = () => false;
+const args = ['personal', 'isAdmin', 'deliver', 'C', 'profileOf', 'ranksOf', 'openWidget', 'closeWidget', 'onUi', 'userOf', 'handleChat', 'isTrialStaff'];
 const api = new Function(...args, section + panelSection + '\nreturn { commands, registerChatCommand, aliasChatCommand, helpGroupsFor, panelTabsFor, openPlayerMenu };')(
-  personal, isAdmin, deliver, C, profileOf, ranksOf, openWidget, closeWidget, onUi, userOf, handleChat);
+  personal, isAdmin, deliver, C, profileOf, ranksOf, openWidget, closeWidget, onUi, userOf, handleChat, isTrialStaff);
 const { commands, registerChatCommand, aliasChatCommand, helpGroupsFor, panelTabsFor, openPlayerMenu } = api;
 const ui = (event, a, ...rest) => (uiHandlers.get(event) || []).forEach((fn) => fn(a, rest));
 registerChatCommand('players', () => {}, { help: 'who is online' });
