@@ -54,36 +54,27 @@ check('legacy mods list gives the names when modNames is missing', P.facePresetF
 const bare = P.facePresetFrom({ version: jslot.version, mods: [] });
 check('a preset with no custom sliders and no sculpt is empty', bare && P.isEmptyFace(bare) && !P.isEmptyFace(face));
 
-// ---- rules ----
-const broken = (name, mutate) => { const j = clone(jslot); mutate(j); check(`refused: ${name}`, P.facePresetFrom(j) === null); };
-broken('no version', (j) => { delete j.version; });
-broken('format version 0', (j) => { j.version.formatVersion = 0; });
-broken('signature not a number', (j) => { j.version.signature = 'SKSE'; });
-broken('a sculpt index at the vertex count', (j) => { j.morphs.sculpt[0].data[0][0] = 9001; });
-broken('a negative sculpt index', (j) => { j.morphs.sculpt[0].data[0][0] = -1; });
-broken('a fractional sculpt index', (j) => { j.morphs.sculpt[0].data[0][0] = 1.5; });
-broken('more vertices than skee indexes (UInt16)', (j) => { j.morphs.sculpt[0].vertices = 70000; });
-broken('zero vertices', (j) => { j.morphs.sculpt[0].vertices = 0; });
-broken('more sculpt entries than vertices', (j) => { j.morphs.sculpt[1].data = new Array(49).fill([0, 1, 1, 1]); });
-broken('a huge sculpt offset', (j) => { j.morphs.sculpt[0].data[1][3] = 1e9; });
-broken('a sculpt entry with three numbers', (j) => { j.morphs.sculpt[0].data[1] = [1, 2, 3]; });
-broken('a host outside Meshes (..)', (j) => { j.morphs.sculpt[0].host = '..\\..\\SKSE\\x.tri'; });
-broken('a rooted host', (j) => { j.morphs.sculpt[0].host = '\\Windows\\x.tri'; });
-broken('a drive host', (j) => { j.morphs.sculpt[0].host = 'C:\\x.tri'; });
-broken('a host that is no .tri', (j) => { j.morphs.sculpt[0].host = 'actors\\head.nif'; });
-broken('seventeen sculpt hosts', (j) => { j.morphs.sculpt = new Array(17).fill(0).map((_, i) => ({ host: `a${i}.tri`, vertices: 4, data: [[0, 1, 1, 1]] })); });
-broken('no sculpt divisor with sculpt', (j) => { delete j.morphs.sculptDivisor; });
-broken('a zero sculpt divisor', (j) => { j.morphs.sculptDivisor = 0; });
-broken('a slider value of 1e9 (skee repeats a slider morph per whole unit)', (j) => { j.morphs.custom[0].value = 1e9; });
-broken('a slider past RaceMenu\'s -1..1 (1.5)', (j) => { j.morphs.custom[0].value = 1.5; });
-broken('a whole number below -1', (j) => { j.morphs.custom[0].value = -2; });
-broken('a preset index past 32', (j) => { j.morphs.custom[0].value = 33; });
-broken('a sculpt offset past 30 units', (j) => { j.morphs.sculpt[0].data[1][3] = 300001; });
-broken('a sculpt offset past 30 units with divisor 1', (j) => { j.morphs.sculptDivisor = 1; j.morphs.sculpt[0].data = [[0, 31, 0, 0]]; });
-broken('a NaN slider value', (j) => { j.morphs.custom[0].value = NaN; });
-broken('a slider name with a control character', (j) => { j.morphs.custom[0].name = 'a\u0001b'; });
-broken('an empty slider name', (j) => { j.morphs.custom[0].name = ''; });
-broken('too many sliders', (j) => { j.morphs.custom = new Array(1025).fill({ name: 'x', value: 1 }); });
+// ---- rules (12 Oct): one entry past them is dropped or clamped on its own, never the whole face ----
+const F = require('./racemenu-face-rules-fixtures');
+let S = null;
+try { S = require(path.resolve('racemenupresets.js')); } catch (e) { S = null; }
+check('racemenupresets.js loads from the repo root', !!S && typeof S.faceFixed === 'function', S && Object.keys(S));
+for (const c of F.cases) {
+  const want = c.out() ? F.encode(c.out()) : null;
+  const cl = P.facePresetFixed(c.input());
+  const sv = S && typeof S.faceFixed === 'function' ? S.faceFixed(F.faceForm(c.input())) : undefined;
+  check(`client: ${c.name}`, (cl ? F.encode(cl.face) : null) === want && F.fixesOf(cl && cl.fixes) === c.fixes, cl && F.fixesOf(cl.fixes));
+  check(`server: ${c.name}`, sv !== undefined && (sv ? F.encode(sv.face) : null) === want && F.fixesOf(sv && sv.fixes) === c.fixes, sv && F.fixesOf(sv.fixes));
+  // The owner's capture (tri counts from the game) is what goes up: the server keeps it as it is, with no fix
+  const tri = c.tri || {};
+  const cap = P.facePresetFixed(c.input(), (h) => (tri[h] === undefined ? -1 : tri[h]));
+  if (cap && sv !== undefined) {
+    const text = P.encodeFace(cap.face);
+    const back = S.faceFixed(JSON.parse(text));
+    check(`  ...the server keeps the client's upload as it is (same text, no fix)`, (!c.captureOut || text === F.encode(c.captureOut())) && !!back && S.encodeFace(back.face) === text && back.fixes.length === 0,
+      back && F.fixesOf(back.fixes));
+  }
+}
 check('refused: not an object', P.facePresetFrom('x') === null && P.facePresetFrom(null) === null && P.facePresetFrom([]) === null);
 const ranged = clone(jslot); ranged.morphs.custom = [{ name: 'Lips', value: 1 }, { name: 'Brows', value: -1 }, { name: 'NosePreset', value: 32 }, { name: 'Fine', value: 0.37 }];
 ranged.morphs.sculpt[0].data = [[0, 300000, -300000, 0]];
@@ -101,7 +92,8 @@ check('a change changes the hash', P.hashText(enc) !== P.hashText(enc.replace('0
 check('FNV-1a of "" and "a" (reference values)', P.hashText('') === '811c9dc5' && P.hashText('a') === 'e40c292c', [P.hashText(''), P.hashText('a')]);
 check('decode refuses junk, empty and oversize text', P.decodeFace('{') === null && P.decodeFace('') === null && P.decodeFace('x'.repeat(P.PRESET_MAX_CHARS + 1)) === null && P.decodeFace(42) === null);
 const bad = JSON.parse(enc); bad.sculpt[0].data[0][0] = 99999;
-check('decode applies the same rules', P.decodeFace(JSON.stringify(bad)) === null);
+const dbad = P.decodeFace(JSON.stringify(bad));
+check('decode applies the same rules (the vertex past the count dropped, the rest kept)', !!dbad && JSON.stringify(dbad.sculpt[0].data) === '[[17,0,0,10000]]' && dbad.sculpt.length === 2 && dbad.custom.length === 2, dbad);
 
 // ---- the sculpt bound: skee writes offsets with no bounds check ----
 const counts = { [HEAD]: 9001, [EYES]: 48 };
@@ -188,21 +180,20 @@ check('file names follow the platform rule', P.presetFileName('self') === 'self'
 check('host rule matches the platform rule', P.isTriPath(HEAD) && P.isTriPath('a/b.TRI') && !P.isTriPath('a..b.tri') && !P.isTriPath(' a.tri') && !P.isTriPath('a.tri ') && !P.isTriPath('x'.repeat(197) + '.tri'));
 
 // ---- the server applies the same rules and text (racemenupresets.js) ----
-let S = null;
-try { S = require(path.resolve('racemenupresets.js')); } catch (e) { S = null; }
 if (S) {
   check('server and client hash alike', S.hashText(big) === P.hashText(big) && S.hashText('') === P.hashText(''));
   check('server re-encodes a client face to the same text', S.encodeFace(S.faceFrom(JSON.parse(enc))) === enc);
-  check('server refuses what the client refuses', S.faceFrom(bad) === null);
+  check('server and client drop the same broken vertex', S.encodeFace(S.faceFrom(bad)) === P.encodeFace(P.decodeFace(JSON.stringify(bad))));
   const huge = JSON.parse(enc); huge.custom[0].value = 1e9;
-  check('server refuses a huge slider too', S.faceFrom(huge) === null && P.decodeFace(JSON.stringify(huge)) === null);
-  for (const v of [1.5, -2, 33, 0.999, 32, -1]) {
+  check('server and client clamp a huge slider alike (to 10)', S.faceFrom(huge).custom[0].value === 10 && P.decodeFace(JSON.stringify(huge)).custom[0].value === 10);
+  for (const v of [1.5, -2, 33, 0.999, 32, -1, 255, 256, -10.5, 12.25, 1e-7]) {
     const t = JSON.parse(enc); t.custom[0].value = v;
-    check(`server and client agree on slider value ${v}`, (S.faceFrom(t) === null) === (P.decodeFace(JSON.stringify(t)) === null));
+    check(`server and client agree on slider value ${v}`, S.encodeFace(S.faceFrom(t)) === P.encodeFace(P.decodeFace(JSON.stringify(t))));
   }
   const far = JSON.parse(enc); far.sculpt[0].data[0][1] = 300001;
-  check('server refuses a sculpt past 30 units too', S.faceFrom(far) === null && P.decodeFace(JSON.stringify(far)) === null);
-} else check('racemenupresets.js loads from the repo root', false);
+  check('server and client clamp a sculpt past 30 units alike', S.faceFrom(far).sculpt[0].data[0][1] === 300000 && P.decodeFace(JSON.stringify(far)).sculpt[0].data[0][1] === 300000);
+  check('server and client share the host rule (KS Hairdo\'s apostrophe taken)', [F.KS, HEAD, 'a..b.tri', ' a.tri', 'C:\\a.tri', 'a"b.tri', 'x'.repeat(197) + '.tri'].every((h) => S.isTriPath(h) === P.isTriPath(h)) && S.isTriPath(F.KS));
+}
 
 console.log(failures ? `${failures} FAILED` : 'all passed');
 process.exit(failures ? 1 : 0);
