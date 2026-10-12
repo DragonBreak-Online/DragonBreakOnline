@@ -40,8 +40,8 @@ check('...but is a Trial GM, logged as trialgm', T.isTrialStaff(TRIAL) === true 
 check('GM and Trial GM roles together give GM', T.tierOf(BOTH) === 'gm' && T.isAdmin(BOTH) && !T.isTrialStaff(BOTH) && T.staffTierOf(BOTH) === 'gm', [T.tierOf(BOTH), T.isTrialStaff(BOTH)]);
 check('a GM, a Lead GM, an Owner and a player are unchanged', T.tierOf(GM) === 'gm' && T.tierOf(LEAD) === 'leadgm' && T.tierOf(OWNER) === 'senior' && T.tierOf(PLAYER) === null && !T.isTrialStaff(PLAYER));
 check('the rank sits below GM', T.TIER_RANK.trialgm > 0 && T.TIER_RANK.trialgm < T.TIER_RANK.gm);
-const ALLOWED = ['rename', 'chargen', 'gmcall', 'tp', 'invis', 'playerinfo', 'bugs'];
-check('exactly the seven rights are on the allowlist', [...T.TRIAL_CAN].sort().join() === ALLOWED.slice().sort().join(), [...T.TRIAL_CAN]);
+const ALLOWED = ['rename', 'chargen', 'gmcall', 'tp', 'invis', 'playerinfo', 'bugs', 'adminchat'];
+check('exactly the eight rights are on the allowlist (adminchat: #gm-chat 12 Oct)', [...T.TRIAL_CAN].sort().join() === ALLOWED.slice().sort().join(), [...T.TRIAL_CAN]);
 check('a Trial GM has each of them', ALLOWED.every((w) => T.staffCan(TRIAL, w)));
 const FORBIDDEN = ['kick', 'ban', 'items', 'gold', 'skills', 'stats', 'housing', 'faction', 'nobility', 'world', 'spawn', 'summon', 'console', 'jail', ''];
 check('...and none of the others', FORBIDDEN.every((w) => !T.staffCan(TRIAL, w)), FORBIDDEN.filter((w) => T.staffCan(TRIAL, w)));
