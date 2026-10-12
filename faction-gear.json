@@ -1,6 +1,50 @@
 {
  "_comment": "Faction gear (server/factiongear.js; built by tools/faction_gear.py from regions.json, edit the SETS there and re-run, or edit an entry here by hand). An item listed here may be crafted only by a member of one of its factions whose rank role is its role (blacksmith for forge work, tailor for the loom and tanning rack) or leader. Nate, 2026-09-28: faction armor and weapons.",
  "items": {
+  "1ac969:DragonBreak Online Edits.esp": {
+   "name": "College of Whispers Cuirass",
+   "set": "College of Whispers",
+   "factions": [
+    "college-of-whispers"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "1ac96e:DragonBreak Online Edits.esp"
+   ]
+  },
+  "1ac96a:DragonBreak Online Edits.esp": {
+   "name": "College of Whispers Gauntlets",
+   "set": "College of Whispers",
+   "factions": [
+    "college-of-whispers"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "1ac970:DragonBreak Online Edits.esp"
+   ]
+  },
+  "1ac96b:DragonBreak Online Edits.esp": {
+   "name": "College of Whispers Greaves",
+   "set": "College of Whispers",
+   "factions": [
+    "college-of-whispers"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "1ac972:DragonBreak Online Edits.esp"
+   ]
+  },
+  "1ac968:DragonBreak Online Edits.esp": {
+   "name": "College of Whispers Hood",
+   "set": "College of Whispers",
+   "factions": [
+    "college-of-whispers"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "1ac96c:DragonBreak Online Edits.esp"
+   ]
+  },
   "a6d7f:Skyrim.esm": {
    "name": "Fur Boots",
    "set": "Stormcloaks",

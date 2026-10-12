@@ -37,6 +37,8 @@ SETS = [
     ('Nightingales', ['cult-nocturnal'], r"^(Nightingale|Karliah's)", None),
     ('Dark Brotherhood', ['dark-brotherhood'], r"^(Shrouded|Ancient Shrouded|Dark Brotherhood)", None),
     ('Thalmor', ['thalmor'], r"^(Hooded )?Thalmor", None),
+    # The College of Whispers' Witchplate with red runes (DLE 9c82f09f, PC 12 Oct): DBO_RecipeWhispers* at the forge, the Artificer's work
+    ('College of Whispers', ['college-of-whispers'], r"^College of Whispers (Hood|Cuirass|Gauntlets|Greaves)$", None),
     ('College of Winterhold', ['college-of-winterhold'], r"^((Hooded )?Arch-Mage's|College Boots|College of Winterhold)", None),
     ('Vampire clans (royal)', ['clan-volkihar'], r"^Vampire Royal Armor$", None),
     ('Vampire clans', VAMPIRES, r"^Vampire (Armor|Boots|Gauntlets|Gloves|Hood|Robes)$", None),
@@ -80,6 +82,18 @@ for desc, r in recipes.items():
         if role != cur['role']: cur['role'] = 'blacksmith'   # made at a forge anywhere: the smith's work
         continue
     items[item] = {'name': name, 'set': hit[0], 'factions': hit[1], 'role': role, 'recipes': [desc]}
+
+# Sets whose recipes regions.json may not list yet (it is regenerated on the PC by ck-mcp/regions.py): kept by hand so a
+# rerun before that regeneration does not drop them; a recipe regions.json does list is merged as above
+HAND_ITEMS = {
+    '1ac968:DragonBreak Online Edits.esp': ('College of Whispers Hood', '1ac96c:DragonBreak Online Edits.esp'),
+    '1ac969:DragonBreak Online Edits.esp': ('College of Whispers Cuirass', '1ac96e:DragonBreak Online Edits.esp'),
+    '1ac96a:DragonBreak Online Edits.esp': ('College of Whispers Gauntlets', '1ac970:DragonBreak Online Edits.esp'),
+    '1ac96b:DragonBreak Online Edits.esp': ('College of Whispers Greaves', '1ac972:DragonBreak Online Edits.esp'),
+}
+for item, (name, recipe) in HAND_ITEMS.items():
+    cur = items.setdefault(item, {'name': name, 'set': 'College of Whispers', 'factions': ['college-of-whispers'], 'role': 'blacksmith', 'recipes': []})
+    if recipe not in cur['recipes']: cur['recipes'].append(recipe)
 
 out = {
     '_comment': 'Faction gear (server/factiongear.js; built by tools/faction_gear.py from regions.json, edit the SETS there '

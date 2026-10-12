@@ -96,6 +96,20 @@
     ]
   },
   {
+    "title": "Armour for the College of Whispers",
+    "date": "2026-10-12",
+    "version": "Server update",
+    "tag": "New",
+    "sections": [
+      {
+        "heading": "Factions",
+        "items": [
+          "The College of Whispers has its own armour: Witchplate with red runes, forged by the College's Artificer."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Voices carry better",
     "date": "2026-10-12",
     "version": "Client 0.3.94",
