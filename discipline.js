@@ -11,7 +11,8 @@
 // The record is the account's (profile), so it follows every character on it. A GM cannot discipline staff; Lead GM and above
 // can. Every action goes to the audit log with who did it and why. A player offline is told at their next login.
 // Records (discipline.json beside world/, never in git): { profiles: { <profile>: [{ n, kind, reason, by, at, char, until?, seen, lifted? }] } }
-// Config "discipline" in gamemode-config.json: { enabled, strikeDays, strikesForReview, maxSuspendDays }.
+// Config "discipline" in gamemode-config.json: { enabled, strikeDays, strikesForReview, maxSuspendDays, record }. record lists
+// actions decided outside the game ({ key, tag, kind: warn|strike, reason, by }), each added once, matched by key.
 const fs = require('fs');
 const path = require('path');
 
@@ -71,10 +72,11 @@ module.exports = (api) => {
     return false;
   };
 
-  const add = (actor, target, kind, reason, until) => {
+  const add = (actor, target, kind, reason, until, from) => {
     const p = profileOf(target);
     const list = D.profiles[p] || (D.profiles[p] = []);
-    const e = { n: list.length + 1, kind, reason, by: display(actor), byProfile: profileOf(actor), at: new Date().toISOString(), char: display(target), seen: false };
+    const e = { n: list.length + 1, kind, reason, by: from ? from.by : display(actor), byProfile: from ? 0 : profileOf(actor), at: new Date().toISOString(), char: display(target), seen: false };
+    if (from) e.key = from.key;
     if (until) e.until = until;
     list.push(e);
     if (!save()) { list.pop(); return null; }
@@ -133,6 +135,17 @@ module.exports = (api) => {
     }
   };
   registerChatCommand('discipline', command, { admin: true, help: '#TAG [warn|strike|suspend <12h|3d>|lift] <reason>: a player\'s record, or list' });
+
+  for (const r of Array.isArray(C.record) ? C.record : []) {
+    if (!r || !r.key || !['warn', 'strike'].includes(r.kind) || String(r.reason || '').length < 5) { log(`discipline: record entry ${r && r.key} refused`); continue; }
+    if (Object.values(D.profiles).some((list) => list.some((e) => e.key === r.key))) continue;
+    const target = findAnyByName(`#${String(r.tag || '').replace(/^#/, '')}`);
+    if (!(target > 0)) { log(`discipline: record ${r.key}: no character #${r.tag}`); continue; }
+    const by = String(r.by || 'staff').slice(0, 40);
+    const e = add(0, target, r.kind, String(r.reason).slice(0, 300), 0, { key: String(r.key), by });
+    if (e) audit(`DISCIPLINE ${r.kind} #${e.n} on ${who(target)} (profile ${profileOf(target)}) by ${by} (config ${r.key}): ${e.reason}`);
+    if (e && onlineActors().includes(target)) { tell(target, e); e.seen = true; save(); }
+  }
 
   // A suspension given while the player was in character select, or a login that raced the record, is caught here
   every('discipline', 30000, () => {
