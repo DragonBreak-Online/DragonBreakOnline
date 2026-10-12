@@ -365,10 +365,10 @@ module.exports = (api) => {
       : `${k}: for rent (${L.deposit} + ${L.weekly}/week), ${L.interest.length} asked${L.interest.length ? ': ' + L.interest.map((x) => x.name).join(', ') : ''}${L.offer ? `; offered to ${L.offer.party.name}` : ''}`);
   };
 
-  // ---- the property panel (front propertyMarket, widget 81; Nate 12 Oct: "i hate chat commands") ------------------------
+  // ---- the property panel (front propertyMarket, widget 82; Nate 12 Oct: "i hate chat commands") ------------------------
   // Opened from the door's property menu (front housing: "For sale and rent"). It always shows the door the player stands
   // at, re-read on every action, so the panel can never act on another property. /property stays for older clients.
-  const PANEL_ID = 81;
+  const PANEL_ID = 82;
   const panels = S.panels instanceof Map ? S.panels : (S.panels = new Map()); // actor -> { key, nonce }
   const holdTaxPct = (zone) => { try { return Math.round(Number(globalThis.__dboHoldTax ? globalThis.__dboHoldTax(zone, 0) : 0) * 100); } catch (e) { return 0; } };
   const panelModel = (a, h) => {
