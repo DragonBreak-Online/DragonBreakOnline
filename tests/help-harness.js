@@ -40,9 +40,14 @@ const uiHandlers = new Map();
 const onUi = (event, fn) => { const l = uiHandlers.get(event) || []; l.push(fn); uiHandlers.set(event, l); };
 const userOf = (a) => a;
 const handleChat = (userId, text) => chatted.push({ userId, text });
-const args = ['personal', 'isAdmin', 'deliver', 'C', 'profileOf', 'ranksOf', 'openWidget', 'closeWidget', 'onUi', 'userOf', 'handleChat'];
+const args = ['personal', 'isAdmin', 'deliver', 'C', 'profileOf', 'ranksOf', 'openWidget', 'closeWidget', 'onUi', 'userOf', 'handleChat',
+  'require', 'path', 'log', 'LEAD_ONLY', 'isLeadStaff', 'onlineActors', 'display', 'tagOf'];
+// The panel's forms, staff topics and names (gamemode.js): the real parser, a Lead GM list, two players online
+const ONLINE = [PLAYER, STAFF];
 const api = new Function(...args, section + panelSection + '\nreturn { commands, registerChatCommand, aliasChatCommand, helpGroupsFor, panelTabsFor, openPlayerMenu };')(
-  personal, isAdmin, deliver, C, profileOf, ranksOf, openWidget, closeWidget, onUi, userOf, handleChat);
+  personal, isAdmin, deliver, C, profileOf, ranksOf, openWidget, closeWidget, onUi, userOf, handleChat,
+  require, { resolve: (f) => path.resolve(__dirname, '..', f) }, () => {}, new Set(['curse']), (a) => a === STAFF, () => ONLINE,
+  (a) => `P${a} #T${a}`, (a) => `T${a}`);
 const { commands, registerChatCommand, aliasChatCommand, helpGroupsFor, panelTabsFor, openPlayerMenu } = api;
 const ui = (event, a, ...rest) => (uiHandlers.get(event) || []).forEach((fn) => fn(a, rest));
 registerChatCommand('players', () => {}, { help: 'who is online' });

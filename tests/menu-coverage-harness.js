@@ -113,14 +113,15 @@ if (s0 < 0 || s1 < s0 || p0 < 0 || p1 < p0) { console.log('FAIL the chat command
 const PLAYER = 1, STAFF = 2, RANKED = 3, BEAST = 4;
 const opened = [], chatted = [];
 const ui = new Map();
-const api = new Function('personal', 'isAdmin', 'deliver', 'C', 'profileOf', 'ranksOf', 'openWidget', 'closeWidget', 'onUi', 'userOf', 'handleChat',
+const api = new Function('personal', 'isAdmin', 'deliver', 'C', 'profileOf', 'ranksOf', 'openWidget', 'closeWidget', 'onUi', 'userOf', 'handleChat', 'require', 'path', 'log', 'LEAD_ONLY', 'isLeadStaff', 'onlineActors', 'display', 'tagOf',
   src.slice(s0, s1) + src.slice(p0, p1) + `
 return { commands, registerChatCommand, helpGroupsFor, panelTabsFor, staffTopics, HELP_GROUPS, HELP_BY_OBJECT, STAFF_HELP,
   PANEL_ASK, PANEL_LABEL: typeof PANEL_LABEL === 'undefined' ? {} : PANEL_LABEL, PANEL_SPLIT: typeof PANEL_SPLIT === 'undefined' ? {} : PANEL_SPLIT,
   PANEL_STAFF: typeof PANEL_STAFF === 'undefined' ? { names: [], hints: [] } : PANEL_STAFF, PANEL_EXTRA, PANEL_WIDGET_ID };`)(
   () => {}, (a) => a === STAFF, () => {}, { WHITE: 'fafafa', SYS: 'eda841' }, (a) => a, (pid) => (pid === RANKED ? [{ zone: { id: 'bruma' }, rank: 'steward' }] : []),
   (a, widget, focus) => opened.push({ a, widget, focus }), () => {}, (ev, fn) => { const l = ui.get(ev) || []; l.push(fn); ui.set(ev, l); }, (a) => a,
-  (userId, text) => chatted.push({ userId, text }));
+  (userId, text) => chatted.push({ userId, text }),
+    require, { resolve: (f) => require('path').resolve(__dirname, '..', f) }, () => {}, new Set(), () => true, () => [], (a) => `P${a}`, (a) => `T${a}`);
 globalThis.__dboSuperKind = (a) => (a === BEAST ? 'werewolf' : null);
 for (const [n, r] of registered) if (!api.commands.has(n)) api.registerChatCommand(n, () => {}, { admin: r.admin, hidden: r.hidden, help: r.help });
 const { commands, HELP_GROUPS, HELP_BY_OBJECT, STAFF_HELP, PANEL_ASK, PANEL_LABEL, PANEL_SPLIT, PANEL_STAFF, PANEL_EXTRA } = api;

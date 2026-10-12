@@ -276,10 +276,11 @@ const flush = () => new Promise((r) => setImmediate(r));
   const start = src.indexOf('const commands = new Map();'), end = src.indexOf("registerChatCommand('players'");
   const pStart = src.indexOf('// ---- the player panel (U)'), pEnd = src.indexOf('globalThis.__dboPanelLeave');
   const opened = [], chatted = [], ui = new Map();
-  const run = new Function('personal', 'isAdmin', 'deliver', 'C', 'profileOf', 'ranksOf', 'openWidget', 'closeWidget', 'onUi', 'userOf', 'handleChat',
+  const run = new Function('personal', 'isAdmin', 'deliver', 'C', 'profileOf', 'ranksOf', 'openWidget', 'closeWidget', 'onUi', 'userOf', 'handleChat', 'require', 'path', 'log', 'LEAD_ONLY', 'isLeadStaff', 'onlineActors', 'display', 'tagOf',
     src.slice(start, end) + src.slice(pStart, pEnd) + '\nreturn { registerChatCommand, panelTabsFor, openPlayerMenu };')(
     () => {}, () => false, () => {}, { WHITE: 'fafafa', SYS: 'eda841' }, (a) => a, () => [], (a, w, f) => opened.push(w), () => {},
-    (e, f) => { const l = ui.get(e) || []; l.push(f); ui.set(e, l); }, (a) => a, (u, t) => chatted.push(t));
+    (e, f) => { const l = ui.get(e) || []; l.push(f); ui.set(e, l); }, (a) => a, (u, t) => chatted.push(t),
+    require, { resolve: (f) => require('path').resolve(__dirname, '..', f) }, () => {}, new Set(), () => true, () => [], (a) => `P${a}`, (a) => `T${a}`);
   run.registerChatCommand('gm', () => {}, { help: '<what you need>: call a GM to you; staff in the game are told at once' });
   for (const n of ['unstuck', 'bug', 'ticket']) run.registerChatCommand(n, () => {}, { help: n });
   const trouble = run.panelTabsFor(1).find((t) => t.key === 'trouble');

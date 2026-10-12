@@ -1148,8 +1148,10 @@ const handleChat = (userId, text) => {
   }
   if (cmd === 'system') { if (!isAdmin(a)) return personal(a, 'Admins only.'); if (body) { broadcast(`[[S]]#{${C.SYS}}${body}`); audit(`GM ${who(a)} /system: ${body}`); staffLog(display(a), tierOf(a), '/system', `${staffWho(a)} (${TIER_LABEL[tierOf(a)] || 'staff'}): /system ${body.slice(0, 300)}`); } return; }
   if (cmd === 'admin') { if (!isAdmin(a)) return personal(a, 'Admins only.'); if (body) broadcast(`[[A]]#{${C.SYS}}${name}: ${body}`, true); return; }
+  // A slash alone opens the panel (U) at its search
+  if (!cmd && hasPlayerMenu(a)) return openPlayerMenu(a, '', '');
   const c = commands.get(cmd);
-  if (!c) return personal(a, `Unknown command /${cmd.slice(0, 32)}. Type /help.`);
+  if (!c) return personal(a, `Unknown command /${cmd.slice(0, 32)}. ${hasPlayerMenu(a) ? 'Type / alone, or press U, to search every command.' : 'Type /help.'}`);
   if (c.admin && !isAdmin(a)) return personal(a, 'Admins only.');
   const sub = `${cmd} ${(body.split(/\s+/)[0] || '').toLowerCase()}`;
   const staffCmd = c.admin || LEAD_ONLY.has(sub);
@@ -2668,10 +2670,9 @@ const PANEL_SPLIT = {
 };
 // Chat reaches these another way (they are not registered commands), so the panel adds them to their topic
 const PANEL_EXTRA = { people: [{ name: 'pm', desc: 'say something to one person, privately' }] };
-// Staff alone are given this tab (isAdmin, the check every staff command makes). Its buttons are views that need no words;
-// everything else a member of staff does is typed, and /adminhelp lists it in the admin tab.
+// Staff alone are given this tab (isAdmin, the check every staff command makes): every staff command by its /adminhelp
+// topic (staffPanelGroups), with these lines under them.
 const PANEL_STAFF = {
-  names: ['adminhelp', 'update', 'load', 'monitor', 'raid', 'placed'],
   hints: ['The admin panel: press F7. Players, Skills, Items, Powers, Teleport, Place, Modes and NPCs.',
     'Placing objects: F7, the Place tab; /placeundo takes back your last one.',
     'Warbands: /warband raise <npc> [n], then follow, attack, charge or unleash; /warband side picks a side.',
@@ -2679,14 +2680,73 @@ const PANEL_STAFF = {
     'Rites: /curse <player> riteclear lets them try again; /curse <#TAG> restore brings back a character a rite killed.',
     'Every staff command, by topic: /adminhelp, or /help admin <topic>.'],
 };
-const panelEntry = (n) => ({ name: n, label: PANEL_LABEL[n] || '/' + n, desc: (commands.get(n) || {}).help || '', ask: PANEL_ASK[n] || null });
+// A command's usage as a form (server\commandforms.js): the panel draws a choice of words and a box or a name list per
+// argument, and builds the line it sends. Usages written in prose get a hand-made form here.
+// Loaded on first use, once per reload; a load that fails leaves every command a plain button
+let formsLoaded = null;
+const formOfHelp = (help) => {
+  if (!formsLoaded) {
+    formsLoaded = () => null;
+    try {
+      const FORMS_JS = path.resolve('commandforms.js');
+      delete require.cache[FORMS_JS];
+      formsLoaded = require(FORMS_JS).formOf;
+    } catch (e) { try { log('commandforms.js failed to load:', e.message); } catch (e2) { /* no log in a harness */ } }
+  }
+  return formsLoaded(help);
+};
+const PANEL_FORM = {
+  level: { variants: [{ word: null, args: [] },
+    ...['health', 'magicka', 'stamina'].map((w) => ({ word: w, args: [{ label: 'points', kind: 'number', optional: true }] }))] },
+  offer: { variants: [{ word: null, args: [{ label: 'gold', kind: 'number', optional: false }] }] },
+};
+// The panel itself is /help, and its search is how a topic or a command is found
+const PANEL_HIDE = new Set(['help']);
+const formFor = (n, help) => {
+  if (PANEL_FORM[n]) return Object.assign({ desc: help }, PANEL_FORM[n]);
+  const f = formOfHelp(help);
+  return f ? { variants: f.variants, usage: f.usage, desc: f.desc || help } : null;
+};
+// With a form the line says what the command does, its usage being the form; the usage is still searched
+const panelEntry = (n) => {
+  const help = (commands.get(n) || {}).help || '';
+  const form = PANEL_ASK[n] ? null : formFor(n, help);
+  return { name: n, label: PANEL_LABEL[n] || '/' + n, desc: form ? form.desc : help, ask: PANEL_ASK[n] || null,
+    form: form ? { variants: form.variants } : null, usage: form && form.usage ? form.usage : '' };
+};
+// Everything a member of staff may run, by the /adminhelp topics; a Lead GM's commands only for a Lead GM and above
+const staffPanelGroups = (a) => {
+  const lead = isLeadStaff(a);
+  return staffTopics().map((t) => ({
+    section: t.title,
+    entries: t.items.filter((i) => lead || !(LEAD_ONLY.has(i.words) || LEAD_ONLY.has(i.words.split(' ')[0]))).map((i) => {
+      const form = formFor(i.words, i.text);
+      return { name: i.words, label: '/' + i.words, desc: form ? form.desc : i.text, ask: null, form: form ? { variants: form.variants } : null,
+        usage: form && form.usage ? form.usage : '', section: t.title };
+    }),
+  })).filter((g) => g.entries.length);
+};
+// Who a player can name in a form: staff see every online player by name and tag; a player only those they have been
+// introduced to, by the name they know (playermenu.js), so the list never names a stranger
+const panelPeople = (a) => {
+  const nameFor = typeof globalThis.__dboNameFor === 'function' ? globalThis.__dboNameFor : null;
+  const staff = isAdmin(a);
+  const out = [];
+  for (const t of onlineActors()) {
+    if ((t >>> 0) === (a >>> 0)) continue;
+    if (staff) { out.push({ label: display(t), value: '#' + tagOf(t) }); continue; }
+    const known = nameFor ? nameFor(a, t) : '';
+    if (known && known !== 'Stranger' && !out.some((p) => p.value === known)) out.push({ label: known, value: known });
+    if (out.length >= 120) break;
+  }
+  return out.sort((x, y) => x.label.localeCompare(y.label));
+};
 const panelTabsFor = (a) => {
   const tabs = [];
   const groups = helpGroupsFor(a);
-  if (isAdmin(a)) groups.push({ key: 'staff', title: 'Staff', names: PANEL_STAFF.names.filter((n) => commands.has(n)), hints: PANEL_STAFF.hints });
   for (const g of groups) {
     const entries = [];
-    for (const n of g.names.filter((x) => x !== 'help')) {
+    for (const n of g.names.filter((x) => !PANEL_HIDE.has(x))) {
       if (PANEL_SPLIT[n]) for (const s of PANEL_SPLIT[n]) entries.push({ name: `${n} ${s.word}`, label: `/${n} ${s.word}`, desc: s.desc, ask: s.ask || null });
       else entries.push(panelEntry(n));
     }
@@ -2695,18 +2755,32 @@ const panelTabsFor = (a) => {
     if (!entries.length && !hints.length) continue;
     tabs.push({ key: g.key, title: PANEL_TITLES[g.key] || g.title, entries, hints });
   }
+  if (isAdmin(a)) {
+    // A command a player tab already offers this person (appoint, officials) is not offered twice
+    const shown = new Set(tabs.flatMap((t) => t.entries.map((e) => e.name)));
+    tabs.push({ key: 'staff', title: PANEL_TITLES.staff, entries: staffPanelGroups(a).flatMap((g) => g.entries).filter((e) => !shown.has(e.name)), hints: PANEL_STAFF.hints });
+  }
   return tabs;
 };
+// The commands /help leaves out of its lists because a key or an object reaches them (HELP_BY_OBJECT): the panel's search
+// still finds them, so a player who only knows a word finds the command
+const panelSearchOnly = (a) => {
+  const staff = isAdmin(a);
+  return [...HELP_BY_OBJECT].filter((n) => { const c = commands.get(n); return !!c && !c.hidden && (!c.admin || staff) && !PANEL_HIDE.has(n); })
+    .sort().map(panelEntry);
+};
+const panelOffered = (a) => new Set(panelTabsFor(a).flatMap((t) => t.entries.map((e) => e.name)).concat(panelSearchOnly(a).map((e) => e.name)));
 const panelState = globalThis.__dboPanelState || (globalThis.__dboPanelState = { caps: new Map(), nonces: new Map() });
 const hasPlayerMenu = (a) => { const c = panelState.caps.get(a >>> 0); return !!c && c.has('playerMenu'); };
 // Any other capability the client's UI named in dbo:uiCaps (hud UI_CAPS): lockpick.js asks for 'lockpickLocal' and
 // supernatural.js for 'riteJudge' before they issue a round the widget judges itself, since an older widget given one
 // would hang or be judged wrongly (DESIGN.md 3.2)
 const hasUiCap = (a, cap) => { const c = panelState.caps.get(a >>> 0); return !!c && c.has(String(cap)); };
-const openPlayerMenu = (a, tab) => {
+const openPlayerMenu = (a, tab, search) => {
   const nonce = `${(a >>> 0).toString(16)}-${Date.now().toString(36)}`;
   panelState.nonces.set(a >>> 0, nonce);
-  openWidget(a, { type: 'playerMenu', id: PANEL_WIDGET_ID, nonce, tab: tab || '', staff: isAdmin(a), tabs: panelTabsFor(a) }, true);
+  openWidget(a, { type: 'playerMenu', id: PANEL_WIDGET_ID, nonce, tab: tab || '', staff: isAdmin(a), tabs: panelTabsFor(a), people: panelPeople(a),
+    searchOnly: panelSearchOnly(a), search: typeof search === 'string' ? search : '' }, true);
 };
 const closePlayerMenu = (a) => { panelState.nonces.delete(a >>> 0); closeWidget(a, PANEL_WIDGET_ID); };
 onUi('uiCaps', (a, args) => { panelState.caps.set(a >>> 0, new Set((args || []).map(String))); });
@@ -2719,8 +2793,7 @@ onUi('close', (a, args, widgetId) => { if (widgetId === PANEL_WIDGET_ID) panelSt
 onUi('menuRun', (a, args) => {
   if (panelState.nonces.get(a >>> 0) !== String((args || [])[0] || '')) return;
   const name = String((args || [])[1] || '').toLowerCase();
-  const offered = new Set(panelTabsFor(a).flatMap((t) => t.entries.map((e) => e.name)));
-  if (!offered.has(name)) return;
+  if (!panelOffered(a).has(name)) return;
   const text = String((args || [])[2] || '').replace(/[\r\n]+/g, ' ').trim();
   closePlayerMenu(a);
   handleChat(userOf(a), `/${name}${text ? ' ' + text : ''}`);
