@@ -28,7 +28,9 @@ ok((h.match(/disabled=""/g) || []).length === 2, 'Send stays off until there is 
 h = render(J.ActionsBox, { points: 0, busy: false, act });
 ok(!/level point/.test(h) && !/\+1 /.test(h), 'no points: no level buttons');
 h = render(J.ActionsBox, { points: 1, busy: true, act });
-ok(/1 level point to spend/.test(text(h)) && !/<button(?![^>]*disabled)[^>]*>/.test(h), 'while an answer is on its way every button waits', h.slice(0, 300));
+// The More links (front d27cb493, 12 Oct) only open the U panel, so they need no answer and never wait
+const live = (h.match(/<button(?![^>]*disabled)[^>]*>[^<]*/g) || []).map((b) => b.replace(/<[^>]*>/, ''));
+ok(/1 level point to spend/.test(text(h)) && live.every((b) => b === 'Open a ticket with staff' || b === 'Every command (U)'), 'while an answer is on its way every button waits (the links to the U panel aside)', live);
 const profile = { name: 'Aela', race: 'Nord', playtime: '3h', backstory: '', origin: '', backstoryMax: 4000, originMax: 1000, skills: [], title: 'Wanderer', titleId: 'x', titles: [] };
 h = render(J.ProfileTab, { data: { profile: Object.assign({ status: [], levelPoints: 1 }, profile) }, editing: false, setEditing: () => {}, busy: false, act });
 ok(/journal__status[\s\S]*journal__actions/.test(h), 'the Profile tab shows them under Status');

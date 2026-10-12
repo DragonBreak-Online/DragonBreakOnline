@@ -76,7 +76,8 @@ clientCaps.add('riteJudge');
 
 // ---- the widget ----
 let t = text(html(both));
-check('the choice: the shrine, Pray, Perform the Rite with its name, Leave', /^Shrine of Molag Bal Pray Perform the Rite Molag Bal's Embrace Leave$/.test(t), t);
+// palette-srv / front d27cb493 (12 Oct): an offering to the shrine's own god sits between the choices and Leave
+check('the choice: the shrine, Pray, Perform the Rite with its name, an offering, Leave', /^Shrine of Molag Bal Pray Perform the Rite Molag Bal's Embrace An offering to Molag Bal Offer .* Leave$/.test(t), t);
 let h = html(both);
 check('Pray is the main button, the rite beside it', /shrine__button shrine__button--primary">Pray</.test(h) && /class="shrine__button">Perform the Rite<span class="shrine__button-sub">Molag Bal&#x27;s Embrace<\/span>/.test(h), h);
 check('no warning until the rite is chosen', !/shrine__warning/.test(h) && !/shrine__fade--grave/.test(h));
@@ -87,7 +88,8 @@ check("choosing the rite: its name, the server's warning, Kneel and Cancel", /Mo
 check('...under the grave shade, with no Leave and no Pray', /shrine__fade--grave/.test(h) && !/Leave/.test(t) && !/>Pray</.test(h), h);
 check('...Kneel is the grave button', /shrine__button shrine__button--grave"[^>]*>Kneel</.test(h), h);
 check('...and it comes up held, so a double click cannot land on Kneel', /<button class="shrine__button shrine__button--grave" disabled="">Kneel<\/button><button class="shrine__button" disabled="">Cancel<\/button>/.test(h), h);
-check('the choice is not held: Pray and Perform the Rite answer at once', !/disabled/.test(html(both)), html(both));
+check('the choice is not held: Pray and Perform the Rite answer at once', /<button class="shrine__button shrine__button--primary">Pray<\/button><button class="shrine__button">Perform the Rite</.test(html(both)), html(both));
+check('...and Offer waits for an amount', /<button class="shrine__button" disabled="">Offer<\/button>/.test(html(both)), html(both));
 
 t = text(html(neither));
 h = html(neither);
@@ -99,7 +101,7 @@ check('an answer from the server shows under the choice', /Arkay has no ear.*Lea
 check('a success shows as one', /shrine__result--ok/.test(html(Object.assign({}, neither, { result: 'The black soul gem drinks the curse from you. You are mortal again.', resultKind: 'ok' }))));
 t = text(html(oldClient));
 check('a client that cannot judge its own strikes: the Embrace in a quiet line, closed until it updates, no rite button',
-  /Molag Bal's Embrace needs the latest game client\..*come back to the shrine\. Leave$/.test(t) && !/>Perform the Rite<span/.test(html(oldClient)), t);
+  /Molag Bal's Embrace needs the latest game client\..*come back to the shrine\..* Leave$/.test(t) && !/>Perform the Rite<span/.test(html(oldClient)), t);
 check('a panel missing a choice still draws', /Shrine of Molag Bal/.test(text(html(Object.assign({}, both, { pray: undefined, rite: undefined })))));
 check('the widget id is a number', both.id === 74 && typeof both.id === 'number', both.id);
 // The confirm view's hold must outlast the server's guard after the choice, or a Kneel the front lets through is one the
