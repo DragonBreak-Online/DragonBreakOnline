@@ -260,8 +260,8 @@ const trialFrom = (profile, roles) => trialRoles.length > 0 && tierFrom(profile,
 const isTrialStaff = (actorId) => trialFrom(profileOf(actorId), rolesOf(actorId));
 // rename: /rename and the panel's Rename; chargen: /chargen; gmcall: /gm list|take|goto|release|close|quiet;
 // tp: /tp and the panel's TP to (to a player only); invis: the panel's Invisible mode; playerinfo: the panel's player
-// list and /charstats; bugs: /bugs
-const TRIAL_CAN = new Set(['rename', 'chargen', 'gmcall', 'tp', 'invis', 'playerinfo', 'bugs']);
+// list and /charstats; bugs: /bugs; adminchat: the chat's Admin tab and /admin (#gm-chat 12 Oct: trials had no admin tab)
+const TRIAL_CAN = new Set(['rename', 'chargen', 'gmcall', 'tp', 'invis', 'playerinfo', 'bugs', 'adminchat']);
 const staffCan = (actorId, what) => isAdmin(actorId) || (TRIAL_CAN.has(what) && isTrialStaff(actorId));
 // The tier for logs and the role sync: an admin tier, 'trialgm', or null
 const staffTierFrom = (profile, roles) => tierFrom(profile, roles) || (trialFrom(profile, roles) ? 'trialgm' : null);
@@ -361,7 +361,7 @@ const bubbleNear = (fromActor, rangeM, cmd, name, body) => {
   for (const a of actorsNear(fromActor, rangeM, true)) sendPacket(a, packet);
 };
 // ---- end chat bubbles ----
-const broadcast = (line, onlyAdmins) => { for (const a of onlineActors()) if (!onlyAdmins || isAdmin(a)) deliver(a, line); };
+const broadcast = (line, onlyAdmins) => { for (const a of onlineActors()) if (!onlyAdmins || staffCan(a, 'adminchat')) deliver(a, line); };
 const findByName = (query) => {
   let q = String(query).trim().toLowerCase(); const all = onlineActors();
   const tagMatch = q.match(/#([a-z0-9]{4})$/);
@@ -616,11 +616,11 @@ const adminResyncing = (a) => { const t = adminResyncAt.get(a >>> 0); return t !
 const resyncAdminFlag = (userId, a) => {
   setTimeout(() => {
     try {
-      if (actorOf(userId) !== a || !isAdmin(a)) return;
+      if (actorOf(userId) !== a || !staffCan(a, 'adminchat')) return;
       adminResyncAt.set(a >>> 0, Date.now());
       mp.set(a, ADMIN_PROP, false);
       setTimeout(() => {
-        try { if (actorOf(userId) === a) mp.set(a, ADMIN_PROP, isAdmin(a)); } catch (e) { /* gone */ }
+        try { if (actorOf(userId) === a) mp.set(a, ADMIN_PROP, staffCan(a, 'adminchat')); } catch (e) { /* gone */ }
         adminResyncAt.delete(a >>> 0);
       }, ADMIN_RESYNC_GAP_MS);
     } catch (e) { adminResyncAt.delete(a >>> 0); }
@@ -633,7 +633,7 @@ const watchPlayers = () => {
     // official who is offline (logging out unmasks)
     const now = { name: realNameOf(a), tier: tierOf(a), roles: rolesOf(a).sort().join(',') };
     const prev = seen.get(p);
-    if (!adminResyncing(a)) { try { if ((mp.get(a, ADMIN_PROP) === true) !== (now.tier !== null)) mp.set(a, ADMIN_PROP, now.tier !== null); } catch (e) { /* ignore */ } }
+    if (!adminResyncing(a)) { try { const shown = staffCan(a, 'adminchat'); if ((mp.get(a, ADMIN_PROP) === true) !== shown) mp.set(a, ADMIN_PROP, shown); } catch (e) { /* ignore */ } }
     // A beast form's name (beastform.js) is not a rename; seen keeps the real one until the revert
     let beastNamed = false; try { const b = mp.get(a, 'private.beast'); beastNamed = !!(b && b.form); } catch (e) { /* not ready */ }
     if (beastNamed) { if (!prev) continue; now.name = prev.name; }
@@ -1263,7 +1263,7 @@ const handleChat = (userId, text) => {
     deliver(t, `[[PM]]${name}|${msg}`); return;
   }
   if (cmd === 'system') { if (!isAdmin(a)) return personal(a, 'Admins only.'); if (body) { broadcast(`[[S]]#{${C.SYS}}${body}`); audit(`GM ${who(a)} /system: ${body}`); staffLog(display(a), tierOf(a), '/system', `${staffWho(a)} (${TIER_LABEL[tierOf(a)] || 'staff'}): /system ${body.slice(0, 300)}`); } return; }
-  if (cmd === 'admin') { if (!isAdmin(a)) return personal(a, 'Admins only.'); if (body) broadcast(`[[A]]#{${C.SYS}}${name}: ${body}`, true); return; }
+  if (cmd === 'admin') { if (!staffCan(a, 'adminchat')) return personal(a, 'Admins only.'); if (body) broadcast(`[[A]]#{${C.SYS}}${name}: ${body}`, true); return; }
   // A slash alone opens the panel (U) at its search
   if (!cmd && hasPlayerMenu(a)) return openPlayerMenu(a, '', '');
   const c = commands.get(cmd);
@@ -2262,8 +2262,8 @@ const onCharacterReady = (userId, a) => {
   setTimeout(() => { if (actorOf(userId) === a && !creationPending(a)) { try { redress(a); } catch (e) { log('redress failed', e.message); } } }, 12000);
   setTimeout(timed('loginSetup', () => {
     if (actorOf(userId) !== a) return;
-    try { mp.set(a, ADMIN_PROP, isAdmin(a)); } catch (e) { /* ignore */ }
-    if (isAdmin(a)) resyncAdminFlag(userId, a);
+    try { mp.set(a, ADMIN_PROP, staffCan(a, 'adminchat')); } catch (e) { /* ignore */ }
+    if (staffCan(a, 'adminchat')) resyncAdminFlag(userId, a);
     if (cfg.welcome) system(a, cfg.welcome);
     audit(`JOIN ${who(a)}${staffTierOf(a) ? ' as ' + staffTierOf(a) : ''}${staffCharOf(a) ? ' (staff character)' : ''}`);
     startLoginGrace(a);

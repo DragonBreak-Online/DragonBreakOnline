@@ -20,7 +20,7 @@ const wEnd = src.indexOf("every('watch', 5000");
 check('gamemode.js has the watch block', wStart > 0 && wEnd > wStart);
 const block = src.slice(wStart, wEnd);
 check('the watch block can resync the isAdmin flag (resyncAdminFlag)', /const resyncAdminFlag = /.test(block));
-check('loginSetup resyncs every staff member after setting isAdmin', /mp\.set\(a, ADMIN_PROP, isAdmin\(a\)\);[^\n]*\n\s*if \(isAdmin\(a\)\) resyncAdminFlag\(userId, a\);/.test(src));
+check('loginSetup resyncs everyone with the Admin tab (staff and Trial GMs) after setting isAdmin', /mp\.set\(a, ADMIN_PROP, staffCan\(a, 'adminchat'\)\);[^\n]*\n\s*if \(staffCan\(a, 'adminchat'\)\) resyncAdminFlag\(userId, a\);/.test(src));
 
 // Fake clock and timers
 let now = 1000000;
@@ -49,10 +49,10 @@ const mp = {
   set: (a, k, v) => { props.set(k, v); if (k === 'isAdmin') sent.push({ at: now, v }); },
 };
 let tier = 'senior';
-const fns = new Function('mp', 'onlineActors', 'profileOf', 'nameOf', 'realNameOf', 'tierOf', 'rolesOf', 'audit', 'who', 'actorOf', 'isAdmin', 'ADMIN_PROP', 'setTimeout', 'globalThis',
+const fns = new Function('mp', 'onlineActors', 'profileOf', 'nameOf', 'realNameOf', 'tierOf', 'rolesOf', 'audit', 'who', 'actorOf', 'isAdmin', 'staffCan', 'ADMIN_PROP', 'setTimeout', 'globalThis',
   block + '\nreturn { watchPlayers, resyncAdminFlag: typeof resyncAdminFlag === "function" ? resyncAdminFlag : null };')(
   mp, () => [A], () => 2, () => 'GM Nate', () => 'GM Nate', () => tier, () => ['1'], () => {}, () => 'GM Nate #DTTM', (u) => (u === USER ? A : 0),
-  () => tier !== null, 'isAdmin', fakeSetTimeout, {});
+  () => tier !== null, () => tier !== null, 'isAdmin', fakeSetTimeout, {});
 
 // The client: the owner model follows every isAdmin the server sends; chatService writes the page when it differs from
 // lastAdmin. It starts in the state the screenshot showed: lastAdmin true, the page false
