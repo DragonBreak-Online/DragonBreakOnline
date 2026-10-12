@@ -2,8 +2,9 @@
 // explosion places an NPC_ (DLC2AshGuardianRune -> DLC2AshGuardianProjectile02 -> DLC2ExplosionAshGuardian ->
 // DLC2SummonAshGuardian) places that NPC as the caster's summon through companions.spawn: where the explosion hit an actor,
 // or in front of the caster when no hit arrives; one per cast, guarding its spot, until killed by default. A spell with no
-// such explosion places nothing, and "explosionSummonEnabled": false switches it off. Real espmMagic on fake records,
-// real companionSystem; settings and placement stubbed. Run it from skymp5-server with node_modules present:
+// such explosion, or a scroll's (Dragonborn's spider scrolls), places nothing, and "explosionSummonEnabled": false switches
+// it off. Real espmMagic on fake records, real companionSystem; settings and placement stubbed. Run it from skymp5-server
+// with node_modules present:
 //
 //   node tests/ash-guardian-harness.js
 'use strict';
@@ -23,6 +24,9 @@ const A = 0xff000101, WOLF = 0xff000200;
 const PLAYER_BASE = 0x7;
 const RUNE = 0x04017782, MGEF = 0x0401777e, PROJ = 0x04017783, EXPL = 0x04017781, GUARDIAN = 0x040177b6;
 const FIRE = 0x12fcd, FIRE_MGEF = 0x12fce, FIRE_PROJ = 0x12fcf, FIRE_EXPL = 0x12fd0, FIRE_LIGHT = 0x12fd1;
+// DLC2ExpSpiderFireCloakScroll: a scroll whose explosion places its spider (DLC2ExpSpiderFireCloakingFriend)
+const SCROLL = 0x0401952c, SP_MGEF = 0x0401952d, SP_PROJ = 0x04019530, SP_EXPL = 0x04019531, SPIDER = 0x04019529;
+const ATRONACH = 0x204c0;
 
 const STUBS = {
   '../settings': 'module.exports = { Settings: { get: async () => ({ allSettings: globalThis.__ashSettings || {} }) } };',
@@ -46,6 +50,12 @@ const RECORDS = {
   [FIRE_PROJ]: ['PROJ', [field('DATA', u32(0x80, 0x24, FIRE_EXPL))]],
   [FIRE_EXPL]: ['EXPL', [field('DATA', u32(52, 0x10, FIRE_LIGHT))]],
   [FIRE_LIGHT]: ['LIGH', []],
+  [SCROLL]: ['SCRL', spel(SP_MGEF)],
+  [SP_MGEF]: ['MGEF', [field('DATA', mgefData(SP_PROJ))]],
+  [SP_PROJ]: ['PROJ', [field('DATA', u32(0x80, 0x24, SP_EXPL))]],
+  [SP_EXPL]: ['EXPL', [field('DATA', u32(52, 0x10, SPIDER))]],
+  [SPIDER]: ['NPC_', []],
+  [ATRONACH]: ['NPC_', []],
 };
 
 (async () => {
@@ -165,6 +175,22 @@ const RECORDS = {
   conj.onSpellCast(A, RUNE);
   advance(2000);
   check('explosionSummonEnabled false: off', placed.length === 0, placed);
+
+  // Only a spell's explosion becomes a summon: Dragonborn's spider scrolls place their spiders through the same chain
+  ({ companions, conj } = await boot());
+  now += 5000;
+  let own = companions.spawn(A, ATRONACH, { kind: 'summon', durationSec: 600 });
+  conj.onSpellCast(A, SCROLL);
+  advance(2000);
+  check('a spider scroll\'s cast places no spider, even with no hit', !placed.some((x) => x.base === SPIDER), placed);
+  check('...and the caster keeps their own summon', companions.info(own)?.ownerId === A, companions.info(own));
+  ({ companions, conj } = await boot());
+  now += 5000;
+  own = companions.spawn(A, ATRONACH, { kind: 'summon', durationSec: 600 });
+  conj.onSpellHit(A, WOLF, SCROLL);
+  advance(2000);
+  check('a spider scroll\'s hit places no spider', !placed.some((x) => x.base === SPIDER), placed);
+  check('...and the caster keeps their own summon', companions.info(own)?.ownerId === A, companions.info(own));
 
   global.setTimeout = realTimeout; global.clearTimeout = realClear;
   Date.now = realNow;

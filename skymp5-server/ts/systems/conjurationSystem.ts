@@ -111,7 +111,7 @@ export class ConjurationSystem implements System {
       this.companions.spawn(casterId, pick.effect.assocId, { kind: "summon", durationSec: this.duration(pick.timed, casterId, "summon"), source: spellId });
       return;
     }
-    const placed = this.placedNpc(effects);
+    const placed = this.placedNpc(spellId, effects);
     if (placed) {
       if (Date.now() - (this.lastPlaceHit.get(casterId) ?? 0) <= PLACE_HIT_FIRST_MS) return;
       this.clearPlace(casterId);
@@ -128,7 +128,7 @@ export class ConjurationSystem implements System {
   }
 
   private onSpellHit(aggressorId: number, targetId: number, spellId: number): void {
-    const placed = this.placedNpc(spellEffects(this.mp, spellId));
+    const placed = this.placedNpc(spellId, spellEffects(this.mp, spellId));
     if (placed && isPlayerActor(this.mp, aggressorId)) this.placeAtHit(aggressorId, targetId, spellId, placed);
     for (const effect of spellEffects(this.mp, spellId)) {
       if (effect.archetype === MgefArchetype.Banish) {
@@ -288,13 +288,18 @@ export class ConjurationSystem implements System {
   }
 
   // The NPC_ the spell's explosion places in the caster's own game only, which the server places for everyone instead
-  private placedNpc(effects: SpellEffect[]): number {
+  private placedNpc(spellId: number, effects: SpellEffect[]): number {
     if (!this.explosionSummonOn) return 0;
     for (const e of effects) {
       const id = explosionPlacedNpc(this.mp, e.mgefId);
-      if (id) return id;
+      // A spell's only: Dragonborn's spider scrolls place their spiders through the same chain
+      if (id) return this.isSpell(spellId) ? id : 0;
     }
     return 0;
+  }
+
+  private isSpell(spellId: number): boolean {
+    try { return this.mp.lookupEspmRecordById(spellId)?.record?.type === "SPEL"; } catch { return false; }
   }
 
   private clearPlace(casterId: number): void {
