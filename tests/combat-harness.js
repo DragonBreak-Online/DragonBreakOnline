@@ -74,6 +74,13 @@ ok(staggers() === 1, 'Master power attack staggers through a weapon block');
 // spells, NPC targets, no flags and no maxima change nothing
 reset(); ok(load().onAttempt(1, 2, SWORD, 20, { spell: true, power: false }, 1) === 1 && staggers() === 0, 'spells are left alone');
 reset(); ok(load().onAttempt(1, 9, SWORD, 20, { power: true }, 1) === 1 && staggers() === 0, 'NPC targets are left alone');
+// An NPC's blow into a player's block costs the player as a player's does, never with a stagger (#bugs 12 Oct: "you can
+// block forever without stamina" in dungeons); its other rules stay off in PvE
+reset(); P[2].stamina = 0.05; load().onAttempt(9, 2, SWORD, 0, { blocked: true, unblockedDamage: 40, targetMaxHealth: 200, targetMaxStamina: 100 }, 1);
+ok(P[2].stamina === 0 && P[2].health < 1 && globalThis.__dboCombat.get(2).guardBrokenUntil > Date.now() && staggers() === 0, 'an NPC\'s blocked blow: chip, stamina, and a broken guard at 0, with no stagger', P[2]);
+const hBefore = P[2].health; load().onAttempt(9, 2, SWORD, 0, { blocked: true, unblockedDamage: 40, targetMaxHealth: 200, targetMaxStamina: 100 }, 1);
+ok(near(P[2].health, hBefore - 40 / 200), '...and the next blocked blow lands in full while the guard is broken', [hBefore, P[2].health]);
+reset(); ok(load().onAttempt(9, 2, SWORD, 20, { power: true, unblockedDamage: 20 }, 1) === 1 && staggers() === 0, 'an NPC\'s power attack still staggers nobody');
 reset(); ok(load().onAttempt(1, 2, SWORD, 20, undefined, 1) === 1, 'no flags, no change');
 reset(); load().onAttempt(1, 2, SWORD, 0, { blocked: true, unblockedDamage: 40 }, 1);
 ok(near(P[2].health, 1) && near(P[2].stamina, 1), 'no maxima: chip and stamina skipped');
