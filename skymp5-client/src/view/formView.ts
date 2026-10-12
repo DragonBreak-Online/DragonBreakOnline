@@ -849,6 +849,8 @@ export class FormView {
         && playerActor.hasLOS(refr)
         && !this.isSweetHidePerson(refr)
         && FormView.adminViewOf(model) !== "hidden"
+        // Nor over someone under an Invisibility spell or potion (#bugs 1 Oct: "you can see invisible people's names")
+        && !this.spellInvisible(refr)
         // A werewolf or Vampire Lord is not recognisable: no name and no #TAG over a beast, even to those who know the
         // player (#bugs 'werewolf shows nametag of player', 2026-09-26)
         && !this.isBeastCopy(model);
