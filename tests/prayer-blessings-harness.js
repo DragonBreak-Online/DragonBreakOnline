@@ -475,6 +475,175 @@ worship('sheogorath');
 b = blessing();
 check('Sheogorath can hand over a boon the server keeps (the Ancestors\' ward)', poolAt >= 0 && !!b && b.deity === 'ancestors' && b.spell === 0 && out.packets.length === 0, JSON.stringify(b));
 
+// ---- 15. display abilities for the server's own boons (12 Oct: "players like visuals for all boons") ---------------
+// A deity whose boon the server keeps can name a display-only Ability (blessingDisplay): learned for as long as the
+// blessing runs so it shows in Active Effects, taken back wherever the blessing ends. skills.json ships them empty.
+check('skills.json ships every blessingDisplay empty, on the six server boons only',
+  SKILLS.deities.choices.filter((c) => 'blessingDisplay' in c).map((c) => c.id).sort().join(',') === 'ancestors,hermaeusmora,hist,ithelia,sanguine,yokudan'
+  && SKILLS.deities.choices.every((c) => !c.blessingDisplay));
+// empty ids: the old behaviour (sections 2 and 14 ran with them)
+load();
+check('with no ids the boot line names none', out.logs.some((l) => l === "prayer: display abilities for the server's boons: 0 of 0 named"), out.logs.filter((l) => /display abil/.test(l)).join(' | '));
+worship('hist'); learned.clear();
+prayAndWin('hist');
+check('and a Hist blessing teaches nothing and records no display', calls('AddSpell').length === 0 && blessing() && !('display' in blessing()), JSON.stringify(blessing()));
+{
+  const DISP = { hist: 0xd15001, sanguine: 0xd15002, hermaeusmora: 0xd15003, ancestors: 0xd15004, yokudan: 0xd15005, ithelia: 0xd15006 };
+  const displayDesc = (id) => `${DISP[id].toString(16)}:DragonBreak Online Edits.esp`;
+  // display records: an Ability (SPIT type 4), constant effect (cast type 0), self, one effect with no duration
+  for (const id of ['hist', 'sanguine', 'hermaeusmora', 'ithelia']) records.set(DISP[id], spel([`DBO_BoonDisplay_${id}`, 4, 0, 0, [0]]));
+  records.set(DISP.yokudan, spel(['DBO_BoonDisplay_yokudan', 0, 1, 0, [28800]]));    // a Fire-and-Forget Spell: not an Ability
+  // the Ancestors' id names a record that is not in the load order (the PC's DLE not deployed yet)
+  const setIds = (ids) => { for (const c of SKILLS.deities.choices) if ('blessingDisplay' in c) c.blessingDisplay = ids[c.id] || ''; };
+  setIds({ hist: displayDesc('hist'), sanguine: displayDesc('sanguine'), hermaeusmora: displayDesc('hermaeusmora'), ancestors: displayDesc('ancestors'),
+    yokudan: displayDesc('yokudan'), ithelia: 'DBO_BoonDisplay_Ithelia' });
+  const dispFor = (id) => DISP[id];
+  const removed = (id) => calls('RemoveSpell').filter((c) => c.spell === dispFor(id)).length;
+  const added = (id) => calls('AddSpell').filter((c) => c.spell === dispFor(id)).length;
+
+  // a blessing granted by the code before this one, still running at the reload that ships it (memory: reload over old state)
+  const fs = require('fs'), os = require('os'), cp = require('child_process');
+  const OLD_REF = process.env.PRAYER_OLD_REF || 'ba438c574f4c728c217402eedb318713e21ff06c';
+  let oldDir = null;
+  try {
+    oldDir = fs.mkdtempSync(path.join(fs.existsSync('/dev/shm') ? '/dev/shm' : os.tmpdir(), 'claude-nate-prayer-old-'));
+    for (const f of ['prayer.js', 'minigames.js']) fs.writeFileSync(path.join(oldDir, f), cp.execFileSync('git', ['-C', SERVER, 'show', `${OLD_REF}:${f}`]));
+  } catch (e) { oldDir = null; console.log(`(the old prayer.js at ${OLD_REF} could not be read: ${e.message})`); }
+  if (oldDir) {
+    const OLDP = path.join(oldDir, 'prayer.js');
+    delete require.cache[OLDP]; handlers.clear(); commands.clear(); timers.clear(); require(OLDP)(api);
+    worship('hist'); learned.clear();
+    prayAndWin('hist');
+    const before = blessing();
+    timers.get('prayerBlessings')();
+    // the release: the new module over the old one's globalThis state and records
+    clear(); load();
+    sweep();
+    const b15 = blessing();
+    check('reload over old state: a Hist blessing the old code gave (no display) gets its display ability at the first sweep after the reload',
+      !!before && !('display' in before) && !!b15 && b15.display === DISP.hist && learned.has(DISP.hist) && added('hist') === 1 && b15.until === before.until && b15.deity === 'hist',
+      JSON.stringify({ before, after: b15 }));
+    clear(); sweep();
+    check('and once: the next sweep sends nothing', out.papyrus.length === 0 && out.packets.length === 0, JSON.stringify(out.papyrus));
+    fs.rmSync(oldDir, { recursive: true, force: true });
+  }
+  clear(); load();
+  const bootDisp = out.logs.find((l) => /display abilities for the server's boons/.test(l)) || '';
+  check('the boot line counts the good ones: 3 of 6 named (hist, sanguine, hermaeusmora)',
+    /: 3 of 6 named \(/.test(bootDisp) && /hist d15001/.test(bootDisp) && /sanguine d15002/.test(bootDisp) && /hermaeusmora d15003/.test(bootDisp), bootDisp);
+  const warns = () => out.logs.filter((l) => /^prayer: the display ability of /.test(l));
+  check('a missing record, a non-Ability and an unresolvable id are each logged once, at boot',
+    warns().length === 3 && warns().some((l) => /Ancestors .* cannot be read/.test(l)) && warns().some((l) => /Yokudan .* is not an Ability \(SPIT type 0\)/.test(l))
+    && warns().some((l) => /Ithelia .* does not resolve/.test(l)), warns().join(' | '));
+
+  // grant
+  worship('hist'); learned.clear();
+  prayAndWin('hist');
+  let bh = blessing();
+  check('a Hist blessing with a display id: the display Ability is learned (AddSpell), nothing is cast, the record keeps it',
+    added('hist') === 1 && learned.has(DISP.hist) && casts().length === 0 && bh.display === DISP.hist && bh.spell === 0 && bh.via === undefined, JSON.stringify(bh));
+  check('the log says it was given as a spell', out.logs.some((l) => /blessing of The Hist \(the server's own\) given .*display ability d15001 given as a spell/.test(l)));
+  const regen = globalThis.__dboBlessingRegen(ACTOR);
+  check('the boon is not doubled: the regeneration held is still the Hist\'s one +50% (the display carries no stat)',
+    regen.length === 1 && regen[0].av === 'HealRateMult' && regen[0].mag === 50, JSON.stringify(regen));
+  wallClock += 60000; sweep();
+  check('a sweep while it runs touches nothing', out.papyrus.length === 0 && out.packets.length === 0);
+  // relog
+  globalThis.__dboDeityForget(ACTOR); wallClock += 60000; clear();
+  globalThis.__dboPrayerLogin(ACTOR);
+  check('a login while it runs gives the display Ability again (a known spell: no change), and casts nothing',
+    added('hist') === 1 && calls('RemoveSpell').length === 0 && learned.has(DISP.hist) && casts().length === 0 && blessing().display === DISP.hist, JSON.stringify(out.papyrus));
+  // replace
+  props.delete(ACTOR + '|private.prayedShrines');
+  worship('sanguine'); props.set(ACTOR + '|private.dboBlessing', bh);
+  clear(); prayAndWin('sanguine');
+  const bs = blessing();
+  const order = out.papyrus.map((c) => `${c.fn}:${c.spell.toString(16)}`).join(' ');
+  check('a new blessing over it: the Hist\'s display is taken back, then Sanguine\'s given',
+    order === 'RemoveSpell:d15001 AddSpell:d15002' && !learned.has(DISP.hist) && learned.has(DISP.sanguine) && bs.display === DISP.sanguine, order);
+  check('and Sanguine\'s appetite is still the server\'s', globalThis.__dboPrayerHungerMult(ACTOR) === 0.5);
+  // expiry at the sweep
+  wallClock = bs.until + 1; sweep();
+  check('at its end the display Ability is taken back with it', !blessing() && removed('sanguine') === 1 && !learned.has(DISP.sanguine)
+    && out.personals.some((p) => /blessing of Sanguine fades/.test(p)), JSON.stringify(out.papyrus));
+  // expiry while logged out
+  worship('hermaeusmora'); learned.clear();
+  prayAndWin('hermaeusmora');
+  const bm = blessing();
+  check('Hermaeus Mora\'s blessing carries its display', bm.display === DISP.hermaeusmora && learned.has(DISP.hermaeusmora));
+  globalThis.__dboDeityForget(ACTOR); online = false;
+  wallClock = bm.until + 3600000; sweep();
+  check('offline, the sweep does not see it', !!blessing() && out.papyrus.length === 0);
+  online = true; clear();
+  globalThis.__dboPrayerLogin(ACTOR);
+  check('a login after it ran out takes the display back at once (not a minute later), and says it faded',
+    !blessing() && removed('hermaeusmora') === 1 && !learned.has(DISP.hermaeusmora) && out.personals.some((p) => /Hermaeus Mora fades/.test(p)) && casts().length === 0,
+    JSON.stringify(out.papyrus));
+  // a turn
+  worship('hist'); learned.clear();
+  prayAndWin('hist');
+  globalThis.__dboDeityPicker(ACTOR);
+  const pk = out.widgets[out.widgets.length - 1];
+  clear(); fire('deityChoose', [pk.nonce, 'mara']);
+  check('turning to another god takes the display back', (props.get(ACTOR + '|private.dboDeity') || {}).id === 'mara' && !blessing() && removed('hist') === 1 && !learned.has(DISP.hist), JSON.stringify(out.papyrus));
+  // the staff reset, online and offline
+  for (const on of [true, false]) {
+    worship('hist'); learned.clear();
+    prayAndWin('hist');
+    online = on; clear();
+    commands.get('deity')(STAFF, 'reset tester');
+    check(`a staff reset (worshipper ${on ? 'online' : 'offline'}) takes the display back`, !blessing() && removed('hist') === 1 && !learned.has(DISP.hist), JSON.stringify(out.papyrus));
+    online = true;
+  }
+  // a broken id: the boon works without it, and the warning is not repeated
+  worship('ancestors'); learned.clear();
+  const w0 = out.logs.length;
+  prayAndWin('ancestors');
+  props.delete(ACTOR + '|private.prayedShrines'); prayAndWin('ancestors');
+  check('the Ancestors (record missing): no AddSpell, no display recorded, the ward still on, no new warning',
+    calls('AddSpell').length === 0 && blessing() && !('display' in blessing()) && globalThis.__dboBlessedWith(ACTOR, 'combatBoon') === true
+    && !out.logs.slice(w0).some((l) => /display ability of/.test(l)), JSON.stringify(blessing()));
+  clear(); sweep();
+  check('and the sweep does not keep trying', out.papyrus.length === 0);
+  worship('yokudan'); learned.clear(); prayAndWin('yokudan');
+  check('the Yokudan gods (display record not an Ability): nothing given, nothing cast, stamina held',
+    calls('AddSpell').length === 0 && casts().length === 0 && !('display' in blessing()) && globalThis.__dboBlessingRegen(ACTOR).some((e) => e.av === 'StaminaRateMult' && e.mag === 100));
+  // an id emptied (or changed) in skills.json while a blessing runs
+  worship('hist'); learned.clear(); prayAndWin('hist');
+  setIds({ sanguine: displayDesc('sanguine'), hermaeusmora: displayDesc('hermaeusmora') });
+  clear(); load(); sweep();
+  check('an id emptied while a blessing runs: the next sweep takes the display back and the boon runs on',
+    removed('hist') === 1 && !learned.has(DISP.hist) && blessing() && blessing().deity === 'hist' && !('display' in blessing())
+    && globalThis.__dboBlessingRegen(ACTOR).some((e) => e.av === 'HealRateMult'), JSON.stringify(blessing()));
+  setIds({ hist: displayDesc('hist'), sanguine: displayDesc('sanguine'), hermaeusmora: displayDesc('hermaeusmora') });
+  load();
+  // a cast blessing is not touched: no display for a deity with a spell
+  worship('akatosh'); learned.clear(); prayAndWin('akatosh');
+  check('a cast blessing (Akatosh) gets no display, as before', calls('AddSpell').length === 0 && casts().length === 1 && !('display' in blessing()));
+  // Sheogorath: unchanged; the god he picks brings its own
+  const sheoPool = SKILLS.deities.choices.filter((x) => x.id !== 'sheogorath' && (/^[0-9a-f]+:/i.test(String(x.blessing)) || x.hungerHalf || x.scholarBoon || x.blessingRegen || x.combatBoon));
+  const sheoPray = (pickId) => {
+    worship('sheogorath'); learned.clear();
+    const sheo = choiceOf('sheogorath');
+    wallClock += 2000; virtual += 100000; clear();
+    if (sheo.prayAnywhere) commands.get('pray')(ACTOR, ''); else globalThis.__dboPrayerActivate(idOf(sheo.shrines[0]), ACTOR);
+    const w = out.widgets[out.widgets.length - 1];
+    virtual += w.totalMs + 100;
+    const at = sheoPool.findIndex((x) => x.id === pickId);
+    const rolls = [0, (at + 0.5) / sheoPool.length];
+    const roll = Math.random; Math.random = () => (rolls.length ? rolls.shift() : 0);
+    clear();
+    try { fire('prayer', [w.nonce, JSON.stringify([[0, w.totalMs]]), w.totalMs]); } finally { Math.random = roll; }
+    return blessing();
+  };
+  let sb = sheoPray('akatosh');
+  check('Sheogorath handing over Akatosh: cast, no display (unchanged)', sb && sb.deity === 'akatosh' && casts().length === 1 && calls('AddSpell').length === 0 && !('display' in sb), JSON.stringify(sb));
+  sb = sheoPray('hist');
+  check('Sheogorath handing over the Hist: the Hist\'s display goes with it', sb && sb.deity === 'hist' && sb.display === DISP.hist && added('hist') === 1, JSON.stringify(sb));
+  check('Sheogorath has no display of his own', !('blessingDisplay' in choiceOf('sheogorath')));
+  setIds({});
+}
+
 console.log('');
 console.log('deity        cast  learned  via');
 for (const x of rows) console.log(`${x.id.padEnd(12)} ${String(x.sent).padEnd(5)} ${String(x.learnedNow).padEnd(8)} ${x.via}`);

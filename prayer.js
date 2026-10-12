@@ -276,6 +276,7 @@ module.exports = (api) => {
     if (!b) return;
     if (b.spell && b.via !== 'cast') castSpell(a, Number(b.spell) >>> 0, false);
     if (b.spell && b.via === 'cast') dispelOnSelf(a, Number(b.spell) >>> 0, reason || 'ended');
+    if (b.display) castSpell(a, Number(b.display) >>> 0, false);
     blessCasts.delete(a);
     regenOwed.delete(a);
     try { mp.set(a, 'private.dboBlessing', null); } catch (e) { /* gone with the character */ }
@@ -292,6 +293,53 @@ module.exports = (api) => {
   const capriceOf = (d) => {
     const pool = DEITIES.filter((x) => x.id !== d.id && (blessingIdOf(x) || serverBoonOf(x)));
     return pool.length ? pool[Math.floor(Math.random() * pool.length)] : null;
+  };
+
+  // A server boon shows nowhere in the game: no spell, no Active Effect (Nate 2026-10-12: "players like visuals for all
+  // boons"). So a deity whose boon the server keeps can name a display ability in skills.json (blessingDisplay
+  // "<local id>:DragonBreak Online Edits.esp"): a SPEL of type Ability, constant effect on self, whose one MGEF carries the
+  // boon's text and changes no stat. It is learned (AddSpell) for as long as the blessing runs, which puts it in Active
+  // Effects, and taken back (RemoveSpell) wherever the blessing ends: clearBlessing (expiry, a new blessing, a turn), the
+  // staff reset, a login after it ran out. The boon itself stays the server's, so the two never add up. The record is
+  // read like a blessing's (spellInfo); one that does not resolve, cannot be read or is not an Ability is logged once and
+  // given to nobody, and the server's boon works as it did. The record keeps the id it was given under `display`.
+  const SPIT_ABILITY = 4;
+  const displayWarned = new Set();
+  const warnDisplay = (d, why) => {
+    if (displayWarned.has(d.id)) return;
+    displayWarned.add(d.id);
+    log(`prayer: the display ability of ${d.name} (${d.blessingDisplay}) ${why}; the server's boon runs without it`);
+  };
+  const displayOf = (d) => {
+    if (!d || !serverBoonOf(d)) return 0;
+    const s = String(d.blessingDisplay || '').trim();
+    if (!s) return 0;
+    const id = /^[0-9a-f]+:/i.test(s) ? idOf(s) : 0;
+    if (!id) { warnDisplay(d, 'does not resolve'); return 0; }
+    if (id === blessingIdOf(d)) return 0;              // the blessing's own spell already shows
+    const info = spellInfo(id);
+    if (!info) { warnDisplay(d, 'cannot be read'); return 0; }
+    if (info.type !== SPIT_ABILITY) { warnDisplay(d, `is not an Ability (SPIT type ${info.type})`); return 0; }
+    return id;
+  };
+  // Bring a running blessing's display ability in line with its deity's: give the one it should carry (a blessing from
+  // before the id was filled in, or from before this code), take back one it should not (an id changed or emptied).
+  // Returns the record as it now stands.
+  const syncDisplay = (a, b, why) => {
+    if (!b || Number(b.until) <= Date.now()) return b;
+    const want = displayOf(deityById(b.deity));
+    const had = Number(b.display) >>> 0;
+    if (want === had) return b;
+    if (had) castSpell(a, had, false);
+    const next = Object.assign({}, b);
+    delete next.display;
+    if (want) {
+      if (castSpell(a, want, true)) next.display = want;
+      else if (!had) return b;                         // nothing given, nothing to record (castSpell logged why)
+    }
+    try { mp.set(a, 'private.dboBlessing', next); } catch (e) { return b; }
+    log(`prayer: ${display(a)}'s blessing of ${b.deity}: display ability ${had ? `${had.toString(16)} taken back` : ''}${had && next.display ? ', ' : ''}${next.display ? `${want.toString(16)} given` : ''} (${why})`);
+    return next;
   };
 
   const grantBlessing = (a, d, hours) => {
@@ -326,9 +374,14 @@ module.exports = (api) => {
     } else if (spell && !castSpell(a, spell, true)) return false;
     const until = Date.now() + Math.max(1, hours) * 3600000;
     // `via` says how the spell was given, so the expiry knows whether there is anything to take back
-    try { mp.set(a, 'private.dboBlessing', spell ? { deity: d.id, spell, until, via: cast ? 'cast' : 'spell' } : { deity: d.id, spell, until }); } catch (e) { /* not fatal */ }
-    if (spell) log(`prayer: the blessing of ${d.name} ${cast ? 'cast on' : 'given as a spell to'} ${display(a)} for ${Math.max(1, hours)} h${info ? '' : ' (spell record unreadable)'}`);
-    else log(`prayer: the blessing of ${d.name} (the server's own) given to ${display(a)} for ${Math.max(1, hours)} h`);
+    const rec = spell ? { deity: d.id, spell, until, via: cast ? 'cast' : 'spell' } : { deity: d.id, spell, until };
+    // and `display` which display ability went with a server boon (above), to be taken back with it
+    const shown = serverSide ? displayOf(d) : 0;
+    if (shown && castSpell(a, shown, true)) rec.display = shown;
+    try { mp.set(a, 'private.dboBlessing', rec); } catch (e) { /* not fatal */ }
+    const shownNote = rec.display ? `, display ability ${shown.toString(16)} given as a spell` : '';
+    if (spell) log(`prayer: the blessing of ${d.name} ${cast ? 'cast on' : 'given as a spell to'} ${display(a)} for ${Math.max(1, hours)} h${info ? '' : ' (spell record unreadable)'}${shownNote}`);
+    else log(`prayer: the blessing of ${d.name} (the server's own) given to ${display(a)} for ${Math.max(1, hours)} h${shownNote}`);
     return true;
   };
 
@@ -353,6 +406,7 @@ module.exports = (api) => {
     if (now && nowInfo && nowInfo.cast) next = { deity: b.deity, spell: now, until: b.until, via: 'cast' };     // cast by the next login or sweep
     else if (now) next = castSpell(a, now, true) ? { deity: b.deity, spell: now, until: b.until, via: 'spell' } : { deity: b.deity, spell: 0, until: b.until };
     else next = { deity: b.deity, spell: 0, until: b.until };
+    if (b.display) next.display = b.display;
     try { mp.set(a, 'private.dboBlessing', next); } catch (e) { return b; }
     log(`prayer: ${display(a)}'s blessing of ${d.name} was the racial power ${old.toString(16)}, which the client blocks; taken back, ${next.via === 'cast' ? `${now.toString(16)} is cast instead` : next.spell ? `${now.toString(16)} given instead` : 'the server keeps the boon now'}`);
     return next;
@@ -383,7 +437,23 @@ module.exports = (api) => {
     return true;
   };
   // gamemode.js calls this with the other login hooks, 8 s into the login
-  globalThis.__dboPrayerLogin = (a) => { blessCasts.delete(a); regenOwed.delete(a); movePower(a, blessingOf(a)); recastBlessing(a, 'login'); };
+  // A display ability (above) is in the learned list, which the client re-applies by itself; it is given again here all
+  // the same while the blessing runs (AddSpell of a known spell changes nothing), and one whose blessing ran out while
+  // its worshipper was away is taken back now rather than at the next sweep.
+  const loginDisplay = (a) => {
+    const b = blessingOf(a);
+    if (!b) return;
+    if (Number(b.until) <= Date.now()) {
+      if (!b.display) return;                          // the sweep ends it, as it always did
+      const d = deityById(b.deity);
+      clearBlessing(a, `The blessing of ${d ? d.name : 'your god'} fades.`, 'expired');
+      return;
+    }
+    const before = Number(b.display) >>> 0;
+    const now = syncDisplay(a, b, 'login');
+    if (before && (Number(now.display) >>> 0) === before) castSpell(a, before, true);
+  };
+  globalThis.__dboPrayerLogin = (a) => { blessCasts.delete(a); regenOwed.delete(a); movePower(a, blessingOf(a)); recastBlessing(a, 'login'); loginDisplay(a); };
 
   // Sanguine's boon is not a spell and could not be one: the Prince of indulgence belongs on the
   // appetite meter, and appetite is the gamemode's (private.needs), not the engine's. The needs tick
@@ -425,6 +495,7 @@ module.exports = (api) => {
         continue;
       }
       b = movePower(a, b);
+      b = syncDisplay(a, b, 'sweep');
       const info = b.spell ? spellInfo(Number(b.spell) >>> 0) : null;
       if (!info || !info.cast) continue;
       const at = blessCasts.get(a);
@@ -1460,6 +1531,7 @@ module.exports = (api) => {
       if (blessing) {
         const bd = deityById(blessing.deity);
         if (blessing.spell && blessing.via !== 'cast') castSpell(t, Number(blessing.spell) >>> 0, false);
+        if (blessing.display) castSpell(t, Number(blessing.display) >>> 0, false);
         mp.set(t, 'private.dboBlessing', null);
         blessCasts.delete(t >>> 0);
         regenOwed.delete(t >>> 0);
@@ -1591,6 +1663,12 @@ module.exports = (api) => {
     return out;
   })();
   if (blessingCheck.broken.length) log(`prayer: ${blessingCheck.broken.length} blessing(s) do not resolve: ${blessingCheck.broken.join(', ')}`);
+  // The display abilities of the server's boons (a bad one is logged once by displayOf, here at boot)
+  {
+    const shown = DEITIES.filter((d) => displayOf(d)).map((d) => `${d.id} ${displayOf(d).toString(16)}`);
+    const named = DEITIES.filter((d) => serverBoonOf(d) && String(d.blessingDisplay || '').trim()).length;
+    log(`prayer: display abilities for the server's boons: ${shown.length} of ${named} named${shown.length ? ` (${shown.join(', ')})` : ''}`);
+  }
 
   const reachable = DEITIES.filter((d) => Number(d.inBruma) > 0 || d.prayAnywhere).length;
   log(`prayer ${CFG.enabled ? 'on' : 'off'}: ${DEITIES.length} deities, ${shrineIndex().size} shrine ids, ${reachable} reachable under the region lock; ${VERSES} verses of ${VERSE_MS} ms, ${SLACK_MS} ms slack, ${Math.round(SHRINE_COOLDOWN_MS / 60000)} min per shrine, conversion every ${CONVERSION_DAYS} day(s); blessings ${blessingCheck.ok} resolved (${blessingCheck.cast} cast on the worshipper, ${blessingCheck.learned} learned${blessingCheck.unread.length ? `, ${blessingCheck.unread.length} unreadable and learned: ${blessingCheck.unread.join(', ')}` : ''}), ${blessingCheck.server} server-side, ${blessingCheck.broken.length} broken`);
