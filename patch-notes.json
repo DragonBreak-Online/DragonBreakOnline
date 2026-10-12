@@ -1,5 +1,19 @@
 [
   {
+    "title": "The Giant's Club",
+    "date": "2026-10-12",
+    "version": "Server update",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Weapons",
+        "items": [
+          "The Giant's Club could be forged, and it was far stronger than any weapon meant for a player. It can no longer be forged or improved, and every one already made has been exchanged for a Steel Warhammer, in your pack or in a chest."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Character creator sliders save",
     "date": "2026-10-12",
     "version": "Server update",
