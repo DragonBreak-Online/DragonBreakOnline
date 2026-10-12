@@ -86,6 +86,16 @@ global.setInterval = () => 0;
   window.__alduinakChatSettings = { ui: { voice: { prefs: { micGain: 1.7 }, launcher: { micGain: 1 } } } };
   window.dispatchEvent(new CustomEvent('dbo:uiSettings'));
   check('the chat\'s file arriving after the push lays its in-game choices over it (dbo:uiSettings)', vm.getPrefs().micGain === 1.7);
+  // ---- a player with no launcher Voice settings: the launcher never pushes (#bugs 12 Oct: the F3 volume was lost at
+  // every game start); the choices made then were saved over the defaults and go back over them when the file arrives ----
+  {
+    const fresh = new vm.constructor();
+    window.__alduinakVoice = fresh;
+    window.__alduinakChatSettings = { ui: { voice: { prefs: { outputVolume: 1.4 }, launcher: { outputVolume: 1 } } } };
+    window.dispatchEvent(new CustomEvent('dbo:uiSettings'));
+    check('no launcher push: the saved in-game volume comes back when the chat\'s file arrives', fresh.getPrefs().outputVolume === 1.4, fresh.getPrefs());
+    window.__alduinakVoice = vm;
+  }
 
   // ---- per player ----
   check('peerSetting: 100% and not muted for a voice never touched', JSON.stringify(vm.peerSetting('ff000040')) === '{"gain":1,"muted":false}');
