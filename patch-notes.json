@@ -1,5 +1,19 @@
 [
   {
+    "title": "Silver and the cursed",
+    "date": "2026-10-12",
+    "version": "Server update",
+    "tag": "Change",
+    "sections": [
+      {
+        "heading": "Vampires and werewolves",
+        "items": [
+          "A vampire or werewolf can no longer carry silver, not only wear it. Silver weapons, jewellery, ingots and ore in their pack are sent to their own mailbox at the notice boards, so nothing is lost; picking it up again sends it straight back."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Executions at Castle Bruma",
     "date": "2026-10-12",
     "version": "Server update",
