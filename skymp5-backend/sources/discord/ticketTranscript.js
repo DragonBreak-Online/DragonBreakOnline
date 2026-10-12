@@ -218,11 +218,12 @@ function saveFile(t, files, base, dir) {
 }
 
 // Returns where the transcript went; throws when it was kept nowhere, or was kept but the channel must stay open
-async function save(channel, closer, { client = channel.client, dir = DIR, fetchFile = download } = {}) {
+// fileOnly keeps a ticket out of the staff channel, for tickets GMs must not read
+async function save(channel, closer, { client = channel.client, dir = DIR, fetchFile = download, fileOnly = false } = {}) {
   const { t, files } = await build(channel, closer, fetchFile)
   const base = String(channel.name || '').toLowerCase().replace(/[^a-z0-9-]+/g, '-').slice(0, 80) || `ticket-${channel.id}`
   let where = ''
-  if (config.discordTicketTranscriptChannelId) {
+  if (config.discordTicketTranscriptChannelId && !fileOnly) {
     try {
       await postToStaff(client, channel, t, files, base)
       where = 'posted to the transcript channel'

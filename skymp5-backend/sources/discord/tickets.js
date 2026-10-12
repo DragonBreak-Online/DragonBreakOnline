@@ -24,6 +24,9 @@ const TYPES = [
     blurb: 'You need a moderator, but nobody has broken a rule.' },
   { id: 'rep',  label: 'Report Player',       category: 'Player Reports',       emoji: '🚩',
     blurb: 'Report a player for breaking the rules. Bring evidence.' },
+  // Only the Owners read it, so a GM never sees a report about themselves
+  { id: 'gmr',  label: 'Report a GM',         category: 'GM Reports',           emoji: '⚖️',
+    blurb: 'Report a Game Master who abuses their powers. Only the Owners can read it.', ownersOnly: true },
   { id: 'fac',  label: 'Faction Inquiry',     category: 'Faction Inquiries',    emoji: '🏰',
     blurb: 'Ask about joining, founding or running a faction.' },
   { id: 'map',  label: 'Map Creation',        category: 'Map Creation',         emoji: '🗺️',
@@ -52,6 +55,8 @@ function writeState(state, file = STATE_FILE) {
     console.error('[tickets] could not save state:', err.message)
   }
 }
+
+const isOwnersOnly = channel => byId.get(String(channel?.name || '').split('-')[0])?.ownersOnly === true
 
 const channelLink = (id, name) => (id ? `<#${id}>` : `#${name}`)
 
@@ -131,7 +136,8 @@ async function openTicket(interaction, typeId, summary) {
     { id: guild.roles.everyone.id, deny: [PermissionFlagsBits.ViewChannel] },
     { id: interaction.user.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.AttachFiles, PermissionFlagsBits.ReadMessageHistory] },
   ]
-  for (const roleId of config.discordStaffRoleIds || []) {
+  const readers = type.ownersOnly ? config.siteOwnerRoleIds : config.discordStaffRoleIds
+  for (const roleId of readers || []) {
     overwrites.push({
       id: roleId,
       allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.AttachFiles, PermissionFlagsBits.ReadMessageHistory, PermissionFlagsBits.ManageMessages],
@@ -139,7 +145,7 @@ async function openTicket(interaction, typeId, summary) {
   }
 
   const channel = await guild.channels.create({
-    name: `${type.id}-${number}-${interaction.user.username}`.slice(0, 90),
+    name: (type.ownersOnly ? `${type.id}-${number}` : `${type.id}-${number}-${interaction.user.username}`).slice(0, 90),
     type: ChannelType.GuildText,
     parent: category.id,
     topic: `${type.label} | opened by ${interaction.user.tag} (${interaction.user.id})`,
@@ -158,11 +164,14 @@ async function openTicket(interaction, typeId, summary) {
 
   // Every staff role can read the ticket, but only the ping role is alerted, so the
   // owner does not get a notification for every map bug
-  const ping = config.discordTicketPingRoleId ? `<@&${config.discordTicketPingRoleId}>` : ''
+  const pingRole = type.ownersOnly ? (config.siteOwnerRoleIds || [])[0] : config.discordTicketPingRoleId
+  const ping = pingRole ? `<@&${pingRole}>` : ''
   await channel.send({ content: `<@${interaction.user.id}> ${ping}`.trim(), embeds: [embed], components: [closeRow] })
   for (const content of type.intro || []) await channel.send({ content, allowedMentions: { parse: [] } })
 
-  audit.log(`TICKET opened ${type.label} #${number} by ${interaction.user.tag} (${interaction.user.id}) in #${channel.name}`)
+  // The audit channel is read by GMs, so an owners-only ticket logs no reporter
+  audit.log(type.ownersOnly ? `TICKET opened #${channel.name} (Owners only)`
+    : `TICKET opened ${type.label} #${number} by ${interaction.user.tag} (${interaction.user.id}) in #${channel.name}`)
   return { channel, number, type }
 }
 
@@ -178,7 +187,7 @@ async function closeTicket(interaction, { wait = 5000, transcripts = transcript 
     audit.log(`TICKET closed #${channel.name} by ${interaction.user.tag} (${interaction.user.id})`)
     await new Promise(resolve => setTimeout(resolve, wait))
     try {
-      audit.log(`TICKET transcript of #${channel.name} ${await transcripts.save(channel, interaction.user)}`)
+      audit.log(`TICKET transcript of #${channel.name} ${await transcripts.save(channel, interaction.user, { fileOnly: isOwnersOnly(channel) })}`)
     } catch (err) {
       console.error(`[tickets] transcript of #${channel.name} failed, channel kept:`, err.message)
       await channel.send(err.channelNote || 'The transcript could not be saved, so this channel stays open. Tell a staff member.').catch(() => {})
