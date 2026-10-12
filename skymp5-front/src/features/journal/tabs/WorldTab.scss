@@ -1,0 +1,20 @@
+// The F3 hub's World tab: a group per command, its lines as they were said
+@import '../../../dbo-theme.scss';
+
+.jworld {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+
+  &__group { display: flex; flex-direction: column; gap: 4px; }
+
+  &__name {
+    margin: 0;
+    color: $dbo-gold;
+    font-size: 13px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  &__line { margin: 0; overflow-wrap: anywhere; color: $dbo-text; font-size: 14px; line-height: 1.45; }
+}
