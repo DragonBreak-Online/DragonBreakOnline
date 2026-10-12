@@ -167,6 +167,22 @@
     ]
   },
   {
+    "title": "Launcher 2.1.47",
+    "date": "2026-10-12",
+    "version": "Launcher 2.1.47",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Launcher",
+        "items": [
+          "Fixed \"Update failed: EPERM\" when the launcher updates itself. A copy of the update left over from an earlier try, often held by an antivirus scan, could block every new try.",
+          "If an update still fails, the launcher now offers a button to download it yourself. It installs over the old launcher and keeps your game files.",
+          "Already stuck on that error? Download 2.1.47 once from https://files.dragonbreakonline.com/launcher/2.1.47/DragonBreakLauncher.exe and run it. Updates after that use the fix."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Client update 0.3.93",
     "date": "2026-10-11",
     "version": "Client 0.3.93",
