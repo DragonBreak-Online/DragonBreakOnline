@@ -6721,7 +6721,7 @@ try {
 try {
   const ECONOMY_JS = path.resolve('economy.js');
   delete require.cache[ECONOMY_JS];
-  require(ECONOMY_JS)({ mp, log, personal, audit, who, cfg, onUi, onlineActors, every, readOfficials, zoneById });
+  require(ECONOMY_JS)({ mp, log, personal, audit, who, display, cfg, onUi, onlineActors, every, readOfficials, zoneById });
 } catch (e) { log('economy.js failed to load:', e.stack || e.message); globalThis.__dboEconomyView = null; }
 
 // ---- weapon racks in homes (server\weaponracks.js, weapon-racks.json from Nat's PC, config "weaponRacks") ------------------

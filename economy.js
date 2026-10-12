@@ -54,7 +54,7 @@ const fs = require('fs');
 const path = require('path');
 
 module.exports = (api) => {
-  const { mp, log, personal, audit, who, cfg, onUi, onlineActors, every, readOfficials, zoneById } = api;
+  const { mp, log, personal, audit, who, display, cfg, onUi, onlineActors, every, readOfficials, zoneById } = api;
   const C = Object.assign({ enabled: false, maxTaxRate: 0.30, defaultPropertyValue: 2000, maxPropertyValue: 1000000, maxWage: 100000, reckonDay: 0, reckonHour: 0,
     wageShare: 0.25, wageIncomeShare: 0.75, assessEveryDays: 7, assessMaxStep: 2,
     titheRate: 0.10, titheTo: 'imperial-legion', titheProvinces: ['cyrodiil'],
@@ -153,6 +153,16 @@ module.exports = (api) => {
   // The fief's share of a building's tax (nobility.js; null without one or with the nobility off), and the fief treasuries
   const FT = () => globalThis.__dboFiefTreasury || null;
   const fiefCut = (ref, rec, tax) => { try { const c = fn('__dboNobilityFiefCut') ? fn('__dboNobilityFiefCut')(ref, rec, tax) : null; return c && FT() && c.share > 0 && c.share < tax ? c : null; } catch (e) { return null; } };
+  // A hold's land pays the hold's own rate (business.js /tax, Nate 12 Oct: "everything in bruma that can be owned"); any other
+  // faction, or a hold that never set one, its rate from the faction panel
+  const holdZoneOf = (fid) => { const f = info(fid); return f && f.kind === 'hold' && f.zone ? f.zone : null; };
+  const rateOf = (fid) => {
+    const own = Number(data().rates[fid]) || 0;
+    const zone = holdZoneOf(fid);
+    let r = own;
+    try { if (zone && fn('__dboHoldTax')) r = Number(fn('__dboHoldTax')(zone, own)); } catch (e) { r = own; }
+    return Math.min(C.maxTaxRate, Math.max(0, Number.isFinite(r) ? r : 0));
+  };
   const valueOf = (ref) => { const v = Number(data().values[String(ref)]); return Number.isFinite(v) && v >= 0 ? v : C.defaultPropertyValue; };
 
   // ---- the Imperial tithe ------------------------------------------------------------------------------------------------
@@ -260,7 +270,7 @@ module.exports = (api) => {
         try {
           const t = territoryOfProperty(ref, rec); if (!t) continue;
           const fid = fn('__dboRealmOwnerOf') ? fn('__dboRealmOwnerOf')(t.id) : null; if (!fid) continue;
-          const rate = Math.min(C.maxTaxRate, Math.max(0, Number(d.rates[fid]) || 0)); if (!rate) continue;
+          const rate = rateOf(fid); if (!rate) continue;
           const tax = Math.floor(valueOf(ref) * rate); if (tax <= 0) continue;
           const r = report(fid);
           const payers = ownerActors(H, rec);
@@ -378,6 +388,8 @@ module.exports = (api) => {
     if (!leads(a, fid)) return reply(a, false, 'Only the leader sets the tax rate.');
     if (!Number.isFinite(pct) || pct < 0 || pct > C.maxTaxRate * 100) return reply(a, false, `The tax rate is from 0% to ${Math.round(C.maxTaxRate * 100)}%.`);
     data().rates[fid] = Math.round(pct) / 100; save();
+    const zone = holdZoneOf(fid);
+    if (zone && fn('__dboSetHoldTax')) fn('__dboSetHoldTax')(zone, Math.round(pct), display(a), who(a));
     audit(`ECONOMY ${who(a)} set ${nameOfFaction(fid)}'s tax rate to ${Math.round(pct)}%`);
     reply(a, true, `${nameOfFaction(fid)} taxes property at ${Math.round(pct)}% from the next reckoning.`);
   });
@@ -459,7 +471,7 @@ module.exports = (api) => {
           ranks = fn('__dboGuildRanks')(fid);
           try { labels = fn('__dboGuildRankShown') ? fn('__dboGuildRankShown')(fid) || {} : {}; } catch (e) { labels = {}; }
         }
-        return { id: fid, name: nameOfFaction(fid), rate: Number(data().rates[fid]) || 0, wages: Object.assign({}, data().wages[fid] || {}), ranks, labels, report: data().reports[fid] || null };
+        return { id: fid, name: nameOfFaction(fid), rate: rateOf(fid), wages: Object.assign({}, data().wages[fid] || {}), ranks, labels, report: data().reports[fid] || null };
       }),
     };
   };
