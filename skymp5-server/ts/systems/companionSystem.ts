@@ -389,6 +389,7 @@ export class CompanionSystem implements System {
       c.returnAt = durationSec > 0 ? Date.now() + durationSec * 1000 : 0;
     }
     this.log(`CompanionSystem: ${c.kind} ${hex(c.id)} of ${hex(c.ownerId)} commanded by ${hex(owner)}${c.returnAt ? ` for ${durationSec}s` : ""}`);
+    this.makeRoom(owner);
     this.changeOwner(c, owner);
     return true;
   }

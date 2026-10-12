@@ -1,7 +1,8 @@
 // Scripted test for Command Daedra (conjurationSystem.ts + companionSystem.ts): another player's summoned daedra within the
 // effect's level, hit by a player's Command Daedra, serves the caster (owner, ff_companionOf, host, state packets) and goes
 // back to its owner when the command ends; a non-daedra, one over the level, one's own summon and another player's summon
-// outside the PvP rules are refused; "commandDaedraEnabled": false switches it off. It bundles both systems with esbuild
+// outside the PvP rules are refused; commanded summons keep the caster within the command limit, the newest replacing the
+// oldest; "commandDaedraEnabled": false switches it off. It bundles both systems with esbuild
 // (settings, placement and the plugin reader stubbed) on a fake mp. Run it from skymp5-server with node_modules present:
 //
 //   node tests/command-daedra-harness.js
@@ -177,6 +178,23 @@ const STUBS = {
   mp.onHitDamageAttempt(B, A, 0x12eb7, 10, {});
   cast(conj, A, T);
   check('commandDaedraEnabled false: off', companions.info(T).ownerId === B);
+
+  // ---- the command limit holds: commanded summons replace the caster's oldest, as summoning does ----
+  const C = 0xff000103;
+  users.set(C, 3); online.add(3); actor(C, PLAYER_BASE, 13, [0, 300, 0]);
+  globalThis.__dboCompanionMayFight = () => true;
+  ({ companions, conj, T } = await boot());
+  const own = companions.spawn(A, DREMORA, { kind: 'summon', durationSec: 600 });
+  const TC = companions.spawn(C, DREMORA, { kind: 'summon', durationSec: 600 });
+  set(TC, 'daedra', true); set(TC, 'level', 15);
+  mp.onHitDamageAttempt(A, B, 0x12eb7, 1, {});
+  mp.onHitDamageAttempt(A, C, 0x12eb7, 1, {});
+  cast(conj, A, T);
+  cast(conj, A, TC);
+  const held = companions.list(A).map((c) => c.id);
+  check('two players\' summons commanded in turn: the caster holds one (the limit), the newest', held.length === 1 && held[0] === TC, held.map((x) => x.toString(16)));
+  check('...the caster\'s own summon and the first commanded one end as replaced', companions.info(own) === undefined && companions.info(T) === undefined
+    && logs.some((x) => x.includes(`${own.toString(16)}`) && /ended \(replaced\)/.test(x)) && logs.some((x) => x.includes(`${T.toString(16)}`) && /ended \(replaced\)/.test(x)), logs.slice(-6));
 
   Date.now = realNow;
   process.chdir(root);
