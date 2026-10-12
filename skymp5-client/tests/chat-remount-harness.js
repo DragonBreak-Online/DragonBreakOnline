@@ -10,7 +10,11 @@ if (start < 0 || end < 0) { console.log('FAIL could not find buildMountJs'); pro
 let fnSrc = src.slice(start, end + '})();`;'.length)
   .replace('const buildMountJs = (name: string, isAdmin: boolean, settingsJson: string, chatHidden: boolean) =>',
            'return (name, isAdmin, settingsJson, chatHidden) =>');
-const buildMountJs = new Function(fnSrc)();
+// The mount script writes the admin flag through adminSyncJs (12 Oct): give it the real one
+const aStart = src.indexOf('const adminSyncJs = (');
+const aEnd = src.indexOf('\n', src.indexOf('`;', aStart));
+const aSrc = aStart < 0 ? 'const adminSyncJs = () => "";' : src.slice(aStart, aEnd).replace('(isAdmin: boolean)', '(isAdmin)');
+const buildMountJs = new Function(aSrc + '\n' + fnSrc)();
 
 // A minimal page: the widget list the front renders, and the bits of DOM the mount script touches
 let widgets = [];
