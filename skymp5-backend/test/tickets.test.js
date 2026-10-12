@@ -13,9 +13,11 @@ const stub = (rel, exports) => {
 const config = {
   discordTicketPanelChannelId: '1554000000000000001', discordBugsForumChannelId: '1551936720713416755',
   discordSuggestionsChannelId: '', websiteUrl: 'https://example.test/', discordStaffRoleIds: [],
+  siteOwnerRoleIds: ['1554000000000000900'],
 }
 stub('../config', config)
-stub('../sources/discord/audit', { log: () => {} })
+const audits = []
+stub('../sources/discord/audit', { log: line => audits.push(line) })
 const tickets = require('../sources/discord/tickets')
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dbo-tickets-'))
@@ -33,7 +35,7 @@ const panelText = p => JSON.stringify(p.embeds.map(e => e.toJSON()))
 const buttonIds = p => p.components.flatMap(r => r.toJSON().components.map(c => c.custom_id))
 
 test('the panel has no Bug Report or Map Changes kind (Map Creation is its own, Nate 8 Oct)', () => {
-  assert.deepStrictEqual(tickets.TYPES.map(t => t.id), ['pk', 'mod', 'rep', 'fac', 'map', 'gm'])
+  assert.deepStrictEqual(tickets.TYPES.map(t => t.id), ['pk', 'mod', 'rep', 'gmr', 'fac', 'map', 'gm'])
 })
 
 test('on boot the panel edits its own message: no bug buttons, and a line to the front door', async () => {
@@ -43,7 +45,7 @@ test('on boot the panel edits its own message: no bug buttons, and a line to the
   await tickets.ensurePanel(client, stateFile)
   assert.strictEqual(calls.sends.length, 0)
   assert.strictEqual(calls.edits.length, 1)
-  assert.deepStrictEqual(buttonIds(calls.edits[0]), ['ticket:open:pk', 'ticket:open:mod', 'ticket:open:rep', 'ticket:open:fac', 'ticket:open:map', 'ticket:open:gm'])
+  assert.deepStrictEqual(buttonIds(calls.edits[0]), ['ticket:open:pk', 'ticket:open:mod', 'ticket:open:rep', 'ticket:open:gmr', 'ticket:open:fac', 'ticket:open:map', 'ticket:open:gm'])
   const text = panelText(calls.edits[0])
   assert.match(text, /Found a bug\?/)
   assert.match(text, /\/bug <what happened>/)
@@ -152,4 +154,33 @@ test('a Faction Inquiry ticket posts only its opening message', async () => {
   })
   assert.strictEqual(sent.length, 1)
   assert.match(JSON.stringify(sent[0].embeds[0].toJSON()), /Faction Inquiry/)
+})
+
+test('a Report a GM ticket is read and pinged by the Owners only, and logs no reporter (Nate, 12 Oct)', async () => {
+  config.discordStaffRoleIds = ['1554000000000000901', '1554000000000000902']
+  config.discordTicketPingRoleId = '1554000000000000902'
+  const sent = []
+  let made
+  const channel = { id: '1554000000000000202', name: 'gmr-0003', send: async p => { sent.push(p) } }
+  const guild = {
+    roles: { everyone: { id: '1' } },
+    channels: { cache: { get: () => null, find: () => ({ id: '1554000000000000302' }) }, fetch: async () => null,
+      create: async opts => { made = opts; return channel } },
+  }
+  audits.length = 0
+  try {
+    await tickets.handleInteraction({
+      guild, user: { id: '1554000000000000402', username: 'reporter', tag: 'reporter' },
+      customId: 'ticket:submit:gmr', isButton: () => false, isModalSubmit: () => true,
+      deferReply: async () => {}, editReply: async () => {}, fields: { getTextInputValue: () => 'A GM spawned gear for a friend' },
+    })
+  } finally {
+    config.discordStaffRoleIds = []
+    config.discordTicketPingRoleId = ''
+  }
+  assert.deepStrictEqual(made.permissionOverwrites.map(o => o.id), ['1', '1554000000000000402', '1554000000000000900'])
+  assert.doesNotMatch(made.name, /reporter/)
+  assert.match(sent[0].content, /<@&1554000000000000900>/)
+  assert.doesNotMatch(sent[0].content, /1554000000000000902/)
+  assert.ok(audits.length && audits.every(l => !/reporter|1554000000000000402/.test(l)), audits.join('\n'))
 })

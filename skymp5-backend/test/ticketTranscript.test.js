@@ -278,3 +278,12 @@ test('a second Close while the first is running is answered privately and does n
   await running
   assert.strictEqual(channel.deleted, true)
 })
+
+test('a fileOnly transcript never reaches the staff channel, even when one is set', async () => {
+  config.discordTicketTranscriptChannelId = id(777)
+  const dir = path.join(root, 'owners-only')
+  const { client, posts } = staffClient()
+  assert.match(await save(ticketChannel(), closer, { client, dir, fileOnly: true, ...files() }), /^saved as pk-g0012-arvel\.json/)
+  assert.strictEqual(posts.length, 0)
+  assert.strictEqual(fs.existsSync(path.join(dir, 'pk-g0012-arvel.json')), true)
+})
