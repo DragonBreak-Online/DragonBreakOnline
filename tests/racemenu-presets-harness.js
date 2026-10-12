@@ -507,6 +507,63 @@ const upload = (userId, t, up, size) => {
   await settle(); pumpAll();
   check('a recipient who left gets nothing and the queue is dropped', take().length === 0 && M.state.queues.size === 0);
 
+  // Upload gap (12 Oct, claude-jake): every finished upload leaves one log line. An empty face with none stored and an
+  // unchanged face were dropped without one, so the live log could not tell a client that sent an empty face from one that
+  // sent nothing (Elaava #Z63J 06:14:56, Foratus #553K 08:11:16: /appearance closes with no 'racemenu presets' line)
+  const C3 = 0xff000c03;
+  users[3] = C3; props[C3] = { profileId: 77, appearance: { raceId: 0x13742, headpartIds: [0x5161c] } };
+  online = [A, B, C3];
+  M = load();
+  take();
+  globalThis.__dboRaceMenuSaveWindows = new Map([[C3, { at: Date.now(), until: Date.now() + 90000, kind: 'appearance', charge: true, headswap: true }]]);
+  const gapLines = () => logs.filter((l) => /^racemenu presets: ff000c03 /.test(l));
+  packet(3, { customPacketType: 'dboPresetPut', up: 1, i: 0, n: 0, hash: '', race: 1, data: '' });
+  await settle();
+  check('upload gap: an empty face with none stored is logged, with the editor window it came from',
+    gapLines().length === 1 && /^racemenu presets: ff000c03 \(profile 77\) empty face \(no RaceMenu slider or sculpt\), none stored: nothing to save \(appearance window, priced, head swapped\)$/.test(gapLines()[0]), gapLines());
+  check('upload gap: ...and nothing is written, refused or sent for it', !fs.existsSync(fileOf(C3)) && take().length === 0);
+  const c3face = Object.assign({}, face, { custom: [{ name: 'EFM_Ears', value: 0.5 }], sculpt: [], sculptDivisor: 10000 });
+  const c3text = P.encodeFace(c3face);
+  upload(3, c3text, 2);
+  await settle();
+  check('upload gap: a first face from that window is saved as before (one face saved line)', fs.existsSync(fileOf(C3)) && gapLines().length === 2 && /face saved/.test(gapLines()[1]), gapLines());
+  M.state.selfSent.set(C3, { at: 0, conn: 0 });
+  upload(3, c3text, 3);
+  await settle();
+  check('upload gap: the same face again is logged as unchanged, nothing written', gapLines().length === 3 && /^racemenu presets: ff000c03 \(profile 77\) face unchanged \([0-9a-f]{8}\), nothing written \(appearance window, priced, head swapped\)$/.test(gapLines()[2]), gapLines());
+  for (let k = 0; k < 6; k++) packet(3, { customPacketType: 'dboPresetPut', up: 'x', i: 0, n: 1, hash: 'zz', data: 'a' });
+  const dropped = gapLines().filter((l) => /upload chunk dropped: bad header \(up "x", n 1, 1 chars\)$/.test(l));
+  check('upload gap: a malformed chunk is logged, at most 3 lines a minute per character', dropped.length === 3, gapLines().slice(3));
+  globalThis.__dboRaceMenuSaveWindows = new Map();
+  online = [B];
+
+  // Upload gap review (12 Oct): the dropped-chunk log limiter is kept out of the rate counters. They are cleared whole past
+  // 5000 keys, so a malformed chunk's 'dropTold' key could be the one that clears them and hand a character past the hourly
+  // upload limit a fresh allowance. 4998 other keys held, D's 30 uploads an hour used up and the 'rateTold' key added
+  // (5000 keys): one malformed chunk must leave the limit standing, D's next face refused 'rate' and nothing written
+  const D = 0xff000d04;
+  users[4] = D; props[D] = { profileId: 88, appearance: { raceId: 0x13743 } };
+  online = [B, D];
+  M = load();
+  take();
+  globalThis.__dboPresetState.rates.clear();
+  for (let k = 0; k < 4998; k++) globalThis.__dboPresetState.rates.set(`get:${0xff100000 + k}`, [Date.now()]);
+  for (let up = 1; up <= 30; up++) packet(4, { customPacketType: 'dboPresetPut', up, i: 0, n: 0, hash: '', race: 1, data: '' });
+  packet(4, { customPacketType: 'dboPresetPut', up: 31, i: 0, n: 0, hash: '', race: 1, data: '' });   // refused rate: adds 'rateTold'
+  await settle();
+  const rateKeys = globalThis.__dboPresetState.rates.size;
+  take(); logs.length = 0;
+  packet(4, { customPacketType: 'dboPresetPut', up: 'x', i: 0, n: 1, hash: 'zz', race: 1, data: 'a' });
+  const dFace = P.encodeFace({ ...face, custom: [{ name: 'NoseBridge', value: 0.33 }] });
+  upload(4, dFace, 32);
+  await settle();
+  s = take().filter((x) => x.p.customPacketType === 'dboPresetRefused');
+  check('upload gap review: a malformed chunk at 5000 rate keys (hourly limit used up, rateTold held) does not clear the limit: the next face is refused rate, nothing written',
+    rateKeys === 5000 && globalThis.__dboPresetState.rates.has(`rateTold:${D}`) && logs.some((l) => /^racemenu presets: ff000d04 \(profile 88\) upload chunk dropped: bad header/.test(l))
+    && !fs.existsSync(fileOf(D)) && s.length === 1 && s[0].to === D && s[0].p.reason === 'rate' && s[0].p.hash === P.hashText(dFace),
+    [rateKeys, globalThis.__dboPresetState.rates.size, fs.existsSync(fileOf(D)), s.map((x) => x.p), logs]);
+  online = [B];
+
   fs.rmSync(TMP, { recursive: true, force: true });
   console.log(failures ? `${failures} FAILED` : 'all passed');
   process.exit(failures ? 1 : 0);

@@ -168,6 +168,7 @@ module.exports = (api) => {
   if (!(S.selfSent instanceof Map)) S.selfSent = new Map();
   if (!(S.selfLast instanceof WeakSet)) S.selfLast = new WeakSet();   // the last packet of an answer to the owner
   if (!(S.gen instanceof Map)) S.gen = new Map();   // key -> how many face writes were asked for (see readDoc)
+  if (!(S.logRates instanceof Map)) S.logRates = new Map();   // log-only limiters, kept apart from S.rates so they never trip its 5000-key clear
 
   const keyOf = (a) => ((Number(a) >>> 0).toString(16)).padStart(8, '0');
   const fileOf = (k) => path.join(DIR, `${k}.json`);
@@ -394,14 +395,14 @@ module.exports = (api) => {
   };
 
   // ---- rate limits ----
-  const allow = (kind, who, perWindow, windowMs) => {
+  const allow = (kind, who, perWindow, windowMs, m = S.rates) => {
     const k = `${kind}:${who}`;
     const now = Date.now();
-    const r = (S.rates.get(k) || []).filter((t) => now - t < windowMs);
-    if (r.length >= perWindow) { S.rates.set(k, r); return false; }
+    const r = (m.get(k) || []).filter((t) => now - t < windowMs);
+    if (r.length >= perWindow) { m.set(k, r); return false; }
     r.push(now);
-    S.rates.set(k, r);
-    if (S.rates.size > 5000) S.rates.clear();
+    m.set(k, r);
+    if (m.size > 5000) m.clear();
     return true;
   };
 
@@ -421,6 +422,16 @@ module.exports = (api) => {
     readDoc(a, (doc, bad) => { if (!bad) answer(me, a, doc, have, self); });
   };
 
+  // The editor close an upload came from, for the log: the save window appearance.js opened at that close, if any
+  const windowOf = (me) => {
+    const ws = globalThis.__dboRaceMenuSaveWindows;
+    const w = ws instanceof Map ? ws.get(me >>> 0) : null;
+    if (!w) return 'no editor window';
+    return `${w.kind || 'editor'} window${w.charge ? ', priced' : ''}${w.headswap ? ', head swapped' : ''}${Date.now() > w.until ? ', expired' : ''}`;
+  };
+  // Every finished upload leaves one log line (12 Oct upload gap): an empty face with none stored and an unchanged face
+  // were dropped without one, so the log could not tell a client that sent an empty face from one that sent nothing
+  // (two /appearance closes, Elaava #Z63J 06:14:56 and Foratus #553K 08:11:16, left no 'racemenu presets' line at all)
   const finishUpload = (me, u) => {
     const k = keyOf(me);
     // The hash the client gave this upload ('' for a clear), handed back in dboPresetRefused
@@ -451,8 +462,8 @@ module.exports = (api) => {
       if (bad) return refuse('unreadable', `${who}: saved face unreadable, not changed`);
       // No change: the same face content (R3), on the same race or its vampire or mortal variant. A face handed back on
       // another race (a GM's /chargen or a reroll that changed it) is stored again with that race, so it goes on there
-      if (!prev && !doc) return;
-      if (prev && doc && contentOfDoc(prev) === doc.content && sameFamily(prev.race, race)) return;
+      if (!prev && !doc) { log(`racemenu presets: ${k} (profile ${profileOf(me)}) empty face (no RaceMenu slider or sculpt), none stored: nothing to save (${windowOf(me)})`); return; }
+      if (prev && doc && contentOfDoc(prev) === doc.content && sameFamily(prev.race, race)) { log(`racemenu presets: ${k} (profile ${profileOf(me)}) face unchanged (${doc.hash}), nothing written (${windowOf(me)})`); return; }
       // A saved face is changed only from an editor opened after it was put back on the player this session; before
       // that the client captures an empty or partial face (9 Oct review). Checked before the gate, so nothing is charged.
       // Only for a close the server gave a save window (appearance.js): with none (the console's showracemenu) the gate's
@@ -504,7 +515,10 @@ module.exports = (api) => {
     const up = Number(content.up), n = Number(content.n), i = Number(content.i);
     const hash = typeof content.hash === 'string' ? content.hash : '';
     const data = typeof content.data === 'string' ? content.data : '';
-    if (!Number.isInteger(up) || !isIntIn(n, 0, MAX_CHUNKS) || data.length > Number(C.chunkChars)) return;
+    // A chunk dropped here, or an upload left unfinished, is logged too (at most 3 lines a minute per character)
+    const dropTold = (why) => { if (allow('dropTold', me, 3, 60000, S.logRates)) log(`racemenu presets: ${keyOf(me)} (profile ${profileOf(me)}) upload chunk dropped: ${why()}`); };
+    const shown = (x) => (typeof x === 'number' || typeof x === 'boolean' || x === null || x === undefined ? String(x) : typeof x === 'string' ? JSON.stringify(x.slice(0, 16)) : typeof x);
+    if (!Number.isInteger(up) || !isIntIn(n, 0, MAX_CHUNKS) || data.length > Number(C.chunkChars)) return dropTold(() => `bad header (up ${shown(content.up)}, n ${shown(content.n)}, ${data.length} chars)`);
     // Told (a log line and a packet) at most 3 times a minute per character: past the hourly limit every new upload start was
     // one log line and one packet, up to the flood guard's 40 a second from one client (10 Oct review 2, item 2)
     const overRate = (h) => { if (allow('rateTold', me, 3, 60000)) refused(me, h, 'rate', `${keyOf(me)} (profile ${profileOf(me)}) face change not saved: over ${Number(C.uploadsPerHour)} uploads an hour`); };
@@ -513,11 +527,12 @@ module.exports = (api) => {
       S.uploads.delete(me);
       return finishUpload(me, { n: 0 });
     }
-    if (!HASH_RX.test(hash) || !isIntIn(i, 0, n - 1)) return;
+    if (!HASH_RX.test(hash) || !isIntIn(i, 0, n - 1)) return dropTold(() => `bad hash or index (hash ${shown(content.hash)}, i ${shown(content.i)} of ${n})`);
     const now = Date.now();
     let u = S.uploads.get(me);
-    if (u && now - u.at > Number(C.uploadTimeoutMs)) u = null;
+    if (u && now - u.at > Number(C.uploadTimeoutMs)) { const old = u; dropTold(() => `upload ${old.up} timed out at ${old.got} of ${old.n} chunks`); u = null; }
     if (!u || u.up !== up || u.n !== n || u.hash !== hash) {
+      if (u && u.got < u.n) { const old = u; dropTold(() => `upload ${old.up} left at ${old.got} of ${old.n} chunks, upload ${up} started`); }
       // Told once per upload (its first chunk), not once per chunk
       if (!allow('put', me, Number(C.uploadsPerHour), 3600000)) { S.uploads.delete(me); if (i === 0) overRate(hash); return; }
       u = { up, n, hash, parts: new Array(n), got: 0, at: now };
