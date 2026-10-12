@@ -5,7 +5,7 @@ import { beastBodyAppearance, beastBodyOf } from "../sync/beastBody";
 import { TAKEOVER_RECHECK_SECONDS, isHostileTakeover, takeoverLine } from "./takeoverDiag";
 import { setDefaultAnimsDisabled, applyAnimation, restoreSitCollisionIfMoving, isInSitPose, clearSitPose, setRefrCollision } from "../sync/animation";
 import { isVampireLordRace, noteVampireLordAnim } from "../sync/vampireLordAnimDiag";
-import { Appearance, applyAppearance } from "../sync/appearance";
+import { Appearance, applyAppearance, needsFreshBase } from "../sync/appearance";
 import { isBadMenuShown, applyEquipment, npcSidearmFor } from "../sync/equipment";
 import { RespawnNeededError } from "../lib/errors";
 import { FormModel } from "./model";
@@ -1281,7 +1281,8 @@ export class FormView {
 
   private getAppearanceBasedBase(): number {
     const base = ActorBase.from(Game.getFormEx(this.appearanceBasedBaseId));
-    if (!base && this.appearanceState.appearance) {
+    const playerBase = (Game.getPlayer() as Actor).getBaseObject();
+    if (needsFreshBase(base ? base.getFormID() : null, playerBase ? playerBase.getFormID() : 0) && this.appearanceState.appearance) {
       this.appearanceBasedBaseId = applyAppearance(this.appearanceState.appearance).getFormID();
     }
     return this.appearanceBasedBaseId;
