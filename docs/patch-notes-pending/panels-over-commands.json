@@ -1,0 +1,27 @@
+{
+  "title": "Fewer chat commands: everything from a panel",
+  "date": "2026-10-12",
+  "version": "Client update",
+  "tag": "New Feature",
+  "sections": [
+    {
+      "heading": "Every command in one place",
+      "items": [
+        "Press U, or type / on its own in chat, to open every command you can use. Search it by a word or two: party, bank, pigeon, bug.",
+        "Commands that need more than a click now ask for it on the panel: a choice of words, a box for a number or a message, and a list of the people you know to pick a name from. The panel shows the exact line it will send before you run it.",
+        "Staff see every staff command there too, by topic."
+      ]
+    },
+    {
+      "heading": "Buttons where you need them",
+      "items": [
+        "At a shrine of your own god, leave an offering from the shrine's panel.",
+        "In the pigeon coop: ignore whoever sent a letter, without learning who it was, and choose how your next letter is signed.",
+        "Found a faction from the Faction panel while charters are open.",
+        "Your journal (F3) has a new World page: who is about, who rules, what is open, the time, named beasts and wildlife. Its Profile page can start an identity reroll and open a ticket with staff.",
+        "With your hands bound, press U to struggle.",
+        "Using an Arcane Enchanter now brings back every enchantment you have learned by itself; /syncenchant is no longer needed."
+      ]
+    }
+  ]
+}
