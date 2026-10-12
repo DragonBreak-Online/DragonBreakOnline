@@ -332,7 +332,7 @@ module.exports = (api) => {
     const why = t[norm(desc)] !== undefined ? t[norm(desc)] : (edid ? t[edid.toLowerCase()] : undefined);
     if (why === undefined || why === null || why === false) return null;
     const w = typeof why === 'object' ? why : { why: String(why) };
-    return { desc: norm(desc), name: String(w.name || edid || 'That'), why: String(w.why || '') };
+    return { desc: norm(desc), name: String(w.name || edid || 'That'), why: String(w.why || ''), told: w.told ? String(w.told) : '' };
   };
   const artifactCraft = (itemId, recipeId) => {
     const product = edidOf(descOf(itemId));
@@ -347,7 +347,8 @@ module.exports = (api) => {
     if (never) {
       if (Date.now() - (dragonToldAt.get(a) || 0) > 3000) {
         dragonToldAt.set(a, Date.now());
-        const text = `${never.name} can no longer be forged or improved: it was far stronger than intended. Your materials come back when you close the menu.`;
+        // An entry's own told line wins (12 Oct: guard armour refused for its models, not its strength)
+        const text = never.told || `${never.name} can no longer be forged or improved: it was far stronger than intended. Your materials come back when you close the menu.`;
         personal(a, text);
         try { sendPacket(a, { customPacketType: 'dboNotice', text }); } catch (e) { /* the chat line is enough */ }
         audit(`FORGENEVER craft refused ${who(a)} recipe ${edidOf(descOf(Number(recipeId) >>> 0)) || (Number(recipeId) >>> 0).toString(16)} -> ${never.desc} (${never.why})`);
