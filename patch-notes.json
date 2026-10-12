@@ -1,5 +1,19 @@
 [
   {
+    "title": "Locked storage",
+    "date": "2026-10-12",
+    "version": "Server update",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Property",
+        "items": [
+          "A chest you claim now starts locked. Claimed chests that had been left open outside a place were locked once; their owners can unlock them again from the menu."
+        ]
+      }
+    ]
+  },
+  {
     "title": "The Court tab",
     "date": "2026-10-12",
     "version": "Client 0.3.94",
