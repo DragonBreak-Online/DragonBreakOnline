@@ -126,6 +126,8 @@ const idList = (v) => Array.isArray(v) ? v.map(String) : [];
 const TIERS = ['senior', 'developer', 'leadgm', 'gm'];
 const tierRoles = {}; for (const t of TIERS) tierRoles[t] = idList((serverSettings.adminRoles || {})[t]);
 const legacyAdminRoles = idList(serverSettings.adminRoleIds);
+// Trial GM roles (staffCan below): no admin tier, so not in TIERS
+const trialRoles = idList((serverSettings.adminRoles || {}).trialgm);
 const ADMIN_PROFILES = new Set([...(serverSettings.adminProfileIds || []), ...(cfg.admins || [])].map(Number).filter(Number.isFinite));
 
 // ---- native helpers --------------------------------------------------------------------------
@@ -194,6 +196,8 @@ const tagOf = (actorId) => {
   } catch (e) { return '????'; }
 };
 const display = (actorId) => `${nameOf(actorId)} #${tagOf(actorId)}`;
+// A character made in a Trial GM's extra slot (fork spawn.ts writes it at creation): for staff work only
+const staffCharOf = (actorId) => { try { return mp.get(actorId, 'private.dboStaffChar') === true; } catch (e) { return false; } };
 const who = (actorId) => { const d = discordOf(actorId); return `${display(actorId)} (profile ${profileOf(actorId)}${d ? `, <@${d}>` : ''})`; };
 // A staff member as #staff-commands names them: the character, then their Discord account (a mention, which shows the
 // Discord name; the post sets allowed_mentions to none, so nobody is pinged)
@@ -212,17 +216,33 @@ const isLeadStaff = (actorId) => { const t = tierOf(actorId); return t !== null 
 // Staff rights are read from the roles written at login, so a Discord demotion only took effect at the next login. The
 // role sync (discordroles.js) reads a staff member's roles every syncMinutes; a lower tier or none logs them out, and the
 // next login derives every right afresh (2026-09-30)
-const TIER_RANK = { senior: 4, developer: 3, leadgm: 2, gm: 1 };
+const TIER_RANK = { senior: 4, developer: 3, leadgm: 2, gm: 1, trialgm: 0.5 };
+// Trial GM (Nate, 11 Oct): an entry GM below GM, from server-settings adminRoles.trialgm (nothing without the key). It is
+// no admin tier: tierOf, isAdmin and isLeadStaff stay as they were for it, so every staff right keyed on them stays
+// closed. A short allowlist is opened by staffCan(a, what) in the commands named in TRIAL_CAN alone. A GM or higher role
+// held beside the Trial GM role wins.
+const trialFrom = (profile, roles) => trialRoles.length > 0 && tierFrom(profile, roles) === null && roles.some((r) => trialRoles.includes(r));
+const isTrialStaff = (actorId) => trialFrom(profileOf(actorId), rolesOf(actorId));
+// rename: /rename and the panel's Rename; chargen: /chargen; gmcall: /gm list|take|goto|release|close|quiet;
+// tp: /tp and the panel's TP to (to a player only); invis: the panel's Invisible mode; playerinfo: the panel's player
+// list and /charstats; bugs: /bugs
+const TRIAL_CAN = new Set(['rename', 'chargen', 'gmcall', 'tp', 'invis', 'playerinfo', 'bugs']);
+const staffCan = (actorId, what) => isAdmin(actorId) || (TRIAL_CAN.has(what) && isTrialStaff(actorId));
+// The tier for logs and the role sync: an admin tier, 'trialgm', or null
+const staffTierFrom = (profile, roles) => tierFrom(profile, roles) || (trialFrom(profile, roles) ? 'trialgm' : null);
+const staffTierOf = (actorId) => staffTierFrom(profileOf(actorId), rolesOf(actorId));
+// Chat commands a Trial GM may run, and the right each needs (the command gate in handleChat)
+const TRIAL_COMMANDS = { rename: 'rename', chargen: 'chargen', tp: 'tp', charstats: 'playerinfo', bugs: 'bugs' };
 const staffRolesSeen = (a, roles) => {
-  const before = tierOf(a);
+  const before = staffTierOf(a);
   if (!before) return;
-  const now = tierFrom(profileOf(a), idList(roles));
+  const now = staffTierFrom(profileOf(a), idList(roles));
   if ((TIER_RANK[now] || 0) >= TIER_RANK[before]) return;
   audit(`STAFF ${who(a)}: Discord roles now give ${now || 'no staff tier'} (was ${before}); logged out so it takes effect`);
   personal(a, 'Your staff roles have changed. Log in again.');
   setTimeout(() => { try { const u = userOf(a); if (u >= 0) mp.kick(u); } catch (e) { log('staff role change: kick failed', e.message); } }, 1500);
 };
-const TIER_LABEL = { senior: 'Senior', developer: 'Developer', leadgm: 'Lead GM', gm: 'GM' };
+const TIER_LABEL = { senior: 'Senior', developer: 'Developer', leadgm: 'Lead GM', gm: 'GM', trialgm: 'Trial GM' };
 // Staff commands a GM may not use (command name, or 'name sub' for one subcommand)
 // appoint and dismiss are here because an official's powers are real money: a rank lets its holder post work paid
 // out of the hold treasury, so a GM who could appoint himself could pay himself (claude-jake's review, A1-1).
@@ -406,7 +426,7 @@ const staffLog = (whoName, tier, what, detail, tally = true) => {
 };
 // A module's own staff line (charters.js, gmcall.js): #staff-commands names whoever acted, the founder of a charter or the
 // GM; counted in the week's summary only when that is staff
-const staffNote = (a, what, detail) => staffLog(display(a), tierOf(a), what, `${staffWho(a)}: ${detail}`, isAdmin(a));
+const staffNote = (a, what, detail) => staffLog(display(a), staffTierOf(a), what, `${staffWho(a)}: ${detail}`, staffTierOf(a) !== null);
 const flushStaff = async () => {
   // Written off the main thread, one write at a time: a synchronous write here froze the server up to 5.4 s when the disk
   // stalled (ticks report, 9 Oct). A change made during a write marks it dirty again for the next tick.
@@ -463,7 +483,7 @@ globalThis.__alduinakAdminLog = (text) => {
   const prof = m ? Number(m[1]) : -1;
   const actor = prof >= 0 ? onlineActors().find((x) => profileOf(x) === prof) : 0;
   const verb = (String(text).replace(/^profile \d+(?: \([a-z]+\))? /, '').split(/\s+/)[0] || 'panel').toLowerCase();
-  staffLog(actor ? display(actor) : `profile ${prof}`, actor ? tierOf(actor) : (m && m[2]) || '', `panel:${verb}`, `${actor ? staffWho(actor) : 'staff'} (panel) ${text}`);
+  staffLog(actor ? display(actor) : `profile ${prof}`, actor ? staffTierOf(actor) : (m && m[2]) || '', `panel:${verb}`, `${actor ? staffWho(actor) : 'staff'} (panel) ${text}`);
 };
 
 // ---- character height (RaceMenu height slider, synced and clamped) --------------------------
@@ -677,7 +697,7 @@ const helpLine = (n) => { const c = commands.get(n); return `/${n}${c && c.help 
 // listed under Other staff tools.
 const STAFF_HELP = [
   { key: 'players', title: 'Players', items: ['kick', 'tp', 'fixloc', 'chargen', 'rename', 'sethunger', 'wipechars',
-    ['tokens', '<player|#TAG>: someone\'s Patreon tier and identity rerolls left'], 'stats', 'charstats'] },
+    ['tokens', '<player|#TAG>: someone\'s Patreon tier and identity rerolls left'], 'stats', 'charstats', 'bugs'] },
   { key: 'calls', title: 'GM calls from players', items: [['gm list', '[all]: the open calls (all: and the last ten closed)'],
     ['gm take', '<n>: the call is yours; the player is told you are on the way, other staff who took it'],
     ['gm goto', '<n>: go to the caller (to where they called from, if they are offline); takes the call if nobody has'],
@@ -717,6 +737,20 @@ const staffTopics = () => {
   topics.push({ key: 'other', title: 'Other staff tools', items: extra.map((n) => ({ words: n, text: commands.get(n).help || '' })) });
   return topics.filter((t) => t.items.length);
 };
+// A Trial GM has no admin tab, so their list comes as private lines; every entry is a TRIAL_CAN right
+const TRIAL_HELP = [
+  ['gm', 'list [all] | take <n> | goto <n> | release <n> | close <n> [note] | quiet [on|off]: answer GM calls'],
+  ['tp', '<player|#TAG>: go to a player'],
+  ['rename', '<player|#TAG> <new name>: rename a character'],
+  ['chargen', '<player|#TAG>: reopen character creation for someone'],
+  ['charstats', '<player|#TAG>: a character\'s journal statistics'],
+  ['bugs', '[n]: the newest /bug reports (5, up to 15)'],
+];
+const trialHelp = (a) => {
+  personal(a, 'Trial GM tools (every use is logged to staff):');
+  for (const [n, text] of TRIAL_HELP) if (commands.has(n)) personal(a, `  /${n} ${text}`);
+  personal(a, '  F7 panel: the Players tab (who is online, TP to, Rename) and the Modes tab (Invisible).');
+};
 const staffHelp = (a, want) => {
   const topics = staffTopics();
   if (!want) {
@@ -734,6 +768,7 @@ registerChatCommand('help', (a, args) => {
   const groups = helpGroupsFor(a);
   const staffAsk = want.match(/^(?:admin|staff)(?:\s+(.*))?$/);
   if (staffAsk && isAdmin(a)) return staffHelp(a, (staffAsk[1] || '').trim());
+  if (staffAsk && isTrialStaff(a)) return trialHelp(a);
   // A UI that draws the panel gets it; everyone else gets the same topics as chat lines
   if (hasPlayerMenu(a) && (!want || groups.some((g) => g.key === want))) return openPlayerMenu(a, want);
   if (!want) {
@@ -741,6 +776,7 @@ registerChatCommand('help', (a, args) => {
     for (const g of groups) personal(a, `${g.title} (/help ${g.key}): ${g.names.map((n) => '/' + n).join('  ') || '-'}`);
     personal(a, 'Talking: plain text speaks. /low /whisper /wide /shout set how far you carry. /me /my /do emote. /looc out of character. /pm <player> <text> in private.');
     if (isAdmin(a)) personal(a, 'Staff: /help admin lists the staff commands in the admin tab.');
+    else if (isTrialStaff(a)) personal(a, 'Trial GM: /help admin lists your staff tools.');
     return;
   }
   const group = groups.find((g) => g.key === want || g.title.toLowerCase().startsWith(want));
@@ -758,7 +794,7 @@ registerChatCommand('help', (a, args) => {
 }, { help: '[topic|command] this list, a topic, or one command explained' });
 registerChatCommand('adminhelp', (a, args) => staffHelp(a, String(args || '').trim().toLowerCase()), { admin: true, help: '[topic] staff commands by topic, in the admin tab' });
 registerChatCommand('players', (a) => { const n = onlineActors().map(display); personal(a, `${n.length} online: ${n.join(', ')}`); }, { help: 'who is online' });
-registerChatCommand('whoami', (a) => personal(a, `${display(a)}  actor ff${a.toString(16)}  profile ${profileOf(a)}${discordOf(a) ? '  discord ' + discordOf(a) : ''}  tier ${tierOf(a) || 'player'}`), { help: 'your name, tag and ids' });
+registerChatCommand('whoami', (a) => personal(a, `${display(a)}  actor ff${a.toString(16)}  profile ${profileOf(a)}${discordOf(a) ? '  discord ' + discordOf(a) : ''}  tier ${staffTierOf(a) || 'player'}`), { help: 'your name, tag and ids' });
 registerChatCommand('ping', (a) => personal(a, 'Pong!'), { help: 'connection test' });
 registerChatCommand('kick', (a, args) => {
   const t = findByName(args.trim()); if (!t) return personal(a, 'No such player.');
@@ -797,7 +833,7 @@ const renameCharacter = (a, t, rawName) => {
     return { ok: true, text: `Renamed ${old} #${tagOf(t)} to ${newName}.` };
   } catch (e) { return { ok: false, text: 'Rename failed: ' + e.message }; }
 };
-globalThis.__dboAdminRename = (a, t, name) => (isAdmin(Number(a) >>> 0) ? renameCharacter(Number(a) >>> 0, Number(t) >>> 0, name) : { ok: false, text: 'Only staff can rename a character.' });
+globalThis.__dboAdminRename = (a, t, name) => (staffCan(Number(a) >>> 0, 'rename') ? renameCharacter(Number(a) >>> 0, Number(t) >>> 0, name) : { ok: false, text: 'Only staff can rename a character.' });
 registerChatCommand('rename', (a, args) => {
   const m = args.trim().match(/^(\S+(?:\s+#[A-Za-z0-9]{4})?|#[A-Za-z0-9]{4})\s+(.+)$/);
   if (!m) return personal(a, 'Usage: /rename <player|#TAG> <new name>');
@@ -1151,14 +1187,16 @@ const handleChat = (userId, text) => {
   if (cmd === 'admin') { if (!isAdmin(a)) return personal(a, 'Admins only.'); if (body) broadcast(`[[A]]#{${C.SYS}}${name}: ${body}`, true); return; }
   const c = commands.get(cmd);
   if (!c) return personal(a, `Unknown command /${cmd.slice(0, 32)}. Type /help.`);
-  if (c.admin && !isAdmin(a)) return personal(a, 'Admins only.');
+  // A Trial GM passes only for the commands in TRIAL_COMMANDS; LEAD_ONLY below is for GMs, so it never refuses them
+  const trial = c.admin && !isAdmin(a) && Object.prototype.hasOwnProperty.call(TRIAL_COMMANDS, cmd) && staffCan(a, TRIAL_COMMANDS[cmd]);
+  if (c.admin && !isAdmin(a) && !trial) return personal(a, 'Admins only.');
   const sub = `${cmd} ${(body.split(/\s+/)[0] || '').toLowerCase()}`;
   const staffCmd = c.admin || LEAD_ONLY.has(sub);
   if ((LEAD_ONLY.has(cmd) || LEAD_ONLY.has(sub)) && isAdmin(a) && !isLeadStaff(a)) {
     staffLog(display(a), tierOf(a), `/${cmd} (refused)`, `${staffWho(a)} (GM): /${cmd} ${body.slice(0, 300)} REFUSED (Lead GM and above)`);
     return personal(a, 'That is for a Lead GM and above.');
   }
-  if (staffCmd && isAdmin(a)) staffLog(display(a), tierOf(a), `/${cmd}`, `${staffWho(a)} (${TIER_LABEL[tierOf(a)] || 'staff'}): /${cmd} ${body.slice(0, 300)}`);
+  if (staffCmd && (isAdmin(a) || trial)) staffLog(display(a), staffTierOf(a), `/${cmd}`, `${staffWho(a)} (${TIER_LABEL[staffTierOf(a)] || 'staff'}): /${cmd} ${body.slice(0, 300)}`);
   try { c.fn(a, body, userId); } catch (e) { log('command', cmd, 'failed', e); personal(a, 'That command failed.'); }
 };
 
@@ -2085,8 +2123,9 @@ const onCharacterReady = (userId, a) => {
     if (actorOf(userId) !== a) return;
     try { mp.set(a, ADMIN_PROP, isAdmin(a)); } catch (e) { /* ignore */ }
     if (cfg.welcome) system(a, cfg.welcome);
-    audit(`JOIN ${who(a)}${tierOf(a) ? ' as ' + tierOf(a) : ''}`);
+    audit(`JOIN ${who(a)}${staffTierOf(a) ? ' as ' + staffTierOf(a) : ''}${staffCharOf(a) ? ' (staff character)' : ''}`);
     startLoginGrace(a);
+    if (staffCharOf(a)) personal(a, 'This is your GM character, made in your Trial GM slot: for staff work only, not for play.');
     sendDriftConfig(a);
     sendConsoleRights(a, true);
     if (creationPending(a)) startCreationInHub(a);
@@ -6452,7 +6491,7 @@ try {
   const auth = serverSettings.discordAuth || {};
   require(DISCORDROLES_JS)({ mp, log, audit, who, onlineActors, every, discordOf, profileOf, zoneById, cfg,
     skills: SKILLS_DEF.skills || [], token: (cfg.discord || {}).botToken || auth.botToken, guildId: ((auth.guilds || [])[0] || {}).guildId,
-    isStaff: (a) => tierOf(a) !== null, staffRolesSeen });
+    isStaff: (a) => staffTierOf(a) !== null, staffRolesSeen });
 } catch (e) { log('discordroles.js failed to load:', e.stack || e.message); }
 
 // ---- /ticket: a private Discord ticket with staff, opened from the game (server\gameticket.js, config "tickets") -------
@@ -6470,7 +6509,7 @@ try {
   delete require.cache[GMCALL_JS];
   const auth = serverSettings.discordAuth || {};
   require(GMCALL_JS)({ mp, log, personal, staffSay, audit, staffNote, who, display, profileOf, discordOf, rolesOf, onlineActors, registerChatCommand,
-    isAdmin, every, saveSoon, sendPacket, zoneOfActor, zoneById, recordOf, teleportTo: staffTeleport, creationPending, sendJson, cfg,
+    isAdmin, staffCan, every, saveSoon, sendPacket, zoneOfActor, zoneById, recordOf, teleportTo: staffTeleport, creationPending, sendJson, cfg,
     token: (cfg.discord || {}).botToken || auth.botToken });
 } catch (e) { log('gmcall.js failed to load:', e.stack || e.message); globalThis.__dboGmCallsOpen = null; }
 
@@ -6500,7 +6539,7 @@ onUi('clientState', (a, args) => {
 try {
   const DEBUGSNAP_JS = path.resolve('debugsnap.js');
   delete require.cache[DEBUGSNAP_JS];
-  require(DEBUGSNAP_JS)({ mp, log, every, personal, registerChatCommand, onlineActors, display, tagOf, profileOf, isAdmin, cfg });
+  require(DEBUGSNAP_JS)({ mp, log, every, personal, registerChatCommand, onlineActors, display, tagOf, profileOf, isAdmin, staffCan, cfg });
 } catch (e) { log('debugsnap.js failed to load:', e.stack || e.message); }
 
 // ---- /monitor: the dbo-monitor service's view for staff (server\monitor.js; tooling/dbo-monitor) -----------------

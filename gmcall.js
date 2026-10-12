@@ -5,7 +5,7 @@
 //
 // Players:  /gm <message> (alias /callgm), or the U panel's Help & trouble tab, "Contact a GM". One open call each; a
 //           second /gm adds to it. /gm alone shows the call; /gm cancel withdraws it.
-// Staff:    every online staff member (gamemode isAdmin, or a Discord role in gmCalls.staffRoleIds) gets a banner across
+// Staff:    every online staff member (gamemode isAdmin, a Trial GM, or a Discord role in gmCalls.staffRoleIds) gets a banner across
 //           the screen, a Skyrim notification and a line in the admin chat tab. An unclaimed call is shown again every
 //           remindMinutes; staff who come online while calls are open are given the list.
 //           /gm list [all]   /gm take <n>   /gm goto <n>   /gm release <n>   /gm close <n> [note]   /gm quiet [on|off]
@@ -74,7 +74,10 @@ module.exports = (api) => {
   // ---- who is staff, and telling them ------------------------------------------------------------------------------
   const roleIds = (Array.isArray(C.staffRoleIds) ? C.staffRoleIds : []).map(String);
   const byRole = (a) => roleIds.length > 0 && rolesOf(a).some((r) => roleIds.includes(String(r)));
-  const isStaff = (a) => { try { return !!isAdmin(a) || byRole(a); } catch (e) { return false; } };
+  // A Trial GM (gamemode staffCan 'gmcall') answers calls like a GM tier, goto included; a role-only helper cannot go
+  const staffCan = fn(api.staffCan, (a) => isAdmin(a));
+  const canAnswer = (a) => { try { return !!staffCan(a, 'gmcall'); } catch (e) { return false; } };
+  const isStaff = (a) => { try { return !!isAdmin(a) || canAnswer(a) || byRole(a); } catch (e) { return false; } };
   const onlineStaff = () => onlineActors().filter(isStaff);
   const quiet = (a) => S.quiet.includes(Number(profileOf(a)));
   // The admin chat tab is drawn for staff tiers only (the client's isAdmin); a role-only helper reads the system tab
@@ -253,7 +256,7 @@ module.exports = (api) => {
     return true;
   };
   const goto = (a, c) => {
-    if (!isAdmin(a)) return say(a, 'Going to a caller is for staff with a GM tier.');
+    if (!isAdmin(a) && !canAnswer(a)) return say(a, 'Going to a caller is for staff with a GM tier.');
     if (!teleportTo) return say(a, 'Teleport is not available right now. Use /tp <name>.');
     if (creationPending(a)) return say(a, 'Finish your own character first.');
     const p = callerOnline(c);

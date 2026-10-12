@@ -79,5 +79,17 @@ const list = ['Elven Bow', 'Bow of the Hunt', 'Bowl', 'Rainbow Trout'];
 check('fuzzyFilter: best first, non-matches out', JSON.stringify(fuzzyFilter(list, 'bow', (x) => x)) === JSON.stringify(['Bow of the Hunt', 'Bowl', 'Elven Bow', 'Rainbow Trout']), fuzzyFilter(list, 'bow', (x) => x));
 check('fuzzyFilter: empty text keeps the list as it is', fuzzyFilter(list, '  ', (x) => x) === list);
 
+// A Trial GM (11 Oct): the server's caps.tabs and caps.actions decide what is drawn. A front from before it skips this part
+if (/allowedActions/.test(SRC)) {
+  const trialCaps = { ban: false, spawn: false, trial: true, tabs: ['debug', 'players', 'modes'], actions: ['teleportTo', 'rename'] };
+  html = render(AdminPanel, { data: data({ tier: 'trialgm', caps: trialCaps, mastery: null }) });
+  const rail = (html.match(/class="admin-panel__railitem[^"]*">([^<]+)</g) || []).map((x) => x.replace(/.*>/, '').replace('<', ''));
+  check('a Trial GM sees only the Debug, Players and Modes tabs', rail.join() === 'Debug,Players,Modes', rail);
+  html = render(AdminPanel, { data: data({ tier: 'leadgm' }) });
+  check('...staff without caps.tabs still see all nine', (html.match(/class="admin-panel__railitem/g) || []).length === 9);
+} else {
+  console.log('note  no Trial GM part to test: this front predates it');
+}
+
 console.log(failures ? `${failures} FAILED` : 'all passed');
 process.exit(failures ? 1 : 0);
