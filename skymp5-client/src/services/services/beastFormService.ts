@@ -177,6 +177,16 @@ export class BeastFormService extends ClientListener {
     try { this.sp.Game.enablePlayerControls(true, true, true, true, true, true, true, true, 0); } catch { /* menu */ }
   }
 
+  // Back to one's own race, first person works again (king_julian_, #bugs 11 Oct: "no longer can go into first person"
+  // until a relog). Vanilla's revert, read from PlayerWerewolfChangeScript.pex ActuallyShiftBackIfNecessary and the same
+  // in DLC1PlayerVampireChangeScript: after SetRace, EnablePlayerControls(False, False, True, False, False, False, False,
+  // False, 1) - the camera switch, POV type 1 (werewolf), which restoreControls' type 0 does not lift - then
+  // ShowFirstPersonGeometry(True), the counterpart of the False its shift into the beast set.
+  private restoreFirstPerson(): void {
+    try { this.sp.Game.enablePlayerControls(false, false, true, false, false, false, false, false, 1); } catch { /* menu */ }
+    try { this.sp.Game.showFirstPersonGeometry(true); } catch (e) { logError(this, "showFirstPersonGeometry failed", e); }
+  }
+
   private onBeastMessage(event: ConnectionMessage<CustomPacketMessage>): void {
     const content = parseCustomPacket(event);
     // Which other players to show in a beast's body (sync/beastBody.ts); formView rebuilds a copy whose race changes
@@ -218,6 +228,7 @@ export class BeastFormService extends ClientListener {
         // Vanilla keeps a beast in third person; the player could flip back and see a broken camera
         this.beastRace = beast ? raceId : 0;
         if (beast) this.sp.Game.forceThirdPerson();
+        else this.restoreFirstPerson();
         // Server calls for the change (AddSpell) can land after this frame; equip again once they have
         this.reapplyAt = beast ? [Date.now() + 1000, Date.now() + 3000] : [];
         this.restoreControls();
@@ -348,7 +359,7 @@ export class BeastFormService extends ClientListener {
     try {
       player.setRace(race);
       try { this.sp.Game.setBeastForm(w.beast); } catch (e) { logError(this, "setBeastForm failed", e); }
-      if (!w.beast) { this.beastRace = 0; this.abilities = null; }
+      if (!w.beast) { this.beastRace = 0; this.abilities = null; this.restoreFirstPerson(); }
       this.restoreControls();
       logTrace(this, "Race did not hold, set again", w.raceId.toString(16), current ? (current.getFormID() >>> 0).toString(16) : "none");
     } catch (e) { logError(this, "setRace retry failed", e); }
