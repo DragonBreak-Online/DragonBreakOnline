@@ -51,7 +51,7 @@ check('without adminRoles.trialgm nobody is a Trial GM and nothing opens', !NOKE
 
 // ---- the chat command gate ---------------------------------------------------------------------------------------------
 const LEAD_ONLY = new Function(`return ${cut('const LEAD_ONLY = new Set([', ']);', 'LEAD_ONLY').replace('const LEAD_ONLY = ', '')}]);`)();
-check('LEAD_ONLY is read', LEAD_ONLY.has('chargen') && LEAD_ONLY.has('wipechars'));
+check('LEAD_ONLY is read, and /chargen is not in it (every GM, Nate 12 Oct)', !LEAD_ONLY.has('chargen') && LEAD_ONLY.has('wipechars'));
 const TIER_LABEL = new Function(`${src.match(/const TIER_LABEL = \{[^}]+\};/)[0]} return TIER_LABEL;`)();
 check('the Trial GM has a label in the staff log', TIER_LABEL.trialgm === 'Trial GM');
 const gateCode = cut('  const c = commands.get(cmd);', "  try { c.fn(a, body, userId); }", 'command gate') + '  c.fn(a, body, userId);';
@@ -77,8 +77,8 @@ check('every other staff command refuses a Trial GM with "Admins only."', refuse
 chat(TRIAL, 'faction leader Mira fightersguild');
 check('a player command reaches its own handler, which keeps its own staff checks (no staff log for the Trial GM)', ran.length === 1 && logged.length === 0, logged);
 check('a player is refused /rename and /tp', !chat(PLAYER, 'rename Mira Bob') && !chat(PLAYER, 'tp Mira') && said.includes('Admins only.'));
-check('a GM is still refused /chargen (Lead GM and above) and runs /tp', !chat(GM, 'chargen Mira') && /Lead GM/.test(said.join()) && chat(GM, 'tp Mira'));
-check('a GM holding the Trial role too is a GM at the gate', !chat(BOTH, 'chargen Mira') && chat(BOTH, 'kick Mira'));
+check('a GM runs /chargen and /tp, and is still refused /wipechars (Lead GM and above)', chat(GM, 'chargen Mira') && chat(GM, 'tp Mira') && !chat(GM, 'wipechars Mira') && /Lead GM/.test(said.join()));
+check('a GM holding the Trial role too is a GM at the gate', !chat(BOTH, 'wipechars Mira') && chat(BOTH, 'kick Mira'));
 check('a Lead GM runs /chargen and /kick', chat(LEAD, 'chargen Mira') && chat(LEAD, 'kick Mira'));
 const NG = tiers([]);
 const chatNoKey = (a, line) => { ran.length = 0; const [cmd, ...rest] = line.split(' ');
