@@ -36,9 +36,12 @@ module.exports = (api) => {
   // Lead GM and above: an emergency revoke only, never a grant (Nate, 10 Oct)
   const isLeadStaff = typeof api.isLeadStaff === 'function' ? api.isLeadStaff : () => false;
   const announce = typeof api.announce === 'function' ? api.announce : () => {};
-  // The roll and the ruler name people by their own name, never a mask's or a beast's (gamemode.js ownNameOf; tracker
-  // 1559074270959640676: a ruler in a beast form was listed as the beast)
+  // The roll and the ruler name people by their own name, never a beast's, and a mask's only while rosterPrivacy.masks
+  // is off (gamemode.js ownNameOf; tracker 1559074270959640676: a ruler in a beast form was listed as the beast)
   const ownNameOf = typeof api.ownNameOf === 'function' ? api.ownNameOf : nameOf;
+  // The answer to a grant names its character as the ruler asked for them (gamemode.js publicNameOf): a mask granted a
+  // title by the #TAG drawn under it stays the mask there; the roll and the decree follow rosterPrivacy.masks
+  const publicNameOf = typeof api.publicNameOf === 'function' ? api.publicNameOf : nameOf;
   const C = Object.assign({
     enabled: false, fiefShare: 0.25, maxEstateName: 40,
     // zone id -> 'cyrodiil' | 'skyrim': which titles its ruler grants; a zone not listed is a Skyrim hold
@@ -201,7 +204,8 @@ module.exports = (api) => {
     const was = before ? labelOf(before) : '';
     const entry = { actor, profile: Number(tg.pid) || profileOf(actor), name: String(ownNameOf(actor) || tg.label || ''), female: isFemale(actor), hold: z.id, title: def.id,
       fief: fief || undefined, estate: estate || undefined, at: Date.now(), by: by ? who(by) : String(how || 'migration') };
-    if (before && labelOf(entry) === was) return { error: `${entry.name} is already ${was}.` };
+    const asked = String(publicNameOf(actor) || entry.name);
+    if (before && labelOf(entry) === was) return { error: `${asked} is already ${was}.` };
     data().nobles = data().nobles.filter((n) => n !== before).concat([entry]);
     save();
     const label = labelOf(entry);
@@ -209,7 +213,7 @@ module.exports = (api) => {
     const line = decree(z.id, by, `${text}${was ? `, formerly ${was}` : ''}.`);
     audit(`NOBILITY ${by ? who(by) : String(how || 'migration')}: ${tg.who || entry.name} (character ${hex(actor)}) is ${label} (${z.name})${was ? `, was ${was}` : ''}${how ? ` [${how}]` : ''}`);
     if (isOnline(actor) && actor !== (by >>> 0)) personal(actor, line);
-    return { text: `${entry.name} is now ${label}.` };
+    return { text: `${asked} is now ${label}.` };
   };
   // staff: a Lead GM's emergency revoke, announced plainly rather than as the ruler's decree
   const revoke = (by, zid, actor, staff) => {

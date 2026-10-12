@@ -18,7 +18,8 @@ const path = require('path');
 module.exports = (api) => {
   const { mp, log, personal, audit, who, display, tagOf, profileOf, onlineActors, every, registerChatCommand,
     takeGold, giveGold, depositToTreasury, boardZoneNear, zoneById, ranksOf, cfg } = api;
-  // A commission names its parties by their own name, never a mask's or a beast's (gamemode.js ownDisplay)
+  // A commission names its parties by their own name, never a beast's, and a mask's only while rosterPrivacy.masks is
+  // off (gamemode.js ownDisplay)
   const ownDisplay = typeof api.ownDisplay === 'function' ? api.ownDisplay : display;
 
   const C = Object.assign({

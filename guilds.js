@@ -20,10 +20,14 @@ module.exports = (api) => {
     onlineActors, isAdmin, findByName, audit, who, cfg, profileOf } = api;
   // Online first, then offline characters too (Add member); an older gamemode passes only findByName
   const findAnyByName = typeof api.findAnyByName === 'function' ? api.findAnyByName : findByName;
-  // Rosters, invitations and the news of who joined or leads name people by their own name, never a mask's or a beast's
-  // (gamemode.js ownNameOf; tracker 1559074270959640676): a pack's leader won by a challenge was written in as "Werewolf"
+  // Rosters, invitations and the news of who joined or leads name people by their own name, never a beast's, and a
+  // mask's only while rosterPrivacy.masks is off (gamemode.js ownNameOf; tracker 1559074270959640676): a pack's leader
+  // won by a challenge was written in as "Werewolf"
   const ownNameOf = typeof api.ownNameOf === 'function' ? api.ownNameOf : nameOf;
   const ownDisplay = typeof api.ownDisplay === 'function' ? api.ownDisplay : display;
+  // Whom the household invited, as the inviter asked for them (gamemode.js publicNameOf): a mask invited by the #TAG drawn
+  // under it stays the mask; a beast is its own name
+  const publicNameOf = typeof api.publicNameOf === 'function' ? api.publicNameOf : nameOf;
   // A GM observes; the powers below are for a Lead GM and above (claude-jake's review A3). Fails closed with an old gamemode.
   const isLeadStaff = typeof api.isLeadStaff === 'function' ? api.isLeadStaff : () => false;
 
@@ -849,7 +853,7 @@ module.exports = (api) => {
     const view = factionView(a >>> 0, f.id);
     // The invitations the household has out, for those who may invite
     const pending = !view.canInvite ? [] : [...ST.invites.entries()].flatMap(([t, list]) => (list || [])
-      .filter((i) => i.fid === f.id && Date.now() - i.at < INVITE_MS).map((i) => ({ actorId: Number(t) >>> 0, name: ownNameOf(Number(t) >>> 0), from: ownNameOf(i.from), at: i.at })));
+      .filter((i) => i.fid === f.id && Date.now() - i.at < INVITE_MS).map((i) => ({ actorId: Number(t) >>> 0, name: publicNameOf(Number(t) >>> 0), from: ownNameOf(i.from), at: i.at })));
     return Object.assign(view, { pending, mine: invitesOf(a).some((i) => i.fid === f.id) });
   };
   // The office is the source of truth (Nate, 3 Oct, Q3): seating someone sets their household rank to the office's

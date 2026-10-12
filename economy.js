@@ -55,7 +55,8 @@ const path = require('path');
 
 module.exports = (api) => {
   const { mp, log, personal, audit, who, display, cfg, onUi, onlineActors, every, readOfficials, zoneById } = api;
-  // Who set the hold's tax is kept by their own name, never a mask's or a beast's (gamemode.js ownDisplay)
+  // Who set the hold's tax is kept by their own name, never a beast's, and a mask's only while rosterPrivacy.masks is
+  // off (gamemode.js ownDisplay)
   const ownDisplay = typeof api.ownDisplay === 'function' ? api.ownDisplay : display;
   const C = Object.assign({ enabled: false, maxTaxRate: 0.30, defaultPropertyValue: 2000, maxPropertyValue: 1000000, maxWage: 100000, reckonDay: 0, reckonHour: 0,
     wageShare: 0.25, wageIncomeShare: 0.75, wageSavingsShare: 0.25, assessEveryDays: 7, assessMaxStep: 2,

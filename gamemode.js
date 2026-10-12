@@ -196,15 +196,40 @@ const tagOf = (actorId) => {
   } catch (e) { return '????'; }
 };
 const display = (actorId) => `${nameOf(actorId)} #${tagOf(actorId)}`;
-// The character's own name behind a mask or a beast form (playermenu.js __dboOwnName). Rosters, lists and records name
-// people by it: the name shown there told anyone who looked who was the beast or the mask (tracker 1559074270959640676,
-// the Court tab's "Werewolf" Jarl), and the client hides the #TAG over a beast. What is said and done in the world keeps
-// the name shown (nameOf, display).
-const ownNameOf = (actorId) => {
-  try { const f = globalThis.__dboOwnName; const n = typeof f === 'function' ? String(f(actorId) || '') : ''; if (n) return n; } catch (e) { /* the name shown */ }
+// Names for lists and answers (tracker 1559074270959640676: the Court tab listed a Jarl in werewolf form as "Werewolf", so
+// anyone who looked learnt who the beast was; playermenu.js keeps the mask and beast rules). What is said and done in the
+// world keeps the name shown (nameOf, display, playermenu.js nameFor).
+// - realNameOf: the own name behind a mask and a beast form ("Stranger" for a beast whose own name is lost).
+// - publicNameOf: the name that goes with the #TAG the world sees. The client hides the #TAG over a beast, so a beast is
+//   its own name; it draws the #TAG under "Masked Person", so a mask stays the mask. /players and the answer to a lookup
+//   (/appoint, a court offer, a title, a staff hire, an invitation, a dossier) use it.
+// - ownNameOf: rosters and records (offices, factions, titles, the party, contacts, letters, jobs). Never the beast's
+//   name; behind a mask the own name while gamemode-config.json rosterPrivacy.masks is on (the default), else the mask's.
+//   On, a roster names a masked character beside the #TAG the client draws under the mask, so its reader can tell who is
+//   behind it; off, no roster names them. Nate's call.
+const ROSTER_MASKS = (cfg.rosterPrivacy || {}).masks !== false;
+const namedBy = (fn, actorId) => {
+  try { const f = globalThis[fn]; const n = typeof f === 'function' ? String(f(actorId) || '') : ''; if (n) return n; } catch (e) { /* the name shown */ }
   return nameOf(actorId);
 };
+const realNameOf = (actorId) => namedBy('__dboOwnName', actorId);
+const publicNameOf = (actorId) => namedBy('__dboPublicName', actorId);
+const ownNameOf = (actorId) => (ROSTER_MASKS ? realNameOf(actorId) : publicNameOf(actorId));
 const ownDisplay = (actorId) => `${ownNameOf(actorId)} #${tagOf(actorId)}`;
+const publicDisplay = (actorId) => `${publicNameOf(actorId)} #${tagOf(actorId)}`;
+// Behind a mask or in a beast form: no name finds them (findByName), only the #TAG or the profile id
+const disguisedOf = (actorId) => {
+  try { const f = globalThis.__dboDisguised; if (typeof f === 'function') return f(actorId) === true; } catch (e) { /* below */ }
+  return realNameOf(actorId) !== nameOf(actorId);
+};
+// Someone a lookup found, as the reply names them to the viewer: the name and #TAG, but a beast or a mask as the viewer
+// sees them in the world, with no #TAG (X > Invite to Party on a beast answered "Werewolf #TAG": the tag the client hides
+// over a beast, which /players and the rosters pair with the own name)
+const displayFor = (viewer, t) => {
+  if (!disguisedOf(t)) return display(t);
+  try { const f = globalThis.__dboNameFor; const n = typeof f === 'function' ? String(f(viewer, t) || '') : ''; if (n) return n; } catch (e) { /* the name shown */ }
+  return nameOf(t);
+};
 // A character made in a Trial GM's extra slot (fork spawn.ts writes it at creation): for staff work only
 const staffCharOf = (actorId) => { try { return mp.get(actorId, 'private.dboStaffChar') === true; } catch (e) { return false; } };
 const who = (actorId) => { const d = discordOf(actorId); return `${display(actorId)} (profile ${profileOf(actorId)}${d ? `, <@${d}>` : ''})`; };
@@ -344,9 +369,10 @@ const findByName = (query) => {
     q = q.slice(0, tagMatch.index).trim();
   }
   const byId = all.find(a => a.toString(16) === q || String(profileOf(a)) === q); if (byId) return byId;
-  // By the own name (ownNameOf): "Werewolf" or "Masked Person" found whoever wore it, and the answer gave away their
-  // #TAG, and so who they were (tracker 1559074270959640676); a beast or a mask is found by the #TAG or the real name
-  const named = all.map((a) => [a, ownNameOf(a).toLowerCase()]);
+  // No name finds one behind a mask or in a beast form (disguisedOf), only the #TAG or the profile id: "Werewolf" or
+  // "Masked Person" found whoever wore it and the answer gave away their #TAG, and the own name was answered with the
+  // beast or the mask beside it (tracker 1559074270959640676)
+  const named = all.filter((a) => !disguisedOf(a)).map((a) => [a, nameOf(a).toLowerCase()]);
   const exact = named.filter(([, n]) => n === q); if (exact.length === 1) return exact[0][0];
   const prefix = named.filter(([, n]) => n.startsWith(q)); return prefix.length === 1 ? prefix[0][0] : 0;
 };
@@ -579,8 +605,9 @@ const seen = new Map(); // profileId -> { name, tier, roles }
 const watchPlayers = () => {
   for (const a of onlineActors()) {
     const p = profileOf(a); if (!(p > 0)) continue;
-    // The own name: a mask put on is not a rename, and /officials and the Court tab read this for an offline official
-    const now = { name: ownNameOf(a), tier: tierOf(a), roles: rolesOf(a).sort().join(',') };
+    // The own name behind a mask: a mask put on is not a rename, and /officials and the Court tab read this for an
+    // official who is offline (logging out unmasks)
+    const now = { name: realNameOf(a), tier: tierOf(a), roles: rolesOf(a).sort().join(',') };
     const prev = seen.get(p);
     try { if ((mp.get(a, ADMIN_PROP) === true) !== (now.tier !== null)) mp.set(a, ADMIN_PROP, now.tier !== null); } catch (e) { /* ignore */ }
     // A beast form's name (beastform.js) is not a rename; seen keeps the real one until the revert
@@ -808,7 +835,9 @@ registerChatCommand('help', (a, args) => {
   personal(a, `No command or topic "${want}". Type /help for the list.`);
 }, { help: '[topic|command] this list, a topic, or one command explained' });
 registerChatCommand('adminhelp', (a, args) => staffHelp(a, String(args || '').trim().toLowerCase()), { admin: true, help: '[topic] staff commands by topic, in the admin tab' });
-registerChatCommand('players', (a) => { const n = onlineActors().map(ownDisplay); personal(a, `${n.length} online: ${n.join(', ')}`); }, { help: 'who is online' });
+// A beast by its own name, a mask as the mask (publicDisplay): the #TAG drawn under a mask beside the own name here took
+// the mask off for anyone who typed /players
+registerChatCommand('players', (a) => { const n = onlineActors().map(publicDisplay); personal(a, `${n.length} online: ${n.join(', ')}`); }, { help: 'who is online' });
 registerChatCommand('whoami', (a) => personal(a, `${display(a)}  actor ff${a.toString(16)}  profile ${profileOf(a)}${discordOf(a) ? '  discord ' + discordOf(a) : ''}  tier ${staffTierOf(a) || 'player'}`), { help: 'your name, tag and ids' });
 registerChatCommand('ping', (a) => personal(a, 'Pong!'), { help: 'connection test' });
 registerChatCommand('kick', (a, args) => {
@@ -1001,7 +1030,10 @@ const findAnyByName = (query) => {
     // A deleted character stays in the name and tag indexes until a restart (naming.js __dboFormGone)
     const live = (ids) => (Array.isArray(ids) ? ids.filter((id) => !(typeof globalThis.__dboFormGone === 'function' && globalThis.__dboFormGone(id))) : []);
     if (tagMatch) { const r = live(mp.findFormsByPropertyValue('private.indexed.tagKey', tagMatch[1])); if (r.length) return Number(r[0]); }
-    const r = live(mp.findFormsByPropertyValue('private.indexed.nameKey', q.replace(/\s*#[a-z0-9]{4}$/, '')));
+    // The index keeps the own name: one online behind a mask or in a beast form is not found by it either (findByName)
+    const on = new Set(onlineActors().map((x) => x >>> 0));
+    const r = live(mp.findFormsByPropertyValue('private.indexed.nameKey', q.replace(/\s*#[a-z0-9]{4}$/, '')))
+      .filter((id) => !(on.has(Number(id) >>> 0) && disguisedOf(Number(id) >>> 0)));
     if (Array.isArray(r) && r.length === 1) return Number(r[0]);
     if (Array.isArray(r) && r.length > 1) return -r.length; // ambiguous
   } catch (e) { log('name lookup failed', e.message); }
@@ -1112,7 +1144,8 @@ const sendPigeon = (a, to, rawText, zoneId, goldRaw, itemsRaw) => {
     const at = Date.now();
     const sig = nextSignature.get(a);
     nextSignature.delete(a);
-    // Signed with the own name, never a mask's or a beast's; /sign leaves a letter unsigned or forges one
+    // Signed with the own name, never a beast's, and a mask's only while rosterPrivacy.masks is off; /sign leaves a
+    // letter unsigned or forges one
     let from = ownDisplay(a);
     if (sig && sig.unsigned) from = 'Unsigned';
     else if (sig && sig.name) from = sig.name + (Math.random() < (Number(FORGE.tellChance[sig.tier]) || 0) ? ' (the hand does not quite match)' : '');
@@ -2871,8 +2904,8 @@ const panelPeople = (a) => {
     if ((t >>> 0) === (a >>> 0)) continue;
     if (staff) { out.push({ label: display(t), value: '#' + tagOf(t) }); continue; }
     const known = nameFor ? nameFor(a, t) : '';
-    // A mask's or a beast's name finds no one (findByName): those are named by the #TAG
-    if (known && known !== 'Stranger' && known === ownNameOf(t) && !out.some((p) => p.value === known)) out.push({ label: known, value: known });
+    // No name finds one behind a mask or in a beast form (findByName): they are left out
+    if (known && known !== 'Stranger' && !disguisedOf(t) && !out.some((p) => p.value === known)) out.push({ label: known, value: known });
     if (out.length >= 120) break;
   }
   return out.sort((x, y) => x.label.localeCompare(y.label));
@@ -3382,10 +3415,13 @@ const officialTarget = (query) => {
     if (!(pid >= 0)) return { error: 'That character has no profile id.' };
   }
   return { pid, actor, online: onlineActors().find((x) => profileOf(x) === pid) || 0,
-    label: actor ? ownDisplay(actor) : `profile ${pid}`, who: actor ? who(actor) : `profile ${pid}` };
+    // The answer names a masked character as the mask shows them: the #TAG asked for may be the one drawn under the mask
+    label: actor ? publicDisplay(actor) : `profile ${pid}`, who: actor ? who(actor) : `profile ${pid}` };
 };
-// An official by their own name (watchPlayers keeps it in seen), never a mask's or a beast's
+// An official as the rosters name them (ownNameOf), never by a beast's name: online by the live character, offline by the
+// own name the name watch kept (watchPlayers, seen)
 const officialName = (pid) => {
+  const on = onlineActors().find((x) => profileOf(x) === Number(pid)); if (on) return ownNameOf(on);
   const s = seen.get(Number(pid)); if (s) return s.name;
   const ids = accountActors(Number(pid)); return ids.length ? ownNameOf(ids[0]) : `profile ${pid}`;
 };
@@ -4106,7 +4142,7 @@ log(`scholar reading ${READ.enabled ? 'on' : 'off'}: ${READ_LINES.length} Skyrim
 try {
   const DUNGEONS_JS = path.resolve('dungeons.js'); // gamemode.js is evaluated outside the bundle's module tree, so resolve by cwd
   delete require.cache[DUNGEONS_JS];
-  require(DUNGEONS_JS)({ mp, log, ownNameOf, ownDisplay, personal, system, registerChatCommand, onUi, openWidget, closeWidget, sendPacket, findByName, display, who, audit, profileOf, nameOf, onlineActors, isAdmin, giveItem, cfg, every });
+  require(DUNGEONS_JS)({ mp, log, ownNameOf, ownDisplay, displayFor, personal, system, registerChatCommand, onUi, openWidget, closeWidget, sendPacket, findByName, display, who, audit, profileOf, nameOf, onlineActors, isAdmin, giveItem, cfg, every });
 } catch (e) { log('dungeons.js failed to load:', e.stack || e.message); globalThis.__dboDungeonActivate = null; globalThis.__dboAggroHit = null; globalThis.__dboSpellUnlock = null; }
 
 // ---- coin purses: Harvesting nodes that pay gold ------------------------------------------------
@@ -6661,7 +6697,7 @@ businessFailClosed.failClosed = true;
 try {
   const BUSINESS_JS = path.resolve('business.js');
   delete require.cache[BUSINESS_JS];
-  require(BUSINESS_JS)({ mp, log, ownNameOf, ownDisplay, personal, audit, who, display, cfg, openWidget, closeWidget, onUi, registerChatCommand, onlineActors,
+  require(BUSINESS_JS)({ mp, log, ownNameOf, ownDisplay, publicDisplay, personal, audit, who, display, cfg, openWidget, closeWidget, onUi, registerChatCommand, onlineActors,
     profileOf, findByName, takeGold, giveGold: (a, n) => giveItem(a, GOLD_BASE, n) !== false, depositToTreasury, zoneOfActor, zoneById,
     ranksOf, distanceMeters, isAdmin });
 } catch (e) { log('business.js failed to load:', e.stack || e.message); globalThis.__dboBusinessActivate = businessFailClosed; globalThis.__dboBusinessLogin = null; globalThis.__dboBusinessRent = null; globalThis.__dboHoldTax = null; globalThis.__dboBusinessLog = null; }
@@ -6934,7 +6970,7 @@ try {
 try {
   const GUILDS_JS = path.resolve('guilds.js');
   delete require.cache[GUILDS_JS];
-  require(GUILDS_JS)({ mp, log, ownNameOf, ownDisplay, personal, system, registerChatCommand, onUi, openWidget, closeWidget, display, nameOf, tagOf, onlineActors, isAdmin, isLeadStaff, findByName, findAnyByName, audit, who, cfg, profileOf, readOfficials });
+  require(GUILDS_JS)({ mp, log, ownNameOf, ownDisplay, publicNameOf, personal, system, registerChatCommand, onUi, openWidget, closeWidget, display, nameOf, tagOf, onlineActors, isAdmin, isLeadStaff, findByName, findAnyByName, audit, who, cfg, profileOf, readOfficials });
 } catch (e) { log('guilds.js failed to load:', e.stack || e.message); globalThis.__dboFactionMenu = null; globalThis.__dboFactionMenuEntries = null; globalThis.__dboFactionMenuAction = null; globalThis.__dboFactionLogin = null; }
 
 // ---- territories, land markers and official war (server\realm.js, territories.json, WAR_DESIGN.md) ---------------------
@@ -7064,7 +7100,7 @@ try {
 try {
   const NOBILITY_JS = path.resolve('nobility.js');
   delete require.cache[NOBILITY_JS];
-  require(NOBILITY_JS)({ mp, log, ownNameOf, ownDisplay, personal, registerChatCommand, audit, who, display, nameOf, tagOf, onUi, onlineActors, profileOf, cfg, every, isLeadStaff,
+  require(NOBILITY_JS)({ mp, log, ownNameOf, ownDisplay, publicNameOf, personal, registerChatCommand, audit, who, display, nameOf, tagOf, onUi, onlineActors, profileOf, cfg, every, isLeadStaff,
     zoneById, readOfficials, ranksOf, accountActors, officialTarget, announce: (text) => broadcast(`[[S]]#{${C.SYS}}${text}`) });
 } catch (e) { log('nobility.js failed to load:', e.stack || e.message); for (const k of ['__dboNobility', '__dboNobilityFiefCut']) globalThis[k] = null; if (globalThis.__dboJournalSections) delete globalThis.__dboJournalSections.nobility; }
 
@@ -7072,7 +7108,7 @@ try {
 try {
   const THALMOR_JS = path.resolve('thalmor.js');
   delete require.cache[THALMOR_JS];
-  require(THALMOR_JS)({ mp, log, ownNameOf, ownDisplay, personal, system, audit, who, display, nameOf, tagOf, cfg, onUi, onlineActors, registerChatCommand, isAdmin, isLeadStaff,
+  require(THALMOR_JS)({ mp, log, ownNameOf, ownDisplay, publicNameOf, personal, system, audit, who, display, nameOf, tagOf, cfg, onUi, onlineActors, registerChatCommand, isAdmin, isLeadStaff,
     findAnyByName, zoneOfActor });
 } catch (e) {
   log('thalmor.js failed to load:', e.stack || e.message);
@@ -7198,7 +7234,7 @@ try {
 try {
   const CHARTERS_JS = path.resolve('charters.js');
   delete require.cache[CHARTERS_JS];
-  require(CHARTERS_JS)({ mp, log, ownNameOf, ownDisplay, personal, audit, who, display, nameOf, cfg, registerChatCommand, onlineActors, isAdmin, isLeadStaff,
+  require(CHARTERS_JS)({ mp, log, ownNameOf, ownDisplay, displayFor, personal, audit, who, display, nameOf, cfg, registerChatCommand, onlineActors, isAdmin, isLeadStaff,
     findByName, profileOf, takeGold, giveItem, every, staffNote, approvalForum });
 } catch (e) { log('charters.js failed to load:', e.stack || e.message); }
 // ---- alchemy at the ordinary labs: the nearest vanilla potion for a client-side mix (server alchemy.js) ------------

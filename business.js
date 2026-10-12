@@ -29,9 +29,12 @@ const path = require('path');
 module.exports = (api) => {
   const { mp, log, personal, audit, who, display, cfg, openWidget, closeWidget, onUi, registerChatCommand, onlineActors,
     profileOf, findByName, takeGold, giveGold, depositToTreasury, zoneOfActor, zoneById, ranksOf, distanceMeters, isAdmin } = api;
-  // The owner, the staff, a chest's renter and who set the tax are kept by their own name, never a mask's or a beast's
-  // (gamemode.js ownDisplay; tracker 1559074270959640676): "kept by Werewolf #TAG" told every visitor who the beast was
+  // The owner, a chest's renter and who set the tax are kept as the rosters name them, never by a beast's name (gamemode.js
+  // ownDisplay; tracker 1559074270959640676): "kept by Werewolf #TAG" told every visitor who the beast was
   const ownDisplay = typeof api.ownDisplay === 'function' ? api.ownDisplay : display;
+  // Staff taken on by a name or #TAG are named as the owner asked for them (gamemode.js publicDisplay): a mask taken on by
+  // the #TAG drawn under it stays the mask; a beast is its own name
+  const publicDisplay = typeof api.publicDisplay === 'function' ? api.publicDisplay : display;
   const C = Object.assign({
     enabled: true, minRent: 1, maxRent: 200, maxChestPrice: 200, chestGraceHours: 72, maxTax: 0.3,
     taxRanks: ['jarl', 'count', 'steward'], maxStaff: 12, maxNote: 300, logKeep: 300, notesKeep: 200, perPage: 8,
@@ -392,7 +395,7 @@ module.exports = (api) => {
     const byProfile = (b.staff || []).find((s) => String(s.profile) === String(q));
     if (byProfile) return { profile: Number(byProfile.profile), name: byProfile.name, actor: 0 };
     const t = q ? findByName(String(q)) : 0;
-    return t ? { profile: profileOf(t), name: ownDisplay(t), actor: t } : null;
+    return t ? { profile: profileOf(t), name: publicDisplay(t), actor: t } : null;
   };
   const ACTIONS = {
     rent: (a, claim, b, v) => {

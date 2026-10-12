@@ -46,8 +46,9 @@ module.exports = (api) => {
   const { mp, log, personal, audit, who, nameOf, tagOf, profileOf, discordOf, onlineActors, every, cfg, onUi, takeGold, giveItem,
     goldOf, GOLD_BASE, recordOf, depositToTreasury, zoneById, zoneList, boardZoneNear, metOf, isAdmin, registerChatCommand,
     openWidget, closeWidget } = api;
-  // A job names its sender, recipient and courier by their own name, never a mask's or a beast's (gamemode.js ownNameOf;
-  // tracker 1559074270959640676). A robber keeps the name they were seen by.
+  // A job names its sender, recipient and courier by their own name, never a beast's, and a mask's only while
+  // rosterPrivacy.masks is off (gamemode.js ownNameOf; tracker 1559074270959640676). A robber keeps the name they were
+  // seen by.
   const ownNameOf = typeof api.ownNameOf === 'function' ? api.ownNameOf : nameOf;
   const C = Object.assign({
     enabled: false,

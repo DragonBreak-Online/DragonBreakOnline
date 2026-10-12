@@ -22,7 +22,8 @@ const path = require('path');
 module.exports = (api) => {
   const { mp, log, personal, audit, who, display, tagOf, profileOf, onlineActors, every, registerChatCommand,
     takeGold, giveGold, depositToTreasury, zoneById, cfg } = api;
-  // A lease names landlord and tenant by their own name, never a mask's or a beast's (gamemode.js ownDisplay)
+  // A lease names landlord and tenant by their own name, never a beast's, and a mask's only while rosterPrivacy.masks
+  // is off (gamemode.js ownDisplay)
   const ownDisplay = typeof api.ownDisplay === 'function' ? api.ownDisplay : display;
   const openWidget = api.openWidget || (() => false), closeWidget = api.closeWidget || (() => false), onUi = api.onUi || (() => {});
 

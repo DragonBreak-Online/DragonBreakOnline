@@ -34,7 +34,8 @@ module.exports = (api) => {
     zoneList, zoneById, readOfficials, rankTitle, appointCap, appointCheck, appointFrom, seatOfficial, unseatOfficial,
     officialTarget, officialName, accountActors, ranksOf, APPOINT_RULES, findByName } = api;
   const personal = typeof api.personal === 'function' ? api.personal : () => {};
-  // Rosters and offers name people by their own name, never a mask's or a beast's (gamemode.js ownNameOf)
+  // Rosters and offers name people by their own name, never a beast's, and a mask's only while rosterPrivacy.masks is
+  // off (gamemode.js ownNameOf)
   const ownNameOf = typeof api.ownNameOf === 'function' ? api.ownNameOf : nameOf;
   const ownDisplay = typeof api.ownDisplay === 'function' ? api.ownDisplay : display;
   const C = Object.assign({

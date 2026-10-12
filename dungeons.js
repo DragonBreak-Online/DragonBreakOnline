@@ -24,10 +24,13 @@ const path = require('path');
 
 module.exports = (api) => {
   const { mp, log, personal, system, registerChatCommand, onUi, openWidget, closeWidget, sendPacket, findByName, display, who, audit, profileOf, nameOf, onlineActors, isAdmin, giveItem, cfg, every } = api;
-  // The party's roster names its members by their own name, never a mask's or a beast's (gamemode.js ownNameOf; tracker
-  // 1559074270959640676)
+  // The party's roster names its members by their own name, never a beast's, and a mask's only while
+  // rosterPrivacy.masks is off (gamemode.js ownNameOf; tracker 1559074270959640676)
   const ownNameOf = typeof api.ownNameOf === 'function' ? api.ownNameOf : nameOf;
   const ownDisplay = typeof api.ownDisplay === 'function' ? api.ownDisplay : display;
+  // An answer about someone /party found names a beast or a mask as the asker sees them, with no #TAG (gamemode.js
+  // displayFor): X > Invite to Party on a beast answered "Invited Werewolf #TAG", the tag the client hides over a beast
+  const displayFor = typeof api.displayFor === 'function' ? api.displayFor : (viewer, t) => display(t);
   // goldChance/goldMult: coin used to be in EVERY container - chestLoot always added some, smallLoot
   // added some half the time, and smallLoot's "nothing rolled" fallback added some again. With ~88
   // containers in a lease that is a flood. Now a chest carries coin goldChance of the time and the
@@ -2095,10 +2098,10 @@ module.exports = (api) => {
         if (t === a) return personal(a, 'You are already with yourself.');
         if (p && p.leader !== pid) return personal(a, 'Only the party leader invites.');
         if (p && p.members.size >= C.raidMax) return personal(a, `A raid holds at most ${C.raidMax}.`);
-        if (partyOf(profileOf(t))) return personal(a, `${display(t)} is already in a party.`);
+        if (partyOf(profileOf(t))) return personal(a, `${displayFor(a, t)} is already in a party.`);
         ST.invites.set(profileOf(t), { from: pid, at: Date.now() });
-        personal(a, `Invited ${display(t)}. They have two minutes to /party accept.`);
-        system(t, `${display(a)} invites you to their party. /party accept to join, /party decline to refuse.`);
+        personal(a, `Invited ${displayFor(a, t)}. They have two minutes to /party accept.`);
+        system(t, `${displayFor(t, a)} invites you to their party. /party accept to join, /party decline to refuse.`);
         return;
       }
       case 'accept': {
@@ -2122,7 +2125,7 @@ module.exports = (api) => {
       case 'kick': {
         if (!p || p.leader !== pid) return personal(a, 'Only the leader kicks.');
         const t = findByName(arg); if (!t || !p.members.has(profileOf(t))) return personal(a, 'They are not in your party.');
-        leaveParty(profileOf(t)); system(t, 'You were removed from the party.'); return personal(a, `${display(t)} removed.`);
+        leaveParty(profileOf(t)); system(t, 'You were removed from the party.'); return personal(a, `${displayFor(a, t)} removed.`);
       }
       default: {
         if (!p) return personal(a, 'Not in a party. /party invite <name|#TAG>, /party accept, /party leave, /party kick <name>.');

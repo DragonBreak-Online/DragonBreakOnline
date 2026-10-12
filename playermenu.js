@@ -102,15 +102,23 @@ module.exports = (api) => {
     const why = [masked ? 'masked' : '', beast ? `${beast} form` : '', own ? '' : 'own name lost'].filter(Boolean);
     return `${own || shown} (${why.join(', ')})`;
   };
-  // Rosters, lists and records name a character by their own name, never the mask's or the beast's (gamemode.js
-  // ownNameOf; tracker 1559074270959640676: the Court tab listed a transformed Jarl as "Werewolf", so anyone who looked
-  // learnt who the beast was). What is said and done in the world keeps the name shown (nameFor above). A beast whose
-  // own name is lost is "Stranger" there, never the beast's name.
-  globalThis.__dboOwnName = (a) => {
+  // The character's own name behind a mask and a beast form (gamemode.js realNameOf; rosters read it through ownNameOf,
+  // which keeps a mask's name while gamemode-config.json rosterPrivacy.masks is off; tracker 1559074270959640676: the Court
+  // tab listed a transformed Jarl as "Werewolf", so anyone who looked learnt who the beast was). What is said and done in
+  // the world keeps the name shown (nameFor above). A beast whose own name is lost is "Stranger", never the beast's name.
+  const ownName = (a) => {
     const beast = beastName(a), shown = nameOf(a);
     if (!isMasked(a) && !beast) return shown;
     return ownBehind(a, beast) || (beast ? 'Stranger' : shown);
   };
+  globalThis.__dboOwnName = ownName;
+  // The name that goes with the #TAG the world sees (gamemode.js publicNameOf; /players and every answer to a lookup). The
+  // client hides the #TAG over a beast, so a beast is named by its own name; it draws the #TAG under "Masked Person", so a
+  // mask stays the mask: the own name beside that #TAG would take the mask off (verify of 12 Oct)
+  globalThis.__dboPublicName = (a) => (beastName(a) ? ownName(a) : nameOf(a));
+  // Behind a mask or in a beast form, or showing the mask's name with no name kept: a name never finds them (gamemode.js
+  // findByName), the #TAG does
+  globalThis.__dboDisguised = (a) => !!beastName(a) || isMasked(a) || isMaskName(nameOf(a));
   const distance = (a, b) => {
     const la = get(a, 'locationalData', null), lb = get(b, 'locationalData', null);
     if (!la || !lb || la.cellOrWorldDesc !== lb.cellOrWorldDesc) return Infinity;
@@ -156,7 +164,8 @@ module.exports = (api) => {
     const beast = beastName(t);
     if (beast) lines.push(beast);
     else lines.push(`${app.isFemale ? 'Woman' : 'Man'}${app.raceId ? `, ${raceName(app.raceId)}` : ''}`);
-    if (isMasked(t)) lines.push('Face hidden behind a mask');
+    // A mask kept from before the change is not on the beast's face: it would tie the beast to the masked one
+    if (isMasked(t) && !beast) lines.push('Face hidden behind a mask');
     if (!isMasked(t) && !beast && knownBy(viewer).includes(t >>> 0)) {
       const ranks = ranksOf(profileOf(t));
       for (const r of ranks.slice(0, 3)) lines.push(`${rankTitle(r)} of ${r.zone.name}`);

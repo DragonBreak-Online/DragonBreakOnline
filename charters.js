@@ -40,8 +40,12 @@ module.exports = (api) => {
   const path = require('path');
   const { mp, log, personal, audit, who, display, nameOf, cfg, registerChatCommand, onlineActors, isAdmin, findByName,
     profileOf, takeGold, giveItem, every } = api;
-  // A charter names its founders by their own name, never a mask's or a beast's (gamemode.js ownNameOf)
+  // A charter names its founders by their own name, never a beast's, and a mask's only while rosterPrivacy.masks is off
+  // (gamemode.js ownNameOf)
   const ownNameOf = typeof api.ownNameOf === 'function' ? api.ownNameOf : nameOf;
+  // An answer about someone /charter invite found names a beast or a mask as the asker sees them, with no #TAG
+  // (gamemode.js displayFor): "Werewolf #TAG" gave away the tag the client hides over a beast
+  const displayFor = typeof api.displayFor === 'function' ? api.displayFor : (viewer, t) => display(t);
   const isLeadStaff = typeof api.isLeadStaff === 'function' ? api.isLeadStaff : () => false;
   const staffNote = typeof api.staffNote === 'function' ? api.staffNote : () => {};
   const approvalForum = typeof api.approvalForum === 'function' ? api.approvalForum : () => {};
@@ -331,16 +335,16 @@ module.exports = (api) => {
     if (!role) role = REQUIRED.find((x) => !c.founders.some((f) => f.role === x) && !Object.values(c.invited).some((i) => i && i.role === x)) || 'member';
     const t = findByName(words.join(' '));
     if (!t || !isOnline(t)) return 'They must be online. Usage: /charter invite <player|#TAG> [officer|sergeant|mage|blacksmith|tailor|member]';
-    if ((t >>> 0) === c.founder.actor || c.founders.some((f) => f.actor === (t >>> 0))) return `${display(t)} is already a founder.`;
+    if ((t >>> 0) === c.founder.actor || c.founders.some((f) => f.actor === (t >>> 0))) return `${displayFor(a, t)} is already a founder.`;
     if (c.founders.length + 1 >= C.maxFounders) return `A charter has at most ${C.maxFounders} founders.`;
     const prof = profile(t);
-    if (prof < 0) return `${display(t)} is not fully logged in.`;
+    if (prof < 0) return `${displayFor(a, t)} is not fully logged in.`;
     if (C.distinctAccounts && accountsOf(c).includes(prof)) return 'Founders must be different players, not characters of one account.';
-    if (openFor(prof)) return `${display(t)} is already on an open charter.`;
+    if (openFor(prof)) return `${displayFor(a, t)} is already on an open charter.`;
     c.invited[String(t >>> 0)] = { at: Date.now(), role }; save();
-    personal(t, `${display(a)} asks you to co-found ${c.name} (charter #${c.n}) as its ${titleOf(role)}. Type /charter confirm ${c.n} to agree, before ${new Date(c.windowEndsAt).toISOString().slice(0, 16).replace('T', ' ')} UTC.`);
+    personal(t, `${displayFor(t, a)} asks you to co-found ${c.name} (charter #${c.n}) as its ${titleOf(role)}. Type /charter confirm ${c.n} to agree, before ${new Date(c.windowEndsAt).toISOString().slice(0, 16).replace('T', ' ')} UTC.`);
     audit(`CHARTER #${c.n} ${who(a)} invited ${who(t)} as ${titleOf(role)}`);
-    return `You asked ${display(t)} to co-found ${c.name} as its ${titleOf(role)}.`;
+    return `You asked ${displayFor(a, t)} to co-found ${c.name} as its ${titleOf(role)}.`;
   };
   const confirm = (a, n) => {
     const c = charter(n);

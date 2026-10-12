@@ -60,7 +60,7 @@ const chat = [];
 // gamemode's personal, as far as the capture goes: a quiet capture keeps the line out of chat
 const personalStub = (a, t) => { const cap = globalThis.__dboTellCapture; if (cap && cap.a === (a >>> 0)) { cap.lines.push(String(t)); if (cap.quiet) return; } chat.push([a, t]); };
 const run = new Function('personal', 'isAdmin', 'deliver', 'C', 'profileOf', 'ranksOf', 'openWidget', 'closeWidget', 'onUi', 'userOf', 'handleChat',
-  'require', 'path', 'log', 'LEAD_ONLY', 'isLeadStaff', 'onlineActors', 'display', 'tagOf', 'mp', 'isTrialStaff', 'staffCan', 'TRIAL_COMMANDS', 'ownNameOf',
+  'require', 'path', 'log', 'LEAD_ONLY', 'isLeadStaff', 'onlineActors', 'display', 'tagOf', 'mp', 'isTrialStaff', 'staffCan', 'TRIAL_COMMANDS', 'ownNameOf', 'disguisedOf',
   section + panel + '\nreturn { registerChatCommand, panelTabsFor, openPlayerMenu, say: personal };')(
   personalStub, (a) => !!tiers[a], () => {}, { WHITE: 'fafafa', SYS: 'eda841' }, (a) => a, () => [], (a, w) => opened.push({ a, w }), () => {},
   (e, fn) => { const l = ui.get(e) || []; l.push(fn); ui.set(e, l); }, (a) => a, () => {},
@@ -70,8 +70,8 @@ const run = new Function('personal', 'isAdmin', 'deliver', 'C', 'profileOf', 'ra
   // a Trial GM (gamemode.js trialFrom/staffCan): no admin tier, a short allowlist of rights and commands
   (a) => a === TRIAL, (a, what) => !!tiers[a] || (a === TRIAL && ['rename', 'chargen', 'gmcall', 'tp', 'invis', 'playerinfo', 'bugs'].includes(what)),
   { rename: 'rename', chargen: 'chargen', tp: 'tp', charstats: 'playerinfo', bugs: 'bugs' },
-  // gamemode.js ownNameOf: the own name behind a mask
-  (a) => (a === OTHER ? 'Dagny Holt' : a === MASKED ? 'Rhea Vane' : `Name${a}`));
+  // gamemode.js ownNameOf: the own name behind a mask; disguisedOf: MASKED wears one (no name finds them, findByName)
+  (a) => (a === OTHER ? 'Dagny Holt' : a === MASKED ? 'Rhea Vane' : `Name${a}`), (a) => a === MASKED);
 run.registerChatCommand('party', () => {}, { help: 'invite|accept|decline|leave|kick: group up for dungeons' });
 run.registerChatCommand('pigeonblock', () => {}, { help: '<name|#TAG> toggle ignoring someone\'s pigeons' });
 run.registerChatCommand('level', () => {}, { help: 'your character level and progress; /level <health|magicka|stamina> [n] spends points' });

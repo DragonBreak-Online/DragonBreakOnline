@@ -58,6 +58,7 @@ const stubs = {
   nameOf: (a) => chars.get(a).name,
   // gamemode.js: the own name behind a mask or a beast form; nobody here wears one (tests/roster-privacy-harness.js does)
   ownNameOf: (a) => chars.get(a).name, ownDisplay: (a) => `${chars.get(a).name} #${chars.get(a).tag}`,
+  publicNameOf: (a) => chars.get(a).name, publicDisplay: (a) => `${chars.get(a).name} #${chars.get(a).tag}`, disguisedOf: () => false,
   seen: new Map([[11, { name: 'Corvus Direnni II' }]]),
   zoneList: () => zones, zoneById: (id) => zones.find((z) => z.id === String(id).toLowerCase()) || null,
   rankTitle: (r) => r[0].toUpperCase() + r.slice(1),
