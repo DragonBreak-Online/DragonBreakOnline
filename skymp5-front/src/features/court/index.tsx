@@ -13,7 +13,7 @@ import './styles.scss';
 // stays, the name shows at once, Default sets it back. Renaming an office renames the household rank it sets with it.
 
 export interface CourtHolder { pid: number; name: string; tag: string; online: boolean }
-export interface CourtOffice { rank: string; title: string; seats: number | null; holders: CourtHolder[]; canAppoint: boolean; named?: boolean; default?: string }
+export interface CourtOffice { rank: string; title: string; seats: number | null; holders: CourtHolder[]; canAppoint: boolean; named?: boolean; default?: string; wage?: number }
 export interface CourtOfferOut { id: string; name: string; rank: string; title: string; from: string; at: number; expiresAt: number }
 export interface CourtOfferIn { id: string; zone: string; zoneName: string; rank: string; title: string; from: string; at: number; expiresAt: number }
 export interface HouseholdMember { actorId: number; name: string; tag: string; rank: number; title: string; role: string; online: boolean }
@@ -25,6 +25,8 @@ export interface Household {
 export interface CourtView {
   id: string; name: string; kind: 'hold' | 'stronghold' | 'region'; mine: boolean; offices: CourtOffice[]; outgoing: CourtOfferOut[];
   household: Household | null; treasury: number | null; appointable: Array<{ rank: string; title: string }>; canName?: boolean;
+  // The hold's one tax rate (business.js) and who keeps its books (economy.js wages)
+  tax?: { pct: number; max: number; canSet: boolean } | null; keepsBooks?: boolean;
 }
 export interface CourtSection { staff: boolean; outright: boolean; courts: CourtView[]; selected: string; offers: CourtOfferIn[] }
 
@@ -74,6 +76,22 @@ const RenameControl = ({ court, kind, id, title, fallback, busy, act }: {
   );
 };
 
+// A whole number with a Set button, for the tax rate and the wages
+const NumberSet = ({ value, max, suffix, busy, onSet }: { value: number; max: number; suffix: string; busy: boolean; onSet: (n: number) => void }) => {
+  const [text, setText] = useState(String(value));
+  useEffect(() => { setText(String(value)); }, [value]);
+  const n = Number(text);
+  return (
+    <span className="court__set">
+      <input className="court__input court__input--number" inputMode="numeric" value={text} maxLength={6}
+        onChange={(e) => setText(e.target.value.replace(/[^0-9]/g, ''))}
+        onKeyDown={(e) => { e.stopPropagation(); if (e.key === 'Enter' && text !== '' && n <= max && n !== value) onSet(n); }} />
+      <span className="court__muted">{suffix}</span>
+      <button type="button" className="journal__button journal__button--small" disabled={busy || text === '' || n > max || n === value} onClick={() => onSet(n)}>Set</button>
+    </span>
+  );
+};
+
 const OfficeRow = ({ court, office, outright, busy, act }: { court: CourtView; office: CourtOffice; outright: boolean; busy: boolean; act: JournalTabProps['act'] }) => {
   const [name, setName] = useState('');
   useEffect(() => { setName(''); }, [office.holders.length]);
@@ -85,6 +103,11 @@ const OfficeRow = ({ court, office, outright, busy, act }: { court: CourtView; o
         <span className="court__office-title">{office.title}{office.named && office.default ? <span className="court__muted"> ({office.default})</span> : null}</span>
         <span className="court__muted">{office.seats !== null ? `${office.holders.length} / ${office.seats}` : office.holders.length || ''}</span>
       </div>
+      {office.wage !== undefined ? (
+        court.keepsBooks ? (
+          <div className="court__wage">Weekly wage <NumberSet value={office.wage} max={100000} suffix="gold" busy={busy} onSet={(n) => act('dbo:courtWage', court.id, office.rank, n)} /></div>
+        ) : <div className="court__wage court__muted">{office.wage ? `${office.wage} gold a week` : 'Unpaid'}</div>
+      ) : null}
       <RenameControl court={court} kind="office" id={office.rank} title={office.title} fallback={office.named ? office.default : undefined} busy={busy} act={act} />
       {office.holders.length ? office.holders.map((h) => (
         <div key={h.pid} className="court__holder">
@@ -187,6 +210,13 @@ export const CourtTab = ({ section, busy, act }: JournalTabProps<CourtSection>) 
           <>
             <h2 className="court__title">{court.kind === 'region' ? 'Court of ' : ''}{court.name}</h2>
             {court.treasury !== null ? <p className="court__muted">The treasury holds {court.treasury} gold.</p> : null}
+            {court.tax ? (
+              <div className="court__tax">
+                <span>Tax: {court.tax.pct}% of every rent and, each week, of every property's value</span>
+                {court.tax.canSet ? <NumberSet value={court.tax.pct} max={court.tax.max} suffix="%" busy={busy} onSet={(n) => act('dbo:courtTax', court.id, n)} /> : null}
+              </div>
+            ) : null}
+            {court.keepsBooks ? <p className="court__note">Wages are paid every Sunday from the treasury into each holder's bank account; the ruler is never paid, and nobody sets their own.</p> : null}
             <div className="court__offices">
               {court.offices.map((o) => <OfficeRow key={o.rank} court={court} office={o} outright={s.outright} busy={busy} act={act} />)}
             </div>

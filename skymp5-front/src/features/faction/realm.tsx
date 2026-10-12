@@ -459,7 +459,7 @@ export const TreasuryTab = ({ economy, act, busy }: { economy: EconomyData | nul
           <div className="war__head"><b>{f.name}</b><span className="war__status">next reckoning {when(economy.nextReckoning)}</span></div>
           <div className="war__actions">Property tax
             <Figure value={Math.round(f.rate * 100)} max={Math.round(economy.maxTaxRate * 100)} suffix="%" busy={busy} onSet={(n) => act('dbo:econRate', f.id, n)} />
-            <span className="war__line--dim">paid every week by every home on your land, from its owner's bank account</span>
+            <span className="war__line--dim">paid every week by every home on your land from its owner's bank account; for a hold, also its tax on every rent</span>
           </div>
           <div className="war__line">Weekly wages by rank, paid from the treasury into each member's bank account:</div>
           <div className="treasury__wages">
