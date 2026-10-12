@@ -1,5 +1,19 @@
 [
   {
+    "title": "Your map remembers",
+    "date": "2026-10-12",
+    "version": "Client 0.3.94",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Map",
+        "items": [
+          "Discovered map locations are now saved on the server for each character, so they stay after a logout, a game repair or on another PC."
+        ]
+      }
+    ]
+  },
+  {
     "title": "A new faith: Ithelia",
     "date": "2026-10-12",
     "version": "Server update",
