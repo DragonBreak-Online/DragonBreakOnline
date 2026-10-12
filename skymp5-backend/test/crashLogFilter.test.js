@@ -261,6 +261,45 @@ test('a kept line whose string holds quotes of its own is cut at its first quote
   ].join('\n'))
 })
 
+test("an object's form id and quoted plugin stay after its name goes, as Crash Logger writes them (D5, 0786F91)", () => {
+  // F4Polymorphic::name() appends the File value as read, quoted: four quotes on every named form's line
+  const log = [
+    'POSSIBLE RELEVANT OBJECTS:',
+    '\tRSP+8: (MovementControllerNPC*)',
+    '\tRSP+568: (hkbBehaviorGraph*) "WolfBehavior"',
+    '\tRSP+5D8: (Character*) "Boar" [0xFF000DBC] ("BSAssets.esm")',
+    `\tRSP+6B8: (Character*) "${SECRETS.otherPlayer}" [0xFF000D2E] ("Skyrim.esm")`,
+    `\tRSP+8D0: (Character*) "Bob "${SECRETS.nestedName}" Smith" [0xFF000D2F] ("COTN - Dawnstar.esp")`,
+    '\tRSI: (TESObjectREFR*) [0x0806241F] ("BSHeartland.esm")',
+    `\tR13: (PlayerCharacter*) "${SECRETS.playerName}" [0x00000014] ("Skyrim.esm")`,
+    `\tRSP+90: (char*) "${SECRETS.chat}" [0x00000014] ("Skyrim.esm")`,
+    `\tRSP+98: (const char*) "${SECRETS.pm}" [0x00000014]`,
+    `\tRSP+A0: (BSFixedString*) "${SECRETS.chat}" [0x00000014]`,
+    `\tRSP+A8: (TESNPC*) "x" [0xFF000A11] ("C:\\Users\\${SECRETS.account}\\x.esp")`,
+    `\tRSP+B0: (TESNPC*) "${SECRETS.remoteNpc}" [0xFF000A12] ("${SECRETS.email}")`,
+    `\tRSP+B8: (Character*) "open ${SECRETS.letterLine} [0xFF000A13] ("Skyrim.esm")`,
+  ].join('\n')
+  const { text, redactions } = filterCrashLog(log)
+  for (const [label, value] of Object.entries(SECRETS)) assert.ok(!text.includes(value), `${label} left in: ${text}`)
+  assert.strictEqual(text, [
+    'POSSIBLE RELEVANT OBJECTS:',
+    '\tRSP+8: (MovementControllerNPC*)',
+    '\tRSP+568: (hkbBehaviorGraph*) ""',
+    '\tRSP+5D8: (Character*) "" [0xFF000DBC] ("BSAssets.esm")',
+    '\tRSP+6B8: (Character*) "" [0xFF000D2E] ("Skyrim.esm")',
+    '\tRSP+8D0: (Character*) "" [0xFF000D2F] ("COTN - Dawnstar.esp")',
+    '\tRSI: (TESObjectREFR*) [0x0806241F] ("BSHeartland.esm")',
+    '\tR13: (PlayerCharacter*) "" [0x00000014] ("Skyrim.esm")',
+    '\tRSP+90: (char*) ""',
+    '\tRSP+98: (const char*) "" [0x00000014]',
+    '\tRSP+A0: (BSFixedString*) "" [0x00000014]',
+    '\tRSP+A8: (TESNPC*) ""',
+    '\tRSP+B0: (TESNPC*) ""',
+    '\tRSP+B8: (Character*) ""',
+  ].join('\n'))
+  assert.ok(redactions >= 11, `${redactions} redactions`)
+})
+
 test('a crash log loses emails, mentions, player tags and OneDrive organisations; CommunityShaders.log its organisation', () => {
   const org = 'OneDrive - Contoso Secret Org'
   const log = [
