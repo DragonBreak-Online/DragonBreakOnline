@@ -179,6 +179,26 @@ const upload = (userId, t, up, size) => {
       && P.faceFixed(JSON.parse(kept.face)).fixes.length === 0 && P.encodeFace(P.faceFixed(JSON.parse(kept.face)).face) === kept.face);
     take();
   }
+  // 12 Oct review (review-srv/fuzz/size-edge.js): an upload of at most 1,000,000 chars that the rules here make longer
+  // (skee's header put in for a bad version, plugin and slider names written as escapes) is refused, never stored over the
+  // cap: readDoc would set that file aside at the next read and the owner's next save would be free
+  {
+    const raw = { version: 0, modNames: [], custom: Array.from({ length: 1024 }, (_, i) => ({ name: `${i}`.padEnd(128, '\ud800'), value: 0.5 })), sculptDivisor: 10000, sculpt: [] };
+    const step = JSON.stringify(`${0}`.padEnd(260, '\ud800')).length + 1;
+    const fit = Math.floor((1000000 - JSON.stringify(raw).length) / step);
+    for (let i = 0; i < fit; i++) raw.modNames.push(`${i}`.padEnd(260, '\ud800'));
+    for (let i = 0; JSON.stringify(raw).length < 999990 && i < 50; i++) raw.modNames.push(`p${i}-`.padEnd(Math.min(260, 1000000 - JSON.stringify(raw).length - 4), 'x'));
+    const crafted = JSON.stringify(raw);
+    const grown = P.encodeFace(P.faceFixed(JSON.parse(crafted)).face).length;
+    logs.length = 0;
+    upload(2, crafted, 7);
+    await settle();
+    const r = take().filter((x) => x.p.customPacketType === 'dboPresetRefused');
+    check(`an upload of ${crafted.length} chars that the rules here make ${grown} is refused (rules), not stored over the cap`,
+      crafted.length <= 1000000 && grown > 1000000 && !fs.existsSync(fileOf(B)) && r.length === 1 && r[0].to === B && r[0].p.reason === 'rules'
+      && logs.some((l) => l === `racemenu presets: ff000b02 upload is ${grown} chars as the rules here give it, over 1000000, refused`),
+      [crafted.length, grown, fs.existsSync(fileOf(B)) ? fs.statSync(fileOf(B)).size : 'no file', r.map((x) => x.p.reason), logs.filter((l) => /ff000b02/.test(l))]);
+  }
   packet(2, { customPacketType: 'dboPresetPut', up: 3, i: 0, n: 999, hash, race: 1, data: 'x' });
   packet(2, { customPacketType: 'dboPresetPut', up: 3, i: 0, n: 1, hash, race: 1, data: 'x'.repeat(12001) });
   check('silly chunk counts and oversize chunks are ignored', !M.state.uploads.has(B));

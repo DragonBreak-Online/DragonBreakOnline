@@ -2,8 +2,10 @@
 // RaceMenu face presets per character: custom sliders, expressions and sculpt, the face part of a skee .jslot. The
 // owner's client (fork racemenuPresetService.ts) uploads it after RaceSexMenu closes; watchers' clients and the owner
 // after a login fetch it and load it onto the copy (CharGen.LoadCharacterPresetEx, face only). One file per character
-// in racemenu-presets/ (gitignored), written only when the face changes. Everything is checked here, because skee
-// adds a sculpt's offsets to the head's vertices with no bounds check: a bad preset could crash every watcher.
+// in racemenu-presets/ (gitignored), written only when the face changes. Every upload is checked here (faceFixed), because
+// skee adds a sculpt's offsets to the head's vertices with no bounds check: a bad preset could crash every watcher. A
+// stored file must match its hash and parse as a face (readDoc), and is then served as it is stored; each client checks
+// a face again when it decodes it (racemenuPresetPlan.ts), so a file edited by hand cannot reach skee unchecked.
 // Config "racemenuPresets": { enabled, dir, ... }; enabled false answers every request with a plain "none" and ignores
 // uploads. Never "off": a 0.3.90 client keeps "off" until Skyrim restarts, so every player online while the module was
 // off (or left out of a staff test) would need a full restart after go-live (10 Oct review S1).
@@ -34,7 +36,8 @@ const MAX_SCULPT_DIVISOR = 1000000;
 const MAX_MOD_NAMES = 512;
 const MAX_MOD_NAME = 260;
 const MAX_TRI_PATH = 200;
-// The client's PRESET_MAX_CHARS: a face the rules give is never longer (the largest sculpted parts go first)
+// The client's PRESET_MAX_CHARS: the rules drop the largest sculpted parts first to stay under it. An upload still over
+// it as the rules give it (sliders and plugin names only, a header put in, escaped names) is refused, never stored
 const PRESET_MAX_CHARS = 1000000;
 // skee's PresetHeader (PresetInterface.cpp:300-305): "SKSE" byte-swapped, format 3; its loader needs both (:932-946)
 const SKEE_SIGNATURE = 0x45534b53;
@@ -569,6 +572,9 @@ module.exports = (api) => {
       if (!taken) return refuse('rules', `${k} upload breaks the preset rules, refused`);
       const face = taken.face;
       const encoded = encodeFace(face);
+      // Never stored over the cap (readDoc would set it aside at the next read, and the owner's next save would be free).
+      // No client sends one: its own rules keep its text at most PRESET_MAX_CHARS, and this is the same text (12 Oct review)
+      if (encoded.length > Number(C.maxChars)) return refuse('rules', `${k} upload is ${encoded.length} chars as the rules here give it, over ${Number(C.maxChars)}, refused`);
       fixedText = fixesText(taken.fixes);
       // Every client sends a face these rules keep as it is, so a change here is a mismatch to look into; the fixed face is kept
       if (encoded !== text) log(`racemenu presets: ${k} (profile ${profileOf(me)}) client/server rule mismatch: upload ${u.hash} changed by the rules here (${fixedText ? `fixed ${fixedText}` : 'not in their text form'}), kept as ${hashText(encoded)}`);
