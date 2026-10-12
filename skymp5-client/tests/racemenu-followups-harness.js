@@ -381,6 +381,17 @@ const bundle = async (rel, dir) => {
   check('late refusal: ...and the same edit at the next close goes up again (not "unchanged")', puts().length === 1 && puts()[0].hash === EDIT.hash, [puts(), W.diag.slice(-2)]);
   check('late refusal: traced as an ask, marked late', TR.includes(`rmp refused h=${EDIT.hash} why=notloaded restore=ask late=1`), TR.filter((l) => /refused/.test(l)).slice(-2));
 
+  // 12 Oct review: kept after 15 s, the editor reopened and closed unchanged, then the refusal lands
+  S = spawned('face');
+  W.savedJslot = jslotWith(-0.6, true);
+  editor(S);
+  step(S, 1000, 16);
+  clear();
+  editor(S);
+  deliver(S, { customPacketType: 'dboPresetRefused', hash: EDIT.hash, reason: 'write' });
+  step(S, 1100, 2);
+  check('late refusal after a reopened editor: the server is asked again', selfGets().length === 1 && TR.includes(`rmp refused h=${EDIT.hash} why=write restore=ask late=1`), TR.slice(-3));
+
   S = spawned('face');
   W.savedJslot = jslotWith(-0.6, true);
   editor(S);

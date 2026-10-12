@@ -369,8 +369,10 @@ export class RacemenuPresetService extends ClientListener {
   // The server refused an upload and charged nothing (hash "" is an empty face or not known): send again, put its face back
   private onRefused(hash: string, reasonRaw: string, now: number): void {
     const reason = /^[A-Za-z0-9_.:-]{1,40}$/.test(reasonRaw) ? reasonRaw : "other";
+    // An upload taken as kept stays ours after a reopened editor resets lastSentHash
     const ours = hash === this.lastSentHash || (!!this.upload && hash === this.upload.hash)
-      || (!!this.sentUpload && hash === this.sentUpload.hash) || hash === "";
+      || (!!this.sentUpload && hash === this.sentUpload.hash) || hash === ""
+      || (!!this.serverSelf && this.serverSelf.hash === hash);
     const h = /^[0-9a-f]{8}$/.test(hash) ? hash : (hash ? "bad" : "empty");
     if (this.off || !ours) {
       this.diag(`preset: refusal for ${hash || "empty"} (${reason}) ignored, not the last upload`);
