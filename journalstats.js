@@ -19,6 +19,7 @@
 // spellbook, not counted. Files are written off the game thread, one at a time (review M2).
 'use strict';
 const fs = require('fs');
+const fsp = fs.promises;
 const path = require('path');
 const crypto = require('crypto');
 
@@ -35,6 +36,7 @@ module.exports = (api) => {
     minStepUnits: 8,            // smaller steps are jitter
     playersFile: '/opt/alduinak/skymp5-backend/data/players.json',
     playersFileMinutes: 10,
+    indexStallSeconds: 120,     // an index build or take-back read with no progress for this long is started again
   }, (cfg && cfg.journalStats) || {});
   const DIR = path.resolve(C.dir);
   const UNITS_PER_METER = 70;
@@ -44,14 +46,19 @@ module.exports = (api) => {
   const NUMBERS = ['since', 'firstSeen', 'playMs', 'sessions', 'sessionMs', 'longestSessionMs', 'distanceUnits', ...COUNTERS];
   const KEY_PROP = 'private.dboJournalId';
   const KEY_RX = /^[0-9a-f]{16}$/;
+  const FILE_RX = /^[0-9a-f]{16}\.json$/;
+  const WAIT = Symbol('wait');      // adoptable(): the answer is still being read
 
   // cache: key -> stats; dirty: keys to write; live: key -> { pos, world, at, pending } of the last sample; online: the
-  // keys seen in the last sample; writing: the one file in flight
-  const blank = () => ({ v: 2, cache: new Map(), dirty: new Set(), live: new Map(), online: new Set(), writing: null, queue: [], seq: 0, index: null, waiters: [], written: 0, players: { at: 0, created: new Map() } });
+  // keys seen in the last sample; writing: the one file in flight; index: account:tag -> key once complete; indexing: the
+  // index build under way; adopting: key -> the take-back read of that file
+  const blank = () => ({ v: 2, cache: new Map(), dirty: new Set(), live: new Map(), online: new Set(), writing: null, queue: [], seq: 0, index: null,
+    indexing: null, indexRetryAt: 0, adopting: new Map(), waiters: [], written: 0, players: { at: 0, created: new Map() } });
   const old = globalThis.__dboJournalStats;
   const S = old && old.v === 2 ? old : (globalThis.__dboJournalStats = Object.assign(blank(), old && old.players ? { players: old.players } : {}));
   // Fields added since the state was made (a reload over an earlier version of this module)
   for (const [k, v] of Object.entries(blank())) if (!(k in S)) S[k] = v;
+  if (!(S.adopting instanceof Map)) S.adopting = new Map();
 
   const isPlayer = (a) => { try { return profileOf(Number(a) >>> 0) >= 0; } catch (e) { return false; } };
   // A character's key: made once, kept on the character, never reused (a new character never carries an old one).
@@ -62,8 +69,12 @@ module.exports = (api) => {
     let k = null;
     try { k = mp.get(id, KEY_PROP); } catch (e) { return null; }
     if (typeof k === 'string' && KEY_RX.test(k)) return k;
-    // A character that lost its key (a staff edit, a restored change form) takes its own file back by account and tag
-    k = adoptable(id) || crypto.randomBytes(8).toString('hex');
+    // A character that lost its key (a staff edit, a restored change form) takes its own file back by account and tag.
+    // Nothing is made while that is still being looked up (null: the sampler asks again 2 s later). A random key made
+    // early would cut a returning character off from its file for good
+    const back = adoptable(id);
+    if (back === WAIT) return null;
+    k = back || crypto.randomBytes(8).toString('hex');
     try { mp.set(id, KEY_PROP, k); } catch (e) { return null; }
     return k;
   };
@@ -78,40 +89,92 @@ module.exports = (api) => {
   const idKey = (account, tag) => `${account}:${tag}`;
   const REMOVED = path.join(DIR, 'removed');
   const readDoc = (k, where = DIR) => { try { return JSON.parse(fs.readFileSync(path.join(where, `${k}.json`), 'utf8')); } catch (e) { return null; } };
-  // account:tag -> key of every file, the ones moved aside too, read once a process (only when a character without a
-  // key turns up); a live file wins over a removed one
-  const index = () => {
-    if (S.index) return S.index;
-    S.index = new Map();
-    for (const where of [REMOVED, DIR]) {
-      let names = []; try { names = fs.readdirSync(where); } catch (e) { names = []; }
-      for (const n of names) {
-        const m = /^([0-9a-f]{16})\.json$/.exec(n); if (!m) continue;
-        const d = readDoc(m[1], where);
-        if (d && Number.isInteger(d.account) && typeof d.tag === 'string') S.index.set(idKey(d.account, d.tag), m[1]);
+  const readDocSoon = async (file) => { try { return JSON.parse(await fsp.readFile(file, 'utf8')); } catch (e) { return null; } };
+  const stalled = (at) => Date.now() - at > C.indexStallSeconds * 1000;
+  // account:tag -> key of every file, the ones moved aside too; a live file wins over a removed one. Built once a process,
+  // off the main thread and one file at a time, from module load. The synchronous build read every file in one sampler
+  // tick the first time a new character turned up: 344 files froze the server for 30.6 s on the cold disk after the host
+  // crash (12 Oct 01:11Z), 1.6 s warm (11 Oct 20:18Z). The run lives in S, so a hot reload carries on with it; what
+  // stamp() learns meanwhile is laid over what the files said when it ends. S.index is only ever the finished map.
+  const buildIndex = () => {
+    if (S.index) return;
+    if (S.indexing ? !stalled(S.indexing.at) : Date.now() < S.indexRetryAt) return;
+    if (S.indexing) log(`journal stats: the index build made no progress for ${C.indexStallSeconds} s (${S.indexing.done} file(s) read); starting it again`);
+    const run = { at: Date.now(), started: Date.now(), done: 0, map: new Map(), stamped: new Map() };
+    S.indexing = run;
+    const mine = () => S.indexing === run;
+    (async () => {
+      const lists = [];
+      for (const where of [REMOVED, DIR]) {
+        let names = [];
+        try { names = await fsp.readdir(where); } catch (e) { if (e.code !== 'ENOENT') throw e; }
+        if (!mine()) return;
+        run.at = Date.now();
+        lists.push([where, names.filter((n) => FILE_RX.test(n))]);
       }
-    }
-    return S.index;
+      for (const [where, names] of lists) {
+        for (const n of names) {
+          // forget() may have moved the file aside between the listing and this read
+          const d = (await readDocSoon(path.join(where, n))) || (await readDocSoon(path.join(where === DIR ? REMOVED : DIR, n)));
+          if (!mine()) return;
+          run.at = Date.now(); run.done++;
+          if (d && Number.isInteger(d.account) && typeof d.tag === 'string') run.map.set(idKey(d.account, d.tag), n.slice(0, 16));
+        }
+      }
+      S.indexing = null;
+      if (S.index) return;          // an earlier module version (a rollback) built its own meanwhile, and kept it current
+      for (const [id, k] of run.stamped) run.map.set(id, k);
+      S.index = run.map;
+      log(`journal stats: index of ${run.done} file(s) built off the main thread in ${Date.now() - run.started} ms`);
+    })().catch((e) => {
+      if (!mine()) return;
+      S.indexing = null; S.indexRetryAt = Date.now() + 30000;
+      log(`journal stats: the index build failed (${e.message}); trying again in 30 s`);
+    });
   };
+  // The file the index names is read again before it is taken back (it may have been moved aside or changed since), off
+  // the main thread too; a file forget() moved aside goes back into the folder first. S.adopting: key -> { at, busy, doc }
+  const recheck = (k, who) => {
+    const c = { at: Date.now(), busy: true, doc: null };
+    S.adopting.set(k, c);
+    (async () => {
+      let d = await readDocSoon(fileOf(k));
+      if (!d) {
+        const r = await readDocSoon(path.join(REMOVED, `${k}.json`));
+        if (r && r.account === who.account && r.tag === who.tag) { try { await fsp.rename(path.join(REMOVED, `${k}.json`), fileOf(k)); d = r; } catch (e) { d = null; } }
+      }
+      if (S.adopting.get(k) === c) { c.busy = false; c.doc = d; c.at = Date.now(); }
+    })().catch(() => { if (S.adopting.get(k) === c) S.adopting.delete(k); });
+  };
+  // A character without a key: the key of its own file, null when it has none to take back, or WAIT while the index or
+  // the file is still being read. Reads nothing on the main thread
   const adoptable = (a) => {
-    const who = identityOf(a); if (!who) return null;
-    const k = index().get(idKey(who.account, who.tag)); if (!k) return null;
-    let d = readDoc(k);
-    // A file forget() moved aside comes back to its character
-    if (!d) { d = readDoc(k, REMOVED); if (d && d.account === who.account && d.tag === who.tag) { try { fs.renameSync(path.join(REMOVED, `${k}.json`), fileOf(k)); } catch (e) { return null; } } }
+    const id = Number(a) >>> 0;
+    const who = identityOf(id); if (!who) return null;
+    if (!S.index) { buildIndex(); return WAIT; }
+    const k = S.index.get(idKey(who.account, who.tag)); if (!k) return null;
+    const c = S.adopting.get(k);
+    // An answer older than a minute is read again; so is a read that hung
+    if (!c || stalled(c.at) || (!c.busy && Date.now() - c.at > 60000)) { recheck(k, who); return WAIT; }
+    if (c.busy) return WAIT;
+    S.adopting.delete(k);
+    const d = c.doc;
     if (!d || d.account !== who.account || d.tag !== who.tag) return null;
     // Never a file another living character holds
     const holder = typeof d.actor === 'string' ? parseInt(d.actor, 16) >>> 0 : 0;
-    if (holder && holder !== (Number(a) >>> 0)) { try { if (mp.get(holder, KEY_PROP) === k) return null; } catch (e) { /* gone */ } }
-    log(`journal stats: ${(Number(a) >>> 0).toString(16)} takes back its file ${k} (account ${who.account}, #${who.tag})`);
+    if (holder && holder !== id) { try { if (mp.get(holder, KEY_PROP) === k) return null; } catch (e) { /* gone */ } }
+    log(`journal stats: ${id.toString(16)} takes back its file ${k} (account ${who.account}, #${who.tag})`);
     return k;
   };
-  // Stamps who a record belongs to, and keeps the index current
+  // Stamps who a record belongs to, and keeps the index current (the one being built too)
   const stamp = (s, k, actor) => {
     if (!actor) return;
     s.actor = (Number(actor) >>> 0).toString(16);
     const who = identityOf(actor);
-    if (who) { s.account = who.account; s.tag = who.tag; if (S.index) S.index.set(idKey(who.account, who.tag), k); }
+    if (!who) return;
+    s.account = who.account; s.tag = who.tag;
+    if (S.index) S.index.set(idKey(who.account, who.tag), k);
+    else if (S.indexing && S.indexing.stamped instanceof Map) S.indexing.stamped.set(idKey(who.account, who.tag), k);
   };
   const fresh = (now) => ({ v: 1, since: now, firstSeen: now, created: null, playMs: 0, sessions: 0, sessionMs: 0, longestSessionMs: 0,
     open: null, distanceUnits: 0, ...Object.fromEntries([...COUNTERS].map((k) => [k, 0])) });
@@ -383,6 +446,8 @@ module.exports = (api) => {
     try { fs.mkdirSync(REMOVED, { recursive: true }); fs.renameSync(fileOf(k), path.join(REMOVED, `${k}.json`)); return true; } catch (e) { return false; }
   };
 
+  // The index is read from load on, so it is usually ready before a new character turns up (a no-op once it is built)
+  if (C.enabled) buildIndex();
   every('journalStatsSample', C.sampleSeconds * 1000, sample);
   every('journalStatsFlush', C.flushSeconds * 1000, flush);
 
