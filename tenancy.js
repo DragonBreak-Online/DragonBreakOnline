@@ -415,7 +415,7 @@ module.exports = (api) => {
     const r = ACTIONS[name](a, ...args.slice(2, 4).map((x) => String(x == null ? '' : x).slice(0, 64)));
     sendPanel(a, here(a), [].concat(r).join(' '));
   });
-  onUi('propertyMarketClose', (a) => panels.delete(a >>> 0));
+  onUi('propertyMarketClose', (a) => closePanel(a));
   onUi('close', (a, args, widgetId) => { if (Number(widgetId) === PANEL_ID) panels.delete(a >>> 0); });
 
   registerChatCommand('property', (a, argStr) => {
