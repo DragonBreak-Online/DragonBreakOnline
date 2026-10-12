@@ -81,6 +81,9 @@ const keptCopies = (tag) => fs.readdirSync(path.join(TMP, 'racemenu-presets'))
   .map((f) => fs.readFileSync(path.join(TMP, 'racemenu-presets', f), 'utf8'));
 // Until fn() holds, or ms pass
 const until = async (fn, ms) => { for (let t = 0; t < ms && !fn(); t += 10) await wait(10); return fn(); };
+// The harness has no logins, so every get is from one connection. A section that asks again for a face its asker was sent
+// before starts as a fresh login: the limit on whole faces sent again (12 Oct, resendsPerFace) has its own section below
+const newLogins = () => { const st = globalThis.__dboPresetState; if (st && st.fullSends instanceof Map) st.fullSends.clear(); };
 
 const P = require(MOD);
 const face = { version: { signature: 1163086675, formatVersion: 3, skseVersion: 1, runtimeVersion: 2 }, modNames: ['Skyrim.esm'], custom: [{ name: 'NoseBridge', value: 0.4 }], sculptDivisor: 10000,
@@ -351,7 +354,7 @@ const upload = (userId, t, up, size) => {
   props[A].appearance = { raceId: 0x13746 };
 
   // ---- R6c: a file that is there but cannot be read (EIO, EMFILE) is not "none": not cached, not answered, not written over ----
-  M.state.cache.clear(); take(); logs.length = 0;
+  M.state.cache.clear(); newLogins(); take(); logs.length = 0;
   const savedText = fs.readFileSync(fileOf(A), 'utf8');
   failRead = 'EIO';
   packet(2, { customPacketType: 'dboPresetGet', actor: A, have: '' });
@@ -370,7 +373,7 @@ const upload = (userId, t, up, size) => {
   check('R6c: once it reads again the face is served', s.length === 2 && s[1].p.data === JSON.parse(savedText).face, s.map((x) => x.p.customPacketType));
 
   // ---- 10 Oct review 2, (a): a face counts only once its file is on disk ----
-  M.state.cache.clear(); M.state.rates.clear(); take(); logs.length = 0;
+  M.state.cache.clear(); M.state.rates.clear(); newLogins(); take(); logs.length = 0;
   const diskBefore = fs.readFileSync(fileOf(A), 'utf8');
   {
     const realWF = fs.writeFile;
@@ -441,6 +444,109 @@ const upload = (userId, t, up, size) => {
     editorOpen(); upload(1, text, 84); await settle(); take();   // A has a face again for what follows
   }
 
+  // ---- 12 Oct review (e2e-mixed.js): a player whose client cannot show a face is not sent all of it every 15 s ----
+  // 0.3.94 refuses a face 0.3.95 saved with the wider values, keeps nothing and asks again with have '' every 15 s, and it
+  // was sent the whole face each time (a 45 KB face 20 times, 907,500 chars in 5 min). A client that shows a face keeps it
+  // and asks with its hash. Past resendsPerFace (2) whole sends in resendWindowMs (10 min) in one connection: the header only
+  {
+    M = load(); M.state.cache.clear(); M.state.rates.clear(); newLogins(); take(); logs.length = 0;
+    const conns = new Map([[A, 1000], [B, 2000]]);   // gamemode.js connectedAt: one value per login
+    globalThis.__dboConnectedAt = conns;
+    const realNow = Date.now;
+    let skew = 0;
+    Date.now = () => realNow() + skew;
+    const ask = async (userId, actor, have) => { packet(userId, { customPacketType: 'dboPresetGet', actor, have }); await settle(); pumpAll(); return take(); };
+    const isFull = (x) => x.some((y) => y.p.customPacketType === 'dboPresetChunk');
+    const isHeader = (x, h) => x.length === 1 && x[0].p.customPacketType === 'dboPresetMeta' && x[0].p.hash === h;
+    const chars = (x) => x.filter((y) => y.p.customPacketType === 'dboPresetChunk').reduce((k, y) => k + y.p.data.length, 0);
+    const kinds = (x) => x.map((y) => y.p.customPacketType.slice(9));
+    const limitLines = () => logs.filter((l) => /asked again for .* sent in full/.test(l));
+    try {
+      let fulls = 0, headers = 0, sentChars = 0;
+      for (let i = 0; i < 20; i++) {
+        const x = await ask(2, A, '');
+        if (isFull(x)) fulls++; else if (isHeader(x, hash)) headers++;
+        sentChars += chars(x);
+        skew += 15000;
+      }
+      check(`resend limit: a watcher asking with have '' every 15 s for 5 min gets the whole face twice, then the header only (${fulls} whole, ${headers} header only, ${sentChars} chars)`,
+        fulls === 2 && headers === 18 && sentChars === 2 * text.length, [fulls, headers, sentChars]);
+      check('resend limit: ...logged once, with the asker, the face and how long the header only lasts',
+        limitLines().length === 1 && new RegExp(`^racemenu presets: ff000b02 asked again for ff000a01's face ${hash}, sent in full 2 times in 3\\d s: the header only for 5[67]\\d s \\(a client that cannot show it, as 0\\.3\\.94\\)$`).test(limitLines()[0]), limitLines());
+      let x = await ask(2, A, hash);
+      check('resend limit: a client that has the face (have its hash) gets the header, as before', isHeader(x, hash), kinds(x));
+      skew += 300000;   // 10 min after the first whole send
+      x = await ask(2, A, '');
+      check('resend limit: once the window is over the whole face goes again', isFull(x) && chars(x) === text.length, kinds(x));
+      await ask(2, A, '');
+      x = await ask(2, A, '');
+      check('resend limit: ...twice, then the header only again', isHeader(x, hash), kinds(x));
+      conns.set(B, 3000);   // B logs in again
+      x = await ask(2, A, '');
+      check('resend limit: a new login starts over: the whole face', isFull(x) && chars(x) === text.length, kinds(x));
+      // The owner's own face (a 0.3.94 owner refuses it the same way)
+      const own = [await ask(1, 0, ''), await ask(1, 0, '')];
+      const thirdAt = Date.now();
+      own.push(await ask(1, 0, ''));
+      check('resend limit: the owner\'s own face too: twice whole, then the header only, each marked self',
+        isFull(own[0]) && isFull(own[1]) && isHeader(own[2], hash) && own.every((y) => y.every((z) => z.to === A && z.p.self === true && z.p.actor === A)), own.map(kinds));
+      check('resend limit: ...the owner\'s header only counts as their face put back, as a whole one did (nothing changes for notloaded)',
+        !!M.state.selfSent.get(A) && M.state.selfSent.get(A).conn === 1000 && M.state.selfSent.get(A).at >= thirdAt, M.state.selfSent.get(A));
+      M.state.rates.clear();
+      packet(1, { customPacketType: 'dboPresetPut', up: 90, i: 0, n: 1, hash: '00000000', race: 1, data: text });
+      await settle();
+      x = take();
+      check('resend limit (setup): an upload of the owner\'s is refused', x.some((y) => y.to === A && y.p.customPacketType === 'dboPresetRefused' && y.p.reason === 'hash'), x.map((y) => y.p));
+      x = await ask(1, 0, '');
+      check('resend limit: after a refused upload the owner is sent their whole face again (0.3.95 asks for it when its upload is lost)', isFull(x) && x.every((z) => z.p.self === true), kinds(x));
+      // Another face starts over
+      editorOpen();
+      const text2 = P.encodeFace({ ...face, custom: [{ name: 'NoseBridge', value: 0.33 }] });
+      upload(1, text2, 91); await settle(); take();
+      check('resend limit (setup): A saves another face', JSON.parse(fs.readFileSync(fileOf(A), 'utf8')).hash === P.hashText(text2));
+      x = await ask(2, A, '');
+      check('resend limit: another face starts over: the watcher gets it whole', isFull(x) && x[0].p.hash === P.hashText(text2), kinds(x));
+      // A long face still on its way when its asker asks again (it takes longer than the client's 15 s retry): not cut
+      const longFace = JSON.parse(JSON.stringify(face)); longFace.sculpt[0].data = new Array(5000).fill(0).map((_, i) => [i, 7, -7, i]);
+      const longText = P.encodeFace(longFace);
+      const nChunks = Math.ceil(longText.length / 12000);
+      fs.writeFileSync(fileOf(B), JSON.stringify({ v: 1, actor: 'ff000b02', profile: 7, race: 0x13741, hash: P.hashText(longText), at: new Date().toISOString(), face: longText }));
+      M.state.cache.delete('ff000b02');
+      const askOnly = async () => { packet(1, { customPacketType: 'dboPresetGet', actor: B, have: '' }); await settle(); };
+      const pumps = (k) => { for (let i = 0; i < k; i++) timers.racemenuPresetSend(); };
+      await askOnly(); pumps(2); take();     // whole send 1: the header and chunk 0 went
+      await askOnly(); pumps(3);             // whole send 2, from the start: the header, chunks 0 and 1
+      const queuedBefore = (M.state.queues.get(A) || []).length;
+      await askOnly();                       // asked again while chunks 2.. wait
+      const queuedAfter = (M.state.queues.get(A) || []).length;
+      pumpAll();
+      x = take().filter((y) => y.p.actor === B);
+      const got = new Set(x.filter((y) => y.p.customPacketType === 'dboPresetChunk').map((y) => y.p.i));
+      check(`resend limit: a long face (${nChunks} chunks) still on its way is not cut when asked for again past the limit: the rest goes out`,
+        nChunks > 3 && queuedBefore === nChunks - 2 && queuedAfter === queuedBefore && got.size === nChunks && x.filter((y) => y.p.customPacketType === 'dboPresetMeta').length === 1,
+        [nChunks, queuedBefore, queuedAfter, got.size, kinds(x).join(' ')]);
+      x = await ask(1, B, '');
+      check('resend limit: ...asked again once it is all out: the header only', isHeader(x, P.hashText(longText)), kinds(x));
+      // The switch, and a hot reload
+      M = load({ resendsPerFace: 0 });
+      const z = [await ask(2, A, ''), await ask(2, A, ''), await ask(2, A, '')];
+      check('resend limit: resendsPerFace 0 (gamemode-config, then a hot reload) turns the limit off: the whole face every time', z.every((y) => isFull(y)), z.map(kinds));
+      M = load();
+      x = await ask(2, A, '');
+      const afterReload = await (async () => { M = load(); return ask(2, A, ''); })();
+      check('resend limit: the counts are kept across a hot reload (state in globalThis.__dboPresetState)', isFull(x) && isHeader(afterReload, P.hashText(text2)), [kinds(x), kinds(afterReload)]);
+    } finally {
+      Date.now = realNow;
+      delete globalThis.__dboConnectedAt;
+    }
+    // As before this section: A's face is text again, counted as put back in no connection; no counts, no rate entries
+    M.state.rates.clear(); newLogins();
+    await ask(1, 0, '');
+    editorOpen(); upload(1, text, 92); await settle(); take();
+    M.state.rates.clear(); newLogins();
+    check('resend limit (teardown): A\'s face is the first one again', JSON.parse(fs.readFileSync(fileOf(A), 'utf8')).hash === hash);
+  }
+
   // ---- hot reload and the off switch ----
   const before = globalThis.__dboPresetState;
   M = load();
@@ -451,7 +557,7 @@ const upload = (userId, t, up, size) => {
   // way when the module is switched off
   const bigDoc = { v: 1, actor: 'ff000b02', profile: 7, race: 0x13741, hash: P.hashText(bigText), at: new Date().toISOString(), face: bigText };
   fs.writeFileSync(fileOf(B), JSON.stringify(bigDoc));
-  M.state.cache.clear();
+  M.state.cache.clear(); newLogins();
   packet(1, { customPacketType: 'dboPresetGet', actor: B, have: '' });
   await settle();
   timers.racemenuPresetSend(); timers.racemenuPresetSend();

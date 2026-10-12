@@ -220,6 +220,12 @@ module.exports = (api) => {
     uploadTimeoutMs: 60000,
     uploadsPerHour: 30,         // per character; each one that changes the face is a file write
     getsPerMinute: 120,         // per player; one per copy that spawns, retried every 15 s at most
+    // One player is sent the whole of one face at most resendsPerFace times per resendWindowMs in a connection (0: no
+    // limit). A client that cannot show a face asks again every 15 s with have '' and was sent all of it each time: 0.3.94
+    // refuses a face 0.3.95 saved with the wider values, a 45 KB face 20 times in 5 min (12 Oct review, e2e-mixed.js).
+    // Past the limit it gets the header only until the window ends
+    resendsPerFace: 2,
+    resendWindowMs: 600000,
     cacheEntries: 16,
     cacheChars: 4000000,        // the read cache holds at most this much face text
     queuePerRecipient: 200,     // packets waiting for one player (a few faces); more waits for the client's retry
@@ -239,6 +245,8 @@ module.exports = (api) => {
   // Kept across a hot reload: uploads in flight, send queues, rate counters, the read cache, writes in flight
   const old = globalThis.__dboPresetState;
   const S = old && old.v === 1 ? old : (globalThis.__dboPresetState = { v: 1, uploads: new Map(), queues: new Map(), rates: new Map(), cache: new Map(), writing: new Map() });
+  // '<to>:<actor>:<self 0|1>' -> { hash, conn, at, n, told }: how often that player was sent the whole of that face (see answer)
+  if (!(S.fullSends instanceof Map)) S.fullSends = new Map();
   // actor -> { at, conn }: when the owner was last sent their own stored face, in which connection (gamemode connectedAt)
   if (!(S.selfSent instanceof Map)) S.selfSent = new Map();
   if (!(S.selfLast instanceof WeakSet)) S.selfLast = new WeakSet();   // the last packet of an answer to the owner
@@ -292,6 +300,8 @@ module.exports = (api) => {
   // A RaceMenu-only change not kept: the owner's client is told which upload (S3), the player why (appearance.js, S5)
   const refused = (me, hash, code, line) => {
     log(`racemenu presets: ${line}`);
+    // A 0.3.95 client that loses its upload asks for its own face again (racemenuPresetService.ts onRefused): sent in full
+    S.fullSends.delete(`${me >>> 0}:${me >>> 0}:1`);
     try { sendPacket(me, { customPacketType: 'dboPresetRefused', actor: me >>> 0, self: true, hash: HASH_RX.test(hash) ? hash : '', reason: code }); } catch (e) { log('racemenu presets: refusal not sent', e.message); }
     try { if (typeof globalThis.__dboRaceMenuRefused === 'function') globalThis.__dboRaceMenuRefused(me, 'face', code); } catch (e) { log('racemenu presets: refusal not told', e.message); }
   };
@@ -465,8 +475,36 @@ module.exports = (api) => {
     const race = now && doc.race && now !== (doc.race >>> 0) && sameFamily(now, doc.race) ? now : doc.race;
     const meta = { customPacketType: 'dboPresetMeta', ...base, hash: doc.hash, race };
     if (have === doc.hash) return enqueueAnswer(to, [meta], self);
+    // Sent in full resendsPerFace times in this window and connection, and asked for again: that player cannot show it
+    // (0.3.94 refuses a face with the wider values, keeps nothing and asks again every 15 s; a client that shows a face
+    // keeps it and asks with its hash). The header only, as for a client that has it, until the window ends. A relog,
+    // another face, or a refused upload of the owner's (refused above) starts the count again
+    const limit = Number(C.resendsPerFace), windowMs = Number(C.resendWindowMs);
+    const k = `${to >>> 0}:${actor}:${self ? 1 : 0}`;
+    const t = Date.now(), conn = connOf(to);
+    let e = S.fullSends.get(k);
+    if (e && (e.hash !== doc.hash || e.conn !== conn || !(t - e.at < windowMs))) { S.fullSends.delete(k); e = undefined; }
+    if (limit > 0 && e && e.n >= limit) {
+      // The rest of a long face may still be on its way (it takes longer than the client's 15 s retry): it goes on
+      const q = S.queues.get(to);
+      if (q && q.some((p) => p.customPacketType === 'dboPresetChunk' && p.actor === actor && p.hash === doc.hash)) return true;
+      if (!e.told) {
+        e.told = true;
+        log(`racemenu presets: ${keyOf(to)} asked again for ${keyOf(actor)}'s face ${doc.hash}${self ? ' (their own)' : ''}, sent in full ${e.n} times in ${Math.round((t - e.at) / 1000)} s: the header only for ${Math.round((e.at + windowMs - t) / 1000)} s (a client that cannot show it, as 0.3.94)`);
+      }
+      return enqueueAnswer(to, [meta], self);
+    }
     const chunks = chunkText(doc.face, Number(C.chunkChars));
-    enqueueAnswer(to, [meta].concat(chunks.map((data, i) => ({ customPacketType: 'dboPresetChunk', ...base, hash: doc.hash, race, i, n: chunks.length, data }))), self);
+    const queued = enqueueAnswer(to, [meta].concat(chunks.map((data, i) => ({ customPacketType: 'dboPresetChunk', ...base, hash: doc.hash, race, i, n: chunks.length, data }))), self);
+    if (queued && limit > 0) {
+      if (!e) { e = { hash: doc.hash, conn, at: t, n: 0, told: false }; S.fullSends.set(k, e); }
+      e.n++;
+      if (S.fullSends.size > 5000) {
+        for (const [x, y] of S.fullSends) if (!(t - y.at < windowMs)) S.fullSends.delete(x);
+        if (S.fullSends.size > 5000) S.fullSends.clear();
+      }
+    }
+    return queued;
   };
 
   // ---- rate limits ----
