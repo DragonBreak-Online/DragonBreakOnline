@@ -780,7 +780,7 @@ const STAFF_HELP = [
     ['dismiss', '<player|#TAG|profile id> <zone>: remove an official, online or offline (told if online). Officials may dismiss the ranks they may appoint'],
     ['officials', '[zone]: who holds which rank where'],
     ['property', 'at a door, as an official: sell <price> | list <deposit> <weekly> | unlist | offer <name> | remind | grace | evict']] },
-  { key: 'beasts', title: 'Beasts and the supernatural', items: ['beastform', 'curse', 'vlremote', 'wwremote', 'feedpair', 'raid', 'warband'] },
+  { key: 'beasts', title: 'Beasts and the supernatural', items: ['beastform', 'curse', 'makesuper', 'vlremote', 'wwremote', 'feedpair', 'raid', 'warband'] },
   { key: 'magic', title: 'Magic and crafts', items: ['schools', 'classteacher', 'preacher', 'manual', 'smithing', 'tailoring'] },
   { key: 'law', title: 'Law', items: ['jail', ['concordat', '[races]: Concordat arrests standing, or the Thalmor outside the race rule'],
     ['dossier', 'list | read <name|#TAG> | reports | add <name|#TAG> <text> | strike <name|#TAG> <n>: the Thalmor dossiers and informant reports (add and strike: Lead GM)']] },
