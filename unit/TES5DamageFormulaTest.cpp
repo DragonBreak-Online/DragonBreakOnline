@@ -199,3 +199,35 @@ TEST_CASE("A fire-and-forget damage over time hits an NPC for magnitude x "
   p.DestroyActor(0xff000000);
   DoDisconnect(p, 0);
 }
+
+TEST_CASE("A contact spell counts one tick per hit, since its hazard, trap or "
+          "attack re-applies it",
+          "[TES5DamageFormula]")
+{
+  PartOne& p = GetPartOne();
+  DoConnect(p, 0);
+  p.CreateActor(0xff000000, { 0, 0, 0 }, 0, 0x3c);
+  p.CreateActor(0xff000001, { 0, 0, 0 }, 0, 0x3c);
+  p.SetUserActor(0, 0xff000000);
+  auto& player = p.worldState.GetFormAt<MpActor>(0xff000000);
+  auto& npc = p.worldState.GetFormAt<MpActor>(0xff000001);
+
+  TES5DamageFormula formula{};
+  const auto damageOf = [&](MpActor& target, uint32_t spellId) {
+    return formula.CalculateDamage(
+      player, target,
+      SpellCastData{ 0xff000000, target.GetFormId(), spellId, false, false,
+                     SpellType::Left });
+  };
+  // crSprigganPoisonClaw: fire-and-forget Contact, crSprigganClawFFContact 2 a second for 10 s
+  REQUIRE(damageOf(npc, 0x000f23d2) == 2.f);
+  // TrapFirePlateHazardSpell01: fire-and-forget Contact, HazardFireDamageFFContact 13 a second for 2 s
+  REQUIRE(damageOf(npc, 0x00109ce6) == 13.f);
+  REQUIRE(damageOf(player, 0x00109ce6) == 13.f);
+  // An aimed fire-and-forget spell still hits an NPC whole: crChaurusPoisonSpit01, 5 a second for 5 s
+  REQUIRE(damageOf(npc, 0x0006f6fe) == 25.f);
+
+  p.DestroyActor(0xff000001);
+  p.DestroyActor(0xff000000);
+  DoDisconnect(p, 0);
+}
