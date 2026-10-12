@@ -203,6 +203,13 @@ const Housing = ({ data }: { data: HousingData }) => {
               Grant this container
             </button>
           ) : null}
+
+          {/* The server's property panel (tenancy.js, widget 81) opens for the door here; this menu closes behind it */}
+          {!data.canGrantContainers ? (
+            <button className="housing__button" onClick={() => { send('dbo:propertyMarket'); send(ev.cancel); }}>
+              {isManager ? 'Sell or rent out' : isOwner ? 'Rent and sale' : 'Buy or rent'}
+            </button>
+          ) : null}
         </div>
 
         {isOwner ? (
