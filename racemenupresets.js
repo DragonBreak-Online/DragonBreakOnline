@@ -515,9 +515,9 @@ module.exports = (api) => {
     const hash = typeof content.hash === 'string' ? content.hash : '';
     const data = typeof content.data === 'string' ? content.data : '';
     // A chunk dropped here, or an upload left unfinished, is logged too (at most 3 lines a minute per character)
-    const dropTold = (why) => { if (allow('dropTold', me, 3, 60000)) log(`racemenu presets: ${keyOf(me)} (profile ${profileOf(me)}) upload chunk dropped: ${why}`); };
-    const shown = (x) => JSON.stringify(x === undefined ? null : x).slice(0, 24);
-    if (!Number.isInteger(up) || !isIntIn(n, 0, MAX_CHUNKS) || data.length > Number(C.chunkChars)) return dropTold(`bad header (up ${shown(content.up)}, n ${shown(content.n)}, ${data.length} chars)`);
+    const dropTold = (why) => { if (allow('dropTold', me, 3, 60000)) log(`racemenu presets: ${keyOf(me)} (profile ${profileOf(me)}) upload chunk dropped: ${why()}`); };
+    const shown = (x) => (typeof x === 'number' || typeof x === 'boolean' || x === null || x === undefined ? String(x) : typeof x === 'string' ? JSON.stringify(x.slice(0, 16)) : typeof x);
+    if (!Number.isInteger(up) || !isIntIn(n, 0, MAX_CHUNKS) || data.length > Number(C.chunkChars)) return dropTold(() => `bad header (up ${shown(content.up)}, n ${shown(content.n)}, ${data.length} chars)`);
     // Told (a log line and a packet) at most 3 times a minute per character: past the hourly limit every new upload start was
     // one log line and one packet, up to the flood guard's 40 a second from one client (10 Oct review 2, item 2)
     const overRate = (h) => { if (allow('rateTold', me, 3, 60000)) refused(me, h, 'rate', `${keyOf(me)} (profile ${profileOf(me)}) face change not saved: over ${Number(C.uploadsPerHour)} uploads an hour`); };
@@ -526,12 +526,12 @@ module.exports = (api) => {
       S.uploads.delete(me);
       return finishUpload(me, { n: 0 });
     }
-    if (!HASH_RX.test(hash) || !isIntIn(i, 0, n - 1)) return dropTold(`bad hash or index (hash ${shown(content.hash)}, i ${shown(content.i)} of ${n})`);
+    if (!HASH_RX.test(hash) || !isIntIn(i, 0, n - 1)) return dropTold(() => `bad hash or index (hash ${shown(content.hash)}, i ${shown(content.i)} of ${n})`);
     const now = Date.now();
     let u = S.uploads.get(me);
-    if (u && now - u.at > Number(C.uploadTimeoutMs)) { dropTold(`upload ${u.up} timed out at ${u.got} of ${u.n} chunks`); u = null; }
+    if (u && now - u.at > Number(C.uploadTimeoutMs)) { const old = u; dropTold(() => `upload ${old.up} timed out at ${old.got} of ${old.n} chunks`); u = null; }
     if (!u || u.up !== up || u.n !== n || u.hash !== hash) {
-      if (u && u.got < u.n) dropTold(`upload ${u.up} left at ${u.got} of ${u.n} chunks, upload ${up} started`);
+      if (u && u.got < u.n) { const old = u; dropTold(() => `upload ${old.up} left at ${old.got} of ${old.n} chunks, upload ${up} started`); }
       // Told once per upload (its first chunk), not once per chunk
       if (!allow('put', me, Number(C.uploadsPerHour), 3600000)) { S.uploads.delete(me); if (i === 0) overRate(hash); return; }
       u = { up, n, hash, parts: new Array(n), got: 0, at: now };
