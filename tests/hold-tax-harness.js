@@ -58,7 +58,7 @@ globalThis.__dboTreasury = {
 };
 globalThis.__dboHousing = {
   recordOf: (r) => (OWNER_OF[r] ? { owner: OWNER_OF[r][0], ownerName: OWNER_OF[r][1], partner: 0 } : null),
-  primaryOf: (r) => r, isManager: () => false,
+  primaryOf: (r) => (OWNER_OF[r] ? r : 0), isManager: () => false,
 };
 globalThis.__dboRealmTerritoryAt = (world) => ({ id: world, name: world });
 globalThis.__dboRealmOwnerOf = (tid) => OWNER_FACTION[tid] || null;
@@ -122,6 +122,16 @@ cmds.tax(COUNT, '0');
 reckonAt(SUNDAY + 14 * 86400000);
 ok(bank(LYDIA) === 4500 && treasuries['county-bruma'] === 500, '/tax 0 taxes no property', [bank(LYDIA), treasuries['county-bruma']]);
 ok(globalThis.__dboSetHoldTax('bruma', 31, 'X', 'X') === null && taxes().bruma.rate === 0, 'the shared setter refuses a rate over 30%', taxes().bruma.rate);
+
+// ---- a house bought from the hold is taxed on its price ----
+ok(globalThis.__dboEconomySaleValue(BRUMA_HOUSE, 5000, 'Lydia') === true, 'a sale sets the value');
+const st = globalThis.__dboEconomy.data;
+ok(st.values[String(BRUMA_HOUSE)] === 5000 && /sale to Lydia/.test(st.assessed[String(BRUMA_HOUSE)].by), 'the value is 5,000, stamped as an assessment', [st.values, st.assessed]);
+cmds.tax(COUNT, '10');
+const before = bank(LYDIA), tBefore = treasuries['county-bruma'];
+reckonAt(SUNDAY + 21 * 86400000);
+ok(bank(LYDIA) === before - 500 && treasuries['county-bruma'] === tBefore + 500, 'the next reckoning taxes 10% of 5,000', [before - bank(LYDIA), treasuries['county-bruma'] - tBefore]);
+ok(globalThis.__dboEconomySaleValue(0x999, 100, 'X') === false, 'no value for something that is no property');
 
 console.log(fails ? `\n${fails} FAILED` : '\nall passed');
 process.exit(fails ? 1 : 0);
