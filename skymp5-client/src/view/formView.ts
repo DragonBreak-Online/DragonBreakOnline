@@ -24,6 +24,7 @@ import { ragdolledAtOf } from "./npcLifetimeRuntime";
 import { ObjectReferenceEx } from "../extensions/objectReferenceEx";
 import { PlayerCharacterDataHolder } from "./playerCharacterDataHolder";
 import { dropCopyNiNodeWork, queueCopyNiNodeUpdate } from "./niNodeQueue";
+import { onScreenRebuildDue, OnScreenRebuildState } from "./onScreenRebuild";
 import { lastTryHost, tryHost } from "./hostAttempts";
 import { GHOST_ALPHA, GHOST_SHADER_ID, INVIS_ABILITY_IDS, INVIS_ABILITY_SHADER_IDS } from "../lib/ghostLook";
 import { AdminView, keepNoCopy, nextHiddenAt } from "./adminCopyPolicy";
@@ -171,11 +172,13 @@ export class FormView {
           } else {
             // Force re-apply appearance on the next getAppearanceBasedBase call
             this.appearanceBasedBaseId = 0;
+            this.rebuild.doneThisLoad = false;
             //printConsole("Appearance updated");
           }
         } else {
           // Force re-apply appearance on the next getAppearanceBasedBase call
           this.appearanceBasedBaseId = 0;
+          this.rebuild.doneThisLoad = false;
           //printConsole("Appearance updated");
         }
 
@@ -390,12 +393,13 @@ export class FormView {
     this.flyerBits = 0;
     this.flyerFirstApply = false;
     this.flyerAi = undefined;
-    this.isOnScreen = false;
+    this.rebuild.isOnScreen = false;
     this.aggro = newWindowState();
     this.combatReported = false;
     // A reused view granted on its first frame must not read the old copy's hosting as its own (false 'pinned')
     this.movState.wasHosted = false;
-    this.lastNiNodeUpdateMs = 0;
+    this.rebuild.lastMs = 0;
+    this.rebuild.doneThisLoad = false;
     this.spawnMoment = 0;
     this.dealtWithRef = false;
     const refrId = this.refrId;
@@ -770,8 +774,9 @@ export class FormView {
             PlayerCharacterDataHolder.getWorldOrCell() !== this.lastPcWorldOrCell
           ) {
             // Redraw tints if PC world/cell changed
-            this.isOnScreen = false;
-            this.lastNiNodeUpdateMs = 0;
+            this.rebuild.isOnScreen = false;
+            this.rebuild.lastMs = 0;
+            this.rebuild.doneThisLoad = false;
           }
           this.lastPcWorldOrCell = PlayerCharacterDataHolder.getWorldOrCell();
         }
@@ -789,18 +794,18 @@ export class FormView {
           screenPoint[0] < 1 &&
           screenPoint[1] < 1 &&
           screenPoint[2] < 1;
-        // Not while a relayed Ragdoll plays on it: it goes out once that is over (ragdollHold.ts)
-        if (isOnScreen != this.isOnScreen && !niNodeWaitsForRagdoll(ragdolledAtOf(this.refrId), Date.now())) {
-          this.isOnScreen = isOnScreen;
-          // Never on a beast copy: the queued 3D reset holds a raw actor pointer and the beast graph is the one that crashed
-          if (isOnScreen && !this.isBeastCopy(model) && Date.now() - this.lastNiNodeUpdateMs >= FormView.niNodeUpdateMinIntervalMs) {
-            this.lastNiNodeUpdateMs = Date.now();
-            noteActorCall("ninode", this.refrId);
-            queueCopyNiNodeUpdate(actor.getFormID());
-            // The rebuilt 3D drops effect shaders
-            if (this.adminShaderOn) {
-              this.adminShaderReplayAt = this.lastNiNodeUpdateMs + FormView.adminShaderReplayDelayMs;
-            }
+        // Not while a relayed Ragdoll plays on it: it goes out once that is over (ragdollHold.ts). Never on a beast copy: the
+        // queued 3D reset holds a raw actor pointer and the beast graph is the one that crashed
+        let loaded = false;
+        try { loaded = actor.is3DLoaded(); } catch (e) { /* gone this frame */ }
+        if (niNodeWaitsForRagdoll(ragdolledAtOf(this.refrId), Date.now())) {
+          if (!loaded) this.rebuild.doneThisLoad = false;
+        } else if (onScreenRebuildDue(this.rebuild, isOnScreen, loaded, this.isBeastCopy(model), Date.now(), FormView.niNodeUpdateMinIntervalMs)) {
+          noteActorCall("ninode", this.refrId);
+          queueCopyNiNodeUpdate(actor.getFormID());
+          // The rebuilt 3D drops effect shaders
+          if (this.adminShaderOn) {
+            this.adminShaderReplayAt = this.rebuild.lastMs + FormView.adminShaderReplayDelayMs;
           }
         }
       }
@@ -1424,8 +1429,8 @@ export class FormView {
   private realMagicka: number | undefined = undefined;
   private magickaSet: number | undefined = undefined;
   private leveledBaseId = 0;
-  private isOnScreen = false;
-  private lastNiNodeUpdateMs = 0;
+  // The face-tint 3D rebuild (onScreenRebuild.ts): on screen, when last, and whether done for the current 3D
+  private rebuild: OnScreenRebuildState = { isOnScreen: false, lastMs: 0, doneThisLoad: false };
   // A head at the camera (a carried player inside their carrier) flickers on and off screen; each rebuild is a hitch
   private static readonly niNodeUpdateMinIntervalMs = 5000;
   private lastPcWorldOrCell = 0;
