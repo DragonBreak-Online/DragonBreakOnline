@@ -1,5 +1,19 @@
 [
   {
+    "title": "Every blessing in Active Effects",
+    "date": "2026-10-12",
+    "version": "Server update",
+    "tag": "New",
+    "sections": [
+      {
+        "heading": "Religion",
+        "items": [
+          "Every blessing now shows under Active Effects, including those of Sanguine, Hermaeus Mora, the Hist, the Ancestors, the Yokudan Gods and Ithelia."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Spells on creatures and people",
     "date": "2026-10-12",
     "version": "Server update",

@@ -1555,7 +1555,7 @@
    },
    {
     "id": "sanguine",
-    "blessingDisplay": "",
+    "blessingDisplay": "1ac97a:DragonBreak Online Edits.esp",
     "name": "Sanguine",
     "kind": "daedra",
     "shrines": [
@@ -1620,7 +1620,7 @@
    },
    {
     "id": "hermaeusmora",
-    "blessingDisplay": "",
+    "blessingDisplay": "1ac97b:DragonBreak Online Edits.esp",
     "name": "Hermaeus Mora",
     "kind": "daedra",
     "shrines": [
@@ -1697,7 +1697,7 @@
    },
    {
     "id": "hist",
-    "blessingDisplay": "",
+    "blessingDisplay": "1ac97c:DragonBreak Online Edits.esp",
     "name": "The Hist",
     "blessing": "",
     "blessingRegen": {
@@ -1725,7 +1725,7 @@
    },
    {
     "id": "ancestors",
-    "blessingDisplay": "",
+    "blessingDisplay": "1ac97d:DragonBreak Online Edits.esp",
     "name": "The Ancestors",
     "blessing": "",
     "combatBoon": true,
@@ -1751,7 +1751,7 @@
    },
    {
     "id": "yokudan",
-    "blessingDisplay": "",
+    "blessingDisplay": "1ac97e:DragonBreak Online Edits.esp",
     "name": "The Yokudan Gods",
     "blessing": "",
     "blessingRegen": {
@@ -1873,7 +1873,7 @@
    },
    {
     "id": "ithelia",
-    "blessingDisplay": "",
+    "blessingDisplay": "1ac97f:DragonBreak Online Edits.esp",
     "name": "Ithelia",
     "note": "Faction Inquiry #0144 (captain_v0c1, 12 Oct): an order of knights in her service. Nate, 12 Oct: add her as a faith with no shrine, prayed to anywhere like the other shrine-less cults; the order is a player charter (cult). Lore: she comes from ESO Gold Road (2E 582), where her very existence had been erased from memory; no 4E source mentions her worship, so a following in 4E 211 is server lore, a rediscovered secret cult. She is kind faith, not daedra, so the sixteen shrine Princes and their rules stay as they are.",
     "blessing": "",
@@ -1900,7 +1900,7 @@
   "_placements": "Measured, not assumed: server\\shrine-placements.json, regenerate with py ck-mcp\\shrines.py. placements = every reference of this deity's shrine bases in the load order; inPlaytest = those inside the region lock; inBruma = those in Bruma county, the only released and walkable part of Beyond Skyrim Cyrodiil. A deity with inBruma 0 cannot be prayed to until Skyrim opens.",
   "_lore": "The roster is the canonical one for Cyrodiil, not whoever happened to have a shrine already: the Nine Divines plus Auri-El, and Oblivion's fifteen Daedric shrines plus Mephala. JYGGALAG IS DELIBERATELY ABSENT - he was Sheogorath until the Greymarch ended in 3E 433 and has walked free since, but he has no cult, no shrine and no worshippers in 4E 201, and a shrine to him would be the one thing in this list that lore actually forbids. Every boon below is grounded in the Prince's sphere, and every magic effect it names exists in this load order (measured by ck-mcp\\blessings.py; see server\\blessing-effects.json).",
   "_blessingSource": "vanilla = a real SPEL that works today, whether Bethesda's or one of the eleven DBO_BlessingOf* records authored on 2026-09-20 by SSEEdit 4.1.5f\\Edit Scripts\\DBO_Blessings.pas. server = the gameplay does it and no record exists (prayer.js; for the Ancestors, gamemode.js blessingCombat). pending = a boon still waiting on a spell; there are none left.",
-  "_blessingDisplay": "blessingDisplay (12 Oct): for a deity whose boon the server keeps (Sanguine, Hermaeus Mora, the Hist, the Ancestors, the Yokudan Gods, Ithelia), the display-only Ability the PC session adds to DragonBreak Online Edits.esp (\"<local id>:DragonBreak Online Edits.esp\": SPEL type Ability, constant effect on self, one MGEF whose description is the boon, no stat change). prayer.js gives it with the blessing so the boon shows in Active Effects, and takes it back when the blessing ends. Empty until the PC fills the ids in; empty = no display, the boon works as before.",
+  "_blessingDisplay": "blessingDisplay (12 Oct): for a deity whose boon the server keeps (Sanguine, Hermaeus Mora, the Hist, the Ancestors, the Yokudan Gods, Ithelia), the display-only Ability the PC session adds to DragonBreak Online Edits.esp (\"<local id>:DragonBreak Online Edits.esp\": SPEL type Ability, constant effect on self, one MGEF whose description is the boon, no stat change). prayer.js gives it with the blessing so the boon shows in Active Effects, and takes it back when the blessing ends. Filled 12 Oct from DLE c907a243 (1ac97a-1ac97f); an empty id = no display, the boon works as before.",
   "_deadStats": "NO BOON MAY BE A DEAD STAT. This server is entirely player-run: no merchants, no dialogue, no barter, and no speech skill among the eighteen. Persuasion, Speechcraft and Pickpocket therefore do nothing at all, and four boons that used them have been replaced (see replacedBoon). Where the replacement overrides a vanilla shrine, Bethesda's record is left untouched on disk and skills.json simply points elsewhere, so reverting is one line. Check any new boon against what this server actually runs: combat and the damage formula, health/magicka/stamina and their regen, carry weight, sneak, the magic schools, alchemy, lockpicking, and the needs meter - all real; anything that needs an NPC to talk to - not.",
   "_authored": "The eleven DBO_BlessingOf* SPELs live at DragonBreak Online Edits.esp:1209BF-1209C9. Each is a copy of AltarNocturnalSpell - a fire-and-forget SELF spell, NOT a constant ability - with one effect swapped and CureDiseaseEffect kept, 28800 s. Namira is the exception: she keeps Fortify Sneak and her second effect is Night Eye instead of cure disease, which suits the Prince of decay. Re-running the script is safe; it leaves records that already exist alone.",
   "_testSite": "Nat placed a statue of every Prince at the Namira shrine site (CYRNamirasShrineExterior and around it, grid 23,47) on 2026-09-20 as one central place to test worship. They went in as STATICS, which the engine never fires an activation on; DBO_ShrineActivators2.pas gave each Prince a DBO_ShrineOf* ACTI using that same statue mesh and repointed the references at it, so the statue itself is the shrine.",

@@ -477,12 +477,25 @@ check('Sheogorath can hand over a boon the server keeps (the Ancestors\' ward)',
 
 // ---- 15. display abilities for the server's own boons (12 Oct: "players like visuals for all boons") ---------------
 // A deity whose boon the server keeps can name a display-only Ability (blessingDisplay): learned for as long as the
-// blessing runs so it shows in Active Effects, taken back wherever the blessing ends. skills.json ships them empty.
-check('skills.json ships every blessingDisplay empty, on the six server boons only',
+// blessing runs so it shows in Active Effects, taken back wherever the blessing ends. The PC's records: DLE c907a243.
+const SHIPPED_DISPLAY = { sanguine: '1ac97a', hermaeusmora: '1ac97b', hist: '1ac97c', ancestors: '1ac97d', yokudan: '1ac97e', ithelia: '1ac97f' };
+check('skills.json sets all six display ids (DLE c907a243, 1ac97a-1ac97f), on the six server boons only',
   SKILLS.deities.choices.filter((c) => 'blessingDisplay' in c).map((c) => c.id).sort().join(',') === 'ancestors,hermaeusmora,hist,ithelia,sanguine,yokudan'
-  && SKILLS.deities.choices.every((c) => !c.blessingDisplay));
-// empty ids: the old behaviour (sections 2 and 14 ran with them)
-load();
+  && Object.entries(SHIPPED_DISPLAY).every(([id, local]) => choiceOf(id).blessingDisplay === `${local}:DragonBreak Online Edits.esp`),
+  SKILLS.deities.choices.filter((c) => 'blessingDisplay' in c).map((c) => `${c.id}=${c.blessingDisplay}`).join(', '));
+// the shipped ids as the server reads them: Ability records, so all six resolve and none is logged
+{
+  for (const local of Object.values(SHIPPED_DISPLAY)) records.set(parseInt(local, 16), spel(['DBO_BoonDisplay', 4, 0, 0, [0]]));
+  load();
+  const line = out.logs.find((l) => /display abilities for the server's boons/.test(l)) || '';
+  check('with the shipped ids (read as Abilities) the boot line names 6 of 6 and logs no bad one',
+    /: 6 of 6 named \(/.test(line) && !out.logs.some((l) => /^prayer: the display ability of /.test(l)), line);
+  for (const local of Object.values(SHIPPED_DISPLAY)) records.delete(parseInt(local, 16));
+}
+// empty ids: the old behaviour
+const shippedIds = Object.fromEntries(SKILLS.deities.choices.filter((c) => 'blessingDisplay' in c).map((c) => [c.id, c.blessingDisplay]));
+for (const c of SKILLS.deities.choices) if ('blessingDisplay' in c) c.blessingDisplay = '';
+clear(); load();
 check('with no ids the boot line names none', out.logs.some((l) => l === "prayer: display abilities for the server's boons: 0 of 0 named"), out.logs.filter((l) => /display abil/.test(l)).join(' | '));
 worship('hist'); learned.clear();
 prayAndWin('hist');
@@ -641,7 +654,7 @@ check('and a Hist blessing teaches nothing and records no display', calls('AddSp
   sb = sheoPray('hist');
   check('Sheogorath handing over the Hist: the Hist\'s display goes with it', sb && sb.deity === 'hist' && sb.display === DISP.hist && added('hist') === 1, JSON.stringify(sb));
   check('Sheogorath has no display of his own', !('blessingDisplay' in choiceOf('sheogorath')));
-  setIds({});
+  setIds(shippedIds);
 }
 
 console.log('');
