@@ -564,12 +564,35 @@ mp._onScaleReport = (pcFormId, reported) => {
 
 // ---- name / permission change watch ----------------------------------------------------------
 const seen = new Map(); // profileId -> { name, tier, roles }
+// The chat's Admin tab follows the owner property isAdmin, and the client writes it into the page only when the value it
+// sees changes (chatService lastAdmin). A page that missed it (Nate, 12 Oct, 0.3.94: senior, no Admin tab) never
+// catches up, because the server only ever sends the same true again. So a while after login every staff member's
+// isAdmin is sent false and then true, two changes the client cannot skip: the page is written false, then true.
+// watchPlayers leaves the property alone in between (it would put true back at once, possibly before the client saw
+// the false). The cosmetic cost: for ADMIN_RESYNC_GAP_MS the client treats its player as no admin (the Admin tab and
+// the invisible-admin ghost); the server's rights never change.
+const ADMIN_RESYNC_DELAY_MS = 20000, ADMIN_RESYNC_GAP_MS = 2000;
+const adminResyncAt = globalThis.__dboAdminResyncAt instanceof Map ? globalThis.__dboAdminResyncAt : (globalThis.__dboAdminResyncAt = new Map());
+const adminResyncing = (a) => { const t = adminResyncAt.get(a >>> 0); return t !== undefined && Date.now() - t < ADMIN_RESYNC_GAP_MS + 1000; };
+const resyncAdminFlag = (userId, a) => {
+  setTimeout(() => {
+    try {
+      if (actorOf(userId) !== a || !isAdmin(a)) return;
+      adminResyncAt.set(a >>> 0, Date.now());
+      mp.set(a, ADMIN_PROP, false);
+      setTimeout(() => {
+        try { if (actorOf(userId) === a) mp.set(a, ADMIN_PROP, isAdmin(a)); } catch (e) { /* gone */ }
+        adminResyncAt.delete(a >>> 0);
+      }, ADMIN_RESYNC_GAP_MS);
+    } catch (e) { adminResyncAt.delete(a >>> 0); }
+  }, ADMIN_RESYNC_DELAY_MS);
+};
 const watchPlayers = () => {
   for (const a of onlineActors()) {
     const p = profileOf(a); if (!(p > 0)) continue;
     const now = { name: nameOf(a), tier: tierOf(a), roles: rolesOf(a).sort().join(',') };
     const prev = seen.get(p);
-    try { if ((mp.get(a, ADMIN_PROP) === true) !== (now.tier !== null)) mp.set(a, ADMIN_PROP, now.tier !== null); } catch (e) { /* ignore */ }
+    if (!adminResyncing(a)) { try { if ((mp.get(a, ADMIN_PROP) === true) !== (now.tier !== null)) mp.set(a, ADMIN_PROP, now.tier !== null); } catch (e) { /* ignore */ } }
     // A beast form's name (beastform.js) is not a rename; seen keeps the real one until the revert
     let beastNamed = false; try { const b = mp.get(a, 'private.beast'); beastNamed = !!(b && b.form); } catch (e) { /* not ready */ }
     if (beastNamed) { if (!prev) continue; now.name = prev.name; }
@@ -2175,6 +2198,7 @@ const onCharacterReady = (userId, a) => {
   setTimeout(timed('loginSetup', () => {
     if (actorOf(userId) !== a) return;
     try { mp.set(a, ADMIN_PROP, isAdmin(a)); } catch (e) { /* ignore */ }
+    if (isAdmin(a)) resyncAdminFlag(userId, a);
     if (cfg.welcome) system(a, cfg.welcome);
     audit(`JOIN ${who(a)}${staffTierOf(a) ? ' as ' + staffTierOf(a) : ''}${staffCharOf(a) ? ' (staff character)' : ''}`);
     startLoginGrace(a);

@@ -6,8 +6,8 @@
 // Players:  /gm <message> (alias /callgm), or the U panel's Help & trouble tab, "Contact a GM". One open call each; a
 //           second /gm adds to it. /gm alone shows the call; /gm cancel withdraws it.
 // Staff:    every online staff member (gamemode isAdmin, a Trial GM, or a Discord role in gmCalls.staffRoleIds) gets a banner across
-//           the screen, a Skyrim notification and a line in the admin chat tab. An unclaimed call is shown again every
-//           remindMinutes; staff who come online while calls are open are given the list.
+//           the screen, a Skyrim notification and a line in the admin chat tab. Unclaimed calls are shown again every
+//           remindMinutes, all of them in one line; staff who come online while calls are open are given the list.
 //           /gm list [all]   /gm take <n>   /gm goto <n>   /gm release <n>   /gm close <n> [note]   /gm quiet [on|off]
 //           take tells the player who is coming and every other staff member who took it. goto moves the GM to the
 //           caller (to where they called from when the caller is offline) and takes the call if nobody has. The note on
@@ -364,6 +364,7 @@ module.exports = (api) => {
       const p = callerOnline(c); if (p) personal(p, `${was} had to leave; your GM call #${c.n} is waiting for the next GM.`);
       mirror(c);
     }
+    let remindDue = false;
     for (const c of S.open.slice()) {
       const last = Math.max(c.at, ...c.lines.map((l) => l.at), c.takenBy ? c.takenBy.at : 0);
       if (C.expireHours > 0 && now - last > C.expireHours * 3600000) {
@@ -373,10 +374,25 @@ module.exports = (api) => {
         const p = callerOnline(c); if (p) personal(p, `Your GM call #${c.n} has expired. /gm <message> if you still need staff.`);
         changed = true; continue;
       }
-      if (!c.takenBy && C.remindMinutes > 0 && now - (c.lastAlert || c.at) >= C.remindMinutes * 60000) {
-        // Not saved: after a restart the reminder simply comes a little early
-        c.lastAlert = now;
-        if (onlineStaff().length) tellStaff(`Still waiting: ${callLine(c)} (/gm take ${c.n})`, `GM call #${c.n} still waiting: ${c.name}`);
+      if (!c.takenBy && C.remindMinutes > 0 && now - (c.lastAlert || c.at) >= C.remindMinutes * 60000) remindDue = true;
+    }
+    // One reminder for all the waiting calls together (Nate, 12 Oct: five waiting calls were five lines, five banners and
+    // five notifications at once). When one is due, every waiting call is named in it and waits remindMinutes again with
+    // it, so they never come back one by one. Not saved: after a restart the reminder simply comes a little early
+    if (remindDue) {
+      const waiting = S.open.filter((c) => !c.takenBy);
+      for (const c of waiting) c.lastAlert = now;
+      if (waiting.length && onlineStaff().length) {
+        if (waiting.length === 1) {
+          const c = waiting[0];
+          tellStaff(`Still waiting: ${callLine(c)} (/gm take ${c.n})`, `GM call #${c.n} still waiting: ${c.name}`);
+        } else {
+          const MAX_NAMED = 6;
+          const named = waiting.slice(0, MAX_NAMED).map((c) => `#${c.n} ${c.name} (${ago(c.at)})`).join(', ');
+          const more = waiting.length > MAX_NAMED ? ` and ${waiting.length - MAX_NAMED} more` : '';
+          tellStaff(`${waiting.length} GM calls still waiting: ${named}${more}. /gm list for the details, /gm take <n>`,
+            `${waiting.length} GM calls still waiting: /gm list`);
+        }
       }
     }
     if (changed) save();

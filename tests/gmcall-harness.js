@@ -267,6 +267,29 @@ const flush = () => new Promise((r) => setImmediate(r));
   online = [CALLER, OTHER, ADMIN, ROLESTAFF];
   reset(); gm(ADMIN, `close ${c5.n} done`); await flush();
 
+  // ---- several waiting calls: one reminder, not one per call (Nate, 12 Oct: five "still waiting" lines at once) --------
+  load();
+  const EXTRA = [0xff000301, 0xff000302, 0xff000303, 0xff000304, 0xff000305];
+  EXTRA.forEach((a, i) => { P[a] = { name: `Caller ${i + 1}`, tag: `CL0${i + 1}`, profile: 31 + i, discord: '', w: '3c:Skyrim.esm', pos: [0, 0, 0], roles: [] }; });
+  online = [ADMIN, ROLESTAFF, ...EXTRA];
+  for (const a of EXTRA) { minutes(0.5); gm(a, 'please help me over here'); }
+  check('five calls are open', globalThis.__dboGmCalls.open.filter((c) => !c.takenBy).length === 5);
+  const stillOf = (a, tab) => sayOf(a, tab).filter((t) => /still waiting/i.test(t));
+  reset(); minutes(6); tick();
+  check('five waiting calls give each staff member one reminder line naming them all', stillOf(ADMIN, 'admin').length === 1 && stillOf(ROLESTAFF, 'system').length === 1
+    && /^5 GM calls still waiting: #\d+ Caller 1 #CL01 \(\d+ min ago\), .*#\d+ Caller 5 #CL05 \(\d+ min ago\)\. \/gm list for the details, \/gm take <n>$/.test(stillOf(ADMIN, 'admin')[0] || ''), [stillOf(ADMIN), stillOf(ROLESTAFF)]);
+  check('...with one banner and one notification, not five', bannersOf(ROLESTAFF).length === 1 && noticesOf(ROLESTAFF).length === 1 && bannersOf(ROLESTAFF)[0] === '5 GM calls still waiting: /gm list', [bannersOf(ROLESTAFF), noticesOf(ROLESTAFF)]);
+  reset(); minutes(1); tick(); minutes(1); tick();
+  check('they wait remindMinutes again together: nothing in between', stillOf(ADMIN).length === 0 && stillOf(ROLESTAFF).length === 0 && !bannersOf(ROLESTAFF).some((t) => /still waiting/.test(t)), [sayOf(ADMIN), bannersOf(ROLESTAFF)]);
+  reset(); minutes(3.5); tick();
+  check('then one line again', stillOf(ADMIN, 'admin').length === 1 && /^5 GM calls/.test(stillOf(ADMIN, 'admin')[0] || ''), stillOf(ADMIN));
+  const extraCalls = globalThis.__dboGmCalls.open.filter((c) => c.profile >= 31 && c.profile <= 35);
+  for (const c of extraCalls.slice(1)) gm(ADMIN, `close ${c.n} done`);
+  reset(); minutes(6); tick();
+  check('a single waiting call keeps its own full reminder', stillOf(ADMIN, 'admin').length === 1 && new RegExp(`^Still waiting: #${extraCalls[0].n} Caller 1 #CL01`).test(stillOf(ADMIN, 'admin')[0] || ''), stillOf(ADMIN));
+  gm(ADMIN, `close ${extraCalls[0].n} done`); await flush();
+  online = [CALLER, OTHER, ADMIN, ROLESTAFF];
+
   // ---- gamemode.js wiring ----------------------------------------------------------------------------------------
   const src = fs.readFileSync(path.join(ROOT, 'gamemode.js'), 'utf8');
   check('gamemode.js loads gmcall.js, after gameticket.js', src.indexOf("path.resolve('gmcall.js')") > src.indexOf("path.resolve('gameticket.js')") && src.indexOf("path.resolve('gameticket.js')") > 0);
