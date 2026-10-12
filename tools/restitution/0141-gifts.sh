@@ -1,0 +1,9 @@
+#!/bin/sh
+# Ticket #0141 (12 Oct): Lady Dyer #MTK7 keeps what she took from the Cheese Barrel 805c0d7 on 11 Oct 05:26-05:33 UTC.
+# Storage locking did not exist until the 12 Oct 04:56 restart (fork 7a65ae5f): the barrel could not be locked, and the
+# server allowed every one of her 71 takes. These are COPIES, so Kalidore's own return (0138-gifts.sh) still runs and
+# nothing is taken from him. The two lists are identical by design. Run once from the server repo.
+set -e
+sudo node tools/gift.js --tag MTK7 --gold 352 --item 0x1397f:9 --item 0x1398a:1 --item 0x16731:1 --item 0x1d4ec:1 --item 0x2c66f:1 --item 0x2f2f4:3 --item 0x34cd6:13 --item 0x3c12ae17:1 --item 0x3c192e49:2 --item 0x3eb2e:1 --item 0x5ace4:1 --item 0x5ace5:23 --item 0x5ad93:10 --item 0x63b43:1 --item 0x63b44:1 --item 0x63b45:1 --item 0x68520:1 --item 0x68522:1 --item 0x6bc02:1 --item 0x76018bf:2 --reason "Ticket #0141: the barrel was unlocked, so these are yours to keep. Part 1 of 3" --by Nate
+sudo node tools/gift.js --tag MTK7 --item 0x76018c0:4 --item 0x76018c3:2 --item 0x760190c:2 --item 0x7601c51:2 --item 0x7601c5a:3 --item 0x760209a:3 --item 0x76020d2:1 --item 0x7602428:1 --item 0x800e4:111 --item 0x805ef51:2 --item 0x80699:1 --item 0x8080f95:1 --item 0x80defb1:4 --item 0x830001c:2 --item 0x830001d:1 --item 0x8698e:1 --item 0x86993:1 --item 0x965a0:1 --item 0x965a3:1 --item 0x965a5:1 --reason "Ticket #0141: the barrel was unlocked, so these are yours to keep. Part 2 of 3" --by Nate
+sudo node tools/gift.js --tag MTK7 --item 0x965ad:1 --item 0x9cd51:1 --item 0x9e2a8:2 --item 0xa:8 --item 0xa9191:1 --item 0xdb5d2:62 --item 0xe3c16:2 --reason "Ticket #0141: the barrel was unlocked, so these are yours to keep. Part 3 of 3" --by Nate
