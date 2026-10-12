@@ -361,6 +361,14 @@
           "Bandits beware, and couriers too: robbing a courier may take their parcel. The robber gets a Broken Courier's Parcel to open at a notice board, and the courier is not paid.",
           "Senders can insure a parcel for up to the goods' value, for 10% of that value. If it is robbed, the hold's treasury pays the sender, as far as the treasury allows. Insurance does not pay out when the robber is the sender, the courier or the recipient, or shares a party or faction with the sender or the courier, and a sender can claim at most twice a week."
         ]
+      },
+      {
+        "heading": "Courier ranks",
+        "items": [
+          "Couriers rise in rank with their deliveries. A Novice carries one parcel at a time and takes jobs worth up to 500 gold; an Apprentice (5 deliveries) two parcels and up to 1,500; a Journeyman (15) three and up to 4,000, and may carry to other holds; an Expert (40) four and up to 10,000; a Master (100) five, of any value.",
+          "The higher your rank, the less often a robbery takes your parcel: one in two for a Novice, one in four for a Master.",
+          "A delivery counts toward your rank when it pays at least 20 gold, and at most three a day count from the same sender. Your rank shows at the top of the Couriers tab."
+        ]
       }
     ]
   },
