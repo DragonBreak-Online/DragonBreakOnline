@@ -1,0 +1,66 @@
+{
+ "0138": {
+  "_comment": "Ticket #0138 (11 Oct 2026): what Lady Dyer #MTK7 (profile 168) took from Kalidore Kenishi #SH4B's unlocked Cheese Barrel 5c0d7:BSHeartland.esm between 05:26 and 05:33 UTC, from ITEMGUARD; containers are where she put some of it, capped at what she put. Kalidore is given it all back by tools/restitution/0138-gifts.sh.",
+  "tag": "MTK7",
+  "bankGold": true,
+  "notice": "Staff have taken back the goods you took from another player's storage on 11 October (ticket #0138). Contact staff if you believe this is a mistake.",
+  "items": {
+   "1397f": 9,
+   "1398a": 1,
+   "16731": 1,
+   "1d4ec": 1,
+   "2c66f": 1,
+   "2f2f4": 3,
+   "34cd6": 13,
+   "3c12ae17": 1,
+   "3c192e49": 2,
+   "3eb2e": 1,
+   "5ace4": 1,
+   "5ace5": 23,
+   "5ad93": 10,
+   "63b43": 1,
+   "63b44": 1,
+   "63b45": 1,
+   "68520": 1,
+   "68522": 1,
+   "6bc02": 1,
+   "76018bf": 2,
+   "76018c0": 4,
+   "76018c3": 2,
+   "760190c": 2,
+   "7601c51": 2,
+   "7601c5a": 3,
+   "760209a": 3,
+   "76020d2": 1,
+   "7602428": 1,
+   "800e4": 111,
+   "805ef51": 2,
+   "80699": 1,
+   "8080f95": 1,
+   "80defb1": 4,
+   "830001c": 2,
+   "830001d": 1,
+   "8698e": 1,
+   "86993": 1,
+   "965a0": 1,
+   "965a3": 1,
+   "965a5": 1,
+   "965ad": 1,
+   "9cd51": 1,
+   "9e2a8": 2,
+   "a": 8,
+   "a9191": 1,
+   "db5d2": 62,
+   "e3c16": 2,
+   "f": 352
+  },
+  "containers": {
+   "651c9:BSHeartland.esm": {
+    "1d4ec": 1
+   },
+   "65359:BSHeartland.esm": {
+    "1d4ec": 1
+   }
+  }
+ }
+}

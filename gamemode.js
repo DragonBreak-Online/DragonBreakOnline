@@ -1333,6 +1333,7 @@ mp.onActivate = (targetId, casterId) => {
   // Gear above the loot cap in a container becomes its steel equivalent before the container opens (gearswap.js)
   if (globalThis.__dboGearSwapContainer) globalThis.__dboGearSwapContainer(targetId >>> 0);
   try { if (globalThis.__dboSprStripContainer) globalThis.__dboSprStripContainer(targetId >>> 0); } catch (e) { log('spr strip container failed', e.message); }
+  try { if (globalThis.__dboRestitutionContainer) globalThis.__dboRestitutionContainer(targetId >>> 0); } catch (e) { log('restitution container failed', e.message); }
   if (globalThis.__dboDungeonActivate) { const v = globalThis.__dboDungeonActivate(targetId >>> 0, casterId >>> 0); if (v === false) return false; if (v === true) return true; }
   if (globalThis.__dboCorpseLoot && globalThis.__dboCorpseLoot(targetId >>> 0, casterId >>> 0) === false) return false;
   if (globalThis.__dboAshPile && globalThis.__dboAshPile(targetId >>> 0, casterId >>> 0) === false) return false;
@@ -2095,6 +2096,7 @@ const onCharacterReady = (userId, a) => {
     // Gear above the loot cap becomes its steel equivalent, once (gearswap.js)
     try { if (globalThis.__dboGearSwapLogin) globalThis.__dboGearSwapLogin(a); } catch (e) { log('gear swap login failed', e.message); }
     try { if (globalThis.__dboSprStripLogin) globalThis.__dboSprStripLogin(a); } catch (e) { log('spr strip login failed', e.message); }
+    try { if (globalThis.__dboRestitutionLogin) globalThis.__dboRestitutionLogin(a); } catch (e) { log('restitution login failed', e.message); }
     try { if (globalThis.__dboBusinessLogin) globalThis.__dboBusinessLogin(a); } catch (e) { log('business login failed', e.message); }
     try { if (globalThis.__dboJailLogin) globalThis.__dboJailLogin(a); } catch (e) { log('jail login failed', e.message); }
     try { if (globalThis.__dboStaffDiagLogin) globalThis.__dboStaffDiagLogin(a); } catch (e) { log('staff trace on login failed', e.message); }
@@ -6636,6 +6638,12 @@ try {
   delete require.cache[SPRSTRIP_JS];
   require(SPRSTRIP_JS)({ mp, log, personal, audit, who, cfg, every, stopTimer, onlineActors, giveItem });
 } catch (e) { log('sprstrip.js failed to load:', e.stack || e.message); globalThis.__dboSprStripLogin = null; globalThis.__dboSprStripContainer = null; }
+// ---- stolen goods taken back for a ticket (server\restitution.js, restitution-cases.json, config "restitution"; Nate, 12 Oct) ----
+try {
+  const RESTITUTION_JS = path.resolve('restitution.js');
+  delete require.cache[RESTITUTION_JS];
+  require(RESTITUTION_JS)({ mp, log, personal, audit, who, cfg, every, stopTimer, onlineActors });
+} catch (e) { log('restitution.js failed to load:', e.stack || e.message); globalThis.__dboRestitutionLogin = null; globalThis.__dboRestitutionContainer = null; }
 // ---- raids and pillage (server\raids.js, WAR_DESIGN.md section 5) -----------------------------------------------------------
 try {
   const RAIDS_JS = path.resolve('raids.js');
