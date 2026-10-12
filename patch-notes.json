@@ -1,5 +1,19 @@
 [
   {
+    "title": "Character creator sliders save",
+    "date": "2026-10-12",
+    "version": "Server update",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Appearance",
+        "items": [
+          "Changes made with the RaceMenu sliders (face shape, expressions, sizes, body and overlays) are now saved and shown to other players, after /appearance or a GM's /chargen, and they stay after a relog."
+        ]
+      }
+    ]
+  },
+  {
     "title": "The 12 October update",
     "date": "2026-10-12",
     "version": "Client 0.3.94",
