@@ -1,5 +1,5 @@
 {
-  "_comment": "Player factions (server\\guilds.js). Separate from hold offices in zones.json/officials.json. Each faction lists its ranks top to bottom; every rank maps to one role, and the role decides the permissions (roles below). Secret factions (the Daedric cults, the Thieves Guild, the Dark Brotherhood, Clan Volkihar) show their roster only to their own members. Membership lives in guilds.json (runtime, gitignored).",
+  "_comment": "Player factions (server\\guilds.js). Separate from hold offices in zones.json/officials.json. Each faction lists its ranks top to bottom; every rank maps to one role, and the role decides the permissions (roles below). Secret factions (the Daedric cults, the Thieves Guild, the Dark Brotherhood, Clan Volkihar) show their roster only to their own members. Membership lives in guilds.json (runtime, gitignored). A hall's doors are the ways in; its cells (optional) are the interior cells that are the hall though no listed door stands in them (the Cathedral of St Martin, whose doors stand in the street; the Synod Conclave's main hall): a Scholars' Ledger or Class Lectern there is that faction's for teaching, and its sales pay that faction's treasury.",
   "roles": {
     "leader": {
       "invite": true,
@@ -395,6 +395,10 @@
         "doors": [
           "6ca59:BSHeartland.esm",
           "6ca75:BSHeartland.esm"
+        ],
+        "cells": [
+          "20ff:BSHeartland.esm",
+          "6c152:BSHeartland.esm"
         ]
       }
     },
@@ -762,6 +766,11 @@
         "doors": [
           "7a815:BSHeartland.esm",
           "7a816:BSHeartland.esm"
+        ],
+        "cells": [
+          "12cb:BSHeartland.esm",
+          "5f78c:BSHeartland.esm",
+          "5f78d:BSHeartland.esm"
         ]
       },
       "note": "Nate 11 Oct 2026 (option A): the players' order of the Eight Divines that runs the Cathedral of St Martin in Bruma, led by Sylvia Dawnveil (its notice: 'Priests and Knights of all Eight Divines'). Neutral: not the Empire's Imperial Cult. At the Cathedral it sells Restoration and Alteration tomes to its own by rank as the colleges do, its Senior ranks (Priest and up) teach those schools, and its sermons offer their spell. The leader may rename the ranks. Staff seat the High Priest."

@@ -29,10 +29,13 @@ const split = (price, taxRate, sinkShare) => {
 
 module.exports = (api) => {
   const { mp, log, audit, who, cfg, personal, onlineActors, depositToTreasury, zoneOfActor } = api;
-  // hallCells: cells that are a faction's hall though guild-defs' hall doors do not lead into them (the Synod Conclave's
-  // main hall, 20ff; guild-defs' doors reach only its lower floor, 6c152)
+  // hallCells: cells that are a faction's hall though guild-defs' hall doors do not stand in them (the Synod Conclave's
+  // main hall, 20ff, whose listed doors stand in its basement, 6c152; the Cathedral of St Martin, 12cb, its undercroft
+  // 5f78c and chapel hall 5f78d, whose doors stand in the street). guild-defs' hall.cells says the same to guilds.js;
+  // kept here too, so a sale there still pays the faction if guilds.js has not loaded.
   const C = Object.assign({ enabled: true, sinkShare: 0.1, defaultTax: 0.1,
-    hallCells: { '20ff:BSHeartland.esm': 'synod', '6c152:BSHeartland.esm': 'synod' } }, cfg.ledgerSale || {});
+    hallCells: { '20ff:BSHeartland.esm': 'synod', '6c152:BSHeartland.esm': 'synod',
+      '12cb:BSHeartland.esm': 'great-faiths', '5f78c:BSHeartland.esm': 'great-faiths', '5f78d:BSHeartland.esm': 'great-faiths' } }, cfg.ledgerSale || {});
   const HALL_CELLS = new Map(Object.entries(C.hallCells || {}).filter(([k]) => k !== '_comment').map(([k, v]) => [String(k).toLowerCase(), String(v)]));
   const HOLD_SHARE = Number((cfg.rest || {}).holdShare);
   const BALANCE = 'private.bankGold';
