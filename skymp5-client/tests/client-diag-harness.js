@@ -64,6 +64,43 @@ const bundle = async (rel, dir, plugins) => {
   check('a unix path and a webpack url too', !/home|nate/.test(D.scrubText('at /home/nate/a/b.js and webpack://skymp5-client/./src/x.ts', 160)), D.scrubText('at /home/nate/a/b.js and webpack://skymp5-client/./src/x.ts', 160));
   check('plain ratios and text stay', D.scrubText('3/19 sliders, a b', 160) === '3/19 sliders, a b', D.scrubText('3/19 sliders, a b', 160));
   check('control characters go and the length is capped', D.scrubText('a\nb\tc' + 'x'.repeat(500), 40).length <= 40 && !/\n/.test(D.scrubText('a\nb', 40)));
+  // 10 Oct review (client-code required change 1): a user or folder name with spaces inside a path, and a very long token
+  {
+    const cerrOf = (message) => {
+      const d = new D.ErrorDigest(D.DBO_CLIENT_VERSION);
+      const e = new Error(message); e.stack = `Error: ${message}`;
+      d.add('on:update', e);
+      return d.drain(5000000)[0] || '';
+    };
+    const word = (line, w) => new RegExp(`(^|[^A-Za-z0-9])${w}([^A-Za-z0-9]|$)`).test(line);
+    const win = cerrOf("ENOENT: no such file or directory, open 'C:\\Users\\A B C\\Documents\\My Games\\Skyrim Special Edition\\x.ini'");
+    check("R1 scrub: 'C:\\Users\\A B C\\...' leaves no 'A', 'B' or 'C' word and no folder in the cerr line, only the file name",
+      !word(win, 'A') && !word(win, 'B') && !word(win, 'C') && !/Users|Documents|Games|Special/.test(win) && / open 'x\.ini'$/.test(win), win);
+    const winFwd = cerrOf('Cannot open C:/Users/First Last/AppData/Local/Skyrim Special Edition/Plugins.txt');
+    check("R1 scrub: 'C:/Users/First Last/...' with forward slashes too", !/First|Last|Users|AppData/.test(winFwd) && /m=Error: Cannot open Plugins\.txt$/.test(winFwd), winFwd);
+    const nix = cerrOf("EACCES: permission denied, open '/home/a b/.local/share/Steam/x.log'");
+    check("R1 scrub: '/home/a b/...' leaves no 'a' or 'b' word and no folder in the cerr line", !word(nix, 'a') && !word(nix, 'b') && !/home|local|Steam/.test(nix)
+      && / open 'x\.log'$/.test(nix), nix);
+    const named = cerrOf("Cannot load D:\\Games\\Fink Winky's Skyrim\\Data\\a.esp");
+    check("R1 scrub: 'D:\\Games\\<Name>'s Skyrim\\...' leaves no part of the name", !/Fink|Winky|Games|Skyrim|Data/.test(named) && /m=Error: Cannot load a\.esp$/.test(named), named);
+    const two = D.scrubText("open 'C:\\a b\\x.ini' failed\nthen /home/c d/y.txt too", 160);
+    check('R1 scrub: a line break ends a path run, the text between two paths stays', two === "open 'x.ini' failed then y.txt too", two);
+    check('R1 scrub: ordinary messages are unchanged', D.scrubText("Cannot read properties of undefined (reading 'f')", 160) === "Cannot read properties of undefined (reading 'f')"
+      && D.scrubText('3/19 sliders, a b', 160) === '3/19 sliders, a b' && D.scrubText('x is not a function', 160) === 'x is not a function');
+    const slow = (fn) => { const t0 = process.hrtime.bigint(); fn(); return Number(process.hrtime.bigint() - t0) / 1e6; };
+    const parens = ')'.repeat(80000) + 'x', dots = '.'.repeat(80000) + 'x';
+    const ms1 = slow(() => D.scrubText(parens, D.ERROR_MESSAGE_MAX)), ms2 = slow(() => D.scrubText(dots, D.ERROR_MESSAGE_MAX));
+    const ms3 = slow(() => D.scrubText(parens, D.DIAG_LINE_MAX)), ms4 = slow(() => cerrOf(parens));
+    check('R1 scrub: an 80,000-character ")))...x" or "...x" token is scrubbed in under 50 ms (the game thread never stalls)',
+      ms1 < 50 && ms2 < 50 && ms3 < 50 && ms4 < 50, [ms1, ms2, ms3, ms4].map((x) => Math.round(x * 10) / 10));
+    // Found with probe-frames.js: the frame regex is quadratic too, on an "at ..." line that only an error message can carry
+    const longAt = 'Error: x\n    at ' + ' ( '.repeat(26667) + ':x\n    at g (C:\\Users\\P\\skymp5-client.js:5:6)';
+    let fr = [];
+    const ms5 = slow(() => { fr = D.stackFrames(longAt); });
+    const ms6 = slow(() => { const d = new D.ErrorDigest(D.DBO_CLIENT_VERSION); const e = new Error('x'); e.stack = longAt; d.add('on:update', e); d.drain(5000000); });
+    check('R1 scrub: an 80,000-character "at ..." line in a stack costs under 50 ms and the real frame after it is still read',
+      ms5 < 50 && ms6 < 50 && fr.length === 1 && fr[0] === 'g@b:5:6', [ms5, ms6, fr]);
+  }
   const stack = ['TypeError: x is undefined',
     '    at RacemenuPresetService.capture (C:\\Users\\SomePlayer\\Skyrim\\Data\\Platform\\Plugins\\skymp5-client.js:21243:15)',
     '    at Object.onUpdate (C:\\Users\\SomePlayer\\Skyrim\\Data\\Platform\\Plugins\\skymp5-client.js:21212:9)',

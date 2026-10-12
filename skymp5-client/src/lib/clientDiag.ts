@@ -67,16 +67,25 @@ const lastPart = (token: string): string => {
   return `${lead}${parts.length ? parts[parts.length - 1] : ""}${tail}`;
 };
 
-// One line of printable text without paths, at most `max` characters
+// Everything from a path's first separator to its last on one line: a user or folder name with spaces in it ("C:\Users\A B\",
+// "/home/a b/", "D:\Games\N's Skyrim\") is inside the run, so only the file name is left. It runs before the control
+// characters become spaces, so a line break ends a run (10 Oct review, client-code required change 1)
+const PATH_RUN = /(?:\b[A-Za-z]:|file:\/\/\/?|\\\\)?[\\/][^"`<>|\r\n]*[\\/]/g;
+
+// One line of printable text without paths, at most `max` characters. The input is cut to max * 8 first, so a very long
+// message costs no more than a short one (lastPart is quadratic in a token's length)
 export const scrubText = (raw: unknown, max: number): string => {
-  const s = safeString(raw).replace(/[\u0000-\u001f\u007f]+/g, " ").replace(/\s+/g, " ").trim();
+  const s = safeString(raw).slice(0, max * 8).replace(PATH_RUN, "").replace(/[\u0000-\u001f\u007f]+/g, " ").replace(/\s+/g, " ").trim();
   const out = s.split(" ").map(lastPart).join(" ");
   return out.length > max ? `${out.slice(0, Math.max(0, max - 3))}...` : out;
 };
 
-// The bundle is named "b" in a frame; any other file by its last part
+// The bundle is named "b" in a frame; any other file by its last part. A V8 frame line is a few hundred characters; a longer
+// "at ..." line can only come from an error message and is skipped (the frame regex is quadratic in a line's length)
 const BUNDLE = "skymp5-client.js";
+const FRAME_LINE_MAX = 1024;
 const frameOf = (line: string): string | null => {
+  if (line.length > FRAME_LINE_MAX) return null;
   const m = /^\s*at\s+(?:(.*?)\s+\()?(.*?):(\d+):(\d+)\)?\s*$/.exec(line);
   if (!m) return null;
   const fn = (m[1] || "").replace(/^(?:async |new )/, "").replace(/^Object\./, "").slice(0, 40) || "?";
