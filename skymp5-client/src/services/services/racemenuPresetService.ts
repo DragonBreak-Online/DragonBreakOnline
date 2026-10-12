@@ -10,7 +10,7 @@ import { isGuardedActor, isGuardedRace } from "../../sync/beastRaces";
 import { Appearance } from "../../sync/appearance";
 import {
   ApplyLedger, ChunkAssembler, FacePreset, applyBlockedBy, boundSculpt, buildJslot, chunkText, decodeFace, encodeFace,
-  facePresetFrom, formIdentifierOf, hashText, isEmptyFace, presetFileName, readChunkPacket, PRESET_MAX_CHARS,
+  facePresetFrom, formIdentifierOf, hashText, isEmptyFace, otherRaceFamily, presetFileName, readChunkPacket, PRESET_MAX_CHARS,
 } from "../../sync/racemenuPresetPlan";
 import { logError, logTrace } from "../../logging";
 import { hex, trace } from "../../lib/clientDiag";
@@ -188,7 +188,17 @@ export class RacemenuPresetService extends ClientListener {
     if (!own.face || own.hash === this.selfLoadedHash) return null;
     if (own.hash === this.selfAppliedHash) return { code: "loadfail", text: "the server's face did not load on this character" };
     const gate = this.gateReason(player, own, now);
+    // Another race family's face never goes on (a GM's /chargen or a reroll changed the race): the server decides (10 Oct review G6)
+    if (gate === "race" && this.storedForOtherFamily(player, own)) return null;
     return { code: `notyet${gate ? `-${gate}` : ""}`, text: `the server's face is not back on yet${gate ? ` (${gate})` : ""}` };
+  }
+
+  private storedForOtherFamily(player: Actor, own: CacheEntry): boolean {
+    let race = 0;
+    try { race = (player.getRace()?.getFormID() ?? 0) >>> 0; } catch { return false; }
+    if (otherRaceFamily(race, own.race) !== true) return false;
+    trace(`rmp cap pass=otherrace race=${hex(race)} stored=${hex(own.race)}`);
+    return true;
   }
 
   private gateReason(actor: Actor, entry: CacheEntry, now: number): string {

@@ -326,6 +326,39 @@ const bundle = async (rel, dir) => {
   step(S, 1100, 8);
   check('C4: a new connection asks again (off is not latched for the game process)', selfGets().length === 1, W.packets);
 
+  // ---- 10 Oct review G6: a stored face of another race family never goes on, so it must not hold every capture ----
+  // A spawn with the player on `race` and the server's face (made on RACE, a Nord) delivered
+  const spawnedOn = (race) => {
+    clear();
+    W.me = ME; W.actors[0x14] = { race, loaded: true, combat: false }; W.loadResult = true;
+    const S2 = make(M.RacemenuPresetService, natives);
+    step(S2, 1100, 7);
+    serverFace(S2);
+    step(S2, 1100);
+    runWorks();
+    return S2;
+  };
+  W.savedJslot = jslotWith(-0.6, true);
+  S = spawnedOn(0x13741);
+  editor(S);
+  check('G6: a Nord face, the character now a Breton (a GM\'s /chargen): the face is never loaded', loads().length === 0, loads().length);
+  check('G6: ...an editor close is not held: the face goes up with the new race and the server decides', puts().length === 1
+    && puts()[0].hash === EDIT.hash && puts()[0].race === 0x13741, [puts(), W.diag.slice(-2)]);
+  check('G6: ...traced as passed for another race family', TR.includes('rmp cap pass=otherrace race=13741 stored=13746'), TR.filter((l) => /^rmp cap/.test(l)).slice(-3));
+  S = spawnedOn(0x88794);
+  editor(S);
+  check('G6: the same family (a Nord face on a Nord vampire): still held until the face is on', puts().length === 0
+    && W.diag.some((l) => /capture held, the server's face is not back on yet \(race\)/.test(l)), W.diag.slice(-2));
+  S = spawnedOn(0x67cd8);
+  editor(S);
+  check('G6: a race the server does not list (ElderRace): held as before', puts().length === 0
+    && W.diag.some((l) => /capture held, the server's face is not back on yet \(race\)/.test(l)), W.diag.slice(-2));
+  const fam = P.otherRaceFamily;
+  check('G6: the plan: a race and its vampire are one family, a child race or another race is not, an unlisted race is unknown',
+    typeof fam === 'function' && fam(0x13746, 0x88794) === false && fam(0x88794, 0x13746) === false && fam(0x13741, 0x13746) === true
+    && fam(0x13746, 0x2c65b) === true && fam(0x13746, 0x13746) === false && fam(0x67cd8, 0x13746) === null && fam(0, 0x13746) === null);
+  W.actors[0x14] = { race: RACE, loaded: true, combat: false };
+
   // ---- C1: the head the editor left is sent as it is ----
   {
     clear();

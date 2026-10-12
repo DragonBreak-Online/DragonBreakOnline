@@ -277,6 +277,34 @@ export const applyBlockedBy = (g: ApplyGate): string | null => {
   return null;
 };
 
+// The server's race families (racemenupresets.js sameFamily over racedefaultheads.json): a race and its vampire variant
+const RACE_FAMILIES: number[][] = [
+  [0x13740, 0x8883a], // Argonian
+  [0x13741, 0x8883c], // Breton
+  [0x13742, 0x8883d], // Dark Elf
+  [0x13743, 0x88840], // High Elf (the Maormer on the High Elf record too)
+  [0x13744, 0x88844], // Imperial
+  [0x13745, 0x88845], // Khajiit
+  [0x13746, 0x88794], // Nord
+  [0x13747, 0xa82b9], // Orc
+  [0x13748, 0x88846], // Redguard
+  [0x13749, 0x88884], // Wood Elf
+  [0x2c65c], [0x2c659], [0x2c65b], [0x2c658], // the Breton, Imperial, Nord and Redguard children
+  [0x131f0], // Dremora
+];
+const FAMILY_OF: Record<number, number> = {};
+for (const family of RACE_FAMILIES) for (const id of family) FAMILY_OF[id] = family[0];
+
+// A face stored on another family's race never goes on this one; null when a race is not in the list
+export const otherRaceFamily = (now: number, stored: number): boolean | null => {
+  const a = now >>> 0, b = stored >>> 0;
+  if (!a || !b) return null;
+  if (a === b) return false;
+  const fa = FAMILY_OF[a], fb = FAMILY_OF[b];
+  if (fa === undefined || fb === undefined) return null;
+  return fa !== fb;
+};
+
 // Which copies need their face: one go per local copy and preset hash. A copy that respawns has a new local id and a
 // fresh base (sync/appearance.ts createNpc), so it is due again.
 export class ApplyLedger {
