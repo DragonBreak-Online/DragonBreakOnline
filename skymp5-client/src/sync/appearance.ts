@@ -183,7 +183,7 @@ export const applyAppearance = (appearance: Appearance): ActorBase => {
 const HEADPART_EYES = 2;
 
 // The eyes in a look (BGSHeadPart type 2, not an extra part), or null
-const eyesOf = (appearance: Appearance): HeadPart | null => {
+export const eyesOf = (appearance: Appearance): HeadPart | null => {
   for (const id of appearance.headpartIds) {
     const part = HeadPart.from(Game.getFormEx(id));
     if (part && !part.isExtraPart() && part.getType() === HEADPART_EYES) return part;

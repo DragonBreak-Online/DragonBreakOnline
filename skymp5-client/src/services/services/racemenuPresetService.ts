@@ -6,6 +6,7 @@ import { CustomPacketMessage } from "../messages/customPacketMessage";
 import { parseCustomPacket, sendCustomPacket } from "./customPacketUtil";
 import { getViewFromStorage } from "../../view/worldViewMisc";
 import { queueCopyNiNodeWork, queuePlayerNiNodeWork } from "../../view/niNodeQueue";
+import * as faceSync from "../../view/faceSyncDiag";
 import { isGuardedActor, isGuardedRace } from "../../sync/beastRaces";
 import { Appearance } from "../../sync/appearance";
 import {
@@ -318,9 +319,9 @@ export class RacemenuPresetService extends ClientListener {
     const blocked = this.gateFor(actor, entry, Date.now());
     if (blocked) return;
     const headParts = this.headPartsOf(c.appearance.headpartIds || []);
-    if (!headParts) { this.ledger.markDone(c.localId, entry.hash); this.diag(`preset: ${c.remoteId.toString(16)} head parts unresolved, face skipped`); return; }
+    if (!headParts) { this.ledger.markDone(c.localId, entry.hash); faceSync.preset(c.localId, "headPartsUnresolved"); this.diag(`preset: ${c.remoteId.toString(16)} head parts unresolved, face skipped`); return; }
     const { face, dropped } = boundSculpt(entry.face, (host) => natives.getTriVertexCount(host));
-    if (dropped.length) this.diag(`preset: ${c.remoteId.toString(16)} sculpt not applied to ${dropped.join(", ")}`);
+    if (dropped.length) { faceSync.preset(c.localId, "sculptDropped"); this.diag(`preset: ${c.remoteId.toString(16)} sculpt not applied to ${dropped.join(", ")}`); }
     if (isEmptyFace(face)) { this.ledger.markDone(c.localId, entry.hash); return; }
     const jslot = buildJslot(face, headParts, c.appearance.weight);
     const name = presetFileName(c.remoteId);
@@ -329,9 +330,9 @@ export class RacemenuPresetService extends ClientListener {
     this.ledger.markDone(localId, hash);
     queueCopyNiNodeWork(localId, (copy) => {
       // The id must still be this player's copy, and the face still theirs: a destroyed copy's id can be reused
-      if (!this.stillOwns(localId, remoteId, hash)) return false;
-      if (this.gateFor(copy, entry, Date.now())) { this.ledger.forget(localId); return false; }
-      if (!this.load(copy, name, jslot, natives)) return false;
+      if (!this.stillOwns(localId, remoteId, hash)) { faceSync.preset(localId, "notOwned"); return false; }
+      if (this.gateFor(copy, entry, Date.now())) { this.ledger.forget(localId); faceSync.preset(localId, "gated"); return false; }
+      if (!this.load(copy, name, jslot, natives)) { faceSync.preset(localId, "loadFailed"); return false; }
       this.afterLoad(localId, `${remoteId.toString(16)} face on ${localId.toString(16)}, ${hash}`);
       return true;
     });

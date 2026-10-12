@@ -5,7 +5,9 @@ import { beastBodyAppearance, beastBodyOf } from "../sync/beastBody";
 import { TAKEOVER_RECHECK_SECONDS, isHostileTakeover, takeoverLine } from "./takeoverDiag";
 import { setDefaultAnimsDisabled, applyAnimation, restoreSitCollisionIfMoving, isInSitPose, clearSitPose, setRefrCollision } from "../sync/animation";
 import { isVampireLordRace, noteVampireLordAnim } from "../sync/vampireLordAnimDiag";
-import { Appearance, applyAppearance } from "../sync/appearance";
+import { Appearance, applyAppearance, eyesOf } from "../sync/appearance";
+import * as faceSync from "./faceSyncDiag";
+import { installFaceSyncReport } from "./faceSyncReport";
 import { isBadMenuShown, applyEquipment, npcSidearmFor } from "../sync/equipment";
 import { RespawnNeededError } from "../lib/errors";
 import { FormModel } from "./model";
@@ -338,6 +340,10 @@ export class FormView {
             this.ready = true;
             this.spawnMoment = Date.now();
             noteCopyBorn(this.refrId);
+            if (model.appearance) {
+              installFaceSyncReport();
+              faceSync.born(this.refrId, this.remoteRefrId || 0, model.appearance.name, (model.appearance.headpartIds || []).length, !!eyesOf(model.appearance), this.spawnMoment);
+            }
           });
         } else {
           printConsole("Unable to triggerSpawnProcess for null refr");
@@ -401,6 +407,7 @@ export class FormView {
     const refrId = this.refrId;
     const remoteRefrId = this.remoteRefrId;
     if (refrId >= 0xff000000) dropCopyNiNodeWork(refrId);
+    faceSync.destroyed(refrId, Date.now());
     if (remoteRefrId) {
       const rawAll = storage["allCompanionIds"];
       if (Array.isArray(rawAll) && rawAll.includes(remoteRefrId)) {
@@ -790,12 +797,16 @@ export class FormView {
           screenPoint[1] < 1 &&
           screenPoint[2] < 1;
         // Not while a relayed Ragdoll plays on it: it goes out once that is over (ragdollHold.ts)
+        if (isOnScreen && isOnScreen != this.isOnScreen && niNodeWaitsForRagdoll(ragdolledAtOf(this.refrId), Date.now())) faceSync.skip(this.refrId, "ragdoll");
         if (isOnScreen != this.isOnScreen && !niNodeWaitsForRagdoll(ragdolledAtOf(this.refrId), Date.now())) {
           this.isOnScreen = isOnScreen;
+          if (isOnScreen && this.isBeastCopy(model)) faceSync.skip(this.refrId, "beast");
+          else if (isOnScreen && Date.now() - this.lastNiNodeUpdateMs < FormView.niNodeUpdateMinIntervalMs) faceSync.skip(this.refrId, "interval");
           // Never on a beast copy: the queued 3D reset holds a raw actor pointer and the beast graph is the one that crashed
           if (isOnScreen && !this.isBeastCopy(model) && Date.now() - this.lastNiNodeUpdateMs >= FormView.niNodeUpdateMinIntervalMs) {
             this.lastNiNodeUpdateMs = Date.now();
             noteActorCall("ninode", this.refrId);
+            faceSync.request(actor.getFormID(), this.lastNiNodeUpdateMs);
             queueCopyNiNodeUpdate(actor.getFormID());
             // The rebuilt 3D drops effect shaders
             if (this.adminShaderOn) {
