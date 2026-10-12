@@ -676,7 +676,7 @@ const helpLine = (n) => { const c = commands.get(n); return `/${n}${c && c.help 
 // power inside a player command. An entry shows only while its command exists; an admin-only command missing here is
 // listed under Other staff tools.
 const STAFF_HELP = [
-  { key: 'players', title: 'Players', items: ['kick', 'tp', 'fixloc', 'chargen', 'rename', 'sethunger', 'wipechars',
+  { key: 'players', title: 'Players', items: ['kick', 'discipline', 'tp', 'fixloc', 'chargen', 'rename', 'sethunger', 'wipechars',
     ['tokens', '<player|#TAG>: someone\'s Patreon tier and identity rerolls left'], 'stats', 'charstats'] },
   { key: 'calls', title: 'GM calls from players', items: [['gm list', '[all]: the open calls (all: and the last ten closed)'],
     ['gm take', '<n>: the call is yours; the player is told you are on the way, other staff who took it'],
@@ -2097,6 +2097,7 @@ const onCharacterReady = (userId, a) => {
     try { if (globalThis.__dboGearSwapLogin) globalThis.__dboGearSwapLogin(a); } catch (e) { log('gear swap login failed', e.message); }
     try { if (globalThis.__dboSprStripLogin) globalThis.__dboSprStripLogin(a); } catch (e) { log('spr strip login failed', e.message); }
     try { if (globalThis.__dboRestitutionLogin) globalThis.__dboRestitutionLogin(a); } catch (e) { log('restitution login failed', e.message); }
+    try { if (globalThis.__dboDisciplineLogin) globalThis.__dboDisciplineLogin(a); } catch (e) { log('discipline login failed', e.message); }
     try { if (globalThis.__dboBusinessLogin) globalThis.__dboBusinessLogin(a); } catch (e) { log('business login failed', e.message); }
     try { if (globalThis.__dboJailLogin) globalThis.__dboJailLogin(a); } catch (e) { log('jail login failed', e.message); }
     try { if (globalThis.__dboStaffDiagLogin) globalThis.__dboStaffDiagLogin(a); } catch (e) { log('staff trace on login failed', e.message); }
@@ -6644,6 +6645,13 @@ try {
   delete require.cache[RESTITUTION_JS];
   require(RESTITUTION_JS)({ mp, log, personal, audit, who, cfg, every, stopTimer, onlineActors });
 } catch (e) { log('restitution.js failed to load:', e.stack || e.message); globalThis.__dboRestitutionLogin = null; globalThis.__dboRestitutionContainer = null; }
+// ---- staff discipline: warnings, strikes, suspensions per account (server\discipline.js, config "discipline"; Nate, 12 Oct) ----
+try {
+  const DISCIPLINE_JS = path.resolve('discipline.js');
+  delete require.cache[DISCIPLINE_JS];
+  require(DISCIPLINE_JS)({ mp, log, personal, audit, who, display, profileOf, onlineActors, registerChatCommand, isAdmin, isLeadStaff,
+    findAnyByName, sendPacket, userOf, every, cfg });
+} catch (e) { log('discipline.js failed to load:', e.stack || e.message); globalThis.__dboDisciplineLogin = null; }
 // ---- raids and pillage (server\raids.js, WAR_DESIGN.md section 5) -----------------------------------------------------------
 try {
   const RAIDS_JS = path.resolve('raids.js');
