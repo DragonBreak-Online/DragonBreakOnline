@@ -56,7 +56,9 @@ function writeState(state, file = STATE_FILE) {
   }
 }
 
-const isOwnersOnly = channel => byId.get(String(channel?.name || '').split('-')[0])?.ownersOnly === true
+// By name, or by category so a renamed channel fails closed (its transcript stays out of the staff channel)
+const isOwnersOnly = channel => byId.get(String(channel?.name || '').split('-')[0])?.ownersOnly === true ||
+  (!!channel?.parentId && TYPES.some(t => t.ownersOnly && (readState().categories || {})[t.id] === channel.parentId))
 
 const channelLink = (id, name) => (id ? `<#${id}>` : `#${name}`)
 

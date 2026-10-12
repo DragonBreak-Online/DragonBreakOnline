@@ -200,3 +200,20 @@ test('closing a Report a GM ticket logs no closer, since the reporter can press 
   assert.strictEqual((await close('rep-0005-someone', { id: '1554000000000000404', tag: 'staffer' })).fileOnly, false)
   assert.ok(audits.some(l => /closed #rep-0005-someone by staffer \(1554000000000000404\)/.test(l)), audits.join('\n'))
 })
+
+test('a Report a GM channel an Owner renamed still closes as owners-only, found by its category (review, 12 Oct)', async () => {
+  fs.writeFileSync(realState, JSON.stringify({ counter: 9, categories: { gmr: '1554000000000000310', rep: '1554000000000000311' }, panelMessageId: null }))
+  const close = async (name, parentId) => {
+    let opts
+    const channel = { id: '1554000000000000204', name, parentId, delete: async () => {}, send: async () => {} }
+    await tickets.closeTicket({ channel, user: { id: '1554000000000000405', tag: 'reporter' }, reply: async () => {} },
+      { wait: 0, transcripts: { save: async (_c, _u, o) => { opts = o; return `saved as ${name}.json` } } })
+    return opts
+  }
+  audits.length = 0
+  assert.strictEqual((await close('harassment-case', '1554000000000000310')).fileOnly, true)
+  assert.ok(audits.length && audits.every(l => !/reporter|1554000000000000405/.test(l)), audits.join('\n'))
+  // A ticket in another category, or in none, is not owners-only
+  assert.strictEqual((await close('rep-0006-someone', '1554000000000000311')).fileOnly, false)
+  assert.strictEqual((await close('chat', undefined)).fileOnly, false)
+})
