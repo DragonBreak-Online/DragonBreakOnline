@@ -216,7 +216,7 @@
    "huntMarkChance": 0.1,
    "infectWerewolf": 0.005,
    "vampireRestoration": { "_comment": "Nate, 11 Oct (a house rule): a vampire cannot cast Restoration's healing spells (restoration-healing.json) nor read, buy or be taught one, and healing magic does nothing for a vampire. Potions still heal; the anti-undead spells still burn. false turns it all off.", "enabled": true },
-   "feedPair": { "_comment": "The standing bite played for both players (client 0.3.71). Off until Nate has seen it in game; the release checks it is written here as false.", "enabled": false },
+   "feedPair": { "_comment": "The standing bite played for both players (client 0.3.71+). On from release 1012 (Nate, 12 Oct: \"turn them all on\"). Rollback: enabled false (hot reload); /feedpair off switches it off until the next restart.", "enabled": true },
    "rite": {
     "_comment": "The rite mini-game (Blood Fever, Hircine's Hunt, Molag Bal's Embrace, the Great Hunt). Merged key by key with supernatural.js RITE_DEFAULTS, so a partial block like this one keeps rounds, need and leadMs.",
     "_clientJudged": "Jake, 2026-09-30: about half the rite misses of the players we could measure came from lag. A client whose UI names riteJudge (the next client cut) judges each strike at the frame on screen with graceMs and reports it with its own times; the server checks the round (once only), that the press fits the round on the widget's clock and that the report did not arrive sooner than the round could be played, and never reads when it arrived. Today's widgets send no time, so they are still judged by arrival, now with one continuous window (lateWindowMs back, earlyWindowMs ahead) and legacyExtraMs more on the round's timer. That holds only up to about 400 ms of round trip with no packet lost (review LAT-2, 2026-10-01: at 1 s, 9 in 100 centre-line Embraces survived), so legacyDeadly 'safe' puts no such client through a rite that kills: Molag Bal's Embrace and the Great Hunt are declined with a line about the update, and a fever rite it loses breaks the fever without killing (the carrier lives, not turned). 'allow' lets the arrival-judged rites kill as before. replayCheck: 'log' lets a claimed hit the press time does not bear out stand with a RITE-MISMATCH audit line, 'refuse' scores the replay. ROLLBACK: commit clientJudged false to this file on origin/server and ship it (a release, or dev-server.sh deploy-gameplay --hotfix); the three-sample arrival check and the 7.7 s timer come back for every client, and legacyDeadly no longer applies (today's rite). Not as a live-only edit: every release and hotfix copies this file over the live one and keeps only admins, so a live edit lasts only until the next deploy.",
@@ -866,8 +866,8 @@
   "trace": { "perMinute": 20, "perHour": 1500 }
  },
  "war": {
-  "_comment": "War and raids stay off until the holds and factions are set up during the alpha (Nate, 2026-09-26). colours: the Realm map's lore colour per faction (Nate's picks; the cults' and the Vigil's chosen by the Prince's or the order's motif); \"base/stripe\" draws a stripe (the Companions). seats: where a faction that is not a hold musters to declare, { id: { name, world, pos, radius, cells } }.",
-  "enabled": false,
+  "_comment": "War and raids: on from release 1012 (Nate, 12 Oct: \"turn them all on\"; closed during the alpha from 2026-09-26). Rollback: enabled false (hot reload) closes declarations and battles; the map, owners and treaties work either way; raids.enabled the same for raids. colours: the Realm map's lore colour per faction (Nate's picks; the cults' and the Vigil's chosen by the Prince's or the order's motif); \"base/stripe\" draws a stripe (the Companions). seats: where a faction that is not a hold musters to declare, { id: { name, world, pos, radius, cells } }.",
+  "enabled": true,
   "seats": {},
   "colours": {
    "hold-whiterun": "#e8e4d8", "hold-riften": "#6b3fa0", "hold-solitude": "#7a1616", "hold-windhelm": "#2f5fb3", "hold-markarth": "#1f8a57",
@@ -882,7 +882,7 @@
    "cult-nocturnal": "#1b1f3a", "cult-peryite": "#9bb33c", "cult-sanguine": "#7b1e3a", "cult-sheogorath": "#b0308f", "cult-vaermina": "#5d4b8a"
   }
  },
- "raids": { "enabled": false },
+ "raids": { "_comment": "Raids and pillage (raids.js, WAR_DESIGN.md section 5): on from release 1012 with war (Nate, 12 Oct: \"turn them all on\"). Rollback: enabled false (hot reload). The 3-day cooldown is kept in memory only: a restart resets it.", "enabled": true },
  "economy": { "_comment": "Weekly taxes and wages (economy.js). On from 2026-09-28 (Nate: \"economy needs to fully be turned on\"); the review B2 guards are in economy.js.", "enabled": true,
   "_dominionStipend": "Nate, 11 Oct: the Aldmeri Dominion pays its Thalmor in the Empire a stipend each weekly reckoning (economy.js), into the dominionStipendTo treasury before wages, in the faction report as stipend. It is NEW gold, made by no one's work, so it is kept modest; 0 turns it off. Hot reload.",
   "dominionStipend": 300, "dominionStipendTo": "thalmor" },

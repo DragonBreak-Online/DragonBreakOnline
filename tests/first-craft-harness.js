@@ -98,5 +98,13 @@ const asrc = fs.readFileSync(path.join(SERVER, 'alchemy.js'), 'utf8');
 ok('alchemy.js reports what a brew credited to skillrates.js', /__dboSkillRateCredited\(a, 'alchemist', 'award', \{ key: Number\(potionId\) >>> 0 \}, units\)/.test(asrc));
 delete globalThis.__dboMasteryCreditsHook;
 
+// ---- with the racial overhaul on (12 Oct): the race's boost first, then the first-craft bonus, both on the skill's rate ----
+const RB = 0xff000202;
+globalThis.__dboRaceSkillRate = (a, skill, kind) => ((a >>> 0) === RB && skill === 'blacksmith' && kind !== 'award' ? 1.15 : 1);
+rate = load({ enabled: true, rates: { blacksmith: 2 }, firstCraft: { enabled: true, rate: 3, fullFor: 25, skills: ['blacksmith'] } });
+ok('an Orc smith\'s new forge item: rate 2 x race 1.15 x first-craft 3 = 6.9; the same item again 2.3', near(rate(RB, 'blacksmith', 'craft', { recipeId: 0x170 }), 6.9) && near(rate(RB, 'blacksmith', 'craft', { recipeId: 0x170 }), 2.3));
+ok('...another race on the same new item: 2 x 3 = 6', near(rate(A, 'blacksmith', 'craft', { recipeId: 0x171 }), 6));
+delete globalThis.__dboRaceSkillRate;
+
 console.log(fails ? `${fails} failed` : 'all passed');
 process.exit(fails ? 1 : 0);
