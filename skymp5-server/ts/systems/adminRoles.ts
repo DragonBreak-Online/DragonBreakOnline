@@ -74,8 +74,11 @@ export function isTrialGm(mp: any, actorId: number, cfg: AdminRoleConfig): boole
   return isTrialGmFrom(profileOn(mp, actorId), rolesOn(mp, actorId), cfg);
 }
 
-// The F7 panel for a Trial GM: the menu (the player list, without addresses or hardware ids), going to a player, the
-// Invisible and Ghost modes and a rename. Every other request and action is refused (AdminSystem.customPacket)
-export const TRIAL_GM_ACTIONS = new Set(["teleportTo", "rename"]);
+// The F7 panel for a Trial GM: the menu (the player list, without addresses or hardware ids), going to a player or to a
+// teleport location (Teleport tab, Nate 12 Oct), the Invisible and Ghost modes and a rename. Every other request and
+// action is refused (AdminSystem.customPacket)
+export const TRIAL_GM_ACTIONS = new Set(["teleportTo", "teleportLoc", "rename"]);
 export const TRIAL_GM_MODES = new Set(["invis", "ghost"]);
-export const TRIAL_GM_TABS = ["debug", "players", "modes"];
+export const TRIAL_GM_TABS = ["debug", "players", "teleport", "modes"];
+// Data requests a Trial GM may make besides the menu: the Teleport tab's list of locations
+export const TRIAL_GM_REQUESTS = new Set(["adminLocationsRequest"]);
