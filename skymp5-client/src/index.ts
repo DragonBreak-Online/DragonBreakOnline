@@ -83,6 +83,7 @@ import { VoiceService } from "./services/services/voiceService";
 import { AdminMenuService } from "./services/services/adminMenuService";
 import { PlacementService } from "./services/services/placementService";
 import { AdminModeService } from "./services/services/adminModeService";
+import { ExecutionService } from "./services/services/executionService";
 // U: the player menu, the server's help topics as a panel (Nate, 2026-09-28)
 import { PersonalMenuService } from "./services/services/personalMenuService";
 import { ChatService } from "./services/services/chatService";
@@ -201,6 +202,7 @@ const main = () => {
       new BountyBoardService(sp, controller),
       new DboRelayService(sp, controller),
       new DboGlowService(sp, controller),
+      new ExecutionService(sp, controller),
       new DboRefAnimService(sp, controller),
       new NpcMoodService(sp, controller),
       new NpcSightService(sp, controller),
