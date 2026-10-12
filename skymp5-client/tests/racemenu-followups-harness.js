@@ -359,6 +359,44 @@ const bundle = async (rel, dir) => {
     && fam(0x13746, 0x2c65b) === true && fam(0x13746, 0x13746) === false && fam(0x67cd8, 0x13746) === null && fam(0, 0x13746) === null);
   W.actors[0x14] = { race: RACE, loaded: true, combat: false };
 
+  // ---- 10 Oct review: a refusal after the 15 s confirm, and a refusal while a newer face goes up ----
+  S = spawned('face');
+  W.savedJslot = jslotWith(-0.6, true);
+  editor(S);
+  step(S, 1000, 16);
+  clear();
+  deliver(S, { customPacketType: 'dboPresetRefused', hash: EDIT.hash, reason: 'notloaded' });
+  step(S, 1100, 2);
+  runWorks();
+  check('late refusal: the refused face is not put back as the server\'s', !loads().some((c) => JSON.parse(c.file).morphs.custom[0].value === -0.6), loads().length);
+  check('late refusal: ...the server is asked for its face again', selfGets().length === 1 && selfGets()[0].have === '', selfGets());
+  serverFace(S);
+  step(S, 1100);
+  runWorks();
+  check('late refusal: ...its answer goes on the player', loads().length === 1 && JSON.parse(loads()[0].file).morphs.custom[0].value === 0.4, loads().length);
+  W.packets = [];
+  editor(S);
+  check('late refusal: ...and the same edit at the next close goes up again (not "unchanged")', puts().length === 1 && puts()[0].hash === EDIT.hash, [puts(), W.diag.slice(-2)]);
+  check('late refusal: traced as an ask, marked late', TR.includes(`rmp refused h=${EDIT.hash} why=notloaded restore=ask late=1`), TR.filter((l) => /refused/.test(l)).slice(-2));
+
+  S = spawned('face');
+  W.savedJslot = jslotWith(-0.6, true);
+  editor(S);
+  W.savedJslot = big;
+  clear();
+  W.menuOpen = true; step(S, 100); W.menuOpen = false; globalThis.__dboRaceMenuClosedAt = NOW; step(S, 1000, 4); step(S, 300, 2);
+  const bigTotal = puts().length ? puts()[0].n : 0;
+  deliver(S, { customPacketType: 'dboPresetRefused', hash: EDIT.hash, reason: 'gold' });
+  deliver(S, { customPacketType: 'dboPresetRefused', hash: '', reason: 'clear' });
+  step(S, 300, bigTotal + 4);
+  step(S, 1100, 2);
+  runWorks();
+  check('in flight: a refusal of the older face does not put the server\'s face back over the newer one going up', loads().length === 0, loads().length);
+  check('in flight: ...neither it nor an empty-face refusal stops the newer upload', bigTotal > 4 && puts().length === bigTotal, [puts().length, bigTotal]);
+  check('in flight: traced as left in flight', TR.includes(`rmp refused h=${EDIT.hash} why=gold restore=inflight`)
+    && TR.includes('rmp refused h=empty why=clear restore=inflight'), TR.filter((l) => /refused/.test(l)).slice(-2));
+  W.savedJslot = jslotWith(-0.6, true);
+
   // ---- C1: the head the editor left is sent as it is ----
   {
     clear();

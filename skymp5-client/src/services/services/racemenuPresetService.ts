@@ -324,8 +324,22 @@ export class RacemenuPresetService extends ClientListener {
       trace(`rmp refused h=${h} why=${reason} restore=ignored`);
       return;
     }
+    // Refused after UPLOAD_CONFIRM_MS took it as kept: the server's face is not known here, so it is asked for again
+    const late = !!this.serverSelf && this.serverSelf.hash === hash;
+    if (late) this.serverSelf = null;
+    const lateTag = late ? " late=1" : "";
+    // The newest upload (this.upload is always newer than this.sentUpload) is another face: it stands by its own answer
+    const newest = this.upload || this.sentUpload;
+    if (newest && newest.hash !== hash) {
+      if (this.sentUpload && this.sentUpload.hash === hash) this.sentUpload = null;
+      this.diag(`preset: the server refused ${hash || "the empty face"} (${reason}); a newer face is going up, left as it is`);
+      trace(`rmp refused h=${h} why=${reason} restore=inflight${lateTag}`);
+      return;
+    }
     this.lastSentHash = undefined;
-    if (this.upload && (hash === "" || this.upload.hash === hash)) this.upload = null;
+    // An older upload not yet taken as kept: what the server holds is not known
+    if (this.upload && this.sentUpload && this.sentUpload.hash !== hash) this.serverSelf = null;
+    if (this.upload && this.upload.hash === hash) this.upload = null;
     this.sentUpload = null;
     let restore = "none", code = "noself";
     if (this.selfRemoteId) {
@@ -343,7 +357,7 @@ export class RacemenuPresetService extends ClientListener {
       this.selfLoadedHash = "";
     }
     this.diag(`preset: the server refused ${hash || "the empty face"} (${reason}); ${restore}`);
-    trace(`rmp refused h=${h} why=${reason} restore=${code}`);
+    trace(`rmp refused h=${h} why=${reason} restore=${code}${lateTag}`);
   }
 
   private store(actor: number, entry: CacheEntry): void {
