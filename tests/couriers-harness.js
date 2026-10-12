@@ -426,6 +426,54 @@ at(K, 'a764b:bsheartland.esm', [64227.91, 156549.83, -4624.79]);
 told.length = 0;
 commands.get('courier').fn(K, 'deliver');
 check('the chat fallback hands it in at the drop point', job(qid).state === 'delivered' && count(K, GOLD) === before2 + 50);
+
+// ---- courier ranks (Nate, 12 Oct): deliveries raise the rank; a rank sets parcels carried, the largest job, the robbery
+// chance and routes to other holds. Two test tiers so a rank is reached in two deliveries ----
+cfg.couriers.tiers = [
+  { name: 'Novice', deliveries: 0, carry: 1, maxValue: 100, robChance: 0.5, boards: false },
+  { name: 'Apprentice', deliveries: 2, carry: 2, maxValue: 0, robChance: 0.25, boards: true },
+];
+cfg.couriers.countMinPay = 20; cfg.couriers.countPerSenderPerDay = 2;
+CA = load();
+reset();
+const DROP = [64227.91, 156549.83, -4624.79];
+const rankOf = (a) => CA.view(a).courier.rank;
+const post = (pay, items) => { ui('courierPost', S, 'drop:aleswell', R, pay, 0, JSON.stringify(items)); return lastId(); };
+const deliverAt = (a) => { at(a, 'a764b:bsheartland.esm', DROP); commands.get('courier').fn(a, 'deliver'); at(a, 'a764b:bsheartland.esm', [0, 0, 0]); };
+check('a new courier is a Novice: 1 parcel, jobs up to 100 gold', rankOf(MATE).name === 'Novice' && rankOf(MATE).carry === 1 && rankOf(MATE).maxValue === 100 && rankOf(MATE).next.name === 'Apprentice', rankOf(MATE));
+const cheapA = post(50, [[INGOT, 1]]), rich = post(50, [[SWORD, 3]]), cheapB = post(50, [[INGOT, 1]]);
+r = ui('courierTake', MATE, rich);
+check('a Novice cannot take goods worth 135 (cap 100)', r.kind === 'refused' && /worth 135 gold.*up to 100/.test(r.text) && job(rich).state === 'open', r);
+check('a Novice takes a 20-gold job', ui('courierTake', MATE, cheapA).kind === 'sent' && job(cheapA).state === 'carried');
+r = ui('courierTake', MATE, cheapB);
+check('...and carries only one parcel at a time', r.kind === 'refused' && /carry 1 parcel at once/.test(r.text), r);
+deliverAt(MATE);
+check('a delivery counts toward the rank', job(cheapA).state === 'delivered' && rankOf(MATE).delivered === 1 && rankOf(MATE).name === 'Novice', rankOf(MATE));
+const tiny = post(10, [[INGOT, 1]]); ui('courierTake', MATE, tiny); deliverAt(MATE);
+check('a job paying under 20 gold is delivered but not counted', job(tiny).state === 'delivered' && rankOf(MATE).delivered === 1, rankOf(MATE));
+told.length = 0;
+ui('courierTake', MATE, cheapB); deliverAt(MATE);
+check('the second counted delivery makes an Apprentice, and the courier is told', rankOf(MATE).name === 'Apprentice' && rankOf(MATE).delivered === 2 && told.some(([a, t]) => a === MATE && /You are now an Apprentice courier: 2 parcels at once, jobs worth any amount, routes to other holds/.test(t)), [rankOf(MATE), told]);
+check('an Apprentice takes the 135-gold job and a second parcel', ui('courierTake', MATE, rich).kind === 'sent' && ui('courierTake', MATE, post(50, [[INGOT, 1]])).kind === 'sent' && CA.view(MATE).courier.rules.maxCarried === 2);
+// robbery: an Apprentice's parcel is taken only below 0.25 (a Novice's below 0.5)
+check('a roll of 0.3 robs a Novice-chance parcel no longer: the Apprentice keeps it', robWith(T, MATE, 0.3) === null && job(rich).state === 'carried');
+check('a roll of 0.2 still robs it', robWith(T, MATE, 0.2) === 'a sealed courier\'s parcel');
+// the same sender counts at most countPerSenderPerDay (2) a day
+const n0 = rankOf(MATE).delivered;
+deliverAt(MATE);
+check('a third counted delivery from the same sender in a day does not count', rankOf(MATE).delivered === n0, rankOf(MATE));
+clock += 25 * HOUR;
+ui('courierTake', MATE, post(50, [[INGOT, 1]])); deliverAt(MATE);
+check('...the next day it counts again', rankOf(MATE).delivered === n0 + 1, rankOf(MATE));
+// routes to other holds (no region lock): a Novice may not, an Apprentice may
+cfg.playtest.enabled = false; CA = load();
+ui('courierPost', S, 'board:whiterun', R, 50, 0, JSON.stringify([[INGOT, 1]])); const far = lastId();
+r = ui('courierTake', R, far);
+check('a Novice may not carry to another hold\'s boards', r.kind === 'refused' && /Routes to other holds are for Apprentice couriers and above/.test(r.text), r);
+check('an Apprentice may', ui('courierTake', MATE, far).kind === 'sent');
+cfg.playtest.enabled = true; delete cfg.couriers.tiers; CA = load();
+check('the default tiers: five ranks, Novice to Master', CA.view(K).courier.rank && ['Novice', 'Apprentice', 'Journeyman', 'Expert', 'Master'].includes(CA.view(K).courier.rank.name), CA.view(K).courier.rank);
+
 fs.writeFileSync(path.join(TMP, 'couriers.json'), '{ not json');
 CA = load();
 check('an unreadable couriers.json turns couriers off and is never overwritten', CA.enabled() === false && fs.readFileSync(path.join(TMP, 'couriers.json'), 'utf8') === '{ not json');
