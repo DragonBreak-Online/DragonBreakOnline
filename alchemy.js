@@ -574,6 +574,17 @@ module.exports = (api) => {
     return n;
   };
 
+  // Using an Arcane Enchanter resends the list on its own, at most once a minute, so nobody has to type /syncenchant: the
+  // game forgets it with a disenchant the server never heard of, and the next use of the table shows it all again
+  const touchedAt = globalThis.__dboEnchTouchedAt || (globalThis.__dboEnchTouchedAt = new Map()); // actorId -> ms
+  globalThis.__dboEnchanterTouched = (target, caster) => {
+    const a = caster >>> 0;
+    if (Date.now() - (touchedAt.get(a) || 0) < 60000 || !isEnchanter(target >>> 0)) return;
+    touchedAt.set(a, Date.now());
+    const n = sendLearned(a);
+    if (n > 0) log(`disenchant: ${display(a)} used an enchanter: ${n} learned effect(s) resent`);
+  };
+
   // CustomEvent prepends the actor: (actor, workbench, result, inputs)
   mp.onCraftUnmatched = (actorId, workbenchId, resultId, inputs) => {
     const a = Number(actorId) >>> 0, wb = Number(workbenchId) >>> 0;

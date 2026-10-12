@@ -165,7 +165,7 @@ const noteTold = (actorId, text) => {
   if (toldCounts.size > 5000) for (const k of toldCounts.keys()) { if (toldCounts.size <= 4000) break; toldCounts.delete(k); }
   if (n === 1 || n === 5 || n % 10 === 0) log(`told ${display(actorId)} (x${n}): ${t.slice(0, 200)}`);
 };
-const personal = (actorId, text) => { try { noteTold(actorId, text); } catch (e) { /* the log line is optional */ } const cap = globalThis.__dboTellCapture; if (cap && cap.a === (actorId >>> 0)) cap.lines.push(String(text)); deliver(actorId, `[[PM]]System|${text}`); };
+const personal = (actorId, text) => { try { noteTold(actorId, text); } catch (e) { /* the log line is optional */ } const cap = globalThis.__dboTellCapture; if (cap && cap.a === (actorId >>> 0)) { cap.lines.push(String(text)); if (cap.quiet) return; } deliver(actorId, `[[PM]]System|${text}`); };
 
 // Survives gamemode hot reloads so players who connected before a reload stay known.
 if (!(globalThis.__dboConnected instanceof Set)) globalThis.__dboConnected = new Set();
@@ -589,10 +589,11 @@ const commands = new Map();
 const registerChatCommand = (name, fn, opts) => commands.set(name.toLowerCase(), { fn, admin: !!(opts && opts.admin), hidden: !!(opts && opts.hidden), help: (opts && opts.help) || '' });
 // The journal's Profile buttons run the chat command itself (journal.js journalAction): the same handler, refusals and
 // cooldowns, the same admin rule. What it tells the player still goes to chat, and comes back here for the journal footer.
-globalThis.__dboRunCommand = (a, name, args) => {
+// quiet: what the command says is kept for the caller and never reaches chat (a journal page reading /players)
+globalThis.__dboRunCommand = (a, name, args, quiet) => {
   const c = commands.get(String(name || '').toLowerCase());
   if (!c || (c.admin && !isAdmin(a))) return null;
-  const cap = { a: a >>> 0, lines: [] };
+  const cap = { a: a >>> 0, lines: [], quiet: !!quiet };
   const prev = globalThis.__dboTellCapture;
   globalThis.__dboTellCapture = cap;
   try { c.fn(a, String(args || '')); } catch (e) { log(`command /${name} from the journal failed`, e.message); cap.lines.push('That did not work. Try the chat command instead.'); }
@@ -1186,8 +1187,10 @@ const handleChat = (userId, text) => {
   }
   if (cmd === 'system') { if (!isAdmin(a)) return personal(a, 'Admins only.'); if (body) { broadcast(`[[S]]#{${C.SYS}}${body}`); audit(`GM ${who(a)} /system: ${body}`); staffLog(display(a), tierOf(a), '/system', `${staffWho(a)} (${TIER_LABEL[tierOf(a)] || 'staff'}): /system ${body.slice(0, 300)}`); } return; }
   if (cmd === 'admin') { if (!isAdmin(a)) return personal(a, 'Admins only.'); if (body) broadcast(`[[A]]#{${C.SYS}}${name}: ${body}`, true); return; }
+  // A slash alone opens the panel (U) at its search
+  if (!cmd && hasPlayerMenu(a)) return openPlayerMenu(a, '', '');
   const c = commands.get(cmd);
-  if (!c) return personal(a, `Unknown command /${cmd.slice(0, 32)}. Type /help.`);
+  if (!c) return personal(a, `Unknown command /${cmd.slice(0, 32)}. ${hasPlayerMenu(a) ? 'Type / alone, or press U, to search every command.' : 'Type /help.'}`);
   // A Trial GM passes only for the commands in TRIAL_COMMANDS; LEAD_ONLY below is for GMs, so it never refuses them
   const trial = c.admin && !isAdmin(a) && Object.prototype.hasOwnProperty.call(TRIAL_COMMANDS, cmd) && staffCan(a, TRIAL_COMMANDS[cmd]);
   if (c.admin && !isAdmin(a) && !trial) return personal(a, 'Admins only.');
@@ -1367,6 +1370,7 @@ mp.onActivate = (targetId, casterId) => {
     if (refused) return false;
   }
   if (globalThis.__dboSalvageActivate && globalThis.__dboSalvageActivate(targetId >>> 0, casterId >>> 0)) return false;
+  try { if (globalThis.__dboEnchanterTouched) globalThis.__dboEnchanterTouched(targetId >>> 0, casterId >>> 0); } catch (e) { log('enchanter resend failed', e.message); }
   // An alchemy lab also shows what the pack can brew (alchemy.js); the lab's own menu still opens
   if (globalThis.__dboAlchemyLab) { try { if (globalThis.__dboAlchemyLab(targetId >>> 0, casterId >>> 0) === true) return false; } catch (e) { log('alchemy lab panel failed', e.message); } }
   if (globalThis.__dboEmptyWorldContainer) globalThis.__dboEmptyWorldContainer(targetId >>> 0);
@@ -2540,7 +2544,8 @@ registerChatCommand('whereami', (a) => personal(a, `server thinks: cell/world ${
 
 // What a playtest actually costs: players, live npcs, the spawn poll and the packets we send
 
-// Resends only (alchemy.js __dboEnchLearnedResend), and says what happened in words (6 Oct: "sent=false" read as broken)
+// Resends only (alchemy.js __dboEnchLearnedResend), and says what happened in words (6 Oct: "sent=false" read as broken).
+// Using an Arcane Enchanter now resends by itself (__dboEnchanterTouched); this stays for a list that still looks short.
 registerChatCommand('syncenchant', (a) => {
   if (typeof globalThis.__dboEnchLearnedResend !== 'function') return personal(a, 'Enchanting is not ready yet. Try again in a minute.');
   const n = globalThis.__dboEnchLearnedResend(a);
@@ -2714,10 +2719,9 @@ const PANEL_SPLIT = {
 };
 // Chat reaches these another way (they are not registered commands), so the panel adds them to their topic
 const PANEL_EXTRA = { people: [{ name: 'pm', desc: 'say something to one person, privately' }] };
-// Staff alone are given this tab (isAdmin, the check every staff command makes). Its buttons are views that need no words;
-// everything else a member of staff does is typed, and /adminhelp lists it in the admin tab.
+// Staff alone are given this tab (isAdmin, the check every staff command makes): every staff command by its /adminhelp
+// topic (staffPanelGroups), with these lines under them.
 const PANEL_STAFF = {
-  names: ['adminhelp', 'update', 'load', 'monitor', 'raid', 'placed'],
   hints: ['The admin panel: press F7. Players, Skills, Items, Powers, Teleport, Place, Modes and NPCs.',
     'Placing objects: F7, the Place tab; /placeundo takes back your last one.',
     'Warbands: /warband raise <npc> [n], then follow, attack, charge or unleash; /warband side picks a side.',
@@ -2725,14 +2729,95 @@ const PANEL_STAFF = {
     'Rites: /curse <player> riteclear lets them try again; /curse <#TAG> restore brings back a character a rite killed.',
     'Every staff command, by topic: /adminhelp, or /help admin <topic>.'],
 };
-const panelEntry = (n) => ({ name: n, label: PANEL_LABEL[n] || '/' + n, desc: (commands.get(n) || {}).help || '', ask: PANEL_ASK[n] || null });
+// A command's usage as a form (server\commandforms.js): the panel draws a choice of words and a box or a name list per
+// argument, and builds the line it sends. Usages written in prose get a hand-made form here.
+// Loaded on first use, once per reload; a load that fails leaves every command a plain button
+let formsLoaded = null;
+const formOfHelp = (help) => {
+  if (!formsLoaded) {
+    formsLoaded = () => null;
+    try {
+      const FORMS_JS = path.resolve('commandforms.js');
+      delete require.cache[FORMS_JS];
+      formsLoaded = require(FORMS_JS).formOf;
+    } catch (e) { try { log('commandforms.js failed to load:', e.message); } catch (e2) { /* no log in a harness */ } }
+  }
+  return formsLoaded(help);
+};
+const PANEL_FORM = {
+  level: { variants: [{ word: null, args: [] },
+    ...['health', 'magicka', 'stamina'].map((w) => ({ word: w, args: [{ label: 'points', kind: 'number', optional: true }] }))] },
+  offer: { variants: [{ word: null, args: [{ label: 'gold', kind: 'number', optional: false }] }] },
+  // The record's action comes after the name (discipline.js); a suspension's length leads its reason
+  discipline: { variants: [{ word: 'list', args: [] }, { word: null, args: [{ label: 'player', kind: 'player', optional: false },
+    { label: 'action', kind: 'enum', options: ['warn', 'strike', 'suspend', 'lift'], optional: false },
+    { label: 'reason (a suspension: its length first, like 12h or 3d)', kind: 'text', optional: false, rest: true }] }] },
+  couriers: { variants: [{ word: null, args: [] }, { word: 'clear', args: [{ label: 'job id', kind: 'text', optional: false }] }] },
+  tailoring: { variants: [{ word: null, args: [] }, { word: 'test', args: [] }] },
+};
+// Usages written only in a command's refusal, read like any other
+const PANEL_USAGE = {
+  charter: '[status | found <name> | cult <name> | kind company|cult | pitch <text> | seat here|none | invite <player> [role] | confirm <n> | leave | submit | withdraw | disband <reason>]',
+};
+// The panel itself is /help, and its search is how a topic or a command is found
+const PANEL_HIDE = new Set(['help']);
+const formFor = (n, help) => {
+  if (PANEL_FORM[n]) return Object.assign({ desc: help }, PANEL_FORM[n]);
+  if (PANEL_USAGE[n]) { const u = formOfHelp(PANEL_USAGE[n]); if (u) return { variants: u.variants, usage: u.usage, desc: help }; }
+  const f = formOfHelp(help);
+  return f ? { variants: f.variants, usage: f.usage, desc: f.desc || help } : null;
+};
+// With a form the line says what the command does, its usage being the form; the usage is still searched
+const panelEntry = (n) => {
+  const help = (commands.get(n) || {}).help || '';
+  const form = PANEL_ASK[n] ? null : formFor(n, help);
+  return { name: n, label: PANEL_LABEL[n] || '/' + n, desc: form ? form.desc : help, ask: PANEL_ASK[n] || null,
+    form: form ? { variants: form.variants } : null, usage: form && form.usage ? form.usage : '' };
+};
+// What a Trial GM may run from the staff tab: the commands TRIAL_COMMANDS opens to the rights they hold, and the GM
+// call words (gmcall). The handleChat gate decides again when the line is sent.
+const trialPanelCan = (a, words) => {
+  const base = words.split(' ')[0];
+  if (base === 'gm') return staffCan(a, 'gmcall');
+  return Object.prototype.hasOwnProperty.call(TRIAL_COMMANDS, base) && staffCan(a, TRIAL_COMMANDS[base]);
+};
+// Everything a member of staff may run, by the /adminhelp topics; a Lead GM's commands only for a Lead GM and above; a
+// Trial GM only its allowlist (trialPanelCan)
+const staffPanelGroups = (a) => {
+  const lead = isLeadStaff(a);
+  const trial = !isAdmin(a);
+  return staffTopics().map((t) => ({
+    section: t.title,
+    entries: t.items.filter((i) => (trial ? trialPanelCan(a, i.words)
+      : (lead || !(LEAD_ONLY.has(i.words) || LEAD_ONLY.has(i.words.split(' ')[0]))))).map((i) => {
+      const form = formFor(i.words, i.text);
+      return { name: i.words, label: '/' + i.words, desc: form ? form.desc : i.text, ask: null, form: form ? { variants: form.variants } : null,
+        usage: form && form.usage ? form.usage : '', section: t.title };
+    }),
+  })).filter((g) => g.entries.length);
+};
+// Who a player can name in a form: staff see every online player by name and tag; a player only those they have been
+// introduced to, by the name they know (playermenu.js), so the list never names a stranger
+const panelPeople = (a) => {
+  const nameFor = typeof globalThis.__dboNameFor === 'function' ? globalThis.__dboNameFor : null;
+  // a Trial GM names players for /tp, /rename, /chargen and /charstats (the playerinfo right)
+  const staff = isAdmin(a) || isTrialStaff(a);
+  const out = [];
+  for (const t of onlineActors()) {
+    if ((t >>> 0) === (a >>> 0)) continue;
+    if (staff) { out.push({ label: display(t), value: '#' + tagOf(t) }); continue; }
+    const known = nameFor ? nameFor(a, t) : '';
+    if (known && known !== 'Stranger' && !out.some((p) => p.value === known)) out.push({ label: known, value: known });
+    if (out.length >= 120) break;
+  }
+  return out.sort((x, y) => x.label.localeCompare(y.label));
+};
 const panelTabsFor = (a) => {
   const tabs = [];
   const groups = helpGroupsFor(a);
-  if (isAdmin(a)) groups.push({ key: 'staff', title: 'Staff', names: PANEL_STAFF.names.filter((n) => commands.has(n)), hints: PANEL_STAFF.hints });
   for (const g of groups) {
     const entries = [];
-    for (const n of g.names.filter((x) => x !== 'help')) {
+    for (const n of g.names.filter((x) => !PANEL_HIDE.has(x))) {
       if (PANEL_SPLIT[n]) for (const s of PANEL_SPLIT[n]) entries.push({ name: `${n} ${s.word}`, label: `/${n} ${s.word}`, desc: s.desc, ask: s.ask || null });
       else entries.push(panelEntry(n));
     }
@@ -2741,22 +2826,46 @@ const panelTabsFor = (a) => {
     if (!entries.length && !hints.length) continue;
     tabs.push({ key: g.key, title: PANEL_TITLES[g.key] || g.title, entries, hints });
   }
+  if (isAdmin(a) || isTrialStaff(a)) {
+    // A command a player tab already offers this person (appoint, officials) is not offered twice
+    const shown = new Set(tabs.flatMap((t) => t.entries.map((e) => e.name)));
+    tabs.push({ key: 'staff', title: PANEL_TITLES.staff, entries: staffPanelGroups(a).flatMap((g) => g.entries).filter((e) => !shown.has(e.name)),
+      hints: isAdmin(a) ? PANEL_STAFF.hints : ['Trial GM: these are your staff tools; every use is logged to staff.',
+        'F7 panel: the Players tab (who is online, TP to, Rename) and the Modes tab (Invisible).'] });
+  }
   return tabs;
 };
+// The commands /help leaves out of its lists because a key or an object reaches them (HELP_BY_OBJECT): the panel's search
+// still finds them, so a player who only knows a word finds the command
+const panelSearchOnly = (a) => {
+  const staff = isAdmin(a);
+  return [...HELP_BY_OBJECT].filter((n) => { const c = commands.get(n); return !!c && !c.hidden && (!c.admin || staff) && !PANEL_HIDE.has(n); })
+    .sort().map(panelEntry);
+};
+const panelOffered = (a) => new Set(panelTabsFor(a).flatMap((t) => t.entries.map((e) => e.name)).concat(panelSearchOnly(a).map((e) => e.name)));
 const panelState = globalThis.__dboPanelState || (globalThis.__dboPanelState = { caps: new Map(), nonces: new Map() });
 const hasPlayerMenu = (a) => { const c = panelState.caps.get(a >>> 0); return !!c && c.has('playerMenu'); };
 // Any other capability the client's UI named in dbo:uiCaps (hud UI_CAPS): lockpick.js asks for 'lockpickLocal' and
 // supernatural.js for 'riteJudge' before they issue a round the widget judges itself, since an older widget given one
 // would hang or be judged wrongly (DESIGN.md 3.2)
 const hasUiCap = (a, cap) => { const c = panelState.caps.get(a >>> 0); return !!c && c.has(String(cap)); };
-const openPlayerMenu = (a, tab) => {
+const openPlayerMenu = (a, tab, search) => {
   const nonce = `${(a >>> 0).toString(16)}-${Date.now().toString(36)}`;
   panelState.nonces.set(a >>> 0, nonce);
-  openWidget(a, { type: 'playerMenu', id: PANEL_WIDGET_ID, nonce, tab: tab || '', staff: isAdmin(a), tabs: panelTabsFor(a) }, true);
+  openWidget(a, { type: 'playerMenu', id: PANEL_WIDGET_ID, nonce, tab: tab || '', staff: isAdmin(a), tabs: panelTabsFor(a), people: panelPeople(a),
+    searchOnly: panelSearchOnly(a), search: typeof search === 'string' ? search : '' }, true);
 };
 const closePlayerMenu = (a) => { panelState.nonces.delete(a >>> 0); closeWidget(a, PANEL_WIDGET_ID); };
 onUi('uiCaps', (a, args) => { panelState.caps.set(a >>> 0, new Set((args || []).map(String))); });
-onUi('menuOpen', (a, args) => { if (hasPlayerMenu(a)) openPlayerMenu(a, String((args || [])[0] || '')); });
+onUi('menuOpen', (a, args) => {
+  if (!hasPlayerMenu(a)) return;
+  let tab = String((args || [])[0] || '');
+  // Bound hands: the panel opens where Struggle is
+  if (!tab) { try { const r = mp.get(a, 'private.restrained'); if (r && r.boundHands) tab = 'trouble'; } catch (e) { /* not an actor */ } }
+  openPlayerMenu(a, tab);
+});
+// Another panel's button opens this one searching for a command (the Faction panel's Found a faction: "charter")
+onUi('menuFind', (a, args) => { if (hasPlayerMenu(a)) openPlayerMenu(a, '', String((args || [])[0] || '').replace(/[^a-z0-9 -]/gi, '').slice(0, 40)); });
 onUi('menuClose', (a) => closePlayerMenu(a));
 // Escape inside the panel closes it through the relay's own path, which sends "close" rather than our event
 onUi('close', (a, args, widgetId) => { if (widgetId === PANEL_WIDGET_ID) panelState.nonces.delete(a >>> 0); });
@@ -2765,12 +2874,28 @@ onUi('close', (a, args, widgetId) => { if (widgetId === PANEL_WIDGET_ID) panelSt
 onUi('menuRun', (a, args) => {
   if (panelState.nonces.get(a >>> 0) !== String((args || [])[0] || '')) return;
   const name = String((args || [])[1] || '').toLowerCase();
-  const offered = new Set(panelTabsFor(a).flatMap((t) => t.entries.map((e) => e.name)));
-  if (!offered.has(name)) return;
+  if (!panelOffered(a).has(name)) return;
   const text = String((args || [])[2] || '').replace(/[\r\n]+/g, ' ').trim();
   closePlayerMenu(a);
   handleChat(userOf(a), `/${name}${text ? ' ' + text : ''}`);
 });
+// ---- the Character Journal's World tab (F3; journal.js section registry) ---------------------------------------------
+// World: what the read-only commands say about the world, as one page, read quietly so nothing reaches chat. Each group
+// is a command's own lines (colour codes taken out); a command that is not loaded, or says nothing, leaves its group out.
+const WORLD_GROUPS = [['players', 'Who is about'], ['officials', 'Who rules'], ['playtest', 'The open world'], ['time', 'The time'],
+  ['champions', 'Named beasts abroad'], ['wildlife', 'What roams the wilds']];
+const plainLine = (t) => String(t).replace(/#\{[0-9a-fA-F]{6}\}/g, '').replace(/\[\[[A-Z]+\]\]/g, '').trim();
+const worldView = (a) => ({
+  groups: WORLD_GROUPS.map(([cmd, name]) => {
+    const lines = commands.has(cmd) ? (globalThis.__dboRunCommand(a, cmd, '', true) || []).map(plainLine).filter(Boolean) : [];
+    return lines.length ? { name, command: cmd, lines } : null;
+  }).filter(Boolean),
+});
+{
+  const SECTIONS = globalThis.__dboJournalSections && typeof globalThis.__dboJournalSections === 'object'
+    ? globalThis.__dboJournalSections : (globalThis.__dboJournalSections = {});
+  SECTIONS.world = { visible: () => true, view: (a) => worldView(a), label: 'World' };
+}
 globalThis.__dboPanelLeave = (a) => { panelState.caps.delete(a >>> 0); panelState.nonces.delete(a >>> 0); };
 
 // ---- meals: eating takes time (Nate, 2026-09-27, from athny's and dunthril's reports) ----------------------------------
@@ -3056,6 +3181,27 @@ const updateLetter = (a, args, change) => {
 };
 onUi('pigeonRead', (a, args) => updateLetter(a, args, 'read'));
 onUi('pigeonDelete', (a, args) => updateLetter(a, args, 'delete'));
+// pigeonBlockLetter [nonce, letter id]: /pigeonblock for whoever sent that letter. The panel is never told who it was, nor
+// whether two letters share a hand: an unsigned or forged letter stays so.
+onUi('pigeonBlockLetter', (a, args) => {
+  if (String(args[0]) !== pigeonNonces.get(a)) return;
+  const m = lettersOf(a).find((x) => x.id === String(args[1] || ''));
+  if (!m || !m.fromProfile) return openPigeonCoop(a, 'That letter carries no sender to ignore.', 'refused', 'letters');
+  let list = [];
+  try { list = Array.isArray(mp.get(a, 'private.pigeonBlock')) ? mp.get(a, 'private.pigeonBlock') : []; } catch (e) { list = []; }
+  const i = list.indexOf(m.fromProfile);
+  if (i >= 0) list.splice(i, 1); else list.push(m.fromProfile);
+  try { mp.set(a, 'private.pigeonBlock', list); } catch (e) { return openPigeonCoop(a, 'That did not work. Try again.', 'refused', 'letters'); }
+  openPigeonCoop(a, i >= 0 ? 'Pigeons from the hand that wrote this letter are let through again.' : 'Pigeons from the hand that wrote this letter will be ignored. Do it again to let them through.', 'sent', 'letters');
+});
+// pigeonSign [nonce, how]: /sign as if typed ('', 'unsigned', 'clear' or a name), its answer on the panel
+onUi('pigeonSign', (a, args) => {
+  if (String(args[0]) !== pigeonNonces.get(a)) return;
+  const how = String(args[1] || '').replace(/[\r\n]+/g, ' ').slice(0, 40);
+  const lines = typeof globalThis.__dboRunCommand === 'function' ? globalThis.__dboRunCommand(a, 'sign', how, true) : null;
+  const text = (lines || []).join(' ') || 'That did not work. Try again.';
+  openPigeonCoop(a, text, /^Your next letter/.test(text) ? 'sent' : 'refused', 'send');
+});
 onUi('pigeonSend', (a, args) => {
   if (String(args[0]) !== pigeonNonces.get(a)) return;
   const zoneId = boardZoneNear(a);
@@ -6975,7 +7121,7 @@ try {
   const ALCHEMY_JS = path.resolve('alchemy.js');
   delete require.cache[ALCHEMY_JS];
   require(ALCHEMY_JS)({ mp, log, personal, audit, display, who, openWidget, closeWidget, every, itemName: (d) => adminItemName(d), cfg, sendPacket, onUi });
-} catch (e) { log('alchemy.js failed to load:', e.stack || e.message); mp.onCraftUnmatched = null; }
+} catch (e) { log('alchemy.js failed to load:', e.stack || e.message); mp.onCraftUnmatched = null; globalThis.__dboEnchanterTouched = null; }
 
 // ---- playtest region lock (server\playtest.js, config "playtest") ------------------------------
 try {

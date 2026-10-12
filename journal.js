@@ -182,10 +182,13 @@ module.exports = (api) => {
       titles: titles.length > 1 ? titles.map((t) => ({ id: t.id, label: t.label })) : [],
       status: own === false ? [] : statusView(a),
       levelPoints: own === false ? 0 : levelPoints(a),
+      // An identity reroll (patrons.js) can be started from the Profile's Help box
+      canReroll: own === false ? false : canReroll(a),
       // The race's once-a-day power (racial.js, the overhaul): its button and countdown; null without one
       racialPower: own === false ? null : racialPowerView(a),
     };
   };
+  const canReroll = (a) => { try { return typeof globalThis.__dboCanReroll === 'function' && !!globalThis.__dboCanReroll(a); } catch (e) { return false; } };
   const km = (units) => Number(units) / 70 / 1000;
   // own: the player's own journal; staff reading another's never see that player's reroll tokens (patrons.js)
   const rerollGroup = (a) => { try { return typeof globalThis.__dboRerollStatsGroup === 'function' ? globalThis.__dboRerollStatsGroup(a) : null; } catch (e) { log('journal: reroll tokens failed', e.message); return null; } };
@@ -638,6 +641,8 @@ module.exports = (api) => {
     report: (a, text) => { const r = typeof globalThis.__dboBugReport === 'function' ? globalThis.__dboBugReport(a, text) : null; return r ? { text: r.text, ok: r.ok } : null; },
     gm: (a, text) => (text.trim().length < 3 ? { text: 'Say what you need, then send it.', ok: false } : run(a, 'gm', `call ${text.trim()}`)),
     unstuck: (a) => run(a, 'unstuck', ''),
+    // The Profile asks first; /reroll confirm opens the character creator, which takes the screen from the journal
+    reroll: (a) => run(a, 'reroll', 'confirm'),
     'level:health': (a) => run(a, 'level', 'health 1'),
     'level:magicka': (a) => run(a, 'level', 'magicka 1'),
     'level:stamina': (a) => run(a, 'level', 'stamina 1'),

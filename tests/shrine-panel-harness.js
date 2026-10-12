@@ -195,6 +195,25 @@ ok(inRite() && indexOf('close', 74) >= 0, '/rite confirm still begins it, and cl
 ok(indexOf('open', 39) >= 0 && indexOf('open', 39) < indexOf('close', 74), "...the rite's panel first, so the cursor stays", trail.map((t) => `${t.op} ${t.id}`));
 globalThis.__dboRites.clear();
 
+// An offering from the panel, for a follower of the shrine's god (Nate, 12 Oct: panels over chat commands)
+globalThis.__dboRunCommand = (a, name, args) => { const fn = commands.get(name); if (!fn) return null; const n = said.length; fn(a, args); return said.splice(n); };
+set(A, 'private.dboDeity', null);
+touch(REF.molagbal); p = lastOpen(74);
+ok(p && p.offer === null, 'no Offer on the panel of a god you do not follow', p && p.offer);
+faith('molagbal');
+touch(REF.molagbal); p = lastOpen(74);
+ok(p && p.offer && p.offer.god === 'Molag Bal' && p.offer.min > 0 && p.offer.max >= p.offer.min, 'a follower is offered an offering, with its bounds', p && p.offer);
+trail.length = 0; said.length = 0;
+ui('shrineOffer', p.nonce, 50);
+let q = lastOpen(74);
+ok(q && q.resultKind === 'refused' && /You do not have 50 gold to offer/.test(q.result) && said.length === 0, 'Offer runs /offer at the shrine; its answer is on the panel, not in chat', q && [q.result, said]);
+trail.length = 0; ui('shrineOffer', p.nonce, 'lots');
+q = lastOpen(74);
+ok(q && /how much gold/.test(q.result), 'a sum that is no number is asked for again', q && q.result);
+trail.length = 0; ui('shrineOffer', 'stale', 50);
+ok(!lastOpen(74), 'a stale nonce does nothing');
+delete globalThis.__dboRunCommand;
+
 // A panel left too long closes itself
 touch(REF.molagbal); p = lastOpen(74);
 wall += 6 * 60000;

@@ -26,7 +26,7 @@ const load = (cfg) => {
 try {
   let opened = load({ charters: { enabled: true } });
   const p = globalThis.__dboFactionPayload(P);
-  ok(/\/charter found <name>/.test(p.result) && /\/charter cult <name>/.test(p.result) && /GM approves/.test(p.result), 'charters on: the panel tells a player how to found a faction', p.result);
+  ok(/Found a faction/.test(p.result) && /\/charter found <name>/.test(p.result) && /GM approves/.test(p.result) && p.charters === true, 'charters on: the panel tells a player how to found a faction, and has its Found a faction button', p.result);
   ok(p.resultKind === 'info', '...as information, not a success or a refusal', p.resultKind);
   globalThis.__dboFactionRefresh(P, 'Invitation sent.', true);
   const last = opened[opened.length - 1] || {};
