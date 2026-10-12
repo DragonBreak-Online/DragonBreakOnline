@@ -43,7 +43,8 @@
         "heading": "Staff",
         "items": [
           "The Admin chat tab now appears reliably for staff after a reconnect or character switch.",
-          "Several waiting GM calls are now reminded in one line instead of one line each."
+          "Several waiting GM calls are now reminded in one line instead of one line each.",
+          "Trial GMs now have the Admin chat tab and /admin, so they see GM call alerts."
         ]
       }
     ]
