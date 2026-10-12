@@ -22,8 +22,8 @@ const sum = (m) => Object.values(m).reduce((s, n) => s + n, 0);
 ok(C0138.tag === 'MTK7' && sum(C0138.items) === 649 && C0138.items.f === 352 && Object.keys(C0138.items).length === 48, 'case 0138: #MTK7, 649 items in 48 kinds, 352 gold');
 ok(Object.values(C0138.containers).every((cap) => Object.entries(cap).every(([h, n]) => n <= (C0138.items[h] || 0))), 'every container cap is within what was taken');
 const gm = fs.readFileSync(path.join(SERVER, 'gamemode.js'), 'utf8');
-ok(/__dboSprStripLogin\(a\);[^\n]*\n\s*try \{ if \(globalThis\.__dboRestitutionLogin\)/.test(gm), 'gamemode.js: login hook');
-ok(/__dboSprStripContainer\(targetId >>> 0\);[^\n]*\n\s*try \{ if \(globalThis\.__dboRestitutionContainer\)/.test(gm), 'gamemode.js: container hook');
+ok(/__dboSprStripLogin\(a\);[^\n]*\n(?:\s*try \{ if \(globalThis\.__dboGearStripLogin\)[^\n]*\n)?\s*try \{ if \(globalThis\.__dboRestitutionLogin\)/.test(gm), 'gamemode.js: login hook (after the SPR strip, and the gear strip when there is one)');
+ok(/__dboSprStripContainer\(targetId >>> 0\);[^\n]*\n(?:\s*try \{ if \(globalThis\.__dboGearStripContainer\)[^\n]*\n)?\s*try \{ if \(globalThis\.__dboRestitutionContainer\)/.test(gm), 'gamemode.js: container hook (after the SPR strip, and the gear strip when there is one)');
 ok(fs.readFileSync(path.join(SERVER, '.gitignore'), 'utf8').includes('restitution-state.json'), 'state file is gitignored');
 
 // pure
