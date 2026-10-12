@@ -935,6 +935,17 @@ void ActionListener::ForgetForm(uint32_t formId)
   npcJumps.erase(formId);
   ForgetScrollReads(formId);
   recentCasts.erase(formId);
+  // A reused form id must not inherit a rider interval, a rune cooldown or a running hold or slow
+  std::erase_if(riderHits, [&](const auto& entry) {
+    return std::get<0>(entry.first) == formId ||
+      std::get<2>(entry.first) == formId;
+  });
+  std::erase_if(explosionHoldReady, [&](const auto& entry) {
+    return static_cast<uint32_t>(entry.first >> 32) == formId ||
+      static_cast<uint32_t>(entry.first) == formId;
+  });
+  std::erase_if(hostEffects,
+                [&](const auto& entry) { return entry.first.first == formId; });
 }
 
 void ActionListener::ForgetScrollReads(uint32_t casterId)
@@ -3275,8 +3286,16 @@ void ActionListener::ResendHostEffects(uint32_t targetId, MpActor& newHost)
 void ActionListener::EndHostEffect(uint32_t targetId, HostEffect effect)
 {
   auto it = hostEffects.find(std::make_pair(targetId, effect));
-  if (it == hostEffects.end() ||
-      std::chrono::steady_clock::now() < it->second.until) {
+  if (it == hostEffects.end()) {
+    return;
+  }
+  const auto now = std::chrono::steady_clock::now();
+  if (now < it->second.until) {
+    // Extended by a later start, or this (system clock) timer fired before the steady deadline: end it then
+    const auto left = std::chrono::ceil<std::chrono::milliseconds>(
+      it->second.until - now);
+    partOne.worldState.SetTimer(left).Then(
+      [this, targetId, effect](Viet::Void) { EndHostEffect(targetId, effect); });
     return;
   }
   const TimedHostEffect ended = it->second;

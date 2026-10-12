@@ -303,8 +303,11 @@ bool CountsWholeDamageOverTime(WorldState* worldState,
                                const espm::SPEL::SPITData* spellItem,
                                const MpActor& target)
 {
+  // A contact spell is re-applied by the hazard, trap or attack carrying it (Blizzard's hazard every 0.5 s), so each of
+  // its hits counts one tick as before
   return worldState && worldState->spellSync.damageOverTime && spellItem &&
     spellItem->castType == espm::SPEL::CastType::FireAndForget &&
+    spellItem->delivery != espm::SPEL::Delivery::Contact &&
     target.GetUserId() == Networking::InvalidUserId;
 }
 

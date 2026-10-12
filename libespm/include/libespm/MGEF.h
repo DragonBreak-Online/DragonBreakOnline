@@ -87,9 +87,9 @@ public:
   struct DATA
   {
     // primary actor value
-    Flags flags;
+    Flags flags{};
     ActorValue primaryAV = espm::ActorValue::None;
-    EffectType effectType;
+    EffectType effectType{};
     // Raw (file-local) ids: cloak spell, bound weapon, summoned NPC_ or hazard
     uint32_t associatedItem = 0;
     uint32_t projectile = 0;

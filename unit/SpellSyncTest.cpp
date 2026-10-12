@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <chrono>
 
+#include "ActionListener.h"
 #include "HitMessage.h"
 #include "libespm/Loader.h"
 
