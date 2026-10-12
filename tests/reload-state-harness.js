@@ -32,6 +32,7 @@ const SESSIONS = [
   ['downed.js', 'S', 'the down state'],
   ['dungeons.js', 'ST', 'dungeon leases and parties'],
   ['naming.js', 'nonces', 'the name panel'],
+  ['journalstats.js', 'S', 'journal stats: the counts, the index build under way and the take-back reads (LOG-1012-03)'],
 ];
 for (const [file, name, what] of SESSIONS) {
   const src = fs.readFileSync(path.join(root, file), 'utf8');

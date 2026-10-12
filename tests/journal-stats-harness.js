@@ -55,6 +55,9 @@ const api = {
   cfg: { journalStats: { playersFile: path.join(dir, 'players.json'), asyncFirstRead: false } },
 };
 const load = () => { delete require.cache[MODULE]; return require(MODULE)(api); };
+// A character without a key waits for the index, which is read off the main thread (LOG-1012-03): asked again, as the
+// sampler does every 2 s, until the answer lands
+const keySoon = async (M, a) => { for (let i = 0; i < 500; i++) { const k = M.keyOf(a); if (k) return k; await new Promise((r) => setTimeout(r, 2)); } return M.keyOf(a); };
 delete globalThis.__dboJournalStats; delete globalThis.__alduinakTradeLog; delete globalThis.__dboPrevTradeLog;
 
 (async () => {
@@ -307,8 +310,8 @@ delete globalThis.__dboJournalStats; delete globalThis.__alduinakTradeLog; delet
     ok(doc6.account === 12 && doc6.tag === 'AbCd' && doc6.actor === 'ff000019', 'the file names its account and #TAG');
     delete globalThis.__dboJournalStats; props.delete(`${P6}|private.dboJournalId`);   // a restart; the key is lost
     M = load();
-    ok(M.keyOf(P6) === k6 && st(P6).trades === 1 && logs.some((l) => /ff000019 takes back its file/.test(l)), 'after losing its key the character takes its own file back, counts and all', [M.keyOf(P6), k6]);
-    ok(M.keyOf(P7) !== k6 && st(P7).trades === 0, 'a character with the same #TAG on another account gets a file of its own');
+    ok(await keySoon(M, P6) === k6 && st(P6).trades === 1 && logs.some((l) => /ff000019 takes back its file/.test(l)), 'after losing its key the character takes its own file back, counts and all', [M.keyOf(P6), k6]);
+    ok(await keySoon(M, P7) !== k6 && st(P7).trades === 0, 'a character with the same #TAG on another account gets a file of its own');
     // A living character is never an orphan, even when its file's key is not on it
     props.set(`${P6}|private.indexed.tagKey`, 'abcd');
     mp.findFormsByPropertyValue = (prop, v) => [...props.entries()].filter(([pk, pv]) => pk.endsWith(`|${prop}`) && pv === v).map(([pk]) => Number(pk.split('|')[0]));
@@ -323,7 +326,7 @@ delete globalThis.__dboJournalStats; delete globalThis.__alduinakTradeLog; delet
     M.forget(k6);
     gone.delete(P6); props.delete(`${P6}|private.dboJournalId`);
     delete globalThis.__dboJournalStats; M = load();
-    ok(M.keyOf(P6) === k6 && fs.existsSync(path.join(dir, 'journal', `${k6}.json`)) && st(P6).trades === 1, 'a file moved aside by forget() comes back when its character turns up again');
+    ok(await keySoon(M, P6) === k6 && fs.existsSync(path.join(dir, 'journal', `${k6}.json`)) && st(P6).trades === 1, 'a file moved aside by forget() comes back when its character turns up again');
     delete mp.findFormsByPropertyValue;
   }
 
