@@ -1,5 +1,33 @@
 [
   {
+    "title": "Tailor ranks at the loom",
+    "date": "2026-10-12",
+    "version": "Server update",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Tailoring",
+        "items": [
+          "Tailor ranks now count at the loom: Fine clothes need an Apprentice Tailor, Noble an Adept, Scaled an Expert and Masterwork a Master."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "First person after a beast form",
+    "date": "2026-10-12",
+    "version": "Client 0.3.94",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Beast forms",
+        "items": [
+          "First person works again after you change back from a werewolf or Vampire Lord."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Holding a skill",
     "date": "2026-10-12",
     "version": "Server update",
