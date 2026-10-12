@@ -128,10 +128,11 @@ now += 1000;
 check('after a hot reload a held player is still refused', hit(SCROLL).length === 0);
 check('the reload wraps the same chain once', typeof mp.onSpellHit === 'function' && mp.onSpellHit.__dbo === true);
 
-// GP-4: the Force Rune scroll staggers like the spell
+// GP-4: the Force Rune scroll acts like the spell: both push at force 10 (force-rune-push, Nate 11 Oct), neither only staggers
 const cfg = JSON.parse(fs.readFileSync(path.join(SERVER, 'gamemode-config.json'), 'utf8'));
 const stagger = ((cfg.combat || {}).staggerSpells) || [];
-check('combat.staggerSpells lists the Force Rune spell and its scroll', stagger.includes('CYRForceRune') && stagger.includes('CYRForceRuneScroll'), JSON.stringify(stagger));
+const push = ((cfg.combat || {}).pushSpells) || {};
+check('combat.pushSpells pushes with the Force Rune spell and its scroll alike, and staggerSpells holds neither', push.CYRForceRune === 10 && push.CYRForceRuneScroll === 10 && !stagger.includes('CYRForceRune') && !stagger.includes('CYRForceRuneScroll'), JSON.stringify({ stagger, push }));
 
 console.log(failures ? `${failures} failure(s)` : 'all passed');
 process.exit(failures ? 1 : 0);
