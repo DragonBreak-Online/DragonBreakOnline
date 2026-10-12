@@ -80,6 +80,23 @@ module.exports = (api) => {
   const nameFor = (viewer, a) => beastName(a) || (isMasked(a) ? C.maskName : knownBy(viewer).includes(a >>> 0) ? nameOf(a) : 'Stranger');
   // Other modules name players the same way (downed.js: who raised you); a name must never skip the introductions
   globalThis.__dboNameFor = nameFor;
+  // For staff eyes only (debugsnap.js: a /bug report's #bug-tracker thread and snapshot), never for a player: the name
+  // shown is the mask's or the beast's, so a /bug from behind a mask reached staff as "Masked Person #TAG" and they had
+  // to work out who sent it (D15: #VKRS, #8KWH and #LLX8, 11 Oct). '' when the name shown is the character's own; else
+  // their own name and why it is hidden, "Raven (masked)". A beast keeps the look from before the change in
+  // private.beast.original (beastform.js); a mask on at the change holds the name in maskName, as any mask does.
+  globalThis.__dboStaffName = (a) => {
+    const masked = isMasked(a), beast = beastName(a), shown = nameOf(a);
+    if (!masked && !beast && !isMaskName(shown)) return '';
+    let own = realName(a);
+    if (!own && beast) {
+      const s = get(a, 'private.beast', null);
+      const n = String((s && s.original && s.original.name) || '').trim();
+      if (n && !isMaskName(n)) own = n;
+    }
+    const why = [masked ? 'masked' : '', beast ? `${beast} form` : '', own ? '' : 'own name lost'].filter(Boolean);
+    return `${own || shown} (${why.join(', ')})`;
+  };
   const distance = (a, b) => {
     const la = get(a, 'locationalData', null), lb = get(b, 'locationalData', null);
     if (!la || !lb || la.cellOrWorldDesc !== lb.cellOrWorldDesc) return Infinity;
