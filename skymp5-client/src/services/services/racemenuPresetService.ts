@@ -9,8 +9,8 @@ import { queueCopyNiNodeWork, queuePlayerNiNodeWork } from "../../view/niNodeQue
 import { isGuardedActor, isGuardedRace } from "../../sync/beastRaces";
 import { Appearance } from "../../sync/appearance";
 import {
-  ApplyLedger, ChunkAssembler, FacePreset, applyBlockedBy, boundSculpt, buildJslot, chunkText, decodeFace, encodeFace,
-  facePresetFrom, facePresetRefusal, formIdentifierOf, hashText, isEmptyFace, otherRaceFamily, presetFileName, readChunkPacket, PRESET_MAX_CHARS,
+  ApplyLedger, ChunkAssembler, FacePreset, FaceTaken, applyBlockedBy, boundSculpt, buildJslot, chunkText, decodeFace, encodeFace,
+  facePresetFixed, facePresetRefusal, fixesText, formIdentifierOf, hashText, isEmptyFace, otherRaceFamily, presetFileName, readChunkPacket, PRESET_MAX_CHARS,
 } from "../../sync/racemenuPresetPlan";
 import { logError, logTrace } from "../../logging";
 import { hex, trace } from "../../lib/clientDiag";
@@ -269,17 +269,22 @@ export class RacemenuPresetService extends ClientListener {
       try { natives.removePresetFile(name); } catch { /* the next save overwrites it */ }
     }
     if (!text) { this.diag("preset: save wrote no file (RaceMenu missing?)"); trace("rmp cap err=nofile"); return; }
-    let face: FacePreset | null = null;
+    let taken: FaceTaken | null = null;
     let raw: unknown = undefined;
     try { raw = JSON.parse(text); } catch { raw = undefined; }
-    if (raw !== undefined) face = facePresetFrom(raw);
-    if (!face) {
-      // The broken rule: named in the diag file, as a code, index and value in the trace
+    // A sculpt skee wrote with no vertex count (a hair or other non-chargen part) takes this game's own tri count
+    if (raw !== undefined) taken = facePresetFixed(raw, (host) => natives.getTriVertexCount(host));
+    if (!taken) {
+      // Not a JSON object: the reason in the diag file, as a code in the trace
       const why = raw === undefined ? null : facePresetRefusal(raw);
       this.diag(`preset: own preset refused (${text.length} chars): ${raw === undefined ? "not JSON" : why ? why.detail : "unknown"}`);
       trace(`rmp cap err=parse chars=${text.length} why=${raw === undefined ? "json" : why ? `${why.code} at=${why.at} v=${why.value}` : "unknown"}`);
       return;
     }
+    const face = taken.face;
+    // What the rules dropped or clamped: codes and counts in the trace, the first entry of each only in the local diag file
+    const fixed = taken.fixes.length ? ` fixed=${fixesText(taken.fixes)}` : "";
+    if (fixed) this.diag(`preset: own face taken with fixes: ${taken.fixes.map((f) => `${f.code} x${f.n} (first: ${f.first})`).join("; ")}`);
     const encoded = isEmptyFace(face) ? "" : encodeFace(face);
     if (encoded.length > PRESET_MAX_CHARS) { this.diag(`preset: own preset too big (${encoded.length} chars)`); trace(`rmp cap err=big chars=${encoded.length}`); return; }
     const hash = encoded ? hashText(encoded) : "";
@@ -288,7 +293,7 @@ export class RacemenuPresetService extends ClientListener {
     this.selfAppliedHash = hash;
     this.selfLoadedHash = hash;
     if (this.selfRemoteId) this.cache[this.selfRemoteId] = entry;
-    const capLine = `rmp cap chars=${encoded.length} h=${hash || "empty"} cu=${face.custom.length} sc=${face.sculpt.length} race=${hex(race)}`;
+    const capLine = `rmp cap chars=${encoded.length} h=${hash || "empty"} cu=${face.custom.length} sc=${face.sculpt.length} race=${hex(race)}${fixed}`;
     if (hash === this.lastSentHash) { trace(`${capLine} send=same`); return; }
     if (this.serverSelf && this.serverSelf.hash === hash && !this.sentUpload && !this.upload) {
       this.diag(`preset: own face unchanged, ${hash || "empty"}, not sent`);

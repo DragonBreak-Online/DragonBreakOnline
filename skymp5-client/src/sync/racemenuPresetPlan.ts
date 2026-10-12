@@ -8,11 +8,12 @@ export const CHUNK_CHARS = 12000;
 export const MAX_CHUNKS = Math.ceil(PRESET_MAX_CHARS / CHUNK_CHARS);
 export const MAX_CUSTOM_MORPHS = 1024;
 export const MAX_MORPH_NAME = 128;
-// RaceMenu's ranges (skee FaceMorphInterface.cpp): a slider runs -1..1 times fSliderMultiplier (1.0 unless skee64.ini
-// changes it) and is applied once per whole unit past 1; a preset slider is a whole number 0..its preset count
-export const MAX_SLIDER = 1;
-export const MAX_PRESET_INDEX = 32;
-// A sculpt moves a vertex at most this many units (a head is about 20 across)
+// skee's ranges (FaceMorphInterface.cpp:963-968, 1318-1354): a preset index 0..255 is kept, any other value clamped to +-MAX_SLIDER
+export const MAX_SLIDER = 10;
+export const MAX_PRESET_INDEX = 255;
+// skee applies a slider once per whole unit of its value on every watcher (FaceMorphInterface.cpp:1156-1167): a face's limit
+export const MAX_MORPH_REPEATS = 4096;
+// A sculpt moves a vertex at most this many units (a head is about 20 across); an offset past it is clamped
 export const MAX_SCULPT_UNITS = 30;
 export const MAX_SCULPT_HOSTS = 16;
 // skee keeps sculpt indices as UInt16
@@ -22,6 +23,9 @@ export const MAX_SCULPT_DIVISOR = 1000000;
 export const MAX_MOD_NAMES = 512;
 export const MAX_MOD_NAME = 260;
 export const MAX_TRI_PATH = 200;
+// skee's PresetHeader (PresetInterface.cpp:300-305): "SKSE" byte-swapped, format 3; its loader needs both (:932-946)
+export const SKEE_SIGNATURE = 0x45534b53;
+export const SKEE_FORMAT_VERSION = 3;
 
 export interface PresetVersion {
   signature: number;
@@ -50,16 +54,22 @@ export interface FacePreset {
   sculpt: SculptHost[];
 }
 
+// One kind of fix the rules made: its code, how many entries, and the first one (for the local diag file only, never the trace)
+export interface FaceFix { code: string; n: number; first: string }
+export interface FaceTaken { face: FacePreset; fixes: FaceFix[] }
+
 const isObject = (x: unknown): x is Record<string, unknown> => !!x && typeof x === "object" && !Array.isArray(x);
 const isUint32 = (x: unknown): x is number => typeof x === "number" && Number.isInteger(x) && x >= 0 && x <= 0xffffffff;
 const isIntIn = (x: unknown, lo: number, hi: number): x is number => typeof x === "number" && Number.isInteger(x) && x >= lo && x <= hi;
 const hasControl = (s: string): boolean => /[\u0000-\u001f\u007f]/.test(s);
 const isCleanString = (x: unknown, max: number): x is string => typeof x === "string" && x.length > 0 && x.length <= max && !hasControl(x);
+// skee's names compare as _stricmp does (StringTable.h SKEEFixedString): ASCII letters only
+const asciiLower = (s: string): string => s.replace(/[A-Z]/g, (c) => c.toLowerCase());
 
-// The rule of the platform's getTriVertexCount (platform_lib PresetFiles.cpp ValidateTriPath)
+// ValidateTriPath's rule (platform PresetFiles.cpp) plus the apostrophe of KS Hairdo's; the platform answers -1 there, so that sculpt is dropped
 export const isTriPath = (x: unknown): x is string => {
   if (typeof x !== "string" || !x.length || x.length > MAX_TRI_PATH) return false;
-  if (!/^[A-Za-z0-9_\-. \\/]+$/.test(x)) return false;
+  if (!/^[A-Za-z0-9_\-. \\/']+$/.test(x)) return false;
   if (/^[\\/ ]/.test(x) || x.indexOf("..") !== -1) return false;
   return /\.tri$/i.test(x);
 };
@@ -81,95 +91,152 @@ const modNamesFrom = (root: Record<string, unknown>): string[] => {
   return out;
 };
 
-export const morphValueOk = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v)
-  && (Number.isInteger(v) ? v >= -MAX_SLIDER && v <= MAX_PRESET_INDEX : Math.abs(v) <= MAX_SLIDER);
+// A slider value as kept, or null for what is not a finite number
+export const morphValueOf = (v: unknown): number | null => {
+  if (typeof v !== "number" || !Number.isFinite(v)) return null;
+  if (Number.isInteger(v) && v >= 0 && v <= MAX_PRESET_INDEX) return v;
+  return Math.min(MAX_SLIDER, Math.max(-MAX_SLIDER, v));
+};
+// A value kept unchanged by the rules
+export const morphValueOk = (v: unknown): v is number => morphValueOf(v) === v;
 
-const customFrom = (x: unknown): CustomMorph[] | null => {
+// Collects the fixes in the order they first happen, so one input always gives one list
+class Fixes {
+  list: FaceFix[] = [];
+  add(code: string, first: () => string, n = 1): void {
+    const f = this.list.find((x) => x.code === code);
+    if (f) f.n += n;
+    else this.list.push({ code, n, first: first().slice(0, 120) });
+  }
+}
+
+const customFrom = (x: unknown, fx: Fixes): CustomMorph[] => {
   if (x === undefined || x === null) return [];
-  if (!Array.isArray(x) || x.length > MAX_CUSTOM_MORPHS) return null;
+  if (!Array.isArray(x)) { fx.add("custom-list", () => typeof x); return []; }
+  // skee's ValueSet keeps one value per name (any case), the last one set (FaceMorphInterface.cpp:450-457)
+  const byName = new Map<string, CustomMorph>();
+  for (let i = 0; i < x.length; i++) {
+    const m = x[i];
+    if (!isObject(m) || !isCleanString(m.name, MAX_MORPH_NAME)) { fx.add("custom-name", () => `#${i}`); continue; }
+    const name = m.name;
+    const value = morphValueOf(m.value);
+    if (value === null) { fx.add("custom-value", () => `${name}=${String(m.value)}`); continue; }
+    if (value !== m.value) fx.add("custom-clamp", () => `${name}=${String(m.value)}`);
+    const key = asciiLower(name);
+    const had = byName.get(key);
+    if (had) { fx.add("custom-dup", () => name); had.value = value; } else byName.set(key, { name, value });
+  }
   const out: CustomMorph[] = [];
-  for (const m of x) {
-    if (!isObject(m) || !isCleanString(m.name, MAX_MORPH_NAME)) return null;
-    const value = m.value;
-    if (!morphValueOk(value)) return null;
-    if (value !== 0) out.push({ name: m.name, value });
+  let repeats = MAX_MORPH_REPEATS;
+  for (const m of Array.from(byName.values())) {
+    if (m.value === 0) continue;
+    if (out.length >= MAX_CUSTOM_MORPHS) { fx.add("custom-count", () => m.name); continue; }
+    const cost = Math.floor(Math.abs(m.value));
+    if (cost > repeats) { fx.add("custom-budget", () => `${m.name}=${m.value}`); continue; }
+    repeats -= cost;
+    out.push({ name: m.name, value: m.value });
   }
   return out;
 };
 
-const sculptFrom = (x: unknown, divisor: unknown): SculptHost[] | null => {
+// A broken entry is dropped, an offset clamped, a repeated vertex kept once with its last offsets (skee's force_insert)
+const sculptDataFrom = (raw: unknown[], vertices: number, maxOffset: number, host: string, fx: Fixes): number[][] => {
+  const byIndex = new Map<number, number[]>();
+  let clamped = 0;
+  for (const v of raw) {
+    if (!Array.isArray(v) || v.length !== 4 || !isIntIn(v[0], 0, vertices - 1)
+      || !Number.isInteger(v[1]) || !Number.isInteger(v[2]) || !Number.isInteger(v[3])) { fx.add("sculpt-vertex", () => host); continue; }
+    const e = [v[0] as number];
+    let c = false;
+    for (let k = 1; k < 4; k++) {
+      const o = v[k] as number;
+      const b = Math.min(maxOffset, Math.max(-maxOffset, o));
+      if (b !== o) c = true;
+      e.push(b);
+    }
+    if (c) clamped++;
+    if (byIndex.has(e[0])) fx.add("sculpt-dupvertex", () => host);
+    byIndex.set(e[0], e);
+  }
+  if (clamped) fx.add("sculpt-offset", () => host, clamped);
+  return Array.from(byIndex.values());
+};
+
+// skee writes vertices 4294967295 for a host that is no chargen tri (PresetInterface.cpp:473-476): the capture reads this game's count
+const sculptFrom = (x: unknown, divisor: number, fx: Fixes, vertexCountOf?: (host: string) => number): SculptHost[] => {
   if (x === undefined || x === null) return [];
-  if (!Array.isArray(x) || x.length > MAX_SCULPT_HOSTS) return null;
+  if (!Array.isArray(x)) { fx.add("sculpt-list", () => typeof x); return []; }
+  const maxOffset = Math.min(MAX_SCULPT_OFFSET, MAX_SCULPT_UNITS * divisor);
   const out: SculptHost[] = [];
-  for (const h of x) {
-    if (!isObject(h) || !isTriPath(h.host) || !isIntIn(h.vertices, 1, MAX_VERTICES)) return null;
-    const host = h.host, vertices = h.vertices;
+  for (let i = 0; i < x.length; i++) {
+    const h = x[i];
+    if (!isObject(h) || !isTriPath(h.host)) { fx.add("sculpt-host", () => (isObject(h) ? String(h.host) : `#${i}`)); continue; }
+    const host = h.host;
     const raw = h.data === undefined || h.data === null ? [] : h.data;
-    if (!Array.isArray(raw) || raw.length > vertices) return null;
-    const data: number[][] = [];
-    for (const v of raw) {
-      if (!Array.isArray(v) || v.length !== 4 || !isIntIn(v[0], 0, vertices - 1)) return null;
-      const maxOffset = Math.min(MAX_SCULPT_OFFSET, MAX_SCULPT_UNITS * (divisor as number));
-      for (let k = 1; k < 4; k++) if (!isIntIn(v[k], -maxOffset, maxOffset)) return null;
-      data.push([v[0], v[1], v[2], v[3]]);
+    if (!Array.isArray(raw)) { fx.add("sculpt-data", () => host); continue; }
+    // Empty, or a second entry for a host already taken (any case): left out
+    if (!raw.length || out.some((o) => o.host.toLowerCase() === host.toLowerCase())) continue;
+    let vertices = h.vertices;
+    if (!isIntIn(vertices, 1, MAX_VERTICES)) {
+      let local = -1;
+      if (vertexCountOf) { try { local = vertexCountOf(host); } catch { local = -1; } }
+      if (!isIntIn(local, 1, MAX_VERTICES)) { fx.add("sculpt-vertices", () => `${host} ${String(h.vertices)}`); continue; }
+      fx.add("sculpt-recount", () => `${host} ${String(h.vertices)} -> ${local}`);
+      vertices = local;
     }
-    if (data.length && !out.some((o) => o.host.toLowerCase() === host.toLowerCase())) out.push({ host, vertices, data });
+    const data = sculptDataFrom(raw, vertices as number, maxOffset, host, fx);
+    if (!data.length) continue;
+    if (out.length >= MAX_SCULPT_HOSTS) { fx.add("sculpt-count", () => host); continue; }
+    out.push({ host, vertices: vertices as number, data });
   }
   return out;
 };
 
-// The face part of a .jslot (skee SaveJsonPreset), or null when it breaks a rule. Head parts, weight, tints, face
-// textures and the vanilla sliders come from the SkyMP appearance; overrides, transforms and body morphs from part 1.
-export const facePresetFrom = (jslot: unknown): FacePreset | null => {
-  if (!isObject(jslot)) return null;
-  const version = versionFrom(jslot.version);
-  if (!version) return null;
-  const morphs = isObject(jslot.morphs) ? jslot.morphs : {};
-  const custom = customFrom(morphs.custom);
-  const hasSculpt = Array.isArray(morphs.sculpt) && morphs.sculpt.some((h) => isObject(h) && Array.isArray(h.data) && h.data.length > 0);
-  if (hasSculpt && !isIntIn(morphs.sculptDivisor, 1, MAX_SCULPT_DIVISOR)) return null;
-  const sculpt = sculptFrom(morphs.sculpt, hasSculpt ? morphs.sculptDivisor : 10000);
-  if (!custom || !sculpt) return null;
-  const sculptDivisor = sculpt.length ? (morphs.sculptDivisor as number) : 10000;
-  return { version, modNames: modNamesFrom(jslot), custom, sculptDivisor, sculpt };
+// An upper bound of encodeFace's length (a name char escapes to at most 6, a number is at most 25 chars), so most faces skip the encode
+const encodedAtMost = (f: FacePreset): number => {
+  let n = 400;
+  for (const m of f.modNames) n += m.length * 6 + 3;
+  for (const m of f.custom) n += m.name.length * 6 + 50;
+  for (const h of f.sculpt) n += h.host.length * 6 + 60 + h.data.length * 40;
+  return n;
 };
 
-// The first rule facePresetFrom finds broken, null when it takes the face; detail (names, paths) is for the diag file only
-export interface PresetRefusal { code: string; at: number; value: string; detail: string }
-const numText = (v: unknown): string => (typeof v === "number" && Number.isFinite(v) ? String(Math.round(v * 1e4) / 1e4) : typeof v);
-export const facePresetRefusal = (jslot: unknown): PresetRefusal | null => {
-  const r = (code: string, at: number, value: unknown, detail: string): PresetRefusal => ({ code, at, value: numText(value), detail });
-  if (!isObject(jslot)) return r("notobject", -1, 0, "not an object");
-  if (!versionFrom(jslot.version)) return r("version", -1, 0, "version");
+// The face part of a .jslot with each bad entry dropped or clamped on its own (racemenupresets.js faceFixed is the same), null if no object
+export const facePresetFixed = (jslot: unknown, vertexCountOf?: (host: string) => number): FaceTaken | null => {
+  if (!isObject(jslot)) return null;
+  const fx = new Fixes();
+  let version = versionFrom(jslot.version);
+  if (!version) { fx.add("version", () => "version"); version = { signature: SKEE_SIGNATURE, formatVersion: SKEE_FORMAT_VERSION, skseVersion: 0, runtimeVersion: 0 }; }
   const morphs = isObject(jslot.morphs) ? jslot.morphs : {};
-  const custom = morphs.custom;
-  if (custom !== undefined && custom !== null) {
-    if (!Array.isArray(custom) || custom.length > MAX_CUSTOM_MORPHS) return r("custom-count", -1, Array.isArray(custom) ? custom.length : 0, "custom list");
-    for (let i = 0; i < custom.length; i++) {
-      const m = custom[i];
-      if (!isObject(m) || !isCleanString(m.name, MAX_MORPH_NAME)) return r("custom-name", i, 0, `custom ${i}: name`);
-      if (!morphValueOk(m.value)) return r("custom-value", i, m.value, `custom ${m.name}=${String(m.value)}`);
-    }
+  const custom = customFrom(morphs.custom, fx);
+  const hasSculpt = Array.isArray(morphs.sculpt) && morphs.sculpt.some((h) => isObject(h) && Array.isArray(h.data) && h.data.length > 0);
+  let sculpt: SculptHost[] = [];
+  if (hasSculpt && !isIntIn(morphs.sculptDivisor, 1, MAX_SCULPT_DIVISOR)) fx.add("sculpt-divisor", () => String(morphs.sculptDivisor));
+  else sculpt = sculptFrom(morphs.sculpt, hasSculpt ? morphs.sculptDivisor as number : 10000, fx, vertexCountOf);
+  const face: FacePreset = { version, modNames: modNamesFrom(jslot), custom, sculptDivisor: sculpt.length ? morphs.sculptDivisor as number : 10000, sculpt };
+  // Too long to send or keep: the largest sculpted parts go first, the sliders stay
+  while (face.sculpt.length && encodedAtMost(face) > PRESET_MAX_CHARS && encodeFace(face).length > PRESET_MAX_CHARS) {
+    let big = 0;
+    for (let i = 1; i < face.sculpt.length; i++) if (face.sculpt[i].data.length > face.sculpt[big].data.length) big = i;
+    const gone = face.sculpt[big];
+    fx.add("sculpt-size", () => gone.host);
+    face.sculpt = face.sculpt.filter((_, i) => i !== big);
+    if (!face.sculpt.length) face.sculptDivisor = 10000;
   }
-  const sculpt = morphs.sculpt;
-  const hasSculpt = Array.isArray(sculpt) && sculpt.some((h) => isObject(h) && Array.isArray(h.data) && h.data.length > 0);
-  if (hasSculpt && !isIntIn(morphs.sculptDivisor, 1, MAX_SCULPT_DIVISOR)) return r("sculpt-divisor", -1, morphs.sculptDivisor, `sculptDivisor ${String(morphs.sculptDivisor)}`);
-  if (sculpt === undefined || sculpt === null) return null;
-  if (!Array.isArray(sculpt) || sculpt.length > MAX_SCULPT_HOSTS) return r("sculpt-count", -1, Array.isArray(sculpt) ? sculpt.length : 0, "sculpt list");
-  const maxOffset = Math.min(MAX_SCULPT_OFFSET, MAX_SCULPT_UNITS * (hasSculpt ? (morphs.sculptDivisor as number) : 10000));
-  for (let i = 0; i < sculpt.length; i++) {
-    const h = sculpt[i];
-    if (!isObject(h) || !isTriPath(h.host)) return r("sculpt-host", i, 0, `sculpt ${i}: host ${isObject(h) ? String(h.host).slice(0, 120) : "?"}`);
-    if (!isIntIn(h.vertices, 1, MAX_VERTICES)) return r("sculpt-vertices", i, h.vertices, `sculpt ${h.host}: vertices ${String(h.vertices)}`);
-    const raw = h.data === undefined || h.data === null ? [] : h.data;
-    if (!Array.isArray(raw) || raw.length > h.vertices) return r("sculpt-data", i, Array.isArray(raw) ? raw.length : 0, `sculpt ${h.host}: data`);
-    for (const v of raw) {
-      if (!Array.isArray(v) || v.length !== 4 || !isIntIn(v[0], 0, h.vertices - 1)) return r("sculpt-vertex", i, Array.isArray(v) ? v[0] : 0, `sculpt ${h.host}: vertex ${JSON.stringify(v).slice(0, 60)}`);
-      for (let k = 1; k < 4; k++) if (!isIntIn(v[k], -maxOffset, maxOffset)) return r("sculpt-offset", i, v[k], `sculpt ${h.host}: offset ${JSON.stringify(v).slice(0, 60)} (max ${maxOffset})`);
-    }
-  }
-  return null;
+  return { face, fixes: fx.list };
 };
+
+export const facePresetFrom = (jslot: unknown, vertexCountOf?: (host: string) => number): FacePreset | null => {
+  const taken = facePresetFixed(jslot, vertexCountOf);
+  return taken ? taken.face : null;
+};
+
+// The trace's short form of the fixes: "code:n,code:n" (no names or paths)
+export const fixesText = (fixes: FaceFix[]): string => fixes.map((f) => `${f.code}:${f.n}`).join(",");
+
+// Why facePresetFrom gives null, or null when it takes the face
+export interface PresetRefusal { code: string; at: number; value: string; detail: string }
+export const facePresetRefusal = (jslot: unknown): PresetRefusal | null => (isObject(jslot) ? null : { code: "notobject", at: -1, value: typeof jslot, detail: "not an object" });
 
 export const isEmptyFace = (f: FacePreset): boolean => !f.custom.length && !f.sculpt.length;
 

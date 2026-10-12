@@ -140,7 +140,8 @@ const bundle = async (rel, dir) => {
     readPresetFile: (n) => W.files[n],
     writePresetFile: (n, t) => { W.files[n] = t; },
     removePresetFile: (n) => { const had = n in W.files; delete W.files[n]; return had; },
-    getTriVertexCount: () => 9001,
+    // A KS Hairdo's path (apostrophe) is one the platform's tri reader refuses: -1
+    getTriVertexCount: (h) => (/'/.test(h) ? -1 : 9001),
   };
   const makeController = () => {
     const ons = {}, emit = {};
@@ -561,23 +562,85 @@ const bundle = async (rel, dir) => {
       && asks.join('|') === 'rmp ask have=-|rmp ask have=- n=5 noanswer', [selfGets().length, asks]);
   }
 
-  // ---- upload gap (12 Oct): every way out of a capture is traced, and a refused capture names the rule it broke ----
+  // ---- upload gap (12 Oct): every way out of a capture is traced; a face past the old limits is sent, not refused ----
   {
-    // a RaceMenu slider past the validator's range (a fraction beyond 1): refused here, nothing sent, the rule named
+    const upText = () => puts().map((p) => p.data).join('');
+    // a RaceMenu slider past -1..1 (skee64.ini fSliderMultiplier above 1): sent as it is, no fix
     let Q = spawned('none');
     W.savedJslot = jslotWith(1.5, false);
     let before = TR.length;
     editor(Q);
-    check('upload gap: a capture with a slider at 1.5 is refused, nothing sent', puts().length === 0 && saves().length === 1, puts());
-    check('upload gap: ...traced with the rule, index and value (no name or path)', TR.slice(before).some((l) => /^rmp cap err=parse chars=\d+ why=custom-value at=0 v=1\.5$/.test(l)), TR.slice(before));
-    check('upload gap: ...and the diag file names the slider', W.diag.some((l) => /^preset: own preset refused \(\d+ chars\): custom NoseBridge=1\.5$/.test(l)), W.diag);
-    // a sculpt offset past 30 units
+    check('upload gap: a capture with a slider at 1.5 is sent whole (was: refused, nothing sent)', puts().length === 1 && saves().length === 1 && P.decodeFace(upText()).custom[0].value === 1.5, puts());
+    check('upload gap: ...traced as an ordinary capture, no fix', TR.slice(before).some((l) => /^rmp cap chars=\d+ h=[0-9a-f]{8} cu=1 sc=0 race=13746 send=1$/.test(l)), TR.slice(before));
+    check('upload gap: ...and the diag file says it was saved, no refusal', W.diag.some((l) => /^preset: own face saved, 1 sliders/.test(l)) && !W.diag.some((l) => /refused/.test(l)), W.diag);
+    // a sculpt offset past 30 units: clamped to 30, the face sent
     Q = spawned('none');
     W.savedJslot = jslotWith(0.2, false);
     W.savedJslot.morphs.sculpt = [{ host: HEAD, vertices: 9001, data: [[3, 10, 20, 400000]] }];
     before = TR.length;
     editor(Q);
-    check('upload gap: a sculpt offset past 30 units is refused and traced as sculpt-offset', puts().length === 0 && TR.slice(before).some((l) => /^rmp cap err=parse chars=\d+ why=sculpt-offset at=0 v=400000$/.test(l)), TR.slice(before));
+    check('upload gap: a sculpt offset past 30 units is clamped to 30 and sent, traced fixed=sculpt-offset:1', puts().length === 1 && JSON.stringify(P.decodeFace(upText()).sculpt[0].data) === '[[3,10,20,300000]]'
+      && TR.slice(before).some((l) => /^rmp cap chars=\d+ h=[0-9a-f]{8} cu=1 sc=1 race=13746 fixed=sculpt-offset:1 send=1$/.test(l)), [TR.slice(before), puts().length]);
+    check('upload gap: ...the diag file names the host it clamped', W.diag.some((l) => l === `preset: own face taken with fixes: sculpt-offset x1 (first: ${HEAD})`), W.diag);
+
+    // An established face loaded from a RaceMenu preset (Olverom #KWK5, 12 Oct 14:07-14:18): sliders made under a wider
+    // fSliderMultiplier, a preset slider past 32, one far past any range, a head sculpt past 30 units, a hair sculpt skee
+    // wrote with no vertex count, a KS Hairdo's hair the tri reader refuses, and fields the rules do not use
+    const HAIR = 'Actors\\Character\\Character Assets\\Hair\\FemaleRedGuardHair04.tri';
+    const KSH = "KS Hairdo's\\Adela.tri";
+    const established = () => {
+      const j = jslotWith(0.2, false);
+      j.modNames = ['Skyrim.esm', "KS Hairdo's.esp"];
+      j.overrides = [{ node: 'Body [Ovl0]', values: [{ data: 0.5, index: -1, key: 8, type: 3 }] }];
+      j.someNewField = { x: 1 };
+      j.morphs.custom = [{ name: 'NoseBridge', value: 1.3700000047683716 }, { name: 'ChinWidth', value: -2 }, { name: 'EyePreset', value: 40 }, { name: 'LipFull', value: 12.5 }, { name: 'BrowUp', value: 0.25 }];
+      j.morphs.sculpt = [{ host: HEAD, vertices: 9001, data: [[3, 10, 20, 400000], [8, -5, 5, 0]] }, { host: HAIR, vertices: 4294967295, data: [[5, 100, 200, 300]] }, { host: KSH, vertices: 4294967295, data: [[1, 1, 1, 1]] }];
+      return j;
+    };
+    Q = spawned('none');
+    W.savedJslot = established();
+    before = TR.length;
+    editor(Q);
+    const up = puts();
+    const sentFace = up.length ? P.decodeFace(upText()) : null;
+    check('established face: captured and sent, every slider kept (1.37, -2, preset 40, 0.25) and 12.5 clamped to 10',
+      up.length >= 1 && !!sentFace && JSON.stringify(sentFace.custom) === JSON.stringify([{ name: 'NoseBridge', value: 1.3700000047683716 }, { name: 'ChinWidth', value: -2 }, { name: 'EyePreset', value: 40 }, { name: 'LipFull', value: 10 }, { name: 'BrowUp', value: 0.25 }]), sentFace && sentFace.custom);
+    check('established face: the head sculpt kept (offset clamped), the hair sculpt recounted from this game\'s tri, the unreadable KS hair left out',
+      !!sentFace && JSON.stringify(sentFace.sculpt) === JSON.stringify([{ host: HEAD, vertices: 9001, data: [[3, 10, 20, 300000], [8, -5, 5, 0]] }, { host: HAIR, vertices: 9001, data: [[5, 100, 200, 300]] }]), sentFace && sentFace.sculpt);
+    check('established face: one trace line with the fixes as codes and counts', TR.slice(before).some((l) => new RegExp(`^rmp cap chars=${upText().length} h=${up.length ? up[0].hash : 'x'} cu=5 sc=2 race=13746 fixed=custom-clamp:1,sculpt-offset:1,sculpt-recount:1,sculpt-vertices:1 send=1$`).test(l)), TR.slice(before));
+    check('established face: the diag file names the first entry of each fix', W.diag.some((l) => l.startsWith('preset: own face taken with fixes: custom-clamp x1 (first: LipFull=12.5); sculpt-offset x1')
+      && l.includes(`sculpt-recount x1 (first: ${HAIR} 4294967295 -> 9001); sculpt-vertices x1 (first: ${KSH} 4294967295)`)), W.diag);
+    check('established face: the text sent is the rules\' own (they change nothing on it: the server keeps it as it is)', !!sentFace && P.encodeFace(sentFace) === upText()
+      && P.facePresetFixed({ version: JSON.parse(upText()).version, modNames: JSON.parse(upText()).modNames, morphs: JSON.parse(upText()) }).fixes.length === 0);
+    // The relog: a new session, the server answers with what was sent; the face goes back on the player as it was sent
+    const sentHash = up.length ? up[0].hash : '';
+    const sentText = upText();
+    clear();
+    W.me = ME; W.actors[0x14] = { race: RACE, loaded: true, combat: false }; W.loadResult = true;
+    const R = make(M.RacemenuPresetService, natives);
+    step(R, 1100, 7);
+    const parts = P.chunkText(sentText);
+    parts.forEach((data, i) => deliver(R, { customPacketType: 'dboPresetChunk', actor: 0xff0000aa, self: true, hash: sentHash, race: RACE, i, n: parts.length, data }));
+    step(R, 1100);
+    runWorks();
+    const back = loads().length ? JSON.parse(loads()[0].file) : null;
+    check('established face after a relog: loaded onto the player with every slider and both sculpted parts',
+      !!back && JSON.stringify(back.morphs.custom.map((m) => m.value)) === '[1.3700000047683716,-2,40,10,0.25]' && back.morphs.sculpt.map((h) => h.host).join('|') === `${HEAD}|${HAIR}`, back && back.morphs);
+    check('established face after a relog: traced as applied, nothing dropped', TR.includes(`rmp apply ok h=${sentHash} hp=1 drop=0`), TR.filter((l) => /rmp apply/.test(l)).slice(-3));
+    // The same preset still in skee: an editor closed with no change sends nothing (the server already keeps it)
+    W.savedJslot = established();
+    W.packets = [];
+    before = TR.length;
+    editor(R);
+    check('established face: an editor closed again with no change sends nothing (send=unchanged)', puts().length === 0
+      && TR.slice(before).some((l) => new RegExp(`^rmp cap chars=\\d+ h=${sentHash} cu=5 sc=2 race=13746 fixed=custom-clamp:1,sculpt-offset:1,sculpt-recount:1,sculpt-vertices:1 send=unchanged$`).test(l)), TR.slice(before));
+
+    // not JSON, or not an object: the only faces refused now, still traced with why
+    Q = spawned('none');
+    W.savedJslot = [1, 2];
+    before = TR.length;
+    editor(Q);
+    check('upload gap: a preset file that is not an object is refused, nothing sent, traced why=notobject', puts().length === 0 && TR.slice(before).some((l) => /^rmp cap err=parse chars=\d+ why=notobject at=-1 v=object$/.test(l)), TR.slice(before));
     // the platform without the preset natives
     clear();
     W.me = ME;
