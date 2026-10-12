@@ -2229,7 +2229,6 @@ globalThis.__dboHandlers.disconnect = (userId) => {
   const a = actorOf(userId); if (a) audit(`LEAVE ${who(a)}`);
   // The body stays a while after a logout; whether it may still be harmed is decided now (offlineBodyProtected)
   if (a) { try { globalThis.__dboNoteLogout(a); } catch (e) { log('logout note failed', e.message); } }
-  if (a && globalThis.__dboPlayerMenuLeave) globalThis.__dboPlayerMenuLeave(a);
   // Before the revert below clears the beast state: a drop with the Journal closed may be a crash next to a
   // Vampire Lord, and the breaker needs the position and the state while they still exist
   if (a && globalThis.__dboVlBreakerDrop) {
@@ -2238,6 +2237,10 @@ globalThis.__dboHandlers.disconnect = (userId) => {
   if (a) globalThis.__dboJournalOpen.delete(a >>> 0);
   // A beast race must never be saved as the character's own
   if (a && globalThis.__dboBeastRevert) { try { globalThis.__dboBeastRevert(a, 'logout'); } catch (e) { log('beast revert on logout failed', e.message); } }
+  // The mask comes off after the beast, as at login: the revert puts back the look kept at the change, which is named
+  // "Masked Person" when the mask was on then. Unmasked first, the real name went back and maskName was cleared, then
+  // the revert wrote the mask name over it with nothing kept behind it (#LLX8, 11 Oct 06:40: masked, Beast Form, logout)
+  if (a && globalThis.__dboPlayerMenuLeave) globalThis.__dboPlayerMenuLeave(a);
   if (a && globalThis.__dboSuperLeave) { try { globalThis.__dboSuperLeave(a); } catch (e) { /* no rite */ } }
   // Logging out inside a dungeon would put them back inside it next time, in a claim that is not theirs
   if (a && globalThis.__dboDungeonLeave) { try { globalThis.__dboDungeonLeave(a); } catch (e) { log('dungeon logout move failed', e.message); } }
