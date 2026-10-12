@@ -510,21 +510,39 @@ module.exports = (api) => {
   // the doors that lead in. The Blades have none on purpose while Cloud Ruler Temple is a ruin.
   globalThis.__dboGuildHall = (id) => { const f = FACTIONS.get(String(id)); return f ? hallOf(f) : null; };
   globalThis.__dboGuildStorage = (id) => storageOf(String(id));
-  // The faction whose hall (guild-defs hall.doors) stands in this interior cell, { id, name } or null: a hall door's own
-  // cell from doors-pos.json, worldspaces left out, so Frostcrag Spire's lectern names the College of Whispers (Nate, 10 Oct)
+  // The faction whose hall stands in this interior cell, { id, name } or null. First the cells guild-defs lists for a hall
+  // (hall.cells): rooms its doors do not stand in, as the Cathedral of St Martin (both its hall doors stand in Bruma's
+  // street) and the Synod Conclave's main hall, where its Scholars' Ledger and Class Lecterns stand (its hall doors stand
+  // in the basement). Then each hall door's own cell from doors-pos.json, worldspaces left out, so Frostcrag Spire's
+  // lectern names the College of Whispers (Nate, 10 Oct). doors-pos.json keeps its cells in lower case and the engine's
+  // getIdFromDesc matches a plugin's name exactly ("bsheartland.esm not found in loaded files"), so a cell is spelled as
+  // the load order spells its plugin before it is looked up: until 12 Oct every lookup threw, the map stayed empty, and
+  // no hall named its faction (spells.js refused teaching at every ledger and lectern; the Cathedral's tome sales were
+  // titled the Synod's and did not pay the Great Faiths).
   const HALL_CELLS = (() => {
     const out = new Map();
+    const add = (cell, f) => { const k = String(cell || '').toLowerCase(); if (k && !out.has(k)) out.set(k, { id: f.id, name: f.name }); };
     let rows = {}; try { rows = (readJson(path.resolve('doors-pos.json'), {}) || {}).doors || {}; } catch (e) { rows = {}; }
     const low = new Map(Object.entries(rows).map(([k, v]) => [String(k).toLowerCase(), v]));
+    const listed = (f) => (f.hall && Array.isArray(f.hall.cells) ? f.hall.cells.map(String) : []);
+    // Each plugin's name as the load order spells it, from the doors' own descs ("7a815:BSHeartland.esm") and the halls'
+    const spelling = new Map();
+    const learn = (desc) => { const s = String(desc), i = s.indexOf(':'); if (i > 0 && !spelling.has(s.slice(i + 1).toLowerCase())) spelling.set(s.slice(i + 1).toLowerCase(), s.slice(i + 1)); };
+    for (const k of Object.keys(rows)) learn(k);
+    for (const f of FACTIONS.values()) for (const d of (hallOf(f) || { doors: [] }).doors.concat(listed(f))) learn(d);
+    const spelled = (desc) => { const i = desc.indexOf(':'); return i > 0 ? `${desc.slice(0, i)}:${spelling.get(desc.slice(i + 1).toLowerCase()) || desc.slice(i + 1)}` : desc; };
+    // true for a worldspace, false for a cell, null when the engine cannot say
+    const isWorld = (desc) => { try { const r = mp.lookupEspmRecordById(mp.getIdFromDesc(spelled(desc)) >>> 0); return r && r.record ? String(r.record.type) === 'WRLD' : null; } catch (e) { return null; } };
+    // A listed cell is left out only when it is a worldspace; a door's cell only when it is not known to be a cell
+    for (const f of FACTIONS.values()) for (const c of listed(f)) if (isWorld(c) !== true) add(c, f);
     for (const f of FACTIONS.values()) for (const d of (hallOf(f) || { doors: [] }).doors) {
       const row = low.get(String(d).toLowerCase());
       const cell = String((Array.isArray(row) && row[3]) || '').toLowerCase();
-      if (!cell) continue;
-      let world = false; try { const r = mp.lookupEspmRecordById(mp.getIdFromDesc(cell) >>> 0); world = !!(r && r.record && String(r.record.type) === 'WRLD'); } catch (e) { world = true; }
-      if (!world && !out.has(cell)) out.set(cell, { id: f.id, name: f.name });
+      if (cell && isWorld(cell) === false) add(cell, f);
     }
     return out;
   })();
+  log(`guilds: ${HALL_CELLS.size} hall cell(s) name their faction (${[...new Set([...HALL_CELLS.values()].map((h) => h.id))].join(', ') || 'none'})`);
   globalThis.__dboHallFactionAt = (cellDesc) => HALL_CELLS.get(String(cellDesc || '').toLowerCase()) || null;
   // A faction's hall as a house (Nate, 4 Oct: the College of Whispers in Frostcrag Spire): a claimed building one of whose
   // doors guild-defs lists as the faction's hall, owned by an account that leads the faction. Its members use it as its
