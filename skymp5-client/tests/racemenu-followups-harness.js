@@ -397,6 +397,29 @@ const bundle = async (rel, dir) => {
     && TR.includes('rmp refused h=empty why=clear restore=inflight'), TR.filter((l) => /refused/.test(l)).slice(-2));
   W.savedJslot = jslotWith(-0.6, true);
 
+  // ---- E6 gap: a capture held because the editor closed before the server answered is made again once it answers ----
+  clear();
+  W.me = ME; W.actors[0x14] = { race: RACE, loaded: true, combat: false }; W.loadResult = true;
+  W.savedJslot = jslotWith(-0.6, true);
+  S = make(M.RacemenuPresetService, natives);
+  step(S, 1100, 2);
+  let t0 = TR.length;
+  editor(S);
+  check('retry: an editor closed before the server answered is held', puts().length === 0 && TR.slice(t0).includes('rmp cap held=noanswer'), TR.slice(t0));
+  step(S, 1100, 4);
+  deliver(S, { customPacketType: 'dboPresetNone', actor: 0xff0000aa, self: true });
+  step(S, 1000, 2);
+  check('retry: the answer (no face) comes in: the held capture is made and sent with no other editor close', puts().length === 1 && puts()[0].hash === EDIT.hash, [puts(), W.diag.slice(-2)]);
+  check('retry: traced', TR.slice(t0).includes('rmp cap retry'), TR.slice(-4));
+  clear();
+  S = make(M.RacemenuPresetService, natives);
+  step(S, 1100, 2);
+  editor(S);
+  step(S, 1000, 50);
+  deliver(S, { customPacketType: 'dboPresetNone', actor: 0xff0000aa, self: true });
+  step(S, 1000, 2);
+  check('retry: an answer more than 45 s after the hold (the server\'s save window is closing): not retried, traced', puts().length === 0 && TR.includes('rmp cap retry=late'), puts());
+
   // ---- C1: the head the editor left is sent as it is ----
   {
     clear();

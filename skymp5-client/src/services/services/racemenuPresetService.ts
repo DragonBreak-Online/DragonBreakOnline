@@ -33,6 +33,8 @@ const CACHE_FRESH_MS = 10 * 60 * 1000;
 const GET_RETRY_MS = 15000;
 // An upload not refused this long after its last chunk is taken as kept by the server
 const UPLOAD_CONFIRM_MS = 15000;
+// A capture held for the server's answer is made again if it comes this soon (appearance.js keeps a save window 90 s)
+const HELD_RETRY_MS = 45000;
 const MAX_CACHED = 64;
 const DIAG_LOG = "dbo-diag";
 const DIAG_MAX_LINES = 60;
@@ -105,6 +107,7 @@ export class RacemenuPresetService extends ClientListener {
     this.sentUpload = null;
     this.selfAsks = 0;
     this.selfWait = "";
+    this.heldForAnswerAt = 0;
     this.off = false;
   }
 
@@ -123,6 +126,7 @@ export class RacemenuPresetService extends ClientListener {
     this.serverSelf = null;
     this.selfAsks = 0;
     this.selfWait = "";
+    this.heldForAnswerAt = 0;
   }
 
   // A gate holding the player's own load is traced when it changes, not every second it holds
@@ -211,6 +215,7 @@ export class RacemenuPresetService extends ClientListener {
     if (!natives || !player) return;
     if (isGuardedActor(player)) return;
     const held = this.captureHeldBy(player, Date.now());
+    this.heldForAnswerAt = held && held.code === "noanswer" ? Date.now() : 0;
     if (held) { this.diag(`preset: capture held, ${held.text}`); trace(`rmp cap held=${held.code}`); return; }
     const race = (player.getRace()?.getFormID() ?? 0) >>> 0;
     const name = presetFileName("self");
@@ -283,7 +288,12 @@ export class RacemenuPresetService extends ClientListener {
       // The server's switch (racemenuPresets.enabled false): nothing more is sent, saved or loaded this session
       if (content["off"] === true && !this.off) { this.off = true; this.upload = null; this.sentUpload = null; this.diag("preset: switched off by the server"); trace("rmp off"); }
       this.store(actor, { hash: "", race: 0, face: null, at: now });
-      if (this.isSelfAnswer(content, actor)) { this.serverSelf = this.cache[actor]; this.selfAsks = 0; trace(`rmp ans none off=${content["off"] === true ? 1 : 0}`); }
+      if (this.isSelfAnswer(content, actor)) {
+        this.serverSelf = this.cache[actor];
+        this.selfAsks = 0;
+        trace(`rmp ans none off=${content["off"] === true ? 1 : 0}`);
+        this.retryHeldCapture(now);
+      }
     } else if (type === "dboPresetMeta") {
       const hash = String(content["hash"] || "");
       const known = this.cache[actor];
@@ -302,11 +312,21 @@ export class RacemenuPresetService extends ClientListener {
         this.serverSelf = this.cache[actor];
         this.selfAsks = 0;
         trace(`rmp ans face h=${chunk.hash} n=${chunk.n} chars=${text.length} cu=${face.custom.length} sc=${face.sculpt.length} race=${hex(content["race"])}`);
+        this.retryHeldCapture(now);
       }
     } else if (type === "dboPresetRev") {
       const known = this.cache[actor];
       if (known && known.hash !== String(content["hash"] || "")) { delete this.cache[actor]; delete this.getSentAt[actor]; }
     }
+  }
+
+  // An editor closed before the server answered: its capture is made again now, not at the next close (E6 harness gap)
+  private retryHeldCapture(now: number): void {
+    if (!this.heldForAnswerAt || this.off) return;
+    const late = now - this.heldForAnswerAt > HELD_RETRY_MS;
+    this.heldForAnswerAt = 0;
+    trace(`rmp cap retry${late ? "=late" : ""}`);
+    if (!late && !this.captureAt) this.captureAt = now;
   }
 
   private isSelfAnswer(content: Record<string, unknown>, actor: number): boolean {
@@ -590,6 +610,8 @@ export class RacemenuPresetService extends ClientListener {
   private sentUpload: { hash: string; entry: CacheEntry; doneAt: number } | null = null;
   private selfAsks = 0;
   private selfWait = "";
+  // When a capture was held for want of the server's answer (0: none waiting)
+  private heldForAnswerAt = 0;
   private noNativesNoted = false;
   private off = false;
   private diagLines = 0;
