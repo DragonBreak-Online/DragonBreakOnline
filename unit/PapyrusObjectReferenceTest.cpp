@@ -292,7 +292,8 @@ TEST_CASE("PlaceAtMe reuses a placed world object already standing at the "
   // The vanilla torch sconce (Skyrim.esm ACTI RemovableTorchSconce01, 9151e)
   // places RemovableTorch01 (ACTI 9151f) in OnCellLoad, which the server runs
   // again every run; each run used to add one more saved torch (12 Oct 2026)
-  constexpr uint32_t kSconce = 0x9151e, kTorch = 0x9151f, kIronSword = 0x12eb7;
+  constexpr uint32_t kSconce = 0x9151e, kTorch = 0x9151f, kIronSword = 0x12eb7,
+                     kTorch01 = 0x1d4ec;
   auto& p = GetPartOne();
   auto& br = p.worldState.GetEspm().GetBrowser();
   LocationalData at = { { 1000, 2000, 300 },
@@ -302,14 +303,16 @@ TEST_CASE("PlaceAtMe reuses a placed world object already standing at the "
                          at, FormCallbacks::DoNothing(), kSconce, "ACTI"),
                        0xff00f001);
   auto& sconce = p.worldState.GetFormAt<MpObjectReference>(0xff00f001);
-  auto place = [&](uint32_t baseId) {
+  auto placeBy = [&](MpObjectReference& placer, uint32_t baseId,
+                     bool forcePersist) {
     auto res = PapyrusObjectReference().PlaceAtMe(
-      sconce.ToVarValue(),
+      placer.ToVarValue(),
       { VarValue(std::make_shared<EspmGameObject>(br.LookupById(baseId))),
-        VarValue(1), VarValue(false), VarValue(false) });
+        VarValue(1), VarValue(forcePersist), VarValue(false) });
     auto refr = GetFormPtr<MpObjectReference>(res);
     return refr ? refr->GetFormId() : 0u;
   };
+  auto place = [&](uint32_t baseId) { return placeBy(sconce, baseId, false); };
 
   const auto first = place(kTorch);
   REQUIRE(first != 0);
@@ -328,4 +331,17 @@ TEST_CASE("PlaceAtMe reuses a placed world object already standing at the "
   const auto swordA = place(kIronSword), swordB = place(kIronSword);
   REQUIRE(swordA != 0);
   REQUIRE(swordA != swordB);
+
+  // abForcePersist is made every time
+  REQUIRE(placeBy(sconce, kTorch, true) != second);
+
+  // An actor on the same spot always gets a new reference (MpActor::DropItem
+  // places a dropped torch, LIGH Torch01, with the dropper as the placer)
+  p.CreateActor(0xff00f002, { 1000, 2000, 300 }, 0, 0x3c);
+  auto& actor = p.worldState.GetFormAt<MpActor>(0xff00f002);
+  const auto droppedA = placeBy(actor, kTorch01, false);
+  const auto droppedB = placeBy(actor, kTorch01, false);
+  REQUIRE(droppedA != 0);
+  REQUIRE(droppedA != droppedB);
+  REQUIRE(placeBy(actor, kTorch, false) != second);
 }

@@ -403,13 +403,10 @@ VarValue PapyrusObjectReference::PlaceAtMe(
   FormCallbacks callbacks = selfRefr->GetCallbacks();
   std::string type = akFormToPlace.rec->GetType().ToString();
 
-  // A script that places a world object at its own spot in OnInit/OnCellLoad/OnLoad runs again every server run (the
-  // "sent" flag lives in memory, script variables are not saved), and each placement is a saved form. The vanilla torch
-  // sconce (RemovableTorchSconce01SCRIPT) put one more torch on its sconce at every restart: 3,414 by 12 Oct 2026, up to
-  // 57 on one sconce. So an activator, light, static or moveable static placed exactly where a live (not disabled, not
-  // deleted) placed copy of the same base already stands returns that copy instead of a new one. Actors, items and
-  // anything placed abForcePersist or more than once are made as before.
-  const bool reusable = aiCount <= 1 && !abInitiallyDisabled &&
+  // A world object's OnCellLoad placement reruns every server run (a torch per sconce per restart): reuse its live copy
+  // An actor's placement is always new: DropItem sets the count on what PlaceAtMe returns, so reuse ate a dropped torch
+  const bool reusable = !selfRefr->AsActor() && aiCount <= 1 &&
+    !abForcePersist && !abInitiallyDisabled &&
     (type == "ACTI" || type == "LIGH" || type == "STAT" || type == "MSTT");
   if (reusable) {
     auto worldState = selfRefr->GetParent();
