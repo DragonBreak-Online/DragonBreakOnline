@@ -28,7 +28,7 @@ type Mp = any;
 // Every tier gets the server console (consoleCommandsAllowed per assign; keep enableConsoleCommandsForAll OFF) and the tabbed admin panel (client AdminMenuService, Insert key).
 // Only tiers with TIER_CAPS.ban may ban; the refusal is enforced here, never in the client.
 // A Trial GM (adminRoles.trialgm, no admin tier) gets the menu without addresses or hardware ids, TP to a player or a
-// location, Rename and the Invisible mode (TRIAL_GM_ACTIONS / TRIAL_GM_MODES); anything else is refused here and logged.
+// location, Rename and the Invisible and Ghost modes (TRIAL_GM_ACTIONS / TRIAL_GM_MODES); anything else is refused here and logged.
 // Bans post to the backend (master key + auth token), which snapshots discordId/hwid/ip into bans.json; connection-check then refuses the player permanently.
 //
 // Wire protocol (CustomPacket JSON):
@@ -619,7 +619,7 @@ export class AdminSystem implements System {
   }
 
   // What a Trial GM may ask of the panel: the menu, the teleport locations, a teleport to an online player or a location,
-  // a rename, the Invisible mode
+  // a rename, the Invisible and Ghost modes
   private trialMay(type: string, content: Content): boolean {
     if (type === "adminMenuRequest" || TRIAL_GM_REQUESTS.has(type)) return true;
     if (type !== "adminAction") return false;
