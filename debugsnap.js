@@ -7,7 +7,7 @@
 // /bug <what happened>: any player. Freezes the same picture for them alone plus the last minute of log lines that
 // name them or an NPC near them, into /var/lib/dbo-monitor/bugs/<time>-<tag>.json (0600: it can hold private log text),
 // and logs a BUGREPORT line that dbo-monitor posts as a thread in #bug-tracker (the old #error-report, same channel).
-// One per player per BUG_EVERY_MS.
+// Both name the reporter by their own name, behind a mask or a beast form too (staffName). One per player per BUG_EVERY_MS.
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -107,6 +107,19 @@ module.exports = (api) => {
     return out;
   };
 
+  // The reporter as staff need them: behind a mask or in a beast form display() is "Masked Person #TAG" or "Werewolf
+  // #TAG", and three /bug threads came in titled so (D15, 11 Oct). playermenu.js gives the character's own name with why
+  // it is hidden, "Raven (masked)"; the #TAG is the same either way. It goes before the tag because dbo-monitor reads
+  // the reporter as everything up to ' #TAG <file>.json: ' (bugreport_re), and '#' or a line break in it would break
+  // that. Staff only: the line becomes a #bug-tracker thread (staff only; an in-game /bug opens no public thread) and
+  // the snapshot is 0600. The player's own reply never names them.
+  const staffName = (a) => {
+    let s = '';
+    try { s = typeof globalThis.__dboStaffName === 'function' ? String(globalThis.__dboStaffName(a) || '') : ''; } catch (e) { s = ''; }
+    s = s.replace(/[#\s]+/g, ' ').trim();
+    return s ? `${s} #${tagOf(a)}` : '';
+  };
+
   // /bug and the journal's Settings, Help (journalReport): { ok, text }, the reply for the player
   const fileBug = (a, args) => {
     // One line: a newline in the text would forge lines in the server log (review 2026-09-25)
@@ -116,13 +129,19 @@ module.exports = (api) => {
     if (!isAdmin(a) && Date.now() - last < C.bugEveryMs) return { ok: false, text: 'Your last report was a moment ago; wait a minute before the next.' };
     S.bugAt.set(profileOf(a), Date.now());
     let view; try { view = playerView(a); } catch (e) { return { ok: false, text: 'Your position could not be read; try again in a moment.' }; }
-    const needles = [display(a).replace(/ #.*/, ''), hex(a)].concat(view.npcs.slice(0, 12).map((n) => n.id));
+    const shown = display(a), staff = staffName(a);
+    // A hidden name is shared ("Masked Person", "Werewolf"): its lines are found by the name with the #TAG, and the
+    // character's own name, when kept, finds the lines from before the mask went on
+    const own = staff.replace(/ \(.*/, ''), shownName = shown.replace(/ #.*/, '');
+    const names = staff ? [shown].concat(own && own !== shownName ? [own] : []) : [shownName];
+    const needles = names.concat(hex(a), view.npcs.slice(0, 12).map((n) => n.id));
     const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
     const file = path.join(C.dir, 'bugs', `${stamp}-${tagOf(a)}.json`);
     // profileId: the backend matches the snapshot to the reporter's launcher, which then sends their logs to the same thread
-    const ok = write(file, { at: new Date().toISOString(), by: display(a), profileId: profileOf(a), text: text.slice(0, 500), view, log: recentLog(needles), voice: voiceNear(a, view) });
+    const ok = write(file, Object.assign({ at: new Date().toISOString(), by: staff || shown }, staff ? { shownAs: shown } : {},
+      { profileId: profileOf(a), text: text.slice(0, 500), view, log: recentLog(needles), voice: voiceNear(a, view) }));
     // The whole text as saved (500): dbo-monitor copies this line into the #bug-tracker thread, which allows 1500
-    log(`BUGREPORT ${display(a)} ${path.basename(file)}: ${text.slice(0, 500)}`);
+    log(`BUGREPORT ${staff || shown} ${path.basename(file)}: ${text.slice(0, 500)}`);
     return { ok, text: ok ? 'Thanks, the staff team has your report. To add a screenshot, use Report a Problem on the website and mention the time of your /bug.' : 'The report could not be saved; please tell staff.' };
   };
   globalThis.__dboBugReport = (a, text) => fileBug(a, text);
