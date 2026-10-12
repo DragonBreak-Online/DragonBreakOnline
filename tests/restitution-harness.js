@@ -17,7 +17,8 @@ const THIEF = 0xff000700, OTHER = 0xff000701, BOX = 0x0806535b;
 const C0138 = CASES['0138'];
 
 // the shipped case
-ok(CFG.restitution && CFG.restitution.enabled === true && CFG.restitution.cases.includes('0138'), 'gamemode-config restitution on, case 0138');
+// Case 0138 closed 12 Oct (Nate, ticket #0141: the barrel was unlocked; Lady Dyer keeps copies). The case data stays as the record.
+ok(CFG.restitution && CFG.restitution.enabled === true && !CFG.restitution.cases.includes('0138'), 'gamemode-config restitution on, case 0138 closed');
 const sum = (m) => Object.values(m).reduce((s, n) => s + n, 0);
 ok(C0138.tag === 'MTK7' && sum(C0138.items) === 649 && C0138.items.f === 352 && Object.keys(C0138.items).length === 48, 'case 0138: #MTK7, 649 items in 48 kinds, 352 gold');
 ok(Object.values(C0138.containers).every((cap) => Object.entries(cap).every(([h, n]) => n <= (C0138.items[h] || 0))), 'every container cap is within what was taken');
