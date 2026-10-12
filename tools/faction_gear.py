@@ -43,6 +43,11 @@ SETS = [
     ('Vampire clans (royal)', ['clan-volkihar'], r"^Vampire Royal Armor$", None),
     ('Vampire clans', VAMPIRES, r"^Vampire (Armor|Boots|Gauntlets|Gloves|Hood|Robes)$", None),
     ('Orcish', CLANS, r"^Orcish (?!Arrow|Bolt)", None),
+    # The Vigil's own kit from Sentinel (Nate, 12 Oct, Roland EbonShield: any tier 5 smith could make these, which left
+    # the faction nothing to recruit with). Four of the fifteen were listed by hand on 28 Sep; the rest were not, so the
+    # mail, plate, coif, shield and the two Vigilant weapons were open to anyone. Sentinel.esp only: "Vigilant" also
+    # names unrelated gear in other mods.
+    ('Vigilants of Stendarr', ['vigil-of-stendarr'], r"^Vigil(ant)? ", lambda n, e, p: '_TH_' in e),
     # Modded silver only: Immersive Weapons' silver weapons and Immersive Armors' mantles, not the base game's
     ('Silver Hand', ['silver-hand'], r"(Silver (Longsword|Battle Staff|War Axe|Battleaxe|Scimitar|Nodachi|Katana|Wakizashi|Tanto|Hawk Bow|Sword)|Mantle of the Silver Hand)$",
      lambda n, e, p: p in ('Immersive Weapons.esp', 'Hothtrooper44_ArmorCompilation.esp')),

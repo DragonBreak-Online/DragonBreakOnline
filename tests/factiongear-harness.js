@@ -150,5 +150,19 @@ globalThis.__dboFactionGearState = undefined;
 require(path.join(SERVER, 'factiongear.js'))(Object.assign({}, api, { cfg: {} }));
 check('with no config at all it is off', globalThis.__dboFactionCraft(A.OUT, IMP_HELM) === true);
 
+// Roland EbonShield, 12 Oct: any tier 5 blacksmith could forge the Vigil kit, so the Vigil of Stendarr had nothing to
+// recruit with. Four of the fifteen Sentinel.esp pieces were listed on 28 Sep; the other eleven, including the mail,
+// the plate, the shield and both Vigilant weapons, were open to anyone. The whole set belongs to the faction.
+{
+  const gear = JSON.parse(require('fs').readFileSync(require('path').resolve(__dirname, '..', 'faction-gear.json'), 'utf8'));
+  const vigil = Object.entries(gear.items).filter(([, v]) => v.set === 'Vigilants of Stendarr');
+  check('all 15 Vigil pieces belong to the set', vigil.length === 15, vigil.length);
+  check('and to that faction alone', vigil.every(([, v]) => v.factions.length === 1 && v.factions[0] === 'vigil-of-stendarr'));
+  check('every one of them is a Sentinel.esp item', vigil.every(([k]) => k.endsWith(':Sentinel.esp')));
+  check('each has the recipe it gates', vigil.every(([, v]) => v.recipes && v.recipes.length));
+  const robes = vigil.filter(([, v]) => v.role === 'tailor').map(([, v]) => v.name).sort();
+  check('the robes and hood are the tailor\'s, the rest the smith\'s', JSON.stringify(robes) === JSON.stringify(['Vigil Hood', 'Vigil Robes']), robes);
+}
+
 console.log(failures ? `${failures} FAILED` : 'all checks passed');
 process.exit(failures ? 1 : 0);

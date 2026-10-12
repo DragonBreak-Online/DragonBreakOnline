@@ -26539,54 +26539,6 @@
 "kind": "light body",
 "province": "skyrim"
 },
-"8f0:sentinel.esp": {
-"to": "13951:Skyrim.esm",
-"edid": "TH_PaladinBootsA",
-"toEdid": "ArmorSteelBootsA",
-"family": "steelplate",
-"kind": "heavy feet",
-"province": "skyrim"
-},
-"8f2:sentinel.esp": {
-"to": "13952:Skyrim.esm",
-"edid": "TH_PaladinCuirassA",
-"toEdid": "ArmorSteelCuirassA",
-"family": "steelplate",
-"kind": "heavy body",
-"province": "skyrim"
-},
-"8f3:sentinel.esp": {
-"to": "13952:Skyrim.esm",
-"edid": "TH_PaladinCuirassB",
-"toEdid": "ArmorSteelCuirassA",
-"family": "steelplate",
-"kind": "heavy body",
-"province": "skyrim"
-},
-"8f4:sentinel.esp": {
-"to": "13953:Skyrim.esm",
-"edid": "TH_PaladinGauntlets",
-"toEdid": "ArmorSteelGauntletsA",
-"family": "steelplate",
-"kind": "heavy hands",
-"province": "skyrim"
-},
-"8f7:sentinel.esp": {
-"to": "13954:Skyrim.esm",
-"edid": "TH_PaladinHelmetA",
-"toEdid": "ArmorSteelHelmetA",
-"family": "steelplate",
-"kind": "heavy head",
-"province": "skyrim"
-},
-"8f8:sentinel.esp": {
-"to": "13955:Skyrim.esm",
-"edid": "TH_PaladinShield",
-"toEdid": "ArmorSteelShield",
-"family": "steelplate",
-"kind": "heavy shield",
-"province": "skyrim"
-},
 "922:immersive weapons.esp": {
 "to": "13986:Skyrim.esm",
 "edid": "IWDragonsteelDagger",
