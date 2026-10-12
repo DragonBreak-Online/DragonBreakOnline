@@ -2142,6 +2142,14 @@ const appearanceHook = (actorId, appearance, isAllowed) => {
 };
 appearanceHook.__dbo = true;
 mp.onUpdateAppearanceAttempt = appearanceHook;
+// ---- spawn watch: a game that never shows its character arriving where the server holds it (server\spawnwatch.js) ----
+// It woke in Riverwood's Sleeping Giant Inn instead ("Losing gear", 11 Oct): the position is sent again, the player told,
+// and that game's outfit and favourites are not written down
+try {
+  const SPAWNWATCH_JS = path.resolve('spawnwatch.js');
+  delete require.cache[SPAWNWATCH_JS];
+  globalThis.__dboSpawnWatch = require(SPAWNWATCH_JS)({ mp, log, personal, display, userOf, creationPending, worldIdOf, cfg });
+} catch (e) { log('spawnwatch.js failed to load:', e.stack || e.message); globalThis.__dboSpawnWatch = null; }
 // Puts the saved outfit back on: the client is asked to equip each remembered item, then reports
 // it worn, and the engine stores that report. Nothing to do when the player is already dressed.
 const redress = (a) => {
@@ -2192,8 +2200,11 @@ const onCharacterReady = (userId, a) => {
   try { if (globalThis.__dboClock) globalThis.__dboClock.sendTo(a); } catch (e) { /* clock later */ }
   // A new character is carried through the landing into the hub behind a black screen
   if (creationPending(a)) { creation.set(a, 'spawning'); setFade(a, true); if (inHub(a)) setCreatorHidden(a, true); setTimeout(() => fallBackToLanding(a), HUB_SPAWN_WAIT_MS); }
-  // Seed the remembered outfit from the save before the client's undressed login reports replace it.
-  try { const worn = wornOf(mp.get(a, 'equipment')); if (worn.length) mp.set(a, 'private.lastWorn', worn.map((w) => [w.baseId, w.left ? 1 : 0])); } catch (e) { /* nothing saved */ }
+  // Seed the remembered outfit from the save before the client's undressed login reports replace it, unless the last
+  // session's game never arrived (spawnwatch.js): that equipment is what it wore in Riverwood
+  let seedOutfit = true;
+  try { if (globalThis.__dboSpawnWatch) seedOutfit = globalThis.__dboSpawnWatch.login(a) !== false; } catch (e) { log('spawn watch login failed', e.message); }
+  try { const worn = wornOf(mp.get(a, 'equipment')); if (worn.length && seedOutfit) mp.set(a, 'private.lastWorn', worn.map((w) => [w.baseId, w.left ? 1 : 0])); } catch (e) { /* nothing saved */ }
   setTimeout(() => { if (actorOf(userId) === a && !creationPending(a)) { try { redress(a); } catch (e) { log('redress failed', e.message); } } }, 12000);
   setTimeout(timed('loginSetup', () => {
     if (actorOf(userId) !== a) return;
@@ -3020,6 +3031,7 @@ onUi('mealCancel', (a, args) => endMeal(a, String(args[0] || 'moved').replace(/[
 // The client reports its body really landed in a world; the creation flow steps on that (see startCreationInHub)
 onUi('arrived', (a, args) => {
   const world = Number(args[0]) >>> 0;
+  if (globalThis.__dboSpawnWatch) globalThis.__dboSpawnWatch.arrived(a, world);
   if (!creationPending(a)) { if (world !== worldIdOf(HUB.cellOrWorldDesc)) leftRealm(a); return; }
   const stage = creation.get(a);
   if (world === worldIdOf(HUB.cellOrWorldDesc)) setCreatorHidden(a, true);
@@ -3051,6 +3063,8 @@ const sendFavorites = (a) => {
 onUi('favorites', (a, args) => {
   const r = args[0] && typeof args[0] === 'object' ? args[0] : null;
   if (!r) return;
+  // A game that has not shown arriving (spawnwatch.js) may not see the plugin items: its shorter list is not kept
+  if (globalThis.__dboSpawnWatch && globalThis.__dboSpawnWatch.holding(a)) { log(`favorites from ${display(a)} not saved: its game has not shown arriving`); return; }
   const saved = { items: cleanFavorites(r.items), spells: cleanFavorites(r.spells) };
   mp.set(a, 'private.dboFavorites', saved);
   log(`favorites saved for ${display(a)}: ${saved.items.length} item(s), ${saved.spells.length} spell(s)`);
@@ -5452,6 +5466,9 @@ const equipHook = (actorId, equipment, isAllowed, ...rest) => {
     // supernatural.js notes a vampire spell the client holds before the server strips an unlearned one
     if (typeof globalThis.__dboSuperEquipSeen === 'function') globalThis.__dboSuperEquipSeen(a, equipment);
     if (typeof globalThis.__dboBeastStaleSpells === 'function') globalThis.__dboBeastStaleSpells(a, equipment);
+    // spawnwatch.js: the game has loaded, so its arrival report is due; until it comes its outfit is not remembered
+    const spawnWatch = globalThis.__dboSpawnWatch;
+    if (spawnWatch) { try { spawnWatch.report(a); } catch (e) { log('spawn watch report failed', e.message); } }
     const worn = wornOf(equipment);
     const conn = connectedAt.get(a) || 0;
     const first = firstEquipOf.get(a) !== conn;
@@ -5459,7 +5476,7 @@ const equipHook = (actorId, equipment, isAllowed, ...rest) => {
     const fresh = first || Date.now() - conn < WORN_GRACE_MS || Date.now() - (firstEquipAt.get(a) || 0) < LOGIN_BURST_MS;
     // A beast form's outfit (the Vampire Lord's robes) is not the character's: a revert re-dresses from lastWorn
     let beast = null; try { beast = mp.get(a, 'private.beast'); } catch (e) { /* not an actor */ }
-    if (isAllowed && worn.length && !fresh && !(beast && beast.form)) mp.set(a, 'private.lastWorn', worn.map((w) => [w.baseId, w.left ? 1 : 0]));
+    if (isAllowed && worn.length && !fresh && !(beast && beast.form) && !(spawnWatch && spawnWatch.holding(a))) mp.set(a, 'private.lastWorn', worn.map((w) => [w.baseId, w.left ? 1 : 0]));
     // Armour changed in a fight costs time (armourswap.js); the login re-dress is the server's own
     if (isAllowed && armourSwap) armourSwap.onEquip(a, worn, fresh || creationPending(a) || Date.now() - (redressAt.get(a) || 0) < 5000);
     // The naked login report is the moment to dress, not the 12 s fallback in onCharacterReady
