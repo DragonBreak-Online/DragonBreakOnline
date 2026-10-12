@@ -872,7 +872,13 @@ module.exports = (api) => {
   // The ledger each open shop came from (its building is paid for the sale); outlives a reload like the nonces
   const shopLedger = globalThis.__dboTomeLedger instanceof Map ? globalThis.__dboTomeLedger : (globalThis.__dboTomeLedger = new Map());
   // The name players read for the seller: the faction whose hall this is (guilds.js), else the Synod as before
-  const sellerName = (a) => { try { const n = typeof globalThis.__dboLedgerPlaceName === 'function' ? globalThis.__dboLedgerPlaceName(shopLedger.get(a >>> 0) || a) : ''; return n || 'The Synod'; } catch (e) { return 'The Synod'; } };
+  // The shop's own place first (shopPlaces: the cathedral is the Great Faiths'), as its refusals already name it (#bugs 12 Oct:
+  // the cathedral's ledger was titled "The Synod" while saying "The Great Faiths sells its tomes only to its own")
+  const sellerName = (a) => {
+    const p = placeOf(a);
+    if (p && p.name) return p.name;
+    try { const n = typeof globalThis.__dboLedgerPlaceName === 'function' ? globalThis.__dboLedgerPlaceName(shopLedger.get(a >>> 0) || a) : ''; return n || 'The Synod'; } catch (e) { return 'The Synod'; }
+  };
   const openShop = (a, result, resultKind) => {
     const nonce = `${(a >>> 0).toString(16)}-${Date.now().toString(36)}`;
     shopNonces.set(a >>> 0, nonce);
@@ -884,7 +890,7 @@ module.exports = (api) => {
     const admin = !!R && R.bypass(a);
     const shelfLine = `The shelf changes each Monday. This week ${stockFor(a, R, admin).length ? 'it holds tomes chosen for your study' : 'it holds no tome your study can take'}.`;
     openWidget(a, {
-      type: 'tomeShop', id: SHOP_ID, nonce, title: R ? `${sellerName(a)}: Spell Tomes of ${R.provinceName(CFG.shopProvince)}` : `${sellerName(a)}: Spell Tomes`, gold,
+      type: 'tomeShop', id: SHOP_ID, nonce, seller: sellerName(a), title: R ? `${sellerName(a)}: Spell Tomes of ${R.provinceName(CFG.shopProvince)}` : `${sellerName(a)}: Spell Tomes`, gold,
       canBuy: !whyNot, nextPurchaseAt: nextBuyAt(a), whyNot,
       skills: held.map((x) => ({ id: x.s.id, label: x.s.label, tier: x.tier, tierName: TIER_NAMES[x.tier], schools: (x.s.vanillaSkills || []).slice() })),
       tomes: stockFor(a, R, admin).filter((t) => schools.has(t.school)).map((t) => {
@@ -930,7 +936,7 @@ module.exports = (api) => {
     const t = SHOP.find((x) => x.bookId === bookId);
     if (!t || !pathsOf(a, t.school).some((skill) => tierOf(a, skill.id) >= 0)) return { ok: false, text: 'The court mage will not sell you that tome.' };
     const R = regions();
-    if (!soldFor(a, R, t) && !R.bypass(a)) return { ok: false, text: `The Synod does not stock ${t.name}; ${soldIn(R, t) ? `it is sold in ${soldIn(R, t)}` : 'it is not sold anywhere'}.` };
+    if (!soldFor(a, R, t) && !R.bypass(a)) return { ok: false, text: `${sellerName(a)} does not stock ${t.name}; ${soldIn(R, t) ? `it is sold in ${soldIn(R, t)}` : 'it is not sold anywhere'}.` };
     const block = tomeBlock(a, t) || rankBlock(a, t);
     if (block) return { ok: false, text: `${t.title}: ${block}.` };
     if (knows(a, t.spellId) || inBook(a, t.spellId)) return { ok: false, text: `You already know ${t.name}.` };

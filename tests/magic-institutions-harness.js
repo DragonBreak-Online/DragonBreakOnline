@@ -570,6 +570,7 @@ ui('lecternCancel', TEACHER, [lastWidget(TEACHER, 'classLectern').nonce]);
   let w = shop(PRIESTLY);
   check('a Great Faiths Acolyte in the Cathedral may buy, and is offered only Restoration and Alteration', w && w.canBuy === true && w.tomes.length > 0 && w.tomes.every((t) => t.school === 'Restoration' || t.school === 'Alteration'), w && [w.whyNot, w.tomes.map((t) => t.school)]);
   check('...up to Apprentice, as a college student', w.tomes.every((t) => t.rank <= 1), w.tomes.map((t) => t.rankName));
+  check('the Cathedral\'s shop is titled and signed by the Great Faiths, not the Synod (#bugs 12 Oct)', /^The Great Faiths: Spell Tomes/.test(w.title) && w.seller === 'The Great Faiths', [w.title, w.seller]);
   at(PRIESTLY, SYNOD);
   check('the Acolyte at the Synod is refused: the Great Faiths buy only at their Cathedral', shop(PRIESTLY).canBuy === false && /court mage sells tomes only to members of the Synod or a College/.test(shop(PRIESTLY).whyNot), shop(PRIESTLY).whyNot);
   member(MAGE, 'synod', 'Associate'); skillAt(MAGE, 'priest', 40); skillAt(MAGE, 'arcane', 40); gold(MAGE, 5000); at(MAGE, CATHEDRAL);
