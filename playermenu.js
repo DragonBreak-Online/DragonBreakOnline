@@ -235,6 +235,8 @@ module.exports = (api) => {
     try { if (typeof globalThis.__dboSuperMenuEntries === 'function') entries.push(...globalThis.__dboSuperMenuEntries(a, t)); } catch (e) { /* no curses */ }
     try { if (typeof globalThis.__dboFactionMenuEntries === 'function') entries.push(...globalThis.__dboFactionMenuEntries(a, t)); } catch (e) { /* factions not loaded */ }
     try { if (typeof globalThis.__dboSchoolsMenuEntries === 'function') entries.push(...globalThis.__dboSchoolsMenuEntries(a, t)); } catch (e) { /* schools not loaded */ }
+    // A ruler or Steward answers a citizenship request face to face (citizenship.js)
+    try { if (typeof globalThis.__dboCitizenMenuEntries === 'function') entries.push(...globalThis.__dboCitizenMenuEntries(a, t)); } catch (e) { /* citizenship not loaded */ }
     const r = get(t, RESTRAINED_PROP, null) || {};
     const own = get(a, RESTRAINED_PROP, null) || {};
     if (get(a, LAWFUL_PROP, false) === true && !own.boundHands && !own.carried) {
@@ -295,6 +297,7 @@ module.exports = (api) => {
     if (typeof globalThis.__dboSuperMenuAction === 'function' && globalThis.__dboSuperMenuAction(a, id, t, nameFor)) return;
     if (typeof globalThis.__dboFactionMenuAction === 'function' && globalThis.__dboFactionMenuAction(a, id, t)) return;
     if (typeof globalThis.__dboSchoolsMenuAction === 'function' && globalThis.__dboSchoolsMenuAction(a, id, t, nameFor)) return;
+    if (typeof globalThis.__dboCitizenMenuAction === 'function' && globalThis.__dboCitizenMenuAction(a, id, t)) return;
     if (typeof globalThis.__dboRopeMenuAction === 'function' && globalThis.__dboRopeMenuAction(a, id, t)) return;
   });
 

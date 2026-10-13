@@ -55,6 +55,8 @@ const path = require('path');
 
 module.exports = (api) => {
   const { mp, log, personal, audit, who, display, cfg, onUi, onlineActors, every, readOfficials, zoneById } = api;
+  // A Lead GM may correct a listed value (citizenship design); everyone else reassesses only unlisted property
+  const isLeadStaff = typeof api.isLeadStaff === 'function' ? api.isLeadStaff : () => false;
   // Who set the hold's tax is kept by their own name, never a beast's, and a mask's only while rosterPrivacy.masks is
   // off (gamemode.js ownDisplay)
   const ownDisplay = typeof api.ownDisplay === 'function' ? api.ownDisplay : display;
@@ -72,7 +74,7 @@ module.exports = (api) => {
   const S = globalThis.__dboEconomy || (globalThis.__dboEconomy = { data: null });
   // balanceAfter: each treasury's balance when the last reckoning ended, to tell what came in since (A1-3)
   const fill = (d) => {
-    for (const k of ['rates', 'wages', 'values', 'owed', 'overdue', 'reports', 'assessed', 'balanceAfter', 'titheOwed']) if (!d[k] || typeof d[k] !== 'object') d[k] = {};
+    for (const k of ['rates', 'wages', 'values', 'owed', 'overdue', 'reports', 'assessed', 'balanceAfter', 'titheOwed', 'listed']) if (!d[k] || typeof d[k] !== 'object') d[k] = {};
     if (!Number.isFinite(d.lastReckoning)) d.lastReckoning = 0;
     return d;
   };
@@ -451,6 +453,14 @@ module.exports = (api) => {
   });
   // A house bought from the hold (tenancy.js /property buy, Nate 12 Oct) is worth what it sold for: the price becomes its
   // value for the weekly tax, stamped as an assessment, so a steward reassesses it within the usual limits after assessEveryDays
+  // tenancy.js's property panel: the value the weekly tax is taken on, and this week's tax at the land's rate
+  globalThis.__dboEconomyTaxOf = (ref) => {
+    const H = housing(); const primary = H && H.primaryOf(Number(ref) >>> 0); if (!primary) return null;
+    const key = String(Number(primary) >>> 0); const value = valueOf(Number(key));
+    let rate = 0;
+    try { const rec = H.recordOf(Number(key)); const t = territoryOfProperty(Number(key), rec); const fid = t && fn('__dboRealmOwnerOf') ? fn('__dboRealmOwnerOf')(t.id) : null; rate = fid ? rateOf(fid) : 0; } catch (e) { rate = 0; }
+    return { taxValue: value, weeklyTax: Math.floor(value * rate), listedValue: !!data().listed[key] };
+  };
   globalThis.__dboEconomySaleValue = (ref, gold, byWho) => {
     const H = housing(); const primary = H && H.primaryOf(Number(ref) >>> 0);
     gold = Math.floor(Number(gold));
@@ -460,7 +470,10 @@ module.exports = (api) => {
     // taxed on that price for months (claude-jake review, 12 Oct); a higher price stands, as the buyer agreed to it
     const step = Math.max(1, Number(C.assessMaxStep) || 1);
     const value = Math.min(C.maxPropertyValue, Math.max(gold, Math.floor(prev / step)));
-    data().values[key] = value; data().assessed[key] = { at: Date.now(), by: `sale to ${byWho}`, from: prev }; delete data().overdue[key]; save();
+    data().values[key] = value; data().assessed[key] = { at: Date.now(), by: `sale to ${byWho}`, from: prev }; delete data().overdue[key];
+    // The hold's listed value (citizenship design, Nate 14 Oct): the tax stays on it, through any resale, and no steward reassesses it
+    data().listed[key] = { value, price: gold, at: Date.now() };
+    save();
     audit(`ECONOMY property ${(Number(key) >>> 0).toString(16)} sold for ${gold} gold to ${byWho}; its value is now ${value} (was ${prev})`);
     return true;
   };
@@ -474,6 +487,9 @@ module.exports = (api) => {
     if (!H.isManager(a, ref) && !fiefHolder) return reply(a, false, 'Only the officials who manage this property assess it.');
     if (!Number.isFinite(gold) || gold < 0 || gold > C.maxPropertyValue) return reply(a, false, `A value is a whole number of gold from 0 to ${C.maxPropertyValue}.`);
     const key = String(H.primaryOf(ref));
+    // A house the hold sold is taxed on its listed value for good; a Lead GM may still correct it
+    const listed = data().listed[key];
+    if (listed && !isLeadStaff(a)) return reply(a, false, `This property was sold by the hold at a listed value of ${listed.value} gold. Its tax stays on that value; it cannot be reassessed.`);
     const last = data().assessed[key];
     const wait = last ? last.at + C.assessEveryDays * 86400000 - Date.now() : 0;
     if (wait > 0) return reply(a, false, `This property was assessed recently. It can be assessed again in ${days(wait)}.`);
@@ -481,7 +497,9 @@ module.exports = (api) => {
     const prev = valueOf(Number(key));
     const lo = Math.floor(prev / step), hi = Math.min(C.maxPropertyValue, Math.max(prev * step, C.defaultPropertyValue));
     if (gold < lo || gold > hi) return reply(a, false, `An assessment moves a value by at most ${step} times at once: from ${lo} to ${hi} gold for this property (now ${prev}).`);
-    data().values[key] = gold; data().assessed[key] = { at: Date.now(), by: who(a), from: prev }; save();
+    data().values[key] = gold; data().assessed[key] = { at: Date.now(), by: who(a), from: prev };
+    if (listed) data().listed[key] = { value: gold, price: listed.price, at: Date.now(), by: who(a) };
+    save();
     audit(`ECONOMY ${who(a)}${fiefHolder ? ' (fief holder)' : ''} assessed property ${ref.toString(16)} at ${gold} gold (was ${prev})`);
     const rec = H.recordOf(Number(key));
     if (rec && rec.owner) for (const x of ownerActors(H, rec)) if (onlineActors().includes(x)) personal(x, `Your property has been assessed at ${gold} gold (it was ${prev}). Property tax is a share of that value each week.`);

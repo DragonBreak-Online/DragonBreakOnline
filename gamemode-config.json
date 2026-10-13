@@ -1269,5 +1269,11 @@
   "nameHash": false,
   "inventoryDiff": false,
   "types": { "combat.hit": false, "cmd.info": true, "social.player_menu": true }
+ },
+ "citizenship": {
+  "_comment": "Citizenship of the holds and the first Jarl vote (server/citizenship.js; Nate 13/14 Oct, ~/claude-nate-release/specs/citizenship-1014.md). Ships on. A hold grants citizenship when its first office is a ruler's (rulerOffices: jarl, count); its ruler or Steward sets the policy (manual, paid, free) at a notice board; with nobody in the ruler's seat it is free. maxHolds per character (Primary, Secondary); cooldownDays after renouncing one. auto: holds whose factions and courts are its citizens. Citizenship gates buying property there (tenancy.js). noElection: holds with no vote (Bruma has a Count). election: starts by itself at threshold citizen accounts; registrationHours, then votingHours; counts hidden until the vote ends. discordRoles: hold id -> Discord role id (create the roles by hand, the code never does). Rollback: enabled false (hot reload): no board tabs, no F3 tab, no purchase gate, no election tick; the rolls stay in citizenship.json.",
+  "enabled": true, "maxHolds": 2, "cooldownDays": 7, "defaultPolicy": "free", "auto": ["bruma"], "noElection": ["bruma"],
+  "election": { "threshold": 15, "registrationHours": 24, "votingHours": 24 },
+  "discordRoles": { "bruma": "" }
  }
 }

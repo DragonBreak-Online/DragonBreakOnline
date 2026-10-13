@@ -3646,6 +3646,18 @@ const unseatOfficial = (a, z, tg) => {
   courtOfficeSync(z, tg, had, false);
   return { had, text: `${tg.label} is no longer ${rankTitle(had, z.id)} of ${z.name}.${tg.online ? '' : ' They are offline and were not told.'}` };
 };
+// Removes tg's rank in z for a process rather than a person (citizenship.js: an elected court replaces whoever held the
+// seat). byWho names it in the audit. { error } or { text, had }
+const unseatOfficialBy = (z, tg, byWho) => {
+  const o = readOfficials(); let had = null;
+  for (const r of Object.keys(o[z.id] || {})) { if ((o[z.id][r] || []).map(Number).includes(tg.pid)) had = r; o[z.id][r] = (o[z.id][r] || []).filter((x) => Number(x) !== tg.pid); }
+  if (!had) return { error: `${tg.label} holds no rank in ${z.name}.` };
+  try { writeOfficials(o); } catch (e) { return { error: 'Could not write officials.json: ' + e.message }; }
+  if (tg.online) system(tg.online, `You are no longer ${rankTitle(had, z.id)} of ${z.name}.`);
+  audit(`OFFICIAL ${byWho} unseated ${tg.who} as ${rankTitle(had, z.id)} of ${z.name}${tg.online ? '' : ' (offline)'}`);
+  courtOfficeSync(z, tg, had, false);
+  return { had, text: `${tg.label} is no longer ${rankTitle(had, z.id)} of ${z.name}.` };
+};
 // A ruler's appointment is an offer the target accepts on the Court tab (Nate, 3 Oct, Q4); staff seat outright
 const appointFrom = (a, z, rank, tg, override) => {
   const chk = appointCheck(a, z, rank, tg, override);
@@ -7187,7 +7199,7 @@ try {
 try {
   const ECONOMY_JS = path.resolve('economy.js');
   delete require.cache[ECONOMY_JS];
-  require(ECONOMY_JS)({ mp, log, ownNameOf, ownDisplay, personal, audit, who, display, cfg, onUi, onlineActors, every, readOfficials, zoneById });
+  require(ECONOMY_JS)({ mp, log, ownNameOf, ownDisplay, personal, audit, who, display, cfg, onUi, onlineActors, every, readOfficials, zoneById, isLeadStaff });
 } catch (e) { log('economy.js failed to load:', e.stack || e.message); globalThis.__dboEconomyView = null; }
 
 // ---- weapon racks in homes (server\weaponracks.js, weapon-racks.json from Nat's PC, config "weaponRacks") ------------------
@@ -7312,6 +7324,20 @@ try {
   require(NOBILITY_JS)({ mp, log, ownNameOf, ownDisplay, publicNameOf, personal, registerChatCommand, audit, who, display, nameOf, tagOf, onUi, onlineActors, profileOf, cfg, every, isLeadStaff,
     zoneById, readOfficials, ranksOf, accountActors, officialTarget, announce: (text) => broadcast(`[[S]]#{${C.SYS}}${text}`) });
 } catch (e) { log('nobility.js failed to load:', e.stack || e.message); for (const k of ['__dboNobility', '__dboNobilityFiefCut']) globalThis[k] = null; if (globalThis.__dboJournalSections) delete globalThis.__dboJournalSections.nobility; }
+
+// ---- citizenship of the holds and the first Jarl vote (server\citizenship.js, config "citizenship"; after court.js,
+// nobility.js and tenancy.js: it reads their officials and households, and tenancy.js asks it before a sale) -------------
+try {
+  const CITIZENSHIP_JS = path.resolve('citizenship.js');
+  delete require.cache[CITIZENSHIP_JS];
+  require(CITIZENSHIP_JS)({ mp, log, ownNameOf, ownDisplay, personal, system, audit, who, display, nameOf, tagOf, onUi, onlineActors, isAdmin, isLeadStaff, profileOf, cfg, every,
+    zoneList, zoneById, readOfficials, rankTitle, officialTarget, accountActors, seatOfficial, unseatOfficialBy, takeGold, depositToTreasury, openWidget, closeWidget,
+    boardZoneNear, raceEdidOf });
+} catch (e) {
+  log('citizenship.js failed to load:', e.stack || e.message);
+  for (const k of ['__dboCitizenMenuEntries', '__dboCitizenMenuAction', '__dboCitizenOf', '__dboCitizenGates', '__dboCitizenHolds', '__dboCitizenRoleIds', '__dboCitizenManagedRoleIds']) globalThis[k] = null;
+  if (globalThis.__dboJournalSections) delete globalThis.__dboJournalSections.citizen;
+}
 
 // ---- the Thalmor: Concordat arrests, informants, dossiers and the journal's Thalmor tab (server\thalmor.js, config "thalmor") --
 try {

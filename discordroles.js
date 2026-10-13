@@ -9,6 +9,10 @@
 // Homes: every property the character owns or rents (housingSystem.ts, housing.json) gives the role of its town under
 // ---HOMES---: Bruma, Falkreath, Whiterun and so on, each created the first time someone lives there.
 //
+// Citizens (citizenship.js, Nate 14 Oct): each hold the character is a citizen of, Primary and Secondary alike, gives the role
+// whose id config citizenship.discordRoles names for it (the roles are made by hand in Discord, never here); a hold with no
+// id gives none.
+//
 // The character online decides: another character of the same Discord user takes over at its own login. Only roles in
 // these two groups are ever added or removed. A player is synced shortly after login and then every syncMinutes while
 // online; nothing is sent when the roles already match. Replaces the MEE6 reaction roles (Nat, 2026-09-24).
@@ -143,16 +147,18 @@ module.exports = (api) => {
         } catch (e) { /* unreadable claim */ }
       }
     }
-    return { skillNames, skillLevels, homes };
+    let citizen = [];
+    try { citizen = typeof globalThis.__dboCitizenRoleIds === 'function' ? (globalThis.__dboCitizenRoleIds(a) || []).map(String) : []; } catch (e) { citizen = []; }
+    return { skillNames, skillLevels, homes, citizen };
   };
 
   const staffRoles = (a, roles) => { try { if (typeof api.staffRolesSeen === 'function') api.staffRolesSeen(a, roles); } catch (e) { log('discord roles: staff check failed for', who(a), e.message); } };
   const sync = (a) => serial(async () => {
     const discordId = discordOf(a);
     if (!discordId || !/^\d{15,22}$/.test(discordId)) return;
-    const { skillLevels, homes } = wanted(a);
+    const { skillLevels, homes, citizen } = wanted(a);
     // The key follows the levels, so a skill overtaking another is a change even when the names are the same set
-    const key = skillLevels.map((c) => `${c.name}:${c.level}`).sort().join(',') + '|' + [...homes].sort().join(',');
+    const key = skillLevels.map((c) => `${c.name}:${c.level}`).sort().join(',') + '|' + [...homes].sort().join(',') + '|' + citizen.slice().sort().join(',');
     const prev = S.synced.get(discordId);
     // Staff are read every time: their roles decide their rights (gamemode.js staffRolesSeen)
     const staff = typeof api.isStaff === 'function' && api.isStaff(a);
@@ -162,6 +168,11 @@ module.exports = (api) => {
     const managed = new Set();
     for (const l of skillLabels()) { const r = roles.get(l); if (r) managed.add(r.id); }
     for (const h of new Set([...Object.values(C.homeNames), ...homes])) { const r = roles.get(h); if (r) managed.add(r.id); }
+    // The citizen roles, by id: only those of the guild
+    const guildIds = new Set([...roles.values()].map((r) => r.id));
+    let citizenManaged = [];
+    try { citizenManaged = typeof globalThis.__dboCitizenManagedRoleIds === 'function' ? (globalThis.__dboCitizenManagedRoleIds() || []).map(String) : []; } catch (e) { citizenManaged = []; }
+    for (const id of citizenManaged) if (guildIds.has(id)) managed.add(id);
     let member;
     try { member = await request('GET', `/guilds/${guildId}/members/${discordId}`); }
     catch (e) {
@@ -174,7 +185,7 @@ module.exports = (api) => {
     // Ties are settled by what is already worn, so the skill roles are only known once the member has been read
     const heldSkills = new Set(skillLabels().filter((l) => { const r = roles.get(l); return r && have.has(r.id); }));
     const skillNames = pickSkills(skillLevels, heldSkills);
-    const want = new Set([...skillNames, ...homes].map((n) => (roles.get(n) || {}).id).filter(Boolean));
+    const want = new Set([...skillNames, ...homes].map((n) => (roles.get(n) || {}).id).filter(Boolean).concat(citizen.filter((id) => guildIds.has(id))));
     const add = [...want].filter((id) => !have.has(id));
     const drop = [...have].filter((id) => managed.has(id) && !want.has(id));
     for (const id of add) await request('PUT', `/guilds/${guildId}/members/${discordId}/roles/${id}`);

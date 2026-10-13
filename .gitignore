@@ -143,3 +143,7 @@ sprstrip-state.json
 gearstrip-state.json
 restitution-state.json
 discipline.json
+
+# Citizenship rolls, requests, policies and elections (citizenship.js)
+/citizenship.json
+/citizenship.json.tmp

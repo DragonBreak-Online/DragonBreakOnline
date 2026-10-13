@@ -83,6 +83,7 @@ declare -A NEEDS=(
   [mastery-refusal-notice]=server:skymp5-server/ts/systems/skillPoints.ts
   [housing-keys]=server:skymp5-server/ts/systems/housingSystem.ts
   [housing-staff]=server:skymp5-server/ts/systems/housingSystem.ts
+  [citizenship-transfer]=server:skymp5-server/ts/systems/housingSystem.ts
   [housing-places]=server:skymp5-server/ts/systems/housingSystem.ts
   [housing-places-apply]=server:skymp5-server/ts/systems/housingSystem.ts
   [housing-places-access]=server:skymp5-server/ts/systems/housingSystem.ts
