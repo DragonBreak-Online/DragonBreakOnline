@@ -1,5 +1,65 @@
 [
   {
+    "title": "The 13 October update, part 2",
+    "date": "2026-10-13",
+    "version": "Client 0.3.95",
+    "tag": "Update",
+    "sections": [
+      {
+        "heading": "Relaunch through the launcher",
+        "items": [
+          "This update brings client 0.3.95: relaunch through the launcher to get it."
+        ]
+      },
+      {
+        "heading": "The Key Ring",
+        "items": [
+          "House keys are no longer items. Every key now hangs on your Key Ring, so copies never stack or get mixed up. Type /keys to list yours in chat. This replaces the key changes from earlier today: keys can no longer be dropped, traded or stored as items.",
+          "A key opens its door even when the door is locked, and the door shows as unlocked to you. Without a key it stays locked.",
+          "Cut a key from the property menu and it goes straight onto your own Key Ring.",
+          "Keys you carry move onto your Key Ring when you log in. Keys left in a chest or sack go onto the ring of whoever opens it next.",
+          "A robber can still, very rarely, take one of your keys.",
+          "The Key Ring panel comes with the next client update. With it you will be able to give a key to a player beside you, and see and take back the copies of your own locks."
+        ]
+      },
+      {
+        "heading": "Characters and appearance",
+        "items": [
+          "RaceMenu slider changes made with /appearance on an existing character now save.",
+          "A GM coming back from invisible, or a player who rejoins, no longer looks like you on your screen.",
+          "Learned enchantments no longer carry over to your second character in the same game session."
+        ]
+      },
+      {
+        "heading": "Items",
+        "items": [
+          "Salt, Aversion poisons and Waterbreathing potions can be stored and dropped again."
+        ]
+      },
+      {
+        "heading": "Notice boards",
+        "items": [
+          "Notice boards now have Supply orders and Couriers buttons."
+        ]
+      },
+      {
+        "heading": "Executions at Castle Bruma",
+        "items": [
+          "The chopping block before Castle Bruma can now be used (press E).",
+          "The beheading animation now plays at the chopping block."
+        ]
+      },
+      {
+        "heading": "Interface",
+        "items": [
+          "No name tag shows over someone under Invisibility.",
+          "Your Other Player Volume setting is kept between game starts.",
+          "The Admin chat tab stays for staff."
+        ]
+      }
+    ]
+  },
+  {
     "title": "The 13 October update",
     "date": "2026-10-13",
     "version": "Server update",
@@ -30,17 +90,6 @@
         "heading": "Combat",
         "items": [
           "Blocking an NPC's blow now costs stamina, as it does against players, and your guard breaks when your stamina runs out."
-        ]
-      },
-      {
-        "heading": "The Key Ring",
-        "items": [
-          "House keys are no longer items. Every key now hangs on your Key Ring, so copies never stack or get mixed up. Open it with /keys.",
-          "A key opens its door even when the door is locked, and the door shows as unlocked to you. Without a key it stays locked.",
-          "Give a key to a player beside you from the Key Ring, or with Give a key on their X menu. They accept or decline it.",
-          "Owners see every copy of their keys and who holds it, can cut a key straight onto a nearby player's ring, and can take a single copy back. A taken-back key stops working at once.",
-          "Keys you carry move onto your Key Ring when you log in. Keys left in a chest or sack go onto the ring of whoever opens it next.",
-          "A robber can still, very rarely, take one of your keys."
         ]
       },
       {
