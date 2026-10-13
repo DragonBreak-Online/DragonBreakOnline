@@ -95,7 +95,7 @@ module.exports = (api) => {
     try {
       if (!globalThis.__dboBlessedWith || !globalThis.__dboBlessedWith(a, 'scholarBoon') || Math.random() >= chance) return;
       const b = pickFrom(skillBooksOf());
-      if (b && giveItem(a, b.id, 1)) personal(a, `Tucked ${where}, a book: ${b.name}. Hermaeus Mora collects, and sometimes he gives.`);
+      if (b && giveItem(a, b.id, 1)) { personal(a, `Tucked ${where}, a book: ${b.name}. Hermaeus Mora collects, and sometimes he gives.`); try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('itemflow', a, 'scholar_gift', b.id, 1); } catch (e) { /* the player log is optional */ } }
     } catch (e) { log('dungeons: scholar gift failed', e.message); }
   };
   const pickFrom = (list) => {
@@ -841,6 +841,8 @@ module.exports = (api) => {
       }
       audit(`DUNGEON ${who(leaderActor)} claimed ${d.name} on ${diff.label} with ${members.size} member(s), ${zones.length} enemies (${placed >= 0 ? placed + ' placed before entry' : 'placed on entry'}), ${filled} containers filled (${lease.rolledGold instanceof Map ? [...lease.rolledGold.values()].reduce((n, g) => n + g, 0) : 0} gold), ${lease.locked.size} locked`);
       log(`dungeon ${d.id} claimed by ${display(leaderActor)}: ${diff.id}, party level ${lease.partyLevel} x${lease.partySize}, ${moved} moved in, ${zones.length} enemies, ${placed} prespawned, ${filled} containers`);
+      // the player log (playerlog.js): the claim on every member's post (the audit names only the leader)
+      try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('dungeon', 'claim', [...members].map((pid) => actorByProfile(pid)).filter(Boolean), d.name, diff.label); } catch (e) { /* the player log is optional */ }
     };
     // Enemies stand on their spots before anyone arrives; the party waits for that, at most a few seconds
     const spawnNow = globalThis.__alduinakNpcSpawnNow;
@@ -945,6 +947,7 @@ module.exports = (api) => {
     // A ruin's opened gates and stairs close again for the next party (ruinbuttons.js)
     try { if (globalThis.__dboRuinLeaseEnded) globalThis.__dboRuinLeaseEnded(lease.id); } catch (e) { log('ruin buttons reset failed', e.message); }
     audit(`DUNGEON ${lease.name} released (${why})`);
+    try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('dungeon', 'end', [...lease.members].map((pid) => actorByProfile(pid)).filter(Boolean), lease.name, lease.difficulty, why); } catch (e) { /* the player log is optional */ }
   };
   // mp.getAllForms answers from a cache filled on its first call and never lists later spawns, so an id that throws once is skipped instead
   const gone = new Set();
@@ -1427,6 +1430,7 @@ module.exports = (api) => {
       if (!hit) return false;
       hit.count -= 1;
       mp.set(a, 'inventory', { entries: entries.filter((e) => Number(e.count) > 0) });
+      try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('itemflow', a, 'pick_snapped', LOCKPICK_BASE, -1); } catch (e) { /* the player log is optional */ }
       return true;
     } catch (e) { return false; }
   };
@@ -1458,6 +1462,7 @@ module.exports = (api) => {
       if (!e) { log(`${display(a)} logged out inside ${d.name}, which has no entrance spot to put them out of`); return false; }
       if (!teleport(a, e.world || e.cell, e.pos, e.rot)) return false;
       log(`${display(a)} logged out inside ${d.name}; moved out to the entrance`);
+      try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('dungeon', 'moved_out', [a], d.name, '', 'logout'); } catch (e) { /* the player log is optional */ }
       return true;
     } catch (err) { log('dungeon logout move failed', err.message); return false; }
   };
@@ -1477,6 +1482,7 @@ module.exports = (api) => {
       if (!teleport(a, e.world || e.cell, e.pos, e.rot)) return false;
       system(a, `${d.name} is claimed anew or rested since you left. You wake at its entrance.`);
       log(`${display(a)} logged in inside ${d.name} without a claim; moved out to the entrance`);
+      try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('dungeon', 'moved_out', [a], d.name, '', 'login'); } catch (e) { /* the player log is optional */ }
       return true;
     } catch (err) { log('dungeon login check failed', err.message); return false; }
   };
@@ -1867,13 +1873,18 @@ module.exports = (api) => {
 
   // ---- shared gold: coin found in a lease is split across the party inside ------------------------
   // Hands the other members inside their shares and returns what the finder keeps.
+  // the shares the last split handed out, for the player log's loot line (the body's search reads it right after)
+  let lastShares = [];
   const splitGold = (finder, lease, count) => {
+    lastShares = [];
     if (!lease) return count;
     const inside = [...lease.members].map((pid) => actorByProfile(pid)).filter((m) => m && (m === finder || (dungeonAround(m) || {}).id === lease.id));
     if (inside.length < 2) return count;
     const share = Math.floor(count / inside.length); if (share < 1) return count;
     let handed = 0;
-    for (const m of inside) { if (m === finder) continue; if (giveItem(m, GOLD_BASE, share)) { handed += share; personal(m, `${nameOf(finder)} found ${count} gold; your share is ${share}.`); raceGold(m, share, 'a share of loot'); } }
+    const shares = [];
+    for (const m of inside) { if (m === finder) continue; if (giveItem(m, GOLD_BASE, share)) { handed += share; shares.push({ actor: m, gold: share }); personal(m, `${nameOf(finder)} found ${count} gold; your share is ${share}.`); raceGold(m, share, 'a share of loot'); } }
+    lastShares = shares;
     return count - handed;
   };
   // Coin taken from a lease chest: the finder already holds the whole pile, so the shares come OUT of the finder first,
@@ -1916,6 +1927,7 @@ module.exports = (api) => {
       // Whatever could not be handed on (a failed give, the odd coin of a split) goes back to the finder
       if (removed > handed) giveItem(actorId, GOLD_BASE, removed - handed);
       if (handed) personal(actorId, `${count} gold, shared with your party: ${handed} went to them.`);
+      if (handed) { try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('loot', 'dungeon_chest_gold', actorId, sourceId, [], count - handed, others.map((m) => ({ actor: m, gold: each }))); } catch (e) { /* the player log is optional */ } }
       luck(actorId, count - handed, 'a chest');
     } catch (e) { log('gold split failed', e.message); }
   };
@@ -1992,14 +2004,18 @@ module.exports = (api) => {
     try { mp.set(targetId, 'private.dboLooted', true); } catch (e) { return false; }
     const diff = DIFFICULTIES.find((x) => x.id === (lease ? lease.difficulty : 'normal')) || DIFFICULTIES[1];
     const got = [];
+    const gave = [];
+    let goldKept = 0;
     const d = lease ? byId.get(lease.id) : null;
     const k = trimFor(d, diff);
     const gear = master ? [] : ((ST.bodyGear.get(targetId >>> 0) || {}).ids || []);
     ST.bodyGear.delete(targetId >>> 0);
     for (const en of (master ? bossLoot(diff, lootOk(lease), ayleidLootHere(d), isRaidRuin(d), k, lease && lease.province) : undead ? undeadLoot(diff, lootOk(lease), k) : corpseLoot(diff, lootOk(lease), k, gear))) {
-      if (en.baseId === GOLD_BASE) { const kept = splitGold(casterId, lease, en.count); if (kept > 0 && giveItem(casterId, GOLD_BASE, kept)) { raceGold(casterId, kept, master ? 'a master\'s body' : 'a body'); got.push(`${en.count} gold${kept < en.count ? ' (shared)' : ''}`); } continue; }
-      if (giveItem(casterId, en.baseId, en.count)) got.push(`${en.count > 1 ? en.count + ' ' : ''}${itemName(en.baseId)}`);
+      if (en.baseId === GOLD_BASE) { const kept = splitGold(casterId, lease, en.count); if (kept > 0 && giveItem(casterId, GOLD_BASE, kept)) { goldKept += kept; raceGold(casterId, kept, master ? 'a master\'s body' : 'a body'); got.push(`${en.count} gold${kept < en.count ? ' (shared)' : ''}`); } continue; }
+      if (giveItem(casterId, en.baseId, en.count)) { got.push(`${en.count > 1 ? en.count + ' ' : ''}${itemName(en.baseId)}`); gave.push(en); }
     }
+    // the player log (playerlog.js): what the body gave and the party's shares of its gold
+    try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('loot', 'dungeon_body', casterId, targetId, gave, goldKept, lastShares); } catch (e) { /* the player log is optional */ }
     personal(casterId, got.length ? `You find ${got.join(', ')}.` : 'You find nothing of use.');
     scholarGift(casterId, SCHOLAR_BODY, 'in their pack');
     return false;
@@ -2057,6 +2073,7 @@ module.exports = (api) => {
     ST.memberOf.delete(pid);
     if (!p) return;
     p.members.delete(pid);
+    { const x = actorByProfile(pid); if (x) { try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('party', 'leave', x, 0, p.members.size); } catch (e) { /* the player log is optional */ } } }
     clearPartyPanel(pid);
     for (const [to, inv] of ST.invites) if (inv.from === pid) ST.invites.delete(to);
     if (p.members.size <= 1) {
@@ -2074,6 +2091,7 @@ module.exports = (api) => {
       for (const m of p.members) ST.memberOf.set(m, next);
       handedTo = p.leaderName;
       if (na) personal(na, 'You now lead the party.');
+      if (na) { try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('party', 'lead', na, 0, p.members.size); } catch (e) { /* the player log is optional */ } }
     }
     pushParty(p);
     if (quiet) return;
@@ -2101,6 +2119,7 @@ module.exports = (api) => {
         if (partyOf(profileOf(t))) return personal(a, `${displayFor(a, t)} is already in a party.`);
         ST.invites.set(profileOf(t), { from: pid, at: Date.now() });
         personal(a, `Invited ${displayFor(a, t)}. They have two minutes to /party accept.`);
+        try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('party', 'invite', a, t, p ? p.members.size : 1); } catch (e) { /* the player log is optional */ }
         system(t, `${displayFor(t, a)} invites you to their party. /party accept to join, /party decline to refuse.`);
         return;
       }
@@ -2116,16 +2135,19 @@ module.exports = (api) => {
         lp.members.add(pid); ST.memberOf.set(pid, inv.from);
         saveParties();
         for (const m of lp.members) { const x = actorByProfile(m); if (x) system(x, `${ownDisplay(a)} joined the ${isRaid(lp) ? 'raid' : 'party'} (${lp.members.size}/${isRaid(lp) ? C.raidMax : C.partyMax}).`); }
+        try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('party', 'accept', a, leaderActor, lp.members.size); } catch (e) { /* the player log is optional */ }
         if (isRaid(lp) && !wasRaid) for (const m of lp.members) { const x = actorByProfile(m); if (x) personal(x, `More than ${C.partyMax} makes this a raid: skill gain is halved while it lasts, except inside a raid ruin.`); }
         pushParty(lp);
         return;
       }
-      case 'decline': ST.invites.delete(pid); return personal(a, 'Declined.');
+      case 'decline': { const inv = ST.invites.get(pid); ST.invites.delete(pid); if (inv) { try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('party', 'decline', a, actorByProfile(inv.from), 0); } catch (e) { /* the player log is optional */ } } return personal(a, 'Declined.'); }
       case 'leave': return leaveCommand(a);
       case 'kick': {
         if (!p || p.leader !== pid) return personal(a, 'Only the leader kicks.');
         const t = findByName(arg); if (!t || !p.members.has(profileOf(t))) return personal(a, 'They are not in your party.');
-        leaveParty(profileOf(t)); system(t, 'You were removed from the party.'); return personal(a, `${displayFor(a, t)} removed.`);
+        leaveParty(profileOf(t)); system(t, 'You were removed from the party.');
+        try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('party', 'kick', a, t, p.members.size); } catch (e) { /* the player log is optional */ }
+        return personal(a, `${displayFor(a, t)} removed.`);
       }
       default: {
         if (!p) return personal(a, 'Not in a party. /party invite <name|#TAG>, /party accept, /party leave, /party kick <name>.');

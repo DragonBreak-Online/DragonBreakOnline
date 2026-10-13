@@ -151,12 +151,13 @@ module.exports = (api) => {
         globalThis.__dboMasteryPending = null;
         globalThis.__dboSuperPending = null;
         // Recovering after a revive: kneeling, out of the fight both ways
-        if (S.recovering && (S.recovering.has(tgt) || S.recovering.has(agg)) && agg !== tgt) return false;
+        if (S.recovering && (S.recovering.has(tgt) || S.recovering.has(agg)) && agg !== tgt) { globalThis.__dboHitRefusal = 'recovering'; return false; }
         // A hostile player finishes a fallen one with a weapon or bare hands once the grace is over: the temple, now.
         // Any other hit on a fallen player (in the grace, a spell, a lingering effect) does nothing.
         if (dmg > 0 && S.downed.has(tgt) && isDead(tgt) && isPlayer(agg) && !friendly(agg, tgt)) {
           const since = Date.now() - S.downed.get(tgt).at;
           if (since >= C.finishGraceSeconds * 1000 && (!C.finishWeaponOnly || isWeaponHit(sourceId))) finish(tgt, agg);
+          globalThis.__dboHitRefusal = 'downed';
           return false;
         }
         if (inner.call(this, aggressorId, targetId, sourceId, damage, ...rest) === false) return false;
@@ -174,6 +175,7 @@ module.exports = (api) => {
             if (reduced > 0.001) {
               setHealth(tgt, reduced);
               log(`downed: friendly hit ${display(agg)} -> ${display(tgt)} ${dmg.toFixed(1)} of ${Math.round(max)} max${known ? '' : ' (assumed)'}, applied ${Math.round(C.friendlyDamage * 100)}% (refused the lethal full hit)`);
+              globalThis.__dboHitRefusal = 'friendly_lethal';
               return false;
             }
           }
@@ -397,12 +399,13 @@ module.exports = (api) => {
       if (!d || String(args[0] || '') !== d.nonce || !isDead(a)) return;
       if (giveUpLeft(d) > 0) return banner(a, `You can give up in ${giveUpLeft(d)} seconds.`, 3);
       log(`downed: ${display(a)} gave up (panel)`);
+      try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('wake', a, 'gave_up', 0, Date.now() - d.at); } catch (e) { /* the player log is optional */ }
       toTemple(a);
     });
   }
   // The engine's own respawn at the end of the bleed-out gives no event: watch the downed every second
   every('downedPanel', 1000, () => {
-    for (const [a, d] of S.downed) { let dead = true; try { dead = isDead(a); } catch (e) { dead = false; } if (!dead) { endDown(a); wakeAfter(a, d); dressAfterWake(a); } }
+    for (const [a, d] of S.downed) { let dead = true; try { dead = isDead(a); } catch (e) { dead = false; } if (!dead) { try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('wake', a, 'bled_out', 0, Date.now() - d.at); } catch (e) { /* the player log is optional */ } endDown(a); wakeAfter(a, d); dressAfterWake(a); } }
     if (S.downed.size || sentTimers.size) pushTimers(false);
   });
 
@@ -463,6 +466,8 @@ module.exports = (api) => {
     banner(t, `${by ? nameTo(t, by) : 'Someone'} raised you with ${how}.${C.recoverSeconds > 0 ? ' Catch your breath before you stand.' : ''}`, 5);
     if (by) banner(by, `You raised ${nameTo(by, t)}.`, 3);
     audit(`REVIVE ${who(t)} by ${by ? who(by) : 'nobody'} (${how})`);
+    // the player log (playerlog.js): how they woke, by whom, after how long down
+    try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('wake', t, how === 'a Draught of Revival' ? 'revived_draught' : 'revived_heal', by, Date.now() - d.at); } catch (e) { /* the player log is optional */ }
     return true;
   };
   // ---- recovery after a revive: kneel, heal slowly, stand ----------------------------------------------------
@@ -594,6 +599,7 @@ module.exports = (api) => {
     }
     if (!away) banner(a, late ? 'Your game had crashed before you fell: the chill of the grave is lifted.' : 'Your game had crashed before you fell: you wake where you were, unharmed.', 6);
     audit(`CRASH-DOWN forgiven ${who(a)}: ${crash}${late ? '; the Chill lifted after the wake' : '; woke where they fell, no Chill'}`);
+    try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('wake', a, 'crash_forgiven', 0, Date.now() - d.at); } catch (e) { /* the player log is optional */ }
     return true;
   };
   // The way out of a down at the temple: forgiven after a crash, else the Chill
@@ -692,6 +698,7 @@ module.exports = (api) => {
     if (!S.downed.has(a) || !isDead(a)) return personal(a, 'You are not down.');
     if (giveUpLeft(S.downed.get(a)) > 0) return personal(a, `You can give up in ${giveUpLeft(S.downed.get(a))} seconds. Someone may yet come for you.`);
     log(`downed: ${display(a)} gave up`);
+    try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('wake', a, 'gave_up', 0, Date.now() - S.downed.get(a).at); } catch (e) { /* the player log is optional */ }
     toTemple(a);
   }, { help: 'while down: stop waiting for help and wake at the temple' });
 
@@ -897,7 +904,7 @@ module.exports = (api) => {
         const t = Number(targetId) >>> 0, a = Number(casterId) >>> 0;
         try {
           if (t !== a && S.downed.has(t) && isDead(t) && countOf(a, POTION) > 0 && canPour(a, t)) {
-            if (revive(t, a, 'a Draught of Revival')) { addItem(a, POTION, -1); return false; }
+            if (revive(t, a, 'a Draught of Revival')) { addItem(a, POTION, -1); try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('itemflow', a, 'revival_draught', POTION, -1); } catch (e) { /* the player log is optional */ } return false; }
           }
         } catch (e) { log(`downed: revive by hand failed: ${e.message}`); }
         return innerActivate.call(this, targetId, casterId, ...rest);
