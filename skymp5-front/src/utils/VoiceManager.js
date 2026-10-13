@@ -33,6 +33,7 @@ const BANNER_MS = 1400;          // how long the mode banner stays up
 const SPEAKING_TICK_MS = 150;    // lip sync report cadence while someone talks
 const VAD_TICK_MS = 50;
 const VAD_HOLD_MS = 400;         // voice activation stays open this long after the level drops
+const GUARD_TICK_MS = 250;       // how often the mic is checked against push-to-talk and voice activation
 const PEER_STEP = 0.25;
 const PEER_MAX = 4;
 const OUTPUT_MAX = 3;
@@ -141,6 +142,8 @@ class VoiceManager {
     this.echoDetail = '';
     this.vadNoticeShown = false;
     this.transmitting = false;
+    this.fallbackBusy = false;  // LiveKit's own microphone (the fallback) is being switched
+    this.guardNoted = {};       // guard notes already sent to the game, one of each kind a session
   }
 
   // ---- launcher prefs ------------------------------------------------------------------------------
@@ -165,7 +168,9 @@ class VoiceManager {
       if (JSON.stringify(was) !== JSON.stringify(base[k])) { dropped = true; continue; }
       out[k] = saved.prefs[k]; keep.prefs[k] = saved.prefs[k]; keep.launcher[k] = was;
     }
-    if (dropped) writeUiExtra('voice', keep);
+    // Before the launcher's push (it comes 1.5 s after the page loads) its values are not known yet: a choice is held
+    // back until then, never dropped from the file against the defaults
+    if (dropped && this.launcherPrefs) writeUiExtra('voice', keep);
     return out;
   }
 
@@ -484,9 +489,13 @@ class VoiceManager {
     try { m.stream.getTracks().forEach((t) => t.stop()); m.ctx.close(); } catch (e) { /* closed */ }
   }
 
+  // The whole restart counts as a mic start: a push-to-talk press between the stop and the start used to find no mic and
+  // no start under way, and switched on LiveKit's own microphone beside ours, which nothing ever closed (#bugs 13 Oct)
   async restartMic() {
-    await this.stopMic();
-    try { await this.openMic(); } catch (e) { sendToGame('voice::micDenied', String(e && e.message || e)); }
+    while (this.micStarting) { try { await this.micStarting; } catch (e) { /* replaced below */ } }
+    const held = this.stopMic().then(() => this.startMic()).finally(() => { if (this.micStarting === held) this.micStarting = null; });
+    this.micStarting = held;
+    try { await held; } catch (e) { sendToGame('voice::micDenied', String(e && e.message || e)); }
     this.updateTransmit();
   }
 
@@ -496,9 +505,13 @@ class VoiceManager {
   }
 
   // Open while push-to-talk is held, or while voice activation hears you (and briefly after)
-  updateTransmit() {
+  wantTransmit() {
     const vad = this.activation() === 'vad' && this.mic && Date.now() < this.vadOpenUntil;
-    const want = !!(this.ptt || vad);
+    return !!(this.ptt || vad);
+  }
+
+  updateTransmit() {
+    const want = this.wantTransmit();
     if (want === this.transmitting) return;
     this.transmitting = want;
     window.dispatchEvent(new CustomEvent('dbo:voicePtt', { detail: want }));
@@ -506,6 +519,48 @@ class VoiceManager {
       const p = want ? this.mic.pub.unmute() : this.mic.pub.mute();
       if (p && p.catch) p.catch(() => { /* retried on the next change */ });
     }
+  }
+
+  // Players were heard with nothing pressed (Nate, 13 Oct). Whatever opened it (a mute that failed, LiveKit's own
+  // microphone switched on beside ours, a fallback switch that finished after its release), a mic that is open while
+  // neither push-to-talk nor voice activation wants it is closed here, and the game is told once of each kind.
+  guardTick() {
+    const room = this.room;
+    if (!room || this.micStarting || this.fallbackBusy || this.wantTransmit()) return;
+    const pubs = [];
+    try { room.localParticipant.audioTrackPublications.forEach((p) => pubs.push(p)); } catch (e) { return; }
+    const ours = this.mic ? this.mic.track : null;
+    for (const p of pubs) {
+      const t = p.track;
+      const mst = t ? t.mediaStreamTrack : null;
+      if (!t) continue;
+      if (ours && mst !== ours) {
+        // LiveKit's own microphone beside ours: never wanted while ours runs
+        const u = room.localParticipant.unpublishTrack(t, true);
+        if (u && u.catch) u.catch(() => { /* tried again on the next tick */ });
+        this.guardNote('second mic unpublished');
+        continue;
+      }
+      if (!p.isMuted) {
+        const m = p.mute();
+        if (m && m.catch) m.catch(() => { /* tried again on the next tick */ });
+        this.guardNote(ours ? 'open mic muted' : 'fallback mic muted');
+      } else if (mst && mst.enabled) {
+        // Marked muted, still sending (LiveKit then skips a second mute)
+        mst.enabled = false;
+        this.guardNote('muted mic still enabled');
+      }
+    }
+    if (this.transmitting) {
+      this.transmitting = false;
+      window.dispatchEvent(new CustomEvent('dbo:voicePtt', { detail: false }));
+    }
+  }
+
+  guardNote(kind) {
+    if (this.guardNoted[kind]) return;
+    this.guardNoted[kind] = true;
+    sendToGame('voice::guard', kind);
   }
 
   vadTick() {
@@ -593,6 +648,7 @@ class VoiceManager {
       try { await room.startAudio(); } catch (e) { /* autoplay policy: unlocked by CEF switch */ }
       // Expose the room only once connected so setPtt cannot hit a not-yet-connected room and mis-report micDenied
       this.room = room;
+      this.guardNoted = {};
       this.publishRange();
       // Opening the mic here also pre-warms Chromium's device stack, so the first press only unmutes
       try {
@@ -667,10 +723,23 @@ class VoiceManager {
     // Fallback path (LiveKit's own microphone): the HUD status panel shows transmit state
     window.dispatchEvent(new CustomEvent('dbo:voicePtt', { detail: this.ptt }));
     if (!this.room) return;
+    // One switch at a time, and it ends on the latest press or release: a release that came while the first press was
+    // still opening LiveKit's microphone used to finish first, and the press then left the mic open
+    if (this.fallbackBusy) return;
+    this.fallbackBusy = true;
     try {
-      await this.room.localParticipant.setMicrophoneEnabled(this.ptt);
-    } catch (e) {
-      if (this.ptt) sendToGame('voice::micDenied', String(e && e.message || e));
+      for (let i = 0; i < 4 && this.room; i++) {
+        const want = this.ptt;
+        try {
+          await this.room.localParticipant.setMicrophoneEnabled(want);
+        } catch (e) {
+          if (want) sendToGame('voice::micDenied', String(e && e.message || e));
+          break;
+        }
+        if (want === this.ptt) break;
+      }
+    } finally {
+      this.fallbackBusy = false;
     }
   }
 
@@ -924,5 +993,6 @@ setInterval(() => {
 // Lip sync clock: LiveKit's speaker event is edge-triggered, range and loudness change between edges
 setInterval(() => window.__alduinakVoice.emitSpeaking(), SPEAKING_TICK_MS);
 setInterval(() => window.__alduinakVoice.vadTick(), VAD_TICK_MS);
+setInterval(() => window.__alduinakVoice.guardTick(), GUARD_TICK_MS);
 
 export default window.__alduinakVoice;
