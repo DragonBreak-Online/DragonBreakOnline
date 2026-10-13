@@ -1460,7 +1460,13 @@ module.exports = (K) => {
   H2.brew = (a, potion, tier, inputs) => emit('item.brew', a, { potion: potion ? itemOf(potion, 1) : undefined, tier: Number(tier) || undefined, inputs: itemsList(inputs) }, { src: 'hook:brew' });
   H2.extras = (a, kind, baseId, soul) => emit('item.extras', a, { kind, item: baseId ? itemOf(baseId, 1) : undefined, soul: Number(soul) || undefined }, { src: 'hook:extras' });
   H2.misc = (a, kind, label, value) => emit('char.misc', a, { kind, label: label ? String(label) : undefined, value: Number.isFinite(Number(value)) ? Number(value) : undefined }, { src: 'hook:misc' });
-  H2.map = (a, names) => { const list = (Array.isArray(names) ? names : []).map((x) => String(x || '')).filter(Boolean); if (list.length) emit('move.map', a, { n: list.length, names: list.slice(0, 5) }, { src: 'hook:map' }); };
+  // mapprogress.js: the map markers discovered (descs); named by their record (the marker's editor id in words, else its id)
+  H2.map = (a, markers) => {
+    const list = (Array.isArray(markers) ? markers : []).map((x) => String(x || '')).filter(Boolean);
+    if (!list.length) return;
+    const names = list.slice(0, 5).map((d) => { try { return recordName(mp.getIdFromDesc(d) >>> 0); } catch (e) { return ''; } }).filter(Boolean);
+    emit('move.map', a, { n: list.length, names }, { src: 'hook:map' });
+  };
   // the dossier: on the subject's post, never the note
   H2.dossier = (op, author, subject) => { const s = u32(subject); if (!s || !isPlayer(s)) return; emit('social.dossier', s, { op }, { o: author && isPlayer(author) ? [partyOf(author, 'by')] : undefined, src: 'hook:dossier' }); };
   H2.report = (kind, a, ref) => emit('social.report', a, { kind, ref: ref ? String(ref).replace(/[^A-Za-z0-9_:.-]/g, '').slice(0, 40) : undefined, op: 'filed' }, { src: 'hook:report' });

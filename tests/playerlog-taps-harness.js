@@ -487,7 +487,9 @@ const housing = (W) => {
   W.h('brew', A, POTION, 2, [{ baseId: ROSE, count: 2 }]);
   W.h('extras', A, 'disenchant', SWORD);
   W.h('misc', A, 'title', 'Thane');
-  W.h('map', A, ['Bruma', 'Cloud Ruler Temple']);
+  W.M.record(0x1f00a, 'REFR', 'BrumaMapMarker');
+  W.h('map', A, ['1f00a:Skyrim.esm', '1f00b:Skyrim.esm']);
+  ok(W.last('move.map') && W.last('move.map').f.n === 2 && W.last('move.map').f.names[0] === 'Bruma Map Marker', 'places discovered: named by their record', W.last('move.map') && W.last('move.map').f);
   W.h('dossier', 'written', D, A);
   W.h('report', 'bug', A, 'bug-2026-10-13-1.json');
   W.h('effect', A, 'stagger');
