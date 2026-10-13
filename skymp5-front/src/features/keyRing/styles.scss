@@ -1,0 +1,140 @@
+// The Key Ring: keys grouped by property, then the owner's locks with every copy out
+@import '../../dbo-theme.scss';
+
+.keyRing {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 54;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  font-family: $dbo-ui-font;
+  color: $dbo-text;
+
+  &__fade {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at center, rgba(8, 25, 28, 0.42), rgba(3, 10, 12, 0.85) 100%);
+  }
+
+  &__panel {
+    position: relative;
+    pointer-events: auto;
+    box-sizing: border-box;
+    width: min(640px, calc(94 * var(--dbo-vw)));
+    max-height: min(760px, calc(90 * var(--dbo-vh)));
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 22px 26px 16px;
+    overflow-y: auto;
+    @include dbo-panel;
+  }
+
+  &__title {
+    margin: 0;
+    @include dbo-title;
+    font-size: clamp(20px, calc(2.2 * var(--dbo-vw)), 28px);
+    text-align: center;
+  }
+
+  &__offer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 8px 10px;
+    border: 1px solid $dbo-border-strong;
+    border-radius: 4px;
+    background: rgba(0, 0, 0, 0.3);
+  }
+
+  &__section { display: flex; flex-direction: column; gap: 8px; }
+
+  &__label {
+    color: $dbo-text-dim;
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  &__group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid $dbo-border;
+  }
+
+  &__place { flex: 1; color: $dbo-gold; font-size: 15px; letter-spacing: 0.04em; }
+
+  &__entry { display: flex; flex-direction: column; gap: 4px; }
+
+  &__row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+
+    &--copy { padding-left: 10px; }
+  }
+
+  &__name { flex: 1; min-width: 0; overflow-wrap: anywhere; font-size: 14px; }
+
+  &__state {
+    flex: none;
+    color: $dbo-text-dim;
+    font-size: 12px;
+
+    &--dead { color: #c98a7a; }
+  }
+
+  &__buttons { display: flex; gap: 6px; flex: none; }
+
+  &__pick {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    padding-left: 10px;
+  }
+
+  &__button {
+    @include dbo-button;
+    padding: 5px 12px;
+    font-size: 13px;
+
+    &--small { flex: none; padding: 3px 10px; font-size: 12px; }
+  }
+
+  &__link {
+    background: none;
+    border: none;
+    color: $dbo-text-dim;
+    font-family: $dbo-ui-font;
+    font-size: 12px;
+    text-decoration: underline;
+    cursor: pointer;
+  }
+
+  &__empty { color: $dbo-text-dim; font-size: 13px; font-style: italic; }
+
+  &__note { margin: 0; color: $dbo-text-dim; font-size: 12px; line-height: 1.4; }
+
+  &__result {
+    margin: 0;
+    font-size: 13px;
+
+    &--ok { color: $dbo-gold; }
+    &--refused { color: #c98a7a; }
+  }
+
+  &__close {
+    @include dbo-button;
+    align-self: center;
+    padding: 5px 22px;
+  }
+}

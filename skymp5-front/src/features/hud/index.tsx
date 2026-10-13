@@ -140,7 +140,9 @@ const UI_CAPS = ['bank', 'robPrompt', 'feedPrompt', 'downed', 'businessLedger', 
   // caster variables out of it (skymp5-client sync/beastBody.ts), so the server may show a werewolf as one (beastform.js)
   'beastBody',
   // The courier's hand-over panel (features/courierHandover; server couriers.js): without it the server uses chat and the mailbox
-  'courierHandover'];
+  'courierHandover',
+  // The Key Ring (features/keyRing; server keyring.js): without it the server uses chat
+  'keyRing'];
 const useUiCaps = (): void => {
   useEffect(() => {
     const tell = () => {

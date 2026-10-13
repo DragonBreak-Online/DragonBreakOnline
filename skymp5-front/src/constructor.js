@@ -46,6 +46,7 @@ import TomeShop from './features/tomeShop';
 import Bank from './features/bank';
 import BusinessLedger from './features/businessLedger';
 import PropertyMarket from './features/propertyMarket';
+import KeyRing from './features/keyRing';
 import RobPrompt from './features/robPrompt';
 import CourierHandover from './features/courierHandover';
 import FeedPrompt from './features/feedPrompt';
@@ -317,6 +318,8 @@ const Constructor = props => {
       return <BusinessLedger data={rend} />;
     case 'propertyMarket':
       return <PropertyMarket data={rend} />;
+    case 'keyRing':
+      return <KeyRing data={rend} />;
     case 'robPrompt':
       return <RobPrompt data={rend} />;
     case 'feedPrompt':
