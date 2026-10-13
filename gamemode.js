@@ -2401,7 +2401,7 @@ globalThis.__dboHandlers.disconnect = (userId) => {
   if (a && globalThis.__dboDungeonLeave) { try { globalThis.__dboDungeonLeave(a); } catch (e) { log('dungeon logout move failed', e.message); } }
   if (a && globalThis.__dboPartyLogout) { try { globalThis.__dboPartyLogout(a); } catch (e) { log('party logout failed', e.message); } }
   // What a UI said it can draw, and a deity offer already made, belong to this session (review C6, PRAY-1)
-  for (const k of ['__dboItemLeave', '__dboBankLeave', '__dboRobLeave', '__dboDeityForget', '__dboPanelLeave', '__dboManualsLeave', '__dboLabourLeave', '__dboPrayerLeave', '__dboSkinLeave', '__dboSchoolsLeave']) { if (a && typeof globalThis[k] === 'function') { try { globalThis[k](a); } catch (e) { log(`${k} failed`, e.message); } } }
+  for (const k of ['__dboItemLeave', '__dboBankLeave', '__dboRobLeave', '__dboDeityForget', '__dboPanelLeave', '__dboManualsLeave', '__dboLabourLeave', '__dboPrayerLeave', '__dboSkinLeave', '__dboSchoolsLeave', '__dboKeyRingLeave']) { if (a && typeof globalThis[k] === 'function') { try { globalThis[k](a); } catch (e) { log(`${k} failed`, e.message); } } }
   connected.delete(userId);
   const wait = globalThis.__dboLoginWaits.get(userId);
   if (wait) { clearInterval(wait); globalThis.__dboLoginWaits.delete(userId); }
@@ -7035,6 +7035,13 @@ try {
   delete require.cache[ROBBERY_JS];
   require(ROBBERY_JS)({ mp, log, personal, audit, who, onlineActors, recordOf, adminItemName, openWidget, closeWidget, onUi, sendPacket, every, cfg });
 } catch (e) { log('robbery.js failed to load:', e.stack || e.message); globalThis.__dboRobEntries = null; globalThis.__dboRobAction = null; }
+
+// ---- the Key Ring panel: house keys as records on the character (server\keyring.js; housingSystem.ts housingKeyRing) ------
+try {
+  const KEYRING_JS = path.resolve('keyring.js');
+  delete require.cache[KEYRING_JS];
+  require(KEYRING_JS)({ log, personal, audit, who, openWidget, closeWidget, onUi, registerChatCommand });
+} catch (e) { log('keyring.js failed to load:', e.stack || e.message); globalThis.__dboKeyRingEntries = null; globalThis.__dboKeyRingAction = null; }
 
 // ---- staff gifts at the next login (server\gifts.js; queue one with tools/gift.js) ---------------------------------
 try {

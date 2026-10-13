@@ -155,6 +155,9 @@ module.exports = (api) => {
         return { error: e.message };
       }
     }
+    // With the key ring (housingSystem.ts housingKeyRing) a house key is a record on the character, not an item
+    const H = globalThis.__dboHousing;
+    if (!key && H && typeof H.keyRingOn === 'function' && H.keyRingOn() && Math.random() < C.keyChance) key = H.ringSteal(victim, robber) || null;
     return { gold, items, key, carried };
   };
   const rob = (robber, victim, nameFor) => {
