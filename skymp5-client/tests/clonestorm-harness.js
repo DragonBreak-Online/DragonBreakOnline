@@ -32,6 +32,7 @@ const fakeGame = () => {
     Game: { getFormEx: (id) => forms.get(id >>> 0) || null, getPlayer: () => player },
     ActorBase: { from: (f) => f || null },
     Actor: { from: (f) => f || null },
+    ObjectReference: { from: (f) => f || null },
     applyAppearance: () => { built++; const id = next++; const b = { id, getFormID() { return this.id; } }; forms.set(id, b); return b; },
     // applyTints: setFormIdUnsafe(base, playerBaseId); the old id still finds the form
     alias: (id) => { const b = forms.get(id); if (b) b.id = PLAYER_BASE; },
@@ -46,8 +47,8 @@ async function main() {
   check('formView has the base getter', !!getter);
   const src = `class View { refrId = 0; appearanceBasedBaseId = 0; appearanceState: any = { appearance: { name: "x" } };\n${getter.replace('private ', '')}\n}\nreturn View;`;
   const js = (await esbuild.transform(src, { loader: 'ts' })).code;
-  const make = (g) => new Function('Game', 'ActorBase', 'Actor', 'applyAppearance', 'needsFreshBase', js)(
-    g.Game, g.ActorBase, g.Actor, g.applyAppearance,
+  const make = (g) => new Function('Game', 'ActorBase', 'Actor', 'ObjectReference', 'applyAppearance', 'needsFreshBase', js)(
+    g.Game, g.ActorBase, g.Actor, g.ObjectReference, g.applyAppearance,
     (baseFormId, playerBaseFormId) => !baseFormId || (baseFormId >>> 0) === (playerBaseFormId >>> 0));
 
   const g = fakeGame();

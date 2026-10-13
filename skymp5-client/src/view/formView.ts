@@ -1298,7 +1298,7 @@ export class FormView {
     const aliased = !!base && (base.getFormID() >>> 0) !== (this.appearanceBasedBaseId >>> 0);
     let copyOnIt = false;
     if (base && aliased) {
-      const copy = Actor.from(Game.getFormEx(this.refrId));
+      const copy = ObjectReference.from(Game.getFormEx(this.refrId));
       const copyBase = copy ? copy.getBaseObject() : null;
       copyOnIt = !!copyBase && (copyBase.getFormID() >>> 0) === (base.getFormID() >>> 0);
     }
