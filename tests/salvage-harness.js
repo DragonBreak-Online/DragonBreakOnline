@@ -10,7 +10,7 @@ process.chdir(scratch);
 
 const IRON = 0x5ace4, STEEL = 0x5ace5, EBONY = 0x5ad9d, STRIPS = 0x800e4, LEATHER = 0xdb5d2, PAPER = 0x0807cba1;
 const GOLD_INGOT = 0x5ad9e, GOLD_RING = 0x10dfcd, DAGGER = 0x1397e; // a ring of one gold ingot (the ragged clothes' one thread is the same shape)
-const SWORD = 0x12eb7, STEEL_ARMOR = 0x13952, DAEDRIC = 0x139b9, LEATHER_ARMOR = 0x3619e, BOOK = 0x1000, NOTE = 0x1001, QUEST_BOOK = 0x1002, APPLE = 0x2000;
+const SWORD = 0x12eb7, STEEL_ARMOR = 0x13952, DAEDRIC = 0x139b9, LEATHER_ARMOR = 0x3619e, BOOK = 0x1000, NOTE = 0x1001, QUEST_BOOK = 0x1002, TOME = 0x1003, SCHEMATIC = 0x1004, APPLE = 0x2000;
 const SMELTER = 0x9000, SMELTER_BASE = 0x9001, RACK = 0x9002, RACK_BASE = 0x9003, LOOM = 0x9004, LOOM_BASE = 0x9005, DESK = 0x9006, DESK_BASE = 0x9007, CHAIR = 0x9008, CHAIR_BASE = 0x9009, LEDGER = 0x900a, LEDGER_BASE = 0x900b;
 const KW = { 0x8001: 'CraftingSmelter', 0x8002: 'isSmelter', 0x8003: 'CraftingTanningRack', 0x8004: 'isTanning', 0x8005: 'MCE_CraftingLoom', 0x8006: 'isHadvarWriteLedger', 0x8007: 'FurnitureSpecial' };
 const PLAYER = 0xff000001, NOVICE = 0xff000002, NOSKILL = 0xff000003;
@@ -36,7 +36,7 @@ const RECS = {
   [DESK_BASE]: { type: 'FURN', fields: [kwda(0x8006)] },
   [CHAIR_BASE]: { type: 'FURN', fields: [kwda(0x8007)] },
   [LEDGER_BASE]: { type: 'ACTI', editorId: 'BookBreakdown', fields: [] },
-  [BOOK]: { type: 'BOOK', fields: [bookData(0, 0)] }, [NOTE]: { type: 'BOOK', fields: [bookData(0, 255)] }, [QUEST_BOOK]: { type: 'BOOK', fields: [bookData(0x02, 0)] },
+  [BOOK]: { type: 'BOOK', fields: [bookData(0, 0)] }, [NOTE]: { type: 'BOOK', fields: [bookData(0, 255)] }, [QUEST_BOOK]: { type: 'BOOK', fields: [bookData(0x02, 0)] }, [TOME]: { type: 'BOOK', fields: [bookData(0x04, 0)] }, [SCHEMATIC]: { type: 'BOOK', fields: [bookData(0, 0)] },
 };
 for (const [id, ed] of Object.entries(KW)) RECS[id] = { type: 'KYWD', editorId: ed, fields: [] };
 const BASE = { [SMELTER]: SMELTER_BASE, [RACK]: RACK_BASE, [LOOM]: LOOM_BASE, [DESK]: DESK_BASE, [CHAIR]: CHAIR_BASE, [LEDGER]: LEDGER_BASE };
@@ -158,10 +158,12 @@ ok(/Nothing else here to break down/.test((said.find((x) => x[0] === PLAYER) || 
 
 // Books at the writing desk (Scholar)
 reset(); S = load();
-INV[PLAYER] = [{ baseId: BOOK, count: 1 }, { baseId: NOTE, count: 1 }, { baseId: QUEST_BOOK, count: 1 }];
+globalThis.__dboManualsIsManual = (id) => id === SCHEMATIC;
+INV[PLAYER] = [{ baseId: BOOK, count: 1 }, { baseId: NOTE, count: 1 }, { baseId: QUEST_BOOK, count: 1 }, { baseId: TOME, count: 1 }, { baseId: SCHEMATIC, count: 1 }];
 act(DESK, PLAYER); w = lastWidget(PLAYER);
 ok(w.actions[0].label === 'Sit at the desk (use it again)', 'the desk offers to sit first');
 ok(!w.actions.some((x) => x.id === `b:${QUEST_BOOK}`), 'a book that cannot be taken is never offered');
+ok(!w.actions.some((x) => x.id === `b:${TOME}`) && !w.actions.some((x) => x.id === `b:${SCHEMATIC}`), 'a spell tome and a smithing schematic are never offered (Barush lost three schematics, 13 Oct)');
 choose(PLAYER, `b:${BOOK}`); choose(PLAYER, `b:${NOTE}`);
 ok(count(PLAYER, PAPER) === 3 && count(PLAYER, STRIPS) === 1 && count(PLAYER, BOOK) === 0 && count(PLAYER, NOTE) === 0, 'a bound book gives 2 paper and a strip, a note 1 paper');
 INV[NOVICE] = [{ baseId: BOOK, count: 1 }];

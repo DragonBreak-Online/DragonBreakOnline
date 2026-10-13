@@ -17,7 +17,7 @@
 // item, by the player's tier in the station's skill (shareByTier, Novice 25 % .. Master 75 %), each rounded down, with
 // at least one of the main material: for certain when it cost two or more, by the share as a chance when it cost one. A Blacksmith needs the tier that works the main metal. Books are read from their
 // own record: a bound book gives bookPaper paper and bookStrips leather strips, a note or letter notePaper paper; a book
-// that cannot be taken (BOOK DATA flag 0x02) is never offered. Worn and equipped stacks are never offered either, nor an
+// that cannot be taken (BOOK DATA flag 0x02), a spell tome (0x04) or a smithing schematic (manuals.js) is never offered. Worn and equipped stacks are never offered either, nor an
 // enchanted, named, tempered, poisoned or charged one, nor an item enchanted by its own record (EITM): only plain copies
 // of plain items are broken down.
 'use strict';
@@ -141,6 +141,10 @@ module.exports = (api) => {
     if (!r || String(r.record.type) !== 'BOOK') return null;
     const d = fieldsOf(r, 'DATA')[0];
     if (!d || d.data.byteLength < 2 || (d.data[0] & 0x02)) return null;
+    // Never a spell tome (DATA flag 0x04, teaches a spell) or a smithing schematic (manuals.js): Barush broke down three
+    // schematics with his old books at the Scholars' Ledger and lost them (13 Oct)
+    if (d.data[0] & 0x04) return null;
+    try { if (typeof globalThis.__dboManualsIsManual === 'function' && globalThis.__dboManualsIsManual(baseId >>> 0)) return null; } catch (e) { return null; }
     const note = d.data[1] === 255;
     const out = [[CFG.paper, note ? CFG.notePaper : CFG.bookPaper]];
     if (!note && CFG.bookStrips > 0) out.push([CFG.leatherStrips, CFG.bookStrips]);
