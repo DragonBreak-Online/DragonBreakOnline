@@ -14,6 +14,12 @@ const UNLINK_SECONDS = 10;
 // IdleExecutionerChop, IdleExecutioneeChop (70c09) ENAM IdleExecutioneeChop. A server that names others is followed
 const HEADSMAN_EVENT = "IdleExecutionerChop";
 const VICTIM_EVENT = "IdleExecutioneeChop";
+// Helgen's player-victim path (HeadChopBlockHookupSCRIPT on ExecutionerChoppingBlock 2e8eb, disassembled from Skyrim -
+// Misc.bsa on CT 115 13 Oct): when the executionee is the player it plays its playerAnimIdle, IdleExecutionerChop_Player
+// (Skyrim.esm f95be: no parent, no conditions, ENAM IdleExecutionerChop_Player), on the executioner and then on the
+// executionee, both, with the executioner already linked to the executionee. The condemned here is always a player
+const PLAYER_VICTIM_IDLE = "f95be:Skyrim.esm";
+const PLAYER_VICTIM_EVENT = "IdleExecutionerChop_Player";
 // The furniture's own exit: vanilla's IdleExecutionerExit1 (Skyrim.esm 2e8ef, under ExecutionerRoot) sends it to the
 // headsman in this block, and IdleWoodChopStop the same at a chopping log
 const FURNITURE_EXIT_EVENT = "IdleChairExitStart";
@@ -46,7 +52,7 @@ const errText = (e: unknown): string => (e instanceof Error ? e.message : String
  * dboExecute plays the beheading on this client's copies of the two actors. Vanilla's HeadChopBlock2ManHookupScript
  * (disassembled from Skyrim - Misc.bsa on CT 115, 13 Oct) links the headsman to the executionee
  * (AddDependentAnimatedObjectReference) and plays IdleHeadChop on the executionee, an NPC; for a player executionee it
- * plays nothing at all. Here the victim gets IdleExecutioneeChop (AOExecutioneeChop.hkx: Decapitate at 11.839 s,
+ * plays nothing at all. The NPC pair, kept as the fallback: the victim gets IdleExecutioneeChop (AOExecutioneeChop.hkx: Decapitate at 11.839 s,
  * KillActor at 16.606 s) and the headsman IdleHeadChop (AOExecutionerChop.hkx), on one frame. A refused PlayIdle
  * (IdleExecutioneeChop wants ExecutioneeRoot's conditions: the FurnitureExecutioner keyword on the seat, the right-hand
  * entry, GetSitting 2) falls back to the bare graph event, which no idle condition stands in front of.
@@ -61,7 +67,12 @@ const errText = (e: unknown): string => (e instanceof Error ? e.message : String
  * Both packets arrive in tick context, where every Papyrus native throws "can't be called in this context" (0.3.96:
  * Game.getFormEx threw, the catch only printed to the console, and nothing played), so all the work runs on update.
  *
- *   Server -> Client: { customPacketType: "dboExecute", victim, executioner, idle, victimIdle, event?, victimEvent? }
+ * The victim is always a player, so the pair plays Helgen's player-victim path first: IdleExecutionerChop_Player on
+ * the headsman, then on the victim (the order HeadChopBlockHookupSCRIPT uses), each falling back to the bare event. Only
+ * if that idle is missing from this game, or the server sends playerIdle "" to turn it off, the NPC pair above plays.
+ *
+ *   Server -> Client: { customPacketType: "dboExecute", victim, executioner, idle, victimIdle, event?, victimEvent?,
+ *                       playerIdle?, playerEvent? }
  *                     { customPacketType: "dboExecuteStand", pos: [x, y, z], rot?: [x, y, z] }
  */
 export class ExecutionService extends ClientListener {
@@ -92,29 +103,25 @@ export class ExecutionService extends ClientListener {
         note(`play skipped victim=${!!victim} headsman=${!!headsman} idle=${!!idle}`);
         return;
       }
-      const headsmanEvent = String(content["event"] || HEADSMAN_EVENT);
-      const victimEvent = victimIdle ? String(content["victimEvent"] || VICTIM_EVENT) : headsmanEvent;
-      // animation.ts blanks a copy's idle events unless they were allowed first
-      allowIdleEvent(victim.getFormID(), victimEvent);
-      if (victimIdle) allowIdleEvent(headsman.getFormID(), headsmanEvent);
       const linked = victim.addDependentAnimatedObjectReference(headsman);
-      // The victim's own clip carries the beheading; a server without victimIdle gets vanilla's single call
-      let victimHow = "idle";
-      if (!victim.playIdle(victimIdle || idle)) {
-        allowIdleEvent(victim.getFormID(), victimEvent);
-        Debug.sendAnimationEvent(victim, victimEvent);
-        victimHow = "event";
+      const playerIdleDesc = content["playerIdle"] === undefined ? PLAYER_VICTIM_IDLE : String(content["playerIdle"] || "");
+      const playerIdle = playerIdleDesc ? this.idleOf(playerIdleDesc) : null;
+      let path: string, victimHow: string, headsmanHow: string;
+      if (playerIdle) {
+        // Helgen: the headsman first, then the victim, the same idle on both
+        const ev = String(content["playerEvent"] || PLAYER_VICTIM_EVENT);
+        path = "helgen";
+        headsmanHow = this.playOrEvent(headsman, playerIdle, ev);
+        victimHow = this.playOrEvent(victim, playerIdle, ev);
+      } else {
+        const headsmanEvent = String(content["event"] || HEADSMAN_EVENT);
+        const victimEvent = victimIdle ? String(content["victimEvent"] || VICTIM_EVENT) : headsmanEvent;
+        path = "npc";
+        // The victim's own clip carries the beheading; a server without victimIdle gets vanilla's single call
+        victimHow = this.playOrEvent(victim, victimIdle || idle, victimEvent);
+        headsmanHow = victimIdle ? this.playOrEvent(headsman, idle, headsmanEvent) : "-";
       }
-      let headsmanHow = "-";
-      if (victimIdle) {
-        headsmanHow = "idle";
-        if (!headsman.playIdle(idle)) {
-          allowIdleEvent(headsman.getFormID(), headsmanEvent);
-          Debug.sendAnimationEvent(headsman, headsmanEvent);
-          headsmanHow = "event";
-        }
-      }
-      note(`play linked=${linked} victim=${this.describe(victim)} ${victimHow} headsman=${this.describe(headsman)} ${headsmanHow}`);
+      note(`play ${path} linked=${linked} victim=${this.describe(victim)} ${victimHow} headsman=${this.describe(headsman)} ${headsmanHow}`);
       const victimId = victim.getFormID(), headsmanId = headsman.getFormID();
       Utility.wait(UNLINK_SECONDS).then(() => this.controller.once("update", () => {
         try {
@@ -126,6 +133,15 @@ export class ExecutionService extends ClientListener {
       logError(this, "dboExecute failed", e);
       note(`play failed ${errText(e)}`);
     }
+  }
+
+  // PlayIdle, or the bare graph event if the idle tree refuses it; a copy's idle event is let past animation.ts's filter
+  private playOrEvent(a: Actor, idle: Idle, event: string): string {
+    allowIdleEvent(a.getFormID(), event);
+    if (a.playIdle(idle)) return "idle";
+    allowIdleEvent(a.getFormID(), event);
+    Debug.sendAnimationEvent(a, event);
+    return "event";
   }
 
   // One way out of the block, then the next if the game still has the player in the furniture
