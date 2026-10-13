@@ -22,6 +22,9 @@ const { visitorIp } = require('../sources/visitorIp')
 
 const STATE_COOKIE   = 'db_site_state'
 const SESSION_COOKIE = 'db_site'
+// Where the callback returns to after a fresh sign-in from the staff console; only this one value is honoured
+const NEXT_COOKIE    = 'db_site_next'
+const CONSOLE_PAGE   = '/dashboard.html#console'
 const STATE_TTL_MS   = 10 * 60 * 1000
 const CALLBACK_PATH  = '/api/site/callback'
 // Only /api/site reads the session, so the browser sends it nowhere else on the host
@@ -44,8 +47,8 @@ try { websiteOrigin = new URL(config.websiteUrl).origin } catch { /* malformed W
 const sameOrigin = req => !!websiteOrigin && req.get('origin') === websiteOrigin
 
 // Sign-in must start on the host Discord returns to, or the host-only state cookie never comes back
-let loginUrl = null
-try { loginUrl = new URL('/api/site/login', config.discordSiteRedirectUri) } catch { /* malformed redirect URI: sign-in starts on any host */ }
+let loginUrl = null, freshUrl = null
+try { loginUrl = new URL('/api/site/login', config.discordSiteRedirectUri); freshUrl = new URL('/api/site/login/fresh', config.discordSiteRedirectUri) } catch { /* malformed redirect URI: sign-in starts on any host */ }
 
 
 const limitOptions = {
@@ -97,6 +100,9 @@ function sameSecret(a, b) {
 function currentSession(req) {
   return siteSessions.validate(readCookie(req, SESSION_COOKIE))
 }
+
+// The raw session token, for the console's webCaller, which reads the identity from the store itself
+const sessionToken = req => readCookie(req, SESSION_COOKIE)
 
 // Read-only lookup on every request, so an admin delete or re-create never leaves a stale id
 function profileIdOf(discordId) {
@@ -210,14 +216,31 @@ router.get('/login', (req, res) => {
   if (loginUrl && String(req.hostname || '').toLowerCase() !== loginUrl.hostname) return res.redirect(loginUrl.href)
   // Already signed in: straight to the profile, without another Discord round trip or a second session
   if (currentSession(req)) return res.redirect(PROFILE_PAGE)
+  startSignIn(res)
+})
+
+// Every site sign-in is a click on Discord's own Authorize page (prompt=consent), so each signedInAt stands for a person
+function startSignIn(res) {
   const state = crypto.randomBytes(32).toString('hex')
   setCookie(res, STATE_COOKIE, state, CALLBACK_PATH, STATE_TTL_MS)
-  res.redirect(oauth.authorizeUrl({ redirectUri: config.discordSiteRedirectUri, state }))
+  res.redirect(oauth.authorizeUrl({ redirectUri: config.discordSiteRedirectUri, state, prompt: 'consent' }))
+}
+
+// GET /api/site/login/fresh: the staff console's sign-in again, even with a session, back to the console afterwards
+router.get('/login/fresh', (req, res) => {
+  if (!config.discordClientId || !config.discordSiteRedirectUri) {
+    return res.redirect(`${PROFILE_PAGE}?error=unconfigured`)
+  }
+  if (freshUrl && String(req.hostname || '').toLowerCase() !== freshUrl.hostname) return res.redirect(freshUrl.href)
+  setCookie(res, NEXT_COOKIE, 'console', CALLBACK_PATH, STATE_TTL_MS)
+  startSignIn(res)
 })
 
 // Discord's redirect is checked against the state cookie first, so only requests that would call Discord count toward the limits
 function checkCallback(req, res, next) {
   setCookie(res, STATE_COOKIE, '', CALLBACK_PATH, 0)
+  req.signInNext = readCookie(req, NEXT_COOKIE) === 'console' ? CONSOLE_PAGE : PROFILE_PAGE
+  setCookie(res, NEXT_COOKIE, '', CALLBACK_PATH, 0)
   const { code, state, error } = req.query
 
   if (error) return res.redirect(`${PROFILE_PAGE}?error=cancelled`)
@@ -234,12 +257,16 @@ router.get('/callback', checkCallback, visitorLimiter, siteLimiter, async (req, 
     if (typeof user.id !== 'string' || !user.id) throw new Error('Discord returned a user without an id')
 
     const token = siteSessions.create({
-      discordId: user.id,
-      username:  String(user.global_name || user.username || ''),
-      avatar:    oauth.avatarUrl(user),
+      discordId:  user.id,
+      username:   String(user.global_name || user.username || ''),
+      avatar:     oauth.avatarUrl(user),
+      signedInAt: Date.now(),
     })
+    // A copied old cookie stops working the moment its owner signs in again
+    const previous = readCookie(req, SESSION_COOKIE)
+    if (previous && previous !== token) siteSessions.revoke(previous)
     setCookie(res, SESSION_COOKIE, token, SESSION_PATH, config.siteSessionTtlHours * 60 * 60 * 1000)
-    res.redirect(PROFILE_PAGE)
+    res.redirect(req.signInNext || PROFILE_PAGE)
   } catch (err) {
     console.error('[site-auth] callback error:', err.message)
     res.redirect(`${PROFILE_PAGE}?error=discord`)
@@ -369,4 +396,4 @@ router.post('/logout', (req, res) => {
 
 module.exports = router
 // Shared with the staff dashboard routes so they read sessions and characters and check the Origin the same way
-module.exports.internals = { currentSession, readStore, toSiteCharacter, profileIdOf, dynamicFields, sameOrigin }
+module.exports.internals = { currentSession, sessionToken, readStore, toSiteCharacter, profileIdOf, dynamicFields, sameOrigin }

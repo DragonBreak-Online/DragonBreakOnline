@@ -7,7 +7,8 @@ const config = require('../../config')
 // Per-request deadline, generous because DNS on CT 115 has taken ~5 s
 const TIMEOUT_MS = 20 * 1000
 
-function authorizeUrl({ redirectUri, state }) {
+// prompt is added only when given, so the launcher and dashboard flows send what they always sent
+function authorizeUrl({ redirectUri, state, prompt }) {
   const params = new URLSearchParams({
     client_id:     config.discordClientId,
     redirect_uri:  redirectUri,
@@ -15,6 +16,7 @@ function authorizeUrl({ redirectUri, state }) {
     scope:         'identify',
     state,
   })
+  if (prompt) params.set('prompt', prompt)
   return `https://discord.com/api/oauth2/authorize?${params}`
 }
 
