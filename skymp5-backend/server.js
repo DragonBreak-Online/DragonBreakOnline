@@ -71,7 +71,7 @@ const globalJson = express.json({
   verify: (req, _res, buf) => { req.rawBody = buf },
 })
 // Problem reports and the server controls are parsed by their own routes, only after the sender checks and rate limits
-const OWN_PARSER_PATHS = [...filesRoute.OWN_PARSER_PATHS, '/api/site/report',
+const OWN_PARSER_PATHS = [...filesRoute.OWN_PARSER_PATHS, '/api/site/report', '/api/site/staff/console/run',
   ...require('./sources/serverControl').ACTIONS.map(a => `/api/site/staff/server/actions/${a}`)]
 app.use(require('./sources/problemReport').parserExcept(OWN_PARSER_PATHS, globalJson))
 
@@ -116,6 +116,7 @@ app.use('/api/players',            playersRoute)
 app.use('/api/launch-check',       launchCheckRoute)
 const siteServerRoute = require('./routes/site-server')
 app.use('/api/site/staff/server', siteServerRoute)
+app.use('/api/site/staff/console', require('./routes/site-console'))
 app.use('/api/site/staff', require('./routes/site-staff'))
 app.use('/api/site',               siteAuthRoute)
 // Body-parser failures on any route answer in JSON; NODE_ENV is unset here, so the default handler would send a stack trace
@@ -124,5 +125,6 @@ app.use(require('./sources/problemReport').bodyErrors)
 app.listen(PORT, () => {
   console.log(`DragonBreak backend running on http://localhost:${PORT}`)
   siteServerRoute.recover()
+  try { require('./sources/console').consoleApi().recover() } catch (err) { console.error('[console] recover failed:', err.message) }
   require('./sources/autoReport').start()
 })
