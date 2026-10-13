@@ -126,8 +126,9 @@ module.exports = (api) => {
   const prior0 = globalThis.__dboPlayerLog;
   const wasOff = !!(prior0 && typeof prior0 === 'object' && prior0.v === STATE_V && prior0.on === false);
   // no state from an earlier generation: the server process has just started, so every session the forwarder still holds
-  // open ended at a stop or a crash (sys.start{fresh}, review C-R6)
-  const fresh = !(prior0 && typeof prior0 === 'object');
+  // open ended at a stop or a crash (sys.start{fresh}, review C-R6). Kept on the state until a load writes its sys.start,
+  // so a first load that failed leaves it to the next one
+  const fresh = !(prior0 && typeof prior0 === 'object') || prior0.freshPending === true;
   // The previous generation goes fully off before anything of this one is installed
   if (typeof globalThis.__dboPlogUninstall === 'function') { try { globalThis.__dboPlogUninstall('reload'); } catch (e) { log('player log: the previous generation did not uninstall:', e.message); } }
   globalThis.__dboPlogHook = null;
@@ -135,6 +136,7 @@ module.exports = (api) => {
   const prior = globalThis.__dboPlayerLog;
   const S = backfill(prior && typeof prior === 'object' && prior.v === STATE_V ? prior : newState());
   globalThis.__dboPlayerLog = S;
+  if (fresh) S.freshPending = true;
   S.gen = Math.random().toString(36).slice(2, 8).padEnd(6, '0');
   S.seq = 0;
   S.generations++;
@@ -819,6 +821,7 @@ module.exports = (api) => {
   setOn();
   globalThis.__dboPlogHook = hook;
   sysEvent('sys.start', { gen: S.gen, ver: CORE_VERSION, cfg: R.siteHash(JSON.stringify(C)), hooks: installed + Object.keys(G.hooks).length, why: 'load', fresh: fresh || undefined });
+  S.freshPending = false;
   // A first check of the STOP file and the disk at once, not after the first interval
   setTimeout(guard('playerlogStop', stopCheck), 0);
   setTimeout(guard('playerlogDisk', diskCheck), 0);

@@ -442,6 +442,18 @@ const parsed = (W) => allLines(W).map((l) => { try { return JSON.parse(l); } cat
   ok(K.S.q.length >= queueBefore && K.S.file === fileBefore, '...the queue and the file handle survive for the next load');
   ok(K.S.q.some((r) => r.ev === 'sys.stop' && r.f.reason === 'load_failed'), '...sys.stop{load_failed} queued');
 
+  // ---- a first load that failed after the state was made leaves the fresh start to the next load (review C-R6) -----------------
+  reset();
+  W = world();
+  {
+    const realEvery = W.api.every;
+    W.api.every = () => { throw new Error('every broken on purpose'); };
+    let threw = false; try { W.load(); } catch (e) { threw = true; }
+    W.api.every = realEvery;
+    K = W.load(); W.QU.run(); await F.settle();
+    ok(threw && K.S.q.some((r) => r.ev === 'sys.start' && r.f.fresh === true), 'a first load that failed leaves the fresh start to the next load', K.S.q.filter((r) => r.ev === 'sys.start').map((r) => r.f));
+  }
+
   // ---- no sync IO after load -------------------------------------------------------------------------------------------------------
   reset();
   W = world();
