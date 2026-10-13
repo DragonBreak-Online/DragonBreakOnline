@@ -287,7 +287,7 @@ module.exports = (api) => {
     if (id.startsWith('voice:')) return sendPacket(a, { customPacketType: 'dboVoicePeer', identity: (t >>> 0).toString(16), op: id.slice(6), name: nameFor(a, t) });
     if (typeof globalThis.__dboPickpocketAction === 'function' && globalThis.__dboPickpocketAction(a, id, t, nameFor)) return;
     if (typeof globalThis.__dboRobAction === 'function' && globalThis.__dboRobAction(a, id, t, nameFor)) return;
-    if (typeof globalThis.__dboKeyRingAction === 'function' && globalThis.__dboKeyRingAction(a, id, t)) return;
+    if (typeof globalThis.__dboKeyRingAction === 'function' && globalThis.__dboKeyRingAction(a, id, t, nameFor)) return;
     if (typeof globalThis.__dboCourierAction === 'function' && globalThis.__dboCourierAction(a, id, t, nameFor)) return;
     if (typeof globalThis.__dboConcordatAction === 'function' && globalThis.__dboConcordatAction(a, id, t, nameFor)) return;
     if (typeof globalThis.__dboSuperMenuAction === 'function' && globalThis.__dboSuperMenuAction(a, id, t, nameFor)) return;
