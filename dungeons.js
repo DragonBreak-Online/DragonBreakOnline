@@ -2005,17 +2005,19 @@ module.exports = (api) => {
     const diff = DIFFICULTIES.find((x) => x.id === (lease ? lease.difficulty : 'normal')) || DIFFICULTIES[1];
     const got = [];
     const gave = [];
+    // this body's own shares only: lastShares is whatever the last split anywhere handed out (review C-R9)
+    const shares = [];
     let goldKept = 0;
     const d = lease ? byId.get(lease.id) : null;
     const k = trimFor(d, diff);
     const gear = master ? [] : ((ST.bodyGear.get(targetId >>> 0) || {}).ids || []);
     ST.bodyGear.delete(targetId >>> 0);
     for (const en of (master ? bossLoot(diff, lootOk(lease), ayleidLootHere(d), isRaidRuin(d), k, lease && lease.province) : undead ? undeadLoot(diff, lootOk(lease), k) : corpseLoot(diff, lootOk(lease), k, gear))) {
-      if (en.baseId === GOLD_BASE) { const kept = splitGold(casterId, lease, en.count); if (kept > 0 && giveItem(casterId, GOLD_BASE, kept)) { goldKept += kept; raceGold(casterId, kept, master ? 'a master\'s body' : 'a body'); got.push(`${en.count} gold${kept < en.count ? ' (shared)' : ''}`); } continue; }
+      if (en.baseId === GOLD_BASE) { const kept = splitGold(casterId, lease, en.count); shares.push(...lastShares); if (kept > 0 && giveItem(casterId, GOLD_BASE, kept)) { goldKept += kept; raceGold(casterId, kept, master ? 'a master\'s body' : 'a body'); got.push(`${en.count} gold${kept < en.count ? ' (shared)' : ''}`); } continue; }
       if (giveItem(casterId, en.baseId, en.count)) { got.push(`${en.count > 1 ? en.count + ' ' : ''}${itemName(en.baseId)}`); gave.push(en); }
     }
     // the player log (playerlog.js): what the body gave and the party's shares of its gold
-    try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('loot', 'dungeon_body', casterId, targetId, gave, goldKept, lastShares); } catch (e) { /* the player log is optional */ }
+    try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('loot', 'dungeon_body', casterId, targetId, gave, goldKept, shares); } catch (e) { /* the player log is optional */ }
     personal(casterId, got.length ? `You find ${got.join(', ')}.` : 'You find nothing of use.');
     scholarGift(casterId, SCHOLAR_BODY, 'in their pack');
     return false;
@@ -2073,7 +2075,7 @@ module.exports = (api) => {
     ST.memberOf.delete(pid);
     if (!p) return;
     p.members.delete(pid);
-    { const x = actorByProfile(pid); if (x) { try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('party', 'leave', x, 0, p.members.size); } catch (e) { /* the player log is optional */ } } }
+    try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('party', 'leave', actorByProfile(pid), 0, p.members.size); } catch (e) { /* the player log is optional */ }
     clearPartyPanel(pid);
     for (const [to, inv] of ST.invites) if (inv.from === pid) ST.invites.delete(to);
     if (p.members.size <= 1) {
