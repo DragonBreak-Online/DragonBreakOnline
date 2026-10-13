@@ -723,6 +723,19 @@ export class HousingSystem implements System {
       this.notice(ctx, userId, full);
       return;
     }
+    // Citizenship (gameplay tenancy.js, Nate 14 Oct): an owner hands a house in a hold that grants citizenship only to someone
+    // who could buy it there. The hold's managers and staff grant as before (their manual power).
+    if (!isManager) {
+      let refused = "";
+      try {
+        const check = (globalThis as any).__dboPropertyTransferCheck;
+        refused = typeof check === "function" ? String(check(primary, recipientActor) || "") : "";
+      } catch (e) { this.log(`[housing] transfer check failed: ${e}`); refused = ""; }
+      if (refused) {
+        this.notice(ctx, userId, refused);
+        return;
+      }
+    }
     // Old keys must not open a new owner's door.
     this.reKey(ctx, primary, rec);
     this.setOwner(ctx, rec, recipientActor, recipientProfile);
