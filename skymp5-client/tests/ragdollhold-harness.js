@@ -54,7 +54,7 @@ function run({ holdsRelayedRagdoll, niNodeWaitsForRagdoll }) {
   check('formView holds a new copy\'s Ragdoll before applyAnimation',
     /is3DLoaded\(\) && !this\.isSettlingCopy\(model\) && !holdsRelayedRagdoll\(model\.animation\?\.animEventName, this\.spawnMoment, Date\.now\(\)\)/.test(fv));
   check('formView sends no NiNode update while a relayed Ragdoll plays',
-    /isOnScreen != this\.isOnScreen && !niNodeWaitsForRagdoll\(ragdolledAtOf\(this\.refrId\), Date\.now\(\)\)/.test(fv));
+    /if \(niNodeWaitsForRagdoll\(ragdolledAtOf\(this\.refrId\), Date\.now\(\)\)\) \{[\s\S]{0,300}?\} else (if \(onScreenRebuildDue\(|\{[\s\S]{0,600}?onScreenRebuildDue\()/.test(fv));
   check('npcLifetimeRuntime exports the time of the last relayed Ragdoll', /export const ragdolledAtOf = \(id: number\): number => ragdolledAt\.get\(id\) \|\| 0;/.test(rt));
   check('allowRelayedRagdoll still records the time it applies one', /ragdolledAt\.set\(id, Date\.now\(\)\);\s*noteActorCall\("ragdoll", id\);/.test(rt));
 
