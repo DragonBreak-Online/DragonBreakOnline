@@ -2,26 +2,13 @@
   {
     "title": "The 13 October update, part 2",
     "date": "2026-10-13",
-    "version": "Client 0.3.95",
+    "version": "Server update",
     "tag": "Fix",
     "sections": [
       {
-        "heading": "Appearance",
-        "items": [
-          "Changes to your RaceMenu sliders now save from /appearance on an existing character too, and your face no longer changes when you log back in.",
-          "A GM returning from invisibility, or a player who rejoins, no longer takes on your own looks."
-        ]
-      },
-      {
-        "heading": "Items and storage",
-        "items": [
-          "Salt, Aversion poisons and Waterbreathing potions can be stored in chests and dropped again."
-        ]
-      },
-      {
         "heading": "Executions",
         "items": [
-          "The chopping block before Castle Bruma can now be used: press E at it. Watchers now see the beheading itself."
+          "The chopping block before Castle Bruma can now be used: press E at it."
         ]
       },
       {
@@ -34,7 +21,6 @@
       {
         "heading": "Notice boards",
         "items": [
-          "Notice boards have Supply orders and Couriers buttons.",
           "Notices pinned while wearing a mask are now signed with your own name."
         ]
       },
@@ -49,12 +35,15 @@
         ]
       },
       {
-        "heading": "Other fixes",
+        "heading": "House keys fixed",
         "items": [
-          "Your Other Player Volume setting is kept between game starts.",
-          "No name tag shows over someone under an Invisibility spell or potion.",
-          "A second character no longer inherits the enchantments your first one learned in the same game session.",
-          "Staff keep their Admin chat tab after a reconnect."
+          "Keys cut since 8 October open their doors again and move onto your key ring when you log in (they had stopped working after this morning's update)."
+        ]
+      },
+      {
+        "heading": "Client",
+        "items": [
+          "The 0.3.95 client was rolled back to 0.3.94: it made other players' characters clone and float. Its fixes come back in the next client, without the clones."
         ]
       }
     ]
