@@ -35,6 +35,8 @@ const fakeGame = () => {
     applyAppearance: () => { built++; const id = next++; const b = { id, getFormID() { return this.id; } }; forms.set(id, b); return b; },
     // applyTints: setFormIdUnsafe(base, playerBaseId); the old id still finds the form
     alias: (id) => { const b = forms.get(id); if (b) b.id = PLAYER_BASE; },
+    // A placed copy whose base is the form it was placed from
+    copyOn: (id) => { const b = forms.get(id); const refId = 0xff100000 + id % 0x1000; forms.set(refId, { id: refId, getFormID() { return this.id; }, getBaseObject: () => b }); return refId; },
   };
 };
 
@@ -42,7 +44,7 @@ async function main() {
   const fv = fs.readFileSync(path.resolve(__dirname, '../src/view/formView.ts'), 'utf8');
   const getter = (fv.match(/private getAppearanceBasedBase\(\): number \{[\s\S]*?\n  \}/) || [''])[0];
   check('formView has the base getter', !!getter);
-  const src = `class View { appearanceBasedBaseId = 0; appearanceState: any = { appearance: { name: "x" } };\n${getter.replace('private ', '')}\n}\nreturn View;`;
+  const src = `class View { refrId = 0; appearanceBasedBaseId = 0; appearanceState: any = { appearance: { name: "x" } };\n${getter.replace('private ', '')}\n}\nreturn View;`;
   const js = (await esbuild.transform(src, { loader: 'ts' })).code;
   const make = (g) => new Function('Game', 'ActorBase', 'Actor', 'applyAppearance', 'needsFreshBase', js)(
     g.Game, g.ActorBase, g.Actor, g.applyAppearance,
@@ -52,6 +54,7 @@ async function main() {
   const v = new (make(g))();
   const first = v.getAppearanceBasedBase();
   check('a copy with no base gets one built', g.built() === 1 && first >= 0xff000000, g.built());
+  v.refrId = g.copyOn(first);
   g.alias(first); // SpawnProcess.enable -> applyTints on the new copy
   const ids = new Set();
   for (let frame = 0; frame < 60; frame++) ids.add(v.getAppearanceBasedBase());
@@ -65,6 +68,24 @@ async function main() {
   v2.appearanceBasedBaseId = 0;
   v2.getAppearanceBasedBase();
   check('a reset id (appearance change, cell change) is rebuilt', g2.built() === 3, g2.built());
+
+  // 7830cf9b's bug: a copy placed again from an aliased base wore the watcher's look (#gm-chat 12 Oct)
+  const g3 = fakeGame();
+  const v3 = new (make(g3))();
+  const b3 = v3.getAppearanceBasedBase();
+  v3.refrId = g3.copyOn(b3);
+  g3.alias(b3);
+  v3.getAppearanceBasedBase();
+  v3.refrId = 0; // keepNoCopy (admin invisible) or another cell: destroy(), refrId 0, the base id kept
+  const fresh = v3.getAppearanceBasedBase();
+  check('a hidden copy shown again gets a fresh base, not the aliased one (the watcher\'s look)', fresh !== b3 && g3.built() === 2, g3.built());
+  for (let frame = 0; frame < 60; frame++) v3.getAppearanceBasedBase();
+  check('...and only one while that base waits for its copy (60 frames)', g3.built() === 2, g3.built());
+  v3.refrId = g3.copyOn(fresh);
+  g3.alias(fresh);
+  g3.forms.delete(v3.refrId); // the copy is gone from the game, refrId kept
+  v3.getAppearanceBasedBase();
+  check('a copy gone from the game gets a fresh base too', g3.built() === 3, g3.built());
 
   console.log(failures ? `${failures} FAILED` : 'all passed');
   process.exit(failures ? 1 : 0);

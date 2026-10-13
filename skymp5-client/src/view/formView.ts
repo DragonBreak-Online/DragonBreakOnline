@@ -1294,10 +1294,15 @@ export class FormView {
 
   private getAppearanceBasedBase(): number {
     const base = ActorBase.from(Game.getFormEx(this.appearanceBasedBaseId));
-    // Only a missing base is rebuilt. SpawnProcess's applyTints aliases this copy's own base to the player's id right after
-    // the spawn, so rebuilding an aliased base (7830cf9b, client 0.3.95) built a new one on the next frame and respawned
-    // every player copy every frame: the 13 Oct clone storm (tests/clonestorm-harness.js)
-    if (!base && this.appearanceState.appearance) {
+    // An applyTints-aliased base is kept while our copy stands on it (else the clone storm) and rebuilt when none does (else the watcher's look)
+    const aliased = !!base && (base.getFormID() >>> 0) !== (this.appearanceBasedBaseId >>> 0);
+    let copyOnIt = false;
+    if (base && aliased) {
+      const copy = Actor.from(Game.getFormEx(this.refrId));
+      const copyBase = copy ? copy.getBaseObject() : null;
+      copyOnIt = !!copyBase && (copyBase.getFormID() >>> 0) === (base.getFormID() >>> 0);
+    }
+    if ((!base || (aliased && !copyOnIt)) && this.appearanceState.appearance) {
       this.appearanceBasedBaseId = applyAppearance(this.appearanceState.appearance).getFormID();
     }
     return this.appearanceBasedBaseId;
