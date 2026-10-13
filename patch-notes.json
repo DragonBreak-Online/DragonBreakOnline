@@ -33,6 +33,21 @@
         ]
       },
       {
+        "heading": "House keys",
+        "items": [
+          "House keys are no longer all \"Werewolf Cage Keys\": each lock now has its own key, named for its house. Your keys change over the next time you log in, and keys you hold no longer vanish and come back every few seconds.",
+          "Single keys can now be traded and stored on their own.",
+          "House keys can be dropped. A dropped key disappears after 2 minutes, but until then whoever picks it up can open that door, so keep them safe.",
+          "A key that no longer opens anything stays a Werewolf Cage Key. Keys left in a chest change over once they are taken out and their holder logs in again."
+        ]
+      },
+      {
+        "heading": "Property",
+        "items": [
+          "Every house, room and chest bought before per-character ownership now belongs to one character, so your other characters on the same account no longer share it."
+        ]
+      },
+      {
         "heading": "Supply orders",
         "items": [
           "An order is filled by any item of the name it asks for: the woodcutters' Charcoal now fills a Charcoal order."
