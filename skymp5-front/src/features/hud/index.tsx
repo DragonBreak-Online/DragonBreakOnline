@@ -142,7 +142,10 @@ const UI_CAPS = ['bank', 'robPrompt', 'feedPrompt', 'downed', 'businessLedger', 
   // The courier's hand-over panel (features/courierHandover; server couriers.js): without it the server uses chat and the mailbox
   'courierHandover',
   // The Key Ring (features/keyRing; server keyring.js): without it the server uses chat
-  'keyRing'];
+  'keyRing',
+  // Not a panel: the client draws the Khajiit's Night Eye from the server's dboNightEye (skymp5-client nightEyeService.ts);
+  // without it the server says the power comes with a later update (racial.js clientCap)
+  'nightEye'];
 const useUiCaps = (): void => {
   useEffect(() => {
     const tell = () => {

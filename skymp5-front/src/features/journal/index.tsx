@@ -59,6 +59,9 @@ export interface JournalRacialPower {
   activeMs?: number;
   waitMs?: number;
   buffs?: Record<string, number>;
+  // A power with no buffs says what it does (racial.js power.effect: Night Eye), and how long its wait is when not a day
+  effect?: string;
+  cooldownHours?: number;
 }
 
 export interface JournalStatGroup {
@@ -235,12 +238,17 @@ export const describePower = (p: JournalRacialPower): string => {
     if (Number(b[k]) > 1) out.push(`${word} regenerates x${Number(b[k])}`);
   }
   if (Number(b.wardPoints) > 0) out.push(`a ward absorbs ${Number(b.wardPoints)} spell damage`);
-  const text = out.join(', ');
+  const text = out.join(', ') || String(p.effect || '');
   return text ? text.charAt(0).toUpperCase() + text.slice(1) : '';
 };
 const clock = (ms: number): string => {
   const m = Math.ceil(ms / 60000);
   return m >= 60 ? `${Math.floor(m / 60)} h${m % 60 ? ` ${m % 60} min` : ''}` : `${Math.max(1, m)} min`;
+};
+
+const often = (p: JournalRacialPower): string => {
+  const h = Number(p.cooldownHours);
+  return h > 0 && h < 24 ? `Again ${clock(h * 3600000)} after each use.` : 'Once a day.';
 };
 
 // The Profile tab's racial power: what it does, and the button while it is ready (journal.js journalAction racialPower)
@@ -263,7 +271,7 @@ export const RacialPowerBox = ({ power, busy, act }: { power: JournalRacialPower
       <h2 className="journal__heading">Racial Power</h2>
       <div className="journal__action">
         <h3 className="journal__action-head">{power.name}</h3>
-        <p className="journal__hint">{what ? `${what}, for ${power.seconds} seconds.` : `For ${power.seconds} seconds.`} Once a day.</p>
+        <p className="journal__hint">{what ? `${what}, for ${power.seconds} seconds.` : `For ${power.seconds} seconds.`} {often(power)}</p>
         <div className="journal__editor-actions">
           {power.clientOnly ? <span className="journal__hint">Comes with a later update of the game.</span>
             : left > 0 ? <span className="journal__hint journal__power-on">Upon you: {Math.ceil(left / 1000)} s</span>
