@@ -7625,6 +7625,18 @@ try {
   require(MOVETRACE_JS)({ mp, log, personal, display, registerChatCommand, onlineActors, every });
 } catch (e) { log('movetrace.js failed to load:', e.stack || e.message); }
 
+// ---- remote staff console (server\console.js): after every module that registers commands (the player log below registers none)
+// Jake, 13 Oct: admins run in-game staff commands from the website dashboard or Discord. The backend drops signed requests
+// into /run/dragonbreak-console; console.js checks everything again and runs each through handleLine, the same gate as typed
+// chat. Timers stop only by name, so a load that fails below must not leave the previous generation's reader running.
+stopTimer('remoteConsole');
+try {
+  const CONSOLE_JS = path.resolve('console.js');
+  delete require.cache[CONSOLE_JS];
+  require(CONSOLE_JS)({ mp, log, audit, every, stopTimer, cfg, commands, handleLine, findByName, tagOf, profileOf, discordOf, userOf,
+    display, who, staffTierFrom, staffTierOf, TIER_LABEL, TIER_RANK, captureFor, onlineActors, gen: globalThis.__dboRunCommand });
+} catch (e) { stopTimer('remoteConsole'); log('console.js failed to load:', e.stack || e.message); }
+
 // ---- per-player activity log, never chat (server\playerlog.js, config "playerLog"): LAST, its hooks wrap every other ----
 try {
   const PLAYERLOG_JS = path.resolve('playerlog.js');

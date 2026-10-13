@@ -236,7 +236,7 @@ const EVENT_TYPES = {
       'submit', 'future', 'late', 'mismatch', 'malformed', 'cooldown', 'away', 'count', 'early', 'faltered', 'overlap', 'overtime', 'parse', 'precise', 'released',
       'rested', 'shape', 'slow', 'stall', 'other'), n: 'int', nums: O({ dxy: 'num', dz: 'num', speed: 'num', budget: 'num', enforced: 'bool' }) }),
   // commands, console and staff
-  'cmd.run': T(1, '', { name: 'code', sub: 'code', nums: A('num', 3), route: E('chat', 'upanel', 'journal', 'quiet', 'xmenu', 'warband'), outcome: E('ok', 'refused', 'error', 'async'), via: E('alias', 'nested'), mirror: 'bool' }),
+  'cmd.run': T(1, '', { name: 'code', sub: 'code', nums: A('num', 3), route: E('chat', 'upanel', 'journal', 'quiet', 'xmenu', 'warband', 'console'), outcome: E('ok', 'refused', 'error', 'async'), via: E('alias', 'nested'), mirror: 'bool' }),
   'cmd.info': T(2, '', { name: 'code', n: 'int' }),
   'cmd.refused': T(2, '', { reason: E('too_long', 'unknown', 'not_staff', 'lead_only'), name: 'code' }),
   'cmd.console': T(0, '', { cmd: 'code', ref: 'hex', form: NAME, k: 'int', rights: 'bool', local: 'bool', blocked: 'bool' }),
@@ -450,6 +450,7 @@ excluded('LEDGER', 'ledger names: the command wrapper');
 excluded('ORPHAN', 'staff only');
 excluded('DISCORD', 'roles: session.perm');
 excluded('WWBREAKER VLBREAKER', 'the beastform breaker names who dropped');
+excluded('REMOTE', 'the remote staff console (console.js): staff command text and a Discord handle; the command wrapper records the run (route console)');
 
 // S: parsed. Only anchored groups survive: parties (resolved in the game), ops from fixed tables, numbers, hex refs.
 // The court, said by staff or an official: office titles are never kept (rolenames can make them staff-written), nor
@@ -1177,6 +1178,10 @@ commissions.js COMMISSION db09dfa4 parsed
 commissions.js COMMISSION ad987a21 parsed
 commissions.js COMMISSION 0aa01cec parsed
 commissions.js COMMISSION 0c709fad parsed
+console.js REMOTE ffdec0aa excluded
+console.js REMOTE 84973282 excluded
+console.js REMOTE 1ef926f8 excluded
+console.js REMOTE 04d3b66a excluded
 contracts.js CONTRACT 5686a09a clean
 contracts.js CONTRACT b6341078 clean
 contracts.js CONTRACT aaccf4b3 clean
