@@ -12,12 +12,16 @@
 //
 //   1. The victim uses the block and kneels (the engine seats them). Using it is the victim's own act.
 //   2. Another player uses it: the headsman. A GM (an admin tier; a Trial GM is not one) must be within gmRangeMeters,
-//      or nothing happens. Every GM in range gets a panel: approve or refuse.
-//   3. Approved, the headsman confirms in a panel of their own.
+//      or nothing happens. Every GM in range gets a panel: approve or refuse. The GM who decides is a third party: never
+//      the headsman nor the one at the block (13 Oct: a GM could approve the beheading they were about to do).
+//   3. Approved, the headsman confirms in a panel of their own. The approving GM must stay within gmRangeMeters until
+//      then (a judge presides over the sentence; 13 Oct: the GM could approve and walk off), or there is no execution.
 //   4. Every player within watchMeters is sent dboExecute (each plays the pair on its copies: the victim's clip takes the
 //      head at 11.8 s); chopMs (16.7 s, the clip's KillActor) later the victim's character ends for good
-//      (supernatural.js __dboPermaKill), audited and posted to the staff log.
-// Anything that breaks it - the victim or headsman stepping away or leaving, a refusal, approvalSeconds passing - ends
+//      (supernatural.js __dboPermaKill), audited and posted to the staff log. Once the headsman has confirmed the blow
+//      falls: standing up, walking off or logging out during the clip no longer cancels it (13 Oct: the victim could
+//      stand up or walk 5 m during the swing and escape). The death still waits for chopMs, the clip's KillActor.
+// Anything before the headsman confirms that breaks it - the victim or headsman stepping away or leaving, a refusal, approvalSeconds passing - ends
 // the attempt, and everyone in it is told. Config "execution": { enabled, blockBases, idle, gmRangeMeters, reachMeters,
 // watchMeters, chopMs, approvalSeconds }. Hot reload.
 'use strict';
@@ -55,7 +59,9 @@ module.exports = (api) => {
   const online = (a) => onlineActors().some((x) => (x >>> 0) === (a >>> 0));
   const near = (a, ref, m) => { try { return online(a) && distanceMeters(a, ref) <= m; } catch (e) { return false; } };
   const nameOf = (a) => { try { return display(a); } catch (e) { return 'someone'; } };
-  const gmsNear = (block) => onlineActors().filter((g) => isAdmin(g) && near(g, block, Number(C.gmRangeMeters)));
+  // The GMs who may decide: in range, and neither the victim nor the headsman
+  const gmsNear = (block, st) => onlineActors().filter((g) => isAdmin(g) && near(g, block, Number(C.gmRangeMeters))
+    && (!st || ((g >>> 0) !== (st.victim >>> 0) && (g >>> 0) !== (st.executioner >>> 0))));
   const nonce = () => Math.random().toString(36).slice(2, 10);
 
   const end = (block, why, tellAll) => {
@@ -80,6 +86,11 @@ module.exports = (api) => {
     const block = targetId >>> 0, a = casterId >>> 0;
     if (!isBlock(block) || !isPlayer(a)) return undefined;
     let st = S.blocks.get(block);
+    // Once the headsman has confirmed, nothing at the block changes it: the victim cannot stand up, nobody else can use it
+    if (st && st.phase === 'chopping') {
+      personal(a, a === st.victim ? 'The axe is already falling. You cannot rise now.' : 'An execution is under way here.');
+      return false;
+    }
     // A victim who is gone frees the block
     if (st && !near(st.victim, block, Number(C.reachMeters))) { end(block, 'The one at the block is gone.', true); st = null; }
     if (!st) {
@@ -89,9 +100,9 @@ module.exports = (api) => {
     }
     if (st.victim === a) { end(block, '', false); return undefined; }   // getting up
     if (st.phase !== 'kneeling') { personal(a, 'An execution is already under way here.'); return false; }
-    const gms = gmsNear(block);
+    const gms = gmsNear(block, { victim: st.victim, executioner: a });
     if (!gms.length) {
-      personal(a, `An execution needs a GM (not a Trial GM) here, within ${C.gmRangeMeters} m, to approve it.`);
+      personal(a, `An execution needs a GM (not a Trial GM) here, within ${C.gmRangeMeters} m, to approve it, and that GM cannot be the headsman or the one at the block.`);
       return false;
     }
     Object.assign(st, { executioner: a, phase: 'awaitGm', at: Date.now(), nonce: nonce(), gms });
@@ -113,7 +124,7 @@ module.exports = (api) => {
     setTimeout(() => {
       const now = S.blocks.get(block);
       if (now !== st || st.phase !== 'chopping') return;
-      if (!near(st.victim, block, Number(C.reachMeters) + 2)) { end(block, 'The execution did not happen: the one at the block was gone.', true); return; }
+      // No distance check here: once confirmed the blow lands, wherever the victim went during the clip (logged out too)
       const why = `executed at the chopping block by ${nameOf(st.executioner)}, approved by GM ${nameOf(st.approvedBy)}`;
       try { if (typeof globalThis.__dboPermaKill === 'function') globalThis.__dboPermaKill(st.victim, why); else log('execution: no __dboPermaKill (supernatural.js); nobody was killed'); } catch (e) { log('execution: kill failed', e.message); }
       try { if (typeof staffLog === 'function') staffLog(nameOf(st.approvedBy), 'gm', 'execution', `${nameOf(st.executioner)} executed ${nameOf(st.victim)} (PK)`); } catch (e) { /* the audit line stands */ }
@@ -130,6 +141,7 @@ module.exports = (api) => {
     if (!st || st.nonce !== m[3]) return personal(a, 'That execution is no longer waiting.');
     if (m[1] === 'approve' || m[1] === 'deny') {
       if (st.phase !== 'awaitGm' || !isAdmin(a) || !near(a, block, Number(C.gmRangeMeters))) return personal(a, 'Only a GM at the block can decide this.');
+      if ((a >>> 0) === (st.executioner >>> 0) || (a >>> 0) === (st.victim >>> 0)) return personal(a, 'You cannot decide an execution you take part in. Another GM must approve or refuse it.');
       for (const g of st.gms || []) if (g !== a) { try { closeWidget(g, PANEL_ID); } catch (e) { /* offline */ } }
       if (m[1] === 'deny') { audit(`EXECUTION refused by ${who(a)}: ${who(st.executioner)} of ${who(st.victim)}`); return end(block, `GM ${nameOf(a)} refused the execution.`, true); }
       Object.assign(st, { phase: 'awaitHeadsman', approvedBy: a, at: Date.now() });
@@ -140,6 +152,8 @@ module.exports = (api) => {
     }
     if (a !== st.executioner || st.phase !== 'awaitHeadsman') return;
     if (m[1] === 'cancel') return end(block, `${nameOf(a)} lowers the axe. There is no execution.`, true);
+    // The approving GM presides until the blow: gone before the confirm, there is no execution
+    if (!isAdmin(st.approvedBy) || !near(st.approvedBy, block, Number(C.gmRangeMeters))) return end(block, `GM ${nameOf(st.approvedBy)}, who allowed the execution, is no longer at the block. There is no execution.`, true);
     chop(block, st);
   });
   onUi('executionClose', () => { /* a closed panel decides nothing; the attempt times out */ });
@@ -153,6 +167,7 @@ module.exports = (api) => {
       if (!near(st.victim, block, Number(C.reachMeters))) { end(block, 'The one at the block stood up or left. There is no execution.', true); continue; }
       if (st.executioner && !near(st.executioner, block, Number(C.reachMeters) + 2)) { end(block, 'The headsman stepped away. There is no execution.', true); continue; }
       if (st.phase === 'awaitGm' && st.approvedBy === undefined && !(st.gms || []).some((g) => near(g, block, Number(C.gmRangeMeters)))) { end(block, 'No GM is at the block any more. There is no execution.', true); continue; }
+      if (st.phase === 'awaitHeadsman' && !near(st.approvedBy, block, Number(C.gmRangeMeters))) { end(block, `GM ${nameOf(st.approvedBy)}, who allowed the execution, left the block. There is no execution.`, true); continue; }
       if (st.phase !== 'kneeling' && now - st.at > Number(C.approvalSeconds) * 1000) end(block, 'Nobody decided in time. There is no execution.', true);
     }
   });

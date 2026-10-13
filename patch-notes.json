@@ -45,6 +45,15 @@
         "items": [
           "The 0.3.95 client was rolled back to 0.3.94: it made other players' characters clone and float. Its fixes come back in the next client, without the clones."
         ]
+      },
+      {
+        "heading": "Fixes since the update",
+        "items": [
+          "Vampires and werewolves keep Quicksilver ore and ingots again: they were mailed away as if they were silver. Other things that only have silver in the name stay too, such as the Silver-Blood ring and keys, house keys and Silver Hand armour. Real silver is still shunned.",
+          "Executions: once the headsman confirms, the execution happens. Standing up, walking away or logging out during the swing no longer stops it.",
+          "Executions: the GM who allows an execution must stay at the block until the headsman confirms, or there is no execution.",
+          "Executions: a GM can no longer approve an execution they take part in, as the headsman or at the block. Another GM must decide."
+        ]
       }
     ]
   },

@@ -651,13 +651,19 @@ module.exports = (api) => {
   const spared = (a, s) => isAlpha(a) || !!(s && s.blessed);
 
   // ---- silver: a werewolf or vampire can neither wear it nor strike with it (Nat) --------------------------
-  // Silver is the silver weapon keyword or "silver" in the editor id, which also catches rings, amulets and circlets
+  // Silver is the silver weapon keyword or "silver" in the editor id, which also catches rings, amulets and circlets.
+  // Editor ids that say silver but are not (scan of the 105-plugin load order, 13 Oct): Quicksilver ore and ingots
+  // (another metal), the Silver-Blood family (ring, inn key), Silver-Eyes and Silver-Plow (house keys), the Silver Hand
+  // (a faction: its armour, mantles and plans), the silver schematics book and the Silver Tooth light; Silverside Perch
+  // and the Silverbird egg are named so in game though no editor id says it today. Both rules use this one test: what is
+  // worn, and what is carried (mailed away). Silver weapons by keyword (isSilverSource) are never excluded
+  const NOT_SILVER = /quicksilver|silver[-_ ]?(blood|eyes?|plow|hand|tooth|side|bird)|schematic/i;
   const silverCache = new Map();
   const isSilverItem = (id) => {
     id = Number(id) >>> 0;
     if (silverCache.has(id)) return silverCache.get(id);
     const r = recordOf(id);
-    const v = !!r && (isSilverSource(id) || /silver/i.test(String(r.editorId || '')));
+    const v = !!r && (isSilverSource(id) || (/silver/i.test(String(r.editorId || '')) && !NOT_SILVER.test(String(r.editorId || ''))));
     if (silverCache.size > 4096) silverCache.clear();
     silverCache.set(id, v); return v;
   };

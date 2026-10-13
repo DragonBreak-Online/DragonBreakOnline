@@ -11,6 +11,7 @@ const ok = (c, name, got) => { if (!c) fails++; console.log(`${c ? 'ok  ' : 'FAI
   const V = 0xff000201, X = 0xff000202, GM = 0xff000203, TRIAL = 0xff000204, FAR_GM = 0xff000205;
   const pos = new Map([[BLOCK, 0], [V, 1], [X, 1.5], [GM, 8], [TRIAL, 5], [FAR_GM, 300]]);
   const onlineSet = new Set([V, X, GM, TRIAL, FAR_GM]);
+  const admins = new Set([GM, FAR_GM]);
   const said = [], audits = [], packets = [], widgets = [], closed = [], killed = [], staff = [];
   let timers = [];
   const ui = new Map();
@@ -23,7 +24,7 @@ const ok = (c, name, got) => { if (!c) fails++; console.log(`${c ? 'ok  ' : 'FAI
     ui.clear(); timers = [];
     require(path.join(SERVER, 'execution.js'))({ mp, log: () => {}, personal: (a, t) => said.push([a, t]), audit: (t) => audits.push(t), who: (a) => `#${a.toString(16)}`,
       display: (a) => ({ [V]: 'Victim', [X]: 'Headsman', [GM]: 'Gm', [TRIAL]: 'Trial' }[a] || '?'), cfg: cfg || {},
-      isAdmin: (a) => a === GM || a === FAR_GM, isPlayer: (a) => a >= 0xff000000, sendPacket: (a, p) => packets.push([a, p]),
+      isAdmin: (a) => admins.has(a), isPlayer: (a) => a >= 0xff000000, sendPacket: (a, p) => packets.push([a, p]),
       openWidget: (a, w) => widgets.push([a, w]), closeWidget: (a, id) => closed.push([a, id]), onUi: (e, fn) => ui.set(e, fn),
       onlineActors: () => [...onlineSet], distanceMeters: (a, b) => Math.abs((pos.get(a) ?? 9999) - (pos.get(b) ?? 9999)),
       every: (n, ms, fn) => timers.push(fn), staffLog: (...x) => staff.push(x) });
@@ -79,11 +80,59 @@ const ok = (c, name, got) => { if (!c) fails++; console.log(`${c ? 'ok  ' : 'FAI
   load({ execution: { chopMs: 0, approvalSeconds: 0 } });
   act(BLOCK, V); act(BLOCK, X); await new Promise((r) => setTimeout(r, 5)); tick();
   ok(!globalThis.__dboExecutionState().length && /Nobody decided in time/.test(last(V)), 'approvalSeconds passing ends it');
-  // The victim leaving during the chop saves them
+  // 13 Oct (claude-jake's check): once the headsman confirms, the blow lands. Walking away during the clip saved the victim
   load({ execution: { chopMs: 20 } }); killed.length = 0;
-  act(BLOCK, V); act(BLOCK, X); choose(GM, lastPanel(GM).actions[0].id); choose(X, lastPanel(X).actions[0].id); pos.set(V, 50);
+  act(BLOCK, V); act(BLOCK, X); choose(GM, lastPanel(GM).actions[0].id); choose(X, lastPanel(X).actions[0].id); pos.set(V, 50); tick();
+  ok(globalThis.__dboExecutionState().length === 1 && globalThis.__dboExecutionState()[0].phase === 'chopping', 'walking off during the chop does not end it (the 2 s watch)');
   await new Promise((r) => setTimeout(r, 40));
-  ok(!killed.length && /did not happen/.test(last(X)), 'a victim gone at the blow is not killed'); pos.set(V, 1);
+  ok(killed.length === 1 && killed[0][0] === V, 'a victim who walked 50 m during the clip is still executed at chopMs', killed); pos.set(V, 1);
+  // Standing up (using the block again) during the chop: refused, and the execution completes
+  load({ execution: { chopMs: 20 } }); killed.length = 0;
+  act(BLOCK, V); act(BLOCK, X); choose(GM, lastPanel(GM).actions[0].id); choose(X, lastPanel(X).actions[0].id);
+  ok(act(BLOCK, V) === false && /already falling/.test(last(V)), 'the victim cannot stand up from the block during the chop', last(V));
+  ok(act(BLOCK, TRIAL) === false && /under way/.test(last(TRIAL)), '...and nobody else can use the block then');
+  ok(killed.length === 0, '...the death still waits for chopMs');
+  await new Promise((r) => setTimeout(r, 40));
+  ok(killed.length === 1 && killed[0][0] === V, 'the execution completes after the victim tried to stand', killed);
+  // The victim logging out during the chop does not escape it either
+  load({ execution: { chopMs: 20 } }); killed.length = 0;
+  act(BLOCK, V); act(BLOCK, X); choose(GM, lastPanel(GM).actions[0].id); choose(X, lastPanel(X).actions[0].id); onlineSet.delete(V); tick();
+  await new Promise((r) => setTimeout(r, 40));
+  ok(killed.length === 1 && killed[0][0] === V, 'logging out during the chop does not escape it', killed); onlineSet.add(V);
+
+  // 13 Oct: the approving GM must stay at the block until the headsman confirms
+  load({ execution: { chopMs: 0 } }); killed.length = 0; packets.length = 0;
+  act(BLOCK, V); act(BLOCK, X); choose(GM, lastPanel(GM).actions[0].id); pos.set(GM, 100); tick();
+  ok(!globalThis.__dboExecutionState().length && /who allowed the execution, left the block/.test(last(X)) && /left the block/.test(last(V)), 'the approving GM walking off before the confirm ends it (the watch), all told', last(X));
+  pos.set(GM, 8);
+  load({ execution: { chopMs: 0 } }); killed.length = 0; packets.length = 0;
+  act(BLOCK, V); act(BLOCK, X); choose(GM, lastPanel(GM).actions[0].id); const hp2 = lastPanel(X); pos.set(GM, 100);
+  choose(X, hp2.actions[0].id);
+  ok(!packets.length && !killed.length && /is no longer at the block/.test(last(X)), 'the headsman confirming after the GM left (between watches): no execution', last(X));
+  pos.set(GM, 8);
+  load({ execution: { chopMs: 20 } }); killed.length = 0;
+  act(BLOCK, V); act(BLOCK, X); choose(GM, lastPanel(GM).actions[0].id); choose(X, lastPanel(X).actions[0].id); pos.set(GM, 100); tick();
+  await new Promise((r) => setTimeout(r, 40));
+  ok(killed.length === 1, 'after the confirm the GM may leave: it proceeds', killed); pos.set(GM, 8);
+
+  // 13 Oct: a GM who is the headsman (or the victim) cannot approve their own execution
+  admins.add(X); onlineSet.delete(GM);
+  load({ execution: { chopMs: 0 } }); killed.length = 0; widgets.length = 0;
+  act(BLOCK, V);
+  ok(act(BLOCK, X) === false && /cannot be the headsman or the one at the block/.test(last(X)), 'a GM headsman with no other GM near is refused', last(X));
+  ok(!widgets.some(([a]) => a === X), '...and is never shown the approval panel');
+  onlineSet.add(GM);
+  ok(act(BLOCK, X) === undefined && !widgets.some(([a]) => a === X) && lastPanel(GM), 'with another GM near only that GM is asked');
+  choose(X, lastPanel(GM).actions[0].id);
+  ok(globalThis.__dboExecutionState()[0].phase === 'awaitGm' && /cannot decide an execution you take part in/.test(last(X)), 'the GM headsman cannot approve with the panel id either', last(X));
+  admins.delete(X);
+  admins.add(V);
+  load({ execution: { chopMs: 0 } }); widgets.length = 0;
+  act(BLOCK, V); act(BLOCK, X);
+  ok(!widgets.some(([a]) => a === V), 'a GM at the block is not asked to approve their own beheading');
+  choose(V, lastPanel(GM).actions[0].id);
+  ok(globalThis.__dboExecutionState()[0].phase === 'awaitGm' && /cannot decide an execution you take part in/.test(last(V)), '...nor can they approve it', last(V));
+  admins.delete(V);
   load({ execution: { enabled: false } });
   ok(act(BLOCK, V) === undefined && !globalThis.__dboExecutionState().length, 'enabled false: the block is plain furniture');
   const gm = fs.readFileSync(path.join(SERVER, 'gamemode.js'), 'utf8');
