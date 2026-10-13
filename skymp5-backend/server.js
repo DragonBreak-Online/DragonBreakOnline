@@ -59,6 +59,8 @@ const PORT = process.env.PORT || 4000
 
 // nginx terminates TLS and proxies over loopback; without this req.ip is 127.0.0.1 for everyone and per-IP rate limiting (routes/files.js) treats all players as one client
 app.set('trust proxy', 'loopback')
+const securityHeaders = require('./sources/securityHeaders')
+app.use(securityHeaders.nosniff)
 
 const corsOrigins = [config.websiteUrl, config.dashboardPublicUrl]
 app.use(cors({ origin: corsOrigins }))
@@ -77,6 +79,7 @@ app.use(require('./sources/problemReport').parserExcept(OWN_PARSER_PATHS, global
 app.use('/files/root', express.static(path.join(config.clientFilesDir, 'root')))
 // Extra files for the launcher's syncExtraFiles, under /api/files because the public proxy forwards only /api paths.
 // A file of a list version that is in the R2 bucket is redirected there first (sources/r2Files.js)
+app.use('/api/files/extra', securityHeaders.sandboxed)
 app.use('/api/files/extra', require('./sources/r2Files').extraRedirect)
 app.use('/api/files/extra', express.static(config.extraFilesDir, { dotfiles: 'deny', index: false, redirect: false }))
 
