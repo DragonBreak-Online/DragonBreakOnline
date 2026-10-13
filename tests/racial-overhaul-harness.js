@@ -164,7 +164,7 @@ told.length = 0;
 check('...a 100-point shock spell: x0.5 x0.75 = 37.5, the ward takes the last 45 to 0... and breaks', near(R.targetMult(NPC, MAORMER, SPARKS, 100), 0) && state[MAORMER].props['private.racialPower'].wardLeft === 7.5 && near(R.targetMult(NPC, MAORMER, SPARKS, 100), 0.375 * (37.5 - 7.5) / 37.5) && state[MAORMER].props['private.racialPower'].wardLeft === 0 && told.some(([a, x]) => a === MAORMER && x === 'Your ward breaks.'), state[MAORMER].props['private.racialPower']);
 check('...spent: magic resist only', near(R.targetMult(NPC, MAORMER, FLAMES, 20), 0.75));
 check('...under the cap: Defense x0.3 with the ward\'s 0 is floored at 0.25', near(R.capTargetSide(0.3 * 0), 0.25));
-// Khajiit Night Eye: the client's, later
+// Khajiit Night Eye: refused for a client that did not say it draws it (no hasUiCap here; tests/nighteye-harness.js has the rest)
 const k = R.usePower(KHAJIIT);
 check('Night Eye is refused until the client can draw it; its view says so, not ready', !k.ok && /later update/.test(k.text) && R.powerView(KHAJIIT).ready === false && /later update/.test(R.statusLine(KHAJIIT)));
 const RK = make({ enabled: true, overhaul: true, khajiit: { unarmedDamage: 8, power: { name: 'Night Eye', seconds: 60, cooldownHours: 1 / 3, buffs: {} } } });
@@ -232,7 +232,7 @@ check('...merged: the Maormer keep shock 50%, Blade +15% and the ward', RL.confi
 const jr = fs.readFileSync(path.join(SERVER, 'journal.js'), 'utf8');
 check('journal.js: the Profile tab\'s action racialPower and its view', /racialPower: \(a\) => \(typeof globalThis\.__dboRacialPowerUse === 'function'/.test(jr) && /racialPower: own === false \? null : racialPowerView\(a\)/.test(jr) && /racialPower: 'Racial Power'/.test(jr));
 const gmSrc = fs.readFileSync(path.join(SERVER, 'gamemode.js'), 'utf8');
-check('gamemode.js: the hit hands the ward its damage; racial gets sendPacket', /racial\.targetMult\(agg, tgt, src, dmg\)/.test(gmSrc) && /gmstFloat, cfg, sendPacket \}\);/.test(gmSrc));
+check('gamemode.js: the hit hands the ward its damage; racial gets sendPacket', /racial\.targetMult\(agg, tgt, src, dmg\)/.test(gmSrc) && /gmstFloat, cfg, sendPacket(, hasUiCap)? \}\);/.test(gmSrc));
 check('gamemode.js: the HUD carries the countdown and can be sent on demand', /globalThis\.__dboRacialPowerHud\(a\) : null; if \(rp\) v\.racialPower = rp;/.test(gmSrc) && /globalThis\.__dboHudRefresh = \(a\) =>/.test(gmSrc));
 check('the hooks are published', ['__dboRaceSkillRate', '__dboRaceDiseaseResist', '__dboRacialPowerUse', '__dboRacialPowerView', '__dboRacialPowerHud'].every((n) => typeof globalThis[n] === 'function'));
 // Others see a power (Nate, 11 Oct: nobody saw Roaring Tempest): its lookShader as a dboGlow on the caster, for players near

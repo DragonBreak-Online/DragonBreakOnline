@@ -28,6 +28,11 @@ h = render(J.RacialPowerBox, { power: Object.assign({}, nord, { ready: false, wa
 ok(/Returns in 5 h 30 min/.test(text(h)) && !/<button/.test(h), 'waiting: when it returns', text(h));
 h = render(J.RacialPowerBox, { power: { name: 'Night Eye', seconds: 60, clientOnly: true, buffs: {} }, busy: false, act });
 ok(/later update/.test(text(h)) && !/<button/.test(h), 'Night Eye: a later update, no button', text(h));
+// A front from 0.3.97 says what a buffless power does and a wait shorter than a day (racial.js effect, cooldownHours)
+if (/after each use/.test(fs.readFileSync(bundle, 'utf8'))) {
+  h = render(J.RacialPowerBox, { power: { name: 'Night Eye', seconds: 60, ready: true, effect: 'you see in the dark', cooldownHours: 1 / 3, buffs: {} }, busy: false, act });
+  ok(/You see in the dark, for 60 seconds\. Again 20 min after each use\./.test(text(h)) && /<button[^>]*>Call on Night Eye<\/button>/.test(h), 'Night Eye on a new client: what it does, its 20-minute wait, the button', text(h));
+} else console.log('ok   Night Eye effect text skipped (this front predates it)');
 ok(J.describePower({ buffs: { resistMagic: 0.25, wardPoints: 60 } }) === '+25% magic resistance, a ward absorbs 60 spell damage'
   && J.describePower({ buffs: { healthRegen: 1.5, physicalTaken: 0.15 } }) === '-15% physical damage taken, health regenerates x1.5'
   && J.describePower({ buffs: { meleeDamage: 0.25, damageTaken: 0.25 } }) === '+25% melee damage, -25% damage taken', 'the buffs in words',

@@ -72,9 +72,11 @@ const DEFAULTS = {
     power: { name: "Ancestor's Wrath", seconds: 60, buffs: { fireDealt: 0.25 } } },
   imperial: { goldBonus: 0.1, xp: { defense: 1.15 },
     power: { name: 'Voice of the Emperor', seconds: 60, buffs: { healthRegen: 1.5, staminaRegen: 1.5 } } },
-  // Night Eye is the player's own imagespace: a client release (clientOnly refuses it until then)
+  // Night Eye is the player's own screen: the server keeps the power (state, wait) and tells that player's client to draw
+  // it (view 'nightEye': dboNightEye, skymp5-client nightEyeService.ts, client 0.3.97). clientCap: a client whose UI did
+  // not name it in dbo:uiCaps (0.3.95 and older) is told it comes with a later update, as clientOnly tells everyone
   khajiit: { unarmedDamage: 8, xp: { unarmed: 1.15 },
-    power: { name: 'Night Eye', seconds: 60, cooldownHours: 1 / 3, clientOnly: true, buffs: {} } },
+    power: { name: 'Night Eye', seconds: 60, cooldownHours: 1 / 3, clientCap: 'nightEye', view: 'nightEye', effect: 'you see in the dark', buffs: {} } },
   // Outdoors in Skyrim, or in the Jerall Mountains: the BSHeartland worldspace around Bruma and the Pale Pass road
   nord: { resistFrost: 0.5, coldStaminaRegen: 1.15, coldProvinces: ['skyrim'],
     coldAreas: [{ world: 'a764b:BSHeartland.esm', pos: [56000, 232000], radius: 60000 }], xp: { blade: 1.15 },
@@ -101,7 +103,7 @@ const num = (v, d) => (Number.isFinite(Number(v)) ? Number(v) : d);
 const clamp01 = (v) => Math.max(0, Math.min(1, v));
 
 module.exports = (api) => {
-  const { mp, log, personal, giveItem, profileOf, display, recordOf, every, onlineActors, weaponHandsOf, sourceResistsOf, gmstFloat, cfg, sendPacket } = api;
+  const { mp, log, personal, giveItem, profileOf, display, recordOf, every, onlineActors, weaponHandsOf, sourceResistsOf, gmstFloat, cfg, sendPacket, hasUiCap } = api;
   const C = merge(cfg && cfg.racial);
   const on = () => C.enabled === true;
   const overhaul = () => on() && C.overhaul === true;
@@ -454,10 +456,18 @@ module.exports = (api) => {
     const activeUntil = st.race === race && Number(st.activeUntil) > now ? Number(st.activeUntil) : 0;
     const readyAt = Number(st.readyAt) > now ? Number(st.readyAt) : 0;
     // activeMs, waitMs: what is left at the time of sending, for a countdown on the player's own clock
-    return { race, name: String(p.name || 'Racial Power'), seconds: Math.max(1, num(p.seconds, 60)), clientOnly: p.clientOnly === true,
+    const clientOnly = p.clientOnly === true || !clientHas(a, p.clientCap);
+    const view = { race, name: String(p.name || 'Racial Power'), seconds: Math.max(1, num(p.seconds, 60)), clientOnly,
       activeUntil, readyAt, activeMs: activeUntil ? activeUntil - now : 0, waitMs: readyAt ? readyAt - now : 0,
-      ready: !readyAt && !activeUntil && p.clientOnly !== true, buffs: Object.assign({}, p.buffs || {}) };
+      ready: !readyAt && !activeUntil && !clientOnly, buffs: Object.assign({}, p.buffs || {}) };
+    // A power without buffs says what it does; a wait shorter than a day is told (the journal's box: front 0.3.97)
+    if (p.effect) view.effect = String(p.effect);
+    if (p.cooldownHours !== undefined) view.cooldownHours = Math.max(0, num(p.cooldownHours, 24));
+    return view;
   };
+  // A power that needs the client to draw it (clientCap): only for a client whose UI named that capability (gamemode.js
+  // hasUiCap, dbo:uiCaps); without the reader, nobody has it
+  const clientHas = (a, cap) => { if (!cap) return true; try { return typeof hasUiCap === 'function' && hasUiCap(a >>> 0, String(cap)) === true; } catch (e) { return false; } };
   // Use it: { ok, text }. Once a real day (cooldownHours), counted from the use, kept on the character
   const usePower = (a, now = Date.now()) => {
     if (!overhaul()) return { ok: false, text: 'Racial powers are not in use yet.' };
@@ -479,6 +489,8 @@ module.exports = (api) => {
     // What others see: the power's shader on the caster for every player near, until it fades (lookShader, an EFSH)
     const shader = shaderOf(p.lookShader);
     if (shader) { S.looks.set(a >>> 0, { shader, until: st.activeUntil, seen: new Set() }); showLooks(now); }
+    // A power its own client draws (view): told at once, then kept in step by eyeTick
+    if (p.view === 'nightEye') eyeTick(now, a >>> 0);
     log(`racial: ${display(a >>> 0)} used ${v.name} (${v.race}) for ${v.seconds} s`);
     return { ok: true, text: `${v.name}: ${v.seconds} seconds.` };
   };
@@ -511,8 +523,52 @@ module.exports = (api) => {
       for (const p of online) if (p !== caster && !l.seen.has(p) && near(p, caster)) { l.seen.add(p); glow(p, caster, l.shader, true); }
     }
   };
+  // ---- Night Eye: the power's look on its own player's screen -------------------------------------------------------
+  // The client draws it on { customPacketType: 'dboNightEye', on: true, seconds: <left> } and takes it off on { on: false }
+  // (skymp5-client nightEyePlan.ts). It is never shown to anyone else: only that player's own client is told. What each
+  // client was last told is kept (S.eyeSent: actor -> true/false) and set right every second: on while a Khajiit's Night
+  // Eye lasts on this character; off when it ends, in a beast form (raceOf has no race then), after a change of race, and
+  // on death, which ends the power (the wait stays). A client is told once when it is first seen (its uiCaps arrive at
+  // login), so a relog while it lasts draws it again and a character switch to one without it takes it off. Logout forgets
+  // the actor (__dboRacialLeave, gamemode.js): its game is gone, and the next login is told afresh.
+  if (!(S.eyeSent instanceof Map)) S.eyeSent = new Map();
+  const isDead = (a) => { try { return mp.get(a >>> 0, 'isDead') === true; } catch (e) { return false; } };
+  // The seconds of a drawn power left on this character now, or 0
+  const eyeLeft = (a, now) => {
+    if (!overhaul()) return 0;
+    const race = raceOf(a); const p = powerOf(race);
+    if (!p || p.view !== 'nightEye') return 0;
+    const st = powerState(a);
+    if (st.race !== race || !(Number(st.activeUntil) > now)) return 0;
+    return (Number(st.activeUntil) - now) / 1000;
+  };
+  const sendEye = (a, on, seconds) => {
+    if (typeof sendPacket !== 'function') return false;
+    try { return sendPacket(a >>> 0, on ? { customPacketType: 'dboNightEye', on: true, seconds: Math.max(1, Math.ceil(seconds)) } : { customPacketType: 'dboNightEye', on: false }) !== false; } catch (e) { log('racial: night eye packet failed', e.message); return false; }
+  };
+  const eyeTick = (now = Date.now(), only = 0) => {
+    const online = only ? [only] : onlineActors().map((x) => x >>> 0);
+    for (const a of online) {
+      if (!clientHas(a, 'nightEye')) continue;
+      let left = eyeLeft(a, now);
+      if (left > 0 && isDead(a)) {
+        // Death ends it; the wait from the use stays
+        const st = powerState(a);
+        try { mp.set(a, POWER, Object.assign({}, st, { activeUntil: now })); } catch (e) { /* the off below still goes */ }
+        S.powerOn.delete(a);
+        hudRefresh(a);
+        left = 0;
+      }
+      const want = left > 0;
+      if (S.eyeSent.get(a) === want) continue;
+      if (sendEye(a, want, left)) S.eyeSent.set(a, want);
+    }
+    if (!only) { const here = new Set(online); for (const a of [...S.eyeSent.keys()]) if (!here.has(a)) S.eyeSent.delete(a); }
+  };
+  globalThis.__dboRacialLeave = (a) => { S.eyeSent.delete(a >>> 0); };
   const powerTick = (now = Date.now()) => {
     showLooks(now);
+    try { eyeTick(now); } catch (e) { log('racial night eye tick failed', e.message); }
     for (const [a, until] of S.powerOn) {
       if (until > now) continue;
       S.powerOn.delete(a);
@@ -582,7 +638,7 @@ module.exports = (api) => {
   globalThis.__dboRacialPowerView = powerView;
   globalThis.__dboRacialPowerHud = hudField;
   return { config: C, raceOf, attackMult, targetMult, capTargetSide, regenFactor, extraPerSecond, regenTick, onCast, castHeld, goldBonus, inCold, fighting, COMBAT,
-    skillRate, diseaseResist, powerView, usePower, powerTick, statusLine, hudField, abilityTick, wardAbsorb };
+    skillRate, diseaseResist, powerView, usePower, powerTick, statusLine, hudField, abilityTick, wardAbsorb, eyeTick };
 };
 module.exports.RACES = RACES;
 module.exports.RACE_IDS = RACE_IDS;
