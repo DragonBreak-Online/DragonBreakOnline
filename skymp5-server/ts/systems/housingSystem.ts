@@ -27,13 +27,10 @@ type Mp = any;
 //     { customPacketType: "propertyRequest", action, target, recipient?, name? }
 //       action: claim | abandon | lock | unlock | rename | transfer
 //             | revoke | createkey | revokekeys | grantcontainer | takekey
-//     { customPacketType: "keyRingRequest", action: list | give | accept | decline, key?, recipient? }
 //   Server -> Client:
 //     { customPacketType: "propertyMenu", target, view, owned, name, locked,
 //       hasKeys, canGrantContainers, ownerName }
 //     { customPacketType: "propertyNotice", text }
-//     { customPacketType: "keyRing", keys: [{name,place,opens}], near: [{actor,name}] }
-//     { customPacketType: "keyOffer", from, key }
 //     { customPacketType: "refDecor", full?, refs: [{refId,name,locked}] }
 //
 // Persistence. The record lives on the reference itself as a `private.` dynamic
@@ -359,7 +356,12 @@ export class HousingSystem implements System {
         const k = ring[Math.floor(Math.random() * ring.length)];
         return this.moveRingKey(ctx, from, to, k) ? k.n : "";
       },
-      openKeyRing: (actorId: unknown): void => this.sendKeyRing(ctx, Number(actorId) >>> 0),
+      // The Key Ring panel (gameplay keyring.js): what it shows, and its actions; each action returns "" or why it failed
+      ringView: (actorId: unknown) => this.ringView(ctx, Number(actorId) >>> 0),
+      ringGive: (actorId: unknown, key: unknown, to: unknown): string => this.offerKey(ctx, Number(actorId) >>> 0, String(key || ""), Number(to) >>> 0),
+      ringAnswer: (actorId: unknown, accept: unknown): string => this.answerOffer(ctx, Number(actorId) >>> 0, accept === true),
+      ringCut: (actorId: unknown, ref: unknown, to: unknown): string => this.ringOwnerAction(ctx, Number(actorId) >>> 0, Number(ref) >>> 0, "cut", to),
+      ringTakeBack: (actorId: unknown, ref: unknown, key: unknown): string => this.ringOwnerAction(ctx, Number(actorId) >>> 0, Number(ref) >>> 0, "take", key),
     };
   }
 
@@ -428,7 +430,6 @@ export class HousingSystem implements System {
     switch (type) {
       case "propertyInfoRequest": this.onInfoRequest(ctx, userId, content); break;
       case "propertyRequest": this.onPropertyRequest(ctx, userId, content); break;
-      case "keyRingRequest": this.onKeyRingRequest(ctx, userId, content); break;
       default: break;
     }
   }
@@ -675,7 +676,7 @@ export class HousingSystem implements System {
     }
     this.freezeKeyNames(ctx, primary, rec);
     const keyName = this.keyCopyToCut(ctx, primary, rec);
-    if (this.keyRing) { this.cutOntoRing(ctx, userId, actorId, primary, rec, keyName, rawRecipient); return; }
+    if (this.keyRing) { this.cutFromMenu(ctx, userId, actorId, primary, rec, keyName, rawRecipient); return; }
     const issued = (rec.issued || []).filter((n) => n !== keyName);
     issued.push(keyName);
     rec.issued = issued.slice(-MAX_ISSUED_KEY_NAMES);
@@ -1820,53 +1821,48 @@ export class HousingSystem implements System {
   }
 
   // A new key goes straight onto a ring: the cutter's, or a player's beside them; the lock records first, so a failed write
-  // never leaves a key nothing answers to
-  private cutOntoRing(ctx: SystemContext, userId: number, actorId: number, primary: number, rec: PropertyRecord, keyName: string, rawRecipient: unknown): void {
-    const to = rawRecipient ? toFormId(rawRecipient) : actorId;
-    if (!to || !this.profileOf(ctx, to) || this.userOf(ctx, to) < 0 || !this.withinReach(ctx, actorId, to)) {
-      this.notice(ctx, userId, "They must stand beside you.");
-      return;
-    }
-    if ((rec.issued || []).length >= MAX_ISSUED_KEY_NAMES) {
-      this.notice(ctx, userId, `${MAX_ISSUED_KEY_NAMES} keys to this are out already. Take one back first.`);
-      return;
-    }
-    if (!this.ringHasRoom(ctx, to, keyName)) {
-      this.notice(ctx, userId, to === actorId ? "Your key ring is full." : "Their key ring is full.");
-      return;
-    }
+  // never leaves a key nothing answers to. "" when cut, else why not
+  private cutOntoRing(ctx: SystemContext, actorId: number, primary: number, rec: PropertyRecord, keyName: string, to: number): string {
+    if (!to || !this.profileOf(ctx, to) || this.userOf(ctx, to) < 0 || !this.withinReach(ctx, actorId, to)) return "They must stand beside you.";
+    if ((rec.issued || []).length >= MAX_ISSUED_KEY_NAMES) return `${MAX_ISSUED_KEY_NAMES} keys to this are out already. Take one back first.`;
+    if (!this.ringHasRoom(ctx, to, keyName)) return to === actorId ? "Your key ring is full." : "Their key ring is full.";
     rec.issued = (rec.issued || []).filter((n) => n !== keyName).concat([keyName]);
     rec.holders = { ...(rec.holders || {}), [keyName]: this.holderOf(ctx, to) };
-    if (!this.commit(ctx, userId, primary, rec)) return;
+    if (!this.write(ctx, primary, rec)) return CHANGE_FAILED;
     this.addToRing(ctx, to, { n: keyName, p: primary, at: Date.now(), by: this.nameOf(ctx, actorId) });
     this.log(`[housing] KEY ${primary.toString(16)} "${keyName}" cut by ${this.nameOf(ctx, actorId)} for ${this.nameOf(ctx, to)}`);
-    if (to === actorId) this.notice(ctx, userId, `${keyName} is on your key ring.`);
-    else {
-      this.notice(ctx, userId, `${keyName} is on ${this.shownNameOf(ctx, to)}'s key ring.`);
-      this.notice(ctx, this.userOf(ctx, to), `${this.shownNameOf(ctx, actorId)} gave you ${keyName}. It is on your key ring.`);
-    }
+    if (to !== actorId) this.notice(ctx, this.userOf(ctx, to), `${this.shownNameOf(ctx, actorId)} gave you ${keyName}. It is on your key ring.`);
+    return "";
+  }
+
+  private cutFromMenu(ctx: SystemContext, userId: number, actorId: number, primary: number, rec: PropertyRecord, keyName: string, rawRecipient: unknown): void {
+    const to = rawRecipient ? toFormId(rawRecipient) : actorId;
+    const why = this.cutOntoRing(ctx, actorId, primary, rec, keyName, to);
+    if (why) { this.notice(ctx, userId, why); return; }
+    this.notice(ctx, userId, to === actorId ? `${keyName} is on your key ring.` : `${keyName} is on ${this.shownNameOf(ctx, to)}'s key ring.`);
     this.sendMenu(ctx, userId, actorId, primary);
   }
 
   // One copy stops opening: its name leaves the lock, and the ring of whoever holds it (offline, at their next login)
-  private doTakeKey(ctx: SystemContext, userId: number, actorId: number, primary: number, rec: PropertyRecord, manages: boolean, rawName: unknown): void {
-    if (!manages) {
-      this.notice(ctx, userId, "This is not yours to re-key.");
-      return;
-    }
-    const name = String(rawName || "");
-    if (!this.keyRing || !(rec.issued || []).includes(name)) {
-      this.notice(ctx, userId, "There is no such key.");
-      return;
-    }
+  private takeBackKey(ctx: SystemContext, actorId: number, primary: number, rec: PropertyRecord, name: string): string {
+    if (!this.keyRing || !(rec.issued || []).includes(name)) return "There is no such key.";
     const holder = rec.holders && rec.holders[name];
     rec.issued = (rec.issued || []).filter((n) => n !== name);
     if (rec.holders) delete rec.holders[name];
-    if (!this.commit(ctx, userId, primary, rec)) return;
-    if (holder && this.dropFromRing(ctx, holder.a, (n) => n === name).length) {
+    if (!this.write(ctx, primary, rec)) return CHANGE_FAILED;
+    if (holder && holder.a !== actorId && this.dropFromRing(ctx, holder.a, (n) => n === name).length) {
       this.notice(ctx, this.userOf(ctx, holder.a), `${name} was taken back. It no longer opens anything.`);
-    }
+    } else if (holder) this.dropFromRing(ctx, holder.a, (n) => n === name);
     this.log(`[housing] KEY ${primary.toString(16)} "${name}" taken back from ${holder ? holder.w : "nobody"} by ${this.nameOf(ctx, actorId)}`);
+    return "";
+  }
+
+  private doTakeKey(ctx: SystemContext, userId: number, actorId: number, primary: number, rec: PropertyRecord, manages: boolean, rawName: unknown): void {
+    if (!manages) { this.notice(ctx, userId, "This is not yours to re-key."); return; }
+    const name = String(rawName || "");
+    const holder = rec.holders && rec.holders[name];
+    const why = this.takeBackKey(ctx, actorId, primary, rec, name);
+    if (why) { this.notice(ctx, userId, why); return; }
     this.notice(ctx, userId, holder && holder.w ? `${name} no longer opens it for ${holder.w}.` : `${name} no longer opens it.`);
     this.sendMenu(ctx, userId, actorId, primary);
   }
@@ -1942,65 +1938,67 @@ export class HousingSystem implements System {
     } catch { return "Someone"; }
   }
 
-  private onKeyRingRequest(ctx: SystemContext, userId: number, content: Content): void {
-    if (!this.keyRing) return;
-    const now = Date.now();
-    if (now - (this.lastRequestMs.get(userId) || 0) < REQUEST_COOLDOWN_MS) return;
-    this.lastRequestMs.set(userId, now);
-    const actorId = this.actorOf(ctx, userId);
-    if (!actorId) return;
-    const action = String(content["action"] || "");
-    if (action === "give") this.offerKey(ctx, userId, actorId, String(content["key"] || ""), toFormId(content["recipient"]));
-    else if (action === "accept" || action === "decline") this.answerOffer(ctx, userId, actorId, action === "accept");
-    this.sendKeyRing(ctx, actorId);
-  }
-
-  private sendKeyRing(ctx: SystemContext, actorId: number): void {
-    const userId = this.userOf(ctx, actorId);
-    if (userId < 0 || !this.keyRing) return;
+  // What the Key Ring panel shows (gameplay keyring.js): the actor's keys, players beside them, an open offer, and the copies
+  // of every lock they own
+  private ringView(ctx: SystemContext, actorId: number): Record<string, unknown> {
     const v = this.viewerAccess(ctx, actorId);
+    const placeOf = (p: number, rec: PropertyRecord | null) => (rec && rec.owner !== 0 && (rec.name || this.doorLabel(ctx, p))) || "";
     const keys = this.ringOf(ctx, actorId).map((k) => {
       const rec = this.read(ctx, k.p);
-      const place = (rec && rec.owner !== 0 && (rec.name || this.doorLabel(ctx, k.p))) || "";
-      return { name: k.n, place, opens: !!rec && rec.owner !== 0 && this.keyOpensWith(ctx, k.p, rec, { ...v, keys: new Set(), ring: new Set([k.n]) }) };
+      return { name: k.n, place: placeOf(k.p, rec), opens: !!rec && rec.owner !== 0 && this.keyOpensWith(ctx, k.p, rec, { ...v, keys: new Set(), ring: new Set([k.n]) }) };
     });
     const near: Array<{ actor: number; name: string }> = [];
     for (const u of this.onlineUsers(ctx)) {
       const other = this.actorOf(ctx, u);
       if (other && other !== actorId && this.withinReach(ctx, actorId, other)) near.push({ actor: other, name: this.shownNameOf(ctx, other) });
     }
-    this.send(ctx, userId, { customPacketType: "keyRing", keys, near });
-  }
-
-  private offerKey(ctx: SystemContext, userId: number, actorId: number, keyName: string, to: number): void {
-    const key = this.ringOf(ctx, actorId).find((k) => k.n === keyName);
-    if (!key) { this.notice(ctx, userId, "That key is not on your ring."); return; }
-    if (!to || to === actorId || this.userOf(ctx, to) < 0 || !this.withinReach(ctx, actorId, to)) {
-      this.notice(ctx, userId, "They must stand beside you.");
-      return;
+    const owned: Array<{ ref: number; place: string; copies: Array<{ name: string; holder: string }> }> = [];
+    for (const p of this.claimed) {
+      const rec = this.read(ctx, p);
+      if (rec && rec.owner !== 0 && this.ownsAs(rec, v.profileId, actorId)) owned.push({ ref: p, place: placeOf(p, rec) || "Property", copies: this.copiesOf(rec) });
     }
-    this.keyOffers.set(to, { from: actorId, key: keyName, until: Date.now() + KEY_OFFER_MS });
-    this.send(ctx, this.userOf(ctx, to), { customPacketType: "keyOffer", from: this.shownNameOf(ctx, actorId), key: keyName });
-    this.notice(ctx, this.userOf(ctx, to), `${this.shownNameOf(ctx, actorId)} offers you ${keyName}. Accept it from your key ring.`);
-    this.notice(ctx, userId, `You offer ${keyName} to ${this.shownNameOf(ctx, to)}.`);
+    const offer = this.keyOffers.get(actorId);
+    return {
+      keys, near, owned,
+      offer: offer && offer.until > Date.now() ? { from: this.shownNameOf(ctx, offer.from), key: offer.key } : null,
+    };
   }
 
-  private answerOffer(ctx: SystemContext, userId: number, actorId: number, accept: boolean): void {
+  // The Key Ring panel's actions on a lock the actor owns (from the panel, so no property menu follows)
+  private ringOwnerAction(ctx: SystemContext, actorId: number, ref: number, what: "cut" | "take", arg: unknown): string {
+    if (!this.keyRing) return "Keys are cut from the property menu.";
+    const primary = this.primaryOf(ctx, ref);
+    const rec = primary ? this.read(ctx, primary) : null;
+    if (!primary || !rec || rec.owner === 0 || !this.ownsAs(rec, this.profileOf(ctx, actorId), actorId)) return "That is not yours.";
+    if (what === "take") return this.takeBackKey(ctx, actorId, primary, rec, String(arg || ""));
+    this.freezeKeyNames(ctx, primary, rec);
+    return this.cutOntoRing(ctx, actorId, primary, rec, this.keyCopyToCut(ctx, primary, rec), arg ? Number(arg) >>> 0 : actorId);
+  }
+
+  private offerKey(ctx: SystemContext, actorId: number, keyName: string, to: number): string {
+    if (!this.keyRing) return "";
+    if (!this.ringOf(ctx, actorId).some((k) => k.n === keyName)) return "That key is not on your ring.";
+    if (!to || to === actorId || this.userOf(ctx, to) < 0 || !this.withinReach(ctx, actorId, to)) return "They must stand beside you.";
+    this.keyOffers.set(to, { from: actorId, key: keyName, until: Date.now() + KEY_OFFER_MS });
+    this.notice(ctx, this.userOf(ctx, to), `${this.shownNameOf(ctx, actorId)} offers you ${keyName}. Accept it on your key ring.`);
+    return "";
+  }
+
+  private answerOffer(ctx: SystemContext, actorId: number, accept: boolean): string {
     const offer = this.keyOffers.get(actorId);
     this.keyOffers.delete(actorId);
-    if (!offer || offer.until < Date.now()) { this.notice(ctx, userId, "Nobody is offering you a key."); return; }
+    if (!offer || offer.until < Date.now()) return "Nobody is offering you a key.";
     const giverUser = this.userOf(ctx, offer.from);
     if (!accept) {
       this.notice(ctx, giverUser, `${this.shownNameOf(ctx, actorId)} turned down ${offer.key}.`);
-      return;
+      return "";
     }
     const key = this.ringOf(ctx, offer.from).find((k) => k.n === offer.key);
-    if (!key || giverUser < 0 || !this.withinReach(ctx, actorId, offer.from)) { this.notice(ctx, userId, "That key is no longer on offer."); return; }
-    if (!this.moveRingKey(ctx, offer.from, actorId, key)) { this.notice(ctx, userId, "Your key ring is full."); return; }
+    if (!key || giverUser < 0 || !this.withinReach(ctx, actorId, offer.from)) return "That key is no longer on offer.";
+    if (!this.moveRingKey(ctx, offer.from, actorId, key)) return "Your key ring is full.";
     this.log(`[housing] KEY "${key.n}" given by ${this.nameOf(ctx, offer.from)} to ${this.nameOf(ctx, actorId)}`);
-    this.notice(ctx, userId, `${key.n} is on your key ring.`);
     this.notice(ctx, giverUser, `${this.shownNameOf(ctx, actorId)} took ${key.n}.`);
-    this.sendKeyRing(ctx, offer.from);
+    return "";
   }
 
   // ── refDecor ────────────────────────────────────────────────────────────────

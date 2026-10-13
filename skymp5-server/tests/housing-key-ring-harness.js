@@ -63,7 +63,8 @@ const check = (name, ok, got) => { console.log(`${ok ? 'ok  ' : 'FAIL'} ${name}$
   const ring = (a) => (mp.get(a, RING) || []).map((k) => k.n);
   const inv = (a) => (mp.get(a, 'inventory') || {}).entries || [];
   const walksIn = (id, a) => sys.onActivate(ctx, id, a);
-  const ask = (a, content) => { sys.lastRequestMs.clear(); sys.customPacket(actors[a].user, 'keyRingRequest', content, ctx); };
+  sys.exposeTenancy(ctx);
+  const H = globalThis.__dboHousing;
   const lastOf = (a, type) => packets.filter((x) => x.u === actors[a].user && x.p.customPacketType === type).slice(-1)[0];
 
   sys.doCreateKey(ctx, 1, OWNER, HOUSE, recOf(HOUSE), true);
@@ -80,19 +81,21 @@ const check = (name, ok, got) => { console.log(`${ok ? 'ok  ' : 'FAIL'} ${name}$
   const menu = (() => { sys.sendMenu(ctx, 1, OWNER, HOUSE); return lastOf(OWNER, 'propertyMenu').p; })();
   check('the owner\'s menu lists every copy with its holder', menu.keyRing === true && menu.copies.length === 2 && menu.copies[1].holder === 'Bera', menu.copies);
 
-  ask(B, { action: 'give', key: bKey, recipient: C });
-  check('a gift is offered, not forced', lastOf(C, 'keyOffer').p.key === bKey && ring(C).length === 0);
-  ask(C, { action: 'accept' });
+  check('a gift is offered, not forced', H.ringGive(B, bKey, C) === '' && H.ringView(C).offer.key === bKey && ring(C).length === 0);
+  check('the offer is answered once', H.ringAnswer(C, true) === '' && H.ringAnswer(C, true) !== '');
   check('an accepted key moves rings', ring(C)[0] === bKey && ring(B).length === 0, [ring(B), ring(C)]);
   check('the holder list follows the key', recOf(HOUSE).holders[bKey].w === 'Cato');
   check('the giver no longer walks in, the taker does', walksIn(HOUSE, B) === false && walksIn(HOUSE, C) === true);
-  ask(C, { action: 'give', key: bKey, recipient: B });
-  ask(B, { action: 'decline' });
+  H.ringGive(C, bKey, B);
+  H.ringAnswer(B, false);
   check('a declined key stays put', ring(C)[0] === bKey && ring(B).length === 0);
-  const rl = (() => { ask(C, { action: 'list' }); return lastOf(C, 'keyRing').p; })();
+  check('a key not on the ring cannot be given', H.ringGive(B, bKey, C) !== '');
+  const rl = H.ringView(C);
   check('the ring list says what each key opens and who stands near', rl.keys[0].place === 'Elions House' && rl.keys[0].opens === true && rl.near.length === 3, rl);
 
-  sys.doTakeKey(ctx, 1, OWNER, HOUSE, recOf(HOUSE), true, bKey);
+  check('the owner\'s ring view lists their lock\'s copies', H.ringView(OWNER).owned[0].copies.find((c) => c.name === bKey).holder === 'Cato');
+  check('only the owner takes a key back from the panel', H.ringTakeBack(C, HOUSE, bKey) !== '' && ring(C).length === 1);
+  check('the owner takes a key back from the panel', H.ringTakeBack(OWNER, HOUSE, bKey) === '');
   check('a taken-back key leaves the holder\'s ring and stops opening', ring(C).length === 0 && walksIn(HOUSE, C) === false && !recOf(HOUSE).issued.includes(bKey));
   check('the owner\'s own copy still opens', walksIn(HOUSE, OWNER) === true && ring(OWNER).length === 1);
 
@@ -108,8 +111,7 @@ const check = (name, ok, got) => { console.log(`${ok ? 'ok  ' : 'FAIL'} ${name}$
   sys.takeKeysFrom(ctx, CHEST, B);
   check('a key in a chest goes onto the opener\'s ring', ring(B).includes('Property Key No. 4 (100)') && inv(CHEST).length === 0 && walksIn(HOUSE, B) === true, ring(B));
 
-  sys.exposeTenancy(ctx);
-  const took = globalThis.__dboHousing.ringSteal(D, C);
+  const took = H.ringSteal(D, C);
   check('robbery moves one key between rings', took === 'Key to the Elions Shed' && ring(C).includes(took) && ring(D).length === 0, took);
 
   // A key whose name the lock no longer answers to is gone at the next login
@@ -117,6 +119,8 @@ const check = (name, ok, got) => { console.log(`${ok ? 'ok  ' : 'FAIL'} ${name}$
   sys.ringAtLogin(ctx, D);
   check('a stale ring key is dropped at login', ring(D).length === 0);
 
+  check('the owner cuts a key for a player from the panel', H.ringCut(OWNER, SHED, D) === '' && ring(D).length === 1 && walksIn(SHED, D) === true, ring(D));
+  check('nobody else cuts one', H.ringCut(C, SHED, C) !== '');
   const house = recOf(HOUSE);
   sys.doRevokeKeys(ctx, 1, HOUSE, house, true, false);
   check('voiding all keys empties every online ring of them', ring(OWNER).length === 0 && !ring(B).some((n) => n.endsWith('(100)') || n.startsWith('Key to the Elions House')) && !recOf(HOUSE).holders);
