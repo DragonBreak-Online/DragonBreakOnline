@@ -15,6 +15,9 @@ const LIMITS = Object.freeze({ triesPer10Min: 20, perMinute: 6, perHour: 60, sit
 const FINAL = new Set(['ran', 'refused', 'failed', 'expired', 'dry-run', 'off', 'busy', 'bad', 'notRun', 'unknown'])
 const TIER_LABEL = Object.freeze({ senior: 'Senior', developer: 'Developer', leadgm: 'Lead GM', gm: 'GM', trialgm: 'Trial GM' })
 const SIGN_IN_URL = '/api/site/login/fresh'
+// The switch is read as the game reads it: no symlink followed, no wait on a FIFO, a regular file of at most 64 bytes
+const SWITCH_OPEN = nodeFs.constants.O_RDONLY | (nodeFs.constants.O_NOFOLLOW || 0) | (nodeFs.constants.O_NONBLOCK || 0)
+const SWITCH_MAX_BYTES = 64
 
 const ids = value => String(value ?? '').split(',').map(s => s.trim()).filter(Boolean)
 const snowflakes = (list, max) => list.length >= 1 && list.length <= max && list.every(x => rules.SNOWFLAKE.test(x))
@@ -82,7 +85,13 @@ function createStaffConsole({
   // ---- the kill switch ---------------------------------------------------------------------------------------------
   function setting(source) {
     let text = null
-    try { text = fs.readFileSync(switchFile, 'utf8') } catch { /* missing is off */ }
+    try {
+      const fd = fs.openSync(switchFile, SWITCH_OPEN)
+      try {
+        const st = fs.fstatSync(fd)
+        if (st.isFile() && st.size <= SWITCH_MAX_BYTES) text = fs.readFileSync(fd, 'utf8')
+      } finally { fs.closeSync(fd) }
+    } catch { /* missing is off */ }
     return rules.parseSwitch(text)[source] || 'off'
   }
 

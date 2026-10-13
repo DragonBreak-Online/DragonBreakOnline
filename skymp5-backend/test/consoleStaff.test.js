@@ -133,6 +133,31 @@ test('the switch file: off, missing, malformed and narrowed per front end', asyn
   assert.equal((await run(web(), '/whoami')).body.error, 'consoleOff')
   assert.equal(F.api.state('discord').setting, 'on')
   assert.equal(F.api.state('web').setting, 'off')
+  fs.writeFileSync(F.switchFile, 'on\n')
+})
+
+test('the switch file is read as the game reads it: a symlink, a directory or a file over 64 bytes is off, and a FIFO never blocks', async () => {
+  const target = path.join(F.root, 'switch-target')
+  fs.writeFileSync(target, 'on\n')
+  try {
+    fs.rmSync(F.switchFile); fs.symlinkSync(target, F.switchFile)
+    assert.equal(F.api.setting('web'), 'off', 'a symlink to a file saying on is not followed')
+    fs.rmSync(F.switchFile); fs.mkdirSync(F.switchFile)
+    assert.equal(F.api.setting('web'), 'off', 'a directory')
+    fs.rmSync(F.switchFile, { recursive: true }); fs.writeFileSync(F.switchFile, `on${' '.repeat(70)}\n`)
+    assert.equal(F.api.setting('web'), 'off', 'over 64 bytes')
+    // The FIFO in a child process with a timeout: a blocking open would hang the backend's thread, and here the test
+    const fifo = path.join(F.root, 'switch-fifo')
+    require('child_process').execFileSync('mkfifo', ['-m', '600', fifo])
+    const child = `const { createStaffConsole } = require(${JSON.stringify(path.join(__dirname, '..', 'sources', 'console', 'staffConsole'))});
+      const api = createStaffConsole({ config: {}, discordBot: {}, siteSessions: {}, profileIdOf: () => null, spool: {}, audit: {}, jobsFile: ${JSON.stringify(path.join(F.root, 'none.json'))},
+        switchFile: ${JSON.stringify(fifo)}, log: () => {} });
+      process.stdout.write(api.setting('web') + ' ' + api.setting('discord'));`
+    const r = require('child_process').spawnSync(process.execPath, ['-e', child], { cwd: F.root, timeout: 10000, killSignal: 'SIGKILL', encoding: 'utf8' })
+    assert.equal(r.signal, null, `the child was killed: it blocked on the FIFO (${r.stderr})`)
+    assert.equal(r.stdout, 'off off', r.stderr)
+  } finally { fs.rmSync(F.switchFile, { recursive: true, force: true }); fs.writeFileSync(F.switchFile, 'on\n') }
+  assert.equal(F.api.setting('web'), 'on')
 })
 
 test('the spool check: 0700 is ready, 0750 is not; a missing or open key is not', async () => {
