@@ -355,6 +355,10 @@ async function main() {
   // npcDriftConfig to applyDriftConfig), read each time a look would go on, so a packet mid-session takes effect at once
   const hd = fs.readFileSync(path.join(SRC, 'services/services/hostedDriftService.ts'), 'utf8');
   check('every npcDriftConfig packet goes to applyDriftConfig (HostedDriftService)', /content\["customPacketType"\] !== "npcDriftConfig"\) return;[\s\S]{0,400}applyDriftConfig\(content\);/.test(hd));
+  // The echo confirms an undo in the server log, so the handler's one echo comes straight after applyDriftConfig
+  const onConfig = (hd.match(/private onCustomPacketMessage\([^)]*\): void \{[\s\S]*?\n  \}/) || [''])[0];
+  check('...and its config echo is sent straight after, so it reports the switches just set', /applyDriftConfig\(content\);\s*this\.send\(\{ kind: "config"/.test(onConfig)
+    && (onConfig.match(/kind: "config"/g) || []).length === 1, onConfig);
   const D = DRIFT.driftConfig;
   check('ownLook defaults to "apply": a server that sends no ownLook keeps the fix on', D.ownLook === 'apply', D.ownLook);
   DRIFT.applyDriftConfig({ customPacketType: 'npcDriftConfig', remote: true, rehostAfterMs: 2100 });
