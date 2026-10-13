@@ -53,6 +53,8 @@ export interface HousingData {
   place?: PlaceData | null;
   placeName?: string | null;
   assignedToYou?: boolean;
+  // Keys are on the Key Ring (/keys) and a key opens a locked door for its holder
+  keyRing?: boolean;
   events: HousingEvents;
 }
 
@@ -212,9 +214,13 @@ const Housing = ({ data }: { data: HousingData }) => {
           ) : null}
         </div>
 
-        {isOwner ? (
+        {isOwner && !data.keyRing && (
           <p className="housing__hint">A locked door stops everyone, you included, until it is unlocked here. A key lets its holder lock and unlock it too: trade it or leave it in a chest. Void all keys cancels every copy.</p>
-        ) : null}
+        )}
+
+        {isOwner && data.keyRing && (
+          <p className="housing__hint">A locked door keeps out everyone without a key; you and your key holders walk straight in. Cut a key puts it on your Key Ring (/keys), where you can give it, cut one for a player beside you, or take a copy back. Void all keys cancels every copy.</p>
+        )}
 
         {manages ? (
           <div className="housing__rename">
