@@ -77,7 +77,7 @@ const member = (a, fid, title) => {
   const r = f.ranks.find((x) => x.title === title);
   if (!r) throw new Error(`no rank ${title} in ${fid}`);
   MEMBERS[a] = [{ id: fid, name: f.name, title, role: r.role }];
-  put(a, 'private.dboGuilds', [{ id: fid, rank: f.ranks.indexOf(r) }]);
+  put(a, 'private.dboGuilds', [{ id: fid, rank: f.ranks.indexOf(r), role: r.role }]);
 };
 globalThis.__dboGuildsOf = (a) => MEMBERS[a >>> 0] || [];
 globalThis.__dboGuildRankList = (id) => { const f = GUILDS.find((x) => x.id === String(id)); return f ? f.ranks.map((r) => ({ title: r.title, role: r.role })) : null; };
@@ -409,34 +409,40 @@ ui('spellsChoose', SENIOR, ['cancel'], 45);
 at(ASSOC, SYNOD, [300, 70, 0]);
 globalThis.__dboSchoolsActivate(LECTERN, ASSOC);
 check('anyone else gets the lectern panel at once', lastWidget(ASSOC).type === 'classLectern');
-// Qualification: Arcane Arts 75, or Expert study in a school
-member(TEACHER, 'synod', 'Mage of the Synod'); member(PLAINT, 'synod', 'Mage of the Synod');
+// A college officer chooses at the lectern first (a class or teaching): take the class
+const openLectern = (a) => { globalThis.__dboSchoolsActivate(LECTERN, a); const m = lastWidget(a); if (m && m.type === 'contextMenu' && m.id === 45) ui('spellsChoose', a, ['lectern'], 45); };
+// Qualification: a college's leader or officers (Nate, 13 Oct), with Arcane Arts 75 or Expert study in a school
+member(TEACHER, 'synod', 'Mage of the Synod');
+at(TEACHER, SYNOD, [300, 70, 0]); skillAt(TEACHER, 'arcane', 78);
+openLectern(TEACHER);
+check('a Mage of the Synod with Arcane Arts 78 may not teach: only the leader or an officer', lastWidget(TEACHER, 'classLectern').canTeach === false && /leader or an officer of the Synod/.test(lastWidget(TEACHER, 'classLectern').whyNot), lastWidget(TEACHER, 'classLectern').whyNot);
+member(TEACHER, 'synod', 'Magister'); member(PLAINT, 'synod', 'Magister');
 for (const a of [TEACHER, PLAINT]) at(a, SYNOD, [300, 70, 0]);
 skillAt(TEACHER, 'arcane', 78); skillAt(PLAINT, 'arcane', 60);
 const adeptSchool = (a) => put(a, 'private.dboSchools', { v: 1, primary: 'Destruction', secondary: null, levels: { Destruction: { level: 55, xp: 0 } }, grandfathered: [], picks: { Destruction: { spell: '', how: 'none', at: 1 } }, pickTold: {}, teacher: { by: 'staff', at: 1 }, firstOffered: 1 });
 adeptSchool(TEACHER); adeptSchool(PLAINT);
 for (const a of [TEACHER, PLAINT]) { known(a).add(idOf(FLAMES.spell)); known(a).add(idOf(FIREBALL.spell)); known(a).add(idOf(tome('SpellTomeIncinerate').spell)); }
-globalThis.__dboSchoolsActivate(LECTERN, PLAINT);
+openLectern(PLAINT);
 w = lastWidget(PLAINT, 'classLectern');
 check('Adept study and Arcane Arts 60: not qualified, and told both ways in', w.canTeach === false && /Teaching a class takes Arcane Arts at 75 or Expert study in one of your schools/.test(w.whyNot), w.whyNot);
-globalThis.__dboSchoolsActivate(LECTERN, TEACHER);
+openLectern(TEACHER);
 w = lastWidget(TEACHER, 'classLectern');
 check('Adept study and Arcane Arts 78: qualified, by spells up to their study (Flames, Fireball; not Incinerate)', w.canTeach === true && w.spells.map((x) => x.name).join() === 'Flames,Fireball', [w.whyNot, w.spells]);
 load(Object.assign(baseCfg(), { schools: Object.assign({}, baseCfg().schools, { classes: Object.assign({}, CONFIG.schools.classes, { teacherArcaneLevel: 101 }) }) }));
-globalThis.__dboSchoolsActivate(LECTERN, TEACHER);
+openLectern(TEACHER);
 check('teacherArcaneLevel above 100 brings back the old rule (Expert study only)', lastWidget(TEACHER, 'classLectern').canTeach === false);
 load();
 
 // ---- 6. a class for students before their first spell ----------------------------------------------------------------
 for (const a of [BEGIN, BEGIN2]) { at(a, SYNOD, [300, 140, 0]); member(a, 'synod', 'Initiate'); put(a, 'private.mastery', { v: 2, skills: {}, order: [] }); }
-globalThis.__dboSchoolsActivate(LECTERN, TEACHER);
+openLectern(TEACHER);
 ui('lecternStart', TEACHER, [lastWidget(TEACHER, 'classLectern').nonce, FIREBALL.spell]);
 globalThis.__dboSchoolsActivate(LECTERN, BEGIN);
 w = lastWidget(BEGIN, 'classLectern');
 check('an Adept class teaches a beginner nothing, and says so', w.canJoin === false && /Before your first spell a class teaches you only when it is set by a Novice or Apprentice spell; this one is Adept/.test(w.whyNot), w.whyNot);
 ui('lecternCancel', TEACHER, [lastWidget(TEACHER, 'classLectern').nonce]);
 put(TEACHER, 'private.dboSchools', Object.assign(getp(TEACHER, 'private.dboSchools'), { classAt: 0 }));
-globalThis.__dboSchoolsActivate(LECTERN, TEACHER);
+openLectern(TEACHER);
 ui('lecternStart', TEACHER, [lastWidget(TEACHER, 'classLectern').nonce, FLAMES.spell]);
 globalThis.__dboSchoolsActivate(LECTERN, BEGIN);
 w = lastWidget(BEGIN, 'classLectern');
@@ -473,7 +479,7 @@ check('...and no school meter was touched', !Object.keys((getp(BEGIN, 'private.d
 check('...audited as a beginner\'s pay', /class by P19 on Flames .* ended: P1a beginner \+[\d.]+ units x2/.test(lastAudit(/class by P19/)), lastAudit(/class by P19/));
 // A second class within 12 hours pays them nothing
 put(TEACHER, 'private.dboSchools', Object.assign(getp(TEACHER, 'private.dboSchools'), { classAt: 0 }));
-globalThis.__dboSchoolsActivate(LECTERN, TEACHER);
+openLectern(TEACHER);
 ui('lecternStart', TEACHER, [lastWidget(TEACHER, 'classLectern').nonce, FLAMES.spell]);
 globalThis.__dboSchoolsActivate(LECTERN, BEGIN);
 check('the 12-hour student cooldown holds for a beginner', lastWidget(BEGIN, 'classLectern').canJoin === false && /You sat a class not long ago/.test(lastWidget(BEGIN, 'classLectern').whyNot), lastWidget(BEGIN, 'classLectern').whyNot);
@@ -512,7 +518,7 @@ ui('lecternCancel', TEACHER, [lastWidget(TEACHER, 'classLectern').nonce]);
   wallClock += 2 * HOUR;
   put(TEACHER, 'private.dboSchools', Object.assign(getp(TEACHER, 'private.dboSchools'), { classAt: 0 }));
   const boughtBefore = getp(TEACHER, 'private.dboTomeBoughtAt');
-  globalThis.__dboSchoolsActivate(LECTERN, TEACHER);
+  openLectern(TEACHER);
   ui('lecternStart', TEACHER, [lastWidget(TEACHER, 'classLectern').nonce, SPARKS.spell]);
   for (const a of [STU, STU2]) { globalThis.__dboSchoolsActivate(LECTERN, a); ui('lecternJoin', a, [lastWidget(a, 'classLectern').nonce]); }
   check('two Destruction students sign up for a Sparks class', [STU, STU2].every((a) => globalThis.__dboSchoolsState.classes.get(LECTERN).students.has(a)));
@@ -551,7 +557,7 @@ ui('lecternCancel', TEACHER, [lastWidget(TEACHER, 'classLectern').nonce]);
   put(TEACHER, 'private.dboSchools', Object.assign(getp(TEACHER, 'private.dboSchools'), { classAt: 0 }));
   for (const a of [TEACHER, STU2]) ui('uiCaps', a, ['spellbook', 'schools']);
   known(STU2).delete(idOf(SPARKS.spell));
-  globalThis.__dboSchoolsActivate(LECTERN, TEACHER);
+  openLectern(TEACHER);
   ui('lecternStart', TEACHER, [lastWidget(TEACHER, 'classLectern').nonce, SPARKS.spell]);
   globalThis.__dboSchoolsActivate(LECTERN, STU2); ui('lecternJoin', STU2, [lastWidget(STU2, 'classLectern').nonce]);
   for (let m = 0; m < 31; m++) { wallClock += MIN; timers.get('schools.classes')(); }
