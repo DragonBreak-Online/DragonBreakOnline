@@ -278,6 +278,7 @@ const staffRolesSeen = (a, roles) => {
   if ((TIER_RANK[now] || 0) >= TIER_RANK[before]) return;
   audit(`STAFF ${who(a)}: Discord roles now give ${now || 'no staff tier'} (was ${before}); logged out so it takes effect`);
   personal(a, 'Your staff roles have changed. Log in again.');
+  try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('leave_reason', a, 'demotion'); } catch (e) { /* the player log is optional */ }
   setTimeout(() => { try { const u = userOf(a); if (u >= 0) mp.kick(u); } catch (e) { log('staff role change: kick failed', e.message); } }, 1500);
 };
 const TIER_LABEL = { senior: 'Senior', developer: 'Developer', leadgm: 'Lead GM', gm: 'GM', trialgm: 'Trial GM' };
@@ -1221,6 +1222,8 @@ const sendPigeon = (a, to, rawText, zoneId, goldRaw, itemsRaw) => {
     const paid = taxed > 0 ? depositToTreasury(zoneId, taxed) : 0;
     if (sig) audit(`PIGEON ${who(a)} sent ${nameOf(to)} a letter signed "${from}"`);
     if (prep) audit(`POST ${who(a)} sent ${who(to)} ${[prep.gold ? `${prep.gold} gold` : '', P.itemsText(items)].filter(Boolean).join(', ')} (tax ${prep.tax + prep.fee}, flight ${price})`);
+    // the player log: that a letter went, its parcel and how it was signed; never the text or the signature
+    try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('letter', a, to, { gold: prep ? prep.gold : 0, items, signed: sig ? (sig.unsigned ? 'unsigned' : 'forged') : 'own' }); } catch (e) { /* the player log is optional */ }
     if (online) { personal(to, prep ? 'A pigeon has brought you a letter with a parcel. Collect it at any notice board.' : 'A pigeon has brought you a letter. Read it at any notice board.'); sendMailState(to); }
     const zone = zoneId ? zoneById(zoneId) : null;
     log(`pigeon ${who(a)} -> ${nameOf(to)} #${tagOf(to)}${taxed > 0 ? ` (${taxed} gold, ${paid ? zoneId + ' treasury' : 'no treasury'})` : ''}: ${text}`);
@@ -2227,6 +2230,8 @@ if (!globalThis.__dboAppearanceHookPrev) {
   globalThis.__dboAppearanceHookPrev = cur && !cur.__dbo ? cur : null;
 }
 const appearanceHook = (actorId, appearance, isAllowed) => {
+  // the player log (playerlog.js): every RaceMenu close, allowed or not; it reads the race and sex, never the name
+  try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('appearance', actorId, appearance, isAllowed); } catch (e) { /* the player log is optional */ }
   let result = true;
   // A player's own /appearance edit (appearance.js): settled there (charge, locks), and none of creation's steps below run
   if (isAllowed) {
@@ -2441,6 +2446,7 @@ const giveStarterKit = (a) => {
   }
   if (given.length) { try { mp.set(a, 'private.starterKitAt', last); } catch (e) { log('starter kit stamp failed', e.message); } }
   if (given.length) { system(a, `Your tools are in your pack: ${given.join(', ')}.`); log(`${display(a)} given ${given.join(', ')}`); }
+  if (given.length) { try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('grant', a, 'kit', STARTER_KIT.filter((k) => given.includes(k.name))); } catch (e) { /* the player log is optional */ } }
 };
 // Players already online when this file reloads get theirs at once (giveItem is defined further down; this runs after load).
 setTimeout(() => { for (const a of onlineActors()) { try { giveStarterKit(a); pushHud(a, needsOf(a), true); } catch (e) { log('starter kit failed', e.message); } } }, 1000);
@@ -2638,6 +2644,11 @@ const adminItemName = (desc) => {
   return adminItemNames.get(String(desc || '').toLowerCase()) || '';
 };
 const recordOf = (id) => { try { const r = mp.lookupEspmRecordById(id >>> 0); return r && r.record ? r : null; } catch (e) { return null; } };
+// The fork's trade summary names an item through this when the entry has no name of its own (tradeSystem.ts describeOffer;
+// called there, defined nowhere until now): the catalog name or the editor id in words, never an entry's own name
+globalThis.__alduinakItemName = (baseId) => {
+  try { const id = Number(baseId) >>> 0; const n = adminItemName(mp.getDescFromId(id)); if (n) return n; const r = recordOf(id); return String((r && r.record.editorId) || '').replace(/([a-z])([A-Z])/g, '$1 $2').trim(); } catch (e) { return ''; }
+};
 const alchIsFood = (rec) => {
   for (const f of (rec.record.fields || [])) {
     if (f.type !== 'ENIT' || !(f.data instanceof Uint8Array) || f.data.byteLength < 8) continue;
@@ -4263,6 +4274,7 @@ onUi('reading', (a, args) => {
     audit(`READ ${who(a)} read ${ses.title} (tier ${tier + 1}) ${results.length ? '-> ' + results.join('; ') : '-> nothing but the knowledge'}`);
   } else {
     say(bad ? `refused(${bad})` : 'lose');
+    if (bad) { try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('signal', a, 'reading', bad); } catch (e) { /* the player log is optional */ } }
     reads[ses.refId.toString(16)] = Date.now() + READ.loseCooldownMinutes * 60000;
   }
   // Keep the cooldown table small: drop entries already expired.
@@ -4337,6 +4349,7 @@ globalThis.__dboCoinPurse = (targetId, casterId) => {
   if (Math.random() > chance) return say('You find nothing worth taking in the purse.');
   const gold = Math.max(1, Math.round((PURSE.goldMin + Math.random() * (PURSE.goldMax - PURSE.goldMin)) * mult));
   if (giveItem(casterId, 0xf, gold)) {
+    try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('loot', 'coin_purse', casterId, targetId, [], gold); } catch (e) { /* the player log is optional */ }
     personal(casterId, `You pocket ${gold} gold from the purse.`);
     try { if (typeof globalThis.__alduinakMasteryEvent === 'function') globalThis.__alduinakMasteryEvent('activate', casterId, { refrId: targetId }); } catch (e) { /* no skill system */ }
   }
@@ -4413,6 +4426,7 @@ globalThis.__dboWispStalk = (targetId, casterId) => {
   if (Math.random() > chance) return sayOnce(casterId, 'The wisp stalk crumbles in your hands.');
   const count = Math.max(1, Math.round(mult));
   if (giveItem(casterId, ingredient, count)) {
+    try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('loot', 'wisp', casterId, targetId, [{ baseId: ingredient, count }], 0); } catch (e) { /* the player log is optional */ }
     personal(casterId, count > 1 ? `You successfully harvest ${count} Wisp Stalks.` : 'You successfully harvest Wisp Stalk.');
     try { if (typeof globalThis.__alduinakMasteryEvent === 'function') globalThis.__alduinakMasteryEvent('activate', casterId, { refrId: targetId }); } catch (e) { /* no skill system */ }
   }
@@ -4970,6 +4984,7 @@ globalThis.__dboAnimalBody = (targetId, casterId) => {
     if (giveAnimalEntry(casterId, e)) got.push(`${count > 1 ? count + ' ' : ''}${e.name || edidWords(r && r.record.editorId, 'something').replace(/^Food /, '')}`);
   }
   try { mp.set(targetId, 'inventory', { entries: [] }); } catch (e) { log('animal body empty failed', e.message); }
+  if (got.length) { try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('loot', 'animal_body', casterId, targetId, give, 0); } catch (e) { /* the player log is optional */ } }
   personal(casterId, got.length ? `You take ${got.join(', ')}.` : 'There is nothing left to take.');
   if (got.length || dropped.length) log(`animal body ${display(casterId)} took ${got.join(', ') || 'nothing'} from ${tag}${dropped.length ? `; not animal parts, left with the body: ${dropped.join(', ')}` : ''}`);
   return false;
@@ -5183,6 +5198,9 @@ const skinReport = (a, args) => {
   log(`skinning ${v.bad ? 'refused(' + v.bad + ')' : win ? 'win' : 'lose'} ${display(a)} ${ses.name} t${ses.tier + 1} ${v.cuts}/${ses.cuts} cuts ${v.slips} slips of ${v.count}${ses.mode === 'pick' ? ' pick' : ''} last=${v.last} at=${v.at} lag=${v.lag} err=${v.err.toFixed(2)} seed=${ses.seed.toString(16)}${skinned ? ' already-skinned' : ''}${near ? '' : ' too-far'}${got.length ? ' -> ' + got.join(', ') : ''}`
     + (cj ? MG.tail({ judge: claim ? 'client' : 'legacy', min: ses.minMs, claim: claim ? `${claim.win ? 'win' : 'lose'}/${claim.hits}/${claim.slips}` : null, sus: v.sus.concat(closed ? [`after-${closed}`] : []) })
       + ` d=${n0(where.d)} moved=${n0(where.moved)}${claim ? ` fr=${n0(claim.frames)} maxFrame=${n0(claim.maxFrameMs)}` : ''}` : ''));
+  // the player log: what the hide gave, and a refused verdict as a security signal
+  if (win && got.length) { try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('loot', 'skinning', a, ses.corpse, pelts, 0); } catch (e) { /* the player log is optional */ } }
+  if (v.bad) { try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('signal', a, 'skinning', v.bad); } catch (e) { /* the player log is optional */ } }
   // A verdict for an attempt whose window is gone (stopped, hidden or replaced) is told in chat
   if (closed) personal(a, text);
   else openWidget(a, skinPacket(ses, text, win ? 'win' : 'lose'), true);
@@ -5272,6 +5290,8 @@ globalThis.__dboLootBody = (targetId, casterId) => {
     personal(targetId, `${nameOf(casterId)} searched your body and took ${named.join(' and ')}.`);
     audit(`BODY ${who(casterId)} searched ${who(targetId)} and took ${named.join(', ')}`);
   }
+  // the player log (playerlog.js): the items by base id (BODY above names them by a custom name first: never kept there)
+  try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('loot', 'player_body', casterId, targetId, taken, coin); } catch (e) { /* the player log is optional */ }
   try { mp.set(targetId, 'private.dboBodySearched', true); } catch (e) { /* the flag is a nicety */ }
   return false;
 };
@@ -6459,6 +6479,9 @@ const summonSpellGuard = (agg, tgt, dmg, mult, flags) => {
   setTimeout(() => { try { const q = mp.get(tgt, 'percentages'); if (q && q.health > 0) mp.set(tgt, 'percentages', { health: Math.max(0.01, q.health - (dmg * mult) / max), magicka: q.magicka, stamina: q.stamina }); } catch (e) { /* gone */ } }, 0);
   return true;
 };
+// Each gate below names its reason in globalThis.__dboHitRefusal on the line before it (a plain assignment, nothing else):
+// when the hook refuses, the reason of the gate that refused is the one set. The player log's wrapper (playerlog.js,
+// outermost) reads it only for a refused attempt and counts refusals by reason for the fights it records.
 const hitDamageAttemptHook =(aggressorId, targetId, sourceId, damage, flags) => {
   const agg = Number(aggressorId) >>> 0;
   const tgt = Number(targetId) >>> 0;
@@ -6467,16 +6490,20 @@ const hitDamageAttemptHook =(aggressorId, targetId, sourceId, damage, flags) => 
   globalThis.__dboMasteryPending = null;
 
   // 0a. A player's shout word counts only if they were given shouts and it is one of the Dragonborn's (combat.js)
+  globalThis.__dboHitRefusal = 'shout_not_given';
   try { if (combat && !combat.shoutAllowed(agg, src)) { log(`shout hit refused: ${display(agg)} -> ${display(tgt)} with ${src.toString(16)}`); return false; } } catch (e) { log('shout gate failed', e.message); }
 
   // 0. A Vampire Lord in Mist Form or bats cannot be touched (beastform.js), and touches no one either: an ethereal
   // attacker's claws and Drain landed while nothing could land on them (combat review, 2026-09-29)
+  globalThis.__dboHitRefusal = 'ethereal';
   try { if (globalThis.__dboBeastEthereal && (globalThis.__dboBeastEthereal(tgt) || (agg !== tgt && globalThis.__dboBeastEthereal(agg)))) return false; } catch (e) { /* not loaded */ }
 
   // 0b. A logged-out player's body cannot be harmed, by players or creatures, unless they left mid-fight
+  globalThis.__dboHitRefusal = 'offline_body';
   if (agg !== tgt && offlineBodyProtected(tgt)) { refuseOfflineBody(agg, tgt); return false; }
 
   // 0c. Just logged in: no creature harms the player yet; their own attack ends the grace
+  globalThis.__dboHitRefusal = 'login_grace';
   if (agg !== tgt) {
     if (profileOf(agg) >= 0) { if (loginGrace.has(agg)) endLoginGrace(agg); }
     else if (profileOf(tgt) >= 0 && inLoginGrace(tgt)) return false;
@@ -6486,14 +6513,18 @@ const hitDamageAttemptHook =(aggressorId, targetId, sourceId, damage, flags) => 
   // those hold only on the victim's own client, so a modified one kept swinging (combat review, 2026-09-29)
   try {
     const r = mp.get(agg, 'private.restrained');
+    globalThis.__dboHitRefusal = 'bound';
     if (r && (r.boundHands || r.carried)) return false;
   } catch (e) { }
+  globalThis.__dboHitRefusal = 'paralysed';
   if (agg !== tgt && (paralysedUntil.get(agg) || 0) > Date.now()) return false;
 
   // 1b. Someone still fastening armour they changed mid-fight lands no blows (armourswap.js)
+  globalThis.__dboHitRefusal = 'armour_change';
   if (dmg > 0 && agg !== tgt && armourSwap && armourSwap.busy(agg)) return false;
 
   // 2. Reject damage exceeding plausible maximums (anti-cheat clamp)
+  globalThis.__dboHitRefusal = 'damage_cap';
   if (!isAdmin(agg) && dmg > MAX_DAMAGE_CAP) {
     log(`damageRefused: ${dmg.toFixed(1)} from ${display(agg)} on ${display(tgt)} (source 0x${src.toString(16)})`);
     return false;
@@ -6501,6 +6532,7 @@ const hitDamageAttemptHook =(aggressorId, targetId, sourceId, damage, flags) => 
 
   // 2b. A concentration spell (Sparks, Flames) sends a hit per engine hit event, each carrying the full per-second
   // magnitude, so a beam dealt about 10x vanilla. One accepted hit per caster, target and spell each second.
+  globalThis.__dboHitRefusal = 'spell_rate';
   if (dmg > 0 && isConcentration(src)) {
     const key = `${agg}:${tgt}:${src}`, now = Date.now();
     if (now - (concLast.get(key) || 0) < 1000) return false;
@@ -6510,11 +6542,15 @@ const hitDamageAttemptHook =(aggressorId, targetId, sourceId, damage, flags) => 
 
   // 2c. Enemies of one dungeon never hurt each other. The host's engine reports every actor a spell touched, so a
   // bandit's Chain Lightning arced through its own allies for full damage (Plundered Mine, 2026-09-23).
+  globalThis.__dboHitRefusal = 'dungeon_ally';
   if (dmg > 0 && agg !== tgt && dungeonAllies(agg, tgt)) return false;
 
   // 2d. GM warbands (warband.js): an NPC a GM raised never harms that GM, after a raid or settle too, and the NPCs of two
   // friendly GMs never harm each other. Before companionSystem's hook, so a refused hit sets no band on anyone.
+  globalThis.__dboHitRefusal = 'warband';
   try { if (agg !== tgt && typeof globalThis.__dboWarbandRefusesHit === 'function' && globalThis.__dboWarbandRefusesHit(agg, tgt)) return false; } catch (e) { log('warband hit check failed', e.message); }
+  // past the gameplay's own gates: a refusal from here on is the fork chain's or the summon guard's, unnamed
+  globalThis.__dboHitRefusal = null;
 
   const prev = globalThis.__dboPrevHitDamageAttempt;
   if (prev) {
