@@ -1,6 +1,6 @@
 // The server's look for the player's own character arrives in tick context, so it waits here and goes on from an update
 import { Game, Ui } from "skyrimPlatform";
-import { Appearance, applyAppearanceToPlayer } from "./appearance";
+import { Appearance, applyAppearanceToPlayer, applyNameToPlayer, ownLookOnBase, sameLookButName } from "./appearance";
 import { isBeastRaceId, isGuardedActor } from "./beastRaces";
 import { trace } from "../lib/clientDiag";
 
@@ -108,8 +108,9 @@ export class OwnLookQueue {
     try { loaded3D = !!player && player.is3DLoaded(); } catch { loaded3D = false; }
     const g = globalThis as any;
     const raceId = Number(look.raceId) >>> 0;
+    const closedAt = Number(g.__dboRaceMenuClosedAt) || 0;
     const verdict = ownLookVerdict({
-      now, seenAt: this.seenAt, raceMenuOpen: Ui.isMenuOpen("RaceSex Menu"), raceMenuClosedAt: Number(g.__dboRaceMenuClosedAt) || 0,
+      now, seenAt: this.seenAt, raceMenuOpen: Ui.isMenuOpen("RaceSex Menu"), raceMenuClosedAt: closedAt,
       raceSwitches: Number(g.__dboRaceSwitches) || 0, raceSwitchAt: Number(g.__dboRaceSwitchAt) || 0, spawnAt: this.spawnAt, loaded3D,
       beastLook: isBeastRaceId(raceId) || !!(g.__dboBeastRaces as Set<number> | undefined)?.has(raceId),
       beastBody: isGuardedActor(player),
@@ -127,6 +128,13 @@ export class OwnLookQueue {
     if (verdict.act === "drop") {
       this.log("Skipped own appearance:", verdict.why);
       trace(`own drop=${verdict.why}`);
+      return;
+    }
+    // RaceMenu writes the base itself, so after a close the guardHead resend can equal the look from before the edit
+    const onBase = ownLookOnBase();
+    if (onBase && onBase.at > closedAt && sameLookButName(onBase.look, look)) {
+      applyNameToPlayer(look, "name");
+      this.log("Put the player's name on, the rest of the look is on already");
       return;
     }
     applyAppearanceToPlayer(look, true, "update");

@@ -223,11 +223,32 @@ export const applyAppearanceToPlayer = (appearance: Appearance, liveEyes = false
   regeneratePlayerHead(appearance);
   traceOwnLook(event, appearance);
   queuePlayerNiNodeUpdate();
+  onBase = { look: appearance, at: Date.now() };
   Utility.wait(0.0625).then(() => {
     once("update", () => {
       Game.getPlayer()?.startDeferredKill();
     });
   });
+};
+
+// The look last written to the player's base by this module, and when
+let onBase: { look: Appearance; at: number } | null = null;
+export const ownLookOnBase = (): { look: Appearance; at: number } | null => onBase;
+
+// True when two looks differ at most in the name (a /mask swap or a rename)
+export const sameLookButName = (a: Appearance, b: Appearance): boolean => {
+  for (const key of Object.keys(a).concat(Object.keys(b))) {
+    if (key !== "name" && JSON.stringify((a as any)[key]) !== JSON.stringify((b as any)[key])) return false;
+  }
+  return true;
+};
+
+// Only the name, for a look whose other fields are on the base already: no tints, head rebuild or NiNode update
+export const applyNameToPlayer = (appearance: Appearance, event = "name"): void => {
+  const base = ActorBase.from((Game.getPlayer() as Actor).getBaseObject()) as ActorBase;
+  base.setName(appearance.name || " ");
+  traceOwnLook(event, appearance);
+  onBase = { look: appearance, at: Date.now() };
 };
 
 // The login save carries no face sliders and setFaceMorph only edits the base, so the player's head is rebuilt from it

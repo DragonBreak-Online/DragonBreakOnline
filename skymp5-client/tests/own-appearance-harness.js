@@ -160,6 +160,21 @@ async function main() {
     && traced(/^Applied appearance to the player$/) && traced(/^own update /), { w: writes(), t: G.traces });
   check('...with no error in tick or update', G.tickErrors.length === 0 && G.updateErrors.length === 0, [G.tickErrors, G.updateErrors]);
 
+  // 1b. A /mask swap or a rename (review D, about 40 of 50 own looks on 13 Oct): only the name, no head rebuild
+  spawn();
+  deliver(ME, look({ name: 'Masked Person' }));
+  runFor(1000);
+  check('a look that differs only in its name sets only the name (no setNpcRace, regenerateHead, tints or NiNode update)',
+    G.baseName === 'Masked Person' && rebuilds().length === 0 && writes().length === 1 && traced(/^own name /), { w: writes(), t: G.traces });
+  clear();
+  deliver(ME, look({ name: 'Masked Person' }));
+  runFor(1000);
+  check('...the same look again sets only the name', rebuilds().length === 0, writes());
+  clear();
+  deliver(ME, look({ name: 'Edda', skinColor: 0x998877 }));
+  runFor(1000);
+  check('...and a look that changes more than the name is a full apply', rebuilds().filter((e) => e.what === 'setNpcRace').length === 1, writes());
+
   // 2. RaceMenu open, and the 3 s after it closes: dropped (the echo; the server resends at 3.5 s)
   spawn();
   G.menuOpen = true;
@@ -187,8 +202,8 @@ async function main() {
   runFor(1700);
   check('the echo is dropped and the resend at close + 3.68 s is not put on before close + 5.5 s', writes().every((e) => e.t >= closeAt + 5500), writes());
   runFor(1500);
-  check('...and is put on once after it (never dropped in that window)', rebuilds().filter((e) => e.what === 'setNpcRace').length === 1
-    && rebuilds()[0].t >= closeAt + 5500, writes());
+  check('...and is put on once after it, in full though it equals the look from before the edit (RaceMenu wrote the base)',
+    rebuilds().filter((e) => e.what === 'setNpcRace').length === 1 && rebuilds().every((e) => e.t >= closeAt + 5500), writes());
 
   // 4. A look of a beast race is dropped; the next normal look goes on
   spawn();
@@ -219,6 +234,7 @@ async function main() {
     check(`[${o}] ...nothing goes on while the live race is the werewolf or within 3 s of the race change`,
       writes().every((e) => e.live === NORD && back && e.t >= back.t + 3000), writes());
     check(`[${o}] ...and the look's name is on the player after it`, G.baseName === 'Edda', G.baseName);
+    check(`[${o}] ...with no head rebuild: the look is the one on the base`, rebuilds().length === 0, writes());
     // 7. The revert with a look the server changed meanwhile (the tells): put on, on the mortal body, 3 s after the swap
     deliver(ME, look({ name: 'Werewolf' }));
     dboBeast(WEREWOLF, true);
