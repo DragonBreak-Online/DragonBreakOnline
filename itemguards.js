@@ -45,11 +45,25 @@ module.exports = (api) => {
     S.typeCache.set(id, t);
     return t;
   };
-  const owned = (holder, baseId) => {
+  // out (optional, the player log's seam): the extras of each matching entry that has any are pushed onto it, structured
+  // values only, with a named flag and never the custom name itself. Callers that pass nothing get the count as before.
+  const EXTRA_KEYS = ['health', 'enchantmentId', 'enchantmentEffects', 'chargePercent', 'soul', 'poisonId', 'poisonCount'];
+  const owned = (holder, baseId, out) => {
     try {
       const inv = mp.get(Number(holder) >>> 0, 'inventory');
       const id = Number(baseId) >>> 0;
-      return ((inv && inv.entries) || []).reduce((n, e) => n + (e && (Number(e.baseId) >>> 0) === id ? Number(e.count) || 0 : 0), 0);
+      const entries = (inv && inv.entries) || [];
+      if (Array.isArray(out)) {
+        for (const e of entries) {
+          if (!e || (Number(e.baseId) >>> 0) !== id) continue;
+          const x = {};
+          let any = false;
+          for (const k of EXTRA_KEYS) if (e[k] !== undefined && e[k] !== null) { x[k] = e[k]; any = true; }
+          if (typeof e.name === 'string' && e.name) { x.named = true; any = true; }
+          if (any) { x.count = Number(e.count) || 1; out.push(x); }
+        }
+      }
+      return entries.reduce((n, e) => n + (e && (Number(e.baseId) >>> 0) === id ? Number(e.count) || 0 : 0), 0);
     } catch (e) { return 0; }
   };
   const nameOf = (a) => { try { return who(Number(a) >>> 0); } catch (e) { return (Number(a) >>> 0).toString(16); } };
@@ -127,10 +141,14 @@ module.exports = (api) => {
   if (!(S.touched instanceof Map)) S.touched = new Map();   // actor -> containers it moved items with this session
   const checkMove = (kind, actor, container, baseId, count) => {
     const a = Number(actor) >>> 0, c = Number(container) >>> 0, id = Number(baseId) >>> 0;
-    const before = [owned(a, id), owned(c, id)];
+    // The extras of the destination holder before and after: the player log takes what moved as the difference
+    const exBefore = [], exAfter = [];
+    const before = [owned(a, id, kind === 'take' ? exBefore : undefined), owned(c, id, kind === 'put' ? exBefore : undefined)];
     const t = S.touched.get(a) || new Set(); t.add(c); S.touched.set(a, t);
     setTimeout(() => {
-      const after = [owned(a, id), owned(c, id)];
+      const after = [owned(a, id, kind === 'take' ? exAfter : undefined), owned(c, id, kind === 'put' ? exAfter : undefined)];
+      // the per-player activity log (playerlog.js): every put and take, with the counts read here
+      try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('move', kind, a, c, id, count, before, after, exBefore, exAfter); } catch (e) { /* the player log is optional */ }
       const made = (after[0] + after[1]) - (before[0] + before[1]);
       const moved = kind === 'put' ? before[0] - after[0] : after[0] - before[0];
       const line = `${kind} by ${nameOf(a)} at ${c.toString(16)}: ${id.toString(16)} x${count} (pack ${before[0]} -> ${after[0]}, container ${before[1]} -> ${after[1]})`;
