@@ -1,5 +1,37 @@
 [
   {
+    "title": "Client 0.3.96",
+    "date": "2026-10-13",
+    "version": "Client 0.3.96",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Fixed",
+        "items": [
+          "No more cloned, floating players: other players' characters are built once and stay dressed and on the ground.",
+          "Fewer crashes when other players come into view (their faces are rebuilt once, not every time they reappear)."
+        ]
+      },
+      {
+        "heading": "New",
+        "items": [
+          "The Key Ring panel: open it from the Keys tab in your F3 Journal, the Key Ring button in a property menu, or Give a key on another player.",
+          "Khajiit can use Night Eye from the racial power box in the F3 Journal: 60 seconds of night vision, every 20 minutes.",
+          "Watchers now see the beheading at the chopping block."
+        ]
+      },
+      {
+        "heading": "Back from 0.3.95",
+        "items": [
+          "Changes to your RaceMenu sliders save from /appearance too, and your face no longer changes when you log back in.",
+          "Salt, Aversion poisons and Waterbreathing potions can be stored and dropped again.",
+          "Notice boards have Supply orders and Couriers buttons.",
+          "Your Other Player Volume is kept between game starts; no name tag shows over someone under Invisibility; a second character no longer inherits the first one's enchantments; staff keep their Admin chat tab."
+        ]
+      }
+    ]
+  },
+  {
     "title": "The 13 October update, part 2",
     "date": "2026-10-13",
     "version": "Server update",
@@ -38,12 +70,6 @@
         "heading": "House keys fixed",
         "items": [
           "Keys cut since 8 October open their doors again and move onto your key ring when you log in (they had stopped working after this morning's update)."
-        ]
-      },
-      {
-        "heading": "Client",
-        "items": [
-          "The 0.3.95 client was rolled back to 0.3.94: it made other players' characters clone and float. Its fixes come back in the next client, without the clones."
         ]
       },
       {
