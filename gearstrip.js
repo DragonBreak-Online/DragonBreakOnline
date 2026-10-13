@@ -74,7 +74,9 @@ module.exports = (api) => {
   const stateDir = () => { try { return path.dirname(fs.realpathSync(path.resolve('world'))); } catch (e) { return path.resolve('.'); } };
   const FILE = C.stateFile ? path.resolve(C.stateFile) : path.join(stateDir(), 'gearstrip-state.json');
   const state = () => {
-    if (S.state && S.file === FILE) return S.state;
+    // A hot reload keeps S from the code before it (globalThis): a state built before owedPaid existed has none, and
+    // payOwed threw on every sweep (12 Oct 16:22Z hotfix-1012c, 312 uncaught TypeErrors)
+    if (S.state && S.file === FILE) { if (!S.state.owedPaid || typeof S.state.owedPaid !== 'object') S.state.owedPaid = {}; return S.state; }
     let st = { removed: {}, refunded: 0, log: [], owedPaid: {} };
     try { const raw = JSON.parse(fs.readFileSync(FILE, 'utf8')); st = Object.assign(st, raw); }
     catch (e) { if (e.code !== 'ENOENT') { log(`gearstrip: ${FILE} unreadable (${e.message}); off, the file is left as it is`); S.readOnly = true; } }
