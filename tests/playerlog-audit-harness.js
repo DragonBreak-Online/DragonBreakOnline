@@ -1,0 +1,231 @@
+// Scripted test for the player log's audit tap (playerlog-rules.js AUDIT_VERBS and AUDIT_SITES, DESIGN.md Appendix A, 6):
+//   - a corpus of one line per audit( call site in the code, built from its real template: identity interpolations (who(),
+//     display() and their kin) become characters of a fake world, every other interpolation the canary PLOGCANARY. Parsed and
+//     excluded verbs never let the canary out, also when it is shaped like a party ("PLOGCANARY #ZZZZ (profile 99)").
+//   - site pinning: every audit( call in every non-test *.js is in AUDIT_SITES with its template hash and class; a new,
+//     changed, gone or reclassified site fails here, named, until a reviewer pins it. A clean site's template holds no quote.
+//   - roles (SMITH, SUPERNATURAL, DISCIPLINE, COURIER robbed, WAR, ROBBERY), the IP of an adminLog line, and the verbs moved
+//     out of clean (THEFT, WARBAND) with their record-named lists where they have them (ROBBERY, RAID, COURIER, POST, SUPPLY).
+//   node tests/playerlog-audit-harness.js   (from server/)
+'use strict';
+const fs = require('fs');
+const path = require('path');
+const F = require('./lib/playerlog-fakes.js');
+
+const ROOT = path.resolve(__dirname, '..');
+const MODULE = path.join(ROOT, 'playerlog.js');
+const R = require(path.join(ROOT, 'playerlog-rules.js'));
+const CANARY = 'PLOGCANARY';
+let failures = 0;
+const ok = (c, what, got) => { console.log(`${c ? 'ok  ' : 'FAIL'} ${what}${!c && got !== undefined ? '   ' + JSON.stringify(got).slice(0, 600) : ''}`); if (!c) failures++; };
+
+// ---- the audit( call sites in the code (a literal first argument; template literals with nested ${...}) ----------------------
+const readLiteral = (src, i) => {
+  const q = src[i];
+  if (q !== '`' && q !== "'" && q !== '"') return null;
+  let j = i + 1, out = '';
+  while (j < src.length) {
+    const ch = src[j];
+    if (ch === '\\') { out += src.slice(j, j + 2); j += 2; continue; }
+    if (ch === q) return [out, j + 1];
+    if (q === '`' && ch === '$' && src[j + 1] === '{') {
+      let depth = 1, k = j + 2;
+      while (k < src.length && depth) {
+        const c = src[k];
+        if (c === '`' || c === "'" || c === '"') { const r = readLiteral(src, k); if (!r) return null; k = r[1]; continue; }
+        if (c === '{') depth++; else if (c === '}') depth--;
+        k++;
+      }
+      out += src.slice(j, k); j = k; continue;
+    }
+    out += ch; j++;
+  }
+  return null;
+};
+const sites = [];
+const unreadable = [];
+for (const f of fs.readdirSync(ROOT).filter((x) => x.endsWith('.js')).sort()) {
+  const src = fs.readFileSync(path.join(ROOT, f), 'utf8');
+  const rx = /(^|[^.\w$])audit\(\s*/g; let m;
+  while ((m = rx.exec(src))) {
+    const at = m.index + m[0].length;
+    // a mention in a comment is not a call
+    const lineStart = src.lastIndexOf('\n', m.index) + 1;
+    if (/\/\/|^\s*\*/.test(src.slice(lineStart, m.index + 1))) continue;
+    const r = readLiteral(src, at);
+    const line = src.slice(0, at).split('\n').length;
+    if (!r) { if (!/^[a-zA-Z_]/.test(src[at]) || !/^(text|body)\b/.test(src.slice(at))) unreadable.push(`${f}:${line} ${src.slice(at, at + 40)}`); continue; }
+    const t = r[0];
+    const verb = t.startsWith('${') ? '<expr>' : t.split(/[\s:]/)[0];
+    sites.push({ file: f, line, verb, t, hash: R.siteHash(t) });
+  }
+}
+ok(unreadable.length === 0, 'every audit( call passes a literal (a variable has to be pinned by hand)', unreadable);
+// pinning
+const pinned = new Map(R.AUDIT_SITES.map((s) => [`${s.file} ${s.verb} ${s.hash}`, s]));
+const scanned = new Map(sites.map((s) => [`${s.file} ${s.verb} ${s.hash}`, s]));
+const fresh = [...scanned.keys()].filter((k) => !pinned.has(k));
+const gone = [...pinned.keys()].filter((k) => !scanned.has(k));
+ok(fresh.length === 0, 'no audit site is new or changed since it was reviewed (pin it in AUDIT_SITES with its class)', fresh.map((k) => `${k} at line ${scanned.get(k).line}: ${scanned.get(k).t.slice(0, 120)}`));
+ok(gone.length === 0, 'no pinned site is gone (unpin it)', gone);
+const clsOf = (s) => (s.verb === '<expr>' ? (/'GM' : 'OFFICIAL'/.test(s.t) ? 'parsed' : 'excluded') : (R.AUDIT_VERBS[s.verb] || {}).cls);
+const mismatched = sites.filter((s) => { const p = pinned.get(`${s.file} ${s.verb} ${s.hash}`); return p && p.cls !== clsOf(s); });
+ok(mismatched.length === 0, 'each pinned class is the registry\'s class for the verb', mismatched.map((s) => `${s.file}:${s.line} ${s.verb}`));
+ok(sites.every((s) => clsOf(s)), 'every verb in the code is classified (clean, parsed or excluded)', sites.filter((s) => !clsOf(s)).map((s) => `${s.file}:${s.line} ${s.verb}`));
+const quoted = sites.filter((s) => clsOf(s) === 'clean' && s.t.replace(/\$\{[^}]*\}/g, '').includes('"'));
+ok(quoted.length === 0, 'no clean site quotes anything (quoted text is someone\'s words)', quoted.map((s) => `${s.file}:${s.line}`));
+
+// ---- the corpus ----------------------------------------------------------------------------------------------------------------
+const CHARS = [
+  { a: 0xff000014, p: 1, n: 'Rowan', c: 'PGDB', d: '337337773973569537' },
+  { a: 0xff000015, p: 2, n: 'Selene', c: 'K2QX', d: '22' },
+  { a: 0xff000016, p: 3, n: 'Mike Morethi', c: '5D8L', d: '33' },
+  { a: 0xff000017, p: 4, n: 'Dar', c: 'U6T6', d: '44' },
+];
+// Lists the design keeps (Appendix A): built from record names only (robbery.js and raids.js label(), post.js nameOfItem via
+// itemsText), so the corpus fills them with record names, not the canary
+const RECORD_NAMED = new Set(["r.items.join(', ')", "what || 'nothing'", 'itemsText(items)', 'itemsText(j.items)', 'itemsText(parcel.items)', 'P.itemsText(items)']);
+// Names from the game's own config that the design keeps (Appendix A: DEITY's deity is a config name, prayer.js reads the
+// pantheon from its config): file|expression
+const CONFIG_NAMED = new Set(['prayer.js|d.name']);
+// A number by its name (gold, count, price ...): filled with a number, as the code writes one
+const NUMERIC = /^[\w$.]*\b(gold|n|count|price|pay|fee|paid|amount|cost|held|reward|value|balance|tribute|weeks|mins|hours|tier|level|insured|premium|delivered|owed|kept|refund|taxed|income|stipend|filled|made|done|added|removed|lucky|earned|prev|was|had|days|left|fromBank|paidIn|deposit|weekly|seconds|s|tax|cleared|copies|have|need|blood|renown)$/;
+const isWho = (e) => /^(who|staffWho)\(/.test(e) || /(^|\.)(who|byWho|byName)$/.test(e) || /^ownWho|^tg\.who|^by\.who/.test(e);
+const isDisplay = (e) => /^(display|ownDisplay|publicDisplay|displayFor)\(/.test(e);
+// one corpus line: identity -> the fake world's characters (in turn), anything else -> fill
+const build = (t, fill, file) => {
+  let i = 0, out = '', k = 0;
+  const next = () => CHARS[(k++) % CHARS.length];
+  while (i < t.length) {
+    if (t[i] === '$' && t[i + 1] === '{') {
+      let depth = 1, j = i + 2;
+      while (j < t.length && depth) { if (t[j] === '{') depth++; else if (t[j] === '}') depth--; j++; }
+      const e = t.slice(i + 2, j - 1).trim();
+      const after = t.slice(j, j + 3);
+      if (isWho(e)) { const c = next(); out += `${c.n} #${c.c} (profile ${c.p}, <@${c.d}>)`; }
+      else if (isDisplay(e)) { const c = next(); out += `${c.n} #${c.c}`; }
+      else if (after === ' #$') { const c = CHARS[k % CHARS.length]; out += c.n; }
+      else if (/Tag\)?$|\.tag$|tagOf\(/.test(e) && out.endsWith(' #')) { const c = next(); out += c.c; }
+      else if (RECORD_NAMED.has(e)) out += /itemsText/.test(e) ? '2x Iron Ingot, 1x Bread' : 'Iron Sword, Bread';
+      else if (CONFIG_NAMED.has(`${file}|${e}`)) out += 'Akatosh';
+      else if (NUMERIC.test(e)) out += '12';
+      else {
+        // a conditional with a template or a string in it ("x ? ` and ${gold} gold` : ''"): its first branch, built the same way
+        const bt = e.indexOf('`');
+        const lit = bt >= 0 ? readLiteral(e, bt) : null;
+        if (lit) out += build(lit[0], fill, file);
+        else { const q = e.match(/\? '([^']*)'/); out += q ? q[1] : fill; }
+      }
+      i = j; continue;
+    }
+    if (t[i] === '\\') { out += t[i + 1]; i += 2; continue; }
+    out += t[i]; i++;
+  }
+  return out;
+};
+// the fake world the resolver reads
+const M = F.makeMp(), FS = F.makeFs(), TM = F.makeTimers(), QU = F.makeQueue(), CL = F.makeClock();
+QU.install();
+for (const c of CHARS) M.player(c.a, { profile: c.p, name: c.n, tag: c.c, discord: c.d });
+M.record(0x12eb7, 'WEAP', 'IronSword');
+const H = new Map([[0x806ca1f, { owner: 3, ownerChar: 0xff000016, ownerName: 'Mike Morethi' }]]);
+globalThis.__dboHousing = { recordOf: (ref) => H.get(ref >>> 0) || null, primaryOf: (r) => r >>> 0, ownsRecord: () => false };
+const api = { mp: M.mp, log: () => {}, cfg: { playerLog: { dir: '/fake/events', stopFile: '/fake/STOP' } }, every: TM.every, stopTimer: TM.stopTimer,
+  onlineActors: () => CHARS.map((c) => c.a), actorOf: () => 0, fs: FS.fs, clock: CL, discordOf: (a) => String(M.mp.get(a, 'private.skympDiscordId') || ''),
+  recordOf: (id) => M.mp.lookupEspmRecordById(id), adminItemName: () => '', commandsHas: () => true, WORLD_GROUPS: [], lastPacketAt: new Map() };
+delete require.cache[MODULE];
+const K = require(MODULE)(api);
+QU.run();
+const run = (line) => {
+  const n0 = K.S.q.length;
+  globalThis.__dboPlogHook('audit', line);
+  K.G.parseAudits(Infinity);
+  QU.run();
+  return K.S.q.slice(n0);
+};
+
+const leaks = [], leaksParty = [], cleanReview = [];
+let parsedN = 0, excludedN = 0, cleanN = 0, produced = 0;
+for (const s of sites) {
+  const cls = clsOf(s);
+  const out1 = run(build(s.t, CANARY, s.file));
+  const out2 = run(build(s.t, `${CANARY} #ZZZZ (profile 99, <@1>)`, s.file));
+  produced += out1.length;
+  if (cls === 'clean') {
+    cleanN++;
+    const free = (s.t.match(/\$\{[^}]*\}/g) || []).map((x) => x.slice(2, -1).trim()).filter((e) => !isWho(e) && !isDisplay(e));
+    cleanReview.push(`${s.file}:${s.line} ${s.verb}: ${free.join(' | ')}`);
+    continue;
+  }
+  if (cls === 'parsed') parsedN++; else excludedN++;
+  if (JSON.stringify(out1).includes(CANARY)) leaks.push(`${s.file}:${s.line} ${s.verb} -> ${JSON.stringify(out1).slice(0, 200)}`);
+  if (JSON.stringify(out2).includes(CANARY)) leaksParty.push(`${s.file}:${s.line} ${s.verb} -> ${JSON.stringify(out2).slice(0, 200)}`);
+  if (cls === 'excluded' && out1.length) leaks.push(`${s.file}:${s.line} ${s.verb} (excluded) gave ${out1.map((r) => r.ev).join(',')}`);
+}
+ok(leaks.length === 0, `parsed (${parsedN}) and excluded (${excludedN}) sites: the canary never reaches an event`, leaks);
+ok(leaksParty.length === 0, '...nor when the canary is shaped like a party', leaksParty);
+ok(produced > 150, 'the corpus gives events (the parsers match the real templates)', produced);
+console.log(`     ${cleanN} clean sites; their non-identity interpolations, for the reviewer:`);
+for (const l of cleanReview) console.log(`       ${l}`);
+
+// ---- clean: act text with the identity normalised ----------------------------------------------------------------------------
+let out = run('CONTRACT Rowan #PGDB (profile 1, <@337337773973569537>) completed 7 wolves for Bruma (84 gold)');
+ok(out.length === 1 && out[0].ev === 'act.CONTRACT' && out[0].f.text === 'CONTRACT Rowan #PGDB completed 7 wolves for Bruma (84 gold)' && out[0].p === 1 && out[0].c === 'PGDB', 'a clean verb: act.<VERB>, "(profile N, <@id>)" gone, the actor from the game', out);
+out = run('LEVEL Rowan #PGDB reached character level 12');
+ok(out.length === 1 && out[0].p === 1, 'a Name #TAG party with no profile: resolved by name and tag', out);
+out = run('LABOUR-MISMATCH Rowan #PGDB (profile 1) chop widget=win/3 replay=1/5 seed=ab');
+ok(out.some((r) => r.ev === 'sec.signal' && r.f.kind === 'mismatch' && r.f.game === 'labour'), 'a *-MISMATCH line is also a security signal', out.map((r) => r.ev));
+// ---- roles --------------------------------------------------------------------------------------------------------------------
+const roleOf = (r, c) => { const x = (r.o || []).find((y) => y.c === c); return x ? x.r : null; };
+out = run('SMITH Selene #K2QX (profile 2) learned Steel Smithing (T2) by staff from Dar #U6T6 (profile 4)');
+ok(out[0].c === 'K2QX' && roleOf(out[0], 'U6T6') === 'staff', 'SMITH: the learner is the actor, the staff member a staff party', out[0]);
+out = run('SUPERNATURAL Selene #K2QX (profile 2) given sanguinare by GM Dar #U6T6 (profile 4)');
+ok(out[0].ev === 'char.supernatural' && out[0].c === 'K2QX', 'SUPERNATURAL "<target> given ... by GM <gm>": the target is the actor (their post)', out[0]);
+out = run(`DISCIPLINE strike #4 on Selene #K2QX (profile 2) (profile 2) by Dar #U6T6 (profile 4): ${CANARY} griefing`);
+ok(out[0].ev === 'session.ban' && out[0].c === 'K2QX' && out[0].f.kind === 'strike' && roleOf(out[0], 'U6T6') === 'staff' && !JSON.stringify(out).includes(CANARY), 'DISCIPLINE "<kind> #n on <target> ... by <staff>: <reason>": the target\'s post, the staff party, no reason', out[0]);
+const byStaff = out.filter((r) => r.c === 'U6T6');
+ok(byStaff.length === 0, '...the staff member is never the actor of it (--who on them finds only what they did)');
+out = run('COURIER #12 robbed from Selene #K2QX (profile 2) by Rowan #PGDB (profile 1): 2x Iron Ingot, 1x Bread');
+ok(out[0].ev === 'item.theft' && out[0].c === 'PGDB' && roleOf(out[0], 'K2QX') === 'victim' && out[0].f.items.length === 2 && out[0].f.items[0].i === 'Iron Ingot', 'COURIER robbed: the robber acts, the victim is the victim, the record-named list kept', out[0]);
+out = run('WAR w3: Rowan #PGDB (profile 1) killed Selene #K2QX (profile 2) in a war to the death');
+ok(out[0].f.op === 'war_kill' && out[0].c === 'PGDB' && roleOf(out[0], 'K2QX') === 'victim', 'WAR kill: killer and victim', out[0]);
+// ---- reclassified and list-keeping verbs --------------------------------------------------------------------------------------
+out = run(`THEFT Rowan #PGDB (profile 1) picked ${CANARY} from Selene #K2QX (profile 2) (32%)`);
+ok(out[0] && out[0].ev === 'item.theft' && out[0].f.kind === 'pickpocket' && !JSON.stringify(out).includes(CANARY), 'THEFT with a custom-named item: the parties and the outcome, never the label', out);
+out = run(`ROBBERY Rowan #PGDB (profile 1) robbed Selene #K2QX (profile 2): 40 gold of 100; items [Iron Sword, Bread]; key ${CANARY} Manor`);
+ok(out[0].f.items.map((x) => x.i).join(',') === 'Iron Sword,Bread' && out[0].f.keyTaken === true && !JSON.stringify(out).includes(CANARY), 'ROBBERY: the record-named list kept, the key\'s name never, keyTaken only', out[0]);
+out = run(`RAID break-in by Rowan #PGDB (profile 1) (${CANARY} Clan) at container 806ca1f of home 806ca1f (Mike Morethi): 40 gold, Iron Sword and Bread`);
+ok(out[0].f.kind === 'raid' && out[0].f.gold === 40 && out[0].f.items.length === 2 && out[0].o.some((x) => x.r === 'owner' && x.c === '5D8L') && !JSON.stringify(out).includes(CANARY), 'RAID: record names kept, routed to the home\'s owner from its ref, no faction name', out[0]);
+out = run(`POST Rowan #PGDB (profile 1) collected 5 gold, 2x Bread from ${CANARY} the Forger`);
+ok(out[0].f.op === 'parcel_collected' && out[0].f.items[0].i === 'Bread' && !JSON.stringify(out).includes(CANARY), 'POST: the list kept, "from <m.from>" never', out[0]);
+out = run('SUPPLY Rowan #PGDB (profile 1) delivered 3x Iron Ingot to #12 of Selene #K2QX for 30 gold');
+ok(out[0].ev === 'act.SUPPLY' && /3x Iron Ingot/.test(out[0].f.text), 'SUPPLY: clean, record names', out[0]);
+out = run(`WARBAND Dar #U6T6 (profile 4) fights for ${CANARY}`);
+ok(!JSON.stringify(out).includes(CANARY), 'WARBAND "fights for <side>": no side name', out);
+out = run(`ECONOMY Rowan #PGDB (profile 1) set ${CANARY} Hold's tax rate to 12%`);
+ok(out[0].f.op === 'tax_rate' && out[0].f.pct === 12 && !JSON.stringify(out).includes(CANARY), 'ECONOMY: the ruler\'s action, no faction name', out[0]);
+out = run('ECONOMY Rowan #PGDB (profile 1) assessed property 806ca1f at 900 gold (was 800)');
+ok(out[0].f.op === 'assessed' && out[0].o.some((x) => x.r === 'owner' && x.c === '5D8L'), '...an assessment also reaches the property owner', out[0]);
+// ---- the server's adminLog lines: the IP is never read --------------------------------------------------------------------------
+out = run('GM profile 4 (gm) lifted the ban on Bob / ip 10.20.30.40');
+ok(!JSON.stringify(out).includes('10.20.30.40') && out[0].f.action === 'unban', 'GM profile N ... / ip <addr>: the IP stripped', out);
+out = run('GM profile 4 (gm) kicked Selene (profile 2)');
+ok(out.some((r) => r.ev === 'staff.action' && r.f.action === 'kick' && r.o[0].p === 2) && out.some((r) => r.ev === 'session.kick' && r.p === 2), 'GM profile N kicked <Name> (profile M): staff.action and the target\'s session.kick', out);
+out = run(`GM Dar #U6T6 (profile 4) /system: ${CANARY}`);
+ok(out[0].ev === 'staff.world' && out[0].f.action === 'broadcast' && !JSON.stringify(out).includes(CANARY), '/system: staff.world{broadcast}, never the text', out);
+out = run(`NAME Rowan #PGDB (profile 1) reroll name "${CANARY}" refused (Names are 2-24 characters.); kept "Rowan"`);
+ok(out.length === 0, 'a refused name (raw typed text) gives nothing', out);
+out = run('NAME profile 1 renamed "Rowan" -> "Rowena"');
+ok(out[0].ev === 'char.rename' && out[0].f.from === 'Rowan' && out[0].f.to === 'Rowena' && out[0].p === 1, 'NAME renamed: char.rename (names are identity)', out[0]);
+out = run(`BOARD [profile 1] posted in bruma (Notices) for 10 gold: "${CANARY}"`);
+ok(!JSON.stringify(out).includes(CANARY), 'BOARD: the note never', out);
+out = run(`PIGEON Rowan #PGDB (profile 1) sent Selene a letter signed "${CANARY}"`);
+ok(out.length === 0, 'PIGEON: excluded', out);
+// ---- unknown verbs: counted by name when shaped like one, else '?' --------------------------------------------------------------
+run('NEWVERB Rowan #PGDB (profile 1) did something');
+run(`${CANARY} lowercase thing`);
+run(`${CANARY.toLowerCase()} lowercase thing`);
+ok(K.S.auditUnknown.get('NEWVERB') === 1 && !K.S.auditUnknown.has(CANARY.toLowerCase()) && K.S.auditUnknown.get('?') >= 1, 'an unknown verb is counted by name only, nothing else of the line', [...K.S.auditUnknown]);
+
+console.log(failures ? `\n${failures} FAILED` : '\nall passed');
+process.exit(failures ? 1 : 0);
