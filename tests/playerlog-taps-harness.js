@@ -660,6 +660,10 @@ const housing = (W) => {
   W.h('packet', 6, { customPacketType: 'adminAction', action: 'tempBan', target: B.toString(16), hours: 2 });
   W.CL.t += 11000; W.tick('playerlogFast');
   ok((W.last('staff.action') || NONE).f.action === 'tempBan' && (W.last('staff.action') || NONE).f.params.hours === 2 && (W.last('staff.action') || NONE).o[0].c === 'K2QX', '...tempBan is named (adminSystem.ts\'s own action names), its target from the hex', W.last('staff.action'));
+  W.h('packet', 6, { customPacketType: 'adminAction', action: 'kill', target: B.toString(16) });
+  W.M.mp.onDeath(B, 0);
+  const pk = W.last('combat.down');
+  ok(pk && pk.p === 2 && pk.f.cause === 'staff_kill' && pk.o && pk.o[0].c === 'U6T6', '...a panel kill: the down\'s cause is staff_kill, by the staff member', pk && [pk.f, pk.o]);
   mark(W);
 
   // recommended fixes: the client's companion orders, a relog that grew in containers only, an NPC staggered, an expired lock,
