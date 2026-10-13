@@ -63,7 +63,7 @@ const STAFF_CMDS = ['rename', 'chargen', 'tp', 'charstats', 'bugs', 'kick', 'fix
 for (const n of STAFF_CMDS) commands.set(n, { admin: true, fn: (a, body) => ran.push([a, n, body]) });
 for (const n of ['faction', 'manual', 'boost', 'appoint', 'gm']) commands.set(n, { admin: false, fn: (a, body) => ran.push([a, n, body]) });
 const gate = new Function('commands', 'personal', 'isAdmin', 'staffCan', 'TRIAL_COMMANDS', 'LEAD_ONLY', 'isLeadStaff', 'staffLog', 'display', 'tierOf', 'staffTierOf',
-  'staffWho', 'TIER_LABEL', 'log', 'a', 'cmd', 'body', 'userId', gateCode);
+  'staffWho', 'TIER_LABEL', 'log', 'a', 'cmd', 'body', 'userId', 'remote', 'dry', gateCode); // remote and dry: the remote console's opts (handleLine), unset for typed chat
 const chat = (a, line) => { ran.length = 0; said.length = 0; logged.length = 0; const [cmd, ...rest] = line.split(' ');
   gate(commands, (x, t) => said.push(t), T.isAdmin, T.staffCan, T.TRIAL_COMMANDS, LEAD_ONLY, T.isLeadStaff, (w, tier, what, detail) => logged.push({ w, tier, what, detail }),
     (x) => `char${x}`, T.tierOf, T.staffTierOf, (x) => `char${x}`, TIER_LABEL, () => {}, a, cmd, rest.join(' '), 1); return ran.length > 0; };

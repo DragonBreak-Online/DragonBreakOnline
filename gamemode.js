@@ -145,8 +145,26 @@ makeProp('ff_factions', true);   // dungeons.js: the placement template's factio
 makeProp('ff_outfit', true);     // dungeons.js: armour a spawned actor should wear, equipped by the client
 makeProp('ff_aggroWindow', true); // dungeons.js: the range a player wakes a dungeon spawn at (0 woken), held passive by the client
 
+// ---- remote staff console capture (console.js; Jake, 13 Oct) ---------------------------------------------------------
+// The remote console runs one command inside captureFor(a, quiet, fn): every chat line meant for the caller's actor is
+// kept at deliver (personal, system, staffSay and module lines alike), and so is each broadcast and audit line of that
+// one synchronous call. quiet: the caller's character is offline, so nothing is written into its chat (the client would
+// show it at the next login). The previous capture comes back in finally, so a throw cannot leave this one behind.
+// __dboRunCommand's capture (no `all`) still takes personal() lines only.
+const CAPTURE_MAX = 100;
+const capPush = (cap, to, text) => { if (cap.lines.length < CAPTURE_MAX) cap.lines.push({ to, text: String(text) }); else cap.dropped++; };
+const captureFor = (a, quiet, fn) => {
+  const cap = { a: a >>> 0, all: true, quiet: !!quiet, inBroadcast: false, lines: [], dropped: 0 };
+  const prev = globalThis.__dboTellCapture;
+  globalThis.__dboTellCapture = cap;
+  try { const result = fn(); return { result, lines: cap.lines, dropped: cap.dropped }; } finally { globalThis.__dboTellCapture = prev; }
+};
 let nonce = Date.now();
-const deliver = (actorId, line) => { try { mp.set(actorId, CHAT_PROP, `${++nonce}${US}${line}`); } catch (e) { log('deliver failed', actorId, e.message); } };
+const deliver = (actorId, line) => {
+  const cap = globalThis.__dboTellCapture;
+  if (cap && cap.all && cap.a === (actorId >>> 0)) { if (!cap.inBroadcast) capPush(cap, 'you', line); if (cap.quiet) return; }
+  try { mp.set(actorId, CHAT_PROP, `${++nonce}${US}${line}`); } catch (e) { log('deliver failed', actorId, e.message); }
+};
 const system = (actorId, text) => deliver(actorId, `[[S]]#{${C.SYS}}${text}`);
 // What a player is refused goes into the log too, sampled, so a survey can see a player stuck in a loop: personal()
 // lines were never logged, and the 48 h refusal survey (2026-09-29) could only read what modules logged themselves.
@@ -166,7 +184,7 @@ const noteTold = (actorId, text) => {
   if (n === 1 || n === 5 || n % 10 === 0) log(`told ${display(actorId)} (x${n}): ${t.slice(0, 200)}`);
 };
 // The player log (playerlog.js) is told too, for the outcome of a command running for that player: the text is never kept
-const personal = (actorId, text) => { try { noteTold(actorId, text); } catch (e) { /* the log line is optional */ } try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('tell', actorId, text); } catch (e) { /* the player log is optional */ } const cap = globalThis.__dboTellCapture; if (cap && cap.a === (actorId >>> 0)) { cap.lines.push(String(text)); if (cap.quiet) return; } deliver(actorId, `[[PM]]System|${text}`); };
+const personal = (actorId, text) => { try { noteTold(actorId, text); } catch (e) { /* the log line is optional */ } try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('tell', actorId, text); } catch (e) { /* the player log is optional */ } const cap = globalThis.__dboTellCapture; if (cap && !cap.all && cap.a === (actorId >>> 0)) { cap.lines.push(String(text)); if (cap.quiet) return; } deliver(actorId, `[[PM]]System|${text}`); };
 
 // Survives gamemode hot reloads so players who connected before a reload stay known.
 if (!(globalThis.__dboConnected instanceof Set)) globalThis.__dboConnected = new Set();
@@ -365,7 +383,13 @@ const bubbleNear = (fromActor, rangeM, cmd, name, body) => {
   for (const a of actorsNear(fromActor, rangeM, true)) sendPacket(a, packet);
 };
 // ---- end chat bubbles ----
-const broadcast = (line, onlyAdmins) => { for (const a of onlineActors()) if (!onlyAdmins || staffCan(a, 'adminchat')) deliver(a, line); };
+// Inside the remote console's capture (captureFor) a broadcast is kept once, as 'all' (or 'staff' for the admin tab), and
+// an online caller's own copy of it is not kept a second time as 'you'
+const broadcast = (line, onlyAdmins) => {
+  const cap = globalThis.__dboTellCapture; const was = cap && cap.all ? cap.inBroadcast : false;
+  if (cap && cap.all) { capPush(cap, onlyAdmins ? 'staff' : 'all', line); cap.inBroadcast = true; }
+  try { for (const a of onlineActors()) if (!onlyAdmins || staffCan(a, 'adminchat')) deliver(a, line); } finally { if (cap && cap.all) cap.inBroadcast = was; }
+};
 const findByName = (query) => {
   let q = String(query).trim().toLowerCase(); const all = onlineActors();
   const tagMatch = q.match(/#([a-z0-9]{4})$/);
@@ -373,6 +397,10 @@ const findByName = (query) => {
     const byTag = all.find(a => tagOf(a).toLowerCase() === tagMatch[1]); if (byTag) return byTag;
     q = q.slice(0, tagMatch.index).trim();
   }
+  // Nothing left to match (no query, or a bare #TAG nobody online carries): no one. An empty name is a prefix of every
+  // name, so this fell through to the only undisguised player online: /kick with no argument, or /kick #TAG with the tag
+  // offline or mistyped, kicked that other player (remote console review, F1, 13 Oct; proven by run)
+  if (!q) return 0;
   const byId = all.find(a => a.toString(16) === q || String(profileOf(a)) === q); if (byId) return byId;
   // No name finds one behind a mask or in a beast form (disguisedOf), only the #TAG or the profile id: "Werewolf" or
   // "Masked Person" found whoever wore it and the answer gave away their #TAG, and the own name was answered with the
@@ -439,6 +467,8 @@ const audit = (text) => {
   log('audit:', body);
   // The per-player activity log (playerlog.js) parses every audit line by its verb's reviewed class; never chat
   try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('audit', body); } catch (e) { /* the player log is optional */ }
+  // The remote console shows the admin the audit lines their command wrote (captureFor)
+  const cap = globalThis.__dboTellCapture; if (cap && cap.all) capPush(cap, 'audit', body);
   if (!discordTarget) return;
   const now = Date.now();
   const key = body.replace(/\d+/g, 'N').slice(0, 48);
@@ -1270,14 +1300,22 @@ registerChatCommand('pigeonblock', (a, args) => {
 
 // ---- incoming chat -------------------------------------------------------------------------
 const quoteSay = (name, verb, body, color) => `#{${color}}${name} ${verb}: "${body}"`;
-const handleChat = (userId, text) => {
-  const a = actorOf(userId); if (!a) return;
+const handleChat = (userId, text) => { const a = actorOf(userId); if (!a) return; handleLine(a, text, userId); };
+// The one command gate, for typed chat (handleChat above, the U panel's menuRun, warband's runChat) and for the remote staff
+// console (console.js, Jake 13 Oct), which passes the admin's own character as `a` and opts { remote: { src, id8 }, dry }.
+// It returns how the line ended: 'unknown' | 'refused' | 'failed' | 'ran' | 'dry' (typed chat ignores it). A remote line
+// stays inside the command registry (never speech, an emote, /pm, /system, /admin or the bare-/ panel), always writes a
+// #staff-commands line tagged [remote <src> <id>], and a dry one stops after the gate, before the staff line and the command.
+const handleLine = (a, text, userId, opts) => {
+  const remote = opts && opts.remote ? opts.remote : null;
+  const dry = !!(opts && opts.dry);
   const name = nameOf(a);
   let cmd = 'say', body = String(text).trim();
   // A player's own '#{rrggbb}' would recolour the rest of the line in every reader's chat (a fake system notice); staff
   // keep it
   if (FLOOD.stripColourCodes && body.includes('#{') && !isAdmin(a)) body = body.split('#{').join('# {');
   if (body.startsWith('/')) { const i = body.indexOf(' '); cmd = (i < 0 ? body : body.slice(0, i)).slice(1).toLowerCase(); body = i < 0 ? '' : body.slice(i + 1).trim(); }
+  if (remote && !commands.has(cmd)) return 'unknown';
   // The chat box stops at 2000 characters and the client then puts the tab's command in front ('/looc ', '/me '...), so
   // what is measured is what is said, after the command
   // The player log records the refusal only for a registered command (a long chat line records nothing)
@@ -1306,16 +1344,21 @@ const handleChat = (userId, text) => {
   if (!c) { try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('gate', a, 'unknown', cmd); } catch (e) { /* the player log is optional */ } return personal(a, `Unknown command /${cmd.slice(0, 32)}. ${hasPlayerMenu(a) ? 'Type / alone, or press U, to search every command.' : 'Type /help.'}`); }
   // A Trial GM passes only for the commands in TRIAL_COMMANDS; LEAD_ONLY below is for GMs, so it never refuses them
   const trial = c.admin && !isAdmin(a) && Object.prototype.hasOwnProperty.call(TRIAL_COMMANDS, cmd) && staffCan(a, TRIAL_COMMANDS[cmd]);
-  if (c.admin && !isAdmin(a) && !trial) { try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('gate', a, 'not_staff', cmd); } catch (e) { /* the player log is optional */ } return personal(a, 'Admins only.'); }
+  if (c.admin && !isAdmin(a) && !trial) { try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('gate', a, 'not_staff', cmd); } catch (e) { /* the player log is optional */ } personal(a, 'Admins only.'); return 'refused'; }
   const sub = `${cmd} ${(body.split(/\s+/)[0] || '').toLowerCase()}`;
-  const staffCmd = c.admin || LEAD_ONLY.has(sub);
+  const remoteTag = remote ? ` [remote ${remote.src} ${remote.id8}]` : '';
+  // Every remote line is a staff line, the read-only /players and /whoami included (registered without admin)
+  const staffCmd = c.admin || LEAD_ONLY.has(sub) || !!remote;
   if ((LEAD_ONLY.has(cmd) || LEAD_ONLY.has(sub)) && isAdmin(a) && !isLeadStaff(a)) {
-    staffLog(display(a), tierOf(a), `/${cmd} (refused)`, `${staffWho(a)} (GM): /${cmd} ${body.slice(0, 300)} REFUSED (Lead GM and above)`);
+    if (!dry) staffLog(display(a), tierOf(a), `/${cmd} (refused)`, `${staffWho(a)} (GM): /${cmd} ${body.slice(0, 300)} REFUSED (Lead GM and above)${remoteTag}`);
     try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('gate', a, 'lead_only', cmd); } catch (e) { /* the player log is optional */ }
-    return personal(a, 'That is for a Lead GM and above.');
+    personal(a, 'That is for a Lead GM and above.'); return 'refused';
   }
-  if (staffCmd && (isAdmin(a) || trial)) staffLog(display(a), staffTierOf(a), `/${cmd}`, `${staffWho(a)} (${TIER_LABEL[staffTierOf(a)] || 'staff'}): /${cmd} ${body.slice(0, 300)}`);
-  try { c.fn(a, body, userId); } catch (e) { log('command', cmd, 'failed', e); personal(a, 'That command failed.'); }
+  // A dry run (the remote console's dry-run switch) has passed the real gate: nothing reaches #staff-commands or the command
+  if (dry) return 'dry';
+  if (staffCmd && (isAdmin(a) || trial)) staffLog(display(a), staffTierOf(a), `/${cmd}`, `${staffWho(a)} (${TIER_LABEL[staffTierOf(a)] || 'staff'}): /${cmd} ${body.slice(0, 300)}${remoteTag}`);
+  try { c.fn(a, body, userId); } catch (e) { log('command', cmd, 'failed', e); personal(a, 'That command failed.'); return 'failed'; }
+  return 'ran';
 };
 
 // ---- Realm of Lorkhan hold gates -------------------------------------------------------------
