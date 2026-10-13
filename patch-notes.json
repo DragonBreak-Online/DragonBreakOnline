@@ -1,30 +1,73 @@
 [
   {
-    "title": "Silver and the cursed",
-    "date": "2026-10-12",
-    "version": "Server update",
-    "tag": "Change",
-    "sections": [
-      {
-        "heading": "Vampires and werewolves",
-        "items": [
-          "A vampire or werewolf can no longer carry silver, not only wear it. Silver weapons, jewellery, ingots and ore in their pack are sent to their own mailbox at the notice boards, so nothing is lost; picking it up again sends it straight back."
-        ]
-      }
-    ]
-  },
-  {
-    "title": "Executions at Castle Bruma",
-    "date": "2026-10-12",
+    "title": "The 13 October update",
+    "date": "2026-10-13",
     "version": "Server update",
     "tag": "New",
     "sections": [
       {
-        "heading": "The chopping block",
+        "heading": "Executions at Castle Bruma",
         "items": [
           "A chopping block now stands on the plaza before Castle Bruma. The condemned kneels at the block, and a headsman takes up the axe.",
           "An execution needs a GM present to approve it, and the headsman confirms before the blow. A beheading ends the condemned character for good.",
           "If the condemned or the headsman steps away, or nobody approves in time, there is no execution."
+        ]
+      },
+      {
+        "heading": "Silver and the cursed",
+        "items": [
+          "A vampire or werewolf can no longer carry silver, not only wear it. Silver weapons, jewellery, ingots and ore in their pack are sent to their own mailbox at the notice boards, so nothing is lost; picking it up again sends it straight back."
+        ]
+      },
+      {
+        "heading": "Soul Trap",
+        "items": [
+          "A Soul Trap weapon with no charge left no longer fills soul gems.",
+          "Capturing a soul with Soul Trap now trains Enchanting a little (up to 10 souls an hour)."
+        ]
+      },
+      {
+        "heading": "Combat",
+        "items": [
+          "Blocking an NPC's blow now costs stamina, as it does against players, and your guard breaks when your stamina runs out."
+        ]
+      },
+      {
+        "heading": "Supply orders",
+        "items": [
+          "An order is filled by any item of the name it asks for: the woodcutters' Charcoal now fills a Charcoal order."
+        ]
+      },
+      {
+        "heading": "Colleges and classes",
+        "items": [
+          "The Cathedral's tome shop is named for the Great Faiths, not the Synod.",
+          "Staff can now name class teachers straight from the player menu, so Class Lecterns can be opened to the colleges' teachers. Ask a GM if you are ready to teach a class."
+        ]
+      },
+      {
+        "heading": "Skills",
+        "items": [
+          "When your work stops counting towards a skill, you are now told why and for how long.",
+          "The /teach hint names the rank you actually need."
+        ]
+      },
+      {
+        "heading": "Faction gear",
+        "items": [
+          "The whole Vigil of Stendarr set now belongs to the Vigil alone."
+        ]
+      },
+      {
+        "heading": "Loot",
+        "items": [
+          "No giant's club drops as loot any more."
+        ]
+      },
+      {
+        "heading": "Staff",
+        "items": [
+          "Trial GMs now have the admin panel's Ghost mode and Teleport tab."
         ]
       }
     ]
