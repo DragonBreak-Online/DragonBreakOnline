@@ -30,17 +30,21 @@
 // ("already occupies it, seating again", 41 times at this block on 13 Oct, against a fresh "seated" each time at an
 // ordinary chair). So the server stands them: whoever this module seated (the victim kneeling, the headsman with the axe)
 // and is still at the block when the attempt ends - done, refused, cancelled, timed out, or by their own E press - is
-// moved standUnits from the block's origin, the way /unstuck moves a player (locationalData). That takes them out of the
-// furniture on their own screen (the client's teleport), their client's closing activation frees the seat, and past the
-// fork's 256-unit furniture reach the seat is stale on the server anyway. Their own E press is refused (false) so the
+// moved standUnits from the block's origin (locationalData), and past the fork's 256-unit furniture reach the seat is stale
+// on the server. That move alone does not take a seated player out of the furniture on their own screen (13 Oct 21:31:58:
+// GM Nate was set down 280 units out, and his client put him back on the block 5 s later and kept him there): so each
+// is also sent dboExecuteStand (client 0.3.97 ExecutionService: Dismount, the furniture exit, then IdleForceDefaultState
+// and the same move), and standCheckMs later anyone still sitting where they sat, within seatUnits of the block, goes to
+// their area's respawn temple, the /unstuck move (api.toTemple), which did free players from this block three times on
+// 13 Oct (12:48, 15:35, 19:04). Their own E press is refused (false) so the
 // engine does not seat them again, and repeats within repeatMs of the one handled are ignored (one press can arrive twice
 // in a millisecond, 20:27:35.880). Config "execution": { enabled, blockBases, idle, gmRangeMeters, reachMeters,
-// watchMeters, chopMs, approvalSeconds, standUnits, repeatMs }. Hot reload.
+// watchMeters, chopMs, approvalSeconds, standUnits, repeatMs, standCheckMs, seatUnits, stillUnits }. Hot reload.
 'use strict';
 
 module.exports = (api) => {
   const { mp, log, personal, audit, who, display, cfg, isAdmin, isPlayer, sendPacket, openWidget, closeWidget, onUi, onlineActors,
-    distanceMeters, every, staffLog } = api;
+    distanceMeters, every, staffLog, toTemple } = api;
   const C = Object.assign({
     enabled: true,
     // The DLE's DBO_ExecutionBlock (fe549 without its script) placed in front of Castle Bruma, and vanilla's two
@@ -56,12 +60,20 @@ module.exports = (api) => {
     // Where a seated player is set down, from the block's origin: past the fork's 256-unit furniture reach (the seat goes
     // stale) and its 3 m reachMeters (210 units). The seats themselves are about 110 units out
     standUnits: 280, repeatMs: 1500,
+    // How long the client has to stand them (its three ways out take about 3.5 s), and what still counts as seated then:
+    // within seatUnits of the block (the seats are 18 to 112 units from its origin on 13 Oct) and within stillUnits of
+    // where they sat
+    standCheckMs: 10000, seatUnits: 160, stillUnits: 40,
+    // The graph events of the two idles (Skyrim.esm IDLE ENAM, read on CT 115 13 Oct), for the client's fallback
+    event: 'IdleExecutionerChop', victimEvent: 'IdleExecutioneeChop',
   }, (cfg && cfg.execution) || {});
   const PANEL_ID = 83; // 81 is the couriers board (widget-ids-harness)
   const S = globalThis.__dboExecState || (globalThis.__dboExecState = { blocks: new Map(), baseOf: new Map() });
   // block -> Set of the players this module let the engine seat there; actor:block -> when their last activation was handled
   if (!(S.seated instanceof Map)) S.seated = new Map();
   if (!(S.lastUse instanceof Map)) S.lastUse = new Map();
+  // actor -> { block, seat: [x, y] where they sat, due }: a stand-up to check
+  if (!(S.standing instanceof Map)) S.standing = new Map();
 
   const idOf = (desc) => { try { return mp.getIdFromDesc(String(desc)) >>> 0; } catch (e) { return 0; } };
   const BASES = new Set((C.blockBases || []).map(idOf).filter(Boolean));
@@ -100,10 +112,32 @@ module.exports = (api) => {
       const len = Math.hypot(dx, dy);
       if (len < 1) { dx = 1; dy = 0; } else { dx /= len; dy /= len; }
       const out = Number(C.standUnits) || 280;
-      mp.set(a, 'locationalData', { cellOrWorldDesc: loc.cellOrWorldDesc, pos: [b[0] + dx * out, b[1] + dy * out, loc.pos[2] + 8], rot: loc.rot || [0, 0, 0] });
+      const to = [b[0] + dx * out, b[1] + dy * out, loc.pos[2] + 8], rot = loc.rot || [0, 0, 0];
+      mp.set(a, 'locationalData', { cellOrWorldDesc: loc.cellOrWorldDesc, pos: to, rot });
+      try { sendPacket(a, { customPacketType: 'dboExecuteStand', pos: to, rot }); } catch (e) { /* offline */ }
+      S.standing.set(a, { block, seat: [loc.pos[0], loc.pos[1]], due: Date.now() + (Number(C.standCheckMs) || 0) });
       log(`execution: ${nameOf(a)} stood up from the block at ${block.toString(16)}`);
       return true;
     } catch (e) { log(`execution: standing ${a.toString(16)} up failed: ${e.message}`); return false; }
+  };
+
+  // standCheckMs after a stand-up: still sitting where they sat, at the block, the client could not stand them (0.3.96 and
+  // older have no dboExecuteStand at all), so they go where /unstuck sends them
+  const checkStanding = (now) => {
+    for (const [a, w] of [...S.standing]) {
+      if (now < w.due) continue;
+      S.standing.delete(a);
+      if (!online(a) || dead(a)) continue;
+      try {
+        const p = mp.get(a, 'pos'), b = mp.get(w.block, 'pos');
+        if (!Array.isArray(p) || !Array.isArray(b)) continue;
+        const fromBlock = Math.hypot(p[0] - b[0], p[1] - b[1]), fromSeat = Math.hypot(p[0] - w.seat[0], p[1] - w.seat[1]);
+        if (fromBlock > Number(C.seatUnits) || fromSeat > Number(C.stillUnits)) continue;
+        const moved = typeof toTemple === 'function' && toTemple(a);
+        log(`execution: ${nameOf(a)} still on the block at ${w.block.toString(16)} ${Math.round(fromBlock)} units from it after the stand-up; ${moved ? 'sent to the respawn temple' : 'no temple to send them to'}`);
+        personal(a, moved ? 'The block would not let you rise. You find your way back to the temple.' : 'The block would not let you rise. Use /unstuck or ask a GM.');
+      } catch (e) { log(`execution: checking ${a.toString(16)} failed: ${e.message}`); }
+    }
   };
 
   const end = (block, why, tellAll) => {
@@ -176,7 +210,7 @@ module.exports = (api) => {
   const chop = (block, st) => {
     st.phase = 'chopping';
     const watchers = onlineActors().filter((p) => near(p, block, Number(C.watchMeters)) || p === st.victim || p === st.executioner);
-    for (const p of watchers) { try { sendPacket(p, { customPacketType: 'dboExecute', victim: st.victim, executioner: st.executioner, idle: C.idle, victimIdle: C.victimIdle }); } catch (e) { /* offline */ } }
+    for (const p of watchers) { try { sendPacket(p, { customPacketType: 'dboExecute', victim: st.victim, executioner: st.executioner, idle: C.idle, victimIdle: C.victimIdle, event: C.event, victimEvent: C.victimEvent }); } catch (e) { /* offline */ } }
     audit(`EXECUTION started: ${who(st.executioner)} beheads ${who(st.victim)}, approved by ${who(st.approvedBy)}, ${watchers.length} watcher(s)`);
     setTimeout(() => {
       const now = S.blocks.get(block);
@@ -219,6 +253,7 @@ module.exports = (api) => {
   every('execution.watch', 2000, () => {
     if (C.enabled === false) return;
     const now = Date.now();
+    checkStanding(now);
     for (const [block, st] of [...S.blocks]) {
       if (st.phase === 'chopping') continue;
       if (!near(st.victim, block, Number(C.reachMeters))) { end(block, 'The one at the block stood up or left. There is no execution.', true); continue; }
