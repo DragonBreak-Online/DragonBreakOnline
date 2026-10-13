@@ -2337,6 +2337,8 @@ const loginStep = (name, fn) => {
 const onCharacterReady = (userId, a) => {
   try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('login', userId, a); } catch (e) { /* the player log is optional */ }
   connectedAt.set(a, Date.now());
+  // The drift switches before the login's looks (the beast revert below), so ownLook "off" or "name" covers a look sent at login
+  loginStep('drift switches', () => sendDriftConfig(a));
   // The client resets its spells to the login list for its first seconds: a spell given then waits (schools.js)
   loginStep('schools arrival', () => { if (globalThis.__dboSchoolsArrived) globalThis.__dboSchoolsArrived(a); });
   // itemguards.js: the pack against the one written down at the last logout, before anything is handed out at login
@@ -3402,7 +3404,9 @@ const sendDriftConfig = (a) => {
 // A hot reload that changes what a client is sent (a gamemode-config.json drift default: the ownLook or faceRebuild undo)
 // sends it to everyone online at once, as /driftset does; the last one sent is kept across reloads, so an unchanged reload
 // sends nothing
-if (typeof globalThis.__dboDriftSent === 'string' && globalThis.__dboDriftSent !== JSON.stringify(driftPayload())) {
+// A load with none kept (a server start, or the reload over a gamemode before ownLook) takes its own config as sent
+if (typeof globalThis.__dboDriftSent !== 'string') globalThis.__dboDriftSent = JSON.stringify(driftPayload());
+if (globalThis.__dboDriftSent !== JSON.stringify(driftPayload())) {
   const online = onlineActors();
   online.forEach(sendDriftConfig);
   log(`drift switches changed by the reload: sent to ${online.length} online`);

@@ -3,7 +3,8 @@
 // gamemode-config.json drift.ownLook, /driftset ownLook switches it for everyone online, and a hot reload that changes what
 // a client is sent sends it to everyone online at once ("name" puts only a name on, "off" no own look; anything else is
 // refused). It cuts the block from DRIFT_REPAIRS to the end of /driftset out of the gamemode and runs it with stubs, a
-// reload being the same block run again on the same globalThis. Run from this folder's parent:
+// reload being the same block run again on the same globalThis; then onCharacterReady, which sends the switches before the
+// login's looks. Run from this folder's parent:
 //   node tests/drift-own-look-harness.js
 'use strict';
 const fs = require('fs');
@@ -101,6 +102,53 @@ t.sendDriftConfig(1);
 check('...a join after it is sent "off"', t.sent[0][1].ownLook === 'off');
 t.cmds.get('driftset')(1, 'ownLook default');
 check('.../driftset ownLook default gives the config\'s "name" to everyone online', t.sent.length === 3 && t.sent.slice(1).every((s) => s[1].ownLook === 'name'), own(t.sent));
+t = load({ drift: { ownLook: 'apply' } }, h);
+check('...and "default" drops the /driftset value: a later reload with drift.ownLook "apply" sends "apply" to everyone online',
+  !Object.prototype.hasOwnProperty.call(h.__dboDriftSet, 'ownLook') && t.sent.length === 2 && t.sent.every((s) => s[1].ownLook === 'apply')
+  && t.sent[0][0] === 1 && t.sent[1][0] === 2 && /sent to 2 online/.test(t.logs.join('|')), { set: h.__dboDriftSet, sent: own(t.sent), logs: t.logs });
+
+// The reload over a gamemode before ownLook kept no sent config: a config undo reloaded before anyone's next login still goes out
+const old = { __dboDriftSet: {} };
+t = load({ drift: { ownLook: 'apply' } }, old);
+check('the reload that brings the switch over an older gamemode sends nothing, and keeps its config as sent', t.sent.length === 0
+  && t.logs.length === 0 && typeof old.__dboDriftSent === 'string' && JSON.parse(old.__dboDriftSent).ownLook === 'apply', { sent: own(t.sent), logs: t.logs });
+t = load({ drift: { ownLook: 'off' } }, old);
+check('...a config undo ("off") reloaded before anyone logs in again goes to everyone online at once, and is logged', t.sent.length === 2
+  && t.sent.every((s) => s[1].ownLook === 'off') && /sent to 2 online/.test(t.logs.join('|')), { sent: own(t.sent), logs: t.logs });
+
+// onCharacterReady (loginStep to its end) with the real sendDriftConfig and a stub for every other name
+const crStart = src.indexOf('const loginStep = (name, fn) => {');
+const crEndMark = '  }), 8000);\n};';
+const crEnd = src.indexOf(crEndMark, src.indexOf('const onCharacterReady = (userId, a) => {'));
+if (crStart < 0 || crEnd < 0 || crEnd < crStart) { console.log('FAIL the onCharacterReady markers are gone from gamemode.js'); process.exit(1); }
+const crBlock = src.slice(crStart, crEnd + crEndMark.length);
+const loginOf = (cfg, g = {}) => {
+  const events = [], timers = [];
+  const drift = new Function('cfg', 'globalThis', 'sendPacket', 'registerChatCommand', 'personal', 'audit', 'who', 'onlineActors', 'log',
+    block + '\nreturn sendDriftConfig;')(cfg, g, (a, p) => events.push([p.customPacketType, a, p.ownLook]), () => { }, () => { }, () => { },
+    String, () => [], () => { });
+  g.__dboBeastRevert = (a, why) => events.push(['beast revert', a, why]);
+  // A stub that can be called, read or put in a string
+  const any = new Proxy(function () { }, { get: (o, k) => (k === Symbol.toPrimitive ? () => '' : any), apply: () => undefined });
+  const named = { globalThis: g, cfg, sendDriftConfig: drift, performance: { now: () => 0 }, log: () => { }, timed: (n, fn) => fn,
+    setTimeout: (fn, ms) => timers.push([ms, fn]), actorOf: () => 7, Date, JSON, Object, Array, String, Number, Math };
+  const scope = new Proxy(named, { has: (o, k) => typeof k === 'string', get: (o, k) => (k in o ? o[k] : k === Symbol.unscopables ? undefined : any) });
+  const onCharacterReady = new Function('scope', `with (scope) {\n${crBlock}\nreturn onCharacterReady;\n}`)(scope);
+  return { events, timers, onCharacterReady };
+};
+let l = loginOf({ drift: { ownLook: 'off' } });
+l.onCharacterReady(3, 7);
+const revertAt = l.events.findIndex((e) => e[0] === 'beast revert');
+check('onCharacterReady sends npcDriftConfig at once, before the beast revert on login', l.events.length >= 2 && l.events[0][0] === 'npcDriftConfig'
+  && l.events[0][1] === 7 && revertAt > 0 && l.events.slice(0, revertAt).some((e) => e[0] === 'npcDriftConfig'), l.events);
+check('...carrying the server\'s ownLook ("off" from the config)', l.events[0][2] === 'off', l.events[0]);
+const loginSetup = l.timers.find((x) => x[0] === 8000);
+const before = l.events.length;
+try { if (loginSetup) loginSetup[1](); } catch (e) { l.events.push(['loginSetup threw', e.message]); }
+check('...and loginSetup (8 s later) sends it again', l.events.slice(before).some((e) => e[0] === 'npcDriftConfig' && e[1] === 7), l.events);
+l = loginOf({});
+l.onCharacterReady(3, 7);
+check('...with no drift config it sends "apply" first, the same way', l.events[0] && l.events[0][0] === 'npcDriftConfig' && l.events[0][2] === 'apply', l.events);
 
 console.log(failures ? `${failures} FAILED` : 'all checks passed');
 process.exit(failures ? 1 : 0);
