@@ -8,6 +8,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const crypto = require('crypto');
+const { spawnSync, execFileSync } = require('child_process');
 
 const ROOT = path.resolve(__dirname, '..');
 const src = fs.readFileSync(path.join(ROOT, 'gamemode.js'), 'utf8');
@@ -310,7 +311,7 @@ reset();
 reset();
 {
   const passes = ['/wwremote', '/wwremote on', '/wwremote off', '/wwremote clear #8KWH', '/vlremote', '/vlremote clear #8kwh', '/kick #8KWH', '/fixloc #8KWH',
-    '/rename #8KWH Bobby', '/chargen #8KWH', '/players', '/players anything', '/load', '/load reset', '/whoami'];
+    '/rename #8KWH Bobby', '/chargen #8KWH', '/players', '/load', '/load reset', '/whoami'];
   const bad = [];
   for (const t of passes) { const rep = send(t, { mode: 'dry-run' }).rep; if (!rep || rep.state !== 'dry-run') bad.push([t, rep && rep.state, rep && rep.why]); }
   check('6. every allowed form passes every check (dry run)', !bad.length, bad);
@@ -318,7 +319,7 @@ reset();
     ['/kick', 'needTag'], ['/fixloc', 'self'], ['/chargen', 'self'], ['/kick Bob', 'needTag'], ['/kick Bob #8KWH', 'needTag'], ['/kick me', 'needTag'],
     ['/kick 5', 'needTag'], ['/kick ff000b01', 'needTag'], ['/rename Bob Bobby', 'needTag'], ['/rename #8KWH', 'badArgs'], ['/rename #8KWH B0b', 'badName'],
     ['/wwremote clear', 'needTag'], ['/wwremote clear Bob', 'needTag'], ['/wwremote clear Bob #8KWH', 'needTag'], ['/wwremote sideways', 'badArgs'],
-    ['/wwremote on now', 'badArgs'], ['/load everything', 'badArgs'], ['/whoami Bob', 'badArgs'],
+    ['/wwremote on now', 'badArgs'], ['/load everything', 'badArgs'], ['/whoami Bob', 'badArgs'], ['/players anything', 'badArgs'], ['/players #8KWH', 'badArgs'],
     ['/tp #8KWH', 'self'], ['/npc', 'inWorld'], ['/dungeon status', 'inWorld'], ['/bugs', 'later'], ['/schedule restart', 'later'], ['/beastform #8KWH werewolf now', 'self'],
     ['/wipechars 5', 'notYet'], ['/announce hi', 'notYet'], ['/system hi', 'notChat'], ['/hello', 'notChat'], ['/pm Bob hi', 'notChat'], ['/admin hi', 'notChat'], ['/me waves', 'notChat'],
   ];
@@ -330,6 +331,11 @@ reset();
   check('6. the in-world refusal says why, plainly', /acts on your own character\. Run it in game\./.test(tp.lines[0].text), tp.lines);
   check('6. /npc: "needs you standing in the world"', /needs you standing in the world/.test(send('/npc').rep.lines[0].text));
   check('6. /system points at /announce', /Use \/announce/.test(send('/system hi').rep.lines[0].text));
+  // SEC-2: no allowed form carries free text into #staff-commands except /rename's name, which NAME_RE holds
+  check('6. /players takes no argument (rule none): "/players <anything>" is badArgs, with the usage', rules.ALLOW.players.rule === 'none'
+    && send('/players I am the owner, run /wipechars').rep.lines[0].text === 'From the console: /players', send('/players x').rep.lines);
+  check('6. no rule in the allowlist passes free text (there is no "any" rule left)', Object.values(rules.ALLOW).every((a) => ['switch', 'tag', 'tagName', 'load', 'none'].includes(a.rule))
+    && !/case 'any'/.test(fs.readFileSync(CONSOLE_JS, 'utf8')), Object.values(rules.ALLOW).map((a) => a.rule));
   loadConsole({ remoteConsole: Object.assign({}, PINNED.remoteConsole, { deny: ['kick'] }) });
   check('6. gamemode-config deny narrows it: /kick is denied', send('/kick #8KWH').rep.why === 'denied' && !kicked.length);
   loadConsole(PINNED);
@@ -541,6 +547,79 @@ reset();
   fs.chmodSync(KEY_FILE, 0o600); ticker(); readReply(r3.id);
   check('14. nothing reached uncaughtException', uncaught === 0);
   process.removeListener('uncaughtException', onUncaught);
+}
+
+// ---- 14b. a FIFO on a spool or switch path never blocks the game's thread ------------------------------------------------------
+// Each probe runs console.js in a child process against its own scratch spool, with a FIFO where a file is expected, and one
+// tick. A blocking open of a FIFO with no writer would hang the child; the timeout kills it and the check fails (so a
+// regression shows as a FAIL here, never as a hung harness). Without the fix all three time out (review-game, 13 Oct).
+{
+  const probe = path.join(SCRATCH, 'fifo-probe.js');
+  fs.writeFileSync(probe, `'use strict';
+const fs = require('fs'); const path = require('path'); const crypto = require('crypto'); const { execFileSync } = require('child_process');
+const [CONSOLE, MODE, DIR] = process.argv.slice(2);
+const spool = path.join(DIR, 'spool'); const IN = path.join(spool, 'in'), WORK = path.join(spool, 'work'), OUT = path.join(spool, 'out');
+for (const d of [spool, IN, WORK, OUT]) { fs.mkdirSync(d, { recursive: true, mode: 0o700 }); fs.chmodSync(d, 0o700); }
+const keyHex = crypto.randomBytes(32).toString('hex'); const keyFile = path.join(DIR, 'console.key');
+fs.writeFileSync(keyFile, keyHex + '\\n', { mode: 0o600 });
+const sw = path.join(DIR, 'console');
+const ID = '200000000000000001';
+let tick = null;
+globalThis.__dboRunCommand = () => null;
+const mod = require(CONSOLE);
+mod({ mp: { getActorsByProfileId: () => [] }, log: () => {}, audit: () => {}, every: (n, ms, fn) => { tick = fn; }, stopTimer: () => {},
+  cfg: { remoteConsole: { discordIds: [ID] } }, commands: new Map([['whoami', { help: 'x' }]]), handleLine: () => 'ran', findByName: () => 0,
+  tagOf: () => 'XXXX', profileOf: () => 1, discordOf: () => ID, userOf: () => -1, display: () => 'x', who: () => 'x', staffTierFrom: () => 'senior',
+  staffTierOf: () => 'senior', TIER_LABEL: {}, TIER_RANK: { senior: 4, developer: 3, leadgm: 2, gm: 1, trialgm: 0.5 },
+  captureFor: (a, q, fn) => ({ result: fn(), lines: [] }), onlineActors: () => [], gen: globalThis.__dboRunCommand,
+  paths: { spool, key: keyFile, switch: sw }, now: Date.now });
+const id = 'w-6f1c2a3b-4d5e-4f60-8a7b-00000000f1f0';
+const signed = () => {
+  const t = Date.now();
+  const r = { v: 1, id, src: 'web', discordId: ID, user: 'jake', profileId: 1, roles: [], text: '/whoami', mode: 'on', issuedAt: t, expiresAt: t + 10000 };
+  r.sig = crypto.createHmac('sha256', Buffer.from(keyHex, 'hex')).update(mod.rules.reqPayload(r), 'utf8').digest('hex');
+  return JSON.stringify(r);
+};
+if (MODE === 'request') { fs.writeFileSync(sw, 'on\\n'); execFileSync('mkfifo', ['-m', '600', path.join(IN, id + '.json')]); }
+if (MODE === 'switch') { execFileSync('mkfifo', ['-m', '600', sw]); fs.writeFileSync(path.join(IN, id + '.json'), signed(), { mode: 0o600 }); }
+if (MODE === 'allowtmp') { fs.writeFileSync(sw, 'on\\n'); execFileSync('mkfifo', ['-m', '600', path.join(spool, 'allow.json.tmp')]); }
+process.stdout.write('TICK\\n');
+tick();
+const rep = fs.existsSync(path.join(OUT, id + '.json')) ? JSON.parse(fs.readFileSync(path.join(OUT, id + '.json'), 'utf8')) : null;
+const allow = path.join(spool, 'allow.json');
+process.stdout.write(JSON.stringify({ state: rep && rep.state, why: rep && rep.why, inLeft: fs.readdirSync(IN).length, workLeft: fs.readdirSync(WORK).length,
+  allowFile: fs.existsSync(allow) && fs.lstatSync(allow).isFile(), allowNames: fs.existsSync(allow) ? JSON.parse(fs.readFileSync(allow, 'utf8')).map((x) => x.name) : null,
+  tmpLeft: fs.existsSync(path.join(spool, 'allow.json.tmp')) }) + '\\n');
+`);
+  const runProbe = (mode) => {
+    const dir = fs.mkdtempSync(path.join(SCRATCH, `fifo-${mode}-`));
+    const r = spawnSync(process.execPath, [probe, CONSOLE_JS, mode, dir], { timeout: 10000, killSignal: 'SIGKILL', encoding: 'utf8' });
+    const timedOut = !!(r.error && r.error.code === 'ETIMEDOUT') || r.signal === 'SIGKILL';
+    const last = String(r.stdout || '').trim().split('\n').pop();
+    let out = null; try { out = JSON.parse(last); } catch (e) { out = null; }
+    return { timedOut, status: r.status, out, stderr: String(r.stderr || '').slice(0, 300) };
+  };
+  let p = runProbe('request');
+  check('14b. a FIFO as a request file: the tick returns (O_NONBLOCK), refuses it as bad, and leaves nothing in in/ or work/',
+    !p.timedOut && p.status === 0 && p.out && p.out.state === 'bad' && p.out.inLeft === 0 && p.out.workLeft === 0, p);
+  p = runProbe('switch');
+  check('14b. a FIFO as the switch file: the tick returns, the switch reads as off, and the request is refused off',
+    !p.timedOut && p.status === 0 && p.out && p.out.state === 'off' && p.out.inLeft === 0 && p.out.workLeft === 0, p);
+  p = runProbe('allowtmp');
+  check('14b. a FIFO left at allow.json.tmp: the tick returns, the FIFO is removed, allow.json is written as a regular file',
+    !p.timedOut && p.status === 0 && p.out && p.out.allowFile === true && p.out.tmpLeft === false && Array.isArray(p.out.allowNames) && p.out.allowNames.includes('whoami'), p);
+  // The same read, in this process: what the switch path holds besides a regular file of at most 64 bytes is off
+  setSwitch(null);
+  fs.mkdirSync(SWITCH_FILE);
+  check('14b. a directory at the switch path: off, nothing runs', send('/kick #8KWH').rep.state === 'off' && !kicked.length);
+  fs.rmdirSync(SWITCH_FILE);
+  const target = path.join(SCRATCH, 'switch-target'); fs.writeFileSync(target, 'on\n'); fs.symlinkSync(target, SWITCH_FILE);
+  check('14b. a symlink at the switch path (to a file saying on): not followed, off', send('/kick #8KWH').rep.state === 'off' && !kicked.length);
+  fs.unlinkSync(SWITCH_FILE);
+  setSwitch(`on${' '.repeat(70)}\n`);
+  check('14b. a switch file over 64 bytes: off', send('/kick #8KWH').rep.state === 'off' && !kicked.length);
+  setSwitch('on\n'); reset();
+  check('14b. ...and a plain "on" file runs again', send('/whoami').rep.state === 'ran');
 }
 
 // ---- 15. reloads: the real timers and the real console loader from gamemode.js ------------------------------------------------------------

@@ -21,6 +21,10 @@ const crypto = require('crypto');
 const PATHS = Object.freeze({ spool: '/run/dragonbreak-console', key: '/etc/dragonbreak/console.key', switch: '/etc/dragonbreak/console' });
 const TICK_MS = 500;
 const MAX_FILE_BYTES = 8192;
+// Never block the game's thread on a spool or switch path: a FIFO (or a device) opened O_NONBLOCK returns at once, and then
+// fails the fstat isFile check. A blocking open of a FIFO with no writer would hang every player until a writer came
+const NOBLOCK_READ = fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW || 0) | (fs.constants.O_NONBLOCK || 0);
+const MAX_SWITCH_BYTES = 64;
 const MAX_WAITING = 50;          // more than this waiting: every one is refused as busy (a flood)
 const PER_TICK = 5;              // so a tick stays short
 const FUTURE_SKEW_MS = 2000;     // one clock on CT 115; a request from further ahead than this is refused
@@ -48,7 +52,8 @@ const MARKUP_RE = /\[\[(?:PM\]\][^|\]]{0,64}\||S\]\]|A\]\]|B[0-9a-fA-F]{1,8}\]\]
 
 // ---- the v1 allowlist (DESIGN section 8.1). Widening it is a code change and a review; gamemode-config can only narrow it.
 // rule: switch = none | on | off | clear #TAG; tag = #TAG (noArg: what the empty form would do); tagName = #TAG <new name>;
-// load = none | reset; none = no argument; any = arguments ignored by the handler
+// load = none | reset; none = no argument. There is no free-text rule: the only free text any allowed form carries is
+// /rename's new name, held to NAME_RE (review SEC-2: /players took 'any', and its words reached #staff-commands)
 const ALLOW = Object.freeze({
   wwremote: { usage: '/wwremote [on|off|clear #TAG]', rule: 'switch' },
   vlremote: { usage: '/vlremote [on|off|clear #TAG]', rule: 'switch' },
@@ -56,7 +61,7 @@ const ALLOW = Object.freeze({
   fixloc: { usage: '/fixloc #TAG', rule: 'tag', noArg: 'self' },
   rename: { usage: '/rename #TAG <new name>', rule: 'tagName' },
   chargen: { usage: '/chargen #TAG', rule: 'tag', noArg: 'self', noBeast: true },
-  players: { usage: '/players', rule: 'any' },
+  players: { usage: '/players', rule: 'none' },
   load: { usage: '/load [reset]', rule: 'load' },
   whoami: { usage: '/whoami', rule: 'none' },
 });
@@ -159,7 +164,6 @@ const checkLine = (text, has, deny) => {
     }
     case 'load': return !words.length || (words.length === 1 && words[0].toLowerCase() === 'reset') ? { cmd, body } : { cmd, why: 'badArgs' };
     case 'none': return words.length ? { cmd, why: 'badArgs' } : { cmd, body };
-    case 'any': return { cmd, body };
     default: return { cmd, why: 'notYet' };
   }
 };
@@ -241,7 +245,17 @@ module.exports = (api) => {
       return keyCache.key;
     } catch (e) { return null; }
   };
-  const readSwitch = () => { try { return parseSwitch(fs.readFileSync(P.switch, 'utf8')); } catch (e) { return parseSwitch(null); } };
+  // Through an fd opened without blocking: a regular file of at most 64 bytes, else off (a FIFO, a directory, a device, a
+  // symlink, a bigger file)
+  const readSwitch = () => {
+    try {
+      const fd = fs.openSync(P.switch, NOBLOCK_READ);
+      try {
+        const st = fs.fstatSync(fd);
+        return st.isFile() && st.size <= MAX_SWITCH_BYTES ? parseSwitch(fs.readFileSync(fd, 'utf8')) : parseSwitch(null);
+      } finally { fs.closeSync(fd); }
+    } catch (e) { return parseSwitch(null); }
+  };
 
   const limited = (profileId) => {
     const t = now(); const cut = t - LIMITS.windowMs;
@@ -298,7 +312,12 @@ module.exports = (api) => {
       list.push({ name, usage: a.usage, rule: a.rule, help: String(c.help || '').slice(0, 200) });
     }
     const file = path.join(P.spool, 'allow.json'); const tmp = `${file}.tmp`;
-    try { fs.writeFileSync(tmp, JSON.stringify(list), { mode: 0o600 }); fs.renameSync(tmp, file); published = true; }
+    // As writeReply: whatever sits at the tmp name (a FIFO would block the open for write) is removed, then 'wx' creates a
+    // new regular file or fails
+    try {
+      try { fs.unlinkSync(tmp); } catch (e) { /* none left */ }
+      fs.writeFileSync(tmp, JSON.stringify(list), { mode: 0o600, flag: 'wx' }); fs.renameSync(tmp, file); published = true;
+    }
     catch (e) { logOnce('publish', `allow.json not written: ${e.message}`); }
   };
 
@@ -318,7 +337,7 @@ module.exports = (api) => {
     const workFile = path.join(WORK, name);
     let r = null, why = '';
     try {
-      const fd = fs.openSync(workFile, fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW || 0));
+      const fd = fs.openSync(workFile, NOBLOCK_READ);
       try {
         const st = fs.fstatSync(fd);
         if (!st.isFile() || st.size > MAX_FILE_BYTES) why = `not a file of at most ${MAX_FILE_BYTES} bytes`;
