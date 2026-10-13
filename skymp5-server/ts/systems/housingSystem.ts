@@ -1328,8 +1328,17 @@ export class HousingSystem implements System {
   }
 
   // One inventory read and one access read per actor, not per claimed ref.
+  // isPropertyKeyBase knows the pool's records only once refreshKeyPool has read house-keys.json, and only keyBaseFor and
+  // migrateKeys read it, neither of which runs with the key ring on: from the 13 Oct boot every key item on a pool record
+  // (every key cut since 8 Oct) read as no key at all, so it opened nothing and never moved onto the ring (Neem's
+  // "Key to the Janitor's Hut (recut 2)", refused at its door 35 times from 06:29Z). Every reader of key items asks this first
+  private keyPoolReady(ctx: SystemContext): void {
+    try { refreshKeyPool(ctx.svr as Mp); } catch { /* no pool: the vanilla key only */ }
+  }
+
   private viewerAccess(ctx: SystemContext, actorId: number): ViewerAccess {
     const mp = ctx.svr as Mp;
+    this.keyPoolReady(ctx);
     const keys = new Set<string>();
     try {
       const inv = mp.get(actorId, "inventory");
@@ -1669,6 +1678,7 @@ export class HousingSystem implements System {
   // copy that was missed (offline, in a container) stops matching.
   private reKey(ctx: SystemContext, primary: number, rec: PropertyRecord): void {
     const mp = ctx.svr as Mp;
+    this.keyPoolReady(ctx);
     const credential = this.keyCredential(primary, rec);
     const names = this.acceptedKeyNames(ctx, primary, rec);
     for (const userId of this.onlineUsers(ctx)) {
@@ -1750,6 +1760,7 @@ export class HousingSystem implements System {
 
   private giveKey(ctx: SystemContext, actorId: number, keyName: string, keyBase = KEY_BASE_ID): boolean {
     const mp = ctx.svr as Mp;
+    this.keyPoolReady(ctx);
     try {
       const inv = mp.get(actorId, "inventory") || { entries: [] };
       const entries = Array.isArray(inv.entries) ? inv.entries.slice() : [];
@@ -1881,6 +1892,7 @@ export class HousingSystem implements System {
   // Key items that open a claimed lock move onto the ring (the name joins the lock's issued ones, so it opens exactly)
   // A key that opens nothing known stays where it is: a record not loaded yet proves nothing
   private ringFromItems(ctx: SystemContext, entries: any[], actorId: number): { kept: any[]; moved: string[] } {
+    this.keyPoolReady(ctx);
     const kept: any[] = [], moved: string[] = [];
     for (const e of entries) {
       const name = isPropertyKeyBase(Number(e?.baseId)) && typeof e?.name === "string" ? e.name : "";
@@ -1922,6 +1934,7 @@ export class HousingSystem implements System {
     const mp = ctx.svr as Mp;
     const inv = mp.get(targetId, "inventory");
     const entries: any[] = inv && Array.isArray(inv.entries) ? inv.entries : [];
+    this.keyPoolReady(ctx);
     if (!entries.some((e) => isPropertyKeyBase(Number(e?.baseId)))) return;
     const { kept, moved } = this.ringFromItems(ctx, entries, casterId);
     if (!moved.length) return;
