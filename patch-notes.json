@@ -39,6 +39,16 @@
         ]
       },
       {
+        "heading": "The Key Ring",
+        "items": [
+          "House keys are no longer items you carry: every key is kept on your key ring, so copies never stack or get mixed up. Type /keys to see yours in a menu.",
+          "Give a key on another player's menu (X) hands one of your keys to them. They accept or decline it in a menu.",
+          "Owners see every copy of their locks and who holds it in /keys, can cut a new key there, and can take a single copy back. A key taken back stops working.",
+          "Keys you carry move onto your key ring the next time you log in. Keys left in a chest or sack move onto the ring of whoever opens it next.",
+          "Since keys are no longer items, they are not dropped or stored any more."
+        ]
+      },
+      {
         "heading": "Other fixes",
         "items": [
           "Your Other Player Volume setting is kept between game starts.",
