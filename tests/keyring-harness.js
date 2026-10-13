@@ -1,7 +1,9 @@
 // Scripted test for keyring.js (the Key Ring panel, Nate 13 Oct): without the panel (client 0.3.95) /keys and "Give a key"
 // open contextMenu widgets whose rows give, accept, cut and take back, and a row the server never sent does nothing; with it
 // /keys opens the panel; a stale window's buttons do nothing; a gift opens the recipient's panel with the offer; an owner's
-// cut and take-back go through __dboHousing; the X menu offers "Give a key" only with the ring on and a key on it.
+// cut and take-back go through __dboHousing; the X menu offers "Give a key" only with the ring on and a key on it. The other
+// entry points: the property menu's Key Ring button (keyRingOpen) and the journal's Keys tab, whose actions carry the journal's
+// nonce and are answered through the journal.
 //   node tests/keyring-harness.js
 'use strict';
 const path = require('path');
@@ -105,6 +107,41 @@ ringOn = false;
 check('with the ring off, no X menu entry and /keys points to the inventory', globalThis.__dboKeyRingEntries(A, B).length === 0 && (cmds.get('keys')(A, ''), /inventory/.test(chat.slice(-1)[0][1])));
 fire('keyRingClose', A, []);
 check('close closes widget 91', lastWidget(A)[1].close === 91);
+
+// ---- the entry points beside /keys (13 Oct): the X menu, the property menu's button, the journal's Keys tab ----
+ringOn = true; keys[A] = [INN]; keys[B] = []; offer = null; calls.length = 0; audits.length = 0; widgets.length = 0;
+check('with the panel, Give a key on the X menu opens widget 91', globalThis.__dboKeyRingAction(A, 'keyring:give', B, () => 'Bo') === true && lastWidget(A)[1].type === 'keyRing' && lastWidget(A)[1].id === 91, lastWidget(A));
+widgets.length = 0;
+fire('keyRingOpen', A, []);
+check('the property menu\'s Key Ring button (dbo:keyRingOpen) opens widget 91', !!lastWidget(A) && lastWidget(A)[1].type === 'keyRing' && lastWidget(A)[1].id === 91 && lastWidget(A)[1].keys.length === 1, lastWidget(A));
+const J = { nonce: { [A]: 'jA', [B]: 'jB' }, answers: [], redraws: [], keysTabOpen: new Set() };
+globalThis.__dboJournalFresh = (a, nonce) => J.nonce[a] === nonce;
+globalThis.__dboJournalLimited = (a, fn) => { J.answers.push([a, fn()]); return true; };
+globalThis.__dboJournalRedraw = (a, tab) => { if (!J.keysTabOpen.has(a) || tab !== 'keys') return false; J.redraws.push([a, tab]); return true; };
+const sec = (globalThis.__dboJournalSections || {}).keys;
+check('keyring.js registers the journal\'s Keys tab, labelled Keys', !!sec && sec.label === 'Keys' && sec.visible(A) === true, sec && sec.label);
+const sv = sec && sec.view(A);
+check('the Keys tab carries the panel\'s rows (keys, near, owned, offer) and no nonce of its own', !!sv && sv.keys.length === 1 && sv.near.length === 1 && sv.owned.length === 1 && 'offer' in sv && !('nonce' in sv), sv);
+widgets.length = 0;
+fire('keyRingGive', A, ['jA', 'Key to the Inn', B]);
+check('a gift from the journal (its nonce) goes to housing and answers through the journal, Keys tab, not widget 91',
+  calls[0] && calls[0][0] === 'give' && calls[0][3] === B && J.answers.length === 1 && J.answers[0][1].tab === 'keys' && /You offer/.test(J.answers[0][1].text) && J.answers[0][1].kind === 'ok' && !widgets.some((x) => x[0] === A), { calls, a: J.answers });
+check('the recipient without the journal gets the panel with the offer', lastWidget(B)[1].type === 'keyRing' && lastWidget(B)[1].offer.key === 'Key to the Inn');
+offer = null; keys[A] = [INN]; widgets.length = 0; J.keysTabOpen.add(B);
+fire('keyRingGive', A, ['jA', 'Key to the Inn', B]);
+check('a recipient reading the Keys tab sees the offer there (journal redraw), no panel over it', J.redraws.length === 1 && J.redraws[0][0] === B && !widgets.some((x) => x[0] === B), { r: J.redraws, w: widgets });
+fire('keyRingAnswer', B, ['jB', true]);
+check('accepting from the journal is answered in the journal', J.answers.slice(-1)[0][0] === B && /is on your key ring/.test(J.answers.slice(-1)[0][1].text));
+fire('keyRingCut', A, ['jA', 7, 0]);
+check('a refused cut from the journal says why, refused', J.answers.slice(-1)[0][1].text === 'That is not yours.' && J.answers.slice(-1)[0][1].kind === 'refused');
+const nA = J.answers.length, nC = calls.length;
+fire('keyRingTake', A, ['jX', 5, 'Key to the Inn No. 2']);
+check('a stale journal nonce does nothing', J.answers.length === nA && calls.length === nC);
+ringOn = false;
+fire('keyRingTake', A, ['jA', 5, 'Key to the Inn No. 2']);
+check('with the ring off, the Keys tab is hidden and its buttons do nothing', sec.visible(A) === false && sec.view(A) === null && J.answers.length === nA && calls.length === nC);
+fire('keyRingOpen', A, []);
+check('with the ring off, the Key Ring button points to the inventory', /inventory/.test(chat.slice(-1)[0][1]));
 
 console.log(failures ? `${failures} FAILED` : 'all checks passed');
 process.exit(failures ? 1 : 0);
