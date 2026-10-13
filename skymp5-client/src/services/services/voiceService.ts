@@ -13,6 +13,10 @@ import { readGamepadModifier, trackGamepadModifier, wasGamepadChordUsed } from "
 
 // A talk button that is also the chord modifier opens the mic only after this hold, so a quick chord never keys it
 const GAMEPAD_PTT_DELAY_S = 0.25;
+// A talk key the game says is no longer down for this long ends the talk, though its key-up never came
+const PTT_STUCK_MS = 300;
+// The page's guard notes (VoiceManager.js guardTick); any other text is not forwarded
+const GUARD_SHAPE = /^(open mic muted|fallback mic muted|second mic unpublished|muted mic still enabled)$/;
 
 // The page's mic summary, e.g. "mics 1, aec on, cap live, ctx running, mix running, loop connected"; nothing else passes
 const MIC_SHAPE = /^mics \d{1,2}(, [a-z]{2,4} [a-z?]{1,12}){1,6}$/;
@@ -94,6 +98,9 @@ export class VoiceService extends ClientListener {
   private altDown = false;
   private altUsedAsModifier = false;
   private pttDown = false;
+  // What holds the talk: a key or mouse button ("key"), the gamepad ("pad")
+  private pttSource: "key" | "pad" | "" = "";
+  private pttUpSince = 0;
   private browserWasFocused = false;
   private micDeniedShown = false;
   private nextTokenAttemptAt = 0;
@@ -152,6 +159,8 @@ export class VoiceService extends ClientListener {
         return;
       }
       this.pttDown = true;
+      this.pttSource = "key";
+      this.pttUpSince = 0;
       this.sp.browser.executeJavaScript(`window.__alduinakVoice && window.__alduinakVoice.setPtt(true)`);
       this.sendAfkPing();
     } else if (e.isUp && this.pttDown) {
@@ -236,12 +245,16 @@ export class VoiceService extends ClientListener {
     if (isModifier && (wasGamepadChordUsed() || e.heldDuration < GAMEPAD_PTT_DELAY_S)) return;
     if (this.sp.browser.isFocused() || isConsoleOpen(this.sp)) return;
     this.pttDown = true;
+    this.pttSource = "pad";
+    this.pttUpSince = 0;
     this.sp.browser.executeJavaScript(`window.__alduinakVoice && window.__alduinakVoice.setPtt(true)`);
     this.sendAfkPing();
   }
 
   private releasePtt() {
     this.pttDown = false;
+    this.pttSource = "";
+    this.pttUpSince = 0;
     this.sp.browser.executeJavaScript(`window.__alduinakVoice && window.__alduinakVoice.setPtt(false)`);
   }
 
@@ -272,6 +285,13 @@ export class VoiceService extends ClientListener {
       logTrace(this, `voice ${line}`);
       const note = (globalThis as any).__dboDiagNote;
       if (typeof note === "function") note("voice", line);
+    } else if (kind === "voice::guard") {
+      // The page closed a mic that was open with nothing pressed (VoiceManager.js guardTick)
+      const what = String(e.arguments[1] ?? "");
+      if (!GUARD_SHAPE.test(what)) return;
+      logTrace(this, `voice guard: ${what}`);
+      const note = (globalThis as any).__dboDiagNote;
+      if (typeof note === "function") note("voice", `guard: ${what}`);
     } else if (kind === "voice::loading") {
       // The mic state before and after a loading screen, sent when it changed and once a session
       const before = String(e.arguments[1] ?? "");
@@ -409,6 +429,7 @@ export class VoiceService extends ClientListener {
     const focused = this.sp.browser.isFocused();
     if (this.browserWasFocused && !focused) this.sp.browser.executeJavaScript(`window.__alduinakVoice && window.__alduinakVoice.releaseDomPtt && window.__alduinakVoice.releaseDomPtt()`);
     this.browserWasFocused = focused;
+    this.checkStuckTalkKey(now, focused);
 
     // Write the chosen mode to disk shortly after it changes
     if (this.modePersistAt && now >= this.modePersistAt) {
@@ -431,6 +452,21 @@ export class VoiceService extends ClientListener {
     }
 
     if (this.pttDown && now >= this.nextAfkPingAt) this.sendAfkPing();
+  }
+
+  // Players were heard with nothing pressed (Nate, 13 Oct): a talk key whose key-up the game never delivered (the game
+  // window lost the keyboard mid-hold: Alt-Tab, an overlay, a Windows prompt) kept the mic open until the next press.
+  // The key's own state ends it. Not while a window has the browser focus (the platform may hide a held mouse button
+  // then) nor for the gamepad, whose button codes Input.isKeyPressed does not take.
+  private checkStuckTalkKey(now: number, focused: boolean) {
+    if (!this.pttDown || this.pttSource !== "key" || focused) { this.pttUpSince = 0; return; }
+    if (this.sp.Input.isKeyPressed(this.voiceKey)) { this.pttUpSince = 0; return; }
+    if (!this.pttUpSince) { this.pttUpSince = now; return; }
+    if (now - this.pttUpSince < PTT_STUCK_MS) return;
+    this.releasePtt();
+    logTrace(this, "voice: talk key released with no key-up from the game");
+    const note = (globalThis as any).__dboDiagNote;
+    if (typeof note === "function") note("voice", "talk key released with no key-up");
   }
 
   // Talking counts as activity for the server's AFK autokick
