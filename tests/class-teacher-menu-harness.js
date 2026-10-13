@@ -1,12 +1,11 @@
-// Class teachers from the X menu (Nate, 12 Oct: "Teachers need to be in the panel. I hate commands."). The Class Lectern
-// needs the staff's list (schools.classes.requireList); staff now name and remove teachers from the X player menu
-// (playermenu.js) as well as with /classteacher. Loads the real spells.js, schools.js and playermenu.js against a fake mp
-// and checks that
-//   - staff (isAdmin) see "Name class teacher" on a player the lectern would let teach (a teacherGuilds member with
-//     Expert study or Arcane Arts at teacherArcaneLevel), "Name class teacher (not eligible)" with the reason otherwise,
-//     and "Remove as class teacher" on a named one; a Trial GM and a player see none of them;
-//   - naming and removing write the record /classteacher writes (private.dboSchools.teacher), audit, and tell both;
-//   - the lectern then lets the named teacher hold a class, and /classteacher add|remove|list still work on the same list.
+// Who holds a class at the Class Lectern (Nate, 13 Oct: "Class teacher needs to be the faction leader and officers? GMs
+// shouldnt name teachers for magic colleges"). The tracked config has schools.classes.requireList off and teacherRoles
+// leader/officer: a college's leader and officers teach, staff name nobody. Loads the real spells.js, schools.js and
+// playermenu.js against a fake mp and checks that
+//   - the lectern lets a Synod officer or leader with Expert study (or Arcane Arts at teacherArcaneLevel) hold a class, and
+//     refuses a plain member, an officer of a non-college faction, and someone in no college;
+//   - staff see no "Name class teacher" entry on anyone, and /classteacher names nobody;
+//   - a teacher named under the old list keeps no right to teach by it: the rank decides.
 // Run it from this folder's parent with
 //   node tests/class-teacher-menu-harness.js
 'use strict';
@@ -103,55 +102,43 @@ const said = (a) => { const l = out.said.filter((p) => p[0] === a); return l.len
 const teacher = (a) => ((props.get(a + '|private.dboSchools') || {}).teacher) || null;
 const cmd = (name, a, args) => commands.get(name).fn(a, args || '');
 
-check('the tracked config still needs the staff\'s list for the Class Lectern', CONFIG.schools.classes.requireList === true);
-// MAGE: a Synod member with Arcane Arts 80 (qualified by Arcane Arts), Destruction chosen, knows Fireball
+check('the tracked config names nobody: leaders and officers of a college teach', CONFIG.schools.classes.requireList === false && CONFIG.schools.classes.teacherRoles.join() === 'leader,officer', CONFIG.schools.classes);
+// MAGE: Arcane Arts 80 (qualified by Arcane Arts), Destruction chosen, knows Fireball
 arcane(MAGE, 80);
 { const p = (ui('uiCaps', MAGE, ['schools']), globalThis.__dboSchoolsProgressSend(MAGE), out.packets.filter((x) => x.a === MAGE && x.p.customPacketType === 'dboSchoolProgress').pop()); if (p && p.p.progress) ui('schoolChoose', MAGE, [p.p.progress.nonce, 'Destruction', 'primary']); }
-put(MAGE, 'private.dboGuilds', [{ id: 'synod', rank: 0 }]);
 known(MAGE).add(FIREBALL);
 // OUTSIDER: Arcane Arts 80 but in no college
 arcane(OUTSIDER, 80);
+const lectern = (a) => { globalThis.__dboSchoolsActivate(LECTERN, a); const w = out.widgets.filter((x) => x.a === a && x.w.type === 'classLectern').pop(); return w ? w.w : {}; };
 
-check('staff see "Name class teacher" on a Synod mage the lectern would let teach', labels(GM, MAGE).includes('Name class teacher'), labels(GM, MAGE));
-check('...and no Remove entry while they are not named', !labels(GM, MAGE).includes('Remove as class teacher'));
-check('a Trial GM sees no class-teacher entry', !ids(TRIAL, MAGE).some((i) => /^schools:/.test(i)), ids(TRIAL, MAGE));
-check('a player sees no class-teacher entry', !ids(PLAYER, MAGE).some((i) => /^schools:/.test(i)), ids(PLAYER, MAGE));
-check('on a mage in no college staff see the entry marked not eligible', labels(GM, OUTSIDER).includes('Name class teacher (not eligible)') && !labels(GM, OUTSIDER).includes('Name class teacher'), labels(GM, OUTSIDER));
-act(GM, 'schools:teacherwhy', OUTSIDER);
-check('...which tells staff why (a college member) and names nobody', /cannot be named a class teacher yet: a class here is held by a member of/.test(said(GM)) && teacher(OUTSIDER) === null, said(GM));
-act(GM, 'schools:teacheron', OUTSIDER);
-check('...and a forged Name on them is refused the same way', /cannot be named/.test(said(GM)) && teacher(OUTSIDER) === null, said(GM));
+put(MAGE, 'private.dboGuilds', [{ id: 'synod', role: 'mage' }]);
+let w = lectern(MAGE);
+check('a plain Synod mage may not hold a class, and is told who may', w.canTeach === false && /held by the leader or an officer of the Synod/.test(w.whyNot), w);
+put(MAGE, 'private.dboGuilds', [{ id: 'synod', role: 'member' }, { id: 'east-empire', role: 'leader' }]);
+w = lectern(MAGE);
+check('...nor the leader of a faction that is no college', w.canTeach === false && /leader or an officer/.test(w.whyNot), w);
+w = lectern(OUTSIDER);
+check('someone in no college is refused as before', w.canTeach === false && /held by a member of/.test(w.whyNot), w);
+put(MAGE, 'private.dboGuilds', [{ id: 'synod', role: 'officer' }]);
+w = lectern(MAGE);
+check('a Synod officer (Magister) may hold a class, with nobody naming them', w.canTeach === true && teacher(MAGE) === null, w);
+put(MAGE, 'private.dboGuilds', [{ id: 'college-of-winterhold', role: 'leader' }]);
+check('...and so may a college\'s leader (Arch-Mage)', lectern(MAGE).canTeach === true);
 
-// The lectern before: the list refuses
-globalThis.__dboSchoolsActivate(LECTERN, MAGE);
-let w = out.widgets.filter((x) => x.a === MAGE && x.w.type === 'classLectern').pop();
-check('before naming, the lectern refuses the mage', w && w.w.canTeach === false && /Only teachers/.test(w.w.whyNot), w && w.w);
-
+check('staff see no Name entry on a mage who may teach', !ids(GM, MAGE).some((i) => /^schools:/.test(i)), labels(GM, MAGE));
+check('...nor on one who may not', !ids(GM, OUTSIDER).some((i) => /^schools:/.test(i)), labels(GM, OUTSIDER));
+check('a Trial GM and a player see none either', !ids(TRIAL, MAGE).some((i) => /^schools:/.test(i)) && !ids(PLAYER, MAGE).some((i) => /^schools:/.test(i)));
 out.audits.length = 0;
-act(TRIAL, 'schools:teacheron', MAGE);
-check('a Trial GM\'s forged Name does nothing', teacher(MAGE) === null && out.audits.length === 0);
-act(GM, 'schools:teacheron', MAGE);
-check('staff Name: the mage is on the list /classteacher keeps', !!(teacher(MAGE) && teacher(MAGE).at && teacher(MAGE).by === 'P14'), teacher(MAGE));
-check('...audited as /classteacher audits it', out.audits.some((t) => t === 'SCHOOLS P14 named P16 as a class teacher'), out.audits);
-check('...staff are told', said(GM) === 'Mage #TAG6 may now hold classes at a Class Lectern.', said(GM));
-check('...and so is the teacher', said(MAGE) === 'You have been named a teacher: you may hold classes at a Class Lectern.', said(MAGE));
-check('the menu now offers Remove and not Name', labels(GM, MAGE).includes('Remove as class teacher') && !labels(GM, MAGE).some((l) => /^Name class teacher/.test(l)), labels(GM, MAGE));
-globalThis.__dboSchoolsActivate(LECTERN, MAGE);
-w = out.widgets.filter((x) => x.a === MAGE && x.w.type === 'classLectern').pop();
-check('the lectern now lets the named mage hold a class', w && w.w.canTeach === true, w && w.w);
-check('/classteacher list shows the teacher named from the menu', (cmd('classteacher', GM, 'list'), /Named teachers online: Mage #TAG6/.test(said(GM))), said(GM));
-
-act(GM, 'schools:teacheroff', MAGE);
-check('staff Remove: off the list, audited, both told', teacher(MAGE) === null && out.audits.includes('SCHOOLS P14 removed P16 as a class teacher') && said(GM) === 'Mage #TAG6 may no longer hold classes.' && said(MAGE) === 'You may no longer hold classes.', [teacher(MAGE), said(GM), said(MAGE)]);
-check('...and the menu offers Name again', labels(GM, MAGE).includes('Name class teacher'), labels(GM, MAGE));
-
-// /classteacher still works, on the same record the menu reads
-cmd('classteacher', GM, 'add Mage');
-check('/classteacher add names them, and the menu sees it', !!teacher(MAGE) && labels(GM, MAGE).includes('Remove as class teacher'));
-cmd('classteacher', GM, 'remove Mage');
-check('/classteacher remove removes them, and the menu sees it', teacher(MAGE) === null && labels(GM, MAGE).includes('Name class teacher'));
+act(GM, 'schools:teacheron', OUTSIDER);
+check('a forged Name from staff names nobody', teacher(OUTSIDER) === null && out.audits.length === 0, said(GM));
 cmd('classteacher', GM, 'add Outsider');
-check('/classteacher add still names anyone (unchanged), and the menu then offers Remove', !!teacher(OUTSIDER) && labels(GM, OUTSIDER).includes('Remove as class teacher'));
+check('/classteacher says teachers are not named, and names nobody', teacher(OUTSIDER) === null && /not named: the leader and officers of a college may teach/.test(said(GM)), said(GM));
+
+// A teacher named under the old list: the rank decides now
+put(OUTSIDER, 'private.dboSchools', Object.assign({}, props.get(OUTSIDER + '|private.dboSchools') || {}, { teacher: { by: 'P14', at: 1 } }));
+put(OUTSIDER, 'private.dboGuilds', [{ id: 'synod', role: 'mage' }]);
+check('a teacher named under the old list but no officer may not hold a class', lectern(OUTSIDER).canTeach === false);
+check('...staff can still clear the old naming from the menu', labels(GM, OUTSIDER).includes('Remove as class teacher') && (act(GM, 'schools:teacheroff', OUTSIDER), teacher(OUTSIDER) === null));
 check('unrelated menu ids fall through to the other handlers', globalThis.__dboSchoolsMenuAction(GM, 'trade', MAGE) === false);
 
 console.log(failures ? `\n${failures} FAILED` : '\nall passed');

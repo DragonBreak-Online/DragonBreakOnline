@@ -33,7 +33,8 @@
 //     the primary school every `tickSeconds` while the reader stays put, `minutesPerWindow` minutes per `windowHours`.
 //     Studying a school closes once a spell of it is in the spellbook (learned through Arcane Arts); before the first
 //     school, any spell of the four closes it. A mage who changes school studies the new one (Z63J, 4 Oct);
-//   classes at a Class Lectern (base editor id `classes.edid`): a qualified teacher picks one spell they know, which sets
+//   classes at a Class Lectern (base editor id `classes.edid`): a qualified teacher (the leader or an officer of a college,
+//     `teacherRoles` in `teacherGuilds`, Nate 13 Oct) picks one spell they know, which sets
 //     the class's school and rank only (nobody learns it); students sign up at the same lectern. It runs `minutes` (30),
 //     teacher and students in the classroom (the lectern's interior cell, or `radiusMeters` outdoors); after it the
 //     teacher ends it at the lectern and every student still there is paid by `scale[student rank][class rank]`.
@@ -125,7 +126,7 @@ module.exports = (api) => {
       wheelEvents: 8, wheelValue: 150, maxStudents: 12,
       scale: [
         [1, 0.7, 0, 0, 0],
-        [0.35, 1, 0.7, 0, 0],
+        [0.5, 1, 0.7, 0, 0],
         [0, 0, 1, 0.7, 0],
         [0, 0, 0, 1, 0.7],
         [0, 0, 0, 0, 1],
@@ -133,7 +134,7 @@ module.exports = (api) => {
     },
     classes: {
       enabled: true, edid: 'ClassLectern', lecterns: [], sameLecternUnits: 300, minutes: 30, joinMinutes: 10, graceMinutes: 5, radiusMeters: 15,
-      teacherCooldownMinutes: 60, studentCooldownHours: 12, teacherMinRank: 3, requireList: true, teacherGuilds: ['synod', 'college-of-winterhold', 'college-of-whispers'],
+      teacherCooldownMinutes: 60, studentCooldownHours: 12, teacherMinRank: 3, requireList: false, teacherGuilds: ['synod', 'college-of-winterhold', 'college-of-whispers'], teacherRoles: ['leader', 'officer'],
       units: 25, wheelEvents: 8, wheelValue: 150, maxStudents: 12,
       // Elion and Aldemar's proposal (Nate, 11 Oct): Arcane Arts at teacherArcaneLevel also qualifies a teacher, as Expert
       // study (teacherMinRank) in a school does. Students short of their first spell (Arcane Arts below firstSchoolAt, no
@@ -145,10 +146,10 @@ module.exports = (api) => {
       // Learn or Decline, the student's own gates, the college rank cap and the restricted arts; Nate, 11 Oct)
       offerSpell: true,
       // [student rank][class rank], ranks Novice..Master. "Reduced" (Apprentice student, Novice class) and "XP" (Expert
-      // student, Master class) had no figure in Swag's spec: 0.35 and 0.7 until Nate says otherwise.
+      // student, Master class) had no figure in Swag's spec: 0.5 (Nate, 13 Oct) and 0.7.
       scale: [
         [1, 0.7, 0, 0, 0],
-        [0.35, 1, 0.7, 0, 0],
+        [0.5, 1, 0.7, 0, 0],
         [0, 0, 1, 0.7, 0],
         [0, 0, 0, 1, 0.7],
         [0, 0, 0, 0, 1],
@@ -1359,6 +1360,7 @@ module.exports = (api) => {
 
   // ---- lecterns: the Class Lectern and the Preach pulpit share one engine ----------------------------------------------
   const guildsOf = (a) => { const g = get(a, 'private.dboGuilds', []); return Array.isArray(g) ? g.map((m) => String(m && m.id)) : []; };
+  const guildRolesOf = (a) => { const g = get(a, 'private.dboGuilds', []); return Array.isArray(g) ? g.filter(Boolean).map((m) => ({ id: String(m.id), role: String(m.role || '') })) : []; };
   const knownSpells = (a) => { try { return typeof globalThis.__dboSpellsKnown === 'function' ? (globalThis.__dboSpellsKnown(a) || []) : []; } catch (e) { return []; } };
   const faithOf = (a) => { const f = get(a, 'private.dboDeity', null); return f && typeof f === 'object' && f.id ? f : null; };
   const priestRank = (a) => { const p = priestOf(a); return p.held && p.level >= 1 ? p.rank : -1; };
@@ -1647,6 +1649,9 @@ module.exports = (api) => {
   const classQualified = (a) => {
     const guilds = Array.isArray(C.classes.teacherGuilds) ? C.classes.teacherGuilds : [];
     if (guilds.length && !guildsOf(a).some((g) => guilds.includes(g))) return `A class here is held by a member of ${schoolHouse(a)}, or of another college.`;
+    // Their college's leader and officers teach; staff name nobody (Nate, 13 Oct)
+    const roles = Array.isArray(C.classes.teacherRoles) ? C.classes.teacherRoles : [];
+    if (roles.length && !guildRolesOf(a).some((m) => (!guilds.length || guilds.includes(m.id)) && roles.includes(m.role))) return `A class is held by the leader or an officer of ${schoolHouse(a)}, or of another college.`;
     const s = stateOf(a);
     if (!byArcane(a) && !SCHOOLS.some((n) => schoolRank(s, n) >= C.classes.teacherMinRank)) return `Teaching a class takes Arcane Arts at ${C.classes.teacherArcaneLevel} or ${RANKS[C.classes.teacherMinRank]} study in one of your schools.`;
     return '';
@@ -1929,6 +1934,7 @@ module.exports = (api) => {
       setClassTeacher(a, t, false);
       return true;
     }
+    if (!C.classes.requireList) { personal(a, 'Class teachers are not named: the leader and officers of a college may teach.'); return true; }
     if (listed(t)) { personal(a, `${display(t)} is already a named class teacher.`); return true; }
     const why = classQualified(t);
     if (why) { personal(a, `${display(t)} cannot be named a class teacher yet: ${why.replace(/\byour\b/g, 'their').replace(/^Teaching/, 'teaching').replace(/^A class/, 'a class')}`); return true; }
@@ -1936,6 +1942,7 @@ module.exports = (api) => {
     return true;
   };
   registerChatCommand('classteacher', (a, args) => {
+    if (!C.classes.requireList) return personal(a, 'Class teachers are not named: the leader and officers of a college may teach.');
     const [verb, ...rest] = argList(args);
     if (!verb || !['add', 'remove', 'list'].includes(verb.toLowerCase())) return personal(a, 'Usage: /classteacher add|remove <player>, or /classteacher list (players online).');
     if (verb.toLowerCase() === 'list') {
@@ -1945,7 +1952,7 @@ module.exports = (api) => {
     const t = findByName(rest.join(' '));
     if (!t) return personal(a, `Nobody online answers to "${rest.join(' ')}".`);
     setClassTeacher(a, t, verb.toLowerCase() === 'add');
-  }, { admin: true, help: 'name or remove a class teacher (Class Lectern)' });
+  }, { admin: true, help: 'name or remove a class teacher (Class Lectern; only with classes.requireList)' });
   // Named preachers matter only with preach.requireList (off by default: a follower of a Divine at Priest rank may preach)
   registerChatCommand('preacher', (a, args) => {
     const [verb, ...rest] = argList(args);

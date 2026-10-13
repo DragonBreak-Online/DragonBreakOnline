@@ -344,10 +344,10 @@ p = progress(TEACHER);
 ui('schoolChoose', TEACHER, [p.nonce, 'Destruction', 'primary']);
 check('a mage who chooses at Arcane Arts 85 starts the primary at 85', level(TEACHER, 'Destruction') === 85);
 check('an activator whose base is ClassLectern opens the lectern panel', activate(LECTERN, TEACHER) === true && lastWidget(TEACHER, 'classLectern').id === 72 && lastWidget(TEACHER, 'classLectern').mode === 'idle', lastWidget(TEACHER, 'classLectern'));
-check('...but a teacher not on the list may not start one', lastWidget(TEACHER, 'classLectern').canTeach === false && /Only teachers the Synod has named/.test(lastWidget(TEACHER, 'classLectern').whyNot));
 cmd('classteacher', TEACHER, 'add Teacher');
+check('staff name nobody: /classteacher says a college\'s leader and officers teach (Nate, 13 Oct)', /not named: the leader and officers of a college may teach/.test(said(TEACHER)) && !rec(TEACHER).teacher, said(TEACHER));
 activate(LECTERN, TEACHER);
-check('named, but not a member of the Synod or a College', /member of the Synod, or of another college/.test(lastWidget(TEACHER, 'classLectern').whyNot), lastWidget(TEACHER, 'classLectern'));
+check('Expert, but not a member of the Synod or a College', lastWidget(TEACHER, 'classLectern').canTeach === false && /member of the Synod, or of another college/.test(lastWidget(TEACHER, 'classLectern').whyNot), lastWidget(TEACHER, 'classLectern'));
 // Frostcrag Spire's lectern names the College of Whispers, not the Synod (Nate, 10 Oct): the hall faction at the reader's cell
 {
   const prevHall = globalThis.__dboHallFactionAt;
@@ -357,10 +357,13 @@ check('named, but not a member of the Synod or a College', /member of the Synod,
   check('a lectern in the College of Whispers hall names that college, not the Synod', /member of the College of Whispers/.test(w) && !/Synod/.test(w), w);
   globalThis.__dboHallFactionAt = prevHall;
 }
-put(TEACHER, 'private.dboGuilds', [{ id: 'synod', rank: 1 }]);
+put(TEACHER, 'private.dboGuilds', [{ id: 'synod', role: 'mage' }, { id: 'east-empire', role: 'officer' }]);
+activate(LECTERN, TEACHER);
+check('a plain Synod mage (and an officer elsewhere) may not teach: only the leader or an officer of a college', lastWidget(TEACHER, 'classLectern').canTeach === false && /leader or an officer of the Synod/.test(lastWidget(TEACHER, 'classLectern').whyNot), lastWidget(TEACHER, 'classLectern'));
+put(TEACHER, 'private.dboGuilds', [{ id: 'synod', role: 'officer' }]);
 activate(LECTERN, TEACHER);
 w = lastWidget(TEACHER, 'classLectern');
-check('named, a Synod member, Expert in Destruction: the Destruction spells they know are offered (not Illusion)', w.canTeach === true && w.spells.map((s) => s.name).join() === 'Fireball,Incinerate' && w.spells[1].rankName === 'Expert', w.spells);
+check('a Synod officer, Expert in Destruction: the Destruction spells they know are offered (not Illusion)', w.canTeach === true && w.spells.map((s) => s.name).join() === 'Fireball,Incinerate' && w.spells[1].rankName === 'Expert', w.spells);
 ui('lecternStart', TEACHER, [w.nonce, T.incinerate[1]]);
 w = lastWidget(TEACHER, 'classLectern');
 check('the class on Incinerate begins: Class in Progress with the countdown', w.mode === 'running' && w.status === 'Class in Progress' && w.spell === 'Incinerate' && w.rankName === 'Expert' && w.endsInMs === 30 * MIN && w.role === 'teacher' && w.canEnd === false, w);
@@ -807,7 +810,7 @@ check('scale: Master full, none below', S[4].join() === '0,0,0,0,1');
   check('someone who never took Priest up listens at Novice: a Novice sermon is the full sermon to them', pw(NEWCOMER).canJoin === true && pw(NEWCOMER).gain === 'At your rank in Priest you would take the full sermon.', pw(NEWCOMER));
   ui('preachJoin', NEWCOMER, [pw(NEWCOMER).nonce]);
   activate(PULPIT, APPRENTICE);
-  check('an Apprentice would take 35% of a Novice sermon', pw(APPRENTICE).canJoin === true && pw(APPRENTICE).gain === 'At your rank in Priest you would take 35% of the sermon.', pw(APPRENTICE));
+  check('an Apprentice would take 50% of a Novice sermon (Nate, 13 Oct)', pw(APPRENTICE).canJoin === true && pw(APPRENTICE).gain === 'At your rank in Priest you would take 50% of the sermon.', pw(APPRENTICE));
   put(APPRENTICE, 'private.dboSchools', Object.assign(rec(APPRENTICE), { sermonPaidAt: Date.now() - HOUR }));
   activate(PULPIT, APPRENTICE);
   check('a listener paid for a sermon an hour ago waits 12 hours for the next', pw(APPRENTICE).canJoin === false && /You heard a sermon not long ago\. You may learn from another in 11 hours\./.test(pw(APPRENTICE).whyNot), pw(APPRENTICE));
