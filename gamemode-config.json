@@ -176,6 +176,15 @@
    "scale": [[1, 0.7, 0, 0, 0], [0.5, 1, 0.7, 0, 0], [0, 0, 1, 0.7, 0], [0, 0, 0, 1, 0.7], [0, 0, 0, 0, 1]]
   }
  },
+ "dogDay": {
+  "_comment": "Dog Day (server\\dogday.js, Nate 13 Oct 2026): from startsAt to endsAt (UTC) every enemy a player kills hands them perKill raw Dog Meat (meat), and Cooked Dog Meat (the ALCH with editor id cookedEdid, a cookpot recipe made on the PC) may be cooked; outside the window that recipe is refused and the materials come back. Switches itself on and off by the clock.",
+  "enabled": true,
+  "startsAt": "2027-03-05T00:00:00Z",
+  "endsAt": "2027-03-06T00:00:00Z",
+  "meat": "edb2e:Skyrim.esm",
+  "perKill": [1, 2],
+  "cookedEdid": "DBO_FoodDogMeatCooked"
+ },
  "regions": {
   "_comment": "Province rules (server\\regions.js; data regions.json from ck-mcp\\regions.py, hand rules regions-overrides.json). craft: a creation recipe is refused outside the provinces its product belongs to (turn on after the in-game rollback test). tomes: /tomes stocks only what spells.shopProvince sells; spells.shopShowForeign lists the rest as blocked rows. adminBypass: admins pass both unless /region test. failOpen: a recipe or tome with no entry is allowed and logged once. defaultPlace: the province of a place no table knows. freeBenches and freeWhy: cooking is known everywhere (Nate, 2026-09-30, after Cooked Boar Meat was refused in Bruma as a Solstheim design): a recipe at one of these benches, or one regions.py tags with one of these reasons, is never refused; a regions-overrides.json entry for that recipe still decides it.",
   "craft": true,
