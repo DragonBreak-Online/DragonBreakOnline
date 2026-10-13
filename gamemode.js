@@ -165,7 +165,8 @@ const noteTold = (actorId, text) => {
   if (toldCounts.size > 5000) for (const k of toldCounts.keys()) { if (toldCounts.size <= 4000) break; toldCounts.delete(k); }
   if (n === 1 || n === 5 || n % 10 === 0) log(`told ${display(actorId)} (x${n}): ${t.slice(0, 200)}`);
 };
-const personal = (actorId, text) => { try { noteTold(actorId, text); } catch (e) { /* the log line is optional */ } const cap = globalThis.__dboTellCapture; if (cap && cap.a === (actorId >>> 0)) { cap.lines.push(String(text)); if (cap.quiet) return; } deliver(actorId, `[[PM]]System|${text}`); };
+// The player log (playerlog.js) is told too, for the outcome of a command running for that player: the text is never kept
+const personal = (actorId, text) => { try { noteTold(actorId, text); } catch (e) { /* the log line is optional */ } try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('tell', actorId, text); } catch (e) { /* the player log is optional */ } const cap = globalThis.__dboTellCapture; if (cap && cap.a === (actorId >>> 0)) { cap.lines.push(String(text)); if (cap.quiet) return; } deliver(actorId, `[[PM]]System|${text}`); };
 
 // Survives gamemode hot reloads so players who connected before a reload stay known.
 if (!(globalThis.__dboConnected instanceof Set)) globalThis.__dboConnected = new Set();
@@ -435,6 +436,8 @@ const audit = (text) => {
   let body = String(text).replace(/[\r\n]+/g, ' / ');
   if (body.length > AUDIT_LINE_MAX) body = `${body.slice(0, AUDIT_LINE_MAX)}...`;
   log('audit:', body);
+  // The per-player activity log (playerlog.js) parses every audit line by its verb's reviewed class; never chat
+  try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('audit', body); } catch (e) { /* the player log is optional */ }
   if (!discordTarget) return;
   const now = Date.now();
   const key = body.replace(/\d+/g, 'N').slice(0, 48);
@@ -652,7 +655,11 @@ every('watch', 5000, () => { try { watchPlayers(); } catch (e) { log('watch fail
 const commands = new Map();
 // `hidden` keeps a command working and explained by /help <name>, but out of the lists. Used for the old names
 // kept as aliases after two commands were merged, so nobody's muscle memory breaks while the list stays short.
-const registerChatCommand = (name, fn, opts) => commands.set(name.toLowerCase(), { fn, admin: !!(opts && opts.admin), hidden: !!(opts && opts.hidden), help: (opts && opts.help) || '' });
+// The player log's command wrapper (playerlog.js): every run of a command, by any route, is recorded as an action (its name,
+// a sub-verb, the target and the outcome, never its text). The handler runs exactly once and its result or error comes back
+// as it was; without playerlog it runs as before.
+const plogCommand = (name, fn) => function (a, args, userId) { const h = globalThis.__dboPlogHook; return typeof h === 'function' ? h('command', name, fn, this, a, args, userId) : fn.call(this, a, args, userId); };
+const registerChatCommand = (name, fn, opts) => commands.set(name.toLowerCase(), { fn: plogCommand(name.toLowerCase(), fn), admin: !!(opts && opts.admin), hidden: !!(opts && opts.hidden), help: (opts && opts.help) || '' });
 // The journal's Profile buttons run the chat command itself (journal.js journalAction): the same handler, refusals and
 // cooldowns, the same admin rule. What it tells the player still goes to chat, and comes back here for the journal footer.
 // quiet: what the command says is kept for the caller and never reaches chat (a journal page reading /players)
@@ -934,6 +941,7 @@ registerChatCommand('rename', (a, args) => {
 }, { admin: true, help: '<player|#TAG> <new name>' });
 // The staff teleport: /tp, and /gm goto (gmcall.js). '' when it went, else why not
 const staffTeleport = (a, place) => {
+  try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('travel', a, 'staff_tp', a); } catch (e) { /* the player log is optional */ }
   try { mp.set(a, 'locationalData', { cellOrWorldDesc: place.cellOrWorldDesc, pos: place.pos, rot: place.rot || [0, 0, 0] }); return ''; }
   catch (e) { return e.message || 'failed'; }
 };
@@ -1269,7 +1277,8 @@ const handleChat = (userId, text) => {
   if (body.startsWith('/')) { const i = body.indexOf(' '); cmd = (i < 0 ? body : body.slice(0, i)).slice(1).toLowerCase(); body = i < 0 ? '' : body.slice(i + 1).trim(); }
   // The chat box stops at 2000 characters and the client then puts the tab's command in front ('/looc ', '/me '...), so
   // what is measured is what is said, after the command
-  if (body.length > Number(FLOOD.chatMaxChars) && !isAdmin(a)) return personal(a, `That message is too long (${Number(FLOOD.chatMaxChars)} characters at most).`);
+  // The player log records the refusal only for a registered command (a long chat line records nothing)
+  if (body.length > Number(FLOOD.chatMaxChars) && !isAdmin(a)) { try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('gate', a, 'too_long', cmd); } catch (e) { /* the player log is optional */ } return personal(a, `That message is too long (${Number(FLOOD.chatMaxChars)} characters at most).`); }
   const spoken = { say: ['says', R.say, C.WHITE], low: ['says quietly', R.low, C.WHITE], whisper: ['whispers', R.whisper, C.WHITE], wide: ['says loudly', R.wide, C.WHITE], shout: ['shouts', R.shout, C.SHOUT] };
   if (spoken[cmd]) { if (body) { sendNear(a, spoken[cmd][1], quoteSay(name, spoken[cmd][0], body, spoken[cmd][2])); bubbleNear(a, spoken[cmd][1], cmd, name, body); } return; }
   const emotes = {
@@ -1291,14 +1300,15 @@ const handleChat = (userId, text) => {
   // A slash alone opens the panel (U) at its search
   if (!cmd && hasPlayerMenu(a)) return openPlayerMenu(a, '', '');
   const c = commands.get(cmd);
-  if (!c) return personal(a, `Unknown command /${cmd.slice(0, 32)}. ${hasPlayerMenu(a) ? 'Type / alone, or press U, to search every command.' : 'Type /help.'}`);
+  if (!c) { try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('gate', a, 'unknown', cmd); } catch (e) { /* the player log is optional */ } return personal(a, `Unknown command /${cmd.slice(0, 32)}. ${hasPlayerMenu(a) ? 'Type / alone, or press U, to search every command.' : 'Type /help.'}`); }
   // A Trial GM passes only for the commands in TRIAL_COMMANDS; LEAD_ONLY below is for GMs, so it never refuses them
   const trial = c.admin && !isAdmin(a) && Object.prototype.hasOwnProperty.call(TRIAL_COMMANDS, cmd) && staffCan(a, TRIAL_COMMANDS[cmd]);
-  if (c.admin && !isAdmin(a) && !trial) return personal(a, 'Admins only.');
+  if (c.admin && !isAdmin(a) && !trial) { try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('gate', a, 'not_staff', cmd); } catch (e) { /* the player log is optional */ } return personal(a, 'Admins only.'); }
   const sub = `${cmd} ${(body.split(/\s+/)[0] || '').toLowerCase()}`;
   const staffCmd = c.admin || LEAD_ONLY.has(sub);
   if ((LEAD_ONLY.has(cmd) || LEAD_ONLY.has(sub)) && isAdmin(a) && !isLeadStaff(a)) {
     staffLog(display(a), tierOf(a), `/${cmd} (refused)`, `${staffWho(a)} (GM): /${cmd} ${body.slice(0, 300)} REFUSED (Lead GM and above)`);
+    try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('gate', a, 'lead_only', cmd); } catch (e) { /* the player log is optional */ }
     return personal(a, 'That is for a Lead GM and above.');
   }
   if (staffCmd && (isAdmin(a) || trial)) staffLog(display(a), staffTierOf(a), `/${cmd}`, `${staffWho(a)} (${TIER_LABEL[staffTierOf(a)] || 'staff'}): /${cmd} ${body.slice(0, 300)}`);
@@ -1496,6 +1506,7 @@ mp.onActivate = (targetId, casterId) => {
   if (g && globalThis.__dboPlaytestGate && globalThis.__dboPlaytestGate(casterId >>> 0)) return false;
   if (g) {
     try {
+      try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('travel', casterId, 'gate'); } catch (e) { /* the player log is optional */ }
       mp.set(casterId, 'locationalData', { cellOrWorldDesc: TAMRIEL, pos: g[1], rot: [0, 0, g[2]] });
       system(casterId, `You step through the gate to ${g[0]}.`);
     } catch (e) { log('gate teleport failed', e.message); }
@@ -1797,6 +1808,8 @@ const writeDiagLines = (userId, lines) => {
   let n = DIAG_SEEN.get(key) || 0;
   for (const raw of (Array.isArray(lines) ? lines.slice(0, DIAG_LINES_PER_PACKET) : [])) {
     const text = String(raw).slice(0, 500);
+    // The client's version for the player log (playerlog.js), by connection: it comes before the character exists
+    if (text.startsWith('apr client v=')) { try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('client', userId, a, text); } catch (e) { /* the player log is optional */ } }
     if (a && text.startsWith('voice ')) keepVoiceLine(a, text);
     const kind = diagKindOf(text);
     if (kind) {
@@ -1824,6 +1837,8 @@ globalThis.__dboHandlers.customPacket = (userId, rawContent) => {
     const content = typeof rawContent === 'string' ? JSON.parse(rawContent) : rawContent;
     if (!content) return;
     if (content.type === 'cef::chat:send') { if (!floodChatOk(userId)) return; return handleChat(userId, content.data); }
+    // The player log (playerlog.js) reads an allow-list of packet types, and of each only the fields listed; chat returned above
+    try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('packet', userId, content); } catch (e) { /* the player log is optional */ }
     // Door prompt names: the client asks what a load door leads to; answers come from doors.json and the hub gates.
     // A named property's door from the street reads as its owner named it (Nate, 3 Oct: renames show on the doors); the
     // housing system answers "" for every other door (the way out, inner doors), which keep their destination.
@@ -1946,6 +1961,7 @@ const moveToHubIfLanding = (a) => {
     if (String(mp.get(a, 'worldOrCellDesc')).toLowerCase() !== String(LANDING.world).toLowerCase()) return false;
     const p = mp.get(a, 'pos'); if (!Array.isArray(p)) return false;
     if (Math.hypot(p[0] - LANDING.pos[0], p[1] - LANDING.pos[1]) > LANDING.radius) return false;
+    try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('travel', a, 'creation'); } catch (e) { /* the player log is optional */ }
     mp.set(a, 'locationalData', HUB);
     return true;
   } catch (e) { log('hub move failed', e.message); return false; }
@@ -2042,6 +2058,7 @@ const placeInCreatorSpot = (a) => {
   try {
     const p = mp.get(a, 'pos');
     if (Array.isArray(p) && Math.hypot(p[0] - spot[0], p[1] - spot[1]) < 30) return false;
+    try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('travel', a, 'creation'); } catch (e) { /* the player log is optional */ }
     mp.set(a, 'locationalData', { cellOrWorldDesc: HUB.cellOrWorldDesc, pos: spot, rot: HUB.rot });
     creatorPlacedAt.set(a >>> 0, Date.now());
     return true;
@@ -2075,6 +2092,7 @@ const fallBackToLanding = (a) => {
   if (creation.get(a) !== 'spawning' || !creationPending(a)) return;
   creation.set(a, 'landing');
   log(`${display(a)} did not arrive in the hub from the spawn; sending them via the landing`);
+  try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('travel', a, 'creation'); } catch (e) { /* the player log is optional */ }
   try { mp.set(a, 'locationalData', LANDING_LOC); } catch (e) { log('landing fallback failed', e.message); }
 };
 const startCreationInHub = (a) => {
@@ -2133,6 +2151,7 @@ const sendToArrival = (a) => {
     if (globalThis.__dboNameHold && globalThis.__dboNameHold(a)) { setTimeout(() => sendToArrival(a), 20000); return; }
     const here = String(mp.get(a, 'worldOrCellDesc') || '').toLowerCase();
     if (here !== String(HUB.cellOrWorldDesc).toLowerCase()) return leftRealm(a);
+    try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('travel', a, 'creation'); } catch (e) { /* the player log is optional */ }
     mp.set(a, 'locationalData', arrivalLocFor(a));
     creation.delete(a);
     creatorSpotRelease(a);
@@ -2311,6 +2330,7 @@ const loginStep = (name, fn) => {
   if (ms > LOGIN_STEP_WARN_MS) log(`slow login step ${name}: ${ms.toFixed(1)} ms`);
 };
 const onCharacterReady = (userId, a) => {
+  try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('login', userId, a); } catch (e) { /* the player log is optional */ }
   connectedAt.set(a, Date.now());
   // The client resets its spells to the login list for its first seconds: a spell given then waits (schools.js)
   loginStep('schools arrival', () => { if (globalThis.__dboSchoolsArrived) globalThis.__dboSchoolsArrived(a); });
@@ -2390,6 +2410,8 @@ const startLoginWait = (userId, seenActor) => {
     const a = actorOf(userId);
     // A character switch hands the user a different actor; each one gets its own login run.
     if (!a || a === seen) return;
+    // the character left behind writes no LEAVE: the player log records the switch
+    if (seen) { try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('switch', userId, seen, a); } catch (e) { /* the player log is optional */ } }
     seen = a;
     try { onCharacterReady(userId, a); } catch (e) { log('login setup failed', e.message); }
   }), 500);
@@ -2426,6 +2448,8 @@ globalThis.__dboHandlers.disconnect = (userId) => {
   const a = actorOf(userId); if (a) audit(`LEAVE ${who(a)}`);
   // The body stays a while after a logout; whether it may still be harmed is decided now (offlineBodyProtected)
   if (a) { try { globalThis.__dboNoteLogout(a); } catch (e) { log('logout note failed', e.message); } }
+  // The player log (playerlog.js), before the beast revert and the unmask below change the name
+  if (a) { try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('logout', userId, a); } catch (e) { /* the player log is optional */ } }
   // Before the revert below clears the beast state: a drop with the Journal closed may be a crash next to a
   // Vampire Lord, and the breaker needs the position and the state while they still exist
   if (a && globalThis.__dboVlBreakerDrop) {
@@ -2735,6 +2759,7 @@ registerChatCommand('wipechars', (a, args) => {
 registerChatCommand('fixloc', (a, args) => {
   const t = args.trim() ? findByName(args.trim()) : a; if (!t) return personal(a, 'No such player.');
   try {
+    try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('travel', t, 'fixloc', a); } catch (e) { /* the player log is optional */ }
     mp.set(t, 'locationalData', { cellOrWorldDesc: '17482:DragonBreak Hub.esp', pos: [2122.2, 2079.6, 3], rot: [0, 0, 22.9] });
     personal(a, `Moved ${nameOf(t)} to the hub; server now says ${JSON.stringify(mp.get(t, 'worldOrCellDesc'))}.`);
   } catch (e) { personal(a, 'Failed: ' + e.message); }
@@ -3084,7 +3109,9 @@ onUi('menuRun', (a, args) => {
   if (!panelOffered(a).has(name)) return;
   const text = String((args || [])[2] || '').replace(/[\r\n]+/g, ' ').trim();
   closePlayerMenu(a);
-  handleChat(userOf(a), `/${name}${text ? ' ' + text : ''}`);
+  // the player log names the route of what runs now (playerlog.js): the U panel
+  globalThis.__dboPlogRoute = 'upanel';
+  try { handleChat(userOf(a), `/${name}${text ? ' ' + text : ''}`); } finally { globalThis.__dboPlogRoute = null; }
 });
 // ---- the Character Journal's World tab (F3; journal.js section registry) ---------------------------------------------
 // World: what the read-only commands say about the world, as one page, read quietly so nothing reaches chat. Each group
@@ -4589,6 +4616,7 @@ const unstuckActor = (a, by) => {
   let from = '?';
   try { const p = mp.get(a, 'pos'); from = `${JSON.stringify(mp.get(a, 'worldOrCellDesc'))} at ${Array.isArray(p) ? p.map((v) => Math.round(v)).join(',') : '?'}`; } catch (e) { /* where is unknown */ }
   try {
+    try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('travel', a, 'unstuck', by); } catch (e) { /* the player log is optional */ }
     mp.set(a, 'locationalData', { cellOrWorldDesc: t.world, pos: t.pos, rot: [0, 0, Number(t.rotZ) || 0] });
     if (by === a) mp.set(a, 'private.unstuckAt', Date.now());
   } catch (e) { log('unstuck failed', e.message); return personal(by, 'That did not work. Ask a GM for help.'); }
@@ -7402,6 +7430,20 @@ try {
   delete require.cache[MOVETRACE_JS];
   require(MOVETRACE_JS)({ mp, log, personal, display, registerChatCommand, onlineActors, every });
 } catch (e) { log('movetrace.js failed to load:', e.stack || e.message); }
+
+// ---- per-player activity log, never chat (server\playerlog.js, config "playerLog"): LAST, its hooks wrap every other ----
+try {
+  const PLAYERLOG_JS = path.resolve('playerlog.js');
+  delete require.cache[PLAYERLOG_JS];
+  require(PLAYERLOG_JS)({ mp, log, cfg, every, stopTimer, onlineActors, actorOf, userOf, profileOf, discordOf, nameOf,
+    realNameOf, recordOf, adminItemName, zoneOfActor, zoneAtPlace, zoneOfCell, isWorldspace, normPlace, REGION_PLUGINS,
+    isAdmin, staffTierOf, staffCharOf, connectedAt, lastPacketAt, commandsHas: (n) => commands.has(n), WORLD_GROUPS, zoneList, creationPending });
+} catch (e) {
+  log('playerlog.js failed to load:', e.stack || e.message);
+  // The previous generation's slot wrappers and timers must not keep running against this gamemode
+  try { if (typeof globalThis.__dboPlogUninstall === 'function') globalThis.__dboPlogUninstall('load_failed'); } catch (x) { /* optional */ }
+  globalThis.__dboPlogHook = null;
+}
 
 
 
