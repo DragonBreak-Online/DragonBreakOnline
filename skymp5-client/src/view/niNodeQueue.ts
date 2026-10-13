@@ -2,6 +2,7 @@ import { Actor, Game, on, printConsole } from "skyrimPlatform";
 import { NiNodeQueuePlan } from "./niNodeQueuePlan";
 import { isBeastRaceId } from "../sync/beastRaceIds";
 import * as faceSync from "./faceSyncDiag";
+import { trace } from "../lib/clientDiag";
 
 // Every NiNode (3D) update goes through here; see niNodeQueuePlan.ts for why and the rules
 const plan = new NiNodeQueuePlan();
@@ -56,6 +57,16 @@ const flush = (): void => {
   faceSync.sent(id, Date.now());
 };
 
+// The copies' beast rule for the player's own 3D reset; queued work still runs, it refuses a beast itself
+const isBeastPlayer = (player: Actor): boolean => {
+  try {
+    const race = player.getRace();
+    return !!race && isBeastRaceId(race.getFormID());
+  } catch {
+    return false;
+  }
+};
+
 const sendPlayer = (): void => {
   const player = Game.getPlayer();
   const work = playerWork;
@@ -64,7 +75,10 @@ const sendPlayer = (): void => {
   playerPlainWanted = false;
   if (player) {
     const queued = work ? runWork(work, player) : false;
-    if (!queued && plain) player.queueNiNodeUpdate();
+    if (!queued && plain) {
+      if (isBeastPlayer(player)) trace("ni self skip=beast");
+      else player.queueNiNodeUpdate();
+    }
   }
   plan.playerQueued(frame);
 };
