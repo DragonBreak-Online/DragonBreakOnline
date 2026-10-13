@@ -345,7 +345,7 @@ export class BountyBoardSystem implements System {
 
     const deposited = cost > 0 ? this.depositToTreasury(ctx, zone, Math.floor(cost * this.treasuryPercent / 100)) : 0;
 
-    const author = this.displayNameOf(ctx, actorId) + (official ? `, ${this.zones.titleOf(official, zone.id)}` : "");
+    const author = this.posterNameOf(ctx, actorId) + (official ? `, ${this.zones.titleOf(official, zone.id)}` : "");
     rec.notes.push({ id: rec.nextId, tab, author, profileId, text, createdAt: now });
     rec.nextId += 1;
     this.saveStore();
@@ -640,18 +640,22 @@ export class BountyBoardSystem implements System {
 
   // "Ysolda #K7Q2": the name others see plus the character tag the gamemode assigns.
   private displayNameOf(ctx: SystemContext, actorId: number): string {
-    const mp = ctx.svr as Mp;
     let name = "Unknown";
-    try { name = String(mp.getActorName(actorId) || "Unknown"); } catch { /* keep */ }
+    try { name = String((ctx.svr as Mp).getActorName(actorId) || "Unknown"); } catch { /* keep */ }
+    return this.withTag(ctx, actorId, name);
+  }
+
+  private withTag(ctx: SystemContext, actorId: number, name: string): string {
     let tag = "";
-    try { const t = mp.get(actorId, "private.charTag"); if (typeof t === "string" && t.length === 4) tag = t; } catch { /* untagged */ }
+    try { const t = (ctx.svr as Mp).get(actorId, "private.charTag"); if (typeof t === "string" && t.length === 4) tag = t; } catch { /* untagged */ }
     return tag ? `${name} #${tag}` : name;
   }
 
-  private realNameOf(ctx: SystemContext, actorId: number): string {
+  // A notice is signed with the poster's own name, not the mask's (playermenu.js keeps it in maskName)
+  private posterNameOf(ctx: SystemContext, actorId: number): string {
     let stashed = "";
     try { stashed = String((ctx.svr as Mp).get(actorId, "maskName") || "").trim(); } catch { /* unmasked */ }
-    return stashed || this.displayNameOf(ctx, actorId);
+    return stashed ? this.withTag(ctx, actorId, stashed) : this.displayNameOf(ctx, actorId);
   }
 
   private profileIdOf(ctx: SystemContext, actorId: number): number {
@@ -662,7 +666,7 @@ export class BountyBoardSystem implements System {
   }
 
   private describeActor(ctx: SystemContext, actorId: number): string {
-    const real = this.realNameOf(ctx, actorId);
+    const real = this.posterNameOf(ctx, actorId);
     const shown = this.displayNameOf(ctx, actorId);
     const mask = shown !== real ? ` (as ${JSON.stringify(shown)})` : "";
     return `[profile ${this.profileIdOf(ctx, actorId)}] ${JSON.stringify(real)}${mask}`;
