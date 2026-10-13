@@ -391,15 +391,21 @@ module.exports = (K) => {
       if (t && action === 'kill') put('deaths', t, { cause: 'staff_kill', by: a, t: now() });
     },
   };
-  // A housing record's signature: what a menu action changes (owner, lock, keys, rooms, name), hashed, never kept as text
+  // A housing record's signature: what a menu action changes (owner, lock, keys, rooms, name), hashed, never kept as text.
+  // With the place rules on, recordOf answers the place's ROOT for any of its doors and chests, while lock, unlock and a
+  // non-entrance's own keys (housingSystem.ts PLACE_WIDE, OWN_KEY_ACTIONS) change the MEMBER's own record (review C-R5,
+  // re-verify): that record, read where housingSystem.ts keeps it (ownRefOf), is hashed next to the root's
+  const recFields = (r) => (r && typeof r === 'object' && !Number(r.primary)
+    ? [r.owner, r.ownerChar || 0, r.locked, r.serial || 0, r.name || '', r.assigned || null, r.shared || null, r.containers || null,
+      Array.isArray(r.issued) ? r.issued.length : 0, r.holders || null, Number(r.memberOf) || 0, Array.isArray(r.keyAliases) ? r.keyAliases.length : 0]
+    : null);
   const propertySig = (target) => {
     const H = housing();
     if (!H || typeof H.recordOf !== 'function') return '';
     try {
       const r = H.recordOf(target);
       if (!r) return 'none';
-      return R.siteHash(JSON.stringify([r.owner, r.ownerChar || 0, r.locked, r.serial || 0, r.name || '', r.assigned || null, r.shared || null, r.containers || null,
-        Array.isArray(r.issued) ? r.issued.length : 0, r.holders || null]));
+      return R.siteHash(JSON.stringify([recFields(r), recFields(get(ownRefOf(u32(target)), 'private.housing'))]));
     } catch (e) { return ''; }
   };
   G.hooks.packet = (userId, content) => {
@@ -577,6 +583,12 @@ module.exports = (K) => {
   // and primaryOf answer with the place's ROOT for any of its doors and chests, while the place's assigned and shared lists are
   // keyed by each member's OWN primary (roomsOf, doRoom): own is that, read from the ref's own record (a pointer's primary, a
   // record's own id), else the ref (a chest), else the lower id of a door's pair, as housingSystem.ts primaryOf (review C-R1)
+  const ownRefOf = (id) => {
+    const raw = get(id, 'private.housing');
+    let own = raw && typeof raw === 'object' ? (Number(raw.primary) ? u32(raw.primary) : id) : id;
+    if (!(raw && typeof raw === 'object') && recordType(baseOfRef(id)) === 'DOOR') { const far = doorPartner(id); if (far && far < own) own = far; }
+    return own;
+  };
   const housingRecord = (ref) => {
     const H = housing();
     if (!H || typeof H.recordOf !== 'function') return null;
@@ -588,9 +600,7 @@ module.exports = (K) => {
       const rec = H.recordOf(id);
       if (rec) {
         const primary = typeof H.primaryOf === 'function' ? u32(H.primaryOf(id)) : id;
-        const raw = get(id, 'private.housing');
-        let own = raw && typeof raw === 'object' ? (Number(raw.primary) ? u32(raw.primary) : id) : id;
-        if (!(raw && typeof raw === 'object') && recordType(baseOfRef(id)) === 'DOOR') { const far = doorPartner(id); if (far && far < own) own = far; }
+        const own = ownRefOf(id);
         const rootId = rec.memberOf && u32(rec.memberOf) !== primary ? u32(rec.memberOf) : primary;
         const root = rootId !== primary ? H.recordOf(rootId) : null;
         v = { rec, root, primary, own, rootId };

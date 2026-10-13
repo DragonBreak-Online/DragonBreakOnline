@@ -648,6 +648,32 @@ const housing = (W) => {
   W.h('packet', 5, { customPacketType: 'propertyRequest', action: 'grantcontainer', target: DOOR, recipient: B });
   W.h('packet', 5, { customPacketType: 'propertyRequest', action: 'revokekeys', target: DOOR });
   ok(W.evs('social.housing').slice(-3).map((r) => r.f.op).join(',') === 'cut_key,grant_container,rekey' && W.evs('social.housing').slice(-3)[0].o[0].c === 'K2QX', '...the real action names: createkey, grantcontainer, revokekeys', W.evs('social.housing').map((r) => r.f.op));
+  // C-R5 (re-verify, reverify/checks/cr5-member-lock.js): a lock on a place MEMBER, a room chest with its own record. recordOf
+  // answers the place's ROOT for it (housingSystem.ts exposeTenancy primary()), while lock is not PLACE_WIDE and goes to the
+  // chest's own record (private.housing on the chest); the root's record does not change
+  {
+    const hs = globalThis.__dboHousing, recordOf0 = hs.recordOf, primaryOf0 = hs.primaryOf;
+    const rootRec = HS2.recs.get(DOOR);
+    hs.recordOf = (ref) => ([DOOR, OWNCHEST].includes(ref >>> 0) ? rootRec : recordOf0(ref));
+    hs.primaryOf = (ref) => ([DOOR, OWNCHEST].includes(ref >>> 0) ? DOOR : primaryOf0(ref));
+    const memberRec = { owner: 3, ownerChar: Cm, memberOf: DOOR, locked: false };
+    W.M.mp.set(OWNCHEST, 'private.housing', memberRec);
+    const rootBefore = JSON.stringify(rootRec);
+    W.h('packet', 5, { customPacketType: 'propertyInfoRequest', target: OWNCHEST });
+    W.M.mp.set(OWNCHEST, 'private.housing', Object.assign({}, memberRec, { locked: true }));   // doLock on the member's own record
+    W.h('packet', 5, { customPacketType: 'propertyRequest', action: 'lock', target: OWNCHEST });
+    const ml = W.last('social.housing') || NONE;
+    ok(ml.f.op === 'lock' && ml.f.ok === true && ml.f.property === OWNCHEST.toString(16) && JSON.stringify(rootRec) === rootBefore, 'C-R5: a lock on a room chest that went through (its own record, not the place root\'s): ok true, never ok false', ml.f);
+    W.h('packet', 5, { customPacketType: 'propertyRequest', action: 'lock', target: OWNCHEST });
+    ok((W.last('social.housing') || NONE).f.ok === false, '...the same lock again, with nothing changed: ok false', (W.last('social.housing') || NONE).f);
+    // an unclaimed chest inside the place: the lock adopts it (housingSystem.ts adopted()), writing its first own record
+    W.M.mp.set(OWNCHEST, 'private.housing', undefined);
+    W.h('packet', 5, { customPacketType: 'propertyInfoRequest', target: OWNCHEST });
+    W.M.mp.set(OWNCHEST, 'private.housing', Object.assign({}, memberRec, { locked: true, issued: [] }));
+    W.h('packet', 5, { customPacketType: 'propertyRequest', action: 'lock', target: OWNCHEST });
+    ok((W.last('social.housing') || NONE).f.ok === true, '...a lock that adopts an unclaimed room chest: ok true', (W.last('social.housing') || NONE).f);
+    hs.recordOf = recordOf0; hs.primaryOf = primaryOf0;
+  }
   W.h('packet', 6, { customPacketType: 'adminAction', action: 'kick', target: Cm.toString(16) });
   W.h('audit', 'GM profile 4 (gm) kicked Mike (profile 3)');
   W.h('logout', 5, Cm); W.QU.run();
