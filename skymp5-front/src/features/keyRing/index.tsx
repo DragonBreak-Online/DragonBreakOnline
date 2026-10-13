@@ -55,12 +55,83 @@ const PickPlayer = ({ near, onPick, onCancel, busy }: { near: NearPlayer[]; onPi
   </div>
 );
 
-const KeyRing = ({ data }: { data: KeyRingData }) => {
-  const [busy, setBusy] = useState(false);
+// What the ring shows, in the panel and in the journal's Keys tab alike (keyring.js ringView)
+export type KeyRingView = Pick<KeyRingData, 'keys' | 'near' | 'owned' | 'offer'>;
+
+// The ring's content: an offer, your keys by property, then your own locks with every copy out. act(event, ...args) sends a
+// dbo:keyRing* event with the window's nonce (the panel's own, or the journal's); busy holds every button until the answer.
+export const KeyRingBody = ({ view, busy, act }: { view: KeyRingView; busy: boolean; act: (event: string, ...args: unknown[]) => void }) => {
   // What is waiting for a player to be picked: "give:<key>" or "cut:<ref>"
   const [picking, setPicking] = useState('');
+  useEffect(() => { setPicking(''); }, [view]);
+  const near = view.near || [];
+  const owned = view.owned || [];
 
-  useEffect(() => { setBusy(false); setPicking(''); }, [data]);
+  return (
+    <>
+      {view.offer && (
+        <div className="keyRing__offer">
+          <span>{view.offer.from} offers you <b>{view.offer.key}</b>.</span>
+          <span className="keyRing__buttons">
+            <button className="keyRing__button" disabled={busy} onClick={() => act('dbo:keyRingAnswer', true)}>Accept</button>
+            <button className="keyRing__button" disabled={busy} onClick={() => act('dbo:keyRingAnswer', false)}>Decline</button>
+          </span>
+        </div>
+      )}
+
+      <div className="keyRing__section">
+        <span className="keyRing__label">Your keys</span>
+        {(view.keys || []).length === 0 && <span className="keyRing__empty">No keys. The owner of a property can cut one for you.</span>}
+        {groupByPlace(view.keys || []).map((g) => (
+          <div key={g.place} className="keyRing__group">
+            <span className="keyRing__place">{g.place}</span>
+            {g.keys.map((k) => (
+              <div key={k.name} className="keyRing__entry">
+                <div className="keyRing__row">
+                  <span className="keyRing__name">{k.name}</span>
+                  <span className={'keyRing__state' + (k.opens ? '' : ' keyRing__state--dead')}>{k.opens ? 'Opens' : 'Opens nothing'}</span>
+                  <button className="keyRing__button keyRing__button--small" disabled={busy} onClick={() => setPicking(picking === `give:${k.name}` ? '' : `give:${k.name}`)}>Give</button>
+                </div>
+                {picking === `give:${k.name}` && <PickPlayer near={near} busy={busy} onCancel={() => setPicking('')} onPick={(a) => act('dbo:keyRingGive', k.name, a)} />}
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+
+      {owned.length > 0 && (
+        <div className="keyRing__section">
+          <span className="keyRing__label">Your properties</span>
+          {owned.map((o) => (
+            <div key={o.ref} className="keyRing__group">
+              <div className="keyRing__row">
+                <span className="keyRing__place">{o.place}</span>
+                <button className="keyRing__button keyRing__button--small" disabled={busy} onClick={() => act('dbo:keyRingCut', o.ref, 0)}>Cut a key</button>
+                <button className="keyRing__button keyRing__button--small" disabled={busy} onClick={() => setPicking(picking === `cut:${o.ref}` ? '' : `cut:${o.ref}`)}>Cut for...</button>
+              </div>
+              {picking === `cut:${o.ref}` && <PickPlayer near={near} busy={busy} onCancel={() => setPicking('')} onPick={(a) => act('dbo:keyRingCut', o.ref, a)} />}
+              {(o.copies || []).length === 0 && <span className="keyRing__empty">No keys are out.</span>}
+              {(o.copies || []).map((c) => (
+                <div key={c.name} className="keyRing__row keyRing__row--copy">
+                  <span className="keyRing__name">{c.name}</span>
+                  <span className="keyRing__state">{c.holder ? `Held by ${c.holder}` : 'Holder unknown'}</span>
+                  <button className="keyRing__button keyRing__button--small" disabled={busy} onClick={() => act('dbo:keyRingTake', o.ref, c.name)}>Take back</button>
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      )}
+
+      <p className="keyRing__note">A key opens its door even when it is locked. Taking a key back stops it opening at once, wherever it is.</p>
+    </>
+  );
+};
+
+const KeyRing = ({ data }: { data: KeyRingData }) => {
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => { setBusy(false); }, [data]);
   useEffect(() => {
     if (!busy) return undefined;
     const t = setTimeout(() => setBusy(false), BUSY_TIMEOUT_MS);
@@ -72,71 +143,14 @@ const KeyRing = ({ data }: { data: KeyRingData }) => {
     setBusy(true);
     send(event, data.nonce, ...args);
   };
-  const near = data.near || [];
-  const owned = data.owned || [];
 
   return (
     <div className="keyRing">
       <div className="keyRing__fade" />
       <div className="keyRing__panel">
         <h2 className="keyRing__title">Key Ring</h2>
-
-        {data.offer && (
-          <div className="keyRing__offer">
-            <span>{data.offer.from} offers you <b>{data.offer.key}</b>.</span>
-            <span className="keyRing__buttons">
-              <button className="keyRing__button" disabled={busy} onClick={() => act('dbo:keyRingAnswer', true)}>Accept</button>
-              <button className="keyRing__button" disabled={busy} onClick={() => act('dbo:keyRingAnswer', false)}>Decline</button>
-            </span>
-          </div>
-        )}
-
-        <div className="keyRing__section">
-          <span className="keyRing__label">Your keys</span>
-          {(data.keys || []).length === 0 && <span className="keyRing__empty">No keys. The owner of a property can cut one for you.</span>}
-          {groupByPlace(data.keys || []).map((g) => (
-            <div key={g.place} className="keyRing__group">
-              <span className="keyRing__place">{g.place}</span>
-              {g.keys.map((k) => (
-                <div key={k.name} className="keyRing__entry">
-                  <div className="keyRing__row">
-                    <span className="keyRing__name">{k.name}</span>
-                    <span className={'keyRing__state' + (k.opens ? '' : ' keyRing__state--dead')}>{k.opens ? 'Opens' : 'Opens nothing'}</span>
-                    <button className="keyRing__button keyRing__button--small" disabled={busy} onClick={() => setPicking(picking === `give:${k.name}` ? '' : `give:${k.name}`)}>Give</button>
-                  </div>
-                  {picking === `give:${k.name}` && <PickPlayer near={near} busy={busy} onCancel={() => setPicking('')} onPick={(a) => act('dbo:keyRingGive', k.name, a)} />}
-                </div>
-              ))}
-            </div>
-          ))}
-        </div>
-
-        {owned.length > 0 && (
-          <div className="keyRing__section">
-            <span className="keyRing__label">Your properties</span>
-            {owned.map((o) => (
-              <div key={o.ref} className="keyRing__group">
-                <div className="keyRing__row">
-                  <span className="keyRing__place">{o.place}</span>
-                  <button className="keyRing__button keyRing__button--small" disabled={busy} onClick={() => act('dbo:keyRingCut', o.ref, 0)}>Cut a key</button>
-                  <button className="keyRing__button keyRing__button--small" disabled={busy} onClick={() => setPicking(picking === `cut:${o.ref}` ? '' : `cut:${o.ref}`)}>Cut for...</button>
-                </div>
-                {picking === `cut:${o.ref}` && <PickPlayer near={near} busy={busy} onCancel={() => setPicking('')} onPick={(a) => act('dbo:keyRingCut', o.ref, a)} />}
-                {o.copies.length === 0 && <span className="keyRing__empty">No keys are out.</span>}
-                {o.copies.map((c) => (
-                  <div key={c.name} className="keyRing__row keyRing__row--copy">
-                    <span className="keyRing__name">{c.name}</span>
-                    <span className="keyRing__state">{c.holder ? `Held by ${c.holder}` : 'Holder unknown'}</span>
-                    <button className="keyRing__button keyRing__button--small" disabled={busy} onClick={() => act('dbo:keyRingTake', o.ref, c.name)}>Take back</button>
-                  </div>
-                ))}
-              </div>
-            ))}
-          </div>
-        )}
-
+        <KeyRingBody view={data} busy={busy} act={act} />
         {data.result && <p className={'keyRing__result keyRing__result--' + (data.resultKind || 'ok')}>{data.result}</p>}
-        <p className="keyRing__note">A key opens its door even when it is locked. Taking a key back stops it opening at once, wherever it is.</p>
         <button className="keyRing__close" onClick={() => send('dbo:keyRingClose')}>Close</button>
       </div>
     </div>

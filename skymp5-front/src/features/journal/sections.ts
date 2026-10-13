@@ -10,3 +10,4 @@ import './tabs/WorldTab';
 import './skillsTab';
 import '../court';
 import '../nobility';
+import './tabs/KeysTab';

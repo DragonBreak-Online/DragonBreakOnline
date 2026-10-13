@@ -206,6 +206,13 @@ const Housing = ({ data }: { data: HousingData }) => {
             </button>
           ) : null}
 
+          {/* The Key Ring (keyring.js, widget 91): the keys you hold and, for an owner, every copy out; this menu closes behind it */}
+          {data.keyRing && canLock ? (
+            <button className="housing__button" onClick={() => { send('dbo:keyRingOpen'); send(ev.cancel); }}>
+              Key Ring
+            </button>
+          ) : null}
+
           {/* The server's property panel (tenancy.js, widget 81) opens for the door here; this menu closes behind it */}
           {!data.canGrantContainers ? (
             <button className="housing__button" onClick={() => { send('dbo:propertyMarket'); send(ev.cancel); }}>
@@ -219,7 +226,7 @@ const Housing = ({ data }: { data: HousingData }) => {
         )}
 
         {isOwner && data.keyRing && (
-          <p className="housing__hint">A locked door keeps out everyone without a key; you and your key holders walk straight in. Cut a key puts it on your Key Ring (/keys), where you can give it, cut one for a player beside you, or take a copy back. Void all keys cancels every copy.</p>
+          <p className="housing__hint">A locked door keeps out everyone without a key; you and your key holders walk straight in. Cut a key puts it on your Key Ring (the Key Ring button here, or Keys in your journal), where you can give it, cut one for a player beside you, or take a copy back. Void all keys cancels every copy.</p>
         )}
 
         {manages ? (

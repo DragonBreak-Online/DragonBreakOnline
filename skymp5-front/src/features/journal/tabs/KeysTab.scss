@@ -1,0 +1,7 @@
+// The Keys tab: the Key Ring's rows (keyRing/styles.scss) in one column, as the panel lays them out
+.jkeys {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 680px;
+}

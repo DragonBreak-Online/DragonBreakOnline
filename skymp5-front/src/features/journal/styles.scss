@@ -87,7 +87,13 @@ $border-dim: dbo-accent(0.2);
   &__clock-time { font-size: 15px; color: $dbo-text; }
   &__clock-moons { font-size: 13px; color: $dbo-text-dim; font-style: italic; }
 
-  &__tabs { grid-area: tabs; margin: 0 -4px; }
+  &__tabs {
+    grid-area: tabs;
+    margin: 0 -4px;
+    // Eleven tabs (Keys, 13 Oct) are wider than the frame at 1280x720 with the bar's own 22 px padding: the journal's tabs
+    // sit closer, and a still fuller bar shrinks its labels rather than pushing Settings out of the frame
+    .dbo-tabs__tab { flex: 0 1 auto; min-width: 0; padding-left: 16px; padding-right: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  }
 
   // One line in the footer, left of the hint; a long answer is cut and shown whole on hover
   &__result {
