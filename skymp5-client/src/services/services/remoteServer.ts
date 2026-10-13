@@ -990,17 +990,18 @@ export class RemoteServer extends ClientListener {
     const newAppearance = msg.data;
 
     if (i === this.getMyActorIndex() && newAppearance) {
-      // The echo of the appearance this client just sent from RaceMenu
-      if (isRaceMenuSettling()) {
-        logTrace(this, "Skipped own appearance echo while RaceMenu settles");
-        return;
-      }
-      // A server transform (BeastFormService) already swapped the race; the echo would rebuild the head on a beast body
-      if (((globalThis as any).__dboBeastRaces as Set<number> | undefined)?.has(Number(newAppearance.raceId) >>> 0)) {
-        logTrace(this, "Skipped own appearance echo for a beast form");
-        return;
-      }
+      // Messages arrive in tick context, where Ui.isMenuOpen throws, so the skips are decided on the update that applies
       this.controller.once("update", () => {
+        // The echo of the appearance this client just sent from RaceMenu
+        if (isRaceMenuSettling()) {
+          logTrace(this, "Skipped own appearance echo while RaceMenu settles");
+          return;
+        }
+        // A server transform (BeastFormService) already swapped the race; the echo would rebuild the head on a beast body
+        if (((globalThis as any).__dboBeastRaces as Set<number> | undefined)?.has(Number(newAppearance.raceId) >>> 0)) {
+          logTrace(this, "Skipped own appearance echo for a beast form");
+          return;
+        }
         applyAppearanceToPlayer(newAppearance, true, "update");
         logTrace(this, "Applied appearance to the player");
       });
