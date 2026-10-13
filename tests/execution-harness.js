@@ -15,11 +15,25 @@ const ok = (c, name, got) => { if (!c) fails++; console.log(`${c ? 'ok  ' : 'FAI
   const said = [], audits = [], packets = [], widgets = [], closed = [], killed = [], staff = [];
   let timers = [];
   const ui = new Map();
+  // Positions are metres along one axis (70 units each); locationalData and the block's pos give the same in units, and a
+  // move (the server standing a player up) lands back in the map
+  const UNITS = 70, moved = [], deadSet = new Set();
   const mp = { getIdFromDesc: (d) => ({ '1ac980:dragonbreak online edits.esp': 0x3c1ac980, 'fe549:skyrim.esm': 0xfe549, '2e8eb:skyrim.esm': 0x2e8eb, '74ec5:skyrim.esm': 0x74ec5 }[String(d).toLowerCase()] || 0),
-    get: (id, k) => (k === 'baseDesc' ? (id === BLOCK ? 'fe549:Skyrim.esm' : '1:Skyrim.esm') : undefined) };
+    get: (id, k) => {
+      if (k === 'baseDesc') return id === BLOCK ? 'fe549:Skyrim.esm' : '1:Skyrim.esm';
+      if (k === 'pos') return [(pos.get(id) ?? 9999) * UNITS, 0, 0];
+      if (k === 'locationalData') return { cellOrWorldDesc: 'a764b:BSHeartland.esm', pos: [(pos.get(id) ?? 9999) * UNITS, 0, 100], rot: [0, 0, 45] };
+      if (k === 'isDead') return deadSet.has(id);
+      return undefined;
+    },
+    set: (id, k, v) => { if (k === 'locationalData') { moved.push([id, v]); pos.set(id, Math.hypot(v.pos[0], v.pos[1]) / UNITS); } } };
   globalThis.__dboPermaKill = (a, why) => killed.push([a, why]);
   const load = (cfg) => {
     delete globalThis.__dboExecState;
+    // Most checks press E twice in a row on purpose; the repeat guard has its own check below
+    cfg = cfg || {}; if (cfg.execution && cfg.execution.repeatMs === undefined) cfg.execution.repeatMs = 0;
+    // A stood-up player is set down 4 m out; every check starts with both back at the block
+    pos.set(V, 1); pos.set(X, 1.5);
     delete require.cache[path.join(SERVER, 'execution.js')];
     ui.clear(); timers = [];
     require(path.join(SERVER, 'execution.js'))({ mp, log: () => {}, personal: (a, t) => said.push([a, t]), audit: (t) => audits.push(t), who: (a) => `#${a.toString(16)}`,
@@ -74,8 +88,10 @@ const ok = (c, name, got) => { if (!c) fails++; console.log(`${c ? 'ok  ' : 'FAI
   act(BLOCK, V); act(BLOCK, X); choose(GM, lastPanel(GM).actions[0].id); choose(X, lastPanel(X).actions[1].id);
   ok(!globalThis.__dboExecutionState().length && /lowers the axe/.test(last(V)) && !killed.length, 'the headsman can lower the axe');
   // The victim getting up from the block frees it
-  act(BLOCK, V); act(BLOCK, V);
-  ok(!globalThis.__dboExecutionState().length, 'the victim using the block again (standing up) frees it');
+  pos.set(V, 1); pos.set(X, 1.5);
+  act(BLOCK, V);
+  ok(act(BLOCK, V) === false && !globalThis.__dboExecutionState().length, 'the victim using the block again (standing up) frees it, and the engine does not seat them again');
+  pos.set(V, 1); pos.set(X, 1.5);
   // Timeout
   load({ execution: { chopMs: 0, approvalSeconds: 0 } });
   act(BLOCK, V); act(BLOCK, X); await new Promise((r) => setTimeout(r, 5)); tick();
@@ -133,6 +149,66 @@ const ok = (c, name, got) => { if (!c) fails++; console.log(`${c ? 'ok  ' : 'FAI
   choose(V, lastPanel(GM).actions[0].id);
   ok(globalThis.__dboExecutionState()[0].phase === 'awaitGm' && /cannot decide an execution you take part in/.test(last(V)), '...nor can they approve it', last(V));
   admins.delete(V);
+  // 13 Oct 20:30Z: after the execution the headsman stayed seated; every E press was seated again by the fork
+  // ("already occupies it, seating again"). Every end now stands whoever this module seated, and their E press is refused
+  const UNSEAT = 256 / UNITS; // the fork's furniture reach: past it the seat is stale
+  const movedTo = (a) => moved.filter(([x]) => x === a).map(([, v]) => v);
+  load({ execution: { chopMs: 20 } }); killed.length = 0; moved.length = 0;
+  act(BLOCK, V); act(BLOCK, X); choose(GM, lastPanel(GM).actions[0].id); choose(X, lastPanel(X).actions[0].id);
+  ok(!moved.length, 'nobody is moved during the chop');
+  deadSet.add(V);
+  await new Promise((r) => setTimeout(r, 40));
+  ok(killed.length === 1 && movedTo(X).length === 1, 'the execution done, the headsman is stood up', moved);
+  const mx = movedTo(X)[0];
+  ok(mx && Math.hypot(mx.pos[0], mx.pos[1]) >= 256 && mx.cellOrWorldDesc === 'a764b:BSHeartland.esm' && mx.rot[2] === 45 && mx.pos[2] === 108,
+    '...set down past the fork\'s 256-unit furniture reach, in the same world, facing as he was', mx);
+  ok(!movedTo(V).length, '...and the dead victim is not moved');
+  ok(pos.get(X) > UNSEAT, 'the headsman is off the block');
+  // The live bug: the headsman's next E press was a new kneel, which let the engine seat him again
+  pos.set(X, 1.5);
+  load({ execution: { chopMs: 20 } }); killed.length = 0; moved.length = 0;
+  // As the live server stood at 20:30:50: the attempt over, the headsman still seated (the module's own record of it)
+  if (globalThis.__dboExecState.seated instanceof Map) globalThis.__dboExecState.seated.set(BLOCK >>> 0, new Set([X]));
+  ok(act(BLOCK, X) === false && movedTo(X).length === 1 && !globalThis.__dboExecutionState().length && /rise from the block/.test(last(X)),
+    'a player this module seated pressing E is stood up and refused (never seated again)', last(X));
+  deadSet.delete(V); pos.set(V, 1); pos.set(X, 1.5);
+  // Refusal, cancel and timeout stand both
+  for (const [label, run] of [
+    ['a GM refusal', () => choose(GM, lastPanel(GM).actions[1].id)],
+    ['the headsman lowering the axe', () => { choose(GM, lastPanel(GM).actions[0].id); choose(X, lastPanel(X).actions[1].id); }],
+  ]) {
+    load({ execution: { chopMs: 0 } }); moved.length = 0;
+    act(BLOCK, V); act(BLOCK, X); run();
+    ok(!globalThis.__dboExecutionState().length && movedTo(V).length === 1 && movedTo(X).length === 1, `${label} stands both`, moved.map(([a]) => a.toString(16)));
+    pos.set(V, 1); pos.set(X, 1.5);
+  }
+  load({ execution: { chopMs: 0, approvalSeconds: 0 } }); moved.length = 0;
+  act(BLOCK, V); act(BLOCK, X); await new Promise((r) => setTimeout(r, 5)); tick();
+  ok(/Nobody decided in time/.test(last(V)) && movedTo(V).length === 1 && movedTo(X).length === 1, 'a timeout stands both');
+  pos.set(V, 1); pos.set(X, 1.5);
+  // The victim who walked off is not pulled back; the headsman still at the block is stood up
+  load({ execution: { chopMs: 0 } }); moved.length = 0;
+  act(BLOCK, V); act(BLOCK, X); pos.set(V, 10); tick();
+  ok(/stood up or left/.test(last(X)) && !movedTo(V).length && movedTo(X).length === 1, 'the victim who left is not moved; the headsman is stood up', moved);
+  pos.set(V, 1); pos.set(X, 1.5);
+  // The headsman pressing E before the confirm steps away: the attempt ends, both stood up
+  load({ execution: { chopMs: 0 } }); moved.length = 0;
+  act(BLOCK, V); act(BLOCK, X); choose(GM, lastPanel(GM).actions[0].id);
+  ok(act(BLOCK, X) === false && !globalThis.__dboExecutionState().length && /stepped away from the block/.test(last(V)) && movedTo(X).length === 1 && movedTo(V).length === 1,
+    'the headsman pressing E before the confirm ends it and stands both', last(V));
+  pos.set(V, 1); pos.set(X, 1.5);
+  // The victim pressing E while the GM decides ends it too
+  load({ execution: { chopMs: 0 } }); moved.length = 0;
+  act(BLOCK, V); act(BLOCK, X);
+  ok(act(BLOCK, V) === false && !globalThis.__dboExecutionState().length && /rose from the block/.test(last(X)) && movedTo(V).length === 1, 'the victim pressing E while the GM decides ends it', last(X));
+  pos.set(V, 1); pos.set(X, 1.5);
+  // One press arriving twice within a millisecond (20:27:35.880): the repeat does nothing
+  load({ execution: { chopMs: 0, repeatMs: 1500 } }); moved.length = 0;
+  ok(act(BLOCK, V) === undefined && act(BLOCK, V) === false && globalThis.__dboExecutionState().length === 1 && !moved.length, 'a repeat of the kneel within repeatMs is ignored (she stays kneeling)');
+  // Someone who left the block another way (/unstuck) kneels again as a kneel, not a getting up
+  load({ execution: { chopMs: 0 } }); moved.length = 0;
+  act(BLOCK, V); pos.set(V, 100); tick(); pos.set(V, 1);
+  ok(act(BLOCK, V) === undefined && globalThis.__dboExecutionState().length === 1 && !moved.length, 'a player who left by /unstuck kneels again normally');
   load({ execution: { enabled: false } });
   ok(act(BLOCK, V) === undefined && !globalThis.__dboExecutionState().length, 'enabled false: the block is plain furniture');
   const gm = fs.readFileSync(path.join(SERVER, 'gamemode.js'), 'utf8');
@@ -140,6 +216,7 @@ const ok = (c, name, got) => { if (!c) fails++; console.log(`${c ? 'ok  ' : 'FAI
   // The live defaults: the Bruma block counts, and the death waits for the clip's KillActor
   const src = fs.readFileSync(path.join(SERVER, 'execution.js'), 'utf8');
   ok(/blockBases: \['1ac980:DragonBreak Online Edits\.esp'/.test(src) && /chopMs: 16700/.test(src) && /victimIdle: '70c09:Skyrim\.esm'/.test(src), 'defaults: the DLE block, IdleExecutioneeChop on the victim, the death at 16.7 s');
+  ok(/standUnits: 280, repeatMs: 1500/.test(src), 'defaults: stood up 280 units out (past the 256-unit seat reach), repeats within 1.5 s ignored');
   console.log(fails ? `${fails} failed` : 'all passed');
   process.exit(fails ? 1 : 0);
 })();

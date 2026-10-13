@@ -22,8 +22,20 @@
 //      falls: standing up, walking off or logging out during the clip no longer cancels it (13 Oct: the victim could
 //      stand up or walk 5 m during the swing and escape). The death still waits for chopMs, the clip's KillActor.
 // Anything before the headsman confirms that breaks it - the victim or headsman stepping away or leaving, a refusal, approvalSeconds passing - ends
-// the attempt, and everyone in it is told. Config "execution": { enabled, blockBases, idle, gmRangeMeters, reachMeters,
-// watchMeters, chopMs, approvalSeconds }. Hot reload.
+// the attempt, and everyone in it is told.
+//
+// Getting up (13 Oct 20:30Z: the headsman stayed seated after the execution, and every player who ever knelt here before
+// it was stuck too until /unstuck): this furniture never lets a player stand. Each E press while seated reaches the
+// server as an activation, and the fork's TryOccupyFurniture answers an occupant's activation by seating them again
+// ("already occupies it, seating again", 41 times at this block on 13 Oct, against a fresh "seated" each time at an
+// ordinary chair). So the server stands them: whoever this module seated (the victim kneeling, the headsman with the axe)
+// and is still at the block when the attempt ends - done, refused, cancelled, timed out, or by their own E press - is
+// moved standUnits from the block's origin, the way /unstuck moves a player (locationalData). That takes them out of the
+// furniture on their own screen (the client's teleport), their client's closing activation frees the seat, and past the
+// fork's 256-unit furniture reach the seat is stale on the server anyway. Their own E press is refused (false) so the
+// engine does not seat them again, and repeats within repeatMs of the one handled are ignored (one press can arrive twice
+// in a millisecond, 20:27:35.880). Config "execution": { enabled, blockBases, idle, gmRangeMeters, reachMeters,
+// watchMeters, chopMs, approvalSeconds, standUnits, repeatMs }. Hot reload.
 'use strict';
 
 module.exports = (api) => {
@@ -41,9 +53,15 @@ module.exports = (api) => {
     gmRangeMeters: 20, reachMeters: 3, watchMeters: 120,
     // The server's death just after the clip's own KillActor (16.606 s), so the body falls as vanilla's does
     chopMs: 16700, approvalSeconds: 120,
+    // Where a seated player is set down, from the block's origin: past the fork's 256-unit furniture reach (the seat goes
+    // stale) and its 3 m reachMeters (210 units). The seats themselves are about 110 units out
+    standUnits: 280, repeatMs: 1500,
   }, (cfg && cfg.execution) || {});
   const PANEL_ID = 83; // 81 is the couriers board (widget-ids-harness)
   const S = globalThis.__dboExecState || (globalThis.__dboExecState = { blocks: new Map(), baseOf: new Map() });
+  // block -> Set of the players this module let the engine seat there; actor:block -> when their last activation was handled
+  if (!(S.seated instanceof Map)) S.seated = new Map();
+  if (!(S.lastUse instanceof Map)) S.lastUse = new Map();
 
   const idOf = (desc) => { try { return mp.getIdFromDesc(String(desc)) >>> 0; } catch (e) { return 0; } };
   const BASES = new Set((C.blockBases || []).map(idOf).filter(Boolean));
@@ -64,6 +82,30 @@ module.exports = (api) => {
     && (!st || ((g >>> 0) !== (st.victim >>> 0) && (g >>> 0) !== (st.executioner >>> 0))));
   const nonce = () => Math.random().toString(36).slice(2, 10);
 
+  const seatedAt = (block) => { let s = S.seated.get(block); if (!s) S.seated.set(block, (s = new Set())); return s; };
+  const isSeated = (block, a) => !!(S.seated.get(block) && S.seated.get(block).has(a >>> 0));
+  const dead = (a) => { try { return !!mp.get(a, 'isDead'); } catch (e) { return false; } };
+  // Stands a player this module seated: set down standUnits from the block, away from it, facing as they were. Nobody
+  // else is moved, nor anyone who already left the block, died there or logged out (their seat is stale on the server)
+  const release = (block, a) => {
+    a = a >>> 0;
+    const seats = S.seated.get(block);
+    if (!seats || !seats.delete(a)) return false;
+    if (!seats.size) S.seated.delete(block);
+    if (!near(a, block, Number(C.reachMeters)) || dead(a)) return false;
+    try {
+      const loc = mp.get(a, 'locationalData'), b = mp.get(block, 'pos');
+      if (!loc || !Array.isArray(loc.pos) || !Array.isArray(b)) return false;
+      let dx = loc.pos[0] - b[0], dy = loc.pos[1] - b[1];
+      const len = Math.hypot(dx, dy);
+      if (len < 1) { dx = 1; dy = 0; } else { dx /= len; dy /= len; }
+      const out = Number(C.standUnits) || 280;
+      mp.set(a, 'locationalData', { cellOrWorldDesc: loc.cellOrWorldDesc, pos: [b[0] + dx * out, b[1] + dy * out, loc.pos[2] + 8], rot: loc.rot || [0, 0, 0] });
+      log(`execution: ${nameOf(a)} stood up from the block at ${block.toString(16)}`);
+      return true;
+    } catch (e) { log(`execution: standing ${a.toString(16)} up failed: ${e.message}`); return false; }
+  };
+
   const end = (block, why, tellAll) => {
     const st = S.blocks.get(block);
     if (!st) return;
@@ -72,6 +114,8 @@ module.exports = (api) => {
       try { closeWidget(a, PANEL_ID); } catch (e) { /* offline */ }
       if (tellAll && why) { try { personal(a, why); } catch (e) { /* offline */ } }
     }
+    // Every end stands both: the block never lets them up itself
+    for (const a of [st.victim, st.executioner].filter(Boolean)) release(block, a);
     if (st.phase !== 'kneeling') log(`execution at ${block.toString(16)} ended: ${why || 'done'}`);
   };
 
@@ -86,6 +130,11 @@ module.exports = (api) => {
     const block = targetId >>> 0, a = casterId >>> 0;
     if (!isBlock(block) || !isPlayer(a)) return undefined;
     let st = S.blocks.get(block);
+    // One press can arrive twice within a millisecond: only the first is handled, and the repeat seats nobody
+    const useKey = `${a}:${block}`, now = Date.now();
+    if (now - (S.lastUse.get(useKey) || 0) < Number(C.repeatMs)) return false;
+    S.lastUse.set(useKey, now);
+    if (S.lastUse.size > 500) for (const [k, t] of S.lastUse) if (now - t > 60000) S.lastUse.delete(k);
     // Once the headsman has confirmed, nothing at the block changes it: the victim cannot stand up, nobody else can use it
     if (st && st.phase === 'chopping') {
       personal(a, a === st.victim ? 'The axe is already falling. You cannot rise now.' : 'An execution is under way here.');
@@ -93,12 +142,19 @@ module.exports = (api) => {
     }
     // A victim who is gone frees the block
     if (st && !near(st.victim, block, Number(C.reachMeters))) { end(block, 'The one at the block is gone.', true); st = null; }
+    // Someone this module seated, pressing E again, wants up: refused, or the engine would seat them again
+    if (!st && isSeated(block, a)) { release(block, a); personal(a, 'You rise from the block.'); return false; }
     if (!st) {
       S.blocks.set(block, { victim: a, phase: 'kneeling', at: Date.now() });
-      personal(a, 'You kneel and lay your head on the block. Nothing more happens unless a GM allows an execution; stand up to leave.');
+      seatedAt(block).add(a);
+      personal(a, 'You kneel and lay your head on the block. Nothing more happens unless a GM allows an execution; use the block again to rise.');
       return undefined;
     }
-    if (st.victim === a) { end(block, '', false); return undefined; }   // getting up
+    if (st.victim === a) {   // getting up
+      if (st.phase !== 'kneeling') { end(block, `${nameOf(a)} rose from the block. There is no execution.`, true); return false; }
+      end(block, '', false); personal(a, 'You rise from the block.'); return false;
+    }
+    if (st.executioner === a) { end(block, `${nameOf(a)} stepped away from the block. There is no execution.`, true); return false; }
     if (st.phase !== 'kneeling') { personal(a, 'An execution is already under way here.'); return false; }
     const gms = gmsNear(block, { victim: st.victim, executioner: a });
     if (!gms.length) {
@@ -106,6 +162,7 @@ module.exports = (api) => {
       return false;
     }
     Object.assign(st, { executioner: a, phase: 'awaitGm', at: Date.now(), nonce: nonce(), gms });
+    seatedAt(block).add(a);
     for (const g of gms) {
       panel(g, `Execution: ${nameOf(a)} would behead ${nameOf(st.victim)}. This ends ${nameOf(st.victim)}'s character for good (PK).`,
         [{ id: `approve:${block.toString(16)}:${st.nonce}`, label: 'Approve the execution' }, { id: `deny:${block.toString(16)}:${st.nonce}`, label: 'Refuse' }]);
@@ -169,6 +226,16 @@ module.exports = (api) => {
       if (st.phase === 'awaitGm' && st.approvedBy === undefined && !(st.gms || []).some((g) => near(g, block, Number(C.gmRangeMeters)))) { end(block, 'No GM is at the block any more. There is no execution.', true); continue; }
       if (st.phase === 'awaitHeadsman' && !near(st.approvedBy, block, Number(C.gmRangeMeters))) { end(block, `GM ${nameOf(st.approvedBy)}, who allowed the execution, left the block. There is no execution.`, true); continue; }
       if (st.phase !== 'kneeling' && now - st.at > Number(C.approvalSeconds) * 1000) end(block, 'Nobody decided in time. There is no execution.', true);
+    }
+    // A seated player who left another way (/unstuck, a logout, a door) is no longer at the block: forget them, so the
+    // next time they kneel is a kneel and not a getting up
+    for (const [block, seats] of [...S.seated]) {
+      const st = S.blocks.get(block);
+      for (const a of [...seats]) {
+        if (st && st.phase === 'chopping' && (a === st.victim || a === st.executioner)) continue;
+        if (!near(a, block, Number(C.reachMeters) + 2)) seats.delete(a);
+      }
+      if (!seats.size) S.seated.delete(block);
     }
   });
 
