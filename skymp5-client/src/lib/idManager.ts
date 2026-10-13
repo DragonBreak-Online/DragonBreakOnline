@@ -1,5 +1,16 @@
+import { logError } from "../logging";
+
 export class IdManager {
   allocateIdFor(value: number): number {
+    // Re-allocating a server idx that is still mapped orphans the old slot: the previous local id
+    // keeps pointing at a form nobody can reach, and a later destroy for that idx resolves to the
+    // WRONG slot. If a player is ever ejected to the main menu by a destroy that was not about
+    // them, this is where it would begin, so it is loud rather than silent.
+    const existing = this.idByValue[value];
+    if (typeof existing === "number") {
+      logError("IdManager", `allocateIdFor: server idx ${value} is already mapped to local id ${existing}; orphaning it and remapping`);
+    }
+
     if (this.idByValue.length <= value) {
       this.idByValue.length = value + 1;
     }
@@ -22,7 +33,13 @@ export class IdManager {
   }
 
   freeIdFor(value: number): void {
-    const id = this.idByValue[value] as number;
+    const id = this.idByValue[value];
+    // Freeing an idx that was never mapped used to run on with id === undefined, which assigned
+    // valueById[undefined] and left a bogus "undefined" key on the array.
+    if (typeof id !== "number") {
+      logError("IdManager", `freeIdFor: server idx ${value} is not mapped, ignoring`);
+      return;
+    }
     if (id < this.minimumUnusedId) {
       this.minimumUnusedId = id;
     }

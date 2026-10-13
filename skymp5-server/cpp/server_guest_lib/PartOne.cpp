@@ -444,6 +444,10 @@ Networking::UserId PartOne::GetUserByActor(uint32_t formId)
 
 void PartOne::DestroyActor(uint32_t actorFormId)
 {
+  // The deliberate destroy, as opposed to the unsubscribe path above. Logged so the two are told
+  // apart in the log: this one really removes the form, that one only stops a listener seeing it.
+  spdlog::info("PartOne::DestroyActor {:x}", actorFormId);
+
   worldState.GetFormAt<MpActor>(actorFormId).Delete();
 
   std::shared_ptr<MpActor> destroyedForm;
@@ -1207,6 +1211,25 @@ void PartOne::Init()
         listenerUserId != serverState.disconnectingUserId) {
       DestroyActorMessage message;
       message.idx = emitter->GetIdx();
+      message.formId = emitter->GetFormId();
+      // A player is subscribed to itself, so an Unsubscribe(self, self) sends that player a destroy
+      // bearing their OWN idx and the client quits to the main menu, while the server-side form
+      // lives on. That left no trace at all when it ejected a GM on 2026-10-13.
+      //
+      // Only the self case is logged at warn: it is rare and it is the one that ejects a player.
+      // Ordinary destroys are far too frequent for the live log - a single teleport released eight
+      // subscriptions in one millisecond - so they stay at debug, off unless logLevel is lowered.
+      const bool destroysListenerSelf =
+        emitter->GetFormId() == listener->GetFormId();
+      if (destroysListenerSelf) {
+        spdlog::warn("DestroyActor -> user {} for ITS OWN actor {:x} (idx {}); "
+                     "the client will quit to the main menu",
+                     listenerUserId, emitter->GetFormId(), emitter->GetIdx());
+      } else {
+        spdlog::debug("DestroyActor -> user {} listener {:x} for form {:x} (idx {})",
+                      listenerUserId, listener->GetFormId(),
+                      emitter->GetFormId(), emitter->GetIdx());
+      }
       sendTarget->Send(listenerUserId, message, true);
     }
   };

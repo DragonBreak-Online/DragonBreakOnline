@@ -833,6 +833,24 @@ export class RemoteServer extends ClientListener {
     if (destroyedRefrId) {
       this.forgetHosted(destroyedRefrId);
     }
+
+    // Record every destroy and whether it hit our own player slot, BEFORE anything is mutated. The
+    // quit below is deferred to the next "update" and can fire long afterwards, so without this the
+    // ejection is unattributable: on 2026-10-13 a GM reached Skyrim's main menu and neither end
+    // could say which form caused it.
+    // Only the two cases worth reading are logged: destroys are far too frequent to record each one.
+    const isOwnPlayer = this.worldModel.playerCharacterFormIdx === i;
+    if (isOwnPlayer || i < 0) {
+      const serverFormId = msg.formId === undefined ? 'not sent' : msg.formId.toString(16);
+      logError(this, `destroyActor idx=${msg.idx} slot=${i} serverForm=${serverFormId} ` +
+        `refrId=${destroyedRefrId === undefined ? 'none' : destroyedRefrId.toString(16)} ` +
+        `ownPlayer=${isOwnPlayer} pcIdx=${this.worldModel.playerCharacterFormIdx}`);
+    }
+    // An unmapped idx used to write forms[-1], silently creating a bogus property on the array.
+    if (i < 0) {
+      return;
+    }
+
     this.worldModel.forms[i] = undefined;
     getViewFromStorage()?.syncFormArray(this.worldModel);
 
