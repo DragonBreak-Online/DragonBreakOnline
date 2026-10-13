@@ -69,7 +69,7 @@ const WEEK = 7 * 86400000;
 ok(JSON.stringify(globalThis.__dboEconomyWages('county-bruma')) === JSON.stringify({ steward: 150, captain: 100, guard: 50, courtmage: 100 }), "Bruma's offices start at the default wages, and the Count has none", globalThis.__dboEconomyWages('county-bruma'));
 reckonAt(SUNDAY);
 ok(bank(STEWARD) === 150 && bank(GUARD1) === 50 && bank(GUARD2) === 50 && bank(COUNT) === 0, 'with no tax coming in, the Steward and both guards are paid from savings; the Count is not', [bank(STEWARD), bank(GUARD1), bank(GUARD2), bank(COUNT)]);
-ok(treasuries['county-bruma'] === 1750 && report().wageBudget === 500, 'the budget is 25% of the 2,000 saved; 250 paid', [treasuries['county-bruma'], report().wageBudget]);
+ok(treasuries['county-bruma'] === 1750 && report().wageBudget === 2000, 'the budget is the whole 2,000 saved (Nate, 13 Oct: wages paid in full while the gold lasts); 250 paid', [treasuries['county-bruma'], report().wageBudget]);
 
 // ---- the Steward changes the guards' wage; their own stays out of reach ----
 ui.econWage(STEWARD, ['nonce', 'county-bruma', 'guard', 80]);
@@ -81,11 +81,11 @@ reckonAt(SUNDAY + WEEK);
 ok(bank(GUARD1) === 130 && bank(STEWARD) === 300, 'the next week pays the new wage', [bank(GUARD1), bank(STEWARD)]);
 
 // ---- a thin treasury: what does not fit is owed, never overdrawn ----
-treasuries['county-bruma'] = 400;
-globalThis.__dboEconomy.data.balanceAfter['county-bruma'] = 400;
+treasuries['county-bruma'] = 200;
+globalThis.__dboEconomy.data.balanceAfter['county-bruma'] = 200;
 reckonAt(SUNDAY + 2 * WEEK);
-ok(report().wageBudget === 100 && treasuries['county-bruma'] >= 0, 'a 400-gold treasury allows 100 a week', [report().wageBudget, treasuries['county-bruma']]);
-ok(report().owed > 0 && report().wagesPaid <= 100, 'the wages that do not fit are owed', report());
+ok(report().wageBudget === 200 && treasuries['county-bruma'] === 0, 'a 200-gold treasury pays out its 200 and no more', [report().wageBudget, treasuries['county-bruma']]);
+ok(report().wagesPaid === 200 && report().owed === 110, 'the 110 of the 310 in wages that did not fit is owed', report());
 
 // ---- a wage set to 0 stops it ----
 ui.econWage(COUNT, ['nonce', 'county-bruma', 'guard', 0]);

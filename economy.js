@@ -32,9 +32,9 @@
 // Guards (review B2: a ruler could pay the treasury out to himself, or drain a rival with an assessment):
 //   - nobody is paid a wage by a treasury their account controls (the hold's ruler, a roster's leader, and their alts),
 //     and nobody sets the wage of a rank their own account holds;
-//   - the wages paid each week are capped at wageIncomeShare of what came into the treasury since the last reckoning
-//     (taxes and deposits, less anything else it paid out), and never more than wageShare of the balance, so neither
-//     the seed nor past income can be paid out without new income (review A1-3); the rest is owed, as when it runs short;
+//   - wages are paid in full while the treasury holds the gold (wageSavingsShare 1, Nate 13 Oct); below 1 a week's wages
+//     take at most wageIncomeShare of the income since the last reckoning, up to wageShare of the balance, plus that share
+//     of the savings (review A1-3). What does not fit is paid in part and the rest owed, paid first the next week;
 //   - an owed wage is dropped once its payee no longer holds the rank (left the roster, lost the office, or the
 //     character was deleted), and the leader may forgive what is owed (dbo econForgive);
 //   - a property is assessed at most once every assessEveryDays, to at most assessMaxStep times or 1/assessMaxStep of
@@ -59,7 +59,7 @@ module.exports = (api) => {
   // off (gamemode.js ownDisplay)
   const ownDisplay = typeof api.ownDisplay === 'function' ? api.ownDisplay : display;
   const C = Object.assign({ enabled: false, maxTaxRate: 0.30, defaultPropertyValue: 2000, maxPropertyValue: 1000000, maxWage: 100000, reckonDay: 0, reckonHour: 0,
-    wageShare: 0.25, wageIncomeShare: 0.75, wageSavingsShare: 0.25, assessEveryDays: 7, assessMaxStep: 2,
+    wageShare: 0.25, wageIncomeShare: 0.75, wageSavingsShare: 1, assessEveryDays: 7, assessMaxStep: 2,
     titheRate: 0.10, titheTo: 'imperial-legion', titheProvinces: ['cyrodiil'],
     dominionStipend: 300, dominionStipendTo: 'thalmor', dominionStipendFrom: 'the Aldmeri Dominion',
     // A hold's offices are paid these each week until its ruler or Steward sets another (Nate, 12 Oct); rulers are never paid
@@ -349,7 +349,9 @@ module.exports = (api) => {
           const income = Number.isFinite(last) && fid in d.balanceAfter ? Math.max(0, balance - last) : Math.max(0, r.income - (r.tithe || 0) + (r.tithesIn || 0) + (r.stipend || 0));
           const savings = Math.max(0, balance - income);
           const fromIncome = Math.min(Math.max(0, Number(C.wageIncomeShare) || 0) * income, Math.max(0, Number(C.wageShare) || 0) * balance);
-          let budget = Math.floor(Math.min(balance, fromIncome + Math.max(0, Number(C.wageSavingsShare) || 0) * savings));
+          // wageSavingsShare 1 (Nate, 13 Oct): the leader's wages are paid in full while the treasury holds the gold
+          const savingsShare = Math.max(0, Number(C.wageSavingsShare) || 0);
+          let budget = Math.floor(savingsShare >= 1 ? balance : Math.min(balance, fromIncome + savingsShare * savings));
           r.wageBudget = budget;
           const fresh = {};
           const owe = (p, actor) => { fresh[p.key] = { actor, gold: ((fresh[p.key] || {}).gold || 0) + p.wage, rank: p.rank }; r.owed += p.wage; r.unpaid.push(p.key); };
@@ -382,7 +384,7 @@ module.exports = (api) => {
       d.balanceAfter[fid] = r.balance;
       d.reports[fid] = r;
       audit(`ECONOMY ${nameOfFaction(fid)}: taxes ${r.income} gold from ${r.taxed} properties, ${r.overdue.length} overdue;${r.stipend ? ` stipend ${r.stipend} from ${r.stipendFrom};` : ''} wages ${r.wagesPaid} paid, ${r.owed} owed; treasury ${r.balance}`);
-      for (const a of onlineActors()) if (leads(a, fid)) personal(a, `The week's reckoning for ${nameOfFaction(fid)}: ${r.income} gold in taxes${r.fiefShares ? ` (and ${r.fiefShares} gold to its fiefs' treasuries)` : ''}${r.tithesIn ? `, ${r.tithesIn} gold in Imperial tithes` : ''}${r.tithe || r.titheOwed ? `, ${r.tithe} gold Imperial tithe to ${r.titheTo}${r.titheOwed ? ` (${r.titheOwed} gold still owed)` : ''}` : ''}${r.stipend ? `, ${r.stipend} gold stipend from ${r.stipendFrom}` : ''}, ${r.wagesPaid} gold in wages${r.owed ? `, ${r.owed} gold of wages owed` : ''}${r.capped ? ` (wages take at most ${Math.round(C.wageIncomeShare * 100)}% of the week's income, up to ${Math.round(C.wageShare * 100)}% of the treasury, plus ${Math.round((Number(C.wageSavingsShare) || 0) * 100)}% of its savings: ${r.wageBudget} gold this week; the rest is paid first next week)` : ''}${r.overdue.length ? `, ${r.overdue.length} properties overdue` : ''}. The treasury holds ${r.balance} gold.`);
+      for (const a of onlineActors()) if (leads(a, fid)) personal(a, `The week's reckoning for ${nameOfFaction(fid)}: ${r.income} gold in taxes${r.fiefShares ? ` (and ${r.fiefShares} gold to its fiefs' treasuries)` : ''}${r.tithesIn ? `, ${r.tithesIn} gold in Imperial tithes` : ''}${r.tithe || r.titheOwed ? `, ${r.tithe} gold Imperial tithe to ${r.titheTo}${r.titheOwed ? ` (${r.titheOwed} gold still owed)` : ''}` : ''}${r.stipend ? `, ${r.stipend} gold stipend from ${r.stipendFrom}` : ''}, ${r.wagesPaid} gold in wages${r.owed ? `, ${r.owed} gold of wages owed` : ''}${r.capped ? ` (${(Number(C.wageSavingsShare) || 0) >= 1 ? 'the treasury ran out' : `wages take at most ${Math.round(C.wageIncomeShare * 100)}% of the week's income, up to ${Math.round(C.wageShare * 100)}% of the treasury, plus ${Math.round((Number(C.wageSavingsShare) || 0) * 100)}% of its savings`}: ${r.wageBudget} gold this week; the rest is paid first next week)` : ''}${r.overdue.length ? `, ${r.overdue.length} properties overdue` : ''}. The treasury holds ${r.balance} gold.`);
     }
     save();
     return reports;
