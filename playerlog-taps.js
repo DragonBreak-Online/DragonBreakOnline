@@ -740,7 +740,12 @@ module.exports = (K) => {
   G.hooks.move = (kind, a, c, id, count, before, after, exBefore, exAfter) => {
     const actor = u32(a), ref = u32(c), base = u32(id);
     if (!online(actor)) return;
-    const moved = kind === 'put' ? (before[0] - after[0]) : (after[0] - before[0]);
+    // itemguards reads before at once and after a tick later, so when two moves of one item land in one batch, the first
+    // one's after already holds the second's count: the pack delta, capped by the move's own count, is what this move moved
+    // (13 Oct, gold review: 'took 5 gold' for 3 + 1)
+    const d = kind === 'put' ? (before[0] - after[0]) : (after[0] - before[0]);
+    const n = Number(count);
+    const moved = Number.isFinite(n) && n > 0 ? Math.max(0, Math.min(d, n)) : d;
     const t = now();
     const extra = extrasDiff(exBefore, exAfter)[0];
     const item = itemOf(base, Math.abs(moved), extra ? Object.assign({ name: extra.named ? 'x' : undefined }, extra) : null);
@@ -751,7 +756,8 @@ module.exports = (K) => {
     const m = kind === 'put' ? s.put : s.took;
     const k = itemKey(item);
     const cur = m.get(k);
-    if (cur) cur.k += Math.abs(moved); else if (m.size < 60) m.set(k, item);
+    // the container's running total is a copy: emit keeps item by reference until the flush writes it (the item.move above)
+    if (cur) cur.k += Math.abs(moved); else if (m.size < 60) m.set(k, Object.assign({}, item));
   };
 
   // =============================================================================================================================
