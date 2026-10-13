@@ -3297,6 +3297,10 @@ const DRIFT_KEYS = {
   sinkReport: { def: 120, ok: driftRange(16, 1000) },
   rehostClock: { def: 'apply', ok: (v) => v === 'packet' || v === 'apply' },
   rehostAfterMs: { def: 2100, ok: driftRange(1000, 10000) },
+  // A remote copy's face-tint rebuild (client 0.3.96 view/onScreenRebuild.ts): "load" once per 3D load (the face-morph crash
+  // SkyrimSE+04328E9), "entry" on every return to the screen as before 0.3.96, the quick undo (claude-jake's review of
+  // 6b7a3c59). Its default is gamemode-config.json drift.faceRebuild when set; /driftset faceRebuild entry switches it live.
+  faceRebuild: { def: (cfg && cfg.drift && (cfg.drift.faceRebuild === 'entry' || cfg.drift.faceRebuild === 'load')) ? cfg.drift.faceRebuild : 'load', ok: (v) => v === 'load' || v === 'entry' },
 };
 const DRIFT_SET = globalThis.__dboDriftSet && typeof globalThis.__dboDriftSet === 'object' ? globalThis.__dboDriftSet : (globalThis.__dboDriftSet = {});
 const driftValue = (k) => (Object.prototype.hasOwnProperty.call(DRIFT_SET, k) ? DRIFT_SET[k] : DRIFT_KEYS[k].def);
