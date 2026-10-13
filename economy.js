@@ -358,11 +358,15 @@ module.exports = (api) => {
               const actor = payeeNow(p);
               // A roster member whose character is gone is owed nothing; a hold official with no character today is owed
               if (!actor && p.key[0] === 'a') { log(`economy: ${nameOfFaction(fid)} pays nobody for ${p.key} (${p.rank}): the character no longer exists`); continue; }
-              if (actor && p.wage <= budget && T.spend(fid, p.wage, `wage ${p.rank} ${p.key}`)) {
+              // What the budget allows is paid and the rest owed: all or nothing let an owed wage grow past every week's
+              // budget and never be paid (#bugs 12 Oct, Treasury Bugged)
+              const pay = actor ? Math.min(p.wage, budget) : 0;
+              if (pay > 0 && T.spend(fid, pay, `wage ${p.rank} ${p.key}`)) {
                 // The treasury has paid: if the credit still fails, the gold goes back and the wage is owed
-                try { credit(actor, p.wage); }
-                catch (e) { T.deposit(fid, p.wage, `wage ${p.rank} ${p.key} returned: ${e.message}`); owe(p, actor); log(`economy: wage ${p.key} of ${nameOfFaction(fid)} could not be credited, returned`, e.message); continue; }
-                r.wagesPaid += p.wage; budget -= p.wage;
+                try { credit(actor, pay); }
+                catch (e) { T.deposit(fid, pay, `wage ${p.rank} ${p.key} returned: ${e.message}`); owe(p, actor); log(`economy: wage ${p.key} of ${nameOfFaction(fid)} could not be credited, returned`, e.message); continue; }
+                r.wagesPaid += pay; budget -= pay;
+                if (pay < p.wage) { r.capped = true; owe({ ...p, wage: p.wage - pay }, actor); }
               } else {
                 if (actor && p.wage > budget) r.capped = true;
                 owe(p, actor);
@@ -378,7 +382,7 @@ module.exports = (api) => {
       d.balanceAfter[fid] = r.balance;
       d.reports[fid] = r;
       audit(`ECONOMY ${nameOfFaction(fid)}: taxes ${r.income} gold from ${r.taxed} properties, ${r.overdue.length} overdue;${r.stipend ? ` stipend ${r.stipend} from ${r.stipendFrom};` : ''} wages ${r.wagesPaid} paid, ${r.owed} owed; treasury ${r.balance}`);
-      for (const a of onlineActors()) if (leads(a, fid)) personal(a, `The week's reckoning for ${nameOfFaction(fid)}: ${r.income} gold in taxes${r.fiefShares ? ` (and ${r.fiefShares} gold to its fiefs' treasuries)` : ''}${r.tithesIn ? `, ${r.tithesIn} gold in Imperial tithes` : ''}${r.tithe || r.titheOwed ? `, ${r.tithe} gold Imperial tithe to ${r.titheTo}${r.titheOwed ? ` (${r.titheOwed} gold still owed)` : ''}` : ''}${r.stipend ? `, ${r.stipend} gold stipend from ${r.stipendFrom}` : ''}, ${r.wagesPaid} gold in wages${r.owed ? `, ${r.owed} gold of wages owed` : ''}${r.capped ? ` (wages take at most ${Math.round(C.wageIncomeShare * 100)}% of the week's income and ${Math.round(C.wageShare * 100)}% of the treasury: ${r.wageBudget} gold this week)` : ''}${r.overdue.length ? `, ${r.overdue.length} properties overdue` : ''}. The treasury holds ${r.balance} gold.`);
+      for (const a of onlineActors()) if (leads(a, fid)) personal(a, `The week's reckoning for ${nameOfFaction(fid)}: ${r.income} gold in taxes${r.fiefShares ? ` (and ${r.fiefShares} gold to its fiefs' treasuries)` : ''}${r.tithesIn ? `, ${r.tithesIn} gold in Imperial tithes` : ''}${r.tithe || r.titheOwed ? `, ${r.tithe} gold Imperial tithe to ${r.titheTo}${r.titheOwed ? ` (${r.titheOwed} gold still owed)` : ''}` : ''}${r.stipend ? `, ${r.stipend} gold stipend from ${r.stipendFrom}` : ''}, ${r.wagesPaid} gold in wages${r.owed ? `, ${r.owed} gold of wages owed` : ''}${r.capped ? ` (wages take at most ${Math.round(C.wageIncomeShare * 100)}% of the week's income, up to ${Math.round(C.wageShare * 100)}% of the treasury, plus ${Math.round((Number(C.wageSavingsShare) || 0) * 100)}% of its savings: ${r.wageBudget} gold this week; the rest is paid first next week)` : ''}${r.overdue.length ? `, ${r.overdue.length} properties overdue` : ''}. The treasury holds ${r.balance} gold.`);
     }
     save();
     return reports;

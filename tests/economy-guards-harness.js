@@ -89,10 +89,18 @@ check('the Count got nothing, neither this week\'s nor what was owed', bal(0x10)
 check('the leader\'s alt got nothing and is owed nothing; with no income the other Associate is owed, not paid', bal(0x42) === 0 && bal(0x41) === 0 && !(state().owed['fighters-guild'] || {}).a66 && (state().owed['fighters-guild'] || {}).a65 && state().owed['fighters-guild'].a65.gold === 100, JSON.stringify(state().owed['fighters-guild']));
 
 // A week's wages take at most 75% of the week's income (200 of tax: 150 of budget) and 25% of the treasury (1,200: 300);
-// two guards at 200 each: neither fits, both are owed
-check('neither guard fits the 150 budget: both wages are owed', bal(0x23) + bal(0x24) === 0 && r['county-bruma'].owed === 400 && r['county-bruma'].wageBudget === 150, JSON.stringify(r['county-bruma']));
-check('the report says the cap stopped it, and the Count is told', r['county-bruma'].capped === true && out.personal.some((x) => x.a === 0x10 && /at most 75% of the week's income and 25% of the treasury: 150 gold/.test(x.t)));
-check('the treasury kept its 1,000 plus 200 of tax', treasuries['county-bruma'] === 1200 && bal(0x20) === 800, `${treasuries['county-bruma']} ${bal(0x20)}`);
+// two guards at 200 each: the budget is paid out and the rest owed (an all-or-nothing wage grew past every budget, #bugs 12 Oct)
+check('the 150 budget goes to the first guard, the rest of the 400 is owed', bal(0x23) + bal(0x24) === 150 && r['county-bruma'].wagesPaid === 150 && r['county-bruma'].owed === 250 && r['county-bruma'].wageBudget === 150, JSON.stringify(r['county-bruma']));
+check('the report says the cap stopped it, and the Count is told', r['county-bruma'].capped === true && out.personal.some((x) => x.a === 0x10 && /at most 75% of the week's income, up to 25% of the treasury, plus 0% of its savings: 150 gold this week; the rest is paid first next week/.test(x.t)));
+check('the treasury kept its 1,000 plus 200 of tax, less the 150 paid', treasuries['county-bruma'] === 1050 && bal(0x20) === 800, `${treasuries['county-bruma']} ${bal(0x20)}`);
+
+// The next week pays the owed rest first and keeps paying down: nothing owed grows past every budget
+const owedBefore = Object.values(state().owed['county-bruma'] || {}).reduce((n, o) => n + o.gold, 0);
+now += 7 * 86400000;
+timers.get('economy')();
+const r2 = state().reports['county-bruma'];
+check('a week on, the guards are paid again from the new budget', bal(0x23) + bal(0x24) === 150 + r2.wagesPaid && r2.wagesPaid > 0, JSON.stringify(r2));
+check('...and an owed wage is paid down first, part by part', !Object.values(state().owed['county-bruma'] || {}).some((o) => o.gold > 400) && owedBefore === 250, JSON.stringify(state().owed['county-bruma']));
 
 // Assessments: once a week, at most twice or half the value, the owner told
 check('a first assessment within twice the value (2,000 to 4,000)', ui('econValue', 0x30, H1, 4000).ok);
