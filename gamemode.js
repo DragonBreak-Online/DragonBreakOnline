@@ -4474,7 +4474,8 @@ const zoneOfActor = (a) => {
   return zone;
 };
 // ---- /unstuck: walk out to the respawn temple of the area you are in ------------------------------
-const UNSTUCK = Object.assign({ cooldownMinutes: 25, pvpCombatSeconds: 60 }, cfg.unstuck || {});
+// Anyone, every 30 minutes and never in a fight, PvE included (Nate, 13 Oct)
+const UNSTUCK = Object.assign({ cooldownMinutes: 30, combatSeconds: 60 }, cfg.unstuck || {});
 const pvpAt = globalThis.__dboPvpAt = globalThis.__dboPvpAt || new Map(); // actorId -> last PvP hit given or taken
 // actorId -> last landed blow a player gave or took, NPCs included: rest.js keeps Sleep waiting its combatSeconds after one
 const combatAt = globalThis.__dboCombatAt = globalThis.__dboCombatAt || new Map();
@@ -4529,8 +4530,9 @@ const unstuckActor = (a, by) => {
   try { const r = mp.get(a, 'private.restrained'); if (r && (r.boundHands || r.carried || r.captorActorId)) return personal(by, 'You cannot use /unstuck while restrained or carried.'); } catch (e) { /* free */ }
   // No walking out of a jail, or out of a sentence (jail.js)
   if (!admin && globalThis.__dboJailUnstuck) { const why = globalThis.__dboJailUnstuck(a); if (why) return personal(by, why); }
-  const fought = Date.now() - (pvpAt.get(a) || 0);
-  if (!admin && fought < UNSTUCK.pvpCombatSeconds * 1000) return personal(by, `You are in combat with another player. Try again in ${Math.ceil((UNSTUCK.pvpCombatSeconds * 1000 - fought) / 1000)} seconds.`);
+  const combatMs = (Number(UNSTUCK.combatSeconds ?? UNSTUCK.pvpCombatSeconds) || 0) * 1000;
+  const fought = Date.now() - Math.max(pvpAt.get(a) || 0, combatAt.get(a >>> 0) || 0);
+  if (!admin && fought < combatMs) return personal(by, `You cannot use /unstuck in combat. Try again in ${Math.ceil((combatMs - fought) / 1000)} seconds.`);
   const last = Number(mp.get(a, 'private.unstuckAt')) || 0;
   const wait = last + UNSTUCK.cooldownMinutes * 60000 - Date.now();
   if (!admin && wait > 0) return personal(by, `/unstuck is ready again in ${Math.ceil(wait / 60000)} minute${Math.ceil(wait / 60000) === 1 ? '' : 's'}.`);
@@ -4554,7 +4556,7 @@ registerChatCommand('unstuck', (a, args) => {
   const t = findByName(name);
   if (!t) return personal(a, `No player online called ${name}.`);
   return unstuckActor(t, a);
-}, { help: `move to the respawn point of your area (every ${UNSTUCK.cooldownMinutes} min, not in PvP combat); staff: [player]` });
+}, { help: `move to the respawn point of your area (every ${UNSTUCK.cooldownMinutes} min, not in combat); staff: [player]` });
 const setDeathTemple = (a) => {
   try { if (!(Number(mp.get(a, 'profileId')) >= 0)) return; } catch (e) { return; }
   const zone = zoneOfActor(a);
@@ -6446,9 +6448,9 @@ const hitDamageAttemptHook =(aggressorId, targetId, sourceId, damage, flags) => 
     catch (e) { /* ignore */ }
   }
 
-  // PvP combat: both sides are marked, so /unstuck cannot be used to leave a fight
+  // PvP combat: both sides are marked
   if (dmg > 0 && agg !== tgt && profileOf(agg) >= 0 && profileOf(tgt) >= 0) { const now = Date.now(); pvpAt.set(agg, now); pvpAt.set(tgt, now); }
-  // Any combat, NPCs included: Sleep refuses for 5 minutes after it (rest.js), as a logout leaves the body that long
+  // Any combat, NPCs included: /unstuck waits combatSeconds after it, Sleep 5 minutes (rest.js), as a logout leaves the body that long
   if (dmg > 0 && agg !== tgt) { const now = Date.now(); if (profileOf(agg) >= 0) combatAt.set(agg >>> 0, now); if (profileOf(tgt) >= 0) combatAt.set(tgt >>> 0, now); }
   // An NPC in a fight stays with its host for a moment (hostcooldown.js)
   if (dmg > 0 && agg !== tgt && globalThis.__dboHostCooldown) { if (profileOf(agg) < 0) globalThis.__dboHostCooldown.noteFight(agg); if (profileOf(tgt) < 0) globalThis.__dboHostCooldown.noteFight(tgt); }
