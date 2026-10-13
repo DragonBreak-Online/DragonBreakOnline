@@ -149,15 +149,16 @@ function service(bundle) {
       Actor: { from: (f) => (f && f.isActor ? f : null) }, Weapon: { from: (f) => (f && f.weapon ? f : null) },
       Spell: none, Scroll: none, Faction: none, Perk: none,
     };
-    const handlers = {};
+    const handlers = {}, onces = [];
     const controller = {
       emitter: { on: (n, fn) => { handlers[n] = fn; } }, on: (n, fn) => { handlers[n] = fn; },
+      once: (n, fn) => { if (n === 'update') onces.push(fn); },
       lookupListener: () => ({ sweepBurst() {} }),
     };
     const { CompanionService } = require(bundle);
     new CompanionService(sp, controller);
     const state = (companions) => handlers.customPacketMessage({ message: { contentJsonDump: JSON.stringify({ customPacketType: 'companionState', companions }) } });
-    const tick = (n = 1) => { for (let i = 0; i < n; i++) { now += 300; handlers.update(); } };
+    const tick = (n = 1) => { for (let i = 0; i < n; i++) { now += 300; handlers.update(); onces.splice(0).forEach((f) => f()); } };
     return { W, player, summon, b, c, wolf, state, tick, handlers };
   };
   const started = (a, id) => a.calls.some(([m, t]) => m === 'startCombat' && t === id);

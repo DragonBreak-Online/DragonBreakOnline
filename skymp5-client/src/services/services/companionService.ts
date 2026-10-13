@@ -138,8 +138,8 @@ export class CompanionService extends ClientListener {
     }
     this.companions = list;
     storage[COMPANION_IDS_KEY] = list.map((c) => c.id);
-    // The update loop idles once the list is empty, so the panel is refreshed here or the last row stays on screen
-    this.publishHud(Date.now());
+    // The update loop idles once the list is empty, so the panel is refreshed from here, on the update (getFormEx throws in tick)
+    this.controller.once("update", () => this.publishHud(Date.now()));
     Array.from(this.local.keys()).forEach((id) => {
       if (!list.some((c) => c.id === id)) {
         const gone = this.local.get(id);
