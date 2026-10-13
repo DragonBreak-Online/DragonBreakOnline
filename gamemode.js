@@ -5498,6 +5498,7 @@ const deathHook = (actorId, killerId, ...rest) => {
   try { if (globalThis.__dboContractKill && killerId) globalThis.__dboContractKill(Number(actorId) >>> 0, Number(killerId) >>> 0); } catch (e) { log('contract kill failed', e.message); }
   try { if (globalThis.__dboTrimCorpse) globalThis.__dboTrimCorpse(Number(actorId) >>> 0); } catch (e) { log('corpse trim failed', e.message); }
   try { if (globalThis.__dboStatsDeath) globalThis.__dboStatsDeath(Number(actorId) >>> 0, Number(killerId) >>> 0); } catch (e) { log('journal stats death failed', e.message); }
+  try { if (globalThis.__dboDogDayDeath) globalThis.__dboDogDayDeath(Number(actorId) >>> 0, Number(killerId) >>> 0); } catch (e) { log('dog day death failed', e.message); }
   const prev = globalThis.__dboPrevDeath;
   if (prev) { try { return prev(actorId, killerId, ...rest); } catch (e) { log('death chain failed', e.message); } }
   return undefined;
@@ -7573,6 +7574,12 @@ try {
   delete require.cache[PATRONS_JS];
   require(PATRONS_JS)({ mp, log, personal, system, registerChatCommand, audit, who, display, profileOf, rolesOf, isAdmin, findByName });
 } catch (e) { log('patrons.js failed to load:', e.stack || e.message); globalThis.__dboRerollDone = null; globalThis.__dboRerollsLeft = null; globalThis.__dboRerollStatsGroup = null; }
+// ---- Dog Day, 5 March 2027 (server\dogday.js, config "dogDay"): enemies drop dog meat and it may be cooked ------------
+try {
+  const DOGDAY_JS = path.resolve('dogday.js');
+  delete require.cache[DOGDAY_JS];
+  require(DOGDAY_JS)({ mp, cfg, log, personal, giveItem, profileOf });
+} catch (e) { log('dogday.js failed to load:', e.stack || e.message); globalThis.__dboDogDayDeath = null; globalThis.__dboDogDayCraft = null; }
 // ---- the playtesters' skill boost at the alpha launch (server\playtesterboost.js, config "playtesterBoost") ----------
 try {
   const PLAYTESTERBOOST_JS = path.resolve('playtesterboost.js');
