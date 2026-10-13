@@ -19,11 +19,11 @@ const { charFromCf, fileChangeForms } = require('../sources/characters')
 const { progressOf } = require('../sources/progress')
 const problemReport = require('../sources/problemReport')
 const { visitorIp } = require('../sources/visitorIp')
+const { createStateStore } = require('../sources/oauthStates')
 
 const STATE_COOKIE   = 'db_site_state'
 const SESSION_COOKIE = 'db_site'
-// Where the callback returns to after a fresh sign-in from the staff console; only this one value is honoured
-const NEXT_COOKIE    = 'db_site_next'
+// Where the callback returns to after /login/fresh, the staff console's sign-in
 const CONSOLE_PAGE   = '/dashboard.html#console'
 const STATE_TTL_MS   = 10 * 60 * 1000
 const CALLBACK_PATH  = '/api/site/callback'
@@ -45,6 +45,11 @@ let websiteOrigin = null
 try { websiteOrigin = new URL(config.websiteUrl).origin } catch { /* malformed WEBSITE_URL: logout refuses every Origin */ }
 // The exact website Origin; a missing one is refused
 const sameOrigin = req => !!websiteOrigin && req.get('origin') === websiteOrigin
+
+// Every state /login and /login/fresh issue; the callback takes only these, whatever the state cookie says
+const oauthStates = createStateStore({ ttlMs: STATE_TTL_MS })
+// The flows whose callback may write signedInAt: both send prompt=consent
+const CONSENT_FLOWS = new Set(['login', 'fresh'])
 
 // Sign-in must start on the host Discord returns to, or the host-only state cookie never comes back
 let loginUrl = null, freshUrl = null
@@ -216,12 +221,12 @@ router.get('/login', (req, res) => {
   if (loginUrl && String(req.hostname || '').toLowerCase() !== loginUrl.hostname) return res.redirect(loginUrl.href)
   // Already signed in: straight to the profile, without another Discord round trip or a second session
   if (currentSession(req)) return res.redirect(PROFILE_PAGE)
-  startSignIn(res)
+  startSignIn(req, res, 'login')
 })
 
 // Every site sign-in is a click on Discord's own Authorize page (prompt=consent), so each signedInAt stands for a person
-function startSignIn(res) {
-  const state = crypto.randomBytes(32).toString('hex')
+function startSignIn(req, res, flow) {
+  const state = oauthStates.issue(flow, visitorIp(req))
   setCookie(res, STATE_COOKIE, state, CALLBACK_PATH, STATE_TTL_MS)
   res.redirect(oauth.authorizeUrl({ redirectUri: config.discordSiteRedirectUri, state, prompt: 'consent' }))
 }
@@ -232,20 +237,23 @@ router.get('/login/fresh', (req, res) => {
     return res.redirect(`${PROFILE_PAGE}?error=unconfigured`)
   }
   if (freshUrl && String(req.hostname || '').toLowerCase() !== freshUrl.hostname) return res.redirect(freshUrl.href)
-  setCookie(res, NEXT_COOKIE, 'console', CALLBACK_PATH, STATE_TTL_MS)
-  startSignIn(res)
+  startSignIn(req, res, 'fresh')
 })
 
-// Discord's redirect is checked against the state cookie first, so only requests that would call Discord count toward the limits
+// Discord's redirect is checked against the issued states and the state cookie first, so only requests that would call Discord count toward the limits
 function checkCallback(req, res, next) {
   setCookie(res, STATE_COOKIE, '', CALLBACK_PATH, 0)
-  req.signInNext = readCookie(req, NEXT_COOKIE) === 'console' ? CONSOLE_PAGE : PROFILE_PAGE
-  setCookie(res, NEXT_COOKIE, '', CALLBACK_PATH, 0)
   const { code, state, error } = req.query
+  // Taken before anything else, so a state works once whatever happens next
+  const issued = oauthStates.take(state)
 
   if (error) return res.redirect(`${PROFILE_PAGE}?error=cancelled`)
-  if (!sameSecret(state, readCookie(req, STATE_COOKIE))) return res.redirect(`${PROFILE_PAGE}?error=state`)
+  if (!issued || !sameSecret(state, readCookie(req, STATE_COOKIE))) return res.redirect(`${PROFILE_PAGE}?error=state`)
   if (typeof code !== 'string' || !code) return res.redirect(`${PROFILE_PAGE}?error=discord`)
+  // The return page comes from the flow the server recorded, never from the request
+  req.signInNext = issued.flow === 'fresh' ? CONSOLE_PAGE : PROFILE_PAGE
+  // Fresh only for a consent flow, finished from the address it was issued to: a state fetched elsewhere and planted by cookie is not fresh
+  req.signInFresh = CONSENT_FLOWS.has(issued.flow) && issued.ip === visitorIp(req)
   next()
 }
 
@@ -255,12 +263,13 @@ router.get('/callback', checkCallback, visitorLimiter, siteLimiter, async (req, 
     const tokenData = await oauth.exchangeCode({ code: req.query.code, redirectUri: config.discordSiteRedirectUri })
     const user      = await oauth.getUser(tokenData.access_token)
     if (typeof user.id !== 'string' || !user.id) throw new Error('Discord returned a user without an id')
+    if (req.signInFresh !== true) console.warn('[site-auth] sign-in finished from another address than it started at; the session is not fresh for the console')
 
     const token = siteSessions.create({
       discordId:  user.id,
       username:   String(user.global_name || user.username || ''),
       avatar:     oauth.avatarUrl(user),
-      signedInAt: Date.now(),
+      ...(req.signInFresh === true ? { signedInAt: Date.now() } : {}),
     })
     // A copied old cookie stops working the moment its owner signs in again
     const previous = readCookie(req, SESSION_COOKIE)
@@ -396,4 +405,4 @@ router.post('/logout', (req, res) => {
 
 module.exports = router
 // Shared with the staff dashboard routes so they read sessions and characters and check the Origin the same way
-module.exports.internals = { currentSession, sessionToken, readStore, toSiteCharacter, profileIdOf, dynamicFields, sameOrigin }
+module.exports.internals = { currentSession, sessionToken, readStore, toSiteCharacter, profileIdOf, dynamicFields, sameOrigin, oauthStates }
