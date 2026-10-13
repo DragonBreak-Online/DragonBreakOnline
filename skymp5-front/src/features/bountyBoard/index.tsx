@@ -151,6 +151,10 @@ const BountyBoard = ({ data }: { data: BountyBoardData }) => {
           ))}
           {/* Letters live in the gamemode's pigeon coop; the tab hands over to it */}
           <button className="bountyBoard__tab" onClick={() => { send('dbo:pigeonOpen', 'letters'); send(ev.close); }}>Letters</button>
+          {/* Citizenship of the hold and the vote for its Jarl live in the gamemode (citizenship.js, Nate 14 Oct): each tab
+              hands over to its panel for this board's hold, as Letters does */}
+          <button className="bountyBoard__tab" onClick={() => { send('dbo:citizenOpen', 'citizenship'); send(ev.close); }}>Citizenship</button>
+          <button className="bountyBoard__tab" onClick={() => { send('dbo:citizenOpen', 'voting'); send(ev.close); }}>Voting</button>
         </div>
 
         {notes.length ? (

@@ -5,6 +5,8 @@ import './styles.scss';
 // Buying and renting a property (server tenancy.js, widget 82), opened from the door's property menu. It always shows the
 // door the player stands at. Actions go to the server as dbo:propertyMarketAct with the window's nonce, the action and its
 // arguments; the server answers by sending the panel again with a result line.
+// Citizenship (Nate, 14 Oct): in a hold that grants it only its citizens buy (citizenNeeded says why not); an owner sells
+// their own house to another player here (state 'resale'), and its tax stays on the hold's listed value.
 export interface MarketInterest { tag: string; name: string }
 
 export interface PropertyMarketData {
@@ -17,7 +19,18 @@ export interface PropertyMarketData {
   ownerName: string;
   yours: boolean;
   manager: boolean;
-  state: 'none' | 'sale' | 'rent' | 'let';
+  state: 'none' | 'sale' | 'rent' | 'let' | 'resale';
+  // resale: the owner selling it, and whether that is the viewer
+  sellerName?: string;
+  yourSale?: boolean;
+  // the owner may put it up for sale (it is theirs and not let)
+  canResell?: boolean;
+  // why this viewer may not buy here (no citizenship of the hold), or absent
+  citizenNeeded?: string;
+  // economy.js: the value the weekly tax is taken on, this week's tax, and whether that value is the hold's listed one
+  taxValue?: number;
+  weeklyTax?: number;
+  listedValue?: boolean;
   price?: number;
   deposit?: number;
   weekly?: number;
@@ -74,6 +87,7 @@ const NumberInput = ({ value, onChange, onEnter, placeholder, max }: {
 
 const statusOf = (d: PropertyMarketData): string => {
   if (d.state === 'sale') return 'For sale';
+  if (d.state === 'resale') return d.yourSale ? 'For sale by you' : `For sale by ${d.sellerName || 'its owner'}`;
   if (d.state === 'rent') return 'For rent';
   if (d.state === 'let') return d.youRent ? 'Rented by you' : 'Let';
   if (d.yours) return 'Yours';
@@ -124,18 +138,46 @@ const PropertyMarket = ({ data }: { data: PropertyMarketData }) => {
         <p className="propMarket__sub">{data.hold} · <span className={'propMarket__status propMarket__status--' + data.state}>{statusOf(data)}</span></p>
 
         <div className="propMarket__figures">
-          {data.state === 'sale' && <span className="propMarket__figure"><span className="propMarket__label">Price</span><Gold n={data.price} /></span>}
+          {(data.state === 'sale' || data.state === 'resale') && <span className="propMarket__figure"><span className="propMarket__label">Price</span><Gold n={data.price} /></span>}
           {data.state === 'rent' && <span className="propMarket__figure"><span className="propMarket__label">Deposit</span><Gold n={data.deposit} /></span>}
           {(data.state === 'rent' || data.state === 'let') && <span className="propMarket__figure"><span className="propMarket__label">Rent</span><Gold n={data.weekly} after=" a week" /></span>}
           {data.state === 'let' && data.paidUntil && <span className="propMarket__figure"><span className="propMarket__label">Paid until</span><span className={'propMarket__plain' + (data.overdue ? ' propMarket__plain--late' : '')}>{data.paidUntil}{data.overdue ? ' · overdue' : ''}</span></span>}
-          <span className="propMarket__figure"><span className="propMarket__label">Property tax</span><span className="propMarket__plain">{data.taxPct}% of its value a week</span></span>
+          <span className="propMarket__figure"><span className="propMarket__label">Property tax</span><span className="propMarket__plain">{data.weeklyTax !== undefined && data.taxValue !== undefined
+            ? `${goldText(data.weeklyTax)} gold a week (${data.taxPct}% of ${goldText(data.taxValue)}${data.listedValue ? ', its listed value' : ''})`
+            : `${data.taxPct}% of its value a week`}</span></span>
         </div>
 
         {/* What anyone at the door can do */}
         {data.state === 'sale' && (
           <div className="propMarket__section">
             <p className="propMarket__note">The first to pay owns it outright. The gold goes to {data.hold}, and the house pays the hold's property tax each week on that price.</p>
-            <div className="propMarket__row"><Ask id="buy" label={`Buy it for ${goldText(data.price)} gold`} question={`Pay ${goldText(data.price)} gold for ${data.name}?`} action={() => act('buy')} /></div>
+            {data.citizenNeeded ? <p className="propMarket__note propMarket__note--warn">{data.citizenNeeded}</p>
+              : <div className="propMarket__row"><Ask id="buy" label={`Buy it for ${goldText(data.price)} gold`} question={`Pay ${goldText(data.price)} gold for ${data.name}?`} action={() => act('buy')} /></div>}
+          </div>
+        )}
+        {data.state === 'resale' && (
+          <div className="propMarket__section">
+            {data.yourSale ? (
+              <>
+                <p className="propMarket__note">You are selling it. The first who may buy property in {data.hold} and pays the price owns it; the gold comes to you, even while you are away.</p>
+                <div className="propMarket__row propMarket__row--end"><button className="propMarket__link" disabled={busy} onClick={() => act('unresell')}>Take it off the market</button></div>
+              </>
+            ) : (
+              <>
+                <p className="propMarket__note">Sold by its owner, {data.sellerName}: the gold goes to them. Its property tax stays what it is, on the hold's listed value.</p>
+                {data.citizenNeeded ? <p className="propMarket__note propMarket__note--warn">{data.citizenNeeded}</p>
+                  : <div className="propMarket__row"><Ask id="buyresale" label={`Buy it for ${goldText(data.price)} gold`} question={`Pay ${data.sellerName} ${goldText(data.price)} gold for ${data.name}?`} action={() => act('buy')} /></div>}
+              </>
+            )}
+          </div>
+        )}
+        {data.canResell && (
+          <div className="propMarket__section">
+            <span className="propMarket__label">{data.state === 'resale' ? 'Change your price' : 'Sell it to another player'}</span>
+            <div className="propMarket__row">
+              <NumberInput value={price} onChange={setPrice} placeholder={`Price, 1 to ${goldText(data.maxPrice)} gold`} max={7} onEnter={() => priceN && act('resell', priceN)} />
+              <button className="propMarket__button" disabled={busy || !priceN} onClick={() => act('resell', priceN)}>{data.state === 'resale' ? 'Change the price' : 'Put up for sale'}</button>
+            </div>
           </div>
         )}
         {data.state === 'rent' && (

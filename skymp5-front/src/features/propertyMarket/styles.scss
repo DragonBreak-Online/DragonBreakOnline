@@ -115,6 +115,8 @@
   &__section { display: flex; flex-direction: column; gap: 10px; }
 
   &__note { margin: 0; color: $dbo-text-dim; font-size: 13px; line-height: 1.4; }
+  // The buyer lacks the hold's citizenship (tenancy.js citizenGate)
+  &__note--warn { color: $dbo-gold; }
 
   &__row {
     display: flex;

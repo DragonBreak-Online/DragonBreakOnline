@@ -1,0 +1,235 @@
+// The notice board's Citizenship and Voting tabs, in the property panel's layout: title, the two tabs, the tab's body, the
+// result line. Also drawn inside the F3 journal's Citizen tab (journal/tabs/CitizenTab), so nothing here assumes the panel.
+@import '../../dbo-theme.scss';
+
+.citizen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 54;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  font-family: $dbo-ui-font;
+  color: $dbo-text;
+
+  &__fade {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at center, rgba(8, 25, 28, 0.42), rgba(3, 10, 12, 0.85) 100%);
+  }
+
+  &__panel {
+    position: relative;
+    pointer-events: auto;
+    box-sizing: border-box;
+    width: min(720px, calc(94 * var(--dbo-vw)));
+    max-height: min(800px, calc(90 * var(--dbo-vh)));
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 22px 26px 16px;
+    @include dbo-panel;
+  }
+
+  &__title {
+    margin: 0;
+    @include dbo-title;
+    font-size: clamp(20px, calc(2.2 * var(--dbo-vw)), 28px);
+    text-align: center;
+  }
+
+  &__tabs {
+    display: flex;
+    justify-content: center;
+    gap: 6px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid $dbo-border;
+  }
+
+  &__tab {
+    @include dbo-button;
+    padding: 6px 18px;
+
+    &--on { border-color: $dbo-border-strong; color: $dbo-gold; }
+  }
+
+  &__body {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-height: 0;
+    overflow-y: auto;
+  }
+
+  &__section { display: flex; flex-direction: column; gap: 8px; }
+
+  &__section--officials {
+    padding-top: 10px;
+    border-top: 1px solid $dbo-border;
+  }
+
+  &__heading {
+    @include dbo-title;
+    font-size: 15px;
+  }
+
+  &__label {
+    color: $dbo-text-dim;
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  &__note {
+    margin: 0;
+    color: $dbo-text-dim;
+    font-size: 13px;
+    line-height: 1.4;
+
+    &--warn { color: $dbo-gold; }
+    &--ok { color: $dbo-text; }
+  }
+
+  // Bruma's Voting tab, and a land that grants no citizenship: a paragraph of lore, read rather than skimmed
+  &__lore { color: $dbo-text; font-size: 14px; font-style: italic; }
+
+  &__muted { color: $dbo-text-dim; font-size: 12px; }
+  &__strong { color: $dbo-text; }
+  &__warn { color: $dbo-red; font-size: 12px; }
+  &__empty { font-size: 13px; color: $dbo-text-dim; }
+
+  &__row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+
+    &--end { justify-content: flex-end; }
+    &--wrap { flex-wrap: wrap; }
+  }
+
+  &__actions { display: inline-flex; align-items: center; gap: 8px; flex: none; }
+
+  &__confirm {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+  }
+
+  &__input {
+    flex: 1;
+    min-width: 0;
+    padding: 6px 10px;
+    border: 1px solid $dbo-border;
+    border-radius: 4px;
+    background: rgba(0, 0, 0, 0.35);
+    color: $dbo-text;
+    font-family: $dbo-ui-font;
+    font-size: 14px;
+    outline: none;
+
+    &:focus { border-color: $dbo-border-strong; }
+  }
+
+  &__button {
+    @include dbo-button;
+    padding: 7px 16px;
+
+    &:disabled { opacity: 0.4; cursor: default; }
+    &--danger { color: $dbo-red; }
+    &--small { padding: 4px 10px; font-size: 13px; }
+  }
+
+  &__choice {
+    @include dbo-button;
+    padding: 5px 12px;
+    font-size: 13px;
+
+    &--on { border-color: $dbo-border-strong; color: $dbo-gold; }
+    &:disabled { opacity: 0.4; cursor: default; }
+  }
+
+  &__link {
+    padding: 0;
+    border: none;
+    background: none;
+    color: $dbo-gold;
+    font-family: $dbo-ui-font;
+    font-size: 13px;
+    cursor: pointer;
+
+    &:disabled { color: $dbo-text-dim; opacity: 0.5; cursor: default; }
+  }
+
+  &__list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding-top: 6px;
+    border-top: 1px solid $dbo-border;
+  }
+
+  &__entry, &__invite {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+  }
+
+  &__invite {
+    padding: 8px 10px;
+    border: 1px solid $dbo-border-strong;
+    border-radius: 4px;
+    background: rgba(0, 0, 0, 0.3);
+  }
+
+  &__court {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 8px 10px;
+    border: 1px solid $dbo-border;
+    border-radius: 4px;
+    background: rgba(0, 0, 0, 0.25);
+
+    &--struck { opacity: 0.5; }
+  }
+
+  &__court-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+
+  &__member {
+    display: grid;
+    grid-template-columns: 130px 1fr auto;
+    align-items: baseline;
+    gap: 8px;
+    font-size: 14px;
+  }
+
+  &__seat { flex: none; width: 130px; }
+
+  &__tag {
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: $dbo-text-dim;
+
+    &--ok { color: $dbo-gold; }
+  }
+
+  &__result {
+    margin: 0;
+    font-size: 14px;
+    color: $dbo-gold;
+
+    &--refused { color: $dbo-red; }
+  }
+
+  &__close {
+    @include dbo-button;
+    padding: 6px 20px;
+  }
+}
