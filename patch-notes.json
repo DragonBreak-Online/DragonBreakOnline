@@ -33,6 +33,12 @@
         ]
       },
       {
+        "heading": "Unstuck",
+        "items": [
+          "/unstuck now has a 30 minute wait between uses, and it cannot be used during a fight with anyone, creatures included. Wait a minute after the last blow."
+        ]
+      },
+      {
         "heading": "House keys",
         "items": [
           "House keys are no longer all \"Werewolf Cage Keys\": each lock now has its own key, named for its house. Your keys change over the next time you log in, and keys you hold no longer vanish and come back every few seconds.",
