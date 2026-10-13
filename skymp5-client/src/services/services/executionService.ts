@@ -17,8 +17,8 @@ const VICTIM_EVENT = "IdleExecutioneeChop";
 // Helgen's player-victim path (HeadChopBlockHookupSCRIPT on ExecutionerChoppingBlock 2e8eb, disassembled from Skyrim -
 // Misc.bsa on CT 115 13 Oct): when the executionee is the player it plays its playerAnimIdle, IdleExecutionerChop_Player
 // (Skyrim.esm f95be: no parent, no conditions, ENAM IdleExecutionerChop_Player), on the executioner and then on the
-// executionee, both, with the executioner already linked to the executionee. The condemned here is always a player
-const PLAYER_VICTIM_IDLE = "f95be:Skyrim.esm";
+// executionee, both, with the executioner already linked to the executionee. That is the scene the player survives (stage
+// 98, Alduin, about 5 s in), so it is played only when the server names it (playerIdle); its event is the default for that
 const PLAYER_VICTIM_EVENT = "IdleExecutionerChop_Player";
 // The furniture's own exit: vanilla's IdleExecutionerExit1 (Skyrim.esm 2e8ef, under ExecutionerRoot) sends it to the
 // headsman in this block, and IdleWoodChopStop the same at a chopping log
@@ -52,7 +52,7 @@ const errText = (e: unknown): string => (e instanceof Error ? e.message : String
  * dboExecute plays the beheading on this client's copies of the two actors. Vanilla's HeadChopBlock2ManHookupScript
  * (disassembled from Skyrim - Misc.bsa on CT 115, 13 Oct) links the headsman to the executionee
  * (AddDependentAnimatedObjectReference) and plays IdleHeadChop on the executionee, an NPC; for a player executionee it
- * plays nothing at all. The NPC pair, kept as the fallback: the victim gets IdleExecutioneeChop (AOExecutioneeChop.hkx: Decapitate at 11.839 s,
+ * plays nothing at all. The NPC pair, played by default: the victim gets IdleExecutioneeChop (AOExecutioneeChop.hkx: Decapitate at 11.839 s,
  * KillActor at 16.606 s) and the headsman IdleHeadChop (AOExecutionerChop.hkx), on one frame. A refused PlayIdle
  * (IdleExecutioneeChop wants ExecutioneeRoot's conditions: the FurnitureExecutioner keyword on the seat, the right-hand
  * entry, GetSitting 2) falls back to the bare graph event, which no idle condition stands in front of.
@@ -67,9 +67,11 @@ const errText = (e: unknown): string => (e instanceof Error ? e.message : String
  * Both packets arrive in tick context, where every Papyrus native throws "can't be called in this context" (0.3.96:
  * Game.getFormEx threw, the catch only printed to the console, and nothing played), so all the work runs on update.
  *
- * The victim is always a player, so the pair plays Helgen's player-victim path first: IdleExecutionerChop_Player on
- * the headsman, then on the victim (the order HeadChopBlockHookupSCRIPT uses), each falling back to the bare event. Only
- * if that idle is missing from this game, or the server sends playerIdle "" to turn it off, the NPC pair above plays.
+ * The NPC pair is the default: AOExecutioneeChop's Decapitate (11.839 s) and KillActor (16.606 s) were read from the hkx
+ * on the PC (12 Oct), and the server's chopMs (16.7 s) is built on them. The victim is always a player, whose seat may
+ * fail IdleExecutioneeChop's tree conditions, which is what the bare-event fallback is for. Only a server that sends
+ * playerIdle (e.g. "f95be:Skyrim.esm") gets Helgen's player-victim path instead: that idle on the headsman, then on the
+ * victim (the order HeadChopBlockHookupSCRIPT uses), each with the same fallback.
  *
  *   Server -> Client: { customPacketType: "dboExecute", victim, executioner, idle, victimIdle, event?, victimEvent?,
  *                       playerIdle?, playerEvent? }
@@ -104,8 +106,7 @@ export class ExecutionService extends ClientListener {
         return;
       }
       const linked = victim.addDependentAnimatedObjectReference(headsman);
-      const playerIdleDesc = content["playerIdle"] === undefined ? PLAYER_VICTIM_IDLE : String(content["playerIdle"] || "");
-      const playerIdle = playerIdleDesc ? this.idleOf(playerIdleDesc) : null;
+      const playerIdle = content["playerIdle"] ? this.idleOf(String(content["playerIdle"])) : null;
       let path: string, victimHow: string, headsmanHow: string;
       if (playerIdle) {
         // Helgen: the headsman first, then the victim, the same idle on both
