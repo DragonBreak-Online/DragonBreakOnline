@@ -156,8 +156,9 @@ export const npcSidearmFor = (ac: Actor): number => {
 };
 
 export const applyEquipment = (ac: Actor, eq: Equipment, opts?: { npcAmmo?: boolean }): boolean => {
-  ac.removeAllItems(null, false, true);
-
+  // UNPROVEN (13 Oct, crash SkyrimSE.exe+0CC90EF, 68233+0x2F, UnequipAllVisitor on a remote copy): unequip first, then one
+  // removal. The old order removed the worn entries before unequipAll walked them, and the crash reads an extra-data list
+  // freed and reused by an ExtraWorn/ExtraWornLeft (rdi = vtable+0x18). Experiment only until a test on the PC shows it
   ac.unequipAll();
 
   ac.removeAllItems(null, false, true);
