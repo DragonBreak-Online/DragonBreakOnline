@@ -12,6 +12,9 @@ export const driftConfig = {
   // "apply" is the 0.3.34 takeover timing; "packet" (B2) is switched on with /driftset for a test
   rehostClock: "apply" as "packet" | "apply",
   rehostAfterMs: 2100,
+  // A remote copy's face-tint 3D rebuild (view/onScreenRebuild.ts): "load" once per 3D load (0.3.96, the face-morph crash
+  // SkyrimSE+04328E9), "entry" on every return to the screen past the interval (0.3.95 and older), the quick undo
+  faceRebuild: "load" as "load" | "entry",
 };
 
 export type DriftConfig = typeof driftConfig;
@@ -43,6 +46,7 @@ const RULES: Record<keyof DriftConfig, (v: unknown) => boolean> = {
   snapUnits: range(0, 8192),
   rehostClock: oneOf("packet", "apply"),
   rehostAfterMs: range(1000, 10000),
+  faceRebuild: oneOf("load", "entry"),
 };
 
 // Copies the known keys that pass their check; anything else in the packet is ignored

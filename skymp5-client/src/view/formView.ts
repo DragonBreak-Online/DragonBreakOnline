@@ -811,9 +811,9 @@ export class FormView {
           if (!loaded) this.rebuild.doneThisLoad = false;
         } else {
           if (entering && this.isBeastCopy(model)) faceSync.skip(this.refrId, "beast");
-          else if (entering && loaded && this.rebuild.doneThisLoad) faceSync.skip(this.refrId, "doneThisLoad");
+          else if (entering && loaded && this.rebuild.doneThisLoad && driftConfig.faceRebuild !== "entry") faceSync.skip(this.refrId, "doneThisLoad");
           else if (entering && Date.now() - this.rebuild.lastMs < FormView.niNodeUpdateMinIntervalMs) faceSync.skip(this.refrId, "interval");
-          if (onScreenRebuildDue(this.rebuild, isOnScreen, loaded, this.isBeastCopy(model), Date.now(), FormView.niNodeUpdateMinIntervalMs)) {
+          if (onScreenRebuildDue(this.rebuild, isOnScreen, loaded, this.isBeastCopy(model), Date.now(), FormView.niNodeUpdateMinIntervalMs, driftConfig.faceRebuild === "entry")) {
             noteActorCall("ninode", this.refrId);
             faceSync.request(actor.getFormID(), this.rebuild.lastMs);
             queueCopyNiNodeUpdate(actor.getFormID());

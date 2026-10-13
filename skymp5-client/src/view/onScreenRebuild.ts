@@ -9,11 +9,12 @@ export interface OnScreenRebuildState {
 
 // Once per 3D load, when the head first comes on screen: rebuilding on every return to the screen swapped heads under
 // the face-morph job (SkyrimSE+04328E9). A copy whose 3D went away is due again when it comes back.
-export const onScreenRebuildDue = (s: OnScreenRebuildState, onScreen: boolean, loaded: boolean, blocked: boolean, now: number, minIntervalMs: number): boolean => {
+// perEntry (driftConfig faceRebuild "entry", the quick undo): every return to the screen past the interval, as before 0.3.96
+export const onScreenRebuildDue = (s: OnScreenRebuildState, onScreen: boolean, loaded: boolean, blocked: boolean, now: number, minIntervalMs: number, perEntry = false): boolean => {
   if (!loaded) s.doneThisLoad = false;
   if (onScreen === s.isOnScreen) return false;
   s.isOnScreen = onScreen;
-  if (!onScreen || blocked || s.doneThisLoad || now - s.lastMs < minIntervalMs) return false;
+  if (!onScreen || blocked || (s.doneThisLoad && !perEntry) || now - s.lastMs < minIntervalMs) return false;
   s.lastMs = now;
   s.doneThisLoad = true;
   return true;

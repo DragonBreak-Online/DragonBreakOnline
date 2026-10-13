@@ -63,6 +63,34 @@ const check = (name, ok, got) => {
   s.doneThisLoad = false;
   check('staying on screen does not fire again', onScreenRebuildDue(s, true, true, false, 30000, MIN) === false);
 
+  // driftConfig faceRebuild (the quick undo): "entry" ignores doneThisLoad, so the walk above rebuilds as the old rule did
+  s = fresh(); let ne = 0;
+  for (let i = 0; i < 20; i++) if (onScreenRebuildDue(s, i % 2 === 0, true, false, 10000 + i * 3000, MIN, true)) ne++;
+  check('faceRebuild "entry" rebuilds on every return past the interval, as before 0.3.96', ne === old, { entry: ne, old });
+  s = fresh(); let nl = 0;
+  for (let i = 0; i < 20; i++) if (onScreenRebuildDue(s, i % 2 === 0, true, false, 10000 + i * 3000, MIN, false)) nl++;
+  check('faceRebuild "load" (perEntry false) is the once-per-load rule', nl === 1, nl);
+  s = fresh();
+  check('"entry" still never rebuilds a beast copy', onScreenRebuildDue(s, true, true, true, 10000, MIN, true) === false);
+  s = fresh(); onScreenRebuildDue(s, true, true, false, 10000, MIN, true); onScreenRebuildDue(s, false, true, false, 11000, MIN, true);
+  check('"entry" still keeps the interval', onScreenRebuildDue(s, true, true, false, 12000, MIN, true) === false);
+
+  // The switch itself (sync/driftConfig.ts): default "load", the packet sets "entry" or "load", anything else is ignored
+  const dout = path.join(path.dirname(out), 'd.js');
+  await esbuild.build({ entryPoints: [path.resolve(__dirname, '../src/sync/driftConfig.ts')], bundle: true, platform: 'node', format: 'cjs', outfile: dout, logLevel: 'silent' });
+  const { driftConfig, applyDriftConfig, driftConfigEcho } = require(dout);
+  check('faceRebuild defaults to "load"', driftConfig.faceRebuild === 'load', driftConfig.faceRebuild);
+  applyDriftConfig({ faceRebuild: 'entry' });
+  check('an npcDriftConfig with faceRebuild "entry" sets it, and the echo reports it live', driftConfig.faceRebuild === 'entry' && driftConfigEcho().faceRebuild === 'entry');
+  applyDriftConfig({ faceRebuild: 'always' });
+  check('an unknown value is ignored', driftConfig.faceRebuild === 'entry');
+  applyDriftConfig({ faceRebuild: 'load' });
+  check('"load" sets it back', driftConfig.faceRebuild === 'load');
+  const fv = fs.readFileSync(path.resolve(__dirname, '../src/view/formView.ts'), 'utf8');
+  check('formView passes faceRebuild "entry" as perEntry and counts doneThisLoad only under "load"',
+    /onScreenRebuildDue\(this\.rebuild, isOnScreen, loaded, this\.isBeastCopy\(model\), Date\.now\(\), FormView\.niNodeUpdateMinIntervalMs, driftConfig\.faceRebuild === "entry"\)/.test(fv)
+    && /this\.rebuild\.doneThisLoad && driftConfig\.faceRebuild !== "entry"\) faceSync\.skip\(this\.refrId, "doneThisLoad"\)/.test(fv));
+
   console.log(failures ? `${failures} failed` : 'all passed');
   process.exit(failures ? 1 : 0);
 })().catch((e) => { console.log('FAIL', e); process.exit(1); });
