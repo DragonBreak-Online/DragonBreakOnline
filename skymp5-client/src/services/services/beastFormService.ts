@@ -195,9 +195,12 @@ export class BeastFormService extends ClientListener {
     if (!content || content["customPacketType"] !== "dboBeast") return;
     const raceId = Number(content["race"]) >>> 0;
     const beast = content["beast"] === true;
-    // remoteServer skips the own-appearance echo for a beast race, so the base record keeps the real race and head
-    const races = ((globalThis as any).__dboBeastRaces = (globalThis as any).__dboBeastRaces || new Set<number>());
+    // sync/ownLook.ts drops an own look of a beast race, and holds every own look while this change is queued and just after
+    const g = globalThis as any;
+    const races = (g.__dboBeastRaces = g.__dboBeastRaces || new Set<number>());
     if (beast) races.add(raceId);
+    g.__dboRaceSwitches = (Number(g.__dboRaceSwitches) || 0) + 1;
+    g.__dboRaceSwitchAt = Date.now();
     this.controller.once("update", () => {
       try {
         const player = this.sp.Game.getPlayer();
@@ -235,6 +238,9 @@ export class BeastFormService extends ClientListener {
         logTrace(this, beast ? "Took beast form" : "Returned to own race", raceId.toString(16));
       } catch (e) {
         logError(this, "setRace failed", e);
+      } finally {
+        g.__dboRaceSwitches = Math.max(0, (Number(g.__dboRaceSwitches) || 0) - 1);
+        g.__dboRaceSwitchAt = Date.now();
       }
     });
   }
@@ -359,6 +365,7 @@ export class BeastFormService extends ClientListener {
     try {
       player.setRace(race);
       try { this.sp.Game.setBeastForm(w.beast); } catch (e) { logError(this, "setBeastForm failed", e); }
+      (globalThis as any).__dboRaceSwitchAt = Date.now();
       if (!w.beast) { this.beastRace = 0; this.abilities = null; this.restoreFirstPerson(); }
       this.restoreControls();
       logTrace(this, "Race did not hold, set again", w.raceId.toString(16), current ? (current.getFormID() >>> 0).toString(16) : "none");
