@@ -2,6 +2,7 @@
 import { Game, Ui } from "skyrimPlatform";
 import { Appearance, applyAppearanceToPlayer, applyNameToPlayer, ownLookOnBase, sameLookButName } from "./appearance";
 import { isBeastRaceId, isGuardedActor } from "./beastRaces";
+import { driftConfig } from "./driftConfig";
 import { trace } from "../lib/clientDiag";
 
 // Dropped this soon after a RaceMenu close (remoteServer RACE_MENU_SETTLE_MS); the server resends the stored look at 3.5 s
@@ -101,6 +102,13 @@ export class OwnLookQueue {
   private check(): void {
     const look = this.look;
     if (!look) return;
+    // The gamemode's switch (npcDriftConfig ownLook), read when the look would go on: "off" puts none on, before any native
+    if (driftConfig.ownLook === "off") {
+      this.look = null;
+      this.log("Skipped own appearance: ownLook is off");
+      trace("own drop=off");
+      return;
+    }
     const now = Date.now();
     if (!this.seenAt) this.seenAt = now;
     const player = Game.getPlayer();
@@ -135,6 +143,12 @@ export class OwnLookQueue {
     if (onBase && onBase.at > closedAt && sameLookButName(onBase.look, look)) {
       applyNameToPlayer(look, "name");
       this.log("Put the player's name on, the rest of the look is on already");
+      return;
+    }
+    // ownLook "name": a look that needs more than its name is never put on, so the head is never rebuilt
+    if (driftConfig.ownLook === "name") {
+      this.log("Skipped own appearance: ownLook puts only a name on");
+      trace("own drop=nameonly");
       return;
     }
     applyAppearanceToPlayer(look, true, "update");

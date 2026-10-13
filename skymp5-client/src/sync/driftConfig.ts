@@ -1,5 +1,8 @@
 // Movement and drift switches set by the gamemode's npcDriftConfig packet; the defaults are the shipped behaviour
 export const driftConfig = {
+  // The server's look for the player's own character (sync/ownLook.ts), the quick undo of the 13 Oct fix: "apply" puts it on,
+  // "name" only a look that changes just the name (no head rebuild), "off" none, as the clients from 15 Sep to the fix
+  ownLook: "apply" as "apply" | "name" | "off",
   remote: true,
   remoteRadius: 4096,
   remoteMax: 16,
@@ -35,6 +38,7 @@ const range = (min: number, max: number) => (v: unknown) => typeof v === "number
 const oneOf = (...values: string[]) => (v: unknown) => typeof v === "string" && values.includes(v);
 
 const RULES: Record<keyof DriftConfig, (v: unknown) => boolean> = {
+  ownLook: oneOf("apply", "name", "off"),
   remote: isBool,
   remoteRadius: range(256, 16384),
   remoteMax: range(0, 64),

@@ -2,7 +2,8 @@
 // change) arrives in tick context (NetworkingService.onTick), where every Papyrus native throws. This runs the real
 // remoteServer onUpdateAppearanceMessage, BeastFormService onBeastMessage, sync/ownLook.ts and sync/appearance.ts against a
 // fake game whose natives throw outside an update callback, with update callbacks run in arrival and in reverse order (once
-// callbacks have no fixed order, EventManager.h), and checks what reaches the player's base and head and when. Run from
+// callbacks have no fixed order, EventManager.h), and checks what reaches the player's base and head and when; then the
+// gamemode's switch (npcDriftConfig ownLook "apply" | "name" | "off", sync/driftConfig.ts) set mid-session. Run from
 // skymp5-client:
 //
 //   node tests/own-appearance-harness.js [path to esbuild's package dir]
@@ -22,7 +23,7 @@ const check = (name, ok, got) => { console.log(`${ok ? 'ok  ' : 'FAIL'} ${name}$
 
 const NORD = 0x13746, WEREWOLF = 0xcdd84;
 const G = globalThis.__OA = { inUpdate: false, menuOpen: false, liveRace: NORD, loaded3D: true, baseName: '', events: [], traces: [],
-  errors: [], tickErrors: [], updateErrors: [] };
+  errors: [], tickErrors: [], updateErrors: [], natives: 0 };
 let NOW = 5000000;
 Date.now = () => NOW;
 globalThis.__dboTrace = (t) => G.traces.push(t);
@@ -31,7 +32,7 @@ globalThis.__dboTrace = (t) => G.traces.push(t);
 const STUBS = {
   skyrimPlatform: `
     const G = globalThis.__OA;
-    const native = (name, fn) => (...a) => { if (!G.inUpdate) throw new Error("'" + name + "' can't be called in this context"); return fn(...a); };
+    const native = (name, fn) => (...a) => { if (!G.inUpdate) throw new Error("'" + name + "' can't be called in this context"); G.natives++; return fn(...a); };
     const ev = (what) => G.events.push({ what, live: G.liveRace, t: Date.now() });
     const race = (id) => ({ getFormID: () => id >>> 0 });
     const base = { getFormID: () => 7, getName: () => G.baseName, getFaceMorph: () => 0,
@@ -84,12 +85,13 @@ const writes = () => G.events.filter((e) => REBUILD.test(e.what) || e.what === '
 
 async function main() {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'claude-jake-ownlook-'));
-  let APP, OWN, sp;
+  let APP, OWN, DRIFT, sp;
   try {
     const own = path.join(SRC, 'sync/ownLook.ts');
     const entry = path.join(tmp, 'entry.ts');
     fs.writeFileSync(entry, [`export * as APP from ${JSON.stringify(path.join(SRC, 'sync/appearance.ts'))};`, "export * as SP from 'skyrimPlatform';",
-      fs.existsSync(own) ? `export * as OWN from ${JSON.stringify(own)};` : 'export const OWN = null;'].join('\n'));
+      fs.existsSync(own) ? `export * as OWN from ${JSON.stringify(own)};` : 'export const OWN = null;',
+      `export * as DRIFT from ${JSON.stringify(path.join(SRC, 'sync/driftConfig.ts'))};`].join('\n'));
     const out = path.join(tmp, 'all.js');
     await esbuild.build({ entryPoints: [entry], bundle: true, platform: 'node', format: 'cjs', outfile: out, logLevel: 'error',
       plugins: [{ name: 'stubs', setup(b) {
@@ -97,7 +99,7 @@ async function main() {
         b.onResolve({ filter: /niNodeQueue$/ }, () => ({ path: 'niNodeQueue', namespace: 'stub' }));
         b.onLoad({ filter: /.*/, namespace: 'stub' }, (a) => ({ contents: STUBS[a.path], loader: a.path === 'skyrimPlatform' ? 'js' : 'ts' }));
       } }] });
-    ({ APP, OWN, SP: sp } = require(out));
+    ({ APP, OWN, DRIFT, SP: sp } = require(out));
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }
@@ -127,7 +129,7 @@ async function main() {
   const deliver = (idx, data) => tick(() => rsi.onUpdateAppearanceMessage({ message: { idx, data } }));
   const dboBeast = (race, beast) => tick(() => bfs.onBeastMessage({ message: { contentJsonDump: JSON.stringify({ customPacketType: 'dboBeast', race, beast, form: 'werewolf', wear: [] }) } }));
   const traced = (re) => G.traces.some((t) => re.test(t));
-  const clear = () => { G.events = []; G.traces = []; G.errors = []; G.tickErrors = []; G.updateErrors = []; };
+  const clear = () => { G.events = []; G.traces = []; G.errors = []; G.tickErrors = []; G.updateErrors = []; G.natives = 0; };
   // remoteServer's create (isMe) and its load apply (onCreateActorMessage), then the 5 s after a spawn
   const created = () => tick(() => { if (rsi.ownLook) rsi.ownLook.created(); });
   const loadApply = (l) => { const at = NOW; controller.once('update', () => { if (rsi.ownLook) rsi.ownLook.putOn(); APP.applyAppearanceToPlayer(l, false, 'load'); }); frame(); return at; };
@@ -348,6 +350,120 @@ async function main() {
   check('a message clearing this character\'s look puts nothing on the player', forms[ME].appearance === undefined && writes().length === 0, writes());
   deliver(7, look({ name: 'Nobody' }));
   check('an idx not in the world model is logged, not thrown', G.tickErrors.length === 0 && G.errors.some((e) => /not found/.test(e)), G.errors);
+
+  // 14. The gamemode's switch, the quick undo with no client build: npcDriftConfig ownLook (HostedDriftService hands every
+  // npcDriftConfig to applyDriftConfig), read each time a look would go on, so a packet mid-session takes effect at once
+  const hd = fs.readFileSync(path.join(SRC, 'services/services/hostedDriftService.ts'), 'utf8');
+  check('every npcDriftConfig packet goes to applyDriftConfig (HostedDriftService)', /content\["customPacketType"\] !== "npcDriftConfig"\) return;[\s\S]{0,400}applyDriftConfig\(content\);/.test(hd));
+  const D = DRIFT.driftConfig;
+  check('ownLook defaults to "apply": a server that sends no ownLook keeps the fix on', D.ownLook === 'apply', D.ownLook);
+  DRIFT.applyDriftConfig({ customPacketType: 'npcDriftConfig', remote: true, rehostAfterMs: 2100 });
+  check('...an npcDriftConfig without the key (a gamemode before it) leaves "apply"', D.ownLook === 'apply', D.ownLook);
+  DRIFT.applyDriftConfig({ ownLook: 'never' });
+  DRIFT.applyDriftConfig({ ownLook: true });
+  check('...an unknown value is ignored', D.ownLook === 'apply', D.ownLook);
+  const echo = DRIFT.driftConfigEcho();
+  check('...and the config line echoes it as a live switch', echo.ownLook === 'apply' && !('ownLook' in echo.inert), echo);
+  const setOwn = (v) => { DRIFT.applyDriftConfig({ customPacketType: 'npcDriftConfig', ownLook: v }); return D.ownLook === v; };
+  const fullApplies = () => rebuilds().filter((e) => e.what === 'setNpcRace').length;
+
+  // "off": the clients from 15 Sep to the fix put no own look on; now without the throw and without a native
+  spawn();
+  check('an npcDriftConfig with ownLook "off" sets it', setOwn('off'), D.ownLook);
+  const offLook = look({ skinColor: 60 });
+  deliver(ME, offLook);
+  runFor(1500);
+  check('ownLook "off": a changed look puts nothing on the player, calls no native, traced "own drop=off"', writes().length === 0
+    && G.natives === 0 && traced(/^own drop=off$/) && G.tickErrors.length === 0 && G.updateErrors.length === 0,
+  { w: writes(), natives: G.natives, t: G.traces, e: [G.tickErrors, G.updateErrors] });
+  check('...the world model still takes the look', forms[ME].appearance === offLook);
+  deliver(ME, look({ name: 'Masked Person' }));
+  runFor(1500);
+  check('...a name-only look (a /mask) puts nothing on either', writes().length === 0 && G.baseName === 'Edda' && G.natives === 0, { w: writes(), name: G.baseName });
+  spawn();
+  globalThis.__dboRaceMenuClosedAt = NOW;
+  runFor(120); deliver(ME, look({ skinColor: 61, name: 'Edited' }));
+  runFor(3560); deliver(ME, look());
+  runFor(4000);
+  check('...nor the guardHead resend after a RaceMenu close', writes().length === 0, writes());
+  spawn();
+  deliver(ME, look({ name: 'Werewolf' }));
+  dboBeast(WEREWOLF, true);
+  runFor(5000);
+  clear();
+  deliver(ME, look());
+  dboBeast(NORD, false);
+  runFor(5000);
+  check('...nor a beast revert\'s look (the race change itself still runs)', writes().length === 0 && G.liveRace === NORD, G.events);
+
+  // Switched mid-session: a look already waiting follows the switch the update sees
+  spawn();
+  setOwn('apply');
+  deliver(ME, look({ skinColor: 62 }));
+  runFor(200);
+  setOwn('off');
+  runFor(1500);
+  check('a look waiting (held 0.5 s) when "off" arrives is not put on', writes().length === 0 && traced(/^own drop=off$/), { w: writes(), t: G.traces });
+  check('"apply" again mid-session, no restart', setOwn('apply'));
+  deliver(ME, look({ skinColor: 63 }));
+  runFor(1500);
+  check('...the next look goes on in full, once', fullApplies() === 1, writes());
+
+  // "name": only a look that changes just the name goes on, so the head is never rebuilt
+  spawn();
+  check('an npcDriftConfig with ownLook "name" sets it', setOwn('name'), D.ownLook);
+  deliver(ME, look({ name: 'Masked Person' }));
+  runFor(1000);
+  check('ownLook "name": a name-only look (a /mask) sets the name, no head rebuild', G.baseName === 'Masked Person' && rebuilds().length === 0
+    && writes().length === 1 && traced(/^own name /), { w: writes(), name: G.baseName });
+  clear();
+  deliver(ME, look({ name: 'Edda', skinColor: 70 }));
+  runFor(1500);
+  check('...a look that changes more than the name is dropped: nothing on the player, traced "own drop=nameonly"', writes().length === 0
+    && G.baseName === 'Masked Person' && traced(/^own drop=nameonly$/), { w: writes(), name: G.baseName, t: G.traces });
+  spawn();
+  setOwn('name');
+  globalThis.__dboRaceMenuClosedAt = NOW;
+  runFor(120); deliver(ME, look({ skinColor: 71, name: 'Edited' }));
+  runFor(3560); deliver(ME, look());
+  runFor(4000);
+  check('...the guardHead resend after a RaceMenu close (in full under "apply") is dropped: no head rebuild', rebuilds().length === 0
+    && traced(/^own drop=nameonly$/), { w: writes(), t: G.traces });
+  for (const o of ['fifo', 'lifo']) {
+    spawn();
+    order = o;
+    setOwn('name');
+    deliver(ME, look({ name: 'Werewolf' }));
+    dboBeast(WEREWOLF, true);
+    runFor(5000);
+    clear();
+    deliver(ME, look());
+    dboBeast(NORD, false);
+    runFor(5000);
+    check(`[${o}] "name": a beast revert to the look the form kept sets the name only`, writes().length === 1 && writes()[0].what === 'setName'
+      && G.baseName === 'Edda' && G.liveRace === NORD && traced(/^own name /), { w: writes(), name: G.baseName });
+    deliver(ME, look({ name: 'Werewolf' }));
+    dboBeast(WEREWOLF, true);
+    runFor(5000);
+    clear();
+    deliver(ME, look({ skinColor: 72 }));
+    dboBeast(NORD, false);
+    runFor(5000);
+    check(`[${o}] ...a revert with a changed look is dropped, no head rebuild`, writes().length === 0 && G.liveRace === NORD
+      && traced(/^own drop=nameonly$/), { w: writes(), t: G.traces });
+  }
+  order = 'fifo';
+  spawn();
+  setOwn('apply');
+  deliver(ME, look({ skinColor: 73 }));
+  runFor(200);
+  setOwn('name');
+  runFor(1500);
+  check('a look waiting when "name" arrives is dropped unless only its name changed', rebuilds().length === 0 && traced(/^own drop=nameonly$/), writes());
+  setOwn('apply');
+  deliver(ME, look({ skinColor: 74 }));
+  runFor(1500);
+  check('..."apply" again: the next look goes on in full', fullApplies() === 1, writes());
 
   console.log(failures ? `${failures} FAILED` : 'all passed');
   process.exit(failures ? 1 : 0);
