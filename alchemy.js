@@ -538,7 +538,7 @@ module.exports = (api) => {
     // ignores it can still have its disenchants taken)
     SESSION.delete(a >>> 0);
     try { restoreOnce(a >>> 0); } catch (e) { log(`disenchant: restore failed: ${e.message}`); }
-    return sendLearned(a >>> 0) > 0;
+    return sendLearned(a >>> 0, true) > 0;
   };
   // Only magic effects go out: ENCH ids (marker 1005e mapped some wrongly) and other records are dropped, unknown ids kept
   const cleanLearned = (a) => {
@@ -555,15 +555,20 @@ module.exports = (api) => {
   const BASES = readJson('ench-bases.json', { bases: {} });
   const BASE_LIST = Object.entries((BASES && BASES.bases) || {}).map(([id, b]) => [parseInt(id, 16) >>> 0, (b.effects || []).map((x) => parseInt(x, 16) >>> 0)]).filter(([id, fx]) => id && fx.length);
   // Bases whose every effect the character holds
+  const ALL_KNOWABLE = [...new Set(BASE_LIST.flatMap(([id, fx]) => [id, ...fx]))];
   const basesOf = (effects) => { const held = new Set(effects); return BASE_LIST.filter(([, fx]) => fx.every((x) => held.has(x))).map(([id]) => id); };
   // The learned effects and their base enchantments to the client again; how many were sent (0: none recorded or sending off, -1: it failed)
-  const sendLearned = (a) => {
+  // At login (atLogin) the list goes even when empty, with every other known enchantment id to forget: the game keeps
+  // "known" on the form, so a character played second in one game session inherited the first one's (SMJ, 12 Oct)
+  const sendLearned = (a, atLogin) => {
     const learned = cleanLearned(a);
     if (!LEARN.enabled || typeof api.sendPacket !== 'function') return 0;
-    if (!learned.length) return 0;
+    if (!learned.length && !atLogin) return 0;
     // The client marks every id it gets known (Form.setPlayerKnows), so the bases ride in the same list
     const effects = learned.concat(basesOf(learned).filter((id) => !learned.includes(id)));
-    try { api.sendPacket(a, { customPacketType: 'dboEnchLearned', effects }); } catch (e) { log(`disenchant: learned enchantments send failed for ${display(a)}: ${e.message}`); return -1; }
+    const packet = { customPacketType: 'dboEnchLearned', effects };
+    if (atLogin) packet.forget = ALL_KNOWABLE.filter((id) => !effects.includes(id));
+    try { api.sendPacket(a, packet); } catch (e) { log(`disenchant: learned enchantments send failed for ${display(a)}: ${e.message}`); return -1; }
     return effects.length;
   };
   // /syncenchant (gamemode.js) resends only. It must not run the login above: that clears this session's disenchants,
@@ -583,6 +588,26 @@ module.exports = (api) => {
     touchedAt.set(a, Date.now());
     const n = sendLearned(a);
     if (n > 0) log(`disenchant: ${display(a)} used an enchanter: ${n} learned effect(s) resent`);
+  };
+
+  // A soul captured in a gem (fork soulTrapSystem) is a little Enchanter work, a few times an hour at most (SMJ, 12 Oct: ten
+  // gems for one level). size 1..5 petty to grand, 0 black. Config "soulTrapXp": { enabled, weightBySize, perHour }
+  const TRAP_XP = Object.assign({ enabled: true, weightBySize: [0.8, 0.4, 0.5, 0.6, 0.7, 0.8], perHour: 10 }, (api.cfg || {}).soulTrapXp || {});
+  const trapsAt = globalThis.__dboSoulTrapXpAt || (globalThis.__dboSoulTrapXpAt = new Map()); // actorId -> [ms]
+  globalThis.__dboSoulCaptured = (caster, target, size) => {
+    const a = caster >>> 0;
+    if (!TRAP_XP.enabled || typeof globalThis.__alduinakMasteryAward !== 'function') return 0;
+    const now = Date.now();
+    const recent = (trapsAt.get(a) || []).filter((t) => now - t < 3600000);
+    if (recent.length >= TRAP_XP.perHour) { trapsAt.set(a, recent); return 0; }
+    const weight = Number(TRAP_XP.weightBySize[Number(size) || 0]) || 0;
+    if (!(weight > 0)) return 0;
+    let units = 0;
+    try { units = Number(globalThis.__alduinakMasteryAward(a, 'enchanter', weight, target >>> 0)) || 0; } catch (e) { log(`soul trap award failed for ${display(a)}: ${e.message}`); return 0; }
+    // Only a credited capture uses the hour's room, so one before Enchanter is taken up costs nothing
+    if (units > 0) recent.push(now);
+    trapsAt.set(a, recent);
+    return units;
   };
 
   // CustomEvent prepends the actor: (actor, workbench, result, inputs)

@@ -14,15 +14,24 @@ const ESBUILD = process.env.ESBUILD || path.join(os.homedir(), 'dragonbreak/fork
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'claude-nate-enchl-'));
 const out = path.join(tmp, 'l.js');
 execFileSync(ESBUILD, [path.join(DIR, 'learnedEnchantments.ts'), '--bundle', '--platform=node', '--format=cjs', `--outfile=${out}`, '--log-level=error']);
-const { readLearned, LEARNED_MAX } = require(out);
+const { readLearned, LEARNED_MAX, readForget, toForget } = require(out);
 let fails = 0;
 const ok = (c, what, got) => { console.log(`${c ? 'PASS' : 'FAIL'}  ${what}${!c && got !== undefined ? '   ' + JSON.stringify(got) : ''}`); if (!c) fails++; };
 ok(JSON.stringify(readLearned({ customPacketType: 'dboEnchLearned', effects: [0x13fa1, 0x7a0f5, 0x13fa0] })) === JSON.stringify([0x13fa1, 0x7a0f5, 0x13fa0]), 'the packet alchemy.js sends reads as its list of effects, in order');
 ok(readLearned({ customPacketType: 'dboIdle', effects: [1] }) === null && readLearned(null) === null && readLearned({ customPacketType: 'dboEnchLearned' }) === null, 'another packet, nothing, or no list is not one');
 ok(JSON.stringify(readLearned({ customPacketType: 'dboEnchLearned', effects: [5, 5, 'x', -1, 0, 1.5, 0xff000001, 7] })) === JSON.stringify([5, 7]), 'junk, duplicates and dynamic (0xff) ids are dropped');
 ok(readLearned({ customPacketType: 'dboEnchLearned', effects: Array.from({ length: 2000 }, (_, i) => i + 1) }).length === LEARNED_MAX, 'the list is bounded', LEARNED_MAX);
+// A second character in one game session inherited the first one's known enchantments (SMJ, 12 Oct): each list unsets the
+// earlier list's ids it lacks and the server's forget list (older clients have neither, and are skipped here)
+if (typeof toForget === 'function') {
+  ok(JSON.stringify(toForget([1, 2, 3], [2])) === JSON.stringify([1, 3]), 'what an earlier list set and this one lacks is forgotten');
+  ok(JSON.stringify(toForget([1, 2], [2], [4, 2, 1])) === JSON.stringify([1, 4]), "...plus the server's forget list, never an id in this list, each once");
+  ok(JSON.stringify(readForget({ customPacketType: 'dboEnchLearned', effects: [], forget: [9, 'x', 9, 8] })) === JSON.stringify([9, 8]) && readForget({ customPacketType: 'dboEnchLearned', effects: [] }).length === 0, 'the forget list reads like the effects; none is empty');
+  ok(JSON.stringify(readLearned({ customPacketType: 'dboEnchLearned', effects: [] })) === '[]', 'an empty list is still a list (a character that learned nothing)');
+  ok(/form\.setPlayerKnows\(false\)/.test(fs.readFileSync(path.join(DIR, 'learnedEnchantmentsService.ts'), 'utf8')) && /toForget\(this\.setThisSession, effects, forget\)/.test(fs.readFileSync(path.join(DIR, 'learnedEnchantmentsService.ts'), 'utf8')), 'the service unsets them with setPlayerKnows(false)');
+}
 const svc = fs.readFileSync(path.join(DIR, 'learnedEnchantmentsService.ts'), 'utf8');
-ok(/readLearned\(parseCustomPacket\(event\)\)/.test(svc) && /this\.controller\.once\("update"/.test(svc) && /form\.setPlayerKnows\(true\)/.test(svc), 'the service sets each effect known on the next update (Form.setPlayerKnows, index.d.ts)');
+ok(/readLearned\((parseCustomPacket\(event\)|content)\)/.test(svc) && /this\.controller\.once\("update"/.test(svc) && /form\.setPlayerKnows\(true\)/.test(svc), 'the service sets each effect known on the next update (Form.setPlayerKnows, index.d.ts)');
 ok(/if \(!form\) \{ missing\+\+; continue; \}/.test(svc), '...skipping an id the game does not have');
 const idx = fs.readFileSync(path.join(ROOT, 'skymp5-client/src/index.ts'), 'utf8');
 ok(/new LearnedEnchantmentsService\(sp, controller\)/.test(idx), 'the client starts the service');

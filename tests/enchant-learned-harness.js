@@ -71,7 +71,11 @@ ok(globalThis.__dboEnchLearnedLogin(P) === false && !packets.length, 'learnedEnc
 load({ learnedEnchantments: { enabled: true } });
 ok(globalThis.__dboEnchLearnedLogin(P) === true && packets.length === 1 && packets[0][0] === P && packets[0][1].customPacketType === 'dboEnchLearned'
   && JSON.stringify(packets[0][1].effects) === JSON.stringify([BURN, STAMINA, FIRE]), 'on: the login sends dboEnchLearned with the effects, read after a reload', packets);
-ok(globalThis.__dboEnchLearnedLogin(Q) === false && packets.length === 1, '...and nothing for a character that learned nothing');
+ok(Array.isArray(packets[0][1].forget) && packets[0][1].forget.length > 0 && !packets[0][1].forget.some((x) => packets[0][1].effects.includes(x)),
+  '...with every other known enchantment id to forget (SMJ, 12 Oct: a second character inherited the first one\'s)', packets[0][1].forget);
+ok(globalThis.__dboEnchLearnedLogin(Q) === false && packets.length === 2 && packets[1][0] === Q && packets[1][1].effects.length === 0
+  && packets[1][1].forget.length >= packets[0][1].forget.length, '...and a character that learned nothing gets an empty list that forgets them all', packets[1]);
+packets.length = 1;
 // /syncenchant resends without the login's session reset (6 Oct): a disenchant this session stays known, so a report
 // naming it again cannot take a second copy
 const S = globalThis.__dboDisenchantSession;
