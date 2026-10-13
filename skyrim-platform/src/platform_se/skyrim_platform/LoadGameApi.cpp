@@ -24,21 +24,33 @@ uint32_t RgbToAbgr(int32_t rgb)
   return resultColor;
 }
 
-SaveFile_::RefID FormIdToRefId(uint32_t formId)
+// RefID of a loaded T: Skyrim.esm direct, plugin forms by FormIDArray index
+template <class T>
+std::optional<SaveFile_::RefID> SaveRefIdOf(SaveFile_::SaveFile& save,
+                                            uint32_t formId)
 {
-  std::string binType = formId >= 0x01000000 ? "10" : "01";
-  std::string binId = std::bitset<22>(formId).to_string();
-
-  std::string binSum = binType + binId;
-  std::string binByte0 = { binSum.begin(), binSum.begin() + 8 };
-  std::string binByte1 = { binSum.begin() + 8, binSum.begin() + 16 };
-  std::string binByte2 = { binSum.begin() + 16, binSum.begin() + 24 };
-
-  SaveFile_::RefID hpRefId;
-  hpRefId.byte0 = std::bitset<8>(binByte0).to_ulong();
-  hpRefId.byte1 = std::bitset<8>(binByte1).to_ulong();
-  hpRefId.byte2 = std::bitset<8>(binByte2).to_ulong();
-  return hpRefId;
+  // Missing or wrong-typed would load as T; light plugins have no slot here
+  if (!RE::TESForm::LookupByID<T>(formId) || formId >= 0xFE000000) {
+    return std::nullopt;
+  }
+  if (formId < 0x01000000) {
+    SaveFile_::RefID res;
+    res.byte0 = 0b01000000 | ((formId >> 16) & 0x3F);
+    res.byte1 = (formId >> 8) & 0xFF;
+    res.byte2 = formId & 0xFF;
+    return res;
+  }
+  const auto found = save.FindIndexInFormIdArray(formId);
+  if (found < 0) {
+    return SaveFile_::RefID::CreateRefId(save, formId);
+  }
+  // FormIDArray indices start at 1
+  const auto index = static_cast<uint32_t>(found) + 1;
+  SaveFile_::RefID res;
+  res.byte0 = (index >> 16) & 0x3F;
+  res.byte1 = (index >> 8) & 0xFF;
+  res.byte2 = index & 0xFF;
+  return res;
 }
 
 std::unique_ptr<SaveFile_::ChangeFormNPC_> CreateChangeFormNpc(
@@ -54,9 +66,11 @@ std::unique_ptr<SaveFile_::ChangeFormNPC_> CreateChangeFormNpc(
   if (auto raceId = npcData.Get("raceId");
       !raceId.IsUndefined() && !raceId.IsNull()) {
     auto raceIdExtracted = NapiHelper::ExtractUInt32(raceId, "npcData.raceId");
-    changeFormNpc->race = SaveFile_::ChangeFormNPC_::RaceChange();
-    changeFormNpc->race->defaultRace = FormIdToRefId(raceIdExtracted);
-    changeFormNpc->race->myRaceNow = FormIdToRefId(raceIdExtracted);
+    if (auto race = SaveRefIdOf<RE::TESRace>(*save, raceIdExtracted)) {
+      changeFormNpc->race = SaveFile_::ChangeFormNPC_::RaceChange();
+      changeFormNpc->race->defaultRace = *race;
+      changeFormNpc->race->myRaceNow = *race;
+    }
   }
 
   // TODO: why mismatch with skyrimPlatform.ts: instead of 'npcData' this is in
@@ -92,7 +106,9 @@ std::unique_ptr<SaveFile_::ChangeFormNPC_> CreateChangeFormNpc(
         auto jHpId = headPartIdsExtracted.Get(i);
         std::string comment = fmt::format("npcData.headPartIds[{}]", i);
         auto hpId = NapiHelper::ExtractUInt32(jHpId, comment.data());
-        changeFormNpc->face->headParts.push_back(FormIdToRefId(hpId));
+        if (auto hp = SaveRefIdOf<RE::BGSHeadPart>(*save, hpId)) {
+          changeFormNpc->face->headParts.push_back(*hp);
+        }
       }
     }
 
@@ -113,7 +129,9 @@ std::unique_ptr<SaveFile_::ChangeFormNPC_> CreateChangeFormNpc(
         !headTextureSetId.IsUndefined() && !headTextureSetId.IsNull()) {
       auto id = NapiHelper::ExtractUInt32(headTextureSetId,
                                           "npcData.headTextureSetId");
-      changeFormNpc->face->headTextureSet = FormIdToRefId(id);
+      if (auto textureSet = SaveRefIdOf<RE::BGSTextureSet>(*save, id)) {
+        changeFormNpc->face->headTextureSet = *textureSet;
+      }
     }
   }
 
