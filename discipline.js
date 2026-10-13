@@ -54,6 +54,8 @@ module.exports = (api) => {
   const recordOf = (profile) => D.profiles[profile] || [];
 
   const kickWithReason = (a, reason) => {
+    // the player log (playerlog.js): the logout's reason, a suspension (never its text)
+    try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('leave_reason', a, 'suspension'); } catch (e) { /* the player log is optional */ }
     try { sendPacket(a, { customPacketType: 'kicked', reason }); } catch (e) { /* gone */ }
     setTimeout(() => { try { const u = userOf(a); if (u >= 0) mp.kick(u); } catch (e) { log('discipline: kick failed', e.message); } }, 1500);
   };

@@ -156,6 +156,8 @@ module.exports = (api) => {
       }
     }
     if (C.log && events.length) log(`combat ${display(agg)} -> ${display(tgt)}: ${events.join(', ')}${flags.power ? ' [power]' : ''}${flags.bash ? ' [bash]' : ''}${flags.blocked ? ' [blocked]' : ''}`);
+    // the player log (playerlog.js): a stagger or a chip through the block, so the health it takes is not unexplained
+    if (events.length) { try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('effect', tgt, events.some((e) => /stagger/.test(e)) ? 'stagger' : 'other', 0); } catch (e) { /* the player log is optional */ } }
     return out;
   };
 
@@ -289,6 +291,7 @@ module.exports = (api) => {
     if (disarms) {
       const n = disarmPlayer(tgt, 'A shout tears the weapon from your grip.');
       if (C.log && n >= 0) log(`combat ${display(agg)} -> ${display(tgt)}: shout disarm, ${n} weapon(s) (spell ${spellId.toString(16)})`);
+      if (n >= 0) { try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('effect', tgt, 'disarm', 0); } catch (e) { /* the player log is optional */ } }
       return;
     }
     if (dismay) {
@@ -296,6 +299,7 @@ module.exports = (api) => {
       const speedMult = Math.max(-90, Math.min(0, Number(C.dismaySpeedMult) || 0));
       try { sendPacket(tgt, { customPacketType: 'dboStatus', kind: 'terror', seconds: dismay, speedMult, text: `A shout breaks your nerve. You are terrified for ${dismay} seconds.` }); } catch (e) { /* offline */ }
       if (C.log) log(`combat ${display(agg)} -> ${display(tgt)}: shout dismay ${dismay} s (spell ${spellId.toString(16)})`);
+      try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('effect', tgt, 'dismay', 0); } catch (e) { /* the player log is optional */ }
       return;
     }
     if (force >= 0 && typeof sendPacket === 'function') {
@@ -304,6 +308,7 @@ module.exports = (api) => {
       s.pushedAt = now;
       try { sendPacket(tgt, { customPacketType: 'dboPush', from: agg >>> 0, force }); } catch (e) { /* offline */ }
       if (C.log) log(`combat ${display(agg)} -> ${display(tgt)}: shout ${force ? `push ${force}` : 'stagger'} (spell ${spellId.toString(16)})`);
+      try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('effect', tgt, force ? 'push' : 'stagger', 0); } catch (e) { /* the player log is optional */ }
       return;
     }
     if (C.playersOnly && !isPlayer(agg)) return;

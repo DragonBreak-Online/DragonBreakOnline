@@ -275,6 +275,8 @@ module.exports = (api) => {
   onUi('playerAction', (a, args) => {
     const id = String(args[0] || ''); const t = Number(args[1]) >>> 0;
     if (!validTarget(a, t)) return personal(a, 'They are too far away.');
+    // the player log (playerlog.js): the action and its target, folded per minute; voice actions never
+    if (!id.startsWith('voice')) { try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('pmenu', a, id, t); } catch (e) { /* the player log is optional */ } }
     if (id === 'introduce') return introduce(a, t);
     if (id === 'inspect') return openMenu(a, t, 'inspect', inspectLines(a, t));
     if (id === 'party') return runCommand(a, 'party', `invite #${tagOf(t)}`);
@@ -348,6 +350,7 @@ module.exports = (api) => {
     personal(a, itemId
       ? 'You pull up a borrowed mask. Others see a Masked Person. Press H to take it off and hand it back.'
       : 'You pull your mask up. Others see a Masked Person. Press H to take it off.');
+    try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('mask', a, true); } catch (e) { /* the player log is optional */ }
   };
   const unmask = (a, quiet) => {
     const stored = String(get(a, MASK_PROP, '') || '');
@@ -363,6 +366,7 @@ module.exports = (api) => {
       setTimeout(() => { if (!removeOne(a, itemId)) { try { mp.set(a, 'private.maskLost', itemId); } catch (e) { log('mask loss not recorded', e.message); } } }, 1500);
     }
     if (!quiet) personal(a, itemId ? 'You take the borrowed mask off and hand it back.' : 'You take your mask off.');
+    try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('mask', a, false); } catch (e) { /* the player log is optional */ }
     if (!real && !quiet) personal(a, 'Your own name was lost behind the mask. Please send a /bug so staff can give it back to you.');
   };
   // A mask taken off is removed 1.5 s later; toggling again inside that let a burst of H hand out a mask each time

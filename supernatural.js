@@ -709,7 +709,7 @@ module.exports = (api) => {
     const inner = mp.onHitDamageAttempt;
     if (typeof inner === 'function') {
       const silverHook = function (agg, tgt, src, ...rest) {
-        try { const s = stateOf(Number(agg) >>> 0); if (s && s.kind && isPlayer(Number(agg) >>> 0) && isSilverItem(src)) return false; } catch (e) { /* not an actor */ }
+        try { const s = stateOf(Number(agg) >>> 0); if (s && s.kind && isPlayer(Number(agg) >>> 0) && isSilverItem(src)) { globalThis.__dboHitRefusal = 'silver'; return false; } } catch (e) { /* not an actor */ }
         return inner.call(this, agg, tgt, src, ...rest);
       };
       silverHook.__dbo = true;
@@ -868,6 +868,7 @@ module.exports = (api) => {
     try { mp.set(a, 'private.permaDead', true); mp.set(a, 'isDead', true); } catch (e) { log(`supernatural: perma death failed on ${display(a)}: ${e.message}`); }
     endCurse(a, why);
     audit(`PERMADEATH ${who(a)} (${why})`);
+    try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('leave_reason', a, 'permadeath'); } catch (e) { /* the player log is optional */ }
     // Nat: the player is logged out with the news; the character screen then shows the slot dead and locked
     const text = `${nameOf(a)} has died, and this life is over. You will be returned to the menu.`;
     onScreen(a, text, 7);
@@ -1216,6 +1217,7 @@ module.exports = (api) => {
   // The cure itself, once chosen: the gem is checked again at the moment it is taken
   const cureAt = (a, deity) => {
     if (!takeOne(a, BLACK_SOUL_GEM_FILLED)) return 'The rite needs a filled black soul gem to take the curse into.';
+    try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('itemflow', a, 'rite_soulgem', BLACK_SOUL_GEM_FILLED, -1); } catch (e) { /* the player log is optional */ }
     endCurse(a, `cured at a shrine of ${deity === 'arkay' ? 'Arkay' : 'Stendarr'}`);
     return '';
   };
@@ -1523,6 +1525,7 @@ module.exports = (api) => {
       if (!onCorpse) {
         const p = health(t);
         if (p) setHealth(t, Math.max(o.long ? 0.05 : 0.1, p.health - (o.long ? Number(C.feed.longHealthTaken) : Number(C.feed.healthTaken))));
+        try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('effect', t, 'feed_drain', 0); } catch (e) { /* the player log is optional */ }
         personal(t, o.long ? `${nameTo(t, a)} drinks long from you. The world goes dark.` : `${nameTo(t, a)} drinks from you. You feel weak.`);
         if (o.long) blackout(t);
         if (Math.random() < C.infectFeed * (1 - raceDiseaseResist(t))) infect(t, 'vampire', a);
@@ -2331,6 +2334,8 @@ module.exports = (api) => {
       const p = health(a); if (!p || p.health <= C.sunFloor) continue;
       const cover = coverOf(a);
       setHealth(a, Math.max(C.sunFloor, p.health - C.sunPerStage * penaltyStage(a, s) * shade * (s.pure ? 0.5 : 1) * (1 - C.sunCoverMax * cover) * bloodRate(a, '__dboBloodSunMult')));
+      // the player log: the sun's toll is no unexplained loss of health (playerlog.js)
+      try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('effect', a, 'sun', 0); } catch (e) { /* the player log is optional */ }
       const last = sunWarned.get(a) || 0;
       if (Date.now() - last > 120000) { sunWarned.set(a, Date.now()); personal(a, cover >= 0.99 ? 'The sun presses on you, but your wrappings hold it off.' : cover > 0 ? 'The sun finds your bare skin and burns it.' : 'The sun burns your skin. Cover your face, body, hands and feet to lessen it.'); }
     }

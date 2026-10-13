@@ -381,6 +381,8 @@ module.exports = (api) => {
     if (inRobbery(a)) return personal(a, 'You cannot sleep in the middle of a robbery.');
     set(a, 'private.dboSleep', { at: Date.now(), bed: bed >>> 0 });
     audit(`REST ${who(a)} went to sleep in bed ${bedDesc(bed)}${where(bed)}`);
+    // the player log (playerlog.js): the logout that follows is sleep
+    try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('leave_reason', a, 'sleep'); } catch (e) { /* the player log is optional */ }
     const reason = `You lie down and sleep. Stay away at least ${CFG.minOfflineMinutes} minutes to wake Well Rested.`;
     try { sendPacket(a, { customPacketType: 'kicked', reason }); } catch (e) { /* the kick still lands */ }
     const user = userOf(a);
