@@ -76,6 +76,11 @@ export class SpawnProcess {
     if (ac) {
       this.note("pre-resurrect", refrId);
       return ac.resurrect().then(() => {
+        // A copy deleted while it was being resurrected is gone, and setCollision throws on a missing ref
+        const resurrected = ObjectReference.from(Game.getFormEx(refrId));
+        if (!resurrected || resurrected.getFormID() !== refrId) {
+          return;
+        }
         setRefrCollision(refrId, true);
         this.callback();
       });
