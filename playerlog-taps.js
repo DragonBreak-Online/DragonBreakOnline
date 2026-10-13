@@ -47,13 +47,21 @@ module.exports = (K) => {
   // =============================================================================================================================
   // Sessions (DESIGN.md 2.2.7)
   // =============================================================================================================================
-  const accountSnapshot = (a) => {
+  // The profile's characters, each with its carried gold and bank (13 Oct, gold review: the forum's account totals left the
+  // alts out). At most ACCT_MAX characters (spawn.ts caps the slots at 10; staff and old characters can add some); total says
+  // how many the profile has, so a list that was cut never reads as characters deleted. src: what asked for it (a login,
+  // or a session the load or a resume picked up, review caveat on the resync)
+  const ACCT_MAX = 24;
+  const accountSnapshot = (a, src) => {
     const p = profileOf(a);
     if (p < 0) return;
-    let actors = [];
-    try { actors = (mp.getActorsByProfileId(p) || []).map(u32).filter(Boolean).slice(0, 12); } catch (e) { actors = [u32(a)]; }
+    let all = [];
+    try { all = (mp.getActorsByProfileId(p) || []).map(u32).filter(Boolean); } catch (e) { all = [u32(a)]; }
+    const actors = all.slice(0, ACCT_MAX);
     const chars = [];
     const slotsOf = new Map();
+    const me = u32(a);
+    let mine = null;
     for (const x of actors) {
       const own = S.ids.get(x);
       const shown = (get(x, 'appearance') || {}).name;
@@ -64,12 +72,34 @@ module.exports = (K) => {
       const rp = get(x, 'private.rp');
       const created = rp && typeof rp === 'object' && Number.isFinite(Number(rp.createdAt)) ? Number(rp.createdAt) : undefined;
       const j = get(x, 'private.dboJournalId');
+      const gold = goldOf(x), bank = bankOf(x);
+      if (x === me) mine = { gold, bank };
       chars.push({ a: hex(x), c: c || undefined, n, slot: Number.isFinite(slot) ? slot : undefined, dead: get(x, 'isDead') === true, perma: get(x, 'private.permaDead') === true,
-        staff: get(x, 'private.dboStaffChar') === true || undefined, created, j: typeof j === 'string' ? j : undefined });
+        staff: get(x, 'private.dboStaffChar') === true || undefined, created, j: typeof j === 'string' ? j : undefined, gold, bank });
       if (Number.isFinite(slot)) slotsOf.set(slot, { c, n });
     }
     put('slotMap', p, { t: now(), slots: slotsOf });
-    emit('account.snapshot', a, { chars }, { src: 'hook:login' });
+    const sent = emit('account.snapshot', a, { chars, total: all.length }, { src: src || 'hook:login' });
+    const sess = S.sessions.get(me);
+    if (sent && sess) { sess.acct = true; if (mine) goldReported(sess, mine.gold, mine.bank, now()); }
+  };
+  // Carried gold and bank (13 Oct, gold review): the session keeps the last values read (g, b: the exit flush writes them,
+  // review C-R6 allows no native get at exit) and the last values the record has (eg, eb: what a login, a snapshot, an
+  // account snapshot or item.gold said). The slow poll writes item.gold when what it reads differs from what the record
+  // has, at most once per goldPoll.minMs a character: trades, contract pay, fees, wages and loot all move gold, and no
+  // single hook sees them all.
+  const goldSeen = (sess, gold, bank, t) => { if (!sess) return; if (gold !== undefined) sess.g = gold; if (bank !== undefined) sess.b = bank; sess.gt = t; };
+  const goldReported = (sess, gold, bank, t) => { if (!sess) return; goldSeen(sess, gold, bank, t); sess.eg = gold; sess.eb = bank; sess.et = t; };
+  const GOLD_POLL = C.goldPoll && typeof C.goldPoll === 'object' ? C.goldPoll : {};
+  const goldPoll = (a, t) => {
+    if (GOLD_POLL.on === false) return;
+    const sess = S.sessions.get(a);
+    if (!sess) return;
+    const gold = goldOf(a), bank = bankOf(a);
+    goldSeen(sess, gold, bank, t);
+    if (gold === sess.eg && bank === sess.eb) return;
+    if (sess.et && t - sess.et < (Number(GOLD_POLL.minMs) >= 0 ? Number(GOLD_POLL.minMs) : 30000)) return;
+    if (emit('item.gold', a, { gold, bank }, { src: 'poll:gold' })) goldReported(sess, gold, bank, t);
   };
   const TIER_OK = new Set(['senior', 'developer', 'leadgm', 'gm', 'trialgm']);
   const login = (userId, a, reselect) => {
@@ -78,7 +108,9 @@ module.exports = (K) => {
     add('online', a);
     const r = refreshId(a, true);
     const t = now();
-    put('sessions', a, { t, userId, gold0: goldOf(a), bank0: bankOf(a) });
+    const g0 = goldOf(a), b0 = bankOf(a);
+    put('sessions', a, { t, userId, gold0: g0, bank0: b0, g: g0, b: b0, gt: t, eg: g0, eb: b0, et: t });
+    S.snapQ.delete(a);
     put('connectByUser', userId, { t, a, p: r.p });
     S.menuLeft.delete(userId);
     const cv = S.clientByUser.get(userId);
@@ -86,7 +118,7 @@ module.exports = (K) => {
     emit('session.login', a, { slot: Number.isFinite(slot) ? slot : undefined, tier: TIER_OK.has(r.staff) ? r.staff : undefined, staffChar: get(a, 'private.dboStaffChar') === true || undefined,
       gold: S.sessions.get(a).gold0, bank: S.sessions.get(a).bank0, userId, client: cv ? cv.v : undefined, sp: cv ? cv.sp : undefined, reselect: reselect || undefined }, { src: reselect ? 'packet:reselect' : 'hook:login' });
     const w = S.worn.get(a); if (w) w.t = t; else put('worn', a, { t, set: null });
-    setTimeout(guard('login.snapshot', () => { if (S.on) accountSnapshot(a); }), 0);
+    setTimeout(guard('login.snapshot', () => { if (S.on) accountSnapshot(a, 'hook:login'); }), 0);
   };
   G.hooks.login = (userId, a) => login(userId, a, false);
   const LEAVE_REASON = { kick: 'kicked', kicked: 'kicked', command: 'kicked', panel: 'kicked', demotion: 'kicked', suspension: 'suspended', suspended: 'suspended',
@@ -112,8 +144,9 @@ module.exports = (K) => {
     if (!reason) reason = 'unknown';
     closeAllFor(a, 'logout');
     if (sess) {
-      emit('session.logout', a, { reason, sec: Math.round((t - sess.t) / 1000), gold0: sess.gold0, gold1: goldOf(a), bank0: sess.bank0, bank1: bankOf(a), silentSec: silent, journalOpen: journalOpen || undefined },
-        { src: src || 'hook:logout', q });
+      // resync: the session was picked up by a load or a resume, so gold0 and bank0 are from then, not from a login
+      emit('session.logout', a, { reason, sec: Math.round((t - sess.t) / 1000), gold0: sess.gold0, gold1: goldOf(a), bank0: sess.bank0, bank1: bankOf(a), silentSec: silent, journalOpen: journalOpen || undefined,
+        resync: sess.resync || undefined }, { src: src || 'hook:logout', q });
     }
     if (C.snapshots.logout && sess) setTimeout(guard('logout.snapshot', () => snapshot(a, 'logout')), 0);
     forget(a);
@@ -121,7 +154,7 @@ module.exports = (K) => {
   // What the state holds for a character in the world, dropped when it leaves it
   const forget = (a) => {
     S.sessions.delete(a); S.pendingLeave.delete(a); S.afk.delete(a); S.vitals.delete(a); S.restrained.delete(a); S.worn.delete(a); S.mastery.delete(a); S.companions.delete(a);
-    S.propSnap.delete(a);
+    S.propSnap.delete(a); S.snapQ.delete(a);
     S.online.delete(a);
   };
   G.hooks.logout = (userId, a) => leave(a, null, 'hook:logout');
@@ -156,7 +189,8 @@ module.exports = (K) => {
     const entries = entriesOf(a);
     const items = [];
     for (const e of entries) { if (!e || u32(e.baseId) === GOLD) continue; items.push(itemOf(e.baseId, e.count, e)); if (items.length >= 250) break; }
-    emit('item.snapshot', a, { at, items, gold: countIn(entries, GOLD), bank: bankOf(a) }, { src: `snapshot:${at}` });
+    const gold = countIn(entries, GOLD), bank = bankOf(a);
+    if (emit('item.snapshot', a, { at, items, gold, bank }, { src: `snapshot:${at}` })) goldReported(S.sessions.get(u32(a)), gold, bank, now());
   };
 
   // =============================================================================================================================
@@ -747,6 +781,7 @@ module.exports = (K) => {
     const n = Number(count);
     const moved = Number.isFinite(n) && n > 0 ? Math.max(0, Math.min(d, n)) : d;
     const t = now();
+    if (base === GOLD && Number.isFinite(Number(after[0]))) goldSeen(S.sessions.get(actor), Number(after[0]), undefined, t);
     const extra = extrasDiff(exBefore, exAfter)[0];
     const item = itemOf(base, Math.abs(moved), extra ? Object.assign({ name: extra.named ? 'x' : undefined }, extra) : null);
     emit('item.move', actor, { kind, ref: hex(ref), base: recordName(baseOfRef(ref)), item, packBefore: before[0], packAfter: after[0], contBefore: before[1], contAfter: after[1] }, { src: 'seam:itemguards' });
@@ -1411,6 +1446,12 @@ module.exports = (K) => {
         emit('combat.capture', a, { op: 'released' }, { o: was.by && isPlayer(was.by) ? [partyOf(was.by, 'captor')] : undefined, src: 'poll:restraint', q: 'inferred' });
       }
     }
+    // one queued account snapshot a tick (G.resync), when the tick has time left
+    if (S.snapQ.size && K.perf() < end) {
+      const [x, q] = S.snapQ.entries().next().value;
+      S.snapQ.delete(x);
+      if (online(x) && S.sessions.has(x)) accountSnapshot(x, `resync:${q && q.why === 'resume' ? 'resume' : 'load'}`);
+    }
     const over = overAt(end);
     for (let i = 0; i < CLOSERS.length; i++) CLOSERS[(closerTurn + i) % CLOSERS.length](t, over);
     closerTurn = (closerTurn + 1) % CLOSERS.length;
@@ -1490,7 +1531,7 @@ module.exports = (K) => {
       if (outdoors) { l.outW = w; l.outPos = pos; }
     }
   };
-  // Slow (5 s, a twelfth of the online players a tick): mastery and companion diffs, the identity refresh
+  // Slow (5 s, a twelfth of the online players a tick): mastery and companion diffs, the identity refresh, carried gold and bank
   const masteryDiff = (a) => {
     const m = get(a, 'private.mastery');
     if (!m || typeof m !== 'object' || !m.skills) return;
@@ -1532,6 +1573,7 @@ module.exports = (K) => {
       try { refreshId(a, false); } catch (e) { err('poll:slow.id', e); }
       try { masteryDiff(a); } catch (e) { err('poll:slow.mastery', e); }
       try { companionDiff(a); } catch (e) { err('poll:slow.companions', e); }
+      try { goldPoll(a, now()); } catch (e) { err('poll:slow.gold', e); }
     }
     S.slowCursor = (S.slowCursor + per) % Math.max(1, list.length);
   };
@@ -1715,10 +1757,21 @@ module.exports = (K) => {
   // are dropped (their logout was not seen, so none is written). After a time off, the polls' caches are stale: positions,
   // health, restraints and idle spots are dropped and the first polls record them again without reading them as a move, a
   // loss or a capture.
+  // A session picked up here starts with the gold and bank read now (two gets, as a login), marked resync so its logout line
+  // does not read as a whole session's. Each online session whose record has no account snapshot with gold yet (a pickup,
+  // or a login before the 13 Oct gold fix) gets one: queued, and written one player per fast tick inside the tick's budget
+  // (gold review caveat: up to 24 characters x 10 gets each must not land in one tick). Capture is off while this runs, so
+  // nothing is written here.
   G.resync = (why) => {
     let on = null;
     try { on = new Set(((typeof api.onlineActors === 'function' ? api.onlineActors() : []) || []).map(u32).filter(Boolean)); } catch (e) { err('load.online', e); return; }
-    for (const x of on) if (!S.online.has(x)) { add('online', x); if (!S.sessions.has(x)) put('sessions', x, { t: now(), userId: undefined, gold0: undefined, bank0: undefined }); }
+    for (const x of on) {
+      if (!S.online.has(x)) add('online', x);
+      let sess = S.sessions.get(x);
+      if (!sess) sess = put('sessions', x, { t: now(), userId: undefined, gold0: undefined, bank0: undefined });
+      if (sess.gold0 === undefined && sess.bank0 === undefined) { sess.gold0 = goldOf(x); sess.bank0 = bankOf(x); sess.resync = true; goldSeen(sess, sess.gold0, sess.bank0, now()); }
+      if (!sess.acct && !S.snapQ.has(x)) put('snapQ', x, { t: now(), why: why === 'load' ? 'load' : 'resume' });
+    }
     for (const a of [...S.online]) if (!on.has(a)) { S.containers.delete(a); forget(a); }
     if (why === 'load' && !K.wasOff) return;
     S.loc.clear(); S.vitals.clear(); S.restrained.clear(); S.afk.clear(); S.hpLossMerge.clear();

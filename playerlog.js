@@ -55,6 +55,9 @@ const DEFAULTS = {
   snapshots: { logout: true, down: true },
   nameHash: false,
   inventoryDiff: false,
+  // carried gold and bank (playerlog-taps.js goldPoll): read in the slow poll's slice, item.gold when it changed, at most once
+  // per minMs a character (13 Oct, gold review)
+  goldPoll: { on: true, minMs: 30000 },
   types: { 'combat.hit': false, 'cmd.info': true, 'social.player_menu': true },
 };
 const merge = (base, over) => {
@@ -85,6 +88,8 @@ const CAPS = {
   // review fixes: the housing record a player saw when the property menu opened (C-R5); the cell -> place root map from the
   // place records read at door and chest uses (C-R10); NPCs killed in the last seconds, so the killing blow opens no fight (C-R3)
   propSnap: { cap: 500, ttl: 600000 }, placeCells: { cap: 2000 }, recentKills: { cap: 1000, ttl: 5000 },
+  // the gold review (13 Oct): sessions picked up by a load or a resume wait here for their account snapshot, one a fast tick
+  snapQ: { cap: 500 },
 };
 const newState = () => {
   const S = { v: STATE_V, q: [], auditQ: [], errTimes: [], cmdStack: [], seq: 0, gen: '', on: false, enabled: false, stopped: false, broken: false,
@@ -615,7 +620,8 @@ module.exports = (api) => {
   // ---- the exit flush (DESIGN.md 3.10): the only sync IO; after the game's own saves --------------------------------------
   // Each generation sets globalThis.__dboPlogFlushSync, and the one chain installed on __dboFlushOnExit calls the latest, so
   // the exit flush runs this generation's code. What it writes, in order: the queue, then a session.logout{server_stop} for
-  // each session still open (review C-R6: from the cached identity and place, no native get at exit), then a sys.dropped for
+  // each session still open (review C-R6: from the cached identity and place, no native get at exit; gold1 and bank1 are the
+  // last values the polls read, marked cached), then a sys.dropped for
   // queue lines over exitFlushBytes, then sys.stop{sigterm}. The tail always fits: the queue fills what room is left (safety
   // review, LOW: the stop marker was the line cut).
   const plogFlushSync = () => {
@@ -633,7 +639,8 @@ module.exports = (api) => {
           const r = S.ids.get(a);
           if (!r || !sess) continue;
           const rec = { v: R.VERSION, t, ev: 'session.logout', p: r.p, a: hex(a), src: 'sys:exit', g: St.gen, s: ++St.seq,
-            f: { reason: 'server_stop', sec: Number(sess.t) > 0 ? Math.max(0, Math.round((t - sess.t) / 1000)) : undefined, gold0: sess.gold0, bank0: sess.bank0 } };
+            f: { reason: 'server_stop', sec: Number(sess.t) > 0 ? Math.max(0, Math.round((t - sess.t) / 1000)) : undefined, gold0: sess.gold0, bank0: sess.bank0,
+              gold1: sess.g, bank1: sess.b, cached: sess.g !== undefined || sess.b !== undefined ? true : undefined, resync: sess.resync || undefined } };
           if (r.c) rec.c = r.c;
           if (r.n) rec.n = r.n;
           if (r.sn) rec.sn = r.sn;

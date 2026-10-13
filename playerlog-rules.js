@@ -116,10 +116,13 @@ const EVENT_TYPES = {
   'sys.schema': T(0, '', { keys: COUNTS, types: COUNTS }),
   'sys.audit_unknown': T(0, '', { verbs: COUNTS }),
   // account and session
-  'account.snapshot': T(0, '', { chars: A(O({ a: 'hex', c: 'tag', n: NAME, slot: 'int', dead: 'bool', perma: 'bool', staff: 'bool', created: 'int', j: 'jid' }), 12) }),
+  // gold and bank per character, and total: how many characters the profile has, so a list cut at 24 never reads as the rest
+  // deleted (13 Oct, gold review)
+  'account.snapshot': T(0, '', { chars: A(O({ a: 'hex', c: 'tag', n: NAME, slot: 'int', dead: 'bool', perma: 'bool', staff: 'bool', created: 'int', j: 'jid', gold: 'int', bank: 'int' }), 24),
+    total: 'int' }),
   'session.login': T(0, 'pos', { slot: 'int', tier: TIER, staffChar: 'bool', gold: 'int', bank: 'int', userId: 'int', client: 'ver', sp: 'ver', reselect: 'bool' }),
   'session.logout': T(0, 'pos', { reason: E('menu_quit', 'crash_likely', 'afk_likely', 'kicked', 'suspended', 'slept', 'permadeath', 'server_stop', 'unknown'),
-    sec: 'int', gold0: 'int', gold1: 'int', bank0: 'int', bank1: 'int', silentSec: 'int', journalOpen: 'bool' }),
+    sec: 'int', gold0: 'int', gold1: 'int', bank0: 'int', bank1: 'int', silentSec: 'int', journalOpen: 'bool', resync: 'bool', cached: 'bool' }),
   'session.switch': T(0, '', { to: O({ a: 'hex', c: 'tag', n: NAME }) }),
   'session.char_menu': T(1, '', {}),
   'session.char_create': T(0, '', { slot: 'int' }),
@@ -154,6 +157,8 @@ const EVENT_TYPES = {
   'item.container': T(1, 'pos', { ref: 'hex', base: NAME, own: OWN, access: ACCESS, took: ITEMS, put: ITEMS, dur: 'int', refused: 'int' }, { near: true }),
   'item.access_refused': T(1, 'cell', { ref: 'hex', kind: E('container', 'door'), own: OWN, why: E('locked', 'not_yours', 'rented', 'business', 'treasury', 'closed_house', 'place_rule', 'unknown'), n: 'int' }, { near: true }),
   'item.snapshot': T(2, '', { at: E('logout', 'down'), items: A(ITEM, 250), gold: 'int', bank: 'int' }, { disk: true }),
+  // carried gold and bank when the slow poll finds them changed (13 Oct, gold review): the forum's account totals
+  'item.gold': T(1, '', { gold: 'int', bank: 'int' }, { disk: true }),
   'law.search': T(0, '', { op: E('requested', 'accepted', 'refused', 'timeout', 'ended') }, { near: true }),
   'item.pickup': T(1, 'cell', { item: ITEM, ref: 'hex' }),
   'item.harvest': T(2, 'cell', { item: ITEM, k: 'int' }),
