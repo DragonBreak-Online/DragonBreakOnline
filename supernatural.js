@@ -887,11 +887,14 @@ module.exports = (api) => {
     return true;
   };
   // Online by name or tag, offline by #TAG
+  // A #TAG names one character: its saved index first (13 Oct: findByName('#XE62') handed back another online actor, a
+  // 'Stranger #????', so a permadead character offline could not be restored); a plain name falls back to who is online
   const findCharacter = (q) => {
-    const online = findByName(q); if (online) return online;
     const m = String(q || '').trim().toLowerCase().match(/#([a-z0-9]{4})$/);
-    if (!m) return 0;
-    try { const r = mp.findFormsByPropertyValue('private.indexed.tagKey', m[1]); return Array.isArray(r) && r.length === 1 ? Number(r[0]) >>> 0 : 0; } catch (e) { return 0; }
+    if (m) {
+      try { const r = mp.findFormsByPropertyValue('private.indexed.tagKey', m[1]); if (Array.isArray(r) && r.length === 1) return Number(r[0]) >>> 0; } catch (e) { /* index unreadable: try who is online */ }
+    }
+    return findByName(q) || 0;
   };
   // Operators restore from the box: write ["#TAG", ...] to revive.json; it is read within 10 s and removed
   const REVIVE_PATH = path.resolve('revive.json');
