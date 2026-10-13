@@ -162,12 +162,18 @@ test('a dashboard sign-in older than 4 hours, or one with no sign-in time, is no
 test('the text is cleaned: one line, no bidi, colour codes broken, a missing / added, 500 at most', async () => {
   F.answer = r => ({ lines: [{ to: 'you', text: r.text }] })
   const cases = [
-    ['whoami', '/whoami'], [`/kick${RLO} #8KWH`, '/kick #8KWH'], ['/KICK   #8KWH', '/kick #8KWH'], ['/players #{ff0000}x', '/players # {ff0000}x'],
-    ['/kick #8KWH\n/kick #LLX8', '/kick #8KWH /kick #LLX8'],
+    ['whoami', '/whoami'], [`/kick${RLO} #8KWH`, '/kick #8KWH'], ['/KICK   #8KWH', '/kick #8KWH'], ['/rename #8KWH #{ff0000}Bob', '/rename #8KWH # {ff0000}Bob'],
+    ['/players #{ff0000}x', '/players # {ff0000}x'], ['/kick #8KWH\n/kick #LLX8', '/kick #8KWH /kick #LLX8'],
   ]
   for (const [input, want] of cases) {
+    const sent = F.requests.length
     const r = await run(web(), input)
-    if (want === '/kick #8KWH /kick #LLX8') { assert.equal(r.body.error, 'notRemote', 'a second command folded onto the line fails the argument rule'); continue }
+    // Cleaned, then refused by the argument rule before the spool: a second command, a colour code in a name, words after /players
+    if (['/kick #8KWH /kick #LLX8', '/rename #8KWH # {ff0000}Bob', '/players # {ff0000}x'].includes(want)) {
+      assert.equal(r.body.error, 'notRemote', input)
+      assert.equal(F.requests.length, sent, `${input}: nothing reached the spool`)
+      continue
+    }
     assert.equal(r.status, 200, input)
     assert.equal(F.requests.at(-1).text, want, input)
   }

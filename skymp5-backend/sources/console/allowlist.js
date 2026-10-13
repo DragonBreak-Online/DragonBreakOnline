@@ -21,7 +21,8 @@ const SELF = new Set(['tp', 'gm', 'masktest', 'mv', 'placeundo', 'factiongear', 
 const LATER = new Set(['bugs', 'update', 'schedule'])
 const BUILTIN = new Set(['say', 'low', 'whisper', 'wide', 'shout', 'me', 'melow', 'melong', 'my', 'mylow', 'mylong', 'do', 'dolow', 'dolong',
   'looc', 'ooc', 'ooclow', 'ooclong', 'pm', 'dm', 'to', 'too', 'system', 'admin'])
-const RULES = new Set(['switch', 'tag', 'tagName', 'load', 'none', 'any'])
+// No free-text rule: the only free text an allowed form carries is /rename's name, held to NAME_RE
+const RULES = new Set(['switch', 'tag', 'tagName', 'load', 'none'])
 // The empty form of a #TAG command: /kick needs a target, /fixloc and /chargen alone act on the caller
 const NO_ARG = Object.freeze({ kick: 'needTag', fixloc: 'self', chargen: 'self' })
 
@@ -114,7 +115,7 @@ function precheck(text, allow) {
       return NAME_RE.test(words.slice(1).join(' ')) ? null : refuse('badName')
     case 'load': return !words.length || (words.length === 1 && words[0].toLowerCase() === 'reset') ? null : refuse('badArgs')
     case 'none': return words.length ? refuse('badArgs') : null
-    default: return null
+    default: return refuse('notYet')
   }
 }
 

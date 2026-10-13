@@ -19,7 +19,7 @@ const ALLOW = [
   { name: 'fixloc', usage: '/fixloc #TAG', rule: 'tag', help: 'x' },
   { name: 'rename', usage: '/rename #TAG <new name>', rule: 'tagName', help: 'x' },
   { name: 'chargen', usage: '/chargen #TAG', rule: 'tag', help: 'x' },
-  { name: 'players', usage: '/players', rule: 'any', help: 'x' },
+  { name: 'players', usage: '/players', rule: 'none', help: 'x' },
   { name: 'load', usage: '/load [reset]', rule: 'load', help: 'x' },
   { name: 'whoami', usage: '/whoami', rule: 'none', help: 'x' },
 ]

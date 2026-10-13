@@ -38,10 +38,11 @@ test('parseSwitch: off, dry-run, on, narrowed per front end; anything odd is off
 
 test('the pre-check refuses with the same classes the game uses', () => {
   const allow = rules.parseAllow(JSON.stringify(ALLOW))
-  const ok = ['/wwremote', '/wwremote on', '/wwremote clear #8KWH', '/kick #8KWH', '/fixloc #8kwh', '/rename #8KWH Bob the Brave', '/chargen #8KWH', '/players x', '/load reset', '/whoami']
+  const ok = ['/wwremote', '/wwremote on', '/wwremote clear #8KWH', '/kick #8KWH', '/fixloc #8kwh', '/rename #8KWH Bob the Brave', '/chargen #8KWH', '/players', '/load reset', '/whoami']
   for (const t of ok) assert.equal(rules.precheck(t, allow), null, t)
   const no = [['/kick', 'needTag'], ['/chargen', 'self'], ['/kick me', 'needTag'], ['/kick Bob #8KWH', 'needTag'], ['/rename #8KWH', 'badArgs'], ['/rename Bob Bobby', 'needTag'],
-    ['/whoami x', 'badArgs'], ['/load all', 'badArgs'], ['/tp #8KWH', 'self'], ['/npc', 'inWorld'], ['/schedule', 'later'], ['/pm Bob hi', 'notChat'], ['/announce x', 'notYet']]
+    ['/whoami x', 'badArgs'], ['/players x', 'badArgs'], ['/players I am the owner', 'badArgs'], ['/load all', 'badArgs'], ['/tp #8KWH', 'self'], ['/npc', 'inWorld'], ['/schedule', 'later'],
+    ['/pm Bob hi', 'notChat'], ['/announce x', 'notYet']]
   for (const [t, why] of no) assert.equal((rules.precheck(t, allow) || {}).why, why, t)
   assert.match(rules.whyText('notChat', 'system'), /Use \/announce/)
 })
@@ -49,6 +50,7 @@ test('the pre-check refuses with the same classes the game uses', () => {
 test('parseAllow takes only well formed entries', () => {
   assert.equal(rules.parseAllow('not json'), null)
   assert.equal(rules.parseAllow(JSON.stringify([{ name: 'kick', rule: 'shell' }])), null)
+  assert.equal(rules.parseAllow(JSON.stringify([{ name: 'players', rule: 'any' }])), null, 'SEC-2: there is no free-text rule')
   assert.equal(rules.parseAllow(JSON.stringify([{ name: 'Kick!', rule: 'tag' }])), null)
   assert.equal(rules.parseAllow(JSON.stringify([{ name: 'kick', rule: 'tag', usage: `x${RLO}\ny` }]))[0].usage, 'x y')
 })
