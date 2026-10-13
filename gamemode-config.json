@@ -1054,6 +1054,10 @@
   "allowRace": false,
   "allowSex": false
  },
+ "drift": {
+  "_comment": "Client drift switches, sent in every npcDriftConfig (gamemode.js DRIFT_KEYS). ownLook: the server's look for the player's own character (client fix/tick-context-1013, sync/ownLook.ts). apply puts it on (the fix); name only a look that changes just the name (a /mask swap; the head is never rebuilt); off none, as the clients from 15 Sep to the fix. name or off is the quick undo, no client build: the hot reload that changes it sends it to every client online at once. /driftset ownLook <apply|name|off> (staff) switches it for everyone online at once and wins over this value until /driftset ownLook default or a restart. A client before the fix ignores it. faceRebuild (load|entry, client 0.3.96b) can be set here the same way; absent, it is load.",
+  "ownLook": "apply"
+ },
  "coinPurses": {
   "_comment": "Coin purses (gamemode.js PURSE): goldMin..goldMax per purse before the Harvesting multiplier, a purse rests restMinutes for everyone (in a claimed dungeon it is full again for the next claim). Gold cut (Nate, 4 Oct; gold-cut-1004): was 8-30.",
   "goldMin": 3,

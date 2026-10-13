@@ -3381,14 +3381,32 @@ const DRIFT_KEYS = {
   // SkyrimSE+04328E9), "entry" on every return to the screen as before 0.3.96, the quick undo (claude-jake's review of
   // 6b7a3c59). Its default is gamemode-config.json drift.faceRebuild when set; /driftset faceRebuild entry switches it live.
   faceRebuild: { def: (cfg && cfg.drift && (cfg.drift.faceRebuild === 'entry' || cfg.drift.faceRebuild === 'load')) ? cfg.drift.faceRebuild : 'load', ok: (v) => v === 'load' || v === 'entry' },
+  // The server's look for the player's own character (client fix/tick-context-1013 sync/ownLook.ts): "apply" puts it on,
+  // "name" only a look that changes just the name (a /mask swap, no head rebuild), "off" none, as the clients from 15 Sep to
+  // that fix: the quick undo. Its default is gamemode-config.json drift.ownLook when set; /driftset ownLook name|off switches it
+  // live. A client before the fix ignores it.
+  ownLook: { def: (cfg && cfg.drift && ['apply', 'name', 'off'].includes(cfg.drift.ownLook)) ? cfg.drift.ownLook : 'apply', ok: (v) => ['apply', 'name', 'off'].includes(v) },
 };
 const DRIFT_SET = globalThis.__dboDriftSet && typeof globalThis.__dboDriftSet === 'object' ? globalThis.__dboDriftSet : (globalThis.__dboDriftSet = {});
 const driftValue = (k) => (Object.prototype.hasOwnProperty.call(DRIFT_SET, k) ? DRIFT_SET[k] : DRIFT_KEYS[k].def);
-const sendDriftConfig = (a) => {
+const driftPayload = () => {
   const payload = { customPacketType: 'npcDriftConfig', repair: globalThis.__dboDriftRepair || 'setPosition', spawn: globalThis.__dboDriftSpawn || 'moveTo' };
   for (const k of Object.keys(DRIFT_KEYS)) payload[k] = driftValue(k);
+  return payload;
+};
+const sendDriftConfig = (a) => {
+  const payload = driftPayload();
+  globalThis.__dboDriftSent = JSON.stringify(payload);
   sendPacket(a, payload);
 };
+// A hot reload that changes what a client is sent (a gamemode-config.json drift default: the ownLook or faceRebuild undo)
+// sends it to everyone online at once, as /driftset does; the last one sent is kept across reloads, so an unchanged reload
+// sends nothing
+if (typeof globalThis.__dboDriftSent === 'string' && globalThis.__dboDriftSent !== JSON.stringify(driftPayload())) {
+  const online = onlineActors();
+  online.forEach(sendDriftConfig);
+  log(`drift switches changed by the reload: sent to ${online.length} online`);
+}
 const driftArgs = (args) => String(args || '').trim().split(/\s+/);
 // How a client seats a new NPC copy: moveTo places it natively before its first load, setPosition is the old way
 registerChatCommand('driftspawn', (a, args) => {
