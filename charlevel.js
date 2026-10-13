@@ -78,6 +78,7 @@ module.exports = (api) => {
     sendPacket(a, { customPacketType: 'dboAvGain', [av]: CFG.perLevel * count });
     personal(a, `+${CFG.perLevel * count} ${VITALS[av]}.${st.pending ? ` ${st.pending} more to spend.` : ''}`);
     log(`level ${display(a)} spent ${count} point${count === 1 ? '' : 's'} on ${av}: ${JSON.stringify(st.spent)}`);
+    try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('level', a, av, count, st.level); } catch (e) { /* the player log is optional */ }
     return true;
   };
 

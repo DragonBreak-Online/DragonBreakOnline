@@ -52,13 +52,16 @@ module.exports = (api) => {
     const seen = new Set(have.map((d) => d.toLowerCase()));
     const max = Math.max(0, Number(C.maxMarkers) || 3000);
     let added = 0;
+    const fresh = [];
     for (const raw of (Array.isArray(markers) ? markers.slice(0, Math.max(1, Number(C.perPacket) || 500)) : [])) {
       if (have.length >= max) break;
       const d = String(raw || '').trim();
       if (!d || seen.has(d.toLowerCase()) || !markerOk(d)) continue;
-      seen.add(d.toLowerCase()); have.push(d); added++;
+      seen.add(d.toLowerCase()); have.push(d); added++; fresh.push(d);
     }
     if (added) { try { mp.set(a >>> 0, PROP, have); } catch (e) { log('mapprogress: save failed', e.message); return 0; } }
+    // the player log (playerlog.js): the places discovered (the markers, checked above)
+    if (added) { try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('map', a >>> 0, fresh); } catch (e) { /* the player log is optional */ } }
     return added;
   };
 

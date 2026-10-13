@@ -190,6 +190,8 @@ module.exports = (api) => {
     creditBrew(a, r.product, tier);
     log(`alchemy: ${display(a)} brewed ${r.name} (tier ${tier})`);
     audit(`ALCHEMY ${who(a)} brewed ${r.name}${r.contraband ? ' (contraband)' : ''}`);
+    // the player log (playerlog.js): the potion and what went into it, by base id
+    try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('brew', a, r.product, tier, r.inputs.map((x) => ({ baseId: x.id, count: x.n }))); } catch (e) { /* the player log is optional */ }
     openBrewing(a, lab);
   };
   if (onUi) {
@@ -287,6 +289,7 @@ module.exports = (api) => {
     creditBrew(a, potion.id, tier);
     log(`alchemy: ${display(a)} brewed ${potion.edid} (${pick.name}, tier ${tier}) from ${used.map((id) => { const r = lookup(id); return r ? r.record.editorId : id.toString(16); }).join(' + ')}`);
     audit(`ALCHEMY ${who(a)} brewed ${potion.edid}`);
+    try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('brew', a, potion.id, tier, used.map((id) => ({ baseId: id, count: 1 }))); } catch (e) { /* the player log is optional */ }
     if (S.panels.has(a)) showBrewable(a);
   };
 
@@ -459,6 +462,8 @@ module.exports = (api) => {
     // the hour less (masterySystem's repeat ring, keyed on the enchantment)
     for (const [, , ench] of taken) creditDisenchant(a, ench);
     audit(`DISENCHANT ${who(a)} used up ${detail}`);
+    // the player log: each item disenchanted, by base id (the audit's names may be custom ones)
+    for (const [id] of taken) { try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('extras', a, 'disenchant', id); } catch (e) { /* the player log is optional */ } }
     tell(a, `Disenchanting uses up the item: ${what} ${taken.length > 1 ? 'are' : 'is'} gone.`);
   };
   const MAX_REPORT_COUNT = 16;

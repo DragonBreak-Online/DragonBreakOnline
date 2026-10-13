@@ -411,6 +411,7 @@ module.exports = (api) => {
     const gotText = got.length ? givesText(got) : 'nothing came back';
     log(`salvage: ${who(a)} broke down ${name} (${descOf(baseId)}) at the ${station.label}, ${TIER_NAMES[rank]}: ${gotText}`);
     try { if (typeof globalThis.__dboSkillRateBrokeDown === 'function') globalThis.__dboSkillRateBrokeDown(a, baseId); } catch (e) { /* no skill rates */ }
+    try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('salvage', a, { baseId, count: 1 }, station.label, rank + 1, got.map(([d, n]) => ({ baseId: idOf(d), count: n })).filter((x) => x.baseId)); } catch (e) { /* the player log is optional */ }
     const left = openPanel(a, p.target, station, p.page, `${name} broken down: ${gotText}`);
     if (!left) { closePanel(a); personal(a, `${name} broken down: ${gotText}. Nothing else here to break down.`); }
   });

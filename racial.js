@@ -492,6 +492,7 @@ module.exports = (api) => {
     // A power its own client draws (view): told at once, then kept in step by eyeTick
     if (p.view === 'nightEye') eyeTick(now, a >>> 0);
     log(`racial: ${display(a >>> 0)} used ${v.name} (${v.race}) for ${v.seconds} s`);
+    try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('misc', a >>> 0, 'racial_power', v.name); } catch (e) { /* the player log is optional */ }
     return { ok: true, text: `${v.name}: ${v.seconds} seconds.` };
   };
   if (!(S.powerOn instanceof Map)) S.powerOn = new Map();   // actor -> activeUntil, to say when it fades

@@ -463,6 +463,8 @@ module.exports = (api) => {
     const id = tab && tabOk(s, String(tab), t) ? String(tab) : 'profile';
     open(s, id, undefined, t);
     log(`journal: ${display(s)} reads the journal of ${display(t)} (${id})`);
+    // the player log: a staff member read this character's journal (on the character's post)
+    try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('staffview', s, t, 'journal'); } catch (e) { /* the player log is optional */ }
     return true;
   };
   // F3 (gamemode.js factionMenuRequest, which may name a tab): a hub opens the last tab used this session
@@ -603,6 +605,8 @@ module.exports = (api) => {
       // Written at once: "saved" must survive a crash before the next minute's flush
       flushDoc();
       log(`journal: ${display(a)} saved their story (${backstory.length} + ${origin.length} characters)`);
+      // the player log (playerlog.js): that the story was edited, never what it says
+      try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('misc', a, 'story_edited'); } catch (e) { /* the player log is optional */ }
       answer(a, st, 'Your story is saved.', 'ok');
     });
   });
@@ -681,6 +685,7 @@ module.exports = (api) => {
     if (!p) return answer(a, st, 'Your journal cannot be written just now. Try again later.', 'refused');
     p.titleId = t.id;
     touchDoc(a);
+    try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('misc', a, 'title', t.id); } catch (e) { /* the player log is optional */ }
     answer(a, st, `You are now known as ${t.label}.`, 'ok');
   };
 

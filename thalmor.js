@@ -245,6 +245,8 @@ module.exports = (api) => {
     }
     if (!save()) { doc.notes.pop(); if (!doc.notes.length) delete D[key]; return { ok: false, text: 'The note could not be kept. Try again.' }; }
     audit(`THALMOR DOSSIER ${sys ? 'record' : who(by)} wrote on ${who(t)}: "${text.slice(0, 160)}${text.length > 160 ? '...' : ''}" (${text.length} chars)`);
+    // the player log (playerlog.js): that a note was written, on the subject's post; never the note
+    try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('dossier', 'written', sys ? 0 : by, t); } catch (e) { /* the player log is optional */ }
     return { ok: true, text: `Noted in the dossier on ${doc.name}.` };
   };
   const strikeNote = (by, key, at) => {
@@ -258,6 +260,7 @@ module.exports = (api) => {
     if (!doc.notes.length) delete D[String(key)];
     if (!save()) { doc.notes.splice(i, 0, gone); D[String(key)] = doc; return { ok: false, text: 'The note could not be struck. Try again.' }; }
     audit(`THALMOR DOSSIER ${who(by)} struck a note on ${doc.name} #${doc.tag} (by ${gone.byName || 'the record'}): "${String(gone.text).slice(0, 160)}"`);
+    try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('dossier', 'struck', by, doc.actor); } catch (e) { /* the player log is optional */ }
     return { ok: true, text: `Struck from the dossier on ${doc.name}.` };
   };
   const findSubject = (q) => {

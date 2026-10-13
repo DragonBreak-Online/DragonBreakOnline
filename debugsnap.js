@@ -150,6 +150,8 @@ module.exports = (api) => {
       { profileId: profileOf(a), text: text.slice(0, 500), view, log: recentLog(needles), voice: voiceNear(a, view) }));
     // The whole text as saved (500): dbo-monitor copies this line into the #bug-tracker thread, which allows 1500
     log(`BUGREPORT ${staff || shown} ${path.basename(file)}: ${text.slice(0, 500)}`);
+    // the player log (playerlog.js): that a bug was filed and its file name; never what it says
+    try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('report', 'bug', a, path.basename(file)); } catch (e) { /* the player log is optional */ }
     if (ok) noteRecent({ at: Date.now(), by: staff || shown, text: text.slice(0, 500) });
     return { ok, text: ok ? 'Thanks, the staff team has your report. To add a screenshot, use Report a Problem on the website and mention the time of your /bug.' : 'The report could not be saved; please tell staff.' };
   };
