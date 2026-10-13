@@ -105,6 +105,16 @@ module.exports = {
   // Discord roles recognised as Owners on the staff dashboard's Server panel
   siteOwnerRoleIds: (process.env.SITE_OWNER_ROLE_IDS || '1494126527489507369')
     .split(',').map(s => s.trim()).filter(Boolean),
+  // Remote staff console (sources/console): the pinned Discord ids (1-10; empty or malformed is off) and the roles they need, read raw so a bad value is caught
+  consoleDiscordIds: process.env.CONSOLE_DISCORD_IDS || '',
+  consoleRoleIds: process.env.CONSOLE_ROLE_IDS || process.env.SITE_STAFF_ROLE_IDS || '1494126527489507369,1494491999305338981',
+  // The dashboard's console needs a Discord sign-in this many hours old at most
+  consoleFreshSigninHours: positiveInt(process.env.CONSOLE_FRESH_SIGNIN_HOURS, 4),
+  // Optional channel lock for /console, comma separated; empty allows any channel of the guild
+  consoleDiscordChannelIds: process.env.CONSOLE_DISCORD_CHANNEL_IDS || '',
+  consoleSwitchFile: process.env.CONSOLE_SWITCH_FILE || '/etc/dragonbreak/console',
+  consoleKeyFile: process.env.CONSOLE_KEY_FILE || '/etc/dragonbreak/console.key',
+  consoleSpoolDir: process.env.CONSOLE_SPOOL_DIR || '/run/dragonbreak-console',
   // Server panel sources, all read only: release control folder, live checkout, reviews, ops claims, updater log, backups, handover
   controlDir:   process.env.DBO_CONTROL_DIR  || '/var/lib/dragonbreak-control',
   releaseRepo:  process.env.DBO_RELEASE_REPO || '/opt/alduinak',

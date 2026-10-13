@@ -147,7 +147,40 @@ async function memberHasRole(discordId, roleId) {
   return (await getMemberRoles(discordId)).includes(roleId)
 }
 
+// The remote console's permission check: a new answer from Discord every time (it refreshes the 60 s cache, never reads it)
+// with the member's username; null on any failure or when not in the guild
+async function getMemberFresh(discordId) {
+  if (!discordId || !config.discordBotToken || !config.discordGuildId) return null
+  if (ready) {
+    try {
+      const guild = await client.guilds.fetch(config.discordGuildId)
+      const member = await guild.members.fetch({ user: discordId, force: true })
+      const roles = [...member.roles.cache.keys()]
+      roleCache.set(discordId, { roles, member: true, expiresAt: Date.now() + ROLE_CACHE_TTL_MS })
+      return { roles, handle: String(member.user?.username || '') }
+    } catch (err) {
+      if (err && err.code === 10007) return null
+      console.warn('[discord-bot] console member fetch failed, falling back to HTTP:', err.message)
+    }
+  }
+  try {
+    const member = await fetchMember(discordId)
+    return member ? { roles: Array.isArray(member.roles) ? member.roles : [], handle: String(member.user?.username || '') } : null
+  } catch (err) {
+    console.error('[discord-bot] console member HTTP lookup failed:', err.message)
+    return null
+  }
+}
+
+// Whether an interaction came through this process's own gateway client
+const isOwnClient = c => c === client
+
 function fetchMemberRoles(discordId) {
+  return fetchMember(discordId).then(member => (member ? (Array.isArray(member.roles) ? member.roles : []) : null))
+}
+
+// The guild member as Discord's REST API answers; null when not in the guild
+function fetchMember(discordId) {
   return new Promise((resolve, reject) => {
     try {
       ensureRoleLookupConfigured()
@@ -169,7 +202,8 @@ function fetchMemberRoles(discordId) {
         }
         try {
           const json = JSON.parse(data)
-          resolve(Array.isArray(json.roles) ? json.roles : [])
+          if (!json || typeof json !== 'object') throw new TypeError('discord member lookup returned no member')
+          resolve(json)
         } catch (err) {
           reject(err)
         }
@@ -255,6 +289,8 @@ module.exports = {
   start,
   audit: require('./audit'),
   getMemberRoles,
+  getMemberFresh,
+  isOwnClient,
   isGuildMember,
   isReady,
   memberHasRole,
