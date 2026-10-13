@@ -1,6 +1,8 @@
 // playtest border outline: inside is remembered, outside is put back there, admins and other worlds are left alone
 const path = require('path');
-const cfg = require(path.join(__dirname, '..', 'gamemode-config.json'));
+const shipped = require(path.join(__dirname, '..', 'gamemode-config.json'));
+// Skyrim is open from 13 Oct (playtest.enabled false in the shipped config); the lock itself is what this tests, so it runs locked
+const cfg = JSON.parse(JSON.stringify(shipped)); cfg.playtest.enabled = true;
 let props = {}, intervalFn = null, audits = [];
 const set = (a, k, v) => { props[a] = props[a] || {}; props[a][k] = v; };
 const mp = { get: (a, k) => (props[a] || {})[k], set, getIdFromDesc: () => 1 };

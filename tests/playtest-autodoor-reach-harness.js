@@ -11,7 +11,9 @@
 const fs = require('fs');
 const path = require('path');
 const SERVER = path.resolve(__dirname, '..');
-const cfg = require(path.join(SERVER, 'gamemode-config.json'));
+const shipped = require(path.join(SERVER, 'gamemode-config.json'));
+// Skyrim is open from 13 Oct (playtest.enabled false in the shipped config); the lock itself is what this tests, so it runs locked
+const cfg = JSON.parse(JSON.stringify(shipped)); cfg.playtest.enabled = true;
 const src = fs.readFileSync(path.join(SERVER, 'gamemode.js'), 'utf8');
 
 let fails = 0;
