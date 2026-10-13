@@ -170,13 +170,21 @@ for (const l of cleanReview) console.log(`       ${l}`);
 
 // ---- clean: act text with the identity normalised ----------------------------------------------------------------------------
 let out = run('CONTRACT Rowan #PGDB (profile 1, <@337337773973569537>) completed 7 wolves for Bruma (84 gold)');
-ok(out.length === 1 && out[0].ev === 'act.CONTRACT' && out[0].f.text === 'CONTRACT Rowan #PGDB completed 7 wolves for Bruma (84 gold)' && out[0].p === 1 && out[0].c === 'PGDB', 'a clean verb: act.<VERB>, "(profile N, <@id>)" gone, the actor from the game', out);
+ok(out.length === 1 && out[0].ev === 'act.CONTRACT' && out[0].f.text === 'completed 7 wolves for Bruma (84 gold)' && out[0].p === 1 && out[0].c === 'PGDB', 'a clean verb: act.<VERB>, the actor from the game; the verb and the actor\'s own "Name #TAG" leave the text, which the forwarder prints after them (review C-R4)', out);
 out = run('LEVEL Rowan #PGDB reached character level 12');
 ok(out.length === 1 && out[0].p === 1, 'a Name #TAG party with no profile: resolved by name and tag', out);
 out = run('LABOUR-MISMATCH Rowan #PGDB (profile 1) chop widget=win/3 replay=1/5 seed=ab');
 ok(out.some((r) => r.ev === 'sec.signal' && r.f.kind === 'mismatch' && r.f.game === 'labour'), 'a *-MISMATCH line is also a security signal', out.map((r) => r.ev));
 // ---- roles --------------------------------------------------------------------------------------------------------------------
 const roleOf = (r, c) => { const x = (r.o || []).find((y) => y.c === c); return x ? x.r : null; };
+out = run('REVIVE Selene #K2QX (profile 2, <@22>) by Rowan #PGDB (profile 1, <@337337773973569537>) (a Draught of Revival)');
+ok(out.length === 1 && out[0].c === 'PGDB' && roleOf(out[0], 'K2QX') === 'target' && out[0].f.text === 'Selene #K2QX by Rowan #PGDB (a Draught of Revival)', 'REVIVE <revived> by <reviver>: the reviver acts, the revived player is the target; another party\'s name stays in the text', out);
+out = run('REVIVE Selene #K2QX (profile 2, <@22>) by nobody (gave up)');
+ok(out.length === 1 && out[0].c === 'K2QX' && out[0].f.text === 'by nobody (gave up)', '...by nobody: the revived player is the only party', out);
+out = run('CHAMPION Ulfgar the Unbroken in bruma killed by Rowan #PGDB, Selene #K2QX');
+ok(out.length === 1 && out[0].ev === 'act.CHAMPION' && out[0].c === 'PGDB' && roleOf(out[0], 'K2QX') === 'other', 'CHAMPION (display() parties): the killers resolve by name and tag', out);
+out = run(`CONCORDAT ARREST Rowan #PGDB (profile 1, <@337337773973569537>) (${CANARY} Of Lies) arrested Selene #K2QX (profile 2, <@22>) for the worship of Talos in Cyrodiil at 3c:Skyrim.esm`);
+ok(out.length === 1 && out[0].c === 'PGDB' && roleOf(out[0], 'K2QX') === 'target' && !JSON.stringify(out).includes(CANARY), 'CONCORDAT ARREST: the rank title (a name the faction\'s leader can write) is cut out (privacy review P-R5)', out);
 out = run('SMITH Selene #K2QX (profile 2) learned Steel Smithing (T2) by staff from Dar #U6T6 (profile 4)');
 ok(out[0].c === 'K2QX' && roleOf(out[0], 'U6T6') === 'staff', 'SMITH: the learner is the actor, the staff member a staff party', out[0]);
 out = run('SUPERNATURAL Selene #K2QX (profile 2) given sanguinare by GM Dar #U6T6 (profile 4)');
@@ -225,7 +233,13 @@ ok(out.length === 0, 'PIGEON: excluded', out);
 run('NEWVERB Rowan #PGDB (profile 1) did something');
 run(`${CANARY} lowercase thing`);
 run(`${CANARY.toLowerCase()} lowercase thing`);
-ok(K.S.auditUnknown.get('NEWVERB') === 1 && !K.S.auditUnknown.has(CANARY.toLowerCase()) && K.S.auditUnknown.get('?') >= 1, 'an unknown verb is counted by name only, nothing else of the line', [...K.S.auditUnknown]);
+ok(K.S.auditUnknown.get('NEWVERB') === 1 && !K.S.auditUnknown.has(CANARY.toLowerCase()) && K.S.auditUnknown.get('_other') >= 1, 'an unknown verb is counted by name only, nothing else of the line', [...K.S.auditUnknown]);
+// the minute's sys.audit_unknown is valid as it stands, so no sys.schema follows it, then or in the minutes after (a '?' key
+// was refused by COUNTS and made sys.schema write itself every minute). The flush's validation is done here by hand.
+const vq = (from) => { for (const r of K.S.q.slice(from)) if (String(r.ev).startsWith('sys.')) R.validate(r, K.S.schemaDrops, K.S.unknownTypes); };
+for (let i = 0; i < 3; i++) { const q0 = K.S.q.length; TM.run('playerlogMinute'); vq(q0); }
+const sysAU = K.S.q.filter((r) => r.ev === 'sys.audit_unknown');
+ok(sysAU.some((r) => r.f.verbs && r.f.verbs._other >= 1) && !K.S.q.some((r) => r.ev === 'sys.schema'), 'an unknown line\'s count is a key COUNTS keeps: no self-perpetuating sys.schema', K.S.q.filter((r) => String(r.ev).startsWith('sys.')).map((r) => [r.ev, r.f]));
 
 console.log(failures ? `\n${failures} FAILED` : '\nall passed');
 process.exit(failures ? 1 : 0);

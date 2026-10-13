@@ -57,6 +57,10 @@ const parsed = (W) => allLines(W).map((l) => { try { return JSON.parse(l); } cat
   const gs = new Set(lines0.map((r) => `${r.g}|${r.s}`));
   ok(gs.size === lines0.length, 'every line has its own (g, s)');
   ok(lines0[1].f.gave[0].i === 'Iron Sword' && lines0[1].o[0].n === 'Selene', 'a trade names the other party', lines0[1]);
+  // the process's first load says so (the forwarder ends the sessions a crash left open), a reload does not (review C-R6)
+  ok(lines0[0].ev === 'sys.start' && lines0[0].f.fresh === true, 'the first load\'s sys.start is fresh', lines0[0]);
+  W.load(); W.QU.run(); await F.settle();
+  ok(K.S.q.some((r) => r.ev === 'sys.start' && r.f.why === 'load' && r.f.fresh === undefined), '...a hot reload\'s is not', K.S.q.filter((r) => r.ev === 'sys.start').map((r) => r.f));
   ok(/^\/fake\/events\/2026-10-13\.jsonl$/.test([...W.FS.files.keys()].find((f) => f.endsWith('.jsonl'))), 'the day file is <dir>/YYYY-MM-DD.jsonl', [...W.FS.files.keys()]);
 
   // ---- a stalled write: one in flight, the buffer grows, one log line a minute, nothing else starts -----------------------
@@ -186,6 +190,19 @@ const parsed = (W) => allLines(W).map((l) => { try { return JSON.parse(l); } cat
   ok(R.clean('a@b.co') === '[email]', 'clean(): e-mail');
   ok(R.clean('14:30:05 a764b:BSHeartland.esm 0.3.95') === '14:30:05 a764b:BSHeartland.esm 0.3.95', 'clean(): a time, a desc and a version are left alone');
   ok(R.clean('x'.repeat(100), 48).length === 48, 'clean(): cut to the kind');
+  // privacy review P-R7: the invisible characters that split a shape so it slips past the patterns
+  const invis = ['\u00ad', '\u034f', '\u115f', '\u1160', '\u180e', '\u2060', '\u2061', '\u2062', '\u2063', '\u2064', '\u3164', '\ufe0f', '\ufeff', '\udb40\udc20'];
+  ok(invis.every((c) => R.clean(`203${c}.0.113.7`) === '[ip]' && R.clean(`@${c}everyone`) === '@ everyone'), 'clean(): an invisible character inside an IP or @everyone is taken out first', invis.map((c) => R.clean(`203${c}.0.113.7`)));
+  // the bot-token shape is joined at run time: GitHub push protection refuses a token-shaped literal in the repo
+  ok(R.clean('t ' + ['MTIzNDU2Nzg5MDEyMzQ1Njc4', 'GaBcDe', 'abcdefghijklmnopqrstuvwxyz0123'].join('.')) === 't [token]' && R.clean('id 0123456789abcdef0123456789abcdef!') === 'id [token]!', 'clean(): a bot token and a long hex run (the forwarder\'s TOKEN and LONGHEX shapes)', [R.clean('t ' + ['MTIzNDU2Nzg5MDEyMzQ1Njc4', 'GaBcDe', 'abcdefghijklmnopqrstuvwxyz0123'].join('.')), R.clean('id 0123456789abcdef0123456789abcdef!')]);
+
+  // ---- the first deploy: statfs before the first flush made the folder is no error (safety review, LOW) -------------------------
+  reset();
+  W = world();
+  W.FS.fs.promises.statfs = () => Promise.reject(Object.assign(new Error('ENOENT fake'), { code: 'ENOENT' }));
+  K = W.load(); W.QU.run(); await F.settle();
+  ok(!K.S.errs.has('fs.statfs') && !W.logs.some((l) => /fs\.statfs/.test(l)), 'statfs on a folder not made yet: no error counted or logged', [...K.S.errs.keys()]);
+  W = world(); reset(); K = W.load(); W.QU.run(); await F.settle();
 
   // ---- every map is registered and capped -----------------------------------------------------------------------------------
   const CAPS = require(MODULE).CAPS;
@@ -235,6 +252,48 @@ const parsed = (W) => allLines(W).map((l) => { try { return JSON.parse(l); } cat
   W.TM.run('playerlogStop'); await F.settle();
   ok(K.S.on === false, '...the STOP poll does not turn it back on');
 
+  // ---- the STOP file and the breaker stop the work, not only the records (safety review R1) -------------------------------------
+  reset();
+  W = world();
+  const P3 = W.M.player(0xff000016, { profile: 3, name: 'Mike', tag: '5D8L', discord: '', user: 5, pos: [900, 0, 0] });
+  W.M.record(0x20000, 'CONT', 'Barrel'); W.M.ref(0x806ca1f, 0x20000); W.M.mp.set(0x806ca1f, 'inventory', { entries: [{ baseId: 0x12eb7, count: 3 }] });
+  for (const k of ['onActivate', 'onTakeItem', 'onPutItem', 'onDropItem', 'onEatItem', 'onHitDamageAttempt', 'onHitDamage', 'onDeath', 'onSpellCast', 'onUpdateEquipmentAttempt']) W.M.mp[k] = () => true;
+  K = W.load(); W.QU.run(); await F.settle();
+  h()('login', 3, W.P1); h()('login', 4, W.P2); W.QU.run();
+  for (const n of ['playerlogLocation', 'playerlogFast', 'playerlogAfk']) W.TM.run(n);
+  W.FS.files.set('/fake/STOP', Buffer.alloc(0));
+  W.TM.run('playerlogStop'); await F.settle();
+  ok(K.S.on === false, 'setup: the STOP file turned capture off');
+  // while off: Mike comes on and Selene goes (their hooks are dropped), Rowan is moved far, loses health and is tied up
+  W.api.onlineActors = () => [W.P1, P3];
+  h()('login', 5, P3); h()('logout', 4, W.P2);
+  W.M.mp.set(W.P1, 'pos', [90000, 0, 0]); W.M.mp.set(W.P1, 'percentages', { health: 0.3 }); W.M.mp.set(W.P1, 'private.restrained', { boundHands: true, captorActorId: P3 });
+  const g0 = W.M.S.gets;
+  for (const n of [...W.TM.T.keys()].filter((x) => /^playerlog(Fast|Location|Slow|Afk|Minute|InvDiff)$/.test(x))) W.TM.run(n);
+  for (let i = 0; i < 4; i++) {
+    W.M.mp.onActivate(0x806ca1f, W.P1); W.M.mp.onTakeItem(0x806ca1f, W.P1, 0x12eb7, 1); W.M.mp.onPutItem(0x806ca1f, W.P1, 0x12eb7, 1); W.M.mp.onDropItem(W.P1, 0x12eb7, 1);
+    W.M.mp.onEatItem(W.P1, 0x12eb7); W.M.mp.onHitDamageAttempt(W.P1, W.P2, 0x12eb7, 5, {}); W.M.mp.onHitDamage(W.P1, W.P2, 0x12eb7, 5); W.M.mp.onDeath(W.P2, W.P1);
+    W.M.mp.onSpellCast(W.P1, 0x12eb7); W.M.mp.onUpdateEquipmentAttempt(W.P1, { inv: { entries: [] } }, true);
+  }
+  W.QU.run();
+  ok(W.M.S.gets === g0, 'STOP present: a round of every poll and 40 wrapper calls make no mp.get', W.M.S.gets - g0);
+  W.FS.files.delete('/fake/STOP');
+  const n0 = K.S.q.length;
+  W.TM.run('playerlogStop'); await F.settle();
+  ok(K.S.on === true && K.S.online.has(P3) && !K.S.online.has(W.P2) && K.S.sessions.has(P3) && !K.S.sessions.has(W.P2), 'STOP removed: who came on meanwhile is online with a session, who left is not', [[...K.S.online].map((x) => x.toString(16)), [...K.S.sessions.keys()].map((x) => x.toString(16))]);
+  for (const n of ['playerlogLocation', 'playerlogFast']) W.TM.run(n);
+  W.CL.t += 31000; W.TM.run('playerlogFast');
+  const after = K.S.q.slice(n0).map((r) => r.ev);
+  ok(!after.some((e) => e === 'move.teleport' || e === 'combat.health_loss' || e === 'combat.capture'), '...the first polls after it read no teleport, health loss or capture out of what changed while off', after);
+  W.M.mp.set(W.P1, 'pos', [190000, 0, 0]); W.TM.run('playerlogLocation');
+  ok(K.S.q.slice(n0).some((r) => r.ev === 'move.teleport'), '...and the polls work again after that');
+  // the breaker: the same, the polls stop working
+  for (let i = 0; i < 25; i++) K.err('test.site', new Error('x'));
+  const g1 = W.M.S.gets;
+  for (const n of ['playerlogFast', 'playerlogLocation', 'playerlogSlow', 'playerlogAfk', 'playerlogMinute']) W.TM.run(n);
+  W.M.mp.onActivate(0x806ca1f, W.P1); W.M.mp.onDropItem(W.P1, 0x12eb7, 1); W.QU.run();
+  ok(K.S.on === false && W.M.S.gets === g1, 'the breaker tripped: the polls and the pre-reads stop too', W.M.S.gets - g1);
+
   // ---- switches: the STOP file, then enabled false ------------------------------------------------------------------------------
   reset();
   W = world();
@@ -258,6 +317,39 @@ const parsed = (W) => allLines(W).map((l) => { try { return JSON.parse(l); } cat
   ok(![...W.TM.T.keys()].some((k) => k.startsWith('playerlog')), '...no player log timer runs', [...W.TM.T.keys()]);
   ok(parsed(W).some((r) => r && r.ev === 'sys.stop' && r.f.reason === 'disabled'), '...sys.stop{disabled} written by the one last flush');
 
+  // ---- enabled false with a write in flight: the queue and the stop marker are still written, each step time-boxed (R2) ----------
+  reset();
+  W = world();
+  K = W.load(); W.QU.run(); await F.settle();
+  await flushN(W, 4);
+  for (let i = 0; i < 3000; i++) K.emit('item.trade', W.P1, { gave: [{ i: 'Iron Sword', k: 1 }] }, { o: [K.partyOf(W.P2, 'other')] });
+  W.FS.ctl.hold.add('write');
+  await flushN(W, 2);
+  ok(!!K.S.writing, 'setup: a write is in flight when the disabling reload lands');
+  W.api.cfg.playerLog.enabled = false;
+  W.QU.restore();
+  const realST = global.setTimeout;
+  const steps = [];
+  const timeouts = [];
+  global.setTimeout = (fn) => { timeouts.push(fn); return timeouts.length; };
+  W.load();
+  W.CL.perUs = 15.6;
+  let released = false;
+  for (let i = 0; i < 4000 && timeouts.length; i++) {
+    const fn = timeouts.shift();
+    const p0 = W.CL.p; fn(); steps.push(W.CL.p - p0);
+    if (i === 20 && !released) { released = true; W.FS.ctl.hold.delete('write'); W.FS.ctl.release(); }
+    await F.settle(3);
+  }
+  W.CL.perUs = 0;
+  global.setTimeout = realST;
+  W.QU.install();
+  await F.settle(10);
+  const dl = parsed(W).filter(Boolean);
+  ok(K.S.q.length === 0 && dl.filter((r) => r.ev === 'item.trade').length >= 3000 - 10 && dl.some((r) => r.ev === 'sys.stop' && r.f.reason === 'disabled'), 'enabled false with a write in flight: the queue and sys.stop{disabled} are written all the same', [K.S.q.length, dl.filter((r) => r.ev === 'item.trade').length, dl.filter((r) => r.ev === 'sys.stop').map((r) => r.f)]);
+  ok(Math.max(...steps) <= 5, '...no drain step over 5 ms (the flush tick\'s time box, at 15.6 µs an event)', Math.max(...steps).toFixed(2));
+  W.api.cfg.playerLog.enabled = true;
+
   // ---- SIGTERM: the earlier flush first, its markers kept, the rest appended once -------------------------------------------------
   reset();
   const tmpRoot = fs.mkdtempSync(path.join(process.env.TMPDIR || os.tmpdir(), 'plog-core-'));
@@ -275,12 +367,30 @@ const parsed = (W) => allLines(W).map((l) => { try { return JSON.parse(l); } cat
   chained();
   fs.appendFileSync = realAppend;
   ok(order.join(',') === 'base,plog', 'SIGTERM: the game\'s saves first, then the player log', order);
-  const exitFile = path.join(tmpRoot, 'events', `${new Date(Date.now()).toISOString().slice(0, 10)}.jsonl`);
+  const exitFile = path.join(tmpRoot, 'events', `${new Date(W.CL.t).toISOString().slice(0, 10)}.jsonl`);
   const exitLines = fs.existsSync(exitFile) ? fs.readFileSync(exitFile, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)) : [];
   ok(exitLines.some((r) => r.f && r.f.gave && r.f.gave[0].i === 'Exit Sword') && exitLines.some((r) => r.ev === 'sys.stop' && r.f.reason === 'sigterm'), '...the queue and sys.stop{sigterm} appended', exitLines.length);
   W.load(); W.QU.run(); await F.settle();
   ok(globalThis.__dboFlushOnExit === chained, 'a second load does not chain twice');
   fs.rmSync(tmpRoot, { recursive: true, force: true });
+  // the sessions still open end at the stop (review C-R6), and a queue over exitFlushBytes keeps the tail (safety review)
+  reset();
+  const tmpRoot2 = fs.mkdtempSync(path.join(process.env.TMPDIR || os.tmpdir(), 'plog-core-'));
+  W = world({ dir: path.join(tmpRoot2, 'events'), exitFlushBytes: 200000 });
+  globalThis.__dboFlushOnExit = () => {};
+  K = W.load(); W.QU.run(); await F.settle();
+  h()('login', 3, W.P1); h()('login', 4, W.P2); W.QU.run();
+  W.TM.run('playerlogLocation');
+  W.CL.t += 600000;
+  for (let i = 0; i < 3000; i++) K.emit('item.trade', W.P1, { gave: [{ i: 'Iron Sword', k: 1 }] });
+  const getsExit = W.M.S.gets;
+  globalThis.__dboFlushOnExit();
+  const exitFile2 = path.join(tmpRoot2, 'events', `${new Date(W.CL.t).toISOString().slice(0, 10)}.jsonl`);
+  const ex2 = fs.existsSync(exitFile2) ? fs.readFileSync(exitFile2, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)) : [];
+  const lo = ex2.filter((r) => r.ev === 'session.logout');
+  ok(lo.length === 2 && lo.every((r) => r.f.reason === 'server_stop' && r.f.sec >= 600 && r.c && r.at && Number.isFinite(r.at.x)) && W.M.S.gets === getsExit, 'SIGTERM: each session still open ends with session.logout{server_stop}, its time played, from the cache (no get)', lo.map((r) => [r.c, r.f, r.at]));
+  ok(ex2.length && ex2[ex2.length - 1].ev === 'sys.stop' && ex2.some((r) => r.ev === 'sys.dropped' && r.f.counts['item.trade'] > 0), '...a queue over exitFlushBytes: the lines cut are counted, and sys.stop{sigterm} is still the last line', ex2.slice(-3).map((r) => [r.ev, r.f]));
+  fs.rmSync(tmpRoot2, { recursive: true, force: true });
 
   // ---- hot reload hygiene: 3 loads, modules that fail to reload, a playerlog.js that throws -------------------------------------
   reset();

@@ -305,8 +305,8 @@ const housing = (W) => {
   const gets1 = W.M.S.gets;
   for (let i = 0; i < 50; i++) { W.M.mp.onHitDamageAttempt(WOLF, BANDIT, SWORD, 5, {}); W.M.mp.onHitDamage(WOLF, BANDIT, SWORD, 5); W.M.mp.onDeath(BANDIT, WOLF); }
   ok(W.M.S.gets === gets1, 'NPC against NPC: no mp.get at all', W.M.S.gets - gets1);
-  W.CL.t += 61000; W.tick('playerlogMinute');
-  ok(W.evs('combat.refused').some((r) => r.f.reason === 'spell_rate' && r.f.n === 100), 'refusals that never became a fight: combat.refused (disk)');
+  W.CL.t += 61000; W.tick('playerlogFast');
+  ok(W.evs('combat.refused').some((r) => r.f.reason === 'spell_rate' && r.f.n === 100), 'refusals that never became a fight: combat.refused (disk), closed by the fast poll');
   // the killing blow: Attempt -> onDeath -> onHitDamage names the weapon
   W.M.mp.onHitDamageAttempt(WOLF, A, 0x12eb7, 40, { targetMaxHealth: 100 });
   W.M.mp.onDeath(A, WOLF);
@@ -430,7 +430,7 @@ const housing = (W) => {
   globalThis.__alduinakTradeLog = () => undefined;
   delete require.cache[MODULE]; require(MODULE)(W.api); W.QU.run(); await F.settle();
   W.h('packet', 3, { customPacketType: 'searchRequest', target: B });
-  W.h('packet', 4, { customPacketType: 'searchConsentResult', target: A, accepted: false });
+  W.h('packet', 4, { customPacketType: 'searchConsentResult', requestId: 1, accepted: false });
   ok(W.evs('law.search').map((r) => r.f.op).join(',') === 'requested,refused', 'a refused search consent: law.search{refused}', W.evs('law.search').map((r) => r.f));
   W.h('packet', 3, { customPacketType: 'searchRequest', target: Cm });
   W.CL.t += 61000; W.tick('playerlogFast');
@@ -509,6 +509,182 @@ const housing = (W) => {
   ok(W.evs('social.player_menu').length === 1 && W.last('social.player_menu').o[0].c === 'K2QX', 'the player menu: the target kept, voice never');
   ok(W.evs('cmd.refused').map((r) => r.f.reason).join(',') === 'unknown,not_staff' && W.evs('cmd.refused').every((r) => r.f.name !== 'xyzzy'), 'gate refusals: a long chat line records nothing, an unknown name is never kept', W.evs('cmd.refused').map((r) => r.f));
   ok(!JSON.stringify(W.K.S.q).includes('PLOGCANARY'), 'no custom name from any hook');
+  mark(W);
+
+
+  // ================================================================================================================ review fixes
+  const NONE = { f: {}, o: [], p: undefined };
+  // housingSystem.ts with the place rules applied (live: "place plan (apply" in the server log): recordOf and primaryOf answer
+  // with the place ROOT for any of its doors and chests; assigned and shared are keyed by each member's OWN primary
+  // (roomsOf/doRoom); a door pair keeps its record on the lower id and a pointer { primary } on the other half; an actor is
+  // never a ref (isClaimable), so recordOf(actor) is null
+  const DOOR2 = 0x806ca41, DOOR2LOW = 0x806ca40;
+  const housingApply = (W) => {
+    const rootRec = { owner: 3, ownerChar: Cm, ownerName: 'Mike', locked: true, serial: 1, place: { cells: ['1a2b:Skyrim.esm'] },
+      assigned: { [CHEST.toString(16)]: { profile: 2, name: 'Selene', char: B }, [DOOR2LOW.toString(16)]: { profile: 2, name: 'Selene', char: B } }, shared: [SHARED.toString(16)] };
+    const members = new Set([DOOR, CHEST, SHARED, DOOR2, DOOR2LOW]);
+    const keys = new Set();
+    W.M.mp.set(DOOR2, 'private.housing', { primary: DOOR2LOW });
+    globalThis.__dboHousing = {
+      primaryOf: (ref) => (members.has(ref >>> 0) ? DOOR : 0),
+      recordOf: (ref) => (members.has(ref >>> 0) ? rootRec : null),
+      ownsRecord: (rec, a) => !!rec && Number(rec.owner) > 0 && W.M.mp.get(a, 'profileId') === rec.owner,
+      keyOpens: (ref, a) => keys.has(a >>> 0),
+      isManager: () => false,
+      perCharacter: () => false,
+    };
+    return { rootRec, keys };
+  };
+  reset();
+  W = world({ caps: { soft: 5, mid: 10, hard: 2000, audit: 2000 } });
+  W.QU.run(); await F.settle();
+  let HA = housingApply(W);
+  for (const [u, a] of [[3, A], [4, B], [5, Cm], [6, D]]) W.h('login', u, a);
+  W.M.mp.onActivate = () => true;
+  W.M.ref(DOOR2, DOORBASE); W.M.ref(DOOR2LOW, DOORBASE);
+  delete require.cache[MODULE]; require(MODULE)(W.api); W.QU.run(); await F.settle();
+  W.tick('playerlogLocation');
+  W.K.S.q.length = 0;
+  // C-R1: Selene's own assigned room chest is hers: no urgent line, even with the record of the root in hand
+  W.M.mp.onActivate(CHEST, B);
+  W.h('move', 'take', B, CHEST, SWORD, 1, [0, 1], [1, 0], [], []);
+  W.M.mp['onPapyrusEvent:SkympOnActivateClose'](CHEST);
+  let ct = W.last('item.container');
+  ok(ct && ct.f.own === 'self' && !ct.o, 'C-R1: the assignee\'s own chest in a place is theirs (own self), with the place root\'s record', ct && [ct.f, ct.o]);
+  // the place's owner at Selene's chest: her chest, the owner's access
+  W.M.mp.onActivate(CHEST, Cm);
+  W.M.mp['onPapyrusEvent:SkympOnActivateClose'](CHEST);
+  ct = W.last('item.container');
+  ok(ct && ct.f.own === 'assignee' && ct.f.access === 'owner' && ct.o.some((x) => x.r === 'assignee' && x.c === 'K2QX'), '...the owner at the assignee\'s chest: own assignee, access owner', ct && [ct.f, ct.o]);
+  // the shared chest, by a housemate with the key: household, P1 (dropped at the mid cap here, where a P0 line is kept)
+  HA.keys.add(A);
+  for (let i = 0; i < 12; i++) W.K.emit('item.trade', D, {});
+  const qn = W.K.S.q.length;
+  W.M.mp.onActivate(SHARED, A);
+  W.h('move', 'take', A, SHARED, BREAD, 1, [0, 1], [1, 0], [], []);
+  W.M.mp['onPapyrusEvent:SkympOnActivateClose'](SHARED);
+  ok(W.K.S.q.length === qn && W.K.S.dropCounts.get('cap|item.container') === 1, '...the shared chest by a key holder: household at P1, not an urgent P0 line (dropped at the mid cap)', [W.K.S.q.length - qn, [...W.K.S.dropCounts]]);
+  // the same chest, picked open by someone with no key: still P0
+  W.h('lock', B, 'win', 1, SHARED);
+  W.M.mp.onActivate(SHARED, B);
+  W.M.mp['onPapyrusEvent:SkympOnActivateClose'](SHARED);
+  ct = W.last('item.container');
+  ok(ct && ct.f.own === 'household' && ct.f.access === 'lockpick' && W.K.S.q.length > qn, '...picked open: household, access lockpick, kept as P0', ct && ct.f);
+  W.K.S.q.length = 0; W.K.S.dropCounts.clear();
+  // a door pair: the record on the lower half, a pointer on the other; Selene's assigned room door is hers
+  W.M.mp.onActivate(DOOR2, B);
+  ok(!W.evs('move.door').length, '...the assignee\'s own room door (its pointer\'s primary keys the assignment): no line', W.evs('move.door').map((r) => r.f));
+  W.M.mp.onActivate(DOOR2, A);
+  ok(W.last('move.door') && (W.last('move.door') || NONE).f.own === 'assignee' && (W.last('move.door') || NONE).o.some((x) => x.c === 'K2QX'), '...someone else at her door: own assignee', W.last('move.door') && (W.last('move.door') || NONE).f);
+  // C-R10: a cell of the place, known from the door use, with recordOf(actor) null as in housingSystem.ts
+  W.M.mp.set(A, 'worldOrCellDesc', '1a2b:Skyrim.esm'); W.M.mp.set(A, 'pos', [10, 10, 10]);
+  W.tick('playerlogLocation');
+  const mc2 = W.last('move.cell');
+  ok(mc2 && mc2.f.own === 'owner' && mc2.f.access === 'key' && mc2.o && mc2.o[0].c === '5D8L', 'C-R10: a cell change into a claimed interior names the owner, from the place\'s cells (recordOf(actor) is null)', mc2 && [mc2.f, mc2.o]);
+  W.M.mp.set(A, 'worldOrCellDesc', '9f9f:Skyrim.esm'); W.tick('playerlogLocation');
+  ok(W.last('move.cell') && !(W.last('move.cell') || NONE).o, '...an interior no place holds: a plain move.cell');
+  mark(W);
+
+  // C-R2: the real consent packet {requestId, accepted}; a body opens with no consent
+  reset();
+  W = world();
+  W.QU.run(); await F.settle();
+  for (const [u, a] of [[3, A], [4, B], [5, Cm], [6, D]]) W.h('login', u, a);
+  W.h('packet', 5, { customPacketType: 'searchRequest', target: B });
+  W.h('packet', 4, { customPacketType: 'searchConsentResult', requestId: 7, accepted: true });
+  W.CL.t += 61000; W.tick('playerlogFast');
+  let ops = W.evs('law.search').map((r) => r.f.op).join(',');
+  ok(ops === 'requested,accepted' && (W.last('law.search') || NONE).p === 3 && (W.last('law.search') || NONE).o[0].c === 'K2QX', 'C-R2: an accepted search with the real packet: accepted, and no false timeout', W.evs('law.search').map((r) => [r.p, r.f]));
+  W.M.mp.set(Cm, 'isDead', true);
+  W.h('packet', 3, { customPacketType: 'searchRequest', target: Cm });
+  W.CL.t += 61000; W.tick('playerlogFast');
+  ok(W.evs('law.search').length === 2, '...a body\'s search (no consent step): no request line and no timeout', W.evs('law.search').map((r) => r.f));
+  mark(W);
+
+  // C-R3: a killing blow, in the engine's order (Attempt, then onDeath inside NetSetPercentages, then onHitDamage)
+  reset();
+  W = world();
+  W.QU.run(); await F.settle();
+  for (const [u, a] of [[3, A], [4, B]]) W.h('login', u, a);
+  W.M.mp.onHitDamageAttempt = () => true; W.M.mp.onHitDamage = () => undefined; W.M.mp.onDeath = () => undefined;
+  delete require.cache[MODULE]; require(MODULE)(W.api); W.QU.run(); await F.settle();
+  W.tick('playerlogLocation');
+  W.M.mp.onHitDamageAttempt(B, A, SWORD, 120, { targetMaxHealth: 100 });
+  W.M.mp.set(A, 'percentages', { health: 0 });
+  W.M.mp.onDeath(A, B);
+  W.M.mp.onHitDamage(B, A, SWORD, 120);
+  W.CL.t += 20000; W.tick('playerlogFast');
+  let fs1 = W.evs('combat.fight');
+  ok(fs1.length === 1 && fs1[0].f.dealt.hits === 1 && fs1[0].f.dealt.dmg === 100 && fs1[0].f.outcome === 'downed' && fs1[0].p === 2, 'C-R3: a one-blow PvP down is one fight with the blow counted, not a second phantom fight', fs1.map((r) => [r.p, r.f.dealt, r.f.taken, r.f.outcome]));
+  W.M.mp.set(A, 'percentages', { health: 1 });
+  W.M.mp.onHitDamageAttempt(A, WOLF, SWORD, 50, { targetMaxHealth: 40 });
+  W.M.mp.set(WOLF, 'percentages', { health: 0 });
+  W.M.mp.onDeath(WOLF, A);
+  W.M.mp.onHitDamage(A, WOLF, SWORD, 50);
+  W.CL.t += 20000; W.tick('playerlogFast');
+  fs1 = W.evs('combat.fight').slice(1);
+  ok(fs1.length === 1 && fs1[0].f.kills === 1 && fs1[0].f.dealt.hits === 1 && fs1[0].f.outcome === 'killed', '...a one-blow PvE kill: one fight, the kill and its blow', fs1.map((r) => r.f));
+  // an owned NPC against an NPC: no fight with no player in it (it was written with p -1)
+  W.K.add('ownedNpcs', LYDIA);
+  W.M.mp.onHitDamageAttempt(BANDIT, LYDIA, SWORD, 10, {});
+  W.M.mp.onHitDamage(BANDIT, LYDIA, SWORD, 10);
+  W.CL.t += 20000; W.tick('playerlogFast');
+  ok(!W.K.S.q.some((r) => r.ev === 'combat.fight' && r.p === -1) && W.evs('combat.fight').length === 2, '...an owned NPC\'s fight with an NPC opens no player-less fight', W.evs('combat.fight').map((r) => r.p));
+  mark(W);
+
+  // C-R5, C-R7, C-R8: the housing menu against its own opening state; the F7 panel's hex target; a kick line after the target left
+  reset();
+  W = world();
+  W.QU.run(); await F.settle();
+  const HS2 = housing(W);
+  for (const [u, a] of [[3, A], [4, B], [5, Cm], [6, D]]) W.h('login', u, a);
+  W.h('packet', 5, { customPacketType: 'propertyInfoRequest', target: DOOR });
+  HS2.recs.get(DOOR).locked = false;   // housingSystem.ts (a TS system) already handled the packet when the gamemode sees it
+  W.h('packet', 5, { customPacketType: 'propertyRequest', action: 'unlock', target: DOOR });
+  ok(W.last('social.housing') && (W.last('social.housing') || NONE).f.op === 'unlock' && (W.last('social.housing') || NONE).f.ok === true, 'C-R5: a property action that went through: ok true (against the state when the menu opened)', W.last('social.housing') && (W.last('social.housing') || NONE).f);
+  W.h('packet', 5, { customPacketType: 'propertyRequest', action: 'unlock', target: DOOR });
+  ok((W.last('social.housing') || NONE).f.ok === false, '...the same again, with nothing changed: ok false');
+  W.h('packet', 5, { customPacketType: 'propertyRequest', action: 'createkey', target: DOOR, recipient: B });
+  W.h('packet', 5, { customPacketType: 'propertyRequest', action: 'grantcontainer', target: DOOR, recipient: B });
+  W.h('packet', 5, { customPacketType: 'propertyRequest', action: 'revokekeys', target: DOOR });
+  ok(W.evs('social.housing').slice(-3).map((r) => r.f.op).join(',') === 'cut_key,grant_container,rekey' && W.evs('social.housing').slice(-3)[0].o[0].c === 'K2QX', '...the real action names: createkey, grantcontainer, revokekeys', W.evs('social.housing').map((r) => r.f.op));
+  W.h('packet', 6, { customPacketType: 'adminAction', action: 'kick', target: Cm.toString(16) });
+  W.h('audit', 'GM profile 4 (gm) kicked Mike (profile 3)');
+  W.h('logout', 5, Cm); W.QU.run();
+  ok((W.last('session.logout') || NONE).p === 3 && (W.last('session.logout') || NONE).f.reason === 'kicked', 'C-R7: the F7 panel\'s hex target: the kicked player\'s logout reason is kicked', (W.last('session.logout') || NONE).f);
+  W.K.flushTick(true);
+  const sk = W.evs('session.kick').find((r) => r.p === 3);
+  const sa2 = W.last('staff.action');
+  ok(sk && sk.c === '5D8L' && sk.n === 'Mike', 'C-R8: a panel kick line parsed after the target left names the character, not "someone"', sk);
+  ok(sa2 && sa2.f.action === 'kick' && sa2.o.some((x) => x.r === 'target' && x.c === '5D8L' && x.a), '...the staff action\'s target is the character the packet named', sa2 && sa2.o);
+  W.h('packet', 6, { customPacketType: 'adminAction', action: 'tempBan', target: B.toString(16), hours: 2 });
+  W.CL.t += 11000; W.tick('playerlogFast');
+  ok((W.last('staff.action') || NONE).f.action === 'tempBan' && (W.last('staff.action') || NONE).f.params.hours === 2 && (W.last('staff.action') || NONE).o[0].c === 'K2QX', '...tempBan is named (adminSystem.ts\'s own action names), its target from the hex', W.last('staff.action'));
+  mark(W);
+
+  // recommended fixes: the client's companion orders, a relog that grew in containers only, an NPC staggered, an expired lock,
+  // a sprint between two samples
+  reset();
+  W = world();
+  W.QU.run(); await F.settle();
+  for (const [u, a] of [[3, A], [4, B]]) W.h('login', u, a);
+  W.h('packet', 3, { customPacketType: 'companionCommand', action: 'follow', companionId: LYDIA });
+  W.h('packet', 3, { customPacketType: 'companionCommand', action: 'attack', targetId: WOLF });
+  W.CL.t += 61000; W.tick('playerlogFast');
+  ok(W.last('social.companion') && (W.last('social.companion') || NONE).f.op === 'command' && /follow/.test((W.last('social.companion') || NONE).f.kind), 'the client\'s companion orders ({action}): folded per minute', W.last('social.companion'));
+  W.h('relog', A, [{ base: '12eb7', pack: [1, 1], containers: [0, 4] }]);
+  ok(W.last('item.relog') && !W.evs('sec.signal').length, 'a relog that grew in containers only: item.relog, no security signal');
+  W.h('relog', A, [{ base: '12eb7', pack: [1, 3], containers: [0, 0] }]);
+  ok(W.evs('sec.signal').length === 1, '...the pack itself grew: the signal');
+  W.h('effect', BANDIT, 'stagger', 0);
+  ok(!W.evs('combat.effect').length, 'combat.js staggering an NPC: no line');
+  W.h('lock', A, 'expired', 1, 0);
+  ok(W.last('social.lock') && (W.last('social.lock') || NONE).f.op === 'cancel' && (W.last('social.lock') || NONE).f.why === 'expired', 'an expired client lock is recorded (lockpick.js busy())', W.last('social.lock'));
+  W.tick('playerlogLocation');
+  W.CL.t += 5000; W.M.mp.set(A, 'pos', [6000, 0, 0]); W.tick('playerlogLocation');
+  ok(!W.evs('move.teleport').length, 'a 6,000 u run in 5 s (under 1,500 u/s): no teleport line');
+  W.CL.t += 5000; W.M.mp.set(A, 'pos', [26000, 0, 0]); W.tick('playerlogLocation');
+  ok(W.evs('move.teleport').length === 1, '...20,000 u in 5 s: a teleport');
   mark(W);
 
   // ================================================================================================================ inventory diff

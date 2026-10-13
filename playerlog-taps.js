@@ -31,6 +31,18 @@ module.exports = (K) => {
   const pairKey = (x, y) => `${u32(x)}|${u32(y)}`;
   const itemsList = (list) => (Array.isArray(list) ? list.slice(0, 60).map((x) => (x && typeof x === 'object' ? itemOf(x.baseId, x.count, x.extras || x) : null)).filter(Boolean) : undefined);
   const lastPacket = (a) => { const m = api.lastPacketAt; return m instanceof Map ? Number(m.get(u32(a))) || 0 : 0; };
+  // a client's form id: a number, or a string as the fork's toFormId reads it (decimal), or hex where the sender writes hex
+  const formIdOf = (v, hexStr) => {
+    if (typeof v === 'number' && Number.isFinite(v)) return v >>> 0;
+    if (typeof v !== 'string' || !v.trim()) return 0;
+    const t = v.trim();
+    if (hexStr) return /^(?:0x)?[0-9a-f]{1,8}$/i.test(t) ? parseInt(t.replace(/^0x/i, ''), 16) >>> 0 : 0;
+    const n = Number(t);
+    return Number.isFinite(n) ? n >>> 0 : 0;
+  };
+  // The closing loops of the polls stop after closeBudgetMs and leave the rest to the next tick (safety review R3); each
+  // record keeps its own times, so what is written does not change
+  const closeDeadline = () => K.perf() + (Number(C.closeBudgetMs) > 0 ? Number(C.closeBudgetMs) : 3);
 
   // =============================================================================================================================
   // Sessions (DESIGN.md 2.2.7)
@@ -104,7 +116,12 @@ module.exports = (K) => {
         { src: src || 'hook:logout', q });
     }
     if (C.snapshots.logout && sess) setTimeout(guard('logout.snapshot', () => snapshot(a, 'logout')), 0);
+    forget(a);
+  };
+  // What the state holds for a character in the world, dropped when it leaves it
+  const forget = (a) => {
     S.sessions.delete(a); S.pendingLeave.delete(a); S.afk.delete(a); S.vitals.delete(a); S.restrained.delete(a); S.worn.delete(a); S.mastery.delete(a); S.companions.delete(a);
+    S.propSnap.delete(a);
     S.online.delete(a);
   };
   G.hooks.logout = (userId, a) => leave(a, null, 'hook:logout');
@@ -297,27 +314,36 @@ module.exports = (K) => {
         emit('session.char_delete', who, { slot: Number.isFinite(slot) ? slot : undefined, c: was ? was.c || undefined : undefined, n: was ? was.n : undefined }, { src: 'packet' });
       }
     },
+    // The housing menu (review C-R5): housingSystem.ts handles a packet before the gamemode's listener (index.ts registers the
+    // systems first), so the record read at propertyRequest is already the after-state. Its state when the menu opened
+    // (propertyInfoRequest) is kept as a signature only, and each request compares against it; nothing of it is written.
+    propertyInfoRequest: (userId, c) => {
+      const a = actorOf(userId), target = formIdOf(c.target);
+      if (!a || !target || !online(a)) return;
+      put('propSnap', a, { target, sig: propertySig(target), t: now() });
+    },
     propertyRequest: (userId, c) => {
       const a = actorOf(userId);
-      const target = u32(c.target);
+      const target = formIdOf(c.target);
       if (!a || !target) return;
       const action = String(c.action || '');
       if (!R.PROPERTY_ACTIONS.has(action)) return;
-      const op = action.replace(/[A-Z]/g, (m) => `_${m.toLowerCase()}`);
-      const H = housing();
-      const before = H && typeof H.recordOf === 'function' ? (() => { try { const r = H.recordOf(target); return r ? `${r.owner}|${r.ownerChar || 0}|${r.locked}|${r.serial || 0}` : ''; } catch (e) { return ''; } })() : '';
-      const recipient = u32(c.recipient);
-      setTimeout(guard('packet.property', () => {
-        let after = '';
-        try { const r = H && H.recordOf(target); after = r ? `${r.owner}|${r.ownerChar || 0}|${r.locked}|${r.serial || 0}` : ''; } catch (e) { after = ''; }
-        emit('social.housing', a, { op: R.EVENT_TYPES['social.housing'].f.op.e.has(op) ? op : 'other', property: hex(target), ok: before !== after },
-          { o: recipient && isPlayer(recipient) ? [partyOf(recipient, 'target')] : undefined, q: 'inferred', src: 'packet' });
-      }), 0);
+      const op = R.PROPERTY_ACTIONS.get(action);
+      const recipient = formIdOf(c.recipient);
+      const snap = S.propSnap.get(a);
+      const after = propertySig(target);
+      const ok = snap && snap.target === target && snap.sig && after ? snap.sig !== after : undefined;
+      // the next request in the same menu compares against this one's result
+      put('propSnap', a, { target, sig: after, t: now() });
+      emit('social.housing', a, { op: R.EVENT_TYPES['social.housing'].f.op.e.has(op) ? op : 'other', property: hex(target), ok },
+        { o: recipient && isPlayer(recipient) ? [partyOf(recipient, 'target')] : undefined, q: 'inferred', src: 'packet' });
     },
+    // the client's own orders (companionService.ts {action, targetId|companionId}): an attack order follows every hit, so they
+    // are folded per minute, by action only
     companionCommand: (userId, c) => {
       const a = actorOf(userId);
       if (!a) return;
-      const cmd = String(c.command || '');
+      const cmd = String(c.action || '');
       if (!R.COMPANION_COMMANDS.has(cmd)) return;
       foldAdd('companionCmd', a, cmd);
     },
@@ -325,43 +351,56 @@ module.exports = (K) => {
       const a = actorOf(userId), t = u32(c.target);
       if (a && t && isPlayer(t)) put('recentPair', pairKey(a, t), { kind: 'capture', by: a, t: now() });
     },
+    // A body opens at once, with no consent (searchSystem.ts): no request line and no timeout for one; its items are the
+    // container session and the loot hook
     searchRequest: (userId, c) => {
       const a = actorOf(userId), t = u32(c.target);
       if (!a || !t || !isPlayer(t)) return;
-      put('searches', a, { target: t, t: now(), accepted: false });
       put('recentPair', pairKey(a, t), { kind: 'search', by: a, t: now() });
+      if (get(t, 'isDead') === true) return;
+      put('searches', a, { target: t, t: now(), accepted: false, answered: false });
       emit('law.search', a, { op: 'requested' }, { o: [partyOf(t, 'searched')], src: 'packet' });
     },
+    // The answer is {requestId, accepted} from the searched player (searchSystem.ts:20, :304), with no target: it answers the
+    // latest unanswered request aimed at them (review C-R2)
     searchConsentResult: (userId, c) => {
-      const a = actorOf(userId), searcher = u32(c.target);
-      if (!a || !searcher) return;
-      const req = S.searches.get(searcher);
+      const a = actorOf(userId);
+      if (!a) return;
+      let searcher = 0, req = null;
+      for (const [s0, r] of S.searches) if (u32(r.target) === a && !r.answered && (!req || r.t >= req.t)) { searcher = s0; req = r; }
+      if (!req) return;
       const accepted = c.accepted === true;
-      if (req) { req.accepted = accepted; req.answered = true; req.t = now(); if (!accepted) S.searches.delete(searcher); }
+      req.answered = true; req.accepted = accepted; req.t = now();
       emit('law.search', searcher, { op: accepted ? 'accepted' : 'refused' }, { o: [partyOf(a, 'searched')], src: 'packet' });
     },
     adminAction: (userId, c) => {
       const a = actorOf(userId);
       if (!a || !isAdmin(a)) return;
       const action = R.ADMIN_ACTIONS.has(String(c.action)) ? String(c.action) : 'other';
-      const target = u32(c.target);
+      // the F7 panel sends an online player's actor id as a hex string (adminMenuService.ts; adminSystem.ts parseInt(.., 16))
+      const target = R.ADMIN_ACTOR_TARGET.has(action) ? formIdOf(c.target, true) : 0;
       const t = target && isPlayer(target) ? target : 0;
       // emitted with the server's outcome when its adminLog line comes (the audit tap), else after 10 s as sent
       const list = S.panelPending.get(a) || [];
       list.push({ action, target: t, params: panelParams(c), t: now() });
       if (list.length > 8) list.shift();
       put('panelPending', a, Object.assign(list, { t: now() }));
-      if (t && (action === 'kick' || action === 'ban' || action === 'tempban')) put('pendingLeave', t, { reason: 'panel', t: now(), by: a });
+      if (t && (action === 'kick' || action === 'ban' || action === 'tempBan' || action === 'ipBan')) put('pendingLeave', t, { reason: 'panel', t: now(), by: a });
       if (t && action === 'summon') put('travel', t, { reason: 'summon', by: a, t: now() });
-      if (t && (action === 'teleport' || action === 'teleportTo')) put('travel', a, { reason: 'panel_tp', by: a, t: now() });
+      if (t && action === 'teleportTo') put('travel', a, { reason: 'panel_tp', by: a, t: now() });
       if (t && action === 'kill') put('deaths', t, { cause: 'staff_kill', by: a, t: now() });
     },
-    craftedExtras: (userId, c) => {
-      const a = actorOf(userId);
-      const kind = String(c.kind || '');
-      if (!a || !['temper', 'enchant', 'recharge'].includes(kind)) return;
-      emit('item.extras', a, { kind, item: itemOf(c.baseId, 1) }, { src: 'packet', q: 'inferred' });
-    },
+  };
+  // A housing record's signature: what a menu action changes (owner, lock, keys, rooms, name), hashed, never kept as text
+  const propertySig = (target) => {
+    const H = housing();
+    if (!H || typeof H.recordOf !== 'function') return '';
+    try {
+      const r = H.recordOf(target);
+      if (!r) return 'none';
+      return R.siteHash(JSON.stringify([r.owner, r.ownerChar || 0, r.locked, r.serial || 0, r.name || '', r.assigned || null, r.shared || null, r.containers || null,
+        Array.isArray(r.issued) ? r.issued.length : 0, r.holders || null]));
+    } catch (e) { return ''; }
   };
   G.hooks.packet = (userId, content) => {
     if (!content || typeof content !== 'object' || content.type === 'cef::chat:send') return;
@@ -391,20 +430,32 @@ module.exports = (K) => {
     if (S.auditQ.length >= C.caps.audit) { const k = 'cap|audit'; S.dropCounts.set(k, (S.dropCounts.get(k) || 0) + 1); return; }
     S.auditQ.push([now(), String(body)]);
   };
-  // An audit party -> the character, read from the game (never the name in the line)
-  const byProfileTag = (profile, tag) => {
+  // An audit party -> the character, read from the game (never the name in the line). recent: with no #TAG and no character
+  // of the profile online, the character of that profile this module saw last (review C-R8: a kick or ban line is parsed
+  // after its target has left); never for a lookup that needs someone in the world
+  const byProfileTag = (profile, tag, recent) => {
     let ids = [];
     try { ids = (mp.getActorsByProfileId(profile) || []).map(u32).filter(Boolean); } catch (e) { ids = []; }
     if (tag) { const hit = ids.find((id) => get(id, 'private.charTag') === tag); return hit || 0; }
     const on = ids.filter(online);
-    return on.length === 1 ? on[0] : 0;
+    if (on.length === 1) return on[0];
+    if (!recent || on.length > 1) return 0;
+    return lastSeenOf(Number(profile));
+  };
+  // The latest identity this module holds for a profile: the identity cache (kept after a logout) and the connections
+  const lastSeenOf = (profile) => {
+    if (!Number.isFinite(profile) || profile < 0) return 0;
+    let best = 0, bt = -1;
+    for (const [a, r] of S.ids) if (r && r.p === profile && Number(r.t) > bt) { bt = Number(r.t); best = a; }
+    for (const c of S.connectByUser.values()) if (c && c.p === profile && c.a && Number(c.t) > bt && S.ids.has(u32(c.a))) { bt = Number(c.t); best = u32(c.a); }
+    return best;
   };
   const resolveAuditParty = (P, x, role) => {
     if (x === -1 || x === null || x === undefined) return null;
     const raw = typeof x === 'number' ? P[x] : x;
     if (!raw) return null;
     let id = 0, amb = false;
-    if (Number.isFinite(raw.profile) && raw.profile !== null) id = byProfileTag(raw.profile, raw.tag || '');
+    if (Number.isFinite(raw.profile) && raw.profile !== null) id = byProfileTag(raw.profile, raw.tag || '', true);
     else if (raw.tag) {
       // Name #TAG with no profile: by name and tag, never by the tag alone (DESIGN.md 1.2)
       const all = indexFind('private.indexed.tagKey', raw.tag.toLowerCase());
@@ -431,7 +482,7 @@ module.exports = (K) => {
       if (!rec || !(Number(rec.owner) > 0)) return null;
       const ch = u32(rec.ownerChar);
       if (ch && isPlayer(ch)) return partyOf(ch, 'owner');
-      const on = byProfileTag(Number(rec.owner), '');
+      const on = byProfileTag(Number(rec.owner), '', true);
       return on ? partyOf(on, 'owner') : { r: 'owner', p: Number(rec.owner) };
     } catch (e) { return null; }
   };
@@ -451,14 +502,36 @@ module.exports = (K) => {
       const who = e.travel.party === 0 || e.travel.party === undefined ? actor : resolveAuditParty(P, e.travel.party, 'x');
       if (who && who.id) put('travel', who.id, { reason: e.travel.reason, by: actor.id || 0, t });
     }
-    // a panel action from the packet tap: its fields join the server's own line, which says whether it went through
+    // a panel action from the packet tap: its fields join the server's own line, which says whether it went through; its
+    // target (read before the target could leave) names a party the line left unresolved (review C-R7)
     if (e.ev === 'staff.action' && f.via === 'panel' && actor.id) {
       const list = S.panelPending.get(actor.id);
-      if (list && list.length) { const pend = list.shift(); if (pend && pend.params && !f.params) f.params = pend.params; if (!list.length) S.panelPending.delete(actor.id); }
+      if (list && list.length) {
+        const pend = list.shift();
+        if (pend && pend.params && !f.params) f.params = pend.params;
+        if (pend && pend.target) {
+          const i = o.findIndex((x) => x.r === 'target');
+          if (i < 0 || !o[i].a) { const tp = partyOf(pend.target, 'target'); if (tp) { if (i < 0) o.push(tp); else o[i] = tp; } }
+        }
+        if (!list.length) S.panelPending.delete(actor.id);
+      }
     }
     if (e.ev === 'session.ban' && actor.id && (f.kind === 'suspend')) put('pendingLeave', actor.id, { reason: 'suspended', t, by: 0 });
-    // a beast change, Death's Chill and a revive move health without a hit: no unexplained loss for 5 s
-    if (actor.id && /^act\.(BEAST|CHILL|REVIVE|BLOODCROWN|FEED|RITE)$/.test(e.ev)) suppress(actor.id, t);
+    // a beast change, Death's Chill and a revive move health without a hit: no unexplained loss for 5 s, for whom it happened to
+    if (/^act\.(BEAST|CHILL|REVIVE|BLOODCROWN|FEED|RITE)$/.test(e.ev)) {
+      if (actor.id) suppress(actor.id, t);
+      for (const x of o) if (x.r === 'target' && x.a) suppress(parseInt(x.a, 16) >>> 0, t);
+    }
+    // a beast form changes the name shown: the identity is read again now, not at the next slow poll
+    if (e.ev === 'act.BEAST' && actor.id) { try { refreshId(actor.id, false); } catch (x) { /* the next poll */ } }
+    // a lock the verdict hook already wrote (social.lock{picked}) is not written again as act.LOCK
+    if (e.ev === 'act.LOCK' && actor.id) { const seen = S.recentPair.get(`${actor.id}|lock`); if (seen && Math.abs(t - seen.t) < 10000) return; }
+    // act.<VERB> text (review C-R4): the forwarder prints the actor and the verb before it, so the actor's own "Name #TAG"
+    // at the start of the text goes; matched against the names the game holds (own and shown), never guessed from the line
+    if (e.ev.startsWith('act.') && actor.id && typeof f.text === 'string') {
+      const r = idOf(actor.id);
+      if (r && r.c) for (const nm of [r.sn, r.n]) { const lead = nm ? `${nm} #${r.c}` : ''; if (lead && (f.text === lead || f.text.startsWith(`${lead} `))) { f.text = f.text.slice(lead.length).trim(); break; } }
+    }
     emit(e.ev, actor.id || 0, f, { o: o.length ? o : undefined, t, src: `audit:${parsed.verb}`, ids: actor.id ? undefined : actor.party.p !== undefined ? { p: actor.party.p, c: actor.party.c } : undefined });
   };
   G.parseAudits = (deadline) => {
@@ -466,7 +539,7 @@ module.exports = (K) => {
       const [t, body] = S.auditQ.shift();
       let parsed;
       try { parsed = R.parseAudit(body); } catch (e) { err('audit.parse', e); continue; }
-      if (!parsed.verb) { const k = parsed.unknown || '?'; if (S.auditUnknown.has(k) || S.auditUnknown.size < 200) S.auditUnknown.set(k, (S.auditUnknown.get(k) || 0) + 1); continue; }
+      if (!parsed.verb) { const k = parsed.unknown || '_other'; if (S.auditUnknown.has(k) || S.auditUnknown.size < 200) S.auditUnknown.set(k, (S.auditUnknown.get(k) || 0) + 1); continue; }
       for (const e of parsed.events) { try { auditEvent(parsed, e, t); } catch (x) { err(`audit.${parsed.verb}`.slice(0, 40), x); } }
     }
   };
@@ -485,9 +558,25 @@ module.exports = (K) => {
   const ownerPartyOf = (profile, ch, role) => {
     const c = u32(ch);
     if (c && isPlayer(c)) return partyOf(c, role);
-    const on = Number(profile) > 0 ? byProfileTag(Number(profile), '') : 0;
+    const on = Number(profile) > 0 ? byProfileTag(Number(profile), '', true) : 0;
     return on ? partyOf(on, role) : Number(profile) > 0 ? { r: role, p: Number(profile) } : null;
   };
+  // A door's teleport partner, from its record's XTEL (the lower id of a pair is where housing keeps a pair's record)
+  const doorPartner = (id) => {
+    try {
+      const r = typeof api.recordOf === 'function' ? api.recordOf(id) : mp.lookupEspmRecordById(id);
+      for (const f of ((r && r.record && r.record.fields) || [])) {
+        if (f.type !== 'XTEL' || !(f.data instanceof Uint8Array) || f.data.byteLength < 4) continue;
+        const local = new DataView(f.data.buffer, f.data.byteOffset, f.data.byteLength).getUint32(0, true);
+        return local && typeof r.toGlobalRecordId === 'function' ? r.toGlobalRecordId(local) >>> 0 : local >>> 0;
+      }
+    } catch (e) { /* not a placed record */ }
+    return 0;
+  };
+  // -> { rec, root, primary, own, rootId } or null. With the place rules on (housingSystem.ts exposeTenancy primary()), recordOf
+  // and primaryOf answer with the place's ROOT for any of its doors and chests, while the place's assigned and shared lists are
+  // keyed by each member's OWN primary (roomsOf, doRoom): own is that, read from the ref's own record (a pointer's primary, a
+  // record's own id), else the ref (a chest), else the lower id of a door's pair, as housingSystem.ts primaryOf (review C-R1)
   const housingRecord = (ref) => {
     const H = housing();
     if (!H || typeof H.recordOf !== 'function') return null;
@@ -499,12 +588,48 @@ module.exports = (K) => {
       const rec = H.recordOf(id);
       if (rec) {
         const primary = typeof H.primaryOf === 'function' ? u32(H.primaryOf(id)) : id;
-        const root = rec.memberOf ? H.recordOf(u32(rec.memberOf)) : null;
-        v = { rec, root, primary };
+        const raw = get(id, 'private.housing');
+        let own = raw && typeof raw === 'object' ? (Number(raw.primary) ? u32(raw.primary) : id) : id;
+        if (!(raw && typeof raw === 'object') && recordType(baseOfRef(id)) === 'DOOR') { const far = doorPartner(id); if (far && far < own) own = far; }
+        const rootId = rec.memberOf && u32(rec.memberOf) !== primary ? u32(rec.memberOf) : primary;
+        const root = rootId !== primary ? H.recordOf(rootId) : null;
+        v = { rec, root, primary, own, rootId };
+        // a place's cells, for a cell change into it (review C-R10)
+        const place = (root || rec).place;
+        if (place && Array.isArray(place.cells)) for (const c of place.cells.slice(0, 8)) put('placeCells', String(c), { root: rootId, t: now() });
       }
     } catch (e) { v = null; }
     put('housingCache', id, { t: now(), v });
     return v;
+  };
+  // Is the actor this place member's assignee (housingSystem.ts isAssignee: by character when property is per character)
+  const isAssigneeOf = (asg, a) => {
+    const H = housing();
+    let perChar = false; try { perChar = !!(H && typeof H.perCharacter === 'function' && H.perCharacter() === true); } catch (e) { perChar = false; }
+    if (perChar && u32(asg.char)) return u32(asg.char) === u32(a);
+    return Number(asg.profile) > 0 && profileOf(a) === Number(asg.profile);
+  };
+  // The owner side of a housing record for an actor -> { own, o, rec } or null (not property)
+  const placeOwnership = (h, a) => {
+    if (!h || !h.rec) return null;
+    const H = housing();
+    const root = h.root || h.rec;
+    const hexP = h.own.toString(16);
+    const asg = root.assigned && root.assigned[hexP];
+    const owns = (rec) => { try { return !!(H && typeof H.ownsRecord === 'function' && H.ownsRecord(rec, a)); } catch (e) { return false; } };
+    if (asg && Number(asg.profile) > 0) {
+      // the assignee's own room or chest is theirs: no urgent line (review C-R1)
+      if (isAssigneeOf(asg, a)) return { own: 'self', o: [] };
+      return { own: 'assignee', o: [ownerPartyOf(asg.profile, asg.char, 'assignee'), Number(root.owner) > 0 ? ownerPartyOf(root.owner, root.ownerChar, 'owner') : null].filter(Boolean), rec: root };
+    }
+    if (Array.isArray(root.shared) && root.shared.includes(hexP) && Number(root.owner) > 0) {
+      if (owns(root)) return { own: 'self', o: [] };
+      return { own: 'household', o: [ownerPartyOf(root.owner, root.ownerChar, 'owner')].filter(Boolean), rec: root };
+    }
+    const rec = Number(h.rec.owner) > 0 ? h.rec : Number(root.owner) > 0 ? root : null;
+    if (!rec) return null;
+    if (owns(rec)) return { own: 'self', o: [] };
+    return { own: 'owner', o: [ownerPartyOf(rec.owner, rec.ownerChar, 'owner')].filter(Boolean), rec };
   };
   // -> { own, o: [owner party], access, ownerIsActor }
   const ownershipOf = (ref, actor) => {
@@ -529,27 +654,8 @@ module.exports = (K) => {
         return { own: mine ? 'self' : 'renter', o: mine ? [] : o.filter(Boolean) };
       }
     } catch (e) { /* not a business chest */ }
-    const h = housingRecord(id);
-    const H = housing();
-    if (h && h.rec) {
-      const root = h.root || h.rec;
-      const hexP = h.primary.toString(16);
-      const asg = root.assigned && root.assigned[hexP];
-      const owns = (rec) => { try { return !!(H && typeof H.ownsRecord === 'function' && H.ownsRecord(rec, a)); } catch (e) { return false; } };
-      if (asg && Number(asg.profile) > 0) {
-        if (profileOf(a) === Number(asg.profile)) return { own: 'self', o: [] };
-        return { own: 'assignee', o: [ownerPartyOf(asg.profile, asg.char, 'assignee'), Number(root.owner) > 0 ? ownerPartyOf(root.owner, root.ownerChar, 'owner') : null].filter(Boolean) };
-      }
-      if (Array.isArray(root.shared) && root.shared.includes(hexP) && Number(root.owner) > 0) {
-        if (owns(root)) return { own: 'self', o: [] };
-        return { own: 'household', o: [ownerPartyOf(root.owner, root.ownerChar, 'owner')].filter(Boolean) };
-      }
-      const rec = Number(h.rec.owner) > 0 ? h.rec : Number(root.owner) > 0 ? root : null;
-      if (rec) {
-        if (owns(rec)) return { own: 'self', o: [] };
-        return { own: 'owner', o: [ownerPartyOf(rec.owner, rec.ownerChar, 'owner')].filter(Boolean), rec };
-      }
-    }
+    const po = placeOwnership(housingRecord(id), a);
+    if (po) return po;
     if (treasuries().has(id)) return { own: 'treasury', o: [] };
     const l = S.loc.get(a);
     try { const cells = globalThis.__dboDungeonCells; if (l && cells instanceof Set && (cells.has(l.w) || (typeof api.normPlace === 'function' && cells.has(api.normPlace(l.w))))) return { own: 'dungeon', o: [] }; } catch (e) { /* none */ }
@@ -570,6 +676,7 @@ module.exports = (K) => {
     const H = housing();
     const call = (name, ...args) => { try { return !!(H && typeof H[name] === 'function' && H[name](...args)); } catch (e) { return false; } };
     if (ow.own === 'assignee' && ow.o[0] && ow.o[0].p === profileOf(a)) return 'assignee';
+    if (ow.own === 'assignee' && ow.rec) { try { if (H && typeof H.ownsRecord === 'function' && H.ownsRecord(ow.rec, a)) return 'owner'; } catch (e) { /* below */ } }
     if (call('keyOpens', id, a)) return 'key';
     if (call('isManager', a, id)) return 'manager';
     if (isAdmin(a)) return 'staff';
@@ -593,6 +700,8 @@ module.exports = (K) => {
     const ow = ownershipOf(ref, a);
     const s = { a, ref, base: base ? recordName(base) : '', own: ow.own, o: ow.o, access: undefined, took: new Map(), put: new Map(), t0: t, t, refused: 0, w: (S.loc.get(a) || {}).w };
     if (ow.own !== 'self' && ow.own !== 'public' && ow.own !== 'treasury' && ow.own !== 'dungeon') s.access = accessOf(ref, a, ow);
+    // the household at its shared chest: P1, not an urgent line, unless nothing shows how they got in
+    s.pri = ow.own === 'household' && s.access !== 'lockpick' && s.access !== 'unknown' ? 1 : undefined;
     put('containers', a, s);
     return s;
   };
@@ -606,7 +715,7 @@ module.exports = (K) => {
     if (!s.took.size && !s.put.size && !s.refused && !others) return;
     const list = (m) => (m.size ? [...m.values()].filter((x) => x.k > 0).slice(0, 60) : undefined);
     emit('item.container', s.a, { ref: hex(s.ref), base: s.base, own: s.own, access: s.access, took: list(s.took), put: list(s.put), dur: Math.round((s.t - s.t0) / 1000), refused: s.refused || undefined },
-      { o: s.o && s.o.length ? s.o : undefined, src: `container:${why}`, p: others && s.own !== 'treasury' && s.own !== 'dungeon' ? 0 : 1, nr: others ? undefined : false, q: s.access ? 'inferred' : undefined });
+      { o: s.o && s.o.length ? s.o : undefined, src: `container:${why}`, p: s.pri !== undefined ? s.pri : others && s.own !== 'treasury' && s.own !== 'dungeon' ? 0 : 1, nr: others ? undefined : false, q: s.access ? 'inferred' : undefined });
   };
   // The itemguards seam (DESIGN.md 2.2.2): counts before and after, already read there; extras from its collectors
   const extrasDiff = (before, after) => {
@@ -652,11 +761,16 @@ module.exports = (K) => {
     return undefined;
   };
   const partyLeader = (a) => { try { const f = globalThis.__dboPartyLeaderOf; return typeof f === 'function' ? f(a) : null; } catch (e) { return null; } };
+  // A target downed or killed in the last 2 s: its killing blow's onHitDamage comes after onDeath (MpActor.cpp:812-817
+  // kills inside NetSetPercentages, before ActionListener.cpp:3031 fires onHitDamage), so it opens no new fight (review C-R3)
+  const justDied = (x, t) => { const d = S.deathSeen.get(u32(x)) || S.recentKills.get(u32(x)); return !!(d && t - d.t < 2000); };
   const fightOf = (agg, tgt, t, create) => {
     const k = fightKey(agg, tgt);
     let f = S.fights.get(k);
-    if (f || !create) return f;
-    // the actor's side is a player: the one who swung, or the player being hit by an NPC
+    if (f || !create || justDied(tgt, t)) return f;
+    // the actor's side is a player: the one who swung, or the player being hit by an NPC; an owned NPC's fight with an NPC
+    // has no player side and is no fight here (its kills are credited to the owner by onDeath)
+    if (!online(agg) && !online(tgt)) return undefined;
     const me = online(agg) ? agg : tgt;
     const them = me === agg ? tgt : agg;
     const pvp = online(me) && online(them);
@@ -695,7 +809,8 @@ module.exports = (K) => {
       : ((f.t1me === undefined ? Infinity : f.t1me) <= (f.t1them === undefined ? Infinity : f.t1them) ? 'me' : 'them');
     const side = (s) => ({ hits: s.hits, dmg: Math.round(s.dmg * 10) / 10, by: s.by.size ? [...s.by].slice(0, 8) : undefined });
     const other = partyOf(f.them, 'opponent');
-    emit('combat.fight', f.me, { dealt: side(f.dealt), taken: side(f.taken), hp0: f.hp0, hp1: f.hp1 !== undefined ? f.hp1 : healthOf(f.me), from: f.from, to: f.to, outcome: f.outcome,
+    const vme = f.hp1 === undefined ? S.vitals.get(u32(f.me)) : null;
+    emit('combat.fight', f.me, { dealt: side(f.dealt), taken: side(f.taken), hp0: f.hp0, hp1: f.hp1 !== undefined ? f.hp1 : vme ? vme.health : undefined, from: f.from, to: f.to, outcome: f.outcome,
       first, t1me: f.t1me, t1them: f.t1them, att1me: f.att1me, att1them: f.att1them, refused: Object.keys(f.refused).length ? f.refused : undefined,
       party: f.pvp ? !!f.party : undefined, pvp: f.pvp || undefined, kills: f.kills || undefined, link: f.link },
     { o: other ? [other] : undefined, at: f.at, p: f.pvp ? 0 : 1, nr: f.pvp ? undefined : false, t: f.to, src: 'hook:combat' });
@@ -781,6 +896,21 @@ module.exports = (K) => {
       if (lh.list.length > 3) lh.list.shift();
     }
   };
+  // The pending killing blow into the fight it ends, before the fight is closed (review C-R3): it took what health was left
+  const countBlow = (f, pend, t) => {
+    if (!f || !pend || pend.inFight) return;
+    const T = u32(pend.tgt);
+    const mine = u32(f.me) === u32(pend.agg);
+    const s = mine ? f.dealt : f.taken;
+    const left = pend.hp0 !== undefined ? Math.max(0, pend.hp0) : 0;
+    const maxHp = maxOf(T, { targetMaxHealth: pend.max }, pend.eng, left);
+    s.hits++; s.dmg += maxHp > 0 && left > 0 ? left * maxHp : pend.eng;
+    if (s.by.size < 8) s.by.add(srcName(pend.src));
+    if (mine) { if (f.t1me === undefined) f.t1me = t; } else if (f.t1them === undefined) f.t1them = t;
+    f.to = t;
+    if (u32(f.me) === T) f.hp1 = 0;
+    pend.inFight = true;
+  };
   const closeAllFor = (a, outcome) => {
     const x = u32(a);
     for (const f of [...S.fights.values()]) if (u32(f.me) === x || u32(f.them) === x) closeFight(f, outcome === 'logout' ? 'logout' : outcome);
@@ -806,6 +936,7 @@ module.exports = (K) => {
       if (Kr) { const kl = S.loc.get(Kr); if (kl && l && kl.w === l.w && Array.isArray(kl.pos) && Array.isArray(l.pos)) dist = Math.round(Math.hypot(kl.pos[0] - l.pos[0], kl.pos[1] - l.pos[1], kl.pos[2] - l.pos[2])); }
       const lastHits = lh ? lh.list.slice(-3).map((h) => { const pp = isPlayer(h.by) ? idOf(h.by) : null; return { src: h.src, dmg: h.dmg, t: h.t, p: pp ? pp.p : undefined, c: pp ? pp.c || undefined : undefined, npc: pp ? undefined : (npcParty(h.by, 'x') || {}).npc }; }) : undefined;
       emit('combat.down', V, { cause, src: pend ? srcName(pend.src) : undefined, dmg: pend ? pend.eng : undefined, dist, lastHits }, { o: Kr ? [partyOf(Kr, 'by')] : staff && staff.by ? [partyOf(staff.by, 'by')] : undefined, at, src: 'hook:onDeath' });
+      if (pend) countBlow(S.fights.get(fightKey(Kr, V)), pend, t);
       for (const f of [...S.fights.values()]) if (u32(f.me) === V || u32(f.them) === V) { if (u32(f.me) === V) f.hp1 = 0; closeFight(f, 'downed'); }
       suppress(V, t);
       if (C.snapshots.down) setTimeout(guard('down.snapshot', () => snapshot(V, 'down')), 0);
@@ -819,9 +950,10 @@ module.exports = (K) => {
     if (!killerPlayer && Kr && S.ownedNpcs.has(Kr)) { const own = npcParty(Kr, 'x').owner; if (own && own.p !== undefined) { const on = byProfileTag(own.p, own.c || ''); if (on) { killerPlayer = on; byCompanion = true; } } }
     const victimInfo = npcParty(V, 'victim');
     if (!killerPlayer && !(victimInfo && victimInfo.owner)) return;
+    put('recentKills', V, { t });
     const pend = Kr ? S.pendingHits.get(`${Kr}|${V}`) : null;
     const f = killerPlayer ? S.fights.get(fightKey(killerPlayer, byCompanion ? Kr : V)) || S.fights.get(fightKey(killerPlayer, V)) : null;
-    if (f) { f.kills++; closeFight(f, 'killed'); }
+    if (f) { if (pend && !byCompanion) countBlow(f, pend, t); f.kills++; closeFight(f, 'killed'); }
     const champion = (() => { const n = S.npcInfo.get(V); return n ? n.champion : false; })();
     const actor = killerPlayer || 0;
     const vic = { npc: victimInfo.npc, base: victimInfo.base, kind: victimInfo.kind, owner: victimInfo.owner };
@@ -867,8 +999,15 @@ module.exports = (K) => {
     for (const map of Object.keys(FOLDS)) for (const [fk, f] of [...S[map]]) if (f.a === x) flushFold(map, fk, f);
     for (const [k, f] of [...S.cmdInfoFold]) if (f.a === x) { S.cmdInfoFold.delete(k); emit('cmd.info', f.a, { name: f.name, n: f.n }, { src: 'cmd' }); }
   };
-  const foldTick = (t) => {
-    for (const map of Object.keys(FOLDS)) for (const [fk, f] of [...S[map]]) { const span = f.kind === 'equipFold' ? C.equipFoldMs : (f.kind === 'companionCmd' || f.kind === 'pmenu') ? 60000 : FOLDS[map]; if (t - f.t >= span) flushFold(map, fk, f); }
+  const foldTick = (t, deadline) => {
+    const over = overAt(deadline || closeDeadline());
+    for (const map of Object.keys(FOLDS)) {
+      for (const [fk, f] of S[map]) {
+        if (over()) return;
+        const span = f.kind === 'equipFold' ? C.equipFoldMs : (f.kind === 'companionCmd' || f.kind === 'pmenu') ? 60000 : FOLDS[map];
+        if (t - f.t >= span) flushFold(map, fk, f);
+      }
+    }
   };
   const suppress = (a, t) => put('suppress', u32(a), { t: t || now(), until: (t || now()) + C.healthLoss.suppressMs });
 
@@ -879,7 +1018,8 @@ module.exports = (K) => {
   const wrap = (holder, key, after, before) => {
     K.wrapSlot(holder, key, (inner) => function plogWrapper(...args) {
       let pre;
-      if (before) { try { pre = before(args); } catch (e) { err(`slot:${key}:pre`.slice(0, 40), e); } }
+      // capture off (the STOP file, the breaker): no pre-read either, so off means no work (safety review R1)
+      if (before && S.on) { try { pre = before(args); } catch (e) { err(`slot:${key}:pre`.slice(0, 40), e); } }
       const verdict = inner ? inner.apply(this, args) : undefined;
       if (S.on) { try { after(args, verdict, pre); } catch (e) { err(`slot:${key}`.slice(0, 40), e); } }
       return verdict;
@@ -912,7 +1052,7 @@ module.exports = (K) => {
     // the take side as well, in a wrapper of its own over gamemode's takeHook
     K.wrapSlot('mp', 'onTakeItem', (inner) => function plogTake(...args) {
       let before = null;
-      try { before = ownDiff('take')(args); } catch (e) { err('slot:onTakeItem:pre', e); }
+      if (S.on) { try { before = ownDiff('take')(args); } catch (e) { err('slot:onTakeItem:pre', e); } }
       const verdict = inner ? inner.apply(this, args) : undefined;
       if (S.on) { try { ownDiffAfter('take')(args, verdict, before); } catch (e) { err('slot:onTakeItem', e); } }
       return verdict;
@@ -966,20 +1106,15 @@ module.exports = (K) => {
       return;
     }
     if (type === 'DOOR') {
-      const h = housingRecord(t);
-      if (!h || !h.rec) return;
-      const rec = Number(h.rec.owner) > 0 ? h.rec : h.root && Number(h.root.owner) > 0 ? h.root : null;
-      if (!rec) return;
-      const H = housing();
-      let mine = false; try { mine = !!(H && typeof H.ownsRecord === 'function' && H.ownsRecord(rec, a)); } catch (e) { mine = false; }
-      if (mine) return;
-      const ow = { own: 'owner', o: [ownerPartyOf(rec.owner, rec.ownerChar, 'owner')].filter(Boolean), rec };
-      if (verdict === false) { accessDedupe(a, t, 'door', 'owner', refusalWhy(t, ow), ow.o); return; }
+      const ow = placeOwnership(housingRecord(t), a);
+      if (!ow || ow.own === 'self') return;
+      if (verdict === false) { accessDedupe(a, t, 'door', ow.own, refusalWhy(t, ow), ow.o); return; }
       const k = `${a}|${t}`;
       const last = S.doorDedupe.get(k);
       if (last && now() - last.t < 60000) return;
       put('doorDedupe', k, { t: now() });
-      emit('move.door', a, { door: hex(t), allowed: true, own: 'owner', access: accessOf(t, a, ow) }, { o: ow.o, p: 0, src: 'hook:onActivate', q: 'inferred' });
+      const access = accessOf(t, a, ow);
+      emit('move.door', a, { door: hex(t), allowed: true, own: ow.own, access }, { o: ow.o, p: ow.own === 'household' && access !== 'lockpick' && access !== 'unknown' ? 1 : 0, src: 'hook:onActivate', q: 'inferred' });
       return;
     }
     if (verdict === false) return;
@@ -1196,13 +1331,41 @@ module.exports = (K) => {
     }
     m.pct += pct; m.merged++;
   };
-  const fastTick = () => {
+  // the first fast poll after a resync records health and restraints without reading them as a loss or a capture
+  let seedQuiet = false;
+  // The closing loops (safety review R3). They share one deadline a tick and stop at it; what is left is still due at the next
+  // tick (a Map keeps its order, so the oldest go first, and deleting the entry in hand while iterating is safe). The loop that
+  // goes first turns over each tick, so none waits behind a busy one. Refused attempts that never became a fight close here,
+  // not once a minute: at the minute's pace a time box could not keep up with a beam on many targets, and a map at its cap
+  // drops its oldest entry unwritten.
+  const CLOSERS = [
+    // windows are made in time order and never moved, so the first one not yet due ends the loop
+    (t, over) => { for (const [k, w] of S.windows) { if (t - w.from < C.windowMs || over()) return; closeWindow(k, w); } },
+    (t, over) => { for (const f of S.fights.values()) { if (over()) return; if (t - f.to >= C.fightIdleMs) closeFight(f, f.outcome === 'ended' ? 'ended' : f.outcome); } },
+    (t, over) => { for (const [a, s] of S.containers) { if (over()) return; if (t - s.t >= C.containerIdleMs) closeContainer(a, 'idle'); } },
+    (t, over) => { for (const [a, m] of S.hpLossMerge) { if (over()) return; if (t - m.t >= C.healthLoss.mergeMs) { S.hpLossMerge.delete(a); emit('combat.health_loss', a, { pct: Math.round(m.pct * 10) / 10, cause: m.cause, dz: m.dz, merged: m.merged }, { src: 'poll:vitals', q: 'inferred' }); } } },
+    (t, over) => { for (const [a, r] of S.searches) { if (over()) return; if (!r.answered && t - r.t >= 60000) { S.searches.delete(a); emit('law.search', a, { op: 'timeout' }, { o: [partyOf(r.target, 'searched')], src: 'poll' }); } } },
+    // refused attempts that never became a fight (a god-moded target, a body that cannot be harmed): a disk record
+    (t, over) => {
+      for (const [k, r] of S.refusedPair) {
+        if (over()) return;
+        if (t - r.t < 60000) continue;
+        S.refusedPair.delete(k);
+        const [A, T] = k.split('|').map(Number);
+        const who = online(A) ? A : online(T) ? T : 0;
+        if (!who) continue;
+        for (const [reason, cnt] of Object.entries(r.n)) emit('combat.refused', who, { reason, n: cnt, windowSec: Math.round((r.t - r.first) / 1000) }, { o: [partyOf(who === A ? T : A, who === A ? 'target' : 'attacker')], t: r.t, src: 'hook:combat' });
+      }
+    },
+  ];
+  let closerTurn = 0;
+  const overAt = (end) => { let n = 0; return () => ((++n & 7) === 0 && K.perf() > end); };
+  // The per-player reads first, then the closing loops with what is left of the tick's budget, so a tick with everything
+  // due still ends near closeBudgetMs and not past it
+  const fastTick = (deadline) => {
+    if (!S.on) return;
+    const end = deadline || closeDeadline();
     const t = now();
-    for (const [k, w] of [...S.windows]) if (t - w.from >= C.windowMs) closeWindow(k, w);
-    for (const f of [...S.fights.values()]) if (t - f.to >= C.fightIdleMs) closeFight(f, f.outcome === 'ended' ? 'ended' : f.outcome);
-    for (const [a, s] of [...S.containers]) if (t - s.t >= C.containerIdleMs) closeContainer(a, 'idle');
-    for (const [a, m] of [...S.hpLossMerge]) if (t - m.t >= C.healthLoss.mergeMs) { S.hpLossMerge.delete(a); emit('combat.health_loss', a, { pct: Math.round(m.pct * 10) / 10, cause: m.cause, dz: m.dz, merged: m.merged }, { src: 'poll:vitals', q: 'inferred' }); }
-    for (const [a, r] of [...S.searches]) if (!r.answered && t - r.t >= 60000) { S.searches.delete(a); emit('law.search', a, { op: 'timeout' }, { o: [partyOf(r.target, 'searched')], src: 'poll' }); }
     for (const [userId, m] of [...S.menuLeft]) {
       if (!m.armed) continue;
       const a = actorOf(userId);
@@ -1210,6 +1373,8 @@ module.exports = (K) => {
       else if (t - m.t > 30000) S.menuLeft.delete(userId);
     }
     flushPanelPending(t, false);
+    const quiet = seedQuiet;
+    seedQuiet = false;
     for (const a of S.online) {
       const p = get(a, 'percentages');
       const h = p && Number.isFinite(Number(p.health)) ? Number(p.health) : undefined;
@@ -1219,6 +1384,7 @@ module.exports = (K) => {
       const r = get(a, 'private.restrained');
       const on = !!(r && (r.boundHands || r.carried));
       const was = S.restrained.get(a);
+      if (quiet) { if (on) put('restrained', a, { t, op: RESTRAINT_OP(r), by: u32(r.captorActorId) }); continue; }
       if (on && (!was || was.op !== RESTRAINT_OP(r))) {
         const by = u32(r.captorActorId);
         put('restrained', a, { t, op: RESTRAINT_OP(r), by });
@@ -1229,6 +1395,9 @@ module.exports = (K) => {
         emit('combat.capture', a, { op: 'released' }, { o: was.by && isPlayer(was.by) ? [partyOf(was.by, 'captor')] : undefined, src: 'poll:restraint', q: 'inferred' });
       }
     }
+    const over = overAt(end);
+    for (let i = 0; i < CLOSERS.length; i++) CLOSERS[(closerTurn + i) % CLOSERS.length](t, over);
+    closerTurn = (closerTurn + 1) % CLOSERS.length;
   };
   // Location (5 s): two gets per player, nothing else; the zone from those two reads, recomputed only on a cell change or
   // a move of zoneMoveUnits
@@ -1242,17 +1411,23 @@ module.exports = (K) => {
     } catch (e) { z = null; }
     return z || undefined;
   };
-  const claimedInterior = (a) => {
+  // A cell of a place someone owns, from the cell -> root map that door and chest uses fill (review C-R10: recordOf(actor)
+  // answers null, housingSystem.ts isClaimable takes doors and containers only). A place nobody has touched since this load
+  // is not known yet (B4's placeOfCell is exact); the root is read again here, so a map entry never outlives the place.
+  const claimedInterior = (a, w) => {
     const H = housing();
     if (!H || typeof H.recordOf !== 'function') return null;
+    const pc = S.placeCells.get(String(w));
+    if (!pc) return null;
     try {
-      const rec = H.recordOf(a);
-      if (!rec || !(Number(rec.owner) > 0)) return null;
+      const rec = H.recordOf(pc.root);
+      if (!rec || !(Number(rec.owner) > 0) || !rec.place || !Array.isArray(rec.place.cells) || !rec.place.cells.includes(String(w))) { S.placeCells.delete(String(w)); return null; }
       if (typeof H.ownsRecord === 'function' && H.ownsRecord(rec, a)) return null;
-      return rec;
+      return { rec, root: pc.root };
     } catch (e) { return null; }
   };
   const locationTick = () => {
+    if (!S.on) return;
     const t = now();
     for (const a of S.online) {
       const w0 = get(a, 'worldOrCellDesc'); const pos = get(a, 'pos');
@@ -1263,11 +1438,14 @@ module.exports = (K) => {
       const outdoors = typeof api.isWorldspace === 'function' && api.isWorldspace(w);
       const jump = l.w === w ? Math.hypot(pos[0] - l.pos[0], pos[1] - l.pos[1], pos[2] - l.pos[2]) : Infinity;
       const tr = S.travel.get(a);
+      // a run, a mount or a beast covers ground between samples: a jump with no reason counts only past what 1,500 u/s
+      // (over the fastest sustained peaks the movement validator logs) covers in the time since the last sample
+      const reach = Math.max(Number(C.polls.teleportUnits) || 3000, (Number(C.polls.teleportSpeed) || 1500) * Math.max(0, t - (Number(l.t) || t)) / 1000);
       if (tr && t - tr.t <= 10000 && (l.w !== w || jump > C.polls.teleportUnits)) {
         S.travel.delete(a);
         emit('move.teleport', a, { reason: R.EVENT_TYPES['move.teleport'].f.reason.e.has(tr.reason) ? tr.reason : 'unknown', dist: Number.isFinite(jump) ? Math.round(jump) : undefined },
           { o: tr.by && tr.by !== a && isPlayer(tr.by) ? [partyOf(tr.by, 'by')] : undefined, src: 'poll:location' });
-      } else if (l.w === w && jump > C.polls.teleportUnits) {
+      } else if (l.w === w && jump > reach) {
         emit('move.teleport', a, { reason: 'unknown', dist: Math.round(jump) }, { src: 'poll:location', q: 'inferred' });
       }
       if (l.w !== w) {
@@ -1276,10 +1454,10 @@ module.exports = (K) => {
         l.w = w; l.pos = pos; l.t = t;
         l.zone = zoneFrom(w, pos, prevLoc); l.zpos = pos;
         const to = { w, cell: cellName(w), zone: l.zone };
-        const rec = !outdoors ? claimedInterior(a) : null;
-        if (rec) {
-          const ow = { own: 'owner', o: [ownerPartyOf(rec.owner, rec.ownerChar, 'owner')].filter(Boolean), rec };
-          emit('move.cell', a, { from, to, own: 'owner', access: accessOf(a, a, ow) }, { o: ow.o, p: 0, src: 'poll:location', q: 'inferred' });
+        const ci = !outdoors ? claimedInterior(a, w) : null;
+        if (ci) {
+          const ow = { own: 'owner', o: [ownerPartyOf(ci.rec.owner, ci.rec.ownerChar, 'owner')].filter(Boolean), rec: ci.rec };
+          emit('move.cell', a, { from, to, own: 'owner', access: accessOf(ci.root, a, ow) }, { o: ow.o, p: 0, src: 'poll:location', q: 'inferred' });
         } else emit('move.cell', a, { from, to }, { src: 'poll:location' });
         // a container session ends when its user leaves the cell
         const s = S.containers.get(a); if (s && s.w && s.w !== w) closeContainer(a, 'left');
@@ -1329,6 +1507,7 @@ module.exports = (K) => {
     for (const [id, c] of prev.cur) if (!cur.has(id)) emit('social.companion', a, { op: 'ended', kind: c.kind, base: recordName(c.base) }, { src: 'poll:companions' });
   };
   const slowTick = () => {
+    if (!S.on) return;
     const list = [...S.online];
     if (!list.length) return;
     const per = Math.max(1, Math.ceil(list.length / Math.max(1, Number(C.polls.slowSlices) || 12)));
@@ -1342,6 +1521,7 @@ module.exports = (K) => {
   };
   // AFK (30 s): the rounded position from the location poll's cache, no get
   const afkTick = () => {
+    if (!S.on) return;
     const t = now();
     for (const a of S.online) {
       const l = S.loc.get(a);
@@ -1360,17 +1540,11 @@ module.exports = (K) => {
   };
   // The minute (called from playerlog.js's minute tick): command info folds (5 min), owned NPCs, the faction storage map
   G.onMinute = (t) => {
-    for (const [k, f] of [...S.cmdInfoFold]) if (t - f.t >= 300000) { S.cmdInfoFold.delete(k); emit('cmd.info', f.a, { name: f.name, n: f.n }, { src: 'cmd' }); }
-    for (const [k, d] of [...S.accessDedupe]) if (t - d.t0 >= C.accessDedupeMs) accessLine(k, d);
-    // refused attempts that never became a fight (a god-moded target, a body that cannot be harmed): a disk record
-    for (const [k, r] of [...S.refusedPair]) {
-      if (t - r.t < 60000) continue;
-      S.refusedPair.delete(k);
-      const [A, T] = k.split('|').map(Number);
-      const who = online(A) ? A : online(T) ? T : 0;
-      if (!who) continue;
-      for (const [reason, n] of Object.entries(r.n)) emit('combat.refused', who, { reason, n, windowSec: Math.round((r.t - r.first) / 1000) }, { o: [partyOf(who === A ? T : A, who === A ? 'target' : 'attacker')], t: r.t, src: 'hook:combat' });
-    }
+    if (!S.on) return;
+    const over = overAt(closeDeadline());
+    // both made in time order and never moved: the first one not yet due ends its loop
+    for (const [k, f] of S.cmdInfoFold) { if (t - f.t < 300000 || over()) break; S.cmdInfoFold.delete(k); emit('cmd.info', f.a, { name: f.name, n: f.n }, { src: 'cmd' }); }
+    for (const [k, d] of S.accessDedupe) { if (t - d.t0 < C.accessDedupeMs || over()) break; accessLine(k, d); }
     try {
       const wb = globalThis.__dboWarband && globalThis.__dboWarband.owners;
       if (wb instanceof Map) for (const id of wb.keys()) add('ownedNpcs', u32(id));
@@ -1433,7 +1607,10 @@ module.exports = (K) => {
     const list = Array.isArray(grew) ? grew.slice(0, 12).map((g) => ({ b: String(g.base || ''), i: recordName(parseInt(g.base, 16)), pack: g.pack, cont: g.containers })) : [];
     if (!list.length) return;
     emit('item.relog', a, { grew: list }, { src: 'hook:relog' });
-    emit('sec.signal', a, { kind: 'relog_grew', n: list.length }, { src: 'hook:relog' });
+    // a security signal only when the pack itself grew: containers others can fill grow on their own (review C, recommended:
+    // all 13 relog lines of 9 h grew in containers only)
+    const packGrew = list.filter((g) => Array.isArray(g.pack) && Number(g.pack[1]) > Number(g.pack[0])).length;
+    if (packGrew) emit('sec.signal', a, { kind: 'relog_grew', n: packGrew }, { src: 'hook:relog' });
   };
   // h('dungeon', op, members[], dungeonName, difficulty, why): to every member
   H2.dungeon = (op, members, name, difficulty, why) => {
@@ -1441,7 +1618,9 @@ module.exports = (K) => {
     const parties = list.map((m) => partyOf(m, 'member')).filter(Boolean);
     for (const m of list) if (online(m)) emit('move.dungeon', m, { op, dungeon: String(name || ''), difficulty: difficulty ? String(difficulty) : undefined, members: parties, why: why ? String(why).replace(/[^A-Za-z0-9_:.-]/g, '').slice(0, 40) : undefined }, { src: 'hook:dungeon' });
   };
-  H2.party = (op, a, other, size) => emit('social.party', a, { op, size: Number(size) || undefined }, { o: other && isPlayer(other) ? [partyOf(other, 'other')] : undefined, src: 'hook:party' });
+  // the actor may be 0 (dungeons.js leavePartyNow looks the character up inside the hook's own call, so nothing is looked up
+  // with the player log off: safety review, LOW)
+  H2.party = (op, a, other, size) => { if (!u32(a)) return; emit('social.party', a, { op, size: Number(size) || undefined }, { o: other && isPlayer(other) ? [partyOf(other, 'other')] : undefined, src: 'hook:party' }); };
   H2.wake = (a, how, by, downMs) => { const x = u32(a); suppress(x); put('recentPair', `${x}|wake`, { t: now(), kind: 'wake', by: 0 }); emit('combat.wake', x, { how, downSec: downMs ? Math.round(downMs / 1000) : undefined }, { o: by && isPlayer(by) ? [partyOf(by, 'by')] : undefined, src: 'hook:wake' }); };
   H2.mask = (a, on) => { const x = u32(a); try { refreshId(x, false); } catch (e) { /* next refresh */ } emit('char.mask', x, { on: !!on }, { src: 'hook:mask' }); };
   H2.pmenu = (a, id, t) => { const action = String(id || ''); if (!action || action.startsWith('voice')) return; foldAdd('pmenu', a, action.replace(/[^A-Za-z0-9_:.-]/g, '').slice(0, 40), 1, { t: u32(t) }); };
@@ -1474,6 +1653,8 @@ module.exports = (K) => {
   H2.effect = (a, kind, pct) => {
     const x = u32(a);
     if (kind === 'sun') G.sunLive = true;
+    // an NPC staggered by combat.js is nobody's line (review C, recommended)
+    if (!online(x)) return;
     suppress(x);
     if (!EFFECTS.has(kind)) return;
     if (kind === 'sun') return;   // a suppression only: the sun is a vampire's daily cost, not an event worth a line
@@ -1497,9 +1678,11 @@ module.exports = (K) => {
     const x = u32(a), ref = u32(target);
     const v = String(verdict || '');
     const m = v.match(/^refused\(([a-z_]{1,20})\)/);
-    const op = v === 'win' ? 'picked' : v === 'fail' ? 'failed' : v === 'cancel' ? 'cancel' : m ? 'refused' : null;
+    // 'expired': a client lock that never reported (lockpick.js busy())
+    const op = v === 'win' ? 'picked' : v === 'fail' ? 'failed' : v === 'cancel' || v === 'expired' ? 'cancel' : m ? 'refused' : null;
     if (!op) return;
-    const why = m ? (LOCK_WHY.has(m[1]) ? m[1] : 'other') : undefined;
+    const why = m ? (LOCK_WHY.has(m[1]) ? m[1] : 'other') : v === 'expired' ? 'expired' : undefined;
+    if (op === 'picked') put('recentPair', `${x}|lock`, { t: now(), kind: 'lock', by: x });
     let own, o;
     if (ref) { const ow = ownershipOf(ref, x); own = ow.own; o = ow.o && ow.o.length ? ow.o : undefined; }
     if (op === 'picked' && ref) { put('lockPicks', `${x}|${ref}`, { t: now() }); const h = housingRecord(ref); if (h && h.primary) put('lockPicks', `${x}|${h.primary}`, { t: now() }); }
@@ -1511,10 +1694,21 @@ module.exports = (K) => {
   H2.signal = (a, game, why) => emit('sec.signal', a, { kind: 'minigame_refused', game: String(game || '').replace(/[^a-z_]/g, '').slice(0, 24) || 'other', why: SIGNAL_WHY.has(why) ? why : 'other' }, { src: 'hook:signal' });
   H2.itemflow = (a, kind, baseId, delta) => emit('item.flow', a, { kind, item: baseId ? itemOf(baseId, Math.abs(Number(delta) || 1)) : undefined, k: Number(delta) || undefined }, { src: 'hook:itemflow' });
 
-  // ---- the online set at load: players who were on before this generation (the state keeps them over a reload) -----------
-  try { for (const a of (typeof api.onlineActors === 'function' ? api.onlineActors() : []) || []) { const x = u32(a); if (x && !S.online.has(x)) { add('online', x); if (!S.sessions.has(x)) put('sessions', x, { t: now(), userId: undefined, gold0: undefined, bank0: undefined }); } } } catch (e) { err('load.online', e); }
-  // the online set never holds someone who left while this file was not loaded
-  try { const on = new Set(((typeof api.onlineActors === 'function' ? api.onlineActors() : []) || []).map(u32)); for (const a of [...S.online]) if (!on.has(a)) { S.online.delete(a); S.sessions.delete(a); } } catch (e) { err('load.online', e); }
+  // ---- the online set against the world: at load, and when capture comes back on (safety review R1) ------------------------
+  // Players who came on while this file was not loaded or capture was off get a session from now; those who left meanwhile
+  // are dropped (their logout was not seen, so none is written). After a time off, the polls' caches are stale: positions,
+  // health, restraints and idle spots are dropped and the first polls record them again without reading them as a move, a
+  // loss or a capture.
+  G.resync = (why) => {
+    let on = null;
+    try { on = new Set(((typeof api.onlineActors === 'function' ? api.onlineActors() : []) || []).map(u32).filter(Boolean)); } catch (e) { err('load.online', e); return; }
+    for (const x of on) if (!S.online.has(x)) { add('online', x); if (!S.sessions.has(x)) put('sessions', x, { t: now(), userId: undefined, gold0: undefined, bank0: undefined }); }
+    for (const a of [...S.online]) if (!on.has(a)) { S.containers.delete(a); forget(a); }
+    if (why === 'load' && !K.wasOff) return;
+    S.loc.clear(); S.vitals.clear(); S.restrained.clear(); S.afk.clear(); S.hpLossMerge.clear();
+    seedQuiet = true;
+  };
+  G.resync('load');
 
   // ---- the optional inventory diff (DESIGN.md 2.4 option B; playerLog.inventoryDiff, off by default) -------------------
   // One twelfth of the online players every slowMs, one inventory get each. A base whose count changed with no item event
@@ -1532,6 +1726,7 @@ module.exports = (K) => {
       }
     };
     const invTick = () => {
+      if (!S.on) return;
       const list = [...S.online];
       if (!list.length) return;
       const per = Math.max(1, Math.ceil(list.length / Math.max(1, Number(C.polls.slowSlices) || 12)));
@@ -1557,7 +1752,8 @@ module.exports = (K) => {
     };
     K.every('playerlogInvDiff', C.polls.slowMs, invTick);
   }
-  K.every('playerlogFast', C.polls.fastMs, () => { fastTick(); foldTick(now()); });
+  // one closing deadline for the fast poll's loops and the folds
+  K.every('playerlogFast', C.polls.fastMs, () => { if (!S.on) return; const end = closeDeadline(); fastTick(end); foldTick(now(), end); });
   K.every('playerlogLocation', C.polls.locationMs, locationTick);
   K.every('playerlogSlow', C.polls.slowMs, slowTick);
   K.every('playerlogAfk', C.polls.afkMs, afkTick);

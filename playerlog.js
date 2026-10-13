@@ -29,6 +29,9 @@ const DEFAULTS = {
   flushMs: 2000,
   flushBudgetMs: 4,
   auditBudgetMs: 2,
+  // the closing loops of the fast and minute polls (windows, fights, containers, folds) stop after this many ms and leave the
+  // rest to the next tick (safety review R3)
+  closeBudgetMs: 3,
   maxPerFlush: 2000,
   rollBytes: 536870912,
   exitFlushBytes: 5242880,
@@ -48,7 +51,7 @@ const DEFAULTS = {
   nearUnits: 3000,
   nearMax: 10,
   healthLoss: { minPct: 5, noHitMs: 2500, suppressMs: 5000, mergeMs: 30000, discord: false },
-  polls: { fastMs: 2000, locationMs: 5000, zoneMoveUnits: 1000, slowMs: 5000, slowSlices: 12, minuteMs: 60000, afkMs: 30000, afkMinutes: 10, teleportUnits: 3000, fallDz: 500 },
+  polls: { fastMs: 2000, locationMs: 5000, zoneMoveUnits: 1000, slowMs: 5000, slowSlices: 12, minuteMs: 60000, afkMs: 30000, afkMinutes: 10, teleportUnits: 3000, teleportSpeed: 1500, fallDz: 500 },
   snapshots: { logout: true, down: true },
   nameHash: false,
   inventoryDiff: false,
@@ -79,6 +82,9 @@ const CAPS = {
   doorDedupe: { cap: 2000, ttl: 60000 }, panelPending: { cap: 200, ttl: 10000 }, mastery: { cap: 500 }, companions: { cap: 500 },
   restrained: { cap: 500 }, pickupWatch: { cap: 500, ttl: 5000 }, deaths: { cap: 500, ttl: 60000 }, deathSeen: { cap: 2000, ttl: 120000 },
   invSnap: { cap: 500 }, invTouched: { cap: 500 },
+  // review fixes: the housing record a player saw when the property menu opened (C-R5); the cell -> place root map from the
+  // place records read at door and chest uses (C-R10); NPCs killed in the last seconds, so the killing blow opens no fight (C-R3)
+  propSnap: { cap: 500, ttl: 600000 }, placeCells: { cap: 2000 }, recentKills: { cap: 1000, ttl: 5000 },
 };
 const newState = () => {
   const S = { v: STATE_V, q: [], auditQ: [], errTimes: [], cmdStack: [], seq: 0, gen: '', on: false, enabled: false, stopped: false, broken: false,
@@ -114,6 +120,14 @@ module.exports = (api) => {
   delete require.cache[TAPS_JS];
   const R = require(RULES_JS);
 
+  // capture was off before this load (the STOP file, the breaker, enabled false, a failed load): what the polls cached then is
+  // stale, and the taps resync it silently instead of reading it as moves and losses (safety review R1). Read before the
+  // previous generation's uninstall, which turns capture off on its way out.
+  const prior0 = globalThis.__dboPlayerLog;
+  const wasOff = !!(prior0 && typeof prior0 === 'object' && prior0.v === STATE_V && prior0.on === false);
+  // no state from an earlier generation: the server process has just started, so every session the forwarder still holds
+  // open ended at a stop or a crash (sys.start{fresh}, review C-R6)
+  const fresh = !(prior0 && typeof prior0 === 'object');
   // The previous generation goes fully off before anything of this one is installed
   if (typeof globalThis.__dboPlogUninstall === 'function') { try { globalThis.__dboPlogUninstall('reload'); } catch (e) { log('player log: the previous generation did not uninstall:', e.message); } }
   globalThis.__dboPlogHook = null;
@@ -339,7 +353,15 @@ module.exports = (api) => {
     } catch (e) { /* no warband */ }
     return null;
   };
-  const partyOf = (a, role) => { const id = Number(a) >>> 0; if (!id) return null; return isPlayer(id) ? playerParty(id, role) : npcParty(id, role); };
+  // A known player (online, or in the identity cache) or a known NPC (its cached info) costs no get; only an unknown id has
+  // its profile read (safety review R3: an NPC's profile read on every closed window and fight was most of the fast poll)
+  const partyOf = (a, role) => {
+    const id = Number(a) >>> 0;
+    if (!id) return null;
+    if (S.online.has(id) || S.ids.has(id)) return playerParty(id, role);
+    if (S.npcInfo.has(id)) return npcParty(id, role);
+    return isPlayer(id) ? playerParty(id, role) : npcParty(id, role);
+  };
 
   // ---- near lists (DESIGN.md 2.2.10): from the location poll's cache, no native get --------------------------------------
   const nearOf = (a) => {
@@ -559,7 +581,7 @@ module.exports = (api) => {
       if (level !== S.diskLevel) log(`player log: disk free ${free.toFixed(1)} GB, level ${level}`);
       S.diskLevel = level;
       if (S.enospc && free >= g.stop) { S.enospc = false; log('player log: disk space is back, writing again'); }
-    }, (e) => err('fs.statfs', e));
+    }, (e) => { if (e && e.code === 'ENOENT') return; err('fs.statfs', e); });   // before the first flush made the folder
   };
   // The STOP file (DESIGN.md 3.9): touch it and capture stops within 30 s; remove it and capture resumes. Skipped while busy.
   const stopCheck = () => {
@@ -567,6 +589,8 @@ module.exports = (api) => {
     if (!p) return;
     p.then(() => true, () => false).then((present) => {
       if (present === S.stopped) return;
+      // resumed: the online set and the polls' caches are brought back to the world first (safety review R1)
+      if (!present && typeof G.resync === 'function') { try { G.resync('resume'); } catch (e) { err('resync', e); } }
       S.stopped = present; setOn();
       log(`player log: ${present ? 'STOP file present, capture off' : 'STOP file gone, capture on'}`);
       if (present) sysEvent('sys.stop', { reason: 'stopfile' });
@@ -587,35 +611,74 @@ module.exports = (api) => {
   };
 
   // ---- the exit flush (DESIGN.md 3.10): the only sync IO; after the game's own saves --------------------------------------
+  // Each generation sets globalThis.__dboPlogFlushSync, and the one chain installed on __dboFlushOnExit calls the latest, so
+  // the exit flush runs this generation's code. What it writes, in order: the queue, then a session.logout{server_stop} for
+  // each session still open (review C-R6: from the cached identity and place, no native get at exit), then a sys.dropped for
+  // queue lines over exitFlushBytes, then sys.stop{sigterm}. The tail always fits: the queue fills what room is left (safety
+  // review, LOW: the stop marker was the line cut).
   const plogFlushSync = () => {
     const St = globalThis.__dboPlayerLog;
     if (!St || !St.dir) return;
     try {
       const sfs = require('fs');
       try { if (St === S && G.parseAudits) G.parseAudits(Infinity); } catch (e) { /* the queue as it is */ }
-      const stop = { v: R.VERSION, t: Date.now(), ev: 'sys.stop', p: -1, f: { reason: 'sigterm' }, src: 'sys', g: St.gen, s: ++St.seq };
-      const recs = [...(St.inflight || []), ...St.q, stop];
-      const parts = [St.needNewline || St.writing ? '\n' : ''];
-      let size = 0;
-      for (const rec of recs) {
-        let v = null; try { v = R.validate(rec, null, null); } catch (e) { v = null; }
-        if (!v) continue;
-        const line = JSON.stringify(v) + '\n';
-        size += line.length;
-        if (size > C.exitFlushBytes) break;
-        parts.push(line);
+      const t = now();
+      const sys = (ev, f) => ({ v: R.VERSION, t, ev, p: -1, f, src: 'sys', g: St.gen, s: ++St.seq });
+      const toLine = (rec) => { let v = null; try { v = R.validate(rec, null, null); } catch (e) { v = null; } return v ? JSON.stringify(v) + '\n' : ''; };
+      const tail = [];
+      if (St === S && S.on && isOn('session.logout')) {
+        for (const [a, sess] of S.sessions) {
+          const r = S.ids.get(a);
+          if (!r || !sess) continue;
+          const rec = { v: R.VERSION, t, ev: 'session.logout', p: r.p, a: hex(a), src: 'sys:exit', g: St.gen, s: ++St.seq,
+            f: { reason: 'server_stop', sec: Number(sess.t) > 0 ? Math.max(0, Math.round((t - sess.t) / 1000)) : undefined, gold0: sess.gold0, bank0: sess.bank0 } };
+          if (r.c) rec.c = r.c;
+          if (r.n) rec.n = r.n;
+          if (r.sn) rec.sn = r.sn;
+          if (r.d) rec.d = r.d;
+          const l = S.loc.get(a);
+          if (l && l.w) {
+            const cell = S.recordCache.get(`w:${l.w}`);
+            rec.at = { w: l.w, cell: typeof cell === 'string' ? cell : undefined, zone: l.zone || undefined };
+            if (Array.isArray(l.pos)) { rec.at.x = Math.round(l.pos[0]); rec.at.y = Math.round(l.pos[1]); rec.at.z = Math.round(l.pos[2]); }
+          }
+          const line = toLine(rec);
+          if (line) tail.push(line);
+          if (tail.length >= 500) break;
+        }
       }
-      const day = new Date().toISOString().slice(0, 10);
+      const stopLine = toLine(sys('sys.stop', { reason: 'sigterm' }));
+      const room = Number(C.exitFlushBytes) - tail.reduce((n, l) => n + l.length, 0) - stopLine.length - 4096;
+      const parts = [St.needNewline || St.writing ? '\n' : ''];
+      const cut = {};
+      let size = 0, over = false, ncut = 0;
+      for (const rec of [...(St.inflight || []), ...St.q]) {
+        if (!over) {
+          const line = toLine(rec);
+          if (!line) continue;
+          if (size + line.length <= room) { size += line.length; parts.push(line); continue; }
+          over = true;
+        }
+        // over the room: counted by type, never validated (the exit is not the place for 300 ms of work)
+        const k = /^[A-Za-z0-9_.:-]{1,40}$/.test(String(rec && rec.ev)) ? String(rec.ev) : 'other';
+        if (cut[k] !== undefined || Object.keys(cut).length < 40) cut[k] = (cut[k] || 0) + 1;
+        ncut++;
+      }
+      parts.push(...tail);
+      if (ncut) parts.push(toLine(sys('sys.dropped', { reason: 'cap', counts: cut })));
+      parts.push(stopLine);
+      const day = new Date(t).toISOString().slice(0, 10);
       const file = St.file && St.file.day === day ? fileName(day, St.file.roll) : fileName(day, 0);
       try { sfs.mkdirSync(St.dir, { recursive: true, mode: 0o700 }); } catch (e) { /* it is there */ }
       sfs.appendFileSync(file, parts.join(''), { mode: 0o600 });
       St.q.length = 0;
     } catch (e) { try { log('player log: the exit flush failed', e.message); } catch (x) { /* exiting */ } }
   };
+  globalThis.__dboPlogFlushSync = plogFlushSync;
   const chainExit = () => {
     const base = globalThis.__dboFlushOnExit;
     if (typeof base === 'function' && base.__dboPlogFlush) return;
-    const chained = () => { try { if (typeof base === 'function') base(); } finally { plogFlushSync(); } };
+    const chained = () => { try { if (typeof base === 'function') base(); } finally { const f = globalThis.__dboPlogFlushSync; if (typeof f === 'function') f(); } };
     chained.__dboPlogFlush = true;
     // The markers of the chains already on it (appearanceextras.js, racemenupresets.js), so they do not chain twice
     if (typeof base === 'function') for (const k of Object.keys(base)) if (k.startsWith('__dbo') && k !== '__dboPlogFlush') chained[k] = base[k];
@@ -681,18 +744,38 @@ module.exports = (api) => {
   globalThis.__dboPlogUninstall = uninstall;
 
   // ---- disabled: write what is queued once, close the file, install nothing ---------------------------------------------------
+  // The drain (safety review R2): a write in flight is waited for (never given up on, which left the queue and the stop marker
+  // unwritten), each step has the flush tick's own time box, and the whole drain stops after drainGiveUpMs, logged once
   if (!S.enabled) {
     S.on = false;
     sysEvent('sys.stop', { reason: 'disabled' });
-    const drain = () => {
-      if (S.writing || !S.q.length) { closeFile(); return; }
-      if (!S.dirReady) { ensureDir(); setTimeout(guard('disabled.drain', drain), 1000); return; }
-      if (!S.file || !S.file.fh) { const p = openDay(dayOf(now())); if (p) p.then(() => setTimeout(guard('disabled.drain', drain), 0), (e) => err('fs.open', e)); else setTimeout(guard('disabled.drain', drain), 1000); return; }
-      const b = takeBatch(perf(), Infinity);
+    const started = now();
+    let steps = 0;
+    const later = (ms) => setTimeout(guard('disabled.drain', drain), ms);
+    const giveUpMs = Number(C.drainGiveUpMs) > 0 ? Number(C.drainGiveUpMs) : 60000;
+    function drain() {
+      if (now() - started > giveUpMs || ++steps > 5000) {
+        log(`player log: disabled; the last write of the queue stopped after ${Math.round((now() - started) / 1000)} s with ${S.q.length} events left`);
+        if (!S.writing) closeFile();
+        return;
+      }
+      if (S.writing) { later(250); return; }
+      if (!S.q.length) { closeFile(); return; }
+      if (S.enospc || S.diskLevel === 'stop') { later(1000); return; }
+      if (!S.dirReady) { ensureDir(); later(1000); return; }
+      const want = dayOf(Math.min(Number(S.q[0].t) || now(), now()));
+      if (!S.file || !S.file.fh || S.file.day < want || S.file.bytes >= C.rollBytes) {
+        if (S.file && S.file.fh) { closeFile(); later(250); return; }
+        const p = openDay(want);
+        if (p) p.then(() => later(0), (e) => { if (e && e.code === 'ENOENT') S.dirReady = false; err('fs.open', e); later(1000); }); else later(250);
+        return;
+      }
+      const b = takeBatch(perf(), Math.max(0.5, Number(C.flushBudgetMs) - 1));
       S.q.splice(0, b.taken);
-      if (b.recs.length && writeBatch(b)) setTimeout(guard('disabled.drain', drain), 1000); else closeFile();
-    };
-    setTimeout(guard('disabled.drain', drain), 0);
+      if (b.recs.length) writeBatch(b);
+      later(b.recs.length ? 50 : 0);
+    }
+    later(0);
     globalThis.__dboPlogUninstall = null;
     log('player log: disabled (playerLog.enabled false); hooks off, the queue written once');
     return { S, C, R, disabled: true };
@@ -700,7 +783,7 @@ module.exports = (api) => {
 
   // ---- the core API for the taps ------------------------------------------------------------------------------------------------
   const K = { api, mp, log, C, R, S, G, CAPS, now, perf, err, guard, put, add, emit, sysEvent, isOn, idOf, refreshId, readId, isPlayer, profileOf, partyOf,
-    playerParty, npcParty, ownerOfNpc, placeOf, nearOf, recordName, recordType, itemOf, descOf, cellName, hex, get, wrapSlot, every, words, flushTick };
+    playerParty, npcParty, ownerOfNpc, placeOf, nearOf, recordName, recordType, itemOf, descOf, cellName, hex, get, wrapSlot, every, words, flushTick, wasOff };
   let installed = 0;
   try {
     const taps = require(TAPS_JS);
@@ -735,7 +818,7 @@ module.exports = (api) => {
   hook.__gen = G.gen;
   setOn();
   globalThis.__dboPlogHook = hook;
-  sysEvent('sys.start', { gen: S.gen, ver: CORE_VERSION, cfg: R.siteHash(JSON.stringify(C)), hooks: installed + Object.keys(G.hooks).length, why: 'load' });
+  sysEvent('sys.start', { gen: S.gen, ver: CORE_VERSION, cfg: R.siteHash(JSON.stringify(C)), hooks: installed + Object.keys(G.hooks).length, why: 'load', fresh: fresh || undefined });
   // A first check of the STOP file and the disk at once, not after the first interval
   setTimeout(guard('playerlogStop', stopCheck), 0);
   setTimeout(guard('playerlogDisk', diskCheck), 0);

@@ -18,7 +18,11 @@
 const VERSION = 1;
 
 // ---- clean(): every string that reaches the disk ----------------------------------------------------------------------
-const RX_CTRL = /[\u0000-\u001f\u007f-\u009f\u2028\u2029\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff]+/g;
+// Control characters and line breaks become a space; the invisible format characters are taken out, so one placed inside an
+// address or an @everyone cannot split it past the patterns below (review P-R7: the soft hyphen, the Hangul fillers, the word
+// joiners, the variation selectors and the tag block U+E0000-E007F, a surrogate pair here since these patterns have no u flag)
+const RX_CTRL = /[\u0000-\u001f\u007f-\u009f\u2028\u2029]+/g;
+const RX_INVIS = /(?:[\u00ad\u034f\u115f\u1160\u180e\u200b-\u200f\u202a-\u202e\u2060-\u2064\u2066-\u2069\u3164\ufe00-\ufe0f\ufeff\uffa0]|\udb40[\udc00-\udc7f])+/g;
 const RX_IPV4 = /(?<![\d.])\d{1,3}(?:\.\d{1,3}){3}(?![\d.])/g;
 // IPv6: a run of hex groups with "::" or with three colons or more (a time "14:30:05" has two, a desc "a764b:X.esm" one)
 const RX_V6 = /(?<![0-9a-z:])[0-9a-f]{0,4}(?::[0-9a-f]{0,4}){2,7}(?:(?<=:)\d{1,3}(?:\.\d{1,3}){3})?(?![0-9a-z:])/gi;
@@ -26,14 +30,20 @@ const RX_URL = /\b(?:[a-z][a-z0-9+.-]{1,9}:\/\/|www\.)[^\s<>"]*|\b[a-z0-9-]{1,63
 const RX_MAIL = /[a-z0-9._%+-]{1,64}@[a-z0-9-]{1,63}(?:\.[a-z0-9-]{1,63})+/gi;
 const RX_MENTION = /<(?:@[!&]?|#|a?:\w{1,32}:)\d{0,22}>/g;
 const RX_EVERYONE = /@(everyone|here)\b/gi;
+// The forwarder's token shapes (scrub.py TOKEN and LONGHEX): a bot token, and a run of 32 hex digits or more
+const RX_TOKEN = /[A-Za-z0-9_-]{23,28}\.[A-Za-z0-9_-]{6,7}\.[A-Za-z0-9_-]{27,}|mfa\.[A-Za-z0-9_-]{60,}/g;
+const RX_LONGHEX = /\b[0-9a-f]{32,}\b/gi;
 const clean = (v, max) => {
   if (v === undefined || v === null) return '';
   let s = typeof v === 'string' ? v : String(v);
   if (s.length > 4096) s = s.slice(0, 4096);
-  s = s.replace(RX_CTRL, ' ')
+  s = s.replace(RX_INVIS, '')
+    .replace(RX_CTRL, ' ')
+    .replace(RX_TOKEN, '[token]')
     .replace(RX_MAIL, '[email]')
     .replace(RX_URL, '[link]')
     .replace(RX_IPV4, '[ip]')
+    .replace(RX_LONGHEX, '[token]')
     .replace(RX_V6, (m) => ((m.match(/:/g) || []).length >= 3 || m.includes('::') ? '[ip]' : m))
     .replace(RX_MENTION, '[mention]')
     .replace(RX_EVERYONE, '@ $1')
@@ -98,7 +108,8 @@ const REFUSAL_REASONS = ['god', 'ethereal', 'offline_body', 'login_grace', 'boun
 const T = (p, place, f, opts) => Object.assign({ p, place: place || '', near: false, on: true, f }, opts || {});
 const EVENT_TYPES = {
   // meta
-  'sys.start': T(0, '', { gen: 'gen', ver: 'code', cfg: 'hex', hooks: 'int', why: E('load', 'resume') }),
+  // fresh: the state was new, so the server process started (after a stop or a crash), not a hot reload (review C-R6)
+  'sys.start': T(0, '', { gen: 'gen', ver: 'code', cfg: 'hex', hooks: 'int', why: E('load', 'resume'), fresh: 'bool' }),
   'sys.stop': T(0, '', { reason: E('disabled', 'stopfile', 'sigterm', 'errors', 'load_failed') }),
   'sys.error': T(0, '', { site: 'code', n: 'int', cls: 'code' }),
   'sys.dropped': T(0, '', { reason: E('cap', 'disk_low', 'write_error', 'enospc', 'off'), counts: COUNTS }),
@@ -201,7 +212,7 @@ const EVENT_TYPES = {
   'social.nobility': T(1, '', { op: E('grant', 'revoke') }),
   'social.realm': T(1, '', { op: E('tax_rate', 'wage', 'forgave_wages', 'assessed', 'bought_from_hold', 'war_declared', 'death_accept', 'death_refuse', 'peace_offer', 'peace_refuse',
     'treaty_offer', 'treaty_accept', 'treaty_refuse', 'capital', 'war_kill', 'raid_start'), pct: 'int', gold: 'int', war: 'code', weeks: 'int', ref: 'hex', fief_holder: 'bool' }),
-  'social.housing': T(1, '', { op: E('claim', 'abandon', 'revoke', 'lock', 'unlock', 'rename', 'cut_key', 'take_key', 'rekey', 'transfer', 'grant', 'assign', 'unassign', 'share', 'unshare', 'staff_override', 'other'), property: 'hex', ok: 'bool' }),
+  'social.housing': T(1, '', { op: E('claim', 'abandon', 'revoke', 'lock', 'unlock', 'rename', 'cut_key', 'take_key', 'rekey', 'transfer', 'grant', 'grant_container', 'assign', 'unassign', 'share', 'unshare', 'staff_override', 'other'), property: 'hex', ok: 'bool' }),
   'social.property': T(1, '', { op: E('list', 'unlist', 'interest', 'offer', 'accept', 'rent', 'buy', 'sell', 'pay', 'leave', 'evict', 'grace', 'remind', 'fief', 'overdue', 'lapsed', 'treasury'), key: 'code', gold: 'int' }),
   'social.rest': T(2, '', { op: E('rent', 'keep', 'unkeep', 'sleep', 'wake', 'collect'), bed: 'code', gold: 'int' }),
   'social.business': T(1, '', { op: E('open', 'note', 'rent', 'chest', 'collect', 'ledger', 'staff_add', 'staff_remove', 'rename', 'close', 'archive'), claim: 'hex', gold: 'int' }),
@@ -215,7 +226,10 @@ const EVENT_TYPES = {
   'social.charter': T(1, '', { op: E('draft', 'pitch_set', 'seat', 'kind', 'invite', 'confirm', 'leave', 'submit', 'withdraw', 'approve', 'deny', 'edit', 'dissolve', 'disband_ask', 'disband_ok', 'disband_no', 'paid', 'lapsed', 'other'), number: 'int', gold: 'int' }),
   'social.lock': T(1, '', { op: E('picked', 'failed', 'cancel', 'refused'), why: E('fast', 'far', 'expired', 'superseded', 'inconsistent', 'replay', 'nonce', 'other'), snaps: 'int', level: 'int', target: 'hex', own: OWN }),
   'sec.signal': T(0, '', { kind: E('minigame_refused', 'mismatch', 'console_blocked', 'relog_grew', 'movement_refused', 'lockpick_refused'), game: 'code',
-    why: E('fast', 'far', 'replay', 'nonce', 'expired', 'superseded', 'inconsistent', 'speed', 'tries', 'other'), n: 'int', nums: O({ dxy: 'num', dz: 'num', speed: 'num', budget: 'num', enforced: 'bool' }) }),
+    // the minigame judges' own refusal codes (gamemode.js reading and skinning, labour.js, minigames.js, prayer.js, struggle.js)
+    why: E('fast', 'far', 'replay', 'nonce', 'expired', 'superseded', 'inconsistent', 'speed', 'tries', 'attempts', 'clock', 'flood', 'range', 'order', 'extra',
+      'submit', 'future', 'late', 'mismatch', 'malformed', 'cooldown', 'away', 'count', 'early', 'faltered', 'overlap', 'overtime', 'parse', 'precise', 'released',
+      'rested', 'shape', 'slow', 'stall', 'other'), n: 'int', nums: O({ dxy: 'num', dz: 'num', speed: 'num', budget: 'num', enforced: 'bool' }) }),
   // commands, console and staff
   'cmd.run': T(1, '', { name: 'code', sub: 'code', nums: A('num', 3), route: E('chat', 'upanel', 'journal', 'quiet', 'xmenu', 'warband'), outcome: E('ok', 'refused', 'error', 'async'), via: E('alias', 'nested'), mirror: 'bool' }),
   'cmd.info': T(2, '', { name: 'code', n: 'int' }),
@@ -257,7 +271,7 @@ const value = (kind, v, path, dropped) => {
     const out = {}; let n = 0;
     for (const [k, c] of (v instanceof Map ? v.entries() : Object.entries(v))) {
       if (n >= 40) break;
-      if (!/^[A-Za-z0-9_.:-]{1,40}$/.test(k)) { bump(dropped, `${path}.?`); continue; }
+      if (!/^[A-Za-z0-9_.:-]{1,40}$/.test(k)) { bump(dropped, `${path}._bad`); continue; }
       const x = toInt(c); if (x === undefined) continue;
       out[k] = x; n++;
     }
@@ -289,7 +303,7 @@ const TOP = { v: 'int', t: 'int', g: 'gen', s: 'int', ev: 'code', p: 'int', c: '
 const validate = (rec, dropped, unknownTypes) => {
   if (!rec || typeof rec !== 'object') return null;
   const spec = typeOf(rec.ev);
-  if (!spec) { bump(unknownTypes, /^[a-z_.*A-Z-]{1,40}$/.test(String(rec.ev)) ? String(rec.ev) : '?'); return null; }
+  if (!spec) { bump(unknownTypes, /^[a-z_.*A-Z-]{1,40}$/.test(String(rec.ev)) ? String(rec.ev) : '_bad'); return null; }
   const out = {};
   for (const k of Object.keys(rec)) {
     if (k === 'f') continue;
@@ -394,12 +408,22 @@ clean_('LABOUR-MISMATCH LOCKPICK-MISMATCH PRAYER-MISMATCH RITE-MISMATCH SKINNING
 // The role maps (Appendix A: "the first party is the actor" is wrong for these)
 AUDIT_VERBS.SMITH = { cls: 'clean', roles: R_BY([[/ made $/, 'target'], [/ (?:by|from) (?:staff )?$/, 'staff']]) };
 AUDIT_VERBS.SPELL.roles = R_BY([[/ taught $/, 'student']]);
-AUDIT_VERBS.REVIVE.roles = R_BY([[/ by $/, 'by']]);
-AUDIT_VERBS.CHILL.roles = R_BY([[/ by $/, 'by']]);
+// REVIVE <revived> by <reviver> (downed.js:468), CHILL <woken> lifted by <lifter> (:287): the one who acted is the actor
+// and the other the target, so the marks read the right way round (review C, recommended); "by nobody" leaves the revived
+// player as the only party, and so the actor
+const BY_ACTS = new RegExp(`(?: by )${NAME_WORDS}`);
+AUDIT_VERBS.REVIVE.roles = (i, pre) => (BY_ACTS.test(pre) ? 'actor' : 'target');
+AUDIT_VERBS.CHILL.roles = (i, pre) => (BY_ACTS.test(pre) ? 'actor' : 'target');
 AUDIT_VERBS.EXECUTION.roles = R_BY([[/ by $/, 'by'], [/ of $/, 'victim'], [/beheads $/, 'victim'], [/: $/, 'actor']]);
 AUDIT_VERBS.UNSTUCK.roles = R_BY([[/ staff $/, 'staff']]);
 AUDIT_VERBS.BOOST.roles = R_BY([[/ (?:extended|granted) $/, 'target']]);
 AUDIT_VERBS.CONCORDAT.roles = R_BY([[/-> $/, 'target'], [/ arrested $/, 'target'], [/ jailed $/, 'target']]);
+// CONCORDAT ARREST <who> (<rank title>) arrested ...: the title is m.shown || m.title (thalmor.js:144), a rank name the
+// faction's leader can rename (guilds.js editRanks), so text a player wrote; the group after the first party goes
+// (privacy review P-R5). The template is unchanged, so its AUDIT_SITES pin stays
+AUDIT_VERBS.CONCORDAT.cut = (text) => text.replace(/^(CONCORDAT ARREST (?:[^\s#()]+ ){0,5}?[^\s#()]+ #[A-Z0-9?]{4} \(profile -?\d{1,9}(?:, <@\d{1,22}>)?\)) \([^()]*\)/, '$1');
+// CHAMPION <champion> in <zone> killed by <display(), ...>: Name #TAG parties with no profile (review C, recommended)
+AUDIT_VERBS.CHAMPION.display = true;
 AUDIT_VERBS.JAIL.roles = R_BY([[/ imprisoned $/, 'target'], [/ to $/, 'target']]);
 AUDIT_VERBS.BEAST.roles = R_BY([[/ (?:to|from) $/, 'target']]);
 AUDIT_VERBS.FEED.roles = R_BY([[/ asked $/, 'target'], [/ let $/, 'target'], [/ refused $/, 'target']]);
@@ -856,8 +880,9 @@ const auditVerbOf = (body) => {
   const m = s.match(/^([A-Z][A-Z0-9-]{1,30})(?=[\s:]|$)/);
   return m ? m[1] : null;
 };
-// A verb is counted by name only when it has the shape of one from code (upper case); anything else counts as '?'
-const unknownVerbKey = (body) => { const m = String(body || '').match(/^([A-Z][A-Z0-9-]{1,23})(?=[\s:]|$)/); return m ? m[1] : '?'; };
+// A verb is counted by name only when it has the shape of one from code (upper case); anything else counts as '_other'
+// ('?' was a key COUNTS refuses, so sys.schema wrote itself again every minute: safety review, LOW)
+const unknownVerbKey = (body) => { const m = String(body || '').match(/^([A-Z][A-Z0-9-]{1,23})(?=[\s:]|$)/); return m ? m[1] : '_other'; };
 // body -> { verb, cls, events, parties, roles }. A parser that throws gives no event (counted by the caller as an error).
 const parseAudit = (body) => {
   const raw = String(body || '').slice(0, 600);
@@ -873,8 +898,10 @@ const parseAudit = (body) => {
   const roles = P.map((p, i) => (def.roles ? def.roles(i, p.pre) : i === 0 ? 'actor' : 'other'));
   if (def.cls === 'clean') {
     if (!P.length) return { verb, cls: 'clean', events: [], parties: P, roles };
-    // identity normalised: "(profile N, <@id>)" goes, the name and #TAG stay; quoted text is already "…"
-    const norm = text.replace(/ \(profile -?\d{1,9}(?:, <@\d{1,22}>)?\)/g, '');
+    // identity normalised: "(profile N, <@id>)" goes, the name and #TAG stay; quoted text is already "…". The verb goes too:
+    // the forwarder prints it after the actor (review C-R4); the actor's own "Name #TAG" at the start is cut in the taps,
+    // where the character's real name is known
+    const norm = text.replace(/ \(profile -?\d{1,9}(?:, <@\d{1,22}>)?\)/g, '').slice(verb.length).replace(/^[\s:]+/, '');
     let actor = roles.indexOf('actor'); if (actor < 0) actor = 0;
     const events = [ev(`act.${verb}`, actor, { text: norm }, P.map((p, i) => [i, roles[i]]).filter(([i]) => i !== actor))];
     if (def.signal) events.push(ev('sec.signal', actor, { kind: def.signal, game: verb.replace(/-MISMATCH$/, '').toLowerCase() }));
@@ -1013,23 +1040,32 @@ const REFUSAL_RX = /\b(cannot|can't|can not|not allowed|too far|get closer|refus
 const CONSOLE_VERBS = new Set(['additem', 'equipitem', 'placeatme', 'disable', 'enable', 'markfordelete', 'mp', 'tgm', 'tcl', 'tai', 'tfc', 'setav', 'modav',
   'forceav', 'player', 'coc', 'cow', 'moveto', 'kill', 'resurrect', 'unlock', 'lock', 'setstage', 'additemmenu', 'removeallitems', 'setlevel', 'advlevel', 'psb', 'tmm', 'tg', 'tm']);
 // The client packets the packet tap reads, and the only fields read of each (no name, reason or zone text)
+// The shapes are the fork's own (review C-R2, C-R5, C-R7): searchSystem.ts {requestId, accepted}; housingSystem.ts reads
+// propertyInfoRequest {target} when the menu opens; the client's companionService.ts sends {action, targetId|companionId}.
+// craftedExtras ({workbench, gained, lost}, client claims the server may refuse) is not read: phase B.
 const PACKET_TYPES = {
   characterSelectMenuRequest: [],
   characterSelectResult: ['action', 'slot'],
+  propertyInfoRequest: ['target'],
   propertyRequest: ['action', 'target', 'recipient'],
-  companionCommand: ['command', 'target'],
+  companionCommand: ['action'],
   captureRequest: ['target'],
   searchRequest: ['target'],
-  searchConsentResult: ['target', 'accepted'],
+  searchConsentResult: ['accepted'],
   adminAction: ['action', 'target', 'mode', 'amount', 'hours', 'item', 'count', 'skill', 'tier', 'kind', 'school', 'level'],
-  craftedExtras: ['baseId', 'kind'],
 };
-const PROPERTY_ACTIONS = new Set(['claim', 'abandon', 'revoke', 'lock', 'unlock', 'rename', 'cut_key', 'cutKey', 'take_key', 'takeKey', 'rekey', 'transfer', 'grant',
-  'assign', 'unassign', 'share', 'unshare', 'staff_override', 'staffOverride']);
-const COMPANION_COMMANDS = new Set(['follow', 'stay', 'attack', 'dismiss', 'release', 'wait', 'trade', 'spawn']);
-const ADMIN_ACTIONS = new Set(['teleport', 'teleportTo', 'summon', 'kick', 'kill', 'ban', 'unban', 'tempban', 'deleteCharacter', 'rename', 'toggleMode', 'spawnItem',
-  'giveItem', 'giveSpells', 'giveShouts', 'giveSpell', 'masteryGrant', 'masteryReset', 'masterySetTier', 'masteryDrop', 'setSchool', 'giveDisease', 'beastForm',
-  'addNpcZone', 'deleteNpcZone', 'resetNpcZone', 'teleportNpcZone', 'teleportLocation', 'heal', 'revive', 'freeze', 'unfreeze', 'mute', 'unmute']);
+// housingSystem.ts onPropertyRequest's actions -> the social.housing op
+const PROPERTY_ACTIONS = new Map([['claim', 'claim'], ['abandon', 'abandon'], ['revoke', 'revoke'], ['lock', 'lock'], ['unlock', 'unlock'], ['rename', 'rename'],
+  ['createkey', 'cut_key'], ['takekey', 'take_key'], ['revokekeys', 'rekey'], ['transfer', 'transfer'], ['grantcontainer', 'grant_container'],
+  ['assign', 'assign'], ['unassign', 'unassign'], ['share', 'share'], ['unshare', 'unshare']]);
+const COMPANION_COMMANDS = new Set(['follow', 'stay', 'attack', 'dismiss', 'release', 'wait', 'trade', 'spawn', 'perks']);
+// adminSystem.ts's actions, as its handler compares them (anything else is 'other')
+const ADMIN_ACTIONS = new Set(['teleportTo', 'teleportLoc', 'summon', 'kick', 'kill', 'ban', 'ipBan', 'tempBan', 'unban', 'deleteCharacter', 'rename', 'toggleMode',
+  'giveItem', 'giveSpells', 'giveShouts', 'giveWerewolf', 'giveVampireLord', 'giveDisease', 'beastForm', 'setSchool', 'masteryGrant', 'masteryReset',
+  'masterySetTier', 'masteryDrop', 'npcZoneAdd', 'npcZoneDelete', 'npcZoneReset', 'npcZoneTp']);
+// The panel actions whose target is an online player's actor id, sent as hex (adminSystem.ts parseInt(target, 16))
+const ADMIN_ACTOR_TARGET = new Set(['teleportTo', 'summon', 'kick', 'kill', 'ban', 'ipBan', 'tempBan', 'deleteCharacter', 'rename', 'masteryGrant', 'masteryReset',
+  'masterySetTier', 'masteryDrop', 'giveItem', 'giveSpells', 'giveShouts', 'giveWerewolf', 'giveVampireLord', 'giveDisease', 'beastForm', 'setSchool']);
 
 // ---- the pinned audit call sites --------------------------------------------------------------------------------------------
 // "file verb hash class", one per audit( call with a literal template. tests/playerlog-audit-harness.js scans every non-test
@@ -1479,5 +1515,5 @@ module.exports = {
   VERSION, EVENT_TYPES, typeOf, clean, validate, REFUSAL_REASONS, AUDIT_SITES, siteHash,
   AUDIT_VERBS, auditVerbOf, parseAudit, unquote, partiesOf, itemsFromText, namesFromText,
   parseTradeSummary, parseClientVersion,
-  CHAT_VERBS, COMMAND_SCHEMA, REFUSAL_RX, CONSOLE_VERBS, PACKET_TYPES, PROPERTY_ACTIONS, COMPANION_COMMANDS, ADMIN_ACTIONS,
+  CHAT_VERBS, COMMAND_SCHEMA, REFUSAL_RX, CONSOLE_VERBS, PACKET_TYPES, PROPERTY_ACTIONS, COMPANION_COMMANDS, ADMIN_ACTIONS, ADMIN_ACTOR_TARGET,
 };

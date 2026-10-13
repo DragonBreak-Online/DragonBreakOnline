@@ -46,14 +46,20 @@ const makeMp = () => {
   return { mp, props, records, users, S, player, npc, record, ref, desc };
 };
 
-// fs.promises in memory. ctl: { delayMs, stall: kinds stalled for ever, shortBytes: at most this many per write, failAt: fail a
-// write once this many bytes of the file have gone, failCode, freeGb }
+// fs.promises in memory. ctl: { delayMs, stall: kinds stalled for ever, hold: kinds held until ctl.release(), shortBytes: at most
+// this many per write, failAt: fail a write once this many bytes of the file have gone, failCode, freeGb }
 const makeFs = () => {
   const files = new Map();
-  const ctl = { stall: new Set(), shortBytes: 0, failAt: -1, failCode: 'EIO', freeGb: 50, pending: 0, maxPending: 0, calls: [], writes: 0 };
+  const ctl = { stall: new Set(), hold: new Set(), held: [], shortBytes: 0, failAt: -1, failCode: 'EIO', freeGb: 50, pending: 0, maxPending: 0, calls: [], writes: 0 };
+  // the calls held so far go through now
+  ctl.release = () => { for (const go of ctl.held.splice(0)) go(); };
   const track = (kind, fn) => {
     ctl.calls.push(kind);
     if (ctl.stall.has(kind)) { ctl.pending++; ctl.maxPending = Math.max(ctl.maxPending, ctl.pending); return new Promise(() => {}); }
+    if (ctl.hold.has(kind)) {
+      ctl.pending++; ctl.maxPending = Math.max(ctl.maxPending, ctl.pending);
+      return new Promise((res, rej) => ctl.held.push(() => { Promise.resolve().then(fn).then(res, rej).finally(() => { ctl.pending--; }); }));
+    }
     ctl.pending++; ctl.maxPending = Math.max(ctl.maxPending, ctl.pending);
     return Promise.resolve().then(fn).finally(() => { ctl.pending--; });
   };
