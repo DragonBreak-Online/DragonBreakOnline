@@ -34,8 +34,12 @@ export class DboGlowService extends ClientListener {
     const content = parseCustomPacket(event);
     if (!content || content["customPacketType"] !== "dboGlow") return;
     const packet = readGlowPacket(content);
-    for (const id of this.set.apply(packet)) this.stop(id);
-    if (packet.clear) this.stopAll();   // anything still lit, wanted or not
+    const stopped = this.set.apply(packet);
+    // Packets arrive in tick context, where getFormEx throws and no shader is found, so the glows are stopped on the update
+    this.controller.once("update", () => {
+      for (const id of stopped) this.stop(id);
+      if (packet.clear) this.stopAll();   // anything still lit, wanted or not
+    });
   }
 
   // A server-made form (a player or a spawned NPC, 0xff...) has a local copy under another id; a plugin ref keeps its own
