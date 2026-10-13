@@ -518,6 +518,18 @@ module.exports = (api) => {
   // the doors that lead in. The Blades have none on purpose while Cloud Ruler Temple is a ruin.
   globalThis.__dboGuildHall = (id) => { const f = FACTIONS.get(String(id)); return f ? hallOf(f) : null; };
   globalThis.__dboGuildStorage = (id) => storageOf(String(id));
+  // The player log (playerlog.js): the faction whose storage chest this is, and its leader's profile; read only, never a
+  // name (a chartered faction's id is a slug of its name and stays inside the player log)
+  globalThis.__dboGuildStorageAt = (ref) => {
+    const id = Number(ref) >>> 0;
+    for (const fid of Object.keys(STORES)) {
+      const st = STORES[fid];
+      if (!st || (Number(st.ref) >>> 0) !== id) continue;
+      const l = leaderOf(fid);
+      return { fid, leaderProfile: l ? Number(profileOf(l)) || 0 : 0 };
+    }
+    return null;
+  };
   // The faction whose hall stands in this interior cell, { id, name } or null. First the cells guild-defs lists for a hall
   // (hall.cells): rooms its doors do not stand in, as the Cathedral of St Martin (both its hall doors stand in Bruma's
   // street) and the Synod Conclave's main hall, where its Scholars' Ledger and Class Lecterns stand (its hall doors stand
@@ -684,6 +696,8 @@ module.exports = (api) => {
     removeMember(fid, t);
     if (isOnline(t)) system(t, `You have been removed from ${f.name}.`);
     audit(`FACTION ${who(a)} removed ${name} from ${f.name}`);
+    // the player log (playerlog.js): who was removed, by whom (the audit names them as text)
+    try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('faction', 'kick', a, t); } catch (e) { /* the player log is optional */ }
     return { text: `${name} is no longer in ${f.name}.` };
   };
   // court: a household's head follows the court's office (court.js), so its rank can be neither given nor taken here
@@ -1042,7 +1056,7 @@ module.exports = (api) => {
     if (s === 'remove') {
       if (!isLeadStaff(a)) return personal(a, 'Use the faction menu (F3) to remove members.');
       const fid = rest[1] || ''; const id = findMember(fid, rest[0]); if (!FACTIONS.get(fid) || !id) return personal(a, 'Usage: /faction remove <name|#TAG> <faction id>');
-      removeMember(fid, id); return personal(a, 'Removed.');
+      removeMember(fid, id); try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('faction', 'kick', a, id); } catch (e) { /* the player log is optional */ } return personal(a, 'Removed.');
     }
     personal(a, 'Usage: /faction [menu|list|accept [id]|invite <player> [id]]  admins: /faction leader <player> <id>, /faction remove <name> <id>, /faction override <player> <id> (lifts the limits once), /faction hallmark|hallunmark <id> (at a building\'s door)');
   }, { help: '[menu|list|accept|invite] your factions (F3 opens the menu)' });

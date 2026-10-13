@@ -196,6 +196,8 @@ module.exports = (api) => {
       const gold = Math.max(1, Math.floor(pot * weightOf(playerId)));
       giveItem(playerId, GOLD_BASE, gold);
       const extra = playerId === gemTo && gemId && giveItem(playerId, gemId, 1) ? ' and something bright out of the hide' : '';
+      // the player log (playerlog.js): each share, which the audit line does not give
+      try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('income', 'champion', playerId, gold, extra ? [{ baseId: gemId, count: 1 }] : []); } catch (e) { /* the player log is optional */ }
       personal(playerId, `The ${champ.name.toLowerCase()} beast falls. ${paid.length > 1 ? 'Your share: ' : ''}${gold} gold${extra}.`);
       names.push(display(playerId));
     }

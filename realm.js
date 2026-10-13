@@ -597,7 +597,7 @@ module.exports = (api) => {
     if (sub === 'seat' && x) {
       if (!info(x)) return personal(a, 'Usage: /war seat <faction id> [clear | <territory id>], standing where it musters');
       const d = wars(); d.capitals = d.capitals || {};
-      if (y === 'clear') { delete d.capitals[x]; if (d.seats) delete d.seats[x]; saveWars(); return personal(a, `${nameOfFaction(x)} has no chosen capital now.`); }
+      if (y === 'clear') { delete d.capitals[x]; if (d.seats) delete d.seats[x]; saveWars(); try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('staffworld', 'war', a); } catch (e) { /* the player log is optional */ } return personal(a, `${nameOfFaction(x)} has no chosen capital now.`); }
       if (y && territory(y)) {
         d.capitals[x] = { territory: y, name: territory(y).name, setAt: Date.now(), by: who(a), byStaff: true };
       } else {

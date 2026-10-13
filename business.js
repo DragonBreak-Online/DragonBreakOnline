@@ -197,6 +197,18 @@ module.exports = (api) => {
   // From the gamemode's activate chain, before the world container wipe; true refuses the activation.
   // With business.enabled false the ledgers are closed, but a rented chest still opens for its renter alone: turning the
   // feature off must never open the renters' chests to everyone (review A2-1 / A2-3, fail closed).
+  // The player log (playerlog.js): whose rented chest this is (the business owner's and the renter's profiles), read only
+  // from what is loaded, never a name; null for a chest no business rents out
+  globalThis.__dboBusinessChestOf = (ref) => {
+    try {
+      const k = hex(Number(ref) >>> 0);
+      for (const [claimHex, b] of Object.entries((S.data && S.data.businesses) || {})) {
+        const c = b && b.chests && b.chests[k];
+        if (c) return { claim: parseInt(claimHex, 16) >>> 0, ownerProfile: Number(b.owner) || 0, renterProfile: c.renter ? Number(c.renter) || 0 : 0, renterChar: 0 };
+      }
+    } catch (e) { /* none */ }
+    return null;
+  };
   globalThis.__dboBusinessActivate = (target, caster) => {
     const a = caster >>> 0, ref = target >>> 0;
     // The business's ledger book opens its panel; with ledgers closed it stays shut (and on its counter)
@@ -468,7 +480,10 @@ module.exports = (api) => {
     if (!Object.prototype.hasOwnProperty.call(ACTIONS, name)) return R(false, 'That is not something the ledger does.');
     if (!isStaff(a, b) && !isAdmin(a)) return R(false, `${b.name}'s ledger is kept for its owner and staff.`);
     if (OWNER_ONLY.has(name) && !isOwner(a, b)) return R(false, 'Only the owner can do that.');
-    return ACTIONS[name](a, claim, b, ...(args || []));
+    const res = ACTIONS[name](a, claim, b, ...(args || []));
+    // the player log (playerlog.js): the action and its claim when it went through; never the name or a note
+    if (res && res.ok) { try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('business', a, name, claim.primary, 0); } catch (e) { /* the player log is optional */ } }
+    return res;
   };
 
   // ---- the ledger's panel (front businessLedger, widget 64) -------------------------------------------

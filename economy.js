@@ -93,7 +93,9 @@ module.exports = (api) => {
   const treasury = () => globalThis.__dboTreasury || null;
   const accountActors = (pid) => { try { return (mp.getActorsByProfileId(pid) || []).map((x) => Number(x) >>> 0); } catch (e) { return []; } };
   const balanceOf = (a) => { try { const v = Number(mp.get(a, BALANCE)); return Number.isFinite(v) && v > 0 ? Math.floor(v) : 0; } catch (e) { return 0; } };
-  const credit = (a, n) => { mp.set(a, BALANCE, balanceOf(a) + n); };
+  // the player log (playerlog.js) gets each write to a character's bank balance: wages and charges reach offline characters
+  // too, and the audit lines give totals per hold only
+  const credit = (a, n, why) => { const was = balanceOf(a); mp.set(a, BALANCE, was + n); try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('bankwrite', a, why || 'credit', was, was + n); } catch (e) { /* the player log is optional */ } };
   // A form that was destroyed (a deleted character) throws on every get or set; 'type' is a property every form has
   const exists = (a) => { if (!a) return false; try { mp.get(a >>> 0, 'type'); return true; } catch (e) { return false; } };
   const profileOfActor = (a) => { try { const v = Number(mp.get(a, 'profileId')); return Number.isFinite(v) ? v : -1; } catch (e) { return -1; } };
@@ -105,7 +107,7 @@ module.exports = (api) => {
     const actors = ids.map((a) => ({ a, b: balanceOf(a) })).sort((x, y) => y.b - x.b);
     if (actors.reduce((s, x) => s + x.b, 0) < n) return false;
     let left = n;
-    for (const x of actors) { if (left <= 0) break; const off = Math.min(x.b, left); mp.set(x.a, BALANCE, x.b - off); left -= off; }
+    for (const x of actors) { if (left <= 0) break; const off = Math.min(x.b, left); mp.set(x.a, BALANCE, x.b - off); left -= off; try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('bankwrite', x.a, 'charge', x.b, x.b - off); } catch (e) { /* the player log is optional */ } }
     return true;
   };
   const chargeAccount = (pid, n) => chargeActors(accountActors(pid), n);
@@ -360,7 +362,7 @@ module.exports = (api) => {
               if (!actor && p.key[0] === 'a') { log(`economy: ${nameOfFaction(fid)} pays nobody for ${p.key} (${p.rank}): the character no longer exists`); continue; }
               if (actor && p.wage <= budget && T.spend(fid, p.wage, `wage ${p.rank} ${p.key}`)) {
                 // The treasury has paid: if the credit still fails, the gold goes back and the wage is owed
-                try { credit(actor, p.wage); }
+                try { credit(actor, p.wage, 'wage'); }
                 catch (e) { T.deposit(fid, p.wage, `wage ${p.rank} ${p.key} returned: ${e.message}`); owe(p, actor); log(`economy: wage ${p.key} of ${nameOfFaction(fid)} could not be credited, returned`, e.message); continue; }
                 r.wagesPaid += p.wage; budget -= p.wage;
               } else {

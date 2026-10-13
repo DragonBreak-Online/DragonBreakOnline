@@ -446,6 +446,8 @@ module.exports = (api) => {
     if (!w) return 'No such contract. /contract lists the ones you hold.';
     putList(keyOf(a), work.filter((x) => x !== w));
     saveNow();
+    // the player log (playerlog.js): a contract given up, which nothing recorded before
+    try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('contract', 'abandon', a, w.kind, w.count, w.zone, 0); } catch (e) { /* the player log is optional */ }
     // The share set aside for this hunter goes back to the hold, once the contract is gone on disk
     if (Number(w.held) > 0 && !refundToTreasury(zoneById(w.zone), Number(w.held))) log(`contracts: ${w.held} gold of given-up ${keyOf(a)}'s contract could not go back to ${w.zone}`);
     return `Contract for ${w.count} ${plural(w.kind)} given up. Its reward goes back to the hold.`;
