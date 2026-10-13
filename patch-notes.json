@@ -33,6 +33,17 @@
         ]
       },
       {
+        "heading": "The Key Ring",
+        "items": [
+          "House keys are no longer items. Every key now hangs on your Key Ring, so copies never stack or get mixed up. Open it with /keys.",
+          "A key opens its door even when the door is locked, and the door shows as unlocked to you. Without a key it stays locked.",
+          "Give a key to a player beside you from the Key Ring, or with Give a key on their X menu. They accept or decline it.",
+          "Owners see every copy of their keys and who holds it, can cut a key straight onto a nearby player's ring, and can take a single copy back. A taken-back key stops working at once.",
+          "Keys you carry move onto your Key Ring when you log in. Keys left in a chest or sack go onto the ring of whoever opens it next.",
+          "A robber can still, very rarely, take one of your keys."
+        ]
+      },
+      {
         "heading": "Unstuck",
         "items": [
           "/unstuck now has a 30 minute wait between uses, and it cannot be used during a fight with anyone, creatures included. Wait a minute after the last blow."
