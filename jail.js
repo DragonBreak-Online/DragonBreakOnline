@@ -131,6 +131,8 @@ module.exports = (api) => {
       if (!hit) return false;
       hit.count -= 1;
       mp.set(a, 'inventory', { entries: entries.filter((e) => Number(e.count) > 0) });
+      // the player log (playerlog.js): a pick snapped on a cell door
+      try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('itemflow', a, 'pick_snapped', LOCKPICK, -1); } catch (e) { /* the player log is optional */ }
       return true;
     } catch (e) { return false; }
   };

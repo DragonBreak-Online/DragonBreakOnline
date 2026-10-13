@@ -127,9 +127,12 @@ module.exports = (api) => {
   const setCount = (a, baseId, want) => {
     try {
       const inv = mp.get(a, 'inventory') || { entries: [] };
+      const was = (inv.entries || []).reduce((n, e) => n + ((Number(e.baseId) >>> 0) === baseId ? Number(e.count) || 0 : 0), 0);
       const entries = (inv.entries || []).filter((e) => (Number(e.baseId) >>> 0) !== baseId);
       if (want > 0) entries.push({ baseId, count: want });
       mp.set(a, 'inventory', Object.assign({}, inv, { entries }));
+      // the player log (playerlog.js): a beast form's own items, given and taken back
+      if (want !== was) { try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('itemflow', a, 'beast_item', baseId, want - was); } catch (e) { /* the player log is optional */ } }
     } catch (e) { log(`beastform: inventory change failed on ${display(a)}: ${e.message}`); }
   };
   // While in a beast form a player goes by the beast's name, never their own (Nate, 5 Oct): the appearance name is what

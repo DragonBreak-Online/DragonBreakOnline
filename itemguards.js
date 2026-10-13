@@ -299,6 +299,8 @@ module.exports = (api) => {
       log(`ITEMGUARD relog total grew for ${nameOf(a)} (logout ${away} min ago, ${Object.keys(now).length} container(s) used): `
         + grew.slice(0, 12).map((g) => `${g.base} pack ${g.pack[0]} -> ${g.pack[1]}, containers ${g.containers[0]} -> ${g.containers[1]}`).join('; ')
         + (grew.length > 12 ? `; and ${grew.length - 12} more` : ''));
+      // the player log (playerlog.js): the bases that grew across the relog, structured, and a security signal
+      try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('relog', a, grew); } catch (e) { /* the player log is optional */ }
     }
     return grew;
   };

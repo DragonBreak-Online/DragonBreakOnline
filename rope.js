@@ -97,6 +97,8 @@ module.exports = (api) => {
       if (!hit) return false;
       hit.count = (Number(hit.count) || 0) - 1;
       mp.set(a, 'inventory', { entries: entries.filter((e) => (Number(e.count) || 0) > 0) });
+      // the player log (playerlog.js): a rope used up on a binding
+      try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('itemflow', a, 'rope_used', ROPE_ID, -1); } catch (e) { /* the player log is optional */ }
       return true;
     } catch (e) { log('rope: taking a rope failed', e.message); return false; }
   };

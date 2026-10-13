@@ -154,7 +154,7 @@ module.exports = (api) => {
     for (const o of owed) {
       if (onlyMoved && norm(o.cell) === norm(cell)) { left.push(o); continue; }
       const bookId = idOf(o.book);
-      if (bookId && takeOne(a, bookId)) { log(`manuals: used up ${who(a)}'s ${o.book} (${why})`); continue; }
+      if (bookId && takeOne(a, bookId)) { log(`manuals: used up ${who(a)}'s ${o.book} (${why})`); try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('itemflow', a, 'manual_used', bookId, -1); } catch (e) { /* the player log is optional */ } continue; }
       if (!o.missing) log(`manuals: ${who(a)} owes ${o.book} but carries none (${why}); the next copy settles it`);
       left.push(Object.assign({}, o, { missing: true, cell: onlyMoved ? cell : o.cell }));
     }
