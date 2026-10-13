@@ -1523,6 +1523,48 @@ mp.onActivate = (targetId, casterId) => {
     return allowed;
   };
 }
+// A key holder walking through a locked property (13 Oct, Roland in #bugs 'Locks': "I lock my house and barrel but I can
+// still enter them"). With housingKeyRing on, a locked door or container refuses only people without a key; its owner,
+// the managers and key holders pass (housingSystem.ts onActivate), so to them a lock looked broken. They are told once per
+// property every few minutes. The claim is read as housingSystem stores it: private.housing on the ref, or on the primary
+// it points to.
+{
+  const activateBeforeLockHint = mp.onActivate;
+  const LOCK_HINT_MS = 5 * 60 * 1000;
+  const lockHintAt = globalThis.__dboLockHintAt instanceof Map ? globalThis.__dboLockHintAt : (globalThis.__dboLockHintAt = new Map());
+  const lockedClaim = (ref) => {
+    const raw = mp.get(ref, 'private.housing');
+    if (!raw || typeof raw !== 'object') return null;
+    const primary = Number(raw.primary) ? Number(raw.primary) >>> 0 : ref;
+    const rec = primary === ref ? raw : mp.get(primary, 'private.housing');
+    if (!rec || typeof rec !== 'object' || Number(rec.primary) || !(Number(rec.owner) > 0) || rec.locked !== true) return null;
+    return { primary, rec };
+  };
+  mp.onActivate = (targetId, casterId) => {
+    const allowed = activateBeforeLockHint(targetId, casterId);
+    if (allowed === false) return allowed;
+    try {
+      const t = targetId >>> 0, c = casterId >>> 0;
+      if (userOf(c) < 0) return allowed;
+      const H = globalThis.__dboHousing;
+      if (H && typeof H.keyRingOn === 'function' && H.keyRingOn() !== true) return allowed;
+      const claim = lockedClaim(t);
+      if (!claim) return allowed;
+      const key = `${c}:${claim.primary}`, now = Date.now();
+      if (now - (lockHintAt.get(key) || 0) < LOCK_HINT_MS) return allowed;
+      if (lockHintAt.size > 2000) for (const [k, at] of lockHintAt) if (now - at >= LOCK_HINT_MS) lockHintAt.delete(k);
+      lockHintAt.set(key, now);
+      let label = typeof claim.rec.name === 'string' && claim.rec.name.trim() ? claim.rec.name.trim() : '';
+      if (!label) {
+        let type = '';
+        try { const desc = String(mp.get(t, 'baseDesc') || ''); const r = desc && mp.lookupEspmRecordById(mp.getIdFromDesc(desc)); type = r && r.record ? String(r.record.type) : ''; } catch (e) { type = ''; }
+        label = type === 'DOOR' ? 'This door' : type === 'CONT' ? 'This container' : 'This';
+      }
+      system(c, `${label} is locked: your key lets you in. Anyone without a key is refused.`);
+    } catch (e) { /* no hint, the activation stands */ }
+    return allowed;
+  };
+}
 // NPCs open doors but never close them (2026-10-04). Each server activation of a plain door flips it (SetOpen(!IsOpen())).
 // The client blocks the engine's own door opening and waits for the server, so an NPC's AI keeps activating a closed door
 // until the server's "open" reaches its hoster. Every activation after the first closed the door again. In Fort Cutpurse
