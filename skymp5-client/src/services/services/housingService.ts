@@ -88,13 +88,15 @@ interface PropertyMenuInfo {
   place: PlaceInfo | null;
   placeName: string | null;
   assignedToYou: boolean;
+  // housingKeyRing on the server: keys are on the Key Ring and a key opens a locked door
+  keyRing: boolean;
 }
 
 // Module-level state shared with the browser-side widget setter via runtime injection
 let info: PropertyMenuInfo = {
   target: 0, view: 'denied', owned: false, name: null, locked: false,
   hasKeys: false, canGrantContainers: false, ownerName: null,
-  place: null, placeName: null, assignedToYou: false,
+  place: null, placeName: null, assignedToYou: false, keyRing: false,
 };
 let targetLabel = '';
 
@@ -218,6 +220,7 @@ export class HousingService extends ClientListener {
           place: readPlace(content["place"]),
           placeName: typeof content["placeName"] === "string" ? (content["placeName"] as string).slice(0, 48) : null,
           assignedToYou: content["assignedToYou"] === true,
+          keyRing: content["keyRing"] === true,
         };
         // A pending recipient pick owns the screen; a late reply must not reopen.
         if (this.pendingRecipient === null) this.openMenu();
@@ -330,6 +333,7 @@ export class HousingService extends ClientListener {
       place: info.place,
       placeName: info.placeName,
       assignedToYou: info.assignedToYou,
+      keyRing: info.keyRing,
       events: events,
     };
     const others = (window.skyrimPlatform.widgets.get() || []).filter((w: any) => w.id !== WIDGET_ID);
