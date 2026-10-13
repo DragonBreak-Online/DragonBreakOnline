@@ -1,26 +1,68 @@
-import { Actor, Game, Idle, ObjectReference } from "skyrimPlatform";
+import { Actor, Debug, Game, Idle, ObjectReference, TESModPlatform, Utility } from "skyrimPlatform";
 import { ClientListener, CombinedController, Sp } from "./clientListener";
 import { parseCustomPacket } from "./customPacketUtil";
 import { ConnectionMessage } from "../events/connectionMessage";
 import { CustomPacketMessage } from "../messages/customPacketMessage";
 import { RemoteServer } from "./remoteServer";
 import { remoteIdToLocalId } from "../../view/worldViewMisc";
-import { logError, logTrace } from "../../logging";
+import { allowIdleEvent } from "../../sync/animation";
+import { logError } from "../../logging";
 
 const PLAYER_FORM_ID = 0x14;
-const UNLINK_MS = 10000;
+const UNLINK_SECONDS = 10;
+// The graph events of the two idles, read from Skyrim.esm's IDLE records on CT 115 (13 Oct): IdleHeadChop (74ec5) ENAM
+// IdleExecutionerChop, IdleExecutioneeChop (70c09) ENAM IdleExecutioneeChop. A server that names others is followed
+const HEADSMAN_EVENT = "IdleExecutionerChop";
+const VICTIM_EVENT = "IdleExecutioneeChop";
+// The furniture's own exit: vanilla's IdleExecutionerExit1 (Skyrim.esm 2e8ef, under ExecutionerRoot) sends it to the
+// headsman in this block, and IdleWoodChopStop the same at a chopping log
+const FURNITURE_EXIT_EVENT = "IdleChairExitStart";
+// How long each way out is given before the next is tried
+const STEP_SECONDS = 1.5;
+
+/** The stand-up's ways out, in order; the next one only while the game still has the player in the furniture */
+export type StandStep = "dismount" | "exitEvent" | "forceDefault" | "done";
+export const nextStandStep = (step: StandStep, stillSeated: boolean): StandStep => {
+  if (!stillSeated) return "done";
+  if (step === "dismount") return "exitEvent";
+  if (step === "exitEvent") return "forceDefault";
+  return "done";
+};
+
+// One line to the server log ("[dboDiag] ... exec ..."), through PageInputDiagService's relay. Never throws
+const note = (text: string): void => {
+  try {
+    const n = (globalThis as { __dboDiagNote?: (kind: string, text: string) => void }).__dboDiagNote;
+    if (typeof n === "function") n("exec", text.slice(0, 300));
+  } catch {
+    // diagnostics never break the caller
+  }
+};
+const errText = (e: unknown): string => (e instanceof Error ? e.message : String(e));
 
 /**
- * The chopping block (server execution.js, Nate 12 Oct): plays vanilla's beheading on this client's copies of the two
- * actors. Vanilla's HeadChopBlock2ManHookupScript (disassembled 12 Oct) does exactly this with both seated in the block:
- * executionee.AddDependentAnimatedObjectReference(executioner), then PlayIdle on the pair. Read from Skyrim -
- * Animations.bsa on the PC (12 Oct): IdleHeadChop (idle) plays AOExecutionerChop.hkx, the headsman's swing (impact
- * 11.9 s); IdleExecutioneeChop (victimIdle) plays AOExecutioneeChop.hkx on the victim, whose Decapitate trigger
- * (11.839 s) takes the head and KillActor (16.606 s) drops the body. Both start on the same frame here so the blow
- * lands as the head comes off. The server's own death follows at its chopMs (16.7 s).
+ * The chopping block (server execution.js, Nate 12 Oct).
  *
- *   Server -> Client: { customPacketType: "dboExecute", victim: <server id>, executioner: <server id>, idle: "<hex>:<plugin>",
- *                       victimIdle: "<hex>:<plugin>" }
+ * dboExecute plays the beheading on this client's copies of the two actors. Vanilla's HeadChopBlock2ManHookupScript
+ * (disassembled from Skyrim - Misc.bsa on CT 115, 13 Oct) links the headsman to the executionee
+ * (AddDependentAnimatedObjectReference) and plays IdleHeadChop on the executionee, an NPC; for a player executionee it
+ * plays nothing at all. Here the victim gets IdleExecutioneeChop (AOExecutioneeChop.hkx: Decapitate at 11.839 s,
+ * KillActor at 16.606 s) and the headsman IdleHeadChop (AOExecutionerChop.hkx), on one frame. A refused PlayIdle
+ * (IdleExecutioneeChop wants ExecutioneeRoot's conditions: the FurnitureExecutioner keyword on the seat, the right-hand
+ * entry, GetSitting 2) falls back to the bare graph event, which no idle condition stands in front of.
+ *
+ * dboExecuteStand stands this player up from the block. The block has no exit a player reaches (vanilla's only one,
+ * IdleExecutionerExit1, sits under ExecutionerRoot, which wants the isExecutioner keyword; the executionee has none), and
+ * the server's own short move (locationalData: a MoveTo) does not take a seated player out of it (13 Oct 21:31: GM Nate
+ * stayed on the block). Tried in order, each given STEP_SECONDS, stopping as soon as the game says the player is out of
+ * the furniture: Actor.Dismount, the furniture exit event, then IdleForceDefaultState (drops the furniture's graph state)
+ * and a move to the server's spot past the seat. The server sends the player to the temple if all of it fails.
+ *
+ * Both packets arrive in tick context, where every Papyrus native throws "can't be called in this context" (0.3.96:
+ * Game.getFormEx threw, the catch only printed to the console, and nothing played), so all the work runs on update.
+ *
+ *   Server -> Client: { customPacketType: "dboExecute", victim, executioner, idle, victimIdle, event?, victimEvent? }
+ *                     { customPacketType: "dboExecuteStand", pos: [x, y, z], rot?: [x, y, z] }
  */
 export class ExecutionService extends ClientListener {
   constructor(private sp: Sp, private controller: CombinedController) {
@@ -30,30 +72,125 @@ export class ExecutionService extends ClientListener {
 
   private onPacket(event: ConnectionMessage<CustomPacketMessage>): void {
     const content = parseCustomPacket(event);
-    if (!content || content["customPacketType"] !== "dboExecute") return;
+    if (!content) return;
+    const type = content["customPacketType"];
+    if (type === "dboExecute") {
+      this.controller.once("update", () => this.play(content));
+    } else if (type === "dboExecuteStand") {
+      const chain = ++this.standChain;
+      this.controller.once("update", () => this.standStep(content, "dismount", chain));
+    }
+  }
+
+  private play(content: Record<string, unknown>): void {
     try {
       const victim = this.localActor(Number(content["victim"]) >>> 0);
       const headsman = this.localActor(Number(content["executioner"]) >>> 0);
       const idle = this.idleOf(String(content["idle"] || ""));
       const victimIdle = this.idleOf(String(content["victimIdle"] || ""));
       if (!victim || !headsman || !idle) {
-        logTrace(this, "dboExecute: an actor or the idle is not here", content["victim"], content["executioner"], content["idle"]);
+        note(`play skipped victim=${!!victim} headsman=${!!headsman} idle=${!!idle}`);
         return;
       }
+      const headsmanEvent = String(content["event"] || HEADSMAN_EVENT);
+      const victimEvent = victimIdle ? String(content["victimEvent"] || VICTIM_EVENT) : headsmanEvent;
+      // animation.ts blanks a copy's idle events unless they were allowed first
+      allowIdleEvent(victim.getFormID(), victimEvent);
+      if (victimIdle) allowIdleEvent(headsman.getFormID(), headsmanEvent);
       const linked = victim.addDependentAnimatedObjectReference(headsman);
       // The victim's own clip carries the beheading; a server without victimIdle gets vanilla's single call
-      const victimPlayed = victimIdle ? victim.playIdle(victimIdle) : victim.playIdle(idle);
-      const headsmanPlayed = victimIdle ? headsman.playIdle(idle) : false;
-      logTrace(this, `dboExecute: linked=${linked} victim=${victimPlayed} headsman=${headsmanPlayed}`);
+      let victimHow = "idle";
+      if (!victim.playIdle(victimIdle || idle)) {
+        allowIdleEvent(victim.getFormID(), victimEvent);
+        Debug.sendAnimationEvent(victim, victimEvent);
+        victimHow = "event";
+      }
+      let headsmanHow = "-";
+      if (victimIdle) {
+        headsmanHow = "idle";
+        if (!headsman.playIdle(idle)) {
+          allowIdleEvent(headsman.getFormID(), headsmanEvent);
+          Debug.sendAnimationEvent(headsman, headsmanEvent);
+          headsmanHow = "event";
+        }
+      }
+      note(`play linked=${linked} victim=${this.describe(victim)} ${victimHow} headsman=${this.describe(headsman)} ${headsmanHow}`);
       const victimId = victim.getFormID(), headsmanId = headsman.getFormID();
-      setTimeout(() => {
+      Utility.wait(UNLINK_SECONDS).then(() => this.controller.once("update", () => {
         try {
           const v = Actor.from(Game.getFormEx(victimId)), h = ObjectReference.from(Game.getFormEx(headsmanId));
           if (v && h) v.removeDependentAnimatedObjectReference(h);
         } catch (e) { /* gone */ }
-      }, UNLINK_MS);
+      }));
     } catch (e) {
       logError(this, "dboExecute failed", e);
+      note(`play failed ${errText(e)}`);
+    }
+  }
+
+  // One way out of the block, then the next if the game still has the player in the furniture
+  private standStep(content: Record<string, unknown>, step: StandStep, chain: number): void {
+    if (chain !== this.standChain) return;
+    try {
+      const player = Game.getPlayer();
+      if (!player) return;
+      const furniture = player.getFurnitureReference();
+      if (!furniture) {
+        note(`stand ${step}: not in furniture sit=${player.getSitState()}`);
+        return;
+      }
+      if (step === "dismount") {
+        note(`stand dismount=${player.dismount()} sit=${player.getSitState()} furn=${furniture.getFormID().toString(16)}`);
+      } else if (step === "exitEvent") {
+        Debug.sendAnimationEvent(player, FURNITURE_EXIT_EVENT);
+        note(`stand exitEvent sit=${player.getSitState()}`);
+      } else if (step === "forceDefault") {
+        Debug.sendAnimationEvent(player, "IdleForceDefaultState");
+        Utility.wait(0.3).then(() => this.controller.once("update", () => this.moveOut(content)));
+        return;
+      } else {
+        return;
+      }
+      Utility.wait(STEP_SECONDS).then(() => this.controller.once("update", () => {
+        if (chain !== this.standChain) return;
+        const p = Game.getPlayer();
+        const next = nextStandStep(step, !!(p && p.getFurnitureReference()));
+        if (next === "done") {
+          if (p) note(`stand ${step} worked sit=${p.getSitState()}`);
+          return;
+        }
+        this.standStep(content, next, chain);
+      }));
+    } catch (e) {
+      logError(this, "dboExecuteStand failed", e);
+      note(`stand ${step} failed ${errText(e)}`);
+    }
+  }
+
+  // The last way out: set the player down at the server's spot past the seat, the teleport path's own move
+  private moveOut(content: Record<string, unknown>): void {
+    try {
+      const p = Game.getPlayer();
+      const pos = content["pos"] as unknown;
+      if (!p || !Array.isArray(pos) || pos.length < 3 || !pos.slice(0, 3).every((v) => Number.isFinite(v))) {
+        note(`stand forceDefault: no spot to move to`);
+        return;
+      }
+      const rot = Array.isArray(content["rot"]) ? (content["rot"] as unknown[]).map(Number) : [0, 0, p.getAngleZ()];
+      TESModPlatform.moveRefrToPosition(p, p.getParentCell(), p.getWorldSpace(), Number(pos[0]), Number(pos[1]), Number(pos[2]),
+        rot[0] || 0, rot[1] || 0, rot[2] || 0);
+      note(`stand forceDefault moved furn=${p.getFurnitureReference() ? "still" : "none"} sit=${p.getSitState()}`);
+    } catch (e) {
+      note(`stand move failed ${errText(e)}`);
+    }
+  }
+
+  private describe(a: Actor): string {
+    try {
+      const f = a.getFurnitureReference();
+      return `${a.getFormID().toString(16)}/sit${a.getSitState()}/${f ? f.getFormID().toString(16) : "nofurn"}`;
+    } catch (e) {
+      return "?";
     }
   }
 
@@ -71,4 +208,6 @@ export class ExecutionService extends ClientListener {
     const form = Game.getFormFromFile(parseInt(desc.slice(0, sep), 16), desc.slice(sep + 1));
     return form ? Idle.from(form) : null;
   }
+
+  private standChain = 0;
 }

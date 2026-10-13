@@ -206,6 +206,13 @@ export const applyAnimation = (
 
 export const isInSitPose = (refrId: number): boolean => sitCollisionDisabledAt.has(refrId);
 
+// One idle event a copy may play once, from this client's own code (ExecutionService): the setupHooks filter blanks every
+// idle event on a 0xff copy that the movement relay did not hand it, and a PlayIdle or sendAnimationEvent from here
+// reaches the graph through that same hook
+export const allowIdleEvent = (refrId: number, animEventName: string): void => {
+  if (refrId >= 0xff000000 && isIdle(animEventName)) allowedIdles.push([refrId, animEventName]);
+};
+
 export const clearSitPose = (refrId: number): void => {
   sitCollisionDisabledAt.delete(refrId);
 };
