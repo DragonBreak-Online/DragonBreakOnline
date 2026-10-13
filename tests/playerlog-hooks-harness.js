@@ -56,7 +56,7 @@ const SITES = [
   ['supernatural.js', 'effect', 2], ['supernatural.js', 'itemflow', 1], ['supernatural.js', 'leave_reason', 1],
   ['playermenu.js', 'mask', 2], ['playermenu.js', 'pmenu', 1],
   ['business.js', 'business', 1], ['guilds.js', 'faction', 2], ['contracts.js', 'contract', 1], ['realm.js', 'staffworld', 1],
-  ['economy.js', 'bankwrite', 2], ['champions.js', 'income', 1], ['charlevel.js', 'level', 1], ['salvage.js', 'salvage', 1],
+  ['economy.js', 'bankwrite', 2], ['ledgersale.js', 'bankwrite', 1], ['restitution.js', 'bankwrite', 1], ['champions.js', 'income', 1], ['charlevel.js', 'level', 1], ['salvage.js', 'salvage', 1],
   ['alchemy.js', 'brew', 2], ['alchemy.js', 'extras', 1], ['racial.js', 'misc', 1], ['journal.js', 'misc', 2], ['journal.js', 'staffview', 1],
   ['mapprogress.js', 'map', 1], ['thalmor.js', 'dossier', 2], ['debugsnap.js', 'report', 1],
   ['pickpocket.js', 'theft', 3], ['robbery.js', 'theft', 1], ['couriers.js', 'theft', 1], ['lockpick.js', 'lock', 1], ['lockpick.js', 'itemflow', 1],

@@ -110,6 +110,8 @@ module.exports = (api) => {
     const fromBank = c.bankGold === false ? 0 : Math.min(gold, bank);
     if (fromBank > 0 && commit(c, `bank of ${who(a)}`, { [GOLD]: fromBank }, () => mp.set(a, 'private.bankGold', bank - fromBank))) {
       got += fromBank;
+      // the player log's record of the bank (13 Oct, gold review)
+      try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('bankwrite', a, 'restitution', bank, bank - fromBank); } catch (e) { /* the player log is optional */ }
       audit(`RESTITUTION ${c.id} took ${fromBank} gold from the bank account of ${who(a)}`);
     }
     if (got) try { personal(a, c.notice || 'Staff have taken back goods you took from another player\'s storage.'); } catch (e) { /* offline */ }

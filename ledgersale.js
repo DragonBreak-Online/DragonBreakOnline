@@ -80,7 +80,13 @@ module.exports = (api) => {
   // The claim's character once property is per character (housingSystem.ts ownerActorsOf), else its account's characters
   const ownerActors = (claim) => { try { const h = globalThis.__dboHousing; if (h && typeof h.ownerActorsOf === 'function') return h.ownerActorsOf(claim).map((x) => Number(x) >>> 0).filter(exists); } catch (e) { /* the account's */ } return accountActors(claim.owner); };
   const ownerCharOf = (claim) => { try { const h = globalThis.__dboHousing; return h && typeof h.perCharacter === 'function' && h.perCharacter() ? claim.ownerChar || 0 : 0; } catch (e) { return 0; } };
-  const credit = (a, n) => { const had = Math.max(0, Math.floor(Number(get(a, BALANCE, 0)) || 0)); try { mp.set(a, BALANCE, had + n); return true; } catch (e) { log('ledgersale: bank credit failed', e.message); return false; } };
+  // the player log's record of the bank (13 Oct, gold review: an owner is often offline, and the credit reached no record)
+  const credit = (a, n) => {
+    const had = Math.max(0, Math.floor(Number(get(a, BALANCE, 0)) || 0));
+    try { mp.set(a, BALANCE, had + n); } catch (e) { log('ledgersale: bank credit failed', e.message); return false; }
+    try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('bankwrite', a, 'ledger_sale', had, had + n); } catch (e) { /* the player log is optional */ }
+    return true;
+  };
   const faction = (fid) => { try { return typeof globalThis.__dboGuildInfo === 'function' ? globalThis.__dboGuildInfo(fid) : null; } catch (e) { return null; } };
 
   // The faction whose hall this cell is (guilds.js), { id, name } or null: the name players read at its ledgers
