@@ -23,10 +23,13 @@ client.once('ready', () => {
 
 // Ticket buttons and their modals. handleInteraction returns false for anything not
 // ours, so another interaction handler can be added here without untangling this one.
+// The remote staff console's /console slash command takes what the tickets leave
 client.on('interactionCreate', interaction => {
-  tickets.handleInteraction(interaction).catch(err => {
-    console.error('[discord-bot] interaction failed:', err.message)
-  })
+  tickets.handleInteraction(interaction)
+    .then(handled => (handled ? true : require('./consoleCommand').handleInteraction(interaction)))
+    .catch(err => {
+      console.error('[discord-bot] interaction failed:', err.message)
+    })
 })
 
 client.on('error', err => {
