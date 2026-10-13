@@ -5,7 +5,7 @@ import { beastBodyAppearance, beastBodyOf } from "../sync/beastBody";
 import { TAKEOVER_RECHECK_SECONDS, isHostileTakeover, takeoverLine } from "./takeoverDiag";
 import { setDefaultAnimsDisabled, applyAnimation, restoreSitCollisionIfMoving, isInSitPose, clearSitPose, setRefrCollision } from "../sync/animation";
 import { isVampireLordRace, noteVampireLordAnim } from "../sync/vampireLordAnimDiag";
-import { Appearance, applyAppearance, eyesOf, needsFreshBase } from "../sync/appearance";
+import { Appearance, applyAppearance, eyesOf } from "../sync/appearance";
 import * as faceSync from "./faceSyncDiag";
 import { installFaceSyncReport } from "./faceSyncReport";
 import { isBadMenuShown, applyEquipment, npcSidearmFor } from "../sync/equipment";
@@ -1294,8 +1294,10 @@ export class FormView {
 
   private getAppearanceBasedBase(): number {
     const base = ActorBase.from(Game.getFormEx(this.appearanceBasedBaseId));
-    const playerBase = (Game.getPlayer() as Actor).getBaseObject();
-    if (needsFreshBase(base ? base.getFormID() : null, playerBase ? playerBase.getFormID() : 0) && this.appearanceState.appearance) {
+    // Only a missing base is rebuilt. SpawnProcess's applyTints aliases this copy's own base to the player's id right after
+    // the spawn, so rebuilding an aliased base (7830cf9b, client 0.3.95) built a new one on the next frame and respawned
+    // every player copy every frame: the 13 Oct clone storm (tests/clonestorm-harness.js)
+    if (!base && this.appearanceState.appearance) {
       this.appearanceBasedBaseId = applyAppearance(this.appearanceState.appearance).getFormID();
     }
     return this.appearanceBasedBaseId;
