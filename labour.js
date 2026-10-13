@@ -661,6 +661,8 @@ module.exports = (api) => {
     // lag= is logged on every line and never decides anything when the widget judges.
     log(`labour ${v.bad ? 'refused(' + v.bad + ')' : win ? 'win' : 'lose'} ${display(a)} ${round.kind}${round.ore ? '/' + round.ore : ''} t${round.tier + 1} ${v.hits}/${round.strikes} of ${v.count}${round.mode === 'pick' ? ` pick slips=${v.misses}/${round.slips}` : ''} last=${v.last} at=${v.at} lag=${v.lag} err=${v.err.toFixed(2)} seed=${round.seed.toString(16)}`
       + MG.tail({ judge: !cj ? 'server' : claim ? 'client' : 'legacy', min: round.minMs, near: cj ? (near === undefined ? NaN : near) : undefined, claim: cj ? (claim ? `${claim.win ? 'win' : 'lose'}/${claim.hits}` : null) : undefined, sus: v.sus.concat(closed ? ['after-close'] : []) }));
+    // a refused verdict is a security signal in the player log (playerlog.js)
+    if (v.bad) { try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('signal', a, 'labour', v.bad); } catch (e) { /* the player log is optional */ } }
 
     if (!win) {
       const text = round.kind === 'mining'

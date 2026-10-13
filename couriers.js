@@ -486,6 +486,7 @@ module.exports = (api) => {
     letter(j.sender, j.originName, `Your parcel for ${destText(j)} was robbed on the road from ${j.courierName}.${pay ? ` The ${pay} gold you put up for the courier comes back to you.` : ''}`, { gold: pay, items: [] });
     const paid = payout(j, robber);
     audit(`COURIER #${j.id} robbed from ${who(victim)} by ${who(robber)}: ${itemsText(j.items)}${j.insured ? `; insured ${j.insured}, paid ${paid}` : ''}`);
+    try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('theft', 'courier_robbed', robber, victim, 'took', j.items, 0); } catch (e) { /* the player log is optional */ }
     return 'a sealed courier\'s parcel';
   };
 

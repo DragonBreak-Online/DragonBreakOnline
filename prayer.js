@@ -1266,6 +1266,8 @@ module.exports = (api) => {
     log(`prayer ${v.bad ? 'refused(' + v.bad + ')' : 'held'} ${display(a)} ${round.deityName}${round.mode === 'pick' ? ` pick verses=${v.hits}/${round.steps.length} faltered=${v.misses}/${round.slips}` : ''} spans=${v.spans} held=${v.held}/${round.totalMs} worst=${v.worst} at=${v.at} lag=${v.lag} ${round.begun ? `started=${round.startedAt - round.openedAt}` : 'legacy'} seed=${round.seed.toString(16)}`
       + MG.tail({ judge: !cj ? 'server' : claim ? 'client' : 'legacy', min: cj ? (round.mode === 'pick' ? round.minMs : round.totalMs) : undefined, near: near !== undefined ? near : undefined, claim: cj ? (claim ? (claim.win ? 'held' : `lose${claim.why ? ':' + claim.why : ''}`) : null) : undefined, sus: v.sus.concat(closed ? [`after-${closed}`] : []) })
       + extra);
+    // a refused verdict is a security signal in the player log (playerlog.js)
+    if (v.bad) { try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('signal', a, 'prayer', v.bad); } catch (e) { /* the player log is optional */ } }
     // A verdict that lands after the panel was closed is told in chat; one after Stand up re-draws the open panel
     const show = closed === 'close' || closed === 'hidden' || round.hidden ? 'say' : 'widget';
 

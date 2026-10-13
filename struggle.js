@@ -398,6 +398,7 @@ module.exports = (api) => {
     const nonce = String(args[0]).slice(0, 60);
     if (!round || nonce !== round.nonce) {
       log(`struggle refused(${spent.has(nonce) ? 'replay' : 'nonce'}) ${display(a)}: ${nonce}`);
+      try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('signal', a, 'struggle', spent.has(nonce) ? 'replay' : 'nonce'); } catch (e) { /* the player log is optional */ }
       return;
     }
     const elapsed = nowMs() - round.startedAt;
@@ -432,6 +433,8 @@ module.exports = (api) => {
     log(`struggle ${v.bad ? `refused(${v.bad})` : moot ? 'moot' : carried ? 'carried' : !clean ? 'lose' : held ? 'held' : 'win'} ${display(a)}${round.alone ? ' (rope, unattended)' : ''} ${v.hits}/${round.strikes} of ${v.count} band=${round.half} last=${v.last} at=${v.at} lag=${v.lag} err=${v.err.toFixed(2)} seed=${round.seed.toString(16)}`
       + MG.tail({ judge: !cj ? 'server' : claim ? 'client' : 'legacy', min: cj ? round.minMs : undefined, claim: cj ? (claim ? `${claim.win ? 'win' : 'lose'}/${claim.hits}` : null) : undefined, sus: v.sus }));
     if (v.bad === 'precise') audit(`STRUGGLE ${display(a)} report refused: every pull on the centre line (err ${v.err.toFixed(3)}, seed ${round.seed.toString(16)})`);
+    // a refused verdict is a security signal in the player log (playerlog.js)
+    if (v.bad) { try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('signal', a, 'struggle', v.bad); } catch (e) { /* the player log is optional */ } }
     if (moot) return conclude(a, round, 'Your hands are already free.');
     if (carried) return finish(a, round, `You were picked up and lost your grip. ${retryText(a)}`, 'lose');
     if (!clean) return finish(a, round, `The bonds hold. ${retryText(a)}`, 'lose');

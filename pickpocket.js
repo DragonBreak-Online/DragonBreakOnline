@@ -236,6 +236,7 @@ module.exports = (api) => {
       personal(a, `${call(a, t)} feels your hand in their pocket.`);
       system(t, `${call(t, a)} just tried to pick your pocket!`);
       audit(`THEFT ${who(a)} was caught picking the pocket of ${who(t)} (${odds})`);
+      try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('theft', 'pickpocket', a, t, 'caught', [], 0); } catch (e) { /* the player log is optional */ }
       return;
     }
     let r = null;
@@ -247,6 +248,7 @@ module.exports = (api) => {
     if (r.none) {
       personal(a, `${call(a, t)} has nothing in their pockets worth taking.`);
       audit(`THEFT ${who(a)} found nothing on ${who(t)} (${odds})`);
+      try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('theft', 'pickpocket', a, t, 'nothing', [], 0); } catch (e) { /* the player log is optional */ }
       return;
     }
     const got = r.got;
@@ -255,6 +257,8 @@ module.exports = (api) => {
     personal(a, `You lift ${got.label} from ${call(a, t)} unnoticed.`);
     try { if (globalThis.__dboStatsAdd) { globalThis.__dboStatsAdd(t, 'timesPickpocketed'); globalThis.__dboStatsAdd(a, 'pickpockets'); } } catch (e) { /* journal stats only */ }
     audit(`THEFT ${who(a)} picked ${got.label} from ${who(t)} (${odds}${credited ? '' : ', no skill credit'}${r.handed ? '' : ', HAND-OVER FAILED'})`);
+    // the player log (playerlog.js): the item by its base id and extras; the label above may be a custom name
+    try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('theft', 'pickpocket', a, t, 'took', got.item ? [got.item] : [], got.gold || 0); } catch (e) { /* the player log is optional */ }
     const after = Number(C.noticeAfterSeconds);
     if (after > 0) {
       setTimeout(() => {

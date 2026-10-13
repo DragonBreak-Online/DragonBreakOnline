@@ -117,6 +117,7 @@ module.exports = (api) => {
       if (!hit) return false;
       hit.count = Number(hit.count) - 1;
       mp.set(a, 'inventory', { entries: entries.filter((e) => Number(e.count) > 0) });
+      try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('itemflow', a, 'pick_snapped', LOCKPICK, -1); } catch (e) { /* the player log is optional */ }
       return true;
     } catch (e) { log('lockpick: taking a pick failed', e.message); return false; }
   };
@@ -153,6 +154,8 @@ module.exports = (api) => {
   // One line per lock, however it ends: the verdict, the lock, who judged and the review figures
   const verdictLine = (L, verdict, extra) => {
     try { log(`lockpick ${verdict} ${name(L.a)} ${LEVELS[L.level]} ${String(L.label).toLowerCase()} ${(Number(L.target) >>> 0).toString(16)}${extra || ''}`); } catch (e) { /* a log line never decides a lock */ }
+    // every verdict to the player log (playerlog.js): a pick, a failure, a cancel, a refusal (a security signal there)
+    try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('lock', L.a, verdict, L.level, L.target); } catch (e) { /* the player log is optional */ }
   };
   const legacyJudge = () => (MG.clientJudged(C) ? 'legacy' : 'server');
 

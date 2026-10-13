@@ -158,7 +158,7 @@ module.exports = (api) => {
     // With the key ring (housingSystem.ts housingKeyRing) a house key is a record on the character, not an item
     const H = globalThis.__dboHousing;
     if (!key && H && typeof H.keyRingOn === 'function' && H.keyRingOn() && Math.random() < C.keyChance) key = H.ringSteal(victim, robber) || null;
-    return { gold, items, key, carried };
+    return { gold, items, key, carried, taken: [...taken] };
   };
   const rob = (robber, victim, nameFor) => {
     const r = take(robber, victim, nameFor);
@@ -178,6 +178,8 @@ module.exports = (api) => {
     S.robberAt.set(robber >>> 0, Date.now()); S.victimAt.set(victim >>> 0, Date.now()); S.contests.delete(victim >>> 0);
     try { if (globalThis.__dboStatsAdd) { globalThis.__dboStatsAdd(victim, 'timesRobbed'); globalThis.__dboStatsAdd(robber, 'peopleRobbed'); } } catch (e) { /* journal stats only */ }
     audit(`ROBBERY ${who(robber)} robbed ${who(victim)}: ${r.gold} gold of ${r.carried}; items [${r.items.join(', ')}]${r.key ? `; key ${r.key}` : ''}${r.parcel ? '; a courier parcel' : ''}`);
+    // the player log: the things by base id; a key only as taken, never its name (a player-chosen property name)
+    try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('theft', 'robbery', robber, victim, 'took', (r.taken || []).map((id) => ({ baseId: id, count: 1 })), r.gold, { keyTaken: !!r.key }); } catch (e) { /* the player log is optional */ }
     return r;
   };
 
