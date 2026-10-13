@@ -26,11 +26,14 @@ type Mp = any;
 //     { customPacketType: "propertyInfoRequest", target: <refrId> }
 //     { customPacketType: "propertyRequest", action, target, recipient?, name? }
 //       action: claim | abandon | lock | unlock | rename | transfer
-//             | revoke | createkey | revokekeys | grantcontainer
+//             | revoke | createkey | revokekeys | grantcontainer | takekey
+//     { customPacketType: "keyRingRequest", action: list | give | accept | decline, key?, recipient? }
 //   Server -> Client:
 //     { customPacketType: "propertyMenu", target, view, owned, name, locked,
 //       hasKeys, canGrantContainers, ownerName }
 //     { customPacketType: "propertyNotice", text }
+//     { customPacketType: "keyRing", keys: [{name,place,opens}], near: [{actor,name}] }
+//     { customPacketType: "keyOffer", from, key }
 //     { customPacketType: "refDecor", full?, refs: [{refId,name,locked}] }
 //
 // Persistence. The record lives on the reference itself as a `private.` dynamic
@@ -79,6 +82,9 @@ export const KEY_BASE_ID = LEGACY_KEY_BASE_ID;
 const MAX_USER_SLOTS = 1024;
 const MAX_NAME_LEN = 32;
 const MAX_KEYS_CARRIED = 64;
+// housingKeyRing: keys are records on the character instead of items, so copies never stack
+const KEY_RING_PROP = "private.dboKeyRing";
+const KEY_OFFER_MS = 30000;
 // Place and room part of a room key's name: with "Key to", a rank, a recut, a copy number and the credential under 128
 const MAX_ROOM_KEY_LABEL = 64;
 // The place's part of it, so the room always shows ("the " and a 32-letter name fit)
@@ -102,9 +108,9 @@ const NOT_GRANTED = "Property here is granted by its ruler (Jarl, Baron or Count
 // their own fief the same way, and nowhere else; their own buildings there are not counted by the one-building cap.
 const MANAGER_RANKS = ["jarl", "baron", "steward", "chieftain", "bane", "count"];
 // Actions on any door or chest of a place that act on the whole place (its root)
-const PLACE_WIDE = ["abandon", "revoke", "rename", "createkey", "revokekeys", "transfer", "assign", "unassign", "share", "unshare"];
+const PLACE_WIDE = ["abandon", "revoke", "rename", "createkey", "revokekeys", "takekey", "transfer", "assign", "unassign", "share", "unshare"];
 // Keys of a place's inner doors and chests are their own (Nate, 5 Oct): only its exterior doors share the place's key
-const OWN_KEY_ACTIONS = ["createkey", "revokekeys"];
+const OWN_KEY_ACTIONS = ["createkey", "revokekeys", "takekey"];
 // The owner's Rooms and chests panel lists at most this many of a place's inner doors and chests
 const MAX_ROOMS_LISTED = 48;
 // A place's cells: the interior behind its door and the rooms reachable only through it, at most this many
@@ -163,6 +169,8 @@ interface PropertyRecord {
   ownerOnly?: boolean;
   // The KEYM record this lock's keys are cut on (houseKeys.ts pool); absent: the vanilla key
   keyBase?: number;
+  // With housingKeyRing: who holds each issued key, by key name (actor id and name at the time)
+  holders?: Record<string, { a: number; w: string }>;
 }
 
 // What the migration does with one planned house (refinePlaces), written into the plan for review
@@ -196,6 +204,16 @@ interface ViewerAccess {
   admin: boolean;
   ranks: Array<{ hold: string; rank: string }>;
   keys: Set<string>;
+  // Key ring names, which open only by an exact issued name
+  ring?: Set<string>;
+}
+
+// One key on a character's ring: its name and the lock it was cut for
+interface RingKey {
+  n: string;
+  p: number;
+  at: number;
+  by: string;
 }
 
 const emptyRecord = (): PropertyRecord => ({
@@ -237,6 +255,7 @@ export class HousingSystem implements System {
     this.perCharacter = all?.["housingOwnerPerCharacter"] === true;
     const ownerMode = String(all?.["housingOwnerMigration"] ?? "dryrun");
     this.ownerMigration = ownerMode === "off" ? "off" : ownerMode === "apply" ? "apply" : "dryrun";
+    this.keyRing = all?.["housingKeyRing"] === true;
     this.initAtMs = Date.now();
 
     this.roleCfg = readAdminRoleConfig(all);
@@ -246,7 +265,7 @@ export class HousingSystem implements System {
     this.installActivationHook(ctx);
     ctx.gm.on("userAssignActor", (userId: number) => this.onActorAssigned(ctx, userId));
     this.exposeTenancy(ctx);
-    this.log(`[housing] ready, ${this.claimed.length} claimed refs in the registry; property belongs to ${this.perCharacter ? "one character" : "the account"}, owner migration ${this.ownerMigration}`);
+    this.log(`[housing] ready, ${this.claimed.length} claimed refs in the registry; property belongs to ${this.perCharacter ? "one character" : "the account"}, owner migration ${this.ownerMigration}, key ring ${this.keyRing ? "on" : "off"}`);
   }
 
   // server/tenancy.js rents property out through these, under the same rules as the menu: the claim limit, re-keying
@@ -330,6 +349,17 @@ export class HousingSystem implements System {
         const c = this.ownerCharOf({ owner: Number(r.owner) || 0, ownerChar: Number(r.ownerChar) >>> 0 });
         return c ? `c${c.toString(16)}` : String(Number(r.owner) || 0);
       },
+      keyRingOn: (): boolean => this.keyRing,
+      // gameplay robbery.js: one random key off the victim's ring onto the robber's; its name, or "" when none moved
+      ringSteal: (victim: unknown, robber: unknown): string => {
+        if (!this.keyRing) return "";
+        const from = Number(victim) >>> 0, to = Number(robber) >>> 0;
+        const ring = this.ringOf(ctx, from);
+        if (!ring.length) return "";
+        const k = ring[Math.floor(Math.random() * ring.length)];
+        return this.moveRingKey(ctx, from, to, k) ? k.n : "";
+      },
+      openKeyRing: (actorId: unknown): void => this.sendKeyRing(ctx, Number(actorId) >>> 0),
     };
   }
 
@@ -346,16 +376,18 @@ export class HousingSystem implements System {
       }
       if (!allowed) return false;
       // Chain, so another handler still gets its say.
-      if (!previous) return true;
-      try {
-        return previous.call(mp, targetId, casterId) !== false;
-      } catch {
-        return true;
+      let chained = true;
+      if (previous) {
+        try { chained = previous.call(mp, targetId, casterId) !== false; } catch { chained = true; }
       }
+      if (chained && this.keyRing) {
+        try { this.takeKeysFrom(ctx, targetId >>> 0, casterId >>> 0); } catch (e) { this.log(`[housing] key sweep failed: ${e}`); }
+      }
+      return chained;
     };
   }
 
-  // Locked means locked for everyone; access only lets a player unlock it from the menu
+  // Locked means locked for everyone and access only unlocks it from the menu; with housingKeyRing, anyone with access walks in
   private onActivate(ctx: SystemContext, targetId: number, casterId: number): boolean {
     const primary = this.primaryOf(ctx, targetId);
     if (!primary) return true;
@@ -377,6 +409,7 @@ export class HousingSystem implements System {
       return false;
     }
     if (!rec.locked) return true;
+    if (this.keyRing && this.hasAccess(ctx, primary, rec, casterId)) return true;
 
     // One notice per player per second; a held activate key fires repeatedly.
     const userId = this.userOf(ctx, casterId);
@@ -395,6 +428,7 @@ export class HousingSystem implements System {
     switch (type) {
       case "propertyInfoRequest": this.onInfoRequest(ctx, userId, content); break;
       case "propertyRequest": this.onPropertyRequest(ctx, userId, content); break;
+      case "keyRingRequest": this.onKeyRingRequest(ctx, userId, content); break;
       default: break;
     }
   }
@@ -433,7 +467,7 @@ export class HousingSystem implements System {
     this.pushDecor(ctx, userId);
     const actorId = this.actorOf(ctx, userId);
     if (actorId) {
-      try { this.migrateKeys(ctx, actorId); } catch (e) { this.log(`[housing] key migration failed: ${e}`); }
+      try { if (this.keyRing) this.ringAtLogin(ctx, actorId); else this.migrateKeys(ctx, actorId); } catch (e) { this.log(`[housing] key migration failed: ${e}`); }
     }
   }
 
@@ -506,7 +540,8 @@ export class HousingSystem implements System {
         case "lock": this.doLock(ctx, userId, actorId, primary, rec, true); break;
         case "unlock": this.doLock(ctx, userId, actorId, primary, rec, false); break;
         case "rename": this.doRename(ctx, userId, primary, rec, isOwner, isManager, content["name"]); break;
-        case "createkey": this.doCreateKey(ctx, userId, actorId, primary, rec, isOwner || isManager); break;
+        case "createkey": this.doCreateKey(ctx, userId, actorId, primary, rec, isOwner || isManager, content["recipient"]); break;
+        case "takekey": this.doTakeKey(ctx, userId, actorId, primary, rec, isOwner || isManager, content["name"]); break;
         case "revokekeys": this.doRevokeKeys(ctx, userId, primary, rec, isOwner, isManager); break;
         case "transfer": this.doTransfer(ctx, userId, primary, rec, isOwner, isManager, content["recipient"]); break;
         case "grantcontainer": this.doGrantContainer(ctx, userId, primary, rec, isOwner, isManager, content["recipient"]); break;
@@ -633,13 +668,14 @@ export class HousingSystem implements System {
 
   // Keys are real inventory items; the name extra is the credential, so a key
   // handed over in trade works immediately and needs no server bookkeeping.
-  private doCreateKey(ctx: SystemContext, userId: number, actorId: number, primary: number, rec: PropertyRecord, isOwner: boolean): void {
+  private doCreateKey(ctx: SystemContext, userId: number, actorId: number, primary: number, rec: PropertyRecord, isOwner: boolean, rawRecipient?: unknown): void {
     if (!isOwner) {
       this.notice(ctx, userId, "Only the owner, the Jarl or the Steward cuts keys here.");
       return;
     }
     this.freezeKeyNames(ctx, primary, rec);
     const keyName = this.keyCopyToCut(ctx, primary, rec);
+    if (this.keyRing) { this.cutOntoRing(ctx, userId, actorId, primary, rec, keyName, rawRecipient); return; }
     const issued = (rec.issued || []).filter((n) => n !== keyName);
     issued.push(keyName);
     rec.issued = issued.slice(-MAX_ISSUED_KEY_NAMES);
@@ -757,6 +793,8 @@ export class HousingSystem implements System {
       hasKeys: owned,
       canGrantContainers: (isOwner || isManager) && owned && this.baseTypeOf(ctx, primary) === "CONT" && !(this.placesOn() && rec!.memberOf),
       ownerName: owned ? (rec!.ownerName || "Someone") : null,
+      keyRing: this.keyRing,
+      copies: this.keyRing && owned && (isOwner || isManager) ? this.copiesOf(rec!) : undefined,
       ...(owned && this.placesOn() ? this.placeMenu(ctx, primary, rec!, isOwner || isManager, profileId, here, actorId) : {}),
     });
   }
@@ -932,6 +970,7 @@ export class HousingSystem implements System {
     const credential = this.keyCredential(primary, rec);
     const names = this.acceptedKeyNames(ctx, primary, rec);
     if (Array.from(v.keys).some((n) => this.isKeyFor(n, credential, names))) return true;
+    if (v.ring && Array.from(v.ring).some((n) => names.indexOf(n) !== -1 || (this.placesOn() && !!rec.keyAliases && rec.keyAliases.indexOf(n) !== -1))) return true;
     return this.placesOn() && !!rec.keyAliases && Array.from(v.keys).some((n) => rec.keyAliases!.some((a) => this.aliasOpens(n, a)));
   }
 
@@ -1304,6 +1343,7 @@ export class HousingSystem implements System {
       admin: this.isAdmin(ctx, actorId),
       ranks: this.holdRanks(ctx, actorId),
       keys,
+      ring: this.keyRing ? new Set(this.ringOf(ctx, actorId).map((k) => k.n)) : undefined,
     };
   }
 
@@ -1640,10 +1680,12 @@ export class HousingSystem implements System {
         const kept = entries.filter((e: any) => !(isPropertyKeyBase(Number(e?.baseId)) && (this.isKeyFor(e?.name, credential, names)
           || (typeof e?.name === "string" && aliases.some((a) => this.aliasOpens(e.name, a))))));
         if (kept.length !== entries.length) mp.set(actorId, "inventory", { entries: kept });
+        if (this.keyRing) this.dropFromRing(ctx, actorId, (n) => names.indexOf(n) !== -1 || n.endsWith(credential) || (rec.keyAliases || []).indexOf(n) !== -1);
       } catch { /* actor gone */ }
     }
     rec.serial += 1;
     rec.issued = [];
+    delete rec.holders;
     // New locks: the key names a place carried over from its members stop opening it too
     if (rec.keyAliases) rec.keyAliases = [];
     // ...and every door and chest of the place gets new locks with it, so no member's own old key still opens it
@@ -1724,27 +1766,269 @@ export class HousingSystem implements System {
     }
   }
 
+  // ── Key ring (housingKeyRing) ───────────────────────────────────────────────
+
+  private ringOf(ctx: SystemContext, actorId: number): RingKey[] {
+    try {
+      const raw = (ctx.svr as Mp).get(actorId, KEY_RING_PROP);
+      return Array.isArray(raw) ? raw.filter((k: any) => k && typeof k.n === "string" && Number(k.p) > 0) : [];
+    } catch { return []; }
+  }
+
+  private setRing(ctx: SystemContext, actorId: number, ring: RingKey[]): void {
+    (ctx.svr as Mp).set(actorId, KEY_RING_PROP, ring.slice(0, MAX_KEYS_CARRIED));
+    const userId = this.userOf(ctx, actorId);
+    if (userId >= 0) this.pushDecor(ctx, userId);
+  }
+
+  // Takes the keys a test accepts off an actor's ring; the keys taken
+  private dropFromRing(ctx: SystemContext, actorId: number, match: (name: string) => boolean): RingKey[] {
+    const ring = this.ringOf(ctx, actorId);
+    const gone = ring.filter((k) => match(k.n));
+    if (gone.length) this.setRing(ctx, actorId, ring.filter((k) => !match(k.n)));
+    return gone;
+  }
+
+  private ringHasRoom(ctx: SystemContext, actorId: number, name: string): boolean {
+    const ring = this.ringOf(ctx, actorId);
+    return ring.some((k) => k.n === name) || ring.length < MAX_KEYS_CARRIED;
+  }
+
+  private addToRing(ctx: SystemContext, actorId: number, key: RingKey): void {
+    this.setRing(ctx, actorId, this.ringOf(ctx, actorId).filter((k) => k.n !== key.n).concat([key]));
+  }
+
+  private holderOf(ctx: SystemContext, actorId: number): { a: number; w: string } {
+    return { a: actorId, w: this.nameOf(ctx, actorId) };
+  }
+
+  // A key moving between two rings (a gift, a robbery): the lock's holder list moves with it
+  private moveRingKey(ctx: SystemContext, from: number, to: number, key: RingKey): boolean {
+    if (from === to || !this.ringHasRoom(ctx, to, key.n)) return false;
+    const rec = this.read(ctx, key.p);
+    if (rec && rec.owner !== 0 && rec.holders && rec.holders[key.n]) {
+      rec.holders[key.n] = this.holderOf(ctx, to);
+      this.write(ctx, key.p, rec);
+    }
+    this.dropFromRing(ctx, from, (n) => n === key.n);
+    this.addToRing(ctx, to, { ...key, at: Date.now() });
+    return true;
+  }
+
+  private copiesOf(rec: PropertyRecord): Array<{ name: string; holder: string }> {
+    return (rec.issued || []).map((n) => ({ name: n, holder: (rec.holders && rec.holders[n] && rec.holders[n].w) || "" }));
+  }
+
+  // A new key goes straight onto a ring: the cutter's, or a player's beside them; the lock records first, so a failed write
+  // never leaves a key nothing answers to
+  private cutOntoRing(ctx: SystemContext, userId: number, actorId: number, primary: number, rec: PropertyRecord, keyName: string, rawRecipient: unknown): void {
+    const to = rawRecipient ? toFormId(rawRecipient) : actorId;
+    if (!to || !this.profileOf(ctx, to) || this.userOf(ctx, to) < 0 || !this.withinReach(ctx, actorId, to)) {
+      this.notice(ctx, userId, "They must stand beside you.");
+      return;
+    }
+    if ((rec.issued || []).length >= MAX_ISSUED_KEY_NAMES) {
+      this.notice(ctx, userId, `${MAX_ISSUED_KEY_NAMES} keys to this are out already. Take one back first.`);
+      return;
+    }
+    if (!this.ringHasRoom(ctx, to, keyName)) {
+      this.notice(ctx, userId, to === actorId ? "Your key ring is full." : "Their key ring is full.");
+      return;
+    }
+    rec.issued = (rec.issued || []).filter((n) => n !== keyName).concat([keyName]);
+    rec.holders = { ...(rec.holders || {}), [keyName]: this.holderOf(ctx, to) };
+    if (!this.commit(ctx, userId, primary, rec)) return;
+    this.addToRing(ctx, to, { n: keyName, p: primary, at: Date.now(), by: this.nameOf(ctx, actorId) });
+    this.log(`[housing] KEY ${primary.toString(16)} "${keyName}" cut by ${this.nameOf(ctx, actorId)} for ${this.nameOf(ctx, to)}`);
+    if (to === actorId) this.notice(ctx, userId, `${keyName} is on your key ring.`);
+    else {
+      this.notice(ctx, userId, `${keyName} is on ${this.shownNameOf(ctx, to)}'s key ring.`);
+      this.notice(ctx, this.userOf(ctx, to), `${this.shownNameOf(ctx, actorId)} gave you ${keyName}. It is on your key ring.`);
+    }
+    this.sendMenu(ctx, userId, actorId, primary);
+  }
+
+  // One copy stops opening: its name leaves the lock, and the ring of whoever holds it (offline, at their next login)
+  private doTakeKey(ctx: SystemContext, userId: number, actorId: number, primary: number, rec: PropertyRecord, manages: boolean, rawName: unknown): void {
+    if (!manages) {
+      this.notice(ctx, userId, "This is not yours to re-key.");
+      return;
+    }
+    const name = String(rawName || "");
+    if (!this.keyRing || !(rec.issued || []).includes(name)) {
+      this.notice(ctx, userId, "There is no such key.");
+      return;
+    }
+    const holder = rec.holders && rec.holders[name];
+    rec.issued = (rec.issued || []).filter((n) => n !== name);
+    if (rec.holders) delete rec.holders[name];
+    if (!this.commit(ctx, userId, primary, rec)) return;
+    if (holder && this.dropFromRing(ctx, holder.a, (n) => n === name).length) {
+      this.notice(ctx, this.userOf(ctx, holder.a), `${name} was taken back. It no longer opens anything.`);
+    }
+    this.log(`[housing] KEY ${primary.toString(16)} "${name}" taken back from ${holder ? holder.w : "nobody"} by ${this.nameOf(ctx, actorId)}`);
+    this.notice(ctx, userId, holder && holder.w ? `${name} no longer opens it for ${holder.w}.` : `${name} no longer opens it.`);
+    this.sendMenu(ctx, userId, actorId, primary);
+  }
+
+  // The lock a key name opens, among the claimed ones (an exact issued name or alias, else the credential suffix)
+  private lockOfKeyName(ctx: SystemContext, name: string): { primary: number; rec: PropertyRecord } | null {
+    for (const primary of this.claimed) {
+      const rec = this.read(ctx, primary);
+      if (!rec || rec.owner === 0) continue;
+      if (this.isKeyFor(name, this.keyCredential(primary, rec), this.acceptedKeyNames(ctx, primary, rec))
+        || (rec.keyAliases || []).some((a) => this.aliasOpens(name, a))) return { primary, rec };
+    }
+    return null;
+  }
+
+  // Key items that open a claimed lock move onto the ring (the name joins the lock's issued ones, so it opens exactly)
+  // A key that opens nothing known stays where it is: a record not loaded yet proves nothing
+  private ringFromItems(ctx: SystemContext, entries: any[], actorId: number): { kept: any[]; moved: string[] } {
+    const kept: any[] = [], moved: string[] = [];
+    for (const e of entries) {
+      const name = isPropertyKeyBase(Number(e?.baseId)) && typeof e?.name === "string" ? e.name : "";
+      const lock = name ? this.lockOfKeyName(ctx, name) : null;
+      if (!lock || !this.ringHasRoom(ctx, actorId, name)) { kept.push(e); continue; }
+      const { primary, rec } = lock;
+      if (!(rec.issued || []).includes(name) && !(rec.keyAliases || []).includes(name)) rec.issued = (rec.issued || []).concat([name]);
+      rec.holders = { ...(rec.holders || {}), [name]: this.holderOf(ctx, actorId) };
+      if (!this.write(ctx, primary, rec)) { kept.push(e); continue; }
+      this.addToRing(ctx, actorId, { n: name, p: primary, at: Date.now(), by: "" });
+      moved.push(name);
+    }
+    return { kept, moved };
+  }
+
+  // At login: key items in the pack move onto the ring, and ring keys that no longer open their lock are dropped
+  private ringAtLogin(ctx: SystemContext, actorId: number): void {
+    const mp = ctx.svr as Mp;
+    const userId = this.userOf(ctx, actorId);
+    const inv = mp.get(actorId, "inventory");
+    const entries: any[] = inv && Array.isArray(inv.entries) ? inv.entries : [];
+    const { kept, moved } = this.ringFromItems(ctx, entries, actorId);
+    if (moved.length) {
+      mp.set(actorId, "inventory", { entries: kept });
+      this.log(`[housing] moved ${moved.length} key item(s) of ${actorId.toString(16)} onto the key ring`);
+      this.notice(ctx, userId, `Your keys are on your key ring now: ${moved.join(", ")}.`);
+    }
+    const stale = new Set(this.ringOf(ctx, actorId).filter((k) => {
+      const rec = this.read(ctx, k.p);
+      return !!rec && (rec.owner === 0 || !(this.acceptedKeyNames(ctx, k.p, rec).includes(k.n) || (rec.keyAliases || []).includes(k.n)));
+    }).map((k) => k.n));
+    const dead = stale.size ? this.dropFromRing(ctx, actorId, (n) => stale.has(n)) : [];
+    if (dead.length) this.notice(ctx, userId, `These keys no longer open anything and are gone: ${dead.map((k) => k.n).join(", ")}.`);
+  }
+
+  // Key items left in a container go onto the ring of whoever opens it
+  private takeKeysFrom(ctx: SystemContext, targetId: number, casterId: number): void {
+    if (this.baseTypeOf(ctx, targetId) !== "CONT" || !this.profileOf(ctx, casterId)) return;
+    const mp = ctx.svr as Mp;
+    const inv = mp.get(targetId, "inventory");
+    const entries: any[] = inv && Array.isArray(inv.entries) ? inv.entries : [];
+    if (!entries.some((e) => isPropertyKeyBase(Number(e?.baseId)))) return;
+    const { kept, moved } = this.ringFromItems(ctx, entries, casterId);
+    if (!moved.length) return;
+    mp.set(targetId, "inventory", { entries: kept });
+    this.log(`[housing] ${casterId.toString(16)} took ${moved.length} key(s) from container ${targetId.toString(16)} onto the key ring`);
+    this.notice(ctx, this.userOf(ctx, casterId), `You take ${moved.join(", ")} onto your key ring.`);
+  }
+
+  // What another player is called on screen: the masked name when masked, as everyone else sees it
+  private shownNameOf(ctx: SystemContext, actorId: number): string {
+    try {
+      const appearance = (ctx.svr as Mp).get(actorId, "appearance");
+      return String((appearance && appearance.name) || "Someone");
+    } catch { return "Someone"; }
+  }
+
+  private onKeyRingRequest(ctx: SystemContext, userId: number, content: Content): void {
+    if (!this.keyRing) return;
+    const now = Date.now();
+    if (now - (this.lastRequestMs.get(userId) || 0) < REQUEST_COOLDOWN_MS) return;
+    this.lastRequestMs.set(userId, now);
+    const actorId = this.actorOf(ctx, userId);
+    if (!actorId) return;
+    const action = String(content["action"] || "");
+    if (action === "give") this.offerKey(ctx, userId, actorId, String(content["key"] || ""), toFormId(content["recipient"]));
+    else if (action === "accept" || action === "decline") this.answerOffer(ctx, userId, actorId, action === "accept");
+    this.sendKeyRing(ctx, actorId);
+  }
+
+  private sendKeyRing(ctx: SystemContext, actorId: number): void {
+    const userId = this.userOf(ctx, actorId);
+    if (userId < 0 || !this.keyRing) return;
+    const v = this.viewerAccess(ctx, actorId);
+    const keys = this.ringOf(ctx, actorId).map((k) => {
+      const rec = this.read(ctx, k.p);
+      const place = (rec && rec.owner !== 0 && (rec.name || this.doorLabel(ctx, k.p))) || "";
+      return { name: k.n, place, opens: !!rec && rec.owner !== 0 && this.keyOpensWith(ctx, k.p, rec, { ...v, keys: new Set(), ring: new Set([k.n]) }) };
+    });
+    const near: Array<{ actor: number; name: string }> = [];
+    for (const u of this.onlineUsers(ctx)) {
+      const other = this.actorOf(ctx, u);
+      if (other && other !== actorId && this.withinReach(ctx, actorId, other)) near.push({ actor: other, name: this.shownNameOf(ctx, other) });
+    }
+    this.send(ctx, userId, { customPacketType: "keyRing", keys, near });
+  }
+
+  private offerKey(ctx: SystemContext, userId: number, actorId: number, keyName: string, to: number): void {
+    const key = this.ringOf(ctx, actorId).find((k) => k.n === keyName);
+    if (!key) { this.notice(ctx, userId, "That key is not on your ring."); return; }
+    if (!to || to === actorId || this.userOf(ctx, to) < 0 || !this.withinReach(ctx, actorId, to)) {
+      this.notice(ctx, userId, "They must stand beside you.");
+      return;
+    }
+    this.keyOffers.set(to, { from: actorId, key: keyName, until: Date.now() + KEY_OFFER_MS });
+    this.send(ctx, this.userOf(ctx, to), { customPacketType: "keyOffer", from: this.shownNameOf(ctx, actorId), key: keyName });
+    this.notice(ctx, this.userOf(ctx, to), `${this.shownNameOf(ctx, actorId)} offers you ${keyName}. Accept it from your key ring.`);
+    this.notice(ctx, userId, `You offer ${keyName} to ${this.shownNameOf(ctx, to)}.`);
+  }
+
+  private answerOffer(ctx: SystemContext, userId: number, actorId: number, accept: boolean): void {
+    const offer = this.keyOffers.get(actorId);
+    this.keyOffers.delete(actorId);
+    if (!offer || offer.until < Date.now()) { this.notice(ctx, userId, "Nobody is offering you a key."); return; }
+    const giverUser = this.userOf(ctx, offer.from);
+    if (!accept) {
+      this.notice(ctx, giverUser, `${this.shownNameOf(ctx, actorId)} turned down ${offer.key}.`);
+      return;
+    }
+    const key = this.ringOf(ctx, offer.from).find((k) => k.n === offer.key);
+    if (!key || giverUser < 0 || !this.withinReach(ctx, actorId, offer.from)) { this.notice(ctx, userId, "That key is no longer on offer."); return; }
+    if (!this.moveRingKey(ctx, offer.from, actorId, key)) { this.notice(ctx, userId, "Your key ring is full."); return; }
+    this.log(`[housing] KEY "${key.n}" given by ${this.nameOf(ctx, offer.from)} to ${this.nameOf(ctx, actorId)}`);
+    this.notice(ctx, userId, `${key.n} is on your key ring.`);
+    this.notice(ctx, giverUser, `${this.shownNameOf(ctx, actorId)} took ${key.n}.`);
+    this.sendKeyRing(ctx, offer.from);
+  }
+
   // ── refDecor ────────────────────────────────────────────────────────────────
 
   private pushDecorToAll(ctx: SystemContext): void {
-    const refs = this.decorRefs(ctx);
-    for (const userId of this.onlineUsers(ctx)) this.sendDecor(ctx, userId, refs);
+    const refs = this.keyRing ? null : this.decorRefs(ctx);
+    for (const userId of this.onlineUsers(ctx)) {
+      if (refs) this.sendDecor(ctx, userId, refs);
+      else this.pushDecor(ctx, userId);
+    }
   }
 
   private pushDecor(ctx: SystemContext, userId: number): void {
-    this.sendDecor(ctx, userId, this.decorRefs(ctx));
+    const actorId = this.keyRing ? this.actorOf(ctx, userId) : 0;
+    this.sendDecor(ctx, userId, this.decorRefs(ctx, actorId ? this.viewerAccess(ctx, actorId) : undefined));
   }
 
-  // A locked claim is locked for every viewer, so one list serves everyone. A member of a place carries the place's name, so
-  // a rename shows on every door pair of it (Nate, 3 Oct)
-  private decorRefs(ctx: SystemContext): Array<Record<string, unknown>> {
+  // A locked claim is locked for every viewer, so one list serves everyone; with housingKeyRing it shows unlocked to whoever
+  // may walk in. A member of a place carries the place's name, so a rename shows on every door pair of it (Nate, 3 Oct)
+  private decorRefs(ctx: SystemContext, v?: ViewerAccess): Array<Record<string, unknown>> {
     const refs: Array<Record<string, unknown>> = [];
     const live = this.liveClaims(ctx);
     const names = new Map<number, string | null>(live.map((c) => [c.primary, c.rec.name]));
     for (const { primary, rec } of live) {
       const name = this.shownName(rec, names);
-      refs.push({ refId: primary, name, locked: rec.locked });
-      if (rec.partner) refs.push({ refId: rec.partner, name, locked: rec.locked });
+      const locked = rec.locked && !(v && this.hasAccessWith(ctx, primary, rec, v));
+      refs.push({ refId: primary, name, locked });
+      if (rec.partner) refs.push({ refId: rec.partner, name, locked });
     }
     return refs;
   }
@@ -1914,6 +2198,7 @@ export class HousingSystem implements System {
         ...(Number(r.memberOf) ? { memberOf: Number(r.memberOf) >>> 0 } : {}),
         ...(r.ownerOnly === true ? { ownerOnly: true } : {}),
         ...(Number(r.keyBase) ? { keyBase: Number(r.keyBase) >>> 0 } : {}),
+        ...(r.holders && typeof r.holders === "object" ? { holders: r.holders } : {}),
       };
     } catch {
       return null;
@@ -2647,6 +2932,8 @@ export class HousingSystem implements System {
   private unclaimableLogged = new Set<number>();
   private lastRequestMs = new Map<number, number>();
   private lastDenyMs = new Map<number, number>();
+  private keyRing = false;
+  private keyOffers = new Map<number, { from: number; key: string; until: number }>();
   private roleCfg: AdminRoleConfig = readAdminRoleConfig(null);
   private zones!: Zones;
   private zoneCache = new Map<number, string | null>();
