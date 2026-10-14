@@ -110,7 +110,7 @@ ok(!/P10 dropped/.test(wwwatch().join('\n')), 'nothing is said of his own drops 
 step(3);
 drop(ONNY, false);
 ok(/^wwwatch: P12 dropped near P10, drop 2 of 2 in 600 s: 4441 units away/.test(wwwatch().slice(-2)[0] || ''), 'Onny\'s drop is the second', wwwatch().slice(-2));
-ok(/^wwwatch: tripped for P10 at a764b:BSHeartland\.esm by 2 drops \(P11, P12\); its werewolf body OFF until \/wwremote clear$/.test(lastWw()), 'the trip is logged with who dropped', lastWw());
+ok(/^wwwatch: tripped for P10 at a764b:BSHeartland\.esm by 2 drops \(P11, P12\); its werewolf body OFF( for \d+ min, or)? until \/wwremote clear$/.test(lastWw()), 'the trip is logged with who dropped', lastWw());
 const off = props.get(DAR + '|private.wwBodyOff');
 ok(off && off.by === 'breaker' && off.drops.join() === 'P11,P12', 'his character carries the trip (private.wwBodyOff)', off);
 ok(!listed(FAR) && !listed(ADMIN), 'every 0.3.77 watcher gets a list without him: they rebuild him human', [listTo(FAR), listTo(ADMIN)]);
