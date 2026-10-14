@@ -1084,6 +1084,8 @@ const siteHash = (t) => { let h = 0x811c9dc5; for (let i = 0; i < t.length; i++)
 const AUDIT_SITES = `
 alchemy.js ALCHEMY 53ff4ec4 clean
 alchemy.js ALCHEMY 2b9554a6 clean
+alchemy.js ALCHEMY bbc0785b clean
+alchemy.js ALCHEMY 1f691b2b clean
 alchemy.js DISENCHANT-AMBIGUOUS 95471a94 parsed
 alchemy.js DISENCHANT 6a0e1f03 parsed
 alchemy.js ENCH-RESTORE 76a26bc3 clean
