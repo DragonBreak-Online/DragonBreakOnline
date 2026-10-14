@@ -123,6 +123,26 @@ step('R1', () => {
     && /\['realnames', '\[on\|off\|status\]: /.test(cut('const TRIAL_HELP = [', '\n];') || ''), pmHelp);
 });
 
+// The U panel (press U, or / alone), built by gamemode.js's own help and panel code with the real tiers: the Staff tab
+step('R1 panel', () => {
+  const section = cut('const commands = new Map();', "registerChatCommand('players'"), panel = cut('// ---- the player panel (U)', 'globalThis.__dboPanelLeave');
+  if (!section || !panel) throw new Error('the help or panel markers are gone');
+  const run = new Function('personal', 'isAdmin', 'deliver', 'C', 'profileOf', 'ranksOf', 'openWidget', 'closeWidget', 'onUi', 'userOf', 'handleChat',
+    'require', 'path', 'log', 'LEAD_ONLY', 'isLeadStaff', 'onlineActors', 'display', 'tagOf', 'mp', 'isTrialStaff', 'staffCan', 'TRIAL_COMMANDS', 'ownNameOf', 'disguisedOf',
+    section + panel + '\nreturn { registerChatCommand, panelTabsFor };')(
+    () => {}, T.isAdmin, () => {}, { WHITE: 'fafafa', SYS: 'eda841' }, (a) => (actors[a >>> 0] || { profile: -1 }).profile, () => [], () => {}, () => {}, () => {}, (a) => a, () => {},
+    require, { resolve: (x) => path.resolve(ROOT, x) }, () => {}, LEAD_ONLY, T.isLeadStaff, () => online.slice(), display, tagOf, { get: () => undefined },
+    T.isTrialStaff, T.staffCan, T.TRIAL_COMMANDS, nameOf, () => false);
+  for (const [n, c] of commands) run.registerChatCommand(n, c.fn, { admin: c.admin, help: c.help });
+  run.registerChatCommand('kick', () => {}, { admin: true, help: '<player>' });
+  const staffTab = (a) => run.panelTabsFor(a).filter((t) => t.key === 'staff').flatMap((t) => t.entries);
+  const gm = staffTab(GM).find((e) => e.name === 'realnames'), trial = staffTab(TRIAL).find((e) => e.name === 'realnames');
+  ok('R1 U panel: /realnames is in a GM\'s Staff tab under Players, with the choices bare, on, off, status', !!gm && gm.section === 'Players' && !!gm.form
+    && gm.form.variants.map((v) => v.word === null ? '' : v.word).join() === ',on,off,status', gm);
+  ok('R1 ...and in a Trial GM\'s, beside none of the GM-only commands', !!trial && !staffTab(TRIAL).some((e) => e.name === 'kick'), staffTab(TRIAL).map((e) => e.name));
+  ok('R1 ...a player has no Staff tab', staffTab(PLAYER).length === 0);
+});
+
 // ---- R2/R3: who may ------------------------------------------------------------------------------------------------------
 step('R3', () => {
   ok('R3 staffCan(TRIAL, realnames) is true, staffCan(PLAYER, realnames) is false, a GM passes as an admin',
