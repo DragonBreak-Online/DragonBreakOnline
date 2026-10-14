@@ -29,7 +29,7 @@ import { dropCopyNiNodeWork, queueCopyNiNodeUpdate } from "./niNodeQueue";
 import { onScreenRebuildDue, OnScreenRebuildState } from "./onScreenRebuild";
 import { lastTryHost, tryHost } from "./hostAttempts";
 import { GHOST_ALPHA, GHOST_SHADER_ID, INVIS_ABILITY_IDS, INVIS_ABILITY_SHADER_IDS } from "../lib/ghostLook";
-import { AdminView, keepNoCopy, nextHiddenAt } from "./adminCopyPolicy";
+import { AdminView, keepNoCopy, nextHiddenAt, seesInvisible, staffRankOf } from "./adminCopyPolicy";
 import { ModelApplyUtils } from "./modelApplyUtils";
 import { localIdToRemoteId } from "./worldViewMisc";
 import { SpApiInteractor } from "../services/spApiInteractor";
@@ -1203,13 +1203,23 @@ export class FormView {
     if (on) for (const id of INVIS_ABILITY_SHADER_IDS) EffectShader.from(Game.getFormEx(id))?.stop(actor);
   }
 
-  // Invisible admins are hidden from players and shown to admins as ghosts; Ghost admins look like ghosts to everyone
+  // Invisible admins are hidden from players and from lower-ranked staff, and a ghost to staff of the same or a higher rank
+  // (Nate, 14 Oct: owners hidden from Lead GMs, Lead GMs from GMs, GMs from Trial GMs); Ghost admins look like ghosts to everyone
   private static adminViewOf(model: FormModel): AdminView {
     const modes = (model as Record<string, unknown>)["ff_adminModes"];
     if (!modes || typeof modes !== "object") return "visible";
     const m = modes as Record<string, unknown>;
-    if (m["invis"]) return FormView.viewerIsAdmin() ? "ghost" : "hidden";
+    if (m["invis"]) return seesInvisible(FormView.viewerRank(), m["rank"]) ? "ghost" : "hidden";
     return m["ghost"] ? "ghost" : "visible";
+  }
+
+  // The viewer's staff rank from their own mirror (server AdminSystem), else 1 for any staff on a server without ranks
+  private static viewerRank(): number {
+    if (storage["ownerModelSet"] !== true) return 0;
+    const owner = storage["ownerModel"] as Record<string, unknown> | undefined;
+    if (!owner) return 0;
+    const own = owner["ff_adminModes"] as Record<string, unknown> | undefined;
+    return staffRankOf(own && typeof own === "object" ? own["rank"] : undefined, owner["isAdmin"] === true);
   }
 
   // A replayed Invisibility spell would otherwise draw the caster as vanilla's shimmer instead of hiding them
@@ -1221,13 +1231,6 @@ export class FormView {
     return this.spellInvisibleSeen;
   }
 
-  private static viewerIsAdmin(): boolean {
-    if (storage["ownerModelSet"] !== true) {
-      return false;
-    }
-    const owner = storage["ownerModel"] as Record<string, unknown> | undefined;
-    return !!owner && owner["isAdmin"] === true;
-  }
 
   private removeNickname() {
     if (this.textNameId) {
