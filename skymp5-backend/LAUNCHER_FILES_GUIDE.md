@@ -97,12 +97,21 @@ npm run merge         # builds skymp-client.zip and data/files-version.json
 
 **Guard (2026-10-14): `populate`, `merge` and `setup` refuse the backend's own bucket.** That is the
 default `build/client-files` of the checkout they run from (`CLIENT_FILES_DIR` unset), anything in
-the live `/opt/alduinak/build/client-files`, and the live `data/files-version.json`. On the PC set
-`DBO_MERGE_LIVE_BUCKET=1` for those commands (`set DBO_MERGE_LIVE_BUCKET=1` in cmd,
-`$env:DBO_MERGE_LIVE_BUCKET='1'` in PowerShell); the manager's Build Client sets it on Windows.
-On the server never: build the package in a work folder (`CLIENT_FILES_DIR=<work folder>`, from a
-scratch backend export), gate it, and ship it through the staged release path. On 6 Oct a plain
-`merge` in the live checkout zipped a stale copy onto the live zip and players hung at the logo.
+the live `/opt/alduinak/build/client-files`, and the live `data/files-version.json`. They check every
+path they write after following links: a work folder whose root, zip or a file in its root links
+into the live files is refused, and so is a zip or manifest that is a hard link to the live one. The
+zip, the manifest and each copied file are written as new files, never through another name of an
+old one, so a `cp -al` copy of the live root stays safe. On the PC set `DBO_MERGE_LIVE_BUCKET=1` for
+those commands only, in the shell (`set DBO_MERGE_LIVE_BUCKET=1` in cmd,
+`$env:DBO_MERGE_LIVE_BUCKET='1'` in PowerShell). Never put it in a `.env`: the guard refuses when the
+backend's `.env` or the `.env` of the folder you run from sets it. The manager's Build Client sets it
+on Windows when `CLIENT_FILES_DIR` is empty or names the default bucket. `setup` and the GitHub
+webhook never clone or pull in, into or around a live checkout, and pull only a `sources/client`
+whose `.git` folder is its own (not a `.git` file or link). The webhook never rebuilds the live
+files at all. On the server never use the opt-in: build the package in a work folder
+(`CLIENT_FILES_DIR=<work folder>`, from a scratch backend export), gate it, and ship it through the
+staged release path. On 6 Oct a plain `merge` in the live checkout zipped a stale copy onto the
+live zip and players hung at the logo.
 
 **Second trap (2026-09-21): `populate` needs the full CI client build.** A box that only runs
 `npm run build` in `skymp5-client` has `skymp5-client.js` alone in `fork/build/dist/client/Data`;
