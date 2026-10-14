@@ -1,6 +1,7 @@
 import { ClientListener, CombinedController, Sp } from "./clientListener";
 import { logTrace } from "../../logging";
-import { MoveSample, MOVING_SPEED, DECAY_RATIO, isMinigameWidget, shouldClearAutoMove, stillPlausible } from "./autoMoveClear";
+import { ButtonEvent, Menu } from "skyrimPlatform";
+import { AFTER_LOAD_CHECKS_MS, MoveSample, MOVING_SPEED, DECAY_RATIO, isMinigameWidget, shouldClearAfterLoad, shouldClearAutoMove, stillPlausible } from "./autoMoveClear";
 
 // Auto-move (auto-run) keeps the player walking with no key held. When a mini-game widget takes the keyboard the
 // player cannot stop, so they drift through the round and often out of range of the station. This switches it off
@@ -13,10 +14,68 @@ const SAMPLES = 3;
 const LOG_NAME = "dbo-diag";
 // Movement controls as controlmap.txt names them, so a player who remapped WASD is read by their own keys
 const MOVE_CONTROLS = ["Forward", "Back", "Strafe Left", "Strafe Right"];
+// Menus that mean the player is not walking under their own control (inputDiagService's list, less the HUD's)
+const BUSY_MENUS: Menu[] = [Menu.Cursor, Menu.Loading, Menu.Fader, Menu.Main, Menu.Mist, Menu.Console, Menu.Tween,
+  Menu.MessageBox, Menu.RaceSex, Menu.Dialogue, Menu.Journal, Menu.Inventory, Menu.Map];
 
 export class AutoMoveService extends ClientListener {
   constructor(private sp: Sp, private controller: CombinedController) {
     super();
+    // A loading screen or the fader (the temple wake after a death, a fast travel, a door) can lose a key release
+    this.controller.on("menuClose", (e) => { if (e.name === Menu.Loading || e.name === Menu.Fader) this.onLoaded(); });
+    this.controller.on("buttonEvent", (e) => this.onButtonEvent(e));
+    this.controller.on("thumbstickEvent", (e) => { if (e.isLeft && Math.hypot(e.inputX, e.inputY) > 0.2) this.stickAt = Date.now(); });
+  }
+
+  private onButtonEvent(e: ButtonEvent): void {
+    if (!e.isDown) return;
+    try { if (e.code === this.sp.Input.getMappedKey("Auto-Move", e.device)) this.autoMoveKeyAt = Date.now(); } catch (e2) { /* unmapped */ }
+  }
+
+  // Looks three times after each load; a newer load restarts the schedule
+  private onLoaded(): void {
+    const load = ++this.loadSeq;
+    this.loadedAt = Date.now();
+    for (const ms of AFTER_LOAD_CHECKS_MS) this.wait(this.loadedAt + ms, () => { if (load === this.loadSeq) this.checkAfterLoad(load, ms); });
+  }
+
+  private checkAfterLoad(load: number, ms: number): void {
+    if (this.busy) return;
+    this.busy = true;
+    this.samples = [];
+    const step = (): void => {
+      if (load !== this.loadSeq) { this.busy = false; return; }
+      const s = this.sample();
+      if (!s) { this.busy = false; return; }
+      this.samples.push(s);
+      if (!stillPlausible(this.samples)) { this.busy = false; return; }
+      if (this.samples.length < SAMPLES) { this.wait(Date.now() + SAMPLE_GAP_MS, step); return; }
+      const tap = shouldClearAfterLoad(this.samples, this.afterLoadState());
+      if (tap) this.tapForward();
+      this.report(`after load +${ms / 1000}s`, tap ? "tapped Forward" : "no tap");
+      this.busy = false;
+    };
+    step();
+  }
+
+  private afterLoadState() {
+    const sp = this.sp;
+    let menuOpen = false, mounted = false, controlsLocked = false;
+    try { menuOpen = sp.browser.isFocused() || BUSY_MENUS.some((m) => sp.Ui.isMenuOpen(m)); } catch (e) { menuOpen = true; }
+    try { mounted = !!sp.Game.getPlayer()?.isOnMount(); } catch (e) { mounted = true; }
+    try { controlsLocked = !sp.Game.isMovementControlsEnabled(); } catch (e) { controlsLocked = true; }
+    return { autoMoveKeySinceLoad: this.autoMoveKeyAt >= this.loadedAt, menuOpen, mounted, controlsLocked, stickMoving: Date.now() - this.stickAt < 1000 };
+  }
+
+  // Forward ends auto-move and releases a movement the game still thinks is held; it never starts anything
+  private tapForward(): void {
+    try {
+      const code = this.sp.Input.getMappedKey("Forward", 0);
+      if (code > 0) this.sp.Input.tapKey(code);
+      else logTrace(this, "Forward is not mapped, nothing to tap");
+    } catch (e) {
+      logTrace(this, `tapping Forward failed: ${e}`);
+    }
   }
 
   // Called by dboRelayService when a widget opens with focus
@@ -95,6 +154,7 @@ export class AutoMoveService extends ClientListener {
       .join(" ");
     const line = `autoMove ${widgetType}: ${what} (over ${MOVING_SPEED}, holding ${DECAY_RATIO}) ${seen}`;
     logTrace(this, line);
+    try { const note = (globalThis as { __dboDiagNote?: (k: string, t: string) => void }).__dboDiagNote; if (typeof note === "function" && what !== "no tap") note("autoMove", line); } catch (e) { /* diagnostics only */ }
     try {
       (this.sp as unknown as { writeLogs: (plugin: string, ...rest: unknown[]) => void }).writeLogs(LOG_NAME, line);
     } catch (e) {
@@ -104,4 +164,8 @@ export class AutoMoveService extends ClientListener {
 
   private busy = false;
   private samples: MoveSample[] = [];
+  private loadSeq = 0;
+  private loadedAt = 0;
+  private autoMoveKeyAt = 0;
+  private stickAt = 0;
 }

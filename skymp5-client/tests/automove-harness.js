@@ -9,7 +9,7 @@
 'use strict';
 const path = require('path');
 const m = require(path.resolve(process.argv[2] || '/tmp/dbo-automove/autoMoveClear.js'));
-const { shouldClearAutoMove, isMinigameWidget, looksAutoMoving, speedHeld, MOVING_SPEED, DECAY_RATIO } = m;
+const { shouldClearAutoMove, isMinigameWidget, looksAutoMoving, speedHeld, MOVING_SPEED, DECAY_RATIO, shouldClearAfterLoad, AFTER_LOAD_CHECKS_MS } = m;
 
 let failures = 0;
 const check = (name, ok, got) => {
@@ -105,6 +105,25 @@ for (const t of ['labour', 'playermenu']) {
   }
 }
 check('every combination of three samples agrees with the rule', bad3 === 0, { disagreements: bad3 });
+
+// ---- after a loading screen (the temple wake after a death, a fast travel; #bugs 30 Sep - 5 Oct) -------------------
+const free = { autoMoveKeySinceLoad: false, menuOpen: false, mounted: false, controlsLocked: false, stickMoving: false };
+const run3 = [running, running, running];
+check('after a load: running with nothing held and the speed holding is cleared (Tiberius #R4XE, 12 Oct)', shouldClearAfterLoad(run3, free) === true);
+check('...not when the player pressed their own Auto-Move key since the load (their choice)', shouldClearAfterLoad(run3, { ...free, autoMoveKeySinceLoad: true }) === false);
+check('...not with a menu or a panel open', shouldClearAfterLoad(run3, { ...free, menuOpen: true }) === false);
+check('...not on a horse', shouldClearAfterLoad(run3, { ...free, mounted: true }) === false);
+check('...not while movement is disabled (downed, carried)', shouldClearAfterLoad(run3, { ...free, controlsLocked: true }) === false);
+check('...not while a gamepad stick walks the player', shouldClearAfterLoad(run3, { ...free, stickMoving: true }) === false);
+check('...not while a movement key is held', shouldClearAfterLoad([held, held, held], free) === false);
+check('...not standing still, falling or slowing to a stop', shouldClearAfterLoad([still, still, still], free) === false
+  && shouldClearAfterLoad([running, s(RUN, false, true), running], free) === false && shouldClearAfterLoad([s(RUN), s(250), s(150)], free) === false);
+check('...not on one sample', shouldClearAfterLoad([running], free) === false);
+check('it looks at 1.5, 5 and 12 s after the load closes', JSON.stringify(AFTER_LOAD_CHECKS_MS) === '[1500,5000,12000]');
+const fs = require('fs');
+const svc = fs.readFileSync(path.resolve(__dirname, '../src/services/services/autoMoveService.ts'), 'utf8');
+check('the service runs it when the Loading Menu or the Fader closes', /menuClose[\s\S]{0,80}Menu\.Loading \|\| e\.name === Menu\.Fader[\s\S]{0,30}onLoaded/.test(svc));
+check('...and taps Forward, never the Auto-Move toggle, after a load', /if \(tap\) this\.tapForward\(\)/.test(svc) && /getMappedKey\("Forward", 0\)/.test(svc));
 
 console.log(failures === 0 ? '\nall checks passed' : `\n${failures} failed`);
 process.exit(failures === 0 ? 0 : 1);

@@ -79,3 +79,26 @@ export function shouldClearAutoMove(widgetType: unknown, samples: MoveSample[]):
   if (!Array.isArray(samples) || samples.length < 2) return false;
   return stillPlausible(samples);
 }
+
+// ---- after a loading screen (#bugs: "after dying it will make you autorun with no way of stopping it", 30 Sep - 5 Oct) --
+// The input diagnostic after a fall (reason "down") shows the shape: past the temple wake or a fast travel's fader the
+// character keeps travelling ~5,000 units every 15 s with no key held for minutes (Tiberius #R4XE, 12 Oct 05:48-05:51).
+// Players stop it by tapping Forward or Back, or with Alt-Tab: the game missed a key release during the load, so the
+// fix taps Forward, which ends auto-move and a stuck movement alike, never the Auto-Move toggle (a wrong toggle STARTS it).
+
+export interface AfterLoadState {
+  autoMoveKeySinceLoad: boolean; // the player pressed their own Auto-Move key since the load: running is their choice
+  menuOpen: boolean;             // any menu, the browser focus included: not walking under their own control
+  mounted: boolean;              // a horse carries the player with no key held
+  controlsLocked: boolean;       // movement disabled (downed, carried, a scene)
+  stickMoving: boolean;          // a gamepad's left stick is tilted: walking with no key held
+}
+
+// Seconds after a loading screen closes at which the client looks: the run often starts once the fader is gone
+export const AFTER_LOAD_CHECKS_MS = [1500, 5000, 12000];
+
+export function shouldClearAfterLoad(samples: MoveSample[], st: AfterLoadState): boolean {
+  if (!st || st.autoMoveKeySinceLoad || st.menuOpen || st.mounted || st.controlsLocked || st.stickMoving) return false;
+  if (!Array.isArray(samples) || samples.length < 2) return false;
+  return stillPlausible(samples);
+}
