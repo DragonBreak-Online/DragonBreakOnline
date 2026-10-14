@@ -2268,25 +2268,34 @@ globalThis.__dboAtCreationEnd = (a) => inHub(a) && !creationPending(a);
 // The live client already hides an actor whose neighbour-visible ff_adminModes says invis: formView draws the body at
 // alpha 0 with no nametag, and shows it to staff as a ghost. AdminSystem keeps the real modes per profile and only mirrors
 // them into that property (god mode and the rest are judged from its own state), so this changes nothing server-side.
-// Only `invis` is written, the other mirrored modes are kept. AdminSystem rewrites the mirror at each login and each
-// toggle, so a sweep puts the flag back; leaving the Realm takes it off at once. actor -> invis was already on (staff).
+// Only `invis` and the sweep's mark are written, the other mirrored modes are kept. AdminSystem rewrites the mirror at each
+// login and each toggle, so a sweep puts the flag back; leaving the Realm takes it off at once, unless Invisible is the
+// staff member's own (on at arrival, or toggled on in the Realm). actor -> { was: Invisible is their own }.
 const creatorHidden = globalThis.__dboCreatorHidden instanceof Map ? globalThis.__dboCreatorHidden : (globalThis.__dboCreatorHidden = new Map());
 const inCreatorRealm = (a) => inHub(a) && (creationPending(a) || creation.has(a >>> 0));
 const adminModesOf = (a) => { try { const m = mp.get(a, 'ff_adminModes'); return m && typeof m === 'object' ? m : {}; } catch (e) { return {}; } };
+// The sweep's flag carries this key; AdminSystem writes a fresh mirror without it, whose invis is then the staff member's own
+const CREATOR_MARK = 'creator';
 const setCreatorHidden = (a, on) => {
   const id = a >>> 0;
   try {
+    const m = adminModesOf(a);
+    const rec = creatorHidden.get(id);
+    // A bare true/false is an entry from before the mark (kept over a reload): its mirror cannot tell who wrote it
+    const marked = !!rec && typeof rec === 'object';
+    const own = marked && m[CREATOR_MARK] !== true ? m.invis === true : null;
+    const was = own !== null ? own : marked ? rec.was : rec === undefined ? m.invis === true : rec === true;
     if (on) {
-      const m = adminModesOf(a);
-      if (!creatorHidden.has(id)) creatorHidden.set(id, m.invis === true);
-      if (m.invis !== true) mp.set(a, 'ff_adminModes', Object.assign({}, m, { invis: true }));
+      if (m.invis !== true || m[CREATOR_MARK] !== true) mp.set(a, 'ff_adminModes', Object.assign({}, m, { invis: true, [CREATOR_MARK]: true }));
+      creatorHidden.set(id, { was });
       return;
     }
-    if (!creatorHidden.has(id)) return;
-    const was = creatorHidden.get(id);
+    if (rec === undefined) return;
     creatorHidden.delete(id);
-    const m = adminModesOf(a);
-    if (!was && m.invis === true) mp.set(a, 'ff_adminModes', Object.assign({}, m, { invis: false }));
+    if (own !== null || (m[CREATOR_MARK] !== true && (was || m.invis !== true))) return;
+    const out = Object.assign({}, m, { invis: was });
+    delete out[CREATOR_MARK];
+    mp.set(a, 'ff_adminModes', out);
   } catch (e) { log('creator hide failed', e.message); }
 };
 every('creatorHide', 1000, () => {
