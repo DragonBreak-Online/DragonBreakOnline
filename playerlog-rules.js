@@ -1492,7 +1492,7 @@ supernatural.js FEED 70f09eb9 clean
 supernatural.js FEED 9de7df49 clean
 supernatural.js SUPERNATURAL 2462dde7 parsed
 supernatural.js SUPERNATURAL ded670f2 parsed
-tailoring.js TAILOR 93b40d4a clean
+tailoring.js TAILOR 4ccf2f80 clean
 tenancy.js PROPERTY 8dbca314 parsed
 tenancy.js PROPERTY e3463099 parsed
 tenancy.js PROPERTY 647d7824 parsed

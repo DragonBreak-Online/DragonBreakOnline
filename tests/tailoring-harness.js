@@ -17,7 +17,9 @@ const ITEMS = { 2: 0xb001, 30: 0xb002, 100: 0xb003, 300: 0xb004, 2000: 0xb005 };
 for (const [v, id] of Object.entries(ITEMS)) { rec(id, 'ARMO', `Item${v}`, [{ type: 'DATA', data: u32(Number(v)) }]); rec(id + 0x1000, 'COBJ', `Recipe${v}`, [{ type: 'CNAM', data: u32(id) }, { type: 'BNAM', data: u32(LOOM) }]); }
 rec(0xc001, 'COBJ', 'ForgeRecipe', [{ type: 'CNAM', data: u32(ITEMS[2000]) }, { type: 'BNAM', data: u32(FORGE) }]);
 const props = new Map();
-const mp = { get: (id, k) => props.get(`${id}|${k}`), lookupEspmRecordById: (id) => recs.get(id >>> 0) || { record: null } };
+const descs = new Map();           // item id -> "local:plugin.esp", for the named list
+const mp = { get: (id, k) => props.get(`${id}|${k}`), lookupEspmRecordById: (id) => recs.get(id >>> 0) || { record: null },
+  getDescFromId: (id) => descs.get(id >>> 0) || '' };
 const told = [], audits = [], cmds = new Map();
 const A = 0x14, STAFF = 0x15;
 const tailor = (a, rank) => props.set(`${a}|private.mastery`, rank === null ? { order: ['blacksmith'], skills: {} } : { order: ['tailor'], skills: { tailor: { rank, level: rank * 25 } } });
@@ -58,5 +60,37 @@ ok(craft(A, 2000) === true, 'enabled false: every loom recipe as before');
 const regions = fs.readFileSync(path.join(SERVER, 'regions.js'), 'utf8'), gm = fs.readFileSync(path.join(SERVER, 'gamemode.js'), 'utf8');
 ok(/__dboSmithCraft\(actorId, itemId, recipeId\) === false\) return false;\n[^\n]*\n\s+if \(typeof globalThis\.__dboTailorCraft === 'function' && globalThis\.__dboTailorCraft\(actorId, itemId, recipeId\) === false\) return false;/.test(regions), 'regions.js asks the tailor gate right after the smithing gate');
 ok(/require\(TAILORING_JS\)\(\{ mp, log, personal, audit, who, cfg, isAdmin, sendPacket, registerChatCommand \}\)/.test(gm), 'gamemode.js loads tailoring.js');
+
+// ---- the curated list (Nate, 14 Oct: the tailoring spec) --------------------------------------------------------
+// The whole point: a name beats the price. Emperor's Robes are tier 5 whatever the stub says they are worth.
+load({ tailoring: cfgLive });
+const NAMED = 0xb900;
+rec(NAMED, 'ARMO', 'NamedItem', [{ type: 'DATA', data: u32(2) }]);                     // value 2 = tier 1 by price
+rec(NAMED + 0x1000, 'COBJ', 'NamedRecipe', [{ type: 'CNAM', data: u32(NAMED) }, { type: 'BNAM', data: u32(LOOM) }]);
+descs.set(NAMED, "15516:Skyrim.esm");                                                  // Emperor's Robes
+tailor(A, 0);                                                                          // a Novice Tailor
+ok(globalThis.__dboTailorCraft(A, NAMED, NAMED + 0x1000) === false, 'a Master robe is Master work even at a beggar\'s price');
+ok(/by name/.test(audits[audits.length - 1] || ''), '...and the audit says the name decided it', audits[audits.length - 1]);
+tailor(A, 4);                                                                          // a Master Tailor
+ok(globalThis.__dboTailorCraft(A, NAMED, NAMED + 0x1000) === true, '...and a Master Tailor makes it');
+
+// An item the list does not name keeps the old rule, so a partial list never opens the loom
+descs.set(ITEMS[2000], 'ffffff:NotInTheList.esp');
+tailor(A, 0);
+ok(craft(A, 2000) === false, 'an unlisted item is still placed by its value');
+ok(/by value 2000/.test(audits[audits.length - 1] || ''), '...and the audit says so', audits[audits.length - 1]);
+
+// The shipped list itself
+const LIST = JSON.parse(fs.readFileSync(path.join(SERVER, 'tailoring-tiers.json'), 'utf8'));
+const byName = (n) => Object.values(LIST.items).filter((v) => v.name === n).map((v) => v.tier);
+ok(Object.keys(LIST.items).length > 200, 'the list covers most of the loom', Object.keys(LIST.items).length);
+ok(byName("Emperor's Robes").every((t) => t === 5), "Emperor's Robes are Master work", byName("Emperor's Robes"));
+ok(byName('Ragged Robes').every((t) => t === 1), 'rags are Novice work');
+ok(byName('Sturdy Pouch (Left)').every((t) => t === 2), 'a pouch is Apprentice work');
+ok(byName('Patchwork Satchel').every((t) => t === 3), 'a satchel is Adept work');
+ok(byName('Reinforced Backpack').every((t) => t === 4), 'a backpack is Expert work');
+ok(Object.values(LIST.items).every((v) => v.tier >= 1 && v.tier <= 5 && v.name), 'every entry has a tier of 1..5 and a name');
+ok(Object.keys(LIST.items).every((d) => d === d.toLowerCase()), 'every key is lowercase, as descOf gives it');
+
 console.log(fails ? `${fails} failed` : 'all passed');
 process.exit(fails ? 1 : 0);
