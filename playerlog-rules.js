@@ -400,7 +400,8 @@ const parsed = (verb, def) => { AUDIT_VERBS[verb] = Object.assign({ cls: 'parsed
 clean_(`SCHOOLS MANUAL SKILLBOOK SCHEMATIC READ CONTRACT CHAMPION CHILL REVIVE FEED BEAST BLOODCROWN BLOOD
   HUNT RITE SILVER DUNGEON CHESTGOLD MINE CHOP ALCHEMY SMELT TAILOR REGION FORGENEVER ARTIFACT ORCISH FACTIONGEAR DRAGON LOCK
   UNSTUCK JAIL CONCORDAT EXECUTION OFFERING PRAYER REST WELL CAMP PLAYTIME PLAYTEST REROLL TICKET CRASH-DOWN CRASHLOOP
-  RUINBUTTON TAX SUPPLY BOOST STAFF APPEARANCE RECIPE BREW TREASURY ENCH-RESTORE ENCH-LEARNED-REPAIR CLOCK SPELL`);
+  RUINBUTTON TAX SUPPLY BOOST STAFF APPEARANCE RECIPE BREW TREASURY ENCH-RESTORE ENCH-LEARNED-REPAIR CLOCK SPELL
+  CITIZEN ELECTION`);
 // Name #TAG parties with no profile (display()): resolved by name and tag, never by the tag alone
 clean_('LEVEL ROPE STRUGGLE', { display: true });
 // The client-judged minigame mismatches: clean, and a security signal
@@ -1139,6 +1140,29 @@ charters.js CHARTER 988f3604 parsed
 charters.js CHARTER dfb1ffd1 parsed
 charters.js CHARTER 0306d70c parsed
 charters.js CHARTER bbc7a352 parsed
+citizenship.js CITIZEN a42c0b01 clean
+citizenship.js CITIZEN 9460e80f clean
+citizenship.js CITIZEN 19b317f7 clean
+citizenship.js CITIZEN 00476b3d clean
+citizenship.js CITIZEN ae3858a3 clean
+citizenship.js CITIZEN 3f205847 clean
+citizenship.js CITIZEN 9798b2f7 clean
+citizenship.js ELECTION f6fe19bb clean
+citizenship.js ELECTION aedc91eb clean
+citizenship.js ELECTION d4c72052 clean
+citizenship.js ELECTION 19644858 clean
+citizenship.js ELECTION 1284d29d clean
+citizenship.js ELECTION a2b8d084 clean
+citizenship.js ELECTION c4f1f300 clean
+citizenship.js ELECTION 361df79b clean
+citizenship.js ELECTION 96adbfc0 clean
+citizenship.js ELECTION 2d4975a2 clean
+citizenship.js ELECTION ba56254e clean
+citizenship.js ELECTION 3130c4e5 clean
+citizenship.js ELECTION 8e12772e clean
+citizenship.js ELECTION e9335d9a clean
+citizenship.js ELECTION 51c738f7 clean
+citizenship.js ELECTION 9607cadb clean
 commissions.js COMMISSION 49e86f26 parsed
 commissions.js COMMISSION 150fc5bd parsed
 commissions.js COMMISSION af1c554e parsed
@@ -1240,6 +1264,7 @@ gamemode.js CONSOLE 9f79f5f1 parsed
 gamemode.js CONSOLE c26ae299 parsed
 gamemode.js DRAGON 2d681b7f clean
 gamemode.js ANNOUNCE e54bab47 excluded
+gamemode.js OFFICIAL 9d4a3473 parsed
 gameticket.js TICKET 77ab190c clean
 gearstrip.js GEARSTRIP b2f2fbe7 parsed
 gearstrip.js GEARSTRIP dbc0d2fc parsed
@@ -1479,6 +1504,9 @@ tenancy.js PROPERTY f2ed1811 parsed
 tenancy.js PROPERTY 78368fd7 parsed
 tenancy.js PROPERTY eea5b910 parsed
 tenancy.js PROPERTY ba2e199b parsed
+tenancy.js PROPERTY e0424aa5 parsed
+tenancy.js PROPERTY a49d27a0 parsed
+tenancy.js PROPERTY 3aac3a2d parsed
 thalmor.js CONCORDAT 230eceba clean
 thalmor.js CONCORDAT 66fa43c2 clean
 thalmor.js CONCORDAT f62ed9cc clean

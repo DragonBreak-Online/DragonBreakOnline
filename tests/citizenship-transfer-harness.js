@@ -11,7 +11,7 @@ const path = require('path');
 const bundle = process.argv[2];
 if (!bundle) { console.error('usage: node tests/citizenship-transfer-harness.js <bundled housingSystem.js>'); process.exit(2); }
 const src = fs.readFileSync(path.resolve(bundle), 'utf8');
-if (!src.includes('__dboPropertyTransferCheck')) { console.log('skipped: this fork\'s housingSystem.ts has no citizenship hook (fork-citizenship-1014)'); process.exit(0); }
+if (!src.includes('__dboPropertyTransferCheck')) { require('./expect')('citizenship-transfer', 'this housingSystem.ts has no citizenship hook'); console.log('skipped: this fork\'s housingSystem.ts has no citizenship hook (fork-citizenship-1014)'); process.exit(0); }
 const { HousingSystem } = require(path.resolve(bundle));
 
 let fail = 0;
