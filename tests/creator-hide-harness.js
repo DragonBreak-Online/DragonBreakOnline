@@ -1,8 +1,8 @@
 // Scripted test for hiding players from each other while they make a character in the Realm (Nate, 4 Oct: "people
 // spawning into other people and seeing them in the creation screen"). gamemode.js sets `invis` in the neighbour-visible
 // ff_adminModes property of everyone in character creation; the client hides an actor with that flag (formView
-// adminViewOf: alpha 0, no nametag; staff see a ghost). AdminSystem keeps the real admin modes per profile, so the flag
-// is visual only, and only `invis` is ever written.
+// adminViewOf: no copy, or on 0.3.97 alpha 0 and a ghost to staff). AdminSystem keeps the real admin modes per profile,
+// so the flag is visual only, and only `invis` and the sweep's mark are ever written.
 // Run it from this folder's parent with
 //
 //   node tests/creator-hide-harness.js
@@ -59,8 +59,9 @@ check('the sweep writes nothing more while the flag is already on', writes.lengt
 // AdminSystem rewrites the whole mirror at each login (resyncModes) and each toggle: the next sweep puts invis back
 modes.set(MAKER, { god: false, smite: false, healhit: false, invis: false, ghost: false });
 sweep();
-check('a mirror rewritten by AdminSystem (a reconnect) is hidden again on the next sweep', modes.get(MAKER).invis === true
-  && modes.get(MAKER).god === false && Object.keys(modes.get(MAKER)).length === 5, modes.get(MAKER));
+check('a mirror rewritten by AdminSystem (a reconnect) is hidden again on the next sweep, under the sweep\'s mark',
+  modes.get(MAKER).invis === true && modes.get(MAKER).creator === true && modes.get(MAKER).god === false
+  && Object.keys(modes.get(MAKER)).length === 6, modes.get(MAKER));
 
 // A finished character choosing a god (still in the hub, creation entry kept) stays hidden; once sent out, shown at once
 pending.delete(MAKER);
@@ -84,7 +85,8 @@ join(STAFF, HUB_DESC, true);
 modes.set(STAFF, { god: true, smite: false, healhit: false, invis: true, ghost: false });
 const n2 = writes.length;
 sweep();
-check('a staff member already invisible is not written to while making a character', writes.length === n2 && modes.get(STAFF).god === true);
+check('a staff member already invisible keeps their modes while making a character (one write, for the mark)',
+  writes.length === n2 + 1 && modes.get(STAFF).god === true && modes.get(STAFF).invis === true, modes.get(STAFF));
 world.set(STAFF, WORLD); creation.delete(STAFF); pending.delete(STAFF);
 H.setCreatorHidden(STAFF, false);
 check('...and stays invisible after leaving the Realm (their own mode, not ours)', modes.get(STAFF).invis === true && modes.get(STAFF).god === true, modes.get(STAFF));
@@ -96,6 +98,47 @@ check('a Ghost staff member is hidden with Ghost kept', modes.get(GHOSTSTAFF).in
 world.set(GHOSTSTAFF, WORLD); creation.delete(GHOSTSTAFF); pending.delete(GHOSTSTAFF);
 sweep();
 check('...and shown again with Ghost still on', modes.get(GHOSTSTAFF).invis === false && modes.get(GHOSTSTAFF).ghost === true, modes.get(GHOSTSTAFF));
+
+// Staff who turn Invisible on or off inside the Realm (AdminSystem.toggleMode writes a fresh mirror from its own state)
+// leave with their own choice, not the sweep's flag
+const ALLOFF = { god: false, smite: false, healhit: false, invis: false, ghost: false };
+const leave = (a) => { world.set(a, WORLD); creation.delete(a); pending.delete(a); H.setCreatorHidden(a, false); };
+const TOGGLER = 9;
+join(TOGGLER, HUB_DESC, true);
+modes.set(TOGGLER, Object.assign({}, ALLOFF));
+sweep();
+modes.set(TOGGLER, Object.assign({}, ALLOFF, { invis: true }));
+sweep();
+leave(TOGGLER);
+check('staff who turn Invisible on inside the Realm stay invisible after leaving it', modes.get(TOGGLER).invis === true, modes.get(TOGGLER));
+check('...with AdminSystem\'s five modes and nothing of the sweep left on the mirror',
+  JSON.stringify(modes.get(TOGGLER)) === JSON.stringify(Object.assign({}, ALLOFF, { invis: true })), modes.get(TOGGLER));
+sweep();
+check('...and the sweep leaves them alone in the world', modes.get(TOGGLER).invis === true && !H.creatorHidden.has(TOGGLER));
+const QUICK = 10;
+join(QUICK, HUB_DESC, true);
+modes.set(QUICK, Object.assign({}, ALLOFF));
+sweep();
+modes.set(QUICK, Object.assign({}, ALLOFF, { invis: true }));
+leave(QUICK);
+check('...also when they leave before the next sweep has seen the toggle', modes.get(QUICK).invis === true, modes.get(QUICK));
+const UNHIDE = 11;
+join(UNHIDE, HUB_DESC, true);
+modes.set(UNHIDE, Object.assign({}, ALLOFF, { invis: true }));
+sweep();
+modes.set(UNHIDE, Object.assign({}, ALLOFF));
+sweep();
+check('staff who turn Invisible off inside the Realm stay hidden while there', modes.get(UNHIDE).invis === true);
+leave(UNHIDE);
+check('...and are shown on leaving, as AdminSystem says', modes.get(UNHIDE).invis === false, modes.get(UNHIDE));
+const NAMEHOLD = 12;
+join(NAMEHOLD, HUB_DESC, true);
+modes.set(NAMEHOLD, Object.assign({}, ALLOFF));
+sweep();
+modes.set(NAMEHOLD, Object.assign({}, ALLOFF, { god: true }));
+sweep();
+leave(NAMEHOLD);
+check('a toggle of another mode inside the Realm still shows them on leaving', modes.get(NAMEHOLD).invis === false && modes.get(NAMEHOLD).god === true, modes.get(NAMEHOLD));
 
 // A player in the hub who is not making a character (staff visiting the Realm) is not hidden
 const VISITOR = 7;
@@ -126,6 +169,15 @@ check('a hot reload reuses the hidden list', H.creatorHidden === before && H.cre
 world.set(8, WORLD); creation.delete(8); pending.delete(8);
 timers.creatorHide.fn();
 check('...and the new sweep shows someone the old code hid', modes.get(8).invis === false && !H.creatorHidden.has(8));
+// Entries written before the sweep marked its flag are a bare true or false, beside a mirror with no mark
+join(13, HUB_DESC, true); H.creatorHidden.set(13, false); modes.set(13, Object.assign({}, ALLOFF, { invis: true }));
+join(14, HUB_DESC, true); H.creatorHidden.set(14, true); modes.set(14, Object.assign({}, ALLOFF, { invis: true }));
+timers.creatorHide.fn();
+leave(13); leave(14);
+check('an entry from before the reload keeps its meaning: a player is shown on leaving', modes.get(13).invis === false, modes.get(13));
+check('...and staff who were already invisible stay so', modes.get(14).invis === true, modes.get(14));
+check('...both with AdminSystem\'s five modes only', Object.keys(modes.get(13)).length === 5 && Object.keys(modes.get(14)).length === 5,
+  [modes.get(13), modes.get(14)]);
 
 // ---- the wiring in gamemode.js ----
 const arrived = gm.slice(gm.indexOf("onUi('arrived'"), gm.indexOf("onUi('arrived'") + 1400);
