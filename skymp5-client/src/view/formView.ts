@@ -62,15 +62,6 @@ export const getScreenResolution = (): ScreenResolution => {
   return _screenResolution;
 }
 
-// Kept once found; a null is not kept, so a keyword that is not loaded yet is looked up again next time
-let _sweetHidePersonKeyword: Keyword | null = null;
-const sweetHidePersonKeyword = (): Keyword | null => {
-  if (!_sweetHidePersonKeyword) {
-    _sweetHidePersonKeyword = Keyword.getKeyword('SweetHidePerson');
-  }
-  return _sweetHidePersonKeyword;
-}
-
 // Copies found pinned while hosted here, reported once each (see the hosted branch of FormView.update)
 const pinReported = new Set<number>();
 const reportPin = (remoteId: number | undefined, ac: Actor, model: FormModel, pin: ReturnType<typeof getApplyState>, everApplied: boolean): void => {
@@ -128,18 +119,12 @@ export class FormView {
 
     // Players with different worldOrCell should be invisible
     if (model.movement) {
-      // Was ObjectReferenceEx.getWorldOrCell(Game.getPlayer()): 3-4 native calls PER FORM per frame.
-      // PlayerCharacterDataHolder.updateData() evaluates the same expression for the same player one
-      // call earlier in the same frame (worldView.ts:133 then :135), so this is the identical value
-      // for free. On an out-of-cell form - most forms, indoors - that was nearly its whole cost.
+      // The player's worldOrCell, read this frame by PlayerCharacterDataHolder.updateData()
       const worldOrCell = PlayerCharacterDataHolder.getWorldOrCell();
       if (
         worldOrCell !== 0 &&
         model.movement.worldOrCell !== worldOrCell
       ) {
-        // destroy() ran unconditionally for every out-of-cell form every frame, registering a
-        // once() callback and allocating a closure each time. The admin-hidden branch below
-        // already guards exactly this way.
         if (this.refrId !== 0) {
           this.destroy();
           this.refrId = 0;
@@ -240,7 +225,6 @@ export class FormView {
 
       let refr = ObjectReference.from(Game.getFormEx(this.refrId));
 
-      // getBaseObject() was called twice in consecutive branches; it is one native call each.
       const refrBase = refr ? refr.getBaseObject() : null;
       let respawnRequired = false;
       if (!refr) {
@@ -553,10 +537,6 @@ export class FormView {
     const hosted = storage['hosted'];
     let alreadyHosted = false;
     if (Array.isArray(hosted)) {
-      // Was localIdToRemoteId(this.refrId), which scans every FormView to find the one whose local
-      // id equals ours - i.e. this view searching the array for itself, O(n) per form and so O(n^2)
-      // per frame: about 45,000 comparisons a frame at 300 forms. this.remoteRefrId is that same
-      // value by construction (it is the constructor argument the lookup would have returned).
       const remoteId = this.remoteRefrId ?? 0;
 
       if (hosted.includes(remoteId) || hosted.includes(remoteId + 0x100000000)) {
@@ -978,9 +958,9 @@ export class FormView {
     if (!actor) {
       return false;
     }
-    // Keyword.getKeyword() is a string-keyed form lookup for a compile-time constant, and this runs
-    // once per visible copy per frame. Resolved once and kept, like getScreenResolution above.
-    return actor.wornHasKeyword(sweetHidePersonKeyword());
+    // Looked up each call: a native object kept across frames is invalid after the next Papyrus update
+    const keyword = Keyword.getKeyword('SweetHidePerson');
+    return actor.wornHasKeyword(keyword);
   }
 
   // ff_hostile can arrive in an UpdateProperty after the copy spawned, so a changed flag is checked again
