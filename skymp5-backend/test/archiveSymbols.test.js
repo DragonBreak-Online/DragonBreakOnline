@@ -491,11 +491,15 @@ test('packages: without AUTO_REPORT_SYMBOL_GUARD, populate-files and merge-files
   if (fs.existsSync(clientSource)) return t.skip('sources/client exists here, and the merge would copy all of it')
   t.mock.method(console, 'log', () => {})
   const warn = t.mock.method(console, 'warn', () => {})
-  // The merge writes data/files-version.json next to the scripts; keep it out of the checkout
+  // The merge writes data/files-version.json next to the scripts as a new file renamed over it; keep it out of the checkout
   const versionFile = path.join(__dirname, '..', 'data', 'files-version.json')
-  const write = fs.writeFileSync
+  const rename = fs.renameSync
   const versions = []
-  t.mock.method(fs, 'writeFileSync', (file, ...rest) => (file === versionFile ? versions.push(JSON.parse(rest[0])) : write(file, ...rest)))
+  t.mock.method(fs, 'renameSync', (from, to) => {
+    if (to !== versionFile) return rename(from, to)
+    versions.push(JSON.parse(fs.readFileSync(from, 'utf8')))
+    fs.rmSync(from)
+  })
   config.clientFilesDir = files
   config.autoReportSymbolGuard = false
   delete require.cache[require.resolve('../scripts/merge-files')]
