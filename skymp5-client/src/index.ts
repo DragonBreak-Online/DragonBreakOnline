@@ -87,6 +87,7 @@ import { AdminModeService } from "./services/services/adminModeService";
 import { ExecutionService } from "./services/services/executionService";
 // U: the player menu, the server's help topics as a panel (Nate, 2026-09-28)
 import { PersonalMenuService } from "./services/services/personalMenuService";
+import { GamepadPointerService } from "./services/services/gamepadPointerService";
 import { ChatService } from "./services/services/chatService";
 import { FactionService } from "./services/services/factionService";
 import { TradeService } from "./services/services/tradeService";
@@ -236,6 +237,7 @@ const main = () => {
       new DeadCritterService(sp, controller),
       new AdminMenuService(sp, controller),
       new PersonalMenuService(sp, controller),
+      new GamepadPointerService(sp, controller),
       new PlacementService(sp, controller),
       new AdminModeService(sp, controller),
       new FactionService(sp, controller),
