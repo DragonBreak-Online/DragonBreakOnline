@@ -9,6 +9,7 @@ import { Provider } from 'react-redux';
 import { Widgets } from './utils/Widgets';
 import './utils/VoiceManager';
 import './utils/mouseMenuKeys';
+import './utils/GamepadPointer';
 import './utils/MainMenuMedia';
 import './utils/UiScale';
 import './utils/PanelScale';
