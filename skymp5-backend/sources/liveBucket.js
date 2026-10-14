@@ -135,11 +135,11 @@ function linksUnder(dir, out = []) {
   return out
 }
 
-// The opt-in counts for one command only: the backend's or the cwd's .env that sets it (dotenv loads both), or null
-const OPT_IN_LINE = new RegExp(`^\\s*(?:export\\s+)?${OPT_IN}\\s*(?:=|:)`, 'm')
+// The opt-in counts for one command only: the backend's or the cwd's .env that sets it (dotenv loads both), or null; Windows env names ignore case
 function optInFile() {
+  const line = new RegExp(`^\\s*(?:export\\s+)?${OPT_IN}\\s*(?:=|:)`, process.platform === 'win32' ? 'mi' : 'm')
   for (const file of new Set([path.join(BACKEND, '.env'), path.resolve('.env')])) {
-    try { if (OPT_IN_LINE.test(fs.readFileSync(file, 'utf8'))) return file } catch { /* no .env there */ }
+    try { if (line.test(fs.readFileSync(file, 'utf8'))) return file } catch { /* no .env there */ }
   }
   return null
 }
