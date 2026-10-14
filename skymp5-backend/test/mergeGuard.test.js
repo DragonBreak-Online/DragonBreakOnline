@@ -91,10 +91,14 @@ function workFolder(name, files = WORK_FILES) {
   return dir
 }
 
-// One script of a backend copy, with only the given env (CLIENT_FILES_DIR is always set) and a cwd without a .env, unless cwd names another
-function run(backend, script, env, { cwd = tmp } = {}) {
+// mount --bind from onto, in a private mount namespace (unshare -m) that no other process sees and that ends with the command
+const BIND = ['unshare', '-m', '--propagation', 'private', 'sh', '-ec', 'mount --bind "$1" "$2"; shift 2; exec "$@"', 'sh']
+
+// One script of a backend copy, with only the given env (CLIENT_FILES_DIR is always set) and a cwd without a .env, unless cwd names another; bind: [from, onto] for that run only
+function run(backend, script, env, { cwd = tmp, bind = null } = {}) {
   assert.ok(env.CLIENT_FILES_DIR, 'every run names its bucket')
-  return spawnSync(process.execPath, [path.join(backend, 'scripts', script)], {
+  const [cmd, ...args] = [...(bind ? [...BIND, ...bind] : []), process.execPath, path.join(backend, 'scripts', script)]
+  return spawnSync(cmd, args, {
     cwd, encoding: 'utf8', timeout: 60000,
     env: { PATH: process.env.PATH, TMPDIR: os.tmpdir(), DBO_RELEASE_REPO: path.join(tmp, 'no-live-checkout'), ...GIT_ENV, ...env },
   })
@@ -613,4 +617,131 @@ test('the opt-in in a .env is no opt-in: merge-files and populate-files refuse a
   assert.match(r.stderr, /DBO_MERGE_LIVE_BUCKET is set in \S*export-dotenv.skymp5-backend.\.env/)
   assert.deepEqual(snapshot(live.bucket), before)
   assert.equal(read(live.manifest), '{"version":"live"}\n')
+})
+
+test('merge-files: checks every folder and file the copy writes, so a link two levels down into the live root is refused before anything is written', () => {
+  const live = liveCheckout('live-deep-link')
+  const exp = backendCopy(path.join(tmp, 'export-deep-link'))
+  write(path.join(exp, 'sources', 'client', 'Data', 'Platform', 'UI', 'index.html'), 'the new ui')
+  write(path.join(exp, 'sources', 'client', 'a.dll'), 'a new dll')
+  // root/Data links to a folder outside the live files, and that folder's Platform links into the live root
+  const stash = path.join(tmp, 'stash-deep-link', 'Data')
+  fs.mkdirSync(stash, { recursive: true })
+  fs.symlinkSync(path.join(live.bucket, 'root', 'Data', 'Platform'), path.join(stash, 'Platform'))
+  const work = path.join(tmp, 'work-deep-link')
+  fs.mkdirSync(path.join(work, 'root'), { recursive: true })
+  fs.symlinkSync(stash, path.join(work, 'root', 'Data'))
+  const before = snapshot(live.bucket)
+  const r = run(exp, 'merge-files.js', { CLIENT_FILES_DIR: work, DBO_RELEASE_REPO: live.repo })
+  assert.deepEqual(snapshot(live.bucket), before, r.stdout + r.stderr)
+  assert.equal(r.status, 1, r.stdout + r.stderr)
+  assert.match(r.stderr, /refusing to write into the live client files: \S*root.Data.Platform is in the live client files bucket/)
+  assert.deepEqual(fs.readdirSync(path.join(work, 'root')), ['Data'])
+  assert.deepEqual(fs.readdirSync(stash), ['Platform'])
+  assert.equal(fs.existsSync(path.join(work, 'skymp-client.zip')), false)
+  assert.equal(fs.existsSync(path.join(exp, 'data', 'files-version.json')), false)
+})
+
+test('setup-client and the webhook: never pull a sources/client whose .git folder shares another checkout\'s (commondir, git-new-workdir, GIT_COMMON_DIR)', { skip: !HAS_GIT && 'git is not installed' }, async (t) => {
+  const errors = t.mock.method(console, 'error', () => {})
+  t.mock.method(console, 'log', () => {})
+  const { pullAndMerge } = require('../routes/webhook').internals
+  const live = liveCheckout('live-shared-git', { asCheckout: true })
+  const other = path.join(tmp, 'other-shared-git')
+  behindCheckout(other)
+  const mains = () => [live.repo, other].map(repo => git(repo, 'rev-parse', 'refs/heads/main'))
+  const start = mains()
+  const releaseRepo = config.releaseRepo
+  config.releaseRepo = live.repo
+  t.after(() => { config.releaseRepo = releaseRepo; delete process.env.GIT_COMMON_DIR })
+  let merges = 0
+  const merge = async () => { merges++ }
+  const said = () => errors.mock.calls.map(c => c.arguments.join(' ')).join('\n')
+  const newWorkdir = '/usr/share/doc/git/contrib/workdir/git-new-workdir'
+
+  // Each shape: how sources/client is made, the env of the pull, and why it is refused
+  const shapes = [
+    // A real .git folder with its own HEAD and index, whose commondir names the live checkout's .git
+    ['commondir', client => {
+      write(path.join(client, '.git', 'HEAD'), 'ref: refs/heads/main\n')
+      write(path.join(client, '.git', 'commondir'), `${path.join(live.repo, '.git')}\n`)
+      git(client, 'reset', '-q', '--hard')
+    }, {}, /holds a commondir file/],
+    // git's own contrib script: a .git folder whose refs, objects and config are links into the live .git
+    ...(fs.existsSync(newWorkdir) ? [['git-new-workdir', client => {
+      execFileSync('sh', [newWorkdir, live.repo, client, 'main'], { stdio: 'ignore' })
+    }, {}, /\.git.\S+ is a link to \S*live-shared-git/]] : []),
+    // A .git folder of its own, but GIT_COMMON_DIR in the env sends the refs and objects to another checkout's .git
+    ['GIT_COMMON_DIR live', client => {
+      git(tmp, 'clone', '-q', `${live.repo}-upstream`, client)
+      git(client, 'reset', '-q', '--hard', 'HEAD~1')
+    }, { GIT_COMMON_DIR: path.join(live.repo, '.git') }, /git keeps its common folder at \S*live-shared-git.\.git, and .* is in the live checkout/],
+    ['GIT_COMMON_DIR other', client => {
+      git(tmp, 'clone', '-q', `${other}-upstream`, client)
+      git(client, 'reset', '-q', '--hard', 'HEAD~1')
+    }, { GIT_COMMON_DIR: path.join(other, '.git') }, /git keeps its common folder at \S*other-shared-git.\.git, outside /],
+  ]
+  for (const [shape, make, env, why] of shapes) {
+    const exp = backendCopy(path.join(tmp, `export-shared-${shape.replace(' ', '-')}`))
+    const client = path.join(exp, 'sources', 'client')
+    make(client)
+    const work = workFolder(`work-shared-${shape.replace(' ', '-')}`)
+    const setup = run(exp, 'setup-client.js', { CLIENT_FILES_DIR: work, DBO_RELEASE_REPO: live.repo, ...env })
+    assert.deepEqual(mains(), start, `setup-client moved a main branch through ${shape}`)
+    assert.equal(setup.status, 1, `${shape}: ${setup.stdout}${setup.stderr}`)
+    assert.match(setup.stderr, /\[setup\] refusing to pull: .* has no git folder of its own: /, shape)
+    assert.match(setup.stderr, why, shape)
+    Object.assign(process.env, env)
+    const pulled = await pullAndMerge({ clientDir: client, bucket: work, merge })
+    delete process.env.GIT_COMMON_DIR
+    assert.deepEqual(mains(), start, `the webhook moved a main branch through ${shape}`)
+    assert.equal(pulled, 'refused', shape)
+    assert.match(said(), why, shape)
+    assert.equal(fs.existsSync(path.join(work, 'skymp-client.zip')), false)
+  }
+  assert.equal(merges, 0)
+})
+
+test('merge-files and populate-files: a work root bind-mounted from the live root is refused, as the same folder by device and inode', (t) => {
+  const live = liveCheckout('live-bind')
+  const probe = [path.join(tmp, 'bind-probe-from'), path.join(tmp, 'bind-probe-onto')]
+  probe.forEach(dir => fs.mkdirSync(dir))
+  const [cmd, ...args] = [...BIND, ...probe, 'true']
+  if (process.platform !== 'linux' || spawnSync(cmd, args).status !== 0) return t.skip('mount --bind in a private mount namespace is not permitted here')
+  const exp = backendCopy(path.join(tmp, 'export-bind'))
+  write(path.join(exp, 'sources', 'client', 'Data', 'Platform', 'UI', 'index.html'), 'the new ui')
+  const src = path.join(tmp, 'build-bind', 'Data')
+  write(path.join(src, 'Platform', 'UI', 'index.html'), 'the built ui')
+  const liveRoot = path.join(live.bucket, 'root')
+  const before = snapshot(live.bucket)
+
+  for (const [script, from, onto] of [
+    ['merge-files.js', liveRoot, 'root'],
+    ['populate-files.js', liveRoot, 'root'],
+    ['populate-files.js', path.join(liveRoot, 'Data'), path.join('root', 'Data')],
+  ]) {
+    const work = path.join(tmp, `work-bind-${script}-${onto.replace(path.sep, '-')}`)
+    fs.mkdirSync(path.join(work, onto), { recursive: true })
+    const r = run(exp, script, { CLIENT_FILES_DIR: work, DBO_RELEASE_REPO: live.repo, SKYMP_CLIENT_DATA: src }, { bind: [from, path.join(work, onto)] })
+    assert.deepEqual(snapshot(live.bucket), before, `${script} with ${onto} bind-mounted: ${r.stdout}${r.stderr}`)
+    assert.equal(r.status, 1, r.stdout + r.stderr)
+    assert.match(r.stderr, /refusing to write into the live client files: \S+ lands in the live folder \S+ under another name \(a bind mount\)/)
+    assert.ok(!fs.readFileSync('/proc/self/mountinfo', 'utf8').includes(work), 'the bind mount outlived its run')
+    assert.deepEqual(fs.readdirSync(path.join(work, onto)), [])
+  }
+  assert.equal(read(live.manifest), '{"version":"live"}\n')
+})
+
+test('the opt-in in a .env on Windows: a key in any case is found, since Windows env names ignore case', (t) => {
+  const cwd = path.join(tmp, 'cwd-dotenv-case')
+  write(path.join(cwd, '.env'), 'PORT=4000\ndbo_merge_live_bucket=1\n')
+  const was = process.cwd()
+  process.chdir(cwd)
+  t.after(() => process.chdir(was))
+  assert.equal(liveBucket.optInFile(), null, 'Linux env names keep their case')
+  const platform = Object.getOwnPropertyDescriptor(process, 'platform')
+  Object.defineProperty(process, 'platform', { value: 'win32' })
+  t.after(() => Object.defineProperty(process, 'platform', platform))
+  assert.equal(liveBucket.optInFile(), path.join(process.cwd(), '.env'))
+  assert.equal(liveBucket.optedIn({ DBO_MERGE_LIVE_BUCKET: '1' }), false)
 })
