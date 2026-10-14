@@ -145,6 +145,15 @@ test('merge-files: refuses the live bucket, also through a symlink or below it, 
   assert.equal(r.status, 1)
   assert.deepEqual(snapshot(live.bucket), before)
   assert.equal(fs.existsSync(path.join(exp, 'data', 'files-version.json')), false)
+
+  // A live bucket that is itself a link is refused by the folder it points to as well
+  const moved = path.join(tmp, 'live-bucket-moved')
+  fs.renameSync(live.bucket, moved)
+  fs.symlinkSync(moved, live.bucket)
+  const target = run(exp, 'merge-files.js', { CLIENT_FILES_DIR: moved, DBO_RELEASE_REPO: live.repo })
+  assert.equal(target.status, 1, target.stdout + target.stderr)
+  assert.match(target.stderr, /is the live client files bucket/)
+  assert.deepEqual(snapshot(moved), before)
 })
 
 test('merge-files: refuses the default bucket of the checkout it runs from', () => {

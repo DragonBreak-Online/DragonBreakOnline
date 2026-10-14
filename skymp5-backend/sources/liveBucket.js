@@ -39,9 +39,9 @@ const liveRepos = () => [...new Set([LIVE_REPO, config.releaseRepo].filter(Boole
 function liveTarget({ bucket, manifest = null }) {
   const dir = realPath(bucket)
   for (const repo of liveRepos()) {
-    const liveBucket = path.join(repo, 'build', 'client-files')
+    const liveBucket = realPath(path.join(repo, 'build', 'client-files'))
     if (isInside(dir, liveBucket)) return `${bucket} is the live client files bucket (${liveBucket})`
-    const liveManifest = path.join(repo, 'skymp5-backend', 'data', 'files-version.json')
+    const liveManifest = realPath(path.join(repo, 'skymp5-backend', 'data', 'files-version.json'))
     if (manifest && realPath(manifest) === liveManifest) return `this is the live checkout: it would rewrite the live manifest ${liveManifest}`
   }
   if (dir === realPath(DEFAULT_CLIENT_FILES_DIR)) return `${bucket} is the default bucket, the one the backend of this checkout serves (CLIENT_FILES_DIR is unset or names it)`
