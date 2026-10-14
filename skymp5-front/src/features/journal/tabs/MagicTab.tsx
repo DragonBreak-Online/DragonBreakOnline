@@ -9,19 +9,26 @@ import { JournalTabProps, registerJournalTab } from '../tabs';
 // firstSpell <school> <spell desc>, prepare <spell desc>, unprepare <spell desc>; prepare and put away only where the
 // server says canPrepare (a college or beside a Scholars' Ledger).
 
-interface FirstSpell { state: 'open' | 'made' | 'none' | 'later' | 'closed'; spell?: string; choices?: Array<{ id: string; name: string; blurb: string }>; at?: number; spells?: string }
+// stage: which pick is waiting (Arcane Mastery, server schools.js rankPicks): 'first', 'Apprentice' or 'Adept'; held: the school goes no further until it is chosen
+interface FirstSpell { state: 'open' | 'made' | 'none' | 'later' | 'closed'; spell?: string; choices?: Array<{ id: string; name: string; blurb: string }>; at?: number; spells?: string; stage?: string; held?: boolean }
 interface Tome { spell: string; school: string; rank: number; rankName: string; where: string }
 export interface MagicSchool {
   name: string; epithet: string; blurb: string; role: string; roleLabel: string; level: number; rank: string; nextRank: string; nextAt: number; fill: number;
   firstSpell: FirstSpell; allows: { maxRank: number; maxRankName: string; line: string }; swapStartsAt: number; recommendations: Tome[];
+  rankSpells?: Array<{ rank: string; spell: string; none?: boolean }>; nextPick?: { rank: string; at: number } | null;
 }
 interface BookSpell { id: string; name: string; school: string; rank: number; rankName: string; prepared?: boolean; outside?: boolean }
+interface Apprenticeship {
+  apprentice: { teacher: string; spell: string; school: string; rank: string; xp: number; need: number; today: number; dailyXp: number; near: boolean } | null;
+  apprentices: Array<{ name: string; spell: string }>; max: number;
+}
 export interface MagicSection {
   v: number; open: boolean; note?: string; ranks?: string[]; firstSpellAt?: number;
   arcane?: { held: boolean; level: number }; priest?: { held: boolean; level: number }; primary?: string; secondary?: string;
   schools?: MagicSchool[];
   book?: { max: number; canPrepare: boolean; hint: string; prepared: BookSpell[]; known: BookSpell[]; outside: BookSpell[] };
   swap?: { enabled: boolean; can: boolean; why: string; nextAt: number; cooldownDays: number; startShare: number; where: string };
+  apprenticeship?: Apprenticeship | null;
 }
 
 const RANKS = ['Novice', 'Apprentice', 'Adept', 'Expert', 'Master'];
@@ -47,8 +54,8 @@ const SchoolPage = ({ s, sec, busy, act }: { s: MagicSchool; sec: MagicSection; 
       <p className="jmagic__prose">{s.allows ? s.allows.line : ''}</p>
       {f.state === 'open' ? (
         <section className="jmagic__first">
-          <h3 className="journal__heading">Choose your first spell</h3>
-          <p className="jmagic__prose">Your study of {s.name} has reached {sec.firstSpellAt || 25}. Choose one spell to know; the others stay to be learned from tomes.</p>
+          <h3 className="journal__heading">Choose your {f.stage && f.stage !== 'first' ? `${f.stage} spell` : 'first spell'}</h3>
+          <p className="jmagic__prose">Your study of {s.name} has reached {f.at || sec.firstSpellAt || 25}. Choose one spell to know; the others stay to be learned from tomes.{f.held ? ` Your study of ${s.name} goes no further until you choose.` : ''}</p>
           <ul className="jmagic__choices">
             {(f.choices || []).map((c) => (
               <li key={c.id} className={'jmagic__choice' + (asking === c.id ? ' jmagic__choice--ask' : '')}>
@@ -66,6 +73,8 @@ const SchoolPage = ({ s, sec, busy, act }: { s: MagicSchool; sec: MagicSection; 
         </section>
       ) : f.state === 'made' && f.spell ? <p className="jmagic__prose jmagic__dim">Your first spell of {s.name}: {f.spell}.</p>
         : f.state === 'later' ? <p className="jmagic__prose jmagic__dim">At {f.at || sec.firstSpellAt || 25} you choose your first spell{f.spells ? `: ${f.spells}` : ''}.</p> : null}
+      {(s.rankSpells || []).filter((x) => x.spell).map((x) => <p key={x.rank} className="jmagic__prose jmagic__dim">Your {x.rank} spell of {s.name}: {x.spell}.</p>)}
+      {s.nextPick && f.state !== 'open' ? <p className="jmagic__prose jmagic__dim">At {s.nextPick.at} you choose your {s.nextPick.rank} spell; your study of {s.name} waits there until you do.</p> : null}
       {s.recommendations && s.recommendations.length ? (
         <section>
           <h3 className="journal__heading">Next tomes for you</h3>
@@ -123,6 +132,10 @@ export const MagicTab = ({ section, busy, act }: JournalTabProps<MagicSection>) 
           ))}
         </ul>
         {sec.note ? <p className="jmagic__note">{sec.note}</p> : null}
+        {sec.apprenticeship && sec.apprenticeship.apprentice ? (() => { const ap = sec.apprenticeship.apprentice; return (
+          <p className="jmagic__note">Apprentice of {ap.teacher} in {ap.spell} ({ap.rank} {ap.school}): {ap.xp} of {ap.need} studied, {ap.today} of {ap.dailyXp} today. {ap.near ? 'You are near your teacher: cast it to study.' : 'Go to your teacher to cast and study it.'}</p>
+        ); })() : null}
+        {sec.apprenticeship && sec.apprenticeship.apprentices.length ? <p className="jmagic__note">Your apprentices: {sec.apprenticeship.apprentices.map((x) => `${x.name} (${x.spell})`).join(', ')}.</p> : null}
       </nav>
       {shown ? <SchoolPage s={shown} sec={sec} busy={busy} act={act} /> : <div />}
       <aside className="jmagic__book">
