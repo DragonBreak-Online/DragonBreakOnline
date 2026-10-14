@@ -7,7 +7,7 @@
 // work/, so a request runs at most once, and checks everything again itself: the signature and a 10 s window, the ids
 // already seen, the switch file, the game's own pin of Discord ids, its own limits, the caller (the admin's own
 // character, stamped with the same Discord id), the tier (the lower of the roles the backend just fetched and the roles
-// stamped at login, Developer or above), the allowlist and its argument rule, and that a #TAG target is exactly one
+// stamped at login, Lead GM or above), the allowlist and its argument rule, and that a #TAG target is exactly one
 // online player. Then the line goes through gamemode.js handleLine, the gate typed chat uses (admin flag, LEAD_ONLY, the
 // #staff-commands line), inside captureFor, and a signed reply goes into out/.
 //
@@ -35,6 +35,11 @@ const OUT_KEEP_MS = 15 * 60 * 1000;
 const LIMITS = Object.freeze({ perProfile: 10, all: 60, windowMs: 60 * 1000 });
 const MAX_LINES = 40, MAX_CHARS = 4000, MAX_LINE = 500;
 const LOG_EVERY_MS = 60 * 1000;
+// The lowest tier the console ever lets in, in code (Jake, 14 Oct: "Jake, Nate and Lead GMs"). gamemode-config
+// remoteConsole.minTier can raise it (developer, senior), never lower it, so a GM or a Trial GM is refused whatever the
+// config says. Above the floor every command keeps its own in-game checks (the admin flag, LEAD_ONLY, the handler's own)
+const CODE_FLOOR = 'leadgm';
+const FLOOR_LABEL = Object.freeze({ leadgm: 'Lead GM', developer: 'Developer', senior: 'Senior' });
 
 const ID_RE = /^(w-[0-9a-f-]{36}|d-\d{17,20})$/;
 const SNOWFLAKE = /^\d{17,20}$/;
@@ -87,7 +92,7 @@ const TEXT = {
   badArgs: (cmd) => `From the console: ${ALLOW[cmd] ? ALLOW[cmd].usage : `/${cmd}`}`,
   badName: () => 'Names: 2-31 letters, spaces, apostrophes or hyphens, starting with a letter.',
   noChar: () => 'The console acts as your own character. Make one in game first.',
-  tier: () => 'The console is for the Developer and Senior tiers in game.',
+  tier: (floor) => `The console is for ${floor || 'Lead GM'} and above in game.`,
   rolesChanged: () => 'Your Discord roles changed since you last logged in (or your character has not been stamped with them yet). Log in once.',
   notPinned: () => "This Discord account is not on the game's console list.",
   tooMany: () => 'Too many console commands. Wait a minute.',
@@ -213,8 +218,8 @@ module.exports = (api) => {
   const C = (cfg && typeof cfg.remoteConsole === 'object' && cfg.remoteConsole) || {};
   const deny = new Set(Array.isArray(C.deny) ? C.deny.map((x) => String(x).toLowerCase()) : []);
   const rank = (t) => (t && Object.prototype.hasOwnProperty.call(TIER_RANK, t) ? TIER_RANK[t] : 0);
-  // The config can raise the floor (to senior), never lower it below developer
-  const FLOOR = rank(C.minTier) > rank('developer') ? String(C.minTier) : 'developer';
+  // The config can raise the floor (to developer or senior), never lower it below CODE_FLOOR
+  const FLOOR = rank(C.minTier) > rank(CODE_FLOOR) ? String(C.minTier) : CODE_FLOOR;
   // The game's own pin: a non-empty list of Discord ids, else the console is off here whatever the backend says
   const PIN = Array.isArray(C.discordIds) && C.discordIds.length > 0 && C.discordIds.length <= 10 && C.discordIds.every((x) => typeof x === 'string' && SNOWFLAKE.test(x))
     ? new Set(C.discordIds) : null;
@@ -373,7 +378,7 @@ module.exports = (api) => {
     const as = { ranAs: display(a), online, tier: stamped || '' };
     // The effective tier is the lower of the two, and must reach the floor (DESIGN 0.3): a demotion counts at once, a
     // promotion only after a login stamps it, and so every remote caller passes isAdmin in the gate (and gets its staff line)
-    if (rank(fresh) < rank(FLOOR)) return refuse(key, r, 'tier', { fields: as });
+    if (rank(fresh) < rank(FLOOR)) return refuse(key, r, 'tier', { subject: FLOOR_LABEL[FLOOR] || FLOOR, fields: as });
     if (rank(stamped) > rank(fresh) || rank(stamped) < rank(FLOOR)) return refuse(key, r, 'rolesChanged', { fields: as });
 
     const line = checkLine(r.text, (n) => commands.has(n), deny);

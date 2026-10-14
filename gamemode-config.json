@@ -1282,10 +1282,10 @@
   "discordRoles": { "bruma": "" }
  },
  "remoteConsole": {
-  "_comment": "The remote staff console, game side (server\\console.js; Jake, 13-14 Oct). discordIds is the game's own pin of who may run in-game staff commands from the staff dashboard or Discord /console (Jake, 14 Oct: Jake, Nate and the Lead GMs). The backend keeps the same list in CONSOLE_DISCORD_IDS, and a request must be on both; an empty or malformed list here is off. The pin grants nothing by itself: the backend also needs an Owners or Dragon Break Dev role, fetched live, and the game needs the lower of the live and login tier to be Developer or above, so a pinned account without those is refused. enabled false turns the game side off at the next reload; deny leaves commands out (it can only narrow the list in console.js); minTier can raise the floor to senior, never lower it. Every gameplay deploy carries this block from the repo (review R3, 14 Oct). The instant off switch is /etc/dragonbreak/console.",
+  "_comment": "The remote staff console, game side (server\\console.js; Jake, 13-14 Oct). discordIds is the game's own pin of who may run in-game staff commands from the staff dashboard or Discord /console (Jake, 14 Oct: Jake, Nate and the Lead GMs, who may use it). The backend keeps the same list in CONSOLE_DISCORD_IDS, and a request must be on both; an empty or malformed list here is off. The pin grants nothing by itself: the backend also needs an Owners, Dragon Break Dev or Lead GM role, fetched live, and the game needs the lower of the live and login tier to be Lead GM or above, so a pinned GM or Trial GM is refused; each command then keeps its own in-game checks (LEAD_ONLY, the admin flag). enabled false turns the game side off at the next reload; deny leaves commands out (it can only narrow the list in console.js); minTier can raise the floor to developer or senior, never lower it below leadgm (the floor in console.js). Every gameplay deploy carries this block from the repo (review R3, 14 Oct). The instant off switch is /etc/dragonbreak/console.",
   "enabled": true,
   "discordIds": ["234362720420364288", "262414676489535489", "274310050762326017", "279763097881935873", "297172235397890050", "358760034769043457", "457340616230174740", "536260882930466816"],
-  "minTier": "developer",
+  "minTier": "leadgm",
   "deny": []
  }
 }

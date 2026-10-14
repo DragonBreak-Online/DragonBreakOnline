@@ -274,15 +274,46 @@ reset();
   check('4. stamped gm with fresh senior is refused (rolesChanged): a forged or stale "senior" cannot lift a GM', rep.why === 'rolesChanged', rep);
   const gm = G.captureFor(A.gm, true, () => G.handleLine(A.gm, '/wwremote clear #8KWH', -1, { remote: { src: 'discord', id8: '12345678' } }));
   check('4. ...and behind it LEAD_ONLY refuses /wwremote for a GM, posted with the remote tag', gm.result === 'refused' && staffLines.some((s) => /REFUSED \(Lead GM and above\) \[remote discord 12345678\]/.test(s.detail)), staffLines);
+  // Jake, 14 Oct: "Jake, Nate and Lead GMs". The floor in code is Lead GM; a GM and a Trial GM stay out even when pinned
+  staffLines.length = 0;
   rep = send('/whoami', { discordId: ID.trial, profileId: 4, roles: [ROLE.trial] }).rep;
-  check('4. a Trial GM is refused (tier)', rep.why === 'tier', rep);
+  check('4. a pinned Trial GM is refused (tier), with the floor named', rep.why === 'tier' && /^The console is for Lead GM and above in game\.$/.test(header(rep)) && !staffLines.length, rep);
+  rep = send('/whoami', { discordId: ID.gm, profileId: 3, roles: [ROLE.gm] }).rep;
+  check('4. a pinned GM is refused (tier): GM is below the floor in code', rep.state === 'refused' && rep.why === 'tier' && rep.tier === 'gm' && !staffLines.length, rep);
   rep = send('/whoami', { discordId: ID.lead, profileId: 9, roles: [ROLE.lead] }).rep;
-  check('4. a Lead GM is refused in v1 (tier: Developer and above)', rep.why === 'tier', rep);
+  check('4. a pinned Lead GM passes (Leda, offline), and the handler sees her own tier, leadgm', rep.state === 'ran' && rep.tier === 'leadgm' && rep.online === false && /tier leadgm$/.test(header(rep)), rep);
+  check('4. ...with a #staff-commands line naming her Lead GM tier and the remote tag', staffLines.some((l) => /^Leda #LEAD <@200000000000000008> \(Lead GM\): \/whoami +\[remote web [0-9a-f]{8}\]$/.test(l.detail)), staffLines);
+  // A Lead-GM command (LEAD_ONLY in game, which a Lead GM passes), run on an online player
+  staffLines.length = 0; store.get(A.bob)['private.wwBodyOff'] = { at: 1 };
+  rep = send('/wwremote clear #8KWH', { discordId: ID.lead, profileId: 9, roles: [ROLE.lead], src: 'discord' }).rep;
+  check('4. a pinned Lead GM runs a Lead-GM command: /wwremote clear #8KWH ran, the breaker is cleared', rep.state === 'ran' && rep.target === 'Bob #8KWH' && store.get(A.bob)['private.wwBodyOff'] === null
+    && /werewolf body may be shown again/.test(header(rep)), rep);
+  check('4. ...and it went through LEAD_ONLY as a Lead GM, not around it (staff line, no refusal)', staffLines.some((l) => /\(Lead GM\): \/wwremote clear #8KWH \[remote discord /.test(l.detail)) && !staffLines.some((l) => /REFUSED/.test(l.detail)), staffLines);
+  // A Developer/Senior-only command in game (/schedule: updates.js may(), senior and developer only) is never run for a Lead GM
+  neverRan.length = 0;
+  rep = send('/schedule restart 30m test', { discordId: ID.lead, profileId: 9, roles: [ROLE.lead] }).rep;
+  check('4. a pinned Lead GM is refused a Developer/Senior-only command (/schedule), and it never runs', rep.state === 'refused' && rep.why === 'later' && !neverRan.length, rep);
+  // A handler's own tier check (as updates.js and placement.js keep them) sees the Lead GM's real tier through the console
+  const realLoad = G.commands.get('load'); const loadRan = [];
+  G.commands.set('load', Object.assign({}, realLoad, { fn: (a) => { if ((G.TIER_RANK[G.tierOf(a)] || 0) < G.TIER_RANK.developer) return G.personal(a, 'That is for a Developer and above.'); loadRan.push(a); } }));
+  rep = send('/load', { discordId: ID.lead, profileId: 9, roles: [ROLE.lead] }).rep;
+  check('4. a handler that checks for Developer and above refuses the pinned Lead GM through the console (nothing lifts her tier)', /That is for a Developer and above\./.test(header(rep)) && !loadRan.length, rep);
+  rep = send('/load', { discordId: ID.nate, profileId: 2, roles: [ROLE.dev] }).rep;
+  check('4. ...and lets a Developer through', loadRan.length === 1 && loadRan[0] === A.nate, rep);
+  G.commands.set('load', realLoad);
   rep = send('/whoami', { discordId: ID.nate, profileId: 2, roles: [ROLE.dev] }).rep;
   check('4. a Developer passes (Nate, offline)', rep.state === 'ran' && rep.tier === 'developer' && rep.online === false, rep);
-  loadConsole({ remoteConsole: Object.assign({}, PINNED.remoteConsole, { minTier: 'gm' }) });
+  for (const low of ['gm', 'trialgm', 'nonsense']) {
+    loadConsole({ remoteConsole: Object.assign({}, PINNED.remoteConsole, { minTier: low }) });
+    rep = send('/whoami', { discordId: ID.gm, profileId: 3, roles: [ROLE.gm] }).rep;
+    const lead = send('/whoami', { discordId: ID.lead, profileId: 9, roles: [ROLE.lead] }).rep;
+    check(`4. minTier "${low}" in config cannot lower the floor: a GM is still refused, a Lead GM still passes`, rep.why === 'tier' && lead.state === 'ran', [rep, lead]);
+  }
+  rep = send('/whoami', { discordId: ID.trial, profileId: 4, roles: [ROLE.trial] }).rep;
+  check('4. ...and a Trial GM is still refused', rep.why === 'tier', rep);
+  loadConsole({ remoteConsole: Object.assign({}, PINNED.remoteConsole, { minTier: 'developer' }) });
   rep = send('/whoami', { discordId: ID.lead, profileId: 9, roles: [ROLE.lead] }).rep;
-  check('4. minTier "gm" in config cannot lower the floor: a Lead GM is still refused', rep.why === 'tier', rep);
+  check('4. minTier "developer" raises it: a Lead GM is refused, with the raised floor named', rep.why === 'tier' && /^The console is for Developer and above in game\.$/.test(header(rep)), rep);
   loadConsole({ remoteConsole: Object.assign({}, PINNED.remoteConsole, { minTier: 'senior' }) });
   rep = send('/whoami', { discordId: ID.nate, profileId: 2, roles: [ROLE.dev] }).rep;
   check('4. minTier "senior" raises it: a Developer is refused', rep.why === 'tier', rep);
@@ -309,18 +340,19 @@ reset();
 
 // ---- 5b. the repo's gamemode-config.json carries the game pin (review R3; Jake's list, 14 Oct) ---------------------------------
 // Every gameplay deploy writes the repo's gamemode-config.json over the live one (keeping only the live admins), so the block
-// lives in the repo. Jake, Nate and the Lead GMs are on it; the pin grants nothing by itself (the tier rule still applies)
+// lives in the repo. Jake, Nate and the Lead GMs are on it and may use it; the pin grants nothing by itself (the tier rule,
+// Lead GM and above, still applies)
 reset();
 {
   const repoCfg = JSON.parse(fs.readFileSync(path.join(ROOT, 'gamemode-config.json'), 'utf8'));
   const rc = repoCfg.remoteConsole || {};
   const D1 = ['234362720420364288', '262414676489535489', '274310050762326017', '279763097881935873', '297172235397890050', '358760034769043457', '457340616230174740', '536260882930466816'];
-  check('5b. the repo config has the remoteConsole block: on, the eight pinned ids, floor developer, nothing denied',
-    rc.enabled === true && JSON.stringify(rc.discordIds) === JSON.stringify(D1) && rc.minTier === 'developer' && Array.isArray(rc.deny) && rc.deny.length === 0, rc);
+  check('5b. the repo config has the remoteConsole block: on, the eight pinned ids, floor leadgm (Jake, 14 Oct), nothing denied',
+    rc.enabled === true && JSON.stringify(rc.discordIds) === JSON.stringify(D1) && rc.minTier === 'leadgm' && Array.isArray(rc.deny) && rc.deny.length === 0, rc);
   check('5b. ...and nothing in it that console.js does not read (besides a comment)', Object.keys(rc).every((k) => ['_comment', 'enabled', 'discordIds', 'minTier', 'deny'].includes(k)), Object.keys(rc));
   logs.length = 0;
   loadConsole(repoCfg);
-  check('5b. console.js loads the repo config as a game pin of 8, floor developer, all nine commands', logs.some((l) => /console: reader on .*, 9 commands, floor developer, game pin 8$/.test(l)), logs);
+  check('5b. console.js loads the repo config as a game pin of 8, floor leadgm, all nine commands', logs.some((l) => /console: reader on .*, 9 commands, floor leadgm, game pin 8$/.test(l)), logs);
   const owner = actor(0xff000d01, { name: 'Jacob', tag: 'JKOW', profile: 21, discord: D1[0], roles: [ROLE.owner] });
   const leadOnly = actor(0xff000d02, { name: 'Icara', tag: 'ICED', profile: 22, discord: D1[2], roles: [ROLE.lead] });
   let rep = send('/whoami', { discordId: D1[0], profileId: 21, user: 'jake', roles: [ROLE.owner] }).rep;
@@ -329,10 +361,21 @@ reset();
   check('5b. ...and a form that would act on that character is refused with a clear message', rep.state === 'refused' && rep.why === 'self' && /acts on your own character\. Run it in game\./.test(header(rep)), rep);
   staffLines.length = 0;
   rep = send('/whoami', { discordId: D1[2], profileId: 22, user: 'icedsky', roles: [ROLE.lead] }).rep;
-  check('5b. a pinned Lead GM whose live tier is below Developer is refused (tier): the pin is not a right', rep.state === 'refused' && rep.why === 'tier' && !staffLines.length, rep);
+  check('5b. a pinned Lead GM runs on the repo config (Jake, 14 Oct: "Jake, Nate and Lead GMs"), as her own character, tier leadgm',
+    rep.state === 'ran' && rep.ranAs === 'Icara #ICED' && rep.tier === 'leadgm' && staffLines.some((l) => /\(Lead GM\): \/whoami +\[remote /.test(l.detail)), rep);
+  store.get(A.lydia)['private.wwBodyOff'] = { at: 1 };
+  rep = send('/wwremote clear #LLX8', { discordId: D1[2], profileId: 22, user: 'icedsky', roles: [ROLE.lead], src: 'discord' }).rep;
+  check('5b. ...and the Lead-GM command /wwremote clear #LLX8 runs for her', rep.state === 'ran' && store.get(A.lydia)['private.wwBodyOff'] === null, rep);
+  // One of the eight demoted to GM in Discord (and stamped GM at the next login): the pin is not a right
+  const demoted = actor(0xff000d03, { name: 'Dunn', tag: 'DUNN', profile: 23, discord: D1[6], roles: [ROLE.gm] });
+  staffLines.length = 0;
+  rep = send('/whoami', { discordId: D1[6], profileId: 23, user: 'dunthril', roles: [ROLE.gm] }).rep;
+  check('5b. a pinned account that is only a GM is refused (tier): the pin is not a right', rep.state === 'refused' && rep.why === 'tier' && !staffLines.length, rep);
+  rep = send('/whoami', { discordId: D1[6], profileId: 23, user: 'dunthril', roles: [ROLE.trial] }).rep;
+  check('5b. ...and so is one that is only a Trial GM', rep.state === 'refused' && rep.why === 'tier' && !staffLines.length, rep);
   rep = send('/whoami').rep;
   check('5b. an id that is not on the repo pin is refused (notPinned)', rep.why === 'notPinned', rep);
-  store.delete(owner); store.delete(leadOnly);
+  store.delete(owner); store.delete(leadOnly); store.delete(demoted);
   loadConsole(PINNED);
 }
 
