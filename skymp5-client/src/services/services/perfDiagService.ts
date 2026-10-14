@@ -12,10 +12,13 @@ import { PlayerCharacterDataHolder } from "../../view/playerCharacterDataHolder"
  *
  *   Client -> Server: { customPacketType: "dbo", event: "npcDrift", args: [{ kind: "perf", fps, frames, windowMs, worstMs,
  *     over50, over100, jsMs, top: [[label, ms, calls]...], cell, world, interior, actors, hosted, glowing,
- *     forms, near }] }
+ *     forms, near, still }] }
  *
  * jsMs and top cover the update handlers registered through the controller (spApiInteractor.ts), labelled by the
  * listener that registered them. Set perfDiag: false in the skymp5-client settings block to turn it all off.
+ *
+ * forms, near and still are what WorldView's cost scales with (see context()); near + still is the set FormView does
+ * full per-frame work for.
  */
 export class PerfDiagService extends ClientListener {
   constructor(private sp: Sp, private controller: CombinedController) {
@@ -48,22 +51,27 @@ export class PerfDiagService extends ClientListener {
     out.hosted = Array.isArray(hosted) ? hosted.length : 0;
     try { out.glowing = this.controller.lookupListener(DboGlowService).getGlowingCount(); } catch { /* not set up */ }
 
-    // WorldView costs (forms streamed to us) x (work per form), and neither term was reported, so
-    // its cost had to be inferred server-side from co-located player counts. These are the real
-    // scaling variables and they cost ZERO native calls - plain JS over a model already in hand.
-    // "forms" is everything streamed to this client; "near" is the subset FormView does full work
-    // for, the rest exiting early on the worldOrCell check.
+    // WorldView's cost scales with these: plain JS over the model already held, no native calls, sampled at report time
+    // forms: live forms streamed to this client, freed slots not counted (the same count as the heartbeat's fr.forms)
+    // near: moving forms past FormView's worldOrCell check (in the player's world or cell, all while it is 0), not our own
+    // still: forms with no movement (object refs such as doors), which skip that check and get full work wherever they are
     try {
-      const forms = this.controller.lookupListener(RemoteServer).getWorldModel().forms;
-      out.forms = forms.length;
+      const model = this.controller.lookupListener(RemoteServer).getWorldModel();
       const woc = PlayerCharacterDataHolder.getWorldOrCell();
+      let forms = 0;
       let near = 0;
-      if (woc) {
-        for (const f of forms) {
-          if (f && f.movement && f.movement.worldOrCell === woc) near++;
-        }
+      let still = 0;
+      for (let i = 0; i < model.forms.length; i++) {
+        const f = model.forms[i];
+        if (!f) continue;
+        forms++;
+        if (i === model.playerCharacterFormIdx) continue;
+        if (!f.movement) still++;
+        else if (!woc || f.movement.worldOrCell === woc) near++;
       }
+      out.forms = forms;
       out.near = near;
+      out.still = still;
     } catch { /* diagnostics only */ }
     const player = this.sp.Game.getPlayer();
     const cell = player?.getParentCell();
