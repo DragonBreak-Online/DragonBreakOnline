@@ -118,7 +118,8 @@ function buildZip(srcDir, zipPath) {
     archive.on('error', reject)
 
     archive.pipe(output)
-    archive.directory(srcDir, false)  // false = no root folder prefix in zip
+    // false = no root folder prefix in zip; the SKIP_ALWAYS names stay out of it as they stay out of the copy and the manifest
+    archive.directory(srcDir, false, entry => (entry.name.split(/[\\/]/).some(part => SKIP_ALWAYS.has(part)) ? false : entry))
     archive.finalize()
   })
 }
