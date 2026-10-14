@@ -260,8 +260,8 @@ const ticks = (n) => { for (let i = 0; i < n; i++) globalThis.__dboAlchemyRunTic
   }
   check('the hit multiplies by it (never for a beast)', /beastAgg \? 1 : masteryDamageMult\(agg, src\) \* potionAttackMult\(agg, src\)\)/.test(GM));
   check('armour counts for the Fortify Armor bonus (defenseDamageMult)', /counted \*= 1 \+ potionBonus\(targetId, 'armor'\);/.test(GM));
-  check('a Flesh spell lasts the Fortify Alteration bonus longer', /f\.seconds \* 1000 \* \(1 \+ potionBonus\(casterId, 'duration:18'\)\)/.test(GM));
-  check('a summon lasts the Fortify Conjuration bonus longer', /\(1 \+ potionBonus\(owner, 'duration:19'\)\)/.test(GM));
+  check('a Flesh spell lasts the Fortify Alteration bonus longer', /f\.seconds \* 1000 \* \(1 \+ \(typeof globalThis\.__dboPotionBonus === 'function' \? Math\.max\(0, Number\(globalThis\.__dboPotionBonus\(casterId >>> 0, 'duration:18'\)\) \|\| 0\) : 0\)\)/.test(GM));
+  check('a summon lasts the Fortify Conjuration bonus longer', /__dboPotionBonus\(owner >>> 0, 'duration:19'\)/.test(GM));
   check('a self-cast Restoration heal gets the Fortify Restoration share (castHook)', /potionRestorationCast\(Number\(casterId\) >>> 0, Number\(spellId\) >>> 0\)/.test(GM) && /spellSchoolOf\(spellId >>> 0\) !== 22/.test(GM));
   check('both landing paths of the hit judge hand weapon blows to the poison judge', (GM.match(/potionPoisonHit\(agg, tgt, src, dmg, flags\);/g) || []).length === 2);
   check('a failed alchemy.js load clears the new hooks', /alchemy\.js failed to load[^\n]*__dboPotionBonus = null; globalThis\.__dboPotionLockpickTiers = null; globalThis\.__dboPoisonHit = null;/.test(GM));

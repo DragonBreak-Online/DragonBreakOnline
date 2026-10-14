@@ -6414,7 +6414,7 @@ const fleshCast = (casterId, spellId) => {
   const f = fleshOfSpell(spellId >>> 0);
   if (!f) return;
   // A Fortify Alteration potion makes the spell last longer ("Alteration spells last <mag>% longer"; alchemy.js duration:18)
-  fleshActive.set(casterId >>> 0, { spell: spellId >>> 0, armor: f.armor, until: Date.now() + f.seconds * 1000 * (1 + potionBonus(casterId, 'duration:18')) });
+  fleshActive.set(casterId >>> 0, { spell: spellId >>> 0, armor: f.armor, until: Date.now() + f.seconds * 1000 * (1 + (typeof globalThis.__dboPotionBonus === 'function' ? Math.max(0, Number(globalThis.__dboPotionBonus(casterId >>> 0, 'duration:18')) || 0) : 0)) });
   if (fleshActive.size > 256) { const now = Date.now(); for (const [k, v] of fleshActive) if (v.until <= now) fleshActive.delete(k); }
 };
 // The rating a Flesh spell adds to `a` now, 0 when none
@@ -6701,7 +6701,7 @@ globalThis.__dboSummonDurationMult = (owner, kind) => {
   if (C.enabled === false || !(Array.isArray(C.kinds) ? C.kinds : []).includes(String(kind))) return 1;
   const pct = byTier(C.durationPctByTier, conjurationTierOf(Number(owner) >>> 0), 0);
   // A Fortify Conjuration potion on the caster ("Conjuration spells last <mag>% longer"; alchemy.js duration:19)
-  return (pct > 0 ? 1 + pct / 100 : 1) * (1 + potionBonus(owner, 'duration:19'));
+  return (pct > 0 ? 1 + pct / 100 : 1) * (1 + (typeof globalThis.__dboPotionBonus === 'function' ? Math.max(0, Number(globalThis.__dboPotionBonus(owner >>> 0, 'duration:19')) || 0) : 0));
 };
 // A spell hit a summon would not live through but the scaled hit would: the snapshot OnSpellHit writes back makes a raise
 // before the hit useless, so the hit is refused and the scaled damage taken off just after. Returns true when it did.

@@ -63,7 +63,7 @@ store.set(`${WOLF2}|appearance`, { raceId: 0x999 });
 ok(near(mult(WOLF2, CLAWS), wolfMult), 'a race with no readable record leaves the multiplier as it was', mult(WOLF2, CLAWS));
 
 const gm = fs.readFileSync(path.resolve(__dirname, '..', 'gamemode.js'), 'utf8');
-ok(/let mult = \(beastAgg \? 1 : masteryDamageMult\(agg, src\)\)/.test(gm), 'the hit hook skips the Martial Arts mastery bonus in beast form');
+ok(/let mult = \(beastAgg \? 1 : masteryDamageMult\(agg, src\)(?: \* potionAttackMult\(agg, src\))?\)/.test(gm), 'the hit hook skips the Martial Arts mastery bonus in beast form');
 ok(/if \(martial && !beastAgg\)/.test(gm), '...and the fist effects (drain, disarm, armour)');
 
 // Held attackers (combat review #9): bound, carried or paralysed, as the hit hook reads them
