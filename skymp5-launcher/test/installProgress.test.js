@@ -283,7 +283,7 @@ test('a refused save says so and puts the stored values back', () => {
 
 // The 16 GB banner used to be painted once at startup and never hidden, so a routine mod check sat
 // under a first-install warning and read as a stuck install.
-test('the install banner shows only while something is really downloading', () => {
+test('the install banner shows only on the long steps: downloading and unpacking', () => {
   const t = P.createTracker()
   t.begin('mo2')
 
@@ -294,7 +294,7 @@ test('the install banner shows only while something is really downloading', () =
   assert.strictEqual(P.describe(t.snapshot()).showBanner, true, 'downloading must show it')
 
   t.step('install', { index: 1, total: 3 })
-  assert.strictEqual(P.describe(t.snapshot()).showBanner, false, 'installing must not show it')
+  assert.strictEqual(P.describe(t.snapshot()).showBanner, true, 'unpacking mods must show it (Windows may say Not Responding)')
 
   t.step('finish', { index: 0, total: 4 })
   assert.strictEqual(P.describe(t.snapshot()).showBanner, false, 'finishing must not show it')

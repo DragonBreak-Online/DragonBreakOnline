@@ -140,10 +140,11 @@
     const counted = itemWord[snap.step] && snap.item && snap.item.total > 0 ? ` (${Math.min(snap.item.index, snap.item.total)} of ${snap.item.total} ${itemWord[snap.step]})` : ''
     const f = snap.file
     const fileLine = f && f.name ? (f.total > 0 ? `${f.name}: ${mb(f.done)} / ${mb(f.total)} MB` : f.name) : (snap.detail || '')
-    // The 16 GB / 65 GB warning belongs only to steps that really do download for a long time. It
-    // used to be painted once at startup and left up for ever, so a routine "Checking installed
-    // mods" pass sat under a first-install warning and read as a stuck install.
-    const longDownload = snap.step === 'download' || snap.step === 'wait' ||
+    // The 16 GB / 65 GB warning belongs only to the long steps: downloads, and unpacking mods, which
+    // is when Windows may call the launcher Not Responding. It used to be painted once at startup and
+    // left up for ever, so a routine "Checking installed mods" pass sat under a first-install warning
+    // and read as a stuck install.
+    const longDownload = snap.step === 'download' || snap.step === 'wait' || snap.step === 'install' ||
       snap.step === 'client' || snap.step === 'unpack' || snap.step === 'extras'
     return {
       showBanner: longDownload,
