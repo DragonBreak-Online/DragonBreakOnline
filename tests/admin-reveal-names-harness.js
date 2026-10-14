@@ -2,7 +2,7 @@
 // 'stranger' as an admin ... a mode that can be toggled on and off"). Runs its two harnesses with the same environment
 // and fails when either does:
 //   tests/real-names-harness.js        the mode: who may, on and off, names and labels, privacy, reload, kill switch, cost,
-//                                      the remote console, /players, the U panel, and a leftover marker gone at login (R1-R25)
+//                                      the remote console, /players, the U panel, and a leftover marker gone at login (R1-R26)
 //   tests/real-names-chat-harness.js   chat: a disguised speaker named to staff with the mode on, and to nobody else (C1-C5)
 //   node tests/admin-reveal-names-harness.js                      (from server/)
 //   REVEAL_ROOT=<another server/ copy> node tests/admin-reveal-names-harness.js    against that copy: origin/server

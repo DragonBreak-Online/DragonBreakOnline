@@ -550,6 +550,76 @@ step('R25 login', () => {
     && JSON.stringify(known(PLAYER)) === playerList, [known(P), known(PLAYER)]);
 });
 
+// ---- R26: the marker goes in the same turn the server hands over the character (mp.onUserAssignActor) ----------------------
+// spawn.ts calls mp.onUserAssignActor right after setUserActor sent the createActor with the saved marker; onCharacterReady
+// only runs at the next 500 ms loginWait poll, so a client already in the world (a reconnect after a restart) could draw the
+// labels in between (claude-jake's review of realnames-login-marker-1014, 14 Oct). Fails on 474b219d2
+step('R26 assign', () => {
+  const a0 = GMSRC.indexOf("if (typeof globalThis.__dboPrevAssign === 'undefined')"), endMark = 'mp.onUserAssignActor = assignHook;';
+  const b0 = a0 < 0 ? -1 : GMSRC.indexOf(endMark, a0);
+  const l0 = GMSRC.indexOf('const loginStep = (name, fn) => {'), l1 = l0 < 0 ? -1 : GMSRC.indexOf('\n};\n', l0);
+  if (a0 < 0 || b0 < 0 || l0 < 0 || l1 < 0) throw new Error('the onUserAssignActor block is not in gamemode.js');
+  const block = `${GMSRC.slice(l0, l1 + 3)}\n${GMSRC.slice(a0, b0 + endMark.length)}`;
+  const loadBlock = () => new Function('mp', 'log', 'performance', 'LOGIN_STEP_WARN_MS', block)(mp, (...x) => logs.push(x.join(' ')), { now: () => 0 }, 100);
+  const restored = () => logs.filter((l) => /^realnames: restored \d+ introductions for Gerd #GERD \(leftover from a crash or restart\)$/.test(l)).length;
+  const listSets = (from) => sets.slice(from).filter((s) => s.k === 'ff_knownIds' || s.k === 'private.dboKnownStash');
+  // A hook another module set before this file's first load is kept and still called
+  const foreign = [];
+  delete globalThis.__dboPrevAssign; mp.onUserAssignActor = (u, x) => foreign.push([u, x >>> 0]);
+  loadBlock(); loadBlock();
+  ok('R26 (gamemode.js sets mp.onUserAssignActor, and a second load, a hot reload, replaces it)', typeof mp.onUserAssignActor === 'function' && mp.onUserAssignActor.__dbo === true);
+
+  // A restart with the GM in the mode: the Map is empty, the saved marker (labels and all) and the stash are not
+  P_(GM, 'ff_knownIds', { reveal: 1, labels: { [hex(M)]: 'Aldric (masked)' } }); P_(GM, 'private.dboKnownStash', [Q, PLAYER, TRIAL]);
+  globalThis.__dboRealNames.clear();
+  let r0 = restored(), s0 = sets.length;
+  mp.onUserAssignActor(1, GM);
+  const w0 = listSets(s0).filter((s) => s.k === 'ff_knownIds');
+  ok('R26 a marker a restart left is gone in the same turn the server hands over the character: the true list back, the stash cleared, one plain list sent',
+    !isMarker(known(GM)) && sameSet(known(GM), [Q, PLAYER, TRIAL]) && stash(GM) == null && w0.length === 1 && Array.isArray(w0[0].v) && restored() === r0 + 1, [known(GM), stash(GM), w0]);
+  ok('R26 ...the hook another module set is still called once, with the same user and character', foreign.length === 1 && foreign[0][0] === 1 && foreign[0][1] === (GM >>> 0), foreign);
+  s0 = sets.length;
+  globalThis.__dboRealNamesLogin(GM);
+  ok('R26 ...onCharacterReady\'s step after it finds nothing left: no list written, no second restore', listSets(s0).length === 0 && restored() === r0 + 1, listSets(s0));
+
+  // A GM demoted while offline: no rights now, the marker and the stash still saved
+  const roles = actors[GM].roles; actors[GM].roles = [];
+  P_(GM, 'ff_knownIds', { reveal: 1, labels: { [hex(M)]: 'Aldric (masked)' } }); P_(GM, 'private.dboKnownStash', [Q, PLAYER, TRIAL]);
+  const demoted = T.staffCan(GM, 'realnames') === false;
+  mp.onUserAssignActor(1, GM);
+  ok('R26 ...a staff member demoted while offline loses the marker in that same turn too', demoted && !isMarker(known(GM)) && sameSet(known(GM), [Q, PLAYER, TRIAL]) && stash(GM) == null, [demoted, known(GM)]);
+  actors[GM].roles = roles;
+
+  // The same character picked again with the mode on (the main menu and back): it stays on, as before this hook
+  cmd(GM, 'on');
+  s0 = sets.length;
+  mp.onUserAssignActor(1, GM);
+  ok('R26 guard: a mode still on is left on when the same character is handed over again: marker kept, no list written',
+    globalThis.__dboRealNamesOn(GM) === true && isMarker(known(GM)) && listSets(s0).length === 0, listSets(s0));
+  cmd(GM, 'off');
+
+  // guard: a player's plain list, a new character's missing list and a player's list beside a corrupt stash are never written
+  const before2 = JSON.stringify(known(PLAYER));
+  props.delete(`${CASS >>> 0}|ff_knownIds`); P_(TRIAL, 'ff_knownIds', [Q]); P_(TRIAL, 'private.dboKnownStash', { 0: 1 });
+  s0 = sets.length;
+  mp.onUserAssignActor(2, PLAYER); mp.onUserAssignActor(3, CASS); mp.onUserAssignActor(4, TRIAL);
+  ok('R26 guard: no list is written for a player with a plain list, a new character with none, or a list beside a corrupt stash',
+    listSets(s0).length === 0 && JSON.stringify(known(PLAYER)) === before2 && known(CASS) === undefined && sameSet(known(TRIAL), [Q]), listSets(s0));
+  props.delete(`${TRIAL >>> 0}|private.dboKnownStash`); P_(TRIAL, 'ff_knownIds', []);
+
+  // Nothing thrown back into spawn.ts: a failed playermenu.js load (hook null), or a hook that throws
+  const savedLogin = globalThis.__dboRealNamesLogin;
+  let threw = null;
+  try {
+    globalThis.__dboRealNamesLogin = null; mp.onUserAssignActor(1, GM);
+    globalThis.__dboRealNamesLogin = () => { throw new Error('boom (harness)'); }; globalThis.__dboPrevAssign = () => { throw new Error('boom 2 (harness)'); };
+    mp.onUserAssignActor(1, GM);
+  } catch (e) { threw = e.message; }
+  globalThis.__dboRealNamesLogin = savedLogin; globalThis.__dboPrevAssign = null; delete mp.onUserAssignActor;
+  ok('R26 ...the hook never throws back into spawn.ts (a failed load, a throwing step, a throwing earlier hook), and logs each failure',
+    threw === null && logs.some((l) => /^real names on assign failed boom \(harness\)$/.test(l)) && logs.some((l) => /^onUserAssignActor \(previous\) failed boom 2/.test(l)), [threw, logs.slice(-3)]);
+});
+
 // ---- the config ------------------------------------------------------------------------------------------------------------
 step('config', () => {
   const j = JSON.parse(fs.readFileSync(CFG_FILE, 'utf8'));
