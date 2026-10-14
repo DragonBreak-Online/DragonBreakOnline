@@ -337,11 +337,16 @@ module.exports = (api) => {
   // ---- introductions ------------------------------------------------------------------------------
   // Turns the system on for a character (an absent list means "show every name"). With real names on it keeps the marker
   // (the old line wrote [] over it on every X press); a marker or a stash left by a crash, a restart or a rollback is
-  // put back into the list
+  // put back into the list (restoreLeftover, also run as the character appears: __dboRealNamesLogin)
+  const restoreLeftover = (a, v) => {
+    if (!isMarker(v) && !Array.isArray(get(a, STASH_PROP, null))) return false;
+    restoreKnown(a, true);
+    return true;
+  };
   const ensureKnown = (a) => {
     const v = get(a, KNOWN_PROP, null);
     if (revealing(a)) { if (!isMarker(v)) writeMarker(a); return; }
-    if (isMarker(v) || Array.isArray(get(a, STASH_PROP, null))) { restoreKnown(a, true); return; }
+    if (restoreLeftover(a, v)) return;
     if (!Array.isArray(v)) { try { mp.set(a, KNOWN_PROP, []); } catch (e) { /* not ready */ } }
   };
   const introduce = (a, t) => {
@@ -629,12 +634,14 @@ module.exports = (api) => {
 
   // Unmask on the way out and on arrival, so a stale mask never reaches the character list or a new session. Real names
   // end with the session: at logout or a character switch, and every login starts with them off (a marker or a stash a
-  // crash or a restart left behind is put back into the list by ensureKnown)
+  // crash or a restart left behind is put back into the list as the character appears: __dboRealNamesLogin)
   globalThis.__dboPlayerMenuLeave = (a) => {
     try { unmask(a, true); } catch (e) { log('unmask on leave failed', e.message); }
     try { endReveal(a, 'logout', true); } catch (e) { log('real names on leave failed', e.message); }
   };
   globalThis.__dboPlayerMenuReady = (a) => { try { unmask(a, true); realNamesOn.delete(Number(a) >>> 0); ensureKnown(a); refreshLawful(a); } catch (e) { log('player menu login failed', e.message); } };
+  // At the character's arrival (gamemode.js onCharacterReady), not 8 s later in loginSetup: a 0.3.98 client draws a leftover marker's labels
+  globalThis.__dboRealNamesLogin = (a) => { try { a = Number(a) >>> 0; realNamesOn.delete(a); restoreLeftover(a, get(a, KNOWN_PROP, null)); } catch (e) { log('realnames: login check failed', e.message); } };
   // A reload keeps the mode only for a staff member still online, still holding the right and still carrying the marker;
   // any other is ended and their list put back (fail closed: a marker other code reset is never put back by itself)
   for (const a of [...realNamesOn.keys()]) {
