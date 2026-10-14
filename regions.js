@@ -377,16 +377,6 @@ module.exports = (api) => {
       }
       return false;
     }
-    // Cooked Dog Meat only on Dog Day (dogday.js)
-    const dogDay = typeof globalThis.__dboDogDayCraft === 'function' ? globalThis.__dboDogDayCraft(a, Number(itemId) >>> 0) : '';
-    if (dogDay) {
-      if (Date.now() - (dragonToldAt.get(a) || 0) > 3000) {
-        dragonToldAt.set(a, Date.now());
-        personal(a, dogDay);
-        try { sendPacket(a, { customPacketType: 'dboNotice', text: dogDay }); } catch (e) { /* the chat line is enough */ }
-      }
-      return false;
-    }
     // Orcish armour is an Orc's work (before the faction rule, so a non-Orc hears why)
     const orcish = orcishRefusal(a, Number(itemId) >>> 0, Number(recipeId) >>> 0);
     if (orcish) {
