@@ -1,5 +1,36 @@
 [
   {
+    "title": "Client 0.3.97: citizenship and the first Jarl elections",
+    "date": "2026-10-14",
+    "version": "Client 0.3.97",
+    "tag": "New",
+    "sections": [
+      {
+        "heading": "New",
+        "items": [
+          "Citizenship of the holds: notice boards have Citizenship and Voting tabs, and your F3 Journal has a Citizen tab.",
+          "Buying a house now needs citizenship of the hold it stands in. Property tax is a fixed amount, set from the property's listed value.",
+          "The first Jarl elections: once a hold of Skyrim has 15 citizens, an election opens at its notice boards, with a day to stand for Jarl and a day to vote. Bruma has no election: the Count holds the seat."
+        ]
+      },
+      {
+        "heading": "Fixed",
+        "items": [
+          "Voice: your microphone no longer stays open when you have let go of the talk key or nothing is pressed.",
+          "The beheading at the chopping block now plays for everyone near, and the headsman stands up afterwards instead of staying stuck at the block.",
+          "Dead hawks no longer pile up: their bodies fade after a few minutes.",
+          "The dead hawks on Bruma's walls can be looted.",
+          "Orc smiths now see the Orcish recipes at the forge as soon as they can make them, and steel, scaled and glass recipes appear when your Blacksmith tier allows them.",
+          "Breaking down books no longer takes smithing schematics or spell tomes.",
+          "Breaking things down now opens the item first: break one, break all, and see what it's worth, so a fast click can't take the wrong item.",
+          "Kills by your summons now count for your hunting contracts.",
+          "Werewolves no longer stay looking like naked humans to other players.",
+          "The carrots at Aleswell can be picked again."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Character creation fix",
     "date": "2026-10-14",
     "version": "Server update",
