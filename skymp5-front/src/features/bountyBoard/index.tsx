@@ -151,6 +151,10 @@ const BountyBoard = ({ data }: { data: BountyBoardData }) => {
           ))}
           {/* Letters live in the gamemode's pigeon coop; the tab hands over to it */}
           <button className="bountyBoard__tab" onClick={() => { send('dbo:pigeonOpen', 'letters'); send(ev.close); }}>Letters</button>
+          {/* Citizenship of the hold and the vote for its Jarl live in the gamemode (citizenship.js, Nate 14 Oct): each tab
+              hands over to its panel for this board's hold, as Letters does */}
+          <button className="bountyBoard__tab" onClick={() => { send('dbo:citizenOpen', 'citizenship'); send(ev.close); }}>Citizenship</button>
+          <button className="bountyBoard__tab" onClick={() => { send('dbo:citizenOpen', 'voting'); send(ev.close); }}>Voting</button>
         </div>
 
         {notes.length ? (
@@ -171,7 +175,7 @@ const BountyBoard = ({ data }: { data: BountyBoardData }) => {
         <div className="bountyBoard__footer">
           <span className="bountyBoard__hint">
             {tab.id === 'hold'
-              ? 'Hold Notices are posted by the Jarl, Steward and Hold Commander (Chieftain and Bane in a stronghold). Notices fade after ' + data.expiryDays + ' days.'
+              ? 'Hold Notices are posted by the Jarl, Steward and Lord Commander (Chieftain and Bane in a stronghold). Notices fade after ' + data.expiryDays + ' days.'
               : 'A notice costs ' + cost + ' gold and fades after ' + data.expiryDays + ' days. You carry ' + data.gold + ' gold.'}
           </span>
           <div className="bountyBoard__actions">

@@ -1,0 +1,9 @@
+// The F3 Citizen tab: the citizen panel's rows (citizenBoard/styles.scss) in one column of the journal's page
+.jcitizen {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 760px;
+
+  .journal__heading { margin: 6px 0 0; }
+}

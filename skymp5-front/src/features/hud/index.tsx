@@ -143,6 +143,8 @@ const UI_CAPS = ['bank', 'robPrompt', 'feedPrompt', 'downed', 'businessLedger', 
   'courierHandover',
   // The Key Ring (features/keyRing; server keyring.js): without it the server uses chat
   'keyRing',
+  // The notice board's Citizenship and Voting panel (features/citizenBoard; server citizenship.js, widget 84)
+  'citizenBoard',
   // Not a panel: the client draws the Khajiit's Night Eye from the server's dboNightEye (skymp5-client nightEyeService.ts);
   // without it the server says the power comes with a later update (racial.js clientCap)
   'nightEye'];
