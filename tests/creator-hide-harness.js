@@ -1,7 +1,8 @@
 // Scripted test for hiding players from each other while they make a character in the Realm (Nate, 4 Oct: "people
 // spawning into other people and seeing them in the creation screen"). gamemode.js sets `invis` in the neighbour-visible
 // ff_adminModes property of everyone in character creation; the client hides an actor with that flag (formView
-// adminViewOf: no copy, or on 0.3.97 alpha 0 and a ghost to staff). AdminSystem keeps the real admin modes per profile,
+// adminViewOf: no copy, or on 0.3.97 alpha 0 and a ghost to staff; from 0.3.98 a ghost to staff of the same or a higher
+// rank, which is every staff member for a player, whose mirror carries no rank). AdminSystem keeps the real admin modes per profile,
 // so the flag is visual only, and only `invis` and the sweep's mark are ever written.
 // Run it from this folder's parent with
 //
@@ -196,6 +197,8 @@ check('the creator spots never include the marker everyone spawns on', /const CR
 
 // ---- the client and AdminSystem it relies on, when run-all hands us the fork ----
 const read = (base, rel) => { try { return base ? fs.readFileSync(path.join(base, rel), 'utf8') : null; } catch (e) { return null; } };
+// adminCopyPolicy's seesInvisible with its type annotations stripped, or null when its signature is not the expected one
+const seesInvisibleOf = (src) => { const m = /export function seesInvisible\(viewerRank: number, invisRank: unknown\): boolean \{([\s\S]*?)\n\}/.exec(src); try { return m ? new Function('viewerRank', 'invisRank', m[1]) : null; } catch (e) { return null; } };
 const formView = read(process.env.FORK, 'skymp5-client/src/view/formView.ts');
 const policy = read(process.env.FORK, 'skymp5-client/src/view/adminCopyPolicy.ts') || '';
 if (!formView) console.log('skip  client source checks (no FORK with skymp5-client/src/view/formView.ts)');
@@ -203,8 +206,12 @@ else {
   const view = formView.slice(formView.indexOf('private static adminViewOf('), formView.indexOf('private static adminViewOf(') + 500);
   const legacy = /if \(m\["invis"\]\) return FormView\.viewerIsAdmin\(\) \? "ghost" : "hidden";/.test(view);
   const everyone = /return adminViewOfModes\(/.test(view) && /if \(m\["invis"\]\) return "hidden";/.test(policy);
-  check('client: an actor whose ff_adminModes has invis is "hidden" (to players, or to every watcher from adminViewOfModes)',
-    legacy || everyone, view.slice(0, 300));
+  // The rank rule (0.3.98): a ghost only to staff of the same or a higher rank; a player (rank 0) sees no one hidden by invis, rank or no rank
+  const sees = seesInvisibleOf(policy);
+  const ranked = /if \(m\["invis"\]\) return seesInvisible\(FormView\.viewerRank\(\), m\["rank"\]\) \? "ghost" : "hidden";/.test(view)
+    && !!sees && [undefined, null, 0, 1, 2, 5, '3'].every((r) => sees(0, r) === false);
+  check('client: an actor whose ff_adminModes has invis is "hidden" (to players; to every watcher from adminViewOfModes; or to players and lower ranks by seesInvisible)',
+    legacy || everyone || ranked, { rule: legacy ? '0.3.97' : everyone ? 'every watcher' : ranked ? 'rank' : 'none', view: view.slice(0, 300) });
   check('client: hidden is drawn at alpha 0', /actor\.setAlpha\(view === "hidden" \? 0 :/.test(formView));
   check('client: the nametag is not drawn over a hidden actor', /adminViewOf\(model\) !== "hidden"|adminViewOf\(model\) === "hidden"/.test(formView));
 }
