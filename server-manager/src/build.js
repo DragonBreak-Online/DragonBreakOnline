@@ -514,7 +514,9 @@ class Builder {
     // CLIENT_VERSION in routes/version.js, set it from the Client version field).
     const dep = await this.ensureDeps(config.paths.backend, 'backend', 'npm')
     if (!dep.ok) return dep
-    const r = await this.run('npm', ['run', 'build-client'], config.paths.backend, 'package client: npm run build-client')
+    // The PC packages into its own backend's default bucket, which populate-files and merge-files refuse without this opt-in; never on CT 115
+    const optIn = isWin ? { DBO_MERGE_LIVE_BUCKET: '1' } : null
+    const r = await this.run('npm', ['run', 'build-client'], config.paths.backend, 'package client: npm run build-client', optIn)
     if (!r.ok) return { ok: false, error: 'build-client failed - see log (is build/dist/client complete?)' }
 
     this.line('\n✓ Client files packaged into the launcher bucket (skymp-client.zip + files-version.json) from the CI build.')
