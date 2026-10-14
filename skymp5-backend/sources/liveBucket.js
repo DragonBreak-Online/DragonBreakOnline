@@ -123,10 +123,42 @@ function hasFiles(dir, skip = new Set()) {
 
 // git -C inside a plain folder (or one with a broken .git) of another checkout lands in that checkout: true only when the top level git printed is dir itself
 function isOwnTopLevel(dir, printed) {
-  try { return fs.realpathSync(String(printed).trim()) === fs.realpathSync(dir) } catch { return false }
+  try { return samePath(fs.realpathSync(String(printed).trim()), fs.realpathSync(dir)) } catch { return false }
+}
+
+// A .git file or link can borrow another checkout's git folder, and a pull then moves that checkout's branch: true only when the git
+// folder git printed is dir's own .git folder
+function isOwnGitDir(dir, printed) {
+  try {
+    const own = path.join(fs.realpathSync(dir), '.git')
+    return fs.lstatSync(own).isDirectory() && samePath(fs.realpathSync(String(printed).trim()), own)
+  } catch { return false }
+}
+
+// What git -C <dir> must print for notOwnCheckout: its top level, then its git folder, one a line
+const REV_PARSE = ['rev-parse', '--show-toplevel', '--absolute-git-dir']
+
+// Why a clone or pull in dir would touch a live checkout, or null: dir (after links) is a live checkout, sits in one, or holds one.
+// Checked before any git runs; there is no opt-in for it
+function nearLiveCheckout(dir) {
+  const real = realPath(dir)
+  for (const repo of liveRepos()) {
+    if (isInside(real, repo)) return `${dir} is in the live checkout ${repo}`
+    if (isInside(repo, real)) return `${dir} holds the live checkout ${repo}`
+  }
+  return null
+}
+
+// Why a pull in dir would pull a checkout other than dir's own, or null. printed: what git -C dir REV_PARSE printed ('' when it failed)
+function notOwnCheckout(dir, printed) {
+  const [top = '', gitDir = ''] = String(printed || '').trim().split(/\r?\n/)
+  if (!isOwnTopLevel(dir, top)) return `${dir} is not its own git checkout (git -C lands in ${top.trim() || 'no checkout'})`
+  if (!isOwnGitDir(dir, gitDir)) return `${dir} has no git folder of its own: its .git is a file or a link, and git uses ${gitDir.trim()}`
+  return null
 }
 
 module.exports = {
   LIVE_REPO, DEFAULT_CLIENT_FILES_DIR, MANIFEST, OPT_IN,
-  realPath, sameInode, livePath, liveTarget, linksUnder, optedIn, refusalMessage, refusal, hasFiles, isOwnTopLevel,
+  realPath, sameInode, livePath, liveTarget, linksUnder, optedIn, refusalMessage, refusal, hasFiles,
+  isOwnTopLevel, isOwnGitDir, REV_PARSE, nearLiveCheckout, notOwnCheckout,
 }

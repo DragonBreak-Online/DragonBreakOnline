@@ -4,7 +4,7 @@
  * GitHub webhook handler: POST /webhooks/github, fired on pushes to the SkyMP-Client repo.
  * Verifies the HMAC-SHA256 signature (X-Hub-Signature-256), responds 200 immediately so
  * GitHub doesn't time out, then runs `git pull` in sources/client/ and rebuilds the client files bucket from it.
- * It pulls only when sources/client is its own git checkout, and never rebuilds the live client files (sources/liveBucket.js).
+ * It pulls only when sources/client is its own git checkout, away from any live checkout, and never rebuilds the live client files (sources/liveBucket.js).
  * Setup (SkyMP-Client repo, Settings -> Webhooks): payload URL https://<server>/webhooks/github,
  * content type application/json, secret GITHUB_WEBHOOK_SECRET (required env var), push event only.
  */
@@ -67,9 +67,15 @@ async function pullAndMerge({ clientDir = CLIENT_DIR, bucket = config.clientFile
     return 'refused'
   }
 
-  const top = await git(['-C', clientDir, 'rev-parse', '--show-toplevel']).then(r => r.stdout, () => '')
-  if (!liveBucket.isOwnTopLevel(clientDir, top)) {
-    console.error(`[webhook] refusing to pull: ${clientDir} is not its own git checkout${top ? ` (git -C lands in ${top.trim()})` : ''}`)
+  const near = liveBucket.nearLiveCheckout(clientDir)
+  if (near) {
+    console.error(`[webhook] refusing to pull: ${near}`)
+    return 'refused'
+  }
+  const printed = await git(['-C', clientDir, ...liveBucket.REV_PARSE]).then(r => r.stdout, () => '')
+  const notOwn = liveBucket.notOwnCheckout(clientDir, printed)
+  if (notOwn) {
+    console.error(`[webhook] refusing to pull: ${notOwn}`)
     return 'refused'
   }
 
