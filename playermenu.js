@@ -25,7 +25,16 @@
 // "Masked Person" instead of the name; the real name is kept in maskName. Pressing H again takes it off and back.
 // Logging out or switching characters always unmasks, so the character list never shows the mask.
 //
-// gamemode-config.json "playerMenu": { maskItem: "808:Armors of the Velothi Pt2.esp", maskName: "Masked Person" }
+// Real names (/realnames, Jake 14 Oct): a staff mode (GM and above, and Trial GMs through staffCan 'realnames') that
+// shows the staff member every player by their own name instead of "Stranger", and "Aldric (masked)" / "Aldric (Werewolf
+// form)" behind a disguise, on their own screen only. It is off at every login. While it is on, the staff member's own
+// ff_knownIds holds a marker, { reveal: 1, labels: { "<actor hex>": "Aldric (masked)" } }: the 0.3.97 client shows every
+// name to a viewer whose list is not an array, and a later client can draw the labels. Their true introductions list
+// waits in private.dboKnownStash (never sent to any client) and comes back when the mode ends, at logout, at the next
+// login after a crash or a restart, and at a reload with the kill switch off. Nothing anyone else receives changes.
+//
+// gamemode-config.json "playerMenu": { maskItem: "808:Armors of the Velothi Pt2.esp", maskName: "Masked Person",
+//   realNames: { enabled: true, labels: true, chat: true, sweepMs: 2000 } }
 'use strict';
 
 module.exports = (api) => {
@@ -33,8 +42,15 @@ module.exports = (api) => {
     giveItem, makeProp, runCommand, cfg, every } = api;
   // A GM observes; the powers below are for a Lead GM and above (claude-jake's review A3). Fails closed with an old gamemode.
   const isLeadStaff = typeof api.isLeadStaff === 'function' ? api.isLeadStaff : () => false;
+  // Staff rights by name (gamemode.js staffCan: every admin tier, and a Trial GM for the rights on its allowlist). An old
+  // gamemode without it lets admins only, never wider
+  const staffCan = typeof api.staffCan === 'function' ? api.staffCan : (a) => isAdmin(a);
   const C = Object.assign({ maskItem: '808:Armors of the Velothi Pt2.esp', maskName: 'Masked Person', maxDistance: 400 }, cfg.playerMenu || {});
+  // The real-names mode (header). enabled false is the kill switch: the command refuses and every mode on ends at the reload
+  const RN = Object.assign({ enabled: true, labels: true, chat: true, sweepMs: 2000 }, C.realNames && typeof C.realNames === 'object' ? C.realNames : {});
+  const RN_ON = RN.enabled !== false;
   const KNOWN_PROP = 'ff_knownIds';
+  const STASH_PROP = 'private.dboKnownStash';
   const LAWFUL_PROP = 'private.dboLawful';
   const RESTRAINED_PROP = 'private.restrained';
   const MASK_PROP = 'maskName';
@@ -44,7 +60,22 @@ module.exports = (api) => {
   const idOf = (desc) => { try { return mp.getIdFromDesc(desc) >>> 0; } catch (e) { return 0; } };
   const get = (a, prop, fallback) => { try { const v = mp.get(a, prop); return v === undefined || v === null ? fallback : v; } catch (e) { return fallback; } };
   const isOnline = (a) => onlineActors().includes(a);
-  const knownBy = (a) => { const v = get(a, KNOWN_PROP, []); return Array.isArray(v) ? v.map((x) => Number(x) >>> 0) : []; };
+  // Who has real names on: actor id -> { since, via, key (the labels last sent) }. Kept over a hot reload; a restart
+  // empties it, and that is off
+  const realNamesOn = globalThis.__dboRealNames instanceof Map ? globalThis.__dboRealNames : (globalThis.__dboRealNames = new Map());
+  // One Map lookup, and nothing when nobody has the mode on
+  const revealing = (v) => RN_ON && realNamesOn.size > 0 && realNamesOn.has(Number(v) >>> 0);
+  const isMarker = (v) => !!v && typeof v === 'object' && !Array.isArray(v) && v.reveal === 1;
+  const ids = (v) => (Array.isArray(v) ? v.map((x) => Number(x) >>> 0) : []);
+  const union = (...ls) => [...new Set([].concat(...ls.map(ids)))];
+  // The introductions a character holds. While real names are on (or when a crash, a restart or a rollback left the
+  // marker or the stash behind) the true list is the stash
+  const knownBy = (a) => {
+    const v = get(a, KNOWN_PROP, []);
+    if (Array.isArray(v) && !revealing(a)) return ids(v);
+    const s = get(a, STASH_PROP, null);
+    return Array.isArray(s) ? ids(s) : ids(v);
+  };
   // The real name kept while masked. The mask's own name is never a real name: mask() once stored "Masked Person" as the
   // real name when the name shown already was the mask's (its maskName lost, e.g. a crash), and every unmask after
   // put the mask name back, locking it (#7DJT, 10-11 Oct). Such a stored name counts as no real name; the mask is still
@@ -77,7 +108,10 @@ module.exports = (api) => {
   const isLawful = (a) => { try { return isLeadStaff(a) || ranksOf(profileOf(a)).some((m) => !UNLAWFUL_RANKS.has(m.rank)) || lawfulByFaction(a); } catch (e) { return false; } };
   // A player in a beast form is the beast to everyone (beastform.js __dboBeastName)
   const beastName = (a) => { try { return typeof globalThis.__dboBeastName === 'function' ? String(globalThis.__dboBeastName(a) || '') : ''; } catch (e) { return ''; } };
-  const nameFor = (viewer, a) => beastName(a) || (isMasked(a) ? C.maskName : knownBy(viewer).includes(a >>> 0) ? nameOf(a) : 'Stranger');
+  // A staff member with real names on sees the own name, and "Aldric (masked)" behind a disguise (staffLabel below); the
+  // text is for that viewer alone, as every caller builds it for the one who receives it
+  const nameFor = (viewer, a) => (revealing(viewer) ? (staffLabel(a) || nameOf(a))
+    : beastName(a) || (isMasked(a) ? C.maskName : knownBy(viewer).includes(a >>> 0) ? nameOf(a) : 'Stranger'));
   // Other modules name players the same way (downed.js: who raised you); a name must never skip the introductions
   globalThis.__dboNameFor = nameFor;
   // The character's own name behind a mask or a beast form, '' when it is lost. A beast keeps the look from before the
@@ -94,14 +128,15 @@ module.exports = (api) => {
   // For staff eyes only (debugsnap.js: a /bug report's #bug-tracker thread and snapshot), never for a player: the name
   // shown is the mask's or the beast's, so a /bug from behind a mask reached staff as "Masked Person #TAG" and they had
   // to work out who sent it (D15: #VKRS, #8KWH and #LLX8, 11 Oct). '' when the name shown is the character's own; else
-  // their own name and why it is hidden, "Raven (masked)".
-  globalThis.__dboStaffName = (a) => {
+  // their own name and why it is hidden, "Raven (masked)". The real-names mode names a disguise the same way.
+  function staffLabel(a) {
     const masked = isMasked(a), beast = beastName(a), shown = nameOf(a);
     if (!masked && !beast && !isMaskName(shown)) return '';
     const own = ownBehind(a, beast);
     const why = [masked ? 'masked' : '', beast ? `${beast} form` : '', own ? '' : 'own name lost'].filter(Boolean);
     return `${own || shown} (${why.join(', ')})`;
-  };
+  }
+  globalThis.__dboStaffName = staffLabel;
   // The character's own name behind a mask and a beast form (gamemode.js realNameOf; rosters read it through ownNameOf,
   // which keeps a mask's name while gamemode-config.json rosterPrivacy.masks is off; tracker 1559074270959640676: the Court
   // tab listed a transformed Jarl as "Werewolf", so anyone who looked learnt who the beast was). What is said and done in
@@ -141,14 +176,156 @@ module.exports = (api) => {
     } catch (e) { log('instant restraint check failed', e.message); return false; }
   };
 
+  // ---- real names: the staff mode (header) ---------------------------------------------------------
+  // The label of every online disguised player, by actor hex, for the staff member's own client (a 0.3.98 nametag draws
+  // it; 0.3.97 ignores it). Never the staff member, never an unmasked player
+  const labelsFor = (a) => {
+    const out = {};
+    if (RN.labels === false) return out;
+    let n = 0;
+    for (const x of onlineActors()) {
+      if ((x >>> 0) === (a >>> 0)) continue;
+      const l = staffLabel(x);
+      if (l) { out[(x >>> 0).toString(16)] = l; if (++n >= 200) break; }
+    }
+    return out;
+  };
+  // A list that other code put back while the mode was on joins the stash before the marker goes over it
+  const keepInStash = (a, v) => {
+    if (!Array.isArray(v) || !v.length) return true;
+    const s = get(a, STASH_PROP, null);
+    const have = new Set(ids(s));
+    if (Array.isArray(s) && ids(v).every((x) => have.has(x))) return true;
+    try { mp.set(a, STASH_PROP, union(s, v)); return true; } catch (e) { log(`realnames: introductions for ${display(a)} not kept`, e.message); return false; }
+  };
+  // The marker on the staff member's own ff_knownIds (owner-only: no neighbour receives it). Sent only when the labels
+  // changed or the marker is not in place
+  const writeMarker = (a) => {
+    a = Number(a) >>> 0;
+    const st = realNamesOn.get(a);
+    const labels = labelsFor(a);
+    const key = JSON.stringify(labels);
+    const v = get(a, KNOWN_PROP, null);
+    if (isMarker(v) && st && st.key === key) return true;
+    if (!isMarker(v) && !keepInStash(a, v)) return false;
+    try { mp.set(a, KNOWN_PROP, { reveal: 1, labels }); } catch (e) { log(`realnames: marker for ${display(a)} not written`, e.message); return false; }
+    if (st) st.key = key;
+    return true;
+  };
+  // The true list back: the stash and whatever the list holds now, merged; the stash is cleared only once that is written
+  const restoreKnown = (a, leftover) => {
+    const s = get(a, STASH_PROP, null), v = get(a, KNOWN_PROP, null);
+    if (!Array.isArray(s) && Array.isArray(v)) return 0;
+    const list = union(s, v);
+    try { mp.set(a, KNOWN_PROP, list); } catch (e) { log(`realnames: introductions for ${display(a)} not restored, kept for the next login`, e.message); return -1; }
+    if (s !== null) { try { mp.set(a, STASH_PROP, null); } catch (e) { /* merged again at the next login */ } }
+    if (leftover) log(`realnames: restored ${list.length} introductions for ${display(a)} (leftover from a crash or restart)`);
+    return list.length;
+  };
+  // A mask put on or taken off changes the labels of everyone with the mode on (nothing when nobody has it on)
+  const refreshLabels = () => { if (!realNamesOn.size) return; for (const v of [...realNamesOn.keys()]) { try { writeMarker(v); } catch (e) { /* the sweep tries again */ } } };
+  const RN_TOLD = {
+    on: 'Real names on: every player shows by their own name to you, and a disguise as "Name (masked)" or "Name (Werewolf form)" in the X menu, messages and chat. Only your screen changes (mind it on stream). A masked head still reads Masked Person on this client; press X on them. /realnames off to stop; it ends when you log out.',
+    command: 'Real names off: people you have not met are Strangers to you again.',
+    rights: 'Real names off: your staff rights no longer include them.',
+    'switched off': 'Real names off: staff switched the mode off on this server.',
+    reload: 'Real names off after a server update. /realnames on to turn them back on.',
+  };
+  // The only way in. 'on' | 'already' | 'off' (kill switch) | 'rights' | 'offline' | 'failed'
+  const startReveal = (a, via) => {
+    a = Number(a) >>> 0;
+    if (!RN_ON) return 'off';
+    if (!staffCan(a, 'realnames')) return 'rights';
+    if (!isOnline(a)) return 'offline';
+    if (revealing(a)) { writeMarker(a); return 'already'; }
+    // The stash first: the old one (a crash may have left one) and today's list
+    try { mp.set(a, STASH_PROP, union(get(a, STASH_PROP, null), get(a, KNOWN_PROP, null))); } catch (e) { log(`realnames: ${display(a)} on refused, the list could not be kept`, e.message); return 'failed'; }
+    realNamesOn.set(a, { since: Date.now(), via: String(via || 'command'), key: null });
+    if (!writeMarker(a)) { realNamesOn.delete(a); restoreKnown(a, false); return 'failed'; }
+    log(`realnames: ${display(a)} on (${String(via || 'command')})`);
+    return 'on';
+  };
+  const endReveal = (a, why, quiet) => {
+    a = Number(a) >>> 0;
+    const was = realNamesOn.delete(a);
+    restoreKnown(a, false);
+    if (!was) return false;
+    log(`realnames: ${display(a)} off (${why})`);
+    if (!quiet && RN_TOLD[why]) personal(a, RN_TOLD[why]);
+    return true;
+  };
+  const routeNow = () => {
+    if (globalThis.__dboPlogRoute === 'upanel') return 'upanel';
+    const cap = globalThis.__dboTellCapture;
+    return cap && cap.all ? 'console' : 'command';
+  };
+  // Chat (gamemode.js handleLine and sendNear), /players and the U panel's player list read these; each fails safe
+  globalThis.__dboRealNamesOn = (viewer) => revealing(viewer);
+  globalThis.__dboRealNamesLabel = (speaker) => (RN_ON && realNamesOn.size > 0 && RN.chat !== false ? staffLabel(Number(speaker) >>> 0) : '');
+  globalThis.__dboRealNamesDisplay = (viewer, t) => (revealing(viewer) ? `${staffLabel(Number(t) >>> 0) || nameOf(t)} #${tagOf(t)}` : '');
+  // For a panel button (fork AdminSystem, later) and the harness: checks the rights itself
+  globalThis.__dboRealNamesSet = (a, on, via) => {
+    try {
+      if (!staffCan(Number(a) >>> 0, 'realnames')) return false;
+      if (on) { const r = startReveal(a, via || 'panel'); if (r === 'on') personal(a, RN_TOLD.on); return r === 'on' || r === 'already'; }
+      endReveal(a, 'command', false);
+      return true;
+    } catch (e) { log('realnames: set failed', e.message); return false; }
+  };
+  api.registerChatCommand('realnames', (a, args) => {
+    const arg = String(args || '').trim().toLowerCase();
+    if (!staffCan(a, 'realnames')) return personal(a, 'Admins only.');
+    if (!RN_ON) return personal(a, 'Real names are switched off on this server just now.');
+    const on = revealing(a);
+    if (arg === 'status') {
+      if (!on) return personal(a, 'Real names are off. /realnames on to see every player by their own name.');
+      const min = Math.max(0, Math.round((Date.now() - (realNamesOn.get(a >>> 0).since || Date.now())) / 60000));
+      return personal(a, `Real names are on (for ${min} min). /realnames off to stop.`);
+    }
+    const want = arg === 'on' ? true : arg === 'off' ? false : arg === '' ? !on : null;
+    if (want === null) return personal(a, 'Usage: /realnames [on|off|status]');
+    if (!want) { if (!on) return personal(a, 'Real names are already off.'); endReveal(a, 'command', false); return; }
+    if (on) { writeMarker(a); return personal(a, 'Real names are already on. /realnames off to stop.'); }
+    const r = startReveal(a, routeNow());
+    if (r === 'on') return personal(a, RN_TOLD.on);
+    if (r === 'offline') return personal(a, 'Real names work only while your character is in the world.');
+    if (r === 'off') return personal(a, 'Real names are switched off on this server just now.');
+    if (r === 'rights') return personal(a, 'Admins only.');
+    personal(a, 'Real names could not be turned on just now, try again.');
+  }, { admin: true, help: '[on|off|status] see every player by their own name instead of Stranger, and who is behind a mask or a beast form. Staff only, on your own screen only, off at every login' });
+  // Rights and labels: a staff member who lost the right or left is taken out; the labels go out again only when they
+  // changed (a mask, a beast form, a disguised player in or out). Nothing at all while nobody has the mode on. A timer
+  // outlives a reload into code that does not register it (gamemode.js TIMERS), so it stops acting once another load
+  // of this file (or an older one) has taken over __dboNameFor
+  every('realnames', Math.max(500, Number(RN.sweepMs) || 2000), () => {
+    if (realNamesOn.size === 0 || globalThis.__dboNameFor !== nameFor) return;
+    const online = new Set(onlineActors().map((x) => x >>> 0));
+    for (const a of [...realNamesOn.keys()]) {
+      try {
+        if (!RN_ON) endReveal(a, 'switched off', false);
+        else if (!online.has(a)) endReveal(a, 'left', true);
+        else if (!staffCan(a, 'realnames')) endReveal(a, 'rights', false);
+        else writeMarker(a);
+      } catch (e) { log('realnames sweep failed', e.message); }
+    }
+  });
+
   // ---- introductions ------------------------------------------------------------------------------
-  // Turns the system on for a character (an absent list means "show every name")
-  const ensureKnown = (a) => { if (!Array.isArray(get(a, KNOWN_PROP, null))) { try { mp.set(a, KNOWN_PROP, []); } catch (e) { /* not ready */ } } };
+  // Turns the system on for a character (an absent list means "show every name"). With real names on it keeps the marker
+  // (the old line wrote [] over it on every X press); a marker or a stash left by a crash, a restart or a rollback is
+  // put back into the list
+  const ensureKnown = (a) => {
+    const v = get(a, KNOWN_PROP, null);
+    if (revealing(a)) { if (!isMarker(v)) writeMarker(a); return; }
+    if (isMarker(v) || Array.isArray(get(a, STASH_PROP, null))) { restoreKnown(a, true); return; }
+    if (!Array.isArray(v)) { try { mp.set(a, KNOWN_PROP, []); } catch (e) { /* not ready */ } }
+  };
   const introduce = (a, t) => {
     if (isMasked(a)) return personal(a, 'Take your mask off (H) before you introduce yourself.');
     const list = knownBy(t);
     if (list.includes(a >>> 0)) return personal(a, `${nameFor(a, t)} already knows who you are.`);
-    try { mp.set(t, KNOWN_PROP, list.concat([a >>> 0])); } catch (e) { return personal(a, 'That did not work, try again.'); }
+    // To a staff member with real names on (or with the marker still in place) the introduction joins the true list, the stash
+    try { mp.set(t, revealing(t) || isMarker(get(t, KNOWN_PROP, null)) ? STASH_PROP : KNOWN_PROP, list.concat([a >>> 0])); } catch (e) { return personal(a, 'That did not work, try again.'); }
     personal(a, `You introduced yourself to ${nameFor(a, t)}.`);
     system(t, `${nameOf(a)} introduces themself.`);
     // A salute goes with it (idles.js)
@@ -166,7 +343,7 @@ module.exports = (api) => {
     else lines.push(`${app.isFemale ? 'Woman' : 'Man'}${app.raceId ? `, ${raceName(app.raceId)}` : ''}`);
     // A mask kept from before the change is not on the beast's face: it would tie the beast to the masked one
     if (isMasked(t) && !beast) lines.push('Face hidden behind a mask');
-    if (!isMasked(t) && !beast && knownBy(viewer).includes(t >>> 0)) {
+    if (!isMasked(t) && !beast && (revealing(viewer) || knownBy(viewer).includes(t >>> 0))) {
       const ranks = ranksOf(profileOf(t));
       for (const r of ranks.slice(0, 3)) lines.push(`${rankTitle(r)} of ${r.zone.name}`);
     }
@@ -344,6 +521,7 @@ module.exports = (api) => {
     }
     if (!setAppearanceName(a, C.maskName)) return personal(a, 'Could not put the mask on.');
     try { mp.set(a, MASK_PROP, real); } catch (e) { /* kept in memory only */ }
+    refreshLabels();
     try { mp.set(a, 'private.maskItemId', itemId); } catch (e) { /* unmask falls back to the race item */ }
     if (itemId) {
       if (lost) { try { mp.set(a, 'private.maskLost', 0); } catch (e) { /* asked again next time */ } } else giveItem(a, itemId, 1);
@@ -363,6 +541,7 @@ module.exports = (api) => {
     if (real) setAppearanceName(a, real);
     else log(`playermenu: ${display(a)} had the mask name kept as the real name; cleared, staff can /rename`);
     try { mp.set(a, MASK_PROP, ''); } catch (e) { /* ignore */ }
+    refreshLabels();
     const itemId = (Number(get(a, 'private.maskItemId', 0)) >>> 0) || maskItemFor(a);
     if (itemId) {
       try { papyrus('UnequipItem', a, itemId); } catch (e) { /* not worn */ }
@@ -424,10 +603,25 @@ module.exports = (api) => {
     personal(a, `Mask ${n + 1}/${MASK_CANDIDATES.length}: ${edid} (${desc}). Your race: ${raceEdidOf(a) || 'unknown'}. /masktest for the next, /masktest off to remove.`);
   }, { admin: true, help: 'try face coverings on yourself: /masktest [n|off]' });
 
-  // Unmask on the way out and on arrival, so a stale mask never reaches the character list or a new session
-  globalThis.__dboPlayerMenuLeave = (a) => { try { unmask(a, true); } catch (e) { log('unmask on leave failed', e.message); } };
-  globalThis.__dboPlayerMenuReady = (a) => { try { unmask(a, true); ensureKnown(a); refreshLawful(a); } catch (e) { log('player menu login failed', e.message); } };
+  // Unmask on the way out and on arrival, so a stale mask never reaches the character list or a new session. Real names
+  // end with the session: at logout or a character switch, and every login starts with them off (a marker or a stash a
+  // crash or a restart left behind is put back into the list by ensureKnown)
+  globalThis.__dboPlayerMenuLeave = (a) => {
+    try { unmask(a, true); } catch (e) { log('unmask on leave failed', e.message); }
+    try { endReveal(a, 'logout', true); } catch (e) { log('real names on leave failed', e.message); }
+  };
+  globalThis.__dboPlayerMenuReady = (a) => { try { unmask(a, true); realNamesOn.delete(Number(a) >>> 0); ensureKnown(a); refreshLawful(a); } catch (e) { log('player menu login failed', e.message); } };
+  // A reload keeps the mode only for a staff member still online, still holding the right and still carrying the marker;
+  // any other is ended and their list put back (fail closed: a marker other code reset is never put back by itself)
+  for (const a of [...realNamesOn.keys()]) {
+    try {
+      const here = isOnline(a);
+      const why = !RN_ON ? 'switched off' : !here ? 'left' : !staffCan(a, 'realnames') ? 'rights' : !isMarker(get(a, KNOWN_PROP, null)) ? 'reload' : '';
+      // Nothing is written into the chat of a character who is not in the world (it would show at their next login)
+      if (why) endReveal(a, why, !here);
+    } catch (e) { log('real names reload check failed', e.message); }
+  }
   for (const a of onlineActors()) { ensureKnown(a); refreshLawful(a); }
 
-  log(`player menu on: mask by race ${JSON.stringify(C.maskItemByRace || {})}, default mask item ${C.maskItem} (${idOf(C.maskItem) ? 'found' : 'NOT FOUND'}), introductions and lawful flags for ${onlineActors().length} online`);
+  log(`player menu on: mask by race ${JSON.stringify(C.maskItemByRace || {})}, default mask item ${C.maskItem} (${idOf(C.maskItem) ? 'found' : 'NOT FOUND'}), introductions and lawful flags for ${onlineActors().length} online, real names ${RN_ON ? `on for ${realNamesOn.size} staff` : 'switched off'}`);
 };

@@ -1034,6 +1034,8 @@ const COMMAND_SCHEMA = {
   npc: { subs: S_('remove info') }, dungeon: { subs: S_('end list') }, expedition: {},
   name: {}, reroll: {}, appearance: {}, struggle: {}, respawn: {}, chill: {}, rite: {}, feed: { subs: S_('on off') }, feedpair: { subs: S_('on off') },
   keys: {}, board: {}, monitor: {}, mv: {}, masktest: { nums: [0] }, factiongear: { subs: S_('test') }, tailoring: {}, syncenchant: {},
+  // the staff real-names mode (playermenu.js): on, off or status, never a name
+  realnames: { subs: S_('on off status') },
   forget: {}, concordat: {}, dossier: { subs: S_('add strike view') },
   // staff world commands: a staff.world action, never their text
   announce: { world: 'announce' }, schedule: { world: 'schedule' }, rolename: { world: 'rolename' },

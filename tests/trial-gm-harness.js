@@ -1,6 +1,6 @@
 // Trial GM (Nate, 11 Oct): a staff rank below GM from server-settings adminRoles.trialgm. It is no admin tier: isAdmin,
 // isLeadStaff and tierOf stay as they were, and staffCan(a, what) opens an allowlist (rename, chargen, gmcall, tp, invis,
-// playerinfo, bugs) in the commands that use it. Cuts the tier code and the chat command gate out of gamemode.js, lifts
+// playerinfo, bugs, adminchat, unstuck, realnames) in the commands that use it. Cuts the tier code and the chat command gate out of gamemode.js, lifts
 // /tp and /chargen, and loads gmcall.js and debugsnap.js with stubs. The panel side is trial-gm-panel-harness.js, the
 // extra character slot trial-gm-slot-harness.js.
 //   node tests/trial-gm-harness.js
@@ -40,8 +40,8 @@ check('...but is a Trial GM, logged as trialgm', T.isTrialStaff(TRIAL) === true 
 check('GM and Trial GM roles together give GM', T.tierOf(BOTH) === 'gm' && T.isAdmin(BOTH) && !T.isTrialStaff(BOTH) && T.staffTierOf(BOTH) === 'gm', [T.tierOf(BOTH), T.isTrialStaff(BOTH)]);
 check('a GM, a Lead GM, an Owner and a player are unchanged', T.tierOf(GM) === 'gm' && T.tierOf(LEAD) === 'leadgm' && T.tierOf(OWNER) === 'senior' && T.tierOf(PLAYER) === null && !T.isTrialStaff(PLAYER));
 check('the rank sits below GM', T.TIER_RANK.trialgm > 0 && T.TIER_RANK.trialgm < T.TIER_RANK.gm);
-const ALLOWED = ['rename', 'chargen', 'gmcall', 'tp', 'invis', 'playerinfo', 'bugs', 'adminchat', 'unstuck'];
-check('exactly the nine rights are on the allowlist (adminchat: #gm-chat 12 Oct; unstuck: Nate 12 Oct)', [...T.TRIAL_CAN].sort().join() === ALLOWED.slice().sort().join(), [...T.TRIAL_CAN]);
+const ALLOWED = ['rename', 'chargen', 'gmcall', 'tp', 'invis', 'playerinfo', 'bugs', 'adminchat', 'unstuck', 'realnames'];
+check('exactly the ten rights are on the allowlist (adminchat: #gm-chat 12 Oct; unstuck: Nate 12 Oct; realnames: Jake 14 Oct)', [...T.TRIAL_CAN].sort().join() === ALLOWED.slice().sort().join(), [...T.TRIAL_CAN]);
 check('a Trial GM has each of them', ALLOWED.every((w) => T.staffCan(TRIAL, w)));
 const FORBIDDEN = ['kick', 'ban', 'items', 'gold', 'skills', 'stats', 'housing', 'faction', 'nobility', 'world', 'spawn', 'summon', 'console', 'jail', ''];
 check('...and none of the others', FORBIDDEN.every((w) => !T.staffCan(TRIAL, w)), FORBIDDEN.filter((w) => T.staffCan(TRIAL, w)));
@@ -58,7 +58,7 @@ const gateCode = cut('  const c = commands.get(cmd);', "  try { c.fn(a, body, us
 const ran = [], said = [], logged = [];
 const commands = new Map();
 // Every staff command a Trial GM must be refused, beside the five they may run
-const STAFF_CMDS = ['rename', 'chargen', 'tp', 'charstats', 'bugs', 'kick', 'fixloc', 'sethunger', 'wipechars', 'announce', 'staffstats', 'stats',
+const STAFF_CMDS = ['rename', 'chargen', 'tp', 'charstats', 'bugs', 'realnames', 'kick', 'fixloc', 'sethunger', 'wipechars', 'announce', 'staffstats', 'stats',
   'settime', 'setweather', 'timescale', 'region', 'warband', 'raid', 'placed', 'placeundo', 'placeexport', 'gearswap', 'feedpair', 'vlremote', 'driftspawn', 'adminhelp'];
 for (const n of STAFF_CMDS) commands.set(n, { admin: true, fn: (a, body) => ran.push([a, n, body]) });
 for (const n of ['faction', 'manual', 'boost', 'appoint', 'gm']) commands.set(n, { admin: false, fn: (a, body) => ran.push([a, n, body]) });
@@ -67,8 +67,8 @@ const gate = new Function('commands', 'personal', 'isAdmin', 'staffCan', 'TRIAL_
 const chat = (a, line) => { ran.length = 0; said.length = 0; logged.length = 0; const [cmd, ...rest] = line.split(' ');
   gate(commands, (x, t) => said.push(t), T.isAdmin, T.staffCan, T.TRIAL_COMMANDS, LEAD_ONLY, T.isLeadStaff, (w, tier, what, detail) => logged.push({ w, tier, what, detail }),
     (x) => `char${x}`, T.tierOf, T.staffTierOf, (x) => `char${x}`, TIER_LABEL, () => {}, a, cmd, rest.join(' '), 1); return ran.length > 0; };
-check('the gate admits a Trial GM for exactly /rename /chargen /tp /charstats /bugs', Object.keys(T.TRIAL_COMMANDS).sort().join() === 'bugs,chargen,charstats,rename,tp', Object.keys(T.TRIAL_COMMANDS));
-for (const n of ['rename', 'chargen', 'tp', 'charstats', 'bugs']) {
+check('the gate admits a Trial GM for exactly /rename /chargen /tp /charstats /bugs /realnames', Object.keys(T.TRIAL_COMMANDS).sort().join() === 'bugs,chargen,charstats,realnames,rename,tp', Object.keys(T.TRIAL_COMMANDS));
+for (const n of ['rename', 'chargen', 'tp', 'charstats', 'bugs', 'realnames']) {
   const ok = chat(TRIAL, `${n} Mira`);
   check(`a Trial GM runs /${n}, staff-logged as Trial GM`, ok && logged.length === 1 && logged[0].tier === 'trialgm' && /\(Trial GM\): \//.test(logged[0].detail), { said, logged });
 }
@@ -115,7 +115,7 @@ check('the role sync sees a Trial GM as staff (a lost role logs them out)', /isS
 check('/whoami says trialgm', /tier \$\{staffTierOf\(a\) \|\| 'player'\}/.test(src));
 check('/help admin gives a Trial GM their own list, as private lines', /if \(staffAsk && isTrialStaff\(a\)\) return trialHelp\(a\);/.test(src) && /const trialHelp = \(a\) => \{[\s\S]*?personal\(a,/.test(src));
 const trialHelpNames = (src.match(/const TRIAL_HELP = \[([\s\S]*?)\n\];/) || ['', ''])[1].match(/\['(\w+)'/g).map((x) => x.slice(2, -1));
-check('...naming gm, tp, rename, chargen, charstats and bugs', trialHelpNames.sort().join() === 'bugs,chargen,charstats,gm,rename,tp', trialHelpNames);
+check('...naming gm, tp, rename, chargen, charstats, bugs and realnames', trialHelpNames.sort().join() === 'bugs,chargen,charstats,gm,realnames,rename,tp', trialHelpNames);
 check('a staff character is named in the JOIN line and told so at login', /staffCharOf\(a\) \? ' \(staff character\)' : ''/.test(src) && /if \(staffCharOf\(a\)\) personal\(a, 'This is your GM character/.test(src));
 
 // ---- gmcall.js: a Trial GM answers calls ----------------------------------------------------------------------------------

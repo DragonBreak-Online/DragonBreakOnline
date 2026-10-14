@@ -59,6 +59,7 @@ registerChatCommand('sign', (a, args) => { ran.push(['sign', args]); personal(a,
 registerChatCommand('help', (a) => { ran.push(['help']); personal(a, 'Topics...'); });
 registerChatCommand('unstuck', (a) => { ran.push(['unstuck']); return 'went'; });
 registerChatCommand('newone', (a) => { ran.push(['newone']); });
+registerChatCommand('realnames', (a, args) => { ran.push(['realnames', args]); personal(a, 'Real names on: every player shows by their own name to you.'); }, { admin: true });
 aliasChatCommand('oldkick', 'kick');
 
 const api = { mp: M.mp, log: () => {}, cfg: { playerLog: { dir: '/fake/events', stopFile: '/fake/STOP' } }, every: TM.every, stopTimer: TM.stopTimer, onlineActors: () => ONLINE,
@@ -94,6 +95,11 @@ out = chat(3, `/party invite Selene ${CANARY}`);
 ok(out[0].f.sub === 'invite' && out[0].o && out[0].o[0].c === 'K2QX' && out[0].f.mirror === true, '/party invite: sub from the list, the target mirrored (an acting command)', out[0]);
 out = chat(3, `/party ${CANARY} Selene`);
 ok(out[0].f.sub === undefined && !JSON.stringify(out).includes(CANARY), 'a first word off the sub list is not kept', out[0].f);
+out = chat(6, `/realnames on ${CANARY}`);
+ok(out.length === 1 && out[0].ev === 'cmd.run' && out[0].f.name === 'realnames' && out[0].f.sub === 'on' && out[0].f.outcome === 'ok' && out[0].o === undefined && !JSON.stringify(out).includes(CANARY),
+  '/realnames on (the staff real-names mode, Jake 14 Oct): one cmd.run, sub on, no target and no text', out);
+out = chat(6, '/realnames');
+ok(out.length === 1 && out[0].f.name === 'realnames' && out[0].f.sub === undefined, '...a bare /realnames (the toggle): by its name alone', out[0] && out[0].f);
 out = chat(3, '/pigeonblock Selene');
 ok(out[0].f.mirror === undefined, '/pigeonblock: never mirrored to the target', out[0].f);
 out = chat(3, '/ledger place My Ledger PLOGCANARY');

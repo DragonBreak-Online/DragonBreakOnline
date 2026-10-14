@@ -281,14 +281,15 @@ const isTrialStaff = (actorId) => trialFrom(profileOf(actorId), rolesOf(actorId)
 // tp: /tp and the panel's TP to (to a player only); invis: the panel's Invisible mode; playerinfo: the panel's player
 // list and /charstats; bugs: /bugs; adminchat: the chat's Admin tab and /admin (#gm-chat 12 Oct: trials had no admin tab)
 // unstuck: /unstuck without the cooldown, jail or PvP wait, and on a named player (Nate, 12 Oct). Ghost is the panel's mode
-// (fork TRIAL_GM_MODES), not a gameplay command
-const TRIAL_CAN = new Set(['rename', 'chargen', 'gmcall', 'tp', 'invis', 'playerinfo', 'bugs', 'adminchat', 'unstuck']);
+// (fork TRIAL_GM_MODES), not a gameplay command. realnames: /realnames, every player by their own name on the staff
+// member's own screen (playermenu.js; Jake, 14 Oct: every staff rank, Trial GMs included)
+const TRIAL_CAN = new Set(['rename', 'chargen', 'gmcall', 'tp', 'invis', 'playerinfo', 'bugs', 'adminchat', 'unstuck', 'realnames']);
 const staffCan = (actorId, what) => isAdmin(actorId) || (TRIAL_CAN.has(what) && isTrialStaff(actorId));
 // The tier for logs and the role sync: an admin tier, 'trialgm', or null
 const staffTierFrom = (profile, roles) => tierFrom(profile, roles) || (trialFrom(profile, roles) ? 'trialgm' : null);
 const staffTierOf = (actorId) => staffTierFrom(profileOf(actorId), rolesOf(actorId));
 // Chat commands a Trial GM may run, and the right each needs (the command gate in handleChat)
-const TRIAL_COMMANDS = { rename: 'rename', chargen: 'chargen', tp: 'tp', charstats: 'playerinfo', bugs: 'bugs' };
+const TRIAL_COMMANDS = { rename: 'rename', chargen: 'chargen', tp: 'tp', charstats: 'playerinfo', bugs: 'bugs', realnames: 'realnames' };
 const staffRolesSeen = (a, roles) => {
   const before = staffTierOf(a);
   if (!before) return;
@@ -822,7 +823,7 @@ const helpLine = (n) => { const c = commands.get(n); return `/${n}${c && c.help 
 // listed under Other staff tools.
 const STAFF_HELP = [
   { key: 'players', title: 'Players', items: ['kick', 'discipline', 'tp', 'fixloc', 'chargen', 'rename', 'sethunger', 'wipechars',
-    ['tokens', '<player|#TAG>: someone\'s Patreon tier and identity rerolls left'], 'stats', 'charstats', 'bugs'] },
+    ['tokens', '<player|#TAG>: someone\'s Patreon tier and identity rerolls left'], 'stats', 'charstats', 'bugs', 'realnames'] },
   { key: 'calls', title: 'GM calls from players', items: [['gm list', '[all]: the open calls (all: and the last ten closed)'],
     ['gm take', '<n>: the call is yours; the player is told you are on the way, other staff who took it'],
     ['gm goto', '<n>: go to the caller (to where they called from, if they are offline); takes the call if nobody has'],
@@ -870,6 +871,7 @@ const TRIAL_HELP = [
   ['chargen', '<player|#TAG>: reopen character creation for someone'],
   ['charstats', '<player|#TAG>: a character\'s journal statistics'],
   ['bugs', '[n]: the newest /bug reports (5, up to 15)'],
+  ['realnames', '[on|off|status]: see every player by their own name instead of Stranger, on your screen only'],
 ];
 const trialHelp = (a) => {
   personal(a, 'Trial GM tools (every use is logged to staff):');
@@ -920,7 +922,8 @@ registerChatCommand('help', (a, args) => {
 registerChatCommand('adminhelp', (a, args) => staffHelp(a, String(args || '').trim().toLowerCase()), { admin: true, help: '[topic] staff commands by topic, in the admin tab' });
 // A beast by its own name, a mask as the mask (publicDisplay): the #TAG drawn under a mask beside the own name here took
 // the mask off for anyone who typed /players
-registerChatCommand('players', (a) => { const n = onlineActors().map(publicDisplay); personal(a, `${n.length} online: ${n.join(', ')}`); }, { help: 'who is online' });
+// A staff member with real names on (playermenu.js) reads "Aldric (masked) #TAG" behind a disguise; everyone else as before
+registerChatCommand('players', (a) => { const n = onlineActors().map((t) => (typeof globalThis.__dboRealNamesDisplay === 'function' && String(globalThis.__dboRealNamesDisplay(a, t) || '')) || publicDisplay(t)); personal(a, `${n.length} online: ${n.join(', ')}`); }, { help: 'who is online' });
 registerChatCommand('whoami', (a) => personal(a, `${display(a)}  actor ff${a.toString(16)}  profile ${profileOf(a)}${discordOf(a) ? '  discord ' + discordOf(a) : ''}  tier ${staffTierOf(a) || 'player'}`), { help: 'your name, tag and ids' });
 registerChatCommand('ping', (a) => personal(a, 'Pong!'), { help: 'connection test' });
 registerChatCommand('kick', (a, args) => {
@@ -3151,7 +3154,9 @@ const panelPeople = (a) => {
   const out = [];
   for (const t of onlineActors()) {
     if ((t >>> 0) === (a >>> 0)) continue;
-    if (staff) { out.push({ label: display(t), value: '#' + tagOf(t) }); continue; }
+    // With real names on the label names a disguise ("Aldric (masked) #TAG"); the value stays the #TAG, so a label never
+    // reaches findByName
+    if (staff) { let label = ''; try { const f = globalThis.__dboRealNamesDisplay; label = typeof f === 'function' ? String(f(a, t) || '') : ''; } catch (e) { /* the name shown */ } out.push({ label: label || display(t), value: '#' + tagOf(t) }); continue; }
     const known = nameFor ? nameFor(a, t) : '';
     // No name finds one behind a mask or in a beast form (findByName): they are left out
     if (known && known !== 'Stranger' && !disguisedOf(t) && !out.some((p) => p.value === known)) out.push({ label: known, value: known });
@@ -7274,8 +7279,12 @@ try {
   const PLAYERMENU_JS = path.resolve('playermenu.js');
   delete require.cache[PLAYERMENU_JS];
   const runCommand = (a, name, argStr) => { const c = commands.get(name); if (c && (!c.admin || isAdmin(a))) c.fn(a, argStr); };
-  require(PLAYERMENU_JS)({ mp, log, personal, system, registerChatCommand, onUi, sendPacket, display, nameOf, tagOf, profileOf, onlineActors, isAdmin, isLeadStaff, ranksOf, giveItem, makeProp, runCommand, zones: ZONES, zoneOfActor, cfg, every });
-} catch (e) { log('playermenu.js failed to load:', e.stack || e.message); globalThis.__dboPlayerMenuLeave = null; globalThis.__dboPlayerMenuReady = null; globalThis.__dboInstantRestraint = null; }
+  require(PLAYERMENU_JS)({ mp, log, personal, system, registerChatCommand, onUi, sendPacket, display, nameOf, tagOf, profileOf, onlineActors, isAdmin, isLeadStaff, staffCan, ranksOf, giveItem, makeProp, runCommand, zones: ZONES, zoneOfActor, cfg, every });
+} catch (e) {
+  log('playermenu.js failed to load:', e.stack || e.message); globalThis.__dboPlayerMenuLeave = null; globalThis.__dboPlayerMenuReady = null; globalThis.__dboInstantRestraint = null;
+  // Chat, /players and the U panel then name everyone as before real names
+  globalThis.__dboRealNamesOn = null; globalThis.__dboRealNamesLabel = null; globalThis.__dboRealNamesDisplay = null; globalThis.__dboRealNamesSet = null;
+}
 
 // ---- RaceMenu extras: overlays, body scales and morphs kept per character (server\appearanceextras.js) ----
 try {

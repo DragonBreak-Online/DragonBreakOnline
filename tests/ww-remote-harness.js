@@ -117,7 +117,9 @@ ok(/const LEAD_ONLY = new Set\(\[[^\]]*'wwremote'/.test(gm), '/wwremote is Lead 
 ok(/items: \[[^\]]*'wwremote'/.test(gm), 'and listed in the staff help beside /vlremote');
 
 const pm = fs.readFileSync(path.join(ROOT, 'playermenu.js'), 'utf8');
-ok(/const nameFor = \(viewer, a\) => beastName\(a\) \|\|/.test(pm), 'playermenu nameFor names a beast after its form for every viewer, before masks and introductions');
+// A staff member with real names on (Jake, 14 Oct) reads "Bryn (Werewolf form)" instead; that branch is keyed on the viewer's
+// mode alone, and every other viewer still gets the beast first
+ok(/const nameFor = \(viewer, a\) => (?:\(revealing\(viewer\) \? \(staffLabel\(a\) \|\| nameOf\(a\)\)\s*: )?beastName\(a\) \|\|/.test(pm), 'playermenu nameFor names a beast after its form for every viewer (but staff with real names on), before masks and introductions');
 ok(/if \(beastName\(a\)\) return personal\(a, 'You cannot handle a mask in this form\.'\);\s*\n\s*if \(isMasked\(a\)\) unmask/.test(pm), 'a mask cannot go on or off in a beast form (it would write a human name over the beast\'s)');
 ok(/if \(beastNamed\) \{ if \(!prev\) continue; now\.name = prev\.name; \}/.test(gm), 'the rename watch does not audit a beast name as a rename');
 ok(/globalThis\.__dboBeastRevert\(a, 'login'\)/.test(gm) && /globalThis\.__dboBeastRevert\(a, 'logout'\)/.test(gm) && /globalThis\.__dboBeastRevert\(actorId, 'death'\)/.test(gm), 'the real name comes back on login, logout and death (each reverts the form)');
