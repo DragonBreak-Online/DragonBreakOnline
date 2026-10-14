@@ -91,6 +91,10 @@ const SPAWN_MODES = new Set(["smite", "healhit"]);
 
 // Modes mirrored onto the neighbors-visible ff_adminModes actor property (registered in gamemode.js)
 const MIRRORED_MODES = ["god", "smite", "healhit", "invis", "ghost"];
+// Staff rank in the mirror (Nate, 14 Oct): an Invisible staff member is hidden from lower ranks and a ghost to the same or
+// higher; each staff member's own mirror carries their rank, which their client compares (formView adminViewOf)
+const STAFF_RANK: Record<AdminTier, number> = { senior: 5, developer: 4, leadgm: 3, gm: 2 };
+const TRIAL_RANK = 1;
 
 interface TeleportLocation {
   name: string;
@@ -185,6 +189,13 @@ export class AdminSystem implements System {
 
   private tierOf(mp: Mp, actorId: number): AdminTier | null {
     return adminTierOf(mp, actorId, this.roleCfg);
+  }
+
+  // 5 owner (senior) .. 2 GM, 1 Trial GM, 0 not staff
+  private staffRank(mp: Mp, actorId: number): number {
+    const tier = this.tierOf(mp, actorId);
+    if (tier) return STAFF_RANK[tier] || 0;
+    return isTrialGm(mp, actorId, this.roleCfg) ? TRIAL_RANK : 0;
   }
 
   private isAdminActor(mp: Mp, actorId: number): boolean {
@@ -926,16 +937,17 @@ export class AdminSystem implements System {
     state[mode] = !state[mode];
     this.modesByProfile.set(adminProfile, state);
     const on = !!state[mode];
-    if (MIRRORED_MODES.includes(mode)) this.writeModeMirror(mp, actorId, state);
+    if (MIRRORED_MODES.includes(mode)) this.writeModeMirror(mp, actorId, state, this.staffRank(mp, actorId));
     this.sendMode(mp, userId, mode, on);
     this.adminLog(`profile ${adminProfile} turned mode ${mode} ${on ? "on" : "off"}`);
   }
 
   // Registration lives in gamemode.js; a missing property must not break the toggle
-  private writeModeMirror(mp: Mp, actorId: number, state: Record<string, boolean>): void {
+  private writeModeMirror(mp: Mp, actorId: number, state: Record<string, boolean>, rank: number): void {
     try {
-      const mirror: Record<string, boolean> = {};
+      const mirror: Record<string, boolean | number> = {};
       for (const m of MIRRORED_MODES) mirror[m] = !!state[m];
+      if (rank > 0) mirror.rank = rank;
       mp.set(actorId, "ff_adminModes", mirror);
     } catch (e) {
       this.log(`AdminSystem: ff_adminModes mirror failed (property registered in gamemode.js?): ${e}`);
@@ -961,7 +973,8 @@ export class AdminSystem implements System {
     if (trial) for (const m of Object.keys(state)) if (!TRIAL_GM_MODES.has(m)) delete state[m];
     let mirror: Record<string, unknown> | null = null;
     try { mirror = mp.get(actorId, "ff_adminModes") ?? null; } catch { }
-    if (MIRRORED_MODES.some(m => !!mirror?.[m] !== !!state[m])) this.writeModeMirror(mp, actorId, state);
+    const rank = isAdmin ? (trial ? TRIAL_RANK : this.staffRank(mp, actorId)) : 0;
+    if (MIRRORED_MODES.some(m => !!mirror?.[m] !== !!state[m]) || (Number(mirror?.rank) || 0) !== rank) this.writeModeMirror(mp, actorId, state, rank);
     for (const m of ADMIN_MODES) {
       if (state[m.id]) this.sendMode(mp, userId, m.id, true);
     }
