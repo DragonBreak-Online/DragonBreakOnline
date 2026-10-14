@@ -145,11 +145,14 @@ check('the creator spots never include the marker everyone spawns on', /const CR
 // ---- the client and AdminSystem it relies on, when run-all hands us the fork ----
 const read = (base, rel) => { try { return base ? fs.readFileSync(path.join(base, rel), 'utf8') : null; } catch (e) { return null; } };
 const formView = read(process.env.FORK, 'skymp5-client/src/view/formView.ts');
+const policy = read(process.env.FORK, 'skymp5-client/src/view/adminCopyPolicy.ts') || '';
 if (!formView) console.log('skip  client source checks (no FORK with skymp5-client/src/view/formView.ts)');
 else {
   const view = formView.slice(formView.indexOf('private static adminViewOf('), formView.indexOf('private static adminViewOf(') + 500);
-  check('client: an actor whose ff_adminModes has invis is "hidden" to players and a ghost to staff',
-    /if \(m\["invis"\]\) return FormView\.viewerIsAdmin\(\) \? "ghost" : "hidden";/.test(view), view.slice(0, 300));
+  const legacy = /if \(m\["invis"\]\) return FormView\.viewerIsAdmin\(\) \? "ghost" : "hidden";/.test(view);
+  const everyone = /return adminViewOfModes\(/.test(view) && /if \(m\["invis"\]\) return "hidden";/.test(policy);
+  check('client: an actor whose ff_adminModes has invis is "hidden" (to players, or to every watcher from adminViewOfModes)',
+    legacy || everyone, view.slice(0, 300));
   check('client: hidden is drawn at alpha 0', /actor\.setAlpha\(view === "hidden" \? 0 :/.test(formView));
   check('client: the nametag is not drawn over a hidden actor', /adminViewOf\(model\) !== "hidden"|adminViewOf\(model\) === "hidden"/.test(formView));
 }
