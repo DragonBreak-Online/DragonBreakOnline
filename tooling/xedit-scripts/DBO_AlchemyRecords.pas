@@ -1,10 +1,11 @@
 {
   DBO - the Alchemy Rework's records (Nate, 14 Oct; specs/alchemy-pc-records.md, server branch alchemy-rework-1014).
-  Builds 10 MGEF, 129 ALCH, 2 FLOR, 29 COBJ bench fixes in one run:
+  Builds 10 MGEF, 129 ALCH, 2 FLOR, 28 COBJ bench fixes in one run:
   - each new MGEF, ALCH and FLOR is a copy (as new record) of a vanilla template into DragonBreak Online Edits.esp, with
     EDID, FULL, the description (MGEF), value and weight (ALCH ENIT/DATA) and the effects (EFID, magnitude, area 0,
     duration) set exactly as the data block below; the template's model, sounds, flags and keywords are kept;
-  - the 29 COBJs of DragonBreak Nexus Patches.esp that sit on the cooking pot (BNAM CraftTypeCookpot) get their right bench.
+  - 28 COBJs of DragonBreak Nexus Patches.esp that sit on the cooking pot (BNAM CraftTypeCookpot) get their right bench;
+    AOTVRecipeArmorBeetleCloak keeps the cooking pot on purpose (it hides the forge recipe; the loom one makes the cloak).
   Safety:
   - first every template, magic effect, bench and recipe is looked up and checked against its editor id and record type,
     and every form a template points at must be in a master of DragonBreak Online Edits; if anything is missing or wrong,
@@ -179,7 +180,6 @@ begin
   D('A|DBO_AlchSleepingTreeSap|Sleeping Tree Sap|Skyrim.esm|0aed90|dunSleepingTreeCampSap|100|500|Skyrim.esm:0e3cba:dunSleepingTreeSlowAlch:25:45;Skyrim.esm:0e3cbb:dunSleepingTreeDruggedAlch:0:45;NEW:DBO_AlchSleepingTreeSapEffect:25:45');
   D('F|DBO_HarvestJugOfMilk|DragonBreak Harvest.esp|000801|RP_HarvestJugOfMilk');
   D('F|DBO_HarvestFlourSack|DragonBreak Harvest.esp|000803|RP_HarvestFlourSack');
-  D('C|AOTVRecipeArmorBeetleCloak|Armors of the Velothi.esp|000883|Skyrim.esm|CraftingSmithingForge');
   D('C|DBOLOOM_ArmorBonesaintCloak|DragonBreak Nexus Patches.esp|000858|MoreCraftableEquipment.esp|MCE_CraftingLoom');
   D('C|DBOLOOM_RedoranWatchmanCloak|DragonBreak Nexus Patches.esp|00085a|MoreCraftableEquipment.esp|MCE_CraftingLoom');
   D('C|DBOLOOM_RhinoBeetleCloak|DragonBreak Nexus Patches.esp|00085b|MoreCraftableEquipment.esp|MCE_CraftingLoom');

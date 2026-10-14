@@ -3,8 +3,10 @@
 For the PC (xEdit lives there). Builds everything in `specs/alchemy-pc-records.md` (claude-nate-release) for the one
 release of server branch `alchemy-rework-1014`:
 - in **DragonBreak Online Edits.esp**: 10 MGEF, 129 ALCH and 2 FLOR, each a copy (as new record) of a vanilla template;
-- in **DragonBreak Nexus Patches.esp**: the BNAM of 29 recipes that sat on the cooking pot (CraftTypeCookpot), set to the
-  loom (MCE_CraftingLoom) or the forge (CraftingSmithingForge).
+- in **DragonBreak Nexus Patches.esp**: the BNAM of 28 recipes that sat on the cooking pot (CraftTypeCookpot), set to the
+  loom (MCE_CraftingLoom) or the forge (CraftingSmithingForge). AOTVRecipeArmorBeetleCloak keeps the cooking pot on purpose
+  (Nate, 14 Oct): that override hides the forge recipe, so the loom's DBOLOOM_RhinoBeetleCloak is the only way to make the
+  cloak. The script never touches it.
 
 The data block inside the script is generated from the spec; edit the spec's generator, never the block by hand.
 
@@ -22,7 +24,7 @@ The data block inside the script is generated from the spec; edit the spec's gen
    Both `-D` and `-P` are needed: `-D` alone still reads Vortex's Plugins.txt and loads the wrong list. The first headless
    run sometimes stops at "Loading active plugin list" without running the script: run it again.
 4. Read `Edit Scripts\DBO_AlchemyRecords_result.txt`:
-   - `"status": "DONE created 141, existing 0, benches fixed 29"` on a first run, `existing 141` on a rerun (a rerun is
+   - `"status": "DONE created 141, existing 0, benches fixed 28"` on a first run, `existing 141` and `benches fixed 0` on a rerun (a rerun is
      safe: every EDID already in DLE is skipped and still reported);
    - `"status": "FATAL: nothing changed"`: a template, magic effect or recipe was missing or carried another editor id,
      or a template points outside DLE's masters. `Edit Scripts\DBO_AlchemyRecords_log.txt` lists each one. Nothing was
@@ -41,12 +43,12 @@ of DLE. So compare each plugin with its backup, record by record:
 
 ```
 py tools\plugin_record_diff.py "ckmcp-backups\DLE-before-alchemy.esp" "Data\DragonBreak Online Edits.esp" --allow-edid-prefix DBO_Alch,DBO_Harvest
-py tools\plugin_record_diff.py "ckmcp-backups\NP-before-alchemy.esp" "Data\DragonBreak Nexus Patches.esp" --allow-changed <the 29 EDIDs of the result log's BENCH lines>
+py tools\plugin_record_diff.py "ckmcp-backups\NP-before-alchemy.esp" "Data\DragonBreak Nexus Patches.esp" --allow-changed <the 28 EDIDs of the result log's BENCH lines>
 ```
 
 Ship only on "OK: only the expected records differ": DLE shows 141 ADDED (DBO_Alch*, DBO_Harvest*) and nothing else
-(the plugin header may count as changed, that is fine); Nexus Patches shows exactly the 29 recipes CHANGED, each in BNAM
-only. Anything else (a DBO_Skill_* spell, a SCEN, a record that lost a subrecord) means the save is rejected: restore the
+(the plugin header may count as changed, that is fine); Nexus Patches shows exactly the 28 recipes CHANGED, each in BNAM
+only (AOTVRecipeArmorBeetleCloak must not be among them). Anything else (a DBO_Skill_* spell, a SCEN, a record that lost a subrecord) means the save is rejected: restore the
 backup and send the diff.
 
 ## After
