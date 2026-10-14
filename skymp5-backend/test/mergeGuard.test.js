@@ -650,6 +650,7 @@ test('setup-client and the webhook: never pull a sources/client whose .git folde
   const other = path.join(tmp, 'other-shared-git')
   behindCheckout(other)
   const mains = () => [live.repo, other].map(repo => git(repo, 'rev-parse', 'refs/heads/main'))
+  const objects = () => [live.repo, other].map(repo => snapshot(path.join(repo, '.git', 'objects')))
   const start = mains()
   const releaseRepo = config.releaseRepo
   config.releaseRepo = live.repo
@@ -685,9 +686,11 @@ test('setup-client and the webhook: never pull a sources/client whose .git folde
     const exp = backendCopy(path.join(tmp, `export-shared-${shape.replace(' ', '-')}`))
     const client = path.join(exp, 'sources', 'client')
     make(client)
+    const fetched = objects()
     const work = workFolder(`work-shared-${shape.replace(' ', '-')}`)
     const setup = run(exp, 'setup-client.js', { CLIENT_FILES_DIR: work, DBO_RELEASE_REPO: live.repo, ...env })
     assert.deepEqual(mains(), start, `setup-client moved a main branch through ${shape}`)
+    assert.deepEqual(objects(), fetched, `setup-client fetched into another checkout's objects through ${shape}`)
     assert.equal(setup.status, 1, `${shape}: ${setup.stdout}${setup.stderr}`)
     assert.match(setup.stderr, /\[setup\] refusing to pull: .* has no git folder of its own: /, shape)
     assert.match(setup.stderr, why, shape)
@@ -695,6 +698,7 @@ test('setup-client and the webhook: never pull a sources/client whose .git folde
     const pulled = await pullAndMerge({ clientDir: client, bucket: work, merge })
     delete process.env.GIT_COMMON_DIR
     assert.deepEqual(mains(), start, `the webhook moved a main branch through ${shape}`)
+    assert.deepEqual(objects(), fetched, `the webhook fetched into another checkout's objects through ${shape}`)
     assert.equal(pulled, 'refused', shape)
     assert.match(said(), why, shape)
     assert.equal(fs.existsSync(path.join(work, 'skymp-client.zip')), false)
@@ -702,7 +706,7 @@ test('setup-client and the webhook: never pull a sources/client whose .git folde
   assert.equal(merges, 0)
 })
 
-test('merge-files and populate-files: a work root bind-mounted from the live root is refused, as the same folder by device and inode', (t) => {
+test('merge-files and populate-files: a work folder with a live folder bind-mounted into it is refused, as the same folder by device and inode', (t) => {
   const live = liveCheckout('live-bind')
   const probe = [path.join(tmp, 'bind-probe-from'), path.join(tmp, 'bind-probe-onto')]
   probe.forEach(dir => fs.mkdirSync(dir))
@@ -715,12 +719,15 @@ test('merge-files and populate-files: a work root bind-mounted from the live roo
   const liveRoot = path.join(live.bucket, 'root')
   const before = snapshot(live.bucket)
 
-  for (const [script, from, onto] of [
+  // The live root onto the work root; a live folder deeper down, which only the copy enters; the whole live bucket; the live Data onto root/Data, which populate deletes
+  for (const [i, [script, from, onto]] of [
     ['merge-files.js', liveRoot, 'root'],
     ['populate-files.js', liveRoot, 'root'],
+    ['merge-files.js', path.join(liveRoot, 'Data', 'Platform'), path.join('root', 'Data', 'Platform')],
+    ['populate-files.js', live.bucket, '.'],
     ['populate-files.js', path.join(liveRoot, 'Data'), path.join('root', 'Data')],
-  ]) {
-    const work = path.join(tmp, `work-bind-${script}-${onto.replace(path.sep, '-')}`)
+  ].entries()) {
+    const work = path.join(tmp, `work-bind-${i}`)
     fs.mkdirSync(path.join(work, onto), { recursive: true })
     const r = run(exp, script, { CLIENT_FILES_DIR: work, DBO_RELEASE_REPO: live.repo, SKYMP_CLIENT_DATA: src }, { bind: [from, path.join(work, onto)] })
     assert.deepEqual(snapshot(live.bucket), before, `${script} with ${onto} bind-mounted: ${r.stdout}${r.stderr}`)
