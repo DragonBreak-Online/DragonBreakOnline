@@ -96,25 +96,31 @@ function writeNew(target, data) {
 
 // File copy
 
-function copyDir(srcDir, destDir, skipNames = new Set()) {
+// guard(p) throws for a live path and runs before every write; write false only checks every folder and file the copy would write
+function copyDir(srcDir, destDir, skipNames, guard, write = true) {
   if (!fs.existsSync(srcDir)) {
-    console.warn(`[merge] source not found, skipping: ${srcDir}`)
+    if (write) console.warn(`[merge] source not found, skipping: ${srcDir}`)
     return 0
   }
+  guard(destDir)
   let count = 0
   for (const entry of fs.readdirSync(srcDir, { withFileTypes: true })) {
     if (skipNames.has(entry.name)) continue
     const src  = path.join(srcDir, entry.name)
     const dest = path.join(destDir, entry.name)
+    guard(dest)
     if (entry.isDirectory()) {
-      fs.mkdirSync(dest, { recursive: true })
-      count += copyDir(src, dest, skipNames)
-    } else {
-      fs.mkdirSync(path.dirname(dest), { recursive: true })
-      removeFile(dest)
-      fs.copyFileSync(src, dest, fs.constants.COPYFILE_EXCL)
-      count++
+      if (write) fs.mkdirSync(dest, { recursive: true })
+      count += copyDir(src, dest, skipNames, guard, write)
+      continue
     }
+    if (write) {
+      fs.mkdirSync(destDir, { recursive: true })
+      removeFile(dest)
+      guard(dest)
+      fs.copyFileSync(src, dest, fs.constants.COPYFILE_EXCL)
+    }
+    count++
   }
   return count
 }
@@ -205,8 +211,8 @@ async function mergeSourcesIntoRoot() {
   console.log(`[merge]   client  : ${CLIENT_SRC}`)
   console.log(`[merge]   output  : ${OUTPUT_DIR}`)
 
-  // Every path it writes, after links: the bucket, its root and zip, the manifest, and any link in the root a copy would write through
-  const targets = { bucket: BUCKET, manifest: VERSION_FILE, writes: [OUTPUT_DIR, ZIP_PATH, ...liveBucket.linksUnder(OUTPUT_DIR)] }
+  // Every path it writes, after links and by device and inode: the bucket, its root, root/Data and zip, the manifest, and any link in the root a copy would write through
+  const targets = { bucket: BUCKET, manifest: VERSION_FILE, writes: [OUTPUT_DIR, path.join(OUTPUT_DIR, 'Data'), ZIP_PATH, ...liveBucket.linksUnder(OUTPUT_DIR)] }
   const refused = liveBucket.refusal(targets)
   if (refused) throw new Error(refused)
   const live = liveBucket.liveTarget(targets)
@@ -228,15 +234,20 @@ async function mergeSourcesIntoRoot() {
   const warned = new Set()
   refuseSymbols(CLIENT_SRC, warned)
   refuseSymbols(OUTPUT_DIR, warned)
+  // A link or bind mount deeper in the root only shows where the copy writes: every folder and file is checked before the first write and again at it
+  const guard = liveBucket.writeGuard()
+  copyDir(CLIENT_SRC, OUTPUT_DIR, SKIP_ALWAYS, guard, false)
+  guard(OUTPUT_DIR)
   fs.mkdirSync(OUTPUT_DIR, { recursive: true })
 
-  const clientFiles = copyDir(CLIENT_SRC, OUTPUT_DIR, SKIP_ALWAYS)
+  const clientFiles = copyDir(CLIENT_SRC, OUTPUT_DIR, SKIP_ALWAYS, guard)
   console.log(`[merge] Files merged: ${clientFiles} total in ${Date.now() - startMs}ms`)
 
   refuseSymbols(OUTPUT_DIR, warned)
 
   console.log('[merge] Building zip…')
   const zipStart = Date.now()
+  guard(ZIP_PATH)
   const zipSize  = await buildZip(OUTPUT_DIR, ZIP_PATH)
   console.log(`[merge] Zip built: ${(zipSize / 1024 / 1024).toFixed(1)} MB in ${Date.now() - zipStart}ms`)
 
@@ -245,6 +256,7 @@ async function mergeSourcesIntoRoot() {
 
   // CLIENT_VERSION in routes/version.js overrides the update-signal version
   const version = routeClientVersion() || clientGitHash()
+  guard(VERSION_FILE)
   fs.mkdirSync(path.dirname(VERSION_FILE), { recursive: true })
   writeNew(VERSION_FILE, JSON.stringify({
     version,
