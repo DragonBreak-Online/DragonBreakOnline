@@ -1,6 +1,6 @@
 [
   {
-    "title": "Character creation fix",
+    "title": "Character creation and werewolf fixes",
     "date": "2026-10-14",
     "version": "Server update",
     "tag": "Fix",
@@ -9,6 +9,12 @@
         "heading": "Making a character",
         "items": [
           "Two people making a character at the same time could end up standing inside each other, with the editor's camera showing the other person instead of your own changes. Each new character is now moved to a spot of their own, and moved again if that did not take, before the editor opens."
+        ]
+      },
+      {
+        "heading": "Werewolves",
+        "items": [
+          "Werewolves no longer stay looking like naked humans to other players. Anyone still seen that way shows their true form again at their next change."
         ]
       }
     ]
