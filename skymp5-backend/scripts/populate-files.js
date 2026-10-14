@@ -19,8 +19,7 @@ const liveBucket = require('../sources/liveBucket')
 const ROOT_DEST = path.join(config.clientFilesDir, 'root')
 const DATA_DEST = path.join(ROOT_DEST, 'Data')
 
-// It deletes and rewrites <bucket>/root/Data, served at /files/root as soon as a file lands there: checked after links, since a
-// root or Data that is a link into the live files would be deleted there
+// It deletes and rewrites <bucket>/root/Data, served at /files/root at once: checked after links, or a linked root would be deleted live
 const targets = { bucket: config.clientFilesDir, writes: [ROOT_DEST, DATA_DEST] }
 const refused = liveBucket.refusal(targets)
 if (refused) {

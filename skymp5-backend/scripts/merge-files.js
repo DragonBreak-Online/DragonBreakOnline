@@ -50,10 +50,9 @@ function clientGitHash() {
   return 'nogit'
 }
 
-// File writes: always a new file, never a write through a link or through another name of the same file. A work root copied with
-// cp -al shares its files with where it came from, and a zip or manifest hard-linked to the live one would rewrite it in place
+// Every write makes a new file, never one through a link or a hard link (a cp -al work root shares its files with the original)
 
-// A file at p is unlinked (a link itself, not where it points); a folder stays
+// Unlinks a file or link at p; a folder stays
 function removeFile(p) {
   try {
     if (!fs.lstatSync(p).isDirectory()) fs.unlinkSync(p)
@@ -62,7 +61,7 @@ function removeFile(p) {
   }
 }
 
-// The new file is written next to target, then renamed over it, so the backend never serves a half-written zip or manifest
+// Written next to target, then renamed over it, so the backend never serves a half-written zip or manifest
 function tempFor(target) {
   const tmp = path.join(path.dirname(target), `.${path.basename(target)}.${process.pid}.tmp`)
   removeFile(tmp)
@@ -74,7 +73,7 @@ function swapIn(tmp, target) {
   try {
     fs.renameSync(tmp, target)
   } catch (err) {
-    // Windows refuses to rename over a file another program holds open: write it in place there, as before (no live checkout on a PC)
+    // Windows refuses to rename over a file another program holds open: write it in place there (no live checkout on a PC)
     if (process.platform !== 'win32' || !['EPERM', 'EACCES', 'EBUSY'].includes(err.code)) {
       fs.rmSync(tmp, { force: true })
       throw err
@@ -217,7 +216,7 @@ async function mergeSourcesIntoRoot() {
   if (fs.existsSync(CLIENT_SRC) && !liveBucket.hasFiles(CLIENT_SRC, SKIP_ALWAYS)) {
     throw new Error(`refusing to merge: the client source ${CLIENT_SRC} is empty, so the zip would be whatever ${OUTPUT_DIR} already holds`)
   }
-  // A live checkout's root is never re-zipped as it is, even with the opt-in; a PC's own default bucket that populate-files just filled is
+  // Never re-zips a live checkout's root as it is, even with the opt-in; a PC's own default bucket filled by populate-files is fine
   if (!fs.existsSync(CLIENT_SRC)) {
     if (liveBucket.liveTarget({ ...targets, checkoutOnly: true })) throw new Error(`refusing to merge: there is no client source ${CLIENT_SRC}, so the zip would be whatever the live root ${OUTPUT_DIR} already holds`)
     if (!liveBucket.hasFiles(OUTPUT_DIR, SKIP_ALWAYS)) throw new Error(`refusing to merge: there is no client source ${CLIENT_SRC} and no file in ${OUTPUT_DIR} to package`)

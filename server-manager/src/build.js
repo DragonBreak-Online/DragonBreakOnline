@@ -514,8 +514,7 @@ class Builder {
     // CLIENT_VERSION in routes/version.js, set it from the Client version field).
     const dep = await this.ensureDeps(config.paths.backend, 'backend', 'npm')
     if (!dep.ok) return dep
-    // The PC packages into its own backend's default bucket, which populate-files and merge-files refuse without this opt-in. Only for
-    // that bucket (CLIENT_FILES_DIR empty or naming it), so another bucket set in Settings keeps the guard; never on CT 115
+    // The PC's default bucket (CLIENT_FILES_DIR empty or naming it) is refused without this opt-in; any other bucket keeps the guard
     const bucket = config.clientFilesDir
     const ownBucket = !bucket || path.resolve(config.paths.backend, bucket).toLowerCase() === path.join(config.repoRoot, 'build', 'client-files').toLowerCase()
     const optIn = isWin && ownBucket ? { DBO_MERGE_LIVE_BUCKET: '1' } : null

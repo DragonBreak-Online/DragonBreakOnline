@@ -102,8 +102,7 @@ module.exports = {
 
   launcherArtifact: 'DragonBreakLauncher.exe',
 
-  // The backend's CLIENT_FILES_DIR as its scripts see it: one set for the manager wins over the backend .env, as dotenv leaves a
-  // set variable alone. '' = the backend's default bucket, build/client-files
+  // The backend's CLIENT_FILES_DIR as its scripts see it (a set variable wins over the backend .env); '' = its default bucket
   get clientFilesDir() {
     return process.env.CLIENT_FILES_DIR || readEnv('CLIENT_FILES_DIR').replace(/^(['"])(.*)\1$/, '$2')
   },

@@ -18,8 +18,7 @@ const OPT_IN = 'DBO_MERGE_LIVE_BUCKET'
 // Windows compares paths without case
 const samePath = (a, b) => (process.platform === 'win32' ? a.toLowerCase() === b.toLowerCase() : a === b)
 
-// Where a write to p lands: its real path, or for a path not created yet the real path of its nearest existing parent with the
-// rest added. A link to a path that does not exist yet is followed too, since a write through it creates its target
+// Where a write to p lands: its real path, else its nearest existing parent's real path plus the rest; a link to nowhere yet is followed too
 function realPath(p, depth = 0) {
   const rest = []
   let dir = path.resolve(p)
@@ -51,8 +50,7 @@ function sameInode(a, b) {
 
 const liveRepos = () => [...new Set([LIVE_REPO, config.releaseRepo].filter(Boolean).map(repo => realPath(repo)))]
 
-// Why writing the file or folder p would write the live client files, or null: at or below a live checkout's bucket, that
-// checkout's manifest, a hard link to its zip or manifest, or (unless checkoutOnly) at or below this checkout's default bucket
+// Why writing p would write the live client files, or null; checkoutOnly leaves out this checkout's default bucket
 function livePath(p, { checkoutOnly = false } = {}) {
   const real = realPath(p)
   for (const repo of liveRepos()) {
@@ -69,8 +67,7 @@ function livePath(p, { checkoutOnly = false } = {}) {
   return null
 }
 
-// Why writing into this bucket (and this manifest, and the files and folders in writes, when given) would write the live client
-// files, or null. checkoutOnly: only a live checkout's files count, not the default bucket of the checkout this runs from
+// Why writing into this bucket, manifest and the paths in writes would write the live client files, or null
 function liveTarget({ bucket, manifest = null, writes = [], checkoutOnly = false }) {
   const dir = realPath(bucket)
   for (const repo of liveRepos()) {
@@ -99,9 +96,7 @@ function linksUnder(dir, out = []) {
   return out
 }
 
-// The opt-in counts for one command only. dotenv copies a .env into process.env (the backend's own .env in merge-files and
-// setup-client, the .env of the folder a script runs from in config.js), so one there would turn the guard off for every later
-// run from that folder; the .env that sets it, or null
+// The opt-in counts for one command only: the backend's or the cwd's .env that sets it (dotenv loads both), or null
 const OPT_IN_LINE = new RegExp(`^\\s*(?:export\\s+)?${OPT_IN}\\s*(?:=|:)`, 'm')
 function optInFile() {
   for (const file of new Set([path.join(BACKEND, '.env'), path.resolve('.env')])) {
@@ -143,8 +138,7 @@ function isOwnTopLevel(dir, printed) {
   try { return samePath(fs.realpathSync(String(printed).trim()), fs.realpathSync(dir)) } catch { return false }
 }
 
-// A .git file or link can borrow another checkout's git folder, and a pull then moves that checkout's branch: true only when the git
-// folder git printed is dir's own .git folder
+// A .git file or link can borrow another checkout's git folder: true only when the one git printed is dir's own .git folder
 function isOwnGitDir(dir, printed) {
   try {
     const own = path.join(fs.realpathSync(dir), '.git')
@@ -155,8 +149,7 @@ function isOwnGitDir(dir, printed) {
 // What git -C <dir> must print for notOwnCheckout: its top level, then its git folder, one a line
 const REV_PARSE = ['rev-parse', '--show-toplevel', '--absolute-git-dir']
 
-// Why a clone or pull in dir would touch a live checkout, or null: dir (after links) is a live checkout, sits in one, or holds one.
-// Checked before any git runs; there is no opt-in for it
+// Why a clone or pull in dir would touch a live checkout (dir is one, sits in one or holds one), or null; no opt-in
 function nearLiveCheckout(dir) {
   const real = realPath(dir)
   for (const repo of liveRepos()) {
