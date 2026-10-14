@@ -4380,6 +4380,8 @@ function writeClientSettings(destPath, srv, serverInfo) {
 
   settings['server-ip']   = srv.address
   settings['server-port'] = Number(srv.port)
+  // Settings > Use a controller also switches DragonBreak's controller buttons and the panel pointer (client gamepadKeys.ts)
+  settings['gamepadControls'] = !!store.get('controllerEnabled')
 
   // Default to false (online mode) when serverInfo is unavailable - safer
   // than defaulting to offline, which would write a wrong profileId-based gameData.
