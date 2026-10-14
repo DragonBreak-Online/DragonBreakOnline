@@ -1391,6 +1391,32 @@ const blockPlacedPickup = (targetId, casterId) => {
   if (Date.now() - (lastPickupDeny.get(casterId) || 0) > 1500) { lastPickupDeny.set(casterId, Date.now()); personal(casterId, "That is not yours to take. Resources come from nodes, containers, crafting and trade."); }
   return true;
 };
+// A dead hawk's body (fcHawkGO 105821:Skyrim.esm, Dawnguard's DLC1BoneHawkGO: a CONT the hawk's own script places where it
+// dies) falls to the ground on every client, but the server keeps the spot it was placed at, in the air. All 80 tries to
+// loot the four the server holds (ff00001c, ff000272, ff000fcd, ff001570; Purr #7DJT 13 Oct 20:45 and 25 others since
+// 11 Oct) were refused by the reach check in the activate chain: each player stood under the body, a few metres across
+// and about 2480 units (35 m) below it. Such a body is held to the reach across (HAWK_BODY_REACH_M) at any height
+// below the spot, in the same world or cell.
+const HAWK_BODY_EDIDS = new Set(['fchawkgo', 'dlc1bonehawkgo']);
+const HAWK_BODY_REACH_M = 10;
+const hawkBodyBase = new Map();   // base id -> is a hawk body (rebuilt with the module)
+const hawkBodyInReach = (caster, target, q) => {
+  if ((target >>> 0) < 0xff000000) return false;
+  let base = 0; try { base = mp.getIdFromDesc(String(mp.get(target, 'baseDesc') || '')) >>> 0; } catch (e) { return false; }
+  if (!base) return false;
+  if (!hawkBodyBase.has(base)) {
+    let hawk = false;
+    try { const r = mp.lookupEspmRecordById(base); hawk = !!(r && r.record && String(r.record.type) === 'CONT' && HAWK_BODY_EDIDS.has(String(r.record.editorId || '').toLowerCase())); } catch (e) { hawk = false; }
+    hawkBodyBase.set(base, hawk);
+  }
+  if (!hawkBodyBase.get(base)) return false;
+  try {
+    if (mp.get(caster, 'worldOrCellDesc') !== mp.get(target, 'worldOrCellDesc')) return false;
+    const p = mp.get(caster, 'pos');
+    if (!Array.isArray(p)) return false;
+    return Math.hypot(p[0] - q[0], p[1] - q[1]) / UNITS_PER_METER <= HAWK_BODY_REACH_M && p[2] - q[2] <= 6.5 * UNITS_PER_METER;
+  } catch (e) { return false; }
+};
 // A hold's treasury chest is paid into at a bank and spent by the realm; nobody but staff opens it (review B1: any rank
 // or key holder, or a lockpick on an unclaimed one, could empty it)
 const treasuryChests = () => {
@@ -1453,7 +1479,7 @@ mp.onActivate = (targetId, casterId) => {
   // Reach applies to actors only; a lever or trap linker activates its gate from any distance
   try {
     const q = mp.get(target, 'pos');
-    if (Array.isArray(q) && mp.get(caster, 'type') === 'MpActor' && distanceMeters(caster, target) > 6.5) return false;
+    if (Array.isArray(q) && mp.get(caster, 'type') === 'MpActor' && distanceMeters(caster, target) > 6.5 && !(typeof hawkBodyInReach === 'function' && hawkBodyInReach(caster, target, q))) return false;
   } catch (e) { }
   // A home's weapon rack (weaponracks.js): owner and key holders rack and take; anyone else, raiders too, is refused. Before
   // the raid hook, and before blockPlacedPickup, which would hand a racked display copy to whoever touched it
