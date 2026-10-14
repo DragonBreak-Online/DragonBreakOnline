@@ -62,11 +62,10 @@ export const getScreenResolution = (): ScreenResolution => {
   return _screenResolution;
 }
 
-// SweetHidePerson is a fixed keyword, so it is resolved once rather than on every visible copy
-// every frame. Lazy because Keyword.getKeyword needs the game loaded, not module-eval time.
-let _sweetHidePersonKeyword: Keyword | null | undefined;
+// Kept once found; a null is not kept, so a keyword that is not loaded yet is looked up again next time
+let _sweetHidePersonKeyword: Keyword | null = null;
 const sweetHidePersonKeyword = (): Keyword | null => {
-  if (_sweetHidePersonKeyword === undefined) {
+  if (!_sweetHidePersonKeyword) {
     _sweetHidePersonKeyword = Keyword.getKeyword('SweetHidePerson');
   }
   return _sweetHidePersonKeyword;
