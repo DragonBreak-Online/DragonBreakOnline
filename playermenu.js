@@ -114,7 +114,7 @@ module.exports = (api) => {
   const beastName = (a) => { try { return typeof globalThis.__dboBeastName === 'function' ? String(globalThis.__dboBeastName(a) || '') : ''; } catch (e) { return ''; } };
   // A staff member with real names on sees the own name, and "Aldric (masked)" behind a disguise (staffLabel below); the
   // text is for that viewer alone, as every caller builds it for the one who receives it
-  const nameFor = (viewer, a) => (revealing(viewer) ? (staffLabel(a) || nameOf(a))
+  const nameFor = (viewer, a) => (revealing(viewer) ? revealedName(a)
     : beastName(a) || (isMasked(a) ? C.maskName : knownBy(viewer).includes(a >>> 0) ? nameOf(a) : 'Stranger'));
   // Other modules name players the same way (downed.js: who raised you); a name must never skip the introductions
   globalThis.__dboNameFor = nameFor;
@@ -133,13 +133,17 @@ module.exports = (api) => {
   // shown is the mask's or the beast's, so a /bug from behind a mask reached staff as "Masked Person #TAG" and they had
   // to work out who sent it (D15: #VKRS, #8KWH and #LLX8, 11 Oct). '' when the name shown is the character's own; else
   // their own name and why it is hidden, "Raven (masked)". The real-names mode names a disguise the same way.
-  function staffLabel(a) {
+  // labelAndShown reads the name shown once, for both answers (the name is the appearance, a large read)
+  function labelAndShown(a) {
     const masked = isMasked(a), beast = beastName(a), shown = nameOf(a);
-    if (!masked && !beast && !isMaskName(shown)) return '';
+    if (!masked && !beast && !isMaskName(shown)) return { label: '', shown };
     const own = ownBehind(a, beast);
     const why = [masked ? 'masked' : '', beast ? `${beast} form` : '', own ? '' : 'own name lost'].filter(Boolean);
-    return `${own || shown} (${why.join(', ')})`;
+    return { label: `${own || shown} (${why.join(', ')})`, shown };
   }
+  function staffLabel(a) { return labelAndShown(a).label; }
+  // What a staff member with real names on is shown: the label behind a disguise, else the name shown (the own name)
+  function revealedName(a) { const x = labelAndShown(a); return x.label || x.shown; }
   globalThis.__dboStaffName = staffLabel;
   // The character's own name behind a mask and a beast form (gamemode.js realNameOf; rosters read it through ownNameOf,
   // which keeps a mask's name while gamemode-config.json rosterPrivacy.masks is off; tracker 1559074270959640676: the Court
@@ -181,17 +185,24 @@ module.exports = (api) => {
   };
 
   // ---- real names: the staff mode (header) ---------------------------------------------------------
-  // The label of every online disguised player, by actor hex, for the staff member's own client (a 0.3.98 nametag draws
-  // it; 0.3.97 ignores it). Never the staff member, never an unmasked player
-  const labelsFor = (a) => {
-    const out = {};
+  // The label of every online disguised player, [[actor hex, label], ...], read once for everyone with the mode on (a
+  // sweep, a mask put on or taken off) rather than once per staff member. At most 201, so each staff member's own map
+  // below still holds 200 once their own entry is left out
+  const disguisedLabels = () => {
+    const out = [];
     if (RN.labels === false) return out;
-    let n = 0;
     for (const x of onlineActors()) {
-      if ((x >>> 0) === (a >>> 0)) continue;
       const l = staffLabel(x);
-      if (l) { out[(x >>> 0).toString(16)] = l; if (++n >= 200) break; }
+      if (l) { out.push([(x >>> 0).toString(16), l]); if (out.length > 200) break; }
     }
+    return out;
+  };
+  // One staff member's labels, for their own client (a 0.3.98 nametag draws them; 0.3.97 ignores them): never their
+  // own, never an unmasked player
+  const labelsFor = (a, all) => {
+    const own = (Number(a) >>> 0).toString(16), out = {};
+    let n = 0;
+    for (const [h, l] of all || disguisedLabels()) { if (h === own) continue; out[h] = l; if (++n >= 200) break; }
     return out;
   };
   // A list that other code put back while the mode was on joins the stash before the marker goes over it
@@ -203,11 +214,11 @@ module.exports = (api) => {
     try { mp.set(a, STASH_PROP, union(s, v)); return true; } catch (e) { log(`realnames: introductions for ${display(a)} not kept`, e.message); return false; }
   };
   // The marker on the staff member's own ff_knownIds (owner-only: no neighbour receives it). Sent only when the labels
-  // changed or the marker is not in place
-  const writeMarker = (a) => {
+  // changed or the marker is not in place. all: disguisedLabels() when the caller already read it
+  const writeMarker = (a, all) => {
     a = Number(a) >>> 0;
     const st = realNamesOn.get(a);
-    const labels = labelsFor(a);
+    const labels = labelsFor(a, all);
     const key = JSON.stringify(labels);
     const v = get(a, KNOWN_PROP, null);
     if (isMarker(v) && st && st.key === key) return true;
@@ -227,7 +238,12 @@ module.exports = (api) => {
     return list.length;
   };
   // A mask put on or taken off changes the labels of everyone with the mode on (nothing when nobody has it on)
-  const refreshLabels = () => { if (!realNamesOn.size) return; for (const v of [...realNamesOn.keys()]) { try { writeMarker(v); } catch (e) { /* the sweep tries again */ } } };
+  const refreshLabels = () => {
+    if (!realNamesOn.size) return;
+    let all;
+    try { all = disguisedLabels(); } catch (e) { return; /* the sweep tries again */ }
+    for (const v of [...realNamesOn.keys()]) { try { writeMarker(v, all); } catch (e) { /* the sweep tries again */ } }
+  };
   const RN_TOLD = {
     on: 'Real names on: every player shows by their own name to you, and a disguise as "Name (masked)" or "Name (Werewolf form)" in the X menu, messages and chat. Only your screen changes (mind it on stream). A masked head still reads Masked Person on this client; press X on them. /realnames off to stop; it ends when you log out.',
     command: 'Real names off: people you have not met are Strangers to you again.',
@@ -266,7 +282,7 @@ module.exports = (api) => {
   // Chat (gamemode.js handleLine and sendNear), /players and the U panel's player list read these; each fails safe
   globalThis.__dboRealNamesOn = (viewer) => revealing(viewer);
   globalThis.__dboRealNamesLabel = (speaker) => (RN_ON && realNamesOn.size > 0 && RN.chat !== false ? staffLabel(Number(speaker) >>> 0) : '');
-  globalThis.__dboRealNamesDisplay = (viewer, t) => (revealing(viewer) ? `${staffLabel(Number(t) >>> 0) || nameOf(t)} #${tagOf(t)}` : '');
+  globalThis.__dboRealNamesDisplay = (viewer, t) => (revealing(viewer) ? `${revealedName(Number(t) >>> 0)} #${tagOf(t)}` : '');
   // For a panel button (fork AdminSystem, later) and the harness: checks the rights itself
   globalThis.__dboRealNamesSet = (a, on, via) => {
     try {
@@ -304,12 +320,14 @@ module.exports = (api) => {
   every('realnames', RN_SWEEP_MS, () => {
     if (realNamesOn.size === 0 || globalThis.__dboNameFor !== nameFor) return;
     const online = new Set(onlineActors().map((x) => x >>> 0));
+    // The disguises are read once per sweep, for every staff member in the mode, and only when one is still in it
+    let all = null;
     for (const a of [...realNamesOn.keys()]) {
       try {
         if (!RN_ON) endReveal(a, 'switched off', false);
         else if (!online.has(a)) endReveal(a, 'left', true);
         else if (!staffCan(a, 'realnames')) endReveal(a, 'rights', false);
-        else writeMarker(a);
+        else writeMarker(a, all || (all = disguisedLabels()));
       } catch (e) { log('realnames sweep failed', e.message); }
     }
   });

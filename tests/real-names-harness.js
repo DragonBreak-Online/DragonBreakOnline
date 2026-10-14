@@ -89,12 +89,15 @@ let fakeNow = 1_900_000_000_000; const savedNow = Date.now; Date.now = () => fak
 const nameOf = (a) => (G_(a, 'appearance') || {}).name || 'Stranger';
 const tagOf = (a) => (actors[a >>> 0] || { tag: '????' }).tag;
 const display = (a) => `${nameOf(a)} #${tagOf(a)}`;
+// The api's nameOf, counted: the live one reads the appearance, a large native read (R23)
+let nameReads = 0;
+const countedNameOf = (a) => { nameReads++; return nameOf(a); };
 const cfg = { playerMenu: {} };
 try { const j = JSON.parse(fs.readFileSync(CFG_FILE, 'utf8')); cfg.playerMenu = JSON.parse(JSON.stringify(j.playerMenu || {})); } catch (e) { /* defaults */ }
 const api = () => ({
   mp, log: (...x) => logs.push(x.join(' ')), personal: (a, t) => said.push({ a: a >>> 0, t: String(t) }), system: (a, t) => said.push({ a: a >>> 0, t: String(t), sys: true }),
   registerChatCommand: (n, fn, o) => commands.set(n, { fn, admin: !!(o && o.admin), help: (o && o.help) || '' }),
-  onUi: (n, fn) => ui.set(n, fn), sendPacket: (a, p) => { packets.push({ a: a >>> 0, p }); return true; }, display, nameOf, tagOf,
+  onUi: (n, fn) => ui.set(n, fn), sendPacket: (a, p) => { packets.push({ a: a >>> 0, p }); return true; }, display, nameOf: countedNameOf, tagOf,
   profileOf: (a) => (actors[a >>> 0] || { profile: -1 }).profile, onlineActors: () => online.slice(), isAdmin: T.isAdmin, isLeadStaff: T.isLeadStaff,
   staffCan: T.staffCan, ranksOf: () => [], giveItem: () => true, makeProp: () => {}, runCommand: () => {}, zones: {}, zoneOfActor: () => null, cfg,
   every: (name, ms, fn) => timers.set(name, { ms, fn }),
@@ -434,6 +437,32 @@ step('R22 pace', () => {
   ok('R22 the sweep never runs slower than every 60 s: sweepMs 1e10, 99999999999, Infinity and "1e10" all give 60000', got.slice(0, 7).every((x) => x === 60000), bad);
   ok('R22 ...never faster than every 500 ms, and a value that is not a number is the 2000 default', got.slice(7).join() === '2000,500,500,500,2000,2000', bad);
   ok('R22 ...so no pace reaches Node\'s 2147483647 ms timer limit (above it a timer fires every 1 ms)', got.every((x) => typeof x === 'number' && x >= 500 && x <= 2147483647), { got, bad });
+});
+
+// ---- R23: the cost with the mode on (the reload review's recommendations, 14 Oct) --------------------------------------------
+step('R23 cost', () => {
+  cmd(GM, 'on'); sweep();
+  let g0 = gets; sweep(); const one = gets - g0;
+  cmd(TRIAL, 'on'); sweep();
+  g0 = gets; sweep(); const two = gets - g0;
+  ok(`R23 a sweep reads each online player's disguise once, not once per staff member in the mode (a second one adds only its own list read): mp.get ${one} with one in the mode, ${two} with two`,
+    one > 0 && two - one <= 2, { oneStaff: one, twoStaff: two });
+  let n0 = nameReads; nameFor(GM, P); const plain = nameReads - n0;
+  n0 = nameReads; globalThis.__dboRealNamesDisplay(GM, P); const disp = nameReads - n0;
+  n0 = nameReads; nameFor(GM, M); const masked = nameReads - n0;
+  ok('R23 for a staff viewer in the mode, nameFor and the /players label read a player\'s name once (it was twice for an undisguised one)',
+    plain === 1 && disp === 1 && masked === 1, { plain, disp, masked });
+  ok('R23 ...and give the same names', nameFor(GM, P) === 'Pell' && globalThis.__dboRealNamesDisplay(GM, P) === 'Pell #PELL' && nameFor(GM, M) === 'Aldric (masked)'
+    && globalThis.__dboRealNamesDisplay(GM, B) === 'Bryn (Werewolf form) #BRYN', [nameFor(GM, P), globalThis.__dboRealNamesDisplay(GM, P)]);
+  // guard: the labels read once are still each staff member's own: a masked GM is labelled to the Trial GM, never to himself
+  P_(GM, 'maskName', 'Gerd'); P_(GM, 'appearance', { name: 'Masked Person', raceId: 1 }); sweep();
+  ok('R23 guard: with two in the mode, a masked GM is "Gerd (masked)" in the Trial GM\'s labels and absent from his own, and both hold every other disguise',
+    !(hex(GM) in known(GM).labels) && known(TRIAL).labels[hex(GM)] === 'Gerd (masked)' && known(GM).labels[hex(M)] === 'Aldric (masked)' && known(TRIAL).labels[hex(M)] === 'Aldric (masked)'
+    && !(hex(TRIAL) in known(TRIAL).labels) && Object.keys(known(TRIAL).labels).length === Object.keys(known(GM).labels).length + 1, [known(GM).labels, known(TRIAL).labels]);
+  P_(GM, 'maskName', ''); P_(GM, 'appearance', { name: 'Gerd', raceId: 1 }); sweep();
+  ok('R23 guard: ...and unmasked he is gone from the Trial GM\'s labels again', !(hex(GM) in known(TRIAL).labels), known(TRIAL).labels);
+  cmd(GM, 'off'); cmd(TRIAL, 'off');
+  ok('R23 (both off again)', !isMarker(known(GM)) && !isMarker(known(TRIAL)));
 });
 
 // ---- the config ------------------------------------------------------------------------------------------------------------
