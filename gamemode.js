@@ -2547,6 +2547,15 @@ globalThis.__dboHandlers.connect = (userId) => { connected.add(userId); resetDia
 // A hot reload drops the waiters; players already connected get theirs back, without redoing the
 // login work for a character they are already playing.
 for (const userId of connected) startLoginWait(userId, actorOf(userId));
+// spawn.ts calls this right after setUserActor: a real-names marker a crash or a restart left goes in that same turn, not at the next loginWait poll
+if (typeof globalThis.__dboPrevAssign === 'undefined') globalThis.__dboPrevAssign = typeof mp.onUserAssignActor === 'function' && !mp.onUserAssignActor.__dbo ? mp.onUserAssignActor : null;
+const assignHook = (userId, a) => {
+  loginStep('real names on assign', () => { if (typeof globalThis.__dboRealNamesLogin === 'function') globalThis.__dboRealNamesLogin(a, true); });
+  // spawn.ts does its own bookkeeping after this call returns, so nothing here may throw
+  try { if (typeof globalThis.__dboPrevAssign === 'function') globalThis.__dboPrevAssign(userId, a); } catch (e) { log('onUserAssignActor (previous) failed', e.message); }
+};
+assignHook.__dbo = true;
+mp.onUserAssignActor = assignHook;
 // Every character carries the working tools: whatever is missing from the kit is handed over on login.
 const STARTER_KIT = (Array.isArray(cfg.starterKit) ? cfg.starterKit : [{ id: 'e3c16:Skyrim.esm', count: 1, name: 'Pickaxe' }, { id: '2f2f4:Skyrim.esm', count: 1, name: "Woodcutter's Axe" }])
   .map((k) => { let baseId = 0; try { baseId = mp.getIdFromDesc(String(k.id)) >>> 0; } catch (e) { log('starter kit: unknown item', k.id); } return { baseId, count: Math.max(1, Number(k.count) || 1), name: String(k.name || k.id) }; })
