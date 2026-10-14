@@ -1249,6 +1249,16 @@ module.exports = (api) => {
   };
   // Tomes of `school` up to the rank `skillId`'s tier allows (and `maxRank`), whose spell `a` does not know, lowest rank
   // first, with where they are sold: [{ spell, school, rank, rankName, where }]
+  // Every spell of `school` at exactly `rank` that a tome teaches, minus the shop's excluded plugins and editor ids: the
+  // Apprentice and Adept choices of the Arcane Mastery picks (schools.js rankPicks). Spell ids, one each, vanilla first.
+  globalThis.__dboSpellsRankOptions = (school, rank) => {
+    const seen = new Set();
+    return [...TOMES.values()]
+      .filter((t) => t.school === String(school) && t.rank === Number(rank) && !(CFG.shopExcludePlugins || []).includes(t.plugin) && !(excluded && excluded.test(t.edid)))
+      .sort((x, y) => (x.plugin === 'Skyrim.esm' ? 0 : 1) - (y.plugin === 'Skyrim.esm' ? 0 : 1) || x.name.localeCompare(y.name))
+      .filter((t) => (seen.has(t.spellId) ? false : seen.add(t.spellId)))
+      .map((t) => t.spellId >>> 0);
+  };
   globalThis.__dboSpellsTomesFor = (a, school, skillId, maxRank, limit) => {
     const cap = Math.min(maxRankFor(String(skillId), tierOf(a, String(skillId))), Number.isFinite(Number(maxRank)) ? Number(maxRank) : 4);
     if (cap < 0) return [];

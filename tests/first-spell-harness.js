@@ -142,7 +142,8 @@ const mkApi = (cfg) => ({
   profileOf: (a) => { const v = props.get(a + '|profileId'); return v === undefined ? -1 : v; },
   takeGold: () => false, giveItem: () => true, depositToTreasury: (z, n) => n,
 });
-const schoolsCfg = Object.assign({}, CONFIG.schools, { enabled: true });
+// The Apprentice and Adept picks (rank-picks-harness) are off here: this harness is about the first spell
+const schoolsCfg = Object.assign({}, CONFIG.schools, { enabled: true, rankPicks: { enabled: false } });
 const load = (overrides, schoolsFile) => {
   handlers.clear(); commands.clear();
   // The Conclave's table is given here even while the tracked config leaves it open (Nate, 30 Sep), so the gate is still tested
