@@ -3,7 +3,8 @@
 /**
  * GitHub webhook handler: POST /webhooks/github, fired on pushes to the SkyMP-Client repo.
  * Verifies the HMAC-SHA256 signature (X-Hub-Signature-256), responds 200 immediately so
- * GitHub doesn't time out, then runs `git pull` in sources/client/ and rebuilds public/files/root/.
+ * GitHub doesn't time out, then runs `git pull` in sources/client/ and rebuilds the client files bucket from it.
+ * It pulls only when sources/client is its own git checkout, and never rebuilds the live client files (sources/liveBucket.js).
  * Setup (SkyMP-Client repo, Settings -> Webhooks): payload URL https://<server>/webhooks/github,
  * content type application/json, secret GITHUB_WEBHOOK_SECRET (required env var), push event only.
  */
@@ -11,9 +12,14 @@
 const crypto  = require('crypto')
 const path    = require('path')
 const { execFile } = require('child_process')
+const { promisify } = require('util')
 const express = require('express')
 const rateLimit = require('express-rate-limit')
+const config  = require('../config')
+const liveBucket = require('../sources/liveBucket')
 const { mergeSourcesIntoRoot } = require('../scripts/merge-files')
+
+const git = promisify(execFile).bind(null, 'git')
 
 const router = express.Router()
 
@@ -52,28 +58,44 @@ function verifySignature(secret, rawBody, receivedSig) {
 
 // Update pipeline
 
-// Pull latest from the client repo and rebuild the file root; runs after the HTTP response is already sent
-function pullAndMerge() {
-  console.log('[webhook] Running git pull in', CLIENT_DIR)
+// Pull latest from the client repo and rebuild the file root; runs after the HTTP response is already sent. Resolves to what it did
+async function pullAndMerge({ clientDir = CLIENT_DIR, bucket = config.clientFilesDir, merge = mergeSourcesIntoRoot } = {}) {
+  // Whatever DBO_MERGE_LIVE_BUCKET says: a client release goes through the staged release path, never a push
+  const live = liveBucket.liveTarget({ bucket, manifest: liveBucket.MANIFEST })
+  if (live) {
+    console.error(`[webhook] refusing to pull and merge: ${live}. The webhook never rebuilds the live client files.`)
+    return 'refused'
+  }
 
-  execFile('git', ['-C', CLIENT_DIR, 'pull', '--ff-only'], (err, stdout, stderr) => {
-    if (err) {
-      console.error('[webhook] git pull failed:', stderr.trim() || err.message)
-      return
-    }
+  const top = await git(['-C', clientDir, 'rev-parse', '--show-toplevel']).then(r => r.stdout, () => '')
+  if (!liveBucket.isOwnTopLevel(clientDir, top)) {
+    console.error(`[webhook] refusing to pull: ${clientDir} is not its own git checkout${top ? ` (git -C lands in ${top.trim()})` : ''}`)
+    return 'refused'
+  }
 
-    const summary = stdout.trim()
-    if (summary === 'Already up to date.') {
-      console.log('[webhook] Client already up to date, skipping merge.')
-      return
-    }
+  console.log('[webhook] Running git pull in', clientDir)
+  let summary
+  try {
+    summary = (await git(['-C', clientDir, 'pull', '--ff-only'])).stdout.trim()
+  } catch (err) {
+    console.error('[webhook] git pull failed:', String(err.stderr || '').trim() || err.message)
+    return 'pull-failed'
+  }
 
-    console.log('[webhook] git pull:', summary)
+  if (summary === 'Already up to date.') {
+    console.log('[webhook] Client already up to date, skipping merge.')
+    return 'up-to-date'
+  }
 
-    mergeSourcesIntoRoot().catch(mergeErr => {
-      console.error('[webhook] merge failed:', mergeErr.message)
-    })
-  })
+  console.log('[webhook] git pull:', summary)
+
+  try {
+    await merge()
+  } catch (mergeErr) {
+    console.error('[webhook] merge failed:', mergeErr.message)
+    return 'merge-failed'
+  }
+  return 'merged'
 }
 
 // Route
@@ -112,7 +134,7 @@ router.post('/github', githubWebhookLimiter, (req, res) => {
     const commits = body?.commits?.length ?? 0
     console.log(`[webhook] Push by ${pusher}: ${commits} commit(s) on ${ref}`)
 
-    pullAndMerge()
+    pullAndMerge().catch(err => console.error('[webhook] pull and merge failed:', err.message))
     return
   }
 
@@ -126,3 +148,4 @@ router.post('/github', githubWebhookLimiter, (req, res) => {
 })
 
 module.exports = router
+module.exports.internals = { pullAndMerge }
