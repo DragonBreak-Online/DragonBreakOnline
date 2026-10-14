@@ -58,10 +58,20 @@ void DX11RenderHandler::Render(
                         m_pStates->NonPremultiplied());
 
   if (Visible()) {
-    // OnPaint skips the copy while hidden, so the texture can be stale when the overlay returns.
-    // Ask CEF for one full repaint; it is a no-op on the frames where nothing was missed.
-    if (m_missedPaintWhileHidden) {
-      m_missedPaintWhileHidden = false;
+    // OnPaint skips the copy while hidden, so the texture can be stale when
+    // the overlay returns. Ask CEF for one full repaint; it is a no-op on the
+    // frames where nothing was missed.
+    if (m_missedPaintWhileHidden.exchange(false)) {
+      const uint32_t skipped = m_paintsSkippedWhileHidden.exchange(0);
+      // The marker that proves this build is the one running, and how much
+      // the hidden overlay would have copied; the first 20 shows only
+      static int shownLogged = 0;
+      if (shownLogged < 20) {
+        ++shownLogged;
+        spdlog::info("browser (tilted): overlay shown after {} paint(s) "
+                     "skipped while hidden, full repaint requested",
+                     skipped);
+      }
       if (m_pParent) {
         if (auto browser = m_pParent->GetBrowser()) {
           if (auto host = browser->GetHost()) {
@@ -220,11 +230,14 @@ void DX11RenderHandler::OnPaint(CefRefPtr<CefBrowser> browser,
                                 const RectList& dirtyRects, const void* buffer,
                                 int width, int height)
 {
-  // The overlay is hidden for most of a session, but CEF keeps painting and this copied the whole
-  // surface regardless - 7.9 MiB at 1920x1080, up to 60 times a second, for something nobody can
-  // see. Visible() already gated the Draw in Render(); it never gated this copy. Skipping it leaves
-  // the texture stale, so Render() asks for one repaint when the overlay comes back.
+  // While the overlay is hidden CEF keeps painting whatever animates, and
+  // this copied the whole surface regardless - 7.9 MiB at 1920x1080, up to
+  // windowless_frame_rate times a second, for something nobody can see.
+  // Visible() already gated the Draw in Render(); it never gated this copy.
+  // Skipping it leaves the texture stale, so Render() asks for one repaint
+  // when the overlay comes back.
   if (!Visible()) {
+    m_paintsSkippedWhileHidden.fetch_add(1, std::memory_order_relaxed);
     m_missedPaintWhileHidden = true;
     return;
   }
