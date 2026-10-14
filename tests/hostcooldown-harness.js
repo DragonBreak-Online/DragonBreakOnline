@@ -49,6 +49,21 @@ check('the windows come from config', make({ fightMs: 100000 }, now, state).conf
   check('...and 29 s after the last blow it is still held', h.holds(F, B, A, true) === 'in a fight');
   t += 1000;
   check('...and at 30 s (fightMs) it is free to move', h.holds(F, B, A, true) === null);
+  // Review 14 Oct (hosting v2): a fightMaxMs that is not a positive number means off. null or 0 once switched the whole fight
+  // hold off ('t - since < null' is false), so the NPC was free 1 s after a blow and the mid-fight swap came back
+  for (const bad of [null, 0, -1, 'off', NaN]) {
+    const name = typeof bad === 'string' ? `'${bad}'` : String(bad);
+    const hb = make(Object.assign({ fightMaxMs: bad }, LIVE), now, {}), FB = 0xff000260;
+    hb.noteFight(FB);
+    t += 1000;
+    const at1 = hb.holds(FB, B, A, true);
+    t += 28000;
+    const at29 = hb.holds(FB, B, A, true);
+    t += 1000;
+    const at30 = hb.holds(FB, B, A, true);
+    check(`fightMaxMs ${name} is off: under the live config a blow still holds its NPC 'in a fight' 1 s and 29 s later, free at 30 s`,
+      hb.config.fightMaxMs === Infinity && at1 === 'in a fight' && at29 === 'in a fight' && at30 === null, { fightMaxMs: hb.config.fightMaxMs, at1, at29, at30 });
+  }
 }
 // With a ceiling set (not live), a fight renewed by every blow is held at most fightMaxMs from its first blow
 const CAP = { fightMaxMs: 30000 };

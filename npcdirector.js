@@ -146,11 +146,13 @@ module.exports = (api) => {
       if (current && online.has(current) && current !== avoid) {
         // An older client that never reports keeps what it hosts. One whose report went stale (8 Oct: a hitch or a
         // loading screen) is measured as the others are if its last report had the NPC, so a short pause does not hand
-        // it over and back; if the last report did not have it, it goes to a player who does
+        // it over and back; if the last report did not have it, it goes to a player who does. A fresh report is never
+        // measured this way: a fresh host left out of seers (past the grant cutoff) hands it over as before, rather than
+        // keeping it until release() gives it to nobody (review 14 Oct, walkAway3000)
         const last = S.sight.get(current);
         if (!last) continue;
         let mine = seers.find(([p]) => p === current);
-        if (!mine && last.dist.has(npc)) { const v = policy(current, npc); if (v.ok) mine = [current, Number(v.dist) || 0]; }
+        if (!mine && !fresh(current, now) && last.dist.has(npc)) { const v = policy(current, npc); if (v.ok) mine = [current, Number(v.dist) || 0]; }
         if (mine && mine[1] <= bestD * C.holdFactor + C.holdUnits) continue;   // still has it, nobody clearly nearer
       }
       // A live host keeps an NPC that just changed hands or is fighting (gamemode.js hostcooldown)

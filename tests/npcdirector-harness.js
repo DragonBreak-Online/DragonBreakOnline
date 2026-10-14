@@ -109,6 +109,16 @@ const EDGE = 0xff000106, NEAR = 0xff000107; npcs[EDGE] = {}; npcs[NEAR] = {}; po
 now += 4000; sight(P1, [[EDGE, 3800], [NEAR, 3000]]); tick();
 check('one just inside releaseUnits but beyond 0.9 of it is not given (no flapping at the edge)', !hosters.get(EDGE), sets);
 check('one well inside it is given', hosters.get(NEAR) === P1, sets);
+// Review 14 Oct (hosting v2, walkAway3000): the server-measured fallback is for stale reports only. A host whose report is
+// fresh but who is past the grant cutoff (releaseUnits x grantFactor = 3600) hands the NPC straight to a player who has it,
+// as before; it is not kept until release() gives it to nobody and the other player gets it 3 s later
+const WALK = 0xff000108; npcs[WALK] = {}; pos[WALK] = [0, 0, 0];
+pos[P1] = [3700, 0, 0]; pos[P2] = [-3000, 0, 0];
+hosters.set(WALK, P1); sets.length = 0;
+now += 4000; sight(P1, [[WALK, 3700]]); sight(P2, [[WALK, 3000]]); tick();
+check('a fresh host past the grant cutoff hands the NPC straight to a player about 3000 away who has it', hosters.get(WALK) === P2 && sets.some(([id, h]) => id === WALK && h === P2), sets);
+now += 4000; pos[P1] = [4100, 0, 0]; sight(P1, [[WALK, 4100]]); sight(P2, [[WALK, 3000]]); tick();
+check('...and it is never released to nobody on the way (the host walking on past releaseUnits)', hosters.get(WALK) === P2 && !sets.some(([id, h]) => id === WALK && h === 0), sets);
 Date.now = realNow; delete globalThis.__dboHostPolicy;
 console.log('');
 console.log(failures ? `${failures} FAILURES` : 'all checks passed');
