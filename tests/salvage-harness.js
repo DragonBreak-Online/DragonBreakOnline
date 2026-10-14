@@ -72,6 +72,8 @@ let fails = 0;
 const ok = (c, what) => { console.log(`${c ? 'ok  ' : 'FAIL'}  ${what}`); if (!c) fails++; };
 const load = () => { for (const k of Object.keys(ui)) delete ui[k]; return require(MODULE)(api); };
 const choose = (a, id) => (ui.salvageChoose || []).forEach((f) => f(a, [id]));
+// A list row opens the item's page; Break down one is the second click
+const breakOne = (a, baseId) => { choose(a, `b:${baseId}`); choose(a, `x1:${baseId}`); };
 const lastWidget = (a) => { for (let i = widgets.length - 1; i >= 0; i--) if (widgets[i][0] === a) return widgets[i][1]; return undefined; };
 const act = (t, a) => globalThis.__dboSalvageActivate(t, a);
 
@@ -98,7 +100,7 @@ ok(labels.some((l) => /Iron Sword \(2\): 1 Iron Ingot$/.test(l)), 'Master: 75 % 
 ok(labels.some((l) => /Daedric Sword: 1 Ebony Ingot$/.test(l)), 'a Master may melt Daedric');
 ok(!labels.some((l) => /Steel Armor/.test(l)), 'worn gear is never offered');
 ok(!labels.some((l) => /Leather Armor/.test(l)), 'leather goes to the tanning rack, not the smelter');
-choose(PLAYER, `b:${SWORD}`);
+breakOne(PLAYER, SWORD);
 ok(count(PLAYER, SWORD) === 1 && count(PLAYER, IRON) === 1, 'breaking one sword takes one and gives an iron ingot');
 ok(logs.some((l) => /salvage: .* broke down Iron Sword/.test(l)), 'the breakdown is logged');
 ok(/Iron Sword broken down: 1 Iron Ingot/.test(lastWidget(PLAYER).targetName), 'the panel says what came back');
@@ -107,8 +109,8 @@ ok(/Iron Sword broken down: 1 Iron Ingot/.test(lastWidget(PLAYER).targetName), '
 reset(); S = load();
 INV[PLAYER] = [{ baseId: SWORD, count: 1, enchantmentId: 0xff000abc, maxCharge: 500, chargePercent: 100 }, { baseId: SWORD, count: 1 }, { baseId: SWORD, count: 1, health: 1.2 }];
 act(SMELTER, PLAYER); w = lastWidget(PLAYER);
-ok(w.actions.some((x) => /^Break down Iron Sword: /.test(x.label)), 'a plain sword beside an enchanted and a tempered one is offered, counted as one');
-choose(PLAYER, `b:${SWORD}`);
+ok(w.actions.some((x) => /^Iron Sword: /.test(x.label)), 'a plain sword beside an enchanted and a tempered one is offered, counted as one');
+breakOne(PLAYER, SWORD);
 ok(INV[PLAYER].length === 3 && INV[PLAYER][0].enchantmentId && INV[PLAYER][1].health === 1.2 && count(PLAYER, IRON) === 1, 'only the plain sword is taken; the enchanted and tempered ones stay');
 reset(); S = load();
 INV[PLAYER] = [{ baseId: SWORD, count: 1, health: 1.1 }, { baseId: DAEDRIC, count: 1, name: 'Oathkeeper' }, { baseId: SWORD, count: 2, poisonId: 0x73f34, poisonCount: 1 }, { baseId: SWORD, count: 1, health: 1 }];
@@ -120,7 +122,7 @@ INV[PLAYER] = [{ baseId: SWORD, count: 1, enchantmentEffects: [{ effectId: 0x3eb
 ok(act(SMELTER, PLAYER) === false, 'a copy enchanted only by its effects is not plain: nothing to break down, the smelter just works');
 reset(); S = load();
 INV[PLAYER] = [{ baseId: SWORD, count: 1, enchantmentEffects: [{ effectId: 0x3eb15, magnitude: 20, area: 0, duration: 0, cost: 30 }] }, { baseId: SWORD, count: 1 }];
-act(SMELTER, PLAYER); choose(PLAYER, `b:${SWORD}`);
+act(SMELTER, PLAYER); breakOne(PLAYER, SWORD);
 ok(INV[PLAYER].filter((e) => e.baseId === SWORD).length === 1 && INV[PLAYER].find((e) => e.baseId === SWORD).enchantmentEffects && count(PLAYER, IRON) === 1, '...beside a plain one, only the plain one is taken', INV[PLAYER]);
 reset(); S = load();
 INV[PLAYER] = [{ baseId: SWORD, count: 1, health: 1.1 }];
@@ -137,7 +139,7 @@ fs.writeFileSync('salvage.json', JSON.stringify(t2)); fs.utimesSync('salvage.jso
 INV[PLAYER] = [{ baseId: MACE_OF_SCORCHING, count: 1 }, { baseId: SWORD, count: 1 }];
 act(SMELTER, PLAYER); w = lastWidget(PLAYER);
 ok(!w.actions.some((x) => /Scorching/.test(x.label)) && w.actions.some((x) => /Iron Sword/.test(x.label)), 'an item enchanted by its record is never offered, the plain sword is');
-choose(PLAYER, `b:${MACE_OF_SCORCHING}`);
+breakOne(PLAYER, MACE_OF_SCORCHING);
 ok(count(PLAYER, MACE_OF_SCORCHING) === 1 && count(PLAYER, IRON) === 0, '...and a forged pick for it breaks nothing');
 INV[PLAYER] = [{ baseId: MACE_OF_SCORCHING, count: 1 }];
 ok(act(SMELTER, PLAYER) === false, 'carrying only enchanted gear, the smelter just works');
@@ -148,11 +150,11 @@ INV[NOVICE] = [{ baseId: SWORD, count: 1 }, { baseId: DAEDRIC, count: 1 }];
 act(SMELTER, NOVICE); w = lastWidget(NOVICE);
 ok(w.actions.some((x) => /Iron Sword: 1 Iron Ingot$/.test(x.label)), 'Novice: 25 % of 2 iron still gives the one main ingot');
 ok(!w.actions.some((x) => /Daedric/.test(x.label)), 'a Novice cannot melt Daedric');
-choose(NOVICE, `b:${DAEDRIC}`);
+breakOne(NOVICE, DAEDRIC);
 ok(count(NOVICE, DAEDRIC) === 1 && count(NOVICE, EBONY) === 0, 'a forged pick for a Daedric sword is refused');
 reset(); S = load();
 INV[PLAYER] = [{ baseId: LEATHER_ARMOR, count: 1 }];
-act(RACK, PLAYER); choose(PLAYER, `b:${LEATHER_ARMOR}`);
+act(RACK, PLAYER); breakOne(PLAYER, LEATHER_ARMOR);
 ok(count(PLAYER, LEATHER) === 2 && count(PLAYER, STRIPS) === 1 && count(PLAYER, LEATHER_ARMOR) === 0, 'Adept skinner: half of 4 leather and 3 strips, rounded down');
 ok(/Nothing else here to break down/.test((said.find((x) => x[0] === PLAYER) || [])[1] || ''), 'the panel closes when nothing is left');
 
@@ -164,8 +166,27 @@ act(DESK, PLAYER); w = lastWidget(PLAYER);
 ok(w.actions[0].label === 'Sit at the desk (use it again)', 'the desk offers to sit first');
 ok(!w.actions.some((x) => x.id === `b:${QUEST_BOOK}`), 'a book that cannot be taken is never offered');
 ok(!w.actions.some((x) => x.id === `b:${TOME}`) && !w.actions.some((x) => x.id === `b:${SCHEMATIC}`), 'a spell tome and a smithing schematic are never offered (Barush lost three schematics, 13 Oct)');
-choose(PLAYER, `b:${BOOK}`); choose(PLAYER, `b:${NOTE}`);
+breakOne(PLAYER, BOOK); breakOne(PLAYER, NOTE);
 ok(count(PLAYER, PAPER) === 3 && count(PLAYER, STRIPS) === 1 && count(PLAYER, BOOK) === 0 && count(PLAYER, NOTE) === 0, 'a bound book gives 2 paper and a strip, a note 1 paper');
+
+// The item page (Barush broke three schematics in 1.5 s, 13 Oct: each click broke one and the list closed up under the cursor)
+reset(); S = load();
+INV[PLAYER] = [{ baseId: BOOK, count: 3 }, { baseId: NOTE, count: 1 }];
+act(DESK, PLAYER);
+choose(PLAYER, `b:${BOOK}`); w = lastWidget(PLAYER);
+ok(count(PLAYER, BOOK) === 3 && w.actions.map((x) => x.id).join() === `x1:${BOOK},xa:${BOOK},list` && /The Lusty Argonian Maid \(3\)/.test(w.targetName),
+  'a row on the list only opens the item: Break down one, Break down all, Back; nothing is broken yet', [count(PLAYER, BOOK), w]);
+choose(PLAYER, `x1:${BOOK}`); w = lastWidget(PLAYER);
+ok(count(PLAYER, BOOK) === 2 && /broken down/.test(w.targetName) && w.actions[0].id === `x1:${BOOK}`, 'Break down one takes one and stays on the same item', [count(PLAYER, BOOK), w.targetName]);
+choose(PLAYER, `x1:${NOTE}`);
+ok(count(PLAYER, NOTE) === 1, 'a break for an item whose page is not open does nothing');
+act(DESK, PLAYER); choose(PLAYER, `b:${BOOK}`); choose(PLAYER, `xa:${BOOK}`); w = lastWidget(PLAYER);
+ok(count(PLAYER, BOOK) === 0 && count(PLAYER, NOTE) === 1 && /2 The Lusty Argonian Maid broken down/.test(w.targetName) && w.actions.some((x) => x.id === `b:${NOTE}`),
+  'Break down all takes the whole stack, never the next item, and the list comes back', [count(PLAYER, BOOK), count(PLAYER, NOTE), w.targetName]);
+globalThis.__dboBaseValue = (id) => (id === NOTE ? 25 : 0);
+choose(PLAYER, `b:${NOTE}`); w = lastWidget(PLAYER);
+ok(/A Note, worth 25 gold$/.test(w.targetName) && !w.actions.some((x) => x.id.startsWith('xa:')), 'the page shows what one is worth; a single item has no Break down all', w);
+delete globalThis.__dboBaseValue;
 INV[NOVICE] = [{ baseId: BOOK, count: 1 }];
 ok(act(DESK, NOVICE) === false, 'a non-Scholar just uses the desk');
 
@@ -179,7 +200,7 @@ ok(w.actions.map((x) => x.label).join('|') === 'Open your Spell Book|Break down 
 choose(PLAYER, 'books'); w = lastWidget(PLAYER);
 ok(w && w.id === 66 && w.actions.length === 1 && w.actions[0].id === `b:${BOOK}` && /at the Scholars' Ledger/.test(w.targetName), 'Break down old books opens the book list in the same panel, the sword not offered, no "use it again" row');
 ok(!widgets.some((x) => x[0] === PLAYER && x[1] === null), '...with no close in between, so the cursor stays');
-choose(PLAYER, `b:${BOOK}`);
+breakOne(PLAYER, BOOK);
 ok(count(PLAYER, PAPER) === 2 && count(PLAYER, STRIPS) === 1 && count(PLAYER, BOOK) === 0, 'the book breaks down there');
 act(LEDGER, PLAYER); choose(PLAYER, 'books'); w = lastWidget(PLAYER);
 ok(w && w.targetName === 'You carry no books to break down.' && w.actions[0].id === 'spellbook', 'with no books left the menu says so and stays open');
@@ -223,7 +244,7 @@ INV[PLAYER] = [{ baseId: SWORD, count: 1 }];
 act(SMELTER, PLAYER); choose(PLAYER, 'use');
 ok(lastWidget(PLAYER) === null && act(SMELTER, PLAYER) === false, 'choosing to work the smelter lets the next use through to the game');
 ok(act(SMELTER, PLAYER) === true, 'only once: the use after that opens the panel again');
-FAR = true; choose(PLAYER, `b:${SWORD}`);
+FAR = true; breakOne(PLAYER, SWORD);
 ok(count(PLAYER, SWORD) === 1 && /walked away/.test(said[said.length - 1][1]), 'nothing breaks once the player walks away');
 reset(); S = load();
 const many = []; for (let i = 0; i < 9; i++) { const id = 0x7000 + i; RECS[id] = { type: 'BOOK', fields: [bookData(0, 0)] }; many.push({ baseId: id, count: 1 }); }
@@ -235,7 +256,7 @@ ok(w.actions.filter((x) => x.id.startsWith('b:')).length === 2 && /page 2 of 2/.
 
 // A reload keeps the open panel
 S = load();
-choose(PLAYER, `b:${0x7007}`);
+breakOne(PLAYER, 0x7007);
 ok(count(PLAYER, 0x7007) === 0 && count(PLAYER, PAPER) === 2, 'a panel opened before a reload still answers after it');
 
 // A recipe that makes several at once costs a share of its materials (review A5-1): a ring made 2 per ingot is not offered
@@ -302,12 +323,12 @@ ok(S.yieldOf(RING, S.stationOf(SMELTER), 4) === null, '...not even to a Master')
   ok(JSON.stringify(S.yieldOf(STEEL_ARMOR, S.stationOf(SMELTER), 4)) === JSON.stringify([[desc(STEEL), 3], [desc(STRIPS), 2]]), '...a secondary of one (the armour\'s iron) still rounds to nothing, no chance');
   INV[PLAYER] = [{ baseId: GOLD_RING, count: 2 }];
   act(SMELTER, PLAYER);
-  ok(lastWidget(PLAYER).actions.some((x) => /^Break down Gold Ring \(2\): 1 Gold Ingot \(75% chance\)$/.test(x.label)), 'the panel shows the chance');
+  ok(lastWidget(PLAYER).actions.some((x) => /^Gold Ring \(2\): 1 Gold Ingot \(75% chance\)$/.test(x.label)), 'the panel shows the chance');
   Math.random = () => 0.9;
-  choose(PLAYER, `b:${GOLD_RING}`);
+  breakOne(PLAYER, GOLD_RING);
   ok(count(PLAYER, GOLD_RING) === 1 && count(PLAYER, GOLD_INGOT) === 0 && /Gold Ring broken down: nothing came back/.test(lastWidget(PLAYER).targetName) && logs.some((l) => /broke down Gold Ring .*: nothing came back$/.test(l)), 'a missed roll takes the ring and gives nothing, and says so');
   Math.random = () => 0.1;
-  choose(PLAYER, `b:${GOLD_RING}`);
+  breakOne(PLAYER, GOLD_RING);
   ok(count(PLAYER, GOLD_RING) === 0 && count(PLAYER, GOLD_INGOT) === 1, '...a made roll gives the ingot');
   Math.random = rand;
 }
