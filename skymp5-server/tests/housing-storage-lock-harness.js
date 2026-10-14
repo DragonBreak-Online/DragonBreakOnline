@@ -55,6 +55,14 @@ const check = (name, ok, got) => { console.log(`${ok ? 'ok  ' : 'FAIL'} ${name}$
   sys.doLock(ctx, USER, OWNER, CHEST, recOf(CHEST), false);
   sys.doLock(ctx, USER, OWNER, CHEST, recOf(CHEST), true);
   check('unlock and lock are logged with the ref, owner and who did it', logs[0] === '[housing] UNLOCK 100 "" owner 55 by Kalidore (profile 55)' && /^\[housing\] LOCK 100 /.test(logs[1]), logs);
+  // the lock reply (lock hint report, 13 Oct): with housingKeyRing on, the owner is told the lock keeps out only those without a key
+  check('without the key ring the lock reply is plain', notices[notices.length - 1] === 'Locked.', notices[notices.length - 1]);
+  sys.keyRing = true;
+  sys.doLock(ctx, USER, OWNER, CHEST, recOf(CHEST), false);
+  check('with the key ring the unlock reply is unchanged', notices[notices.length - 1] === 'Unlocked.', notices[notices.length - 1]);
+  sys.doLock(ctx, USER, OWNER, CHEST, recOf(CHEST), true);
+  check('with the key ring the lock reply names key holders', notices[notices.length - 1] === 'Locked: only key holders can enter.', notices[notices.length - 1]);
+  sys.keyRing = false;
 
   // the one-time lock of what was left open
   const owned = (o) => Object.assign(blank(), { owner: 55, ownerName: 'K' }, o);

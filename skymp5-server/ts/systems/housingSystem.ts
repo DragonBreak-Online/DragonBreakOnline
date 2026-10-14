@@ -640,7 +640,11 @@ export class HousingSystem implements System {
     // Every way in to a place locks with any one of them; its inner doors and chests keep their own locks
     const doors = this.placesOn() && rec.partner && this.isEntrance(ctx, primary, rec) ? this.placeDoorsWith(ctx, primary, rec).filter((d) => this.isEntrance(ctx, d.ref, d.rec)) : [];
     for (const d of doors) { d.rec.locked = locked; this.write(ctx, d.ref, d.rec); }
-    this.notice(ctx, userId, doors.length ? (locked ? `Locked, with every way in.` : `Unlocked, with every way in.`) : (locked ? "Locked." : "Unlocked."));
+    // With housingKeyRing a lock refuses only those without a key (onActivate), so the owner is told who it keeps out
+    // (lock hint report, 13 Oct: owners walked through their own lock and took it for broken)
+    const lockedText = this.keyRing ? (doors.length ? "Locked, with every way in: only key holders can enter." : "Locked: only key holders can enter.")
+      : (doors.length ? "Locked, with every way in." : "Locked.");
+    this.notice(ctx, userId, locked ? lockedText : (doors.length ? "Unlocked, with every way in." : "Unlocked."));
     this.sendMenu(ctx, userId, actorId, primary);
   }
 
