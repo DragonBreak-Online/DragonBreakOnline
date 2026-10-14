@@ -68,16 +68,18 @@ function backendCopy(root) {
   return dir
 }
 
-// A stand-in for the live checkout, named by DBO_RELEASE_REPO: a bucket with a zip and a root, a backend with a manifest
-function liveCheckout(name) {
+// A stand-in for the live checkout, named by DBO_RELEASE_REPO: a bucket with a zip and a root, a backend with a manifest.
+// asCheckout: also a git checkout one commit behind its upstream, with head() reading its HEAD
+function liveCheckout(name, { asCheckout = false } = {}) {
   const repo = path.join(tmp, name)
+  const head = asCheckout ? behindCheckout(repo) : null
   const backend = backendCopy(repo)
   const bucket = path.join(repo, 'build', 'client-files')
   write(path.join(bucket, 'skymp-client.zip'), 'the live zip')
   write(path.join(bucket, 'root', 'Data', 'Platform', 'UI', 'index.html'), 'the live ui')
   const manifest = path.join(backend, 'data', 'files-version.json')
   write(manifest, '{"version":"live"}\n')
-  return { repo, backend, bucket, manifest }
+  return { repo, backend, bucket, manifest, head }
 }
 
 const WORK_FILES = { 'Data/Platform/UI/index.html': 'ui', 'Data/Platform/Plugins/skymp5-client.js': 'client' }
@@ -89,11 +91,11 @@ function workFolder(name, files = WORK_FILES) {
   return dir
 }
 
-// One script of a backend copy, with only the given env (CLIENT_FILES_DIR is always set) and a cwd without a .env
-function run(backend, script, env) {
+// One script of a backend copy, with only the given env (CLIENT_FILES_DIR is always set) and a cwd without a .env, unless cwd names another
+function run(backend, script, env, { cwd = tmp } = {}) {
   assert.ok(env.CLIENT_FILES_DIR, 'every run names its bucket')
   return spawnSync(process.execPath, [path.join(backend, 'scripts', script)], {
-    cwd: tmp, encoding: 'utf8', timeout: 60000,
+    cwd, encoding: 'utf8', timeout: 60000,
     env: { PATH: process.env.PATH, TMPDIR: os.tmpdir(), DBO_RELEASE_REPO: path.join(tmp, 'no-live-checkout'), ...GIT_ENV, ...env },
   })
 }
@@ -374,4 +376,241 @@ test('webhook: never pulls or merges for the live files whatever DBO_MERGE_LIVE_
   assert.equal(merges, 1)
   assert.equal(await pullAndMerge({ clientDir, bucket: work, merge }), 'up-to-date')
   assert.equal(merges, 1)
+})
+
+// The paths merge-files writes, not only the bucket folder: a work folder can hold links and hard links into the live files
+
+const read = file => fs.readFileSync(file, 'utf8')
+const tempLeft = dir => fs.readdirSync(dir).filter(name => name.endsWith('.tmp'))
+
+test('merge-files: refuses a work folder whose root, zip or a file or folder in its root links into the live files', () => {
+  const live = liveCheckout('live-links')
+  const exp = backendCopy(path.join(tmp, 'export-links'))
+  write(path.join(exp, 'sources', 'client', 'Data', 'Platform', 'UI', 'index.html'), 'the new ui')
+  write(path.join(exp, 'sources', 'client', 'Data', 'Platform', 'UI', 'brand-new.html'), 'a new page')
+  const liveRoot = path.join(live.bucket, 'root')
+  const before = snapshot(live.bucket)
+
+  // The root itself a link to the live root
+  const rootLink = path.join(tmp, 'work-root-link')
+  fs.mkdirSync(rootLink)
+  fs.symlinkSync(liveRoot, path.join(rootLink, 'root'))
+  // The zip a link to the live zip
+  const zipLink = workFolder('work-zip-link')
+  fs.symlinkSync(path.join(live.bucket, 'skymp-client.zip'), path.join(zipLink, 'skymp-client.zip'))
+  // One folder of the root a link into the live root
+  const folderLink = path.join(tmp, 'work-folder-link')
+  fs.mkdirSync(path.join(folderLink, 'root', 'Data', 'Platform'), { recursive: true })
+  fs.symlinkSync(path.join(liveRoot, 'Data', 'Platform', 'UI'), path.join(folderLink, 'root', 'Data', 'Platform', 'UI'))
+  // A file of the root a link to a live file that does not exist yet: a copy through it would create it there
+  const newLink = workFolder('work-new-file-link')
+  fs.symlinkSync(path.join(liveRoot, 'Data', 'Platform', 'UI', 'brand-new.html'), path.join(newLink, 'root', 'Data', 'Platform', 'UI', 'brand-new.html'))
+
+  for (const [work, named] of [[rootLink, 'root'], [zipLink, 'skymp-client.zip'], [folderLink, 'UI'], [newLink, 'brand-new.html']]) {
+    const r = run(exp, 'merge-files.js', { CLIENT_FILES_DIR: work, DBO_RELEASE_REPO: live.repo })
+    assert.equal(r.status, 1, `${work}: ${r.stdout}${r.stderr}`)
+    assert.match(r.stderr, new RegExp(`refusing to write into the live client files: \\S*${named.replace('.', '\\.')} is in the live client files bucket`))
+    assert.deepEqual(snapshot(live.bucket), before, work)
+  }
+  assert.equal(read(live.manifest), '{"version":"live"}\n')
+  assert.equal(fs.existsSync(path.join(exp, 'data', 'files-version.json')), false)
+})
+
+test('merge-files: a work folder hard-linked to the live files (cp -al) never rewrites them', () => {
+  const live = liveCheckout('live-hardlinks')
+  const exp = backendCopy(path.join(tmp, 'export-hardlinks'))
+  write(path.join(exp, 'sources', 'client', 'Data', 'Platform', 'UI', 'index.html'), 'the new ui')
+  const liveZip = path.join(live.bucket, 'skymp-client.zip')
+  const before = snapshot(live.bucket)
+  const env = work => ({ CLIENT_FILES_DIR: work, DBO_RELEASE_REPO: live.repo })
+
+  // The zip a hard link to the live zip, alone or in a cp -al copy of the whole live bucket: refused
+  const zipLink = workFolder('work-zip-hardlink')
+  fs.linkSync(liveZip, path.join(zipLink, 'skymp-client.zip'))
+  const bucketCopy = path.join(tmp, 'work-cp-al-bucket')
+  execFileSync('cp', ['-al', live.bucket, bucketCopy])
+  for (const work of [zipLink, bucketCopy]) {
+    const r = run(exp, 'merge-files.js', env(work))
+    assert.equal(r.status, 1, `${work}: ${r.stdout}${r.stderr}`)
+    assert.match(r.stderr, /skymp-client\.zip is a hard link to the live skymp-client\.zip/)
+    assert.deepEqual(snapshot(live.bucket), before, work)
+  }
+
+  // The export's manifest a hard link to the live manifest: refused
+  const work = workFolder('work-manifest-hardlink')
+  fs.linkSync(live.manifest, path.join(exp, 'data', 'files-version.json'))
+  const manifestLink = run(exp, 'merge-files.js', env(work))
+  assert.equal(manifestLink.status, 1, manifestLink.stdout + manifestLink.stderr)
+  assert.match(manifestLink.stderr, /files-version\.json is a hard link to the live files-version\.json/)
+  assert.equal(read(live.manifest), '{"version":"live"}\n')
+  fs.unlinkSync(path.join(exp, 'data', 'files-version.json'))
+
+  // A cp -al copy of the live root: the copy writes a new file instead of through the hard link, and the live root stays as it was
+  const rootCopy = path.join(tmp, 'work-cp-al-root')
+  fs.mkdirSync(rootCopy)
+  execFileSync('cp', ['-al', path.join(live.bucket, 'root'), path.join(rootCopy, 'root')])
+  const merged = run(exp, 'merge-files.js', env(rootCopy))
+  assert.equal(merged.status, 0, merged.stdout + merged.stderr)
+  assert.equal(read(path.join(rootCopy, 'root', 'Data', 'Platform', 'UI', 'index.html')), 'the new ui')
+  assert.deepEqual(zipNames(path.join(rootCopy, 'skymp-client.zip')), ['Data/Platform/UI/index.html'])
+  assert.deepEqual(snapshot(live.bucket), before)
+  assert.equal(read(live.manifest), '{"version":"live"}\n')
+})
+
+test('merge-files: replaces the zip, the manifest and each copied file with a new file, never writing through another name of it', () => {
+  const exp = backendCopy(path.join(tmp, 'export-other-names'))
+  write(path.join(exp, 'sources', 'client', 'Data', 'Platform', 'UI', 'index.html'), 'the new ui')
+  const work = workFolder('work-other-names')
+  const others = {}
+  for (const [name, target] of [['zip', path.join(work, 'skymp-client.zip')], ['manifest', path.join(exp, 'data', 'files-version.json')],
+    ['ui', path.join(work, 'root', 'Data', 'Platform', 'UI', 'index.html')]]) {
+    others[name] = path.join(tmp, `other-names-${name}`)
+    write(others[name], `another ${name}`)
+    fs.rmSync(target, { force: true })
+    fs.linkSync(others[name], target)
+  }
+  const r = run(exp, 'merge-files.js', { CLIENT_FILES_DIR: work })
+  assert.equal(r.status, 0, r.stdout + r.stderr)
+  for (const [name, file] of Object.entries(others)) assert.equal(read(file), `another ${name}`, `the ${name} was written through its other name`)
+  assert.equal(read(path.join(work, 'root', 'Data', 'Platform', 'UI', 'index.html')), 'the new ui')
+  assert.deepEqual(zipNames(path.join(work, 'skymp-client.zip')), Object.keys(WORK_FILES).sort())
+  const manifest = JSON.parse(read(path.join(exp, 'data', 'files-version.json')))
+  assert.deepEqual(manifest.files.map(f => f.path).sort(), Object.keys(WORK_FILES).sort())
+  assert.deepEqual([...tempLeft(work), ...tempLeft(path.join(exp, 'data'))], [])
+})
+
+test('merge-files: the PC\'s Build Client (populate-files, then merge-files) packages its own default bucket with the opt-in, and is refused without it', () => {
+  const checkout = path.join(tmp, 'pc-checkout')
+  const backend = backendCopy(checkout)
+  const bucket = path.join(checkout, 'build', 'client-files')
+  // populate-files' default source, the CI client build
+  const built = path.join(checkout, 'build', 'dist', 'client', 'Data')
+  write(path.join(built, 'Platform', 'UI', 'index.html'), 'pc ui')
+  write(path.join(built, 'Platform', 'Plugins', 'skymp5-client.js'), 'pc client')
+  // CLIENT_FILES_DIR unset on the PC means this bucket; the runs here name it, which the guard treats the same
+  const env = { CLIENT_FILES_DIR: bucket }
+  assert.equal(fs.existsSync(path.join(backend, 'sources', 'client')), false)
+
+  for (const script of ['populate-files.js', 'merge-files.js']) {
+    const refused = run(backend, script, env)
+    assert.equal(refused.status, 1, `${script}: ${refused.stdout}${refused.stderr}`)
+    assert.match(refused.stderr, /is the default bucket/)
+  }
+  assert.equal(fs.existsSync(bucket), false)
+
+  const optIn = { ...env, DBO_MERGE_LIVE_BUCKET: '1' }
+  const populated = run(backend, 'populate-files.js', optIn)
+  assert.equal(populated.status, 0, populated.stdout + populated.stderr)
+  const merged = run(backend, 'merge-files.js', optIn)
+  assert.equal(merged.status, 0, merged.stdout + merged.stderr)
+  assert.match(merged.stderr, /DBO_MERGE_LIVE_BUCKET=1: writing into the live client files as asked/)
+  const files = ['Data/Platform/Plugins/skymp5-client.js', 'Data/Platform/UI/index.html']
+  assert.deepEqual(zipNames(path.join(bucket, 'skymp-client.zip')), files)
+  assert.deepEqual(JSON.parse(read(path.join(backend, 'data', 'files-version.json'))).files.map(f => f.path).sort(), files)
+})
+
+test('populate-files: refuses a work folder whose root links into the live root, before it deletes anything', () => {
+  const live = liveCheckout('live-populate-root-link')
+  const exp = backendCopy(path.join(tmp, 'export-populate-root-link'))
+  const src = path.join(tmp, 'build-populate-root-link', 'Data')
+  write(path.join(src, 'Platform', 'UI', 'index.html'), 'the built ui')
+  const work = path.join(tmp, 'work-populate-root-link')
+  fs.mkdirSync(work)
+  fs.symlinkSync(path.join(live.bucket, 'root'), path.join(work, 'root'))
+  const before = snapshot(live.bucket)
+  const r = run(exp, 'populate-files.js', { SKYMP_CLIENT_DATA: src, CLIENT_FILES_DIR: work, DBO_RELEASE_REPO: live.repo })
+  assert.equal(r.status, 1, r.stdout + r.stderr)
+  assert.match(r.stderr, /refusing to write into the live client files: \S*root is in the live client files bucket/)
+  assert.deepEqual(snapshot(live.bucket), before)
+})
+
+test('setup-client and the webhook: never pull the live checkout through a link, nor a checkout whose .git is another checkout\'s', { skip: !HAS_GIT && 'git is not installed' }, async (t) => {
+  const errors = t.mock.method(console, 'error', () => {})
+  t.mock.method(console, 'log', () => {})
+  const { pullAndMerge } = require('../routes/webhook').internals
+  const live = liveCheckout('live-git', { asCheckout: true })
+  const liveStart = live.head()
+  const releaseRepo = config.releaseRepo
+  config.releaseRepo = live.repo
+  t.after(() => { config.releaseRepo = releaseRepo })
+  let merges = 0
+  const merge = async () => { merges++ }
+  const said = () => errors.mock.calls.map(c => c.arguments.join(' ')).join('\n')
+
+  // sources/client a link to the live checkout's top level: its real path is that top level, so the top-level check alone let it pull
+  const exp = backendCopy(path.join(tmp, 'export-client-link'))
+  const clientLink = path.join(exp, 'sources', 'client')
+  fs.symlinkSync(live.repo, clientLink)
+  const work = workFolder('work-client-link')
+  const setup = run(exp, 'setup-client.js', { CLIENT_FILES_DIR: work, DBO_RELEASE_REPO: live.repo })
+  assert.equal(live.head(), liveStart, 'setup-client pulled the live checkout')
+  assert.equal(setup.status, 1, setup.stdout + setup.stderr)
+  assert.match(setup.stderr, /\[setup\] refusing to clone or pull: .* is in the live checkout/)
+  assert.equal(await pullAndMerge({ clientDir: clientLink, bucket: work, merge }), 'refused')
+  assert.equal(live.head(), liveStart, 'the webhook pulled the live checkout')
+  assert.match(said(), /\[webhook\] refusing to pull: .* is in the live checkout/)
+
+  // A checkout of its own, but inside the live checkout, or holding it
+  const inside = path.join(live.repo, 'vendor', 'client')
+  const insideHead = behindCheckout(inside)
+  const insideStart = insideHead()
+  const holder = path.join(tmp, 'holder-git')
+  const holderHead = behindCheckout(holder)
+  const holderStart = holderHead()
+  assert.equal(await pullAndMerge({ clientDir: inside, bucket: work, merge }), 'refused')
+  config.releaseRepo = path.join(holder, 'live')
+  assert.equal(await pullAndMerge({ clientDir: holder, bucket: work, merge }), 'refused')
+  config.releaseRepo = live.repo
+  assert.equal(insideHead(), insideStart)
+  assert.equal(holderHead(), holderStart)
+  assert.match(said(), /holds the live checkout .*holder-git.live/)
+
+  // A .git file or a .git link that borrows another checkout's git folder: the pull would move that checkout's branch
+  const other = path.join(tmp, 'other-git')
+  const otherHead = behindCheckout(other)
+  const otherStart = otherHead()
+  for (const kind of ['file', 'link']) {
+    const borrower = backendCopy(path.join(tmp, `export-git-${kind}`))
+    const client = path.join(borrower, 'sources', 'client')
+    write(path.join(client, 'Data', 'Platform', 'UI', 'index.html'), 'a client folder')
+    if (kind === 'file') write(path.join(client, '.git'), `gitdir: ${path.join(other, '.git')}\n`)
+    else fs.symlinkSync(path.join(other, '.git'), path.join(client, '.git'))
+    const borrowed = run(borrower, 'setup-client.js', { CLIENT_FILES_DIR: workFolder(`work-git-${kind}`) })
+    assert.equal(otherHead(), otherStart, `setup-client pulled through a .git ${kind}`)
+    assert.equal(borrowed.status, 1, borrowed.stdout + borrowed.stderr)
+    assert.match(borrowed.stderr, /\[setup\] refusing to pull: .* has no git folder of its own/)
+    assert.equal(await pullAndMerge({ clientDir: client, bucket: work, merge }), 'refused')
+    assert.equal(otherHead(), otherStart, `the webhook pulled through a .git ${kind}`)
+  }
+  assert.match(said(), /\[webhook\] refusing to pull: .* has no git folder of its own/)
+  assert.equal(merges, 0)
+  assert.equal(fs.existsSync(path.join(work, 'skymp-client.zip')), false)
+})
+
+test('the opt-in in a .env is no opt-in: merge-files and populate-files refuse and name the file', () => {
+  const live = liveCheckout('live-dotenv')
+  const exp = backendCopy(path.join(tmp, 'export-dotenv'))
+  write(path.join(exp, 'sources', 'client', 'Data', 'Platform', 'UI', 'index.html'), 'the new ui')
+  const src = path.join(tmp, 'build-dotenv', 'Data')
+  write(path.join(src, 'Platform', 'UI', 'index.html'), 'the built ui')
+  const env = { CLIENT_FILES_DIR: live.bucket, DBO_RELEASE_REPO: live.repo, SKYMP_CLIENT_DATA: src }
+  const before = snapshot(live.bucket)
+
+  // A .env in the folder the script runs from, which config.js loads
+  const cwd = path.join(tmp, 'cwd-dotenv')
+  write(path.join(cwd, '.env'), 'DBO_MERGE_LIVE_BUCKET=1\n')
+  for (const script of ['merge-files.js', 'populate-files.js']) {
+    const r = run(exp, script, env, { cwd })
+    assert.equal(r.status, 1, `${script}: ${r.stdout}${r.stderr}`)
+    assert.match(r.stderr, /DBO_MERGE_LIVE_BUCKET is set in \S*cwd-dotenv.\.env, which would turn this guard off/)
+    assert.deepEqual(snapshot(live.bucket), before, script)
+  }
+
+  // The backend's own .env, which merge-files loads, even with the opt-in on the command line as well
+  write(path.join(exp, '.env'), 'PORT=4000\nexport DBO_MERGE_LIVE_BUCKET = 1\n')
+  const r = run(exp, 'merge-files.js', { ...env, DBO_MERGE_LIVE_BUCKET: '1' })
+  assert.equal(r.status, 1, r.stdout + r.stderr)
+  assert.match(r.stderr, /DBO_MERGE_LIVE_BUCKET is set in \S*export-dotenv.skymp5-backend.\.env/)
+  assert.deepEqual(snapshot(live.bucket), before)
+  assert.equal(read(live.manifest), '{"version":"live"}\n')
 })
