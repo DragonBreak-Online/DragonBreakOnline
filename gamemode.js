@@ -354,9 +354,13 @@ const actorsNear = (fromActor, rangeM, includeSelf) => {
   }
   return out;
 };
-const sendNear = (fromActor, rangeM, line, includeSelf) => {
+// staffLine (optional): the same line with a disguised speaker named as staff with real names on read it (playermenu.js,
+// "Aldric (masked) says: ..."); it goes to those recipients alone, and everyone else gets the line as before
+const sendNear = (fromActor, rangeM, line, includeSelf, staffLine) => {
   const tagged = `[[B${fromActor.toString(16)}]]${line}`;
-  for (const a of actorsNear(fromActor, rangeM, includeSelf)) deliver(a, tagged);
+  const revealTo = staffLine && typeof globalThis.__dboRealNamesOn === 'function' ? globalThis.__dboRealNamesOn : null;
+  const staffTagged = revealTo ? `[[B${fromActor.toString(16)}]]${staffLine}` : '';
+  for (const a of actorsNear(fromActor, rangeM, includeSelf)) deliver(a, revealTo && revealTo(a) === true ? staffTagged : tagged);
 };
 // ---- chat bubbles: an in-character local line also floats over the speaker's head ----
 // For players who cannot hear or use voice (Nate, 30 Sep; #suggestions "Floating Text"). The client drew bubbles from
@@ -1323,21 +1327,29 @@ const handleLine = (a, text, userId, opts) => {
   // what is measured is what is said, after the command
   // The player log records the refusal only for a registered command (a long chat line records nothing)
   if (body.length > Number(FLOOD.chatMaxChars) && !isAdmin(a)) { try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('gate', a, 'too_long', cmd); } catch (e) { /* the player log is optional */ } return personal(a, `That message is too long (${Number(FLOOD.chatMaxChars)} characters at most).`); }
+  // A disguised speaker as staff with real names on read them ("Aldric (masked)", playermenu.js): '' unless someone has
+  // the mode on, its chat switch is on and the speaker is behind a mask or a beast form. Those recipients alone get it
+  let staffName = '';
+  try { staffName = typeof globalThis.__dboRealNamesLabel === 'function' ? String(globalThis.__dboRealNamesLabel(a) || '') : ''; } catch (e) { staffName = ''; }
   const spoken = { say: ['says', R.say, C.WHITE], low: ['says quietly', R.low, C.WHITE], whisper: ['whispers', R.whisper, C.WHITE], wide: ['says loudly', R.wide, C.WHITE], shout: ['shouts', R.shout, C.SHOUT] };
-  if (spoken[cmd]) { if (body) { sendNear(a, spoken[cmd][1], quoteSay(name, spoken[cmd][0], body, spoken[cmd][2])); bubbleNear(a, spoken[cmd][1], cmd, name, body); } return; }
-  const emotes = {
-    me: [`#{${C.ME}}${name} ${body}`, R.emote], melow: [`#{${C.ME}}${name} ${body}`, R.emoteLow], melong: [`#{${C.ME}}${name} ${body}`, R.emoteLong],
-    my: [`#{${C.ME}}${name}'s ${body}`, R.emote], mylow: [`#{${C.ME}}${name}'s ${body}`, R.emoteLow], mylong: [`#{${C.ME}}${name}'s ${body}`, R.emoteLong],
+  if (spoken[cmd]) { if (body) { sendNear(a, spoken[cmd][1], quoteSay(name, spoken[cmd][0], body, spoken[cmd][2]), false, staffName && quoteSay(staffName, spoken[cmd][0], body, spoken[cmd][2])); bubbleNear(a, spoken[cmd][1], cmd, name, body); } return; }
+  const emotesOf = (n) => ({
+    me: [`#{${C.ME}}${n} ${body}`, R.emote], melow: [`#{${C.ME}}${n} ${body}`, R.emoteLow], melong: [`#{${C.ME}}${n} ${body}`, R.emoteLong],
+    my: [`#{${C.ME}}${n}'s ${body}`, R.emote], mylow: [`#{${C.ME}}${n}'s ${body}`, R.emoteLow], mylong: [`#{${C.ME}}${n}'s ${body}`, R.emoteLong],
     do: [`#{${C.ME}}${body}`, R.emote], dolow: [`#{${C.ME}}${body}`, R.emoteLow], dolong: [`#{${C.ME}}${body}`, R.emoteLong],
-    looc: [`#{${C.OOC}}${name} (OOC): "${body}"`, R.looc], ooc: [`#{${C.OOC}}${name} (OOC): "${body}"`, R.looc],
-    ooclow: [`#{${C.OOC}}${name} (OOC - Low): "${body}"`, R.loocLow], ooclong: [`#{${C.OOC}}${name} (OOC - Long): "${body}"`, R.loocLong],
-  };
-  if (emotes[cmd]) { if (body) { sendNear(a, emotes[cmd][1], emotes[cmd][0]); bubbleNear(a, emotes[cmd][1], cmd, name, body); } return; }
+    looc: [`#{${C.OOC}}${n} (OOC): "${body}"`, R.looc], ooc: [`#{${C.OOC}}${n} (OOC): "${body}"`, R.looc],
+    ooclow: [`#{${C.OOC}}${n} (OOC - Low): "${body}"`, R.loocLow], ooclong: [`#{${C.OOC}}${n} (OOC - Long): "${body}"`, R.loocLong],
+  });
+  const emotes = emotesOf(name);
+  // /do names nobody, so it never has a staff line
+  if (emotes[cmd]) { if (body) { sendNear(a, emotes[cmd][1], emotes[cmd][0], false, staffName && !cmd.startsWith('do') ? emotesOf(staffName)[cmd][0] : ''); bubbleNear(a, emotes[cmd][1], cmd, name, body); } return; }
   if (cmd === 'pm' || cmd === 'dm' || cmd === 'to' || cmd === 'too') {
     const i = body.indexOf(' '); const target = i < 0 ? body : body.slice(0, i); const msg = i < 0 ? '' : body.slice(i + 1).trim();
     if (!target || !msg) return personal(a, 'Usage: /pm <player> <message>');
     const t = findByName(target); if (!t) return personal(a, `No player matches "${target}".`);
-    deliver(t, `[[PM]]${name}|${msg}`); return;
+    // From behind a disguise, staff with real names on read who sent it
+    const pmFrom = staffName && typeof globalThis.__dboRealNamesOn === 'function' && globalThis.__dboRealNamesOn(t) === true ? staffName : name;
+    deliver(t, `[[PM]]${pmFrom}|${msg}`); return;
   }
   if (cmd === 'system') { if (!isAdmin(a)) return personal(a, 'Admins only.'); if (body) { broadcast(`[[S]]#{${C.SYS}}${body}`); audit(`GM ${who(a)} /system: ${body}`); staffLog(display(a), tierOf(a), '/system', `${staffWho(a)} (${TIER_LABEL[tierOf(a)] || 'staff'}): /system ${body.slice(0, 300)}`); } return; }
   if (cmd === 'admin') { if (!staffCan(a, 'adminchat')) return personal(a, 'Admins only.'); if (body) broadcast(`[[A]]#{${C.SYS}}${name}: ${body}`, true); return; }

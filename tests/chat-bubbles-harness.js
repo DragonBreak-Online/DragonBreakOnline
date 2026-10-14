@@ -69,7 +69,8 @@ ok(lines.some(([a]) => a === SPK), 'sendNear with includeSelf still reaches the 
 // handleChat wires it on the spoken and emote paths, after the chat line, with the same range
 const hc = src.slice(src.indexOf('const handleChat ='), src.indexOf("if (cmd === 'pm'", src.indexOf('const handleChat =')));
 ok(/if \(spoken\[cmd\]\) \{ if \(body\) \{ sendNear\(a, spoken\[cmd\]\[1\], [^;]+\); bubbleNear\(a, spoken\[cmd\]\[1\], cmd, name, body\); \} return; \}/.test(hc), 'handleChat: spoken lines send a bubble at their own range');
-ok(/if \(emotes\[cmd\]\) \{ if \(body\) \{ sendNear\(a, emotes\[cmd\]\[1\], emotes\[cmd\]\[0\]\); bubbleNear\(a, emotes\[cmd\]\[1\], cmd, name, body\); \} return; \}/.test(hc), 'handleChat: emote lines go through bubbleNear (which keeps OOC and /do out)');
+// The optional fifth argument is the staff real-names line (Jake, 14 Oct; tests/real-names-chat-harness.js)
+ok(/if \(emotes\[cmd\]\) \{ if \(body\) \{ sendNear\(a, emotes\[cmd\]\[1\], emotes\[cmd\]\[0\](?:, [^;]+)?\); bubbleNear\(a, emotes\[cmd\]\[1\], cmd, name, body\); \} return; \}/.test(hc), 'handleChat: emote lines go through bubbleNear (which keeps OOC and /do out)');
 ok((src.match(/bubbleNear\(/g) || []).length === 2, 'bubbleNear is called only from those two paths');
 
 console.log(fails ? `${fails} FAILED` : 'all checks passed');
