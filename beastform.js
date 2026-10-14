@@ -22,7 +22,8 @@ module.exports = (api) => {
   // An admin's off must survive a hot reload; a value merely seeded from config must not, or an old seed outlives the
   // config that set it.
   const CFG = Object.assign({ vampireLordRemoteRace: true, werewolfRemoteRace: true, breakerUnits: 6000, breakerSeconds: 120,
-    breakerDrops: 2, breakerWindowSeconds: 600 }, (cfg && cfg.beastform) || {});
+    breakerDrops: 2, breakerWindowSeconds: 600, breakerHoldMinutes: 10, vampireLordBreakerHoldMinutes: 0, breakerReconnectSeconds: 0 },
+    (cfg && cfg.beastform) || {});
   // It must survive a restart too (2026-09-29: the 17:15 restart read the config again and undid an off). /vlremote and
   // /wwremote write beastform-state.json beside the gamemode; a fresh process reads it before the config.
   const STATE_PATH = path.resolve('beastform-state.json');
@@ -402,7 +403,24 @@ module.exports = (api) => {
   const WB = globalThis.__dboBeastBody = globalThis.__dboBeastBody || { sent: new Map(), sentAt: 0 };   // viewer -> last list sent
   const RESEND_MS = 30000;
   const formOf = (a) => { const s = stateOf(a); return s && BODY[s.form] ? s.form : ''; };
-  const bodyTripped = (a, form) => { try { const t = mp.get(a, BODY[form].flag); return !!(t && t.at); } catch (e) { return false; } };
+  // A werewolf's trip holds breakerHoldMinutes, a Vampire Lord's vampireLordBreakerHoldMinutes (0: until /wwremote or
+  // /vlremote clear, as before 13 Oct). It was for good, and every werewolf it caught stayed a naked human to everyone for
+  // days: #8KWH and #LLX8 tripped 12 Oct 08:01-08:03 by watchers who were back in 12-21 s, #7DJT 13 Oct 06:38 in the 0.3.95
+  // clone-storm drop wave (claude-jake's investigation). The Lord's trips came from real crashes, so it keeps until-cleared.
+  // An expired trip is cleared from the character, once, and logged.
+  const minutes = (v, dflt) => { const n = Number(v); return (v === null || v === '' || !Number.isFinite(n)) ? dflt : Math.max(0, n); };
+  const HOLD_MS = { werewolf: minutes(CFG.breakerHoldMinutes, 10) * 60000, vampirelord: minutes(CFG.vampireLordBreakerHoldMinutes, 0) * 60000 };
+  const bodyTripped = (a, form) => {
+    try {
+      const t = mp.get(a, BODY[form].flag);
+      if (!(t && t.at)) return false;
+      const hold = HOLD_MS[form] || 0;
+      if (!hold || t.by !== 'breaker' || Date.now() - Number(t.at) < hold) return true;
+      mp.set(a, BODY[form].flag, null);
+      log(`${BODY[form].tag}: ${display(a)}'s ${BODY[form].name} body shown again: the breaker's ${Math.round(hold / 60000)} min are up (tripped ${new Date(Number(t.at)).toISOString()})`);
+      return false;
+    } catch (e) { return false; }
+  };
   const bodyShown = (a) => { const f = formOf(a); return !!f && BODY[f].on() && !bodyTripped(a, f); };
   // On a change only to a viewer whose list changed, and to every capable viewer every 30 s while it is not empty
   const sendBeastBodies = () => {
@@ -427,7 +445,7 @@ module.exports = (api) => {
   // and it hid every Lord from everyone. So every drop near a beast is logged with its distance and timing (the body off
   // included, as the control), and only breakerDrops drops by watchers shown that beast's body, inside
   // breakerWindowSeconds, turn its body off, for that character alone (private.wwBodyOff / private.vlBodyOff, through
-  // reloads and restarts) until an admin says /wwremote or /vlremote clear.
+  // reloads and restarts) for its form's hold minutes, or until an admin says /wwremote or /vlremote clear.
   const UNITS = Number(CFG.breakerUnits) || 6000;
   const NEAR_MS = (Number(CFG.breakerSeconds) || 120) * 1000;
   const DROPS = Math.max(1, Number(CFG.breakerDrops) || 2);
@@ -479,8 +497,9 @@ module.exports = (api) => {
     sendBeastBodies();
     const names = drops.map((d) => d.who).join(', ');
     audit(`${B.audit} tripped: ${names} dropped near ${display(b)} at ${cell}`);
-    log(`${B.tag}: tripped for ${display(b)} at ${cell} by ${drops.length} drops (${names}); its ${B.name} body OFF until /${B.cmd} clear`);
-    tellStaff(`The ${B.name} body of ${display(b)} turned itself off: ${drops.length} ${drops.length === 1 ? 'player' : 'players'} dropped beside it. Ask them for their crash logs, then /${B.cmd} clear ${display(b)} to show it again.`);
+    const holdMin = Math.round((HOLD_MS[form] || 0) / 60000);
+    log(`${B.tag}: tripped for ${display(b)} at ${cell} by ${drops.length} drops (${names}); its ${B.name} body OFF${holdMin ? ` for ${holdMin} min, or` : ''} until /${B.cmd} clear`);
+    tellStaff(`The ${B.name} body of ${display(b)} turned itself off${holdMin ? ` for ${holdMin} minutes` : ''}: ${drops.length} ${drops.length === 1 ? 'player' : 'players'} dropped beside it. Ask them for their crash logs, then /${B.cmd} clear ${display(b)} to show it again${holdMin ? ' sooner' : ''}.`);
     return true;
   };
   const beastDrop = (a, journalOpen) => {
@@ -504,10 +523,22 @@ module.exports = (api) => {
         `their other drops in 24 h: ${before.length} (${before.filter((d) => !d.near).length} with no beast near)`];
       if (journalOpen) { log(`${B.tag}: ${display(a)} quit through the menu near ${display(b)}, not counted: ${parts.join('; ')}`); continue; }
       if (!shown || bodyTripped(b, form)) { log(`${B.tag}: ${display(a)} dropped near ${display(b)}, not counted: ${parts.join('; ')}`); continue; }
-      const drops = (counted.get(b >>> 0) || []).filter((d) => now - d.at <= WINDOW_MS).concat([{ at: now, who: display(a) }]);
-      counted.set(b >>> 0, drops);
-      log(`${B.tag}: ${display(a)} dropped near ${display(b)}, drop ${drops.length} of ${DROPS} in ${secs(WINDOW_MS)} s: ${parts.join('; ')}`);
-      if (drops.length >= DROPS && tripBody(b, form, drops, String(cell))) tripped = true;
+      const count = () => {
+        const at = Date.now();
+        const drops = (counted.get(b >>> 0) || []).filter((d) => at - d.at <= WINDOW_MS).concat([{ at, who: display(a) }]);
+        counted.set(b >>> 0, drops);
+        log(`${B.tag}: ${display(a)} dropped near ${display(b)}, drop ${drops.length} of ${DROPS} in ${secs(WINDOW_MS)} s: ${parts.join('; ')}`);
+        return drops.length >= DROPS && tripBody(b, form, drops, String(cell));
+      };
+      // breakerReconnectSeconds (0: off): a watcher back within it reconnected rather than crashed and is not counted
+      const back = minutes(CFG.breakerReconnectSeconds, 0) * 1000;
+      if (!back) { if (count()) tripped = true; continue; }
+      setTimeout(() => {
+        try {
+          if (api.onlineActors().some((o) => (o >>> 0) === (a >>> 0))) { log(`${B.tag}: ${display(a)} was back within ${secs(back)} s of dropping near ${display(b)}, not counted`); return; }
+          count();
+        } catch (e) { log(`${B.tag}: deferred drop failed: ${e.message}`); }
+      }, back);
     }
     for (const k of [...near.keys()]) if (k.startsWith(`${a}:`)) near.delete(k);
     return tripped;
