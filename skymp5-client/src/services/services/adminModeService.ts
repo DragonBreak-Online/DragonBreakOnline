@@ -14,7 +14,7 @@ const LOCAL_MODES = ["god", "noclip", "ghost", "invis"];
  * god/noclip/ghost/invis map to local natives; smite/healhit are fully
  * server-side; freecam has no SkyrimPlatform native (tfc stays a console
  * command for admins, who already hold consoleCommandsAllowed).
- * God also holds server-side (AdminSystem refuses hit damage); FormView hides remote invis admins via ff_adminModes, and shows them to admins as ghosts.
+ * God also holds server-side (AdminSystem refuses hit damage); FormView keeps no copy of a remote invis admin (ff_adminModes) for players and lower ranks, and shows them to the same or a higher rank as ghosts.
  * Ghost looks like one: the ethereal shader and half alpha here, and to everyone else through the same mirror.
  */
 export class AdminModeService extends ClientListener {

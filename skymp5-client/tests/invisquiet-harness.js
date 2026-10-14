@@ -1,6 +1,7 @@
 // Scripted test for adminCopyPolicy.ts and its use in formView.ts: a player hidden by ff_adminModes.invis (an Invisible
-// admin, someone in character creation) has no local copy on a non-staff watcher's client, so no footsteps, no body and
-// no nametag; staff keep a ghost copy; the copy returns once the player has stayed un-hidden for REVEAL_HOLD_MS.
+// admin, someone in character creation) has no local copy on the client of a player or of lower-ranked staff, so no
+// footsteps, no body and no nametag; staff of the same or a higher rank keep a ghost copy, and Ghost mode is a ghost copy;
+// the copy returns once the player has stayed un-hidden for REVEAL_HOLD_MS.
 //
 // adminCopyPolicy.ts has no imports, so it transpiles on its own. Run it from skymp5-client:
 //
@@ -9,7 +10,7 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
-const { keepNoCopy, nextHiddenAt, REVEAL_HOLD_MS, staffRankOf, seesInvisible } = require(path.resolve(process.argv[2]));
+const { adminViewOfModes, keepNoCopy, nextHiddenAt, REVEAL_HOLD_MS, staffRankOf, seesInvisible } = require(path.resolve(process.argv[2]));
 
 let failures = 0;
 const check = (name, ok, got) => {
@@ -36,7 +37,7 @@ const run = (s, view, from, to, step = 16) => { for (let t = from; t <= to; t +=
 // ---- the policy on its own ------------------------------------------------------------------------------------
 check('hidden keeps no copy', keepNoCopy('hidden', 1000, 1000) === true);
 check('a player never hidden has a copy', keepNoCopy('visible', 0, 5000) === false);
-check('a ghost (staff watching, or Ghost mode) has a copy', keepNoCopy('ghost', 0, 5000) === false);
+check('a ghost (staff of the same or a higher rank watching, or Ghost mode) has a copy', keepNoCopy('ghost', 0, 5000) === false);
 check('un-hidden a moment ago: still no copy', keepNoCopy('visible', 1000, 1000 + REVEAL_HOLD_MS - 1) === true);
 check('un-hidden for the whole hold: the copy returns', keepNoCopy('visible', 1000, 1000 + REVEAL_HOLD_MS) === false);
 check('nextHiddenAt moves only while hidden', nextHiddenAt('hidden', 5, 99) === 99 && nextHiddenAt('visible', 5, 99) === 5 && nextHiddenAt('ghost', 5, 99) === 5);
@@ -64,11 +65,26 @@ check('the hold is short enough not to look broken (<= 2 s)', REVEAL_HOLD_MS > 0
   check('a mirror flicker shorter than the hold never spawns a copy', !s.copy && s.spawns === 0 && s.destroys === 0, s);
 }
 
-// ---- a staff watcher sees a ghost throughout -------------------------------------------------------------------
+// ---- the view from the mirror: the same for every watcher ------------------------------------------------------
+check('Invisible is hidden', adminViewOfModes({ invis: true }) === 'hidden');
+check('Invisible wins over Ghost', adminViewOfModes({ invis: true, ghost: true }) === 'hidden');
+check('Ghost alone is a ghost', adminViewOfModes({ ghost: true, invis: false }) === 'ghost');
+check('god, smite and the rest change nothing', adminViewOfModes({ god: true, smite: true, healhit: true }) === 'visible');
+check('no mirror, or a bad one, is visible', ['visible', 'visible', 'visible'].join() === [undefined, null, 'x'].map(adminViewOfModes).join());
+
+// ---- a staff watcher of the same or a higher rank sees a ghost throughout ---------------------------------------
 {
   const s = watcher();
   run(s, 'ghost', 0, 3000);
-  check('staff watching an Invisible admin keep one ghost copy', s.copy && s.spawns === 1 && s.destroys === 0, s);
+  check('staff of the same or a higher rank watching an Invisible admin keep one ghost copy', s.copy && s.spawns === 1 && s.destroys === 0, s);
+}
+
+// ---- a lower-ranked staff watcher keeps no copy (Jake, 14 Oct: heard walking and jumping) ------------------------
+{
+  const s = watcher();
+  run(s, 'visible', 0, 1000);
+  run(s, seesInvisible(staffRankOf(1, true), 5) ? 'ghost' : 'hidden', 1016, 5000);
+  check('a Trial GM watching an owner who turns Invisible: the copy is deleted once and stays gone', !s.copy && s.spawns === 1 && s.destroys === 1, s);
 }
 
 // ---- formView.ts uses the policy where the copy is made ----------------------------------------------------------
@@ -107,7 +123,7 @@ check('the nametag guard stays', /adminViewOf\(model\) !== "hidden"/.test(src));
   check('...on the player, for each shader id', /for \(const id of INVIS_ABILITY_SHADER_IDS\) this\.sp\.EffectShader\.from\(this\.sp\.Game\.getFormEx\(id\)\)\?\.stop\(player\)/.test(ams));
   check('...and again after the 2 s reapply re-adds Karliah\'s ability (it replays the shader)', /player\.addSpell\(karliah, false\);\s+\}\s+this\.stopAbilityShaders\(\);/.test(ams));
   const fv = src.slice(src.indexOf('private static applyInvisAbilities('));
-  check('a staff watcher\'s ghost copy stops them too (the ghost shader only)', /if \(on\) for \(const id of INVIS_ABILITY_SHADER_IDS\) EffectShader\.from\(Game\.getFormEx\(id\)\)\?\.stop\(actor\);/.test(fv.slice(0, 800)));
+  check('a copy given the abilities stops their shaders too (the ghost shader only)', /if \(on\) for \(const id of INVIS_ABILITY_SHADER_IDS\) EffectShader\.from\(Game\.getFormEx\(id\)\)\?\.stop\(actor\);/.test(fv.slice(0, 800)));
 }
 
 console.log(failures ? `\n${failures} FAILED` : '\nall passed');

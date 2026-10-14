@@ -1183,7 +1183,7 @@ export class FormView {
     }
     if (view !== this.adminView || now - this.lastAdminHideApply >= FormView.adminHideReapplyMs) {
       actor.setAlpha(view === "hidden" ? 0 : view === "ghost" ? GHOST_ALPHA : 1, false);
-      // An Invisible admin's ghost copy on an admin watcher: the NPCs that watcher hosts must not see or hear it either
+      // An Invisible staff member's ghost copy on a same-or-higher-rank watcher: the NPCs that watcher hosts must not see or hear it either
       FormView.applyInvisAbilities(actor, FormView.isInvisAdmin(model));
       this.adminView = view;
       this.lastAdminHideApply = now;
@@ -1216,7 +1216,7 @@ export class FormView {
       if (on && !actor.hasSpell(spell)) actor.addSpell(spell, false);
       else if (!on && actor.hasSpell(spell)) actor.removeSpell(spell);
     }
-    // The staff watcher's ghost copy shows the ghost shader only, not the potion's shimmer
+    // A copy with the abilities shows the ghost shader only, not the potion's shimmer
     if (on) for (const id of INVIS_ABILITY_SHADER_IDS) EffectShader.from(Game.getFormEx(id))?.stop(actor);
   }
 
@@ -1247,7 +1247,6 @@ export class FormView {
     try { this.spellInvisibleSeen = (Actor.from(refr)?.getActorValue("Invisibility") ?? 0) > 0; } catch { this.spellInvisibleSeen = false; }
     return this.spellInvisibleSeen;
   }
-
 
   private removeNickname() {
     if (this.textNameId) {

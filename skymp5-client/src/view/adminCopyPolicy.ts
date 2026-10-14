@@ -7,6 +7,14 @@ export type AdminView = "visible" | "hidden" | "ghost";
 
 export const REVEAL_HOLD_MS = 1500;
 
+// Invisible is hidden from every watcher, staff included (any copy is an actor that makes sounds); Ghost is a ghost to all
+export function adminViewOfModes(modes: unknown): AdminView {
+  if (!modes || typeof modes !== "object") return "visible";
+  const m = modes as Record<string, unknown>;
+  if (m["invis"]) return "hidden";
+  return m["ghost"] ? "ghost" : "visible";
+}
+
 /** The moment the player was last seen hidden: now while hidden, otherwise unchanged. */
 export function nextHiddenAt(view: AdminView, lastHiddenAt: number, now: number): number {
   return view === "hidden" ? now : lastHiddenAt;
