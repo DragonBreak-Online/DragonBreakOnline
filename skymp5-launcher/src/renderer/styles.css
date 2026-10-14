@@ -1827,6 +1827,9 @@ button.hotkey-btn--capturing {
   gap: 6px;
 }
 .install-mini { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; }
+/* display: flex above overrides the browser's own [hidden] rule, so without these the panel stays on screen after
+   the install ends, frozen on its last step */
+.install-panel[hidden], .install-mini[hidden] { display: none; }
 .install-banner {
   margin: 0 0 4px;
   font-family: 'Barlow Condensed', sans-serif;

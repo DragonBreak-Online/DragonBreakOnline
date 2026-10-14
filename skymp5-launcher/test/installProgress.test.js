@@ -302,3 +302,25 @@ test('the install banner shows only while something is really downloading', () =
   t.end()
   assert.strictEqual(P.describe(t.snapshot()), null, 'an ended flow describes as nothing at all')
 })
+
+// .install-panel and .install-mini set display: flex, which beats the browser's own [hidden] rule, so setting
+// hidden did nothing: the panel stayed on screen after every install, frozen on its last step.
+test('the install panel and the Repair bar really disappear when hidden', () => {
+  const css = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'styles.css'), 'utf8')
+  for (const cls of ['install-panel', 'install-mini']) {
+    assert.match(css, new RegExp(`\\.${cls}\\[hidden\\][^{]*\\{[^}]*display:\\s*none`), `.${cls}[hidden] must set display: none`)
+  }
+})
+
+// A handler that ends a flow in its finally must own the gate first, or a refused begin clears another flow's
+// gate and panel while that flow is still running.
+test('every handler that ends a flow in its finally checks the gate it began', () => {
+  for (const name of ['game:createIsolated', 'install:mo2only', 'install:skse', 'install:check']) {
+    const body = handler(name)
+    if (!/finally \{\s*endInstall\(\)/.test(body)) continue
+    const begin = body.indexOf('const gate = beginInstall(')
+    assert.ok(begin >= 0, `${name} keeps the result of beginInstall`)
+    const check = body.indexOf('if (!gate.ok) return', begin)
+    assert.ok(check > begin && check < body.indexOf('try {', begin), `${name} returns on a refused gate before its try`)
+  }
+})

@@ -3025,7 +3025,10 @@ ipcMain.handle('install:skse', async (_e, opts) => {
   if (!gamePath || !fs.existsSync(path.join(gamePath, 'SkyrimSE.exe'))) {
     return { success: false, error: 'No game folder found - install the game copy or set a valid Skyrim path first.' }
   }
-  beginInstall('SKSE')
+  // Only a handler that owns the gate may end the flow in its finally; ending one it never began clears another
+  // flow's gate and panel while that flow is still running.
+  const gate = beginInstall('SKSE')
+  if (!gate.ok) return { success: false, error: gate.error }
   try {
     if (opts && opts.force) {
       try { fs.rmSync(path.join(mo2.getDownloadsDir(), mo2.skseSourceFor(gamePath).fileName), { force: true }) } catch {}
@@ -4340,7 +4343,9 @@ async function runMO2Install(opts = {}) {
     fail(`Install failed: ${err.message}`)
     return
   } finally {
-    endInstall()
+    // fail() has already ended the flow on every failure path; ending it again would log a false
+    // "end called with no flow running" and read as a leaked gate.
+    if (installGate.running()) endInstall()
   }
 }
 
