@@ -340,13 +340,16 @@ module.exports = (api) => {
     log(`supernatural: ${display(a)} shows the ${s.kind}'s tells`);
   };
   // The tells by thirst: a werewolf always; a vampire from vampireTellsStage, or before the first meal
+  // Nate, 14 Oct ("everyone can see my vampiric eyes even when well fed"): a newly turned vampire, GM-made included, shows the
+  // tells until their first blood, as designed, but nothing said so, and a full stomach (needs: Sated) read as fed
+  const UNFED_TELLS_LINE = 'Until your first taste of blood, your eyes and your colour give you away. Food will not hide them: feed on blood, and you will pass for mortal.';
   const tellsShown = (s) => s.kind !== 'vampire' || !!s.unfed || (Number(s.stage) || 1) >= (Number(C.vampireTellsStage) || 1);
   const showTells = (a, s) => {
     if (!s || !s.kind) return;
     if (tellsShown(s)) {
       const had = !!s.look;
       ensureTells(a, s);
-      if (!had && s.look && s.kind === 'vampire' && !s.unfed) personal(a, 'Your thirst shows: your eyes and your colour give you away until you feed.');
+      if (!had && s.look && s.kind === 'vampire') personal(a, s.unfed ? UNFED_TELLS_LINE : 'Your thirst shows: your eyes and your colour give you away until you feed.');
       return;
     }
     if (!s.look || beastForm(a)) return;
@@ -2120,10 +2123,21 @@ module.exports = (api) => {
     const next = stage < 4 && rate > 0 ? fed + stage / rate : 0;
     const holder = crownHolder();
     const lord = holder === (a >>> 0) || (() => { try { return mp.get(a, 'private.vampireLordGrant') === true; } catch (e) { return false; } })();
+    // lastFed is stamped when the curse goes on, so before the first meal it is the turning, not a feed (Nate, 14 Oct)
+    const shown = tellsShown(s);
     const rows = [
-      {
+      s.unfed ? {
+        label: 'Thirst', value: 'Not fed yet',
+        hint: `You have not fed since you were turned: your gifts sleep, and your eyes and your colour give you away, until your first taste of blood. Food does not count. After your first meal your thirst starts at stage 1 and grows a stage at a time until you feed again.`,
+      } : {
         label: 'Thirst', value: `Stage ${stage} of 4`,
         hint: `You last fed ${inWords(realMinutes(now - fed))} ago. ${next ? `Stage ${stage + 1} comes in about ${inWords(realMinutes(next - now))} unless you feed.` : 'It can grow no worse.'} Feeding brings you back to stage 1. The thirstier you are, the stronger your gifts and the worse you burn.`,
+      },
+      {
+        label: 'Your look', value: shown ? 'Gives you away' : 'Passes for mortal',
+        hint: s.unfed ? 'Your eyes and your colour show what you are until your first taste of blood.'
+          : shown ? `Your thirst shows in your eyes and your colour from stage ${Number(C.vampireTellsStage) || 1}: feed, and you pass for mortal again.`
+          : `Fed, you keep your own eyes and colour. From stage ${Number(C.vampireTellsStage) || 1} of thirst they give you away until you feed.`,
       },
       firstMealRow(a, s, 'Activate a fresh body, or choose Feed on a bound captive or on anyone who lets you, to drink for the first time.'),
       ...(s.unfed ? [{
