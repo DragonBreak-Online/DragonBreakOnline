@@ -49,6 +49,51 @@ function clientGitHash() {
   return 'nogit'
 }
 
+// File writes: always a new file, never a write through a link or through another name of the same file. A work root copied with
+// cp -al shares its files with where it came from, and a zip or manifest hard-linked to the live one would rewrite it in place
+
+// A file at p is unlinked (a link itself, not where it points); a folder stays
+function removeFile(p) {
+  try {
+    if (!fs.lstatSync(p).isDirectory()) fs.unlinkSync(p)
+  } catch (err) {
+    if (err.code !== 'ENOENT') throw err
+  }
+}
+
+// The new file is written next to target, then renamed over it, so the backend never serves a half-written zip or manifest
+function tempFor(target) {
+  const tmp = path.join(path.dirname(target), `.${path.basename(target)}.${process.pid}.tmp`)
+  removeFile(tmp)
+  return tmp
+}
+
+function swapIn(tmp, target) {
+  try { fs.chmodSync(tmp, fs.statSync(target).mode & 0o777) } catch { /* no file there yet */ }
+  try {
+    fs.renameSync(tmp, target)
+  } catch (err) {
+    // Windows refuses to rename over a file another program holds open: write it in place there, as before (no live checkout on a PC)
+    if (process.platform !== 'win32' || !['EPERM', 'EACCES', 'EBUSY'].includes(err.code)) {
+      fs.rmSync(tmp, { force: true })
+      throw err
+    }
+    fs.copyFileSync(tmp, target)
+    fs.rmSync(tmp, { force: true })
+  }
+}
+
+function writeNew(target, data) {
+  const tmp = tempFor(target)
+  try {
+    fs.writeFileSync(tmp, data, { flag: 'wx' })
+  } catch (err) {
+    fs.rmSync(tmp, { force: true })
+    throw err
+  }
+  swapIn(tmp, target)
+}
+
 // File copy
 
 function copyDir(srcDir, destDir, skipNames = new Set()) {
@@ -66,7 +111,8 @@ function copyDir(srcDir, destDir, skipNames = new Set()) {
       count += copyDir(src, dest, skipNames)
     } else {
       fs.mkdirSync(path.dirname(dest), { recursive: true })
-      fs.copyFileSync(src, dest)
+      removeFile(dest)
+      fs.copyFileSync(src, dest, fs.constants.COPYFILE_EXCL)
       count++
     }
   }
@@ -104,11 +150,26 @@ async function listFiles(dir, base = dir, out = []) {
 function buildZip(srcDir, zipPath) {
   return new Promise((resolve, reject) => {
     fs.mkdirSync(path.dirname(zipPath), { recursive: true })
-    const output  = fs.createWriteStream(zipPath)
+    const tmp     = tempFor(zipPath)
+    const output  = fs.createWriteStream(tmp, { flags: 'wx' })
     const archive = archiver('zip', { zlib: { level: 6 } })
+    let failed = false
+    const fail = err => {
+      if (failed) return
+      failed = true
+      output.destroy()
+      fs.rmSync(tmp, { force: true })
+      reject(err)
+    }
 
-    output.on('close', () => resolve(archive.pointer()))
-    archive.on('error', reject)
+    output.on('close', () => {
+      // After a failure the stream may still have created the file once its open finished
+      if (failed) return fs.rmSync(tmp, { force: true })
+      try { swapIn(tmp, zipPath) } catch (err) { return fail(err) }
+      resolve(archive.pointer())
+    })
+    output.on('error', fail)
+    archive.on('error', fail)
 
     archive.pipe(output)
     // false = no root folder prefix in zip; the SKIP_ALWAYS names stay out of it as they stay out of the copy and the manifest
@@ -144,8 +205,11 @@ async function mergeSourcesIntoRoot() {
   console.log(`[merge]   client  : ${CLIENT_SRC}`)
   console.log(`[merge]   output  : ${OUTPUT_DIR}`)
 
-  const live = liveBucket.liveTarget({ bucket: BUCKET, manifest: VERSION_FILE })
-  if (live && !liveBucket.optedIn()) throw new Error(liveBucket.refusalMessage(live))
+  // Every path it writes, after links: the bucket, its root and zip, the manifest, and any link in the root a copy would write through
+  const targets = { bucket: BUCKET, manifest: VERSION_FILE, writes: [OUTPUT_DIR, ZIP_PATH, ...liveBucket.linksUnder(OUTPUT_DIR)] }
+  const refused = liveBucket.refusal(targets)
+  if (refused) throw new Error(refused)
+  const live = liveBucket.liveTarget(targets)
   if (live) console.warn(`[merge] ${liveBucket.OPT_IN}=1: writing into the live client files as asked (${live})`)
 
   // An empty source would zip whatever the output already holds; with no source, only a work folder's root is packaged as it is
@@ -181,7 +245,7 @@ async function mergeSourcesIntoRoot() {
   // CLIENT_VERSION in routes/version.js overrides the update-signal version
   const version = routeClientVersion() || clientGitHash()
   fs.mkdirSync(path.dirname(VERSION_FILE), { recursive: true })
-  fs.writeFileSync(VERSION_FILE, JSON.stringify({
+  writeNew(VERSION_FILE, JSON.stringify({
     version,
     builtAt:   new Date().toISOString(),
     fileCount: clientFiles,
