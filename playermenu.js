@@ -640,8 +640,8 @@ module.exports = (api) => {
     try { endReveal(a, 'logout', true); } catch (e) { log('real names on leave failed', e.message); }
   };
   globalThis.__dboPlayerMenuReady = (a) => { try { unmask(a, true); realNamesOn.delete(Number(a) >>> 0); ensureKnown(a); refreshLawful(a); } catch (e) { log('player menu login failed', e.message); } };
-  // At the character's arrival (gamemode.js onCharacterReady), not 8 s later in loginSetup: a 0.3.98 client draws a leftover marker's labels
-  globalThis.__dboRealNamesLogin = (a) => { try { a = Number(a) >>> 0; realNamesOn.delete(a); restoreLeftover(a, get(a, KNOWN_PROP, null)); } catch (e) { log('realnames: login check failed', e.message); } };
+  // At arrival (gamemode.js onUserAssignActor with assigned, then onCharacterReady), not 8 s later; assigned leaves a mode still on alone (the same character picked again)
+  globalThis.__dboRealNamesLogin = (a, assigned) => { try { a = Number(a) >>> 0; if (assigned && revealing(a)) return; realNamesOn.delete(a); restoreLeftover(a, get(a, KNOWN_PROP, null)); } catch (e) { log('realnames: login check failed', e.message); } };
   // A reload keeps the mode only for a staff member still online, still holding the right and still carrying the marker;
   // any other is ended and their list put back (fail closed: a marker other code reset is never put back by itself)
   for (const a of [...realNamesOn.keys()]) {
