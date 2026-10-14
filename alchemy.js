@@ -295,7 +295,10 @@ module.exports = (api) => {
     if (!d) return '';
     return d.restores.map((r) => (short ? `${Math.round(r.share * 100)}% ${r.av}${r.slow ? ` ${overText()}` : ''}` : `restores ${Math.round(r.share * 100)}% of your ${r.av}${r.slow ? ` ${overText()}` : ''}`))
       .concat(d.resists.map((r) => (short ? `${Math.round(r.share * 100)}% ${r.element}` : `${Math.round(r.share * 100)}% ${r.element} resistance for ${r.seconds} s`)))
-      .concat(d.fortify.map((r) => (r.hook === 'lockpick' ? `locks one rank easier for ${r.seconds} s` : short ? `+${Math.round(r.bonus * 100)}% ${r.text}` : `+${Math.round(r.bonus * 100)}% ${r.text} for ${r.seconds} s`))).join(', ');
+      .concat(d.fortify.map((r) => {
+        const what = r.hook === 'lockpick' ? 'locks one rank easier' : r.hook === 'health' ? `+${Math.round(r.bonus)} health` : r.hook === 'taken' ? `${Math.round(r.bonus * 100)}% less damage taken` : `+${Math.round(r.bonus * 100)}% ${r.text}`;
+        return short ? what : `${what} for ${r.seconds} s`;
+      })).join(', ');
   };
 
   // Drinking: a restore gives a share of the drinker's own pool (percentages are fractions of the actor's maximum, so a
@@ -350,18 +353,23 @@ module.exports = (api) => {
       FORTIFIED.set(a, s);
       if (FORTIFIED.size > 512) { const now = Date.now(); for (const [k, v] of FORTIFIED) if (Object.values(v).every((x) => x.until <= now)) FORTIFIED.delete(k); }
     }
-    if (!d.restores.length || !before || !(before.health > 0) || downed(a)) return;
+    // Fortify Health is extra health for its duration (gamemode.js potionHealthMult: hits land as on a pool that much
+    // larger), not a heal: the C++ applies any Health effect as a restore of its points, so that comes off again here
+    const extraHealth = d.fortify.some((r) => r.hook === 'health');
+    if ((!d.restores.length && !extraHealth) || !before || !(before.health > 0) || downed(a)) return;
     later(() => {
       try {
         const now = pctOf(a);
         if (!now || !(now.health > 0)) return;
         const next = { health: now.health, magicka: now.magicka, stamina: now.stamina };
+        if (extraHealth && !d.restores.some((r) => r.av === 'health')) next.health = Math.min(next.health, Number(before.health) || next.health);
         for (const r of d.restores) {
           const from = Number(before[r.av]) || 0;
           // Over time: the C++'s instant points come off again, the share arrives in ticks from here
           if (r.slow) { next[r.av] = Math.min(Number(next[r.av]) || 0, from); startTicks(a, r.av, r.share, OVER.seconds, 0, 'potion'); } else next[r.av] = Math.max(0, Math.min(1, from + r.share));
         }
         mp.set(a, 'percentages', next);
+        if (!d.restores.length) return;
         const r0 = lookup(baseId);
         log(`alchemy: ${display(a)} drank ${r0 ? r0.record.editorId : (baseId >>> 0).toString(16)}: ${d.restores.map((r) => `${r.av} ${(Number(before[r.av]) || 0).toFixed(2)} -> ${r.slow ? `+${Math.round(r.share * 100)}% ${overText()}` : `${next[r.av].toFixed(2)} (+${Math.round(r.share * 100)}%)`}`).join(', ')}`);
       } catch (e) { log(`alchemy: restore for ${display(a)} failed: ${e.message}`); }
@@ -465,6 +473,49 @@ module.exports = (api) => {
     });
     return { poison: poisonId, hits: p.hits, drains: p.drains };
   };
+  // ---- specialties: fixed three-ingredient recipes at the lab (Nate, 14 Oct) ---------------------------------------
+  // The design's Fortify Blade and Blunt (the vanilla One- and Two-handed effects count by the weapon's hands, as their
+  // text says, so the DBO skill potions have recipes of their own) and the Master's Blood Potion. The exact set of
+  // ingredients makes it at minTier and up, the strength by the brewer's tier; below that the mix brews as any other.
+  // { label, inputs: [refs], minTier, byTier: [x5], fallback: [x5], name } in alchemy-rework.json specialties.
+  const SPECIALTIES = (RW.enabled !== false && Array.isArray(RW.specialties) ? RW.specialties : []).map((v) => {
+    const inputs = (v.inputs || []).map(effectRef).filter(Boolean).sort((x, y) => x - y);
+    const byTier = [0, 1, 2, 3, 4].map((i) => recordRef((v.byTier || [])[i]) || recordRef((v.fallback || [])[i]));
+    return { label: String(v.label || ''), name: String(v.name || ''), inputs, minTier: Math.max(1, Math.min(5, Math.floor(Number(v.minTier) || 1))), byTier, n: (v.inputs || []).length };
+  }).filter((v) => v.inputs.length === v.n && v.inputs.length >= 2);
+  const specialtyFor = (used) => {
+    const key = used.slice().sort((x, y) => x - y).join(',');
+    return SPECIALTIES.find((v) => v.inputs.join(',') === key) || null;
+  };
+  const specialtyName = (v, t) => v.name || `${RW.words.potion[Math.max(0, Math.min(4, t - 1))]} of ${v.label}`;
+  // Blood Potions: the design's record and Dawnguard's own (DLC1BloodPotion), found or brewed
+  const BLOOD_POTIONS = new Set((Array.isArray(RW.bloodPotions) ? RW.bloodPotions : ['DBO_AlchBloodPotion', '018ef3:Dawnguard.esm']).map((r) => { const x = recordRef(r); return x ? x.id : 0; }).filter(Boolean));
+
+  // ---- Sleeping Tree Sap (Nate, 14 Oct): tapped at the Sleeping Tree by a Master Alchemist once a day --------------
+  // The tree stands in the Reach, outside the Bruma lock, so this is inert (enabled false) until Skyrim opens. A tap
+  // gives the design's record (25% less damage taken for 45 s, the giants' slow and visions as vanilla's sap), kept on
+  // the character (private.dboSapTapAt) so a relog or restart does not hand out another.
+  const SAP = Object.assign({ enabled: false, bases: ['0e1fc1:Skyrim.esm', '0aed89:Skyrim.esm'], minTier: 5, hours: 24, product: 'DBO_AlchSleepingTreeSap' }, RW.sleepingTreeSap || {});
+  const SAP_BASES = new Set((SAP.bases || []).map((d) => idOf(String(d))).filter(Boolean));
+  globalThis.__dboSleepingTreeTap = (targetId, casterId) => {
+    if (SAP.enabled !== true) return false;
+    let base = 0; try { base = mp.getIdFromDesc(String(mp.get(targetId >>> 0, 'baseDesc'))) >>> 0; } catch (e) { return false; }
+    if (!SAP_BASES.has(base)) return false;
+    const a = casterId >>> 0;
+    if (alchemistTier(a) < SAP.minTier) { tell(a, `Only an Alchemist of ${tierName(SAP.minTier)} rank knows how to draw the sap without harming the tree.`); return true; }
+    let at = 0; try { at = Number(mp.get(a, 'private.dboSapTapAt')) || 0; } catch (e) { at = 0; }
+    const wait = at + Math.max(1, Number(SAP.hours) || 24) * 3600000 - Date.now();
+    if (wait > 0) { tell(a, `The tree has given you its sap today. Come back in about ${Math.ceil(wait / 3600000)} hour${Math.ceil(wait / 3600000) === 1 ? '' : 's'}.`); return true; }
+    const rec = recordRef(SAP.product);
+    if (!rec) { log(`alchemy: Sleeping Tree Sap ${SAP.product} is not in the load order; nothing tapped`); return true; }
+    const entries = invOf(a);
+    give(entries, rec.id, 1);
+    try { mp.set(a, 'inventory', { entries: entries.filter((e) => Number(e.count) > 0) }); mp.set(a, 'private.dboSapTapAt', Date.now()); } catch (e) { log(`alchemy: sap for ${display(a)} failed: ${e.message}`); return true; }
+    tell(a, 'You draw a measure of the Sleeping Tree\'s sap.');
+    audit(`ALCHEMY ${who(a)} tapped Sleeping Tree Sap`);
+    return true;
+  };
+
   if (RW.enabled !== false) {
     // gamemode.js re-installs its eat hook before this module on every reload; a second load without that unwraps first
     let inner = mp.onEatItem;
@@ -475,6 +526,8 @@ module.exports = (api) => {
       try { if (drinkOf(id)) before = pctOf(a); } catch (e) { before = null; }
       const out = typeof inner === 'function' ? inner.call(this, actorId, baseId, ...rest) : undefined;
       if (out !== false) { try { onDrink(a, id, before); } catch (e) { log(`alchemy: drink handling failed: ${e.message}`); } }
+      // A Blood Potion is a meal for a vampire (supernatural.js __dboSuperBloodPotion); for anyone else only its restore
+      if (out !== false && BLOOD_POTIONS.has(id) && typeof globalThis.__dboSuperBloodPotion === 'function') { try { globalThis.__dboSuperBloodPotion(a); } catch (e) { log(`alchemy: blood potion failed: ${e.message}`); } }
       return out;
     };
     hook.__dboAlchemyEat = true; hook.__inner = inner;
@@ -650,7 +703,26 @@ module.exports = (api) => {
       log(`alchemy: ${display(a)} brewed the ${draught.name} (tier ${alchemistTier(a)}) from ${used.map((id) => { const r = lookup(id); return r ? r.record.editorId : id.toString(16); }).join(' + ')}`);
       return;
     }
-    const hint = draught && draught.hint ? ` ${draught.hint}` : '';
+    let hint = draught && draught.hint ? ` ${draught.hint}` : '';
+    const special = specialtyFor(used);
+    if (special) {
+      const t = alchemistTier(a);
+      const rec = t >= special.minTier ? special.byTier[t - 1] : null;
+      if (rec) {
+        for (const id of used) take(entries, id, 1);
+        give(entries, rec.id, 1);
+        try { mp.set(a, 'inventory', { entries: entries.filter((e) => Number(e.count) > 0) }); } catch (e) { log(`alchemy: inventory write failed for ${display(a)}: ${e.message}`); return; }
+        const nm = specialtyName(special, t), does = doesText(rec.id);
+        tell(a, `You brew ${/^[AEIOU]/.test(nm) ? 'an' : 'a'} ${nm}${does ? ` (${does})` : ''}.`);
+        creditBrew(a, rec.id, t, ingredientValue(used.map((id) => [id, 1])));
+        log(`alchemy: ${display(a)} brewed the specialty ${rec.edid} (${nm}, tier ${t})`);
+        audit(`ALCHEMY ${who(a)} brewed ${rec.edid}`);
+        try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('brew', a, rec.id, t, used.map((id) => ({ baseId: id, count: 1 }))); } catch (e) { /* the player log is optional */ }
+        if (S.panels.has(a)) showBrewable(a);
+        return;
+      }
+      if (t < special.minTier) hint += ` These make ${special.name ? `a ${special.name}` : `a potion of ${special.label}`} for an Alchemist of ${tierName(special.minTier)} rank (level ${tierLevel(special.minTier)}).`;
+    }
     const shared = sharedEffects(used);
     if (!shared.length) {
       const tally = new Map();
@@ -664,7 +736,7 @@ module.exports = (api) => {
     if (shared.length > 1) log(`alchemy: ${display(a)} shared ${shared.map((e) => { const r = lookup(e); return `${r ? r.record.editorId : e.toString(16)}@${Math.round(baseCost(e))}`; }).join(', ')}; took ${potion ? potion.edid : 'none (locked)'}`);
     if (!potion) {
       log(`alchemy: ${display(a)} mixed ${used.map((id) => { const r = lookup(id); return r ? r.record.editorId : id.toString(16); }).join(' + ')} at tier ${tier}: every shared effect opens later`);
-      return tell(a, `You cannot brew that${passed.length && passed.every((p) => p.dropped) ? '' : ' yet'}.${lockedHint(passed)} You keep your ingredients.`);
+      return tell(a, `You cannot brew that${passed.length && passed.every((p) => p.dropped) ? '' : ' yet'}.${lockedHint(passed)}${hint} You keep your ingredients.`);
     }
     for (const id of used) take(entries, id, 1);
     give(entries, potion.id, 1);
