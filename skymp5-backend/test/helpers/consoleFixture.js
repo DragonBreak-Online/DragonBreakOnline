@@ -10,8 +10,11 @@ const { createSpool } = require('../../sources/console/spool')
 const { createStaffConsole } = require('../../sources/console/staffConsole')
 
 const GUILD = '1494109013300744312'
-const ROLE = { owner: '1494126527489507369', dev: '1494491999305338981', gm: '1553844072878178384' }
-const ID = { jake: '300000000000000001', nate: '300000000000000002', gm: '300000000000000003', stranger: '300000000000000004', unpinnedOwner: '300000000000000005' }
+const ROLE = { owner: '1494126527489507369', dev: '1494491999305338981', lead: '1494126618065506425', gm: '1553844072878178384', trial: '1558248795932860507' }
+const ID = { jake: '300000000000000001', nate: '300000000000000002', gm: '300000000000000003', stranger: '300000000000000004', unpinnedOwner: '300000000000000005',
+  lead: '300000000000000006', trial: '300000000000000007', unpinnedLead: '300000000000000008' }
+// The role set the deploy writes (host/console.env, Jake 14 Oct): Owners, Dragon Break Dev and Lead GM
+const DEPLOY_ROLE_IDS = `${ROLE.owner},${ROLE.dev},${ROLE.lead}`
 const ALLOW = [
   { name: 'wwremote', usage: '/wwremote [on|off|clear #TAG]', rule: 'switch', help: 'x' },
   { name: 'vlremote', usage: '/vlremote [on|off|clear #TAG]', rule: 'switch', help: 'x' },
@@ -43,6 +46,9 @@ function createConsoleFixture(label = 'dbo-console-') {
     [ID.gm, { roles: [GUILD, ROLE.gm], handle: 'gemma' }],
     [ID.stranger, { roles: [GUILD], handle: 'stranger' }],
     [ID.unpinnedOwner, { roles: [GUILD, ROLE.owner], handle: 'otherowner' }],
+    [ID.lead, { roles: [GUILD, ROLE.lead], handle: 'icedsky' }],
+    [ID.trial, { roles: [GUILD, ROLE.trial], handle: 'trina' }],
+    [ID.unpinnedLead, { roles: [GUILD, ROLE.lead], handle: 'otherlead' }],
   ])
   F.lookups = 0
   F.client = { name: 'our client' }
@@ -63,10 +69,10 @@ function createConsoleFixture(label = 'dbo-console-') {
     F.sessions.set(token, { discordId, username: 'Display Name', ...(signedInAgoMs === null ? {} : { signedInAt: F.now() - signedInAgoMs }), ...extra })
     return token
   }
-  F.profiles = new Map([[ID.jake, 1], [ID.nate, 2], [ID.gm, 3], [ID.stranger, 4], [ID.unpinnedOwner, 5]])
+  F.profiles = new Map([[ID.jake, 1], [ID.nate, 2], [ID.gm, 3], [ID.stranger, 4], [ID.unpinnedOwner, 5], [ID.lead, 6], [ID.trial, 7], [ID.unpinnedLead, 8]])
   F.now = () => Date.now() + F.clock.offset
   F.config = {
-    consoleDiscordIds: `${ID.jake},${ID.nate},${ID.gm},${ID.stranger}`, consoleRoleIds: `${ROLE.owner},${ROLE.dev}`, discordGuildId: GUILD,
+    consoleDiscordIds: `${ID.jake},${ID.nate},${ID.gm},${ID.stranger},${ID.lead},${ID.trial}`, consoleRoleIds: DEPLOY_ROLE_IDS, discordGuildId: GUILD,
     consoleFreshSigninHours: 4, consoleDiscordChannelIds: '',
   }
   F.audit = { log: line => F.audits.push(line) }
@@ -111,4 +117,4 @@ function createConsoleFixture(label = 'dbo-console-') {
 let seq = 0
 const uuid = () => `7a1c2a3b-4d5e-4f60-8a7b-${String(++seq).padStart(12, '0')}`
 
-module.exports = { createConsoleFixture, uuid, GUILD, ROLE, ID, ALLOW }
+module.exports = { createConsoleFixture, uuid, GUILD, ROLE, ID, ALLOW, DEPLOY_ROLE_IDS }

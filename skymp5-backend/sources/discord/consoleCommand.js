@@ -12,7 +12,7 @@ const seen = new Map()
 const ERRORS = Object.freeze({
   consoleOff: 'The console is switched off.',
   unavailable: 'The console is not set up on the server right now.',
-  notAllowed: 'The console is for the pinned Owners and Dragon Break Dev only.',
+  notAllowed: 'The console is for the pinned Owners, Dragon Break Dev and Lead GMs only.',
   noProfile: 'Join the game once with this Discord account first.',
   badCommand: 'Type one command as in game, e.g. /wwremote clear #8KWH',
   tooMany: 'Too many console commands. Wait a few minutes.',

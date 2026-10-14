@@ -9,7 +9,8 @@ const crypto = require('crypto')
 
 require.cache[require.resolve('dotenv')] = { exports: { config: () => ({}) } }
 const { ChatInputCommandInteraction } = require('discord.js')
-const { createConsoleFixture, uuid, GUILD, ROLE, ID } = require('./helpers/consoleFixture')
+const { createConsoleFixture, uuid, GUILD, ROLE, ID, DEPLOY_ROLE_IDS } = require('./helpers/consoleFixture')
+const { execFileSync } = require('child_process')
 const { createSpool } = require('../sources/console/spool')
 
 let F
@@ -93,6 +94,42 @@ test('the role check fails closed: an error, a hang, not in the guild, a wrong r
   }
   F.members.set(ID.jake, { roles: [GUILD, ROLE.owner], handle: 'jake' })
   assert.equal(F.requests.length, 0)
+})
+
+// Jake, 14 Oct: "Jake, Nate and Lead GMs". The backend's half: the Lead GM role passes the live role check for a pinned
+// account; a GM or Trial GM role alone does not, pinned or not; the Lead GM role does not get round the pin
+test('a pinned Lead GM passes the role check; a GM or Trial GM role does not; the pin still applies', async () => {
+  const lead = await run(web(ID.lead), '/wwremote clear #8KWH')
+  assert.equal(lead.status, 200, JSON.stringify(lead.body))
+  assert.equal(lead.body.job.state, 'ran')
+  const r = F.requests.find(x => x.discordId === ID.lead)
+  assert.ok(r && r.sigOk, 'the request reached the game, signed')
+  assert.deepEqual(r.roles, [GUILD, ROLE.lead], 'with the Lead GM role fetched live; the game decides the tier from it')
+  assert.equal(r.user, 'icedsky')
+  for (const [label, id] of [['a pinned GM', ID.gm], ['a pinned Trial GM', ID.trial]]) {
+    const res = await run(web(id), '/whoami')
+    assert.equal(res.status, 403, label)
+    assert.equal(res.body.error, 'notAllowed', label)
+  }
+  const unpinned = await run(web(ID.unpinnedLead), '/whoami')
+  assert.equal(unpinned.body.error, 'notAllowed', 'a Lead GM who is not pinned')
+  assert.equal(F.requests.length, 1, 'only the pinned Lead GM reached the game')
+  // The role set before 14 Oct (Owners + Dev) refuses the same Lead GM: the role list is what lets them in
+  F.make({ consoleRoleIds: `${ROLE.owner},${ROLE.dev}` })
+  assert.equal((await run(web(ID.lead), '/whoami')).body.error, 'notAllowed')
+})
+
+test('the config: the console has its own role list (Owners, Dev, Lead GM), not the dashboard staff roles; one count line at start', () => {
+  const read = env => execFileSync(process.execPath, ['-e', "require.cache[require.resolve('dotenv')] = { exports: { config: () => ({}) } }; const c = require('./config'); process.stdout.write(JSON.stringify([c.consoleDiscordIds, c.consoleRoleIds]))"],
+    { cwd: path.join(__dirname, '..'), env: { PATH: process.env.PATH, ...env }, encoding: 'utf8' })
+  assert.deepEqual(JSON.parse(read({ SITE_STAFF_ROLE_IDS: ROLE.owner })), ['', DEPLOY_ROLE_IDS], 'unset: the three roles, whatever SITE_STAFF_ROLE_IDS says')
+  assert.deepEqual(JSON.parse(read({ CONSOLE_ROLE_IDS: ROLE.dev, CONSOLE_DISCORD_IDS: ID.nate })), [ID.nate, ROLE.dev], 'set: the variable as given')
+  F.logs.length = 0
+  F.make()
+  assert.deepEqual(F.logs, ['config: 6 pinned ids, 3 role ids'])
+  F.logs.length = 0
+  F.make({ consoleDiscordIds: '' })
+  assert.deepEqual(F.logs, ['off: CONSOLE_DISCORD_IDS must be 1 to 10 Discord ids (empty is off)'])
 })
 
 test('a hanging Discord answers no after the 8 s deadline', { timeout: 15000 }, async () => {

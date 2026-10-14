@@ -107,7 +107,9 @@ module.exports = {
     .split(',').map(s => s.trim()).filter(Boolean),
   // Remote staff console (sources/console): the pinned Discord ids (1-10; empty or malformed is off) and the roles they need, read raw so a bad value is caught
   consoleDiscordIds: process.env.CONSOLE_DISCORD_IDS || '',
-  consoleRoleIds: process.env.CONSOLE_ROLE_IDS || process.env.SITE_STAFF_ROLE_IDS || '1494126527489507369,1494491999305338981',
+  // Owners, Dragon Break Dev and Lead GM (Jake, 14 Oct: "Jake, Nate and Lead GMs"). The console's own list: it does not
+  // follow SITE_STAFF_ROLE_IDS (the staff dashboard's roles, Owners and Dev by default), which would leave the Lead GMs out
+  consoleRoleIds: process.env.CONSOLE_ROLE_IDS || '1494126527489507369,1494491999305338981,1494126618065506425',
   // The dashboard's console needs a Discord sign-in this many hours old at most
   consoleFreshSigninHours: positiveInt(process.env.CONSOLE_FRESH_SIGNIN_HOURS, 4),
   // Optional channel lock for /console, comma separated; empty allows any channel of the guild

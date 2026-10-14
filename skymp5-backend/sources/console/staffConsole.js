@@ -50,7 +50,9 @@ function createStaffConsole({
   log = (...a) => console.log('[console]', ...a), waitMs = WAIT_MS, lateWaitMs = LATE_WAIT_MS,
 }) {
   const C = readConfig(config)
+  // One line at start either way, counts only, so a deploy can see which config the backend runs with
   if (C.problem) log(`off: ${C.problem}`)
+  else log(`config: ${C.pins.size} pinned ids, ${C.roles.size} role ids${C.channels.size ? `, ${C.channels.size} channels` : ''}`)
   const callers = new WeakSet()
   const jobs = new Map()
   const running = new Map()
