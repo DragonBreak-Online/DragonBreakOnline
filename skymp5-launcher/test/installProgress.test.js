@@ -280,3 +280,25 @@ test('a refused save says so and puts the stored values back', () => {
   assert.ok(refusal.indexOf('return') < refusal.indexOf("'Saved!'") || refusal.indexOf("'Saved!'") === -1,
     'the refusal path returns before the Saved! message')
 })
+
+// The 16 GB banner used to be painted once at startup and never hidden, so a routine mod check sat
+// under a first-install warning and read as a stuck install.
+test('the install banner shows only while something is really downloading', () => {
+  const t = P.createTracker()
+  t.begin('mo2')
+
+  t.step('verify', { index: 105, total: 105 })
+  assert.strictEqual(P.describe(t.snapshot()).showBanner, false, 'verify must not show the banner')
+
+  t.step('download', { index: 0, total: 3 })
+  assert.strictEqual(P.describe(t.snapshot()).showBanner, true, 'downloading must show it')
+
+  t.step('install', { index: 1, total: 3 })
+  assert.strictEqual(P.describe(t.snapshot()).showBanner, false, 'installing must not show it')
+
+  t.step('finish', { index: 0, total: 4 })
+  assert.strictEqual(P.describe(t.snapshot()).showBanner, false, 'finishing must not show it')
+
+  t.end()
+  assert.strictEqual(P.describe(t.snapshot()), null, 'an ended flow describes as nothing at all')
+})

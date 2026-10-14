@@ -2812,14 +2812,25 @@ function sendInstallState(now = false) {
   send('install:state', installTrack.snapshot())
 }
 // flow: 'mo2' or 'client' draw a weighted bar; anything else a bar that only shows the install is working
+// The install panel is on screen for as long as the tracker runs, so a flow that begins and never
+// ends leaves it up for ever showing a frozen step. That happened in the field and could not be
+// diagnosed afterwards because neither end of a flow was recorded. Both ends are logged now.
 function beginInstall(what, flow = 'other') {
   const gate = installGate.begin(what)
-  if (!gate.ok) return gate
+  if (!gate.ok) {
+    log(`[install-flow] refused "${what}": "${installGate.running()}" is already running`)
+    return gate
+  }
+  log(`[install-flow] begin "${what}" (${flow})`)
   installTrack.begin(flow)
   sendInstallState(true)
   return gate
 }
 function endInstall() {
+  const was = installGate.running()
+  // Ending a flow nobody started means a caller ran its finally without owning the gate, which
+  // clears somebody else's panel. Worth seeing rather than doing silently.
+  log(was ? `[install-flow] end "${was}"` : '[install-flow] end called with no flow running')
   installGate.end()
   installTrack.end()
   sendInstallState(true)
