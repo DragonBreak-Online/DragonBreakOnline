@@ -7227,7 +7227,9 @@ try {
   const EXECUTION_JS = path.resolve('execution.js');
   delete require.cache[EXECUTION_JS];
   require(EXECUTION_JS)({ mp, log, personal, audit, who, display, cfg, isAdmin, isPlayer: (a) => profileOf(a) >= 0, sendPacket, openWidget, closeWidget,
-    onUi, onlineActors, distanceMeters, every, staffLog });
+    onUi, onlineActors, distanceMeters, every, staffLog,
+    // The /unstuck move without its checks: a player the chopping block will not let up (13 Oct)
+    toTemple: (a) => { const t = templeFor(zoneOfActor(a) || 'bruma') || templeFor('bruma'); if (!t) return false; mp.set(a, 'locationalData', { cellOrWorldDesc: t.world, pos: t.pos, rot: [0, 0, Number(t.rotZ) || 0] }); return true; } });
 } catch (e) { log('execution.js failed to load:', e.stack || e.message); globalThis.__dboExecutionActivate = null; }
 // ---- the Dawnguard War Axe SPR taken back, its smith refunded (server\sprstrip.js, config "sprStrip"; Nate, 11 Oct) ----------
 try {

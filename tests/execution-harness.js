@@ -17,7 +17,7 @@ const ok = (c, name, got) => { if (!c) fails++; console.log(`${c ? 'ok  ' : 'FAI
   const ui = new Map();
   // Positions are metres along one axis (70 units each); locationalData and the block's pos give the same in units, and a
   // move (the server standing a player up) lands back in the map
-  const UNITS = 70, moved = [], deadSet = new Set();
+  const UNITS = 70, moved = [], deadSet = new Set(), templed = [];
   const mp = { getIdFromDesc: (d) => ({ '1ac980:dragonbreak online edits.esp': 0x3c1ac980, 'fe549:skyrim.esm': 0xfe549, '2e8eb:skyrim.esm': 0x2e8eb, '74ec5:skyrim.esm': 0x74ec5 }[String(d).toLowerCase()] || 0),
     get: (id, k) => {
       if (k === 'baseDesc') return id === BLOCK ? 'fe549:Skyrim.esm' : '1:Skyrim.esm';
@@ -41,7 +41,7 @@ const ok = (c, name, got) => { if (!c) fails++; console.log(`${c ? 'ok  ' : 'FAI
       isAdmin: (a) => admins.has(a), isPlayer: (a) => a >= 0xff000000, sendPacket: (a, p) => packets.push([a, p]),
       openWidget: (a, w) => widgets.push([a, w]), closeWidget: (a, id) => closed.push([a, id]), onUi: (e, fn) => ui.set(e, fn),
       onlineActors: () => [...onlineSet], distanceMeters: (a, b) => Math.abs((pos.get(a) ?? 9999) - (pos.get(b) ?? 9999)),
-      every: (n, ms, fn) => timers.push(fn), staffLog: (...x) => staff.push(x) });
+      every: (n, ms, fn) => timers.push(fn), staffLog: (...x) => staff.push(x), toTemple: (a) => { templed.push(a); pos.set(a, 5000); return true; } });
   };
   const act = (t, c) => globalThis.__dboExecutionActivate(t, c);
   const last = (a) => { const l = said.filter((x) => x[0] === a); return l.length ? l[l.length - 1][1] : ''; };
@@ -124,7 +124,7 @@ const ok = (c, name, got) => { if (!c) fails++; console.log(`${c ? 'ok  ' : 'FAI
   load({ execution: { chopMs: 0 } }); killed.length = 0; packets.length = 0;
   act(BLOCK, V); act(BLOCK, X); choose(GM, lastPanel(GM).actions[0].id); const hp2 = lastPanel(X); pos.set(GM, 100);
   choose(X, hp2.actions[0].id);
-  ok(!packets.length && !killed.length && /is no longer at the block/.test(last(X)), 'the headsman confirming after the GM left (between watches): no execution', last(X));
+  ok(!packets.some(([, p]) => p.customPacketType === 'dboExecute') && !killed.length && /is no longer at the block/.test(last(X)), 'the headsman confirming after the GM left (between watches): no execution', last(X));
   pos.set(GM, 8);
   load({ execution: { chopMs: 20 } }); killed.length = 0;
   act(BLOCK, V); act(BLOCK, X); choose(GM, lastPanel(GM).actions[0].id); choose(X, lastPanel(X).actions[0].id); pos.set(GM, 100); tick();
@@ -209,6 +209,41 @@ const ok = (c, name, got) => { if (!c) fails++; console.log(`${c ? 'ok  ' : 'FAI
   load({ execution: { chopMs: 0 } }); moved.length = 0;
   act(BLOCK, V); pos.set(V, 100); tick(); pos.set(V, 1);
   ok(act(BLOCK, V) === undefined && globalThis.__dboExecutionState().length === 1 && !moved.length, 'a player who left by /unstuck kneels again normally');
+  // 13 Oct 21:31:58: the 280-unit move did not take GM Nate off the block; his client put him back on it 5 s later. Each
+  // stand-up also asks the client to stand them (dboExecuteStand), and standCheckMs later one still sitting goes to the temple
+  const standsTo = (a) => packets.filter(([x, p]) => x === a && p.customPacketType === 'dboExecuteStand').map(([, p]) => p);
+  load({ execution: { chopMs: 20, standCheckMs: 0 } }); killed.length = 0; moved.length = 0; packets.length = 0; templed.length = 0;
+  act(BLOCK, V); act(BLOCK, X); choose(GM, lastPanel(GM).actions[0].id); choose(X, lastPanel(X).actions[0].id);
+  deadSet.add(V);
+  await new Promise((r) => setTimeout(r, 40));
+  const sx = standsTo(X)[0], mvx = movedTo(X)[0];
+  ok(standsTo(X).length === 1 && sx && mvx && JSON.stringify(sx.pos) === JSON.stringify(mvx.pos) && JSON.stringify(sx.rot) === JSON.stringify(mvx.rot),
+    'the headsman is sent dboExecuteStand with the same spot and facing as the server\'s move', [sx, mvx]);
+  ok(!standsTo(V).length, '...the dead victim is not');
+  ok(packets.find(([, p]) => p.customPacketType === 'dboExecute')[1].event === 'IdleExecutionerChop' && packets.find(([, p]) => p.customPacketType === 'dboExecute')[1].victimEvent === 'IdleExecutioneeChop',
+    'dboExecute names the two graph events for the client\'s fallback');
+  // His client put him back where he sat (1.5 m out): the next watch sends him to the temple
+  pos.set(X, 1.5); tick();
+  ok(templed.join() === String(X) && /would not let you rise\. You find your way back to the temple/.test(last(X)), 'still sitting where he sat after standCheckMs: sent to the respawn temple, told why', last(X));
+  tick();
+  ok(templed.length === 1, '...once');
+  deadSet.delete(V);
+  // Stood up by the client: left alone
+  load({ execution: { chopMs: 0, standCheckMs: 0 } }); templed.length = 0; packets.length = 0;
+  act(BLOCK, V); act(BLOCK, X); choose(GM, lastPanel(GM).actions[1].id);
+  pos.set(V, 4); pos.set(X, 6); tick();
+  ok(!templed.length && standsTo(V).length === 1 && standsTo(X).length === 1, 'both stood up and off their seats: nobody is sent to the temple', templed);
+  // Waits standCheckMs, and leaves a player who logged off alone
+  load({ execution: { chopMs: 0, standCheckMs: 60000 } }); templed.length = 0;
+  act(BLOCK, V); act(BLOCK, X); choose(GM, lastPanel(GM).actions[1].id);
+  pos.set(V, 1); pos.set(X, 1.5); tick();
+  ok(!templed.length, 'nobody is sent before standCheckMs');
+  load({ execution: { chopMs: 0, standCheckMs: 0 } }); templed.length = 0;
+  act(BLOCK, V); act(BLOCK, X); choose(GM, lastPanel(GM).actions[1].id);
+  pos.set(V, 1); pos.set(X, 1.5); onlineSet.delete(V); tick(); onlineSet.add(V);
+  ok(templed.join() === String(X), 'a player who logged off meanwhile is left alone, the one online still seated is sent', templed);
+  ok(/toTemple: \(a\) => \{ const t = templeFor\(zoneOfActor\(a\) \|\| 'bruma'\) \|\| templeFor\('bruma'\);[^\n]*mp\.set\(a, 'locationalData', \{ cellOrWorldDesc: t\.world, pos: t\.pos/.test(fs.readFileSync(path.join(SERVER, 'gamemode.js'), 'utf8')),
+    'gamemode.js gives it toTemple: the /unstuck move to the area\'s respawn temple');
   load({ execution: { enabled: false } });
   ok(act(BLOCK, V) === undefined && !globalThis.__dboExecutionState().length, 'enabled false: the block is plain furniture');
   const gm = fs.readFileSync(path.join(SERVER, 'gamemode.js'), 'utf8');
