@@ -196,5 +196,50 @@ check('the journal\'s button calls usePower (journal.js journalAction racialPowe
   check('...and Night Eye can still be called in the same minute', R.usePower(KHAJIIT, now, 'nighteye').ok === true);
 }
 
+// ---- what that client is told to do with it (dboCatReflexes) ------------------------------------------------------
+// The same machinery as Night Eye's, once per view: the server carries the power's numbers (moveSpeed as whole SpeedMult
+// points, jumpHeight as the share the jump rises by) and the client obeys them (skymp5-client catReflexesPlan.ts).
+{
+  const CAT = 7;   // 1-5 and 6 (SWITCH) are taken above
+  player(CAT, 'khajiit');
+  caps.set(CAT, new Set(['nightEye', 'catReflexes']));
+  const sent = () => packets.filter(([x, p]) => x === CAT && p.customPacketType === 'dboCatReflexes').map(([, p]) => p);
+  clear();
+  R.viewTick(now);
+  check('a client with neither power upon it is told off, once per view', JSON.stringify(sent()) === '[{"customPacketType":"dboCatReflexes","on":false}]'
+    && eye(CAT).length === 1, packets.filter(([x]) => x === CAT).map(([, p]) => p));
+
+  clear();
+  const used = R.usePower(CAT, now, 'catreflexes');
+  check('the use tells that client at once, with the config\'s own numbers', used.ok === true
+    && JSON.stringify(sent()) === '[{"customPacketType":"dboCatReflexes","on":true,"seconds":60,"speed":15,"jump":0.2}]', sent());
+  check('nobody else is told (it is that player\'s own game)', packets.every(([x]) => x === CAT));
+  check('and Night Eye is not touched by it', eye(CAT).length === 0);
+
+  clear(); R.viewTick(now + 1000);
+  check('nothing again while it lasts', sent().length === 0);
+  clear(); R.viewTick(now + 61_000);
+  check('when it is over the client is told off, once', JSON.stringify(sent()) === '[{"customPacketType":"dboCatReflexes","on":false}]');
+
+  // death ends it, the wait from the use stays
+  const again = R.usePower(CAT, now + 3_600_000, 'catreflexes');
+  clear();
+  state[CAT].dead = true;
+  R.viewTick(now + 3_600_001);
+  check('death takes it off', again.ok === true && JSON.stringify(sent()) === '[{"customPacketType":"dboCatReflexes","on":false}]', sent());
+  state[CAT].dead = false;
+
+  // a beast form, and a character of another race, have no such power: their client is told off and never on
+  clear();
+  state[CAT].beast = { kind: 'werewolf' };
+  R.viewTick(now + 3_600_002);
+  check('a beast form is told nothing more (it was already off)', sent().length === 0);
+  state[CAT].beast = null;
+  clear();
+  state[OLD].dead = false;
+  R.viewTick(now + 3_600_003);
+  check('a client that does not name the cap is never told', !packets.some(([x]) => x === OLD));
+}
+
 console.log(failures ? `\n${failures} FAILED` : '\nall passed');
 process.exitCode = failures ? 1 : 0;

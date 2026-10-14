@@ -576,8 +576,8 @@ module.exports = (api) => {
     // What others see: the power's shader on the caster for every player near, until it fades (lookShader, an EFSH)
     const shader = shaderOf(p.lookShader);
     if (shader) { S.looks.set(a >>> 0, { shader, until: st.activeUntil, seen: new Set() }); showLooks(now); }
-    // A power its own client draws (view): told at once, then kept in step by eyeTick
-    if (p.view === 'nightEye') eyeTick(now, a >>> 0);
+    // A power its own client draws (view): told at once, then kept in step by viewTick
+    if (p.view && VIEWS[p.view]) viewTick(now, a >>> 0);
     log(`racial: ${display(a >>> 0)} used ${v.name} (${v.race}) for ${v.seconds} s`);
     try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('misc', a >>> 0, 'racial_power', v.name); } catch (e) { /* the player log is optional */ }
     return { ok: true, text: `${v.name}: ${v.seconds} seconds.` };
@@ -611,53 +611,79 @@ module.exports = (api) => {
       for (const p of online) if (p !== caster && !l.seen.has(p) && near(p, caster)) { l.seen.add(p); glow(p, caster, l.shader, true); }
     }
   };
-  // ---- Night Eye: the power's look on its own player's screen -------------------------------------------------------
-  // The client draws it on { customPacketType: 'dboNightEye', on: true, seconds: <left> } and takes it off on { on: false }
-  // (skymp5-client nightEyePlan.ts). It is never shown to anyone else: only that player's own client is told. What each
-  // client was last told is kept (S.eyeSent: actor -> true/false) and set right every second: on while a Khajiit's Night
-  // Eye lasts on this character; off when it ends, in a beast form (raceOf has no race then), after a change of race, and
-  // on death, which ends the power (the wait stays). A client is told once when it is first seen (its uiCaps arrive at
-  // login), so a relog while it lasts draws it again and a character switch to one without it takes it off. Logout forgets
-  // the actor (__dboRacialLeave, gamemode.js): its game is gone, and the next login is told afresh.
-  if (!(S.eyeSent instanceof Map)) S.eyeSent = new Map();
+  // ---- The powers a client draws: on its own player's game only ------------------------------------------------------
+  // A power with a view is that player's own game, not the server's judgement, so the server keeps the state and the wait
+  // and tells only that one client what to do with it:
+  //   view 'nightEye'    -> { customPacketType: 'dboNightEye', on: true, seconds: <left> } / { on: false }
+  //                         the dark on its own screen (skymp5-client nightEyePlan.ts)
+  //   view 'catReflexes' -> { customPacketType: 'dboCatReflexes', on: true, seconds: <left>, speed, jump } / { on: false }
+  //                         the speed and the jump height (catReflexesPlan.ts); speed and jump are the power's own buffs,
+  //                         moveSpeed as whole SpeedMult points and jumpHeight as the share the jump rises by, so the
+  //                         numbers stay this config's and the client only obeys them
+  // Neither is shown to anyone else: only that player's own client is told, and nothing is cast or relayed.
+  // What each client was last told is kept per view (S.viewSent: 'view|actor' -> true/false) and set right every second:
+  // on while that power lasts on this character; off when it ends, in a beast form (raceOf has no race then), after a
+  // change of race, and on death, which ends the power (the wait stays). A client is told once when it is first seen (its
+  // uiCaps arrive at login), so a relog while it lasts shows it again and a character switch to one without it takes it
+  // off. Logout forgets the actor (__dboRacialLeave, gamemode.js): its game is gone, and the next login is told afresh.
+  const VIEWS = {
+    nightEye: { cap: 'nightEye', packet: 'dboNightEye', extra: () => ({}) },
+    catReflexes: { cap: 'catReflexes', packet: 'dboCatReflexes',
+      extra: (p) => ({ speed: Math.round(num((p.buffs || {}).moveSpeed, 0) * 100), jump: num((p.buffs || {}).jumpHeight, 0) }) },
+  };
+  if (!(S.viewSent instanceof Map)) S.viewSent = new Map();
   const isDead = (a) => { try { return mp.get(a >>> 0, 'isDead') === true; } catch (e) { return false; } };
-  // The seconds of a drawn power left on this character now, or 0
-  const eyeLeft = (a, now) => {
+  // The power of this character's race that its client draws under this view, or null (another race, or a beast form)
+  const viewPower = (a, view) => powersOf(raceOf(a)).find((x) => x.view === view) || null;
+  // The seconds of that power left on this character now, or 0
+  const viewLeft = (a, now, view) => {
     if (!overhaul()) return 0;
-    const race = raceOf(a); const p = powersOf(race).find((x) => x.view === 'nightEye');
+    const race = raceOf(a); const p = viewPower(a, view);
     if (!p) return 0;
     const st = powerState(a, keyOf(p));
     if (st.race !== race || !(Number(st.activeUntil) > now)) return 0;
     return (Number(st.activeUntil) - now) / 1000;
   };
-  const sendEye = (a, on, seconds) => {
+  const sendView = (a, view, on, seconds, p) => {
     if (typeof sendPacket !== 'function') return false;
-    try { return sendPacket(a >>> 0, on ? { customPacketType: 'dboNightEye', on: true, seconds: Math.max(1, Math.ceil(seconds)) } : { customPacketType: 'dboNightEye', on: false }) !== false; } catch (e) { log('racial: night eye packet failed', e.message); return false; }
+    const v = VIEWS[view];
+    if (!v) return false;
+    const msg = on
+      ? Object.assign({ customPacketType: v.packet, on: true, seconds: Math.max(1, Math.ceil(seconds)) }, v.extra(p || {}))
+      : { customPacketType: v.packet, on: false };
+    try { return sendPacket(a >>> 0, msg) !== false; } catch (e) { log(`racial: ${view} packet failed`, e.message); return false; }
   };
-  const eyeTick = (now = Date.now(), only = 0) => {
+  const viewTick = (now = Date.now(), only = 0) => {
     const online = only ? [only] : onlineActors().map((x) => x >>> 0);
-    for (const a of online) {
-      if (!clientHas(a, 'nightEye')) continue;
-      let left = eyeLeft(a, now);
-      if (left > 0 && isDead(a)) {
-        // Death ends it; the wait from the use stays
-        const eye = powersOf(raceOf(a)).find((x) => x.view === 'nightEye');
-        const st = powerState(a, keyOf(eye));
-        writePowerState(a, keyOf(eye), Object.assign({}, st, { race: st.race || raceOf(a), activeUntil: now }));
-        S.powerOn.delete(a);
-        hudRefresh(a);
-        left = 0;
+    for (const view of Object.keys(VIEWS)) {
+      for (const a of online) {
+        if (!clientHas(a, VIEWS[view].cap)) continue;
+        const p = viewPower(a, view);
+        let left = viewLeft(a, now, view);
+        if (left > 0 && isDead(a)) {
+          // Death ends it; the wait from the use stays
+          const st = powerState(a, keyOf(p));
+          writePowerState(a, keyOf(p), Object.assign({}, st, { race: st.race || raceOf(a), activeUntil: now }));
+          S.powerOn.delete(a);
+          hudRefresh(a);
+          left = 0;
+        }
+        const want = left > 0;
+        const seen = `${view}|${a}`;
+        if (S.viewSent.get(seen) === want) continue;
+        if (sendView(a, view, want, left, p)) S.viewSent.set(seen, want);
       }
-      const want = left > 0;
-      if (S.eyeSent.get(a) === want) continue;
-      if (sendEye(a, want, left)) S.eyeSent.set(a, want);
     }
-    if (!only) { const here = new Set(online); for (const a of [...S.eyeSent.keys()]) if (!here.has(a)) S.eyeSent.delete(a); }
+    if (!only) {
+      const here = new Set(online);
+      for (const seen of [...S.viewSent.keys()]) if (!here.has(Number(seen.split('|')[1]))) S.viewSent.delete(seen);
+    }
   };
-  globalThis.__dboRacialLeave = (a) => { S.eyeSent.delete(a >>> 0); };
+  const eyeTick = viewTick;   // the name this module was exported with before there was more than one view
+  globalThis.__dboRacialLeave = (a) => { for (const view of Object.keys(VIEWS)) S.viewSent.delete(`${view}|${a >>> 0}`); };
   const powerTick = (now = Date.now()) => {
     showLooks(now);
-    try { eyeTick(now); } catch (e) { log('racial night eye tick failed', e.message); }
+    try { viewTick(now); } catch (e) { log('racial drawn-power tick failed', e.message); }
     for (const [a, until] of S.powerOn) {
       if (until > now) continue;
       S.powerOn.delete(a);
@@ -728,7 +754,7 @@ module.exports = (api) => {
   globalThis.__dboRacialPowerViews = powerViews;
   globalThis.__dboRacialPowerHud = hudField;
   return { config: C, raceOf, attackMult, targetMult, capTargetSide, regenFactor, extraPerSecond, regenTick, onCast, castHeld, goldBonus, inCold, fighting, COMBAT,
-    skillRate, diseaseResist, powerView, powerViews, usePower, powerTick, statusLine, hudField, abilityTick, wardAbsorb, eyeTick };
+    skillRate, diseaseResist, powerView, powerViews, usePower, powerTick, statusLine, hudField, abilityTick, wardAbsorb, eyeTick, viewTick };
 };
 module.exports.RACES = RACES;
 module.exports.RACE_IDS = RACE_IDS;
