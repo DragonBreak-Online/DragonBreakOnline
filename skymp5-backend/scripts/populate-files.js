@@ -19,7 +19,7 @@ const liveBucket = require('../sources/liveBucket')
 const ROOT_DEST = path.join(config.clientFilesDir, 'root')
 const DATA_DEST = path.join(ROOT_DEST, 'Data')
 
-// It deletes and rewrites <bucket>/root/Data, served at /files/root at once: checked after links, or a linked root would be deleted live
+// It deletes and rewrites <bucket>/root/Data, served at /files/root at once: checked after links and by device and inode, or a linked or bind-mounted root would be deleted live
 const targets = { bucket: config.clientFilesDir, writes: [ROOT_DEST, DATA_DEST] }
 const refused = liveBucket.refusal(targets)
 if (refused) {
@@ -56,22 +56,31 @@ if (symbols.length > 0) {
 const PLUGIN_RE = /\.(esp|esm|esl)$/i
 const skippedPlugins = []
 
-// Copy the whole Data/ tree
+// Copy the whole Data/ tree, each folder and file checked as it is written
 let copied = 0
-function copyTree(src, dest) {
+function copyTree(src, dest, guard) {
+  guard(dest)
   fs.mkdirSync(dest, { recursive: true })
   for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
     const s = path.join(src, entry.name)
     const d = path.join(dest, entry.name)
-    if (entry.isDirectory()) copyTree(s, d)
+    if (entry.isDirectory()) copyTree(s, d, guard)
     else if (src === SKYMP_DATA && PLUGIN_RE.test(entry.name)) skippedPlugins.push(entry.name)
-    else { fs.copyFileSync(s, d); copied++ }
+    else { guard(d); fs.copyFileSync(s, d); copied++ }
   }
 }
 
 console.log(`\nCopying client Data from\n  ${SKYMP_DATA}\nto\n  ${DATA_DEST}`)
+const guard = liveBucket.writeGuard()
+try {
+  guard(ROOT_DEST)
+  guard(DATA_DEST)
+} catch (err) {
+  console.error(`\n${err.message}\n`)
+  process.exit(1)
+}
 fs.rmSync(DATA_DEST, { recursive: true, force: true })
-copyTree(SKYMP_DATA, DATA_DEST)
+copyTree(SKYMP_DATA, DATA_DEST, guard)
 if (skippedPlugins.length > 0) {
   console.log(`Skipped plugin(s) ${skippedPlugins.join(', ')}: the MO2 install manifest delivers plugins, not the client zip.`)
 }
