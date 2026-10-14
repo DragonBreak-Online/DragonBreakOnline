@@ -81,7 +81,7 @@ const api = () => ({
   cfg: { citizenship: { discordRoles: { bruma: '1500000000000000001', whiterun: 'not-an-id' } } },
   every: (n, ms, f) => { timer = f; },
   zoneList: () => ZONES, zoneById: (id) => ZONES.find((z) => z.id === String(id)) || null, readOfficials: () => officials,
-  rankTitle: (r) => ({ count: 'Count', jarl: 'Jarl', steward: 'Steward', commander: 'Hold Commander' })[r] || r,
+  rankTitle: (r) => ({ count: 'Count', jarl: 'Jarl', steward: 'Steward', commander: 'Lord Commander' })[r] || r,
   officialTarget: (q) => {
     const s = String(q).replace(/^#/, '').toLowerCase();
     const hit = [...chars.entries()].filter(([id, c]) => c.name.toLowerCase() === s || `t${id.toString(16)}` === s);
@@ -284,6 +284,14 @@ ok(unseats.some((u) => u.zone === 'whiterun' && u.pid === 999), 'whoever held th
 ok(courtSyncs.some((c) => c.zone === 'whiterun' && c.actor === H1 && c.titles[0] === 'Housecarl' && c.seated), 'the Housecarl takes the household rank Housecarl');
 vv = M.votingView(V1, WR);
 ok(vv.result && vv.result.winner && vv.result.winner.jarl === nm(J1) && vv.result.counts.some((c) => c.votes === 2) && vv.result.counts.some((c) => c.votes === 1), 'after the vote the result shows the winner and each court\'s count', vv.result);
+// After the election a seat of the elected court goes only to a citizen (coordinator's decision, 14 Oct)
+const seatNo = globalThis.__dboCitizenSeatCheck('whiterun', 'commander', '', GUILDIE, 'Gunnar');
+ok(/no citizen of Whiterun/.test(seatNo), 'the empty Lord Commander seat is refused to a non-citizen', seatNo);
+ok(globalThis.__dboCitizenSeatCheck('whiterun', 'commander', '', V1, 'V1') === '', 'a citizen may be appointed to it');
+ok(/no citizen/.test(globalThis.__dboCitizenSeatCheck('whiterun', '', 'Housecarl', GUILDIE, 'Gunnar')), 'the Housecarl household rank too');
+ok(globalThis.__dboCitizenSeatCheck('whiterun', 'guard', '', GUILDIE, 'Gunnar') === '', 'other offices are not seats of the ballot');
+ok(globalThis.__dboCitizenSeatCheck('riften', 'commander', '', GUILDIE, 'Gunnar') === '', 'a hold that has not elected asks nothing');
+ok(globalThis.__dboCitizenSeatCheck('whiterun', 'jarl', '', GUILDIE, 'Gunnar') !== '', 'nor the Jarl seat');
 guilds.delete(C1);
 
 // ---- Riften: no complete court, reopening, cancel below 15 --------------------------------------------------------------
@@ -400,6 +408,11 @@ ok(nb.grants === false && /no citizenship/.test(nb.why), 'a stronghold board say
 // ---- staff revoke ------------------------------------------------------------------------------------------------------
 ok(M.revoke(COUNT, 'bruma', BJORN).error, 'a ruler cannot revoke a citizenship');
 ok(!M.revoke(STAFF, 'bruma', BJORN).error && !M.citizenOf(BJORN, 'bruma'), 'a Lead GM can');
+
+// ---- Lord Commander (coordinator's decision, 14 Oct): the commander office reads Lord Commander to players ---------------------
+const ZJ = JSON.parse(fs.readFileSync(path.resolve(__dirname, '..', 'zones.json'), 'utf8'));
+ok(ZJ.rankTitles.commander === 'Lord Commander', 'zones.json titles the commander office Lord Commander', ZJ.rankTitles.commander);
+ok(M.votingView(V1, WR).seats.find((s) => s.id === 'commander').label === 'Lord Commander', 'and the ballot names it the same');
 
 console.log(fails ? `\n${fails} FAILED` : '\nall passed');
 process.exit(fails ? 1 : 0);

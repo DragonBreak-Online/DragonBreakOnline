@@ -322,7 +322,17 @@ module.exports = (api) => {
   const guildCall = (name, ...rest) => (typeof globalThis[name] === 'function' ? globalThis[name](...rest) : { error: 'The household cannot be changed just now.' });
   onUi('courtRank', (a, args) => {
     if (!fresh(a, args)) return;
-    answer(a, () => { const h = householdOf(a, args[1]); return h.error ? h : guildCall('__dboGuildSetRank', a, h.fid, Number(args[2]) >>> 0, Math.floor(Number(args[3])), true); });
+    answer(a, () => {
+      const h = householdOf(a, args[1]); if (h.error) return h;
+      // A household rank that is a seat of an elected court (the Housecarl) goes only to a citizen of the hold (citizenship.js)
+      try {
+        const ranks = typeof globalThis.__dboGuildRankList === 'function' ? globalThis.__dboGuildRankList(h.fid) : null;
+        const title = ranks && ranks[Math.floor(Number(args[3]))] ? ranks[Math.floor(Number(args[3]))].title : '';
+        const no = title && typeof globalThis.__dboCitizenSeatCheck === 'function' ? globalThis.__dboCitizenSeatCheck(h.z.id, '', title, Number(args[2]) >>> 0, '') : '';
+        if (no) return { error: no };
+      } catch (e) { log('court: citizen seat check failed', e.message); }
+      return guildCall('__dboGuildSetRank', a, h.fid, Number(args[2]) >>> 0, Math.floor(Number(args[3])), true);
+    });
   });
   onUi('courtKick', (a, args) => {
     if (!fresh(a, args)) return;

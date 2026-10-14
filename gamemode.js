@@ -803,7 +803,7 @@ const STAFF_HELP = [
     ['faction remove', '<name|#TAG> <faction id>: take someone out of a faction'], ['faction hallmark', "<faction id>, at a building's door: its faction's hall (hallunmark undoes it)"], ['faction list', 'every faction id, secret ones included'], 'ledgerpoint',
     ['rolename', 'list <court|faction> | <court> <office> <new title> | <faction> <rank number> <new title> | reset <court> <office> | reset <faction> <rank number>: rename an office or rank for everyone who holds it, at once (Lead GM; F3 Court and the Faction tab\'s rank editor do it too)'], 'war'] },
   { key: 'appoint', title: 'Appointments and property', items: [
-    ['appoint', '<player|#TAG|profile id> <zone> <rank> [override]: make someone an official, online or offline. A Jarl must be a Nord or an Imperial; only the Owners may add override. /appoint alone lists the zone ids; a wrong rank lists that zone\'s ranks. Rulers name 5 Stewards, 2 Court Mages, a Guard Captain and any number of Guards; Chieftains 5 Banes, a Shaman, a Wise-Woman, a Guard Commander and any number of Guards; captains name Guards'],
+    ['appoint', '<player|#TAG|profile id> <zone> <rank> [override]: make someone an official, online or offline. A Jarl must be a Breton, a Nord or an Imperial; only the Owners may add override. /appoint alone lists the zone ids; a wrong rank lists that zone\'s ranks. Rulers name 5 Stewards, 2 Court Mages, a Guard Captain and any number of Guards; Chieftains 5 Banes, a Shaman, a Wise-Woman, a Guard Commander and any number of Guards; captains name Guards'],
     ['dismiss', '<player|#TAG|profile id> <zone>: remove an official, online or offline (told if online). Officials may dismiss the ranks they may appoint'],
     ['officials', '[zone]: who holds which rank where'],
     ['property', 'at a door, as an official: sell <price> | list <deposit> <weekly> | unlist | offer <name> | remind | grace | evict']] },
@@ -3579,10 +3579,11 @@ const officialName = (pid) => {
   const s = seen.get(Number(pid)); if (s) return s.name;
   const ids = accountActors(Number(pid)); return ids.length ? ownNameOf(ids[0]) : `profile ${pid}`;
 };
-// Skyrim's law in the server's lore (4E 211, the Discord lore-archives): only a Nord or an Imperial sits as Jarl. The
+// Skyrim's law in the server's lore (4E 211, the Discord lore-archives): only a Nord or an Imperial sat as Jarl; Nate's
+// citizenship design (14 Oct) admits the Bretons too, the same rule the election uses (citizenship.js). The
 // Owners may seat anyone else by adding "override" (Nate, 2026-09-27). The race is the character's own, under any beast
 // form; officials are kept per account, so the rule reads the character named (or, for a profile id, the one found).
-const JARL_RACE = /^(Nord|Imperial)Race(Vampire)?$/;
+const JARL_RACE = /^(Breton|Nord|Imperial)Race(Vampire)?$/;
 const raceEdidOf = (actor) => {
   let race = 0;
   try { race = typeof globalThis.__dboBeastOriginalRace === 'function' ? Number(globalThis.__dboBeastOriginalRace(actor)) >>> 0 : 0; } catch (e) { race = 0; }
@@ -3603,7 +3604,7 @@ const appointCheck = (a, z, rank, tg, override) => {
   if (rank === 'jarl') {
     const race = raceEdidOf(tg.actor);
     if (!JARL_RACE.test(race)) {
-      if (!override) return { error: `${tg.label} is ${raceLabel(race)}. By Skyrim's law only a Nord or an Imperial may sit as Jarl.${tierOf(a) === 'senior' ? ' As an Owner you may add "override" to seat them anyway.' : ''}` };
+      if (!override) return { error: `${tg.label} is ${raceLabel(race)}. By Skyrim's law only a Breton, a Nord or an Imperial may sit as Jarl.${tierOf(a) === 'senior' ? ' As an Owner you may add "override" to seat them anyway.' : ''}` };
       overridden = raceLabel(race);
     }
   }
@@ -3613,6 +3614,8 @@ const appointCheck = (a, z, rank, tg, override) => {
     if (held && !appointCap(a, z, held)) return { error: `${tg.label} already holds ${rankTitle(held, z.id)} of ${z.name}; you cannot replace that.` };
     if (((zo[rank] || []).map(Number).filter((x) => x !== tg.pid)).length >= cap) return { error: `${z.name} already has ${cap} ${rankTitle(rank, z.id)}s. Dismiss one first.` };
   }
+  // A hold that elected its court (citizenship.js): its seats go to its citizens, staff appointments too
+  try { const no = typeof globalThis.__dboCitizenSeatCheck === 'function' ? globalThis.__dboCitizenSeatCheck(z.id, rank, '', tg.actor, tg.label) : ''; if (no) return { error: no }; } catch (e) { log('citizen seat check failed', e.message); }
   // The faction limits (guilds.js, court.js): an office in a hold's court takes the allegiance slot; a Lead GM's
   // /faction override lifts it once
   try { const lim = typeof globalThis.__dboCourtSeatLimit === 'function' ? globalThis.__dboCourtSeatLimit(a, z, rank, tg) : null; if (lim) return { error: lim }; } catch (e) { log('faction limit check failed', e.message); }
@@ -3675,7 +3678,7 @@ registerChatCommand('appoint', (a, args) => {
   const tg = officialTarget(m[1]); if (tg.error) return personal(a, tg.error);
   const r = appointFrom(a, z, rank, tg, override);
   personal(a, r.error || r.text);
-}, { help: '<player|#TAG|profile id> <zone> <rank> [override] make someone an official, online or not (admins at once; a ruler\'s appointment is offered and accepted in the journal, F3 Court; rulers name 5 Stewards, 2 Court Mages, a Guard Captain and any number of Guards; Chieftains 5 Banes, a Shaman, a Wise-Woman, a Guard Commander and any number of Guards; captains name Guards). A Jarl must be a Nord or an Imperial; only the Owners may add override' });
+}, { help: '<player|#TAG|profile id> <zone> <rank> [override] make someone an official, online or not (admins at once; a ruler\'s appointment is offered and accepted in the journal, F3 Court; rulers name 5 Stewards, 2 Court Mages, a Guard Captain and any number of Guards; Chieftains 5 Banes, a Shaman, a Wise-Woman, a Guard Commander and any number of Guards; captains name Guards). A Jarl must be a Breton, a Nord or an Imperial; only the Owners may add override' });
 registerChatCommand('dismiss', (a, args) => {
   // The name may have spaces: the zone is the last word
   const m = args.trim().match(/^(.+?)\s+(\S+)$/); if (!m) return personal(a, 'Usage: /dismiss <player|#TAG|profile id> <zone>');

@@ -700,6 +700,18 @@ module.exports = (api) => {
   // tenancy.js: whether a character may buy property in a hold. A zone that grants no citizenship asks none.
   globalThis.__dboCitizenOf = (a, zid) => (C.enabled ? citizenOf(Number(a) >>> 0, String(zid || '')) : true);
   globalThis.__dboCitizenGates = (zid) => !!C.enabled && !!holdOf(zid);
+  // gamemode.js appointCheck and court.js's household ranks (coordinator's decision, 14 Oct): once a hold has elected its
+  // court, a seat of it (an office or the household rank a ballot seat names) goes only to a citizen of the hold. office:
+  // an office id, or '' with rankTitle a household rank title. '' when allowed, else the refusal
+  globalThis.__dboCitizenSeatCheck = (zid, office, rankTitle, actor, label) => {
+    if (!C.enabled) return '';
+    const z = holdOf(zid); const E = z && elOf(z.id);
+    if (!z || !E || E.phase !== 'seated') return '';
+    const seat = SEATS.find((s) => (office && s.office && (s.office === '@ruler' ? rulerOffice(z) : s.office) === String(office))
+      || (!office && rankTitle && s.rank && s.rank.toLowerCase() === String(rankTitle).toLowerCase()));
+    if (!seat || citizenOf(Number(actor) >>> 0, z.id)) return '';
+    return `${label || nameNow(actor)} is no citizen of ${ofPlace(z.name)}. The seats of its elected court go only to its citizens.`;
+  };
   globalThis.__dboCitizenHolds = (a) => (C.enabled ? holdsOf(Number(a) >>> 0).map((h) => h.zone) : []);
   // discordroles.js: the citizen roles this character should wear, and every role this module manages
   const roleIds = () => Object.fromEntries(Object.entries(C.discordRoles || {}).filter(([, id]) => /^\d{15,22}$/.test(String(id))));
