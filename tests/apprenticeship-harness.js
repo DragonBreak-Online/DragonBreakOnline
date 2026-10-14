@@ -205,7 +205,7 @@ let w = lastWidget(TCH, 'studyMagic');
 check('the teacher picks from spells they know that the student\'s rank allows: Firebolt (Apprentice), not Fireball (Adept)', w.title === 'Take an Apprentice' && w.choices.some((c) => c.name === 'Firebolt') && !w.choices.some((c) => c.name === 'Fireball') && w.events.choose === 'dbo:apprenticeTeach', w.choices);
 ui('apprenticeTeach', TCH, [w.nonce, 'Firebolt']);
 let o = lastWidget(STU, 'contextMenu');
-check('the student is asked, with the spell and how long', o.id === 84 && /offers to take you as apprentice to learn Firebolt \(Apprentice Destruction\): about 2 days/.test(o.targetName) && o.actions.length === 2, o);
+check('the student is asked, with the spell and how long', o.id === 85 && /offers to take you as apprentice to learn Firebolt \(Apprentice Destruction\): about 2 days/.test(o.targetName) && o.actions.length === 2, o);
 ui('apprenticeOffer', STU, [o.actions.find((x) => x.id.endsWith('|accept')).id]);
 check('accepted: the student holds Firebolt near the teacher, and both are recorded', rec(STU).apprentice && rec(STU).apprentice.need === 40 && known(STU).has(idOf(T.firebolt[1])) && rec(TCH).apprentices.length === 1, [rec(STU).apprentice, rec(TCH).apprentices]);
 check('...not yet in their spellbook', !studied(STU).includes(T.firebolt[1]));
