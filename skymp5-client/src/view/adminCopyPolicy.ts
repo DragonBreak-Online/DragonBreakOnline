@@ -17,3 +17,17 @@ export function keepNoCopy(view: AdminView, lastHiddenAt: number, now: number): 
   if (view === "hidden") return true;
   return lastHiddenAt > 0 && now - lastHiddenAt < REVEAL_HOLD_MS;
 }
+
+/** A viewer's staff rank: the number their own mirror carries, else 1 for staff (isAdmin) and 0 for a player. */
+export function staffRankOf(rank: unknown, isAdmin: boolean): number {
+  const n = Number(rank);
+  if (Number.isFinite(n) && n > 0) return Math.floor(n);
+  return isAdmin ? 1 : 0;
+}
+
+/** Whether a viewer of `viewerRank` sees an Invisible staff member of `invisRank` as a ghost: staff of the same or a higher rank. */
+export function seesInvisible(viewerRank: number, invisRank: unknown): boolean {
+  if (!(viewerRank > 0)) return false;
+  const r = Number(invisRank);
+  return viewerRank >= (Number.isFinite(r) && r > 0 ? r : 1);
+}

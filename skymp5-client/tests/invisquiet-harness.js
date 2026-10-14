@@ -9,7 +9,7 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
-const { keepNoCopy, nextHiddenAt, REVEAL_HOLD_MS } = require(path.resolve(process.argv[2]));
+const { keepNoCopy, nextHiddenAt, REVEAL_HOLD_MS, staffRankOf, seesInvisible } = require(path.resolve(process.argv[2]));
 
 let failures = 0;
 const check = (name, ok, got) => {
@@ -83,8 +83,14 @@ check('...only for players (forms with an appearance)', /if \(model\.appearance\
 check('...deletes an existing copy through destroy() and forgets its id, once',
   /if \(this\.refrId !== 0\) \{\s+this\.destroy\(\);\s+this\.refrId = 0;\s+\}\s+return;/.test(upd));
 check('destroy() still removes the nametag', /this\.adminShaderReplayAt = 0;[\s\S]{0,120}this\.removeNickname\(\);\s+\}/.test(src));
-check('adminViewOf unchanged: invis is hidden to players and a ghost to staff',
-  /if \(m\["invis"\]\) return FormView\.viewerIsAdmin\(\) \? "ghost" : "hidden";/.test(src));
+check('adminViewOf: invis is hidden to players and lower ranks, a ghost to staff of the same or a higher rank',
+  /if \(m\["invis"\]\) return seesInvisible\(FormView\.viewerRank\(\), m\["rank"\]\) \? "ghost" : "hidden";/.test(src));
+// Staff ranks (Nate, 14 Oct): owner 5, developer 4, Lead GM 3, GM 2, Trial GM 1, player 0
+check('a player never sees an Invisible staff member', !seesInvisible(0, 1) && !seesInvisible(0, undefined));
+check('an owner is hidden from a Lead GM, a Lead GM from a GM, a GM from a Trial GM', !seesInvisible(3, 5) && !seesInvisible(2, 3) && !seesInvisible(1, 2));
+check('...and a ghost to the same rank or a higher one', seesInvisible(5, 5) && seesInvisible(5, 2) && seesInvisible(3, 3) && seesInvisible(2, 1));
+check('a mirror from before ranks (no rank) shows to every staff member, as before', seesInvisible(1, undefined) && seesInvisible(1, 0));
+check('the viewer\'s rank: their mirror\'s, else 1 for staff and 0 for a player', staffRankOf(4, true) === 4 && staffRankOf(undefined, true) === 1 && staffRankOf(undefined, false) === 0 && staffRankOf('x', false) === 0);
 check('the alpha path stays for a copy that exists (spell Invisibility, staff ghost)', /actor\.setAlpha\(view === "hidden" \? 0 :/.test(src));
 check('the nametag guard stays', /adminViewOf\(model\) !== "hidden"/.test(src));
 
