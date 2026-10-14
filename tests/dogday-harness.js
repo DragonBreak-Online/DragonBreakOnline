@@ -1,6 +1,6 @@
 // Dog Day (dogday.js, Nate 13 Oct 2026): dormant until 5 March 2027 UTC, then every enemy a player kills hands them dog
-// meat and Cooked Dog Meat may be cooked; before and after, nothing drops and the recipe is refused. Loads the real
-// module against a fake mp, and checks gamemode.js and regions.js call it.
+// meat; before and after, nothing drops. Cooking dog meat is open all year (Jake, 14 Oct), so the event never refuses a
+// craft. Loads the real module against a fake mp, and checks gamemode.js calls it.
 //   node tests/dogday-harness.js   (from server/)
 'use strict';
 const fs = require('fs');
@@ -27,7 +27,7 @@ require(path.join(SERVER, 'dogday.js'))(api);
 
 const T = (iso) => Date.parse(iso);
 const BEFORE = T('2027-03-04T23:59:59Z'), DURING = T('2027-03-05T12:00:00Z'), AFTER = T('2027-03-06T00:00:00Z');
-ok(CONFIG.dogDay && CONFIG.dogDay.startsAt === '2027-03-05T00:00:00Z' && CONFIG.dogDay.endsAt === '2027-03-06T00:00:00Z', 'the tracked config runs it on 5 March 2027 UTC', CONFIG.dogDay);
+ok(CONFIG.dogDay && !('cookedEdid' in CONFIG.dogDay) && CONFIG.dogDay.startsAt === '2027-03-05T00:00:00Z' && CONFIG.dogDay.endsAt === '2027-03-06T00:00:00Z', 'the tracked config runs it on 5 March 2027 UTC', CONFIG.dogDay);
 ok(!globalThis.__dboDogDayOn(Date.now()), 'it is off today');
 ok(!globalThis.__dboDogDayOn(BEFORE) && globalThis.__dboDogDayOn(DURING) && !globalThis.__dboDogDayOn(AFTER), 'on only from 5 March 00:00 to 6 March 00:00 UTC');
 
@@ -47,14 +47,11 @@ ok(given.length === 2, 'an NPC killing an NPC gives nobody meat');
 globalThis.__dboDogDayDeath(BANDIT, PLAYER, AFTER);
 ok(given.length === 2, 'after the day a kill drops nothing');
 
-ok(/only cooked on Dog Day/.test(globalThis.__dboDogDayCraft(PLAYER, COOKED, BEFORE)), 'before the day Cooked Dog Meat is refused');
-ok(globalThis.__dboDogDayCraft(PLAYER, COOKED, DURING) === '', 'on the day it may be cooked');
-ok(/only cooked on Dog Day/.test(globalThis.__dboDogDayCraft(PLAYER, COOKED, AFTER)), 'after the day it is refused again');
-ok(globalThis.__dboDogDayCraft(PLAYER, BOAR, BEFORE) === '', 'other cooking is never touched');
+ok(typeof globalThis.__dboDogDayCraft === 'undefined', 'the event refuses no craft: cooking dog meat is open all year');
 
 const gm = fs.readFileSync(path.join(SERVER, 'gamemode.js'), 'utf8'), rg = fs.readFileSync(path.join(SERVER, 'regions.js'), 'utf8');
 ok(/require\(DOGDAY_JS\)/.test(gm) && /__dboDogDayDeath\(Number\(actorId\) >>> 0, Number\(killerId\) >>> 0\)/.test(gm), 'gamemode.js loads it and calls it on every death');
-ok(/__dboDogDayCraft\(a, Number\(itemId\) >>> 0\)/.test(rg) && /if \(dogDay\) \{[\s\S]{0,400}return false;/.test(rg), 'regions.js refuses the craft when it says so');
+ok(!/__dboDogDayCraft/.test(rg), 'regions.js has no Dog Day craft rule');
 
 console.log(fails ? `${fails} failed` : 'all passed');
 process.exit(fails ? 1 : 0);

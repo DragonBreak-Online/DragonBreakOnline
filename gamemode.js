@@ -7574,12 +7574,12 @@ try {
   delete require.cache[PATRONS_JS];
   require(PATRONS_JS)({ mp, log, personal, system, registerChatCommand, audit, who, display, profileOf, rolesOf, isAdmin, findByName });
 } catch (e) { log('patrons.js failed to load:', e.stack || e.message); globalThis.__dboRerollDone = null; globalThis.__dboRerollsLeft = null; globalThis.__dboRerollStatsGroup = null; }
-// ---- Dog Day, 5 March 2027 (server\dogday.js, config "dogDay"): enemies drop dog meat and it may be cooked ------------
+// ---- Dog Day, 5 March 2027 (server\dogday.js, config "dogDay"): every enemy a player kills drops dog meat -------------
 try {
   const DOGDAY_JS = path.resolve('dogday.js');
   delete require.cache[DOGDAY_JS];
   require(DOGDAY_JS)({ mp, cfg, log, personal, giveItem, profileOf });
-} catch (e) { log('dogday.js failed to load:', e.stack || e.message); globalThis.__dboDogDayDeath = null; globalThis.__dboDogDayCraft = null; }
+} catch (e) { log('dogday.js failed to load:', e.stack || e.message); globalThis.__dboDogDayDeath = null; }
 // ---- the playtesters' skill boost at the alpha launch (server\playtesterboost.js, config "playtesterBoost") ----------
 try {
   const PLAYTESTERBOOST_JS = path.resolve('playtesterboost.js');
