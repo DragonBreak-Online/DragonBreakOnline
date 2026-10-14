@@ -23,6 +23,13 @@
         ]
       },
       {
+        "heading": "Lycanthropy",
+        "items": [
+          "A werewolf's bite now carries Sanies Lupinus twice as often. The disease is still rare, and a vampire's hit is still the likelier of the two.",
+          "Nothing else about the turning has changed: the fever takes the same time to peak, and Hircine's Hunt is unchanged."
+        ]
+      },
+      {
         "heading": "Fixed",
         "items": [
           "Voice: your microphone no longer stays open when you have let go of the talk key or nothing is pressed.",
@@ -34,6 +41,23 @@
           "Breaking things down now opens the item first: break one, break all, and see what it's worth, so a fast click can't take the wrong item.",
           "Kills by your summons now count for your hunting contracts.",
           "The carrots at Aleswell can be picked again."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Scholar spell tomes",
+    "date": "2026-10-14",
+    "version": "Server update",
+    "tag": "Change",
+    "sections": [
+      {
+        "heading": "Spell tomes from reading",
+        "items": [
+          "The spell tomes a Scholar finds while reading now follow the Scholar level: Apprentice tomes from 25, Adept tomes from 50, and Expert tomes from 75 for senior ranks of the Synod, the Colleges and the Great Faiths.",
+          "You no longer need a college to find Adept tomes by reading. Anyone can, from Scholar 50.",
+          "At Scholar 100, a senior college rank may very rarely find a Master spell tome.",
+          "Learning a tome still needs its school of magic at a high enough level, as before."
         ]
       }
     ]
@@ -154,13 +178,6 @@
           "A chopping block now stands on the plaza before Castle Bruma. The condemned kneels at the block, and a headsman takes up the axe.",
           "An execution needs a GM present to approve it, and the headsman confirms before the blow. A beheading ends the condemned character for good.",
           "If the condemned or the headsman steps away, or nobody approves in time, there is no execution."
-        ]
-      },
-      {
-        "heading": "Lycanthropy",
-        "items": [
-          "A werewolf's bite now carries Sanies Lupinus twice as often. The disease is still rare, and a vampire's hit is still the likelier of the two.",
-          "Nothing else about the turning has changed: the fever takes the same time to peak, and Hircine's Hunt is unchanged."
         ]
       },
       {
