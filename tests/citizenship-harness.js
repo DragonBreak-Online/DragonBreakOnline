@@ -193,7 +193,7 @@ M.join(ELF, 'whiterun');
 timer();
 let E = M.data().elections.whiterun;
 ok(E && E.phase === 'registration' && E.phaseEndsAt === now + 24 * HOUR, 'the 15th account starts registration for 24 hours by itself', E);
-ok(said.some(([a, t]) => a === voters[0] && /choose its Jarl/.test(t)), 'citizens online are told');
+ok(said.some(([a, t]) => a === voters[0] && /choose their Jarl/.test(t)), 'citizens online are told');
 
 // ---- registering a court -------------------------------------------------------------------------------------------------
 const [J1, S1, C1, H1, J2, S2, C2, H2, V1, V2] = voters;
@@ -248,14 +248,15 @@ guilds.set(V2, [{ id: 'companions', title: 'Whelp', role: 'member', kind: 'guild
 r = M.vote(V2, 'whiterun', K1);
 ok(r.error && /faction/.test(r.error), 'a citizen in a faction cannot vote in the first election', r);
 guilds.delete(V2);
+const altV1 = add(0x2f1, chars.get(V1).pid, 'Whiterunner 8 alt'); online.push(altV1); M.join(altV1, 'whiterun');
 ok(!M.vote(V1, 'whiterun', K1).error, 'a citizen votes');
 r = M.vote(V1, 'whiterun', K2);
 ok(r.error && /One vote/.test(r.error), 'no second vote');
-ok(!M.vote(J1, 'whiterun', K1).error, 'a candidate who is a citizen in no faction votes too');
-r = M.vote(alt1, 'whiterun', K2);
+r = M.vote(altV1, 'whiterun', K2);
 ok(r.error && /One vote per player/.test(r.error), "an alt of a voter's account cannot vote again", r);
 ok(!audits.slice(-1)[0].includes(K1) && /voted/.test(audits.slice(-1)[0]), 'the audit records that a vote was cast, not for whom', audits.slice(-1)[0]);
-M.vote(V2, 'whiterun', K2); M.vote(S2, 'whiterun', K2);
+M.vote(V2, 'whiterun', K2);
+const V3 = voters[10];
 vv = M.votingView(V1, WR);
 ok(vv.voted && noCounts(vv) && noCounts(M.votingView(STAFF, WR)) && noCounts(M.journalView(STAFF)), 'during the vote nobody sees a count, staff included');
 ok(!JSON.stringify(M.boardPayload(STAFF, 'whiterun', 'n', 'voting')).includes('"votes"'), 'nor in the board panel');
@@ -263,7 +264,7 @@ ok(!JSON.stringify(M.boardPayload(STAFF, 'whiterun', 'n', 'voting')).includes('"
 // ---- a tie goes to a revote between the tied courts ---------------------------------------------------------------------
 now += 24 * HOUR; timer();
 E = M.data().elections.whiterun;
-ok(E.phase === 'voting' && E.round === 2 && E.revote && E.ballot.length === 2 && Object.keys(E.votes).length === 0, 'a 2-2 tie: a 24-hour revote between them, votes cleared', E);
+ok(E.phase === 'voting' && E.round === 2 && E.revote && E.ballot.length === 2 && Object.keys(E.votes).length === 0, 'a 1-1 tie: a 24-hour revote between them, votes cleared', E);
 vv = M.votingView(V1, WR);
 ok(vv.revote && !vv.voted && noCounts(vv), 'the voter may vote again in the revote, still no count');
 ok(!M.data().elections.whiterun.result, 'no result yet');
@@ -271,7 +272,7 @@ ok(!M.data().elections.whiterun.result, 'no result yet');
 // ---- a court member loses eligibility during the vote: the seat starts empty -------------------------------------------
 M.vote(V1, 'whiterun', K1);
 M.vote(V2, 'whiterun', K1);
-M.vote(S2, 'whiterun', K2);
+M.vote(V3, 'whiterun', K2);
 guilds.set(C1, [{ id: 'companions', title: 'Whelp', role: 'member', kind: 'guild', zone: '' }]);
 officials.whiterun = { jarl: [999] };
 now += 24 * HOUR; timer();

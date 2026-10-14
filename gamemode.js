@@ -2525,6 +2525,8 @@ const onCharacterReady = (userId, a) => {
     try { if (globalThis.__dboPrayerLogin) globalThis.__dboPrayerLogin(a); } catch (e) { log('prayer login failed', e.message); }
     // The first spell: a mage at Arcane Arts 25 with no school is offered the choice, one with a school and no spell gets its starter (schools.js)
     try { if (globalThis.__dboSchoolsLogin) globalThis.__dboSchoolsLogin(a); } catch (e) { log('schools login failed', e.message); }
+    // The election notice of the current phase for a citizen of a hold that is choosing its Jarl, once per character (citizenship.js)
+    try { if (globalThis.__dboCitizenLogin) globalThis.__dboCitizenLogin(a); } catch (e) { log('citizen notice login failed', e.message); }
   }), 8000);
 };
 const startLoginWait = (userId, seenActor) => {
@@ -7177,7 +7179,7 @@ try {
   require(DISCORDROLES_JS)({ mp, log, audit, who, onlineActors, every, discordOf, profileOf, zoneById, cfg,
     skills: SKILLS_DEF.skills || [], token: (cfg.discord || {}).botToken || auth.botToken, guildId: ((auth.guilds || [])[0] || {}).guildId,
     isStaff: (a) => staffTierOf(a) !== null, staffRolesSeen });
-} catch (e) { log('discordroles.js failed to load:', e.stack || e.message); }
+} catch (e) { log('discordroles.js failed to load:', e.stack || e.message); globalThis.__dboDiscordPost = null; }
 
 // ---- /ticket: a private Discord ticket with staff, opened from the game (server\gameticket.js, config "tickets") -------
 try {
@@ -7525,7 +7527,7 @@ try {
     boardZoneNear, raceEdidOf });
 } catch (e) {
   log('citizenship.js failed to load:', e.stack || e.message);
-  for (const k of ['__dboCitizenMenuEntries', '__dboCitizenMenuAction', '__dboCitizenOf', '__dboCitizenGates', '__dboCitizenHolds', '__dboCitizenRoleIds', '__dboCitizenManagedRoleIds']) globalThis[k] = null;
+  for (const k of ['__dboCitizenMenuEntries', '__dboCitizenMenuAction', '__dboCitizenLogin', '__dboCitizenOf', '__dboCitizenGates', '__dboCitizenHolds', '__dboCitizenRoleIds', '__dboCitizenManagedRoleIds']) globalThis[k] = null;
   if (globalThis.__dboJournalSections) delete globalThis.__dboJournalSections.citizen;
 }
 

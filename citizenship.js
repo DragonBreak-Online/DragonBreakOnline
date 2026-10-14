@@ -23,12 +23,17 @@
 // with a member who lost it is dropped unless the candidate replaced them; in voting such a seat starts empty, and a Jarl
 // candidate who lost it strikes the court off and voids its votes. The winner is seated (officials.json and the household
 // rank), the result shown with each court's count. Every phase's start and end are stored, so a restart resumes the clock.
+// Those standing in a court on the ballot (Jarl candidate, Steward, Lord Commander, Housecarl, and their accounts' other
+// characters) do not vote (Nate, 14 Oct: "cabinets cant vote"). Each phase is announced (Nate, 14 Oct): registration open,
+// reopened, voting open, revote and the result go to the hold's online citizens, to each citizen character once at login
+// during the phase (gamemode.js calls __dboCitizenLogin), and to Discord (election.announceChannel, #server-updates) pinging
+// only the hold's Citizen role (discordRoles) through discordroles.js's bot (__dboDiscordPost); no channel or role: no post.
 //
 // State in citizenship.json (runtime, gitignored):
 //   { chars: { <actor hex>: { pid, name, holds: [{ zone, since, how }], cooldownUntil, renounced: [{ zone, at }] } },
 //     requests: [{ zone, actor, pid, name, at }], policies: { zone: { policy, fee, by, at } },
 //     elections: { zone: { phase, round, startedAt, phaseStartedAt, phaseEndsAt, courts: [court], ballot: [id], votes: { pid: id },
-//                          result?: { winner, counts, at }, held? } } }
+//                          result?: { winner, counts, at }, held?, notice?: { key, kind, text, at, until }, noticed?: { <actor hex>: key } } } }
 //   court: { id, at, members: { jarl|steward|commander|housecarl: { actor, pid, name, accepted } | null }, struck? }
 //
 // Panels: the notice board's Citizenship and Voting tabs (front bountyBoard sends dbo:citizenOpen <tab>) open the board panel
@@ -60,7 +65,10 @@ module.exports = (api) => {
   const raceEdidOf = typeof api.raceEdidOf === 'function' ? api.raceEdidOf : () => '';
   const unseatOfficialBy = typeof api.unseatOfficialBy === 'function' ? api.unseatOfficialBy : null;
 
+  // announceChannel: the Discord channel of the election notices (#server-updates); resultLoginDays: how long a citizen logging
+  // in is still told the result
   const E0 = { threshold: 15, registrationHours: 24, votingHours: 24, jarlRaces: ['BretonRace', 'NordRace', 'ImperialRace'], noFactionVoters: true,
+    announceChannel: '1555017562700390602', resultLoginDays: 7,
     // The ballot's four seats and where the winner sits: an office of zones.json ('@ruler' = the hold's first office) or a
     // rank of the hold's household (guild-defs.json)
     seats: [{ id: 'jarl', label: 'Jarl', office: '@ruler' }, { id: 'steward', label: 'Steward', office: 'steward' },
@@ -304,22 +312,118 @@ module.exports = (api) => {
     if (seat === 'jarl' && !isJarlRace(a)) return 'is no Breton, Nord or Imperial: only they may be Jarl';
     return '';
   };
-  const canVote = (a, z) => {
+  const courtById = (E, id) => (E.courts || []).find((c) => c.id === String(id || '')) || null;
+  // Cabinets cannot vote (Nate, 14 Oct): the Jarl candidate and the named Steward, Lord Commander and Housecarl of a court on
+  // this ballot. A court reaches the ballot only once all four have accepted, so every member of it has; members of a court
+  // that was dropped at the close (one never accepted) or lost a tie are no cabinet of this vote any more. The account
+  // counts too: another character of the same player does not vote for them. { court, seat, self } or null
+  const cabinetOf = (E, a) => {
+    if (!E || E.phase !== 'voting') return null;
+    const pid = Number(profileOf(a));
+    for (const id of E.ballot || []) {
+      const c = courtById(E, id); if (!c || c.struck) continue;
+      for (const s of SEATS) {
+        const m = c.members[s.id]; if (!m) continue;
+        const self = (m.actor >>> 0) === (a >>> 0);
+        if (self || (pid >= 0 && Number(m.pid) === pid)) return { court: c, seat: s, self };
+      }
+    }
+    return null;
+  };
+  const canVote = (a, z, E) => {
     if (!citizenOf(a, z.id)) return `Only the citizens of ${ofPlace(z.name)} vote here.`;
     if (EL.noFactionVoters && !factionFree(a)) return 'Those who serve a faction or a court cannot vote in this first election.';
+    const cab = cabinetOf(E, a);
+    if (cab) {
+      const jarl = cab.court.members.jarl ? cab.court.members.jarl.name : 'a candidate';
+      const where = cab.seat.id === 'jarl' ? 'You stand for Jarl on this ballot' : `You stand on this ballot as ${cab.seat.label} in the court of ${jarl}`;
+      return cab.self ? `${where}. Those who stand in a court do not vote in its election.`
+        : `Another of your characters stands on this ballot (${cab.court.members[cab.seat.id].name}, ${cab.seat.id === 'jarl' ? 'for Jarl' : `${cab.seat.label} in the court of ${jarl}`}). Those who stand in a court do not vote in its election.`;
+    }
     return '';
   };
-  const courtById = (E, id) => (E.courts || []).find((c) => c.id === String(id || '')) || null;
   const courtOfActor = (E, a) => (E.courts || []).find((c) => SEATS.some((s) => c.members[s.id] && (c.members[s.id].actor >>> 0) === (a >>> 0))) || null;
   const courtOfAccount = (E, pid, except) => (E.courts || []).find((c) => c !== except && SEATS.some((s) => c.members[s.id] && Number(c.members[s.id].pid) === Number(pid))) || null;
   const complete = (c, z) => SEATS.every((s) => c.members[s.id] && c.members[s.id].accepted && !unfit(c.members[s.id].actor, z, s.id));
+  // ---- election notices (Nate, 14 Oct): to the hold's citizens in game, again at login, and on Discord ------------------------
+  // Each notice is kept on the election ({ key, kind, text, at, until }) with the characters already told (noticed: actor hex
+  // -> key), so a citizen logging in during the phase is told once per character, across restarts and reloads.
+  const roleIds = () => Object.fromEntries(Object.entries(C.discordRoles || {}).filter(([, id]) => /^\d{15,22}$/.test(String(id))));
+  const when = (t) => `<t:${Math.floor(Number(t) / 1000)}:f>`;
+  const SEATLIST = () => SEATS.map((s) => s.label).join(', ');
+  const noticeTexts = (z, E, kind, extra) => {
+    const place = ofPlace(z.name);
+    const until = dateText(E.phaseEndsAt);
+    const at = 'at a notice board of the hold, on its Voting tab';
+    switch (kind) {
+      case 'registration': return {
+        game: `The citizens of ${place} are to choose their Jarl. Until ${until}, any citizen who would rule may put forward a full court (${SEATLIST()}) ${at}. When that time is up, the vote begins.`,
+        discord: `**${z.name} will choose its Jarl.** The hold counts ${citizenAccounts(z)} citizens. Until ${when(E.phaseEndsAt)}, any citizen who would rule may put forward a full court (${SEATLIST()}) at a notice board of the hold, Voting tab. The vote opens when that time is up.` };
+      case 'reopened': return {
+        game: `No full court stood before the citizens of ${place}, so the call goes out again. Until ${until}, any citizen who would rule may put forward a court (${SEATLIST()}) ${at}.`,
+        discord: `**${z.name}: the call for courts goes out again.** No full court stood for the vote. Until ${when(E.phaseEndsAt)}, any citizen may put forward a court (${SEATLIST()}) at a notice board of the hold, Voting tab.` };
+      case 'voting': return {
+        game: `The vote for the Jarl of ${place} is open until ${until}. Each citizen who serves no faction casts one vote ${at}. Those who stand in a court do not vote.`,
+        discord: `**The vote for the Jarl of ${z.name} is open** until ${when(E.phaseEndsAt)}. Citizens who serve no faction cast one vote each at a notice board of the hold, Voting tab. Those who stand in a court do not vote, and no count is shown until the vote closes.` };
+      case 'revote': return {
+        game: `The vote for the Jarl of ${place} is tied. A new vote between the tied courts runs until ${until}, ${at}. Every citizen who may vote, votes again.`,
+        discord: `**The vote in ${z.name} is tied.** A new vote between the tied courts runs until ${when(E.phaseEndsAt)}, at a notice board of the hold, Voting tab. Every citizen who may vote, votes again.` };
+      case 'result': return {
+        game: `${extra.jarl} is elected Jarl of ${place} by its citizens.${extra.empty.length ? ` The seats of ${extra.empty.join(', ')} start empty; the new Jarl appoints them.` : ''} The count stands on the notice boards of the hold, on the Voting tab.`,
+        discord: `**${extra.jarl} is elected Jarl of ${z.name}.**${extra.court ? ` The court: ${extra.court}.` : ''}${extra.empty.length ? ` The seats of ${extra.empty.join(', ')} start empty; the new Jarl appoints them.` : ''} The count is on the hold's notice boards, Voting tab.` };
+      default: return null;
+    }
+  };
+  const discordPost = (z, kind, content) => {
+    const ch = String(EL.announceChannel || ''); const role = roleIds()[z.id];
+    if (!/^\d{15,22}$/.test(ch) || !role) { log(`citizenship: no Discord notice for ${kind} in ${z.id}: ${!/^\d{15,22}$/.test(ch) ? 'no announceChannel' : 'no citizen role'} set`); return false; }
+    const post = globalThis.__dboDiscordPost;
+    if (typeof post !== 'function') { log(`citizenship: no Discord notice for ${kind} in ${z.id}: no bot`); return false; }
+    // Only the hold's citizen role is pinged: never @everyone or @here, nor a user named in the text
+    const body = { content: `<@&${role}> ${content}`, allowed_mentions: { parse: [], roles: [role] } };
+    try {
+      Promise.resolve(post(ch, body)).then(() => log(`citizenship: Discord notice ${kind} for ${z.id} posted`), (e) => log(`citizenship: Discord notice ${kind} for ${z.id} failed: ${e && e.message}`));
+    } catch (e) { log(`citizenship: Discord notice ${kind} for ${z.id} failed: ${e.message}`); }
+    return true;
+  };
+  // Tells every online citizen of z now, keeps the notice for those who log in, and posts it on Discord
+  const announce = (z, E, kind, extra) => {
+    const t = noticeTexts(z, E, kind, extra || {}); if (!t) return;
+    const at = Date.now();
+    E.notice = { key: `${kind}:${Number(E.round) || 1}:${at}`, kind, text: t.game, at, until: kind === 'result' ? at + EL.resultLoginDays * DAY : Number(E.phaseEndsAt) || 0 };
+    E.noticed = {};
+    for (const m of onlineActors()) if (citizenOf(m, z.id)) { personal(m, t.game); E.noticed[hex(m)] = E.notice.key; }
+    save();
+    discordPost(z, kind, t.discord);
+  };
+  // At login: the notice of each hold's current phase, once per character
+  const noticeLogin = (a) => {
+    a = a >>> 0;
+    let told = false;
+    for (const z of holds()) {
+      const E = elOf(z.id); const n = E && E.notice;
+      if (!n || !electing(z) || !(Date.now() < Number(n.until)) || !citizenOf(a, z.id)) continue;
+      if (n.kind !== 'result' && !(E.phase === 'registration' || E.phase === 'voting')) continue;
+      if (!E.noticed || typeof E.noticed !== 'object') E.noticed = {};
+      if (E.noticed[hex(a)] === n.key) continue;
+      E.noticed[hex(a)] = n.key; told = true;
+      personal(a, n.text);
+    }
+    if (told) save();
+  };
+  // An election that ran before the notices existed: its current phase is announced once
+  const backfill = (z, E) => {
+    if (E.notice || !(E.phase === 'registration' || E.phase === 'voting')) return;
+    announce(z, E, E.phase === 'voting' ? (E.revote ? 'revote' : 'voting') : (Number(E.reopened) ? 'reopened' : 'registration'));
+    log(`citizenship: the running election of ${z.id} had no notice; announced its ${E.phase} now`);
+  };
   const startPhase = (E, phase, hours) => { E.phase = phase; E.phaseStartedAt = Date.now(); E.phaseEndsAt = Date.now() + hours * HOUR; };
   const startElection = (z, why) => {
     const E = { phase: '', round: 1, startedAt: Date.now(), courts: [], ballot: [], votes: {} };
     startPhase(E, 'registration', EL.registrationHours);
     data().elections[z.id] = E; save();
     audit(`ELECTION ${z.name}: registration opened (${why}); closes ${dateText(E.phaseEndsAt)}`);
-    for (const m of onlineActors()) if (citizenOf(m, z.id)) personal(m, `${z.name} will choose its Jarl. Candidates have until ${dateText(E.phaseEndsAt)} to enter a full court at any notice board of the hold (Voting).`);
+    announce(z, E, 'registration');
     return E;
   };
   const cancel = (z, why, held) => {
@@ -368,12 +472,13 @@ module.exports = (api) => {
         E.courts = ok; E.ballot = ok.map((c) => c.id); E.votes = {};
         startPhase(E, 'voting', EL.votingHours); save();
         audit(`ELECTION ${z.name}: ${ok.length} court(s) on the ballot; the vote closes ${dateText(E.phaseEndsAt)}`);
-        for (const m of onlineActors()) if (citizenOf(m, z.id)) personal(m, `The vote for the Jarl of ${ofPlace(z.name)} is open until ${dateText(E.phaseEndsAt)}. Cast yours at a notice board of the hold (Voting).`);
+        announce(z, E, 'voting');
         return true;
       }
       if (citizenAccounts(z) >= EL.threshold) {
         startPhase(E, 'registration', EL.registrationHours); E.reopened = (Number(E.reopened) || 0) + 1; save();
         audit(`ELECTION ${z.name}: no complete court; registration reopened until ${dateText(E.phaseEndsAt)}`);
+        announce(z, E, 'reopened');
         return true;
       }
       cancel(z, `no complete court, and fewer than ${EL.threshold} citizens`);
@@ -390,7 +495,7 @@ module.exports = (api) => {
       log(`citizenship: ${z.id} round ${E.round} closed: ${JSON.stringify(counts)}`);
       if (!E.ballot.length) {
         E.courts = []; E.ballot = []; E.votes = {};
-        if (citizenAccounts(z) >= EL.threshold) { startPhase(E, 'registration', EL.registrationHours); save(); audit(`ELECTION ${z.name}: no court left on the ballot; registration reopened`); }
+        if (citizenAccounts(z) >= EL.threshold) { startPhase(E, 'registration', EL.registrationHours); E.revote = false; save(); audit(`ELECTION ${z.name}: no court left on the ballot; registration reopened`); announce(z, E, 'reopened'); }
         else cancel(z, 'no court left on the ballot');
         return true;
       }
@@ -398,7 +503,7 @@ module.exports = (api) => {
       const best = E.ballot.filter((id) => counts[id] === top);
       if (E.ballot.length === 1 && top < 1) {
         E.courts = []; E.ballot = []; E.votes = {};
-        if (citizenAccounts(z) >= EL.threshold) { startPhase(E, 'registration', EL.registrationHours); save(); audit(`ELECTION ${z.name}: the one court had no vote; registration reopened`); }
+        if (citizenAccounts(z) >= EL.threshold) { startPhase(E, 'registration', EL.registrationHours); E.revote = false; save(); audit(`ELECTION ${z.name}: the one court had no vote; registration reopened`); announce(z, E, 'reopened'); }
         else cancel(z, 'the one court had no vote');
         return true;
       }
@@ -407,7 +512,7 @@ module.exports = (api) => {
         E.courts = E.courts.filter((c) => best.includes(c.id));
         startPhase(E, 'voting', EL.votingHours); save();
         audit(`ELECTION ${z.name}: a tie between ${best.length} courts; a revote between them until ${dateText(E.phaseEndsAt)}`);
-        for (const m of onlineActors()) if (citizenOf(m, z.id)) personal(m, `The vote in ${ofPlace(z.name)} is tied. A new vote between the tied courts runs until ${dateText(E.phaseEndsAt)}.`);
+        announce(z, E, 'revote');
         return true;
       }
       const winner = courtById(E, best[0]);
@@ -416,7 +521,7 @@ module.exports = (api) => {
       E.phase = 'seated'; E.phaseEndsAt = 0; E.revote = false; save();
       const j = winner.members.jarl;
       audit(`ELECTION ${z.name}: ${j.name} is elected Jarl with a court of ${SEATS.filter((s) => s.id !== 'jarl').map((s) => `${s.label} ${winner.members[s.id] ? winner.members[s.id].name : '(empty)'}`).join(', ')}${empty.length ? `; empty: ${empty.join(', ')}` : ''}`);
-      for (const m of onlineActors()) if (citizenOf(m, z.id)) personal(m, `${j.name} is elected Jarl of ${ofPlace(z.name)}.${empty.length ? ` The seats of ${empty.join(', ')} start empty; the new Jarl appoints them.` : ''}`);
+      announce(z, E, 'result', { jarl: j.name, empty, court: SEATS.filter((s) => s.id !== 'jarl' && winner.members[s.id] && !empty.includes(s.label)).map((s) => `${s.label} ${winner.members[s.id].name}`).join(', ') });
       return true;
     }
     return false;
@@ -428,7 +533,7 @@ module.exports = (api) => {
       const E = elOf(z.id);
       try {
         if (!E) { if (citizenAccounts(z) >= EL.threshold) startElection(z, `${EL.threshold} citizens`); continue; }
-        advance(z, E);
+        if (!advance(z, E)) backfill(z, E);
       } catch (e) { log(`citizenship: the election of ${z.id} failed this tick`, e.stack || e.message); }
     }
   };
@@ -514,7 +619,7 @@ module.exports = (api) => {
   const vote = (a, zid, courtId) => {
     const z = holdOf(zid); if (!z) return { error: 'There is no such hold.' };
     const E = elOf(z.id); if (!E || E.phase !== 'voting') return { error: 'No vote is open here.' };
-    const why = canVote(a, z); if (why) return { error: why };
+    const why = canVote(a, z, E); if (why) return { error: why };
     const pid = String(Number(profileOf(a)));
     if (E.votes[pid] !== undefined) return { error: 'Your vote is cast. One vote per player.' };
     if (!E.ballot.includes(String(courtId || ''))) return { error: 'That court is not on the ballot.' };
@@ -553,7 +658,7 @@ module.exports = (api) => {
     v.round = E ? Number(E.round) || 1 : 0;
     v.endsAt = E ? Number(E.phaseEndsAt) || 0 : 0;
     v.revote = !!(E && E.revote);
-    v.voteWhy = canVote(a, z);
+    v.voteWhy = canVote(a, z, E);
     v.staff = isLeadStaff(a);
     if (!E) return v;
     const pid = String(Number(profileOf(a)));
@@ -712,14 +817,15 @@ module.exports = (api) => {
     if (!seat || citizenOf(Number(actor) >>> 0, z.id)) return '';
     return `${label || nameNow(actor)} is no citizen of ${ofPlace(z.name)}. The seats of its elected court go only to its citizens.`;
   };
+  // gamemode.js's login: the election notice of the current phase, once per character
+  globalThis.__dboCitizenLogin = (a) => { if (C.enabled) noticeLogin(Number(a) >>> 0); };
   globalThis.__dboCitizenHolds = (a) => (C.enabled ? holdsOf(Number(a) >>> 0).map((h) => h.zone) : []);
   // discordroles.js: the citizen roles this character should wear, and every role this module manages
-  const roleIds = () => Object.fromEntries(Object.entries(C.discordRoles || {}).filter(([, id]) => /^\d{15,22}$/.test(String(id))));
   globalThis.__dboCitizenRoleIds = (a) => { const ids = roleIds(); return C.enabled ? holdsOf(Number(a) >>> 0).map((h) => ids[h.zone]).filter(Boolean) : []; };
   globalThis.__dboCitizenManagedRoleIds = () => Object.values(roleIds());
 
   if (typeof every === 'function') every('citizenship', 60000, tick);
   log(`citizenship ${C.enabled ? 'on' : 'off'}: ${holds().length} holds grant it, ${Object.keys(data().chars).length} characters on the rolls, ${Object.keys(data().elections).length} election(s)`);
   return { join, grant, decline, renounce, makePrimary, revoke, setPolicy, register, replace, withdraw, answerInvite, vote, staffAct, tick, advance,
-    holdsOf, citizenOf, factionFree, citizenAccounts, boardPayload, journalView, votingView, citizenshipView, data, PANEL_ID };
+    holdsOf, citizenOf, factionFree, citizenAccounts, canVote, noticeLogin, boardPayload, journalView, votingView, citizenshipView, data, PANEL_ID };
 };

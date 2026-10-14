@@ -12,7 +12,8 @@
           "Buying a house now needs citizenship of the hold it stands in. Property tax is a fixed amount, set from the property's listed value.",
           "The first Jarl elections: once a hold of Skyrim has 15 citizens, an election opens at its notice boards, with a day to stand for Jarl and a day to vote. Bruma has no election: the Count holds the seat.",
           "Controller support: in panels the right stick moves a pointer, A clicks, B closes and the left stick scrolls. New shortcuts: Back+LB opens skills, Back+right stick click the personal menu, Back+left stick click the emote wheel.",
-          "Citizens get their hold's Citizen role on our Discord, given and taken with your citizenship in game (it follows your character when you play)."
+          "Citizens get their hold's Citizen role on our Discord, given and taken with your citizenship in game (it follows your character when you play).",
+          "Election notices: when a hold reaches 15 citizens, its citizens are told in game, when they next log in and on Discord that courts may be put forward, and again when the vote opens a day later, for a revote and for the result. Those who stand in a court on the ballot (the Jarl candidate, Steward, Lord Commander and Housecarl) do not vote."
         ]
       },
       {

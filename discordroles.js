@@ -29,11 +29,10 @@ module.exports = (api) => {
     rename: { 'One-Handed': 'Blade', 'Two-Handed': 'Blunt', Unarmed: 'Martial Arts' },
     homeNames: { whiterun: 'Whiterun', riften: 'Riften', solitude: 'Solitude', windhelm: 'Windhelm', markarth: 'Markarth', falkreath: 'Falkreath',
       morthal: 'Morthal', dawnstar: 'Dawnstar', winterhold: 'Winterhold', bruma: 'Bruma', solstheim: 'Solstheim', alikr: "Alik'r" } }, cfg.discordRoles || {});
-  if (!C.enabled || !token || !guildId) { log(`discord roles off (${!C.enabled ? 'config' : 'no bot token or guild'})`); return; }
-
   // roles: name -> { id, position } of the guild; synced: discordId -> { key, at }; seen: actorId -> first seen online
   const S = globalThis.__dboDiscordRoles || (globalThis.__dboDiscordRoles = { roles: null, setup: null, synced: new Map(), seen: new Map(), chain: Promise.resolve(), pruned: { roles: 0, players: 0 } });
   if (!S.pruned) S.pruned = { roles: 0, players: 0 };
+  if (!S.chain) S.chain = Promise.resolve();
 
   const request = (method, route, body, attempt = 0) => new Promise((resolve, reject) => {
     const data = body === undefined ? '' : JSON.stringify(body);
@@ -59,6 +58,13 @@ module.exports = (api) => {
   });
   // One Discord call at a time, in order, so a burst of logins never trips the rate limit
   const serial = (fn) => { const p = S.chain.then(fn, fn); S.chain = p.catch(() => {}); return p; };
+  // A message from the game to a channel (citizenship.js's election notices, Nate 14 Oct), through the same bot, one call at a
+  // time with the role syncs. body is Discord's message object; the caller sets allowed_mentions. Needs only the bot token,
+  // so it works with the role sync switched off. Resolves to the message, rejects with the HTTP status (never the token)
+  globalThis.__dboDiscordPost = token
+    ? (channelId, body) => (/^\d{15,22}$/.test(String(channelId || '')) ? serial(() => request('POST', `/channels/${channelId}/messages`, body)) : Promise.reject(new Error('no channel id')))
+    : null;
+  if (!C.enabled || !token || !guildId) { log(`discord roles off (${!C.enabled ? 'config' : 'no bot token or guild'})`); return; }
 
   const loadRoles = async () => {
     const list = await request('GET', `/guilds/${guildId}/roles`);
