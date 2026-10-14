@@ -44,7 +44,14 @@ module.exports = (api) => {
   // Survive a gamemode reload; a restart forgets them, which only forgives a loop in progress
   const S = globalThis.__dboSkillRates = globalThis.__dboSkillRates || { brokeDown: new Map(), told: new Map() };
   if (!(S.firstPending instanceof Map)) S.firstPending = new Map();   // actor|skill -> the first-time craft waiting for its credit
-  const recipeCache = new Map();   // recipe id -> { product, tier }
+  const recipeCache = new Map();   // recipe id -> { product, tier, inputValue }
+  // A craft is worth what went into it (Nate, 14 Oct: "200 salt for one Cook level"). The weight a craft carries meters it
+  // through the hourly bucket, which a pot of salt soup fills as fast as a stew (12-49 crafts, under a minute), so the hour
+  // was the same whatever was cooked and only the cheapest route made sense. This factor multiplies the rate after the
+  // meter, like every rate here: g = value / full, between min and 1, where value is the sum of the inputs' gold values
+  // (each at most itemCap; the product's value when that is more). A rich dish or brew earns what any craft earns today,
+  // salt soup a quarter of it; the bucket and the day's caps are unchanged. Config skillRates.valueWeight.
+  const VALUE = Object.assign({ enabled: true, itemCap: 100, skills: { cook: { full: 10, min: 0.25 }, alchemist: { full: 12, min: 0.35 } } }, C.valueWeight || {});
 
   const num = (v) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : undefined);
   const u32 = (f, off) => (f && f.data && f.data.byteLength >= off + 4 ? new DataView(f.data.buffer, f.data.byteOffset, f.data.byteLength).getUint32(off, true) : 0);
@@ -59,9 +66,11 @@ module.exports = (api) => {
     // An unreadable recipe has no tier, so it keeps the skill's default rate
     let tier = lr ? 1 : 0;
     const consumes = [];
+    let inputValue = 0;
     for (const f of fieldsOf(lr, 'CNTO')) {
       const item = globalOf(lr, u32(f, 0));
       const r = recordOf(item);
+      inputValue += itemValueOf(r) * Math.max(1, u32(f, 4));
       const t = TIERS[String((r && r.record.editorId) || '').toLowerCase()];
       if (t > tier) tier = t;
       const type = String((r && r.record.type) || '');
@@ -69,9 +78,33 @@ module.exports = (api) => {
     }
     const benchId = globalOf(lr, u32(fieldsOf(lr, 'BNAM')[0], 0));
     const benchRec = benchId ? recordOf(benchId) : null;
-    const out = { product: globalOf(lr, u32(fieldsOf(lr, 'CNAM')[0], 0)), tier, consumes, bench: String((benchRec && benchRec.record.editorId) || '') };
+    const out = { product: globalOf(lr, u32(fieldsOf(lr, 'CNAM')[0], 0)), tier, consumes, bench: String((benchRec && benchRec.record.editorId) || ''), inputValue };
     recipeCache.set(id, out);
     return out;
+  };
+
+  // An item's gold value, at most itemCap: ALCH ENIT at 0, INGR/MISC/WEAP/ARMO/AMMO/SLGM DATA at 0 (an int32)
+  const itemValueOf = (r) => {
+    if (!r || !r.record) return 0;
+    const f = fieldsOf(r, String(r.record.type) === 'ALCH' ? 'ENIT' : 'DATA')[0];
+    const v = f && f.data && f.data.byteLength >= 4 ? new DataView(f.data.buffer, f.data.byteOffset, f.data.byteLength).getInt32(0, true) : 0;
+    return Math.max(0, Math.min(Number(VALUE.itemCap) || 100, v));
+  };
+  // The value factor of a craft (1 when the skill has none or the value is not known)
+  const valueFactor = (actorId, skillId, kind, detail) => {
+    const spec = VALUE.enabled !== false && VALUE.skills ? VALUE.skills[skillId] : null;
+    if (!spec || !detail) return 1;
+    let value = NaN;
+    if (kind === 'craft' && detail.recipeId) value = Math.max(recipeOf(detail.recipeId).inputValue || 0, Math.min(Number(VALUE.itemCap) || 100, Number(detail.value) || 0));
+    else if (kind === 'award' && detail.key) {
+      // alchemy.js leaves the brew's ingredient value just before it asks for the award
+      const b = globalThis.__dboBrewValue;
+      if (b && (b.actor >>> 0) === (actorId >>> 0) && (b.key >>> 0) === (Number(detail.key) >>> 0)) value = Number(b.value);
+    }
+    // Nothing known of what went in (a recipe or ingredient the server cannot read): the craft keeps its rate
+    if (!Number.isFinite(value) || !(value > 0)) return 1;
+    const full = Math.max(1, Number(spec.full) || 10), min = Math.max(0, Math.min(1, Number(spec.min) || 0));
+    return Math.max(min, Math.min(1, value / full));
   };
 
   const loopKey = (actorId, baseId) => `${actorId >>> 0}:${baseId >>> 0}`;
@@ -113,6 +146,7 @@ module.exports = (api) => {
     if (typeof globalThis.__dboRaceSkillRate === 'function') {
       try { const r = Number(globalThis.__dboRaceSkillRate(actorId >>> 0, skillId, kind)); if (Number.isFinite(r) && r > 0) rate *= r; } catch (e) { /* no race boost */ }
     }
+    if (as === 'craft' && rate > 0) rate *= valueFactor(actorId, skillId, kind, detail);
     if (as === 'craft' && rate > 0) rate *= firstCraftRate(actorId, skillId, detail, kind);
     return rate;
   };
@@ -187,6 +221,6 @@ module.exports = (api) => {
 
   const plain = (v) => Object.fromEntries(Object.entries(v).filter(([k]) => !k.startsWith('_')));
   const shown = Object.entries(C.rates || {}).filter(([k]) => !k.startsWith('_')).map(([k, v]) => `${k} ${v && typeof v === 'object' ? JSON.stringify(plain(v)) : 'x' + v}`);
-  log(`skillRates ${C.enabled ? 'on' : 'off'}: ${shown.join(', ') || 'every skill x1'}; ${Object.keys(TIERS).length} material tiers; salvage loop ${LOOP.enabled ? `x${LOOP.rate} for ${LOOP.windowMinutes} min` : 'off'}; beast form x${num(C.beastRate) ?? 0}`);
-  return { rateFor, noteBreakdown, recipeOf };
+  log(`skillRates ${C.enabled ? 'on' : 'off'}: ${shown.join(', ') || 'every skill x1'}; ${Object.keys(TIERS).length} material tiers; salvage loop ${LOOP.enabled ? `x${LOOP.rate} for ${LOOP.windowMinutes} min` : 'off'}; craft value ${VALUE.enabled !== false ? Object.entries(VALUE.skills || {}).map(([k, v]) => `${k} full ${v.full} min ${v.min}`).join(', ') : 'off'}; beast form x${num(C.beastRate) ?? 0}`);
+  return { rateFor, noteBreakdown, recipeOf, valueFactor };
 };

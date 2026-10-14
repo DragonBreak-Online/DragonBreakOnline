@@ -110,12 +110,16 @@ const snapshot = (edids) => Object.fromEntries(edids.map((e) => [e, count(pid(e)
   check('alchemy.js loads with the rework data', typeof mp.onCraftUnmatched === 'function' && !out.logs.some((l) => /not a known potion|unreadable/.test(l)), out.logs);
 
   // ---- the data file ----
-  const rules = Object.entries(RW.effects);
-  check('every record the rework names is a known potion', rules.every(([, v]) => v.byTier.every((x) => x === null || EDID.has(x))), rules.filter(([, v]) => v.byTier.some((x) => x && !EDID.has(x))).map(([k]) => k));
+  const rules = Object.entries(RW.effects).filter(([, v]) => v.kind !== 'dropped');
+  // byTier: a vanilla potion or one of the PC's records listed in `records`; fallback: vanilla only (the tiers until the PC's ids are mapped)
+  const named = (x) => x === null || EDID.has(x) || (/^DBO_Alch/.test(x) && x in (RW.records || {}));
+  check('every record the rework names is a known potion or a listed PC record', rules.every(([, v]) => v.byTier.every(named)), rules.filter(([, v]) => !v.byTier.every(named)).map(([k]) => k));
+  check('...every fallback a known vanilla potion', rules.every(([, v]) => (v.fallback || []).every((x) => x === null || EDID.has(x))), rules.filter(([, v]) => !(v.fallback || []).every((x) => x === null || EDID.has(x))).map(([k]) => k));
   check('...with nothing below its minimum tier and something from it on', rules.every(([, v]) => v.byTier.length === 5 && v.byTier.every((x, i) => (i + 1 < v.minTier ? x === null : !!x))));
-  check('...every tier at least as strong as the one below', rules.every(([, v]) => v.byTier.filter(Boolean).every((x, i, l) => i === 0 || EDID.get(x).mag * Math.max(1, EDID.get(x).dur) >= EDID.get(l[i - 1]).mag * Math.max(1, EDID.get(l[i - 1]).dur) || /Stamina0?5$/.test(x))));
+  const tiered = (v) => [0, 1, 2, 3, 4].map((i) => (EDID.has(v.byTier[i]) ? v.byTier[i] : (v.fallback || [])[i])).filter(Boolean);
+  check('...every vanilla tier at least as strong as the one below', rules.every(([, v]) => tiered(v).every((x, i, l) => i === 0 || EDID.get(x).mag * Math.max(1, EDID.get(x).dur) >= EDID.get(l[i - 1]).mag * Math.max(1, EDID.get(l[i - 1]).dur) || /Stamina0?5$/.test(x))));
   const restores = rules.filter(([, v]) => v.kind === 'restore');
-  check('the three restores: five different records, never the Minor (01)', restores.length === 3 && restores.every(([, v]) => new Set(v.byTier).size === 5 && !v.byTier.some((x) => /01$/.test(x))));
+  check('the three restores: five different records, never the Minor (01)', restores.length === 3 && restores.every(([, v]) => new Set(tiered(v)).size === 5 && !tiered(v).some((x) => /01$/.test(x))));
   check('the shipped combination list is empty until the PC adds the records', Array.isArray(RW.combos) && RW.combos.length === 0);
 
   // ---- tiers ----
@@ -131,7 +135,7 @@ const snapshot = (edids) => Object.fromEntries(edids.map((e) => [e, count(pid(e)
   check('tiers 1..5 brew RestoreHealth 02/03/04/05/06', names.map(([, e]) => e).join(',') === 'RestoreHealth02,RestoreHealth03,RestoreHealth04,RestoreHealth05,RestoreHealth06', names);
   check('...never the Minor potion', !names.some(([, e]) => e === 'RestoreHealth01'));
   check('...named Potion / Draught / Solution / Philter / Elixir of Healing', names.every(([t, , m]) => m.startsWith(`You brew ${t === 5 ? 'an' : 'a'} ${['Potion', 'Draught', 'Solution', 'Philter', 'Elixir'][t - 1]} of Healing`)), names.map((n) => n[2]));
-  check('...saying what each restores: 20/30/45/60/75%', names.every(([t, , m]) => m.includes(`(restores ${[20, 30, 45, 60, 75][t - 1]}% of your health)`)), names.map((n) => n[2]));
+  check('...saying what each restores: 20/30/45% at once, 60/75% over 5 s', names.every(([t, , m]) => m.includes(`(restores ${[20, 30, 45, 60, 75][t - 1]}% of your health${t >= 4 ? ' over 5 s' : ''})`)), names.map((n) => n[2]));
 
   // ---- minimum tiers ----
   tierOf(A, 2); stockAll();
@@ -141,20 +145,19 @@ const snapshot = (edids) => Object.fromEntries(edids.map((e) => [e, count(pid(e)
   tierOf(A, 3); stockAll();
   msg = craft([ARCH_A, ARCH_B]);
   check('an Adept brews the Fortify Archery (FortifySkillMarksman02)', count(pid('FortifySkillMarksman02')) === 1 && /Solution of Fortify Archery/.test(msg), msg);
-  tierOf(A, 3); stockAll();
-  const inv = JSON.stringify(props.get(A + '|inventory'));
-  msg = craft([SMITH_A, SMITH_B]);
-  check('an Adept cannot brew Fortify Smithing: nothing made, nothing taken', JSON.stringify(props.get(A + '|inventory')) === inv, msg);
-  check('...and is told it needs Expert (75)', /^You cannot brew that yet\. Fortify Smithing needs an Alchemist of Expert rank \(level 75\)\. You keep your ingredients\.$/.test(msg), msg);
-  tierOf(A, 4); stockAll();
-  msg = craft([SMITH_A, SMITH_B]);
-  check('an Expert brews it (FortifySkillSmithing03)', count(pid('FortifySkillSmithing03')) === 1, msg);
-  tierOf(A, 1); stockAll();
-  msg = craft([INVIS_A, INVIS_B]);
-  check('a Novice cannot brew Invisibility (Apprentice, 25)', count(pid('Invisibility01')) === 0 && /Invisibility needs an Alchemist of Apprentice rank \(level 25\)/.test(msg), msg);
+  for (const t of [3, 5]) {
+    tierOf(A, t); stockAll();
+    const inv = JSON.stringify(props.get(A + '|inventory'));
+    msg = craft([SMITH_A, SMITH_B]);
+    check(`Fortify Smithing is dropped: tier ${t} brews nothing and keeps the ingredients`, JSON.stringify(props.get(A + '|inventory')) === inv && count(pid('FortifySkillSmithing03')) === 0, msg);
+    check('...with a clear line', /^You cannot brew that\. Fortify Smithing is not brewed here: nothing on this server reads it[^.]*\. You keep your ingredients\.$/.test(msg), msg);
+  }
   tierOf(A, 2); stockAll();
+  msg = craft([INVIS_A, INVIS_B]);
+  check('an Apprentice cannot brew Invisibility (PvP gate: Adept, 50)', count(pid('Invisibility01')) === 0 && count(pid('Invisibility02')) === 0 && /Invisibility needs an Alchemist of Adept rank \(level 50\)/.test(msg), msg);
+  tierOf(A, 3); stockAll();
   craft([INVIS_A, INVIS_B]);
-  check('...an Apprentice can (Invisibility01)', count(pid('Invisibility01')) === 1);
+  check('...an Adept can (Invisibility02)', count(pid('Invisibility02')) === 1);
 
   // ---- combinations (config; the shipped list is empty) ----
   tierOf(A, 4); stockAll();
@@ -181,7 +184,7 @@ const snapshot = (edids) => Object.fromEntries(edids.map((e) => [e, count(pid(e)
   const panel = out.widgets.filter((w) => w.id === 71).pop() || { lines: [] };
   check('the lab panel names the tier and its strength', /You can brew \(\d+\), Apprentice: Draught strength/.test(panel.targetName || ''), panel.targetName);
   check('...each potion by the design name and what it does', panel.lines.some((l) => /^Draught of Healing \(30% health\): /.test(l)), panel.lines);
-  check('...and what opens later', panel.lines.some((l) => /^Later: .*Fortify Archery at Adept \(50\).*Fortify Smithing at Expert \(75\)/.test(l)), panel.lines);
+  check('...and what opens later', panel.lines.some((l) => /^Later: .*Fortify Archery at Adept \(50\)/.test(l) && /Invisibility at Adept \(50\)/.test(l) && !/Smithing/.test(l)), panel.lines);
   check('...never a locked potion as brewable', !panel.lines.some((l) => /Fortify Smithing.*:.*\+/.test(l) || /Fortify Archery \(/.test(l)), panel.lines);
 
   // ---- drinking: a share of the drinker's own pool ----
@@ -199,9 +202,13 @@ const snapshot = (edids) => Object.fromEntries(edids.map((e) => [e, count(pid(e)
   let p = await drink(pid('RestoreHealth02'), { health: 0.3, magicka: 0.5, stamina: 0.5 }, { health: 0.125 });
   check('a Potion of Healing gives 20% of the pool, not its 50 points', near(p.health, 0.5) && near(p.magicka, 0.5), p);
   p = await drink(pid('RestoreHealth06'), { health: 0.1, magicka: 0.5, stamina: 0.5 }, { health: 0.9 });
-  check('an Elixir (the old Ultimate, full) gives 75%', near(p.health, 0.85), p);
+  check('an Elixir (the old Ultimate, full) gives nothing at once: the C++\'s points come off', near(p.health, 0.1), p);
+  for (let i = 0; i < 10; i++) globalThis.__dboAlchemyRunTicks();
+  p = mp.get(A, 'percentages');
+  check('...and 75% over ten ticks (5 s)', near(p.health, 0.85), p);
   p = await drink(pid('RestoreHealth04'), { health: 0.9, magicka: 0.5, stamina: 0.5 }, { health: 0.1 });
   check('...never past full', near(p.health, 1), p);
+  for (let i = 0; i < 10; i++) globalThis.__dboAlchemyRunTicks();
   p = await drink(pid('RestoreHealth01'), { health: 0.2, magicka: 0.5, stamina: 0.5 }, { health: 0.1667 });
   check('a Minor potion from a drop gives 10%', near(p.health, 0.3), p);
   p = await drink(pid('RestoreMagicka04'), { health: 0.4, magicka: 0.2, stamina: 0.5 }, { magicka: 0.25 });

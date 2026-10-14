@@ -5721,6 +5721,21 @@ const openLockLevelOf = (spellId) => {
   const l = openLockIds.get(spellId >>> 0);
   return l === undefined ? -1 : l;
 };
+// A Fortify Restoration potion ("Restoration spells are <mag>% stronger"): the C++ applies a heal the caster cast on
+// themselves after the cast hook, so the gain is measured on the next turn and the potion's share of it added on top
+const potionRestorationCast = (casterId, spellId) => {
+  const bonus = potionBonus(casterId, 'school:22');
+  if (!(bonus > 0) || spellSchoolOf(spellId >>> 0) !== 22) return;
+  let before = null; try { before = mp.get(casterId >>> 0, 'percentages'); } catch (e) { return; }
+  if (!before || !(before.health > 0)) return;
+  setImmediate(() => {
+    try {
+      const now = mp.get(casterId >>> 0, 'percentages');
+      if (!now || !(now.health > before.health)) return;
+      mp.set(casterId >>> 0, 'percentages', { health: Math.min(1, now.health + (now.health - before.health) * bonus), magicka: now.magicka, stamina: now.stamina });
+    } catch (e) { /* gone */ }
+  });
+};
 const castHook = (casterId, spellId, ...rest) => {
   try { if (racial) racial.onCast(Number(casterId) >>> 0, Number(spellId) >>> 0); } catch (e) { log('racial cast failed', e.message); }
   try { if (globalThis.__dboBeastCast) globalThis.__dboBeastCast(casterId, spellId); } catch (e) { log('beast cast failed', e.message); }
@@ -5763,6 +5778,7 @@ const castHook = (casterId, spellId, ...rest) => {
   if (verdict !== false && !beastCaster && globalThis.__dboSchoolsCast) { try { globalThis.__dboSchoolsCast(Number(casterId) >>> 0, Number(spellId) >>> 0); } catch (e) { log('schools cast failed', e.message); } }
   // A Flesh spell's armour counts on the server while it lasts (fleshCast, below; called at the cast, defined by then)
   if (verdict !== false && typeof globalThis.__dboFleshCast === 'function') { try { globalThis.__dboFleshCast(Number(casterId) >>> 0, Number(spellId) >>> 0); } catch (e) { log('flesh cast failed', e.message); } }
+  if (verdict !== false) { try { potionRestorationCast(Number(casterId) >>> 0, Number(spellId) >>> 0); } catch (e) { log('restoration potion failed', e.message); } }
   return verdict;
 };
 castHook.__dbo = true;
@@ -6214,6 +6230,21 @@ const arcaneDamageMult = (aggressorId, sourceId) => {
   const bonus = Number((ARCANE_DMG.byTier || [])[rank]) || 0;
   return bonus > 0 ? 1 + bonus : 1;
 };
+// Fortify potions (alchemy rework, Nate 14 Oct: "only where the server can honour them"; alchemy.js __dboPotionBonus): a
+// weapon potion adds its share to that weapon's blows (Blade, Blunt, Archery by the DBO weapon skill; a vanilla One- or
+// Two-handed potion by the weapon's hands, as its text says), a Destruction or Restoration potion to that school's spell
+// hits. The game's own copy of the effect raised only the client's skill, which no server number reads.
+const potionBonus = (a, hook) => { try { const f = globalThis.__dboPotionBonus; const b = typeof f === 'function' ? Number(f(a >>> 0, hook)) : 0; return Number.isFinite(b) && b > 0 ? b : 0; } catch (e) { return 0; } };
+const potionAttackMult = (aggressorId, sourceId) => {
+  if (typeof globalThis.__dboPotionBonus !== 'function') return 1;
+  let bonus = 0;
+  const skill = weaponSkillOf(sourceId);
+  if (skill === 'blade' || skill === 'blunt' || skill === 'archery') bonus += potionBonus(aggressorId, skill);
+  const hands = weaponHandsOf(sourceId);
+  if (hands === 'one' || hands === 'two') bonus += potionBonus(aggressorId, hands);
+  if (isSpellSource(sourceId)) { const school = spellSchoolOf(sourceId); if (school === 20 || school === 22) bonus += potionBonus(aggressorId, `school:${school}`); }
+  return 1 + bonus;
+};
 // Weapon materials: vanilla keeps the tiers close (Daedric sword 14, Dragonbone 15), so Nat (2026-09-25) wanted better
 // gear to hit clearly harder. The weapon's material keyword (KWDA, matched by editor id, so no form id is assumed) adds
 // its share on top of the base damage. Config "weaponMaterials": { enabled, playersOnly, byKeyword: { editorId: bonus } }.
@@ -6378,6 +6409,8 @@ const defenseDamageMult = (targetId) => {
       counted += ((p.counted || p.rating) + temperBonus(w.health, p.chest)) * (p.heavy ? pm.heavy : pm.light);
     }
   } catch (e) { return 1; }
+  // A Fortify Armor potion (alchemy.js, hook armor): the worn armour counts for that much more while it lasts
+  counted *= 1 + potionBonus(targetId, 'armor');
   if (!(bare > 0) || Math.abs(counted - bare) < 1e-9) return 1;
   const scale = gmstFloat(0x21a72, 0.12), cap = gmstFloat(0x37deb, 80);
   const kept = (rating) => 1 - Math.min(rating * scale, cap) / 100;
@@ -6425,7 +6458,8 @@ const fleshCast = (casterId, spellId) => {
   if (!FLESH.enabled) return;
   const f = fleshOfSpell(spellId >>> 0);
   if (!f) return;
-  fleshActive.set(casterId >>> 0, { spell: spellId >>> 0, armor: f.armor, until: Date.now() + f.seconds * 1000 });
+  // A Fortify Alteration potion makes the spell last longer ("Alteration spells last <mag>% longer"; alchemy.js duration:18)
+  fleshActive.set(casterId >>> 0, { spell: spellId >>> 0, armor: f.armor, until: Date.now() + f.seconds * 1000 * (1 + potionBonus(casterId, 'duration:18')) });
   if (fleshActive.size > 256) { const now = Date.now(); for (const [k, v] of fleshActive) if (v.until <= now) fleshActive.delete(k); }
 };
 // The rating a Flesh spell adds to `a` now, 0 when none
@@ -6711,7 +6745,8 @@ globalThis.__dboSummonDurationMult = (owner, kind) => {
   const C = summonBuffCfg();
   if (C.enabled === false || !(Array.isArray(C.kinds) ? C.kinds : []).includes(String(kind))) return 1;
   const pct = byTier(C.durationPctByTier, conjurationTierOf(Number(owner) >>> 0), 0);
-  return pct > 0 ? 1 + pct / 100 : 1;
+  // A Fortify Conjuration potion on the caster ("Conjuration spells last <mag>% longer"; alchemy.js duration:19)
+  return (pct > 0 ? 1 + pct / 100 : 1) * (1 + potionBonus(owner, 'duration:19'));
 };
 // A spell hit a summon would not live through but the scaled hit would: the snapshot OnSpellHit writes back makes a raise
 // before the hit useless, so the hit is refused and the scaled damage taken off just after. Returns true when it did.
@@ -6729,6 +6764,13 @@ const summonSpellGuard = (agg, tgt, dmg, mult, flags) => {
 // Each gate below names its reason in globalThis.__dboHitRefusal on the line before it (a plain assignment, nothing else):
 // when the hook refuses, the reason of the gate that refused is the one set. The player log's wrapper (playerlog.js,
 // outermost) reads it only for a refused attempt and counts refusals by reason for the fights it records.
+// A weapon poison on the attacker's worn copy of the weapon (alchemy.js __dboPoisonHit; inert until alchemy-rework.json
+// poisons.judge): a landed, unblocked weapon blow only, its share of the target's pool taken after the hit
+const potionPoisonHit = (agg, tgt, src, dmg, flags) => {
+  if (!(dmg > 0) || agg === tgt || (flags && typeof flags === 'object' && (flags.blocked || flags.spell)) || typeof globalThis.__dboPoisonHit !== 'function') return;
+  const r = recordOf(src); if (!r || String(r.record.type) !== 'WEAP') return;
+  try { globalThis.__dboPoisonHit(agg, tgt, src, flags); } catch (e) { log('poison hit failed', e.message); }
+};
 const hitDamageAttemptHook =(aggressorId, targetId, sourceId, damage, flags) => {
   const agg = Number(aggressorId) >>> 0;
   const tgt = Number(targetId) >>> 0;
@@ -6829,7 +6871,7 @@ const hitDamageAttemptHook =(aggressorId, targetId, sourceId, damage, flags) => 
     if (racial) { try { targetSide = racial.capTargetSide(targetSide * racial.targetMult(agg, tgt, src, dmg)); } catch (e) { log('racial target failed', e.message); } }
     let raceAtk = 1;
     if (racial && !beastAgg) { try { raceAtk = racial.attackMult(agg, tgt, src, dmg); } catch (e) { log('racial attack failed', e.message); } }
-    let mult = (beastAgg ? 1 : masteryDamageMult(agg, src)) * arcaneDamageMult(agg, src) * materialDamageMult(agg, src) * temperDamageMult(agg, src) * arrowDamageMult(agg, src) * targetSide * blessingAttackMult(agg, src) * raceAtk * huntDamageMult(agg, tgt) * pvp;
+    let mult = (beastAgg ? 1 : masteryDamageMult(agg, src) * potionAttackMult(agg, src)) * arcaneDamageMult(agg, src) * materialDamageMult(agg, src) * temperDamageMult(agg, src) * arrowDamageMult(agg, src) * targetSide * blessingAttackMult(agg, src) * raceAtk * huntDamageMult(agg, tgt) * pvp;
     // Tired blows, fists into armour, staves through it, the fist's stamina drain and disarm (martial.js)
     if (martial && !beastAgg) { try { mult *= martial.onAttempt(agg, tgt, src, dmg, flags); } catch (e) { log('martial failed', e.message); } }
     // Block chip and stamina, guard breaks, bash, stagger (combat.js); a bash's blow comes back scaled down
@@ -6849,6 +6891,7 @@ const hitDamageAttemptHook =(aggressorId, targetId, sourceId, damage, flags) => 
     const guard = npcLethalGuard(agg, tgt, dmg, mult, flags);
     if (guard) {
       if (guard.rest < 1) globalThis.__dboMasteryPending = { agg, tgt, mult: guard.rest, health: guard.health };
+      potionPoisonHit(agg, tgt, src, dmg, flags);
       return true;
     }
     // The health before anything below changes it: the give-back measures the hit from here
@@ -6860,6 +6903,7 @@ const hitDamageAttemptHook =(aggressorId, targetId, sourceId, damage, flags) => 
     if (mult !== 1 && dmg > 0) {
       if (before && before.health > 0) globalThis.__dboMasteryPending = { agg, tgt, mult, health: before.health };
     }
+    potionPoisonHit(agg, tgt, src, dmg, flags);
   } catch (e) { /* not an actor */ }
   return true;
 };
@@ -7733,7 +7777,7 @@ try {
   const ALCHEMY_JS = path.resolve('alchemy.js');
   delete require.cache[ALCHEMY_JS];
   require(ALCHEMY_JS)({ mp, log, personal, audit, display, who, openWidget, closeWidget, every, itemName: (d) => adminItemName(d), cfg, sendPacket, onUi });
-} catch (e) { log('alchemy.js failed to load:', e.stack || e.message); mp.onCraftUnmatched = null; globalThis.__dboEnchanterTouched = null; globalThis.__dboPotionResistOf = null; }
+} catch (e) { log('alchemy.js failed to load:', e.stack || e.message); mp.onCraftUnmatched = null; globalThis.__dboEnchanterTouched = null; globalThis.__dboPotionResistOf = null; globalThis.__dboPotionBonus = null; globalThis.__dboPotionLockpickTiers = null; globalThis.__dboPoisonHit = null; }
 
 // ---- playtest region lock (server\playtest.js, config "playtest") ------------------------------
 try {
