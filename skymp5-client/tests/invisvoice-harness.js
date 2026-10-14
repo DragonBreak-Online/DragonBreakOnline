@@ -1,6 +1,7 @@
 // Scripted test for voiceService.pushPeers with VoiceManager.js: a player hidden by ff_adminModes.invis (an Invisible admin,
-// someone in character creation) who talks is heard by nobody and named on nobody's speaking HUD, staff included, the
-// same as the body (adminCopyPolicy.ts). Everyone else is heard as before, and the Invisible admin still hears them.
+// someone in character creation) who talks is heard by no player and no lower-ranked staff member and named on none of
+// their speaking HUDs, the same as the body (adminCopyPolicy.ts, formView.adminViewOf); staff of the same or a higher rank,
+// who keep a ghost copy, hear him as before. Everyone else is heard as before, and the Invisible admin still hears them.
 //
 // The real pushPeers, adminCopyPolicy, voicePeerKey, VoiceManager and voiceFalloff run; every other import is a stub. Run
 // it from skymp5-client:
@@ -80,13 +81,16 @@ const world = (adminModes, meModes) => ({
   ],
 });
 
-// One push, then the page as it stands after it: who it would play, how loud, and who the speaking HUD names
-const push = (wm) => {
+// One push, then the page as it stands after it: who it would play, how loud, and who the speaking HUD names. `owner`
+// (the listener's own form gets these fields) makes storage's ownerModel, as gamemodeUpdateService sets it; none = a player.
+const push = (wm, owner) => {
   const sent = [];
+  const storage = {};
+  if (owner) { Object.assign(wm.forms[wm.playerCharacterFormIdx], owner); storage.ownerModel = wm.forms[wm.playerCharacterFormIdx]; storage.ownerModelSet = true; }
   const fake = {
     controller: { lookupListener: () => ({ getWorldModel: () => wm }) },
     modes: [{ key: 'whisper', units: 140 }, { key: 'talk', units: 840 }, { key: 'shout', units: 3150 }],
-    identityMap: IDS, sp: { browser: { executeJavaScript: (s) => sent.push(s) } },
+    identityMap: IDS, sp: { storage, browser: { executeJavaScript: (s) => sent.push(s) } },
   };
   VoiceService.prototype.pushPeers.call(fake);
   const speakers = ['p1', 'p151', 'p3', 'p51', 'p200', 'p70'];
@@ -137,6 +141,40 @@ const named = (r, id, name) => r.hud.some((x) => x.id === id || x.name === name)
 {
   const r = push(world('x'));
   check('a mirror that is not an object hides nobody', heard(r, 'p1'));
+}
+
+// ---- staff listening: ranks (Nate and Jake, 14 Oct; owner 5, developer 4, Lead GM 3, GM 2, Trial GM 1) ------------
+const staff = (rank) => ({ isAdmin: true, ff_adminModes: Object.assign({}, ALL_OFF, rank ? { rank } : {}) });
+{
+  const r = push(world(Object.assign({}, ALL_OFF, { invis: true, rank: 5 })), staff(1));
+  check('a Trial GM does not hear an Invisible owner, and the HUD does not name him', silent(r, 'p1') && !named(r, 'p1', 'Dialis'), r.hud);
+}
+{
+  const r = push(world(Object.assign({}, ALL_OFF, { invis: true, rank: 3 })), staff(2));
+  check('a GM does not hear an Invisible Lead GM', silent(r, 'p1') && !named(r, 'p1', 'Dialis'));
+}
+{
+  const r = push(world(Object.assign({}, ALL_OFF, { invis: true, rank: 3 })), staff(3));
+  check('a Lead GM hears an Invisible Lead GM (the same rank keeps the ghost copy)', heard(r, 'p1') && named(r, 'p1', 'Dialis'));
+}
+{
+  const r = push(world(Object.assign({}, ALL_OFF, { invis: true, rank: 2 })), staff(5));
+  check('an owner hears an Invisible GM', heard(r, 'p1') && named(r, 'p1', 'Dialis'));
+  check('...and a player beside them as before', heard(r, 'p151') && named(r, 'p151', 'Rokvar'));
+}
+{
+  const r = push(world(Object.assign({}, ALL_OFF, { invis: true, rank: 5 })), { isAdmin: false, ff_adminModes: Object.assign({}, ALL_OFF) });
+  check('a player with an owner model set does not hear an Invisible owner', silent(r, 'p1') && !named(r, 'p1', 'Dialis'));
+}
+// The live server before a1bf0abf sends no rank: staff keep the ghost copy and hear him, players neither, as the body
+{
+  const r = push(world(Object.assign({}, ALL_OFF, { invis: true, god: true })), { isAdmin: true });
+  check('no rank anywhere: a staff listener hears the Invisible admin, as the ghost copy (0.3.97 for staff)', heard(r, 'p1') && named(r, 'p1', 'Dialis'));
+  check('no rank anywhere: staff hear someone in character creation, as the ghost copy', heard(r, 'p200'));
+}
+{
+  const r = push(world(Object.assign({}, ALL_OFF, { invis: true, god: true })), { isAdmin: false });
+  check('no rank anywhere: a player hears neither (0.3.97 played both)', silent(r, 'p1') && silent(r, 'p200'));
 }
 
 // ---- the Invisible admin listening ---------------------------------------------------------------------------

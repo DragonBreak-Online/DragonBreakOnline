@@ -10,7 +10,7 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
-const { adminViewOfModes, keepNoCopy, nextHiddenAt, REVEAL_HOLD_MS, staffRankOf, seesInvisible } = require(path.resolve(process.argv[2]));
+const { adminViewOfModes, keepNoCopy, nextHiddenAt, REVEAL_HOLD_MS, staffRankOf, seesInvisible, viewerRankOf } = require(path.resolve(process.argv[2]));
 
 let failures = 0;
 const check = (name, ok, got) => {
@@ -65,12 +65,34 @@ check('the hold is short enough not to look broken (<= 2 s)', REVEAL_HOLD_MS > 0
   check('a mirror flicker shorter than the hold never spawns a copy', !s.copy && s.spawns === 0 && s.destroys === 0, s);
 }
 
-// ---- the view from the mirror: the same for every watcher ------------------------------------------------------
+// ---- the view from the mirror (adminViewOfModes, the voice's filter); a viewer of rank 0 is a player -------------
 check('Invisible is hidden', adminViewOfModes({ invis: true }) === 'hidden');
 check('Invisible wins over Ghost', adminViewOfModes({ invis: true, ghost: true }) === 'hidden');
 check('Ghost alone is a ghost', adminViewOfModes({ ghost: true, invis: false }) === 'ghost');
 check('god, smite and the rest change nothing', adminViewOfModes({ god: true, smite: true, healhit: true }) === 'visible');
-check('no mirror, or a bad one, is visible', ['visible', 'visible', 'visible'].join() === [undefined, null, 'x'].map(adminViewOfModes).join());
+check('no mirror, or a bad one, is visible', ['visible', 'visible', 'visible'].join() === [undefined, null, 'x'].map((m) => adminViewOfModes(m)).join());
+check('Invisible is a ghost to the same or a higher rank, hidden from a lower one',
+  adminViewOfModes({ invis: true, rank: 3 }, 3) === 'ghost' && adminViewOfModes({ invis: true, rank: 2 }, 5) === 'ghost' &&
+  adminViewOfModes({ invis: true, rank: 5 }, 3) === 'hidden' && adminViewOfModes({ invis: true, rank: 2 }, 1) === 'hidden');
+check('a mirror from before ranks (no rank) is a ghost to every staff member and hidden from players, as on 0.3.97',
+  adminViewOfModes({ invis: true }, 1) === 'ghost' && adminViewOfModes({ invis: true }, 0) === 'hidden');
+// formView.adminViewOf's rule as the checks below pin it in the source; the voice's view must agree with it everywhere
+{
+  const bodyView = (modes, r) => {
+    if (!modes || typeof modes !== 'object') return 'visible';
+    if (modes.invis) return seesInvisible(r, modes.rank) ? 'ghost' : 'hidden';
+    return modes.ghost ? 'ghost' : 'visible';
+  };
+  const ranks = [undefined, null, 0, 1, 2, 3, 4, 5, '3', 'x', -1, 2.5];
+  const mirrors = [undefined, null, 'x', 7, {}, { ghost: true }, { god: true }, ...ranks.flatMap((rank) => [{ invis: true, rank }, { invis: true, ghost: true, rank }, { ghost: true, rank }])];
+  const bad = [];
+  for (const m of mirrors) for (const r of [0, 1, 2, 3, 4, 5]) if (adminViewOfModes(m, r) !== bodyView(m, r)) bad.push([m, r]);
+  check(`voice and body agree on every mirror and viewer rank (${mirrors.length * 6} cases)`, bad.length === 0, bad.slice(0, 3));
+}
+check('the viewer\'s rank from storage: none before the owner model, their mirror\'s, else 1 for staff, 0 for a player',
+  viewerRankOf(false, { isAdmin: true }) === 0 && viewerRankOf(true, undefined) === 0 && viewerRankOf(true, { isAdmin: true }) === 1 &&
+  viewerRankOf(true, { isAdmin: true, ff_adminModes: { invis: false, rank: 4 } }) === 4 && viewerRankOf(true, { isAdmin: false }) === 0 &&
+  viewerRankOf(true, { isAdmin: true, ff_adminModes: 'x' }) === 1);
 
 // ---- a staff watcher of the same or a higher rank sees a ghost throughout ---------------------------------------
 {
@@ -107,6 +129,16 @@ check('an owner is hidden from a Lead GM, a Lead GM from a GM, a GM from a Trial
 check('...and a ghost to the same rank or a higher one', seesInvisible(5, 5) && seesInvisible(5, 2) && seesInvisible(3, 3) && seesInvisible(2, 1));
 check('a mirror from before ranks (no rank) shows to every staff member, as before', seesInvisible(1, undefined) && seesInvisible(1, 0));
 check('the viewer\'s rank: their mirror\'s, else 1 for staff and 0 for a player', staffRankOf(4, true) === 4 && staffRankOf(undefined, true) === 1 && staffRankOf(undefined, false) === 0 && staffRankOf('x', false) === 0);
+check('adminViewOf: no mirror is visible, Ghost alone a ghost (the rest of the rule voice and body share)',
+  /const modes = \(model as Record<string, unknown>\)\["ff_adminModes"\];\s+if \(!modes \|\| typeof modes !== "object"\) return "visible";\s+const m = modes as Record<string, unknown>;\s+if \(m\["invis"\]\)[^\n]*\n\s+return m\["ghost"\] \? "ghost" : "visible";/.test(src));
+check('...and the viewer\'s rank comes from viewerRankOf, as the voice reads it',
+  /private static viewerRank\(\): number \{\s+return viewerRankOf\(storage\["ownerModelSet"\], storage\["ownerModel"\]\);\s+\}/.test(src));
+{
+  const voice = fs.readFileSync(path.join(__dirname, '..', 'src', 'services', 'services', 'voiceService.ts'), 'utf8');
+  check('voiceService.pushPeers leaves out a peer hidden for this viewer\'s rank',
+    /const viewerRank = viewerRankOf\(this\.sp\.storage\["ownerModelSet"\], this\.sp\.storage\["ownerModel"\]\);/.test(voice) &&
+    /if \(adminViewOfModes\(\(form as Record<string, unknown>\)\["ff_adminModes"\], viewerRank\) === "hidden"\) continue;/.test(voice));
+}
 check('the alpha path stays for a copy that exists (spell Invisibility, staff ghost)', /actor\.setAlpha\(view === "hidden" \? 0 :/.test(src));
 check('the nametag guard stays', /adminViewOf\(model\) !== "hidden"/.test(src));
 

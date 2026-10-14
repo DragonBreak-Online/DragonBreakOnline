@@ -8,7 +8,7 @@ import { RemoteServer } from "./remoteServer";
 import { BrowserMessageEvent, ButtonEvent, DxScanCode, InputDeviceType, Menu } from "skyrimPlatform";
 import { logTrace } from "../../logging";
 import { IdentityMap, parseIdentityMap, peerKey } from "./voicePeerKey";
-import { adminViewOfModes } from "../../view/adminCopyPolicy";
+import { adminViewOfModes, viewerRankOf } from "../../view/adminCopyPolicy";
 import { buttonKeyCode, isMouseKey, mouseKeyButton } from "./mouseKeys";
 import { readGamepadModifier, trackGamepadModifier, wasGamepadChordUsed } from "./gamepadKeys";
 
@@ -490,14 +490,15 @@ export class VoiceService extends ClientListener {
     const includeWithin = maxUnits * 1.2;
     const peers: Record<string, number> = {};
     const vectors: Record<string, { d: number; az: number; fa: number; n: string }> = {};
+    const viewerRank = viewerRankOf(this.sp.storage["ownerModelSet"], this.sp.storage["ownerModel"]);
     for (let i = 0; i < worldModel.forms.length; i++) {
       if (i === worldModel.playerCharacterFormIdx) continue;
       const form = worldModel.forms[i];
       if (!form || typeof form.refrId !== "number" || form.refrId < PLAYER_ID_SPACE) continue;
       if (!form.appearance || !form.movement || !Array.isArray(form.movement.pos)) continue;
       if (form.movement.worldOrCell !== myMovement.worldOrCell) continue;
-      // Hidden like the body (Invisible admin, character creation): the page neither plays nor names a peer it is not given
-      if (adminViewOfModes((form as Record<string, unknown>)["ff_adminModes"]) === "hidden") continue;
+      // Hidden like the body (Invisible staff to players and lower ranks, character creation): the page neither plays nor names a peer it is not given
+      if (adminViewOfModes((form as Record<string, unknown>)["ff_adminModes"], viewerRank) === "hidden") continue;
       const dx = form.movement.pos[0] - myMovement.pos[0];
       const dy = form.movement.pos[1] - myMovement.pos[1];
       const dz = form.movement.pos[2] - myMovement.pos[2];

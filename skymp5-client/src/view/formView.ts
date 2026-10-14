@@ -30,7 +30,7 @@ import { dropCopyNiNodeWork, queueCopyNiNodeUpdate } from "./niNodeQueue";
 import { onScreenRebuildDue, OnScreenRebuildState } from "./onScreenRebuild";
 import { lastTryHost, tryHost } from "./hostAttempts";
 import { GHOST_ALPHA, GHOST_SHADER_ID, INVIS_ABILITY_IDS, INVIS_ABILITY_SHADER_IDS } from "../lib/ghostLook";
-import { AdminView, keepNoCopy, nextHiddenAt, seesInvisible, staffRankOf } from "./adminCopyPolicy";
+import { AdminView, keepNoCopy, nextHiddenAt, seesInvisible, viewerRankOf } from "./adminCopyPolicy";
 import { ModelApplyUtils } from "./modelApplyUtils";
 import { SpApiInteractor } from "../services/spApiInteractor";
 import { WorldCleanerService } from "../services/services/worldCleanerService";
@@ -1232,11 +1232,7 @@ export class FormView {
 
   // The viewer's staff rank from their own mirror (server AdminSystem), else 1 for any staff on a server without ranks
   private static viewerRank(): number {
-    if (storage["ownerModelSet"] !== true) return 0;
-    const owner = storage["ownerModel"] as Record<string, unknown> | undefined;
-    if (!owner) return 0;
-    const own = owner["ff_adminModes"] as Record<string, unknown> | undefined;
-    return staffRankOf(own && typeof own === "object" ? own["rank"] : undefined, owner["isAdmin"] === true);
+    return viewerRankOf(storage["ownerModelSet"], storage["ownerModel"]);
   }
 
   // A replayed Invisibility spell would otherwise draw the caster as vanilla's shimmer instead of hiding them

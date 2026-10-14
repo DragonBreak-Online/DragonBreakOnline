@@ -7,11 +7,11 @@ export type AdminView = "visible" | "hidden" | "ghost";
 
 export const REVEAL_HOLD_MS = 1500;
 
-// Invisible is hidden from every watcher, staff included (any copy is an actor that makes sounds); Ghost is a ghost to all
-export function adminViewOfModes(modes: unknown): AdminView {
+// Invisible is hidden from players and lower ranks and a ghost to the same or a higher rank (formView.adminViewOf's rule); Ghost is a ghost to all
+export function adminViewOfModes(modes: unknown, viewerRank = 0): AdminView {
   if (!modes || typeof modes !== "object") return "visible";
   const m = modes as Record<string, unknown>;
-  if (m["invis"]) return "hidden";
+  if (m["invis"]) return seesInvisible(viewerRank, m["rank"]) ? "ghost" : "hidden";
   return m["ghost"] ? "ghost" : "visible";
 }
 
@@ -31,6 +31,14 @@ export function staffRankOf(rank: unknown, isAdmin: boolean): number {
   const n = Number(rank);
   if (Number.isFinite(n) && n > 0) return Math.floor(n);
   return isAdmin ? 1 : 0;
+}
+
+/** The viewer's rank from storage's ownerModelSet and ownerModel: their own mirror's rank, else 1 for staff, 0 before the owner model is set. */
+export function viewerRankOf(ownerModelSet: unknown, ownerModel: unknown): number {
+  if (ownerModelSet !== true || !ownerModel || typeof ownerModel !== "object") return 0;
+  const owner = ownerModel as Record<string, unknown>;
+  const own = owner["ff_adminModes"] as Record<string, unknown> | undefined;
+  return staffRankOf(own && typeof own === "object" ? own["rank"] : undefined, owner["isAdmin"] === true);
 }
 
 /** Whether a viewer of `viewerRank` sees an Invisible staff member of `invisRank` as a ghost: staff of the same or a higher rank. */
