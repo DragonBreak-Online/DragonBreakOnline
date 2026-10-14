@@ -2,6 +2,7 @@ import { ClientListener, CombinedController, Sp } from "./clientListener";
 import { sendCustomPacket } from "./customPacketUtil";
 import { readMenuKeyCode, isMenuKeyPressBlocked } from "./widgetMenuUtil";
 import { buttonKeyCode } from "./mouseKeys";
+import { GamepadButton, isGamepadChord } from "./gamepadKeys";
 import { CustomPacketMessage } from "../messages/customPacketMessage";
 import { MsgType } from "../../messages";
 import { BrowserMessageEvent, ButtonEvent, DxScanCode, InputDeviceType } from "skyrimPlatform";
@@ -25,12 +26,14 @@ export class PersonalMenuService extends ClientListener {
     this.controller.on("browserMessage", (e) => this.onBrowserMessage(e));
 
     this.menuKey = readMenuKeyCode(this.sp, "personalMenuKeyCode", DxScanCode.U);
+    // Gamepad: the modifier (Back) held with the right stick click (Toggle POV alone)
+    this.menuPad = readMenuKeyCode(this.sp, "personalMenuGamepadButton", GamepadButton.RightThumb);
   }
 
   private onButtonEvent(e: ButtonEvent): void {
-    // The key's scan code, or 256 + the button for a bindable mouse button (mouseKeys.ts); gamepad idCodes alias onto
-    // keyboard scancodes and are never a key here
-    const code = buttonKeyCode(e);
+    // The key's scan code, or 256 + the button for a bindable mouse button (mouseKeys.ts); a gamepad chord stands in
+    // for its key
+    const code = buttonKeyCode(e) ?? (isGamepadChord(this.sp, e, this.menuPad) ? this.menuKey : null);
     if (code === null) return;
     if (code !== this.menuKey || !e.isDown) return;
     if (isMenuKeyPressBlocked(this.sp, this.controller, e)) return;
@@ -51,4 +54,5 @@ export class PersonalMenuService extends ClientListener {
   }
 
   private menuKey: DxScanCode = DxScanCode.U;
+  private menuPad: number = GamepadButton.RightThumb;
 }

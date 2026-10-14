@@ -2,6 +2,7 @@ import { ClientListener, CombinedController, Sp } from "./clientListener";
 import { sendCustomPacket, parseCustomPacket, notifyNextUpdate } from "./customPacketUtil";
 import { openFormMenu, closeFormMenu, readMenuKeyCode, isMenuKeyPressBlocked } from "./widgetMenuUtil";
 import { buttonKeyCode } from "./mouseKeys";
+import { GamepadButton, isGamepadChord } from "./gamepadKeys";
 import { ConnectionMessage } from "../events/connectionMessage";
 import { CustomPacketMessage } from "../messages/customPacketMessage";
 import { BrowserMessageEvent, ButtonEvent, DxScanCode, InputDeviceType } from "skyrimPlatform";
@@ -82,12 +83,14 @@ export class MasteryService extends ClientListener {
     this.controller.emitter.on("uiHiddenChanged", (e) => { if (e.hidden && this.menuOpen) this.closeMenu(); });
 
     this.menuKey = readMenuKeyCode(this.sp, "masteryMenuKeyCode", DxScanCode.K);
+    // Gamepad: the modifier (Back) held with LB (Sprint alone, harmless standing still)
+    this.menuPad = readMenuKeyCode(this.sp, "masteryMenuGamepadButton", GamepadButton.LeftShoulder);
   }
 
   private onButtonEvent(e: ButtonEvent): void {
-    // The key's scan code, or 256 + the button for a bindable mouse button (mouseKeys.ts); gamepad idCodes alias onto
-    // keyboard scancodes and are never a key here
-    const code = buttonKeyCode(e);
+    // The key's scan code, or 256 + the button for a bindable mouse button (mouseKeys.ts); a gamepad chord stands in
+    // for its key
+    const code = buttonKeyCode(e) ?? (isGamepadChord(this.sp, e, this.menuPad) ? this.menuKey : null);
     if (code === null) return;
     if (code === DxScanCode.Escape && e.isDown && this.menuOpen) {
       this.closeMenu();
@@ -231,6 +234,7 @@ export class MasteryService extends ClientListener {
   };
 
   private menuKey: DxScanCode = DxScanCode.K;
+  private menuPad: number = GamepadButton.LeftShoulder;
   private menuOpen = false;
   private awaitingOpen = false;
 }

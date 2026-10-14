@@ -2,6 +2,7 @@ import { ClientListener, CombinedController, Sp } from "./clientListener";
 import { notifyNextUpdate } from "./customPacketUtil";
 import { openFormMenu, closeFormMenu, readMenuKeyCode, isGameInputBlocked, isMenuKeyPressBlocked } from "./widgetMenuUtil";
 import { buttonKeyCode } from "./mouseKeys";
+import { GamepadButton, isGamepadChord } from "./gamepadKeys";
 import { RestraintService } from "./restraintService";
 import { emoteNote } from "./emoteDiag";
 import { BrowserService } from "./browserService";
@@ -175,6 +176,8 @@ export class EmoteService extends ClientListener {
     this.controller.on("update", () => this.watchWheel());
 
     this.menuKey = readMenuKeyCode(this.sp, "emoteWheelKeyCode", DxScanCode.B);
+    // Gamepad: the modifier (Back) held with the left stick click (Sneak alone)
+    this.menuPad = readMenuKeyCode(this.sp, "emoteWheelGamepadButton", GamepadButton.LeftThumb);
 
     this.allowedAnims = new Set<string>();
     this.propAnims = new Set<string>();
@@ -206,9 +209,9 @@ export class EmoteService extends ClientListener {
   }
 
   private onButtonEvent(e: ButtonEvent): void {
-    // The key's scan code, or 256 + the button for a bindable mouse button (mouseKeys.ts); gamepad idCodes alias onto
-    // keyboard scancodes and are never a key here
-    const code = buttonKeyCode(e);
+    // The key's scan code, or 256 + the button for a bindable mouse button (mouseKeys.ts); a gamepad chord stands in
+    // for its key
+    const code = buttonKeyCode(e) ?? (isGamepadChord(this.sp, e, this.menuPad) ? this.menuKey : null);
     if (code === null) return;
     if (code === DxScanCode.Escape && e.isDown && this.menuOpen) {
       this.closeMenu("escape");
@@ -596,6 +599,7 @@ export class EmoteService extends ClientListener {
   };
 
   private menuKey: DxScanCode = DxScanCode.B;
+  private menuPad: number = GamepadButton.LeftThumb;
   private menuOpen = false;
   private openedAt = 0;
   private unfocusedSince = 0;
