@@ -20,9 +20,12 @@ const STUBS = {
   messages: 'module.exports = { MsgType: { CustomPacket: "CustomPacket" } };',
   systemNotification: 'module.exports = { showSystemNotification() {} };',
   glow: 'class DboGlowService { getGlowingCount() { return 3; } } module.exports = { DboGlowService };',
+  remoteServer: 'class RemoteServer { getWorldModel() { return globalThis.__perfWorld; } } module.exports = { RemoteServer };',
+  pcHolder: 'class PlayerCharacterDataHolder { static getWorldOrCell() { return globalThis.__perfWoc; } } module.exports = { PlayerCharacterDataHolder };',
 };
 const STUB_OF = { skyrimPlatform: 'sp', './clientListener': 'clientListener', '../../messages': 'messages',
-  './systemNotification': 'systemNotification', './dboGlowService': 'glow' };
+  './systemNotification': 'systemNotification', './dboGlowService': 'glow',
+  './remoteServer': 'remoteServer', '../../view/playerCharacterDataHolder': 'pcHolder' };
 
 async function build(tmp, file) {
   const out = path.join(tmp, path.basename(file, '.ts') + '.js');
@@ -42,6 +45,11 @@ async function main() {
   const realNow = Date.now;
   try {
     globalThis.__perfStorage = { hosted: [1, 2, 3, 4] };
+    // 7 slots: our own character, a freed slot, an actor here, one elsewhere, two object refs without movement, one more here
+    const here = () => ({ movement: { worldOrCell: 0x1234 } });
+    globalThis.__perfWorld = { playerCharacterFormIdx: 0, forms: [here(), undefined, here(), { movement: { worldOrCell: 0x5678 } },
+      {}, {}, here()] };
+    globalThis.__perfWoc = 0x1234;
     const { FrameWindow, UpdateTiming, topSlots, perfDiagEnabled } = await build(tmp, 'perfDiag.ts');
 
     const w = new FrameWindow();
@@ -106,10 +114,16 @@ async function main() {
     check('packet goes out as an npcDrift perf line', p.customPacketType === 'dbo' && p.event === 'npcDrift' && a.kind === 'perf');
     check('context: cell, interior, actors, hosted, glowing', a.cell === '1234' && a.interior === true && a.actors === 17 && a.hosted === 4
       && a.glowing === 3 && a.world === undefined, a);
+    check('forms counts live forms, not freed slots', a.forms === 6, a);
+    check('near counts moving forms in the player\'s cell, not our own', a.near === 2, a);
+    check('still counts forms with no movement', a.still === 2, a);
     check('frame fields present', a.fps > 60 && a.fps < 64 && a.worstMs === 16 && a.over50 === 0 && Array.isArray(a.top), a);
     check('report fits the logged 900 chars', JSON.stringify(a).length < 900);
+    globalThis.__perfWoc = 0;
     for (let i = 0; i < 1900; i++) { onUpdate[0](); clock += 16; }
     check('the next report 30 s later', sent.length === 2, sent.length);
+    const a2 = ((sent[1] || {}).args || [])[0] || {};
+    check('with no worldOrCell yet, near counts every moving form but our own', a2.near === 3 && a2.still === 2 && a2.forms === 6, a2);
     Date.now = realNow;
   } finally {
     Date.now = realNow;

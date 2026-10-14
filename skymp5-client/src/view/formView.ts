@@ -31,7 +31,6 @@ import { lastTryHost, tryHost } from "./hostAttempts";
 import { GHOST_ALPHA, GHOST_SHADER_ID, INVIS_ABILITY_IDS, INVIS_ABILITY_SHADER_IDS } from "../lib/ghostLook";
 import { AdminView, keepNoCopy, nextHiddenAt } from "./adminCopyPolicy";
 import { ModelApplyUtils } from "./modelApplyUtils";
-import { localIdToRemoteId } from "./worldViewMisc";
 import { SpApiInteractor } from "../services/spApiInteractor";
 import { WorldCleanerService } from "../services/services/worldCleanerService";
 import { GamemodeUpdateService } from "../services/services/gamemodeUpdateService";
@@ -120,13 +119,16 @@ export class FormView {
 
     // Players with different worldOrCell should be invisible
     if (model.movement) {
-      const worldOrCell = ObjectReferenceEx.getWorldOrCell(Game.getPlayer() as Actor);
+      // The player's worldOrCell, read this frame by PlayerCharacterDataHolder.updateData()
+      const worldOrCell = PlayerCharacterDataHolder.getWorldOrCell();
       if (
         worldOrCell !== 0 &&
         model.movement.worldOrCell !== worldOrCell
       ) {
-        this.destroy();
-        this.refrId = 0;
+        if (this.refrId !== 0) {
+          this.destroy();
+          this.refrId = 0;
+        }
         return;
       }
     }
@@ -223,12 +225,13 @@ export class FormView {
 
       let refr = ObjectReference.from(Game.getFormEx(this.refrId));
 
+      const refrBase = refr ? refr.getBaseObject() : null;
       let respawnRequired = false;
       if (!refr) {
         respawnRequired = true;
-      } else if (!refr.getBaseObject()) {
+      } else if (!refrBase) {
         respawnRequired = true;
-      } else if ((refr.getBaseObject() as Form).getFormID() !== base.getFormID()) {
+      } else if (refrBase.getFormID() !== base.getFormID()) {
         respawnRequired = true;
       }
 
@@ -534,7 +537,7 @@ export class FormView {
     const hosted = storage['hosted'];
     let alreadyHosted = false;
     if (Array.isArray(hosted)) {
-      const remoteId = localIdToRemoteId(this.refrId);
+      const remoteId = this.remoteRefrId ?? 0;
 
       if (hosted.includes(remoteId) || hosted.includes(remoteId + 0x100000000)) {
         alreadyHosted = true;
@@ -955,6 +958,7 @@ export class FormView {
     if (!actor) {
       return false;
     }
+    // Looked up each call: a native object kept across frames is invalid after the next Papyrus update
     const keyword = Keyword.getKeyword('SweetHidePerson');
     return actor.wornHasKeyword(keyword);
   }
