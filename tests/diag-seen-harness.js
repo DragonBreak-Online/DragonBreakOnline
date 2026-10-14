@@ -93,6 +93,8 @@ check('a player who spent the shared 60 lines', count(() => writeDiagLines(10, l
 check('...still gets appearance trace lines, written as before', count(() => writeDiagLines(10, ['apr own spawn r=13746 mm=-'])) === 1
   && logged[logged.length - 1] === '[dboDiag] profile 30 Purr #7DJT apr own spawn r=13746 mm=-');
 check('...and client error lines', count(() => writeDiagLines(10, ['cerr v=0.3.91 id=1a2b3c4d at=on:update n=1 m=Error: x'])) === 1);
+check('...and the login save line (client loadGameDiag.ts: what a BGSLoadFormBuffer crash read)', count(() => writeDiagLines(10, ['loadGame world 3c pos 1,2,3 rot 0,0,0; npc none; face none; mods 3 hash 1 last x; hour 9'])) === 1);
+check('loadGame lines stop at 10', DIAG_KIND_MAX.loadGame === 10 && count(() => writeDiagLines(10, lines(20, 'loadGame z'))) === 9);
 check('the trace allowance is 400 a player, errors 120', DIAG_KIND_MAX.apr === 400 && DIAG_KIND_MAX.cerr === 120);
 check('apr lines stop at 400', count(() => { for (let i = 0; i < 6; i++) writeDiagLines(10, lines(100, 'apr x').map((l) => l.replace(/^apr x/, 'apr x'))); }) === 399);
 check('cerr lines stop at 120', count(() => { for (let i = 0; i < 2; i++) writeDiagLines(10, lines(100, 'cerr y')); }) === 119);
