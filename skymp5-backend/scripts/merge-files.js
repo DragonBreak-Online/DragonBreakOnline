@@ -216,8 +216,9 @@ async function mergeSourcesIntoRoot() {
   if (fs.existsSync(CLIENT_SRC) && !liveBucket.hasFiles(CLIENT_SRC, SKIP_ALWAYS)) {
     throw new Error(`refusing to merge: the client source ${CLIENT_SRC} is empty, so the zip would be whatever ${OUTPUT_DIR} already holds`)
   }
+  // A live checkout's root is never re-zipped as it is, even with the opt-in; a PC's own default bucket that populate-files just filled is
   if (!fs.existsSync(CLIENT_SRC)) {
-    if (live) throw new Error(`refusing to merge: there is no client source ${CLIENT_SRC}, so the zip would be whatever the live root ${OUTPUT_DIR} already holds`)
+    if (liveBucket.liveTarget({ ...targets, checkoutOnly: true })) throw new Error(`refusing to merge: there is no client source ${CLIENT_SRC}, so the zip would be whatever the live root ${OUTPUT_DIR} already holds`)
     if (!liveBucket.hasFiles(OUTPUT_DIR, SKIP_ALWAYS)) throw new Error(`refusing to merge: there is no client source ${CLIENT_SRC} and no file in ${OUTPUT_DIR} to package`)
     console.log(`[merge] no client source: packaging the work folder's root ${OUTPUT_DIR} as it is`)
   }
