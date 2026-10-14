@@ -34,7 +34,7 @@
 // login after a crash or a restart, and at a reload with the kill switch off. Nothing anyone else receives changes.
 //
 // gamemode-config.json "playerMenu": { maskItem: "808:Armors of the Velothi Pt2.esp", maskName: "Masked Person",
-//   realNames: { enabled: true, labels: true, chat: true, sweepMs: 2000 } }
+//   realNames: { enabled: true, labels: true, chat: true, sweepMs: 2000 (500 to 60000) } }
 'use strict';
 
 module.exports = (api) => {
@@ -49,6 +49,10 @@ module.exports = (api) => {
   // The real-names mode (header). enabled false is the kill switch: the command refuses and every mode on ends at the reload
   const RN = Object.assign({ enabled: true, labels: true, chat: true, sweepMs: 2000 }, C.realNames && typeof C.realNames === 'object' ? C.realNames : {});
   const RN_ON = RN.enabled !== false;
+  // How often the sweep runs: 500 ms at the fastest, 60 s at the slowest. Node runs a timer set above 2147483647 ms every
+  // 1 ms instead (TimeoutOverflowWarning), so a sweepMs of 1e10 in the config would have run the sweep without pause
+  // (claude-jake's reload review, 14 Oct)
+  const RN_SWEEP_MS = Math.min(60000, Math.max(500, Number(RN.sweepMs) || 2000));
   const KNOWN_PROP = 'ff_knownIds';
   const STASH_PROP = 'private.dboKnownStash';
   const LAWFUL_PROP = 'private.dboLawful';
@@ -297,7 +301,7 @@ module.exports = (api) => {
   // changed (a mask, a beast form, a disguised player in or out). Nothing at all while nobody has the mode on. A timer
   // outlives a reload into code that does not register it (gamemode.js TIMERS), so it stops acting once another load
   // of this file (or an older one) has taken over __dboNameFor
-  every('realnames', Math.max(500, Number(RN.sweepMs) || 2000), () => {
+  every('realnames', RN_SWEEP_MS, () => {
     if (realNamesOn.size === 0 || globalThis.__dboNameFor !== nameFor) return;
     const online = new Set(onlineActors().map((x) => x >>> 0));
     for (const a of [...realNamesOn.keys()]) {

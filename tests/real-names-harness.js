@@ -420,6 +420,22 @@ step('R20', () => {
   ok('R20 ...and for the GM with the mode off, the picker is as today', JSON.stringify(runPanel(GM)) === gmPanelOff);
 });
 
+// ---- R22: the sweep's pace stays in range, whatever the config says ---------------------------------------------------------
+// Node runs a timer set above 2147483647 ms every 1 ms (TimeoutOverflowWarning), so a big sweepMs would run the sweep
+// without pause: the pace is held to 500 ms .. 60 s (the reload review's required change, 14 Oct)
+step('R22 pace', () => {
+  const saved = cfg.playerMenu.realNames;
+  const paceFor = (v) => { cfg.playerMenu.realNames = Object.assign({}, saved || {}, { sweepMs: v }); load(); const t = timers.get('realnames'); return t ? t.ms : undefined; };
+  const want = [[1e10, 60000], [99999999999, 60000], [Infinity, 60000], ['1e10', 60000], [2147483648, 60000], [60001, 60000], [60000, 60000],
+    [2000, 2000], [500, 500], [100, 500], [-5, 500], ['abc', 2000], [null, 2000]];
+  const got = want.map(([v]) => paceFor(v));
+  cfg.playerMenu.realNames = saved; load();
+  const bad = want.map(([v, w], i) => (got[i] === w ? null : { sweepMs: String(v), want: w, got: got[i] })).filter(Boolean);
+  ok('R22 the sweep never runs slower than every 60 s: sweepMs 1e10, 99999999999, Infinity and "1e10" all give 60000', got.slice(0, 7).every((x) => x === 60000), bad);
+  ok('R22 ...never faster than every 500 ms, and a value that is not a number is the 2000 default', got.slice(7).join() === '2000,500,500,500,2000,2000', bad);
+  ok('R22 ...so no pace reaches Node\'s 2147483647 ms timer limit (above it a timer fires every 1 ms)', got.every((x) => typeof x === 'number' && x >= 500 && x <= 2147483647), { got, bad });
+});
+
 // ---- the config ------------------------------------------------------------------------------------------------------------
 step('config', () => {
   const j = JSON.parse(fs.readFileSync(CFG_FILE, 'utf8'));
