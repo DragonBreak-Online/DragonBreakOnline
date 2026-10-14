@@ -29,6 +29,15 @@ const mp = {
   getIdFromDesc: () => 0, getDescFromId: (id) => `${id.toString(16)}:Skyrim.esm`, getServerSettings: () => ({}),
 };
 const packets = [];
+
+// racial.js keeps a record per power since 14 Oct (a race may have more than one), so a test that fast-forwards a
+// power reaches for its own record rather than the character's whole property.
+const prec = (actor, key) => {
+  const all = state[actor].props['private.racialPower'] || (state[actor].props['private.racialPower'] = {});
+  all.used = all.used || {};
+  return (all.used[key] = all.used[key] || {});
+};
+
 const told = [];
 const caps = new Map();
 let online = [];
@@ -54,8 +63,8 @@ state[NPC] = { race: RACE_IDS.khajiit[0] };
 let now = 10_000_000;
 // ---- who may call it ----
 check('the default: Night Eye, 60 s, a 20-minute wait, drawn by the client (no clientOnly)',
-  R.config.khajiit.power.name === 'Night Eye' && R.config.khajiit.power.seconds === 60 && R.config.khajiit.power.cooldownHours === 1 / 3
-  && R.config.khajiit.power.clientOnly !== true && R.config.khajiit.power.clientCap === 'nightEye' && R.config.khajiit.power.view === 'nightEye');
+  R.config.khajiit.powers[0].name === 'Night Eye' && R.config.khajiit.powers[0].seconds === 60 && R.config.khajiit.powers[0].cooldownHours === 1 / 3
+  && R.config.khajiit.powers[0].clientOnly !== true && R.config.khajiit.powers[0].clientCap === 'nightEye' && R.config.khajiit.powers[0].view === 'nightEye');
 const v0 = R.powerView(KHAJIIT, now);
 check('a Khajiit on a new client: ready, with what it does and its wait', v0 && v0.ready === true && v0.clientOnly === false && v0.effect === 'you see in the dark' && v0.cooldownHours === 1 / 3, v0);
 check('a Khajiit on an old client (no nightEye cap): a later update, not ready', R.powerView(OLD, now).clientOnly === true && R.powerView(OLD, now).ready === false && /later update/.test(R.statusLine(OLD, now)));
@@ -73,7 +82,7 @@ check('...and then nothing while nothing changes', anyEye().length === 0);
 // ---- use ----
 clear();
 const u = R.usePower(KHAJIIT, now);
-const st = state[KHAJIIT].props['private.racialPower'];
+const st = prec(KHAJIIT, 'nighteye');
 check('a Khajiit calls it: ok, 60 s, the wait 20 minutes', u.ok && st.race === 'khajiit' && st.activeUntil - st.usedAt === 60000 && st.readyAt - st.usedAt === 20 * 60000, [u, st]);
 check('...its own client is told on at once with 60 s', eye(KHAJIIT).length === 1 && eye(KHAJIIT)[0].on === true && eye(KHAJIIT)[0].seconds === 60, eye(KHAJIIT));
 check('...and nobody else is (no relay to the Khajiit watching, the Nord or the old client)', anyEye().length === 1);
@@ -97,7 +106,7 @@ check('logged in, before the UI said it draws it: nothing yet', eye(KHAJIIT).len
 caps.set(KHAJIIT, new Set(['nightEye']));
 R.powerTick(now + 7000);
 check('logged in with the cap while it lasts: on again, with the 53 s left', eye(KHAJIIT).length === 1 && eye(KHAJIIT)[0].on === true && eye(KHAJIIT)[0].seconds === 53, eye(KHAJIIT));
-check('the relog neither reset the wait nor ended it', state[KHAJIIT].props['private.racialPower'].readyAt === st.readyAt && state[KHAJIIT].props['private.racialPower'].activeUntil === st.activeUntil);
+check('the relog neither reset the wait nor ended it', prec(KHAJIIT, 'nighteye').readyAt === st.readyAt && prec(KHAJIIT, 'nighteye').activeUntil === st.activeUntil);
 
 // ---- the end ----
 clear(); R.powerTick(now + 60000);
@@ -112,7 +121,7 @@ let t = now + 20 * 60000 + 1;
 // ---- death ends it, the wait stays ----
 clear(); state[KHAJIIT].dead = true; R.powerTick(t + 5000);
 check('death: off at once', eye(KHAJIIT).length === 1 && eye(KHAJIIT)[0].on === false, eye(KHAJIIT));
-check('...the power has ended (no countdown) and the wait stays', R.hudField(KHAJIIT, t + 5000) === null && state[KHAJIIT].props['private.racialPower'].readyAt === t + 20 * 60000);
+check('...the power has ended (no countdown) and the wait stays', R.hudField(KHAJIIT, t + 5000) === null && prec(KHAJIIT, 'nighteye').readyAt === t + 20 * 60000);
 state[KHAJIIT].dead = false; clear(); R.powerTick(t + 10000);
 check('...and it does not come back on revival', anyEye().length === 0 && !R.usePower(KHAJIIT, t + 10000).ok);
 
@@ -155,6 +164,37 @@ const gm = fs.readFileSync(path.join(SERVER, 'gamemode.js'), 'utf8');
 check('gamemode.js gives racial.js the uiCaps reader', /require\(RACIAL_JS\)\(\{[^}]*\bhasUiCap\b[^}]*\}\)/.test(gm));
 check('gamemode.js forgets the actor at logout (__dboRacialLeave)', /'__dboRacialLeave'\]\)/.test(gm));
 check('the journal\'s button calls usePower (journal.js journalAction racialPower)', /racialPower: \(a\) => \(typeof globalThis.__dboRacialPowerUse/.test(fs.readFileSync(path.join(SERVER, 'journal.js'), 'utf8')));
+
+// ---- Cat-like Reflexes, the Khajiit's second power (Nate, 14 Oct) ----------------------------------------------
+// Two powers on one race, each with its own wait. The buffs are the player's own game (speed and jump), so the server
+// carries the numbers and declines the call until a client names the cap, exactly as Night Eye was before 0.3.97.
+{
+  const cfg = R.config.khajiit;
+  check('the Khajiit have two powers, Night Eye first', Array.isArray(cfg.powers) && cfg.powers.length === 2
+    && cfg.powers[0].name === 'Night Eye' && cfg.powers[1].name === 'Cat-like Reflexes', (cfg.powers || []).map((p) => p.name));
+  const cat = cfg.powers[1];
+  check('Cat-like Reflexes: 60 s, 15% faster, 20% higher', cat.seconds === 60 && cat.buffs.moveSpeed === 0.15 && cat.buffs.jumpHeight === 0.2, cat);
+  check('...and it waits its own cooldown, named for a client to draw', cat.cooldownHours === 1 / 3 && cat.clientCap === 'catReflexes' && cat.view === 'catReflexes');
+
+  const views = R.powerViews(KHAJIIT, now);
+  check('both are offered, each with its own key', views.length === 2 && views[0].key === 'nighteye' && views[1].key === 'catreflexes', views.map((v) => v.key));
+  check('powerView still answers with the first, and lists the other', R.powerView(KHAJIIT, now).name === 'Night Eye'
+    && (R.powerView(KHAJIIT, now).others || []).length === 1);
+  check('no client draws it yet, so it is refused by name', /later update/.test(R.usePower(KHAJIIT, now, 'Cat-like Reflexes').text));
+  check('...and a name the race does not have says so', /no power called/.test(R.usePower(KHAJIIT, now, 'Dragonskin').text));
+
+  // With a client that names both caps, the two run on their own waits and do not touch each other
+  caps.set(KHAJIIT, new Set(['nightEye', 'catReflexes']));
+  const a = R.usePower(KHAJIIT, now, 'cat-like reflexes');
+  check('a client that can draw it may call it, by its name', a.ok === true, a);
+  check('...and it is upon them while Night Eye is still ready, each wait its own', (() => {
+    const vs = R.powerViews(KHAJIIT, now);
+    const cat = vs.find((v) => v.key === 'catreflexes'), eye = vs.find((v) => v.key === 'nighteye');
+    return cat && cat.activeMs > 0 && eye && eye.ready === true;
+  })(), R.powerViews(KHAJIIT, now).map((v) => [v.key, v.ready, v.activeMs]));
+  check('...calling it twice while it runs is refused', /already upon you/.test(R.usePower(KHAJIIT, now, 'catreflexes').text));
+  check('...and Night Eye can still be called in the same minute', R.usePower(KHAJIIT, now, 'nighteye').ok === true);
+}
 
 console.log(failures ? `\n${failures} FAILED` : '\nall passed');
 process.exitCode = failures ? 1 : 0;
