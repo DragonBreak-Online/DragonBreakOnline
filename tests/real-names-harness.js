@@ -465,6 +465,34 @@ step('R23 cost', () => {
   ok('R23 (both off again)', !isMarker(known(GM)) && !isMarker(known(TRIAL)));
 });
 
+// ---- R24: a playermenu.js load that throws part way ends every mode on (fail closed) ------------------------------------------
+// gamemode.js's own loader block, cut out and run, with a playermenu.js that throws at its first every() call: after
+// __dboNameFor is set, before the realnames sweep is registered (the privacy review's case, 14 Oct). Its catch nulls the
+// leave and login hooks, so a mode left on would outlast a logout and lost rights
+step('R24 failed load', () => {
+  const a0 = GMSRC.indexOf("try {\n  const PLAYERMENU_JS = path.resolve('playermenu.js');");
+  const b0 = a0 < 0 ? -1 : GMSRC.indexOf('\n}\n', GMSRC.indexOf('playermenu.js failed to load', a0));
+  if (a0 < 0 || b0 < 0) throw new Error('the playermenu.js loader markers are gone');
+  const block = GMSRC.slice(a0, b0 + 2);
+  const A = api();
+  const loader = new Function('path', 'commands', 'isAdmin', 'mp', 'log', 'personal', 'system', 'registerChatCommand', 'onUi', 'sendPacket', 'display', 'nameOf', 'tagOf',
+    'profileOf', 'onlineActors', 'isLeadStaff', 'staffCan', 'ranksOf', 'giveItem', 'makeProp', 'ZONES', 'zoneOfActor', 'cfg', 'every', 'require', block);
+  cmd(GM, 'on');
+  ok('R24 (the GM is in the mode)', isMarker(known(GM)) && nameFor(GM, P) === 'Pell');
+  const keepUi = new Map(ui), keepTimers = new Map(timers), prevNameFor = globalThis.__dboNameFor;
+  loader({ resolve: () => PM_FILE }, new Map(), T.isAdmin, mp, A.log, A.personal, A.system, A.registerChatCommand, A.onUi, A.sendPacket, display, A.nameOf, tagOf,
+    A.profileOf, A.onlineActors, T.isLeadStaff, T.staffCan, A.ranksOf, A.giveItem, A.makeProp, {}, A.zoneOfActor, cfg, () => { throw new Error('boom (harness)'); }, require);
+  ok('R24 (the load threw where the review said: the hooks are cleared, __dboNameFor is the new partial load\'s)', globalThis.__dboPlayerMenuReady === null && globalThis.__dboRealNamesOn === null
+    && typeof globalThis.__dboNameFor === 'function' && globalThis.__dboNameFor !== prevNameFor && logs.some((l) => /^playermenu\.js failed to load:/.test(l)));
+  ok('R24 a load that throws part way ends the mode: the server names an unmet player Stranger to the GM again', nameFor(GM, P) === 'Stranger' && nameFor(GM, M) === 'Masked Person', [nameFor(GM, P), nameFor(GM, M)]);
+  ok('R24 ...the server log says whose mode ended', logs.some((l) => /^realnames: Gerd #GERD off \(playermenu\.js failed to load\)$/.test(l)), logs.slice(-3));
+  ui.get('playerMenu')(GM, [P]);
+  ok('R24 ...and the next X press puts the true list back from the stash', !isMarker(known(GM)) && sameSet(known(GM), [Q, PLAYER, TRIAL]) && (stash(GM) === null || stash(GM) === undefined), [known(GM), stash(GM)]);
+  for (const [k, v] of keepUi) ui.set(k, v); for (const [k, v] of keepTimers) timers.set(k, v);
+  load();
+  ok('R24 ...after a load that works the GM can turn it on again', /^Real names on: /.test(cmd(GM, 'on')) && /^Real names off: /.test(cmd(GM, 'off')) && sameSet(known(GM), [Q, PLAYER, TRIAL]));
+});
+
 // ---- the config ------------------------------------------------------------------------------------------------------------
 step('config', () => {
   const j = JSON.parse(fs.readFileSync(CFG_FILE, 'utf8'));

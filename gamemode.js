@@ -7296,6 +7296,14 @@ try {
   log('playermenu.js failed to load:', e.stack || e.message); globalThis.__dboPlayerMenuLeave = null; globalThis.__dboPlayerMenuReady = null; globalThis.__dboInstantRestraint = null;
   // Chat, /players and the U panel then name everyone as before real names
   globalThis.__dboRealNamesOn = null; globalThis.__dboRealNamesLabel = null; globalThis.__dboRealNamesDisplay = null; globalThis.__dboRealNamesSet = null;
+  // And every real-names mode on ends (fail closed): a load that threw part way leaves no sweep and no leave or login
+  // hook, so a mode on would outlast a logout and lost rights (privacy review, 14 Oct). The server names Strangers
+  // again at once; each list comes back from its stash at the next X press or the next load that works
+  const RNM = globalThis.__dboRealNames;
+  if (RNM instanceof Map && RNM.size) {
+    try { for (const x of RNM.keys()) log(`realnames: ${display(x)} off (playermenu.js failed to load)`); } catch (e2) { /* the clear below still runs */ }
+    RNM.clear();
+  }
 }
 
 // ---- RaceMenu extras: overlays, body scales and morphs kept per character (server\appearanceextras.js) ----

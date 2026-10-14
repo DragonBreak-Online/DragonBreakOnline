@@ -281,6 +281,8 @@ module.exports = (api) => {
   };
   // Chat (gamemode.js handleLine and sendNear), /players and the U panel's player list read these; each fails safe
   globalThis.__dboRealNamesOn = (viewer) => revealing(viewer);
+  // Not tied to a viewer: the label is for the recipients for whom __dboRealNamesOn(recipient) is true and no one else
+  // (gamemode.js handleLine and sendNear check it per recipient). A new caller must do the same
   globalThis.__dboRealNamesLabel = (speaker) => (RN_ON && realNamesOn.size > 0 && RN.chat !== false ? staffLabel(Number(speaker) >>> 0) : '');
   globalThis.__dboRealNamesDisplay = (viewer, t) => (revealing(viewer) ? `${revealedName(Number(t) >>> 0)} #${tagOf(t)}` : '');
   // For a panel button (fork AdminSystem, later) and the harness: checks the rights itself
