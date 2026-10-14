@@ -307,6 +307,9 @@ module.exports = (api) => {
     } catch (e) { log('spells: learned list failed', e.message); return null; }
   };
   const knows = (a, spellId) => { const l = learnedIds(a); return !!l && l.includes(spellId >>> 0); };
+  // A spell an apprentice holds on loan from their teacher (schools.js apprenticeship) is not theirs to pass on
+  const onLoan = (a, spellId) => { try { return typeof globalThis.__dboSchoolsOnLoan === 'function' && !!globalThis.__dboSchoolsOnLoan(a, spellId >>> 0); } catch (e) { return false; } };
+  const ownLearned = (a) => (learnedIds(a) || []).filter((id) => !onLoan(a, id));
   const papyrus = (a, fn, spellId, extra) => {
     try { return mp.callPapyrusFunction('method', 'Actor', fn, { type: 'form', desc: descOf(a) }, [{ type: 'espm', desc: descOf(spellId) }].concat(extra || [])) === true; }
     catch (e) { log(`spells: ${fn} ${descOf(spellId)} failed`, e.message); return false; }
@@ -622,7 +625,7 @@ module.exports = (api) => {
   const teachable = (a) => {
     const skills = SPELL_SKILLS.filter((s) => tierOf(a, s.id) >= CFG.teacherMinTier);
     if (!skills.length) return [];
-    const ids = new Set(learnedIds(a) || []);
+    const ids = new Set(ownLearned(a));
     for (const s of skills) for (const id of studiedIds(a, s.id)) ids.add(id);
     return [...ids].map(classifySpell).filter((sp) => sp && !removed(sp.id) && Number(sp.rank) >= CFG.teachMinRank && pathsOf(a, sp.school).some((skill) => skills.includes(skill)));
   };
@@ -981,7 +984,7 @@ module.exports = (api) => {
   };
   // Spells the teacher may teach: school spells they hold (book or engine), never above shopMaxRank (no Master spells)
   const collegeTeachable = (a) => {
-    const ids = new Set([].concat(learnedIds(a) || [], knownIds(a)));
+    const ids = new Set([].concat(ownLearned(a), knownIds(a)));
     return [...ids].map(classifySpell).filter((sp) => sp && Number(sp.rank) <= Number(CFG.shopMaxRank))
       .sort((x, y) => x.school.localeCompare(y.school) || x.rank - y.rank || x.name.localeCompare(y.name));
   };
@@ -1111,7 +1114,7 @@ module.exports = (api) => {
   };
   const classRefusal = (teacher, student, sp) => {
     if (!onlineActors().includes(student >>> 0)) return `${display(student)} is not here.`;
-    if (!(knows(teacher, sp.id) || inBook(teacher, sp.id))) return `${display(teacher)} can no longer teach ${sp.name}.`;
+    if (!((knows(teacher, sp.id) && !onLoan(teacher, sp.id)) || inBook(teacher, sp.id))) return `${display(teacher)} can no longer teach ${sp.name}.`;
     if (restrictedSpell(sp.id) && !isSenior(student)) return `${RESTRICTED_LINE}.`;
     const cap = classStudentCap(student);
     if (Number(sp.rank) > cap) return `At your rank you may be taught spells up to ${RANKS[cap]}; ${sp.name} is ${/^[AEIOU]/.test(rankWord(sp.rank)) ? 'an' : 'a'} ${rankWord(sp.rank)} spell.`;
@@ -1251,13 +1254,27 @@ module.exports = (api) => {
   // first, with where they are sold: [{ spell, school, rank, rankName, where }]
   // Every spell of `school` at exactly `rank` that a tome teaches, minus the shop's excluded plugins and editor ids: the
   // Apprentice and Adept choices of the Arcane Mastery picks (schools.js rankPicks). Spell ids, one each, vanilla first.
-  globalThis.__dboSpellsRankOptions = (school, rank) => {
+  // Removed spells never; the restricted arts (seniorOnlyTomes) only when `a` is given and is a Senior rank, as at the shop.
+  globalThis.__dboSpellsRankOptions = (school, rank, a) => {
     const seen = new Set();
+    const senior = !!a && isSenior(a);
     return [...TOMES.values()]
-      .filter((t) => t.school === String(school) && t.rank === Number(rank) && !(CFG.shopExcludePlugins || []).includes(t.plugin) && !(excluded && excluded.test(t.edid)))
+      .filter((t) => t.school === String(school) && t.rank === Number(rank) && !(CFG.shopExcludePlugins || []).includes(t.plugin) && !(excluded && excluded.test(t.edid))
+        && !removed(t.spellId) && (senior || !restrictedTome(t)))
       .sort((x, y) => (x.plugin === 'Skyrim.esm' ? 0 : 1) - (y.plugin === 'Skyrim.esm' ? 0 : 1) || x.name.localeCompare(y.name))
       .filter((t) => (seen.has(t.spellId) ? false : seen.add(t.spellId)))
       .map((t) => t.spellId >>> 0);
+  };
+  // Why a spell may not pass to `a` by an apprenticeship (schools.js), or '': a removed spell, one no tome teaches (a beast
+  // form's, a power, a quest's), a restricted art below Senior rank, or one switched off
+  const TOME_SPELLS = new Set([...TOMES.values()].map((t) => t.spellId >>> 0));
+  globalThis.__dboSpellsOpenTo = (a, spellId) => {
+    const id = Number(spellId) >>> 0;
+    if (removed(id)) return 'no longer taught';
+    if (!TOME_SPELLS.has(id)) return 'not a spell of the tomes';
+    if (restrictedSpell(id) && !isSenior(a)) return RESTRICTED_LINE;
+    try { if (typeof globalThis.__dboCastBlocked === 'function' && globalThis.__dboCastBlocked(id)) return 'switched off'; } catch (e) { /* no gate */ }
+    return '';
   };
   globalThis.__dboSpellsTomesFor = (a, school, skillId, maxRank, limit) => {
     const cap = Math.min(maxRankFor(String(skillId), tierOf(a, String(skillId))), Number.isFinite(Number(maxRank)) ? Number(maxRank) : 4);

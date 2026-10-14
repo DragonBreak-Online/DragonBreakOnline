@@ -118,7 +118,7 @@ module.exports = (api) => {
     // apprentice's school rank (Priest's for Restoration) must be at least the spell's.
     apprenticeship: {
       enabled: true, teacherArcaneLevel: 75, teacherPriestLevel: 75, radiusMeters: 60, xpPerCast: 1, castGapSeconds: 2, dailyXp: 20,
-      daysByRank: [1, 2, 3, 5, 15], max: 1, seniorMax: 3, seniorGuilds: ['synod', 'college-of-winterhold', 'college-of-whispers', 'house-telvanni', 'mages-guild'],
+      daysByRank: [1, 2, 3, 5, 15], max: 1, seniorMax: 3, seniorGuilds: ['synod', 'college-of-winterhold', 'college-of-whispers', 'house-telvanni'],
       seniorRoles: ['leader', 'officer'], offerMinutes: 5, tickSeconds: 3,
     },
     swap: { enabled: true, cooldownDays: 7, startShare: 0.5 },
@@ -188,6 +188,35 @@ module.exports = (api) => {
     rankPicks: Object.assign({}, DEFAULTS.rankPicks, raw.rankPicks || {}, { ranks: Object.assign({}, DEFAULTS.rankPicks.ranks, (raw.rankPicks || {}).ranks || {}) }),
     apprenticeship: Object.assign({}, DEFAULTS.apprenticeship, raw.apprenticeship || {}),
   });
+  // Arcane Mastery's numbers, checked once a load: a value of the wrong kind or out of range falls back to its default and
+  // is logged, never thrown (a typo in gamemode-config.json must not hold a school or hand out a spell)
+  const fix = (obj, dflt, key, min, max) => {
+    const v = obj[key];
+    if (v === undefined) { obj[key] = dflt[key]; return; }
+    const n = Number(v);
+    if (typeof v === 'boolean' || !Number.isFinite(n) || n < min || n > max) { log(`schools: config ${key} ${JSON.stringify(v)} is not ${min} to ${max}; ${JSON.stringify(dflt[key])} is used`); obj[key] = dflt[key]; } else obj[key] = n;
+  };
+  (() => {
+    const RP0 = DEFAULTS.rankPicks, AP0 = DEFAULTS.apprenticeship, rp = C.rankPicks, ap = C.apprenticeship;
+    fix(rp, RP0, 'priestHoldXp', 0, 99.99);
+    const ranks = {};
+    for (const [rank, at] of Object.entries(rp.ranks || {})) {
+      const n = Number(at);
+      if (['Apprentice', 'Adept', 'Expert', 'Master'].includes(rank) && Number.isFinite(n) && n >= 1 && n <= 99) ranks[rank] = Math.floor(n);
+      else log(`schools: config rankPicks.ranks.${rank} ${JSON.stringify(at)} is not a rank at 1 to 99; left out`);
+    }
+    rp.ranks = ranks;
+    if (!C.rankSpells || typeof C.rankSpells !== 'object' || Array.isArray(C.rankSpells)) C.rankSpells = {};
+    for (const [key, min, max] of [['teacherArcaneLevel', 1, 100], ['teacherPriestLevel', 1, 100], ['radiusMeters', 1, 1000], ['xpPerCast', 0.01, 1000],
+      ['castGapSeconds', 0, 3600], ['dailyXp', 1, 10000], ['max', 0, 20], ['seniorMax', 0, 20], ['offerMinutes', 1, 120], ['tickSeconds', 1, 60]]) fix(ap, AP0, key, min, max);
+    if (!Array.isArray(ap.daysByRank) || ap.daysByRank.length !== 5 || !ap.daysByRank.every((d) => Number.isFinite(Number(d)) && Number(d) >= 0.05 && Number(d) <= 365)) {
+      if (ap.daysByRank !== AP0.daysByRank) log(`schools: config apprenticeship.daysByRank ${JSON.stringify(ap.daysByRank)} is not five day counts (Novice to Master); ${JSON.stringify(AP0.daysByRank)} is used`);
+      ap.daysByRank = AP0.daysByRank.slice();
+    } else ap.daysByRank = ap.daysByRank.map(Number);
+    for (const key of ['seniorGuilds', 'seniorRoles']) {
+      if (!Array.isArray(ap[key]) || !ap[key].every((x) => typeof x === 'string')) { log(`schools: config apprenticeship.${key} ${JSON.stringify(ap[key])} is not a list of names; the default is used`); ap[key] = AP0[key].slice(); }
+    }
+  })();
   const ALTERATION = ['both', 'arcane', 'priest'].includes(String(C.alteration)) ? String(C.alteration) : 'both';
   const SCHOOLS = (Array.isArray(C.schools) ? C.schools : DEFAULTS.schools).map(String).filter((n) => n !== 'Alteration' || ALTERATION !== 'priest');
   const RANKS = ['Novice', 'Apprentice', 'Adept', 'Expert', 'Master'];
@@ -210,6 +239,19 @@ module.exports = (api) => {
   const idOf = (desc) => { try { return mp.getIdFromDesc(String(desc)) >>> 0; } catch (e) { return 0; } };
   const descOf = (id) => { try { return String(mp.getDescFromId(id >>> 0)); } catch (e) { return ''; } };
   const norm = (d) => { const s = String(d || ''); const i = s.indexOf(':'); if (i < 0) return s.toLowerCase(); const n = parseInt(s.slice(0, i), 16); return (Number.isFinite(n) ? n.toString(16) : s.slice(0, i).toLowerCase()) + ':' + s.slice(i + 1).toLowerCase(); };
+  // Spell lines (Nate, 14 Oct, option B): vanilla's own families, school by school, in spell-lines.json. At a rank pick the
+  // next spell of each line the character knows comes first, marked as such; it is added, and the old spell is kept.
+  // [{ school, name, ids: [spell id, in order] }]; an entry whose id does not resolve here ends its line there.
+  const LINES = (() => {
+    let raw = null;
+    for (const f of [require('path').resolve('spell-lines.json'), require('path').join(__dirname, 'spell-lines.json')]) { try { raw = JSON.parse(require('fs').readFileSync(f, 'utf8')); break; } catch (e) { /* the next place */ } }
+    if (!raw || !Array.isArray(raw.lines)) { log('schools: spell-lines.json not found or unreadable: rank picks list no lines'); return []; }
+    return raw.lines.filter((l) => l && typeof l.school === 'string' && Array.isArray(l.spells)).map((l) => {
+      const ids = [];
+      for (const sp of l.spells) { const id = sp && sp.id ? idOf(sp.id) : 0; if (!id) break; ids.push(id); }
+      return { school: l.school, name: String(l.name || ''), ids };
+    }).filter((l) => l.ids.length > 1);
+  })();
   const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
   const inWords = (ms) => { const m = Math.max(1, Math.ceil(ms / MIN)); return m < 90 ? plural(m, 'minute') : plural(Math.round(m / 60), 'hour'); };
   const online = (a) => { try { return onlineActors().includes(a >>> 0); } catch (e) { return false; } };
@@ -361,18 +403,37 @@ module.exports = (api) => {
   // "at 25 Apprentice, and at the threshold for 26 it locks": a rank's pick opens once the school is held there.
   const stageOf = (a, s, school) => {
     const level = pickLevel(a, s, school);
-    if (pickOpen(s, school)) return level >= PICK_AT && (C.firstSpells[school] || []).length ? 'first' : '';
+    // A school with no first spells listed has no first pick to wait on: its rank picks still open, so a hold never strands it
+    if (pickOpen(s, school) && (C.firstSpells[school] || []).length) return level >= PICK_AT ? 'first' : '';
     for (const p of RANK_PICKS) if (!rankMade(s, school, p.rank) && atThreshold(a, s, school, p)) return p.rank;
     return '';
   };
   const stageAt = (st) => (st === 'first' ? PICK_AT : (RANK_PICKS.find((p) => p.rank === st) || { at: PICK_AT }).at);
   const stageWord = (st) => (st && st !== 'first' ? `${st} spell` : 'first spell');
   // A stage's spells as descs: the first spells, or the rank's (rankSpells, else every tome spell of that school and rank)
-  const stageList = (school, st) => {
+  // `a`: the chooser, so a restricted art (spells.js seniorOnlyTomes) is listed only for a Senior; removed spells never are
+  const stageList = (school, st, a) => {
     if (!st || st === 'first') return C.firstSpells[school] || [];
     const own = (C.rankSpells[school] || {})[st];
     if (Array.isArray(own) && own.length) return own;
-    try { return typeof globalThis.__dboSpellsRankOptions === 'function' ? (globalThis.__dboSpellsRankOptions(school, RANKS.indexOf(st)) || []).map((id) => descOf(id >>> 0)).filter(Boolean) : []; } catch (e) { return []; }
+    try { return typeof globalThis.__dboSpellsRankOptions === 'function' ? (globalThis.__dboSpellsRankOptions(school, RANKS.indexOf(st), a) || []).map((id) => descOf(id >>> 0)).filter(Boolean) : []; } catch (e) { return []; }
+  };
+  // The next spell of each line `a` knows (their own spells, not one on loan to an apprentice) in `school`: id -> the name of
+  // the spell it follows. Only spells in `ids` (the pick's options) count, so an excluded, restricted or removed successor,
+  // one of another rank, or one already known is skipped and that line offers nothing here.
+  const lineNexts = (a, school, ids) => {
+    const out = new Map();
+    if (!LINES.length || !ids.size) return out;
+    const own = new Set(ownSpells(a).map((sp) => sp.id >>> 0));
+    for (const sp of bookOf(a)) own.add(sp.id >>> 0);
+    for (const l of LINES) {
+      if (l.school !== school) continue;
+      for (let i = 0; i + 1 < l.ids.length; i++) {
+        const next = l.ids[i + 1];
+        if (own.has(l.ids[i]) && ids.has(next) && !out.has(next)) { const from = classify(l.ids[i]); out.set(next, from ? from.name : nameOfSpell(descOf(l.ids[i]))); }
+      }
+    }
+    return out;
   };
   const markStage = (s, school, st, rec) => {
     if (st === 'first') { s.picks[school] = rec; return; }
@@ -407,11 +468,17 @@ module.exports = (api) => {
   };
   // A school's first spells the character does not know yet: [{ id, desc, name }]
   const pickOptions = (a, school) => {
-    const known = new Set(knownSpells(a).map((sp) => sp.id >>> 0));
+    const known = new Set(ownSpells(a).map((sp) => sp.id >>> 0));
     for (const sp of bookOf(a)) known.add(sp.id >>> 0);
     // desc as the engine writes it (ids are looked up by it); key, lower case, for SPELL_BLURB and comparisons
-    return stageList(school, stageOf(a, stateOf(a), school)).map((d) => ({ id: idOf(d) })).filter((o) => o.id && !known.has(o.id))
+    const st = stageOf(a, stateOf(a), school);
+    const list = stageList(school, st, a).map((d) => ({ id: idOf(d) })).filter((o) => o.id && !known.has(o.id))
       .map((o) => Object.assign(o, { desc: descOf(o.id), key: norm(descOf(o.id)) })).map((o) => Object.assign(o, { name: nameOfSpell(o.desc) })).filter((o) => o.name);
+    if (!st || st === 'first') return list;
+    // A rank pick: the next spell of each line they know first, marked (from), then the rest of the rank's tomes as before
+    const nexts = lineNexts(a, school, new Set(list.map((o) => o.id)));
+    for (const o of list) if (nexts.has(o.id)) { o.from = nexts.get(o.id); o.blurb = `Next in your line: ${o.name} (from ${o.from})`; }
+    return list.filter((o) => o.from).concat(list.filter((o) => !o.from));
   };
   const listWords = (names) => (names.length < 2 ? names.join('') : `${names.slice(0, -1).join(', ')} or ${names[names.length - 1]}`);
   // Every first spell of a school, known or not, in words: 'Flames, Sparks or Frostbite'
@@ -420,7 +487,7 @@ module.exports = (api) => {
   // spells.js away, the engine's list unreadable or an id that does not resolve, the answer is false, and nothing is saved.
   const knowsEvery = (a, school) => {
     if (typeof globalThis.__dboSpellsKnown !== 'function' || typeof globalThis.__dboSpellsBook !== 'function') return false;
-    const list = stageList(school, stageOf(a, stateOf(a), school));
+    const list = stageList(school, stageOf(a, stateOf(a), school), a);
     if (!list.length) return false;
     let known;
     try { known = new Set((globalThis.__dboSpellsKnown(a) || []).map((sp) => sp.id >>> 0)); for (const sp of globalThis.__dboSpellsBook(a) || []) known.add(sp.id >>> 0); } catch (e) { return false; }
@@ -433,7 +500,7 @@ module.exports = (api) => {
       if (pickOptions(a, school).length) { out.push(school); continue; }
       const st = stageOf(a, s, school);
       // A rank with no tome spell at all has nothing to choose; otherwise it cannot be offered just now: asked again later
-      const none = st !== 'first' && typeof globalThis.__dboSpellsRankOptions === 'function' && !stageList(school, st).length;
+      const none = st !== 'first' && typeof globalThis.__dboSpellsRankOptions === 'function' && !stageList(school, st, a).length;
       if (!none && !knowsEvery(a, school)) continue;
       markStage(s, school, st, { spell: '', how: 'none', at: Date.now() });
       save(a, s);
@@ -457,7 +524,7 @@ module.exports = (api) => {
       type: 'studyMagic', id: STUDY_PANEL_ID, nonce, title: st === 'first' ? 'Your First Spell' : `Your ${st} Spell`, mode: 'choose',
       lead: `${what}: choose your ${stageWord(st)} of ${school}. It goes into your spellbook, no tome needed.${held}`,
       school, level: pickLevel(a, stateOf(a), school), rank: st === 'first' ? RANKS[1] : st, fill: 0, leftSeconds: 0, tickSeconds: 0, gained: 0, whyNot: '',
-      choices: options.map((o) => ({ name: o.name, blurb: SPELL_BLURB[o.key] || '', confirm: `Do you want ${o.name} as your ${stageWord(st)} of ${school}?${options.length > 1 ? ` The other${options.length > 2 ? 's' : ''} you can still learn from a tome or a teacher.` : ''}` })),
+      choices: options.map((o) => ({ name: o.name, blurb: o.blurb || SPELL_BLURB[o.key] || '', confirm: `Do you want ${o.name} as your ${stageWord(st)} of ${school}?${o.from ? ` You keep ${o.from}.` : ''}${options.length > 1 ? ` The other${options.length > 2 ? 's' : ''} you can still learn from a tome or a teacher.` : ''}` })),
       result: result || '', resultKind: resultKind || '',
       events: { choose: 'dbo:firstSpellPick', start: 'dbo:firstSpellPick', stop: 'dbo:firstSpellPick', close: 'dbo:firstSpellClose' },
     }, true);
@@ -471,7 +538,7 @@ module.exports = (api) => {
   const seen = (a, arrived) => { if (arrived || !seenAt.has(a >>> 0)) seenAt.set(a >>> 0, Date.now()); };
   const settled = (a) => seenAt.has(a >>> 0) && Date.now() - seenAt.get(a >>> 0) >= SETTLE_MS;
   globalThis.__dboSchoolsArrived = (a) => seen(a, true);
-  globalThis.__dboSchoolsLeave = (a) => { seenAt.delete(a >>> 0); };
+  globalThis.__dboSchoolsLeave = (a) => { seenAt.delete(a >>> 0); try { apLeave(a); } catch (e) { log('schools: apprentice leave failed', e.message); } };
 
   // A spell given to the client once more, once per grant: the client's resets count only time outside menus, so a
   // player sitting in a menu can outlast starterSettleSeconds. Two checks, so the client cannot run the add before the
@@ -1438,6 +1505,20 @@ module.exports = (api) => {
   const guildsOf = (a) => { const g = get(a, 'private.dboGuilds', []); return Array.isArray(g) ? g.map((m) => String(m && m.id)) : []; };
   const guildRolesOf = (a) => { const g = get(a, 'private.dboGuilds', []); return Array.isArray(g) ? g.filter(Boolean).map((m) => ({ id: String(m.id), role: String(m.role || '') })) : []; };
   const knownSpells = (a) => { try { return typeof globalThis.__dboSpellsKnown === 'function' ? (globalThis.__dboSpellsKnown(a) || []) : []; } catch (e) { return []; } };
+  // Spells on loan to an apprentice (the lesson's spell, and any still to be taken back), unless they own it in their book:
+  // never theirs to teach, to set a class by or to count as known in a spell line. Read from the record as it is, so an
+  // offline or unread character is never given a fresh one.
+  const loansOf = (a) => {
+    const s = get(a, PROP, null);
+    if (!s || typeof s !== 'object') return [];
+    const out = (Array.isArray(s.apStray) ? s.apStray : []).concat(s.apprentice && s.apprentice.spell ? [s.apprentice.spell] : []).map(idOf).filter(Boolean);
+    if (!out.length) return out;
+    const book = new Set(bookOf(a).map((sp) => sp.id >>> 0));
+    return out.filter((id) => !book.has(id));
+  };
+  const ownSpells = (a) => { const loans = loansOf(a); return loans.length ? knownSpells(a).filter((sp) => !loans.includes(sp.id >>> 0)) : knownSpells(a); };
+  // spells.js asks before /teach, a college lesson or a class passes a spell on
+  globalThis.__dboSchoolsOnLoan = (a, id) => { try { return loansOf(a >>> 0).includes(Number(id) >>> 0); } catch (e) { return false; } };
   const faithOf = (a) => { const f = get(a, 'private.dboDeity', null); return f && typeof f === 'object' && f.id ? f : null; };
   const priestRank = (a) => { const p = priestOf(a); return p.held && p.level >= 1 ? p.rank : -1; };
   // K: one kind of lectern. conf, refs, the state maps' keys, the record keys for its cooldowns and named list, the
@@ -1742,7 +1823,7 @@ module.exports = (api) => {
       const s = stateOf(a);
       const seen = new Set();
       const arcane = byArcane(a);
-      return knownSpells(a).filter((sp) => {
+      return ownSpells(a).filter((sp) => {
         if (!sp || !SCHOOLS.includes(sp.school) || seen.has(sp.id)) return false;
         seen.add(sp.id);
         const r = schoolRank(s, sp.school);
@@ -1832,7 +1913,7 @@ module.exports = (api) => {
       const r = priestRank(a);
       if (r < P.teacherMinRank) return [];
       const seen = new Set();
-      return knownSpells(a).filter((sp) => {
+      return ownSpells(a).filter((sp) => {
         if (!sp || sp.school !== P.school || seen.has(sp.id)) return false;
         seen.add(sp.id);
         return Number(sp.rank) <= r;
@@ -1914,7 +1995,7 @@ module.exports = (api) => {
       // spell", a newer one reads stage and at. rankSpells lists the Apprentice and Adept spells chosen.
       const st = on ? stageOf(a, s, school) : '';
       const firstPick = pend.includes(school) ? { state: 'open', stage: st, at: stageAt(st), held: st !== 'first',
-        choices: pickOptions(a, school).map((o) => ({ id: o.desc, name: o.name, blurb: SPELL_BLURB[o.key] || '' })) }
+        choices: pickOptions(a, school).map((o) => (o.from ? { id: o.desc, name: o.name, blurb: o.blurb, line: o.from } : { id: o.desc, name: o.name, blurb: SPELL_BLURB[o.key] || '' })) }
         : made ? { state: made.how === 'none' ? 'none' : 'made', spell: made.spell ? nameOfSpell(made.spell) : '' }
           : { state: on ? 'later' : 'closed', at: PICK_AT, spells: firstWords(school) };
       const nextPick = on && made ? RANK_PICKS.find((p) => !rankMade(s, school, p.rank) && p.rank !== st) : null;
@@ -1972,6 +2053,8 @@ module.exports = (api) => {
     const list = Array.isArray(args) ? args.map(String) : [];
     if (!ready(a) || !isPlayer(a)) return { ok: false, text: 'Magic is not open to you yet.' };
     if (op === 'firstSpell') { const r = pickSpell(a, list[0] || '', list[1] || ''); if (r.ok) { try { globalThis.__dboSchoolsProgressSend(a); } catch (e) { /* no K menu */ } } return r; }
+    if (op === 'apprenticeLeave') return leaveApprenticeship(a);
+    if (op === 'apprenticeRelease') return releaseApprentice(a, parseInt(list[0] || '', 16) >>> 0);
     if (op === 'prepare' || op === 'unprepare') {
       if (typeof globalThis.__dboSpellsChangePrepared !== 'function') return { ok: false, text: 'Your spellbook cannot be opened right now.' };
       return globalThis.__dboSpellsChangePrepared(a, list[0] || '', op === 'prepare');
@@ -2001,35 +2084,46 @@ module.exports = (api) => {
   // ---- apprenticeship (Arcane Mastery stage 2, Nate 14 Oct) --------------------------------------------------------------
   // The apprentice's record: s.apprentice { teacher, teacherName, spell (desc), school, rank, xp, need, day, dayXp, at, held,
   // lastCastAt, capTold }; the teacher's: s.apprentices [{ student, name, spell, at }]. An offer waits in memory only.
+  // The lesson's spell is on loan (loansOf): the engine holds it only while held is true. It is taken back away from the
+  // teacher, with the teacher offline, downed or dead, at logout (__dboSchoolsLeave), with the apprenticeship switched off or
+  // the client not able to draw it, and when the lesson ends. One that could not be taken back then (the apprentice offline)
+  // waits in s.apStray and goes at their next check. Held only once the client has settled (starterSettleSeconds), as a
+  // first spell is given, because the client puts its spell list back for its first seconds in the world.
   const AP = C.apprenticeship;
   const APPRENTICE_MENU_ID = 85;
   const AP_MS = Math.max(1, Number(AP.tickSeconds) || 3) * 1000;
   const apOffers = ST0.apOffers instanceof Map ? ST0.apOffers : (ST0.apOffers = new Map()); // student -> { teacher, spell, nonce, until }
   const apTeachPanels = ST0.apTeachPanels instanceof Map ? ST0.apTeachPanels : (ST0.apTeachPanels = new Map()); // teacher -> { nonce, student, options }
+  const apOn = () => !!C.enabled && AP.enabled !== false;
   const dayKey = () => new Date(Date.now()).toISOString().slice(0, 10);
   const spellSkill = (school) => (school === RESTORATION ? PS.skill : C.arcaneSkill);
   const studentRank = (a, s, school) => (school === RESTORATION ? priestRank(a) : schoolRank(s, school));
   const knowsSpell = (a, id) => knownSpells(a).some((sp) => sp.id >>> 0 === id >>> 0) || bookOf(a).some((sp) => sp.id >>> 0 === id >>> 0);
   const inBookOf = (a, id) => bookOf(a).some((sp) => sp.id >>> 0 === id >>> 0);
+  const engineHas = (a, id) => knownSpells(a).some((sp) => sp.id >>> 0 === id >>> 0);
   const isSenior = (a) => guildRolesOf(a).some((m) => (AP.seniorGuilds || []).includes(m.id) && (AP.seniorRoles || []).includes(m.role));
   const apMax = (a) => Math.max(0, Number(isSenior(a) ? AP.seniorMax : AP.max) || 0);
   const apList = (s) => (Array.isArray(s.apprentices) ? s.apprentices : []);
   const canTeachAny = (a) => arcaneOf(a).level >= AP.teacherArcaneLevel || (priestOf(a).held && priestOf(a).level >= AP.teacherPriestLevel);
   const canTeachSchool = (a, school) => (school === RESTORATION ? priestOf(a).held && priestOf(a).level >= AP.teacherPriestLevel : arcaneOf(a).level >= AP.teacherArcaneLevel);
-  const needFor = (rank) => Math.max(1, Number(AP.dailyXp) || 20) * Math.max(1, Number((AP.daysByRank || [])[rank]) || 1);
-  // The spells `a` could teach `t`: known to the teacher, a school the teacher may teach, unknown to the apprentice, at
-  // most the apprentice's rank in that school
+  const needFor = (rank) => Math.max(1, Math.round(Math.max(1, Number(AP.dailyXp) || 20) * Math.max(0.05, Number((AP.daysByRank || [])[rank]) || 1)));
+  // Why the spell may not pass to `t` at all (spells.js: a removed spell, a restricted art below Senior, a spell switched
+  // off), or ''
+  const closedTo = (t, id) => { try { return typeof globalThis.__dboSpellsOpenTo === 'function' ? String(globalThis.__dboSpellsOpenTo(t, id) || '') : ''; } catch (e) { return ''; } };
+  // The spells `a` could teach `t`: their own (never one on loan to them as an apprentice), a school the teacher may teach,
+  // unknown to the apprentice, at most the apprentice's rank in that school, and open to the apprentice
   const teachable = (a, t) => {
     const st = stateOf(t);
     const seen = new Set();
-    return bookOf(a).concat(knownSpells(a)).filter((sp) => sp && sp.school && !seen.has(sp.id >>> 0) && seen.add(sp.id >>> 0))
-      .filter((sp) => (SCHOOLS.includes(sp.school) || sp.school === RESTORATION) && canTeachSchool(a, sp.school) && !knowsSpell(t, sp.id) && studentRank(t, st, sp.school) >= sp.rank)
+    return bookOf(a).concat(ownSpells(a)).filter((sp) => sp && sp.school && !seen.has(sp.id >>> 0) && seen.add(sp.id >>> 0))
+      .filter((sp) => (SCHOOLS.includes(sp.school) || sp.school === RESTORATION) && canTeachSchool(a, sp.school) && !knowsSpell(t, sp.id) && studentRank(t, st, sp.school) >= sp.rank && !closedTo(t, sp.id))
       .sort((x, y) => x.rank - y.rank || x.name.localeCompare(y.name));
   };
   // Why `a` cannot take `t` as apprentice now, or ''
   const takeRefusal = (a, t) => {
-    if (!C.enabled || AP.enabled === false) return 'Apprenticeship is not open.';
+    if (!apOn()) return 'Apprenticeship is not open.';
     if (a >>> 0 === t >>> 0) return 'You cannot be your own apprentice.';
+    if (!online(a) || !online(t)) return 'Both of you must be here.';
     if (!canTeachAny(a)) return `Taking an apprentice takes Arcane Arts at ${AP.teacherArcaneLevel}, or Priest at ${AP.teacherPriestLevel} to teach Restoration.`;
     const s = stateOf(a);
     if (apList(s).length >= apMax(a)) return apMax(a) === 1 ? 'You already have an apprentice. Release them first, or finish their lesson.' : `You already have ${apList(s).length} apprentices, as many as your standing allows.`;
@@ -2039,13 +2133,29 @@ module.exports = (api) => {
     return '';
   };
   const papyrusQuiet = (a, fn, id) => papyrusSpell(a, fn, id, fn === 'AddSpell' ? [false] : []);
+  // Takes a loaned spell off the character unless they own it in their book; true when the engine no longer holds it on loan
+  const takeBack = (a, id) => {
+    if (!id || inBookOf(a, id)) return true;
+    if (engineHas(a, id)) papyrusQuiet(a, 'RemoveSpell', id);
+    return !engineHas(a, id);
+  };
+  const addStray = (s, desc) => { s.apStray = [...new Set((Array.isArray(s.apStray) ? s.apStray : []).concat([desc]))]; };
   // The spell is held only while near the teacher; never take back one the apprentice owns in their book
   const setHeld = (a, s, on) => {
     const ap = s.apprentice;
     if (!ap || !!ap.held === on) return;
     const id = idOf(ap.spell);
     if (!id) return;
-    if (on) { papyrusQuiet(a, 'AddSpell', id); ap.held = true; } else { if (!inBookOf(a, id)) papyrusQuiet(a, 'RemoveSpell', id); ap.held = false; }
+    if (on) { papyrusQuiet(a, 'AddSpell', id); ap.held = true; } else { if (!online(a) || !takeBack(a, id)) addStray(s, ap.spell); ap.held = false; }
+    save(a, s);
+  };
+  // Loaned spells left over (an apprentice offline when their lesson ended, or a take-back that did not land): taken now
+  const clearStrays = (a, s) => {
+    if (!Array.isArray(s.apStray) || !s.apStray.length) return;
+    const keep = s.apprentice && s.apprentice.held ? norm(s.apprentice.spell) : '';
+    const left = s.apStray.filter((d) => norm(d) !== keep && !takeBack(a, idOf(d)));
+    if (left.length !== s.apStray.length) { audit(`SCHOOLS ${who(a)}: loaned spell${s.apStray.length === 1 ? '' : 's'} ${s.apStray.join(', ')} taken back${left.length ? ` (${left.length} still waiting)` : ''}`); }
+    if (left.length) s.apStray = left; else delete s.apStray;
     save(a, s);
   };
   const endApprenticeship = (t, why, tell) => {
@@ -2055,11 +2165,14 @@ module.exports = (api) => {
     setHeld(t, s, false);
     const teacher = ap.teacher >>> 0;
     delete s.apprentice; save(t, s);
-    try {
-      const ts = stateOf(teacher);
-      const left = apList(ts).filter((x) => x.student >>> 0 !== t >>> 0);
-      if (left.length !== apList(ts).length) { ts.apprentices = left; save(teacher, ts); }
-    } catch (e) { /* the teacher's record is gone */ }
+    // The teacher's list, when their record can be read (online); an offline teacher's is pruned at their next check
+    if (online(teacher)) {
+      try {
+        const ts = stateOf(teacher);
+        const left = apList(ts).filter((x) => x.student >>> 0 !== t >>> 0);
+        if (left.length !== apList(ts).length) { ts.apprentices = left; save(teacher, ts); }
+      } catch (e) { /* the teacher's record is gone */ }
+    }
     audit(`SCHOOLS apprenticeship of ${who(t)} with ${ap.teacherName || teacher.toString(16)} in ${ap.spell} ended: ${why}`);
     if (tell) personal(t, tell);
   };
@@ -2100,9 +2213,11 @@ module.exports = (api) => {
     apOffers.delete(t >>> 0);
     closeWidget(t, APPRENTICE_MENU_ID);
     if (!o) return;
-    if (!accept || Date.now() > o.until) { personal(o.teacher, `${display(t)} declined to study ${o.name} with you.`); return; }
+    if (!accept || Date.now() > o.until) { if (online(o.teacher)) personal(o.teacher, `${display(t)} declined to study ${o.name} with you.`); return; }
     const why = takeRefusal(o.teacher, t);
-    if (why) { personal(t, 'The apprenticeship cannot begin just now.'); personal(o.teacher, why); return; }
+    if (why) { personal(t, 'The apprenticeship cannot begin just now.'); if (online(o.teacher)) personal(o.teacher, why); return; }
+    // The spell offered must still be one the teacher can teach this student (it may have been lost or learned meanwhile)
+    if (!teachable(o.teacher, t).some((sp) => sp.id >>> 0 === idOf(o.spell))) { personal(t, `${display(o.teacher)} can no longer teach you ${o.name}.`); return; }
     const s = stateOf(t);
     const need = needFor(o.rank);
     s.apprentice = { teacher: o.teacher, teacherName: display(o.teacher), spell: o.spell, school: o.school, rank: o.rank, xp: 0, need, day: dayKey(), dayXp: 0, at: Date.now(), held: false, lastCastAt: 0 };
@@ -2112,7 +2227,7 @@ module.exports = (api) => {
     save(o.teacher, ts);
     audit(`SCHOOLS ${who(o.teacher)} took ${who(t)} as apprentice in ${o.spell} ${o.name} (${RANKS[o.rank]} ${o.school}, ${need} study)`);
     personal(o.teacher, `${display(t)} is now your apprentice in ${o.name}.`);
-    personal(t, `You are ${display(o.teacher)}'s apprentice in ${o.name}. Near them you can prepare and cast it; casting it is your study, up to ${AP.dailyXp} a day, ${need} in all.`);
+    personal(t, `You are ${display(o.teacher)}'s apprentice in ${o.name}. Near them you hold the spell and can cast it; casting it is your study, up to ${AP.dailyXp} a day, ${need} in all.`);
     apTick(t);
   };
   onUi('apprenticeOffer', (t, args) => {
@@ -2122,24 +2237,76 @@ module.exports = (api) => {
     answerOffer(t, raw.slice(cut + 1) === 'accept');
   });
   onUi('apprenticeOfferClose', (t) => { if (apOffers.has(t >>> 0)) answerOffer(t, false); });
-  // Near the teacher: the spell is held; away (or the teacher offline): it is taken back
+  // Downed (downed.js) or dead: a teacher on the ground teaches nobody
+  const downOrDead = (x) => { try { if (typeof globalThis.__dboIsDowned === 'function' && globalThis.__dboIsDowned(x)) return true; } catch (e) { /* no down state */ } return get(x, 'isDead', false) === true; };
+  // Whether `t` may hold the lesson's spell now: their teacher online, up, within radiusMeters, and their own client settled
+  const nearTeacher = (t, ap) => {
+    const teacher = ap.teacher >>> 0;
+    try { return online(teacher) && !downOrDead(teacher) && distanceMeters(t, teacher) <= Number(AP.radiusMeters || 60); } catch (e) { return false; }
+  };
+  // Near the teacher: the spell is held; away (or the teacher offline, downed or dead): it is taken back
   const apTick = (t) => {
     const s = stateOf(t);
+    clearStrays(t, s);
     const ap = s.apprentice;
     if (!ap) return;
     const teacher = ap.teacher >>> 0;
-    let near = false;
-    try { near = onlineActors().includes(teacher) && distanceMeters(t, teacher) <= Number(AP.radiusMeters || 60); } catch (e) { near = false; }
-    // The teacher released them while they were away
-    try { if (!apList(stateOf(teacher)).some((x) => x.student >>> 0 === t >>> 0)) { endApprenticeship(t, 'released', `${ap.teacherName || 'Your teacher'} has ended your apprenticeship.`); return; } } catch (e) { /* teacher unreadable: keep */ }
-    if (near !== !!ap.held) { setHeld(t, s, near); personal(t, near ? `You are near ${ap.teacherName}: you can cast ${nameOfSpell(ap.spell)} again.` : `You have left ${ap.teacherName}'s side: ${nameOfSpell(ap.spell)} slips from your mind until you return.`); }
+    const id = idOf(ap.spell);
+    // Learned another way meanwhile (a tome, a rank pick, a lesson): the lesson has nothing left to teach
+    if (id && inBookOf(t, id)) { endApprenticeship(t, 'learned another way', `${nameOfSpell(ap.spell) || 'The spell'} is in your spellbook now, so your apprenticeship with ${ap.teacherName} ends.`); return; }
+    // The teacher released them while they were away (read only while the teacher is online, so their record is real)
+    if (online(teacher)) {
+      try { const tr = get(teacher, PROP, null); if (tr && tr.v && !apList(tr).some((x) => x.student >>> 0 === t >>> 0)) { endApprenticeship(t, 'released', `${ap.teacherName || 'Your teacher'} has ended your apprenticeship.`); return; } } catch (e) { /* teacher unreadable: keep */ }
+    }
+    const near = settled(t) && nearTeacher(t, ap);
+    if (near !== !!ap.held) {
+      setHeld(t, s, near);
+      personal(t, near ? `You are near ${ap.teacherName}: you can cast ${nameOfSpell(ap.spell)} again.` : `${online(teacher) && !downOrDead(teacher) ? `You have left ${ap.teacherName}'s side` : `${ap.teacherName} cannot teach you just now`}: ${nameOfSpell(ap.spell)} slips from your mind until you return.`);
+    }
   };
-  every('schools.apprentice', AP_MS, () => { if (!C.enabled || AP.enabled === false) return; for (const t of onlineActors()) { try { if (ready(t) && isPlayer(t) && stateOf(t).apprentice) apTick(t); } catch (e) { log('schools: apprentice tick failed', e.message); } } });
-  // A cast of the studied spell near the teacher is study (gamemode castHook -> __dboSchoolsCast)
+  // Switched off, or a client that cannot draw it: the lesson waits, the spell is taken back
+  const apSuspend = (t) => { const s = stateOf(t); clearStrays(t, s); if (s.apprentice && s.apprentice.held) setHeld(t, s, false); };
+  // A teacher's list loses entries whose apprentice is online and no longer theirs (an apprenticeship ended while the
+  // teacher was away)
+  const apPrune = (a) => {
+    const r = get(a, PROP, null);
+    if (!r || !apList(r).length) return;
+    const left = apList(r).filter((x) => { const st = online(x.student) ? get(x.student >>> 0, PROP, null) : null; return !st || (st.apprentice && st.apprentice.teacher >>> 0 === a >>> 0); });
+    if (left.length !== apList(r).length) { const s = stateOf(a); s.apprentices = left; save(a, s); }
+  };
+  every('schools.apprentice', AP_MS, () => {
+    for (const t of onlineActors()) {
+      try {
+        // The record as it is: a character with no lesson, loan or apprentices costs one read and is never given a record
+        const raw = get(t, PROP, null);
+        if (!raw || typeof raw !== 'object' || !raw.v || !isPlayer(t)) continue;
+        if (raw.apprentice || (Array.isArray(raw.apStray) && raw.apStray.length)) { if (apOn() && ready(t)) apTick(t); else apSuspend(t); }
+        if (apList(raw).length) apPrune(t);
+      } catch (e) { log('schools: apprentice tick failed', e.message); }
+    }
+  });
+  // At logout (gamemode.js disconnect, __dboSchoolsLeave): the loaned spell is taken back before the character is stored
+  // and an open offer is dropped; it is held again near the teacher after the next login
+  const apLeave = (a) => {
+    apOffers.delete(a >>> 0); apTeachPanels.delete(a >>> 0);
+    for (const [k, o] of apOffers) if (o.teacher >>> 0 === a >>> 0) apOffers.delete(k);
+    const raw = get(a, PROP, null);
+    if (!raw || !raw.v || !raw.apprentice || !raw.apprentice.held) return;
+    const s = stateOf(a);
+    const id = idOf(s.apprentice.spell);
+    if (!takeBack(a, id)) addStray(s, s.apprentice.spell);
+    s.apprentice.held = false;
+    save(a, s);
+  };
+  // A cast of the studied spell near the teacher is study (gamemode castHook -> __dboSchoolsCast). Near is checked at the
+  // cast itself, not only by the last tick.
   const apCast = (t, spellId) => {
+    if (!apOn()) return;
+    const raw = get(t, PROP, null);
+    if (!raw || !raw.apprentice || !raw.apprentice.held) return;
     const s = stateOf(t);
     const ap = s.apprentice;
-    if (!ap || !ap.held || idOf(ap.spell) !== spellId >>> 0) return;
+    if (!ap || !ap.held || idOf(ap.spell) !== spellId >>> 0 || !nearTeacher(t, ap)) return;
     if (Date.now() - (Number(ap.lastCastAt) || 0) < Math.max(0, Number(AP.castGapSeconds) || 0) * 1000) return;
     ap.lastCastAt = Date.now();
     if (ap.day !== dayKey()) { ap.day = dayKey(); ap.dayXp = 0; ap.capTold = false; }
@@ -2161,27 +2328,48 @@ module.exports = (api) => {
     let r = null;
     try { r = typeof globalThis.__dboSpellsGrant === 'function' ? globalThis.__dboSpellsGrant(t, id, spellSkill(ap.school)) : null; } catch (e) { r = null; }
     if (!r || !r.ok) { log(`schools: ${who(t)}'s apprenticeship spell ${ap.spell} could not be granted; it stays waiting`); return; }
-    // Held through the lesson: given for good now, so ending the lesson leaves it where the spellbook put it
-    const prepared = (get(t, 'private.dboPrepared', []) || []).map(norm);
+    // Given for good now (__dboSpellsGrant prepared it, or put it in the book and took the engine's copy back), so ending
+    // the lesson leaves it where the spellbook put it
     ap.held = false;
-    if (!prepared.includes(norm(ap.spell))) papyrusQuiet(t, 'RemoveSpell', id);
     save(t, s);
     const teacher = ap.teacher >>> 0, name = ap.teacherName;
     endApprenticeship(t, 'learned', `You have learned ${r.name} from ${name}. ${r.line}`);
-    if (onlineActors().includes(teacher)) personal(teacher, `${display(t)} has learned ${r.name}. Your apprenticeship with them is complete.`);
+    if (online(teacher)) personal(teacher, `${display(t)} has learned ${r.name}. Your apprenticeship with them is complete.`);
     audit(`SCHOOLS ${who(t)} learned ${ap.spell} ${r.name} as apprentice of ${name}`);
   };
   globalThis.__dboSchoolsApprenticeView = (a) => {
     const s = stateOf(a);
     const ap = s.apprentice;
     return {
-      apprentice: ap ? { teacher: ap.teacherName, spell: nameOfSpell(ap.spell), school: ap.school, rank: RANKS[ap.rank], xp: ap.xp, need: ap.need, today: ap.day === dayKey() ? ap.dayXp : 0, dailyXp: Number(AP.dailyXp) || 20, near: !!ap.held } : null,
-      apprentices: apList(s).map((x) => ({ name: x.name, spell: nameOfSpell(x.spell) })), max: apMax(a),
+      apprentice: ap ? { teacher: ap.teacherName, spell: nameOfSpell(ap.spell), school: ap.school, rank: RANKS[ap.rank], xp: ap.xp, need: ap.need, today: ap.day === dayKey() ? ap.dayXp : 0, dailyXp: Number(AP.dailyXp) || 20, near: !!ap.held, canLeave: true } : null,
+      // id: the apprentice, for the Magic tab's Release (apprenticeRelease <id>)
+      apprentices: apList(s).map((x) => ({ id: (x.student >>> 0).toString(16), name: x.name, spell: nameOfSpell(x.spell) })), max: apMax(a),
     };
+  };
+  // Release (the teacher) and leave (the apprentice): the X menu beside them, or the Magic tab from anywhere, so a lesson
+  // with someone who never comes back can still be ended. An offline apprentice's record is not touched: their next check
+  // finds they are no longer on the teacher's list and ends it there.
+  const releaseApprentice = (a, t) => {
+    const s = stateOf(a);
+    const x = apList(s).find((y) => y.student >>> 0 === t >>> 0);
+    if (!x) return { ok: false, text: 'That is not one of your apprentices.' };
+    if (online(t)) endApprenticeship(t, `released by ${who(a)}`, `${display(a)} has ended your apprenticeship.`);
+    const after = stateOf(a);
+    after.apprentices = apList(after).filter((y) => y.student >>> 0 !== t >>> 0);
+    save(a, after);
+    audit(`SCHOOLS ${who(a)} released apprentice ${who(t)} (${x.spell})${online(t) ? '' : ', who is away'}`);
+    return { ok: true, text: `${x.name} is no longer your apprentice.` };
+  };
+  const leaveApprenticeship = (a) => {
+    const ap = stateOf(a).apprentice;
+    if (!ap) return { ok: false, text: 'You are nobody\'s apprentice.' };
+    endApprenticeship(a, 'left by the apprentice', `You are no longer ${ap.teacherName}'s apprentice.`);
+    if (online(ap.teacher)) personal(ap.teacher, `${display(a)} has left your apprenticeship.`);
+    return { ok: true, text: `You are no longer ${ap.teacherName}'s apprentice.` };
   };
   // X menu: take, release, leave
   const apEntries = (a, t) => {
-    if (!C.enabled || AP.enabled === false) return [];
+    if (!apOn()) return [];
     const out = [];
     const mine = apList(stateOf(a)).some((x) => x.student >>> 0 === t >>> 0);
     if (mine) out.push({ id: 'schools:apprenticeend', label: 'Release apprentice' });
@@ -2194,15 +2382,13 @@ module.exports = (api) => {
     if (id === 'schools:apprentice') { const why = takeRefusal(a, t); if (why) personal(a, why); else openTeachPanel(a, t); return true; }
     if (id === 'schools:apprenticeend') {
       if (!apList(stateOf(a)).some((x) => x.student >>> 0 === t >>> 0)) { personal(a, `${display(t)} is not your apprentice.`); return true; }
-      endApprenticeship(t, `released by ${who(a)}`, `${display(a)} has ended your apprenticeship.`);
-      personal(a, `${display(t)} is no longer your apprentice.`);
+      personal(a, releaseApprentice(a, t).text);
       return true;
     }
     if (id === 'schools:apprenticequit') {
       const ap = stateOf(a).apprentice;
       if (!ap || ap.teacher >>> 0 !== t >>> 0) return true;
-      endApprenticeship(a, 'left by the apprentice', `You are no longer ${ap.teacherName}'s apprentice.`);
-      personal(t, `${display(a)} has left your apprenticeship.`);
+      leaveApprenticeship(a);
       return true;
     }
     return false;

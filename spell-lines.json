@@ -1,0 +1,119 @@
+{
+  "_comment": "Spell lines for the Arcane Mastery rank picks (Nate, 14 Oct, option B), read by server\\schools.js. Vanilla's own families, each in rank order; at an Apprentice or Adept pick (Priest's for Restoration) the next spell of a line the character knows is offered first when it is of that pick's rank. Built from spell-tomes.json by spell editor id (the SPEL record, Skyrim.esm); id is the spell as the server writes it, name, edid and rank are for reading only. Frost has no Adept step: Ice Storm has no tome in spell-tomes.json. tests/spell-lines-harness.js checks every id against spell-tomes.json.",
+  "lines": [
+    { "school": "Destruction", "name": "Fire", "spells": [
+      { "id": "12fcd:Skyrim.esm", "name": "Flames", "edid": "Flames", "rank": "Novice" },
+      { "id": "12fd0:Skyrim.esm", "name": "Firebolt", "edid": "Firebolt", "rank": "Apprentice" },
+      { "id": "1c789:Skyrim.esm", "name": "Fireball", "edid": "Fireball", "rank": "Adept" },
+      { "id": "10f7ed:Skyrim.esm", "name": "Incinerate", "edid": "Incinerate", "rank": "Expert" },
+      { "id": "7a82b:Skyrim.esm", "name": "Fire Storm", "edid": "FireStorm", "rank": "Master" }
+    ] },
+    { "school": "Destruction", "name": "Frost", "spells": [
+      { "id": "2b96b:Skyrim.esm", "name": "Frostbite", "edid": "Frostbite", "rank": "Novice" },
+      { "id": "2b96c:Skyrim.esm", "name": "Ice Spike", "edid": "IceSpike", "rank": "Apprentice" },
+      { "id": "10f7ec:Skyrim.esm", "name": "Icy Spear", "edid": "IcySpear", "rank": "Expert" },
+      { "id": "7e8e4:Skyrim.esm", "name": "Blizzard", "edid": "Blizzard", "rank": "Master" }
+    ] },
+    { "school": "Destruction", "name": "Shock", "spells": [
+      { "id": "2dd2a:Skyrim.esm", "name": "Sparks", "edid": "Sparks", "rank": "Novice" },
+      { "id": "2dd29:Skyrim.esm", "name": "Lightning Bolt", "edid": "LightningBolt", "rank": "Apprentice" },
+      { "id": "45f9d:Skyrim.esm", "name": "Chain Lightning", "edid": "ChainLightning", "rank": "Adept" },
+      { "id": "10f7ee:Skyrim.esm", "name": "Thunderbolt", "edid": "Thunderbolt", "rank": "Expert" },
+      { "id": "7e8e5:Skyrim.esm", "name": "Lightning Storm", "edid": "LightningStorm", "rank": "Master" }
+    ] },
+    { "school": "Restoration", "name": "Healing", "spells": [
+      { "id": "12fcc:Skyrim.esm", "name": "Healing", "edid": "Healing", "rank": "Novice" },
+      { "id": "2f3b8:Skyrim.esm", "name": "Fast Healing", "edid": "FastHealing", "rank": "Apprentice" },
+      { "id": "b62ef:Skyrim.esm", "name": "Close Wounds", "edid": "CloseWounds", "rank": "Adept" },
+      { "id": "b62ee:Skyrim.esm", "name": "Grand Healing", "edid": "GrandHealing", "rank": "Expert" }
+    ] },
+    { "school": "Restoration", "name": "Healing others", "spells": [
+      { "id": "4d3f2:Skyrim.esm", "name": "Healing Hands", "edid": "HealingHands", "rank": "Apprentice" },
+      { "id": "12fd2:Skyrim.esm", "name": "Heal Other", "edid": "HealOther", "rank": "Adept" }
+    ] },
+    { "school": "Restoration", "name": "Wards", "spells": [
+      { "id": "13018:Skyrim.esm", "name": "Lesser Ward", "edid": "WardLesser", "rank": "Novice" },
+      { "id": "211f1:Skyrim.esm", "name": "Steadfast Ward", "edid": "WardSteadfast", "rank": "Apprentice" },
+      { "id": "211f0:Skyrim.esm", "name": "Greater Ward", "edid": "WardGreater", "rank": "Adept" }
+    ] },
+    { "school": "Restoration", "name": "Turning the undead", "spells": [
+      { "id": "4b146:Skyrim.esm", "name": "Turn Lesser Undead", "edid": "TurnLesserUndead", "rank": "Apprentice" },
+      { "id": "5dd5d:Skyrim.esm", "name": "Turn Undead", "edid": "TurnUndead", "rank": "Adept" },
+      { "id": "5dd5e:Skyrim.esm", "name": "Turn Greater Undead", "edid": "TurnGreaterUndead", "rank": "Expert" },
+      { "id": "8c1ab:Skyrim.esm", "name": "Bane of the Undead", "edid": "BaneoftheUndead", "rank": "Master" }
+    ] },
+    { "school": "Restoration", "name": "Repelling the undead", "spells": [
+      { "id": "4d3f8:Skyrim.esm", "name": "Repel Lesser Undead", "edid": "RepelLesserUndead", "rank": "Adept" },
+      { "id": "5dd60:Skyrim.esm", "name": "Repel Undead", "edid": "RepelUndead", "rank": "Expert" }
+    ] },
+    { "school": "Restoration", "name": "Circles", "spells": [
+      { "id": "5312d:Skyrim.esm", "name": "Circle of Protection", "edid": "CircleOfProtection", "rank": "Expert" },
+      { "id": "e0ccf:Skyrim.esm", "name": "Guardian Circle", "edid": "GuardianCircle", "rank": "Master" }
+    ] },
+    { "school": "Alteration", "name": "Flesh", "spells": [
+      { "id": "5ad5c:Skyrim.esm", "name": "Oakflesh", "edid": "Oakflesh", "rank": "Novice" },
+      { "id": "5ad5d:Skyrim.esm", "name": "Stoneflesh", "edid": "Stoneflesh", "rank": "Apprentice" },
+      { "id": "51b16:Skyrim.esm", "name": "Ironflesh", "edid": "Ironflesh", "rank": "Adept" },
+      { "id": "5ad5e:Skyrim.esm", "name": "Ebonyflesh", "edid": "Ebonyflesh", "rank": "Expert" },
+      { "id": "cdb70:Skyrim.esm", "name": "Dragonhide", "edid": "Dragonhide", "rank": "Master" }
+    ] },
+    { "school": "Alteration", "name": "Light", "spells": [
+      { "id": "43324:Skyrim.esm", "name": "Candlelight", "edid": "Candlelight", "rank": "Novice" },
+      { "id": "43323:Skyrim.esm", "name": "Magelight", "edid": "Magelight", "rank": "Apprentice" }
+    ] },
+    { "school": "Alteration", "name": "Detection", "spells": [
+      { "id": "211ee:Skyrim.esm", "name": "Detect Life", "edid": "DetectLife", "rank": "Adept" },
+      { "id": "211ef:Skyrim.esm", "name": "Detect Dead", "edid": "DetectDead", "rank": "Expert" }
+    ] },
+    { "school": "Alteration", "name": "Paralysis", "spells": [
+      { "id": "5ad5f:Skyrim.esm", "name": "Paralyze", "edid": "Paralyze", "rank": "Expert" },
+      { "id": "b62e6:Skyrim.esm", "name": "Mass Paralysis", "edid": "MassParalysis", "rank": "Master" }
+    ] },
+    { "school": "Conjuration", "name": "Bound weapons", "spells": [
+      { "id": "211eb:Skyrim.esm", "name": "Bound Sword", "edid": "BoundSword", "rank": "Novice" },
+      { "id": "211ec:Skyrim.esm", "name": "Bound Battleaxe", "edid": "BoundBattleAxe", "rank": "Apprentice" },
+      { "id": "211ed:Skyrim.esm", "name": "Bound Bow", "edid": "BoundBow", "rank": "Adept" }
+    ] },
+    { "school": "Conjuration", "name": "Atronachs", "spells": [
+      { "id": "640b6:Skyrim.esm", "name": "Conjure Familiar", "edid": "ConjureFamiliar", "rank": "Novice" },
+      { "id": "204c3:Skyrim.esm", "name": "Conjure Flame Atronach", "edid": "ConjureFlameAtronach", "rank": "Apprentice" },
+      { "id": "204c4:Skyrim.esm", "name": "Conjure Frost Atronach", "edid": "ConjureFrostAtronach", "rank": "Adept" },
+      { "id": "204c5:Skyrim.esm", "name": "Conjure Storm Atronach", "edid": "ConjureStormAtronach", "rank": "Expert" }
+    ] },
+    { "school": "Conjuration", "name": "Raising the dead", "spells": [
+      { "id": "7e8e1:Skyrim.esm", "name": "Raise Zombie", "edid": "RaiseZombie", "rank": "Novice" },
+      { "id": "65bd7:Skyrim.esm", "name": "Reanimate Corpse", "edid": "ReanimateCorpse", "rank": "Apprentice" },
+      { "id": "96d94:Skyrim.esm", "name": "Revenant", "edid": "Revenant", "rank": "Adept" },
+      { "id": "96d95:Skyrim.esm", "name": "Dread Zombie", "edid": "DreadZombie", "rank": "Expert" },
+      { "id": "7e8df:Skyrim.esm", "name": "Dead Thrall", "edid": "DeadThrall", "rank": "Master" }
+    ] },
+    { "school": "Conjuration", "name": "Banishing Daedra", "spells": [
+      { "id": "6d22c:Skyrim.esm", "name": "Banish Daedra", "edid": "BanishDaedra", "rank": "Adept" },
+      { "id": "6f952:Skyrim.esm", "name": "Expel Daedra", "edid": "ExpelDaedra", "rank": "Expert" }
+    ] },
+    { "school": "Illusion", "name": "Courage", "spells": [
+      { "id": "4dee8:Skyrim.esm", "name": "Courage", "edid": "Courage", "rank": "Novice" },
+      { "id": "4deec:Skyrim.esm", "name": "Rally", "edid": "Rally", "rank": "Adept" },
+      { "id": "7e8dd:Skyrim.esm", "name": "Call to Arms", "edid": "CallToArms", "rank": "Master" }
+    ] },
+    { "school": "Illusion", "name": "Fury", "spells": [
+      { "id": "4deeb:Skyrim.esm", "name": "Fury", "edid": "Fury", "rank": "Novice" },
+      { "id": "4deee:Skyrim.esm", "name": "Frenzy", "edid": "Frenzy", "rank": "Adept" },
+      { "id": "7e8da:Skyrim.esm", "name": "Mayhem", "edid": "Mayhem", "rank": "Master" }
+    ] },
+    { "school": "Illusion", "name": "Calm", "spells": [
+      { "id": "4dee9:Skyrim.esm", "name": "Calm", "edid": "Calm", "rank": "Apprentice" },
+      { "id": "4deed:Skyrim.esm", "name": "Pacify", "edid": "Pacify", "rank": "Expert" },
+      { "id": "7e8db:Skyrim.esm", "name": "Harmony", "edid": "Harmony", "rank": "Master" }
+    ] },
+    { "school": "Illusion", "name": "Fear", "spells": [
+      { "id": "4deea:Skyrim.esm", "name": "Fear", "edid": "Fear", "rank": "Apprentice" },
+      { "id": "4deef:Skyrim.esm", "name": "Rout", "edid": "Rout", "rank": "Expert" },
+      { "id": "7e8de:Skyrim.esm", "name": "Hysteria", "edid": "Hysteria", "rank": "Master" }
+    ] },
+    { "school": "Illusion", "name": "Silence", "spells": [
+      { "id": "8f3eb:Skyrim.esm", "name": "Muffle", "edid": "Muffle", "rank": "Apprentice" },
+      { "id": "27eb6:Skyrim.esm", "name": "Invisibility", "edid": "Invisibility", "rank": "Expert" }
+    ] }
+  ]
+}

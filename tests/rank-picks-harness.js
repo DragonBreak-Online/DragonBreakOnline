@@ -247,6 +247,82 @@ check('...chosen: no longer held', r.ok && globalThis.__dboSchoolsSkillHeld(PRI,
 const rates = fs.readFileSync(path.join(SERVER, 'skillrates.js'), 'utf8');
 check('skillrates.js rates a held skill 0 before anything else', /const rateFor = [^\n]*\n[^\n]*\n\s*try \{ if \(typeof globalThis\.__dboSchoolsSkillHeld === 'function' && globalThis\.__dboSchoolsSkillHeld\(actorId >>> 0, skillId\)\) return 0;/.test(rates));
 
+// ---- spell lines (Nate, 14 Oct, option B): the next spell of each line known comes first ----
+const LN = 0x35; put(LN, 'profileId', LN); at(LN, SYNOD, [0, 0, 0]); online.push(LN); ui('uiCaps', LN, ['bank', 'spellbook', 'schools']); arcane(LN, 25);
+tick('schools.first'); advance(91000);
+p = progress(LN); ui('schoolChoose', LN, [p.nonce, 'Destruction', 'primary']);
+ui('firstSpellPick', LN, [lastWidget(LN, 'studyMagic').nonce, 'Flames']);
+// Sparks in the book as well, Frostbite and Ice Spike known (read from tomes before the schools)
+const book = (a, descs, skill) => { const st = props.get(a + '|private.dboStudied') || {}; st[skill || 'arcane'] = (st[skill || 'arcane'] || []).concat(descs); put(a, 'private.dboStudied', st); };
+book(LN, [T.sparks[1]]);
+known(LN).add(idOf(T.frostbite[1])); known(LN).add(idOf('2b96c:Skyrim.esm')); // Ice Spike
+const ICE_SPIKE = '2b96c:Skyrim.esm', LIGHTNING_BOLT = '2dd29:Skyrim.esm', CHAIN = '45f9d:Skyrim.esm', ICY_SPEAR = '10f7ec:Skyrim.esm';
+put(LN, 'private.dboSchools', Object.assign(rec(LN), { levels: Object.assign(rec(LN).levels, { Destruction: { level: 25, xp: 99.99 } }) }));
+let f = view(LN).schools.find((x) => x.name === 'Destruction').firstSpell;
+const lineChoices = f.choices.filter((c) => c.line);
+check('lines: the next spell of each line known comes first, marked (Firebolt from Flames, Lightning Bolt from Sparks)',
+  f.stage === 'Apprentice' && lineChoices.length === 2 && f.choices[0].line && f.choices[1].line
+  && lineChoices.some((c) => c.name === 'Firebolt' && c.line === 'Flames' && c.blurb === 'Next in your line: Firebolt (from Flames)')
+  && lineChoices.some((c) => c.name === 'Lightning Bolt' && c.line === 'Sparks'), f.choices.slice(0, 4));
+check('...then the rest of the rank\'s tomes, unmarked, as before', f.choices.length > 2 && f.choices.slice(2).every((c) => !c.line) && f.choices.some((c) => c.name === 'Fire Rune'), f.choices.map((c) => c.name));
+check('...a successor already known (Ice Spike, from Frostbite) is not offered again', !f.choices.some((c) => c.id === ICE_SPIKE), f.choices.map((c) => c.name));
+let pw = (globalThis.__dboSchoolsActivate(BOOKCASE, LN), lastWidget(LN, 'studyMagic'));
+check('...the shelf\'s panel lists them first too, with the line and "you keep" in the question', pw && pw.choices[0].blurb.startsWith('Next in your line: ') && / You keep (Flames|Sparks)\./.test(pw.choices[0].confirm), pw && pw.choices.slice(0, 2));
+r = globalThis.__dboMagicAction(LN, 'firstSpell', ['Destruction', T.firebolt[1]]);
+check('picking Firebolt adds it: Flames stays in the spellbook', r.ok && studied(LN).includes(T.firebolt[1]) && studied(LN).includes(T.flames[1]) && studied(LN).includes(T.sparks[1]), [r, studied(LN)]);
+r = globalThis.__dboMagicAction(LN, 'firstSpell', ['Destruction', LIGHTNING_BOLT]);
+check('...and the Apprentice pick cannot be taken twice (Lightning Bolt refused now)', r.ok === false && !studied(LN).includes(LIGHTNING_BOLT), r);
+r = (ui('firstSpellPick', LN, [pw.nonce, 'Lightning Bolt']), studied(LN).includes(LIGHTNING_BOLT));
+check('...nor through the shelf panel opened before it was chosen', r === false);
+// The Adept pick: Fire goes on (Fireball from Firebolt); Shock's next is Lightning Bolt, still an Apprentice spell (not
+// offered at Adept), Frost's after Ice Spike is Icy Spear, an Expert spell (no Adept step in spell-tomes.json)
+put(LN, 'private.dboSchools', Object.assign(rec(LN), { levels: Object.assign(rec(LN).levels, { Destruction: { level: 50, xp: 99.99 } }) }));
+f = view(LN).schools.find((x) => x.name === 'Destruction').firstSpell;
+check('the Adept pick: Fireball from Firebolt first; nothing of another rank (Icy Spear, Lightning Bolt) is offered', f.stage === 'Adept' && f.choices[0].name === 'Fireball' && f.choices[0].line === 'Firebolt' && !f.choices.some((c) => c.id === ICY_SPEAR || c.id === LIGHTNING_BOLT) && f.choices.filter((c) => c.line).length === 1, f.choices.slice(0, 3));
+known(LN).add(idOf(CHAIN));
+f = view(LN).schools.find((x) => x.name === 'Destruction').firstSpell;
+check('...Chain Lightning known already: not offered at all', !f.choices.some((c) => c.id === CHAIN));
+// An excluded successor: Raise Zombie > Reanimate Corpse is a restricted art (spells.js seniorOnlyTomes), skipped below
+// Senior rank and listed first for a Senior; Bound Sword > Bound Battleaxe offered either way
+const CJ = 0x36; put(CJ, 'profileId', CJ); at(CJ, SYNOD, [0, 0, 0]); online.push(CJ); ui('uiCaps', CJ, ['bank', 'spellbook', 'schools']); arcane(CJ, 25);
+tick('schools.first'); advance(91000);
+p = progress(CJ); ui('schoolChoose', CJ, [p.nonce, 'Conjuration', 'primary']);
+ui('firstSpellPick', CJ, [lastWidget(CJ, 'studyMagic').nonce, 'Bound Sword']);
+known(CJ).add(idOf('7e8e1:Skyrim.esm')); // Raise Zombie
+const REANIMATE = '65bd7:Skyrim.esm', BATTLEAXE = '211ec:Skyrim.esm';
+put(CJ, 'private.dboSchools', Object.assign(rec(CJ), { levels: Object.assign(rec(CJ).levels, { Conjuration: { level: 25, xp: 99.99 } }) }));
+f = view(CJ).schools.find((x) => x.name === 'Conjuration').firstSpell;
+check('an excluded successor is skipped: Reanimate Corpse (restricted) is not offered to an Associate; Bound Battleaxe leads', f.stage === 'Apprentice' && !f.choices.some((c) => c.id === REANIMATE) && f.choices[0].id === BATTLEAXE && f.choices[0].line === 'Bound Sword', f.choices.slice(0, 3));
+put(CJ, 'private.dboGuilds', [{ id: 'synod', role: 'officer' }]);
+const guildsOfWas = globalThis.__dboGuildsOf; globalThis.__dboGuildsOf = (a) => props.get(a + '|private.dboGuilds') || [];
+f = view(CJ).schools.find((x) => x.name === 'Conjuration').firstSpell;
+const seniorOk = typeof globalThis.__dboSpellsOpenTo === 'function' && globalThis.__dboSpellsOpenTo(CJ, idOf(REANIMATE)) === '';
+check('...a Senior rank (a Synod officer) sees it, marked as the next of their line', seniorOk && f.choices.some((c) => c.id === REANIMATE && c.line === 'Raise Zombie'), [seniorOk, f.choices.slice(0, 3)]);
+put(CJ, 'private.dboGuilds', []); globalThis.__dboGuildsOf = guildsOfWas;
+check('a removed spell (Transmute) is never a rank option', !(globalThis.__dboSpellsRankOptions('Alteration', 2) || []).includes(idOf('109111:Skyrim.esm')) && (globalThis.__dboSpellsRankOptions('Alteration', 2) || []).length > 0);
+// Restoration follows Priest: its lines (Healing > Fast Healing, Lesser Ward > Steadfast Ward) at Priest's picks
+const RL = 0x37; put(RL, 'profileId', RL); at(RL, SYNOD, [0, 0, 0]); online.push(RL); ui('uiCaps', RL, ['bank', 'spellbook', 'schools']);
+priestOf(RL, 25);
+tick('schools.first'); advance(91000);
+r = globalThis.__dboMagicAction(RL, 'firstSpell', ['Restoration', HEALING]);
+book(RL, ['13018:Skyrim.esm'], 'priest'); // Lesser Ward
+{ const m = props.get(RL + '|private.mastery'); m.skills.priest.xp = 95; put(RL, 'private.mastery', m); }
+f = view(RL).schools.find((x) => x.name === 'Restoration').firstSpell;
+check('Restoration\'s lines follow Priest: Fast Healing (from Healing) and Steadfast Ward (from Lesser Ward) first', r.ok && f.stage === 'Apprentice' && f.choices.slice(0, 2).every((c) => c.line) && f.choices.some((c) => c.id === '2f3b8:Skyrim.esm' && c.line === 'Healing') && f.choices.some((c) => c.id === '211f1:Skyrim.esm' && c.line === 'Lesser Ward'), [r, f.choices.slice(0, 3)]);
+// A school with no first spells listed still reaches its rank picks (no hold strands it)
+load({ firstSpells: Object.assign({}, schoolsCfg.firstSpells || {}, { Illusion: [] }) });
+const IL = 0x38; put(IL, 'profileId', IL); at(IL, SYNOD, [0, 0, 0]); online.push(IL); ui('uiCaps', IL, ['bank', 'spellbook', 'schools']); arcane(IL, 25);
+tick('schools.first'); advance(91000);
+p = progress(IL); ui('schoolChoose', IL, [p.nonce, 'Illusion', 'primary']);
+for (let i = 0; i < 600; i++) globalThis.__dboSchoolsCast(IL, idOf(T.courage[1]));
+const ilf = view(IL).schools.find((x) => x.name === 'Illusion').firstSpell;
+check('a school with no first spells: held at 25 but its Apprentice pick opens (never stranded)', level(IL, 'Illusion') <= 25 && (level(IL, 'Illusion') < 25 || (ilf.state === 'open' && ilf.stage === 'Apprentice')), [rec(IL).levels.Illusion, ilf]);
+load();
+// Config: a bad value falls back to its default, logged
+load({ rankPicks: { ranks: { Apprentice: 'x', Adept: 50 }, priestHoldXp: 500 } });
+check('config: a rank at a bad level is left out and a bad priestHoldXp falls back, both logged', out.logs.some((l) => /rankPicks\.ranks\.Apprentice "x" is not a rank/.test(l)) && out.logs.some((l) => /priestHoldXp 500 is not 0 to 99\.99/.test(l)));
+load();
+
 // ---- switched off ----
 load({ rankPicks: { enabled: false } });
 const OFF = 0x34; put(OFF, 'profileId', OFF); at(OFF, SYNOD, [0, 0, 0]); online.push(OFF); ui('uiCaps', OFF, ['bank', 'spellbook', 'schools']); arcane(OFF, 25);

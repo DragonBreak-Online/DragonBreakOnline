@@ -245,6 +245,127 @@ check('the apprentice sees "Leave apprenticeship" on their teacher', entries(STU
 act(TCH, 'schools:apprenticeend', STU2);
 check('released: the lesson ends and the held spell is taken back', !rec(STU2).apprentice && !known(STU2).has(idOf(T.firebolt[1])) && saidAny(STU2, /has ended your apprenticeship/));
 
+// ---- adversarial cases (release review, 14 Oct) ----
+let r;
+const T2 = 0x50, S3 = 0x51, S4 = 0x52, T3 = 0x53;
+join(T2, 80); join(S3, 80); join(S4, 25); join(T3, 80);
+tick('schools.first'); advance(91000);
+for (const a of [T2, S3, S4, T3]) {
+  const pp = progress(a); ui('schoolChoose', a, [pp.nonce, 'Destruction', 'primary']);
+  ui('firstSpellPick', a, [lastWidget(a, 'studyMagic').nonce, a === S4 ? 'Sparks' : 'Flames']);
+}
+setLevel(T2, 'Destruction', 80); setLevel(S3, 'Destruction', 30); setLevel(S4, 'Destruction', 30); setLevel(T3, 'Destruction', 80);
+for (const sp of [T.firebolt, T.fireball]) { known(T2).add(idOf(sp[1])); known(T3).add(idOf(sp[1])); }
+const FB = idOf(T.firebolt[1]);
+const take = (teacher, student, spell) => {
+  act(teacher, 'schools:apprentice', student);
+  const tw = lastWidget(teacher, 'studyMagic');
+  ui('apprenticeTeach', teacher, [tw.nonce, spell]);
+  const ow = lastWidget(student, 'contextMenu');
+  ui('apprenticeOffer', student, [ow.actions.find((x) => x.id.endsWith('|accept')).id]);
+};
+take(T2, S3, 'Firebolt');
+check('setup: S3 is T2\'s apprentice in Firebolt and holds it', rec(S3).apprentice && rec(S3).apprentice.held && known(S3).has(FB), rec(S3).apprentice);
+// A spell on loan is never passed on
+act(S3, 'schools:apprentice', S4);
+const s3w = lastWidget(S3, 'studyMagic');
+check('an apprentice cannot teach the spell they hold on loan (S3, Arcane Arts 80, offers S4 nothing of it)', !(s3w && s3w.title === 'Take an Apprentice' && s3w.choices.some((c) => c.name === 'Firebolt')) && globalThis.__dboSchoolsOnLoan(S3, FB) === true, [s3w && s3w.choices, said(S3)]);
+check('...spells.js sees it as on loan, so /teach, a college lesson and a class pass over it', globalThis.__dboSchoolsOnLoan(S3, FB) === true && globalThis.__dboSchoolsOnLoan(T2, FB) === false);
+// Cast gap
+const xp0 = rec(S3).apprentice.xp;
+globalThis.__dboSchoolsCast(S3, FB); globalThis.__dboSchoolsCast(S3, FB); globalThis.__dboSchoolsCast(S3, FB);
+check('casts closer than castGapSeconds count once', rec(S3).apprentice.xp === xp0 + 1, rec(S3).apprentice);
+advance(3000);
+// Logout while held: taken back at once; after the next login, held again once the client has settled
+globalThis.__dboSchoolsLeave(S3); online = online.filter((x) => x !== S3);
+check('logout while held: the spell is taken back and the record says so', !known(S3).has(FB) && rec(S3).apprentice.held === false, rec(S3).apprentice);
+online.push(S3); globalThis.__dboSchoolsArrived(S3); tick('schools.apprentice');
+check('...back online beside the teacher: not held until the client has settled', !known(S3).has(FB) && !rec(S3).apprentice.held);
+advance(91000); tick('schools.apprentice');
+check('...then held again', known(S3).has(FB) && rec(S3).apprentice.held);
+// A cast after walking away but before the tick: no study (near is checked at the cast)
+const xp1 = rec(S3).apprentice.xp;
+at(S3, BRUMA, [0, 0, 0]); globalThis.__dboSchoolsCast(S3, FB); advance(3000);
+check('a cast away from the teacher before the next check is no study', rec(S3).apprentice.xp === xp1);
+tick('schools.apprentice'); at(S3, SYNOD, [0, 0, 0]); tick('schools.apprentice');
+// Teacher logout
+online = online.filter((x) => x !== T2); tick('schools.apprentice');
+check('teacher logs out: taken back, the lesson kept', !known(S3).has(FB) && rec(S3).apprentice && !rec(S3).apprentice.held && saidAny(S3, /cannot teach you just now/));
+online.push(T2); tick('schools.apprentice');
+check('...teacher back: held again', known(S3).has(FB));
+// Teacher downed, then dead
+globalThis.__dboIsDowned = (x) => x === T2; tick('schools.apprentice');
+const xp2 = rec(S3).apprentice.xp; globalThis.__dboSchoolsCast(S3, FB); advance(3000);
+check('teacher downed: taken back, and a cast is no study', !known(S3).has(FB) && rec(S3).apprentice.xp === xp2);
+globalThis.__dboIsDowned = () => false; put(T2, 'isDead', true); tick('schools.apprentice');
+check('teacher dead: still not held', !known(S3).has(FB));
+put(T2, 'isDead', false); tick('schools.apprentice');
+check('...teacher up again: held', known(S3).has(FB));
+// Hot reload: the record and offers live on; a reload with the lesson held keeps it right
+load(); tick('schools.apprentice');
+check('hot reload: the lesson and the held spell carry over', rec(S3).apprentice && rec(S3).apprentice.held && known(S3).has(FB));
+at(S3, BRUMA, [0, 0, 0]); tick('schools.apprentice');
+check('...and the new code takes it back away from the teacher', !known(S3).has(FB));
+at(S3, SYNOD, [0, 0, 0]); tick('schools.apprentice');
+// Server restart without a clean logout (a crash): the engine still holds it, the record says held
+delete globalThis.__dboSchoolsState; globalThis.__dboSchoolsSeenAt = new Map();
+load(); at(S3, BRUMA, [0, 0, 0]); globalThis.__dboSchoolsArrived(S3); tick('schools.apprentice');
+check('restart after a crash, apprentice away: taken back at the first check', !known(S3).has(FB) && !rec(S3).apprentice.held);
+at(S3, SYNOD, [0, 0, 0]); advance(91000); tick('schools.apprentice');
+check('...beside the teacher once settled: held again', known(S3).has(FB));
+// Switched off: the spell is taken back, the lesson waits
+load({ apprenticeship: Object.assign({}, schoolsCfg.apprenticeship || {}, { enabled: false }) }); tick('schools.apprentice');
+check('apprenticeship switched off: the held spell is taken back, the lesson kept', !known(S3).has(FB) && rec(S3).apprentice && !globalThis.__dboSchoolsMenuEntries(T2, S4).some((x) => /apprentice/.test(x.id)));
+const xp3 = rec(S3).apprentice.xp; globalThis.__dboSchoolsCast(S3, FB); advance(3000);
+check('...and no study while off', rec(S3).apprentice.xp === xp3);
+load(); tick('schools.apprentice');
+check('...on again: held beside the teacher', known(S3).has(FB));
+// UTC midnight: the day's count starts again at 00:00 UTC; the total carries over
+wallClock = Date.parse('2026-10-20T23:59:00Z');
+const xp4 = rec(S3).apprentice.xp;
+for (let i = 0; i < 25; i++) { globalThis.__dboSchoolsCast(S3, FB); advance(2000); }
+const capAt = rec(S3).apprentice;
+check('before midnight: at most 20 that day', capAt.dayXp === 20 && capAt.day === '2026-10-20' && capAt.xp === Math.min(capAt.need, xp4 + 20), capAt);
+wallClock = Date.parse('2026-10-21T00:00:01Z');
+check('...after midnight the Magic tab shows 0 today before a cast', view(S3).apprenticeship.apprentice.today === 0);
+// Firebolt (Apprentice) needs 40; S3 is at 20 + the earlier ones, so a reduced number finishes it: count it out
+const need = rec(S3).apprentice.need, have = rec(S3).apprentice.xp;
+check('...the total carried over the night', have === capAt.xp);
+// Alternating teachers gains nothing: leaving ends the lesson and a new one starts from 0
+r = globalThis.__dboMagicAction(S3, 'apprenticeLeave', []);
+check('leave from the Magic tab (no command, no need to stand beside the teacher)', r.ok && !rec(S3).apprentice && !known(S3).has(FB) && !(rec(T2).apprentices || []).length, [r, rec(T2).apprentices]);
+take(T3, S3, 'Firebolt');
+check('a new teacher for the same spell starts from 0 (no carrying study between teachers)', rec(S3).apprentice && rec(S3).apprentice.xp === 0 && rec(S3).apprentice.dayXp === 0 && rec(S3).apprentice.need === need, rec(S3).apprentice);
+// Release from the Magic tab while the apprentice is offline (and still marked held after a crash)
+online = online.filter((x) => x !== S3);
+const id3 = view(T3).apprenticeship.apprentices[0].id;
+r = globalThis.__dboMagicAction(T3, 'apprenticeRelease', [id3]);
+check('release from the Magic tab with the apprentice away: the teacher is free, the apprentice\'s record untouched', r.ok && !(rec(T3).apprentices || []).length && rec(S3).apprentice, [r, rec(T3).apprentices]);
+online.push(S3); globalThis.__dboSchoolsArrived(S3); tick('schools.apprentice');
+check('...at the apprentice\'s next check the lesson ends and the spell is gone', !rec(S3).apprentice && !known(S3).has(FB) && saidAny(S3, /has ended your apprenticeship/));
+// Learned another way: a rank pick or a tome puts it in the book; the lesson ends and the spell stays
+take(T3, S3, 'Firebolt'); advance(91000); tick('schools.apprentice');
+const st3 = props.get(S3 + '|private.dboStudied') || {}; st3.arcane = (st3.arcane || []).concat([T.firebolt[1]]); put(S3, 'private.dboStudied', st3);
+tick('schools.apprentice');
+check('learned another way: the lesson ends and the spell stays theirs', !rec(S3).apprentice && known(S3).has(FB) && !(rec(T3).apprentices || []).length, rec(S3).apprentice);
+// A teacher's list loses an apprentice whose lesson ended while the teacher was away
+take(T3, S4, 'Firebolt');
+online = online.filter((x) => x !== T3);
+r = globalThis.__dboMagicAction(S4, 'apprenticeLeave', []);
+online.push(T3); tick('schools.apprentice');
+check('an apprenticeship left while the teacher was away is cleared from their list at their next check', r.ok && !(rec(T3).apprentices || []).length, rec(T3).apprentices);
+// Restricted arts, removed and non-tome spells never pass by apprenticeship
+const REANIM = idOf('65bd7:Skyrim.esm');
+check('spells.js: a restricted art is closed to an Associate, a removed spell and a spell no tome teaches to anyone', /restricted arts/.test(globalThis.__dboSpellsOpenTo(S4, REANIM)) && globalThis.__dboSpellsOpenTo(S4, idOf('109111:Skyrim.esm')) !== '' && globalThis.__dboSpellsOpenTo(S4, idOf('b3165:Skyrim.esm')) !== '' && globalThis.__dboSpellsOpenTo(S4, FB) === '');
+// Config: bad values fall back to their defaults, logged; mages-guild is gone from the senior list
+out.logs.length = 0;
+load({ apprenticeship: { dailyXp: 'lots', radiusMeters: -5, daysByRank: [1, 2], seniorGuilds: 'synod' } });
+check('config: a bad dailyXp, radiusMeters, daysByRank and seniorGuilds each fall back and are logged', ['dailyXp "lots"', 'radiusMeters -5', 'daysByRank [1,2]', 'seniorGuilds "synod"'].every((k) => out.logs.some((l) => l.includes(k))), out.logs.filter((l) => /config/.test(l)));
+load();
+check('the senior guilds are the four colleges, no mages-guild', !/mages-guild/.test(fs.readFileSync(SCHOOLS, 'utf8')));
+// No mp.on of its own
+check('schools.js and spells.js register no mp.on handler', !/\bmp\.on\s*\(/.test(fs.readFileSync(SCHOOLS, 'utf8')) && !/\bmp\.on\s*\(/.test(fs.readFileSync(SPELLS, 'utf8')));
+
 console.log(`${checks - failures}/${checks} passed`);
 process.exit(failures ? 1 : 0);
 })().catch((e) => { console.log('FAIL crashed:', e.stack || e.message); process.exit(1); });
