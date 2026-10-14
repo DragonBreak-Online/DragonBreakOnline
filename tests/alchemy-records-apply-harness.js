@@ -2,7 +2,8 @@
 // builds the records in DragonBreak Online Edits.esp and writes Edit Scripts\DBO_AlchemyRecords_result.txt;
 // tools/alchemy-records-apply.js fills alchemy-rework.json from it. Checks:
 // - the script's data block and alchemy-rework.json name exactly the same records (every key of `records` is built, every
-//   built ALCH/MGEF has a key), every NEW: effect is one of its own MGEFs, the 29 bench fixes and the 2 kitchen FLOR;
+//   built ALCH/MGEF has a key), every NEW: effect is one of its own MGEFs, the 28 bench fixes (never the AOTV beetle cloak,
+//   whose cooking-pot override hides its forge recipe on purpose) and the 2 kitchen FLOR;
 // - the script checks everything before it changes anything, skips an EDID that exists, rolls back on a failed build,
 //   and writes the result file and the run line the README gives;
 // - the tool fills `records`, moves `_combosPlanned` into `combos` only when all their records are mapped, changes nothing
@@ -33,7 +34,7 @@ const RW = JSON.parse(RW_TEXT);
 const lines = [...PAS.matchAll(/^ {2}D\('((?:[^']|'')*)'\);$/gm)].map((m) => m[1].replace(/''/g, "'").split('|'));
 const kinds = (k) => lines.filter((l) => l[0] === k);
 const M = kinds('M'), A = kinds('A'), F = kinds('F'), C = kinds('C');
-check('data block: 10 MGEF, 129 ALCH, 2 FLOR, 29 bench fixes', M.length === 10 && A.length === 129 && F.length === 2 && C.length === 29, [M.length, A.length, F.length, C.length]);
+check('data block: 10 MGEF, 129 ALCH, 2 FLOR, 28 bench fixes', M.length === 10 && A.length === 129 && F.length === 2 && C.length === 28, [M.length, A.length, F.length, C.length]);
 const built = new Set(M.concat(A).map((l) => l[1]));
 const keys = Object.keys(RW.records || {});
 check('every key of alchemy-rework.json records is built by the script', keys.every((k) => built.has(k)), keys.filter((k) => !built.has(k)));
@@ -51,8 +52,9 @@ check('Fortify One-handed uses the vanilla One-handed effect; Fortify Blade the 
 check('the Blood Potion keeps Dawnguard\'s feeding effect and restores 20%', byEdid.DBO_AlchBloodPotion[3] === 'Dawnguard.esm' && /DLC1BloodPotionEffect:0:0;NEW:DBO_AlchRestoreHealthEffect:20:0$/.test(byEdid.DBO_AlchBloodPotion[8]));
 check('the sap drops the vanilla Fortify Health 100 for 25% less damage taken', !/AlchFortifyHealth/.test(byEdid.DBO_AlchSleepingTreeSap[8]) && /NEW:DBO_AlchSleepingTreeSapEffect:25:45$/.test(byEdid.DBO_AlchSleepingTreeSap[8]));
 check('the kitchen flora are copies of DragonBreak Harvest\'s jug and sack', F.map((l) => `${l[1]}<${l[4]}`).join() === 'DBO_HarvestJugOfMilk<RP_HarvestJugOfMilk,DBO_HarvestFlourSack<RP_HarvestFlourSack');
-check('bench fixes: 3 loom recipes to MCE_CraftingLoom, 25 smithing ones to the forge, the AOTV cloak to its own forge', C.filter((l) => /^DBOLOOM_/.test(l[1])).every((l) => l[5] === 'MCE_CraftingLoom' && l[4] === 'MoreCraftableEquipment.esp')
-  && C.filter((l) => /^DBOLOOM_/.test(l[1])).length === 3 && C.filter((l) => /^DBOSM_/.test(l[1])).length === 25 && C.filter((l) => /^DBOSM_|^AOTV/.test(l[1])).every((l) => l[5] === 'CraftingSmithingForge' && l[4] === 'Skyrim.esm'));
+check('the AOTV beetle cloak is never touched (Nate, 14 Oct: its cooking-pot override hides the forge recipe)', !C.some((l) => /AOTV/.test(l[1])) && !/D\('C\|AOTV/.test(PAS));
+check('bench fixes: 3 loom recipes to MCE_CraftingLoom, 25 smithing ones to the forge', C.filter((l) => /^DBOLOOM_/.test(l[1])).every((l) => l[5] === 'MCE_CraftingLoom' && l[4] === 'MoreCraftableEquipment.esp')
+  && C.filter((l) => /^DBOLOOM_/.test(l[1])).length === 3 && C.filter((l) => /^DBOSM_/.test(l[1])).length === 25 && C.filter((l) => /^DBOSM_/.test(l[1])).every((l) => l[5] === 'CraftingSmithingForge' && l[4] === 'Skyrim.esm'));
 
 // ---- the script's safety ----
 check('the script checks everything first and changes nothing when anything is wrong', /if Errors = 0 then CheckAll;\s*if Errors > 0 then begin[^]*?FATAL: nothing changed/.test(PAS));
@@ -68,13 +70,14 @@ check('the run line (with -D and -P) is in the script and the README', PAS.inclu
 if (fs.existsSync(README)) {
   const RD = fs.readFileSync(README, 'utf8');
   check('the README has the PC diff record by record, the leftover .save file and the poison test', /record by record/i.test(RD) && /\.save/.test(RD) && /poisons\.judge/.test(RD));
+  check('...and expects exactly 28 BNAM changes in Nexus Patches, never the AOTV cloak', /exactly the 28 recipes CHANGED, each in BNAM/.test(RD) && /AOTVRecipeArmorBeetleCloak must not be among them/.test(RD) && !/\b29\b/.test(RD));
 }
 
 // ---- the tool ----
 const { apply, format } = require(path.resolve(TOOL));
 let n = 0x18e000;
 const ids = Object.fromEntries([...M, ...A, ...F].map((l) => [l[1], `${(n++).toString(16)}:DragonBreak Online Edits.esp`]));
-const result = (records, extra = {}) => JSON.stringify(Object.assign({ status: 'DONE created 141, existing 0, benches fixed 29', created: 141, existing: 0, benchesFixed: 29, errors: 0, records }, extra));
+const result = (records, extra = {}) => JSON.stringify(Object.assign({ status: 'DONE created 141, existing 0, benches fixed 28', created: 141, existing: 0, benchesFixed: 28, errors: 0, records }, extra));
 let r = apply('﻿' + result(ids), RW);
 check('a full result fills every record', r.ok && r.filled === keys.length && r.missing.length === 0 && Object.values(r.rework.records).every(Boolean), r.error || r.missing);
 check('...moves the six planned combinations into combos and drops _combosPlanned', r.ok && r.moved === 6 && r.rework.combos.length === 6 && !('_combosPlanned' in r.rework));
