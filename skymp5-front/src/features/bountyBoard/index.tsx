@@ -175,7 +175,7 @@ const BountyBoard = ({ data }: { data: BountyBoardData }) => {
         <div className="bountyBoard__footer">
           <span className="bountyBoard__hint">
             {tab.id === 'hold'
-              ? 'Hold Notices are posted by the Jarl, Steward and Hold Commander (Chieftain and Bane in a stronghold). Notices fade after ' + data.expiryDays + ' days.'
+              ? 'Hold Notices are posted by the Jarl, Steward and Lord Commander (Chieftain and Bane in a stronghold). Notices fade after ' + data.expiryDays + ' days.'
               : 'A notice costs ' + cost + ' gold and fades after ' + data.expiryDays + ' days. You carry ' + data.gold + ' gold.'}
           </span>
           <div className="bountyBoard__actions">
