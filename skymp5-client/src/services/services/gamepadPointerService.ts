@@ -1,12 +1,13 @@
 import { ButtonEvent, InputDeviceType, ThumbstickEvent } from "skyrimPlatform";
 import { ClientListener, CombinedController, Sp } from "./clientListener";
-import { GamepadButton, isGamepadModifierHeld, trackGamepadModifier } from "./gamepadKeys";
+import { GamepadButton, gamepadControlsOn, isGamepadModifierHeld, trackGamepadModifier } from "./gamepadKeys";
 import { DPAD_SCROLL, SEND_EVERY_MS, pageCall, pointerStep, scrollStep } from "./gamepadPointer";
 
 // Drives the page's gamepad pointer (gamepadPointer.ts) while a panel has the browser focus
 export class GamepadPointerService extends ClientListener {
   constructor(private sp: Sp, private controller: CombinedController) {
     super();
+    if (!gamepadControlsOn(this.sp)) return;
     this.controller.on("thumbstickEvent", (e) => this.onThumbstick(e));
     this.controller.on("buttonEvent", (e) => this.onButtonEvent(e));
     this.controller.on("update", () => this.onUpdate());

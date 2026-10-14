@@ -26,6 +26,16 @@ const DEFAULT_MODIFIER = GamepadButton.Back;
 let modifierHeld = false;
 let chordUsed = false;
 
+// The launcher's Controller switch (skymp5-client-settings.txt gamepadControls, on unless set false): the menu chords and the
+// panel pointer. Read once, as the launcher writes the file before the game starts.
+let controlsOn: boolean | null = null;
+export function gamepadControlsOn(sp: Sp): boolean {
+  if (controlsOn === null) {
+    try { controlsOn = (sp.settings["skymp5-client"] as Record<string, unknown> | undefined)?.["gamepadControls"] !== false; } catch { controlsOn = true; }
+  }
+  return controlsOn;
+}
+
 export function readGamepadModifier(sp: Sp): number {
   return readMenuKeyCode(sp, "gamepadModifierButton", DEFAULT_MODIFIER);
 }
@@ -48,7 +58,7 @@ export function trackGamepadModifier(sp: Sp, e: ButtonEvent): void {
 // True on the press of `button` while the modifier is held
 export function isGamepadChord(sp: Sp, e: ButtonEvent, button: number): boolean {
   trackGamepadModifier(sp, e);
-  return e.device === InputDeviceType.Gamepad && e.isDown && modifierHeld && e.code === button;
+  return e.device === InputDeviceType.Gamepad && e.isDown && modifierHeld && e.code === button && gamepadControlsOn(sp);
 }
 
 export function isGamepadModifierHeld(): boolean {
