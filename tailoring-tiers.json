@@ -1,0 +1,1305 @@
+{
+ "_comment": "Which Tailor rank a loom recipe needs, by the item it makes (server/tailoring.js; Nate, 14 Oct, from ~/claude-nate-release/specs/tailoring-tiers.md). tier 1 Novice .. 5 Master. AN ITEM NOT LISTED KEEPS THE OLDER RULE, its tier from the item's gold value (config tailoring.tierValueCap), so a partial list is never a broken gate. Only items the design note names, or unambiguous members of a family it names, are listed; the rest of the 308 loom items are left for Nate to place. Capes, cloaks and collars are listed before they move: they are forge and tanning-rack work until the Nexus Patches override lands (spec 4c), and this gate only reads a recipe once it is at a loom, so listing them early is harmless.",
+ "items": {
+  "5b6a1:skyrim.esm": {
+   "tier": 1,
+   "name": "Barkeeper's Clothes",
+   "why": "loom"
+  },
+  "6ff38:skyrim.esm": {
+   "tier": 1,
+   "name": "Barkeeper's Clothes",
+   "why": "loom"
+  },
+  "5b6a0:skyrim.esm": {
+   "tier": 1,
+   "name": "Barkeeper's Shoes",
+   "why": "loom"
+  },
+  "18c26d:windhelmsse.esp": {
+   "tier": 1,
+   "name": "Belted Tunic",
+   "why": "loom"
+  },
+  "1be1a:skyrim.esm": {
+   "tier": 1,
+   "name": "Belted Tunic",
+   "why": "loom"
+  },
+  "5b69f:skyrim.esm": {
+   "tier": 1,
+   "name": "Blacksmith's Apron",
+   "why": "loom"
+  },
+  "6ff37:skyrim.esm": {
+   "tier": 1,
+   "name": "Blacksmith's Apron",
+   "why": "loom"
+  },
+  "5b69e:skyrim.esm": {
+   "tier": 1,
+   "name": "Blacksmith's Shoes",
+   "why": "loom"
+  },
+  "c744:hearthfires.esm": {
+   "tier": 1,
+   "name": "Boy's Blue Tunic",
+   "why": "loom"
+  },
+  "c743:hearthfires.esm": {
+   "tier": 1,
+   "name": "Boy's Green Tunic",
+   "why": "loom"
+  },
+  "c745:hearthfires.esm": {
+   "tier": 1,
+   "name": "Boy's Grey Tunic",
+   "why": "loom"
+  },
+  "c742:hearthfires.esm": {
+   "tier": 1,
+   "name": "Boy's Red Tunic",
+   "why": "loom"
+  },
+  "c746:hearthfires.esm": {
+   "tier": 1,
+   "name": "Boy's Yellow Tunic",
+   "why": "loom"
+  },
+  "2214e0:windhelmsse.esp": {
+   "tier": 1,
+   "name": "Chef's Hat",
+   "why": "loom"
+  },
+  "1bca7:skyrim.esm": {
+   "tier": 1,
+   "name": "Chef's Hat",
+   "why": "loom"
+  },
+  "2266b2:windhelmsse.esp": {
+   "tier": 1,
+   "name": "Chef's Tunic",
+   "why": "loom"
+  },
+  "1bc82:skyrim.esm": {
+   "tier": 1,
+   "name": "Chef's Tunic",
+   "why": "loom"
+  },
+  "8e1:ccbgssse001-fish.esm": {
+   "tier": 1,
+   "name": "Fishing Boots",
+   "why": "loom"
+  },
+  "8e2:ccbgssse001-fish.esm": {
+   "tier": 1,
+   "name": "Fishing Clothes",
+   "why": "loom"
+  },
+  "8e4:ccbgssse001-fish.esm": {
+   "tier": 1,
+   "name": "Fishing Hat",
+   "why": "loom"
+  },
+  "e9ea:dawnguard.esm": {
+   "tier": 1,
+   "name": "Footwraps",
+   "why": "loom"
+  },
+  "3ca00:skyrim.esm": {
+   "tier": 1,
+   "name": "Footwraps",
+   "why": "loom"
+  },
+  "d81e:hearthfires.esm": {
+   "tier": 1,
+   "name": "Girl's Blue Dress",
+   "why": "loom"
+  },
+  "d81f:hearthfires.esm": {
+   "tier": 1,
+   "name": "Girl's Green Dress",
+   "why": "loom"
+  },
+  "d820:hearthfires.esm": {
+   "tier": 1,
+   "name": "Girl's Grey Dress",
+   "why": "loom"
+  },
+  "d821:hearthfires.esm": {
+   "tier": 1,
+   "name": "Girl's Red Dress",
+   "why": "loom"
+  },
+  "d822:hearthfires.esm": {
+   "tier": 1,
+   "name": "Girl's Yellow Dress",
+   "why": "loom"
+  },
+  "2def:cloaks&capes.esp": {
+   "tier": 1,
+   "name": "Leather Cape",
+   "why": "loom"
+  },
+  "2dee:cloaks&capes.esp": {
+   "tier": 1,
+   "name": "Linen Cape (Black)",
+   "why": "loom"
+  },
+  "2887:cloaks&capes.esp": {
+   "tier": 1,
+   "name": "Linen Cape (Blue)",
+   "why": "loom"
+  },
+  "2888:cloaks&capes.esp": {
+   "tier": 1,
+   "name": "Linen Cape (Green)",
+   "why": "loom"
+  },
+  "2889:cloaks&capes.esp": {
+   "tier": 1,
+   "name": "Linen Cape (Purple)",
+   "why": "loom"
+  },
+  "12c7:cloaks&capes.esp": {
+   "tier": 1,
+   "name": "Linen Cape (Red)",
+   "why": "loom"
+  },
+  "2ded:cloaks&capes.esp": {
+   "tier": 1,
+   "name": "Linen Cape (White)",
+   "why": "loom"
+  },
+  "2dec:cloaks&capes.esp": {
+   "tier": 1,
+   "name": "Linen Cape (Yellow)",
+   "why": "loom"
+  },
+  "80699:skyrim.esm": {
+   "tier": 1,
+   "name": "Miner's Boots",
+   "why": "loom"
+  },
+  "80697:skyrim.esm": {
+   "tier": 1,
+   "name": "Miner's Clothes",
+   "why": "loom"
+  },
+  "6ff43:skyrim.esm": {
+   "tier": 1,
+   "name": "Miner's Clothes",
+   "why": "loom"
+  },
+  "a4980:surwr.esp": {
+   "tier": 1,
+   "name": "Mourner's Clothes",
+   "why": "loom"
+  },
+  "646a7:skyrim.esm": {
+   "tier": 1,
+   "name": "Mourner's Clothes",
+   "why": "loom"
+  },
+  "646ab:skyrim.esm": {
+   "tier": 1,
+   "name": "Mourner's Hat",
+   "why": "loom"
+  },
+  "13106:skyrim.esm": {
+   "tier": 1,
+   "name": "Ragged Boots",
+   "why": "loom"
+  },
+  "13104:skyrim.esm": {
+   "tier": 1,
+   "name": "Ragged Cap",
+   "why": "loom"
+  },
+  "13105:skyrim.esm": {
+   "tier": 1,
+   "name": "Ragged Robes",
+   "why": "loom"
+  },
+  "8bc02:bsheartland.esm": {
+   "tier": 1,
+   "name": "Ragged Trousers",
+   "why": "loom"
+  },
+  "e9eb:dawnguard.esm": {
+   "tier": 1,
+   "name": "Ragged Trousers",
+   "why": "loom"
+  },
+  "8f19a:skyrim.esm": {
+   "tier": 1,
+   "name": "Ragged Trousers",
+   "why": "loom"
+  },
+  "8bc03:bsheartland.esm": {
+   "tier": 1,
+   "name": "Roughspun Tunic",
+   "why": "loom"
+  },
+  "3c9fe:skyrim.esm": {
+   "tier": 1,
+   "name": "Roughspun Tunic",
+   "why": "loom"
+  },
+  "d191f:skyrim.esm": {
+   "tier": 1,
+   "name": "Tavern Clothes",
+   "why": "loom"
+  },
+  "e4c:ccbgssse001-fish.esm": {
+   "tier": 1,
+   "name": "Vagrant Boots",
+   "why": "loom"
+  },
+  "e4b:ccbgssse001-fish.esm": {
+   "tier": 1,
+   "name": "Vagrant Hood",
+   "why": "loom"
+  },
+  "e4a:ccbgssse001-fish.esm": {
+   "tier": 1,
+   "name": "Vagrant Robes",
+   "why": "loom"
+  },
+  "7bc1a:skyrim.esm": {
+   "tier": 2,
+   "name": "Alik'r Hood",
+   "why": "loom"
+  },
+  "10d2b5:skyrim.esm": {
+   "tier": 2,
+   "name": "Apprentice Hood",
+   "why": "loom"
+  },
+  "83e:morecraftableequipment.esp": {
+   "tier": 2,
+   "name": "Black Cowl",
+   "why": "loom"
+  },
+  "106661:skyrim.esm": {
+   "tier": 2,
+   "name": "Black Robes",
+   "why": "loom"
+  },
+  "812:morecraftableequipment.esp": {
+   "tier": 2,
+   "name": "Blue Cowl",
+   "why": "loom"
+  },
+  "a199b:skyrim.esm": {
+   "tier": 2,
+   "name": "Blue Robes",
+   "why": "loom"
+  },
+  "880:armors of the velothi pt2.esp": {
+   "tier": 2,
+   "name": "Bonesaint Cloak",
+   "why": "loom"
+  },
+  "84a:sentinel.esp": {
+   "tier": 2,
+   "name": "Bosmer Cape",
+   "why": "loom"
+  },
+  "238e9:hothtrooper44_armorcompilation.esp": {
+   "tier": 2,
+   "name": "Bosmer Engraved Shoulder Cape",
+   "why": "loom"
+  },
+  "238ea:hothtrooper44_armorcompilation.esp": {
+   "tier": 2,
+   "name": "Bosmer Full Cape",
+   "why": "loom"
+  },
+  "238fc:hothtrooper44_armorcompilation.esp": {
+   "tier": 2,
+   "name": "Bosmer Shoulder Cape",
+   "why": "loom"
+  },
+  "84b:sentinel.esp": {
+   "tier": 2,
+   "name": "Bosmer Shoulder Cape",
+   "why": "loom"
+  },
+  "83a:morecraftableequipment.esp": {
+   "tier": 2,
+   "name": "Brown Cowl",
+   "why": "loom"
+  },
+  "10cfef:skyrim.esm": {
+   "tier": 2,
+   "name": "Brown Robes",
+   "why": "loom"
+  },
+  "cee78:skyrim.esm": {
+   "tier": 2,
+   "name": "Cuffed Boots",
+   "why": "loom"
+  },
+  "e0dd2:skyrim.esm": {
+   "tier": 2,
+   "name": "Dark Alik'r Hood",
+   "why": "loom"
+  },
+  "e0dd0:skyrim.esm": {
+   "tier": 2,
+   "name": "Dark Hammerfell Garb",
+   "why": "loom"
+  },
+  "e0dd4:skyrim.esm": {
+   "tier": 2,
+   "name": "Dark Redguard Boots",
+   "why": "loom"
+  },
+  "3037b3:journey to baan malur.esp": {
+   "tier": 2,
+   "name": "Dunmer Boots",
+   "why": "loom"
+  },
+  "836:morecraftableequipment.esp": {
+   "tier": 2,
+   "name": "Dunmer Hood",
+   "why": "loom"
+  },
+  "837:morecraftableequipment.esp": {
+   "tier": 2,
+   "name": "Dunmer Hood",
+   "why": "loom"
+  },
+  "838:morecraftableequipment.esp": {
+   "tier": 2,
+   "name": "Dunmer Hood",
+   "why": "loom"
+  },
+  "d30be:windhelmsse.esp": {
+   "tier": 2,
+   "name": "Dunmer Hood",
+   "why": "loom"
+  },
+  "6c72d:windhelmsse.esp": {
+   "tier": 2,
+   "name": "Dunmer Hood",
+   "why": "loom"
+  },
+  "82c:morecraftableequipment.esp": {
+   "tier": 2,
+   "name": "Dunmer Hooded Outfit",
+   "why": "loom"
+  },
+  "82d:morecraftableequipment.esp": {
+   "tier": 2,
+   "name": "Dunmer Hooded Outfit",
+   "why": "loom"
+  },
+  "831:morecraftableequipment.esp": {
+   "tier": 2,
+   "name": "Dunmer Hooded Outfit",
+   "why": "loom"
+  },
+  "82f:morecraftableequipment.esp": {
+   "tier": 2,
+   "name": "Dunmer Outfit",
+   "why": "loom"
+  },
+  "830:morecraftableequipment.esp": {
+   "tier": 2,
+   "name": "Dunmer Outfit",
+   "why": "loom"
+  },
+  "832:morecraftableequipment.esp": {
+   "tier": 2,
+   "name": "Dunmer Outfit",
+   "why": "loom"
+  },
+  "3705a:dragonborn.esm": {
+   "tier": 2,
+   "name": "Dunmer Shoes",
+   "why": "loom"
+  },
+  "83b:morecraftableequipment.esp": {
+   "tier": 2,
+   "name": "Green Cowl",
+   "why": "loom"
+  },
+  "10cff0:skyrim.esm": {
+   "tier": 2,
+   "name": "Green Robes",
+   "why": "loom"
+  },
+  "83c:morecraftableequipment.esp": {
+   "tier": 2,
+   "name": "Grey Cowl",
+   "why": "loom"
+  },
+  "10cff1:skyrim.esm": {
+   "tier": 2,
+   "name": "Grey Robes",
+   "why": "loom"
+  },
+  "10f86f:surwr.esp": {
+   "tier": 2,
+   "name": "Hammerfell Garb",
+   "why": "loom"
+  },
+  "7bc19:skyrim.esm": {
+   "tier": 2,
+   "name": "Hammerfell Garb",
+   "why": "loom"
+  },
+  "107108:skyrim.esm": {
+   "tier": 2,
+   "name": "Hooded Black Robes",
+   "why": "loom"
+  },
+  "10710a:skyrim.esm": {
+   "tier": 2,
+   "name": "Hooded Blue Robes",
+   "why": "loom"
+  },
+  "10cfe4:skyrim.esm": {
+   "tier": 2,
+   "name": "Hooded Brown Robes",
+   "why": "loom"
+  },
+  "10cfec:skyrim.esm": {
+   "tier": 2,
+   "name": "Hooded Green Robes",
+   "why": "loom"
+  },
+  "10cfea:skyrim.esm": {
+   "tier": 2,
+   "name": "Hooded Grey Robes",
+   "why": "loom"
+  },
+  "107106:skyrim.esm": {
+   "tier": 2,
+   "name": "Hooded Monk Robes",
+   "why": "loom"
+  },
+  "10cfeb:skyrim.esm": {
+   "tier": 2,
+   "name": "Hooded Red Robes",
+   "why": "loom"
+  },
+  "820:morecraftableequipment.esp": {
+   "tier": 2,
+   "name": "Hooded Thalmor Robes",
+   "why": "loom"
+  },
+  "b94:[kirax] lost ark reborn paladin legendary.esp": {
+   "tier": 2,
+   "name": "Lost Ark Reborn Paladin Legendary Alt Cloak",
+   "why": "moving to the loom (spec 4c)"
+  },
+  "a5e:[kirax] lost ark reborn paladin legendary.esp": {
+   "tier": 2,
+   "name": "Lost Ark Reborn Paladin Legendary Cloak",
+   "why": "moving to the loom (spec 4c)"
+  },
+  "4223d:skyrim.esm": {
+   "tier": 2,
+   "name": "Merchant's Boots",
+   "why": "loom"
+  },
+  "4223c:skyrim.esm": {
+   "tier": 2,
+   "name": "Merchant's Clothes",
+   "why": "loom"
+  },
+  "6ff45:skyrim.esm": {
+   "tier": 2,
+   "name": "Merchant's Clothes",
+   "why": "loom"
+  },
+  "4223b:skyrim.esm": {
+   "tier": 2,
+   "name": "Merchant's Hat",
+   "why": "loom"
+  },
+  "bacd7:skyrim.esm": {
+   "tier": 2,
+   "name": "Monk Boots",
+   "why": "loom"
+  },
+  "839:morecraftableequipment.esp": {
+   "tier": 2,
+   "name": "Monk Cowl",
+   "why": "loom"
+  },
+  "bacf3:skyrim.esm": {
+   "tier": 2,
+   "name": "Monk Robes",
+   "why": "loom"
+  },
+  "10cee8:skyrim.esm": {
+   "tier": 2,
+   "name": "Novice Hood",
+   "why": "loom"
+  },
+  "10d2b4:skyrim.esm": {
+   "tier": 2,
+   "name": "Novice Robes",
+   "why": "loom"
+  },
+  "187e:dis_heavy_legion.esp": {
+   "tier": 2,
+   "name": "Penitus Oculatus Cloak",
+   "why": "moving to the loom (spec 4c)"
+  },
+  "8698e:skyrim.esm": {
+   "tier": 2,
+   "name": "Pleated Boots",
+   "why": "loom"
+  },
+  "83d:morecraftableequipment.esp": {
+   "tier": 2,
+   "name": "Red Cowl",
+   "why": "loom"
+  },
+  "10cff2:skyrim.esm": {
+   "tier": 2,
+   "name": "Red Robes",
+   "why": "loom"
+  },
+  "7bc15:skyrim.esm": {
+   "tier": 2,
+   "name": "Redguard Boots",
+   "why": "loom"
+  },
+  "5a0d:journey to baan malur.esp": {
+   "tier": 2,
+   "name": "Redoran Cloak",
+   "why": "moving to the loom (spec 4c)"
+  },
+  "820:armors of the velothi.esp": {
+   "tier": 2,
+   "name": "Redoran Watchman Cloak",
+   "why": "loom"
+  },
+  "19b6e9:windhelmsse.esp": {
+   "tier": 2,
+   "name": "Refined Tunic",
+   "why": "loom"
+  },
+  "e84c6:skyrim.esm": {
+   "tier": 2,
+   "name": "Refined Tunic",
+   "why": "loom"
+  },
+  "81e:armors of the velothi.esp": {
+   "tier": 2,
+   "name": "Rhino Beetle Cloak",
+   "why": "moving to the loom (spec 4c)"
+  },
+  "2dd5:hothtrooper44_armorcompilation.esp": {
+   "tier": 2,
+   "name": "Seadog Cape",
+   "why": "loom"
+  },
+  "192e71:dragonbreak online edits.esp": {
+   "tier": 2,
+   "name": "Sturdy Pouch (Left)",
+   "why": "loom"
+  },
+  "192e72:dragonbreak online edits.esp": {
+   "tier": 2,
+   "name": "Sturdy Pouch (Left)",
+   "why": "loom"
+  },
+  "192e86:dragonbreak online edits.esp": {
+   "tier": 2,
+   "name": "Sturdy Pouch (Right)",
+   "why": "loom"
+  },
+  "192e87:dragonbreak online edits.esp": {
+   "tier": 2,
+   "name": "Sturdy Pouch (Right)",
+   "why": "loom"
+  },
+  "10cee6:skyrim.esm": {
+   "tier": 3,
+   "name": "Adept Hood",
+   "why": "loom"
+  },
+  "10cee3:skyrim.esm": {
+   "tier": 3,
+   "name": "Adept Robes",
+   "why": "loom"
+  },
+  "a4917:windhelmsse.esp": {
+   "tier": 3,
+   "name": "Bear Cape",
+   "why": "loom"
+  },
+  "37b8e:dragonborn.esm": {
+   "tier": 3,
+   "name": "Cultist Boots",
+   "why": "loom"
+  },
+  "37b8c:dragonborn.esm": {
+   "tier": 3,
+   "name": "Cultist Gloves",
+   "why": "loom"
+  },
+  "37b8a:dragonborn.esm": {
+   "tier": 3,
+   "name": "Cultist Robes",
+   "why": "loom"
+  },
+  "b8e80:windhelmsse.esp": {
+   "tier": 3,
+   "name": "Dark Fur Cape",
+   "why": "loom"
+  },
+  "b8e81:windhelmsse.esp": {
+   "tier": 3,
+   "name": "Fur Cape",
+   "why": "loom"
+  },
+  "1d9db3:windhelmsse.esp": {
+   "tier": 3,
+   "name": "Fur Cape",
+   "why": "loom"
+  },
+  "2883:cloaks&capes.esp": {
+   "tier": 3,
+   "name": "Fur Cloak (Black)",
+   "why": "loom"
+  },
+  "2884:cloaks&capes.esp": {
+   "tier": 3,
+   "name": "Fur Cloak (Brown)",
+   "why": "loom"
+  },
+  "2885:cloaks&capes.esp": {
+   "tier": 3,
+   "name": "Fur Cloak (Snowy Sabre)",
+   "why": "loom"
+  },
+  "2886:cloaks&capes.esp": {
+   "tier": 3,
+   "name": "Fur Cloak (Vale Sabre)",
+   "why": "loom"
+  },
+  "1d8e:cloaks&capes.esp": {
+   "tier": 3,
+   "name": "Fur Cloak (White)",
+   "why": "loom"
+  },
+  "911:sentinel.esp": {
+   "tier": 3,
+   "name": "Fur Collar",
+   "why": "loom"
+  },
+  "23060:hothtrooper44_armorcompilation.esp": {
+   "tier": 3,
+   "name": "Fur Collar - Loose",
+   "why": "loom"
+  },
+  "23061:hothtrooper44_armorcompilation.esp": {
+   "tier": 3,
+   "name": "Fur Collar - Tight",
+   "why": "loom"
+  },
+  "5db7e:skyrim.esm": {
+   "tier": 3,
+   "name": "Fur-Lined Boots",
+   "why": "loom"
+  },
+  "8698c:skyrim.esm": {
+   "tier": 3,
+   "name": "Fur-Trimmed Cloak",
+   "why": "loom"
+  },
+  "82a:morecraftableequipment.esp": {
+   "tier": 3,
+   "name": "Hooded Necromancer Robes",
+   "why": "loom"
+  },
+  "912:sentinel.esp": {
+   "tier": 3,
+   "name": "Large Fur Collar",
+   "why": "loom"
+  },
+  "6b46b:skyrim.esm": {
+   "tier": 3,
+   "name": "Mage Robes",
+   "why": "loom"
+  },
+  "47d7:dawnguard.esm": {
+   "tier": 3,
+   "name": "Moth Priest Robes",
+   "why": "loom"
+  },
+  "47d9:dawnguard.esm": {
+   "tier": 3,
+   "name": "Moth Priest Sandals",
+   "why": "loom"
+  },
+  "c36e8:skyrim.esm": {
+   "tier": 3,
+   "name": "Necromancer Boots",
+   "why": "loom"
+  },
+  "83f:morecraftableequipment.esp": {
+   "tier": 3,
+   "name": "Necromancer Cowl",
+   "why": "loom"
+  },
+  "829:morecraftableequipment.esp": {
+   "tier": 3,
+   "name": "Necromancer Robes",
+   "why": "loom"
+  },
+  "192e6b:dragonbreak online edits.esp": {
+   "tier": 3,
+   "name": "Patchwork Satchel",
+   "why": "loom"
+  },
+  "192e6e:dragonbreak online edits.esp": {
+   "tier": 3,
+   "name": "Patchwork Satchel",
+   "why": "loom"
+  },
+  "192e6f:dragonbreak online edits.esp": {
+   "tier": 3,
+   "name": "Reinforced Satchel",
+   "why": "loom"
+  },
+  "192e70:dragonbreak online edits.esp": {
+   "tier": 3,
+   "name": "Reinforced Satchel",
+   "why": "loom"
+  },
+  "808:morecraftableequipment.esp": {
+   "tier": 3,
+   "name": "Shrouded Hand Wraps",
+   "why": "loom"
+  },
+  "809:morecraftableequipment.esp": {
+   "tier": 3,
+   "name": "Shrouded Hood",
+   "why": "loom"
+  },
+  "806:morecraftableequipment.esp": {
+   "tier": 3,
+   "name": "Shrouded Robes",
+   "why": "loom"
+  },
+  "807:morecraftableequipment.esp": {
+   "tier": 3,
+   "name": "Shrouded Shoes",
+   "why": "loom"
+  },
+  "822:journey to baan malur.esp": {
+   "tier": 3,
+   "name": "Telvanni Guard Cloak",
+   "why": "moving to the loom (spec 4c)"
+  },
+  "834:morecraftableequipment.esp": {
+   "tier": 3,
+   "name": "Telvanni Robes",
+   "why": "loom"
+  },
+  "9f3:morecraftableequipment.esp": {
+   "tier": 3,
+   "name": "Telvanni Robes",
+   "why": "loom"
+  },
+  "835:morecraftableequipment.esp": {
+   "tier": 3,
+   "name": "Telvanni Shoes",
+   "why": "loom"
+  },
+  "3b04b:dragonborn.esm": {
+   "tier": 3,
+   "name": "Temple Priest Boots",
+   "why": "loom"
+  },
+  "3b04e:dragonborn.esm": {
+   "tier": 3,
+   "name": "Temple Priest Hood",
+   "why": "loom"
+  },
+  "9f0:morecraftableequipment.esp": {
+   "tier": 3,
+   "name": "Temple Priest Robes",
+   "why": "loom"
+  },
+  "192e6c:dragonbreak online edits.esp": {
+   "tier": 3,
+   "name": "Toothlock Satchel",
+   "why": "loom"
+  },
+  "192e6d:dragonbreak online edits.esp": {
+   "tier": 3,
+   "name": "Toothlock Satchel",
+   "why": "loom"
+  },
+  "e739b:skyrim.esm": {
+   "tier": 3,
+   "name": "Vaermina Robes",
+   "why": "loom"
+  },
+  "825:morecraftableequipment.esp": {
+   "tier": 4,
+   "name": "Arch-Mage's Boots",
+   "why": "loom"
+  },
+  "828:morecraftableequipment.esp": {
+   "tier": 4,
+   "name": "Arch-Mage's Hood",
+   "why": "loom"
+  },
+  "826:morecraftableequipment.esp": {
+   "tier": 4,
+   "name": "Arch-Mage's Robes",
+   "why": "loom"
+  },
+  "10e2dc:skyrim.esm": {
+   "tier": 4,
+   "name": "College Boots",
+   "why": "loom"
+  },
+  "10e2ce:skyrim.esm": {
+   "tier": 4,
+   "name": "College Boots",
+   "why": "loom"
+  },
+  "6b46c:skyrim.esm": {
+   "tier": 4,
+   "name": "College Boots",
+   "why": "loom"
+  },
+  "2dfa:cloaks&capes.esp": {
+   "tier": 4,
+   "name": "College of Winterhold Cloak",
+   "why": "moving to the loom (spec 4c)"
+  },
+  "2dfb:cloaks&capes.esp": {
+   "tier": 4,
+   "name": "Dark Brotherhood Cloak",
+   "why": "moving to the loom (spec 4c)"
+  },
+  "2df9:cloaks&capes.esp": {
+   "tier": 4,
+   "name": "Dawngaurd Cloak",
+   "why": "moving to the loom (spec 4c)"
+  },
+  "e84c4:skyrim.esm": {
+   "tier": 4,
+   "name": "Embellished Robes",
+   "why": "loom"
+  },
+  "ead49:skyrim.esm": {
+   "tier": 4,
+   "name": "Embroidered Garment",
+   "why": "loom"
+  },
+  "10d662:skyrim.esm": {
+   "tier": 4,
+   "name": "Expert Robes",
+   "why": "loom"
+  },
+  "2df1:cloaks&capes.esp": {
+   "tier": 4,
+   "name": "Falkreath Guard Cloak",
+   "why": "moving to the loom (spec 4c)"
+  },
+  "86990:skyrim.esm": {
+   "tier": 4,
+   "name": "Fine Armguards",
+   "why": "loom"
+  },
+  "376de:dragonborn.esm": {
+   "tier": 4,
+   "name": "Fine Boots",
+   "why": "loom"
+  },
+  "86993:skyrim.esm": {
+   "tier": 4,
+   "name": "Fine Boots",
+   "why": "loom"
+  },
+  "376df:dragonborn.esm": {
+   "tier": 4,
+   "name": "Fine Clothes",
+   "why": "loom"
+  },
+  "86991:skyrim.esm": {
+   "tier": 4,
+   "name": "Fine Clothes",
+   "why": "loom"
+  },
+  "f8713:skyrim.esm": {
+   "tier": 4,
+   "name": "Fine Clothes",
+   "why": "loom"
+  },
+  "cee80:skyrim.esm": {
+   "tier": 4,
+   "name": "Fine Clothes",
+   "why": "loom"
+  },
+  "f8715:skyrim.esm": {
+   "tier": 4,
+   "name": "Fine Clothes",
+   "why": "loom"
+  },
+  "20d7ac:riften expansion.esp": {
+   "tier": 4,
+   "name": "Fine Doublet",
+   "why": "loom"
+  },
+  "1b1077:windhelmsse.esp": {
+   "tier": 4,
+   "name": "Fine Fur",
+   "why": "loom"
+  },
+  "b8e83:windhelmsse.esp": {
+   "tier": 4,
+   "name": "Fine Fur",
+   "why": "loom"
+  },
+  "2128c6:riften expansion.esp": {
+   "tier": 4,
+   "name": "Fine Fur Pelt",
+   "why": "loom"
+  },
+  "20d7bd:riften expansion.esp": {
+   "tier": 4,
+   "name": "Fine Hat",
+   "why": "loom"
+  },
+  "cee84:skyrim.esm": {
+   "tier": 4,
+   "name": "Fine Hat",
+   "why": "loom"
+  },
+  "20d7a8:riften expansion.esp": {
+   "tier": 4,
+   "name": "Fine Outlander Clothes",
+   "why": "loom"
+  },
+  "cee76:skyrim.esm": {
+   "tier": 4,
+   "name": "Fine Raiment",
+   "why": "loom"
+  },
+  "cee82:skyrim.esm": {
+   "tier": 4,
+   "name": "Fine Shoes",
+   "why": "loom"
+  },
+  "e84c1:skyrim.esm": {
+   "tier": 4,
+   "name": "Gilded Wristguards",
+   "why": "loom"
+  },
+  "192e77:dragonbreak online edits.esp": {
+   "tier": 4,
+   "name": "Glowdust Gem Backpack",
+   "why": "loom"
+  },
+  "192e78:dragonbreak online edits.esp": {
+   "tier": 4,
+   "name": "Glowdust Gem Backpack",
+   "why": "loom"
+  },
+  "192e79:dragonbreak online edits.esp": {
+   "tier": 4,
+   "name": "Glowdust Gem Backpack",
+   "why": "loom"
+  },
+  "824:morecraftableequipment.esp": {
+   "tier": 4,
+   "name": "Greybeard's Boots",
+   "why": "loom"
+  },
+  "823:morecraftableequipment.esp": {
+   "tier": 4,
+   "name": "Greybeard's Hood",
+   "why": "loom"
+  },
+  "822:morecraftableequipment.esp": {
+   "tier": 4,
+   "name": "Greybeard's Robes",
+   "why": "loom"
+  },
+  "2df2:cloaks&capes.esp": {
+   "tier": 4,
+   "name": "Hjaalmarch Guard Cloak",
+   "why": "moving to the loom (spec 4c)"
+  },
+  "187c:dis_heavy_legion.esp": {
+   "tier": 4,
+   "name": "Imperial Cloak",
+   "why": "moving to the loom (spec 4c)"
+  },
+  "6aa04:hothtrooper44_armorcompilation.esp": {
+   "tier": 4,
+   "name": "Imperial Knight Cape",
+   "why": "moving to the loom (spec 4c)"
+  },
+  "187d:dis_heavy_legion.esp": {
+   "tier": 4,
+   "name": "Imperial Officer's Cloak",
+   "why": "moving to the loom (spec 4c)"
+  },
+  "5a1a:journey to baan malur.esp": {
+   "tier": 4,
+   "name": "Indoril Guard Cloak",
+   "why": "moving to the loom (spec 4c)"
+  },
+  "80b:morecraftableequipment.esp": {
+   "tier": 4,
+   "name": "Jester's Boots",
+   "why": "loom"
+  },
+  "80a:morecraftableequipment.esp": {
+   "tier": 4,
+   "name": "Jester's Clothes",
+   "why": "loom"
+  },
+  "80c:morecraftableequipment.esp": {
+   "tier": 4,
+   "name": "Jester's Gloves",
+   "why": "loom"
+  },
+  "80d:morecraftableequipment.esp": {
+   "tier": 4,
+   "name": "Jester's Hat",
+   "why": "loom"
+  },
+  "2df3:cloaks&capes.esp": {
+   "tier": 4,
+   "name": "Markarth Guard Cloak",
+   "why": "moving to the loom (spec 4c)"
+  },
+  "b145b:skyrim.esm": {
+   "tier": 4,
+   "name": "Mythic Dawn Gloves",
+   "why": "loom"
+  },
+  "842:morecraftableequipment.esp": {
+   "tier": 4,
+   "name": "Mythic Dawn Hood",
+   "why": "loom"
+  },
+  "840:morecraftableequipment.esp": {
+   "tier": 4,
+   "name": "Mythic Dawn Hooded Robes",
+   "why": "loom"
+  },
+  "841:morecraftableequipment.esp": {
+   "tier": 4,
+   "name": "Mythic Dawn Robes",
+   "why": "loom"
+  },
+  "b1460:skyrim.esm": {
+   "tier": 4,
+   "name": "Mythic Dawn Shoes",
+   "why": "loom"
+  },
+  "5db7b:skyrim.esm": {
+   "tier": 4,
+   "name": "Noble Clothes",
+   "why": "loom"
+  },
+  "2df0:cloaks&capes.esp": {
+   "tier": 4,
+   "name": "Pale Guard Cloak",
+   "why": "moving to the loom (spec 4c)"
+  },
+  "65b9b:skyrim.esm": {
+   "tier": 4,
+   "name": "Psijic Boots",
+   "why": "loom"
+  },
+  "65b9d:skyrim.esm": {
+   "tier": 4,
+   "name": "Psijic Gloves",
+   "why": "loom"
+  },
+  "65b99:skyrim.esm": {
+   "tier": 4,
+   "name": "Psijic Hood",
+   "why": "loom"
+  },
+  "65b94:skyrim.esm": {
+   "tier": 4,
+   "name": "Psijic Robes",
+   "why": "loom"
+  },
+  "f74c:hothtrooper44_armorcompilation.esp": {
+   "tier": 4,
+   "name": "Redguard Knight Cape",
+   "why": "moving to the loom (spec 4c)"
+  },
+  "192e73:dragonbreak online edits.esp": {
+   "tier": 4,
+   "name": "Reinforced Backpack",
+   "why": "loom"
+  },
+  "192e74:dragonbreak online edits.esp": {
+   "tier": 4,
+   "name": "Reinforced Backpack",
+   "why": "loom"
+  },
+  "192e7d:dragonbreak online edits.esp": {
+   "tier": 4,
+   "name": "Reinforced Backpack",
+   "why": "loom"
+  },
+  "192e84:dragonbreak online edits.esp": {
+   "tier": 4,
+   "name": "Reinforced Backpack",
+   "why": "loom"
+  },
+  "192e75:dragonbreak online edits.esp": {
+   "tier": 4,
+   "name": "Reinforced Backpack & Lantern",
+   "why": "loom"
+  },
+  "192e76:dragonbreak online edits.esp": {
+   "tier": 4,
+   "name": "Reinforced Backpack & Lantern",
+   "why": "loom"
+  },
+  "192e7e:dragonbreak online edits.esp": {
+   "tier": 4,
+   "name": "Reinforced Backpack & Lantern",
+   "why": "loom"
+  },
+  "192e85:dragonbreak online edits.esp": {
+   "tier": 4,
+   "name": "Reinforced Backpack & Lantern",
+   "why": "loom"
+  },
+  "2df4:cloaks&capes.esp": {
+   "tier": 4,
+   "name": "Riften Guard Cloak",
+   "why": "moving to the loom (spec 4c)"
+  },
+  "2df5:cloaks&capes.esp": {
+   "tier": 4,
+   "name": "Solitude Guard Cloak",
+   "why": "moving to the loom (spec 4c)"
+  },
+  "2df7:cloaks&capes.esp": {
+   "tier": 4,
+   "name": "Stormcloak Cloak",
+   "why": "moving to the loom (spec 4c)"
+  },
+  "65bac:skyrim.esm": {
+   "tier": 4,
+   "name": "Thalmor Boots",
+   "why": "loom"
+  },
+  "65bb3:skyrim.esm": {
+   "tier": 4,
+   "name": "Thalmor Gloves",
+   "why": "loom"
+  },
+  "821:morecraftableequipment.esp": {
+   "tier": 4,
+   "name": "Thalmor Hood",
+   "why": "loom"
+  },
+  "81f:morecraftableequipment.esp": {
+   "tier": 4,
+   "name": "Thalmor Robes",
+   "why": "loom"
+  },
+  "86e:armors of the velothi pt2.esp": {
+   "tier": 4,
+   "name": "Travelling Merchant Backpack",
+   "why": "loom"
+  },
+  "19ae1:dawnguard.esm": {
+   "tier": 4,
+   "name": "Vampire Boots",
+   "why": "loom"
+  },
+  "19ae3:dawnguard.esm": {
+   "tier": 4,
+   "name": "Vampire Gloves",
+   "why": "loom"
+  },
+  "19ade:dawnguard.esm": {
+   "tier": 4,
+   "name": "Vampire Hood",
+   "why": "loom"
+  },
+  "19adf:dawnguard.esm": {
+   "tier": 4,
+   "name": "Vampire Robes",
+   "why": "loom"
+  },
+  "88956:skyrim.esm": {
+   "tier": 4,
+   "name": "Wedding Dress",
+   "why": "loom"
+  },
+  "88958:skyrim.esm": {
+   "tier": 4,
+   "name": "Wedding Sandals",
+   "why": "loom"
+  },
+  "8895a:skyrim.esm": {
+   "tier": 4,
+   "name": "Wedding Wreath",
+   "why": "loom"
+  },
+  "2df6:cloaks&capes.esp": {
+   "tier": 4,
+   "name": "Whiterun Guard Cloak",
+   "why": "moving to the loom (spec 4c)"
+  },
+  "84c:sentinel - city guards.esp": {
+   "tier": 4,
+   "name": "Winterhold Cloak",
+   "why": "moving to the loom (spec 4c)"
+  },
+  "2df8:cloaks&capes.esp": {
+   "tier": 4,
+   "name": "Winterhold Guard Cloak",
+   "why": "moving to the loom (spec 4c)"
+  },
+  "15516:skyrim.esm": {
+   "tier": 5,
+   "name": "Emperor's Robes",
+   "why": "loom"
+  },
+  "827:morecraftableequipment.esp": {
+   "tier": 5,
+   "name": "Hooded Arch-Mage's Robes",
+   "why": "loom"
+  },
+  "10d664:skyrim.esm": {
+   "tier": 5,
+   "name": "Master Robes",
+   "why": "loom"
+  },
+  "6230b:skyrim.esm": {
+   "tier": 5,
+   "name": "Ulfric's Armguards",
+   "why": "loom"
+  },
+  "62311:skyrim.esm": {
+   "tier": 5,
+   "name": "Ulfric's Boots",
+   "why": "loom"
+  },
+  "62303:skyrim.esm": {
+   "tier": 5,
+   "name": "Ulfric's Clothes",
+   "why": "loom"
+  }
+ }
+}

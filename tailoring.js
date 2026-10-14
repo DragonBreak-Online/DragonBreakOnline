@@ -12,6 +12,8 @@
 // do a faction's own tailors making that faction's gear (factiongear.js decides those).
 // Config "tailoring": { enabled, tierValueCap: [15, 50, 150, 400, 1e9], benchKeywords }. Hot reload.
 'use strict';
+const fs = require('fs');
+const path = require('path');
 
 module.exports = (api) => {
   const { mp, log, personal, audit, who, cfg, isAdmin, sendPacket, registerChatCommand } = api;
@@ -49,6 +51,31 @@ module.exports = (api) => {
   };
   // 1..5
   const tierOfValue = (value) => { const caps = Array.isArray(C.tierValueCap) ? C.tierValueCap : [15, 50, 150, 400, 1e9]; for (let i = 0; i < caps.length; i++) if (value <= Number(caps[i])) return i + 1; return caps.length; };
+
+  // The curated list first, the item's value only for what it does not name (Nate, 14 Oct: the tailoring spec). Value
+  // was the rarity signal the plugins already carried and it reads a mourner's hat and a master's robe the same way
+  // when their prices are close; a named tier does not. The list covers 260 of the 377 loom items, so the rest still
+  // need the old rule, and a missing or broken file leaves every one of them on it rather than opening the loom.
+  const LIST = (() => {
+    try {
+      const raw = JSON.parse(fs.readFileSync(path.resolve('tailoring-tiers.json'), 'utf8'));
+      const out = new Map();
+      for (const [desc, v] of Object.entries((raw && raw.items) || {})) {
+        const t = Math.round(Number(v && v.tier));
+        if (t >= 1 && t <= 5) out.set(String(desc).toLowerCase(), t);
+      }
+      log(`tailoring: ${out.size} item(s) placed by name, the rest by value`);
+      return out;
+    } catch (e) {
+      log(`tailoring: tailoring-tiers.json not read (${e.message}); every item falls back to its value`);
+      return new Map();
+    }
+  })();
+  const descOf = (itemId) => { try { return String(mp.getDescFromId(itemId >>> 0) || '').toLowerCase(); } catch (e) { return ''; } };
+  const tierOfItem = (itemId) => {
+    const named = LIST.get(descOf(itemId));
+    return named || tierOfValue(valueOf(itemId));
+  };
   // 0 without the Tailor skill, else 1..5
   const tailorTier = (a) => {
     const r = get(a, 'private.mastery', null);
@@ -71,13 +98,13 @@ module.exports = (api) => {
     if (isAdmin(a) && !S.test.has(a)) return true;
     // A faction's own tailor makes that faction's gear (factiongear.js), as smithing.js lets its smiths
     try { if (typeof globalThis.__dboFactionGearMember === 'function' && globalThis.__dboFactionGearMember(a, itemId) === true) return true; } catch (e) { /* the usual gate */ }
-    const need = tierOfValue(valueOf(itemId)), have = tailorTier(a);
+    const need = tierOfItem(itemId), have = tailorTier(a);
     if (have >= need) return true;
     tell(a, `${TIERS[need - 1]} are ${RANKS[need - 1]} Tailor's work; ${have ? `you are a ${RANKS[have - 1]} Tailor` : 'you have not taken up the Tailor'}. Your materials come back when you close the menu.`);
-    audit(`TAILOR craft refused ${who(a)} at Tailor tier ${have}: recipe ${(recipeId >>> 0).toString(16)} needs tier ${need} (value ${valueOf(itemId)})`);
+    audit(`TAILOR craft refused ${who(a)} at Tailor tier ${have}: recipe ${(recipeId >>> 0).toString(16)} needs tier ${need} (${LIST.has(descOf(itemId)) ? 'by name' : `by value ${valueOf(itemId)}`})`);
     return false;
   };
-  globalThis.__dboTailorTierOf = (itemId) => tierOfValue(valueOf(itemId >>> 0));
+  globalThis.__dboTailorTierOf = (itemId) => tierOfItem(itemId >>> 0);
 
   if (typeof registerChatCommand === 'function') {
     registerChatCommand('tailoring', (a, rest) => {
