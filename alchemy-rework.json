@@ -14,7 +14,7 @@
   [75, 0.3],
   [100, 0.45],
   [150, 0.6],
-  [1000000000.0, 0.75]
+  [1000000000, 0.75]
  ],
  "percentEffects": ["DBO_AlchRestoreHealthEffect", "DBO_AlchRestoreMagickaEffect", "DBO_AlchRestoreStaminaEffect"],
  "overTime": {
@@ -33,7 +33,7 @@
   "_comment": "hook: blade/blunt/archery (DBO weapon skills), one/two (vanilla One-/Two-handed potions, by the weapon's hands), school:20 Destruction and school:22 Restoration damage (Restoration also its healing), duration:18 Alteration (the Flesh spells), duration:19 Conjuration (summons), block (what gets through a block), armor (worn armour rating), lockpick (Lockpicking ranks, lockpickTiers). Vanilla Heavy/Light Armor potions raise a skill by points: the game counts a point as 0.4% armour (UESP Skyrim:Armor), perPoint 0.004. health: Fortify Health's points become extra health (hits scaled by base/(base+points), gamemode.js potionTakenMult); taken: a share off every hit (Sleeping Tree Sap).",
   "lockpickTiers": [
    [0.35, 1],
-   [1000000000.0, 2]
+   [1000000000, 2]
   ],
   "effects": {
    "03eb19": {
