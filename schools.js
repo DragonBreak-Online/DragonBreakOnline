@@ -110,6 +110,17 @@ module.exports = (api) => {
     // from priestHoldXp of the way to the next level
     rankPicks: { enabled: true, ranks: { Apprentice: 25, Adept: 50 }, priestHoldXp: 90 },
     rankSpells: {},
+    // Apprenticeship (Arcane Mastery, Nate 14 Oct): a teacher at Arcane Arts teacherArcaneLevel (Priest teacherPriestLevel for
+    // Restoration) takes another player as apprentice from the X menu and picks a spell they know; the apprentice accepts.
+    // Inside radiusMeters of the teacher the apprentice holds the spell (learned server-side for the while, as beastform.js
+    // does); each cast of it there is xpPerCast, at most dailyXp a day (UTC), and dailyXp x daysByRank[spell rank] learns it
+    // for good. One apprentice at a time (max), seniorMax for the leader or an officer of a seniorGuilds faction. The
+    // apprentice's school rank (Priest's for Restoration) must be at least the spell's.
+    apprenticeship: {
+      enabled: true, teacherArcaneLevel: 75, teacherPriestLevel: 75, radiusMeters: 60, xpPerCast: 1, castGapSeconds: 2, dailyXp: 20,
+      daysByRank: [1, 2, 3, 5, 15], max: 1, seniorMax: 3, seniorGuilds: ['synod', 'college-of-winterhold', 'college-of-whispers', 'house-telvanni', 'mages-guild'],
+      seniorRoles: ['leader', 'officer'], offerMinutes: 5, tickSeconds: 3,
+    },
     swap: { enabled: true, cooldownDays: 7, startShare: 0.5 },
     // A third of the first pace (Nate, 3 Oct): 25 to 50 takes about 12 days at the daily cap
     castUnits: 0.2,
@@ -175,6 +186,7 @@ module.exports = (api) => {
     swap: Object.assign({}, DEFAULTS.swap, raw.swap || {}),
     firstSpells: Object.assign({}, DEFAULTS.firstSpells, raw.firstSpells || {}),
     rankPicks: Object.assign({}, DEFAULTS.rankPicks, raw.rankPicks || {}, { ranks: Object.assign({}, DEFAULTS.rankPicks.ranks, (raw.rankPicks || {}).ranks || {}) }),
+    apprenticeship: Object.assign({}, DEFAULTS.apprenticeship, raw.apprenticeship || {}),
   });
   const ALTERATION = ['both', 'arcane', 'priest'].includes(String(C.alteration)) ? String(C.alteration) : 'both';
   const SCHOOLS = (Array.isArray(C.schools) ? C.schools : DEFAULTS.schools).map(String).filter((n) => n !== 'Alteration' || ALTERATION !== 'priest');
@@ -730,6 +742,7 @@ module.exports = (api) => {
   };
   globalThis.__dboSchoolsCast = (casterId, spellId) => {
     if (!ready(casterId) || !isPlayer(casterId)) return;
+    try { apCast(casterId >>> 0, spellId >>> 0); } catch (e) { log('schools: apprentice cast failed', e.message); }
     let sp = null; try { sp = typeof globalThis.__dboSpellsClassify === 'function' ? globalThis.__dboSpellsClassify(spellId >>> 0) : null; } catch (e) { return; }
     if (!sp || !SCHOOLS.includes(sp.school)) return;
     const s = stateOf(casterId);
@@ -1162,7 +1175,7 @@ module.exports = (api) => {
   // The shelf's (or the ledger's) magic menu: a first spell waiting, the secondary school, a change of school
   const openSchoolMenu = (a, ref, where, note) => {
     const s = stateOf(a);
-    const rows = pendingPicks(a, s).map((school) => ({ id: `pick:${school}`, label: `Choose your first spell of ${school}` }));
+    const rows = pendingPicks(a, s).map((school) => ({ id: `pick:${school}`, label: `Choose your ${stageWord(stageOf(a, s, school))} of ${school}` }));
     if (secondaryWaits(a, s)) {
       rows.push({ id: 'secondary', label: 'Choose your secondary school' });
       if (where === 'shelf' && isStudy(ref) && !studyRefusal(a, s)) rows.push({ id: 'study', label: `Study ${s.primary}` });
@@ -1935,6 +1948,8 @@ module.exports = (api) => {
       primary: s.primary || '', secondary: s.secondary || '',
       note: beforeFirst(a, s) ? notYet(arc.level) : !s.primary && arc.held ? 'Choose your school of magic at a Study Magic shelf.' : secondaryWaits(a, s) ? SECOND_WHERE : '',
       ranks: RANKS.slice(), floors: FLOORS.slice(), firstSpellAt: PICK_AT,
+      // Apprenticeship: the lesson the character is studying, and the apprentices they teach (a newer client draws it)
+      apprenticeship: (() => { try { return typeof globalThis.__dboSchoolsApprenticeView === 'function' ? globalThis.__dboSchoolsApprenticeView(a) : null; } catch (e) { return null; } })(),
       schools,
       book: book || { max: 0, canPrepare: false, hint: '', prepared: [], known: [], outside: [] },
       swap: { enabled: !!SW.enabled, can: !swapWhy, why: swapWhy, nextAt: next > Date.now() ? next : 0, cooldownDays: Number(SW.cooldownDays) || 0, startShare: Number(SW.startShare) || 0.5,
@@ -1983,6 +1998,216 @@ module.exports = (api) => {
   };
   globalThis.__dboAdminSetSchool = (t, school, level, by) => { try { return adminSet(by || 0, t >>> 0, school, level); } catch (e) { return { ok: false, text: e.message }; } };
 
+  // ---- apprenticeship (Arcane Mastery stage 2, Nate 14 Oct) --------------------------------------------------------------
+  // The apprentice's record: s.apprentice { teacher, teacherName, spell (desc), school, rank, xp, need, day, dayXp, at, held,
+  // lastCastAt, capTold }; the teacher's: s.apprentices [{ student, name, spell, at }]. An offer waits in memory only.
+  const AP = C.apprenticeship;
+  const APPRENTICE_MENU_ID = 84;
+  const AP_MS = Math.max(1, Number(AP.tickSeconds) || 3) * 1000;
+  const apOffers = ST0.apOffers instanceof Map ? ST0.apOffers : (ST0.apOffers = new Map()); // student -> { teacher, spell, nonce, until }
+  const apTeachPanels = ST0.apTeachPanels instanceof Map ? ST0.apTeachPanels : (ST0.apTeachPanels = new Map()); // teacher -> { nonce, student, options }
+  const dayKey = () => new Date(Date.now()).toISOString().slice(0, 10);
+  const spellSkill = (school) => (school === RESTORATION ? PS.skill : C.arcaneSkill);
+  const studentRank = (a, s, school) => (school === RESTORATION ? priestRank(a) : schoolRank(s, school));
+  const knowsSpell = (a, id) => knownSpells(a).some((sp) => sp.id >>> 0 === id >>> 0) || bookOf(a).some((sp) => sp.id >>> 0 === id >>> 0);
+  const inBookOf = (a, id) => bookOf(a).some((sp) => sp.id >>> 0 === id >>> 0);
+  const isSenior = (a) => guildRolesOf(a).some((m) => (AP.seniorGuilds || []).includes(m.id) && (AP.seniorRoles || []).includes(m.role));
+  const apMax = (a) => Math.max(0, Number(isSenior(a) ? AP.seniorMax : AP.max) || 0);
+  const apList = (s) => (Array.isArray(s.apprentices) ? s.apprentices : []);
+  const canTeachAny = (a) => arcaneOf(a).level >= AP.teacherArcaneLevel || (priestOf(a).held && priestOf(a).level >= AP.teacherPriestLevel);
+  const canTeachSchool = (a, school) => (school === RESTORATION ? priestOf(a).held && priestOf(a).level >= AP.teacherPriestLevel : arcaneOf(a).level >= AP.teacherArcaneLevel);
+  const needFor = (rank) => Math.max(1, Number(AP.dailyXp) || 20) * Math.max(1, Number((AP.daysByRank || [])[rank]) || 1);
+  // The spells `a` could teach `t`: known to the teacher, a school the teacher may teach, unknown to the apprentice, at
+  // most the apprentice's rank in that school
+  const teachable = (a, t) => {
+    const st = stateOf(t);
+    const seen = new Set();
+    return bookOf(a).concat(knownSpells(a)).filter((sp) => sp && sp.school && !seen.has(sp.id >>> 0) && seen.add(sp.id >>> 0))
+      .filter((sp) => (SCHOOLS.includes(sp.school) || sp.school === RESTORATION) && canTeachSchool(a, sp.school) && !knowsSpell(t, sp.id) && studentRank(t, st, sp.school) >= sp.rank)
+      .sort((x, y) => x.rank - y.rank || x.name.localeCompare(y.name));
+  };
+  // Why `a` cannot take `t` as apprentice now, or ''
+  const takeRefusal = (a, t) => {
+    if (!C.enabled || AP.enabled === false) return 'Apprenticeship is not open.';
+    if (a >>> 0 === t >>> 0) return 'You cannot be your own apprentice.';
+    if (!canTeachAny(a)) return `Taking an apprentice takes Arcane Arts at ${AP.teacherArcaneLevel}, or Priest at ${AP.teacherPriestLevel} to teach Restoration.`;
+    const s = stateOf(a);
+    if (apList(s).length >= apMax(a)) return apMax(a) === 1 ? 'You already have an apprentice. Release them first, or finish their lesson.' : `You already have ${apList(s).length} apprentices, as many as your standing allows.`;
+    const ts = stateOf(t);
+    if (ts.apprentice) return `${display(t)} is already someone's apprentice.`;
+    if (!teachable(a, t).length) return `You know no spell ${display(t)} could study yet: their rank in its school must be at least the spell's.`;
+    return '';
+  };
+  const papyrusQuiet = (a, fn, id) => papyrusSpell(a, fn, id, fn === 'AddSpell' ? [false] : []);
+  // The spell is held only while near the teacher; never take back one the apprentice owns in their book
+  const setHeld = (a, s, on) => {
+    const ap = s.apprentice;
+    if (!ap || !!ap.held === on) return;
+    const id = idOf(ap.spell);
+    if (!id) return;
+    if (on) { papyrusQuiet(a, 'AddSpell', id); ap.held = true; } else { if (!inBookOf(a, id)) papyrusQuiet(a, 'RemoveSpell', id); ap.held = false; }
+    save(a, s);
+  };
+  const endApprenticeship = (t, why, tell) => {
+    const s = stateOf(t);
+    const ap = s.apprentice;
+    if (!ap) return;
+    setHeld(t, s, false);
+    const teacher = ap.teacher >>> 0;
+    delete s.apprentice; save(t, s);
+    try {
+      const ts = stateOf(teacher);
+      const left = apList(ts).filter((x) => x.student >>> 0 !== t >>> 0);
+      if (left.length !== apList(ts).length) { ts.apprentices = left; save(teacher, ts); }
+    } catch (e) { /* the teacher's record is gone */ }
+    audit(`SCHOOLS apprenticeship of ${who(t)} with ${ap.teacherName || teacher.toString(16)} in ${ap.spell} ended: ${why}`);
+    if (tell) personal(t, tell);
+  };
+  const openTeachPanel = (a, t) => {
+    const options = teachable(a, t);
+    const nonce = mkNonce('a', a);
+    apTeachPanels.set(a >>> 0, { nonce, student: t >>> 0, options: options.map((sp) => ({ id: sp.id >>> 0, name: sp.name, school: sp.school, rank: sp.rank })) });
+    openWidget(a, {
+      type: 'studyMagic', id: STUDY_PANEL_ID, nonce, title: 'Take an Apprentice', mode: 'choose',
+      lead: `Choose the spell you will teach ${display(t)}. They study it near you, a little each day: ${(AP.daysByRank || []).map((d, i) => `${RANKS[i]} ${d} day${d === 1 ? '' : 's'}`).join(', ')}.`,
+      school: '', level: 0, rank: '', fill: 0, leftSeconds: 0, tickSeconds: 0, gained: 0, whyNot: '', result: '', resultKind: '',
+      choices: options.map((sp) => ({ name: sp.name, blurb: `${RANKS[sp.rank]} ${sp.school}`, confirm: `Teach ${sp.name} to ${display(t)}? They must accept.` })),
+      events: { choose: 'dbo:apprenticeTeach', start: 'dbo:apprenticeTeach', stop: 'dbo:apprenticeTeach', close: 'dbo:apprenticeTeachClose' },
+    }, true);
+  };
+  onUi('apprenticeTeachClose', (a) => { apTeachPanels.delete(a >>> 0); closeWidget(a, STUDY_PANEL_ID); });
+  onUi('apprenticeTeach', (a, args) => {
+    const m = apTeachPanels.get(a >>> 0);
+    if (!m || String(args[0] || '') !== m.nonce) return;
+    apTeachPanels.delete(a >>> 0);
+    closeWidget(a, STUDY_PANEL_ID);
+    const o = m.options.find((x) => x.name.toLowerCase() === String(args[1] || '').toLowerCase());
+    const t = m.student;
+    if (!o) return personal(a, 'That spell cannot be taught just now.');
+    const why = takeRefusal(a, t);
+    if (why) return personal(a, why);
+    if (!teachable(a, t).some((sp) => sp.id >>> 0 === o.id)) return personal(a, `${display(t)} cannot study ${o.name} now.`);
+    const nonce = mkNonce('o', t);
+    apOffers.set(t >>> 0, { teacher: a >>> 0, spell: descOf(o.id), name: o.name, school: o.school, rank: o.rank, nonce, until: Date.now() + Math.max(1, Number(AP.offerMinutes) || 5) * 60000 });
+    openWidget(t, { type: 'contextMenu', id: APPRENTICE_MENU_ID, mode: 'menu',
+      targetName: `${display(a)} offers to take you as apprentice to learn ${o.name} (${RANKS[o.rank]} ${o.school}): about ${(AP.daysByRank || [])[o.rank] || 1} day${((AP.daysByRank || [])[o.rank] || 1) === 1 ? '' : 's'} of study near them.`,
+      actions: [{ id: `${nonce}|accept`, label: 'Become their apprentice' }, { id: `${nonce}|decline`, label: 'Decline' }],
+      events: { action: 'dbo:apprenticeOffer', close: 'dbo:apprenticeOfferClose' } }, true);
+    personal(a, `You offer to teach ${display(t)} ${o.name}. They must accept.`);
+  });
+  const answerOffer = (t, accept) => {
+    const o = apOffers.get(t >>> 0);
+    apOffers.delete(t >>> 0);
+    closeWidget(t, APPRENTICE_MENU_ID);
+    if (!o) return;
+    if (!accept || Date.now() > o.until) { personal(o.teacher, `${display(t)} declined to study ${o.name} with you.`); return; }
+    const why = takeRefusal(o.teacher, t);
+    if (why) { personal(t, 'The apprenticeship cannot begin just now.'); personal(o.teacher, why); return; }
+    const s = stateOf(t);
+    const need = needFor(o.rank);
+    s.apprentice = { teacher: o.teacher, teacherName: display(o.teacher), spell: o.spell, school: o.school, rank: o.rank, xp: 0, need, day: dayKey(), dayXp: 0, at: Date.now(), held: false, lastCastAt: 0 };
+    save(t, s);
+    const ts = stateOf(o.teacher);
+    ts.apprentices = apList(ts).concat({ student: t >>> 0, name: display(t), spell: o.spell, at: Date.now() });
+    save(o.teacher, ts);
+    audit(`SCHOOLS ${who(o.teacher)} took ${who(t)} as apprentice in ${o.spell} ${o.name} (${RANKS[o.rank]} ${o.school}, ${need} study)`);
+    personal(o.teacher, `${display(t)} is now your apprentice in ${o.name}.`);
+    personal(t, `You are ${display(o.teacher)}'s apprentice in ${o.name}. Near them you can prepare and cast it; casting it is your study, up to ${AP.dailyXp} a day, ${need} in all.`);
+    apTick(t);
+  };
+  onUi('apprenticeOffer', (t, args) => {
+    const o = apOffers.get(t >>> 0);
+    const raw = String(args[0] || ''), cut = raw.indexOf('|');
+    if (!o || cut < 0 || raw.slice(0, cut) !== o.nonce) return;
+    answerOffer(t, raw.slice(cut + 1) === 'accept');
+  });
+  onUi('apprenticeOfferClose', (t) => { if (apOffers.has(t >>> 0)) answerOffer(t, false); });
+  // Near the teacher: the spell is held; away (or the teacher offline): it is taken back
+  const apTick = (t) => {
+    const s = stateOf(t);
+    const ap = s.apprentice;
+    if (!ap) return;
+    const teacher = ap.teacher >>> 0;
+    let near = false;
+    try { near = onlineActors().includes(teacher) && distanceMeters(t, teacher) <= Number(AP.radiusMeters || 60); } catch (e) { near = false; }
+    // The teacher released them while they were away
+    try { if (!apList(stateOf(teacher)).some((x) => x.student >>> 0 === t >>> 0)) { endApprenticeship(t, 'released', `${ap.teacherName || 'Your teacher'} has ended your apprenticeship.`); return; } } catch (e) { /* teacher unreadable: keep */ }
+    if (near !== !!ap.held) { setHeld(t, s, near); personal(t, near ? `You are near ${ap.teacherName}: you can cast ${nameOfSpell(ap.spell)} again.` : `You have left ${ap.teacherName}'s side: ${nameOfSpell(ap.spell)} slips from your mind until you return.`); }
+  };
+  every('schools.apprentice', AP_MS, () => { if (!C.enabled || AP.enabled === false) return; for (const t of onlineActors()) { try { if (ready(t) && isPlayer(t) && stateOf(t).apprentice) apTick(t); } catch (e) { log('schools: apprentice tick failed', e.message); } } });
+  // A cast of the studied spell near the teacher is study (gamemode castHook -> __dboSchoolsCast)
+  const apCast = (t, spellId) => {
+    const s = stateOf(t);
+    const ap = s.apprentice;
+    if (!ap || !ap.held || idOf(ap.spell) !== spellId >>> 0) return;
+    if (Date.now() - (Number(ap.lastCastAt) || 0) < Math.max(0, Number(AP.castGapSeconds) || 0) * 1000) return;
+    ap.lastCastAt = Date.now();
+    if (ap.day !== dayKey()) { ap.day = dayKey(); ap.dayXp = 0; ap.capTold = false; }
+    const cap = Math.max(1, Number(AP.dailyXp) || 20);
+    if (ap.dayXp >= cap) {
+      if (!ap.capTold) { ap.capTold = true; personal(t, 'You have studied this magic enough for today. Come back tomorrow to continue your studies.'); }
+      save(t, s); return;
+    }
+    const add = Math.min(cap - ap.dayXp, Math.max(0, Number(AP.xpPerCast) || 1));
+    ap.dayXp += add; ap.xp += add;
+    if (ap.xp >= ap.need) { save(t, s); return finishApprenticeship(t); }
+    if (ap.dayXp >= cap) { ap.capTold = true; personal(t, `You have studied this magic enough for today. Come back tomorrow to continue your studies. (${ap.xp}/${ap.need})`); }
+    save(t, s);
+  };
+  const finishApprenticeship = (t) => {
+    const s = stateOf(t);
+    const ap = s.apprentice;
+    const id = idOf(ap.spell);
+    let r = null;
+    try { r = typeof globalThis.__dboSpellsGrant === 'function' ? globalThis.__dboSpellsGrant(t, id, spellSkill(ap.school)) : null; } catch (e) { r = null; }
+    if (!r || !r.ok) { log(`schools: ${who(t)}'s apprenticeship spell ${ap.spell} could not be granted; it stays waiting`); return; }
+    // Held through the lesson: given for good now, so ending the lesson leaves it where the spellbook put it
+    const prepared = (get(t, 'private.dboPrepared', []) || []).map(norm);
+    ap.held = false;
+    if (!prepared.includes(norm(ap.spell))) papyrusQuiet(t, 'RemoveSpell', id);
+    save(t, s);
+    const teacher = ap.teacher >>> 0, name = ap.teacherName;
+    endApprenticeship(t, 'learned', `You have learned ${r.name} from ${name}. ${r.line}`);
+    if (onlineActors().includes(teacher)) personal(teacher, `${display(t)} has learned ${r.name}. Your apprenticeship with them is complete.`);
+    audit(`SCHOOLS ${who(t)} learned ${ap.spell} ${r.name} as apprentice of ${name}`);
+  };
+  globalThis.__dboSchoolsApprenticeView = (a) => {
+    const s = stateOf(a);
+    const ap = s.apprentice;
+    return {
+      apprentice: ap ? { teacher: ap.teacherName, spell: nameOfSpell(ap.spell), school: ap.school, rank: RANKS[ap.rank], xp: ap.xp, need: ap.need, today: ap.day === dayKey() ? ap.dayXp : 0, dailyXp: Number(AP.dailyXp) || 20, near: !!ap.held } : null,
+      apprentices: apList(s).map((x) => ({ name: x.name, spell: nameOfSpell(x.spell) })), max: apMax(a),
+    };
+  };
+  // X menu: take, release, leave
+  const apEntries = (a, t) => {
+    if (!C.enabled || AP.enabled === false) return [];
+    const out = [];
+    const mine = apList(stateOf(a)).some((x) => x.student >>> 0 === t >>> 0);
+    if (mine) out.push({ id: 'schools:apprenticeend', label: 'Release apprentice' });
+    else if (canTeachAny(a) && !stateOf(t).apprentice) out.push({ id: 'schools:apprentice', label: 'Take as apprentice' });
+    const myAp = stateOf(a).apprentice;
+    if (myAp && myAp.teacher >>> 0 === t >>> 0) out.push({ id: 'schools:apprenticequit', label: 'Leave apprenticeship' });
+    return out;
+  };
+  const apAction = (a, id, t) => {
+    if (id === 'schools:apprentice') { const why = takeRefusal(a, t); if (why) personal(a, why); else openTeachPanel(a, t); return true; }
+    if (id === 'schools:apprenticeend') {
+      if (!apList(stateOf(a)).some((x) => x.student >>> 0 === t >>> 0)) { personal(a, `${display(t)} is not your apprentice.`); return true; }
+      endApprenticeship(t, `released by ${who(a)}`, `${display(a)} has ended your apprenticeship.`);
+      personal(a, `${display(t)} is no longer your apprentice.`);
+      return true;
+    }
+    if (id === 'schools:apprenticequit') {
+      const ap = stateOf(a).apprentice;
+      if (!ap || ap.teacher >>> 0 !== t >>> 0) return true;
+      endApprenticeship(a, 'left by the apprentice', `You are no longer ${ap.teacherName}'s apprentice.`);
+      personal(t, `${display(a)} has left your apprenticeship.`);
+      return true;
+    }
+    return false;
+  };
+
   // ---- staff ---------------------------------------------------------------------------------------------------------
   const argList = (args) => (Array.isArray(args) ? args.map(String) : String(args || '').trim().split(/\s+/)).filter(Boolean);
   // Naming or removing a class teacher: /classteacher and the X menu's staff entries share it (one record, one audit line)
@@ -1998,13 +2223,15 @@ module.exports = (api) => {
   // teacher" for one the lectern would let teach, or the same entry marked "(not eligible)" that says why; "Remove as class
   // teacher" for one already named (Nate, 12 Oct: "Teachers need to be in the panel. I hate commands.")
   const staffOnly = (a) => { try { return typeof isAdmin === 'function' && !!isAdmin(a); } catch (e) { return false; } };
-  globalThis.__dboSchoolsMenuEntries = (a, t) => {
+  globalThis.__dboSchoolsMenuEntries = (a, t) => apEntries(a, t).concat(staffEntries(a, t));
+  const staffEntries = (a, t) => {
     if (!staffOnly(a) || !C.enabled || !C.classes.enabled) return [];
     if (listed(t)) return [{ id: 'schools:teacheroff', label: 'Remove as class teacher' }];
     if (!C.classes.requireList) return [];
     return [classQualified(t) ? { id: 'schools:teacherwhy', label: 'Name class teacher (not eligible)' } : { id: 'schools:teacheron', label: 'Name class teacher' }];
   };
   globalThis.__dboSchoolsMenuAction = (a, id, t, nameFor) => {
+    if (apAction(a, id, t)) return true;
     if (id !== 'schools:teacheron' && id !== 'schools:teacheroff' && id !== 'schools:teacherwhy') return false;
     if (!staffOnly(a)) return true;
     if (id === 'schools:teacheroff') {
