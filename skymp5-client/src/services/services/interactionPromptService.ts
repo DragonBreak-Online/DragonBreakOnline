@@ -9,6 +9,7 @@ import { isRemotePlayerCharacter, localIdToRemoteId } from "../../view/worldView
 import { ObjectReferenceEx } from "../../extensions/objectReferenceEx";
 import { logError } from "../../logging";
 import { changedDecorNames } from "./refDecorNames";
+import { revealLabelFor } from "../../view/realNamesMarker";
 
 // for the browser-side widget setter (executed inside the CEF browser)
 declare const window: any;
@@ -212,6 +213,8 @@ export class InteractionPromptService extends ClientListener {
     }
     // The engine must not start a dialogue or a local loot window on the clone under our menu.
     try { ref.blockActivation(true); } catch { /* unloaded ref */ }
+    const staffLabel = revealLabelFor(this.ownerKnownIds(), remoteId);
+    if (staffLabel) return { verb: dead ? "Search" : "Interact", label: staffLabel };
     const raw = (ref.getName() || "").trim();
     const known = raw && this.knowsTarget(remoteId);
     if (dead) return { verb: "Search", label: known ? raw : "Body" };
@@ -226,6 +229,12 @@ export class InteractionPromptService extends ClientListener {
     const known = owner ? owner["ff_knownIds"] : undefined;
     if (!Array.isArray(known)) return true;
     return known.includes(remoteId);
+  }
+
+  private ownerKnownIds(): unknown {
+    if (this.sp.storage["ownerModelSet"] !== true) return undefined;
+    const owner = this.sp.storage["ownerModel"] as Record<string, unknown> | undefined;
+    return owner ? owner["ff_knownIds"] : undefined;
   }
 
   // undefined = the server has not answered yet (asked once), "" = not a load door, otherwise the destination name
