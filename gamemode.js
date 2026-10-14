@@ -2466,6 +2466,8 @@ const onCharacterReady = (userId, a) => {
   try { if (globalThis.__dboClock) globalThis.__dboClock.sendTo(a); } catch (e) { /* clock later */ }
   // A new character is carried through the landing into the hub behind a black screen
   if (creationPending(a)) { creation.set(a, 'spawning'); setFade(a, true); if (inHub(a)) setCreatorHidden(a, true); setTimeout(() => fallBackToLanding(a), HUB_SPAWN_WAIT_MS); }
+  // A real-names marker a crash or a restart left in the list goes now, not in loginSetup 8 s later (playermenu.js)
+  loginStep('real names leftover', () => { if (typeof globalThis.__dboRealNamesLogin === 'function') globalThis.__dboRealNamesLogin(a); });
   // Seed the remembered outfit from the save before the client's undressed login reports replace it, unless the last
   // session's game never arrived (spawnwatch.js): that equipment is what it wore in Riverwood
   let seedOutfit = true;
@@ -7294,6 +7296,7 @@ try {
   require(PLAYERMENU_JS)({ mp, log, personal, system, registerChatCommand, onUi, sendPacket, display, nameOf, tagOf, profileOf, onlineActors, isAdmin, isLeadStaff, staffCan, ranksOf, giveItem, makeProp, runCommand, zones: ZONES, zoneOfActor, cfg, every });
 } catch (e) {
   log('playermenu.js failed to load:', e.stack || e.message); globalThis.__dboPlayerMenuLeave = null; globalThis.__dboPlayerMenuReady = null; globalThis.__dboInstantRestraint = null;
+  globalThis.__dboRealNamesLogin = null; // the arrival hook goes with the login hook
   // Chat, /players and the U panel then name everyone as before real names
   globalThis.__dboRealNamesOn = null; globalThis.__dboRealNamesLabel = null; globalThis.__dboRealNamesDisplay = null; globalThis.__dboRealNamesSet = null;
   // And every real-names mode on ends (fail closed): a load that threw part way leaves no sweep and no leave or login
