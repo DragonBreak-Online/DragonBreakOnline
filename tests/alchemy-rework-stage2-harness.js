@@ -152,6 +152,20 @@ const ticks = (n) => { for (let i = 0; i < n; i++) globalThis.__dboAlchemyRunTic
   craft([HEAL_A, HEAL_B]);
   check('...the refused Apprentice restore falls back to vanilla RestoreHealth03', count(pid('RestoreHealth03')) === 1);
 
+  // ---- a planned combination, once mapped: named by tier ----
+  MGEF('3eb16:Skyrim.esm', 'AlchRestoreStamina', 0.5, { av: 26 });
+  ALCH(DBO('c04'), 'DBO_AlchComboRestoreHealthStaminaT4', [['e02:DragonBreak Online Edits.esp', 45]]);
+  ALCH(DBO('c05'), 'DBO_AlchComboRestoreHealthStaminaT5', [['e02:DragonBreak Online Edits.esp', 60]]);
+  const VIG_A = INGR('10b', 'VigA', ['3eb15:Skyrim.esm', '3eb16:Skyrim.esm']), VIG_B = INGR('10c', 'VigB', ['3eb15:Skyrim.esm', '3eb16:Skyrim.esm']);
+  const planned = (RW._combosPlanned || []).find((c) => c.effects.join() === '03eb15,03eb16');
+  load({ records: Object.assign({ DBO_AlchComboRestoreHealthStaminaT4: 'c04:DragonBreak Online Edits.esp', DBO_AlchComboRestoreHealthStaminaT5: 'c05:DragonBreak Online Edits.esp' }, MAPPED), combos: planned ? [planned] : [] });
+  for (const [t, id, word] of [[4, DBO('c04'), 'Philter'], [5, DBO('c05'), 'Elixir']]) {
+    tierOf(A, t); put(A, 'inventory', { entries: [{ baseId: VIG_A, count: 2 }, { baseId: VIG_B, count: 2 }] });
+    msg = craft([VIG_A, VIG_B]);
+    check(`the planned Health + Stamina combination at tier ${t}: ${word} of Health and Stamina`, count(id) === 1 && msg.includes(`${word} of Health and Stamina`), msg);
+  }
+  load({ records: MAPPED });
+
   // ---- dropped and PvP gates ----
   for (const t of [1, 5]) {
     tierOf(A, t); stockAll();
