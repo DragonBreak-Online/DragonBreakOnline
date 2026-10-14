@@ -172,6 +172,84 @@ test('the state store: hashed keys, the flow recorded, 10 minutes, once, a cap',
   assert.equal(S.size(), 1, 'expired states are pruned on the next issue')
 })
 
+test('R1: the store holds at most 10 states per visitor, and a visitor at its limit loses its own oldest, never another visitor\'s', () => {
+  const S = createStateStore()
+  const other = S.issue('fresh', '198.51.100.20')
+  const mine = []
+  for (let i = 0; i < 11; i++) mine.push(S.issue('login', '203.0.113.50'))
+  assert.equal(S.heldBy('203.0.113.50'), 10)
+  assert.equal(S.take(mine[0]), null, 'the eleventh pushed out that address\'s own first')
+  assert.equal(S.take(mine[1]).flow, 'login', 'its second still works')
+  assert.equal(S.take(other).ip, '198.51.100.20', 'the other address\'s state is untouched')
+})
+
+test('R1: 10,000 states issued to one address, or to requests with no address, leave another address\'s state working', () => {
+  const S = createStateStore()
+  const admin = S.issue('fresh', '198.51.100.20')
+  for (let i = 0; i < 10000; i++) S.issue('login', '203.0.113.50')
+  assert.ok(S.size() <= 11, `size ${S.size()}`)
+  const direct = S.issue('fresh', '198.51.100.21')
+  for (let i = 0; i < 10000; i++) S.issue('login', null)
+  assert.equal(S.heldBy(null), 10, 'every request without an address counts as one visitor')
+  assert.deepEqual(Object.keys(S.take(admin)), ['flow', 'ip', 'at'])
+  assert.equal(S.take(direct).ip, '198.51.100.21')
+})
+
+test('R1: past the store\'s cap the heaviest visitor loses its oldest first, so a visitor with one state survives a flood from many addresses', () => {
+  const S = createStateStore({ max: 50, perVisitor: 10 })
+  const admin = S.issue('fresh', '198.51.100.20')
+  for (let a = 1; a <= 5; a++) for (let i = 0; i < 20; i++) S.issue('login', `203.0.113.${a}`)
+  for (let a = 1; a <= 20; a++) S.issue('login', `192.0.2.${a}`)
+  assert.equal(S.size(), 50, 'the cap holds')
+  assert.equal(S.take(admin).flow, 'fresh', 'the one-state visitor kept its state')
+  // What is left: as many addresses as the cap, each with one state, push out the oldest of those equals
+  const T = createStateStore({ max: 5, perVisitor: 10 })
+  const first = T.issue('fresh', '198.51.100.20')
+  for (let a = 1; a <= 5; a++) T.issue('login', `192.0.2.${a}`)
+  assert.equal(T.take(first), null)
+})
+
+test('R1: an IPv6 /56 counts as one visitor, as it does for the rate limits; the record keeps the exact address', () => {
+  const rateLimit = require('express-rate-limit')
+  const S = createStateStore({ visitorOf: ip => rateLimit.ipKeyGenerator(ip) })
+  const states = []
+  for (let i = 0; i < 11; i++) states.push(S.issue('login', `2001:db8:1:${(i + 1).toString(16)}::${i + 1}`))
+  assert.equal(S.heldBy('2001:db8:1:ff::1'), 10)
+  assert.equal(S.take(states[0]), null, 'the /56\'s own oldest went')
+  assert.equal(S.take(states[10]).ip, '2001:db8:1:b::11')
+})
+
+test('R1: 10,000 /login from one address still leave another address\'s issued state working (and /login is limited per visitor)', async () => {
+  const { oauthStates } = require('../routes/site-auth').internals
+  const agent = new http.Agent({ keepAlive: true, maxSockets: 16 })
+  const flood = async (n, headers) => {
+    let limited = 0
+    for (let i = 0; i < n; i += 50) {
+      const batch = []
+      for (let j = 0; j < 50 && i + j < n; j++) batch.push(new Promise((resolve, reject) => {
+        http.get(`${base}/api/site/login`, { agent, headers }, res => { res.resume(); res.on('end', () => resolve(res.statusCode)) }).on('error', reject)
+      }))
+      for (const status of await Promise.all(batch)) if (status === 429) limited++
+    }
+    return limited
+  }
+  try {
+    const admin = await get('/api/site/login/fresh', '', { 'cf-connecting-ip': '198.51.100.20' })
+    const state = stateOf(admin)
+    const limited = await flood(10000, { 'cf-connecting-ip': '203.0.113.50' })
+    assert.ok(limited >= 9990, `the per-visitor limit answered ${limited} of 10,000 with 429`)
+    assert.ok(oauthStates.heldBy('203.0.113.50') <= 10, 'that address holds at most 10 states')
+    const unlimited = await flood(10000, {})
+    assert.equal(unlimited, 0, 'requests without the header skip the limiter (as for the callback)...')
+    assert.equal(oauthStates.heldBy(null), 10, '...and all count as one visitor in the store')
+    const before = exchanges
+    const cb = await get(`/api/site/callback?code=abc&state=${state}`, `db_site_state=${state}`, { 'cf-connecting-ip': '198.51.100.20' })
+    assert.equal(cb.location, '/dashboard.html#console', 'the admin\'s own sign-in still finishes')
+    assert.equal(exchanges - before, 1)
+    assert.equal(typeof store.validate(cookieOf(cb.cookies, 'db_site')).signedInAt, 'number', 'and is fresh')
+  } finally { agent.destroy() }
+})
+
 test('the plain /login with a session still goes straight to the profile (no second session)', async () => {
   const s = store.create({ discordId: '300000000000000002', username: 'Nate', signedInAt: Date.now() })
   const r = await get('/api/site/login', `db_site=${s}`)

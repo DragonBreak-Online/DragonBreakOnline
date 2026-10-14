@@ -26,6 +26,10 @@ const SESSION_COOKIE = 'db_site'
 // Where the callback returns to after /login/fresh, the staff console's sign-in
 const CONSOLE_PAGE   = '/dashboard.html#console'
 const STATE_TTL_MS   = 10 * 60 * 1000
+// Outstanding sign-in states per visitor; a new one pushes out that visitor's own oldest
+const STATES_PER_VISITOR = 10
+// A sign-in state issued with no visitor address is logged at most this often (in production every visitor has one)
+const NO_ADDRESS_LOG_MS  = 60 * 60 * 1000
 const CALLBACK_PATH  = '/api/site/callback'
 // Only /api/site reads the session, so the browser sends it nowhere else on the host
 const SESSION_PATH   = '/api/site'
@@ -46,8 +50,8 @@ try { websiteOrigin = new URL(config.websiteUrl).origin } catch { /* malformed W
 // The exact website Origin; a missing one is refused
 const sameOrigin = req => !!websiteOrigin && req.get('origin') === websiteOrigin
 
-// Every state /login and /login/fresh issue; the callback takes only these, whatever the state cookie says
-const oauthStates = createStateStore({ ttlMs: STATE_TTL_MS })
+// Every state /login and /login/fresh issue; the callback takes only these, whatever the state cookie says; an IPv6 /56 counts as one visitor, as for the rate limits
+const oauthStates = createStateStore({ ttlMs: STATE_TTL_MS, perVisitor: STATES_PER_VISITOR, visitorOf: ip => rateLimit.ipKeyGenerator(ip) })
 // The flows whose callback may write signedInAt: both send prompt=consent
 const CONSENT_FLOWS = new Set(['login', 'fresh'])
 
@@ -67,6 +71,14 @@ const limitOptions = {
 const visitorLimiter = rateLimit({
   ...limitOptions,
   max: 5,
+  skip: req => !visitorIp(req),
+  keyGenerator: req => rateLimit.ipKeyGenerator(visitorIp(req)),
+})
+
+// Per visitor for /login and /login/fresh together, so one client cannot churn through states; requests without the header meet the store's per-visitor cap only
+const loginLimiter = rateLimit({
+  ...limitOptions,
+  max: 10,
   skip: req => !visitorIp(req),
   keyGenerator: req => rateLimit.ipKeyGenerator(visitorIp(req)),
 })
@@ -214,7 +226,7 @@ function toSiteCharacter({ cf, char, mtime }, names, account) {
 }
 
 // GET /api/site/login: binds a random state to this browser, then sends it to Discord
-router.get('/login', (req, res) => {
+router.get('/login', loginLimiter, (req, res) => {
   if (!config.discordClientId || !config.discordSiteRedirectUri) {
     return res.redirect(`${PROFILE_PAGE}?error=unconfigured`)
   }
@@ -224,15 +236,21 @@ router.get('/login', (req, res) => {
   startSignIn(req, res, 'login')
 })
 
+let noAddressLoggedAt = 0
 // Every site sign-in is a click on Discord's own Authorize page (prompt=consent), so each signedInAt stands for a person
 function startSignIn(req, res, flow) {
-  const state = oauthStates.issue(flow, visitorIp(req))
+  const ip = visitorIp(req)
+  if (!ip && Date.now() - noAddressLoggedAt > NO_ADDRESS_LOG_MS) {
+    noAddressLoggedAt = Date.now()
+    console.warn('[site-auth] a sign-in started without CF-Connecting-IP; every such request shares one visitor limit of outstanding states')
+  }
+  const state = oauthStates.issue(flow, ip)
   setCookie(res, STATE_COOKIE, state, CALLBACK_PATH, STATE_TTL_MS)
   res.redirect(oauth.authorizeUrl({ redirectUri: config.discordSiteRedirectUri, state, prompt: 'consent' }))
 }
 
 // GET /api/site/login/fresh: the staff console's sign-in again, even with a session, back to the console afterwards
-router.get('/login/fresh', (req, res) => {
+router.get('/login/fresh', loginLimiter, (req, res) => {
   if (!config.discordClientId || !config.discordSiteRedirectUri) {
     return res.redirect(`${PROFILE_PAGE}?error=unconfigured`)
   }
