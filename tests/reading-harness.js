@@ -529,7 +529,7 @@ console.log('client-judged:');
   let g = tomeRanks(1, 30);
   check('gate: a Master Scholar capped at Apprentice by college rank is pressed Novice or Apprentice tomes, every time', g.max === 1 && g.missed === 0, g);
   g = tomeRanks(3, 60);
-  check('gate: ...a Senior (cap Expert) can be pressed an Adept tome (the Scholar tier stops it there)', g.max === 2 && g.missed === 0, g);
+  check('gate: ...a Senior (cap Expert) can be pressed an Expert tome (Nate, 14 Oct: Expert from Scholar 75)', g.max === 3 && g.missed === 0, g);
   delete globalThis.__dboSpellsReadRankCap;
   props.set(READER + '|private.mastery', { order: ['scholar'], skills: { scholar: { rank: 0 } } });
   for (const k of ['scholarCopies', 'scholarScrolls', 'scholarTomes', 'scholarReads', 'scholarTomeDry']) props.delete(READER + '|private.' + k);

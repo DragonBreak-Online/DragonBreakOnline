@@ -3748,6 +3748,13 @@ const READ = Object.assign({
   tomeChanceAfterFind: 0.5,
   // A guaranteed tome after this many won readings without one, on a day with none found yet (0 = off; Nate, 10 Oct)
   tomePityReads: 100,
+  // The highest tome rank by Scholar tier, Novice to Master (Nate, 14 Oct: the rank follows the tier): Apprentice tomes from
+  // Scholar 25, Adept from 50, Expert from 75 (the college gate keeps Expert to Senior ranks)
+  tomeRankByTier: [0, 1, 2, 3, 3],
+  // A Master tome only at Scholar masterTomeLevel, as masterTomeShare of the tomes found there ("extremely super super
+  // rare": 1 in 50 tomes, about 1 in 1000 readings at the Master tier's 5%), for a Senior rank as an Expert tome is
+  masterTomeLevel: 100,
+  masterTomeShare: 0.02,
   // Copies of the book read, a day. A spell tome, a skill book or a note that cannot be taken is never copied: reading
   // a placed tome every 30 minutes on each character got round the Synod's one a week (loot review, 2026-09-29)
   bookDailyCap: 6,
@@ -4003,22 +4010,27 @@ const wheelRoom = (a, skill, now = Date.now()) => {
 globalThis.__dboWheelRoom = wheelRoom;
 globalThis.__dboScholarNoRoom = scholarNoRoom;
 // The tome a reading presses between the pages (Nate, 10 Oct, #suggestions: "5 courage tomes", "10 lesser wards"):
-// - ranks by Scholar tier: Novice to Apprentice readers Novice tomes, Adept and Expert up to Apprentice, Master up to
-//   Adept (READ.tomeRankByTier, was Adept still Novice-only);
-// - and by college rank (Nate, 11 Oct: "RP gate-keep the high tiers"; spells.js readGate, __dboSpellsReadRankCap): no
-//   college rank reads up to Apprentice, a rank only up to what it may buy at the colleges, never a Master tome; a tome
-//   above the cap is simply not in the pool, so the chance of a tome is unchanged and the find comes from the ranks
+// - ranks by Scholar tier (READ.tomeRankByTier, Nate 14 Oct): Novice tomes below 25, Apprentice from 25, Adept from 50,
+//   Expert from 75; a Master tome only at Scholar 100, as READ.masterTomeShare of the finds;
+// - and by college rank (Nate, 11 Oct: "RP gate-keep the high tiers"; spells.js readGate, __dboSpellsReadRankCap): anyone
+//   reads up to Adept (floorRank, Nate 14 Oct), Senior ranks up to Expert, and a Master tome only for a Senior rank; a
+//   tome above the cap is simply not in the pool, so the chance of a tome is unchanged and the find comes from the ranks
 //   allowed; the restricted arts only for Senior ranks (__dboSpellsReadRestricted). Without spells.js: Apprentice;
 // - never a tome whose spell the reader already knows, nor one they are carrying;
 // - a tome of a school the reader's own magic skills cover (arcane: Destruction, Conjuration, Illusion; priest:
 //   Restoration, Alteration, from skills.json vanillaSkills) is READ.tomeSchoolWeight times as likely.
 // null when nothing is left to give (the day's tome count is then not spent).
-const scholarTomePick = (a, tier) => {
-  const caps = Array.isArray(READ.tomeRankByTier) ? READ.tomeRankByTier : [0, 0, 1, 1, 2];
+const scholarTomePick = (a, tier, noMaster) => {
+  const caps = Array.isArray(READ.tomeRankByTier) ? READ.tomeRankByTier : [0, 1, 2, 3, 3];
   const tierRank = Number(caps[Math.max(0, Math.min(tier, caps.length - 1))]) || 0;
   let collegeRank = 1;
   try { if (typeof globalThis.__dboSpellsReadRankCap === 'function') collegeRank = Number(globalThis.__dboSpellsReadRankCap(a)); } catch (e) { collegeRank = 1; }
-  const maxRank = Math.min(tierRank, Number.isFinite(collegeRank) ? collegeRank : 1);
+  if (!Number.isFinite(collegeRank)) collegeRank = 1;
+  let level = 0; try { const m = masteryOf(a); level = Number(m && m.skills && m.skills.scholar && m.skills.scholar.level) || 0; } catch (e) { level = 0; }
+  // The Master roll: a Senior rank (college cap at Expert) at Scholar masterTomeLevel; with no Master tome left it falls back
+  const master = !noMaster && collegeRank >= 3 && level >= (Number(READ.masterTomeLevel) || 100) && Math.random() < (Number(READ.masterTomeShare) || 0);
+  const maxRank = master ? 4 : Math.min(tierRank, collegeRank);
+  const minRank = master ? 4 : 0;
   const restricted = typeof globalThis.__dboSpellsReadRestricted === 'function' ? globalThis.__dboSpellsReadRestricted : () => false;
   let carried = new Set();
   try { const inv = mp.get(a, 'inventory'); carried = new Set(((inv && inv.entries) || []).filter((e) => Number(e.count) > 0).map((e) => Number(e.baseId) >>> 0)); } catch (e) { /* none known */ }
@@ -4030,7 +4042,7 @@ const scholarTomePick = (a, tier) => {
   const weight = Math.max(1, Number(READ.tomeSchoolWeight) || 3);
   const pool = [];
   for (const t of READABLES.tomes || []) {
-    if (Number(t.rank) > maxRank) continue;
+    if (Number(t.rank) > maxRank || Number(t.rank) < minRank) continue;
     let id = 0; try { id = mp.getIdFromDesc(String(t.id).replace(/^([^:]+):0*([0-9a-fA-F]+)$/, '$2:$1')) >>> 0; } catch (e) { continue; }
     if (!id || carried.has(id)) continue;
     const spell = typeof globalThis.__dboSpellsTomeSpell === 'function' ? globalThis.__dboSpellsTomeSpell(id) : 0;
@@ -4038,7 +4050,7 @@ const scholarTomePick = (a, tier) => {
     try { if (restricted(a, id)) continue; } catch (e) { /* not restricted */ }
     pool.push({ t, w: schools.has(String(t.school)) ? weight : 1 });
   }
-  if (!pool.length) return null;
+  if (!pool.length) return master ? scholarTomePick(a, tier, true) : null;
   let roll = Math.random() * pool.reduce((n, x) => n + x.w, 0);
   for (const x of pool) { roll -= x.w; if (roll < 0) return x.t; }
   return pool[pool.length - 1].t;

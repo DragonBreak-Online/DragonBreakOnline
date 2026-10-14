@@ -275,16 +275,16 @@ load(Object.assign(baseCfg(), { spells: Object.assign({}, baseCfg().spells, { sh
   const cap = (a) => globalThis.__dboSpellsReadRankCap(a);
   const LEADER = 0x30, MAGISTER = 0x31, NOBODY = 0x32, WIZARD = 0x33;
   member(LEADER, 'synod', 'Chancellor of the Synod'); member(MAGISTER, 'synod', 'Magister'); member(WIZARD, 'college-of-winterhold', 'Wizard');
-  check('gate: config is on, floor Apprentice, top Expert, restricted arts gated', CONFIG.spells.readGate && CONFIG.spells.readGate.enabled === true && CONFIG.spells.readGate.floorRank === 1 && CONFIG.spells.readGate.maxRank === 3 && CONFIG.spells.readGate.restricted === true, CONFIG.spells.readGate);
-  check('gate: no college at all reads up to Apprentice', cap(NOBODY) === 1, cap(NOBODY));
-  check('gate: an Initiate and a Synod Artificer read up to Apprentice (the floor)', cap(INITIATE) === 1 && cap(SMITH) === 1, [cap(INITIATE), cap(SMITH)]);
-  check('gate: an Associate, a Whisperer and a Wizard read up to Apprentice, what they may buy', cap(ASSOC) === 1 && cap(WHISPER) === 1 && cap(WIZARD) === 1, [cap(ASSOC), cap(WHISPER), cap(WIZARD)]);
+  check('gate: config is on, floor Adept (Nate, 14 Oct), top Expert, restricted arts gated', CONFIG.spells.readGate && CONFIG.spells.readGate.enabled === true && CONFIG.spells.readGate.floorRank === 2 && CONFIG.spells.readGate.maxRank === 3 && CONFIG.spells.readGate.restricted === true, CONFIG.spells.readGate);
+  check('gate: no college at all reads up to Adept', cap(NOBODY) === 2, cap(NOBODY));
+  check('gate: an Initiate and a Synod Artificer read up to Adept (the floor)', cap(INITIATE) === 2 && cap(SMITH) === 2, [cap(INITIATE), cap(SMITH)]);
+  check('gate: an Associate, a Whisperer and a Wizard read up to Adept (the floor, above what they may buy)', cap(ASSOC) === 2 && cap(WHISPER) === 2 && cap(WIZARD) === 2, [cap(ASSOC), cap(WHISPER), cap(WIZARD)]);
   check('gate: a Senior Magister, a Magister and the Chancellor read up to Expert, never Master', cap(SENIOR) === 3 && cap(MAGISTER) === 3 && cap(LEADER) === 3, [cap(SENIOR), cap(MAGISTER), cap(LEADER)]);
   check('gate: the restricted arts are passed over for an Associate (Raise Zombie, Conjure Boneman), not an atronach', globalThis.__dboSpellsReadRestricted(ASSOC, idOf(RAISE.book)) === true && globalThis.__dboSpellsReadRestricted(ASSOC, idOf(BONEMAN.book)) === true && globalThis.__dboSpellsReadRestricted(ASSOC, idOf(ATRONACH.book)) === false);
   check('gate: ...and not for a Senior', globalThis.__dboSpellsReadRestricted(SENIOR, idOf(RAISE.book)) === false);
-  // readGate.byRole replaces shopRankByRole for reading only (a mage reading Adept), the shop unchanged
-  load(Object.assign(baseCfg(), { spells: Object.assign({}, baseCfg().spells, { readGate: Object.assign({}, CONFIG.spells.readGate, { byRole: { leader: 3, officer: 3, sergeant: 3, mage: 2, member: 1 } }) }) }));
-  check('gate: byRole set: a Whisperer reads Adept, an Associate Apprentice, the shop still sells the Whisperer Apprentice', cap(WHISPER) === 2 && cap(ASSOC) === 1 && ranksOn(shop(WHISPER)) === '0,1', [cap(WHISPER), cap(ASSOC)]);
+  // readGate.byRole replaces shopRankByRole for reading only (a mage reading Expert), the shop unchanged
+  load(Object.assign(baseCfg(), { spells: Object.assign({}, baseCfg().spells, { readGate: Object.assign({}, CONFIG.spells.readGate, { byRole: { leader: 3, officer: 3, sergeant: 3, mage: 3, member: 1 } }) }) }));
+  check('gate: byRole set: a Whisperer reads Expert, an Associate the Adept floor, the shop still sells the Whisperer Apprentice', cap(WHISPER) === 3 && cap(ASSOC) === 2 && ranksOn(shop(WHISPER)) === '0,1', [cap(WHISPER), cap(ASSOC)]);
   load(Object.assign(baseCfg(), { spells: Object.assign({}, baseCfg().spells, { readGate: Object.assign({}, CONFIG.spells.readGate, { enabled: false }) }) }));
   check('gate: enabled false: no college cap (4) and nothing restricted', cap(NOBODY) === 4 && globalThis.__dboSpellsReadRestricted(ASSOC, idOf(RAISE.book)) === false);
   load();
@@ -298,9 +298,9 @@ load(Object.assign(baseCfg(), { spells: Object.assign({}, baseCfg().spells, { sh
   const RESTRICTED_EDIDS = new Set((CONFIG.spells.seniorOnlyTomes || []).map((e) => e.toLowerCase()));
   const drawRanks = (a) => { const seen = new Set(); let restricted = 0, none = 0; for (let i = 0; i < 3000; i++) { const t = pickOf(a, 4); if (!t) { none++; continue; } seen.add(Number(t.rank)); if (RESTRICTED_EDIDS.has(String(t.name).toLowerCase())) restricted++; } return { ranks: [...seen].sort().join(), restricted, none }; };
   const dn = drawRanks(NOBODY), da = drawRanks(ASSOC), ds = drawRanks(SENIOR);
-  check('gate end to end: a Master Scholar with no college finds Novice and Apprentice tomes only, never restricted', dn.ranks === '0,1' && dn.restricted === 0 && dn.none === 0, dn);
-  check('gate end to end: ...an Associate the same', da.ranks === '0,1' && da.restricted === 0, da);
-  check('gate end to end: a Senior Magister finds Adept too (the Scholar tier stops it there): never Expert or Master', ds.ranks === '0,1,2' && ds.none === 0, ds);
+  check('gate end to end: a Master Scholar with no college finds Novice to Adept tomes, never restricted', dn.ranks === '0,1,2' && dn.restricted === 0 && dn.none === 0, dn);
+  check('gate end to end: ...an Associate the same', da.ranks === '0,1,2' && da.restricted === 0, da);
+  check('gate end to end: a Senior Magister finds Expert too: never Master below Scholar 100', ds.ranks === '0,1,2,3' && ds.none === 0, ds);
   for (const a of [LEADER, MAGISTER, NOBODY, WIZARD]) delete MEMBERS[a];
   load(Object.assign(baseCfg(), { spells: Object.assign({}, baseCfg().spells, { shopSeniorWindowDays: 1, shopSeniorPerWindow: 1 }) }));   // back to section 4's one-a-day mode
 }

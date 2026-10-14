@@ -1,5 +1,22 @@
 [
   {
+    "title": "Scholar spell tomes",
+    "date": "2026-10-14",
+    "version": "Server update",
+    "tag": "Change",
+    "sections": [
+      {
+        "heading": "Spell tomes from reading",
+        "items": [
+          "The spell tomes a Scholar finds while reading now follow the Scholar level: Apprentice tomes from 25, Adept tomes from 50, and Expert tomes from 75 for senior ranks of the Synod, the Colleges and the Great Faiths.",
+          "You no longer need a college to find Adept tomes by reading. Anyone can, from Scholar 50.",
+          "At Scholar 100, a senior college rank may very rarely find a Master spell tome.",
+          "Learning a tome still needs its school of magic at a high enough level, as before."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Character creation and werewolf fixes",
     "date": "2026-10-14",
     "version": "Server update",

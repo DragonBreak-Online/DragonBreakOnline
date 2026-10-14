@@ -88,12 +88,12 @@ module.exports = (api) => {
     shopSeniorWindowDays: 3,
     // Spell tomes from a Scholar's reading (gamemode.js scholarTomePick), by college rank (Nate, 11 Oct: "RP gate-keep the
     // high tiers"): a reader gets tomes up to the rank their college rank buys (shopRankByRole, or byRole when set, for
-    // reading only), never below floorRank (Apprentice: no college, an Initiate or a smith still reads Novice and Apprentice
-    // tomes) and never above maxRank (Expert: Master tomes come only through a college, never from reading). The
+    // reading only), never below floorRank (Adept since Nate 14 Oct: no college, an Initiate or a smith still reads up to Adept
+    // tomes) and never above maxRank (Expert; a Master tome only from gamemode.js's rare roll at Scholar 100, for Senior ranks). The
     // Scholar tier's own cap (reading.tomeRankByTier) still applies on top. restricted: the restricted arts
     // (seniorOnlyTomes) come from reading only to Senior ranks and above, as at the shop. enabled false: the Scholar
     // tier alone decides, as before.
-    readGate: { enabled: true, floorRank: 1, maxRank: 3, byRole: null, restricted: true },
+    readGate: { enabled: true, floorRank: 2, maxRank: 3, byRole: null, restricted: true },
     // Restricted arts, sold (and taught) only to Senior ranks and above: raising the dead and calling the Daedra lords, and
     // the spells that banish or command Daedra. Tome editor ids from spell-tomes.json; the shop's own filters (shopMaxRank,
     // the province, shopExcludePattern) still apply on top, so some are listed only so that they stay restricted.
@@ -1217,7 +1217,7 @@ module.exports = (api) => {
   };
   // The highest tome rank a Scholar's reading may give `a` (readGate, above): the college rank's, between floorRank and
   // maxRank; 4 (no gate) when readGate is off. Without guilds.js no college rank is known, so the floor.
-  const READ_GATE = Object.assign({ enabled: true, floorRank: 1, maxRank: 3, byRole: null, restricted: true }, CFG.readGate || {});
+  const READ_GATE = Object.assign({ enabled: true, floorRank: 2, maxRank: 3, byRole: null, restricted: true }, CFG.readGate || {});
   const readCapIn = (m) => {
     const by = READ_GATE.byRole && typeof READ_GATE.byRole === 'object' ? READ_GATE.byRole : null;
     if (!by) return rankCapIn(m);
