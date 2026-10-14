@@ -161,6 +161,8 @@ module.exports = (api) => {
     valueCache.set(id, v);
     return v;
   };
+  // salvage.js shows an item's worth before it is broken down
+  globalThis.__dboBaseValue = baseValue;
   const goodsValue = (items) => (items || []).reduce((n, t) => n + baseValue(Number(t.baseId) >>> 0) * (Number(t.count) || 0), 0);
 
   // ---- state --------------------------------------------------------------------------------------------------------

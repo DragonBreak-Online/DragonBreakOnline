@@ -17,7 +17,7 @@
 // item, by the player's tier in the station's skill (shareByTier, Novice 25 % .. Master 75 %), each rounded down, with
 // at least one of the main material: for certain when it cost two or more, by the share as a chance when it cost one. A Blacksmith needs the tier that works the main metal. Books are read from their
 // own record: a bound book gives bookPaper paper and bookStrips leather strips, a note or letter notePaper paper; a book
-// that cannot be taken (BOOK DATA flag 0x02) is never offered. Worn and equipped stacks are never offered either, nor an
+// that cannot be taken (BOOK DATA flag 0x02), a spell tome (0x04) or a smithing schematic (manuals.js) is never offered. Worn and equipped stacks are never offered either, nor an
 // enchanted, named, tempered, poisoned or charged one, nor an item enchanted by its own record (EITM): only plain copies
 // of plain items are broken down.
 'use strict';
@@ -37,6 +37,8 @@ module.exports = (api) => {
   // A number: the client relay drops a widget whose id is not a positive number (dboRelayService.ts:202), so the
   // string 'dboSalvage' this had was never drawn (Nate, 2026-09-28: the Scholars' Ledger and the smelter showed nothing)
   const WIDGET_ID = 66;
+  // Break down all takes at most this many in one click
+  const MAX_ALL = 50;
   // Checked in this order: the MCE loom also carries isTanning
   const STATIONS = [
     { id: 'loom', skill: 'tailor', label: 'loom', keywords: ['MCE_CraftingLoom', 'TailorBench'] },
@@ -141,6 +143,10 @@ module.exports = (api) => {
     if (!r || String(r.record.type) !== 'BOOK') return null;
     const d = fieldsOf(r, 'DATA')[0];
     if (!d || d.data.byteLength < 2 || (d.data[0] & 0x02)) return null;
+    // Never a spell tome (DATA flag 0x04, teaches a spell) or a smithing schematic (manuals.js): Barush broke down three
+    // schematics with his old books at the Scholars' Ledger and lost them (13 Oct)
+    if (d.data[0] & 0x04) return null;
+    try { if (typeof globalThis.__dboManualsIsManual === 'function' && globalThis.__dboManualsIsManual(baseId >>> 0)) return null; } catch (e) { return null; }
     const note = d.data[1] === 255;
     const out = [[CFG.paper, note ? CFG.notePaper : CFG.bookPaper]];
     if (!note && CFG.bookStrips > 0) out.push([CFG.leatherStrips, CFG.bookStrips]);
@@ -233,13 +239,13 @@ module.exports = (api) => {
     const p = ((page % pages) + pages) % pages;
     const actions = station.dedicated ? [] : [{ id: 'use', label: station.id === 'desk' ? 'Sit at the desk (use it again)' : `Work the ${station.label} (use it again)` }];
     for (const it of list.slice(p * size, p * size + size)) {
-      actions.push({ id: `b:${it.baseId}`, label: `Break down ${nameOf(descOf(it.baseId))}${it.count > 1 ? ` (${it.count})` : ''}: ${givesText(it.gives)}` });
+      actions.push({ id: `b:${it.baseId}`, label: `${nameOf(descOf(it.baseId))}${it.count > 1 ? ` (${it.count})` : ''}: ${givesText(it.gives)}` });
     }
     if (pages > 1) actions.push({ id: 'more', label: `More (page ${p + 1} of ${pages})` });
     S.pending.set(a >>> 0, { target: target >>> 0, station: station.id, page: p });
     openWidget(a, {
       type: 'contextMenu', id: WIDGET_ID, mode: 'menu',
-      targetName: note || `Break down at the ${station.label} (${TIER_NAMES[rank] || 'Novice'})`,
+      targetName: note || `Break down at the ${station.label} (${TIER_NAMES[rank] || 'Novice'}): choose an item`,
       actions, events: { action: 'dbo:salvageChoose', close: 'dbo:salvageClose' },
     }, true);
     return list.length;
@@ -322,6 +328,27 @@ module.exports = (api) => {
     return true;
   };
 
+  // One item's own page: a row on the list only opens it, so a click never lands on the next row when a stack runs out
+  // and the list closes up (Barush broke three schematics in 1.5 s at the Scholars' Ledger, 13 Oct). Break one keeps
+  // this page while any are left; Break down all takes the stack in one go; the item's worth is shown first.
+  const worthOf = (baseId) => { try { return typeof globalThis.__dboBaseValue === 'function' ? Number(globalThis.__dboBaseValue(baseId >>> 0)) || 0 : 0; } catch (e) { return 0; } };
+  const openItem = (a, target, station, page, baseId, note) => {
+    const rank = rankIn(a, station.skill);
+    const it = breakable(a, station, rank).find((x) => x.baseId === (baseId >>> 0));
+    if (!it) return openPanel(a, target, station, page, note);
+    const name = nameOf(descOf(it.baseId));
+    const worth = worthOf(it.baseId);
+    const actions = [{ id: `x1:${it.baseId}`, label: `Break down one: ${givesText(it.gives)}` }];
+    if (it.count > 1) actions.push({ id: `xa:${it.baseId}`, label: `Break down all ${it.count}` });
+    actions.push({ id: 'list', label: 'Back to the list' });
+    S.pending.set(a >>> 0, { target: target >>> 0, station: station.id, page, item: it.baseId });
+    openWidget(a, {
+      type: 'contextMenu', id: WIDGET_ID, mode: 'menu',
+      targetName: `${note ? `${note}. ` : ''}${name}${it.count > 1 ? ` (${it.count})` : ''}${worth > 0 ? `, worth ${worth} gold${it.count > 1 ? ' each' : ''}` : ''}`,
+      actions, events: { action: 'dbo:salvageChoose', close: 'dbo:salvageClose' },
+    }, true);
+    return it.count;
+  };
   onUi('salvageChoose', (a, args) => {
     const p = S.pending.get(a >>> 0);
     if (!p) return;
@@ -398,22 +425,34 @@ module.exports = (api) => {
       closeWidget(a, WIDGET_ID);
       return;
     }
-    if (!id.startsWith('b:')) return;
+    if (id === 'list') { openPanel(a, p.target, station, p.page); return; }
+    const m = /^(b|x1|xa):(\d+)$/.exec(id);
+    if (!m) return;
     // The panel stays open while the player walks; the station must still be in reach
     try { if (distanceMeters(a, p.target) > CFG.reachMeters) { closePanel(a); personal(a, `You walked away from the ${station.label}.`); return; } } catch (e) { /* no position */ }
-    const baseId = Number(id.slice(2)) >>> 0;
+    const baseId = Number(m[2]) >>> 0;
+    if (m[1] === 'b') { openItem(a, p.target, station, p.page, baseId); return; }
+    // A break is only for the item whose page is open
+    if (p.item !== baseId) { openPanel(a, p.target, station, p.page); return; }
     const rank = rankIn(a, station.skill);
     const gives = rank < 0 ? null : yieldOf(baseId, station, rank);
     const name = nameOf(descOf(baseId));
-    if (!gives || !takeOne(a, baseId)) { openPanel(a, p.target, station, p.page, `You no longer have that ${name} to break down.`); return; }
-    const got = rollGives(gives);
-    for (const [d, n] of got) { const mid = idOf(d); if (mid) giveItem(a, mid, n); }
-    const gotText = got.length ? givesText(got) : 'nothing came back';
-    log(`salvage: ${who(a)} broke down ${name} (${descOf(baseId)}) at the ${station.label}, ${TIER_NAMES[rank]}: ${gotText}`);
-    try { if (typeof globalThis.__dboSkillRateBrokeDown === 'function') globalThis.__dboSkillRateBrokeDown(a, baseId); } catch (e) { /* no skill rates */ }
-    try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('salvage', a, { baseId, count: 1 }, station.label, rank + 1, got.map(([d, n]) => ({ baseId: idOf(d), count: n })).filter((x) => x.baseId)); } catch (e) { /* the player log is optional */ }
-    const left = openPanel(a, p.target, station, p.page, `${name} broken down: ${gotText}`);
-    if (!left) { closePanel(a); personal(a, `${name} broken down: ${gotText}. Nothing else here to break down.`); }
+    const want = m[1] === 'xa' ? Math.min(MAX_ALL, (breakable(a, station, rank).find((x) => x.baseId === baseId) || { count: 0 }).count) : 1;
+    let done = 0;
+    const total = new Map();
+    for (; gives && done < want; done++) {
+      if (!takeOne(a, baseId)) break;
+      const got = rollGives(gives);
+      for (const [d, n] of got) { const mid = idOf(d); if (mid) giveItem(a, mid, n); total.set(d, (total.get(d) || 0) + n); }
+      try { if (typeof globalThis.__dboSkillRateBrokeDown === 'function') globalThis.__dboSkillRateBrokeDown(a, baseId); } catch (e) { /* no skill rates */ }
+      try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('salvage', a, { baseId, count: 1 }, station.label, rank + 1, got.map(([d, n]) => ({ baseId: idOf(d), count: n })).filter((x) => x.baseId)); } catch (e) { /* the player log is optional */ }
+    }
+    if (!done) { openPanel(a, p.target, station, p.page, `You no longer have that ${name} to break down.`); return; }
+    const gotText = total.size ? givesText([...total]) : 'nothing came back';
+    const what = done > 1 ? `${done} ${name}` : name;
+    log(`salvage: ${who(a)} broke down ${what} (${descOf(baseId)}) at the ${station.label}, ${TIER_NAMES[rank]}: ${gotText}`);
+    const left = openItem(a, p.target, station, p.page, baseId, `${what} broken down: ${gotText}`);
+    if (!left && !breakable(a, station, rank).length) { closePanel(a); personal(a, `${what} broken down: ${gotText}. Nothing else here to break down.`); }
   });
   onUi('salvageClose', (a) => closePanel(a));
   onUi('close', (a, args, widgetId) => { if (widgetId === WIDGET_ID) S.pending.delete(a >>> 0); });

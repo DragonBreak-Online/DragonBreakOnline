@@ -39,7 +39,7 @@ ORE_BY_TIER.forEach((ores, i) => ores.forEach((ore) => {
 }));
 ok('gamemode loads skillrates.js with recordOf and fieldsOf', /require\(SKILLRATES_JS\)\(\{[^}]*recordOf, fieldsOf[^}]*\}\)/.test(GAMEMODE));
 ok('gamemode clears the hooks when it fails to load', /skillrates\.js failed to load[^\n]*__dboSkillRate = null/.test(GAMEMODE));
-ok('salvage.js tells it about each breakdown', /broke down \$\{name\}[^\n]*\n\s*try \{ if \(typeof globalThis\.__dboSkillRateBrokeDown === 'function'\) globalThis\.__dboSkillRateBrokeDown\(a, baseId\)/.test(SALVAGE));
+ok('salvage.js tells it about each breakdown, one call per item taken', /if \(!takeOne\(a, baseId\)\) break;[\s\S]{0,400}?try \{ if \(typeof globalThis\.__dboSkillRateBrokeDown === 'function'\) globalThis\.__dboSkillRateBrokeDown\(a, baseId\)/.test(SALVAGE));
 
 // ---- stub records: ingredients by editor id, recipes with CNTO/CNAM -------------------------------------------------
 const world = new Map();
