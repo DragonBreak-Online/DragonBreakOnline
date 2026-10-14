@@ -23,6 +23,9 @@ module.exports = (api) => {
     // A player blocking an NPC's blow pays for it too (#bugs 12 Oct: "you can block forever without stamina" in dungeons):
     // the chip, the stamina and the broken guard's full blows, never a stagger (playersOnly keeps NPC staggers off)
     pveBlocks: true,
+    // An NPC blocking a player's blow pays for it the same way (ghostmantle, 14 Oct: "bandits can block even with 0 stamina"):
+    // the chip, the stamina, and at 0 a broken guard that lets blows land in full; NPCs are never staggered here
+    npcBlocks: true,
     weaponChip: 0.30, shieldChip: 0.15, chipPerDefenseTier: 0.05,
     // An arrow or bolt stopped by a raised shield lets this much through (Uhtred, 14 Oct: "players take damage when an arrow
     // hits their shield"; vanilla stops it), unless the guard is broken; a weapon block of one still chips
@@ -120,7 +123,9 @@ module.exports = (api) => {
   const onAttempt = (agg, tgt, src, dmg, flags, mult) => {
     // Player against player only: NPC power attacks staggered players over and over in PvE (Da'Di, 2026-09-26)
     const fromNpc = !isPlayer(agg);
-    if (!C.enabled || !flags || typeof flags !== 'object' || flags.spell || agg === tgt || !isPlayer(tgt)) return 1;
+    if (!C.enabled || !flags || typeof flags !== 'object' || flags.spell || agg === tgt) return 1;
+    const tgtNpc = !isPlayer(tgt);
+    if (tgtNpc && !(C.npcBlocks && flags.blocked && !fromNpc)) return 1;
     // From an NPC only a block counts, and only with pveBlocks: no stagger, bash or power rule in PvE
     if (C.playersOnly && fromNpc && !(C.pveBlocks && flags.blocked)) return 1;
     const now = Date.now();
@@ -147,8 +152,8 @@ module.exports = (api) => {
         st(tgt).guardBrokenUntil = now + C.guardBreakSeconds * 1000;
         const resisted = flags.bash && rankIn(tgt, 'defense') >= C.bashStaggerResistRank;
         events.push(`guard broken${flags.bash ? ' by a bash' : ''}`);
-        if (!resisted && !(fromNpc && C.playersOnly) && stagger(tgt, agg)) events.push('stagger');
-      } else if (!(fromNpc && C.playersOnly) && !broken && flags.power && !shield && rankIn(agg, weaponSkillOf(src)) >= C.powerStaggerThroughWeaponBlockRank) {
+        if (!resisted && !tgtNpc && !(fromNpc && C.playersOnly) && stagger(tgt, agg)) events.push('stagger');
+      } else if (!tgtNpc && !(fromNpc && C.playersOnly) && !broken && flags.power && !shield && rankIn(agg, weaponSkillOf(src)) >= C.powerStaggerThroughWeaponBlockRank) {
         if (stagger(tgt, agg)) events.push('stagger through the block');
       }
     } else if (dmg > 0) {

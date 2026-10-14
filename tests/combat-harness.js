@@ -8,8 +8,8 @@ const pushes = [], statuses = [];
 const RECS = { [UF1]: { type: 'SPEL', editorId: 'VoiceUnrelentingForce1', fields: [] }, [UF3]: { type: 'SPEL', editorId: 'VoiceUnrelentingForce3', fields: [] }, [RUNE]: { type: 'SPEL', editorId: 'CYRForceRune', fields: [] }, [FIREBALL]: { type: 'SPEL', editorId: 'Fireball', fields: [] }, [DISARM2]: { type: 'SPEL', editorId: 'VoiceDisarm2', fields: [] }, [DISMAY1]: { type: 'SPEL', editorId: 'VoiceDismayingShout1', fields: [] }, [DISMAY3]: { type: 'SPEL', editorId: 'VoiceDismayingShout3', fields: [] }, [SWORD]: { type: 'WEAP', fields: [] }, [SHIELD]: { type: 'ARMO', fields: [{ type: 'BOD2', data: (() => { const d = new Uint8Array(8); new DataView(d.buffer).setUint32(0, 1 << 9, true); return d; })() }] } };
 let P, EQ, calls, MAST;
 const reset = () => {
-  P = { 1: { health: 1, magicka: 1, stamina: 1 }, 2: { health: 1, magicka: 1, stamina: 1 } };
-  EQ = { 1: [], 2: [] }; calls = []; MAST = {};
+  P = { 1: { health: 1, magicka: 1, stamina: 1 }, 2: { health: 1, magicka: 1, stamina: 1 }, 9: { health: 1, magicka: 1, stamina: 1 } };
+  EQ = { 1: [], 2: [], 9: [] }; calls = []; MAST = {};
   globalThis.__dboCombat = undefined;
 };
 reset();
@@ -55,6 +55,14 @@ reset(); shot({ blocked: true, unblockedDamage: 40 });
 ok(near(P[2].health, 1 - 12 / 200), 'an arrow blocked with a weapon still lets 30 % through');
 reset(); EQ[2] = [SHIELD]; hit({ blocked: true, bash: true, unblockedDamage: 40 }); P[2].health = 1; shot({ blocked: true, unblockedDamage: 40 });
 ok(near(P[2].health, 1 - 40 / 200), 'a broken guard lets the arrow land in full', P[2]);
+// an NPC blocking a player's blow (ghostmantle, 14 Oct: bandits blocked forever at 0 stamina)
+const npcHit = (flags) => load().onAttempt(1, 9, SWORD, 0, Object.assign({ targetMaxHealth: 200, targetMaxStamina: 100 }, flags), 1);
+reset(); npcHit({ blocked: true, unblockedDamage: 40 });
+ok(near(P[9].health, 1 - 12 / 200) && near(P[9].stamina, 1 - 28 / 100) && staggers() === 0, 'an NPC blocking a player\'s blow: chip and stamina as a player pays, no stagger');
+reset(); P[9].stamina = 0.05; npcHit({ blocked: true, unblockedDamage: 40 }); P[9].health = 1; npcHit({ blocked: true, unblockedDamage: 40 });
+ok(near(P[9].health, 1 - 40 / 200) && staggers() === 0, 'at 0 stamina its guard breaks: the next blocked blow lands in full, still no stagger', P[9]);
+reset(); load().onAttempt(9, 2, SWORD, 0, { blocked: true, unblockedDamage: 40, targetMaxHealth: 200, targetMaxStamina: 100 }, 1);
+ok(near(P[9].stamina, 1), 'an NPC hitting a player is unchanged by this (the player blocks, the NPC pays nothing)');
 // the skills' multiplier scales the blocked blow too
 reset(); hit({ blocked: true, unblockedDamage: 40 }, 1.5);
 ok(near(P[2].health, 1 - 18 / 200), 'blocked blow carries the attack multiplier');
