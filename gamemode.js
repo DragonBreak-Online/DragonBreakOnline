@@ -3381,6 +3381,11 @@ const DRIFT_KEYS = {
   // SkyrimSE+04328E9), "entry" on every return to the screen as before 0.3.96, the quick undo (claude-jake's review of
   // 6b7a3c59). Its default is gamemode-config.json drift.faceRebuild when set; /driftset faceRebuild entry switches it live.
   faceRebuild: { def: (cfg && cfg.drift && (cfg.drift.faceRebuild === 'entry' || cfg.drift.faceRebuild === 'load')) ? cfg.drift.faceRebuild : 'load', ok: (v) => v === 'load' || v === 'entry' },
+  // The server's look for the player's own character (client 0.3.97 sync/ownLook.ts, claude-jake 17d1d719): "apply" puts it
+  // on (the 13 Oct fix), "name" only a changed name, "off" none, the quick undo with no client build. Its default is
+  // gamemode-config.json drift.ownLook when set; /driftset ownLook off switches it live. (claude-jake's gameplay half,
+  // feat/ownlook-switch-1013 e678d9567, was not in the review bundle; this is the same switch built the faceRebuild way.)
+  ownLook: { def: (cfg && cfg.drift && ['apply', 'name', 'off'].includes(cfg.drift.ownLook)) ? cfg.drift.ownLook : 'apply', ok: (v) => v === 'apply' || v === 'name' || v === 'off' },
 };
 const DRIFT_SET = globalThis.__dboDriftSet && typeof globalThis.__dboDriftSet === 'object' ? globalThis.__dboDriftSet : (globalThis.__dboDriftSet = {});
 const driftValue = (k) => (Object.prototype.hasOwnProperty.call(DRIFT_SET, k) ? DRIFT_SET[k] : DRIFT_KEYS[k].def);
