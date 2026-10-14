@@ -29,7 +29,7 @@ import { dropCopyNiNodeWork, queueCopyNiNodeUpdate } from "./niNodeQueue";
 import { onScreenRebuildDue, OnScreenRebuildState } from "./onScreenRebuild";
 import { lastTryHost, tryHost } from "./hostAttempts";
 import { GHOST_ALPHA, GHOST_SHADER_ID, INVIS_ABILITY_IDS, INVIS_ABILITY_SHADER_IDS } from "../lib/ghostLook";
-import { AdminView, keepNoCopy, nextHiddenAt } from "./adminCopyPolicy";
+import { AdminView, adminViewOfModes, keepNoCopy, nextHiddenAt } from "./adminCopyPolicy";
 import { ModelApplyUtils } from "./modelApplyUtils";
 import { localIdToRemoteId } from "./worldViewMisc";
 import { SpApiInteractor } from "../services/spApiInteractor";
@@ -1166,7 +1166,7 @@ export class FormView {
     }
     if (view !== this.adminView || now - this.lastAdminHideApply >= FormView.adminHideReapplyMs) {
       actor.setAlpha(view === "hidden" ? 0 : view === "ghost" ? GHOST_ALPHA : 1, false);
-      // An Invisible admin's ghost copy on an admin watcher: the NPCs that watcher hosts must not see or hear it either
+      // An Invisible admin has no copy, so a copy here keeps none of their abilities
       FormView.applyInvisAbilities(actor, FormView.isInvisAdmin(model));
       this.adminView = view;
       this.lastAdminHideApply = now;
@@ -1199,17 +1199,12 @@ export class FormView {
       if (on && !actor.hasSpell(spell)) actor.addSpell(spell, false);
       else if (!on && actor.hasSpell(spell)) actor.removeSpell(spell);
     }
-    // The staff watcher's ghost copy shows the ghost shader only, not the potion's shimmer
+    // A copy with the abilities shows the ghost shader only, not the potion's shimmer
     if (on) for (const id of INVIS_ABILITY_SHADER_IDS) EffectShader.from(Game.getFormEx(id))?.stop(actor);
   }
 
-  // Invisible admins are hidden from players and shown to admins as ghosts; Ghost admins look like ghosts to everyone
   private static adminViewOf(model: FormModel): AdminView {
-    const modes = (model as Record<string, unknown>)["ff_adminModes"];
-    if (!modes || typeof modes !== "object") return "visible";
-    const m = modes as Record<string, unknown>;
-    if (m["invis"]) return FormView.viewerIsAdmin() ? "ghost" : "hidden";
-    return m["ghost"] ? "ghost" : "visible";
+    return adminViewOfModes((model as Record<string, unknown>)["ff_adminModes"]);
   }
 
   // A replayed Invisibility spell would otherwise draw the caster as vanilla's shimmer instead of hiding them
@@ -1219,14 +1214,6 @@ export class FormView {
     this.lastSpellInvisCheck = now;
     try { this.spellInvisibleSeen = (Actor.from(refr)?.getActorValue("Invisibility") ?? 0) > 0; } catch { this.spellInvisibleSeen = false; }
     return this.spellInvisibleSeen;
-  }
-
-  private static viewerIsAdmin(): boolean {
-    if (storage["ownerModelSet"] !== true) {
-      return false;
-    }
-    const owner = storage["ownerModel"] as Record<string, unknown> | undefined;
-    return !!owner && owner["isAdmin"] === true;
   }
 
   private removeNickname() {
