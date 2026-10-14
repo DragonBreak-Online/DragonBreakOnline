@@ -95,6 +95,15 @@ npm run merge         # builds skymp-client.zip and data/files-version.json
 `populate` deliberately skips plugins and deletes the folder first. If you run `populate` and then
 `merge` straight away, the 9 plugins are gone and players cannot load the game.
 
+**Guard (2026-10-14): `populate`, `merge` and `setup` refuse the backend's own bucket.** That is the
+default `build/client-files` of the checkout they run from (`CLIENT_FILES_DIR` unset), anything in
+the live `/opt/alduinak/build/client-files`, and the live `data/files-version.json`. On the PC set
+`DBO_MERGE_LIVE_BUCKET=1` for those commands (`set DBO_MERGE_LIVE_BUCKET=1` in cmd,
+`$env:DBO_MERGE_LIVE_BUCKET='1'` in PowerShell); the manager's Build Client sets it on Windows.
+On the server never: build the package in a work folder (`CLIENT_FILES_DIR=<work folder>`, from a
+scratch backend export), gate it, and ship it through the staged release path. On 6 Oct a plain
+`merge` in the live checkout zipped a stale copy onto the live zip and players hung at the logo.
+
 **Second trap (2026-09-21): `populate` needs the full CI client build.** A box that only runs
 `npm run build` in `skymp5-client` has `skymp5-client.js` alone in `fork/build/dist/client/Data`;
 the DLLs, CEF runtime and UI come from CI. `populate` still wipes `root/Data` first, then warns
