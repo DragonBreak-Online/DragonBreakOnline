@@ -202,7 +202,8 @@ check('...and opens once it has landed', opened.includes(30));
 
 // ---- 3. the wiring in gamemode.js ----
 const arrived = gm.slice(gm.indexOf("onUi('arrived'"), gm.indexOf("onUi('arrived'") + 1200);
-check('on arriving in the hub the character is placed first, then RaceMenu opens after the landing time', /if \(placeInCreatorSpot\(a\)\) \{\s*creation\.set\(a, 'placed'\);\s*setTimeout\(\(\) => \{ creatorPlacedAt\.delete\(a >>> 0\); openCreator\(a\); \}, CREATOR_PLACE_MS\);/.test(arrived));
+// Since 14 Oct the landing time ends in confirmCreatorSpot, which opens RaceMenu once the move held (creator-spot-recheck)
+check('on arriving in the hub the character is placed first, then RaceMenu opens after the landing time', /if \(placeInCreatorSpot\(a\)\) \{\s*creation\.set\(a, 'placed'\);\s*setTimeout\(\(\) => confirmCreatorSpot\(a, 1\), CREATOR_PLACE_MS\);/.test(arrived));
 const toArrival = gm.slice(gm.indexOf('const sendToArrival = '), gm.indexOf('const sendToArrival = ') + 1400);
 check('leaving the Realm frees the spot and sends the real clock at once', /creatorSpotRelease\(a\);/.test(toArrival) && /__dboClock\.sendTo\(a\)/.test(toArrival) && toArrival.indexOf('creation.delete(a)') < toArrival.indexOf('__dboClock.sendTo(a)'));
 check('the clock asks the gamemode who is in creation (a reconnect mid-creation is still pending)', /inCreator: \(a\) => creationPending\(a\) \|\| \(creation\.has\(a >>> 0\) && inHub\(a\)\)/.test(gm));

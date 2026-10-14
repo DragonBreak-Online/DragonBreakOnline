@@ -2053,19 +2053,39 @@ const creatorPlacedAt = globalThis.__dboCreatorPlacedAt instanceof Map ? globalT
 // An arrival not yet placed is still on the marker, about to be moved
 const creatorSpots = spotPicker({ spots: CREATOR_SPOTS, holds: creatorSpotHolds, spacing: CREATOR_SPACING, holdMs: CREATOR_HOLD_MS,
   here: (p) => inHub(p), pending: (id) => { const st = creation.get(id); return st === 'spawning' || st === 'hub'; }, keepOwn: true });
-const creatorSpotRelease = (a) => { creatorSpots.release(a); creatorPlacedAt.delete(a >>> 0); };
+const creatorSpotRelease = (a) => { creatorSpots.release(a); creatorPlacedAt.delete(a >>> 0); creatorSpotOf.delete(a >>> 0); };
 const creatorSpotFor = (a) => creatorSpots.pick(a);
+// actorId -> the spot its last move went to, checked before the creator opens
+const creatorSpotOf = globalThis.__dboCreatorSpotOf instanceof Map ? globalThis.__dboCreatorSpotOf : (globalThis.__dboCreatorSpotOf = new Map());
+const CREATOR_PLACE_TRIES = 3;
 // true when a move was made (the creator then opens once it has landed)
-const placeInCreatorSpot = (a) => {
-  const spot = creatorSpotFor(a);
+const placeInCreatorSpot = (a, again) => {
+  const spot = again || creatorSpotFor(a);
+  creatorSpotOf.set(a >>> 0, spot);
   try {
     const p = mp.get(a, 'pos');
-    if (Array.isArray(p) && Math.hypot(p[0] - spot[0], p[1] - spot[1]) < 30) return false;
+    if (!again && Array.isArray(p) && Math.hypot(p[0] - spot[0], p[1] - spot[1]) < 30) return false;
     try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('travel', a, 'creation'); } catch (e) { /* the player log is optional */ }
     mp.set(a, 'locationalData', { cellOrWorldDesc: HUB.cellOrWorldDesc, pos: spot, rot: HUB.rot });
     creatorPlacedAt.set(a >>> 0, Date.now());
     return true;
   } catch (e) { log('creator spot move failed', e.message); return false; }
+};
+// Every creator on 12 and 13 Oct still stood on the marker when RaceMenu opened (whereis: 2122.2,2079.6), two or three
+// inside each other: the move did not hold. The server's position is checked before the creator opens, and the move made
+// again while it is off its spot (Eirik's report, 13 Oct)
+const confirmCreatorSpot = (a, tries) => {
+  creatorPlacedAt.delete(a >>> 0);
+  const spot = creatorSpotOf.get(a >>> 0);
+  let off = 0;
+  try { const p = mp.get(a, 'pos'); off = spot && Array.isArray(p) ? Math.hypot(p[0] - spot[0], p[1] - spot[1]) : 0; } catch (e) { /* gone */ }
+  log(`creator spot ${display(a)}: ${Math.round(off)} u off its spot after move ${tries}`);
+  if (off > 60 && tries < CREATOR_PLACE_TRIES && creationPending(a) && placeInCreatorSpot(a, spot)) {
+    setTimeout(() => confirmCreatorSpot(a, tries + 1), CREATOR_PLACE_MS);
+    return;
+  }
+  creatorSpotOf.delete(a >>> 0);
+  openCreator(a);
 };
 const openCreator = (a) => {
   try {
@@ -3200,7 +3220,7 @@ onUi('arrived', (a, args) => {
     log(`${display(a)} arrived in the hub${stage === 'spawning' ? ' straight from the spawn' : ''}`);
     if (placeInCreatorSpot(a)) {
       creation.set(a, 'placed');
-      setTimeout(() => { creatorPlacedAt.delete(a >>> 0); openCreator(a); }, CREATOR_PLACE_MS);
+      setTimeout(() => confirmCreatorSpot(a, 1), CREATOR_PLACE_MS);
       return;
     }
     openCreator(a);

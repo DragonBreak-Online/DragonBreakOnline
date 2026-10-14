@@ -1,5 +1,19 @@
 [
   {
+    "title": "Character creation fix",
+    "date": "2026-10-14",
+    "version": "Server update",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Making a character",
+        "items": [
+          "Two people making a character at the same time could end up standing inside each other, with the editor's camera showing the other person instead of your own changes. Each new character is now moved to a spot of their own, and moved again if that did not take, before the editor opens."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Client 0.3.96",
     "date": "2026-10-13",
     "version": "Client 0.3.96",
