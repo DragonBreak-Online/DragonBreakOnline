@@ -50,8 +50,8 @@ module.exports = (api) => {
   // was the same whatever was cooked and only the cheapest route made sense. This factor multiplies the rate after the
   // meter, like every rate here: g = value / full, between min and 1, where value is the sum of the inputs' gold values
   // (each at most itemCap; the product's value when that is more). A rich dish or brew earns what any craft earns today,
-  // salt soup a quarter of it; the bucket and the day's caps are unchanged. Config skillRates.valueWeight.
-  const VALUE = Object.assign({ enabled: true, itemCap: 100, skills: { cook: { full: 10, min: 0.25 }, alchemist: { full: 12, min: 0.35 } } }, C.valueWeight || {});
+  // salt soup half of it (Nate, 14 Oct: cheap work still teaches at least half); the bucket and the day's caps are unchanged. Config skillRates.valueWeight.
+  const VALUE = Object.assign({ enabled: true, itemCap: 100, skills: { cook: { full: 10, min: 0.5 }, alchemist: { full: 12, min: 0.5 } } }, C.valueWeight || {});
 
   const num = (v) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : undefined);
   const u32 = (f, off) => (f && f.data && f.data.byteLength >= off + 4 ? new DataView(f.data.buffer, f.data.byteOffset, f.data.byteLength).getUint32(off, true) : 0);
@@ -196,8 +196,44 @@ module.exports = (api) => {
     }
     try { if (typeof personal === 'function') personal(actorId >>> 0, mult >= 1.5 ? 'Something new: you learn more making it the first time.' : 'Something new, though by now you learn little more from it.'); } catch (e) { /* the message is optional */ }
   };
+  // ---- the hourly bucket, said out loud (Nate, 14 Oct) ----------------------------------------------------------------
+  // A craft at an empty bucket teaches nothing, and the fork says so at most once in ten minutes (masterySystem
+  // POINT_REFUSE_NOTICE_MS), so players went on making salt soup for nothing ("200 salt for one Cook level"). Here: the
+  // first refused craft of each empty bucket is told, then every refused craft once the bucket has been empty for
+  // repeatAfterMinutes, each with how long until it pays again (the fork's own token bucket, skillPoints.ts
+  // bucketAfterRefill / msUntilOneToken, from skills.json pointSystem). A craft that credits something ends the run.
+  // Config skillRates.bucketNotice: { enabled, repeatAfterMinutes }.
+  const NOTICE = Object.assign({ enabled: true, repeatAfterMinutes: 10 }, C.bucketNotice || {});
+  const SKILLS_FILE = (() => { try { return JSON.parse(require('fs').readFileSync(require('path').resolve('skills.json'), 'utf8')); } catch (e) { return {}; } })();
+  const PS = SKILLS_FILE.pointSystem || {};
+  const PER_HOUR = Number(PS.bucketPerHour) > 0 ? Number(PS.bucketPerHour) : 30, BURST = Number(PS.bucketBurst) > 0 ? Number(PS.bucketBurst) : 20;
+  const LABELS = new Map((Array.isArray(SKILLS_FILE.skills) ? SKILLS_FILE.skills : []).filter((k) => k && k.id).map((k) => [String(k.id), String(k.label || k.id)]));
+  if (!(S.bucketRuns instanceof Map)) S.bucketRuns = new Map();   // actor|skill -> { since } while crafts find the bucket empty
+  // ms until the skill's bucket pays for one unit again; 0 when it already would (so the refusal was something else)
+  const bucketWait = (actorId, skillId) => {
+    let b = null; try { const r = mp.get(actorId >>> 0, 'private.mastery'); b = r && r.skills && r.skills[skillId] && r.skills[skillId].bucket; } catch (e) { return 0; }
+    if (!b || !Number.isFinite(Number(b.tokens)) || !Number.isFinite(Number(b.at))) return 0;
+    const tokens = Math.max(0, Math.min(BURST, Number(b.tokens) + ((Date.now() - Number(b.at)) / 3600000) * PER_HOUR));
+    return tokens >= 1 ? 0 : Math.ceil(((1 - tokens) / PER_HOUR) * 3600000);
+  };
+  const bucketNotice = (actorId, skillId, units) => {
+    if (NOTICE.enabled === false || !mp || typeof personal !== 'function') return;
+    const key = `${actorId >>> 0}|${skillId}`;
+    if (Number(units) > 0) { S.bucketRuns.delete(key); return; }
+    const wait = bucketWait(actorId, skillId);
+    if (!(wait > 0)) return;
+    const now = Date.now();
+    const run = S.bucketRuns.get(key);
+    if (run && now - run.since < Math.max(0, Number(NOTICE.repeatAfterMinutes) || 0) * 60000) return;
+    if (!run) S.bucketRuns.set(key, { since: now });
+    if (S.bucketRuns.size > 4096) S.bucketRuns.clear();
+    const mins = Math.max(1, Math.round(wait / 60000));
+    try { personal(actorId >>> 0, `Your ${LABELS.get(skillId) || skillId} has learned all it can for now: what you make teaches nothing until it rests. It counts again in about ${mins} minute${mins === 1 ? '' : 's'}.`); } catch (e) { /* the notice is optional */ }
+  };
+
   // masterySystem, after the meter: the units this act credited to this skill (fork mastery-credited-hook)
   const credited = (actorId, skillId, kind, detail, units) => {
+    if (kindOf(skillId, kind) === 'craft') bucketNotice(actorId, skillId, units);
     const key = `${actorId >>> 0}|${skillId}`;
     const p = S.firstPending.get(key);
     if (!p) return;
@@ -221,6 +257,6 @@ module.exports = (api) => {
 
   const plain = (v) => Object.fromEntries(Object.entries(v).filter(([k]) => !k.startsWith('_')));
   const shown = Object.entries(C.rates || {}).filter(([k]) => !k.startsWith('_')).map(([k, v]) => `${k} ${v && typeof v === 'object' ? JSON.stringify(plain(v)) : 'x' + v}`);
-  log(`skillRates ${C.enabled ? 'on' : 'off'}: ${shown.join(', ') || 'every skill x1'}; ${Object.keys(TIERS).length} material tiers; salvage loop ${LOOP.enabled ? `x${LOOP.rate} for ${LOOP.windowMinutes} min` : 'off'}; craft value ${VALUE.enabled !== false ? Object.entries(VALUE.skills || {}).map(([k, v]) => `${k} full ${v.full} min ${v.min}`).join(', ') : 'off'}; beast form x${num(C.beastRate) ?? 0}`);
+  log(`skillRates ${C.enabled ? 'on' : 'off'}: ${shown.join(', ') || 'every skill x1'}; ${Object.keys(TIERS).length} material tiers; salvage loop ${LOOP.enabled ? `x${LOOP.rate} for ${LOOP.windowMinutes} min` : 'off'}; bucket notice ${NOTICE.enabled !== false ? `on, again after ${NOTICE.repeatAfterMinutes} min` : 'off'}; craft value ${VALUE.enabled !== false ? Object.entries(VALUE.skills || {}).map(([k, v]) => `${k} full ${v.full} min ${v.min}`).join(', ') : 'off'}; beast form x${num(C.beastRate) ?? 0}`);
   return { rateFor, noteBreakdown, recipeOf, valueFactor };
 };

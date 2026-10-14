@@ -38,7 +38,7 @@ check('combinations ship empty, 6 pairs planned for Expert and Master', Array.is
 check('poison words: Level 1 and 25 "Poison" (Weak is the drop-only one)', JSON.stringify(RW.words.poison) === JSON.stringify(['Poison', 'Poison', 'Potent Poison', 'Virulent Poison', 'Deadly Poison']));
 
 // ---- mock records ---------------------------------------------------------------------------------------------------
-const PLUGINS = { 'Skyrim.esm': 0x00, 'BSAssets.esm': 0x07, 'Mock.esp': 0x50, 'DragonBreak Online Edits.esp': 0x60 };
+const PLUGINS = { 'Skyrim.esm': 0x00, 'Dawnguard.esm': 0x02, 'BSAssets.esm': 0x07, 'BSHeartland.esm': 0x08, 'Mock.esp': 0x50, 'DragonBreak Online Edits.esp': 0x60 };
 const idOf = (d) => { const [hex, plugin] = String(d).split(':'); if (!(plugin in PLUGINS)) throw new Error(`no plugin ${plugin}`); return ((PLUGINS[plugin] << 24) | parseInt(hex, 16)) >>> 0; };
 const TABLE = JSON.parse(fs.readFileSync('alchemy-potions.json', 'utf8')).effects;
 const EDID = new Map();
@@ -144,7 +144,35 @@ const ticks = (n) => { for (let i = 0; i < n; i++) globalThis.__dboAlchemyRunTic
   check('a mapped desc carrying another editor id is refused', /DBO_AlchRestoreHealthT2 -> a31:DragonBreak Online Edits\.esp is SomethingElse, not DBO_AlchRestoreHealthT2; left out/.test(out.logs.join('\n')), out.logs);
   tierOf(A, 3); stockAll();
   msg = craft([ONE_A, ONE_B]);
-  check('mapped: an Adept brews DBO_AlchFortifyBladeT3, a Solution of Fortify Blade', count(DBO('a10')) === 1 && /Solution of Fortify Blade \(\+10% blade damage for 60 s\)/.test(msg), msg);
+  check('One-handed ingredients make Fortify One-handed (by hands), never Blade: the vanilla record while unmapped', count(DBO('a10')) === 0 && count(pid('FortifySkillOneHanded02')) === 1 && /Solution of Fortify One-handed/.test(msg), msg);
+  // the Blade specialty: Bear Claws + Black Eagle Feathers + Canis Root
+  const CLAW = idOf('06bc02:Skyrim.esm'), EAGLE = idOf('05ef50:BSHeartland.esm'), CANIS = idOf('06abcb:Skyrim.esm');
+  for (const [id, e] of [[CLAW, 'BearClaws'], [EAGLE, 'CYRBlackEagleFeathers'], [CANIS, 'CanisRoot01']]) RECORDS[id] = { type: 'INGR', editorId: e, fields: [{ type: 'EFID', data: u32(idOf('3eb19:Skyrim.esm')) }] };
+  tierOf(A, 3); put(A, 'inventory', { entries: [CLAW, EAGLE, CANIS].map((baseId) => ({ baseId, count: 2 })) });
+  msg = craft([CLAW, EAGLE, CANIS]);
+  check('Bear Claws + Black Eagle Feathers + Canis Root: an Adept brews DBO_AlchFortifyBladeT3, a Solution of Fortify Blade', count(DBO('a10')) === 1 && /Solution of Fortify Blade \(\+10% blade damage for 60 s\)/.test(msg), msg);
+  check('...one of each taken', count(CLAW) === 1 && count(EAGLE) === 1 && count(CANIS) === 1);
+  tierOf(A, 4); craft([CLAW, EAGLE, CANIS]);
+  check('...an Expert the Philter (T4)', count(DBO('a11')) === 1);
+  tierOf(A, 2); put(A, 'inventory', { entries: [CLAW, EAGLE, CANIS].map((baseId) => ({ baseId, count: 2 })) });
+  msg = craft([CLAW, EAGLE, CANIS]);
+  check('...an Apprentice brews the mix as any other, told what it makes at Adept', count(DBO('a10')) === 0 && /These make a potion of Fortify Blade for an Alchemist of Adept rank \(level 50\)\./.test(msg), msg);
+  // the Blood Potion: Vampire Dust + Human Heart + Nightshade at a Master's lab
+  const DUST = idOf('03ad76:Skyrim.esm'), HEART = idOf('0b18cd:Skyrim.esm'), SHADE = idOf('02f44c:Skyrim.esm'), DG_BLOOD = idOf('018ef3:Dawnguard.esm');
+  for (const [id, e] of [[DUST, 'vampireDust'], [HEART, 'HumanHeart'], [SHADE, 'Nightshade']]) RECORDS[id] = { type: 'INGR', editorId: e, fields: [{ type: 'EFID', data: u32(idOf('3eb15:Skyrim.esm')) }] };
+  ALCH(DG_BLOOD, 'DLC1BloodPotion', [['3eb15:Skyrim.esm', 100]]);
+  load({ records: MAPPED });
+  tierOf(A, 5); put(A, 'inventory', { entries: [DUST, HEART, SHADE].map((baseId) => ({ baseId, count: 1 })) });
+  msg = craft([DUST, HEART, SHADE]);
+  check('a Master brews a Blood Potion (Dawnguard\'s record until the PC\'s is mapped)', count(DG_BLOOD) === 1 && /^You brew a Blood Potion/.test(msg), msg);
+  tierOf(A, 4); put(A, 'inventory', { entries: [DUST, HEART, SHADE].map((baseId) => ({ baseId, count: 1 })) });
+  msg = craft([DUST, HEART, SHADE]);
+  check('...an Expert does not', count(DG_BLOOD) === 0 && /These make a Blood Potion for an Alchemist of Master rank/.test(msg), msg);
+  let fed = [];
+  globalThis.__dboSuperBloodPotion = (a) => { fed.push(a); return true; };
+  await drink(DG_BLOOD, { health: 0.5, magicka: 1, stamina: 1 });
+  check('drinking it asks supernatural.js to count a feed', fed.length === 1 && fed[0] === A, fed);
+  delete globalThis.__dboSuperBloodPotion;
   tierOf(A, 2); stockAll();
   msg = craft([LIGHT_A, LIGHT_B]);
   check('mapped: an Apprentice brews Light (DBO_AlchLightT2) from the Beyond Skyrim effect', count(DBO('a20')) === 1 && /Draught of Light/.test(msg), msg);
@@ -287,13 +315,92 @@ const ticks = (n) => { for (let i = 0; i < n; i++) globalThis.__dboAlchemyRunTic
   check('...a stew (10 gold in) a full one: x2', near(rate(A, 'cook', 'craft', { recipeId: 0x952, value: 6 }), 2));
   check('...never more than today, however rich', near(rate(A, 'cook', 'craft', { recipeId: 0x952, value: 400 }), 2));
   globalThis.__dboBrewValue = { actor: A, key: 0x777, value: 3 };
-  check('a brew from 3 gold of ingredients: alchemist x2 x 0.35', near(rate(A, 'alchemist', 'award', { key: 0x777 }), 2 * 0.35), rate(A, 'alchemist', 'award', { key: 0x777 }));
+  check('a brew from 3 gold of ingredients still teaches half: alchemist x2 x 0.5', near(rate(A, 'alchemist', 'award', { key: 0x777 }), 2 * 0.5), rate(A, 'alchemist', 'award', { key: 0x777 }));
   globalThis.__dboBrewValue = { actor: A, key: 0x777, value: 30 };
   check('...from 30 gold: x2', near(rate(A, 'alchemist', 'award', { key: 0x777 }), 2));
   check('...another potion\'s award is not weighted by it', near(rate(A, 'alchemist', 'award', { key: 0x778 }), 2));
   check('other skills are untouched (miner x2)', near(rate(A, 'miner', 'mine', {}), 2));
   const AL = fs.readFileSync('alchemy.js', 'utf8');
-  check('alchemy.js passes each brew\'s ingredient value to the award (lab, drinks, Draught)', (AL.match(/creditBrew\([^\n]*ingredientValue\(/g) || []).length === 3);
+  check('alchemy.js passes each brew\'s ingredient value to the award (lab, drinks, Draught, specialties)', (AL.match(/creditBrew\([^\n]*ingredientValue\(/g) || []).length === 4);
+
+  // ---- Fortify Health is extra health; Sleeping Tree Sap ----
+  load({ records: MAPPED });
+  MGEF('3eaf3:Skyrim.esm', 'AlchFortifyHealth', 0.35, { av: 24, flags: 0x2, archetype: 34 });
+  ALCH(pid('FortifyHealth03'), 'FortifyHealth03', [['3eaf3:Skyrim.esm', 60, 60]]);
+  load({ records: MAPPED });
+  let fp = await drink(pid('FortifyHealth03'), { health: 0.4, magicka: 1, stamina: 1 }, { health: 0.4 });
+  check('Fortify Health 60: the C++\'s 60-point heal comes off, 60 extra health for 60 s', near(fp.health, 0.4) && near(globalThis.__dboPotionBonus(A, 'health'), 60), [fp, globalThis.__dboPotionBonus(A, 'health')]);
+  const a1 = GM.indexOf('const potionMaxSeen = '), b1 = GM.indexOf('const potionAttackMult = ');
+  let potionTakenMult = null;
+  try { potionTakenMult = new Function('potionBonus', 'globalThis', GM.slice(a1, b1) + '\nreturn potionTakenMult;')((a, h) => globalThis.__dboPotionBonus(a, h), globalThis); } catch (e) { /* not there */ }
+  check('gamemode.js has potionTakenMult', typeof potionTakenMult === 'function');
+  if (potionTakenMult) {
+    check('...a weapon hit on a 150-point pool with 60 extra lands at 150/210', near(potionTakenMult(A, { targetMaxHealth: 150 }), 150 / 210));
+    check('...a spell hit (no maximum named) uses the last maximum seen', near(potionTakenMult(A, { spell: true }), 150 / 210));
+    check('...nobody else', potionTakenMult(B, { targetMaxHealth: 150 }) === 1);
+    await drink(pid('FortifyHealth03'), { health: 1, magicka: 1, stamina: 1 });
+    check('...a second drink replaces, never stacks', near(potionTakenMult(A, { targetMaxHealth: 150 }), 150 / 210));
+    clock += 61000;
+    check('...and it wears off cleanly after 60 s', potionTakenMult(A, { targetMaxHealth: 150 }) === 1 && globalThis.__dboPotionBonus(A, 'health') === 0);
+    const kept = globalThis.__dboPotionFortify;
+    await drink(pid('FortifyHealth03'), { health: 1, magicka: 1, stamina: 1 });
+    load({ records: MAPPED });
+    check('...a reload keeps it (globalThis), keyed by the character, with its own end', globalThis.__dboPotionFortify === kept && near(globalThis.__dboPotionBonus(A, 'health'), 60));
+    clock += 61000;
+    check('...and still ends on time after the reload', globalThis.__dboPotionBonus(A, 'health') === 0);
+  }
+  check('the hit multiplies by potionTakenMult outside the racial cap', /potionAttackMult\(agg, src\)\) \* potionTakenMult\(tgt, flags\) \*/.test(GM));
+  // the sap: inert as shipped, a Master's daily tap once enabled
+  const SPIGOT = 0x7000;
+  put(SPIGOT, 'baseDesc', '0e1fc1:Skyrim.esm');
+  ALCH(DBO('a40'), 'DBO_AlchSleepingTreeSap', [['e04:DragonBreak Online Edits.esp', 25, 45]]);
+  MGEF('e04:DragonBreak Online Edits.esp', 'DBO_AlchSleepingTreeSapEffect', 1, { av: 138, flags: 0x2, archetype: 34 });
+  const SAPMAP = Object.assign({ DBO_AlchSleepingTreeSap: 'a40:DragonBreak Online Edits.esp', DBO_AlchSleepingTreeSapEffect: 'e04:DragonBreak Online Edits.esp' }, MAPPED);
+  load({ records: SAPMAP });
+  check('the Sleeping Tree is not tapped while the lock holds (sleepingTreeSap.enabled false)', RW.sleepingTreeSap && RW.sleepingTreeSap.enabled === false && globalThis.__dboSleepingTreeTap(SPIGOT, A) === false);
+  load({ records: SAPMAP, sleepingTreeSap: Object.assign({}, RW.sleepingTreeSap, { enabled: true }) });
+  tierOf(A, 4); put(A, 'inventory', { entries: [] }); props.delete(A + '|private.dboSapTapAt');
+  clock += 5000; out.said.length = 0;
+  check('enabled: an Expert is refused', globalThis.__dboSleepingTreeTap(SPIGOT, A) === true && count(DBO('a40')) === 0 && /Master rank/.test(out.said[0] || ''), out.said);
+  tierOf(A, 5); clock += 5000;
+  globalThis.__dboSleepingTreeTap(SPIGOT, A);
+  check('...a Master taps one', count(DBO('a40')) === 1);
+  clock += 5000; out.said.length = 0; globalThis.__dboSleepingTreeTap(SPIGOT, A);
+  check('...once a day', count(DBO('a40')) === 1 && /Come back in about 24 hours/.test(out.said[0] || ''), out.said);
+  await drink(DBO('a40'), { health: 1, magicka: 1, stamina: 1 });
+  check('drinking the sap: 25% less damage taken for 45 s', near(globalThis.__dboPotionBonus(A, 'taken'), 0.25) && (!potionTakenMult || near(potionTakenMult(A, { targetMaxHealth: 150 }), 0.75)));
+  load({ records: MAPPED });
+  check('supernatural.js counts a Blood Potion as a vampire\'s meal, nobody else\'s', /globalThis\.__dboSuperBloodPotion = \(a\) => \{[\s\S]{0,200}s\.kind !== 'vampire'\) return false;[\s\S]{0,200}lastFed: gameDays\(\), stage: 1, unfed: null/.test(fs.readFileSync('supernatural.js', 'utf8')));
+
+  // ---- the bucket said out loud ----
+  {
+    const told = [];
+    const SR2 = path.resolve('skillrates.js'); delete require.cache[SR2];
+    const CFG2 = JSON.parse(fs.readFileSync('gamemode-config.json', 'utf8'));
+    require(SR2)({ log: () => {}, cfg: { skillRates: Object.assign({}, CFG2.skillRates, { firstCraft: { enabled: false } }) }, recordOf: () => null, fieldsOf: () => [], inBeastForm: () => false, mp, personal: (a, t) => told.push(t) });
+    put(A, 'private.mastery', { skills: { cook: { level: 30, bucket: { tokens: 0.2, at: clock } } }, order: ['cook'] });
+    const cr = globalThis.__dboSkillRateCredited;
+    cr(A, 'cook', 'craft', {}, 0);
+    check('the first craft at an empty bucket is told, with the wait (0.8 of a unit at 20 an hour: about 2 minutes)', told.length === 1 && /Your Cook has learned all it can for now[^.]*\. It counts again in about 2 minutes\./.test(told[0]), told);
+    clock += 60000; cr(A, 'cook', 'craft', {}, 0);
+    check('...not the next ones for ten minutes', told.length === 1, told);
+    clock += 10 * 60000; put(A, 'private.mastery', { skills: { cook: { level: 30, bucket: { tokens: 0, at: clock } } }, order: ['cook'] });
+    cr(A, 'cook', 'craft', {}, 0); cr(A, 'cook', 'craft', {}, 0);
+    check('...then every refused craft', told.length === 3, told);
+    cr(A, 'cook', 'craft', {}, 1.5);
+    put(A, 'private.mastery', { skills: { cook: { level: 30, bucket: { tokens: 0, at: clock } } }, order: ['cook'] });
+    cr(A, 'cook', 'craft', {}, 0); cr(A, 'cook', 'craft', {}, 0);
+    check('...a craft that credits ends the run: the next empty bucket is told once again', told.length === 4, told);
+    put(A, 'private.mastery', { skills: { cook: { level: 30, bucket: { tokens: 5, at: clock } } }, order: ['cook'] });
+    clock += 11 * 60000; cr(A, 'cook', 'craft', {}, 0);
+    check('...a refusal with a full bucket (the day\'s cap) is not this notice', told.length === 4, told);
+  }
+
+  // ---- Bruma food ----
+  check('placed foods are harvest nodes: bread, honey, cheese, green apples, trout, turkey, brandy, watermelon, flour, milk',
+    ['foodbread', 'foodhoney', 'foodcheesewheel', 'foodapple02', 'cyrfoodtrout', 'cyrfoodturkey', 'cyrfoodbrandybottle', 'bskfoodwatermelon', 'byohfoodflour', 'byohfoodmilk'].every((k) => new RegExp(`HARVEST_ITEM_PREFIXES = \\[[^\\]]*'${k}'`).test(GM)));
+  const BREW = JSON.parse(fs.readFileSync('brewing.json', 'utf8')).recipes;
+  check('Brandy (CYRFoodBrandyBottle01A) is brewed from three grapes', BREW.some((r) => r.product === '858ef:BSHeartland.esm' && r.name === 'Brandy' && JSON.stringify(r.inputs) === '[["601fca:BSAssets.esm",3]]'));
 
   // ---- kitchen staples ----
   const LOOT = JSON.parse(fs.readFileSync('loot.json', 'utf8')).pools;

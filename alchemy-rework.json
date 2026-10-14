@@ -30,7 +30,7 @@
  },
  "fortify": {
   "enabled": true,
-  "_comment": "hook: blade/blunt/archery (DBO weapon skills), one/two (vanilla One-/Two-handed potions, by the weapon's hands), school:20 Destruction and school:22 Restoration damage (Restoration also its healing), duration:18 Alteration (the Flesh spells), duration:19 Conjuration (summons), block (what gets through a block), armor (worn armour rating), lockpick (Lockpicking ranks, lockpickTiers). Vanilla Heavy/Light Armor potions raise a skill by points: the game counts a point as 0.4% armour (UESP Skyrim:Armor), perPoint 0.004.",
+  "_comment": "hook: blade/blunt/archery (DBO weapon skills), one/two (vanilla One-/Two-handed potions, by the weapon's hands), school:20 Destruction and school:22 Restoration damage (Restoration also its healing), duration:18 Alteration (the Flesh spells), duration:19 Conjuration (summons), block (what gets through a block), armor (worn armour rating), lockpick (Lockpicking ranks, lockpickTiers). Vanilla Heavy/Light Armor potions raise a skill by points: the game counts a point as 0.4% armour (UESP Skyrim:Armor), perPoint 0.004. health: Fortify Health's points become extra health (hits scaled by base/(base+points), gamemode.js potionTakenMult); taken: a share off every hit (Sleeping Tree Sap).",
   "lockpickTiers": [
    [0.35, 1],
    [1000000000.0, 2]
@@ -95,6 +95,16 @@
    "DBO_AlchFortifyArmorEffect": {
     "hook": "armor",
     "text": "armour"
+   },
+   "03eaf3": {
+    "hook": "health",
+    "perPoint": 1,
+    "cap": 1000,
+    "text": "health"
+   },
+   "DBO_AlchSleepingTreeSapEffect": {
+    "hook": "taken",
+    "text": "less damage taken"
    }
   }
  },
@@ -245,7 +255,16 @@
   "DBO_AlchComboPoisonMagickaStaminaT4": "",
   "DBO_AlchComboPoisonMagickaStaminaT5": "",
   "DBO_AlchComboPoisonHealthMagickaT4": "",
-  "DBO_AlchComboPoisonHealthMagickaT5": ""
+  "DBO_AlchComboPoisonHealthMagickaT5": "",
+  "DBO_AlchFortifyOneHandedT3": "",
+  "DBO_AlchFortifyOneHandedT4": "",
+  "DBO_AlchFortifyOneHandedT5": "",
+  "DBO_AlchFortifyTwoHandedT3": "",
+  "DBO_AlchFortifyTwoHandedT4": "",
+  "DBO_AlchFortifyTwoHandedT5": "",
+  "DBO_AlchBloodPotion": "",
+  "DBO_AlchSleepingTreeSap": "",
+  "DBO_AlchSleepingTreeSapEffect": ""
  },
  "effects": {
   "03eb15": {
@@ -402,20 +421,20 @@
    "_why": "Beyond Skyrim effect BSKAlchLight: Milk Thistle, Alkanet, Red Lichen, pond fish; no potion record until the PC adds DBO_AlchLight"
   },
   "03eb19": {
-   "label": "Fortify Blade",
+   "label": "Fortify One-handed",
    "kind": "skill",
    "minTier": 3,
-   "byTier": [null, null, "DBO_AlchFortifyBladeT3", "DBO_AlchFortifyBladeT4", "DBO_AlchFortifyBladeT5"],
+   "byTier": [null, null, "DBO_AlchFortifyOneHandedT3", "DBO_AlchFortifyOneHandedT4", "DBO_AlchFortifyOneHandedT5"],
    "fallback": [null, null, "FortifySkillOneHanded02", "FortifySkillOneHanded03", "FortifySkillOneHanded04"],
-   "fallbackLabel": "Fortify One-handed"
+   "_why": "by the weapon's hands, as the vanilla text says (Nate, 14 Oct); Fortify Blade and Blunt are specialties"
   },
   "03eb1a": {
-   "label": "Fortify Blunt",
+   "label": "Fortify Two-handed",
    "kind": "skill",
    "minTier": 3,
-   "byTier": [null, null, "DBO_AlchFortifyBluntT3", "DBO_AlchFortifyBluntT4", "DBO_AlchFortifyBluntT5"],
+   "byTier": [null, null, "DBO_AlchFortifyTwoHandedT3", "DBO_AlchFortifyTwoHandedT4", "DBO_AlchFortifyTwoHandedT5"],
    "fallback": [null, null, "FortifySkillTwoHanded02", "FortifySkillTwoHanded03", "FortifySkillTwoHanded04"],
-   "fallbackLabel": "Fortify Two-handed"
+   "_why": "by the weapon's hands, as the vanilla text says (Nate, 14 Oct); Fortify Blade and Blunt are specialties"
   },
   "03eb1b": {
    "label": "Fortify Archery",
@@ -536,5 +555,41 @@
    "byTier": [null, null, null, "DBO_AlchComboPoisonHealthMagickaT4", "DBO_AlchComboPoisonHealthMagickaT5"],
    "names": [null, null, null, "Virulent Poison of Health and Magicka", "Deadly Poison of Health and Magicka"]
   }
- ]
+ ],
+ "specialties": [
+  {
+   "label": "Fortify Blade",
+   "inputs": ["06bc02", "05ef50:BSHeartland.esm", "06abcb"],
+   "minTier": 3,
+   "byTier": [null, null, "DBO_AlchFortifyBladeT3", "DBO_AlchFortifyBladeT4", "DBO_AlchFortifyBladeT5"],
+   "_inputs": "Bear Claws, Black Eagle Feathers (Cyrodiil), Canis Root: all three carry Fortify One-handed"
+  },
+  {
+   "label": "Fortify Blunt",
+   "inputs": ["03ad72", "60194d:BSAssets.esm", "602045:BSAssets.esm"],
+   "minTier": 3,
+   "byTier": [null, null, "DBO_AlchFortifyBluntT3", "DBO_AlchFortifyBluntT4", "DBO_AlchFortifyBluntT5"],
+   "_inputs": "Troll Fat, Goblin Wax, Blessed Thistle: all three carry Fortify Two-handed"
+  },
+  {
+   "label": "Blood",
+   "name": "Blood Potion",
+   "inputs": ["03ad76", "0b18cd", "02f44c"],
+   "minTier": 5,
+   "byTier": [null, null, null, null, "DBO_AlchBloodPotion"],
+   "fallback": [null, null, null, null, "018ef3:Dawnguard.esm"],
+   "_inputs": "Vampire Dust, Human Heart, Nightshade (Nate, 14 Oct); a vampire who drinks it counts as fed (supernatural.js __dboSuperBloodPotion)"
+  }
+ ],
+ "_specialties": "Fixed recipes at the lab: the exact set of inputs (ingredient refs) makes the record of the brewer's tier from minTier; below that the mix brews as any other, with a hint.",
+ "bloodPotions": ["DBO_AlchBloodPotion", "018ef3:Dawnguard.esm"],
+ "sleepingTreeSap": {
+  "enabled": false,
+  "bases": ["0e1fc1:Skyrim.esm", "0aed89:Skyrim.esm"],
+  "minTier": 5,
+  "hours": 24,
+  "product": "DBO_AlchSleepingTreeSap",
+  "_comment": "The Sleeping Tree's sap spigot (dunSleepingTreeSapSpigot ACTI, ref 0aed8b:Skyrim.esm in the Reach; the spigot FLOR too): a Master Alchemist taps it once a day. Off until Skyrim opens (the tree is outside the Bruma lock)."
+ },
+ "_dropped": "Potion of Muffle and Potion of True Shot are dropped (Nate, 14 Oct): no ingredient carries either effect."
 }

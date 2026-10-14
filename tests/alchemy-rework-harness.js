@@ -220,7 +220,7 @@ const snapshot = (edids) => Object.fromEntries(edids.map((e) => [e, count(pid(e)
   p = await drink(pid('DamageHealth01'), { health: 0.3, magicka: 0.5, stamina: 0.5 });
   check('a poison drunk is left alone', near(p.health, 0.3) && out.sets.length === 0, p);
   p = await drink(pid('FortifyHealth01'), { health: 0.3, magicka: 0.5, stamina: 0.5 }, { health: 0.05 });
-  check('a Fortify Health potion is not a restore', near(p.health, 0.35) && out.sets.length === 0, p);
+  check('a Fortify Health potion is extra health, not a heal: the C++\'s points come off again', near(p.health, 0.3) && out.sets.length === 1, p);
   eatVerdict = false;
   p = await drink(pid('RestoreHealth02'), { health: 0.3, magicka: 0.5, stamina: 0.5 });
   check('an eat the chain refused restores nothing', near(p.health, 0.3) && out.sets.length === 0, p);

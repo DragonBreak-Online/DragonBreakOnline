@@ -1405,7 +1405,11 @@ const ITEM_TYPES = new Set(['WEAP', 'ARMO', 'MISC', 'INGR', 'ALCH', 'BOOK', 'AMM
 const HARVEST_ITEM_PREFIXES = ['hangingrabbit', 'hangingpheasant', 'hanginggarlic', 'garlicbraid', 'hangingelvesear', 'hangingfrostmirriam', 'driedelvesear', 'driedfrostmirriam', 'hangingsalmon', 'salmonrack', 'hangingherb', 'sleepingtreesap',
   // Nat 2026-09-28: the herbs and food hanging in Bruma's houses. 'Lavander' is the game's own spelling;
   // 'lavender' is here too so a correctly spelled record in another plugin is not silently missed.
-  'hanginglavander', 'hanginglavender', 'hangingmagusmint', 'hangingmoratapinella', 'hangingscalypholiota', 'hangingonionbraid', 'hangingmoss'];
+  'hanginglavander', 'hanginglavender', 'hangingmagusmint', 'hangingmoratapinella', 'hangingscalypholiota', 'hangingonionbraid', 'hangingmoss',
+  // Nate, 14 Oct: no shop sells food, so the food set out in Bruma's houses, inns and castle can be taken, each piece
+  // then spent for the hour like the herbs: bread, honey, cheese, green apples, trout, turkey, brandy, watermelon, and
+  // flour and milk where a sack or jug stands (Bruma had no other source of either)
+  'foodbread', 'foodhoney', 'foodcheesewheel', 'foodapple02', 'cyrfoodtrout', 'cyrfoodturkey', 'cyrfoodbrandybottle', 'bskfoodwatermelon', 'byohfoodflour', 'byohfoodmilk'];
 // Nat 2026-09-28: sleeping tree sap can be taken, and the tap is then spent for an hour. The harvestables above
 // had no timer at all, so a hanging rabbit could be taken again the moment it was looked at; they share this one.
 // Keyed by the reference and kept on globalThis, so a gamemode reload does not hand everyone a fresh harvest.
@@ -1573,6 +1577,8 @@ mp.onActivate = (targetId, casterId) => {
   try { if (globalThis.__dboEnchanterTouched) globalThis.__dboEnchanterTouched(targetId >>> 0, casterId >>> 0); } catch (e) { log('enchanter resend failed', e.message); }
   // An alchemy lab also shows what the pack can brew (alchemy.js); the lab's own menu still opens
   if (globalThis.__dboAlchemyLab) { try { if (globalThis.__dboAlchemyLab(targetId >>> 0, casterId >>> 0) === true) return false; } catch (e) { log('alchemy lab panel failed', e.message); } }
+  // The Sleeping Tree's sap spigot: a Master Alchemist's daily tap (alchemy.js; off until Skyrim opens)
+  if (globalThis.__dboSleepingTreeTap) { try { if (globalThis.__dboSleepingTreeTap(targetId >>> 0, casterId >>> 0) === true) return false; } catch (e) { log('sleeping tree tap failed', e.message); } }
   if (globalThis.__dboEmptyWorldContainer) globalThis.__dboEmptyWorldContainer(targetId >>> 0);
   // Gear above the loot cap in a container becomes its steel equivalent before the container opens (gearswap.js)
   if (globalThis.__dboGearSwapContainer) globalThis.__dboGearSwapContainer(targetId >>> 0);
@@ -6190,6 +6196,25 @@ const arcaneDamageMult = (aggressorId, sourceId) => {
 // Two-handed potion by the weapon's hands, as its text says), a Destruction or Restoration potion to that school's spell
 // hits. The game's own copy of the effect raised only the client's skill, which no server number reads.
 const potionBonus = (a, hook) => { try { const f = globalThis.__dboPotionBonus; const b = typeof f === 'function' ? Number(f(a >>> 0, hook)) : 0; return Number.isFinite(b) && b > 0 ? b : 0; } catch (e) { return 0; } };
+// Fortify Health is extra health (alchemy.js hook health, its points): a hit lands as it would on a pool that much larger,
+// the engine's damage over the server's maximum (flags.targetMaxHealth) scaled by base/(base + extra). A share of the
+// bar then holds base + extra points, which is what a larger maximum is; restores stay shares of the bar. Sleeping Tree
+// Sap (hook taken) takes its share off every hit. Both sit outside the racial cap, as a larger pool is not a resistance.
+const potionMaxSeen = globalThis.__dboPotionMaxSeen instanceof Map ? globalThis.__dboPotionMaxSeen : (globalThis.__dboPotionMaxSeen = new Map());
+const potionTakenMult = (targetId, flags) => {
+  if (typeof globalThis.__dboPotionBonus !== 'function') return 1;
+  let m = 1;
+  const extra = potionBonus(targetId, 'health');
+  // A weapon hit names the maximum; a spell hit does not, so the last one seen for the target stands in (it changes only
+  // with the character's level), else downed.js's measured one, else the smallest a character has (150)
+  let base = flags && typeof flags === 'object' ? Number(flags.targetMaxHealth) : NaN;
+  if (base > 0) { potionMaxSeen.set(targetId >>> 0, base); if (potionMaxSeen.size > 4096) potionMaxSeen.clear(); }
+  else if (extra > 0) { const d = globalThis.__dboDownedState; base = potionMaxSeen.get(targetId >>> 0) || (d && d.maxHp instanceof Map ? Number(d.maxHp.get(targetId >>> 0)) : 0) || 150; }
+  if (extra > 0 && base > 0) m *= base / (base + extra);
+  const less = potionBonus(targetId, 'taken');
+  if (less > 0) m *= Math.max(0, 1 - Math.min(0.9, less));
+  return m;
+};
 const potionAttackMult = (aggressorId, sourceId) => {
   if (typeof globalThis.__dboPotionBonus !== 'function') return 1;
   let bonus = 0;
@@ -6826,7 +6851,7 @@ const hitDamageAttemptHook =(aggressorId, targetId, sourceId, damage, flags) => 
     if (racial) { try { targetSide = racial.capTargetSide(targetSide * racial.targetMult(agg, tgt, src, dmg)); } catch (e) { log('racial target failed', e.message); } }
     let raceAtk = 1;
     if (racial && !beastAgg) { try { raceAtk = racial.attackMult(agg, tgt, src, dmg); } catch (e) { log('racial attack failed', e.message); } }
-    let mult = (beastAgg ? 1 : masteryDamageMult(agg, src) * potionAttackMult(agg, src)) * arcaneDamageMult(agg, src) * materialDamageMult(agg, src) * temperDamageMult(agg, src) * arrowDamageMult(agg, src) * targetSide * blessingAttackMult(agg, src) * raceAtk * huntDamageMult(agg, tgt) * pvp;
+    let mult = (beastAgg ? 1 : masteryDamageMult(agg, src) * potionAttackMult(agg, src)) * potionTakenMult(tgt, flags) * arcaneDamageMult(agg, src) * materialDamageMult(agg, src) * temperDamageMult(agg, src) * arrowDamageMult(agg, src) * targetSide * blessingAttackMult(agg, src) * raceAtk * huntDamageMult(agg, tgt) * pvp;
     // Tired blows, fists into armour, staves through it, the fist's stamina drain and disarm (martial.js)
     if (martial && !beastAgg) { try { mult *= martial.onAttempt(agg, tgt, src, dmg, flags); } catch (e) { log('martial failed', e.message); } }
     // Block chip and stamina, guard breaks, bash, stagger (combat.js); a bash's blow comes back scaled down
@@ -7648,7 +7673,7 @@ try {
   // Feeding counts as a meal for the hunger meter
   const needsFeed = (a) => { if (!NEEDS.enabled) return; const n = needsOf(a); n.hunger = Math.max(0, n.hunger - (Number((NEEDS.restore || {}).meal) || 0)); saveNeeds(a, n); applyNeedsStage(a, n, false); };
   require(SUPERNATURAL_JS)({ mp, log, personal, registerChatCommand, onUi, openWidget, closeWidget, sendPacket, display, who, audit, isAdmin, findByName, onlineActors, every, profileOf, nameOf, isWorldspace, needsFeed, hungerOf: (a) => needsOf(a).hunger, cfg, hasUiCap, sourceResistsOf });
-} catch (e) { log('supernatural.js failed to load:', e.stack || e.message); for (const k of ['__dboSuperDamageMult', '__dboSuperHit', '__dboSuperEat', '__dboSuperPrayed', '__dboSuperPrayWarning', '__dboSuperDeath', '__dboSuperActivate', '__dboSuperMenuEntries', '__dboSuperMenuAction', '__dboSuperAdminInfect', '__dboBeastAllow', '__dboBeastChanged', '__dboSuperKind', '__dboSuperLogin', '__dboSuperLeave', '__dboSuperProgress', '__dboSuperProgressSend', '__dboSuperRateMult', '__dboSuperFoodMult', '__dboTellsRetake', '__dboVampHealCast', '__dboVampHealRefusal', '__dboVampHealBlocks']) globalThis[k] = null; }
+} catch (e) { log('supernatural.js failed to load:', e.stack || e.message); for (const k of ['__dboSuperDamageMult', '__dboSuperHit', '__dboSuperEat', '__dboSuperPrayed', '__dboSuperPrayWarning', '__dboSuperDeath', '__dboSuperActivate', '__dboSuperMenuEntries', '__dboSuperMenuAction', '__dboSuperAdminInfect', '__dboBeastAllow', '__dboBeastChanged', '__dboSuperKind', '__dboSuperLogin', '__dboSuperLeave', '__dboSuperProgress', '__dboSuperProgressSend', '__dboSuperRateMult', '__dboSuperFoodMult', '__dboTellsRetake', '__dboVampHealCast', '__dboVampHealRefusal', '__dboVampHealBlocks', '__dboSuperBloodPotion']) globalThis[k] = null; }
 
 // ---- friendly fire and the down state (server\downed.js): after supernatural.js, whose hooks it wraps -------
 try {
@@ -7726,7 +7751,7 @@ try {
   const ALCHEMY_JS = path.resolve('alchemy.js');
   delete require.cache[ALCHEMY_JS];
   require(ALCHEMY_JS)({ mp, log, personal, audit, display, who, openWidget, closeWidget, every, itemName: (d) => adminItemName(d), cfg, sendPacket, onUi });
-} catch (e) { log('alchemy.js failed to load:', e.stack || e.message); mp.onCraftUnmatched = null; globalThis.__dboEnchanterTouched = null; globalThis.__dboPotionResistOf = null; globalThis.__dboPotionBonus = null; globalThis.__dboPotionLockpickTiers = null; globalThis.__dboPoisonHit = null; }
+} catch (e) { log('alchemy.js failed to load:', e.stack || e.message); mp.onCraftUnmatched = null; globalThis.__dboEnchanterTouched = null; globalThis.__dboPotionResistOf = null; globalThis.__dboPotionBonus = null; globalThis.__dboPotionLockpickTiers = null; globalThis.__dboPoisonHit = null; globalThis.__dboSleepingTreeTap = null; }
 
 // ---- playtest region lock (server\playtest.js, config "playtest") ------------------------------
 try {
