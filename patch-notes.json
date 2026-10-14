@@ -10,7 +10,16 @@
         "items": [
           "Citizenship of the holds: notice boards have Citizenship and Voting tabs, and your F3 Journal has a Citizen tab.",
           "Buying a house now needs citizenship of the hold it stands in. Property tax is a fixed amount, set from the property's listed value.",
-          "The first Jarl elections: once a hold of Skyrim has 15 citizens, an election opens at its notice boards, with a day to stand for Jarl and a day to vote. Bruma has no election: the Count holds the seat."
+          "The first Jarl elections: once a hold of Skyrim has 15 citizens, an election opens at its notice boards, with a day to stand for Jarl and a day to vote. Bruma has no election: the Count holds the seat.",
+          "Controller support: in panels the right stick moves a pointer, A clicks, B closes and the left stick scrolls. New shortcuts: Back+LB opens skills, Back+right stick click the personal menu, Back+left stick click the emote wheel."
+        ]
+      },
+      {
+        "heading": "Tailoring",
+        "items": [
+          "What a loom will make is now set garment by garment rather than by what the garment is worth. Rags, work clothes and footwraps stay Novice work; robes and fur accessories are Adept; fine and noble clothes are Expert; the Emperor's Robes and a master's robes are Master work.",
+          "Bags follow the same ladder: pouches at Apprentice, satchels at Adept, backpacks at Expert.",
+          "Anything not yet placed by hand is unchanged and still goes by its value, so most recipes sit where they did."
         ]
       },
       {
@@ -24,30 +33,27 @@
           "Breaking down books no longer takes smithing schematics or spell tomes.",
           "Breaking things down now opens the item first: break one, break all, and see what it's worth, so a fast click can't take the wrong item.",
           "Kills by your summons now count for your hunting contracts.",
-          "Werewolves no longer stay looking like naked humans to other players.",
           "The carrots at Aleswell can be picked again."
         ]
       }
     ]
   },
   {
-    "title": "Character creation fix",
+    "title": "Character creation and werewolf fixes",
     "date": "2026-10-14",
     "version": "Server update",
     "tag": "Fix",
     "sections": [
       {
-        "heading": "Tailoring",
-        "items": [
-          "What a loom will make is now set garment by garment rather than by what the garment is worth. Rags, work clothes and footwraps stay Novice work; robes and fur accessories are Adept; fine and noble clothes are Expert; the Emperor's Robes and a master's robes are Master work.",
-          "Bags follow the same ladder: pouches at Apprentice, satchels at Adept, backpacks at Expert.",
-          "Anything not yet placed by hand is unchanged and still goes by its value, so most recipes sit where they did."
-        ]
-      },
-      {
         "heading": "Making a character",
         "items": [
           "Two people making a character at the same time could end up standing inside each other, with the editor's camera showing the other person instead of your own changes. Each new character is now moved to a spot of their own, and moved again if that did not take, before the editor opens."
+        ]
+      },
+      {
+        "heading": "Werewolves",
+        "items": [
+          "Werewolves no longer stay looking like naked humans to other players. Anyone still seen that way shows their true form again at their next change."
         ]
       }
     ]
