@@ -58,6 +58,19 @@ void DX11RenderHandler::Render(
                         m_pStates->NonPremultiplied());
 
   if (Visible()) {
+    // OnPaint skips the copy while hidden, so the texture can be stale when the overlay returns.
+    // Ask CEF for one full repaint; it is a no-op on the frames where nothing was missed.
+    if (m_missedPaintWhileHidden) {
+      m_missedPaintWhileHidden = false;
+      if (m_pParent) {
+        if (auto browser = m_pParent->GetBrowser()) {
+          if (auto host = browser->GetHost()) {
+            host->Invalidate(PET_VIEW);
+          }
+        }
+      }
+    }
+
     std::unique_lock<std::mutex> _(m_textureLock);
 
     if (m_pTextureView) {
@@ -207,6 +220,15 @@ void DX11RenderHandler::OnPaint(CefRefPtr<CefBrowser> browser,
                                 const RectList& dirtyRects, const void* buffer,
                                 int width, int height)
 {
+  // The overlay is hidden for most of a session, but CEF keeps painting and this copied the whole
+  // surface regardless - 7.9 MiB at 1920x1080, up to 60 times a second, for something nobody can
+  // see. Visible() already gated the Draw in Render(); it never gated this copy. Skipping it leaves
+  // the texture stale, so Render() asks for one repaint when the overlay comes back.
+  if (!Visible()) {
+    m_missedPaintWhileHidden = true;
+    return;
+  }
+
   if (type == PET_VIEW && m_width == width && m_height == height) {
     std::unique_lock<std::mutex> _(m_textureLock);
 

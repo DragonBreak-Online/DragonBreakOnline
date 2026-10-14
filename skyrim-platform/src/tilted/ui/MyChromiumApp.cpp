@@ -91,7 +91,8 @@ void MyChromiumApp::Initialize(bool initChromium) noexcept
   settings.multi_threaded_message_loop = true;
   settings.windowless_rendering_enabled = true;
 
-  settings.log_severity = LOGSEVERITY_VERBOSE;
+  // Verbose wrote 75 MB of cef_debug.log in a single 30-minute session, almost all WebRTC chatter
+  settings.log_severity = LOGSEVERITY_WARNING;
   // DevTools only when SKYMP_CEF_DEBUG_PORT names a port; 0 turns CEF remote debugging off
   const char* debugPort = std::getenv("SKYMP_CEF_DEBUG_PORT");
   const int port = debugPort ? std::atoi(debugPort) : 0;
@@ -144,7 +145,8 @@ void MyChromiumApp::Initialize(bool initChromium) noexcept
 
   CefBrowserSettings browserSettings{};
 
-  browserSettings.windowless_frame_rate = 60;
+  // The overlay is a menu, not video: 30 halves the paint work and is imperceptible on a static panel
+  browserSettings.windowless_frame_rate = 30;
 
   CefWindowInfo info;
   info.SetAsWindowless(m_pRenderProvider->GetWindow());

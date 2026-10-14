@@ -6,6 +6,7 @@
 #include <DirectXTK/SpriteBatch.h>
 #include <DirectXTK/SpriteFont.h>
 #include <Signal.hpp>
+#include <atomic>
 #include <functional>
 #include <map>
 #include <mutex>
@@ -58,6 +59,11 @@ protected:
 private:
   uint32_t m_width{ 0 };
   uint32_t m_height{ 0 };
+
+  // Set by OnPaint when a paint is dropped because the overlay is hidden; Render() consumes it and
+  // asks CEF for one repaint, so the overlay is never shown with a stale surface. Written on the
+  // CEF thread, read on the render thread; a torn read would only cost one extra Invalidate.
+  std::atomic<bool> m_missedPaintWhileHidden{ false };
 
   Microsoft::WRL::ComPtr<ID3D11Texture2D> m_pTexture;
   Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> m_pCursorTexture;
