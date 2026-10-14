@@ -18,12 +18,17 @@ export interface MagicSchool {
   rankSpells?: Array<{ rank: string; spell: string; none?: boolean }>; nextPick?: { rank: string; at: number } | null;
 }
 interface BookSpell { id: string; name: string; school: string; rank: number; rankName: string; prepared?: boolean; outside?: boolean }
+interface Apprenticeship {
+  apprentice: { teacher: string; spell: string; school: string; rank: string; xp: number; need: number; today: number; dailyXp: number; near: boolean } | null;
+  apprentices: Array<{ name: string; spell: string }>; max: number;
+}
 export interface MagicSection {
   v: number; open: boolean; note?: string; ranks?: string[]; firstSpellAt?: number;
   arcane?: { held: boolean; level: number }; priest?: { held: boolean; level: number }; primary?: string; secondary?: string;
   schools?: MagicSchool[];
   book?: { max: number; canPrepare: boolean; hint: string; prepared: BookSpell[]; known: BookSpell[]; outside: BookSpell[] };
   swap?: { enabled: boolean; can: boolean; why: string; nextAt: number; cooldownDays: number; startShare: number; where: string };
+  apprenticeship?: Apprenticeship | null;
 }
 
 const RANKS = ['Novice', 'Apprentice', 'Adept', 'Expert', 'Master'];
@@ -127,6 +132,10 @@ export const MagicTab = ({ section, busy, act }: JournalTabProps<MagicSection>) 
           ))}
         </ul>
         {sec.note ? <p className="jmagic__note">{sec.note}</p> : null}
+        {sec.apprenticeship && sec.apprenticeship.apprentice ? (() => { const ap = sec.apprenticeship.apprentice; return (
+          <p className="jmagic__note">Apprentice of {ap.teacher} in {ap.spell} ({ap.rank} {ap.school}): {ap.xp} of {ap.need} studied, {ap.today} of {ap.dailyXp} today. {ap.near ? 'You are near your teacher: cast it to study.' : 'Go to your teacher to cast and study it.'}</p>
+        ); })() : null}
+        {sec.apprenticeship && sec.apprenticeship.apprentices.length ? <p className="jmagic__note">Your apprentices: {sec.apprenticeship.apprentices.map((x) => `${x.name} (${x.spell})`).join(', ')}.</p> : null}
       </nav>
       {shown ? <SchoolPage s={shown} sec={sec} busy={busy} act={act} /> : <div />}
       <aside className="jmagic__book">
