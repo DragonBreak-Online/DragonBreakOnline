@@ -2173,7 +2173,7 @@ module.exports = (api) => {
         if (left.length !== apList(ts).length) { ts.apprentices = left; save(teacher, ts); }
       } catch (e) { /* the teacher's record is gone */ }
     }
-    audit(`SCHOOLS apprenticeship of ${who(t)} with ${ap.teacherName || teacher.toString(16)} in ${ap.spell} ended: ${why}`);
+    audit(`SCHOOLS apprenticeship of ${who(t)} with ${who(teacher)} in ${ap.spell} ended: ${why}`);
     if (tell) personal(t, tell);
   };
   const openTeachPanel = (a, t) => {
@@ -2335,7 +2335,7 @@ module.exports = (api) => {
     const teacher = ap.teacher >>> 0, name = ap.teacherName;
     endApprenticeship(t, 'learned', `You have learned ${r.name} from ${name}. ${r.line}`);
     if (online(teacher)) personal(teacher, `${display(t)} has learned ${r.name}. Your apprenticeship with them is complete.`);
-    audit(`SCHOOLS ${who(t)} learned ${ap.spell} ${r.name} as apprentice of ${name}`);
+    audit(`SCHOOLS ${who(t)} learned ${ap.spell} ${r.name} as apprentice of ${who(teacher)}`);
   };
   globalThis.__dboSchoolsApprenticeView = (a) => {
     const s = stateOf(a);
