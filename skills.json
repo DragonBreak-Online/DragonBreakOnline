@@ -637,7 +637,7 @@
     0.04,
     0.05
    ],
-   "tiers": ["Read common books; now and then a scroll, rarely a novice spell tome", "Better copies; now and then a novice spell tome", "Rare books", "More and stronger scrolls; apprentice spell tomes", "Adept spell tomes"],
+   "tiers": ["Read common books; now and then a scroll, rarely a novice spell tome", "Better copies; apprentice spell tomes", "Rare books; adept spell tomes", "More and stronger scrolls; expert spell tomes for senior college ranks", "The finest finds; at 100, very rarely a master spell tome for senior college ranks"],
    "markerSpells": [
     "<T1>",
     "<T2>",
