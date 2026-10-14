@@ -1,48 +1,540 @@
 {
- "_comment": "Alchemy rework (Nate, 14 Oct, 'DBO: Alchemy Rework'; plan in claude-nate-release/specs/alchemy-rework-1014-plan.md). Read by alchemy.js at every hot reload. tierNames: the strength words of the five Alchemist tiers (Novice 1, Apprentice 25, Adept 50, Expert 75, Master 90). effects: by magic effect (Skyrim.esm id, as alchemy-potions.json), minTier the lowest tier that may brew it, byTier the record (an editor id from alchemy-potions.json, or a desc 'id:Plugin') given at tiers 1..5 (null below minTier), label the design's name after the strength word, kind restore|regen|resist|fortify|skill|poison|special. An effect not listed keeps alchemy-potions.json's old choice. restoreBands: what a restore potion of each magnitude gives when drunk, as a share of the drinker's own pool (any plugin's restore potion, food left alone). combos: two-effect records for tier 4 and 5 brewers whose mix shares both effects (empty until the PC adds the records). Config 'alchemyRework' in gamemode-config.json overrides any key.",
+ "_comment": "Alchemy rework (Nate, 14 Oct, 'DBO: Alchemy Rework'; plan in claude-nate-release/specs/alchemy-rework-1014-plan.md). Read by alchemy.js at every hot reload. tierNames: the strength words of the five Alchemist tiers (Novice 1, Apprentice 25, Adept 50, Expert 75, Master 90). effects: by magic effect (Skyrim.esm id, as alchemy-potions.json), minTier the lowest tier that may brew it, byTier the record (an editor id from alchemy-potions.json, or a desc 'id:Plugin') given at tiers 1..5 (null below minTier), label the design's name after the strength word, kind restore|regen|resist|fortify|skill|poison|special. An effect not listed keeps alchemy-potions.json's old choice. restoreBands: what a restore potion of each magnitude gives when drunk, as a share of the drinker's own pool (any plugin's restore potion, food left alone). records: the PC's records (DragonBreak Online Edits.esp) by editor id -> 'localid:DragonBreak Online Edits.esp', filled once the PC sends the ids (each is checked against its editor id at load; an unmapped one leaves its tier to fallback, the vanilla record). percentEffects/overTime.slowEffects: the PC's restore effects whose magnitude is the percentage itself. fortify: what each fortify effect feeds on the server (hook), bonus = magnitude x perPoint up to cap. poisons: weapon poisons as a share of the target's pool (magnitude / anchorPool), judged only with judge true. A kind 'dropped' effect is never brewed (why says so). combos: two-effect records for tier 4 and 5 brewers whose mix shares both effects (empty until the PC adds the records). Config 'alchemyRework' in gamemode-config.json overrides any key.",
  "enabled": true,
  "tierNames": ["Novice", "Apprentice", "Adept", "Expert", "Master"],
  "tierLevels": [1, 25, 50, 75, 90],
  "words": {
   "potion": ["Potion", "Draught", "Solution", "Philter", "Elixir"],
-  "poison": ["Weak Poison", "Poison", "Potent Poison", "Virulent Poison", "Deadly Poison"]
+  "poison": ["Poison", "Poison", "Potent Poison", "Virulent Poison", "Deadly Poison"],
+  "_poison": "Weak Poison is the drop-only weakest (vanilla DamageHealth01 and the like); the design names Level 1 and Level 25 both 'Poison' (Nate's defaults, 14 Oct)"
  },
- "restoreBands": [[25, 0.10], [50, 0.20], [75, 0.30], [100, 0.45], [150, 0.60], [1e9, 0.75]],
- "resist": { "enabled": true },
+ "restoreBands": [
+  [25, 0.1],
+  [50, 0.2],
+  [75, 0.3],
+  [100, 0.45],
+  [150, 0.6],
+  [1000000000.0, 0.75]
+ ],
+ "percentEffects": ["DBO_AlchRestoreHealthEffect", "DBO_AlchRestoreMagickaEffect", "DBO_AlchRestoreStaminaEffect"],
+ "overTime": {
+  "enabled": true,
+  "fromShare": 0.6,
+  "seconds": 5,
+  "tickMs": 500,
+  "slowEffects": ["DBO_AlchRestoreHealthSlowEffect", "DBO_AlchRestoreMagickaSlowEffect", "DBO_AlchRestoreStaminaSlowEffect"],
+  "_comment": "Philter (60%) and Elixir (75%) restore over seconds, in ticks every tickMs (Nate, 14 Oct: only the low tiers are instant, so burst damage can still win); a new drink of the same pool replaces a running one"
+ },
+ "resist": {
+  "enabled": true
+ },
+ "fortify": {
+  "enabled": true,
+  "_comment": "hook: blade/blunt/archery (DBO weapon skills), one/two (vanilla One-/Two-handed potions, by the weapon's hands), school:20 Destruction and school:22 Restoration damage (Restoration also its healing), duration:18 Alteration (the Flesh spells), duration:19 Conjuration (summons), block (what gets through a block), armor (worn armour rating), lockpick (Lockpicking ranks, lockpickTiers). Vanilla Heavy/Light Armor potions raise a skill by points: the game counts a point as 0.4% armour (UESP Skyrim:Armor), perPoint 0.004.",
+  "lockpickTiers": [
+   [0.35, 1],
+   [1000000000.0, 2]
+  ],
+  "effects": {
+   "03eb19": {
+    "hook": "one",
+    "text": "one-handed weapon damage"
+   },
+   "03eb1a": {
+    "hook": "two",
+    "text": "two-handed weapon damage"
+   },
+   "03eb1b": {
+    "hook": "archery",
+    "text": "bow and crossbow damage"
+   },
+   "03eb1c": {
+    "hook": "block",
+    "text": "blocked damage absorbed"
+   },
+   "03eb1e": {
+    "hook": "armor",
+    "perPoint": 0.004,
+    "text": "armour"
+   },
+   "03eb1f": {
+    "hook": "armor",
+    "perPoint": 0.004,
+    "text": "armour"
+   },
+   "03eb26": {
+    "hook": "school:20",
+    "text": "Destruction damage"
+   },
+   "03eb28": {
+    "hook": "school:22",
+    "text": "Restoration healing and damage"
+   },
+   "03eb24": {
+    "hook": "duration:18",
+    "cap": 1,
+    "text": "Alteration spell duration"
+   },
+   "03eb25": {
+    "hook": "duration:19",
+    "cap": 1,
+    "text": "summon duration"
+   },
+   "03eb21": {
+    "hook": "lockpick",
+    "text": "lockpicking"
+   },
+   "DBO_AlchFortifyBladeEffect": {
+    "hook": "blade",
+    "text": "blade damage"
+   },
+   "DBO_AlchFortifyBluntEffect": {
+    "hook": "blunt",
+    "text": "blunt weapon damage"
+   },
+   "DBO_AlchFortifyArmorEffect": {
+    "hook": "armor",
+    "text": "armour"
+   }
+  }
+ },
+ "poisons": {
+  "judge": false,
+  "anchorPool": 200,
+  "minHealth": 0.01,
+  "ledgerMinutes": 5,
+  "_comment": "Weapon poisons as a share of the TARGET's pool: the record's points / anchorPool (a 200-point pool takes the design's 30/35/40/50/65 and 2/3/5/5 a second; 150 takes three quarters of that). judge false: inert until an in-game test (plan section 9).",
+  "damage": {
+   "03eb42": "health",
+   "03a2b6": "magicka",
+   "03a2c6": "stamina"
+  },
+  "linger": {
+   "10aa4a": "health",
+   "10de5f": "magicka",
+   "10de5e": "stamina"
+  }
+ },
+ "records": {
+  "DBO_AlchRestoreHealthEffect": "",
+  "DBO_AlchRestoreMagickaEffect": "",
+  "DBO_AlchRestoreStaminaEffect": "",
+  "DBO_AlchRestoreHealthSlowEffect": "",
+  "DBO_AlchRestoreMagickaSlowEffect": "",
+  "DBO_AlchRestoreStaminaSlowEffect": "",
+  "DBO_AlchFortifyBladeEffect": "",
+  "DBO_AlchFortifyBluntEffect": "",
+  "DBO_AlchFortifyArmorEffect": "",
+  "DBO_AlchRestoreHealthT1": "",
+  "DBO_AlchRestoreHealthT2": "",
+  "DBO_AlchRestoreHealthT3": "",
+  "DBO_AlchRestoreHealthT4": "",
+  "DBO_AlchRestoreHealthT5": "",
+  "DBO_AlchRestoreMagickaT1": "",
+  "DBO_AlchRestoreMagickaT2": "",
+  "DBO_AlchRestoreMagickaT3": "",
+  "DBO_AlchRestoreMagickaT4": "",
+  "DBO_AlchRestoreMagickaT5": "",
+  "DBO_AlchRestoreStaminaT1": "",
+  "DBO_AlchRestoreStaminaT2": "",
+  "DBO_AlchRestoreStaminaT3": "",
+  "DBO_AlchRestoreStaminaT4": "",
+  "DBO_AlchRestoreStaminaT5": "",
+  "DBO_AlchRegenHealthT1": "",
+  "DBO_AlchRegenHealthT2": "",
+  "DBO_AlchRegenHealthT3": "",
+  "DBO_AlchRegenHealthT4": "",
+  "DBO_AlchRegenHealthT5": "",
+  "DBO_AlchRegenMagickaT1": "",
+  "DBO_AlchRegenMagickaT2": "",
+  "DBO_AlchRegenMagickaT3": "",
+  "DBO_AlchRegenMagickaT4": "",
+  "DBO_AlchRegenMagickaT5": "",
+  "DBO_AlchRegenStaminaT1": "",
+  "DBO_AlchRegenStaminaT2": "",
+  "DBO_AlchRegenStaminaT3": "",
+  "DBO_AlchRegenStaminaT4": "",
+  "DBO_AlchRegenStaminaT5": "",
+  "DBO_AlchResistFireT1": "",
+  "DBO_AlchResistFireT2": "",
+  "DBO_AlchResistFireT3": "",
+  "DBO_AlchResistFireT4": "",
+  "DBO_AlchResistFireT5": "",
+  "DBO_AlchResistFrostT1": "",
+  "DBO_AlchResistFrostT2": "",
+  "DBO_AlchResistFrostT3": "",
+  "DBO_AlchResistFrostT4": "",
+  "DBO_AlchResistFrostT5": "",
+  "DBO_AlchResistShockT1": "",
+  "DBO_AlchResistShockT2": "",
+  "DBO_AlchResistShockT3": "",
+  "DBO_AlchResistShockT4": "",
+  "DBO_AlchResistShockT5": "",
+  "DBO_AlchFortifyHealthT1": "",
+  "DBO_AlchFortifyHealthT2": "",
+  "DBO_AlchFortifyHealthT3": "",
+  "DBO_AlchFortifyHealthT4": "",
+  "DBO_AlchFortifyHealthT5": "",
+  "DBO_AlchFortifyMagickaT1": "",
+  "DBO_AlchFortifyMagickaT2": "",
+  "DBO_AlchFortifyMagickaT3": "",
+  "DBO_AlchFortifyMagickaT4": "",
+  "DBO_AlchFortifyMagickaT5": "",
+  "DBO_AlchFortifyStaminaT1": "",
+  "DBO_AlchFortifyStaminaT2": "",
+  "DBO_AlchFortifyStaminaT3": "",
+  "DBO_AlchFortifyStaminaT4": "",
+  "DBO_AlchFortifyStaminaT5": "",
+  "DBO_AlchPoisonHealthT1": "",
+  "DBO_AlchPoisonHealthT2": "",
+  "DBO_AlchPoisonHealthT3": "",
+  "DBO_AlchPoisonHealthT4": "",
+  "DBO_AlchPoisonHealthT5": "",
+  "DBO_AlchPoisonMagickaT1": "",
+  "DBO_AlchPoisonMagickaT2": "",
+  "DBO_AlchPoisonMagickaT3": "",
+  "DBO_AlchPoisonMagickaT4": "",
+  "DBO_AlchPoisonMagickaT5": "",
+  "DBO_AlchPoisonStaminaT1": "",
+  "DBO_AlchPoisonStaminaT2": "",
+  "DBO_AlchPoisonStaminaT3": "",
+  "DBO_AlchPoisonStaminaT4": "",
+  "DBO_AlchPoisonStaminaT5": "",
+  "DBO_AlchLightT2": "",
+  "DBO_AlchLightT3": "",
+  "DBO_AlchLightT4": "",
+  "DBO_AlchLightT5": "",
+  "DBO_AlchFortifyBladeT3": "",
+  "DBO_AlchFortifyBladeT4": "",
+  "DBO_AlchFortifyBladeT5": "",
+  "DBO_AlchFortifyBluntT3": "",
+  "DBO_AlchFortifyBluntT4": "",
+  "DBO_AlchFortifyBluntT5": "",
+  "DBO_AlchFortifyArcheryT3": "",
+  "DBO_AlchFortifyArcheryT4": "",
+  "DBO_AlchFortifyArcheryT5": "",
+  "DBO_AlchFortifyDefenceT3": "",
+  "DBO_AlchFortifyDefenceT4": "",
+  "DBO_AlchFortifyDefenceT5": "",
+  "DBO_AlchFortifyArmorT3": "",
+  "DBO_AlchFortifyArmorT4": "",
+  "DBO_AlchFortifyArmorT5": "",
+  "DBO_AlchFortifyDestructionT3": "",
+  "DBO_AlchFortifyDestructionT4": "",
+  "DBO_AlchFortifyDestructionT5": "",
+  "DBO_AlchFortifyRestorationT3": "",
+  "DBO_AlchFortifyRestorationT4": "",
+  "DBO_AlchFortifyRestorationT5": "",
+  "DBO_AlchFortifyAlterationT3": "",
+  "DBO_AlchFortifyAlterationT4": "",
+  "DBO_AlchFortifyAlterationT5": "",
+  "DBO_AlchFortifyConjurationT3": "",
+  "DBO_AlchFortifyConjurationT4": "",
+  "DBO_AlchFortifyConjurationT5": "",
+  "DBO_AlchFortifyLockpickingT3": "",
+  "DBO_AlchFortifyLockpickingT4": "",
+  "DBO_AlchFortifyLockpickingT5": "",
+  "DBO_AlchComboRestoreHealthStaminaT4": "",
+  "DBO_AlchComboRestoreHealthStaminaT5": "",
+  "DBO_AlchComboRestoreHealthMagickaT4": "",
+  "DBO_AlchComboRestoreHealthMagickaT5": "",
+  "DBO_AlchComboRestoreMagickaStaminaT4": "",
+  "DBO_AlchComboRestoreMagickaStaminaT5": "",
+  "DBO_AlchComboPoisonHealthStaminaT4": "",
+  "DBO_AlchComboPoisonHealthStaminaT5": "",
+  "DBO_AlchComboPoisonMagickaStaminaT4": "",
+  "DBO_AlchComboPoisonMagickaStaminaT5": "",
+  "DBO_AlchComboPoisonHealthMagickaT4": "",
+  "DBO_AlchComboPoisonHealthMagickaT5": ""
+ },
  "effects": {
-  "03eb15": { "label": "Healing", "kind": "restore", "av": "health", "minTier": 1, "byTier": ["RestoreHealth02", "RestoreHealth03", "RestoreHealth04", "RestoreHealth05", "RestoreHealth06"] },
-  "03eb17": { "label": "Magicka", "kind": "restore", "av": "magicka", "minTier": 1, "byTier": ["RestoreMagicka02", "RestoreMagicka03", "RestoreMagicka04", "RestoreMagicka05", "RestoreMagicka06"] },
-  "03eb16": { "label": "Stamina", "kind": "restore", "av": "stamina", "minTier": 1, "byTier": ["RestoreStamina02", "RestoreStamina03", "RestoreStamina04", "RestoreStamina05", "RestoreStamina06"] },
-  "03eb06": { "label": "Health Regen", "kind": "regen", "minTier": 1, "byTier": ["FortifyHealRate01", "FortifyHealRate02", "FortifyHealRate03", "FortifyHealRate04", "FortifyHealRate05"] },
-  "03eb07": { "label": "Magicka Regen", "kind": "regen", "minTier": 1, "byTier": ["FortifyMagickaRate01", "FortifyMagickaRate02", "FortifyMagickaRate03", "FortifyMagickaRate04", "FortifyMagickaRate05"] },
-  "03eb08": { "label": "Stamina Regen", "kind": "regen", "minTier": 1, "byTier": ["FortifyStaminaRate01", "FortifyStaminaRate02", "FortifyStaminaRate03", "FortifyStaminaRate04", "FortifyStaminaRate05"] },
-  "03eaea": { "label": "Resist Fire", "kind": "resist", "minTier": 1, "byTier": ["ResistFire25", "ResistFire25", "ResistFire50", "ResistFire75", "ResistFire100"] },
-  "03eaeb": { "label": "Resist Frost", "kind": "resist", "minTier": 1, "byTier": ["ResistFrost25", "ResistFrost25", "ResistFrost50", "ResistFrost75", "ResistFrost100"] },
-  "03eaec": { "label": "Resist Shock", "kind": "resist", "minTier": 1, "byTier": ["ResistShock25", "ResistShock25", "ResistShock50", "ResistShock75", "ResistShock100"] },
-  "03eaf3": { "label": "Fortify Health", "kind": "fortify", "minTier": 1, "byTier": ["FortifyHealth01", "FortifyHealth02", "FortifyHealth03", "FortifyHealth04", "FortifyHealth05"] },
-  "03eaf8": { "label": "Fortify Magicka", "kind": "fortify", "minTier": 1, "byTier": ["FortifyMagicka01", "FortifyMagicka02", "FortifyMagicka03", "FortifyMagicka04", "FortifyMagicka05"] },
-  "03eaf9": { "label": "Fortify Stamina", "kind": "fortify", "minTier": 1, "byTier": ["FortifyStamina01", "FortifyStamina02", "FortifyStamina03", "FortifyStamina04", "FortifyStamina05"] },
-  "03eb42": { "label": "Damage Health", "kind": "poison", "minTier": 1, "byTier": ["DamageHealth01", "DamageHealth02", "DamageHealth03", "DamageHealth03", "DamageHealth05"] },
-  "03a2b6": { "label": "Damage Magicka", "kind": "poison", "minTier": 1, "byTier": ["DamageMagicka01", "DamageMagicka02", "DamageMagicka03", "DamageMagicka04", "DamageMagicka05"] },
-  "03a2c6": { "label": "Damage Stamina", "kind": "poison", "minTier": 1, "byTier": ["DamageStamina01", "DamageStamina02", "DamageStamina03", "DamageStamina04", "DamageStamina05"] },
-  "03eb3d": { "label": "Invisibility", "kind": "special", "minTier": 2, "byTier": [null, "Invisibility01", "Invisibility02", "Invisibility03", "Invisibility04"] },
-  "03ac2d": { "label": "Waterbreathing", "kind": "special", "minTier": 2, "byTier": [null, "Waterbreathing01", "Waterbreathing02", "Waterbreathing03", "Waterbreathing04"] },
-  "0ae722": { "label": "Cure Disease", "kind": "special", "minTier": 2, "byTier": [null, "CureDisease", "CureDisease", "CureDisease", "CureDisease"] },
-  "109add": { "label": "Cure Poison", "kind": "special", "minTier": 2, "byTier": [null, "CurePoison", "CurePoison", "CurePoison", "CurePoison"] },
-  "03eb19": { "label": "Fortify One-handed", "kind": "skill", "minTier": 3, "byTier": [null, null, "FortifySkillOneHanded02", "FortifySkillOneHanded03", "FortifySkillOneHanded04"] },
-  "03eb1a": { "label": "Fortify Two-handed", "kind": "skill", "minTier": 3, "byTier": [null, null, "FortifySkillTwoHanded02", "FortifySkillTwoHanded03", "FortifySkillTwoHanded04"] },
-  "03eb1b": { "label": "Fortify Archery", "kind": "skill", "minTier": 3, "byTier": [null, null, "FortifySkillMarksman02", "FortifySkillMarksman03", "FortifySkillMarksman04"] },
-  "03eb1c": { "label": "Fortify Defence", "kind": "skill", "minTier": 3, "byTier": [null, null, "FortifySkillBlock02", "FortifySkillBlock03", "FortifySkillBlock04"] },
-  "03eb1e": { "label": "Fortify Heavy Armor", "kind": "skill", "minTier": 3, "byTier": [null, null, "FortifySkillHeavyArmor02", "FortifySkillHeavyArmor03", "FortifySkillHeavyArmor04"] },
-  "03eb1f": { "label": "Fortify Light Armor", "kind": "skill", "minTier": 3, "byTier": [null, null, "FortifySkillLightArmor02", "FortifySkillLightArmor03", "FortifySkillLightArmor04"] },
-  "03eb26": { "label": "Fortify Destruction", "kind": "skill", "minTier": 3, "byTier": [null, null, "FortifySkillDestruction02", "FortifySkillDestruction03", "FortifySkillDestruction04"] },
-  "03eb28": { "label": "Fortify Restoration", "kind": "skill", "minTier": 3, "byTier": [null, null, "FortifySkillRestoration02", "FortifySkillRestoration03", "FortifySkillRestoration04"] },
-  "03eb24": { "label": "Fortify Alteration", "kind": "skill", "minTier": 3, "byTier": [null, null, "FortifySkillAlteration02", "FortifySkillAlteration03", "FortifySkillAlteration04"] },
-  "03eb25": { "label": "Fortify Conjuration", "kind": "skill", "minTier": 3, "byTier": [null, null, "FortifySkillConjuration02", "FortifySkillConjuration03", "FortifySkillConjuration04"] },
-  "03eb27": { "label": "Fortify Illusion", "kind": "skill", "minTier": 3, "byTier": [null, null, "FortifySkillIllusion02", "FortifySkillIllusion03", "FortifySkillIllusion04"] },
-  "03eb21": { "label": "Fortify Lockpicking", "kind": "skill", "minTier": 3, "byTier": [null, null, "FortifySkillLockpicking02", "FortifySkillLockpicking03", "FortifySkillLockpicking04"] },
-  "03eb1d": { "label": "Fortify Smithing", "kind": "skill", "minTier": 4, "byTier": [null, null, null, "FortifySkillSmithing03", "FortifySkillSmithing03"] },
-  "03eb29": { "label": "Fortify Enchanting", "kind": "skill", "minTier": 4, "byTier": [null, null, null, "FortifySkillEnchanting03", "FortifySkillEnchanting03"] }
+  "03eb15": {
+   "label": "Healing",
+   "kind": "restore",
+   "minTier": 1,
+   "byTier": ["DBO_AlchRestoreHealthT1", "DBO_AlchRestoreHealthT2", "DBO_AlchRestoreHealthT3", "DBO_AlchRestoreHealthT4", "DBO_AlchRestoreHealthT5"],
+   "fallback": ["RestoreHealth02", "RestoreHealth03", "RestoreHealth04", "RestoreHealth05", "RestoreHealth06"],
+   "av": "health"
+  },
+  "03eb17": {
+   "label": "Magicka",
+   "kind": "restore",
+   "minTier": 1,
+   "byTier": ["DBO_AlchRestoreMagickaT1", "DBO_AlchRestoreMagickaT2", "DBO_AlchRestoreMagickaT3", "DBO_AlchRestoreMagickaT4", "DBO_AlchRestoreMagickaT5"],
+   "fallback": ["RestoreMagicka02", "RestoreMagicka03", "RestoreMagicka04", "RestoreMagicka05", "RestoreMagicka06"],
+   "av": "magicka"
+  },
+  "03eb16": {
+   "label": "Stamina",
+   "kind": "restore",
+   "minTier": 1,
+   "byTier": ["DBO_AlchRestoreStaminaT1", "DBO_AlchRestoreStaminaT2", "DBO_AlchRestoreStaminaT3", "DBO_AlchRestoreStaminaT4", "DBO_AlchRestoreStaminaT5"],
+   "fallback": ["RestoreStamina02", "RestoreStamina03", "RestoreStamina04", "RestoreStamina05", "RestoreStamina06"],
+   "av": "stamina"
+  },
+  "03eb06": {
+   "label": "Health Regen",
+   "kind": "regen",
+   "minTier": 1,
+   "byTier": ["DBO_AlchRegenHealthT1", "DBO_AlchRegenHealthT2", "DBO_AlchRegenHealthT3", "DBO_AlchRegenHealthT4", "DBO_AlchRegenHealthT5"],
+   "fallback": ["FortifyHealRate01", "FortifyHealRate02", "FortifyHealRate03", "FortifyHealRate04", "FortifyHealRate05"]
+  },
+  "03eb07": {
+   "label": "Magicka Regen",
+   "kind": "regen",
+   "minTier": 1,
+   "byTier": ["DBO_AlchRegenMagickaT1", "DBO_AlchRegenMagickaT2", "DBO_AlchRegenMagickaT3", "DBO_AlchRegenMagickaT4", "DBO_AlchRegenMagickaT5"],
+   "fallback": ["FortifyMagickaRate01", "FortifyMagickaRate02", "FortifyMagickaRate03", "FortifyMagickaRate04", "FortifyMagickaRate05"]
+  },
+  "03eb08": {
+   "label": "Stamina Regen",
+   "kind": "regen",
+   "minTier": 1,
+   "byTier": ["DBO_AlchRegenStaminaT1", "DBO_AlchRegenStaminaT2", "DBO_AlchRegenStaminaT3", "DBO_AlchRegenStaminaT4", "DBO_AlchRegenStaminaT5"],
+   "fallback": ["FortifyStaminaRate01", "FortifyStaminaRate02", "FortifyStaminaRate03", "FortifyStaminaRate04", "FortifyStaminaRate05"]
+  },
+  "03eaea": {
+   "label": "Resist Fire",
+   "kind": "resist",
+   "minTier": 1,
+   "byTier": ["DBO_AlchResistFireT1", "DBO_AlchResistFireT2", "DBO_AlchResistFireT3", "DBO_AlchResistFireT4", "DBO_AlchResistFireT5"],
+   "fallback": ["ResistFire25", "ResistFire25", "ResistFire50", "ResistFire75", "ResistFire100"]
+  },
+  "03eaeb": {
+   "label": "Resist Frost",
+   "kind": "resist",
+   "minTier": 1,
+   "byTier": ["DBO_AlchResistFrostT1", "DBO_AlchResistFrostT2", "DBO_AlchResistFrostT3", "DBO_AlchResistFrostT4", "DBO_AlchResistFrostT5"],
+   "fallback": ["ResistFrost25", "ResistFrost25", "ResistFrost50", "ResistFrost75", "ResistFrost100"]
+  },
+  "03eaec": {
+   "label": "Resist Shock",
+   "kind": "resist",
+   "minTier": 1,
+   "byTier": ["DBO_AlchResistShockT1", "DBO_AlchResistShockT2", "DBO_AlchResistShockT3", "DBO_AlchResistShockT4", "DBO_AlchResistShockT5"],
+   "fallback": ["ResistShock25", "ResistShock25", "ResistShock50", "ResistShock75", "ResistShock100"]
+  },
+  "03eaf3": {
+   "label": "Fortify Health",
+   "kind": "fortify",
+   "minTier": 1,
+   "byTier": ["DBO_AlchFortifyHealthT1", "DBO_AlchFortifyHealthT2", "DBO_AlchFortifyHealthT3", "DBO_AlchFortifyHealthT4", "DBO_AlchFortifyHealthT5"],
+   "fallback": ["FortifyHealth01", "FortifyHealth02", "FortifyHealth03", "FortifyHealth04", "FortifyHealth05"]
+  },
+  "03eaf8": {
+   "label": "Fortify Magicka",
+   "kind": "fortify",
+   "minTier": 1,
+   "byTier": ["DBO_AlchFortifyMagickaT1", "DBO_AlchFortifyMagickaT2", "DBO_AlchFortifyMagickaT3", "DBO_AlchFortifyMagickaT4", "DBO_AlchFortifyMagickaT5"],
+   "fallback": ["FortifyMagicka01", "FortifyMagicka02", "FortifyMagicka03", "FortifyMagicka04", "FortifyMagicka05"]
+  },
+  "03eaf9": {
+   "label": "Fortify Stamina",
+   "kind": "fortify",
+   "minTier": 1,
+   "byTier": ["DBO_AlchFortifyStaminaT1", "DBO_AlchFortifyStaminaT2", "DBO_AlchFortifyStaminaT3", "DBO_AlchFortifyStaminaT4", "DBO_AlchFortifyStaminaT5"],
+   "fallback": ["FortifyStamina01", "FortifyStamina02", "FortifyStamina03", "FortifyStamina04", "FortifyStamina05"]
+  },
+  "03eb42": {
+   "label": "Damage Health",
+   "kind": "poison",
+   "minTier": 1,
+   "byTier": ["DBO_AlchPoisonHealthT1", "DBO_AlchPoisonHealthT2", "DBO_AlchPoisonHealthT3", "DBO_AlchPoisonHealthT4", "DBO_AlchPoisonHealthT5"],
+   "fallback": ["DamageHealth01", "DamageHealth02", "DamageHealth03", "DamageHealth03", "DamageHealth05"]
+  },
+  "03a2b6": {
+   "label": "Damage Magicka",
+   "kind": "poison",
+   "minTier": 1,
+   "byTier": ["DBO_AlchPoisonMagickaT1", "DBO_AlchPoisonMagickaT2", "DBO_AlchPoisonMagickaT3", "DBO_AlchPoisonMagickaT4", "DBO_AlchPoisonMagickaT5"],
+   "fallback": ["DamageMagicka01", "DamageMagicka02", "DamageMagicka03", "DamageMagicka04", "DamageMagicka05"]
+  },
+  "03a2c6": {
+   "label": "Damage Stamina",
+   "kind": "poison",
+   "minTier": 1,
+   "byTier": ["DBO_AlchPoisonStaminaT1", "DBO_AlchPoisonStaminaT2", "DBO_AlchPoisonStaminaT3", "DBO_AlchPoisonStaminaT4", "DBO_AlchPoisonStaminaT5"],
+   "fallback": ["DamageStamina01", "DamageStamina02", "DamageStamina03", "DamageStamina04", "DamageStamina05"]
+  },
+  "03eb3d": {
+   "label": "Invisibility",
+   "kind": "special",
+   "minTier": 3,
+   "byTier": [null, null, "Invisibility02", "Invisibility03", "Invisibility04"],
+   "fallback": [null, null, null, null, null],
+   "_why": "PvP gate: Adept (50), Nate 14 Oct"
+  },
+  "03ac2d": {
+   "label": "Waterbreathing",
+   "kind": "special",
+   "minTier": 2,
+   "byTier": [null, "Waterbreathing01", "Waterbreathing02", "Waterbreathing03", "Waterbreathing04"],
+   "fallback": [null, null, null, null, null]
+  },
+  "0ae722": {
+   "label": "Cure Disease",
+   "kind": "special",
+   "minTier": 2,
+   "byTier": [null, "CureDisease", "CureDisease", "CureDisease", "CureDisease"],
+   "fallback": [null, null, null, null, null]
+  },
+  "109add": {
+   "label": "Cure Poison",
+   "kind": "special",
+   "minTier": 2,
+   "byTier": [null, "CurePoison", "CurePoison", "CurePoison", "CurePoison"],
+   "fallback": [null, null, null, null, null]
+  },
+  "073f30": {
+   "label": "Paralysis",
+   "kind": "poison",
+   "minTier": 4,
+   "byTier": [null, null, null, "Paralyze02", "Paralyze03"],
+   "fallback": [null, null, null, null, null],
+   "_why": "PvP gate: Expert (75), Nate 14 Oct; 5 s and 7 s"
+  },
+  "60193e:BSAssets.esm": {
+   "label": "Light",
+   "kind": "special",
+   "minTier": 2,
+   "byTier": [null, "DBO_AlchLightT2", "DBO_AlchLightT3", "DBO_AlchLightT4", "DBO_AlchLightT5"],
+   "fallback": [null, null, null, null, null],
+   "_why": "Beyond Skyrim effect BSKAlchLight: Milk Thistle, Alkanet, Red Lichen, pond fish; no potion record until the PC adds DBO_AlchLight"
+  },
+  "03eb19": {
+   "label": "Fortify Blade",
+   "kind": "skill",
+   "minTier": 3,
+   "byTier": [null, null, "DBO_AlchFortifyBladeT3", "DBO_AlchFortifyBladeT4", "DBO_AlchFortifyBladeT5"],
+   "fallback": [null, null, "FortifySkillOneHanded02", "FortifySkillOneHanded03", "FortifySkillOneHanded04"],
+   "fallbackLabel": "Fortify One-handed"
+  },
+  "03eb1a": {
+   "label": "Fortify Blunt",
+   "kind": "skill",
+   "minTier": 3,
+   "byTier": [null, null, "DBO_AlchFortifyBluntT3", "DBO_AlchFortifyBluntT4", "DBO_AlchFortifyBluntT5"],
+   "fallback": [null, null, "FortifySkillTwoHanded02", "FortifySkillTwoHanded03", "FortifySkillTwoHanded04"],
+   "fallbackLabel": "Fortify Two-handed"
+  },
+  "03eb1b": {
+   "label": "Fortify Archery",
+   "kind": "skill",
+   "minTier": 3,
+   "byTier": [null, null, "DBO_AlchFortifyArcheryT3", "DBO_AlchFortifyArcheryT4", "DBO_AlchFortifyArcheryT5"],
+   "fallback": [null, null, "FortifySkillMarksman02", "FortifySkillMarksman03", "FortifySkillMarksman04"]
+  },
+  "03eb1c": {
+   "label": "Fortify Defence",
+   "kind": "skill",
+   "minTier": 3,
+   "byTier": [null, null, "DBO_AlchFortifyDefenceT3", "DBO_AlchFortifyDefenceT4", "DBO_AlchFortifyDefenceT5"],
+   "fallback": [null, null, "FortifySkillBlock02", "FortifySkillBlock03", "FortifySkillBlock04"]
+  },
+  "03eb1e": {
+   "label": "Fortify Armor",
+   "kind": "skill",
+   "minTier": 3,
+   "byTier": [null, null, "DBO_AlchFortifyArmorT3", "DBO_AlchFortifyArmorT4", "DBO_AlchFortifyArmorT5"],
+   "fallback": [null, null, "FortifySkillHeavyArmor02", "FortifySkillHeavyArmor03", "FortifySkillHeavyArmor04"],
+   "fallbackLabel": "Fortify Heavy Armor"
+  },
+  "03eb1f": {
+   "label": "Fortify Armor",
+   "kind": "skill",
+   "minTier": 3,
+   "byTier": [null, null, "DBO_AlchFortifyArmorT3", "DBO_AlchFortifyArmorT4", "DBO_AlchFortifyArmorT5"],
+   "fallback": [null, null, "FortifySkillLightArmor02", "FortifySkillLightArmor03", "FortifySkillLightArmor04"],
+   "fallbackLabel": "Fortify Light Armor"
+  },
+  "03eb26": {
+   "label": "Fortify Destruction",
+   "kind": "skill",
+   "minTier": 3,
+   "byTier": [null, null, "DBO_AlchFortifyDestructionT3", "DBO_AlchFortifyDestructionT4", "DBO_AlchFortifyDestructionT5"],
+   "fallback": [null, null, "FortifySkillDestruction02", "FortifySkillDestruction03", "FortifySkillDestruction04"]
+  },
+  "03eb28": {
+   "label": "Fortify Restoration",
+   "kind": "skill",
+   "minTier": 3,
+   "byTier": [null, null, "DBO_AlchFortifyRestorationT3", "DBO_AlchFortifyRestorationT4", "DBO_AlchFortifyRestorationT5"],
+   "fallback": [null, null, "FortifySkillRestoration02", "FortifySkillRestoration03", "FortifySkillRestoration04"]
+  },
+  "03eb24": {
+   "label": "Fortify Alteration",
+   "kind": "skill",
+   "minTier": 3,
+   "byTier": [null, null, "DBO_AlchFortifyAlterationT3", "DBO_AlchFortifyAlterationT4", "DBO_AlchFortifyAlterationT5"],
+   "fallback": [null, null, "FortifySkillAlteration02", "FortifySkillAlteration03", "FortifySkillAlteration04"]
+  },
+  "03eb25": {
+   "label": "Fortify Conjuration",
+   "kind": "skill",
+   "minTier": 3,
+   "byTier": [null, null, "DBO_AlchFortifyConjurationT3", "DBO_AlchFortifyConjurationT4", "DBO_AlchFortifyConjurationT5"],
+   "fallback": [null, null, "FortifySkillConjuration02", "FortifySkillConjuration03", "FortifySkillConjuration04"]
+  },
+  "03eb21": {
+   "label": "Fortify Lockpicking",
+   "kind": "skill",
+   "minTier": 3,
+   "byTier": [null, null, "DBO_AlchFortifyLockpickingT3", "DBO_AlchFortifyLockpickingT4", "DBO_AlchFortifyLockpickingT5"],
+   "fallback": [null, null, "FortifySkillLockpicking02", "FortifySkillLockpicking03", "FortifySkillLockpicking04"]
+  },
+  "03eb1d": {
+   "label": "Fortify Smithing",
+   "kind": "dropped",
+   "why": "nothing on this server reads it (tempering is judged by the Blacksmith tiers)"
+  },
+  "03eb29": {
+   "label": "Fortify Enchanting",
+   "kind": "dropped",
+   "why": "nothing on this server reads it (enchantment strength is the base game's)"
+  },
+  "03eb27": {
+   "label": "Fortify Illusion",
+   "kind": "dropped",
+   "why": "no Illusion spell is judged on the server"
+  }
  },
- "combos": []
+ "combos": [],
+ "_combosPlanned": [
+  {
+   "effects": ["03eb15", "03eb16"],
+   "minTier": 4,
+   "byTier": [null, null, null, "DBO_AlchComboRestoreHealthStaminaT4", "DBO_AlchComboRestoreHealthStaminaT5"],
+   "name": "Philter of Health and Stamina"
+  },
+  {
+   "effects": ["03eb15", "03eb17"],
+   "minTier": 4,
+   "byTier": [null, null, null, "DBO_AlchComboRestoreHealthMagickaT4", "DBO_AlchComboRestoreHealthMagickaT5"],
+   "name": "Philter of Health and Magicka"
+  },
+  {
+   "effects": ["03eb17", "03eb16"],
+   "minTier": 4,
+   "byTier": [null, null, null, "DBO_AlchComboRestoreMagickaStaminaT4", "DBO_AlchComboRestoreMagickaStaminaT5"],
+   "name": "Philter of Magicka and Stamina"
+  },
+  {
+   "effects": ["03eb42", "03a2c6"],
+   "minTier": 4,
+   "byTier": [null, null, null, "DBO_AlchComboPoisonHealthStaminaT4", "DBO_AlchComboPoisonHealthStaminaT5"],
+   "name": "Virulent Poison of Health and Stamina"
+  },
+  {
+   "effects": ["03a2b6", "03a2c6"],
+   "minTier": 4,
+   "byTier": [null, null, null, "DBO_AlchComboPoisonMagickaStaminaT4", "DBO_AlchComboPoisonMagickaStaminaT5"],
+   "name": "Virulent Poison of Magicka and Stamina"
+  },
+  {
+   "effects": ["03eb42", "03a2b6"],
+   "minTier": 4,
+   "byTier": [null, null, null, "DBO_AlchComboPoisonHealthMagickaT4", "DBO_AlchComboPoisonHealthMagickaT5"],
+   "name": "Virulent Poison of Health and Magicka"
+  }
+ ]
 }

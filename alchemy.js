@@ -89,18 +89,27 @@ module.exports = (api) => {
   const sharedEffects = (used) => {
     const tally = new Map();
     for (const id of used) for (const e of new Set(effectsOf(id) || [])) tally.set(e, (tally.get(e) || 0) + 1);
-    return [...tally].filter(([, n]) => n >= 2).map(([e]) => e).filter((e) => POTIONS.has(e)).sort((x, y) => baseCost(y) - baseCost(x));
+    return [...tally].filter(([, n]) => n >= 2).map(([e]) => e).filter((e) => POTIONS.has(e) || RULES.has(e)).sort((x, y) => baseCost(y) - baseCost(x));
   };
   const potionAt = (pick, tier) => pick.potions[Math.max(0, Math.min(pick.potions.length - 1, Math.round(tier / 5 * (pick.potions.length - 1))))];
   // Brewing is the Alchemist's work (Nate, 2026-09-30: Alchemist rose from picking mushrooms; gathering is the Harvesting
   // trade's). One brew is worth 1 at tier 1 up to 3 at tier 5, and the same potion again within the hour less
   // (masterySystem's repeat ring, keyed on the potion). __alduinakMasteryAward (fork server-next-v2) credits only a skill
   // already held; before that fork is live there is nothing to call, and the lab's own count in skills.json stands in.
-  const creditBrew = (a, potionId, tier) => {
+  // What went into a brew, in gold (each ingredient's INGR DATA value at 0, at most 100): skillrates.js valueWeight reads it
+  // (globalThis.__dboBrewValue) for the award that follows, so two Wheat earn less than Deathbell and Nightshade
+  const ingredientValue = (ids) => ids.reduce((n, [id, count]) => {
+    const lr = lookup(id); const f = lr && (lr.record.fields || []).find((x) => x.type === (String(lr.record.type) === 'ALCH' ? 'ENIT' : 'DATA'));
+    const v = f && f.data instanceof Uint8Array && f.data.byteLength >= 4 ? new DataView(f.data.buffer, f.data.byteOffset, f.data.byteLength).getInt32(0, true) : 0;
+    return n + Math.max(0, Math.min(100, v)) * (Number(count) || 1);
+  }, 0);
+  const creditBrew = (a, potionId, tier, value) => {
     const award = globalThis.__alduinakMasteryAward;
     if (typeof award !== 'function') return 0;
+    globalThis.__dboBrewValue = Number.isFinite(Number(value)) ? { actor: a >>> 0, key: Number(potionId) >>> 0, value: Number(value) } : null;
     let units = 0;
-    try { units = Number(award(a, 'alchemist', Math.min(3, 1 + 0.5 * Math.max(0, (Number(tier) || 1) - 1)), Number(potionId) >>> 0)) || 0; } catch (e) { log(`alchemy: mastery award failed for ${display(a)}: ${e.message}`); return 0; }
+    try { units = Number(award(a, 'alchemist', Math.min(3, 1 + 0.5 * Math.max(0, (Number(tier) || 1) - 1)), Number(potionId) >>> 0)) || 0; } catch (e) { log(`alchemy: mastery award failed for ${display(a)}: ${e.message}`); globalThis.__dboBrewValue = null; return 0; }
+    globalThis.__dboBrewValue = null;
     // masterySystem reports what a craft event credited, never an award: tell skillrates.js, so a first brew of a potion is
     // marked made only when it earned something (skillrates.js craftAwards)
     try { if (typeof globalThis.__dboSkillRateCredited === 'function') globalThis.__dboSkillRateCredited(a, 'alchemist', 'award', { key: Number(potionId) >>> 0 }, units); } catch (e) { /* the bonus waits */ }
@@ -115,51 +124,76 @@ module.exports = (api) => {
   // An effect the file does not list keeps potionAt. Config "alchemyRework" in gamemode-config.json overrides any key.
   const RW = Object.assign({ enabled: true, tierNames: ['Novice', 'Apprentice', 'Adept', 'Expert', 'Master'], tierLevels: [1, 25, 50, 75, 90],
     words: { potion: ['Potion', 'Draught', 'Solution', 'Philter', 'Elixir'], poison: ['Weak Poison', 'Poison', 'Potent Poison', 'Virulent Poison', 'Deadly Poison'] },
-    restoreBands: [[25, 0.1], [50, 0.2], [75, 0.3], [100, 0.45], [150, 0.6], [1e9, 0.75]], resist: { enabled: true }, effects: {}, combos: [] },
+    restoreBands: [[25, 0.1], [50, 0.2], [75, 0.3], [100, 0.45], [150, 0.6], [1e9, 0.75]], resist: { enabled: true }, effects: {}, combos: [],
+    records: {}, percentEffects: [], overTime: {}, fortify: {}, poisons: {} },
   readJson('alchemy-rework.json', {}), (api.cfg || {}).alchemyRework || {});
   const EDID_IDS = new Map();
   for (const v of Object.values(TABLE)) for (const p of v.potions || []) { const id = idOf(p.id); if (id) EDID_IDS.set(String(p.edid), { id, edid: String(p.edid) }); }
+  // The PC's records (DragonBreak Online Edits) are named by editor id; `records` maps each to its desc once the PC has
+  // sent the local ids. A desc whose record carries another editor id is refused (a wrong id would hand out the wrong
+  // potion), and an editor id not mapped yet leaves that tier to its vanilla fallback.
+  const MAPPED = RW.records && typeof RW.records === 'object' ? RW.records : {};
+  const unmapped = new Set();
+  const byEditorId = (edid) => {
+    const desc = MAPPED[edid];
+    if (!desc || typeof desc !== 'string' || !/:/.test(desc)) { unmapped.add(edid); return null; }
+    const id = idOf(desc); const r = id ? lookup(id) : null;
+    if (!r || String(r.record.editorId || '') !== edid) { log(`alchemy: rework record ${edid} -> ${desc} is ${r ? `${r.record.editorId}, not ${edid}` : 'not in the load order'}; left out`); return null; }
+    return { id, edid };
+  };
   const recordRef = (ref) => {
     if (!ref) return null;
     if (EDID_IDS.has(String(ref))) return EDID_IDS.get(String(ref));
-    if (!/:/.test(String(ref))) return null;
+    if (!/:/.test(String(ref))) return byEditorId(String(ref));
     const id = idOf(String(ref)); if (!id) return null;
     const r = lookup(id);
     return { id, edid: String((r && r.record.editorId) || ref) };
   };
-  const RULES = new Map();   // effect (global id) -> { label, kind, minTier, byTier: [{ id, edid } | null] x5 }
+  // A magic effect named in the data: a Skyrim.esm local id ('03eb15'), a desc ('60193e:BSAssets.esm') or a PC editor id
+  const effectRef = (ref) => {
+    const s = String(ref || '');
+    if (/^[0-9a-f]{1,6}$/i.test(s)) return idOf(`${s}:Skyrim.esm`);
+    if (/:/.test(s)) return idOf(s);
+    const r = byEditorId(s); return r ? r.id : 0;
+  };
+  const RULES = new Map();   // effect (global id) -> { label, kind, minTier, byTier: [{ id, edid } | null] x5, why }
   if (RW.enabled !== false) {
     for (const [mg, v] of Object.entries(RW.effects || {})) {
       if (!v || mg.startsWith('_')) continue;
-      const effect = idOf(`${mg}:Skyrim.esm`);
+      const effect = effectRef(mg);
       if (!effect) continue;
-      const byTier = [0, 1, 2, 3, 4].map((i) => recordRef((v.byTier || [])[i]));
-      const unresolved = (v.byTier || []).filter((x, i) => x && !byTier[i]);
+      // byTier names the design's records, fallback the vanilla ones used until those are mapped
+      // A fallback record is named for what it is (fallbackLabel: a vanilla One-handed potion is not a Fortify Blade)
+      const byTier = [0, 1, 2, 3, 4].map((i) => { const own = recordRef((v.byTier || [])[i]); if (own) return own; const fb = recordRef((v.fallback || [])[i]); return fb && v.fallbackLabel ? Object.assign({ label: String(v.fallbackLabel) }, fb) : fb; });
+      const unresolved = (v.byTier || []).filter((x, i) => x && !byTier[i] && (EDID_IDS.has(x) || /:/.test(x) || MAPPED[x]));
       if (unresolved.length) log(`alchemy: rework ${v.label || mg} names ${unresolved.join(', ')}, not a known potion; those tiers brew nothing`);
-      RULES.set(effect, { label: String(v.label || mg), kind: String(v.kind || ''), minTier: Math.max(1, Math.min(5, Math.floor(Number(v.minTier) || 1))), byTier });
+      RULES.set(effect, { label: String(v.label || mg), kind: String(v.kind || ''), minTier: Math.max(1, Math.min(5, Math.floor(Number(v.minTier) || 1))), byTier, why: String(v.why || '') });
     }
   }
+  if (unmapped.size) log(`alchemy: rework ${unmapped.size} PC record(s) not mapped yet (alchemy-rework.json records); their tiers brew the vanilla fallback`);
   // Two-effect records for tier 4 and 5 (combination potions): { effects: ['03eb42', '03a2c6'], minTier: 4, byTier: [..x5], name }
   const COMBOS = (RW.enabled !== false && Array.isArray(RW.combos) ? RW.combos : []).map((c) => ({
-    effects: (c.effects || []).map((mg) => idOf(`${mg}:Skyrim.esm`)).filter(Boolean),
+    effects: (c.effects || []).map(effectRef).filter(Boolean),
     minTier: Math.max(1, Math.min(5, Math.floor(Number(c.minTier) || 4))),
     byTier: [0, 1, 2, 3, 4].map((i) => recordRef((c.byTier || [])[i])),
     name: String(c.name || ''),
   })).filter((c) => c.effects.length === 2 && c.byTier.some(Boolean));
   const tierName = (tier) => RW.tierNames[Math.max(0, Math.min(4, (Number(tier) || 1) - 1))];
   const tierLevel = (tier) => RW.tierLevels[Math.max(0, Math.min(4, (Number(tier) || 1) - 1))];
-  const designName = (rule, tier) => {
+  const designName = (rule, tier, label) => {
     const words = rule.kind === 'poison' ? RW.words.poison : RW.words.potion;
-    return `${words[Math.max(0, Math.min(4, tier - 1))]} of ${rule.label}`;
+    return `${words[Math.max(0, Math.min(4, tier - 1))]} of ${label || rule.label}`;
   };
   // The potion the brewer's tier gives for an effect: { id, edid, name, effect } or { locked: minTier } or null
   const chooseFor = (effect, tier) => {
     const t = Math.max(1, Math.min(5, Number(tier) || 1));
     const rule = RULES.get(effect);
     if (rule) {
+      // An effect nothing on the server honours (Fortify Smithing, Enchanting, Illusion) is never brewed
+      if (rule.kind === 'dropped') return { dropped: true, label: rule.label, why: rule.why };
       if (t < rule.minTier) return { locked: rule.minTier, label: rule.label };
       const rec = rule.byTier[t - 1];
-      return rec ? { id: rec.id, edid: rec.edid, name: designName(rule, t), effect } : null;
+      return rec ? { id: rec.id, edid: rec.edid, name: designName(rule, t, rec.label), effect } : null;
     }
     const pick = POTIONS.get(effect);
     if (!pick) return null;
@@ -179,12 +213,13 @@ module.exports = (api) => {
     for (const e of shared) {
       const got = chooseFor(e, t);
       if (!got) continue;
-      if (got.locked) { passed.push(got); continue; }
+      if (got.locked || got.dropped) { passed.push(got); continue; }
       return { potion: got, passed };
     }
     return { potion: null, passed };
   };
-  const lockedHint = (passed) => (passed.length ? ` ${passed[0].label} needs an Alchemist of ${tierName(passed[0].locked)} rank (level ${tierLevel(passed[0].locked)}).` : '');
+  const passedLine = (p) => (p.dropped ? ` ${p.label} is not brewed here${p.why ? `: ${p.why}` : ''}.` : ` ${p.label} needs an Alchemist of ${tierName(p.locked)} rank (level ${tierLevel(p.locked)}).`);
+  const lockedHint = (passed) => (passed.length ? passedLine(passed[0]) : '');
 
   // ---- what a potion does when drunk, read from its record (ALCH ENIT, EFID/EFIT; MGEF DATA, libespm MGEF.cpp) -----
   // ENIT flags at 4: 0x2 food, 0x20000 poison (libespm ALCH.cpp). MGEF DATA: flags at 0 (0x1 hostile, 0x2 recover,
@@ -198,6 +233,22 @@ module.exports = (api) => {
     for (const [upTo, share] of RW.restoreBands || []) if (magnitude <= Number(upTo)) return Number(share) || 0;
     return 0;
   };
+  // The PC's restore effects carry the share itself as their magnitude ("Restores <mag>% of your Health"); a vanilla one
+  // carries points, read through restoreBands. Philter and Elixir strength (fromShare and up) and the PC's slow effects
+  // restore over overTime.seconds in ticks, so a burst of damage meanwhile can still win (Nate, 14 Oct)
+  const PCT_EFFECTS = new Set((RW.percentEffects || []).map(effectRef).filter(Boolean));
+  const OVER = Object.assign({ enabled: true, fromShare: 0.6, seconds: 5, tickMs: 500, slowEffects: [] }, RW.overTime || {});
+  const SLOW_EFFECTS = new Set((OVER.slowEffects || []).map(effectRef).filter(Boolean));
+  // Fortify potions the server honours, by magic effect: hook (what reads it: blade, blunt, archery, one, two, bow,
+  // school:20 Destruction, school:22 Restoration, duration:18 Alteration, duration:19 Conjuration, block, armor, lockpick),
+  // bonus = magnitude x perPoint, at most cap. The game's own copy of the effect never reaches the server's numbers.
+  const FORT = Object.assign({ enabled: true, effects: {}, lockpickTiers: [[0.35, 1], [1e9, 2]] }, RW.fortify || {});
+  const FORT_EFFECTS = new Map();
+  for (const [ref, v] of Object.entries(FORT.effects || {})) {
+    if (ref.startsWith('_') || !v || !v.hook) continue;
+    const id = effectRef(ref);
+    if (id) FORT_EFFECTS.set(id, { hook: String(v.hook), perPoint: Number(v.perPoint) || 0.01, cap: Number(v.cap) || 0.5, text: String(v.text || v.hook) });
+  }
   const drinkOf = (baseId) => {
     const id = baseId >>> 0;
     if (drinkCache.has(id)) return drinkCache.get(id);
@@ -207,42 +258,80 @@ module.exports = (api) => {
       const fields = lr.record.fields || [];
       const flags = u32(fields.find((f) => f.type === 'ENIT'), 4);
       if (!(flags & 0x2) && !(flags & 0x20000)) {
-        out = { restores: [], resists: [] };
+        out = { restores: [], resists: [], fortify: [] };
         let effect = 0;
         for (const f of fields) {
           if (f.type === 'EFID') { try { effect = lr.toGlobalRecordId(u32(f, 0)) >>> 0; } catch (e) { effect = 0; } continue; }
           if (f.type !== 'EFIT' || !effect) continue;
-          const m = lookup(effect); const data = m && (m.record.fields || []).find((x) => x.type === 'DATA');
-          effect = 0;
+          const mg = effect; effect = 0;
+          const magnitude = f32(f, 0), duration = u32(f, 8);
+          const fort = FORT.enabled !== false ? FORT_EFFECTS.get(mg) : null;
+          if (fort) {
+            if (magnitude > 0 && duration > 0) out.fortify.push({ hook: fort.hook, bonus: Math.min(fort.cap, magnitude * fort.perPoint), seconds: duration, text: fort.text });
+            continue;
+          }
+          const m = lookup(mg); const data = m && (m.record.fields || []).find((x) => x.type === 'DATA');
           if (!data || !(data.data instanceof Uint8Array) || data.data.byteLength < 0x48) continue;
           const mflags = u32(data, 0), archetype = u32(data, 0x40), av = new DataView(data.data.buffer, data.data.byteOffset, data.data.byteLength).getInt32(0x44, true);
-          const magnitude = f32(f, 0), duration = u32(f, 8);
-          if (AV_POOL[av] && archetype === 0 && !(mflags & 0x7)) out.restores.push({ av: AV_POOL[av], share: restoreShare(magnitude), magnitude });
-          else if (AV_ELEMENT[av] && !(mflags & 0x4) && magnitude > 0 && duration > 0) out.resists.push({ element: AV_ELEMENT[av], share: Math.min(1, magnitude / 100), seconds: duration });
+          if (AV_POOL[av] && archetype === 0 && !(mflags & 0x7)) {
+            const share = PCT_EFFECTS.has(mg) || SLOW_EFFECTS.has(mg) ? Math.max(0, Math.min(1, magnitude / 100)) : restoreShare(magnitude);
+            const slow = OVER.enabled !== false && (SLOW_EFFECTS.has(mg) || share >= (Number(OVER.fromShare) || 2));
+            out.restores.push({ av: AV_POOL[av], share, magnitude, slow });
+          } else if (AV_ELEMENT[av] && !(mflags & 0x4) && magnitude > 0 && duration > 0) out.resists.push({ element: AV_ELEMENT[av], share: Math.min(1, magnitude / 100), seconds: duration });
         }
-        if (!out.restores.length && !out.resists.length) out = null;
+        if (!out.restores.length && !out.resists.length && !out.fortify.length) out = null;
       }
     }
     if (lr || !id) drinkCache.set(id, out);
     return out;
   };
   // What a brewed potion does, in words for the brew message and the panel
+  const overText = () => `over ${Number(OVER.seconds) || 5} s`;
   const doesText = (potionId, short) => {
     const d = drinkOf(potionId);
     if (!d) return '';
-    return d.restores.map((r) => (short ? `${Math.round(r.share * 100)}% ${r.av}` : `restores ${Math.round(r.share * 100)}% of your ${r.av}`))
-      .concat(d.resists.map((r) => (short ? `${Math.round(r.share * 100)}% ${r.element}` : `${Math.round(r.share * 100)}% ${r.element} resistance for ${r.seconds} s`))).join(', ');
+    return d.restores.map((r) => (short ? `${Math.round(r.share * 100)}% ${r.av}${r.slow ? ` ${overText()}` : ''}` : `restores ${Math.round(r.share * 100)}% of your ${r.av}${r.slow ? ` ${overText()}` : ''}`))
+      .concat(d.resists.map((r) => (short ? `${Math.round(r.share * 100)}% ${r.element}` : `${Math.round(r.share * 100)}% ${r.element} resistance for ${r.seconds} s`)))
+      .concat(d.fortify.map((r) => (r.hook === 'lockpick' ? `locks one rank easier for ${r.seconds} s` : short ? `+${Math.round(r.bonus * 100)}% ${r.text}` : `+${Math.round(r.bonus * 100)}% ${r.text} for ${r.seconds} s`))).join(', ');
   };
 
   // Drinking: a restore gives a share of the drinker's own pool (percentages are fractions of the actor's maximum, so a
   // larger pool gains more), never the record's points. The C++ applies the record first (MpActor ApplyMagicEffect,
   // which also opens the 5 s window that echoes the client's stale reports); on the next turn of the loop the value is
-  // set to what it was before the drink plus the share. A resist is remembered for the damage judge (gamemode.js
-  // potionResistMult), which knew nothing of it: the client's own copy of the effect never reaches the server.
+  // set to what it was before the drink plus the share, or, for a restore over time, back to what it was, the share then
+  // coming in ticks (a new drink of the same pool replaces a running one; the C++'s 10 s potion cooldown stays). A resist
+  // and a fortify are remembered for the damage judge and the systems that read them (gamemode.js potionResistMult,
+  // __dboPotionBonus), which knew nothing of them: the client's own copy of the effect never reaches the server.
   const RESIST = globalThis.__dboPotionResist instanceof Map ? globalThis.__dboPotionResist : (globalThis.__dboPotionResist = new Map()); // actor -> { element: { share, until } }
+  const FORTIFIED = globalThis.__dboPotionFortify instanceof Map ? globalThis.__dboPotionFortify : (globalThis.__dboPotionFortify = new Map()); // actor -> { hook: { bonus, until } }
+  // Restores and poison drains in ticks: `${actor}|${pool}` -> { a, av, per (signed share per tick), left (ticks), floor, why }
+  const TICKS = globalThis.__dboAlchemyTicks instanceof Map ? globalThis.__dboAlchemyTicks : (globalThis.__dboAlchemyTicks = new Map());
   const later = typeof setImmediate === 'function' ? setImmediate : (fn) => setTimeout(fn, 0);
   const pctOf = (a) => { try { const p = mp.get(a, 'percentages'); return p && typeof p.health === 'number' ? p : null; } catch (e) { return null; } };
   const downed = (a) => { try { return typeof globalThis.__dboIsDowned === 'function' && !!globalThis.__dboIsDowned(a); } catch (e) { return false; } };
+  const tickMs = () => Math.max(100, Number(OVER.tickMs) || 500);
+  const startTicks = (a, av, total, seconds, floor, why) => {
+    const n = Math.max(1, Math.round((Math.max(0, Number(seconds) || 0) * 1000) / tickMs()));
+    TICKS.set(`${a >>> 0}|${av}`, { a: a >>> 0, av, per: total / n, left: n, floor: Number(floor) || 0, why });
+  };
+  // One turn of every running restore and drain, one write per actor; a dead or downed actor's stop
+  const runTicks = () => {
+    const byActor = new Map();
+    for (const [k, t] of TICKS) { if (!byActor.has(t.a)) byActor.set(t.a, []); byActor.get(t.a).push([k, t]); }
+    for (const [a, list] of byActor) {
+      const p = pctOf(a);
+      if (!p || !(p.health > 0) || downed(a)) { for (const [k] of list) TICKS.delete(k); continue; }
+      const next = { health: p.health, magicka: p.magicka, stamina: p.stamina };
+      for (const [k, t] of list) {
+        const v = Number(next[t.av]) || 0;
+        next[t.av] = t.per >= 0 ? Math.min(1, v + t.per) : Math.max(Math.min(v, t.floor), v + t.per);
+        if (--t.left <= 0) TICKS.delete(k);
+      }
+      try { mp.set(a, 'percentages', next); } catch (e) { for (const [k] of list) TICKS.delete(k); }
+    }
+  };
+  globalThis.__dboAlchemyRunTicks = runTicks;
+  if (every) every('alchemyTicks', tickMs(), () => { if (TICKS.size) runTicks(); });
   const onDrink = (a, baseId, before) => {
     const d = drinkOf(baseId);
     if (!d) return;
@@ -251,16 +340,27 @@ module.exports = (api) => {
       for (const r of d.resists) s[r.element] = { share: r.share, until: Date.now() + r.seconds * 1000 };
       RESIST.set(a, s);
     }
+    // A fortify replaces the running one of its kind, never stacks with it
+    if (d.fortify.length) {
+      const s = Object.assign({}, FORTIFIED.get(a) || {});
+      for (const r of d.fortify) s[r.hook] = { bonus: r.bonus, until: Date.now() + r.seconds * 1000 };
+      FORTIFIED.set(a, s);
+      if (FORTIFIED.size > 512) { const now = Date.now(); for (const [k, v] of FORTIFIED) if (Object.values(v).every((x) => x.until <= now)) FORTIFIED.delete(k); }
+    }
     if (!d.restores.length || !before || !(before.health > 0) || downed(a)) return;
     later(() => {
       try {
         const now = pctOf(a);
         if (!now || !(now.health > 0)) return;
         const next = { health: now.health, magicka: now.magicka, stamina: now.stamina };
-        for (const r of d.restores) next[r.av] = Math.max(0, Math.min(1, (Number(before[r.av]) || 0) + r.share));
+        for (const r of d.restores) {
+          const from = Number(before[r.av]) || 0;
+          // Over time: the C++'s instant points come off again, the share arrives in ticks from here
+          if (r.slow) { next[r.av] = Math.min(Number(next[r.av]) || 0, from); startTicks(a, r.av, r.share, OVER.seconds, 0, 'potion'); } else next[r.av] = Math.max(0, Math.min(1, from + r.share));
+        }
         mp.set(a, 'percentages', next);
         const r0 = lookup(baseId);
-        log(`alchemy: ${display(a)} drank ${r0 ? r0.record.editorId : (baseId >>> 0).toString(16)}: ${d.restores.map((r) => `${r.av} ${(Number(before[r.av]) || 0).toFixed(2)} -> ${next[r.av].toFixed(2)} (+${Math.round(r.share * 100)}%)`).join(', ')}`);
+        log(`alchemy: ${display(a)} drank ${r0 ? r0.record.editorId : (baseId >>> 0).toString(16)}: ${d.restores.map((r) => `${r.av} ${(Number(before[r.av]) || 0).toFixed(2)} -> ${r.slow ? `+${Math.round(r.share * 100)}% ${overText()}` : `${next[r.av].toFixed(2)} (+${Math.round(r.share * 100)}%)`}`).join(', ')}`);
       } catch (e) { log(`alchemy: restore for ${display(a)} failed: ${e.message}`); }
     });
   };
@@ -270,6 +370,97 @@ module.exports = (api) => {
     if (!r) return 0;
     if (Date.now() >= r.until) { delete s[element]; return 0; }
     return r.share;
+  };
+  // The bonus a fortify potion gives `a` for `hook` now (0 when none): gamemode.js (weapon and spell damage, armour, the
+  // Flesh spells' and summons' durations, Restoration's healing), combat.js (block) and lockpick.js read it
+  globalThis.__dboPotionBonus = (a, hook) => {
+    const s = FORTIFIED.get(a >>> 0);
+    const r = s && s[hook];
+    if (!r) return 0;
+    if (Date.now() >= r.until) { delete s[hook]; return 0; }
+    return Number(r.bonus) || 0;
+  };
+  // A lockpicking potion counts as this many Lockpicking ranks more (lockpickTiers: [[bonus up to, ranks], ...])
+  globalThis.__dboPotionLockpickTiers = (a) => {
+    const b = globalThis.__dboPotionBonus(a, 'lockpick');
+    if (!(b > 0)) return 0;
+    for (const [upTo, n] of FORT.lockpickTiers || []) if (b <= Number(upTo)) return Math.max(0, Math.floor(Number(n) || 0));
+    return 0;
+  };
+
+  // ---- weapon poisons, judged on the server (inert until poisons.judge; plan section 9) ----------------------------
+  // A poison the player puts on a weapon reaches the server's copy of it (fork craftedExtrasSystem: poisonId and
+  // poisonCount on the inventory entry, from the client's craft report), and its blow arrives as that weapon's own hit:
+  // the client never reports a hit whose source is the poison (staffHit.ts routeHit drops "other source"). So the hit
+  // judge can find the poison on the attacker's worn copy of the weapon. Damage is a share of the TARGET's own pool, the
+  // record's points over anchorPool (200: a 200-point pool takes exactly the design's numbers, 30/35/40/50/65 at once and
+  // 2/3/5/5 a second for 10 s), so a larger pool loses more points, a smaller one fewer. Poison never lands the killing
+  // blow (minHealth, as the mastery give-back: percentages carry no killer); the next blow does. A drain replaces a running
+  // one on the same pool. Charges are counted here, since the client's "used up" report comes up to 10 s later.
+  const POISON = Object.assign({ judge: false, anchorPool: 200, minHealth: 0.01, ledgerMinutes: 5,
+    damage: { '03eb42': 'health', '03a2b6': 'magicka', '03a2c6': 'stamina' },
+    linger: { '10aa4a': 'health', '10de5f': 'magicka', '10de5e': 'stamina' } }, RW.poisons || {});
+  const POISON_DAMAGE = new Map(), POISON_LINGER = new Map();
+  for (const [ref, av] of Object.entries(POISON.damage || {})) { const id = effectRef(ref); if (id) POISON_DAMAGE.set(id, String(av)); }
+  for (const [ref, av] of Object.entries(POISON.linger || {})) { const id = effectRef(ref); if (id) POISON_LINGER.set(id, String(av)); }
+  const poisonCache = new Map();
+  // { hits: [{ av, share }], drains: [{ av, perSecond, seconds }] } of a poison record, null for anything else
+  const poisonOf = (baseId) => {
+    const id = baseId >>> 0;
+    if (poisonCache.has(id)) return poisonCache.get(id);
+    let out = null;
+    const lr = id ? lookup(id) : null;
+    if (lr && String(lr.record.type) === 'ALCH' && (u32((lr.record.fields || []).find((f) => f.type === 'ENIT'), 4) & 0x20000)) {
+      const anchor = Math.max(1, Number(POISON.anchorPool) || 200);
+      out = { hits: [], drains: [] };
+      let effect = 0;
+      for (const f of lr.record.fields || []) {
+        if (f.type === 'EFID') { try { effect = lr.toGlobalRecordId(u32(f, 0)) >>> 0; } catch (e) { effect = 0; } continue; }
+        if (f.type !== 'EFIT' || !effect) continue;
+        const mg = effect; effect = 0;
+        const magnitude = f32(f, 0), duration = u32(f, 8);
+        if (!(magnitude > 0)) continue;
+        if (POISON_DAMAGE.has(mg)) out.hits.push({ av: POISON_DAMAGE.get(mg), share: Math.min(1, magnitude / anchor) });
+        else if (POISON_LINGER.has(mg) && duration > 0) out.drains.push({ av: POISON_LINGER.get(mg), perSecond: magnitude / anchor, seconds: duration });
+      }
+      if (!out.hits.length && !out.drains.length) out = null;
+    }
+    if (lr || !id) poisonCache.set(id, out);
+    return out;
+  };
+  const LEDGER = globalThis.__dboPoisonLedger instanceof Map ? globalThis.__dboPoisonLedger : (globalThis.__dboPoisonLedger = new Map()); // agg|weapon|poison -> { left, at }
+  // From gamemode.js's hit judge for a landed, unblocked weapon hit. Returns what it did (for the log and the harness)
+  globalThis.__dboPoisonHit = (aggressor, target, source, flags) => {
+    if (POISON.judge !== true) return null;
+    const agg = aggressor >>> 0, tgt = target >>> 0, src = source >>> 0;
+    if (agg === tgt || (flags && (flags.blocked || flags.spell))) return null;
+    let entries = [];
+    try { const inv = mp.get(agg, 'inventory'); entries = inv && Array.isArray(inv.entries) ? inv.entries : []; } catch (e) { return null; }
+    const copy = entries.find((e) => e && (Number(e.baseId) >>> 0) === src && (e.worn || e.wornLeft) && (Number(e.poisonId) >>> 0));
+    const now = Date.now();
+    for (const [k, v] of LEDGER) if (now - v.at > Math.max(1, Number(POISON.ledgerMinutes) || 5) * 60000) LEDGER.delete(k);
+    if (!copy) { for (const k of [...LEDGER.keys()]) if (k.startsWith(`${agg}|${src}|`)) LEDGER.delete(k); return null; }
+    const poisonId = Number(copy.poisonId) >>> 0;
+    const p = poisonOf(poisonId);
+    if (!p) return null;
+    const key = `${agg}|${src}|${poisonId}`;
+    const l = LEDGER.get(key) || { left: Math.max(1, Math.floor(Number(copy.poisonCount) || 1)), at: now };
+    if (l.left <= 0) return null;
+    l.left -= 1; l.at = now; LEDGER.set(key, l);
+    later(() => {
+      try {
+        const q = pctOf(tgt);
+        if (!q || !(q.health > 0) || downed(tgt)) return;
+        const next = { health: q.health, magicka: q.magicka, stamina: q.stamina };
+        const floor = (av) => (av === 'health' ? Math.max(0, Number(POISON.minHealth) || 0) : 0);
+        for (const h of p.hits) { const v = Number(next[h.av]) || 0; next[h.av] = Math.max(Math.min(v, floor(h.av)), v - h.share); }
+        mp.set(tgt, 'percentages', next);
+        for (const d of p.drains) startTicks(tgt, d.av, -d.perSecond * d.seconds, d.seconds, floor(d.av), 'poison');
+        const r0 = lookup(poisonId);
+        log(`alchemy: poison ${r0 ? r0.record.editorId : poisonId.toString(16)} from ${display(agg)} on ${display(tgt)}: ${p.hits.map((h) => `${h.av} -${Math.round(h.share * 1000) / 10}%`).concat(p.drains.map((d) => `${d.av} -${Math.round(d.perSecond * 1000) / 10}%/s for ${d.seconds} s`)).join(', ')}`);
+      } catch (e) { log(`alchemy: poison on ${display(tgt)} failed: ${e.message}`); }
+    });
+    return { poison: poisonId, hits: p.hits, drains: p.drains };
   };
   if (RW.enabled !== false) {
     // gamemode.js re-installs its eat hook before this module on every reload; a second load without that unwraps first
@@ -309,7 +500,7 @@ module.exports = (api) => {
         const shared = sharedEffects([held[i], held[j]]);
         if (!shared.length) continue;
         const { potion, passed } = choose(shared, tier);
-        for (const p of passed) if (!locked.has(p.label)) locked.set(p.label, p.locked);
+        for (const p of passed) if (p.locked && !locked.has(p.label)) locked.set(p.label, p.locked);
         if (!potion) continue;
         if (!found.has(potion.edid)) found.set(potion.edid, { name: potion.name, does: doesText(potion.id, true), value: baseCost(potion.effect), pair: [held[i], held[j]] });
       }
@@ -374,7 +565,7 @@ module.exports = (api) => {
     give(entries, r.product, 1);
     try { mp.set(a, 'inventory', { entries: entries.filter((e) => Number(e.count) > 0) }); } catch (e) { log(`alchemy: inventory write failed for ${display(a)}: ${e.message}`); return; }
     personal(a, `You brew ${r.name}.`);
-    creditBrew(a, r.product, tier);
+    creditBrew(a, r.product, tier, ingredientValue(r.inputs.map((x) => [x.id, x.n])));
     log(`alchemy: ${display(a)} brewed ${r.name} (tier ${tier})`);
     audit(`ALCHEMY ${who(a)} brewed ${r.name}${r.contraband ? ' (contraband)' : ''}`);
     // the player log (playerlog.js): the potion and what went into it, by base id
@@ -452,7 +643,7 @@ module.exports = (api) => {
       give(entries, draught.potion, 1);
       try { mp.set(a, 'inventory', { entries: entries.filter((e) => Number(e.count) > 0) }); } catch (e) { log(`alchemy: inventory write failed for ${display(a)}: ${e.message}`); return; }
       draught.brewed();
-      creditBrew(a, draught.potion, alchemistTier(a));
+      creditBrew(a, draught.potion, alchemistTier(a), ingredientValue(used.map((id) => [id, 1])));
       log(`alchemy: ${display(a)} brewed the ${draught.name} (tier ${alchemistTier(a)}) from ${used.map((id) => { const r = lookup(id); return r ? r.record.editorId : id.toString(16); }).join(' + ')}`);
       return;
     }
@@ -470,14 +661,14 @@ module.exports = (api) => {
     if (shared.length > 1) log(`alchemy: ${display(a)} shared ${shared.map((e) => { const r = lookup(e); return `${r ? r.record.editorId : e.toString(16)}@${Math.round(baseCost(e))}`; }).join(', ')}; took ${potion ? potion.edid : 'none (locked)'}`);
     if (!potion) {
       log(`alchemy: ${display(a)} mixed ${used.map((id) => { const r = lookup(id); return r ? r.record.editorId : id.toString(16); }).join(' + ')} at tier ${tier}: every shared effect opens later`);
-      return tell(a, `You cannot brew that yet.${lockedHint(passed)} You keep your ingredients.`);
+      return tell(a, `You cannot brew that${passed.length && passed.every((p) => p.dropped) ? '' : ' yet'}.${lockedHint(passed)} You keep your ingredients.`);
     }
     for (const id of used) take(entries, id, 1);
     give(entries, potion.id, 1);
     try { mp.set(a, 'inventory', { entries: entries.filter((e) => Number(e.count) > 0) }); } catch (e) { log(`alchemy: inventory write failed for ${display(a)}: ${e.message}`); return; }
     const does = doesText(potion.id);
     tell(a, `You brew ${/^[AEIOU]/.test(potion.name) ? 'an' : 'a'} ${potion.name}${does ? ` (${does})` : ''}.${lockedHint(passed)}${hint}`);
-    creditBrew(a, potion.id, tier);
+    creditBrew(a, potion.id, tier, ingredientValue(used.map((id) => [id, 1])));
     log(`alchemy: ${display(a)} brewed ${potion.edid} (${potion.name}, tier ${tier}) from ${used.map((id) => { const r = lookup(id); return r ? r.record.editorId : id.toString(16); }).join(' + ')}`);
     audit(`ALCHEMY ${who(a)} brewed ${potion.edid}`);
     try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('brew', a, potion.id, tier, used.map((id) => ({ baseId: id, count: 1 }))); } catch (e) { /* the player log is optional */ }

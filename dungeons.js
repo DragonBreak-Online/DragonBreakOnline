@@ -504,6 +504,12 @@ module.exports = (api) => {
   const ALL_OK = () => true;
   // Dungeons hold provisions, not meals: salt keeps, bread and stew do not. Extra items via config dungeons.provisions
   const PROVISIONS = [{ id: '34cdf:Skyrim.esm', name: 'SaltPile' }].concat(Array.isArray(C.provisions) ? C.provisions : []);
+  // Kitchen staples that keep (Nate, 14 Oct: "players can't find flour, butter or milk"): no shop sells food and Bruma has
+  // no churn, milk jug or mill a player can reach, so the provisions of a barrel or sack draw them too, from loot.json's
+  // food pool by the lease's province (the pool was filled on 30 Sep, but nothing drew from it). Config
+  // dungeons.provisionFoods (editor ids), [] for salt alone.
+  const PROVISION_FOODS = new Set((Array.isArray(C.provisionFoods) ? C.provisionFoods : ['BYOHFoodButter', 'BYOHFoodFlour', 'BYOHFoodMilk', 'FoodCheeseWheel02A', 'FoodHoney', 'BSKFoodCoffee']).map(String));
+  const provisionsFor = (ok) => PROVISIONS.concat(pool('food', 0, ok).filter((it) => PROVISION_FOODS.has(String(it.name))));
   const EDIBLE = /^(?:BSK|CYR|els|BYOH|DLC2)?(?:Garlic|Wheat|Rice|RiceGrains|Saltrice|Onion|RedOnion|Sugarcane|BirdEggd*|HawkEggd*|Blackberries|Blueberries|Rasberries|Critterw*Fishw*|SalmonRoed*)/i;
   const lootIngredients = (ok) => pool('ingredients', 0, ok).filter((it) => !EDIBLE.test(it.name));
   // Artifacts and Ebony/Daedric are refused here, for every draw: chestLoot, smallLoot and corpseLoot default to ALL_OK,
@@ -681,7 +687,7 @@ module.exports = (api) => {
     const p = (chance) => Math.random() < chance * k.xs;
     const foodish = /food|barrel|basket|sack|cupboard|pantry|crate/i.test(edid || '');
     if (p((foodish ? 0.5 : 1) * GOLD_CHANCE)) addEntry(entries, { id: 'f:Skyrim.esm' }, goldAmount(rnd(1, Math.max(2, diff.gold[0] * 2))));
-    if (p(foodish ? 0.5 : 0.1)) addEntry(entries, pickFrom(PROVISIONS), k.single ? 1 : rnd(1, 2));
+    if (p(foodish ? 0.5 : 0.1)) addEntry(entries, pickFrom(provisionsFor(ok)), k.single ? 1 : rnd(1, 2));
     if (p(0.3)) addEntry(entries, pickFrom(lootIngredients(ok)), k.single ? 1 : rnd(1, 2));
     if (p(Number(POT.container))) addEntry(entries, potionPick(Math.max(0, diff.potionTier - 1), ok), 1);
     if (p(0.12 * ARROW_CHANCE)) addEntry(entries, pickFrom(pool('arrows', 0, ok)), rnd(k.containerArrows[0], k.containerArrows[1]));

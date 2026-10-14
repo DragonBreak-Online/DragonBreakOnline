@@ -130,7 +130,9 @@ module.exports = (api) => {
       const shield = hasShield(tgt);
       const broken = st(tgt).guardBrokenUntil > now;
       const share = broken ? 1 : Math.max(0, (shield ? C.shieldChip : C.weaponChip) - C.chipPerDefenseTier * Math.max(0, rankIn(tgt, 'defense')));
-      const through = raw * share;
+      // A Fortify Defence potion ("Blocking absorbs <mag>% more damage"; alchemy.js __dboPotionBonus block): less gets through
+      let blockPotion = 0; try { const f = globalThis.__dboPotionBonus; blockPotion = typeof f === 'function' ? Math.max(0, Math.min(1, Number(f(tgt, 'block')) || 0)) : 0; } catch (e) { blockPotion = 0; }
+      const through = raw * share * (broken ? 1 : 1 - blockPotion);
       if (through > 0 && drain(tgt, 'health', through, Number(flags.targetMaxHealth)) !== null) events.push(`chip ${through.toFixed(1)}${broken ? ' (guard broken)' : ''}`);
       let breakGuard = !broken && !!flags.bash;
       if (!broken) {

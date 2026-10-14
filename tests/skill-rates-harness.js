@@ -94,7 +94,7 @@ ok('shipped: smelting orichalcum ore x1 (Miner tier 3)', craft(r, SMELT_ORICHALC
 ok('shipped: a skinned wolf x1.5', r.rateFor(A, 'skinner', 'skin', { refrId: 2, value: 10 }) === 1.5);
 ok('shipped: a skill with no entry x1', r.rateFor(A, 'blade', 'hit', { targetId: 3 }) === 1);
 ok('shipped: the hook is published', globalThis.__dboSkillRate === r.rateFor && globalThis.__dboSkillRateBrokeDown === r.noteBreakdown);
-ok('shipped: one load line with the rates and the guard', /skillRates on: miner x2, skinner \{"default":1\.5,"kill":0\}, priest x1\.25, blacksmith .*; 28 material tiers; salvage loop x0 for 60 min; beast form x0/.test(logs[logs.length - 1]), logs[logs.length - 1]);
+ok('shipped: one load line with the rates and the guard', /skillRates on: miner x2, skinner \{"default":1\.5,"kill":0\}, priest x1\.25, blacksmith .*; 28 material tiers; salvage loop x0 for 60 min; craft value cook full 10 min 0.25, alchemist full 12 min 0.35; beast form x0/.test(logs[logs.length - 1]), logs[logs.length - 1]);
 r.noteBreakdown(A, ITEM.IronDagger);
 ok('shipped: a breakdown then the same craft is worth nothing', craft(r, DAGGER) === 0);
 globalThis.__dboSkillRates = undefined;
