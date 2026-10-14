@@ -75,7 +75,7 @@ const zoneById = (id) => zones.find((z) => z.id === String(id).toLowerCase()) ||
 const ranksOf = (pid) => { const out = []; for (const z of zones) for (const r of Object.keys(officials[z.id] || {})) if ((officials[z.id][r] || []).map(Number).includes(pid)) out.push({ zone: z, rank: r }); return out; };
 const handlers = {};
 const commands = new Map();
-const rankTitle = new Function('ZONES', 'globalThis', `${rt[0]}\nreturn rankTitle;`)(ZONES, globalThis);
+const rankTitle = new Function('ZONES', 'globalThis', 'RANK_TITLES', `${rt[0]}\nreturn rankTitle;`)(ZONES, globalThis, ZONES.rankTitles);
 const base = {
   mp, log: (...x) => logs.push(x.join(' ')), personal: (a, t) => said.push(t), system: (a, text) => told.push({ a, text }), audit: (t) => audits.push(t), cfg: {},
   isAdmin: (a) => a === LEAD || a === GM, isLeadStaff: (a) => a === LEAD, tierOf: (a) => (a === LEAD ? 'developer' : a === GM ? 'gm' : null),

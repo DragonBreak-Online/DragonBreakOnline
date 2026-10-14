@@ -9,11 +9,16 @@
 //
 // Or for sale (Nate, 12 Oct): the officials list an empty house at a price; the first player to pay it at the door
 // (/property buy) owns it outright, the price goes to the hold's treasury, and it becomes the house's value for the weekly
-// property tax (economy.js). Only the hold's own empty houses are sold; players do not resell yet.
+// property tax (economy.js).
+// Citizenship (citizenship.js, Nate 14 Oct): in a hold that grants it, only its citizens buy property, from the hold or from
+// another player. An owner may put their own house up for sale at its door (resale); the first eligible citizen to pay the
+// price owns it, the gold goes to the seller, and the house's tax value stays what it was (the hold's listed value: a
+// resale never changes the tax). Owners from before keep their houses; citizenship is asked only of a new buyer.
 //
 // State in tenancy.json: { listings: { <primary hex>: { door, zone, deposit, weekly, listedBy, listedAt,
 //   interest: [party], offer?: { party, until }, tenant?: party, deposit held in depositHeld, paidUntil, overdueSince? }
-//   or, for sale, { door, zone, sale: true, price, listedBy, listedAt } },
+//   or, for sale, { door, zone, sale: true, price, listedBy, listedAt }
+//   or, for sale by its owner, { door, zone, sale: true, resale: true, price, seller: party, listedBy, listedAt } },
 //   owed: [{ tag, gold, why }] }, a party being { profile, char (its actor, from 10 Oct), tag, name }.
 
 const fs = require('fs');
@@ -140,6 +145,7 @@ module.exports = (api) => {
     const h = here(a); if (h.err) return h.err;
     const { L, rec } = h;
     if (!L) return rec.owner ? `This property belongs to ${rec.ownerName || 'someone'}. It is not for rent.` : 'This property stands empty and is not for rent.';
+    if (L.resale) return sellerOwns(L, rec) ? `For sale by its owner, ${L.seller.name}: ${L.price} gold. Buy it from the property panel at this door.` : `This property belongs to ${rec.ownerName || 'someone'}.`;
     if (L.sale) return rec.owner ? `This property belongs to ${rec.ownerName || 'someone'}.` : `For sale: ${L.price} gold, paid to ${zoneName(L.zone)}. Say /property buy ${L.price} here to buy it at that price; the first to pay owns it.`;
     if (L.tenant) return `Let to ${L.tenant.name} for ${L.weekly} gold a week, paid until ${due(L)}${L.overdueSince ? ' (rent overdue)' : ''}.`;
     return `For rent: ${L.deposit} gold deposit and ${L.weekly} gold a week. ${L.interest.length} ${L.interest.length === 1 ? 'person has' : 'people have'} asked for it. Say /property interest to put your name down.`;
@@ -188,6 +194,30 @@ module.exports = (api) => {
   // A sale's price goes to the hold's treasury (gamemode.js depositToTreasury, bank.js): a hold with none (Dawnstar, the
   // strongholds, a place in no hold) would take the buyer's gold and keep nothing (claude-jake review, 12 Oct)
   const hasTreasury = (id) => { const z = id ? zoneById(id) : null; return !!(z && z.treasury); };
+  // citizenship.js: whether a hold asks citizenship of a buyer, and whether this character has it ('' when they may buy)
+  const citizenGate = (a, zone) => {
+    try {
+      if (typeof globalThis.__dboCitizenGates !== 'function' || !globalThis.__dboCitizenGates(zone)) return '';
+      if (typeof globalThis.__dboCitizenOf === 'function' && globalThis.__dboCitizenOf(a, zone)) return '';
+    } catch (e) { return ''; }
+    return `Only the citizens of ${zoneName(zone).replace(/^The /, 'the ')} may buy property there. Become one at a notice board of the hold (Citizenship).`;
+  };
+  // The fork's housingSystem.ts asks before an owner hands a house over for nothing: the recipient must be able to buy it
+  globalThis.__dboPropertyTransferCheck = (ref, recipient) => {
+    try {
+      const H = housing(); const zone = H ? H.holdOf(ref) || '' : '';
+      // A chest or an inner door is no property (Nate, 5 Oct): handing one over asks nothing
+      if (!zone || (typeof H.isBuilding === 'function' && H.isBuilding(ref) === false)) return '';
+      return citizenGate(Number(recipient) >>> 0, zone).replace(/may buy property there/, 'may own property there');
+    }
+    catch (e) { return ''; }
+  };
+  // A resale whose seller no longer owns the house (handed over, taken back) stands no more
+  const sellerOwns = (L, rec) => {
+    if (!L || !L.resale || !L.seller || !rec || !rec.owner) return false;
+    if (Number(rec.owner) !== Number(L.seller.profile)) return false;
+    return !(perChar() && Number(rec.ownerChar) && Number(L.seller.char)) || (Number(rec.ownerChar) >>> 0) === (Number(L.seller.char) >>> 0);
+  };
 
   const offer = (a, whom) => {
     const h = here(a); if (h.err) return h.err;
@@ -252,6 +282,7 @@ module.exports = (api) => {
     const h = here(a); if (h.err) return h.err;
     const L = h.L;
     if (!L || !L.sale) return 'This property is not for sale.';
+    if (L.resale) return buyFrom(a, h, seen, viaChat);
     // An owner since it was listed (a grant from the property menu): the sale no longer stands
     if (h.rec && h.rec.owner) { delete data().listings[h.key]; save(); return 'This property has an owner now, so it is no longer for sale.'; }
     const price = Math.floor(Number(L.price));
@@ -261,6 +292,7 @@ module.exports = (api) => {
         : `The price is now ${price} gold. Nothing was paid: buy it again at this price if you still want it.`;
     }
     if (!hasTreasury(L.zone)) return `${zoneName(L.zone)} keeps no treasury for the price, so this property cannot be sold.`;
+    const gate = citizenGate(a, L.zone); if (gate) return gate;
     if (!takeGold(a, price)) return `It costs ${price} gold, and you do not have it.`;
     const err = housing().grant(h.door, a);
     if (err) { giveGold(a, price); return err; }
@@ -274,6 +306,50 @@ module.exports = (api) => {
     for (const m of managersOnline(h.door)) if (tagOf(m) !== L.listedBy.tag) personal(m, `${p.name} has bought property ${h.key} in ${zoneName(L.zone)} for ${price} gold.`);
     audit(`PROPERTY ${who(a)} bought ${h.key} for ${price} gold, paid to ${L.zone}`);
     return `It is yours: bought for ${price} gold, paid to ${zoneName(L.zone)}. It pays the hold's property tax each week on that value. Cut keys from the door's property menu.`;
+  };
+
+  // ---- resale: an owner sells their own house to another player (Nate, 14 Oct) ----------------------------------------------
+  const resell = (a, price) => {
+    const h = here(a); if (h.err) return h.err;
+    if (!h.rec.owner || !owns(a, h.rec)) return 'Only its owner can put a property up for sale.';
+    if (h.L && h.L.tenant) return 'A rented property stays the hold\'s: it cannot be sold.';
+    if (h.L && !h.L.resale) return 'This property is listed by the hold. Ask its officials.';
+    price = Math.floor(Number(price));
+    if (!(price >= 1 && price <= C.maxPrice)) return `A price is a whole number of gold from 1 to ${C.maxPrice}.`;
+    const zone = housing().holdOf(h.door) || '';
+    data().listings[h.key] = { door: h.door, zone, sale: true, resale: true, price, seller: me(a), listedBy: me(a), listedAt: Date.now() };
+    save();
+    audit(`PROPERTY ${who(a)} put their property ${h.key} in ${zone} up for sale at ${price} gold`);
+    return `For sale at ${price} gold. The first who may buy property in ${zoneName(zone)} and pays it at this door owns it; the gold comes to you. Its property tax stays as it is.`;
+  };
+  const unresell = (a) => {
+    const h = here(a); if (h.err) return h.err;
+    const L = h.L;
+    if (!L || !L.resale) return 'It is not for sale by its owner.';
+    if (!(owns(a, h.rec) || h.manager(a))) return 'Only its owner can take it off the market.';
+    delete data().listings[h.key]; save();
+    audit(`PROPERTY ${who(a)} took the resale of ${h.key} off the market`);
+    return 'Taken off the market.';
+  };
+  const buyFrom = (a, h, seen, viaChat) => {
+    const L = h.L;
+    if (!sellerOwns(L, h.rec)) { delete data().listings[h.key]; save(); return 'Its owner has changed, so it is no longer for sale.'; }
+    if (owns(a, h.rec)) return 'It is yours already.';
+    const price = Math.floor(Number(L.price));
+    const named = String(seen == null ? '' : seen).trim() === '' ? NaN : Math.floor(Number(seen));
+    if (named !== price) {
+      return viaChat ? `It costs ${price} gold. Say /property buy ${price} to buy it at that price.`
+        : `The price is now ${price} gold. Nothing was paid: buy it again at this price if you still want it.`;
+    }
+    const gate = citizenGate(a, L.zone); if (gate) return gate;
+    if (!takeGold(a, price)) return `It costs ${price} gold, and you do not have it.`;
+    const err = housing().grant(h.door, a);
+    if (err) { giveGold(a, price); return err; }
+    pay(L.seller, price, `the sale of your property in ${zoneName(L.zone)} to ${me(a).name}`);
+    delete data().listings[h.key];
+    save();
+    audit(`PROPERTY ${who(a)} bought ${h.key} from ${L.seller.name} for ${price} gold (resale; tax value unchanged)`);
+    return `It is yours: bought from ${L.seller.name} for ${price} gold. Its property tax is what it was, on the hold's listed value. Cut keys from the door's property menu.`;
   };
 
   const payRent = (a, weeks) => {
@@ -392,9 +468,14 @@ module.exports = (api) => {
     const zone = (L && L.zone) || (housing().holdOf(h.door) || '');
     const m = {
       name: rec.name || 'This property', hold: zoneName(zone), taxPct: holdTaxPct(zone), owned: !!rec.owner, ownerName: rec.owner ? String(rec.ownerName || 'Someone') : '',
-      yours: !!rec.owner && owns(a, rec), manager: mgr, state: 'none', maxPrice: C.maxPrice, maxDeposit: C.maxDeposit, maxWeekly: C.maxWeekly,
+      yours: !!rec.owner && owns(a, rec), canResell: !!rec.owner && owns(a, rec) && !(L && (L.tenant || !L.resale)), manager: mgr, state: 'none', maxPrice: C.maxPrice, maxDeposit: C.maxDeposit, maxWeekly: C.maxWeekly,
     };
-    if (L && L.sale) Object.assign(m, { state: 'sale', price: L.price });
+    const gate = zone ? citizenGate(a, zone) : '';
+    if (gate) m.citizenNeeded = gate;
+    try { if (typeof globalThis.__dboEconomyTaxOf === 'function') Object.assign(m, globalThis.__dboEconomyTaxOf(h.door) || {}); } catch (e) { /* no economy */ }
+    if (L && L.resale) {
+      if (sellerOwns(L, rec)) Object.assign(m, { state: 'resale', price: L.price, sellerName: L.seller.name, yourSale: owns(a, rec) });
+    } else if (L && L.sale) Object.assign(m, { state: 'sale', price: L.price });
     else if (L && L.tenant) {
       Object.assign(m, { state: 'let', weekly: L.weekly, paidUntil: due(L), overdue: !!L.overdueSince, youRent: L.tenant.tag === p.tag });
       if (mgr) m.tenantName = L.tenant.name;
@@ -410,7 +491,7 @@ module.exports = (api) => {
     if (!p || p.key !== h.key) { p = { key: h.key, nonce: `${(a >>> 0).toString(36)}-${Date.now().toString(36)}` }; panels.set(a >>> 0, p); }
     const m = panelModel(a, h);
     // The price this panel shows is the only one its Buy button pays
-    p.shown = m.state === 'sale' ? m.price : null;
+    p.shown = m.state === 'sale' || m.state === 'resale' ? m.price : null;
     openWidget(a, Object.assign({ type: 'propertyMarket', id: PANEL_ID, nonce: p.nonce, result: text || '' }, m), true);
   };
   const closePanel = (a) => { panels.delete(a >>> 0); closeWidget(a, PANEL_ID); };
@@ -423,6 +504,7 @@ module.exports = (api) => {
     buy: (a) => buy(a, (panels.get(a >>> 0) || {}).shown), sell: (a, x) => sell(a, x), list: (a, d, w) => list(a, d, w), unlist: (a) => unlist(a),
     interest: (a) => interest(a), offer: (a, tag) => offer(a, tag), accept: (a) => accept(a), pay: (a, w) => payRent(a, w),
     leave: (a) => leave(a), evict: (a) => evict(a), grace: (a) => grace(a), remind: (a) => remind(a),
+    resell: (a, x) => resell(a, x), unresell: (a) => unresell(a),
   };
   onUi('propertyMarketAct', (a, args) => {
     const p = panels.get(a >>> 0);

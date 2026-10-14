@@ -115,12 +115,16 @@ check('a steward cannot appoint either', /Only an admin, or a seat that may name
 out = run('dismiss', ADMIN, 'Corvus Direnni II');
 check('usage when the zone is missing is not mistaken for a name', /No such zone|Usage/.test(out), out);
 
-// The Jarl rule: a Nord or an Imperial only, unless an Owner adds "override"
+// The Jarl rule: a Breton, a Nord or an Imperial only (citizenship design, 14 Oct: the election's rule), unless an Owner
+// adds "override"
 officials = {};
-out = run('appoint', ADMIN, 'Corvus Direnni II whiterun jarl');
-check('a Breton cannot be made Jarl', !(officials.whiterun && officials.whiterun.jarl) && /is a Breton\. By Skyrim's law only a Nord or an Imperial may sit as Jarl\.$/.test(out), out);
-out = run('appoint', ADMIN, 'Corvus Direnni II whiterun jarl override');
+out = run('appoint', ADMIN, 'J\'zar whiterun jarl');
+check('a Khajiit cannot be made Jarl', !(officials.whiterun && officials.whiterun.jarl) && /is a Khajiit\. By Skyrim's law only a Breton, a Nord or an Imperial may sit as Jarl\.$/.test(out), out);
+out = run('appoint', ADMIN, 'J\'zar whiterun jarl override');
 check('staff below the Owners cannot override', !(officials.whiterun && officials.whiterun.jarl) && /Only the Owners can override/.test(out), out);
+out = run('appoint', ADMIN, 'Corvus Direnni II whiterun jarl');
+check('a Breton can be made Jarl now', (officials.whiterun.jarl || []).includes(11), out);
+officials = {};
 out = run('appoint', ADMIN, 'Marcus Aurelius whiterun jarl');
 check('an Imperial can be Jarl, offline too', (officials.whiterun.jarl || []).includes(12), out);
 out = run('appoint', ADMIN, 'Serana whiterun jarl');
@@ -138,6 +142,15 @@ out = run('appoint', ADMIN, 'Corvus Direnni II whiterun steward');
 check('other ranks take any race', (officials.whiterun.steward || []).includes(11), out);
 out = run('appoint', OWNER, 'Lydia #LYD1 bruma guard override');
 check('an Owner\'s override on another rank changes nothing', (officials.bruma.guard || []).includes(14) && !/overridden/.test(audits[audits.length - 1]), out);
+
+// A hold that elected its court (citizenship.js __dboCitizenSeatCheck): its seats go to its citizens, staff included
+globalThis.__dboCitizenSeatCheck = (zid, rank, title, actor, label) => (zid === 'whiterun' && rank === 'steward' && actor !== MARCUS ? `${label} is no citizen of Whiterun. The seats of its elected court go only to its citizens.` : '');
+officials = {};
+out = run('appoint', ADMIN, 'Corvus Direnni II whiterun steward');
+check('an elected hold refuses a non-citizen for an empty seat of its court', !(officials.whiterun && officials.whiterun.steward) && /no citizen of Whiterun/.test(out), out);
+out = run('appoint', ADMIN, 'Marcus Aurelius whiterun steward');
+check('a citizen takes it', ((officials.whiterun || {}).steward || []).includes(12), out);
+delete globalThis.__dboCitizenSeatCheck;
 
 console.log(failures ? `${failures} failure(s)` : 'all passed');
 process.exit(failures ? 1 : 0);

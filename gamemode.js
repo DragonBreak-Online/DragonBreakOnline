@@ -803,7 +803,7 @@ const STAFF_HELP = [
     ['faction remove', '<name|#TAG> <faction id>: take someone out of a faction'], ['faction hallmark', "<faction id>, at a building's door: its faction's hall (hallunmark undoes it)"], ['faction list', 'every faction id, secret ones included'], 'ledgerpoint',
     ['rolename', 'list <court|faction> | <court> <office> <new title> | <faction> <rank number> <new title> | reset <court> <office> | reset <faction> <rank number>: rename an office or rank for everyone who holds it, at once (Lead GM; F3 Court and the Faction tab\'s rank editor do it too)'], 'war'] },
   { key: 'appoint', title: 'Appointments and property', items: [
-    ['appoint', '<player|#TAG|profile id> <zone> <rank> [override]: make someone an official, online or offline. A Jarl must be a Nord or an Imperial; only the Owners may add override. /appoint alone lists the zone ids; a wrong rank lists that zone\'s ranks. Rulers name 5 Stewards, 2 Court Mages, a Guard Captain and any number of Guards; Chieftains 5 Banes, a Shaman, a Wise-Woman, a Guard Commander and any number of Guards; captains name Guards'],
+    ['appoint', '<player|#TAG|profile id> <zone> <rank> [override]: make someone an official, online or offline. A Jarl must be a Breton, a Nord or an Imperial; only the Owners may add override. /appoint alone lists the zone ids; a wrong rank lists that zone\'s ranks. Rulers name 5 Stewards, 2 Court Mages, a Guard Captain and any number of Guards; Chieftains 5 Banes, a Shaman, a Wise-Woman, a Guard Commander and any number of Guards; captains name Guards'],
     ['dismiss', '<player|#TAG|profile id> <zone>: remove an official, online or offline (told if online). Officials may dismiss the ranks they may appoint'],
     ['officials', '[zone]: who holds which rank where'],
     ['property', 'at a door, as an official: sell <price> | list <deposit> <weekly> | unlist | offer <name> | remind | grace | evict']] },
@@ -2357,6 +2357,8 @@ const loginStep = (name, fn) => {
 const onCharacterReady = (userId, a) => {
   try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('login', userId, a); } catch (e) { /* the player log is optional */ }
   connectedAt.set(a, Date.now());
+  // The drift switches before the login's looks (the beast revert below), so ownLook "off" or "name" covers a look sent at login
+  loginStep('drift switches', () => sendDriftConfig(a));
   // The client resets its spells to the login list for its first seconds: a spell given then waits (schools.js)
   loginStep('schools arrival', () => { if (globalThis.__dboSchoolsArrived) globalThis.__dboSchoolsArrived(a); });
   // itemguards.js: the pack against the one written down at the last logout, before anything is handed out at login
@@ -3401,14 +3403,34 @@ const DRIFT_KEYS = {
   // SkyrimSE+04328E9), "entry" on every return to the screen as before 0.3.96, the quick undo (claude-jake's review of
   // 6b7a3c59). Its default is gamemode-config.json drift.faceRebuild when set; /driftset faceRebuild entry switches it live.
   faceRebuild: { def: (cfg && cfg.drift && (cfg.drift.faceRebuild === 'entry' || cfg.drift.faceRebuild === 'load')) ? cfg.drift.faceRebuild : 'load', ok: (v) => v === 'load' || v === 'entry' },
+  // The server's look for the player's own character (client fix/tick-context-1013 sync/ownLook.ts): "apply" puts it on,
+  // "name" only a look that changes just the name (a /mask swap, no head rebuild), "off" none, as the clients from 15 Sep to
+  // that fix: the quick undo. Its default is gamemode-config.json drift.ownLook when set; /driftset ownLook name|off switches it
+  // live. A client before the fix ignores it.
+  ownLook: { def: (cfg && cfg.drift && ['apply', 'name', 'off'].includes(cfg.drift.ownLook)) ? cfg.drift.ownLook : 'apply', ok: (v) => ['apply', 'name', 'off'].includes(v) },
 };
 const DRIFT_SET = globalThis.__dboDriftSet && typeof globalThis.__dboDriftSet === 'object' ? globalThis.__dboDriftSet : (globalThis.__dboDriftSet = {});
 const driftValue = (k) => (Object.prototype.hasOwnProperty.call(DRIFT_SET, k) ? DRIFT_SET[k] : DRIFT_KEYS[k].def);
-const sendDriftConfig = (a) => {
+const driftPayload = () => {
   const payload = { customPacketType: 'npcDriftConfig', repair: globalThis.__dboDriftRepair || 'setPosition', spawn: globalThis.__dboDriftSpawn || 'moveTo' };
   for (const k of Object.keys(DRIFT_KEYS)) payload[k] = driftValue(k);
+  return payload;
+};
+const sendDriftConfig = (a) => {
+  const payload = driftPayload();
+  globalThis.__dboDriftSent = JSON.stringify(payload);
   sendPacket(a, payload);
 };
+// A hot reload that changes what a client is sent (a gamemode-config.json drift default: the ownLook or faceRebuild undo)
+// sends it to everyone online at once, as /driftset does; the last one sent is kept across reloads, so an unchanged reload
+// sends nothing
+// A load with none kept (a server start, or the reload over a gamemode before ownLook) takes its own config as sent
+if (typeof globalThis.__dboDriftSent !== 'string') globalThis.__dboDriftSent = JSON.stringify(driftPayload());
+if (globalThis.__dboDriftSent !== JSON.stringify(driftPayload())) {
+  const online = onlineActors();
+  online.forEach(sendDriftConfig);
+  log(`drift switches changed by the reload: sent to ${online.length} online`);
+}
 const driftArgs = (args) => String(args || '').trim().split(/\s+/);
 // How a client seats a new NPC copy: moveTo places it natively before its first load, setPosition is the old way
 registerChatCommand('driftspawn', (a, args) => {
@@ -3538,12 +3560,15 @@ const writeOfficials = (o) => {
   officialsText = text; officialsCheckedAt = Date.now();
   try { officialsMtime = fs.statSync(OFFICIALS_PATH).mtimeMs; } catch (e) { officialsMtime = -1; }
 };
+// The default office titles: zones.json's rankTitles, with the commander office read as Lord Commander (citizenship design,
+// coordinator's decision 14 Oct; zones.json stays as it is because the fork reads it at boot) and config rankTitles on top
+const RANK_TITLES = Object.assign({}, ZONES.rankTitles || {}, { commander: 'Lord Commander' }, (cfg && cfg.rankTitles) || {});
 // An office's title: what staff renamed it to at that court (rolenames.js, role-names.json), or zones.json's rankTitles.
 // The office id (r) stays the key everywhere; zoneId left out gives the default.
 const rankTitle = (r, zoneId) => {
   const RN = globalThis.__dboRoleNames;
   if (zoneId && typeof zoneId === 'string' && RN && typeof RN.officeName === 'function') { try { const n = RN.officeName(zoneId, r); if (n) return n; } catch (e) { /* the default */ } }
-  return String((ZONES.rankTitles || {})[r] || r);
+  return String(RANK_TITLES[r] || r);
 };
 const ranksOf = (profileId) => {
   const o = readOfficials(); const out = [];
@@ -3599,10 +3624,11 @@ const officialName = (pid) => {
   const s = seen.get(Number(pid)); if (s) return s.name;
   const ids = accountActors(Number(pid)); return ids.length ? ownNameOf(ids[0]) : `profile ${pid}`;
 };
-// Skyrim's law in the server's lore (4E 211, the Discord lore-archives): only a Nord or an Imperial sits as Jarl. The
+// Skyrim's law in the server's lore (4E 211, the Discord lore-archives): only a Nord or an Imperial sat as Jarl; Nate's
+// citizenship design (14 Oct) admits the Bretons too, the same rule the election uses (citizenship.js). The
 // Owners may seat anyone else by adding "override" (Nate, 2026-09-27). The race is the character's own, under any beast
 // form; officials are kept per account, so the rule reads the character named (or, for a profile id, the one found).
-const JARL_RACE = /^(Nord|Imperial)Race(Vampire)?$/;
+const JARL_RACE = /^(Breton|Nord|Imperial)Race(Vampire)?$/;
 const raceEdidOf = (actor) => {
   let race = 0;
   try { race = typeof globalThis.__dboBeastOriginalRace === 'function' ? Number(globalThis.__dboBeastOriginalRace(actor)) >>> 0 : 0; } catch (e) { race = 0; }
@@ -3623,7 +3649,7 @@ const appointCheck = (a, z, rank, tg, override) => {
   if (rank === 'jarl') {
     const race = raceEdidOf(tg.actor);
     if (!JARL_RACE.test(race)) {
-      if (!override) return { error: `${tg.label} is ${raceLabel(race)}. By Skyrim's law only a Nord or an Imperial may sit as Jarl.${tierOf(a) === 'senior' ? ' As an Owner you may add "override" to seat them anyway.' : ''}` };
+      if (!override) return { error: `${tg.label} is ${raceLabel(race)}. By Skyrim's law only a Breton, a Nord or an Imperial may sit as Jarl.${tierOf(a) === 'senior' ? ' As an Owner you may add "override" to seat them anyway.' : ''}` };
       overridden = raceLabel(race);
     }
   }
@@ -3633,6 +3659,8 @@ const appointCheck = (a, z, rank, tg, override) => {
     if (held && !appointCap(a, z, held)) return { error: `${tg.label} already holds ${rankTitle(held, z.id)} of ${z.name}; you cannot replace that.` };
     if (((zo[rank] || []).map(Number).filter((x) => x !== tg.pid)).length >= cap) return { error: `${z.name} already has ${cap} ${rankTitle(rank, z.id)}s. Dismiss one first.` };
   }
+  // A hold that elected its court (citizenship.js): its seats go to its citizens, staff appointments too
+  try { const no = typeof globalThis.__dboCitizenSeatCheck === 'function' ? globalThis.__dboCitizenSeatCheck(z.id, rank, '', tg.actor, tg.label) : ''; if (no) return { error: no }; } catch (e) { log('citizen seat check failed', e.message); }
   // The faction limits (guilds.js, court.js): an office in a hold's court takes the allegiance slot; a Lead GM's
   // /faction override lifts it once
   try { const lim = typeof globalThis.__dboCourtSeatLimit === 'function' ? globalThis.__dboCourtSeatLimit(a, z, rank, tg) : null; if (lim) return { error: lim }; } catch (e) { log('faction limit check failed', e.message); }
@@ -3666,6 +3694,18 @@ const unseatOfficial = (a, z, tg) => {
   courtOfficeSync(z, tg, had, false);
   return { had, text: `${tg.label} is no longer ${rankTitle(had, z.id)} of ${z.name}.${tg.online ? '' : ' They are offline and were not told.'}` };
 };
+// Removes tg's rank in z for a process rather than a person (citizenship.js: an elected court replaces whoever held the
+// seat). byWho names it in the audit. { error } or { text, had }
+const unseatOfficialBy = (z, tg, byWho) => {
+  const o = readOfficials(); let had = null;
+  for (const r of Object.keys(o[z.id] || {})) { if ((o[z.id][r] || []).map(Number).includes(tg.pid)) had = r; o[z.id][r] = (o[z.id][r] || []).filter((x) => Number(x) !== tg.pid); }
+  if (!had) return { error: `${tg.label} holds no rank in ${z.name}.` };
+  try { writeOfficials(o); } catch (e) { return { error: 'Could not write officials.json: ' + e.message }; }
+  if (tg.online) system(tg.online, `You are no longer ${rankTitle(had, z.id)} of ${z.name}.`);
+  audit(`OFFICIAL ${byWho} unseated ${tg.who} as ${rankTitle(had, z.id)} of ${z.name}${tg.online ? '' : ' (offline)'}`);
+  courtOfficeSync(z, tg, had, false);
+  return { had, text: `${tg.label} is no longer ${rankTitle(had, z.id)} of ${z.name}.` };
+};
 // A ruler's appointment is an offer the target accepts on the Court tab (Nate, 3 Oct, Q4); staff seat outright
 const appointFrom = (a, z, rank, tg, override) => {
   const chk = appointCheck(a, z, rank, tg, override);
@@ -3683,7 +3723,7 @@ registerChatCommand('appoint', (a, args) => {
   const tg = officialTarget(m[1]); if (tg.error) return personal(a, tg.error);
   const r = appointFrom(a, z, rank, tg, override);
   personal(a, r.error || r.text);
-}, { help: '<player|#TAG|profile id> <zone> <rank> [override] make someone an official, online or not (admins at once; a ruler\'s appointment is offered and accepted in the journal, F3 Court; rulers name 5 Stewards, 2 Court Mages, a Guard Captain and any number of Guards; Chieftains 5 Banes, a Shaman, a Wise-Woman, a Guard Commander and any number of Guards; captains name Guards). A Jarl must be a Nord or an Imperial; only the Owners may add override' });
+}, { help: '<player|#TAG|profile id> <zone> <rank> [override] make someone an official, online or not (admins at once; a ruler\'s appointment is offered and accepted in the journal, F3 Court; rulers name 5 Stewards, 2 Court Mages, a Guard Captain and any number of Guards; Chieftains 5 Banes, a Shaman, a Wise-Woman, a Guard Commander and any number of Guards; captains name Guards). A Jarl must be a Breton, a Nord or an Imperial; only the Owners may add override' });
 registerChatCommand('dismiss', (a, args) => {
   // The name may have spaces: the zone is the last word
   const m = args.trim().match(/^(.+?)\s+(\S+)$/); if (!m) return personal(a, 'Usage: /dismiss <player|#TAG|profile id> <zone>');
@@ -7185,7 +7225,7 @@ try {
   const ROLENAMES_JS = path.resolve('rolenames.js');
   delete require.cache[ROLENAMES_JS];
   require(ROLENAMES_JS)({ log, personal, system, audit, who, registerChatCommand, isAdmin, isLeadStaff, onlineActors, profileOf, readOfficials,
-    zoneList, zoneById, defaultTitles: ZONES.rankTitles || {}, cfg });
+    zoneList, zoneById, defaultTitles: RANK_TITLES, cfg });
 } catch (e) { log('rolenames.js failed to load:', e.stack || e.message); globalThis.__dboRoleNames = null; globalThis.__dboOfficeTitle = null; }
 
 // ---- player factions: guilds, holds, clans, cults (server\guilds.js, guild-defs.json) -------------
@@ -7207,7 +7247,7 @@ try {
 try {
   const ECONOMY_JS = path.resolve('economy.js');
   delete require.cache[ECONOMY_JS];
-  require(ECONOMY_JS)({ mp, log, ownNameOf, ownDisplay, personal, audit, who, display, cfg, onUi, onlineActors, every, readOfficials, zoneById });
+  require(ECONOMY_JS)({ mp, log, ownNameOf, ownDisplay, personal, audit, who, display, cfg, onUi, onlineActors, every, readOfficials, zoneById, isLeadStaff });
 } catch (e) { log('economy.js failed to load:', e.stack || e.message); globalThis.__dboEconomyView = null; }
 
 // ---- weapon racks in homes (server\weaponracks.js, weapon-racks.json from Nat's PC, config "weaponRacks") ------------------
@@ -7334,6 +7374,20 @@ try {
   require(NOBILITY_JS)({ mp, log, ownNameOf, ownDisplay, publicNameOf, personal, registerChatCommand, audit, who, display, nameOf, tagOf, onUi, onlineActors, profileOf, cfg, every, isLeadStaff,
     zoneById, readOfficials, ranksOf, accountActors, officialTarget, announce: (text) => broadcast(`[[S]]#{${C.SYS}}${text}`) });
 } catch (e) { log('nobility.js failed to load:', e.stack || e.message); for (const k of ['__dboNobility', '__dboNobilityFiefCut']) globalThis[k] = null; if (globalThis.__dboJournalSections) delete globalThis.__dboJournalSections.nobility; }
+
+// ---- citizenship of the holds and the first Jarl vote (server\citizenship.js, config "citizenship"; after court.js,
+// nobility.js and tenancy.js: it reads their officials and households, and tenancy.js asks it before a sale) -------------
+try {
+  const CITIZENSHIP_JS = path.resolve('citizenship.js');
+  delete require.cache[CITIZENSHIP_JS];
+  require(CITIZENSHIP_JS)({ mp, log, ownNameOf, ownDisplay, personal, system, audit, who, display, nameOf, tagOf, onUi, onlineActors, isAdmin, isLeadStaff, profileOf, cfg, every,
+    zoneList, zoneById, readOfficials, rankTitle, officialTarget, accountActors, seatOfficial, unseatOfficialBy, takeGold, depositToTreasury, openWidget, closeWidget,
+    boardZoneNear, raceEdidOf });
+} catch (e) {
+  log('citizenship.js failed to load:', e.stack || e.message);
+  for (const k of ['__dboCitizenMenuEntries', '__dboCitizenMenuAction', '__dboCitizenOf', '__dboCitizenGates', '__dboCitizenHolds', '__dboCitizenRoleIds', '__dboCitizenManagedRoleIds']) globalThis[k] = null;
+  if (globalThis.__dboJournalSections) delete globalThis.__dboJournalSections.citizen;
+}
 
 // ---- the Thalmor: Concordat arrests, informants, dossiers and the journal's Thalmor tab (server\thalmor.js, config "thalmor") --
 try {

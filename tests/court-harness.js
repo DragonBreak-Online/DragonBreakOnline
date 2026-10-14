@@ -179,6 +179,12 @@ ok('...nor take the Count\'s rank away', r.kind === 'refused' && hhTitle(COUNT) 
 r = ev('courtRank', COUNT, 'N', 'bruma', ALDO, hhIndex('Knight'));
 ok('the Count sets a household rank (Knight)', hhTitle(ALDO) === 'Knight' && r.kind === 'ok', [r, hhTitle(ALDO)]);
 ok('a Citizen cannot', ev('courtRank', ALDO, 'N', 'bruma', COUNT, hhIndex('Citizen')).kind === 'refused' && hhTitle(COUNT) === 'Count');
+// A household rank that is a seat of an elected court goes only to a citizen (citizenship.js __dboCitizenSeatCheck, 14 Oct)
+let seatAsked = null;
+globalThis.__dboCitizenSeatCheck = (zid, office, title, actor) => { seatAsked = { zid, office, title, actor }; return title === 'Steward' ? 'Aldo is no citizen of Bruma. The seats of its elected court go only to its citizens.' : ''; };
+r = ev('courtRank', COUNT, 'N', 'bruma', ALDO, hhIndex('Steward'));
+ok('a household seat of an elected court is refused to a non-citizen', r.kind === 'refused' && /no citizen of Bruma/.test(r.text) && hhTitle(ALDO) === 'Knight' && seatAsked && seatAsked.title === 'Steward' && seatAsked.office === '' && seatAsked.actor === ALDO, [r, seatAsked]);
+delete globalThis.__dboCitizenSeatCheck;
 r = ev('courtInvite', COUNT, 'N', 'bruma', 'Kesta');
 ok('the Count invites into the household', r.kind === 'ok' && told.some((t) => t.a === KNIGHT && /invites you to join County of Bruma/.test(t.text)), r);
 view = sec.view(COUNT);
