@@ -196,8 +196,27 @@ function isOwnGitDir(dir, printed) {
   } catch { return false }
 }
 
-// What git -C <dir> must print for notOwnCheckout: its top level, then its git folder, one a line
-const REV_PARSE = ['rev-parse', '--show-toplevel', '--absolute-git-dir']
+// Where a pull writes besides the common folder, each as git rev-parse --git-path prints it
+const GIT_PATHS = ['refs', 'objects', 'packed-refs', 'index']
+// What git -C <dir> must print for notOwnCheckout, one a line: its top level, its git folder, its common folder, then GIT_PATHS
+const REV_PARSE = ['rev-parse', '--show-toplevel', '--absolute-git-dir', '--git-common-dir', ...GIT_PATHS.flatMap(p => ['--git-path', p])]
+
+// Why a .git folder shares another checkout's (a commondir file, or a link as git-new-workdir makes), or null
+function sharedGitDir(gitDir) {
+  if (fs.existsSync(path.join(gitDir, 'commondir'))) return `${gitDir} holds a commondir file, so git keeps its refs and objects in another checkout`
+  const linked = dir => {
+    let entries
+    try { entries = fs.readdirSync(dir, { withFileTypes: true }) } catch (err) { return `${dir} cannot be read (${err.code})` }
+    for (const e of entries) {
+      const p = path.join(dir, e.name)
+      if (e.isSymbolicLink()) return `${p} is a link to ${fs.readlinkSync(p)}, so git would write through it`
+      const why = e.isDirectory() ? linked(p) : null
+      if (why) return why
+    }
+    return null
+  }
+  return linked(gitDir)
+}
 
 // Why a clone or pull in dir would touch a live checkout (dir is one, sits in one or holds one), or null; no opt-in
 function nearLiveCheckout(dir) {
@@ -211,14 +230,25 @@ function nearLiveCheckout(dir) {
 
 // Why a pull in dir would pull a checkout other than dir's own, or null. printed: what git -C dir REV_PARSE printed ('' when it failed)
 function notOwnCheckout(dir, printed) {
-  const [top = '', gitDir = ''] = String(printed || '').trim().split(/\r?\n/)
+  const [top = '', gitDir = '', ...paths] = String(printed || '').trim().split(/\r?\n/)
   if (!isOwnTopLevel(dir, top)) return `${dir} is not its own git checkout (git -C lands in ${top.trim() || 'no checkout'})`
   if (!isOwnGitDir(dir, gitDir)) return `${dir} has no git folder of its own: its .git is a file or a link, and git uses ${gitDir.trim()}`
+  const own = path.join(fs.realpathSync(dir), '.git')
+  const shared = sharedGitDir(own)
+  if (shared) return `${dir} has no git folder of its own: ${shared}`
+  const names = ['common folder', ...GIT_PATHS]
+  if (paths.length !== names.length) return `${dir}: git did not say where it keeps its ${names.join(', ')}`
+  for (const [i, printedPath] of paths.entries()) {
+    const real = realPath(path.resolve(dir, printedPath.trim()))
+    const near = nearLiveCheckout(real)
+    if (near) return `${dir} has no git folder of its own: git keeps its ${names[i]} at ${real}, and ${near}`
+    if (!isInside(real, own)) return `${dir} has no git folder of its own: git keeps its ${names[i]} at ${real}, outside ${own}`
+  }
   return null
 }
 
 module.exports = {
   LIVE_REPO, DEFAULT_CLIENT_FILES_DIR, MANIFEST, OPT_IN,
   realPath, sameInode, dirId, liveState, livePath, liveTarget, linksUnder, optInFile, optedIn, refusalMessage, refusalFor, refusal, writeGuard, hasFiles,
-  isOwnTopLevel, isOwnGitDir, REV_PARSE, nearLiveCheckout, notOwnCheckout,
+  isOwnTopLevel, isOwnGitDir, REV_PARSE, GIT_PATHS, sharedGitDir, nearLiveCheckout, notOwnCheckout,
 }
