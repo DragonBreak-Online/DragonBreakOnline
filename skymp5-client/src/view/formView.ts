@@ -1,6 +1,7 @@
 import { Actor, ActorBase, createText, destroyText, EffectShader, Faction, Form, FormType, Game, Keyword, NetImmerse, ObjectReference, once, printConsole, setTextColor, setTextPos, setTextSize, setTextString, Spell, storage, TESModPlatform, Utility, worldPointToScreenPoint } from "skyrimPlatform";
 import { isSpeaking } from "../services/services/voiceSpeaking";
 import { isBeastRaceId } from "../sync/beastRaceIds";
+import { revealLabelFor, revealMarkerOf, revealTagText } from "./realNamesMarker";
 import { beastBodyAppearance, beastBodyOf } from "../sync/beastBody";
 import { TAKEOVER_RECHECK_SECONDS, isHostileTakeover, takeoverLine } from "./takeoverDiag";
 import { setDefaultAnimsDisabled, applyAnimation, restoreSitCollisionIfMoving, isInSitPose, clearSitPose, setRefrCollision } from "../sync/animation";
@@ -867,16 +868,19 @@ export class FormView {
       const headPart = "NPC Head [Head]";
       const maxNicknameDrawDistance = 1000;
       const playerActor = Game.getPlayer()!;
+      // Staff with real names on see a hooded player and a labelled beast; every other rule holds for them too
+      const known = FormView.ownerKnownIds();
+      const revealing = revealMarkerOf(known) !== null;
       const isVisibleByPlayer = !model.movement?.isSneaking
         && playerActor.getDistance(refr) <= maxNicknameDrawDistance
         && playerActor.hasLOS(refr)
-        && !this.isSweetHidePerson(refr)
+        && (revealing || !this.isSweetHidePerson(refr))
         && FormView.adminViewOf(model) !== "hidden"
         // Nor over someone under an Invisibility spell or potion (#bugs 1 Oct: "you can see invisible people's names")
         && !this.spellInvisible(refr)
         // A werewolf or Vampire Lord is not recognisable: no name and no #TAG over a beast, even to those who know the
         // player (#bugs 'werewolf shows nametag of player', 2026-09-26)
-        && !this.isBeastCopy(model);
+        && (!this.isBeastCopy(model) || (revealing && revealLabelFor(known, this.getRemoteRefrId()) !== ""));
       if (isVisibleByPlayer) {
         const headScreenPos = worldPointToScreenPoint([
           NetImmerse.getNodeWorldPositionX(refr, headPart, false),
@@ -947,10 +951,19 @@ export class FormView {
     }
     const owner = storage["ownerModel"] as Record<string, unknown> | undefined;
     const known = owner ? owner["ff_knownIds"] : undefined;
+    if (revealMarkerOf(known)) {
+      return revealTagText(known, this.getRemoteRefrId(), name, this.isSweetHidePerson(refr));
+    }
     if (!Array.isArray(known)) {
       return name;
     }
     return known.includes(this.getRemoteRefrId()) ? name : "Stranger";
+  }
+
+  private static ownerKnownIds(): unknown {
+    if (storage["ownerModelSet"] !== true) return undefined;
+    const owner = storage["ownerModel"] as Record<string, unknown> | undefined;
+    return owner ? owner["ff_knownIds"] : undefined;
   }
 
   private isSweetHidePerson(refr: ObjectReference): boolean {
