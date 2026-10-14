@@ -1,5 +1,29 @@
 [
   {
+    "title": "Arcane Mastery: rank spells and apprenticeship",
+    "date": "2026-10-14",
+    "version": "Server update",
+    "tag": "New",
+    "sections": [
+      {
+        "heading": "Rank spells",
+        "items": [
+          "After your first spell, you choose one more spell of your school at 25 (an Apprentice spell) and another at 50 (an Adept spell). Your school stops rising at 25 and at 50 until you choose. Choose in your F3 Journal's Magic tab, at a Study Magic shelf or at a Scholars' Ledger. Priest works the same way for Restoration.",
+          "Spell lines: the next spell of a line you already know is listed first, for example \"Next in your line: Firebolt (from Flames)\". Choosing it adds the new spell; you keep the old one.",
+          "Mages already past 25 or 50 are offered their picks too, and lose nothing."
+        ]
+      },
+      {
+        "heading": "Apprenticeship",
+        "items": [
+          "A mage with Arcane Arts 75 (or Priest 75, for Restoration) can take another player as apprentice: open the X menu on them and choose Take as apprentice, then pick a spell. The apprentice must accept.",
+          "While near their teacher, the apprentice can cast that spell. Each cast counts as study, up to 20 a day. After about 1 day of study for a Novice spell, 2 for Apprentice, 3 for Adept, 5 for Expert and 15 for Master, the spell is theirs for good. Away from the teacher, or with the teacher gone, the spell is set aside until they return.",
+          "A teacher has one apprentice at a time. Leaders and officers of the Synod, the College of Winterhold, the College of Whispers and House Telvanni can have three. Either of you can end it from the X menu."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Client 0.3.97: citizenship and the first Jarl elections",
     "date": "2026-10-14",
     "version": "Client 0.3.97",
