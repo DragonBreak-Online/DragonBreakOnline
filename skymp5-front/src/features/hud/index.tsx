@@ -147,7 +147,10 @@ const UI_CAPS = ['bank', 'robPrompt', 'feedPrompt', 'downed', 'businessLedger', 
   'citizenBoard',
   // Not a panel: the client draws the Khajiit's Night Eye from the server's dboNightEye (skymp5-client nightEyeService.ts);
   // without it the server says the power comes with a later update (racial.js clientCap)
-  'nightEye'];
+  'nightEye',
+  // Not a panel: the client gives the Khajiit's Cat-like Reflexes its speed and jump from the server's dboCatReflexes
+  // (skymp5-client catReflexesService.ts); without it the server says the power comes with a later update
+  'catReflexes'];
 const useUiCaps = (): void => {
   useEffect(() => {
     const tell = () => {
