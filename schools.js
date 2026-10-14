@@ -2002,7 +2002,7 @@ module.exports = (api) => {
   // The apprentice's record: s.apprentice { teacher, teacherName, spell (desc), school, rank, xp, need, day, dayXp, at, held,
   // lastCastAt, capTold }; the teacher's: s.apprentices [{ student, name, spell, at }]. An offer waits in memory only.
   const AP = C.apprenticeship;
-  const APPRENTICE_MENU_ID = 84;
+  const APPRENTICE_MENU_ID = 85;
   const AP_MS = Math.max(1, Number(AP.tickSeconds) || 3) * 1000;
   const apOffers = ST0.apOffers instanceof Map ? ST0.apOffers : (ST0.apOffers = new Map()); // student -> { teacher, spell, nonce, until }
   const apTeachPanels = ST0.apTeachPanels instanceof Map ? ST0.apTeachPanels : (ST0.apTeachPanels = new Map()); // teacher -> { nonce, student, options }
