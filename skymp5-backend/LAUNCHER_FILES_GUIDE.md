@@ -103,12 +103,15 @@ by device and inode: a work folder is refused when its root, its zip or any fold
 writes links into the live files at any depth, when it is bind-mounted from a live folder, and when
 its zip or manifest is a hard link to the live one. The zip, the manifest and each copied file are
 written as new files, never through another name of an old one, so a `cp -al` copy of the live root
-stays safe. Never bind-mount the live files into a work folder. On the PC set
+stays safe. Mounts are out of scope (Jake, 14 Oct): a plain bind mount of a live folder onto a work
+folder is refused, but overlay mounts and mounts on the git path are not covered, so never bind-mount
+or overlay-mount live folders into a work folder or `sources/client`. On the PC set
 `DBO_MERGE_LIVE_BUCKET=1` for those commands only, in the shell (`set DBO_MERGE_LIVE_BUCKET=1` in
 cmd, `$env:DBO_MERGE_LIVE_BUCKET='1'` in PowerShell). Never put it in a `.env`: the guard refuses
 when the backend's `.env` or the `.env` of the folder you run from sets it. The manager's Build
 Client sets it on Windows when `CLIENT_FILES_DIR` is empty or names the default bucket. `setup` and
-the GitHub webhook never clone or pull in, into or around a live checkout, and pull only a
+the GitHub webhook refuse to clone or pull in, into or around a live checkout reached by path or link
+(mounts are not covered), and pull only a
 `sources/client` whose `.git` folder is its own: not a `.git` file or link, no `commondir` file and
 no link inside it (as `git-new-workdir` makes), and git's common folder, refs, objects, packed-refs
 and index all inside it. The webhook never rebuilds the live files at all. On the server never use
