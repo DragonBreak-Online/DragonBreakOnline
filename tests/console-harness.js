@@ -307,6 +307,35 @@ reset();
   loadConsole(PINNED);
 }
 
+// ---- 5b. the repo's gamemode-config.json carries the game pin (review R3; Jake's list, 14 Oct) ---------------------------------
+// Every gameplay deploy writes the repo's gamemode-config.json over the live one (keeping only the live admins), so the block
+// lives in the repo. Jake, Nate and the Lead GMs are on it; the pin grants nothing by itself (the tier rule still applies)
+reset();
+{
+  const repoCfg = JSON.parse(fs.readFileSync(path.join(ROOT, 'gamemode-config.json'), 'utf8'));
+  const rc = repoCfg.remoteConsole || {};
+  const D1 = ['234362720420364288', '262414676489535489', '274310050762326017', '279763097881935873', '297172235397890050', '358760034769043457', '457340616230174740', '536260882930466816'];
+  check('5b. the repo config has the remoteConsole block: on, the eight pinned ids, floor developer, nothing denied',
+    rc.enabled === true && JSON.stringify(rc.discordIds) === JSON.stringify(D1) && rc.minTier === 'developer' && Array.isArray(rc.deny) && rc.deny.length === 0, rc);
+  check('5b. ...and nothing in it that console.js does not read (besides a comment)', Object.keys(rc).every((k) => ['_comment', 'enabled', 'discordIds', 'minTier', 'deny'].includes(k)), Object.keys(rc));
+  logs.length = 0;
+  loadConsole(repoCfg);
+  check('5b. console.js loads the repo config as a game pin of 8, floor developer, all nine commands', logs.some((l) => /console: reader on .*, 9 commands, floor developer, game pin 8$/.test(l)), logs);
+  const owner = actor(0xff000d01, { name: 'Jacob', tag: 'JKOW', profile: 21, discord: D1[0], roles: [ROLE.owner] });
+  const leadOnly = actor(0xff000d02, { name: 'Icara', tag: 'ICED', profile: 22, discord: D1[2], roles: [ROLE.lead] });
+  let rep = send('/whoami', { discordId: D1[0], profileId: 21, user: 'jake', roles: [ROLE.owner] }).rep;
+  check('5b. a pinned Owner runs as their own character while offline (Jake, 14 Oct: "Yes, as my character")', rep.state === 'ran' && rep.ranAs === 'Jacob #JKOW' && rep.online === false, rep);
+  rep = send('/fixloc', { discordId: D1[0], profileId: 21, user: 'jake', roles: [ROLE.owner] }).rep;
+  check('5b. ...and a form that would act on that character is refused with a clear message', rep.state === 'refused' && rep.why === 'self' && /acts on your own character\. Run it in game\./.test(header(rep)), rep);
+  staffLines.length = 0;
+  rep = send('/whoami', { discordId: D1[2], profileId: 22, user: 'icedsky', roles: [ROLE.lead] }).rep;
+  check('5b. a pinned Lead GM whose live tier is below Developer is refused (tier): the pin is not a right', rep.state === 'refused' && rep.why === 'tier' && !staffLines.length, rep);
+  rep = send('/whoami').rep;
+  check('5b. an id that is not on the repo pin is refused (notPinned)', rep.why === 'notPinned', rep);
+  store.delete(owner); store.delete(leadOnly);
+  loadConsole(PINNED);
+}
+
 // ---- 6. the allowlist and its argument rules ----------------------------------------------------------------------------------
 reset();
 {
