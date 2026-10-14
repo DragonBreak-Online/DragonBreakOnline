@@ -6,7 +6,8 @@ require('dotenv').config({ path: require('path').join(__dirname, '..', '.env') }
  * Merge pipeline: copies the client source into the bucket the launcher downloads and builds the zip.
  *   build/dist/client (via `npm run populate`) -> build/client-files/root/ -> build/client-files/<zip> + data/files-version.json
  * SKSE is NOT included; the user manages it via the Vortex collection.
- * Run standalone: node scripts/merge-files.js. Called by scripts/setup-client.js and routes/webhook.js.
+ * Run standalone from a scratch backend export: CLIENT_FILES_DIR=<work folder> node scripts/merge-files.js.
+ * Refuses the live bucket and the live manifest (sources/liveBucket.js) unless DBO_MERGE_LIVE_BUCKET=1. Called by scripts/setup-client.js and routes/webhook.js.
  */
 
 const path               = require('path')
@@ -16,12 +17,14 @@ const { execFileSync }   = require('child_process')
 const archiver           = require('archiver')
 const config             = require('../config')
 const { findSymbolFiles } = require('./archive-symbols')
+const liveBucket         = require('../sources/liveBucket')
 
 const ROOT = path.join(__dirname, '..')
 
 const CLIENT_SRC   = path.join(ROOT, 'sources', 'client')
-const OUTPUT_DIR   = path.join(config.clientFilesDir, 'root')
-const ZIP_PATH     = path.join(config.clientFilesDir, config.clientZipName)
+const BUCKET       = config.clientFilesDir
+const OUTPUT_DIR   = path.join(BUCKET, 'root')
+const ZIP_PATH     = path.join(BUCKET, config.clientZipName)
 const VERSION_FILE = path.join(ROOT, 'data', 'files-version.json')
 
 // skymp5-client-settings.txt is the launcher's per-player file (server ip, hotkey rebinds): never copied and never listed in the manifest, since the launcher rewrites it on every launch
@@ -139,6 +142,10 @@ async function mergeSourcesIntoRoot() {
   console.log('[merge] Starting merge…')
   console.log(`[merge]   client  : ${CLIENT_SRC}`)
   console.log(`[merge]   output  : ${OUTPUT_DIR}`)
+
+  const live = liveBucket.liveTarget({ bucket: BUCKET, manifest: VERSION_FILE })
+  if (live && !liveBucket.optedIn()) throw new Error(liveBucket.refusalMessage(live))
+  if (live) console.warn(`[merge] ${liveBucket.OPT_IN}=1: writing into the live client files as asked (${live})`)
 
   // The source and what an earlier run or populate left in the output, before anything is copied: OUTPUT_DIR is served
   // at /files/root as soon as a file lands in it, and the copy never removes a stale file
