@@ -2270,8 +2270,10 @@ globalThis.__dboAtCreationEnd = (a) => inHub(a) && !creationPending(a);
 // them into that property (god mode and the rest are judged from its own state), so this changes nothing server-side.
 // Only `invis` and the sweep's mark are written, the other mirrored modes are kept. AdminSystem rewrites the mirror at each
 // login and each toggle, so a sweep puts the flag back; leaving the Realm takes it off at once, unless Invisible is the
-// staff member's own (on at arrival, or toggled on in the Realm). actor -> { was: Invisible is their own }.
+// staff member's own (on at arrival, or toggled on in the Realm). actor -> Invisible is their own.
 const creatorHidden = globalThis.__dboCreatorHidden instanceof Map ? globalThis.__dboCreatorHidden : (globalThis.__dboCreatorHidden = new Map());
+// Actors whose mirror the sweep has marked; kept out of the Map, which the code before the mark reads as true/false
+const creatorMarked = globalThis.__dboCreatorMarked instanceof Set ? globalThis.__dboCreatorMarked : (globalThis.__dboCreatorMarked = new Set());
 const inCreatorRealm = (a) => inHub(a) && (creationPending(a) || creation.has(a >>> 0));
 const adminModesOf = (a) => { try { const m = mp.get(a, 'ff_adminModes'); return m && typeof m === 'object' ? m : {}; } catch (e) { return {}; } };
 // The sweep's flag carries this key; AdminSystem writes a fresh mirror without it, whose invis is then the staff member's own
@@ -2281,15 +2283,15 @@ const setCreatorHidden = (a, on) => {
   try {
     const m = adminModesOf(a);
     const rec = creatorHidden.get(id);
-    // A bare true/false is an entry from before the mark (kept over a reload): its mirror cannot tell who wrote it
-    const marked = !!rec && typeof rec === 'object';
-    const own = marked && m[CREATOR_MARK] !== true ? m.invis === true : null;
-    const was = own !== null ? own : marked ? rec.was : rec === undefined ? m.invis === true : rec === true;
+    const own = rec !== undefined && creatorMarked.has(id) && m[CREATOR_MARK] !== true ? m.invis === true : null;
+    const was = own !== null ? own : rec === undefined ? m.invis === true : rec === true;
     if (on) {
       if (m.invis !== true || m[CREATOR_MARK] !== true) mp.set(a, 'ff_adminModes', Object.assign({}, m, { invis: true, [CREATOR_MARK]: true }));
-      creatorHidden.set(id, { was });
+      creatorHidden.set(id, was);
+      creatorMarked.add(id);
       return;
     }
+    creatorMarked.delete(id);
     if (rec === undefined) return;
     creatorHidden.delete(id);
     if (own !== null || (m[CREATOR_MARK] !== true && (was || m.invis !== true))) return;
@@ -2307,6 +2309,7 @@ every('creatorHide', 1000, () => {
   }
   // Offline: AdminSystem clears a stale mirror at the next login, so the entry only has to go
   for (const id of creatorHidden.keys()) if (!seen.has(id)) creatorHidden.delete(id);
+  for (const id of creatorMarked) if (!creatorHidden.has(id)) creatorMarked.delete(id);
 });
 // The move never beats the starter kit, which lands 6 s after the creator closes
 const CREATION_MOVE_MS = 9000;
