@@ -53,7 +53,9 @@ const GOLD = 0xf;
 // A power's buffs: meleeDamage, bowDamage, fireDealt, shockDealt (shares added to the attacker's hit); damageTaken (every
 // hit), physicalTaken (a hit that is not a spell, enchantment or scroll), resistMagic (added to the race's own share):
 // shares off the target's; wardPoints: spell damage absorbed in all while it lasts; healthRegen, staminaRegen,
-// magickaRegen: factors, at most conditionalRegenCap
+// magickaRegen: factors, at most conditionalRegenCap. moveSpeed and jumpHeight are shares the PLAYER'S OWN GAME applies
+// (the server is only a relay for movement), so they need a client that names the power's clientCap; the server carries
+// the numbers and the wait and never applies them itself.
 const DEFAULTS = {
   enabled: false, overhaul: false, reductionCap: 0.75, alwaysRegenCap: 1.25, conditionalRegenCap: 1.5, combatSeconds: 10, tickSeconds: 0.25, minStep: 0.002,
   payoutSeconds: 1,
@@ -75,8 +77,17 @@ const DEFAULTS = {
   // Night Eye is the player's own screen: the server keeps the power (state, wait) and tells that player's client to draw
   // it (view 'nightEye': dboNightEye, skymp5-client nightEyeService.ts, client 0.3.97). clientCap: a client whose UI did
   // not name it in dbo:uiCaps (0.3.95 and older) is told it comes with a later update, as clientOnly tells everyone
+  // Two powers, each on its own wait (Nate, 14 Oct). Cat-like Reflexes is clientOnly until a client draws it: moveSpeed
+  // and jumpHeight are the player's own game, not the server's judgement, so there is nothing for the server to apply
+  // and it is declined with the usual "comes with a later update" line until the cap is named.
   khajiit: { unarmedDamage: 8, xp: { unarmed: 1.15 },
-    power: { name: 'Night Eye', seconds: 60, cooldownHours: 1 / 3, clientCap: 'nightEye', view: 'nightEye', effect: 'you see in the dark', buffs: {} } },
+    powers: [
+      // key: what the character's record is filed under. Pinned rather than taken from the name, so renaming a power
+      // later does not orphan every player's cooldown. 'nighteye' is what the name already gave, so nothing moves.
+      { key: 'nighteye', name: 'Night Eye', seconds: 60, cooldownHours: 1 / 3, clientCap: 'nightEye', view: 'nightEye', effect: 'you see in the dark', buffs: {} },
+      { key: 'catreflexes', name: 'Cat-like Reflexes', seconds: 60, cooldownHours: 1 / 3, clientCap: 'catReflexes', view: 'catReflexes',
+        effect: 'you move faster and jump higher', buffs: { moveSpeed: 0.15, jumpHeight: 0.2 } },
+    ] },
   // Outdoors in Skyrim, or in the Jerall Mountains: the BSHeartland worldspace around Bruma and the Pale Pass road
   nord: { resistFrost: 0.5, coldStaminaRegen: 1.15, coldProvinces: ['skyrim'],
     coldAreas: [{ world: 'a764b:BSHeartland.esm', pos: [56000, 232000], radius: 60000 }], xp: { blade: 1.15 },
@@ -164,24 +175,76 @@ module.exports = (api) => {
 
   // ---- the Racial Power: its state and the buff it gives now ------------------------------------------------------------
   const POWER = 'private.racialPower';
-  const powerOf = (race) => { const p = race && C[race] && C[race].power; return p && typeof p === 'object' ? p : null; };
-  const powerState = (a) => { try { const v = mp.get(a >>> 0, POWER); return v && typeof v === 'object' ? v : {}; } catch (e) { return {}; } };
+  // A race may have more than one power (Nate, 14 Oct: the Khajiit keep Night Eye and gain Cat-like Reflexes). `powers`
+  // is the list; the older single `power` still reads as a list of one, so a race that has not been moved over is
+  // unchanged. Each one is kept apart by a key made from its name, because the wait is per power, not per race.
+  // `power` wins where it is set, because the config merges onto the defaults and a race given one in gamemode-config
+  // is overriding the list, not adding to it.
+  const powersOf = (race) => {
+    const r = race && C[race]; if (!r) return [];
+    if (r.power && typeof r.power === 'object') return [r.power];
+    return Array.isArray(r.powers) ? r.powers.filter((p) => p && typeof p === 'object') : [];
+  };
+  const slug = (x) => String(x || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
+  const keyOf = (p) => slug((p && p.key) || (p && p.name) || '');
+  // A power answers to its key or to its name, so /power cat-like reflexes works as well as its filed key
+  const named = (p, want) => !!p && (keyOf(p) === want || slug(p.name) === want);
+  const powerOf = (race, which) => {
+    const list = powersOf(race);
+    if (!which) return list[0] || null;
+    const want = slug(which);
+    return list.find((p) => named(p, want)) || null;
+  };
+  const rawState = (a) => { try { const v = mp.get(a >>> 0, POWER); return v && typeof v === 'object' ? v : {}; } catch (e) { return {}; } };
+  // The record a character holds for one power. Characters from before the list carry the old flat shape (race, usedAt,
+  // activeUntil, readyAt at the top), which belongs to that race's first power: it is read in place, never rewritten,
+  // so a relog in either direction keeps the wait and the running buff.
+  const powerState = (a, key) => {
+    const st = rawState(a);
+    const used = st.used && typeof st.used === 'object' ? st.used : null;
+    if (!key) return st;
+    if (used && used[key] && typeof used[key] === 'object') return Object.assign({ race: st.race }, used[key]);
+    const firstKey = keyOf(powerOf(st.race));
+    if (!used && firstKey && key === firstKey && st.activeUntil !== undefined) return st;
+    return { race: st.race };
+  };
+  const writePowerState = (a, key, rec) => {
+    const st = rawState(a);
+    const used = Object.assign({}, st.used && typeof st.used === 'object' ? st.used : {});
+    // the old flat record is carried into the map the first time this character uses any power
+    const firstKey = keyOf(powerOf(st.race));
+    if (!st.used && firstKey && st.activeUntil !== undefined) used[firstKey] = { usedAt: st.usedAt, activeUntil: st.activeUntil, readyAt: st.readyAt, wardLeft: st.wardLeft };
+    used[key] = rec;
+    const next = { race: rec.race || st.race, used };
+    try { mp.set(a >>> 0, POWER, next); return true; } catch (e) { return false; }
+  };
   // The running power's buffs, or null: only the race that used it, and only while it lasts (a beast form has no race)
   const activeBuffs = (a, now = Date.now()) => {
     if (!overhaul()) return null;
-    const race = raceOf(a); const st = powerState(a); const p = powerOf(race);
-    return p && st.race === race && Number(st.activeUntil) > now ? (p.buffs || {}) : null;
+    const race = raceOf(a); if (!race) return null;
+    let out = null;
+    for (const p of powersOf(race)) {
+      const st = powerState(a, keyOf(p));
+      if (st.race !== race || !(Number(st.activeUntil) > now)) continue;
+      // Two powers can run at once, so their shares add; the caps downstream still hold each kind in check.
+      for (const [k, v] of Object.entries(p.buffs || {})) { out = out || {}; out[k] = num(out[k], 0) + num(v, 0); }
+      out = out || {};
+    }
+    return out;
   };
   const buff = (a, key) => { const b = memoised('buffs', a, activeBuffs); return b ? Math.max(0, num(b[key], 0)) : 0; };
   // The ward: a pool of spell damage (wardPoints, set when the power is called) it takes off hits until it is spent or the
   // power ends. dmg: the hit after the race's other shares. Returns the factor on the hit, spending what it absorbed (the
   // reductionCap floor may let a little more through than the pool counted)
   const wardAbsorb = (a, dmg) => {
-    const st = powerState(a);
+    const race = raceOf(a);
+    const p = powersOf(race).find((x) => num(x.wardLeft, 0) >= 0 && num((x.buffs || {}).wardPoints, 0) > 0);
+    const key = keyOf(p);
+    const st = key ? powerState(a, key) : {};
     const left = Math.max(0, num(st.wardLeft, 0));
     if (!(left > 0) || !(dmg > 0)) return 1;
     const took = Math.min(left, dmg);
-    try { mp.set(a >>> 0, POWER, Object.assign({}, st, { wardLeft: left - took })); } catch (e) { return 1; }
+    if (!writePowerState(a, key, Object.assign({}, st, { race: st.race || race, wardLeft: left - took }))) return 1;
     if (took >= left) { try { personal(a >>> 0, 'Your ward breaks.'); } catch (e) { /* the message is optional */ } }
     return (dmg - took) / dmg;
   };
@@ -448,11 +511,11 @@ module.exports = (api) => {
     return m >= 60 ? `${Math.floor(m / 60)} h${m % 60 ? ` ${m % 60} min` : ''}` : `${m} min`;
   };
   // What the Journal and /status show: null without a power (the overhaul off, a beast form, a race without one)
-  const powerView = (a, now = Date.now()) => {
-    if (!overhaul()) return null;
-    const race = raceOf(a); const p = powerOf(race);
-    if (!p) return null;
-    const st = powerState(a);
+  // One power's view. powerView keeps returning the race's first, so the journal, the HUD and /status are unchanged;
+  // powerViews returns every one, for a UI that can offer a choice.
+  const viewOf = (a, p, now) => {
+    const race = raceOf(a);
+    const st = powerState(a, keyOf(p));
     const activeUntil = st.race === race && Number(st.activeUntil) > now ? Number(st.activeUntil) : 0;
     const readyAt = Number(st.readyAt) > now ? Number(st.readyAt) : 0;
     // activeMs, waitMs: what is left at the time of sending, for a countdown on the player's own clock
@@ -463,24 +526,48 @@ module.exports = (api) => {
     // A power without buffs says what it does; a wait shorter than a day is told (the journal's box: front 0.3.97)
     if (p.effect) view.effect = String(p.effect);
     if (p.cooldownHours !== undefined) view.cooldownHours = Math.max(0, num(p.cooldownHours, 24));
+    view.key = keyOf(p);
     return view;
+  };
+  const powerViews = (a, now = Date.now()) => {
+    if (!overhaul()) return [];
+    const race = raceOf(a); if (!race) return [];
+    return powersOf(race).map((p) => viewOf(a, p, now)).filter(Boolean);
+  };
+  const powerView = (a, now = Date.now()) => {
+    const all = powerViews(a, now);
+    if (!all.length) return null;
+    const first = all[0];
+    // What a race's other powers are doing, for a UI that lists them; the old callers read only the fields above.
+    if (all.length > 1) first.others = all.slice(1);
+    return first;
   };
   // A power that needs the client to draw it (clientCap): only for a client whose UI named that capability (gamemode.js
   // hasUiCap, dbo:uiCaps); without the reader, nobody has it
   const clientHas = (a, cap) => { if (!cap) return true; try { return typeof hasUiCap === 'function' && hasUiCap(a >>> 0, String(cap)) === true; } catch (e) { return false; } };
   // Use it: { ok, text }. Once a real day (cooldownHours), counted from the use, kept on the character
-  const usePower = (a, now = Date.now()) => {
+  // `which` names one of the race's powers; without it the first that can be called is used, so a UI that knows nothing
+  // of the list still works and a race with one power behaves exactly as before.
+  const usePower = (a, now = Date.now(), which) => {
     if (!overhaul()) return { ok: false, text: 'Racial powers are not in use yet.' };
-    const v = powerView(a, now);
-    if (!v) return { ok: false, text: inBeastForm(a) ? 'The beast has no use for it.' : 'You have no racial power to call on.' };
+    const all = powerViews(a, now);
+    if (!all.length) return { ok: false, text: inBeastForm(a) ? 'The beast has no use for it.' : 'You have no racial power to call on.' };
+    let v = null;
+    if (which) {
+      const want = slug(which);
+      v = all.find((x) => x.key === want || slug(x.name) === want) || null;
+      if (!v) return { ok: false, text: `You have no power called "${which}". Yours: ${all.map((x) => x.name).join(', ')}.` };
+    } else {
+      v = all.find((x) => x.ready) || all[0];
+    }
     if (v.clientOnly) return { ok: false, text: `${v.name} comes with a later update of the game.` };
     if (v.activeUntil) return { ok: false, text: `${v.name} is already upon you (${Math.ceil((v.activeUntil - now) / 1000)} s).` };
     if (v.readyAt) return { ok: false, text: `${v.name} returns in ${fmtWait(v.readyAt - now)}.` };
-    const p = powerOf(v.race);
+    const p = powerOf(v.race, v.key);
     const hours = Math.max(0, num(p.cooldownHours, num(C.powerCooldownHours, 24)));
     const st = { race: v.race, usedAt: now, activeUntil: now + v.seconds * 1000, readyAt: now + hours * 3600000 };
     if (num((p.buffs || {}).wardPoints, 0) > 0) st.wardLeft = num(p.buffs.wardPoints, 0);
-    try { mp.set(a >>> 0, POWER, st); } catch (e) { return { ok: false, text: 'Your power cannot be called just now.' }; }
+    if (!writePowerState(a, v.key, st)) return { ok: false, text: 'Your power cannot be called just now.' };
     S.powerOn.set(a >>> 0, st.activeUntil);
     hudRefresh(a);
     // Its look on the player's own game (the DLE's ward spell): nothing when the record is not in the load order yet
@@ -537,9 +624,9 @@ module.exports = (api) => {
   // The seconds of a drawn power left on this character now, or 0
   const eyeLeft = (a, now) => {
     if (!overhaul()) return 0;
-    const race = raceOf(a); const p = powerOf(race);
-    if (!p || p.view !== 'nightEye') return 0;
-    const st = powerState(a);
+    const race = raceOf(a); const p = powersOf(race).find((x) => x.view === 'nightEye');
+    if (!p) return 0;
+    const st = powerState(a, keyOf(p));
     if (st.race !== race || !(Number(st.activeUntil) > now)) return 0;
     return (Number(st.activeUntil) - now) / 1000;
   };
@@ -554,8 +641,9 @@ module.exports = (api) => {
       let left = eyeLeft(a, now);
       if (left > 0 && isDead(a)) {
         // Death ends it; the wait from the use stays
-        const st = powerState(a);
-        try { mp.set(a, POWER, Object.assign({}, st, { activeUntil: now })); } catch (e) { /* the off below still goes */ }
+        const eye = powersOf(raceOf(a)).find((x) => x.view === 'nightEye');
+        const st = powerState(a, keyOf(eye));
+        writePowerState(a, keyOf(eye), Object.assign({}, st, { race: st.race || raceOf(a), activeUntil: now }));
         S.powerOn.delete(a);
         hudRefresh(a);
         left = 0;
@@ -637,9 +725,10 @@ module.exports = (api) => {
   globalThis.__dboRaceDiseaseResist = diseaseResist;
   globalThis.__dboRacialPowerUse = usePower;
   globalThis.__dboRacialPowerView = powerView;
+  globalThis.__dboRacialPowerViews = powerViews;
   globalThis.__dboRacialPowerHud = hudField;
   return { config: C, raceOf, attackMult, targetMult, capTargetSide, regenFactor, extraPerSecond, regenTick, onCast, castHeld, goldBonus, inCold, fighting, COMBAT,
-    skillRate, diseaseResist, powerView, usePower, powerTick, statusLine, hudField, abilityTick, wardAbsorb, eyeTick };
+    skillRate, diseaseResist, powerView, powerViews, usePower, powerTick, statusLine, hudField, abilityTick, wardAbsorb, eyeTick };
 };
 module.exports.RACES = RACES;
 module.exports.RACE_IDS = RACE_IDS;

@@ -59,6 +59,15 @@ const G = lifted(mp, recordOf, {});
 // ---- the module ----
 const P = (n) => n; // profiles: actors 1..99 are players, 1000+ NPCs
 const given = [];
+
+// racial.js keeps a record per power since 14 Oct (a race may have more than one), so a test that fast-forwards a
+// power reaches for its own record rather than the character's whole property.
+const prec = (actor, key) => {
+  const all = state[actor].props['private.racialPower'] || (state[actor].props['private.racialPower'] = {});
+  all.used = all.used || {};
+  return (all.used[key] = all.used[key] || {});
+};
+
 const told = [];
 let timers = [];
 const make = (racialCfg, extra = {}) => require(path.join(SERVER, 'racial.js'))(Object.assign({
@@ -115,20 +124,20 @@ const view0 = R.powerView(NORD);
 check('a Nord\'s power: Battle Cry, 60 s, ready', view0 && view0.name === 'Battle Cry' && view0.seconds === 60 && view0.ready === true, view0);
 check('before it: a sword hits as today', R.attackMult(NORD, NPC, SWORD, 10) === 1);
 const u = R.usePower(NORD);
-check('used: told, and kept on the character with a day\'s wait', u.ok && /^Battle Cry: 60 seconds/.test(u.text) && (() => { const st = state[NORD].props['private.racialPower']; return st.race === 'nord' && st.activeUntil - st.usedAt === 60000 && st.readyAt - st.usedAt === 24 * 3600000; })(), u);
+check('used: told, and kept on the character with a day\'s wait', u.ok && /^Battle Cry: 60 seconds/.test(u.text) && (() => { const st = prec(NORD, 'battlecry'); return st.race === 'nord' && st.activeUntil - st.usedAt === 60000 && st.readyAt - st.usedAt === 24 * 3600000; })(), u);
 check('Battle Cry: melee +15% (a sword, fists), a bow and a spell unchanged', near(R.attackMult(NORD, NPC, SWORD, 10), 1.15) && near(R.attackMult(NORD, NPC, FIST, 10), 1.15) && R.attackMult(NORD, NPC, BOW, 10) === 1 && R.attackMult(NORD, NPC, FLAMES, 10) === 1);
 check('...not used twice while it lasts', /already upon you/.test(R.usePower(NORD).text));
 check('the status line and the HUD countdown say so', /^Battle Cry: upon you, (59|60) s left$/.test(R.statusLine(NORD)) && R.hudField(NORD) && R.hudField(NORD).name === 'Battle Cry' && [59000, 60000].includes(R.hudField(NORD).ms) && R.powerView(NORD).activeMs > 59000 && R.powerView(NORD).waitMs > 86399000, [R.statusLine(NORD), R.hudField(NORD)]);
 // a relog: a new module over the same character state
 const R2 = make({ enabled: true, overhaul: true });
 check('a relog or a reload keeps the buff and the wait', near(R2.attackMult(NORD, NPC, SWORD, 10), 1.15) && /already upon you/.test(R2.usePower(NORD).text));
-const st = state[NORD].props['private.racialPower'];
+const st = prec(NORD, 'battlecry');
 st.activeUntil = Date.now() - 1;
 check('when it ends: the hit is plain again, and it waits out the day', R2.attackMult(NORD, NPC, SWORD, 10) === 1 && /^Battle Cry returns in 24 h\./.test(R2.usePower(NORD).text) && /^Battle Cry: returns in 24 h$/.test(R2.statusLine(NORD)), R2.usePower(NORD).text);
 st.readyAt = Date.now() - 1;
 check('...then it is ready again', R2.powerView(NORD).ready === true && R2.usePower(NORD).ok === true);
 // the fade message
-told.length = 0; state[NORD].props['private.racialPower'].activeUntil = Date.now() - 1; globalThis.__dboRacialState.powerOn.set(NORD, Date.now() - 1);
+told.length = 0; prec(NORD, 'battlecry').activeUntil = Date.now() - 1; globalThis.__dboRacialState.powerOn.set(NORD, Date.now() - 1);
 R2.powerTick();
 check('it fades with a word', told.some(([a, t]) => a === NORD && t === 'Battle Cry fades.'), told);
 
@@ -153,15 +162,15 @@ R.usePower(IMPERIAL); R.usePower(REDGUARD); R.usePower(BOSMER);
 check('Voice of the Emperor: health and stamina regen x1.5', near(R.regenFactor(IMPERIAL, 'health'), 1.5) && near(R.regenFactor(IMPERIAL, 'stamina'), 1.5));
 check('Adrenaline Rush: stamina x1.5 in place of the gift\'s x1.25', near(R.regenFactor(REDGUARD, 'stamina'), 1.5));
 check('Wild Hunt: a bow x1.1 x1.2, stamina x1.5, a sword unchanged; 30 s', near(R.attackMult(BOSMER, NPC, BOW, 10), 1.1 * 1.2) && near(R.regenFactor(BOSMER, 'stamina'), 1.5) && R.attackMult(BOSMER, NPC, SWORD, 10) === 1
-  && state[BOSMER].props['private.racialPower'].activeUntil - state[BOSMER].props['private.racialPower'].usedAt === 30000);
+  && prec(BOSMER, 'wildhunt').activeUntil - prec(BOSMER, 'wildhunt').usedAt === 30000);
 // Dunmer and Maormer: damage dealt by element
 R.usePower(DUNMER); R.usePower(MAORMER);
 check("Ancestor's Wrath: fire dealt x1.25 (a spell or a fire staff), frost unchanged", near(R.attackMult(DUNMER, NPC, FLAMES, 10), 1.25) && near(R.attackMult(DUNMER, NPC, FIRE_STAFF, 10), 1.25) && R.attackMult(DUNMER, NPC, FROSTBITE, 10) === 1);
-check('Roaring Tempest: no shock damage dealt; the ward is 60 points', R.attackMult(MAORMER, NPC, SPARKS, 10) === 1 && state[MAORMER].props['private.racialPower'].wardLeft === 60);
-check('...a 20-point fire spell: 25% magic resist leaves 15, the ward takes all of it', R.targetMult(NPC, MAORMER, FLAMES, 20) === 0 && state[MAORMER].props['private.racialPower'].wardLeft === 45, state[MAORMER].props['private.racialPower']);
-check('...a sword is not warded', R.targetMult(NPC, MAORMER, SWORD, 20) === 1 && state[MAORMER].props['private.racialPower'].wardLeft === 45);
+check('Roaring Tempest: no shock damage dealt; the ward is 60 points', R.attackMult(MAORMER, NPC, SPARKS, 10) === 1 && prec(MAORMER, 'roaringtempest').wardLeft === 60);
+check('...a 20-point fire spell: 25% magic resist leaves 15, the ward takes all of it', R.targetMult(NPC, MAORMER, FLAMES, 20) === 0 && prec(MAORMER, 'roaringtempest').wardLeft === 45, state[MAORMER].props['private.racialPower']);
+check('...a sword is not warded', R.targetMult(NPC, MAORMER, SWORD, 20) === 1 && prec(MAORMER, 'roaringtempest').wardLeft === 45);
 told.length = 0;
-check('...a 100-point shock spell: x0.5 x0.75 = 37.5, the ward takes the last 45 to 0... and breaks', near(R.targetMult(NPC, MAORMER, SPARKS, 100), 0) && state[MAORMER].props['private.racialPower'].wardLeft === 7.5 && near(R.targetMult(NPC, MAORMER, SPARKS, 100), 0.375 * (37.5 - 7.5) / 37.5) && state[MAORMER].props['private.racialPower'].wardLeft === 0 && told.some(([a, x]) => a === MAORMER && x === 'Your ward breaks.'), state[MAORMER].props['private.racialPower']);
+check('...a 100-point shock spell: x0.5 x0.75 = 37.5, the ward takes the last 45 to 0... and breaks', near(R.targetMult(NPC, MAORMER, SPARKS, 100), 0) && prec(MAORMER, 'roaringtempest').wardLeft === 7.5 && near(R.targetMult(NPC, MAORMER, SPARKS, 100), 0.375 * (37.5 - 7.5) / 37.5) && prec(MAORMER, 'roaringtempest').wardLeft === 0 && told.some(([a, x]) => a === MAORMER && x === 'Your ward breaks.'), state[MAORMER].props['private.racialPower']);
 check('...spent: magic resist only', near(R.targetMult(NPC, MAORMER, FLAMES, 20), 0.75));
 check('...under the cap: Defense x0.3 with the ward\'s 0 is floored at 0.25', near(R.capTargetSide(0.3 * 0), 0.25));
 // Khajiit Night Eye: refused for a client that did not say it draws it (no hasUiCap here; tests/nighteye-harness.js has the rest)
@@ -169,9 +178,9 @@ const k = R.usePower(KHAJIIT);
 check('Night Eye is refused until the client can draw it; its view says so, not ready', !k.ok && /later update/.test(k.text) && R.powerView(KHAJIIT).ready === false && /later update/.test(R.statusLine(KHAJIIT)));
 const RK = make({ enabled: true, overhaul: true, khajiit: { unarmedDamage: 8, power: { name: 'Night Eye', seconds: 60, cooldownHours: 1 / 3, buffs: {} } } });
 const k2 = RK.usePower(KHAJIIT);
-check('...once it is, it waits 20 minutes, not a day', k2.ok && state[KHAJIIT].props['private.racialPower'].readyAt - state[KHAJIIT].props['private.racialPower'].usedAt === 20 * 60000);
+check('...once it is, it waits 20 minutes, not a day', k2.ok && prec(KHAJIIT, 'nighteye').readyAt - prec(KHAJIIT, 'nighteye').usedAt === 20 * 60000, k2);
 // a beast form has no race and no power
-state[ORC].props['private.racialPower'].activeUntil = Date.now() + 60000; state[ORC].beast = { form: 'werewolf' };
+prec(ORC, 'orcishfury').activeUntil = Date.now() + 60000; state[ORC].beast = { form: 'werewolf' };
 check('in a beast form the running power gives nothing and none can be called', R.attackMult(ORC, NPC, SWORD, 10) === 1 && R.targetMult(NPC, ORC, SWORD) === 1 && /beast/.test(R.usePower(ORC).text));
 delete state[ORC].beast;
 check('NPCs have no power', R.powerView(NPC) === null && R.usePower(NPC).ok === false);
