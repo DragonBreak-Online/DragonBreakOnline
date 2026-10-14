@@ -150,7 +150,10 @@ const UI_CAPS = ['bank', 'bankVault', 'robPrompt', 'feedPrompt', 'downed', 'busi
   'nightEye',
   // The business ledger's shop pages (features/businessLedger: the Buy list, the Shop tab; server shops.js): without them
   // the server points customers and owners to /shop and /business shop in chat
-  'playerShop'];
+  'playerShop',
+  // Not a panel: the client gives the Khajiit's Cat-like Reflexes its speed and jump from the server's dboCatReflexes
+  // (skymp5-client catReflexesService.ts); without it the server says the power comes with a later update
+  'catReflexes'];
 const useUiCaps = (): void => {
   useEffect(() => {
     const tell = () => {

@@ -178,7 +178,7 @@ function source() {
   check('the service never casts or relays (no cast, sendCustomPacket, SpellCast message)', !/\.cast\(|sendCustomPacket|SpellCast|MsgType/.test(svc));
   check('the vanilla power stays blocked (magicSyncService BLOCKED_POWER_IDS 0xAA01D)', /0x000AA01D, \/\/ PowerKhajiitNightEye/.test(src('services/services/magicSyncService.ts')));
   check('the service is registered (index.ts)', /new NightEyeService\(sp, controller\)/.test(src('index.ts')));
-  check('the front tells the server it has it (uiCaps nightEye)', /'nightEye'\]/.test(fs.readFileSync(path.resolve(__dirname, '../../skymp5-front/src/features/hud/index.tsx'), 'utf8')));
+  check('the front tells the server it has it (uiCaps nightEye)', /'nightEye',/.test(fs.readFileSync(path.resolve(__dirname, '../../skymp5-front/src/features/hud/index.tsx'), 'utf8')));
 }
 
 main().catch((e) => { console.error(e); process.exitCode = 1; });

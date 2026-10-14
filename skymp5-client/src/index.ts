@@ -77,6 +77,7 @@ import { AutoMoveService } from "./services/services/autoMoveService";
 import { ParalysisService } from "./services/services/paralysisService";
 import { CastSelfService } from "./services/services/castSelfService";
 import { NightEyeService } from "./services/services/nightEyeService";
+import { CatReflexesService } from "./services/services/catReflexesService";
 import { PaleCoatService } from "./services/services/paleCoatService";
 import { AppearanceExtrasService } from "./services/services/appearanceExtrasService";
 import { RestraintService } from "./services/services/restraintService";
@@ -230,6 +231,7 @@ const main = () => {
       new ParalysisService(sp, controller),
       new CastSelfService(sp, controller),
       new NightEyeService(sp, controller),
+      new CatReflexesService(sp, controller),
       new PaleCoatService(sp, controller),
       new AppearanceExtrasService(sp, controller),
       new RestraintService(sp, controller),
