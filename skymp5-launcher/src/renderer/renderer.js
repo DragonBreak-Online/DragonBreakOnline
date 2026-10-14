@@ -980,11 +980,14 @@ const installPanelLog   = document.getElementById('install-panel-log')
 const installPanel      = document.getElementById('install-panel')
 const installMini       = document.getElementById('install-mini')
 const IP = window.dboInstallProgress
+// The banner text is fixed; whether it is shown is decided per state in drawInstallBar.
 document.getElementById('install-banner').textContent = IP.BANNER
 
 // One install's progress, drawn into the main screen panel and the Repair tab's bar alike
 function drawInstallBar(root, d) {
   const q = (sel) => root.querySelector(sel)
+  const banner = q('.install-banner')
+  if (banner) banner.hidden = !d.showBanner
   q('.install-title').textContent = d.title
   q('.install-percent').textContent = d.percent
   const overall = q('.install-bar--overall')
