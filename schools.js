@@ -102,6 +102,14 @@ module.exports = (api) => {
       Conjuration: ['211eb:Skyrim.esm', '640b6:Skyrim.esm'],                    // Bound Sword, Conjure Familiar
       Illusion: ['4dee8:Skyrim.esm', '4deeb:Skyrim.esm'],                       // Courage, Fury
     },
+    // Arcane Mastery (Nate, 14 Oct): after the first spell, one Apprentice spell at ranks.Apprentice and one Adept spell at
+    // ranks.Adept are chosen (F3 Magic tab, a Study Magic shelf or a Scholars' Ledger) from every tome spell of that school and
+    // rank (spells.js __dboSpellsRankOptions), or rankSpells[school][rank] when set. Until it is chosen the school stops at
+    // that level (Priest through skillrates.js). Expert and Master come from tomes and teaching.
+    // A pick opens when the school is held at its level (or already past it); Priest, which rises through the Wheel, is held
+    // from priestHoldXp of the way to the next level
+    rankPicks: { enabled: true, ranks: { Apprentice: 25, Adept: 50 }, priestHoldXp: 90 },
+    rankSpells: {},
     swap: { enabled: true, cooldownDays: 7, startShare: 0.5 },
     // A third of the first pace (Nate, 3 Oct): 25 to 50 takes about 12 days at the daily cap
     castUnits: 0.2,
@@ -166,6 +174,7 @@ module.exports = (api) => {
     wheel: Object.assign({}, DEFAULTS.wheel, raw.wheel || {}),
     swap: Object.assign({}, DEFAULTS.swap, raw.swap || {}),
     firstSpells: Object.assign({}, DEFAULTS.firstSpells, raw.firstSpells || {}),
+    rankPicks: Object.assign({}, DEFAULTS.rankPicks, raw.rankPicks || {}, { ranks: Object.assign({}, DEFAULTS.rankPicks.ranks, (raw.rankPicks || {}).ranks || {}) }),
   });
   const ALTERATION = ['both', 'arcane', 'priest'].includes(String(C.alteration)) ? String(C.alteration) : 'both';
   const SCHOOLS = (Array.isArray(C.schools) ? C.schools : DEFAULTS.schools).map(String).filter((n) => n !== 'Alteration' || ALTERATION !== 'priest');
@@ -295,12 +304,18 @@ module.exports = (api) => {
   const active = (s, school) => s.primary === school || s.secondary === school;
   const schoolRank = (s, school) => (active(s, school) ? rankOfLevel(levelOf(s, school)) : -1);
   // Adds units to one school; returns levels gained
+  // A school stops at an Apprentice or Adept pick's level until that spell is chosen (Arcane Mastery); one already past it
+  // (a change of school, a mage from before the picks) is never pulled back
   const credit = (s, school, units) => {
     const l = s.levels[school] || { level: 0, xp: 0 };
-    const out = addUnits(Number(l.level) || 0, Number(l.xp) || 0, units);
-    s.levels[school] = { level: out.level, xp: out.xp };
-    return out.gained;
+    const before = Number(l.level) || 0;
+    const out = addUnits(before, Number(l.xp) || 0, units);
+    let level = out.level, xp = out.xp;
+    for (const p of RANK_PICKS) if (before <= p.at && level > p.at && !rankMade(s, school, p.rank)) { level = p.at; xp = 99.99; break; }
+    s.levels[school] = { level, xp };
+    return Math.max(0, level - before);
   };
+  const lockedAt = (s, school) => { const lv = levelOf(s, school); const p = RANK_PICKS.find((x) => lv === x.at && !rankMade(s, school, x.rank)); return p ? p.rank : ''; };
   const tellGain = (a, school, before, s) => {
     const now = levelOf(s, school);
     if (now <= before) return;
@@ -319,6 +334,39 @@ module.exports = (api) => {
   // such a pick from before this code first loaded opens once more
   const REOPEN_NONE_BEFORE = globalThis.__dboRestorationListAt || (globalThis.__dboRestorationListAt = Date.now());
   const pickOpen = (s, school) => { const p = s.picks[school]; return !p || (school === RESTORATION && p.how === 'none' && (Number(p.at) || 0) < REOPEN_NONE_BEFORE); };
+  // The Apprentice and Adept picks (rankPicks), lowest first; each is kept in s.rankPicks[school][rank] as a first spell is
+  const RANK_PICKS = C.rankPicks.enabled === false ? [] : Object.entries(C.rankPicks.ranks || {})
+    .map(([rank, at]) => ({ rank, at: Math.floor(Number(at) || 0) })).filter((x) => RANKS.includes(x.rank) && x.at > 0).sort((x, y) => x.at - y.at);
+  const rankMade = (s, school, rank) => !!(s.rankPicks && s.rankPicks[school] && s.rankPicks[school][rank]);
+  // Held at a pick's level: a school by credit() (xp at the top of the level), Priest from priestHoldXp of it; past it counts
+  const PRIEST_HOLD_XP = Math.max(0, Math.min(99.99, Number(C.rankPicks.priestHoldXp) || 90));
+  const atThreshold = (a, s, school, p) => {
+    if (school === RESTORATION) { const pr = priestOf(a); return pr.level > p.at || (pr.level === p.at && pr.xp >= PRIEST_HOLD_XP); }
+    const lv = levelOf(s, school);
+    return lv > p.at || (lv === p.at && (Number((s.levels[school] || {}).xp) || 0) >= 99.99);
+  };
+  // The pick waiting in a school: 'first', a rank of RANK_PICKS, or '' (the first spell always comes first). The doc's
+  // "at 25 Apprentice, and at the threshold for 26 it locks": a rank's pick opens once the school is held there.
+  const stageOf = (a, s, school) => {
+    const level = pickLevel(a, s, school);
+    if (pickOpen(s, school)) return level >= PICK_AT && (C.firstSpells[school] || []).length ? 'first' : '';
+    for (const p of RANK_PICKS) if (!rankMade(s, school, p.rank) && atThreshold(a, s, school, p)) return p.rank;
+    return '';
+  };
+  const stageAt = (st) => (st === 'first' ? PICK_AT : (RANK_PICKS.find((p) => p.rank === st) || { at: PICK_AT }).at);
+  const stageWord = (st) => (st && st !== 'first' ? `${st} spell` : 'first spell');
+  // A stage's spells as descs: the first spells, or the rank's (rankSpells, else every tome spell of that school and rank)
+  const stageList = (school, st) => {
+    if (!st || st === 'first') return C.firstSpells[school] || [];
+    const own = (C.rankSpells[school] || {})[st];
+    if (Array.isArray(own) && own.length) return own;
+    try { return typeof globalThis.__dboSpellsRankOptions === 'function' ? (globalThis.__dboSpellsRankOptions(school, RANKS.indexOf(st)) || []).map((id) => descOf(id >>> 0)).filter(Boolean) : []; } catch (e) { return []; }
+  };
+  const markStage = (s, school, st, rec) => {
+    if (st === 'first') { s.picks[school] = rec; return; }
+    s.rankPicks = Object.assign({}, s.rankPicks || {});
+    s.rankPicks[school] = Object.assign({}, s.rankPicks[school] || {}, { [st]: rec });
+  };
   const RESTORATION = 'Restoration';
   // One line for each first spell, in the panel's choice
   const SPELL_BLURB = {
@@ -340,9 +388,9 @@ module.exports = (api) => {
   // Schools whose first spell waits to be chosen, in the order they are offered
   const pickSchools = (a, s) => {
     const out = [];
-    for (const school of SCHOOLS) if (active(s, school) && pickOpen(s, school) && levelOf(s, school) >= PICK_AT && (C.firstSpells[school] || []).length) out.push(school);
+    for (const school of SCHOOLS) if (active(s, school) && stageOf(a, s, school)) out.push(school);
     const pr = priestOf(a);
-    if (pr.held && pr.level >= PICK_AT && pickOpen(s, RESTORATION) && (C.firstSpells[RESTORATION] || []).length) out.push(RESTORATION);
+    if (pr.held && stageOf(a, s, RESTORATION)) out.push(RESTORATION);
     return out;
   };
   // A school's first spells the character does not know yet: [{ id, desc, name }]
@@ -350,7 +398,7 @@ module.exports = (api) => {
     const known = new Set(knownSpells(a).map((sp) => sp.id >>> 0));
     for (const sp of bookOf(a)) known.add(sp.id >>> 0);
     // desc as the engine writes it (ids are looked up by it); key, lower case, for SPELL_BLURB and comparisons
-    return (C.firstSpells[school] || []).map((d) => ({ id: idOf(d) })).filter((o) => o.id && !known.has(o.id))
+    return stageList(school, stageOf(a, stateOf(a), school)).map((d) => ({ id: idOf(d) })).filter((o) => o.id && !known.has(o.id))
       .map((o) => Object.assign(o, { desc: descOf(o.id), key: norm(descOf(o.id)) })).map((o) => Object.assign(o, { name: nameOfSpell(o.desc) })).filter((o) => o.name);
   };
   const listWords = (names) => (names.length < 2 ? names.join('') : `${names.slice(0, -1).join(', ')} or ${names[names.length - 1]}`);
@@ -360,7 +408,7 @@ module.exports = (api) => {
   // spells.js away, the engine's list unreadable or an id that does not resolve, the answer is false, and nothing is saved.
   const knowsEvery = (a, school) => {
     if (typeof globalThis.__dboSpellsKnown !== 'function' || typeof globalThis.__dboSpellsBook !== 'function') return false;
-    const list = C.firstSpells[school] || [];
+    const list = stageList(school, stageOf(a, stateOf(a), school));
     if (!list.length) return false;
     let known;
     try { known = new Set((globalThis.__dboSpellsKnown(a) || []).map((sp) => sp.id >>> 0)); for (const sp of globalThis.__dboSpellsBook(a) || []) known.add(sp.id >>> 0); } catch (e) { return false; }
@@ -371,11 +419,14 @@ module.exports = (api) => {
     const out = [];
     for (const school of pickSchools(a, s)) {
       if (pickOptions(a, school).length) { out.push(school); continue; }
-      if (!knowsEvery(a, school)) continue; // cannot be offered just now: asked again later, nothing burned
-      s.picks[school] = { spell: '', how: 'none', at: Date.now() };
+      const st = stageOf(a, s, school);
+      // A rank with no tome spell at all has nothing to choose; otherwise it cannot be offered just now: asked again later
+      const none = st !== 'first' && typeof globalThis.__dboSpellsRankOptions === 'function' && !stageList(school, st).length;
+      if (!none && !knowsEvery(a, school)) continue;
+      markStage(s, school, st, { spell: '', how: 'none', at: Date.now() });
       save(a, s);
-      audit(`SCHOOLS ${who(a)} reached ${school} ${PICK_AT} knowing every first spell of it: no pick`);
-      personal(a, `Your ${school === RESTORATION ? 'Priest skill' : `study of ${school}`} has reached ${PICK_AT}. You already know every first spell of ${school}, so there is none to choose.`);
+      audit(`SCHOOLS ${who(a)} reached ${school} ${stageAt(st)} knowing every ${stageWord(st)} of it: no pick`);
+      personal(a, `Your ${school === RESTORATION ? 'Priest skill' : `study of ${school}`} has reached ${stageAt(st)}. ${none ? `There is no ${stageWord(st)} of ${school} to choose` : `You already know every ${stageWord(st)} of ${school}, so there is none to choose`}.`);
     }
     return out;
   };
@@ -387,12 +438,14 @@ module.exports = (api) => {
     if (!options.length) return false;
     const nonce = mkNonce('f', a);
     pickNonces.set(a >>> 0, { nonce, school, ref: ref >>> 0, options });
-    const what = school === RESTORATION ? `Priest has reached ${PICK_AT}` : `Your study of ${school} has reached ${PICK_AT}`;
+    const st = stageOf(a, stateOf(a), school);
+    const what = school === RESTORATION ? `Priest has reached ${stageAt(st)}` : `Your study of ${school} has reached ${stageAt(st)}`;
+    const held = st !== 'first' ? ` Your ${school === RESTORATION ? 'Priest skill' : `study of ${school}`} goes no further until you choose.` : '';
     openWidget(a, {
-      type: 'studyMagic', id: STUDY_PANEL_ID, nonce, title: 'Your First Spell', mode: 'choose',
-      lead: `${what}: choose your first spell of ${school}. It goes into your spellbook, no tome needed.`,
-      school, level: pickLevel(a, stateOf(a), school), rank: RANKS[1], fill: 0, leftSeconds: 0, tickSeconds: 0, gained: 0, whyNot: '',
-      choices: options.map((o) => ({ name: o.name, blurb: SPELL_BLURB[o.key] || '', confirm: `Do you want ${o.name} as your first spell of ${school}?${options.length > 1 ? ` The other${options.length > 2 ? 's' : ''} you can still learn from a tome or a teacher.` : ''}` })),
+      type: 'studyMagic', id: STUDY_PANEL_ID, nonce, title: st === 'first' ? 'Your First Spell' : `Your ${st} Spell`, mode: 'choose',
+      lead: `${what}: choose your ${stageWord(st)} of ${school}. It goes into your spellbook, no tome needed.${held}`,
+      school, level: pickLevel(a, stateOf(a), school), rank: st === 'first' ? RANKS[1] : st, fill: 0, leftSeconds: 0, tickSeconds: 0, gained: 0, whyNot: '',
+      choices: options.map((o) => ({ name: o.name, blurb: SPELL_BLURB[o.key] || '', confirm: `Do you want ${o.name} as your ${stageWord(st)} of ${school}?${options.length > 1 ? ` The other${options.length > 2 ? 's' : ''} you can still learn from a tome or a teacher.` : ''}` })),
       result: result || '', resultKind: resultKind || '',
       events: { choose: 'dbo:firstSpellPick', start: 'dbo:firstSpellPick', stop: 'dbo:firstSpellPick', close: 'dbo:firstSpellClose' },
     }, true);
@@ -452,39 +505,45 @@ module.exports = (api) => {
   const givePending = (a, s) => {
     if (!settled(a)) return [];
     const lines = [];
-    for (const [school, pk] of Object.entries(s.picks || {})) {
+    const waiting = Object.entries(s.picks || {}).map(([school, pk]) => [school, 'first', pk]);
+    for (const [school, byRank] of Object.entries(s.rankPicks || {})) for (const [rank, pk] of Object.entries(byRank || {})) waiting.push([school, rank, pk]);
+    for (const [school, st, pk] of waiting) {
       if (!pk || pk.given !== false) continue;
       const r = grantFirst(a, school, idOf(pk.spell));
-      if (!r) { delete s.picks[school]; save(a, s); log(`schools: ${who(a)}'s first spell ${pk.spell} of ${school} could not be given; the pick opens again`); continue; }
-      s.picks[school] = { spell: pk.spell, how: pk.how, at: pk.at };
+      if (!r) {
+        if (st === 'first') delete s.picks[school]; else delete s.rankPicks[school][st];
+        save(a, s); log(`schools: ${who(a)}'s ${stageWord(st)} ${pk.spell} of ${school} could not be given; the pick opens again`); continue;
+      }
+      markStage(s, school, st, { spell: pk.spell, how: pk.how, at: pk.at });
       queueResend(s, pk.spell, RESEND_MS, '');
       save(a, s);
-      audit(`SCHOOLS ${who(a)} was given ${pk.spell} ${r.name}, the first spell of ${school} they chose`);
-      if (r.ok) lines.push(`You learn ${r.name}, your first spell of ${school}. ${r.line}`);
+      audit(`SCHOOLS ${who(a)} was given ${pk.spell} ${r.name}, the ${stageWord(st)} of ${school} they chose`);
+      if (r.ok) lines.push(`You learn ${r.name}, your ${stageWord(st)} of ${school}. ${r.line}`);
     }
     return lines;
   };
   // { ok, text } of choosing `desc` (or a spell name) as the first spell of `school`
   const pickSpell = (a, school, which) => {
     const s = stateOf(a);
-    if (!pickSchools(a, s).includes(school)) return { ok: false, text: s.picks[school] ? `You have already chosen your first spell of ${school}.` : `${school}'s first spell opens at ${PICK_AT}.` };
+    if (!pickSchools(a, s).includes(school)) return { ok: false, text: s.picks[school] ? `There is no spell of ${school} to choose just now.` : `${school}'s first spell opens at ${PICK_AT}.` };
+    const st = stageOf(a, s, school);
     const w = String(which || '').toLowerCase();
     const o = pickOptions(a, school).find((x) => x.key === norm(which) || x.name.toLowerCase() === w);
-    if (!o) return { ok: false, text: `That is not one of ${school}'s first spells you can choose.` };
+    if (!o) return { ok: false, text: `That is not one of ${school}'s ${stageWord(st)}s you can choose.` };
     if (typeof globalThis.__dboSpellsGrant !== 'function') return { ok: false, text: 'Your spellbook cannot be written just now. Try again in a moment.' };
     if (!settled(a)) {
-      s.picks[school] = { spell: o.desc, how: 'chose', at: Date.now(), given: false };
+      markStage(s, school, st, { spell: o.desc, how: 'chose', at: Date.now(), given: false });
       save(a, s);
-      audit(`SCHOOLS ${who(a)} chose ${o.desc} ${o.name} as their first spell of ${school} (given once the client has settled)`);
-      return { ok: true, text: `${o.name} is your first spell of ${school}; it comes to you in a moment.` };
+      audit(`SCHOOLS ${who(a)} chose ${o.desc} ${o.name} as their ${stageWord(st)} of ${school} (given once the client has settled)`);
+      return { ok: true, text: `${o.name} is your ${stageWord(st)} of ${school}; it comes to you in a moment.` };
     }
     const r = grantFirst(a, school, o.id);
     if (!r || !r.ok) return { ok: false, text: r && r.line ? r.line : `${o.name} would not settle. Try again in a moment.` };
-    s.picks[school] = { spell: o.desc, how: 'chose', at: Date.now() };
+    markStage(s, school, st, { spell: o.desc, how: 'chose', at: Date.now() });
     queueResend(s, o.desc, RESEND_MS, '');
     save(a, s);
-    audit(`SCHOOLS ${who(a)} chose ${o.desc} ${o.name} as their first spell of ${school}`);
-    return { ok: true, text: `You learn ${r.name}, your first spell of ${school}. ${r.line}` };
+    audit(`SCHOOLS ${who(a)} chose ${o.desc} ${o.name} as their ${stageWord(st)} of ${school}`);
+    return { ok: true, text: `You learn ${r.name}, your ${stageWord(st)} of ${school}. ${r.line}${st !== 'first' ? ` Your ${school === RESTORATION ? 'Priest skill' : `study of ${school}`} can rise again.` : ''}` };
   };
   // The first spell's moment, checked every few seconds, at login and at a shelf or ledger. With no school at Arcane Arts
   // firstSchoolAt, the school choice is told once (Swag's line). A school (or Priest) at firstSpellAt with its first spell
@@ -516,17 +575,21 @@ module.exports = (api) => {
     }
     // The 10 s check looks no further once every waiting pick has been told (the options read the engine's spell list)
     const waiting = pickSchools(a, s);
-    if (!waiting.length || (why === 'tick' && waiting.every((x) => s.pickTold[x]))) return false;
+    // Told once per pick: the first spell under the school's name, the Apprentice and Adept picks under school:rank
+    const toldKey = (x) => { const st = stageOf(a, s, x); return st === 'first' ? x : `${x}:${st}`; };
+    if (!waiting.length || (why === 'tick' && waiting.every((x) => s.pickTold[toldKey(x)]))) return false;
     const pend = pendingPicks(a, s);
     if (!pend.length) return false;
     const school = pend[0];
-    const told = !!s.pickTold[school];
-    if (!told) { s.pickTold[school] = Date.now(); save(a, s); audit(`SCHOOLS ${who(a)} reached ${school} ${PICK_AT}: first spell offered (${why})`); }
+    const st = stageOf(a, s, school);
+    const key = toldKey(school);
+    const told = !!s.pickTold[key];
+    if (!told) { s.pickTold[key] = Date.now(); save(a, s); audit(`SCHOOLS ${who(a)} reached ${school} ${stageAt(st)}: ${stageWord(st)} offered (${why})`); }
     const names = listWords(pickOptions(a, school).map((o) => o.name));
-    const line = `${school === RESTORATION ? 'Priest' : `Your study of ${school}`} has reached ${PICK_AT}: you may choose your first spell of ${school} (${names}).`;
+    const line = `${school === RESTORATION ? 'Priest' : `Your study of ${school}`} has reached ${stageAt(st)}: ${st === 'first' ? 'you may choose' : 'choose'} your ${stageWord(st)} of ${school} (${names})${st !== 'first' ? '; it rises no further until you do' : ''}.`;
     const at = ref || (why === 'study' ? studyAt.get(a >>> 0) || 0 : 0);
-    if (at || why === 'login') { personal(a, told ? `Your first spell of ${school} waits to be chosen.` : line); return openPick(a, at, school); }
-    if (!told) personal(a, `${line} Choose it at a Study Magic shelf or a Scholars' Ledger, or when you next log in.`);
+    if (at || why === 'login') { personal(a, told ? `Your ${stageWord(st)} of ${school} waits to be chosen.` : line); return openPick(a, at, school); }
+    if (!told) personal(a, `${line} Choose it in your journal's Magic tab (F3), at a Study Magic shelf or a Scholars' Ledger, or when you next log in.`);
     return false;
   };
 
@@ -1834,15 +1897,22 @@ module.exports = (api) => {
       const next = r + 1 < FLOORS.length ? FLOORS[r + 1] : 0;
       const l = isR ? null : s.levels[school];
       const made = s.picks[school];
-      const firstPick = made ? { state: made.how === 'none' ? 'none' : 'made', spell: made.spell ? nameOfSpell(made.spell) : '' }
-        : pend.includes(school) ? { state: 'open', choices: pickOptions(a, school).map((o) => ({ id: o.desc, name: o.name, blurb: SPELL_BLURB[o.key] || '' })) }
+      // The pick waiting now (first, Apprentice or Adept) takes the first spell's place; an older client titles it "first
+      // spell", a newer one reads stage and at. rankSpells lists the Apprentice and Adept spells chosen.
+      const st = on ? stageOf(a, s, school) : '';
+      const firstPick = pend.includes(school) ? { state: 'open', stage: st, at: stageAt(st), held: st !== 'first',
+        choices: pickOptions(a, school).map((o) => ({ id: o.desc, name: o.name, blurb: SPELL_BLURB[o.key] || '' })) }
+        : made ? { state: made.how === 'none' ? 'none' : 'made', spell: made.spell ? nameOfSpell(made.spell) : '' }
           : { state: on ? 'later' : 'closed', at: PICK_AT, spells: firstWords(school) };
+      const nextPick = on && made ? RANK_PICKS.find((p) => !rankMade(s, school, p.rank) && p.rank !== st) : null;
+      const rankSpells = RANK_PICKS.map((p) => { const r = ((s.rankPicks || {})[school] || {})[p.rank]; return r ? { rank: p.rank, spell: r.spell ? nameOfSpell(r.spell) : '', none: r.how === 'none' } : null; }).filter(Boolean);
       return {
         name: school, epithet: EPITHET[school] || '', blurb: isR ? RESTORATION_BLURB : BLURB[school] || '',
         role, roleLabel: { primary: 'Primary school', secondary: 'Secondary school', priest: 'Through Priest', resting: 'Resting', closed: isR ? 'Opens with Priest' : 'Closed' }[role],
         level, rank: r >= 0 && role !== 'closed' ? (isR ? RANKS[r] : withProgress(RANKS[r], s, school)) : '', nextRank: next ? RANKS[r + 1] : '', nextAt: next,
         fill: Math.max(0, Math.min(1, (level + (l ? Number(l.xp) || 0 : 0) / 100) / 100)),
         firstSpell: firstPick,
+        rankSpells, nextPick: nextPick ? { rank: nextPick.rank, at: nextPick.at } : null,
         // What the rank really allows: the highest tome rank read in this school (the school's rank, capped by Arcane Arts'
         // tier; Restoration by Priest's), and why it stops there
         allows: (() => {
@@ -1870,6 +1940,14 @@ module.exports = (api) => {
       swap: { enabled: !!SW.enabled, can: !swapWhy, why: swapWhy, nextAt: next > Date.now() ? next : 0, cooldownDays: Number(SW.cooldownDays) || 0, startShare: Number(SW.startShare) || 0.5,
         where: "At a Scholars' Ledger or a Study Magic shelf" },
     };
+  };
+  // Priest stops at an Apprentice or Adept pick's level until it is chosen (skillrates.js asks; schools hold in credit())
+  globalThis.__dboSchoolsSkillHeld = (a, skillId) => {
+    try {
+      if (String(skillId) !== PS.skill || !ready(a) || !isPlayer(a)) return false;
+      const s = stateOf(a), pr = priestOf(a);
+      return RANK_PICKS.some((p) => pr.level === p.at && pr.xp >= PRIEST_HOLD_XP && !rankMade(s, RESTORATION, p.rank));
+    } catch (e) { return false; }
   };
   const magicView = (a) => { try { return magicTabOf(a); } catch (e) { log(`schools: magic view for ${display(a)} failed: ${e.message}`); return null; } };
   globalThis.__dboMagicView = magicView;

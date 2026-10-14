@@ -134,7 +134,8 @@ const mkApi = (cfg) => ({
 });
 // The school chosen at any level with no starter, as before Swag's first spell (firstSchoolAt 0): these checks keep the
 // paths that did not change. tests/first-spell-harness.js runs the first spell at Arcane Arts 25.
-const schoolsCfg = Object.assign({}, CONFIG.schools, { enabled: true, firstSchoolAt: 0, starters: {} });
+// The Apprentice and Adept picks (rank-picks-harness) are off here
+const schoolsCfg = Object.assign({}, CONFIG.schools, { enabled: true, firstSchoolAt: 0, starters: {}, rankPicks: { enabled: false } });
 const load = (overrides, schoolsFile) => {
   handlers.clear(); commands.clear();
   // The Conclave's table is given here even while the tracked config leaves it open (Nate, 30 Sep), so the gate is still tested

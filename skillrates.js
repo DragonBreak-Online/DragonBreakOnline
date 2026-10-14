@@ -120,6 +120,8 @@ module.exports = (api) => {
   // A class at a Class Lectern before the first spell (schools.js, Nate 11 Oct): its award to Arcane Arts is worth the
   // class's firstRate, on top of the skill's own rate; the Wheel's meter has already decided how much work got through
   const rateFor = (actorId, skillId, kind, detail) => {
+    // Priest held at an Apprentice or Adept pick until that spell is chosen (schools.js, Arcane Mastery)
+    try { if (typeof globalThis.__dboSchoolsSkillHeld === 'function' && globalThis.__dboSchoolsSkillHeld(actorId >>> 0, skillId)) return 0; } catch (e) { /* never blocks on error */ }
     const rate = baseRate(actorId, skillId, kind, detail);
     if (kind !== 'award' || typeof globalThis.__dboSchoolsAwardRate !== 'function') return rate;
     let k = 1;
