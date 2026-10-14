@@ -24,6 +24,9 @@ module.exports = (api) => {
     // the chip, the stamina and the broken guard's full blows, never a stagger (playersOnly keeps NPC staggers off)
     pveBlocks: true,
     weaponChip: 0.30, shieldChip: 0.15, chipPerDefenseTier: 0.05,
+    // An arrow or bolt stopped by a raised shield lets this much through (Uhtred, 14 Oct: "players take damage when an arrow
+    // hits their shield"; vanilla stops it), unless the guard is broken; a weapon block of one still chips
+    rangedShieldChip: 0,
     blockStaminaMult: 1, shieldStaminaMult: 0.5, powerIntoShieldStaminaMult: 2,
     guardBreakSeconds: 2,
     bashDamageMult: 0.25, bashStaggerResistRank: 3,
@@ -129,7 +132,9 @@ module.exports = (api) => {
       if (!(raw > 0)) return 1;
       const shield = hasShield(tgt);
       const broken = st(tgt).guardBrokenUntil > now;
-      const share = broken ? 1 : Math.max(0, (shield ? C.shieldChip : C.weaponChip) - C.chipPerDefenseTier * Math.max(0, rankIn(tgt, 'defense')));
+      const ranged = !flags.bash && weaponSkillOf(src) === 'archery';
+      const share = broken ? 1 : shield && ranged ? Math.max(0, Number(C.rangedShieldChip) || 0)
+        : Math.max(0, (shield ? C.shieldChip : C.weaponChip) - C.chipPerDefenseTier * Math.max(0, rankIn(tgt, 'defense')));
       const through = raw * share;
       if (through > 0 && drain(tgt, 'health', through, Number(flags.targetMaxHealth)) !== null) events.push(`chip ${through.toFixed(1)}${broken ? ' (guard broken)' : ''}`);
       let breakGuard = !broken && !!flags.bash;
