@@ -1,5 +1,40 @@
 [
   {
+    "title": "The 15 October update",
+    "date": "2026-10-15",
+    "version": "Server update",
+    "tag": "Change",
+    "sections": [
+      {
+        "heading": "Combat",
+        "items": [
+          "An arrow or bolt that hits your raised shield no longer hurts you. Once your guard is broken, it lands in full.",
+          "Enemies who block your blows now spend stamina doing it, as players do. With no stamina left their guard breaks, and your blows land in full."
+        ]
+      },
+      {
+        "heading": "Homes",
+        "items": [
+          "Handing a house to another player now needs them to be a citizen of the hold it stands in, as buying one does. The hold's officials and staff can still grant houses as before.",
+          "With the Key Ring, locking a door or chest now tells you \"Locked: only key holders can enter.\" You, and anyone with a key, still go through."
+        ]
+      },
+      {
+        "heading": "The world",
+        "items": [
+          "New characters now start at one of 18 spots in the character creation area instead of all on one, so people making a character at the same time no longer stand inside each other.",
+          "The carrot plants at Aleswell can be picked again."
+        ]
+      },
+      {
+        "heading": "Skills",
+        "items": [
+          "The Scholar skill's tier list now says which spell tomes each tier can find by reading: Apprentice tomes from the second tier, Adept from the third, and Expert and, very rarely, Master tomes for senior college ranks."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Staff permissions for courts and citizenship",
     "date": "2026-10-15",
     "version": "Server update",
