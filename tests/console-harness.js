@@ -104,9 +104,18 @@ const G = new Function('mp', 'log', 'cfg', 'fs', 'path', 'world', 'CHAT_PROP', '
   () => {}, () => {}, () => false, () => {}, (who, tier, what, detail) => staffLines.push({ who, tier, what, detail }), () => {}, null, async () => {}, () => 0);
 
 // beastform.js's /wwremote and /vlremote, with its BODY table and breaker flag, cut as written
+// beastform.js's bodyTripped as written, with what it reads. One line until origin/server d4be291be (Nate's hotfix-1014b,
+// 14 Oct: a werewolf breaker trip expires after breakerHoldMinutes); a block after it, with minutes() and HOLD_MS before
+// it, read from the module's CFG, which is {} here, so the defaults. The cut runs to bodyShown either way
+const trippedCut = (text) => {
+  const t = text.indexOf('\n  const bodyTripped = '); const end = t < 0 ? -1 : text.indexOf('\n  const bodyShown = ', t);
+  if (t < 0 || end < 0) { console.log('FAIL the bodyTripped markers are gone from beastform.js'); process.exit(1); };
+  const m = text.lastIndexOf('\n  const minutes = ', t); const wb = text.indexOf('\n  const WB = ');
+  return `const CFG = {};${text.slice(m > wb && wb >= 0 ? m : t, end)}`;
+};
 const beastBody = [
   cutIn(beastSrc, '  const BODY = {', '  const WB = ', 'BODY'),
-  beastSrc.match(/^ {2}const bodyTripped = .*$/m)[0],
+  trippedCut(beastSrc),
   cutIn(beastSrc, '  // /vlremote and /wwremote', "  registerChatCommand('forms'", 'remoteCommand'),
 ].join('\n');
 const beastSent = [];
