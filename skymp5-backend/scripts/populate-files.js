@@ -19,13 +19,15 @@ const liveBucket = require('../sources/liveBucket')
 const ROOT_DEST = path.join(config.clientFilesDir, 'root')
 const DATA_DEST = path.join(ROOT_DEST, 'Data')
 
-// It deletes and rewrites <bucket>/root/Data, served at /files/root as soon as a file lands there
-const refused = liveBucket.refusal({ bucket: config.clientFilesDir })
+// It deletes and rewrites <bucket>/root/Data, served at /files/root as soon as a file lands there: checked after links, since a
+// root or Data that is a link into the live files would be deleted there
+const targets = { bucket: config.clientFilesDir, writes: [ROOT_DEST, DATA_DEST] }
+const refused = liveBucket.refusal(targets)
 if (refused) {
   console.error(`\n${refused}\n`)
   process.exit(1)
 }
-const live = liveBucket.liveTarget({ bucket: config.clientFilesDir })
+const live = liveBucket.liveTarget(targets)
 if (live) console.warn(`\n${liveBucket.OPT_IN}=1: writing into the live client files as asked (${live})\n`)
 
 if (!fs.existsSync(SKYMP_DATA)) {
