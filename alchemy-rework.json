@@ -1,5 +1,5 @@
 {
- "_comment": "Alchemy rework (Nate, 14 Oct, 'DBO: Alchemy Rework'; plan in claude-nate-release/specs/alchemy-rework-1014-plan.md). Read by alchemy.js at every hot reload. tierNames: the strength words of the five Alchemist tiers (Novice 1, Apprentice 25, Adept 50, Expert 75, Master 90). effects: by magic effect (Skyrim.esm id, as alchemy-potions.json), minTier the lowest tier that may brew it, byTier the record (an editor id from alchemy-potions.json, or a desc 'id:Plugin') given at tiers 1..5 (null below minTier), label the design's name after the strength word, kind restore|regen|resist|fortify|skill|poison|special. An effect not listed keeps alchemy-potions.json's old choice. restoreBands: what a restore potion of each magnitude gives when drunk, as a share of the drinker's own pool (any plugin's restore potion, food left alone). records: the PC's records (DragonBreak Online Edits.esp) by editor id -> 'localid:DragonBreak Online Edits.esp', filled once the PC sends the ids (each is checked against its editor id at load; an unmapped one leaves its tier to fallback, the vanilla record). percentEffects/overTime.slowEffects: the PC's restore effects whose magnitude is the percentage itself. fortify: what each fortify effect feeds on the server (hook), bonus = magnitude x perPoint up to cap. poisons: weapon poisons as a share of the target's pool (magnitude / anchorPool), judged only with judge true. A kind 'dropped' effect is never brewed (why says so). combos: two-effect records for tier 4 and 5 brewers whose mix shares both effects (empty until the PC adds the records). Config 'alchemyRework' in gamemode-config.json overrides any key.",
+ "_comment": "Alchemy rework (Nate, 14 Oct, 'DBO: Alchemy Rework'; plan in claude-nate-release/specs/alchemy-rework-1014-plan.md). Read by alchemy.js at every hot reload. tierNames: the strength words of the five Alchemist tiers (Novice 1, Apprentice 25, Adept 50, Expert 75, Master 90). effects: by magic effect (Skyrim.esm id, as alchemy-potions.json), minTier the lowest tier that may brew it, byTier the record (an editor id from alchemy-potions.json, or a desc 'id:Plugin') given at tiers 1..5 (null below minTier), label the design's name after the strength word, kind restore|regen|resist|fortify|skill|poison|special. An effect not listed keeps alchemy-potions.json's old choice. restoreBands: what a restore potion of each magnitude gives when drunk, as a share of the drinker's own pool (any plugin's restore potion, food left alone). records: the PC's records (DragonBreak Online Edits.esp) by editor id -> 'localid:DragonBreak Online Edits.esp', filled once the PC sends the ids (each is checked against its editor id at load; an unmapped one leaves its tier to fallback, the vanilla record). percentEffects/overTime.slowEffects: the PC's restore effects whose magnitude is the percentage itself. fortify: what each fortify effect feeds on the server (hook), bonus = magnitude x perPoint up to cap. poisons: weapon poisons as a share of the target's pool (magnitude / anchorPool), judged only with judge true. A kind 'dropped' effect is never brewed (why says so). combos: two-effect records for tier 4 and 5 brewers whose mix shares both effects (empty until the PC adds the records). Config 'alchemyRework' in gamemode-config.json overrides any key. A combination's names give its name per tier (else name).",
  "enabled": true,
  "tierNames": ["Novice", "Apprentice", "Adept", "Expert", "Master"],
  "tierLevels": [1, 25, 50, 75, 90],
@@ -504,37 +504,37 @@
    "effects": ["03eb15", "03eb16"],
    "minTier": 4,
    "byTier": [null, null, null, "DBO_AlchComboRestoreHealthStaminaT4", "DBO_AlchComboRestoreHealthStaminaT5"],
-   "name": "Philter of Health and Stamina"
+   "names": [null, null, null, "Philter of Health and Stamina", "Elixir of Health and Stamina"]
   },
   {
    "effects": ["03eb15", "03eb17"],
    "minTier": 4,
    "byTier": [null, null, null, "DBO_AlchComboRestoreHealthMagickaT4", "DBO_AlchComboRestoreHealthMagickaT5"],
-   "name": "Philter of Health and Magicka"
+   "names": [null, null, null, "Philter of Health and Magicka", "Elixir of Health and Magicka"]
   },
   {
    "effects": ["03eb17", "03eb16"],
    "minTier": 4,
    "byTier": [null, null, null, "DBO_AlchComboRestoreMagickaStaminaT4", "DBO_AlchComboRestoreMagickaStaminaT5"],
-   "name": "Philter of Magicka and Stamina"
+   "names": [null, null, null, "Philter of Magicka and Stamina", "Elixir of Magicka and Stamina"]
   },
   {
    "effects": ["03eb42", "03a2c6"],
    "minTier": 4,
    "byTier": [null, null, null, "DBO_AlchComboPoisonHealthStaminaT4", "DBO_AlchComboPoisonHealthStaminaT5"],
-   "name": "Virulent Poison of Health and Stamina"
+   "names": [null, null, null, "Virulent Poison of Health and Stamina", "Deadly Poison of Health and Stamina"]
   },
   {
    "effects": ["03a2b6", "03a2c6"],
    "minTier": 4,
    "byTier": [null, null, null, "DBO_AlchComboPoisonMagickaStaminaT4", "DBO_AlchComboPoisonMagickaStaminaT5"],
-   "name": "Virulent Poison of Magicka and Stamina"
+   "names": [null, null, null, "Virulent Poison of Magicka and Stamina", "Deadly Poison of Magicka and Stamina"]
   },
   {
    "effects": ["03eb42", "03a2b6"],
    "minTier": 4,
    "byTier": [null, null, null, "DBO_AlchComboPoisonHealthMagickaT4", "DBO_AlchComboPoisonHealthMagickaT5"],
-   "name": "Virulent Poison of Health and Magicka"
+   "names": [null, null, null, "Virulent Poison of Health and Magicka", "Deadly Poison of Health and Magicka"]
   }
  ]
 }

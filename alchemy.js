@@ -179,6 +179,7 @@ module.exports = (api) => {
     minTier: Math.max(1, Math.min(5, Math.floor(Number(c.minTier) || 4))),
     byTier: [0, 1, 2, 3, 4].map((i) => recordRef((c.byTier || [])[i])),
     name: String(c.name || ''),
+    names: Array.isArray(c.names) ? c.names.map((x) => (x ? String(x) : '')) : [],
   })).filter((c) => c.effects.length === 2 && c.byTier.some(Boolean));
   const tierName = (tier) => RW.tierNames[Math.max(0, Math.min(4, (Number(tier) || 1) - 1))];
   const tierLevel = (tier) => RW.tierLevels[Math.max(0, Math.min(4, (Number(tier) || 1) - 1))];
@@ -209,7 +210,7 @@ module.exports = (api) => {
     for (const c of COMBOS) {
       if (t < c.minTier || !c.effects.every((e) => shared.includes(e))) continue;
       const rec = c.byTier[t - 1];
-      if (rec) return { potion: { id: rec.id, edid: rec.edid, name: c.name || potionName(rec), effect: c.effects[0] }, passed: [] };
+      if (rec) return { potion: { id: rec.id, edid: rec.edid, name: c.names[t - 1] || c.name || potionName(rec), effect: c.effects[0] }, passed: [] };
     }
     const passed = [];
     for (const e of shared) {
