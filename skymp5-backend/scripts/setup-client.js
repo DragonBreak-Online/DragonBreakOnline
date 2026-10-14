@@ -5,19 +5,39 @@
  *   First run:  git clone https://github.com/skyrim-multiplayer/skymp.git sources/client/
  *   Later runs: git pull --ff-only (refuse dirty merges)
  * Then the merge pipeline runs so public/files/root/ is immediately up to date.
- * Usage: node scripts/setup-client.js  (npm run setup)
+ * Refuses the live client files before cloning or pulling, as merge-files.js does (sources/liveBucket.js).
+ * Usage: CLIENT_FILES_DIR=<work folder> node scripts/setup-client.js  (npm run setup)
  */
 
 const { execFileSync } = require('child_process')
 const path = require('path')
 const fs   = require('fs')
+require('dotenv').config({ path: path.join(__dirname, '..', '.env') })
+const config     = require('../config')
+const liveBucket = require('../sources/liveBucket')
 
 const CLIENT_REPO = 'https://github.com/skyrim-multiplayer/skymp.git'
 const CLIENT_DIR  = path.join(__dirname, '..', 'sources', 'client')
 
+const refused = liveBucket.refusal({ bucket: config.clientFilesDir, manifest: liveBucket.MANIFEST })
+if (refused) {
+  console.error(`[setup] ${refused}`)
+  process.exit(1)
+}
+
 // Clone or pull
 
 const isCloned = fs.existsSync(path.join(CLIENT_DIR, '.git'))
+
+function topLevel(dir) {
+  try { return execFileSync('git', ['-C', dir, 'rev-parse', '--show-toplevel'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }) } catch { return '' }
+}
+
+const top = isCloned ? topLevel(CLIENT_DIR) : ''
+if (isCloned && !liveBucket.isOwnTopLevel(CLIENT_DIR, top)) {
+  console.error(`[setup] refusing to pull: ${CLIENT_DIR} is not its own git checkout (git -C lands in ${top.trim() || 'no checkout'})`)
+  process.exit(1)
+}
 
 if (isCloned) {
   console.log('[setup] Client repo already present, pulling latest…')

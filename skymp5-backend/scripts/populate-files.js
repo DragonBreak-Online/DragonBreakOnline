@@ -15,12 +15,28 @@ const SKYMP_DATA = process.env.SKYMP_CLIENT_DATA
 
 // Destination
 const config    = require('../config')
+const liveBucket = require('../sources/liveBucket')
 const ROOT_DEST = path.join(config.clientFilesDir, 'root')
 const DATA_DEST = path.join(ROOT_DEST, 'Data')
+
+// It deletes and rewrites <bucket>/root/Data, served at /files/root as soon as a file lands there
+const refused = liveBucket.refusal({ bucket: config.clientFilesDir })
+if (refused) {
+  console.error(`\n${refused}\n`)
+  process.exit(1)
+}
+const live = liveBucket.liveTarget({ bucket: config.clientFilesDir })
+if (live) console.warn(`\n${liveBucket.OPT_IN}=1: writing into the live client files as asked (${live})\n`)
 
 if (!fs.existsSync(SKYMP_DATA)) {
   console.error(`\nClient build output not found:\n  ${SKYMP_DATA}\n`)
   console.error('Build the client first, or set SKYMP_CLIENT_DATA to its Data/ folder.\n')
+  process.exit(1)
+}
+// An empty Data/ would leave the bucket with no Data at all
+if (!liveBucket.hasFiles(SKYMP_DATA)) {
+  console.error(`\nClient build output is empty:\n  ${SKYMP_DATA}\n`)
+  console.error(`Refusing to replace ${DATA_DEST} with nothing. Build the client first, or set SKYMP_CLIENT_DATA to its Data/ folder.\n`)
   process.exit(1)
 }
 

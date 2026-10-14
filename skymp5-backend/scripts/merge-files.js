@@ -73,13 +73,6 @@ function copyDir(srcDir, destDir, skipNames = new Set()) {
   return count
 }
 
-// Any file but the SKIP_ALWAYS names, at any depth
-function hasFiles(dir) {
-  let entries
-  try { entries = fs.readdirSync(dir, { withFileTypes: true }) } catch { return false }
-  return entries.some(e => !SKIP_ALWAYS.has(e.name) && (!e.isDirectory() || hasFiles(path.join(dir, e.name))))
-}
-
 // Per-file manifest of the output dir (launcher-owned files excluded), so the launcher's Check Files can verify every client file by size + sha256.
 
 function sha256File(p) {
@@ -156,12 +149,12 @@ async function mergeSourcesIntoRoot() {
   if (live) console.warn(`[merge] ${liveBucket.OPT_IN}=1: writing into the live client files as asked (${live})`)
 
   // An empty source would zip whatever the output already holds; with no source, only a work folder's root is packaged as it is
-  if (fs.existsSync(CLIENT_SRC) && !hasFiles(CLIENT_SRC)) {
+  if (fs.existsSync(CLIENT_SRC) && !liveBucket.hasFiles(CLIENT_SRC, SKIP_ALWAYS)) {
     throw new Error(`refusing to merge: the client source ${CLIENT_SRC} is empty, so the zip would be whatever ${OUTPUT_DIR} already holds`)
   }
   if (!fs.existsSync(CLIENT_SRC)) {
     if (live) throw new Error(`refusing to merge: there is no client source ${CLIENT_SRC}, so the zip would be whatever the live root ${OUTPUT_DIR} already holds`)
-    if (!hasFiles(OUTPUT_DIR)) throw new Error(`refusing to merge: there is no client source ${CLIENT_SRC} and no file in ${OUTPUT_DIR} to package`)
+    if (!liveBucket.hasFiles(OUTPUT_DIR, SKIP_ALWAYS)) throw new Error(`refusing to merge: there is no client source ${CLIENT_SRC} and no file in ${OUTPUT_DIR} to package`)
     console.log(`[merge] no client source: packaging the work folder's root ${OUTPUT_DIR} as it is`)
   }
 

@@ -63,9 +63,16 @@ function refusal(targets, env = process.env) {
   return reason && !optedIn(env) ? refusalMessage(reason) : null
 }
 
+// Any file but the skipped names, at any depth
+function hasFiles(dir, skip = new Set()) {
+  let entries
+  try { entries = fs.readdirSync(dir, { withFileTypes: true }) } catch { return false }
+  return entries.some(e => !skip.has(e.name) && (!e.isDirectory() || hasFiles(path.join(dir, e.name), skip)))
+}
+
 // git -C inside a plain folder (or one with a broken .git) of another checkout lands in that checkout: true only when the top level git printed is dir itself
 function isOwnTopLevel(dir, printed) {
   try { return fs.realpathSync(String(printed).trim()) === fs.realpathSync(dir) } catch { return false }
 }
 
-module.exports = { LIVE_REPO, DEFAULT_CLIENT_FILES_DIR, MANIFEST, OPT_IN, realPath, liveTarget, optedIn, refusalMessage, refusal, isOwnTopLevel }
+module.exports = { LIVE_REPO, DEFAULT_CLIENT_FILES_DIR, MANIFEST, OPT_IN, realPath, liveTarget, optedIn, refusalMessage, refusal, hasFiles, isOwnTopLevel }
