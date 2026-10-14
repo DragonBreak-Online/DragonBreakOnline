@@ -410,8 +410,11 @@ ok(M.revoke(COUNT, 'bruma', BJORN).error, 'a ruler cannot revoke a citizenship')
 ok(!M.revoke(STAFF, 'bruma', BJORN).error && !M.citizenOf(BJORN, 'bruma'), 'a Lead GM can');
 
 // ---- Lord Commander (coordinator's decision, 14 Oct): the commander office reads Lord Commander to players ---------------------
-const ZJ = JSON.parse(fs.readFileSync(path.resolve(__dirname, '..', 'zones.json'), 'utf8'));
-ok(ZJ.rankTitles.commander === 'Lord Commander', 'zones.json titles the commander office Lord Commander', ZJ.rankTitles.commander);
+const GM_SRC = fs.readFileSync(path.resolve(__dirname, '..', 'gamemode.js'), 'utf8');
+const RT = GM_SRC.slice(GM_SRC.indexOf('const RANK_TITLES = '), GM_SRC.indexOf('\n', GM_SRC.indexOf('const RANK_TITLES = ')));
+const titles = new Function('ZONES', 'cfg', RT + '\nreturn RANK_TITLES;')(JSON.parse(fs.readFileSync(path.resolve(__dirname, '..', 'zones.json'), 'utf8')), {});
+ok(titles.commander === 'Lord Commander' && titles.jarl === 'Jarl', "the gamemode's default titles read the commander office Lord Commander", titles);
+ok(GM_SRC.includes('defaultTitles: RANK_TITLES') && /return String\(RANK_TITLES\[r\] \|\| r\)/.test(GM_SRC), 'rankTitle and rolenames.js (the boards\' bylines) use them');
 ok(M.votingView(V1, WR).seats.find((s) => s.id === 'commander').label === 'Lord Commander', 'and the ballot names it the same');
 
 console.log(fails ? `\n${fails} FAILED` : '\nall passed');

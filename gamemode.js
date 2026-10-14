@@ -3540,12 +3540,15 @@ const writeOfficials = (o) => {
   officialsText = text; officialsCheckedAt = Date.now();
   try { officialsMtime = fs.statSync(OFFICIALS_PATH).mtimeMs; } catch (e) { officialsMtime = -1; }
 };
+// The default office titles: zones.json's rankTitles, with the commander office read as Lord Commander (citizenship design,
+// coordinator's decision 14 Oct; zones.json stays as it is because the fork reads it at boot) and config rankTitles on top
+const RANK_TITLES = Object.assign({}, ZONES.rankTitles || {}, { commander: 'Lord Commander' }, (cfg && cfg.rankTitles) || {});
 // An office's title: what staff renamed it to at that court (rolenames.js, role-names.json), or zones.json's rankTitles.
 // The office id (r) stays the key everywhere; zoneId left out gives the default.
 const rankTitle = (r, zoneId) => {
   const RN = globalThis.__dboRoleNames;
   if (zoneId && typeof zoneId === 'string' && RN && typeof RN.officeName === 'function') { try { const n = RN.officeName(zoneId, r); if (n) return n; } catch (e) { /* the default */ } }
-  return String((ZONES.rankTitles || {})[r] || r);
+  return String(RANK_TITLES[r] || r);
 };
 const ranksOf = (profileId) => {
   const o = readOfficials(); const out = [];
@@ -7202,7 +7205,7 @@ try {
   const ROLENAMES_JS = path.resolve('rolenames.js');
   delete require.cache[ROLENAMES_JS];
   require(ROLENAMES_JS)({ log, personal, system, audit, who, registerChatCommand, isAdmin, isLeadStaff, onlineActors, profileOf, readOfficials,
-    zoneList, zoneById, defaultTitles: ZONES.rankTitles || {}, cfg });
+    zoneList, zoneById, defaultTitles: RANK_TITLES, cfg });
 } catch (e) { log('rolenames.js failed to load:', e.stack || e.message); globalThis.__dboRoleNames = null; globalThis.__dboOfficeTitle = null; }
 
 // ---- player factions: guilds, holds, clans, cults (server\guilds.js, guild-defs.json) -------------
