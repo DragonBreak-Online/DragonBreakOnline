@@ -107,6 +107,185 @@ module.exports = (api) => {
     return units;
   };
   const potionName = (potion) => potion.edid.replace(/([a-z])([A-Z0-9])/g, '$1 $2').replace(/\s+0?(\d+)$/, ' $1');
+
+  // ---- the alchemy rework (Nate, 14 Oct, "DBO: Alchemy Rework"; alchemy-rework.json) -------------------------------
+  // The Alchemist's five tiers are the design's five levels (skillPoints TIER_FLOORS 1/25/50/75/90), so each tier names its
+  // own record per effect: the weakest restore (Minor) is never brewed, Apprentice and Adept no longer share a strength
+  // (potionAt's rounding gave both index 2), and specials, fortify skills, Smithing and Enchanting open at 25, 50 and 75.
+  // An effect the file does not list keeps potionAt. Config "alchemyRework" in gamemode-config.json overrides any key.
+  const RW = Object.assign({ enabled: true, tierNames: ['Novice', 'Apprentice', 'Adept', 'Expert', 'Master'], tierLevels: [1, 25, 50, 75, 90],
+    words: { potion: ['Potion', 'Draught', 'Solution', 'Philter', 'Elixir'], poison: ['Weak Poison', 'Poison', 'Potent Poison', 'Virulent Poison', 'Deadly Poison'] },
+    restoreBands: [[25, 0.1], [50, 0.2], [75, 0.3], [100, 0.45], [150, 0.6], [1e9, 0.75]], resist: { enabled: true }, effects: {}, combos: [] },
+  readJson('alchemy-rework.json', {}), (api.cfg || {}).alchemyRework || {});
+  const EDID_IDS = new Map();
+  for (const v of Object.values(TABLE)) for (const p of v.potions || []) { const id = idOf(p.id); if (id) EDID_IDS.set(String(p.edid), { id, edid: String(p.edid) }); }
+  const recordRef = (ref) => {
+    if (!ref) return null;
+    if (EDID_IDS.has(String(ref))) return EDID_IDS.get(String(ref));
+    if (!/:/.test(String(ref))) return null;
+    const id = idOf(String(ref)); if (!id) return null;
+    const r = lookup(id);
+    return { id, edid: String((r && r.record.editorId) || ref) };
+  };
+  const RULES = new Map();   // effect (global id) -> { label, kind, minTier, byTier: [{ id, edid } | null] x5 }
+  if (RW.enabled !== false) {
+    for (const [mg, v] of Object.entries(RW.effects || {})) {
+      if (!v || mg.startsWith('_')) continue;
+      const effect = idOf(`${mg}:Skyrim.esm`);
+      if (!effect) continue;
+      const byTier = [0, 1, 2, 3, 4].map((i) => recordRef((v.byTier || [])[i]));
+      const unresolved = (v.byTier || []).filter((x, i) => x && !byTier[i]);
+      if (unresolved.length) log(`alchemy: rework ${v.label || mg} names ${unresolved.join(', ')}, not a known potion; those tiers brew nothing`);
+      RULES.set(effect, { label: String(v.label || mg), kind: String(v.kind || ''), minTier: Math.max(1, Math.min(5, Math.floor(Number(v.minTier) || 1))), byTier });
+    }
+  }
+  // Two-effect records for tier 4 and 5 (combination potions): { effects: ['03eb42', '03a2c6'], minTier: 4, byTier: [..x5], name }
+  const COMBOS = (RW.enabled !== false && Array.isArray(RW.combos) ? RW.combos : []).map((c) => ({
+    effects: (c.effects || []).map((mg) => idOf(`${mg}:Skyrim.esm`)).filter(Boolean),
+    minTier: Math.max(1, Math.min(5, Math.floor(Number(c.minTier) || 4))),
+    byTier: [0, 1, 2, 3, 4].map((i) => recordRef((c.byTier || [])[i])),
+    name: String(c.name || ''),
+  })).filter((c) => c.effects.length === 2 && c.byTier.some(Boolean));
+  const tierName = (tier) => RW.tierNames[Math.max(0, Math.min(4, (Number(tier) || 1) - 1))];
+  const tierLevel = (tier) => RW.tierLevels[Math.max(0, Math.min(4, (Number(tier) || 1) - 1))];
+  const designName = (rule, tier) => {
+    const words = rule.kind === 'poison' ? RW.words.poison : RW.words.potion;
+    return `${words[Math.max(0, Math.min(4, tier - 1))]} of ${rule.label}`;
+  };
+  // The potion the brewer's tier gives for an effect: { id, edid, name, effect } or { locked: minTier } or null
+  const chooseFor = (effect, tier) => {
+    const t = Math.max(1, Math.min(5, Number(tier) || 1));
+    const rule = RULES.get(effect);
+    if (rule) {
+      if (t < rule.minTier) return { locked: rule.minTier, label: rule.label };
+      const rec = rule.byTier[t - 1];
+      return rec ? { id: rec.id, edid: rec.edid, name: designName(rule, t), effect } : null;
+    }
+    const pick = POTIONS.get(effect);
+    if (!pick) return null;
+    const potion = potionAt(pick, tier);
+    return { id: potion.id, edid: potion.edid, name: potionName(potion), effect };
+  };
+  // What a mix makes: a combination first at tier 4+, else the most valuable shared effect the brewer may brew, and the
+  // stronger effects it passed over because they open later
+  const choose = (shared, tier) => {
+    const t = Math.max(1, Math.min(5, Number(tier) || 1));
+    for (const c of COMBOS) {
+      if (t < c.minTier || !c.effects.every((e) => shared.includes(e))) continue;
+      const rec = c.byTier[t - 1];
+      if (rec) return { potion: { id: rec.id, edid: rec.edid, name: c.name || potionName(rec), effect: c.effects[0] }, passed: [] };
+    }
+    const passed = [];
+    for (const e of shared) {
+      const got = chooseFor(e, t);
+      if (!got) continue;
+      if (got.locked) { passed.push(got); continue; }
+      return { potion: got, passed };
+    }
+    return { potion: null, passed };
+  };
+  const lockedHint = (passed) => (passed.length ? ` ${passed[0].label} needs an Alchemist of ${tierName(passed[0].locked)} rank (level ${tierLevel(passed[0].locked)}).` : '');
+
+  // ---- what a potion does when drunk, read from its record (ALCH ENIT, EFID/EFIT; MGEF DATA, libespm MGEF.cpp) -----
+  // ENIT flags at 4: 0x2 food, 0x20000 poison (libespm ALCH.cpp). MGEF DATA: flags at 0 (0x1 hostile, 0x2 recover,
+  // 0x4 detrimental), archetype at 0x40 (0 value modifier), primary actor value at 0x44 (24 Health, 25 Magicka, 26 Stamina,
+  // 41 FireResist, 42 ElectricResist, 43 FrostResist; libespm ActorValue.h). EFIT: magnitude float at 0, duration at 8.
+  const AV_POOL = { 24: 'health', 25: 'magicka', 26: 'stamina' };
+  const AV_ELEMENT = { 41: 'fire', 42: 'shock', 43: 'frost' };
+  const DRAUGHT_OF_REVIVAL = idOf('12ae16:DragonBreak Online Edits.esp');
+  const drinkCache = new Map();   // rebuilt at each reload, so new restoreBands take at once
+  const restoreShare = (magnitude) => {
+    for (const [upTo, share] of RW.restoreBands || []) if (magnitude <= Number(upTo)) return Number(share) || 0;
+    return 0;
+  };
+  const drinkOf = (baseId) => {
+    const id = baseId >>> 0;
+    if (drinkCache.has(id)) return drinkCache.get(id);
+    let out = null;
+    const lr = id && id !== DRAUGHT_OF_REVIVAL ? lookup(id) : null;
+    if (lr && String(lr.record.type) === 'ALCH') {
+      const fields = lr.record.fields || [];
+      const flags = u32(fields.find((f) => f.type === 'ENIT'), 4);
+      if (!(flags & 0x2) && !(flags & 0x20000)) {
+        out = { restores: [], resists: [] };
+        let effect = 0;
+        for (const f of fields) {
+          if (f.type === 'EFID') { try { effect = lr.toGlobalRecordId(u32(f, 0)) >>> 0; } catch (e) { effect = 0; } continue; }
+          if (f.type !== 'EFIT' || !effect) continue;
+          const m = lookup(effect); const data = m && (m.record.fields || []).find((x) => x.type === 'DATA');
+          effect = 0;
+          if (!data || !(data.data instanceof Uint8Array) || data.data.byteLength < 0x48) continue;
+          const mflags = u32(data, 0), archetype = u32(data, 0x40), av = new DataView(data.data.buffer, data.data.byteOffset, data.data.byteLength).getInt32(0x44, true);
+          const magnitude = f32(f, 0), duration = u32(f, 8);
+          if (AV_POOL[av] && archetype === 0 && !(mflags & 0x7)) out.restores.push({ av: AV_POOL[av], share: restoreShare(magnitude), magnitude });
+          else if (AV_ELEMENT[av] && !(mflags & 0x4) && magnitude > 0 && duration > 0) out.resists.push({ element: AV_ELEMENT[av], share: Math.min(1, magnitude / 100), seconds: duration });
+        }
+        if (!out.restores.length && !out.resists.length) out = null;
+      }
+    }
+    if (lr || !id) drinkCache.set(id, out);
+    return out;
+  };
+  // What a brewed potion does, in words for the brew message and the panel
+  const doesText = (potionId, short) => {
+    const d = drinkOf(potionId);
+    if (!d) return '';
+    return d.restores.map((r) => (short ? `${Math.round(r.share * 100)}% ${r.av}` : `restores ${Math.round(r.share * 100)}% of your ${r.av}`))
+      .concat(d.resists.map((r) => (short ? `${Math.round(r.share * 100)}% ${r.element}` : `${Math.round(r.share * 100)}% ${r.element} resistance for ${r.seconds} s`))).join(', ');
+  };
+
+  // Drinking: a restore gives a share of the drinker's own pool (percentages are fractions of the actor's maximum, so a
+  // larger pool gains more), never the record's points. The C++ applies the record first (MpActor ApplyMagicEffect,
+  // which also opens the 5 s window that echoes the client's stale reports); on the next turn of the loop the value is
+  // set to what it was before the drink plus the share. A resist is remembered for the damage judge (gamemode.js
+  // potionResistMult), which knew nothing of it: the client's own copy of the effect never reaches the server.
+  const RESIST = globalThis.__dboPotionResist instanceof Map ? globalThis.__dboPotionResist : (globalThis.__dboPotionResist = new Map()); // actor -> { element: { share, until } }
+  const later = typeof setImmediate === 'function' ? setImmediate : (fn) => setTimeout(fn, 0);
+  const pctOf = (a) => { try { const p = mp.get(a, 'percentages'); return p && typeof p.health === 'number' ? p : null; } catch (e) { return null; } };
+  const downed = (a) => { try { return typeof globalThis.__dboIsDowned === 'function' && !!globalThis.__dboIsDowned(a); } catch (e) { return false; } };
+  const onDrink = (a, baseId, before) => {
+    const d = drinkOf(baseId);
+    if (!d) return;
+    if (d.resists.length && (RW.resist || {}).enabled !== false) {
+      const s = Object.assign({}, RESIST.get(a) || {});
+      for (const r of d.resists) s[r.element] = { share: r.share, until: Date.now() + r.seconds * 1000 };
+      RESIST.set(a, s);
+    }
+    if (!d.restores.length || !before || !(before.health > 0) || downed(a)) return;
+    later(() => {
+      try {
+        const now = pctOf(a);
+        if (!now || !(now.health > 0)) return;
+        const next = { health: now.health, magicka: now.magicka, stamina: now.stamina };
+        for (const r of d.restores) next[r.av] = Math.max(0, Math.min(1, (Number(before[r.av]) || 0) + r.share));
+        mp.set(a, 'percentages', next);
+        const r0 = lookup(baseId);
+        log(`alchemy: ${display(a)} drank ${r0 ? r0.record.editorId : (baseId >>> 0).toString(16)}: ${d.restores.map((r) => `${r.av} ${(Number(before[r.av]) || 0).toFixed(2)} -> ${next[r.av].toFixed(2)} (+${Math.round(r.share * 100)}%)`).join(', ')}`);
+      } catch (e) { log(`alchemy: restore for ${display(a)} failed: ${e.message}`); }
+    });
+  };
+  globalThis.__dboPotionResistOf = (a, element) => {
+    const s = RESIST.get(a >>> 0);
+    const r = s && s[element];
+    if (!r) return 0;
+    if (Date.now() >= r.until) { delete s[element]; return 0; }
+    return r.share;
+  };
+  if (RW.enabled !== false) {
+    // gamemode.js re-installs its eat hook before this module on every reload; a second load without that unwraps first
+    let inner = mp.onEatItem;
+    if (inner && inner.__dboAlchemyEat) inner = inner.__inner;
+    const hook = function (actorId, baseId, ...rest) {
+      const a = Number(actorId) >>> 0, id = Number(baseId) >>> 0;
+      let before = null;
+      try { if (drinkOf(id)) before = pctOf(a); } catch (e) { before = null; }
+      const out = typeof inner === 'function' ? inner.call(this, actorId, baseId, ...rest) : undefined;
+      if (out !== false) { try { onDrink(a, id, before); } catch (e) { log(`alchemy: drink handling failed: ${e.message}`); } }
+      return out;
+    };
+    hook.__dboAlchemyEat = true; hook.__inner = inner;
+    mp.onEatItem = hook;
+  }
   // The F7 catalog's display name (gamemode adminItemName), else the editor id spaced out
   const ingredientName = (id) => {
     try { const n = itemName && mp.getDescFromId ? itemName(mp.getDescFromId(id >>> 0)) : ''; if (n) return n; } catch (e) { /* not in the catalog */ }
@@ -123,24 +302,32 @@ module.exports = (api) => {
   const brewable = (a) => {
     const held = [...new Set(invOf(a).filter((e) => (Number(e.count) || 0) > 0).map((e) => Number(e.baseId) >>> 0))].filter((id) => id < 0xff000000 && (effectsOf(id) || []).length);
     const tier = alchemistTier(a);
-    const found = new Map();   // potion edid -> { name, value, pair }
+    const found = new Map();   // potion edid -> { name, does, value, pair }
+    const locked = new Map();  // label -> tier it opens at, for a pair whose strongest effect waits on a rank
     for (let i = 0; i < held.length; i++) {
       for (let j = i + 1; j < held.length; j++) {
         const shared = sharedEffects([held[i], held[j]]);
         if (!shared.length) continue;
-        const potion = potionAt(POTIONS.get(shared[0]), tier);
-        if (!found.has(potion.edid)) found.set(potion.edid, { name: potionName(potion), value: baseCost(shared[0]), pair: [held[i], held[j]] });
+        const { potion, passed } = choose(shared, tier);
+        for (const p of passed) if (!locked.has(p.label)) locked.set(p.label, p.locked);
+        if (!potion) continue;
+        if (!found.has(potion.edid)) found.set(potion.edid, { name: potion.name, does: doesText(potion.id, true), value: baseCost(potion.effect), pair: [held[i], held[j]] });
       }
     }
-    return [...found.values()].sort((x, y) => y.value - x.value || x.name.localeCompare(y.name));
+    const list = [...found.values()].sort((x, y) => y.value - x.value || x.name.localeCompare(y.name));
+    list.locked = [...locked].sort((x, y) => x[1] - y[1] || x[0].localeCompare(y[0]));
+    return list;
   };
   const showBrewable = (a) => {
     const list = brewable(a);
+    const tier = Math.max(1, alchemistTier(a));
     const lines = list.length
-      ? list.slice(0, PANEL_LINES).map((p) => `${p.name}: ${p.pair.map(ingredientName).join(' + ')}`).concat(list.length > PANEL_LINES ? [`and ${list.length - PANEL_LINES} more`] : [])
-      : ['Nothing yet: no two of your ingredients share an effect.'];
+      ? list.slice(0, PANEL_LINES).map((p) => `${p.name}${p.does ? ` (${p.does})` : ''}: ${p.pair.map(ingredientName).join(' + ')}`).concat(list.length > PANEL_LINES ? [`and ${list.length - PANEL_LINES} more`] : [])
+      : ['Nothing yet: no two of your ingredients share an effect you can brew.'];
+    if (list.locked.length) lines.push(`Later: ${list.locked.slice(0, 3).map(([label, t]) => `${label} at ${tierName(t)} (${tierLevel(t)})`).join(', ')}${list.locked.length > 3 ? ` and ${list.locked.length - 3} more` : ''}`);
     if (BREW.length) lines.push('Crouch and use the lab to brew drinks.');
-    openWidget(a, { type: 'contextMenu', id: PANEL_ID, mode: 'inspect', targetName: list.length ? `You can brew (${list.length})` : 'You can brew', lines }, false);
+    const head = `${tierName(tier)}: ${RW.words.potion[tier - 1]} strength`;
+    openWidget(a, { type: 'contextMenu', id: PANEL_ID, mode: 'inspect', targetName: list.length ? `You can brew (${list.length}), ${head}` : `You can brew, ${head}`, lines }, false);
   };
   // ---- drinks (Nate, 8 Oct: "add or create alcohol recipes for alchemy, includes skooma etc") ------------------------
   // Crouching at a lab opens the Brewing panel instead of the lab's menu: every recipe of brewing.json at or under the
@@ -278,16 +465,20 @@ module.exports = (api) => {
       log(`alchemy: ${display(a)} mixed ${used.map((id) => { const r = lookup(id); return r ? r.record.editorId : id.toString(16); }).join(' + ')} and nothing matched; effects ${seen.join(', ')}`);
       return tell(a, 'These ingredients share no effect that makes a potion you know. You keep them.');
     }
-    const pick = POTIONS.get(shared[0]);
-    if (shared.length > 1) log(`alchemy: ${display(a)} shared ${shared.map((e) => { const r = lookup(e); return `${r ? r.record.editorId : e.toString(16)}@${Math.round(baseCost(e))}`; }).join(', ')}; took the first`);
     const tier = alchemistTier(a);   // 0 without the trade, 1..5 by rank
-    const potion = potionAt(pick, tier);
+    const { potion, passed } = choose(shared, tier);
+    if (shared.length > 1) log(`alchemy: ${display(a)} shared ${shared.map((e) => { const r = lookup(e); return `${r ? r.record.editorId : e.toString(16)}@${Math.round(baseCost(e))}`; }).join(', ')}; took ${potion ? potion.edid : 'none (locked)'}`);
+    if (!potion) {
+      log(`alchemy: ${display(a)} mixed ${used.map((id) => { const r = lookup(id); return r ? r.record.editorId : id.toString(16); }).join(' + ')} at tier ${tier}: every shared effect opens later`);
+      return tell(a, `You cannot brew that yet.${lockedHint(passed)} You keep your ingredients.`);
+    }
     for (const id of used) take(entries, id, 1);
     give(entries, potion.id, 1);
     try { mp.set(a, 'inventory', { entries: entries.filter((e) => Number(e.count) > 0) }); } catch (e) { log(`alchemy: inventory write failed for ${display(a)}: ${e.message}`); return; }
-    tell(a, `You brew ${potionName(potion)}.${hint}`);
+    const does = doesText(potion.id);
+    tell(a, `You brew ${/^[AEIOU]/.test(potion.name) ? 'an' : 'a'} ${potion.name}${does ? ` (${does})` : ''}.${lockedHint(passed)}${hint}`);
     creditBrew(a, potion.id, tier);
-    log(`alchemy: ${display(a)} brewed ${potion.edid} (${pick.name}, tier ${tier}) from ${used.map((id) => { const r = lookup(id); return r ? r.record.editorId : id.toString(16); }).join(' + ')}`);
+    log(`alchemy: ${display(a)} brewed ${potion.edid} (${potion.name}, tier ${tier}) from ${used.map((id) => { const r = lookup(id); return r ? r.record.editorId : id.toString(16); }).join(' + ')}`);
     audit(`ALCHEMY ${who(a)} brewed ${potion.edid}`);
     try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('brew', a, potion.id, tier, used.map((id) => ({ baseId: id, count: 1 }))); } catch (e) { /* the player log is optional */ }
     if (S.panels.has(a)) showBrewable(a);

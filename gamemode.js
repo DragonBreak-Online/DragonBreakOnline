@@ -6105,6 +6105,19 @@ const blessingTargetMult = (targetId, sourceId) => {
   const def = (BLESS_COMBAT.target || {})[blessedDeityOf(targetId)];
   return def && (def.element ? fitsElement(def.element, sourceId) : def.spell ? isSpellSource(sourceId) : true) ? Number(def.mult) || 1 : 1;
 };
+// A Resist Fire, Frost or Shock potion the target drank (alchemy.js __dboPotionResistOf, alchemy rework 14 Oct): the
+// client's own copy of the effect never reaches this judge, so the potion did nothing against a spell before. The hit's
+// element is the one the game resists it by (sourceResistsOf); the strongest matching potion counts, inside the racial cap.
+const potionResistMult = (targetId, sourceId) => {
+  const of = globalThis.__dboPotionResistOf;
+  if (typeof of !== 'function') return 1;
+  let share = 0;
+  for (const [element, av] of Object.entries(ELEMENT_RESIST)) {
+    if (!sourceResistsOf(sourceId).has(av)) continue;
+    try { share = Math.max(share, Number(of(targetId >>> 0, element)) || 0); } catch (e) { /* not loaded */ }
+  }
+  return share > 0 ? Math.max(0, 1 - Math.min(1, share)) : 1;
+};
 const blessingDamageMult = (aggressorId, targetId, sourceId) => blessingAttackMult(aggressorId, sourceId) * blessingTargetMult(targetId, sourceId);
 // The server's hit formula counts only the bow's WEAP damage; vanilla adds the worn arrow's (AMMO DATA float at byte 8)
 const ARROWS = Object.assign({ enabled: true, scale: 1 }, cfg.arrows || {});
@@ -6767,7 +6780,7 @@ const hitDamageAttemptHook =(aggressorId, targetId, sourceId, damage, flags) => 
     // so a werewolf also took the Master fist bonus, the fist's stamina drain and its disarm (combat review, 2026-09-29)
     let beastAgg = false; try { const b = mp.get(agg, 'private.beast'); beastAgg = !!(b && b.form); } catch (e) { /* not an actor */ }
     // The target's side (Defense, a blessing, the race's resistance) is capped together: racial.js reductionCap
-    let targetSide = defenseDamageMult(tgt) * fleshDamageMult(tgt, src) * blessingTargetMult(tgt, src);
+    let targetSide = defenseDamageMult(tgt) * fleshDamageMult(tgt, src) * blessingTargetMult(tgt, src) * potionResistMult(tgt, src);
     if (racial) { try { targetSide = racial.capTargetSide(targetSide * racial.targetMult(agg, tgt, src, dmg)); } catch (e) { log('racial target failed', e.message); } }
     let raceAtk = 1;
     if (racial && !beastAgg) { try { raceAtk = racial.attackMult(agg, tgt, src, dmg); } catch (e) { log('racial attack failed', e.message); } }
@@ -7669,7 +7682,7 @@ try {
   const ALCHEMY_JS = path.resolve('alchemy.js');
   delete require.cache[ALCHEMY_JS];
   require(ALCHEMY_JS)({ mp, log, personal, audit, display, who, openWidget, closeWidget, every, itemName: (d) => adminItemName(d), cfg, sendPacket, onUi });
-} catch (e) { log('alchemy.js failed to load:', e.stack || e.message); mp.onCraftUnmatched = null; globalThis.__dboEnchanterTouched = null; }
+} catch (e) { log('alchemy.js failed to load:', e.stack || e.message); mp.onCraftUnmatched = null; globalThis.__dboEnchanterTouched = null; globalThis.__dboPotionResistOf = null; }
 
 // ---- playtest region lock (server\playtest.js, config "playtest") ------------------------------
 try {
