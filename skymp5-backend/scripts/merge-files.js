@@ -7,7 +7,8 @@ require('dotenv').config({ path: require('path').join(__dirname, '..', '.env') }
  *   build/dist/client (via `npm run populate`) -> build/client-files/root/ -> build/client-files/<zip> + data/files-version.json
  * SKSE is NOT included; the user manages it via the Vortex collection.
  * Run standalone from a scratch backend export: CLIENT_FILES_DIR=<work folder> node scripts/merge-files.js.
- * Refuses the live bucket and the live manifest (sources/liveBucket.js) unless DBO_MERGE_LIVE_BUCKET=1. Called by scripts/setup-client.js and routes/webhook.js.
+ * Refuses the live bucket and the live manifest (sources/liveBucket.js) unless DBO_MERGE_LIVE_BUCKET=1 is given for this one
+ * command (never from a .env). Called by scripts/setup-client.js and routes/webhook.js.
  */
 
 const path               = require('path')

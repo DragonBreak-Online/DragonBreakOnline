@@ -99,7 +99,18 @@ function linksUnder(dir, out = []) {
   return out
 }
 
-const optedIn = (env = process.env) => env[OPT_IN] === '1'
+// The opt-in counts for one command only. dotenv copies a .env into process.env (the backend's own .env in merge-files and
+// setup-client, the .env of the folder a script runs from in config.js), so one there would turn the guard off for every later
+// run from that folder; the .env that sets it, or null
+const OPT_IN_LINE = new RegExp(`^\\s*(?:export\\s+)?${OPT_IN}\\s*(?:=|:)`, 'm')
+function optInFile() {
+  for (const file of new Set([path.join(BACKEND, '.env'), path.resolve('.env')])) {
+    try { if (OPT_IN_LINE.test(fs.readFileSync(file, 'utf8'))) return file } catch { /* no .env there */ }
+  }
+  return null
+}
+
+const optedIn = (env = process.env) => env[OPT_IN] === '1' && !optInFile()
 
 function refusalMessage(reason) {
   return `refusing to write into the live client files: ${reason}. ` +
@@ -111,7 +122,13 @@ function refusalMessage(reason) {
 // The refusal for a script that honours the opt-in, or null to go ahead
 function refusal(targets, env = process.env) {
   const reason = liveTarget(targets)
-  return reason && !optedIn(env) ? refusalMessage(reason) : null
+  if (!reason) return null
+  const file = optInFile()
+  if (file) {
+    return `${refusalMessage(reason)} ${OPT_IN} is set in ${file}, which would turn this guard off for every run from there: ` +
+      'it counts only on the command line, so remove it from that file.'
+  }
+  return optedIn(env) ? null : refusalMessage(reason)
 }
 
 // Any file but the skipped names, at any depth
@@ -159,6 +176,6 @@ function notOwnCheckout(dir, printed) {
 
 module.exports = {
   LIVE_REPO, DEFAULT_CLIENT_FILES_DIR, MANIFEST, OPT_IN,
-  realPath, sameInode, livePath, liveTarget, linksUnder, optedIn, refusalMessage, refusal, hasFiles,
+  realPath, sameInode, livePath, liveTarget, linksUnder, optInFile, optedIn, refusalMessage, refusal, hasFiles,
   isOwnTopLevel, isOwnGitDir, REV_PARSE, nearLiveCheckout, notOwnCheckout,
 }
