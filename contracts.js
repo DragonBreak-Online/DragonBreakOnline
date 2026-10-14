@@ -350,8 +350,17 @@ module.exports = (api) => {
   };
 
   // Death of a spawned creature: every one of the killer's contracts it matches moves on, each at most once per body
-  globalThis.__dboContractKill = (npcId, killerId) => {
+  // A kill by a player's summon, raised corpse or companion counts for its owner (ff_companionOf; soapyfresh, 13 Oct:
+  // a familiar's kill of a contracted wolf gave no credit)
+  const creditedTo = (killerId) => {
+    try {
+      if (mp.get(killerId, 'private.dboCompanion')) { const o = Number(mp.get(killerId, 'ff_companionOf')) >>> 0; if (o) return o; }
+    } catch (e) { /* not a companion */ }
+    return killerId;
+  };
+  globalThis.__dboContractKill = (npcId, killer) => {
     if (!CFG.enabled) return;
+    const killerId = creditedTo(Number(killer) >>> 0);
     if (!takenBy(killerId)) return;
     const work = copiesOf(killerId);
     if (!work.length) return;

@@ -188,11 +188,18 @@ check('...and the notice is still up for anyone else', posted().length === 1);
 beast(0x905, 'wolf');
 killOf(0x905, GUARD);
 check('one hunter\'s kill counts for that hunter only', tk('12').progress === 1 && tk('13').progress === 0, JSON.stringify(stored().taken));
+// A kill by the hunter's summon counts for the hunter (soapyfresh, 13 Oct: a familiar's wolf gave no credit)
+set(0x951, 'private.dboCompanion', 'summon'); set(0x951, 'ff_companionOf', HUNTER);
+killOf(0x905, 0x951);
+check('a kill by a hunter\'s summon counts for the hunter', tk('13').progress === 1 && tk('12').progress === 1, JSON.stringify(stored().taken));
+set(0x951, 'ff_companionOf', 0);
+killOf(0x905, 0x951);
+check('...and an ownerless one counts for nobody', tk('13').progress === 1 && tk('12').progress === 1, JSON.stringify(stored().taken));
 const g0 = goldOf(GUARD), h0 = goldOf(HUNTER);
 killOf(0x905, GUARD);
 check('the first to finish is paid their 24', goldOf(GUARD) === g0 + 24 && !tk('12'), `${goldOf(GUARD) - g0}`);
-check('...and the other hunter keeps their contract and their count', tk('13') && tk('13').progress === 0 && goldOf(HUNTER) === h0);
-killOf(0x905, HUNTER); killOf(0x905, HUNTER);
+check('...and the other hunter keeps their contract and their count', tk('13') && tk('13').progress === 1 && goldOf(HUNTER) === h0);
+killOf(0x905, HUNTER);
 check('the second hunter finishes theirs and is paid their own 24', goldOf(HUNTER) === h0 + 24 && !tk('13'), `${goldOf(HUNTER) - h0}`);
 check('...each completion paid from the treasury, never twice: 100 - 24 - 24', goldOf(CHEST) === 52, `${goldOf(CHEST)}`);
 // a hold that cannot set aside another share refuses the take (the conservative rule): nobody hunts for pay that is not there
