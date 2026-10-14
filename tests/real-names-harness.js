@@ -484,6 +484,7 @@ step('R24 failed load', () => {
     A.profileOf, A.onlineActors, T.isLeadStaff, T.staffCan, A.ranksOf, A.giveItem, A.makeProp, {}, A.zoneOfActor, cfg, () => { throw new Error('boom (harness)'); }, require);
   ok('R24 (the load threw where the review said: the hooks are cleared, __dboNameFor is the new partial load\'s)', globalThis.__dboPlayerMenuReady === null && globalThis.__dboRealNamesOn === null
     && typeof globalThis.__dboNameFor === 'function' && globalThis.__dboNameFor !== prevNameFor && logs.some((l) => /^playermenu\.js failed to load:/.test(l)));
+  ok('R24 ...the arrival hook (__dboRealNamesLogin) is cleared with the login hook', globalThis.__dboRealNamesLogin === null, typeof globalThis.__dboRealNamesLogin);
   ok('R24 a load that throws part way ends the mode: the server names an unmet player Stranger to the GM again', nameFor(GM, P) === 'Stranger' && nameFor(GM, M) === 'Masked Person', [nameFor(GM, P), nameFor(GM, M)]);
   ok('R24 ...the server log says whose mode ended', logs.some((l) => /^realnames: Gerd #GERD off \(playermenu\.js failed to load\)$/.test(l)), logs.slice(-3));
   ui.get('playerMenu')(GM, [P]);
@@ -491,6 +492,62 @@ step('R24 failed load', () => {
   for (const [k, v] of keepUi) ui.set(k, v); for (const [k, v] of keepTimers) timers.set(k, v);
   load();
   ok('R24 ...after a load that works the GM can turn it on again', /^Real names on: /.test(cmd(GM, 'on')) && /^Real names off: /.test(cmd(GM, 'off')) && sameSet(known(GM), [Q, PLAYER, TRIAL]));
+});
+
+// ---- R25: a marker a crash or a restart left behind is gone as the character appears, before loginSetup runs ----------------
+// The 0.3.98 client draws a marker's labels ("Aldric (masked)") for as long as the list holds one, so gamemode.js's own
+// onCharacterReady (cut out, a stub for every other name, as drift-own-look-harness.js does) must replace it at once, not
+// loginSetup's 8 s timer (the 0.3.98 client verify's required change, 14 Oct). Fails on origin/server 5cba05cf4
+step('R25 login', () => {
+  const endMark = '  }), 8000);\n};';
+  const a0 = GMSRC.indexOf('const loginStep = (name, fn) => {');
+  const b0 = a0 < 0 ? -1 : GMSRC.indexOf(endMark, GMSRC.indexOf('const onCharacterReady = (userId, a) => {'));
+  if (a0 < 0 || b0 < 0) throw new Error('the onCharacterReady markers are gone');
+  const users = new Map([[1, GM], [2, PLAYER], [3, P]]), waits = [];
+  // A stub that can be called, read or put in a string
+  const any = new Proxy(function () {}, { get: (o, k) => (k === Symbol.toPrimitive ? () => '' : any), apply: () => undefined });
+  const named = { globalThis, mp, cfg: {}, log: (...x) => logs.push(x.join(' ')), performance: { now: () => 0 }, LOGIN_STEP_WARN_MS: 100, timed: (n, fn) => fn,
+    setTimeout: (fn, ms) => { waits.push({ ms, fn }); return 0; }, actorOf: (u) => users.get(u) || 0, creationPending: () => false, wornOf: () => [],
+    staffCan: T.staffCan, ADMIN_PROP: 'harness.isAdmin', display, undefined, Date, JSON, Object, Array, String, Number, Math, Map, Set };
+  const scope = new Proxy(named, { has: (o, k) => typeof k === 'string', get: (o, k) => (k in o ? o[k] : k === Symbol.unscopables ? undefined : any) });
+  const onCharacterReady = new Function('scope', `with (scope) {\n${GMSRC.slice(a0, b0 + endMark.length)}\nreturn onCharacterReady;\n}`)(scope);
+  const loginSetup = () => { const w = waits.filter((x) => x.ms === 8000); waits.length = 0; for (const x of w) x.fn(); return w.length; };
+  const restored = () => logs.filter((l) => /^realnames: restored \d+ introductions for Gerd #GERD \(leftover from a crash or restart\)$/.test(l)).length;
+  const listSets = (a, from) => sets.slice(from).filter((s) => s.a === (a >>> 0) && (s.k === 'ff_knownIds' || s.k === 'private.dboKnownStash'));
+
+  // A restart with the GM in the mode: the Map is empty, the saved marker (labels and all) and the stash are not
+  P_(GM, 'ff_knownIds', { reveal: 1, labels: { [hex(M)]: 'Aldric (masked)', [hex(B)]: 'Bryn (Werewolf form)' } }); P_(GM, 'private.dboKnownStash', [Q, PLAYER, TRIAL]);
+  globalThis.__dboRealNames.clear(); waits.length = 0;
+  const r0 = restored(), s0 = sets.length;
+  onCharacterReady(1, GM);
+  ok('R25 (the login run left loginSetup waiting on its 8 s timer, not yet run)', waits.some((x) => x.ms === 8000), waits.map((x) => x.ms));
+  ok('R25 a marker a restart left in the GM\'s list is gone as the character appears, before loginSetup runs: the true list is back and the stash cleared',
+    !isMarker(known(GM)) && sameSet(known(GM), [Q, PLAYER, TRIAL]) && stash(GM) == null, [known(GM), stash(GM)]);
+  const w0 = listSets(GM, s0).filter((s) => s.k === 'ff_knownIds');
+  ok('R25 ...so the client is sent one plain list, no labels', w0.length === 1 && Array.isArray(w0[0].v), w0);
+  ok('R25 ...the log says what was restored, and the server names an unmet player Stranger to the GM', restored() === r0 + 1 && nameFor(GM, P) === 'Stranger', logs.slice(-3));
+  const s1 = sets.length;
+  const ran = loginSetup();
+  ok('R25 ...loginSetup 8 s later finds nothing left over: no list written, no second restore, the mode off',
+    ran === 1 && listSets(GM, s1).length === 0 && restored() === r0 + 1 && sameSet(known(GM), [Q, PLAYER, TRIAL]) && /^Real names are off/.test(cmd(GM, 'status')), listSets(GM, s1));
+
+  // The leave hook never ran: the Map still holds the GM in the mode and the marker is saved
+  cmd(GM, 'on');
+  ok('R25 (the GM is in the mode again)', isMarker(known(GM)) && globalThis.__dboRealNamesOn(GM) === true);
+  onCharacterReady(1, GM);
+  ok('R25 ...a login with the mode still in the Map (a leave hook that never ran) ends it and puts the list back at once',
+    !isMarker(known(GM)) && globalThis.__dboRealNamesOn(GM) === false && sameSet(known(GM), [Q, PLAYER, TRIAL]) && stash(GM) == null && nameFor(GM, P) === 'Stranger', [known(GM), stash(GM)]);
+  loginSetup();
+
+  // guard: a player's plain list and a new character with none are not written at arrival; loginSetup starts the empty list, as before
+  props.delete(`${P >>> 0}|ff_knownIds`);
+  const playerList = JSON.stringify(known(PLAYER)), s2 = sets.length;
+  onCharacterReady(2, PLAYER); onCharacterReady(3, P);
+  const atArrival = sets.slice(s2).filter((s) => s.k === 'ff_knownIds' || s.k === 'private.dboKnownStash');
+  ok('R25 guard: the arrival writes no list for a player with a plain one, nor for a new character with none', atArrival.length === 0 && known(P) === undefined, atArrival);
+  loginSetup();
+  ok('R25 guard: ...and loginSetup then starts the new character\'s empty list and leaves the player\'s as it was', Array.isArray(known(P)) && known(P).length === 0
+    && JSON.stringify(known(PLAYER)) === playerList, [known(P), known(PLAYER)]);
 });
 
 // ---- the config ------------------------------------------------------------------------------------------------------------
