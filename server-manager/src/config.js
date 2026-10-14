@@ -14,11 +14,11 @@ function nssmPath() {
   return fs.existsSync(bundled) ? bundled : 'nssm'
 }
 
-// Read a single KEY=value from the backend .env (used for the WS console link).
+// Read a single KEY=value (or export KEY=value, as dotenv reads it) from the backend .env (used for the WS console link).
 function readEnv(key) {
   try {
     const txt = fs.readFileSync(path.join(repoRoot, 'skymp5-backend', '.env'), 'utf8')
-    const m = txt.match(new RegExp('^\\s*' + key + '\\s*=\\s*(.*)\\s*$', 'm'))
+    const m = txt.match(new RegExp('^\\s*(?:export\\s+)?' + key + '\\s*=\\s*(.*)\\s*$', 'm'))
     return m ? m[1].trim() : ''
   } catch { return '' }
 }
