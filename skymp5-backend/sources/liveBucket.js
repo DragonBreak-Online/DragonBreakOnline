@@ -48,37 +48,76 @@ function sameInode(a, b) {
   } catch { return false }
 }
 
+// A folder's device and inode after links, or null when p is no folder
+function dirId(p) {
+  try {
+    const s = fs.statSync(p, { bigint: true })
+    return s.isDirectory() && s.ino !== 0n ? `${s.dev}:${s.ino}` : null
+  } catch { return null }
+}
+
+// The folder a write to p lands in: p when it is a folder, else its nearest existing parent
+function landingDirId(p) {
+  for (let dir = path.resolve(p); ;) {
+    const id = dirId(dir)
+    if (id) return id
+    const up = path.dirname(dir)
+    if (up === dir) return null
+    dir = up
+  }
+}
+
 const liveRepos = () => [...new Set([LIVE_REPO, config.releaseRepo].filter(Boolean).map(repo => realPath(repo)))]
 
+// Each live checkout's bucket and manifest after links, and every folder of those buckets and their data folders by device and inode, which a bind mount keeps and realpath cannot see
+function liveState() {
+  const repos = liveRepos().map(repo => ({
+    bucket:   realPath(path.join(repo, 'build', 'client-files')),
+    manifest: realPath(path.join(repo, 'skymp5-backend', 'data', 'files-version.json')),
+  }))
+  const dirs = new Map()
+  const walk = dir => {
+    const id = dirId(dir)
+    if (!id || dirs.has(id)) return
+    dirs.set(id, dir)
+    let entries
+    try { entries = fs.readdirSync(dir, { withFileTypes: true }) } catch { return }
+    for (const e of entries) if (e.isDirectory()) walk(path.join(dir, e.name))
+  }
+  for (const { bucket, manifest } of repos) {
+    walk(bucket)
+    const data = dirId(path.dirname(manifest))
+    if (data && !dirs.has(data)) dirs.set(data, path.dirname(manifest))
+  }
+  return { repos, own: realPath(DEFAULT_CLIENT_FILES_DIR), dirs }
+}
+
 // Why writing p would write the live client files, or null; checkoutOnly leaves out this checkout's default bucket
-function livePath(p, { checkoutOnly = false } = {}) {
+function livePath(p, { checkoutOnly = false, state = liveState() } = {}) {
   const real = realPath(p)
-  for (const repo of liveRepos()) {
-    const bucket = realPath(path.join(repo, 'build', 'client-files'))
+  for (const { bucket, manifest } of state.repos) {
     if (isInside(real, bucket)) return `${p} is in the live client files bucket (${bucket})`
-    const manifest = realPath(path.join(repo, 'skymp5-backend', 'data', 'files-version.json'))
     if (samePath(real, manifest)) return `${p} is the live manifest ${manifest}`
     for (const file of [manifest, path.join(bucket, config.clientZipName)]) {
       if (sameInode(p, file)) return `${p} is a hard link to the live ${path.basename(file)} (${file}): delete it first`
     }
   }
-  const own = realPath(DEFAULT_CLIENT_FILES_DIR)
-  if (!checkoutOnly && isInside(real, own)) return `${p} is in the default bucket, the one the backend of this checkout serves (${own})`
+  const same = state.dirs.get(landingDirId(p))
+  if (same) return `${p} lands in the live folder ${same} under another name (a bind mount): unmount it first`
+  if (!checkoutOnly && isInside(real, state.own)) return `${p} is in the default bucket, the one the backend of this checkout serves (${state.own})`
   return null
 }
 
 // Why writing into this bucket, manifest and the paths in writes would write the live client files, or null
-function liveTarget({ bucket, manifest = null, writes = [], checkoutOnly = false }) {
+function liveTarget({ bucket, manifest = null, writes = [], checkoutOnly = false }, state = liveState()) {
   const dir = realPath(bucket)
-  for (const repo of liveRepos()) {
-    const liveBucket = realPath(path.join(repo, 'build', 'client-files'))
+  for (const { bucket: liveBucket, manifest: liveManifest } of state.repos) {
     if (isInside(dir, liveBucket)) return `${bucket} is the live client files bucket (${liveBucket})`
-    const liveManifest = realPath(path.join(repo, 'skymp5-backend', 'data', 'files-version.json'))
     if (manifest && samePath(realPath(manifest), liveManifest)) return `this is the live checkout: it would rewrite the live manifest ${liveManifest}`
   }
-  if (!checkoutOnly && samePath(dir, realPath(DEFAULT_CLIENT_FILES_DIR))) return `${bucket} is the default bucket, the one the backend of this checkout serves (CLIENT_FILES_DIR is unset or names it)`
-  for (const p of [...(manifest ? [manifest] : []), ...writes]) {
-    const why = livePath(p, { checkoutOnly })
+  if (!checkoutOnly && samePath(dir, state.own)) return `${bucket} is the default bucket, the one the backend of this checkout serves (CLIENT_FILES_DIR is unset or names it)`
+  for (const p of [bucket, ...(manifest ? [manifest] : []), ...writes]) {
+    const why = livePath(p, { checkoutOnly, state })
     if (why) return why
   }
   return null
@@ -114,9 +153,8 @@ function refusalMessage(reason) {
     `Only to rebuild the live files in place on purpose, run this one command with ${OPT_IN}=1.`
 }
 
-// The refusal for a script that honours the opt-in, or null to go ahead
-function refusal(targets, env = process.env) {
-  const reason = liveTarget(targets)
+// The refusal for a reason to refuse, in a script that honours the opt-in, or null to go ahead
+function refusalFor(reason, env = process.env) {
   if (!reason) return null
   const file = optInFile()
   if (file) {
@@ -124,6 +162,18 @@ function refusal(targets, env = process.env) {
       'it counts only on the command line, so remove it from that file.'
   }
   return optedIn(env) ? null : refusalMessage(reason)
+}
+
+const refusal = (targets, env = process.env) => refusalFor(liveTarget(targets), env)
+
+// Checks each path a script is about to write after its first refusal(): throws the same refusal for a live one
+function writeGuard(env = process.env) {
+  const state = liveState()
+  const allowed = optedIn(env)
+  return p => {
+    const why = livePath(p, { state })
+    if (why && !allowed) throw new Error(refusalFor(why, env))
+  }
 }
 
 // Any file but the skipped names, at any depth
@@ -169,6 +219,6 @@ function notOwnCheckout(dir, printed) {
 
 module.exports = {
   LIVE_REPO, DEFAULT_CLIENT_FILES_DIR, MANIFEST, OPT_IN,
-  realPath, sameInode, livePath, liveTarget, linksUnder, optInFile, optedIn, refusalMessage, refusal, hasFiles,
+  realPath, sameInode, dirId, liveState, livePath, liveTarget, linksUnder, optInFile, optedIn, refusalMessage, refusalFor, refusal, writeGuard, hasFiles,
   isOwnTopLevel, isOwnGitDir, REV_PARSE, nearLiveCheckout, notOwnCheckout,
 }
