@@ -12,7 +12,8 @@
 // spells.js asks tomeOk for its shop stock. Admins bypass both unless /region test is on.
 //
 // Files: regions.json (generated, read at load), regions-overrides.json (hand rules, re-read when saved).
-// Config "regions": { craft, tomes, adminBypass, failOpen, defaultPlace, freeBenches, freeWhy, raceStyles }
+// Config "regions": { craft, tomes, adminBypass, failOpen, defaultPlace, freeBenches, freeWhy, raceStyles }; "raceCraft" (a
+// people's own armoury, below); regions-overrides.json recipePlugins (a plugin regions.json does not list yet, below).
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -54,12 +55,12 @@ module.exports = (api) => {
       if (mtime !== S.ovrMtime) {
         try {
           const raw = mtime ? JSON.parse(fs.readFileSync(OVR_FILE, 'utf8')) : {};
-          S.ovr = { aliases: lowerKeys(raw.aliases), families: lowerKeys(raw.families), benches: lowerKeys(raw.benches), items: lowerKeys(raw.items), recipes: lowerKeys(raw.recipes), tomes: lowerKeys(raw.tomes), places: lowerKeys(raw.places), forgeNever: lowerKeys(raw.forgeNever) };
+          S.ovr = { aliases: lowerKeys(raw.aliases), families: lowerKeys(raw.families), benches: lowerKeys(raw.benches), items: lowerKeys(raw.items), recipes: lowerKeys(raw.recipes), tomes: lowerKeys(raw.tomes), places: lowerKeys(raw.places), forgeNever: lowerKeys(raw.forgeNever), recipePlugins: lowerKeys(raw.recipePlugins) };
           S.ovrMtime = mtime;
         } catch (e) { log(`regions: ${OVR_FILE} unreadable (${e.message})${S.ovr ? ', keeping the last good copy' : ''}`); S.ovrMtime = mtime; }
       }
     }
-    return S.ovr || { aliases: {}, families: {}, benches: {}, items: {}, recipes: {}, tomes: {}, places: {}, forgeNever: {} };
+    return S.ovr || { aliases: {}, families: {}, benches: {}, items: {}, recipes: {}, tomes: {}, places: {}, forgeNever: {}, recipePlugins: {} };
   };
   const hand = (table, desc, edid) => { const t = O()[table]; const a = desc ? t[norm(desc)] : undefined; return a !== undefined ? a : (edid ? t[String(edid).toLowerCase()] : undefined); };
 
@@ -145,12 +146,32 @@ module.exports = (api) => {
   };
 
   // ---- recipes -----------------------------------------------------------------------------------
+  // A plugin regions.json does not cover yet (the Skyrim release's armouries, 15 Oct, until ck-mcp/regions.py runs on the new
+  // order): regions-overrides.json recipePlugins { "<recipe's plugin>": { p, c, edid?, notEdid?, name? } or a list of them,
+  // the first whose edid / notEdid regexes match the recipe's editor id }. c is the culture regions.json would give (a
+  // raceStyles family). Creation recipes only: tempering at the armour table and the grindstone stays open, as for the
+  // listed recipes. The rule names its p and c; the synthesised entry carries the bench, so food and place benches act as before
+  const pluginRule = (rd, recipeId, itemId) => {
+    const plugin = String(rd || '').slice(String(rd || '').indexOf(':') + 1).toLowerCase();
+    const raw = plugin ? O().recipePlugins[plugin] : undefined;
+    if (raw === undefined || isTemper(recipeId)) return null;
+    const edid = edidOf(rd);
+    for (const r of (Array.isArray(raw) ? raw : [raw])) {
+      if (!r || typeof r !== 'object') continue;
+      const want = rx(r.edid), not = rx(r.notEdid);
+      if ((want && !want.test(edid)) || (not && not.test(edid))) continue;
+      const p = resolve(r.p);
+      if (p === null) return null;
+      return { p, entry: { edid, item: descOf(itemId), name: String(r.name || edidOf(descOf(itemId)) || edid), bench: benchEdid(recipeId), p: r.p, c: String(r.c || r.p || ''), why: 'plugin' }, why: 'plugin' };
+    }
+    return null;
+  };
   // Provinces a recipe may be crafted in, or null when nothing decides it
   const recipeWhere = (recipeId, itemId) => {
     const rd = descOf(recipeId); const entry = D().recipes[norm(rd)] || null;
     const ovR = hand('recipes', rd, entry ? entry.edid : '');
     if (ovR !== undefined && resolve(ovR) !== null) return { p: resolve(ovR), entry, why: 'override' };
-    if (!entry) return null;
+    if (!entry) return pluginRule(rd, recipeId, itemId);
     const itemDesc = entry.item || descOf(itemId);
     const ovI = hand('items', itemDesc, Object.keys(O().items).length ? edidOf(itemDesc) : '');
     const item = D().items[norm(itemDesc)];
@@ -238,6 +259,10 @@ module.exports = (api) => {
     } catch (e) { return ''; }
   };
   const isTemper = (recipeId) => TEMPER_BENCHES.has(benchOf(recipeId));
+  // The bench keyword's editor id as written (CraftingSmithingForge), for a synthesised regions entry
+  const BENCH_NAMES = ['CraftingSmithingForge', 'CraftingSmithingSkyforge', 'CraftingSmelter', 'CraftingTanningRack', 'MCE_CraftingLoom', 'CraftingCookpot',
+    'BYOHCraftingOven', 'CYRproxy_HF_BYOHCraftingOven', 'Camping_CampfireCookingShared', 'isGrainMill', 'DLC1CraftingDawnguard', 'DLC1LD_CraftingForgeAetherium', 'DLC2StaffEnchanter', 'CYRCraftingAyleidWell'];
+  const benchEdid = (recipeId) => { const b = benchOf(recipeId); return BENCH_NAMES.find((x) => x.toLowerCase() === b) || b; };
   // Only an Orc makes Orcish armour and weapons (Nate, 2026-10-06), whatever the province or faction rule says; staff pass
   // with adminBypass, as the province rule. Told by the product: an ARMO (and a WEAP when weapons is on) whose editor id
   // matches edid or which carries one of the material keywords. Tempering stays open to all: it improves a piece, it
@@ -266,6 +291,37 @@ module.exports = (api) => {
       const kws = new Set((ORCISH.keywords || []).map((k) => String(k).toLowerCase()));
       return keywordsOf(r).some((k) => kws.has(k));
     } catch (e) { return false; }
+  };
+  // A people's own armoury (Nat, 13 Oct: "make sure server claude has a note of what to add to race only"; Nate, 14 Oct: Gild
+  // crude Goblins only, Pig Iron Orcs only): config "raceCraft": { enabled, rules: [{ id, name, people, plugins: [product's
+  // plugin], edid: regex on the product's editor id, races: [RACE editor id prefixes, so the vampire race counts] }] }. The
+  // first rule matching the product decides: only those races make it, anywhere, before the Orcish and faction rules (a
+  // Yoku shield of Orcish metal is still a Redguard's). Tempering stays open; staff pass with adminBypass; a race that
+  // cannot be read fails closed. Some sets carry the same lock in DragonBreak Armory.esp (GetIsRace), so the client menu
+  // hides them; this rule holds for every set, those without a plugin lock too
+  const RACE_CRAFT = Object.assign({ enabled: true, rules: [] }, cfg.raceCraft || {});
+  const raceEdidOf = (a) => { try { const app = mp.get(a >>> 0, 'appearance'); const r = app && app.raceId ? mp.lookupEspmRecordById(Number(app.raceId) >>> 0) : null; return r && r.record ? String(r.record.editorId || '') : ''; } catch (e) { return ''; } };
+  const raceRuleOf = (itemId) => {
+    if (!RACE_CRAFT.enabled || !Array.isArray(RACE_CRAFT.rules) || !RACE_CRAFT.rules.length) return null;
+    const d = descOf(itemId); const plugin = d.slice(d.indexOf(':') + 1).toLowerCase(); let edid = null;
+    for (const r of RACE_CRAFT.rules) {
+      if (!r || !Array.isArray(r.races)) continue;
+      if (Array.isArray(r.plugins) && r.plugins.length && !r.plugins.some((x) => String(x).toLowerCase() === plugin)) continue;
+      if (r.edid) { if (edid === null) edid = edidOf(d); const want = rx(r.edid); if (!want || !want.test(edid)) continue; }
+      if (!(Array.isArray(r.plugins) && r.plugins.length) && !r.edid) continue;
+      return r;
+    }
+    return null;
+  };
+  // { rule, text } when the race rule refuses this craft, { rule } when a rule decides and lets it on, null when none applies
+  const raceCraftVerdict = (a, itemId, recipeId) => {
+    const rule = raceRuleOf(itemId);
+    if (!rule) return null;
+    if (isTemper(recipeId) || bypass(a)) return { rule };
+    const race = raceEdidOf(a);
+    if (race && rule.races.some((x) => race.startsWith(String(x)))) return { rule };
+    const people = String(rule.people || 'its own people');
+    return { rule, race, text: `${rule.name || 'This'} is ${people} work: only ${people} smiths make it. Your materials come back when you close the menu.` };
   };
   // The refusal's text, or '' when the craft may go on
   const orcishRefusal = (a, itemId, recipeId) => {
@@ -377,9 +433,20 @@ module.exports = (api) => {
       }
       return false;
     }
-    // Orcish armour is an Orc's work (before the faction rule, so a non-Orc hears why)
+    // A people's own armoury (config raceCraft): its rule decides who makes it, before the Orcish and faction rules
+    const byRace = raceCraftVerdict(a, Number(itemId) >>> 0, Number(recipeId) >>> 0);
+    if (byRace && byRace.text) {
+      if (Date.now() - (dragonToldAt.get(a) || 0) > 3000) {
+        dragonToldAt.set(a, Date.now());
+        personal(a, byRace.text);
+        try { sendPacket(a, { customPacketType: 'dboNotice', text: byRace.text }); } catch (e) { /* the chat line is enough */ }
+        audit(`RACECRAFT refused ${who(a)} (${byRace.race || 'unknown race'}) ${byRace.rule.id || ''} recipe ${edidOf(descOf(Number(recipeId) >>> 0)) || (Number(recipeId) >>> 0).toString(16)} -> ${edidOf(descOf(Number(itemId) >>> 0))}`);
+      }
+      return false;
+    }
+    // Orcish armour is an Orc's work (before the faction rule, so a non-Orc hears why); a people's armoury rule has decided its own sets
     const orcish = orcishRefusal(a, Number(itemId) >>> 0, Number(recipeId) >>> 0);
-    if (orcish) {
+    if (orcish && !byRace) {
       if (Date.now() - (dragonToldAt.get(a) || 0) > 3000) {
         dragonToldAt.set(a, Date.now());
         personal(a, orcish);
@@ -442,7 +509,7 @@ module.exports = (api) => {
     personal(a, `${pl.desc || '?'} ${pl.edid ? `(${pl.edid}) ` : ''}is ${provinceName(pl.province)}, from ${SOURCE_TEXT[pl.source] || pl.source}${pl.via ? ` (${pl.via})` : ''}. Craft gate ${CFG.craft ? 'on' : 'off'}, tome filter ${CFG.tomes ? 'on' : 'off'}, your bypass ${bypass(a) ? 'on' : 'off'}. /region test plays it as a player.`);
   }, { admin: true, help: 'this place\'s province and the region gates; /region test drops your admin bypass' });
 
-  globalThis.__dboRegions = { provinceAt, placeOf, recipeOk, raceOf, raceStyle, recipeWhere, tomeOk, tomeWhere, bypass, provinceName, listNames, tomesOn: () => !!CFG.tomes };
+  globalThis.__dboRegions = { provinceAt, placeOf, recipeOk, raceOf, raceStyle, recipeWhere, raceCraftVerdict, tomeOk, tomeWhere, bypass, provinceName, listNames, tomesOn: () => !!CFG.tomes };
 
   const data = D();
   const count = (table, prov) => Object.values(data[table]).filter((v) => { const r = resolve(v.p); return r && r.includes(prov); }).length;

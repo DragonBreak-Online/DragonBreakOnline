@@ -191,8 +191,9 @@ ok(globalThis.__dboManualsShop(A).some((x) => /^Schematics: Ancient Imperial \(T
 
 // The PC's books (9 Oct): smithing.json carries each family's bookId; config smithing.books overrides it
 const REAL = JSON.parse(fs.readFileSync(path.join(SERVER, 'smithing.json'), 'utf8')).families;
-const noBook = REAL.filter((f) => f.tier > 1 && !f.bookId && !f.free && !f.technique && f.book !== 'staff').map((f) => f.id);
-ok(noBook.join() === 'orcish' && REAL.filter((f) => f.bookId).every((f) => /^[0-9a-f]+:DragonBreak Online Edits\.esp$/.test(f.bookId)), 'every family above T1 has a DLE book except Orcish (apprentice only)', noBook);
+const noBook = REAL.filter((f) => f.tier > 1 && !f.bookId && !f.free && !f.technique && f.book !== 'staff' && f.book !== 'race').map((f) => f.id);
+// A people's own armoury (book 'race': Yokudan, Black Bear, Apex Khajiit; Skyrim release 15 Oct) has no book by design
+ok(noBook.join() === 'orcish' && REAL.filter((f) => f.bookId).every((f) => /^[0-9a-f]+:DragonBreak Online Edits\.esp$/.test(f.bookId)), 'every family above T1 has a DLE book except Orcish (apprentice only) and the peoples\' own armouries', noBook);
 const steelBook = mp.getIdFromDesc(REAL.find((f) => f.id === 'steel').bookId);
 rec(steelBook, 'BOOK', 'DBO_Schematics_steel', [{ type: 'DATA', data: bookData() }]);
 load({ enabled: true, drops: {} });

@@ -86,7 +86,31 @@
     "DBOBAG_evgsmptraderpacklanternGRAYarmor": "common",
     "DBOBAG_evgsmptraderpacklanternREDarmor": "common",
     "DBOBAG_evgsmptraderpacklanternarmor": "common",
-    "DBOSM_TravellingMerchantBackpack": "common"
+    "DBOSM_TravellingMerchantBackpack": "common",
+    "_skyrimRelease": "Skyrim release check (15 Oct, ~/claude-nate-release/specs/skyrim-recipes-check.md): Black Bear Ancient Nord Armor.esp's two light hood recipes (RecipeBlackBearAncientNordHoodLight d8d, ...LoweredHoodLight d97) list a null input (raw 00000000, count 0), and the Lowered one makes the heavy Lowered Hood: refused until the PC's Nexus Patches override fixes both. DBOSM_Res_GoldIngotDB (b75) smelts DragonBreak.esp's IngotGoldStatic, which stands only as bank-vault dressing (21 refs in the Whiterun, Riften and Solitude banks, which open with Skyrim): refused, so a vault's decor never becomes gold.",
+    "d8d:Black Bear Ancient Nord Armor.esp": "none",
+    "d97:Black Bear Ancient Nord Armor.esp": "none",
+    "b75:DragonBreak Nexus Patches.esp": "none"
+  },
+  "recipePlugins": {
+    "_comment": "The Skyrim release's armouries (15 Oct): province and culture for the creation recipes of plugins regions.json does not list yet (regions.js pluginRule; ck-mcp/regions.py on the 140-plugin order replaces these on the PC). Key: the recipe's own plugin; value { p, c, edid?, notEdid?, why } or a list of them, the first whose edid / notEdid regexes match the recipe's editor id wins. c is the culture a raceStyles family reads: a people's own set is made by that race anywhere (config raceCraft says who may make it at all; Nat's race-only list, 13 Oct), the rest follow gear by province (Nate, 17 Sep). Tempering stays open. Applied on save.",
+    "YokuWeapons.esp": {"p": "hammerfell", "c": "hammerfell", "why": "Yoku Armory: Yokudan (Redguard) gear, Hammerfell; Redguards make it anywhere"},
+    "Apex_Khajiit.esp": {"p": "elsweyr", "c": "elsweyr", "why": "Apex Khajiit Armory: Elsweyr; Khajiit make it anywhere"},
+    "LunarGuardArmor.esp": {"p": "elsweyr", "c": "elsweyr", "why": "Lunar Guard, listed with the Khajiit set (Nat, 13 Oct)"},
+    "Black Bear Ancient Nord Armor.esp": {"p": "skyrim", "c": "nord", "why": "Black Bear Ancient Nord: Skyrim; Nords make it anywhere"},
+    "SteelheartArmors.esp": {"p": "skyrim", "c": "nord", "why": "Nord Steelheart: Skyrim; Nords make it anywhere"},
+    "1AncientImperial.esp": {"p": "cyrodiil", "c": "imperial", "why": "Ancient Imperial Armor: Cyrodiil; Imperials make it anywhere"},
+    "GVLT_Gryphonknight.esp": {"p": "common", "c": "breton", "why": "Breton noble armour; High Rock is not in the game, so the race lock alone decides"},
+    "knighterrant.esp": {"p": "common", "c": "breton", "why": "Knight-Errant, Breton (Armory locks its forge recipes)"},
+    "Summer Druid Armor Set.esp": {"p": "common", "c": "breton", "why": "Flora Druid, Breton"},
+    "Seascale.esl": {"p": "common", "c": "maormer", "why": "Maormer Seascale (Armory locks the recipes)"},
+    "GildForgottenArmoryCrude.esp": {"p": "common", "c": "goblin", "why": "Goblin work in Skyrim and Cyrodiil alike (Nate, 14 Oct: Goblins only)"},
+    "PigIronSet.esl": {"p": "common", "c": "orcish", "why": "Orcish work (Nate, 14 Oct: Orcs only)"},
+    "LEITEUHTThalmor.esp": {"p": "summerset", "c": "summerset", "why": "Dominion Thalmor gear (faction-gear.json: Thalmor smiths, anywhere)"},
+    "Civil War Battlemage Armors.esp": [{"edid": "Imperial", "p": "imperial", "c": "imperial", "why": "the Legion's battlemage (faction-gear.json)"}, {"edid": "Stormcloak", "p": "skyrim", "c": "skyrim", "why": "the Stormcloaks' battlemage (faction-gear.json)"}, {"edid": "Thalmor", "p": "summerset", "c": "summerset", "why": "the Thalmor battlemage (faction-gear.json)"}],
+    "DIS_Authentic_Legion.esp": {"p": "imperial", "c": "imperial", "why": "the Legion's (faction-gear.json)"},
+    "Skaal Heavy Armor SE.esp": {"p": "solstheim", "c": "solstheim", "why": "Skaal gear is Solstheim's (closed), so only Nords make it (raceStyles nord: skaal) until Solstheim opens or a Skaal faction exists"},
+    "DragonBreak Armory.esp": [{"edid": "^DBOArm_RecipeGoblin", "p": "common", "c": "goblin", "why": "Goblin armour (Armory locks it to the goblin races)"}, {"edid": "^DBOArm_Adam", "p": "common", "c": "steelplate", "why": "Adamantium Addon: every race (Armory v7), as the other Adamantium recipes"}, {"edid": "^DBOArm_RecipeSeascale", "p": "common", "c": "maormer", "why": "Seascale (Maormer, Armory lock)"}, {"edid": "^DBOArm_RecipeDruid", "p": "common", "c": "breton", "why": "Flora Druid (Breton, Armory lock)"}]
   },
   "tomes": {
     "ISS_SpellTomeConjureSkeleton": ["skyrim"],
@@ -150,6 +174,14 @@
     "b91:[Kirax] Lost Ark Reborn Paladin Legendary.esp": { "name": "The Lost Ark Reborn Paladin Legendary Alt Hands", "why": "LoARPalLegendaryAltHands armour rating 45 (Daedric gauntlets have 18); far stronger than intended (11 Oct audit)" },
     "b92:[Kirax] Lost Ark Reborn Paladin Legendary.esp": { "name": "The Lost Ark Reborn Paladin Legendary Alt Shoes", "why": "LoARPalLegendaryAltShoes armour rating 45 (Daedric boots have 18); far stronger than intended (11 Oct audit)" },
     "b93:[Kirax] Lost Ark Reborn Paladin Legendary.esp": { "name": "The Lost Ark Reborn Paladin Legendary Alt Helm", "why": "LoARPalLegendaryAltHelm armour rating 45 (the Daedric helmet has 23); far stronger than intended (11 Oct audit)" },
-    "b94:[Kirax] Lost Ark Reborn Paladin Legendary.esp": { "name": "The Lost Ark Reborn Paladin Legendary Alt Cloak", "why": "LoARPalLegendaryAltCloak armour rating 45 (a cloak normally has none); far stronger than intended (11 Oct audit)" }
+    "b94:[Kirax] Lost Ark Reborn Paladin Legendary.esp": { "name": "The Lost Ark Reborn Paladin Legendary Alt Cloak", "why": "LoARPalLegendaryAltCloak armour rating 45 (a cloak normally has none); far stronger than intended (11 Oct audit)" },
+    "81d:DragonBreak Armory.esp": {"name": "The Dwemer Mantis armour", "told": "The Dwemer Mantis armour is not made or improved by any smith: the Game Masters give it out. Your materials come back when you close the menu.", "why": "DBOArm_MantisArmorDwarvenAngelChassis: Nate, 14 Oct: \"should not be craftable at all, GMs will give it out\" (no recipe exists; this holds if one is ever added)"},
+    "81e:DragonBreak Armory.esp": {"name": "The Dwemer Mantis armour", "told": "The Dwemer Mantis armour is not made or improved by any smith: the Game Masters give it out. Your materials come back when you close the menu.", "why": "DBOArm_MantisArmorDwarvenAngelChassiscrossbow: Nate, 14 Oct: \"should not be craftable at all, GMs will give it out\" (no recipe exists; this holds if one is ever added)"},
+    "81f:DragonBreak Armory.esp": {"name": "The Dwemer Mantis armour", "told": "The Dwemer Mantis armour is not made or improved by any smith: the Game Masters give it out. Your materials come back when you close the menu.", "why": "DBOArm_MantisArmorDwarvenAngelChassisLight: Nate, 14 Oct: \"should not be craftable at all, GMs will give it out\" (no recipe exists; this holds if one is ever added)"},
+    "820:DragonBreak Armory.esp": {"name": "The Dwemer Mantis armour", "told": "The Dwemer Mantis armour is not made or improved by any smith: the Game Masters give it out. Your materials come back when you close the menu.", "why": "DBOArm_MantisArmorDwarvenAngelChassiscrossbowLight: Nate, 14 Oct: \"should not be craftable at all, GMs will give it out\" (no recipe exists; this holds if one is ever added)"},
+    "821:DragonBreak Armory.esp": {"name": "The Dwemer Mantis armour", "told": "The Dwemer Mantis armour is not made or improved by any smith: the Game Masters give it out. Your materials come back when you close the menu.", "why": "DBOArm_MantisArmorDwarvenAngelChassisUnarmored: Nate, 14 Oct: \"should not be craftable at all, GMs will give it out\" (no recipe exists; this holds if one is ever added)"},
+    "822:DragonBreak Armory.esp": {"name": "The Dwemer Mantis armour", "told": "The Dwemer Mantis armour is not made or improved by any smith: the Game Masters give it out. Your materials come back when you close the menu.", "why": "DBOArm_MantisArmorDwarvenAngelChassiscrossbowUnarmored: Nate, 14 Oct: \"should not be craftable at all, GMs will give it out\" (no recipe exists; this holds if one is ever added)"},
+    "823:DragonBreak Armory.esp": {"name": "The Dwemer Mantis armour", "told": "The Dwemer Mantis armour is not made or improved by any smith: the Game Masters give it out. Your materials come back when you close the menu.", "why": "DBOArm_MantisArmorDwarvenAngelShield: Nate, 14 Oct: \"should not be craftable at all, GMs will give it out\" (no recipe exists; this holds if one is ever added)"},
+    "824:DragonBreak Armory.esp": {"name": "The Dwemer Mantis armour", "told": "The Dwemer Mantis armour is not made or improved by any smith: the Game Masters give it out. Your materials come back when you close the menu.", "why": "DBOArm_MantisArmorDwarvenAngelShieldAmmo: Nate, 14 Oct: \"should not be craftable at all, GMs will give it out\" (no recipe exists; this holds if one is ever added)"}
   }
 }

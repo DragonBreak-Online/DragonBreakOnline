@@ -94,7 +94,8 @@ module.exports = (api) => {
   // A teacher needs supervisorMinPoints Blacksmith points (Nate, 9 Oct: 75), the technique and its craft tier
   const teacher = () => `a teacher needs Blacksmith ${Number(C.supervisorMinPoints)} to teach`;
   // A closely held technique (held, Nate 11 Oct) is never taught at the forge: its book is the only way
-  const hintOf = (fam) => (isFree(fam) ? '' : techOf(fam) === fam && fam.held ? `Book: Schematics: ${fam.name}${fam.where ? ', ' + fam.where : ''}. No smith teaches it at the forge` : techOf(fam) !== fam ? `Worked with the ${techOf(fam).name} technique. ${hintOf(techOf(fam))}` : fam.book === 'apprentice' ? `${fam.where || 'Apprentice under a Blacksmith who knows it'} (${teacher()})`
+  // A people's own armoury (book: 'race', Nat 13 Oct: race-only): no book and no teacher, only its raceFree people forge it
+  const hintOf = (fam) => (isFree(fam) ? '' : techOf(fam).book === 'race' ? (techOf(fam).where || `Only its own people's smiths work ${fam.name}`) : techOf(fam) === fam && fam.held ? `Book: Schematics: ${fam.name}${fam.where ? ', ' + fam.where : ''}. No smith teaches it at the forge` : techOf(fam) !== fam ? `Worked with the ${techOf(fam).name} technique. ${hintOf(techOf(fam))}` : fam.book === 'apprentice' ? `${fam.where || 'Apprentice under a Blacksmith who knows it'} (${teacher()})`
     : fam.book === 'staff' ? fam.where || 'taught only in roleplay' : `Book: Schematics: ${fam.name}${(C.withheldBooks || []).includes(fam.id) ? ', not to be had in Cyrodiil yet' : fam.where ? ', ' + fam.where : ''}, or apprentice under a Blacksmith who knows it (${teacher()})`);
   // regions.js craft hook: false refuses the craft (materials kept); anything else lets it on
   globalThis.__dboSmithCraft = (actorId, itemId, recipeId) => {
@@ -109,6 +110,8 @@ module.exports = (api) => {
     const tier = craftTier(a);
     if (tier < fam.tier) { tell(a, `${fam.name} is craft tier ${fam.tier} (${TIER_NAMES[fam.tier - 1] || ''}) work; you are at tier ${tier || 0}. Your materials come back when you close the menu.`); return false; }
     if (knows(a, fam)) return true;
+    // A people's own armoury is never apprenticed (regions.js raceCraft refuses other peoples first; this holds a staff grant's gaps)
+    if (techOf(fam).book === 'race') { tell(a, `${hintOf(fam)}. Your materials come back when you close the menu.`); return false; }
     const sup = supervisorFor(a, fam);
     S.pending.delete(a);
     if (!sup) { tell(a, `You don't know how to work ${fam.name} yet. ${hintOf(fam)}. Your materials come back when you close the menu.`); return false; }
@@ -209,7 +212,7 @@ module.exports = (api) => {
     if (!C.enabled || C.carryOver === false || get(a, CARRIED, null) || !blacksmith(a)) return 0;
     const tier = craftTier(a), rec = Object.assign({}, known(a)), race = raceEdid(a), got = [];
     for (const f of FAMILIES) {
-      if (f.tier < 2 || f.tier > tier || f.free || f.technique || f.id === 'artifact' || rec[f.id]) continue;
+      if (f.tier < 2 || f.tier > tier || f.free || f.technique || f.id === 'artifact' || f.book === 'race' || rec[f.id]) continue;
       if (f.supervisorRace && !race.startsWith(f.supervisorRace)) continue;
       rec[f.id] = { at: Date.now(), how: 'staff', from: 'carry-over' }; got.push(f.name);
     }
