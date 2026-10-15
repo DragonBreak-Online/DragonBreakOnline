@@ -511,6 +511,7 @@ def main():
     ovr_rec = {(nd(k) if ':' in k else k.lower()): v for k, v in (ovr.get('recipes') or {}).items() if not k.startswith('_')}
     ovr_never = {(nd(k) if ':' in k else k.lower()): v for k, v in (ovr.get('forgeNever') or {}).items() if not k.startswith('_')}
     rrec = {nd(k): v for k, v in (regions.get('recipes') or {}).items()}
+    ovr_plug = {k.lower(): v for k, v in (ovr.get('recipePlugins') or {}).items() if not k.startswith('_')}
 
     def region_of(r):
         d = desc(r['key']).lower()
@@ -522,7 +523,28 @@ def main():
             return {'p': o if not isinstance(o, dict) else o.get('p'), 'why': 'override', 'c': (o.get('c') if isinstance(o, dict) else None) or (e or {}).get('c')}
         if e:
             return {'p': e.get('p'), 'why': e.get('why'), 'c': e.get('c')}
-        return {'p': None, 'why': 'no entry: failOpen allows it everywhere'}
+        rule = ovr_plug.get(r['key'][0])
+        if rule is not None and not re.match(r'CraftingSmithing(ArmorTable|SharpeningWheel)$', edid.get(r['bench'], '')):
+            for x in (rule if isinstance(rule, list) else [rule]):
+                if (x.get('edid') and not re.search(x['edid'], r['edid'], re.I)) or (x.get('notEdid') and re.search(x['notEdid'], r['edid'], re.I)):
+                    continue
+                return {'p': x.get('p'), 'c': x.get('c'), 'why': 'recipePlugins'}
+        return {'p': None, 'why': 'no entry: failOpen allows it everywhere' if not re.match(r'CraftingSmithing(ArmorTable|SharpeningWheel)$', edid.get(r['bench'], '')) else 'tempering: no province rule'}
+
+    race_rules = (gcfg.get('raceCraft') or {}).get('rules') or []
+    def race_rule(prod):
+        if not prod:
+            return None
+        e = edid.get(prod, '')
+        for x in race_rules:
+            pl = [y.lower() for y in x.get('plugins') or []]
+            if pl and prod[0] not in pl:
+                continue
+            if x.get('edid') and not re.search(x['edid'], e):
+                continue
+            if pl or x.get('edid'):
+                return {'id': x.get('id'), 'races': x.get('races')}
+        return None
 
     # ---- the rows ------------------------------------------------------------------------------------------------
     out = []
@@ -553,7 +575,7 @@ def main():
             'unknownConditions': [{'fn': c['name'], 'param': c.get('param'), 'stage': c.get('stage'), 'op': c['op'], 'value': c['value']} for c in unknown],
             'family': fam, 'smithing': ({'tier': sf.get('tier'), 'free': bool(sf.get('free')), 'technique': sf.get('technique'), 'raceFree': sf.get('raceFree'),
                                          'book': sf.get('book'), 'bookId': sf.get('bookId'), 'drops': sorted(drop_fams.get((sf.get('technique') or fam), set()))} if sf else None),
-            'region': region_of(r), 'forgeNever': ovr_never.get(desc(prod).lower()) or ovr_never.get(edid.get(prod, '').lower()),
+            'region': region_of(r), 'raceCraft': race_rule(prod), 'forgeNever': ovr_never.get(desc(prod).lower()) or ovr_never.get(edid.get(prod, '').lower()),
         })
     bench_summary = {edid.get(kw, desc(kw)): {'placed': dict(c), 'where': {kk: dict(v.most_common(6)) for kk, v in bench_where[kw].items()}} for kw, c in benches.items()}
     json.dump({'order': len(order), 'missing': missing, 'closed': sorted(closed), 'recipes': out, 'benches': bench_summary,

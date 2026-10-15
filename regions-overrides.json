@@ -87,8 +87,8 @@
     "DBOBAG_evgsmptraderpacklanternREDarmor": "common",
     "DBOBAG_evgsmptraderpacklanternarmor": "common",
     "DBOSM_TravellingMerchantBackpack": "common",
-    "_skyrimRelease": "Skyrim release check (15 Oct, ~/claude-nate-release/specs/skyrim-recipes-check.md): Black Bear Ancient Nord Armor.esp's two light hood recipes (RecipeBlackBearAncientNordHoodLight d8d, ...LoweredHoodLight d97) list a null input (raw 00000000, count 0), and the Lowered one makes the heavy Lowered Hood: refused until the PC's Nexus Patches override fixes both. DBOSM_Res_GoldIngotDB (b75) smelts DragonBreak.esp's IngotGoldStatic, which stands only as bank-vault dressing (21 refs in the Whiterun, Riften and Solitude banks, which open with Skyrim): refused, so a vault's decor never becomes gold.",
-    "d8d:Black Bear Ancient Nord Armor.esp": "none",
+    "_skyrimRelease": "Skyrim release check (15 Oct, ~/claude-nate-release/specs/skyrim-recipes-check.md): Black Bear Ancient Nord Armor.esp's two light hood recipes (RecipeBlackBearAncientNordHoodLight d99, ...LoweredHoodLight d97) list a null input (raw 00000000, count 0), and the Lowered one makes the heavy Lowered Hood: refused until the PC's Nexus Patches override fixes both. DBOSM_Res_GoldIngotDB (b75) smelts DragonBreak.esp's IngotGoldStatic, which stands only as bank-vault dressing (21 refs in the Whiterun, Riften and Solitude banks, which open with Skyrim): refused, so a vault's decor never becomes gold.",
+    "d99:Black Bear Ancient Nord Armor.esp": "none",
     "d97:Black Bear Ancient Nord Armor.esp": "none",
     "b75:DragonBreak Nexus Patches.esp": "none"
   },
