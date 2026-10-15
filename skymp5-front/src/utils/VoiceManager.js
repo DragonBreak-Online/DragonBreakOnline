@@ -31,6 +31,7 @@ import talkImg from '../img/voice/Talk.png';
 import shoutImg from '../img/voice/Shout.png';
 
 const UNSUB_HYSTERESIS = 1.15;   // unsubscribe only past range*this (no flapping)
+const RESUBSCRIBE_MS = 3000;     // a wanted voice LiveKit allows but has not delivered is asked for again this often
 const BANNER_MS = 1400;          // how long the mode banner stays up
 const SPEAKING_TICK_MS = 150;    // lip sync report cadence while someone talks
 const VAD_TICK_MS = 50;
@@ -888,13 +889,18 @@ class VoiceManager {
     if (!this.room) return;
     this.audioEls.forEach((el, identity) => this.applyVolume(identity));
     // Bandwidth: don't even receive audio from players far out of range
+    const now = Date.now();
     this.room.remoteParticipants.forEach((participant) => {
       const d = this.distances[participant.identity];
       const wanted = d !== undefined && d <= this.rangeFor(participant.identity) * UNSUB_HYSTERESIS;
       participant.audioTrackPublications.forEach((pub) => {
-        if (pub.isSubscribed !== wanted && typeof pub.setSubscribed === 'function') {
-          try { pub.setSubscribed(wanted); } catch (e) { /* transient */ }
-        }
+        if (typeof pub.setSubscribed !== 'function') return;
+        // Asked once: LiveKit delivers it when the speaker lets me hear them; asked again only while it is allowed and still missing
+        const desired = typeof pub.isDesired === 'boolean' ? pub.isDesired : pub.isSubscribed;
+        const missing = wanted && !pub.isSubscribed && pub.permissionStatus !== 'not_allowed' && now - (pub.dboAskedAt || 0) >= RESUBSCRIBE_MS;
+        if (desired === wanted && !missing) return;
+        pub.dboAskedAt = now;
+        try { pub.setSubscribed(wanted); } catch (e) { /* transient */ }
       });
     });
   }
