@@ -12,7 +12,7 @@ const b64url = buf => buf.toString('base64').replace(/\+/g, '-').replace(/\//g, 
 const escapeHtml = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
 
 // What the player is approving, in the launcher's tooltip and on the page the browser shows at the end
-const APPROVAL_NOTE = 'DragonBreak asks Discord only for your Discord name and avatar. The sign-in comes back only to this launcher, on this PC. Never authorize DragonBreak from a link someone sent you.'
+const APPROVAL_NOTE = 'DragonBreak asks Discord only for your Discord account id, name and avatar. The sign-in comes back only to this launcher, on this PC. Never authorize DragonBreak from a link someone sent you.'
 
 // The PKCE pair (RFC 7636, S256): the verifier stays in this process, only the challenge is sent
 function pkcePair() {

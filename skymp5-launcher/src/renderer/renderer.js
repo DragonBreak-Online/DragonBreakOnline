@@ -594,7 +594,7 @@ async function loadSettings() {
 // Discord topbar widget
 const discordTopbarSlot = document.getElementById('discord-topbar-slot')
 const DISCORD_LOGIN_HINT = 'Discord is opening in your browser. Press Authorize there to sign in this launcher on this PC.'
-const DISCORD_APPROVAL_NOTE = 'DragonBreak asks Discord only for your Discord name and avatar. The sign-in comes back only to this launcher, on this PC. Never authorize DragonBreak from a link someone sent you.'
+const DISCORD_APPROVAL_NOTE = 'DragonBreak asks Discord only for your Discord account id, name and avatar. The sign-in comes back only to this launcher, on this PC. Never authorize DragonBreak from a link someone sent you.'
 
 function showLoggedOut() {
   discordUser   = null

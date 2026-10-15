@@ -62,6 +62,7 @@ test('the login opens the backend page with the issued state and trades the code
   assert.strictEqual(page.status, 200)
   assert.match(page.body, /Signed in as Alpha/)
   assert.match(page.body, /Never authorize DragonBreak from a link someone sent you/)
+  assert.match(page.body, /only for your Discord account id, name and avatar/, 'the page names everything Discord hands over')
 })
 
 test('a request without this login\'s state, on another path or for another host is answered and ignored', async () => {
