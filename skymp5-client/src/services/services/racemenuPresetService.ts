@@ -136,12 +136,21 @@ export class RacemenuPresetService extends ClientListener {
     this.earlyEditor = false;
   }
 
-  // A gate holding the player's own load is traced when it changes, not every second it holds
-  private traceSelfWait(gate: string, hash: string): void {
-    const key = `${gate}|${hash}`;
+  // A gate holding the player's own load is traced when it or the races it compares change, not every second it holds
+  private traceSelfWait(gate: string, hash: string, player: Actor, entry: CacheEntry): void {
+    const races = this.racesOf(player, entry);
+    const key = `${gate}|${hash}|${races}`;
     if (key === this.selfWait) return;
     this.selfWait = key;
-    trace(`rmp apply wait=${gate} h=${hash}`);
+    trace(`rmp apply wait=${gate} h=${hash} ${races}`);
+  }
+
+  // now= the actor's live race (what the gate compares), base= its base's (what the look trace reads), want= the face's
+  private racesOf(actor: Actor, entry: CacheEntry): string {
+    let now = 0, base = 0;
+    try { now = (actor.getRace()?.getFormID() ?? 0) >>> 0; } catch { now = 0; }
+    try { base = (ActorBase.from(actor.getBaseObject())?.getRace()?.getFormID() ?? 0) >>> 0; } catch { base = 0; }
+    return `now=${hex(now)} base=${hex(base)} want=${hex(entry.race)}`;
   }
 
   private raceMenuSettling(now: number): boolean {
@@ -574,7 +583,7 @@ export class RacemenuPresetService extends ClientListener {
     const player = Game.getPlayer();
     if (!player || !entry.face || this.selfQueued) return;
     const gate = this.gateFor(player, entry, now);
-    if (gate) { this.traceSelfWait(gate, entry.hash); return; }
+    if (gate) { this.traceSelfWait(gate, entry.hash, player, entry); return; }
     const base = ActorBase.from(player.getBaseObject());
     if (!base) return;
     const ids: number[] = [];
@@ -593,7 +602,7 @@ export class RacemenuPresetService extends ClientListener {
     queuePlayerNiNodeWork((p) => {
       this.selfQueued = false;
       const late = this.gateFor(p, entry, Date.now());
-      if (late) { this.traceSelfWait(late, hash); return false; }
+      if (late) { this.traceSelfWait(late, hash, p, entry); return false; }
       // Once per face either way: a load skee refuses is not retried every second
       this.selfAppliedHash = hash;
       if (!this.load(p, presetFileName("self"), jslot, natives)) { trace(`rmp apply fail h=${hash}`); return false; }

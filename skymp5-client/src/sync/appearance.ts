@@ -277,6 +277,11 @@ const playerBase = (): ActorBase | null => {
 
 const hasTraceSink = (): boolean => typeof (globalThis as any).__dboTrace === "function";
 
+// The player's live race (Actor.getRace), for the look trace: a login save can leave it apart from the base's; undefined when unread
+const playerLiveRace = (): number | undefined => {
+  try { const race = Game.getPlayer()?.getRace(); return race ? race.getFormID() >>> 0 : 0; } catch { return undefined; }
+};
+
 // What went on the base and what it reads back, now and RECHECK_AFTER_S later if no newer look went on meanwhile
 const traceOwnLook = (event: string, appearance: Appearance): void => {
   try {
@@ -289,7 +294,7 @@ const traceOwnLook = (event: string, appearance: Appearance): void => {
     }
     const base = playerBase();
     if (!base) return;
-    trace(lookTraceLine(event, appearance, readLook(base)));
+    trace(lookTraceLine(event, appearance, readLook(base), playerLiveRace()));
     if (event === "preview") return;
     Utility.wait(RECHECK_AFTER_S).then(() => once("update", () => {
       if (lastOwnLook === appearance) recheckOwnLook(`${event}+${RECHECK_AFTER_S}s`);
@@ -301,7 +306,7 @@ export const recheckOwnLook = (event: string): void => {
   try {
     if (!lastOwnLook || !hasTraceSink()) return;
     const base = playerBase();
-    if (base) trace(lookRecheckLine(event, lastOwnLook, readLook(base)));
+    if (base) trace(lookRecheckLine(event, lastOwnLook, readLook(base), playerLiveRace()));
   } catch (e) { /* diagnostics only */ }
 };
 

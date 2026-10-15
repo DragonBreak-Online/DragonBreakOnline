@@ -671,7 +671,7 @@ const bundle = async (rel, dir) => {
   check('trace: the server\'s answer: face hash, chunks, size, sliders, sculpt, race', has(`rmp ans face h=${SERVER.hash} n=1 chars=${SERVER.text.length} cu=1 sc=1 race=13746`), TR.filter((l) => /ans face/.test(l)));
   check('trace: an answer of none, and the off switch', has('rmp ans none off=0') && has('rmp ans none off=1') && has('rmp off'));
   check('trace: the load on the player: hash, head parts, sculpt hosts dropped', has(`rmp apply ok h=${SERVER.hash} hp=1 drop=0`), TR.filter((l) => /apply/.test(l)));
-  check('trace: a gate holding the load names it, once while it holds', TR.filter((l) => l === `rmp apply wait=combat h=${SERVER.hash}`).length === 1,
+  check('trace: a gate holding the load names it, once while it holds (with the races it compares)', TR.filter((l) => l === `rmp apply wait=combat h=${SERVER.hash} now=13746 base=13746 want=13746`).length === 1,
     TR.filter((l) => /apply wait/.test(l)));
   check('trace: a load skee refused', has(`rmp apply fail h=${SERVER.hash}`));
   check('trace: the load asks the look trace for a read-back now and 3 s later', RECHECKS.includes('rmface') && RECHECKS.includes('rmface+3'), RECHECKS.slice(0, 4));
