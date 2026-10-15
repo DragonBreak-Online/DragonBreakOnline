@@ -1,6 +1,7 @@
 import * as crypto from "crypto";
 import { Settings } from "../settings";
 import { System, Log, SystemContext, Content } from "./system";
+import { userOf } from "./actorUtil";
 
 // The ScampServer / `mp` API is untyped here, same convention as spawn.ts.
 type Mp = any;
@@ -17,21 +18,30 @@ type Mp = any;
 //
 // Settings (server-settings.json "voiceChat" object):
 //   { "enabled": true, "url": "ws://host:7880", "apiKey": "...",
-//     "apiSecret": "...", "room": "dragonbreak", "rangeUnits": 2000 }
+//     "apiSecret": "...", "room": "dragonbreak", "rangeUnits": 2000,
+//     "apiUrl": "http://host:7880" }
 // rangeUnits falls back to chatRanges.say, then 2000 game units.
+// apiUrl is optional: the LiveKit server API base the game server calls, by default url with ws(s) turned into http(s).
 
 // Short on purpose: LiveKit refreshes tokens over live connections, and a kicked/banned player's credential dies with the TTL (no admin-API revocation)
 const TOKEN_TTL_SECONDS = 60 * 60;
+const ADMIN_TOKEN_TTL_SECONDS = 60;
+const API_TIMEOUT_MS = 5000;
 
 function b64url(input: Buffer | string): string {
   return (typeof input === "string" ? Buffer.from(input) : input).toString("base64url");
 }
 
+function signHs256(apiSecret: string, payload: Record<string, unknown>): string {
+  const body = `${b64url(JSON.stringify({ alg: "HS256", typ: "JWT" }))}.${b64url(JSON.stringify(payload))}`;
+  const sig = crypto.createHmac("sha256", apiSecret).update(body).digest("base64url");
+  return `${body}.${sig}`;
+}
+
 // Hand-minted LiveKit access token; the payload shape matches livekit-server-sdk.
 function mintLiveKitToken(apiKey: string, apiSecret: string, identity: string, room: string): string {
   const now = Math.floor(Date.now() / 1000);
-  const header = { alg: "HS256", typ: "JWT" };
-  const payload = {
+  return signHs256(apiSecret, {
     iss: apiKey,
     sub: identity,
     jti: identity,
@@ -40,11 +50,20 @@ function mintLiveKitToken(apiKey: string, apiSecret: string, identity: string, r
     exp: now + TOKEN_TTL_SECONDS,
     name: identity,
     video: { roomJoin: true, room, canPublish: true, canSubscribe: true, canPublishData: true },
-  };
-  const body = `${b64url(JSON.stringify(header))}.${b64url(JSON.stringify(payload))}`;
-  const sig = crypto.createHmac("sha256", apiSecret).update(body).digest("base64url");
-  return `${body}.${sig}`;
+  });
 }
+
+// Server API token for one RoomService call: admin of this room only, it cannot join it
+function mintAdminToken(apiKey: string, apiSecret: string, room: string): string {
+  const now = Math.floor(Date.now() / 1000);
+  return signHs256(apiSecret, { iss: apiKey, sub: "dragonbreak-game-server", nbf: now - 10, exp: now + ADMIN_TOKEN_TTL_SECONDS, video: { roomAdmin: true, room } });
+}
+
+// wss://host/path -> https://host/path, ws:// -> http://
+const httpBaseOf = (url: string): string => url.trim().replace(/^ws(s?):\/\//i, "http$1://").replace(/\/+$/, "");
+
+// Error code only: a fetch error's cause carries the address it tried
+const errCode = (e: any): string => String(e?.cause?.code || e?.name || "error");
 
 export class VoiceSystem implements System {
   systemName = "VoiceSystem";
@@ -54,7 +73,11 @@ export class VoiceSystem implements System {
   private url = "";
   private apiKey = "";
   private apiSecret = "";
+  private apiBase = "";
   private room = "dragonbreak";
+  // userId -> identities minted for that connection; they leave the room when it ends
+  private mintedByUser = new Map<number, Set<string>>();
+  private apiFailing = false;
   // One token per user every 2 s at most (a port of 57503548 without the profile identity): the client asks every 5 s at
   // most (voiceService TOKEN_RETRY_MS), so a faster stream of requests comes from a modified client, and each one signs
   // a token
@@ -79,6 +102,7 @@ export class VoiceSystem implements System {
     this.apiKey = typeof vc.apiKey === "string" ? vc.apiKey : "";
     this.apiSecret = typeof vc.apiSecret === "string" ? vc.apiSecret : "";
     if (typeof vc.room === "string" && vc.room) this.room = vc.room;
+    this.apiBase = httpBaseOf(typeof vc.apiUrl === "string" && vc.apiUrl ? vc.apiUrl : this.url);
 
     // Optional override: voiceChat.modes = [{ key, label, meters }]
     if (Array.isArray(vc.modes) && vc.modes.length) {
@@ -100,9 +124,53 @@ export class VoiceSystem implements System {
     this.log(`VoiceSystem: ${this.enabled ? `enabled, room '${this.room}', modes: ${modeDesc}` : "disabled (missing url/apiKey/apiSecret or enabled=false)"}`);
   }
 
-  // A new connection on the same user slot is not held to the last one's cooldown
-  disconnect(userId: number, _ctx: SystemContext): void {
+  // A new connection on the same user slot is not held to the last one's cooldown; every kick and ban ends here too
+  disconnect(userId: number, ctx: SystemContext): void {
     this.lastMintAt.delete(userId);
+    const minted = this.mintedByUser.get(userId);
+    this.mintedByUser.delete(userId);
+    if (!minted || !this.enabled) return;
+    const mp = ctx.svr as Mp;
+    for (const identity of minted) {
+      // A relog that already holds this character on a new connection keeps its voice
+      const other = userOf(mp, parseInt(identity, 16));
+      if (other >= 0 && other !== userId) continue;
+      void this.removeParticipant(identity, "left the game");
+    }
+  }
+
+  // A token cannot be revoked and LiveKit re-signs one for a connected session every few minutes, so the session is removed
+  private async removeParticipant(identity: string, why: string): Promise<void> {
+    const res = await this.roomService("RemoveParticipant", { room: this.room, identity });
+    if (res && !res.notFound) this.log(`VoiceSystem: removed voice participant ${identity} (${why})`);
+  }
+
+  // One LiveKit RoomService call (Twirp JSON); null when it failed
+  private async roomService(method: string, body: Record<string, unknown>): Promise<any | null> {
+    try {
+      const timeout = (AbortSignal as any).timeout;
+      const res = await fetch(`${this.apiBase}/twirp/livekit.RoomService/${method}`, {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${mintAdminToken(this.apiKey, this.apiSecret, this.room)}`, "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+        signal: typeof timeout === "function" ? timeout(API_TIMEOUT_MS) : undefined,
+      });
+      // not_found: the participant already left
+      if (res.status === 404) return { notFound: true };
+      if (!res.ok) return this.apiFailed(`${method} answered HTTP ${res.status}`);
+      if (this.apiFailing) this.log("VoiceSystem: the LiveKit server API answers again");
+      this.apiFailing = false;
+      return await res.json().catch(() => ({}));
+    } catch (e) {
+      return this.apiFailed(`${method} failed (${errCode(e)})`);
+    }
+  }
+
+  // Logged once per outage, never with the address
+  private apiFailed(what: string): null {
+    if (!this.apiFailing) this.log(`VoiceSystem: LiveKit server API call ${what}; voice sessions are not being removed (voiceChat.apiUrl?)`);
+    this.apiFailing = true;
+    return null;
   }
 
   customPacket(userId: number, type: string, _content: Content, ctx: SystemContext): void {
@@ -121,6 +189,8 @@ export class VoiceSystem implements System {
     const identity = actorId.toString(16);
     try {
       const token = mintLiveKitToken(this.apiKey, this.apiSecret, identity, this.room);
+      const minted = this.mintedByUser.get(userId) || new Set<string>();
+      this.mintedByUser.set(userId, minted.add(identity));
       mp.sendCustomPacket(userId, JSON.stringify({
         customPacketType: "voiceToken",
         enabled: true,

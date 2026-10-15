@@ -30,6 +30,8 @@ const check = (name, ok, got) => { console.log(`${ok ? 'ok  ' : 'FAIL'} ${name}$
     }],
   });
   const { VoiceSystem } = require(bundle);
+  // A disconnect asks LiveKit to remove the session: answered here, never sent
+  globalThis.fetch = async () => ({ ok: true, status: 200, json: async () => ({}) });
 
   let now = 1_700_000_000_000;
   const realNow = Date.now;
