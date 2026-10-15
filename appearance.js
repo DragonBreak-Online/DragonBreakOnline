@@ -558,7 +558,7 @@ module.exports = (api) => {
     if (!free && !takeGold(a, cost)) {
       mp.set(a, 'appearance', before);
       resendAfterSettle(a, appearance);
-      system(a, e.free === true ? `Your free appearance change is no longer there, and a new look costs ${cost} gold, which you no longer have, so your previous look was kept.`
+      system(a, e.free === true ? `Your free appearance change is no longer there, and a new look costs ${cost} gold, which you don't have, so your previous look was kept.`
         : `You no longer have ${cost} gold, so your previous look was kept.`);
       audit(`APPEARANCE ${who(a)} closed the editor without ${cost} gold: previous look kept`);
       return true;
@@ -577,7 +577,8 @@ module.exports = (api) => {
       audit(`APPEARANCE ${who(a)} changed their look with their free appearance change (no gold)${nameKept ? ' (a name change in the editor was undone)' : ''}`);
       return true;
     }
-    system(a, `Your new look is saved. ${cost} gold paid.${headNote}${nameNote}${raceMenuKept(a) ? '' : NOT_KEPT_NOTE}`);
+    // Opened free, but the free change went meanwhile (switched off by a hot reload, or used by a RaceMenu save): say why gold was taken
+    system(a, `Your new look is saved. ${cost} gold paid${e.free === true ? ': your free appearance change is no longer there' : ''}.${headNote}${nameNote}${raceMenuKept(a) ? '' : NOT_KEPT_NOTE}`);
     audit(`APPEARANCE ${who(a)} changed their look for ${cost} gold${nameKept ? ' (a name change in the editor was undone)' : ''}`);
     return true;
   };

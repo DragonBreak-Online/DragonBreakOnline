@@ -77,7 +77,7 @@ section('the second change is paid again', () => {
   run();
   ok(opened === 2 && /costs 500 gold/.test(lastSaid()) && !/free/.test(lastSaid()), 'with the gold it opens at the price', lastSaid());
   finish(Object.assign(look(), { hairColor: 4 }));
-  ok(gold() === 300 && /500 gold paid/.test(lastSys()), 'and the second change costs 500 gold', [gold(), lastSys()]);
+  ok(gold() === 300 && /500 gold paid\./.test(lastSys()) && !/free/.test(lastSys()), 'and the second change costs 500 gold', [gold(), lastSys()]);
 });
 
 // 3. The cooldown is skipped for the free use
@@ -157,11 +157,11 @@ section('freeChanges 0 restores today', () => {
   const edit = props.get(`${A}|private.dboAppearanceEdit`);
   load(800, { freeChanges: 0 }); props.set(`${A}|private.dboAppearanceEdit`, edit);
   finish(changed());
-  ok(gold() === 300 && /500 gold paid/.test(lastSys()), 'switched off mid-edit: the close is paid', [gold(), lastSys()]);
+  ok(gold() === 300 && /500 gold paid: your free appearance change is no longer there\./.test(lastSys()), 'switched off mid-edit: the close is paid, and the player told why', [gold(), lastSys()]);
   load(100); run(); const edit2 = props.get(`${A}|private.dboAppearanceEdit`);
   load(100, { freeChanges: 0 }); props.set(`${A}|private.dboAppearanceEdit`, edit2);
   finish(changed());
-  ok(gold() === 100 && props.get(`${A}|appearance`).hairColor === 2 && /free appearance change is no longer there/.test(lastSys()), '...and without the gold the previous look is kept, the player told why', lastSys());
+  ok(gold() === 100 && props.get(`${A}|appearance`).hairColor === 2 && /free appearance change is no longer there, and a new look costs 500 gold, which you don't have/.test(lastSys()), '...and without the gold the previous look is kept, the player told why', lastSys());
   // Neither an unchanged free close: its RaceMenu window charges gold, as today
   load(800); run(); const edit3 = props.get(`${A}|private.dboAppearanceEdit`);
   load(800, { freeChanges: 0 }); props.set(`${A}|private.dboAppearanceEdit`, edit3); finish(look());
@@ -175,7 +175,7 @@ section('one free change, not two', () => {
   const v = globalThis.__dboRaceMenuSaveGate(A, 'face', false);
   ok(v.ok && v.freeChange && freeLeft() === 0, 'the earlier close\'s RaceMenu change uses the free change', v);
   finish(changed());
-  ok(gold() === 300 && /500 gold paid/.test(lastSys()) && Number(props.get(`${A}|private.dboAppearanceFreeUsed`)) === 1, 'the open editor\'s change is then paid', [gold(), lastSys()]);
+  ok(gold() === 300 && /500 gold paid: your free appearance change is no longer there\./.test(lastSys()) && Number(props.get(`${A}|private.dboAppearanceFreeUsed`)) === 1, 'the open editor\'s change is then paid, and the player told why', [gold(), lastSys()]);
 });
 
 // 8. The notice: once per character, never while still being made, existing and new characters both
