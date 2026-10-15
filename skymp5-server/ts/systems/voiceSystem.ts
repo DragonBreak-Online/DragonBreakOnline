@@ -241,7 +241,9 @@ export class VoiceSystem implements System {
     return list.map((p) => String(p?.identity ?? "")).filter(Boolean);
   }
 
+  // Only the sweep reads and expires these
   private noteRemoval(identity: string): void {
+    if (!this.sweepMs) return;
     this.removals.set(identity, { n: (this.removals.get(identity)?.n || 0) + 1, at: Date.now() });
   }
 
