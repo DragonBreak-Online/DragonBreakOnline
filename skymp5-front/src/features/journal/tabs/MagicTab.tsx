@@ -7,10 +7,11 @@ import { JournalTabProps, registerJournalTab } from '../tabs';
 // magic-flow-2): the five schools, the open one's page with what its rank allows, the first spell to choose at 25 and
 // the next tomes, and the spell book (prepared and known). Actions are dbo:journalMagic [nonce, op, ...]:
 // firstSpell <school> <spell desc>, prepare <spell desc>, unprepare <spell desc>; prepare and put away only where the
-// server says canPrepare (a college or beside a Scholars' Ledger).
+// server says canPrepare (a college or beside a Scholars' Ledger); apprenticeLeave, apprenticeRelease <apprentice id>.
+// A rank pick's choice with `line` is the next spell of a line the character knows (server spell-lines.json): listed first.
 
 // stage: which pick is waiting (Arcane Mastery, server schools.js rankPicks): 'first', 'Apprentice' or 'Adept'; held: the school goes no further until it is chosen
-interface FirstSpell { state: 'open' | 'made' | 'none' | 'later' | 'closed'; spell?: string; choices?: Array<{ id: string; name: string; blurb: string }>; at?: number; spells?: string; stage?: string; held?: boolean }
+interface FirstSpell { state: 'open' | 'made' | 'none' | 'later' | 'closed'; spell?: string; choices?: Array<{ id: string; name: string; blurb: string; line?: string }>; at?: number; spells?: string; stage?: string; held?: boolean }
 interface Tome { spell: string; school: string; rank: number; rankName: string; where: string }
 export interface MagicSchool {
   name: string; epithet: string; blurb: string; role: string; roleLabel: string; level: number; rank: string; nextRank: string; nextAt: number; fill: number;
@@ -19,8 +20,8 @@ export interface MagicSchool {
 }
 interface BookSpell { id: string; name: string; school: string; rank: number; rankName: string; prepared?: boolean; outside?: boolean }
 interface Apprenticeship {
-  apprentice: { teacher: string; spell: string; school: string; rank: string; xp: number; need: number; today: number; dailyXp: number; near: boolean } | null;
-  apprentices: Array<{ name: string; spell: string }>; max: number;
+  apprentice: { teacher: string; spell: string; school: string; rank: string; xp: number; need: number; today: number; dailyXp: number; near: boolean; canLeave?: boolean } | null;
+  apprentices: Array<{ id?: string; name: string; spell: string }>; max: number;
 }
 export interface MagicSection {
   v: number; open: boolean; note?: string; ranks?: string[]; firstSpellAt?: number;
@@ -55,10 +56,10 @@ const SchoolPage = ({ s, sec, busy, act }: { s: MagicSchool; sec: MagicSection; 
       {f.state === 'open' ? (
         <section className="jmagic__first">
           <h3 className="journal__heading">Choose your {f.stage && f.stage !== 'first' ? `${f.stage} spell` : 'first spell'}</h3>
-          <p className="jmagic__prose">Your study of {s.name} has reached {f.at || sec.firstSpellAt || 25}. Choose one spell to know; the others stay to be learned from tomes.{f.held ? ` Your study of ${s.name} goes no further until you choose.` : ''}</p>
+          <p className="jmagic__prose">Your study of {s.name} has reached {f.at || sec.firstSpellAt || 25}. Choose one spell to know; the others stay to be learned from tomes.{(f.choices || []).some((c) => c.line) ? ' The first follow a spell you know; you keep that one.' : ''}{f.held ? ` Your study of ${s.name} goes no further until you choose.` : ''}</p>
           <ul className="jmagic__choices">
             {(f.choices || []).map((c) => (
-              <li key={c.id} className={'jmagic__choice' + (asking === c.id ? ' jmagic__choice--ask' : '')}>
+              <li key={c.id} className={'jmagic__choice' + (c.line ? ' jmagic__choice--line' : '') + (asking === c.id ? ' jmagic__choice--ask' : '')}>
                 <span className="jmagic__choice-name">{c.name}</span>
                 <span className="jmagic__choice-blurb">{c.blurb}</span>
                 {asking === c.id ? (
@@ -106,6 +107,40 @@ const SpellRow = ({ sp, can, busy, act, outside }: { sp: BookSpell; can: boolean
   </li>
 );
 
+// The lesson studied and the apprentices taught, each ended from here with a second click (Leave, Release), so a lesson
+// with someone who never comes back can still end
+const ApprenticeshipNote = ({ ap, busy, act }: { ap: Apprenticeship; busy: boolean; act: JournalTabProps['act'] }) => {
+  const [asking, setAsking] = useState('');
+  useEffect(() => setAsking(''), [busy]);
+  const a = ap.apprentice;
+  const ask = (key: string, label: string, sure: string, run: () => void) => (asking === key
+    ? <span className="jmagic__choice-act"><button type="button" className="journal__button" onClick={() => setAsking('')}>Not yet</button><button type="button" className="journal__button journal__button--primary" disabled={busy} onClick={run}>{sure}</button></span>
+    : <button type="button" className="journal__button" disabled={busy} onClick={() => setAsking(key)}>{label}</button>);
+  return (
+    <>
+      {a ? (
+        <div className="jmagic__note">
+          <p>Apprentice of {a.teacher} in {a.spell} ({a.rank} {a.school}): {a.xp} of {a.need} studied, {a.today} of {a.dailyXp} today. {a.near ? 'You are near your teacher: cast it to study.' : 'Go to your teacher to cast and study it.'}</p>
+          {a.canLeave ? ask('leave', 'Leave apprenticeship', 'Leave it', () => act('journalMagic', 'apprenticeLeave')) : null}
+        </div>
+      ) : null}
+      {ap.apprentices.length ? (
+        <div className="jmagic__note">
+          <p>Your apprentices{ap.max > 1 ? ` (${ap.apprentices.length} of ${ap.max})` : ''}:</p>
+          <ul className="jmagic__apprentices">
+            {ap.apprentices.map((x) => (
+              <li key={x.id || x.name} className="jmagic__apprentice">
+                <span>{x.name} ({x.spell})</span>
+                {x.id ? ask('release:' + x.id, 'Release', `Release ${x.name}`, () => act('journalMagic', 'apprenticeRelease', x.id as string)) : null}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+    </>
+  );
+};
+
 export const MagicTab = ({ section, busy, act }: JournalTabProps<MagicSection>) => {
   const sec = (section || { v: 1, open: false }) as MagicSection;
   const schools = sec.schools || [];
@@ -126,16 +161,13 @@ export const MagicTab = ({ section, busy, act }: JournalTabProps<MagicSection>) 
               <button type="button" className={'jmagic__school jmagic__school--' + (ROLE_CLASS[s.role] || 'off') + (shown && s.name === shown.name ? ' jmagic__school--sel' : '')} onClick={() => setPicked(s.name)}>
                 <span className="jmagic__school-name">{s.name}</span>
                 <span className="jmagic__school-level">{s.role === 'closed' ? '' : s.level}</span>
-                <span className="jmagic__school-role">{s.firstSpell && s.firstSpell.state === 'open' ? 'a first spell waits' : s.roleLabel}</span>
+                <span className="jmagic__school-role">{s.firstSpell && s.firstSpell.state === 'open' ? (s.firstSpell.stage && s.firstSpell.stage !== 'first' ? `${s.firstSpell.stage.toLowerCase()} spell waits` : 'a first spell waits') : s.roleLabel}</span>
               </button>
             </li>
           ))}
         </ul>
         {sec.note ? <p className="jmagic__note">{sec.note}</p> : null}
-        {sec.apprenticeship && sec.apprenticeship.apprentice ? (() => { const ap = sec.apprenticeship.apprentice; return (
-          <p className="jmagic__note">Apprentice of {ap.teacher} in {ap.spell} ({ap.rank} {ap.school}): {ap.xp} of {ap.need} studied, {ap.today} of {ap.dailyXp} today. {ap.near ? 'You are near your teacher: cast it to study.' : 'Go to your teacher to cast and study it.'}</p>
-        ); })() : null}
-        {sec.apprenticeship && sec.apprenticeship.apprentices.length ? <p className="jmagic__note">Your apprentices: {sec.apprenticeship.apprentices.map((x) => `${x.name} (${x.spell})`).join(', ')}.</p> : null}
+        {sec.apprenticeship ? <ApprenticeshipNote ap={sec.apprenticeship} busy={busy} act={act} /> : null}
       </nav>
       {shown ? <SchoolPage s={shown} sec={sec} busy={busy} act={act} /> : <div />}
       <aside className="jmagic__book">
