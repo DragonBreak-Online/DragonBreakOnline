@@ -593,6 +593,16 @@ async function loadSettings() {
 
 // Discord topbar widget
 const discordTopbarSlot = document.getElementById('discord-topbar-slot')
+const DISCORD_LOGIN_HINT = 'Discord is opening in your browser. Press Authorize there to sign in this launcher on this PC.'
+const DISCORD_APPROVAL_NOTE = 'DragonBreak asks Discord only for your Discord account id, name and avatar. The sign-in comes back only to this launcher, on this PC. Never authorize DragonBreak from a link someone sent you.'
+
+function showLoggedOut() {
+  discordUser   = null
+  serverAllowed = true  // reset: access unknown until next login
+  window.dboLegal.reset()
+  renderTopbarDiscord()
+  updateLockState()
+}
 
 function renderTopbarDiscord() {
   discordTopbarSlot.innerHTML = ''
@@ -621,15 +631,11 @@ function renderTopbarDiscord() {
 
     const logoutBtn = document.createElement('button')
     logoutBtn.className   = 'discord-topbar-logout'
-    logoutBtn.title       = 'Logout'
+    logoutBtn.title       = 'Log out of this launcher'
     logoutBtn.textContent = '✕'
     logoutBtn.addEventListener('click', async () => {
       await window.electronAPI.discordLogout()
-      discordUser   = null
-      serverAllowed = true  // reset: access unknown until next login
-      window.dboLegal.reset()
-      renderTopbarDiscord()
-      updateLockState()
+      showLoggedOut()
     })
     wrap.appendChild(logoutBtn)
 
@@ -641,12 +647,12 @@ function renderTopbarDiscord() {
     loginBtn.addEventListener('click', async () => {
       loginBtn.disabled    = true
       loginBtn.textContent = 'Waiting for Discord…'
-      loginBtn.title       = 'Finish logging in from the browser window that just opened.'
-      if (connectWarning.textContent.startsWith('Discord login failed:')) {
-        connectWarning.classList.remove('visible')
-        connectWarning.textContent = ''
-      }
+      loginBtn.title       = DISCORD_APPROVAL_NOTE
+      // What the player is about to approve, shown while the browser is open
+      showWarning(DISCORD_LOGIN_HINT)
+      connectWarning.title = DISCORD_APPROVAL_NOTE
       const result = await window.electronAPI.discordLogin()
+      if (connectWarning.textContent === DISCORD_LOGIN_HINT) clearWarning()
       if (result.success) {
         discordUser = result.user
         if (connectWarning.textContent.startsWith('Your Discord login has expired.')) clearWarning()
@@ -921,6 +927,26 @@ fieldMo2Enabled.addEventListener('change', refreshMo2Status)
 document.getElementById('btn-open-install').addEventListener('click', async () => {
   const r = await window.electronAPI.openInstallFolder()
   if (!r.success) alert(`Could not open the install folder: ${r.error}`)
+})
+
+// Troubleshooting: end every session of this Discord account, on any PC
+const signoutButton = document.getElementById('btn-signout-everywhere')
+const signoutStatus = document.getElementById('signout-everywhere-status')
+const SIGNOUT_HINT  = signoutStatus.textContent
+signoutButton.addEventListener('click', async () => {
+  if (!discordUser) { signoutStatus.textContent = 'Log in with Discord first, then use this.'; return }
+  signoutButton.disabled = true
+  signoutStatus.textContent = 'Signing out everywhere...'
+  let r
+  try { r = await window.electronAPI.discordLogoutEverywhere() } catch { r = { success: false, error: 'Could not reach the server. Try again in a moment.' } }
+  signoutButton.disabled = false
+  if (r && r.success) {
+    showLoggedOut()
+    signoutStatus.textContent = `Done: ${r.ended} sign-in${r.ended === 1 ? '' : 's'} ended. Press Discord Login to sign this launcher in again.`
+  } else {
+    signoutStatus.textContent = (r && r.error) || 'Could not sign out everywhere.'
+  }
+  setTimeout(() => { signoutStatus.textContent = SIGNOUT_HINT }, 15000)
 })
 
 // Troubleshooting: send the logs to staff
