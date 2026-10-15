@@ -91,6 +91,14 @@ function waitForCallback(server, { port, state, verifier, apiUrl, postJSON, time
         return reply(400, false, 'Not this login', 'This page does not belong to the login the launcher started. Return to the launcher.')
       }
       if (settled || busy) return reply(409, false, 'Already finished', 'This login has already finished. Return to the launcher.')
+      if (url.searchParams.get('error') === 'access_denied') {
+        reply(200, false, 'Login cancelled', 'The login was cancelled on Discord. Return to the launcher and press Discord Login to try again.')
+        return finish(new Error('Login cancelled on Discord - press Discord Login to try again.'))
+      }
+      if (url.searchParams.get('error')) {
+        reply(200, false, 'Login failed', 'The server could not finish the login with Discord. Return to the launcher and try again.')
+        return finish(new Error('The server could not finish the login with Discord - please try again.'))
+      }
       const code = url.searchParams.get('code')
       if (!code) {
         reply(400, false, 'Login failed', 'Discord sent no login code. Return to the launcher and try again.')

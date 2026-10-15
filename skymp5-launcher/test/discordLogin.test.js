@@ -124,6 +124,17 @@ test('a refused trade fails the login and tells the browser', async () => {
   assert.match(page.body, /Login failed/)
 })
 
+test('a cancel on Discord ends the login at once, without a trade', async () => {
+  const backend = fakeBackend()
+  let browser
+  await assert.rejects(loopbackLogin({
+    apiUrl: API, postJSON: backend.postJSON,
+    openUrl: () => { browser = browserGet(backend.calls[0].body.redirect_port, `${CALLBACK_PATH}?error=access_denied&state=${STATE}`) },
+  }), /cancelled on Discord/)
+  assert.match((await browser).body, /Login cancelled/)
+  assert.strictEqual(backend.calls.filter(c => c.url.endsWith('/token')).length, 0)
+})
+
 test('the login gives up after its timeout', async () => {
   const backend = fakeBackend()
   await assert.rejects(loopbackLogin({ apiUrl: API, postJSON: backend.postJSON, openUrl: () => {}, timeoutMs: 50 }), /timed out/)
