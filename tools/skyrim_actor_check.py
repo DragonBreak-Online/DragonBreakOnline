@@ -22,12 +22,13 @@ bad = [r for r in rows if r['reason']]
 by = collections.Counter('near landing' if r['near'] else 'hostile in town' if r['town'] and r['hostile'] else 'hostile' if r['hostile'] else r['reason'].split(':')[0] for r in bad)
 ok(not bad, '%d troublesome living plugin actors still enabled %s%s' % (len(bad), dict(by), (': ' + ', '.join(r['ref'] + ' ' + r['baseEdid'] + ' (' + r['reason'] + ')' for r in bad[:15])) if bad else ''))
 near = collections.Counter(r['near'] for r in bad if r['near'])
-ok(not near, 'no living plugin actor within 4000 units of a landing%s' % (' ' + json.dumps(near) if near else ''))
+ok(not near, 'no hostile actor or creature within 4000 units of a landing (guards, townsfolk, merchants, children stay)%s' % (' ' + json.dumps(near) if near else ''))
 base_path = os.path.join(srv, 'tooling', 'xedit-scripts', 'DBO_SkyrimActorsBaseline.json')
 base = json.load(open(base_path))['keep']
 keep = collections.Counter(r['kind'] for r in rows if not r['reason'])
 for kind in ('guard', 'townsfolk', 'merchant', 'child'):
     ok(keep[kind] >= base.get(kind, 0), '%s still enabled: %d (baseline %d)' % (kind, keep[kind], base.get(kind, 0)))
+ok(keep['hostile'] >= base.get('hostile', 0), 'kept by decision (Ysgramor ghosts, Vaermina devotees, giants) still enabled: %d (baseline %d)' % (keep['hostile'], base.get('hostile', 0)))
 w = json.load(open(os.path.join(srv, 'wildlife.json')))['placements']
 tam = [p for p in w if str(p.get('world', '')).lower() == '3c:skyrim.esm']
 ok(len(tam) >= 2612, 'wildlife.json still places %d creatures in Tamriel (2612 on 15 Oct)' % len(tam))

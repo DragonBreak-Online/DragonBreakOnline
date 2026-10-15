@@ -8,10 +8,12 @@
   Made on CT 115 by tools/skyrim_actor_narrow.py from the Skyrim release package's 140-plugin order. Of every winning living
   ACHR in the open lands (not deleted, not Initially Disabled, not Starts Dead, not sunk, outside the hub and the closed
   lands) only these are listed:
-    near     every living actor within 4000 units of a hold-gate landing spot or of the creator landing / Pale Pass arrival;
+    near     a hostile actor or creature within 4000 units of a hold-gate landing spot or of the creator landing / Pale Pass
+             arrival (guards, townsfolk, merchants, children and friendly NPCs at the gates stay: Nate, 15 Oct);
     town     a hostile actor or creature in a city or town (city worldspace, or a cell whose location is LocTypeCity/Town);
     hostile  an actor whose factions or AI make it attack players (bandits, Forsworn, vampires, necromancers, hostile animals...).
-  Guards, townsfolk, merchants, children and friendly NPCs elsewhere stay enabled. The reason is logged with each line.
+  Guards, townsfolk, merchants, children and friendly NPCs stay enabled, and so do the Ysgramor's Tomb ghosts, Vaermina's
+  devotees in Nightcaller Temple and giants (Nate, 15 Oct). The reason is logged with each line.
   targetPlugin: DragonBreak Online Edits.esp for vanilla/DLC/DragonBreak refs, DragonBreak Nexus Patches.esp for a
   Nexus mod's own refs (third-party edits never go in the DLE or the mod) or a ref whose winner is already Nexus Patches.
   The expected base EditorID is checked first; "*" skips the check. Idempotent.

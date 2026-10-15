@@ -20,7 +20,6 @@ disable|DragonBreak Online Edits.esp|1D1F5D|EncFalmer04MeleeBoss|DragonBreak Onl
 disable|DragonBreak Online Edits.esp|1D1F68|DrV_DwemerSentry|DragonBreak Online Edits.esp|hostile: aggression 2
 disable|DragonBreak Online Edits.esp|1D1F69|DrV_DwemerBurrower|DragonBreak Online Edits.esp|hostile: aggression 2
 disable|DragonBreak Online Edits.esp|1D1F6B|DLC1LD_EncDwarvenSphere03|DragonBreak Online Edits.esp|hostile: kind DwarvenSphere
-disable|DragonBreak Online Edits.esp|1D1F85|DA06GiantBoss|DragonBreak Online Edits.esp|hostile: aggression 2
 disable|DragonBreak Online Edits.esp|1D1F97|EncWispMother|DragonBreak Online Edits.esp|hostile: kind Wisp
 disable|DragonBreak Online Edits.esp|1D1F9A|EncWisp|DragonBreak Online Edits.esp|hostile: kind Wisp
 disable|DragonBreak Online Edits.esp|1D1F9B|EncWisp|DragonBreak Online Edits.esp|hostile: kind Wisp
@@ -45,7 +44,6 @@ disable|Skyrim.esm|050833|LvlFrostbiteSpiderNoGiant|DragonBreak Online Edits.esp
 disable|Skyrim.esm|050D2A|LvlFalmerMelee|DragonBreak Online Edits.esp|hostile: faction FalmerFaction
 disable|Skyrim.esm|050D2E|LvlFalmerMelee|DragonBreak Online Edits.esp|hostile: faction FalmerFaction
 disable|Skyrim.esm|0579E2|LvlFalmerMissile|DragonBreak Online Edits.esp|hostile: faction FalmerFaction
-disable|Skyrim.esm|07C0F6|LvlGiant|DragonBreak Online Edits.esp|hostile: aggressive creature (GiantRace)
 disable|Skyrim.esm|07C133|LvlFalmerMelee|DragonBreak Online Edits.esp|hostile: faction FalmerFaction
 disable|Skyrim.esm|07C134|LvlFalmerMelee|DragonBreak Online Edits.esp|hostile: faction FalmerFaction
 disable|Skyrim.esm|09C1BA|LvlFrostbiteSpiderNoGiantAmbush|DragonBreak Online Edits.esp|hostile: faction PredatorFaction
@@ -145,7 +143,6 @@ disable|Dawnguard.esm|018675|LvlFalmerMissileHoldPosition256|DragonBreak Online 
 disable|Dawnguard.esm|018677|LvlFalmerMissileHoldPosition256|DragonBreak Online Edits.esp|hostile: faction FalmerFaction
 disable|Dawnguard.esm|01867A|LvlFalmerShaman|DragonBreak Online Edits.esp|hostile: faction FalmerFaction
 disable|Dawnguard.esm|01867B|LvlFalmerSpellsword|DragonBreak Online Edits.esp|hostile: faction FalmerFaction
-disable|Dawnguard.esm|018D42|DLC1FrostGiant|DragonBreak Online Edits.esp|hostile: aggressive creature (GiantRace)
 disable|Dawnguard.esm|019545|LvlFalmerMissileHoldPosition256|DragonBreak Online Edits.esp|hostile: faction FalmerFaction
 disable|Dawnguard.esm|019546|LvlFalmerSpellswordHoldPosition256|DragonBreak Online Edits.esp|hostile: faction FalmerFaction
 disable|Dawnguard.esm|019547|LvlFalmerMissileHoldPosition256|DragonBreak Online Edits.esp|hostile: faction FalmerFaction
@@ -160,15 +157,12 @@ disable|Dawnguard.esm|003C6A|DLC1EncSabreCatVale|DragonBreak Online Edits.esp|ho
 disable|Dawnguard.esm|003C6B|DLC1EncSabreCatVale|DragonBreak Online Edits.esp|hostile: faction PredatorFaction
 disable|Dawnguard.esm|003C6C|DLC1EncSabreCatVale|DragonBreak Online Edits.esp|hostile: faction PredatorFaction
 disable|Dawnguard.esm|005EA9|LvlFalmerMelee|DragonBreak Online Edits.esp|hostile: faction FalmerFaction
-disable|Dawnguard.esm|00C0EF|DLC1FrostGiant|DragonBreak Online Edits.esp|hostile: aggressive creature (GiantRace)
 disable|Dawnguard.esm|00C1D1|LvlFalmerMissileHoldPosition256|DragonBreak Online Edits.esp|hostile: faction FalmerFaction
 disable|Dawnguard.esm|00C1D5|LvlFalmerMelee|DragonBreak Online Edits.esp|hostile: faction FalmerFaction
 disable|Dawnguard.esm|00D053|EncIceWraithAmbush|DragonBreak Online Edits.esp|hostile: kind IceWraith
 disable|Dawnguard.esm|00D12F|DLC1LvlChaurusHunterCocoonAmbush|DragonBreak Online Edits.esp|hostile: faction PredatorFaction
-disable|Dawnguard.esm|00E216|DLC1FrostGiant|DragonBreak Online Edits.esp|hostile: aggressive creature (GiantRace)
 disable|Dawnguard.esm|00F790|EncTrollFrost|DragonBreak Online Edits.esp|hostile: kind Troll
 disable|Dawnguard.esm|00F79E|DLC1EncSabreCatVale|DragonBreak Online Edits.esp|hostile: faction PredatorFaction
-disable|Dawnguard.esm|00F7A4|DLC1FrostGiant|DragonBreak Online Edits.esp|hostile: aggressive creature (GiantRace)
 disable|Dawnguard.esm|00F7BA|LvlFalmerMissileHoldPosition256|DragonBreak Online Edits.esp|hostile: faction FalmerFaction
 disable|Dawnguard.esm|00F7BD|LvlFalmerMissileHoldPosition256|DragonBreak Online Edits.esp|hostile: faction FalmerFaction
 disable|Dawnguard.esm|00F7C4|DLC1EncSabreCatVale|DragonBreak Online Edits.esp|hostile: faction PredatorFaction
@@ -369,9 +363,6 @@ disable|Skyrim.esm|067688|LvlSpriggan|DragonBreak Online Edits.esp|hostile: fact
 disable|Skyrim.esm|067689|LvlSpriggan|DragonBreak Online Edits.esp|hostile: faction SprigganPredatorFaction
 disable|Skyrim.esm|06768A|LvlSpriggan|DragonBreak Online Edits.esp|hostile: faction SprigganPredatorFaction
 disable|Skyrim.esm|06768B|LvlSpriggan|DragonBreak Online Edits.esp|hostile: faction SprigganPredatorFaction
-disable|Skyrim.esm|0223F7|DA06GiantBoss|DragonBreak Online Edits.esp|hostile: aggression 2
-disable|Skyrim.esm|024590|EncGiant01|DragonBreak Online Edits.esp|hostile: aggressive creature (GiantRace)
-disable|Skyrim.esm|096C24|EncGiant01|DragonBreak Online Edits.esp|hostile: aggressive creature (GiantRace)
 disable|Skyrim.esm|096E78|LvlAnimalForestPredator|DragonBreak Online Edits.esp|hostile: faction PredatorFaction
 disable|Skyrim.esm|096E79|LvlAnimalForestPredator|DragonBreak Online Edits.esp|hostile: faction PredatorFaction
 disable|Skyrim.esm|096E7A|LvlAnimalForestPredator|DragonBreak Online Edits.esp|hostile: faction PredatorFaction
@@ -492,9 +483,6 @@ disable|Skyrim.esm|078F68|LvlFrostbiteSpiderNoGiant|DragonBreak Online Edits.esp
 disable|Skyrim.esm|09C1B9|LvlFrostbiteSpiderSnowAllAmbush|DragonBreak Online Edits.esp|hostile: faction PredatorFaction
 disable|Skyrim.esm|0B1190|dunSouthfringePetFox|DragonBreak Online Edits.esp|hostile: faction NecromancerFaction
 disable|ccBGSSSE025-AdvDSGS.esm|001004|ccBGSSSE025_SmithEnchanter|DragonBreak Online Edits.esp|hostile: faction BanditFaction
-disable|WindhelmSSE.esp|1014DA|0DockArgonianNoAlms|DragonBreak Nexus Patches.esp|near Windhelm
-disable|WindhelmSSE.esp|1014F6|0DockArgonianHears|DragonBreak Nexus Patches.esp|near Windhelm
-disable|WindhelmSSE.esp|1014FE|0WHDockmastersWife|DragonBreak Nexus Patches.esp|near Windhelm
 disable|DragonBreak.esp|01017E|LvlForswornMissile|DragonBreak Online Edits.esp|hostile: faction ForswornFaction
 disable|DragonBreak.esp|010184|LvlForswornShaman|DragonBreak Online Edits.esp|hostile: faction ForswornFaction
 disable|Skyrim.esm|1018FA|LvlBanditMelee1H|DragonBreak Online Edits.esp|hostile: faction BanditFaction
@@ -1370,7 +1358,6 @@ disable|Skyrim.esm|10C28B|LvlBanditMelee1HAggro1024|DragonBreak Online Edits.esp
 disable|Skyrim.esm|10C62D|EncWisp|DragonBreak Online Edits.esp|hostile: kind Wisp
 disable|Skyrim.esm|10C62E|EncWisp|DragonBreak Online Edits.esp|hostile: kind Wisp
 disable|Skyrim.esm|10C62F|EncWisp|DragonBreak Online Edits.esp|hostile: kind Wisp
-disable|Skyrim.esm|10DE31|GuardRiftenSonsTowerGuard|DragonBreak Online Edits.esp|near Riften
 disable|Skyrim.esm|10E05C|LvlWarlockNecromancerAggro2048|DragonBreak Online Edits.esp|hostile: faction NecromancerFaction
 disable|Skyrim.esm|10E68B|LvlAnimalMountainSnowPredator|DragonBreak Online Edits.esp|hostile: faction PredatorFaction
 disable|Skyrim.esm|10E799|EncTrollFrost|DragonBreak Online Edits.esp|hostile: kind Troll
@@ -1387,14 +1374,12 @@ disable|Dawnguard.esm|011D0A|DLC1VCSkeletonWarrior1h2_Ambush|DragonBreak Online 
 disable|Dawnguard.esm|011D0C|DLC1VCSkeletonWarrior2h_Ambush|DragonBreak Online Edits.esp|hostile: faction SkeletonFaction
 disable|Dawnguard.esm|011D0E|EncSkeleton01AmbushMissile|DragonBreak Online Edits.esp|hostile: faction SkeletonFaction
 disable|Dawnguard.esm|011D11|EncSkeleton01AmbushMelee1HShield|DragonBreak Online Edits.esp|hostile: faction SkeletonFaction
-disable|SurWR.esp|123CB3|0WRMerchantNord|DragonBreak Nexus Patches.esp|near Whiterun
 disable|Dawnguard.esm|012402|DLC1VQ08LvlGargoyle_Ambush|DragonBreak Online Edits.esp|hostile: faction DLC1VampireFaction
 disable|Dawnguard.esm|012406|DLC1VQ08LvlGargoyle_Ambush|DragonBreak Online Edits.esp|hostile: faction DLC1VampireFaction
 disable|arnima.esm|129475|HorseForCarrriageTemplateArnimaMerchMark|DragonBreak Nexus Patches.esp|near Markarth
 disable|unofficial skyrim special edition patch.esp|0012ED|LvlBanditMelee1HAggro1024|DragonBreak Nexus Patches.esp|hostile: faction BanditFaction
 disable|unofficial skyrim special edition patch.esp|0012EE|LvlBanditMissileAggro1024|DragonBreak Nexus Patches.esp|hostile: faction BanditFaction
 disable|DragonBreak.esp|00134B|LvlWarlockElemental|DragonBreak Online Edits.esp|hostile: faction WarlockFaction
-disable|Skyrim.esm|013698|CarriageDriverWhiterun|DragonBreak Online Edits.esp|near Whiterun
 disable|DragonBreak.esp|00136F|ISS_Skeleton_Argonian_AmbushMelee2H|DragonBreak Online Edits.esp|hostile: faction SkeletonFaction
 disable|DragonBreak.esp|001370|ISS_Skeleton_Argonian_AmbushMissile|DragonBreak Online Edits.esp|hostile: faction SkeletonFaction
 disable|DragonBreak.esp|001371|ISS_Skeleton_Argonian_AmbushMissileHoldPosition32|DragonBreak Online Edits.esp|hostile: faction SkeletonFaction
@@ -1415,7 +1400,6 @@ disable|Skyrim.esm|015A6E|EncWisp|DragonBreak Online Edits.esp|hostile: kind Wis
 disable|Skyrim.esm|015A72|EncWisp|DragonBreak Online Edits.esp|hostile: kind Wisp
 disable|Skyrim.esm|015A74|EncWisp|DragonBreak Online Edits.esp|hostile: kind Wisp
 disable|Skyrim.esm|015A75|EncWispMother|DragonBreak Online Edits.esp|hostile: kind Wisp
-disable|Dawnguard.esm|016853|DLC1FerrymanDawnstar|DragonBreak Online Edits.esp|near Dawnstar
 disable|DragonBreak.esp|017165|LvlBanditMeleeTank|DragonBreak Online Edits.esp|hostile: faction BanditFaction
 disable|DragonBreak.esp|017166|LvlBanditMeleeTank|DragonBreak Online Edits.esp|hostile: faction BanditFaction
 disable|JK's Whiterun's Outskirts.esp|17DFCB|EncHorseGrey|DragonBreak Nexus Patches.esp|near Whiterun
@@ -1425,8 +1409,6 @@ disable|DragonBreak.esp|018F41|LvlAnimalForestPredator|DragonBreak Online Edits.
 disable|Dawnguard.esm|019DB2|LvlBanditMeleeTank|DragonBreak Online Edits.esp|hostile: faction BanditFaction
 disable|Skyrim.esm|019F40|LvlBearNotSnow|DragonBreak Online Edits.esp|hostile: faction PredatorFaction
 disable|Dawnguard.esm|01A683|DLC1VampireCastleGuard|DragonBreak Online Edits.esp|hostile: kind Vampire
-disable|COTN - Falkreath.esp|1B43DA|LvlFalkreathHoldGuardImperialVoiceTypeMaleGuard|DragonBreak Nexus Patches.esp|near Falkreath
-disable|COTN - Falkreath.esp|1B43DC|LvlFalkreathHoldGuardSonsVoiceTypeMaleGuard|DragonBreak Nexus Patches.esp|near Falkreath
 disable|COTN - Falkreath.esp|1B4431|LvlHorseSaddled|DragonBreak Nexus Patches.esp|near Falkreath
 disable|COTN - Falkreath.esp|1B4432|LvlHorseSaddled|DragonBreak Nexus Patches.esp|near Falkreath
 disable|Skyrim.esm|01BA06|Telrav|DragonBreak Online Edits.esp|hostile: kind Bandit
@@ -1445,7 +1427,6 @@ disable|Skyrim.esm|020509|LvlForswornMissilePoisoner|DragonBreak Online Edits.es
 disable|Skyrim.esm|0211C9|LvlBanditMissile|DragonBreak Online Edits.esp|hostile: faction BanditFaction
 disable|Skyrim.esm|0211CC|LvlBanditMissile|DragonBreak Online Edits.esp|hostile: faction BanditFaction
 disable|Skyrim.esm|0211F5|HorseForCarriageNew|DragonBreak Online Edits.esp|near Solitude
-disable|Skyrim.esm|021217|MQ201PartyCarriageSolitudeDriver|DragonBreak Online Edits.esp|near Solitude
 disable|The Great City of Winterhold v4.esp|2179F7|EncGoatDomestic|DragonBreak Nexus Patches.esp|near Winterhold
 disable|The Great City of Winterhold v4.esp|2179F8|EncGoatDomestic|DragonBreak Nexus Patches.esp|near Winterhold
 disable|Skyrim.esm|0235D6|LvlWarlockNecromancer|DragonBreak Online Edits.esp|hostile: faction NecromancerFaction
@@ -1455,12 +1436,6 @@ disable|JKs Skyrim.esp|023F29|EncChicken|DragonBreak Nexus Patches.esp|near Falk
 disable|JKs Skyrim.esp|023F5E|EncGoatDomestic|DragonBreak Nexus Patches.esp|near Falkreath
 disable|JKs Skyrim.esp|023F5F|EncGoatDomestic|DragonBreak Nexus Patches.esp|near Falkreath
 disable|Skyrim.esm|0240D8|Drascua|DragonBreak Online Edits.esp|hostile: faction HagravenFaction
-disable|Skyrim.esm|024B10|GuardWinterholdTownImperialPost|DragonBreak Online Edits.esp|near Winterhold
-disable|Skyrim.esm|024B11|GuardWinterholdTownImperialPatrol|DragonBreak Online Edits.esp|near Winterhold
-disable|Skyrim.esm|024B12|GuardWinterholdTownImperialPatrol2|DragonBreak Online Edits.esp|near Winterhold
-disable|Skyrim.esm|024B13|GuardWinterholdTownSonsPatrol2|DragonBreak Online Edits.esp|near Winterhold
-disable|Skyrim.esm|024B14|GuardWinterholdTownSonsPatrol|DragonBreak Online Edits.esp|near Winterhold
-disable|Skyrim.esm|024B15|GuardWinterholdTownSonsPost|DragonBreak Online Edits.esp|near Winterhold
 disable|JKs Skyrim.esp|024BBF|EncChicken|DragonBreak Nexus Patches.esp|near Winterhold
 disable|DragonBreak.esp|0263C4|EncAtronachFrost|DragonBreak Online Edits.esp|hostile: faction DaedraFaction
 disable|Skyrim.esm|029600|LvlBanditMissile|DragonBreak Online Edits.esp|hostile: faction BanditFaction
@@ -1470,33 +1445,17 @@ disable|Skyrim.esm|0299F7|LvlBanditMeleeAny|DragonBreak Online Edits.esp|hostile
 disable|Skyrim.esm|02A939|LvlForswornMeleeBerserkerAmbush|DragonBreak Online Edits.esp|hostile: faction ForswornFaction
 disable|Skyrim.esm|02BCDD|LvlBanditMelee2H|DragonBreak Online Edits.esp|hostile: faction BanditFaction
 disable|Skyrim.esm|02BCE0|LvlBanditMelee1H|DragonBreak Online Edits.esp|hostile: faction BanditFaction
-disable|Skyrim.esm|02C77D|GuardDawnstarSonsNight20x12|DragonBreak Online Edits.esp|near Dawnstar
-disable|Skyrim.esm|02C790|GuardDawnstarSonsNight18x12|DragonBreak Online Edits.esp|near Dawnstar
 disable|Skyrim.esm|02C79D|LvlSpriggan|DragonBreak Online Edits.esp|hostile: faction SprigganPredatorFaction
 disable|Skyrim.esm|02C79E|LvlSpriggan|DragonBreak Online Edits.esp|hostile: faction SprigganPredatorFaction
 disable|Skyrim.esm|02C7A8|LvlBanditMelee2H|DragonBreak Online Edits.esp|hostile: faction BanditFaction
-disable|Skyrim.esm|02C82B|GuardMorthalImperialPostNight|DragonBreak Online Edits.esp|near Morthal
 disable|Skyrim.esm|02C9A0|dunRedEagle_LvlForswornBossAmbush|DragonBreak Online Edits.esp|hostile: faction ForswornFaction
 disable|Skyrim.esm|02C9AD|LvlForswornMissileHoldPosition768UntilReleased|DragonBreak Online Edits.esp|hostile: faction ForswornFaction
 disable|Skyrim.esm|02C9B2|LvlForswornMissile|DragonBreak Online Edits.esp|hostile: faction ForswornFaction
-disable|Skyrim.esm|02D2A4|GuardDawnstarImperialNight20x12|DragonBreak Online Edits.esp|near Dawnstar
-disable|Skyrim.esm|02D2DB|GuardDawnstarSonsNight20x12|DragonBreak Online Edits.esp|near Dawnstar
-disable|Skyrim.esm|02D4C4|GuardDawnstarSonsDay7x12|DragonBreak Online Edits.esp|near Dawnstar
-disable|Skyrim.esm|02D4CB|GuardDawnstarSonsNight19x12|DragonBreak Online Edits.esp|near Dawnstar
-disable|Skyrim.esm|02D4CC|GuardDawnstarSonsDay6x12|DragonBreak Online Edits.esp|near Dawnstar
-disable|Skyrim.esm|02D4CD|GuardDawnstarSonsDay8x12|DragonBreak Online Edits.esp|near Dawnstar
-disable|Skyrim.esm|02D787|GuardDawnstarImperialDay8x12|DragonBreak Online Edits.esp|near Dawnstar
-disable|Skyrim.esm|02D789|GuardDawnstarImperialDay7x12|DragonBreak Online Edits.esp|near Dawnstar
-disable|Skyrim.esm|02D78B|GuardDawnstarImperialNight19x12|DragonBreak Online Edits.esp|near Dawnstar
-disable|Skyrim.esm|02D78F|GuardDawnstarImperialNight18x12|DragonBreak Online Edits.esp|near Dawnstar
-disable|Skyrim.esm|02D791|GuardDawnstarImperialDay6x12|DragonBreak Online Edits.esp|near Dawnstar
 disable|Skyrim.esm|02D956|LvlBanditMissile|DragonBreak Online Edits.esp|hostile: faction BanditFaction
 disable|Skyrim.esm|02E39B|dunDruadachRedoubt_LvlForswornMissile|DragonBreak Online Edits.esp|hostile: kind Forsworn
 disable|Skyrim.esm|02E3BF|dunDruadachRedoubt_LvlForswornMelee|DragonBreak Online Edits.esp|hostile: kind Forsworn
 disable|Skyrim.esm|02EB1B|LvlAnimalForestPredator|DragonBreak Online Edits.esp|hostile: faction PredatorFaction
 disable|Skyrim.esm|02EB1C|LvlAnimalForestPredator|DragonBreak Online Edits.esp|hostile: faction PredatorFaction
-disable|The Great City of Winterhold v4.esp|2FBF3A|GuardWinterholdTownImperialGeneralTGCoWH|DragonBreak Nexus Patches.esp|near Winterhold
-disable|The Great City of Winterhold v4.esp|2FBF3B|GuardWinterholdSonsGeneralTGCoWH|DragonBreak Nexus Patches.esp|near Winterhold
 disable|Skyrim.esm|02FF8B|LvlAnimalForestPredator|DragonBreak Online Edits.esp|hostile: faction PredatorFaction
 disable|Skyrim.esm|02FF8C|LvlAnimalForestPredator|DragonBreak Online Edits.esp|hostile: faction PredatorFaction
 disable|Update.esm|003029|ccBGSSSE003_LvlBoneWolfZombie|DragonBreak Online Edits.esp|hostile: kind BoneWolf
@@ -1531,8 +1490,6 @@ disable|Skyrim.esm|0334E9|LvlSprigganCompanion|DragonBreak Online Edits.esp|host
 disable|Skyrim.esm|0334EE|LvlSprigganGuard|DragonBreak Online Edits.esp|hostile: faction PredatorFaction
 disable|Skyrim.esm|033D18|LvlForswornMissilePoisoner|DragonBreak Online Edits.esp|hostile: faction ForswornFaction
 disable|Skyrim.esm|033D19|LvlForswornMissilePoisoner|DragonBreak Online Edits.esp|hostile: faction ForswornFaction
-disable|Skyrim.esm|033F9F|LvlGiant|DragonBreak Online Edits.esp|hostile: aggressive creature (GiantRace)
-disable|Skyrim.esm|033FA3|LvlGiant|DragonBreak Online Edits.esp|hostile: aggressive creature (GiantRace)
 disable|Skyrim.esm|0340D4|LvlForswornMeleeBerserker|DragonBreak Online Edits.esp|hostile: faction ForswornFaction
 disable|Skyrim.esm|0340D5|dunLostValleyRedoubtHagraven|DragonBreak Online Edits.esp|hostile: faction HagravenFaction
 disable|Skyrim.esm|0340D8|dunLostValleyRedoubForswornBerserker|DragonBreak Online Edits.esp|hostile: faction ForswornFaction
@@ -1540,14 +1497,11 @@ disable|Skyrim.esm|0340E2|LvlForswornMeleeGuard|DragonBreak Online Edits.esp|hos
 disable|Skyrim.esm|0340E4|LvlForswornBossShaman|DragonBreak Online Edits.esp|hostile: faction ForswornFaction
 disable|Skyrim.esm|034129|dunLostValley_LvlForswornBossAmbush|DragonBreak Online Edits.esp|hostile: faction ForswornFaction
 disable|Skyrim.esm|03412A|dunLostValleyRedoubtHagraven|DragonBreak Online Edits.esp|hostile: faction HagravenFaction
-disable|Skyrim.esm|034165|LvlGiant|DragonBreak Online Edits.esp|hostile: aggressive creature (GiantRace)
 disable|DragonBreak.esp|00341F|LvlWarlockNecromancerAggro1024|DragonBreak Online Edits.esp|hostile: faction NecromancerFaction
 disable|DragonBreak.esp|003425|ISS_Skeleton_Orc_AmbushMelee1H|DragonBreak Online Edits.esp|hostile: faction SkeletonFaction
 disable|DragonBreak.esp|003427|ISS_Skeleton_Orc_AmbushMelee1HShield|DragonBreak Online Edits.esp|hostile: faction SkeletonFaction
 disable|DragonBreak.esp|003428|ISS_Skeleton_Orc_AmbushMissile|DragonBreak Online Edits.esp|hostile: faction SkeletonFaction
 disable|DragonBreak.esp|00342C|ISS_Skeleton_Orc_AmbushMelee2H|DragonBreak Online Edits.esp|hostile: faction SkeletonFaction
-disable|Skyrim.esm|03489F|LvlGiant|DragonBreak Online Edits.esp|hostile: aggressive creature (GiantRace)
-disable|Skyrim.esm|0348E8|LvlGiant|DragonBreak Online Edits.esp|hostile: aggressive creature (GiantRace)
 disable|Skyrim.esm|034D04|EncWolf|DragonBreak Online Edits.esp|hostile: faction PredatorFaction
 disable|Skyrim.esm|034D12|EncWolf|DragonBreak Online Edits.esp|hostile: faction PredatorFaction
 disable|Skyrim.esm|034D13|EncWolf|DragonBreak Online Edits.esp|hostile: faction PredatorFaction
@@ -1581,7 +1535,6 @@ disable|SurWR.esp|361DD6|WRThaneIntroQuestRaiderHorn|DragonBreak Nexus Patches.e
 disable|SurWR.esp|361DDA|WRThaneIntroQuestRaiderRanged|DragonBreak Nexus Patches.esp|hostile: faction BanditFaction
 disable|SurWR.esp|361DEF|WRThaneIntroQuestRaiderRanged|DragonBreak Nexus Patches.esp|hostile: faction BanditFaction
 disable|SurWR.esp|361DF0|WRThaneIntroQuestRaiderHorn|DragonBreak Nexus Patches.esp|hostile: faction BanditFaction
-disable|Skyrim.esm|0365AB|LvlGiant|DragonBreak Online Edits.esp|hostile: aggressive creature (GiantRace)
 disable|SurWR.esp|366F08|WRThaneIntroQuestRaider|DragonBreak Nexus Patches.esp|hostile: faction BanditFaction
 disable|SurWR.esp|366F09|WRThaneIntroQuestRaider|DragonBreak Nexus Patches.esp|hostile: faction BanditFaction
 disable|SurWR.esp|366F0A|WRThaneIntroQuestRaider|DragonBreak Nexus Patches.esp|hostile: faction BanditFaction
@@ -1632,7 +1585,6 @@ disable|Skyrim.esm|03D277|dunRavenscarSabreCat|DragonBreak Online Edits.esp|host
 disable|Skyrim.esm|03E971|dunPOIAggroTroll1024|DragonBreak Online Edits.esp|hostile: kind Troll
 disable|Skyrim.esm|03E972|dunPOIAggroTroll1024|DragonBreak Online Edits.esp|hostile: kind Troll
 disable|Skyrim.esm|03F21D|HorseForCarriageNew|DragonBreak Online Edits.esp|near Markarth
-disable|Skyrim.esm|03F220|CarriageDriverMarkarth|DragonBreak Online Edits.esp|near Markarth
 disable|Skyrim.esm|03F351|MarkarthPlayerHorse|DragonBreak Online Edits.esp|near Markarth
 disable|Skyrim.esm|03F7AC|LvlBanditBoss|DragonBreak Online Edits.esp|hostile: faction BanditFaction
 disable|Skyrim.esm|03F7AD|LvlBanditMeleeTankGuard|DragonBreak Online Edits.esp|hostile: faction BanditFaction
@@ -1658,7 +1610,6 @@ disable|Skyrim.esm|043C93|DA13LvlAfflictedMelee1H|DragonBreak Online Edits.esp|h
 disable|Skyrim.esm|044BB3|LvlBanditMissile|DragonBreak Online Edits.esp|hostile: faction BanditFaction
 disable|Skyrim.esm|044BB7|LvlBanditMissile|DragonBreak Online Edits.esp|hostile: faction BanditFaction
 disable|Skyrim.esm|044BBB|LvlBanditMissile|DragonBreak Online Edits.esp|hostile: faction BanditFaction
-disable|Skyrim.esm|0458BD|LvlGiant|DragonBreak Online Edits.esp|hostile: aggressive creature (GiantRace)
 disable|Skyrim.esm|04598F|LvlAnimalCanyonPredator|DragonBreak Online Edits.esp|hostile: faction PredatorFaction
 disable|Skyrim.esm|0459B1|LvlAnimalCanyonPredator|DragonBreak Online Edits.esp|hostile: faction PredatorFaction
 disable|Skyrim.esm|0459BF|LvlAnimalCanyonPredator|DragonBreak Online Edits.esp|hostile: faction PredatorFaction
@@ -1701,7 +1652,6 @@ disable|Skyrim.esm|045C07|LvlAnimalCanyonPredator|DragonBreak Online Edits.esp|h
 disable|Skyrim.esm|045C46|LvlAnimalCanyonPredator|DragonBreak Online Edits.esp|hostile: faction PredatorFaction
 disable|Skyrim.esm|045D1C|LvlAnimalCanyonPredator|DragonBreak Online Edits.esp|hostile: faction PredatorFaction
 disable|Skyrim.esm|045D45|LvlAnimalCanyonPredator|DragonBreak Online Edits.esp|hostile: faction PredatorFaction
-disable|Skyrim.esm|045D5D|LvlGiant|DragonBreak Online Edits.esp|hostile: aggressive creature (GiantRace)
 disable|Skyrim.esm|045F0B|LvlAnimalCanyonPredator|DragonBreak Online Edits.esp|hostile: faction PredatorFaction
 disable|Skyrim.esm|046552|LvlForswornMissile_Hold256|DragonBreak Online Edits.esp|hostile: faction ForswornFaction
 disable|Skyrim.esm|04655C|LvlForswornMelee|DragonBreak Online Edits.esp|hostile: faction ForswornFaction
@@ -1714,12 +1664,9 @@ disable|Skyrim.esm|04659A|LvlForswornMissilePoisoner|DragonBreak Online Edits.es
 disable|Skyrim.esm|04659C|LvlForswornMissilePoisoner|DragonBreak Online Edits.esp|hostile: faction ForswornFaction
 disable|Skyrim.esm|04659D|LvlForswornMelee|DragonBreak Online Edits.esp|hostile: faction ForswornFaction
 disable|Skyrim.esm|04659E|LvlForswornMissilePoisoner|DragonBreak Online Edits.esp|hostile: faction ForswornFaction
-disable|Skyrim.esm|046731|LvlGiant|DragonBreak Online Edits.esp|hostile: aggressive creature (GiantRace)
 disable|Skyrim.esm|046746|LvlBearNotSnow|DragonBreak Online Edits.esp|hostile: faction PredatorFaction
 disable|Skyrim.esm|046E80|MS03ChaletGuardExterior|DragonBreak Online Edits.esp|hostile in town RiftenLocation: faction BanditFaction
 disable|Skyrim.esm|046E87|MS03ChaletGuardBow|DragonBreak Online Edits.esp|hostile in town RiftenLocation: faction BanditFaction
-disable|Skyrim.esm|04708A|LvlGiant|DragonBreak Online Edits.esp|hostile: aggressive creature (GiantRace)
-disable|Skyrim.esm|0470C1|LvlGiant|DragonBreak Online Edits.esp|hostile: aggressive creature (GiantRace)
 disable|Skyrim.esm|048DEF|LvlAnimalMountainSnowPredator|DragonBreak Online Edits.esp|hostile: faction PredatorFaction
 disable|Skyrim.esm|049B12|LvlForswornMeleeFemale|DragonBreak Online Edits.esp|hostile: faction ForswornFaction
 disable|Skyrim.esm|049B16|LvlForswornMissileFemale|DragonBreak Online Edits.esp|hostile: faction ForswornFaction
@@ -1733,7 +1680,6 @@ disable|DragonBreak.esp|004B89|ISS_Skeleton_Elf_AmbushMissile|DragonBreak Online
 disable|DragonBreak.esp|004B8E|ISS_Skeleton_Elf_AmbushMelee2H|DragonBreak Online Edits.esp|hostile: faction SkeletonFaction
 disable|DragonBreak.esp|004B8F|ISS_Skeleton_Elf_AmbushMelee1H|DragonBreak Online Edits.esp|hostile: faction SkeletonFaction
 disable|DragonBreak.esp|004B90|ISS_Skeleton_Elf_AmbushMelee1HShield|DragonBreak Online Edits.esp|hostile: faction SkeletonFaction
-disable|Skyrim.esm|04BB23|dunTalkingStoneHerderGiant|DragonBreak Online Edits.esp|hostile: aggressive creature (GiantRace)
 disable|Skyrim.esm|04C08D|LvlMudcrab|DragonBreak Online Edits.esp|hostile: kind Mudcrab
 disable|Skyrim.esm|04C08E|LvlMudcrab|DragonBreak Online Edits.esp|hostile: kind Mudcrab
 disable|Skyrim.esm|04C207|LvlWitchStorm|DragonBreak Online Edits.esp|hostile: faction HagravenFaction
@@ -1771,10 +1717,6 @@ disable|Skyrim.esm|0543E8|LvlBanditMissile|DragonBreak Online Edits.esp|hostile:
 disable|Skyrim.esm|0545BE|LvlBanditBoss|DragonBreak Online Edits.esp|hostile: faction BanditFaction
 disable|Skyrim.esm|0545C0|LvlBanditMissile|DragonBreak Online Edits.esp|hostile: faction BanditFaction
 disable|Skyrim.esm|0545C1|LvlBanditMeleeTank|DragonBreak Online Edits.esp|hostile: faction BanditFaction
-disable|Skyrim.esm|055649|LvlFalkreathHoldGuardImperialVoiceTypeMaleGuard|DragonBreak Online Edits.esp|near Falkreath
-disable|Skyrim.esm|05564A|LvlFalkreathHoldGuardImperialVoiceTypeMaleGuard|DragonBreak Online Edits.esp|near Falkreath
-disable|Skyrim.esm|055653|LvlFalkreathHoldGuardSonsVoiceTypeMaleGuard|DragonBreak Online Edits.esp|near Falkreath
-disable|Skyrim.esm|055654|LvlFalkreathHoldGuardSonsVoiceTypeMaleGuard|DragonBreak Online Edits.esp|near Falkreath
 disable|Skyrim.esm|05675A|DA13LvlAfflictedMissile|DragonBreak Online Edits.esp|hostile: kind Afflicted
 disable|Skyrim.esm|05776E|LvlMudcrab|DragonBreak Online Edits.esp|hostile: kind Mudcrab
 disable|Skyrim.esm|05776F|LvlMudcrab|DragonBreak Online Edits.esp|hostile: kind Mudcrab
@@ -1823,7 +1765,6 @@ disable|Skyrim.esm|06481C|EncTrollFrost|DragonBreak Online Edits.esp|hostile: ki
 disable|Skyrim.esm|0648A6|LvlSkeletonMeleeMixed|DragonBreak Online Edits.esp|hostile: faction SkeletonFaction
 disable|Skyrim.esm|0648A7|LvlSkeletonMeleeMixed|DragonBreak Online Edits.esp|hostile: faction SkeletonFaction
 disable|Skyrim.esm|0648B8|LvlSkeletonMeleeMixed|DragonBreak Online Edits.esp|hostile: faction SkeletonFaction
-disable|Skyrim.esm|0664F4|LvlGiant|DragonBreak Online Edits.esp|hostile: aggressive creature (GiantRace)
 disable|Dawnguard.esm|006876|DLC1LvlRedwaterThrallMissileEvenTonedFAggro1024|DragonBreak Online Edits.esp|hostile: faction VampireThrallFaction
 disable|Dawnguard.esm|006877|DLC1LvlRedwaterThrallMeleeCommonerAcMAggro1024|DragonBreak Online Edits.esp|hostile: faction BanditFaction
 disable|Skyrim.esm|068D74|WhiterunPlayerHorse|DragonBreak Online Edits.esp|near Whiterun
@@ -1875,12 +1816,6 @@ disable|Skyrim.esm|07757E|EncWolf|DragonBreak Online Edits.esp|hostile: faction 
 disable|Skyrim.esm|07757F|LvlBearNotSnow|DragonBreak Online Edits.esp|hostile: faction PredatorFaction
 disable|Skyrim.esm|077589|EncSabreCat|DragonBreak Online Edits.esp|hostile: faction PredatorFaction
 disable|Skyrim.esm|07758D|EncSabreCat|DragonBreak Online Edits.esp|hostile: faction PredatorFaction
-disable|Skyrim.esm|077D5F|CWFieldCOImperialPale|DragonBreak Online Edits.esp|near Dawnstar
-disable|Skyrim.esm|077D61|CWFieldCOSonsPale|DragonBreak Online Edits.esp|near Dawnstar
-disable|Skyrim.esm|077D67|CWFieldCOImperialFalkreath|DragonBreak Online Edits.esp|near Falkreath
-disable|Skyrim.esm|077D68|CWFieldCOSonsFalkreath|DragonBreak Online Edits.esp|near Falkreath
-disable|Skyrim.esm|077E16|CWFieldCOSonsWinterhold|DragonBreak Online Edits.esp|near Winterhold
-disable|Skyrim.esm|077E17|CWFieldCOImperialWinterhold|DragonBreak Online Edits.esp|near Winterhold
 disable|Skyrim.esm|078459|LvlBanditMelee1H|DragonBreak Online Edits.esp|hostile: faction BanditFaction
 disable|Skyrim.esm|07845B|LvlBanditMeleeBerserker|DragonBreak Online Edits.esp|hostile: faction BanditFaction
 disable|Skyrim.esm|078AF7|dunRobbersGorge_LvlBanditBoss|DragonBreak Online Edits.esp|hostile: faction dunRobbersGorgeBanditFaction
@@ -1973,9 +1908,6 @@ disable|Seascale.esl|000807|EncMudcrabMedium|DragonBreak Nexus Patches.esp|hosti
 disable|Seascale.esl|000808|EncMudcrabMedium|DragonBreak Nexus Patches.esp|hostile: kind Mudcrab
 disable|Skyrim.esm|080B20|dunWhiteRiverWatchLvlBanditBoss|DragonBreak Online Edits.esp|hostile: faction BanditFaction
 disable|Skyrim.esm|080B81|LvlBanditMissileHoldPos256LinkRef|DragonBreak Online Edits.esp|hostile: faction BanditFaction
-disable|WindhelmSSE.esp|080C5E|0WHBridgeVendorFisherman|DragonBreak Nexus Patches.esp|near Windhelm
-disable|WindhelmSSE.esp|080C73|0WHBridgeVendorGenericPeddler|DragonBreak Nexus Patches.esp|near Windhelm
-disable|WindhelmSSE.esp|080C74|0WHBridgeVendorMorrowing|DragonBreak Nexus Patches.esp|near Windhelm
 disable|GVLT_Gryphonknight.esp|00080E|BaronTibauld|DragonBreak Nexus Patches.esp|hostile: faction ForswornFaction
 disable|Skyrim.esm|0812FD|LvlBanditMeleeCommonerM|DragonBreak Online Edits.esp|hostile: faction BanditFaction
 disable|Skyrim.esm|081CDF|LvlAnimalMountainSnowPredator|DragonBreak Online Edits.esp|hostile: faction PredatorFaction
@@ -2245,14 +2177,12 @@ disable|Skyrim.esm|08433B|LvlAnimalPlainsPredator|DragonBreak Online Edits.esp|h
 disable|Skyrim.esm|08433C|LvlAnimalPlainsPredator|DragonBreak Online Edits.esp|hostile: faction PredatorFaction
 disable|Skyrim.esm|084360|LvlMudcrab|DragonBreak Online Edits.esp|hostile: kind Mudcrab
 disable|Skyrim.esm|08438C|LvlBearNotSnow|DragonBreak Online Edits.esp|hostile: faction PredatorFaction
-disable|YokuWeapons.esp|000843|0_MkaiMerc|DragonBreak Nexus Patches.esp|near Solitude
 disable|Skyrim.esm|08440E|EncWolf|DragonBreak Online Edits.esp|hostile: faction PredatorFaction
 disable|Skyrim.esm|084462|LvlAnimalPlainsPredator|DragonBreak Online Edits.esp|hostile: faction PredatorFaction
 disable|Skyrim.esm|084463|LvlAnimalPlainsPredator|DragonBreak Online Edits.esp|hostile: faction PredatorFaction
 disable|Skyrim.esm|084464|LvlAnimalPlainsPredator|DragonBreak Online Edits.esp|hostile: faction PredatorFaction
 disable|Skyrim.esm|084485|LvlAnimalPlainsPredator|DragonBreak Online Edits.esp|hostile: faction PredatorFaction
 disable|Skyrim.esm|084488|LvlAnimalPlainsPredator|DragonBreak Online Edits.esp|hostile: faction PredatorFaction
-disable|YokuWeapons.esp|000844|0_MkaiMerc2|DragonBreak Nexus Patches.esp|near Solitude
 disable|Skyrim.esm|0844A3|LvlAnimalMarshPredator|DragonBreak Online Edits.esp|hostile: faction PredatorFaction
 disable|Skyrim.esm|0844A4|LvlAnimalMarshPredator|DragonBreak Online Edits.esp|hostile: faction PredatorFaction
 disable|Skyrim.esm|0844A5|LvlAnimalMarshPredator|DragonBreak Online Edits.esp|hostile: faction PredatorFaction
@@ -2283,7 +2213,6 @@ disable|Skyrim.esm|084573|LvlAnimalPlainsPredator|DragonBreak Online Edits.esp|h
 disable|Skyrim.esm|084574|LvlAnimalPlainsPredator|DragonBreak Online Edits.esp|hostile: faction PredatorFaction
 disable|Skyrim.esm|084575|LvlAnimalPlainsPredator|DragonBreak Online Edits.esp|hostile: faction PredatorFaction
 disable|Skyrim.esm|08457A|LvlAnimalHillsPredator|DragonBreak Online Edits.esp|hostile: faction PredatorFaction
-disable|YokuWeapons.esp|000845|0_MkaiMerc3|DragonBreak Nexus Patches.esp|near Solitude
 disable|Skyrim.esm|0845F4|LvlAnimalMountainSnowPredator|DragonBreak Online Edits.esp|hostile: faction PredatorFaction
 disable|Skyrim.esm|0845F6|LvlAnimalForestSnowPredator|DragonBreak Online Edits.esp|hostile: faction PredatorFaction
 disable|Skyrim.esm|08461A|LvlAnimalMarshPredator|DragonBreak Online Edits.esp|hostile: faction PredatorFaction
@@ -2446,7 +2375,6 @@ disable|Skyrim.esm|085B06|LvlAnimalForestPredator|DragonBreak Online Edits.esp|h
 disable|Skyrim.esm|085B07|LvlAnimalForestPredator|DragonBreak Online Edits.esp|hostile: faction PredatorFaction
 disable|Skyrim.esm|085B09|LvlAnimalForestPredator|DragonBreak Online Edits.esp|hostile: faction PredatorFaction
 disable|Skyrim.esm|085B0A|LvlAnimalForestPredator|DragonBreak Online Edits.esp|hostile: faction PredatorFaction
-disable|Saltdeposits.esp|00085B|00123SaltVendor|DragonBreak Nexus Patches.esp|near Dawnstar
 disable|Skyrim.esm|085C59|LvlSkeletonMeleeMixed|DragonBreak Online Edits.esp|hostile: faction SkeletonFaction
 disable|Skyrim.esm|085C5A|LvlSkeletonMeleeMixed|DragonBreak Online Edits.esp|hostile: faction SkeletonFaction
 disable|Skyrim.esm|085CC2|LvlAnimalForestPredator|DragonBreak Online Edits.esp|hostile: faction PredatorFaction
@@ -2551,20 +2479,14 @@ disable|Skyrim.esm|086640|LvlAnimalPlainsPredator|DragonBreak Online Edits.esp|h
 disable|Skyrim.esm|086643|LvlAnimalPlainsPredator|DragonBreak Online Edits.esp|hostile: faction PredatorFaction
 disable|Skyrim.esm|0866DE|LvlAnimalPlainsPredator|DragonBreak Online Edits.esp|hostile: faction PredatorFaction
 disable|Skyrim.esm|086726|LvlAnimalHillsPredator|DragonBreak Online Edits.esp|hostile: faction PredatorFaction
-disable|Skyrim.esm|087646|GuardDawnstarImperialNoShift|DragonBreak Online Edits.esp|near Dawnstar
-disable|Skyrim.esm|087668|GuardDawnstarImperialNoShift|DragonBreak Online Edits.esp|near Dawnstar
-disable|Skyrim.esm|087696|GuardDawnstarSonsNoShift|DragonBreak Online Edits.esp|near Dawnstar
-disable|Skyrim.esm|087697|GuardDawnstarSonsNoShift|DragonBreak Online Edits.esp|near Dawnstar
 disable|man_DaedricShrines.esp|000887|LvlFrostbiteSpiderAll|DragonBreak Nexus Patches.esp|hostile: faction PredatorFaction
 disable|Skyrim.esm|088F54|LvlMudcrab|DragonBreak Online Edits.esp|hostile: kind Mudcrab
 disable|Skyrim.esm|088F55|LvlMudcrab|DragonBreak Online Edits.esp|hostile: kind Mudcrab
 disable|Skyrim.esm|088F56|LvlMudcrab|DragonBreak Online Edits.esp|hostile: kind Mudcrab
-disable|Skyrim.esm|088FF2|LvlGiant|DragonBreak Online Edits.esp|hostile: aggressive creature (GiantRace)
 disable|JKs Skyrim.esp|0089A1|EncGoatDomestic|DragonBreak Nexus Patches.esp|near Winterhold
 disable|Skyrim.esm|08B706|LvlBanditMeleeAny|DragonBreak Online Edits.esp|hostile: faction BanditFaction
 disable|ccBGSSSE025-AdvDSGS.esm|0008BA|ccBGSSSE025_LvlGoldenBanditMissileAggro768|DragonBreak Online Edits.esp|hostile: faction ccBGSSSE025_SaintsSeducersBanditFaction
 disable|ccBGSSSE025-AdvDSGS.esm|0008BC|ccBGSSSE025_LvlGoldenBanditMelee1HAggro768|DragonBreak Online Edits.esp|hostile: faction ccBGSSSE025_SaintsSeducersBanditFaction
-disable|Skyrim.esm|08BEE2|DA06LvlGiant|DragonBreak Online Edits.esp|hostile: aggression 2
 disable|Skyrim.esm|08BEE3|DA06LvlOrcMelee|DragonBreak Online Edits.esp|hostile: faction BanditFaction
 disable|Skyrim.esm|08BEE4|DA06LvlOrcMelee|DragonBreak Online Edits.esp|hostile: faction BanditFaction
 disable|Skyrim.esm|08BEE5|DA06LvlOrcMelee|DragonBreak Online Edits.esp|hostile: faction BanditFaction
@@ -2608,9 +2530,6 @@ disable|Skyrim.esm|091447|LvlBanditMissile|DragonBreak Online Edits.esp|hostile:
 disable|Skyrim.esm|091448|LvlBanditMissile|DragonBreak Online Edits.esp|hostile: faction BanditFaction
 disable|Skyrim.esm|09144A|LvlBanditMissile|DragonBreak Online Edits.esp|hostile: faction BanditFaction
 disable|Skyrim.esm|093332|LvlBanditMelee1HAggro1024|DragonBreak Online Edits.esp|hostile: faction BanditFaction
-disable|Skyrim.esm|093654|E3demoGiant02|DragonBreak Online Edits.esp|hostile: aggressive creature (GiantRace)
-disable|Skyrim.esm|093660|E3demoGiant01|DragonBreak Online Edits.esp|hostile: aggressive creature (GiantRace)
-disable|Skyrim.esm|09424A|Guthrum|DragonBreak Online Edits.esp|near Dawnstar
 disable|ccBGSSSE025-AdvDSGS.esm|000950|ccBGSSSE025_LvlSeducerBanditMissileAggro768|DragonBreak Online Edits.esp|hostile: faction ccBGSSSE025_SaintsSeducersBanditFaction
 disable|ccBGSSSE025-AdvDSGS.esm|000951|ccBGSSSE025_LvlSeducerBanditMelee1HAggro768|DragonBreak Online Edits.esp|hostile: faction ccBGSSSE025_SaintsSeducersBanditFaction
 disable|ccBGSSSE025-AdvDSGS.esm|000952|ccBGSSSE025_LvlSeducerBanditMelee1HAggro768|DragonBreak Online Edits.esp|hostile: faction ccBGSSSE025_SaintsSeducersBanditFaction
@@ -2636,8 +2555,6 @@ disable|Skyrim.esm|0984A1|RiftenStablesHorseUnsaddled|DragonBreak Online Edits.e
 disable|Skyrim.esm|0984AB|RiftenPlayerHorse|DragonBreak Online Edits.esp|near Riften
 disable|Skyrim.esm|09872B|LvlBanditMissileGuard|DragonBreak Online Edits.esp|hostile: faction BanditFaction
 disable|Skyrim.esm|09872C|LvlBanditMissileGuard|DragonBreak Online Edits.esp|hostile: faction BanditFaction
-disable|Skyrim.esm|098B85|GuardSolitudeSonsDay|DragonBreak Online Edits.esp|near Solitude
-disable|Skyrim.esm|098B87|GuardHaafingarImperialDay|DragonBreak Online Edits.esp|near Solitude
 disable|Skyrim.esm|0992D8|EncWolf|DragonBreak Online Edits.esp|hostile: faction PredatorFaction
 disable|Skyrim.esm|099319|e3DemoAlphaWolf|DragonBreak Online Edits.esp|hostile: kind Wolf
 disable|Skyrim.esm|099400|LvlAnimalMountainSnowPredator|DragonBreak Online Edits.esp|hostile: faction PredatorFaction
@@ -2665,8 +2582,6 @@ disable|Skyrim.esm|09B0DC|EncWolf|DragonBreak Online Edits.esp|hostile: faction 
 disable|Skyrim.esm|09B0DD|EncWolf|DragonBreak Online Edits.esp|hostile: faction PredatorFaction
 disable|Skyrim.esm|09B7A2|SolitudeStablesHorseUnsaddled|DragonBreak Online Edits.esp|near Solitude
 disable|Skyrim.esm|09B7A9|HorseForCarriageNew|DragonBreak Online Edits.esp|near Whiterun
-disable|Skyrim.esm|09B7B1|CarriageDriverSolitude|DragonBreak Online Edits.esp|near Solitude
-disable|Skyrim.esm|09B7B4|CarriageDriverRiften|DragonBreak Online Edits.esp|near Riften
 disable|Skyrim.esm|09B7BA|HorseForCarriageNew|DragonBreak Online Edits.esp|near Riften
 disable|Skyrim.esm|09DB20|EncSkeleton01AmbushMelee2H|DragonBreak Online Edits.esp|hostile: faction SkeletonFaction
 disable|Skyrim.esm|09DB29|EncSkeleton01AmbushMelee1H|DragonBreak Online Edits.esp|hostile: faction SkeletonFaction
@@ -2683,8 +2598,6 @@ disable|Skyrim.esm|09FF8B|LvlForswornMeleeAmbush|DragonBreak Online Edits.esp|ho
 disable|Skyrim.esm|09FF8C|LvlForswornMissileAmbush|DragonBreak Online Edits.esp|hostile: faction ForswornFaction
 disable|Skyrim.esm|09FF8D|LvlForswornMissileAmbush|DragonBreak Online Edits.esp|hostile: faction ForswornFaction
 disable|Skyrim.esm|09FF8F|dunRedEagle_LvlForswornMissileAmbushHoldPositionRunner|DragonBreak Online Edits.esp|hostile: faction ForswornFaction
-disable|Skyrim.esm|0A17A8|RavamVerethi|DragonBreak Online Edits.esp|near Dawnstar
-disable|Skyrim.esm|0A17AB|LeifWayfinder|DragonBreak Online Edits.esp|near Dawnstar
 disable|Skyrim.esm|0A1941|lvlDragon|DragonBreak Online Edits.esp|hostile: kind Dragon
 disable|Skyrim.esm|0A194B|lvlDragon|DragonBreak Online Edits.esp|hostile: kind Dragon
 disable|Skyrim.esm|0A31FF|dunSouthfringeSpellsword|DragonBreak Online Edits.esp|hostile: faction NecromancerFaction
@@ -2702,7 +2615,6 @@ disable|Skyrim.esm|0ACCE5|DunRannveigGhostLvlBandit01Melee1H|DragonBreak Online 
 disable|Skyrim.esm|0ACCE8|DunRannveigGhostLvlBanditMissile|DragonBreak Online Edits.esp|hostile: kind Bandit
 disable|Skyrim.esm|0ACCEC|DunRannveigGhostLvlBandit01Melee1H|DragonBreak Online Edits.esp|hostile: kind Bandit
 disable|Skyrim.esm|0AD0AF|MS03ChaletGuardExterior|DragonBreak Online Edits.esp|hostile in town RiftenLocation: faction BanditFaction
-disable|Skyrim.esm|0AE018|LvlGiant|DragonBreak Online Edits.esp|hostile: aggressive creature (GiantRace)
 disable|ccBGSSSE025-AdvDSGS.esm|0AF336|ccBGSSSE025_LvlSeducerBanditMelee1HAggro768|DragonBreak Online Edits.esp|hostile: faction ccBGSSSE025_SaintsSeducersBanditFaction
 disable|ccBGSSSE025-AdvDSGS.esm|0AF337|ccBGSSSE025_LvlSeducerBanditBossAggro768|DragonBreak Online Edits.esp|hostile: faction ccBGSSSE025_SaintsSeducersBanditFaction
 disable|ccBGSSSE025-AdvDSGS.esm|0AF338|ccBGSSSE025_LvlSeducerBanditMissileAggro768|DragonBreak Online Edits.esp|hostile: faction ccBGSSSE025_SaintsSeducersBanditFaction
@@ -2725,7 +2637,6 @@ disable|Skyrim.esm|0B5FD4|LvlForswornMissileAmbush|DragonBreak Online Edits.esp|
 disable|Skyrim.esm|0B5FD7|LvlForswornBossAmbush|DragonBreak Online Edits.esp|hostile: faction ForswornFaction
 disable|Skyrim.esm|0B6CE1|LvlBanditMelee1HAggro1024|DragonBreak Online Edits.esp|hostile: faction BanditFaction
 disable|Skyrim.esm|0BA4B3|LvlDraugrAmbushMelee1HMale|DragonBreak Online Edits.esp|hostile: faction DraugrFaction
-disable|Skyrim.esm|0BB986|EncGiant01|DragonBreak Online Edits.esp|hostile: aggressive creature (GiantRace)
 disable|Skyrim.esm|0BDF8C|EncHagravenHoldPosition256|DragonBreak Online Edits.esp|hostile: faction HagravenFaction
 disable|Skyrim.esm|0BDF90|LvlForswornMeleeBerserkerAggro1024|DragonBreak Online Edits.esp|hostile: faction ForswornFaction
 disable|Skyrim.esm|0BDF94|LvlForswornShaman_Hold256|DragonBreak Online Edits.esp|hostile: faction ForswornFaction
@@ -3005,13 +2916,10 @@ disable|Skyrim.esm|0DED81|LvlMudcrab|DragonBreak Online Edits.esp|hostile: kind 
 disable|Skyrim.esm|0DED83|LvlMudcrab|DragonBreak Online Edits.esp|hostile: kind Mudcrab
 disable|Skyrim.esm|0DED84|LvlMudcrab|DragonBreak Online Edits.esp|hostile: kind Mudcrab
 disable|Skyrim.esm|0DED85|LvlAnimalForestSnowPredator|DragonBreak Online Edits.esp|hostile: faction PredatorFaction
-disable|JK's Whiterun's Outskirts.esp|0E07F3|GuardWhiterunHoldImperialGeneric|DragonBreak Nexus Patches.esp|near Whiterun
-disable|JK's Whiterun's Outskirts.esp|0E07FC|GuardWhiterunHoldImperialGeneric|DragonBreak Nexus Patches.esp|near Whiterun
 disable|Skyrim.esm|0E0F43|LvlBanditMeleeTankAggro1024|DragonBreak Online Edits.esp|hostile: faction BanditFaction
 disable|Skyrim.esm|0E0F44|LvlBanditMissileAggro1024|DragonBreak Online Edits.esp|hostile: faction BanditFaction
 disable|Skyrim.esm|0E0F45|LvlBanditMissileAggro1024|DragonBreak Online Edits.esp|hostile: faction BanditFaction
 disable|Skyrim.esm|0E1352|dunRobbersGorge_LvlBanditSentry|DragonBreak Online Edits.esp|hostile: faction dunRobbersGorgeBanditFaction
-disable|JKs Skyrim.esp|000E24|XJKblacksmithMorthal|DragonBreak Nexus Patches.esp|near Morthal
 disable|Skyrim.esm|0E2D2A|CW01BIceWraith|DragonBreak Online Edits.esp|hostile: kind IceWraith
 disable|Skyrim.esm|0E407D|EncWispMother|DragonBreak Online Edits.esp|hostile: kind Wisp
 disable|Skyrim.esm|0E4C9D|EncTrollFrost|DragonBreak Online Edits.esp|hostile: kind Troll
@@ -3064,7 +2972,6 @@ disable|Skyrim.esm|0E6039|LvlBanditMissileAggro1024|DragonBreak Online Edits.esp
 disable|Skyrim.esm|0E603A|LvlBanditMeleeTank|DragonBreak Online Edits.esp|hostile: faction BanditFaction
 disable|Skyrim.esm|0E603B|LvlBanditMissileNordF|DragonBreak Online Edits.esp|hostile: faction BanditFaction
 disable|Skyrim.esm|0E603C|LvlBanditMissileAggro1024|DragonBreak Online Edits.esp|hostile: faction BanditFaction
-disable|Skyrim.esm|0E66FB|GuardRiftenGateNorthStartup|DragonBreak Online Edits.esp|near Riften
 disable|Skyrim.esm|0E68B1|LvlWarlockFireBoss|DragonBreak Online Edits.esp|hostile: faction WarlockFaction
 disable|Skyrim.esm|0E68B2|LvlWarlockElementalAggro1024|DragonBreak Online Edits.esp|hostile: faction WarlockFaction
 disable|Skyrim.esm|0E68B3|LvlWarlockElementalAggro1024|DragonBreak Online Edits.esp|hostile: faction WarlockFaction
@@ -3075,8 +2982,6 @@ disable|Skyrim.esm|0E68B7|LvlWarlockElemental|DragonBreak Online Edits.esp|hosti
 disable|Skyrim.esm|0E68BA|LvlWarlockElemental|DragonBreak Online Edits.esp|hostile: faction WarlockFaction
 disable|Skyrim.esm|0E68BB|LvlWarlockElementalAggro1024|DragonBreak Online Edits.esp|hostile: faction WarlockFaction
 disable|Skyrim.esm|0E7913|LvlFrostbiteSpiderNoGiant|DragonBreak Online Edits.esp|hostile: faction PredatorFaction
-disable|Skyrim.esm|0E9348|GuardDawnstarSonsJailer|DragonBreak Online Edits.esp|near Dawnstar
-disable|Skyrim.esm|0E9349|GuardDawnstarImperialJailer|DragonBreak Online Edits.esp|near Dawnstar
 disable|Skyrim.esm|0E9369|dunCrackedTuskShamanAggroSpecial|DragonBreak Online Edits.esp|hostile: faction BanditFaction
 disable|Skyrim.esm|0E93D2|E3demoThief|DragonBreak Online Edits.esp|hostile: faction BanditFaction
 disable|Skyrim.esm|0E9627|E3DemoTowerBanditMelee|DragonBreak Online Edits.esp|hostile: faction BanditFaction
@@ -3087,7 +2992,6 @@ disable|Skyrim.esm|0E9E8D|EncSkeleton01AmbushMissile|DragonBreak Online Edits.es
 disable|Skyrim.esm|0EA278|EncWolf|DragonBreak Online Edits.esp|hostile: faction PredatorFaction
 disable|Skyrim.esm|0EA279|EncWolf|DragonBreak Online Edits.esp|hostile: faction PredatorFaction
 disable|Skyrim.esm|0EA27A|EncWolf|DragonBreak Online Edits.esp|hostile: faction PredatorFaction
-disable|Skyrim.esm|0EA551|LvlGiant|DragonBreak Online Edits.esp|hostile: aggressive creature (GiantRace)
 disable|Skyrim.esm|0EA567|LvlSprigganAmbush|DragonBreak Online Edits.esp|hostile: faction SprigganPredatorFaction
 disable|Skyrim.esm|0EA56D|EncElkFemaleSprigganCompanion|DragonBreak Online Edits.esp|hostile: kind Spriggan
 disable|Skyrim.esm|0EA58F|LvlBanditMissileAggro1024|DragonBreak Online Edits.esp|hostile: faction BanditFaction
@@ -3110,7 +3014,6 @@ disable|Skyrim.esm|0ECF56|LvlMudcrab|DragonBreak Online Edits.esp|hostile: kind 
 disable|Skyrim.esm|0ECF57|LvlMudcrab|DragonBreak Online Edits.esp|hostile: kind Mudcrab
 disable|Skyrim.esm|0ECF58|LvlMudcrab|DragonBreak Online Edits.esp|hostile: kind Mudcrab
 disable|Skyrim.esm|0ECF59|LvlMudcrab|DragonBreak Online Edits.esp|hostile: kind Mudcrab
-disable|Skyrim.esm|0ECF8A|LvlGiant|DragonBreak Online Edits.esp|hostile: aggressive creature (GiantRace)
 disable|Skyrim.esm|0EE52C|dunRobbersGorge_LvlBanditGuard|DragonBreak Online Edits.esp|hostile: faction dunRobbersGorgeBanditFaction
 disable|Skyrim.esm|0EE5FE|LvlDraugrAmbushWarlock|DragonBreak Online Edits.esp|hostile: faction DraugrFaction
 disable|Skyrim.esm|0EE795|EncSkeleton01Melee1Hshield|DragonBreak Online Edits.esp|hostile: faction SkeletonFaction
@@ -3188,8 +3091,6 @@ disable|Skyrim.esm|0FDC33|LvlAnimalMountainSnowPredator|DragonBreak Online Edits
 disable|Skyrim.esm|0FDC34|LvlAnimalMountainSnowPredator|DragonBreak Online Edits.esp|hostile: faction PredatorFaction
 disable|Skyrim.esm|0FDCBB|LvlDraugrMissileFemale|DragonBreak Online Edits.esp|hostile: faction DraugrFaction
 disable|Skyrim.esm|0FDCBE|LvlDraugrMissileFemale|DragonBreak Online Edits.esp|hostile: faction DraugrFaction
-disable|COTN - Falkreath.esp|0FDFAA|LvlFalkreathHoldGuardSonsVoiceTypeMaleGuard|DragonBreak Nexus Patches.esp|near Falkreath
-disable|COTN - Falkreath.esp|0FDFAB|LvlFalkreathHoldGuardImperialVoiceTypeMaleGuard|DragonBreak Nexus Patches.esp|near Falkreath
 disable|Skyrim.esm|0FE54B|dunCragslaneOutdoorGuy|DragonBreak Online Edits.esp|hostile: faction BanditFaction
 disable|Skyrim.esm|0FECAA|LvlMudcrab|DragonBreak Online Edits.esp|hostile: kind Mudcrab
 disable|Druadach.esm|030D94|DD_Jzhir|DragonBreak Nexus Patches.esp|closed land: an actor of druadach.esm in an open cell
@@ -3767,7 +3668,6 @@ disable|Dawnguard.esm|009836|LvlDraugrBossMale|DragonBreak Online Edits.esp|host
 disable|Dawnguard.esm|00FBF5|DLC1LvlVampireBossMaleVampireNord|DragonBreak Online Edits.esp|hostile: faction VampireFaction
 disable|Dawnguard.esm|00FBF6|DLC1LvlVampireFemaleVampire|DragonBreak Online Edits.esp|hostile: faction VampireFaction
 disable|Dawnguard.esm|00FBF9|LvlVampireThrallMelee2H|DragonBreak Online Edits.esp|hostile: faction VampireThrallFaction
-disable|Dawnguard.esm|012631|DLC1FrostGiantAggresive|DragonBreak Online Edits.esp|hostile: aggression 2
 disable|Dawnguard.esm|00C251|LvlFalmerShamanHoldPosition256|DragonBreak Online Edits.esp|hostile: faction FalmerFaction
 disable|Dawnguard.esm|00C33F|EncTrollFrost|DragonBreak Online Edits.esp|hostile: kind Troll
 disable|Dawnguard.esm|00C342|LvlFalmerMelee|DragonBreak Online Edits.esp|hostile: faction FalmerFaction
@@ -5099,38 +4999,20 @@ disable|Skyrim.esm|09C1F4|LvlDwarvenSpiderAmbush|DragonBreak Online Edits.esp|ho
 disable|Skyrim.esm|09C1F5|LvlDwarvenSpiderAmbush|DragonBreak Online Edits.esp|hostile: kind DwarvenSpider
 disable|Skyrim.esm|0C07FB|LvlFalmerMissileHoldPosition256|DragonBreak Online Edits.esp|hostile: faction FalmerFaction
 disable|Skyrim.esm|01C58C|DA16LvlBanditMeleeOrcMAmbush|DragonBreak Online Edits.esp|hostile: kind Bandit
-disable|Skyrim.esm|01C593|DA16LvlVaerminaDevoteeAmbushMaleWarlock|DragonBreak Online Edits.esp|hostile: kind Warlock
-disable|Skyrim.esm|01C596|DA16LvlVaerminaDevoteeAmbushFemaleCon|DragonBreak Online Edits.esp|hostile: kind Warlock
-disable|Skyrim.esm|01C597|DA16LvlVaerminaDevoteeAmbushMaleWarlock|DragonBreak Online Edits.esp|hostile: kind Warlock
 disable|Skyrim.esm|01C598|DA16LvlBanditMeleeOrcMAmbush|DragonBreak Online Edits.esp|hostile: kind Bandit
 disable|Skyrim.esm|0343E4|DA16LvlBanditMeleeOrcMDream|DragonBreak Online Edits.esp|hostile: kind Bandit
-disable|Skyrim.esm|0343E8|DA16LvlVaerminaDevoteeDreamMaleSly|DragonBreak Online Edits.esp|hostile: kind Warlock
 disable|Skyrim.esm|09E139|DA16LvlBanditMeleeOrcMAmbush|DragonBreak Online Edits.esp|hostile: kind Bandit
-disable|Skyrim.esm|09E13C|DA16LvlVaerminaDevoteeAmbushMaleWarlock|DragonBreak Online Edits.esp|hostile: kind Warlock
 disable|Skyrim.esm|09E13D|DA16LvlBanditMeleeOrcMAmbush|DragonBreak Online Edits.esp|hostile: kind Bandit
 disable|Skyrim.esm|09E13F|DA16LvlBanditMeleeOrcMAmbush|DragonBreak Online Edits.esp|hostile: kind Bandit
-disable|Skyrim.esm|09E141|DA16LvlVaerminaDevoteeAmbushMaleSly|DragonBreak Online Edits.esp|hostile: kind Warlock
 disable|Skyrim.esm|09E143|DA16LvlBanditMeleeOrcMAmbush|DragonBreak Online Edits.esp|hostile: kind Bandit
-disable|Skyrim.esm|09E145|DA16LvlVaerminaDevoteeAmbushMaleSly|DragonBreak Online Edits.esp|hostile: kind Warlock
 disable|Skyrim.esm|09E148|DA16LvlBanditMeleeOrcMAmbush|DragonBreak Online Edits.esp|hostile: kind Bandit
 disable|Skyrim.esm|09E14C|DA16LvlBanditMeleeOrcMAmbush|DragonBreak Online Edits.esp|hostile: kind Bandit
-disable|Skyrim.esm|09E14D|DA16LvlVaerminaDevoteeAmbushMaleSly|DragonBreak Online Edits.esp|hostile: kind Warlock
-disable|Skyrim.esm|09E14F|DA16LvlVaerminaDevoteeAmbushFemaleCon|DragonBreak Online Edits.esp|hostile: kind Warlock
-disable|Skyrim.esm|09E151|DA16LvlVaerminaDevoteeAmbushMaleWarlock|DragonBreak Online Edits.esp|hostile: kind Warlock
 disable|Skyrim.esm|09E153|DA16LvlBanditMeleeOrcMAmbush|DragonBreak Online Edits.esp|hostile: kind Bandit
-disable|Skyrim.esm|09E155|DA16LvlVaerminaDevoteeAmbushFemaleCon|DragonBreak Online Edits.esp|hostile: kind Warlock
 disable|Skyrim.esm|09EF26|DA16LvlBanditMeleeOrcMDream|DragonBreak Online Edits.esp|hostile: kind Bandit
 disable|Skyrim.esm|09EF27|DA16LvlBanditMeleeOrcMDream|DragonBreak Online Edits.esp|hostile: kind Bandit
 disable|Skyrim.esm|09EF28|DA16LvlBanditMeleeOrcMDream|DragonBreak Online Edits.esp|hostile: kind Bandit
-disable|Skyrim.esm|09EF59|DA16LvlVaerminaDevoteeDreamMaleCon|DragonBreak Online Edits.esp|hostile: kind Warlock
-disable|Skyrim.esm|09EF5A|DA16LvlVaerminaDevoteeDreamMaleSly|DragonBreak Online Edits.esp|hostile: kind Warlock
 disable|Skyrim.esm|09EF5B|DA16LvlBanditMeleeOrcMDream|DragonBreak Online Edits.esp|hostile: kind Bandit
-disable|Skyrim.esm|09EF5C|DA16LvlVaerminaDevoteeDreamMaleWarlock|DragonBreak Online Edits.esp|hostile: kind Warlock
-disable|Skyrim.esm|09EF5D|DA16LvlVaerminaDevoteeDreamMaleCon|DragonBreak Online Edits.esp|hostile: kind Warlock
 disable|Skyrim.esm|09EF5F|DA16LvlBanditMeleeOrcMDream|DragonBreak Online Edits.esp|hostile: kind Bandit
-disable|Skyrim.esm|09EF60|DA16LvlVaerminaDevoteeDreamMaleWarlock|DragonBreak Online Edits.esp|hostile: kind Warlock
-disable|Skyrim.esm|09EF61|DA16LvlVaerminaDevoteeDreamMaleCon|DragonBreak Online Edits.esp|hostile: kind Warlock
-disable|Skyrim.esm|09EF62|DA16LvlVaerminaDevoteeDreamMaleSly|DragonBreak Online Edits.esp|hostile: kind Warlock
 disable|Skyrim.esm|09F167|DA16LvlBanditMeleeOrcMAmbush|DragonBreak Online Edits.esp|hostile: kind Bandit
 disable|Skyrim.esm|0C6381|EncSkeeverAggroRadius1024|DragonBreak Online Edits.esp|hostile: kind Skeever
 disable|Skyrim.esm|0C6385|EncSkeeverAggroRadius1024|DragonBreak Online Edits.esp|hostile: kind Skeever
@@ -5704,7 +5586,6 @@ disable|Skyrim.esm|0EF070|LvlBanditMeleeTank|DragonBreak Online Edits.esp|hostil
 disable|Skyrim.esm|0EF075|LvlBanditMelee1H|DragonBreak Online Edits.esp|hostile: faction BanditFaction
 disable|Skyrim.esm|0EF076|LvlBanditMissile|DragonBreak Online Edits.esp|hostile: faction BanditFaction
 disable|Skyrim.esm|0EF078|LvlBanditMissile|DragonBreak Online Edits.esp|hostile: faction BanditFaction
-disable|Skyrim.esm|0AEDC7|LvlGiant|DragonBreak Online Edits.esp|hostile: aggressive creature (GiantRace)
 disable|Skyrim.esm|067F2C|LvlHagravenCompanion|DragonBreak Online Edits.esp|hostile: faction HagravenFaction
 disable|Skyrim.esm|067FD4|EncHagraven|DragonBreak Online Edits.esp|hostile: faction HagravenFaction
 disable|Skyrim.esm|0682D6|EncFrostbiteSpider|DragonBreak Online Edits.esp|hostile: faction PredatorFaction
@@ -6179,34 +6060,13 @@ disable|Skyrim.esm|037D84|dunYngvildLvlGhostMeleeNord|DragonBreak Online Edits.e
 disable|Skyrim.esm|0735C5|dunYngvildLvlGhostMeleeEvenToned|DragonBreak Online Edits.esp|hostile: kind Bandit
 disable|Skyrim.esm|06C57E|EncSkeever|DragonBreak Online Edits.esp|hostile: kind Skeever
 disable|Skyrim.esm|06C57F|EncSkeever|DragonBreak Online Edits.esp|hostile: kind Skeever
-disable|Skyrim.esm|0AB18F|DunYsgramorsTomb_LvlGhostMelee1HMale|DragonBreak Online Edits.esp|hostile: kind Bandit
-disable|Skyrim.esm|0AB190|DunYsgramorsTomb_LvlGhostMelee2HMale|DragonBreak Online Edits.esp|hostile: kind Bandit
-disable|Skyrim.esm|0AFB94|DunYsgramorsTomb_LvlGhostMelee2HFemale|DragonBreak Online Edits.esp|hostile: kind Bandit
-disable|Skyrim.esm|0AFB9A|DunYsgramorsTomb_LvlGhostMissileMale|DragonBreak Online Edits.esp|hostile: kind Bandit
-disable|Skyrim.esm|0AFB9B|DunYsgramorsTomb_LvlGhostMelee2HMale|DragonBreak Online Edits.esp|hostile: kind Bandit
-disable|Skyrim.esm|0AFBA0|DunYsgramorsTomb_LvlGhostMelee1HFemale|DragonBreak Online Edits.esp|hostile: kind Bandit
-disable|Skyrim.esm|0AFBA1|DunYsgramorsTomb_LvlGhostMelee1HFemale|DragonBreak Online Edits.esp|hostile: kind Bandit
 disable|Skyrim.esm|0DBC1C|EncFrostbiteSpider|DragonBreak Online Edits.esp|hostile: faction PredatorFaction
 disable|Skyrim.esm|0DBC1D|EncFrostbiteSpider|DragonBreak Online Edits.esp|hostile: faction PredatorFaction
-disable|Skyrim.esm|0DCB0E|DunYsgramorsTomb_LvlGhostMissileFemale|DragonBreak Online Edits.esp|hostile: kind Bandit
-disable|Skyrim.esm|0DCB11|DunYsgramorsTomb_LvlGhostMelee1HMale|DragonBreak Online Edits.esp|hostile: kind Bandit
-disable|Skyrim.esm|0DCB19|DunYsgramorsTomb_LvlGhostMelee1HFemale|DragonBreak Online Edits.esp|hostile: kind Bandit
-disable|Skyrim.esm|0DCB1A|DunYsgramorsTomb_LvlGhostMissileFemale|DragonBreak Online Edits.esp|hostile: kind Bandit
-disable|Skyrim.esm|0DCB24|DunYsgramorsTomb_LvlGhostMelee2HMale|DragonBreak Online Edits.esp|hostile: kind Bandit
-disable|Skyrim.esm|0DCB2B|DunYsgramorsTomb_LvlGhostMissileMale|DragonBreak Online Edits.esp|hostile: kind Bandit
-disable|Skyrim.esm|0DCB30|DunYsgramorsTomb_LvlGhostMelee1HFemale|DragonBreak Online Edits.esp|hostile: kind Bandit
-disable|Skyrim.esm|0DCB40|DunYsgramorsTomb_LvlGhostMelee1HMale|DragonBreak Online Edits.esp|hostile: kind Bandit
-disable|Skyrim.esm|0DCB41|DunYsgramorsTomb_LvlGhostMissileMale|DragonBreak Online Edits.esp|hostile: kind Bandit
-disable|Skyrim.esm|0DCB42|DunYsgramorsTomb_LvlGhostMelee2HFemale|DragonBreak Online Edits.esp|hostile: kind Bandit
 disable|Skyrim.esm|0DCBC4|LvlFrostbiteSpiderNoGiant|DragonBreak Online Edits.esp|hostile: faction PredatorFaction
 disable|Skyrim.esm|0DCC59|LvlFrostbiteSpiderNoGiant|DragonBreak Online Edits.esp|hostile: faction PredatorFaction
 disable|Skyrim.esm|0DCC77|LvlFrostbiteSpiderNoGiant|DragonBreak Online Edits.esp|hostile: faction PredatorFaction
 disable|Skyrim.esm|0DCC80|LvlFrostbiteSpiderNoGiant|DragonBreak Online Edits.esp|hostile: faction PredatorFaction
 disable|Skyrim.esm|0DCC8E|LvlFrostbiteSpiderAllAmbush|DragonBreak Online Edits.esp|hostile: faction PredatorFaction
-disable|Skyrim.esm|0FF130|DunYsgramorsTomb_LvlGhostMissileMale|DragonBreak Online Edits.esp|hostile: kind Bandit
-disable|Skyrim.esm|0FF131|DunYsgramorsTomb_LvlGhostMissileFemale|DragonBreak Online Edits.esp|hostile: kind Bandit
-disable|Skyrim.esm|0FF132|DunYsgramorsTomb_LvlGhostMelee1HMale|DragonBreak Online Edits.esp|hostile: kind Bandit
-disable|Skyrim.esm|0FF133|DunYsgramorsTomb_LvlGhostMelee1HMale|DragonBreak Online Edits.esp|hostile: kind Bandit
 disable|Skyrim.esm|10FE97|EncDragon05Fire|DragonBreak Online Edits.esp|hostile: kind Dragon
 disable|ccBGSSSE025-AdvDSGS.esm|02B806|ccBGSSSE025_EncCorruptedSprigganDementia|DragonBreak Online Edits.esp|hostile in town SolitudeLocation: kind Spriggan
 disable|ccBGSSSE025-AdvDSGS.esm|0B9592|ccBGSSSE025_EncCorruptedSprigganDementia|DragonBreak Online Edits.esp|hostile in town SolitudeLocation: kind Spriggan

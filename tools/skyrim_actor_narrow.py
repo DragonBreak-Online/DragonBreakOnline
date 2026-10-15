@@ -4,7 +4,8 @@
 # same census as tools/skyrim_release_scan.py (every winning ACHR that is not deleted, not Initially Disabled, not Starts
 # Dead, not sunk below -20000, outside the hub and the closed lands), then each living actor is judged:
 #   near     within NEAR units (2D, same worldspace) of a hold-gate landing spot (gamemode.js GATES + config hubGates) or of
-#            the creator landing / Pale Pass arrival (config landing, playtest.arrival): every living actor, whatever it is;
+#            the creator landing / Pale Pass arrival (config landing, playtest.arrival): hostile actors and creatures only
+#            (15 Oct: guards, townsfolk, merchants, children and friendly NPCs at the gates stay);
 #   town     a hostile actor or creature inside a city or town: a city worldspace (Whiterun, Solitude, Markarth, Riften,
 #            Windhelm) or a cell whose location (XLCN, up its parents) carries LocTypeCity or LocTypeTown;
 #   hostile  anywhere else: an actor whose factions or AI make it attack players (bandits, Forsworn, vampires,
@@ -61,6 +62,7 @@ def main():
     closed = {p.lower() for p in cfg.get('playtest', {}).get('closedPlugins', [])}
     if os.environ.get('DBO_FROM_JUDGED'):   # re-judge the closed-route rule only, from an earlier pass's achr-judged.json
         rows = json.load(open(os.environ['DBO_FROM_JUDGED']))
+        for r in rows: r['reason'] = reason_of(r)
     else:
         rows = judge(cfg, gm_path, order, closed)
     closed_routes(rows, closed)
@@ -254,13 +256,37 @@ def judge(cfg, gm_path, order, closed):
         town = ''
         if CITY_WORLDS.match(wname or ''): town = wname
         else: town = town_loc(loc)
-        reason = ''
-        if near: reason = 'near ' + near
-        elif host and town: reason = 'hostile in town %s: %s' % (town, host)
-        elif host: reason = 'hostile: ' + host
-        rows.append({'ref': key, 'by': r['by'], 'base': r['base'], 'baseEdid': bedid, 'place': where, 'placeEdid': wname, 'interior': interior,
-                     'pos': r['pos'], 'xesp': r['xesp'], 'kind': kind, 'town': town, 'near': near, 'hostile': host, 'reason': reason})
+        row = {'ref': key, 'by': r['by'], 'base': r['base'], 'baseEdid': bedid, 'place': where, 'placeEdid': wname, 'interior': interior,
+               'pos': r['pos'], 'xesp': r['xesp'], 'kind': kind, 'town': town, 'near': near, 'hostile': host,
+               'races': sorted({t[2] for t in traits if t[2]})}
+        row['reason'] = reason_of(row)
+        rows.append(row)
     return rows
+
+
+# Near a landing (Nate, 15 Oct, decision 1 of integration B): only hostile actors and creatures are disabled there. Guards,
+# townsfolk, merchants, children and other friendly NPCs at the gates stay. 'near' is still recorded on a kept row.
+NEAR_DISABLE = {'hostile', 'creature'}
+
+
+# Kept enabled whatever the judge says (Nate, 15 Oct, decision 5 of integration B): the Companions' ghosts in Ysgramor's Tomb,
+# Vaermina's devotees in Nightcaller Temple (both quest set pieces), and giants (they warn before they fight).
+KEEP_BASE = re.compile(r'^(?:DunYsgramorsTomb_LvlGhost|DA16LvlVaerminaDevotee)')
+KEEP_RACE = {'GiantRace'}
+
+
+def kept_by_decision(r):
+    if KEEP_BASE.match(r.get('baseEdid') or ''): return True
+    races = set(r.get('races') or [])
+    return bool(races) and races <= KEEP_RACE
+
+
+def reason_of(r):
+    if kept_by_decision(r): return ''
+    if r['near'] and r['kind'] in NEAR_DISABLE: return 'near ' + r['near']
+    if r['hostile'] and r['town']: return 'hostile in town %s: %s' % (r['town'], r['hostile'])
+    if r['hostile']: return 'hostile: ' + r['hostile']
+    return ''
 
 
 # Kept from the 9,620 list (Nate 15 Oct, "just skyrim will be open"): the Northern Maiden's crew at the Windhelm docks, whose
@@ -281,6 +307,7 @@ def closed_routes(rows, closed):
 def report(rows):
     dis = [r for r in rows if r['reason']]
     keep = [r for r in rows if not r['reason']]
+    print('kept near a landing, by kind:', dict(collections.Counter(r['kind'] for r in keep if r['near'])))
     by = collections.Counter('near landing' if r['reason'].startswith('near') else 'hostile in town' if r['reason'].startswith('hostile in town') else r['reason'].split(':')[0] for r in dis)
     print('living actors judged %d: disable %d, keep %d' % (len(rows), len(dis), len(keep)))
     print('disable by reason:', dict(by))
@@ -288,6 +315,8 @@ def report(rows):
     print('disable, near a landing, by kind:', dict(collections.Counter(r['kind'] for r in dis if r['near'])))
     print('disable, hostile, by cause:', dict(collections.Counter(re.sub(r' \(.*\)|faction ', '', r['hostile']) for r in dis if r['hostile'] and not r['near']).most_common(25)))
     print('keep by kind:', dict(collections.Counter(r['kind'] for r in keep)))
+    print('kept by decision (Ysgramor ghosts, Vaermina devotees, giants):', dict(collections.Counter(
+        'giant' if set(r.get('races') or []) <= KEEP_RACE and r.get('races') else (r['baseEdid'] or '')[:16] for r in keep if kept_by_decision(r))))
 
 
 def write_list(rows, order, out_list):
