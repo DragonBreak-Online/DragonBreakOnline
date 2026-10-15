@@ -14,14 +14,20 @@ type Mp = any;
 // Clients already know every remote player's refrId, so they match LiveKit participants to actors and gate volume by distance; server-side minting means identities cannot be spoofed.
 //
 // Wire protocol (CustomPacket JSON):
-//   Client -> Server: { customPacketType: "voiceTokenRequest" }
+//   Client -> Server: { customPacketType: "voiceTokenRequest", caps?: { hearingLists?: 1 } }
 //   Server -> Client: { customPacketType: "voiceToken", enabled, url?, token?,
-//                       room?, identity?, rangeUnits? }
+//                       room?, identity?, modes?, hearers? }
+//   Server -> Client: { customPacketType: "voiceHearers", bands: { <mode key>: [identity, ...] } }
+// hearers and bands go only to a client that sent caps.hearingLists: who may hear it in each mode, from the server's positions.
+// Its page makes the list for its mode its LiveKit track subscription permissions, which LiveKit enforces on every listener.
 //
 // Settings (server-settings.json "voiceChat" object):
 //   { "enabled": true, "url": "ws://host:7880", "apiKey": "...",
 //     "apiSecret": "...", "room": "dragonbreak", "rangeUnits": 2000,
-//     "apiUrl": "http://host:7880", "sweepSeconds": 15, "moveRoomOnReplay": true }
+//     "apiUrl": "http://host:7880", "sweepSeconds": 15, "moveRoomOnReplay": true,
+//     "hearingLists": true, "hearingTickMs": 500, "hearingPadUnits": 350 }
+// hearingLists: false = no lists, every voice is open to the whole room as before (the fallback).
+// hearingTickMs: how often the lists are worked out; hearingPadUnits: how far past a mode's range a listener is let in early.
 // rangeUnits falls back to chatRanges.say, then 2000 game units.
 // apiUrl is optional: the LiveKit server API base the game server calls, by default url with ws(s) turned into http(s).
 // sweepSeconds: the longest gap between checks of the room for sessions no online character may hold, each gap random from half of it (0 = never).
@@ -40,6 +46,20 @@ const REPLAY_REMOVALS = 2;
 const REPLAY_MEMORY_MS = 24 * 60 * 60 * 1000;
 const DRAIN_GRACE_MS = 10 * 1000;
 const DRAIN_MS = 2 * 60 * 1000;
+const DEFAULT_HEARING_TICK_MS = 500;
+const DEFAULT_HEARING_PAD_UNITS = 350;
+// A listener's page drops a speaker past its range x 1.15 (VoiceManager UNSUB_HYSTERESIS); a list reaches that plus the pad
+const LISTENER_HYSTERESIS = 1.15;
+// On a list until this many times the distance that put them on it, so a listener at the edge does not flap
+const HEARING_LEAVE_FACTOR = 1.2;
+const REFUSAL_CACHE_MS = 10 * 1000;
+
+type Flow = "lists" | "open";
+type Bands = Record<string, string[]>;
+interface Voice { userId: number; actorId: number; identity: string; cell: number; pos: number[] }
+
+const bandsKey = (bands: Bands): string => Object.keys(bands).map((k) => `${k}:${bands[k].join(",")}`).join("|");
+const distance = (a: number[], b: number[]): number => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
 
 function b64url(input: Buffer | string): string {
   return (typeof input === "string" ? Buffer.from(input) : input).toString("base64url");
@@ -124,6 +144,17 @@ export class VoiceSystem implements System {
   private sweepMs = DEFAULT_SWEEP_SECONDS * 1000;
   private nextSweepAt = 0;
   private sweeping = false;
+  private hearingLists = true;
+  private hearingTickMs = DEFAULT_HEARING_TICK_MS;
+  private hearingPad = DEFAULT_HEARING_PAD_UNITS;
+  private nextHearingAt = 0;
+  // userId -> how its client asked for voice on this connection
+  private flowByUser = new Map<number, Flow>();
+  // userId -> the lists last sent to it, for the actor they were worked out for
+  private heardBy = new Map<number, { actorId: number; bands: Bands; key: string }>();
+  private refusalCache = new Map<number, { actorId: number; at: number; refused: boolean }>();
+  // Properties a get failed on once (not registered by the gamemode); a failed get logs a context dump natively, so they are not read again
+  private unreadable = new Set<string>();
   // One token per user every 2 s at most (a port of 57503548 without the profile identity): the client asks every 5 s at
   // most (voiceService TOKEN_RETRY_MS), so a faster stream of requests comes from a modified client, and each one signs
   // a token
@@ -154,6 +185,11 @@ export class VoiceSystem implements System {
     this.apiBase = httpBaseOf(typeof vc.apiUrl === "string" && vc.apiUrl ? vc.apiUrl : this.url);
     const sweepSeconds = Number(vc.sweepSeconds ?? DEFAULT_SWEEP_SECONDS);
     this.sweepMs = Number.isFinite(sweepSeconds) && sweepSeconds > 0 ? Math.max(5, sweepSeconds) * 1000 : 0;
+    this.hearingLists = vc.hearingLists !== false;
+    const tick = Number(vc.hearingTickMs ?? DEFAULT_HEARING_TICK_MS);
+    this.hearingTickMs = Number.isFinite(tick) ? Math.min(5000, Math.max(200, tick)) : DEFAULT_HEARING_TICK_MS;
+    const pad = Number(vc.hearingPadUnits ?? DEFAULT_HEARING_PAD_UNITS);
+    this.hearingPad = Number.isFinite(pad) ? Math.min(2000, Math.max(0, pad)) : DEFAULT_HEARING_PAD_UNITS;
 
     // Optional override: voiceChat.modes = [{ key, label, meters }]
     if (Array.isArray(vc.modes) && vc.modes.length) {
@@ -172,12 +208,15 @@ export class VoiceSystem implements System {
     this.enabled = vc.enabled !== false && !!(this.url && this.apiKey && this.apiSecret);
     (globalThis as any).__dboVoiceEnabled = this.enabled;
     const modeDesc = this.modes.map(m => `${m.label} ${Math.round(m.units / 70)}m`).join(", ");
-    this.log(`VoiceSystem: ${this.enabled ? `enabled, room '${this.room}', modes: ${modeDesc}` : "disabled (missing url/apiKey/apiSecret or enabled=false)"}`);
+    this.log(`VoiceSystem: ${this.enabled ? `enabled, room '${this.room}', modes: ${modeDesc}, hearing lists ${this.hearingLists ? "on" : "off (every voice open to the room)"}` : "disabled (missing url/apiKey/apiSecret or enabled=false)"}`);
   }
 
   // A new connection on the same user slot is not held to the last one's cooldown; every kick and ban ends here too
   disconnect(userId: number, ctx: SystemContext): void {
     this.lastMintAt.delete(userId);
+    this.flowByUser.delete(userId);
+    this.heardBy.delete(userId);
+    this.refusalCache.delete(userId);
     const minted = this.mintedByUser.get(userId);
     this.mintedByUser.delete(userId);
     if (!minted || !this.enabled) return;
@@ -192,7 +231,9 @@ export class VoiceSystem implements System {
 
   async updateAsync(ctx: SystemContext): Promise<void> {
     const now = Date.now();
-    if (!this.enabled || !this.sweepMs || now < this.nextSweepAt || this.sweeping) return;
+    if (!this.enabled) return;
+    this.hearingTick(ctx.svr as Mp, now);
+    if (!this.sweepMs || now < this.nextSweepAt || this.sweeping) return;
     // A random gap of half to one interval: a replayer cannot time its exits around a sweep it cannot predict
     const half = Math.floor(this.sweepMs / 2);
     this.nextSweepAt = now + half + crypto.randomInt(half + 1);
@@ -279,6 +320,116 @@ export class VoiceSystem implements System {
     return "";
   }
 
+  // Sends each client on hearing lists its lists when they changed; nothing to work out while none is
+  private hearingTick(mp: Mp, now: number): void {
+    if (!this.hearingLists || now < this.nextHearingAt) return;
+    this.nextHearingAt = now + this.hearingTickMs;
+    let any = false;
+    for (const flow of this.flowByUser.values()) if (flow === "lists") { any = true; break; }
+    if (!any) return;
+    const voices = this.voices(mp, now);
+    for (const speaker of voices) {
+      if (this.flowByUser.get(speaker.userId) !== "lists") continue;
+      const prev = this.heardBy.get(speaker.userId);
+      const bands = this.bandsFor(mp, speaker, voices, prev && prev.actorId === speaker.actorId ? prev.bands : null);
+      const key = bandsKey(bands);
+      if (prev && prev.actorId === speaker.actorId && prev.key === key) continue;
+      this.heardBy.set(speaker.userId, { actorId: speaker.actorId, bands, key });
+      try {
+        mp.sendCustomPacket(speaker.userId, JSON.stringify({ customPacketType: "voiceHearers", bands }));
+      } catch { }
+    }
+  }
+
+  // The lists for a client on them as its token goes out, so its page is closed to everyone else before it publishes; undefined for any other client
+  private firstBands(mp: Mp, userId: number, actorId: number): Bands | undefined {
+    if (this.flowByUser.get(userId) !== "lists") return undefined;
+    const voices = this.voices(mp, Date.now());
+    const speaker = voices.find((v) => v.userId === userId && v.actorId === actorId);
+    const bands = speaker ? this.bandsFor(mp, speaker, voices, null) : Object.fromEntries(this.modes.map((m) => [m.key, [] as string[]]));
+    this.heardBy.set(userId, { actorId, bands, key: bandsKey(bands) });
+    return bands;
+  }
+
+  // Online characters holding a token minted for them on this connection and allowed voice, with the server's own positions
+  private voices(mp: Mp, now: number): Voice[] {
+    const out: Voice[] = [];
+    for (const [userId, minted] of this.mintedByUser) {
+      try {
+        if (!mp.isConnected(userId)) continue;
+        const actorId = mp.getUserActor(userId);
+        if (!actorId) continue;
+        const identity = actorId.toString(16);
+        if (!minted.has(identity) || this.refusedNow(mp, userId, actorId, now)) continue;
+        const pos = mp.getActorPos(actorId);
+        if (!Array.isArray(pos) || pos.length < 3) continue;
+        out.push({ userId, actorId, identity, cell: mp.getActorCellOrWorld(actorId), pos: [Number(pos[0]), Number(pos[1]), Number(pos[2])] });
+      } catch { }
+    }
+    return out;
+  }
+
+  // Per mode, who in the same cell or worldspace is near enough to hear the speaker; a hidden Invisible speaker lists only staff who see them
+  private bandsFor(mp: Mp, speaker: Voice, voices: Voice[], prev: Bands | null): Bands {
+    const hiddenRank = this.invisibleRank(mp, speaker.actorId);
+    const ranks = new Map<number, number>();
+    const seen = (l: Voice): boolean => {
+      if (!hiddenRank) return true;
+      if (!ranks.has(l.actorId)) ranks.set(l.actorId, this.viewerRank(mp, l.actorId));
+      return (ranks.get(l.actorId) || 0) >= hiddenRank;
+    };
+    const bands: Bands = {};
+    for (const m of this.modes) {
+      const enter = m.units * LISTENER_HYSTERESIS + this.hearingPad;
+      const had = new Set(prev?.[m.key] || []);
+      const ids: string[] = [];
+      for (const l of voices) {
+        if (l.identity === speaker.identity || l.cell !== speaker.cell) continue;
+        if (distance(l.pos, speaker.pos) > (had.has(l.identity) ? enter * HEARING_LEAVE_FACTOR : enter) || !seen(l)) continue;
+        ids.push(l.identity);
+      }
+      bands[m.key] = ids.sort();
+    }
+    return bands;
+  }
+
+  // The rank a viewer needs to see this actor, 0 when it is not Invisible (adminCopyPolicy.ts adminViewOfModes on the client)
+  private invisibleRank(mp: Mp, actorId: number): number {
+    const modes = this.readProp(mp, actorId, "ff_adminModes");
+    if (!modes || typeof modes !== "object" || !modes.invis) return 0;
+    const r = Number(modes.rank);
+    return Number.isFinite(r) && r > 0 ? Math.floor(r) : 1;
+  }
+
+  // The client's viewerRankOf: the actor's own mirror rank, else 1 for staff and 0 for a player
+  private viewerRank(mp: Mp, actorId: number): number {
+    const modes = this.readProp(mp, actorId, "ff_adminModes");
+    const r = Number(modes && typeof modes === "object" ? modes.rank : undefined);
+    if (Number.isFinite(r) && r > 0) return Math.floor(r);
+    return this.readProp(mp, actorId, "isAdmin") === true ? 1 : 0;
+  }
+
+  // Undefined once unreadable: without ff_adminModes nobody is hidden, without isAdmin only a mirror rank lets a viewer hear a hidden speaker
+  private readProp(mp: Mp, actorId: number, name: string): any {
+    if (this.unreadable.has(name)) return undefined;
+    try {
+      return mp.get(actorId, name);
+    } catch (e) {
+      this.unreadable.add(name);
+      this.log(`VoiceSystem: cannot read ${name} for hearing lists (${e}), not read again`);
+      return undefined;
+    }
+  }
+
+  // refusal() for the lists, checked again at most every 10 s per connection
+  private refusedNow(mp: Mp, userId: number, actorId: number, now: number): boolean {
+    const hit = this.refusalCache.get(userId);
+    if (hit && hit.actorId === actorId && now - hit.at < REFUSAL_CACHE_MS) return hit.refused;
+    const refused = !!this.refusal(mp, userId, actorId);
+    this.refusalCache.set(userId, { actorId, at: now, refused });
+    return refused;
+  }
+
   // A token cannot be revoked and LiveKit re-signs one for a connected session every few minutes, so the session is removed
   private async removeParticipant(identity: string, why: string, room = this.room): Promise<boolean> {
     const res = await this.roomService("RemoveParticipant", { room, identity });
@@ -317,7 +468,7 @@ export class VoiceSystem implements System {
     return null;
   }
 
-  customPacket(userId: number, type: string, _content: Content, ctx: SystemContext): void {
+  customPacket(userId: number, type: string, content: Content, ctx: SystemContext): void {
     if (type !== "voiceTokenRequest") return;
     const mp = ctx.svr as Mp;
     if (!this.enabled) {
@@ -336,6 +487,8 @@ export class VoiceSystem implements System {
       mp.sendCustomPacket(userId, JSON.stringify({ customPacketType: "voiceToken", enabled: false }));
       return;
     }
+    const caps = content?.caps && typeof content.caps === "object" ? content.caps : {};
+    this.flowByUser.set(userId, this.hearingLists && caps.hearingLists ? "lists" : "open");
     this.sendToken(mp, userId, actorId);
   }
 
@@ -354,6 +507,7 @@ export class VoiceSystem implements System {
         room: this.room,
         identity,
         modes: this.modes,
+        hearers: this.firstBands(mp, userId, actorId),
       }));
       return true;
     } catch (e) {
