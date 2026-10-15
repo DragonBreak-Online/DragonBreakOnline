@@ -168,8 +168,8 @@ function getByProfileId(profileId) {
   return decorate(data[discordId] || { profileId: Number(profileId), discordId })
 }
 
-// Removes the player record AND the profile mapping; the same Discord user
-// gets a fresh profile id on their next login.
+// Removes the player record, the device check's entry (kept for a banned account) AND the profile mapping; the same
+// Discord user gets a fresh profile id on their next login.
 function deleteByProfileId(profileId) {
   const discordId = profiles.getDiscordIdByProfileId(profileId)
   if (!discordId) {
@@ -180,6 +180,8 @@ function deleteByProfileId(profileId) {
   const data = load()
   delete data[discordId]
   save(data)
+  try { require('./deviceChecks').forgetAccount(discordId) }
+  catch (err) { console.error('[players] device check entry not erased (run scripts/forget-device.js):', err.message) }
   profiles.deleteByDiscordId(discordId)
   return { discordId }
 }
