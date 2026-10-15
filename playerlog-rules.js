@@ -164,7 +164,7 @@ const EVENT_TYPES = {
   'item.harvest': T(2, 'cell', { item: ITEM, k: 'int' }),
   'item.drop': T(1, 'cell', { item: ITEM }),
   'item.trade': T(0, '', { gave: ITEMS, got: ITEMS }),
-  'item.loot': T(1, 'cell', { source: E('player_body', 'animal_body', 'dungeon_body', 'dungeon_chest_gold', 'camp', 'skinning', 'coin_purse', 'wisp', 'reading', 'scholar_gift'), items: ITEMS, gold: 'int', shares: A(O({ p: 'int', c: 'tag', gold: 'int' }), 12) }),
+  'item.loot': T(1, 'cell', { source: E('player_body', 'animal_body', 'dungeon_body', 'dungeon_chest_gold', 'camp', 'skinning', 'coin_purse', 'wisp', 'reading', 'scholar_gift', 'blackreach_chest'), items: ITEMS, gold: 'int', shares: A(O({ p: 'int', c: 'tag', gold: 'int' }), 12) }),
   'item.craft': T(1, '', { product: ITEM, k: 'int', inputs: ITEMS, fuel: ITEMS, station: NAME }),
   'item.brew': T(1, '', { potion: ITEM, tier: 'int', inputs: ITEMS }),
   'item.extras': T(1, '', { kind: E('temper', 'enchant', 'recharge', 'disenchant', 'soul'), item: ITEM, soul: 'int' }),

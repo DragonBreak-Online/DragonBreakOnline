@@ -1654,6 +1654,8 @@ mp.onActivate = (targetId, casterId) => {
   if (globalThis.__dboLootBody && globalThis.__dboLootBody(targetId >>> 0, casterId >>> 0) === false) return false;
   if (globalThis.__dboSkin && globalThis.__dboSkin(targetId >>> 0, casterId >>> 0) === false) return false;
   if (globalThis.__dboAnimalBody && globalThis.__dboAnimalBody(targetId >>> 0, casterId >>> 0) === false) return false;
+  // Blackreach's ten chests (blackreach.js): a Master boss roll into the pack once its guardians fell to the player
+  if (globalThis.__dboBlackreachChest) { let v = null; try { v = globalThis.__dboBlackreachChest(targetId >>> 0, casterId >>> 0); } catch (e) { log('blackreach chest failed', e.message); v = false; } if (v === false) return false; }
   if (globalThis.__dboCampChest) { const v = globalThis.__dboCampChest(targetId >>> 0, casterId >>> 0); if (v === false) return false; }
   if (blockPlacedPickup(targetId >>> 0, casterId >>> 0)) return false;
   // The last container gate: crouch over the chest, and it opens a moment later (idles.js chestHold, off by default)
@@ -3233,6 +3235,7 @@ registerChatCommand('selftest', (a) => {
     ['labour', typeof globalThis.__dboLabour === 'function' && !globalThis.__dboLabour.failClosed],
     ['dungeons', typeof globalThis.__dboDungeonActivate === 'function'],
     ['wildlife', typeof globalThis.__dboCampChest === 'function'],
+    ['blackreach', typeof globalThis.__dboBlackreachChest === 'function'],
     ['playtest lock', typeof globalThis.__dboPlaytestGate === 'function'],
     ['reading', typeof globalThis.__dboReadBook === 'function'],
     ['skinning', typeof globalThis.__dboSkin === 'function'],
@@ -5741,6 +5744,7 @@ const deathHook = (actorId, killerId, ...rest) => {
   try { if (globalThis.__dboChampionDeath) globalThis.__dboChampionDeath(Number(actorId) >>> 0, Number(killerId) >>> 0); } catch (e) { log('champion death failed', e.message); }
   try { if (globalThis.__dboSuperDeath) globalThis.__dboSuperDeath(Number(actorId) >>> 0, Number(killerId) >>> 0); } catch (e) { log('supernatural death failed', e.message); }
   try { if (globalThis.__dboContractKill && killerId) globalThis.__dboContractKill(Number(actorId) >>> 0, Number(killerId) >>> 0); } catch (e) { log('contract kill failed', e.message); }
+  try { if (globalThis.__dboBlackreachDeath) globalThis.__dboBlackreachDeath(Number(actorId) >>> 0, Number(killerId) >>> 0); } catch (e) { log('blackreach death failed', e.message); }
   try { if (globalThis.__dboTrimCorpse) globalThis.__dboTrimCorpse(Number(actorId) >>> 0); } catch (e) { log('corpse trim failed', e.message); }
   try { if (globalThis.__dboStatsDeath) globalThis.__dboStatsDeath(Number(actorId) >>> 0, Number(killerId) >>> 0); } catch (e) { log('journal stats death failed', e.message); }
   try { if (globalThis.__dboDogDayDeath) globalThis.__dboDogDayDeath(Number(actorId) >>> 0, Number(killerId) >>> 0); } catch (e) { log('dog day death failed', e.message); }
@@ -5759,6 +5763,7 @@ const hitDamageHook = (aggressorId, targetId, sourceId, damage, ...rest) => {
   // so the tier's share has to be on the target by the time it looks.
   try { dealt += masteryBonusDamage(agg, tgt, dealt); } catch (e) { log('mastery damage failed', e.message); }
   try { if (globalThis.__dboChampionHit) globalThis.__dboChampionHit(agg, tgt, dealt); } catch (e) { log('champion hit failed', e.message); }
+  try { if (globalThis.__dboBlackreachHit && dealt > 0) globalThis.__dboBlackreachHit(agg, tgt); } catch (e) { log('blackreach hit failed', e.message); }
   try { dealt += superBonusDamage(agg, tgt, Number(sourceId) >>> 0, dealt); } catch (e) { log('supernatural damage failed', e.message); }
   try { if (globalThis.__dboSuperHit && dealt > 0) globalThis.__dboSuperHit(agg, tgt); } catch (e) { log('supernatural hit failed', e.message); }
   try { if (globalThis.__dboAggroHit && dealt > 0) globalThis.__dboAggroHit(agg, tgt); } catch (e) { log('aggro hit failed', e.message); }
@@ -6714,6 +6719,8 @@ const dungeonAllies = (a, b) => {
   try {
     if (profileOf(a) >= 0 || profileOf(b) >= 0) return false;
     if (mp.get(a, 'private.dboCompanion') || mp.get(b, 'private.dboCompanion')) return false;
+    // Blackreach's spawns (blackreach.js): one open-world dungeon, whose camps stand side by side
+    if (typeof globalThis.__dboBlackreachAllies === 'function' && globalThis.__dboBlackreachAllies(a, b)) return true;
     const cell = cellKey(a);
     return cell === cellKey(b) && !!globalThis.__dboDungeonCells && globalThis.__dboDungeonCells.has(cell);
   } catch (e) { return false; }
@@ -7215,6 +7222,13 @@ try {
   delete require.cache[WILDLIFE_JS];
   require(WILDLIFE_JS)({ mp, log, personal, system, registerChatCommand, giveItem, profileOf, display, who, audit, onlineActors, isAdmin, cfg, sendPacket });
 } catch (e) { log('wildlife.js failed to load:', e.stack || e.message); }
+
+// ---- Blackreach, the open-world dungeon (server\blackreach.js; its zones are wildlife.js's) -------------------------------
+try {
+  const BLACKREACH_JS = path.resolve('blackreach.js');
+  delete require.cache[BLACKREACH_JS];
+  require(BLACKREACH_JS)({ mp, log, personal, registerChatCommand, giveItem, profileOf, display, who, audit, onlineActors, isAdmin, cfg, sendPacket });
+} catch (e) { log('blackreach.js failed to load:', e.stack || e.message); globalThis.__dboBlackreachChest = null; globalThis.__dboBlackreachHit = null; globalThis.__dboBlackreachDeath = null; globalThis.__dboBlackreachAllies = null; }
 
 // ---- NPCs under the terrain (server\npcground.js, terrain-heights.json copied by hand) ------------
 try {
