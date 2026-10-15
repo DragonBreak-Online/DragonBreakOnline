@@ -1420,18 +1420,20 @@ const handleLine = (a, text, userId, opts) => {
 // group arriving together is not made inside each other. The spots stand on the winning navmesh of the 140-plugin
 // Skyrim release order, clear of every object's bounds at feet, waist and head height, 20 units above the navmesh
 // (~/claude-nate-sky3/tools/skyscan.py, 15 Oct; the city mods JK's, Great Cities, COTN and WindhelmSSE included).
-// Morthal's old point stood inside COTN_Morthal06's bounds, 680 above the ground, and Dawnstar's 257 above the navmesh
-// over the shore: both centres moved. Config gamemode-config "hubGates": { a000: { name, rotZ, spots: [[x, y, z], ...] } }
+// Moved (Nate 15 Oct: "yes move them", each to be checked in game): Morthal's old point stood inside COTN_Morthal06's
+// bounds 680 above the ground; Dawnstar's 257 above the navmesh over the shore; Solitude's off the navmesh; Markarth's
+// in the stable doorway's bounds 18 units under JK's hanging brazier. Their first spots are the points suggested in
+// skyrim-check-3.md, at the navmesh + 20. Config gamemode-config "hubGates": { a000: { name, rotZ, spots: [[x, y, z], ...] } }
 // replaces a gate's entry; the defaults below are the same points.
 const GATE_DEFAULTS = {
   a000: ['Whiterun', [[18313, -10665, -4588.5], [18434.2, -10579.3, -4581.4], [18478.3, -10840.4, -4584.1], [18458.3, -11033.9, -4579.6], [18696.9, -10485.9, -4579.5]], 90],
   a001: ['Riften', [[173137, -90912, 11073.9], [172927.1, -91073.5, 11117.9], [173078.5, -91204.1, 11128.4], [173536.7, -90898.5, 11070.1]], 0],
-  a002: ['Solitude', [[-74392.3, 96419.1, -11478.7], [-74421.6, 96540.0, -11476.9], [-74520.9, 96441.1, -11469.2], [-74371.8, 96255.3, -11478.5], [-74246.6, 96333.1, -11486.7], [-74628.7, 96383.9, -11463.8]], 0],
+  a002: ['Solitude', [[-74313.4, 96373.3, -11483.6], [-74371.8, 96255.3, -11478.5], [-74458.1, 96454.3, -11473.1], [-74126.7, 96298.4, -11494.7], [-74516.8, 96336.4, -11468.5], [-74385.5, 96144.3, -11478.2]], 0],
   a003: ['Windhelm', [[135039, 33143, -12547.6], [134893.3, 33064.7, -12546.2], [135082.7, 32978.0, -12546.8], [134954.7, 32943.4, -12546.2], [135080.7, 32843.5, -12545.6], [134999.7, 32670.3, -12543.2]], 0],
   a004: ['Markarth', [[-171223.0, 6919.6, -3908.4], [-171323.1, 7026.4, -3909.4], [-171284.5, 6747.6, -3909.3], [-171479.8, 6818.8, -3901.8], [-171476.8, 7081.1, -3904.2], [-171340.2, 6634.8, -3915.9]], 0],
   a005: ['Falkreath', [[-30323.8, -86273.2, -3094.4], [-30358.5, -86152.7, -3097.9], [-30459.9, -86367.7, -3095.7], [-30506.5, -86072.4, -3095.3], [-30022.8, -86039.1, -3088.2], [-30453.6, -86633.9, -3099.4]], 0],
-  a006: ['Morthal', [[-38816.5, 67103.3, -13809.9], [-39071.0, 67255.3, -13840.0]], 0],
-  a007: ['Dawnstar', [[30665.4, 106124.6, -14166.7], [30549.8, 106123.5, -14178.9]], 0],
+  a006: ['Morthal', [[-38293.3, 67050.7, -13860.8], [-38165.3, 67114.7, -13881.7], [-38250.7, 67221.3, -13860.5], [-38246.5, 67363.4, -13901.2]], 0],
+  a007: ['Dawnstar', [[30549.8, 106123.5, -14178.9], [30665.4, 106124.6, -14166.7]], 0],
   a008: ['Winterhold', [[109208, 102864, -8953.7], [109173.5, 102753.7, -8964.6], [109076.6, 102929.1, -8936.0], [109049.9, 102767.9, -8940.5], [109285.4, 102658.2, -8995.5], [109080.1, 102630.9, -8940.6]], 0],
 };
 const validSpot = (q) => Array.isArray(q) && q.length >= 3 && q.every((v) => Number.isFinite(Number(v)));
@@ -2347,8 +2349,10 @@ const sendToArrival = (a) => {
 // spawn, if you choose skyrim you stay in the hub world room and walk through one of the hold doors."
 // While Skyrim is open beside Bruma (playtest.gatesToArrival false), a character just made is asked after the deity step
 // (and after naming, naming.js). Cyrodiil goes to the Pale Pass arrival (sendToArrival, the spread arrival spots).
-// Skyrim, Close, or no answer in START_PROMPT_MS: no move, creation ends in the Realm, and its nine gates (GATES) take them
-// to a hold. Staying is the default because it moves nobody and every gate is live. With Skyrim closed nothing is asked.
+// Skyrim: no move, creation ends in the Realm, and its nine gates (GATES) take them to a hold. Nothing is decided without an
+// answer (Nate 15 Oct: "question comes back"): Close asks again after START_RETRY_MS, no answer re-sends it every
+// START_PROMPT_MS, and a disconnect asks at the next login; nobody is stranded, as the gates work all the while (taking
+// one answers Skyrim). With Skyrim closed nothing is asked.
 // The question is kept on the character (START_KEY): 'asking' from the creator's close until it is answered, then
 // 'cyrodiil' or 'skyrim'. So a crash, a disconnect or a restart mid-question asks again at the next login in the Realm
 // (startLogin), and a character made before this release (no key) is never asked. Staff make characters the same way and
@@ -2358,6 +2362,7 @@ const sendToArrival = (a) => {
 // onUi's declaration (startUi), never here: a top-level onUi() call above it throws and the whole gamemode fails to load.
 const START_WIDGET_ID = 86;
 const START_PROMPT_MS = 3 * 60000;
+const START_RETRY_MS = 60000;
 const START_KEY = 'private.dboStartChoice';
 const DEITY_PICKER_ID = 36; // prayer.js PICKER_ID: closed after the question opens (the panel handoff keeps the cursor)
 const startPending = globalThis.__dboStartPending instanceof Map ? globalThis.__dboStartPending : (globalThis.__dboStartPending = new Map());
@@ -2365,20 +2370,33 @@ const askCyrodiil = () => { const p = cfg.playtest || {}; return !!p.enabled && 
 const startChoiceOf = (a) => { try { return String(mp.get(a, START_KEY) || ''); } catch (e) { return ''; } };
 const setStartChoice = (a, v) => { try { mp.set(a, START_KEY, v); } catch (e) { log('start choice save failed', e.message); } };
 // Creation ends in the Realm: the same clean-up sendToArrival does, without the move
-const stayInRealm = (a, why) => {
+// Creation's own state ends (no fade, seen again, the real clock), without a move and without answering
+const settleInRealm = (a) => {
   const id = a >>> 0;
-  startPending.delete(id);
-  try { closeWidget(a, START_WIDGET_ID); } catch (e) { /* not open */ }
-  if (startChoiceOf(a) === 'asking') setStartChoice(a, 'skyrim');
+  if (!creation.has(id)) return;
   creation.delete(id);
   creatorSpotRelease(a);
   setCreatorHidden(a, false);
   setFade(a, false);
   try { if (globalThis.__dboClock) globalThis.__dboClock.sendTo(a); } catch (e) { /* the next broadcast */ }
-  system(a, why === 'chose Skyrim'
-    ? 'Your story begins in Skyrim. Walk through the gate of the hold you choose; each one opens outside its city.'
-    : 'You stay in the Realm. Walk through the gate of a hold to begin in Skyrim; the Falkreath road south over the Pale Pass leads on to Bruma.');
+};
+// Skyrim chosen: creation ends in the Realm, no move
+const stayInRealm = (a, why) => {
+  startPending.delete(a >>> 0);
+  try { closeWidget(a, START_WIDGET_ID); } catch (e) { /* not open */ }
+  if (startChoiceOf(a) === 'asking') setStartChoice(a, 'skyrim');
+  settleInRealm(a);
+  if (why === 'chose Skyrim') system(a, 'Your story begins in Skyrim. Walk through the gate of the hold you choose; each one opens outside its city.');
   log(`${display(a)} stays in the Realm to start in Skyrim (${why})`);
+};
+const startQuestion = () => {
+  const t = (cfg.playtest && cfg.playtest.cyrodiilPrompt) || {};
+  return {
+    type: 'contextMenu', id: START_WIDGET_ID, mode: 'menu',
+    targetName: t.title || 'Where does your story begin: Cyrodiil or Skyrim?',
+    actions: [{ id: 'cyrodiil', label: t.yes || 'Cyrodiil: the road into Bruma, by the Pale Pass' }, { id: 'skyrim', label: t.no || 'Skyrim: stay, and walk through the gate of a hold' }],
+    events: { action: 'dbo:startChoose', close: 'dbo:startClose' },
+  };
 };
 // Every way out of creation goes through here: the deity step's answer, its timeout, no deity step, a name given at last,
 // and a login in the Realm with the question still open
@@ -2393,24 +2411,24 @@ const leaveRealm = (a) => {
     // Answered Skyrim before (a relog, or the deity step's own fallback): they stay, and are not asked again
     if (choice === 'skyrim') { if (creation.has(id)) stayInRealm(a, 'answered before'); return; }
     if (startPending.has(id)) return;   // the question is up
-    const t = (cfg.playtest && cfg.playtest.cyrodiilPrompt) || {};
     const asked = Date.now();
     startPending.set(id, asked);
-    openWidget(a, {
-      type: 'contextMenu', id: START_WIDGET_ID, mode: 'menu',
-      targetName: t.title || 'Where does your story begin: Cyrodiil or Skyrim?',
-      actions: [{ id: 'cyrodiil', label: t.yes || 'Cyrodiil: the road into Bruma, by the Pale Pass' }, { id: 'skyrim', label: t.no || 'Skyrim: stay, and walk through the gate of a hold' }],
-      events: { action: 'dbo:startChoose', close: 'dbo:startClose' },
-    }, true);
+    settleInRealm(a);
+    openWidget(a, startQuestion(), true);
     // The god's picker may still be up showing its answer: the question took the focus first, so this close keeps the cursor
     closeWidget(a, DEITY_PICKER_ID);
     log(`${display(a)} was asked whether to start in Cyrodiil or Skyrim`);
-    // Only this session's question times out, and only while they are online: offline, it stays open for the next login
-    setTimeout(() => {
+    // Unanswered (Nate 15 Oct: "question comes back"): every START_PROMPT_MS while they are online it is sent again (the
+    // same id with focus, never closed in between, so the cursor stays); offline, it waits for the next login
+    const again = () => {
       if (startPending.get(id) !== asked) return;
       let online = false; try { online = mp.get(a, 'isOnline') !== false; } catch (e) { online = false; }
-      if (online) stayInRealm(a, 'no answer'); else startPending.delete(id);
-    }, START_PROMPT_MS);
+      if (!online || startChoiceOf(a) !== 'asking' || !inHub(a)) { startPending.delete(id); return; }
+      openWidget(a, startQuestion(), true);
+      log(`${display(a)} was asked again (no answer)`);
+      setTimeout(again, START_PROMPT_MS);
+    };
+    setTimeout(again, START_PROMPT_MS);
   } catch (e) { log('start prompt failed', e.message); sendToArrival(a); }
 };
 const startChoose = (a, args) => {
@@ -2435,7 +2453,17 @@ const gateAnswersStart = (a) => {
   setStartChoice(a, 'skyrim');
   log(`${display(a)} answered the start question by taking a gate`);
 };
-const startClose = (a) => { if (startPending.has(a >>> 0)) stayInRealm(a, 'closed the question'); };
+// Closed without an answer: nothing is decided. The question comes back after START_RETRY_MS, or at the next login; a
+// hold gate meanwhile answers it (Skyrim)
+const startClose = (a) => {
+  const id = a >>> 0;
+  if (!startPending.has(id)) return;
+  startPending.delete(id);
+  closeWidget(a, START_WIDGET_ID);
+  system(a, 'The question will come back in a minute. Or walk through the gate of a hold to begin in Skyrim now.');
+  log(`${display(a)} closed the start question; asked again in ${START_RETRY_MS / 1000} s`);
+  setTimeout(() => { if (startChoiceOf(a) === 'asking' && !startPending.has(id)) leaveRealm(a); }, START_RETRY_MS);
+};
 // A login (the client's 'arrived') in the Realm with the question still open: the god first if none is chosen yet
 // (prayer.js reopens that step itself and its end comes back here), else the question again
 const startLogin = (a) => {

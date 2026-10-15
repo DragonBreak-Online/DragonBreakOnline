@@ -32,4 +32,11 @@ ok(first !== second, 'two arrivals at once are promised different spots', [first
 const gate = src.slice(src.indexOf('const g = gateOf(targetId >>> 0);'), src.indexOf('const prev = globalThis.__dboPrevActivate;'));
 ok(/gateSpotFor\(g, casterId >>> 0\)/.test(gate) && !/pos: g\[1\],/.test(gate), 'the gate hook lands on a picked spot, not a fixed point');
 ok(!/gates there are scenery|whose gates teleport nobody/.test(src), 'no comment still calls the gates scenery');
+// Nate 15 Oct ("yes move them"): Morthal, Dawnstar, Solitude and Markarth land at the points suggested in
+// skyrim-check-3.md, set in the shipped config so each can be changed after the in-game check
+const shipped = JSON.parse(fs.readFileSync(path.resolve(__dirname, '..', 'gamemode-config.json'), 'utf8')).hubGates || {};
+const SUGGESTED = { a002: [-74313.4, 96373.3], a004: [-171223.0, 6919.6], a006: [-38293.3, 67050.7], a007: [30549.8, 106123.5] };
+ok(Object.entries(SUGGESTED).every(([id, p]) => shipped[id] && Array.isArray(shipped[id].spots) && Math.hypot(shipped[id].spots[0][0] - p[0], shipped[id].spots[0][1] - p[1]) < 1), 'the four moved gates are in the shipped config, first spot at the suggested point');
+const S = gatesFor(JSON.parse(fs.readFileSync(path.resolve(__dirname, '..', 'gamemode-config.json'), 'utf8')));
+ok(Object.keys(SUGGESTED).every((id) => S[id][1] === undefined || Math.hypot(S[id][1][0][0] - SUGGESTED[id][0], S[id][1][0][1] - SUGGESTED[id][1]) < 1), 'and the gates read them from there');
 console.log(fails ? `${fails} failure(s)` : 'all checks passed'); process.exit(fails ? 1 : 0);

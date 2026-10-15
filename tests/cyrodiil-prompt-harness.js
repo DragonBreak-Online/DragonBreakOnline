@@ -47,9 +47,15 @@ ok(w.sent.some((s) => /gate of the hold you choose/.test(s)), 'Skyrim: told to w
 w.leaveRealm(A); ok(opens(w) === 1 && !w.sent.includes('arrival'), 'after Skyrim the fallback neither asks again nor moves them');
 // ---- no answer ----
 w = world(asking); w.leaveRealm(A); w.startClose(A);
-ok(!w.sent.includes('arrival') && w.choice() === 'skyrim' && w.sent.some((s) => /Pale Pass leads on to Bruma/.test(s)), 'Close: stays in the Realm (Skyrim), told the gates and the road to Bruma');
-w = world(asking); w.leaveRealm(A); w.fire(3 * 60000);
-ok(!w.sent.includes('arrival') && w.choice() === 'skyrim', 'no answer in 3 minutes while online: the default is Skyrim, no move');
+ok(!w.sent.includes('arrival') && w.choice() === 'asking' && w.sent.some((s) => /question will come back in a minute/.test(s)), 'Close decides nothing (Nate: "question comes back"): still asking, told it returns and that a gate works now', w.sent);
+ok(!w.env.creation.has(A), '...and creation\'s fade, hiding and noon are already over (nobody is left in the creator state)');
+w.sent.length = 0; w.fire(60000);
+ok(opens(w) === 1, 'a minute later the question is asked again', w.sent);
+w = world(asking); w.leaveRealm(A); w.sent.length = 0; w.fire(3 * 60000);
+ok(opens(w) === 1 && !w.sent.some((s) => s.startsWith('close:86')) && w.choice() === 'asking', 'no answer in 3 minutes: sent again with focus, never closed in between (the cursor stays)', w.sent);
+ok(w.timers.some((t) => t.ms === 3 * 60000), '...and again 3 minutes later while it is still unanswered');
+w.startChoose(A, ['skyrim']); w.sent.length = 0; w.fire(3 * 60000);
+ok(opens(w) === 0, 'once answered, the repeat stops');
 w = world(asking); w.leaveRealm(A); w.st.online = false; w.fire(3 * 60000);
 ok(w.choice() === 'asking' && !w.sent.includes('arrival'), 'disconnected before answering: the question stays open on the character');
 // ---- relog / restart ----
@@ -76,7 +82,7 @@ w = world(asking); globalThis.__dboNameHold = () => true; w.leaveRealm(A);
 ok(opens(w) === 0 && w.timers.some((t) => t.ms === 20000), 'still "Prisoner": not asked until named (naming.js), checked again in 20 s');
 w = world(asking); w.leaveRealm(A); w.gateAnswersStart(A);
 ok(w.choice() === 'skyrim' && w.sent.includes('close:86'), 'a hold gate taken with the question up answers it: Skyrim');
-w.fire(3 * 60000); ok(!w.sent.some((s) => /You stay in the Realm/.test(s)), '...and the timer then says nothing');
+w.sent.length = 0; w.fire(3 * 60000); ok(opens(w) === 0, '...and the question is not sent again');
 // ---- wiring in gamemode.js ----
 const hook = src.slice(src.indexOf('const appearanceHook = '), src.indexOf('appearanceHook.__dbo = true'));
 ok(/madeNow = !!isAllowed && creationPending\(actorId >>> 0\)/.test(hook) && hook.indexOf('madeNow = !!isAllowed') < hook.indexOf('prev.call(mp, actorId'), 'the question is set only for a character made now, read before spawn.ts finishes creation (not a reroll or /chargen)');

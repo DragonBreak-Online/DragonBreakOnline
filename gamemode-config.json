@@ -718,7 +718,45 @@
   ]
  },
  "hubGates": {
-  "_comment": "The Realm's nine hold gates (gamemode.js GATES; DOOR a000-a008 of DragonBreak Hub.esp): a gate id -> { name, rotZ, spots: [[x, y, z], ...] } replaces that gate's landing in Tamriel. Unset, the defaults in gamemode.js are used: spots on the Skyrim release's navmesh, clear of every object's bounds, 105+ apart (skyscan.py, 15 Oct). Arrivals take the first free spot, like the creator spots. Hot reload."
+  "_comment": "The Realm's nine hold gates (gamemode.js GATES; DOOR a000-a008 of DragonBreak Hub.esp): a gate id -> { name, rotZ, spots: [[x, y, z], ...] } replaces that gate's landing in Tamriel. Unset, the defaults in gamemode.js are used: spots on the Skyrim release's navmesh, clear of every object's bounds, 105+ apart (skyscan.py, 15 Oct). Arrivals take the first free spot, like the creator spots. Hot reload. Morthal, Dawnstar, Solitude and Markarth are set here (Nate 15 Oct: \"yes move them\"; to be checked in game): the old points were inside a COTN building (Morthal), 257 over the navmesh by the shore (Dawnstar), off the navmesh (Solitude) and under JK's hanging brazier in the stable doorway (Markarth). ROLLBACK for one gate: delete its entry (the defaults in gamemode.js are the same points; the pre-release points are in origin/server 38ed04dc GATES).",
+  "a002": {
+   "name": "Solitude",
+   "spots": [
+    [-74313.4, 96373.3, -11483.6],
+    [-74371.8, 96255.3, -11478.5],
+    [-74458.1, 96454.3, -11473.1],
+    [-74126.7, 96298.4, -11494.7],
+    [-74516.8, 96336.4, -11468.5],
+    [-74385.5, 96144.3, -11478.2]
+   ]
+  },
+  "a004": {
+   "name": "Markarth",
+   "spots": [
+    [-171223.0, 6919.6, -3908.4],
+    [-171323.1, 7026.4, -3909.4],
+    [-171284.5, 6747.6, -3909.3],
+    [-171479.8, 6818.8, -3901.8],
+    [-171476.8, 7081.1, -3904.2],
+    [-171340.2, 6634.8, -3915.9]
+   ]
+  },
+  "a006": {
+   "name": "Morthal",
+   "spots": [
+    [-38293.3, 67050.7, -13860.8],
+    [-38165.3, 67114.7, -13881.7],
+    [-38250.7, 67221.3, -13860.5],
+    [-38246.5, 67363.4, -13901.2]
+   ]
+  },
+  "a007": {
+   "name": "Dawnstar",
+   "spots": [
+    [30549.8, 106123.5, -14178.9],
+    [30665.4, 106124.6, -14166.7]
+   ]
+  }
  },
  "playtest": {
   "_comment": "Region lock for the Bruma playtest (server/playtest.js). Hub gates lead to the arrival spot; blockedDoors refuse; anyone outside allowedWorlds / interiors from allowedPlugins / allowedCells is returned (allowedCells: Bruma interiors made in our own plugins, e.g. CYRBrumaBank in DragonBreak Online Edits.esp, and CYRBleakFrostMine01 177fb6, the Bleak-Frost Mine of DLE v13; 17826b ThalmorEmbassyAlenwell and 1780c8 ThalmorEmbassyAlenwellBarracks, Nate 9 Oct). blockedDoors refuse admins too; admins are not returned. Set enabled false to open all of Skyrim. 12 Oct (Nate): Skyrim and Bruma open, every other land closed: closedPlugins lists the closed lands (a place from any other plugin is allowed), blockedDoors are the 13 load doors from Skyrim into them (_work/skyrim-open/doors.py), the Pale Pass doors are open again, hub gates lead to the holds.",
