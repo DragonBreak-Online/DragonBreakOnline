@@ -24,8 +24,8 @@ type Mp = any;
 // apiUrl is optional: the LiveKit server API base the game server calls, by default url with ws(s) turned into http(s).
 // sweepSeconds: how often the room is checked for sessions no online character may hold (0 = never).
 
-// Short on purpose: LiveKit refreshes tokens over live connections, and a kicked/banned player's credential dies with the TTL (no admin-API revocation)
-const TOKEN_TTL_SECONDS = 60 * 60;
+// LiveKit keeps a live session supplied with refreshed tokens, so this bounds only a copied token; the disconnect removal and the sweep end sessions
+const TOKEN_TTL_SECONDS = 10 * 60;
 const ADMIN_TOKEN_TTL_SECONDS = 60;
 const API_TIMEOUT_MS = 5000;
 const DEFAULT_SWEEP_SECONDS = 15;
