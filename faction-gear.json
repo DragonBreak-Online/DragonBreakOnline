@@ -5006,6 +5006,292 @@
    ],
    "role": "blacksmith",
    "recipes": []
+  },
+  "800:Civil War Battlemage Armors.esp": {
+   "name": "Imperial Battlemage Boots",
+   "set": "Imperial Legion",
+   "factions": [
+    "imperial-legion"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "81e:Civil War Battlemage Armors.esp"
+   ]
+  },
+  "801:Civil War Battlemage Armors.esp": {
+   "name": "Imperial Battlemage Robes",
+   "set": "Imperial Legion",
+   "factions": [
+    "imperial-legion"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "81f:Civil War Battlemage Armors.esp"
+   ]
+  },
+  "802:Civil War Battlemage Armors.esp": {
+   "name": "Imperial Battlemage Gloves",
+   "set": "Imperial Legion",
+   "factions": [
+    "imperial-legion"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "820:Civil War Battlemage Armors.esp"
+   ]
+  },
+  "803:Civil War Battlemage Armors.esp": {
+   "name": "Imperial Battlemage Hood",
+   "set": "Imperial Legion",
+   "factions": [
+    "imperial-legion"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "821:Civil War Battlemage Armors.esp"
+   ]
+  },
+  "804:Civil War Battlemage Armors.esp": {
+   "name": "Stormcloak Shaman Boots",
+   "set": "Stormcloaks",
+   "factions": [
+    "stormcloaks"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "822:Civil War Battlemage Armors.esp"
+   ]
+  },
+  "805:Civil War Battlemage Armors.esp": {
+   "name": "Stormcloak Shaman Robes",
+   "set": "Stormcloaks",
+   "factions": [
+    "stormcloaks"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "823:Civil War Battlemage Armors.esp"
+   ]
+  },
+  "806:Civil War Battlemage Armors.esp": {
+   "name": "Stormcloak Shaman Gloves",
+   "set": "Stormcloaks",
+   "factions": [
+    "stormcloaks"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "824:Civil War Battlemage Armors.esp"
+   ]
+  },
+  "807:Civil War Battlemage Armors.esp": {
+   "name": "Stormcloak Shaman Helmet",
+   "set": "Stormcloaks",
+   "factions": [
+    "stormcloaks"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "825:Civil War Battlemage Armors.esp"
+   ]
+  },
+  "808:Civil War Battlemage Armors.esp": {
+   "name": "Thalmor Battlereeve Boots",
+   "set": "Thalmor",
+   "factions": [
+    "thalmor"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "826:Civil War Battlemage Armors.esp"
+   ]
+  },
+  "809:Civil War Battlemage Armors.esp": {
+   "name": "Thalmor Battlereeve Robes",
+   "set": "Thalmor",
+   "factions": [
+    "thalmor"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "827:Civil War Battlemage Armors.esp"
+   ]
+  },
+  "80a:Civil War Battlemage Armors.esp": {
+   "name": "Thalmor Battlereeve Gloves",
+   "set": "Thalmor",
+   "factions": [
+    "thalmor"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "828:Civil War Battlemage Armors.esp"
+   ]
+  },
+  "80b:Civil War Battlemage Armors.esp": {
+   "name": "Thalmor Battlereeve Hood",
+   "set": "Thalmor",
+   "factions": [
+    "thalmor"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "829:Civil War Battlemage Armors.esp"
+   ]
+  },
+  "800:LEITEUHTThalmor.esp": {
+   "name": "Thalmor Ranger Armor",
+   "set": "Thalmor",
+   "factions": [
+    "thalmor"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "805:LEITEUHTThalmor.esp"
+   ]
+  },
+  "801:LEITEUHTThalmor.esp": {
+   "name": "Thalmor Justiciar Armor",
+   "set": "Thalmor",
+   "factions": [
+    "thalmor"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "807:LEITEUHTThalmor.esp"
+   ]
+  },
+  "808:LEITEUHTThalmor.esp": {
+   "name": "Thalmor Greaves",
+   "set": "Thalmor",
+   "factions": [
+    "thalmor"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "82c:LEITEUHTThalmor.esp"
+   ]
+  },
+  "809:LEITEUHTThalmor.esp": {
+   "name": "Thalmor Gauntlets",
+   "set": "Thalmor",
+   "factions": [
+    "thalmor"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "82a:LEITEUHTThalmor.esp"
+   ]
+  },
+  "80a:LEITEUHTThalmor.esp": {
+   "name": "Thalmor Helmet",
+   "set": "Thalmor",
+   "factions": [
+    "thalmor"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "828:LEITEUHTThalmor.esp"
+   ]
+  },
+  "80b:LEITEUHTThalmor.esp": {
+   "name": "Thalmor Shield",
+   "set": "Thalmor",
+   "factions": [
+    "thalmor"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "833:LEITEUHTThalmor.esp"
+   ]
+  },
+  "812:LEITEUHTThalmor.esp": {
+   "name": "Thalmor Gloves",
+   "set": "Thalmor",
+   "factions": [
+    "thalmor"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "830:LEITEUHTThalmor.esp"
+   ]
+  },
+  "813:LEITEUHTThalmor.esp": {
+   "name": "Thalmor Boots",
+   "set": "Thalmor",
+   "factions": [
+    "thalmor"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "82e:LEITEUHTThalmor.esp"
+   ]
+  },
+  "814:LEITEUHTThalmor.esp": {
+   "name": "Thalmor Hood",
+   "set": "Thalmor",
+   "factions": [
+    "thalmor"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "831:LEITEUHTThalmor.esp"
+   ]
+  },
+  "823:LEITEUHTThalmor.esp": {
+   "name": "Thalmor Soldier Armor",
+   "set": "Thalmor",
+   "factions": [
+    "thalmor"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "826:LEITEUHTThalmor.esp"
+   ]
+  },
+  "81b:LEITEUHTThalmor.esp": {
+   "name": "Thalmor War Axe",
+   "set": "Thalmor",
+   "factions": [
+    "thalmor"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "83b:LEITEUHTThalmor.esp"
+   ]
+  },
+  "81c:LEITEUHTThalmor.esp": {
+   "name": "Thalmor Dagger",
+   "set": "Thalmor",
+   "factions": [
+    "thalmor"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "839:LEITEUHTThalmor.esp"
+   ]
+  },
+  "81d:LEITEUHTThalmor.esp": {
+   "name": "Thalmor Hammer",
+   "set": "Thalmor",
+   "factions": [
+    "thalmor"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "837:LEITEUHTThalmor.esp"
+   ]
+  },
+  "81e:LEITEUHTThalmor.esp": {
+   "name": "Thalmor Sword",
+   "set": "Thalmor",
+   "factions": [
+    "thalmor"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "835:LEITEUHTThalmor.esp"
+   ]
   }
  },
  "_uniformsComment": "War uniforms (realm.js, config war.uniforms): in a battle only fighters wearing a body piece of their faction's uniform count at a standard. A faction's uniform is its items above plus these worn-only extras; a faction with neither (the Fighters Guild today) is not held to it.",

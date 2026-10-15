@@ -10,6 +10,7 @@ Clothing, jewellery and staves get families of their own; what none of these pla
     python3 tools/loot/loot_materials.py                 # scan the plugins (a minute or two; nice it)
     python3 tools/loot/loot_materials.py --scan s.json   # reuse a saved scan ({kywd, items}), e.g. the census's
     python3 tools/loot/loot_materials.py --save-scan s.json
+    python3 tools/loot/loot_materials.py --package ~/inbox/<release>   # a release package's order and plugins
 Run from server/. Re-run after any plugin change that adds or changes weapons or armour, and commit the result."""
 import argparse, json, os, re, struct, sys
 
@@ -72,10 +73,20 @@ EDID_FIRST = [(r'AncientImperial', 'ancient_imperial'), (r'GlacialCrystal', 'gla
               # forge pieces the keywords leave unclassified or under misc (smithing on at launch, Nate 10 Oct: every forged
               # piece tiered): fishing rods are tools (free); Tsun's MCE set is an artifact (staff only)
               (r'^ArmorFAlmerHelmet$', 'falmer'), (r'^DLC1ArmorFAlmerHeavyHelmet$', 'falmer_honed'), (r'^DLC1ArmorShellbugHelmet$', 'chitin'),
-              (r'^0WHPiecesBearCapeBigReward$', 'hide'), (r'FishingRod', 'tool'), (r'^MCEArmorGiant', 'hide'), (r'^MCEArmorTsun', 'artifact')]
+              (r'^0WHPiecesBearCapeBigReward$', 'hide'), (r'FishingRod', 'tool'), (r'^MCEArmorGiant', 'hide'), (r'^MCEArmorTsun', 'artifact'),
+              # the Skyrim release (15 Oct): Ancient Imperial Armor SE's 1AnIm* pieces carry Iron keywords; the Adamantium
+              # Addon's pieces, copied into DragonBreak Armory.esp (DBOArm_AdamArmor*), carry none
+              (r'^1AnIm', 'ancient_imperial'), (r'^DBOArm_AdamArmor', 'adamantium')]
 # Sets named by editor id whose metal pieces borrow another material's keyword (the Ayleid gear Elven, the Goblin gear
 # Iron or Leather); their robes and staves stay clothing and staves
-SET_BY_NAME = [(r'Ayleid', 'ayleid'), (r'Goblin', 'goblin')]
+SET_BY_NAME = [(r'Ayleid', 'ayleid'), (r'Goblin', 'goblin'),
+               # Gild's Medieval Armory Crude pack: goblin-made (Nate, 14 Oct: Goblins only), its pieces borrow Iron's keywords
+               (r'^GildCrude|^ArmorGildCrude', 'goblin')]
+# The Skyrim release's peoples' armouries (15 Oct; smithing.json families): a set named by editor id takes its own family
+# whatever metal keywords its pieces borrow (Yoku's Raid Shield is Orcish by keyword, Apex's Mane boots Steel), unless the
+# piece's own creation recipe is worked in a never-loot metal (Yoku's heavy armour and Apex's Drozira pieces are forged
+# from Ebony ingots and daedra hearts): those stay Ebony or Daedric, with those techniques
+SET_FIRST = [(r'^0_', 'yoku'), (r'^Khajiiti', 'apex_khajiit'), (r'^BlackBearAncientNord', 'black_bear')]
 BANNED_NAME = re.compile(r'Ebony|Daedric|Dragon(?:plate|scale|bone|hide)|DLC1Keeper|Dragonsteel|DragonPriestDagger|Orcish|Orichalcum|Stalhrim', re.I)
 
 
@@ -84,13 +95,18 @@ def canon(desc):
     return '%x:%s' % (int(a, 16), b.lower())
 
 
-def scan():
+def scan(package=None):
     sys.path.insert(0, ESPLIB)
     from esplib import Plugin, subrecords
-    order = [l.strip().lstrip('*') for l in open(ORDER, encoding='utf-8-sig') if l.strip() and not l.startswith('#')]
+    # A release package (<dir>/skyrim-data/loadorder.txt and <dir>/plugins) is read in its own order, each plugin from the
+    # package when it is there, else from DATA (the Skyrim release, 15 Oct)
+    order_file = os.path.join(package, 'skyrim-data', 'loadorder.txt') if package else ORDER
+    order = [l.strip().lstrip('*') for l in open(order_file, encoding='utf-8-sig') if l.strip() and not l.startswith('#')]
     kywd, items, misc, recipes = {}, {}, {}, {}
     for name in order:
-        path = os.path.join(DATA, name)
+        path = os.path.join(package, 'plugins', name) if package else ''
+        if not path or not os.path.exists(path):
+            path = os.path.join(DATA, name)
         if not os.path.exists(path):
             continue
         p = Plugin(path)
@@ -202,6 +218,10 @@ def classifier(scan_data):
     def classify_fixed(key):
         f = classify(key)
         e = (I.get(key) or {}).get('edid') or ''
+        for pat, fam in SET_FIRST:
+            if re.search(pat, e) and f not in ('clothing', 'staff'):
+                m = main_metal(key)
+                return m if m in BANNED and m != 'orcish' else fam
         if f not in ('clothing', 'staff', 'unclassified') + BANNED:
             for pat, fam in SET_BY_NAME:
                 if re.search(pat, e):
@@ -218,8 +238,9 @@ def main():
     ap.add_argument('--scan', help='a saved scan to reuse instead of reading the plugins')
     ap.add_argument('--save-scan', help='write the scan here too')
     ap.add_argument('--out', default=os.path.join(SERVER, 'loot-materials.json'))
+    ap.add_argument('--package', help='a release package: its skyrim-data/loadorder.txt and plugins/ (else DATA)')
     a = ap.parse_args()
-    data = json.load(open(a.scan)) if a.scan else scan()
+    data = json.load(open(a.scan)) if a.scan else scan(a.package)
     if a.save_scan:
         json.dump(data, open(a.save_scan, 'w'))
     I, classify = classifier(data)
