@@ -25,6 +25,11 @@ Our game server, launcher downloads, and website may receive or record:
 * IP address
 * Connection or access times
 * Basic connection information needed to operate and secure the service
+* A one-way code made from your PC's Windows machine ID (never the ID itself), used only to enforce bans
+
+### Ban enforcement check
+
+When you press Play, the launcher sends a one-way code made on your PC from its Windows machine ID. We never receive the machine ID itself, and we store only a keyed scramble of the code that means nothing outside DragonBreak. We use it only to spot a banned player who comes back on another account. A match is never proof on its own: staff review it, and players who share a PC are not banned because of it. We also read the date your Discord account was created, which is part of your Discord user ID. We keep the code for 30 days after the PC was last used to play, or for as long as a ban lasts when it belongs to a banned account, and we delete it when your account is deleted unless the account is banned.
 
 ### Characters and game activity
 
@@ -185,6 +190,7 @@ Our current target retention periods are:
 | Account and active character data    | While your account remains active |
 | World backups                        | 30 days |
 | Server activity and connection logs  | 90 days |
+| Ban enforcement check codes | 30 days after the PC was last used to play; for a banned account, while the ban lasts |
 | Launcher session and problem reports | 180 days |
 | Bug-report snapshots                 | 180 days |
 | Thalmor dossier notes                | Until struck in game, or by staff |
