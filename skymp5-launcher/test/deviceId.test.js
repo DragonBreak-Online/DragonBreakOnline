@@ -53,3 +53,17 @@ test('the machine id is read once per run and never appears in what is sent or l
   failed.id.fields()
   assert.strictEqual(failed.reads(), 1, 'a failed read is not retried in the same run')
 })
+
+test('main.js sends the code with launch-check and no longer posts the raw machine id anywhere', () => {
+  const main = require('fs').readFileSync(require('path').join(__dirname, '..', 'src', 'main.js'), 'utf8')
+  assert.ok(!main.includes('/api/users/me/hwid'), 'the raw report is gone')
+  assert.ok(!/\bgetHwid\b/.test(main))
+  assert.match(main, /\nfunction reportHwid\(\) \{\}\n/)
+  const reads = main.split('\n').filter(l => l.includes('MachineGuid') && !l.trim().startsWith('//'))
+  assert.strictEqual(reads.length, 1, 'the machine id is read only through createDeviceId')
+  assert.match(reads[0], /require\('\.\/deviceId'\)\.createDeviceId\(\{ platform: process\.platform, readMachineGuid: \(\) => regQueryValue\(/)
+  const at = main.indexOf('/api/launch-check`, {')
+  assert.ok(at > 0)
+  const body = main.slice(at, main.indexOf("}, { 'x-session': session })", at))
+  assert.match(body, /filesVersion:[\s\S]*plugins:[\s\S]*\.\.\.deviceId\.fields\(\),\s*$/)
+})

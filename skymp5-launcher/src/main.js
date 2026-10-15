@@ -240,23 +240,11 @@ function isValidSkyrimPath(p) {
   return !!p && fs.existsSync(path.join(p, 'SkyrimSE.exe'))
 }
 
-// Stable per-machine id (Windows MachineGuid) for the backend ban system; null when unavailable, treated as optional.
-function getHwid() {
-  if (process.platform !== 'win32') return null
-  const guid = regQueryValue('HKLM\\SOFTWARE\\Microsoft\\Cryptography', 'MachineGuid')
-  return guid && /^[0-9a-fA-F-]{10,64}$/.test(guid) ? guid : null
-}
+// One-way code from the Windows MachineGuid for the backend's report-only ban check, sent with launch-check; the id itself never leaves the PC
+const deviceId = require('./deviceId').createDeviceId({ platform: process.platform, readMachineGuid: () => regQueryValue('HKLM\\SOFTWARE\\Microsoft\\Cryptography', 'MachineGuid'), log })
 
-// Fire-and-forget: attach this machine's hwid to the fresh play session.
-async function reportHwid(token) {
-  const hwid = getHwid()
-  if (!hwid || !token) return
-  try {
-    await postJSON(`${config.apiUrl}/api/users/me/hwid`, { hwid }, { Authorization: `Bearer ${token}` })
-  } catch (err) {
-    log(`[hwid] report failed (${err.statusCode || err.message}) - continuing without it`)
-  }
-}
+// The raw machine id report is retired (launch-check carries the one-way code); F1 moves this call into finishDiscordLogin, so the stub stays until F1 merges
+function reportHwid() {}
 
 // First registry hit that exists on disk and contains SkyrimSE.exe, or null.
 function detectSkyrimPath() {
@@ -2793,6 +2781,7 @@ async function prepareForLaunch(skyrimPath, viaMO2) {
         plugins: Array.isArray(serverInfo.loadOrder)
           ? serverInfo.loadOrder.map(f => path.basename(f))
           : [],
+        ...deviceId.fields(),
       }, { 'x-session': session })
       if (!check.ok) {
         if (check.filesOk === false) {
