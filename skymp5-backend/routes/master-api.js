@@ -112,11 +112,20 @@ function loadSessions() {
 
 loadSessions()
 
+// Sessions made before the F1 fix carry no flow and count as legacy
+const isLegacySession = s => !s.flow || s.flow === 'legacy'
+
+// LAUNCHER_LOGIN_LEGACY=revoke: a session the old login flow made is refused, not deleted, so switching back restores it
+function sessionUsable(entry) {
+  return !!entry && !(config.launcherLoginLegacy === 'revoke' && isLegacySession(entry))
+}
+
 // Helper: look up a session entry (exported for serverinfo route)
 
 function lookupSession(token) {
   pruneExpired()
-  return sessions.get(token) || null
+  const entry = sessions.get(token) || null
+  return sessionUsable(entry) ? entry : null
 }
 
 // Launch sanity check: the launcher reports files version + plugin list to POST /api/launch-check; the result is stored on the session so validation can refuse stale or launcher-skipping clients
@@ -275,7 +284,7 @@ router.get('/:key/sessions/:session', async (req, res) => {
 
   pruneExpired()
   const entry = sessions.get(req.params.session)
-  if (!entry)
+  if (!sessionUsable(entry))
     return res.status(404).json({ error: 'Session not found or expired.' })
 
   let access
@@ -524,7 +533,7 @@ router.get('/:key/sessions/:session/balance', (req, res) => {
 
   pruneExpired()
   const entry = sessions.get(req.params.session)
-  if (!entry)
+  if (!sessionUsable(entry))
     return res.status(404).json({ error: 'Session not found or expired.' })
 
   const balance = getBalance(entry.profileId)
@@ -540,7 +549,7 @@ router.post('/:key/sessions/:session/purchase', (req, res) => {
 
   pruneExpired()
   const entry = sessions.get(req.params.session)
-  if (!entry)
+  if (!sessionUsable(entry))
     return res.status(404).json({ error: 'Session not found or expired.' })
 
   const { balanceToSpend } = req.body || {}
