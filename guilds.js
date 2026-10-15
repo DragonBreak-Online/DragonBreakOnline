@@ -1024,7 +1024,9 @@ module.exports = (api) => {
       const storeLine = (f) => { const st = storageOf(f.id); return st && (isAdmin(a) || entryOf(f.id, a)) ? `, storage: ${st.name}` : ''; };
       // A seat outside the playtest's region is real but cannot be walked to yet, and saying so is kinder than
       // letting someone hunt for it (Mythic Dawn keeps the museum in Dawnstar).
-      const reach = (h) => (h.zone && h.zone !== PLAYTEST_ZONE ? ' (not reachable yet)' : '');
+      // Only while the lock is on (read now, so the hot reload that opens Skyrim drops the note at once)
+      // With closedPlugins (the Skyrim release) the lock closes other lands only, and every seat in Skyrim or Bruma is reachable
+      const reach = (h) => ((cfg.playtest || {}).enabled && !((cfg.playtest || {}).closedPlugins || []).length && h.zone && h.zone !== PLAYTEST_ZONE ? ' (not reachable yet)' : '');
       const lines = seen.filter((f) => hallOf(f)).map((f) => { const h = hallOf(f); return `${f.name}: ${h.name}${h.shared ? ' (shared)' : ''}${reach(h)}${h.note ? ` - ${h.note}` : ''}${storeLine(f)}`; });
       if (one) return personal(a, lines[0] || `${one.name} has no seat at all.`);
       return personal(a, lines.length ? `Faction seats: ${lines.join(' | ')}` : 'No faction has a seat yet.');

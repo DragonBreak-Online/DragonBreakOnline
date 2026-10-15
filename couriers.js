@@ -192,7 +192,8 @@ module.exports = (api) => {
   const sealedCount = (a) => carriedBy(a).length;
 
   // ---- places -------------------------------------------------------------------------------------------------------
-  const locked = () => !!(cfg.playtest && cfg.playtest.enabled !== false);
+  // Only Bruma is open: the lock is on and lists no closedPlugins. With closedPlugins (the Skyrim release) every hold is reachable
+  const locked = () => !!(cfg.playtest && cfg.playtest.enabled !== false) && !((cfg.playtest.closedPlugins || []).length);
   const allowedWorlds = () => new Set(((cfg.playtest && cfg.playtest.allowedWorlds) || []).map((w) => String(w).toLowerCase()));
   let spots = null;
   const spotList = () => {

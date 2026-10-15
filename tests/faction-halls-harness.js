@@ -44,6 +44,8 @@ const last = () => (said[said.length - 1] || [])[1] || '';
 const faction = (a, args) => { said.length = 0; cmds.faction(a, args); return last(); };
 
 // ---- the halls that come from guild-defs.json ----
+// The "not reachable yet" note is the region lock's (Skyrim opens 13 Oct with playtest.enabled false), so these run locked
+api.cfg.playtest = { enabled: true };
 ok(/Bruma Fighters Guild/.test(faction(LEADER, 'hall fighters-guild')), 'the Fighters Guild sits in the Bruma Fighters Guild');
 ok(/Bruma Synod Conclave/.test(faction(LEADER, 'hall synod')), 'the Synod sits in the Bruma Synod Conclave');
 ok(/Bruma Castle/.test(faction(LEADER, 'hall county-bruma')), 'the County sits in Bruma Castle');
@@ -66,6 +68,11 @@ const blades = faction(LEADER, 'hall blades');
 ok(/Sky Haven Temple/.test(blades), 'the Blades keep Sky Haven Temple', blades);
 ok(/not reachable yet/.test(blades), '...out of reach for now');
 ok(/Cloud Ruler Temple above Bruma is still a ruin/.test(blades), '...and why they are not at Cloud Ruler');
+api.cfg.playtest = { enabled: true, closedPlugins: ['Druadach.esm'] };
+ok(!/not reachable yet/.test(faction(LEADER, 'hall blades')), 'with Skyrim open (the lock lists closedPlugins) no Skyrim seat says it cannot be reached');
+api.cfg.playtest = { enabled: false };
+ok(!/not reachable yet/.test(faction(LEADER, 'hall cult-mehrunes-dagon')) && !/not reachable yet/.test(faction(LEADER, 'hall blades')), 'with the region lock off no seat says it cannot be reached');
+delete api.cfg.playtest;
 // Every faction with a seat now has one, so the no-seat path is checked against a faction that has none.
 ok(/no seat at all/.test(faction(LEADER, 'hall hold-whiterun')), 'a faction with no seat still says so');
 ok(/No such faction/.test(faction(LEADER, 'hall not-a-faction')), 'an unknown faction is refused');

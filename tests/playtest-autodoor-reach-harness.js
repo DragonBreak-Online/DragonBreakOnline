@@ -11,7 +11,10 @@
 const fs = require('fs');
 const path = require('path');
 const SERVER = path.resolve(__dirname, '..');
-const cfg = require(path.join(SERVER, 'gamemode-config.json'));
+const shipped = require(path.join(SERVER, 'gamemode-config.json'));
+// Skyrim is open with the Skyrim release (the shipped lock lists only closedPlugins); the Bruma lock itself is what this tests,
+// so it runs on the old Bruma-only block rebuilt over the shipped config
+const cfg = require('./playtest-bruma-lock.js')(shipped);
 const src = fs.readFileSync(path.join(SERVER, 'gamemode.js'), 'utf8');
 
 let fails = 0;

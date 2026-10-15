@@ -1,6 +1,9 @@
 // playtest border outline: inside is remembered, outside is put back there, admins and other worlds are left alone
 const path = require('path');
-const cfg = require(path.join(__dirname, '..', 'gamemode-config.json'));
+const shipped = require(path.join(__dirname, '..', 'gamemode-config.json'));
+// Skyrim is open with the Skyrim release (the shipped lock lists only closedPlugins); the Bruma lock itself is what this tests,
+// so it runs on the old Bruma-only block rebuilt over the shipped config
+const cfg = require('./playtest-bruma-lock.js')(shipped);
 let props = {}, intervalFn = null, audits = [];
 const set = (a, k, v) => { props[a] = props[a] || {}; props[a][k] = v; };
 const mp = { get: (a, k) => (props[a] || {})[k], set, getIdFromDesc: () => 1 };
