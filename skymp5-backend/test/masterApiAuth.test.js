@@ -119,3 +119,16 @@ test('every other master-api route refuses a caller with the master key but no X
     else assert.deepEqual(r, REFUSED, name)
   }
 })
+
+test('the X-Auth-Token is compared in constant time, and an unset token on the backend opens nothing', async t => {
+  const crypto = require('crypto')
+  const compare = t.mock.method(crypto, 'timingSafeEqual')
+  assert.equal((await call('GET', `${base}/holds/whiterun/roster`, TOKEN)).status, 200)
+  assert.deepEqual(await call('GET', `${base}/holds/whiterun/roster`, `${TOKEN}x`), REFUSED)
+  assert.equal(compare.mock.callCount(), 2)
+  config.masterApiAuthToken = ''
+  try {
+    assert.deepEqual(await call('GET', `${base}/holds/whiterun/roster`, ''), REFUSED)
+    assert.deepEqual(await call('GET', `${base}/holds/whiterun/roster`, 'anything'), REFUSED)
+  } finally { config.masterApiAuthToken = TOKEN }
+})
