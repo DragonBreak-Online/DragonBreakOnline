@@ -316,6 +316,13 @@ const realNow = Date.now;
     check('a replayer that times its exits around each sweep is still caught: voice moves within 10 minutes', movedOut(), { heardShare: Math.round((heard / ticks) * 100) / 100, removals: removed().length });
     fs.rmSync(path.join(out, 'voice-room.json'), { force: true });
   }
+  {
+    reset();
+    const { sys, logs } = await make();
+    for (let i = 0; i < 3; i++) { now += 20 * 60 * 1000; room = ['ff000009']; await sweep(sys); }
+    check('a replayer that waits 20 minutes between rejoins is still counted: voice moves on its third', logs.some((l) => /ff000009 keeps rejoining/.test(l)), logs);
+    fs.rmSync(path.join(out, 'voice-room.json'), { force: true });
+  }
 
   // ---- settings and failures ----
   {

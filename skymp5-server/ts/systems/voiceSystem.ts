@@ -36,7 +36,8 @@ const MAX_USER_SLOTS = 1024;
 const ROOM_FILE = "voice-room.json";
 // Removals before a session seen again counts as a replayed token: an honest client never rejoins after one
 const REPLAY_REMOVALS = 2;
-const REPLAY_MEMORY_MS = 15 * 60 * 1000;
+// Long, so a replayer cannot wait out its count between short rejoins; an allowed sighting clears it at once
+const REPLAY_MEMORY_MS = 24 * 60 * 60 * 1000;
 const DRAIN_GRACE_MS = 10 * 1000;
 const DRAIN_MS = 2 * 60 * 1000;
 
