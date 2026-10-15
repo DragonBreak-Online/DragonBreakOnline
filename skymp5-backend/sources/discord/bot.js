@@ -6,6 +6,7 @@ const config = require('../../config')
 const bans = require('../bans')
 const players = require('../players')
 const tickets = require('./tickets')
+const banAudit = require('./banAudit')
 const serverStatus = require('./serverStatus')
 
 const client = new Client({
@@ -36,8 +37,9 @@ client.on('error', err => {
   console.error('[discord-bot] error:', err.message)
 })
 
-// A real Discord guild ban snapshots the player's hwid/ip into bans.json
+// A real Discord guild ban snapshots the player's hwid/ip into bans.json; the staff audit channel gets who and why either way
 client.on('guildBanAdd', ban => {
+  let listNote = 'added to the game ban list'
   try {
     if (config.discordGuildId && ban.guild.id !== config.discordGuildId) return
     const discordId = ban.user.id
@@ -52,22 +54,28 @@ client.on('guildBanAdd', ban => {
     bans.logBan(`discord ban: discordId=${discordId} username=${ban.user.username || 'unknown'} hwid=${entry.hwid || 'none'} ip=${entry.ip || 'none'}`)
     console.log(`[discord-bot] recorded guild ban for ${discordId}`)
   } catch (err) {
+    listNote = 'the game ban list could not be written'
     console.error('[discord-bot] failed to record guild ban:', err.message)
   }
+  banAudit.record('ban', ban, listNote).catch(err => console.error('[discord-bot] ban audit failed:', err.message))
 })
 
 // A Discord unban lifts the snapshot too, or the player would stay banned forever
 client.on('guildBanRemove', ban => {
+  let listNote = 'it was not on the game ban list'
   try {
     if (config.discordGuildId && ban.guild.id !== config.discordGuildId) return
     const discordId = ban.user.id
     if (bans.removeByDiscordId(discordId)) {
+      listNote = 'lifted from the game ban list'
       bans.logBan(`discord unban: discordId=${discordId} username=${ban.user.username || 'unknown'}`)
       console.log(`[discord-bot] lifted guild ban for ${discordId}`)
     }
   } catch (err) {
+    listNote = 'the game ban list could not be updated'
     console.error('[discord-bot] failed to lift guild ban:', err.message)
   }
+  banAudit.record('unban', ban, listNote).catch(err => console.error('[discord-bot] unban audit failed:', err.message))
 })
 
 // Role and nickname changes go to the audit channel the moment they happen
