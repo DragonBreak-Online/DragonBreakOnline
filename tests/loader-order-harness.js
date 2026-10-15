@@ -38,5 +38,15 @@ while ((m = re.exec(src))) {
   }
 }
 ok(loaders >= 10, `found ${loaders} module loaders (the scan still sees them)`);
+// A top-level call (column 0) of a const declared further down throws the same way, and takes the WHOLE gamemode load
+// with it, not one module: the 13 Oct Cyrodiil prompt diff called onUi('startChoose', ...) 800 lines above `const onUi`
+let calls = 0;
+lines.forEach((l, i) => {
+  const c = l.match(/^([A-Za-z_$][\w$]*)\(/);
+  if (!c || !declared.has(c[1])) return;
+  calls++;
+  ok(declared.get(c[1]) < i + 1, `line ${i + 1} calls ${c[1]}() at load, but it is declared on line ${declared.get(c[1])}`);
+});
+ok(calls >= 10, `found ${calls} top-level calls of consts (the scan still sees them)`);
 console.log(fails ? `${fails} failure(s)` : `all checks passed (${loaders} loaders)`);
 process.exit(fails ? 1 : 0);

@@ -717,6 +717,9 @@
    }
   ]
  },
+ "hubGates": {
+  "_comment": "The Realm's nine hold gates (gamemode.js GATES; DOOR a000-a008 of DragonBreak Hub.esp): a gate id -> { name, rotZ, spots: [[x, y, z], ...] } replaces that gate's landing in Tamriel. Unset, the defaults in gamemode.js are used: spots on the Skyrim release's navmesh, clear of every object's bounds, 105+ apart (skyscan.py, 15 Oct). Arrivals take the first free spot, like the creator spots. Hot reload."
+ },
  "playtest": {
   "_comment": "Region lock for the Bruma playtest (server/playtest.js). Hub gates lead to the arrival spot; blockedDoors refuse; anyone outside allowedWorlds / interiors from allowedPlugins / allowedCells is returned (allowedCells: Bruma interiors made in our own plugins, e.g. CYRBrumaBank in DragonBreak Online Edits.esp, and CYRBleakFrostMine01 177fb6, the Bleak-Frost Mine of DLE v13; 17826b ThalmorEmbassyAlenwell and 1780c8 ThalmorEmbassyAlenwellBarracks, Nate 9 Oct). blockedDoors refuse admins too; admins are not returned. Set enabled false to open all of Skyrim. 12 Oct (Nate): Skyrim and Bruma open, every other land closed: closedPlugins lists the closed lands (a place from any other plugin is allowed), blockedDoors are the 13 load doors from Skyrim into them (_work/skyrim-open/doors.py), the Pale Pass doors are open again, hub gates lead to the holds.",
   "enabled": true,
