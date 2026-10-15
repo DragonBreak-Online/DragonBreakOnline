@@ -566,6 +566,39 @@ globalThis.__alduinakAdminLog = (text) => {
   const verb = (String(text).replace(/^profile \d+(?: \([a-z]+\))? /, '').split(/\s+/)[0] || 'panel').toLowerCase();
   staffLog(actor ? display(actor) : `profile ${prof}`, actor ? staffTierOf(actor) : (m && m[2]) || '', `panel:${verb}`, `${actor ? staffWho(actor) : 'staff'} (panel) ${text}`);
 };
+// ---- a ban or unban issued on Discord (security audit L4-2): the fork's DiscordBanSystem calls __dboDiscordBan ----------
+const DISCORD_BAN_VIA = new Set(['guild ban', 'ban role']);
+const banOneLine = (s, max) => String(s || '').replace(/[\u0000-\u001f\u007f]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, max);
+const banIdOk = (d) => /^\d{5,22}$/.test(String(d || ''));
+// A Discord id or mention a moderator typed into the reason
+const BAN_ID_RX = /<[@#][!&]?\d{5,22}>|\b\d{17,20}\b/g;
+// profile -> that Discord account's characters, the online one first
+const banAccountsOf = (discordId, online) => {
+  let ids = [];
+  try { ids = (mp.findFormsByPropertyValue('private.indexed.discordId', String(discordId)) || []).map((x) => Number(x) >>> 0).filter(Boolean); } catch (e) { ids = []; }
+  const by = new Map();
+  for (const a of ids) { const p = profileOf(a); if (!(p >= 0)) continue; if (!by.has(p)) by.set(p, []); by.get(p).push(a); }
+  for (const list of by.values()) list.sort((x, y) => Number(online.has(y)) - Number(online.has(x)));
+  return by;
+};
+const banCharText = (a) => `${realNameOf(a)} #${tagOf(a)} (profile ${profileOf(a)})`;
+// { op, via, discordId, by: { discordId, name, bot }, reason } -> one BAN line per game account, never a Discord id in it
+globalThis.__dboDiscordBan = (info) => {
+  const op = info && (info.op === 'ban' || info.op === 'unban') ? info.op : null;
+  if (!op || !banIdOk(info.discordId)) return 0;
+  const via = DISCORD_BAN_VIA.has(info.via) ? info.via : 'guild ban';
+  const online = new Set(onlineActors().map((x) => Number(x) >>> 0));
+  const mod = info.by && typeof info.by === 'object' ? info.by : {};
+  const modChars = banIdOk(mod.discordId) ? [...banAccountsOf(mod.discordId, online).values()][0] : null;
+  // A Discord username in plain characters only, so it can never read as a character's #TAG or profile
+  const modName = banOneLine(mod.name, 40).replace(/[^A-Za-z0-9_. -]+/g, '').trim();
+  const by = modChars && modChars.length ? banCharText(modChars[0]) : modName ? `Discord user ${modName}${mod.bot === true ? ' (a bot)' : ''}` : 'an unknown moderator';
+  const reason = banOneLine(String(info.reason || '').replace(BAN_ID_RX, '[id]'), 200);
+  const targets = [...banAccountsOf(info.discordId, online).values()].map((list) => `${banCharText(list[0])}${list.length > 1 ? `, ${list.length - 1} more character${list.length > 2 ? 's' : ''}` : ''}`);
+  if (!targets.length) targets.push('a Discord account with no character');
+  for (const target of targets) audit(`BAN Discord ${op} (${via}) on ${target} by ${by}${reason ? `: ${reason}` : ''}`);
+  return targets.length;
+};
 
 // ---- character height (RaceMenu height slider, synced and clamped) --------------------------
 // SkyMP does not sync actor scale. The client reports its own scale after RaceMenu closes, the

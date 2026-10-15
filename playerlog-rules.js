@@ -631,6 +631,17 @@ parsed('DISCIPLINE', {
     return [ev('session.ban', t, { kind: m[1], entry: Number(m[2]), hours }, s >= 0 ? [[s, 'staff']] : [])];
   },
 });
+// BAN Discord <ban|unban> (<via>) on <target> (profile N)... by <moderator>: <reason> (gamemode.js __dboDiscordBan); the reason is cut
+parsed('BAN', {
+  cut: /: .*$/,
+  roles: R_BY([[/ on $/, 'target'], [/ by $/, 'staff']]),
+  parse: (text, P, raw, roles) => {
+    const m = text.match(/^BAN Discord (ban|unban) \((?:guild ban|ban role)\) on /);
+    const t = roles.indexOf('target'), s = roles.indexOf('staff');
+    if (!m || t < 0) return [];
+    return [ev('session.ban', t, { kind: m[1] }, s >= 0 ? [[s, 'staff']] : [])];
+  },
+});
 // COURIER and POST keep their item lists: post.js itemsText names items from the record only (nameOfItem)
 parsed('COURIER', {
   roles: R_BY([[/ robbed from $/, 'victim'], [/ by $/, 'robber']]),
@@ -1242,6 +1253,7 @@ execution.js EXECUTION 76ea358d clean
 factiongear.js FACTIONGEAR 79b8dc7c clean
 gamemode.js STAFF 6fcfd67a clean
 gamemode.js GM b82067a4 parsed
+gamemode.js BAN 50b88b35 parsed
 gamemode.js NAME 1dc3182f parsed
 gamemode.js PERM cf246214 parsed
 gamemode.js PERM c10e460a parsed

@@ -193,6 +193,11 @@ out = run(`DISCIPLINE strike #4 on Selene #K2QX (profile 2) (profile 2) by Dar #
 ok(out[0].ev === 'session.ban' && out[0].c === 'K2QX' && out[0].f.kind === 'strike' && roleOf(out[0], 'U6T6') === 'staff' && !JSON.stringify(out).includes(CANARY), 'DISCIPLINE "<kind> #n on <target> ... by <staff>: <reason>": the target\'s post, the staff party, no reason', out[0]);
 const byStaff = out.filter((r) => r.c === 'U6T6');
 ok(byStaff.length === 0, '...the staff member is never the actor of it (--who on them finds only what they did)');
+// a ban issued on Discord (gamemode.js __dboDiscordBan, security audit L4-2)
+out = run(`BAN Discord ban (guild ban) on Selene #K2QX (profile 2), 1 more character by Dar #U6T6 (profile 4): ${CANARY} threats`);
+ok(out.length === 1 && out[0].ev === 'session.ban' && out[0].c === 'K2QX' && out[0].f.kind === 'ban' && roleOf(out[0], 'U6T6') === 'staff' && !JSON.stringify(out).includes(CANARY), 'BAN "Discord <ban|unban> (<via>) on <target> ... by <moderator>: <reason>": the target\'s post, the staff party, no reason', out);
+out = run(`BAN Discord unban (ban role) on Selene #K2QX (profile 2) by Discord user ${CANARY}`);
+ok(out.length === 1 && out[0].f.kind === 'unban' && !(out[0].o || []).length && !JSON.stringify(out).includes(CANARY), '...an unban by a Discord user with no character: no staff party, the username never kept', out);
 out = run('COURIER #12 robbed from Selene #K2QX (profile 2) by Rowan #PGDB (profile 1): 2x Iron Ingot, 1x Bread');
 ok(out[0].ev === 'item.theft' && out[0].c === 'PGDB' && roleOf(out[0], 'K2QX') === 'victim' && out[0].f.items.length === 2 && out[0].f.items[0].i === 'Iron Ingot', 'COURIER robbed: the robber acts, the victim is the victim, the record-named list kept', out[0]);
 out = run('WAR w3: Rowan #PGDB (profile 1) killed Selene #K2QX (profile 2) in a war to the death');
