@@ -10,9 +10,9 @@
  *   POST /auth/session  (X-Auth-Token)
  *     Body: { discordUser: { id, username } }  Returns: { profileId, session }
  *     Called by the launcher after Discord login; the game client passes the session token to the game server.
- *   GET /api/servers/:key/sessions/:session
+ *   GET /api/servers/:key/sessions/:session  (X-Auth-Token while MASTER_SESSION_CHECK_TOKEN=required)
  *     Validates a session token. Returns: { user: { id, discordId, username } }
- *   GET /api/servers/:key/sessions/:session/balance
+ *   GET /api/servers/:key/sessions/:session/balance  (X-Auth-Token while MASTER_SESSION_CHECK_TOKEN=required)
  *     Returns a player's coin balance: { user: { id, balance } }
  *   POST /api/servers/:key/sessions/:session/purchase  (X-Auth-Token)
  *     Spends a player's coins. Body: { balanceToSpend: number }  Returns: { balanceSpent, success }
@@ -265,6 +265,29 @@ function createSession(discordUser, { flow = 'server' } = {}) {
   return { profileId, session: token, ended }
 }
 
+// MASTER_SESSION_CHECK_TOKEN: optional takes a check without X-Auth-Token (game server builds before F1) and logs an hourly count; required refuses it; a wrong token is always refused
+let noTokenLoggedAt = 0
+let noTokenSinceLog = 0
+function checkSessionReadToken(req, res) {
+  const sent = req.headers['x-auth-token']
+  if (typeof sent === 'string' && sent) {
+    if (config.masterApiAuthToken && safeEqual(sent, config.masterApiAuthToken)) return true
+    res.status(403).json({ error: 'Invalid auth token.' })
+    return false
+  }
+  if (config.masterSessionCheckToken === 'required') {
+    res.status(403).json({ error: 'Invalid auth token.' })
+    return false
+  }
+  noTokenSinceLog++
+  if (Date.now() - noTokenLoggedAt > 60 * 60 * 1000) {
+    console.log(`[master-api] ${noTokenSinceLog} session check(s) without X-Auth-Token in the last hour (a game server build from before F1, or someone else)`)
+    noTokenLoggedAt = Date.now()
+    noTokenSinceLog = 0
+  }
+  return true
+}
+
 // POST /auth/session
 
 router.post('/session', (req, res) => {
@@ -280,7 +303,7 @@ router.post('/session', (req, res) => {
 // GET /api/servers/:key/sessions/:session
 
 router.get('/:key/sessions/:session', async (req, res) => {
-  if (!checkKey(req, res)) return
+  if (!checkKey(req, res) || !checkSessionReadToken(req, res)) return
 
   pruneExpired()
   const entry = sessions.get(req.params.session)
@@ -529,7 +552,7 @@ router.delete('/:key/profiles/:profileId/factions/:assignmentId', (req, res) => 
 // GET /api/servers/:key/sessions/:session/balance
 
 router.get('/:key/sessions/:session/balance', (req, res) => {
-  if (!checkKey(req, res)) return
+  if (!checkKey(req, res) || !checkSessionReadToken(req, res)) return
 
   pruneExpired()
   const entry = sessions.get(req.params.session)

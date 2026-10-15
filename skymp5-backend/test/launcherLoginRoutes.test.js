@@ -286,6 +286,18 @@ test('F1: LAUNCHER_LOGIN_LEGACY=revoke refuses the sessions the old flow made, a
   assert.equal((await sessionCheck(legacy)).status, 200)
 })
 
+test('F1: MASTER_SESSION_CHECK_TOKEN: optional takes a check without X-Auth-Token, required refuses it, a wrong token is always refused', async () => {
+  const token = masterApi.createSession({ id: PROFILES[31], username: 'alpha' }, { flow: 'loopback' }).session
+  assert.equal((await sessionCheck(token, {})).status, 200)
+  assert.equal((await sessionCheck(token, { 'x-auth-token': 'wrong' })).status, 403)
+  assert.equal((await get(`/api/servers/test-key/sessions/${token}/balance`, { headers: { 'x-auth-token': 'wrong' } })).status, 403)
+  await withConfig({ masterSessionCheckToken: 'required' }, async () => {
+    assert.equal((await sessionCheck(token, {})).status, 403)
+    assert.equal((await get(`/api/servers/test-key/sessions/${token}/balance`)).status, 403)
+    assert.equal((await sessionCheck(token)).status, 200)
+  })
+})
+
 test('F1: login pages are never cached, framed or sent as a referrer', async () => {
   const { page } = await legacyToConfirmPage()
   assert.equal(page.headers['x-frame-options'], 'DENY')

@@ -70,6 +70,8 @@ module.exports = {
   launcherLoginLegacy: ['off', 'revoke'].includes(LAUNCHER_LOGIN_LEGACY) ? LAUNCHER_LOGIN_LEGACY : 'allow',
   // A new launcher or in-game Discord login ends that account's older sessions; false keeps them
   launcherLoginSingleSession: process.env.LAUNCHER_LOGIN_SINGLE_SESSION !== 'false',
+  // required: the game server's session check must carry X-Auth-Token; optional (default) also takes one without, for game server builds before F1
+  masterSessionCheckToken: String(process.env.MASTER_SESSION_CHECK_TOKEN || '').trim().toLowerCase() === 'required' ? 'required' : 'optional',
 
   // Metrics HTTP auth (Basic auth for the game server's /metrics endpoint)
   metricsUser:     process.env.METRICS_USER     || '',
