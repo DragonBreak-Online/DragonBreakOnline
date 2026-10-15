@@ -257,3 +257,108 @@ TEST_CASE("'isRaceMenuOpen' property should present in 'createActor'",
   REQUIRE(partOne.Messages()[0].j["t"] == MsgType::CreateActor);
   REQUIRE(partOne.Messages()[0].j["props"]["isRaceMenuOpen"] == true);
 }
+
+TEST_CASE("private.* properties are never sent to any client", "[PartOne]")
+{
+  // Discord ids, roles, masked names and house keys stay on the server
+  PartOne partOne;
+  partOne.worldState.espmFiles = std::vector<std::string>{ "Skyrim.esm" };
+
+  // Registered owner-only and public props keep working as before
+  GamemodeApi::State state;
+  GamemodeApi::PropertyInfo ownerOnly;
+  ownerOnly.isVisibleByOwner = true;
+  ownerOnly.isVisibleByNeighbors = false;
+  GamemodeApi::PropertyInfo everyone;
+  everyone.isVisibleByOwner = true;
+  everyone.isVisibleByNeighbors = true;
+  state.createdProperties["ctlOwnerOnly"] = ownerOnly;
+  state.createdProperties["ctlPublic"] = everyone;
+  partOne.NotifyGamemodeApiStateChanged(state);
+
+  const uint32_t owner = 0xff000A01, neighbour = 0xff000A02, door = 0xff000A03,
+                 doorBase = 0xabcd;
+  partOne.CreateActor(owner, { 0.f, 0.f, 0.f }, 0.f, 0x3c);
+  partOne.CreateActor(neighbour, { 300.f, 0.f, 0.f }, 0.f, 0x3c);
+
+  // Saved props load through ApplyChangeForm, as from the database
+  auto& ac = partOne.worldState.GetFormAt<MpActor>(owner);
+  MpChangeForm changeForm = ac.GetChangeForm();
+  changeForm.formDesc =
+    FormDesc::FromFormId(owner, partOne.worldState.espmFiles);
+  changeForm.baseDesc =
+    FormDesc::FromFormId(ac.GetBaseId(), partOne.worldState.espmFiles);
+  changeForm.dynamicFields = DynamicFields::FromJson(
+    nlohmann::json{ { "private.skympDiscordId", "dummy-id" },
+                    { "private.discordRoles", { "dummy-role" } },
+                    { "ctlOwnerOnly", 1 },
+                    { "ctlPublic", 2 } });
+  ac.ApplyChangeForm(changeForm);
+  // Indexed private props go through the same call mp.set() makes
+  ac.RegisterPrivateIndexedProperty("private.indexed.charName",
+                                    "\"dummy name\"");
+
+  // A house door between them with its private.housing record
+  LocationalData doorLocation;
+  doorLocation.pos = { 200.f, 0.f, 0.f };
+  doorLocation.rot = { 0.f, 0.f, 0.f };
+  doorLocation.cellOrWorldDesc = FormDesc::Tamriel();
+  partOne.worldState.AddForm(
+    std::make_unique<MpObjectReference>(
+      doorLocation, partOne.CreateFormCallbacks(), doorBase, "DOOR"),
+    door);
+  auto& doorRef = partOne.worldState.GetFormAt<MpObjectReference>(door);
+  MpChangeForm doorForm = doorRef.GetChangeForm();
+  doorForm.formDesc = FormDesc::FromFormId(door, partOne.worldState.espmFiles);
+  doorForm.baseDesc =
+    FormDesc::FromFormId(doorBase, partOne.worldState.espmFiles);
+  doorForm.dynamicFields = DynamicFields::FromJson(
+    nlohmann::json{ { "private.housing", { { "ownerName", "dummy owner" } } },
+                    { "ctlPublic", 3 } });
+  doorRef.ApplyChangeForm(doorForm);
+  doorRef.SetPos(doorLocation.pos);
+
+  DoConnect(partOne, 0);
+  DoConnect(partOne, 1);
+  partOne.Messages().clear();
+  partOne.SetUserActor(0, owner);
+  partOne.SetUserActor(1, neighbour);
+
+  // The custom prop names one user got in the createActor of one form
+  auto propsSent = [&](Networking::UserId userId, uint32_t refrId) {
+    std::set<std::string> names;
+    int createActors = 0;
+    for (auto& m : partOne.Messages()) {
+      auto createActor = dynamic_cast<CreateActorMessage*>(m.message.get());
+      if (!createActor || m.userId != userId ||
+          createActor->refrId.value_or(0) % 0x100000000 != refrId) {
+        continue;
+      }
+      ++createActors;
+      for (auto& entry : createActor->customPropsJsonDumps) {
+        names.insert(entry.propName);
+      }
+    }
+    REQUIRE(createActors == 1);
+    return names;
+  };
+
+  using Names = std::set<std::string>;
+  CHECK(propsSent(0, owner) == Names{ "ctlOwnerOnly", "ctlPublic" });
+  CHECK(propsSent(1, owner) == Names{ "ctlPublic" });
+  CHECK(propsSent(0, door) == Names{ "ctlPublic" });
+  CHECK(propsSent(1, door) == Names{ "ctlPublic" });
+
+  // The server still has every value, for mp.get and the index
+  REQUIRE(ac.GetDynamicFields().GetValueDump("private.skympDiscordId") ==
+          "\"dummy-id\"");
+  REQUIRE(ac.GetDynamicFields().GetValueDump("private.indexed.charName") ==
+          "\"dummy name\"");
+  REQUIRE(doorRef.GetDynamicFields().GetValueDump("private.housing") ==
+          "{\"ownerName\":\"dummy owner\"}");
+  REQUIRE(partOne.worldState
+            .GetActorsByPrivateIndexedProperty(
+              partOne.worldState.MakePrivateIndexedPropertyMapKey(
+                "private.indexed.charName", "\"dummy name\""))
+            .count(owner) == 1);
+}

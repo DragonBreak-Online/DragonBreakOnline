@@ -1138,6 +1138,11 @@ void PartOne::Init()
     emitter->VisitProperties(message, mode);
 
     auto isFilteredOut = [&](const CustomPropsEntry& customPropsEntry) {
+      // private.* props are server-only, the owner's own client included
+      if (customPropsEntry.propName.rfind(
+            MpObjectReference::GetPropertyPrefixPrivate(), 0) == 0) {
+        return true;
+      }
       auto it = pImpl->gamemodeApiState.createdProperties.find(
         customPropsEntry.propName);
       if (it != pImpl->gamemodeApiState.createdProperties.end()) {
