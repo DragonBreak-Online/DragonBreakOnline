@@ -187,7 +187,7 @@ its own lines; `<you>` is your ledger operator name.
 1. **Deploy the backend with `DEVICE_ID_HMAC_KEY` unset**, with Phase 1 or after it. Who: claude-jake, after Jake's go.
    Ask for that go together with his OK for the full erase's exception to ops README rule 9 (Undo, Full erase).
    - Ledger first: `ops claim backend claude-jake "L3-01 backend deploy and restart" 60`. When the deploy goes through
-     a push to main, also `ops claim github-main claude-jake "L3-01 deploy merge to main" 30` and follow ops README
+     a push to main, also `ops claim github-main claude-jake "L3-01 deploy push to main" 30` and follow ops README
      rule 6: the updater resets `/opt/alduinak` to `origin/main` and restarts the game server, never the backend.
    - **Before that start**, the disk gate: at least 1 GB free on `/`, or stop. Check with `df -h /`, or
      `[ "$(df --output=avail -k / | tail -n 1)" -ge 1048576 ] && echo ok || echo STOP`. On 15 Oct `/` reached 0 MB
@@ -198,12 +198,26 @@ its own lines; `<you>` is your ledger operator name.
    - If the deploy is on a day other than 2026-10-15: set that day in `data/legal/legal.json` (`version` and
      `effective`) and in `data/legal/privacy.md` (Effective date and Last updated), drop the unshipped `2026-10-15` key
      from `data/legal/hashes.json`, run `npm run legal-record` again, and commit that before deploying.
-   - **Deploy tree:** the live main head at deploy time (`git -C /opt/alduinak rev-parse HEAD`, the same as
-     `origin/main`; on 15 Oct 18:44Z that is f985e98fe, which serves launcher 2.1.49 and client 0.3.98), merged with
-     Phase 1 (`secfix-phase1-backend-1015`, 1314e05ca), this branch (`secfix3-L3-01-backend-1015`) and, once F1 is
-     approved, F1 (`secfix2-F1-backend-1015`). On 15 Oct each of these merges had no conflicts. Never deploy one of the
-     branch heads on its own: Phase 1, F1 and this branch all carry `routes/version.js` from c90ee09fd, which
-     advertises launcher 2.1.48, its download link and client 0.3.97.
+   - **Deploy tree:** the backend release tree, built on the live main head at deploy time (`git -C /opt/alduinak
+     rev-parse HEAD`, the same as `origin/main`; on 15 Oct 18:44Z that is f985e98fe, which serves launcher 2.1.49 and
+     client 0.3.98) from cherry-picks, never `git merge`. Phase 1 (`secfix-phase1-backend-1015`) and, once F1 is
+     approved, F1 (`secfix2-F1-backend-1015`) go in as cherry-picks, as in `backend-release-1015-trial`. Then add this
+     branch's own commits, and only those (1314e05ca is the Phase 1 head this branch is built on):
+
+     ```
+     git cherry-pick -x 1314e05ca..secfix3-L3-01-backend-1015
+     git log --reverse --format='%h %s' -n "$(git rev-list --count 1314e05ca..secfix3-L3-01-backend-1015)" HEAD
+     ```
+
+     Never `git merge` this branch into a tree that already holds Phase 1 or F1 as cherry-picks: the tree has copies
+     of Phase 1, not the commits this branch is built on, so a merge conflicts (15 Oct, onto backend-release-1015-trial:
+     `routes/site-auth.js`, `sources/discord/bot.js` and `test/discordBanAudit.test.js`), while the cherry-pick range
+     applies cleanly. `-x` adds `(cherry picked from commit <sha>)` to each message, which is how Undo finds them
+     again. The `git log` line lists the L3-01 commits on the tree: note the first and the last sha for the ledger.
+     Then, on the result, rerun the version.js gate below and the backend suite (`npm test` in `skymp5-backend`; a
+     test that fails on a load timeout is rerun alone). Never deploy one of the branch heads on its own: Phase 1, F1
+     and this branch all carry `routes/version.js` from c90ee09fd, which advertises launcher 2.1.48, its download link
+     and client 0.3.97.
    - Before the tree reaches the live checkout, this must print `same`:
      `git diff --quiet <live head> <deploy tree> -- skymp5-backend/routes/version.js && echo same || echo STOP`.
      version.js is read from disk on every request, so a wrong one reaches every launcher as soon as it lands.
@@ -214,9 +228,11 @@ its own lines; `<you>` is your ledger operator name.
      which gives every entry without one a `B-` ref and saves it (15 Oct: 1 entry, none with a ref). The save is
      atomic and keeps the file 0600.
    - The policy bump asks every player to accept the updated Privacy Policy once in the launcher.
-   - Ledger after: `ops log claude-jake "L3-01 backend live at <deploy sha>, device check off (no key)" "revert
-     <deploy sha> on main, then systemctl restart dragonbreak-backend.service"`, then `ops release backend claude-jake`
-     (and `ops release github-main claude-jake`).
+   - Ledger after: `ops log claude-jake "L3-01 backend live: main <first>..<last>, cherry-picks of
+     1314e05ca..secfix3-L3-01-backend-1015, device check off (no key)" "Undo, Code: full erase first if the key was
+     set; claim backend and github-main, rule 6 online check, git revert --no-edit <first>^..<last> on main, push,
+     systemctl restart dragonbreak-backend.service. DEVICE_MATCH=off pauses the device check alone, no push"`, then
+     `ops release backend claude-jake` (and `ops release github-main claude-jake`).
    - Rolling back to the old code is safe: it ignores the refs. A re-ban made under the old code gets a new ref when
      the new code next reads the list, and a Not an alt mark on the old ref then lapses.
 2. **Keep the store out of backups**, before the key is set. Who: claude-jake, the backup tool's owner (per its
@@ -322,8 +338,39 @@ and `ops release backend claude-jake`.
   The `*.tmp` names are unfinished saves that a crash can leave behind. The log then says `is not set`. Backups of
   `backend.env` made after step 3 still hold the key. With the store gone it links nothing, but restoring one turns the
   check back on, so run the count from step 3 after any restore.
-- **Code:** revert the deploy on main, then restart (step 1: the old code ignores the refs). **Launcher:** version.js
-  back to 2.1.49 (step 4).
+- **Code.** The release lands on main as cherry-picks (step 1), never as a merge, so the code undo is a `git revert`
+  of L3-01's own commits on main, which leaves Phase 1 and F1 in place. For the device check alone the undo is the
+  Pause (`DEVICE_MATCH=off`): no push and no game-server restart. The revert also takes back the bans.js address
+  changes and the ban refs (the old code ignores the refs, step 1).
+  1. If the key was ever set (step 3), run the full erase first: the old code never reads or prunes
+     `data/device-ids.json`, so codes left on disk would be kept for ever.
+  2. Find the range. The step 1 ledger line names it (`<first>..<last>`). To find it from git, using the
+     `cherry picked from commit` line that `-x` wrote:
+
+     ```
+     git fetch origin main
+     for c in $(git rev-list --reverse 1314e05ca..secfix3-L3-01-backend-1015); do git log -F --grep="cherry picked from commit $c" --format='%h %s' origin/main; done
+     ```
+
+     It prints the main commits oldest first. The number of lines must equal
+     `git rev-list --count 1314e05ca..secfix3-L3-01-backend-1015`, and `git log --oneline <first>^..<last>` must list
+     exactly those commits. If something else landed between them, revert the listed commits one at a time instead,
+     newest first (`git revert --no-edit <sha>`).
+  3. Ledger: `ops claim backend claude-jake "revert L3-01 on main" 30` and
+     `ops claim github-main claude-jake "revert L3-01 on main" 30`. Then ops README rule 6: the push restarts the
+     game server, so `curl -s https://dragonbreakonline.com/api/servers` must show `"online":0` first.
+  4. On a clean checkout of `origin/main`: `git revert --no-edit <first>^..<last>` (one revert commit each, newest
+     first). Before the push, the version.js gate
+     (`git diff --quiet origin/main HEAD -- skymp5-backend/routes/version.js && echo same || echo STOP`) and the
+     backend suite. Push, wait until `git -C /opt/alduinak rev-parse HEAD` shows the pushed sha (the updater, within
+     5 minutes), then `systemctl restart dragonbreak-backend.service`.
+  5. `ops log claude-jake "L3-01 reverted on main (<first>..<last>), backend restarted" "cherry-pick
+     1314e05ca..secfix3-L3-01-backend-1015 again (step 1)"`, then `ops release github-main claude-jake` and
+     `ops release backend claude-jake`.
+
+  The revert puts the policy back to the version before it (2026-10-11 on 15 Oct), so a player who accepted only
+  2026-10-15 is asked once to accept that one.
+- **Launcher:** version.js back to 2.1.49 (step 4).
 - Old launchers keep working throughout, and a new launcher works against an old backend (it ignores the field).
 
 ## Enforcement (not built)
