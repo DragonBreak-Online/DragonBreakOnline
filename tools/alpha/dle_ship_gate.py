@@ -52,12 +52,19 @@ ANCHORS = [
     (0x125BD3, 'DBO_ShrineOfPeryite', 'Peryite'), (0x125BD6, 'DBO_ShrineOfVaermina', 'Vaermina')]]
 
 
-def same_region(a, b):
+def same_region(a, b, src_a=None, src_b=None):
     """The same border: every subrecord byte-identical except RPLD, whose points must be the same polygon - the same
-    cycle, from any start, in either direction (DLE v8 came with v4's 18 points wound the other way round)"""
+    cycle, from any start, in either direction (DLE v8 came with v4's 18 points wound the other way round), and WNAM,
+    the worldspace, compared by (plugin, local id) when both files' resolvers are given: a grown master list moves
+    BSHeartland's index (the Skyrim release DLE 641f3719: 10 -> 6), which is the same worldspace"""
     if [x for x, _ in a] != [x for x, _ in b]:
         return False
     for (s1, v1), (s2, v2) in zip(a, b):
+        if s1 == b'WNAM' and src_a and src_b and len(v1) == 4 and len(v2) == 4:
+            ra, rb = src_a(struct.unpack('<I', v1)[0]), src_b(struct.unpack('<I', v2)[0])
+            if (str(ra[0]).lower(), ra[1] & 0xFFFFFF) != (str(rb[0]).lower(), rb[1] & 0xFFFFFF):
+                return False
+            continue
         if s1 != b'RPLD':
             if v1 != v2:
                 return False
@@ -142,7 +149,7 @@ def main():
     else:
         if r[3] != BORDER_SIZE:
             fails.append(f'border: REGN 0B0CBCDD is {r[3]} bytes, want {BORDER_SIZE} (border A+B, 20 points)')
-        if BORDER in live.rec and not same_region(new.subs(BORDER), live.subs(BORDER)):
+        if BORDER in live.rec and not same_region(new.subs(BORDER), live.subs(BORDER), new.p.modindex_source, live.p.modindex_source):
             fails.append('border: REGN 0B0CBCDD is not the live border (points, or another field, differ)')
     bn, bl = new.border_cells(), live.border_cells()
     fmt = lambda ks: ', '.join('%06X %s' % (k[1], new.edid(k) or live.edid(k)) for k in sorted(ks)[:12]) + (' ...' if len(ks) > 12 else '')
