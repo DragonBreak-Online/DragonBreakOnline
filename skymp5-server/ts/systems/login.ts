@@ -91,10 +91,16 @@ export class Login implements System {
     };
   }
 
+  // The master key is public, so the session check proves it is this game server; the backend can then refuse anyone else (MASTER_SESSION_CHECK_TOKEN)
+  private masterAuthHeaders(): Record<string, string> {
+    const authToken = this.settingsObject?.allSettings?.["masterApiAuthToken"];
+    return typeof authToken === "string" && authToken ? { "X-Auth-Token": authToken } : {};
+  }
+
   private async getUserProfile(session: string, userId: number, ctx: SystemContext, assertSameConnection: (op: string) => void): Promise<UserProfile> {
     const response = await this.fetchRetry(
       `${this.masterUrl}/api/servers/${this.masterKey}/sessions/${encodeURIComponent(session)}`,
-      this.getFetchOptions('getUserProfile')
+      { ...this.getFetchOptions('getUserProfile'), headers: this.masterAuthHeaders() }
     );
 
     if (!response.ok) {

@@ -44,7 +44,7 @@ const SESSION = 'a'.repeat(64);
 const calls = [];
 globalThis.__loginKicks = [];
 globalThis.__loginFetch = async (url, opts) => {
-  calls.push([opts && opts.method || 'GET', url]);
+  calls.push([opts && opts.method || 'GET', url, (opts && opts.headers) || {}]);
   const u = new URL(url);
   const json = (status, body) => ({ ok: status < 300, status, statusText: String(status), json: async () => body });
   if (u.pathname.endsWith('/connection-check')) return json(200, { allowed: true });
@@ -127,8 +127,21 @@ const quiet = { log: console.log, error: console.error };
   l2.customPacket(4, 'loginWithSkympIo', { gameData: { session: SESSION } }, ctx); await tick();
   done();
   check('a well-formed session reaches the session route', calls.some(([, u]) => u === `http://master.test/api/servers/KEY/sessions/${SESSION}`), calls);
+  check('...with the game server\'s X-Auth-Token (F1)', calls.some(([, u, h]) => u.endsWith(`/sessions/${SESSION}`) && h && h['X-Auth-Token'] === 't'), calls.map(([, u, h]) => [u.slice(-20), Object.keys(h || {})]));
   check('...then the Discord membership check runs', calls.some(([, u]) => u.includes('/guilds/G/members/555')), calls);
   check('...and a non-member is refused', sent.some(([u, t]) => u === 4 && t === 'loginFailedNotInTheDiscordServer'), sent);
+  console.log = () => {}; console.error = () => {};
+
+  // ---- no masterApiAuthToken: the session check is sent without the header, as before ----
+  const savedSettings = globalThis.__loginSettings;
+  globalThis.__loginSettings = { ...savedSettings, allSettings: {} };
+  const noToken = new Login(() => {}, 100, 'http://master.test', 7777, 'KEY', false);
+  await noToken.initAsync(ctx);
+  globalThis.__loginSettings = savedSettings;
+  calls.length = 0;
+  noToken.customPacket(5, 'loginWithSkympIo', { gameData: { session: SESSION } }, ctx); await tick();
+  done();
+  check('without masterApiAuthToken the session check still goes out, with no X-Auth-Token', calls.some(([, u, h]) => u.endsWith(`/sessions/${SESSION}`) && h && !('X-Auth-Token' in h)), calls.length);
   console.log = () => {}; console.error = () => {};
 
   // ---- one attempt per connection ----
@@ -195,7 +208,7 @@ const quiet = { log: console.log, error: console.error };
         setup(b) {
           b.onResolve({ filter: /^(axios|\.\.\/settings)$/ }, (a) => ({ path: a.path, namespace: 'stub' }));
           b.onLoad({ filter: /.*/, namespace: 'stub' }, (a) => ({ loader: 'js', contents: a.path === 'axios'
-            ? 'module.exports = { __esModule: true, default: { get: async (u) => { globalThis.__balanceUrls.push(u); return { data: { user: { id: 1, balance: 5 } } }; }, post: async (u) => { globalThis.__balanceUrls.push(u); return { data: { balanceSpent: 1, success: true } }; } } };'
+            ? 'module.exports = { __esModule: true, default: { get: async (u, o) => { globalThis.__balanceUrls.push(u); globalThis.__balanceHeaders = (o && o.headers) || {}; return { data: { user: { id: 1, balance: 5 } } }; }, post: async (u) => { globalThis.__balanceUrls.push(u); return { data: { balanceSpent: 1, success: true } }; } } };'
             : 'module.exports = { Settings: { get: async () => ({ allSettings: { masterApiAuthToken: "t" } }) } };' }));
         },
       }],
@@ -205,6 +218,7 @@ const quiet = { log: console.log, error: console.error };
     const bal = new MasterApiBalanceSystem(() => {}, 10, 'http://master.test', 7777, 'KEY', false);
     await bal['getUserBalanceImpl']('a/b?c');
     await bal['makeUserMasterApiPurchaseImpl']('a/b?c', 1);
+    check('the balance read carries the game server\'s X-Auth-Token (F1)', (globalThis.__balanceHeaders || {})['X-Auth-Token'] === 't', globalThis.__balanceHeaders);
     check('the balance and purchase URLs carry the session as one encoded segment', urls[0] === 'http://master.test/api/servers/KEY/sessions/a%2Fb%3Fc/balance' && urls[1] === 'http://master.test/api/servers/KEY/sessions/a%2Fb%3Fc/purchase', urls);
   }
 

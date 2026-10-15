@@ -58,8 +58,11 @@ export class MasterApiBalanceSystem implements System {
 
     private async getUserBalanceImpl(session: string): Promise<number> {
         try {
+            // The backend can require the game server's X-Auth-Token on balance reads (MASTER_SESSION_CHECK_TOKEN)
+            const authToken = (await Settings.get()).allSettings.masterApiAuthToken;
             const response = await Axios.get(
                 `${this.masterUrl}/api/servers/${this.masterKey}/sessions/${encodeURIComponent(session)}/balance`,
+                { headers: typeof authToken === "string" && authToken ? { 'X-Auth-Token': authToken } : {} },
             );
             if (!response.data || !response.data.user || !response.data.user.id || typeof response.data.user.balance !== "number") {
                 throw new Error(`getUserBalanceImpl: bad master-api response ${JSON.stringify(response.data)}`);
