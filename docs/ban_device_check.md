@@ -93,9 +93,11 @@ and **Undo**.
 | `NEW_ACCOUNT_FLAG_DAYS` | `30` | NEW ACCOUNT for Discord accounts younger than this at first launch, 0 to 365. 0 turns it off. The age is read from the Discord id itself; no API call. |
 
 The check is also off, and leaves the file as it is, when `data/device-ids.json` cannot be read; one log line names it.
-Once a day the backend logs one line of counts, without values: launch-checks with a code, unavailable or none,
+Every hour that counted anything, the backend logs one line of counts, without values, that starts
+`[device-check] last hour:` and ends with `until <UTC minute>Z`: launch-checks with a code, unavailable or none,
 malformed codes, session changes, codes dropped by the limits, flags by kind, not-an-alt marks, and raw hwids discarded
-on the old routes.
+on the old routes. The counts are in memory only and start again after each line, so a restart loses at most the hour
+since the last line. An hour with nothing counted prints nothing.
 
 ## Retention and erasure
 
@@ -264,10 +266,17 @@ its own lines; `<you>` is your ledger operator name.
    - **Undo:** set version.js back to 2.1.49 the same way. A 2.1.50 launcher works against either backend: it offers
      an update only when the advertised version is higher (`compareVersions(latest, current) > 0` in `src/main.js`),
      and launch-check before this branch reads only `filesVersion` and `plugins` from the body.
-5. **Watch the counts** for at least 2 weeks. Who: claude-jake. The daily line:
-   `grep -F '[device-check] last day:' /var/log/dragonbreak-backend.log | tail -n 14`. If more than 5% of the
-   launch-checks from new launchers say unavailable (`unavailable` out of `with a device code` plus `unavailable`), look
-   at a server-issued install token. Ledger: none, because reading changes nothing (ops README: claims are for changes).
+5. **Watch the counts** for at least 2 weeks. Who: claude-jake. The hourly lines (see Switches) are summed over the
+   last 14 days. The log rotates weekly (`/etc/logrotate.d/dragonbreak`: weekly, rotate 8, compressed), so read the
+   rotated files too; `zgrep` reads the plain and the `.gz` ones:
+
+   ```
+   zgrep -h -F '[device-check] last hour:' /var/log/dragonbreak-backend.log* | awk -v from="$(date -u -d '14 days ago' +%Y-%m-%dT%H:%M)" '$NF >= from { n++; for (i = 1; i < NF; i++) { if ($i == "code") d += $(i + 1); if ($i == "unavailable") u += $(i + 1) } } END { printf "%d hourly lines: with a device code %d, unavailable %d (%.1f%%)\n", n, d, u, (d + u) ? 100 * u / (d + u) : 0 }'
+   ```
+
+   It prints only totals. If more than 5% of the launch-checks from new launchers say unavailable (`unavailable` out of
+   `with a device code` plus `unavailable`), look at a server-issued install token. Ledger: none, because reading
+   changes nothing (ops README: claims are for changes).
 6. **Enforce.** Who: Jake decides whether enforcement is ever built. Today `DEVICE_MATCH=enforce` only reports. Building
    it is a separate change, with its own review, claim and log (see Enforcement below).
 

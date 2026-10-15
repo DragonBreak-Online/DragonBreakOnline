@@ -354,15 +354,50 @@ test('a store that cannot be read turns the check off and is left exactly as it 
   assert.deepEqual(lines, [])
 })
 
-test('the old raw-hwid routes and the day\'s counts are counted in one line without values', () => {
+test('the old raw-hwid routes and the hour\'s counts are counted in one line without values', () => {
   setup()
   dc.legacyHwidDiscarded()
   launch(AELA, 'pc-1')
   launch(BRYN, null)
   dc._test.logCounts()
-  assert.equal(logs.at(-1), '[device-check] last day: launch-checks with a device code 1, unavailable 0, none (older launcher) 1; malformed 0; ' +
-    'session changes 0; cap drops 0; flags: alt check 0, new account 0, banned account back 0, churn 0; not-alt marks 0; legacy hwid discarded 1')
+  assert.equal(logs.at(-1), '[device-check] last hour: launch-checks with a device code 1, unavailable 0, none (older launcher) 1; malformed 0; ' +
+    'session changes 0; cap drops 0; flags: alt check 0, new account 0, banned account back 0, churn 0; not-alt marks 0; legacy hwid discarded 1; until 2026-10-16T14:00Z')
   assert.equal(counts().withDevice, 0, 'counts start again')
+  const before = logs.length
+  dc._test.logCounts()
+  assert.equal(logs.length, before, 'an hour with nothing counted prints nothing')
+})
+
+test('the count line is printed every hour, so a restart loses at most the last hour', t => {
+  t.mock.timers.enable({ apis: ['setInterval'] })
+  const HOUR = 60 * 60 * 1000
+  const hourLines = () => logs.filter(l => l.startsWith('[device-check] last hour:'))
+  const withCode = line => Number(line.match(/with a device code (\d+),/)[1])
+  try {
+    setup()
+    dc.start()
+    launch(AELA, 'pc-1')
+    t.mock.timers.tick(HOUR - 1)
+    assert.equal(hourLines().length, 0, 'not before the hour')
+    t.mock.timers.tick(1)
+    assert.equal(hourLines().length, 1, 'printed on the hour')
+    assert.equal(withCode(hourLines()[0]), 1)
+    t.mock.timers.tick(3 * HOUR)
+    assert.equal(hourLines().length, 1, 'hours with nothing counted print nothing')
+    // One launch every 10 minutes for 5.5 hours, then a restart: only the launches since the last line are lost
+    let launched = 0
+    for (let i = 0; i < 33; i++) {
+      launch(BRYN, null, { token: `t${i}` })
+      launched++
+      t.mock.timers.tick(10 * 60 * 1000)
+    }
+    const printed = hourLines().slice(1).reduce((sum, line) => sum + Number(line.match(/none \(older launcher\) (\d+);/)[1]), 0)
+    assert.equal(hourLines().length, 6, 'one line for each hour with launches')
+    assert.equal(launched - printed, counts().none, 'what is not yet printed is what a restart would lose')
+    assert.ok(counts().none <= 6, `at most an hour of launches unprinted, got ${counts().none}`)
+  } finally {
+    dc._test.reset()
+  }
 })
 
 test('requiring the module does nothing: no file, no timer, no log line', () => {

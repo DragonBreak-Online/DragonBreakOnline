@@ -65,7 +65,7 @@ function init() {
     if (c.deviceMatch === 'enforce') log('[device-check] DEVICE_MATCH=enforce is not available yet; reporting only')
     log(`[device-check] on, report only: PCs linked to a banned account are flagged to staff; codes are kept ${s.retentionDays} days after last use`)
   }
-  s.timers = [setInterval(prune, PRUNE_MS), setInterval(sweepIfBansChanged, SWEEP_MS), setInterval(logCounts, DAY_MS)]
+  s.timers = [setInterval(hourly, PRUNE_MS), setInterval(sweepIfBansChanged, SWEEP_MS)]
   for (const t of s.timers) t.unref()
   return s
 }
@@ -404,12 +404,22 @@ function prune() {
   if (dirty) writeData(data)
 }
 
+const anyCount = c => Object.values(c).some(v => (typeof v === 'object' ? anyCount(v) : v > 0))
+
+// The last hour's counts, only when there are some, ending with the UTC minute; a restart loses at most that hour
 function logCounts() {
   const c = state.counts
-  log(`[device-check] last day: launch-checks with a device code ${c.withDevice}, unavailable ${c.unavailable}, none (older launcher) ${c.none}; ` +
+  if (!anyCount(c)) return
+  log(`[device-check] last hour: launch-checks with a device code ${c.withDevice}, unavailable ${c.unavailable}, none (older launcher) ${c.none}; ` +
     `malformed ${c.malformed}; session changes ${c.sessionChanges}; cap drops ${c.capDrops}; flags: alt check ${c.flags.alt}, ` +
-    `new account ${c.flags.new}, banned account back ${c.flags.back}, churn ${c.flags.churn}; not-alt marks ${c.notAlt}; legacy hwid discarded ${c.legacyHwid}`)
+    `new account ${c.flags.new}, banned account back ${c.flags.back}, churn ${c.flags.churn}; not-alt marks ${c.notAlt}; legacy hwid discarded ${c.legacyHwid}; ` +
+    `until ${new Date(hooks.now()).toISOString().slice(0, 16)}Z`)
   state.counts = zeroCounts()
+}
+
+function hourly() {
+  logCounts()
+  prune()
 }
 
 // Every banned account this account shares a PC with, without codes: { banRef, notAlt, sharedAccounts, bound, createdVsBanDays }
@@ -486,7 +496,7 @@ function forgetAccount(discordId) {
   return 'removed'
 }
 
-// The old raw-hwid routes discard what they get; counted for the daily line
+// The old raw-hwid routes discard what they get; counted for the hourly line
 function legacyHwidDiscarded() {
   init().counts.legacyHwid++
 }
