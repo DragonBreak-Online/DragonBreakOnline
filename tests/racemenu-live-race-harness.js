@@ -321,10 +321,11 @@ const afterHold = async () => { await wait(HOLD + 30); tick(); await settle(); }
   await afterHold(); pumpAll(); s = take();
   check('picked again: then the face, marked self, with 3c192ede', presets(s, M).length === 2 && presets(s, M).every((x) => x.p.self === true && x.p.race === MAORMER && x.p.hash === hM), s.map((x) => x.p));
   askSelf(1); await settle(); pumpAll(); s = take();
-  check('picked again: a later ask in that load sends no race', races(s).length === 0 && presets(s, M).length >= 1, s.map((x) => x.p));
+  check('picked again: a later ask in that load sends no race and is answered at once', races(s).length === 0 && presets(s, M).length === 2, s.map((x) => x.p));
   pick(M); await pickSettle(); tick(); askSelf(1); s = take();
   check('picked a third time (the tick ran first): the race again', races(s, M).length === 1, s.map((x) => x.p));
-  await settle(); await afterHold(); pumpAll(); take();
+  await settle(); await afterHold(); pumpAll(); s = take();
+  check('...and the face after it', presets(s, M).length === 2, s.map((x) => x.p));
 
   // 2. Picked again while the face is held for the race (inside the hold): the old load's face would reach the new load before its race
   login(M); take(); logs.length = 0;
@@ -395,13 +396,16 @@ const afterHold = async () => { await wait(HOLD + 30); tick(); await settle(); }
   check('...its ask: one race (the same race), then the face with 3c192ede', races(s, M).length === 1 && races(s, M)[0].p.race === MAORMER && presets(s, M).length === 2 && presets(s, M)[0].p.race === MAORMER, s.map((x) => x.p));
   pick(M); await pickSettle(); askSelf(1); s = take();
   check('picked again after the rev: the race again', races(s, M).length === 1, s.map((x) => x.p));
-  await settle(); await afterHold(); pumpAll(); take();
+  await settle(); await afterHold(); pumpAll(); s = take();
+  check('...then the face', presets(s, M).length === 2, s.map((x) => x.p));
 
   // 8. Unchanged: a vanilla race picked again, and a watcher's ask about someone who just picked again
   login(H); take();
   askSelf(2); await settle(); pumpAll(); take();
   pick(H); askSelf(2); await settle(); pumpAll(); s = take();
   check('a High Elf picked again: no race, the face at once even right after the pick', races(s).length === 0 && presets(s, H).length === 2 && presets(s, H)[0].p.race === HIGH_ELF, s.map((x) => x.p));
+  await pickSettle(); pick(H); await pickSettle(); askSelf(2); await settle(); pumpAll(); s = take();
+  check('a High Elf picked a second time in that connection: the face in full again (each load starts with none)', races(s).length === 0 && presets(s, H).length === 2 && presets(s, H)[1].p.customPacketType === 'dboPresetChunk', s.map((x) => x.p));
   pick(M); packet(5, { customPacketType: 'dboPresetGet', actor: M, have: '' }); await settle(); pumpAll(); s = take();
   check('a watcher\'s ask about a Maormer who just picked again is answered as before', presets(s, W).length === 2 && races(s).length === 0, s.map((x) => x.p));
   await pickSettle();

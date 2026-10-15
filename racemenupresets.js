@@ -223,7 +223,7 @@ module.exports = (api) => {
     uploadTimeoutMs: 60000,
     uploadsPerHour: 30,         // per character; each one that changes the face is a file write
     getsPerMinute: 120,         // per player; one per copy that spawns, retried every 15 s at most
-    // One player is sent the whole of one face at most resendsPerFace times per resendWindowMs in a connection (0: no
+    // One player is sent the whole of one face at most resendsPerFace times per resendWindowMs in a load (0: no
     // limit). A client that cannot show a face asks again every 15 s with have '' and was sent all of it each time: 0.3.94
     // refuses a face 0.3.95 saved with the wider values, a 45 KB face 20 times in 5 min (12 Oct review, e2e-mixed.js).
     // Past the limit it gets the header only until the window ends
@@ -538,15 +538,15 @@ module.exports = (api) => {
     }
     const meta = { customPacketType: 'dboPresetMeta', ...base, hash: doc.hash, race };
     if (have === doc.hash) return enqueueAnswer(to, [meta], self);
-    // Sent in full resendsPerFace times in this window and connection, and asked for again: that player cannot show it
+    // Sent in full resendsPerFace times in this window and load, and asked for again: that player cannot show it
     // (0.3.94 refuses a face with the wider values, keeps nothing and asks again every 15 s; a client that shows a face
     // keeps it and asks with its hash). The header only, as for a client that has it, until the window ends. A relog,
-    // another face, or a refused upload of the owner's (refused above) starts the count again
+    // the owner's pick of the character again (its load has no face), another face, or a refused upload of the owner's (refused above) starts the count again
     const limit = Number(C.resendsPerFace), windowMs = Number(C.resendWindowMs);
     const k = `${to >>> 0}:${actor}:${self ? 1 : 0}`;
     const t = Date.now(), conn = connOf(to);
     let e = S.fullSends.get(k);
-    if (e && (e.hash !== doc.hash || e.conn !== conn || !(t - e.at < windowMs))) { S.fullSends.delete(k); e = undefined; }
+    if (e && (e.hash !== doc.hash || e.conn !== conn || !(t - e.at < windowMs) || (self && e.at <= pickedAt(to)))) { S.fullSends.delete(k); e = undefined; }
     if (limit > 0 && e && e.n >= limit) {
       // The rest of a long face may still be on its way (it takes longer than the client's 15 s retry): it goes on
       const q = S.queues.get(to);
