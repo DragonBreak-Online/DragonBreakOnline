@@ -83,11 +83,12 @@ export const SPECIES = [
       {
         id: 'reachfolk',
         name: 'Reachfolk',
+        // The DLE's DBOReachmanRace; the server swaps the Breton id for it (raceOverrideFor, config reachmanRace)
         raceId: BRETON,
-        raceEditorId: 'BretonRace',
+        raceEditorId: 'DBOReachmanRace',
+        fallbackEditorId: 'BretonRace',
         childRaceId: 0x2c65c,
         faceGen: true,
-        placeholder: true,
         lore: 'Clans of the Reach: hedge-witches and hunters who keep the old gods, scorned by outsiders as Forsworn.'
       },
       {

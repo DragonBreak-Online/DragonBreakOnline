@@ -21,7 +21,8 @@ export function setModHeadparts (parts, extras) {
 // generated with it) reads its fallbackEditorId's head parts, tints and defaults
 const knownRace = (edid) => !!(headparts.raceDefaults[edid] || tints[edid] || headparts.parts.some(p => p.races.includes(edid)));
 export function editorIdFor (race, age) {
-  if (age === 'child' && race.childRaceId) return race.raceEditorId + 'Child';
+  // A DLE race has no child race of its own: its children use the fallback's child data
+  if (age === 'child' && race.childRaceId) return (race.fallbackEditorId || race.raceEditorId) + 'Child';
   if (race.fallbackEditorId && !knownRace(race.raceEditorId)) return race.fallbackEditorId;
   return race.raceEditorId;
 }
