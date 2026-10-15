@@ -13,7 +13,19 @@ The code is in `skymp5-backend/sources/deviceChecks.js` (called from `routes/lau
 - It raises the cost of ban evasion. It is not proof.
 - A modified launcher, a virtual machine, a Windows reinstall or a machine id changer gets past it. A missing code is
   never held against anyone.
-- It catches a banned player who keeps using the official launcher on the same Windows install.
+- An ALT CHECK lead is posted only when all three of these hold:
+  1. the ban is in bans.json: a dashboard ban, an in-game permanent ban, or a Discord ban recorded while the backend
+     was running;
+  2. the banned account's PC was seen with launcher 2.1.50 or later while the key was set, in the 30 days before the
+     ban (`DEVICE_RETENTION_DAYS`) or any time after it;
+  3. the alt plays with launcher 2.1.50 or later.
+- **Not covered.** These cases produce no line at all, so silence never means "not an alt":
+  - in-game temp bans and IP bans: they are kept only on the game server (`skymp5-server/ts/systems/adminBans.ts`),
+    never in bans.json;
+  - Discord bans made while the backend was down: the bot records a ban only as it happens (`sources/discord/bot.js`
+    has no start-up reconciliation);
+  - bans made before the key was set, until the banned account presses PLAY again with 2.1.50 or later;
+  - a banned account idle for more than 30 days before its ban: its PCs were already deleted under the 30-day rule.
 - The code comes from the player's own PC, so the server never trusts it: it never allows, verifies, clears, lifts or
   whitelists anything, and nothing reads it except this check and the staff view.
 - Until the F1 login fix is live with `LAUNCHER_LOGIN_LEGACY=revoke`, a stolen old-flow session could attach the thief's
@@ -34,7 +46,8 @@ The code is in `skymp5-backend/sources/deviceChecks.js` (called from `routes/lau
    ignored), at most 3 new PCs a day and 5 in all per account. The extra ones are dropped, never the first ones, so a
    stolen session cannot push the owner's real PC out.
 5. Every ban has a reference, `B-` and 6 characters (for example `B-7KQ2MX`). Banned means the account has an entry in
-   bans.json (a Discord ban, a dashboard ban or an in-game ban).
+   bans.json (a dashboard ban, an in-game permanent ban, or a Discord ban recorded while the backend was running; see
+   Not covered above).
 
 ## What staff see
 
@@ -64,6 +77,10 @@ and **Undo**.
   account was seen on that PC recently (BANNED ACCOUNT BACK is a strong sign).
 - "Older launcher login, so this could be someone else's PC" means the evidence came from a launcher session that is
   not bound to the PC it started on. Weigh it less.
+- Some modified Windows images and VM templates share one `MachineGuid`, so one code held by several unrelated accounts
+  can look like a shared PC. A "Shared PC" count can be strangers, not a family.
+- An account made before the ban reads like a family member, and so does an alt made in advance. "Existed before the
+  ban" lowers the weight of a lead; it does not clear it.
 - A confirmed alt gets the existing **Add Ban** on the dashboard (or a Discord ban). Never ban on a lead alone.
 
 ## Switches (backend env, read at start)
@@ -110,10 +127,23 @@ sending the raw machine id. No proxy change is needed for this check, because `/
 IPv4-mapped IPv6 turned into IPv4) and uses only what Node accepts as an address. Special-purpose ranges are never
 stored in a ban or matched (private, loopback, link-local, carrier-grade NAT, `192.0.0.0/24`, `198.18.0.0/15`,
 multicast, reserved, NAT64, Teredo, 6to4, unique local). A public address that is the last address of 3 or more players
-is never stored or matched either; a players.json that cannot be read turns address matching off. Today no ban holds an
-address and every stored address is the one internal relay value, so no address can refuse anyone. Follow-ups: stop
-storing the internal last ip (L3-02), and give the game server's `adminBans.ts` and `adminSystem.ts` the same checks
-(its private-address test lacks `100.64.0.0/10`).
+is never stored or matched either; a players.json that cannot be read turns address matching off.
+
+**An address match still refuses.** It is the only refusal path besides the Discord id: the game server's connection
+check (`POST /api/servers/:key/connection-check`) refuses a connection whose address matches a ban's. Today it is
+dormant only because every stored address is the one internal relay value (15 Oct: 1 ban, holding no address; 184 of
+184 stored addresses are the one internal value). Once the server sees real player addresses:
+
+- banning one player refuses every other account behind the same public address while fewer than 3 player records
+  share it (a household of 2, a CGNAT pair);
+- if the relay itself became a public address, a ban made in the first minutes can refuse the next player to connect,
+  until a third player has connected through it.
+
+**Gate:** before any change that lets the server see real addresses (L3-02, a port forward that keeps source addresses,
+a server move), address matches must become report-only leads or be removed.
+
+Follow-ups: stop storing the internal last ip (L3-02), and give the game server's `adminBans.ts` and `adminSystem.ts`
+the same checks (its private-address test lacks `100.64.0.0/10`).
 
 ## Rollout
 
