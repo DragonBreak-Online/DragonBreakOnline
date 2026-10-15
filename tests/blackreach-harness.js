@@ -157,9 +157,7 @@ const main = async () => {
   given.length = 0;
   ok(use(CH, P3) === false && given.length === 2, 'P3, in P1\'s party, shares the party\'s credit');
   // Kept across a hot reload and a restart: the state file (written off the game loop)
-  Date.now = realNow;
-  await new Promise((res) => savedTimeout(res, 50));
-  Date.now = () => clock;
+  // (written in the same tick as the roll, before the pay: save-before-pay-harness.js)
   {
     const saved = JSON.parse(fs.readFileSync(path.join(dir, 'blackreach-cooldowns.json'), 'utf8'));
     ok([101, 102, 103].every((p) => Number(saved[`${p}:${CH.toString(16)}`]) > Date.now() + (B.chestHours - 1) * 3600000), 'blackreach-cooldowns.json keeps each account\'s rest', saved);
@@ -198,6 +196,7 @@ const main = async () => {
   ok(/__dboBlackreachChest\(targetId >>> 0, casterId >>> 0\)[\s\S]{0,200}\n  if \(globalThis\.__dboCampChest\)/.test(gm) && /__dboBlackreachDeath\(Number\(actorId\)/.test(gm) && /__dboBlackreachHit\(agg, tgt\)/.test(gm) && /require\(BLACKREACH_JS\)/.test(gm),
     'gamemode.js wires the chest (before the camp chests), the hit, the death and the module');
   ok(!/mp\.on\(/.test(fs.readFileSync(path.join(ROOT, 'blackreach.js'), 'utf8')), 'blackreach.js registers no mp.on listener (hot reload stacks them)');
+  ok(!/__dboRaceGold\(/.test(fs.readFileSync(path.join(ROOT, 'blackreach.js'), 'utf8')), 'a Blackreach chest\'s coin is no Imperial Luck (racial-harness: only dungeons, camps and contracts pay it)');
 
   // ---- 4. the loot (the real dungeons.js) ------------------------------------------------------------------------------
   {

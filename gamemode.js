@@ -833,7 +833,7 @@ const HELP_GROUPS = [
 const HELP_BY_OBJECT = new Set(['bank', 'board', 'business', 'faction', 'deity', 'rite', 'tomes', 'respawn', 'skills',
   'ledger', 'chill', 'sentence', 'hunger', 'rest', 'tokens', 'whoami', 'pigeonblock', 'sign', 'level', 'spells',
   'teach', 'reroll', 'offer', 'contract', 'commission', 'wildlife', 'champions', 'whereami', 'playtest', 'dungeon', 'ping',
-  'expedition', 'expeditions']);
+  'expedition', 'expeditions', 'blackreach']);
 const helpRoleOk = (a, role) => {
   if (!role) return true;
   try {

@@ -130,19 +130,14 @@ module.exports = (api) => {
     try { const raw = JSON.parse(fs.readFileSync(CD_PATH, 'utf8')); for (const [k, v] of Object.entries(raw || {})) if (Number(v) > Date.now()) m.set(k, Number(v)); } catch (e) { if (e.code !== 'ENOENT') log('blackreach-cooldowns.json unreadable', e.message); }
     return m;
   })());
-  // Off the game loop, temp file then rename, one write at a time (a sync write stalls the live server: 4 Oct)
-  const saveState = globalThis.__dboBlackreachSave || (globalThis.__dboBlackreachSave = { writing: false, dirty: false });
+  // Written in the same tick, before the roll is handed over (tests/save-before-pay-harness.js: a crash between the pay and
+  // a later write would give the chest again), temp file then rename, as dungeons.js keeps dungeon-cooldowns.json. Once a
+  // chest is looted, a few hundred bytes
   const saveRest = () => {
-    saveState.dirty = true;
-    if (saveState.writing) return;
-    saveState.writing = true;
-    saveState.dirty = false;
     const now = Date.now();
     for (const [k, v] of rest) if (v < now) rest.delete(k);
-    fs.promises.writeFile(CD_PATH + '.tmp', JSON.stringify(Object.fromEntries(rest)))
-      .then(() => fs.promises.rename(CD_PATH + '.tmp', CD_PATH))
-      .catch((e) => log('blackreach-cooldowns.json save failed', e.message))
-      .finally(() => { saveState.writing = false; if (saveState.dirty) saveRest(); });
+    try { fs.writeFileSync(CD_PATH + '.tmp', JSON.stringify(Object.fromEntries(rest))); fs.renameSync(CD_PATH + '.tmp', CD_PATH); return true; }
+    catch (e) { log('blackreach-cooldowns.json save failed', e.message); return false; }
   };
   const restKey = (pid, chestId) => `${pid}:${chestId.toString(16)}`;
 
@@ -194,9 +189,9 @@ module.exports = (api) => {
     // No loot module: refused, and the chest's rest is not spent
     if (!got) { log('blackreach: dungeons.js __dboOpenWorldLoot missing; chest refused'); return refuse(casterId, 'The lock is jammed. Try again later.'); }
     rest.set(key, Date.now() + C.chestHours * 3600000);
-    saveRest();
+    // Not saved, not paid: a rest the file does not hold would be gone after a restart
+    if (!saveRest()) { rest.delete(key); return refuse(casterId, 'The lock is jammed. Try again later.'); }
     const given = got.filter((e) => giveItem(casterId, e.baseId, e.count));
-    for (const e of given) if (e.baseId === GOLD_BASE) { try { if (typeof globalThis.__dboRaceGold === 'function') globalThis.__dboRaceGold(casterId, e.count, 'a Blackreach chest'); } catch (err) { log('racial gold failed', err.message); } }
     try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('loot', 'blackreach_chest', casterId, targetId, given, 0); } catch (e) { /* the player log is optional */ }
     personal(casterId, given.length ? `You force the chest open: ${given.map((e) => `${e.count > 1 ? e.count + ' ' : ''}${nameOf(e.baseId, e.baseId === GOLD_BASE ? 'Gold' : e.name)}`).join(', ')}.` : 'The chest is empty.');
     audit(`BLACKREACH ${who(casterId)} looted ${entry.chest.edid} ${entry.chest.ref}: ${given.map((e) => `${e.count}x ${e.baseId.toString(16)}`).join(', ')}`);
