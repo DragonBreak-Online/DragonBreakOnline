@@ -28,7 +28,8 @@ const SWEEP_MS = 5 * 60 * 1000
 const DISCORD_EPOCH = 1420070400000n
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 const RECOVERY = 'The device check is off until the backend restarts with a readable file. It holds nothing that must ' +
-  'be kept: with the backend stopped, move it aside or delete it, and it rebuilds as players launch'
+  'be kept: with the backend stopped, delete it and its .tmp files (a privacy erase: never move it aside or archive ' +
+  'it), and it rebuilds as players launch (docs/ban_device_check.md, Undo, Unreadable store)'
 
 const paths = { store: path.join(__dirname, '..', 'data', 'device-ids.json') }
 const hooks = { now: () => Date.now(), audit: null, log: null, config: null, bans: null, players: null, who: null }

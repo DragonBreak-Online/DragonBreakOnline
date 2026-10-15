@@ -350,6 +350,8 @@ test('a store that cannot be read turns the check off and is left exactly as it 
   launch(AELA, 'pc-2', { token: 'again' })
   assert.equal(fs.readFileSync(STORE, 'utf8'), '{"v":1,"accounts":{"cut')
   assert.equal(errors.filter(e => e.includes('device-ids.json')).length, 1, 'said once')
+  assert.ok(errors.find(e => e.includes('device-ids.json')).includes('delete it and its .tmp files (a privacy erase: ' +
+    'never move it aside or archive it)'), 'the advice is a privacy erase, never an archive')
   assert.throws(() => dc.forgetAccount(AELA), /cannot be read/)
   assert.deepEqual(lines, [])
 })

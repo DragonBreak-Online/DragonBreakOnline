@@ -97,7 +97,10 @@ and **Undo**.
 | `DEVICE_RETENTION_DAYS` | `30` | Days a code is kept after the PC was last used to play, 7 to 90. Above 30 needs the Privacy Policy changed first. |
 | `NEW_ACCOUNT_FLAG_DAYS` | `30` | NEW ACCOUNT for Discord accounts younger than this at first launch, 0 to 365. 0 turns it off. The age is read from the Discord id itself; no API call. |
 
-The check is also off, and leaves the file as it is, when `data/device-ids.json` cannot be read; one log line names it.
+The check is also off, and leaves the file as it is, when `data/device-ids.json` cannot be read; one log line names it
+and says what to do: with the backend stopped, delete it and its `.tmp` files (a privacy erase: never move it aside or
+archive it), and it rebuilds as players launch. The steps are in Undo, **Unreadable store**: the full erase's `rm`,
+but the key stays.
 Every hour that counted anything, the backend logs one line of counts, without values, that starts
 `[device-check] last hour:` and ends with `until <UTC minute>Z`: launch-checks with a code, unavailable or none,
 malformed codes, session changes, codes dropped by the limits, flags by kind, not-an-alt marks, and raw hwids discarded
@@ -185,7 +188,8 @@ its own lines; `<you>` is your ledger operator name.
   anything the two files leave unset, so a key there would survive the full erase.
 
 1. **Deploy the backend with `DEVICE_ID_HMAC_KEY` unset**, with Phase 1 or after it. Who: claude-jake, after Jake's go.
-   Ask for that go together with his OK for the full erase's exception to ops README rule 9 (Undo, Full erase).
+   Ask for that go together with his OK for the full erase's exception to ops README rule 9 (Undo, Full erase and
+   Unreadable store).
    - Ledger first: `ops claim backend claude-jake "L3-01 backend deploy and restart" 60`. When the deploy goes through
      a push to main, also `ops claim github-main claude-jake "L3-01 deploy push to main" 30` and follow ops README
      rule 6: the updater resets `/opt/alduinak` to `origin/main` and restarts the game server, never the backend.
@@ -346,6 +350,24 @@ and `ops release backend claude-jake`.
   The `*.tmp` names are unfinished saves that a crash can leave behind. The log then says `is not set`. Backups of
   `backend.env` made after step 3 still hold the key. With the store gone it links nothing, but restoring one turns the
   check back on, so run the count from step 3 after any restore.
+- **Unreadable store.** When a log line says `data/device-ids.json` cannot be read (`[device-check] ... cannot be
+  read` or `[store] FAIL CLOSED: ... device-ids.json ...`), the check is off until the backend restarts without that
+  file. It holds nothing that must be kept, so delete it, never repair, move or archive it. This is the full erase's
+  `rm`, but the `DEVICE_ID_HMAC_KEY` line stays, so `backend.env` is not changed and needs no backup. Run the disk
+  gate (step 1) first, as before any start:
+
+  ```
+  systemctl stop dragonbreak-backend.service; rm -f /opt/alduinak/skymp5-backend/data/device-ids.json /opt/alduinak/skymp5-backend/data/device-ids.json.*.tmp; systemctl start dragonbreak-backend.service
+  grep -F -e '[device-check]' -e 'device-ids.json' /var/log/dragonbreak-backend.log | tail -n 2
+  ```
+
+  The last line must be the start line, `[device-check] on, report only: ...` (or `DEVICE_MATCH=off: ...` while
+  paused). A `cannot be read` or `FAIL CLOSED` line after it means the file is still there and unreadable: stop and
+  ask Jake. The store rebuilds as players launch. The `rm` is the same privacy erase and ops README rule 9 exception as
+  the full erase, under the same OK from Jake (step 1): never `ops archive` the file or its `.tmp` files and never
+  move them aside, not even to look at them. The `ops log` line says so, for example `ops log claude-jake "device
+  check store unreadable: device-ids.json and its .tmp files deleted (privacy erase, ops README rule 9 exception), key
+  kept" "none by design: the store rebuilds as players launch"`.
 - **Code.** The release lands on main as cherry-picks (step 1), never as a merge, so the code undo is a `git revert`
   of L3-01's own commits on main, which leaves Phase 1 and F1 in place. For the device check alone the undo is the
   Pause (`DEVICE_MATCH=off`): no push and no game-server restart. The revert also takes back the bans.js address
