@@ -12,10 +12,23 @@ import base64, hashlib, hmac, json, sys, time, urllib.request
 from collections import Counter
 
 SETTINGS = '/opt/alduinak/build/dist/server/server-settings.json'
+# The room the game server moved voice to after a replayed token (fork voiceSystem.ts), beside the settings
+MOVED_ROOM = '/opt/alduinak/build/dist/server/voice-room.json'
 
 
 def b64(raw):
     return base64.urlsafe_b64encode(raw).rstrip(b'=').decode()
+
+
+def current_room(room):
+    try:
+        moved = json.load(open(MOVED_ROOM))
+    except (OSError, ValueError):
+        return room
+    if not isinstance(moved, dict):
+        return room
+    new = str(moved.get('room', ''))
+    return new if moved.get('base') == room and new.startswith(room + '-') else room
 
 
 def main():
@@ -23,6 +36,7 @@ def main():
     url, key, secret, room = vc.get('url', ''), vc.get('apiKey', ''), vc.get('apiSecret', ''), vc.get('room', 'dragonbreak')
     if not (url and key and secret):
         sys.exit('voiceChat has no url/apiKey/apiSecret: voice is off here')
+    room = current_room(room)
     base = url.replace('wss://', 'https://').replace('ws://', 'http://').rstrip('/')
 
     grants = {'ListRooms': {'roomList': True}, 'ListParticipants': {'roomAdmin': True, 'room': room}}
