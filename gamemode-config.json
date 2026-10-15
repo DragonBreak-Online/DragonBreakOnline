@@ -949,6 +949,20 @@
   "hours": 150,
   "slots": 1
  },
+ "snowElfRace": {
+  "_comment": "The DLE's DBOSnowElfRace and its vampire (Nat, 13 Oct). racial.js gives the creator's snowelf slug this race (__dboRaceOverrides) and the Snow Elf's gifts (racial.snowelf).",
+  "race": "1ac9ff:DragonBreak Online Edits.esp",
+  "vampire": "1aca00:DragonBreak Online Edits.esp"
+ },
+ "goblinRace": {
+  "_comment": "The DLE's DBOGoblinRace (Nat, 13 Oct; no vampire race). racial.js gives the creator's goblin slug this race (__dboRaceOverrides) and the Goblin's gifts (racial.goblin). Its colour is its skin tone (the race's ten Skin Tone presets); variants: { slug: race desc } would add more goblin races.",
+  "race": "1aca01:DragonBreak Online Edits.esp"
+ },
+ "reachmanRace": {
+  "_comment": "The DLE's DBOReachmanRace and its vampire (Nat, 14 Oct; from Reachman Race.esp v2, Nexus 39844, Breton morph, vanilla heads). racial.js gives the creator's reachfolk slug this race (__dboRaceOverrides) and the Reachman's gifts (racial.reachman); supernatural.js turns it into its vampire and back.",
+  "race": "1c8981:DragonBreak Online Edits.esp",
+  "vampire": "1c8982:DragonBreak Online Edits.esp"
+ },
  "maormerRace": {
   "_comment": "The DLE's own Maormer race (Nate, 10 Oct: lore skin tones, a little shorter than the Altmer): MaormerRace and MaormerRaceVampire, as <hex>:<plugin> descs. Until both resolve to RACE records in the load order every Maormer stays on the High Elf record. Once they do: the character creator makes new Maormer on it (charCreatorData.ts reads __dboRaceOverrides), racial.js counts it as the Maormer, supernatural.js turns it into its vampire and back, and appearance.js guards its heads as the High Elf's.",
   "race": "192ede:DragonBreak Online Edits.esp",
@@ -976,7 +990,9 @@
   "orc": { "lowHealth": 0.3, "meleeDamage": 0.2, "damageTaken": 0.2 },
   "redguard": { "staminaRegen": 1.25, "resistPoison": 0.5 },
   "_maormer": "The Maormer with the overhaul on (Nate's table, 10 Oct): DBO_AbMaormerSeafarer (swimming) on every Maormer, Roaring Tempest's ward look DBO_MaormerTempestWard (DLE ec2de1a0). power is replaced whole by this block, so it carries every field.",
-  "maormer": {"resistShock": 0.5, "seafarerSpell": "192ee1:DragonBreak Online Edits.esp", "xp": {"blade": 1.15}, "power": {"name": "Roaring Tempest", "seconds": 60, "wardSpell": "192ee3:DragonBreak Online Edits.esp", "lookShader": "10f9a6:Skyrim.esm", "buffs": {"resistMagic": 0.25, "wardPoints": 60}}}
+  "maormer": {"resistShock": 0.5, "seafarerSpell": "192ee1:DragonBreak Online Edits.esp", "xp": {"blade": 1.15}, "power": {"name": "Roaring Tempest", "seconds": 60, "wardSpell": "192ee3:DragonBreak Online Edits.esp", "lookShader": "10f9a6:Skyrim.esm", "buffs": {"resistMagic": 0.25, "wardPoints": 60}}},
+  "_reachman": "The Reachman with the overhaul on (PROPOSED 15 Oct, waiting on Nate's approval): Mongrel Blood 15% magic and 25% poison resistance, Alchemist XP +15%, Fury of the Reach 60 s: stamina and magicka regeneration x1.5. A Reachfolk made in the creator on the Breton record counts too.",
+  "reachman": { "resistMagic": 0.15, "resistPoison": 0.25, "xp": { "alchemist": 1.15 }, "power": { "name": "Fury of the Reach", "seconds": 60, "buffs": { "staminaRegen": 1.5, "magickaRegen": 1.5 } } }
  },
  "loginGrace": {
   "_comment": "A player just in cannot be harmed by creatures for this many seconds after the JOIN (gamemode.js; Nate, 5 Oct: wolves downed one 12 s after it); the player's own attack or cast ends it, players can still hit them. 0 turns it off. Hot reload.",

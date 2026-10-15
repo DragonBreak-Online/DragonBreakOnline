@@ -140,6 +140,14 @@ module.exports = (api) => {
     const r = rec(M.race), v = rec(M.vampire);
     if (r && v && HEADS.own.has('HighElfRace')) { HEADS.raceOf.set(r, 'HighElfRace'); HEADS.raceOf.set(v, 'HighElfRace'); }
   } catch (e) { log('appearance: the Maormer race could not be read', e.message); }
+  // The DLE's DBOReachmanRace and its vampire (config reachmanRace) wear the Breton's own heads (MaleHeadBreton, FemaleHeadBreton
+  // on the Breton morph): guarded as the Breton, the same way
+  try {
+    const M = (cfg && cfg.reachmanRace) || {};
+    const rec = (d) => { const id = d ? mp.getIdFromDesc(String(d)) >>> 0 : 0; const r = id ? mp.lookupEspmRecordById(id) : null; return r && r.record && String(r.record.type) === 'RACE' ? id : 0; };
+    const r = rec(M.race), v = rec(M.vampire);
+    if (r && v && HEADS.own.has('BretonRace')) { HEADS.raceOf.set(r, 'BretonRace'); HEADS.raceOf.set(v, 'BretonRace'); }
+  } catch (e) { log('appearance: the Reachman race could not be read', e.message); }
 
   const get = (a, k) => { try { return mp.get(a, k); } catch (e) { return undefined; } };
   const userOf = (a) => {

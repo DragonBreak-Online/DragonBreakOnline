@@ -142,6 +142,7 @@ declare -A NEEDS=(
   [journal-actions-front]=front:skymp5-front/src/features/journal/index.tsx
   [racial-power-front]=front:skymp5-front/src/features/journal/index.tsx
   [maormer-race-front]=front:skymp5-front/src/features/charCreator/appearanceBuilder.js
+  [reachman-race-front]=front:skymp5-front/src/features/charCreator/appearanceBuilder.js
   [thalmor-tab-front]=front:skymp5-front/src/features/journal/index.tsx
   [courier-tab-front]=front:skymp5-front/src/features/pigeon/index.tsx
   [courier-handover-front]=front:skymp5-front/src/features/courierHandover/index.tsx

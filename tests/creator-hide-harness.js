@@ -37,9 +37,11 @@ const mp = {
 const inHub = (a) => { try { return String(mp.get(a, 'worldOrCellDesc') || '').toLowerCase() === HUB_DESC.toLowerCase(); } catch (e) { return false; } };
 const timers = {};
 const logs = [];
-const load = (creation) => new Function('mp', 'inHub', 'creationPending', 'creation', 'every', 'onlineActors', 'log', 'globalThis',
+// cfg: gamemode-config; creatorHide.enabled false switches the hide off (the goblin creator test, 13 Oct)
+const cfg = {};
+const load = (creation) => new Function('mp', 'inHub', 'creationPending', 'creation', 'every', 'onlineActors', 'log', 'globalThis', 'cfg',
   gm.slice(a0, b0) + '\nreturn { setCreatorHidden, inCreatorRealm, creatorHidden };')(
-  mp, inHub, (a) => pending.has(a), creation, (n, ms, fn) => { timers[n] = { ms, fn }; }, () => online, (...x) => logs.push(x.join(' ')), globalThis);
+  mp, inHub, (a) => pending.has(a), creation, (n, ms, fn) => { timers[n] = { ms, fn }; }, () => online, (...x) => logs.push(x.join(' ')), globalThis, cfg);
 
 delete globalThis.__dboCreatorHidden;
 const creation = new Map();
@@ -178,6 +180,17 @@ check('an entry from before the reload keeps its meaning: a player is shown on l
 check('...and staff who were already invisible stay so', modes.get(14).invis === true, modes.get(14));
 check('...both with AdminSystem\'s five modes only', Object.keys(modes.get(13)).length === 5 && Object.keys(modes.get(14)).length === 5,
   [modes.get(13), modes.get(14)]);
+
+// creatorHide.enabled false: nobody is hidden, and whoever the sweep hid is shown again; true or absent hides as before
+join(15, HUB_DESC, true); timers.creatorHide.fn();
+check('with no creatorHide config a maker is hidden (live today)', modes.get(15) && modes.get(15).invis === true, modes.get(15));
+cfg.creatorHide = { enabled: false }; timers.creatorHide.fn();
+check('creatorHide.enabled false shows a hidden maker again', modes.get(15).invis === false && !H.creatorHidden.has(15), modes.get(15));
+join(16, HUB_DESC, true); timers.creatorHide.fn();
+check('...and hides no new maker', !modes.has(16) || modes.get(16).invis !== true, modes.get(16));
+delete cfg.creatorHide; timers.creatorHide.fn();
+check('switched back on (config removed), the next sweep hides makers again', modes.get(16) && modes.get(16).invis === true, modes.get(16));
+leave(15); leave(16);
 
 // ---- the wiring in gamemode.js ----
 const arrived = gm.slice(gm.indexOf("onUi('arrived'"), gm.indexOf("onUi('arrived'") + 1400);
