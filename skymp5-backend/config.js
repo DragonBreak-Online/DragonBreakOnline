@@ -16,6 +16,10 @@ const NAME_TABLE_PATH = process.env.NAME_TABLE_PATH || path.join(GAME_SERVER_DIR
 const siteShows = (value) => String(value || '').trim().toLowerCase() !== 'off'
 // A positive whole number from the env, or the fallback when unset or anything else
 const positiveInt = (value, fallback) => (Number.isSafeInteger(Number(value)) && Number(value) > 0 ? Number(value) : fallback)
+// A whole number from the env held to min..max, or the fallback when unset or not a whole number
+const clampedInt = (value, min, max, fallback) => (String(value ?? '').trim() !== '' && Number.isSafeInteger(Number(value)) ? Math.min(max, Math.max(min, Number(value))) : fallback)
+// Device check switch (sources/deviceChecks.js): off and enforce are the only other values, so a typo keeps it reporting
+const DEVICE_MATCH = String(process.env.DEVICE_MATCH || '').trim().toLowerCase()
 // Auto report switch: anything but collect or on is off
 const AUTO_REPORTS = String(process.env.AUTO_REPORTS || '').trim().toLowerCase()
 // Old launcher login switch: off and revoke are the only other values, so a typo keeps the old flow working
@@ -83,6 +87,14 @@ module.exports = {
   launchCheckEnforce: process.env.LAUNCH_CHECK_ENFORCE !== 'false',
   // Refuse game sessions of players who have not accepted the current Terms of Service and Privacy Policy (sources/legal.js)
   legalRequired: process.env.LEGAL_REQUIRED === 'true',
+  // Report-only ban check on PCs (docs/ban_device_check.md): the secret for the stored device codes, 64 or more hex characters; empty keeps the check off
+  deviceIdHmacKey: process.env.DEVICE_ID_HMAC_KEY || '',
+  // report (default) flags a PC linked to a banned account to staff; off collects and flags nothing; enforce is not built and reports only
+  deviceMatch: ['off', 'enforce'].includes(DEVICE_MATCH) ? DEVICE_MATCH : 'report',
+  // Days a device code is kept after the PC was last used to play (7-90); a banned account's are kept while the ban lasts
+  deviceRetentionDays: clampedInt(process.env.DEVICE_RETENTION_DAYS, 7, 90, 30),
+  // A Discord account younger than this many days at its first launch is flagged to staff (0-365; 0 turns it off)
+  newAccountFlagDays: clampedInt(process.env.NEW_ACCOUNT_FLAG_DAYS, 0, 365, 30),
 
   // Admin service
   adminUrl:   process.env.ADMIN_URL   || 'http://localhost:5001',
