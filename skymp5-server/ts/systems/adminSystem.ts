@@ -387,6 +387,16 @@ export class AdminSystem implements System {
     for (const p of this.onlinePlayers(mp)) this.enforceBan(mp, p.userId, p.profileId);
   }
 
+  // Voice asks before it mints a token, so a panel ban refuses one before the 2 s sweep's kick
+  voiceRefusal(mp: Mp, userId: number, actorId: number): string {
+    if (!this.bans) return "";
+    let ip = "";
+    try { ip = String(mp.getUserIp(userId) || ""); } catch { return ""; }
+    let profileId = 0;
+    try { profileId = Number(mp.get(actorId, "profileId")) || 0; } catch { }
+    return this.bans.find(profileId, ip) ? "banned in the admin panel" : "";
+  }
+
   private enforceBan(mp: Mp, userId: number, profileId: number): void {
     if (!this.bans) return;
     let ip = "";

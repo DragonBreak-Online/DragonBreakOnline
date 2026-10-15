@@ -220,20 +220,21 @@ const main = async () => {
   const npcSpawnSystem = new NpcSpawnSystem(log);
   const masterySystem = new MasterySystem(log);
   const companionSystem = new CompanionSystem(log);
+  const adminSystem = new AdminSystem(log, npcSpawnSystem, masterySystem);
   systems.push(
     new MetricsSystem(),
     new MasterClient(log, port, master, maxPlayers, name, masterKey, 5000, offlineMode, masterApiAuthToken),
     new Spawn(log),
     new Login(log, maxPlayers, master, port, masterKey, offlineMode),
     // Keep AdminSystem before capture/trade: its console grant/revoke is security-relevant and must not be skipped by an earlier listener throwing
-    new AdminSystem(log, npcSpawnSystem, masterySystem),
+    adminSystem,
     new CaptureSystem(log),
     new HousingSystem(log),
     new TradeSystem(log),
     new CraftedExtrasSystem(log),
     new SearchSystem(log),
     new SoulTrapSystem(log, companionSystem),
-    new VoiceSystem(log),
+    new VoiceSystem(log, [(mp, userId, actorId) => adminSystem.voiceRefusal(mp, userId, actorId)]),
     new AfkSystem(log),
     masterySystem,
     // After mastery so a refused tool check is never credited as work.

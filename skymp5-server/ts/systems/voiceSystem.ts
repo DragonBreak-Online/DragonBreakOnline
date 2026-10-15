@@ -65,9 +65,12 @@ const httpBaseOf = (url: string): string => url.trim().replace(/^ws(s?):\/\//i, 
 // Error code only: a fetch error's cause carries the address it tried
 const errCode = (e: any): string => String(e?.cause?.code || e?.name || "error");
 
+// Why this account may not use voice ("" = it may): a panel ban, wired in index.ts
+export type VoiceRefusal = (mp: Mp, userId: number, actorId: number) => string;
+
 export class VoiceSystem implements System {
   systemName = "VoiceSystem";
-  constructor(private log: Log) { }
+  constructor(private log: Log, private refusals: VoiceRefusal[] = []) { }
 
   private enabled = false;
   private url = "";
@@ -139,6 +142,19 @@ export class VoiceSystem implements System {
     }
   }
 
+  // The checks wired in index.ts, then the gamemode's globalThis.__dboVoiceRefused(actorId) (a suspension); a check that throws refuses nothing
+  private refusal(mp: Mp, userId: number, actorId: number): string {
+    for (const check of this.refusals) {
+      try { const why = check(mp, userId, actorId); if (why) return why; } catch { }
+    }
+    try {
+      const hook = (globalThis as any).__dboVoiceRefused;
+      const why = typeof hook === "function" ? hook(actorId) : "";
+      if (why) return typeof why === "string" ? why : "refused by the gamemode";
+    } catch { }
+    return "";
+  }
+
   // A token cannot be revoked and LiveKit re-signs one for a connected session every few minutes, so the session is removed
   private async removeParticipant(identity: string, why: string): Promise<void> {
     const res = await this.roomService("RemoveParticipant", { room: this.room, identity });
@@ -187,6 +203,12 @@ export class VoiceSystem implements System {
     if (now - (this.lastMintAt.get(userId) || 0) < VoiceSystem.MINT_COOLDOWN_MS) return;
     this.lastMintAt.set(userId, now);
     const identity = actorId.toString(16);
+    const refused = this.refusal(mp, userId, actorId);
+    if (refused) {
+      this.log(`VoiceSystem: no voice token for user ${userId} (actor ${identity}): ${refused}`);
+      mp.sendCustomPacket(userId, JSON.stringify({ customPacketType: "voiceToken", enabled: false }));
+      return;
+    }
     try {
       const token = mintLiveKitToken(this.apiKey, this.apiSecret, identity, this.room);
       const minted = this.mintedByUser.get(userId) || new Set<string>();
