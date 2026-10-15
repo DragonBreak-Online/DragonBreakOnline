@@ -211,10 +211,11 @@ its own lines; `<you>` is your ledger operator name.
      the wrong first commit, and the Undo revert of that range stops with a conflict in `data/legal/hashes.json`
      (tested 15 Oct).
    - **Deploy tree:** the backend release tree, built on the live main head at deploy time (`git -C /opt/alduinak
-     rev-parse HEAD`, the same as `origin/main`; on 15 Oct 18:44Z that is f985e98fe, which serves launcher 2.1.49 and
-     client 0.3.98) from cherry-picks, never `git merge`. Phase 1 (`secfix-phase1-backend-1015`) and, once F1 is
-     approved, F1 (`secfix2-F1-backend-1015`) go in as cherry-picks, as in `backend-release-1015-trial`. Then add this
-     branch's own commits, and only those (1314e05ca is the Phase 1 head this branch is built on):
+     rev-parse HEAD`, the same as `origin/main`) from cherry-picks, never `git merge`. Phase 1
+     (`secfix-phase1-backend-1015`) and F1 (`secfix2-F1-backend-1015` with its Continue guard) are already on main
+     since the 15 Oct 20:21Z backend release (main 0a918b236, which serves launcher 2.1.49 and client 0.3.98), so they
+     are not picked again. The deploy tree is that head plus this branch's own commits, and only those (1314e05ca is
+     the Phase 1 head this branch is built on; on 0a918b236 the 25 picks apply cleanly, tested 15 Oct):
 
      ```
      git cherry-pick -x 1314e05ca..secfix3-L3-01-backend-1015
@@ -357,12 +358,13 @@ and `ops release backend claude-jake`.
   gate (step 1) first, as before any start:
 
   ```
-  systemctl stop dragonbreak-backend.service; rm -f /opt/alduinak/skymp5-backend/data/device-ids.json /opt/alduinak/skymp5-backend/data/device-ids.json.*.tmp; systemctl start dragonbreak-backend.service
-  grep -F -e '[device-check]' -e 'device-ids.json' /var/log/dragonbreak-backend.log | tail -n 2
+  systemctl stop dragonbreak-backend.service; rm -f /opt/alduinak/skymp5-backend/data/device-ids.json /opt/alduinak/skymp5-backend/data/device-ids.json.*.tmp; test ! -e /opt/alduinak/skymp5-backend/data/device-ids.json && echo gone; systemctl start dragonbreak-backend.service
+  sleep 10; grep -F -e '[device-check]' -e 'device-ids.json' /var/log/dragonbreak-backend.log | tail -n 2
   ```
 
-  The last line must be the start line, `[device-check] on, report only: ...` (or `DEVICE_MATCH=off: ...` while
-  paused). A `cannot be read` or `FAIL CLOSED` line after it means the file is still there and unreadable: stop and
+  The unit is Type=simple, so `systemctl start` returns before the backend prints its start line: the `sleep 10`
+  waits for it. If no new start line shows yet, wait a few seconds and run the grep again. The last line must be the
+  start line, `[device-check] on, report only: ...` (or `DEVICE_MATCH=off: ...` while paused). A `cannot be read` or `FAIL CLOSED` line after it means the file is still there and unreadable: stop and
   ask Jake. The store rebuilds as players launch. The `rm` is the same privacy erase and ops README rule 9 exception as
   the full erase, under the same OK from Jake (step 1): never `ops archive` the file or its `.tmp` files and never
   move them aside, not even to look at them. The `ops log` line says so, for example `ops log claude-jake "device
