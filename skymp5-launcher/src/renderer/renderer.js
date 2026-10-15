@@ -593,6 +593,8 @@ async function loadSettings() {
 
 // Discord topbar widget
 const discordTopbarSlot = document.getElementById('discord-topbar-slot')
+const DISCORD_LOGIN_HINT = 'Discord is opening in your browser. Press Authorize there to sign in this launcher on this PC.'
+const DISCORD_APPROVAL_NOTE = 'DragonBreak asks Discord only for your Discord name and avatar. The sign-in comes back only to this launcher, on this PC. Never authorize DragonBreak from a link someone sent you.'
 
 function showLoggedOut() {
   discordUser   = null
@@ -645,12 +647,12 @@ function renderTopbarDiscord() {
     loginBtn.addEventListener('click', async () => {
       loginBtn.disabled    = true
       loginBtn.textContent = 'Waiting for Discord…'
-      loginBtn.title       = 'Finish logging in from the browser window that just opened.'
-      if (connectWarning.textContent.startsWith('Discord login failed:')) {
-        connectWarning.classList.remove('visible')
-        connectWarning.textContent = ''
-      }
+      loginBtn.title       = DISCORD_APPROVAL_NOTE
+      // What the player is about to approve, shown while the browser is open
+      showWarning(DISCORD_LOGIN_HINT)
+      connectWarning.title = DISCORD_APPROVAL_NOTE
       const result = await window.electronAPI.discordLogin()
+      if (connectWarning.textContent === DISCORD_LOGIN_HINT) clearWarning()
       if (result.success) {
         discordUser = result.user
         if (connectWarning.textContent.startsWith('Your Discord login has expired.')) clearWarning()
