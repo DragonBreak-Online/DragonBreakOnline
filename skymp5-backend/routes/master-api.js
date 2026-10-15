@@ -213,9 +213,30 @@ function getProfileFactionPayload(discordId) {
   }
 }
 
-// Session creation helper (used by POST /auth/session and discord-auth callback)
+// Ends every session of one Discord account except keepToken; returns how many ended
+function endSessionsOf(discordId, keepToken = null) {
+  const id = String(discordId || '')
+  if (!id) return 0
+  let ended = 0
+  for (const [token, s] of sessions) {
+    if (token !== keepToken && String(s.discordId) === id) { sessions.delete(token); ended++ }
+  }
+  if (ended) saveSessions()
+  return ended
+}
 
-function createSession(discordUser) {
+// Ends one session; true when it existed
+function endSession(token) {
+  if (typeof token !== 'string' || !sessions.has(token)) return false
+  sessions.delete(token)
+  saveSessions()
+  return true
+}
+
+// Session creation helper (used by POST /auth/session and the launcher and in-game Discord logins)
+// flow: loopback, device or legacy for a Discord login, server for POST /auth/session; a Discord login ends the account's older sessions
+
+function createSession(discordUser, { flow = 'server' } = {}) {
   if (sessionsUnreadable) throw new Error(`sessions store unavailable: ${sessionsUnreadable.message}`)
   pruneExpired()
   const player = players.upsertFromDiscordUser(discordUser)
@@ -225,10 +246,14 @@ function createSession(discordUser) {
     profileId,
     discordId: discordUser.id,
     username:  discordUser.username || '',
+    flow,
+    createdAt: Date.now(),
     expiresAt: Date.now() + SESSION_TTL,
   })
+  // A stolen token stops working the next time its owner logs in
+  const ended = flow !== 'server' && config.launcherLoginSingleSession ? endSessionsOf(discordUser.id, token) : 0
   saveSessions()
-  return { profileId, session: token }
+  return { profileId, session: token, ended }
 }
 
 // POST /auth/session
@@ -400,12 +425,7 @@ router.delete('/:key/sessions-by-discord/:discordId', (req, res) => {
   if (!checkKey(req, res) || !checkWriteToken(req, res)) return
   const discordId = String(req.params.discordId || '').trim()
   if (!discordId) return res.status(400).json({ error: 'Invalid discordId.' })
-  let dropped = 0
-  for (const [token, s] of sessions) {
-    if (String(s.discordId) === discordId) { sessions.delete(token); dropped++ }
-  }
-  if (dropped) saveSessions()
-  res.json({ ok: true, dropped })
+  res.json({ ok: true, dropped: endSessionsOf(discordId) })
 })
 
 // GET /api/servers/:key/players  (X-Auth-Token)
@@ -544,6 +564,8 @@ async function isDiscordWhitelisted(discordId) {
 module.exports = router
 module.exports.lookupSession  = lookupSession
 module.exports.createSession  = createSession
+module.exports.endSession     = endSession
+module.exports.endSessionsOf  = endSessionsOf
 module.exports.isDiscordWhitelisted = isDiscordWhitelisted
 module.exports.recordLaunchCheck    = recordLaunchCheck
 module.exports.recordSessionHwid    = recordSessionHwid

@@ -64,6 +64,8 @@ module.exports = {
   discordClientSecret: process.env.DISCORD_CLIENT_SECRET || '',
   // Redirect URI registered in the Discord application settings
   discordRedirectUri:  process.env.DISCORD_REDIRECT_URI  || 'http://localhost:4000/api/users/login-discord/callback',
+  // A new launcher or in-game Discord login ends that account's older sessions; false keeps them
+  launcherLoginSingleSession: process.env.LAUNCHER_LOGIN_SINGLE_SESSION !== 'false',
 
   // Metrics HTTP auth (Basic auth for the game server's /metrics endpoint)
   metricsUser:     process.env.METRICS_USER     || '',
