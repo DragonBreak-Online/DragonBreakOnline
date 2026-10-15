@@ -44,7 +44,10 @@ const ROW = {
   createdBy: '100000000000000099', updatedAt: '2026-10-01T00:00:00.000Z', updatedBy: '100000000000000099',
 }
 fs.writeFileSync(path.join(tmp, 'faction-whitelist.json'), JSON.stringify({
-  requirements: [{ id: 'hold:whiterun:steward', scope: 'hold', group: 'Whiterun', rank: 'Steward', permission: 'hold.whiterun.steward', capacity: 4 }],
+  requirements: [
+    { id: 'hold:whiterun:steward', scope: 'hold', group: 'Whiterun', rank: 'Steward', permission: 'hold.whiterun.steward', capacity: 4 },
+    { id: 'hold:whiterun:captain', scope: 'hold', group: 'Whiterun', rank: 'Captain', permission: 'hold.whiterun.captain', capacity: 4 },
+  ],
   assignments: [ROW],
 }))
 const masterApi = loadWithDataIn(tmp, ['sessions.json', 'balances.json', 'faction-whitelist.json'], () => require('../routes/master-api'))
@@ -65,8 +68,9 @@ after(async () => {
   fs.rmSync(tmp, { recursive: true, force: true })
 })
 
-const call = async (method, url, token) => {
-  const r = await fetch(`${root}${url}`, { method, headers: token === undefined ? {} : { 'x-auth-token': token }, signal: AbortSignal.timeout(5000) })
+const call = async (method, url, token, body) => {
+  const headers = { ...(token === undefined ? {} : { 'x-auth-token': token }), ...(body === undefined ? {} : { 'content-type': 'application/json' }) }
+  const r = await fetch(`${root}${url}`, { method, headers, body: body === undefined ? undefined : JSON.stringify(body), signal: AbortSignal.timeout(5000) })
   return { status: r.status, body: await r.json() }
 }
 const base = `/api/servers/${KEY}`
@@ -131,4 +135,37 @@ test('the X-Auth-Token is compared in constant time, and an unset token on the b
     assert.deepEqual(await call('GET', `${base}/holds/whiterun/roster`, ''), REFUSED)
     assert.deepEqual(await call('GET', `${base}/holds/whiterun/roster`, 'anything'), REFUSED)
   } finally { config.masterApiAuthToken = TOKEN }
+})
+
+// The fields backendFactionApi and the gamemode read (requirementId), and nothing a player or a neighbour should see
+const ROW_KEYS = ['id', 'permission', 'playerName', 'requirement', 'requirementId', 'slot']
+const assertTrimmed = (rows, label) => {
+  assert.ok(rows.length > 0, label)
+  for (const row of rows) assert.deepEqual(Object.keys(row).sort(), ROW_KEYS, label)
+  const text = JSON.stringify(rows)
+  for (const secret of [ROW.notes, ROW.createdBy, PROFILES[21]]) assert.ok(!text.includes(secret), `${label} carries no staff note or Discord id`)
+}
+
+test('faction rows sent to the game server carry no staff notes, Discord ids or audit fields', async () => {
+  const check = await call('GET', `${base}/profiles/21/check`, TOKEN)
+  assert.equal(check.status, 200)
+  assert.equal('roles' in check.body, false, 'the offline check sends no Discord role ids')
+  assertTrimmed(check.body.factions, 'offline check')
+  // The login rows become private.skympAccess on the character
+  const login = await call('GET', `${base}/sessions/${session}`)
+  assert.equal(login.status, 200)
+  assertTrimmed(login.body.user.factions, 'login check')
+  assert.deepEqual(login.body.user.factions, check.body.factions)
+  assert.deepEqual(login.body.user.gameFactions.map(f => f.factionId), ['hold:whiterun'])
+})
+
+test('an in-game appointment still replaces the old hold rank by row id, with trimmed rows', async () => {
+  const added = await call('POST', `${base}/profiles/21/factions`, TOKEN, { requirementId: 'hold:whiterun:captain', playerName: 'Fake Steward' })
+  assert.equal(added.status, 201)
+  assertTrimmed([added.body.assignment], 'new assignment')
+  assertTrimmed(added.body.factions, 'factions after the appointment')
+  const stale = added.body.factions.find(f => f.requirementId === ROW.requirementId)
+  const dropped = await call('DELETE', `${base}/profiles/21/factions/${stale.id}`, TOKEN)
+  assert.equal(dropped.status, 200)
+  assert.deepEqual(dropped.body.factions.map(f => f.requirementId), ['hold:whiterun:captain'])
 })

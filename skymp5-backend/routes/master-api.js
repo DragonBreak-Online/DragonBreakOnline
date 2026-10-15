@@ -193,11 +193,23 @@ function getProfileDiscordId(req, res) {
   return discordId
 }
 
+// What the game server reads from a faction row (backendFactionApi drops stale ranks by id, requirementId and slot); notes, Discord ids and audit fields stay on the dashboard
+function gameServerAssignment(row) {
+  return {
+    id: row.id,
+    requirementId: row.requirementId,
+    slot: row.slot ?? null,
+    playerName: row.playerName || '',
+    requirement: row.requirement,
+    permission: row.permission,
+  }
+}
+
 function getProfileFactionPayload(discordId) {
   return {
     permissions: factionWhitelist.getPlayerFactionPermissions(discordId),
     gameFactions: factionWhitelist.getPlayerGameFactions(discordId),
-    factions: factionWhitelist.getPlayerAssignments(discordId),
+    factions: factionWhitelist.getPlayerAssignments(discordId).map(gameServerAssignment),
   }
 }
 
@@ -291,9 +303,7 @@ router.get('/:key/sessions/:session', async (req, res) => {
       discordId: entry.discordId,
       username:  entry.username,
       roles:     access.roles,
-      permissions: factionWhitelist.getPlayerFactionPermissions(entry.discordId),
-      gameFactions: factionWhitelist.getPlayerGameFactions(entry.discordId),
-      factions: factionWhitelist.getPlayerAssignments(entry.discordId),
+      ...getProfileFactionPayload(entry.discordId),
     },
   })
 })
@@ -326,7 +336,6 @@ router.get('/:key/profiles/:profileId/check', async (req, res) => {
 
   res.json({
     allowed: true,
-    roles: access.roles,
     ...getProfileFactionPayload(discordId),
   })
 })
@@ -456,7 +465,7 @@ router.post('/:key/profiles/:profileId/factions', (req, res) => {
       discordId,
     }, 'skymp-server')
     res.status(201).json({
-      assignment,
+      assignment: gameServerAssignment(assignment),
       ...getProfileFactionPayload(discordId),
     })
   } catch (err) {
