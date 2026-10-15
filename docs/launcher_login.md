@@ -17,7 +17,9 @@ In every login:
 
 - the backend issues the state; `/login-discord` refuses a state it did not issue (an old launcher's own 64-hex state
   only while the old flow is allowed, registered once, never extended, 5 minutes);
-- Discord is asked with `prompt=consent`, so the Authorize page always shows;
+- our own links ask Discord with `prompt=consent`, so the Authorize page shows. A link made straight to Discord can
+  leave that out, so no protection depends on it: the binding to the device (loopback), the code page (game) and the
+  Continue page (old flow) do that;
 - a state is taken by one Discord callback only, and the result is delivered once; a cancel on Discord, or a
   failure talking to Discord, is sent back to the launcher's listener too, so it stops waiting at once;
 - the session is made only when the device collects the result, so no session token is ever kept in
@@ -45,6 +47,15 @@ because that is the prefix the public proxy forwards.
 1. **Backend.** Deploy and restart the backend. Nothing changes for players yet, except that old launchers show the
    Continue page after Discord. Check: an old launcher still logs in, and `data/login-flows.json` appears with a
    `legacy` count.
+   - Before the restart, check that the public proxy passes POSTs under `/api/users/login-discord/` on. From
+     outside, `curl -si -X POST https://dragonbreakonline.com/api/users/login-discord/confirm` must get the
+     backend's own answer (today Express's `Cannot POST /api/users/login-discord/confirm`), not an nginx 404 or 405.
+     The old launchers' Continue button and the new launcher's `/start`, `/token` and `/logout` are all POSTs under
+     that prefix. If nginx answers, have the whole prefix forwarded first, or every old-launcher login stops at
+     Continue.
+   - Tokens taken before the fix stay valid until their owner logs in again or `revoke` is set. Staff accounts can be
+     cleared at once after the deploy with `DELETE /api/servers/:key/sessions-by-discord/:discordId`
+     (`X-Auth-Token`); each of them then presses Discord Login once.
 2. **Game server (fork).** The build that sends `X-Auth-Token` on session and balance checks. After its restart the
    backend's hourly line `session check(s) without X-Auth-Token` stops appearing in
    `/var/log/dragonbreak-backend.log`.
