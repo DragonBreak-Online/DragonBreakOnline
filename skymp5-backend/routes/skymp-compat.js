@@ -463,7 +463,7 @@ function confirmPage({ flow, state, nonce, username, error = '' }) {
 // The button is live in the markup and the script puts it to sleep, so if the script cannot run (scripts off, or a CSP from a proxy or an extension) it works as before
 // While Continue sleeps a Tab stays on the page, so a quick Tab and Enter cannot reach the address bar and load the callback again
 const CONTINUE_BUTTON = `<button type="submit" id="continue">Continue</button>
-<p class="meta" id="continue-hint" hidden>If Continue does not respond, move the mouse or press Tab, then press it again.</p>
+<p class="meta" id="continue-hint" hidden>If Continue does not respond, wait a second, move the mouse or press Tab, then press it again.</p>
 <script>(function () {
   var b = document.getElementById('continue'), since = -1, entered = -1
   b.disabled = true
