@@ -1,5 +1,21 @@
 [
   {
+    "title": "Smithing schematics",
+    "date": "2026-10-15",
+    "version": "Server update",
+    "tag": "Change",
+    "sections": [
+      {
+        "heading": "Reading schematics",
+        "items": [
+          "A Blacksmith no longer needs the Scholar skill to learn a schematic. Your Blacksmith craft tier alone decides which schematics you can follow.",
+          "Only a Blacksmith can learn a schematic. A Scholar who is no smith can still find schematics while reading, and sell or trade them.",
+          "Copying schematics at the Scholars' Ledger is unchanged."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Client 0.3.98",
     "date": "2026-10-15",
     "version": "Client 0.3.98",

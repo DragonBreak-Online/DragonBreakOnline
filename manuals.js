@@ -62,12 +62,13 @@ module.exports = (api) => {
   const TIER_NAMES = ['Novice', 'Apprentice', 'Adept', 'Expert', 'Master'];
   // Smithing rework (smithing.js, config "smithing", Nate 9 Oct): a manual is the technique of a smithing.json family on the
   // 7 craft tiers, "Schematics: <Family>", its book smithing.json's bookId (config smithing.books overrides it); no marker spell (the forge gate is server-side),
-  // read by the Scholar tier rule, no Orcish book (apprentice only), Dragon given only by staff
+  // read by the smith's craft tier (no Scholar since 15 Oct), no Orcish book (apprentice only), Dragon given only by staff
   const SMC = cfg.smithing || {};
   const SMITH = SMC.enabled === true;
   // Families whose book is neither sold nor dropped for now (config smithing.withheldBooks; [] brings them all back): Chitin
   // until Solstheim opens, as no chitin plate can be had inside the Bruma lock (smithing obtainability audit, 9 Oct)
   const WITHHELD = new Set((Array.isArray(SMC.withheldBooks) ? SMC.withheldBooks : ['chitin']).map(String));
+  // The Scholar tier a copy of a book of this craft tier needs at the Scholars' Ledger
   const scholarNeed = (tier) => Number((SMC.scholarForBook || { 2: 1, 3: 1, 4: 1, 5: 2, 6: 3, 7: 3 })[tier]) || 0;
   const scholarTier = (a) => (typeof globalThis.__dboSmithScholarTier === 'function' ? Number(globalThis.__dboSmithScholarTier(a)) || 0 : rankIn(a, C.scholarSkill) + 1);
   const REC = 'private.dboManuals', BOOKS_READ = 'private.dboSkillBooks', COPIES = 'private.dboManualCopies', OWED = 'private.dboManualsOwed';
@@ -178,12 +179,8 @@ module.exports = (api) => {
   const readManual = (a, m, fromInventory) => {
     if (knows(a, m)) { personal(a, `You already know how to work ${m.name}. Read on if you like; the book stays yours.`); return null; }
     if (SMITH) {
-      const need = scholarNeed(m.tier), have = scholarTier(a);
-      if (have < need) {
-        personal(a, `You can't follow this yet: ${m.title} needs a Scholar of tier ${need} or better to make sense of it. You keep the book.`);
-        audit(`MANUAL ${who(a)} could not follow ${m.name} (craft tier ${m.tier}) at Scholar tier ${have}`);
-        return false;
-      }
+      // A smith reads a schematic by their craft tier alone, no Scholar needed; one who is no smith cannot learn it (Nate,
+      // 15 Oct, #suggestions). The Scholar tier still decides which schematics a Scholar copies at the ledger (scholarNeed)
       // The smith's own craft tier must reach the book's (Nate, 10 Oct), so a technique is never learned ahead of the forge
       const craft = typeof globalThis.__dboSmithCraftTier === 'function' ? Number(globalThis.__dboSmithCraftTier(a)) || 0 : 0;
       if (craft < m.tier) {

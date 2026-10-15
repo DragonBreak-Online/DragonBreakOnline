@@ -155,10 +155,12 @@ ok(/No smith teaches it/.test(fam('glass').learnHint) && !/apprentice/i.test(fam
 // Technique books (manuals.js, smithing mode)
 props.set(`${A}|private.dboManuals`, {});
 put(A, 'private.mastery', { order: ['blacksmith'], skills: { blacksmith: { level: 20 } } });
-ok(globalThis.__dboManualsRead(A, BOOK_STEEL) === false && /Scholar of tier 1/.test(lastTold(A)), 'a T2 book without the Scholar skill: refused and kept', lastTold(A));
-smith(A, 20, { scholar: 0 });
-ok(globalThis.__dboManualsRead(A, BOOK_STEEL) !== false && props.get(`${A}|private.dboManuals`).steel.how === 'book', 'Scholar tier 1 reads a T2 book: learned (no marker spell needed)');
-ok(globalThis.__dboManualsRead(A, BOOK_GLASS) === false && /Scholar of tier 2/.test(lastTold(A)), 'a T5 book needs Scholar tier 2');
+// No Scholar for a smith (Nate, 15 Oct, #suggestions): the craft tier alone decides, and one who is no smith cannot learn it
+ok(globalThis.__dboManualsRead(A, BOOK_STEEL) !== false && props.get(`${A}|private.dboManuals`).steel.how === 'book', 'a T2 book without the Scholar skill: learned by the craft tier alone (no marker spell needed)', lastTold(A));
+const NOSMITH = 0x14b77; props.set(`${NOSMITH}|profileId`, 77); put(NOSMITH, 'appearance', { raceId: NORD_RACE }); put(NOSMITH, 'inventory', { entries: [] }); put(NOSMITH, 'worldOrCellDesc', 'cell'); put(NOSMITH, 'pos', [0, 0, 0]);
+put(NOSMITH, 'private.mastery', { order: ['scholar'], skills: { scholar: { level: 90, rank: 4 } } });
+props.set(`${NOSMITH}|private.dboManuals`, {});
+ok(globalThis.__dboManualsRead(NOSMITH, BOOK_STEEL) === false && !(props.get(`${NOSMITH}|private.dboManuals`) || {}).steel && /not taken up the Blacksmith/.test(lastTold(NOSMITH)), 'a Master Scholar who is no smith cannot learn a schematic: refused, book kept', lastTold(NOSMITH));
 smith(A, 20, { scholar: 1 });
 told.length = 0;
 ok(globalThis.__dboManualsRead(A, BOOK_GLASS) === false && !(props.get(`${A}|private.dboManuals`) || {}).glass && /craft tier 5 work, and your Blacksmith craft tier is 2/.test(lastTold(A)), '...but a T5 book also needs craft tier 5: refused at tier 2, book kept (Nate, 10 Oct)', lastTold(A));

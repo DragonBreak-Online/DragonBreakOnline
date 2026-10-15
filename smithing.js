@@ -192,7 +192,7 @@ module.exports = (api) => {
       families, apprentice: app && app.family ? { family: app.family, count: Number(app.count) || 0, of: Number(C.apprenticeCrafts) || 10 } : null,
       upgradeRule: 'An item improves up to two tier steps above its own, never past tier 5 or your craft tier; tier 5-7 items cannot be improved.' };
   };
-  // For manuals.js: the Scholar tier a book of this family needs to be read, and the craft tier
+  // For manuals.js: the Scholar tier a copy of this family's book needs at the Scholars' Ledger, and the craft tier
   globalThis.__dboSmithBookNeeds = (familyId) => { const f = BY_FAMILY.get(familyId); return f ? { tier: f.tier, scholar: Number(C.scholarForBook[f.tier]) || 0 } : null; };
   globalThis.__dboSmithScholarTier = scholarTier;
   globalThis.__dboSmithCraftTier = craftTier;
