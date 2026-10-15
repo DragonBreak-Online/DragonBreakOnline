@@ -27,8 +27,23 @@ const README = path.join('tooling', 'xedit-scripts', 'DBO_AlchemyRecords_README.
 const TOOL = path.join('tools', 'alchemy-records-apply.js');
 if (!fs.existsSync(PAS_FILE) || !fs.existsSync(TOOL)) { check('the script and the tool exist', false, [PAS_FILE, TOOL]); console.log(`\n${checks - failures}/${checks} passed`); process.exit(1); }
 const PAS = fs.readFileSync(PAS_FILE, 'utf8');
-const RW_TEXT = fs.readFileSync('alchemy-rework.json', 'utf8');
-const RW = JSON.parse(RW_TEXT);
+const SHIPPED_TEXT = fs.readFileSync('alchemy-rework.json', 'utf8');
+const SHIPPED = JSON.parse(SHIPPED_TEXT);
+// The tool's input is the unmapped file. Once the PC's result is applied (Skyrim release, 15 Oct) the shipped file is mapped,
+// so the unmapped one is rebuilt from it: every record blank, the combinations back under _combosPlanned, in the file's order
+const unmapped = (src) => {
+  if (Array.isArray(src._combosPlanned) || !Object.values(src.records || {}).every(Boolean)) return src;
+  const out = {};
+  for (const [k, v] of Object.entries(src)) {
+    if (k === 'records') out.records = Object.fromEntries(Object.keys(v).map((x) => [x, '']));
+    else if (k === 'combos') { out.combos = []; out._combosPlanned = v; }
+    else out[k] = v;
+  }
+  return out;
+};
+const RW = unmapped(SHIPPED);
+const { format: FORMAT } = require(path.resolve(TOOL));
+const RW_TEXT = RW === SHIPPED ? SHIPPED_TEXT : FORMAT(RW);
 
 // ---- the data block ----
 const lines = [...PAS.matchAll(/^ {2}D\('((?:[^']|'')*)'\);$/gm)].map((m) => m[1].replace(/''/g, "'").split('|'));
@@ -59,7 +74,9 @@ check('bench fixes: 3 loom recipes to MCE_CraftingLoom, 25 smithing ones to the 
 // ---- the script's safety ----
 check('the script checks everything first and changes nothing when anything is wrong', /if Errors = 0 then CheckAll;\s*if Errors > 0 then begin[^]*?FATAL: nothing changed/.test(PAS));
 check('...looks each record up by local id and checks its signature and editor id', /\(Signature\(r\) <> sig\) or \(EditorID\(r\) <> edid\)/.test(PAS));
-check('...refuses a template that points outside DragonBreak Online Edits\' masters', /function MastersOk[^]*HasMaster\(Dle, GetFileName\(f\)\)/.test(PAS) && (PAS.match(/MastersOk\(t, fl\[1\]\)/g) || []).length === 3);
+check('...refuses a template that points outside DragonBreak Online Edits\' masters', /function MastersOk[^]*HasMaster\(Dle, GetFileName\(f\)\)/.test(PAS) && (PAS.match(/MastersOk\(t, fl\[1\]\)/g) || []).length === 2
+  // a FLOR template's own record header links to DragonBreak Harvest.esp, not a DLE master: every other field is checked (PC fix, 14 Oct)
+  && /fl\[0\] = 'F'[^]*?for k := 1 to Pred\(ElementCount\(t\)\) do MastersOk\(ElementByIndex\(t, k\), fl\[1\]\)/.test(PAS));
 check('...skips an EDID that already exists in DLE, and still reports its id', (PAS.match(/r := InDle\('(MGEF|ALCH|FLOR)', fl\[1\]\);\s*if Assigned\(r\) then begin slLog\.Add\('EXISTS\|' \+ fl\[1\]\); Inc\(Existing\);/g) || []).length === 3);
 check('...copies each template as a new record', (PAS.match(/wbCopyElementToFile\(t, Dle, True, True\)/g) || []).length === 3);
 check('...sets EDID, FULL, value, weight, effects, magnitudes and durations', ['SetEditorID(r, fl[1])', "SetElementEditValues(r, 'FULL', fl[2])", "'ENIT\\Value'", "SetElementNativeValues(r, 'DATA'", "'EFIT\\Magnitude'", "'EFIT\\Duration'", "SetElementNativeValues(e, 'EFID'"].every((x) => PAS.includes(x)));
@@ -84,7 +101,8 @@ check('...moves the six planned combinations into combos and drops _combosPlanne
 check('...names the placement bases it leaves out', r.ok && r.extra.join() === 'DBO_HarvestJugOfMilk,DBO_HarvestFlourSack');
 const again = r.ok ? apply(result(ids), r.rework) : { ok: false };
 check('a second run changes nothing', again.ok && again.changed === 0 && JSON.stringify(again.rework) === JSON.stringify(r.rework));
-check('the layout stays alchemy-rework.json\'s own (only the filled lines differ)', format(RW) === RW_TEXT);
+check('the layout stays alchemy-rework.json\'s own (only the filled lines differ)', format(SHIPPED) === SHIPPED_TEXT && format(RW) === RW_TEXT);
+check('the shipped alchemy-rework.json is mapped in full, with its 6 combinations (the PC result of 14 Oct applied)', Object.values(SHIPPED.records).every(Boolean) && (SHIPPED.combos || []).length === 6 && !('_combosPlanned' in SHIPPED));
 const part = Object.fromEntries(Object.entries(ids).filter(([k]) => !/^DBO_AlchCombo.*T5$/.test(k)));
 r = apply(result(part), RW);
 check('a combination missing its Master record stays planned', r.ok && r.moved === 0 && r.rework._combosPlanned.length === 6 && r.missing.length === 6);

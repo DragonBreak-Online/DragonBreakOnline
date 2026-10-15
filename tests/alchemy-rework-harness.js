@@ -120,7 +120,7 @@ const snapshot = (edids) => Object.fromEntries(edids.map((e) => [e, count(pid(e)
   check('...every vanilla tier at least as strong as the one below', rules.every(([, v]) => tiered(v).every((x, i, l) => i === 0 || EDID.get(x).mag * Math.max(1, EDID.get(x).dur) >= EDID.get(l[i - 1]).mag * Math.max(1, EDID.get(l[i - 1]).dur) || /Stamina0?5$/.test(x))));
   const restores = rules.filter(([, v]) => v.kind === 'restore');
   check('the three restores: five different records, never the Minor (01)', restores.length === 3 && restores.every(([, v]) => new Set(tiered(v)).size === 5 && !tiered(v).some((x) => /01$/.test(x))));
-  check('the shipped combination list is empty until the PC adds the records', Array.isArray(RW.combos) && RW.combos.length === 0);
+  check('the shipped combination list holds the 6 pairs now the PC records are mapped', Array.isArray(RW.combos) && RW.combos.length === 6 && RW.combos.every((c) => (c.byTier || []).every((x) => !x || (RW.records || {})[x])));
 
   // ---- tiers ----
   const heal = ['RestoreHealth01', 'RestoreHealth02', 'RestoreHealth03', 'RestoreHealth04', 'RestoreHealth05', 'RestoreHealth06'];

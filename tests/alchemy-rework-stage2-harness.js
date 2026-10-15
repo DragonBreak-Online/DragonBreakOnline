@@ -34,7 +34,8 @@ check('every PC editor id the effects name is listed in records', Object.values(
 check('...as are the percent and slow restore effects and the fortify effects', (RW.percentEffects || []).concat((RW.overTime || {}).slowEffects || [], Object.keys((RW.fortify || {}).effects || {}).filter((k) => /^DBO_/.test(k))).every((x) => x in RW.records));
 check('overTime: from 60% (Philter, Elixir) over 5 s', RW.overTime && RW.overTime.fromShare === 0.6 && RW.overTime.seconds === 5);
 check('poisons ship inert (judge false), as a share of a 200-point pool', RW.poisons && RW.poisons.judge === false && RW.poisons.anchorPool === 200);
-check('combinations ship empty, 6 pairs planned for Expert and Master', Array.isArray(RW.combos) && RW.combos.length === 0 && (RW._combosPlanned || []).length === 6 && RW._combosPlanned.every((c) => c.minTier === 4 && c.byTier[3] && c.byTier[4] && c.byTier[3] in RW.records));
+check('the 6 combinations ship for Expert and Master once the PC records are mapped (none left planned)', Array.isArray(RW.combos) && RW.combos.length === 6 && !RW._combosPlanned && RW.combos.every((c) => c.minTier === 4 && c.byTier[3] && c.byTier[4] && RW.records[c.byTier[3]] && RW.records[c.byTier[4]]));
+check('every PC record is mapped to an id of DragonBreak Online Edits.esp (alchemy-records-apply.js, 15 Oct)', Object.values(RW.records || {}).every((v) => /^[0-9a-f]{1,6}:DragonBreak Online Edits\.esp$/.test(v)));
 check('poison words: Level 1 and 25 "Poison" (Weak is the drop-only one)', JSON.stringify(RW.words.poison) === JSON.stringify(['Poison', 'Poison', 'Potent Poison', 'Virulent Poison', 'Deadly Poison']));
 
 // ---- mock records ---------------------------------------------------------------------------------------------------
@@ -130,7 +131,9 @@ const ticks = (n) => { for (let i = 0; i < n; i++) globalThis.__dboAlchemyRunTic
 
 (async () => {
   // ---- before the PC's ids: the vanilla fallback, named for what it is ----
-  load();
+  // the shipped file is mapped now; the unmapped fallback is pinned with every record blanked
+  const BLANK = Object.fromEntries(Object.keys(RW.records || {}).map((k) => [k, '']));
+  load({ records: BLANK });
   check('without mapped ids, alchemy.js says the PC records wait and loads', /PC record\(s\) not mapped yet/.test(out.logs.join('\n')), out.logs);
   tierOf(A, 3); stockAll();
   let msg = craft([ONE_A, ONE_B]);
@@ -185,7 +188,7 @@ const ticks = (n) => { for (let i = 0; i < n; i++) globalThis.__dboAlchemyRunTic
   ALCH(DBO('c04'), 'DBO_AlchComboRestoreHealthStaminaT4', [['e02:DragonBreak Online Edits.esp', 45]]);
   ALCH(DBO('c05'), 'DBO_AlchComboRestoreHealthStaminaT5', [['e02:DragonBreak Online Edits.esp', 60]]);
   const VIG_A = INGR('10b', 'VigA', ['3eb15:Skyrim.esm', '3eb16:Skyrim.esm']), VIG_B = INGR('10c', 'VigB', ['3eb15:Skyrim.esm', '3eb16:Skyrim.esm']);
-  const planned = (RW._combosPlanned || []).find((c) => c.effects.join() === '03eb15,03eb16');
+  const planned = (RW.combos || []).concat(RW._combosPlanned || []).find((c) => c.effects.join() === '03eb15,03eb16');
   load({ records: Object.assign({ DBO_AlchComboRestoreHealthStaminaT4: 'c04:DragonBreak Online Edits.esp', DBO_AlchComboRestoreHealthStaminaT5: 'c05:DragonBreak Online Edits.esp' }, MAPPED), combos: planned ? [planned] : [] });
   for (const [t, id, word] of [[4, DBO('c04'), 'Philter'], [5, DBO('c05'), 'Elixir']]) {
     tierOf(A, t); put(A, 'inventory', { entries: [{ baseId: VIG_A, count: 2 }, { baseId: VIG_B, count: 2 }] });

@@ -327,7 +327,9 @@ begin
         end;
       end else if fl[0] = 'F' then begin
         t := Lookup(fl[2], fl[3], 'FLOR', fl[4]);
-        if Assigned(t) then MastersOk(t, fl[1]);
+        // PC 14 Oct: the two FLOR templates live in DragonBreak Harvest.esp (not a DLE master); copied as new, only what they
+        // point at matters, so the record header (which links to the template itself) is left out of the check
+        if Assigned(t) then for k := 1 to Pred(ElementCount(t)) do MastersOk(ElementByIndex(t, k), fl[1]);
       end else if fl[0] = 'C' then begin
         r := MainRecordByEditorID(GroupBySignature(Np, 'COBJ'), fl[1]);
         if not Assigned(r) then Fail('COBJ ' + fl[1] + ' not in ' + NP_NAME)
