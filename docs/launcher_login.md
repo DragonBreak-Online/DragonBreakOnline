@@ -11,7 +11,7 @@ the launcher's half in `skymp5-launcher/src/discordLogin.js`, the game's half in
 |---|---|---|
 | Launcher with this change | The launcher listens on `127.0.0.1` on a random port and sends a PKCE challenge to `POST /api/users/login-discord/start`. After Discord, the backend sends the browser to `http://127.0.0.1:<port>/discord/callback` with a one-time code (30 s). Only the launcher holding the PKCE verifier can trade that code for a session (`POST /api/users/login-discord/token`), once. | Discord's Authorize page, then "Signed in as ..." in the tab. |
 | Game (in-game sign-in, off until `GAME_LOGIN_DEVICE=on`) | `POST /start` with `client: game` returns a state, a secret device code and a short code like `BCDF-GHJK`. The game shows the short code. After Discord, our page asks for it; only the game's device code collects the result (`POST /api/users/login-discord/poll`), once. The device code is never in a URL. | The code in game, Discord's Authorize page, then our page asking for the code. |
-| Launchers up to 2.1.49 (old flow) | The launcher makes its own state and polls `GET /status`. While `LAUNCHER_LOGIN_LEGACY=allow` this still works, but the result is released only after the player presses Continue on our own page. The button wakes only after the tab has been visible and focused for a second and then sees the pointer or a key, so a window swapped under a double-click (double-clickjacking) cannot press it. | Discord's Authorize page, then "Finish signing in" with a Continue button and a warning. |
+| Launchers up to 2.1.49 (old flow) | The launcher makes its own state and polls `GET /status`. While `LAUNCHER_LOGIN_LEGACY=allow` this still works, but the result is released only after the player presses Continue on our own page. Continue wakes only after the tab has been in front (visible and focused) for a second with no presses on it, and, for the mouse, once the pointer has been on the page for half a second; a held key or a held button never counts. So a window swapped or uncovered under a double-click or a burst of clicks (double-clickjacking) cannot press it. Not covered: a player typing, or tapping a touch screen, blind into the page while a window that stays on top without taking focus hides it. If the page's script cannot run, Continue works as a plain button. | Discord's Authorize page, then "Finish signing in" with a Continue button and a warning. |
 
 In every login:
 
@@ -28,7 +28,9 @@ In every login:
   when the backend starts;
 - a new login ends the account's older sessions (`LAUNCHER_LOGIN_SINGLE_SESSION`), so a copied token stops working
   the next time its owner logs in;
-- the login pages are `no-store`, cannot be framed, and send no referrer.
+- the login pages are `no-store`, cannot be framed, send no referrer, and send `Cross-Origin-Opener-Policy: same-origin`:
+  the page that opened the login window loses its handle on it, and a sandboxed popup, which runs no script, cannot
+  load them at all.
 
 A player can end their own sessions: the launcher's Log out (the X next to the name) ends that launcher's session on
 the server, and Troubleshooting > Sign Out Everywhere ends every session of the Discord account
@@ -55,6 +57,15 @@ because that is the prefix the public proxy forwards.
      The old launchers' Continue button and the new launcher's `/start`, `/token` and `/logout` are all POSTs under
      that prefix. If nginx answers, have the whole prefix forwarded first, or every old-launcher login stops at
      Continue.
+   - Before the restart, and again after any change to CT 107's nginx headers or Cloudflare rules while the old flow
+     is allowed, check the login pages' Content-Security-Policy from outside:
+     `curl -s -o /dev/null -D - "https://dragonbreakonline.com/api/users/login-discord?state=$(openssl rand -hex 32)"`
+     (a throwaway login that expires on its own). The answer is a 302, and nginx `add_header` covers a 302 even
+     without `always`. After the restart it must show exactly one `Content-Security-Policy`, the backend's own
+     (`frame-ancestors 'none'; form-action 'self'; base-uri 'none'`); before it, today's backend sends none, so any
+     policy seen then comes from nginx or Cloudflare. A second policy with `script-src` or `default-src` blocks the
+     Continue page's script: Continue then works as a plain button and its guard is silently off. Then check again
+     that an old launcher still logs in.
    - Tokens taken before the fix stay valid until their owner logs in again or `revoke` is set. Staff accounts can be
      cleared at once after the deploy with `DELETE /api/servers/:key/sessions-by-discord/:discordId`
      (`X-Auth-Token`); each of them then presses Discord Login once.
