@@ -993,31 +993,13 @@ registerChatCommand('tp', (a, args) => {
 // ---- pigeons (player mail, works for offline recipients) --------------------------------------
 // Each character keeps 'private.indexed.nameKey' (lowercase name) so an offline character can be found
 // by name, and 'private.pigeons' (unread mail). One pigeon per player every PIGEON_COOLDOWN_MS, only to a
-// character the sender's character has met, for gold by distance (PIGEON_PRICE) paid into the treasury of the hold it is sent from.
+// character the sender's character has met, for a flat fee (PIGEON_PRICE) paid into the treasury of the hold it is sent from.
 const PIGEON_COOLDOWN_MS = 35 * 60 * 1000;
 const PIGEON_MAX_TEXT = 240;
 const PIGEON_MAX_UNREAD = 20;
-// A base fee, gold per kilometre flown, and a cap; a bird to another land costs the cap
-const PIGEON_PRICE = Object.assign({ baseFee: 5, goldPerKm: 10, maxFee: 50 }, cfg.pigeons || {});
-// Where a character is for pricing: outdoors as it stands, indoors where it last stood outside
-const pigeonPlace = (x) => {
-  try {
-    const world = String(mp.get(x, 'worldOrCellDesc') || '');
-    if (world && isWorldspace(world)) return { world, pos: mp.get(x, 'pos') };
-    const last = mp.get(x, 'private.lastOutside');
-    return last && last.world ? { world: String(last.world), pos: last.pos } : null;
-  } catch (e) { return null; }
-};
-const pigeonFee = (a, t) => {
-  const max = Math.max(0, Math.floor(Number(PIGEON_PRICE.maxFee) || 0));
-  const from = pigeonPlace(a); const to = pigeonPlace(t);
-  if (!from || !to || !Array.isArray(from.pos) || !Array.isArray(to.pos)) return max;
-  const fw = normPlace(from.world); const tw = normPlace(to.world);
-  if (fw !== tw && !(TAMRIEL_FRAME.has(fw) && TAMRIEL_FRAME.has(tw))) return max;
-  const km = Math.hypot(from.pos[0] - to.pos[0], from.pos[1] - to.pos[1]) / UNITS_PER_METER / 1000;
-  const base = Math.max(0, Math.floor(Number(PIGEON_PRICE.baseFee) || 0));
-  return Math.min(max, base + Math.round(km * (Number(PIGEON_PRICE.goldPerKm) || 0)));
-};
+// One fee for every flight. It was 5 plus 10 a km to where the recipient stood, so three boards' fees placed them (L2-2)
+const PIGEON_PRICE = Object.assign({ baseFee: 5 }, cfg.pigeons || {});
+const pigeonFee = () => Math.max(0, Math.floor(Number(PIGEON_PRICE.baseFee) || 0));
 // profileId -> epoch ms, on disk so a restart or a gamemode reload does not forgive everyone's wait
 const PIGEON_COOLDOWN_FILE = path.resolve('pigeon-cooldowns.json');
 const pigeonLastSent = (() => {
@@ -1227,7 +1209,7 @@ const sendPigeon = (a, to, rawText, zoneId, goldRaw, itemsRaw) => {
     const isBlocked = Array.isArray(blocked) && blocked.includes(p);
     // A blocked sender's parcel is never lost to the void: the bird will not take it
     if (isBlocked && prep) return { ok: false, text: 'Your pigeon will not carry a parcel to them.' };
-    const price = admin ? 0 : pigeonFee(a, to);
+    const price = admin ? 0 : pigeonFee();
     const charges = prep ? prep.gold + prep.tax + prep.fee : 0;
     if (price + charges > 0 && !takeGold(a, price + charges)) {
       return { ok: false, text: prep ? `The flight costs ${price} gold, the parcel's tax ${prep.tax + prep.fee}${prep.gold ? `, and you send ${prep.gold}` : ''}: ${price + charges} gold in all, and you do not have it.` : `A pigeon to ${ownNameOf(to)} costs ${price} gold, and you do not have it.` };
@@ -1272,11 +1254,12 @@ const openPigeonCoop = (a, result, resultKind, view) => {
   const zone = zoneId ? zoneById(zoneId) : null;
   const admin = isAdmin(a);
   const online = onlineActors();
+  const price = admin ? 0 : pigeonFee();
   const contacts = [];
   for (const id of metOf(a)) {
     try { if (!mp.get(id, 'appearance')) continue; } catch (e) { continue; }
     // Who they met: a contact behind a mask or in a beast form keeps their own name here
-    contacts.push({ id, name: ownNameOf(id), tag: tagOf(id), online: online.includes(id), price: admin ? 0 : pigeonFee(a, id) });
+    contacts.push({ id, name: ownNameOf(id), tag: tagOf(id), online: online.includes(id), price });
   }
   contacts.sort((x, y) => x.name.localeCompare(y.name));
   const left = PIGEON_COOLDOWN_MS - (Date.now() - (pigeonLastSent.get(profileOf(a)) || 0));

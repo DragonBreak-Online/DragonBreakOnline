@@ -744,10 +744,8 @@
   "checkSeconds": 5
  },
  "pigeons": {
-  "_comment": "Pigeon price: baseFee plus goldPerKm for the distance flown, capped at maxFee; a pigeon to another land costs maxFee. Paid into the treasury of the hold it is sent from.",
-  "baseFee": 5,
-  "goldPerKm": 10,
-  "maxFee": 50
+  "_comment": "Pigeon price: one flat baseFee for every flight, wherever the recipient is (a fee by distance told the sender where they stood: security audit L2-2). Paid into the treasury of the hold it is sent from.",
+  "baseFee": 5
  },
  "respawnTemples": {
   "_comment": "Bruma deaths respawn at the cathedral door (user decision 2026-09-16). The login hang there was vanilla creature pathing, fixed by disabling Bruma's plugin creatures (HANDOFF section 14). Hub gates still lead to the Pale Pass arrival.",
