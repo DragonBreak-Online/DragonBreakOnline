@@ -16,6 +16,7 @@ import {
 import { queuePlayerNiNodeUpdate } from "../view/niNodeQueue";
 import { trace } from "../lib/clientDiag";
 import { lookRecheckLine, lookTraceLine, readLook } from "./appearanceTrace";
+import { goblinHeadAfterLook } from "./goblinHead";
 
 export interface Tint {
   texturePath: string;
@@ -223,6 +224,8 @@ export const applyAppearanceToPlayer = (appearance: Appearance, liveEyes = false
   regeneratePlayerHead(appearance);
   traceOwnLook(event, appearance);
   queuePlayerNiNodeUpdate();
+  // The NiNode update recolours the body but keeps a goblin's head piece (skin slot 30) as it was
+  goblinHeadAfterLook(appearance, event);
   onBase = { look: appearance, at: Date.now() };
   Utility.wait(0.0625).then(() => {
     once("update", () => {
