@@ -674,8 +674,10 @@ class VoiceManager {
         if (!participant) return;
         try {
           const msg = JSON.parse(new TextDecoder().decode(payload));
-          if (msg && msg.t === 'voiceRange' && msg.r > 0) {
-            this.peerRanges[participant.identity] = Math.round(msg.r);
+          // Only a range one of the server's modes has: a made-up one carried a voice past every mode or out of the whisper cone
+          const mode = msg && msg.t === 'voiceRange' ? this.modes.find((m) => Math.abs(m.units - msg.r) < 1) : null;
+          if (mode) {
+            this.peerRanges[participant.identity] = mode.units;
             this.applyVolume(participant.identity);
           }
         } catch (e) { /* not ours */ }
