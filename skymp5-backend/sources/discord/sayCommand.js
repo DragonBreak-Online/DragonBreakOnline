@@ -44,7 +44,7 @@ const ERRORS = Object.freeze({
 const has = (perms, flag) => !!perms && typeof perms.has === 'function' && perms.has(flag)
 const isThread = channel => typeof channel?.isThread === 'function' && channel.isThread()
 // Inline code in the audit channel, so markdown, mentions and links in a name or the text show as typed
-const code = text => `\`${fold(text)}\``
+const code = text => `\`${fold(text).toWellFormed()}\``
 
 // The member's role ids, from a cached GuildMember or the raw interaction member
 function rolesOf(member) {

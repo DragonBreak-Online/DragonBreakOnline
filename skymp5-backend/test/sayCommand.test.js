@@ -332,6 +332,15 @@ test('the audit line holds the name and the first words as inline code, so markd
   assert.ok(audits[0].startsWith(`SAY \`||Ja${T}ke\` (@icedsky) posted as Dragonbaron in <#${CH.general}>: https://`), audits[0])
   assert.ok(audits[0].endsWith(` \`||hide ${T}this${T} <@&123> [x](https://e.example) ${T}${T}${T}\``), audits[0])
   assert.equal(audits[0].split('`').length, 5, 'only the four backticks that open and close the two code spans')
+  // The cut at 100 (text) or 48 (name) characters can split an emoji in half; the half becomes U+FFFD, never a lone surrogate
+  const E = '\u{1F600}'
+  const split = command({ text: `${'a'.repeat(99)}${E}`, fields: { member: { displayName: `${'b'.repeat(47)}${E}`, roles: { cache: new Map([[ROLE.lead, {}]]) } } } })
+  await S.handleInteraction(split.it)
+  assert.equal(audits.length, 2)
+  assert.ok(audits[1].isWellFormed(), 'no lone surrogate in the audit line')
+  assert.ok(audits[1].startsWith(`SAY \`${'b'.repeat(47)}�...\` (@icedsky)`), audits[1])
+  assert.ok(audits[1].endsWith(` \`${'a'.repeat(99)}�...\``), audits[1])
+  assert.equal(channels.get(CH.general).sends.at(-1).content, `${'a'.repeat(99)}${E}`, 'the post itself keeps the emoji whole')
 })
 
 test('a defer that fails posts nothing, and a post Discord refuses is reported privately and not logged as posted', async () => {
