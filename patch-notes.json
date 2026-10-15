@@ -1,5 +1,19 @@
 [
   {
+    "title": "Priest training rate",
+    "date": "2026-10-15",
+    "version": "Hotfix",
+    "tag": "Balance",
+    "sections": [
+      {
+        "heading": "Changes",
+        "items": [
+          "Priest now trains at the normal rate, like every other skill (it had a 25% bonus). The bonus came before Priest Studies at the temples and sermons, which now give Priest more ways to train than any other skill. Levels already earned are kept."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Client 0.3.99",
     "date": "2026-10-15",
     "version": "Client 0.3.99",
