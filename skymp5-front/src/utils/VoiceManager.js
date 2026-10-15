@@ -1,7 +1,9 @@
 // Proximity voice chat over LiveKit, driven by the game side via window.__alduinakVoice (skymp5-client voiceService.ts).
 // Plain JS on purpose: the repo pins TypeScript 4.6 and livekit-client's types need 5.x.
 // Contract with the game side:
-//   connect(url, token, cfg)  join the room; cfg = { modes: [{key,label,units}], mode }
+//   connect(url, token, cfg)  join the room; cfg = { modes: [{key,label,units}], mode, hearers? }
+//   setHearers({ modeKey: [identity] })  who the server lets hear me in each mode; with it (or cfg.hearers) LiveKit lets only
+//                             the list for my mode subscribe to my voice; without either, everyone in the room may (old servers)
 //   disconnect()              leave the room
 //   setPtt(bool)              push-to-talk: enable/disable the mic track
 //   setMode(key)              Alt+V cycles whisper/talk/shout; the range goes out on the data channel so listeners attenuate by the SPEAKER's loudness
@@ -29,6 +31,7 @@ import talkImg from '../img/voice/Talk.png';
 import shoutImg from '../img/voice/Shout.png';
 
 const UNSUB_HYSTERESIS = 1.15;   // unsubscribe only past range*this (no flapping)
+const RESUBSCRIBE_MS = 3000;     // a wanted voice LiveKit allows but has not delivered is asked for again this often
 const BANNER_MS = 1400;          // how long the mode banner stays up
 const SPEAKING_TICK_MS = 150;    // lip sync report cadence while someone talks
 const VAD_TICK_MS = 50;
@@ -101,6 +104,16 @@ const DX_TO_MOUSE_BUTTON = { 258: 1 };
 const isTextField = (el) => !!el && (el.isContentEditable || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT'
   || (el.tagName === 'INPUT' && !['button', 'checkbox', 'radio', 'range', 'submit', 'reset', 'image', 'color', 'number'].includes(String(el.type || '').toLowerCase())));
 
+// String lists by mode key only; anything else is an empty list, so a bad packet closes my voice rather than opening it
+const parseHearers = (raw) => {
+  const out = {};
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return out;
+  for (const k of Object.keys(raw)) {
+    if (Array.isArray(raw[k])) out[k] = raw[k].filter((x) => typeof x === 'string' && x && x.length <= 64).slice(0, 512);
+  }
+  return out;
+};
+
 // An error's name only ("NotFoundError"): its message can carry a device label, which must not reach the server's log
 const errorName = (e) => String((e && e.name) || 'Error').replace(/[^A-Za-z]/g, '').slice(0, 40) || 'Error';
 
@@ -122,6 +135,8 @@ class VoiceManager {
     this.distances = {};       // identity -> game units, refreshed by setPeers
     this.vectors = {};         // identity -> { d, az, fa } from setPeerVectors: distance, bearing, how squarely they face me
     this.peerRanges = {};      // identity -> that speaker's mode range
+    this.hearers = null;       // modeKey -> identities the server lets hear me; null = everyone in the room (an old server)
+    this.allowKey = null;      // the list last given to LiveKit, so an unchanged one is not sent again
     this.ptt = false;
     this.pttCode = 'KeyV';     // the talk key while the page has the keyboard (the game side sees it otherwise)
     this.pttMouseButton = null; // the talk key's MouseEvent.button when it is a mouse button the page receives
@@ -577,6 +592,37 @@ class VoiceManager {
       this.pttCode = DX_TO_CODE[cfg.pttScanCode] || null;
       this.pttMouseButton = cfg.pttScanCode in DX_TO_MOUSE_BUTTON ? DX_TO_MOUSE_BUTTON[cfg.pttScanCode] : null;
     }
+    // A token from a server with hearing lists carries them; one without leaves my voice open to the room as before
+    this.hearers = 'hearers' in cfg ? parseHearers(cfg.hearers) : null;
+  }
+
+  setHearers(bands) {
+    this.hearers = parseHearers(bands);
+    const added = this.applyHearers(this.room);
+    if (added.length) this.publishRange(added);
+  }
+
+  // The identities the server lets hear me in my current mode
+  allowedNow() {
+    const list = this.hearers && this.hearers[this.mode];
+    return Array.isArray(list) ? list : [];
+  }
+
+  // LiveKit refuses my voice to anyone not on the list for my mode, whatever their client does; returns the listeners newly let in
+  applyHearers(room, resend = false) {
+    if (!room || !this.hearers) return [];
+    const ids = this.allowedNow().slice().sort();
+    const key = ids.join(',');
+    if (key === this.allowKey && !resend) return [];
+    const before = new Set(this.allowKey ? this.allowKey.split(',') : []);
+    this.allowKey = key;
+    try {
+      room.localParticipant.setTrackSubscriptionPermissions(false, ids.map((identity) => ({ participantIdentity: identity, allowAll: true })));
+    } catch (e) {
+      this.allowKey = null;
+      return [];
+    }
+    return ids.filter((i) => !before.has(i));
   }
 
   modeByKey(key) {
@@ -597,7 +643,11 @@ class VoiceManager {
 
   async connect(url, token, cfg) {
     this.applyCfg(cfg);
-    if (this.connecting || (this.room && this.lastToken === token)) return;
+    if (this.connecting || (this.room && this.lastToken === token)) {
+      const added = this.applyHearers(this.room);
+      if (added.length) this.publishRange(added);
+      return;
+    }
     this.connecting = true; // set before any await so calls cannot interleave
     try {
       await this.disconnect();
@@ -625,8 +675,10 @@ class VoiceManager {
         if (!participant) return;
         try {
           const msg = JSON.parse(new TextDecoder().decode(payload));
-          if (msg && msg.t === 'voiceRange' && msg.r > 0) {
-            this.peerRanges[participant.identity] = Math.round(msg.r);
+          // Only a range one of the server's modes has: a made-up one carried a voice past every mode or out of the whisper cone
+          const mode = msg && msg.t === 'voiceRange' ? this.modes.find((m) => Math.abs(m.units - msg.r) < 1) : null;
+          if (mode) {
+            this.peerRanges[participant.identity] = mode.units;
             this.applyVolume(participant.identity);
           }
         } catch (e) { /* not ours */ }
@@ -644,10 +696,15 @@ class VoiceManager {
       });
       room.on(RoomEvent.ActiveSpeakersChanged, () => this.emitSpeaking());
 
+      // Set before joining: livekit-client sends it as the connection opens, ahead of any track I publish
+      this.allowKey = null;
+      this.applyHearers(room);
       await room.connect(url, token, { autoSubscribe: true });
       try { await room.startAudio(); } catch (e) { /* autoplay policy: unlocked by CEF switch */ }
       // Expose the room only once connected so setPtt cannot hit a not-yet-connected room and mis-report micDenied
       this.room = room;
+      // Sent again now joined, with any list that came in meanwhile
+      this.applyHearers(room, true);
       this.guardNoted = {};
       this.publishRange();
       // Opening the mic here also pre-warms Chromium's device stack, so the first press only unmutes
@@ -746,17 +803,21 @@ class VoiceManager {
   setMode(key) {
     if (!this.modeByKey(key)) return;
     this.mode = key;
+    this.applyHearers(this.room);
     this.publishRange();
     window.__dboVoiceMode = key;
     window.dispatchEvent(new CustomEvent('dbo:voiceMode', { detail: key }));
   }
 
-  publishRange() {
+  // With hearing lists only listeners allowed to hear me learn my mode; LiveKit sends to everyone when no destination is named
+  publishRange(to) {
     if (!this.room) return;
+    const dest = this.hearers ? (Array.isArray(to) ? to : this.allowedNow()) : null;
+    if (dest && !dest.length) return;
     this.lastRangePublishAt = Date.now();
     try {
       const payload = new TextEncoder().encode(JSON.stringify({ t: 'voiceRange', r: this.myRange }));
-      const p = this.room.localParticipant.publishData(payload, { reliable: true });
+      const p = this.room.localParticipant.publishData(payload, dest ? { reliable: true, destinationIdentities: dest } : { reliable: true });
       if (p && p.catch) p.catch(() => { /* transient; republished on the heartbeat */ });
     } catch (e) { /* transient; republished on next change/join */ }
   }
@@ -828,13 +889,18 @@ class VoiceManager {
     if (!this.room) return;
     this.audioEls.forEach((el, identity) => this.applyVolume(identity));
     // Bandwidth: don't even receive audio from players far out of range
+    const now = Date.now();
     this.room.remoteParticipants.forEach((participant) => {
       const d = this.distances[participant.identity];
       const wanted = d !== undefined && d <= this.rangeFor(participant.identity) * UNSUB_HYSTERESIS;
       participant.audioTrackPublications.forEach((pub) => {
-        if (pub.isSubscribed !== wanted && typeof pub.setSubscribed === 'function') {
-          try { pub.setSubscribed(wanted); } catch (e) { /* transient */ }
-        }
+        if (typeof pub.setSubscribed !== 'function') return;
+        // Asked once: LiveKit delivers it when the speaker lets me hear them; asked again only while it is allowed and still missing
+        const desired = typeof pub.isDesired === 'boolean' ? pub.isDesired : pub.isSubscribed;
+        const missing = wanted && !pub.isSubscribed && pub.permissionStatus !== 'not_allowed' && now - (pub.dboAskedAt || 0) >= RESUBSCRIBE_MS;
+        if (desired === wanted && !missing) return;
+        pub.dboAskedAt = now;
+        try { pub.setSubscribed(wanted); } catch (e) { /* transient */ }
       });
     });
   }
@@ -906,7 +972,7 @@ class VoiceManager {
     peers.sort((a, b) => (a.d === null ? Infinity : a.d) - (b.d === null ? Infinity : b.d));
     const [mic, micPk] = stat('');
     return { mode: this.mode, vol: round(this.prefs.outputVolume, 2), mg: round(this.prefs.micGain, 2), mic, micPk, tx: this.transmitting,
-      echo: this.echo, room: !!this.room, peers: peers.slice(0, DIAG_MAX_PEERS) };
+      echo: this.echo, room: !!this.room, hl: this.hearers ? this.allowedNow().length : null, peers: peers.slice(0, DIAG_MAX_PEERS) };
   }
 
   // ── Mode banner (bottom left, flashed when Alt+V changes the mode) ─────────
