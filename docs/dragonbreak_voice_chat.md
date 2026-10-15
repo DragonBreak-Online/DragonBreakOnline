@@ -43,9 +43,18 @@ LiveKit server + firewall are already live on the box (`DragonBreakLiveKit`).
   every speaker server-wide regardless of distance, which partially undermines
   the Stranger/mask anonymity system. Accepted for v1; the fix is a server-side
   range enforcer driving LiveKit's admin API from authoritative positions.
-- **Revocation = token expiry.** Tokens live 1 hour and nothing calls the
-  LiveKit admin API on kick/ban, so a banned player's existing token keeps
-  working against the voice room until it expires.
+- **Revocation (15 Oct 2026, security audit F3).** A token cannot be revoked,
+  and LiveKit re-signs one for a connected session every few minutes, so the
+  game server removes sessions itself through LiveKit's RoomService API
+  (RemoveParticipant, signed with a 60 s admin token for the room):
+  - when a player's game connection ends; every kick and ban ends in one;
+  - in a sweep every `voiceChat.sweepSeconds` (default 15, 0 = off) that
+    removes any identity that is not an online character allowed voice, so a
+    kicked or banned player who rejoins with a kept token is out again.
+  A panel-banned account (admin-bans.json) gets no token, nor one the
+  gamemode refuses through `globalThis.__dboVoiceRefused(actorId)` (a
+  suspension). Tokens live 10 minutes. The API base is `voiceChat.apiUrl`,
+  or `url` with ws(s) turned into http(s).
 - **Voice is inherently identifying.** Nothing in the UI ties a LiveKit
   identity to a character name (identities are actor ids, never rendered), but
   a recognizable voice defeats /mask on its own - an RP-rules matter. The
