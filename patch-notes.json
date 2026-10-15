@@ -1,5 +1,19 @@
 [
   {
+    "title": "Alchemy fix",
+    "date": "2026-10-15",
+    "version": "Server update",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Potion strength",
+        "items": [
+          "A new Alchemist was brewing the strongest Invisibility potion (50 seconds) and the strongest Fortify Stamina potion, as if they were a Master. Each now brews the strength their Alchemist tier allows; the strongest come only at the top tiers. Potions already brewed are unchanged."
+        ]
+      }
+    ]
+  },
+  {
     "title": "The 15 October update",
     "date": "2026-10-15",
     "version": "Server update",

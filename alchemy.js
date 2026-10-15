@@ -20,7 +20,9 @@ module.exports = (api) => {
   const POTIONS = new Map();
   for (const [mg, v] of Object.entries(TABLE)) {
     const effect = idOf(`${mg}:Skyrim.esm`);
-    const ids = (v.potions || []).map((p) => ({ id: idOf(p.id), edid: p.edid })).filter((p) => p.id);
+    // Sorted here: the table lists some out of order (Invisibility 01, 04, 02, 03), which gave a tier 1 brewer the strongest
+    const ids = (v.potions || []).map((p) => ({ id: idOf(p.id), edid: p.edid, mag: Number(p.mag) || 0, dur: Number(p.dur) || 0 })).filter((p) => p.id)
+      .sort((x, y) => x.mag - y.mag || x.dur - y.dur);
     if (effect && ids.length) POTIONS.set(effect, { name: v.effect, potions: ids });
   }
 
