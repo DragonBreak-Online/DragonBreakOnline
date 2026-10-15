@@ -14,10 +14,20 @@
 *Journey to Baan Malur.esp
 *Journey to Baan Malur - Dunmeth Pass.esp
 *Gray Fox Cowl.esm
+*Druadach.esm
+*arnima.esm
+*summersetisles.esp
+*SummersetFixes.esp
+*King of the Murkmire.esp
+*Murkmire Official Housing Pack.esp
+*1AncArgArm.esl
+*StridingSiltStrider.esl
 *unofficial skyrim special edition patch.esp
 *Expressive Facegen Morphs.esl
 *TrueHUD.esl
 *Sentinel - Master Plugin.esp
+*Seascale.esl
+*PigIronSet.esl
 *DragonBreak Built.esp
 *JKs Skyrim.esp
 *WindhelmSSE.esp
@@ -102,5 +112,30 @@
 *DragonBreak.esp
 *Armors of the Velothi.esp
 *Armors of the Velothi Pt2.esp
+*Baan Malur Landscape Updates.esp
+*BaanMalurMapMarker.esp
+*Morrowind Map Fix.esp
+*MoreToDoHammerfell.esp
+*MTDHammerfell10YPatch.esp
+*King of the Murkmire - Ancient Argonian Armor.esp
+*Druadach0.esp
+*Druadach1.esp
+*Helgen Reborn.esp
+*DIS_Authentic_Legion.esp
+*shadowscaleset.esp
+*Summer Druid Armor Set.esp
+*1AncientImperial.esp
+*knighterrant.esp
+*LEITEUHTThalmor.esp
+*Civil War Battlemage Armors.esp
+*YokuWeapons.esp
+*Skaal Heavy Armor SE.esp
+*Black Bear Ancient Nord Armor.esp
+*LunarGuardArmor.esp
+*Apex_Khajiit.esp
+*GVLT_Gryphonknight.esp
+*SteelheartArmors.esp
+*GildForgottenArmoryCrude.esp
 *DragonBreak Online Edits.esp
 *DragonBreak Nexus Patches.esp
+*DragonBreak Armory.esp

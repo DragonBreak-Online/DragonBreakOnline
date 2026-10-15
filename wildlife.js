@@ -119,8 +119,9 @@ module.exports = (api) => {
       if (out.length >= C.maxZones) break;
       if (!pl.ref || !Array.isArray(pl.pos)) continue;
       // No navmesh in the placement's cell (BSHeartland covers 524 of 2381 Cyrodiil cells): the creature cannot path
-      // and sinks or slides. Skipped, but still counted, so every later wild:* zone keeps its name.
-      if (pl.noNavmesh) { n++; continue; }
+      // and sinks or slides. Skipped, but still counted, so every later wild:* zone keeps its name. anchorGone: the anchor ref
+      // left the plugins (the Skyrim release DLE removed 5edb2 at Bilegulch); skipped and counted the same way.
+      if (pl.noNavmesh || pl.anchorGone) { n++; continue; }
       const { id, left } = safePick(pl.options, pickFor(pl));
       // Left out by the guard: still counted, so every later wild:* zone keeps its name (as a no-navmesh one is)
       if (!id) { if (left) n++; continue; }

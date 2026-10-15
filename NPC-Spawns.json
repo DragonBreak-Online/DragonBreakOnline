@@ -43683,25 +43683,6 @@
    "Respawn": 1800
   },
   {
-   "Name": "wild:skeever:2299",
-   "ID": "3c:Skyrim.esm",
-   "POS": [
-    -84766.7,
-    -42240.5,
-    2818.11
-   ],
-   "Size": 3000,
-   "Anchor": "5edb2:DragonBreak Online Edits.esp",
-   "NPC": [
-    {
-     "id": "23ab5:Skyrim.esm",
-     "count": 1
-    }
-   ],
-   "Despawn": 240,
-   "Respawn": 1800
-  },
-  {
    "Name": "wild:fox:2300",
    "ID": "3c:Skyrim.esm",
    "POS": [
