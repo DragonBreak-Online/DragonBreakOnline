@@ -196,7 +196,7 @@ module.exports = (api) => {
   // of its /status wording. NAMES gives the names a line starts with; a line without one (blood, hunt: a rank) gets LABEL.
   const NAMES = { level: ['Level'], hunger: ['Hunger'], rest: ['Well Rested', 'Well Fed'], chill: ["Death's Chill"], sentence: ['Sentence'],
     rerolls: ['Rerolls'], boost: ['Skill boost'] };
-  const LABEL = { blood: 'Vampire rank', hunt: 'Great Hunt', racialPower: 'Racial Power' };
+  const LABEL = { blood: 'Vampire rank', hunt: 'Great Hunt', racialPower: 'Racial Power', racialGifts: 'Racial Gifts' };
   const racialPowerView = (a) => { try { return typeof globalThis.__dboRacialPowerView === 'function' ? globalThis.__dboRacialPowerView(a) : null; } catch (e) { log('journal: racial power view failed', e.message); return null; } };
   const chillHint = () => {
     let tier = 0; try { tier = Number(globalThis.__dboChillCureTier && globalThis.__dboChillCureTier()) || 0; } catch (e) { tier = 0; }

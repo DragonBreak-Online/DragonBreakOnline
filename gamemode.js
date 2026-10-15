@@ -2351,6 +2351,12 @@ const setCreatorHidden = (a, on) => {
   } catch (e) { log('creator hide failed', e.message); }
 };
 every('creatorHide', 1000, () => {
+  // config creatorHide.enabled false (PC test, 13 Oct: the goblin flashing in the creator): nobody is hidden, and anyone still
+  // hidden is shown again
+  if (cfg.creatorHide && cfg.creatorHide.enabled === false) {
+    for (const a of onlineActors()) if (creatorHidden.has(a >>> 0)) setCreatorHidden(a, false);
+    return;
+  }
   const seen = new Set();
   for (const a of onlineActors()) {
     const id = a >>> 0; seen.add(id);
@@ -2381,9 +2387,37 @@ if (!globalThis.__dboAppearanceHookPrev) {
   const cur = typeof mp.onUpdateAppearanceAttempt === 'function' ? mp.onUpdateAppearanceAttempt : null;
   globalThis.__dboAppearanceHookPrev = cur && !cur.__dbo ? cur : null;
 }
+// The Goblin (Nat, 13 Oct): male only (its source race's female is a placeholder body), and its skin colour is the creator's
+// preset (private.rp.race goblin, goblinswamp, goblinash, goblinochre: each its own race; only the green one is playable, so
+// RaceMenu lists one Goblin and may hand back another race). RaceMenu's Sex slider and race list cannot be trimmed per race,
+// so once a close has settled a goblin is set back to male and to its chosen colour, and told when that changed something
+const GOBLIN_LOOK_MS = 2000;
+const goblinLook = (a, appearance) => {
+  const gobs = Array.isArray(globalThis.__dboGoblinRaces) ? globalThis.__dboGoblinRaces : [];
+  if (!gobs.length || !appearance) return;
+  const chosen = () => { try { const rp = mp.get(a, 'private.rp'); const id = rp && rp.race ? (globalThis.__dboRaceOverrides || {})[String(rp.race).toLowerCase()] : 0; return gobs.includes(id >>> 0) ? id >>> 0 : 0; } catch (e) { return 0; } };
+  const isGob = (look) => gobs.includes(Number(look && look.raceId) >>> 0);
+  if (!isGob(appearance) && !chosen()) return;
+  setTimeout(() => {
+    try {
+      const cur = mp.get(a, 'appearance');
+      if (!cur) return;
+      const want = chosen() || (isGob(cur) ? Number(cur.raceId) >>> 0 : 0);
+      if (!want) return;
+      const fix = {};
+      if ((Number(cur.raceId) >>> 0) !== want) fix.raceId = want;
+      if (cur.isFemale === true) fix.isFemale = false;
+      if (!Object.keys(fix).length) return;
+      mp.set(a, 'appearance', Object.assign({}, cur, fix));
+      if (fix.isFemale === false) personal(a, 'Goblins are male only: your character stays male.');
+      log(`${display(a)} closed the race menu as ${fix.raceId ? 'another race' : ''}${fix.raceId && fix.isFemale === false ? ' and ' : ''}${fix.isFemale === false ? 'a female' : ''} goblin; set back to its chosen goblin (${want.toString(16)}), male`);
+    } catch (e) { log('goblin look reset failed', e.message); }
+  }, GOBLIN_LOOK_MS);
+};
 const appearanceHook = (actorId, appearance, isAllowed) => {
   // the player log (playerlog.js): every RaceMenu close, allowed or not; it reads the race and sex, never the name
   try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('appearance', actorId, appearance, isAllowed); } catch (e) { /* the player log is optional */ }
+  if (isAllowed) { try { goblinLook(actorId >>> 0, appearance); } catch (e) { log('goblin look check failed', e.message); } }
   let result = true;
   // A player's own /appearance edit (appearance.js): settled there (charge, locks), and none of creation's steps below run
   if (isAllowed) {

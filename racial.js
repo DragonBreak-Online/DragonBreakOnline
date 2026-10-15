@@ -35,7 +35,7 @@
 //     activeUntil } is the character's, so a relog neither resets the wait nor ends the buff.
 'use strict';
 
-const RACES = ['altmer', 'argonian', 'bosmer', 'breton', 'dunmer', 'imperial', 'khajiit', 'nord', 'orc', 'redguard', 'maormer'];
+const RACES = ['altmer', 'argonian', 'bosmer', 'breton', 'dunmer', 'imperial', 'khajiit', 'nord', 'orc', 'redguard', 'maormer', 'snowelf', 'goblin'];
 // Each race by its own RACE record and its vampire variant (Skyrim.esm, index 0: the same pairs regions.js and
 // supernatural.js use)
 const RACE_IDS = {
@@ -50,7 +50,7 @@ const AV = { poison: 40, fire: 41, shock: 42, frost: 43, magic: 44 };
 const UNARMED = 0x1f4;
 const HIGHBORN = 0x0e40c8; // PowerHighElfMagickaRegen
 const GOLD = 0xf;
-// A power's buffs: meleeDamage, bowDamage, fireDealt, shockDealt (shares added to the attacker's hit); damageTaken (every
+// A power's buffs: meleeDamage, bowDamage, fireDealt, shockDealt, frostDealt (shares added to the attacker's hit); damageTaken (every
 // hit), physicalTaken (a hit that is not a spell, enchantment or scroll), resistMagic (added to the race's own share):
 // shares off the target's; wardPoints: spell damage absorbed in all while it lasts; healthRegen, staminaRegen,
 // magickaRegen: factors, at most conditionalRegenCap. moveSpeed and jumpHeight are shares the PLAYER'S OWN GAME applies
@@ -104,6 +104,15 @@ const DEFAULTS = {
   maormer: { resistShock: 0.5, seafarerSpell: '', xp: { blade: 1.15 },
     // lookShader: what everyone near sees on the caster, ShockPlayerCloakFXShader (the ward effect's own hit shader)
     power: { name: 'Roaring Tempest', seconds: 60, wardSpell: '', lookShader: '10f9a6:Skyrim.esm', buffs: { resistMagic: 0.25, wardPoints: 60 } } },
+  // The DLE's own Snow Elf and Goblin (Nat's Racial Updates table, 13 Oct; config snowElfRace, goblinRace), only with the
+  // overhaul on. Glacier Fall, the frost cloak: frost damage dealt +25% (Ancestor's Wrath's fire share, in frost); its look
+  // is the DLE's DBO_SnowElfGlacierFall cast on the caster
+  snowelf: { resistFrost: 0.5, xp: { arcane: 1.15, defense: 1.15 },
+    power: { name: 'Glacier Fall', seconds: 60, wardSpell: '1ac9fe:DragonBreak Online Edits.esp', buffs: { frostDealt: 0.25 } } },
+  // goldBonus: the Imperial's coin share (goldBonus below). Feeding Frenzy asks for faster melee attacks, which the server cannot
+  // set: harder blows and quicker stamina instead
+  goblin: { resistPoison: 0.5, goldBonus: 0.1, xp: { harvesting: 1.15 },
+    power: { name: 'Feeding Frenzy', seconds: 60, buffs: { meleeDamage: 0.15, staminaRegen: 1.5 } } },
 };
 const merge = (cfg) => {
   const c = Object.assign({}, DEFAULTS, cfg || {});
@@ -140,7 +149,17 @@ module.exports = (api) => {
   const raceRec = (desc) => { try { const id = desc ? mp.getIdFromDesc(String(desc)) >>> 0 : 0; const r = id ? recordOf(id) : null; return r && String(r.record.type) === 'RACE' ? id : 0; } catch (e) { return 0; } };
   const MR = (cfg && cfg.maormerRace) || {};
   const MAORMER_IDS = (() => { const r = raceRec(MR.race), v = raceRec(MR.vampire); return r && v ? [r, v] : []; })();
-  globalThis.__dboRaceOverrides = MAORMER_IDS.length ? { maormer: MAORMER_IDS[0] } : {};
+  // The DLE's Snow Elf (and its vampire) and Goblin (config snowElfRace, goblinRace), the same way
+  const SR = (cfg && cfg.snowElfRace) || {}, GR = (cfg && cfg.goblinRace) || {};
+  const SNOWELF_IDS = [raceRec(SR.race), raceRec(SR.vampire)].filter((x) => x);
+  // The goblin skin colours (goblinRace.variants: creator slug -> race desc) are goblins too, each its own race record
+  const GV = GR.variants && typeof GR.variants === 'object' ? GR.variants : {};
+  const GOBLIN_SLUGS = Object.entries(Object.assign({ goblin: GR.race }, GV)).map(([slug, d]) => [slug, raceRec(d)]).filter(([, id]) => id);
+  const GOBLIN_IDS = GOBLIN_SLUGS.map(([, id]) => id);
+  globalThis.__dboGoblinRaces = GOBLIN_IDS;
+  globalThis.__dboRaceOverrides = Object.assign(MAORMER_IDS.length ? { maormer: MAORMER_IDS[0] } : {},
+    raceRec(SR.race) ? { snowelf: raceRec(SR.race) } : {}, Object.fromEntries(GOBLIN_SLUGS));
+  log(`racial: DLE races maormer ${MAORMER_IDS.map((x) => x.toString(16))} snowelf ${SNOWELF_IDS.map((x) => x.toString(16))} goblin ${GOBLIN_IDS.map((x) => x.toString(16))}, overhaul ${C.overhaul === true}`);
   const rpRace = (a) => { try { const rp = mp.get(a >>> 0, 'private.rp'); return rp && rp.race ? String(rp.race).toLowerCase() : ''; } catch (e) { return ''; } };
   // The race whose gift this player has now, or '' (not a player, a beast form, an unknown race, switched off)
   const raceOf = (a) => memoised('race', a, raceNow);
@@ -149,6 +168,8 @@ module.exports = (api) => {
     const id = raceIdOf(a);
     // On the DLE's MaormerRace: the Maormer with the overhaul, the Altmer's gift without it (as on the High Elf record)
     if (MAORMER_IDS.includes(id)) return C.overhaul === true ? 'maormer' : 'altmer';
+    if (SNOWELF_IDS.includes(id)) return C.overhaul === true ? 'snowelf' : 'altmer';
+    if (GOBLIN_IDS.includes(id)) return C.overhaul === true ? 'goblin' : '';
     const r = RACE_OF_ID.get(id) || '';
     // A Maormer made before the DLE's race stands on the High Elf record (charCreatorData.ts): without this every Maormer
     // counts as an Altmer
@@ -279,6 +300,7 @@ module.exports = (api) => {
     if (h === 'bow') m *= 1 + Math.max(0, num(b.bowDamage, 0));
     if (rs.has(AV.fire)) m *= 1 + Math.max(0, num(b.fireDealt, 0));
     if (rs.has(AV.shock)) m *= 1 + Math.max(0, num(b.shockDealt, 0));
+    if (rs.has(AV.frost)) m *= 1 + Math.max(0, num(b.frostDealt, 0));
     return m;
   };
   // The target's gift: below 1 takes less, above 1 more (the Altmer's optional weakness)
@@ -289,9 +311,9 @@ module.exports = (api) => {
     const rs = resists(src);
     let m = 1;
     const resist = (share) => { m *= 1 - clamp01(num(share, 0)); };
-    if (rs.has(AV.poison) && (race === 'argonian' || race === 'bosmer' || race === 'redguard')) resist(R.resistPoison);
+    if (rs.has(AV.poison) && (race === 'argonian' || race === 'bosmer' || race === 'redguard' || race === 'goblin')) resist(R.resistPoison);
     if (race === 'dunmer' && rs.has(AV.fire)) resist(R.resistFire);
-    if (race === 'nord' && rs.has(AV.frost)) resist(R.resistFrost);
+    if ((race === 'nord' || race === 'snowelf') && rs.has(AV.frost)) resist(R.resistFrost);
     if (race === 'maormer' && rs.has(AV.shock)) resist(R.resistShock);
     // Magic resistance: the race's own share and the power's add up (Dragonskin: 25% + 25% = 50%), under the cap
     const magic = (race === 'breton' || race === 'maormer' ? Math.max(0, num(R.resistMagic, 0)) : 0) + buff(tgt, 'resistMagic');
@@ -486,12 +508,14 @@ module.exports = (api) => {
   // straight to the Imperial. A lease chest pays only on the coin it was rolled with (dungeons.js counts that down), so
   // putting the pile back and taking it again pays nothing. Returns the extra given.
   const goldBonus = (a, amount, why) => {
-    if (raceOf(a) !== 'imperial' || !(amount > 0)) return 0;
-    const extra = Math.floor(amount * Math.max(0, num(C.imperial.goldBonus, 0)));
+    const race = raceOf(a);
+    if ((race !== 'imperial' && race !== 'goblin') || !(amount > 0)) return 0;
+    const extra = Math.floor(amount * Math.max(0, num(C[race].goldBonus, 0)));
     if (extra < 1) return 0;
     if (!giveItem(a >>> 0, GOLD, extra)) return 0;
-    try { personal(a >>> 0, `Imperial Luck: ${extra} more gold.`); } catch (e) { /* the message is optional */ }
-    log(`racial: ${display(a >>> 0)} Imperial Luck +${extra} gold on ${amount} (${why || 'loot'})`);
+    const gift = race === 'goblin' ? 'Goblin Greed' : 'Imperial Luck';
+    try { personal(a >>> 0, `${gift}: ${extra} more gold.`); } catch (e) { /* the message is optional */ }
+    log(`racial: ${display(a >>> 0)} ${gift} +${extra} gold on ${amount} (${why || 'loot'})`);
     return extra;
   };
 
@@ -675,6 +699,35 @@ module.exports = (api) => {
     if (v.readyAt) return `${v.name}: returns in ${fmtWait(v.readyAt - now)}`;
     return `${v.name}: ready`;
   };
+  // The Journal's Profile and /status: the race's passive gifts in words (Nat, 13 Oct: "show the passives in the profile tab"),
+  // read from the same numbers the hooks use, so a config change shows here too. XP boosts only with the overhaul on
+  const RACE_NAME = { altmer: 'High Elf', argonian: 'Argonian', bosmer: 'Wood Elf', breton: 'Breton', dunmer: 'Dark Elf', imperial: 'Imperial',
+    khajiit: 'Khajiit', nord: 'Nord', orc: 'Orc', redguard: 'Redguard', maormer: 'Maormer', snowelf: 'Snow Elf', goblin: 'Goblin' };
+  const SKILL_NAME = { arcane: 'Arcane', defense: 'Defence', harvesting: 'Gatherer', archery: 'Archery', blade: 'Blade', blunt: 'Blunt',
+    priest: 'Priest', unarmed: 'Martial Arts', blacksmith: 'Blacksmithing' };
+  const pct = (v) => Math.round(num(v, 0) * 100);
+  const giftsLine = (a) => {
+    const race = raceOf(a); if (!race) return '';
+    const R = C[race]; const out = [];
+    for (const [k, what] of [['resistFrost', 'frost'], ['resistFire', 'fire'], ['resistShock', 'shock'], ['resistPoison', 'poison'], ['resistMagic', 'magic']]) {
+      if (num(R[k], 0) > 0) out.push(`${pct(R[k])}% ${what} resistance`);
+    }
+    if (num(R.diseaseResist, 0) > 0) out.push(`${pct(R.diseaseResist)}% disease resistance`);
+    if (race === 'altmer' && num(R.magickaRegen, 1) > 1) out.push(`+${pct(R.magickaRegen - 1)}% Magicka regeneration`);
+    if (race === 'redguard' && num(R.staminaRegen, 1) > 1) out.push(`+${pct(R.staminaRegen - 1)}% Stamina regeneration`);
+    if (race === 'argonian' && num(R.lowHealthHealRegen, 1) > 1) out.push(`+${pct(R.lowHealthHealRegen - 1)}% Health regeneration below ${pct(R.lowHealth)}% health`);
+    if (race === 'nord' && num(R.coldStaminaRegen, 1) > 1) out.push(`+${pct(R.coldStaminaRegen - 1)}% Stamina regeneration in the cold`);
+    if (race === 'bosmer' && num(R.bowDamage, 0) > 0) out.push(`+${pct(R.bowDamage)}% bow damage`);
+    if (race === 'khajiit' && num(R.unarmedDamage, 0) > 0) out.push(`+${num(R.unarmedDamage, 0)} unarmed damage (claws)`);
+    if (race === 'orc' && num(R.lowHealth, 0) > 0) out.push(`below ${pct(R.lowHealth)}% health: +${pct(R.meleeDamage)}% melee damage, ${pct(R.damageTaken)}% less damage taken`);
+    if ((race === 'imperial' || race === 'goblin') && num(R.goldBonus, 0) > 0) out.push(`+${pct(R.goldBonus)}% gold from loot and contracts`);
+    if (race === 'altmer' && num(R.elementalWeakness, 0) > 0) out.push(`+${pct(R.elementalWeakness)}% damage from fire, frost and shock`);
+    if (overhaul() && R.xp && typeof R.xp === 'object') {
+      for (const [sk, rate] of Object.entries(R.xp)) if (num(rate, 1) > 1) out.push(`+${pct(rate - 1)}% ${SKILL_NAME[sk] || sk} XP`);
+    }
+    return out.length ? `${RACE_NAME[race] || race}: ${out.join(', ')}` : '';
+  };
+  if (typeof globalThis.__dboRegisterStatus === 'function') globalThis.__dboRegisterStatus('racialGifts', 56, (a) => giftsLine(a) || null);
   if (typeof globalThis.__dboRegisterStatus === 'function') globalThis.__dboRegisterStatus('racialPower', 57, (a) => statusLine(a) || null);
   // The HUD's countdown (gamemode.js pushHud): { name, ms } while it lasts. ms is what is left at sending; the client turns it
   // into an end on its own clock. Whole seconds, so the HUD's dedupe sends it once a second at most

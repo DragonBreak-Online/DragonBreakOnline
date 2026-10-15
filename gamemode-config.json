@@ -941,6 +941,15 @@
   "hours": 150,
   "slots": 1
  },
+ "snowElfRace": {
+  "_comment": "The DLE's DBOSnowElfRace and its vampire (Nat, 13 Oct). racial.js gives the creator's snowelf slug this race (__dboRaceOverrides) and the Snow Elf's gifts (racial.snowelf).",
+  "race": "1ac9ff:DragonBreak Online Edits.esp",
+  "vampire": "1aca00:DragonBreak Online Edits.esp"
+ },
+ "goblinRace": {
+  "_comment": "The DLE's DBOGoblinRace (Nat, 13 Oct; no vampire race). racial.js gives the creator's goblin slug this race (__dboRaceOverrides) and the Goblin's gifts (racial.goblin). Its colour is its skin tone (the race's ten Skin Tone presets); variants: { slug: race desc } would add more goblin races.",
+  "race": "1aca01:DragonBreak Online Edits.esp"
+ },
  "maormerRace": {
   "_comment": "The DLE's own Maormer race (Nate, 10 Oct: lore skin tones, a little shorter than the Altmer): MaormerRace and MaormerRaceVampire, as <hex>:<plugin> descs. Until both resolve to RACE records in the load order every Maormer stays on the High Elf record. Once they do: the character creator makes new Maormer on it (charCreatorData.ts reads __dboRaceOverrides), racial.js counts it as the Maormer, supernatural.js turns it into its vampire and back, and appearance.js guards its heads as the High Elf's.",
   "race": "192ede:DragonBreak Online Edits.esp",
