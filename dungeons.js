@@ -140,14 +140,28 @@ module.exports = (api) => {
   const LOOT_TIERS_JS = path.join(__dirname, 'loottiers.js');
   delete require.cache[LOOT_TIERS_JS];
   const besideJson = (file, fallback, without) => { try { return JSON.parse(fs.readFileSync(path.join(__dirname, file), 'utf8')); } catch (e) { log(`${file} unreadable: ${without}`, e.message); return fallback; } };
-  const TIERS = require(LOOT_TIERS_JS)({
+  const TIERS_INPUT = {
     materials: besideJson('loot-materials.json', { items: {} }, 'no weapon or armour is loot'),
     factionGear: besideJson('faction-gear.json', { items: {} }, 'only the uniform families are kept out, not the named faction pieces'),
     overrides: besideJson('loot-overrides.json', { never: {} }, 'no hand overrides (an item kept out by hand may drop)'),
     // The ingots, ores and arrows above the ceiling: the gear swap's own lists (Nate, 4 Oct: loot keeps the swap's cap)
     swap: besideJson('gear-swap.json', null, 'no ingot, ore or arrow is loot under the ceiling'),
-    cfg: C.lootTiers,
-  });
+  };
+  const BASE_TIERS = require(LOOT_TIERS_JS)(Object.assign({ cfg: C.lootTiers }, TIERS_INPUT));
+  // TIERS is the base ceiling everywhere but inside withCap, which lends one open-world path its own (below)
+  let TIERS = BASE_TIERS;
+  // A per-path ceiling (Blackreach's chests, Nate 15 Oct): { cap?: 'steel' | 'iron' | 'none', add?: [family] } over
+  // lootTiers; the never families, BANNED_LOOT, artifacts, dragon materials and the ingot cap hold under every one
+  const capTiers = new Map();
+  const tiersFor = (spec) => {
+    if (!spec || typeof spec !== 'object') return BASE_TIERS;
+    const key = JSON.stringify(spec);
+    if (!capTiers.has(key)) capTiers.set(key, require(LOOT_TIERS_JS)(Object.assign({ cfg: Object.assign({}, C.lootTiers || {}, spec.cap !== undefined ? { cap: spec.cap } : {}, { capAdd: Array.isArray(spec.add) ? spec.add : [] }) }, TIERS_INPUT)));
+    return capTiers.get(key);
+  };
+  // Runs fn with TIERS swapped to the spec's ceiling (synchronous: nothing else rolls in between)
+  const withCap = (spec, fn) => { const prev = TIERS; TIERS = tiersFor(spec); try { return fn(); } finally { TIERS = prev; } };
+  globalThis.__dboLootableUnder = (spec) => tiersFor(spec).lootable;
   const GEAR_POOLS = new Set(['weapons', 'armor', 'ench_weapons', 'ench_armor']);
   // The pools whose items are metals or ammunition, for the ceiling's check when gear-swap.json is missing (loottiers.js)
   const CAP_KIND = { materials: 'metal', arrows: 'ammo' };
@@ -684,11 +698,12 @@ module.exports = (api) => {
   // rolled as a lease's chest of difficulty diffId (a boss chest's roll when boss), from the province's gear and with every
   // rule of the dungeons' loot (artifacts, dragon materials, BANNED_LOOT, the material tiers and their province rule, the
   // ingot cap). [{ baseId, count }], or null for an unknown difficulty
-  globalThis.__dboOpenWorldLoot = (diffId, boss, province, dungeonId) => {
+  // cap: a ceiling of its own for this path ({ cap, add }, tiersFor above), else the base one
+  globalThis.__dboOpenWorldLoot = (diffId, boss, province, dungeonId, cap) => {
     const diff = DIFFICULTIES.find((x) => x.id === diffId);
     if (!diff) return null;
     const ok = lootOk({ province: String(province || ''), id: String(dungeonId || '') });
-    return boss ? bossLoot(diff, ok, false, false, NO_TRIM, String(province || '')) : chestLoot(diff, false, ok, false, false, NO_TRIM);
+    return withCap(cap, () => (boss ? bossLoot(diff, ok, false, false, NO_TRIM, String(province || '')) : chestLoot(diff, false, ok, false, false, NO_TRIM)));
   };
   // Urns, sacks, barrels and the like: a little coin or food, now and then a potion or arrows. In an expedition one
   // thing at most (Nate: "mostly empty or a single item")

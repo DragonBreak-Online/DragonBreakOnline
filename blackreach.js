@@ -24,7 +24,11 @@ const path = require('path');
 
 module.exports = (api) => {
   const { mp, log, personal, registerChatCommand, giveItem, profileOf, display, who, audit, isAdmin, cfg, onlineActors, sendPacket } = api;
-  const C = Object.assign({ enabled: true, chestHours: 20, creditMinutes: 60, guardReach: 4000, difficulty: 'nightmare', province: 'skyrim', dungeonId: 'BlackreachLocation', themeChance: 0.5, allBoss: true, glowSeconds: 30 }, cfg.blackreach || {});
+  const C = Object.assign({ enabled: true, chestHours: 20, creditMinutes: 60, guardReach: 4000, difficulty: 'nightmare', province: 'skyrim', dungeonId: 'BlackreachLocation', themeChance: 0.5, allBoss: true, glowSeconds: 30,
+    // The steel ceiling (loottiers.js, 1 Oct) is lifted for these chests only (Nate, 15 Oct): Glass and Amber, and the honed
+    // Falmer and Dwarven gear of their tier, over the steel cap. Ebony, Daedric, Stalhrim, Orcish, dragon materials and
+    // artifacts stay out (loottiers.js NEVER, dungeons.js BANNED_LOOT, ARTIFACT, DRAGON_LOOT), and so do the ingots above steel
+    lootCap: { cap: 'steel', add: ['glass', 'amber', 'falmer_honed', 'dwarven'] } }, cfg.blackreach || {});
   const readJson = (file, fallback) => { try { return JSON.parse(fs.readFileSync(path.resolve(file), 'utf8')); } catch (e) { return fallback; } };
   const DATA = readJson('blackreach.json', { spots: [], chests: [] });
   const SPAWNED_IDS_FILE = path.resolve('zone-spawns.json');
@@ -147,7 +151,7 @@ module.exports = (api) => {
   const THEME = /^(?:DLC1)?(?:Armor)?(?:Dwarven|Falmer)/;
   const themePiece = () => {
     const banned = globalThis.__dboBannedLoot instanceof RegExp ? globalThis.__dboBannedLoot : null;
-    const lootable = typeof globalThis.__dboLootable === 'function' ? globalThis.__dboLootable : null;
+    const lootable = typeof globalThis.__dboLootableUnder === 'function' ? globalThis.__dboLootableUnder(C.lootCap) : typeof globalThis.__dboLootable === 'function' ? globalThis.__dboLootable : null;
     const inProvince = typeof globalThis.__dboLootInProvince === 'function' ? globalThis.__dboLootInProvince : null;
     if (!banned || !lootable || !inProvince) return null;
     const list = [].concat(LOOT.armor || [], LOOT.weapons || []).filter((it) => THEME.test(String(it.name || '')) && !banned.test(String(it.name || '')) && lootable(it.id) && inProvince(it, C.province));
@@ -156,7 +160,7 @@ module.exports = (api) => {
   const roll = (entry) => {
     if (typeof globalThis.__dboOpenWorldLoot !== 'function') return null;
     // Every chest rolls as a boss chest (allBoss, Nate: the loot really worth it); allBoss false leaves TreasFalmerChest a plain one
-    const entries = globalThis.__dboOpenWorldLoot(C.difficulty, C.allBoss !== false || !!entry.chest.boss, C.province, C.dungeonId);
+    const entries = globalThis.__dboOpenWorldLoot(C.difficulty, C.allBoss !== false || !!entry.chest.boss, C.province, C.dungeonId, C.lootCap);
     if (!Array.isArray(entries)) return null;
     const out = entries.map((e) => ({ baseId: Number(e.baseId) >>> 0, count: Number(e.count) || 0 })).filter((e) => e.baseId && e.count > 0);
     if (Math.random() < C.themeChance) { const it = themePiece(); const id = it ? idOf(it.id) : 0; if (id) out.push({ baseId: id, count: 1, name: it.name }); }

@@ -91,7 +91,9 @@ module.exports = ({ materials, factionGear, overrides, cfg, swap }) => {
   const enemy = { ordinary: Object.assign({}, ENEMY.ordinary, (C.enemy || {}).ordinary || {}), boss: Object.assign({}, ENEMY.boss, (C.enemy || {}).boss || {}) };
   const enchCap = Object.assign({}, ENCH_CAP, C.enchCap || {});
   const capName = C.cap === undefined ? 'steel' : String(C.cap || 'none');
-  const capSet = CAPS[capName] ? new Set(CAPS[capName]) : null;
+  // capAdd: families let through on top of the named ceiling, for one loot path (dungeons.js tiersFor: Blackreach's chests
+  // take Glass, Amber, honed Falmer and Dwarven over the steel ceiling, Nate 15 Oct). A never family stays never
+  const capSet = CAPS[capName] ? new Set(CAPS[capName].concat((Array.isArray(C.capAdd) ? C.capAdd : []).map(String).filter((f) => !NEVER.has(f)))) : null;
   const fam = new Map(Object.entries((materials && materials.items) || {}).map(([k, v]) => [normDesc(k), String(v)]));
   const faction = new Set(Object.keys((factionGear && factionGear.items) || {}).map(normDesc));
   const handNever = new Map(Object.entries((overrides && overrides.never) || {}).filter(([k]) => k[0] !== '_').map(([k, why]) => [normDesc(k), String(why)]));

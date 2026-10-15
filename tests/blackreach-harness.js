@@ -149,7 +149,7 @@ const main = async () => {
   writeSpawned([boss2]);
   lootCalls = [];
   ok(use(CH, P1) === false && given.length === 2 && /force the chest open/.test(last()), 'P1, who landed the boss kill, gets the roll straight into the pack', last());
-  ok(lootCalls.length === 1 && JSON.stringify(lootCalls[0]) === JSON.stringify(['nightmare', true, 'skyrim', 'BlackreachLocation']), 'the roll is dungeons.js\'s Master boss roll from Skyrim\'s gear', lootCalls);
+  ok(lootCalls.length === 1 && JSON.stringify(lootCalls[0]) === JSON.stringify(['nightmare', true, 'skyrim', 'BlackreachLocation', (CFG.blackreach || {}).lootCap]), 'the roll is dungeons.js\'s Master boss roll from Skyrim\'s gear', lootCalls);
   ok(audits.some((t) => /^BLACKREACH /.test(t)), 'the loot is audited');
   given.length = 0;
   ok(use(CH, P1) === false && /emptied this chest already/.test(last()) && !given.length, `rested: the same account gets nothing more for ${B.chestHours} hours`, last());
@@ -222,10 +222,14 @@ const main = async () => {
     const art = readJson('artifacts.json').patterns; const ART = new RegExp(art.map((x) => `(?:${x})`).join('|'), 'i');
     const DRAGON = new RegExp(`^(?:${readJson('dragon-materials.json').editorIds.join('|')})$`, 'i');
     const BANNED = /Ebony|Daedric|Dragon(?:plate|scale|bone)|DLC1Keeper|DragonHide|Dragonsteel|DragonPriestDagger|Orcish|Orichalcum|Stalhrim/i;
+    // Blackreach's own ceiling (blackreach.lootCap, Nate 15 Oct): the steel cap plus Glass, Amber, honed Falmer and Dwarven
+    const BRCAP = (CFG.blackreach || {}).lootCap;
+    ok(BRCAP && BRCAP.cap === 'steel' && JSON.stringify(BRCAP.add) === JSON.stringify(['glass', 'amber', 'falmer_honed', 'dwarven']), 'blackreach.lootCap: the steel cap plus glass, amber, falmer_honed, dwarven', BRCAP);
+    const lootableBR = globalThis.__dboLootableUnder(BRCAP);
     const bad = [], low = [], tiers = { 3: 0, 4: 0, other: 0 }, fams = {};
     let rolls = 0, gold = 0;
     for (let i = 0; i < 2000; i++) {
-      const got = globalThis.__dboOpenWorldLoot('nightmare', true, 'skyrim', 'BlackreachLocation');
+      const got = globalThis.__dboOpenWorldLoot('nightmare', true, 'skyrim', 'BlackreachLocation', BRCAP);
       rolls++;
       for (const e of got) {
         const d = descs.get(e.baseId) || ''; const nm = nameOf.get(d) || d;
@@ -233,7 +237,7 @@ const main = async () => {
         if (ART.test(nm) || DRAGON.test(nm) || BANNED.test(nm) || globalThis.__dboLootAboveCap(d, 'metal')) bad.push(nm);
         const fam = MAT[d];
         if (fam && !['clothing', 'staff', 'misc', 'tool'].includes(fam)) {
-          if (!globalThis.__dboLootable(d)) { bad.push(`${nm} (not lootable: ${fam})`); continue; }
+          if (!lootableBR(d)) { bad.push(`${nm} (not lootable under Blackreach's cap: ${fam})`); continue; }
           const t = TIER(fam) || ({ steelplate: 3, scaled: 3, elven_gilded: 3, nordic: 3, glass: 4, amber: 4 })[fam];
           if (t === 3 || t === 4) tiers[t]++; else { tiers.other++; low.push(`${nm}:${fam}`); }
           fams[fam] = (fams[fam] || 0) + 1;
@@ -248,10 +252,27 @@ const main = async () => {
     ok(pieces >= 2000, 'every roll holds a piece of gear (a boss chest\'s certain piece)', pieces);
     // Under the 1 Oct ceiling (lootTiers.cap 'steel', Jake and Nate) no tier above it is loot anywhere, Blackreach included;
     // with the cap lifted the Master boss row's tiers 3-4 come through, glass and amber (4) ahead of tier 3
-    if (cap === 'none') ok(tiers[3] + tiers[4] >= pieces * 0.9 && tiers[4] > tiers[3], 'cap lifted: the gear is the Master boss row, tier 4 ahead of tier 3', tiers);
-    else ok(tiers[3] + tiers[4] === 0 && Object.keys(fams).every((f) => ['steel', 'iron', 'hide', 'leather', 'studded', 'wood', 'falmer', 'forsworn', 'bronze', 'copper', 'ancient_nord', 'goblin', 'silver', 'imperial', 'trinket'].includes(f) || TIER(f) <= 2), `cap '${cap}': nothing above it, as at every other loot path`, fams);
+    // The base ceiling holds everywhere else (lootTiers.cap 'steel', 1 Oct); Blackreach's chests lift it to Glass and Amber (tier 4)
+    // and the honed Falmer and Dwarven gear, never a tier 3 family (none is added) and never a never family
+    const BR_OK = new Set(['steel', 'iron', 'hide', 'leather', 'studded', 'wood', 'falmer', 'forsworn', 'bronze', 'copper', 'ancient_nord', 'goblin', 'silver', 'imperial', 'ancient_imperial', 'glass', 'amber', 'falmer_honed', 'dwarven']);
+    ok(cap === 'steel', "the base ceiling is still 'steel' (lootTiers.cap)", cap);
+    ok(tiers[4] > 0 && tiers[3] === 0 && Object.keys(fams).every((f) => BR_OK.has(f)), 'Blackreach: Glass or Amber (tier 4) comes through, no tier 3 family, nothing outside the lifted cap', { tiers, fams });
+    // Amber (Saints and Seducers, ccBGSSSE025) is let through by the cap, but loot.json's pools hold no Amber piece yet
+    // (ck-mcp/loot.py leaves the Creation Club set out), so only Glass can come out until they do
+    const AMBER = Object.keys(MAT).filter((k) => MAT[k] === 'amber');
+    const amberPooled = [].concat(LOOT.weapons || [], LOOT.armor || [], LOOT.ench_weapons || [], LOOT.ench_armor || []).filter((it) => MAT[String(it.id).toLowerCase()] === 'amber').length;
+    ok((fams.glass || 0) > 0 && AMBER.length > 0 && AMBER.every((d) => lootableBR(d)) && (amberPooled ? (fams.amber || 0) > 0 : true), `Blackreach: Glass drops; Amber is lootable under the cap (${AMBER.length} pieces, ${amberPooled} in loot.json's pools)`, { fams, amberPooled });
+    ok((fams.dwarven || 0) + (fams.falmer_honed || 0) > 0, 'Blackreach: Dwarven or honed Falmer gear drops at its tier', fams);
+    // The same roll without Blackreach's cap (any other open-world path) keeps the steel ceiling
+    const famsBase = {};
+    for (let i = 0; i < 500; i++) for (const e of globalThis.__dboOpenWorldLoot('nightmare', true, 'skyrim', 'BlackreachLocation')) { const d = descs.get(e.baseId) || ''; const fam = MAT[d]; if (fam && !['clothing', 'staff', 'misc', 'tool'].includes(fam)) famsBase[fam] = (famsBase[fam] || 0) + 1; }
+    ok(!famsBase.glass && !famsBase.amber && !famsBase.dwarven && !famsBase.falmer_honed, 'without the per-path cap the steel ceiling holds (no Glass, Amber, Dwarven, honed Falmer)', famsBase);
+    ok(['glass', 'amber', 'dwarven', 'falmer_honed'].every((f) => !globalThis.__dboLootable(Object.keys(MAT).find((k) => MAT[k] === f))), 'the base __dboLootable still refuses those four families');
+    // A never family named in add stays never
+    const evil = globalThis.__dboLootableUnder({ cap: 'steel', add: ['EBONY', 'DAEDRIC', 'stalhrim', 'DRAGON'] });
+    ok(['EBONY', 'DAEDRIC', 'stalhrim', 'DRAGON'].every((f) => !evil(Object.keys(MAT).find((k) => MAT[k] === f))), 'a never family added to a cap stays never (Ebony, Daedric, Stalhrim, dragon)');
     // the theme piece, as blackreach.js draws it: Dwemer and Falmer gear of Skyrim, lootable
-    const theme = [].concat(LOOT.armor || [], LOOT.weapons || []).filter((it) => /^(?:DLC1)?(?:Armor)?(?:Dwarven|Falmer)/.test(it.name) && globalThis.__dboLootable(it.id) && globalThis.__dboLootInProvince(it, 'skyrim') && !globalThis.__dboBannedLoot.test(it.name));
+    const theme = [].concat(LOOT.armor || [], LOOT.weapons || []).filter((it) => /^(?:DLC1)?(?:Armor)?(?:Dwarven|Falmer)/.test(it.name) && lootableBR(it.id) && globalThis.__dboLootInProvince(it, 'skyrim') && !globalThis.__dboBannedLoot.test(it.name));
     ok(theme.length >= 8 && theme.every((it) => /^(dwarven|falmer|falmer_honed)$/.test(MAT[String(it.id).toLowerCase()] || '')), `the Dwemer and Falmer pieces a chest adds come from ${theme.length} lootable Skyrim items of those two families`, theme.map((it) => it.name).slice(0, 8));
   }
 
