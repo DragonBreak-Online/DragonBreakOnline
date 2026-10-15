@@ -2582,7 +2582,9 @@ const goblinLook = (a, appearance) => {
       const want = chosen() || (isGob(cur) ? Number(cur.raceId) >>> 0 : 0);
       if (!want) return;
       const fix = {};
-      if ((Number(cur.raceId) >>> 0) !== want) fix.raceId = want;
+      // A goblin vampire (supernatural.js) wears its own race: kept, as long as it is the chosen goblin's
+      const vampOf = (globalThis.__dboGoblinVampires || {})[want];
+      if ((Number(cur.raceId) >>> 0) !== want && !(vampOf && (Number(cur.raceId) >>> 0) === (vampOf >>> 0))) fix.raceId = want;
       if (cur.isFemale === true) fix.isFemale = false;
       if (!Object.keys(fix).length) return;
       mp.set(a, 'appearance', Object.assign({}, cur, fix));

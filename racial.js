@@ -169,7 +169,11 @@ module.exports = (api) => {
   // races.js: a placeholder on the Breton record until now), so the override is filed under it
   const RR = (cfg && cfg.reachmanRace) || {};
   const REACHMAN_IDS = [raceRec(RR.race), raceRec(RR.vampire)].filter((x) => x);
+  // The goblin vampire (goblinRace.vampire, DBOGoblinRaceVampire, PC 15 Oct) keeps the Goblin's gift, as the Snow Elf's does.
+  // It stays out of __dboGoblinRaces: gamemode.js goblinLook would set it back to the mortal race on a RaceMenu close
+  const GOBLIN_VAMPIRE = raceRec(GR.vampire);
   globalThis.__dboGoblinRaces = GOBLIN_IDS;
+  globalThis.__dboGoblinVampires = GOBLIN_VAMPIRE && raceRec(GR.race) ? { [raceRec(GR.race)]: GOBLIN_VAMPIRE } : {};
   globalThis.__dboRaceOverrides = Object.assign(MAORMER_IDS.length ? { maormer: MAORMER_IDS[0] } : {},
     raceRec(SR.race) ? { snowelf: raceRec(SR.race) } : {}, Object.fromEntries(GOBLIN_SLUGS), raceRec(RR.race) ? { reachfolk: raceRec(RR.race) } : {});
   log(`racial: DLE races maormer ${MAORMER_IDS.map((x) => x.toString(16))} snowelf ${SNOWELF_IDS.map((x) => x.toString(16))} goblin ${GOBLIN_IDS.map((x) => x.toString(16))} reachman ${REACHMAN_IDS.map((x) => x.toString(16))}, overhaul ${C.overhaul === true}`);
@@ -182,7 +186,7 @@ module.exports = (api) => {
     // On the DLE's MaormerRace: the Maormer with the overhaul, the Altmer's gift without it (as on the High Elf record)
     if (MAORMER_IDS.includes(id)) return C.overhaul === true ? 'maormer' : 'altmer';
     if (SNOWELF_IDS.includes(id)) return C.overhaul === true ? 'snowelf' : 'altmer';
-    if (GOBLIN_IDS.includes(id)) return C.overhaul === true ? 'goblin' : '';
+    if (GOBLIN_IDS.includes(id) || (GOBLIN_VAMPIRE && id === GOBLIN_VAMPIRE)) return C.overhaul === true ? 'goblin' : '';
     // Without the overhaul a Reachman has the Breton's gift (their morph race and their forebears)
     if (REACHMAN_IDS.includes(id)) return C.overhaul === true ? 'reachman' : 'breton';
     const r = RACE_OF_ID.get(id) || '';

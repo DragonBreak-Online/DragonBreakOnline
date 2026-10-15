@@ -195,7 +195,7 @@ module.exports = (api) => {
     return r && v ? [r, v] : null;
   })();
   if (maormerRace) { VAMPIRE_RACES.set(maormerRace[0], maormerRace[1]); MORTAL_RACES.set(maormerRace[1], maormerRace[0]); }
-  // The DLE's DBOSnowElfRace and its vampire (config snowElfRace) the same way; the Goblin has no vampire race and stays mortal
+  // The DLE's DBOSnowElfRace and its vampire (config snowElfRace) the same way
   const snowElfRace = (() => {
     const M = cfg.snowElfRace || {};
     const rec = (d) => { const id = d ? (() => { try { return mp.getIdFromDesc(String(d)) >>> 0; } catch (e) { return 0; } })() : 0; let r = null; try { r = id ? recordOf(id) : null; } catch (e) { r = null; } const t = r && (r.record ? r.record.type : r.type); return t && String(t) === 'RACE' ? id : 0; };
@@ -203,6 +203,15 @@ module.exports = (api) => {
     return r && v ? [r, v] : null;
   })();
   if (snowElfRace) { VAMPIRE_RACES.set(snowElfRace[0], snowElfRace[1]); MORTAL_RACES.set(snowElfRace[1], snowElfRace[0]); }
+  // The DLE's DBOGoblinRace and its vampire DBOGoblinRaceVampire (config goblinRace.race / .vampire, PC 15 Oct) the same way.
+  // Only the green goblin has a vampire; a colour variant (goblinRace.variants) without one stays mortal
+  const goblinRace = (() => {
+    const M = cfg.goblinRace || {};
+    const rec = (d) => { const id = d ? (() => { try { return mp.getIdFromDesc(String(d)) >>> 0; } catch (e) { return 0; } })() : 0; let r = null; try { r = id ? recordOf(id) : null; } catch (e) { r = null; } const t = r && (r.record ? r.record.type : r.type); return t && String(t) === 'RACE' ? id : 0; };
+    const r = rec(M.race), v = rec(M.vampire);
+    return r && v ? [r, v] : null;
+  })();
+  if (goblinRace) { VAMPIRE_RACES.set(goblinRace[0], goblinRace[1]); MORTAL_RACES.set(goblinRace[1], goblinRace[0]); }
   // The DLE's DBOReachmanRace and its vampire (config reachmanRace) the same way
   const reachmanRace = (() => {
     const M = cfg.reachmanRace || {};
@@ -292,6 +301,11 @@ module.exports = (api) => {
   if (snowElfRace) FAMILY.set(snowElfRace[0], 'highelf');
   // A Reachman is a man of Breton stock on the Breton morph, with vanilla human heads: the human tells
   if (reachmanRace) FAMILY.set(reachmanRace[0], 'human');
+  // A Goblin has no eyes to choose (no head parts at all): its tells are the skin tone alone (Nat, 15 Oct: "skin tone works").
+  // A goblin werewolf shows nothing
+  if (goblinRace) FAMILY.set(goblinRace[0], 'goblin');
+  const SKIN_ONLY = new Set(['goblin']);
+  const skinOnly = (fam, s) => SKIN_ONLY.has(fam) && s && s.kind === 'vampire';
   const familyOf = (race) => FAMILY.get(race) || FAMILY.get(MORTAL_RACES.get(race)) || null;
   const isEyePart = (id) => fieldIds(recordOf(id), 'PNAM')[0] === 2;
   // A head part's extra parts (HNAM), and theirs in turn: eyes such as the blind ones carry an overlay part that the
@@ -319,13 +333,20 @@ module.exports = (api) => {
   // The tells laid over a look that does not show them: { next, look } (look is what they hide, s.look), or null when the
   // look has no eyes to swap
   const layTells = (app, s, fam, want) => {
-    const idx = app.headpartIds.findIndex((h) => isEyePart(Number(h) >>> 0));
-    if (idx < 0) return null;
-    const prevEye = app.headpartIds[idx];
-    const prevExtras = strayExtras(app.headpartIds, prevEye, want);
-    const drop = new Set(prevExtras);
-    const next = Object.assign({}, app, { headpartIds: app.headpartIds.map((h, i) => (i === idx ? want : h)).filter((h) => !drop.has(Number(h) >>> 0)) });
-    const look = { kind: s.kind, eye: want, prevEye, prevExtras };
+    let next, look;
+    if (!want && skinOnly(fam, s)) {
+      // No eyes: the skin tone alone (look.eye 0, nothing to swap back)
+      next = Object.assign({}, app);
+      look = { kind: s.kind, eye: 0, prevEye: 0, prevExtras: [], skinOnly: true };
+    } else {
+      const idx = want ? app.headpartIds.findIndex((h) => isEyePart(Number(h) >>> 0)) : -1;
+      if (idx < 0) return null;
+      const prevEye = app.headpartIds[idx];
+      const prevExtras = strayExtras(app.headpartIds, prevEye, want);
+      const drop = new Set(prevExtras);
+      next = Object.assign({}, app, { headpartIds: app.headpartIds.map((h, i) => (i === idx ? want : h)).filter((h) => !drop.has(Number(h) >>> 0)) });
+      look = { kind: s.kind, eye: want, prevEye, prevExtras };
+    }
     if (s.kind === 'vampire') {
       const t = fam === 'khajiit' || fam === 'argonian' ? C.vampirePallorBeast : C.vampirePallor;
       look.prevSkin = next.skinColor; next.skinColor = blend(Number(next.skinColor) >>> 0, t);
@@ -339,8 +360,9 @@ module.exports = (api) => {
     let app = null; try { app = mp.get(a, 'appearance'); } catch (e) { return; }
     if (!app || !Array.isArray(app.headpartIds)) return;
     const { fam, want } = tellEyeFor(app, s);
-    if (!want) return;
-    if (app.headpartIds.includes(want)) {
+    if (!want && !skinOnly(fam, s)) return;
+    if (!want && s.look) return; // a goblin's pallor is laid once, as eyes are
+    if (want && app.headpartIds.includes(want)) {
       // Shown before the eyes' extras went with them (2026-09-29): take the stray overlay off once, keeping it for the cure
       const look = s.look;
       if (!look || look.eye !== want || Array.isArray(look.prevExtras)) return;
@@ -383,7 +405,7 @@ module.exports = (api) => {
     let app = null; try { app = mp.get(a, 'appearance'); } catch (e) { return; }
     if (!app || !Array.isArray(app.headpartIds)) return;
     const extras = (Array.isArray(look.prevExtras) ? look.prevExtras : []).filter((x) => !app.headpartIds.some((h) => (Number(h) >>> 0) === x));
-    const next = Object.assign({}, app, { headpartIds: app.headpartIds.flatMap((h) => ((Number(h) >>> 0) === look.eye ? [look.prevEye, ...extras] : [h])) });
+    const next = Object.assign({}, app, { headpartIds: look.eye ? app.headpartIds.flatMap((h) => ((Number(h) >>> 0) === look.eye ? [look.prevEye, ...extras] : [h])) : app.headpartIds.slice() });
     if (look.prevSkin !== undefined) next.skinColor = look.prevSkin;
     if (look.prevTone !== undefined) next.tints = (next.tints || []).map((x) => (isToneTint(x) ? Object.assign({}, x, { argb: look.prevTone }) : x));
     mp.set(a, 'appearance', next);
@@ -409,7 +431,7 @@ module.exports = (api) => {
     if (look) {
       const ids = app.headpartIds.map((h) => Number(h) >>> 0);
       // Still the tell eyes: the player kept them, so the eyes they hide stay (with the extras that went with them)
-      if (ids.includes(look.eye)) {
+      if (look.eye && ids.includes(look.eye)) {
         const extras = (Array.isArray(look.prevExtras) ? look.prevExtras : []).filter((x) => !ids.includes(x));
         mortal.headpartIds = app.headpartIds.flatMap((h) => ((Number(h) >>> 0) === look.eye ? [look.prevEye, ...extras] : [h]));
       }
@@ -431,7 +453,7 @@ module.exports = (api) => {
     let next = mortal;
     if (tellsShown(s)) {
       const { fam, want } = tellEyeFor(mortal, s);
-      const laid = want && !mortal.headpartIds.includes(want) ? layTells(mortal, s, fam, want) : null;
+      const laid = want ? (!mortal.headpartIds.includes(want) ? layTells(mortal, s, fam, want) : null) : (skinOnly(fam, s) ? layTells(mortal, s, fam, 0) : null);
       if (laid) { s.look = laid.look; next = laid.next; }
     }
     if (!look && !s.look && !bloodTaken) return false;
