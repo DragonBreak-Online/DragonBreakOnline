@@ -1,5 +1,5 @@
 'use strict'
-// Discord id -> player record (names, hwid, last ip, notes, times). Read fail closed like profiles.json
+// Discord id -> player record (names, last ip, notes, times). Read fail closed like profiles.json
 // (sources/storeFile.js): a players.json that exists but cannot be read stops sign-ins instead of starting empty.
 // Saved often (several times per game start), so its saves are atomic but not fsynced (see storeFile.replaceFile).
 
@@ -11,7 +11,7 @@ const { readStore, replaceFile, isPlainObject } = require('./storeFile')
 const FILE = path.join(__dirname, '..', 'data', 'players.json')
 // What the FAIL CLOSED line tells the operator. Profile ids live in profiles.json, so this store can start over
 const RECOVERY = 'Repair it by hand if you can (it is JSON). Or move it aside with the backend stopped: it then starts ' +
-  'with no player records, profile ids stay as profiles.json has them, and names, hwid and last ip come back as ' +
+  'with no player records, profile ids stay as profiles.json has them, and names and last ip come back as ' +
   'players sign in (notes are lost). Keep the moved file: scripts/rebuild-profiles.js reads it with --players'
 
 // null for a store this module writes, else what is wrong with it
@@ -85,8 +85,8 @@ function createManual(input) {
   return decorate(data[discordId])
 }
 
-// Records the latest hwid and/or ip for a player; empty values never overwrite stored ones
-function updateIdentity(discordId, { hwid, ip } = {}) {
+// Records the latest ip for a player; an empty one never overwrites the stored one. A raw hwid is never stored (L3-01)
+function updateIdentity(discordId, { ip } = {}) {
   const id = String(discordId || '').trim()
   if (!id) return null
   const data = load()
@@ -103,9 +103,7 @@ function updateIdentity(discordId, { hwid, ip } = {}) {
     lastSeenAt: null,
   }
   let changed = !data[id]
-  const cleanHwid = String(hwid || '').trim()
   const cleanIp = String(ip || '').trim()
-  if (cleanHwid && current.hwid !== cleanHwid) { current.hwid = cleanHwid; changed = true }
   if (cleanIp && current.lastIp !== cleanIp) { current.lastIp = cleanIp; changed = true }
   if (changed) {
     current.updatedAt = now

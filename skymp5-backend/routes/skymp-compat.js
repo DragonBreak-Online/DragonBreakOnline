@@ -53,15 +53,10 @@ function sanitizeHwid(value) {
   return value.replace(/[\x00-\x1f\x7f]/g, '').trim().slice(0, 128)
 }
 
-// Stores a hwid on both the session record and the player record; never throws
+// The raw hardware id is personal data and is no longer stored (L3-01): it is only counted; launch-check carries a one-way code instead
 function storeHwid(token, session, hwid) {
-  const { recordSessionHwid } = require('./master-api')
-  try {
-    recordSessionHwid(token, hwid)
-    players.updateIdentity(session.discordId, { hwid })
-  } catch (e) {
-    console.error('[skymp-compat] failed to store hwid:', e.message)
-  }
+  try { require('../sources/deviceChecks').legacyHwidDiscarded() }
+  catch { /* a count only */ }
 }
 
 // The launcher sends "Bearer <token>"; the game client convention is the raw token
