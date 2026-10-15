@@ -22,10 +22,10 @@ globalThis.__dboCharLevelLogin(1);
 ok(globalThis.__dboCharLevel(1) === 2, 'one skill at Apprentice (250 units) is level 2');
 ok(widgets.length === 1, 'the level-up opens the choice menu');
 handlers.levelChoose(1, ['health']);
-ok(JSON.stringify(api.mp.get(1, 'private.dboAvBonus')) === '{"health":10,"magicka":0,"stamina":0}', 'spending a point writes private.dboAvBonus');
-ok(packets.some((p) => p.customPacketType === 'dboAvGain' && p.health === 10), 'the client is told the gain');
+ok(JSON.stringify(api.mp.get(1, 'private.dboAvBonus')) === '{"health":25,"magicka":0,"stamina":0}', 'spending a point writes private.dboAvBonus');
+ok(packets.some((p) => p.customPacketType === 'dboAvGain' && p.health === 25), 'the client is told the gain');
 handlers.levelChoose(1, ['health']);
-ok(api.mp.get(1, 'private.dboAvBonus').health === 10, 'no point to spend, nothing changes');
+ok(api.mp.get(1, 'private.dboAvBonus').health === 25, 'no point to spend, nothing changes');
 setSkills({ smithing: skill(80), alchemy: skill(10) });
 globalThis.__dboCharLevelLogin(1);
 ok(globalThis.__dboCharLevel(1) === 4, 'Expert plus a little elsewhere is level 4, not 5');
@@ -41,9 +41,20 @@ handlers.levelChoose(1, ['bogus']);
 ok(api.mp.get(1, 'private.dboLevel').pending === 3, 'an unknown choice is ignored');
 // /level <vital> <n> spends several at once (3 pending here); asking for more than is left spends what is left
 cmds.level(1, 'stamina 2');
-ok(api.mp.get(1, 'private.dboLevel').pending === 1 && api.mp.get(1, 'private.dboAvBonus').stamina === 20, '/level stamina 2 spends two points');
-ok(packets.length && JSON.stringify(packets[packets.length - 1]).includes('"stamina":20'), 'one gain packet carries both points');
+ok(api.mp.get(1, 'private.dboLevel').pending === 1 && api.mp.get(1, 'private.dboAvBonus').stamina === 50, '/level stamina 2 spends two points');
+ok(packets.length && JSON.stringify(packets[packets.length - 1]).includes('"stamina":50'), 'one gain packet carries both points');
 cmds.level(1, 'magicka 5');
-ok(api.mp.get(1, 'private.dboLevel').pending === 0 && api.mp.get(1, 'private.dboAvBonus').magicka === 10, '/level magicka 5 with one left spends one');
+ok(api.mp.get(1, 'private.dboLevel').pending === 0 && api.mp.get(1, 'private.dboAvBonus').magicka === 25, '/level magicka 5 with one left spends one');
+
+// A character who spent points at the old +10 is topped up to +25 once, and the client is told the difference
+api.mp.set(2, 'private.mastery', { v: 2, skills: { smithing: skill(25) }, order: ['smithing'] });
+api.mp.set(2, 'private.dboLevel', { level: 2, pending: 0, spent: { health: 10, magicka: 0, stamina: 0 } });
+api.mp.set(2, 'private.dboAvBonus', { health: 10, magicka: 0, stamina: 0 });
+packets.length = 0;
+globalThis.__dboCharLevelLogin(2);
+ok(api.mp.get(2, 'private.dboAvBonus').health === 25 && api.mp.get(2, 'private.dboLevel').per === 25, 'old +10 points are re-priced at +25');
+ok(packets.length === 1 && packets[0].health === 15 && packets[0].magicka === undefined, 'the client is told only the +15 difference');
+globalThis.__dboCharLevelLogin(2);
+ok(api.mp.get(2, 'private.dboAvBonus').health === 25 && packets.length === 1, 'the top-up happens once');
 console.log(fails ? `${fails} FAILURES` : 'all passed');
 process.exit(fails ? 1 : 0);
