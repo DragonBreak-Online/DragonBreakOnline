@@ -278,17 +278,28 @@ test('reply_to takes a link or an id in this channel and posts as a reply withou
   assert.equal(sent.length, 2)
 })
 
-test('close in a to-do thread posts, then locks and archives it with one edit as dbdiscord todo done does', async () => {
+test('close in a to-do thread posts, answers privately, then locks and archives it with one edit as dbdiscord todo done does', async () => {
   const S = make()
   const { it, calls } = command({ close: true, channelId: CH.todoThread, text: 'Completed. The new map is live.' })
-  await S.handleInteraction(it)
   const th = channels.get(CH.todoThread)
+  const answeredBefore = []
+  th.edit = async p => { answeredBefore.push(names(calls).join(',')); th.edits.push(p); return th }
+  await S.handleInteraction(it)
   assert.equal(th.sends.length, 1)
   assert.equal(th.edits.length, 1)
   assert.equal(th.edits[0].locked, true)
   assert.equal(th.edits[0].archived, true)
+  assert.deepEqual(answeredBefore, ['defer,edit'], 'the private reply is edited while the thread is still open')
+  assert.deepEqual(names(calls), ['defer', 'edit'])
+  assert.match(calls[1][1].content, /^Posted as Dragonbaron: https:\/\/discord\.com\/channels\/\d+\/\d+\/\d+\nLocking and archiving the thread now\.$/)
   assert.match(audits[0], /, then locked and archived the thread: /)
-  assert.match(calls[1][1].content, /The thread is now locked and archived\.$/)
+
+  const stuck = command({ close: true, channelId: CH.todoThread })
+  th.edit = async () => { throw new Error('Missing Permissions') }
+  await S.handleInteraction(stuck.it)
+  assert.deepEqual(names(stuck.calls), ['defer', 'edit', 'edit'])
+  assert.match(stuck.calls[2][1].content, /\nThe thread could not be locked; close it by hand\.$/)
+  assert.match(audits[1], /, but the thread could not be locked: /)
 })
 
 test('a defer that fails posts nothing, and a post Discord refuses is reported privately and not logged as posted', async () => {

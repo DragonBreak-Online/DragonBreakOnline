@@ -156,8 +156,11 @@ function createSayCommand({
       await answer(ERRORS.postFailed)
       return true
     }
+    const posted = `Posted as Dragonbaron: ${sent.url}`
     let closed = false
     if (ctx.close) {
+      // Answered before the close, since an archived thread can refuse the edit of the private reply
+      await answer(`${posted}\nLocking and archiving the thread now.`)
       try {
         await ctx.channel.edit({ locked: true, archived: true, reason: `/say close by ${ctx.handle}` })
         closed = true
@@ -167,8 +170,8 @@ function createSayCommand({
     try {
       audit.log(`SAY "${ctx.name}" (@${ctx.handle}) posted as Dragonbaron in ${where}${replyUrl ? ` replying to ${replyUrl}` : ''}${did}: ${sent.url} "${rules.foldText(text, 100)}"`)
     } catch (err) { log('audit failed:', err.message) }
-    const note = ctx.close ? (closed ? '\nThe thread is now locked and archived.' : '\nThe thread could not be locked; close it by hand.') : ''
-    await answer(`Posted as Dragonbaron: ${sent.url}${note}`)
+    if (!ctx.close) await answer(posted)
+    else if (!closed) await answer(`${posted}\nThe thread could not be locked; close it by hand.`)
     return true
   }
 
