@@ -36,6 +36,7 @@ because that is the prefix the public proxy forwards.
 | Variable | Default | Values |
 |---|---|---|
 | `LAUNCHER_LOGIN_LEGACY` | `allow` | `allow` keeps the old flow working. `off` refuses new old-flow logins: the browser page says to update the launcher, and the old launcher stops after about 20 s with HTTP 426. Sessions it already made keep working. `revoke` is `off` plus: sessions the old flow made, and every session from before this change, are refused (not deleted) until the switch goes back. Any other value counts as `allow`. |
+| `GAME_LOGIN_DEVICE` | off | `on` offers the in-game sign-in (the device code). The game has had no sign-in button since June, so nothing uses it today, and while it is off nobody can be talked into typing a code on its page. Turn it on in the release that brings the button back. |
 | `LAUNCHER_LOGIN_SINGLE_SESSION` | on | `false` keeps older sessions when the same account logs in again. |
 | `MASTER_SESSION_CHECK_TOKEN` | `optional` | `required`: the game server's session check (`GET /api/servers/:key/sessions/:session` and `/balance`) must carry `X-Auth-Token`. `optional` also takes a check without it and logs an hourly count. A wrong token is refused in both. |
 
@@ -52,6 +53,7 @@ because that is the prefix the public proxy forwards.
    backend rollback), so rolling the backend back never locks new launchers out.
 4. **Client.** Any later client release. The in-game sign-in has had no button since June ("Removed in-game sign
    in"), so no player depends on it; with the old flow off, an old client's in-game sign-in is refused.
+   `GAME_LOGIN_DEVICE` stays off until a client brings the button back.
 5. **Switches.**
    - `MASTER_SESSION_CHECK_TOKEN=required` once the log has shown no check without the token for 24 hours after the
      fork restart.

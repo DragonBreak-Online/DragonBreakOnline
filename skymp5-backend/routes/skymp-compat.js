@@ -121,6 +121,7 @@ router.post('/login-discord/start', startLimiter, (req, res) => {
       return res.json({ state, expiresIn: TTL.pending / 1000 })
     }
     if (body.client === 'game') {
+      if (!config.gameLoginDevice) return res.status(403).json({ error: 'gameLoginOff' })
       const { state, deviceCode, userCode } = logins.issue('device')
       return res.json({ state, deviceCode, userCode, interval: POLL_INTERVAL_S, expiresIn: TTL.pending / 1000 })
     }

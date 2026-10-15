@@ -68,6 +68,8 @@ module.exports = {
   discordRedirectUri:  process.env.DISCORD_REDIRECT_URI  || 'http://localhost:4000/api/users/login-discord/callback',
   // The launcher login of launchers up to 2.1.49 (a state the launcher chose): allow (default), off refuses it, revoke also refuses the sessions it made
   launcherLoginLegacy: ['off', 'revoke'].includes(LAUNCHER_LOGIN_LEGACY) ? LAUNCHER_LOGIN_LEGACY : 'allow',
+  // The in-game sign-in's device-code login (no game button since June); on enables it, anything else answers 403, so its code page cannot be used to talk players into typing a code
+  gameLoginDevice: String(process.env.GAME_LOGIN_DEVICE || '').trim().toLowerCase() === 'on',
   // A new launcher or in-game Discord login ends that account's older sessions; false keeps them
   launcherLoginSingleSession: process.env.LAUNCHER_LOGIN_SINGLE_SESSION !== 'false',
   // required: the game server's session check must carry X-Auth-Token; optional (default) also takes one without, for game server builds before F1

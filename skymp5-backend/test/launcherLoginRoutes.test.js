@@ -34,7 +34,7 @@ stub('../sources/factionWhitelist', { getPlayerFactionPermissions: () => [], get
 const config = require('../config')
 Object.assign(config, {
   serverMasterKey: 'test-key', masterApiAuthToken: 'server-secret', launchCheckEnforce: false, legalRequired: false,
-  discordClientId: '1400000000000000888', discordRedirectUri: 'https://api.test/api/users/login-discord/callback',
+  discordClientId: '1400000000000000888', discordRedirectUri: 'https://api.test/api/users/login-discord/callback', gameLoginDevice: true,
 })
 
 let discordUser = { id: PROFILES[31], username: 'alpha', global_name: 'Alpha', avatar: null }
@@ -222,6 +222,15 @@ test('F1: the game\'s login needs the code the game shows, typed on our page, an
   assert.equal(ok.status, 200)
   assert.match(ok.json.token, /^[0-9a-f]{64}$/)
   assert.equal((await post('/api/users/login-discord/poll', { state, device_code: deviceCode })).status, 403, 'delivered once')
+})
+
+test('F1: with GAME_LOGIN_DEVICE off (the default) the game\'s login is not offered', async () => {
+  await withConfig({ gameLoginDevice: false }, async () => {
+    const r = await post('/api/users/login-discord/start', { client: 'game' })
+    assert.equal(r.status, 403)
+    assert.equal(r.json.error, 'gameLoginOff')
+    assert.equal(r.json.state, undefined)
+  })
 })
 
 test('F1: five wrong game codes end that login', async () => {
