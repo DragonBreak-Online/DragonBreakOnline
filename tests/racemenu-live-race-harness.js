@@ -70,6 +70,8 @@ const store = (a, race, v) => {
   fs.mkdirSync(DIR, { recursive: true });
   const k = (a >>> 0).toString(16);
   fs.writeFileSync(path.join(DIR, `${k}.json`), JSON.stringify({ v: 1, actor: k, profile: props[a].profileId, race, hash: P.hashText(text), at: '2026-10-13T20:19:14Z', face: text }));
+  // The module's read cache holds the file it read last
+  const st = globalThis.__dboPresetState; if (st) st.cache.delete(k.padStart(8, '0'));
   return P.hashText(text);
 };
 
@@ -174,6 +176,30 @@ const afterHold = async () => { await wait(HOLD + 30); tick(); await settle(); }
   await settle(); await afterHold(); pumpAll(); s = s.concat(take());
   check('vampire: after a cure and a relog, 3c192ede goes and the face with it', races(s, V).length === 1 && races(s, V)[0].p.race === MAORMER && presets(s, V).length === 2 && presets(s, V)[0].p.race === MAORMER, s.map((x) => x.p));
 
+  // ---- a face stored on another family, a plugin race on one side (a GM's /chargen between High Elf and Maormer) ----
+  // The client's family table has no plugin race, so a face it is sent for another family holds every capture: none to the owner
+  store(M, HIGH_ELF, 0.2);
+  login(M); take(); logs.length = 0;
+  askSelf(1); await settle(); await afterHold(); pumpAll(); s = take();
+  check('a High Elf face on a Maormer: the race goes, then the owner is answered none (no capture held behind it)', races(s, M).length === 1 && presets(s, M).length === 1 && presets(s, M)[0].p.customPacketType === 'dboPresetNone'
+    && logs.some((l) => /^racemenu presets: ff000a6d \(profile 51\) own face [0-9a-f]{8} is for race 13743, another family than 3c192ede: the owner is answered none, watchers as before$/.test(l)), [s.map((x) => x.p), logs]);
+  packet(5, { customPacketType: 'dboPresetGet', actor: M, have: '' }); await settle(); pumpAll(); s = take();
+  check('...a watcher still gets it with its own race 13743, as before', presets(s, W).length === 2 && presets(s, W)[0].p.race === HIGH_ELF, s.map((x) => x.p));
+  store(H, MAORMER, 0.3);
+  login(H); take();
+  askSelf(2); await settle(); pumpAll(); s = take();
+  check('a Maormer face on a High Elf: none to the owner at once, no race', races(s).length === 0 && presets(s, H).length === 1 && presets(s, H)[0].p.customPacketType === 'dboPresetNone', s.map((x) => x.p));
+  store(H, 0x13744, 0.3);
+  login(H); take();
+  askSelf(2); await settle(); pumpAll(); s = take();
+  check('vanilla on vanilla (an Imperial face on a High Elf): sent with its own race 13744, as before', presets(s, H).length === 2 && presets(s, H)[0].p.race === 0x13744, s.map((x) => x.p));
+  store(H, HIGH_ELF, 0.01); store(M, MAORMER, 1);
+  props[M].appearance.raceId = VAMPIRE_LORD; beastOf.set(M, MAORMER);
+  login(M); take();
+  askSelf(1); await settle(); pumpAll(); s = take();
+  check('in a Vampire Lord form the Maormer face goes as before (its own race, the client waits)', races(s).length === 0 && presets(s, M).length === 2 && presets(s, M)[0].p.race === MAORMER, s.map((x) => x.p));
+  beastOf.delete(M); props[M].appearance.raceId = MAORMER;
+
   // ---- what the race waits for ----
   const now = () => Date.now();
   const blockers = [
@@ -231,7 +257,8 @@ const afterHold = async () => { await wait(HOLD + 30); tick(); await settle(); }
   askSelf(1); await settle(); tick(); take();
   props[M].appearance.raceId = HIGH_ELF; delete props[M].isDead;
   tick(); await settle(); pumpAll(); s = take();
-  check('a GM\'s /chargen to High Elf while it waited: no race goes, the held face is answered (with its own race)', races(s).length === 0 && presets(s, M).length === 2 && presets(s, M)[0].p.race === MAORMER
+  // The held answer goes out; the face stored on Maormer is another family's now, so it is none to the owner (see above)
+  check('a GM\'s /chargen to High Elf while it waited: no race goes, the held answer goes out (none: the face is Maormer\'s)', races(s).length === 0 && presets(s, M).length === 1 && presets(s, M)[0].p.customPacketType === 'dboPresetNone'
     && logs.some((l) => l === 'racemenu presets: ff000a6d (profile 51) live race not sent: 13743 is no plugin race now'), [s.map((x) => x.p), logs]);
   props[M].appearance.raceId = MAORMER;
 

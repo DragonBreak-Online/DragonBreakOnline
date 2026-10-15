@@ -328,8 +328,9 @@ module.exports = (api) => {
   const idOfDesc = (d) => { try { return typeof mp.getIdFromDesc === 'function' ? mp.getIdFromDesc(String(d)) >>> 0 : 0; } catch (e) { return 0; } };
   const NEVER_LIVE = new Set((Array.isArray(C.liveRaceNever) ? C.liveRaceNever : []).map(idOfDesc).filter(Boolean));
   const isRaceRecord = (id) => { try { const r = typeof mp.lookupEspmRecordById === 'function' ? mp.lookupEspmRecordById(id) : null; return !!(r && r.record && String(r.record.type) === 'RACE'); } catch (e) { return false; } };
+  const isPluginRace = (r) => { r = Number(r) >>> 0; return r >= PLUGIN_RACE_MIN && r < PLUGIN_RACE_END && !NEVER_LIVE.has(r); };
   // The race the owner's own actor needs after a load, or 0: a vanilla race loads right, so only a plugin RACE that is no beast's
-  const liveRaceOf = (a) => { const r = raceOf(a); return r >= PLUGIN_RACE_MIN && r < PLUGIN_RACE_END && !NEVER_LIVE.has(r) && isRaceRecord(r) ? r : 0; };
+  const liveRaceOf = (a) => { const r = raceOf(a); return isPluginRace(r) && isRaceRecord(r) ? r : 0; };
   const propOf = (a, k) => { try { return mp.get(a, k); } catch (e) { return undefined; } };
   const stampOf = (m, a) => (m instanceof Map ? Number(m.get(a >>> 0)) || 0 : 0);
   // Why the race may not go now, or '': the client's revert frees every control (beastFormService.ts restoreControls) and rebuilds the 3D
@@ -521,6 +522,11 @@ module.exports = (api) => {
     // keeps the stored one, and the client waits
     const now = raceOf(a);
     const race = now && doc.race && now !== (doc.race >>> 0) && sameFamily(now, doc.race) ? now : doc.race;
+    // Another family's face with a plugin race on either side is none to its owner: their client's family table (vanilla only) would hold every capture
+    if (self && now && doc.race && !sameFamily(now, doc.race) && !inBeastForm(a) && (isPluginRace(now) || isPluginRace(doc.race))) {
+      if (allow('otherFamilyTold', a >>> 0, 1, 3600000, S.logRates)) log(`racemenu presets: ${keyOf(a)} (profile ${profileOf(a)}) own face ${doc.hash} is for race ${hx(doc.race)}, another family than ${hx(now)}: the owner is answered none, watchers as before`);
+      return enqueueAnswer(to, [{ customPacketType: 'dboPresetNone', ...base }], self);
+    }
     const meta = { customPacketType: 'dboPresetMeta', ...base, hash: doc.hash, race };
     if (have === doc.hash) return enqueueAnswer(to, [meta], self);
     // Sent in full resendsPerFace times in this window and connection, and asked for again: that player cannot show it
