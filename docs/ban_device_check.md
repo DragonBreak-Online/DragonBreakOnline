@@ -111,7 +111,14 @@ on the old routes.
   and is safe while the backend runs.
 - The script finds the entry only through profiles.json. If the profile is already gone it cannot find it, and the
   entry is deleted under the 30-day rule: within 30 days of the player's last PLAY, unless the account is banned.
-- Never copy `data/device-ids.json` into `/opt/skymp-backups`: it rebuilds itself as players launch.
+- **Never move or delete `data/bans.json` while the backend runs**, and never start the backend with it moved aside. A
+  missing file counts as no bans, so the hourly prune (and the one at start-up) deletes banned accounts' PCs older
+  than 30 days, and putting the file back does not restore them.
+- Never copy `data/device-ids.json` into `/opt/skymp-backups` or any other backup or archive: it has its own 30-day
+  retention class (Privacy Policy section 5), and it rebuilds itself as players launch. The hourly backup tool
+  `/opt/dragonbreak-tools/backups/dbo_backup.py` copies only its allowlist from `data/`, so it does not take the file,
+  but it logs every unclassified `data/` name on each run and its cloud push WARNs "so somebody decides allow or deny".
+  Rollout step 2 settles that before the key is set.
 - Changing the key makes every stored code meaningless: delete the file at the same time.
 
 ## The old raw hwid
@@ -147,16 +154,51 @@ the same checks (its private-address test lacks `100.64.0.0/10`).
 
 ## Rollout
 
-1. Deploy the backend after the Phase 1 restart with `DEVICE_ID_HMAC_KEY` unset: the check is off (one log line), and
-   the policy bump asks every player to accept the updated Privacy Policy once in the launcher.
-2. In a restart window, set the key without printing it, then restart:
-   `umask 077; printf '\nDEVICE_ID_HMAC_KEY=%s\n' "$(openssl rand -hex 32)" >> /opt/dragonbreak/backend.env`.
-   The log says `on, report only`.
-3. Release launcher 2.1.50 with the device code (launcher only, no CLIENT_VERSION bump), ideally with F1's launcher
+Commands below run as root; from the `nate` user, prefix them with `sudo` (step 3 says how for its redirect).
+
+1. Deploy the backend after the Phase 1 restart with `DEVICE_ID_HMAC_KEY` unset.
+   - **Before that start**, check free space on CT 115's root filesystem (`df -h /`). On 15 Oct it was at 100% (about
+     370 MB free) and `dbo-disk-check.service` had failed: free space first.
+   - **Before that start**, copy the ban list aside, keeping its 0600 mode, into a root-only folder (never `/tmp`):
+     `install -d -m 700 /root/ban-list-backups && cp -p /opt/alduinak/skymp5-backend/data/bans.json /root/ban-list-backups/bans.json.before-L3-01`
+   - If the deploy is on a day other than 2026-10-15: set that day in `data/legal/legal.json` (`version` and
+     `effective`) and in `data/legal/privacy.md` (Effective date and Last updated), drop the unshipped `2026-10-15` key
+     from `data/legal/hashes.json`, run `npm run legal-record` again, and commit that before deploying.
+   - The first start rewrites `data/bans.json` once, even with the key unset: the start-up prune reads the ban list,
+     which gives every entry without one a `B-` ref and saves it (15 Oct: 1 entry, none with a ref). The save is
+     atomic and keeps the file 0600.
+   - The check is off (one log line), and the policy bump asks every player to accept the updated Privacy Policy once
+     in the launcher.
+   - Rolling back to the old code is safe: it ignores the refs. A re-ban made under the old code gets a new ref when
+     the new code next reads the list, and a Not an alt mark on the old ref then lapses.
+2. **Before the key is set, hand this to the backup tool's owner** (claude-jake, per its README; this lane cannot change
+   `/opt`): add `device-ids\.json` to `DENY` in `/opt/dragonbreak-tools/backups/dbo_backup.py`, so `verify` refuses it
+   in any archive, or at least to `BACKEND_KNOWN_OUT`. The reason: it has its own 30-day retention class
+   (privacy.md section 5) and is never archived. Go on to step 3 only once that is in.
+3. In a restart window, set the key without printing it. It must be added once only: a second run would silently
+   rotate the key (the last assignment in the EnvironmentFile wins) while the store stays, which must never happen.
+   As root:
+
+   ```
+   grep -q '^DEVICE_ID_HMAC_KEY=' /opt/dragonbreak/backend.env || { umask 077; printf '\nDEVICE_ID_HMAC_KEY=%s\n' "$(openssl rand -hex 32)" >> /opt/dragonbreak/backend.env; }
+   grep -c '^DEVICE_ID_HMAC_KEY=' /opt/dragonbreak/backend.env
+   ```
+
+   From the `nate` user the whole first line goes in `sudo sh -c`, because a `>>` after `sudo` runs as `nate` and fails:
+
+   ```
+   sudo sh -c 'grep -q "^DEVICE_ID_HMAC_KEY=" /opt/dragonbreak/backend.env || { umask 077; printf "\nDEVICE_ID_HMAC_KEY=%s\n" "$(openssl rand -hex 32)" >> /opt/dragonbreak/backend.env; }'
+   sudo grep -c '^DEVICE_ID_HMAC_KEY=' /opt/dragonbreak/backend.env
+   ```
+
+   The count must print `1` (a count, never the value); anything else, do not restart. Then restart. The log says
+   `on, report only`. If it says `is not set`, the file holds an empty `DEVICE_ID_HMAC_KEY=` line: replace that line
+   by hand without printing the file, never add a second one.
+4. Release launcher 2.1.50 with the device code (launcher only, no CLIENT_VERSION bump), ideally with F1's launcher
    release.
-4. Watch at least 2 weeks of the daily count line. If more than 5% of launch-checks from new launchers say
+5. Watch at least 2 weeks of the daily count line. If more than 5% of launch-checks from new launchers say
    unavailable, look at a server-issued install token.
-5. Jake decides whether enforcement is ever built.
+6. Jake decides whether enforcement is ever built.
 
 **Undo:** `DEVICE_MATCH=off` and restart. Full erase: stop the backend, delete `data/device-ids.json`, unset the key.
 Old launchers keep working throughout, and a new launcher works against an old backend (it ignores the field).
