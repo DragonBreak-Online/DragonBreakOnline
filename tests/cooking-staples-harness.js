@@ -5,7 +5,6 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
-const { execFileSync } = require('child_process');
 const SERVER = path.resolve(__dirname, '..');
 let fails = 0;
 const ok = (c, what, got) => { console.log(`${c ? 'PASS' : 'FAIL'}  ${what}${!c && got !== undefined ? '   ' + JSON.stringify(got) : ''}`); if (!c) fails++; };
@@ -32,14 +31,10 @@ for (const n of STAPLES) {
 const ovr = JSON.parse(fs.readFileSync(path.join(SERVER, 'regions-overrides.json'), 'utf8'));
 for (const n of STAPLES) ok(ovr.items && ovr.items[n] === 'common', `regions-overrides.json makes ${n} common`, ovr.items && ovr.items[n]);
 
-// nothing else in loot.json moved (against the release line this branch starts from, when git has it)
-try {
-  const base = JSON.parse(execFileSync('git', ['-C', SERVER, 'show', 'origin/release-1003-gameplay:loot.json'], { encoding: 'utf8', maxBuffer: 1 << 28, stdio: ['ignore', 'pipe', 'ignore'] }));
-  // Plain Jade joined the gems pool on purpose (smithing obtainability, 9 Oct: nothing else produces it)
-  const LATER = new Set(['BSKGemJade']);
-  const strip = (l) => JSON.stringify(Object.fromEntries(Object.entries(l.pools || {}).map(([k, v]) => [k, (v || []).filter((it) => !(it && LATER.has(it.name))).map((it) => (it && STAPLES.includes(it.name) ? { ...it, p: undefined } : it))])));
-  ok(strip(base) === strip(loot), 'no other loot.json entry changed (plain Jade, added to the gems on purpose, aside)');
-} catch (e) { console.log('skip  no origin/release-1003-gameplay to compare with'); }
+// loot.json was regenerated on the 140-plugin order (PC, 15 Oct: ck-mcp loot.py, final-fixes gen140), so the old
+// "nothing else moved since release-1003" comparison no longer applies; what must survive a regeneration is checked instead:
+// the hand additions the generator does not make (the lights pool's Torch01, plain Jade in the gems)
+ok((loot.pools.lights || []).some((it) => it.name === 'Torch01') && (loot.pools.gems || []).some((it) => it.name === 'BSKGemJade'), 'the hand additions survive the regeneration (Torch01 lights, BSKGemJade gems)');
 
 console.log(fails ? `${fails} FAILED` : 'all checks passed');
 process.exit(fails ? 1 : 0);

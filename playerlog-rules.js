@@ -403,7 +403,7 @@ const parsed = (verb, def) => { AUDIT_VERBS[verb] = Object.assign({ cls: 'parsed
 // C: clean. Every interpolation of every site is identity, a number, an enum, a config name or a record name (the reviewer
 // confirms each site; tests/playerlog-audit-harness.js pins them and fails a clean site whose template holds a quote)
 clean_(`SCHOOLS MANUAL SKILLBOOK SCHEMATIC READ CONTRACT CHAMPION CHILL REVIVE FEED BEAST BLOODCROWN BLOOD
-  HUNT RITE SILVER DUNGEON CHESTGOLD MINE CHOP ALCHEMY SMELT TAILOR REGION FORGENEVER ARTIFACT ORCISH FACTIONGEAR DRAGON LOCK
+  HUNT RITE SILVER DUNGEON CHESTGOLD MINE CHOP ALCHEMY SMELT TAILOR REGION FORGENEVER ARTIFACT ORCISH RACECRAFT FACTIONGEAR DRAGON LOCK
   UNSTUCK JAIL CONCORDAT EXECUTION OFFERING PRAYER REST WELL CAMP PLAYTIME PLAYTEST REROLL TICKET CRASH-DOWN CRASHLOOP
   RUINBUTTON TAX SUPPLY BOOST STAFF APPEARANCE RECIPE BREW TREASURY ENCH-RESTORE ENCH-LEARNED-REPAIR CLOCK SPELL
   CITIZEN ELECTION BLACKREACH`);
@@ -1361,7 +1361,6 @@ lockpick.js LOCKPICK-MISMATCH 280b5b3c clean
 lockpick.js LOCK 24f728b1 clean
 manuals.js MANUAL c367d194 clean
 manuals.js MANUAL d08c753a clean
-manuals.js MANUAL 06971557 clean
 manuals.js MANUAL 53f416fb clean
 manuals.js MANUAL d753d3eb clean
 manuals.js SKILLBOOK a5403e71 clean
@@ -1396,7 +1395,7 @@ placement.js PLACE b7914e97 excluded
 placement.js PLACE 15bbb51c excluded
 playtest.js PLAYTEST 006bc8da clean
 playtest.js PLAYTEST 37ce7390 clean
-playtest.js PLAYTEST 13f5d094 clean
+playtest.js PLAYTEST 6d1c5991 clean
 playtesterboost.js BOOST 86d7eb6d clean
 playtesterboost.js BOOST 7a3a00b0 clean
 playtesterboost.js BOOST d1a90aa3 clean
@@ -1433,6 +1432,7 @@ regions.js FORGENEVER d25fc68f clean
 regions.js ARTIFACT e31183e3 clean
 regions.js DRAGON 437085f5 clean
 regions.js ORCISH b4078025 clean
+regions.js RACECRAFT 6c57b214 clean
 regions.js SMELT f53c6262 clean
 rest.js REST 4946e270 clean
 rest.js REST 1900507e clean

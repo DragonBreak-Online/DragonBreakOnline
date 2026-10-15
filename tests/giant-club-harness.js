@@ -32,7 +32,8 @@ const OVR = readJson('regions-overrides.json').forgeNever || {};
 const missing = Object.keys(CLUBS).filter((d) => !OVR[d]);
 ok(!missing.length, 'forgeNever lists all four club bases', missing);
 const recipe = Object.entries(readJson('regions.json').recipes || {}).filter(([, r]) => r && /giant/i.test(r.name || '') && /club/i.test(r.name || ''));
-ok(recipe.length === 1 && recipe[0][1].item === '2f7067:SurWR.esp' && OVR[recipe[0][1].item], 'the one club recipe (DBOSM_CrGiantClubWR) makes a forgeNever product', recipe);
+// The 140-order regions.json (PC, 15 Oct) has none: the release's Nexus Patches 995433b2 no longer carries DBOSM_CrGiantClubWR
+ok(recipe.length <= 1 && recipe.every(([, r]) => r.item === '2f7067:SurWR.esp' && OVR[r.item]), 'the club recipe (DBOSM_CrGiantClubWR), where the plugins still have it, makes a forgeNever product', recipe);
 const G = readJson('gamemode-config.json').gearStrip || { items: [] };
 ok(G.enabled === true, 'gearStrip is on');
 const listed = Object.keys(CLUBS).filter((d) => G.items.some((it) => it.item === d && /giant's club/.test(it.reason || '')));
