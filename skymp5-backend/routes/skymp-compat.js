@@ -458,21 +458,35 @@ function confirmPage({ flow, state, nonce, username, error = '' }) {
   })
 }
 
-// Continue wakes only after this tab was visible and focused for a second and then saw the pointer or a key, so a window swapped under a double-click cannot press it
+// Continue wakes after this tab has been in front for a second with no presses on it, and for a pointer once it has been on the page for half a second; a held key or button never counts
 // The button is live in the markup and the script puts it to sleep, so if the script cannot run (scripts off, or a CSP from a proxy or an extension) it works as before
 const CONTINUE_BUTTON = `<button type="submit" id="continue">Continue</button>
 <p class="meta" id="continue-hint" hidden>If Continue does not respond, move the mouse or press Tab, then press it again.</p>
 <script>(function () {
-  var b = document.getElementById('continue'), timer = null, ready = false
+  var b = document.getElementById('continue'), since = -1, entered = -1
   b.disabled = true
-  function sleep() { clearTimeout(timer); timer = null; ready = false; b.disabled = true }
-  function wake() { if (timer || ready || document.visibilityState !== 'visible' || !document.hasFocus()) return; timer = setTimeout(function () { timer = null; ready = true }, 1000) }
-  function gesture() { if (ready) b.disabled = false; else wake() }
-  ['pointermove', 'mousemove', 'keydown', 'touchstart'].forEach(function (e) { document.addEventListener(e, gesture, true) })
-  window.addEventListener('focus', wake)
+  function now() { return performance.now() }
+  function live() { return document.visibilityState === 'visible' && document.hasFocus() }
+  function pointer(e) { return /^(pointer|mouse)/.test(e.type) }
+  function sleep() { since = -1; entered = -1; b.disabled = true }
+  function arm() { if (since < 0 && live()) since = now() }
+  function ready() { return since >= 0 && now() - since >= 1000 }
+  function press(e) { if (pointer(e) && entered < 0) entered = now(); if (!ready()) { since = -1; arm() } }
+  function gesture(e) {
+    if (e.repeat || e.buttons) return
+    if (!live()) return sleep()
+    arm()
+    if (pointer(e) && entered < 0) entered = now()
+    if (ready() && (!pointer(e) || now() - entered >= 500)) b.disabled = false
+  }
+  function left(e) { if (!e.relatedTarget && e.pointerType === 'mouse') { entered = -1; b.disabled = true } }
+  ['pointerdown', 'mousedown', 'keydown', 'touchstart'].forEach(function (t) { document.addEventListener(t, press, true) });
+  ['pointermove', 'mousemove', 'keydown', 'touchstart'].forEach(function (t) { document.addEventListener(t, gesture, true) })
+  document.addEventListener('pointerout', left, true)
+  window.addEventListener('focus', arm)
   window.addEventListener('blur', sleep)
-  document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') wake(); else sleep() })
-  wake()
+  document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') arm(); else sleep() })
+  arm()
   document.getElementById('continue-hint').hidden = false
 })()</script>`
 

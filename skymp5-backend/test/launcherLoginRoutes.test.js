@@ -159,32 +159,151 @@ test('F1: the old flow\'s Continue button starts asleep and wakes only on a focu
   assert.match(form, /addEventListener\('blur', sleep\)/)
 })
 
-test('F1: the Continue guard: a click right after the tab comes to the front is ignored, a click after a second and a pointer move goes through', async () => {
-  const { page } = await legacyToConfirmPage()
-  const script = /<script>(\(function \(\) \{[\s\S]*?\}\)\(\))<\/script>/.exec(page.text)[1]
-  const listeners = {}
-  const on = (target, type, fn) => { (listeners[`${target}:${type}`] = listeners[`${target}:${type}`] || []).push(fn) }
-  const fire = (target, type) => (listeners[`${target}:${type}`] || []).forEach(fn => fn())
+// Runs the page's Continue guard script in a fake browser: a clock, focus and visibility, listeners, and full event objects
+function guardPage(html, { focused = true } = {}) {
+  const script = /<script>(\(function \(\) \{[\s\S]*?\}\)\(\))<\/script>/.exec(html)[1]
+  const st = { focused, visible: true, now: 0 }
   const button = { hidden: false, disabled: false }
   const hint = { hidden: true }
-  let focused = false, now = 0
+  const listeners = {}
+  const on = target => (type, fn) => { (listeners[`${target}:${type}`] = listeners[`${target}:${type}`] || []).push(fn) }
+  const doc = {
+    get visibilityState() { return st.visible ? 'visible' : 'hidden' },
+    hasFocus: () => st.focused,
+    getElementById: id => ({ continue: button, 'continue-hint': hint })[id],
+    addEventListener: on('doc'),
+  }
   const timers = []
-  const doc = { visibilityState: 'visible', hasFocus: () => focused, getElementById: id => (id === 'continue' ? button : hint), addEventListener: (t, fn) => on('doc', t, fn) }
-  const win = { addEventListener: (t, fn) => on('win', t, fn) }
-  const sandbox = { document: doc, window: win, setTimeout: (fn, ms) => { const t = { at: now + ms, fn }; timers.push(t); return t }, clearTimeout: t => { const i = timers.indexOf(t); if (i >= 0) timers.splice(i, 1) } }
-  const advance = ms => { now += ms; for (const t of [...timers]) if (t.at <= now) { timers.splice(timers.indexOf(t), 1); t.fn() } }
-  require('vm').runInNewContext(script, sandbox)
-  assert.equal(hint.hidden, false, 'the script shows the hint')
-  assert.equal(button.disabled, true, 'asleep while the tab has no focus (a window above it)')
-  fire('doc', 'mousemove')
-  assert.equal(button.disabled, true)
-  focused = true; fire('win', 'focus')
-  advance(150); fire('doc', 'mousemove')
-  assert.equal(button.disabled, true, 'the second click of a double-click lands on a sleeping button')
-  advance(1000); fire('doc', 'mousemove')
-  assert.equal(button.disabled, false, 'a player who looks at the page and moves the pointer can press it')
-  focused = false; fire('win', 'blur')
-  assert.equal(button.disabled, true, 'asleep again when another window comes in front')
+  const setTimeout = (fn, ms) => { const t = { at: st.now + ms, fn }; timers.push(t); return t }
+  const clearTimeout = t => { if (timers.includes(t)) timers.splice(timers.indexOf(t), 1) }
+  require('vm').runInNewContext(script, { document: doc, window: { addEventListener: on('win') }, performance: { now: () => st.now }, setTimeout, clearTimeout })
+  const fire = (target, type, ev = {}) => (listeners[`${target}:${type}`] || []).forEach(fn => fn({ type, repeat: false, buttons: 0, pointerType: undefined, relatedTarget: null, ...ev }))
+  const down = () => { fire('doc', 'pointerdown', { pointerType: 'mouse', buttons: 1 }); fire('doc', 'mousedown', { buttons: 1 }) }
+  const up = () => { fire('doc', 'pointerup', { pointerType: 'mouse' }); fire('doc', 'mouseup') }
+  return {
+    st, button, hint, down, up,
+    at: ms => { for (const t of timers.filter(x => x.at <= ms).sort((a, b) => a.at - b.at)) { st.now = t.at; clearTimeout(t); t.fn() } st.now = ms },
+    focus: () => { st.focused = true; fire('win', 'focus') },
+    blur: () => { st.focused = false; fire('win', 'blur') },
+    move: (ev = {}) => { fire('doc', 'pointermove', { pointerType: 'mouse', ...ev }); fire('doc', 'mousemove', ev) },
+    key: (key, ev = {}) => fire('doc', 'keydown', { key, ...ev }),
+    leave: () => { fire('doc', 'pointerout', { pointerType: 'mouse' }); fire('doc', 'mouseout') },
+    // A mouse click presses Continue only if the button is awake when the press ends
+    click: () => { down(); up(); return !button.disabled },
+    // A finger tap: the touch pointerout to nowhere on lift-off, then the compatibility mouse events before its click
+    tap: () => {
+      fire('doc', 'pointerdown', { pointerType: 'touch', buttons: 1 }); fire('doc', 'touchstart')
+      fire('doc', 'pointerup', { pointerType: 'touch' }); fire('doc', 'pointerout', { pointerType: 'touch' }); fire('doc', 'touchend')
+      fire('doc', 'mousemove'); fire('doc', 'mousedown', { buttons: 1 }); fire('doc', 'mouseup')
+      return !button.disabled
+    },
+  }
+}
+
+test('F1: the Continue guard: a click right after the tab comes to the front is ignored, a click after a second and a pointer move goes through', async () => {
+  const { page } = await legacyToConfirmPage()
+  const p = guardPage(page.text, { focused: false })
+  assert.equal(p.hint.hidden, false, 'the script shows the hint')
+  assert.equal(p.button.disabled, true, 'asleep while the tab has no focus (a window above it)')
+  p.move()
+  assert.equal(p.button.disabled, true)
+  p.at(5000); p.focus()
+  p.at(5150); p.move()
+  assert.equal(p.click(), false, 'the second click of a double-click lands on a sleeping button')
+  p.at(6100); p.move()
+  assert.equal(p.button.disabled, true, 'that press started the second again')
+  p.at(6200); p.move()
+  assert.equal(p.click(), true, 'a player who looks at the page and moves the pointer can press it')
+  p.blur()
+  assert.equal(p.button.disabled, true, 'asleep again when another window comes in front')
+})
+
+test('F1: the Continue guard refuses presses that cross the swap, held keys and buttons, and a page that was covered', async () => {
+  const { page } = await legacyToConfirmPage()
+  const html = page.text
+  {
+    const p = guardPage(html)
+    p.at(3000); p.move(); p.at(3150); p.move()
+    assert.equal(p.click(), false, 'B: focused for 3 s with no pointer event (covered), the pointer appears and clicks 150 ms later')
+  }
+  {
+    const p = guardPage(html, { focused: false })
+    p.focus()
+    let through = false
+    for (let t = 0; t <= 3000 && !through; t += 120) { p.at(t); p.move(); through = p.click() }
+    assert.equal(through, false, 'C: a click burst that crosses the swap and never pauses')
+  }
+  {
+    const p = guardPage(html, { focused: false })
+    p.focus()
+    for (let t = 0; t <= 2000; t += 33) { p.at(t); p.key('Enter', { repeat: true }) }
+    assert.equal(p.button.disabled, true, 'D: a held key (auto-repeat) does not wake it')
+  }
+  {
+    const p = guardPage(html, { focused: false })
+    p.focus(); p.at(100); p.down()
+    for (let t = 100; t <= 2000; t += 50) { p.at(t); p.move({ buttons: 1 }) }
+    assert.equal(p.button.disabled, true, 'E: moves with a button held do not wake it')
+  }
+  {
+    const p = guardPage(html)
+    p.at(200); p.move(); p.at(1200); p.move()
+    assert.equal(p.button.disabled, false)
+    p.st.focused = false
+    p.at(1300); p.move()
+    assert.equal(p.button.disabled, true, 'F: focus lost without a blur event puts it to sleep at the next move')
+    assert.equal(p.click(), false)
+  }
+  {
+    const p = guardPage(html)
+    p.at(200); p.move(); p.at(1500); p.move()
+    assert.equal(p.button.disabled, false)
+    p.leave()
+    assert.equal(p.button.disabled, true, 'G: the mouse leaving the page puts it to sleep')
+    p.at(3000); p.move(); p.at(3150)
+    assert.equal(p.click(), false, 'G: back on the page, a click 150 ms later is refused')
+    p.at(3700); p.move()
+    assert.equal(p.click(), true, 'after half a second back on the page it wakes again')
+  }
+})
+
+test('F1: the Continue guard lets a player through by mouse, keyboard and touch', async () => {
+  const { page } = await legacyToConfirmPage()
+  const html = page.text
+  {
+    const p = guardPage(html)
+    p.at(400); p.move(); p.at(1600); p.move()
+    assert.equal(p.click(), true, 'mouse: moves, clicks at 1.6 s')
+  }
+  {
+    const p = guardPage(html)
+    p.at(300); p.move()
+    assert.equal(p.click(), false, 'an early click is ignored')
+    p.at(2000); p.move()
+    assert.equal(p.click(), true, 'and a later one goes through')
+  }
+  {
+    const p = guardPage(html)
+    p.at(1500); p.key('Tab')
+    assert.equal(p.button.disabled, false, 'keyboard: Tab at 1.5 s wakes it before the focus moves')
+  }
+  {
+    const p = guardPage(html)
+    p.at(300); p.key('Tab'); p.at(1500); p.key('Tab')
+    assert.equal(p.button.disabled, false, 'keyboard: Tab at 0.3 s and again at 1.5 s')
+  }
+  {
+    const p = guardPage(html)
+    p.at(1500)
+    assert.equal(p.tap(), true, 'touch: a full tap at 1.5 s, with its pointerout on lift-off')
+  }
+  {
+    const p = guardPage(html)
+    p.at(300)
+    assert.equal(p.tap(), false, 'touch: a tap at 0.3 s is ignored')
+    p.at(1800)
+    assert.equal(p.tap(), true, 'touch: a tap at 1.8 s goes through')
+  }
 })
 
 test('F1: reopening an old launcher\'s login link does not keep it alive, and a second Discord callback is refused', async () => {
