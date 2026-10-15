@@ -162,7 +162,7 @@ check('without the reader (an older gamemode): refused as a later update', /late
 // ---- the wiring ----
 const gm = fs.readFileSync(path.join(SERVER, 'gamemode.js'), 'utf8');
 check('gamemode.js gives racial.js the uiCaps reader', /require\(RACIAL_JS\)\(\{[^}]*\bhasUiCap\b[^}]*\}\)/.test(gm));
-check('gamemode.js forgets the actor at logout (__dboRacialLeave)', /'__dboRacialLeave'\]\)/.test(gm));
+check('gamemode.js forgets the actor at logout (__dboRacialLeave)', /'__dboRacialLeave'(, '__dboStartLeave')?\]\)/.test(gm));
 check('the journal\'s button calls usePower (journal.js journalAction racialPower)', /racialPower: \(a\) => \(typeof globalThis.__dboRacialPowerUse/.test(fs.readFileSync(path.join(SERVER, 'journal.js'), 'utf8')));
 
 // ---- Cat-like Reflexes, the Khajiit's second power (Nate, 14 Oct) ----------------------------------------------
