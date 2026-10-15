@@ -3,9 +3,12 @@
 // data/bans.json: one entry per banned discordId with hwid/ip captured at ban time, so alt accounts can be matched later
 
 const fs   = require('fs')
+const net  = require('net')
 const path = require('path')
 
 const FILE    = path.join(__dirname, '..', 'data', 'bans.json')
+// The player store beside this one; path.dirname so a test that moves bans.json moves this too
+const PLAYERS_FILE = path.join(path.dirname(FILE), 'players.json')
 const LOG_DIR = process.env.BAN_LOG_DIR || 'C:\\Users\\Administrator\\Desktop\\logs'
 
 function load() {
@@ -24,22 +27,89 @@ function save(data) {
 // Every player reaches the game server through the host's port forward, so the address the server reports for all of
 // them is one internal one (9 Oct 2026: 146 of 173 players share it). Storing or matching it would make one ban refuse
 // everyone, so internal, loopback, link-local and carrier-grade NAT addresses never go into a ban or match one.
-function isInternalIp(ip) {
-  let a = String(ip || '').trim().toLowerCase()
-  if (!a) return false
-  if (a.startsWith('::ffff:')) a = a.slice(7)
-  const m = a.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/)
-  if (m) {
-    const [x, y] = [Number(m[1]), Number(m[2])]
-    return x === 10 || x === 127 || x === 0 || (x === 172 && y >= 16 && y <= 31) || (x === 192 && y === 168) ||
-      (x === 169 && y === 254) || (x === 100 && y >= 64 && y <= 127)
-  }
-  return a === '::1' || a === '::' || /^f[cd][0-9a-f]{0,2}:/.test(a) || /^fe[89ab][0-9a-f]?:/.test(a)
+// Special-purpose ranges (RFC 6890 and IANA's registries): none of them is one player's own public address
+const SPECIAL = new net.BlockList()
+for (const [addr, bits] of [['0.0.0.0', 8], ['10.0.0.0', 8], ['100.64.0.0', 10], ['127.0.0.0', 8], ['169.254.0.0', 16],
+  ['172.16.0.0', 12], ['192.0.0.0', 24], ['192.168.0.0', 16], ['198.18.0.0', 15], ['224.0.0.0', 4], ['240.0.0.0', 4]]) {
+  SPECIAL.addSubnet(addr, bits, 'ipv4')
+}
+for (const [addr, bits] of [['::', 128], ['::1', 128], ['64:ff9b::', 96], ['2001::', 32], ['2002::', 16], ['fc00::', 7],
+  ['fe80::', 10], ['ff00::', 8]]) {
+  SPECIAL.addSubnet(addr, bits, 'ipv6')
 }
 
+// The eight 16-bit groups of an IPv6 address net.isIPv6 accepted (an IPv4 tail counts as the last two)
+function ipv6Groups(a) {
+  let s = a
+  const tail = s.match(/(\d{1,3}(?:\.\d{1,3}){3})$/)
+  if (tail) {
+    const [b0, b1, b2, b3] = tail[1].split('.').map(Number)
+    s = s.slice(0, -tail[1].length) + `${((b0 << 8) | b1).toString(16)}:${((b2 << 8) | b3).toString(16)}`
+  }
+  const [head, rest] = s.split('::')
+  const left = head ? head.split(':') : []
+  const right = rest === undefined ? [] : (rest ? rest.split(':') : [])
+  const fill = rest === undefined ? [] : new Array(8 - left.length - right.length).fill('0')
+  return [...left, ...fill, ...right].map(g => parseInt(g, 16))
+}
+
+// One canonical form, or '' when it is not an address: brackets, a %zone, a trailing dot and an IPv4 :port go, and
+// an IPv4-mapped or -compatible IPv6 address (::ffff:a.b.c.d or its hex and long forms) becomes the IPv4 address
+function normalizeIp(ip) {
+  let a = String(ip || '').trim().toLowerCase()
+  const bracketed = a.match(/^\[([^\]]*)\](?::\d{1,5})?$/)
+  if (bracketed) a = bracketed[1]
+  a = a.replace(/%[^%]*$/, '').replace(/\.$/, '')
+  const withPort = a.match(/^(\d{1,3}(?:\.\d{1,3}){3}):\d{1,5}$/)
+  if (withPort) a = withPort[1]
+  if (net.isIPv6(a)) {
+    const g = ipv6Groups(a)
+    const mapped = g.slice(0, 5).every(x => x === 0) && (g[5] === 0xffff || (g[5] === 0 && (g[6] !== 0 || g[7] > 1)))
+    const translated = g.slice(0, 4).every(x => x === 0) && g[4] === 0xffff && g[5] === 0
+    if (mapped || translated) a = [g[6] >> 8, g[6] & 255, g[7] >> 8, g[7] & 255].join('.')
+  }
+  return net.isIP(a) ? a : ''
+}
+
+function isInternalIp(ip) {
+  const a = normalizeIp(ip)
+  return !!a && SPECIAL.check(a, net.isIPv4(a) ? 'ipv4' : 'ipv6')
+}
+
+// An address on this many player records is a relay or a shared connection, not one player's
+const SHARED_MIN = 3
+const NO_SHARED = new Set()
+let sharedCache = { key: null, shared: NO_SHARED }
+
+// The public addresses that are the lastIp of SHARED_MIN or more players (players.json, re-read when it changes).
+// No file: none. A file that cannot be read or is not a player store: null, and no address is used at all
+function sharedAddresses() {
+  let st
+  try { st = fs.statSync(PLAYERS_FILE) } catch (err) { return err.code === 'ENOENT' ? NO_SHARED : null }
+  const key = `${st.ino}:${st.mtimeMs}:${st.size}`
+  if (sharedCache.key === key) return sharedCache.shared
+  let shared = null
+  try {
+    const data = JSON.parse(fs.readFileSync(PLAYERS_FILE, 'utf8'))
+    if (data && typeof data === 'object' && !Array.isArray(data)) {
+      const counts = new Map()
+      for (const record of Object.values(data)) {
+        const a = normalizeIp(record && record.lastIp)
+        if (a) counts.set(a, (counts.get(a) || 0) + 1)
+      }
+      shared = new Set([...counts].filter(([, n]) => n >= SHARED_MIN).map(([a]) => a))
+    }
+  } catch { shared = null }
+  sharedCache = { key, shared }
+  return shared
+}
+
+// The address in canonical form when one player's ban may hold or match it, else ''
 const publicIp = (ip) => {
-  const a = String(ip || '').trim()
-  return a && !isInternalIp(a) ? a : ''
+  const a = normalizeIp(ip)
+  if (!a || isInternalIp(a)) return ''
+  const shared = sharedAddresses()
+  return shared && !shared.has(a) ? a : ''
 }
 
 function list() {
