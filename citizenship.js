@@ -134,8 +134,9 @@ module.exports = (api) => {
     try { return !!fid && typeof globalThis.__dboGuildHolders === 'function' && globalThis.__dboGuildHolders(fid, 0).some(exists); } catch (e) { return false; }
   };
   const isSteward = (a, z) => (C.stewardOffices || []).some((o) => seated(z, o).includes(Number(profileOf(a))));
-  // Who runs the hold's citizenship: the ruler, a Steward, or staff
-  const manages = (a, z) => isAdmin(a) || rules(a, z) || isSteward(a, z);
+  // Who runs the hold's citizenship: the ruler, a Steward, or a Lead GM and above (Nate, 15 Oct: any GM could grant,
+  // decline and set the policy and fee). A GM or Trial GM who holds the ruler's or Steward's office keeps that office's rights
+  const manages = (a, z) => isLeadStaff(a) || rules(a, z) || isSteward(a, z);
   const rulerWord = (z) => rankTitle(rulerOffice(z), z.id);
   const hasTreasury = (z) => !!(z && z.treasury);
 
@@ -199,7 +200,7 @@ module.exports = (api) => {
       if (requestOf(a, z.id)) return { error: `You have asked already. The ${rulerWord(z)} or the Steward of ${ofPlace(z.name)} decides.` };
       data().requests.push({ zone: z.id, actor: a >>> 0, pid: Number(profileOf(a)), name: nameNow(a), at: Date.now() });
       save();
-      for (const m of onlineActors()) if (m !== (a >>> 0) && !isAdmin(m) && (rules(m, z) || isSteward(m, z))) personal(m, `${nameNow(a)} asks to become a citizen of ${ofPlace(z.name)}. Grant or decline it at a notice board (Citizenship) or in your journal (F3, Citizen).`);
+      for (const m of onlineActors()) if (m !== (a >>> 0) && !isLeadStaff(m) && (rules(m, z) || isSteward(m, z))) personal(m, `${nameNow(a)} asks to become a citizen of ${ofPlace(z.name)}. Grant or decline it at a notice board (Citizenship) or in your journal (F3, Citizen).`);
       audit(`CITIZEN ${who(a)} asked for the citizenship of ${z.name}`);
       return { text: `You have asked for the citizenship of ${ofPlace(z.name)}. Go before the ${rulerWord(z)} or the Steward: they grant it.` };
     }
@@ -764,7 +765,7 @@ module.exports = (api) => {
       }
       if (E && electing(z) && (citizenOf(a, z.id) || courtOfActor(E, a))) v.elections.push({ zone: z.id, name: z.name, phase: E.phase, endsAt: Number(E.phaseEndsAt) || 0, revote: !!E.revote,
         voted: E.phase === 'voting' && E.votes[String(Number(profileOf(a)))] !== undefined, mine: !!courtOfActor(E, a) });
-      if (!isAdmin(a) && (rules(a, z) || isSteward(a, z))) v.manage.push({ zone: z.id, name: z.name, policy: policyOf(z).policy, fee: policyOf(z).fee,
+      if (!isLeadStaff(a) && (rules(a, z) || isSteward(a, z))) v.manage.push({ zone: z.id, name: z.name, policy: policyOf(z).policy, fee: policyOf(z).fee,
         requests: liveRequests().filter((r) => r.zone === z.id).map((r) => ({ actor: hex(r.actor), name: r.name, tag: tagSafe(r.actor), at: r.at })) });
       if (v.staff && electing(z)) v.staff.push({ zone: z.id, name: z.name, phase: E ? E.phase : 'none', endsAt: E ? Number(E.phaseEndsAt) || 0 : 0, citizens: citizenAccounts(z), threshold: EL.threshold });
     }
@@ -789,7 +790,7 @@ module.exports = (api) => {
     const out = [];
     for (const r of liveRequests()) {
       if ((r.actor >>> 0) !== (t >>> 0)) continue;
-      const z = holdOf(r.zone); if (!z || !(rules(a, z) || isSteward(a, z) || isAdmin(a))) continue;
+      const z = holdOf(r.zone); if (!z || !manages(a, z)) continue;
       out.push({ id: `citizen:grant:${z.id}`, label: `Grant citizenship of ${z.name}` }, { id: `citizen:decline:${z.id}`, label: `Decline citizenship of ${z.name}` });
     }
     return out;

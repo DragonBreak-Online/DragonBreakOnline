@@ -3696,8 +3696,11 @@ const APPOINT_RULES = Object.assign({
   chieftain: { bane: 5, shaman: 1, wisewoman: 1, strongholdcommander: 1, strongholdguard: Infinity }, strongholdcommander: { strongholdguard: Infinity },
 }, cfg.appointRules || {});
 for (const rules of Object.values(APPOINT_RULES)) for (const k of Object.keys(rules || {})) if (rules[k] === null) rules[k] = Infinity;
+// The staff override (any office, no seat limit, seated outright) is a Lead GM's and above, the same as /appoint and
+// /dismiss in LEAD_ONLY: an office pays out of the hold treasury (claude-jake's review, A1-1). A GM or Trial GM has exactly
+// the rights of the office they hold, if any (Nate, 15 Oct: the F3 Court tab let any GM seat officials)
 const appointCap = (a, z, rank) => {
-  if (isAdmin(a)) return Infinity;
+  if (isLeadStaff(a)) return Infinity;
   let cap = 0;
   for (const m of ranksOf(profileOf(a))) if (m.zone.id === z.id) cap = Math.max(cap, Number((APPOINT_RULES[m.rank] || {})[rank]) || 0);
   // The leader of a faction that took this hold's capital in war names its new ruler and whoever the ruler names (realm.js)
@@ -3755,7 +3758,7 @@ const appointCheck = (a, z, rank, tg, override) => {
   if (!(z.officials || []).includes(rank)) return { error: `${z.name} has the ranks: ${(z.officials || []).map((r) => rankTitle(r, z.id)).join(', ')}.` };
   if (!tg.actor) return { error: `Profile ${tg.pid} has no characters.` };
   const cap = appointCap(a, z, rank);
-  if (!cap) return { error: `Only an admin, or a seat that may name a ${rankTitle(rank, z.id)}, can appoint one in ${z.name}.` };
+  if (!cap) return { error: `Only a Lead GM or above, or a seat that may name a ${rankTitle(rank, z.id)}, can appoint one in ${z.name}.` };
   if (override && tierOf(a) !== 'senior') return { error: 'Only the Owners can override the Jarl rule.' };
   let overridden = '';
   if (rank === 'jarl') {
@@ -3765,7 +3768,7 @@ const appointCheck = (a, z, rank, tg, override) => {
       overridden = raceLabel(race);
     }
   }
-  if (!isAdmin(a)) {
+  if (!isLeadStaff(a)) {
     const zo = readOfficials()[z.id] || {};
     const held = Object.keys(zo).find((r) => (zo[r] || []).map(Number).includes(tg.pid));
     if (held && !appointCap(a, z, held)) return { error: `${tg.label} already holds ${rankTitle(held, z.id)} of ${z.name}; you cannot replace that.` };
@@ -3822,8 +3825,8 @@ const unseatOfficialBy = (z, tg, byWho) => {
 const appointFrom = (a, z, rank, tg, override) => {
   const chk = appointCheck(a, z, rank, tg, override);
   if (chk.error) return chk;
-  if (!isAdmin(a) && typeof globalThis.__dboCourtOffer === 'function') return globalThis.__dboCourtOffer(a, z, rank, tg, chk);
-  return seatOfficial(z, rank, tg, { who: who(a), staff: isAdmin(a), overridden: chk.overridden });
+  if (!isLeadStaff(a) && typeof globalThis.__dboCourtOffer === 'function') return globalThis.__dboCourtOffer(a, z, rank, tg, chk);
+  return seatOfficial(z, rank, tg, { who: who(a), staff: isLeadStaff(a), overridden: chk.overridden });
 };
 registerChatCommand('appoint', (a, args) => {
   // An Owner's trailing "override" lifts the Jarl rule for this appointment
@@ -7505,7 +7508,7 @@ try {
 try {
   const COURT_JS = path.resolve('court.js');
   delete require.cache[COURT_JS];
-  require(COURT_JS)({ mp, log, ownNameOf, ownDisplay, system, personal, registerChatCommand, audit, who, display, nameOf, tagOf, onUi, onlineActors, isAdmin, profileOf, cfg, findByName,
+  require(COURT_JS)({ mp, log, ownNameOf, ownDisplay, system, personal, registerChatCommand, audit, who, display, nameOf, tagOf, onUi, onlineActors, isAdmin, isLeadStaff, profileOf, cfg, findByName,
     zoneList, zoneById, readOfficials, rankTitle, appointCap, appointCheck, appointFrom, seatOfficial, unseatOfficial, officialTarget,
     officialName, accountActors, ranksOf, APPOINT_RULES });
 } catch (e) { log('court.js failed to load:', e.stack || e.message); globalThis.__dboCourtOffer = null; globalThis.__dboCourtOfficeSync = null; if (globalThis.__dboJournalSections) delete globalThis.__dboJournalSections.court; }

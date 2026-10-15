@@ -7,18 +7,18 @@
 // the office's (config court.factionRanks), and unseating drops it to the lowest rank (gamemode.js seatOfficial and
 // unseatOfficial call __dboCourtOfficeSync). The rules of /appoint exist once, in gamemode.js (appointCheck): the tab
 // and the chat commands both call them.
-// A ruler's appointment is an offer the target accepts here; staff appoint outright (Nate, Q4). Offers live 24 hours in
+// A ruler's appointment is an offer the target accepts here; a Lead GM or above appoints outright (Nate, Q4; Lead GM only since 15 Oct). Offers live 24 hours in
 // court-offers.json (runtime, gitignored) and the target is told in chat, never by a pushed widget.
 //
 // Journal contract (H1 shell, journal.js): __dboJournalSections.court = { visible(a), view(a, opts) } puts the section at
 // payload.court; the events below carry the journal nonce first (__dboJournalFresh) and answer through __dboJournalLimited
 // (the 3 s rule), which redraws the tab with the result line.
-//   courtAppoint [nonce, zoneId, nameOrTag, rank]   staff seat outright, anyone else offers
+//   courtAppoint [nonce, zoneId, nameOrTag, rank]   a Lead GM+ seats outright, anyone else offers
 //   courtOffer   [nonce, zoneId, nameOrTag, rank]   always an offer
 //   courtDismiss [nonce, zoneId, profileId]
 //   courtMove    [nonce, zoneId, profileId, rank]   a serving official moves to another office of the same court
 //   courtAnswer  [nonce, offerId, 'accept'|'decline']
-//   courtWithdraw [nonce, offerId]                  the one who offered, or staff
+//   courtWithdraw [nonce, offerId]                  the one who offered, or a Lead GM+
 //   courtRank    [nonce, zoneId, actorId, rank]     the household's ranks (guilds.js rules)
 //   courtKick    [nonce, zoneId, actorId]
 //   courtInvite  [nonce, zoneId, nameOrTag]
@@ -34,6 +34,9 @@ module.exports = (api) => {
     zoneList, zoneById, readOfficials, rankTitle, appointCap, appointCheck, appointFrom, seatOfficial, unseatOfficial,
     officialTarget, officialName, accountActors, ranksOf, APPOINT_RULES, findByName } = api;
   const personal = typeof api.personal === 'function' ? api.personal : () => {};
+  // The staff override on appointments (seat outright, offer anyone, withdraw anyone's offer) is a Lead GM's and above,
+  // like /appoint (gamemode.js appointCap). Any staff tier still sees every court; a GM acts in one only as its office allows
+  const isLead = typeof api.isLeadStaff === 'function' ? api.isLeadStaff : () => false;
   // Rosters and offers name people by their own name, never a beast's, and a mask's only while rosterPrivacy.masks is
   // off (gamemode.js ownNameOf)
   const ownNameOf = typeof api.ownNameOf === 'function' ? api.ownNameOf : nameOf;
@@ -106,7 +109,7 @@ module.exports = (api) => {
     if (tg.pid === profileOf(a)) return { error: 'You cannot offer a post to yourself.' };
     const others = live().filter((o) => !(o.zone === z.id && o.pid === tg.pid));
     const offer = { id: `c${Date.now().toString(36)}${(++S.seq).toString(36)}`, zone: z.id, rank, pid: tg.pid, actor: tg.actor >>> 0, name: tg.label,
-      by: a >>> 0, byPid: profileOf(a), byWho: who(a), byName: ownDisplay(a), staff: isAdmin(a), overridden: chk && chk.overridden ? chk.overridden : '', at: Date.now() };
+      by: a >>> 0, byPid: profileOf(a), byWho: who(a), byName: ownDisplay(a), staff: isLead(a), overridden: chk && chk.overridden ? chk.overridden : '', at: Date.now() };
     S.offers = others.concat([offer]);
     saveOffers();
     redrawCourt(tg.online);
@@ -115,7 +118,7 @@ module.exports = (api) => {
     return { text: `You offered ${tg.label} the post of ${rankTitle(rank, z.id)} of ${z.name}. They accept it in their journal.` };
   };
   // gamemode.js /appoint (appointFrom): a ruler's appointment becomes an offer
-  globalThis.__dboCourtOffer = (a, z, rank, tg, chk) => (C.enabled ? offerTo(a >>> 0, z, rank, tg, chk) : seatOfficial(z, rank, tg, { who: who(a), staff: isAdmin(a), overridden: chk && chk.overridden }));
+  globalThis.__dboCourtOffer = (a, z, rank, tg, chk) => (C.enabled ? offerTo(a >>> 0, z, rank, tg, chk) : seatOfficial(z, rank, tg, { who: who(a), staff: isLead(a), overridden: chk && chk.overridden }));
 
   const selfTarget = (a) => ({ pid: profileOf(a), actor: a >>> 0, online: a >>> 0, label: ownDisplay(a), who: who(a) });
   const answerOffer = (a, id, yes) => {
@@ -142,7 +145,7 @@ module.exports = (api) => {
   const withdraw = (a, id) => {
     const o = live().find((x) => x.id === String(id));
     if (!o) return { error: 'That offer has already gone.' };
-    if (!isAdmin(a) && o.byPid !== profileOf(a)) return { error: 'Only the one who made an offer may withdraw it.' };
+    if (!isLead(a) && o.byPid !== profileOf(a)) return { error: 'Only the one who made an offer may withdraw it.' };
     S.offers = live().filter((x) => x.id !== o.id);
     saveOffers();
     audit(`${isAdmin(a) ? 'GM' : 'OFFICIAL'} ${who(a)} withdrew the offer of ${rankTitle(o.rank, o.zone)} of ${o.zone} to ${o.name}`);
@@ -195,7 +198,7 @@ module.exports = (api) => {
         wages && !isRulerOffice(rank) ? { wage: Math.floor(Number(wages[rank]) || 0) } : {});
     });
     const pid = profileOf(a);
-    const outgoing = live().filter((o) => o.zone === z.id && (staff || o.byPid === pid))
+    const outgoing = live().filter((o) => o.zone === z.id && (isLead(a) || o.byPid === pid))
       .map((o) => ({ id: o.id, name: o.name, rank: o.rank, title: rankTitle(o.rank, z.id), from: o.byName, at: o.at, expiresAt: Number(o.at) + OFFER_MS }));
     const household = typeof globalThis.__dboCourtHousehold === 'function' ? globalThis.__dboCourtHousehold(a, z.id) : null;
     const holdsOffice = offices.some((o) => o.holders.some((h) => h.pid === pid));
@@ -221,7 +224,7 @@ module.exports = (api) => {
     const mine = courtZoneIds(a);
     const zones = zoneList().filter((z) => staff || mine.has(z.id));
     return {
-      staff, outright: staff,
+      staff, outright: isLead(a),
       courts: zones.map((z) => zoneView(a, z, mine.has(z.id))),
       selected: (zones.find((z) => z.id === S.lastZone.get(a >>> 0)) || zones.find((z) => mine.has(z.id)) || zones[0] || {}).id || '',
       offers: offersFor(a).map((o) => { const z = zoneById(o.zone); return { id: o.id, zone: o.zone, zoneName: z ? z.name : o.zone, rank: o.rank, title: rankTitle(o.rank, o.zone), from: o.byName, at: o.at, expiresAt: Number(o.at) + OFFER_MS }; }),
@@ -259,7 +262,7 @@ module.exports = (api) => {
     const z = zoneFor(a, args[1]); if (!z) return NO_COURT;
     const rank = rankIn(z, args[3]); if (!rank) return { error: `${z.name} has no such office.` };
     const tg = target(args[2]); if (tg.error) return tg;
-    if (!isAdmin(a) && tg.pid === profileOf(a)) return { error: 'You cannot offer a post to yourself.' };
+    if (!isLead(a) && tg.pid === profileOf(a)) return { error: 'You cannot offer a post to yourself.' };
     if (!offerOnly) return appointFrom(a, z, rank, tg, false);
     const chk = appointCheck(a, z, rank, tg, false);
     return chk.error ? chk : offerTo(a, z, rank, tg, chk);
@@ -309,7 +312,7 @@ module.exports = (api) => {
       if (!appointCap(a, z, had)) return { error: `You cannot move a ${rankTitle(had, z.id)} of ${z.name}.` };
       const chk = appointCheck(a, z, rank, tg, false); if (chk.error) return chk;
       // Already in the court's service, so a move needs no acceptance; seatOfficial drops the old office's household rank
-      return seatOfficial(z, rank, tg, { who: who(a), staff: isAdmin(a), overridden: chk.overridden, via: `, moved from ${rankTitle(had, z.id)}` });
+      return seatOfficial(z, rank, tg, { who: who(a), staff: isLead(a), overridden: chk.overridden, via: `, moved from ${rankTitle(had, z.id)}` });
     });
   });
   onUi('courtAnswer', (a, args) => { if (fresh(a, args)) answer(a, () => answerOffer(a, args[1], String(args[2]) === 'accept')); });

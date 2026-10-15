@@ -1,5 +1,19 @@
 [
   {
+    "title": "Staff permissions for courts and citizenship",
+    "date": "2026-10-15",
+    "version": "Server update",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Staff",
+        "items": [
+          "Only a Lead GM or above can now seat or remove officials from the F3 Court tab, or grant, decline and set the rules and fee for a hold's citizenship; a GM who holds an office (a Jarl, Count or Steward) keeps exactly that office's rights."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Arcane Mastery: rank spells and apprenticeship",
     "date": "2026-10-14",
     "version": "Server update",

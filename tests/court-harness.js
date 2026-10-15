@@ -28,6 +28,8 @@ const ok = (label, cond, got) => { console.log(`${cond ? 'ok  ' : 'FAIL'} ${labe
 
 // ---- the world --------------------------------------------------------------------------------------------------------
 const ADMIN = 0x10, COUNT = 0x14, ALDO = 0x15, BRAN = 0xff000200, CAPT = 0x16, OUT = 0x17, KNIGHT = 0x18;
+// Staff caps (Nate, 15 Oct): a GM, a Trial GM, a Lead GM, a GM who is Jarl of Whiterun, and two plain targets
+const GM = 0x19, TRIAL = 0x1a, LEAD = 0x1b, GMJARL = 0x1c, TG1 = 0x1d, TG2 = 0x1e;
 const chars = new Map([
   [ADMIN, { pid: 1, name: 'Admin', tag: 'AAAA', online: true, race: 'ImperialRace' }],
   [COUNT, { pid: 11, name: 'Narina Carvain', tag: 'CNT1', online: true, race: 'ImperialRace' }],
@@ -36,6 +38,12 @@ const chars = new Map([
   [CAPT, { pid: 14, name: 'Cyrus Fane', tag: 'CPT1', online: true, race: 'BretonRace' }],
   [OUT, { pid: 15, name: 'Outsider', tag: 'OUT1', online: true, race: 'NordRace' }],
   [KNIGHT, { pid: 16, name: 'Kesta', tag: 'KST1', online: true, race: 'NordRace' }],
+  [GM, { pid: 17, name: 'Gm Gale', tag: 'GMG1', online: true, race: 'NordRace' }],
+  [TRIAL, { pid: 18, name: 'Trial Tam', tag: 'TRL1', online: true, race: 'NordRace' }],
+  [LEAD, { pid: 19, name: 'Lead Lia', tag: 'LED1', online: true, race: 'NordRace' }],
+  [GMJARL, { pid: 20, name: 'Jarl Gunnar', tag: 'JRL1', online: true, race: 'NordRace' }],
+  [TG1, { pid: 21, name: 'Hilde', tag: 'HLD1', online: true, race: 'NordRace' }],
+  [TG2, { pid: 22, name: 'Ivar', tag: 'IVR1', online: true, race: 'NordRace' }],
 ]);
 const zones = [
   { id: 'bruma', name: 'Bruma', treasury: '79b22:BSHeartland.esm', officials: ['count', 'steward', 'captain', 'courtmage', 'guard'], worldspaces: [] },
@@ -71,8 +79,11 @@ const tagOf = (a) => (chars.has(a) ? chars.get(a).tag : '????');
 const profileOf = (a) => (chars.has(a) ? chars.get(a).pid : -1);
 const display = (a) => `${nameOf(a)} #${tagOf(a)}`;
 const who = (a) => `${display(a)} (profile ${profileOf(a)})`;
-const isAdmin = (a) => a === ADMIN;
-const tierOf = (a) => (a === ADMIN ? 'developer' : null);
+// gamemode.js: isAdmin is any admin tier (GM and up), isLeadStaff a Lead GM and up; a Trial GM is neither
+const TIERS = new Map([[ADMIN, 'developer'], [GM, 'gm'], [LEAD, 'leadgm'], [GMJARL, 'gm']]);
+const tierOf = (a) => TIERS.get(a) || null;
+const isAdmin = (a) => tierOf(a) !== null;
+const isLeadStaff = (a) => tierOf(a) !== null && tierOf(a) !== 'gm';
 const zoneList = () => zones;
 const zoneById = (id) => zones.find((z) => z.id === String(id).toLowerCase()) || null;
 const ranksOf = (pid) => { const out = []; for (const z of zones) for (const r of Object.keys(officials[z.id] || {})) if ((officials[z.id][r] || []).map(Number).includes(pid)) out.push({ zone: z, rank: r }); return out; };
@@ -80,7 +91,7 @@ const handlers = {};
 const onUi = (ev, fn) => { (handlers[ev] = handlers[ev] || []).push(fn); };
 const base = {
   mp, log: () => {}, personal: (a, t) => said.push(t), system: (a, text) => told.push({ a, text }), audit: (t) => audits.push(t), cfg: {},
-  isAdmin, isLeadStaff: isAdmin, tierOf, profileOf, nameOf, tagOf, display, who, findByName, findAnyByName, onUi,
+  isAdmin, isLeadStaff, tierOf, profileOf, nameOf, tagOf, display, who, findByName, findAnyByName, onUi,
   // gamemode.js: the own name behind a mask or a beast form; nobody here wears one (tests/roster-privacy-harness.js does)
   ownNameOf: nameOf, ownDisplay: display, publicNameOf: nameOf, publicDisplay: display, disguisedOf: () => false,
   onlineActors: online, userOf: (a) => (chars.has(a) && chars.get(a).online ? 1 : -1), seen: new Map(),
@@ -287,6 +298,44 @@ ok('/court decline <number> declines that one', /declined/.test(line) && sec.vie
   r = ev('courtWage', OUT, 'N', 'bruma', 'guard', 1);
   ok('an outsider cannot set wages', wages.guard === 75 && r.kind === 'refused', r);
   for (const k of ['__dboHoldTax', '__dboHoldTaxMax', '__dboCanSetHoldTax', '__dboSetHoldTax', '__dboEconomyWages', '__dboEconomyKeepsBooks', '__dboEconomySetWage']) delete globalThis[k];
+}
+
+// ---- staff caps (Nate, 15 Oct): the staff override on appointments is a Lead GM's and above, like /appoint ------------
+{
+  const wr = () => officials.whiterun || {};
+  r = ev('courtAppoint', GM, 'N', 'whiterun', 'Hilde', 'steward');
+  ok('caps: a GM cannot seat an official from the Court tab', !(wr().steward || []).includes(21) && r.kind === 'refused', [r, wr()]);
+  r = ev('courtOffer', GM, 'N', 'whiterun', 'Hilde', 'steward');
+  ok('caps: ...nor offer one a post', r.kind === 'refused' && !sec.view(TG1).offers.some((o) => o.zone === 'whiterun'), r);
+  ok('caps: a GM sees every court but may fill no office and has no outright', sec.view(GM).courts.length === 3 && sec.view(GM).outright === false && sec.view(GM).courts.every((c) => c.appointable.length === 0), sec.view(GM).courts.map((c) => c.appointable));
+  ok('caps: /appoint\'s shared rule refuses a GM too', !!O.appointFrom(GM, zoneById('whiterun'), 'steward', O.officialTarget('Hilde'), false).error && !(wr().steward || []).includes(21));
+  r = ev('courtAppoint', TRIAL, 'N', 'whiterun', 'Hilde', 'steward');
+  ok('caps: a Trial GM cannot seat one', r.kind === 'refused' && !(wr().steward || []).includes(21), r);
+  ok('caps: a Trial GM sees no court of their own', sec.visible(TRIAL) === false);
+  r = ev('courtAppoint', LEAD, 'N', 'whiterun', 'Jarl Gunnar', 'jarl');
+  ok('caps: a Lead GM seats outright (the GM as Jarl of Whiterun)', (wr().jarl || []).includes(20) && r.kind === 'ok' && /is now Jarl of Whiterun/.test(r.text), [r, wr()]);
+  ok('caps: a Lead GM has outright and every office', sec.view(LEAD).outright === true && sec.view(LEAD).courts.find((c) => c.id === 'whiterun').appointable.length === 6);
+  // The GM who is Jarl has exactly a Jarl's rights: offers (not seats), the Jarl's offices only, never himself
+  const wj = sec.view(GMJARL).courts.find((c) => c.id === 'whiterun');
+  ok('caps: the GM Jarl may fill the Jarl\'s offices only (no Hold Commander)', wj.appointable.map((x) => x.rank).join() === 'steward,courtmage,guardcaptain,guard' && sec.view(GMJARL).outright === false, wj.appointable);
+  r = ev('courtAppoint', GMJARL, 'N', 'whiterun', 'Hilde', 'steward');
+  ok('caps: the GM Jarl\'s appointment is an offer, not a seat', !(wr().steward || []).includes(21) && r.kind === 'ok' && /offered Hilde/.test(r.text), [r, wr()]);
+  ok('caps: ...and is not marked as a staff appointment', JSON.parse(fs.readFileSync(path.join(dir, 'court-offers.json'), 'utf8')).some((o) => o.pid === 21 && o.staff === false));
+  ok('caps: the GM Jarl cannot name a Hold Commander', ev('courtOffer', GMJARL, 'N', 'whiterun', 'Ivar', 'commander').kind === 'refused');
+  ok('caps: the GM Jarl cannot offer himself a post', /yourself/.test(ev('courtOffer', GMJARL, 'N', 'whiterun', 'Jarl Gunnar', 'steward').text));
+  const offId = sec.view(TG1).offers.find((o) => o.zone === 'whiterun').id;
+  ok('caps: a GM cannot withdraw another\'s offer', ev('courtWithdraw', GM, 'N', offId).kind === 'refused' && sec.view(TG1).offers.some((o) => o.id === offId));
+  ok('caps: a GM does not see others\' outgoing offers', sec.view(GM).courts.find((c) => c.id === 'whiterun').outgoing.length === 0 && sec.view(LEAD).courts.find((c) => c.id === 'whiterun').outgoing.some((o) => o.name === 'Hilde #HLD1'), [sec.view(GM).courts.find((c) => c.id === 'whiterun').outgoing, sec.view(LEAD).courts.find((c) => c.id === 'whiterun').outgoing]);
+  ok('caps: a Lead GM can', ev('courtWithdraw', LEAD, 'N', offId).kind === 'ok' && !sec.view(TG1).offers.some((o) => o.id === offId));
+  ev('courtAppoint', LEAD, 'N', 'whiterun', 'Ivar', 'commander');
+  r = ev('courtDismiss', GM, 'N', 'whiterun', 22);
+  ok('caps: a GM cannot dismiss an official', (wr().commander || []).includes(22) && r.kind === 'refused', [r, wr()]);
+  r = ev('courtMove', GM, 'N', 'whiterun', 22, 'steward');
+  ok('caps: ...nor move one', (wr().commander || []).includes(22) && r.kind === 'refused', [r, wr()]);
+  r = ev('courtDismiss', GMJARL, 'N', 'whiterun', 22);
+  ok('caps: the GM Jarl cannot dismiss the Hold Commander (not a Jarl\'s to name)', (wr().commander || []).includes(22) && r.kind === 'refused', [r, wr()]);
+  r = ev('courtDismiss', LEAD, 'N', 'whiterun', 22);
+  ok('caps: a Lead GM can', !(wr().commander || []).includes(22) && r.kind === 'ok', [r, wr()]);
 }
 
 // ---- expiry -------------------------------------------------------------------------------------------------------------

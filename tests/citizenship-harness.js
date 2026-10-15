@@ -42,6 +42,9 @@ const ELF = add(0x23, 23, 'Elwen', 'HighElfRace');
 const GUILDIE = add(0x24, 24, 'Gunnar the Guildsman');
 const STAFF = add(0x30, 30, 'Staff Lead');
 const GM = add(0x31, 31, 'Plain GM');
+// Staff caps (Nate, 15 Oct): a Trial GM (neither admin nor lead) and a GM who is Jarl of the Rift
+const TRIAL = add(0x32, 32, 'Trial GM');
+const GMJARL = add(0x33, 33, 'Jarl Laila');
 let online = [...chars.keys()];
 // guild memberships per actor (guilds.js __dboGuildsOf shape)
 const guilds = new Map([[GUILDIE, [{ id: 'fighters-guild', name: 'Fighters Guild', title: 'Associate', role: 'member', kind: 'guild', zone: '', hall: { zone: 'bruma' } }]]]);
@@ -76,7 +79,7 @@ let nearBoard = new Map();
 const api = () => ({
   mp, log: () => {}, audit: (t) => audits.push(t), who: (a) => (chars.get(a >>> 0) || {}).name || `actor ${a}`,
   personal: (a, t) => said.push([a >>> 0, t]), nameOf: (a) => chars.get(a >>> 0).name, ownNameOf: (a) => chars.get(a >>> 0).name, tagOf: (a) => `T${(a >>> 0).toString(16)}`,
-  onUi: (n, f) => { ui[n] = f; }, onlineActors: () => online.slice(), isAdmin: (a) => a === STAFF || a === GM, isLeadStaff: (a) => a === STAFF,
+  onUi: (n, f) => { ui[n] = f; }, onlineActors: () => online.slice(), isAdmin: (a) => a === STAFF || a === GM || a === GMJARL, isLeadStaff: (a) => a === STAFF,
   profileOf: (a) => { const c = chars.get(a >>> 0); return c ? c.pid : -1; },
   cfg: { citizenship: { discordRoles: { bruma: '1500000000000000001', whiterun: 'not-an-id' } } },
   every: (n, ms, f) => { timer = f; },
@@ -417,6 +420,37 @@ const titles = new Function('ZONES', 'cfg', RT + '\nreturn RANK_TITLES;')(JSON.p
 ok(titles.commander === 'Lord Commander' && titles.jarl === 'Jarl', "the gamemode's default titles read the commander office Lord Commander", titles);
 ok(GM_SRC.includes('defaultTitles: RANK_TITLES') && /return String\(RANK_TITLES\[r\] \|\| r\)/.test(GM_SRC), 'rankTitle and rolenames.js (the boards\' bylines) use them');
 ok(M.votingView(V1, WR).seats.find((s) => s.id === 'commander').label === 'Lord Commander', 'and the ballot names it the same');
+
+// ---- staff caps (Nate, 15 Oct): the staff override on a hold's citizenship is a Lead GM's and above --------------------
+{
+  officials.riften = { jarl: [33] };
+  const asker = add(0x50, 50, 'Ragnar'); online.push(asker);
+  ok(M.setPolicy(GM, 'bruma', 'free').error && M.data().policies.bruma.policy === 'manual', 'caps: a GM cannot set a hold\'s policy');
+  ok(M.setPolicy(GM, 'bruma', 'paid', 10).error && M.data().policies.bruma.policy === 'manual', 'caps: ...nor its fee');
+  ok(M.setPolicy(TRIAL, 'bruma', 'free').error && M.data().policies.bruma.policy === 'manual', 'caps: a Trial GM cannot either');
+  r = M.join(asker, 'bruma');
+  ok(!r.error && !M.citizenOf(asker, 'bruma'), 'caps: Ragnar asks Bruma', r);
+  ok(M.grant(GM, 'bruma', asker).error && !M.citizenOf(asker, 'bruma'), 'caps: a GM cannot grant a request');
+  ok(M.decline(GM, 'bruma', asker).error, 'caps: a GM cannot decline one');
+  ok(M.grant(TRIAL, 'bruma', asker).error && !M.citizenOf(asker, 'bruma'), 'caps: a Trial GM cannot grant');
+  ok(globalThis.__dboCitizenMenuEntries(GM, asker).length === 0 && globalThis.__dboCitizenMenuEntries(TRIAL, asker).length === 0, 'caps: no Grant or Decline in a GM\'s or Trial GM\'s X menu');
+  ok(globalThis.__dboCitizenMenuAction(GM, 'citizen:grant:bruma', asker) === true && !M.citizenOf(asker, 'bruma'), 'caps: a forged X menu action by a GM is refused');
+  ok(!M.boardPayload(GM, 'bruma', 'n', 'citizenship').citizenship.manage, 'caps: a GM\'s board panel has no manage section');
+  ok(!!M.boardPayload(STAFF, 'bruma', 'n', 'citizenship').citizenship.manage, 'caps: a Lead GM\'s has');
+  ok(globalThis.__dboCitizenMenuEntries(STAFF, asker).length === 2, 'caps: a Lead GM gets Grant and Decline in the X menu');
+  ok(!M.grant(STAFF, 'bruma', asker).error && M.citizenOf(asker, 'bruma'), 'caps: a Lead GM grants');
+  // A GM who is Jarl of the Rift has exactly the Jarl's rights there, and none in Bruma
+  ok(!M.setPolicy(GMJARL, 'riften', 'manual').error && M.data().policies.riften.policy === 'manual', 'caps: the GM Jarl sets the Rift\'s policy');
+  ok(M.setPolicy(GMJARL, 'bruma', 'free').error, 'caps: ...but not Bruma\'s');
+  said.length = 0;
+  const asker2 = add(0x51, 51, 'Sigrid'); online.push(asker2);
+  r = M.join(asker2, 'riften');
+  ok(!r.error && /asks to become a citizen of/.test(last(GMJARL)), 'caps: the GM Jarl is told of a request to the Rift', [r, last(GMJARL)]);
+  ok(M.journalView(GMJARL).manage.some((m) => m.zone === 'riften' && m.requests.length === 1) && !M.journalView(GMJARL).manage.some((m) => m.zone === 'bruma'), 'caps: the GM Jarl\'s journal manages the Rift only', M.journalView(GMJARL).manage);
+  ok(M.journalView(GM).manage.length === 0, 'caps: a plain GM\'s journal manages nothing');
+  ok(globalThis.__dboCitizenMenuEntries(GMJARL, asker2).some((e) => e.id === 'citizen:grant:riften'), 'caps: the GM Jarl gets Grant in the X menu');
+  ok(!M.grant(GMJARL, 'riften', asker2).error && M.citizenOf(asker2, 'riften'), 'caps: and grants it');
+}
 
 console.log(fails ? `\n${fails} FAILED` : '\nall passed');
 process.exit(fails ? 1 : 0);

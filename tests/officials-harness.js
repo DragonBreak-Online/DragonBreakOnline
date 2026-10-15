@@ -19,13 +19,17 @@ const section = src.slice(start, end);
 // "Lydia"s, and profile 13 with no characters left
 const ADMIN = 0x10, CORVUS = 0x14, MARCUS = 0xff000200, LYDIA1 = 0xff000300, LYDIA2 = 0xff000301;
 const OWNER = 0x11, SERANA = 0x15, ULF = 0x16, JZAR = 0xff000400, BLANK = 0x17;
+// Staff caps (Nate, 15 Oct): a GM, a Trial GM, a Lead GM and a GM who rules Bruma
+const GM = 0x18, TRIAL = 0x19, LEAD = 0x1a, GMRULER = 0x1b;
 const chars = new Map([[ADMIN, { pid: 1, name: 'Admin', tag: 'AAAA', online: true }], [CORVUS, { pid: 11, name: 'Corvus Direnni II', tag: 'UFSR', online: true }],
   [MARCUS, { pid: 12, name: 'Marcus Aurelius', tag: 'KQ7P', online: false }], [LYDIA1, { pid: 14, name: 'Lydia', tag: 'LYD1', online: false }],
   [LYDIA2, { pid: 15, name: 'Lydia', tag: 'LYD2', online: false }],
   // For the Jarl rule: an Owner, a Nord vampire, a werewolf in beast form who was born a Nord, a Khajiit, no race at all
   [OWNER, { pid: 2, name: 'Owner', tag: 'OWNR', online: true }], [SERANA, { pid: 16, name: 'Serana', tag: 'VAMP', online: true }],
   [ULF, { pid: 17, name: 'Ulf', tag: 'WOLF', online: true }], [JZAR, { pid: 18, name: 'J\'zar', tag: 'JZAR', online: false }],
-  [BLANK, { pid: 19, name: 'Blank', tag: 'NONE', online: true }]]);
+  [BLANK, { pid: 19, name: 'Blank', tag: 'NONE', online: true }],
+  [GM, { pid: 20, name: 'Gm', tag: 'GMGM', online: true }], [TRIAL, { pid: 21, name: 'Trial', tag: 'TRIA', online: true }],
+  [LEAD, { pid: 22, name: 'Lead', tag: 'LEAD', online: true }], [GMRULER, { pid: 23, name: 'Ruling Gm', tag: 'RGMR', online: true }]]);
 const RACES = { 1: 'NordRace', 2: 'ImperialRace', 3: 'BretonRace', 4: 'NordRaceVampire', 5: 'WerewolfBeastRace', 6: 'KhajiitRace' };
 const raceOf = new Map([[ADMIN, 1], [OWNER, 1], [CORVUS, 3], [MARCUS, 2], [LYDIA1, 1], [LYDIA2, 1], [SERANA, 4], [ULF, 5], [JZAR, 6]]);
 globalThis.__dboBeastOriginalRace = (a) => (a === ULF ? 1 : 0);
@@ -45,8 +49,10 @@ const stubs = {
   mp: { getActorsByProfileId: (pid) => [...chars.entries()].filter(([, c]) => c.pid === pid).map(([id]) => id),
     get: (a, prop) => (prop === 'appearance' && raceOf.has(a) ? { raceId: raceOf.get(a) } : null),
     lookupEspmRecordById: (id) => (RACES[id] ? { record: { editorId: RACES[id] } } : { record: null }) },
-  isAdmin: (a) => a === ADMIN || a === OWNER,
-  tierOf: (a) => (a === OWNER ? 'senior' : a === ADMIN ? 'developer' : null),
+  // gamemode.js: isAdmin is GM and up, isLeadStaff Lead GM and up; a Trial GM is neither
+  isAdmin: (a) => [ADMIN, OWNER, GM, LEAD, GMRULER].includes(a),
+  isLeadStaff: (a) => [ADMIN, OWNER, LEAD].includes(a),
+  tierOf: (a) => (a === OWNER ? 'senior' : a === ADMIN ? 'developer' : a === LEAD ? 'leadgm' : a === GM || a === GMRULER ? 'gm' : null),
   ranksOf: (pid) => { const out = []; for (const z of zones) for (const r of Object.keys(officials[z.id] || {})) if ((officials[z.id][r] || []).includes(pid)) out.push({ zone: z, rank: r }); return out; },
   profileOf: (a) => (chars.has(a) ? chars.get(a).pid : -1),
   APPOINT_RULES: { ruler: { steward: 5, guard: 20 } },
@@ -111,7 +117,7 @@ officials = { bruma: { steward: [11], guard: [12] } };
 out = run('dismiss', CORVUS, 'Marcus Aurelius bruma');
 check('a steward cannot dismiss a guard', (officials.bruma.guard || []).includes(12) && /cannot dismiss a Guard/.test(out), out);
 out = run('appoint', CORVUS, 'Marcus Aurelius bruma guard');
-check('a steward cannot appoint either', /Only an admin, or a seat that may name/.test(out), out);
+check('a steward cannot appoint either', /Only a Lead GM or above, or a seat/.test(out), out);
 out = run('dismiss', ADMIN, 'Corvus Direnni II');
 check('usage when the zone is missing is not mistaken for a name', /No such zone|Usage/.test(out), out);
 
@@ -151,6 +157,30 @@ check('an elected hold refuses a non-citizen for an empty seat of its court', !(
 out = run('appoint', ADMIN, 'Marcus Aurelius whiterun steward');
 check('a citizen takes it', ((officials.whiterun || {}).steward || []).includes(12), out);
 delete globalThis.__dboCitizenSeatCheck;
+
+// Staff caps (Nate, 15 Oct): the staff override (any rank, no limit, outright) is a Lead GM's and above; a GM or Trial GM
+// has only the rights of an office they hold. /appoint itself is LEAD_ONLY at the command gate; these are the shared rules
+// the F3 Court tab uses too
+officials = { bruma: { ruler: [23], guard: [12] } };
+out = run('appoint', GM, 'Corvus Direnni II bruma steward');
+check('caps: a GM cannot appoint', !(officials.bruma.steward || []).includes(11) && /Only a Lead GM or above, or a seat/.test(out), out);
+out = run('dismiss', GM, 'Marcus Aurelius bruma');
+check('caps: a GM cannot dismiss', (officials.bruma.guard || []).includes(12) && /cannot dismiss/.test(out), out);
+out = run('appoint', TRIAL, 'Corvus Direnni II bruma steward');
+check('caps: a Trial GM cannot appoint', !(officials.bruma.steward || []).includes(11) && /Only a Lead GM or above, or a seat/.test(out), out);
+out = run('appoint', GMRULER, 'Ruling Gm bruma ruler');
+check('caps: a GM who rules cannot re-seat over their own rank', /Only a Lead GM or above, or a seat/.test(out) && JSON.stringify(officials.bruma.ruler) === '[23]', out);
+out = run('appoint', GMRULER, 'Corvus Direnni II bruma steward');
+check('caps: a GM who rules names a Steward as a ruler does', (officials.bruma.steward || []).includes(11), out);
+officials.bruma.steward = [1, 2, 11, 14, 15];
+out = run('appoint', GMRULER, 'Marcus Aurelius bruma steward');
+check('caps: ...and is held to the ruler\'s limit of 5 Stewards', !(officials.bruma.steward || []).includes(12) && /already has 5/.test(out), out);
+out = run('dismiss', GMRULER, 'Marcus Aurelius bruma');
+check('caps: ...and dismisses a guard as a ruler does', !(officials.bruma.guard || []).includes(12), out);
+out = run('appoint', LEAD, 'Marcus Aurelius bruma steward');
+check('caps: a Lead GM appoints past the limit, outright', (officials.bruma.steward || []).includes(12) && /is now Steward of Bruma/.test(out), out);
+out = run('dismiss', LEAD, 'Ruling Gm bruma');
+check('caps: a Lead GM dismisses a ruler', !(officials.bruma.ruler || []).includes(23), out);
 
 console.log(failures ? `${failures} failure(s)` : 'all passed');
 process.exit(failures ? 1 : 0);
