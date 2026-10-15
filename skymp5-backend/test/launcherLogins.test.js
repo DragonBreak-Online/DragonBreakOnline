@@ -58,6 +58,8 @@ test('a state is taken by one Discord callback only', () => {
   const { state } = store.issue('device')
   assert.deepEqual(store.beginCallback(state), { flow: 'device' })
   assert.equal(store.beginCallback(state), null)
+  const loop = store.issue('loopback', { challenge: verifierPair().c, port: 50001 }).state
+  assert.deepEqual(store.beginCallback(loop), { flow: 'loopback', port: 50001 })
 })
 
 test('the old status route never answers for a loopback or device login', () => {

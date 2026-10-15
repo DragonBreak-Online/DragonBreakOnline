@@ -102,6 +102,13 @@ router.use('/login-discord', loginHeaders)
 
 const legacyAllowed = () => config.launcherLoginLegacy === 'allow'
 
+// The launcher's own listener on the PC that started the login; only ever 127.0.0.1
+function launcherUrl(port, params) {
+  const to = new URL(`http://127.0.0.1:${port}/discord/callback`)
+  for (const [k, v] of Object.entries(params)) to.searchParams.set(k, v)
+  return to.href
+}
+
 // POST /api/users/login-discord/start
 
 router.post('/login-discord/start', startLimiter, (req, res) => {
@@ -165,6 +172,8 @@ router.get('/login-discord/callback', async (req, res) => {
 
   if (error) {
     if (started) logins.drop(state)
+    // The launcher stops waiting at once instead of after its 5 minutes
+    if (started && started.flow === 'loopback') return res.redirect(launcherUrl(started.port, { error: 'access_denied', state }))
     return res.status(400).send(authPage({
       ok: false, title: 'Login cancelled',
       message: `Discord reported: ${escapeHtml(String(error))}. Return to the launcher and try again.`,
@@ -186,6 +195,7 @@ router.get('/login-discord/callback', async (req, res) => {
 
   if (typeof code !== 'string' || !code) {
     logins.drop(state)
+    if (started.flow === 'loopback') return res.redirect(launcherUrl(started.port, { error: 'server_error', state }))
     return res.status(400).send(authPage({
       ok: false, title: 'Login failed',
       message: 'The Discord response was missing its code. Return to the launcher and try again.',
@@ -201,6 +211,7 @@ router.get('/login-discord/callback', async (req, res) => {
   } catch (err) {
     console.error('[launcher-login] Discord callback error:', err.message)
     logins.drop(state)
+    if (started.flow === 'loopback') return res.redirect(launcherUrl(started.port, { error: 'server_error', state }))
     return res.status(500).send(authPage({
       ok: false, title: 'Login failed',
       message: 'Something went wrong while talking to Discord. Return to the launcher and try again.',
@@ -213,12 +224,7 @@ router.get('/login-discord/callback', async (req, res) => {
   }
 
   // The launcher's answer goes to the PC that started the login, never to whoever holds the state
-  if (next.flow === 'loopback') {
-    const to = new URL(`http://127.0.0.1:${next.port}/discord/callback`)
-    to.searchParams.set('code', next.code)
-    to.searchParams.set('state', state)
-    return res.redirect(to.href)
-  }
+  if (next.flow === 'loopback') return res.redirect(launcherUrl(next.port, { code: next.code, state }))
 
   res.send(confirmPage({ flow: next.flow, state, nonce: next.nonce, username: user.username }))
 })

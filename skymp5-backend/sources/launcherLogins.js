@@ -146,14 +146,14 @@ function createLoginStore({ file = null, now = Date.now, max = 5000, log = conso
     return f ? { flow: f.rec.flow, status: f.rec.status } : null
   }
 
-  // Discord's redirect: works once per state, so a second callback with the same state is refused
+  // Discord's redirect: works once per state, so a second callback with the same state is refused; a loopback login also gets its port back
   function beginCallback(state) {
     const f = find(state)
     if (!f || f.rec.status !== 'pending') return null
     f.rec.status = 'discord'
     f.rec.expiresAt = now() + TTL.discord
     save()
-    return { flow: f.rec.flow }
+    return f.rec.flow === 'loopback' ? { flow: 'loopback', port: f.rec.port } : { flow: f.rec.flow }
   }
 
   // After Discord named the user: loopback gets its one-time code, device and legacy a confirmation page nonce

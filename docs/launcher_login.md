@@ -18,7 +18,8 @@ In every login:
 - the backend issues the state; `/login-discord` refuses a state it did not issue (an old launcher's own 64-hex state
   only while the old flow is allowed, registered once, never extended, 5 minutes);
 - Discord is asked with `prompt=consent`, so the Authorize page always shows;
-- a state is taken by one Discord callback only, and the result is delivered once;
+- a state is taken by one Discord callback only, and the result is delivered once; a cancel on Discord, or a
+  failure talking to Discord, is sent back to the launcher's listener too, so it stops waiting at once;
 - the session is made only when the device collects the result, so no session token is ever kept in
   `data/auth-states.json`, which holds hashes only (0600). The pre-F1 file is overwritten when the backend starts;
 - a new login ends the account's older sessions (`LAUNCHER_LOGIN_SINGLE_SESSION`), so a copied token stops working

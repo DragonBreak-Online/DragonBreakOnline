@@ -173,6 +173,19 @@ test('F1: the launcher\'s login goes to 127.0.0.1 on the PC that started it, and
   assert.equal((await post('/api/users/login-discord/token', { state, code, code_verifier: verifier })).status, 400, 'the code works once')
 })
 
+test('F1: a cancel on Discord goes straight back to the launcher, and ends that login', async () => {
+  const { verifier, challenge } = pkce()
+  const { state } = (await post('/api/users/login-discord/start', { client: 'launcher', code_challenge: challenge, code_challenge_method: 'S256', redirect_port: 48124 })).json
+  await get(`/api/users/login-discord?state=${state}`)
+  const cb = await get(`/api/users/login-discord/callback?error=access_denied&state=${state}`)
+  assert.equal(cb.status, 302)
+  const to = new URL(cb.location)
+  assert.equal(to.origin, 'http://127.0.0.1:48124')
+  assert.equal(to.searchParams.get('error'), 'access_denied')
+  assert.equal(to.searchParams.get('code'), null)
+  assert.equal((await post('/api/users/login-discord/token', { state, code: 'c'.repeat(64), code_verifier: verifier })).status, 400)
+})
+
 test('F1: /start refuses a plain challenge, a missing method and a privileged port', async () => {
   const { challenge } = pkce()
   const cases = [
