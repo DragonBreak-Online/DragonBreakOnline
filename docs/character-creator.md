@@ -161,3 +161,13 @@ against the same esm dump. Custom races (Colovian, Reachfolk, Akaviri, Maormer,
 furstocks, daedra variants) are `placeholder: true` entries that reuse vanilla
 races until their esp lands in AlduinakPatchMerged — update `raceId` +
 `skymp5-server/ts/systems/charCreatorData.ts` together.
+
+The DLE's own races (DBOSnowElfRace, MaormerRace, DBOReachmanRace) are added by
+`skymp5-front/docs/creator_races.py` (15 Oct): tint layers and skin presets from
+each RACE record, head-part validity from the winning valid-race FormLists. It
+first rebuilds BretonRace, HighElfRace and NordRace from the same records and
+reports whether they match the json. The front's ids are numeric, so only
+vanilla (Skyrim.esm and DLC) head parts can be named: the DLE's own Lost Races
+parts for the Snow Elf and the Maormer are listed in its report, not offered.
+A DLE race keeps its creator slug and its vanilla `raceId`; the server makes the
+character on the DLE record through `raceOverrideFor` (config `<race>Race`).
