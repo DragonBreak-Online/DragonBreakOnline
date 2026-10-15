@@ -164,6 +164,15 @@ Commands below run as root; from the `nate` user, prefix them with `sudo` (step 
    - If the deploy is on a day other than 2026-10-15: set that day in `data/legal/legal.json` (`version` and
      `effective`) and in `data/legal/privacy.md` (Effective date and Last updated), drop the unshipped `2026-10-15` key
      from `data/legal/hashes.json`, run `npm run legal-record` again, and commit that before deploying.
+   - **Deploy tree:** the live main head at deploy time (`git -C /opt/alduinak rev-parse HEAD`, the same as
+     `origin/main`; on 15 Oct 18:44Z that is f985e98fe, which serves launcher 2.1.49 and client 0.3.98), merged with
+     Phase 1 (`secfix-phase1-backend-1015`, 1314e05ca), this branch (`secfix3-L3-01-backend-1015`) and, once F1 is
+     approved, F1 (`secfix2-F1-backend-1015`). On 15 Oct each of these merges had no conflicts. Never deploy one of the
+     branch heads on its own: Phase 1, F1 and this branch all carry `routes/version.js` from c90ee09fd, which
+     advertises launcher 2.1.48, its download link and client 0.3.97.
+   - Before the tree reaches the live checkout, this must print `same`:
+     `git diff --quiet <live head> <deploy tree> -- skymp5-backend/routes/version.js && echo same || echo STOP`.
+     version.js is read from disk on every request, so a wrong one reaches every launcher as soon as it lands.
    - The first start rewrites `data/bans.json` once, even with the key unset: the start-up prune reads the ban list,
      which gives every entry without one a `B-` ref and saves it (15 Oct: 1 entry, none with a ref). The save is
      atomic and keeps the file 0600.
