@@ -405,6 +405,7 @@ function authPage({ ok, title, message, autoClose = false, tag = 'Launcher sign-
           padding: .6rem 1.6rem; background: #c8a25f; color: #08191c; border: 0; border-radius: 4px; }
   .panel .warn { margin-top: 1rem; }
   .panel .err { margin-top: .8rem; color: #e08a80; }
+  .panel button:disabled { opacity: .55; cursor: default; }
 </style>
 </head>
 <body>
@@ -458,10 +459,12 @@ function confirmPage({ flow, state, nonce, username, error = '' }) {
 }
 
 // Continue wakes only after this tab was visible and focused for a second and then saw the pointer or a key, so a window swapped under a double-click cannot press it
-const CONTINUE_BUTTON = `<noscript><button type="submit">Continue</button></noscript><button type="submit" id="continue" disabled hidden>Continue</button>
+// The button is live in the markup and the script puts it to sleep, so if the script cannot run (scripts off, or a CSP from a proxy or an extension) it works as before
+const CONTINUE_BUTTON = `<button type="submit" id="continue">Continue</button>
+<p class="meta" id="continue-hint" hidden>If Continue does not respond, move the mouse or press Tab, then press it again.</p>
 <script>(function () {
   var b = document.getElementById('continue'), timer = null, ready = false
-  b.hidden = false
+  b.disabled = true
   function sleep() { clearTimeout(timer); timer = null; ready = false; b.disabled = true }
   function wake() { if (timer || ready || document.visibilityState !== 'visible' || !document.hasFocus()) return; timer = setTimeout(function () { timer = null; ready = true }, 1000) }
   function gesture() { if (ready) b.disabled = false; else wake() }
@@ -470,6 +473,7 @@ const CONTINUE_BUTTON = `<noscript><button type="submit">Continue</button></nosc
   window.addEventListener('blur', sleep)
   document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') wake(); else sleep() })
   wake()
+  document.getElementById('continue-hint').hidden = false
 })()</script>`
 
 module.exports = router

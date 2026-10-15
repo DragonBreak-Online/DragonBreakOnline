@@ -148,8 +148,12 @@ test('F1: an old launcher\'s login is held until the player presses Continue on 
 test('F1: the old flow\'s Continue button starts asleep and wakes only on a focused, visible page, so a double-click on a swapped window cannot press it', async () => {
   const { page } = await legacyToConfirmPage()
   const form = /<form[^>]*>[\s\S]*?<\/form>/.exec(page.text)[0]
-  assert.match(form, /<button type="submit" id="continue" disabled hidden>Continue<\/button>/)
-  assert.match(form, /<noscript><button type="submit">Continue<\/button><\/noscript>/, 'without scripts the button still works')
+  assert.match(form, /<button type="submit" id="continue">Continue<\/button>/, 'live in the markup, so it works when the script cannot run')
+  assert.doesNotMatch(form, /<noscript>/)
+  assert.match(form, /<script>\(function \(\) \{\n  var b = document\.getElementById\('continue'\)[^\n]*\n  b\.disabled = true\n/, 'the script puts it to sleep first')
+  assert.match(form, /<p class="meta" id="continue-hint" hidden>/, 'the hint shows only when the script runs')
+  assert.match(page.text, /\.panel button:disabled \{ opacity: \.55; cursor: default; \}/, 'a sleeping button looks asleep')
+  assert.doesNotMatch(page.headers['content-security-policy'], /script-src|default-src|sandbox/, 'the page lets its inline script run')
   assert.match(form, /document\.hasFocus\(\)/)
   assert.match(form, /visibilitychange/)
   assert.match(form, /addEventListener\('blur', sleep\)/)
@@ -161,15 +165,16 @@ test('F1: the Continue guard: a click right after the tab comes to the front is 
   const listeners = {}
   const on = (target, type, fn) => { (listeners[`${target}:${type}`] = listeners[`${target}:${type}`] || []).push(fn) }
   const fire = (target, type) => (listeners[`${target}:${type}`] || []).forEach(fn => fn())
-  const button = { hidden: true, disabled: true }
+  const button = { hidden: false, disabled: false }
+  const hint = { hidden: true }
   let focused = false, now = 0
   const timers = []
-  const doc = { visibilityState: 'visible', hasFocus: () => focused, getElementById: () => button, addEventListener: (t, fn) => on('doc', t, fn) }
+  const doc = { visibilityState: 'visible', hasFocus: () => focused, getElementById: id => (id === 'continue' ? button : hint), addEventListener: (t, fn) => on('doc', t, fn) }
   const win = { addEventListener: (t, fn) => on('win', t, fn) }
   const sandbox = { document: doc, window: win, setTimeout: (fn, ms) => { const t = { at: now + ms, fn }; timers.push(t); return t }, clearTimeout: t => { const i = timers.indexOf(t); if (i >= 0) timers.splice(i, 1) } }
   const advance = ms => { now += ms; for (const t of [...timers]) if (t.at <= now) { timers.splice(timers.indexOf(t), 1); t.fn() } }
   require('vm').runInNewContext(script, sandbox)
-  assert.equal(button.hidden, false)
+  assert.equal(hint.hidden, false, 'the script shows the hint')
   assert.equal(button.disabled, true, 'asleep while the tab has no focus (a window above it)')
   fire('doc', 'mousemove')
   assert.equal(button.disabled, true)
