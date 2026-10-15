@@ -57,6 +57,23 @@ module.exports = (api) => {
     const count = Math.max(1, Math.min(4, Math.floor(Number(r.count) || 1)));   // how many stand in each spot
     return Object.assign({}, sp, { kind: String(r.kind || sp.kind), options: opts || sp.options, count });
   };
+  // Blackreach, the open-world dungeon (Nate, 14 Oct: "super hard and the loot really worth it"). blackreach.json
+  // (tools/blackreach/blackreach_build.py) lists every living actor of the Blackreach world: Nate's 25 in DragonBreak Online
+  // Edits, enabled or not, and the vanilla ones. Each is a permanent zone of its own spot, named in the file
+  // (wild:br<kind>:b<local id>-<plugin>), the leveled pick 'high' as a Master lease's, Nate's ordinary spots countMult deep
+  // (Master's 1.6: a share of them two, by the spot's own id), the vanilla ones vanillaCountMult, a boss always one. A
+  // kill comes back after respawnSeconds (bossRespawnSeconds for a boss), a cooldown NpcSpawnSystem keeps per slot across
+  // a despawn, so groups sharing the area meet the same camp and the camp stays cleared for the next. The ten chests and
+  // the kill credit are blackreach.js's. gamemode-config.json "blackreach": { enabled, radius, despawnSeconds,
+  // respawnSeconds, bossRespawnSeconds, pick, countMult, vanilla, vanillaCountMult, ... }
+  const BR = readJson('blackreach.json', { spots: [] });
+  const BRC = Object.assign({ enabled: true, radius: 3000, despawnSeconds: 240, respawnSeconds: 1200, bossRespawnSeconds: 1800, pick: 'high', countMult: 1.6, vanilla: true, vanillaCountMult: 1 }, cfg.blackreach || {});
+  const brCount = (sp) => {
+    if (sp.boss) return 1;
+    const m = Math.max(1, Math.min(4, Number(sp.nate ? BRC.countMult : BRC.vanillaCountMult) || 1));
+    const frac = parseInt(crypto.createHash('sha1').update(String(sp.src)).digest('hex').slice(0, 8), 16) / 0x100000000;
+    return Math.max(1, Math.min(4, Math.floor(m) + (frac < m % 1 ? 1 : 0)));
+  };
   const ownedZoneName = (sp) => { const [loc, plugin] = String(sp.src).split(':'); return `${PREFIX}${sp.kind}:p${loc}-${String(plugin || '').toLowerCase().replace(/\.es[mpl]$/, '').replace(/[^a-z0-9]/g, '')}`; };
   const LOOT = (readJson('loot.json', { pools: {} }).pools) || {};
   // Nate, 2026-09-29: artifacts are never loot (artifacts.json, as dungeons.js reads it); nor dragon bone and scales
@@ -117,6 +134,15 @@ module.exports = (api) => {
       if (!id) continue;
       out.push(Object.assign({ Name: ownedZoneName(sp), ID: sp.world, POS: sp.pos, Size: C.radius, Anchor: sp.ref, Heading: Number(sp.heading) || 0, NPC: [{ id, count: sp.count || 1 }], Despawn: C.despawnSeconds, Respawn: C.respawnSeconds }, HOSTILE_KINDS.has(sp.kind) ? { Hostile: true } : {}));
     }
+    // Blackreach: every spot hostile (its Falmer, automatons, chaurus, giants and wisps attack on sight), none without its anchor
+    if (BRC.enabled) for (const sp of BR.spots || []) {
+      if (out.length >= C.maxZones) break;
+      if (!sp || !/^wild:br[a-z]+:b[0-9a-f]+-[a-z0-9]+$/.test(String(sp.zone || '')) || !sp.ref || !sp.world || !Array.isArray(sp.pos)) continue;
+      if (!sp.nate && BRC.vanilla === false) continue;
+      const { id } = safePick(sp.options, BRC.pick);
+      if (!id) continue;
+      out.push({ Name: sp.zone, ID: sp.world, POS: sp.pos, Size: BRC.radius, Anchor: sp.ref, Heading: Number(sp.heading) || 0, NPC: [{ id, count: brCount(sp) }], Despawn: BRC.despawnSeconds, Respawn: sp.boss ? BRC.bossRespawnSeconds : BRC.respawnSeconds, Hostile: true });
+    }
     return out;
   };
   const writeZones = () => {
@@ -128,7 +154,7 @@ module.exports = (api) => {
     const kept = list.filter((z) => !String((z && (z.Name || z.name)) || '').startsWith(PREFIX));
     const mine = C.enabled ? buildZones() : [];
     // The zones themselves are in the signature, so a moved spot reaches NPC-Spawns.json on a hot reload
-    const signature = JSON.stringify([C.radius, C.despawnSeconds, C.respawnSeconds, C.pick, SAFE, mine.length, crypto.createHash('sha1').update(JSON.stringify(mine)).digest('hex')]);
+    const signature = JSON.stringify([C.radius, C.despawnSeconds, C.respawnSeconds, C.pick, SAFE, BRC, mine.length, crypto.createHash('sha1').update(JSON.stringify(mine)).digest('hex')]);
     const before = list.filter((z) => String((z && (z.Name || z.name)) || '').startsWith(PREFIX)).length;
     if (before === mine.length && globalThis.__dboWildSig === signature) return mine.length;
     globalThis.__dboWildSig = signature;
@@ -310,5 +336,5 @@ module.exports = (api) => {
   }
 
   const zones = writeZones();
-  log(`wildlife ${C.enabled ? 'on' : 'off'}: ${(DATA.placements || []).length} placements -> ${zones} zones (${(DATA.placements || []).filter((p) => p.noNavmesh).length} skipped, no navmesh), ${(OWNED.spawns || []).length} owned-plugin creature spots, ${campChests.size} camp chests, radius ${C.radius}, despawn ${C.despawnSeconds}s, respawn ${C.respawnSeconds}s${globalThis.__dboWildFactionAudit || ''}`);
+  log(`wildlife ${C.enabled ? 'on' : 'off'}: ${(DATA.placements || []).length} placements -> ${zones} zones (${(DATA.placements || []).filter((p) => p.noNavmesh).length} skipped, no navmesh), ${(OWNED.spawns || []).length} owned-plugin creature spots, ${BRC.enabled ? (BR.spots || []).filter((sp) => sp && (sp.nate || BRC.vanilla !== false)).length : 0} Blackreach spots, ${campChests.size} camp chests, radius ${C.radius}, despawn ${C.despawnSeconds}s, respawn ${C.respawnSeconds}s${globalThis.__dboWildFactionAudit || ''}`);
 };

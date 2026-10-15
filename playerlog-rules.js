@@ -164,7 +164,7 @@ const EVENT_TYPES = {
   'item.harvest': T(2, 'cell', { item: ITEM, k: 'int' }),
   'item.drop': T(1, 'cell', { item: ITEM }),
   'item.trade': T(0, '', { gave: ITEMS, got: ITEMS }),
-  'item.loot': T(1, 'cell', { source: E('player_body', 'animal_body', 'dungeon_body', 'dungeon_chest_gold', 'camp', 'skinning', 'coin_purse', 'wisp', 'reading', 'scholar_gift'), items: ITEMS, gold: 'int', shares: A(O({ p: 'int', c: 'tag', gold: 'int' }), 12) }),
+  'item.loot': T(1, 'cell', { source: E('player_body', 'animal_body', 'dungeon_body', 'dungeon_chest_gold', 'camp', 'skinning', 'coin_purse', 'wisp', 'reading', 'scholar_gift', 'blackreach_chest'), items: ITEMS, gold: 'int', shares: A(O({ p: 'int', c: 'tag', gold: 'int' }), 12) }),
   'item.craft': T(1, '', { product: ITEM, k: 'int', inputs: ITEMS, fuel: ITEMS, station: NAME }),
   'item.brew': T(1, '', { potion: ITEM, tier: 'int', inputs: ITEMS }),
   'item.extras': T(1, '', { kind: E('temper', 'enchant', 'recharge', 'disenchant', 'soul'), item: ITEM, soul: 'int' }),
@@ -406,7 +406,7 @@ clean_(`SCHOOLS MANUAL SKILLBOOK SCHEMATIC READ CONTRACT CHAMPION CHILL REVIVE F
   HUNT RITE SILVER DUNGEON CHESTGOLD MINE CHOP ALCHEMY SMELT TAILOR REGION FORGENEVER ARTIFACT ORCISH FACTIONGEAR DRAGON LOCK
   UNSTUCK JAIL CONCORDAT EXECUTION OFFERING PRAYER REST WELL CAMP PLAYTIME PLAYTEST REROLL TICKET CRASH-DOWN CRASHLOOP
   RUINBUTTON TAX SUPPLY BOOST STAFF APPEARANCE RECIPE BREW TREASURY ENCH-RESTORE ENCH-LEARNED-REPAIR CLOCK SPELL
-  CITIZEN ELECTION`);
+  CITIZEN ELECTION BLACKREACH`);
 // Name #TAG parties with no profile (display()): resolved by name and tag, never by the tag alone
 clean_('LEVEL ROPE STRUGGLE', { display: true });
 // The client-judged minigame mismatches: clean, and a security signal
@@ -1130,6 +1130,7 @@ bank.js BANK 49f63759 parsed
 bank.js BANK b3999936 parsed
 bank.js BANK e33b0e75 parsed
 bank.js BANK f4565b27 parsed
+blackreach.js BLACKREACH 3be01906 clean
 beastform.js BEAST d8772b8c clean
 beastform.js <expr> 403600c0 excluded
 beastform.js GM 20c30028 parsed

@@ -149,6 +149,8 @@ def main():
     ap.add_argument('--out', default='owned-spawns.json')
     ap.add_argument('--dungeons', default=os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'dungeons.json'),
                     help='dungeons.json: placements a dungeon lease spawns are left to dungeons.js')
+    ap.add_argument('--blackreach', default=os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'blackreach.json'),
+                    help='blackreach.json: Blackreach\'s actors are its own zones (wildlife.js), never an owned spawn too')
     a = ap.parse_args()
     replace = {}
     for r in a.replace:
@@ -161,7 +163,12 @@ def main():
         leased = {m.lower() for m in re.findall(r'[0-9a-fA-F]{1,6}:[^"\\]+?\.es[mpl]', open(a.dungeons, encoding='utf-8').read())}
     except OSError:
         print(f'note: {a.dungeons} not readable; no dungeon placements excluded')
-    result = build(lo, leased)
+    blackreach = set()
+    try:
+        blackreach = {sp['src'].lower() for sp in json.load(open(a.blackreach, encoding='utf-8')).get('spots', [])}
+    except (OSError, ValueError, KeyError):
+        print(f'note: {a.blackreach} not readable; no Blackreach placements excluded')
+    result = build(lo, leased, blackreach)
     # Which copies of the owned plugins this was generated from (the gate checks the shipping plugin itself)
     result['sources'] = {lo.proper[p.key]: hashlib.sha256(open(p.srcpath, 'rb').read()).hexdigest()[:16] for p in lo.plugins if p.key in lo.owned}
     with open(a.out, 'w', encoding='utf-8') as f:
@@ -174,7 +181,7 @@ def main():
     return 0
 
 
-def build(lo, leased=frozenset()):
+def build(lo, leased=frozenset(), blackreach=frozenset()):
     # ---- the leveled and template chain, as wildlife.py resolve() --------------------------------------------------
     def npc_info(k):
         s = lo.data(k)
@@ -262,7 +269,7 @@ def build(lo, leased=frozenset()):
         return 'creature'
 
     # ---- the owned plugins' disabled living ACHRs -----------------------------------------------------------------
-    spawns, skipped = [], {'person': [], 'startsDead': [], 'unresolved': [], 'interior': [], 'dungeon': []}
+    spawns, skipped = [], {'person': [], 'startsDead': [], 'unresolved': [], 'interior': [], 'dungeon': [], 'blackreach': []}
     worlds_needed = collections.defaultdict(set)   # world/cell key -> {(gx, gy)}
     for p in lo.plugins:
         if p.key not in lo.owned:
@@ -284,6 +291,9 @@ def build(lo, leased=frozenset()):
             src = lo.desc(k)
             if src.lower() in leased:      # a dungeon lease's placement (dungeons.js spawns it while claimed)
                 skipped['dungeon'].append(src)
+                continue
+            if src.lower() in blackreach:  # Blackreach's own zones (blackreach.json) spawn it
+                skipped['blackreach'].append(src)
                 continue
             if not (wctx and wctx[0]):     # interiors are dungeons, expeditions and homes, each with its own spawner
                 skipped['interior'].append(src)

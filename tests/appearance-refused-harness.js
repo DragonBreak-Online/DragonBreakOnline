@@ -43,9 +43,9 @@ const steps = [];
 let prevCalls = [];
 globalThis.__dboAppearanceHookPrev = (actorId, app, isAllowed) => { prevCalls.push(isAllowed); return true; };
 globalThis.__dboCreatorName = null; globalThis.__dboRerollDone = null;
-const hook = new Function('mp', 'log', 'creationPending', 'moveToHubWhenReady', 'giveStarterKit', 'creatorClosedAt', 'endCreation', 'CREATION_MOVE_MS', 'setTimeout',
+const hook = new Function('mp', 'log', 'creationPending', 'moveToHubWhenReady', 'giveStarterKit', 'creatorClosedAt', 'endCreation', 'CREATION_MOVE_MS', 'setTimeout', 'askCyrodiil', 'setStartChoice',
   `${hookSrc}\nreturn appearanceHook;`)(mp, () => {}, (a) => props.get(`${a}|private.creationPending`) === true || props.get(`${a}|appearance`) == null,
-  (a) => steps.push('hub'), (a) => steps.push('kit'), { set: () => steps.push('closedAt') }, (a) => steps.push('end'), 9000, (fn, ms) => steps.push(`timer ${ms}`));
+  (a) => steps.push('hub'), (a) => steps.push('kit'), { set: () => steps.push('closedAt') }, (a) => steps.push('end'), 9000, (fn, ms) => steps.push(`timer ${ms}`), () => false, () => {});
 
 // 1. Pure echoes say nothing
 reset();

@@ -136,7 +136,9 @@ check('the rules carry the limit in game days', v.rules.limitGameDays === 3, v.r
 check('off in the config: nothing in the coop window', (() => { cfg.couriers.enabled = false; const r = load().view(S); cfg.couriers.enabled = true; CA = load(); return Object.keys(r).length === 0; })());
 cfg.playtest.enabled = false; CA = load();
 check('without the region lock another hold\'s boards are a destination', CA.view(S).courier.destinations.some((d) => d.key === 'board:whiterun'));
-cfg.playtest.enabled = true; CA = load();
+cfg.playtest.enabled = true; cfg.playtest.closedPlugins = ['Druadach.esm']; CA = load();
+check('with Skyrim open (the lock on, listing closedPlugins) another hold\'s boards are a destination too', CA.view(S).courier.destinations.some((d) => d.key === 'board:whiterun'));
+delete cfg.playtest.closedPlugins; CA = load();
 
 // ---- posting ----
 reset();

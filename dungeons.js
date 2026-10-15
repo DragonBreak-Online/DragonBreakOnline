@@ -674,6 +674,16 @@ module.exports = (api) => {
     try { if (typeof globalThis.__dboManualsBossLoot === 'function') addEntry(entries, globalThis.__dboManualsBossLoot(diff.id, province), 1); } catch (e) { log('manual loot failed', e.message); }
     return entries;
   };
+  // Open-world loot (blackreach.js, Blackreach's chests; Nate, 14 Oct: "the loot really worth it"): a chest outside any lease
+  // rolled as a lease's chest of difficulty diffId (a boss chest's roll when boss), from the province's gear and with every
+  // rule of the dungeons' loot (artifacts, dragon materials, BANNED_LOOT, the material tiers and their province rule, the
+  // ingot cap). [{ baseId, count }], or null for an unknown difficulty
+  globalThis.__dboOpenWorldLoot = (diffId, boss, province, dungeonId) => {
+    const diff = DIFFICULTIES.find((x) => x.id === diffId);
+    if (!diff) return null;
+    const ok = lootOk({ province: String(province || ''), id: String(dungeonId || '') });
+    return boss ? bossLoot(diff, ok, false, false, NO_TRIM, String(province || '')) : chestLoot(diff, false, ok, false, false, NO_TRIM);
+  };
   // Urns, sacks, barrels and the like: a little coin or food, now and then a potion or arrows. In an expedition one
   // thing at most (Nate: "mostly empty or a single item")
   const smallLoot = (diff, edid, ok = ALL_OK, k = NO_TRIM) => {

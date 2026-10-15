@@ -833,7 +833,7 @@ const HELP_GROUPS = [
 const HELP_BY_OBJECT = new Set(['bank', 'board', 'business', 'faction', 'deity', 'rite', 'tomes', 'respawn', 'skills',
   'ledger', 'chill', 'sentence', 'hunger', 'rest', 'tokens', 'whoami', 'pigeonblock', 'sign', 'level', 'spells',
   'teach', 'reroll', 'offer', 'contract', 'commission', 'wildlife', 'champions', 'whereami', 'playtest', 'dungeon', 'ping',
-  'expedition', 'expeditions']);
+  'expedition', 'expeditions', 'blackreach']);
 const helpRoleOk = (a, role) => {
   if (!role) return true;
   try {
@@ -1412,25 +1412,59 @@ const handleLine = (a, text, userId, opts) => {
 };
 
 // ---- Realm of Lorkhan hold gates -------------------------------------------------------------
-// The nine RP_LorkhanGate* doors in DragonBreak Hub.esp have no teleport data of their own; activating
-// one drops the player outside the matching hold capital in Tamriel.
-const GATES = {
-  a000: ['Whiterun', [18313, -10665, -4540], 90],
-  a001: ['Riften', [173137, -90912, 11150], 0],
-  a002: ['Solitude', [-74344, 96470, -11460], 0],
-  a003: ['Windhelm', [135039, 33143, -12525], 0],
-  a004: ['Markarth', [-171097, 6922, -3890], 0],
-  a005: ['Falkreath', [-30296, -86284, -3060], 0],
-  a006: ['Morthal', [-38640, 66734, -13200], 0],
-  a007: ['Dawnstar', [30808, 106138, -13870], 0],
-  a008: ['Winterhold', [109208, 102864, -8960], 0],
+// The nine RP_LorkhanGate* doors (DOOR bases a000-a008 of DragonBreak Hub.esp, placed in the Realm as REFRs 174c0-174f4)
+// have no teleport data of their own; activating one drops a finished character outside the matching hold capital in
+// Tamriel. With Skyrim open they are the way into Skyrim (the Cyrodiil or Skyrim question); under the Bruma-only lock
+// playtest.js sends them to the Pale Pass arrival instead.
+// Each gate lands on one of its spots, spread like the creator spots (spotPicker, 105 apart, the first free one), so a
+// group arriving together is not made inside each other. The spots stand on the winning navmesh of the 140-plugin
+// Skyrim release order, clear of every object's bounds at feet, waist and head height, 20 units above the navmesh
+// (~/claude-nate-sky3/tools/skyscan.py, 15 Oct; the city mods JK's, Great Cities, COTN and WindhelmSSE included).
+// Moved (Nate 15 Oct: "yes move them", each to be checked in game): Morthal's old point stood inside COTN_Morthal06's
+// bounds 680 above the ground; Dawnstar's 257 above the navmesh over the shore; Solitude's off the navmesh; Markarth's
+// in the stable doorway's bounds 18 units under JK's hanging brazier. Their first spots are the points suggested in
+// skyrim-check-3.md, at the navmesh + 20. Config gamemode-config "hubGates": { a000: { name, rotZ, spots: [[x, y, z], ...] } }
+// replaces a gate's entry; the defaults below are the same points.
+const GATE_DEFAULTS = {
+  a000: ['Whiterun', [[18313, -10665, -4588.5], [18434.2, -10579.3, -4581.4], [18478.3, -10840.4, -4584.1], [18458.3, -11033.9, -4579.6], [18696.9, -10485.9, -4579.5]], 90],
+  a001: ['Riften', [[173137, -90912, 11073.9], [172927.1, -91073.5, 11117.9], [173078.5, -91204.1, 11128.4], [173536.7, -90898.5, 11070.1]], 0],
+  a002: ['Solitude', [[-74313.4, 96373.3, -11483.6], [-74371.8, 96255.3, -11478.5], [-74458.1, 96454.3, -11473.1], [-74126.7, 96298.4, -11494.7], [-74516.8, 96336.4, -11468.5], [-74385.5, 96144.3, -11478.2]], 0],
+  a003: ['Windhelm', [[135039, 33143, -12547.6], [134893.3, 33064.7, -12546.2], [135082.7, 32978.0, -12546.8], [134954.7, 32943.4, -12546.2], [135080.7, 32843.5, -12545.6], [134999.7, 32670.3, -12543.2]], 0],
+  a004: ['Markarth', [[-171223.0, 6919.6, -3908.4], [-171323.1, 7026.4, -3909.4], [-171284.5, 6747.6, -3909.3], [-171479.8, 6818.8, -3901.8], [-171476.8, 7081.1, -3904.2], [-171340.2, 6634.8, -3915.9]], 0],
+  a005: ['Falkreath', [[-30323.8, -86273.2, -3094.4], [-30358.5, -86152.7, -3097.9], [-30459.9, -86367.7, -3095.7], [-30506.5, -86072.4, -3095.3], [-30022.8, -86039.1, -3088.2], [-30453.6, -86633.9, -3099.4]], 0],
+  a006: ['Morthal', [[-38293.3, 67050.7, -13860.8], [-38165.3, 67114.7, -13881.7], [-38250.7, 67221.3, -13860.5], [-38246.5, 67363.4, -13901.2]], 0],
+  a007: ['Dawnstar', [[30549.8, 106123.5, -14178.9], [30665.4, 106124.6, -14166.7]], 0],
+  a008: ['Winterhold', [[109208, 102864, -8953.7], [109173.5, 102753.7, -8964.6], [109076.6, 102929.1, -8936.0], [109049.9, 102767.9, -8940.5], [109285.4, 102658.2, -8995.5], [109080.1, 102630.9, -8940.6]], 0],
 };
+const validSpot = (q) => Array.isArray(q) && q.length >= 3 && q.every((v) => Number.isFinite(Number(v)));
+// gate id -> [name, spots, rotZ]
+const GATES = (() => {
+  const over = cfg.hubGates && typeof cfg.hubGates === 'object' ? cfg.hubGates : {};
+  const out = {};
+  for (const [id, [name, spots, rotZ]] of Object.entries(GATE_DEFAULTS)) {
+    const o = over[id] && typeof over[id] === 'object' ? over[id] : {};
+    const mine = Array.isArray(o.spots) ? o.spots.filter(validSpot).map((q) => q.slice(0, 3).map(Number)) : [];
+    out[id] = [String(o.name || name), mine.length ? mine : spots, Number.isFinite(Number(o.rotZ)) ? Number(o.rotZ) : rotZ];
+  }
+  return out;
+})();
 const TAMRIEL = (() => { try { return mp.getDescFromId(0x3c); } catch (e) { return '3c:Skyrim.esm'; } })();
 const gateOf = (targetId) => {
   try {
     const m = String(mp.get(targetId, 'baseDesc')).toLowerCase().match(/^0*([0-9a-f]+):dragonbreak hub\.esp$/);
     return m ? GATES[m[1]] || null : null;
   } catch (e) { return null; }
+};
+// One spot picker per gate; holds live on globalThis so a reload keeps the promises already made
+const gateSpotHolds = globalThis.__dboGateSpotHolds instanceof Map ? globalThis.__dboGateSpotHolds : (globalThis.__dboGateSpotHolds = new Map());
+const gatePickers = new Map();
+const gateSpotFor = (g, a) => {
+  if (!gatePickers.has(g[0])) {
+    if (!gateSpotHolds.has(g[0])) gateSpotHolds.set(g[0], new Map());
+    const inTamriel = (p) => { try { return String(mp.get(p, 'worldOrCellDesc') || '').toLowerCase() === String(TAMRIEL).toLowerCase(); } catch (e) { return false; } };
+    gatePickers.set(g[0], spotPicker({ spots: g[1], holds: gateSpotHolds.get(g[0]), spacing: 105, holdMs: 20000, here: inTamriel }));
+  }
+  return gatePickers.get(g[0]).pick(a);
 };
 // Keep the hook installed before the gamemode (housing locks etc.) across hot reloads.
 if (typeof globalThis.__dboPrevActivate === 'undefined') globalThis.__dboPrevActivate = typeof mp.onActivate === 'function' ? mp.onActivate : null;
@@ -1620,17 +1654,24 @@ mp.onActivate = (targetId, casterId) => {
   if (globalThis.__dboLootBody && globalThis.__dboLootBody(targetId >>> 0, casterId >>> 0) === false) return false;
   if (globalThis.__dboSkin && globalThis.__dboSkin(targetId >>> 0, casterId >>> 0) === false) return false;
   if (globalThis.__dboAnimalBody && globalThis.__dboAnimalBody(targetId >>> 0, casterId >>> 0) === false) return false;
+  // Blackreach's ten chests (blackreach.js): a Master boss roll into the pack once its guardians fell to the player
+  if (globalThis.__dboBlackreachChest) { let v = null; try { v = globalThis.__dboBlackreachChest(targetId >>> 0, casterId >>> 0); } catch (e) { log('blackreach chest failed', e.message); v = false; } if (v === false) return false; }
   if (globalThis.__dboCampChest) { const v = globalThis.__dboCampChest(targetId >>> 0, casterId >>> 0); if (v === false) return false; }
   if (blockPlacedPickup(targetId >>> 0, casterId >>> 0)) return false;
   // The last container gate: crouch over the chest, and it opens a moment later (idles.js chestHold, off by default)
   if (globalThis.__dboChestHold) { try { if (globalThis.__dboChestHold(targetId >>> 0, casterId >>> 0) === true) return false; } catch (e) { log('chest hold failed', e.message); } }
   const g = gateOf(targetId >>> 0);
+  // A character still being made goes nowhere (the race menu and the god come first; never a move with RaceMenu open)
+  if (g && creationPending(casterId >>> 0)) return false;
   if (g && globalThis.__dboPlaytestGate && globalThis.__dboPlaytestGate(casterId >>> 0)) return false;
   if (g) {
     try {
+      // Walking through a gate with the Cyrodiil or Skyrim question still up answers it: Skyrim
+      gateAnswersStart(casterId >>> 0);
       try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('travel', casterId, 'gate'); } catch (e) { /* the player log is optional */ }
-      mp.set(casterId, 'locationalData', { cellOrWorldDesc: TAMRIEL, pos: g[1], rot: [0, 0, g[2]] });
+      mp.set(casterId, 'locationalData', { cellOrWorldDesc: TAMRIEL, pos: gateSpotFor(g, casterId >>> 0), rot: [0, 0, g[2]] });
       system(casterId, `You step through the gate to ${g[0]}.`);
+      log(`gate: ${display(casterId)} went through the gate to ${g[0]}`);
     } catch (e) { log('gate teleport failed', e.message); }
     return false;
   }
@@ -2307,12 +2348,140 @@ const sendToArrival = (a) => {
     setTimeout(() => { try { if (globalThis.__dboAppearanceFreeLogin && !creationPending(a) && !inCreatorRealm(a)) globalThis.__dboAppearanceFreeLogin(a); } catch (e) { log('free appearance notice failed', e.message); } }, 15000);
   } catch (e) { log('send to arrival failed', e.message); }
 };
+// ---- where a new character starts: Cyrodiil or Skyrim (Nate, 12 and 14 Oct) --------------------------------------------
+// Nate, 14 Oct: "after race menu and religion it asks you if you want to go to cyrodiil, if you pick cyrodiil pale pass
+// spawn, if you choose skyrim you stay in the hub world room and walk through one of the hold doors."
+// While Skyrim is open beside Bruma (playtest.gatesToArrival false), a character just made is asked after the deity step
+// (and after naming, naming.js). Cyrodiil goes to the Pale Pass arrival (sendToArrival, the spread arrival spots).
+// Skyrim: no move, creation ends in the Realm, and its nine gates (GATES) take them to a hold. Nothing is decided without an
+// answer (Nate 15 Oct: "question comes back"): Close asks again after START_RETRY_MS, no answer re-sends it every
+// START_PROMPT_MS, and a disconnect asks at the next login; nobody is stranded, as the gates work all the while (taking
+// one answers Skyrim). With Skyrim closed nothing is asked.
+// The question is kept on the character (START_KEY): 'asking' from the creator's close until it is answered, then
+// 'cyrodiil' or 'skyrim'. So a crash, a disconnect or a restart mid-question asks again at the next login in the Realm
+// (startLogin), and a character made before this release (no key) is never asked. Staff make characters the same way and
+// get the same question; their /tp works anywhere.
+// Config: gamemode-config "playtest": { askCyrodiil (default true), cyrodiilPrompt: { title, yes, no } }.
+// 86: the PC diff's 84 is citizenship.js's PANEL_ID (tests/widget-ids-harness.js). The handlers are registered below
+// onUi's declaration (startUi), never here: a top-level onUi() call above it throws and the whole gamemode fails to load.
+const START_WIDGET_ID = 86;
+const START_PROMPT_MS = 3 * 60000;
+const START_RETRY_MS = 60000;
+const START_KEY = 'private.dboStartChoice';
+const DEITY_PICKER_ID = 36; // prayer.js PICKER_ID: closed after the question opens (the panel handoff keeps the cursor)
+const startPending = globalThis.__dboStartPending instanceof Map ? globalThis.__dboStartPending : (globalThis.__dboStartPending = new Map());
+const askCyrodiil = () => { const p = cfg.playtest || {}; return !!p.enabled && p.gatesToArrival === false && p.askCyrodiil !== false; };
+const startChoiceOf = (a) => { try { return String(mp.get(a, START_KEY) || ''); } catch (e) { return ''; } };
+const setStartChoice = (a, v) => { try { mp.set(a, START_KEY, v); } catch (e) { log('start choice save failed', e.message); } };
+// Creation ends in the Realm: the same clean-up sendToArrival does, without the move
+// Creation's own state ends (no fade, seen again, the real clock), without a move and without answering
+const settleInRealm = (a) => {
+  const id = a >>> 0;
+  if (!creation.has(id)) return;
+  creation.delete(id);
+  creatorSpotRelease(a);
+  setCreatorHidden(a, false);
+  setFade(a, false);
+  try { if (globalThis.__dboClock) globalThis.__dboClock.sendTo(a); } catch (e) { /* the next broadcast */ }
+};
+// Skyrim chosen: creation ends in the Realm, no move
+const stayInRealm = (a, why) => {
+  startPending.delete(a >>> 0);
+  try { closeWidget(a, START_WIDGET_ID); } catch (e) { /* not open */ }
+  if (startChoiceOf(a) === 'asking') setStartChoice(a, 'skyrim');
+  settleInRealm(a);
+  if (why === 'chose Skyrim') system(a, 'Your story begins in Skyrim. Walk through the gate of the hold you choose; each one opens outside its city.');
+  log(`${display(a)} stays in the Realm to start in Skyrim (${why})`);
+};
+const startQuestion = () => {
+  const t = (cfg.playtest && cfg.playtest.cyrodiilPrompt) || {};
+  return {
+    type: 'contextMenu', id: START_WIDGET_ID, mode: 'menu',
+    targetName: t.title || 'Where does your story begin: Cyrodiil or Skyrim?',
+    actions: [{ id: 'cyrodiil', label: t.yes || 'Cyrodiil: the road into Bruma, by the Pale Pass' }, { id: 'skyrim', label: t.no || 'Skyrim: stay, and walk through the gate of a hold' }],
+    events: { action: 'dbo:startChoose', close: 'dbo:startClose' },
+  };
+};
+// Every way out of creation goes through here: the deity step's answer, its timeout, no deity step, a name given at last,
+// and a login in the Realm with the question still open
+const leaveRealm = (a) => {
+  try {
+    const choice = startChoiceOf(a);
+    if (!askCyrodiil() || (choice !== 'asking' && choice !== 'skyrim')) return sendToArrival(a);
+    if (mp.get(a, 'isOnline') === false || creationPending(a)) return;
+    if (globalThis.__dboNameHold && globalThis.__dboNameHold(a)) { setTimeout(() => leaveRealm(a), 20000); return; }
+    if (!inHub(a)) return leftRealm(a);
+    const id = a >>> 0;
+    // Answered Skyrim before (a relog, or the deity step's own fallback): they stay, and are not asked again
+    if (choice === 'skyrim') { if (creation.has(id)) stayInRealm(a, 'answered before'); return; }
+    if (startPending.has(id)) return;   // the question is up
+    const asked = Date.now();
+    startPending.set(id, asked);
+    settleInRealm(a);
+    openWidget(a, startQuestion(), true);
+    // The god's picker may still be up showing its answer: the question took the focus first, so this close keeps the cursor
+    closeWidget(a, DEITY_PICKER_ID);
+    log(`${display(a)} was asked whether to start in Cyrodiil or Skyrim`);
+    // Unanswered (Nate 15 Oct: "question comes back"): every START_PROMPT_MS while they are online it is sent again (the
+    // same id with focus, never closed in between, so the cursor stays); offline, it waits for the next login
+    const again = () => {
+      if (startPending.get(id) !== asked) return;
+      let online = false; try { online = mp.get(a, 'isOnline') !== false; } catch (e) { online = false; }
+      if (!online || startChoiceOf(a) !== 'asking' || !inHub(a)) { startPending.delete(id); return; }
+      openWidget(a, startQuestion(), true);
+      log(`${display(a)} was asked again (no answer)`);
+      setTimeout(again, START_PROMPT_MS);
+    };
+    setTimeout(again, START_PROMPT_MS);
+  } catch (e) { log('start prompt failed', e.message); sendToArrival(a); }
+};
+const startChoose = (a, args) => {
+  const id = a >>> 0;
+  if (!startPending.has(id)) return;
+  if (String((args && args[0]) || '') === 'cyrodiil') {
+    startPending.delete(id);
+    closeWidget(a, START_WIDGET_ID);
+    setStartChoice(a, 'cyrodiil');
+    log(`${display(a)} chose to start in Cyrodiil`);
+    sendToArrival(a);
+  } else stayInRealm(a, 'chose Skyrim');
+};
+// A logout drops this session's question (its timer then does nothing); the key stays 'asking' for the next login
+globalThis.__dboStartLeave = (a) => { startPending.delete(a >>> 0); };
+// A gate taken with the question up (gamemode's gate hook): Skyrim, without the stay-in-the-Realm line
+const gateAnswersStart = (a) => {
+  const id = a >>> 0;
+  if (!startPending.has(id) && startChoiceOf(a) !== 'asking') return;
+  startPending.delete(id);
+  try { closeWidget(a, START_WIDGET_ID); } catch (e) { /* not open */ }
+  setStartChoice(a, 'skyrim');
+  log(`${display(a)} answered the start question by taking a gate`);
+};
+// Closed without an answer: nothing is decided. The question comes back after START_RETRY_MS, or at the next login; a
+// hold gate meanwhile answers it (Skyrim)
+const startClose = (a) => {
+  const id = a >>> 0;
+  if (!startPending.has(id)) return;
+  startPending.delete(id);
+  closeWidget(a, START_WIDGET_ID);
+  system(a, 'The question will come back in a minute. Or walk through the gate of a hold to begin in Skyrim now.');
+  log(`${display(a)} closed the start question; asked again in ${START_RETRY_MS / 1000} s`);
+  setTimeout(() => { if (startChoiceOf(a) === 'asking' && !startPending.has(id)) leaveRealm(a); }, START_RETRY_MS);
+};
+// A login (the client's 'arrived') in the Realm with the question still open: the god first if none is chosen yet
+// (prayer.js reopens that step itself and its end comes back here), else the question again
+const startLogin = (a) => {
+  if (!askCyrodiil() || startChoiceOf(a) !== 'asking' || creationPending(a) || !inHub(a)) return;
+  startPending.delete(a >>> 0);
+  setTimeout(() => { try { endCreation(a); } catch (e) { log('start question at login failed', e.message); } }, 4000);
+};
 // ---- a name of its own before the world (server\naming.js): /name for a character left as "Prisoner" ----------------
 // The naming.js loader sits below onUi (naming.js registers its panel events with it at load; a const in the TDZ
 // before that line made every load fail at 05:06Z, 2026-09-29)
 function inHubForName(a) { try { return String(mp.get(a, 'worldOrCellDesc') || '').toLowerCase() === String(HUB.cellOrWorldDesc).toLowerCase(); } catch (e) { return false; } }
 // Choosing a god is the last creation step (prayer.js): the picker opens in the hub and the move to the arrival waits
-// for a choice or Not yet. A picker that never answers must not strand anyone in the Realm, whose gates teleport nobody.
+// for a choice or Not yet. A picker that never answers must not strand anyone in the Realm: with the region lock on the
+// gates lead to the arrival, and with Skyrim open (leaveRealm above) the gates lead to the holds.
 const DEITY_STEP_MAX_MS = 5 * 60000;
 const inHub = (a) => { try { return String(mp.get(a, 'worldOrCellDesc') || '').toLowerCase() === String(HUB.cellOrWorldDesc).toLowerCase(); } catch (e) { return false; } };
 globalThis.__dboAtCreationEnd = (a) => inHub(a) && !creationPending(a);
@@ -2374,15 +2543,15 @@ const CREATION_MOVE_MS = 9000;
 const creatorClosedAt = globalThis.__dboCreatorClosedAt instanceof Map ? globalThis.__dboCreatorClosedAt : (globalThis.__dboCreatorClosedAt = new Map());
 globalThis.__dboCreationEndDone = (a) => {
   const wait = Math.max(2500, CREATION_MOVE_MS - (Date.now() - (creatorClosedAt.get(a) || 0)));
-  setTimeout(() => sendToArrival(a), wait);
+  setTimeout(() => leaveRealm(a), wait);
 };
 const endCreation = (a) => {
   let opened = false;
   try { opened = typeof globalThis.__dboDeityCreationOpen === 'function' && inHub(a) && globalThis.__dboDeityCreationOpen(a); }
   catch (e) { log('deity step failed', e.message); }
-  if (!opened) return sendToArrival(a);
+  if (!opened) return leaveRealm(a);
   log(`${display(a)} is choosing a god before leaving the Realm`);
-  setTimeout(() => sendToArrival(a), DEITY_STEP_MAX_MS);
+  setTimeout(() => leaveRealm(a), DEITY_STEP_MAX_MS);
 };
 // The original is stored once so a hot reload re-wraps the same function instead of stacking.
 if (!globalThis.__dboAppearanceHookPrev) {
@@ -2460,16 +2629,21 @@ const appearanceHook = (actorId, appearance, isAllowed) => {
       if (kind && globalThis.__dboCreatorName) globalThis.__dboCreatorName(a, appearance, kind);
     } catch (e) { log('creator name check failed', e.message); }
   }
+  // A character made now (not a reroll or a GM's /chargen): the Cyrodiil or Skyrim question is theirs until answered.
+  // Read before the chain below, where spawn.ts finishes creation and clears creationPending
+  let madeNow = false;
+  try { madeNow = !!isAllowed && creationPending(actorId >>> 0); } catch (e) { madeNow = false; }
   const prev = globalThis.__dboAppearanceHookPrev;
   if (prev) { try { result = prev.call(mp, actorId, appearance, isAllowed) !== false; } catch (e) { log('appearance hook chain failed', e.message); } }
+  if (madeNow && askCyrodiil()) setStartChoice(actorId >>> 0, 'asking');
   if (isAllowed) { try { moveToHubWhenReady(actorId >>> 0, 'creator closed'); } catch (e) { log('hub move schedule failed', e.message); } }
   // An identity reroll (patrons.js) is spent only once the creator closes with the new look
   if (isAllowed) { try { if (globalThis.__dboRerollDone) globalThis.__dboRerollDone(actorId >>> 0); } catch (e) { log('reroll finish failed', e.message); } }
   // The kit at login skips characters still in creation; finishCreation resets the inventory first, so wait past it.
   if (isAllowed) setTimeout(() => { try { giveStarterKit(actorId >>> 0); } catch (e) { log('starter kit after creation failed', e.message); } }, 6000);
-  // Creation ends in the Realm and the gates there are scenery: they carry no XTEL, so they teleport
-  // nobody. playtest.js allows the hub, so nothing evicts a finished character either, and without
-  // this they stay in the Realm for good. Send them to the arrival once the kit has landed and a god is chosen.
+  // Creation ends in the Realm. Its nine gates carry no XTEL; gamemode's gate hook (GATES) moves a finished character
+  // through them. Once the kit has landed and a god is chosen, endCreation asks Cyrodiil or Skyrim (leaveRealm) while Skyrim
+  // is open, or sends them to the arrival as before while only Bruma is.
   if (isAllowed) creatorClosedAt.set(actorId >>> 0, Date.now());
   if (isAllowed) setTimeout(() => endCreation(actorId >>> 0), CREATION_MOVE_MS);
   return result;
@@ -2680,7 +2854,7 @@ globalThis.__dboHandlers.disconnect = (userId) => {
   if (a && globalThis.__dboDungeonLeave) { try { globalThis.__dboDungeonLeave(a); } catch (e) { log('dungeon logout move failed', e.message); } }
   if (a && globalThis.__dboPartyLogout) { try { globalThis.__dboPartyLogout(a); } catch (e) { log('party logout failed', e.message); } }
   // What a UI said it can draw, and a deity offer already made, belong to this session (review C6, PRAY-1)
-  for (const k of ['__dboItemLeave', '__dboBankLeave', '__dboRobLeave', '__dboDeityForget', '__dboPanelLeave', '__dboManualsLeave', '__dboLabourLeave', '__dboPrayerLeave', '__dboSkinLeave', '__dboSchoolsLeave', '__dboKeyRingLeave', '__dboRacialLeave']) { if (a && typeof globalThis[k] === 'function') { try { globalThis[k](a); } catch (e) { log(`${k} failed`, e.message); } } }
+  for (const k of ['__dboItemLeave', '__dboBankLeave', '__dboRobLeave', '__dboDeityForget', '__dboPanelLeave', '__dboManualsLeave', '__dboLabourLeave', '__dboPrayerLeave', '__dboSkinLeave', '__dboSchoolsLeave', '__dboKeyRingLeave', '__dboRacialLeave', '__dboStartLeave']) { if (a && typeof globalThis[k] === 'function') { try { globalThis[k](a); } catch (e) { log(`${k} failed`, e.message); } } }
   connected.delete(userId);
   const wait = globalThis.__dboLoginWaits.get(userId);
   if (wait) { clearInterval(wait); globalThis.__dboLoginWaits.delete(userId); }
@@ -3067,6 +3241,7 @@ registerChatCommand('selftest', (a) => {
     ['labour', typeof globalThis.__dboLabour === 'function' && !globalThis.__dboLabour.failClosed],
     ['dungeons', typeof globalThis.__dboDungeonActivate === 'function'],
     ['wildlife', typeof globalThis.__dboCampChest === 'function'],
+    ['blackreach', typeof globalThis.__dboBlackreachChest === 'function'],
     ['playtest lock', typeof globalThis.__dboPlaytestGate === 'function'],
     ['reading', typeof globalThis.__dboReadBook === 'function'],
     ['skinning', typeof globalThis.__dboSkin === 'function'],
@@ -3137,8 +3312,12 @@ try {
   delete require.cache[NAMING_JS];
   require(NAMING_JS)({ mp, log, personal, audit, who, display, registerChatCommand, onlineActors, every, profileOf, inCreation: (a) => creationPending(a),
     onUi, openWidget, closeWidget, inHub: (a) => inHubForName(a) });
-  globalThis.__dboNamed = (a) => { if (inHubForName(a)) sendToArrival(a); };
+  // Named at last: the same way out of the Realm as the deity step's (the Cyrodiil or Skyrim question while Skyrim is open)
+  globalThis.__dboNamed = (a) => { if (inHubForName(a)) leaveRealm(a); };
 } catch (e) { log('naming.js failed to load:', e.stack || e.message); globalThis.__dboNameHold = null; globalThis.__dboNamed = null; globalThis.__dboNameKey = null; globalThis.__dboNameTaken = null; }
+// The Cyrodiil or Skyrim question's answers (startChoose / startClose above, registered here, below onUi)
+onUi('startChoose', (a, args) => startChoose(a, args));
+onUi('startClose', (a) => startClose(a));
 // ---- the player panel (U) ----------------------------------------------------------------------------------------------
 // The same topics /help lists, as a window: a topic added to HELP_GROUPS reaches both. Each entry is a command with one
 // line of what it does; a few ask for words in a box before they are sent; the rest of a topic is plain lines, because
@@ -3402,7 +3581,7 @@ onUi('mealCancel', (a, args) => endMeal(a, String(args[0] || 'moved').replace(/[
 onUi('arrived', (a, args) => {
   const world = Number(args[0]) >>> 0;
   if (globalThis.__dboSpawnWatch) globalThis.__dboSpawnWatch.arrived(a, world);
-  if (!creationPending(a)) { if (world !== worldIdOf(HUB.cellOrWorldDesc)) leftRealm(a); return; }
+  if (!creationPending(a)) { if (world !== worldIdOf(HUB.cellOrWorldDesc)) leftRealm(a); else startLogin(a); return; }
   const stage = creation.get(a);
   if (world === worldIdOf(HUB.cellOrWorldDesc)) setCreatorHidden(a, true);
   if (world === worldIdOf(HUB.cellOrWorldDesc) && (stage === 'spawning' || stage === 'hub')) {
@@ -5571,6 +5750,7 @@ const deathHook = (actorId, killerId, ...rest) => {
   try { if (globalThis.__dboChampionDeath) globalThis.__dboChampionDeath(Number(actorId) >>> 0, Number(killerId) >>> 0); } catch (e) { log('champion death failed', e.message); }
   try { if (globalThis.__dboSuperDeath) globalThis.__dboSuperDeath(Number(actorId) >>> 0, Number(killerId) >>> 0); } catch (e) { log('supernatural death failed', e.message); }
   try { if (globalThis.__dboContractKill && killerId) globalThis.__dboContractKill(Number(actorId) >>> 0, Number(killerId) >>> 0); } catch (e) { log('contract kill failed', e.message); }
+  try { if (globalThis.__dboBlackreachDeath) globalThis.__dboBlackreachDeath(Number(actorId) >>> 0, Number(killerId) >>> 0); } catch (e) { log('blackreach death failed', e.message); }
   try { if (globalThis.__dboTrimCorpse) globalThis.__dboTrimCorpse(Number(actorId) >>> 0); } catch (e) { log('corpse trim failed', e.message); }
   try { if (globalThis.__dboStatsDeath) globalThis.__dboStatsDeath(Number(actorId) >>> 0, Number(killerId) >>> 0); } catch (e) { log('journal stats death failed', e.message); }
   try { if (globalThis.__dboDogDayDeath) globalThis.__dboDogDayDeath(Number(actorId) >>> 0, Number(killerId) >>> 0); } catch (e) { log('dog day death failed', e.message); }
@@ -5589,6 +5769,7 @@ const hitDamageHook = (aggressorId, targetId, sourceId, damage, ...rest) => {
   // so the tier's share has to be on the target by the time it looks.
   try { dealt += masteryBonusDamage(agg, tgt, dealt); } catch (e) { log('mastery damage failed', e.message); }
   try { if (globalThis.__dboChampionHit) globalThis.__dboChampionHit(agg, tgt, dealt); } catch (e) { log('champion hit failed', e.message); }
+  try { if (globalThis.__dboBlackreachHit && dealt > 0) globalThis.__dboBlackreachHit(agg, tgt); } catch (e) { log('blackreach hit failed', e.message); }
   try { dealt += superBonusDamage(agg, tgt, Number(sourceId) >>> 0, dealt); } catch (e) { log('supernatural damage failed', e.message); }
   try { if (globalThis.__dboSuperHit && dealt > 0) globalThis.__dboSuperHit(agg, tgt); } catch (e) { log('supernatural hit failed', e.message); }
   try { if (globalThis.__dboAggroHit && dealt > 0) globalThis.__dboAggroHit(agg, tgt); } catch (e) { log('aggro hit failed', e.message); }
@@ -6544,6 +6725,8 @@ const dungeonAllies = (a, b) => {
   try {
     if (profileOf(a) >= 0 || profileOf(b) >= 0) return false;
     if (mp.get(a, 'private.dboCompanion') || mp.get(b, 'private.dboCompanion')) return false;
+    // Blackreach's spawns (blackreach.js): one open-world dungeon, whose camps stand side by side
+    if (typeof globalThis.__dboBlackreachAllies === 'function' && globalThis.__dboBlackreachAllies(a, b)) return true;
     const cell = cellKey(a);
     return cell === cellKey(b) && !!globalThis.__dboDungeonCells && globalThis.__dboDungeonCells.has(cell);
   } catch (e) { return false; }
@@ -7045,6 +7228,13 @@ try {
   delete require.cache[WILDLIFE_JS];
   require(WILDLIFE_JS)({ mp, log, personal, system, registerChatCommand, giveItem, profileOf, display, who, audit, onlineActors, isAdmin, cfg, sendPacket });
 } catch (e) { log('wildlife.js failed to load:', e.stack || e.message); }
+
+// ---- Blackreach, the open-world dungeon (server\blackreach.js; its zones are wildlife.js's) -------------------------------
+try {
+  const BLACKREACH_JS = path.resolve('blackreach.js');
+  delete require.cache[BLACKREACH_JS];
+  require(BLACKREACH_JS)({ mp, log, personal, registerChatCommand, giveItem, profileOf, display, who, audit, onlineActors, isAdmin, cfg, sendPacket });
+} catch (e) { log('blackreach.js failed to load:', e.stack || e.message); globalThis.__dboBlackreachChest = null; globalThis.__dboBlackreachHit = null; globalThis.__dboBlackreachDeath = null; globalThis.__dboBlackreachAllies = null; }
 
 // ---- NPCs under the terrain (server\npcground.js, terrain-heights.json copied by hand) ------------
 try {

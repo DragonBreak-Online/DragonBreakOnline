@@ -27,6 +27,7 @@ const PENDING = {};
 // longer registered, fails: the list is kept true.
 const EXCLUDED = {
   bank: 'opened at a bank counter (hint: Your money)',
+  blackreach: 'a status line for those in Blackreach; its chests tell the rest when used (blackreach.js, Skyrim release)',
   board: 'opened at a notice board (hints: work for pay, pigeons)',
   business: 'opened from its ledger book (hint: Your business)',
   faction: 'F3, the Faction tab (hint)',

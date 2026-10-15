@@ -1,5 +1,20 @@
 # DragonBreak Online checklist (2026-09-14)
 
+## Added 2026-10-15: Blackreach, the open-world dungeon (Skyrim release check 5) - NOT DEPLOYED, waits on Nate
+
+Nate, 14 Oct: "super hard and the loot really worth it". Branch `skyrim-blackreach-1015` (on skyrim-hub-1015).
+- `tools/blackreach/blackreach_build.py` reads the load order and Nate's census (`blackreach-placements.json`, PC) and
+  writes `blackreach.json`: 75 spots (Nate's 25 in the DLE, enabled or not, and 50 vanilla in the Blackreach world; the
+  Zcells stay the BlackreachLocation lease), 10 chests. Rerun it after any DLE change that touches Blackreach.
+- `wildlife.js` spawns them as permanent `wild:br<kind>:b<id>-<plugin>` zones (pick high, Nate's ordinary spots x1.6,
+  respawn 20 min, bosses 30 min); `blackreach.js` owns the chests (Master boss roll per account per 20 h, only after the
+  guards fell to the player or their party, the boss when there is one), the kill credit and "Blackreach's enemies never
+  hurt each other". Config `gamemode-config.json` "blackreach"; `npcDamage.takenByKind` br* 0.75 (proposal).
+- `dungeons.exclude` now names DLC1BthalftAetheriumForgeLocation: the Aetherium Forge stays closed.
+- [ ] Nate: confirm the vanilla spots, the 0.75 toughness, the loot under the steel cap, the Falmer thralls.
+- [ ] In game: a group at the Silent City (spawn, fight, chest refusal then roll), a watcher beside a second group.
+- `tests/blackreach-harness.js` checks every rule.
+
 ## Added 2026-09-30: placing creatures in our plugins - PC session: set Initially Disabled
 
 Nate: "those living actors should be used as spawns for their respective npc" (creatures only).
