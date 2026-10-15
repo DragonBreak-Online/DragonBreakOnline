@@ -7,6 +7,7 @@ const players           = require('../sources/players')
 const serverAccess      = require('../sources/serverAccess')
 const factions          = require('../sources/factionWhitelist')
 const bans              = require('../sources/bans')
+const deviceChecks      = require('../sources/deviceChecks')
 
 const router = Router()
 
@@ -43,6 +44,22 @@ router.put('/:profileId/whitelist', requirePermission('players.manage'), async (
 
 router.put('/:profileId/ban', requirePermission('players.manage'), async (req, res) => {
   await mutateAccess(req, res, 'ban')
+})
+
+// Staff: this player is not an alt of that ban (the report-only device check stops flagging the pair), or take the mark back
+router.put('/:profileId/not-alt', requirePermission('players.manage'), async (req, res) => {
+  try {
+    const discordId = requireDiscordId(req.params.profileId)
+    const { banRef, notAlt } = req.body || {}
+    if (typeof banRef !== 'string' || !deviceChecks.BAN_REF_RE.test(banRef) || typeof notAlt !== 'boolean') {
+      return res.status(400).json({ error: 'banRef (B-XXXXXX) and notAlt (true or false) are required' })
+    }
+    const result = deviceChecks.setNotAlt(discordId, banRef, notAlt, (req.session && req.session.username) || 'a staff member')
+    if (!result.ok) return res.status(result.error === 'invalidBanRef' || result.error === 'noSuchLink' ? 400 : 503).json({ error: result.error })
+    res.json({ ok: true, changed: result.changed, player: await enrichPlayer(players.getByProfileId(req.params.profileId)) })
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message || 'failed to update the device check' })
+  }
 })
 
 router.post('/:profileId/factions', requirePermission('factions.manage'), (req, res) => {
@@ -84,11 +101,11 @@ async function mutateAccess(req, res, type) {
     if (type === 'whitelist') {
       result = await serverAccess.setWhitelisted(discordId, enabled)
     } else {
-      // bans.json snapshot is the source of truth; capture hwid/ip so alts can be matched
+      // bans.json snapshot is the source of truth; a public ip is kept when it is safe to match (sources/bans.js)
       const record = players.load()[discordId] || {}
       const actor = (req.session && (req.session.username || req.session.discordId)) || null
       if (enabled) {
-        const entry = bans.add({ discordId, hwid: record.hwid || null, ip: record.lastIp || null, reason: 'dashboard ban', bannedBy: actor })
+        const entry = bans.add({ discordId, ip: record.lastIp || null, reason: 'dashboard ban', bannedBy: actor })
         bans.logBan(`banned: discordId=${discordId} hwid=${entry.hwid || 'none'} ip=${entry.ip || 'none'} by=${actor || 'unknown'}`)
       } else {
         bans.removeByDiscordId(discordId)
@@ -135,9 +152,18 @@ async function enrichPlayer(player) {
   } catch (err) {
     access = { allowed: false, error: 'accessUnavailable', roles: [] }
   }
-  // Ban snapshot (bans.json) matched on any stored identifier; hwid/lastIp ride along in ...player
-  const ban = bans.isBanned({ discordId: player.discordId, hwid: player.hwid, ip: player.lastIp })
-  return { ...player, access, ban: ban ? { reason: ban.reason, bannedAt: ban.bannedAt, bannedBy: ban.bannedBy } : null }
+  // Ban snapshot (bans.json) matched on the Discord id or a usable ip; the hwid and last ip themselves are never sent
+  const ban = bans.isBanned({ discordId: player.discordId, ip: player.lastIp })
+  let device = { links: [] }
+  try { device = deviceChecks.statusFor(player.discordId, player) }
+  catch (err) { console.error('[players] device check unavailable:', err.message) }
+  const { hwid, lastIp, ...shown } = player
+  return {
+    ...shown,
+    access,
+    ban: ban ? { ref: ban.ref || null, reason: ban.reason, bannedAt: ban.bannedAt, bannedBy: ban.bannedBy } : null,
+    device,
+  }
 }
 
 module.exports = router

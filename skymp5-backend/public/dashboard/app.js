@@ -52,6 +52,7 @@ const nodes = {
   playerNotesInput: el('playerNotesInput'),
   whitelistPlayerButton: el('whitelistPlayerButton'),
   banPlayerButton: el('banPlayerButton'),
+  playerDeviceLinks: el('playerDeviceLinks'),
   playerAssignmentsTable: el('playerAssignmentsTable'),
   playerFactionForm: el('playerFactionForm'),
   playerRequirementSelect: el('playerRequirementSelect'),
@@ -216,6 +217,7 @@ function selectedPlayer() {
   return state.players.find(player => player.profileId === state.selectedProfileId) || null
 }
 
+// A ban ref finds the banned account and every account the device check links to it
 function filteredPlayers() {
   const q = String(nodes.playerSearchInput.value || '').trim().toLowerCase()
   if (!q) return state.players
@@ -223,8 +225,16 @@ function filteredPlayers() {
     String(player.profileId).includes(q) ||
     String(player.discordId || '').toLowerCase().includes(q) ||
     String(player.username || '').toLowerCase().includes(q) ||
-    String(player.displayName || '').toLowerCase().includes(q)
+    String(player.displayName || '').toLowerCase().includes(q) ||
+    String(player.ban?.ref || '').toLowerCase().includes(q) ||
+    (player.device?.links || []).some(link => String(link.banRef).toLowerCase().includes(q))
   )
+}
+
+function deviceText(player) {
+  const links = player.device?.links || []
+  if (!links.length) return '-'
+  return links.map(link => (link.notAlt ? `not an alt (${link.banRef})` : `linked to ban ${link.banRef}`)).join(', ')
 }
 
 function renderPlayers() {
@@ -238,7 +248,7 @@ function renderPlayers() {
           <th>Name</th>
           <th>Discord ID</th>
           <th>Access</th>
-          <th>HWID</th>
+          <th>Device</th>
           <th>Factions</th>
           <th></th>
         </tr>
@@ -249,8 +259,8 @@ function renderPlayers() {
             <td>#${player.profileId}</td>
             <td>${escapeHtml(player.displayName || player.username || 'Unnamed')}</td>
             <td>${escapeHtml(player.discordId)}</td>
-            <td><span class="tag ${player.access?.allowed ? '' : 'locked'}">${escapeHtml(player.access?.allowed ? 'allowed' : (player.access?.error || 'blocked'))}</span>${player.ban ? ' <span class="tag locked">banned</span>' : ''}</td>
-            <td>${escapeHtml(player.hwid ? player.hwid.slice(0, 12) : '-')}</td>
+            <td><span class="tag ${player.access?.allowed ? '' : 'locked'}">${escapeHtml(player.access?.allowed ? 'allowed' : (player.access?.error || 'blocked'))}</span>${player.ban ? ` <span class="tag locked">banned${player.ban.ref ? ` ${escapeHtml(player.ban.ref)}` : ''}</span>` : ''}</td>
+            <td>${escapeHtml(deviceText(player))}</td>
             <td>${escapeHtml((player.assignments || []).map(a => a.requirement ? `${a.requirement.group} ${a.requirement.rank}` : a.requirementId).join(', '))}</td>
             <td><button class="ghost mini" data-select-player="${player.profileId}" type="button">Open</button></td>
           </tr>
@@ -277,6 +287,7 @@ function renderPlayerDetail() {
   nodes.banPlayerButton.textContent = playerIsBanned(player)
     ? 'Remove Ban'
     : 'Add Ban'
+  nodes.playerDeviceLinks.innerHTML = player ? renderPlayerDeviceLinks(player) : ''
   nodes.playerAssignmentsTable.innerHTML = player
     ? renderPlayerAssignments(player)
     : '<div class="empty-row">Save the player before assigning factions.</div>'
@@ -284,6 +295,36 @@ function renderPlayerDetail() {
     .map(req => `<option value="${escapeHtml(req.id)}">${escapeHtml(req.group)} - ${escapeHtml(req.rank)}</option>`)
     .join('')
   nodes.playerFactionForm.querySelector('button[type="submit"]').disabled = !player
+}
+
+// Report-only device check: a PC this player shares with a banned account, as its ban ref; a lead, not proof
+function renderPlayerDeviceLinks(player) {
+  const links = player.device?.links || []
+  if (!links.length) return '<div class="empty-row">No PC shared with a banned account.</div>'
+  return `
+    <table>
+      <thead>
+        <tr>
+          <th>Linked ban</th>
+          <th>Shared PC</th>
+          <th>Login</th>
+          <th>First seen</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        ${links.map(link => `
+          <tr>
+            <td>${escapeHtml(link.banRef)}${link.notAlt ? ' <span class="tag">not an alt</span>' : ''}</td>
+            <td>${escapeHtml(link.sharedAccounts >= 2 ? `yes, ${link.sharedAccounts} other accounts` : link.sharedAccounts === 1 ? '1 other account' : 'no')}</td>
+            <td>${escapeHtml(link.bound ? 'PC-bound' : 'older launcher')}</td>
+            <td>${escapeHtml(link.createdVsBanDays === null ? '-' : link.createdVsBanDays >= 0 ? `${link.createdVsBanDays} d after the ban` : `${-link.createdVsBanDays} d before the ban`)}</td>
+            <td><button class="${link.notAlt ? 'ghost' : 'danger'} mini" data-not-alt="${escapeHtml(link.banRef)}" data-not-alt-value="${link.notAlt ? 'false' : 'true'}" type="button">${link.notAlt ? 'Undo' : 'Not an alt'}</button></td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  `
 }
 
 function renderPlayerAssignments(player) {
@@ -723,6 +764,21 @@ function bindEvents() {
         .then(renderFactions)
         .then(refreshPlayers)
         .then(() => toast('Assignment removed'))
+        .catch(err => toast(err.message))
+      return
+    }
+
+    const notAlt = event.target.closest('[data-not-alt]')
+    if (notAlt) {
+      const player = selectedPlayer()
+      if (!player) return
+      const marked = notAlt.dataset.notAltValue === 'true'
+      api(`/api/players/${player.profileId}/not-alt`, {
+        method: 'PUT',
+        body: JSON.stringify({ banRef: notAlt.dataset.notAlt, notAlt: marked }),
+      })
+        .then(refreshPlayers)
+        .then(() => toast(marked ? 'Marked not an alt' : 'Not-an-alt mark removed'))
         .catch(err => toast(err.message))
       return
     }

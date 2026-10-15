@@ -38,7 +38,7 @@ client.on('error', err => {
   console.error('[discord-bot] error:', err.message)
 })
 
-// A real Discord guild ban snapshots the player's hwid/ip into bans.json; the staff audit channel gets who and why either way
+// A real Discord guild ban snapshots the player into bans.json under a ban ref; the staff audit channel gets who and why either way
 client.on('guildBanAdd', ban => {
   let listNote = 'added to the game ban list'
   try {
@@ -47,11 +47,11 @@ client.on('guildBanAdd', ban => {
     const record = players.load()[discordId] || {}
     const entry = bans.add({
       discordId,
-      hwid: record.hwid || null,
       ip: record.lastIp || null,
       reason: 'discord ban',
       bannedBy: 'discord',
     })
+    if (entry.ref) listNote = `added to the game ban list as ${entry.ref}`
     bans.logBan(`discord ban: discordId=${discordId} username=${ban.user.username || 'unknown'} hwid=${entry.hwid || 'none'} ip=${entry.ip || 'none'}`)
     console.log(`[discord-bot] recorded guild ban for ${discordId}`)
   } catch (err) {

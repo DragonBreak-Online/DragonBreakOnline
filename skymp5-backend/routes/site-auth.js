@@ -423,4 +423,4 @@ router.post('/logout', (req, res) => {
 
 module.exports = router
 // Shared with the staff dashboard routes so they read sessions and characters and check the Origin the same way
-module.exports.internals = { currentSession, sessionToken, readStore, toSiteCharacter, profileIdOf, dynamicFields, ownedBy, sameOrigin, oauthStates }
+module.exports.internals = { currentSession, sessionToken, readStore, toSiteCharacter, profileIdOf, dynamicFields, ownedBy, characterName, sameOrigin, oauthStates }

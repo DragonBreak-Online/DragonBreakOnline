@@ -17,8 +17,9 @@ stub(path.join(ROOT, 'config.js'), { discordGuildId: GUILD, discordBotToken: '',
 const onList = new Set()
 const banList = []
 let listBroken = false
+let giveRef = null
 stub(path.join(ROOT, 'sources/bans.js'), {
-  add: entry => { if (listBroken) throw new Error('EACCES'); onList.add(entry.discordId); banList.push(entry); return { ...entry } },
+  add: entry => { if (listBroken) throw new Error('EACCES'); onList.add(entry.discordId); banList.push(entry); return { ...entry, ...(giveRef ? { ref: giveRef } : {}) } },
   logBan: () => {},
   removeByDiscordId: id => onList.delete(id),
 })
@@ -160,4 +161,15 @@ test('a ban on another guild is not ours', async () => {
   handlers.guildBanRemove(ban(ZED, 'zed_user', { ...guild, id: '1' }))
   await settle()
   assert.deepEqual(lines, [])
+})
+
+test('the BAN line names the game ban list entry by its ban ref, and no hwid is handed to the ban list', async () => {
+  reset()
+  giveRef = 'B-7KQ2MX'
+  entries = [entry(22)]
+  handlers.guildBanAdd(ban())
+  await settle()
+  giveRef = null
+  assert.deepEqual(lines, ['BAN zed_user (profile 209: #RC9H, #K7QM) banned on Discord by rowan_staff; added to the game ban list as B-7KQ2MX; reason: threats in chat'])
+  assert.equal('hwid' in banList.at(-1), false)
 })
