@@ -1,12 +1,46 @@
-// Werewolf (Skyrim 0CDD84) and Vampire Lord (Dawnguard 00283A). Their behaviour graphs are not the humanoid master
+// Werewolf (Skyrim 0CDD84), Vampire Lord (Dawnguard 00283A) and PLUGIN_BEAST_RACES. Their behaviour graphs are not the humanoid master
 // graph, which matters twice: a copy's first moments after a race swap (formView), and the caster animation variables
 // a relayed spell carries (remoteServer). SkyrimPlatform's ApplyVariablesToActor writes those at the humanoid master
 // graph's fixed indexes (AnimVariableMasterGraphIndexes::CreateDefault, up to 291) with no graph or bounds check, and a
 // werewolf's howls crashed three watchers within seconds of their relayed stops (2026-09-30). No imports, so a harness
 // can load it on its own (tests/beastguard-harness.js).
-export const BEAST_RACE_IDS = new Set([0x000cdd84, 0x0200283a]);
+export const WEREWOLF_RACE_ID = 0x000cdd84;
+export const BEAST_RACE_IDS = new Set([WEREWOLF_RACE_ID, 0x0200283a]);
 
-export const isBeastRaceId = (raceId: number | undefined | null): boolean => BEAST_RACE_IDS.has(Number(raceId) >>> 0);
+// Plugin races that are a vanilla beast race in another body, found by plugin name at runtime: [plugin, local id, editor id, vanilla race]
+export const PLUGIN_BEAST_RACES: ReadonlyArray<readonly [string, number, string, number]> = [
+  // The Werewolf Behemoth (1.3x): its own skeleton on the werewolf's behaviour graph WerewolfBeastProject.hkx
+  ["DragonBreak Online Edits.esp", 0x1d1f9e, "DBO_WerewolfBehemothRace", WEREWOLF_RACE_ID],
+];
+
+const pluginBeastRaces = new Map<number, number>(); // runtime id -> the vanilla beast race it plays
+let pluginBeastResolver: (() => void) | null = null;
+
+// beastRaces.ts hands in the runtime lookup; every check runs it until it clears itself
+export const setPluginBeastResolver = (resolver: (() => void) | null): void => {
+  pluginBeastResolver = resolver;
+};
+
+// lookup gives a plugin race's runtime form id, or 0 or a throw when the plugin or the record is missing; one line per race
+export const resolvePluginBeastRaces = (lookup: (file: string, localId: number) => number): string[] => {
+  pluginBeastRaces.clear();
+  return PLUGIN_BEAST_RACES.map(([file, localId, editorId, vanilla]) => {
+    let id = 0;
+    try { id = Number(lookup(file, localId)) >>> 0; } catch { id = 0; }
+    if (id && !BEAST_RACE_IDS.has(id)) pluginBeastRaces.set(id, vanilla);
+    return `${editorId} ${id ? id.toString(16) : "missing"}`;
+  });
+};
+
+// The vanilla beast race this race is or plays, else 0
+export const vanillaBeastRaceOf = (raceId: number | undefined | null): number => {
+  const id = Number(raceId) >>> 0;
+  if (!id || BEAST_RACE_IDS.has(id)) return id;
+  if (pluginBeastResolver) pluginBeastResolver();
+  return pluginBeastRaces.get(id) || 0;
+};
+
+export const isBeastRaceId = (raceId: number | undefined | null): boolean => vanillaBeastRaceOf(raceId) !== 0;
 
 // Every other race whose behaviour graph is not the humanoid master graph (sync/nonHumanoidRaceList.ts), resolved at
 // runtime by beastRaces.ts. An Ayleid Pelinaga's copy (draugr graph) crashed a watcher 2 s after its relayed stop (1 Oct).
