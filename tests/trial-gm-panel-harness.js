@@ -96,7 +96,9 @@ const result = (out) => (out.find((x) => x.p.customPacketType === 'adminActionRe
     out = packet(1, 'adminAction', { action: 'toggleMode', mode });
     if (!result(out) || result(out).ok !== false) leaked.push(mode);
   }
-  ok('every mode but Invisible and Ghost is refused', leaked.length === 0 && Object.keys(props.get(`${TRIAL}|ff_adminModes`)).filter((k) => props.get(`${TRIAL}|ff_adminModes`)[k]).join() === 'invis', leaked);
+  ok('every mode but Invisible and Ghost is refused', leaked.length === 0 && Object.keys(props.get(`${TRIAL}|ff_adminModes`)).filter((k) => k !== 'rank' && props.get(`${TRIAL}|ff_adminModes`)[k]).join() === 'invis', leaked);
+  // Staff rank in the mirror (fork staff-invis-ranks, Nate 14 Oct): a Trial GM is 1, hidden by Invisible from no staff below; a fork without ranks writes none
+  ok('...and the mirror carries the Trial GM\'s rank (1) when the fork has ranks', [undefined, 1].includes(props.get(`${TRIAL}|ff_adminModes`).rank), props.get(`${TRIAL}|ff_adminModes`));
   for (const type of ['adminItemsRequest', 'npcZonesRequest', 'adminMasteryRequest']) {
     out = packet(1, type, { targetName: 'Mira' });
     if (out.length) leaked.push([type, out]);
