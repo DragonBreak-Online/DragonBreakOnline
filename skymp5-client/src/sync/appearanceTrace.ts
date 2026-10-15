@@ -65,18 +65,22 @@ export const lookMismatches = (sent: SentLook, got: ReadLook): string[] => {
   return out.slice(0, MAX_MISMATCHES).concat([`+${out.length - MAX_MISMATCHES}`]);
 };
 
-// "own <event> r=<race> s=<sex> hp=<sent>/<on base> p=<presets> o=<options> mm=<mismatches or ->"
-export const lookTraceLine = (event: string, sent: SentLook, got: ReadLook): string => {
+// " ar=<actor race>" when the actor's live race (Actor.getRace, what the face gate compares) is not its base's, else ""
+export const actorRaceNote = (actorRace: number | undefined, got: ReadLook): string =>
+  actorRace === undefined || (actorRace >>> 0) === (got.raceId >>> 0) ? "" : ` ar=${hex(actorRace)}`;
+
+// "own <event> r=<race>[ ar=<actor race>] s=<sex> hp=<sent>/<on base> p=<presets> o=<options> mm=<mismatches or ->"
+export const lookTraceLine = (event: string, sent: SentLook, got: ReadLook, actorRace?: number): string => {
   const presets = Array.isArray(sent.presets) ? sent.presets.slice(0, MAX_PRESETS) : [];
   const options = Array.isArray(sent.options) ? sent.options.slice(0, MAX_OPTIONS) : [];
   const parts = Array.isArray(sent.headpartIds) ? sent.headpartIds.length : 0;
   const mm = lookMismatches(sent, got);
-  return `own ${event} r=${hex(sent.raceId)} s=${sent.isFemale ? 1 : 0} hp=${parts}/${num(got.parts)} p=${presets.map(num).join(",")}`
+  return `own ${event} r=${hex(sent.raceId)}${actorRaceNote(actorRace, got)} s=${sent.isFemale ? 1 : 0} hp=${parts}/${num(got.parts)} p=${presets.map(num).join(",")}`
     + ` o=${options.map(num).join(",")} mm=${mm.length ? mm.join(",") : "-"}`;
 };
 
-// A later read-back against the same look: only the result ("ok" or the mismatches)
-export const lookRecheckLine = (event: string, sent: SentLook, got: ReadLook): string => {
+// A later read-back against the same look: only the result ("ok" or the mismatches), and the actor's race when not the base's
+export const lookRecheckLine = (event: string, sent: SentLook, got: ReadLook, actorRace?: number): string => {
   const mm = lookMismatches(sent, got);
-  return `own ${event} hp=${num(got.parts)} mm=${mm.length ? mm.join(",") : "-"}`;
+  return `own ${event}${actorRaceNote(actorRace, got)} hp=${num(got.parts)} mm=${mm.length ? mm.join(",") : "-"}`;
 };
