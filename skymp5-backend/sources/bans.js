@@ -7,6 +7,7 @@ const crypto = require('crypto')
 const fs     = require('fs')
 const net    = require('net')
 const path   = require('path')
+const { replaceFile } = require('./storeFile')
 
 const FILE    = path.join(__dirname, '..', 'data', 'bans.json')
 // The player store beside this one; path.dirname so a test that moves bans.json moves this too
@@ -43,9 +44,12 @@ function giveRefs(data) {
     givenRefs.set(key, e.ref)
     taken.add(e.ref)
   }
-  try { save(data) } catch (err) {
-    if (!refSaveFailed) console.error('[bans] could not save the new ban references:', err.message)
-    refSaveFailed = true
+  // One try per process: every lookup reads the file, and givenRefs keeps the refs stable without the save
+  if (!refSaveFailed) {
+    try { save(data) } catch (err) {
+      console.error('[bans] could not save the new ban references:', err.message)
+      refSaveFailed = true
+    }
   }
   return data
 }
@@ -56,8 +60,9 @@ function load() {
   return Array.isArray(data) ? giveRefs(data) : []
 }
 
+// Atomic and on disk when it returns (storeFile.replaceFile): a full disk or a crash leaves the old list, never a cut one
 function save(data) {
-  fs.writeFileSync(FILE, JSON.stringify(data, null, 2) + '\n')
+  replaceFile(FILE, JSON.stringify(data, null, 2) + '\n', { mode: 0o600, durable: true })
 }
 
 // Every player reaches the game server through the host's port forward, so the address the server reports for all of

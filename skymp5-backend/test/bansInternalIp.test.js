@@ -7,11 +7,11 @@ const fs = require('fs')
 const os = require('os')
 const path = require('path')
 
-// A private copy of bans.js beside its own data folder, so the real data/bans.json is never touched
+// A private copy of bans.js (and the storeFile helper it saves with) beside its own data folder, so the real data/bans.json is never touched
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'bans-test-'))
 fs.mkdirSync(path.join(root, 'sources'))
 fs.mkdirSync(path.join(root, 'data'))
-fs.copyFileSync(path.join(__dirname, '..', 'sources', 'bans.js'), path.join(root, 'sources', 'bans.js'))
+for (const f of ['bans.js', 'storeFile.js']) fs.copyFileSync(path.join(__dirname, '..', 'sources', f), path.join(root, 'sources', f))
 process.env.BAN_LOG_DIR = path.join(root, 'logs')
 const bans = require(path.join(root, 'sources', 'bans.js'))
 

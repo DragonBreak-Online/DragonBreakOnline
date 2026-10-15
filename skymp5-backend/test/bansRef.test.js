@@ -1,17 +1,17 @@
 'use strict'
 
 // Every ban has a reference staff can search and quote, and no raw hardware id is kept or matched (security audit L3-01)
-const { test } = require('node:test')
+const { test, mock } = require('node:test')
 const assert = require('node:assert/strict')
 const fs = require('fs')
 const os = require('os')
 const path = require('path')
 
-// A private copy of bans.js beside its own data folder, so the real data/bans.json is never touched
+// A private copy of bans.js (and the storeFile helper it saves with) beside its own data folder, so the real data/bans.json is never touched
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'bans-ref-test-'))
 fs.mkdirSync(path.join(root, 'sources'))
 fs.mkdirSync(path.join(root, 'data'))
-fs.copyFileSync(path.join(__dirname, '..', 'sources', 'bans.js'), path.join(root, 'sources', 'bans.js'))
+for (const f of ['bans.js', 'storeFile.js']) fs.copyFileSync(path.join(__dirname, '..', 'sources', f), path.join(root, 'sources', f))
 process.env.BAN_LOG_DIR = path.join(root, 'logs')
 const bans = require(path.join(root, 'sources', 'bans.js'))
 const BANS = path.join(root, 'data', 'bans.json')
@@ -70,6 +70,42 @@ test('a hardware id never matches a ban, not even one an old entry holds', () =>
   assert.equal(bans.isBanned({ discordId: '555', hwid: 'FAKE-MACHINE-GUID' }), null)
   assert.equal(bans.isBanned({ hwid: 'FAKE-MACHINE-GUID' }), null)
   assert.equal(bans.isBanned({ discordId: '444', hwid: 'other' }).discordId, '444', 'the Discord id still matches')
+})
+
+test('a ban list saved on a full disk is left as it was, never cut short', () => {
+  fs.rmSync(BANS, { force: true })
+  bans.add({ discordId: '666', reason: 'kept' })
+  const before = fs.readFileSync(BANS, 'utf8')
+  const real = fs.writeFileSync
+  // The disk fills after the file was opened for writing: what was opened is now empty, then the write fails
+  mock.method(fs, 'writeFileSync', (target, ...rest) => {
+    real.call(fs, target, '')
+    throw Object.assign(new Error('ENOSPC: no space left on device'), { code: 'ENOSPC' })
+  })
+  try { assert.throws(() => bans.add({ discordId: '667', reason: 'lost' }), /ENOSPC/) } finally { mock.restoreAll() }
+  assert.equal(fs.readFileSync(BANS, 'utf8'), before)
+  assert.deepEqual(fs.readdirSync(path.dirname(BANS)).filter(n => n.endsWith('.tmp')), [], 'no temp file is left behind')
+  assert.equal(fs.statSync(BANS).mode & 0o777, 0o600)
+})
+
+// Last in this file: after a failed save this process never tries to back-fill references again
+test('when the new references cannot be saved, 50 lookups try to save once and keep the same references', () => {
+  fs.writeFileSync(BANS, JSON.stringify([{ discordId: '777', hwid: null, ip: null, reason: 'old', bannedAt: '2026-10-14T23:50:53.000Z' }]))
+  const before = fs.readFileSync(BANS, 'utf8')
+  let attempts = 0
+  mock.method(fs, 'writeFileSync', () => {
+    attempts++
+    throw Object.assign(new Error('ENOSPC: no space left on device'), { code: 'ENOSPC' })
+  })
+  mock.method(console, 'error', () => {})
+  const refs = new Set()
+  try {
+    for (let i = 0; i < 50; i++) refs.add(bans.isBanned({ discordId: '777' }).ref)
+  } finally { mock.restoreAll() }
+  assert.equal(attempts, 1)
+  assert.equal(refs.size, 1)
+  assert.match([...refs][0], REF)
+  assert.equal(fs.readFileSync(BANS, 'utf8'), before, 'the list on disk is untouched')
 })
 
 test.after(() => fs.rmSync(root, { recursive: true, force: true }))
