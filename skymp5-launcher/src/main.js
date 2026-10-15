@@ -37,6 +37,7 @@ const downloadLib = require('./download')
 const selfUpdate = require('./selfUpdate')
 const nxmLinks = require('./nxm')
 const legalLib = require('./legal')
+const discordLogin = require('./discordLogin')
 const installProgress = require('./renderer/installProgress')
 const installGate  = installProgress.createGate()
 const installTrack = installProgress.createTracker()
@@ -1032,7 +1033,40 @@ ipcMain.handle('discord:logout', () => {
   return { success: true }
 })
 
+// Stores a login result (token = play session, masterApiId = the stable numeric profileId) the way every flow returns it
+function finishDiscordLogin({ token, masterApiId, discordUsername, discordAvatar }) {
+  const discordUser = {
+    username: discordUsername || `Player ${masterApiId}`,
+    tag:      discordUsername || `Player ${masterApiId}`,
+    avatar:   discordAvatar   || null,
+  }
+
+  store.set('discordUser',   discordUser)
+  store.set('gameProfileId', masterApiId)
+  store.set('gameSession',   token)
+  log(`[discord] logged in as ${discordUser.username} (profileId ${masterApiId})`)
+
+  reportHwid(token) // not awaited: login must not block on the ban-system hwid
+
+  return { success: true, user: discordUser }
+}
+
 ipcMain.handle('discord:login', async () => {
+  try {
+    return finishDiscordLogin(await discordLogin.loopbackLogin({ apiUrl: config.apiUrl, postJSON, openUrl: url => shell.openExternal(url), log }))
+  } catch (err) {
+    if (!err.legacy) {
+      log(`[discord] login failed: ${err.message}`)
+      return { success: false, error: err.message }
+    }
+  }
+  // A backend from before the loopback login (a rollback): the old login, the only one it has
+  log('[discord] the server has no loopback login, using the old login')
+  return legacyDiscordLogin()
+})
+
+// The login of launchers up to 2.1.49, kept only for a backend without /api/users/login-discord/start
+async function legacyDiscordLogin() {
   const state = crypto.randomBytes(32).toString('hex')
 
   // Open the backend's login-discord URL in the user's default browser.
@@ -1077,30 +1111,13 @@ ipcMain.handle('discord:login', async () => {
       }
       continue
     }
-    unexpectedStreak = 0
 
     // 200 OK - auth complete.
-    // token is the play-session token; masterApiId is the stable numeric profileId.
-    const { token, masterApiId, discordUsername, discordAvatar } = data
-
-    const discordUser = {
-      username: discordUsername || `Player ${masterApiId}`,
-      tag:      discordUsername || `Player ${masterApiId}`,
-      avatar:   discordAvatar   || null,
-    }
-
-    store.set('discordUser',   discordUser)
-    store.set('gameProfileId', masterApiId)
-    store.set('gameSession',   token)
-    log(`[discord] logged in as ${discordUser.username} (profileId ${masterApiId})`)
-
-    reportHwid(token) // not awaited: login must not block on the ban-system hwid
-
-    return { success: true, user: discordUser }
+    return finishDiscordLogin(data)
   }
 
   return { success: false, error: 'Login timed out - please try again.' }
-})
+}
 
 // MO2 integration
 
