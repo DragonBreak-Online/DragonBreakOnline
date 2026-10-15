@@ -1,6 +1,6 @@
 # DragonBreak Online Privacy Policy
 
-**Effective date: October 1, 2026**
+**Effective date: October 15, 2026**
 
 DragonBreak Online is a free, unofficial roleplay server for *The Elder Scrolls V: Skyrim Special Edition*, operated by the DragonBreak Online team ("we," "us," or "our") from the United States. DragonBreak Online is for players **18 and over**.
 
@@ -25,11 +25,11 @@ Our game server, launcher downloads, and website may receive or record:
 * IP address
 * Connection or access times
 * Basic connection information needed to operate and secure the service
-* A one-way code made from your PC's Windows machine ID (never the ID itself), used only to enforce bans
+* A one-way code made from your PC's Windows machine ID, used only to enforce bans (we never keep the ID itself)
 
 ### Ban enforcement check
 
-When you press Play, the launcher sends a one-way code made on your PC from its Windows machine ID. We never receive the machine ID itself, and we store only a keyed scramble of the code that means nothing outside DragonBreak. We use it only to spot a banned player who comes back on another account. A match is never proof on its own: staff review it, and players who share a PC are not banned because of it. We also read the date your Discord account was created, which is part of your Discord user ID. We keep the code for 30 days after the PC was last used to play, or for as long as a ban lasts when it belongs to a banned account, and we delete it when your account is deleted unless the account is banned.
+When you press Play, the launcher sends a one-way code made on your PC from its Windows machine ID. The launcher never sends the machine ID itself for this check, and we store only a keyed scramble of the code that means nothing outside DragonBreak. Launchers older than 2.1.50 also try to send the machine ID itself when you log in; our servers turn that request away and do not keep the ID. We use the code only to spot a banned player who comes back on another account. A match is never proof on its own: staff review it, and players who share a PC are not banned because of it. We also read the date your Discord account was created, which is part of your Discord user ID. We keep the code for 30 days after the PC was last used to play, or for as long as a ban lasts when it belongs to a banned account, and we delete it when your account is deleted unless the account is banned.
 
 ### Characters and game activity
 
@@ -231,4 +231,4 @@ The current version will be published with its effective date. Significant chang
 **Support:**
 DragonBreak Online Discord tickets
 
-**Last updated:** October 1, 2026
+**Last updated:** October 15, 2026
