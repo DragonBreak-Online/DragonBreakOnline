@@ -13,7 +13,8 @@ module.exports = (api) => {
     enabled: true,
     // Units of work one skill needs for Apprentice, Adept, Expert and Master (fork skillPoints.ts)
     thresholds: [0, 250, 750, 1750, 2950],
-    perLevel: 10,
+    // Nate 15 Oct: +25 a level (was +10). Characters who spent points at the old rate are topped up (rescale)
+    perLevel: 25,
     checkSeconds: 30,
   }, cfg.charLevel || {});
   const WIDGET_ID = 43;
@@ -48,11 +49,32 @@ module.exports = (api) => {
       level: Math.max(1, Math.min(MAX_LEVEL, Number(s && s.level) || 1)),
       pending: Math.max(0, Number(s && s.pending) || 0),
       spent: { health: Number(spent.health) || 0, magicka: Number(spent.magicka) || 0, stamina: Number(spent.stamina) || 0 },
+      // the rate the spent points were bought at; records from before it was kept were all +10
+      per: Number(s && s.per) || 10,
     };
   };
   const save = (a, st) => {
+    st.per = CFG.perLevel;
     mp.set(a, 'private.dboLevel', st);
     mp.set(a, 'private.dboAvBonus', st.spent);
+  };
+  // Points bought at another rate are re-priced at today's, and the client is told the difference
+  const rescale = (a, st) => {
+    if (st.per === CFG.perLevel) return false;
+    const gain = {};
+    for (const av of Object.keys(VITALS)) {
+      const now = Math.round((st.spent[av] / st.per) * CFG.perLevel);
+      if (now !== st.spent[av]) gain[av] = now - st.spent[av];
+      st.spent[av] = now;
+    }
+    const was = st.per;
+    save(a, st);
+    if (Object.keys(gain).length) {
+      sendPacket(a, Object.assign({ customPacketType: 'dboAvGain' }, gain));
+      personal(a, `Level bonuses are now +${CFG.perLevel} a level: yours were raised to match (${Object.entries(gain).map(([av, n]) => `${n > 0 ? '+' : ''}${n} ${VITALS[av]}`).join(', ')}).`);
+      log(`level ${display(a)} rescaled from +${was} to +${CFG.perLevel} a level: ${JSON.stringify(st.spent)}`);
+    }
+    return true;
   };
 
   // Focus hands the keyboard to the CEF window, so only a panel the player just asked for may take it
@@ -86,6 +108,7 @@ module.exports = (api) => {
   const check = (a) => {
     if (!CFG.enabled) return false;
     const st = stateOf(a);
+    rescale(a, st);
     const earned = levelOfUnits(unitsOf(a));
     if (earned <= st.level) return false;
     const gained = earned - st.level;
