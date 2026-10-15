@@ -195,9 +195,17 @@ its own lines; `<you>` is your ledger operator name.
      `data/bans.json`, and the running backend writes players.json and sessions.json all the time.
    - **Before that start**, copy the ban list aside, keeping its 0600 mode, into a root-only folder (never `/tmp`):
      `install -d -m 700 /root/ban-list-backups && cp -p /opt/alduinak/skymp5-backend/data/bans.json /root/ban-list-backups/bans.json.before-L3-01`
-   - If the deploy is on a day other than 2026-10-15: set that day in `data/legal/legal.json` (`version` and
-     `effective`) and in `data/legal/privacy.md` (Effective date and Last updated), drop the unshipped `2026-10-15` key
-     from `data/legal/hashes.json`, run `npm run legal-record` again, and commit that before deploying.
+   - If the deploy is on a day other than 2026-10-15, re-date the policy on this branch first, before the cherry-pick
+     below. On a checkout of `secfix3-L3-01-backend-1015` at its head: set that day in `data/legal/legal.json`
+     (`version` and `effective`) and in `data/legal/privacy.md` (Effective date and Last updated), drop the unshipped
+     `2026-10-15` key from `data/legal/hashes.json`, run `npm run legal-record` again (a second run says `already
+     recorded`), then rerun the legal tests in `skymp5-backend`:
+     `node --test test/legalText.test.js test/legalGate.test.js test/legalRoute.test.js`. Commit it on
+     `secfix3-L3-01-backend-1015`, on top of its head. Then `1314e05ca..secfix3-L3-01-backend-1015` includes the
+     re-date, so the cherry-pick, the `git log` line below, the ledger `<first>..<last>`, the Undo finder count and the
+     revert all cover it. Never commit the re-date on the release tree after the picks: the `git log` line then names
+     the wrong first commit, and the Undo revert of that range stops with a conflict in `data/legal/hashes.json`
+     (tested 15 Oct).
    - **Deploy tree:** the backend release tree, built on the live main head at deploy time (`git -C /opt/alduinak
      rev-parse HEAD`, the same as `origin/main`; on 15 Oct 18:44Z that is f985e98fe, which serves launcher 2.1.49 and
      client 0.3.98) from cherry-picks, never `git merge`. Phase 1 (`secfix-phase1-backend-1015`) and, once F1 is
@@ -369,7 +377,7 @@ and `ops release backend claude-jake`.
      `ops release backend claude-jake`.
 
   The revert puts the policy back to the version before it (2026-10-11 on 15 Oct), so a player who accepted only
-  2026-10-15 is asked once to accept that one.
+  L3-01's version (2026-10-15, or the day it was re-dated to in step 1) is asked once to accept that one.
 - **Launcher:** version.js back to 2.1.49 (step 4).
 - Old launchers keep working throughout, and a new launcher works against an old backend (it ignores the field).
 
