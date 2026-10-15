@@ -744,29 +744,17 @@
 {
 "id": "10dd3c:Skyrim.esm",
 "name": "EnchClothesRobesMageHoodAdept",
-"value": 10,
-"p": [
-"cyrodiil",
-"skyrim"
-]
+"value": 10
 },
 {
 "id": "10dd3b:Skyrim.esm",
 "name": "EnchClothesRobesMageHoodApprentice",
-"value": 10,
-"p": [
-"cyrodiil",
-"skyrim"
-]
+"value": 10
 },
 {
 "id": "10dd3a:Skyrim.esm",
 "name": "EnchClothesRobesMageHoodNovice",
-"value": 10,
-"p": [
-"cyrodiil",
-"skyrim"
-]
+"value": 10
 },
 {
 "id": "602522:BSAssets.esm",
@@ -2503,6 +2491,7 @@
 "name": "ClothesMythicDawnRobes",
 "value": 25,
 "p": [
+"cyrodiil",
 "skyrim"
 ]
 },
@@ -2511,6 +2500,7 @@
 "name": "ClothesMythicDawnRobesNoHood",
 "value": 25,
 "p": [
+"cyrodiil",
 "skyrim"
 ]
 },
@@ -11231,362 +11221,202 @@
 {
 "id": "d536e:Skyrim.esm",
 "name": "EnchArmorGlassBootsCarry03",
-"value": 190,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 190
 },
 {
 "id": "d536f:Skyrim.esm",
 "name": "EnchArmorGlassBootsCarry04",
-"value": 190,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 190
 },
 {
 "id": "d5370:Skyrim.esm",
 "name": "EnchArmorGlassBootsCarry05",
-"value": 190,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 190
 },
 {
 "id": "d5371:Skyrim.esm",
 "name": "EnchArmorGlassBootsMuffle",
-"value": 190,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 190
 },
 {
 "id": "d5372:Skyrim.esm",
 "name": "EnchArmorGlassBootsResistFire03",
-"value": 190,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 190
 },
 {
 "id": "d5373:Skyrim.esm",
 "name": "EnchArmorGlassBootsResistFire04",
-"value": 190,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 190
 },
 {
 "id": "d5374:Skyrim.esm",
 "name": "EnchArmorGlassBootsResistFire05",
-"value": 190,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 190
 },
 {
 "id": "d5375:Skyrim.esm",
 "name": "EnchArmorGlassBootsResistFrost03",
-"value": 190,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 190
 },
 {
 "id": "d5376:Skyrim.esm",
 "name": "EnchArmorGlassBootsResistFrost04",
-"value": 190,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 190
 },
 {
 "id": "d5377:Skyrim.esm",
 "name": "EnchArmorGlassBootsResistFrost05",
-"value": 190,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 190
 },
 {
 "id": "d5378:Skyrim.esm",
 "name": "EnchArmorGlassBootsResistShock03",
-"value": 190,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 190
 },
 {
 "id": "d5379:Skyrim.esm",
 "name": "EnchArmorGlassBootsResistShock04",
-"value": 190,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 190
 },
 {
 "id": "d537a:Skyrim.esm",
 "name": "EnchArmorGlassBootsResistShock05",
-"value": 190,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 190
 },
 {
 "id": "10df74:Skyrim.esm",
 "name": "EnchArmorGlassBootsSneak03",
-"value": 190,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 190
 },
 {
 "id": "10df75:Skyrim.esm",
 "name": "EnchArmorGlassBootsSneak04",
-"value": 190,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 190
 },
 {
 "id": "10df76:Skyrim.esm",
 "name": "EnchArmorGlassBootsSneak05",
-"value": 190,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 190
 },
 {
 "id": "10df89:Skyrim.esm",
 "name": "EnchArmorGlassBootsStamina03",
-"value": 190,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 190
 },
 {
 "id": "10df8a:Skyrim.esm",
 "name": "EnchArmorGlassBootsStamina04",
-"value": 190,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 190
 },
 {
 "id": "10df8b:Skyrim.esm",
 "name": "EnchArmorGlassBootsStamina05",
-"value": 190,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 190
 },
 {
 "id": "d5397:Skyrim.esm",
 "name": "EnchArmorGlassGauntletsAlchemy03",
-"value": 190,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 190
 },
 {
 "id": "d5398:Skyrim.esm",
 "name": "EnchArmorGlassGauntletsAlchemy04",
-"value": 190,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 190
 },
 {
 "id": "d5399:Skyrim.esm",
 "name": "EnchArmorGlassGauntletsAlchemy05",
-"value": 190,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 190
 },
 {
 "id": "fcef1:Skyrim.esm",
 "name": "EnchArmorGlassGauntletsLockpicking03",
-"value": 190,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 190
 },
 {
 "id": "fcef2:Skyrim.esm",
 "name": "EnchArmorGlassGauntletsLockpicking04",
-"value": 190,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 190
 },
 {
 "id": "fcef3:Skyrim.esm",
 "name": "EnchArmorGlassGauntletsLockpicking05",
-"value": 190,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 190
 },
 {
 "id": "d53ac:Skyrim.esm",
 "name": "EnchArmorGlassGauntletsMarksman03",
-"value": 190,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 190
 },
 {
 "id": "d53ad:Skyrim.esm",
 "name": "EnchArmorGlassGauntletsMarksman04",
-"value": 190,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 190
 },
 {
 "id": "d53ae:Skyrim.esm",
 "name": "EnchArmorGlassGauntletsMarksman05",
-"value": 190,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 190
 },
 {
 "id": "d53af:Skyrim.esm",
 "name": "EnchArmorGlassGauntletsOneHanded03",
-"value": 190,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 190
 },
 {
 "id": "d53b0:Skyrim.esm",
 "name": "EnchArmorGlassGauntletsOneHanded04",
-"value": 190,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 190
 },
 {
 "id": "d53b1:Skyrim.esm",
 "name": "EnchArmorGlassGauntletsOneHanded05",
-"value": 190,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 190
 },
 {
 "id": "fcef4:Skyrim.esm",
 "name": "EnchArmorGlassGauntletsPickpocket03",
-"value": 190,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 190
 },
 {
 "id": "fcef5:Skyrim.esm",
 "name": "EnchArmorGlassGauntletsPickpocket04",
-"value": 190,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 190
 },
 {
 "id": "fcef6:Skyrim.esm",
 "name": "EnchArmorGlassGauntletsPickpocket05",
-"value": 190,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 190
 },
 {
 "id": "d53b5:Skyrim.esm",
 "name": "EnchArmorGlassGauntletsSmithing03",
-"value": 190,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 190
 },
 {
 "id": "d53b6:Skyrim.esm",
 "name": "EnchArmorGlassGauntletsSmithing04",
-"value": 190,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 190
 },
 {
 "id": "d53b7:Skyrim.esm",
 "name": "EnchArmorGlassGauntletsSmithing05",
-"value": 190,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 190
 },
 {
 "id": "d53bb:Skyrim.esm",
 "name": "EnchArmorGlassGauntletsTwoHanded03",
-"value": 190,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 190
 },
 {
 "id": "d53bc:Skyrim.esm",
 "name": "EnchArmorGlassGauntletsTwoHanded04",
-"value": 190,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 190
 },
 {
 "id": "d53bd:Skyrim.esm",
 "name": "EnchArmorGlassGauntletsTwoHanded05",
-"value": 190,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 190
 },
 {
 "id": "d3ace:Skyrim.esm",
@@ -14000,281 +13830,157 @@
 {
 "id": "cf824:Skyrim.esm",
 "name": "EnchArmorEbonyBootsCarry03",
-"value": 275,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 275
 },
 {
 "id": "cf825:Skyrim.esm",
 "name": "EnchArmorEbonyBootsCarry04",
-"value": 275,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 275
 },
 {
 "id": "cf826:Skyrim.esm",
 "name": "EnchArmorEbonyBootsCarry05",
-"value": 275,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 275
 },
 {
 "id": "cf827:Skyrim.esm",
 "name": "EnchArmorEbonyBootsMuffle",
-"value": 275,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 275
 },
 {
 "id": "cf828:Skyrim.esm",
 "name": "EnchArmorEbonyBootsResistFire03",
-"value": 275,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 275
 },
 {
 "id": "cf829:Skyrim.esm",
 "name": "EnchArmorEbonyBootsResistFire04",
-"value": 275,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 275
 },
 {
 "id": "cf82a:Skyrim.esm",
 "name": "EnchArmorEbonyBootsResistFire05",
-"value": 275,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 275
 },
 {
 "id": "cf82b:Skyrim.esm",
 "name": "EnchArmorEbonyBootsResistFrost03",
-"value": 275,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 275
 },
 {
 "id": "cf82c:Skyrim.esm",
 "name": "EnchArmorEbonyBootsResistFrost04",
-"value": 275,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 275
 },
 {
 "id": "cf82d:Skyrim.esm",
 "name": "EnchArmorEbonyBootsResistFrost05",
-"value": 275,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 275
 },
 {
 "id": "cf82e:Skyrim.esm",
 "name": "EnchArmorEbonyBootsResistShock03",
-"value": 275,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 275
 },
 {
 "id": "cf82f:Skyrim.esm",
 "name": "EnchArmorEbonyBootsResistShock04",
-"value": 275,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 275
 },
 {
 "id": "cf830:Skyrim.esm",
 "name": "EnchArmorEbonyBootsResistShock05",
-"value": 275,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 275
 },
 {
 "id": "10df83:Skyrim.esm",
 "name": "EnchArmorEbonyBootsStamina03",
-"value": 275,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 275
 },
 {
 "id": "10df84:Skyrim.esm",
 "name": "EnchArmorEbonyBootsStamina04",
-"value": 275,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 275
 },
 {
 "id": "10df85:Skyrim.esm",
 "name": "EnchArmorEbonyBootsStamina05",
-"value": 275,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 275
 },
 {
 "id": "cf84d:Skyrim.esm",
 "name": "EnchArmorEbonyGauntletsAlchemy03",
-"value": 275,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 275
 },
 {
 "id": "cf84e:Skyrim.esm",
 "name": "EnchArmorEbonyGauntletsAlchemy04",
-"value": 275,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 275
 },
 {
 "id": "cf84f:Skyrim.esm",
 "name": "EnchArmorEbonyGauntletsAlchemy05",
-"value": 275,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 275
 },
 {
 "id": "cf862:Skyrim.esm",
 "name": "EnchArmorEbonyGauntletsMarksman03",
-"value": 275,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 275
 },
 {
 "id": "cf863:Skyrim.esm",
 "name": "EnchArmorEbonyGauntletsMarksman04",
-"value": 275,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 275
 },
 {
 "id": "cf864:Skyrim.esm",
 "name": "EnchArmorEbonyGauntletsMarksman05",
-"value": 275,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 275
 },
 {
 "id": "cf865:Skyrim.esm",
 "name": "EnchArmorEbonyGauntletsOneHanded03",
-"value": 275,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 275
 },
 {
 "id": "cf866:Skyrim.esm",
 "name": "EnchArmorEbonyGauntletsOneHanded04",
-"value": 275,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 275
 },
 {
 "id": "cf867:Skyrim.esm",
 "name": "EnchArmorEbonyGauntletsOneHanded05",
-"value": 275,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 275
 },
 {
 "id": "cf86b:Skyrim.esm",
 "name": "EnchArmorEbonyGauntletsSmithing03",
-"value": 275,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 275
 },
 {
 "id": "cf86c:Skyrim.esm",
 "name": "EnchArmorEbonyGauntletsSmithing04",
-"value": 275,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 275
 },
 {
 "id": "cf86d:Skyrim.esm",
 "name": "EnchArmorEbonyGauntletsSmithing05",
-"value": 275,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 275
 },
 {
 "id": "cf86e:Skyrim.esm",
 "name": "EnchArmorEbonyGauntletsTwoHanded03",
-"value": 275,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 275
 },
 {
 "id": "cf86f:Skyrim.esm",
 "name": "EnchArmorEbonyGauntletsTwoHanded04",
-"value": 275,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 275
 },
 {
 "id": "cf870:Skyrim.esm",
 "name": "EnchArmorEbonyGauntletsTwoHanded05",
-"value": 275,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 275
 },
 {
 "id": "accc0:Skyrim.esm",
@@ -15171,11 +14877,7 @@
 {
 "id": "10d67d:Skyrim.esm",
 "name": "EnchClothesRobesMageRegen02",
-"value": 308,
-"p": [
-"cyrodiil",
-"skyrim"
-]
+"value": 308
 },
 {
 "id": "61cb9:Skyrim.esm",
@@ -15614,47 +15316,27 @@
 {
 "id": "10d66c:Skyrim.esm",
 "name": "EnchClothesRobesMageAlteration02",
-"value": 408,
-"p": [
-"cyrodiil",
-"skyrim"
-]
+"value": 408
 },
 {
 "id": "10d672:Skyrim.esm",
 "name": "EnchClothesRobesMageConjuration02",
-"value": 408,
-"p": [
-"cyrodiil",
-"skyrim"
-]
+"value": 408
 },
 {
 "id": "10d670:Skyrim.esm",
 "name": "EnchClothesRobesMageDestruction02",
-"value": 408,
-"p": [
-"cyrodiil",
-"skyrim"
-]
+"value": 408
 },
 {
 "id": "10d679:Skyrim.esm",
 "name": "EnchClothesRobesMageIllusion02",
-"value": 408,
-"p": [
-"cyrodiil",
-"skyrim"
-]
+"value": 408
 },
 {
 "id": "10d681:Skyrim.esm",
 "name": "EnchClothesRobesMageRestoration02",
-"value": 408,
-"p": [
-"cyrodiil",
-"skyrim"
-]
+"value": 408
 },
 {
 "id": "60251a:BSAssets.esm",
@@ -16578,389 +16260,217 @@
 {
 "id": "d53be:Skyrim.esm",
 "name": "EnchArmorGlassHelmetAlchemy03",
-"value": 450,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 450
 },
 {
 "id": "d53bf:Skyrim.esm",
 "name": "EnchArmorGlassHelmetAlchemy04",
-"value": 450,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 450
 },
 {
 "id": "d53c0:Skyrim.esm",
 "name": "EnchArmorGlassHelmetAlchemy05",
-"value": 450,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 450
 },
 {
 "id": "d53c1:Skyrim.esm",
 "name": "EnchArmorGlassHelmetAlteration03",
-"value": 450,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 450
 },
 {
 "id": "d53c2:Skyrim.esm",
 "name": "EnchArmorGlassHelmetAlteration04",
-"value": 450,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 450
 },
 {
 "id": "d53c3:Skyrim.esm",
 "name": "EnchArmorGlassHelmetAlteration05",
-"value": 450,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 450
 },
 {
 "id": "d53c4:Skyrim.esm",
 "name": "EnchArmorGlassHelmetConjuration03",
-"value": 450,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 450
 },
 {
 "id": "d53c5:Skyrim.esm",
 "name": "EnchArmorGlassHelmetConjuration04",
-"value": 450,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 450
 },
 {
 "id": "d53c6:Skyrim.esm",
 "name": "EnchArmorGlassHelmetConjuration05",
-"value": 450,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 450
 },
 {
 "id": "d53c7:Skyrim.esm",
 "name": "EnchArmorGlassHelmetDestruction03",
-"value": 450,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 450
 },
 {
 "id": "d53c8:Skyrim.esm",
 "name": "EnchArmorGlassHelmetDestruction04",
-"value": 450,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 450
 },
 {
 "id": "d53c9:Skyrim.esm",
 "name": "EnchArmorGlassHelmetDestruction05",
-"value": 450,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 450
 },
 {
 "id": "d53cd:Skyrim.esm",
 "name": "EnchArmorGlassHelmetIllusion03",
-"value": 450,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 450
 },
 {
 "id": "d53ce:Skyrim.esm",
 "name": "EnchArmorGlassHelmetIllusion04",
-"value": 450,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 450
 },
 {
 "id": "d53cf:Skyrim.esm",
 "name": "EnchArmorGlassHelmetIllusion05",
-"value": 450,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 450
 },
 {
 "id": "d53d0:Skyrim.esm",
 "name": "EnchArmorGlassHelmetMagicka03",
-"value": 450,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 450
 },
 {
 "id": "d53d1:Skyrim.esm",
 "name": "EnchArmorGlassHelmetMagicka04",
-"value": 450,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 450
 },
 {
 "id": "d53d2:Skyrim.esm",
 "name": "EnchArmorGlassHelmetMagicka05",
-"value": 450,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 450
 },
 {
 "id": "fe2da:Skyrim.esm",
 "name": "EnchArmorGlassHelmetMagickaRate03",
-"value": 450,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 450
 },
 {
 "id": "fe2db:Skyrim.esm",
 "name": "EnchArmorGlassHelmetMagickaRate04",
-"value": 450,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 450
 },
 {
 "id": "fe2df:Skyrim.esm",
 "name": "EnchArmorGlassHelmetMagickaRate05",
-"value": 450,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 450
 },
 {
 "id": "d53d3:Skyrim.esm",
 "name": "EnchArmorGlassHelmetMarksman03",
-"value": 450,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 450
 },
 {
 "id": "d53d4:Skyrim.esm",
 "name": "EnchArmorGlassHelmetMarksman04",
-"value": 450,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 450
 },
 {
 "id": "d53d5:Skyrim.esm",
 "name": "EnchArmorGlassHelmetMarksman05",
-"value": 450,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 450
 },
 {
 "id": "d53d6:Skyrim.esm",
 "name": "EnchArmorGlassHelmetRestoration03",
-"value": 450,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 450
 },
 {
 "id": "d53d7:Skyrim.esm",
 "name": "EnchArmorGlassHelmetRestoration04",
-"value": 450,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 450
 },
 {
 "id": "d53d8:Skyrim.esm",
 "name": "EnchArmorGlassHelmetRestoration05",
-"value": 450,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 450
 },
 {
 "id": "d53d9:Skyrim.esm",
 "name": "EnchArmorGlassHelmetWaterbreathing",
-"value": 450,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 450
 },
 {
 "id": "d53da:Skyrim.esm",
 "name": "EnchArmorGlassShieldBlock03",
-"value": 450,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 450
 },
 {
 "id": "d53db:Skyrim.esm",
 "name": "EnchArmorGlassShieldBlock04",
-"value": 450,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 450
 },
 {
 "id": "d53dc:Skyrim.esm",
 "name": "EnchArmorGlassShieldBlock05",
-"value": 450,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 450
 },
 {
 "id": "d53dd:Skyrim.esm",
 "name": "EnchArmorGlassShieldResistFire03",
-"value": 450,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 450
 },
 {
 "id": "d53de:Skyrim.esm",
 "name": "EnchArmorGlassShieldResistFire04",
-"value": 450,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 450
 },
 {
 "id": "d53df:Skyrim.esm",
 "name": "EnchArmorGlassShieldResistFire05",
-"value": 450,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 450
 },
 {
 "id": "d53e0:Skyrim.esm",
 "name": "EnchArmorGlassShieldResistFrost03",
-"value": 450,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 450
 },
 {
 "id": "d53e1:Skyrim.esm",
 "name": "EnchArmorGlassShieldResistFrost04",
-"value": 450,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 450
 },
 {
 "id": "d53e2:Skyrim.esm",
 "name": "EnchArmorGlassShieldResistFrost05",
-"value": 450,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 450
 },
 {
 "id": "10dfb3:Skyrim.esm",
 "name": "EnchArmorGlassShieldResistMagic03",
-"value": 450,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 450
 },
 {
 "id": "10dfb4:Skyrim.esm",
 "name": "EnchArmorGlassShieldResistMagic04",
-"value": 450,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 450
 },
 {
 "id": "10dfb5:Skyrim.esm",
 "name": "EnchArmorGlassShieldResistMagic05",
-"value": 450,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 450
 },
 {
 "id": "d53e3:Skyrim.esm",
 "name": "EnchArmorGlassShieldResistShock03",
-"value": 450,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 450
 },
 {
 "id": "d53e4:Skyrim.esm",
 "name": "EnchArmorGlassShieldResistShock04",
-"value": 450,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 450
 },
 {
 "id": "d53e5:Skyrim.esm",
 "name": "EnchArmorGlassShieldResistShock05",
-"value": 450,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 450
 },
 {
 "id": "fc000:Skyrim.esm",
@@ -18532,11 +18042,7 @@
 {
 "id": "10d67e:Skyrim.esm",
 "name": "EnchClothesRobesMageRegen03",
-"value": 660,
-"p": [
-"cyrodiil",
-"skyrim"
-]
+"value": 660
 },
 {
 "id": "284d:Dawnguard.esm",
@@ -18944,389 +18450,217 @@
 {
 "id": "cf871:Skyrim.esm",
 "name": "EnchArmorEbonyHelmetAlchemy03",
-"value": 750,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 750
 },
 {
 "id": "cf872:Skyrim.esm",
 "name": "EnchArmorEbonyHelmetAlchemy04",
-"value": 750,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 750
 },
 {
 "id": "cf873:Skyrim.esm",
 "name": "EnchArmorEbonyHelmetAlchemy05",
-"value": 750,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 750
 },
 {
 "id": "cf874:Skyrim.esm",
 "name": "EnchArmorEbonyHelmetAlteration03",
-"value": 750,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 750
 },
 {
 "id": "cf875:Skyrim.esm",
 "name": "EnchArmorEbonyHelmetAlteration04",
-"value": 750,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 750
 },
 {
 "id": "cf876:Skyrim.esm",
 "name": "EnchArmorEbonyHelmetAlteration05",
-"value": 750,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 750
 },
 {
 "id": "cf877:Skyrim.esm",
 "name": "EnchArmorEbonyHelmetConjuration03",
-"value": 750,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 750
 },
 {
 "id": "cf878:Skyrim.esm",
 "name": "EnchArmorEbonyHelmetConjuration04",
-"value": 750,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 750
 },
 {
 "id": "cf879:Skyrim.esm",
 "name": "EnchArmorEbonyHelmetConjuration05",
-"value": 750,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 750
 },
 {
 "id": "cf87a:Skyrim.esm",
 "name": "EnchArmorEbonyHelmetDestruction03",
-"value": 750,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 750
 },
 {
 "id": "cf87b:Skyrim.esm",
 "name": "EnchArmorEbonyHelmetDestruction04",
-"value": 750,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 750
 },
 {
 "id": "cf87c:Skyrim.esm",
 "name": "EnchArmorEbonyHelmetDestruction05",
-"value": 750,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 750
 },
 {
 "id": "cf880:Skyrim.esm",
 "name": "EnchArmorEbonyHelmetIllusion03",
-"value": 750,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 750
 },
 {
 "id": "cf881:Skyrim.esm",
 "name": "EnchArmorEbonyHelmetIllusion04",
-"value": 750,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 750
 },
 {
 "id": "cf882:Skyrim.esm",
 "name": "EnchArmorEbonyHelmetIllusion05",
-"value": 750,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 750
 },
 {
 "id": "cf883:Skyrim.esm",
 "name": "EnchArmorEbonyHelmetMagicka03",
-"value": 750,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 750
 },
 {
 "id": "cf884:Skyrim.esm",
 "name": "EnchArmorEbonyHelmetMagicka04",
-"value": 750,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 750
 },
 {
 "id": "cf885:Skyrim.esm",
 "name": "EnchArmorEbonyHelmetMagicka05",
-"value": 750,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 750
 },
 {
 "id": "fe2ef:Skyrim.esm",
 "name": "EnchArmorEbonyHelmetMagickaRate03",
-"value": 750,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 750
 },
 {
 "id": "fe2f0:Skyrim.esm",
 "name": "EnchArmorEbonyHelmetMagickaRate04",
-"value": 750,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 750
 },
 {
 "id": "fe2f1:Skyrim.esm",
 "name": "EnchArmorEbonyHelmetMagickaRate05",
-"value": 750,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 750
 },
 {
 "id": "cf886:Skyrim.esm",
 "name": "EnchArmorEbonyHelmetMarksman03",
-"value": 750,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 750
 },
 {
 "id": "cf887:Skyrim.esm",
 "name": "EnchArmorEbonyHelmetMarksman04",
-"value": 750,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 750
 },
 {
 "id": "cf888:Skyrim.esm",
 "name": "EnchArmorEbonyHelmetMarksman05",
-"value": 750,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 750
 },
 {
 "id": "cf889:Skyrim.esm",
 "name": "EnchArmorEbonyHelmetRestoration03",
-"value": 750,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 750
 },
 {
 "id": "cf88a:Skyrim.esm",
 "name": "EnchArmorEbonyHelmetRestoration04",
-"value": 750,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 750
 },
 {
 "id": "cf88b:Skyrim.esm",
 "name": "EnchArmorEbonyHelmetRestoration05",
-"value": 750,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 750
 },
 {
 "id": "cf88c:Skyrim.esm",
 "name": "EnchArmorEbonyHelmetWaterbreathing",
-"value": 750,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 750
 },
 {
 "id": "cf88d:Skyrim.esm",
 "name": "EnchArmorEbonyShieldBlock03",
-"value": 750,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 750
 },
 {
 "id": "cf88e:Skyrim.esm",
 "name": "EnchArmorEbonyShieldBlock04",
-"value": 750,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 750
 },
 {
 "id": "cf88f:Skyrim.esm",
 "name": "EnchArmorEbonyShieldBlock05",
-"value": 750,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 750
 },
 {
 "id": "cf890:Skyrim.esm",
 "name": "EnchArmorEbonyShieldResistFire03",
-"value": 750,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 750
 },
 {
 "id": "cf891:Skyrim.esm",
 "name": "EnchArmorEbonyShieldResistFire04",
-"value": 750,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 750
 },
 {
 "id": "cf892:Skyrim.esm",
 "name": "EnchArmorEbonyShieldResistFire05",
-"value": 750,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 750
 },
 {
 "id": "cf893:Skyrim.esm",
 "name": "EnchArmorEbonyShieldResistFrost03",
-"value": 750,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 750
 },
 {
 "id": "cf894:Skyrim.esm",
 "name": "EnchArmorEbonyShieldResistFrost04",
-"value": 750,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 750
 },
 {
 "id": "cf895:Skyrim.esm",
 "name": "EnchArmorEbonyShieldResistFrost05",
-"value": 750,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 750
 },
 {
 "id": "10dfad:Skyrim.esm",
 "name": "EnchArmorEbonyShieldResistMagic03",
-"value": 750,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 750
 },
 {
 "id": "10dfae:Skyrim.esm",
 "name": "EnchArmorEbonyShieldResistMagic04",
-"value": 750,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 750
 },
 {
 "id": "10dfaf:Skyrim.esm",
 "name": "EnchArmorEbonyShieldResistMagic05",
-"value": 750,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 750
 },
 {
 "id": "cf896:Skyrim.esm",
 "name": "EnchArmorEbonyShieldResistShock03",
-"value": 750,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 750
 },
 {
 "id": "cf897:Skyrim.esm",
 "name": "EnchArmorEbonyShieldResistShock04",
-"value": 750,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 750
 },
 {
 "id": "cf898:Skyrim.esm",
 "name": "EnchArmorEbonyShieldResistShock05",
-"value": 750,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 750
 },
 {
 "id": "5db86:Skyrim.esm",
@@ -19571,299 +18905,167 @@
 {
 "id": "10cf98:Skyrim.esm",
 "name": "EnchArmorGlassCuirassAlteration03",
-"value": 900,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 900
 },
 {
 "id": "10cf99:Skyrim.esm",
 "name": "EnchArmorGlassCuirassAlteration04",
-"value": 900,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 900
 },
 {
 "id": "10cf9a:Skyrim.esm",
 "name": "EnchArmorGlassCuirassAlteration05",
-"value": 900,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 900
 },
 {
 "id": "10cf9b:Skyrim.esm",
 "name": "EnchArmorGlassCuirassConjuration03",
-"value": 900,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 900
 },
 {
 "id": "10cf9c:Skyrim.esm",
 "name": "EnchArmorGlassCuirassConjuration04",
-"value": 900,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 900
 },
 {
 "id": "10cf9d:Skyrim.esm",
 "name": "EnchArmorGlassCuirassConjuration05",
-"value": 900,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 900
 },
 {
 "id": "10cf9e:Skyrim.esm",
 "name": "EnchArmorGlassCuirassDestruction03",
-"value": 900,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 900
 },
 {
 "id": "10cfa0:Skyrim.esm",
 "name": "EnchArmorGlassCuirassDestruction04",
-"value": 900,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 900
 },
 {
 "id": "10cfa1:Skyrim.esm",
 "name": "EnchArmorGlassCuirassDestruction05",
-"value": 900,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 900
 },
 {
 "id": "fe2d7:Skyrim.esm",
 "name": "EnchArmorGlassCuirassHealRate03",
-"value": 900,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 900
 },
 {
 "id": "fe2d8:Skyrim.esm",
 "name": "EnchArmorGlassCuirassHealRate04",
-"value": 900,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 900
 },
 {
 "id": "fe2d9:Skyrim.esm",
 "name": "EnchArmorGlassCuirassHealRate05",
-"value": 900,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 900
 },
 {
 "id": "d5381:Skyrim.esm",
 "name": "EnchArmorGlassCuirassHealth03",
-"value": 900,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 900
 },
 {
 "id": "d5382:Skyrim.esm",
 "name": "EnchArmorGlassCuirassHealth04",
-"value": 900,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 900
 },
 {
 "id": "d5383:Skyrim.esm",
 "name": "EnchArmorGlassCuirassHealth05",
-"value": 900,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 900
 },
 {
 "id": "10cfa2:Skyrim.esm",
 "name": "EnchArmorGlassCuirassIllusion03",
-"value": 900,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 900
 },
 {
 "id": "10cfa3:Skyrim.esm",
 "name": "EnchArmorGlassCuirassIllusion04",
-"value": 900,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 900
 },
 {
 "id": "10cfa4:Skyrim.esm",
 "name": "EnchArmorGlassCuirassIllusion05",
-"value": 900,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 900
 },
 {
 "id": "d5384:Skyrim.esm",
 "name": "EnchArmorGlassCuirassLightArmor03",
-"value": 900,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 900
 },
 {
 "id": "d5385:Skyrim.esm",
 "name": "EnchArmorGlassCuirassLightArmor04",
-"value": 900,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 900
 },
 {
 "id": "d5386:Skyrim.esm",
 "name": "EnchArmorGlassCuirassLightArmor05",
-"value": 900,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 900
 },
 {
 "id": "10cfa5:Skyrim.esm",
 "name": "EnchArmorGlassCuirassRestoration03",
-"value": 900,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 900
 },
 {
 "id": "10cfa6:Skyrim.esm",
 "name": "EnchArmorGlassCuirassRestoration04",
-"value": 900,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 900
 },
 {
 "id": "10cfa7:Skyrim.esm",
 "name": "EnchArmorGlassCuirassRestoration05",
-"value": 900,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 900
 },
 {
 "id": "fe2dc:Skyrim.esm",
 "name": "EnchArmorGlassCuirassStaminaRate03",
-"value": 900,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 900
 },
 {
 "id": "fe2dd:Skyrim.esm",
 "name": "EnchArmorGlassCuirassStaminaRate04",
-"value": 900,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 900
 },
 {
 "id": "fe2de:Skyrim.esm",
 "name": "EnchArmorGlassCuirassStaminaRate05",
-"value": 900,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 900
 },
 {
 "id": "10cf9f:Skyrim.esm",
 "name": "EnchArmorGlassVsDestruction04",
-"value": 900,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 900
 },
 {
 "id": "10d66d:Skyrim.esm",
 "name": "EnchClothesRobesMageAlteration03",
-"value": 910,
-"p": [
-"cyrodiil",
-"skyrim"
-]
+"value": 910
 },
 {
 "id": "10d673:Skyrim.esm",
 "name": "EnchClothesRobesMageConjuration03",
-"value": 910,
-"p": [
-"cyrodiil",
-"skyrim"
-]
+"value": 910
 },
 {
 "id": "10d676:Skyrim.esm",
 "name": "EnchClothesRobesMageDestruction03",
-"value": 910,
-"p": [
-"cyrodiil",
-"skyrim"
-]
+"value": 910
 },
 {
 "id": "10d67a:Skyrim.esm",
 "name": "EnchClothesRobesMageIllusion03",
-"value": 910,
-"p": [
-"cyrodiil",
-"skyrim"
-]
+"value": 910
 },
 {
 "id": "10d682:Skyrim.esm",
 "name": "EnchClothesRobesMageRestoration03",
-"value": 910,
-"p": [
-"cyrodiil",
-"skyrim"
-]
+"value": 910
 },
 {
 "id": "e41d8:Skyrim.esm",
@@ -20871,11 +20073,7 @@
 {
 "id": "10d67f:Skyrim.esm",
 "name": "EnchClothesRobesMageRegen04",
-"value": 1112,
-"p": [
-"cyrodiil",
-"skyrim"
-]
+"value": 1112
 },
 {
 "id": "1c655:Dragonborn.esm",
@@ -21155,245 +20353,137 @@
 {
 "id": "10cf6b:Skyrim.esm",
 "name": "EnchArmorEbonyCuirassAlteration03",
-"value": 1500,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1500
 },
 {
 "id": "10cf6c:Skyrim.esm",
 "name": "EnchArmorEbonyCuirassAlteration04",
-"value": 1500,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1500
 },
 {
 "id": "10cf6d:Skyrim.esm",
 "name": "EnchArmorEbonyCuirassAlteration05",
-"value": 1500,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1500
 },
 {
 "id": "10cf6e:Skyrim.esm",
 "name": "EnchArmorEbonyCuirassConjuration03",
-"value": 1500,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1500
 },
 {
 "id": "10cf6f:Skyrim.esm",
 "name": "EnchArmorEbonyCuirassConjuration04",
-"value": 1500,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1500
 },
 {
 "id": "10cf70:Skyrim.esm",
 "name": "EnchArmorEbonyCuirassConjuration05",
-"value": 1500,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1500
 },
 {
 "id": "10cf71:Skyrim.esm",
 "name": "EnchArmorEbonyCuirassDestruction03",
-"value": 1500,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1500
 },
 {
 "id": "10cf72:Skyrim.esm",
 "name": "EnchArmorEbonyCuirassDestruction04",
-"value": 1500,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1500
 },
 {
 "id": "10cf78:Skyrim.esm",
 "name": "EnchArmorEbonyCuirassDestruction05",
-"value": 1500,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1500
 },
 {
 "id": "cf837:Skyrim.esm",
 "name": "EnchArmorEbonyCuirassHealth03",
-"value": 1500,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1500
 },
 {
 "id": "cf838:Skyrim.esm",
 "name": "EnchArmorEbonyCuirassHealth04",
-"value": 1500,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1500
 },
 {
 "id": "cf839:Skyrim.esm",
 "name": "EnchArmorEbonyCuirassHealth05",
-"value": 1500,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1500
 },
 {
 "id": "fe2e9:Skyrim.esm",
 "name": "EnchArmorEbonyCuirassHealthRate03",
-"value": 1500,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1500
 },
 {
 "id": "fe2ea:Skyrim.esm",
 "name": "EnchArmorEbonyCuirassHealthRate04",
-"value": 1500,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1500
 },
 {
 "id": "fe2eb:Skyrim.esm",
 "name": "EnchArmorEbonyCuirassHealthRate05",
-"value": 1500,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1500
 },
 {
 "id": "cf83a:Skyrim.esm",
 "name": "EnchArmorEbonyCuirassHeavyArmor03",
-"value": 1500,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1500
 },
 {
 "id": "cf83b:Skyrim.esm",
 "name": "EnchArmorEbonyCuirassHeavyArmor04",
-"value": 1500,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1500
 },
 {
 "id": "cf83c:Skyrim.esm",
 "name": "EnchArmorEbonyCuirassHeavyArmor05",
-"value": 1500,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1500
 },
 {
 "id": "10cf73:Skyrim.esm",
 "name": "EnchArmorEbonyCuirassIllusion03",
-"value": 1500,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1500
 },
 {
 "id": "10cf74:Skyrim.esm",
 "name": "EnchArmorEbonyCuirassIllusion04",
-"value": 1500,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1500
 },
 {
 "id": "10cf79:Skyrim.esm",
 "name": "EnchArmorEbonyCuirassIllusion05",
-"value": 1500,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1500
 },
 {
 "id": "10cf75:Skyrim.esm",
 "name": "EnchArmorEbonyCuirassRestoration03",
-"value": 1500,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1500
 },
 {
 "id": "10cf76:Skyrim.esm",
 "name": "EnchArmorEbonyCuirassRestoration04",
-"value": 1500,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1500
 },
 {
 "id": "10cf77:Skyrim.esm",
 "name": "EnchArmorEbonyCuirassRestoration05",
-"value": 1500,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1500
 },
 {
 "id": "fe2ec:Skyrim.esm",
 "name": "EnchArmorEbonyCuirassStaminaRate03",
-"value": 1500,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1500
 },
 {
 "id": "fe2ed:Skyrim.esm",
 "name": "EnchArmorEbonyCuirassStaminaRate04",
-"value": 1500,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1500
 },
 {
 "id": "fe2ee:Skyrim.esm",
 "name": "EnchArmorEbonyCuirassStaminaRate05",
-"value": 1500,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1500
 },
 {
 "id": "d7ad2:Skyrim.esm",
@@ -21785,47 +20875,27 @@
 {
 "id": "10d66e:Skyrim.esm",
 "name": "EnchClothesRobesMageAlteration04",
-"value": 1612,
-"p": [
-"cyrodiil",
-"skyrim"
-]
+"value": 1612
 },
 {
 "id": "10d674:Skyrim.esm",
 "name": "EnchClothesRobesMageConjuration04",
-"value": 1612,
-"p": [
-"cyrodiil",
-"skyrim"
-]
+"value": 1612
 },
 {
 "id": "10d677:Skyrim.esm",
 "name": "EnchClothesRobesMageDestruction04",
-"value": 1612,
-"p": [
-"cyrodiil",
-"skyrim"
-]
+"value": 1612
 },
 {
 "id": "10d67b:Skyrim.esm",
 "name": "EnchClothesRobesMageIllusion04",
-"value": 1612,
-"p": [
-"cyrodiil",
-"skyrim"
-]
+"value": 1612
 },
 {
 "id": "10d683:Skyrim.esm",
 "name": "EnchClothesRobesMageRestoration04",
-"value": 1612,
-"p": [
-"cyrodiil",
-"skyrim"
-]
+"value": 1612
 },
 {
 "id": "1db99:Dragonborn.esm",
@@ -21838,11 +20908,7 @@
 {
 "id": "10d680:Skyrim.esm",
 "name": "EnchClothesRobesMageRegen05",
-"value": 1803,
-"p": [
-"cyrodiil",
-"skyrim"
-]
+"value": 1803
 },
 {
 "id": "2920c:Dragonborn.esm",
@@ -22314,47 +21380,27 @@
 {
 "id": "10d66f:Skyrim.esm",
 "name": "EnchClothesRobesMageAlteration05",
-"value": 2563,
-"p": [
-"cyrodiil",
-"skyrim"
-]
+"value": 2563
 },
 {
 "id": "10d675:Skyrim.esm",
 "name": "EnchClothesRobesMageConjuration05",
-"value": 2563,
-"p": [
-"cyrodiil",
-"skyrim"
-]
+"value": 2563
 },
 {
 "id": "10d678:Skyrim.esm",
 "name": "EnchClothesRobesMageDestruction05",
-"value": 2563,
-"p": [
-"cyrodiil",
-"skyrim"
-]
+"value": 2563
 },
 {
 "id": "10d67c:Skyrim.esm",
 "name": "EnchClothesRobesMageIllusion05",
-"value": 2563,
-"p": [
-"cyrodiil",
-"skyrim"
-]
+"value": 2563
 },
 {
 "id": "10d684:Skyrim.esm",
 "name": "EnchClothesRobesMageRestoration05",
-"value": 2563,
-"p": [
-"cyrodiil",
-"skyrim"
-]
+"value": 2563
 },
 {
 "id": "1db97:Dragonborn.esm",
@@ -22636,14 +21682,6 @@
 {
 "id": "c0165:Skyrim.esm",
 "name": "ArmorTsunCuirass",
-"value": 0,
-"p": [
-"skyrim"
-]
-},
-{
-"id": "92dbe:Skyrim.esm",
-"name": "MGR02Gloves02",
 "value": 0,
 "p": [
 "skyrim"
@@ -23025,6 +22063,7 @@
 "name": "ClothesMythicDawnBoots",
 "value": 15,
 "p": [
+"cyrodiil",
 "skyrim"
 ]
 },
@@ -23080,14 +22119,6 @@
 "value": 20,
 "p": [
 "cyrodiil",
-"skyrim"
-]
-},
-{
-"id": "26c3b:Skyrim.esm",
-"name": "MGR02Gloves",
-"value": 20,
-"p": [
 "skyrim"
 ]
 },
@@ -23428,6 +22459,7 @@
 "name": "ClothesMythicDawnGloves",
 "value": 25,
 "p": [
+"cyrodiil",
 "skyrim"
 ]
 },
@@ -23538,14 +22570,6 @@
 {
 "id": "292ad:Dragonborn.esm",
 "name": "DLC2MoragTongGauntlets",
-"value": 25,
-"p": [
-"solstheim"
-]
-},
-{
-"id": "24fa4:Dragonborn.esm",
-"name": "DLC2RRF05EECNecklace",
 "value": 25,
 "p": [
 "solstheim"
@@ -24820,6 +23844,14 @@
 ]
 },
 {
+"id": "39d4a:Dragonborn.esm",
+"name": "DLC2SkaalAmulet",
+"value": 100,
+"p": [
+"solstheim"
+]
+},
+{
 "id": "d8d50:Skyrim.esm",
 "name": "ForswornCuirass",
 "value": 100,
@@ -25188,20 +24220,12 @@
 {
 "id": "13938:Skyrim.esm",
 "name": "ArmorGlassBoots",
-"value": 190,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 190
 },
 {
 "id": "1393a:Skyrim.esm",
 "name": "ArmorGlassGauntlets",
-"value": 190,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 190
 },
 {
 "id": "30002e:BSHeartland.esm",
@@ -25543,20 +24567,12 @@
 {
 "id": "13960:Skyrim.esm",
 "name": "ArmorEbonyBoots",
-"value": 275,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 275
 },
 {
 "id": "13962:Skyrim.esm",
 "name": "ArmorEbonyGauntlets",
-"value": 275,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 275
 },
 {
 "id": "b83cb:Skyrim.esm",
@@ -25795,20 +24811,12 @@
 {
 "id": "1393b:Skyrim.esm",
 "name": "ArmorGlassHelmet",
-"value": 450,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 450
 },
 {
 "id": "1393c:Skyrim.esm",
 "name": "ArmorGlassShield",
-"value": 450,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 450
 },
 {
 "id": "60291f:BSAssets.esm",
@@ -26043,20 +25051,12 @@
 {
 "id": "13963:Skyrim.esm",
 "name": "ArmorEbonyHelmet",
-"value": 750,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 750
 },
 {
 "id": "13964:Skyrim.esm",
 "name": "ArmorEbonyShield",
-"value": 750,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 750
 },
 {
 "id": "300040:BSHeartland.esm",
@@ -26082,11 +25082,7 @@
 {
 "id": "13939:Skyrim.esm",
 "name": "ArmorGlassCuirass",
-"value": 900,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 900
 },
 {
 "id": "6020c8:BSAssets.esm",
@@ -26246,14 +25242,6 @@
 ]
 },
 {
-"id": "39d4a:Dragonborn.esm",
-"name": "DLC2SkaalAmulet",
-"value": 1000,
-"p": [
-"solstheim"
-]
-},
-{
 "id": "13969:Skyrim.esm",
 "name": "ArmorDragonplateHelmet",
 "value": 1050,
@@ -26304,11 +25292,7 @@
 {
 "id": "13961:Skyrim.esm",
 "name": "ArmorEbonyCuirass",
-"value": 1500,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1500
 },
 {
 "id": "30003e:BSHeartland.esm",
@@ -28124,11 +27108,6 @@
 ],
 "gems": [
 {
-"id": "601c8b:BSAssets.esm",
-"name": "BSKGemJade",
-"value": 25
-},
-{
 "id": "601c8c:BSAssets.esm",
 "name": "BSKGemJadeFlawless",
 "value": 75
@@ -28197,6 +27176,11 @@
 "id": "6851f:Skyrim.esm",
 "name": "GemDiamondFlawless",
 "value": 1000
+},
+{
+"id": "601c8b:BSAssets.esm",
+"name": "BSKGemJade",
+"value": 25
 }
 ],
 "ench_weapons": [
@@ -28518,23 +27502,6 @@
 "value": 5,
 "p": [
 "skyrim"
-]
-},
-{
-"id": "6a093:Skyrim.esm",
-"name": "MGRArniel02Staff",
-"value": 5,
-"p": [
-"skyrim"
-]
-},
-{
-"id": "6a13c:Skyrim.esm",
-"name": "MGRKeening",
-"value": 5,
-"p": [
-"skyrim",
-"solstheim"
 ]
 },
 {
@@ -37842,335 +36809,187 @@
 {
 "id": "beee7:Skyrim.esm",
 "name": "EnchGlassDaggerAbsorbH03",
-"value": 165,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 165
 },
 {
 "id": "beee8:Skyrim.esm",
 "name": "EnchGlassDaggerAbsorbH04",
-"value": 165,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 165
 },
 {
 "id": "beee9:Skyrim.esm",
 "name": "EnchGlassDaggerAbsorbH05",
-"value": 165,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 165
 },
 {
 "id": "beeea:Skyrim.esm",
 "name": "EnchGlassDaggerAbsorbM03",
-"value": 165,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 165
 },
 {
 "id": "beeeb:Skyrim.esm",
 "name": "EnchGlassDaggerAbsorbM04",
-"value": 165,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 165
 },
 {
 "id": "beeec:Skyrim.esm",
 "name": "EnchGlassDaggerAbsorbM05",
-"value": 165,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 165
 },
 {
 "id": "beeed:Skyrim.esm",
 "name": "EnchGlassDaggerAbsorbS03",
-"value": 165,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 165
 },
 {
 "id": "beeee:Skyrim.esm",
 "name": "EnchGlassDaggerAbsorbS04",
-"value": 165,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 165
 },
 {
 "id": "beeef:Skyrim.esm",
 "name": "EnchGlassDaggerAbsorbS05",
-"value": 165,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 165
 },
 {
 "id": "beef0:Skyrim.esm",
 "name": "EnchGlassDaggerBanish04",
-"value": 165,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 165
 },
 {
 "id": "beef1:Skyrim.esm",
 "name": "EnchGlassDaggerBanish05",
-"value": 165,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 165
 },
 {
 "id": "beef2:Skyrim.esm",
 "name": "EnchGlassDaggerFear03",
-"value": 165,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 165
 },
 {
 "id": "beef3:Skyrim.esm",
 "name": "EnchGlassDaggerFear04",
-"value": 165,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 165
 },
 {
 "id": "beef4:Skyrim.esm",
 "name": "EnchGlassDaggerFear05",
-"value": 165,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 165
 },
 {
 "id": "beef5:Skyrim.esm",
 "name": "EnchGlassDaggerFire03",
-"value": 165,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 165
 },
 {
 "id": "beef6:Skyrim.esm",
 "name": "EnchGlassDaggerFire04",
-"value": 165,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 165
 },
 {
 "id": "beef7:Skyrim.esm",
 "name": "EnchGlassDaggerFire05",
-"value": 165,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 165
 },
 {
 "id": "beef8:Skyrim.esm",
 "name": "EnchGlassDaggerFrost03",
-"value": 165,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 165
 },
 {
 "id": "beef9:Skyrim.esm",
 "name": "EnchGlassDaggerFrost04",
-"value": 165,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 165
 },
 {
 "id": "beefa:Skyrim.esm",
 "name": "EnchGlassDaggerFrost05",
-"value": 165,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 165
 },
 {
 "id": "beefb:Skyrim.esm",
 "name": "EnchGlassDaggerMagicka03",
-"value": 165,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 165
 },
 {
 "id": "beefc:Skyrim.esm",
 "name": "EnchGlassDaggerMagicka04",
-"value": 165,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 165
 },
 {
 "id": "beefd:Skyrim.esm",
 "name": "EnchGlassDaggerMagicka05",
-"value": 165,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 165
 },
 {
 "id": "beefe:Skyrim.esm",
 "name": "EnchGlassDaggerParalyze04",
-"value": 165,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 165
 },
 {
 "id": "beeff:Skyrim.esm",
 "name": "EnchGlassDaggerParalyze05",
-"value": 165,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 165
 },
 {
 "id": "bef00:Skyrim.esm",
 "name": "EnchGlassDaggerShock03",
-"value": 165,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 165
 },
 {
 "id": "bef01:Skyrim.esm",
 "name": "EnchGlassDaggerShock04",
-"value": 165,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 165
 },
 {
 "id": "bef25:Skyrim.esm",
 "name": "EnchGlassDaggerShock05",
-"value": 165,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 165
 },
 {
 "id": "bef02:Skyrim.esm",
 "name": "EnchGlassDaggerSoulTrap03",
-"value": 165,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 165
 },
 {
 "id": "bef03:Skyrim.esm",
 "name": "EnchGlassDaggerSoulTrap04",
-"value": 165,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 165
 },
 {
 "id": "bef04:Skyrim.esm",
 "name": "EnchGlassDaggerSoulTrap05",
-"value": 165,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 165
 },
 {
 "id": "bef05:Skyrim.esm",
 "name": "EnchGlassDaggerStamina03",
-"value": 165,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 165
 },
 {
 "id": "bef06:Skyrim.esm",
 "name": "EnchGlassDaggerStamina04",
-"value": 165,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 165
 },
 {
 "id": "bef07:Skyrim.esm",
 "name": "EnchGlassDaggerStamina05",
-"value": 165,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 165
 },
 {
 "id": "bef08:Skyrim.esm",
 "name": "EnchGlassDaggerTurn03",
-"value": 165,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 165
 },
 {
 "id": "bef09:Skyrim.esm",
 "name": "EnchGlassDaggerTurn04",
-"value": 165,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 165
 },
 {
 "id": "bef0a:Skyrim.esm",
 "name": "EnchGlassDaggerTurn05",
-"value": 165,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 165
 },
 {
 "id": "aa166:Skyrim.esm",
@@ -39000,119 +37819,67 @@
 {
 "id": "bef6b:Skyrim.esm",
 "name": "EnchGlassSwordParalyze05",
-"value": 205,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 205
 },
 {
 "id": "bef6c:Skyrim.esm",
 "name": "EnchGlassSwordShock03",
-"value": 205,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 205
 },
 {
 "id": "bef6d:Skyrim.esm",
 "name": "EnchGlassSwordShock04",
-"value": 205,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 205
 },
 {
 "id": "bef6e:Skyrim.esm",
 "name": "EnchGlassSwordShock05",
-"value": 205,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 205
 },
 {
 "id": "bef6f:Skyrim.esm",
 "name": "EnchGlassSwordSoulTrap03",
-"value": 205,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 205
 },
 {
 "id": "bef70:Skyrim.esm",
 "name": "EnchGlassSwordSoulTrap04",
-"value": 205,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 205
 },
 {
 "id": "bef71:Skyrim.esm",
 "name": "EnchGlassSwordSoulTrap05",
-"value": 205,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 205
 },
 {
 "id": "bef72:Skyrim.esm",
 "name": "EnchGlassSwordStamina03",
-"value": 205,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 205
 },
 {
 "id": "bef73:Skyrim.esm",
 "name": "EnchGlassSwordStamina04",
-"value": 205,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 205
 },
 {
 "id": "bef74:Skyrim.esm",
 "name": "EnchGlassSwordStamina05",
-"value": 205,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 205
 },
 {
 "id": "bef75:Skyrim.esm",
 "name": "EnchGlassSwordTurn03",
-"value": 205,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 205
 },
 {
 "id": "bef76:Skyrim.esm",
 "name": "EnchGlassSwordTurn04",
-"value": 205,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 205
 },
 {
 "id": "bef77:Skyrim.esm",
 "name": "EnchGlassSwordTurn05",
-"value": 205,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 205
 },
 {
 "id": "282e6:Dragonborn.esm",
@@ -41272,353 +40039,197 @@
 {
 "id": "bf41e:Skyrim.esm",
 "name": "EnchEbonyDaggerAbsorbH04",
-"value": 290,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 290
 },
 {
 "id": "bf41f:Skyrim.esm",
 "name": "EnchEbonyDaggerAbsorbH05",
-"value": 290,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 290
 },
 {
 "id": "bf420:Skyrim.esm",
 "name": "EnchEbonyDaggerAbsorbH06",
-"value": 290,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 290
 },
 {
 "id": "bf421:Skyrim.esm",
 "name": "EnchEbonyDaggerAbsorbM04",
-"value": 290,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 290
 },
 {
 "id": "bf422:Skyrim.esm",
 "name": "EnchEbonyDaggerAbsorbM05",
-"value": 290,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 290
 },
 {
 "id": "bf423:Skyrim.esm",
 "name": "EnchEbonyDaggerAbsorbM06",
-"value": 290,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 290
 },
 {
 "id": "bf424:Skyrim.esm",
 "name": "EnchEbonyDaggerAbsorbS04",
-"value": 290,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 290
 },
 {
 "id": "bf425:Skyrim.esm",
 "name": "EnchEbonyDaggerAbsorbS05",
-"value": 290,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 290
 },
 {
 "id": "bf426:Skyrim.esm",
 "name": "EnchEbonyDaggerAbsorbS06",
-"value": 290,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 290
 },
 {
 "id": "bf427:Skyrim.esm",
 "name": "EnchEbonyDaggerBanish04",
-"value": 290,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 290
 },
 {
 "id": "bf428:Skyrim.esm",
 "name": "EnchEbonyDaggerBanish05",
-"value": 290,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 290
 },
 {
 "id": "bf429:Skyrim.esm",
 "name": "EnchEbonyDaggerBanish06",
-"value": 290,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 290
 },
 {
 "id": "bf42a:Skyrim.esm",
 "name": "EnchEbonyDaggerFear04",
-"value": 290,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 290
 },
 {
 "id": "bf42b:Skyrim.esm",
 "name": "EnchEbonyDaggerFear05",
-"value": 290,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 290
 },
 {
 "id": "bf42c:Skyrim.esm",
 "name": "EnchEbonyDaggerFear06",
-"value": 290,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 290
 },
 {
 "id": "bf42d:Skyrim.esm",
 "name": "EnchEbonyDaggerFire04",
-"value": 290,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 290
 },
 {
 "id": "bf42e:Skyrim.esm",
 "name": "EnchEbonyDaggerFire05",
-"value": 290,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 290
 },
 {
 "id": "bf42f:Skyrim.esm",
 "name": "EnchEbonyDaggerFire06",
-"value": 290,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 290
 },
 {
 "id": "bf430:Skyrim.esm",
 "name": "EnchEbonyDaggerFrost04",
-"value": 290,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 290
 },
 {
 "id": "bf431:Skyrim.esm",
 "name": "EnchEbonyDaggerFrost05",
-"value": 290,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 290
 },
 {
 "id": "bf432:Skyrim.esm",
 "name": "EnchEbonyDaggerFrost06",
-"value": 290,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 290
 },
 {
 "id": "bf433:Skyrim.esm",
 "name": "EnchEbonyDaggerMagicka04",
-"value": 290,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 290
 },
 {
 "id": "bf434:Skyrim.esm",
 "name": "EnchEbonyDaggerMagicka05",
-"value": 290,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 290
 },
 {
 "id": "bf435:Skyrim.esm",
 "name": "EnchEbonyDaggerMagicka06",
-"value": 290,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 290
 },
 {
 "id": "bf436:Skyrim.esm",
 "name": "EnchEbonyDaggerParalyze04",
-"value": 290,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 290
 },
 {
 "id": "bf437:Skyrim.esm",
 "name": "EnchEbonyDaggerParalyze05",
-"value": 290,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 290
 },
 {
 "id": "bf438:Skyrim.esm",
 "name": "EnchEbonyDaggerParalyze06",
-"value": 290,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 290
 },
 {
 "id": "bf439:Skyrim.esm",
 "name": "EnchEbonyDaggerShock04",
-"value": 290,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 290
 },
 {
 "id": "bf43a:Skyrim.esm",
 "name": "EnchEbonyDaggerShock05",
-"value": 290,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 290
 },
 {
 "id": "bf43b:Skyrim.esm",
 "name": "EnchEbonyDaggerShock06",
-"value": 290,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 290
 },
 {
 "id": "bf43c:Skyrim.esm",
 "name": "EnchEbonyDaggerSoulTrap04",
-"value": 290,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 290
 },
 {
 "id": "bf43d:Skyrim.esm",
 "name": "EnchEbonyDaggerSoulTrap05",
-"value": 290,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 290
 },
 {
 "id": "bf43e:Skyrim.esm",
 "name": "EnchEbonyDaggerSoulTrap06",
-"value": 290,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 290
 },
 {
 "id": "bf43f:Skyrim.esm",
 "name": "EnchEbonyDaggerStamina04",
-"value": 290,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 290
 },
 {
 "id": "bf440:Skyrim.esm",
 "name": "EnchEbonyDaggerStamina05",
-"value": 290,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 290
 },
 {
 "id": "bf441:Skyrim.esm",
 "name": "EnchEbonyDaggerStamina06",
-"value": 290,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 290
 },
 {
 "id": "bf442:Skyrim.esm",
 "name": "EnchEbonyDaggerTurn04",
-"value": 290,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 290
 },
 {
 "id": "bf443:Skyrim.esm",
 "name": "EnchEbonyDaggerTurn05",
-"value": 290,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 290
 },
 {
 "id": "bf444:Skyrim.esm",
 "name": "EnchEbonyDaggerTurn06",
-"value": 290,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 290
 },
 {
 "id": "acb94:Skyrim.esm",
@@ -43014,209 +41625,117 @@
 {
 "id": "bef54:Skyrim.esm",
 "name": "EnchGlassSwordAbsorbH03",
-"value": 410,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 410
 },
 {
 "id": "bef55:Skyrim.esm",
 "name": "EnchGlassSwordAbsorbH04",
-"value": 410,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 410
 },
 {
 "id": "bef56:Skyrim.esm",
 "name": "EnchGlassSwordAbsorbH05",
-"value": 410,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 410
 },
 {
 "id": "bef57:Skyrim.esm",
 "name": "EnchGlassSwordAbsorbM03",
-"value": 410,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 410
 },
 {
 "id": "bef58:Skyrim.esm",
 "name": "EnchGlassSwordAbsorbM04",
-"value": 410,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 410
 },
 {
 "id": "bef59:Skyrim.esm",
 "name": "EnchGlassSwordAbsorbM05",
-"value": 410,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 410
 },
 {
 "id": "bef5a:Skyrim.esm",
 "name": "EnchGlassSwordAbsorbS03",
-"value": 410,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 410
 },
 {
 "id": "bef5b:Skyrim.esm",
 "name": "EnchGlassSwordAbsorbS04",
-"value": 410,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 410
 },
 {
 "id": "bef5c:Skyrim.esm",
 "name": "EnchGlassSwordAbsorbS05",
-"value": 410,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 410
 },
 {
 "id": "bef5d:Skyrim.esm",
 "name": "EnchGlassSwordBanish04",
-"value": 410,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 410
 },
 {
 "id": "bef5e:Skyrim.esm",
 "name": "EnchGlassSwordBanish05",
-"value": 410,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 410
 },
 {
 "id": "bef5f:Skyrim.esm",
 "name": "EnchGlassSwordFear03",
-"value": 410,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 410
 },
 {
 "id": "bef60:Skyrim.esm",
 "name": "EnchGlassSwordFear04",
-"value": 410,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 410
 },
 {
 "id": "bef61:Skyrim.esm",
 "name": "EnchGlassSwordFear05",
-"value": 410,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 410
 },
 {
 "id": "bef62:Skyrim.esm",
 "name": "EnchGlassSwordFire03",
-"value": 410,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 410
 },
 {
 "id": "bef63:Skyrim.esm",
 "name": "EnchGlassSwordFire04",
-"value": 410,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 410
 },
 {
 "id": "bef64:Skyrim.esm",
 "name": "EnchGlassSwordFire05",
-"value": 410,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 410
 },
 {
 "id": "bef65:Skyrim.esm",
 "name": "EnchGlassSwordFrost03",
-"value": 410,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 410
 },
 {
 "id": "bef66:Skyrim.esm",
 "name": "EnchGlassSwordFrost04",
-"value": 410,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 410
 },
 {
 "id": "bef67:Skyrim.esm",
 "name": "EnchGlassSwordFrost05",
-"value": 410,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 410
 },
 {
 "id": "bef68:Skyrim.esm",
 "name": "EnchGlassSwordMagicka04",
-"value": 410,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 410
 },
 {
 "id": "bef69:Skyrim.esm",
 "name": "EnchGlassSwordMagicka05",
-"value": 410,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 410
 },
 {
 "id": "bef6a:Skyrim.esm",
 "name": "EnchGlassSwordParalyze04",
-"value": 410,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 410
 },
 {
 "id": "f6525:Skyrim.esm",
@@ -44142,326 +42661,182 @@
 {
 "id": "bef78:Skyrim.esm",
 "name": "EnchGlassWarAxeAbsorbH03",
-"value": 490,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 490
 },
 {
 "id": "bef79:Skyrim.esm",
 "name": "EnchGlassWarAxeAbsorbH04",
-"value": 490,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 490
 },
 {
 "id": "bef7a:Skyrim.esm",
 "name": "EnchGlassWarAxeAbsorbH05",
-"value": 490,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 490
 },
 {
 "id": "bef7b:Skyrim.esm",
 "name": "EnchGlassWarAxeAbsorbM03",
-"value": 490,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 490
 },
 {
 "id": "bef7c:Skyrim.esm",
 "name": "EnchGlassWarAxeAbsorbM04",
-"value": 490,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 490
 },
 {
 "id": "bef7d:Skyrim.esm",
 "name": "EnchGlassWarAxeAbsorbM05",
-"value": 490,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 490
 },
 {
 "id": "bef7e:Skyrim.esm",
 "name": "EnchGlassWarAxeAbsorbS03",
-"value": 490,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 490
 },
 {
 "id": "bef7f:Skyrim.esm",
 "name": "EnchGlassWarAxeAbsorbS04",
-"value": 490,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 490
 },
 {
 "id": "bef80:Skyrim.esm",
 "name": "EnchGlassWarAxeAbsorbS05",
-"value": 490,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 490
 },
 {
 "id": "bef81:Skyrim.esm",
 "name": "EnchGlassWarAxeBanish04",
-"value": 490,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 490
 },
 {
 "id": "bef82:Skyrim.esm",
 "name": "EnchGlassWarAxeBanish05",
-"value": 490,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 490
 },
 {
 "id": "bef83:Skyrim.esm",
 "name": "EnchGlassWarAxeFear03",
-"value": 490,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 490
 },
 {
 "id": "bef84:Skyrim.esm",
 "name": "EnchGlassWarAxeFear04",
-"value": 490,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 490
 },
 {
 "id": "bef85:Skyrim.esm",
 "name": "EnchGlassWarAxeFear05",
-"value": 490,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 490
 },
 {
 "id": "bef86:Skyrim.esm",
 "name": "EnchGlassWarAxeFire03",
-"value": 490,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 490
 },
 {
 "id": "bef87:Skyrim.esm",
 "name": "EnchGlassWarAxeFire04",
-"value": 490,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 490
 },
 {
 "id": "bef88:Skyrim.esm",
 "name": "EnchGlassWarAxeFire05",
-"value": 490,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 490
 },
 {
 "id": "bef89:Skyrim.esm",
 "name": "EnchGlassWarAxeFrost03",
-"value": 490,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 490
 },
 {
 "id": "bef8a:Skyrim.esm",
 "name": "EnchGlassWarAxeFrost04",
-"value": 490,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 490
 },
 {
 "id": "bef8b:Skyrim.esm",
 "name": "EnchGlassWarAxeFrost05",
-"value": 490,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 490
 },
 {
 "id": "bef8c:Skyrim.esm",
 "name": "EnchGlassWarAxeMagicka04",
-"value": 490,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 490
 },
 {
 "id": "bef8d:Skyrim.esm",
 "name": "EnchGlassWarAxeMagicka05",
-"value": 490,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 490
 },
 {
 "id": "bef8e:Skyrim.esm",
 "name": "EnchGlassWarAxeParalyze04",
-"value": 490,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 490
 },
 {
 "id": "bef8f:Skyrim.esm",
 "name": "EnchGlassWarAxeParalyze05",
-"value": 490,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 490
 },
 {
 "id": "bef90:Skyrim.esm",
 "name": "EnchGlassWarAxeShock03",
-"value": 490,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 490
 },
 {
 "id": "bef91:Skyrim.esm",
 "name": "EnchGlassWarAxeShock04",
-"value": 490,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 490
 },
 {
 "id": "bef92:Skyrim.esm",
 "name": "EnchGlassWarAxeShock05",
-"value": 490,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 490
 },
 {
 "id": "bef93:Skyrim.esm",
 "name": "EnchGlassWarAxeSoulTrap03",
-"value": 490,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 490
 },
 {
 "id": "bef94:Skyrim.esm",
 "name": "EnchGlassWarAxeSoulTrap04",
-"value": 490,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 490
 },
 {
 "id": "bef95:Skyrim.esm",
 "name": "EnchGlassWarAxeSoulTrap05",
-"value": 490,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 490
 },
 {
 "id": "bef96:Skyrim.esm",
 "name": "EnchGlassWarAxeStamina03",
-"value": 490,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 490
 },
 {
 "id": "bef97:Skyrim.esm",
 "name": "EnchGlassWarAxeStamina04",
-"value": 490,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 490
 },
 {
 "id": "bef98:Skyrim.esm",
 "name": "EnchGlassWarAxeStamina05",
-"value": 490,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 490
 },
 {
 "id": "bef99:Skyrim.esm",
 "name": "EnchGlassWarAxeTurn03",
-"value": 490,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 490
 },
 {
 "id": "bef9a:Skyrim.esm",
 "name": "EnchGlassWarAxeTurn04",
-"value": 490,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 490
 },
 {
 "id": "bef9b:Skyrim.esm",
 "name": "EnchGlassWarAxeTurn05",
-"value": 490,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 490
 },
 {
 "id": "964c9:Skyrim.esm",
@@ -46397,326 +44772,182 @@
 {
 "id": "bef30:Skyrim.esm",
 "name": "EnchGlassMaceAbsorbH03",
-"value": 575,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 575
 },
 {
 "id": "bef31:Skyrim.esm",
 "name": "EnchGlassMaceAbsorbH04",
-"value": 575,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 575
 },
 {
 "id": "bef32:Skyrim.esm",
 "name": "EnchGlassMaceAbsorbH05",
-"value": 575,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 575
 },
 {
 "id": "bef33:Skyrim.esm",
 "name": "EnchGlassMaceAbsorbM03",
-"value": 575,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 575
 },
 {
 "id": "bef34:Skyrim.esm",
 "name": "EnchGlassMaceAbsorbM04",
-"value": 575,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 575
 },
 {
 "id": "bef35:Skyrim.esm",
 "name": "EnchGlassMaceAbsorbM05",
-"value": 575,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 575
 },
 {
 "id": "bef36:Skyrim.esm",
 "name": "EnchGlassMaceAbsorbS03",
-"value": 575,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 575
 },
 {
 "id": "bef37:Skyrim.esm",
 "name": "EnchGlassMaceAbsorbS04",
-"value": 575,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 575
 },
 {
 "id": "bef38:Skyrim.esm",
 "name": "EnchGlassMaceAbsorbS05",
-"value": 575,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 575
 },
 {
 "id": "bef39:Skyrim.esm",
 "name": "EnchGlassMaceBanish04",
-"value": 575,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 575
 },
 {
 "id": "bef3a:Skyrim.esm",
 "name": "EnchGlassMaceBanish05",
-"value": 575,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 575
 },
 {
 "id": "bef3b:Skyrim.esm",
 "name": "EnchGlassMaceFear03",
-"value": 575,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 575
 },
 {
 "id": "bef3c:Skyrim.esm",
 "name": "EnchGlassMaceFear04",
-"value": 575,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 575
 },
 {
 "id": "bef3d:Skyrim.esm",
 "name": "EnchGlassMaceFear05",
-"value": 575,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 575
 },
 {
 "id": "bef3e:Skyrim.esm",
 "name": "EnchGlassMaceFire03",
-"value": 575,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 575
 },
 {
 "id": "bef3f:Skyrim.esm",
 "name": "EnchGlassMaceFire04",
-"value": 575,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 575
 },
 {
 "id": "bef40:Skyrim.esm",
 "name": "EnchGlassMaceFire05",
-"value": 575,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 575
 },
 {
 "id": "bef41:Skyrim.esm",
 "name": "EnchGlassMaceFrost03",
-"value": 575,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 575
 },
 {
 "id": "bef42:Skyrim.esm",
 "name": "EnchGlassMaceFrost04",
-"value": 575,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 575
 },
 {
 "id": "bef43:Skyrim.esm",
 "name": "EnchGlassMaceFrost05",
-"value": 575,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 575
 },
 {
 "id": "bef44:Skyrim.esm",
 "name": "EnchGlassMaceMagicka04",
-"value": 575,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 575
 },
 {
 "id": "bef45:Skyrim.esm",
 "name": "EnchGlassMaceMagicka05",
-"value": 575,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 575
 },
 {
 "id": "bef46:Skyrim.esm",
 "name": "EnchGlassMaceParalyze04",
-"value": 575,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 575
 },
 {
 "id": "bef47:Skyrim.esm",
 "name": "EnchGlassMaceParalyze05",
-"value": 575,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 575
 },
 {
 "id": "bef48:Skyrim.esm",
 "name": "EnchGlassMaceShock03",
-"value": 575,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 575
 },
 {
 "id": "bef49:Skyrim.esm",
 "name": "EnchGlassMaceShock04",
-"value": 575,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 575
 },
 {
 "id": "bef4a:Skyrim.esm",
 "name": "EnchGlassMaceShock05",
-"value": 575,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 575
 },
 {
 "id": "bef4b:Skyrim.esm",
 "name": "EnchGlassMaceSoulTrap03",
-"value": 575,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 575
 },
 {
 "id": "bef4c:Skyrim.esm",
 "name": "EnchGlassMaceSoulTrap04",
-"value": 575,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 575
 },
 {
 "id": "bef4d:Skyrim.esm",
 "name": "EnchGlassMaceSoulTrap05",
-"value": 575,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 575
 },
 {
 "id": "bef4e:Skyrim.esm",
 "name": "EnchGlassMaceStamina03",
-"value": 575,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 575
 },
 {
 "id": "bef4f:Skyrim.esm",
 "name": "EnchGlassMaceStamina04",
-"value": 575,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 575
 },
 {
 "id": "bef50:Skyrim.esm",
 "name": "EnchGlassMaceStamina05",
-"value": 575,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 575
 },
 {
 "id": "bef51:Skyrim.esm",
 "name": "EnchGlassMaceTurn03",
-"value": 575,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 575
 },
 {
 "id": "bef52:Skyrim.esm",
 "name": "EnchGlassMaceTurn04",
-"value": 575,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 575
 },
 {
 "id": "bef53:Skyrim.esm",
 "name": "EnchGlassMaceTurn05",
-"value": 575,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 575
 },
 {
 "id": "2840b:Dragonborn.esm",
@@ -47033,353 +45264,197 @@
 {
 "id": "1d4ed:Skyrim.esm",
 "name": "EnchEbonySwordAbsorbH04",
-"value": 720,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 720
 },
 {
 "id": "1d4fd:Skyrim.esm",
 "name": "EnchEbonySwordAbsorbH05",
-"value": 720,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 720
 },
 {
 "id": "1d520:Skyrim.esm",
 "name": "EnchEbonySwordAbsorbH06",
-"value": 720,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 720
 },
 {
 "id": "1d535:Skyrim.esm",
 "name": "EnchEbonySwordAbsorbM04",
-"value": 720,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 720
 },
 {
 "id": "1d551:Skyrim.esm",
 "name": "EnchEbonySwordAbsorbM05",
-"value": 720,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 720
 },
 {
 "id": "1d552:Skyrim.esm",
 "name": "EnchEbonySwordAbsorbM06",
-"value": 720,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 720
 },
 {
 "id": "1d55d:Skyrim.esm",
 "name": "EnchEbonySwordAbsorbS04",
-"value": 720,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 720
 },
 {
 "id": "1d568:Skyrim.esm",
 "name": "EnchEbonySwordAbsorbS05",
-"value": 720,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 720
 },
 {
 "id": "1d59a:Skyrim.esm",
 "name": "EnchEbonySwordAbsorbS06",
-"value": 720,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 720
 },
 {
 "id": "1d5de:Skyrim.esm",
 "name": "EnchEbonySwordBanish04",
-"value": 720,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 720
 },
 {
 "id": "1d5e2:Skyrim.esm",
 "name": "EnchEbonySwordBanish05",
-"value": 720,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 720
 },
 {
 "id": "1d5e4:Skyrim.esm",
 "name": "EnchEbonySwordBanish06",
-"value": 720,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 720
 },
 {
 "id": "1d5e6:Skyrim.esm",
 "name": "EnchEbonySwordFear04",
-"value": 720,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 720
 },
 {
 "id": "1d5e7:Skyrim.esm",
 "name": "EnchEbonySwordFear05",
-"value": 720,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 720
 },
 {
 "id": "1d5e9:Skyrim.esm",
 "name": "EnchEbonySwordFear06",
-"value": 720,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 720
 },
 {
 "id": "1d5eb:Skyrim.esm",
 "name": "EnchEbonySwordFire04",
-"value": 720,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 720
 },
 {
 "id": "1d62c:Skyrim.esm",
 "name": "EnchEbonySwordFire05",
-"value": 720,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 720
 },
 {
 "id": "1d62e:Skyrim.esm",
 "name": "EnchEbonySwordFire06",
-"value": 720,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 720
 },
 {
 "id": "1d62f:Skyrim.esm",
 "name": "EnchEbonySwordFrost04",
-"value": 720,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 720
 },
 {
 "id": "1d6ca:Skyrim.esm",
 "name": "EnchEbonySwordFrost05",
-"value": 720,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 720
 },
 {
 "id": "1d728:Skyrim.esm",
 "name": "EnchEbonySwordFrost06",
-"value": 720,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 720
 },
 {
 "id": "1d745:Skyrim.esm",
 "name": "EnchEbonySwordMagicka04",
-"value": 720,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 720
 },
 {
 "id": "1d7ea:Skyrim.esm",
 "name": "EnchEbonySwordMagicka05",
-"value": 720,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 720
 },
 {
 "id": "1d7eb:Skyrim.esm",
 "name": "EnchEbonySwordMagicka06",
-"value": 720,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 720
 },
 {
 "id": "1d7f2:Skyrim.esm",
 "name": "EnchEbonySwordParalyze04",
-"value": 720,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 720
 },
 {
 "id": "1d85e:Skyrim.esm",
 "name": "EnchEbonySwordParalyze05",
-"value": 720,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 720
 },
 {
 "id": "1d85f:Skyrim.esm",
 "name": "EnchEbonySwordParalyze06",
-"value": 720,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 720
 },
 {
 "id": "1d860:Skyrim.esm",
 "name": "EnchEbonySwordShock04",
-"value": 720,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 720
 },
 {
 "id": "1d862:Skyrim.esm",
 "name": "EnchEbonySwordShock05",
-"value": 720,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 720
 },
 {
 "id": "1d865:Skyrim.esm",
 "name": "EnchEbonySwordShock06",
-"value": 720,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 720
 },
 {
 "id": "1d867:Skyrim.esm",
 "name": "EnchEbonySwordSoulTrap04",
-"value": 720,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 720
 },
 {
 "id": "1d86b:Skyrim.esm",
 "name": "EnchEbonySwordSoulTrap05",
-"value": 720,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 720
 },
 {
 "id": "1d877:Skyrim.esm",
 "name": "EnchEbonySwordSoulTrap06",
-"value": 720,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 720
 },
 {
 "id": "1d87b:Skyrim.esm",
 "name": "EnchEbonySwordStamina04",
-"value": 720,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 720
 },
 {
 "id": "1d87c:Skyrim.esm",
 "name": "EnchEbonySwordStamina05",
-"value": 720,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 720
 },
 {
 "id": "1d87e:Skyrim.esm",
 "name": "EnchEbonySwordStamina06",
-"value": 720,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 720
 },
 {
 "id": "1d87f:Skyrim.esm",
 "name": "EnchEbonySwordTurn04",
-"value": 720,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 720
 },
 {
 "id": "1d8a5:Skyrim.esm",
 "name": "EnchEbonySwordTurn05",
-"value": 720,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 720
 },
 {
 "id": "1d8aa:Skyrim.esm",
 "name": "EnchEbonySwordTurn06",
-"value": 720,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 720
 },
 {
 "id": "f6526:Skyrim.esm",
@@ -47392,578 +45467,322 @@
 {
 "id": "beecb:Skyrim.esm",
 "name": "EnchGlassBowBanish04",
-"value": 820,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 820
 },
 {
 "id": "beecc:Skyrim.esm",
 "name": "EnchGlassBowBanish05",
-"value": 820,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 820
 },
 {
 "id": "beecd:Skyrim.esm",
 "name": "EnchGlassBowFear03",
-"value": 820,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 820
 },
 {
 "id": "beece:Skyrim.esm",
 "name": "EnchGlassBowFear04",
-"value": 820,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 820
 },
 {
 "id": "beecf:Skyrim.esm",
 "name": "EnchGlassBowFear05",
-"value": 820,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 820
 },
 {
 "id": "beed0:Skyrim.esm",
 "name": "EnchGlassBowFire03",
-"value": 820,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 820
 },
 {
 "id": "beed1:Skyrim.esm",
 "name": "EnchGlassBowFire04",
-"value": 820,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 820
 },
 {
 "id": "beed2:Skyrim.esm",
 "name": "EnchGlassBowFire05",
-"value": 820,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 820
 },
 {
 "id": "beed3:Skyrim.esm",
 "name": "EnchGlassBowFrost03",
-"value": 820,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 820
 },
 {
 "id": "beed4:Skyrim.esm",
 "name": "EnchGlassBowFrost04",
-"value": 820,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 820
 },
 {
 "id": "beed5:Skyrim.esm",
 "name": "EnchGlassBowFrost05",
-"value": 820,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 820
 },
 {
 "id": "beed6:Skyrim.esm",
 "name": "EnchGlassBowMagicka03",
-"value": 820,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 820
 },
 {
 "id": "beed7:Skyrim.esm",
 "name": "EnchGlassBowMagicka04",
-"value": 820,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 820
 },
 {
 "id": "beed8:Skyrim.esm",
 "name": "EnchGlassBowMagicka05",
-"value": 820,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 820
 },
 {
 "id": "beed9:Skyrim.esm",
 "name": "EnchGlassBowParalyze04",
-"value": 820,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 820
 },
 {
 "id": "beeda:Skyrim.esm",
 "name": "EnchGlassBowParalyze05",
-"value": 820,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 820
 },
 {
 "id": "beedb:Skyrim.esm",
 "name": "EnchGlassBowShock03",
-"value": 820,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 820
 },
 {
 "id": "beedc:Skyrim.esm",
 "name": "EnchGlassBowShock04",
-"value": 820,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 820
 },
 {
 "id": "beedd:Skyrim.esm",
 "name": "EnchGlassBowShock05",
-"value": 820,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 820
 },
 {
 "id": "beede:Skyrim.esm",
 "name": "EnchGlassBowSoulTrap03",
-"value": 820,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 820
 },
 {
 "id": "beedf:Skyrim.esm",
 "name": "EnchGlassBowSoulTrap04",
-"value": 820,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 820
 },
 {
 "id": "beee0:Skyrim.esm",
 "name": "EnchGlassBowSoulTrap05",
-"value": 820,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 820
 },
 {
 "id": "beee1:Skyrim.esm",
 "name": "EnchGlassBowStamina03",
-"value": 820,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 820
 },
 {
 "id": "beee2:Skyrim.esm",
 "name": "EnchGlassBowStamina04",
-"value": 820,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 820
 },
 {
 "id": "beee3:Skyrim.esm",
 "name": "EnchGlassBowStamina05",
-"value": 820,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 820
 },
 {
 "id": "beee4:Skyrim.esm",
 "name": "EnchGlassBowTurn03",
-"value": 820,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 820
 },
 {
 "id": "beee5:Skyrim.esm",
 "name": "EnchGlassBowTurn04",
-"value": 820,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 820
 },
 {
 "id": "beee6:Skyrim.esm",
 "name": "EnchGlassBowTurn05",
-"value": 820,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 820
 },
 {
 "id": "bef0b:Skyrim.esm",
 "name": "EnchGlassGreatswordAbsorbH03",
-"value": 820,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 820
 },
 {
 "id": "bef0c:Skyrim.esm",
 "name": "EnchGlassGreatswordAbsorbH04",
-"value": 820,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 820
 },
 {
 "id": "bef0d:Skyrim.esm",
 "name": "EnchGlassGreatswordAbsorbH05",
-"value": 820,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 820
 },
 {
 "id": "bef0e:Skyrim.esm",
 "name": "EnchGlassGreatswordAbsorbM03",
-"value": 820,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 820
 },
 {
 "id": "bef0f:Skyrim.esm",
 "name": "EnchGlassGreatswordAbsorbM04",
-"value": 820,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 820
 },
 {
 "id": "bef10:Skyrim.esm",
 "name": "EnchGlassGreatswordAbsorbM05",
-"value": 820,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 820
 },
 {
 "id": "bef11:Skyrim.esm",
 "name": "EnchGlassGreatswordAbsorbS03",
-"value": 820,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 820
 },
 {
 "id": "bef12:Skyrim.esm",
 "name": "EnchGlassGreatswordAbsorbS04",
-"value": 820,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 820
 },
 {
 "id": "bef13:Skyrim.esm",
 "name": "EnchGlassGreatswordAbsorbS05",
-"value": 820,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 820
 },
 {
 "id": "bef14:Skyrim.esm",
 "name": "EnchGlassGreatswordBanish04",
-"value": 820,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 820
 },
 {
 "id": "bef15:Skyrim.esm",
 "name": "EnchGlassGreatswordBanish05",
-"value": 820,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 820
 },
 {
 "id": "bef16:Skyrim.esm",
 "name": "EnchGlassGreatswordFear03",
-"value": 820,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 820
 },
 {
 "id": "bef17:Skyrim.esm",
 "name": "EnchGlassGreatswordFear04",
-"value": 820,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 820
 },
 {
 "id": "bef18:Skyrim.esm",
 "name": "EnchGlassGreatswordFear05",
-"value": 820,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 820
 },
 {
 "id": "bef19:Skyrim.esm",
 "name": "EnchGlassGreatswordFire03",
-"value": 820,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 820
 },
 {
 "id": "bef1a:Skyrim.esm",
 "name": "EnchGlassGreatswordFire04",
-"value": 820,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 820
 },
 {
 "id": "bef1b:Skyrim.esm",
 "name": "EnchGlassGreatswordFire05",
-"value": 820,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 820
 },
 {
 "id": "bef1c:Skyrim.esm",
 "name": "EnchGlassGreatswordFrost03",
-"value": 820,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 820
 },
 {
 "id": "bef1d:Skyrim.esm",
 "name": "EnchGlassGreatswordFrost04",
-"value": 820,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 820
 },
 {
 "id": "bef1e:Skyrim.esm",
 "name": "EnchGlassGreatswordFrost05",
-"value": 820,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 820
 },
 {
 "id": "bef1f:Skyrim.esm",
 "name": "EnchGlassGreatswordMagicka04",
-"value": 820,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 820
 },
 {
 "id": "bef20:Skyrim.esm",
 "name": "EnchGlassGreatswordMagicka05",
-"value": 820,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 820
 },
 {
 "id": "bef21:Skyrim.esm",
 "name": "EnchGlassGreatswordParalyze04",
-"value": 820,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 820
 },
 {
 "id": "bef22:Skyrim.esm",
 "name": "EnchGlassGreatswordParalyze05",
-"value": 820,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 820
 },
 {
 "id": "bef23:Skyrim.esm",
 "name": "EnchGlassGreatswordShock03",
-"value": 820,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 820
 },
 {
 "id": "bef24:Skyrim.esm",
 "name": "EnchGlassGreatswordShock04",
-"value": 820,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 820
 },
 {
 "id": "bef26:Skyrim.esm",
 "name": "EnchGlassGreatswordShock05",
-"value": 820,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 820
 },
 {
 "id": "bef27:Skyrim.esm",
 "name": "EnchGlassGreatswordSoulTrap03",
-"value": 820,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 820
 },
 {
 "id": "bef28:Skyrim.esm",
 "name": "EnchGlassGreatswordSoulTrap04",
-"value": 820,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 820
 },
 {
 "id": "bef29:Skyrim.esm",
 "name": "EnchGlassGreatswordSoulTrap05",
-"value": 820,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 820
 },
 {
 "id": "bef2a:Skyrim.esm",
 "name": "EnchGlassGreatswordStamina03",
-"value": 820,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 820
 },
 {
 "id": "bef2b:Skyrim.esm",
 "name": "EnchGlassGreatswordStamina04",
-"value": 820,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 820
 },
 {
 "id": "bef2c:Skyrim.esm",
 "name": "EnchGlassGreatswordStamina05",
-"value": 820,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 820
 },
 {
 "id": "bef2d:Skyrim.esm",
 "name": "EnchGlassGreatswordTurn03",
-"value": 820,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 820
 },
 {
 "id": "bef2e:Skyrim.esm",
 "name": "EnchGlassGreatswordTurn04",
-"value": 820,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 820
 },
 {
 "id": "bef2f:Skyrim.esm",
 "name": "EnchGlassGreatswordTurn05",
-"value": 820,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 820
 },
 {
 "id": "f652a:Skyrim.esm",
@@ -48288,1010 +46107,562 @@
 {
 "id": "1d8ae:Skyrim.esm",
 "name": "EnchEbonyWarAxeAbsorbH04",
-"value": 865,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 865
 },
 {
 "id": "1d8b5:Skyrim.esm",
 "name": "EnchEbonyWarAxeAbsorbH05",
-"value": 865,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 865
 },
 {
 "id": "1d8c0:Skyrim.esm",
 "name": "EnchEbonyWarAxeAbsorbH06",
-"value": 865,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 865
 },
 {
 "id": "1d8c7:Skyrim.esm",
 "name": "EnchEbonyWarAxeAbsorbM04",
-"value": 865,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 865
 },
 {
 "id": "1d8c8:Skyrim.esm",
 "name": "EnchEbonyWarAxeAbsorbM05",
-"value": 865,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 865
 },
 {
 "id": "1d8c9:Skyrim.esm",
 "name": "EnchEbonyWarAxeAbsorbM06",
-"value": 865,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 865
 },
 {
 "id": "1d9ba:Skyrim.esm",
 "name": "EnchEbonyWarAxeAbsorbS04",
-"value": 865,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 865
 },
 {
 "id": "1d9bb:Skyrim.esm",
 "name": "EnchEbonyWarAxeAbsorbS05",
-"value": 865,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 865
 },
 {
 "id": "1d9bc:Skyrim.esm",
 "name": "EnchEbonyWarAxeAbsorbS06",
-"value": 865,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 865
 },
 {
 "id": "1d9bd:Skyrim.esm",
 "name": "EnchEbonyWarAxeBanish04",
-"value": 865,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 865
 },
 {
 "id": "1d9be:Skyrim.esm",
 "name": "EnchEbonyWarAxeBanish05",
-"value": 865,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 865
 },
 {
 "id": "1d9bf:Skyrim.esm",
 "name": "EnchEbonyWarAxeBanish06",
-"value": 865,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 865
 },
 {
 "id": "1d9c0:Skyrim.esm",
 "name": "EnchEbonyWarAxeFear04",
-"value": 865,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 865
 },
 {
 "id": "1d9c1:Skyrim.esm",
 "name": "EnchEbonyWarAxeFear05",
-"value": 865,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 865
 },
 {
 "id": "1d9c2:Skyrim.esm",
 "name": "EnchEbonyWarAxeFear06",
-"value": 865,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 865
 },
 {
 "id": "1d9c7:Skyrim.esm",
 "name": "EnchEbonyWarAxeFire04",
-"value": 865,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 865
 },
 {
 "id": "1d9e2:Skyrim.esm",
 "name": "EnchEbonyWarAxeFire05",
-"value": 865,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 865
 },
 {
 "id": "1d9ee:Skyrim.esm",
 "name": "EnchEbonyWarAxeFire06",
-"value": 865,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 865
 },
 {
 "id": "1d9f2:Skyrim.esm",
 "name": "EnchEbonyWarAxeFrost04",
-"value": 865,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 865
 },
 {
 "id": "1d9f5:Skyrim.esm",
 "name": "EnchEbonyWarAxeFrost05",
-"value": 865,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 865
 },
 {
 "id": "1d9fa:Skyrim.esm",
 "name": "EnchEbonyWarAxeFrost06",
-"value": 865,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 865
 },
 {
 "id": "1d9fb:Skyrim.esm",
 "name": "EnchEbonyWarAxeMagicka04",
-"value": 865,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 865
 },
 {
 "id": "1d9fc:Skyrim.esm",
 "name": "EnchEbonyWarAxeMagicka05",
-"value": 865,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 865
 },
 {
 "id": "1d9fd:Skyrim.esm",
 "name": "EnchEbonyWarAxeMagicka06",
-"value": 865,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 865
 },
 {
 "id": "1d9fe:Skyrim.esm",
 "name": "EnchEbonyWarAxeParalyze04",
-"value": 865,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 865
 },
 {
 "id": "1d9ff:Skyrim.esm",
 "name": "EnchEbonyWarAxeParalyze05",
-"value": 865,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 865
 },
 {
 "id": "1da02:Skyrim.esm",
 "name": "EnchEbonyWarAxeParalyze06",
-"value": 865,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 865
 },
 {
 "id": "1da08:Skyrim.esm",
 "name": "EnchEbonyWarAxeShock04",
-"value": 865,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 865
 },
 {
 "id": "1da26:Skyrim.esm",
 "name": "EnchEbonyWarAxeShock05",
-"value": 865,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 865
 },
 {
 "id": "1da32:Skyrim.esm",
 "name": "EnchEbonyWarAxeShock06",
-"value": 865,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 865
 },
 {
 "id": "1da3b:Skyrim.esm",
 "name": "EnchEbonyWarAxeSoulTrap04",
-"value": 865,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 865
 },
 {
 "id": "1dac1:Skyrim.esm",
 "name": "EnchEbonyWarAxeSoulTrap05",
-"value": 865,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 865
 },
 {
 "id": "1db3f:Skyrim.esm",
 "name": "EnchEbonyWarAxeSoulTrap06",
-"value": 865,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 865
 },
 {
 "id": "1db51:Skyrim.esm",
 "name": "EnchEbonyWarAxeStamina04",
-"value": 865,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 865
 },
 {
 "id": "1db54:Skyrim.esm",
 "name": "EnchEbonyWarAxeStamina05",
-"value": 865,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 865
 },
 {
 "id": "1db58:Skyrim.esm",
 "name": "EnchEbonyWarAxeStamina06",
-"value": 865,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 865
 },
 {
 "id": "1db5b:Skyrim.esm",
 "name": "EnchEbonyWarAxeTurn04",
-"value": 865,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 865
 },
 {
 "id": "1db5c:Skyrim.esm",
 "name": "EnchEbonyWarAxeTurn05",
-"value": 865,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 865
 },
 {
 "id": "1db71:Skyrim.esm",
 "name": "EnchEbonyWarAxeTurn06",
-"value": 865,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 865
 },
 {
 "id": "bee9d:Skyrim.esm",
 "name": "EnchGlassBattleaxeAbsorbH03",
-"value": 900,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 900
 },
 {
 "id": "bee9e:Skyrim.esm",
 "name": "EnchGlassBattleaxeAbsorbH04",
-"value": 900,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 900
 },
 {
 "id": "bee9f:Skyrim.esm",
 "name": "EnchGlassBattleaxeAbsorbH05",
-"value": 900,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 900
 },
 {
 "id": "beea0:Skyrim.esm",
 "name": "EnchGlassBattleaxeAbsorbM03",
-"value": 900,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 900
 },
 {
 "id": "beea1:Skyrim.esm",
 "name": "EnchGlassBattleaxeAbsorbM04",
-"value": 900,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 900
 },
 {
 "id": "beea2:Skyrim.esm",
 "name": "EnchGlassBattleaxeAbsorbM05",
-"value": 900,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 900
 },
 {
 "id": "beea3:Skyrim.esm",
 "name": "EnchGlassBattleaxeAbsorbS03",
-"value": 900,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 900
 },
 {
 "id": "beea4:Skyrim.esm",
 "name": "EnchGlassBattleaxeAbsorbS04",
-"value": 900,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 900
 },
 {
 "id": "beea5:Skyrim.esm",
 "name": "EnchGlassBattleaxeAbsorbS05",
-"value": 900,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 900
 },
 {
 "id": "beea6:Skyrim.esm",
 "name": "EnchGlassBattleaxeBanish04",
-"value": 900,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 900
 },
 {
 "id": "beea7:Skyrim.esm",
 "name": "EnchGlassBattleaxeBanish05",
-"value": 900,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 900
 },
 {
 "id": "beea8:Skyrim.esm",
 "name": "EnchGlassBattleaxeFear03",
-"value": 900,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 900
 },
 {
 "id": "beea9:Skyrim.esm",
 "name": "EnchGlassBattleaxeFear04",
-"value": 900,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 900
 },
 {
 "id": "beeaa:Skyrim.esm",
 "name": "EnchGlassBattleaxeFear05",
-"value": 900,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 900
 },
 {
 "id": "beeab:Skyrim.esm",
 "name": "EnchGlassBattleaxeFire03",
-"value": 900,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 900
 },
 {
 "id": "beeac:Skyrim.esm",
 "name": "EnchGlassBattleaxeFire04",
-"value": 900,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 900
 },
 {
 "id": "beead:Skyrim.esm",
 "name": "EnchGlassBattleaxeFire05",
-"value": 900,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 900
 },
 {
 "id": "beeae:Skyrim.esm",
 "name": "EnchGlassBattleaxeFrost03",
-"value": 900,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 900
 },
 {
 "id": "beeaf:Skyrim.esm",
 "name": "EnchGlassBattleaxeFrost04",
-"value": 900,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 900
 },
 {
 "id": "beeb0:Skyrim.esm",
 "name": "EnchGlassBattleaxeFrost05",
-"value": 900,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 900
 },
 {
 "id": "beeb1:Skyrim.esm",
 "name": "EnchGlassBattleaxeMagicka03",
-"value": 900,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 900
 },
 {
 "id": "beeb2:Skyrim.esm",
 "name": "EnchGlassBattleaxeMagicka04",
-"value": 900,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 900
 },
 {
 "id": "beeb3:Skyrim.esm",
 "name": "EnchGlassBattleaxeMagicka05",
-"value": 900,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 900
 },
 {
 "id": "beeb4:Skyrim.esm",
 "name": "EnchGlassBattleaxeParalyze04",
-"value": 900,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 900
 },
 {
 "id": "beeb5:Skyrim.esm",
 "name": "EnchGlassBattleaxeParalyze05",
-"value": 900,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 900
 },
 {
 "id": "beeb6:Skyrim.esm",
 "name": "EnchGlassBattleaxeShock03",
-"value": 900,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 900
 },
 {
 "id": "beeb7:Skyrim.esm",
 "name": "EnchGlassBattleaxeShock04",
-"value": 900,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 900
 },
 {
 "id": "beeb8:Skyrim.esm",
 "name": "EnchGlassBattleaxeShock05",
-"value": 900,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 900
 },
 {
 "id": "beeb9:Skyrim.esm",
 "name": "EnchGlassBattleaxeSoulTrap03",
-"value": 900,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 900
 },
 {
 "id": "beeba:Skyrim.esm",
 "name": "EnchGlassBattleaxeSoulTrap04",
-"value": 900,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 900
 },
 {
 "id": "beebb:Skyrim.esm",
 "name": "EnchGlassBattleaxeSoulTrap05",
-"value": 900,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 900
 },
 {
 "id": "beebc:Skyrim.esm",
 "name": "EnchGlassBattleaxeStamina03",
-"value": 900,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 900
 },
 {
 "id": "beebd:Skyrim.esm",
 "name": "EnchGlassBattleaxeStamina04",
-"value": 900,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 900
 },
 {
 "id": "beebe:Skyrim.esm",
 "name": "EnchGlassBattleaxeStamina05",
-"value": 900,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 900
 },
 {
 "id": "beebf:Skyrim.esm",
 "name": "EnchGlassBattleaxeTurn03",
-"value": 900,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 900
 },
 {
 "id": "beec0:Skyrim.esm",
 "name": "EnchGlassBattleaxeTurn04",
-"value": 900,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 900
 },
 {
 "id": "beec1:Skyrim.esm",
 "name": "EnchGlassBattleaxeTurn05",
-"value": 900,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 900
 },
 {
 "id": "bef9c:Skyrim.esm",
 "name": "EnchGlassWarhammerAbsorbH03",
-"value": 985,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 985
 },
 {
 "id": "bef9d:Skyrim.esm",
 "name": "EnchGlassWarhammerAbsorbH04",
-"value": 985,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 985
 },
 {
 "id": "bef9e:Skyrim.esm",
 "name": "EnchGlassWarhammerAbsorbH05",
-"value": 985,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 985
 },
 {
 "id": "bef9f:Skyrim.esm",
 "name": "EnchGlassWarhammerAbsorbM03",
-"value": 985,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 985
 },
 {
 "id": "befa0:Skyrim.esm",
 "name": "EnchGlassWarhammerAbsorbM04",
-"value": 985,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 985
 },
 {
 "id": "befa1:Skyrim.esm",
 "name": "EnchGlassWarhammerAbsorbM05",
-"value": 985,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 985
 },
 {
 "id": "befa2:Skyrim.esm",
 "name": "EnchGlassWarhammerAbsorbS03",
-"value": 985,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 985
 },
 {
 "id": "befa3:Skyrim.esm",
 "name": "EnchGlassWarhammerAbsorbS04",
-"value": 985,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 985
 },
 {
 "id": "befa4:Skyrim.esm",
 "name": "EnchGlassWarhammerAbsorbS05",
-"value": 985,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 985
 },
 {
 "id": "befa5:Skyrim.esm",
 "name": "EnchGlassWarhammerBanish04",
-"value": 985,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 985
 },
 {
 "id": "befa6:Skyrim.esm",
 "name": "EnchGlassWarhammerBanish05",
-"value": 985,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 985
 },
 {
 "id": "befa7:Skyrim.esm",
 "name": "EnchGlassWarhammerFear03",
-"value": 985,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 985
 },
 {
 "id": "befa8:Skyrim.esm",
 "name": "EnchGlassWarhammerFear04",
-"value": 985,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 985
 },
 {
 "id": "befa9:Skyrim.esm",
 "name": "EnchGlassWarhammerFear05",
-"value": 985,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 985
 },
 {
 "id": "befaa:Skyrim.esm",
 "name": "EnchGlassWarhammerFire03",
-"value": 985,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 985
 },
 {
 "id": "befab:Skyrim.esm",
 "name": "EnchGlassWarhammerFire04",
-"value": 985,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 985
 },
 {
 "id": "befac:Skyrim.esm",
 "name": "EnchGlassWarhammerFire05",
-"value": 985,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 985
 },
 {
 "id": "befad:Skyrim.esm",
 "name": "EnchGlassWarhammerFrost03",
-"value": 985,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 985
 },
 {
 "id": "befae:Skyrim.esm",
 "name": "EnchGlassWarhammerFrost04",
-"value": 985,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 985
 },
 {
 "id": "befaf:Skyrim.esm",
 "name": "EnchGlassWarhammerFrost05",
-"value": 985,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 985
 },
 {
 "id": "befb0:Skyrim.esm",
 "name": "EnchGlassWarhammerMagicka04",
-"value": 985,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 985
 },
 {
 "id": "befb1:Skyrim.esm",
 "name": "EnchGlassWarhammerMagicka05",
-"value": 985,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 985
 },
 {
 "id": "befb2:Skyrim.esm",
 "name": "EnchGlassWarhammerParalyze04",
-"value": 985,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 985
 },
 {
 "id": "befb3:Skyrim.esm",
 "name": "EnchGlassWarhammerParalyze05",
-"value": 985,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 985
 },
 {
 "id": "befb4:Skyrim.esm",
 "name": "EnchGlassWarhammerShock03",
-"value": 985,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 985
 },
 {
 "id": "befb5:Skyrim.esm",
 "name": "EnchGlassWarhammerShock04",
-"value": 985,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 985
 },
 {
 "id": "befb6:Skyrim.esm",
 "name": "EnchGlassWarhammerShock05",
-"value": 985,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 985
 },
 {
 "id": "cb3eb:Skyrim.esm",
 "name": "EnchGlassWarhammerSoulTrap03",
-"value": 985,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 985
 },
 {
 "id": "cb3ec:Skyrim.esm",
 "name": "EnchGlassWarhammerSoulTrap04",
-"value": 985,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 985
 },
 {
 "id": "cb3ed:Skyrim.esm",
 "name": "EnchGlassWarhammerSoulTrap05",
-"value": 985,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 985
 },
 {
 "id": "befb7:Skyrim.esm",
 "name": "EnchGlassWarhammerStamina03",
-"value": 985,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 985
 },
 {
 "id": "befb8:Skyrim.esm",
 "name": "EnchGlassWarhammerStamina04",
-"value": 985,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 985
 },
 {
 "id": "befb9:Skyrim.esm",
 "name": "EnchGlassWarhammerStamina05",
-"value": 985,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 985
 },
 {
 "id": "befba:Skyrim.esm",
 "name": "EnchGlassWarhammerTurn03",
-"value": 985,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 985
 },
 {
 "id": "befbb:Skyrim.esm",
 "name": "EnchGlassWarhammerTurn04",
-"value": 985,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 985
 },
 {
 "id": "befbc:Skyrim.esm",
 "name": "EnchGlassWarhammerTurn05",
-"value": 985,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 985
 },
 {
 "id": "800:Dawnguard.esm",
@@ -49632,361 +47003,197 @@
 {
 "id": "1cece:Skyrim.esm",
 "name": "EnchEbonyMaceAbsorbH04",
-"value": 1000,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1000
 },
 {
 "id": "1cee2:Skyrim.esm",
 "name": "EnchEbonyMaceAbsorbH05",
-"value": 1000,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1000
 },
 {
 "id": "1cee3:Skyrim.esm",
 "name": "EnchEbonyMaceAbsorbH06",
-"value": 1000,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1000
 },
 {
 "id": "1cee4:Skyrim.esm",
 "name": "EnchEbonyMaceAbsorbM04",
-"value": 1000,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1000
 },
 {
 "id": "1cee6:Skyrim.esm",
 "name": "EnchEbonyMaceAbsorbM05",
-"value": 1000,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1000
 },
 {
 "id": "1ceea:Skyrim.esm",
 "name": "EnchEbonyMaceAbsorbM06",
-"value": 1000,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1000
 },
 {
 "id": "1cf00:Skyrim.esm",
 "name": "EnchEbonyMaceAbsorbS04",
-"value": 1000,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1000
 },
 {
 "id": "1cf2e:Skyrim.esm",
 "name": "EnchEbonyMaceAbsorbS05",
-"value": 1000,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1000
 },
 {
 "id": "1cf31:Skyrim.esm",
 "name": "EnchEbonyMaceAbsorbS06",
-"value": 1000,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1000
 },
 {
 "id": "1cf5c:Skyrim.esm",
 "name": "EnchEbonyMaceBanish04",
-"value": 1000,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1000
 },
 {
 "id": "1cf77:Skyrim.esm",
 "name": "EnchEbonyMaceBanish05",
-"value": 1000,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1000
 },
 {
 "id": "1cf78:Skyrim.esm",
 "name": "EnchEbonyMaceBanish06",
-"value": 1000,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1000
 },
 {
 "id": "1cfb0:Skyrim.esm",
 "name": "EnchEbonyMaceFear04",
-"value": 1000,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1000
 },
 {
 "id": "1cfb2:Skyrim.esm",
 "name": "EnchEbonyMaceFear05",
-"value": 1000,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1000
 },
 {
 "id": "1cfb3:Skyrim.esm",
 "name": "EnchEbonyMaceFear06",
-"value": 1000,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1000
 },
 {
 "id": "1cfb4:Skyrim.esm",
 "name": "EnchEbonyMaceFire04",
-"value": 1000,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1000
 },
 {
 "id": "1cfb9:Skyrim.esm",
 "name": "EnchEbonyMaceFire05",
-"value": 1000,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1000
 },
 {
 "id": "1cfbb:Skyrim.esm",
 "name": "EnchEbonyMaceFire06",
-"value": 1000,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1000
 },
 {
 "id": "1cfc0:Skyrim.esm",
 "name": "EnchEbonyMaceFrost04",
-"value": 1000,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1000
 },
 {
 "id": "1cfc8:Skyrim.esm",
 "name": "EnchEbonyMaceFrost05",
-"value": 1000,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1000
 },
 {
 "id": "1cfca:Skyrim.esm",
 "name": "EnchEbonyMaceFrost06",
-"value": 1000,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1000
 },
 {
 "id": "1cfcd:Skyrim.esm",
 "name": "EnchEbonyMaceMagicka04",
-"value": 1000,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1000
 },
 {
 "id": "1cfd1:Skyrim.esm",
 "name": "EnchEbonyMaceMagicka05",
-"value": 1000,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1000
 },
 {
 "id": "1cfd2:Skyrim.esm",
 "name": "EnchEbonyMaceMagicka06",
-"value": 1000,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1000
 },
 {
 "id": "1cfd4:Skyrim.esm",
 "name": "EnchEbonyMaceParalyze04",
-"value": 1000,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1000
 },
 {
 "id": "1cfd8:Skyrim.esm",
 "name": "EnchEbonyMaceParalyze05",
-"value": 1000,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1000
 },
 {
 "id": "1cfde:Skyrim.esm",
 "name": "EnchEbonyMaceParalyze06",
-"value": 1000,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1000
 },
 {
 "id": "1cfdf:Skyrim.esm",
 "name": "EnchEbonyMaceShock04",
-"value": 1000,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1000
 },
 {
 "id": "1d062:Skyrim.esm",
 "name": "EnchEbonyMaceShock05",
-"value": 1000,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1000
 },
 {
 "id": "1d082:Skyrim.esm",
 "name": "EnchEbonyMaceShock06",
-"value": 1000,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1000
 },
 {
 "id": "1d083:Skyrim.esm",
 "name": "EnchEbonyMaceSoulTrap04",
-"value": 1000,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1000
 },
 {
 "id": "1d097:Skyrim.esm",
 "name": "EnchEbonyMaceSoulTrap05",
-"value": 1000,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1000
 },
 {
 "id": "1d098:Skyrim.esm",
 "name": "EnchEbonyMaceSoulTrap06",
-"value": 1000,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1000
 },
 {
 "id": "1d3ed:Skyrim.esm",
 "name": "EnchEbonyMaceStamina04",
-"value": 1000,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1000
 },
 {
 "id": "1d49f:Skyrim.esm",
 "name": "EnchEbonyMaceStamina05",
-"value": 1000,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1000
 },
 {
 "id": "1d4b3:Skyrim.esm",
 "name": "EnchEbonyMaceStamina06",
-"value": 1000,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1000
 },
 {
 "id": "1d4b4:Skyrim.esm",
 "name": "EnchEbonyMaceTurn04",
-"value": 1000,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1000
 },
 {
 "id": "1d4b6:Skyrim.esm",
 "name": "EnchEbonyMaceTurn05",
-"value": 1000,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1000
 },
 {
 "id": "1d4d4:Skyrim.esm",
 "name": "EnchEbonyMaceTurn06",
-"value": 1000,
-"p": [
-"skyrim",
-"solstheim"
-]
-},
-{
-"id": "1a578:Dragonborn.esm",
-"name": "DLC2RR01FalxWarhammer",
-"value": 1100,
-"p": [
-"solstheim"
-]
+"value": 1000
 },
 {
 "id": "28e78:Skyrim.esm",
@@ -50662,623 +47869,347 @@
 {
 "id": "bf3ff:Skyrim.esm",
 "name": "EnchEbonyBowBanish04",
-"value": 1440,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1440
 },
 {
 "id": "bf400:Skyrim.esm",
 "name": "EnchEbonyBowBanish05",
-"value": 1440,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1440
 },
 {
 "id": "bf401:Skyrim.esm",
 "name": "EnchEbonyBowBanish06",
-"value": 1440,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1440
 },
 {
 "id": "bf402:Skyrim.esm",
 "name": "EnchEbonyBowFear04",
-"value": 1440,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1440
 },
 {
 "id": "bf403:Skyrim.esm",
 "name": "EnchEbonyBowFear05",
-"value": 1440,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1440
 },
 {
 "id": "bf404:Skyrim.esm",
 "name": "EnchEbonyBowFear06",
-"value": 1440,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1440
 },
 {
 "id": "bf405:Skyrim.esm",
 "name": "EnchEbonyBowFire04",
-"value": 1440,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1440
 },
 {
 "id": "bf406:Skyrim.esm",
 "name": "EnchEbonyBowFire05",
-"value": 1440,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1440
 },
 {
 "id": "bf407:Skyrim.esm",
 "name": "EnchEbonyBowFire06",
-"value": 1440,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1440
 },
 {
 "id": "bf409:Skyrim.esm",
 "name": "EnchEbonyBowFrost04",
-"value": 1440,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1440
 },
 {
 "id": "bf40a:Skyrim.esm",
 "name": "EnchEbonyBowFrost05",
-"value": 1440,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1440
 },
 {
 "id": "bf40b:Skyrim.esm",
 "name": "EnchEbonyBowFrost06",
-"value": 1440,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1440
 },
 {
 "id": "bf40c:Skyrim.esm",
 "name": "EnchEbonyBowMagicka04",
-"value": 1440,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1440
 },
 {
 "id": "bf40d:Skyrim.esm",
 "name": "EnchEbonyBowMagicka05",
-"value": 1440,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1440
 },
 {
 "id": "bf40e:Skyrim.esm",
 "name": "EnchEbonyBowMagicka06",
-"value": 1440,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1440
 },
 {
 "id": "bf40f:Skyrim.esm",
 "name": "EnchEbonyBowParalyze04",
-"value": 1440,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1440
 },
 {
 "id": "bf410:Skyrim.esm",
 "name": "EnchEbonyBowParalyze05",
-"value": 1440,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1440
 },
 {
 "id": "bf411:Skyrim.esm",
 "name": "EnchEbonyBowParalyze06",
-"value": 1440,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1440
 },
 {
 "id": "bf412:Skyrim.esm",
 "name": "EnchEbonyBowShock04",
-"value": 1440,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1440
 },
 {
 "id": "bf413:Skyrim.esm",
 "name": "EnchEbonyBowShock05",
-"value": 1440,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1440
 },
 {
 "id": "bf414:Skyrim.esm",
 "name": "EnchEbonyBowShock06",
-"value": 1440,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1440
 },
 {
 "id": "bf415:Skyrim.esm",
 "name": "EnchEbonyBowSoulTrap04",
-"value": 1440,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1440
 },
 {
 "id": "bf416:Skyrim.esm",
 "name": "EnchEbonyBowSoulTrap05",
-"value": 1440,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1440
 },
 {
 "id": "bf417:Skyrim.esm",
 "name": "EnchEbonyBowSoulTrap06",
-"value": 1440,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1440
 },
 {
 "id": "bf418:Skyrim.esm",
 "name": "EnchEbonyBowStamina04",
-"value": 1440,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1440
 },
 {
 "id": "bf419:Skyrim.esm",
 "name": "EnchEbonyBowStamina05",
-"value": 1440,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1440
 },
 {
 "id": "bf41a:Skyrim.esm",
 "name": "EnchEbonyBowStamina06",
-"value": 1440,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1440
 },
 {
 "id": "bf41b:Skyrim.esm",
 "name": "EnchEbonyBowTurn04",
-"value": 1440,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1440
 },
 {
 "id": "bf41c:Skyrim.esm",
 "name": "EnchEbonyBowTurn05",
-"value": 1440,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1440
 },
 {
 "id": "bf41d:Skyrim.esm",
 "name": "EnchEbonyBowTurn06",
-"value": 1440,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1440
 },
 {
 "id": "1cd24:Skyrim.esm",
 "name": "EnchEbonyGreatswordAbsorbH04",
-"value": 1440,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1440
 },
 {
 "id": "1cd27:Skyrim.esm",
 "name": "EnchEbonyGreatswordAbsorbH05",
-"value": 1440,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1440
 },
 {
 "id": "1cd2c:Skyrim.esm",
 "name": "EnchEbonyGreatswordAbsorbH06",
-"value": 1440,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1440
 },
 {
 "id": "1cd2e:Skyrim.esm",
 "name": "EnchEbonyGreatswordAbsorbM04",
-"value": 1440,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1440
 },
 {
 "id": "1cd2f:Skyrim.esm",
 "name": "EnchEbonyGreatswordAbsorbM05",
-"value": 1440,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1440
 },
 {
 "id": "1cd30:Skyrim.esm",
 "name": "EnchEbonyGreatswordAbsorbM06",
-"value": 1440,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1440
 },
 {
 "id": "1cd37:Skyrim.esm",
 "name": "EnchEbonyGreatswordAbsorbS04",
-"value": 1440,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1440
 },
 {
 "id": "1cd4d:Skyrim.esm",
 "name": "EnchEbonyGreatswordAbsorbS05",
-"value": 1440,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1440
 },
 {
 "id": "1cd50:Skyrim.esm",
 "name": "EnchEbonyGreatswordAbsorbS06",
-"value": 1440,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1440
 },
 {
 "id": "1cd61:Skyrim.esm",
 "name": "EnchEbonyGreatswordBanish04",
-"value": 1440,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1440
 },
 {
 "id": "1cd82:Skyrim.esm",
 "name": "EnchEbonyGreatswordBanish05",
-"value": 1440,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1440
 },
 {
 "id": "1cd84:Skyrim.esm",
 "name": "EnchEbonyGreatswordBanish06",
-"value": 1440,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1440
 },
 {
 "id": "1cd8a:Skyrim.esm",
 "name": "EnchEbonyGreatswordFear04",
-"value": 1440,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1440
 },
 {
 "id": "1cd8c:Skyrim.esm",
 "name": "EnchEbonyGreatswordFear05",
-"value": 1440,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1440
 },
 {
 "id": "1cd9e:Skyrim.esm",
 "name": "EnchEbonyGreatswordFear06",
-"value": 1440,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1440
 },
 {
 "id": "1cdc2:Skyrim.esm",
 "name": "EnchEbonyGreatswordFire04",
-"value": 1440,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1440
 },
 {
 "id": "1cdc8:Skyrim.esm",
 "name": "EnchEbonyGreatswordFire05",
-"value": 1440,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1440
 },
 {
 "id": "1cfba:Skyrim.esm",
 "name": "EnchEbonyGreatswordFire06",
-"value": 1440,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1440
 },
 {
 "id": "1cdca:Skyrim.esm",
 "name": "EnchEbonyGreatswordFrost04",
-"value": 1440,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1440
 },
 {
 "id": "1cdcb:Skyrim.esm",
 "name": "EnchEbonyGreatswordFrost05",
-"value": 1440,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1440
 },
 {
 "id": "1cdcc:Skyrim.esm",
 "name": "EnchEbonyGreatswordFrost06",
-"value": 1440,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1440
 },
 {
 "id": "1cdcd:Skyrim.esm",
 "name": "EnchEbonyGreatswordMagicka04",
-"value": 1440,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1440
 },
 {
 "id": "1cdd7:Skyrim.esm",
 "name": "EnchEbonyGreatswordMagicka05",
-"value": 1440,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1440
 },
 {
 "id": "1cdf9:Skyrim.esm",
 "name": "EnchEbonyGreatswordMagicka06",
-"value": 1440,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1440
 },
 {
 "id": "1ce57:Skyrim.esm",
 "name": "EnchEbonyGreatswordParalyze04",
-"value": 1440,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1440
 },
 {
 "id": "1ce58:Skyrim.esm",
 "name": "EnchEbonyGreatswordParalyze05",
-"value": 1440,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1440
 },
 {
 "id": "1ce65:Skyrim.esm",
 "name": "EnchEbonyGreatswordParalyze06",
-"value": 1440,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1440
 },
 {
 "id": "1ce81:Skyrim.esm",
 "name": "EnchEbonyGreatswordShock04",
-"value": 1440,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1440
 },
 {
 "id": "1ce82:Skyrim.esm",
 "name": "EnchEbonyGreatswordShock05",
-"value": 1440,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1440
 },
 {
 "id": "1ce99:Skyrim.esm",
 "name": "EnchEbonyGreatswordShock06",
-"value": 1440,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1440
 },
 {
 "id": "1ce9b:Skyrim.esm",
 "name": "EnchEbonyGreatswordSoulTrap04",
-"value": 1440,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1440
 },
 {
 "id": "1ce9c:Skyrim.esm",
 "name": "EnchEbonyGreatswordSoulTrap05",
-"value": 1440,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1440
 },
 {
 "id": "1cec0:Skyrim.esm",
 "name": "EnchEbonyGreatswordSoulTrap06",
-"value": 1440,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1440
 },
 {
 "id": "1cec1:Skyrim.esm",
 "name": "EnchEbonyGreatswordStamina04",
-"value": 1440,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1440
 },
 {
 "id": "1cec2:Skyrim.esm",
 "name": "EnchEbonyGreatswordStamina05",
-"value": 1440,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1440
 },
 {
 "id": "1cec3:Skyrim.esm",
 "name": "EnchEbonyGreatswordStamina06",
-"value": 1440,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1440
 },
 {
 "id": "1cec7:Skyrim.esm",
 "name": "EnchEbonyGreatswordTurn04",
-"value": 1440,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1440
 },
 {
 "id": "1cecb:Skyrim.esm",
 "name": "EnchEbonyGreatswordTurn05",
-"value": 1440,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1440
 },
 {
 "id": "1cecd:Skyrim.esm",
 "name": "EnchEbonyGreatswordTurn06",
-"value": 1440,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1440
 },
 {
 "id": "f652b:Skyrim.esm",
@@ -51990,353 +48921,197 @@
 {
 "id": "bf3ce:Skyrim.esm",
 "name": "EnchEbonyBattleaxeAbsorbH04",
-"value": 1585,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1585
 },
 {
 "id": "bf3cf:Skyrim.esm",
 "name": "EnchEbonyBattleaxeAbsorbH05",
-"value": 1585,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1585
 },
 {
 "id": "bf3d0:Skyrim.esm",
 "name": "EnchEbonyBattleaxeAbsorbH06",
-"value": 1585,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1585
 },
 {
 "id": "bf3d4:Skyrim.esm",
 "name": "EnchEbonyBattleaxeAbsorbM04",
-"value": 1585,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1585
 },
 {
 "id": "bf3d5:Skyrim.esm",
 "name": "EnchEbonyBattleaxeAbsorbM05",
-"value": 1585,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1585
 },
 {
 "id": "bf3d6:Skyrim.esm",
 "name": "EnchEbonyBattleaxeAbsorbM06",
-"value": 1585,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1585
 },
 {
 "id": "bf3d1:Skyrim.esm",
 "name": "EnchEbonyBattleaxeAbsorbS04",
-"value": 1585,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1585
 },
 {
 "id": "bf3d2:Skyrim.esm",
 "name": "EnchEbonyBattleaxeAbsorbS05",
-"value": 1585,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1585
 },
 {
 "id": "bf3d3:Skyrim.esm",
 "name": "EnchEbonyBattleaxeAbsorbS06",
-"value": 1585,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1585
 },
 {
 "id": "bf3d7:Skyrim.esm",
 "name": "EnchEbonyBattleaxeBanish04",
-"value": 1585,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1585
 },
 {
 "id": "bf3d8:Skyrim.esm",
 "name": "EnchEbonyBattleaxeBanish05",
-"value": 1585,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1585
 },
 {
 "id": "bf3d9:Skyrim.esm",
 "name": "EnchEbonyBattleaxeBanish06",
-"value": 1585,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1585
 },
 {
 "id": "bf3da:Skyrim.esm",
 "name": "EnchEbonyBattleaxeFear04",
-"value": 1585,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1585
 },
 {
 "id": "bf3db:Skyrim.esm",
 "name": "EnchEbonyBattleaxeFear05",
-"value": 1585,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1585
 },
 {
 "id": "bf3dc:Skyrim.esm",
 "name": "EnchEbonyBattleaxeFear06",
-"value": 1585,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1585
 },
 {
 "id": "bf3dd:Skyrim.esm",
 "name": "EnchEbonyBattleaxeFire04",
-"value": 1585,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1585
 },
 {
 "id": "bf3de:Skyrim.esm",
 "name": "EnchEbonyBattleaxeFire05",
-"value": 1585,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1585
 },
 {
 "id": "bf3df:Skyrim.esm",
 "name": "EnchEbonyBattleaxeFire06",
-"value": 1585,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1585
 },
 {
 "id": "bf3e0:Skyrim.esm",
 "name": "EnchEbonyBattleaxeFrost04",
-"value": 1585,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1585
 },
 {
 "id": "bf3e1:Skyrim.esm",
 "name": "EnchEbonyBattleaxeFrost05",
-"value": 1585,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1585
 },
 {
 "id": "bf3e2:Skyrim.esm",
 "name": "EnchEbonyBattleaxeFrost06",
-"value": 1585,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1585
 },
 {
 "id": "bf3e3:Skyrim.esm",
 "name": "EnchEbonyBattleaxeMagicka04",
-"value": 1585,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1585
 },
 {
 "id": "bf3e4:Skyrim.esm",
 "name": "EnchEbonyBattleaxeMagicka05",
-"value": 1585,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1585
 },
 {
 "id": "bf3e5:Skyrim.esm",
 "name": "EnchEbonyBattleaxeMagicka06",
-"value": 1585,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1585
 },
 {
 "id": "bf3e6:Skyrim.esm",
 "name": "EnchEbonyBattleaxeParalyze04",
-"value": 1585,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1585
 },
 {
 "id": "bf3e7:Skyrim.esm",
 "name": "EnchEbonyBattleaxeParalyze05",
-"value": 1585,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1585
 },
 {
 "id": "bf3e8:Skyrim.esm",
 "name": "EnchEbonyBattleaxeParalyze06",
-"value": 1585,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1585
 },
 {
 "id": "bf3e9:Skyrim.esm",
 "name": "EnchEbonyBattleaxeShock04",
-"value": 1585,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1585
 },
 {
 "id": "bf3ea:Skyrim.esm",
 "name": "EnchEbonyBattleaxeShock05",
-"value": 1585,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1585
 },
 {
 "id": "bf3eb:Skyrim.esm",
 "name": "EnchEbonyBattleaxeShock06",
-"value": 1585,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1585
 },
 {
 "id": "bf3ec:Skyrim.esm",
 "name": "EnchEbonyBattleaxeSoulTrap04",
-"value": 1585,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1585
 },
 {
 "id": "bf3ed:Skyrim.esm",
 "name": "EnchEbonyBattleaxeSoulTrap05",
-"value": 1585,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1585
 },
 {
 "id": "bf3ee:Skyrim.esm",
 "name": "EnchEbonyBattleaxeSoulTrap06",
-"value": 1585,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1585
 },
 {
 "id": "bf3ef:Skyrim.esm",
 "name": "EnchEbonyBattleaxeStamina04",
-"value": 1585,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1585
 },
 {
 "id": "bf3f0:Skyrim.esm",
 "name": "EnchEbonyBattleaxeStamina05",
-"value": 1585,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1585
 },
 {
 "id": "bf3f1:Skyrim.esm",
 "name": "EnchEbonyBattleaxeStamina06",
-"value": 1585,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1585
 },
 {
 "id": "bf3f2:Skyrim.esm",
 "name": "EnchEbonyBattleaxeTurn04",
-"value": 1585,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1585
 },
 {
 "id": "bf3f3:Skyrim.esm",
 "name": "EnchEbonyBattleaxeTurn05",
-"value": 1585,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1585
 },
 {
 "id": "bf3f4:Skyrim.esm",
 "name": "EnchEbonyBattleaxeTurn06",
-"value": 1585,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1585
 },
 {
 "id": "283bd:Dragonborn.esm",
@@ -52653,353 +49428,197 @@
 {
 "id": "1dbcf:Skyrim.esm",
 "name": "EnchEbonyWarhammerAbsorbH04",
-"value": 1725,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1725
 },
 {
 "id": "1dbd6:Skyrim.esm",
 "name": "EnchEbonyWarhammerAbsorbH05",
-"value": 1725,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1725
 },
 {
 "id": "1dbd7:Skyrim.esm",
 "name": "EnchEbonyWarhammerAbsorbH06",
-"value": 1725,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1725
 },
 {
 "id": "1dbf8:Skyrim.esm",
 "name": "EnchEbonyWarhammerAbsorbM04",
-"value": 1725,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1725
 },
 {
 "id": "1dbfd:Skyrim.esm",
 "name": "EnchEbonyWarhammerAbsorbM05",
-"value": 1725,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1725
 },
 {
 "id": "1dc14:Skyrim.esm",
 "name": "EnchEbonyWarhammerAbsorbM06",
-"value": 1725,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1725
 },
 {
 "id": "1dc1e:Skyrim.esm",
 "name": "EnchEbonyWarhammerAbsorbS04",
-"value": 1725,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1725
 },
 {
 "id": "1dc1f:Skyrim.esm",
 "name": "EnchEbonyWarhammerAbsorbS05",
-"value": 1725,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1725
 },
 {
 "id": "1dcce:Skyrim.esm",
 "name": "EnchEbonyWarhammerAbsorbS06",
-"value": 1725,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1725
 },
 {
 "id": "1dccf:Skyrim.esm",
 "name": "EnchEbonyWarhammerBanish04",
-"value": 1725,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1725
 },
 {
 "id": "1dcdd:Skyrim.esm",
 "name": "EnchEbonyWarhammerBanish05",
-"value": 1725,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1725
 },
 {
 "id": "1dcde:Skyrim.esm",
 "name": "EnchEbonyWarhammerBanish06",
-"value": 1725,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1725
 },
 {
 "id": "1dce0:Skyrim.esm",
 "name": "EnchEbonyWarhammerFear04",
-"value": 1725,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1725
 },
 {
 "id": "1dce1:Skyrim.esm",
 "name": "EnchEbonyWarhammerFear05",
-"value": 1725,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1725
 },
 {
 "id": "1dce2:Skyrim.esm",
 "name": "EnchEbonyWarhammerFear06",
-"value": 1725,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1725
 },
 {
 "id": "1dce3:Skyrim.esm",
 "name": "EnchEbonyWarhammerFire04",
-"value": 1725,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1725
 },
 {
 "id": "1dce4:Skyrim.esm",
 "name": "EnchEbonyWarhammerFire05",
-"value": 1725,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1725
 },
 {
 "id": "1dce6:Skyrim.esm",
 "name": "EnchEbonyWarhammerFire06",
-"value": 1725,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1725
 },
 {
 "id": "1dce8:Skyrim.esm",
 "name": "EnchEbonyWarhammerFrost04",
-"value": 1725,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1725
 },
 {
 "id": "1dce9:Skyrim.esm",
 "name": "EnchEbonyWarhammerFrost05",
-"value": 1725,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1725
 },
 {
 "id": "1dcea:Skyrim.esm",
 "name": "EnchEbonyWarhammerFrost06",
-"value": 1725,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1725
 },
 {
 "id": "1dceb:Skyrim.esm",
 "name": "EnchEbonyWarhammerMagicka04",
-"value": 1725,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1725
 },
 {
 "id": "1dcec:Skyrim.esm",
 "name": "EnchEbonyWarhammerMagicka05",
-"value": 1725,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1725
 },
 {
 "id": "1dcee:Skyrim.esm",
 "name": "EnchEbonyWarhammerMagicka06",
-"value": 1725,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1725
 },
 {
 "id": "1dcf5:Skyrim.esm",
 "name": "EnchEbonyWarhammerParalyze04",
-"value": 1725,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1725
 },
 {
 "id": "1dcfa:Skyrim.esm",
 "name": "EnchEbonyWarhammerParalyze05",
-"value": 1725,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1725
 },
 {
 "id": "1dcfe:Skyrim.esm",
 "name": "EnchEbonyWarhammerParalyze06",
-"value": 1725,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1725
 },
 {
 "id": "1dd01:Skyrim.esm",
 "name": "EnchEbonyWarhammerShock04",
-"value": 1725,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1725
 },
 {
 "id": "1dd02:Skyrim.esm",
 "name": "EnchEbonyWarhammerShock05",
-"value": 1725,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1725
 },
 {
 "id": "1dd03:Skyrim.esm",
 "name": "EnchEbonyWarhammerShock06",
-"value": 1725,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1725
 },
 {
 "id": "1dd04:Skyrim.esm",
 "name": "EnchEbonyWarhammerSoulTrap04",
-"value": 1725,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1725
 },
 {
 "id": "1dd05:Skyrim.esm",
 "name": "EnchEbonyWarhammerSoulTrap05",
-"value": 1725,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1725
 },
 {
 "id": "1dd06:Skyrim.esm",
 "name": "EnchEbonyWarhammerSoulTrap06",
-"value": 1725,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1725
 },
 {
 "id": "1dd07:Skyrim.esm",
 "name": "EnchEbonyWarhammerStamina04",
-"value": 1725,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1725
 },
 {
 "id": "1dd0b:Skyrim.esm",
 "name": "EnchEbonyWarhammerStamina05",
-"value": 1725,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1725
 },
 {
 "id": "1dd0d:Skyrim.esm",
 "name": "EnchEbonyWarhammerStamina06",
-"value": 1725,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1725
 },
 {
 "id": "1dd0e:Skyrim.esm",
 "name": "EnchEbonyWarhammerTurn04",
-"value": 1725,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1725
 },
 {
 "id": "1dd17:Skyrim.esm",
 "name": "EnchEbonyWarhammerTurn05",
-"value": 1725,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1725
 },
 {
 "id": "1dd1b:Skyrim.esm",
 "name": "EnchEbonyWarhammerTurn06",
-"value": 1725,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1725
 },
 {
 "id": "28dc6:Skyrim.esm",
@@ -54976,14 +51595,6 @@
 ]
 },
 {
-"id": "d0758:Skyrim.esm",
-"name": "MGRitual05Dagger",
-"value": 9,
-"p": [
-"skyrim"
-]
-},
-{
 "id": "60297b:BSAssets.esm",
 "name": "CYRIronDagger",
 "value": 10,
@@ -55798,11 +52409,7 @@
 {
 "id": "139a6:Skyrim.esm",
 "name": "GlassDagger",
-"value": 165,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 165
 },
 {
 "id": "68c63:Skyrim.esm",
@@ -55972,11 +52579,7 @@
 {
 "id": "139ae:Skyrim.esm",
 "name": "EbonyDagger",
-"value": 290,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 290
 },
 {
 "id": "3aeb9:Skyrim.esm",
@@ -56105,11 +52708,7 @@
 {
 "id": "139a9:Skyrim.esm",
 "name": "GlassSword",
-"value": 410,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 410
 },
 {
 "id": "ef659:BSHeartland.esm",
@@ -56164,11 +52763,7 @@
 {
 "id": "139a3:Skyrim.esm",
 "name": "GlassWarAxe",
-"value": 490,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 490
 },
 {
 "id": "300085:BSHeartland.esm",
@@ -56240,11 +52835,7 @@
 {
 "id": "139a8:Skyrim.esm",
 "name": "GlassMace",
-"value": 575,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 575
 },
 {
 "id": "26232:Dragonborn.esm",
@@ -56298,11 +52889,7 @@
 {
 "id": "139b1:Skyrim.esm",
 "name": "EbonySword",
-"value": 720,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 720
 },
 {
 "id": "300074:BSHeartland.esm",
@@ -56323,20 +52910,12 @@
 {
 "id": "139a5:Skyrim.esm",
 "name": "GlassBow",
-"value": 820,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 820
 },
 {
 "id": "139a7:Skyrim.esm",
 "name": "GlassGreatsword",
-"value": 820,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 820
 },
 {
 "id": "ee5c5:BSHeartland.esm",
@@ -56357,11 +52936,7 @@
 {
 "id": "139ab:Skyrim.esm",
 "name": "EbonyWarAxe",
-"value": 865,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 865
 },
 {
 "id": "300073:BSHeartland.esm",
@@ -56374,11 +52949,7 @@
 {
 "id": "139a4:Skyrim.esm",
 "name": "GlassBattleaxe",
-"value": 900,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 900
 },
 {
 "id": "30007a:BSHeartland.esm",
@@ -56399,11 +52970,7 @@
 {
 "id": "139aa:Skyrim.esm",
 "name": "GlassWarhammer",
-"value": 985,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 985
 },
 {
 "id": "30007f:BSHeartland.esm",
@@ -56416,11 +52983,7 @@
 {
 "id": "139b0:Skyrim.esm",
 "name": "EbonyMace",
-"value": 1000,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1000
 },
 {
 "id": "1cdb9:Dragonborn.esm",
@@ -56482,20 +53045,12 @@
 {
 "id": "139ad:Skyrim.esm",
 "name": "EbonyBow",
-"value": 1440,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1440
 },
 {
 "id": "139af:Skyrim.esm",
 "name": "EbonyGreatsword",
-"value": 1440,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1440
 },
 {
 "id": "300089:BSHeartland.esm",
@@ -56543,11 +53098,7 @@
 {
 "id": "139ac:Skyrim.esm",
 "name": "EbonyBattleaxe",
-"value": 1585,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1585
 },
 {
 "id": "14fcf:Dawnguard.esm",
@@ -56569,11 +53120,7 @@
 {
 "id": "139b2:Skyrim.esm",
 "name": "EbonyWarhammer",
-"value": 1725,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 1725
 },
 {
 "id": "300087:BSHeartland.esm",
@@ -56772,22 +53319,6 @@
 ],
 "arrows": [
 {
-"id": "20ddf:Skyrim.esm",
-"name": "CWArrow",
-"value": 0,
-"p": [
-"skyrim"
-]
-},
-{
-"id": "20f02:Skyrim.esm",
-"name": "CWArrowShort",
-"value": 0,
-"p": [
-"skyrim"
-]
-},
-{
 "id": "5bc3b:BSHeartland.esm",
 "name": "CYRAncientImperialArrow",
 "value": 0,
@@ -56970,11 +53501,7 @@
 {
 "id": "139bf:Skyrim.esm",
 "name": "EbonyArrow",
-"value": 0,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 0
 },
 {
 "id": "139bd:Skyrim.esm",
@@ -57005,11 +53532,7 @@
 {
 "id": "139be:Skyrim.esm",
 "name": "GlassArrow",
-"value": 0,
-"p": [
-"skyrim",
-"solstheim"
-]
+"value": 0
 },
 {
 "id": "1397d:Skyrim.esm",
@@ -57913,14 +54436,6 @@
 }
 ],
 "food": [
-{
-"id": "24e0b:Dragonborn.esm",
-"name": "DLC2RRF04Sujamma",
-"value": 0,
-"p": [
-"solstheim"
-]
-},
 {
 "id": "602b07:BSAssets.esm",
 "name": "BSKFoodBeet",
@@ -59177,14 +55692,6 @@
 ]
 },
 {
-"id": "320df:Dragonborn.esm",
-"name": "DLC2RRFavor01EmberbrandWine",
-"value": 15,
-"p": [
-"solstheim"
-]
-},
-{
 "id": "cc27e:BSHeartland.esm",
 "name": "CYRFoodCheeseWheel02B",
 "value": 20,
@@ -59285,11 +55792,6 @@
 "id": "1895f:Skyrim.esm",
 "name": "FirebrandWine",
 "value": 137
-},
-{
-"id": "b91d7:Skyrim.esm",
-"name": "WEDL03CyrodilicBrandy",
-"value": 150
 }
 ],
 "recipes": [

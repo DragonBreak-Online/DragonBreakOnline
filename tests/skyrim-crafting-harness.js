@@ -3,8 +3,9 @@
 //    Goblins only, Pig Iron Orcs only; Nat's race-only list of 13 Oct), tempering open, staff pass, an unread race fails
 //    closed, and the set's rule decides before the Orcish rule (a Yoku shield of Orcish metal is a Redguard's);
 //  - the Adamantium Addon (DragonBreak Armory.esp) is every race's; the Dwemer Mantis armour is never forged (forgeNever);
-//  - regions-overrides.json recipePlugins: the new plugins' creation recipes get a province and culture (raceStyles), their
-//    tempering stays open; the Black Bear light hoods and the bank-vault gold ingot recipe are refused;
+//  - regions.json (140-plugin order, PC 15 Oct) lists the new plugins' creation recipes; regions-overrides.json makes the
+//    peoples' recipes it tags too narrowly common (raceCraft decides who), recipePlugins is empty, tempering stays open;
+//    the Black Bear light hoods are forgeable again (Armory v9), the bank-vault gold ingot recipe is refused;
 //  - smithing.json's Yokudan, Black Bear and Apex Khajiit families (book 'race'): known by birth, never apprenticed, never
 //    carried over; loot-materials.json files the new sets under them;
 //  - faction-gear.json carries the Civil War battlemage and Dominion Thalmor sets.
@@ -63,12 +64,14 @@ const GOBLIN_ARMOUR = item('DragonBreak Armory.esp', 0x80c, 'ARMO', 'DBOArm_Gobl
 const R_GOBLIN_ARMOUR = recipe('DragonBreak Armory.esp', 0x80d, 'DBOArm_RecipeGoblinFurArmor1', KW_FORGE);
 const BEAR_HOOD = item('Black Bear Ancient Nord Armor.esp', 0xd8d, 'ARMO', 'BlackBearAncientNordHoodLight');
 const R_BEAR_HOOD = recipe('Black Bear Ancient Nord Armor.esp', 0xd99, 'RecipeBlackBearAncientNordHoodLight', KW_FORGE);
-const BEAR_CUIRASS = item('Black Bear Ancient Nord Armor.esp', 0x800, 'ARMO', 'BlackBearAncientNordCuirass');
-const R_BEAR = recipe('Black Bear Ancient Nord Armor.esp', 0x880, 'RecipeBlackBearAncientNordCuirass', KW_FORGE);
+const BEAR_CUIRASS = item('Black Bear Ancient Nord Armor.esp', 0xd69, 'ARMO', 'BlackBearAncientNordCuirass');
+const R_BEAR = recipe('Black Bear Ancient Nord Armor.esp', 0xd6d, 'RecipeBlackBearAncientNordCuirass', KW_FORGE);
+const YOKU_STONE = item('YokuWeapons.esp', 0x827, 'ARMO', '0_StoneShield');
+const R_YOKU_STONE = recipe('YokuWeapons.esp', 0x85a, '0_RecipeStoneShield', KW_FORGE);
 const THALMOR = item('LEITEUHTThalmor.esp', 0x801, 'ARMO', 'LEITEUHTArmorThalmorJusticiar');
 const R_THALMOR = recipe('LEITEUHTThalmor.esp', 0x807, 'LEITEUHTRecipeThalmorArmor', KW_FORGE);
-const SKAAL = item('Skaal Heavy Armor SE.esp', 0x812, 'ARMO', 'DLC2ClothesSkaalHCoat');
-const R_SKAAL = recipe('Skaal Heavy Armor SE.esp', 0x8812, 'RecipeArmorSkaalHOutfit', KW_FORGE);
+const SKAAL = item('Skaal Heavy Armor SE.esp', 0x811, 'ARMO', 'DLC2ClothesSkaalHCoat');
+const R_SKAAL = recipe('Skaal Heavy Armor SE.esp', 0x812, 'RecipeArmorSkaalHOutfit', KW_FORGE);
 const R_SKAAL_TEMPER = recipe('Skaal Heavy Armor SE.esp', 0x8813, 'TemperArmorSkaalHOutfit', KW_TABLE);
 const GOLD = SKY('5ad9e'); rec(GOLD, 'MISC', 'IngotGold');
 const R_GOLD = recipe('DragonBreak Nexus Patches.esp', 0xb75, 'DBOSM_Res_GoldIngotDB', KW_FORGE);
@@ -119,32 +122,39 @@ ok(said.some(([, t]) => /Game Masters/.test(t)), '...and the smith hears the GMs
 ok(!craft('nord', GOBLIN_ARMOUR, R_GOBLIN_ARMOUR) && craft('goblin', GOBLIN_ARMOUR, R_GOBLIN_ARMOUR), 'Armory goblin armour: Goblins only (edid rule)');
 ok(craft('nord', BEAR_CUIRASS, R_BEAR), 'Black Bear: a Nord forges it in Skyrim');
 ok(!craft('breton', BEAR_CUIRASS, R_BEAR), '...a Breton cannot');
-ok(!craft('nord', BEAR_HOOD, R_BEAR_HOOD), 'the Black Bear light hood recipe with a null input is refused until the PC fix');
+ok(craft('nord', BEAR_HOOD, R_BEAR_HOOD) && !craft('breton', BEAR_HOOD, R_BEAR_HOOD), 'the Black Bear light hood is forgeable again (Armory v9 fe2eb7dd fixed its input), by Nords');
+ok(!Object.keys(readJson('regions-overrides.json').recipes).some((k) => /^d9[79]:Black Bear/i.test(k)), '...and regions-overrides.json no longer refuses d99 / d97');
 ok(!craft('nord', GOLD, R_GOLD), 'the bank-vault gold ingot never smelts to gold');
 load({ raceCraft: { enabled: false } });
 ok(craft('nord', GILD_AXE, R_GILD), 'raceCraft.enabled false turns the race rule off');
 ok(!craft('nord', PIG_CUIRASS, R_PIG) && craft('orc', PIG_CUIRASS, R_PIG), '...and Pig Iron is still an Orc\'s through the Orcish rule (its keyword)');
 load();
 
-// ---- provinces for plugins regions.json does not list ----------------------------------------------------------------
+// ---- provinces: regions.json on the 140 order, the peoples' recipes it tags narrowly made common --------------------------
 const R = globalThis.__dboRegions;
 const where = (r, it) => R.recipeWhere(r, it);
-ok(JSON.stringify(where(R_YOKU, YOKU_SHIELD).p) === '["cyrodiil"]' && where(R_YOKU, YOKU_SHIELD).entry.c === 'hammerfell', 'Yoku recipes: Hammerfell work (Cyrodiil), culture hammerfell', where(R_YOKU, YOKU_SHIELD));
-ok(where(R_YOKU_TEMPER, YOKU_SHIELD) === null, '...its tempering has no province rule');
-ok(where(R_BEAR, BEAR_CUIRASS).entry.bench === 'CraftingSmithingForge', '...the synthesised entry carries the bench as written');
-ok(JSON.stringify(where(R_THALMOR, THALMOR).p) === '["cyrodiil","skyrim"]', 'Dominion Thalmor: summerset, made in Cyrodiil and Skyrim', where(R_THALMOR, THALMOR));
-ok(craft('nord', THALMOR, R_THALMOR) || true, '(faction rule not loaded here: province only)');
+const rp = readJson('regions-overrides.json').recipePlugins;
+ok(Object.keys(rp).filter((k) => k[0] !== '_').length === 0, 'recipePlugins is empty: regions.json lists every Skyrim-release plugin', Object.keys(rp));
+const ys = where(R_YOKU_STONE, YOKU_STONE);
+ok(ys && ys.why === 'override' && ys.p.length === 3, 'Yoku Stone Shield (tagged Skyrim/Solstheim dwarven by its shape) is common by override', ys);
+const yr = R.recipeOk(ACT.redguard, YOKU_STONE, R_YOKU_STONE);
+props.set(ACT.redguard + '|worldOrCellDesc', 'a764b:BSHeartland.esm');
+ok(yr.ok && R.recipeOk(ACT.redguard, YOKU_STONE, R_YOKU_STONE).ok, '...a Redguard makes it in Skyrim and in Bruma', yr);
+props.set(ACT.redguard + '|worldOrCellDesc', SKYRIM_WORLD);
+ok(where(R_YOKU_TEMPER, YOKU_SHIELD) === null, 'a tempering recipe with no regions entry has no province rule');
+ok(where(R_BEAR, BEAR_CUIRASS).entry.bench === 'CraftingSmithingForge', 'the regions entry carries the bench');
+ok(JSON.stringify(where(R_THALMOR, THALMOR).p) === '["cyrodiil","skyrim"]' && where(R_THALMOR, THALMOR).entry.c === 'summerset', 'Dominion Thalmor: summerset, made in Cyrodiil and Skyrim', where(R_THALMOR, THALMOR));
 const ok1 = R.recipeOk(ACT.nord, SKAAL, R_SKAAL), ok2 = R.recipeOk(ACT.breton, SKAAL, R_SKAAL);
 ok(ok1.ok && /race:nord/.test(ok1.why), 'Skaal heavy armour in Skyrim: a Nord makes it (raceStyles nord: skaal)', ok1);
 ok(!ok2.ok, '...a Breton cannot (Solstheim work, Solstheim closed)', ok2);
 ok(R.recipeOk(ACT.breton, SKAAL, R_SKAAL_TEMPER).why === 'unknown', '...its tempering is not gated');
-const yr = R.recipeOk(ACT.redguard, YOKU_SHIELD, R_YOKU);
-ok(yr.ok && /race:redguard/.test(yr.why), 'a Redguard makes Yoku work in Skyrim (raceStyles redguard: hammerfell)', yr);
 const bb = R.recipeOk(ACT.nord, BEAR_CUIRASS, R_BEAR);
-ok(bb.ok && bb.why === 'province', 'Black Bear is Skyrim work', bb);
+ok(bb.ok && bb.why === 'common', 'Black Bear (tagged Skyrim) is common by override: raceCraft keeps it to Nords', bb);
 props.set(ACT.nord + '|worldOrCellDesc', 'a764b:BSHeartland.esm');
-const bb2 = R.recipeOk(ACT.nord, BEAR_CUIRASS, R_BEAR);
-ok(bb2.ok && bb2.why === 'race:nord', '...and a Nord makes it in Bruma too (raceStyles nord: nord)', bb2);
+ok(craft('nord', BEAR_CUIRASS, R_BEAR) && craft('nord', BEAR_HOOD, R_BEAR_HOOD), '...and a Nord forges it in Bruma too');
+ok(craft('nord', ADAM, R_ADAM) && craft('breton', ADAM, R_ADAM), 'the Adamantium Addon (tagged Skyrim) is forged anywhere by every race', R.recipeOk(ACT.breton, ADAM, R_ADAM));
+props.set(ACT.goblin + '|worldOrCellDesc', SKYRIM_WORLD);
+ok(craft('goblin', GOBLIN_ARMOUR, R_GOBLIN_ARMOUR), 'Armory goblin armour (tagged Cyrodiil) is forged by a Goblin in Skyrim');
 props.set(ACT.nord + '|worldOrCellDesc', SKYRIM_WORLD);
 
 // ---- the data -------------------------------------------------------------------------------------------------------
