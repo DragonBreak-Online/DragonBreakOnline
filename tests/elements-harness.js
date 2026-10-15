@@ -116,5 +116,60 @@ check('the config ships frost on for players and off for NPCs', conf.elements &&
   && conf.elements.frost.player.enabled === true && conf.elements.frost.npc.enabled === false, conf.elements && conf.elements.frost);
 check('the config says how to roll it back', /ROLLBACK: enabled false/.test(String(conf.elements._comment || '')));
 
+// ---- Restoration's sun on the undead (gamemode.js sunDamageMult, config elements.sun) ------------------------------
+// The multiplier lives in gamemode.js beside the other damage factors, so the real code is sliced out and driven here,
+// the way supernatural-weakness-harness.js drives blessingTargetMult.
+{
+  const GM = fs.readFileSync(path.join(ROOT, 'gamemode.js'), 'utf8');
+  const a0 = GM.indexOf('const SUN = Object.assign(');
+  const END = '  return isUndead(tgt) ? Number(SUN.undeadMult) : 1;\n};';
+  const b0 = GM.indexOf(END) + END.length;
+  check('the sun block is where the harness expects it', a0 > 0 && b0 > a0);
+
+  const SUNFIRE = 0x02003f52, VAMPSUN = 0x000ed09c, FIREBOLT2 = 0x0002dd27;
+  const DRAUGR = 0xff000200, BANDIT = 0xff000201, PLAYER2 = 0xff000016;
+  const DRAUGR_BASE = 0x0002d1de, BANDIT_BASE = 0x0001be1c, DRAUGR_RACE = 0x000d53ab, BANDIT_RACE = 0x00013746;
+  const UNDEAD_KW = 0x0013796, NPC_KW = 0x0013794;
+  // The records the real code walks: actor -> baseDesc -> NPC_ -> RNAM race -> RACE KWDA -> keyword editor ids
+  const u32 = (v) => { const b = new Uint8Array(4); new DataView(b.buffer).setUint32(0, v, true); return b; };
+  const records = new Map([
+    [DRAUGR_BASE, { record: { type: 'NPC_', fields: [{ type: 'RNAM', data: u32(DRAUGR_RACE) }] }, toGlobalRecordId: (x) => x }],
+    [BANDIT_BASE, { record: { type: 'NPC_', fields: [{ type: 'RNAM', data: u32(BANDIT_RACE) }] }, toGlobalRecordId: (x) => x }],
+    [DRAUGR_RACE, { record: { type: 'RACE', fields: [{ type: 'KWDA', data: new Uint8Array([...u32(NPC_KW), ...u32(UNDEAD_KW)]) }] }, toGlobalRecordId: (x) => x }],
+    [BANDIT_RACE, { record: { type: 'RACE', fields: [{ type: 'KWDA', data: u32(NPC_KW) }] }, toGlobalRecordId: (x) => x }],
+    [UNDEAD_KW, { record: { type: 'KYWD', editorId: 'ActorTypeUndead' } }],
+    [NPC_KW, { record: { type: 'KYWD', editorId: 'ActorTypeNPC' } }],
+  ]);
+  const bases = new Map([[DRAUGR, DRAUGR_BASE], [BANDIT, BANDIT_BASE], [PLAYER2, 0]]);
+  const descs = { '3f52:Dawnguard.esm': SUNFIRE, '10d8d:Dawnguard.esm': 0x02010d8d, '38b6:Dawnguard.esm': 0x020038b6,
+    '38b5:Dawnguard.esm': 0x020038b5, '71df:Dawnguard.esm': 0x020071df, '15718:Dawnguard.esm': 0x02015718 };
+  const gmp = {
+    get: (id, p2) => { if (p2 !== 'baseDesc') throw new Error('unexpected ' + p2); const b = bases.get(id); if (b === undefined) throw new Error('no form'); return b ? `base${b}` : ''; },
+    getIdFromDesc: (d) => { if (d in descs) return descs[d]; const m = /^base(\d+)$/.exec(String(d)); if (m) return Number(m[1]); throw new Error('no such desc'); },
+  };
+  const conf = JSON.parse(fs.readFileSync(path.join(ROOT, 'gamemode-config.json'), 'utf8'));
+  const G = new Function('mp', 'recordOf', 'fieldsOf', 'u32At', 'globalAt', 'profileOf', 'log', 'cfg',
+    GM.slice(a0, b0) + '\nreturn { sunDamageMult, isUndead, SUN };')(
+    gmp,
+    (id) => records.get(id >>> 0) || null,
+    (lr, type) => ((lr && lr.record && lr.record.fields) || []).filter((f) => f.type === type && f.data instanceof Uint8Array),
+    (f, off) => (f && f.data.byteLength >= off + 4 ? new DataView(f.data.buffer, f.data.byteOffset, f.data.byteLength).getUint32(off, true) : 0),
+    (lr, local) => { try { return local ? lr.toGlobalRecordId(local) >>> 0 : 0; } catch (e) { return 0; } },
+    (id) => (id === PLAYER || id === PLAYER2 ? 1 : -1),
+    () => {}, conf);
+
+  check('a draugr is undead by its race\'s keyword', G.isUndead(DRAUGR) === true);
+  check('a bandit is not', G.isUndead(BANDIT) === false);
+  check('Sun Fire on a draugr is doubled', G.sunDamageMult(PLAYER, DRAUGR, SUNFIRE) === 2);
+  check('...and on a bandit is not', G.sunDamageMult(PLAYER, BANDIT, SUNFIRE) === 1);
+  check('a firebolt on a draugr is not (only the named sources)', G.sunDamageMult(PLAYER, DRAUGR, FIREBOLT2) === 1);
+  check('the vampire sun penalty is not one of the sources (it burns our own players)', G.sunDamageMult(PLAYER, DRAUGR, VAMPSUN) === 1);
+  check('an NPC\'s own sun hit is not scaled', G.sunDamageMult(DRAUGR, BANDIT, SUNFIRE) === 1);
+  check('a hit on a player is never scaled', G.sunDamageMult(PLAYER, PLAYER2, SUNFIRE) === 1);
+  check('all six surveyed sources resolve', Object.keys(descs).every((d) => G.sunDamageMult(PLAYER, DRAUGR, descs[d]) === 2));
+  check('the config says how to roll it back', /ROLLBACK: enabled false/.test(String(conf.elements.sun._comment || '')));
+  check('gamemode.js multiplies it into the hit', /mult \*= sunDamageMult\(agg, tgt, src\);/.test(GM));
+}
+
 console.log(failures ? `\n${failures} FAILED` : '\nall passed');
 process.exitCode = failures ? 1 : 0;

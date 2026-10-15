@@ -6074,6 +6074,60 @@ const sourceResistsOf = (sourceId) => {
   return out;
 };
 const fitsElement = (element, sourceId) => ELEMENT_RESIST[element] !== undefined && sourceResistsOf(sourceId).has(ELEMENT_RESIST[element]);
+// ---- The sun burns the undead: a Restoration sun spell does more to what should not be walking ------------------------
+// Nate, 15 Oct. Restoration's one bite is its sun, and it had none here: the server decides every hit from armour and
+// the multipliers below, and the conditions a vanilla sun effect carries ("more against the undead") are never evaluated
+// server-side, so Sun Fire hit a draugr exactly as hard as it hit a bandit.
+// The sources are named, not sniffed: a sun effect carries no resistance to recognise it by (every DLC1...Sun MGEF in the
+// load order has resist -1), so config "elements".sun.sources lists them by <local id>:<plugin>, resolved at runtime so a
+// load-order change never points them at another form. They are the player's: Sun Fire, Vampire's Bane, Stendarr's Aura
+// and Auriel's Bow. The vampire sun penalties (VampireSunDamage01-04, DLC1VampireLordSunDamage) are deliberately NOT
+// among them: those are the sun burning our own vampire players, and they are not a Restoration hit on an undead enemy.
+// The undead are the game's own answer: the ActorTypeUndead keyword on the target's race, matched by editor id (as the
+// weapon material bonus matches its keywords), so no form id is assumed.
+const SUN = Object.assign({ enabled: true, undeadMult: 2, undeadKeyword: 'ActorTypeUndead', sources: [] }, (cfg.elements || {}).sun || {});
+let sunSources = null;
+const sunSourceIds = () => {
+  if (sunSources) return sunSources;
+  sunSources = new Set();
+  for (const desc of (SUN.sources || [])) {
+    try { const id = mp.getIdFromDesc(String(desc)) >>> 0; if (id) sunSources.add(id); }
+    catch (e) { log(`sun: ${desc} is not in the load order`); }
+  }
+  return sunSources;
+};
+const undeadCache = new Map();   // base id -> true/false
+// The race of this actor's base carries the undead keyword
+const isUndead = (id) => {
+  let base = 0;
+  try { base = mp.getIdFromDesc(String(mp.get(id, 'baseDesc') || '')) >>> 0; } catch (e) { return false; }
+  if (!base) return false;
+  if (undeadCache.has(base)) return undeadCache.get(base);
+  let undead = false;
+  const npc = recordOf(base);
+  if (npc && String(npc.record.type) === 'NPC_') {
+    const rnam = fieldsOf(npc, 'RNAM')[0];
+    const race = rnam ? recordOf(globalAt(npc, u32At(rnam, 0))) : null;
+    if (race && String(race.record.type) === 'RACE') {
+      for (const f of fieldsOf(race, 'KWDA')) {
+        for (let off = 0; off + 4 <= f.data.byteLength && !undead; off += 4) {
+          const kw = recordOf(globalAt(race, u32At(f, off)));
+          if (kw && String(kw.record.editorId || '') === String(SUN.undeadKeyword)) undead = true;
+        }
+      }
+    }
+  }
+  undeadCache.set(base, undead);
+  return undead;
+};
+// What a sun hit on an undead target is multiplied by, else 1. A player's hit only: an NPC's sun spell on another NPC is
+// not ours to scale, and a player struck by one is never the undead this is for
+const sunDamageMult = (agg, tgt, src) => {
+  if (SUN.enabled === false || !(Number(SUN.undeadMult) > 0) || Number(SUN.undeadMult) === 1) return 1;
+  if (agg === tgt || !(profileOf(agg) >= 0) || profileOf(tgt) >= 0) return 1;
+  if (!sunSourceIds().has(src >>> 0)) return 1;
+  return isUndead(tgt) ? Number(SUN.undeadMult) : 1;
+};
 const weaponHandsCache = new Map();
 // one (swords, daggers, axes, maces), two (greatswords, battleaxes, warhammers), bow (bows, crossbows), or '' when not a weapon
 const weaponHandsOf = (sourceId) => {
@@ -6785,6 +6839,8 @@ const hitDamageAttemptHook =(aggressorId, targetId, sourceId, damage, flags) => 
     mult *= npcDifficultyDamageMult(agg, tgt, dmg, flags);
     // A player's summon takes less by its owner's Conjuration rank (summonBuff.takenByTier)
     mult *= summonTakenMult(agg, tgt, dmg);
+    // Restoration's sun on the undead (config elements.sun)
+    mult *= sunDamageMult(agg, tgt, src);
     try { npcHitLog(agg, tgt, src, dmg, mult, flags); } catch (e) { log('npc hit log failed', e.message); }
     if (summonSpellGuard(agg, tgt, dmg, mult, flags)) return false;
     // Would the engine's full hit down a player the scaled hit would not? Then it lands scaled from the start, and what a
