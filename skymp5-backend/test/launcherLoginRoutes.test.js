@@ -145,6 +145,43 @@ test('F1: an old launcher\'s login is held until the player presses Continue on 
   assert.equal((await get(`/api/users/login-discord/status?state=${state}`)).status, 403, 'the result is delivered once')
 })
 
+test('F1: the old flow\'s Continue button starts asleep and wakes only on a focused, visible page, so a double-click on a swapped window cannot press it', async () => {
+  const { page } = await legacyToConfirmPage()
+  const form = /<form[^>]*>[\s\S]*?<\/form>/.exec(page.text)[0]
+  assert.match(form, /<button type="submit" id="continue" disabled hidden>Continue<\/button>/)
+  assert.match(form, /<noscript><button type="submit">Continue<\/button><\/noscript>/, 'without scripts the button still works')
+  assert.match(form, /document\.hasFocus\(\)/)
+  assert.match(form, /visibilitychange/)
+  assert.match(form, /addEventListener\('blur', sleep\)/)
+})
+
+test('F1: the Continue guard: a click right after the tab comes to the front is ignored, a click after a second and a pointer move goes through', async () => {
+  const { page } = await legacyToConfirmPage()
+  const script = /<script>(\(function \(\) \{[\s\S]*?\}\)\(\))<\/script>/.exec(page.text)[1]
+  const listeners = {}
+  const on = (target, type, fn) => { (listeners[`${target}:${type}`] = listeners[`${target}:${type}`] || []).push(fn) }
+  const fire = (target, type) => (listeners[`${target}:${type}`] || []).forEach(fn => fn())
+  const button = { hidden: true, disabled: true }
+  let focused = false, now = 0
+  const timers = []
+  const doc = { visibilityState: 'visible', hasFocus: () => focused, getElementById: () => button, addEventListener: (t, fn) => on('doc', t, fn) }
+  const win = { addEventListener: (t, fn) => on('win', t, fn) }
+  const sandbox = { document: doc, window: win, setTimeout: (fn, ms) => { const t = { at: now + ms, fn }; timers.push(t); return t }, clearTimeout: t => { const i = timers.indexOf(t); if (i >= 0) timers.splice(i, 1) } }
+  const advance = ms => { now += ms; for (const t of [...timers]) if (t.at <= now) { timers.splice(timers.indexOf(t), 1); t.fn() } }
+  require('vm').runInNewContext(script, sandbox)
+  assert.equal(button.hidden, false)
+  assert.equal(button.disabled, true, 'asleep while the tab has no focus (a window above it)')
+  fire('doc', 'mousemove')
+  assert.equal(button.disabled, true)
+  focused = true; fire('win', 'focus')
+  advance(150); fire('doc', 'mousemove')
+  assert.equal(button.disabled, true, 'the second click of a double-click lands on a sleeping button')
+  advance(1000); fire('doc', 'mousemove')
+  assert.equal(button.disabled, false, 'a player who looks at the page and moves the pointer can press it')
+  focused = false; fire('win', 'blur')
+  assert.equal(button.disabled, true, 'asleep again when another window comes in front')
+})
+
 test('F1: reopening an old launcher\'s login link does not keep it alive, and a second Discord callback is refused', async () => {
   const { state } = await legacyToConfirmPage()
   const again = await get(`/api/users/login-discord?state=${state}`)

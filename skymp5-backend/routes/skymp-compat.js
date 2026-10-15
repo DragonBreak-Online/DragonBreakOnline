@@ -452,9 +452,24 @@ function confirmPage({ flow, state, nonce, username, error = '' }) {
   return authPage({
     ok: true, mark: '?', title: 'Finish signing in',
     message: `${who} Press Continue only if you pressed <strong>Discord Login</strong> in the DragonBreak launcher on this PC in the last few minutes. That signs in your launcher, which can then play as you.`,
-    form: `<form method="post" action="/api/users/login-discord/confirm">${hidden}${err}<button type="submit">Continue</button></form>
+    form: `<form method="post" action="/api/users/login-discord/confirm">${hidden}${err}${CONTINUE_BUTTON}</form>
     <p class="warn"><strong>If someone sent you this link, close this tab now.</strong> Continuing would let them play as you.</p>`,
   })
 }
+
+// Continue wakes only after this tab was visible and focused for a second and then saw the pointer or a key, so a window swapped under a double-click cannot press it
+const CONTINUE_BUTTON = `<noscript><button type="submit">Continue</button></noscript><button type="submit" id="continue" disabled hidden>Continue</button>
+<script>(function () {
+  var b = document.getElementById('continue'), timer = null, ready = false
+  b.hidden = false
+  function sleep() { clearTimeout(timer); timer = null; ready = false; b.disabled = true }
+  function wake() { if (timer || ready || document.visibilityState !== 'visible' || !document.hasFocus()) return; timer = setTimeout(function () { timer = null; ready = true }, 1000) }
+  function gesture() { if (ready) b.disabled = false; else wake() }
+  ['pointermove', 'mousemove', 'keydown', 'touchstart'].forEach(function (e) { document.addEventListener(e, gesture, true) })
+  window.addEventListener('focus', wake)
+  window.addEventListener('blur', sleep)
+  document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') wake(); else sleep() })
+  wake()
+})()</script>`
 
 module.exports = router
