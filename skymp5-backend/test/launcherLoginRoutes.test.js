@@ -345,3 +345,14 @@ test('F1: the in-flight login file holds no state, code or token in the clear', 
   assert.equal(fs.statSync(path.join(tmp, 'auth-states.json')).mode & 0o777, 0o600)
   assert.equal(discord.calls.other.length, 0, 'nothing but the fake discord.com was called')
 })
+
+test('F1: the login rate limits run on Cloudflare\'s visitor header, per visitor', async () => {
+  // Every real request carries CF-Connecting-IP, so this is the path production takes; documentation-range addresses only
+  const visitor = n => ({ 'cf-connecting-ip': `2001:db8:${n}::1` })
+  const start = headers => post('/api/users/login-discord/start', { client: 'launcher', code_challenge: pkce().challenge, code_challenge_method: 'S256', redirect_port: 48125 }, { headers })
+  for (let i = 0; i < 10; i++) assert.equal((await start(visitor(1))).status, 200, `start ${i + 1} of 10`)
+  const over = await start(visitor(1))
+  assert.equal(over.status, 429)
+  assert.match(over.json.error, /Too many login attempts/)
+  assert.equal((await start(visitor(2))).status, 200, 'another visitor is not held back')
+})
