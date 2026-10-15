@@ -157,8 +157,10 @@ the same checks (its private-address test lacks `100.64.0.0/10`).
 Commands below run as root; from the `nate` user, prefix them with `sudo` (step 3 says how for its redirect).
 
 1. Deploy the backend after the Phase 1 restart with `DEVICE_ID_HMAC_KEY` unset.
-   - **Before that start**, check free space on CT 115's root filesystem (`df -h /`). On 15 Oct it was at 100% (about
-     370 MB free) and `dbo-disk-check.service` had failed: free space first.
+   - **Before that start**, the disk gate: at least 1 GB free on `/`, or stop. Check with `df -h /`, or
+     `[ "$(df --output=avail -k / | tail -n 1)" -ge 1048576 ] && echo ok || echo STOP`. On 15 Oct `/` reached 0 MB
+     free, `dbo-disk-check.service` failed and `dbo-monitor.service` logged "no space" errors. The first start rewrites
+     `data/bans.json`, and the running backend writes players.json and sessions.json all the time.
    - **Before that start**, copy the ban list aside, keeping its 0600 mode, into a root-only folder (never `/tmp`):
      `install -d -m 700 /root/ban-list-backups && cp -p /opt/alduinak/skymp5-backend/data/bans.json /root/ban-list-backups/bans.json.before-L3-01`
    - If the deploy is on a day other than 2026-10-15: set that day in `data/legal/legal.json` (`version` and
@@ -200,7 +202,8 @@ Commands below run as root; from the `nate` user, prefix them with `sudo` (step 
    sudo grep -c '^DEVICE_ID_HMAC_KEY=' /opt/dragonbreak/backend.env
    ```
 
-   The count must print `1` (a count, never the value); anything else, do not restart. Then restart. The log says
+   The count must print `1` (a count, never the value); anything else, do not restart. Before the restart, the disk
+   gate again (step 1): at least 1 GB free on `/`, or stop. Then restart. The log says
    `on, report only`. If it says `is not set`, the file holds an empty `DEVICE_ID_HMAC_KEY=` line: replace that line
    by hand without printing the file, never add a second one.
 4. Release launcher 2.1.50 with the device code, ideally together with F1's launcher half. Launcher only: no
