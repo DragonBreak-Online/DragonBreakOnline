@@ -102,7 +102,9 @@ ok('switching the boost back on clears the mark', JSON.parse(fs.readFileSync('pl
 // The region lock speaks of the alpha
 const lock = fs.readFileSync(path.join(SERVER, 'playtest.js'), 'utf8');
 const shown = (lock.match(/(?:personal|system)\([^;]*\);/g) || []).join('\n');
-ok('the region lock says the alpha begins in the region', shown.includes('The road to Skyrim is closed for now. The alpha begins in ${C.name}.') && shown.includes('Skyrim is closed for now: the alpha begins in ${C.name}. You have been brought back.'));
+// The refusal's first sentence is closedMessage (its default "The road to Skyrim is closed for now."; the Skyrim release
+// names the closed lands); the bounce line is BOUNCE_LINE
+ok('the region lock says the alpha begins in the region', shown.includes('${C.closedMessage} The alpha begins in ${C.name}.') && /closedMessage: 'The road to Skyrim is closed for now\.'/.test(lock) && lock.includes('Skyrim is closed for now: the alpha begins in ${C.name}. You have been brought back.') && shown.includes('system(a, BOUNCE_LINE)'));
 ok('...and no message a player sees says playtest (the admin hint names the config key, which stays)', !/playtest/i.test(shown.replace(/"playtest"/g, '')), shown.match(/.*playtest.*/i));
 
 Date.now = realNow;

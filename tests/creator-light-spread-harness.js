@@ -197,7 +197,7 @@ check('...and opens once it has landed', opened.includes(30));
   check('...one still creating keeps it (noon is right for them)', creation2.has(61) && !clockTo.includes(61));
   check('both sendToArrival (not in the hub) and a finished player\'s arrival elsewhere call it',
     /if \(here !== String\(HUB\.cellOrWorldDesc\)\.toLowerCase\(\)\) return leftRealm\(a\);/.test(gm)
-    && /if \(!creationPending\(a\)\) \{ if \(world !== worldIdOf\(HUB\.cellOrWorldDesc\)\) leftRealm\(a\); return; \}/.test(gm));
+    && /if \(!creationPending\(a\)\) \{ if \(world !== worldIdOf\(HUB\.cellOrWorldDesc\)\) leftRealm\(a\);( else startLogin\(a\);)? return; \}/.test(gm));
 }
 
 // ---- 3. the wiring in gamemode.js ----

@@ -26,6 +26,8 @@ module.exports = (api) => {
   const allowedWorlds = new Set([hubDesc, ...C.allowedWorlds].map(normDesc));
   const allowedCells = new Set((C.allowedCells || []).map(normDesc));
   const allowedPlugins = new Set((C.allowedPlugins || []).map((p) => String(p).toLowerCase()));
+  // What a player brought back is told: the closed lands' own line with closedMessage set (Skyrim open), else the alpha's
+  const BOUNCE_LINE = (cfg.playtest || {}).closedMessage ? `${C.closedMessage} You have been brought back to ${C.name}.` : `Skyrim is closed for now: the alpha begins in ${C.name}. You have been brought back.`;
   const closedPlugins = new Set((C.closedPlugins || []).map((p) => String(p).toLowerCase()));
   const blockedDoors = new Set((C.blockedDoors || []).map(idOf).filter(Boolean));
   // blockedDoors that are automatic load doors (walked into, not activated): refused ones send the player back
@@ -174,7 +176,7 @@ module.exports = (api) => {
         if (now - (bounced.get(a) || 0) < 10000) continue;
         bounced.set(a, now);
         if (sendToArrival(a, 'bounce')) {
-          system(a, cfg.playtest && cfg.playtest.closedMessage ? `${C.closedMessage} You have been brought back to ${C.name}.` : `Skyrim is closed for now: the alpha begins in ${C.name}. You have been brought back.`);
+          system(a, BOUNCE_LINE);
           audit(`PLAYTEST ${who(a)} was outside the region (${place}) and was returned to ${C.name}`);
         }
       } catch (e) { log('playtest check failed', e.message); }
