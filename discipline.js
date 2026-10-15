@@ -37,7 +37,7 @@ module.exports = (api) => {
   const { mp, log, personal, audit, who, display, profileOf, onlineActors, registerChatCommand, isAdmin, isLeadStaff, findAnyByName,
     sendPacket, userOf, every } = api;
   const C = Object.assign({}, DEFAULTS, (api.cfg || {}).discipline || {});
-  if (C.enabled === false) { globalThis.__dboDisciplineLogin = null; log('discipline: off'); return; }
+  if (C.enabled === false) { globalThis.__dboDisciplineLogin = null; globalThis.__dboVoiceRefused = null; log('discipline: off'); return; }
   const stateDir = () => { try { return path.dirname(fs.realpathSync(path.resolve('world'))); } catch (e) { return path.resolve('.'); } };
   const FILE = C.file ? path.resolve(C.file) : path.join(stateDir(), 'discipline.json');
   let readOnly = false;
@@ -76,6 +76,9 @@ module.exports = (api) => {
     save();
     return false;
   };
+
+  // The fork's voice system asks before it mints a voice token and in its room sweep: a suspended account gets no voice
+  globalThis.__dboVoiceRefused = (a) => (activeSuspension(recordOf(profileOf(a)), Date.now()) ? 'suspended' : '');
 
   const add = (actor, target, kind, reason, until, from) => {
     const p = profileOf(target);
