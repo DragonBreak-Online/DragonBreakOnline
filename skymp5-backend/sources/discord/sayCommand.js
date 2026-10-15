@@ -21,6 +21,7 @@ const ERRORS = Object.freeze({
   unavailable: '/say is not set up on the server right now.',
   notAllowed: '/say is for Lead GMs and above (Owners, Dragon Break Dev and Lead GMs).',
   noChannel: 'Dragonbaron cannot see this channel.',
+  record: 'This channel holds only Dragonbaron\'s own records (audit log, ticket transcripts), so /say cannot post here.',
   cannotPost: 'You cannot post in this channel yourself, so Dragonbaron will not post here for you.',
   locked: 'This thread is locked. Only staff who can manage threads can post in it.',
   botCannot: 'Dragonbaron is not allowed to post here.',
@@ -72,6 +73,7 @@ function createSayCommand({
 }) {
   const R = readRankRule(config)
   const todoForum = rules.SNOWFLAKE.test(String(config.discordTodoForumChannelId || '')) ? String(config.discordTodoForumChannelId) : ''
+  const records = new Set([config.discordLogChannelId, config.discordTicketTranscriptChannelId].map(String).filter(id => rules.SNOWFLAKE.test(id)))
   if (R.problem) log(`off: ${R.problem}`)
   const windows = new Map()
   const forms = new Map()
@@ -98,6 +100,8 @@ function createSayCommand({
     if (!channel) channel = await Promise.resolve(interaction.client?.channels?.fetch?.(interaction.channelId)).catch(() => null)
     if (!channel || channel.id !== interaction.channelId || typeof channel.send !== 'function') return { refused: 'noChannel' }
     const thread = isThread(channel)
+    // A post as the bot in its own record channels would read as a genuine audit or transcript line
+    if (records.has(channel.id) || (thread && records.has(String(channel.parentId)))) return { refused: 'record' }
     const sendFlag = thread ? PermissionFlagsBits.SendMessagesInThreads : PermissionFlagsBits.SendMessages
     const mine = interaction.memberPermissions
     if (!has(mine, PermissionFlagsBits.ViewChannel) || !has(mine, sendFlag)) return { refused: 'cannotPost' }

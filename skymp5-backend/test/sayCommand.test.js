@@ -17,7 +17,7 @@ const consoleScript = require('../scripts/console-command')
 const snow = n => (10n ** 18n + BigInt(n)).toString()
 const GUILD = snow(1)
 const ROLE = { owner: snow(11), dev: snow(12), lead: snow(13), gm: snow(14) }
-const CH = { general: snow(21), todoThread: snow(22), todoForum: snow(23), otherForum: snow(24), otherThread: snow(25), elsewhere: snow(26) }
+const CH = { general: snow(21), todoThread: snow(22), todoForum: snow(23), otherForum: snow(24), otherThread: snow(25), elsewhere: snow(26), audit: snow(27), transcripts: snow(28), auditThread: snow(29) }
 const USER = { lead: snow(31), gm: snow(32), owner: snow(33) }
 const OLD_MESSAGE = snow(41)
 const SEND = [P.ViewChannel, P.SendMessages, P.SendMessagesInThreads, P.ReadMessageHistory]
@@ -166,6 +166,26 @@ test('refusals are private, carry the reason, and post nothing', async () => {
   await make({ discordTodoForumChannelId: '' }).handleInteraction(closeOff.it)
   assert.equal(closeOff.calls[0][1].content, say.ERRORS.closeOff)
   assert.equal(allSends().length, 0)
+})
+
+test('the audit and transcript channels and their threads are refused, even for an Administrator, so no record can be faked', async () => {
+  channels.set(CH.audit, fakeChannel(CH.audit))
+  channels.set(CH.transcripts, fakeChannel(CH.transcripts))
+  channels.set(CH.auditThread, fakeChannel(CH.auditThread, { thread: true, parentId: CH.audit }))
+  const S = make({ discordLogChannelId: CH.audit, discordTicketTranscriptChannelId: CH.transcripts })
+  for (const channelId of [CH.audit, CH.transcripts, CH.auditThread]) {
+    for (const text of ['[2026-10-15 19:00:00] PERM someone gained role(s): Owners', null]) {
+      const { it, calls } = command({ channelId, text, perms: [...SEND, P.Administrator] })
+      await S.handleInteraction(it)
+      assert.deepEqual(names(calls), ['reply'], channelId)
+      assert.equal(calls[0][1].content, say.ERRORS.record)
+    }
+  }
+  assert.equal(allSends().length, 0)
+  assert.equal(audits.length, 0)
+  const elsewhere = command()
+  await S.handleInteraction(elsewhere.it)
+  assert.deepEqual(names(elsewhere.calls), ['defer', 'edit'], 'other channels still work')
 })
 
 test('a locked thread takes a post from someone who can manage threads', async () => {
