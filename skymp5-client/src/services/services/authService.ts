@@ -1,4 +1,3 @@
-import * as crypto from "crypto";
 import * as fs from "fs";
 import { AuthGameData, RemoteAuthGameData, authGameDataStorageKey } from "../../features/authModel";
 import { FunctionInfo } from "../../lib/functionInfo";
@@ -7,7 +6,6 @@ import { BrowserMessageEvent, Menu, browser } from "skyrimPlatform";
 import { AuthNeededEvent } from "../events/authNeededEvent";
 import { BrowserWindowLoadedEvent } from "../events/browserWindowLoadedEvent";
 import { TimersService } from "./timersService";
-import { MasterApiAuthStatus } from "../messages_http/masterApiAuthStatus";
 import { logTrace, logError } from "../../logging";
 import { ConnectionMessage } from "../events/connectionMessage";
 import { CreateActorMessage } from "../messages/createActorMessage";
@@ -16,6 +14,7 @@ import { NetworkingService } from "./networkingService";
 import { MsgType } from "../../messages";
 import { ConnectionDenied } from "../events/connectionDenied";
 import { SettingsService } from "./settingsService";
+import { DeviceLogin, loginUrl, parseStart, pollBody, pollOutcome, pollRoute, startBody, startRoute } from "./discordDeviceLogin";
 
 // for browsersideWidgetSetter
 declare const window: any;
@@ -71,6 +70,11 @@ const translations = {
     back: 'назад',
     quitGame: 'выйти из игры',
     quitGameHint: 'Закрыть игру и выйти на рабочий стол',
+    yourCode: 'ваш код:',
+    typeCodeHint: 'введите его на странице, открывшейся в браузере',
+    neverShareCode: 'никому не сообщайте этот код',
+    loginExpired: 'время входа истекло, попробуйте снова',
+    loginUnavailable: 'вход сейчас недоступен, попробуйте позже',
   },
   "en": {
     loginViaDiscord: 'log in via Discord',
@@ -99,6 +103,11 @@ const translations = {
     back: 'back',
     quitGame: 'quit game',
     quitGameHint: 'Close the game and return to desktop',
+    yourCode: 'your code:',
+    typeCodeHint: 'type it on the page that opened in your browser',
+    neverShareCode: 'never give this code to anyone',
+    loginExpired: 'the sign-in expired, please try again',
+    loginUnavailable: 'sign-in is unavailable right now, try again later',
   },
 } as const;
 
@@ -282,8 +291,6 @@ export class AuthService extends ClientListener {
       return;
     }
 
-    const settingsService = this.controller.lookupListener(SettingsService);
-
     // The event name only: other widgets' messages pass through here too and may carry what a player typed
     logTrace(this, `onBrowserMessage:`, String(e.arguments[0]));
 
@@ -292,10 +299,7 @@ export class AuthService extends ClientListener {
       case events.openDiscordOauth:
         browserState.comment = strings.openingBrowser;
         this.refreshWidgets();
-        this.sp.win32.loadUrl(`${settingsService.getMasterUrl()}/api/users/login-discord?state=${this.discordAuthState}`);
-
-        // Launch checkLoginState loop
-        this.checkLoginState();
+        this.startDeviceLogin();
         break;
       case events.authAttempt:
         if (authData === null) {
@@ -366,70 +370,97 @@ export class AuthService extends ClientListener {
     });
   }
 
-  private checkLoginState() {
+  // The backend issues the state and the code shown here; the browser page asks for the code after Discord
+  private startDeviceLogin() {
+    const settingsService = this.controller.lookupListener(SettingsService);
+    const masterUrl = settingsService.getMasterUrl();
+    new this.sp.HttpClient(masterUrl).post(startRoute, {
+      body: startBody(),
+      contentType: 'application/json',
+      // @ts-ignore
+    }, (res) => {
+      const login = parseStart(res.status, res.body, Date.now());
+      if (!login) {
+        logError(this, `Discord sign-in could not start, status`, res.status);
+        browserState.comment = strings.loginUnavailable;
+        this.refreshWidgets();
+        return;
+      }
+      this.deviceLogin = login;
+      browserState.failCount = 0;
+      browserState.comment = `${strings.yourCode} ${login.userCode}. ${strings.typeCodeHint}. ${strings.neverShareCode}.`;
+      this.refreshWidgets();
+      this.sp.win32.loadUrl(loginUrl(masterUrl, login));
+      this.controller.lookupListener(TimersService).setTimeout(() => this.checkLoginState(login), login.intervalMs);
+    });
+  }
+
+  private checkLoginState(login: DeviceLogin) {
     if (!this.isListenBrowserMessage) {
       logTrace(this, `checkLoginState: isListenBrowserMessage was false, aborting check`);
       return;
     }
+    // A newer sign-in replaced this one
+    if (this.deviceLogin !== login) return;
 
     const settingsService = this.controller.lookupListener(SettingsService);
     const timersService = this.controller.lookupListener(TimersService);
+    const again = () => timersService.setTimeout(() => this.checkLoginState(login), login.intervalMs);
 
-    // Social engineering protection, don't show the full state
-    const halfDiscordAuthState = this.discordAuthState.slice(0, 16);
+    if (Date.now() > login.deadline) {
+      this.deviceLogin = null;
+      browserState.comment = strings.loginExpired;
+      this.refreshWidgets();
+      return;
+    }
 
-    logTrace(this, `Checking login state`, halfDiscordAuthState, '...');
-
-    new this.sp.HttpClient(settingsService.getMasterUrl())
-      .get("/api/users/login-discord/status?state=" + this.discordAuthState, undefined,
-        // @ts-ignore
-        (response) => {
-          switch (response.status) {
-            case 200:
-              const {
-                token,
-                masterApiId,
-                discordUsername,
-                discordDiscriminator,
-                discordAvatar,
-              } = JSON.parse(response.body) as MasterApiAuthStatus;
+    new this.sp.HttpClient(settingsService.getMasterUrl()).post(pollRoute, {
+      body: pollBody(login),
+      contentType: 'application/json',
+      // @ts-ignore
+    }, (response) => {
+      const outcome = pollOutcome(response.status, response.body);
+      switch (outcome.kind) {
+        case "done": {
+          this.deviceLogin = null;
+          const { token, masterApiId, discordUsername, discordDiscriminator, discordAvatar } = outcome.auth;
+          browserState.failCount = 0;
+          this.createPlaySession(token, (playSession, error) => {
+            if (error) {
               browserState.failCount = 0;
-              this.createPlaySession(token, (playSession, error) => {
-                if (error) {
-                  browserState.failCount = 0;
-                  browserState.comment = (error);
-                  timersService.setTimeout(() => this.checkLoginState(), Math.floor((1.5 + Math.random() * 2) * 1000));
-                  this.refreshWidgets();
-                  return;
-                }
-                authDataFromLogin = true;
-                authData = {
-                  session: playSession,
-                  masterApiId,
-                  discordUsername,
-                  discordDiscriminator,
-                  discordAvatar,
-                };
-                browserState.comment = strings.linkedSuccessfully;
-                this.refreshWidgets();
-              });
-              break;
-            case 401: // Unauthorized
-              browserState.failCount = 0;
-              browserState.comment = '';//(`Still waiting...`);
-              timersService.setTimeout(() => this.checkLoginState(), Math.floor((1.5 + Math.random() * 2) * 1000));
-              break;
-            case 403: // Forbidden
-            case 404: // Not found
-              browserState.failCount = 9000;
-              browserState.comment = (`Fail: ${response.body}`);
-              break;
-            default:
-              ++browserState.failCount;
-              browserState.comment = `Server returned ${response.status.toString() || "???"} "${response.body || response.error}"`;
-              timersService.setTimeout(() => this.checkLoginState(), Math.floor((1.5 + Math.random() * 2) * 1000));
-          }
-        });
+              browserState.comment = (error);
+              this.refreshWidgets();
+              return;
+            }
+            authDataFromLogin = true;
+            authData = {
+              session: playSession,
+              masterApiId,
+              discordUsername,
+              discordDiscriminator,
+              discordAvatar,
+            };
+            browserState.comment = strings.linkedSuccessfully;
+            this.refreshWidgets();
+          });
+          break;
+        }
+        case "pending":
+          browserState.failCount = 0;
+          again();
+          break;
+        case "expired":
+          this.deviceLogin = null;
+          browserState.failCount = 9000;
+          browserState.comment = strings.loginExpired;
+          this.refreshWidgets();
+          break;
+        default:
+          ++browserState.failCount;
+          logTrace(this, `Sign-in poll answered`, response.status, `, retrying`);
+          again();
+      }
+    });
   };
 
   private refreshWidgets() {
@@ -741,7 +772,8 @@ export class AuthService extends ClientListener {
       return this.authNeededFired && this.browserWindowLoadedFired
     }
   };
-  private discordAuthState = crypto.randomBytes(32).toString('hex');
+  // The in-game sign-in in progress; its device code never leaves this process except to the backend's poll
+  private deviceLogin: DeviceLogin | null = null;
   private authDialogOpen = false;
 
   private loggingStartMoment = 0;
