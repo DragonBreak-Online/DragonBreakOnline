@@ -72,7 +72,12 @@ and **Undo**.
 
 - **A family or shared PC** usually looks like: the account existed before the ban, several active accounts play on
   the PC, and the Discord account is old. Mark it **Not an alt** once you are satisfied. The mark lasts until that
-  ban is lifted.
+  ban is lifted, or until the marked account has not played for 30 days (`DEVICE_RETENTION_DAYS`; only plays with
+  launcher 2.1.50 or later count). Then its entry, and the mark with it, are deleted under the 30-day rule, and if it
+  plays on that PC again a new ALT CHECK is posted, worded exactly like the first.
+- **A repeated lead.** Before acting on an ALT CHECK, search the staff audit channel for an earlier
+  `NOT AN ALT <name> for ban B-...` line for the same name and ban. If there is one and nothing else has changed, it
+  is the lapsed mark, not new evidence: mark it **Not an alt** again.
 - **An alt** usually looks like: the account is new since the ban, the Discord account is days old, and the banned
   account was seen on that PC recently (BANNED ACCOUNT BACK is a strong sign).
 - "Older launcher login, so this could be someone else's PC" means the evidence came from a launcher session that is
@@ -104,7 +109,10 @@ since the last line. An hour with nothing counted prints nothing.
 - A code is deleted 30 days after the PC was last used to play (hourly prune, and once at start-up).
 - A banned account's codes are kept while its bans.json entry exists; after an unban the 30-day rule applies.
 - An account entry with no codes is deleted 30 days after its last day, unless the account is banned.
-- Flags last 30 days. A not-an-alt mark lasts until its ban is gone. Session bindings are in memory only.
+- Flags last 30 days. A Not an alt mark lasts until its ban is lifted, or until the marked account has not played
+  for 30 days: then the account entry, and the mark with it, are deleted under the 30-day rule above, and a new ALT
+  CHECK can be posted if the account plays on that PC again (see Reading a lead: search the audit channel for the
+  earlier `NOT AN ALT <name> for ban B-...` line before acting on it). Session bindings are in memory only.
 - Deleting a player (`players.deleteByProfileId`) erases its entry, except a banned account's (Privacy Policy section 6).
 - **Privacy request:** run this **before** the player's profile or characters are deleted. With the player's profile
   number, run `node scripts/forget-device.js --profile <N>` in `skymp5-backend`. It prints only `removed`,
