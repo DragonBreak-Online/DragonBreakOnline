@@ -48,9 +48,11 @@ LiveKit server + firewall are already live on the box (`DragonBreakLiveKit`).
   game server removes sessions itself through LiveKit's RoomService API
   (RemoveParticipant, signed with a 60 s admin token for the room):
   - when a player's game connection ends; every kick and ban ends in one;
-  - in a sweep every `voiceChat.sweepSeconds` (default 15, 0 = off) that
-    removes any identity that is not an online character allowed voice, so a
-    kicked or banned player who rejoins with a kept token is out again;
+  - in a sweep at random gaps of half to all of `voiceChat.sweepSeconds`
+    (default 15, 0 = off) that removes any identity that is not an online
+    character allowed voice, so a kicked or banned player who rejoins with a
+    kept token is out again; the gaps are random so a script cannot step out
+    of the room just before each check;
   - LiveKit gives every join a fresh token at once, so a script could rejoin
     forever. A session removed twice that comes back a third time moves voice
     to a new room (`<room>-<suffix>`, kept in `voice-room.json` beside the
@@ -61,7 +63,11 @@ LiveKit server + firewall are already live on the box (`DragonBreakLiveKit`).
   A panel-banned account (admin-bans.json) gets no token, nor one the
   gamemode refuses through `globalThis.__dboVoiceRefused(actorId)` (a
   suspension). Tokens live 10 minutes. The API base is `voiceChat.apiUrl`,
-  or `url` with ws(s) turned into http(s).
+  or `url` with ws(s) turned into http(s). After a restart the server log
+  shows "VoiceSystem: the LiveKit server API answers" once the first sweep
+  reaches it; "LiveKit server API call ... failed" or "answered HTTP" means
+  sessions are not being removed (a 404 that is not LiveKit's own not_found
+  counts as a failure).
 - **Voice is inherently identifying.** Nothing in the UI ties a LiveKit
   identity to a character name (identities are actor ids, never rendered), but
   a recognizable voice defeats /mask on its own - an RP-rules matter. The
