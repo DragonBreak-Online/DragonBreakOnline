@@ -481,9 +481,10 @@ test('F1: MASTER_SESSION_CHECK_TOKEN: optional takes a check without X-Auth-Toke
   })
 })
 
-test('F1: login pages are never cached, framed or sent as a referrer', async () => {
+test('F1: login pages are never cached, framed, sent as a referrer or left in reach of the page that opened them', async () => {
   const { page } = await legacyToConfirmPage()
   assert.equal(page.headers['x-frame-options'], 'DENY')
+  assert.equal(page.headers['cross-origin-opener-policy'], 'same-origin', 'a sandboxed popup cannot load the Continue page without its script')
   assert.match(page.headers['content-security-policy'], /frame-ancestors 'none'/)
   assert.match(page.headers['cache-control'], /no-store/)
   assert.equal(page.headers['referrer-policy'], 'no-referrer')

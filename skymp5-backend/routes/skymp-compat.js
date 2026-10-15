@@ -88,12 +88,13 @@ const pollLimiter     = perVisitor(60)
 
 const OUTDATED = 'This DragonBreak launcher is out of date, so it cannot log in any more. Close it and open it again: it updates itself. Then press Discord Login in the new launcher.'
 
-// Every login page and answer: never cached, never framed, no referrer, and forms post only to this site
+// Every login page and answer: never cached, never framed, no referrer, forms post only to this site, and the page that opened it loses its handle
 function loginHeaders(_req, res, next) {
   res.set({
     'Cache-Control': 'no-store, private',
     'Referrer-Policy': 'no-referrer',
     'X-Frame-Options': 'DENY',
+    'Cross-Origin-Opener-Policy': 'same-origin',
     'Content-Security-Policy': "frame-ancestors 'none'; form-action 'self'; base-uri 'none'",
   })
   next()
