@@ -28,3 +28,7 @@ These properties can NOT be modified by a script with `mp.set`.
 - equipment
 - isOnline
 - neighbors ([0xff000000, 0xff000001, ...])
+
+## Private Properties
+
+A property whose name starts with `private.` needs no `mp.makeProperty`. The server saves it and scripts read it with `mp.get`, but it is never sent to any client, the owner's own client included. Names starting with `private.indexed.` are also indexed for `mp.findFormsByPropertyValue`.
