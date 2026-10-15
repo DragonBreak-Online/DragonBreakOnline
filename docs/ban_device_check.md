@@ -119,7 +119,7 @@ on the old routes.
   `/opt/dragonbreak-tools/backups/dbo_backup.py` copies only its allowlist from `data/`, so it does not take the file,
   but it logs every unclassified `data/` name on each run and its cloud push WARNs "so somebody decides allow or deny".
   Rollout step 2 settles that before the key is set.
-- Changing the key makes every stored code meaningless: delete the file at the same time.
+- Changing the key makes every stored code meaningless: use the full erase (Rollout, Undo), then set the new key.
 
 ## The old raw hwid
 
@@ -154,9 +154,26 @@ the same checks (its private-address test lacks `100.64.0.0/10`).
 
 ## Rollout
 
+Who does what: claude-jake deploys and restarts the backend after Jake's go, and settles the backup tool; root on
+CT 115 sets the key; the launcher lane releases the launcher; claude-jake watches the counts; Jake decides on enforce.
 Commands below run as root; from the `nate` user, prefix them with `sudo` (step 3 says how for its redirect).
 
-1. Deploy the backend after the Phase 1 restart with `DEVICE_ID_HMAC_KEY` unset.
+**Ledger, on every step that changes something** (CLAUDE.md rule 1, `ops readme`): `ops claim <resource> <you>
+"<why>" <minutes>` before, `ops log <you> "<what changed>" "<how to undo it>"` after, then `ops release <resource>
+<you>`. Back up a live file before editing it: `cp -a <file> <file>.bak-$(date +%Y%m%d-%H%M%S)`. Each step below gives
+its own lines; `<you>` is your ledger operator name.
+
+**Env override check**, before step 3 and before any undo that edits `backend.env`:
+
+- `grep -c '^[[:space:]]*DEVICE_' /etc/dragonbreak/console.env` must print `0` (15 Oct: 0). That file is read after
+  `backend.env` (the `console.conf` drop-in), so a `DEVICE_` line there would override `backend.env`.
+- `/opt/alduinak/skymp5-backend/.env` must not exist (15 Oct: it does not). `config.js` loads it with dotenv for
+  anything the two files leave unset, so a key there would survive the full erase.
+
+1. **Deploy the backend with `DEVICE_ID_HMAC_KEY` unset**, with Phase 1 or after it. Who: claude-jake, after Jake's go.
+   - Ledger first: `ops claim backend claude-jake "L3-01 backend deploy and restart" 60`. When the deploy goes through
+     a push to main, also `ops claim github-main claude-jake "L3-01 deploy merge to main" 30` and follow ops README
+     rule 6: the updater resets `/opt/alduinak` to `origin/main` and restarts the game server, never the backend.
    - **Before that start**, the disk gate: at least 1 GB free on `/`, or stop. Check with `df -h /`, or
      `[ "$(df --output=avail -k / | tail -n 1)" -ge 1048576 ] && echo ok || echo STOP`. On 15 Oct `/` reached 0 MB
      free, `dbo-disk-check.service` failed and `dbo-monitor.service` logged "no space" errors. The first start rewrites
@@ -175,20 +192,31 @@ Commands below run as root; from the `nate` user, prefix them with `sudo` (step 
    - Before the tree reaches the live checkout, this must print `same`:
      `git diff --quiet <live head> <deploy tree> -- skymp5-backend/routes/version.js && echo same || echo STOP`.
      version.js is read from disk on every request, so a wrong one reaches every launcher as soon as it lands.
+   - Restart: `systemctl restart dragonbreak-backend.service`. Then
+     `grep -F '[device-check]' /var/log/dragonbreak-backend.log | tail -n 2` shows the check is off:
+     `DEVICE_ID_HMAC_KEY is not set: the device check is off and nothing is stored`.
    - The first start rewrites `data/bans.json` once, even with the key unset: the start-up prune reads the ban list,
      which gives every entry without one a `B-` ref and saves it (15 Oct: 1 entry, none with a ref). The save is
      atomic and keeps the file 0600.
-   - The check is off (one log line), and the policy bump asks every player to accept the updated Privacy Policy once
-     in the launcher.
+   - The policy bump asks every player to accept the updated Privacy Policy once in the launcher.
+   - Ledger after: `ops log claude-jake "L3-01 backend live at <deploy sha>, device check off (no key)" "revert
+     <deploy sha> on main, then systemctl restart dragonbreak-backend.service"`, then `ops release backend claude-jake`
+     (and `ops release github-main claude-jake`).
    - Rolling back to the old code is safe: it ignores the refs. A re-ban made under the old code gets a new ref when
      the new code next reads the list, and a Not an alt mark on the old ref then lapses.
-2. **Before the key is set, hand this to the backup tool's owner** (claude-jake, per its README; this lane cannot change
-   `/opt`): add `device-ids\.json` to `DENY` in `/opt/dragonbreak-tools/backups/dbo_backup.py`, so `verify` refuses it
-   in any archive, or at least to `BACKEND_KNOWN_OUT`. The reason: it has its own 30-day retention class
-   (privacy.md section 5) and is never archived. Go on to step 3 only once that is in.
-3. In a restart window, set the key without printing it. It must be added once only: a second run would silently
-   rotate the key (the last assignment in the EnvironmentFile wins) while the store stays, which must never happen.
-   As root:
+2. **Keep the store out of backups**, before the key is set. Who: claude-jake, the backup tool's owner (per its
+   README). Add `device-ids\.json` to `DENY` in `/opt/dragonbreak-tools/backups/dbo_backup.py`, so `verify` refuses it
+   in any archive, or at least to `BACKEND_KNOWN_OUT`. The reason: it has its own 30-day retention class (privacy.md
+   section 5) and is never archived. Go on to step 3 only once that is in.
+   - Ledger: no ledger resource covers `/opt/dragonbreak-tools` (`ops claim` accepts only its fixed list), so there is
+     no claim. Back the file up, edit it, then `ops log claude-jake "dbo_backup.py: device-ids.json added to DENY"
+     "restore dbo_backup.py.bak-<stamp>"`.
+3. **Set the key**, in a restart window. Who: root on CT 115.
+   - Ledger first: `ops claim backend <you> "L3-01: add DEVICE_ID_HMAC_KEY, restart backend" 30`.
+   - The env override check (above), then back up `backend.env` (it holds no key yet):
+     `cp -a /opt/dragonbreak/backend.env /opt/dragonbreak/backend.env.bak-$(date +%Y%m%d-%H%M%S)`
+   - Add the key without printing it. It must be added once only: a second run would silently rotate the key (the
+     last assignment in the EnvironmentFile wins) while the store stays, which must never happen. As root:
 
    ```
    grep -q '^DEVICE_ID_HMAC_KEY=' /opt/dragonbreak/backend.env || { umask 077; printf '\nDEVICE_ID_HMAC_KEY=%s\n' "$(openssl rand -hex 32)" >> /opt/dragonbreak/backend.env; }
@@ -202,13 +230,19 @@ Commands below run as root; from the `nate` user, prefix them with `sudo` (step 
    sudo grep -c '^DEVICE_ID_HMAC_KEY=' /opt/dragonbreak/backend.env
    ```
 
-   The count must print `1` (a count, never the value); anything else, do not restart. Before the restart, the disk
-   gate again (step 1): at least 1 GB free on `/`, or stop. Then restart. The log says
-   `on, report only`. If it says `is not set`, the file holds an empty `DEVICE_ID_HMAC_KEY=` line: replace that line
-   by hand without printing the file, never add a second one.
-4. Release launcher 2.1.50 with the device code, ideally together with F1's launcher half. Launcher only: no
-   CLIENT_VERSION bump. 2.1.50 here means the first launcher release that carries this branch's launcher commits; if
-   another release takes 2.1.50 first, use the next number throughout.
+   - The count must print `1` (a count, never the value); anything else, do not restart. Before the restart, the disk
+     gate again (step 1): at least 1 GB free on `/`, or stop. Then `systemctl restart dragonbreak-backend.service`.
+     The log says `on, report only`.
+   - If it says `is not set`, the file already held an empty `DEVICE_ID_HMAC_KEY=` line, so the guarded add did
+     nothing. Delete that line with `sed -i '/^DEVICE_ID_HMAC_KEY=$/d' /opt/dragonbreak/backend.env`, run the guarded
+     add and the count again, then restart. That never puts the key in a process argument list (`printf` is a shell
+     builtin, and `sed` deletes by pattern). Never add a second line.
+   - If it says `is not 64 or more hex characters`, an older value is in the file: stop, never print it, and ask Jake.
+   - Ledger after: `ops log <you> "DEVICE_ID_HMAC_KEY added to backend.env (value not logged), backend restarted:
+     device check on, report only" "pause, or the full erase (see Undo)"`, then `ops release backend <you>`.
+4. **Release launcher 2.1.50 with the device code**, ideally together with F1's launcher half. Who: the launcher lane.
+   Launcher only: no CLIENT_VERSION bump. 2.1.50 here means the first launcher release that carries this branch's
+   launcher commits; if another release takes 2.1.50 first, use the next number throughout.
    1. Bump `skymp5-launcher/package.json` to 2.1.50, and its two lines in `package-lock.json`, as 122f8e8bf did for
       2.1.49.
    2. Build with the manager's **Build launcher**.
@@ -220,16 +254,48 @@ Commands below run as root; from the `nate` user, prefix them with `sudo` (step 
       needed: version.js is read from disk on every `GET /api/version`, so it is served as soon as the live checkout
       has it (a restart does no harm).
 
-   Until version.js says 2.1.50, no launcher sends a code: the self-update offers only the advertised version, so
-   report mode collects nothing. **Undo:** set version.js back to 2.1.49 the same way. A 2.1.50 launcher works against
-   either backend: it offers an update only when the advertised version is higher (`compareVersions(latest, current) >
-   0` in `src/main.js`), and launch-check before this branch reads only `filesVersion` and `plugins` from the body.
-5. Watch at least 2 weeks of the daily count line. If more than 5% of launch-checks from new launchers say
-   unavailable, look at a server-issued install token.
-6. Jake decides whether enforcement is ever built.
+   - Until version.js says 2.1.50, no launcher sends a code: the self-update offers only the advertised version, so
+     report mode collects nothing.
+   - Ledger: no resource covers the launcher build or the file host, so the upload gets only
+     `ops log <you> "launcher 2.1.50 installer uploaded" "delete launcher/2.1.50/ while version.js does not advertise it"`.
+     For the version.js push, `ops claim github-main <you> "version.js: launcher 2.1.50" 30` first (the push restarts
+     the game server through the updater, ops README rule 6), then `ops log <you> "version.js advertises launcher
+     2.1.50" "set LATEST_VERSION and DOWNLOAD_URL back to 2.1.49 the same way"` and `ops release github-main <you>`.
+   - **Undo:** set version.js back to 2.1.49 the same way. A 2.1.50 launcher works against either backend: it offers
+     an update only when the advertised version is higher (`compareVersions(latest, current) > 0` in `src/main.js`),
+     and launch-check before this branch reads only `filesVersion` and `plugins` from the body.
+5. **Watch the counts** for at least 2 weeks. Who: claude-jake. The daily line:
+   `grep -F '[device-check] last day:' /var/log/dragonbreak-backend.log | tail -n 14`. If more than 5% of the
+   launch-checks from new launchers say unavailable (`unavailable` out of `with a device code` plus `unavailable`), look
+   at a server-issued install token. Ledger: none, because reading changes nothing (ops README: claims are for changes).
+6. **Enforce.** Who: Jake decides whether enforcement is ever built. Today `DEVICE_MATCH=enforce` only reports. Building
+   it is a separate change, with its own review, claim and log (see Enforcement below).
 
-**Undo:** `DEVICE_MATCH=off` and restart. Full erase: stop the backend, delete `data/device-ids.json`, unset the key.
-Old launchers keep working throughout, and a new launcher works against an old backend (it ignores the field).
+**Undo.** Who: claude-jake, as root, after the env override check. Each one: `ops claim backend claude-jake "<why>" 15`
+first, back up `backend.env` (`cp -a`, as in step 3), then `ops log claude-jake "<what changed>" "<how to undo it>"`
+and `ops release backend claude-jake`.
+
+- **Pause.** Nothing new is collected or flagged; codes already stored are kept and still deleted after 30 days.
+
+  ```
+  grep -q '^DEVICE_MATCH=' /opt/dragonbreak/backend.env && sed -i 's/^DEVICE_MATCH=.*/DEVICE_MATCH=off/' /opt/dragonbreak/backend.env || printf '\nDEVICE_MATCH=off\n' >> /opt/dragonbreak/backend.env
+  systemctl restart dragonbreak-backend.service
+  ```
+
+  The log says `DEVICE_MATCH=off: no device codes are collected and nothing is flagged`. To resume, set
+  `DEVICE_MATCH=report` the same way and restart.
+- **Full erase.** Deletes every stored code and the key. It is also the only way to change the key: erase, then step 3.
+
+  ```
+  systemctl stop dragonbreak-backend.service; rm -f /opt/alduinak/skymp5-backend/data/device-ids.json /opt/alduinak/skymp5-backend/data/device-ids.json.*.tmp; sed -i '/^DEVICE_ID_HMAC_KEY=/d' /opt/dragonbreak/backend.env; systemctl start dragonbreak-backend.service
+  ```
+
+  The `*.tmp` names are unfinished saves that a crash can leave behind. The log then says `is not set`. Backups of
+  `backend.env` made after step 3 still hold the key. With the store gone it links nothing, but restoring one turns the
+  check back on, so run the count from step 3 after any restore.
+- **Code:** revert the deploy on main, then restart (step 1: the old code ignores the refs). **Launcher:** version.js
+  back to 2.1.49 (step 4).
+- Old launchers keep working throughout, and a new launcher works against an old backend (it ignores the field).
 
 ## Enforcement (not built)
 
