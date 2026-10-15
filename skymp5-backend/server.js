@@ -127,4 +127,5 @@ app.listen(PORT, () => {
   siteServerRoute.recover()
   try { require('./sources/console').consoleApi().recover() } catch (err) { console.error('[console] recover failed:', err.message) }
   require('./sources/autoReport').start()
+  try { require('./sources/deviceChecks').start() } catch (err) { console.error('[device-check] start failed:', err.message) }
 })

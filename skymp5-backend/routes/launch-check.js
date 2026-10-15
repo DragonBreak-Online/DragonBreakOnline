@@ -3,11 +3,12 @@
 /**
  * POST /api/launch-check: called by the launcher right before starting the game.
  *   Headers: { x-session: <play-session token> }
- *   Body:    { filesVersion: string, plugins: string[] }  (plugins in load order)
+ *   Body:    { filesVersion: string, plugins: string[], device?: 'v1.<64 hex>', deviceStatus?: 'unavailable' }  (plugins in load order)
  * Compares the report against what the backend publishes and records the result on
  * the session; session validation (master-api.js) refuses sessions whose last check
  * is missing or stale, so out-of-date clients can't bypass the launcher's gate.
  * Returns 200 { ok, filesOk, pluginsOk, requiredVersion }; ok false means update/repair.
+ * device is the launcher's one-way PC code for the report-only ban check (sources/deviceChecks.js); the answer never depends on it.
  */
 
 const router = require('express').Router()
@@ -46,6 +47,11 @@ router.post('/', async (req, res) => {
   recordLaunchCheck(token, { filesVersion: filesVersion || '', filesOk, pluginsOk })
 
   res.json({ ok: filesOk && pluginsOk, filesOk, pluginsOk, requiredVersion })
+
+  setImmediate(() => {
+    try { require('../sources/deviceChecks').onLaunchCheck(token, entry, req.body) }
+    catch (err) { console.error('[device-check] launch-check hook failed:', err.message) }
+  })
 })
 
 module.exports = router
