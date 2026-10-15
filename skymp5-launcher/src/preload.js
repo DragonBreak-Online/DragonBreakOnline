@@ -43,6 +43,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Discord OAuth
   discordLogin:   () => ipcRenderer.invoke('discord:login'),
   discordLogout:  () => ipcRenderer.invoke('discord:logout'),
+  discordLogoutEverywhere: () => ipcRenderer.invoke('discord:logoutEverywhere'),
   discordGetUser: () => ipcRenderer.invoke('discord:getUser'),
 
   // Terms of Service and Privacy Policy: texts (markdown parsed to blocks), status, accept

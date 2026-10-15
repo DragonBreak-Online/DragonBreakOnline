@@ -128,3 +128,15 @@ test('the login gives up after its timeout', async () => {
   const backend = fakeBackend()
   await assert.rejects(loopbackLogin({ apiUrl: API, postJSON: backend.postJSON, openUrl: () => {}, timeoutMs: 50 }), /timed out/)
 })
+
+test('main.js: Log out ends the session on the server, Sign Out Everywhere ends them all, and the old login is only a fallback', () => {
+  const main = fs.readFileSync(path.join(__dirname, '..', 'src', 'main.js'), 'utf8')
+  assert.match(main, /api\/users\/login-discord\/logout/)
+  assert.match(main, /ipcMain\.handle\('discord:logoutEverywhere'/)
+  assert.match(main, /discordLogin\.loopbackLogin\(/)
+  assert.match(main, /if \(!err\.legacy\)/, 'only a backend without the new login gets the old one')
+  const preload = fs.readFileSync(path.join(__dirname, '..', 'src', 'preload.js'), 'utf8')
+  assert.match(preload, /discordLogoutEverywhere/)
+  const html = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'index.html'), 'utf8')
+  assert.match(html, /id="btn-signout-everywhere"/)
+})

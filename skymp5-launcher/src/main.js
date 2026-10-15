@@ -1028,9 +1028,31 @@ ipcMain.handle('legal:accept', async (_e, version) => {
   return r
 })
 
+// Ends this launcher's session on the server too, so a copy of the token stops working; never blocks the local logout
+function endServerSession(token, everywhere) {
+  return postJSON(`${config.apiUrl}/api/users/login-discord/logout`, everywhere ? { everywhere: true } : {}, { Authorization: `Bearer ${token}` }, 10_000)
+}
+
 ipcMain.handle('discord:logout', () => {
+  const token = store.get('gameSession')
   clearDiscordAuth()
+  if (token) endServerSession(token, false).catch(err => log(`[discord] the server did not end the session (${err.statusCode || err.message})`))
   return { success: true }
+})
+
+// Sign out everywhere: every session of this Discord account ends, on any PC, including one someone else got hold of
+ipcMain.handle('discord:logoutEverywhere', async () => {
+  const token = store.get('gameSession')
+  if (!token) return { success: false, error: 'Log in with Discord first.' }
+  try {
+    const r = await endServerSession(token, true)
+    clearDiscordAuth()
+    log(`[discord] signed out everywhere, ${Number(r && r.ended) || 0} session(s) ended`)
+    return { success: true, ended: Number(r && r.ended) || 0 }
+  } catch (err) {
+    log(`[discord] sign out everywhere failed (${err.statusCode || err.message})`)
+    return { success: false, error: err.statusCode === 404 ? 'The server cannot do this yet.' : 'Could not reach the server. Try again in a moment.' }
+  }
 })
 
 // Stores a login result (token = play session, masterApiId = the stable numeric profileId) the way every flow returns it

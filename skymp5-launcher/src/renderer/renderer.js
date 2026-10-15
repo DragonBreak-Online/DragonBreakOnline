@@ -594,6 +594,14 @@ async function loadSettings() {
 // Discord topbar widget
 const discordTopbarSlot = document.getElementById('discord-topbar-slot')
 
+function showLoggedOut() {
+  discordUser   = null
+  serverAllowed = true  // reset: access unknown until next login
+  window.dboLegal.reset()
+  renderTopbarDiscord()
+  updateLockState()
+}
+
 function renderTopbarDiscord() {
   discordTopbarSlot.innerHTML = ''
 
@@ -621,15 +629,11 @@ function renderTopbarDiscord() {
 
     const logoutBtn = document.createElement('button')
     logoutBtn.className   = 'discord-topbar-logout'
-    logoutBtn.title       = 'Logout'
+    logoutBtn.title       = 'Log out of this launcher'
     logoutBtn.textContent = '✕'
     logoutBtn.addEventListener('click', async () => {
       await window.electronAPI.discordLogout()
-      discordUser   = null
-      serverAllowed = true  // reset: access unknown until next login
-      window.dboLegal.reset()
-      renderTopbarDiscord()
-      updateLockState()
+      showLoggedOut()
     })
     wrap.appendChild(logoutBtn)
 
@@ -921,6 +925,26 @@ fieldMo2Enabled.addEventListener('change', refreshMo2Status)
 document.getElementById('btn-open-install').addEventListener('click', async () => {
   const r = await window.electronAPI.openInstallFolder()
   if (!r.success) alert(`Could not open the install folder: ${r.error}`)
+})
+
+// Troubleshooting: end every session of this Discord account, on any PC
+const signoutButton = document.getElementById('btn-signout-everywhere')
+const signoutStatus = document.getElementById('signout-everywhere-status')
+const SIGNOUT_HINT  = signoutStatus.textContent
+signoutButton.addEventListener('click', async () => {
+  if (!discordUser) { signoutStatus.textContent = 'Log in with Discord first, then use this.'; return }
+  signoutButton.disabled = true
+  signoutStatus.textContent = 'Signing out everywhere...'
+  let r
+  try { r = await window.electronAPI.discordLogoutEverywhere() } catch { r = { success: false, error: 'Could not reach the server. Try again in a moment.' } }
+  signoutButton.disabled = false
+  if (r && r.success) {
+    showLoggedOut()
+    signoutStatus.textContent = `Done: ${r.ended} sign-in${r.ended === 1 ? '' : 's'} ended. Press Discord Login to sign this launcher in again.`
+  } else {
+    signoutStatus.textContent = (r && r.error) || 'Could not sign out everywhere.'
+  }
+  setTimeout(() => { signoutStatus.textContent = SIGNOUT_HINT }, 15000)
 })
 
 // Troubleshooting: send the logs to staff
