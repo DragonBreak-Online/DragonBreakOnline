@@ -27,9 +27,9 @@ type Mp = any;
 // Admins resolve to a tier (senior | developer | gm) via adminRoles.ts from "adminRoles", the legacy "adminRoleIds" and "adminProfileIds".
 // Every tier gets the server console (consoleCommandsAllowed per assign; keep enableConsoleCommandsForAll OFF) and the tabbed admin panel (client AdminMenuService, Insert key).
 // Only tiers with TIER_CAPS.ban may ban; the refusal is enforced here, never in the client.
-// A Trial GM (adminRoles.trialgm, no admin tier) gets the menu without addresses or hardware ids, TP to a player or a
-// location, Rename and the Invisible and Ghost modes (TRIAL_GM_ACTIONS / TRIAL_GM_MODES; Ghost from 12 Oct, Nate: "trial
-// gms need to use the ghost form button in the admin panel"); anything else is refused here and logged.
+// A Trial GM (adminRoles.trialgm, no admin tier) gets the menu (who is online, without Discord ids, addresses or hardware
+// ids), TP to a player or a location, Rename and the Invisible and Ghost modes (TRIAL_GM_ACTIONS / TRIAL_GM_MODES; Ghost
+// from 12 Oct, Nate: "trial gms need to use the ghost form button in the admin panel"); anything else is refused here and logged.
 // Bans post to the backend (master key + auth token), which snapshots discordId/hwid/ip into bans.json; connection-check then refuses the player permanently.
 //
 // Wire protocol (CustomPacket JSON):
@@ -435,11 +435,13 @@ export class AdminSystem implements System {
     try { adminProfile = Number(mp.get(myActorId, "profileId")) || 0; } catch { }
 
     if (type === "adminMenuRequest") {
-      this.fetchBackendRoster().then(backendPlayers => {
+      // A Trial GM's menu lists only who is online, so the backend's account list is never fetched for one
+      const roster: Promise<any[]> = trial ? Promise.resolve([]) : this.fetchBackendRoster();
+      roster.then(backendPlayers => {
         try {
           // The fetch outlives the packet handler; the slot must still belong to the same admin
           if (mp.getUserActor(userId) !== myActorId) return;
-          if (trial) { this.sendTrialMenu(ctx, mp, userId, myActorId, adminProfile, backendPlayers); return; }
+          if (trial) { this.sendTrialMenu(ctx, mp, userId, myActorId, adminProfile); return; }
           mp.sendCustomPacket(userId, JSON.stringify({
             customPacketType: "adminMenu",
             players: this.buildRoster(ctx, myActorId, adminProfile, backendPlayers),
@@ -640,11 +642,12 @@ export class AdminSystem implements System {
     return TRIAL_GM_ACTIONS.has(action);
   }
 
-  // The menu for a Trial GM: who is playing, with no addresses, hardware ids, bans, zones, locations or mastery, and the
-  // tabs they may use (caps.tabs; the panel shows those alone)
-  private sendTrialMenu(ctx: SystemContext, mp: Mp, userId: number, myActorId: number, adminProfile: number, backendPlayers: any[]): void {
-    const players = this.buildRoster(ctx, myActorId, adminProfile, backendPlayers)
-      .map((r) => Object.assign({}, r, { ip: "", hwid: "", m: undefined, b: undefined }));
+  // The menu for a Trial GM: who is online, with no Discord ids or names, addresses, hardware ids, bans, zones, locations
+  // or mastery, and the tabs they may use (caps.tabs; the panel shows those alone)
+  private sendTrialMenu(ctx: SystemContext, mp: Mp, userId: number, myActorId: number, adminProfile: number): void {
+    const players = this.buildRoster(ctx, myActorId, adminProfile, [])
+      .filter((r) => r.online)
+      .map((r) => Object.assign({}, r, { d: "", dn: "", ip: "", hwid: "", m: undefined, b: undefined }));
     mp.sendCustomPacket(userId, JSON.stringify({
       customPacketType: "adminMenu",
       players,
