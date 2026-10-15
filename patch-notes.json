@@ -1,5 +1,67 @@
 [
   {
+    "title": "Skyrim opens",
+    "date": "2026-10-16",
+    "version": "Skyrim release",
+    "tag": "Update",
+    "sections": [
+      {
+        "heading": "Skyrim is open",
+        "items": [
+          "Skyrim is open to everyone, alongside Bruma. Solstheim, Hammerfell, Summerset, Murkmire and the other far lands stay closed for now; boats and roads that lead there will not take you.",
+          "After you make a new character you are asked where to begin: Cyrodiil (the Pale Pass road down to Bruma) or Skyrim. If you close the question it comes back a minute later. Choosing Skyrim, or walking through a hold gate, keeps you in the Realm to pick one of the nine hold gates: Whiterun, Solitude, Windhelm, Riften, Markarth, Falkreath, Morthal, Dawnstar and Winterhold.",
+          "Each gate now lands you on clear ground near its city, and Solitude, Markarth, Morthal and Dawnstar land in better places than before.",
+          "The bandits, wild animals and monsters the old world placed around the gates and inside the towns are gone; the server places Skyrim's creatures and enemies itself. Guards, townsfolk, merchants and children stay where they live."
+        ]
+      },
+      {
+        "heading": "New peoples",
+        "items": [
+          "Snow Elf: 50% frost resistance, +15% Arcane experience. Racial power Glacier Fall: your frost damage is 25% stronger for 60 seconds.",
+          "Goblin: 50% poison resistance, +15% Gatherer experience. Racial power Feeding Frenzy: harder melee blows and faster stamina for 60 seconds. Goblins are male only, and their colour is chosen from their skin tones.",
+          "Reachman: Mongrel Blood gives 15% magic resistance and 25% poison resistance, +15% Alchemist experience. Racial power Fury of the Reach: faster stamina and magicka for 60 seconds.",
+          "Snow Elves, Goblins and Reachmen can become vampires. A Goblin vampire's thirst shows in the colour of its skin."
+        ]
+      },
+      {
+        "heading": "Levels",
+        "items": [
+          "Each character level now gives +25 points, up from +10. Points you already have are counted again at the new rate the next time you log in."
+        ]
+      },
+      {
+        "heading": "Crafting",
+        "items": [
+          "Each people's own armoury is made only by that people, anywhere: Yoku gear by Redguards, Apex and Lunar Guard by Khajiit, Black Bear and Steelheart by Nords, Ancient Imperial by Imperials, Gryphon Knight, Knight-Errant and Flora Druid by Bretons, Seascale by Maormer, Ancient Argonian by Argonians, crude Gild arms and Goblin armour by Goblins, and Pig Iron by Orcs. Anyone may temper them.",
+          "Yokudan, Black Bear and Apex Khajiit smithing is known by birth: those smiths need no book or teacher, only the craft tier.",
+          "The new Ancient Imperial armour counts as Ancient Imperial smithing.",
+          "Adamantium armour can be forged by every people.",
+          "The Civil War battlemage sets are faction gear for the Legion, the Stormcloaks and the Thalmor: light armour as strong as Glass, made by the faction's own smiths.",
+          "The Black Bear light hoods can be forged again.",
+          "The Dwemer Mantis armour is never forged; Game Masters give it out. The gold bars in the bank vaults are decoration and cannot be taken or smelted."
+        ]
+      },
+      {
+        "heading": "Alchemy",
+        "items": [
+          "Every Alchemist tier brews a stronger potion. Restore potions now give back a share of your own health, stamina or magicka, from 20% up to 75%; the two strongest restore over five seconds.",
+          "Some effects open with rank: cures and Waterbreathing at Apprentice, fortify potions and Invisibility at Adept, Paralysis at Expert. Fortify Smithing, Enchanting and Illusion are no longer brewed. A locked effect falls back to the next one the mix shares and tells you why.",
+          "Fortify potions now work in fights: weapon damage, Destruction and Restoration, block, armour, lockpicking and more. Fortify Health gives extra health while it lasts. Resist Fire, Frost and Shock potions now protect you.",
+          "New special brews: Fortify Blade and Fortify Blunt (three ingredients each, from Adept), and the Blood Potion at Master, which feeds a vampire.",
+          "Alchemy and cooking experience now follow the value of what you put in. Butter, flour, milk, cheese, honey and coffee turn up in dungeons and camps, and placed foods can be gathered."
+        ]
+      },
+      {
+        "heading": "Blackreach",
+        "items": [
+          "Blackreach is an open dungeon under Skyrim, and very hard: its Falmer, Dwemer machines, chaurus, spiders, trolls and giants shrug off a quarter of your damage. They come back 20 minutes after they fall, their bosses after 30.",
+          "Ten guarded chests stand in Blackreach. Defeat a chest's guards (its boss, if it has one) with your party, and within the hour the chest gives you one roll every 20 hours: Glass, Dwarven and honed Falmer gear among it, never Ebony, Daedric, Stalhrim or dragon materials."
+        ]
+      }
+    ],
+    "_staff": "NOT for the launcher until the Skyrim window has run (strip this key on publish). Live-true only once the 140-plugin release is deployed (DLE 641f3719, Armory v9 fe2eb7dd, Nexus Patches 995433b2 and the new plugins), the client package with the creator's new races is out, and the server restarts with this branch. Needs the plugins: the races and the Goblin vampire (DLE races), Black Bear hoods and Battlemage Glass (Armory v9), the vault bars (DLE), the alchemy records (DLE), the narrowed actor pass (xEdit on the PC, not run yet). The start question, gates, closed lands, levels, crafting locks and Blackreach are server-side and live with the restart. The Reachman gifts were PROPOSED; ship only if Nate approved them. Amber is allowed in Blackreach chests but loot.json has no Amber piece yet, so the note does not promise it."
+  },
+  {
     "title": "Priest training rate",
     "date": "2026-10-15",
     "version": "Hotfix",
