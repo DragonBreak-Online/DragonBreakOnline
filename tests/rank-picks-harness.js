@@ -238,6 +238,15 @@ check('Priest 25 before its first spell: not held (the first spell never holds)'
 r = globalThis.__dboMagicAction(PRI, 'firstSpell', ['Restoration', HEALING]);
 setPriestXp(50);
 check('Priest 25, first spell made, half way to 26: not held yet', r.ok && globalThis.__dboSchoolsSkillHeld(PRI, 'priest') === false, r);
+// A rank reached whose pick is still a level's tail away: said once, so nobody waits wondering (Choom, #bugs 15 Oct)
+tick('schools.first');
+check('...and is told the Apprentice spell comes as the level is finished', saidAny(PRI, /You have reached Apprentice in Restoration\. Your Apprentice spell of Restoration is chosen as you finish Priest 25/), said(PRI));
+{
+  const before = out.said.filter((x) => x[0] === PRI && /chosen as you finish/.test(x[1])).length;
+  tick('schools.first'); tick('schools.first');
+  const after = out.said.filter((x) => x[0] === PRI && /chosen as you finish/.test(x[1])).length;
+  check('...and told only once, however often the check runs', before === 1 && after === 1, [before, after]);
+}
 setPriestXp(95);
 check('...at 95% of the way: held, and its Apprentice pick opens', globalThis.__dboSchoolsSkillHeld(PRI, 'priest') === true && view(PRI).schools.find((x) => x.name === 'Restoration').firstSpell.stage === 'Apprentice');
 check('...another skill is never held', globalThis.__dboSchoolsSkillHeld(PRI, 'arcane') === false);

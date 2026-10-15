@@ -509,6 +509,30 @@ module.exports = (api) => {
     }
     return out;
   };
+  // A rank's pick is coming, but not open yet. The rank's word changes the moment the level is reached, while the pick
+  // itself opens once the school is HELD there - Priest at rankPicks.priestHoldXp of the way through the level, an
+  // arcane school at the top of it - so a player reads "Adept" and waits for a choice that is still a level's tail away,
+  // with nothing to tell them it is coming (Choom, #bugs 15 Oct: "i just hit 50 priest and resto, still seem to be
+  // getting xp and haven't picked an adept spell"). Said once per school and rank, beside the rest of pickTold.
+  const schoolsHeld = (a, s) => {
+    const out = [];
+    for (const school of SCHOOLS) if (active(s, school)) out.push(school);
+    if (priestOf(a).held && !out.includes(RESTORATION)) out.push(RESTORATION);
+    return out;
+  };
+  const tellComing = (a, s) => {
+    for (const school of schoolsHeld(a, s)) {
+      const level = pickLevel(a, s, school);
+      const p = RANK_PICKS.find((x) => !rankMade(s, school, x.rank) && level >= x.at && !atThreshold(a, s, school, x));
+      if (!p) continue;
+      const key = `${school}:${p.rank}:coming`;
+      if (s.pickTold[key]) continue;
+      s.pickTold[key] = Date.now();
+      save(a, s);
+      const by = school === RESTORATION ? 'Priest' : school;
+      personal(a, `You have reached ${p.rank} in ${school}. Your ${p.rank} spell of ${school} is chosen as you finish ${by} ${p.at}, so keep at it: nothing is owed to you yet.`);
+    }
+  };
   const ST0 = globalThis.__dboSchoolsState || (globalThis.__dboSchoolsState = {});
   const pickNonces = ST0.pickNonces instanceof Map ? ST0.pickNonces : (ST0.pickNonces = new Map()); // actor -> { nonce, school, ref, options }
   // The pick panel: Study Magic's choose mode with its lead line (client 0.3.75); `ref` is the shelf or ledger it opened at
@@ -652,6 +676,8 @@ module.exports = (api) => {
       audit(`SCHOOLS ${who(a)} reached Arcane Arts ${C.secondaryAtLevel}: secondary school offered (${why})`);
       personal(a, SECOND_WHERE);
     }
+    // A rank reached whose pick is still a level's tail away: said once, so nobody waits wondering (tellComing)
+    if (why === 'tick' || why === 'login') { try { tellComing(a, s); } catch (e) { log('schools: coming-pick notice failed', e.message); } }
     // The 10 s check looks no further once every waiting pick has been told (the options read the engine's spell list)
     const waiting = pickSchools(a, s);
     // Told once per pick: the first spell under the school's name, the Apprentice and Adept picks under school:rank
