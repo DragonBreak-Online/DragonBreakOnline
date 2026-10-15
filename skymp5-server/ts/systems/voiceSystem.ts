@@ -123,6 +123,7 @@ export class VoiceSystem implements System {
   private apiAnswered = false;
   private sweepMs = DEFAULT_SWEEP_SECONDS * 1000;
   private nextSweepAt = 0;
+  private sweeping = false;
   // One token per user every 2 s at most (a port of 57503548 without the profile identity): the client asks every 5 s at
   // most (voiceService TOKEN_RETRY_MS), so a faster stream of requests comes from a modified client, and each one signs
   // a token
@@ -191,11 +192,13 @@ export class VoiceSystem implements System {
 
   async updateAsync(ctx: SystemContext): Promise<void> {
     const now = Date.now();
-    if (!this.enabled || !this.sweepMs || now < this.nextSweepAt) return;
+    if (!this.enabled || !this.sweepMs || now < this.nextSweepAt || this.sweeping) return;
     // A random gap of half to one interval: a replayer cannot time its exits around a sweep it cannot predict
     const half = Math.floor(this.sweepMs / 2);
     this.nextSweepAt = now + half + crypto.randomInt(half + 1);
-    await this.sweep(ctx.svr as Mp);
+    // Not awaited: LiveKit API calls (5 s timeout each) must not hold up this loop, one sweep at a time
+    this.sweeping = true;
+    this.sweep(ctx.svr as Mp).catch((e) => this.log(`VoiceSystem: room sweep failed: ${e}`)).finally(() => { this.sweeping = false; });
   }
 
   // Removes every session whose identity is not an online character allowed voice: a kicked or banned player back with an old or LiveKit-refreshed token
