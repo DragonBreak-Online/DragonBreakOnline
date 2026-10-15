@@ -1,0 +1,75 @@
+{
+ "_comment": "tools/skyrim_actor_narrow.py on the Skyrim release package (140-plugin order, DLE 641f3719, 15 Oct): the living plugin actors it judged, what DBO_SkyrimActorsList.txt disables by reason, and what it keeps by kind. tools/skyrim_actor_check.py holds the PC-returned plugins to these keep counts.",
+ "judged": 9620,
+ "disable": 6234,
+ "disableByReason": {
+  "hostile": 5709,
+  "hostile in town": 399,
+  "near landing": 116,
+  "closed route": 3,
+  "closed land": 7
+ },
+ "nearBySpot": {
+  "Solitude": 15,
+  "Riften": 7,
+  "Whiterun": 8,
+  "Markarth": 5,
+  "Falkreath": 23,
+  "Winterhold": 17,
+  "Dawnstar": 26,
+  "Windhelm": 7,
+  "Morthal": 8
+ },
+ "nearByKind": {
+  "townsfolk": 12,
+  "creature": 42,
+  "guard": 48,
+  "hostile": 5,
+  "merchant": 6,
+  "friendly": 3
+ },
+ "hostileTop": {
+  "PredatorFaction": 1136,
+  "DraugrFaction": 801,
+  "SprigganPredatorFaction": 660,
+  "BanditFaction": 647,
+  "FalmerFaction": 399,
+  "SkeletonFaction": 348,
+  "kind Mudcrab": 254,
+  "kind Skeever": 168,
+  "ForswornFaction": 161,
+  "kind Horker": 123,
+  "kind Bandit": 119,
+  "kind Slaughterfish": 119,
+  "kind DwarvenSpider": 110,
+  "WarlockFaction": 85,
+  "VampireFaction": 84,
+  "NecromancerFaction": 64,
+  "aggression 2": 64,
+  "kind Troll": 60,
+  "kind Wisp": 58,
+  "SilverHandFaction": 57,
+  "kind DwarvenSphere": 55,
+  "HagravenFaction": 50,
+  "kind Afflicted": 44,
+  "DLC1VampireCompanionFaction": 40,
+  "VampireThrallFaction": 33,
+  "aggressive creature": 32,
+  "kind IceWraith": 30,
+  "MS07BanditFaction": 28,
+  "kind Dragon": 24,
+  "kind Warlock": 21
+ },
+ "keep": {
+  "child": 39,
+  "townsfolk": 945,
+  "guard": 774,
+  "merchant": 246,
+  "friendly": 429,
+  "creature": 953
+ },
+ "targets": {
+  "DragonBreak Nexus Patches.esp": 160,
+  "DragonBreak Online Edits.esp": 6074
+ }
+}
