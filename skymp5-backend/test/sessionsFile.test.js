@@ -62,13 +62,13 @@ test('X3: a sessions.json made 0644 before is replaced by a 0600 one, so no toke
 })
 
 test('the game server\'s session and offline profile checks answer 503 storeUnavailable at once when a player store is unreadable', async () => {
-  Object.assign(require('../config'), { serverMasterKey: 'test-key' })
+  Object.assign(require('../config'), { serverMasterKey: 'test-key', masterApiAuthToken: 'test-token' })
   const app = express()
   app.use('/api/servers', masterApi)
   const server = http.createServer(app)
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
   const base = `http://127.0.0.1:${server.address().port}/api/servers/test-key`
-  const get = async url => { const r = await fetch(url, { signal: AbortSignal.timeout(5000) }); return [r.status, await r.json()] }
+  const get = async url => { const r = await fetch(url, { headers: { 'x-auth-token': 'test-token' }, signal: AbortSignal.timeout(5000) }); return [r.status, await r.json()] }
   try {
     const { session } = masterApi.createSession({ id: '323456789012345678', username: 'tester3' })
     storeDown = true

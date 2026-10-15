@@ -31,7 +31,7 @@ stub('../sources/bans', { isBanned: ({ discordId }) => (banned.has(discordId) ? 
 stub('../sources/profiles', { getDiscordIdByProfileId: id => PROFILES[id] || null })
 stub('../sources/factionWhitelist', { getPlayerFactionPermissions: () => [], getPlayerGameFactions: () => [], getPlayerAssignments: () => [] })
 const config = require('../config')
-Object.assign(config, { serverMasterKey: 'test-key', launchCheckEnforce: false, legalRequired: false })
+Object.assign(config, { serverMasterKey: 'test-key', masterApiAuthToken: 'test-token', launchCheckEnforce: false, legalRequired: false })
 
 const express = require('express')
 const legal = require('../sources/legal')
@@ -62,7 +62,8 @@ after(async () => {
 })
 
 const session = async token => { const r = await fetch(`${base}/sessions/${token}`); return { status: r.status, body: await r.json() } }
-const offline = async profileId => { const r = await fetch(`${base}/profiles/${profileId}/check`); return { status: r.status, body: await r.json() } }
+// The game server sends its X-Auth-Token on the offline check
+const offline = async profileId => { const r = await fetch(`${base}/profiles/${profileId}/check`, { headers: { 'x-auth-token': 'test-token' } }); return { status: r.status, body: await r.json() } }
 const REFUSED = { error: 'legalNotAccepted', message: "Please accept the Terms of Service in the launcher. Update the launcher if you don't see them." }
 
 test('with LEGAL_REQUIRED off nobody is refused for the legal texts', async () => {

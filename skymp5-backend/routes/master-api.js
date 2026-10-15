@@ -16,12 +16,14 @@
  *     Returns a player's coin balance: { user: { id, balance } }
  *   POST /api/servers/:key/sessions/:session/purchase  (X-Auth-Token)
  *     Spends a player's coins. Body: { balanceToSpend: number }  Returns: { balanceSpent, success }
- *   GET /api/servers/:key/profiles/:profileId/check
+ *   GET /api/servers/:key/profiles/:profileId/check  (X-Auth-Token)
  *     Offline-mode profileId check, same lock/whitelist/legal rules as session validation. Returns { allowed: true } or 403/404 { error }
  *   POST /api/servers/:key/connection-check  (X-Auth-Token)
  *     Game server reports a connecting player. Body: { profileId, ip }  Returns { allowed: true } or { allowed: false, reason: 'banned' }
  *   GET /api/servers/:key/players  (X-Auth-Token)
  *     Full player roster (identity fields only) for the in-game admin panel.
+ *   GET /api/servers/:key/holds/:holdSlug/roster  (X-Auth-Token)
+ *     Every member of one hold, online or not, for the in-game faction menu.
  *   POST /api/servers/:key/profiles/:profileId/factions  (X-Auth-Token)
  *     In-game faction appointment. Body: { requirementId, playerName?, notes? }
  *   DELETE /api/servers/:key/profiles/:profileId/factions/:assignmentId  (X-Auth-Token)
@@ -155,6 +157,7 @@ function launchGateStatus(entry) {
 }
 
 // Helper: validate server master key
+// The key is public (GET /api/serverinfo hands it to every launcher): it picks the server, only X-Auth-Token proves the game server
 
 function checkKey(req, res) {
   if (req.params.key !== config.serverMasterKey) {
@@ -294,11 +297,11 @@ router.get('/:key/sessions/:session', async (req, res) => {
   })
 })
 
-// GET /api/servers/:key/profiles/:profileId/check
+// GET /api/servers/:key/profiles/:profileId/check  (X-Auth-Token)
 // Used by the game server in offline mode to verify a profileId is allowed.
 
 router.get('/:key/profiles/:profileId/check', async (req, res) => {
-  if (!checkKey(req, res)) return
+  if (!checkKey(req, res) || !checkWriteToken(req, res)) return
 
   let discordId
   try { discordId = getProfileDiscordId(req, res) }
@@ -416,11 +419,11 @@ router.get('/:key/players', (req, res) => {
   }
 })
 
-// GET /api/servers/:key/holds/:holdSlug/roster
+// GET /api/servers/:key/holds/:holdSlug/roster  (X-Auth-Token)
 // Full member list of one hold (online or not) for the in-game faction menu.
 
 router.get('/:key/holds/:holdSlug/roster', (req, res) => {
-  if (!checkKey(req, res)) return
+  if (!checkKey(req, res) || !checkWriteToken(req, res)) return
 
   try {
     // Read-only profile lookup, and discordIds stay out of the response
