@@ -50,7 +50,14 @@ LiveKit server + firewall are already live on the box (`DragonBreakLiveKit`).
   - when a player's game connection ends; every kick and ban ends in one;
   - in a sweep every `voiceChat.sweepSeconds` (default 15, 0 = off) that
     removes any identity that is not an online character allowed voice, so a
-    kicked or banned player who rejoins with a kept token is out again.
+    kicked or banned player who rejoins with a kept token is out again;
+  - LiveKit gives every join a fresh token at once, so a script could rejoin
+    forever. A session removed twice that comes back a third time moves voice
+    to a new room (`<room>-<suffix>`, kept in `voice-room.json` beside the
+    server): online voice users get a token for it at once, the old room is
+    emptied for two minutes after a 10 s grace, and the replayed tokens open
+    only the empty old room. `voiceChat.moveRoomOnReplay: false` turns the
+    move off. Staff tools that list the room should read `voice-room.json`.
   A panel-banned account (admin-bans.json) gets no token, nor one the
   gamemode refuses through `globalThis.__dboVoiceRefused(actorId)` (a
   suspension). Tokens live 10 minutes. The API base is `voiceChat.apiUrl`,
