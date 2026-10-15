@@ -31,6 +31,9 @@
  *   POST /api/users/me/hwid
  *     Headers: { authorization: <token> } (or Body: { token })  Body: { hwid }
  *     Stores the launcher-reported hardware id on the session and player record. Returns { ok }.
+ *   POST /api/users/login-discord/logout
+ *     Headers: { authorization: <token> }  Body: { everywhere?: true }
+ *     Ends this session, or every session of the account. Returns { ok, ended }. Under login-discord, the prefix the public proxy forwards.
  */
 
 const express   = require('express')
@@ -335,6 +338,24 @@ router.post('/me/hwid', (req, res) => {
 
   storeHwid(token, session, hwid)
   res.json({ ok: true })
+})
+
+// POST /api/users/login-discord/logout
+// The launcher's Log out ends its session here too, and Sign out everywhere ends every session of the account, a stolen one included
+
+router.post('/login-discord/logout', (req, res) => {
+  const token = authToken(req)
+  if (!token) return res.status(401).json({ error: 'Missing authorization header.' })
+
+  const { lookupSession, endSession, endSessionsOf } = require('./master-api')
+  const session = lookupSession(token)
+  // Already gone: the launcher is logged out either way
+  if (!session) return res.json({ ok: true, ended: 0 })
+
+  const everywhere = !!(req.body && req.body.everywhere === true)
+  const ended = everywhere ? endSessionsOf(session.discordId) : (endSession(token) ? 1 : 0)
+  console.log(`[launcher-login] profile ${session.profileId} logged out${everywhere ? ` everywhere, ${ended} session(s) ended` : ''}`)
+  res.json({ ok: true, ended })
 })
 
 // Browser-facing pages

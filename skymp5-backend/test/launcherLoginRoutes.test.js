@@ -238,6 +238,25 @@ test('F1: a new login ends the account\'s older sessions, and LAUNCHER_LOGIN_SIN
   })
 })
 
+test('F1: a player can log out this launcher, or end every session of the account and no one else\'s', async () => {
+  const mine = masterApi.createSession({ id: PROFILES[31], username: 'alpha' }, { flow: 'loopback' }).session
+  await withConfig({ launcherLoginSingleSession: false }, async () => {
+    const mineToo = masterApi.createSession({ id: PROFILES[31], username: 'alpha' }, { flow: 'loopback' }).session
+    const other = masterApi.createSession({ id: PROFILES[32], username: 'beta' }, { flow: 'loopback' }).session
+    const one = await post('/api/users/login-discord/logout', {}, { headers: { authorization: `Bearer ${mineToo}` } })
+    assert.deepEqual(one.json, { ok: true, ended: 1 })
+    assert.equal((await sessionCheck(mineToo)).status, 404)
+    assert.equal((await sessionCheck(mine)).status, 200, 'logging out one launcher leaves the others')
+    const third = masterApi.createSession({ id: PROFILES[31], username: 'alpha' }, { flow: 'loopback' }).session
+    const all = await post('/api/users/login-discord/logout', { everywhere: true }, { headers: { authorization: third } })
+    assert.equal(all.json.ended, 2)
+    assert.equal((await sessionCheck(mine)).status, 404)
+    assert.equal((await sessionCheck(third)).status, 404)
+    assert.equal((await sessionCheck(other)).status, 200, 'another account is untouched')
+    assert.deepEqual((await post('/api/users/login-discord/logout', {}, { headers: { authorization: third } })).json, { ok: true, ended: 0 }, 'an ended session logs out quietly')
+  })
+})
+
 test('F1: with LAUNCHER_LOGIN_LEGACY=off the old flow is refused with an update message, and its sessions keep working', async () => {
   const { state, page } = await legacyToConfirmPage()
   const nonce = hiddenValue(page.text, 'nonce')
