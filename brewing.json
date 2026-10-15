@@ -215,6 +215,18 @@
    ]
   },
   {
+   "product": "858ef:BSHeartland.esm",
+   "name": "Brandy",
+   "tier": 2,
+   "_note": "Cyrodiil's bottled brandy (CYRFoodBrandyBottle01A), a cooking input with no other source in the Bruma lock (Nate, 14 Oct)",
+   "inputs": [
+    [
+     "601fca:BSAssets.esm",
+     3
+    ]
+   ]
+  },
+  {
    "product": "b91d7:Skyrim.esm",
    "name": "Cyrodilic Brandy",
    "tier": 3,

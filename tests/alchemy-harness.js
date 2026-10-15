@@ -123,7 +123,9 @@ check('/brew is gone', !commands.has('brew'), [...commands.keys()]);
 check('/respawn stays', commands.has('respawn'));
 
 // ---- reading the recipe book ----
-mastery(BREWER, 3); mastery(NOVICE, 1); mastery(STRANGER, 4);
+// NOVICE is an Adept (tier 3): below the Draught's tier 4, and Fortify Two-handed (a fortify skill) opens at Adept since
+// the alchemy rework (alchemy-rework.json, 14 Oct), so the recipe's pair still brews something
+mastery(BREWER, 3); mastery(NOVICE, 2); mastery(STRANGER, 4);
 out.packets.length = 0;
 mp.onReadBook(BREWER, RECIPE_BOOK);
 check('the book teaches the recipe', (props.get(BREWER + '|private.dboRecipes') || {}).revive === true);
@@ -250,7 +252,7 @@ check('...and the pair still brews', out.said.some(([, t]) => /You brew/.test(t)
   check('...and opens the list beside it, unfocused', !!panel && panel.w.type === 'contextMenu' && panel.w.mode === 'inspect' && panel.focus === false, panel);
   const lines = panel ? panel.w.lines : [];
   check('...naming Restore Health (Yellow Polypore + Blue Mountain Flower) and Fortify Two-handed (Troll Fat + Fly Amanita)',
-    lines.some((l) => /Restore Health/.test(l)) && lines.some((l) => /Two ?Handed/i.test(l)), lines);
+    lines.some((l) => /Restore Health|of Healing/.test(l)) && lines.some((l) => /Two.?Handed/i.test(l)), lines);
   // Each line's pair, brewed, gives the potion the line names
   const nameIds = { 'Troll Fat': TROLL_FAT, 'Fly Amanita': FLY_AMANITA, 'Yellow Cinnabar Polypore': YELLOW_POLYPORE, 'Blue Mountain Flower': BLUE_FLOWER };
   check('ingredients go by their catalog names, and by their editor id where the catalog has none', lines.some((l) => /Fly Amanita/.test(l)) && lines.some((l) => /Troll Fat/.test(l)), lines);
@@ -261,7 +263,9 @@ check('...and the pair still brews', out.said.some(([, t]) => /You brew/.test(t)
     stock(BREWER);
     craft(BREWER, pair);
     const brewed = (out.said.find(([a, t]) => a === BREWER && /You brew/.test(t)) || [])[1] || '';
-    if (brewed.indexOf(`You brew ${m[1]}`) === 0) agree++; else check(`"${l}" brews what it says`, false, brewed);
+    // The line's name, without what the potion does in brackets; the message adds an article (alchemy rework)
+    const name = m[1].replace(/ \([^)]*\)$/, '');
+    if (new RegExp(`^You brew (?:an? )?${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).test(brewed)) agree++; else check(`"${l}" brews what it says`, false, brewed);
   }
   check(`every listed pair brews the potion its line names (${agree} pairs)`, agree === lines.filter((l) => /^(.+): (.+) \+ (.+)$/.test(l)).length && agree > 0);
   out.widgets.length = 0;

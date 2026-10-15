@@ -101,8 +101,10 @@ module.exports = (api) => {
   const tierOf = (a) => {
     try {
       const r = mp.get(a, 'private.mastery');
-      if (!r || !Array.isArray(r.order) || !r.order.includes('lockpicking')) return -1;
-      return Math.max(0, Number(((r.skills || {}).lockpicking || {}).rank) || 0);
+      const own = !r || !Array.isArray(r.order) || !r.order.includes('lockpicking') ? -1 : Math.max(0, Number(((r.skills || {}).lockpicking || {}).rank) || 0);
+      // A Fortify Lockpicking potion ("Lockpicking is <mag>% easier"; alchemy.js) counts as ranks more, up to Master
+      let extra = 0; try { const f = globalThis.__dboPotionLockpickTiers; extra = typeof f === 'function' ? Math.max(0, Math.floor(Number(f(a)) || 0)) : 0; } catch (e) { extra = 0; }
+      return extra ? Math.min(4, own + extra) : own;
     } catch (e) { return -1; }
   };
   const picksOf = (a) => {

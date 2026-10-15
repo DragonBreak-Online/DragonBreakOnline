@@ -193,6 +193,11 @@ module.exports = (api) => {
   const provinceOf = (a) => { try { const R = globalThis.__dboRegions; const p = R && typeof R.provinceAt === 'function' ? R.provinceAt(a) : null; return p && typeof p.province === 'string' && p.province !== 'none' ? p.province : ''; } catch (e) { return ''; } };
   const CAMP_ING_MAX = Number(C.campIngredientMaxValue) > 0 ? Number(C.campIngredientMaxValue) : 10;
   const CAMP_ING_EXCLUDE = new Set((Array.isArray(C.campIngredientExclude) ? C.campIngredientExclude : ['DBJarrinRoot', 'Nirnroot', 'NirnrootRed', 'BSEdjenirnrootBlue01', 'HumanHeart', 'HumanFlesh', 'BriarHeart', 'DaedraHeart', 'VoidSalts', 'BSKAshSalts', 'HagravenClaw', 'HagravenFeathers', 'vampireDust', 'Ectoplasm', 'glowDust', 'WispWrappings', 'BSKWispStalk', 'DLC2GhoulAsh', 'DLC2AshHopperJelly', 'BSKMortFlesh']).map(String));
+  // Kitchen staples that keep (Nate, 14 Oct: flour, butter and milk had no source inside the Bruma lock): a camp's chest
+  // holds a sack of them now and then, from loot.json's food pool, by the camp's province. Config wildlife.campProvisions
+  // (editor ids, [] for none), campProvisionChance.
+  const CAMP_FOODS = new Set((Array.isArray(C.campProvisions) ? C.campProvisions : ['BYOHFoodButter', 'BYOHFoodFlour', 'BYOHFoodMilk', 'FoodCheeseWheel02A', 'FoodHoney', 'BSKFoodCoffee']).map(String));
+  const CAMP_FOOD_CHANCE = Number.isFinite(Number(C.campProvisionChance)) ? Number(C.campProvisionChance) : 0.4;
   const campLoot = (province = '') => {
     const out = [];
     const add = (item, count) => { if (!item) return; const id = idOf(item.id); if (id) out.push({ id, count, name: item.name }); };
@@ -203,6 +208,7 @@ module.exports = (api) => {
     // worth campIngredientMaxValue or less and not on campIngredientExclude (rare finds stay with dungeons and the world)
     if (Math.random() < 0.6) add(pickFrom(pool('ingredients').filter((it) => { const v = Number(it.value) || 0; return v >= 1 && v <= CAMP_ING_MAX && !CAMP_ING_EXCLUDE.has(String(it.name)); })), rnd(1, 3));
     if (Math.random() < 0.5) add(pickFrom(pool('materials')), rnd(1, 2));
+    if (CAMP_FOODS.size && Math.random() < CAMP_FOOD_CHANCE) add(pickFrom(pool('food').filter((it) => CAMP_FOODS.has(String(it.name)) && (!province || !it.p || it.p.indexOf(province) >= 0))), rnd(1, 2));
     if (Math.random() < 0.25) add(pickFrom(pool('gems').filter((g) => !/flawless/i.test(g.name))), 1);
     if (Math.random() < 0.15) add(pickFrom(pool('soulgems').filter((g) => /petty|lesser/i.test(g.name))), 1);
     if (Math.random() < 0.2) add(pickFrom(pool('weapons', province).filter((w) => Number(w.value) <= 300)), 1);

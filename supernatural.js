@@ -1577,6 +1577,21 @@ module.exports = (api) => {
     }
     return false;
   };
+  // A Blood Potion (alchemy.js: Dawnguard's bottled blood or the Master's brew, Nate 14 Oct) is a meal for a vampire: the
+  // thirst resets as a feed's does, the gifts of a first meal wake, but no blood rank and no smear (nobody was bitten).
+  // false for anyone else, who has only the potion's restore.
+  globalThis.__dboSuperBloodPotion = (a) => {
+    const s = stateOf(a >>> 0);
+    if (!s || s.kind !== 'vampire') return false;
+    const wasUnfed = !!s.unfed, wasStage = Number(s.stage) || 1;
+    Object.assign(s, { lastFed: gameDays(), stage: 1, unfed: null });
+    saveState(a >>> 0, s);
+    if (wasUnfed || wasStage > 1) { syncVampSpells(a >>> 0, s); flushStageSpells(a >>> 0, s, wasUnfed ? 'first meal' : 'fed'); }
+    if (wasUnfed) refreshRates(a >>> 0);
+    if (needsFeed) try { needsFeed(a >>> 0); } catch (e) { /* hunger off */ }
+    personal(a >>> 0, wasUnfed ? 'Blood, at last, if only from a bottle. The withering lifts, and your gifts wake in you.' : 'The bottled blood is thin, but the thirst recedes.');
+    return true;
+  };
   // A captive standing with bound hands, drained by a deep feed, sinks to the ground for a while (the bleed-out pose
   // downed.js uses) and comes to on their own
   const blackout = (t) => {
