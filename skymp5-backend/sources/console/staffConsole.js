@@ -22,21 +22,29 @@ const SWITCH_MAX_BYTES = 64
 const ids = value => String(value ?? '').split(',').map(s => s.trim()).filter(Boolean)
 const snowflakes = (list, max) => list.length >= 1 && list.length <= max && list.every(x => rules.SNOWFLAKE.test(x))
 
+// The rank rule, Lead GM and above (Owners, Dragon Break Dev, Lead GM in CONSOLE_ROLE_IDS), shared with /say; problem is '' when usable
+function readRankRule(config) {
+  const roles = ids(config.consoleRoleIds)
+  const guild = String(config.discordGuildId || '')
+  let problem = ''
+  if (!snowflakes(roles, 10)) problem = 'CONSOLE_ROLE_IDS must be 1 to 10 role ids'
+  else if (!rules.SNOWFLAKE.test(guild)) problem = 'DISCORD_GUILD_ID is not set'
+  // The guild id is the @everyone role, which discord.js puts in every member's role cache
+  else if (roles.includes(guild)) problem = 'CONSOLE_ROLE_IDS holds the guild id (@everyone)'
+  return { roles: new Set(roles), guild, problem }
+}
+
 // The console's config, read once (env does not change without a restart); problem is '' when usable
 function readConfig(config) {
   const pins = ids(config.consoleDiscordIds)
-  const roles = ids(config.consoleRoleIds)
-  const guild = String(config.discordGuildId || '')
+  const rank = readRankRule(config)
   const channels = ids(config.consoleDiscordChannelIds)
   const hours = Number(config.consoleFreshSigninHours)
   let problem = ''
   if (!snowflakes(pins, 10)) problem = 'CONSOLE_DISCORD_IDS must be 1 to 10 Discord ids (empty is off)'
-  else if (!snowflakes(roles, 10)) problem = 'CONSOLE_ROLE_IDS must be 1 to 10 role ids'
-  else if (!rules.SNOWFLAKE.test(guild)) problem = 'DISCORD_GUILD_ID is not set'
-  // The guild id is the @everyone role, which discord.js puts in every member's role cache
-  else if (roles.includes(guild)) problem = 'CONSOLE_ROLE_IDS holds the guild id (@everyone)'
+  else if (rank.problem) problem = rank.problem
   else if (channels.length && !snowflakes(channels, 25)) problem = 'CONSOLE_DISCORD_CHANNEL_IDS must be channel ids'
-  return { pins: new Set(pins), roles: new Set(roles), guild, channels: new Set(channels), freshMs: (hours > 0 && hours <= 24 ? hours : 4) * 3600 * 1000, problem }
+  return { pins: new Set(pins), roles: rank.roles, guild: rank.guild, channels: new Set(channels), freshMs: (hours > 0 && hours <= 24 ? hours : 4) * 3600 * 1000, problem }
 }
 
 const withDeadline = (promise, ms) => {
@@ -305,4 +313,4 @@ function createStaffConsole({
   return { webCaller, discordCaller, runStaffCommand, state, job, isFresh, recover, setting, config: C }
 }
 
-module.exports = { createStaffConsole, readConfig, LIMITS, SIGN_IN_URL, TIER_LABEL }
+module.exports = { createStaffConsole, readConfig, readRankRule, LIMITS, SIGN_IN_URL, TIER_LABEL }
