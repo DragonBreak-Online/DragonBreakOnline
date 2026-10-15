@@ -353,6 +353,12 @@ export class VoiceService extends ClientListener {
       logTrace(this, `voice trace open for ${seconds} s`);
       return;
     }
+    // Who may hear me in each mode, from the server's positions: the page makes the list for my mode its LiveKit subscription permissions
+    if (content["customPacketType"] === "voiceHearers") {
+      const bands = content["bands"];
+      if (bands && typeof bands === "object" && !Array.isArray(bands)) this.sp.browser.executeJavaScript(`window.__alduinakVoice && window.__alduinakVoice.setHearers && window.__alduinakVoice.setHearers(${JSON.stringify(bands)})`);
+      return;
+    }
     // Sent whenever the room's players change; the map only ever grows more accurate, so a late one is harmless
     if (content["customPacketType"] === "voiceIdentityMap") {
       this.identityMap = parseIdentityMap(content["identityMap"]);
@@ -391,8 +397,9 @@ export class VoiceService extends ClientListener {
     }
 
     this.pushPrefs();
-    // The talk key, so the page can push-to-talk while one of its windows has the keyboard (the trade window)
-    const cfg = { modes: this.modes, mode: this.mode, pttScanCode: this.voiceKey };
+    // The talk key, so the page can push-to-talk while one of its windows has the keyboard (the trade window); hearers only from a server that sends lists
+    const hearers = content["hearers"];
+    const cfg = { modes: this.modes, mode: this.mode, pttScanCode: this.voiceKey, ...(hearers && typeof hearers === "object" && !Array.isArray(hearers) ? { hearers } : {}) };
     this.pendingRefrId = this.myRefrId();
     this.sp.browser.executeJavaScript(
       `window.__alduinakVoice && window.__alduinakVoice.connect(${JSON.stringify(url)}, ${JSON.stringify(token)}, ${JSON.stringify(cfg)})`
@@ -443,7 +450,7 @@ export class VoiceService extends ClientListener {
     // New character/actor (or a dropped room): (re)request a token
     if (this.connectedForRefrId !== myRefr && now >= this.nextTokenAttemptAt) {
       this.nextTokenAttemptAt = now + TOKEN_RETRY_MS;
-      sendCustomPacket(this.controller, { customPacketType: "voiceTokenRequest", caps: { identityV2: true } });
+      sendCustomPacket(this.controller, { customPacketType: "voiceTokenRequest", caps: { identityV2: true, hearingLists: 1 } });
       return;
     }
 
