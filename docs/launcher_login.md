@@ -11,7 +11,7 @@ the launcher's half in `skymp5-launcher/src/discordLogin.js`, the game's half in
 |---|---|---|
 | Launcher with this change | The launcher listens on `127.0.0.1` on a random port and sends a PKCE challenge to `POST /api/users/login-discord/start`. After Discord, the backend sends the browser to `http://127.0.0.1:<port>/discord/callback` with a one-time code (30 s). Only the launcher holding the PKCE verifier can trade that code for a session (`POST /api/users/login-discord/token`), once. | Discord's Authorize page, then "Signed in as ..." in the tab. |
 | Game (in-game sign-in, off until `GAME_LOGIN_DEVICE=on`) | `POST /start` with `client: game` returns a state, a secret device code and a short code like `BCDF-GHJK`. The game shows the short code. After Discord, our page asks for it; only the game's device code collects the result (`POST /api/users/login-discord/poll`), once. The device code is never in a URL. | The code in game, Discord's Authorize page, then our page asking for the code. |
-| Launchers up to 2.1.49 (old flow) | The launcher makes its own state and polls `GET /status`. While `LAUNCHER_LOGIN_LEGACY=allow` this still works, but the result is released only after the player presses Continue on our own page. | Discord's Authorize page, then "Finish signing in" with a Continue button and a warning. |
+| Launchers up to 2.1.49 (old flow) | The launcher makes its own state and polls `GET /status`. While `LAUNCHER_LOGIN_LEGACY=allow` this still works, but the result is released only after the player presses Continue on our own page. The button wakes only after the tab has been visible and focused for a second and then sees the pointer or a key, so a window swapped under a double-click (double-clickjacking) cannot press it. | Discord's Authorize page, then "Finish signing in" with a Continue button and a warning. |
 
 In every login:
 
@@ -23,7 +23,9 @@ In every login:
 - a state is taken by one Discord callback only, and the result is delivered once; a cancel on Discord, or a
   failure talking to Discord, is sent back to the launcher's listener too, so it stops waiting at once;
 - the session is made only when the device collects the result, so no session token is ever kept in
-  `data/auth-states.json`, which holds hashes only (0600). The pre-F1 file is overwritten when the backend starts;
+  `data/auth-states.json` (0600). It holds no state, code, nonce or device code in the clear, only their hashes, plus the
+  Discord id and name of a login that is past Discord and not yet collected (minutes). The pre-F1 file is overwritten
+  when the backend starts;
 - a new login ends the account's older sessions (`LAUNCHER_LOGIN_SINGLE_SESSION`), so a copied token stops working
   the next time its owner logs in;
 - the login pages are `no-store`, cannot be framed, and send no referrer.
@@ -59,6 +61,9 @@ because that is the prefix the public proxy forwards.
 2. **Game server (fork).** The build that sends `X-Auth-Token` on session and balance checks. After its restart the
    backend's hourly line `session check(s) without X-Auth-Token` stops appearing in
    `/var/log/dragonbreak-backend.log`.
+   - Before the restart, `grep -c 'checkConnectionAllowed: HTTP 403' /var/log/skymp-server.log` must be 0. That
+     warning means the game server's `masterApiAuthToken` is not the backend's; the old build lets that pass (the ban
+     check fails open), but the new build's session check would then be refused for every player.
 3. **Launcher.** Release the launcher with this change and announce it in `/api/version`. Old launchers keep logging
    in with the old flow. The new launcher falls back to the old flow only when the backend has no `/start` (a
    backend rollback), so rolling the backend back never locks new launchers out.
@@ -71,6 +76,9 @@ because that is the prefix the public proxy forwards.
    - `LAUNCHER_LOGIN_LEGACY=off` when `data/login-flows.json` shows `legacy: 0` for 3 days in a row, with `loopback`
      above 0 on each of those days, and not before 7 days after the new launcher went live. The launcher's Play
      button installs a waiting update, so old launchers fade out as players press Play.
+   - After `off`, and again after `revoke`, read `legacyRefused` each day. Above 0 on two days in a row means players
+     whose launcher cannot update itself (a failed self-update) are stuck on the old flow: switch one step back
+     (`revoke` to `off`, or `off` to `allow`) and have staff help them install the new launcher by hand.
    - `LAUNCHER_LOGIN_LEGACY=revoke` together with `off`, or right after, in a quiet hour. It ends every login made
      before this change, including any token taken before the fix. Those players press Discord Login once in the new
      launcher. To count them first (a count only):
