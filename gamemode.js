@@ -859,7 +859,7 @@ const helpLine = (n) => { const c = commands.get(n); return `/${n}${c && c.help 
 // power inside a player command. An entry shows only while its command exists; an admin-only command missing here is
 // listed under Other staff tools.
 const STAFF_HELP = [
-  { key: 'players', title: 'Players', items: ['kick', 'discipline', 'tp', 'fixloc', 'chargen', 'rename', 'sethunger', 'wipechars',
+  { key: 'players', title: 'Players', items: ['kick', 'discipline', 'tp', 'fixloc', 'chargen', 'grantappearance', 'rename', 'sethunger', 'wipechars',
     ['tokens', '<player|#TAG>: someone\'s Patreon tier and identity rerolls left'], 'stats', 'charstats', 'bugs', 'realnames'] },
   { key: 'calls', title: 'GM calls from players', items: [['gm list', '[all]: the open calls (all: and the last ten closed)'],
     ['gm take', '<n>: the call is yours; the player is told you are on the way, other staff who took it'],
@@ -2303,6 +2303,8 @@ const sendToArrival = (a) => {
     // The creator's noon ends with the Realm
     try { if (globalThis.__dboClock) globalThis.__dboClock.sendTo(a); } catch (e) { /* the next broadcast */ }
     log(`sent ${display(a)} from the Realm to the arrival`);
+    // A new character hears of their free appearance change 15 s on, past the arrival's loading screen (appearance.js)
+    setTimeout(() => { try { if (globalThis.__dboAppearanceFreeLogin && !creationPending(a) && !inCreatorRealm(a)) globalThis.__dboAppearanceFreeLogin(a); } catch (e) { log('free appearance notice failed', e.message); } }, 15000);
   } catch (e) { log('send to arrival failed', e.message); }
 };
 // ---- a name of its own before the world (server\naming.js): /name for a character left as "Prisoner" ----------------
@@ -2562,6 +2564,8 @@ const onCharacterReady = (userId, a) => {
     try { if (globalThis.__dboSchoolsLogin) globalThis.__dboSchoolsLogin(a); } catch (e) { log('schools login failed', e.message); }
     // The election notice of the current phase for a citizen of a hold that is choosing its Jarl, once per character (citizenship.js)
     try { if (globalThis.__dboCitizenLogin) globalThis.__dboCitizenLogin(a); } catch (e) { log('citizen notice login failed', e.message); }
+    // A free appearance change waiting, once per character, never while one is still being made (appearance.js)
+    try { if (globalThis.__dboAppearanceFreeLogin && !creationPending(a) && !inCreatorRealm(a)) globalThis.__dboAppearanceFreeLogin(a); } catch (e) { log('free appearance notice failed', e.message); }
   }), 8000);
 };
 const startLoginWait = (userId, seenActor) => {
@@ -3092,8 +3096,8 @@ const onUi = (event, fn) => {
 try {
   const APPEARANCE_JS = path.resolve('appearance.js');
   delete require.cache[APPEARANCE_JS];
-  require(APPEARANCE_JS)({ mp, log, personal, system, audit, who, registerChatCommand, cfg, userOf, profileOf });
-} catch (e) { log('appearance.js failed to load:', e.stack || e.message); globalThis.__dboAppearanceEdit = null; globalThis.__dboRaceMenuSaveGate = null; }
+  require(APPEARANCE_JS)({ mp, log, personal, system, audit, who, registerChatCommand, cfg, userOf, profileOf, findByName, display });
+} catch (e) { log('appearance.js failed to load:', e.stack || e.message); globalThis.__dboAppearanceEdit = null; globalThis.__dboRaceMenuSaveGate = null; globalThis.__dboAppearanceFreeLogin = null; }
 try {
   const NAMING_JS = path.resolve('naming.js');
   delete require.cache[NAMING_JS];

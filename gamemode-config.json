@@ -1056,12 +1056,13 @@
   "message": "Dragons are switched off for now: a dragon near players crashes their games (4 Oct). They come back with the client fix."
  },
  "appearance": {
-  "_comment": "/appearance (appearance.js, #suggestions #1, Jake 2026-10-04): a player reopens the appearance editor for gold. cost in gold, taken only for a changed look; cooldownHours between uses; allowRace/allowSex false keep race and sex (a change puts the previous look back). Names always go through staff (/rename).",
+  "_comment": "/appearance (appearance.js, #suggestions #1, Jake 2026-10-04): a player reopens the appearance editor for gold. cost in gold, taken only for a changed look; cooldownHours between uses; allowRace/allowSex false keep race and sex (a change puts the previous look back). Names always go through staff (/rename). freeChanges (Jake 2026-10-15): uses per character, old and new, that skip the gold and the cooldown (a GM's /grantappearance adds one); 0 turns them off, grants included.",
   "enabled": true,
   "cost": 500,
   "cooldownHours": 24,
   "allowRace": false,
-  "allowSex": false
+  "allowSex": false,
+  "freeChanges": 1
  },
  "drift": {
   "_comment": "Client drift switches, sent in every npcDriftConfig (gamemode.js DRIFT_KEYS). ownLook: the server's look for the player's own character (client fix/tick-context-1013, sync/ownLook.ts). apply puts it on (the fix); name only a look that changes just the name (a /mask swap; the head is never rebuilt); off none, as the clients from 15 Sep to the fix. name or off is the quick undo, no client build: the hot reload that changes it sends it to every client online at once. /driftset ownLook <apply|name|off> (staff) switches it for everyone online at once and wins over this value until /driftset ownLook default or a restart. A client before the fix ignores it. faceRebuild (load|entry, client 0.3.96b) can be set here the same way; absent, it is load.",

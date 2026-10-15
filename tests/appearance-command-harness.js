@@ -9,6 +9,7 @@
 // drops every write to its own look in the window. Second review, 8 Oct: the head a high-poly look lost is found by its
 // record's type (HDPT PNAM 1, Face), a beast form taken in the window gets no settled write, and /appearance waits while
 // a forced werewolf change is coming.
+// The paid rules run with free changes off (freeChanges 0, 15 Oct): the free change is tests/appearance-free-harness.js.
 //   node tests/appearance-command-harness.js   (from server/)
 'use strict';
 const path = require('path');
@@ -38,7 +39,7 @@ const reset = (gold, start) => {
   return require(MOD)({
     mp: { get: (id, k) => props.get(`${id}|${k}`), set: (id, k, v) => { if (k === 'appearance') writes.push(JSON.parse(JSON.stringify(v))); props.set(`${id}|${k}`, v); }, setRaceMenuOpen: () => { opened++; }, lookupEspmRecordById },
     log: () => {}, personal: (a, t) => said.push(t), system: (a, t) => sys.push(t), audit: (t) => audits.push(t), who: () => 'Brand',
-    registerChatCommand: (n, fn) => cmds.set(n, fn), cfg: { appearance: { cost: 500, cooldownHours: 24 } },
+    registerChatCommand: (n, fn) => cmds.set(n, fn), cfg: { appearance: { cost: 500, cooldownHours: 24, freeChanges: 0 } },
     userOf: () => user, profileOf: () => 7, later: (fn, ms) => timers.push({ fn, ms }),
   });
 };

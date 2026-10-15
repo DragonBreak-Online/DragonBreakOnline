@@ -12,6 +12,7 @@
 // 10 Oct review 2-e2e: E4 a console edit of a stored face is refused noeditor, not notloaded; E5 a face made on a head the
 // guard swapped back (finish()) is refused headswap, uncharged. 12 Oct re-review, server-data 4: only one with a sculpt on a
 // head the stored face has no sculpt on; a slider-only face, or one sculpted only where the stored face is, saves and pays.
+// The paid rules run with free changes off (freeChanges 0, 15 Oct): the free change is tests/appearance-free-harness.js.
 //   node tests/racemenu-save-gate-harness.js   (from server/)
 'use strict';
 const fs = require('fs');
@@ -57,7 +58,7 @@ const loadAppearance = (gold, extra, top) => {
   return require(APPEARANCE)({
     mp: { get: (id, k) => props.get(`${id}|${k}`), set: (id, k, v) => props.set(`${id}|${k}`, v), setRaceMenuOpen: () => {}, lookupEspmRecordById: () => { throw new Error('no record'); } },
     log: () => {}, personal: () => {}, system: (a, t) => sys.push(t), audit: (t) => audits.push(t), who: () => 'Brand',
-    registerChatCommand: (n, fn) => cmds.set(n, fn), cfg: Object.assign({ appearance: Object.assign({ cost: 500, cooldownHours: 24 }, extra || {}) }, top || {}),
+    registerChatCommand: (n, fn) => cmds.set(n, fn), cfg: Object.assign({ appearance: Object.assign({ cost: 500, cooldownHours: 24, freeChanges: 0 }, extra || {}) }, top || {}),
     userOf: () => 3, profileOf: (a) => Number(props.get(`${a >>> 0}|profileId`)), later: () => {},
   });
 };

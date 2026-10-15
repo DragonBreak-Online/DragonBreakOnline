@@ -7,6 +7,13 @@
 // - The gold is taken only when a changed look is saved; closing the editor unchanged costs nothing.
 // - Once per cooldownHours. Not in a fight, down, in a beast form, jailed, bound, inside a dungeon, dead, or while
 //   still making or rerolling a character.
+// - Free changes (Jake, 15 Oct: "give 1 free appearance change to every new character", every character old and new):
+//   each character has freeChanges (default 1) uses that skip the gold and the daily wait, with every other rule above.
+//   One is used only where the gold would have been taken (a saved changed look, or a RaceMenu-only change the save gate
+//   below would charge), and the cooldown then starts as for a paid change; closing unchanged keeps it. The count used is
+//   kept on the character (private.dboAppearanceFreeUsed, a number; a GM's /grantappearance takes one off), and the
+//   character is told once, at login or on leaving the Realm, while one is left (private.dboAppearanceFreeTold).
+//   freeChanges 0 turns them off, grants included: /appearance is then exactly as before.
 // The engine applies the editor's result before the gamemode hears of it (ActionListener::OnUpdateAppearance applies it
 // and tells the neighbours, then fires the event), so a locked change is undone here by setting the appearance back. The
 // edit waits on the character (private.dboAppearanceEdit, with the look before it), so a relog or a restart in the
@@ -57,6 +64,10 @@ const path = require('path');
 const GOLD = 0x0000000f;
 const EDIT = 'private.dboAppearanceEdit';
 const LAST = 'private.dboAppearanceAt';
+// The free changes this character has used; a GM's /grantappearance takes one off (it may go below 0)
+const FREE_USED = 'private.dboAppearanceFreeUsed';
+// 1 once the character was told a free change waits
+const FREE_TOLD = 'private.dboAppearanceFreeTold';
 // A GM's /chargen on a character that already exists: the look as it was when the GM opened it
 const CHARGEN = 'private.dboChargenEdit';
 // A /chargen snapshot older than this is not trusted as the look before (that editor never closed through the server)
@@ -112,9 +123,10 @@ const sameLook = (x, y) => {
 
 module.exports = (api) => {
   const { mp, log, personal, system, audit, who, registerChatCommand, cfg } = api;
-  const C = Object.assign({ enabled: true, cost: 500, cooldownHours: 24, allowRace: false, allowSex: false, combatSeconds: 30, headGuard: true, refusedNotice: true },
-    (cfg && cfg.appearance) || {});
+  const C = Object.assign({ enabled: true, cost: 500, cooldownHours: 24, allowRace: false, allowSex: false, combatSeconds: 30, headGuard: true, refusedNotice: true,
+    freeChanges: 1 }, (cfg && cfg.appearance) || {});
   const cost = Math.max(0, Math.floor(Number(C.cost) || 0));
+  const freeChanges = Math.max(0, Math.floor(Number(C.freeChanges) || 0));
   // The harness passes its own clock for the settle write
   const later = typeof api.later === 'function' ? api.later : (fn, ms) => setTimeout(fn, ms);
   const HEADS = loadHeads(log);
@@ -177,6 +189,12 @@ module.exports = (api) => {
     const due = globalThis.__dboFeralDue instanceof Map ? globalThis.__dboFeralDue.get(a >>> 0) : undefined;
     return due !== undefined && Date.now() < (Number(due) || 0) + BEAST_DUE_STALE_MS;
   };
+  // Free changes: how many this character has left (none while freeChanges is 0), and one used or given back
+  const freeUsed = (a) => Math.floor(Number(get(a, FREE_USED)) || 0);
+  const freeLeft = (a) => (freeChanges > 0 ? Math.max(0, freeChanges - freeUsed(a)) : 0);
+  const useFree = (a) => mp.set(a, FREE_USED, freeUsed(a) + 1);
+  const unuseFree = (a) => mp.set(a, FREE_USED, freeUsed(a) - 1);
+  const FREE_KEPT = ' Your free appearance change is still yours.';
 
   // Why this player cannot open the editor now, or null
   const blocked = (a) => {
@@ -199,20 +217,29 @@ module.exports = (api) => {
     a = a >>> 0;
     if (get(a, EDIT)) return personal(a, 'Your appearance editor is already open. Finish it first.');
     const why = blocked(a); if (why) return personal(a, why);
-    const wait = (Number(get(a, LAST)) || 0) + (Number(C.cooldownHours) || 0) * 3600000 - Date.now();
-    if (wait > 0) return personal(a, `You can change your appearance again in ${hours(wait)}.`);
-    const gold = goldOf(a);
-    if (gold < cost) return personal(a, `Changing your appearance costs ${cost} gold. You have ${gold}.`);
+    // A free change skips the daily wait and the gold; every other rule above still holds
+    const left = freeLeft(a);
+    if (!left) {
+      const wait = (Number(get(a, LAST)) || 0) + (Number(C.cooldownHours) || 0) * 3600000 - Date.now();
+      if (wait > 0) return personal(a, `You can change your appearance again in ${hours(wait)}.`);
+      const gold = goldOf(a);
+      if (gold < cost) return personal(a, `Changing your appearance costs ${cost} gold. You have ${gold}.`);
+    }
     const before = get(a, 'appearance');
     if (!before || typeof before !== 'object') return personal(a, 'Your appearance could not be read. Ask a GM for help.');
     try {
-      mp.set(a, EDIT, { at: Date.now(), before: copy(before) });
+      mp.set(a, EDIT, Object.assign({ at: Date.now(), before: copy(before) }, left ? { free: true } : {}));
       mp.setRaceMenuOpen(a, true);
       noteEditorOpened(a);
     } catch (e) {
       try { mp.set(a, EDIT, null); } catch (e2) { /* nothing more to undo */ }
       log('appearance: could not open the editor for', who(a), e.message);
       return personal(a, 'The appearance editor could not be opened. Try again in a moment.');
+    }
+    if (left) {
+      personal(a, `The appearance editor is open. ${left === 1 ? 'This change is free (your one free appearance change).' : `This change is free (one of your ${left} free appearance changes).`} Saving a new look uses it; closing the editor unchanged keeps it. Your race, sex and name stay as they are.`);
+      audit(`APPEARANCE ${who(a)} opened the appearance editor (free: ${left} free change(s) left)`);
+      return;
     }
     personal(a, `The appearance editor is open. Saving a new look costs ${cost} gold; closing it unchanged costs nothing. Your race, sex and name stay as they are.`);
     audit(`APPEARANCE ${who(a)} opened the appearance editor (${cost} gold on a changed look)`);
@@ -337,9 +364,11 @@ module.exports = (api) => {
   // show on the player's own (10 Oct review 2-e2e G8, E5): a face from that close with a sculpt on a head its stored face
   // has none on (racemenupresets.js opts.newSculpt) is not taken, and nothing is charged for it. Slider changes, and a
   // sculpt the stored face already had, are taken as from any other close (12 Oct re-review, server-data 4)
-  const openSaveWindow = (a, kind, charge, headswap) => {
+  // free: a priced window of a free /appearance, whose charge uses the free change instead of gold
+  const openSaveWindow = (a, kind, charge, headswap, free) => {
     const now = Date.now();
-    saveWindows.set(a >>> 0, Object.assign({ at: now, until: now + SAVE_WINDOW_MS, kind: String(kind || 'editor'), charge: !!charge }, headswap ? { headswap: true } : {}));
+    saveWindows.set(a >>> 0, Object.assign({ at: now, until: now + SAVE_WINDOW_MS, kind: String(kind || 'editor'), charge: !!charge }, headswap ? { headswap: true } : {},
+      free ? { free: true } : {}));
     if (saveWindows.size > 256) for (const [k, w] of saveWindows) if (now > w.until) saveWindows.delete(k);
   };
   const closeSaveWindow = (a) => { saveWindows.delete(a >>> 0); };
@@ -372,6 +401,30 @@ module.exports = (api) => {
     if (first && C.raceMenuFirstSaveFree !== false) {
       audit(`APPEARANCE ${who(a)} kept their RaceMenu ${what} for the first time (free)`);
       return { ok: true, kind: w.kind, free: true };
+    }
+    // A free /appearance: the free change pays for it, as the gold would have, and is given back as the gold would be
+    if (w.free && freeLeft(a) > 0) {
+      useFree(a);
+      w.charge = false;
+      const lastWas = get(a, LAST);
+      const usedAt = Date.now();
+      mp.set(a, LAST, usedAt);
+      const freeTold = () => {
+        system(a, 'Your RaceMenu changes are saved. They used your free appearance change, so no gold was taken.');
+        audit(`APPEARANCE ${who(a)} changed only RaceMenu details (${what}) with their free appearance change (no gold)`);
+      };
+      if (!(opts && opts.hold)) { freeTold(); return { ok: true, kind: w.kind, freeChange: true }; }
+      let done = false;
+      const settleFree = (saved) => {
+        if (done) return;
+        done = true;
+        if (saved) { freeTold(); return; }
+        unuseFree(a);
+        if (Number(get(a, LAST)) === usedAt) mp.set(a, LAST, lastWas === undefined ? 0 : lastWas);
+        if (saveWindows.get(a) === w) w.charge = true;
+        audit(`APPEARANCE ${who(a)} RaceMenu ${what} could not be written: their free appearance change given back`);
+      };
+      return { ok: true, kind: w.kind, freeChange: true, settle: settleFree };
     }
     if (!takeGold(a, cost)) {
       system(a, `Your RaceMenu changes weren't saved: they cost ${cost} gold and you don't have it. They are gone when you log out.`);
@@ -471,12 +524,15 @@ module.exports = (api) => {
     const after = appearance && typeof appearance === 'object' ? copy(appearance) : null;
     closeSaveWindow(a);
     if (!after) return true;
+    // Opened as a free change and one is still left (the switch may have gone off, or a RaceMenu save used it, meanwhile)
+    const free = e.free === true && freeLeft(a) > 0;
+    const freeKept = free ? FREE_KEPT : '';
     const raceChanged = C.allowRace !== true && Number(after.raceId) !== Number(before.raceId);
     const sexChanged = C.allowSex !== true && !!after.isFemale !== !!before.isFemale;
     if (raceChanged || sexChanged) {
       mp.set(a, 'appearance', before);
       resendAfterSettle(a, appearance);
-      system(a, `${raceChanged ? 'Race' : 'Sex'} can't be changed here, so your previous look was kept. No gold was taken.`);
+      system(a, `${raceChanged ? 'Race' : 'Sex'} can't be changed here, so your previous look was kept. No gold was taken.${freeKept}`);
       audit(`APPEARANCE ${who(a)} tried to change ${raceChanged ? 'race' : 'sex'}: previous look kept, nothing charged`);
       return true;
     }
@@ -489,29 +545,39 @@ module.exports = (api) => {
     if (sameLook(look, before)) {
       if (nameKept || guarded) { mp.set(a, 'appearance', before); resendAfterSettle(a, appearance); }
       if (!raceMenuKept(a)) {
-        system(a, `Your look is unchanged, so nothing was charged.${headNote}${nameKept ? ' Your name stays the same: a GM can rename you.' : ''}${NOT_KEPT_NOTE}`);
+        system(a, `Your look is unchanged, so nothing was charged.${freeKept}${headNote}${nameKept ? ' Your name stays the same: a GM can rename you.' : ''}${NOT_KEPT_NOTE}`);
         return true;
       }
-      // A RaceMenu-only change (sliders, sculpt, overlays) arrives after this and is paid for then (raceMenuSaveGate); a
-      // face made on a swapped-in head is not taken (E5)
-      openSaveWindow(a, 'appearance', true, !!guarded);
-      system(a, `Your standard look is unchanged. RaceMenu-only changes (extra sliders, sculpt, overlays) cost ${cost} gold and are charged when they are saved.${headNote}${nameKept ? ' Your name stays the same: a GM can rename you.' : ''}`);
+      // A RaceMenu-only change (sliders, sculpt, overlays) arrives after this and is paid for then (raceMenuSaveGate), with
+      // the free change on a free edit; a face made on a swapped-in head is not taken (E5)
+      openSaveWindow(a, 'appearance', true, !!guarded, free);
+      system(a, `Your standard look is unchanged. ${free ? 'RaceMenu-only changes (extra sliders, sculpt, overlays), if you made any, use your free appearance change when they are saved; otherwise it stays yours.'
+        : `RaceMenu-only changes (extra sliders, sculpt, overlays) cost ${cost} gold and are charged when they are saved.`}${headNote}${nameKept ? ' Your name stays the same: a GM can rename you.' : ''}`);
       return true;
     }
-    if (!takeGold(a, cost)) {
+    if (!free && !takeGold(a, cost)) {
       mp.set(a, 'appearance', before);
       resendAfterSettle(a, appearance);
-      system(a, `You no longer have ${cost} gold, so your previous look was kept.`);
+      system(a, e.free === true ? `Your free appearance change is no longer there, and a new look costs ${cost} gold, which you no longer have, so your previous look was kept.`
+        : `You no longer have ${cost} gold, so your previous look was kept.`);
       audit(`APPEARANCE ${who(a)} closed the editor without ${cost} gold: previous look kept`);
       return true;
     }
     if (nameKept || guarded) mp.set(a, 'appearance', look);
+    // The free change is used exactly where the gold would have been taken, and the cooldown starts as for a paid change
+    if (free) useFree(a);
     mp.set(a, LAST, Date.now());
     // Paid: what skee keeps from this close is saved with it, but for a face made on a swapped-in head (E5)
     openSaveWindow(a, 'appearance', false, !!guarded);
     retakeTells(a, before);
     resendAfterSettle(a, appearance);
-    system(a, `Your new look is saved. ${cost} gold paid.${headNote}${nameKept ? ' Your name stays the same: a GM can rename you.' : ''}${raceMenuKept(a) ? '' : NOT_KEPT_NOTE}`);
+    const nameNote = nameKept ? ' Your name stays the same: a GM can rename you.' : '';
+    if (free) {
+      system(a, `Your new look is saved. It used your free appearance change, so no gold was taken.${headNote}${nameNote}${raceMenuKept(a) ? '' : NOT_KEPT_NOTE}`);
+      audit(`APPEARANCE ${who(a)} changed their look with their free appearance change (no gold)${nameKept ? ' (a name change in the editor was undone)' : ''}`);
+      return true;
+    }
+    system(a, `Your new look is saved. ${cost} gold paid.${headNote}${nameNote}${raceMenuKept(a) ? '' : NOT_KEPT_NOTE}`);
     audit(`APPEARANCE ${who(a)} changed their look for ${cost} gold${nameKept ? ' (a name change in the editor was undone)' : ''}`);
     return true;
   };
@@ -585,7 +651,41 @@ module.exports = (api) => {
     return true;
   };
 
-  globalThis.__dboAppearanceEdit = { pending, finish, blocked, chargenOpened, chargenFinish, refused, raceMenuClosed };
-  log(`appearance ${C.enabled ? 'on' : 'off'}: /appearance costs ${cost} gold, every ${Number(C.cooldownHours) || 0} h, race ${C.allowRace === true ? 'free' : 'kept'}, sex ${C.allowSex === true ? 'free' : 'kept'}, head guard ${C.headGuard === false ? 'off' : `on (${HEADS.raceOf.size} race ids)`}`);
-  return { pending, finish, blocked, goldOf, takeGold, C, chargenOpened, chargenFinish, refused, guardHead, sameLook, SETTLE_RESEND_MS, raceMenuClosed, raceMenuSaveGate, raceMenuRefused };
+  // gamemode.js's login and a new character's arrival from the Realm: a free change waiting is told once per character,
+  // never while it is still being made or rerolled. True when told
+  const freeNotice = (a) => {
+    a = a >>> 0;
+    if (!C.enabled || Number(get(a, FREE_TOLD)) > 0) return false;
+    const left = freeLeft(a);
+    if (!left || get(a, 'isOnline') === false) return false;
+    if (get(a, 'private.creationPending') === true || get(a, 'private.rerollPending') === true || !get(a, 'appearance')) return false;
+    mp.set(a, FREE_TOLD, 1);
+    system(a, left === 1 ? 'You have one free appearance change. Type /appearance to use it.' : `You have ${left} free appearance changes. Type /appearance to use them.`);
+    return true;
+  };
+  globalThis.__dboAppearanceFreeLogin = freeNotice;
+
+  // /grantappearance <name|#TAG>: a GM gives an online character one more free change (logged in #staff-commands too)
+  if (typeof api.findByName === 'function') {
+    registerChatCommand('grantappearance', (a, args) => {
+      a = a >>> 0;
+      if (!(freeChanges > 0)) return personal(a, 'Free appearance changes are switched off (appearance.freeChanges is 0).');
+      const q = String(args || '').trim();
+      if (!q) return personal(a, 'Use /grantappearance <name|#TAG>.');
+      const t = Number(api.findByName(q)) >>> 0;
+      if (!t) return personal(a, 'No such player online. Use their name or #TAG.');
+      unuseFree(t);
+      mp.set(t, FREE_TOLD, 1);
+      const left = freeLeft(t);
+      const name = typeof api.display === 'function' ? api.display(t) : who(t);
+      personal(a, `${name} now has ${left} free appearance change${left === 1 ? '' : 's'}.`);
+      if (t !== a) system(t, 'A GM gave you a free appearance change. Type /appearance to use it.');
+      audit(`APPEARANCE ${who(a)} granted ${who(t)} a free appearance change (${left} left)`);
+    }, { admin: true, help: '<player|#TAG> give someone one more free /appearance change' });
+  }
+
+  globalThis.__dboAppearanceEdit = { pending, finish, blocked, chargenOpened, chargenFinish, refused, raceMenuClosed, freeLeft, freeNotice };
+  log(`appearance ${C.enabled ? 'on' : 'off'}: /appearance costs ${cost} gold, every ${Number(C.cooldownHours) || 0} h, ${freeChanges} free per character, race ${C.allowRace === true ? 'free' : 'kept'}, sex ${C.allowSex === true ? 'free' : 'kept'}, head guard ${C.headGuard === false ? 'off' : `on (${HEADS.raceOf.size} race ids)`}`);
+  return { pending, finish, blocked, goldOf, takeGold, C, chargenOpened, chargenFinish, refused, guardHead, sameLook, SETTLE_RESEND_MS, raceMenuClosed, raceMenuSaveGate, raceMenuRefused,
+    freeLeft, freeNotice };
 };

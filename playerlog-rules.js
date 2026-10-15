@@ -423,6 +423,8 @@ AUDIT_VERBS.CHILL.roles = (i, pre) => (BY_ACTS.test(pre) ? 'actor' : 'target');
 AUDIT_VERBS.EXECUTION.roles = R_BY([[/ by $/, 'by'], [/ of $/, 'victim'], [/beheads $/, 'victim'], [/: $/, 'actor']]);
 AUDIT_VERBS.UNSTUCK.roles = R_BY([[/ staff $/, 'staff']]);
 AUDIT_VERBS.BOOST.roles = R_BY([[/ (?:extended|granted) $/, 'target']]);
+// APPEARANCE <staff> granted <target> a free appearance change (appearance.js /grantappearance): the one given it is the target
+AUDIT_VERBS.APPEARANCE.roles = R_BY([[/ granted $/, 'target']]);
 AUDIT_VERBS.CONCORDAT.roles = R_BY([[/-> $/, 'target'], [/ arrested $/, 'target'], [/ jailed $/, 'target']]);
 // CONCORDAT ARREST <who> (<rank title>) arrested ...: the title is m.shown || m.title (thalmor.js:144), a rank name the
 // faction's leader can rename (guilds.js editRanks), so text a player wrote; the group after the first party goes
@@ -995,6 +997,7 @@ const COMMAND_SCHEMA = {
   kick: { target: { from: 0, lookup: 'online' } },
   tp: { target: { from: 0, lookup: 'online' } },
   chargen: { target: { from: 0, lookup: 'online' } },
+  grantappearance: { target: { from: 0, lookup: 'online' } },
   rename: { target: { from: 0, to: 1, lookup: 'online' } },
   fixloc: { target: { from: 0, lookup: 'online' } },
   sethunger: { target: { from: 0, to: 1, lookup: 'online' }, nums: [-1] },
@@ -1111,6 +1114,11 @@ appearance.js APPEARANCE 41478c6a clean
 appearance.js APPEARANCE e32ecc46 clean
 appearance.js APPEARANCE 5db735ef clean
 appearance.js APPEARANCE 25b16683 clean
+appearance.js APPEARANCE dc1453e1 clean
+appearance.js APPEARANCE cc2a3d88 clean
+appearance.js APPEARANCE 8dda1487 clean
+appearance.js APPEARANCE c08fc0d2 clean
+appearance.js APPEARANCE 8a7cc30f clean
 bank.js BANK 462e889d parsed
 bank.js BANK 5efd151e parsed
 bank.js BANK 8324fa85 parsed
