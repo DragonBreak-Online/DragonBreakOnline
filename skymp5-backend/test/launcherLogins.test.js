@@ -34,7 +34,7 @@ test('an old launcher state expires 5 minutes after it was first opened, however
   for (const bad of ['a', 'G'.repeat(64), 'a'.repeat(63), 42, null]) assert.equal(store.registerLegacy(bad), 'invalid')
 })
 
-test('a loopback code lives 60 seconds and is traded only with its own verifier', () => {
+test('a loopback code lives 30 seconds and is traded only with its own verifier', () => {
   const c = clock()
   const store = createLoginStore({ now: c.now, log: quiet })
   const a = loopbackAtCode(store)

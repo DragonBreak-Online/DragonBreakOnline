@@ -22,7 +22,7 @@ const TTL = Object.freeze({
   legacyPending:  5 * 60 * 1000, // the old launcher stops polling after 5 minutes, and an old state is never extended
   discord:        2 * 60 * 1000, // the callback is talking to Discord
   confirming:     5 * 60 * 1000, // Discord is done, the confirmation page waits for the player
-  code:               60 * 1000, // loopback: the one-time code waits for the launcher's exchange
+  code:               30 * 1000, // loopback: the one-time code waits for the launcher's exchange, which follows within a second
   ready:          2 * 60 * 1000, // device and legacy: confirmed, waiting for the next poll
 })
 // Wrong device codes typed on one confirmation page, or failed exchanges of one code, before the login is dropped
