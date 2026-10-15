@@ -158,6 +158,8 @@ module.exports = {
   discordSuggestionsChannelId: process.env.DISCORD_SUGGESTIONS_CHANNEL_ID || '',
   // Bug-tracker forum (formerly #error-report): each launcher, game or website problem report opens its own thread
   discordErrorForumChannelId: process.env.DISCORD_ERROR_FORUM_CHANNEL_ID || '',
+  // Staff #to-do forum: /say close locks and archives a thread of this forum only; empty turns close off
+  discordTodoForumChannelId: process.env.DISCORD_TODO_FORUM_CHANNEL_ID || '',
   // JSON map {tag name: tag id} for that forum, written once its tags exist; reports go untagged without it
   bugTagsFile: process.env.BUG_TAGS_FILE || '/etc/dragonbreak/bug-tags.json',
 
