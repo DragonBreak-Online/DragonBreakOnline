@@ -257,16 +257,24 @@ const main = async () => {
     const BR_OK = new Set(['steel', 'iron', 'hide', 'leather', 'studded', 'wood', 'falmer', 'forsworn', 'bronze', 'copper', 'ancient_nord', 'goblin', 'silver', 'imperial', 'ancient_imperial', 'glass', 'amber', 'falmer_honed', 'dwarven']);
     ok(cap === 'steel', "the base ceiling is still 'steel' (lootTiers.cap)", cap);
     ok(tiers[4] > 0 && tiers[3] === 0 && Object.keys(fams).every((f) => BR_OK.has(f)), 'Blackreach: Glass or Amber (tier 4) comes through, no tier 3 family, nothing outside the lifted cap', { tiers, fams });
-    // Amber (Saints and Seducers, ccBGSSSE025) is let through by the cap, but loot.json's pools hold no Amber piece yet
-    // (ck-mcp/loot.py leaves the Creation Club set out), so only Glass can come out until they do
+    // Amber (Saints and Seducers, ccBGSSSE025): its 13 pieces are hand-added to loot.json's armor and weapons pools (Nate,
+    // 15 Oct; ck-mcp/loot.py leaves the Creation Club set out), so Blackreach's cap must drop it
     const AMBER = Object.keys(MAT).filter((k) => MAT[k] === 'amber');
     const amberPooled = [].concat(LOOT.weapons || [], LOOT.armor || [], LOOT.ench_weapons || [], LOOT.ench_armor || []).filter((it) => MAT[String(it.id).toLowerCase()] === 'amber').length;
-    ok((fams.glass || 0) > 0 && AMBER.length > 0 && AMBER.every((d) => lootableBR(d)) && (amberPooled ? (fams.amber || 0) > 0 : true), `Blackreach: Glass drops; Amber is lootable under the cap (${AMBER.length} pieces, ${amberPooled} in loot.json's pools)`, { fams, amberPooled });
+    ok(amberPooled === 13, `loot.json's pools hold the 13 Amber pieces (5 armour, 8 weapons): ${amberPooled}`, amberPooled);
+    ok((fams.glass || 0) > 0 && AMBER.length > 0 && AMBER.every((d) => lootableBR(d)) && (fams.amber || 0) > 0, `Blackreach: Glass and Amber drop (${fams.amber || 0} Amber pieces in 2,000 rolls; ${AMBER.length} Amber records lootable under the cap)`, { fams, amberPooled });
     ok((fams.dwarven || 0) + (fams.falmer_honed || 0) > 0, 'Blackreach: Dwarven or honed Falmer gear drops at its tier', fams);
     // The same roll without Blackreach's cap (any other open-world path) keeps the steel ceiling
     const famsBase = {};
     for (let i = 0; i < 500; i++) for (const e of globalThis.__dboOpenWorldLoot('nightmare', true, 'skyrim', 'BlackreachLocation')) { const d = descs.get(e.baseId) || ''; const fam = MAT[d]; if (fam && !['clothing', 'staff', 'misc', 'tool'].includes(fam)) famsBase[fam] = (famsBase[fam] || 0) + 1; }
     ok(!famsBase.glass && !famsBase.amber && !famsBase.dwarven && !famsBase.falmer_honed, 'without the per-path cap the steel ceiling holds (no Glass, Amber, Dwarven, honed Falmer)', famsBase);
+    // Every other path, at every difficulty and in each province, boss chest or not: never Amber
+    let amberElsewhere = 0, rollsElsewhere = 0;
+    for (const diff of ['story', 'normal', 'hard', 'nightmare']) for (const prov of ['skyrim', 'cyrodiil', 'solstheim']) for (const boss of [true, false]) for (let i = 0; i < 60; i++) {
+      rollsElsewhere++;
+      for (const e of globalThis.__dboOpenWorldLoot(diff, boss, prov, 'SomeOtherDungeon') || []) if (MAT[descs.get(e.baseId) || ''] === 'amber') amberElsewhere++;
+    }
+    ok(amberElsewhere === 0, `no Amber outside Blackreach's cap: 0 in ${rollsElsewhere} rolls over every difficulty, province and chest kind`, amberElsewhere);
     ok(['glass', 'amber', 'dwarven', 'falmer_honed'].every((f) => !globalThis.__dboLootable(Object.keys(MAT).find((k) => MAT[k] === f))), 'the base __dboLootable still refuses those four families');
     // A never family named in add stays never
     const evil = globalThis.__dboLootableUnder({ cap: 'steel', add: ['EBONY', 'DAEDRIC', 'stalhrim', 'DRAGON'] });
