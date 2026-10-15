@@ -48,6 +48,8 @@ export class ConjurationSystem implements System {
   private mp: Mp = null;
   private pending = new Map<number, PendingReanimate>();
   private lastReanimateHit = new Map<number, number>();
+  // Spells already reported as having conjured nothing, so one is said once however often it is cast (reportQuietCast)
+  private reportedQuiet = new Set<number>();
   private lastRefusalNotice = new Map<number, number>();
   // server-settings "commandDaedraEnabled"
   private commandDaedraOn = true;
@@ -108,7 +110,8 @@ export class ConjurationSystem implements System {
     const summons = effects.filter((e) => e.archetype === MgefArchetype.SummonCreature && e.assocId);
     const pick = pickSummon(summons, () => this.casterRace(casterId));
     if (pick) {
-      this.companions.spawn(casterId, pick.effect.assocId, { kind: "summon", durationSec: this.duration(pick.timed, casterId, "summon"), source: spellId });
+      const placedId = this.companions.spawn(casterId, pick.effect.assocId, { kind: "summon", durationSec: this.duration(pick.timed, casterId, "summon"), source: spellId });
+      if (!placedId) this.log(`ConjurationSystem: ${hex(casterId)} cast ${hex(spellId)} and its summon ${hex(pick.effect.assocId)} was not placed`);
       return;
     }
     const placed = this.placedNpc(spellId, effects);
@@ -124,7 +127,26 @@ export class ConjurationSystem implements System {
       this.clearPending(casterId);
       const timer = setTimeout(() => this.reanimateFallback(casterId), REANIMATE_FALLBACK_MS);
       this.pending.set(casterId, { spellId, effect: reanimate, timer });
+      return;
     }
+    this.reportQuietCast(casterId, spellId, effects);
+  }
+
+  // Why a cast conjured nothing. Until this, a conjuration that did nothing did it in silence: a spell whose effects the
+  // server cannot read at all, and one whose summon effect names no actor, both fall out of onSpellCast without a word,
+  // so a player's "it doesn't even summon" (Summon Skeleton, 15 Oct 2026) left nothing in the log to read. Only a cast
+  // that looks like conjuration is reported - a spell with a summon effect, or one the server has no effects for at all -
+  // and each spell once per run, so a caster repeating it does not fill the log.
+  private reportQuietCast(casterId: number, spellId: number, effects: SpellEffect[]): void {
+    const summons = effects.filter((e) => e.archetype === MgefArchetype.SummonCreature);
+    if (!summons.length && effects.length > 0) return;   // an ordinary spell, nothing to say
+    if (this.reportedQuiet.has(spellId)) return;
+    this.reportedQuiet.add(spellId);
+    if (!effects.length) {
+      this.log(`ConjurationSystem: ${hex(casterId)} cast ${hex(spellId)} and the server reads no effects for it, so nothing was conjured (is it in the load order the server indexed?)`);
+      return;
+    }
+    this.log(`ConjurationSystem: ${hex(casterId)} cast ${hex(spellId)} with ${summons.length} summon effect(s), none of which names an actor to place, so nothing was conjured`);
   }
 
   private onSpellHit(aggressorId: number, targetId: number, spellId: number): void {
