@@ -1,5 +1,22 @@
 [
   {
+    "title": "Client 0.3.99",
+    "date": "2026-10-15",
+    "version": "Client 0.3.99",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Changes",
+        "items": [
+          "Voice: voice range is now handled by the server. How you talk and hear does not change.",
+          "Chat, HUD and menus: the in-game overlay no longer redraws while it is hidden, so it uses less of your PC. If chat or the HUD looks old or blank after you close a menu, please tell us in #bugs.",
+          "Login: the game now loads races, head parts and face textures from our own mods correctly when you log in. Maormer faces should now come back after a relog, and a rare crash at login should be gone. If not, please tell us in #bugs with the time.",
+          "The update is about 23 MB."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Alchemy fix",
     "date": "2026-10-15",
     "version": "Server update",
