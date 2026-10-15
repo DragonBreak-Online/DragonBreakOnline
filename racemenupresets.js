@@ -241,6 +241,14 @@ module.exports = (api) => {
     // A change to a saved face is taken only once the owner was sent it this session (its last chunk, or "none"), and only
     // from an editor opened this long after: a RaceMenu opened before the face was put back captures an empty one (9 Oct)
     loadSettleMs: 10000,
+    // The owner's live race on a plugin race, once per connection (see liveRaceStep); false: no race sent, the face answered at once
+    liveRace: true,
+    // From the race going out to the owner's own face: the client's two race checks a second apart and its own-look hold (3 s)
+    liveRaceHoldMs: 6000,
+    // No race while the player gave or took a blow this recently (appearance.js combatSeconds)
+    liveRaceCombatSeconds: 30,
+    // Beast form races (beastform.js FORMS), never sent as a player's own
+    liveRaceNever: ['283a:Dawnguard.esm', 'cdd84:Skyrim.esm'],
   }, (cfg && cfg.racemenuPresets) || {});
   const DIR = path.resolve(C.dir);
   const MAX_CHUNKS = Math.ceil(Number(C.maxChars) / Number(C.chunkChars));
@@ -255,6 +263,8 @@ module.exports = (api) => {
   if (!(S.selfLast instanceof WeakSet)) S.selfLast = new WeakSet();   // the last packet of an answer to the owner
   if (!(S.gen instanceof Map)) S.gen = new Map();   // key -> how many face writes were asked for (see readDoc)
   if (!(S.logRates instanceof Map)) S.logRates = new Map();   // log-only limiters, kept apart from S.rates so they never trip its 5000-key clear
+  // actor -> { conn, race, since, sentAt, why, done, held }: the owner's live race this connection; held is their own face's answer, waiting for it
+  if (!(S.liveRace instanceof Map)) S.liveRace = new Map();
 
   const keyOf = (a) => ((Number(a) >>> 0).toString(16)).padStart(8, '0');
   const fileOf = (k) => path.join(DIR, `${k}.json`);
@@ -310,6 +320,41 @@ module.exports = (api) => {
   };
   // In a beast form the appearance carries the beast race (beastform.js keeps the real one): no face is taken then
   const inBeastForm = (a) => { try { return typeof globalThis.__dboBeastOriginalRace === 'function' && globalThis.__dboBeastOriginalRace(a) > 0; } catch (e) { return true; } };
+
+  // ---- the owner's live race after a load (15 Oct: every Maormer face logged 'rmp apply wait=race' and never went on) ----
+  // SkyrimPlatform's login save writes a plugin form's id as a created one (LoadGameApi.cpp FormIdToRefId: 3c192ede goes in as ff192ede)
+  const PLUGIN_RACE_MIN = 0x01000000, PLUGIN_RACE_END = 0xff000000;
+  const hx = (n) => (Number(n) >>> 0).toString(16);
+  const idOfDesc = (d) => { try { return typeof mp.getIdFromDesc === 'function' ? mp.getIdFromDesc(String(d)) >>> 0 : 0; } catch (e) { return 0; } };
+  const NEVER_LIVE = new Set((Array.isArray(C.liveRaceNever) ? C.liveRaceNever : []).map(idOfDesc).filter(Boolean));
+  const isRaceRecord = (id) => { try { const r = typeof mp.lookupEspmRecordById === 'function' ? mp.lookupEspmRecordById(id) : null; return !!(r && r.record && String(r.record.type) === 'RACE'); } catch (e) { return false; } };
+  // The race the owner's own actor needs after a load, or 0: a vanilla race loads right, so only a plugin RACE that is no beast's
+  const liveRaceOf = (a) => { const r = raceOf(a); return r >= PLUGIN_RACE_MIN && r < PLUGIN_RACE_END && !NEVER_LIVE.has(r) && isRaceRecord(r) ? r : 0; };
+  const propOf = (a, k) => { try { return mp.get(a, k); } catch (e) { return undefined; } };
+  const stampOf = (m, a) => (m instanceof Map ? Number(m.get(a >>> 0)) || 0 : 0);
+  // Why the race may not go now, or '': the client's revert frees every control (beastFormService.ts restoreControls) and rebuilds the 3D
+  const liveRaceWaits = (a, now) => {
+    const beast = propOf(a, 'private.beast');
+    if (inBeastForm(a) || (beast && beast.form)) return 'beast';
+    // A forced werewolf change warned and on its way (supernatural.js __dboFeralDue; stale after 60 s, as appearance.js beastComing)
+    const due = globalThis.__dboFeralDue instanceof Map ? globalThis.__dboFeralDue.get(a >>> 0) : undefined;
+    if (due !== undefined && now < (Number(due) || 0) + 60000) return 'beastcoming';
+    if (propOf(a, 'isDead') === true) return 'dead';
+    try { if (typeof globalThis.__dboIsDowned === 'function' && globalThis.__dboIsDowned(a)) return 'downed'; } catch (e) { return 'downed'; }
+    if (now - stampOf(globalThis.__dboCombatAt, a) < Number(C.liveRaceCombatSeconds) * 1000) return 'combat';
+    const r = propOf(a, 'private.restrained');
+    if (r && (r.boundHands || r.carried || r.captorActorId)) return 'restrained';
+    if (stampOf(globalThis.__dboParalysedUntil, a) > now) return 'paralysed';
+    if (propOf(a, 'private.creationPending') === true || propOf(a, 'private.rerollPending') === true) return 'creator';
+    // Every other editor the server opens stays marked until its close (appearance.js EDIT and CHARGEN, a /chargen snapshot trusted 24 h)
+    if (propOf(a, 'private.dboAppearanceEdit')) return 'editor';
+    const chargen = propOf(a, 'private.dboChargenEdit');
+    if (chargen && now - (Number(chargen.at) || 0) < 24 * 3600000) return 'editor';
+    const ws = globalThis.__dboRaceMenuSaveWindows;
+    const w = ws instanceof Map ? ws.get(a >>> 0) : null;
+    if (w && now <= Number(w.until)) return 'savewindow';
+    return '';
+  };
 
   // ---- storage: one file per character, the cache in front of it ----
   const remember = (k, doc) => {
@@ -510,6 +555,42 @@ module.exports = (api) => {
     return queued;
   };
 
+  // The owner's own face, held for their live race, goes out now (read again: it may have changed meanwhile)
+  const liveRaceAnswer = (a, e) => { const h = e.held; e.held = null; if (h) readDoc(a, (doc, bad) => { if (!bad) answer(a, a, doc, h.have, true); }); };
+  // One step for one owner: the race as a beast revert sends it (dboBeast beast false: beastFormService.ts setRace, rechecked until it holds), then the face
+  const liveRaceStep = (a, e, now) => {
+    if (e.done) return;
+    const who = `${keyOf(a)} (profile ${profileOf(a)})`;
+    if (!e.sentAt) {
+      // Read again at every step: a GM's /chargen or a reroll may have put a vanilla race on meanwhile
+      const r = liveRaceOf(a);
+      if (!r) { e.done = true; log(`racemenu presets: ${who} live race not sent: ${hx(raceOf(a))} is no plugin race now`); liveRaceAnswer(a, e); return; }
+      const why = liveRaceWaits(a, now);
+      if (why) { if (why !== e.why) { e.why = why; log(`racemenu presets: ${who} live race ${hx(r)} waits (${why})`); } return; }
+      e.race = r;
+      e.sentAt = now;
+      try { sendPacket(a, { customPacketType: 'dboBeast', race: r, beast: false }); } catch (err) { log(`racemenu presets: ${who} live race not sent (${err.message})`); }
+      log(`racemenu presets: ${who} live race ${hx(r)} sent to the owner's client${e.why ? ` after waiting (${e.why})` : ''}`);
+      return;
+    }
+    if (now - e.sentAt < Number(C.liveRaceHoldMs)) return;
+    e.done = true;
+    if (e.held) log(`racemenu presets: ${who} own face answered ${Math.round((now - e.sentAt) / 1000)} s after its live race`);
+    liveRaceAnswer(a, e);
+  };
+  const liveRaceTick = () => {
+    if (!S.liveRace.size) return;
+    const now = Date.now();
+    const online = new Set(onlineActors().map((x) => x >>> 0));
+    for (const [a, e] of S.liveRace) {
+      // Gone, or connected again (that connection's own ask starts it over)
+      if (!online.has(a) || e.conn !== connOf(a)) { S.liveRace.delete(a); continue; }
+      try { liveRaceStep(a, e, now); } catch (err) { log('racemenu presets: live race step failed', err.message); }
+    }
+  };
+  if (typeof api.every === 'function') api.every('racemenuLiveRace', 1000, liveRaceTick);
+  else { if (S.liveTimer) clearInterval(S.liveTimer); S.liveTimer = setInterval(liveRaceTick, 1000); }
+
   // ---- rate limits ----
   const allow = (kind, who, perWindow, windowMs, m = S.rates) => {
     const k = `${kind}:${who}`;
@@ -533,9 +614,27 @@ module.exports = (api) => {
     const a = self ? me : Number(content.actor) >>> 0;
     if (!a || !isPlayer(a)) return enqueue(me, [{ customPacketType: 'dboPresetNone', actor: a || me, ...(self ? { self: true } : {}) }]);
     const have = typeof content.have === 'string' ? content.have : '';
+    // The owner asks after every load (racemenuPresetService.ts onGameLoad): on a plugin race, once per connection, the race goes first
+    let live = null;
+    if (self && C.liveRace !== false) {
+      const conn = connOf(me);
+      live = S.liveRace.get(me >>> 0);
+      if (live && live.conn !== conn) { S.liveRace.delete(me >>> 0); live = null; }
+      const r = live ? 0 : liveRaceOf(me);
+      if (r) {
+        live = { conn, race: r, since: Date.now(), sentAt: 0, why: '', done: false, held: null };
+        S.liveRace.set(me >>> 0, live);
+        liveRaceStep(me, live, Date.now());
+      }
+    }
     // A file that could not be read is not answered: "none" would let the owner's next capture, made without the face,
     // replace it. The client asks again every 15 s while it has no answer (racemenuPresetService.ts GET_RETRY_MS)
-    readDoc(a, (doc, bad) => { if (!bad) answer(me, a, doc, have, self); });
+    readDoc(a, (doc, bad) => {
+      if (bad) return;
+      // A face waits for the race to hold (liveRaceStep answers it); no face is answered now
+      if (doc && live && !live.done && S.liveRace.get(me >>> 0) === live) { live.held = { have }; return; }
+      answer(me, a, doc, have, self);
+    });
   };
 
   // The editor close an upload came from, for the log: the save window appearance.js opened at that close, if any
@@ -753,6 +852,12 @@ module.exports = (api) => {
     if (n) log(`racemenu presets: on again, so ${n} player(s) online were told to ask for their own face again`);
   }
   S.lastEnabled = !!C.enabled;
+  // The live race switched off by a reload (the quick undo): a face held for it goes out now, and nothing more is sent
+  if (C.liveRace === false || !C.enabled) {
+    for (const [a, e] of S.liveRace) { e.done = true; if (C.enabled) { try { liveRaceAnswer(a, e); } catch (err) { log('racemenu presets: held face not answered', err.message); } } }
+    S.liveRace.clear();
+  }
+  log(`racemenu presets: live race ${C.enabled && C.liveRace !== false ? `on for plugin races (face ${Number(C.liveRaceHoldMs)} ms after it, ${NEVER_LIVE.size} beast race ids never sent)` : 'off'}`);
 
   // What runs, in the log at every load (10 Oct review S4: the module said nothing, so the log could not show it was on)
   log(`racemenupresets ${C.enabled ? 'on' : 'off'}${C.enabled && TEST ? `, staff test only (${TEST.size} profile(s))` : C.enabled ? ', every player' : ''}, `
