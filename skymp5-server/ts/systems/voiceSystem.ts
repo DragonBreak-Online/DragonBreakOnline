@@ -19,14 +19,17 @@ type Mp = any;
 // Settings (server-settings.json "voiceChat" object):
 //   { "enabled": true, "url": "ws://host:7880", "apiKey": "...",
 //     "apiSecret": "...", "room": "dragonbreak", "rangeUnits": 2000,
-//     "apiUrl": "http://host:7880" }
+//     "apiUrl": "http://host:7880", "sweepSeconds": 15 }
 // rangeUnits falls back to chatRanges.say, then 2000 game units.
 // apiUrl is optional: the LiveKit server API base the game server calls, by default url with ws(s) turned into http(s).
+// sweepSeconds: how often the room is checked for sessions no online character may hold (0 = never).
 
 // Short on purpose: LiveKit refreshes tokens over live connections, and a kicked/banned player's credential dies with the TTL (no admin-API revocation)
 const TOKEN_TTL_SECONDS = 60 * 60;
 const ADMIN_TOKEN_TTL_SECONDS = 60;
 const API_TIMEOUT_MS = 5000;
+const DEFAULT_SWEEP_SECONDS = 15;
+const MAX_USER_SLOTS = 1024;
 
 function b64url(input: Buffer | string): string {
   return (typeof input === "string" ? Buffer.from(input) : input).toString("base64url");
@@ -81,6 +84,8 @@ export class VoiceSystem implements System {
   // userId -> identities minted for that connection; they leave the room when it ends
   private mintedByUser = new Map<number, Set<string>>();
   private apiFailing = false;
+  private sweepMs = DEFAULT_SWEEP_SECONDS * 1000;
+  private lastSweepAt = 0;
   // One token per user every 2 s at most (a port of 57503548 without the profile identity): the client asks every 5 s at
   // most (voiceService TOKEN_RETRY_MS), so a faster stream of requests comes from a modified client, and each one signs
   // a token
@@ -106,6 +111,8 @@ export class VoiceSystem implements System {
     this.apiSecret = typeof vc.apiSecret === "string" ? vc.apiSecret : "";
     if (typeof vc.room === "string" && vc.room) this.room = vc.room;
     this.apiBase = httpBaseOf(typeof vc.apiUrl === "string" && vc.apiUrl ? vc.apiUrl : this.url);
+    const sweepSeconds = Number(vc.sweepSeconds ?? DEFAULT_SWEEP_SECONDS);
+    this.sweepMs = Number.isFinite(sweepSeconds) && sweepSeconds > 0 ? Math.max(5, sweepSeconds) * 1000 : 0;
 
     // Optional override: voiceChat.modes = [{ key, label, meters }]
     if (Array.isArray(vc.modes) && vc.modes.length) {
@@ -140,6 +147,37 @@ export class VoiceSystem implements System {
       if (other >= 0 && other !== userId) continue;
       void this.removeParticipant(identity, "left the game");
     }
+  }
+
+  async updateAsync(ctx: SystemContext): Promise<void> {
+    const now = Date.now();
+    if (!this.enabled || !this.sweepMs || now - this.lastSweepAt < this.sweepMs) return;
+    this.lastSweepAt = now;
+    await this.sweep(ctx.svr as Mp);
+  }
+
+  // Removes every session whose identity is not an online character allowed voice: a kicked or banned player back with an old or LiveKit-refreshed token
+  private async sweep(mp: Mp): Promise<void> {
+    const res = await this.roomService("ListParticipants", { room: this.room });
+    const participants: any[] = Array.isArray(res?.participants) ? res.participants : [];
+    if (!participants.length) return;
+    const allowed = this.allowedIdentities(mp);
+    for (const p of participants) {
+      const identity = String(p?.identity ?? "");
+      if (identity && !allowed.has(identity)) await this.removeParticipant(identity, "not an online character allowed voice");
+    }
+  }
+
+  private allowedIdentities(mp: Mp): Set<string> {
+    const out = new Set<string>();
+    for (let userId = 0; userId < MAX_USER_SLOTS; userId++) {
+      try {
+        if (!mp.isConnected(userId)) continue;
+        const actorId = mp.getUserActor(userId);
+        if (actorId && !this.refusal(mp, userId, actorId)) out.add(actorId.toString(16));
+      } catch { }
+    }
+    return out;
   }
 
   // The checks wired in index.ts, then the gamemode's globalThis.__dboVoiceRefused(actorId) (a suspension); a check that throws refuses nothing
