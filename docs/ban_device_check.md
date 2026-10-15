@@ -130,6 +130,10 @@ since the last line. An hour with nothing counted prints nothing.
   but it logs every unclassified `data/` name on each run and its cloud push WARNs "so somebody decides allow or deny".
   Rollout step 2 settles that before the key is set.
 - Changing the key makes every stored code meaningless: use the full erase (Rollout, Undo), then set the new key.
+  The full erase deletes `data/device-ids.json` and its `.tmp` files outright. That is a privacy erase and a
+  deliberate exception to ops README rule 9 ("Never delete: archive"): never `ops archive` them or move them aside.
+  The archive is kept until the owner prunes it, so archived codes would outlive the 30-day and erase promises in
+  privacy.md. Jake's OK for this exception is asked together with his go for the deploy (step 1).
 
 ## The old raw hwid
 
@@ -181,6 +185,7 @@ its own lines; `<you>` is your ledger operator name.
   anything the two files leave unset, so a key there would survive the full erase.
 
 1. **Deploy the backend with `DEVICE_ID_HMAC_KEY` unset**, with Phase 1 or after it. Who: claude-jake, after Jake's go.
+   Ask for that go together with his OK for the full erase's exception to ops README rule 9 (Undo, Full erase).
    - Ledger first: `ops claim backend claude-jake "L3-01 backend deploy and restart" 60`. When the deploy goes through
      a push to main, also `ops claim github-main claude-jake "L3-01 deploy merge to main" 30` and follow ops README
      rule 6: the updater resets `/opt/alduinak` to `origin/main` and restarts the game server, never the backend.
@@ -306,6 +311,13 @@ and `ops release backend claude-jake`.
   ```
   systemctl stop dragonbreak-backend.service; rm -f /opt/alduinak/skymp5-backend/data/device-ids.json /opt/alduinak/skymp5-backend/data/device-ids.json.*.tmp; sed -i '/^DEVICE_ID_HMAC_KEY=/d' /opt/dragonbreak/backend.env; systemctl start dragonbreak-backend.service
   ```
+
+  This `rm` is a privacy erase and a deliberate exception to ops README rule 9 ("Never delete: archive"), which Jake
+  OKs with his go for the deploy (step 1). Never `ops archive` the store or its `.tmp` files and never move them
+  aside: the archive is kept until the owner prunes it, so the codes would outlive the 30-day and erase promises in
+  privacy.md. The `ops log` line says so, for example `ops log claude-jake "device check full erase: device-ids.json
+  and its .tmp files deleted (privacy erase, ops README rule 9 exception), key line removed" "none by design: set a
+  new key (step 3); the store rebuilds as players launch"`.
 
   The `*.tmp` names are unfinished saves that a crash can leave behind. The log then says `is not set`. Backups of
   `backend.env` made after step 3 still hold the key. With the store gone it links nothing, but restoring one turns the
