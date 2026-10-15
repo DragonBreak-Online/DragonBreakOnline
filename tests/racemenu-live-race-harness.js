@@ -1,8 +1,8 @@
 // Scripted test for racemenupresets.js's live race (15 Oct): a player on a plugin race (the DLE's MaormerRace 3c192ede) is
-// sent their appearance race as a beast revert (dboBeast beast false) once per connection, at their client's first ask for
-// its own face, and their own face only liveRaceHoldMs after it; never in a beast form, dead, down, in a fight, bound,
-// carried, paralysed, in the creator or an editor, or in an editor's save window. A vanilla race, a watcher's ask, a mask
-// and a second ask in the same connection send no race. Before the fix SkyrimPlatform's login save left such a player on
+// sent their appearance race as a beast revert (dboBeast beast false) once per load (a connection, or the same character
+// picked again at character select), at their client's first ask for its own face, and their own face only liveRaceHoldMs
+// after it; never in a beast form, dead, down, in a fight, bound, carried, paralysed, in the creator or an editor, or in an
+// editor's save window. A vanilla race, a watcher's ask, a mask and a second ask in the same load send no race. Before the fix SkyrimPlatform's login save left such a player on
 // the template's race and their face waited for it forever ('rmp apply wait=race'). Runs against a fake mp in a scratch
 // folder:
 //
@@ -22,6 +22,7 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'claude-jake-liverace-'));
 const DIR = path.join(TMP, 'racemenu-presets');
 const HOLD = 300;
+const SETTLE = 120;
 const MAORMER = 0x3c192ede, MAORMER_VAMPIRE = 0x3c192edf, VAMPIRE_LORD = 0x0200283a, HIGH_ELF = 0x13743, HIGH_ELF_VAMPIRE = 0x88840, NORD = 0x13746;
 const NOT_A_RACE = 0x05001234;
 // Choom (Maormer with a face), Kalaman (High Elf with a face), Kinro (Maormer, no face), Vex (Maormer vampire), a watcher
@@ -46,7 +47,7 @@ const mp = {
   lookupEspmRecordById: (id) => (RECORDS[id >>> 0] ? { record: { type: RECORDS[id >>> 0] } } : null),
 };
 const cfg = (extra) => ({ maormerRace: { race: '192ede:DragonBreak Online Edits.esp', vampire: '192edf:DragonBreak Online Edits.esp' },
-  racemenuPresets: Object.assign({ dir: DIR, loadSettleMs: 0, liveRaceHoldMs: HOLD }, extra || {}) });
+  racemenuPresets: Object.assign({ dir: DIR, loadSettleMs: 0, liveRaceHoldMs: HOLD, liveRacePickSettleMs: SETTLE }, extra || {}) });
 const api = (extra) => ({
   mp, log: (...x) => logs.push(x.join(' ')), cfg: cfg(extra),
   sendPacket: (a, p) => { sent.push({ to: a >>> 0, p }); return true; },
@@ -60,7 +61,13 @@ const P = require(MOD);
 const packet = (userId, p) => globalThis.__dboPresetPacket(userId, p);
 const pumpAll = () => { for (let i = 0; i < 50; i++) timers.racemenuPresetSend(); };
 const take = () => sent.splice(0, sent.length);
-const settle = () => wait(40);
+// The module's file calls under way, waited for by settle(): an idle-class ionice run (as deploy-batch.sh runs it) can hold a read past 40 ms
+let fsPending = 0;
+for (const fn of ['readFile', 'writeFile', 'rename', 'unlink', 'open', 'close', 'fdatasync', 'mkdir']) {
+  const orig = fs[fn];
+  fs[fn] = (...args) => { const cb = args[args.length - 1]; if (typeof cb !== 'function') return orig(...args); fsPending++; return orig(...args.slice(0, -1), (...r) => { fsPending--; cb(...r); }); };
+}
+const settle = async () => { await wait(40); for (let i = 0; i < 1000 && fsPending > 0; i++) await wait(10); await wait(5); };
 
 // The stored faces, written as the module writes them
 const face = (v) => ({ version: { signature: 1163086675, formatVersion: 3, skseVersion: 1, runtimeVersion: 2 }, modNames: ['Skyrim.esm'],
@@ -82,13 +89,14 @@ globalThis.__dboRaceMenuSaveWindows = new Map();
 globalThis.__dboCombatAt = new Map();
 globalThis.__dboParalysedUntil = new Map();
 globalThis.__dboFeralDue = new Map();
+globalThis.__dboAssignedAt = new Map();
 let downed = new Set();
 let beastOf = new Map();
 globalThis.__dboIsDowned = (a) => downed.has(a >>> 0);
 globalThis.__dboBeastOriginalRace = (a) => beastOf.get(a >>> 0) || 0;
 let connSeq = 1000;
-// A fresh login: a new connection stamp (gamemode.js onCharacterReady), and the owner's client asks again with nothing known
-const login = (a) => { globalThis.__dboConnectedAt.set(a >>> 0, ++connSeq); const st = globalThis.__dboPresetState; if (st) { st.fullSends.clear(); st.rates.clear(); } };
+// A fresh login: a new connection stamp, in ms as gamemode.js onCharacterReady sets it, and the owner's client asks again with nothing known
+const login = (a) => { connSeq = Math.max(Date.now(), connSeq + 1); globalThis.__dboConnectedAt.set(a >>> 0, connSeq); const st = globalThis.__dboPresetState; if (st) { st.fullSends.clear(); st.rates.clear(); } };
 const askSelf = (userId, have) => packet(userId, { customPacketType: 'dboPresetGet', actor: 0, have: have || '' });
 const races = (s, to) => s.filter((x) => x.p.customPacketType === 'dboBeast' && (to === undefined || x.to === to));
 const presets = (s, to) => s.filter((x) => /^dboPreset/.test(x.p.customPacketType) && (to === undefined || x.to === to));
@@ -285,6 +293,118 @@ const afterHold = async () => { await wait(HOLD + 30); tick(); await settle(); }
   load();
   await afterHold(); pumpAll(); s = s.concat(take());
   check('a hot reload during the hold keeps it: one race, then the face', races(s, M).length === 1 && presets(s, M).length === 2, s.map((x) => x.p));
+
+  // ---- the same character picked again at character select, in the same connection (15 Oct end-to-end review) ----
+  // spawn.ts keeps the connection, hands the user the same actor and calls gamemode.js assignHook (__dboAssignedAt); the
+  // client loads its save again (the template race on the actor) and asks for its own face 6 s after that load
+  const pick = (a) => globalThis.__dboAssignedAt.set(a >>> 0, Date.now());
+  const pickSettle = () => wait(SETTLE + 30);
+  const ownSent = (a) => { const x = globalThis.__dboPresetState.selfSent.get(a >>> 0); return !!x && x.conn === connSeq; };
+  const PICKED_LINE = 'racemenu presets: ff000a6d (profile 51) live race 3c192ede sent to the owner\'s client (the character picked again)';
+
+  // A pick at login comes just before the connect stamp (gamemode.js onCharacterReady): an ordinary first load
+  pick(M); await wait(5); login(M); take(); logs.length = 0;
+  await pickSettle();
+  askSelf(1); s = take();
+  check('a login (pick, then connect): the race goes, logged as a plain login', races(s, M).length === 1 && logs.includes('racemenu presets: ff000a6d (profile 51) live race 3c192ede sent to the owner\'s client'), [s.map((x) => x.p), logs]);
+  await settle(); await afterHold(); pumpAll(); take();
+
+  // 1. Picked again long after the face went on
+  logs.length = 0;
+  pick(M); await pickSettle(); pumpAll(); s = take();
+  check('picked again after the face went on: nothing is sent before the new load asks', s.length === 0, s.map((x) => x.p));
+  askSelf(1); s = take();
+  check('picked again: the new load\'s first ask sends the race again', races(s, M).length === 1 && races(s, M)[0].p.race === MAORMER, s.map((x) => x.p));
+  check('...logged as the character picked again', logs.includes(PICKED_LINE), logs);
+  await settle(); pumpAll(); s = take();
+  check('picked again: the face is held while the race holds', presets(s, M).length === 0, s.map((x) => x.p));
+  await afterHold(); pumpAll(); s = take();
+  check('picked again: then the face, marked self, with 3c192ede', presets(s, M).length === 2 && presets(s, M).every((x) => x.p.self === true && x.p.race === MAORMER && x.p.hash === hM), s.map((x) => x.p));
+  askSelf(1); await settle(); pumpAll(); s = take();
+  check('picked again: a later ask in that load sends no race', races(s).length === 0 && presets(s, M).length >= 1, s.map((x) => x.p));
+  pick(M); await pickSettle(); tick(); askSelf(1); s = take();
+  check('picked a third time (the tick ran first): the race again', races(s, M).length === 1, s.map((x) => x.p));
+  await settle(); await afterHold(); pumpAll(); take();
+
+  // 2. Picked again while the face is held for the race (inside the hold): the old load's face would reach the new load before its race
+  login(M); take(); logs.length = 0;
+  askSelf(1); s = take();
+  check('hold: the race went and the face is held', races(s, M).length === 1, s.map((x) => x.p));
+  await wait(5); pick(M); await settle(); tick(); await wait(HOLD + 30); tick(); await settle(); pumpAll(); s = take();
+  check('picked again during the hold: the held face is not sent to the old load, nothing kept', presets(s, M).length === 0 && races(s).length === 0 && !liveKept(M), [s.map((x) => x.p), logs]);
+  askSelf(1); s = take();
+  check('...the new load\'s ask sends the race again', races(s, M).length === 1 && logs.includes(PICKED_LINE), [s.map((x) => x.p), logs]);
+  await settle(); pumpAll(); s = take();
+  const heldAgain = presets(s, M).length === 0;
+  await afterHold(); pumpAll(); s = take();
+  check('...and the face only after its hold', heldAgain && presets(s, M).length === 2 && presets(s, M)[0].p.race === MAORMER, s.map((x) => x.p));
+
+  // 3. Picked again while the race waits (bound): the race goes to the new load once freed
+  login(M); take(); logs.length = 0;
+  props[M]['private.restrained'] = { boundHands: true };
+  askSelf(1); await settle(); tick(); pumpAll(); s = take();
+  pick(M); await pickSettle(); tick(); pumpAll(); s = s.concat(take());
+  askSelf(1); await settle(); tick(); pumpAll(); s = s.concat(take());
+  check('picked again while bound: no race and no face yet', races(s).length === 0 && presets(s, M).length === 0, s.map((x) => x.p));
+  props[M]['private.restrained'] = null;
+  tick(); s = take();
+  check('...freed: the race goes once', races(s, M).length === 1, s.map((x) => x.p));
+  await afterHold(); pumpAll(); s = take();
+  check('...then the face once', presets(s, M).length === 2, s.map((x) => x.p));
+
+  // 4. An ask the old load sent as the character was picked (it reaches the server just after the pick)
+  login(M); take();
+  askSelf(1); await settle(); await afterHold(); pumpAll(); take();
+  pick(M); askSelf(1); await settle(); tick(); pumpAll(); s = take();
+  check('an ask from the old load right after the pick: no race and no answer (the new load asks for itself)', s.length === 0, s.map((x) => x.p));
+  await pickSettle(); askSelf(1); s = take();
+  await settle(); await afterHold(); pumpAll(); s = s.concat(take());
+  check('...the new load\'s ask: the race, then the face', races(s, M).length === 1 && presets(s, M).length === 2, s.map((x) => x.p));
+
+  // 5. The owner's answer still queued when they pick again would reach the new load unasked
+  login(M); take();
+  askSelf(1); take(); await settle(); await wait(HOLD + 30); tick(); await settle();
+  pick(M); pumpAll(); s = take();
+  check('an own answer still queued at the pick is not sent, nor counted as the face put back', presets(s, M).length === 0 && !ownSent(M), s.map((x) => x.p));
+  await pickSettle(); askSelf(1); s = take();
+  await settle(); await afterHold(); pumpAll(); s = s.concat(take());
+  check('...the new load\'s ask: the race, then the face, counted as put back', races(s, M).length === 1 && presets(s, M).length === 2 && ownSent(M), s.map((x) => x.p));
+
+  // 6. Picked again after a dboPresetRev: the owner's own face save (the rev goes to the others)
+  login(M); take();
+  askSelf(1); await settle(); await afterHold(); pumpAll(); take();
+  const t2 = P.encodeFace(face(0.7)), h2 = P.hashText(t2);
+  logs.length = 0;
+  packet(1, { customPacketType: 'dboPresetPut', up: 77, i: 0, n: 1, hash: h2, race: 1, data: t2 });
+  await settle(); await settle(); pumpAll(); s = take();
+  check('the owner saves a new face: the others are sent dboPresetRev, no race goes', s.some((x) => x.to === W && x.p.customPacketType === 'dboPresetRev' && x.p.hash === h2) && !s.some((x) => x.to === M && x.p.customPacketType === 'dboPresetRev') && races(s).length === 0, [s.map((x) => x.p), logs]);
+  pick(M); await pickSettle(); askSelf(1); s = take();
+  check('picked again after that save: the race again', races(s, M).length === 1, s.map((x) => x.p));
+  await settle(); await afterHold(); pumpAll(); s = take();
+  check('...then the new face with 3c192ede', presets(s, M).length === 2 && presets(s, M).every((x) => x.p.hash === h2 && x.p.race === MAORMER), s.map((x) => x.p));
+  store(M, MAORMER, 1);
+
+  // 7. Picked again after a dboPresetRev to the owner: faces off and on again by a reload (the rev 'on' makes the client ask)
+  login(M); take();
+  askSelf(1); await settle(); await afterHold(); pumpAll(); take();
+  load({ enabled: false }); take(); load(); s = take();
+  check('faces on again: the owner is sent dboPresetRev self "on"', s.some((x) => x.to === M && x.p.customPacketType === 'dboPresetRev' && x.p.self === true && x.p.hash === 'on'), s.map((x) => x.p));
+  askSelf(1); s = take();
+  await settle(); await afterHold(); pumpAll(); s = s.concat(take());
+  // The off load forgets the live race (as before this change), so this ask sends the same race once more, as a login does
+  check('...its ask: one race (the same race), then the face with 3c192ede', races(s, M).length === 1 && races(s, M)[0].p.race === MAORMER && presets(s, M).length === 2 && presets(s, M)[0].p.race === MAORMER, s.map((x) => x.p));
+  pick(M); await pickSettle(); askSelf(1); s = take();
+  check('picked again after the rev: the race again', races(s, M).length === 1, s.map((x) => x.p));
+  await settle(); await afterHold(); pumpAll(); take();
+
+  // 8. Unchanged: a vanilla race picked again, and a watcher's ask about someone who just picked again
+  login(H); take();
+  askSelf(2); await settle(); pumpAll(); take();
+  pick(H); askSelf(2); await settle(); pumpAll(); s = take();
+  check('a High Elf picked again: no race, the face at once even right after the pick', races(s).length === 0 && presets(s, H).length === 2 && presets(s, H)[0].p.race === HIGH_ELF, s.map((x) => x.p));
+  pick(M); packet(5, { customPacketType: 'dboPresetGet', actor: M, have: '' }); await settle(); pumpAll(); s = take();
+  check('a watcher\'s ask about a Maormer who just picked again is answered as before', presets(s, W).length === 2 && races(s).length === 0, s.map((x) => x.p));
+  await pickSettle();
 
   // ---- the quick undo: liveRace false ----
   login(M); take();

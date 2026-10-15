@@ -2587,6 +2587,8 @@ for (const userId of connected) startLoginWait(userId, actorOf(userId));
 // spawn.ts calls this right after setUserActor: a real-names marker a crash or a restart left goes in that same turn, not at the next loginWait poll
 if (typeof globalThis.__dboPrevAssign === 'undefined') globalThis.__dboPrevAssign = typeof mp.onUserAssignActor === 'function' && !mp.onUserAssignActor.__dbo ? mp.onUserAssignActor : null;
 const assignHook = (userId, a) => {
+  // When each actor was last handed to a user, the same character picked again included (racemenupresets.js sends a plugin race again after it)
+  try { (globalThis.__dboAssignedAt instanceof Map ? globalThis.__dboAssignedAt : (globalThis.__dboAssignedAt = new Map())).set(Number(a) >>> 0, Date.now()); } catch (e) { /* nothing here may throw */ }
   loginStep('real names on assign', () => { if (typeof globalThis.__dboRealNamesLogin === 'function') globalThis.__dboRealNamesLogin(a, true); });
   // spawn.ts does its own bookkeeping after this call returns, so nothing here may throw
   try { if (typeof globalThis.__dboPrevAssign === 'function') globalThis.__dboPrevAssign(userId, a); } catch (e) { log('onUserAssignActor (previous) failed', e.message); }

@@ -241,8 +241,10 @@ module.exports = (api) => {
     // A change to a saved face is taken only once the owner was sent it this session (its last chunk, or "none"), and only
     // from an editor opened this long after: a RaceMenu opened before the face was put back captures an empty one (9 Oct)
     loadSettleMs: 10000,
-    // The owner's live race on a plugin race, once per connection (see liveRaceStep); false: no race sent, the face answered at once
+    // The owner's live race on a plugin race, once per load: a connection or a character pick (see liveRaceStep); false: no race sent, the face answered at once
     liveRace: true,
+    // This soon after a character pick, an own-face ask or answer is the old load's (the new load asks 6 s after it loads: racemenuPresetService.ts)
+    liveRacePickSettleMs: 3000,
     // From the race going out to the owner's own face: the client's two race checks a second apart and its own-look hold (3 s)
     liveRaceHoldMs: 6000,
     // No race while the player gave or took a blow this recently (appearance.js combatSeconds)
@@ -263,7 +265,7 @@ module.exports = (api) => {
   if (!(S.selfLast instanceof WeakSet)) S.selfLast = new WeakSet();   // the last packet of an answer to the owner
   if (!(S.gen instanceof Map)) S.gen = new Map();   // key -> how many face writes were asked for (see readDoc)
   if (!(S.logRates instanceof Map)) S.logRates = new Map();   // log-only limiters, kept apart from S.rates so they never trip its 5000-key clear
-  // actor -> { conn, race, since, sentAt, why, done, held }: the owner's live race this connection; held is their own face's answer, waiting for it
+  // actor -> { conn, race, since, sentAt, why, done, held, again }: the owner's live race this load; held is their own face's answer, waiting for it
   if (!(S.liveRace instanceof Map)) S.liveRace = new Map();
 
   const keyOf = (a) => ((Number(a) >>> 0).toString(16)).padStart(8, '0');
@@ -333,6 +335,12 @@ module.exports = (api) => {
   const liveRaceOf = (a) => { const r = raceOf(a); return isPluginRace(r) && isRaceRecord(r) ? r : 0; };
   const propOf = (a, k) => { try { return mp.get(a, k); } catch (e) { return undefined; } };
   const stampOf = (m, a) => (m instanceof Map ? Number(m.get(a >>> 0)) || 0 : 0);
+  // When spawn.ts last handed this actor to a user (gamemode.js assignHook): the same character picked again loads its save again in this connection
+  const pickedAt = (a) => stampOf(globalThis.__dboAssignedAt, a);
+  // The client is loading the character it just picked, on a plugin race: its own face asked for or sent now is the old load's
+  const loadingPick = (a, now) => C.enabled && C.liveRace !== false && now < pickedAt(a) + Number(C.liveRacePickSettleMs) && !!liveRaceOf(a);
+  // An entry made for another load: another connection, or before the character was picked again
+  const liveStale = (a, e) => e.conn !== connOf(a) || e.since <= pickedAt(a);
   // Why the race may not go now, or '': the client's revert frees every control (beastFormService.ts restoreControls) and rebuilds the 3D
   const liveRaceWaits = (a, now) => {
     const beast = propOf(a, 'private.beast');
@@ -500,7 +508,8 @@ module.exports = (api) => {
       const p = q.shift();
       // Off, only the plain 'none' goes out: a face read that was under way at the switch queues its answer after the
       // queues were emptied (the quick undo below), and that face must not reach anyone either
-      if (C.enabled || p.customPacketType === 'dboPresetNone') {
+      // An owner's own answer still queued when they picked the character again would land in the new load unasked: it is dropped, the new load asks
+      if ((C.enabled || p.customPacketType === 'dboPresetNone') && !(p.self === true && loadingPick(to, Date.now()))) {
         sendPacket(to, p);
         if (S.selfLast.has(p)) S.selfSent.set(to >>> 0, { at: Date.now(), conn: connOf(to) });
       }
@@ -576,7 +585,7 @@ module.exports = (api) => {
       e.race = r;
       e.sentAt = now;
       try { sendPacket(a, { customPacketType: 'dboBeast', race: r, beast: false }); } catch (err) { log(`racemenu presets: ${who} live race not sent (${err.message})`); }
-      log(`racemenu presets: ${who} live race ${hx(r)} sent to the owner's client${e.why ? ` after waiting (${e.why})` : ''}`);
+      log(`racemenu presets: ${who} live race ${hx(r)} sent to the owner's client${e.again ? ' (the character picked again)' : ''}${e.why ? ` after waiting (${e.why})` : ''}`);
       return;
     }
     if (now - e.sentAt < Number(C.liveRaceHoldMs)) return;
@@ -589,8 +598,8 @@ module.exports = (api) => {
     const now = Date.now();
     const online = new Set(onlineActors().map((x) => x >>> 0));
     for (const [a, e] of S.liveRace) {
-      // Gone, or connected again (that connection's own ask starts it over)
-      if (!online.has(a) || e.conn !== connOf(a)) { S.liveRace.delete(a); continue; }
+      // Gone, connected again or picked again (that load's own ask starts it over; a face held here was the old load's)
+      if (!online.has(a) || liveStale(a, e)) { S.liveRace.delete(a); continue; }
       try { liveRaceStep(a, e, now); } catch (err) { log('racemenu presets: live race step failed', err.message); }
     }
   };
@@ -620,17 +629,19 @@ module.exports = (api) => {
     const a = self ? me : Number(content.actor) >>> 0;
     if (!a || !isPlayer(a)) return enqueue(me, [{ customPacketType: 'dboPresetNone', actor: a || me, ...(self ? { self: true } : {}) }]);
     const have = typeof content.have === 'string' ? content.have : '';
-    // The owner asks after every load (racemenuPresetService.ts onGameLoad): on a plugin race, once per connection, the race goes first
+    // The owner asks after every load (racemenuPresetService.ts onGameLoad): on a plugin race, once per load (a connection or a character pick), the race goes first
     let live = null;
     if (self && C.liveRace !== false) {
-      const conn = connOf(me);
+      const conn = connOf(me), now = Date.now();
+      // Asked by the old load while the client loads the character it picked: the new load asks for itself
+      if (loadingPick(me, now)) return;
       live = S.liveRace.get(me >>> 0);
-      if (live && live.conn !== conn) { S.liveRace.delete(me >>> 0); live = null; }
+      if (live && liveStale(me, live)) { S.liveRace.delete(me >>> 0); live = null; }
       const r = live ? 0 : liveRaceOf(me);
       if (r) {
-        live = { conn, race: r, since: Date.now(), sentAt: 0, why: '', done: false, held: null };
+        live = { conn, race: r, since: now, sentAt: 0, why: '', done: false, held: null, again: pickedAt(me) > conn };
         S.liveRace.set(me >>> 0, live);
-        liveRaceStep(me, live, Date.now());
+        liveRaceStep(me, live, now);
       }
     }
     // A file that could not be read is not answered: "none" would let the owner's next capture, made without the face,
