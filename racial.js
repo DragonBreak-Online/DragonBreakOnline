@@ -98,12 +98,13 @@ const DEFAULTS = {
     power: { name: 'Adrenaline Rush', seconds: 60, buffs: { staminaRegen: 1.5 } } },
   // Pyandonea's sea-elves (lore), Nate's own table (10 Oct): a High Elf record with private.rp.race 'maormer', only with the
   // overhaul on. seafarerSpell: the DLE's DBO_AbMaormerSeafarer (SpeedMult +25 while swimming), an ability kept on every
-  // Maormer while they are one; '' or a record not in the load order does nothing. Roaring Tempest (Nate 15 Oct, one buff
-  // like the others): shock damage dealt +25%, Ancestor's Wrath's fire share in lightning, the storm-callers of Pyandonea;
-  // wardSpell (the DLE's DBO_MaormerTempestWard, its look only) is cast on the player when it is called
+  // Maormer while they are one; '' or a record not in the load order does nothing. Roaring Tempest: +25% magic resistance and
+  // a ward that absorbs wardPoints of spell damage while it lasts (60, Steadfast Ward's), under reductionCap; wardSpell (the
+  // DLE's DBO_MaormerTempestWard, its look only) is cast on the player when it is called. Nate 15 Oct: kept as it is, a bubble
+  // shield, though it is the one power with two buffs
   maormer: { resistShock: 0.5, seafarerSpell: '', xp: { blade: 1.15 },
     // lookShader: what everyone near sees on the caster, ShockPlayerCloakFXShader (the ward effect's own hit shader)
-    power: { name: 'Roaring Tempest', seconds: 60, wardSpell: '', lookShader: '10f9a6:Skyrim.esm', buffs: { shockDealt: 0.25 } } },
+    power: { name: 'Roaring Tempest', seconds: 60, wardSpell: '', lookShader: '10f9a6:Skyrim.esm', buffs: { resistMagic: 0.25, wardPoints: 60 } } },
   // The DLE's own Snow Elf and Goblin (Nat's Racial Updates table, 13 Oct; config snowElfRace, goblinRace), only with the
   // overhaul on. Glacier Fall, the frost cloak: frost damage dealt +25% (Ancestor's Wrath's fire share, in frost); its look
   // is the DLE's DBO_SnowElfGlacierFall cast on the caster
