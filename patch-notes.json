@@ -1,5 +1,21 @@
 [
   {
+    "title": "Client 0.3.98",
+    "date": "2026-10-15",
+    "version": "Client 0.3.98",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Changes",
+        "items": [
+          "Arcane Mastery: your Magic tab marks the next spell in each of your lines, and has Leave and Release buttons for an apprenticeship.",
+          "Smoother play around other players and NPCs: the game does less work for every character it draws.",
+          "Staff who are invisible can no longer be heard by players nearby."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Staff permissions for courts and citizenship",
     "date": "2026-10-15",
     "version": "Server update",
