@@ -177,7 +177,13 @@ function guardPage(html, { focused = true } = {}) {
   const setTimeout = (fn, ms) => { const t = { at: st.now + ms, fn }; timers.push(t); return t }
   const clearTimeout = t => { if (timers.includes(t)) timers.splice(timers.indexOf(t), 1) }
   require('vm').runInNewContext(script, { document: doc, window: { addEventListener: on('win') }, performance: { now: () => st.now }, setTimeout, clearTimeout })
-  const fire = (target, type, ev = {}) => (listeners[`${target}:${type}`] || []).forEach(fn => fn({ type, repeat: false, buttons: 0, pointerType: undefined, relatedTarget: null, ...ev }))
+  // Returns whether a listener cancelled the event's default action
+  const fire = (target, type, ev = {}) => {
+    let cancelled = false
+    const e = { type, repeat: false, buttons: 0, pointerType: undefined, relatedTarget: null, ...ev, preventDefault: () => { cancelled = true } }
+    for (const fn of listeners[`${target}:${type}`] || []) fn(e)
+    return cancelled
+  }
   const down = () => { fire('doc', 'pointerdown', { pointerType: 'mouse', buttons: 1 }); fire('doc', 'mousedown', { buttons: 1 }) }
   const up = () => { fire('doc', 'pointerup', { pointerType: 'mouse' }); fire('doc', 'mouseup') }
   return {
@@ -304,6 +310,19 @@ test('F1: the Continue guard lets a player through by mouse, keyboard and touch'
     p.at(1800)
     assert.equal(p.tap(), true, 'touch: a tap at 1.8 s goes through')
   }
+})
+
+test('F1: the Continue guard keeps a Tab on the page while Continue sleeps, so a quick Tab and Enter cannot reach the address bar', async () => {
+  const { page } = await legacyToConfirmPage()
+  const p = guardPage(page.text)
+  p.at(300)
+  assert.equal(p.key('Tab'), true, 'a Tab while Continue sleeps does not leave the page')
+  assert.equal(p.key('Tab', { shiftKey: true }), true, 'nor a Shift+Tab')
+  assert.equal(p.key('Tab', { ctrlKey: true }), false, 'Ctrl+Tab is left to the browser')
+  assert.equal(p.button.disabled, true, 'those Tabs did not wake it')
+  p.at(1500)
+  assert.equal(p.key('Tab'), false, 'after a calm second a Tab wakes Continue and moves the focus onto it')
+  assert.equal(p.button.disabled, false)
 })
 
 test('F1: reopening an old launcher\'s login link does not keep it alive, and a second Discord callback is refused', async () => {

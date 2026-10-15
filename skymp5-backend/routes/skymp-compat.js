@@ -461,6 +461,7 @@ function confirmPage({ flow, state, nonce, username, error = '' }) {
 
 // Continue wakes after this tab has been in front for a second with no presses on it, and for a pointer once it has been on the page for half a second; a held key or button never counts
 // The button is live in the markup and the script puts it to sleep, so if the script cannot run (scripts off, or a CSP from a proxy or an extension) it works as before
+// While Continue sleeps a Tab stays on the page, so a quick Tab and Enter cannot reach the address bar and load the callback again
 const CONTINUE_BUTTON = `<button type="submit" id="continue">Continue</button>
 <p class="meta" id="continue-hint" hidden>If Continue does not respond, move the mouse or press Tab, then press it again.</p>
 <script>(function () {
@@ -488,6 +489,7 @@ const CONTINUE_BUTTON = `<button type="submit" id="continue">Continue</button>
   window.addEventListener('blur', sleep)
   document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') arm(); else sleep() })
   arm()
+  document.addEventListener('keydown', function (e) { if (e.key === 'Tab' && !e.ctrlKey && !e.altKey && !e.metaKey && b.disabled) e.preventDefault() }, true)
   document.getElementById('continue-hint').hidden = false
 })()</script>`
 
