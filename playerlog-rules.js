@@ -1119,6 +1119,8 @@ appearance.js APPEARANCE cc2a3d88 clean
 appearance.js APPEARANCE 8dda1487 clean
 appearance.js APPEARANCE c08fc0d2 clean
 appearance.js APPEARANCE 8a7cc30f clean
+appearance.js APPEARANCE b80ac1f1 clean
+appearance.js APPEARANCE b0525394 clean
 bank.js BANK 462e889d parsed
 bank.js BANK 5efd151e parsed
 bank.js BANK 8324fa85 parsed

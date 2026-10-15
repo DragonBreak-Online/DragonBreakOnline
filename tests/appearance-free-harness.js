@@ -152,30 +152,48 @@ section('freeChanges 0 restores today', () => {
   finish(changed());
   ok(gold() === 300 && /500 gold paid/.test(lastSys()) && !props.get(`${A}|private.dboAppearanceFreeUsed`), 'switched off: paid, and nothing is counted', [gold(), lastSys()]);
   ok(freeLeft() === 0 && notice() === false && !sys.some(([, t]) => /free appearance change/.test(t)), 'switched off: no free change left and no notice');
-  // A switch turned off by a hot reload while a free editor is open: that close is paid as today
+  // A switch turned off by a hot reload while a free editor is open: that editor skipped the gold and the daily wait, so its
+  // close charges nothing and keeps the previous look (review, 15 Oct: it used to be paid, with no daily wait checked)
   load(800); run(); ok(/This change is free/.test(lastSaid()), 'opened free');
   const edit = props.get(`${A}|private.dboAppearanceEdit`);
   load(800, { freeChanges: 0 }); props.set(`${A}|private.dboAppearanceEdit`, edit);
   finish(changed());
-  ok(gold() === 300 && /500 gold paid: your free appearance change is no longer there\./.test(lastSys()), 'switched off mid-edit: the close is paid, and the player told why', [gold(), lastSys()]);
+  ok(gold() === 800 && props.get(`${A}|appearance`).hairColor === 2 && !cooldown() && /no longer there \(used meanwhile, or switched off\), so your previous look was kept and nothing was charged/.test(lastSys()),
+    'switched off mid-edit: the previous look is kept, no gold is taken, no cooldown starts, the player is told why', [gold(), cooldown(), lastSys()]);
+  ok(audits.some((t) => t === 'APPEARANCE Brand #BBBB (profile 7) closed a free appearance editor with no free change left: previous look kept, nothing charged'), '...and staff see it in the audit', audits.slice(-1));
   load(100); run(); const edit2 = props.get(`${A}|private.dboAppearanceEdit`);
   load(100, { freeChanges: 0 }); props.set(`${A}|private.dboAppearanceEdit`, edit2);
   finish(changed());
-  ok(gold() === 100 && props.get(`${A}|appearance`).hairColor === 2 && /free appearance change is no longer there, and a new look costs 500 gold, which you don't have/.test(lastSys()), '...and without the gold the previous look is kept, the player told why', lastSys());
-  // Neither an unchanged free close: its RaceMenu window charges gold, as today
+  ok(gold() === 100 && props.get(`${A}|appearance`).hairColor === 2 && /free appearance change is no longer there/.test(lastSys()), '...and the same without the gold', lastSys());
+  // Neither an unchanged free close: its RaceMenu-only changes are refused with no gold taken; a first save stays free
   load(800); run(); const edit3 = props.get(`${A}|private.dboAppearanceEdit`);
   load(800, { freeChanges: 0 }); props.set(`${A}|private.dboAppearanceEdit`, edit3); finish(look());
-  ok(/cost 500 gold and are charged when they are saved/.test(lastSys()), 'switched off mid-edit, closed unchanged: RaceMenu-only changes are priced', lastSys());
+  ok(/not charged and are kept only if you have none saved yet/.test(lastSys()) && !/500 gold/.test(lastSys()), 'switched off mid-edit, closed unchanged: told nothing from it is charged', lastSys());
+  let v = globalThis.__dboRaceMenuSaveGate(A, 'face', false);
+  ok(!v.ok && v.code === 'gold' && gold() === 800 && !cooldown() && /weren't saved: your free appearance change is no longer there, and nothing was charged/.test(lastSys()),
+    '...a RaceMenu-only change of it is then refused, with no gold taken and no cooldown', [v, gold(), lastSys()]);
+  ok(globalThis.__dboRaceMenuRefused(A, 'face', v.code) === false, '...told once (by the gate), as a gold refusal is');
+  v = globalThis.__dboRaceMenuSaveGate(A, 'face', true);
+  ok(v.ok && v.free && gold() === 800, '...but a first save of a kind stays free, as before', v);
 });
 
-// 7. The free change used meanwhile (a RaceMenu save of an earlier close) leaves the open editor paid: one free change, not two
+// 7. The free change used meanwhile (a RaceMenu save of an earlier close) leaves the open editor with none: one free change,
+// not two, and no gold from an editor opened free (it never checked the gold or the daily wait)
 section('one free change, not two', () => {
   load(800); run(); finish(look());
   run(); ok(pending() && /This change is free/.test(lastSaid()), 'reopened at once, still free');
-  const v = globalThis.__dboRaceMenuSaveGate(A, 'face', false);
+  let v = globalThis.__dboRaceMenuSaveGate(A, 'face', false);
   ok(v.ok && v.freeChange && freeLeft() === 0, 'the earlier close\'s RaceMenu change uses the free change', v);
+  const at = cooldown();
   finish(changed());
-  ok(gold() === 300 && /500 gold paid: your free appearance change is no longer there\./.test(lastSys()) && Number(props.get(`${A}|private.dboAppearanceFreeUsed`)) === 1, 'the open editor\'s change is then paid, and the player told why', [gold(), lastSys()]);
+  ok(gold() === 800 && props.get(`${A}|appearance`).hairColor === 2 && Number(props.get(`${A}|private.dboAppearanceFreeUsed`)) === 1 && cooldown() === at
+    && /no longer there/.test(lastSys()), 'the open editor\'s change is then not saved and not charged (no paid change inside the daily wait)', [gold(), lastSys()]);
+  // The same overlap closed unchanged: its RaceMenu-only change is refused, no gold
+  load(800); run(); finish(look()); run();
+  globalThis.__dboRaceMenuSaveGate(A, 'face', false);
+  finish(look());
+  v = globalThis.__dboRaceMenuSaveGate(A, 'extras', false);
+  ok(!v.ok && v.code === 'gold' && gold() === 800 && Number(props.get(`${A}|private.dboAppearanceFreeUsed`)) === 1, '...closed unchanged, its RaceMenu-only change is refused with no gold taken', [v, gold()]);
 });
 
 // 8. The notice: once per character, never while still being made, existing and new characters both
@@ -235,9 +253,10 @@ section('player log', () => {
   const src = fs.readFileSync(MOD, 'utf8');
   const pins = new Set(R.AUDIT_SITES.filter((s) => s.file === 'appearance.js').map((s) => s.hash));
   const want = ['opened the appearance editor (free: ${left} free change(s) left)', 'with their free appearance change (no gold)${', 'could not be written: their free appearance change given back',
-    'with their free appearance change (no gold)`', 'granted ${who(t)} a free appearance change (${left} left)'];
+    'with their free appearance change (no gold)`', 'granted ${who(t)} a free appearance change (${left} left)',
+    'with no free change left: not saved, nothing charged', 'closed a free appearance editor with no free change left: previous look kept, nothing charged'];
   ok(want.every((w) => src.includes(w)), 'the free audit lines are in appearance.js');
-  ok(pins.size >= 17, 'the appearance.js audit sites are pinned (12 before, 5 free ones)', pins.size);
+  ok(pins.size >= 19, 'the appearance.js audit sites are pinned (12 before, 7 free ones)', pins.size);
   ok(Object.prototype.hasOwnProperty.call(R.COMMAND_SCHEMA, 'grantappearance') && R.COMMAND_SCHEMA.grantappearance.target, 'the player log knows /grantappearance and its target');
 });
 

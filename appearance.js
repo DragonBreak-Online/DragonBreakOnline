@@ -13,7 +13,9 @@
 //   below would charge), and the cooldown then starts as for a paid change; closing unchanged keeps it. The count used is
 //   kept on the character (private.dboAppearanceFreeUsed, a number; a GM's /grantappearance takes one off), and the
 //   character is told once, at login or on leaving the Realm, while one is left (private.dboAppearanceFreeTold).
-//   freeChanges 0 turns them off, grants included: /appearance is then exactly as before.
+//   freeChanges 0 turns them off, grants included: /appearance is then exactly as before. An editor opened free whose free
+//   change is gone by the time its changes arrive (a RaceMenu save of an earlier close used it, or it was switched off)
+//   saves nothing and charges nothing: it never checked the gold or the daily wait (review, 15 Oct).
 // The engine applies the editor's result before the gamemode hears of it (ActionListener::OnUpdateAppearance applies it
 // and tells the neighbours, then fires the event), so a locked change is undone here by setting the appearance back. The
 // edit waits on the character (private.dboAppearanceEdit, with the look before it), so a relog or a restart in the
@@ -402,8 +404,14 @@ module.exports = (api) => {
       audit(`APPEARANCE ${who(a)} kept their RaceMenu ${what} for the first time (free)`);
       return { ok: true, kind: w.kind, free: true };
     }
+    // A free /appearance whose free change is gone (used meanwhile, or switched off): not saved, and no gold is taken for it
+    if (w.free && !(freeLeft(a) > 0)) {
+      system(a, 'Your RaceMenu changes weren\'t saved: your free appearance change is no longer there, and nothing was charged. They are gone when you log out.');
+      audit(`APPEARANCE ${who(a)} changed only RaceMenu details (${what}) with no free change left: not saved, nothing charged`);
+      return { ok: false, reason: 'no free change left', code: 'gold' };
+    }
     // A free /appearance: the free change pays for it, as the gold would have, and is given back as the gold would be
-    if (w.free && freeLeft(a) > 0) {
+    if (w.free) {
       useFree(a);
       w.charge = false;
       const lastWas = get(a, LAST);
@@ -526,6 +534,8 @@ module.exports = (api) => {
     if (!after) return true;
     // Opened as a free change and one is still left (the switch may have gone off, or a RaceMenu save used it, meanwhile)
     const free = e.free === true && freeLeft(a) > 0;
+    // Opened free but none is left now: that editor skipped the gold and the daily wait, so nothing from it is charged
+    const freeGone = e.free === true && !free;
     const freeKept = free ? FREE_KEPT : '';
     const raceChanged = C.allowRace !== true && Number(after.raceId) !== Number(before.raceId);
     const sexChanged = C.allowSex !== true && !!after.isFemale !== !!before.isFemale;
@@ -550,16 +560,25 @@ module.exports = (api) => {
       }
       // A RaceMenu-only change (sliders, sculpt, overlays) arrives after this and is paid for then (raceMenuSaveGate), with
       // the free change on a free edit; a face made on a swapped-in head is not taken (E5)
-      openSaveWindow(a, 'appearance', true, !!guarded, free);
+      openSaveWindow(a, 'appearance', true, !!guarded, e.free === true);
       system(a, `Your standard look is unchanged. ${free ? 'RaceMenu-only changes (extra sliders, sculpt, overlays), if you made any, use your free appearance change when they are saved; otherwise it stays yours.'
-        : `RaceMenu-only changes (extra sliders, sculpt, overlays) cost ${cost} gold and are charged when they are saved.`}${headNote}${nameKept ? ' Your name stays the same: a GM can rename you.' : ''}`);
+        : freeGone ? 'Your free appearance change is no longer there (used meanwhile, or switched off), so RaceMenu-only changes (extra sliders, sculpt, overlays) from this editor are not charged and are kept only if you have none saved yet.'
+          : `RaceMenu-only changes (extra sliders, sculpt, overlays) cost ${cost} gold and are charged when they are saved.`}${headNote}${nameKept ? ' Your name stays the same: a GM can rename you.' : ''}`);
+      return true;
+    }
+    // A free editor whose free change is gone: the previous look is kept and nothing is charged (it never checked the gold
+    // or the daily wait)
+    if (freeGone) {
+      mp.set(a, 'appearance', before);
+      resendAfterSettle(a, appearance);
+      system(a, 'Your free appearance change is no longer there (used meanwhile, or switched off), so your previous look was kept and nothing was charged. Type /appearance to change it at the usual price.');
+      audit(`APPEARANCE ${who(a)} closed a free appearance editor with no free change left: previous look kept, nothing charged`);
       return true;
     }
     if (!free && !takeGold(a, cost)) {
       mp.set(a, 'appearance', before);
       resendAfterSettle(a, appearance);
-      system(a, e.free === true ? `Your free appearance change is no longer there, and a new look costs ${cost} gold, which you don't have, so your previous look was kept.`
-        : `You no longer have ${cost} gold, so your previous look was kept.`);
+      system(a, `You no longer have ${cost} gold, so your previous look was kept.`);
       audit(`APPEARANCE ${who(a)} closed the editor without ${cost} gold: previous look kept`);
       return true;
     }
@@ -577,8 +596,7 @@ module.exports = (api) => {
       audit(`APPEARANCE ${who(a)} changed their look with their free appearance change (no gold)${nameKept ? ' (a name change in the editor was undone)' : ''}`);
       return true;
     }
-    // Opened free, but the free change went meanwhile (switched off by a hot reload, or used by a RaceMenu save): say why gold was taken
-    system(a, `Your new look is saved. ${cost} gold paid${e.free === true ? ': your free appearance change is no longer there' : ''}.${headNote}${nameNote}${raceMenuKept(a) ? '' : NOT_KEPT_NOTE}`);
+    system(a, `Your new look is saved. ${cost} gold paid.${headNote}${nameNote}${raceMenuKept(a) ? '' : NOT_KEPT_NOTE}`);
     audit(`APPEARANCE ${who(a)} changed their look for ${cost} gold${nameKept ? ' (a name change in the editor was undone)' : ''}`);
     return true;
   };
