@@ -181,7 +181,7 @@ function deleteByProfileId(profileId) {
   delete data[discordId]
   save(data)
   try { require('./deviceChecks').forgetAccount(discordId) }
-  catch (err) { console.error('[players] device check entry not erased (run scripts/forget-device.js):', err.message) }
+  catch (err) { console.error('[players] device check entry not erased; it is deleted under the 30-day rule unless the account is banned:', err.message) }
   profiles.deleteByDiscordId(discordId)
   return { discordId }
 }

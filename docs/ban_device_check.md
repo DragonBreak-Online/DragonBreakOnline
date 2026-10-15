@@ -87,10 +87,13 @@ on the old routes.
 - An account entry with no codes is deleted 30 days after its last day, unless the account is banned.
 - Flags last 30 days. A not-an-alt mark lasts until its ban is gone. Session bindings are in memory only.
 - Deleting a player (`players.deleteByProfileId`) erases its entry, except a banned account's (Privacy Policy section 6).
-- **Privacy request:** with the player's profile number, run
-  `node scripts/forget-device.js --profile <N>` in `skymp5-backend`. It prints only `removed`, `nothing stored` or
-  `kept: account is banned`. Run it twice to confirm. It takes a profile number, never a Discord id, and is safe
-  while the backend runs.
+- **Privacy request:** run this **before** the player's profile or characters are deleted. With the player's profile
+  number, run `node scripts/forget-device.js --profile <N>` in `skymp5-backend`. It prints only `removed`,
+  `nothing stored` or `kept: account is banned`, or `no such profile: nothing was checked` (exit code 3) for a
+  profile number profiles.json does not hold. Run it twice to confirm. It takes a profile number, never a Discord id,
+  and is safe while the backend runs.
+- The script finds the entry only through profiles.json. If the profile is already gone it cannot find it, and the
+  entry is deleted under the 30-day rule: within 30 days of the player's last PLAY, unless the account is banned.
 - Never copy `data/device-ids.json` into `/opt/skymp-backups`: it rebuilds itself as players launch.
 - Changing the key makes every stored code meaningless: delete the file at the same time.
 

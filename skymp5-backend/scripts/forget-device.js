@@ -6,6 +6,8 @@
  *   node scripts/forget-device.js --profile <profile number>
  * Prints only "removed", "nothing stored" or "kept: account is banned" (the Privacy Policy keeps what enforces a ban).
  * Run it twice to confirm: the second run says "nothing stored", or "kept: account is banned" again.
+ * It finds the entry through profiles.json, so run it before the profile is deleted. An unknown profile prints
+ * "no such profile: nothing was checked" and exits 3: an entry may still be kept, and expires under the 30-day rule.
  */
 
 const profiles     = require('../sources/profiles')
@@ -13,6 +15,8 @@ const deviceChecks = require('../sources/deviceChecks')
 
 const PROFILE = /^\d{1,16}$/
 const SAID = { removed: 'removed', nothing: 'nothing stored', 'kept-banned': 'kept: account is banned' }
+// Exit code for a profile number profiles.json does not hold: nothing was looked up, so nothing is known
+const NO_PROFILE = 3
 
 // Returns the exit code
 function main(argv) {
@@ -23,7 +27,11 @@ function main(argv) {
     return 2
   }
   const discordId = profiles.getDiscordIdByProfileId(Number(pid))
-  console.log(SAID[discordId ? deviceChecks.forgetAccount(discordId) : 'nothing'])
+  if (!discordId) {
+    console.log('no such profile: nothing was checked')
+    return NO_PROFILE
+  }
+  console.log(SAID[deviceChecks.forgetAccount(discordId)])
   return 0
 }
 

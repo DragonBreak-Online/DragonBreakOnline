@@ -50,9 +50,25 @@ test('scripts/forget-device.js --profile N removes the entry, says only that, an
   assert.deepEqual(run('--profile', '2'), { code: 0, out: ['removed'] })
   assert.deepEqual(run('--profile', '2'), { code: 0, out: ['nothing stored'] })
   assert.deepEqual(run('--profile', '4'), { code: 0, out: ['kept: account is banned'] })
-  assert.deepEqual(run('--profile', '99'), { code: 0, out: ['nothing stored'] })
   assert.deepEqual(accounts(), [B, BANNED].sort())
   for (const argv of [[], ['--profile'], ['--profile', 'abc'], ['--discord', A], ['--profile', A + A]]) assert.equal(run(...argv).code, 2, argv.join(' '))
+})
+
+test('an unknown profile number says nothing was checked and exits 3, never "nothing stored"', () => {
+  const r = run('--profile', '99')
+  assert.deepEqual(r, { code: 3, out: ['no such profile: nothing was checked'] })
+  assert.ok(!r.out.join('\n').includes('nothing stored'))
+  assert.deepEqual(accounts(), [B, BANNED].sort(), 'nothing was erased')
+})
+
+test('a failed erase while deleting a player names the 30-day rule, not the script that can no longer find it', () => {
+  const lines = []
+  mock.method(dc, 'forgetAccount', () => { throw new Error('store cannot be read') })
+  mock.method(console, 'error', (...args) => { lines.push(args.join(' ')) })
+  try { players.deleteByProfileId(2) } finally { mock.restoreAll() }
+  assert.equal(lines.length, 1)
+  assert.match(lines[0], /30-day rule unless the account is banned/)
+  assert.ok(!lines[0].includes('forget-device'))
 })
 
 test('deleting a player also erases its device check entry', () => {
