@@ -58,10 +58,10 @@ LiveKit server + firewall are already live on the box (`DragonBreakLiveKit`).
   - Its page sets the list for its current mode as its LiveKit permissions
     before it joins, and again on every list or mode change (a mode change
     needs no server round trip: all three lists are on hand). LiveKit then
-    refuses that voice, and its speaking events, to every other listener,
-    whatever their client does; allowing takes about 30 ms. The mode range
-    on the data channel goes only to allowed listeners, and a listener page
-    ignores a range that is not one of the server's modes.
+    refuses that voice, and its active-speaker events, to every other
+    listener, whatever their client does; allowing takes about 30 ms. The
+    mode range on the data channel goes only to allowed listeners, and a
+    listener page ignores a range that is not one of the server's modes.
   - Cost at 30 players (tests/voice-hearing-harness.js, 10 simulated
     minutes): no extra LiveKit API call (the 15 s sweep stays the only one,
     about 0.09/s); in a crowded town, 27 list packets/s server-wide (about
@@ -71,8 +71,15 @@ LiveKit server + firewall are already live on the box (`DragonBreakLiveKit`).
     and 0.3 updates a second. A list tick costs about 0.3 ms.
   - Limits: an old client's voice stays open until `allowOldClients` is
     turned off (below). A cheater still hears what their character's
-    position allows; moving the character there is visible in game. The
-    participant list (actor ids, joins and leaves) is still room-wide.
+    position allows: the server's movement checks bound how fast the
+    character gets there, but it can be parked out of sight (under the
+    ground or behind a wall) within range. Still room-wide: the participant
+    list (actor ids, joins and leaves) and each microphone's mute and
+    unmute, so a far client can tell when each actor id presses the talk
+    key, though not what is said (checked on a scratch livekit-server
+    1.13.7, 15 Oct). Invisible staff near a player are on that player's own
+    lists, as they must be to hear them; the server half of Invisible
+    (L2-4) has to allow for that.
 - **Switches** (server-settings.json `voiceChat`, read at start):
   - `hearingLists` (default true): false sends no lists, so every voice is
     open to the room exactly as before (the fallback).
