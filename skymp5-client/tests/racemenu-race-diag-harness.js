@@ -23,7 +23,7 @@ const check = (name, ok, got) => {
 };
 
 const NORD = 0x13746, HIGH_ELF = 0x13743, MAORMER = 0x3c192ede, MAORMER_VAMPIRE = 0x3c192edf;
-const ME = 0xff000a6d;
+const ME = 0xff0e57a1; // a made-up actor id
 // The player: the actor's live race and its base's apart, as SkyrimPlatform's login save leaves a Maormer
 const W = { files: {}, calls: [], packets: [], works: [], diag: [], me: ME, actor: { race: NORD, base: MAORMER, loaded: true, combat: false }, forms: {} };
 globalThis.__rdW = W;
