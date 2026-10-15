@@ -16,16 +16,17 @@ export interface BanModerator { found: boolean; discordId?: string; name?: strin
 // An audit-log entry older than this belongs to an earlier ban of the same member
 const AUDIT_ENTRY_MAX_AGE_MS = 2 * 60 * 1000;
 
-const touchesRole = (changes: unknown, roleId: string): boolean =>
-    Array.isArray(changes) && changes.some((c: any) => (c?.key === "$add" || c?.key === "$remove") && Array.isArray(c.new) && c.new.some((r: any) => r?.id === roleId));
+// key "$add" (the role given) or "$remove" (taken off)
+const touchesRole = (changes: unknown, roleId: string, key: "$add" | "$remove"): boolean =>
+    Array.isArray(changes) && changes.some((c: any) => c?.key === key && Array.isArray(c.new) && c.new.some((r: any) => r?.id === roleId));
 
 // The newest entry of this type on this member, read again after each wait because Discord can write it a moment late
-export const findBanModerator = async (guild: Guild, type: AuditLogEvent, targetId: string, waitsMs: number[], roleId?: string): Promise<BanModerator> => {
+export const findBanModerator = async (guild: Guild, type: AuditLogEvent, targetId: string, waitsMs: number[], roleId?: string, roleKey: "$add" | "$remove" = "$add"): Promise<BanModerator> => {
     for (const wait of waitsMs) {
         if (wait > 0) await new Promise(resolve => setTimeout(resolve, wait));
         let entries: any[];
         try { entries = [...(await guild.fetchAuditLogs({ type, limit: 10 })).entries.values()]; } catch { return { found: false }; }
-        const hit = entries.find(e => e?.targetId === targetId && Date.now() - Number(e.createdTimestamp) < AUDIT_ENTRY_MAX_AGE_MS && (!roleId || touchesRole(e.changes, roleId)));
+        const hit = entries.find(e => e?.targetId === targetId && Date.now() - Number(e.createdTimestamp) < AUDIT_ENTRY_MAX_AGE_MS && (!roleId || touchesRole(e.changes, roleId, roleKey)));
         if (hit) return { found: true, discordId: hit.executorId || undefined, name: hit.executor?.username || undefined, bot: hit.executor?.bot === true, reason: hit.reason || undefined };
     }
     return { found: false };
@@ -100,7 +101,10 @@ export class DiscordBanSystem implements System {
 
         // An uncached member's first update arrives here instead of guildMemberUpdate
         client.on("guildMemberAvailable", (member) => {
-            if (isBanned(member)) this.banDiscordAccount(ctx, member.id, `ban role on guild ${member.guild.id}`);
+            if (!isBanned(member)) return;
+            this.banDiscordAccount(ctx, member.id, `ban role on guild ${member.guild.id}`);
+            // The role may be old: only a role given in the audit log just now makes it a new ban
+            this.recordBan("ban", "ban role", member.guild, member.id, true, banRoleOf(member));
         });
 
         client.on("guildBanAdd", (ban) => {
@@ -151,7 +155,7 @@ export class DiscordBanSystem implements System {
     // Hands the gamemode (gamemode.js __dboDiscordBan) the ban or unban for its BAN audit line, which the player log reads
     private recordBan(op: "ban" | "unban", via: "guild ban" | "ban role", guild: Guild, discordId: string, needEntry: boolean, roleId?: string): void {
         const type = via === "ban role" ? AuditLogEvent.MemberRoleUpdate : op === "ban" ? AuditLogEvent.MemberBanAdd : AuditLogEvent.MemberBanRemove;
-        findBanModerator(guild, type, discordId, this.auditWaitsMs, via === "ban role" ? roleId : undefined).then(mod => {
+        findBanModerator(guild, type, discordId, this.auditWaitsMs, via === "ban role" ? roleId : undefined, op === "ban" ? "$add" : "$remove").then(mod => {
             if (needEntry && !mod.found) return;
             const hook = (globalThis as any).__dboDiscordBan;
             if (typeof hook !== "function") return console.warn(`DiscordBanSystem: no gamemode hook, the ${via} ${op} is not in the audit log`);

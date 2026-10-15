@@ -141,6 +141,27 @@ const SETTINGS_STUB = `module.exports = { Settings: { get: async () => ({ offlin
   fire('guildMemberUpdate', member([BAN_ROLE]), member([BAN_ROLE, '42']));
   await settle();
   check('another role change on a banned member records nothing', records.length === 0, records);
+  entries = [entry(25, { reason: 'old unban', changes: [{ key: '$remove', new: [{ id: BAN_ROLE, name: 'Banned' }] }] })];
+  fire('guildMemberUpdate', member([]), member([BAN_ROLE]));
+  await settle();
+  check('the ban role given while the newest entry is the role taken off: a ban record without that entry\'s moderator or reason', records.length === 1 && records[0].op === 'ban' && !records[0].reason && !records[0].by.discordId, records);
+
+  // ---- an uncached member: with no member partials, discord.js sends their first update as guildMemberAvailable ----------
+  records.length = 0; events.length = 0;
+  entries = [entry(25, { reason: 'role ban', changes: [{ key: '$add', new: [{ id: BAN_ROLE, name: 'Banned' }] }] })];
+  fire('guildMemberAvailable', member([BAN_ROLE]));
+  await settle();
+  check('an uncached member given the ban role: the kick as before, and a ban record via ban role', events.some((e) => e[0] === 'kick') && records.length === 1 && records[0].op === 'ban' && records[0].via === 'ban role' && records[0].reason === 'role ban', records);
+  records.length = 0; events.length = 0;
+  entries = [entry(25, { changes: [{ key: '$remove', new: [{ id: BAN_ROLE, name: 'Banned' }] }] })];
+  fire('guildMemberAvailable', member([BAN_ROLE]));
+  await settle();
+  check('...a role taken off in the audit log is not the role given: no record, the kick as before', events.some((e) => e[0] === 'kick') && records.length === 0, records);
+  entries = [];
+  fire('guildMemberAvailable', member([BAN_ROLE]));
+  fire('guildMemberAvailable', member([]));
+  await settle();
+  check('...no fresh audit-log entry (a ban role from before), or no ban role: no record', records.length === 0, records);
 
   // ---- robustness ----------------------------------------------------------------------------------------------------------
   records.length = 0;
