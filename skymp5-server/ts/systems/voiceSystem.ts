@@ -24,7 +24,7 @@ type Mp = any;
 //     "apiUrl": "http://host:7880", "sweepSeconds": 15, "moveRoomOnReplay": true }
 // rangeUnits falls back to chatRanges.say, then 2000 game units.
 // apiUrl is optional: the LiveKit server API base the game server calls, by default url with ws(s) turned into http(s).
-// sweepSeconds: how often the room is checked for sessions no online character may hold (0 = never).
+// sweepSeconds: the longest gap between checks of the room for sessions no online character may hold, each gap random from half of it (0 = never).
 // moveRoomOnReplay: a removed session back twice moves voice to a new room (kept in voice-room.json); false = only remove it.
 
 // LiveKit keeps a live session supplied with refreshed tokens, so this bounds only a copied token; the disconnect removal and the sweep end sessions
@@ -120,7 +120,7 @@ export class VoiceSystem implements System {
   private mintedByUser = new Map<number, Set<string>>();
   private apiFailing = false;
   private sweepMs = DEFAULT_SWEEP_SECONDS * 1000;
-  private lastSweepAt = 0;
+  private nextSweepAt = 0;
   // One token per user every 2 s at most (a port of 57503548 without the profile identity): the client asks every 5 s at
   // most (voiceService TOKEN_RETRY_MS), so a faster stream of requests comes from a modified client, and each one signs
   // a token
@@ -189,8 +189,10 @@ export class VoiceSystem implements System {
 
   async updateAsync(ctx: SystemContext): Promise<void> {
     const now = Date.now();
-    if (!this.enabled || !this.sweepMs || now - this.lastSweepAt < this.sweepMs) return;
-    this.lastSweepAt = now;
+    if (!this.enabled || !this.sweepMs || now < this.nextSweepAt) return;
+    // A random gap of half to one interval: a replayer cannot time its exits around a sweep it cannot predict
+    const half = Math.floor(this.sweepMs / 2);
+    this.nextSweepAt = now + half + crypto.randomInt(half + 1);
     await this.sweep(ctx.svr as Mp);
   }
 

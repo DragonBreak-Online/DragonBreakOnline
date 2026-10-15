@@ -293,6 +293,27 @@ const realNow = Date.now;
     now += 15000; room = ['ff000005']; await sweep(sys);
     check('a player allowed voice again starts with no removals counted: no move', removed().length === 3 && !logs.some((l) => /voice moved/.test(l)), logs);
   }
+  // ---- a replayer that steps out of the room around each sweep it expects, timed from its last removal ----
+  {
+    reset();
+    const { sys, logs } = await make();
+    let caughtAt = -1, heard = 0, ticks = 0;
+    const movedOut = () => logs.some((l) => /voice moved/.test(l));
+    for (let t = 0; t < 10 * 60 * 1000 && !movedOut(); t += 250) {
+      now += 250; ticks++;
+      // Out for a second around every whole sweep interval after its last removal, in the rest of the time
+      const phase = caughtAt < 0 ? 7000 : (now - caughtAt) % 15000;
+      const wantIn = phase > 500 && phase < 14500;
+      if (wantIn && !room.includes('ff000009')) room.push('ff000009');
+      if (!wantIn) room = room.filter((i) => i !== 'ff000009');
+      const before = removed().length;
+      await sweep(sys);
+      if (removed().length > before) caughtAt = now;
+      if (room.includes('ff000009')) heard++;
+    }
+    check('a replayer that times its exits around each sweep is still caught: voice moves within 10 minutes', movedOut(), { heardShare: Math.round((heard / ticks) * 100) / 100, removals: removed().length });
+    fs.rmSync(path.join(out, 'voice-room.json'), { force: true });
+  }
 
   // ---- settings and failures ----
   {
