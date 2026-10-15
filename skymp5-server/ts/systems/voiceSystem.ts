@@ -25,8 +25,9 @@ type Mp = any;
 //   { "enabled": true, "url": "ws://host:7880", "apiKey": "...",
 //     "apiSecret": "...", "room": "dragonbreak", "rangeUnits": 2000,
 //     "apiUrl": "http://host:7880", "sweepSeconds": 15, "moveRoomOnReplay": true,
-//     "hearingLists": true, "hearingTickMs": 500, "hearingPadUnits": 350 }
+//     "hearingLists": true, "allowOldClients": true, "hearingTickMs": 500, "hearingPadUnits": 350 }
 // hearingLists: false = no lists, every voice is open to the whole room as before (the fallback).
+// allowOldClients (with hearingLists on): true = a client without lists keeps open voice; "listen" = it may only listen; false = no voice.
 // hearingTickMs: how often the lists are worked out; hearingPadUnits: how far past a mode's range a listener is let in early.
 // rangeUnits falls back to chatRanges.say, then 2000 game units.
 // apiUrl is optional: the LiveKit server API base the game server calls, by default url with ws(s) turned into http(s).
@@ -53,8 +54,10 @@ const LISTENER_HYSTERESIS = 1.15;
 // On a list until this many times the distance that put them on it, so a listener at the edge does not flap
 const HEARING_LEAVE_FACTOR = 1.2;
 const REFUSAL_CACHE_MS = 10 * 1000;
+const FLOW_REPORT_MS = 15 * 60 * 1000;
 
-type Flow = "lists" | "open";
+// lists = an updated client; open, listen and refused = an old client, by allowOldClients
+type Flow = "lists" | "open" | "listen" | "refused";
 type Bands = Record<string, string[]>;
 interface Voice { userId: number; actorId: number; identity: string; cell: number; pos: number[] }
 
@@ -72,7 +75,7 @@ function signHs256(apiSecret: string, payload: Record<string, unknown>): string 
 }
 
 // Hand-minted LiveKit access token; the payload shape matches livekit-server-sdk.
-function mintLiveKitToken(apiKey: string, apiSecret: string, identity: string, room: string): string {
+function mintLiveKitToken(apiKey: string, apiSecret: string, identity: string, room: string, publish = true): string {
   const now = Math.floor(Date.now() / 1000);
   return signHs256(apiSecret, {
     iss: apiKey,
@@ -82,7 +85,7 @@ function mintLiveKitToken(apiKey: string, apiSecret: string, identity: string, r
     nbf: now - 10,
     exp: now + TOKEN_TTL_SECONDS,
     name: identity,
-    video: { roomJoin: true, room, canPublish: true, canSubscribe: true, canPublishData: true },
+    video: { roomJoin: true, room, canPublish: publish, canSubscribe: true, canPublishData: publish },
   });
 }
 
@@ -145,6 +148,12 @@ export class VoiceSystem implements System {
   private nextSweepAt = 0;
   private sweeping = false;
   private hearingLists = true;
+  private oldClients: "allow" | "listen" | "refuse" = "allow";
+  // userId -> whether its client can take hearing lists, for the log line that says when old clients are gone
+  private capableByUser = new Map<number, boolean>();
+  // Old clients refused voice since the last report line
+  private refusedOld = new Set<string>();
+  private nextReportAt = 0;
   private hearingTickMs = DEFAULT_HEARING_TICK_MS;
   private hearingPad = DEFAULT_HEARING_PAD_UNITS;
   private nextHearingAt = 0;
@@ -186,6 +195,7 @@ export class VoiceSystem implements System {
     const sweepSeconds = Number(vc.sweepSeconds ?? DEFAULT_SWEEP_SECONDS);
     this.sweepMs = Number.isFinite(sweepSeconds) && sweepSeconds > 0 ? Math.max(5, sweepSeconds) * 1000 : 0;
     this.hearingLists = vc.hearingLists !== false;
+    this.oldClients = vc.allowOldClients === false ? "refuse" : vc.allowOldClients === "listen" ? "listen" : "allow";
     const tick = Number(vc.hearingTickMs ?? DEFAULT_HEARING_TICK_MS);
     this.hearingTickMs = Number.isFinite(tick) ? Math.min(5000, Math.max(200, tick)) : DEFAULT_HEARING_TICK_MS;
     const pad = Number(vc.hearingPadUnits ?? DEFAULT_HEARING_PAD_UNITS);
@@ -208,13 +218,14 @@ export class VoiceSystem implements System {
     this.enabled = vc.enabled !== false && !!(this.url && this.apiKey && this.apiSecret);
     (globalThis as any).__dboVoiceEnabled = this.enabled;
     const modeDesc = this.modes.map(m => `${m.label} ${Math.round(m.units / 70)}m`).join(", ");
-    this.log(`VoiceSystem: ${this.enabled ? `enabled, room '${this.room}', modes: ${modeDesc}, hearing lists ${this.hearingLists ? "on" : "off (every voice open to the room)"}` : "disabled (missing url/apiKey/apiSecret or enabled=false)"}`);
+    this.log(`VoiceSystem: ${this.enabled ? `enabled, room '${this.room}', modes: ${modeDesc}, hearing lists ${this.hearingLists ? `on, old clients ${{ allow: "keep open voice", listen: "listen only", refuse: "get no voice" }[this.oldClients]}` : "off (every voice open to the room)"}` : "disabled (missing url/apiKey/apiSecret or enabled=false)"}`);
   }
 
   // A new connection on the same user slot is not held to the last one's cooldown; every kick and ban ends here too
   disconnect(userId: number, ctx: SystemContext): void {
     this.lastMintAt.delete(userId);
     this.flowByUser.delete(userId);
+    this.capableByUser.delete(userId);
     this.heardBy.delete(userId);
     this.refusalCache.delete(userId);
     const minted = this.mintedByUser.get(userId);
@@ -233,6 +244,7 @@ export class VoiceSystem implements System {
     const now = Date.now();
     if (!this.enabled) return;
     this.hearingTick(ctx.svr as Mp, now);
+    this.reportFlows(now);
     if (!this.sweepMs || now < this.nextSweepAt || this.sweeping) return;
     // A random gap of half to one interval: a replayer cannot time its exits around a sweep it cannot predict
     const half = Math.floor(this.sweepMs / 2);
@@ -488,14 +500,38 @@ export class VoiceSystem implements System {
       return;
     }
     const caps = content?.caps && typeof content.caps === "object" ? content.caps : {};
-    this.flowByUser.set(userId, this.hearingLists && caps.hearingLists ? "lists" : "open");
+    const capable = !!caps.hearingLists;
+    const flow: Flow = !this.hearingLists ? "open" : capable ? "lists" : this.oldClients === "allow" ? "open" : this.oldClients === "listen" ? "listen" : "refused";
+    if (!this.nextReportAt) this.nextReportAt = now + FLOW_REPORT_MS;
+    if (flow === "refused") {
+      this.refusedOld.add(actorId.toString(16));
+      this.log(`VoiceSystem: no voice token for user ${userId} (actor ${actorId.toString(16)}): an old client without hearing lists (voiceChat.allowOldClients is false)`);
+      mp.sendCustomPacket(userId, JSON.stringify({ customPacketType: "voiceToken", enabled: false }));
+      return;
+    }
+    this.capableByUser.set(userId, capable);
+    this.flowByUser.set(userId, flow);
     this.sendToken(mp, userId, actorId);
+  }
+
+  // Every 15 min while voice is used: online players with a voice token on updated and old clients, so allowOldClients can go false once old ones stop
+  private reportFlows(now: number): void {
+    if (!this.nextReportAt || now < this.nextReportAt) return;
+    let updated = 0, open = 0, listen = 0;
+    for (const [userId, capable] of this.capableByUser) {
+      if (capable) updated++;
+      else if (this.flowByUser.get(userId) === "listen") listen++;
+      else open++;
+    }
+    this.log(`VoiceSystem: online players with a voice token: ${updated} on updated clients, ${open + listen} on old clients (${open} open voice, ${listen} listen only); ${this.refusedOld.size} old client(s) refused voice in the last 15 min`);
+    this.refusedOld.clear();
+    this.nextReportAt = this.capableByUser.size ? now + FLOW_REPORT_MS : 0;
   }
 
   private sendToken(mp: Mp, userId: number, actorId: number): boolean {
     const identity = actorId.toString(16);
     try {
-      const token = mintLiveKitToken(this.apiKey, this.apiSecret, identity, this.room);
+      const token = mintLiveKitToken(this.apiKey, this.apiSecret, identity, this.room, this.flowByUser.get(userId) !== "listen");
       this.lastMintAt.set(userId, Date.now());
       const minted = this.mintedByUser.get(userId) || new Set<string>();
       this.mintedByUser.set(userId, minted.add(identity));
