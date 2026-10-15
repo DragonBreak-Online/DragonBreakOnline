@@ -203,8 +203,24 @@ Commands below run as root; from the `nate` user, prefix them with `sudo` (step 
    The count must print `1` (a count, never the value); anything else, do not restart. Then restart. The log says
    `on, report only`. If it says `is not set`, the file holds an empty `DEVICE_ID_HMAC_KEY=` line: replace that line
    by hand without printing the file, never add a second one.
-4. Release launcher 2.1.50 with the device code (launcher only, no CLIENT_VERSION bump), ideally with F1's launcher
-   release.
+4. Release launcher 2.1.50 with the device code, ideally together with F1's launcher half. Launcher only: no
+   CLIENT_VERSION bump. 2.1.50 here means the first launcher release that carries this branch's launcher commits; if
+   another release takes 2.1.50 first, use the next number throughout.
+   1. Bump `skymp5-launcher/package.json` to 2.1.50, and its two lines in `package-lock.json`, as 122f8e8bf did for
+      2.1.49.
+   2. Build with the manager's **Build launcher**.
+   3. Upload the installer to `files.dragonbreakonline.com/launcher/2.1.50/DragonBreakLauncher.exe`. Go on only once
+      `curl -sI https://files.dragonbreakonline.com/launcher/2.1.50/DragonBreakLauncher.exe | head -n 1` says 200.
+   4. Then set `LATEST_VERSION` to `'2.1.50'` and `DOWNLOAD_URL` to
+      `'https://files.dragonbreakonline.com/launcher/2.1.50/DragonBreakLauncher.exe'` in `routes/version.js`, in a commit
+      on the live main head that changes only those two lines, the way a6837b06c did for 2.1.49. No backend restart is
+      needed: version.js is read from disk on every `GET /api/version`, so it is served as soon as the live checkout
+      has it (a restart does no harm).
+
+   Until version.js says 2.1.50, no launcher sends a code: the self-update offers only the advertised version, so
+   report mode collects nothing. **Undo:** set version.js back to 2.1.49 the same way. A 2.1.50 launcher works against
+   either backend: it offers an update only when the advertised version is higher (`compareVersions(latest, current) >
+   0` in `src/main.js`), and launch-check before this branch reads only `filesVersion` and `plugins` from the body.
 5. Watch at least 2 weeks of the daily count line. If more than 5% of launch-checks from new launchers say
    unavailable, look at a server-issued install token.
 6. Jake decides whether enforcement is ever built.
