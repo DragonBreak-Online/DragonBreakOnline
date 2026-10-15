@@ -5,6 +5,7 @@ const crypto = require('crypto')
 const { ChatInputCommandInteraction, ModalSubmitInteraction, MessageFlags, PermissionFlagsBits, ModalBuilder, ActionRowBuilder, TextInputBuilder, TextInputStyle } = require('discord.js')
 const { readRankRule } = require('../console/staffConsole')
 const rules = require('../console/allowlist')
+const { fold } = require('./consoleCommand')
 
 const MAX_TEXT = 2000
 const FORM_MS = 15 * 60 * 1000
@@ -42,6 +43,8 @@ const ERRORS = Object.freeze({
 
 const has = (perms, flag) => !!perms && typeof perms.has === 'function' && perms.has(flag)
 const isThread = channel => typeof channel?.isThread === 'function' && channel.isThread()
+// Inline code in the audit channel, so markdown, mentions and links in a name or the text show as typed
+const code = text => `\`${fold(text)}\``
 
 // The member's role ids, from a cached GuildMember or the raw interaction member
 function rolesOf(member) {
@@ -172,7 +175,7 @@ function createSayCommand({
     }
     const did = ctx.close ? (closed ? ', then locked and archived the thread' : ', but the thread could not be locked') : ''
     try {
-      audit.log(`SAY "${ctx.name}" (@${ctx.handle}) posted as Dragonbaron in ${where}${replyUrl ? ` replying to ${replyUrl}` : ''}${did}: ${sent.url} "${rules.foldText(text, 100)}"`)
+      audit.log(`SAY ${code(ctx.name)} (@${ctx.handle}) posted as Dragonbaron in ${where}${replyUrl ? ` replying to ${replyUrl}` : ''}${did}: ${sent.url} ${code(rules.foldText(text, 100))}`)
     } catch (err) { log('audit failed:', err.message) }
     if (!ctx.close) await answer(posted)
     else if (!closed) await answer(`${posted}\nThe thread could not be locked; close it by hand.`)

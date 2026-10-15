@@ -105,7 +105,7 @@ test('a Lead GM\'s /say is deferred privately, posted as the bot with no pings, 
   assert.deepEqual(Object.keys(sent[0]).sort(), ['allowedMentions', 'content'], 'no files, embeds or reply')
   const link = `https://discord.com/channels/${GUILD}/${CH.general}/${snow(1001)}`
   assert.equal(audits.length, 1)
-  assert.match(audits[0], /^SAY "Iced Sky" \(@icedsky\) posted as Dragonbaron in <#\d+>: /)
+  assert.match(audits[0], /^SAY `Iced Sky` \(@icedsky\) posted as Dragonbaron in <#\d+>: /)
   assert.ok(audits[0].includes(`<#${CH.general}>`) && audits[0].includes(link))
   assert.ok(!audits[0].includes(USER.lead), 'who is the display name and username, not the account id')
   assert.equal(calls[1][1].content, `Posted as Dragonbaron: ${link}`)
@@ -117,7 +117,7 @@ test('the rank rule is the console\'s role list: Owners and Lead GMs pass, a GM 
   const owner = command({ as: 'owner' })
   await S.handleInteraction(owner.it)
   assert.deepEqual(names(owner.calls), ['defer', 'edit'])
-  assert.match(audits[0], /^SAY "Jake" \(@jake\)/)
+  assert.match(audits[0], /^SAY `Jake` \(@jake\)/)
   const gm = command({ as: 'gm' })
   await S.handleInteraction(gm.it)
   assert.deepEqual(names(gm.calls), ['reply'])
@@ -320,6 +320,18 @@ test('close in a to-do thread posts, answers privately, then locks and archives 
   assert.deepEqual(names(stuck.calls), ['defer', 'edit', 'edit'])
   assert.match(stuck.calls[2][1].content, /\nThe thread could not be locked; close it by hand\.$/)
   assert.match(audits[1], /, but the thread could not be locked: /)
+})
+
+test('the audit line holds the name and the first words as inline code, so markdown or mentions in them cannot hide or fake part of the audit channel', async () => {
+  const S = make()
+  const tricky = { displayName: '||Ja`ke', roles: { cache: new Map([[ROLE.lead, {}]]) } }
+  const { it } = command({ text: '||hide `this` <@&123> [x](https://e.example) ```', fields: { member: tricky } })
+  await S.handleInteraction(it)
+  assert.equal(audits.length, 1)
+  const T = String.fromCharCode(0x02cb)
+  assert.ok(audits[0].startsWith(`SAY \`||Ja${T}ke\` (@icedsky) posted as Dragonbaron in <#${CH.general}>: https://`), audits[0])
+  assert.ok(audits[0].endsWith(` \`||hide ${T}this${T} <@&123> [x](https://e.example) ${T}${T}${T}\``), audits[0])
+  assert.equal(audits[0].split('`').length, 5, 'only the four backticks that open and close the two code spans')
 })
 
 test('a defer that fails posts nothing, and a post Discord refuses is reported privately and not logged as posted', async () => {

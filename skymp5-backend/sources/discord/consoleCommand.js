@@ -84,4 +84,4 @@ async function handleInteraction(interaction, given) {
   return true
 }
 
-module.exports = { handleInteraction, format, ERRORS }
+module.exports = { handleInteraction, format, fold, ERRORS }
