@@ -27,7 +27,10 @@ module.exports = (api) => {
   const allowedCells = new Set((C.allowedCells || []).map(normDesc));
   const allowedPlugins = new Set((C.allowedPlugins || []).map((p) => String(p).toLowerCase()));
   // What a player brought back is told: the closed lands' own line with closedMessage set (Skyrim open), else the alpha's
-  const BOUNCE_LINE = (cfg.playtest || {}).closedMessage ? `${C.closedMessage} You have been brought back to ${C.name}.` : `Skyrim is closed for now: the alpha begins in ${C.name}. You have been brought back.`;
+  const OWN_LINE = !!(cfg.playtest || {}).closedMessage;
+  const BOUNCE_LINE = OWN_LINE ? `${C.closedMessage} You have been brought back.` : `Skyrim is closed for now: the alpha begins in ${C.name}. You have been brought back.`;
+  // A refused door (or a ferryman, a ship's hatch: any ref in blockedDoors) says closedMessage alone when it is set
+  const REFUSE_LINE = OWN_LINE ? C.closedMessage : `${C.closedMessage} The alpha begins in ${C.name}.`;
   const closedPlugins = new Set((C.closedPlugins || []).map((p) => String(p).toLowerCase()));
   const blockedDoors = new Set((C.blockedDoors || []).map(idOf).filter(Boolean));
   // blockedDoors that are automatic load doors (walked into, not activated): refused ones send the player back
@@ -101,7 +104,7 @@ module.exports = (api) => {
             if (sendToArrival(casterId, 'border')) audit(`PLAYTEST ${who(casterId)} walked into the closed automatic door ${door} and was taken back to ${C.name}`);
           } catch (e) { log('playtest: border return failed', e.message); }
         }, 300);
-      } else personal(casterId, `${C.closedMessage} The alpha begins in ${C.name}.`);
+      } else personal(casterId, REFUSE_LINE);
     }
     return false;
   };
@@ -139,7 +142,13 @@ module.exports = (api) => {
     }
     return best;
   };
+  // With closedPlugins (Skyrim open) every allowed place is remembered, so a player carried into a closed land (a
+  // ferryman's dialogue travel runs in the game, not here) goes back where they stood, not to Bruma's arrival
   const rememberInside = (a, place) => {
+    if (closedPlugins.size && place !== borderWorld) {
+      try { const l = mp.get(a, 'locationalData'); if (l && Array.isArray(l.pos)) lastInside.set(a, l); } catch (e) { /* next tick */ }
+      return;
+    }
     if (!B || place !== borderWorld) return;
     try {
       const l = mp.get(a, 'locationalData');
@@ -175,9 +184,12 @@ module.exports = (api) => {
         }
         if (now - (bounced.get(a) || 0) < 10000) continue;
         bounced.set(a, now);
-        if (sendToArrival(a, 'bounce')) {
+        const back = closedPlugins.size ? lastInside.get(a) : null;
+        let moved = false;
+        try { if (back) { mp.set(a, 'locationalData', back); moved = true; } } catch (e) { log('playtest return failed', e.message); }
+        if (moved || sendToArrival(a, 'bounce')) {
           system(a, BOUNCE_LINE);
-          audit(`PLAYTEST ${who(a)} was outside the region (${place}) and was returned to ${C.name}`);
+          audit(`PLAYTEST ${who(a)} was outside the region (${place}) and was returned ${back ? 'to where they last stood in it' : `to ${C.name}`}`);
         }
       } catch (e) { log('playtest check failed', e.message); }
     }

@@ -141,6 +141,9 @@ disable|Skyrim.esm|060FB1|EncBanditDog|DragonBreak Online Edits.esp
 disable|Skyrim.esm|082AE7|LvlBanditWizardEvenTonedF|DragonBreak Online Edits.esp
 disable|Skyrim.esm|082AE9|LvlBanditMeleeNordM|DragonBreak Online Edits.esp
 disable|Skyrim.esm|082FB4|LvlFrostbiteSpiderNoGiant|DragonBreak Online Edits.esp
+disable|Dragonborn.esm|01F999|DLC2MiraakTest|DragonBreak Online Edits.esp
+disable|Dragonborn.esm|01F99A|DLC2TameDragonVoice|DragonBreak Online Edits.esp
+disable|Dragonborn.esm|01F99C|EncHorseGrey|DragonBreak Online Edits.esp
 disable|Dawnguard.esm|00BFFE|DLC1VQ05BonemanSummon|DragonBreak Online Edits.esp
 disable|Dawnguard.esm|00C001|DLC1VQ05BonemanSummon|DragonBreak Online Edits.esp
 disable|Dawnguard.esm|00C003|DLC1VQ05BonemanSummon|DragonBreak Online Edits.esp
@@ -1908,6 +1911,7 @@ disable|SurWR.esp|123CB3|0WRMerchantNord|DragonBreak Nexus Patches.esp
 disable|Dawnguard.esm|012402|DLC1VQ08LvlGargoyle_Ambush|DragonBreak Online Edits.esp
 disable|Dawnguard.esm|012406|DLC1VQ08LvlGargoyle_Ambush|DragonBreak Online Edits.esp
 disable|JK's Whiterun's Outskirts.esp|127A4D|EncHorsePalomino|DragonBreak Nexus Patches.esp
+disable|arnima.esm|129475|HorseForCarrriageTemplateArnimaMerchMark|DragonBreak Nexus Patches.esp
 disable|unofficial skyrim special edition patch.esp|0012ED|LvlBanditMelee1HAggro1024|DragonBreak Nexus Patches.esp
 disable|unofficial skyrim special edition patch.esp|0012EE|LvlBanditMissileAggro1024|DragonBreak Nexus Patches.esp
 disable|DragonBreak.esp|001343|CWFortSoldierImperial|DragonBreak Online Edits.esp
@@ -1981,6 +1985,7 @@ disable|DragonBreak.esp|017165|LvlBanditMeleeTank|DragonBreak Online Edits.esp
 disable|DragonBreak.esp|017166|LvlBanditMeleeTank|DragonBreak Online Edits.esp
 disable|JK's Whiterun's Outskirts.esp|17DFCB|EncHorseGrey|DragonBreak Nexus Patches.esp
 disable|JK's Whiterun's Outskirts.esp|17DFCC|EncHorseBlackAndWhite|DragonBreak Nexus Patches.esp
+disable|Dragonborn.esm|0182AF|DLC2RRGjalundSaltSageWindhelm|DragonBreak Online Edits.esp
 disable|JK's Whiterun's Outskirts.esp|1883A3|EncCow|DragonBreak Nexus Patches.esp
 disable|JK's Whiterun's Outskirts.esp|1883A4|EncCow|DragonBreak Nexus Patches.esp
 disable|JK's Whiterun's Outskirts.esp|1883A5|EncCow|DragonBreak Nexus Patches.esp
@@ -2414,6 +2419,8 @@ disable|SurWR.esp|36C04B|WRThaneIntroQuestRaider|DragonBreak Nexus Patches.esp
 disable|SurWR.esp|36C04C|WRThaneIntroQuestRaider|DragonBreak Nexus Patches.esp
 disable|SurWR.esp|36C04D|WRThaneIntroQuestRaider|DragonBreak Nexus Patches.esp
 disable|SurWR.esp|36C04E|WRThaneIntroQuestRaiderRanged|DragonBreak Nexus Patches.esp
+disable|Dragonborn.esm|0376F7|DLC2RRLygrleidWindhelm|DragonBreak Online Edits.esp
+disable|Dragonborn.esm|0376F8|DLC2RRSogrlafWindhelm|DragonBreak Online Edits.esp
 disable|Skyrim.esm|037DDD|EncGoatDomestic|DragonBreak Online Edits.esp
 disable|Skyrim.esm|037DDF|EncGoatDomestic|DragonBreak Online Edits.esp
 disable|Skyrim.esm|037DE0|EncGoatDomestic|DragonBreak Online Edits.esp
@@ -4269,6 +4276,10 @@ disable|Skyrim.esm|099CBE|LvlAnimalForestPredator|DragonBreak Online Edits.esp
 disable|Skyrim.esm|099CBF|LvlAnimalForestPredator|DragonBreak Online Edits.esp
 disable|Skyrim.esm|09A724|EncHare|DragonBreak Online Edits.esp
 disable|Skyrim.esm|09A72A|E3demoFox|DragonBreak Online Edits.esp
+disable|King of the Murkmire.esp|9A87F3|KoTMSkyrimSailorCaptain|DragonBreak Nexus Patches.esp
+disable|King of the Murkmire.esp|9A87F4|KoTMSkyrimSailorDeckhand01|DragonBreak Nexus Patches.esp
+disable|King of the Murkmire.esp|9A87F5|KoTMSkyrimSailorDeckhand02|DragonBreak Nexus Patches.esp
+disable|King of the Murkmire.esp|9A8843|LilmothEmissaryCallia|DragonBreak Nexus Patches.esp
 disable|The Great Cities - Minor Cities and Towns.esp|009AF7|EncDog|DragonBreak Nexus Patches.esp
 disable|The Great City of Falkreath.esp|009AF7|EncDog|DragonBreak Nexus Patches.esp
 disable|The Great Cities - Minor Cities and Towns.esp|009AF8|EncDog|DragonBreak Nexus Patches.esp
@@ -5217,6 +5228,7 @@ disable|SurWR.esp|024339|EncChicken|DragonBreak Nexus Patches.esp
 disable|SurWR.esp|02433A|EncChicken|DragonBreak Nexus Patches.esp
 disable|SurWR.esp|26E2B6|0WRThalmorInqusitor|DragonBreak Nexus Patches.esp
 disable|SurWR.esp|2F1EE8|EncHorseSaddledGrey|DragonBreak Nexus Patches.esp
+disable|Druadach.esm|030D94|DD_Jzhir|DragonBreak Nexus Patches.esp
 disable|Skyrim.esm|03704B|GuardWhiterunImperialPostNight1|DragonBreak Online Edits.esp
 disable|Skyrim.esm|03704E|GuardWhiterunImperialPostNight2|DragonBreak Online Edits.esp
 disable|Skyrim.esm|037053|GuardWhiterunSonsPatrolNight1|DragonBreak Online Edits.esp
@@ -5988,6 +6000,7 @@ disable|Skyrim.esm|08B52E|LvlDwarvenSphere|DragonBreak Online Edits.esp
 disable|Skyrim.esm|019821|Kust|DragonBreak Online Edits.esp
 disable|COTN - Falkreath.esp|0FDD42|LvlFalkreathHoldGuardImperialVoiceTypeMaleGuard|DragonBreak Nexus Patches.esp
 disable|COTN - Falkreath.esp|0FDD43|LvlFalkreathHoldGuardSonsVoiceTypeMaleGuard|DragonBreak Nexus Patches.esp
+disable|Dragonborn.esm|031CA3|DLC2TestRiekling|DragonBreak Online Edits.esp
 disable|Skyrim.esm|01FA89|LvlGuardImperial|DragonBreak Online Edits.esp
 disable|Skyrim.esm|01FA8B|LvlGuardImperial|DragonBreak Online Edits.esp
 disable|Skyrim.esm|01FA8C|LvlGuardImperial|DragonBreak Online Edits.esp

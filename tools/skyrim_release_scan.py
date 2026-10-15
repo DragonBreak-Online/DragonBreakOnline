@@ -187,7 +187,7 @@ for key, r in achr.items():
     if r['pos'] and r['pos'][2] < -20000: continue
     where, wname, interior = place_of(r)
     origin = (where or ':').split(':', 1)[1]
-    if origin in CLOSED or key.split(':', 1)[1] in CLOSED: continue
+    if origin in CLOSED: continue   # placed in a closed land; a closed plugin's actor standing in Skyrim (the Northern Maiden's crew) is listed
     if where == '17482:dragonbreak hub.esp': continue
     b = base_info(r['base']) or {}
     rows.append({'ref': key, 'by': r['by'], 'base': r['base'], 'baseEdid': b.get('edid', ''), 'baseType': b.get('type', ''),
