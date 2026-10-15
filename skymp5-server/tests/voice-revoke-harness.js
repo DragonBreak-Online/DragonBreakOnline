@@ -76,6 +76,8 @@ globalThis.fetch = async (url, opts) => {
     throw e;
   }
   if (failMode === 'http500') return { ok: false, status: 500, json: async () => ({}) };
+  // A wrong API address behind a web proxy: a 404 page, not LiveKit's Twirp not_found
+  if (failMode === 'proxy404') return { ok: false, status: 404, json: async () => { throw new SyntaxError('Unexpected token <'); } };
   if (String(url).endsWith('/RemoveParticipant')) {
     if (gone.has(body.identity)) return { ok: false, status: 404, json: async () => ({ code: 'not_found' }) };
     setRoom(body.room, roomList(body.room).filter((i) => i !== body.identity));
@@ -361,6 +363,23 @@ const realNow = Date.now;
     room = ['ff000009'];
     await sweep(s2);
     check('an HTTP error is logged the same way', logs.filter((l) => /LiveKit server API call ListParticipants answered HTTP 500/.test(l)).length === 1, logs);
+
+    reset();
+    const p404 = await make();
+    failMode = 'proxy404';
+    conns.set(1, 0xff000001);
+    ask(p404.sys, 1);
+    conns.delete(1);
+    p404.sys.disconnect(1, ctx);
+    await settle();
+    now += 60000; room = ['ff000009']; await sweep(p404.sys);
+    check('a 404 that is not LiveKit\'s not_found (a wrong API address) is logged as a failure, not taken as "already left"', p404.logs.filter((l) => /LiveKit server API call (RemoveParticipant|ListParticipants) answered HTTP 404/.test(l)).length === 1, p404.logs);
+
+    reset();
+    const first = await make();
+    now += 60000; await sweep(first.sys);
+    now += 15000; room = ['ff000009']; await sweep(first.sys);
+    check('the first answer of the LiveKit server API is logged once, so a restart shows it is reachable', first.logs.filter((l) => /the LiveKit server API answers$/.test(l)).length === 1, first.logs);
   }
 
   // ---- part 2: the admin panel's ban list refuses voice (adminSystem.ts) and index.ts wires it in ----

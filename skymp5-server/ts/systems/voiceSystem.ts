@@ -119,6 +119,7 @@ export class VoiceSystem implements System {
   // userId -> identities minted for that connection; they leave the room when it ends
   private mintedByUser = new Map<number, Set<string>>();
   private apiFailing = false;
+  private apiAnswered = false;
   private sweepMs = DEFAULT_SWEEP_SECONDS * 1000;
   private nextSweepAt = 0;
   // One token per user every 2 s at most (a port of 57503548 without the profile identity): the client asks every 5 s at
@@ -292,12 +293,14 @@ export class VoiceSystem implements System {
         body: JSON.stringify(body),
         signal: typeof timeout === "function" ? timeout(API_TIMEOUT_MS) : undefined,
       });
-      // not_found: the participant already left
-      if (res.status === 404) return { notFound: true };
-      if (!res.ok) return this.apiFailed(`${method} answered HTTP ${res.status}`);
+      // LiveKit's Twirp not_found means the participant already left; any other 404 is a wrong API address
+      const notFound = res.status === 404 && (await res.json().catch(() => null))?.code === "not_found";
+      if (!res.ok && !notFound) return this.apiFailed(`${method} answered HTTP ${res.status}`);
       if (this.apiFailing) this.log("VoiceSystem: the LiveKit server API answers again");
+      else if (!this.apiAnswered) this.log("VoiceSystem: the LiveKit server API answers");
       this.apiFailing = false;
-      return await res.json().catch(() => ({}));
+      this.apiAnswered = true;
+      return notFound ? { notFound: true } : await res.json().catch(() => ({}));
     } catch (e) {
       return this.apiFailed(`${method} failed (${errCode(e)})`);
     }
