@@ -2,9 +2,9 @@
 // connection, the LiveKit session stayed in the room and LiveKit kept refreshing its token. It bundles voiceSystem.ts with
 // esbuild (settings stubbed with test-only LiveKit values), fakes the native server and LiveKit's RoomService (fetch), and
 // checks: the session is removed when its connection ends, a sweep removes every session no online character allowed voice
-// holds, a banned or suspended account gets no token, and a token lives 10 minutes. Part 2 bundles adminSystem.ts to check
-// the panel-ban refusal it hands the voice system. Nothing reaches the network. Run it from skymp5-server with
-// node_modules present:
+// holds, a session back after two removals (a replayed token) moves voice to a new room, a banned or suspended account
+// gets no token, and a token lives 10 minutes. Part 2 bundles adminSystem.ts to check the panel-ban refusal it hands the
+// voice system. Nothing reaches the network. Run it from skymp5-server with node_modules present:
 //
 //   node tests/voice-revoke-harness.js
 'use strict';
@@ -59,7 +59,11 @@ const ctx = { svr: mp, gm: new EventEmitter() };
 
 // LiveKit's RoomService over Twirp JSON
 let calls = [];
+// room 'r' (the settings room) and every other room by name
 let room = [];
+let others = {};
+const roomList = (name) => (name === 'r' ? room : (others[name] = others[name] || []));
+const setRoom = (name, list) => { if (name === 'r') room = list; else others[name] = list; };
 let gone = new Set();
 let failMode = '';
 globalThis.fetch = async (url, opts) => {
@@ -74,25 +78,29 @@ globalThis.fetch = async (url, opts) => {
   if (failMode === 'http500') return { ok: false, status: 500, json: async () => ({}) };
   if (String(url).endsWith('/RemoveParticipant')) {
     if (gone.has(body.identity)) return { ok: false, status: 404, json: async () => ({ code: 'not_found' }) };
-    room = room.filter((i) => i !== body.identity);
+    setRoom(body.room, roomList(body.room).filter((i) => i !== body.identity));
     return { ok: true, status: 200, json: async () => ({}) };
   }
-  if (String(url).endsWith('/ListParticipants')) return { ok: true, status: 200, json: async () => ({ participants: room.map((identity) => ({ identity, state: 'ACTIVE' })) }) };
+  if (String(url).endsWith('/ListParticipants')) return { ok: true, status: 200, json: async () => ({ participants: roomList(body.room).map((identity) => ({ identity, state: 'ACTIVE' })) }) };
   return { ok: false, status: 501, json: async () => ({}) };
 };
 const removed = () => calls.filter((c) => c.method === 'RemoveParticipant').map((c) => c.body.identity);
 const listed = () => calls.filter((c) => c.method === 'ListParticipants').length;
 const settle = async () => { for (let i = 0; i < 20; i++) await new Promise((r) => setImmediate(r)); };
-const reset = () => { conns = new Map(); sent = []; calls = []; room = []; gone = new Set(); failMode = ''; delete globalThis.__dboVoiceRefused; };
+const reset = () => { conns = new Map(); sent = []; calls = []; room = []; others = {}; gone = new Set(); failMode = ''; delete globalThis.__dboVoiceRefused; };
 // Failure output shows whether a token was sent, never the token
 const brief = (p) => (p ? { enabled: p.enabled, token: p.token ? '<token>' : undefined } : p);
 const tokenFor = (u) => { const hit = sent.filter(([x, p]) => x === u && p.customPacketType === 'voiceToken').pop(); return hit ? hit[1] : null; };
+const roomOf = (u) => { const t = tokenFor(u); const c = t && t.token ? decode(t.token) : null; return c && c.video ? c.video.room : ''; };
 const sweep = async (sys) => { if (typeof sys.updateAsync === 'function') await sys.updateAsync(ctx); await settle(); };
 
 let now = 1_700_000_000_000;
 const realNow = Date.now;
 
 (async () => {
+  // voice-room.json is written to the working directory
+  const startDir = process.cwd();
+  process.chdir(out);
   await bundle('voiceSystem.ts', 'voice.js');
   await bundle('adminSystem.ts', 'admin.js');
   const { VoiceSystem } = require(path.join(out, 'voice.js'));
@@ -220,6 +228,72 @@ const realNow = Date.now;
     check('a refusal hook that throws refuses nothing', !!tokenFor(3) && tokenFor(3).enabled === true, brief(tokenFor(3)));
   }
 
+  // ---- a scripted rejoin: LiveKit hands every join a fresh token, so removing alone never ends it; voice moves room ----
+  {
+    reset();
+    const refusals = [(_mp, u) => (u === 4 ? 'banned in the admin panel' : '')];
+    const { sys, logs } = await make(refusals);
+    [1, 2, 3, 4, 9].forEach((u) => conns.set(u, 0xff000000 + u));
+    ask(sys, 1); ask(sys, 2); ask(sys, 9);
+    room = ['ff000001', 'ff000002', 'ff000009'];
+    conns.delete(9);
+    sys.disconnect(9, ctx);
+    await settle();
+    now += 15000; room.push('ff000009'); await sweep(sys);
+    check('a banned player back once is removed again, and voice stays in its room', removed().filter((i) => i === 'ff000009').length === 2 && !logs.some((l) => /voice moved/.test(l)), logs);
+    sent = [];
+    now += 15000; room.push('ff000009'); await sweep(sys);
+    const moved = logs.find((l) => /voice moved from 'r' to/.test(l)) || '';
+    const newRoom = (/to '([^']+)'/.exec(moved) || [])[1] || '';
+    check('back a second time (a replayed token): voice moves to a new room', /^r-[0-9a-z]+$/.test(newRoom) && /ff000009 keeps rejoining/.test(moved), logs);
+    check('...every online player who uses voice is sent a token for it at once', !!newRoom && roomOf(1) === newRoom && roomOf(2) === newRoom && (tokenFor(1) || {}).room === newRoom, [roomOf(1), roomOf(2)]);
+    check('...nobody who never asked for voice, nor a refused account, nor the replayer', !tokenFor(3) && !tokenFor(4) && !tokenFor(9), sent.map(([u, p]) => [u, brief(p)]));
+    check('...the replayer is removed from the old room', calls.some((c) => c.method === 'RemoveParticipant' && c.body.identity === 'ff000009' && c.body.room === 'r'), calls);
+    const kept = (() => { try { return JSON.parse(fs.readFileSync(path.join(out, 'voice-room.json'), 'utf8')); } catch (e) { return null; } })();
+    check('...and the new room is kept in voice-room.json', !!kept && kept.base === 'r' && kept.room === newRoom, kept);
+    // 2 switched rooms; 1 missed its token and is still in the old room
+    others[newRoom] = ['ff000002']; room = ['ff000001'];
+    calls = [];
+    now += 15000; await sweep(sys);
+    const lists = calls.filter((c) => c.method === 'ListParticipants');
+    check('the sweep now watches the new room, with an admin token for it', !!newRoom && (lists[0] || {}).body?.room === newRoom && (decode(String((lists[0] || {}).auth || '').replace(/^Bearer /, '')) || {}).video?.room === newRoom, lists.map((c) => c.body));
+    check('after a 10 s grace the old room is emptied: a client that missed its token is removed and asks again', calls.some((c) => c.method === 'RemoveParticipant' && c.body.identity === 'ff000001' && c.body.room === 'r'), calls);
+    check('...and nobody allowed is removed from the new room', !!newRoom && !calls.some((c) => c.method === 'RemoveParticipant' && c.body.room === newRoom), calls);
+    sent = [];
+    ask(sys, 1);
+    check('a token asked for after the move opens the new room', !!newRoom && roomOf(1) === newRoom, roomOf(1));
+    calls = [];
+    now += 120000; await sweep(sys);
+    check('two minutes on, the old room is left alone', listed() >= 1 && !calls.some((c) => c.body.room === 'r'), calls);
+    const again = await make(refusals);
+    sent = [];
+    ask(again.sys, 2);
+    check('after a restart voice stays in the moved room, so the old room\'s tokens stay shut out', !!newRoom && roomOf(2) === newRoom, roomOf(2));
+    fs.writeFileSync(path.join(out, 'voice-room.json'), JSON.stringify({ base: 'other', room: 'other-x' }));
+    const fresh = await make(refusals);
+    sent = [];
+    ask(fresh.sys, 2);
+    check('...but a file kept for another base room is ignored', roomOf(2) === 'r', roomOf(2));
+    fs.rmSync(path.join(out, 'voice-room.json'), { force: true });
+  }
+  {
+    reset();
+    const { sys, logs } = await make([], voiceSettings({ moveRoomOnReplay: false }));
+    for (let i = 0; i < 4; i++) { now += 15000; room = ['ff000009']; await sweep(sys); }
+    check('moveRoomOnReplay false: a replayer is only removed, every time', removed().length === 4 && !logs.some((l) => /voice moved/.test(l)), logs);
+  }
+  {
+    reset();
+    const { sys, logs } = await make();
+    now += 15000; room = ['ff000005']; await sweep(sys);
+    now += 15000; room = ['ff000005']; await sweep(sys);
+    conns.set(5, 0xff000005);
+    now += 15000; room = ['ff000005']; await sweep(sys);
+    conns.delete(5);
+    now += 15000; room = ['ff000005']; await sweep(sys);
+    check('a player allowed voice again starts with no removals counted: no move', removed().length === 3 && !logs.some((l) => /voice moved/.test(l)), logs);
+  }
+
   // ---- settings and failures ----
   {
     reset();
@@ -297,6 +371,7 @@ const realNow = Date.now;
   }
 
   Date.now = realNow;
+  process.chdir(startDir);
   fs.rmSync(out, { recursive: true, force: true });
   console.log(failures ? `\n${failures} FAILED` : '\nall passed');
   process.exit(failures ? 1 : 0);
