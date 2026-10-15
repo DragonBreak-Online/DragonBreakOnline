@@ -2305,12 +2305,69 @@ const sendToArrival = (a) => {
     log(`sent ${display(a)} from the Realm to the arrival`);
   } catch (e) { log('send to arrival failed', e.message); }
 };
+// ---- where a new character starts: Cyrodiil or Skyrim (Nate, 12 Oct) ------------------------------------------------
+// While Skyrim is open beside Bruma (playtest.gatesToArrival false), a finished character is asked after the deity step
+// whether to travel to Cyrodiil. Yes goes to the Pale Pass arrival as before; anything else (No, Close, no answer in
+// START_PROMPT_MS) ends creation in the Realm, whose gates lead to the Skyrim holds. With Skyrim closed nothing is asked.
+// Config: gamemode-config "playtest": { askCyrodiil (default true), cyrodiilPrompt: { title, yes, no } }.
+// 86: the PC diff's 84 is citizenship.js's PANEL_ID (tests/widget-ids-harness.js)
+const START_WIDGET_ID = 86;
+const START_PROMPT_MS = 3 * 60000;
+const startPending = globalThis.__dboStartPending instanceof Map ? globalThis.__dboStartPending : (globalThis.__dboStartPending = new Map());
+const askCyrodiil = () => { const p = cfg.playtest || {}; return !!p.enabled && p.gatesToArrival === false && p.askCyrodiil !== false; };
+// Creation ends in the Realm: the same clean-up sendToArrival does, without the move
+const stayInRealm = (a, why) => {
+  const id = a >>> 0;
+  startPending.delete(id);
+  try { closeWidget(a, START_WIDGET_ID); } catch (e) { /* not open */ }
+  if (!creation.has(id)) return;
+  creation.delete(id);
+  creatorSpotRelease(a);
+  setCreatorHidden(a, false);
+  setFade(a, false);
+  try { if (globalThis.__dboClock) globalThis.__dboClock.sendTo(a); } catch (e) { /* the next broadcast */ }
+  system(a, 'The gates of the Realm lead to the holds of Skyrim. Step through one when you are ready.');
+  log(`${display(a)} stays in the Realm to start in Skyrim (${why})`);
+};
+// Every way out of creation goes through here: the deity step's answer, its timeout, and no deity step at all
+const leaveRealm = (a) => {
+  try {
+    if (!askCyrodiil()) return sendToArrival(a);
+    if (mp.get(a, 'isOnline') === false || creationPending(a)) return;
+    if (globalThis.__dboNameHold && globalThis.__dboNameHold(a)) { setTimeout(() => leaveRealm(a), 20000); return; }
+    if (!inHub(a)) return leftRealm(a);
+    const id = a >>> 0;
+    if (!creation.has(id) || startPending.has(id)) return;   // already answered, or the prompt is up
+    const t = (cfg.playtest && cfg.playtest.cyrodiilPrompt) || {};
+    const asked = Date.now();
+    startPending.set(id, asked);
+    openWidget(a, {
+      type: 'contextMenu', id: START_WIDGET_ID, mode: 'menu',
+      targetName: t.title || 'Where does your story begin: Cyrodiil or Skyrim?',
+      actions: [{ id: 'cyrodiil', label: t.yes || 'Cyrodiil: the road into Bruma, by the Pale Pass' }, { id: 'skyrim', label: t.no || 'Skyrim: stay, and walk through the gate of a hold' }],
+      events: { action: 'dbo:startChoose', close: 'dbo:startClose' },
+    }, true);
+    log(`${display(a)} was asked whether to travel to Cyrodiil`);
+    setTimeout(() => { if (startPending.get(id) === asked) stayInRealm(a, 'no answer'); }, START_PROMPT_MS);
+  } catch (e) { log('start prompt failed', e.message); sendToArrival(a); }
+};
+onUi('startChoose', (a, args) => {
+  if (!startPending.has(a >>> 0)) return;
+  if (String((args && args[0]) || '') === 'cyrodiil') {
+    startPending.delete(a >>> 0);
+    closeWidget(a, START_WIDGET_ID);
+    log(`${display(a)} chose to travel to Cyrodiil`);
+    sendToArrival(a);
+  } else stayInRealm(a, 'chose Skyrim');
+});
+onUi('startClose', (a) => { if (startPending.has(a >>> 0)) stayInRealm(a, 'closed the prompt'); });
 // ---- a name of its own before the world (server\naming.js): /name for a character left as "Prisoner" ----------------
 // The naming.js loader sits below onUi (naming.js registers its panel events with it at load; a const in the TDZ
 // before that line made every load fail at 05:06Z, 2026-09-29)
 function inHubForName(a) { try { return String(mp.get(a, 'worldOrCellDesc') || '').toLowerCase() === String(HUB.cellOrWorldDesc).toLowerCase(); } catch (e) { return false; } }
 // Choosing a god is the last creation step (prayer.js): the picker opens in the hub and the move to the arrival waits
-// for a choice or Not yet. A picker that never answers must not strand anyone in the Realm, whose gates teleport nobody.
+// for a choice or Not yet. A picker that never answers must not strand anyone in the Realm: with the region lock on the
+// gates lead to the arrival, and with Skyrim open (leaveRealm above) the gates lead to the holds.
 const DEITY_STEP_MAX_MS = 5 * 60000;
 const inHub = (a) => { try { return String(mp.get(a, 'worldOrCellDesc') || '').toLowerCase() === String(HUB.cellOrWorldDesc).toLowerCase(); } catch (e) { return false; } };
 globalThis.__dboAtCreationEnd = (a) => inHub(a) && !creationPending(a);
@@ -2372,15 +2429,15 @@ const CREATION_MOVE_MS = 9000;
 const creatorClosedAt = globalThis.__dboCreatorClosedAt instanceof Map ? globalThis.__dboCreatorClosedAt : (globalThis.__dboCreatorClosedAt = new Map());
 globalThis.__dboCreationEndDone = (a) => {
   const wait = Math.max(2500, CREATION_MOVE_MS - (Date.now() - (creatorClosedAt.get(a) || 0)));
-  setTimeout(() => sendToArrival(a), wait);
+  setTimeout(() => leaveRealm(a), wait);
 };
 const endCreation = (a) => {
   let opened = false;
   try { opened = typeof globalThis.__dboDeityCreationOpen === 'function' && inHub(a) && globalThis.__dboDeityCreationOpen(a); }
   catch (e) { log('deity step failed', e.message); }
-  if (!opened) return sendToArrival(a);
+  if (!opened) return leaveRealm(a);
   log(`${display(a)} is choosing a god before leaving the Realm`);
-  setTimeout(() => sendToArrival(a), DEITY_STEP_MAX_MS);
+  setTimeout(() => leaveRealm(a), DEITY_STEP_MAX_MS);
 };
 // The original is stored once so a hot reload re-wraps the same function instead of stacking.
 if (!globalThis.__dboAppearanceHookPrev) {
@@ -3131,7 +3188,8 @@ try {
   delete require.cache[NAMING_JS];
   require(NAMING_JS)({ mp, log, personal, audit, who, display, registerChatCommand, onlineActors, every, profileOf, inCreation: (a) => creationPending(a),
     onUi, openWidget, closeWidget, inHub: (a) => inHubForName(a) });
-  globalThis.__dboNamed = (a) => { if (inHubForName(a)) sendToArrival(a); };
+  // Named at last: the same way out of the Realm as the deity step's (the Cyrodiil or Skyrim question while Skyrim is open)
+  globalThis.__dboNamed = (a) => { if (inHubForName(a)) leaveRealm(a); };
 } catch (e) { log('naming.js failed to load:', e.stack || e.message); globalThis.__dboNameHold = null; globalThis.__dboNamed = null; globalThis.__dboNameKey = null; globalThis.__dboNameTaken = null; }
 // ---- the player panel (U) ----------------------------------------------------------------------------------------------
 // The same topics /help lists, as a window: a topic added to HELP_GROUPS reaches both. Each entry is a command with one

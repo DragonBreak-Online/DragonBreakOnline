@@ -10,18 +10,23 @@
 //  - border doors refuse everyone; admins are never bounced (they can /tp anywhere to test).
 //
 // gamemode-config.json "playtest": { enabled, name, arrival: { world, pos, rotZ }, allowedWorlds: [desc],
-//   allowedPlugins: [name], allowedCells: [desc], blockedDoors: [desc], graceSeconds, checkSeconds }
+//   allowedPlugins: [name], allowedCells: [desc], blockedDoors: [desc], graceSeconds, checkSeconds,
+//   closedPlugins: [name], gatesToArrival, closedMessage }
+// closedPlugins (Nate, 12 Oct: Skyrim and Bruma open, every other land closed): when set, a place whose form comes from
+// any plugin NOT in this list is allowed too, so the open region is "everything but these lands". gatesToArrival false
+// lets the hub gates lead to the Skyrim holds again. closedMessage replaces "The road to Skyrim is closed".
 'use strict';
 
 module.exports = (api) => {
   const { mp, log, personal, system, registerChatCommand, display, who, audit, onlineActors, isAdmin, sendPacket, cfg, hubDesc, connectedAt, every } = api;
-  const C = Object.assign({ enabled: false, name: 'the playtest region', arrival: null, allowedWorlds: [], allowedPlugins: [], allowedCells: [], blockedDoors: [], graceSeconds: 60, checkSeconds: 5 }, cfg.playtest || {});
+  const C = Object.assign({ enabled: false, name: 'the playtest region', arrival: null, allowedWorlds: [], allowedPlugins: [], allowedCells: [], blockedDoors: [], graceSeconds: 60, checkSeconds: 5, closedPlugins: [], gatesToArrival: true, closedMessage: 'The road to Skyrim is closed for now.' }, cfg.playtest || {});
 
   const normDesc = (d) => { const s = String(d || ''); const i = s.indexOf(':'); if (i < 0) return s.toLowerCase(); const n = parseInt(s.slice(0, i), 16); return (Number.isFinite(n) ? n.toString(16) : s.slice(0, i).toLowerCase()) + ':' + s.slice(i + 1).toLowerCase(); };
   const idOf = (desc) => { try { return mp.getIdFromDesc(desc) >>> 0; } catch (e) { return 0; } };
   const allowedWorlds = new Set([hubDesc, ...C.allowedWorlds].map(normDesc));
   const allowedCells = new Set((C.allowedCells || []).map(normDesc));
   const allowedPlugins = new Set((C.allowedPlugins || []).map((p) => String(p).toLowerCase()));
+  const closedPlugins = new Set((C.closedPlugins || []).map((p) => String(p).toLowerCase()));
   const blockedDoors = new Set((C.blockedDoors || []).map(idOf).filter(Boolean));
   // blockedDoors that are automatic load doors (walked into, not activated): refused ones send the player back
   const autoDoors = new Set((C.autoDoors || ['877c2:BSHeartland.esm']).map(idOf).filter(Boolean));
@@ -45,7 +50,8 @@ module.exports = (api) => {
     if (!desc) return true; // unknown: never bounce on a failed read
     if (allowedWorlds.has(desc) || allowedCells.has(desc)) return true;
     const plugin = desc.slice(desc.indexOf(':') + 1);
-    return allowedPlugins.has(plugin);
+    if (allowedPlugins.has(plugin)) return true;
+    return closedPlugins.size > 0 && !closedPlugins.has(plugin);
   };
   const sendToArrival = (a, why) => {
     try { mp.set(a, 'locationalData', arrival); return true; } catch (e) { log('playtest move failed', e.message); return false; }
@@ -53,7 +59,7 @@ module.exports = (api) => {
 
   // Hub gates: gamemode.js asks before its own hold teleport. Returns true when it handled the gate.
   globalThis.__dboPlaytestGate = (casterId) => {
-    if (!active()) return false;
+    if (!active() || C.gatesToArrival === false) return false;
     if (sendToArrival(casterId, 'gate')) system(casterId, `You step through the gate to ${C.name}.`);
     return true;
   };
@@ -84,7 +90,7 @@ module.exports = (api) => {
       toldAt.set(casterId, now);
       if (trip) {
         denyAt.set(casterId, now);
-        personal(casterId, `The road to Skyrim is closed for now. You find your way back to ${C.name}.`);
+        personal(casterId, `${C.closedMessage} You find your way back to ${C.name}.`);
         setTimeout(() => {
           try {
             // Audited, so a return that did not happen shows (7 Oct 04:54: nothing in the log said whether it ran)
@@ -93,7 +99,7 @@ module.exports = (api) => {
             if (sendToArrival(casterId, 'border')) audit(`PLAYTEST ${who(casterId)} walked into the closed automatic door ${door} and was taken back to ${C.name}`);
           } catch (e) { log('playtest: border return failed', e.message); }
         }, 300);
-      } else personal(casterId, `The road to Skyrim is closed for now. The alpha begins in ${C.name}.`);
+      } else personal(casterId, `${C.closedMessage} The alpha begins in ${C.name}.`);
     }
     return false;
   };
@@ -168,7 +174,7 @@ module.exports = (api) => {
         if (now - (bounced.get(a) || 0) < 10000) continue;
         bounced.set(a, now);
         if (sendToArrival(a, 'bounce')) {
-          system(a, `Skyrim is closed for now: the alpha begins in ${C.name}. You have been brought back.`);
+          system(a, cfg.playtest && cfg.playtest.closedMessage ? `${C.closedMessage} You have been brought back to ${C.name}.` : `Skyrim is closed for now: the alpha begins in ${C.name}. You have been brought back.`);
           audit(`PLAYTEST ${who(a)} was outside the region (${place}) and was returned to ${C.name}`);
         }
       } catch (e) { log('playtest check failed', e.message); }
