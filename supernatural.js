@@ -203,6 +203,14 @@ module.exports = (api) => {
     return r && v ? [r, v] : null;
   })();
   if (snowElfRace) { VAMPIRE_RACES.set(snowElfRace[0], snowElfRace[1]); MORTAL_RACES.set(snowElfRace[1], snowElfRace[0]); }
+  // The DLE's DBOReachmanRace and its vampire (config reachmanRace) the same way
+  const reachmanRace = (() => {
+    const M = cfg.reachmanRace || {};
+    const rec = (d) => { const id = d ? (() => { try { return mp.getIdFromDesc(String(d)) >>> 0; } catch (e) { return 0; } })() : 0; let r = null; try { r = id ? recordOf(id) : null; } catch (e) { r = null; } const t = r && (r.record ? r.record.type : r.type); return t && String(t) === 'RACE' ? id : 0; };
+    const r = rec(M.race), v = rec(M.vampire);
+    return r && v ? [r, v] : null;
+  })();
+  if (reachmanRace) { VAMPIRE_RACES.set(reachmanRace[0], reachmanRace[1]); MORTAL_RACES.set(reachmanRace[1], reachmanRace[0]); }
   const keywordsOf = (id) => fieldIds(recordOf(id), 'KWDA').map((k) => globalOf(id, k));
   const hasKeyword = (id, kw) => !!kw && keywordsOf(id).includes(kw);
   const effectsOf = (id) => fieldIds(recordOf(id), 'EFID').map((e) => globalOf(id, e));
@@ -282,6 +290,8 @@ module.exports = (api) => {
   if (maormerRace) FAMILY.set(maormerRace[0], 'highelf');
   // A Snow Elf has the High Elf's body too (the DLE lists DBOSnowElfRace in the High Elf's eyes and vampire eyes)
   if (snowElfRace) FAMILY.set(snowElfRace[0], 'highelf');
+  // A Reachman is a man of Breton stock on the Breton morph, with vanilla human heads: the human tells
+  if (reachmanRace) FAMILY.set(reachmanRace[0], 'human');
   const familyOf = (race) => FAMILY.get(race) || FAMILY.get(MORTAL_RACES.get(race)) || null;
   const isEyePart = (id) => fieldIds(recordOf(id), 'PNAM')[0] === 2;
   // A head part's extra parts (HNAM), and theirs in turn: eyes such as the blind ones carry an overlay part that the

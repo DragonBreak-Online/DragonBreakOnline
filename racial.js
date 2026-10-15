@@ -35,7 +35,7 @@
 //     activeUntil } is the character's, so a relog neither resets the wait nor ends the buff.
 'use strict';
 
-const RACES = ['altmer', 'argonian', 'bosmer', 'breton', 'dunmer', 'imperial', 'khajiit', 'nord', 'orc', 'redguard', 'maormer', 'snowelf', 'goblin'];
+const RACES = ['altmer', 'argonian', 'bosmer', 'breton', 'dunmer', 'imperial', 'khajiit', 'nord', 'orc', 'redguard', 'maormer', 'snowelf', 'goblin', 'reachman'];
 // Each race by its own RACE record and its vampire variant (Skyrim.esm, index 0: the same pairs regions.js and
 // supernatural.js use)
 const RACE_IDS = {
@@ -113,6 +113,14 @@ const DEFAULTS = {
   // set: harder blows and quicker stamina instead
   goblin: { resistPoison: 0.5, goldBonus: 0.1, xp: { harvesting: 1.15 },
     power: { name: 'Feeding Frenzy', seconds: 60, buffs: { meleeDamage: 0.15, staminaRegen: 1.5 } } },
+  // The Reachmen (the DLE's DBOReachmanRace, config reachmanRace; PROPOSED 15 Oct, waiting on Nate): Bretons of the Reach
+  // whose blood is mixed with Nord and Orc, witch-folk of the hagravens. Only with the overhaul on. Mongrel Blood (the
+  // Reachman Race mod's own ability, 20% magic, 15% poison, 5% disease and frost) in our style: a Breton's magic share,
+  // smaller (15%, as the Maormer's spec had it), and a quarter of the poison the wild races shrug off. Alchemist XP: the
+  // hagravens' brews (the mod's Alchemy +10). Fury of the Reach (the mod's power: 1 min, +10% stamina and magicka
+  // regeneration, +20% attack speed): attack speed is the player's own game, so both regenerations at the timed cap instead
+  reachman: { resistMagic: 0.15, resistPoison: 0.25, xp: { alchemist: 1.15 },
+    power: { name: 'Fury of the Reach', seconds: 60, buffs: { staminaRegen: 1.5, magickaRegen: 1.5 } } },
 };
 const merge = (cfg) => {
   const c = Object.assign({}, DEFAULTS, cfg || {});
@@ -156,10 +164,14 @@ module.exports = (api) => {
   const GV = GR.variants && typeof GR.variants === 'object' ? GR.variants : {};
   const GOBLIN_SLUGS = Object.entries(Object.assign({ goblin: GR.race }, GV)).map(([slug, d]) => [slug, raceRec(d)]).filter(([, id]) => id);
   const GOBLIN_IDS = GOBLIN_SLUGS.map(([, id]) => id);
+  // The DLE's Reachman and its vampire (config reachmanRace), the same way. The creator's slug is 'reachfolk' (charCreatorData.ts,
+  // races.js: a placeholder on the Breton record until now), so the override is filed under it
+  const RR = (cfg && cfg.reachmanRace) || {};
+  const REACHMAN_IDS = [raceRec(RR.race), raceRec(RR.vampire)].filter((x) => x);
   globalThis.__dboGoblinRaces = GOBLIN_IDS;
   globalThis.__dboRaceOverrides = Object.assign(MAORMER_IDS.length ? { maormer: MAORMER_IDS[0] } : {},
-    raceRec(SR.race) ? { snowelf: raceRec(SR.race) } : {}, Object.fromEntries(GOBLIN_SLUGS));
-  log(`racial: DLE races maormer ${MAORMER_IDS.map((x) => x.toString(16))} snowelf ${SNOWELF_IDS.map((x) => x.toString(16))} goblin ${GOBLIN_IDS.map((x) => x.toString(16))}, overhaul ${C.overhaul === true}`);
+    raceRec(SR.race) ? { snowelf: raceRec(SR.race) } : {}, Object.fromEntries(GOBLIN_SLUGS), raceRec(RR.race) ? { reachfolk: raceRec(RR.race) } : {});
+  log(`racial: DLE races maormer ${MAORMER_IDS.map((x) => x.toString(16))} snowelf ${SNOWELF_IDS.map((x) => x.toString(16))} goblin ${GOBLIN_IDS.map((x) => x.toString(16))} reachman ${REACHMAN_IDS.map((x) => x.toString(16))}, overhaul ${C.overhaul === true}`);
   const rpRace = (a) => { try { const rp = mp.get(a >>> 0, 'private.rp'); return rp && rp.race ? String(rp.race).toLowerCase() : ''; } catch (e) { return ''; } };
   // The race whose gift this player has now, or '' (not a player, a beast form, an unknown race, switched off)
   const raceOf = (a) => memoised('race', a, raceNow);
@@ -170,10 +182,15 @@ module.exports = (api) => {
     if (MAORMER_IDS.includes(id)) return C.overhaul === true ? 'maormer' : 'altmer';
     if (SNOWELF_IDS.includes(id)) return C.overhaul === true ? 'snowelf' : 'altmer';
     if (GOBLIN_IDS.includes(id)) return C.overhaul === true ? 'goblin' : '';
+    // Without the overhaul a Reachman has the Breton's gift (their morph race and their forebears)
+    if (REACHMAN_IDS.includes(id)) return C.overhaul === true ? 'reachman' : 'breton';
     const r = RACE_OF_ID.get(id) || '';
     // A Maormer made before the DLE's race stands on the High Elf record (charCreatorData.ts): without this every Maormer
     // counts as an Altmer
-    return r === 'altmer' && C.overhaul === true && rpRace(a) === 'maormer' ? 'maormer' : r;
+    if (r === 'altmer' && C.overhaul === true && rpRace(a) === 'maormer') return 'maormer';
+    // A Reachfolk made in the creator before the DLE's race stands on the Breton record (its placeholder): the Reachman's gift
+    if (r === 'breton' && C.overhaul === true && rpRace(a) === 'reachfolk') return 'reachman';
+    return r;
   };
   const healthOf = (a) => { try { const p = mp.get(a >>> 0, 'percentages'); return p ? Number(p.health) : NaN; } catch (e) { return NaN; } };
 
@@ -311,12 +328,12 @@ module.exports = (api) => {
     const rs = resists(src);
     let m = 1;
     const resist = (share) => { m *= 1 - clamp01(num(share, 0)); };
-    if (rs.has(AV.poison) && (race === 'argonian' || race === 'bosmer' || race === 'redguard' || race === 'goblin')) resist(R.resistPoison);
+    if (rs.has(AV.poison) && (race === 'argonian' || race === 'bosmer' || race === 'redguard' || race === 'goblin' || race === 'reachman')) resist(R.resistPoison);
     if (race === 'dunmer' && rs.has(AV.fire)) resist(R.resistFire);
     if ((race === 'nord' || race === 'snowelf') && rs.has(AV.frost)) resist(R.resistFrost);
     if (race === 'maormer' && rs.has(AV.shock)) resist(R.resistShock);
     // Magic resistance: the race's own share and the power's add up (Dragonskin: 25% + 25% = 50%), under the cap
-    const magic = (race === 'breton' || race === 'maormer' ? Math.max(0, num(R.resistMagic, 0)) : 0) + buff(tgt, 'resistMagic');
+    const magic = (race === 'breton' || race === 'maormer' || race === 'reachman' ? Math.max(0, num(R.resistMagic, 0)) : 0) + buff(tgt, 'resistMagic');
     if (magic > 0 && isMagicSource(src)) resist(magic);
     const b = activeBuffs(tgt);
     if (b) { resist(b.damageTaken); if (!isMagicSource(src)) resist(b.physicalTaken); }
@@ -702,9 +719,9 @@ module.exports = (api) => {
   // The Journal's Profile and /status: the race's passive gifts in words (Nat, 13 Oct: "show the passives in the profile tab"),
   // read from the same numbers the hooks use, so a config change shows here too. XP boosts only with the overhaul on
   const RACE_NAME = { altmer: 'High Elf', argonian: 'Argonian', bosmer: 'Wood Elf', breton: 'Breton', dunmer: 'Dark Elf', imperial: 'Imperial',
-    khajiit: 'Khajiit', nord: 'Nord', orc: 'Orc', redguard: 'Redguard', maormer: 'Maormer', snowelf: 'Snow Elf', goblin: 'Goblin' };
+    khajiit: 'Khajiit', nord: 'Nord', orc: 'Orc', redguard: 'Redguard', maormer: 'Maormer', snowelf: 'Snow Elf', goblin: 'Goblin', reachman: 'Reachman' };
   const SKILL_NAME = { arcane: 'Arcane', defense: 'Defence', harvesting: 'Gatherer', archery: 'Archery', blade: 'Blade', blunt: 'Blunt',
-    priest: 'Priest', unarmed: 'Martial Arts', blacksmith: 'Blacksmithing' };
+    priest: 'Priest', unarmed: 'Martial Arts', blacksmith: 'Blacksmithing', alchemist: 'Alchemy' };
   const pct = (v) => Math.round(num(v, 0) * 100);
   const giftsLine = (a) => {
     const race = raceOf(a); if (!race) return '';

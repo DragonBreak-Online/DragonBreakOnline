@@ -204,9 +204,12 @@ const loadFamilies = (mp, cfg, log) => {
       return r && r.record && String(r.record.type) === 'RACE' ? id : 0;
     } catch (e) { return 0; }
   };
-  const M = (cfg && cfg.maormerRace) || {};
-  const r = raceId(M.race), v = raceId(M.vampire);
-  if (r && v) { fam.set(r, 'MaormerRace'); fam.set(v, 'MaormerRace'); }
+  // The DLE's own pairs: the Maormer, the Snow Elf and the Reachman (config maormerRace, snowElfRace, reachmanRace)
+  for (const [key, family] of [['maormerRace', 'MaormerRace'], ['snowElfRace', 'DBOSnowElfRace'], ['reachmanRace', 'DBOReachmanRace']]) {
+    const M = (cfg && cfg[key]) || {};
+    const r = raceId(M.race), v = raceId(M.vampire);
+    if (r && v) { fam.set(r, family); fam.set(v, family); }
+  }
   return fam;
 };
 
