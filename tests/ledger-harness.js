@@ -35,6 +35,8 @@ let atBoard = new Set([ME]);
 const said = [];
 const letters = [];
 const commands = {};
+const shares = {};   // who lets whom see them about (gamemode.js private.presenceShare)
+const shareSet = (a) => shares[a] || (shares[a] = new Set());
 require(MODULE)({
   mp: {
     getIdFromDesc: (d) => parseInt(d, 16),
@@ -52,6 +54,10 @@ require(MODULE)({
   metOf: (a) => chars[a].met.slice(), forgetMet: (a, b) => { chars[a].met = chars[a].met.filter((x) => x !== b); },
   sendPigeon: (a, to, text, zone) => { letters.push({ a, to, text, zone }); return { ok: true, text: `Your pigeon flies to ${chars[to].name}.` }; },
   boardZoneNear: (a) => (atBoard.has(a) ? 'bruma' : null), zoneOfActor: () => ({ id: 'bruma' }), cfg: {},
+  // gamemode.js presenceShown: online, met both ways and shared both ways
+  presenceShown: (v, c, online) => online.has(c) && chars[c].met.includes(v) && chars[v].met.includes(c) && shareSet(c).has(v) && shareSet(v).has(c),
+  togglePresenceShare: (a, b) => { const s = shareSet(a); if (s.has(b)) { s.delete(b); return false; } s.add(b); return true; },
+  presenceSharesOf: (a) => [...shareSet(a)],
 });
 
 let failures = 0;
@@ -63,7 +69,15 @@ let r = run(ME, '');
 check('at a notice board it opens and counts everyone met', /Your ledger at the notice board: 4 contacts/.test(r), r);
 check('your own factions head the page', /Your factions: Fighters Guild \(Associate\)/.test(r));
 check('a shared faction is its own section', /-- Fighters Guild --\nFlo Riahn #GILD/.test(r), r);
-check('a shared family name (gro-/gra- alike) files them under Family', /-- Family --\nBolar gra-Shatul #CLAN \(about\)/.test(r), r);
+check('a shared family name (gro-/gra- alike) files them under Family', /-- Family --\nBolar gra-Shatul #CLAN\n/.test(r), r);
+check('nobody is shown about until both share (L2-2)', !/\(about\)/.test(r), r);
+r = run(ME, 'share Bolar');
+check('/ledger share <name> shares with that one contact', /Bolar gra-Shatul will see when you are about/.test(r), r);
+check('...one side sharing is not enough', !/\(about\)/.test(run(ME, '')));
+check('...and the switch works away from any ledger', /Argosh gro-Shatul will see when you are about/.test(run(CLAN, 'share Argosh')));
+r = run(ME, '');
+check('both shared: the contact online is about, the others not', /Bolar gra-Shatul #CLAN \(about\)/.test(r) && (r.match(/\(about\)/g) || []).length === 1, r);
+check('one contact\'s page says you share with them', /You let them see when you are about/.test(run(ME, 'Bolar')));
 check('the rest are acquaintances', /-- Acquaintances --\nEola #STRA\nEorlund Gray-Mane #FRND/.test(r), r);
 check('the help works anywhere', /ledger forget/.test(run(OUTSIDER, 'help')));
 

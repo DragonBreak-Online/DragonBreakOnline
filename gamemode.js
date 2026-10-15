@@ -1062,6 +1062,25 @@ every('meet', MEET_TICK_MS, () => {
 const forgetMet = (a, b) => {
   try { mp.set(a, 'private.metActors', metOf(a).filter((x) => x !== b)); } catch (e) { log('forget failed', e.message); }
   metCache.delete(a);
+  // A share goes with the contact: meeting again does not bring it back
+  const id = Number(b) >>> 0; const shares = presenceSharesOf(a);
+  try { if (shares.includes(id)) mp.set(a, 'private.presenceShare', shares.filter((x) => x !== id)); } catch (e) { log('forget share failed', e.message); }
+};
+// The contacts a character lets see when they are about (/ledger share), by actor id
+const presenceSharesOf = (a) => { try { const r = mp.get(a, 'private.presenceShare'); return Array.isArray(r) ? r.map((x) => Number(x) >>> 0) : []; } catch (e) { return []; } };
+// Turns a's share with b on or off; true when it is now on
+const togglePresenceShare = (a, b) => {
+  const id = Number(b) >>> 0; const list = presenceSharesOf(a); const i = list.indexOf(id);
+  if (i >= 0) list.splice(i, 1); else list.push(id);
+  if (list.length > MAX_MET) list.splice(0, list.length - MAX_MET);
+  mp.set(a, 'private.presenceShare', list);
+  return i < 0;
+};
+// c shows as about to v only when online, met both ways and shared both ways (L2-2: anyone met once saw it); online: a Set
+const presenceShown = (v, c, online) => {
+  v = Number(v) >>> 0; c = Number(c) >>> 0;
+  if (v === c || !(online instanceof Set ? online : new Set(onlineActors())).has(c)) return false;
+  return presenceSharesOf(c).includes(v) && presenceSharesOf(v).includes(c) && metOf(c).includes(v) && metOf(v).includes(c);
 };
 const takeGold = (a, amount) => {
   // A negative amount would add gold and NaN would empty the purse; every caller checks today, this is the backstop
@@ -1253,13 +1272,13 @@ const openPigeonCoop = (a, result, resultKind, view) => {
   const zoneId = boardZoneNear(a);
   const zone = zoneId ? zoneById(zoneId) : null;
   const admin = isAdmin(a);
-  const online = onlineActors();
+  const online = new Set(onlineActors());
   const price = admin ? 0 : pigeonFee();
   const contacts = [];
   for (const id of metOf(a)) {
     try { if (!mp.get(id, 'appearance')) continue; } catch (e) { continue; }
     // Who they met: a contact behind a mask or in a beast form keeps their own name here
-    contacts.push({ id, name: ownNameOf(id), tag: tagOf(id), online: online.includes(id), price });
+    contacts.push({ id, name: ownNameOf(id), tag: tagOf(id), online: presenceShown(a, id, online), price });
   }
   contacts.sort((x, y) => x.name.localeCompare(y.name));
   const left = PIGEON_COOLDOWN_MS - (Date.now() - (pigeonLastSent.get(profileOf(a)) || 0));
@@ -7147,7 +7166,7 @@ try {
   const LEDGER_JS = path.resolve('ledger.js');
   delete require.cache[LEDGER_JS];
   require(LEDGER_JS)({ mp, log, ownNameOf, ownDisplay, personal, audit, who, nameOf, tagOf, profileOf, onlineActors, registerChatCommand, isAdmin, isWorldspace,
-    metOf, forgetMet, sendPigeon, boardZoneNear, zoneOfActor, cfg });
+    metOf, forgetMet, sendPigeon, boardZoneNear, zoneOfActor, cfg, presenceShown, togglePresenceShare, presenceSharesOf });
 } catch (e) { log('ledger.js failed to load:', e.stack || e.message); }
 
 // ---- Oblivion-style lockpicking for cell doors and dungeon chests (server\lockpick.js, config "lockpick") -------

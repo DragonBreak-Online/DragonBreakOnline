@@ -5,7 +5,7 @@
 // inside a house the character owns or rents. Contacts sort themselves into the factions both belong to and into
 // family (marked by hand, or by a shared family name), then the reader's own groups, then acquaintances. Each contact
 // can carry a private note. From the ledger a letter can be sent by pigeon, and a contact can be forgotten: they come
-// back only by meeting again in person.
+// back only by meeting again in person. A contact shows as "about" only when both met and both chose /ledger share.
 //
 // Per character in private.ledger: { <actorId>: { group?: string ('none' turns the automatic family off), note?: string } }.
 // Ledger points in ledger-points.json (runtime, gitignored): [{ name, where, pos, faction?, by, at }].
@@ -20,6 +20,10 @@ module.exports = (api) => {
   // contact listed as "Werewolf" beside their #TAG and factions told the reader who the beast was (gamemode.js
   // ownNameOf; tracker 1559074270959640676)
   const ownNameOf = typeof api.ownNameOf === 'function' ? api.ownNameOf : nameOf;
+  // gamemode.js decides who sees whom about (met and shared both ways, L2-2); without it nobody is shown about
+  const shown = typeof api.presenceShown === 'function' ? api.presenceShown : () => false;
+  const toggleShare = typeof api.togglePresenceShare === 'function' ? api.togglePresenceShare : null;
+  const sharesOf = typeof api.presenceSharesOf === 'function' ? api.presenceSharesOf : () => [];
 
   const C = Object.assign({ atBoards: true, atHome: true, pointReach: 300, perPage: 15, maxNote: 160, maxGroup: 24 }, cfg.ledger || {});
   const POINTS_FILE = path.resolve('ledger-points.json');
@@ -103,6 +107,7 @@ module.exports = (api) => {
     const mine = new Map(guildsOf(a).map((g) => [g.id, g]));
     const myFamily = familyName(ownNameOf(a));
     const b = book(a);
+    const mineShared = new Set(sharesOf(a));
     const out = [];
     for (const id of metOf(a)) {
       try { if (!mp.get(id, 'appearance')) continue; } catch (e) { continue; }
@@ -112,7 +117,7 @@ module.exports = (api) => {
       let group = e.group || '';
       if (!group && myFamily && familyName(name) === myFamily) group = 'Family';
       if (group === 'none') group = '';
-      out.push({ id, name, tag: tagOf(id), online: online.has(id), group, note: e.note || '', shared });
+      out.push({ id, name, tag: tagOf(id), online: shown(a, id, online), sharing: mineShared.has(Number(id) >>> 0), group, note: e.note || '', shared });
     }
     return out.sort((x, y) => x.name.localeCompare(y.name));
   };
@@ -183,6 +188,7 @@ module.exports = (api) => {
     '/ledger group <name> <group>: file them under Family, Friends or a group of your own; "none" takes them out',
     '/ledger letter <name> <text>: send them a letter by pigeon from here',
     '/ledger forget <name>: strike them out; you will know them again only by meeting in person',
+    '/ledger share <name>: let them see when you are about, or stop it; you see each other about only if both share (works anywhere)',
     'A ledger lies at every notice board, in your own home, and where a court or guild keeps one.',
   ];
 
@@ -191,6 +197,14 @@ module.exports = (api) => {
     const [sub] = text.split(/\s+/);
     const cmd = (sub || '').toLowerCase();
     if (cmd === 'help') { for (const h of HELP) personal(a, h); return; }
+    // A privacy switch, so it works anywhere and not only at a ledger
+    if (cmd === 'share') {
+      const target = text.slice(sub.length).trim();
+      if (!target) return personal(a, 'Usage: /ledger share <name>. They see when you are about only if they share with you too.');
+      const r = findContact(a, target); if (r.err) return personal(a, r.err);
+      if (!toggleShare) return personal(a, 'Sharing when you are about is not available right now.');
+      return personal(a, toggleShare(a, r.c.id) ? `${r.c.name} will see when you are about, once they share with you too.` : `${r.c.name} no longer sees when you are about.`);
+    }
     const where = pointAt(a);
     if (!where) return personal(a, 'There is no ledger here. One lies at every notice board, in your own home, and where a court or guild keeps one.');
     const rest = text.slice(sub ? sub.length : 0).trim();
@@ -238,8 +252,9 @@ module.exports = (api) => {
     personal(a, `${c.name} #${c.tag}${c.online ? ', about in the world now' : ''}.`);
     if (c.shared.length) personal(a, `Shares with you: ${c.shared.map((s) => `${s.name} (${s.title})`).join(', ')}.`);
     if (c.group) personal(a, `Filed under ${c.group}.`);
+    if (c.sharing) personal(a, 'You let them see when you are about. /ledger share <name> stops it.');
     personal(a, c.note ? `Your note: ${c.note}` : 'No note. /ledger note <name> <text> writes one.');
-  }, { help: 'help | [page] | <name> | note | group | letter | forget: the ledger of everyone you have met' });
+  }, { help: 'help | [page] | <name> | note | group | letter | forget | share: the ledger of everyone you have met' });
 
   // Admins mark where a court or guild keeps its ledger: at their own feet, optionally for one faction's members only
   registerChatCommand('ledgerpoint', (a, args) => {
