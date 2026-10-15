@@ -1,5 +1,5 @@
 'use strict'
-// The Discord audit poster against a fake Discord on mock timers: long lines, well-formed text, batches, waits
+// The Discord audit poster against a fake Discord on mock timers: refused batches, long lines, well-formed text, waits
 
 const { test } = require('node:test')
 const assert = require('node:assert/strict')
@@ -55,6 +55,41 @@ async function run(t, n) {
 const STAMP = '[1970-01-01 00:00:00] '
 const texts = lines => lines.map(l => l.replace(/^\[[\d-]+ [\d:]+\] /, ''))
 
+test('a batch Discord refuses for good goes one line per post, and only the line it refuses alone is dropped', async t => {
+  const { audit, dropped } = load(t)
+  const discord = fakeDiscord(t)
+  audit.log('TICKET opened #pk-0001')
+  audit.log('REPORT problem REFUSED')
+  audit.log('PERM staffer gained role(s): Lead GM')
+  await run(t, 1)
+  assert.deepEqual(discord.sent.map(c => c.split('\n').length), [3], 'the three lines go as one batch first')
+  await run(t, 6)
+  audit.log('NAME staffer nickname "a" -> "b"')
+  await run(t, 2)
+  assert.deepEqual(texts(discord.delivered), ['TICKET opened #pk-0001', 'PERM staffer gained role(s): Lead GM', 'NAME staffer nickname "a" -> "b"'])
+  assert.equal(dropped().length, 1, dropped().join('\n'))
+  assert.match(dropped()[0], /REPORT problem REFUSED.*\(400\)/)
+  const posts = discord.sent.length
+  await run(t, 10)
+  assert.equal(discord.sent.length, posts, 'nothing is left to send again')
+})
+
+test('a rate limit while the lines go one at a time keeps them and their order', async t => {
+  const { audit, dropped } = load(t)
+  const discord = fakeDiscord(t)
+  audit.log('L1')
+  audit.log('L2 REFUSED')
+  audit.log('L3')
+  await run(t, 1)
+  discord.answer = [429, { retry_after: 3 }]
+  await run(t, 1)
+  discord.answer = null
+  await run(t, 8)
+  assert.deepEqual(texts(discord.delivered), ['L1', 'L3'])
+  assert.ok(discord.sent.slice(1).every(c => !c.includes('\n')), 'one line per post after the refusal')
+  assert.equal(dropped().length, 1)
+})
+
 test('a line too long for one post is cut to fit and marked, and the lines after it still go', async t => {
   const { audit } = load(t)
   const discord = fakeDiscord(t)
@@ -107,8 +142,11 @@ for (const [status, body, wait] of [
   [429, { message: 'You are being rate limited.', retry_after: 12.5, global: false }, 12500],
   [500, null, 5000],
   [502, null, 5000],
+  [400, '<html>400 Bad Request</html>', 5000],
+  [400, null, 5000],
+  [408, null, 5000],
 ]) {
-  test(`a ${status} keeps the batch whole and waits ${wait / 1000} s before sending it again`, async t => {
+  test(`a ${status}${status === 400 ? (body ? ' with a page, not Discord JSON,' : ' with no body') : ''} keeps the batch whole and waits ${wait / 1000} s before sending it again`, async t => {
     const { audit, dropped } = load(t)
     const discord = fakeDiscord(t)
     discord.answer = [status, body]
