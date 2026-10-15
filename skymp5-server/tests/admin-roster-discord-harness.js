@@ -1,5 +1,6 @@
 // Scripted test for who sees Discord ids and names in the F7 admin roster (security audit L2-7 / L3-05, 15 Oct): Lead GM
-// and above see each account's Discord id and name, online and offline, as before; a Trial GM gets only who is online, with no Discord, address or hardware id, and the backend's account list is not fetched for them.
+// and above see each account's Discord id and name, online and offline, as before; a GM's rows carry neither; a Trial GM
+// gets only who is online, with no Discord, address or hardware id, and the backend's account list is not fetched for them.
 // The tools still work: the rows keep the actor id, name and #TAG a teleport or rename acts on.
 // It bundles adminSystem.ts with esbuild (settings, NPC spawns, mastery and the ban store stubbed) and fakes the native
 // server and the backend's GET /:key/players with made-up accounts. Run it from skymp5-server with node_modules present:
@@ -118,6 +119,24 @@ const settle = async () => { for (let i = 0; i < 30; i++) await turn(); };
     const mira = rowOf(menu.players, MIRA.profileId), off = rowOf(menu.players, OFFLINE.profileId);
     check(`${s.tier}: an online player's row carries the Discord id and name`, !!mira && mira.online && mira.d === MIRA.discordId && mira.dn === MIRA.discordName, mira);
     check(`${s.tier}: an offline account's row carries them too`, !!off && !off.online && off.d === OFFLINE.discordId && off.dn === OFFLINE.discordName, off);
+  }
+
+  // ---- a GM: the same roster with no Discord id or name in it ----
+  const gm = STAFF.find((x) => x.tier === 'gm');
+  {
+    const { menu } = await menuFor(gm, 'GM');
+    const rows = menu.players;
+    check('GM: no row carries a Discord id or name', rows.length > 0 && rows.every((r) => r.d === '' && r.dn === ''), rows.map((r) => [r.p, r.d, r.dn]));
+    check('GM: no Discord value anywhere in the menu', leaks(menu).length === 0, leaks(menu));
+    const mira = rowOf(rows, MIRA.profileId), off = rowOf(rows, OFFLINE.profileId);
+    check('GM: online players keep the actor id, name and #TAG the tools act on', !!mira && mira.online && mira.a === MIRA.actorId.toString(16) && mira.n === MIRA.name && mira.t === MIRA.tag, mira);
+    check('GM: a player with no profile yet is listed, without Discord', rows.some((r) => r.online && r.n === NOPROFILE.name && r.d === ''), rows.map((r) => r.n));
+    check('GM: offline accounts are still listed by profile, as before', !!off && !off.online && off.ip !== '' && off.hwid === 'hwid-offline', off);
+    check('GM: the menu still carries the GM caps, modes and bans', menu.caps && menu.caps.ban === false && menu.caps.spawn === false && Array.isArray(menu.modes) && menu.modes.length === 7 && Array.isArray(menu.bans), menu.caps);
+    packets.length = 0;
+    sys.customPacket(gm.userId, 'adminAction', { customPacketType: 'adminAction', action: 'teleportTo', target: mira ? mira.a : '' }, ctx);
+    const r = (packets.find((x) => x.p.customPacketType === 'adminActionResult') || {}).p;
+    check('GM: teleport to a player from the roster still works', !!r && r.ok === true && props[gm.actorId].locationalData && props[gm.actorId].locationalData.cellOrWorldDesc === 'cell-mira', r);
   }
 
   // ---- a Trial GM: who is online, by character name and #TAG, nothing that names an account ----

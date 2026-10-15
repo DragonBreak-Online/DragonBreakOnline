@@ -69,6 +69,7 @@ type Mp = any;
 //                     { customPacketType: "adminActionResult", ok, text }
 // The roster merges online actors with the backend's full player list (GET /:key/players);
 // ips are masked to the first two octets before leaving the server (full ip stays in the backend).
+// Discord ids and names (d, dn) go to Lead GM and above only (DISCORD_ROSTER_TIERS); a Trial GM's menu lists who is online.
 // Non-admin requests are ignored silently; every Insert press sends adminMenuRequest, so that refusal is logged once per user slot.
 
 const MAX_USER_SLOTS = 1024;
@@ -88,6 +89,8 @@ const ADMIN_MODES: Array<{ id: string; label: string }> = [
 const SPAWN_ACTIONS = new Set(["kill", "deleteCharacter", "masteryGrant", "masteryReset", "masterySetTier", "masteryDrop",
   "giveItem", "giveSpells", "giveShouts", "giveWerewolf", "giveVampireLord", "giveDisease", "setSchool", "beastForm", "npcZoneAdd", "npcZoneDelete", "npcZoneReset"]);
 const SPAWN_MODES = new Set(["smite", "healhit"]);
+// Ranks whose roster rows carry each account's Discord id and name (d, dn): Lead GM and above; a GM's rows have them blank
+const DISCORD_ROSTER_TIERS = new Set<AdminTier>(["senior", "developer", "leadgm"]);
 
 // Modes mirrored onto the neighbors-visible ff_adminModes actor property (registered in gamemode.js)
 const MIRRORED_MODES = ["god", "smite", "healhit", "invis", "ghost"];
@@ -317,6 +320,11 @@ export class AdminSystem implements System {
     return rows;
   }
 
+  // The roster as a tier may see it: below Lead GM the Discord id and name are blanked
+  private rosterForTier(tier: AdminTier, rows: any[]): any[] {
+    return DISCORD_ROSTER_TIERS.has(tier) ? rows : rows.map((r) => Object.assign({}, r, { d: "", dn: "" }));
+  }
+
   // The character's #TAG (ff_charTag), or ""
   private tagOf(mp: Mp, actorId: number): string {
     try { return String(mp.get(actorId, "ff_charTag") || "").toUpperCase(); } catch { return ""; }
@@ -444,7 +452,7 @@ export class AdminSystem implements System {
           if (trial) { this.sendTrialMenu(ctx, mp, userId, myActorId, adminProfile); return; }
           mp.sendCustomPacket(userId, JSON.stringify({
             customPacketType: "adminMenu",
-            players: this.buildRoster(ctx, myActorId, adminProfile, backendPlayers),
+            players: this.rosterForTier(tier, this.buildRoster(ctx, myActorId, adminProfile, backendPlayers)),
             locations: this.locations.map(l => ({ name: l.name })),
             modes: this.modesFor(adminProfile),
             npcZones: this.npcSpawns.listZones(),
