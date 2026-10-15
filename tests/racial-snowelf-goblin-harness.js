@@ -25,7 +25,7 @@ check('a Swamp goblin is a goblin, and its slug names its race', R.raceOf(3) ===
 const pv = R.powerView(1);
 check('the Snow Elf power is Glacier Fall', pv && pv.name === 'Glacier Fall', pv);
 check('the Goblin power is Feeding Frenzy', (R.powerView(2) || {}).name === 'Feeding Frenzy', R.powerView(2));
-check('Snow Elf arcane and defense x1.15', Math.abs(R.skillRate(1, 'arcane', 'hit') - 1.15) < 1e-9 && Math.abs(R.skillRate(1, 'defense', 'hit') - 1.15) < 1e-9);
+check('Snow Elf arcane x1.15 and nothing else (one XP skill, Nate 15 Oct)', Math.abs(R.skillRate(1, 'arcane', 'hit') - 1.15) < 1e-9 && Math.abs(R.skillRate(1, 'defense', 'hit') - 1) < 1e-9);
 check('Goblin harvesting x1.15', Math.abs(R.skillRate(2, 'harvesting', 'hit') - 1.15) < 1e-9);
 const parts = new Map(); globalThis.__dboRegisterStatus = (k, o, fn) => parts.set(k, fn);
 const R2 = require(path.join(SERVER, 'racial.js'))({ mp, log: () => {}, personal: () => {}, display: String, recordOf: (id) => records[id >>> 0] || null,
@@ -33,6 +33,6 @@ const R2 = require(path.join(SERVER, 'racial.js'))({ mp, log: () => {}, personal
   weaponHandsOf: () => '', sourceResistsOf: () => new Set(), cfg });
 const line = (a) => parts.get('racialGifts')(a);
 console.log('  snow elf:', line(1)); console.log('  goblin:', line(2));
-check('the Snow Elf gifts line', line(1) === 'Snow Elf: 50% frost resistance, +15% Arcane XP, +15% Defence XP', line(1));
-check('the Goblin gifts line', line(2) === 'Goblin: 50% poison resistance, +10% gold from loot and contracts, +15% Gatherer XP', line(2));
+check('the Snow Elf gifts line', line(1) === 'Snow Elf: 50% frost resistance, +15% Arcane XP', line(1));
+check('the Goblin gifts line', line(2) === 'Goblin: 50% poison resistance, +15% Gatherer XP', line(2));
 console.log(failed ? `\n${failed} failed` : '\nall passed'); process.exit(failed ? 1 : 0);

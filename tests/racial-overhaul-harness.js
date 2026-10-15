@@ -166,12 +166,8 @@ check('Wild Hunt: a bow x1.1 x1.2, stamina x1.5, a sword unchanged; 30 s', near(
 // Dunmer and Maormer: damage dealt by element
 R.usePower(DUNMER); R.usePower(MAORMER);
 check("Ancestor's Wrath: fire dealt x1.25 (a spell or a fire staff), frost unchanged", near(R.attackMult(DUNMER, NPC, FLAMES, 10), 1.25) && near(R.attackMult(DUNMER, NPC, FIRE_STAFF, 10), 1.25) && R.attackMult(DUNMER, NPC, FROSTBITE, 10) === 1);
-check('Roaring Tempest: no shock damage dealt; the ward is 60 points', R.attackMult(MAORMER, NPC, SPARKS, 10) === 1 && prec(MAORMER, 'roaringtempest').wardLeft === 60);
-check('...a 20-point fire spell: 25% magic resist leaves 15, the ward takes all of it', R.targetMult(NPC, MAORMER, FLAMES, 20) === 0 && prec(MAORMER, 'roaringtempest').wardLeft === 45, state[MAORMER].props['private.racialPower']);
-check('...a sword is not warded', R.targetMult(NPC, MAORMER, SWORD, 20) === 1 && prec(MAORMER, 'roaringtempest').wardLeft === 45);
-told.length = 0;
-check('...a 100-point shock spell: x0.5 x0.75 = 37.5, the ward takes the last 45 to 0... and breaks', near(R.targetMult(NPC, MAORMER, SPARKS, 100), 0) && prec(MAORMER, 'roaringtempest').wardLeft === 7.5 && near(R.targetMult(NPC, MAORMER, SPARKS, 100), 0.375 * (37.5 - 7.5) / 37.5) && prec(MAORMER, 'roaringtempest').wardLeft === 0 && told.some(([a, x]) => a === MAORMER && x === 'Your ward breaks.'), state[MAORMER].props['private.racialPower']);
-check('...spent: magic resist only', near(R.targetMult(NPC, MAORMER, FLAMES, 20), 0.75));
+check('Roaring Tempest (Nate 15 Oct): shock dealt x1.25 (Ancestor\'s Wrath in lightning), fire unchanged, no ward', near(R.attackMult(MAORMER, NPC, SPARKS, 10), 1.25) && R.attackMult(MAORMER, NPC, FLAMES, 10) === 1 && !(prec(MAORMER, 'roaringtempest').wardLeft > 0));
+check('...it adds no defence: a fire spell lands in full, a shock spell is only the gift\'s 50%', R.targetMult(NPC, MAORMER, FLAMES, 20) === 1 && near(R.targetMult(NPC, MAORMER, SPARKS, 100), 0.5));
 check('...under the cap: Defense x0.3 with the ward\'s 0 is floored at 0.25', near(R.capTargetSide(0.3 * 0), 0.25));
 // Khajiit Night Eye: refused for a client that did not say it draws it (no hasUiCap here; tests/nighteye-harness.js has the rest)
 const k = R.usePower(KHAJIIT);
@@ -196,7 +192,7 @@ check('no ability record in the load order yet: nothing is added', calls.length 
 records[ABIL] = { record: { type: 'SPEL', fields: [] } }; records[LOOK] = { record: { type: 'SPEL', fields: [] } };
 mp.getIdFromDesc = ((orig) => (d) => ({ '7701:DragonBreak Online Edits.esp': ABIL, '7702:DragonBreak Online Edits.esp': LOOK, '7701:Skyrim.esm': ABIL })[d] || orig(d))(mp.getIdFromDesc);
 const packets = [];
-const RB = make({ enabled: true, overhaul: true, maormer: { resistShock: 0.5, seafarerSpell: '7701:DragonBreak Online Edits.esp', power: { name: 'Roaring Tempest', seconds: 60, wardSpell: '7702:DragonBreak Online Edits.esp', buffs: { resistMagic: 0.25, wardPoints: 60 } } } },
+const RB = make({ enabled: true, overhaul: true, maormer: { resistShock: 0.5, seafarerSpell: '7701:DragonBreak Online Edits.esp', power: { name: 'Roaring Tempest', seconds: 60, wardSpell: '7702:DragonBreak Online Edits.esp', buffs: { shockDealt: 0.25 } } } },
   { sendPacket: (a, p) => { packets.push([a, p]); return true; } });
 RB.abilityTick();
 check('the ability goes on the Maormer only, once', calls.length === 1 && calls[0][0] === 'AddSpell' && calls[0][1] === MAORMER.toString(16) + ':Skyrim.esm' && state[MAORMER].props['private.racialAbility'] === '7701:Skyrim.esm', calls);
@@ -232,10 +228,10 @@ check('appearance.js: both guarded as the High Elf\'s heads', /HEADS\.raceOf\.se
 const gc = JSON.parse(fs.readFileSync(path.join(SERVER, 'gamemode-config.json'), 'utf8'));
 check('gamemode-config.json: maormerRace is the final DLE\'s (ec2de1a0) MaormerRace 192ede and MaormerRaceVampire 192edf', gc.maormerRace && gc.maormerRace.race === '192ede:DragonBreak Online Edits.esp' && gc.maormerRace.vampire === '192edf:DragonBreak Online Edits.esp');
 check('...the Seafarer ability 192ee1 and the Tempest ward look 192ee3; the power block whole, the overhaul on (release 1012)', gc.racial.maormer.seafarerSpell === '192ee1:DragonBreak Online Edits.esp' && gc.racial.maormer.power.wardSpell === '192ee3:DragonBreak Online Edits.esp'
-  && gc.racial.maormer.power.name === 'Roaring Tempest' && gc.racial.maormer.power.seconds === 60 && gc.racial.maormer.power.buffs.resistMagic === 0.25 && gc.racial.maormer.power.buffs.wardPoints === 60 && gc.racial.overhaul === true);
+  && gc.racial.maormer.power.name === 'Roaring Tempest' && gc.racial.maormer.power.seconds === 60 && gc.racial.maormer.power.buffs.shockDealt === 0.25 && gc.racial.maormer.power.buffs.wardPoints === undefined && gc.racial.overhaul === true);
 // the live config, as racial.js merges it: the Maormer as in the code's defaults but for the two spells
 const RL = make(gc.racial, { cfg: { racial: Object.assign({}, gc.racial, { overhaul: true }), maormerRace: gc.maormerRace } });
-check('...merged: the Maormer keep shock 50%, Blade +15% and the ward', RL.config.maormer.resistShock === 0.5 && RL.config.maormer.xp.blade === 1.15 && RL.config.maormer.power.buffs.wardPoints === 60);
+check('...merged: the Maormer keep shock 50%, Blade +15%, and the Tempest is shock dealt only', RL.config.maormer.resistShock === 0.5 && RL.config.maormer.xp.blade === 1.15 && RL.config.maormer.power.buffs.shockDealt === 0.25 && RL.config.maormer.power.buffs.wardPoints === undefined);
 
 // ---- 6. the wiring ----
 const jr = fs.readFileSync(path.join(SERVER, 'journal.js'), 'utf8');

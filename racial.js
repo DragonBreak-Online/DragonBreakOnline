@@ -98,20 +98,20 @@ const DEFAULTS = {
     power: { name: 'Adrenaline Rush', seconds: 60, buffs: { staminaRegen: 1.5 } } },
   // Pyandonea's sea-elves (lore), Nate's own table (10 Oct): a High Elf record with private.rp.race 'maormer', only with the
   // overhaul on. seafarerSpell: the DLE's DBO_AbMaormerSeafarer (SpeedMult +25 while swimming), an ability kept on every
-  // Maormer while they are one; '' or a record not in the load order does nothing. Roaring Tempest: +25% magic resistance and
-  // a ward that absorbs wardPoints of spell damage while it lasts (60, Steadfast Ward's), under reductionCap; wardSpell (the
-  // DLE's DBO_MaormerTempestWard, its look only) is cast on the player when it is called
+  // Maormer while they are one; '' or a record not in the load order does nothing. Roaring Tempest (Nate 15 Oct, one buff
+  // like the others): shock damage dealt +25%, Ancestor's Wrath's fire share in lightning, the storm-callers of Pyandonea;
+  // wardSpell (the DLE's DBO_MaormerTempestWard, its look only) is cast on the player when it is called
   maormer: { resistShock: 0.5, seafarerSpell: '', xp: { blade: 1.15 },
     // lookShader: what everyone near sees on the caster, ShockPlayerCloakFXShader (the ward effect's own hit shader)
-    power: { name: 'Roaring Tempest', seconds: 60, wardSpell: '', lookShader: '10f9a6:Skyrim.esm', buffs: { resistMagic: 0.25, wardPoints: 60 } } },
+    power: { name: 'Roaring Tempest', seconds: 60, wardSpell: '', lookShader: '10f9a6:Skyrim.esm', buffs: { shockDealt: 0.25 } } },
   // The DLE's own Snow Elf and Goblin (Nat's Racial Updates table, 13 Oct; config snowElfRace, goblinRace), only with the
   // overhaul on. Glacier Fall, the frost cloak: frost damage dealt +25% (Ancestor's Wrath's fire share, in frost); its look
   // is the DLE's DBO_SnowElfGlacierFall cast on the caster
-  snowelf: { resistFrost: 0.5, xp: { arcane: 1.15, defense: 1.15 },
+  snowelf: { resistFrost: 0.5, xp: { arcane: 1.15 },
     power: { name: 'Glacier Fall', seconds: 60, wardSpell: '1ac9fe:DragonBreak Online Edits.esp', buffs: { frostDealt: 0.25 } } },
-  // goldBonus: the Imperial's coin share (goldBonus below). Feeding Frenzy asks for faster melee attacks, which the server cannot
+  // One gift like the others (Nate 15 Oct): the coin share stays the Imperial's alone. Feeding Frenzy asks for faster melee attacks, which the server cannot
   // set: harder blows and quicker stamina instead
-  goblin: { resistPoison: 0.5, goldBonus: 0.1, xp: { harvesting: 1.15 },
+  goblin: { resistPoison: 0.5, xp: { harvesting: 1.15 },
     power: { name: 'Feeding Frenzy', seconds: 60, buffs: { meleeDamage: 0.15, staminaRegen: 1.5 } } },
   // The Reachmen (the DLE's DBOReachmanRace, config reachmanRace; PROPOSED 15 Oct, waiting on Nate): Bretons of the Reach
   // whose blood is mixed with Nord and Orc, witch-folk of the hagravens. Only with the overhaul on. Mongrel Blood (the
