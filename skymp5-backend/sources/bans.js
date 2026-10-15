@@ -1,23 +1,59 @@
 'use strict'
 
-// data/bans.json: one entry per banned discordId with hwid/ip captured at ban time, so alt accounts can be matched later
+// data/bans.json: one entry per banned discordId with its ban reference (B-XXXXXX) and a public ip when one is safe to match
+// The raw hardware id is never stored or matched (security audit L3-01): sources/deviceChecks.js flags alts to staff instead
 
-const fs   = require('fs')
-const net  = require('net')
-const path = require('path')
+const crypto = require('crypto')
+const fs     = require('fs')
+const net    = require('net')
+const path   = require('path')
 
 const FILE    = path.join(__dirname, '..', 'data', 'bans.json')
 // The player store beside this one; path.dirname so a test that moves bans.json moves this too
 const PLAYERS_FILE = path.join(path.dirname(FILE), 'players.json')
 const LOG_DIR = process.env.BAN_LOG_DIR || 'C:\\Users\\Administrator\\Desktop\\logs'
 
-function load() {
-  try {
-    const data = JSON.parse(fs.readFileSync(FILE, 'utf8'))
-    return Array.isArray(data) ? data : []
-  } catch {
-    return []
+// Ban references staff search and quote: B- and 6 Crockford base32 characters (no I, L, O or U)
+const REF_RE = /^B-[0-9A-HJKMNP-TV-Z]{6}$/
+const REF_CHARS = '0123456789ABCDEFGHJKMNPQRSTVWXYZ'
+// Refs given to old entries in this process, so they stay the same even when the file cannot be saved
+const givenRefs = new Map()
+let refSaveFailed = false
+
+function newRef(taken) {
+  for (;;) {
+    const ref = `B-${[...crypto.randomBytes(6)].map(b => REF_CHARS[b & 31]).join('')}`
+    if (!taken.has(ref)) return ref
   }
+}
+
+// An entry from before refs (or one sharing another's) gets one the first time it is read, saved once
+function giveRefs(data) {
+  const taken = new Set()
+  const missing = []
+  for (const e of data) {
+    if (!e || typeof e !== 'object') continue
+    if (REF_RE.test(String(e.ref || '')) && !taken.has(e.ref)) taken.add(e.ref)
+    else missing.push(e)
+  }
+  if (!missing.length) return data
+  for (const e of missing) {
+    const key = `${e.discordId}\n${e.bannedAt}`
+    e.ref = givenRefs.has(key) && !taken.has(givenRefs.get(key)) ? givenRefs.get(key) : newRef(taken)
+    givenRefs.set(key, e.ref)
+    taken.add(e.ref)
+  }
+  try { save(data) } catch (err) {
+    if (!refSaveFailed) console.error('[bans] could not save the new ban references:', err.message)
+    refSaveFailed = true
+  }
+  return data
+}
+
+function load() {
+  let data
+  try { data = JSON.parse(fs.readFileSync(FILE, 'utf8')) } catch { return [] }
+  return Array.isArray(data) ? giveRefs(data) : []
 }
 
 function save(data) {
@@ -116,32 +152,33 @@ function list() {
   return load()
 }
 
-// Returns the first entry matching ANY given identifier (empty/null ones are ignored), or null
-function isBanned({ discordId, hwid, ip } = {}) {
+// Returns the first entry matching the Discord id or a usable public ip (empty/null ones are ignored), or null; an hwid is never matched
+function isBanned({ discordId, ip } = {}) {
   const id   = String(discordId || '').trim()
-  const hw   = String(hwid || '').trim()
   const addr = publicIp(ip)
-  if (!id && !hw && !addr) return null
+  if (!id && !addr) return null
   return load().find(entry =>
     (id && entry.discordId && String(entry.discordId) === id) ||
-    (hw && entry.hwid && String(entry.hwid) === hw) ||
     (addr && publicIp(entry.ip) === addr)
   ) || null
 }
 
-// Adds a ban entry; an existing entry for the same discordId is replaced
+// Adds a ban entry; an existing entry for the same discordId is replaced and keeps its ref
 function add(input) {
   const discordId = String((input && input.discordId) || '').trim()
   if (!discordId) throw new Error('discordId is required')
+  const all = load()
+  const old = all.find(e => String(e.discordId) === discordId)
+  const data = all.filter(e => String(e.discordId) !== discordId)
   const entry = {
     discordId,
-    hwid: input.hwid || null,
+    ref: old && REF_RE.test(String(old.ref || '')) ? old.ref : newRef(new Set(data.map(e => e && e.ref))),
+    hwid: null,
     ip: publicIp(input.ip) || null,
     reason: String(input.reason || ''),
     bannedAt: input.bannedAt || new Date().toISOString(),
     bannedBy: input.bannedBy || null,
   }
-  const data = load().filter(e => String(e.discordId) !== discordId)
   data.push(entry)
   save(data)
   return entry
@@ -167,6 +204,8 @@ function logBan(line) {
 }
 
 module.exports = {
+  FILE,
+  REF_RE,
   isInternalIp,
   list,
   isBanned,
