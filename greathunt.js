@@ -126,6 +126,8 @@ module.exports = (api) => {
     s.changeDay = day; s.changesPaid = paid + 1; save(a, s);
     return award(a, 'change', C.points.change);
   };
+  // A werewolf's rank, { index, name } (beastform.js: the Behemoth is the Elder's form, Nate 15 Oct)
+  globalThis.__dboHuntRank = (a) => { const i = rankOf(a); return { index: i, name: String(C.ranks[i] || ''), top: i >= C.ranks.length - 1 }; };
   globalThis.__dboHuntBeastSeconds = (a) => at(C.beastSeconds, a);
   globalThis.__dboHuntFeedSeconds = (a) => at(C.feedSeconds, a);
   globalThis.__dboHuntChangesPerDay = (a) => at(C.changesPerDay, a);

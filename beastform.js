@@ -65,6 +65,28 @@ module.exports = (api) => {
     vampirelord: { name: 'Vampire Lord', race: idOf('283a:Dawnguard.esm'), power: idOf('283b:Dawnguard.esm'), seconds: 0 },
   };
   const REVERT_POWER = idOf('cd5c:Dawnguard.esm');
+  // The Werewolf Behemoth (DLE DBO race 1d1f9e, a werewolf copy at 1.3x; Nat tested it on the PC's local server, 15 Oct) is the
+  // form of an Elder of the Great Hunt only (Nate, 15 Oct); every other werewolf keeps the vanilla body. Config
+  // beastform.behemoth { enabled, race, rank }: OFF until client 0.3.100 (its watcher guard for the bigger body) is out and a
+  // live two-player test has passed. rank: the greathunt.js rank name that takes it ('Elder', the top rank).
+  const BEHEMOTH = Object.assign({ enabled: false, race: '1d1f9e:DragonBreak Online Edits.esp', rank: 'Elder' }, CFG.behemoth || {});
+  const behemothRace = () => {
+    if (BEHEMOTH.enabled !== true) return 0;
+    const id = idOf(String(BEHEMOTH.race || ''));
+    let rec = null; try { rec = id ? mp.lookupEspmRecordById(id) : null; } catch (e) { rec = null; }
+    return rec && rec.record && String(rec.record.type) === 'RACE' ? id : 0;
+  };
+  const isElder = (a) => {
+    try { const r = typeof globalThis.__dboHuntRank === 'function' ? globalThis.__dboHuntRank(a) : null; return !!r && r.name === String(BEHEMOTH.rank || 'Elder'); } catch (e) { return false; }
+  };
+  // The race a change takes: the Behemoth for an Elder werewolf with the switch on, else the form's own
+  const raceFor = (a, key) => {
+    const f = FORMS[key];
+    if (key !== 'werewolf') return f.race;
+    const b = behemothRace();
+    return b && isElder(a) ? b : f.race;
+  };
+  globalThis.__dboBeastRaceFor = raceFor;
   // What the Vampire Lord wears. Vanilla equips DLC1ClothesVampireLordArmor (DLC1PlayerVampireQuest's
   // DLC1VampireLordArmor property); Nat wanted him to look better, so he gets Harkon's royal robes. Harkon's cape
   // (15bc1) is left off: on the player it rendered very shiny and hung without physics. Taken back on the revert.
@@ -193,7 +215,8 @@ module.exports = (api) => {
     const full = Number.isFinite(hunt) && hunt > 0 ? hunt : f.seconds;
     const seconds = carry && full ? Math.min(full, Math.ceil(Number(carry.seconds))) : full;
     if (carry) { try { mp.set(a, 'private.beastCarry', null); } catch (e) { /* written below anyway */ } log(`beastform: ${display(a)} takes back ${seconds} s kept from the last change`); }
-    mp.set(a, 'private.beast', { form: key, original, at: Date.now(), until: seconds ? Date.now() + seconds * 1000 : 0 });
+    const race = raceFor(a, key);
+    mp.set(a, 'private.beast', Object.assign({ form: key, original, at: Date.now(), until: seconds ? Date.now() + seconds * 1000 : 0 }, race !== f.race ? { race } : {}));
     // No server UnequipAll: it reached the client after the change and stripped the spells it had just equipped
     // (only the abPreventRemoval robes survived). The client unequips before it swaps race.
     const wear = WEAR[key] || [];
@@ -203,7 +226,8 @@ module.exports = (api) => {
     // (a stripped human playing the beast's animations, the naked skating of #bugs 1552425534028251227)
     mp.set(a, 'appearance', Object.assign({}, original, { name: String(NAMES[key] || f.name) }));
     learn(a, key, true);
-    sendPacket(a, { customPacketType: 'dboBeast', race: f.race, beast: true, form: key, wear, abilities: packetAbilities(key) });
+    sendPacket(a, { customPacketType: 'dboBeast', race, beast: true, form: key, wear, abilities: packetAbilities(key) });
+    if (race !== f.race) log(`beastform: ${display(a)} is an Elder and takes the Behemoth (${race.toString(16)})`);
     personal(a, key === 'werewolf' ? `The beast takes you for ${seconds} seconds.` : 'You take the form of a Vampire Lord. Press 9, then your Shout key, to revert.');
     for (const line of legend(key)) personal(a, line);
     audit(`BEAST ${who(a)} took ${f.name}`);
@@ -426,7 +450,7 @@ module.exports = (api) => {
   const sendBeastBodies = () => {
     const now = Date.now();
     const all = api.onlineActors();
-    const bodies = all.filter(bodyShown).map((a) => ({ id: a >>> 0, race: FORMS[formOf(a)].race }));
+    const bodies = all.filter(bodyShown).map((a) => { const s = stateOf(a); return { id: a >>> 0, race: (s && Number(s.race) >>> 0) || FORMS[formOf(a)].race }; });
     const resend = now - WB.sentAt >= RESEND_MS;
     if (resend) WB.sentAt = now;
     for (const o of all) {
@@ -662,5 +686,5 @@ module.exports = (api) => {
     const r = takeForm(a, key); if (r) personal(a, r);
   }, { help: '[werewolf|vampirelord|revert] take or leave your beast form (or cast the power)' });
 
-  log(`beastform on: ${Object.entries(FORMS).map(([k, f]) => `${k} race ${f.race.toString(16)} power ${f.power.toString(16)}${f.seconds ? ` ${f.seconds}s` : ''}`).join(', ')}, revert ${REVERT_POWER.toString(16)}, Vampire Lord remote body ${globalThis.__dboVampireLordRemote === true ? 'ON' : 'off'}, werewolf remote body ${globalThis.__dboWerewolfRemote !== false ? 'ON' : 'off'}${globalThis.__dboWwRemoteSetBy ? ` (${globalThis.__dboWwRemoteSetBy})` : ''}`);
+  log(`beastform on: ${Object.entries(FORMS).map(([k, f]) => `${k} race ${f.race.toString(16)} power ${f.power.toString(16)}${f.seconds ? ` ${f.seconds}s` : ''}`).join(', ')}, revert ${REVERT_POWER.toString(16)}, Behemoth for the ${BEHEMOTH.rank} ${BEHEMOTH.enabled === true ? `ON (${behemothRace() ? behemothRace().toString(16) : 'race not in the load order'})` : 'off'}, Vampire Lord remote body ${globalThis.__dboVampireLordRemote === true ? 'ON' : 'off'}, werewolf remote body ${globalThis.__dboWerewolfRemote !== false ? 'ON' : 'off'}${globalThis.__dboWwRemoteSetBy ? ` (${globalThis.__dboWwRemoteSetBy})` : ''}`);
 };
