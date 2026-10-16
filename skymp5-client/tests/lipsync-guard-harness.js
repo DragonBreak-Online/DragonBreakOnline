@@ -17,7 +17,7 @@ const check = (name, ok, got) => {
 };
 
 // ---- who may speak ----------------------------------------------------------------------------------------------------
-const alive = { loaded: true, disabled: false, dead: false, faceGenHead: true };
+const alive = { loaded: true, disabled: false, dead: false, faceGenHead: true, beast: false };
 check('the FaceGen Head flag is RACE DATA bit 1', RACE_FLAG_FACEGEN_HEAD === 2);
 check('a loaded, living humanoid speaks', mouthSkipReason(alive) === '');
 check('a downed player\'s copy (killed with Actor.kill) does not', mouthSkipReason({ ...alive, dead: true }) === 'dead');
@@ -28,6 +28,8 @@ for (const k of Object.keys(alive)) {
   check(`an unread ${k} (the native threw) is refused`, mouthSkipReason({ ...alive, [k]: null }) !== '', mouthSkipReason({ ...alive, [k]: null }));
 }
 check('a dead werewolf reads as dead first', mouthSkipReason({ ...alive, dead: true, faceGenHead: false }) === 'dead');
+check('a beast race does not speak even when its record sets the FaceGen Head flag (a plugin beast race)', mouthSkipReason({ ...alive, beast: true }) === 'beast');
+check('a werewolf with the flag clear still reads as noFaceGenHead (the trace line is unchanged)', mouthSkipReason({ ...alive, faceGenHead: false, beast: true }) === 'noFaceGenHead');
 
 // ---- trace lines --------------------------------------------------------------------------------------------------------
 const notes = createSkipNotes();
@@ -46,6 +48,8 @@ check('animate checks the guard before its first phoneme write', animate.indexOf
 const close = src.slice(src.indexOf('private closeMouth('));
 check('closeMouth checks it too', close.indexOf('mouthSkipReason(') >= 0 && close.indexOf('mouthSkipReason(') < close.indexOf('setExpressionPhoneme'));
 check('the race read uses the FaceGen Head flag', /isRaceFlagSet\(RACE_FLAG_FACEGEN_HEAD\)/.test(src));
+check('the beast read uses isBeastRaceId on the live race, plugin beast races included', /beast: read\(\(\) => \{\s*const race = actor\.getRace\(\);\s*return race \? isBeastRaceId\(race\.getFormID\(\)\) : null;/.test(src) &&
+  /import \{ isBeastRaceId \} from "\.\.\/\.\.\/sync\/beastRaces";/.test(src));
 const writes = (src.match(/setExpressionPhoneme\(/g) || []).length;
 check('no other phoneme writes in the service (3: close in animate, open in animate, closeMouth)', writes === 3, writes);
 

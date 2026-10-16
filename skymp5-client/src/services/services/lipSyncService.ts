@@ -5,6 +5,7 @@ import { remoteIdToLocalId } from "../../view/worldViewMisc";
 import { logError, logTrace } from "../../logging";
 import { setSpeaking } from "./voiceSpeaking";
 import { MouthState, RACE_FLAG_FACEGEN_HEAD, createSkipNotes, mouthSkipReason } from "./lipSyncGuard";
+import { isBeastRaceId } from "../../sync/beastRaces";
 
 // Drives Actor.setExpressionPhoneme from the front's voice::speaking reports, contract in docs/dragonbreak_voice_chat.md
 
@@ -112,7 +113,7 @@ export class LipSyncService extends ClientListener {
     return Actor.from(Game.getFormEx(mouth.localId));
   }
 
-  // A dead, unloaded or disabled body, or a race with no FaceGen head (werewolf, Vampire Lord), gets no phoneme (lipSyncGuard.ts)
+  // A dead, unloaded or disabled body, a race with no FaceGen head or any beast race (werewolf, Behemoth, Vampire Lord) gets no phoneme (lipSyncGuard.ts)
   private mouthState(actor: Actor): MouthState {
     const read = <T>(f: () => T): T | null => { try { return f(); } catch { return null; } };
     return {
@@ -122,6 +123,10 @@ export class LipSyncService extends ClientListener {
       faceGenHead: read(() => {
         const race = actor.getRace();
         return race ? race.isRaceFlagSet(RACE_FLAG_FACEGEN_HEAD) : null;
+      }),
+      beast: read(() => {
+        const race = actor.getRace();
+        return race ? isBeastRaceId(race.getFormID()) : null;
       }),
     };
   }

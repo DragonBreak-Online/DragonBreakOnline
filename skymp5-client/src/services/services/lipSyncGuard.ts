@@ -9,7 +9,7 @@
 // RACE DATA flag "FaceGen Head" (TESRace RACE_DATA kFaceGenHead = 1 << 1), read through Race.isRaceFlagSet
 export const RACE_FLAG_FACEGEN_HEAD = 0x2;
 
-export type MouthSkip = "" | "unloaded" | "disabled" | "dead" | "noFaceGenHead";
+export type MouthSkip = "" | "unloaded" | "disabled" | "dead" | "noFaceGenHead" | "beast";
 
 // What the natives said about the actor; null where the read threw
 export interface MouthState {
@@ -17,6 +17,7 @@ export interface MouthState {
   disabled: boolean | null;
   dead: boolean | null;
   faceGenHead: boolean | null;
+  beast: boolean | null; // a beast race (sync/beastRaceIds.ts), refused even if its record sets the FaceGen Head flag
 }
 
 // "" when the mouth may move. Anything unread is refused: a wrong skip costs a still mouth, a wrong write a crash.
@@ -25,6 +26,7 @@ export const mouthSkipReason = (s: MouthState): MouthSkip => {
   if (s.disabled !== false) return "disabled";
   if (s.dead !== false) return "dead";
   if (s.faceGenHead !== true) return "noFaceGenHead";
+  if (s.beast !== false) return "beast";
   return "";
 };
 

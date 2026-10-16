@@ -1,9 +1,27 @@
 import { Actor, Game, writeLogs } from "skyrimPlatform";
-import { createBeastSkipLog, isBeastRaceId, isGuardedRaceId, setNonHumanoidRaceIds } from "./beastRaceIds";
+import { createBeastSkipLog, isBeastRaceId, isGuardedRaceId, resolvePluginBeastRaces, setNonHumanoidRaceIds, setPluginBeastResolver, WEREWOLF_RACE_ID } from "./beastRaceIds";
 import { NON_HUMANOID_RACES } from "./nonHumanoidRaceList";
 import { beastBodyOf } from "./beastBody";
 
-export { BEAST_RACE_IDS, isBeastRaceId, isGuardedRaceId, casterVariablesFor, emptyCasterVariables } from "./beastRaceIds";
+export { BEAST_RACE_IDS, isBeastRaceId, isGuardedRaceId, casterVariablesFor, emptyCasterVariables, vanillaBeastRaceOf } from "./beastRaceIds";
+
+let pluginBeastsResolved = false;
+
+// Once a session: Skyrim.esm's werewolf resolves once natives work here and the forms are loaded, so a plugin race missing then stays missing
+export const resolveBeastRaces = (): void => {
+  if (pluginBeastsResolved) return;
+  try {
+    if (!Game.getFormFromFile(WEREWOLF_RACE_ID, "Skyrim.esm")) return;
+  } catch {
+    return; // no natives in this context (a packet handler), tried again on the next check
+  }
+  pluginBeastsResolved = true;
+  setPluginBeastResolver(null);
+  const found = resolvePluginBeastRaces((file, localId) => Game.getFormFromFile(localId, file)?.getFormID() ?? 0);
+  writeDiagLine(`beast races: ${found.join(", ")}`);
+};
+
+setPluginBeastResolver(resolveBeastRaces);
 
 // The copy's race when it is a beast race (sync/beastRaceIds.ts), else 0
 export const beastRaceOf = (ac: Actor | null | undefined): number => {

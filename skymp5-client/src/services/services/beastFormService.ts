@@ -8,6 +8,7 @@ import { logError, logTrace } from "../../logging";
 import { adoptHeld } from "./beastLoadout";
 import { howlShoutIds, mayHoldHowl, stripDue } from "./beastHowl";
 import { parseBeastBodies, setBeastBodies } from "../../sync/beastBody";
+import { resolveBeastRaces, vanillaBeastRaceOf } from "../../sync/beastRaces";
 import { RaceWanted, raceCheckStep, wantRace } from "./beastRaceCheck";
 
 // WerewolfChange 92c48, DLC1VampireChange 0200283b, DLC1RevertForm 0200cd5c (load order: Dawnguard is index 02)
@@ -85,6 +86,8 @@ export class BeastFormService extends ClientListener {
     this.controller.on("buttonEvent", (e) => this.onButtonEvent(e));
     this.controller.on("update", () => this.onCameraCheck());
     this.controller.on("update", () => this.onHowlCheck());
+    // The plugin beast races resolve in the first update, before a dboBeastBody list (read where natives cannot run) needs them
+    this.controller.on("update", () => resolveBeastRaces());
     this.controller.emitter.on("connectionAccepted", () => { this.howlForced = true; setBeastBodies([]); });
   }
 
@@ -247,7 +250,7 @@ export class BeastFormService extends ClientListener {
 
   // Grants on the way in, takes back on the way out, so a beast power never lingers on the real race.
   private applyLoadout(player: Actor, raceId: number, beast: boolean): void {
-    const loadout = BEAST_LOADOUT[raceId];
+    const loadout = BEAST_LOADOUT[vanillaBeastRaceOf(raceId)];
     if (!loadout) return;
     let perks = 0;
     let spells = 0;
