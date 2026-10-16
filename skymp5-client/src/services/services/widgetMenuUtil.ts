@@ -163,6 +163,29 @@ export function isMenuKeyPressBlocked(sp: Sp, controller: CombinedController, e:
   }
 }
 
+// What made isMenuKeyPressBlocked refuse a press, for a diagnostic line: each recorded menu says whether the engine has it open
+export function menuKeyBlockReason(sp: Sp, controller: CombinedController, e: ButtonEvent): string {
+  const why: string[] = [];
+  if (isUiHidden(controller)) why.push("interface hidden");
+  if (e.device !== InputDeviceType.Mouse && sp.browser.isFocused()) why.push("browser focused");
+  if (isConsoleOpen(sp)) why.push("console open");
+  let menus: string[] = [];
+  try {
+    menus = controller.lookupListener(BrowserService).recordedBlockingMenus();
+  } catch {
+    menus = [];
+  }
+  const state = (name: string): string => {
+    try {
+      return sp.Ui.isMenuOpen(name) ? "open" : "closed";
+    } catch {
+      return "?";
+    }
+  };
+  if (menus.length > 0) why.push(`menus ${menus.map((name) => `${name} (${state(name)})`).join(", ")}`);
+  return why.length > 0 ? why.join("; ") : "none found";
+}
+
 // Live query: the console can swallow input without a tracked menuOpen event
 export function isConsoleOpen(sp: Sp): boolean {
   try {
