@@ -53,6 +53,7 @@ const GRAIN_MILL = { ref: 0x5cabc, base: 0x9c6df, keywords: ['isGrainMill', 'Fur
 const OVEN = { ref: 0x4812ae06, base: 0x300283f, keywords: ['FurnitureForce3rdPerson', 'FurnitureSpecial', 'RaceToScale', 'isCraftingOven', 'BYOHCraftingOven'] };
 const COOKPOT = { ref: 0x80717dd, base: 0x1010b3, keywords: ['FurnitureForce3rdPerson', 'FurnitureSpecial', 'isSmallCookingPot', 'CraftingCookpot', 'RaceToScale'] };
 const CHAIR = { ref: 0x80b5d59, base: 0x1379e, keywords: ['FurnitureForce3rdPerson'] };
+const ENCHANTER = { ref: 0xbad0d, base: 0xbad0c, keywords: ['FurnitureForce3rdPerson', 'FurnitureSpecial', 'isEnchanting', 'CraftingEnchanting'] };
 
 function run({ CraftService }, { WorkbenchDiag }, { TraceGate }) {
   const realNow = Date.now;
@@ -109,6 +110,24 @@ function run({ CraftService }, { WorkbenchDiag }, { TraceGate }) {
       t.close(); t.tick(300); t.world.seat = null; t.tick(300);
       check('the craft report still goes to the server', t.sent.length === 1 && t.sent[0].data.resultObjectId === 0xf431c && t.sent[0].data.workbench === 0x80717dd, t.sent);
       check('...and the line counts two out, one in, one sent', t.lines.length === 1 && / kw=CraftingCookpot .* menu=0\.0 out=2 in=1 sent=1$/.test(t.lines[0]), t.lines);
+    }
+    // ---- a report sent on standing up (a disenchant: nothing comes back) counts for the bench left -------------------
+    {
+      const t = make(); t.tick(300);
+      t.world.seat = ENCHANTER; t.tick(300); t.open(); t.tick(300);
+      t.leave(0x13989); t.tick(300);
+      t.world.seat = null; t.tick(300);
+      check('the report goes out on standing up', t.sent.length === 1 && t.sent[0].data.workbench === 0xbad0d && t.sent[0].data.resultObjectId === 0, t.sent);
+      check('...and counts for that seat', t.lines.length === 1 && /^wb seat bad0d .* kw=CraftingEnchanting .* out=1 in=0 sent=1$/.test(t.lines[0]), t.lines);
+    }
+    // ---- a report still waiting when the player moves straight to the mill counts for the first bench --------------
+    {
+      const t = make(); t.tick(300);
+      t.world.seat = ENCHANTER; t.tick(300); t.open(); t.tick(300); t.leave(0x13989); t.close();
+      t.world.seat = GRAIN_MILL; t.tick(300); t.tick(2000);
+      t.world.seat = null; t.tick(300);
+      check('the waiting report goes out with the first bench', t.sent.length === 1 && t.sent[0].data.workbench === 0xbad0d, t.sent);
+      check('...and counts for it, not for the mill', t.lines.length === 2 && / sent=1$/.test(t.lines[0]) && /^wb seat 5cabc base=9c6df kw=isGrainMill .* menu=no out=0 in=0 sent=0$/.test(t.lines[1]), t.lines);
     }
     // ---- a chair where nothing happened says nothing; a key rebuild on it is not counted ------------------------------
     {

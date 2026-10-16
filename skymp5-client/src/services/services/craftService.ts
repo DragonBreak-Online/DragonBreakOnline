@@ -44,14 +44,16 @@ export class CraftService extends ClientListener {
         } catch (e) {
             return;
         }
+        if (this.furnitureStreak.size > 0) {
+            const closed = this.menuClosedAt > 0 && now - this.menuClosedAt >= FLUSH_AFTER_CLOSE_MS;
+            if (closed) this.menuClosedAt = 0;
+            for (const furnitureId of Array.from(this.furnitureStreak.keys())) {
+                if (closed || furnitureId !== seatedAt) this.sendCraft(furnitureId, 0, closed ? 'menu closed' : 'left the furniture');
+            }
+        }
+        // After the flush, so a report sent on leaving counts for the seat being left
         const seatLine = this.workbenchDiag.seat(seatedAt, now, () => describeSeat(furnitureRef));
         if (seatLine) trace(seatLine);
-        if (this.furnitureStreak.size === 0) return;
-        const closed = this.menuClosedAt > 0 && now - this.menuClosedAt >= FLUSH_AFTER_CLOSE_MS;
-        if (closed) this.menuClosedAt = 0;
-        for (const furnitureId of Array.from(this.furnitureStreak.keys())) {
-            if (closed || furnitureId !== seatedAt) this.sendCraft(furnitureId, 0, closed ? 'menu closed' : 'left the furniture');
-        }
     }
 
     // Sends the report bundled for this furniture, if it holds anything, and forgets it
@@ -77,7 +79,7 @@ export class CraftService extends ClientListener {
             },
             reliability: "reliable"
         });
-        this.workbenchDiag.sent();
+        this.workbenchDiag.sent(furnitureId);
     }
 
     private onContainerChanged(e: ContainerChangedEvent) {

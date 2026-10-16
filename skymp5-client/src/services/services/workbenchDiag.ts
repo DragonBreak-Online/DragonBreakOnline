@@ -51,8 +51,9 @@ export class WorkbenchDiag {
     else this.current.in++;
   }
 
-  sent(): void {
-    if (this.current) this.current.sent++;
+  // Counts only a report for this seat's furniture
+  sent(localId: number): void {
+    if (this.current && this.current.localId === localId >>> 0) this.current.sent++;
   }
 
   private finish(s: Seat, now: number): string | null {
