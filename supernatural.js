@@ -75,6 +75,10 @@ module.exports = (api) => {
     // Nate, 12 Oct: a werewolf or vampire cannot hold silver either: silver in the pack is mailed to their own mailbox at the
     // notice boards (post.js), from silverMailFrom's board. false turns it off
     silverCarry: true, silverMailFrom: 'Bruma',
+    // Silver is not mailed while its bearer is still moving items at a chest (SkaldsChosen, #bugs 15 Oct "Duplication
+    // with vampires": silver taken from a chest was mailed within 2 s while the chest was still open, and putting it back
+    // then showed it in the chest and in the mailbox at once). Mailed once no put or take for this long.
+    silverHoldAfterMoveMs: 20000,
     // Silver beyond the keyword: form descs ("10aa19:Skyrim.esm") of weapons that are silver but lack WeapMaterialSilver.
     // The keyword covers all 41 silver weapons of the 105-plugin load order (vanilla, Dawnguard, Dragonborn, Beyond Skyrim,
     // Immersive Weapons, Sentinel, WindhelmSSE, DragonBreak.esp; scan 4 Oct). Only IWSilverHawkBow is named silver
@@ -717,6 +721,8 @@ module.exports = (api) => {
   const carrySilver = (a, s) => {
     const P = globalThis.__dboPostApi;
     if (!P || typeof P.takeParcel !== 'function' || typeof P.boardLetter !== 'function') return;
+    let lastMove = 0; try { const f = globalThis.__dboLastItemMoveAt; lastMove = typeof f === 'function' ? Number(f(a)) || 0 : 0; } catch (e) { lastMove = 0; }
+    if (Date.now() - lastMove < Math.max(0, Number(C.silverHoldAfterMoveMs) || 0)) return;
     let inv = null; try { inv = mp.get(a, 'inventory'); } catch (e) { return; }
     const want = new Map();
     for (const e of (inv && Array.isArray(inv.entries) ? inv.entries : [])) {

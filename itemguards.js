@@ -139,12 +139,16 @@ module.exports = (api) => {
     log(text);
   };
   if (!(S.touched instanceof Map)) S.touched = new Map();   // actor -> containers it moved items with this session
+  // actor -> when it last put or took anything (supernatural.js holds a vampire's silver mail while they are at a chest)
+  if (!(S.lastMove instanceof Map)) S.lastMove = new Map();
+  globalThis.__dboLastItemMoveAt = (actor) => S.lastMove.get(Number(actor) >>> 0) || 0;
   const checkMove = (kind, actor, container, baseId, count) => {
     const a = Number(actor) >>> 0, c = Number(container) >>> 0, id = Number(baseId) >>> 0;
     // The extras of the destination holder before and after: the player log takes what moved as the difference
     const exBefore = [], exAfter = [];
     const before = [owned(a, id, kind === 'take' ? exBefore : undefined), owned(c, id, kind === 'put' ? exBefore : undefined)];
     const t = S.touched.get(a) || new Set(); t.add(c); S.touched.set(a, t);
+    S.lastMove.set(a, Date.now());
     setTimeout(() => {
       const after = [owned(a, id, kind === 'take' ? exAfter : undefined), owned(c, id, kind === 'put' ? exAfter : undefined)];
       // the per-player activity log (playerlog.js): every put and take, with the counts read here
