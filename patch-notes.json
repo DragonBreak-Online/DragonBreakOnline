@@ -1,5 +1,21 @@
 [
   {
+    "title": "Meat, Dead Man's Drink and the day of the week",
+    "date": "2026-10-16",
+    "version": "Hotfix",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Fixes",
+        "items": [
+          "Chickens, hares, rats and dogs give their meat when you search the body again, without skinning them. Every other animal still gives its hide or part to a skinner.",
+          "Dead Man's Drink in Falkreath shows its name on the door again and counts as a building for property.",
+          "/time and the journal now name the day of the week (Sundas to Loredas), from the same clock as the sky and the moons."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Blocking and vampire silver",
     "date": "2026-10-16",
     "version": "Hotfix",
