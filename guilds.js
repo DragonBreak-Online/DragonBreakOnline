@@ -95,10 +95,13 @@ module.exports = (api) => {
   // ---- membership state -------------------------------------------------------------------------
   // { factionId: { actorId: { rank, name, tag, since } } }
   const ST = globalThis.__dboGuildState || (globalThis.__dboGuildState = { members: readJson(STATE_PATH, {}), invites: new Map(), nonces: new Map() });
+  // A membership change may name a new leader, whose hall is then granted if nobody owns it (syncHalls, below)
+  let hallSyncSoon = () => {};
   const save = () => {
     stampAll();
     try { fs.writeFileSync(STATE_PATH + '.tmp', JSON.stringify(ST.members, null, 1)); fs.renameSync(STATE_PATH + '.tmp', STATE_PATH); }
     catch (e) { log('guilds.json write failed', e.message); }
+    hallSyncSoon();
   };
   // ---- a rank list changed in guild-defs.json keeps every member on their title -----------------------------------
   // Members are stored by rank index, so a rank inserted or moved in the defs would shift everyone below it. Every
@@ -591,9 +594,52 @@ module.exports = (api) => {
     }
     return [...out];
   };
+  // A hall's leader (Nate, 16 Oct: "make sure the guild leaders own their HQ"). A building's record sits on whichever door
+  // was claimed first, and that need not be a door guild-defs lists: Castle Bruma's root is 6c473, its listed doors b46a8 and
+  // 726f2 are members of it, so the Count and the Legion's leader never matched it. For a leader, a building is also the hall
+  // whose listed doors belong to it (housingSystem.ts primaryOf: a door of a place answers with the place's root). Members
+  // still match by the listed doors alone, as before. Rebuilt at most once a minute; empty until the housing system is up.
+  let ROOTS = null, ROOTS_AT = 0;
+  const hallRoots = () => {
+    if (ROOTS && Date.now() - ROOTS_AT < 60000) return ROOTS;
+    const out = new Map();
+    const H = globalThis.__dboHousing;
+    if (H && typeof H.primaryOf === 'function') {
+      const descs = new Set(HALL_DOORS.keys());
+      for (const m of Object.values(readMarks())) for (const d of ((m && m.doors) || [])) descs.add(String(d).toLowerCase());
+      for (const d of descs) {
+        let id = 0, root = 0;
+        try { id = Number(mp.getIdFromDesc(d)) >>> 0; root = id ? Number(H.primaryOf(id)) >>> 0 : 0; } catch (e) { continue; }
+        if (root && root !== id) out.set(root, (out.get(root) || []).concat([d]));
+      }
+    }
+    ROOTS = out; ROOTS_AT = Date.now();
+    return out;
+  };
+  // A hall several factions list, all but one marked shared (Bruma Castle: the County's seat, shared by the Legion, the
+  // Commission and the Penitus Oculatus): the shared ones' leaders use it as its owner does but do not hold it. A staff mark
+  // (/faction hallmark) is never a shared one.
+  const sharedAt = (fid, desc) => {
+    const h = hallOf(FACTIONS.get(fid));
+    return !!(h && h.shared) && (HALL_DOORS.get(desc) || []).includes(fid) && !(((readMarks()[fid] || {}).doors) || []).includes(desc);
+  };
+  // { fid, shared } for each faction with a leader whose hall this building is, by its doors or by its root
+  const hallsLedAt = (refs) => {
+    const out = new Map();
+    const add = (desc) => { for (const fid of hallFactionsAt(desc)) if (leaderOf(fid)) out.set(fid, (out.has(fid) ? out.get(fid) : true) && sharedAt(fid, desc)); };
+    for (const r of Array.isArray(refs) ? refs : []) {
+      const id = Number(r) >>> 0;
+      let desc = ''; try { desc = String(mp.getDescFromId(id) || '').toLowerCase(); } catch (e) { desc = ''; }
+      if (desc) add(desc);
+      for (const d of hallRoots().get(id) || []) add(d);
+    }
+    return [...out].map(([fid, shared]) => ({ fid, shared }));
+  };
+  const leadsAt = (refs, a, shared) => hallsLedAt(refs).some((h) => h.shared === shared && (rankOf(h.fid, a) || {}).role === 'leader');
   // The owner arguments are kept for the callers (housingSystem.ts, rest.js, ledgersale.js) and no longer decide
   globalThis.__dboHallOf = (refs) => hallFactionsOf(refs);
-  globalThis.__dboHallLeader = (refs, actor) => { const a = Number(actor) >>> 0; return !!a && hallFactionsOf(refs).some((fid) => (rankOf(fid, a) || {}).role === 'leader'); };
+  // The owner's powers: the leader of a faction that holds the hall, never of one that only shares it
+  globalThis.__dboHallLeader = (refs, actor) => { const a = Number(actor) >>> 0; return !!a && leadsAt(refs, a, false); };
   // A building may also name offices whose holders share it, "<zone>:<office>" (Nate, 4 Oct: Castle Bruma and Bruma's
   // Steward, whoever holds it): gamemode-config.json housingPlaces.shares { door desc: [office] } and the staff marks
   // ("@offices", "@officesOff" in faction-halls.json). Read live from officials.json, so a new Steward takes over at once.
@@ -609,7 +655,62 @@ module.exports = (api) => {
   const descsOf = (refs) => (Array.isArray(refs) ? refs : []).map((r) => { try { return String(mp.getDescFromId(Number(r) >>> 0) || '').toLowerCase(); } catch (e) { return ''; } }).filter(Boolean);
   const officeShare = (refs, a) => descsOf(refs).some((d) => officesAt(d).some((k) => holdsOffice(a, k)));
   globalThis.__dboHallOffice = (refs, owner, actor) => { const a = Number(actor) >>> 0; return !!a && officeShare(refs, a); };
-  globalThis.__dboHallMember = (refs, owner, actor, ownerChar) => { const a = Number(actor) >>> 0; return !!a && (hallFactionsOf(refs).some((fid) => !!entryOf(fid, a)) || officeShare(refs, a)); };
+  // A shared hall's leader uses it as its owner does (Nate, 16 Oct: the Countess owns Castle Bruma, the Legion's leader shares it)
+  globalThis.__dboHallMember = (refs, owner, actor, ownerChar) => { const a = Number(actor) >>> 0; return !!a && (hallFactionsOf(refs).some((fid) => !!entryOf(fid, a)) || officeShare(refs, a) || leadsAt(refs, a, true)); };
+  // A hall nobody owns gives its leader nothing (housingSystem.ts leadsHall needs an owned place), so each faction with a
+  // leader is given the hall it holds (not one it only shares) when its ways in are unowned: on load and after every
+  // membership change. A building somebody owns stays theirs; its leader holds it through __dboHallLeader. Only a door that
+  // reads as unowned AND is not in the housing registry (housing.json) is granted: just after a boot the records can read
+  // as nothing (memory: housing records unreadable at boot), so the first run waits until the server has been up 3 minutes.
+  // gamemode-config.json guildHalls.grantToLeader false switches it off. Rollback: /property revoke (or abandon) at the door.
+  const REGISTRY_PATH = path.resolve('housing.json');
+  const hallSyncMsg = globalThis.__dboHallSyncSaid || (globalThis.__dboHallSyncSaid = new Map());
+  const sayOnce = (key, text) => { if (hallSyncMsg.get(key) === text) return; hallSyncMsg.set(key, text); log(text); };
+  const syncHalls = () => {
+    if (((cfg.guildHalls || {}).grantToLeader) === false) return [];
+    const H = globalThis.__dboHousing;
+    if (!H || typeof H.primaryOf !== 'function' || typeof H.recordOf !== 'function' || typeof H.grant !== 'function') return [];
+    const reg = readJson(REGISTRY_PATH, null);
+    if (!Array.isArray(reg)) { sayOnce('@registry', 'guild halls: housing.json unreadable, no hall granted'); return []; }
+    const registry = new Set(reg.map((n) => Number(n) >>> 0));
+    const done = [];
+    for (const f of FACTIONS.values()) {
+      const h = hallOf(f);
+      const leader = leaderOf(f.id);
+      if (!h || h.shared || !leader) continue;
+      const marked = ((readMarks()[f.id] || {}).doors) || [];
+      const off = ((readMarks()[f.id] || {}).off) || [];
+      const descs = [...new Set(h.doors.map((d) => String(d).toLowerCase()).concat(marked))].filter((d) => !off.includes(d));
+      for (const d of descs) {
+        let id = 0; try { id = Number(mp.getIdFromDesc(d)) >>> 0; } catch (e) { id = 0; }
+        if (!id) continue;
+        let root = 0, rec = null;
+        try { root = Number(H.primaryOf(id)) >>> 0; rec = root ? H.recordOf(root) : null; } catch (e) { continue; }
+        if (!root) continue;
+        if (rec && Number(rec.owner)) continue;
+        if (registry.has(root) || registry.has(id)) { sayOnce(`${f.id}|${d}`, `guild halls: ${h.name} door ${d} is in the registry but reads unowned; left alone`); continue; }
+        let err = '';
+        try { err = String(H.grant(id, leader) || ''); } catch (e) { err = e.message || 'failed'; }
+        if (err) { sayOnce(`${f.id}|${d}`, `guild halls: ${h.name} (${f.name}) door ${d} not granted to ${who(leader)}: ${err}`); continue; }
+        ROOTS = null;
+        hallSyncMsg.delete(`${f.id}|${d}`);
+        done.push({ fid: f.id, door: d, leader });
+        audit(`FACTION hall ${h.name} (door ${d}) granted to ${who(leader)}, leader of ${f.name}: it was unowned`);
+      }
+    }
+    return done;
+  };
+  globalThis.__dboGuildHallSync = syncHalls;
+  if (globalThis.__dboHallSyncTimer) clearTimeout(globalThis.__dboHallSyncTimer);
+  const runHallSync = () => { globalThis.__dboHallSyncTimer = null; try { syncHalls(); } catch (e) { log('guild halls: sync failed', e.message); } };
+  hallSyncSoon = () => {
+    if (globalThis.__dboHallSyncTimer) clearTimeout(globalThis.__dboHallSyncTimer);
+    const wait = Math.max(5000, 180000 - Math.floor(process.uptime() * 1000));
+    const t = setTimeout(runHallSync, wait);
+    if (t && typeof t.unref === 'function') t.unref();
+    globalThis.__dboHallSyncTimer = t;
+  };
+  hallSyncSoon();
   // charters.js: a faction founded by charter goes live at once (charters.js has already written player-factions.json, so a
   // reload keeps it). The founder takes the leader rank, and each co-founder ({ actor, role }) the rank of their role, or
   // the rank below the leader without one. An error string, or null.
