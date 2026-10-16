@@ -35,6 +35,7 @@
   }
   &__friend--counted { color: $dbo-gold; }
   &__friend--ineligible, &__friend--revoked { color: $dbo-text-dim; }
+  &__friend--review { color: $dbo-amber; }
   &__boost--running { color: $dbo-silver; }
   &__left { color: $dbo-text-dim; font-size: 13px; }
   &__carry { margin: 4px 0 0; color: $dbo-gold; }

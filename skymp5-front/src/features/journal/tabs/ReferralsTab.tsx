@@ -6,7 +6,7 @@ import { JournalTabProps, registerJournalTab } from '../tabs';
 // The F3 hub's Referrals tab (server referrals.js, Nate 16 Oct): the player's link, the friends who joined with it, the
 // boost queue and the carry weight. A new account may enter a friend's code once (referralCode [nonce, code]).
 
-export interface ReferralFriend { n: number; status: 'counted' | 'playing' | 'ineligible' | 'revoked'; text: string }
+export interface ReferralFriend { n: number; status: 'counted' | 'playing' | 'review' | 'ineligible' | 'revoked'; text: string }
 export interface ReferralBoost { kind: 'first' | 'later' | 'welcome'; mult: number; leftMs: number; running: boolean }
 export interface ReferralsSection {
   link: string;
