@@ -614,7 +614,21 @@ module.exports = (api) => {
     return n;
   };
   globalThis.__dboSpellsHoldSuspended = holdSuspended;
-  if (typeof api.every === 'function') api.every('spells.hold', 15000, () => { if (!SUSPENDED.size && !onlineActors().some((a) => heldOf(a).length)) return; for (const a of onlineActors()) { try { holdSuspended(a); } catch (e) { log('spells: hold failed', e.message); } } });
+  // Each online character once per session, at most HOLD_PER_TICK a run: reading the engine's spell list is the cost, and
+  // checking everyone every 15 s stalled the main loop (2.7 s a run with 32 online, 16 Oct); logins are held at login
+  const holdChecked = globalThis.__dboSpellsHoldChecked instanceof Set ? globalThis.__dboSpellsHoldChecked : (globalThis.__dboSpellsHoldChecked = new Set());
+  const HOLD_PER_TICK = 2;
+  if (typeof api.every === 'function') api.every('spells.hold', 15000, () => {
+    const online = onlineActors().map((a) => a >>> 0);
+    const here = new Set(online);
+    for (const k of holdChecked) if (!here.has(k)) holdChecked.delete(k);
+    let n = 0;
+    for (const a of online) {
+      if (holdChecked.has(a)) continue;
+      if (n++ >= HOLD_PER_TICK) break;
+      try { if (!SUSPENDED.size && !heldOf(a).length) { holdChecked.add(a); continue; } holdSuspended(a); holdChecked.add(a); } catch (e) { log('spells: hold failed', e.message); }
+    }
+  });
 
   // A spell given outright into one skill's book, as a lesson adds it (schools.js: a new mage's first spell). No tier or
   // school check: the giver has decided. { ok, name, line }, or null when the spell is unknown here.
