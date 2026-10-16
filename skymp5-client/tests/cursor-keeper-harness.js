@@ -281,7 +281,13 @@ function makeGame() {
     w.g.openMenu('Fader Menu'); w.run(100); w.g.closeMenu('Fader Menu');
     w.run(20000);
     const tries = w.notes.filter((n) => /panel pointer put back/.test(n)).length;
-    check('a pointer that never comes back is tried a few times, then left alone', tries >= 1 && tries <= 3 && w.notes.some((n) => /no more repairs this session/.test(n)), { tries });
+    check('a pointer that never comes back is tried a few times, then left alone', tries >= 1 && tries <= 3 && w.notes.some((n) => /no more repairs until it is up again/.test(n)), { tries });
+    w.press(1); w.run(100);
+    w.g.ignoreCursorShow = false;
+    w.press(20); w.run(200);
+    w.g.openMenu('Fader Menu'); w.run(100); w.g.closeMenu('Fader Menu'); w.run(600);
+    check('...until a later focus has its pointer: then a fade closing under the chat is repaired again', w.g.focus && w.pointer()
+      && w.notes.some((n) => /put back after \d+ ms closed under focus \(4 this session\)$/.test(n)), w.notes);
   }
 
   // ---- controller mode ----

@@ -5,7 +5,7 @@
 export const RESHOW_AFTER_MS = 250;
 /** At most one repair in this window */
 export const RESHOW_GAP_MS = 2000;
-/** Repairs that did not take this many times in a row are not tried again this session */
+/** Repairs that did not take this many times in a row stop until the pointer is seen up under focus again */
 export const MAX_FAILED_RESHOWS = 3;
 /** A vanilla menu open this long without the pointer is reported */
 export const VANILLA_REPORT_MS = 1500;

@@ -241,7 +241,7 @@ export class BrowserService extends ClientListener {
     const since = state.missingSince;
     this.panelCursor = state;
     if (state.failedReshows >= MAX_FAILED_RESHOWS && failedBefore < MAX_FAILED_RESHOWS) {
-      this.diagNote("cursor", `panel pointer did not come back ${MAX_FAILED_RESHOWS} times, no more repairs this session`);
+      this.diagNote("cursor", `panel pointer did not come back ${MAX_FAILED_RESHOWS} times, no more repairs until it is up again`);
     }
     if (action !== "reshow") return;
     this.panelReshows++;
