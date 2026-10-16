@@ -8,6 +8,7 @@ import { MAP_MARKER_REFS } from "../../data/mapMarkerRefs";
 import { parseCustomPacket, sendCustomPacket } from "./customPacketUtil";
 import { ConnectionMessage } from "../events/connectionMessage";
 import { CustomPacketMessage } from "../messages/customPacketMessage";
+import { trace } from "../../lib/clientDiag";
 
 // Per-character local replay of discovered map markers and learned ingredient effects, keyed by server and actor id.
 // The server keeps the map markers too (mapprogress.js, Nate 12 Oct: "make sure map data ... stays synced"): the local
@@ -15,6 +16,7 @@ import { CustomPacketMessage } from "../messages/customPacketMessage";
 // marker the file holds is reported with dboMapSync, the last batch asking for the whole list back (want); the server's
 // dboMapMarkers answer adds what this PC never saw. Each later discovery is reported within REPORT_MS, and at once on a
 // disconnect or the main menu.
+// A marker only seen is restored with addToMap(false); one the character entered (canFastTravelToMarker) with addToMap(true).
 
 const PLUGIN_NAME = "character-progress-no-load";
 const FILE_VERSION = 1;
@@ -41,6 +43,8 @@ interface CharacterEntry {
   name: string;
   updatedAt: number;
   markers: string[];
+  // The markers the character entered (none in a file written before 0.3.102)
+  visited?: string[];
   ingredients: Record<string, boolean[]>;
 }
 
@@ -60,13 +64,17 @@ interface State {
   key: string | null;
   myIdx: number;
   markers: Record<string, true>;
+  visited: Record<string, true>;
   ingredients: Record<string, boolean[]>;
   queue: RestoreItem[];
   restored: boolean;
   dirty: boolean;
-  // Markers to report to the server, and whether the last report should ask for the whole list back
+  // Markers to report to the server (seen, and entered), and whether the last report should ask for the whole list back
   report?: string[];
+  reportVisited?: string[];
   want?: boolean;
+  // Set by a hot reload over a 0.3.101 session, whose markers the old client put back entered; cleared by the next restore
+  legacy?: boolean;
 }
 
 export class CharacterProgressService extends ClientListener {
@@ -109,8 +117,13 @@ export class CharacterProgressService extends ClientListener {
   private get state(): State {
     let s = this.sp.storage[STORAGE_KEY] as State | undefined;
     if (!s || typeof s !== "object") {
-      s = { key: null, myIdx: -1, markers: {}, ingredients: {}, queue: [], restored: false, dirty: false };
+      s = { key: null, myIdx: -1, markers: {}, visited: {}, ingredients: {}, queue: [], restored: false, dirty: false };
       this.sp.storage[STORAGE_KEY] = s;
+    }
+    // A hot reload over a state kept before 0.3.102
+    if (!s.visited) {
+      s.visited = {};
+      s.legacy = true;
     }
     return s;
   }
@@ -191,18 +204,22 @@ export class CharacterProgressService extends ClientListener {
     const s = this.state;
     s.key = `${cfg["server-ip"]}:${cfg["server-port"]}/${remoteId.toString(16)}`;
     s.markers = {};
+    s.visited = {};
     s.ingredients = {};
     s.queue = [];
     s.restored = false;
+    s.legacy = false;
     this.restoreArmed = false;
     s.report = [];
     s.want = true;
     const entry = this.readDoc().characters[s.key];
     if (entry) {
       if (Array.isArray(entry.markers)) {
+        const visited = new Set(Array.isArray(entry.visited) ? entry.visited : []);
         entry.markers.forEach((desc) => {
           if (typeof desc !== "string") return;
           s.markers[desc] = true;
+          if (visited.has(desc)) s.visited[desc] = true;
           s.queue.push({ desc });
         });
       }
@@ -216,21 +233,28 @@ export class CharacterProgressService extends ClientListener {
       }
     }
     // Everything this PC kept goes to the server once (it merges), and the server's list comes back
-    s.report = Object.keys(s.markers);
+    s.report = Object.keys(s.markers).filter((desc) => !s.visited[desc]);
+    s.reportVisited = Object.keys(s.visited);
     this.reportAt = 0;
     logTrace(this, `Restoring ${s.queue.length} items for ${s.key}`);
   }
 
-  // The server's list of this character's markers (dboMapMarkers): those this PC never saw are restored and kept
+  // The server's list (dboMapMarkers): markers this PC never saw, or saw while the server has them visited, are restored and kept
   private onServerMarkers(event: ConnectionMessage<CustomPacketMessage>): void {
     const content = parseCustomPacket(event);
     if (!content || content["customPacketType"] !== "dboMapMarkers") return;
     const s = this.state;
     if (!s.key || !Array.isArray(content["markers"])) return;
+    const visited = new Set(Array.isArray(content["visited"]) ? (content["visited"] as unknown[]) : []);
+    let count = Object.keys(s.markers).length;
     let added = 0;
     for (const desc of (content["markers"] as unknown[]).slice(0, MAX_MARKERS)) {
-      if (typeof desc !== "string" || s.markers[desc] || Object.keys(s.markers).length >= MAX_MARKERS) continue;
+      if (typeof desc !== "string") continue;
+      const entered = visited.has(desc) && !s.visited[desc];
+      if (s.markers[desc] ? !entered : count >= MAX_MARKERS) continue;
+      if (!s.markers[desc]) count++;
       s.markers[desc] = true;
+      if (entered) s.visited[desc] = true;
       s.queue.push({ desc });
       added++;
     }
@@ -243,6 +267,7 @@ export class CharacterProgressService extends ClientListener {
   private dropReport(): void {
     const s = this.state;
     s.report = [];
+    s.reportVisited = [];
     s.want = false;
   }
 
@@ -251,15 +276,24 @@ export class CharacterProgressService extends ClientListener {
     const s = this.state;
     if (!s.key || (!force && now < this.reportAt)) return;
     const report = s.report || [];
-    if (!report.length && !s.want) return;
+    const visited = s.reportVisited || [];
+    if (!report.length && !visited.length && !s.want) return;
     this.reportAt = now + REPORT_MS;
-    const batch = report.splice(0, REPORT_BATCH);
-    const want = !!s.want && !report.length;
+    // The server reads visited and markers together, at most its perPacket (500) a packet
+    const visitedBatch = visited.splice(0, REPORT_BATCH);
+    const batch = report.splice(0, REPORT_BATCH - visitedBatch.length);
+    const want = !!s.want && !report.length && !visited.length;
     try {
-      sendCustomPacket(this.controller, { customPacketType: "dboMapSync", markers: batch, ...(want ? { want: true } : {}) });
+      sendCustomPacket(this.controller, {
+        customPacketType: "dboMapSync",
+        markers: batch,
+        ...(visitedBatch.length ? { visited: visitedBatch } : {}),
+        ...(want ? { want: true } : {}),
+      });
       if (want) s.want = false;
     } catch (err) {
       report.unshift(...batch);
+      visited.unshift(...visitedBatch);
     }
   }
 
@@ -278,6 +312,7 @@ export class CharacterProgressService extends ClientListener {
     this.ingrQueue = [];
     this.ingrPollAt = 0;
     logTrace(this, "Restore complete for", s.key);
+    trace(`map restore markers=${Object.keys(s.markers).length} visited=${Object.keys(s.visited).length}`);
   }
 
   // Both restore helpers return the number of native calls made so the frame budget holds
@@ -285,8 +320,9 @@ export class CharacterProgressService extends ClientListener {
     try {
       const ref = this.sp.ObjectReference.from(this.formFromDesc(desc));
       if (!ref) return 1;
-      if (ref.isMapMarkerVisible()) return 2;
-      ref.addToMap(true);
+      const entered = !!this.state.visited[desc];
+      if (entered ? ref.canFastTravelToMarker() : ref.isMapMarkerVisible()) return 2;
+      ref.addToMap(entered);
       return 3;
     } catch (err) {
       return 1;
@@ -322,16 +358,29 @@ export class CharacterProgressService extends ClientListener {
     for (; this.scanCursor < end; ++this.scanCursor) {
       const [localId, plugin] = MAP_MARKER_REFS[this.scanCursor];
       const desc = localId.toString(16) + ":" + plugin;
-      if (s.markers[desc]) continue;
+      if (s.visited[desc]) continue;
+      const known = !!s.markers[desc];
+      // In a 0.3.101 session a known marker's entered look proves no visit
+      if (known && s.legacy) continue;
+      let entered = false;
       try {
         const ref = this.sp.ObjectReference.from(this.formFromDesc(desc));
-        if (!ref || !ref.isMapMarkerVisible()) continue;
+        if (!ref || (!known && !ref.isMapMarkerVisible())) continue;
+        entered = ref.canFastTravelToMarker();
       } catch (err) {
         continue;
       }
-      if (Object.keys(s.markers).length >= MAX_MARKERS) return;
-      s.markers[desc] = true;
-      (s.report = s.report || []).push(desc);
+      if (known && !entered) continue;
+      if (!known) {
+        if (Object.keys(s.markers).length >= MAX_MARKERS) return;
+        s.markers[desc] = true;
+      }
+      if (entered) {
+        s.visited[desc] = true;
+        (s.reportVisited = s.reportVisited || []).push(desc);
+      } else {
+        (s.report = s.report || []).push(desc);
+      }
       this.markDirty();
     }
   }
@@ -446,6 +495,7 @@ export class CharacterProgressService extends ClientListener {
       name: this.ownerName() || (old && old.name) || "",
       updatedAt: Date.now(),
       markers: Object.keys(s.markers).slice(0, MAX_MARKERS),
+      visited: Object.keys(s.visited).slice(0, MAX_MARKERS),
       ingredients: {},
     };
     Object.keys(s.ingredients).slice(0, MAX_INGREDIENTS).forEach((desc) => {
