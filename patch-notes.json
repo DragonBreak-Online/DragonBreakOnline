@@ -1,5 +1,19 @@
 [
   {
+    "title": "Underarch Harbor",
+    "date": "2026-10-16",
+    "version": "Hotfix",
+    "tag": "World",
+    "sections": [
+      {
+        "heading": "New",
+        "items": [
+          "Solitude's eastern harbor, from the East Empire Company warehouse to the Dainty Sload, is now its own fief: Underarch Harbor, with its houses, farms, smithy, inn and chapel. The Jarl of Haafingar can grant it, and its holder is styled Harbormaster. Solitude keeps the city, Katla's Farm and the western docks."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Taxes, treasuries and client 0.3.102",
     "date": "2026-10-16",
     "version": "Client 0.3.102",
