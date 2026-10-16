@@ -1,7 +1,7 @@
 import { Settings } from "../settings";
 import { System, Log, SystemContext } from "./system";
 import { CompanionSystem } from "./companionSystem";
-import { spellEffects, SpellEffect, MgefArchetype, npcLevel, keywordConditionsPass, turnsToAsh, pickSummon, explosionPlacedNpc } from "./espmMagic";
+import { spellEffects, SpellEffect, MgefArchetype, npcLevel, keywordConditionsPass, turnsToAsh, pickSummon, explosionPlacedNpc, NORD_RACE } from "./espmMagic";
 import { isPlayerActor, isNear, baseIdOf, hex } from "./actorUtil";
 
 // The ScampServer / `mp` API is untyped here, same convention as spawn.ts.
@@ -54,6 +54,11 @@ export class ConjurationSystem implements System {
   // server-settings "explosionSummonEnabled", and "explosionSummonSeconds" (0: until killed, as vanilla's Ash Guardian)
   private explosionSummonOn = true;
   private explosionSummonSec = 0;
+  // server-settings "summonRaceVariants": Summon Skeleton conjures the caster race's own skeleton. Off by default: the
+  // Khajiit, Argonian, Elf and Orc skeletons (ISS_BeastSkeletonRace) use Issgard\actors\BeastSkeletons meshes that no
+  // launcher archive ships, so they never load on a client (#bugs 15 Oct "Summon Skeleton is not working": 5 of 5 Elf
+  // skeletons for an elf caster never loaded, every other summon base did). Off, every caster gets the human skeleton.
+  private summonRaceVariants = false;
   private pendingPlace = new Map<number, PendingPlace>();
   private lastPlaceHit = new Map<number, number>();
 
@@ -62,6 +67,7 @@ export class ConjurationSystem implements System {
     const all = (await Settings.get()).allSettings as Record<string, unknown> | null;
     this.commandDaedraOn = all?.["commandDaedraEnabled"] !== false;
     this.explosionSummonOn = all?.["explosionSummonEnabled"] !== false;
+    this.summonRaceVariants = all?.["summonRaceVariants"] === true;
     const placeSec = Number(all?.["explosionSummonSeconds"]);
     if (Number.isFinite(placeSec) && placeSec > 0) this.explosionSummonSec = placeSec;
     this.hook("onSpellCast", (casterId, spellId) => this.onSpellCast(casterId, spellId));
@@ -106,7 +112,7 @@ export class ConjurationSystem implements System {
     // The first summon effect is the unperked one; perk conditions are not evaluated server-side. A spell with one summon
     // per caster race (Summon Skeleton) conjures the caster's (pickSummon)
     const summons = effects.filter((e) => e.archetype === MgefArchetype.SummonCreature && e.assocId);
-    const pick = pickSummon(summons, () => this.casterRace(casterId));
+    const pick = pickSummon(summons, () => (this.summonRaceVariants ? this.casterRace(casterId) : NORD_RACE));
     if (pick) {
       this.companions.spawn(casterId, pick.effect.assocId, { kind: "summon", durationSec: this.duration(pick.timed, casterId, "summon"), source: spellId });
       return;
