@@ -6,6 +6,7 @@ import { RemoteServer } from "./remoteServer";
 import { ConnectionMessage } from "../events/connectionMessage";
 import { CustomPacketMessage } from "../messages/customPacketMessage";
 import { AuthGameData, authGameDataStorageKey } from "../../features/authModel";
+import { weekdayOf } from "./calendar";
 import { ActiveEffectApplyRemoveEvent, BrowserMessageEvent, ButtonEvent, DxScanCode, InputDeviceType } from "skyrimPlatform";
 
 declare const window: any;
@@ -24,6 +25,7 @@ const GLOBAL_HOUR = 0x38;
 const GLOBAL_DAY = 0x37;
 const GLOBAL_MONTH = 0x36;
 const GLOBAL_YEAR = 0x35;
+const GLOBAL_DAYS_PASSED = 0x39;
 
 const events = {
   tp: "admin::tp",
@@ -358,11 +360,11 @@ export class AdminMenuService extends ClientListener {
         d.effects.push({ id: hex(id), name: info.name, elapsedSec: Math.round((now - info.since) / 1000) });
       });
     }
-    // timeService mirrors the real UTC calendar shifted by hoursOffset into these globals, so the weekday follows the same clock
+    // timeService writes the server's clock into these globals; the weekday comes from GameDaysPassed as the engine's does, not the real date
     const global = (id: number) => safe(() => sp.GlobalVariable.from(sp.Game.getFormEx(id))?.getValue(), NaN);
-    const hour = global(GLOBAL_HOUR), day = global(GLOBAL_DAY), month = global(GLOBAL_MONTH), year = global(GLOBAL_YEAR);
-    if ([hour, day, month, year].every(Number.isFinite)) {
-      d.gameTime = { hour, day, month, year, weekday: new Date(now + d.hoursOffset * 3600000).getUTCDay() };
+    const hour = global(GLOBAL_HOUR), day = global(GLOBAL_DAY), month = global(GLOBAL_MONTH), year = global(GLOBAL_YEAR), daysPassed = global(GLOBAL_DAYS_PASSED);
+    if ([hour, day, month, year, daysPassed].every(Number.isFinite)) {
+      d.gameTime = { hour, day, month, year, weekday: weekdayOf(daysPassed) };
     }
     panelData.debug = d;
   }
