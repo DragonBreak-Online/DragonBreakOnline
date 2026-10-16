@@ -102,7 +102,7 @@ export class HitService extends ClientListener {
             right: null,
             left: null,
         };
-        // The hands are read only when they can matter: a staff, an enchantment, or a source the trace looks at
+        // The hands are read only when they can matter: a staff, an enchantment, or any other source that is not a spell or scroll
         const staffLike = weapon ? weaponType === STAFF_WEAPON_TYPE : !isSpell && !isScroll;
         if (staffLike) {
             const actor = sp.Actor.from(e.aggressor);
