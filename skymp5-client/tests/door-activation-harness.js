@@ -39,8 +39,8 @@ const STUBS = {
   singlePlayer: 'class SinglePlayerService {} module.exports = { SinglePlayerService };',
   remoteServer: 'class RemoteServer {} module.exports = { RemoteServer };',
   messages: 'module.exports = { MsgType: { Activate: 6 } };',
-  inventory: 'module.exports = { getInventory: () => ({ entries: [] }) };',
-  worldViewMisc: 'module.exports = { localIdToRemoteId: (id) => (id >= 0xff000000 ? 0 : id) };',
+  inventory: 'module.exports = { getInventory: () => { if (globalThis.__invThrows) throw new TypeError("Cannot read properties of null (reading \'getFormID\')"); return { entries: [] }; } };',
+  worldViewMisc: 'module.exports = { localIdToRemoteId: (id) => (id >= 0xff000000 ? (id + 0x100000) >>> 0 : id) };',
   lastInv: 'class LastInvService {} module.exports = { LastInvService };',
   selfActivation: 'module.exports = { selfActivated() {} };',
   customPacketUtil: 'module.exports = { parseCustomPacket: () => null };',
@@ -165,8 +165,9 @@ async function main() {
         getWorldSpace: () => null, getParentCell: () => ({ getFormID: () => 0x806c40f }) };
       return d;
     };
+    const lastInv = {};
     const activate = (caster, target) => {
-      const c = controller({ LastInvService: {} });
+      const c = controller({ LastInvService: lastInv });
       new ActivationService({ Game: { getPlayer: () => player } }, c);
       c.fire('activate', { caster, target });
       return c.sent;
@@ -181,6 +182,18 @@ async function main() {
     check('a blocked closed door is sent, as before', activate(player, door({ state: 3, blocked: true })).length === 1);
     check('the Bleak Falls secret door the client leaves unblocked keeps its old rule', activate(player, door({ state: 2, blocked: false, base: 0x6f703 })).length === 0);
     check('an NPC copy walking through an unblocked door keeps the old rule', activate({ getFormID: () => 0xff000123 }, door({ state: 4, blocked: false })).length === 0);
+    check('...while its activation of a closed door is still sent', activate({ getFormID: () => 0xff000123 }, door({ state: 3, blocked: false })).length === 1);
+    const reported = [];
+    globalThis.__dboReportError = (w) => reported.push(w);
+    globalThis.__invThrows = true;
+    lastInv.lastInv = { entries: [{ baseId: 0xf, count: 1 }] };
+    let thrown;
+    try { thrown = activate(player, door({ state: 3, blocked: true })); } catch (e) { thrown = String(e); }
+    globalThis.__invThrows = false;
+    check('an inventory read that throws (a player whose base reads null) no longer drops the activation', Array.isArray(thrown) && thrown.length === 1, thrown);
+    check('...and the stale snapshot is cleared, so ContainersService reads its own', lastInv.lastInv === undefined, lastInv.lastInv);
+    check('...and the error still reaches the server log as a cerr line', reported.length === 1 && reported[0] === 'on:activate:inv', reported);
+    delete globalThis.__dboReportError;
 
     // C. StaticRefsService
     const { StaticRefsService } = await build(tmp, 'src/services/services/staticRefsService.ts', 'staticRefsService');
