@@ -3,6 +3,8 @@
 // the restrained refusal only showed a notification. Each refusal now writes an "emote key refused: <gate>" line, the menu
 // gate naming every recorded menu and whether the engine still has it open. And the emote lines get a relay allowance of
 // their own (PageInputDiagService EVENT_KIND_MAX), so host-change lines can no longer spend the one they shared.
+// Emote lines also go out in full until that allowance is spent, then as the 5 s summary (review of 72f91ab58: a close 2.6 s
+// after the wheel opened was lost once a launch had six emote lines).
 // Drives the real emoteService.ts and pageInputDiagService.ts against a stubbed game. Run from skymp5-client:
 //
 //   node tests/emote-key-diag-harness.js [path to esbuild's package dir]
@@ -45,7 +47,7 @@ const enumsOf = (src) => {
 const ENUMS = enumsOf(fs.readFileSync(DTS, 'utf8'));
 const { DxScanCode, InputDeviceType, Menu } = ENUMS;
 
-const H = { notes: [], notified: [], js: [], focus: [], packets: [], lookups: {} };
+const H = { notes: [], notified: [], js: [], focus: [], packets: [], file: [], lookups: {} };
 globalThis.__ekH = H;
 const STUBS = {
   skyrimPlatform: `module.exports = Object.assign(${JSON.stringify(ENUMS)}, { once: (ev, fn) => globalThis.__ekH.spOnce = fn });`,
@@ -98,7 +100,7 @@ const sp = {
   settings: { 'skymp5-client': {} },
   getPluginSourceCode: () => '',
   writePlugin: () => {},
-  writeLogs: () => {},
+  writeLogs: (plugin, line) => { if (plugin === 'dbo-diag') H.file.push(line); },
   hooks: { sendAnimationEvent: { add: () => {} } },
   browser: {
     isFocused: () => world.focused,
@@ -125,7 +127,7 @@ const browser = {
 const restraint = { isPoseLocked: false };
 
 const reset = () => {
-  H.notes.length = 0; H.notified.length = 0; H.js.length = 0; H.focus.length = 0; H.packets.length = 0;
+  H.notes.length = 0; H.notified.length = 0; H.js.length = 0; H.focus.length = 0; H.packets.length = 0; H.file.length = 0;
   world.focused = false; world.engineOpen = new Set(); world.menuOpenThrows = false;
   browser.recorded = new Set(); browser.uiHidden = false; restraint.isPoseLocked = false;
 };
@@ -263,6 +265,94 @@ const wheelPushed = () => H.js.some((s) => /emoteWheel/.test(s));
     const all2 = H.packets.reduce((a, p) => a.concat(p.lines || []), []);
     check('six emote lines take nothing from the 40 shared ones', all2.filter((l) => /^fv:j/.test(l)).length === 40 && all2.filter((l) => /^emote /.test(l)).length === 6,
       [all2.filter((l) => /^fv:j/.test(l)).length, all2.filter((l) => /^emote /.test(l)).length]);
+  } finally {
+    Date.now = realNow;
+  }
+
+  // ---- Dragonsreach-like sequences past the first six emote lines of a launch: the real wheel feeding the real relay ----------
+  Date.now = () => clock;
+  try {
+    reset();
+    H.lookups = { BrowserService: browser, RestraintService: restraint, NetworkingService: { isConnected: () => true } };
+    const pc3 = makeController();
+    new P.PageInputDiagService(sp, pc3);
+    const ec3 = makeController();
+    new E.EmoteService(sp, ec3);
+    // Gamepad codes from gamepadKeys.ts: the chord is Back held with the left stick click
+    const PAD_BACK = 0x0020; const PAD_LEFT_THUMB = 0x0040;
+    const pad = (code, down) => ({ code, device: InputDeviceType.Gamepad, isDown: down, isUp: !down, userEventName: '' });
+    const press = (e) => { ec3.fire('buttonEvent', e); clock += 300; };
+    const flush = () => { for (let i = 0; i < 12; i++) { clock += 6000; pc3.fire('tick'); } };
+    const relayedEmote = () => H.packets.reduce((a, p) => a.concat(p.lines || []), []).filter((l) => /^emote /.test(l));
+    const fileEmote = () => H.file.filter((l) => /^emote /.test(l));
+    const inBoth = (line) => relayedEmote().includes(line) && fileEmote().includes(line);
+    const isSummary = (l) => /^emote \+\d+ more \(\d+ this session\), latest: /.test(l);
+
+    // Earlier this launch: the wheel opened and shut by its key three times, six lines
+    for (let i = 0; i < 3; i++) { press(key(DxScanCode.B)); press(key(DxScanCode.B)); }
+    flush();
+    check('six earlier emote lines this launch', fileEmote().length === 6 && relayedEmote().length === 6, fileEmote());
+
+    // In Dragonsreach: the key refused by each gate in turn, all inside one 5 s window
+    const refusals = [];
+    browser.recorded.add(Menu.Inventory); press(key(DxScanCode.B)); browser.recorded.clear();
+    refusals.push(`emote key refused: menus ${Menu.Inventory} (closed)`);
+    browser.recorded.add(Menu.Loading); world.engineOpen.add(Menu.Loading); press(key(DxScanCode.B));
+    browser.recorded.clear(); world.engineOpen.clear();
+    refusals.push(`emote key refused: menus ${Menu.Loading} (open)`);
+    browser.uiHidden = true; press(key(DxScanCode.B)); browser.uiHidden = false;
+    refusals.push('emote key refused: interface hidden');
+    world.focused = true;
+    press(pad(PAD_BACK, true)); press(pad(PAD_LEFT_THUMB, true)); press(pad(PAD_LEFT_THUMB, false)); press(pad(PAD_BACK, false));
+    world.focused = false;
+    refusals.push('emote key refused: browser focused');
+    restraint.isPoseLocked = true; press(key(DxScanCode.B)); restraint.isPoseLocked = false;
+    refusals.push('emote key refused: restrained');
+    flush();
+    for (const r of refusals) check(`past the 6th line, "${r.slice(6)}" reaches the file and the server in full`, inBoth(r), relayedEmote().slice(-6));
+    check('...each refusal once, with no summary in between', relayedEmote().length === 11 && !relayedEmote().some(isSummary), relayedEmote().slice(6));
+
+    // The wheel opened, then a panel took the cursor and the watch took the wheel down about 2.5 s later
+    press(key(DxScanCode.B));
+    const opened = H.focus[H.focus.length - 1] === true;
+    world.focused = false;
+    for (let i = 0; i < 16; i++) { clock += 250; ec3.fire('update'); }
+    flush();
+    const closeRe = /^emote wheel closed after (\d+) ms by losing the cursor$/;
+    const closed = relayedEmote().filter((l) => closeRe.test(l));
+    const ms = closed.length ? Number(closed[0].match(closeRe)[1]) : -1;
+    check('the wheel opened past the 6th line is written in full', opened && relayedEmote().filter((l) => l === 'emote wheel open').length === 4
+      && fileEmote().filter((l) => l === 'emote wheel open').length === 4, relayedEmote().slice(-3));
+    check('...and its close by losing the cursor, under 5 s later, reaches the file and the server in full',
+      closed.length === 1 && ms >= 2000 && ms < 5000 && fileEmote().some((l) => closeRe.test(l)), relayedEmote().slice(-3));
+
+    // A flood that hits the cap: B mashed against a stale record, a press every 300 ms for 90 s
+    const before = relayedEmote().length;
+    browser.recorded.add(Menu.Inventory);
+    for (let i = 0; i < 300; i++) { press(key(DxScanCode.B)); if (i % 10 === 0) pc3.fire('tick'); }
+    browser.recorded.clear();
+    flush();
+    const rel = relayedEmote(); const fil = fileEmote();
+    check('the first 40 emote lines of the launch go out in full, in the file and to the server',
+      before === 13 && rel.filter((l) => !isSummary(l)).length === 40 && fil.filter((l) => !isSummary(l)).length === 40,
+      [before, rel.filter((l) => !isSummary(l)).length, fil.filter((l) => !isSummary(l)).length]);
+    const firstSummary = rel.find(isSummary) || '';
+    check('the first summary counts from the allowance, not from 6',
+      firstSummary === `emote +1 more (41 this session), latest: key refused: menus ${Menu.Inventory} (closed)`, firstSummary);
+    check('the server gets 40 in full plus 10 summaries this launch, inside its 200 emote lines a player', rel.length === 50 && rel.filter(isSummary).length === 10,
+      [rel.length, rel.filter(isSummary).length]);
+    const sums = fil.filter(isSummary).map((l) => l.match(/^emote \+(\d+) more \((\d+) this session\)/).slice(1).map(Number));
+    const chained = sums.every(([n, m], i) => m - n === (i ? sums[i - 1][1] : 40));
+    check('the file keeps the 5 s summary past the relay cap, every line counted', sums.length > 10 && chained && sums[sums.length - 1][1] >= 300,
+      sums.slice(0, 3).concat(sums.slice(-2)));
+    check('a packet still carries at most 8 lines', H.packets.every((p) => p.lines.length <= 8), H.packets.map((p) => p.lines.length));
+
+    // A kind with no allowance of its own is unchanged: six in full, then the 5 s summary
+    const note3 = globalThis.__dboDiagNote;
+    for (let i = 0; i < 10; i++) { note3('fv:host', `npc ${i}`); clock += 300; }
+    flush();
+    const fv = H.packets.reduce((a, p) => a.concat(p.lines || []), []).filter((l) => /^fv:host /.test(l));
+    check('host-change lines still go out six in full, then one summary a window', fv.length === 7 && fv[6] === 'fv:host +1 more (7 this session), latest: npc 6', fv.slice(5));
   } finally {
     Date.now = realNow;
   }
