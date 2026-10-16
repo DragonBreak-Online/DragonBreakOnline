@@ -1,5 +1,19 @@
 [
   {
+    "title": "Spell tomes from reading",
+    "date": "2026-10-16",
+    "version": "Hotfix",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Fixes",
+        "items": [
+          "Reading as a Scholar no longer finds Transmute tomes. Transmute was taken out of the game, so those tomes could not be read. You now get a tome you can actually learn."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Meat, Dead Man's Drink and the day of the week",
     "date": "2026-10-16",
     "version": "Hotfix",
