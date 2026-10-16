@@ -6,696 +6,1031 @@
     "source": "backend"
   },
   {
-    "name": "A Quality World Map",
-    "required": true,
-    "enabled": true,
-    "source": "nexus",
-    "nexusId": 5804
-  },
-  {
-    "name": "Actor Limit Fix",
-    "required": true,
-    "enabled": true,
-    "source": "nexus",
-    "nexusId": 32349
-  },
-  {
-    "name": "Address Library for SKSE Plugins",
-    "required": true,
-    "enabled": true,
-    "source": "nexus",
-    "nexusId": 32444
-  },
-  {
-    "name": "Alternate High Poly Head",
-    "required": true,
-    "enabled": true,
-    "source": "nexus",
-    "nexusId": 148541
-  },
-  {
-    "name": "Animation Queue Fix",
-    "required": true,
-    "enabled": true,
-    "source": "nexus",
-    "nexusId": 82395
-  },
-  {
-    "name": "Armors of the Velothi Pt. I",
-    "required": true,
-    "enabled": true,
-    "source": "nexus",
-    "nexusId": 62752
-  },
-  {
-    "name": "Armors of the Velothi Pt. I - 3BA and Himbo V5 Refits",
-    "required": true,
-    "enabled": true,
-    "source": "nexus",
-    "nexusId": 133353
-  },
-  {
-    "name": "Armors of the Velothi Pt. II",
-    "required": true,
-    "enabled": true,
-    "source": "nexus",
-    "nexusId": 69996
-  },
-  {
-    "name": "Armors of the Velothi Pt. II - 3BA Refits",
-    "required": true,
-    "enabled": true,
-    "source": "nexus",
-    "nexusId": 134100
-  },
-  {
-    "name": "Armory of the Dragon Cult - Dragon Priest Armor",
-    "required": true,
-    "enabled": true,
-    "source": "nexus",
-    "nexusId": 94244
-  },
-  {
-    "name": "Beards",
-    "required": true,
-    "enabled": true,
-    "source": "nexus",
-    "nexusId": 1067
-  },
-  {
-    "name": "Beyond Skyrim - Bruma SE",
-    "required": true,
-    "enabled": true,
-    "source": "nexus",
-    "nexusId": 10917
-  },
-  {
-    "name": "BodySlide and Outfit Studio",
-    "required": true,
-    "enabled": true,
-    "source": "nexus",
-    "nexusId": 201
-  },
-  {
-    "name": "Brows",
-    "required": true,
-    "enabled": true,
-    "source": "nexus",
-    "nexusId": 1062
-  },
-  {
-    "name": "Caliente's Beautiful Bodies Enhancer -CBBE SFW Edition-",
-    "required": true,
-    "enabled": true,
-    "source": "nexus",
-    "nexusId": 74257
-  },
-  {
-    "name": "Capital Whiterun Expansion",
-    "required": true,
-    "enabled": true,
-    "source": "nexus",
-    "nexusId": 37982
-  },
-  {
-    "name": "Capital Windhelm Expansion",
-    "required": true,
-    "enabled": true,
-    "source": "nexus",
-    "nexusId": 42990
-  },
-  {
-    "name": "Capital Windhelm Expansion and JK Skyrim - United",
-    "required": true,
-    "enabled": true,
-    "source": "nexus",
-    "nexusId": 49298
-  },
-  {
-    "name": "Cities of the North - Dawnstar",
-    "required": true,
-    "enabled": true,
-    "source": "nexus",
-    "nexusId": 28952
-  },
-  {
-    "name": "Cities of the North - Dawnstar Patch Collection",
-    "required": true,
-    "enabled": true,
-    "source": "nexus",
-    "nexusId": 30885
-  },
-  {
-    "name": "Cities of the North - Falkreath",
-    "required": true,
-    "enabled": true,
-    "source": "nexus",
-    "nexusId": 56731
-  },
-  {
-    "name": "Cities of the North - Falkreath Patch Collection",
-    "required": true,
-    "enabled": true,
-    "source": "nexus",
-    "nexusId": 56734
-  },
-  {
-    "name": "Cities of the North - Morthal",
-    "required": true,
-    "enabled": true,
-    "source": "nexus",
-    "nexusId": 34168
-  },
-  {
-    "name": "Cities of the North - Morthal Patch Collection",
-    "required": true,
-    "enabled": true,
-    "source": "nexus",
-    "nexusId": 34228
-  },
-  {
-    "name": "Cities of the North - Winterhold",
-    "required": true,
-    "enabled": true,
-    "source": "nexus",
-    "nexusId": 40088
-  },
-  {
-    "name": "Cloaks and Capes",
-    "required": true,
-    "enabled": true,
-    "source": "nexus",
-    "nexusId": 2019
-  },
-  {
-    "name": "Community Shaders",
-    "required": true,
-    "enabled": true,
-    "source": "nexus",
-    "nexusId": 86492
-  },
-  {
-    "name": "Constructible Object Custom Keyword System",
-    "required": true,
-    "enabled": true,
-    "source": "nexus",
-    "nexusId": 81409
-  },
-  {
-    "name": "Crash Logger SSE AE VR - PDB support",
-    "required": true,
-    "enabled": true,
-    "source": "nexus",
-    "nexusId": 59818
-  },
-  {
-    "name": "Daedric Shrines - All in One",
-    "required": true,
-    "enabled": true,
-    "source": "nexus",
-    "nexusId": 78772
-  },
-  {
-    "name": "Dragon Priests Retexture SE",
-    "required": true,
-    "enabled": true,
-    "source": "nexus",
-    "nexusId": 101101
-  },
-  {
-    "name": "Expressive Facegen Morphs SE",
-    "required": true,
-    "enabled": true,
-    "source": "nexus",
-    "nexusId": 35785
-  },
-  {
-    "name": "Expressive Facial Animation -Female Edition-",
-    "required": true,
-    "enabled": true,
-    "source": "nexus",
-    "nexusId": 19181
-  },
-  {
-    "name": "Eyes AO Clipping Fix",
-    "required": true,
-    "enabled": true,
-    "source": "nexus",
-    "nexusId": 25753
-  },
-  {
-    "name": "FSMP - Faster HDT-SMP",
-    "required": true,
-    "enabled": true,
-    "source": "nexus",
-    "nexusId": 57339
-  },
-  {
-    "name": "Feminine Khajiit Textures (Grey Cat and Leopard)",
-    "required": true,
-    "enabled": true,
-    "source": "nexus",
-    "nexusId": 183
-  },
-  {
-    "name": "Flawn's Argonians",
-    "required": true,
-    "enabled": true,
-    "source": "nexus",
-    "nexusId": 28995
-  },
-  {
-    "name": "Flawn's Vanilla Argonians Redux - 4k CBBE UNP SOS HIMBO - FVAR",
-    "required": true,
-    "enabled": true,
-    "source": "nexus",
-    "nexusId": 43389
-  },
-  {
-    "name": "Fores New Idles in Skyrim SE - FNIS SE",
-    "required": true,
-    "enabled": true,
-    "source": "nexus",
-    "nexusId": 3038
-  },
-  {
-    "name": "Immersive Armors",
-    "required": true,
-    "enabled": true,
-    "source": "nexus",
-    "nexusId": 3479
-  },
-  {
-    "name": "Immersive Armours - SSE CBBE 3BA BodySlide",
-    "required": true,
-    "enabled": true,
-    "source": "nexus",
-    "nexusId": 22382
-  },
-  {
-    "name": "Immersive Weapons",
-    "required": true,
-    "enabled": true,
-    "source": "nexus",
-    "nexusId": 16788
-  },
-  {
-    "name": "Improved Eyes Skyrim",
-    "required": true,
-    "enabled": true,
-    "source": "nexus",
-    "nexusId": 9141
-  },
-  {
-    "name": "JK's Castle Volkihar",
-    "required": true,
-    "enabled": true,
-    "source": "nexus",
-    "nexusId": 116314
-  },
-  {
-    "name": "JK's Fort Dawnguard",
-    "required": true,
-    "enabled": true,
-    "source": "nexus",
-    "nexusId": 110645
-  },
-  {
-    "name": "JK's Markarth Outskirts",
-    "required": true,
-    "enabled": true,
-    "source": "nexus",
-    "nexusId": 93006
-  },
-  {
-    "name": "JK's Riften Outskirts",
-    "required": true,
-    "enabled": true,
-    "source": "nexus",
-    "nexusId": 90864
-  },
-  {
-    "name": "JK's Skyrim",
-    "required": true,
-    "enabled": true,
-    "source": "nexus",
-    "nexusId": 6289
-  },
-  {
-    "name": "JK's Whiterun Outskirts",
-    "required": true,
-    "enabled": true,
-    "source": "nexus",
-    "nexusId": 78351
-  },
-  {
-    "name": "Journey to Baan Malur and Morrowind",
-    "required": true,
-    "enabled": true,
-    "source": "nexus",
-    "nexusId": 114518
-  },
-  {
-    "name": "KS Hairdos 1.7 Salt and Wind",
-    "required": true,
-    "enabled": true,
-    "source": "nexus",
-    "nexusId": 44975
-  },
-  {
-    "name": "KS Hairdos SSE",
-    "required": true,
-    "enabled": true,
-    "source": "nexus",
-    "nexusId": 6817
-  },
-  {
-    "name": "MCM Helper",
-    "required": true,
-    "enabled": true,
-    "source": "nexus",
-    "nexusId": 53000
-  },
-  {
-    "name": "Mage Clothing Expansion",
-    "required": true,
-    "enabled": true,
-    "source": "nexus",
-    "nexusId": 128173
-  },
-  {
-    "name": "Moons and Stars - Sky Overhaul SKSE",
-    "required": true,
-    "enabled": true,
-    "source": "nexus",
-    "nexusId": 73336
-  },
-  {
-    "name": "More Craftable Equipment - Unenchanted Clothing and Specialty Gear",
-    "required": true,
-    "enabled": true,
-    "source": "nexus",
-    "nexusId": 44666
-  },
-  {
-    "name": "Native EditorID Fix",
-    "required": true,
-    "enabled": true,
-    "source": "nexus",
-    "nexusId": 85260
-  },
-  {
-    "name": "New Legion",
-    "required": true,
-    "enabled": true,
-    "source": "nexus",
-    "nexusId": 30468
-  },
-  {
-    "name": "New Legion - CBBE 3BA",
-    "required": true,
-    "enabled": true,
-    "source": "nexus",
-    "nexusId": 122841
-  },
-  {
-    "name": "Obscure's College of Winterhold",
-    "required": true,
-    "enabled": true,
-    "source": "nexus",
-    "nexusId": 20514
-  },
-  {
-    "name": "Obsidian CS",
-    "required": true,
-    "enabled": true,
-    "source": "nexus",
-    "nexusId": 162627
-  },
-  {
-    "name": "Obsidian Weathers and Seasons",
-    "required": true,
-    "enabled": true,
-    "source": "nexus",
-    "nexusId": 12125
-  },
-  {
-    "name": "Open Animation Replacer",
+    "name": "14_ce_99_14ce99ee-73f7-4d71-984e-5c746f7b8bb9",
     "required": true,
     "enabled": true,
     "source": "nexus",
     "nexusId": 92109
   },
   {
-    "name": "Pipe Smoking SE",
+    "name": "2b_a8_ca_2ba8ca49-2bbd-4cfb-a06b-bc5d44c83a31",
     "required": true,
     "enabled": true,
     "source": "nexus",
-    "nexusId": 13061
+    "nexusId": 57339
   },
   {
-    "name": "Precision - Accurate Melee Collisions",
+    "name": "43_59_d1_4359d1e1-c2ce-45f2-ac87-917a021a2c6f",
     "required": true,
     "enabled": true,
     "source": "nexus",
-    "nexusId": 72347
+    "nexusId": 10917
   },
   {
-    "name": "RaceMenu",
-    "required": true,
-    "enabled": true,
-    "source": "nexus",
-    "nexusId": 19080
-  },
-  {
-    "name": "Relighting Skyrim SE",
-    "required": true,
-    "enabled": true,
-    "source": "nexus",
-    "nexusId": 8586
-  },
-  {
-    "name": "SSE Display Tweaks",
-    "required": true,
-    "enabled": true,
-    "source": "nexus",
-    "nexusId": 34705
-  },
-  {
-    "name": "SSE Engine Fixes (skse64 plugin)",
-    "required": true,
-    "enabled": true,
-    "source": "nexus",
-    "nexusId": 17230
-  },
-  {
-    "name": "Sea Salt Deposits",
-    "required": true,
-    "enabled": true,
-    "source": "nexus",
-    "nexusId": 7300
-  },
-  {
-    "name": "Sentinel - An Equipment Overhaul",
-    "required": true,
-    "enabled": true,
-    "source": "nexus",
-    "nexusId": 100985
-  },
-  {
-    "name": "Simple Dual Sheath",
-    "required": true,
-    "enabled": true,
-    "source": "nexus",
-    "nexusId": 50049
-  },
-  {
-    "name": "SkyPatcher",
-    "required": true,
-    "enabled": true,
-    "source": "nexus",
-    "nexusId": 106659
-  },
-  {
-    "name": "SkyUI",
-    "required": true,
-    "enabled": true,
-    "source": "nexus",
-    "nexusId": 12604
-  },
-  {
-    "name": "Skyrim Priority SE AE - CPU Performance FPS Optimizer",
-    "required": true,
-    "enabled": true,
-    "source": "nexus",
-    "nexusId": 50129
-  },
-  {
-    "name": "Skyrim Script Extender (SKSE64)",
-    "required": true,
-    "enabled": true,
-    "source": "nexus",
-    "nexusId": 30379
-  },
-  {
-    "name": "Skyrim Souls RE - Unpaused Menus",
-    "required": true,
-    "enabled": true,
-    "source": "nexus",
-    "nexusId": 27859
-  },
-  {
-    "name": "Tempered Skins for Females - UNP CBBE and Vanilla",
-    "required": true,
-    "enabled": true,
-    "source": "nexus",
-    "nexusId": 8505
-  },
-  {
-    "name": "Tempered Skins for Males - Vanilla and SOS versions",
-    "required": true,
-    "enabled": true,
-    "source": "nexus",
-    "nexusId": 7902
-  },
-  {
-    "name": "The City of Crossed Daggers - Riften Expansion",
-    "required": true,
-    "enabled": true,
-    "source": "nexus",
-    "nexusId": 168629
-  },
-  {
-    "name": "The Eyes Of Beauty SSE",
-    "required": true,
-    "enabled": true,
-    "source": "nexus",
-    "nexusId": 16185
-  },
-  {
-    "name": "The Gray Cowl of Nocturnal SE",
-    "required": true,
-    "enabled": true,
-    "source": "nexus",
-    "nexusId": 4509
-  },
-  {
-    "name": "The Great Cities - Minor Cities and Towns SSE Edition",
-    "required": true,
-    "enabled": true,
-    "source": "nexus",
-    "nexusId": 20272
-  },
-  {
-    "name": "The Great Cities of JK's North - Patch",
-    "required": true,
-    "enabled": true,
-    "source": "nexus",
-    "nexusId": 33687
-  },
-  {
-    "name": "The Great Cities- Resources",
-    "required": true,
-    "enabled": true,
-    "source": "nexus",
-    "nexusId": 104373
-  },
-  {
-    "name": "The Great City Of Dawnstar SSE Edition",
-    "required": true,
-    "enabled": true,
-    "source": "nexus",
-    "nexusId": 19491
-  },
-  {
-    "name": "The Great City Of Falkreath SSE Edition",
-    "required": true,
-    "enabled": true,
-    "source": "nexus",
-    "nexusId": 19709
-  },
-  {
-    "name": "The Great City Of Morthal SSE Edition",
-    "required": true,
-    "enabled": true,
-    "source": "nexus",
-    "nexusId": 19592
-  },
-  {
-    "name": "The Great City Of Winterhold SSE Edition",
-    "required": true,
-    "enabled": true,
-    "source": "nexus",
-    "nexusId": 17127
-  },
-  {
-    "name": "The Great City of Dragon Bridge SSE Edition",
-    "required": true,
-    "enabled": true,
-    "source": "nexus",
-    "nexusId": 19962
-  },
-  {
-    "name": "The Great City of Rorikstead SSE Edition",
-    "required": true,
-    "enabled": true,
-    "source": "nexus",
-    "nexusId": 20151
-  },
-  {
-    "name": "The Great City of Winterhold Patch Collection",
-    "required": true,
-    "enabled": true,
-    "source": "nexus",
-    "nexusId": 74560
-  },
-  {
-    "name": "The Notice Board SE",
-    "required": true,
-    "enabled": true,
-    "source": "nexus",
-    "nexusId": 3218
-  },
-  {
-    "name": "True Directional Movement - Modernized Third Person Gameplay",
+    "name": "63_22_a2_6322a284-2010-401e-913d-0c18c1214065",
     "required": true,
     "enabled": true,
     "source": "nexus",
     "nexusId": 51614
   },
   {
-    "name": "TrueHUD - HUD Additions",
+    "name": "67_ca_88_67ca88cf-8ea0-4696-a1c1-00f483528a9d",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 74257
+  },
+  {
+    "name": "73_48_15_734815bb-19f7-42a8-a315-cd304ecd5083",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 201
+  },
+  {
+    "name": "84_71_fc_8471fc2b-7839-48bb-9e2c-42aa16e599c2",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 183
+  },
+  {
+    "name": "9.0.1 A Quality World Map - Vivid with Stone Roads-5804-9-0-1",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 5804
+  },
+  {
+    "name": "A Quality World Map - Clear Map Skies-5804-9-0-1CMS",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 5804
+  },
+  {
+    "name": "a4_d9_9d_a4d99d6e-b998-4791-9d90-4ba88e224101",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 86492
+  },
+  {
+    "name": "Actor Limit Fix - Anniversary Edition (1.6.629.0 and later)-32349-9-1678780488",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 32349
+  },
+  {
+    "name": "All in one (all game versions)-32444-11-1770897704",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 32444
+  },
+  {
+    "name": "Alternate High Poly Head SE-148541-2-5-1774792055",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 148541
+  },
+  {
+    "name": "Animation Queue Fix-82395-1-0-1-1673338766",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 82395
+  },
+  {
+    "name": "Armors of the Velothi Pt. I - 3BA-133353-1-2-1731703489",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 133353
+  },
+  {
+    "name": "Armors of the Velothi Pt. I 2k (1.3)-62752-1-3-1-1746608181",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 62752
+  },
+  {
+    "name": "Armors of the Velothi Pt. II - 3BA-134100-1-0-1731823575",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 134100
+  },
+  {
+    "name": "Armors of the Velothi Pt. II 2k (1.1.2)-69996-1-1-2-1757775274",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 69996
+  },
+  {
+    "name": "Armory of the Dragon Cult - Dragon Priest Armor-94244-2-0-1717171562",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 94244
+  },
+  {
+    "name": "B. Whiterun Expansion 1.3 Exterior Compatibility Version-37982-1-3-1598121752",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 37982
+  },
+  {
+    "name": "Base-30468-1-0-1574192977",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 30468
+  },
+  {
+    "name": "c2_1d_0f_c21d0f55-4a38-476a-8b37-6fc83f9213bf",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 10917
+  },
+  {
+    "name": "Capital Windhelm Expansion - Normal-42990-1-3-1614298844",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 42990
+  },
+  {
+    "name": "Cities of the North - Dawnstar-28952-1-4-1700479671",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 28952
+  },
+  {
+    "name": "Cities of the North - Falkreath Patch-56731-1-3-1681414570",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 56731
+  },
+  {
+    "name": "Cities of the North - Morthal-34168-1-2-1700483274",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 34168
+  },
+  {
+    "name": "Cities of the North - Winterhold-40088-1-1-1602459318",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 40088
+  },
+  {
+    "name": "Cloaks and Capes-2019-1-4",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 2019
+  },
+  {
+    "name": "COTN Dawnstar Patch Collection-30885-5-9-1771973931",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 30885
+  },
+  {
+    "name": "COTN Falkreath Patch Collection-56734-1-29-1768260027",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 56734
+  },
+  {
+    "name": "COTN Morthal Patch Collection-34228-3-7-1771708887",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 34228
+  },
+  {
+    "name": "Crafting Categories for SkyUI-81409-1-1-1-1713865527",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 81409
+  },
+  {
+    "name": "CrashLogger-59818-1-24-0-1782605772",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 59818
+  },
+  {
+    "name": "CWE - JK - United-49298-1-0-7-1621916249",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 49298
+  },
+  {
+    "name": "Daedric Shrines - All in One  - 2K-78772-1-02-1724805261",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 78772
+  },
+  {
+    "name": "dc_ab_df_dcabdf18-a5f1-475f-9b03-ca54e5730836",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 106659
+  },
+  {
+    "name": "Dragon Priests Retexture SE - Half Res-101101-1-1-1717159764",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 101101
+  },
+  {
+    "name": "Dunmeth Pass-114518-i1-0-0-1748465347",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 114518
+  },
+  {
+    "name": "ed_8d_27_ed8d270a-f9dc-46a7-84a6-7f0ed78d0eb4",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 51073
+  },
+  {
+    "name": "Engine Fixes - Main File-17230-7-0-20-1772078239",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 17230
+  },
+  {
+    "name": "Expressive Facegen Morphs SE-35785-1-0-1595174141",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 35785
+  },
+  {
+    "name": "Expressive Facial Animation - Female Edition-19181-1-7-1575746557",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 19181
+  },
+  {
+    "name": "Eyes AO Clipping Fix-25753-1-3-1558284484",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 25753
+  },
+  {
+    "name": "Flawn's Argonians - CBBE Patch 2k-28995-1-0-1593520371",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 28995
+  },
+  {
+    "name": "Flawn's Argonians - Main 2k-28995-1-0-1593519901",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 28995
+  },
+  {
+    "name": "FNIS Behavior SE 7_6-3038-7-6-1582048023",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 3038
+  },
+  {
+    "name": "FVAR - Main CBBE-43389-2-0-1749995439",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 43389
+  },
+  {
+    "name": "Hvergelmir's Aesthetics - Beards 5.0.1-1067-5-0-1-1553198800",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 1067
+  },
+  {
+    "name": "Hvergelmir's Aesthetics - Brows 4.1-1062-4-1-1553175906",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 1062
+  },
+  {
+    "name": "Immersive Armors 8.1 SSE Test-3479-8-1",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 3479
+  },
+  {
+    "name": "Immersive Armours - SSE CBBE 3BA BodySlide-22382-3-1-1-1705420305",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 22382
+  },
+  {
+    "name": "Immersive Weapons-16788-2",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 16788
+  },
+  {
+    "name": "Improved Eyes Skyrim 1.6-9141-1-6",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 9141
+  },
+  {
+    "name": "JK's Castle Volkihar-116314-1-1-2-1715478966",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 116314
+  },
+  {
+    "name": "JK's Fort Dawnguard-110645-1-0-3-1753727561",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 110645
+  },
+  {
+    "name": "JK's Markarth Outskirts-93006-2-0-1-1776882761",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 93006
+  },
+  {
+    "name": "JK's Riften Outskirts-90864-1-1-1706043663",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 90864
+  },
+  {
+    "name": "JK's Skyrim all in one-6289-1-7-1614998676",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 6289
+  },
+  {
+    "name": "JK's Skyrim Patch-168629-1-6-1770830169",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 168629
+  },
+  {
+    "name": "JK's Whiterun Outskirts-78351-1-6-2-1754255259",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 78351
+  },
+  {
+    "name": "Journey to Baan Malur-114518-i1-1-9b-1748515734",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 114518
+  },
+  {
+    "name": "KS Hairdos 1.7 - Salt and Wind-44975-1-1-1612082685",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 44975
+  },
+  {
+    "name": "KS Hairdos SSE-6817-1-10-1747506054",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 6817
+  },
+  {
+    "name": "Mage Clothing Expansion-128173-2-0-1-1727108300",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 128173
+  },
+  {
+    "name": "MCM Helper-53000-1-6-2-1777219181",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 53000
+  },
+  {
+    "name": "Moons And Stars - Sky Overhaul SKSE-73336-2-0-2-1665609139",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 73336
+  },
+  {
+    "name": "More Craftable Equipment-44666-1-4-0-1677446835",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 44666
+  },
+  {
+    "name": "Native EditorID Fix-85260-1-2-2-1712605528",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 85260
+  },
+  {
+    "name": "New Legion CBBE 3BA-122841-1-0-1719501776",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 122841
+  },
+  {
+    "name": "Obscure's College of Winterhold-20514-1-6-1-1587010675",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 20514
+  },
+  {
+    "name": "Obsidian CS-162627-1-1-2-1761688089",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 162627
+  },
+  {
+    "name": "Obsidian Weathers - 1.07a-12125-1-07a-1620568126",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 12125
+  },
+  {
+    "name": "Pipe Smoking SE-13061-1-0",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 13061
+  },
+  {
+    "name": "Precision-72347-2-0-4-1674360214",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 72347
+  },
+  {
+    "name": "RaceMenu Anniversary Edition v0-4-20-0-19080-0-4-20-0-1776620918",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 19080
+  },
+  {
+    "name": "Relighting Skyrim SE v3.1-8586-3-1-1773701905",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 8586
+  },
+  {
+    "name": "Sea Salt Deposits 2.0-7300-2-0-1702182805",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 7300
+  },
+  {
+    "name": "Sentinel - An Equipment Overhaul-100985-3-2-0-1740901216",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 100985
+  },
+  {
+    "name": "Sentinel - Required Resources-100985-3-2-0-1740901115",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 100985
+  },
+  {
+    "name": "Simple Dual Sheath for 1.6.629 and newer-50049-1-5-7-1702208537",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 50049
+  },
+  {
+    "name": "Skyrim Priority SE AE-50129-3-4-0-1675213326",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 50129
+  },
+  {
+    "name": "Skyrim Souls RE - Unpaused Menus-27859-3-1-2-1779355258",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 27859
+  },
+  {
+    "name": "SkyUI-12604-6-8-1775516551",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 12604
+  },
+  {
+    "name": "SSE Display Tweaks-34705-0-5-16-1703410713",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 34705
+  },
+  {
+    "name": "Tempered Skins for Females CBBE-8505-1-32-1604152171",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 8505
+  },
+  {
+    "name": "Tempered Skins for Males - Dressed Version-7902-2-05-1601297180",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 7902
+  },
+  {
+    "name": "Textures Medium-30468-1-0-1574193036",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 30468
+  },
+  {
+    "name": "The City of Crossed Daggers - Riften Expansion-168629-1-8-1769359375",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 168629
+  },
+  {
+    "name": "The Eyes of Beauty SSE-16185-1-2-1-1598238698",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 16185
+  },
+  {
+    "name": "The Great Cities - Resources 2k-104373-1-1-1734084651",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 104373
+  },
+  {
+    "name": "The Great Cities 2.01-20272-2-01-1551532639",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 20272
+  },
+  {
+    "name": "The Great Cities of JK's North v6-33687-6-01-1732373746",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 33687
+  },
+  {
+    "name": "The Great City of Dawnstar SSE-19491-2-12-1674666614",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 19491
+  },
+  {
+    "name": "The Great City of Dragon Bridge 1.12-19962-1-12-1539428884",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 19962
+  },
+  {
+    "name": "The Great City of Falkreath-19709-1-22-1679571743",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 19709
+  },
+  {
+    "name": "The Great City of Morthal-19592-1-11",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 19592
+  },
+  {
+    "name": "The Great City of Rorikstead 1.2-20151-1-2-1551470732",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 20151
+  },
+  {
+    "name": "The Great City of Winterhold Patch Collection-74560-2-10-1761247389",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 74560
+  },
+  {
+    "name": "The Great City of Winterhold-17127-4-2-3-1736080766",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 17127
+  },
+  {
+    "name": "The Notice Board-3218-1-4",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 3218
+  },
+  {
+    "name": "TrueHUD-62775-1-1-9-1703382929",
     "required": true,
     "enabled": true,
     "source": "nexus",
     "nexusId": 62775
   },
   {
-    "name": "Unofficial Skyrim Special Edition Patch - USSEP",
+    "name": "Unofficial Skyrim Special Edition Patch-266-4-3-6c-1756684569",
     "required": true,
     "enabled": true,
     "source": "nexus",
     "nexusId": 266
   },
   {
-    "name": "Vanilla hair remake",
+    "name": "Vanilla hair remake-63979-1-0-2-1715806292",
     "required": true,
     "enabled": true,
     "source": "nexus",
     "nexusId": 63979
   },
   {
-    "name": "XP32 Maximum Skeleton Special Extended - XPMSSE",
+    "name": "XP32 Maximum Skeleton Special Extended-1988-5-06-1707663131",
     "required": true,
     "enabled": true,
     "source": "nexus",
     "nexusId": 1988
   },
   {
-    "name": "powerofthree's Tweaks",
+    "name": "1AAASE-100724-1-1694866126",
     "required": true,
     "enabled": true,
-    "source": "nexus",
-    "nexusId": 51073
+    "source": "url"
+  },
+  {
+    "name": "1AncientImparisalArmorSE-142655-4-1746702476",
+    "required": true,
+    "enabled": true,
+    "source": "url"
+  },
+  {
+    "name": "1k Textures-110922-1-1707196032",
+    "required": true,
+    "enabled": true,
+    "source": "url"
+  },
+  {
+    "name": "ALT TEXTURES - Stall Cover Textures-19275-1-0-1587588632",
+    "required": true,
+    "enabled": true,
+    "source": "url"
+  },
+  {
+    "name": "Architecture and Clutter Resources 183044 1.16 2026-09-09T23-25Z lNkz9LCTZ",
+    "required": true,
+    "enabled": true,
+    "source": "url"
+  },
+  {
+    "name": "Baan Malur - A Landscape Overhaul - CORE-152707-0-04RC-1765405591",
+    "required": true,
+    "enabled": true,
+    "source": "url"
+  },
+  {
+    "name": "Base-29559-1-1-1571507150",
+    "required": true,
+    "enabled": true,
+    "source": "url"
+  },
+  {
+    "name": "Beyond Reach 4.8-3008-4-8-1747019788",
+    "required": true,
+    "enabled": true,
+    "source": "url"
+  },
+  {
+    "name": "Black Bear Ancient Nord Armor-60040-1-1-2-1644273369",
+    "required": true,
+    "enabled": true,
+    "source": "url"
+  },
+  {
+    "name": "Blacklight Baan Malur Overhaul-166401-v1-1-1765671871",
+    "required": true,
+    "enabled": true,
+    "source": "url"
+  },
+  {
+    "name": "Civil War Battlemage Armors Half Resolution-139332-1-1-1744116355",
+    "required": true,
+    "enabled": true,
+    "source": "url"
+  },
+  {
+    "name": "DB Armor Reforged V2.2 152112 2.2 2026-08-27T23-22Z 31i7IogHm",
+    "required": true,
+    "enabled": true,
+    "source": "url"
+  },
+  {
+    "name": "DOMINION - HDT SMP Patch 188421 1 2026-08-21T20-25Z hfH9s6iEl",
+    "required": true,
+    "enabled": true,
+    "source": "url"
+  },
+  {
+    "name": "DOMINION New Thalmor Armors And Weapons 188421 1 2026-08-21T20-23Z Sx9oEw7CW",
+    "required": true,
+    "enabled": true,
+    "source": "url"
+  },
+  {
+    "name": "Dark's Resources-177424-3-1777198993",
+    "required": true,
+    "enabled": true,
+    "source": "url"
+  },
+  {
+    "name": "Flora Druid-149385-1-2-1746661620",
+    "required": true,
+    "enabled": true,
+    "source": "url"
+  },
+  {
+    "name": "Goblins (se-ae) v4-24525-4-1688736652",
+    "required": true,
+    "enabled": true,
+    "source": "url"
+  },
+  {
+    "name": "Gryphonknight Regalia - Breton Noble Armor-107437-1-3-1724880605",
+    "required": true,
+    "enabled": true,
+    "source": "url"
+  },
+  {
+    "name": "Gryphonknight Regalia - SMP patch-107437-1-3-1724880660",
+    "required": true,
+    "enabled": true,
+    "source": "url"
+  },
+  {
+    "name": "Helgen Reborn SSE Version 106 With bsa file-5673-V106SSEBSA",
+    "required": true,
+    "enabled": true,
+    "source": "url"
+  },
+  {
+    "name": "Immersive Armors Retexture and Mesh Fixes SE-75891-1-6-1679607226",
+    "required": true,
+    "enabled": true,
+    "source": "url"
+  },
+  {
+    "name": "King of the Murkmire - Ancient Argonian Armor 190459 1.0.0 2026-09-02T16-57Z Dc5uGkS7E",
+    "required": true,
+    "enabled": true,
+    "source": "url"
+  },
+  {
+    "name": "King of the Murkmire - LOD 190459 1.1.0 2026-10-04T22-14Z Z3mWyIH82",
+    "required": true,
+    "enabled": true,
+    "source": "url"
+  },
+  {
+    "name": "King of the Murkmire - Main 190459 1.1.0 2026-10-04T22-15Z Ks18n0Uwm",
+    "required": true,
+    "enabled": true,
+    "source": "url"
+  },
+  {
+    "name": "Knight-Errant Armor Set-130790-1-4-1730094470",
+    "required": true,
+    "enabled": true,
+    "source": "url"
+  },
+  {
+    "name": "Lordbound Main File-160493-0-8-1-1760641847",
+    "required": true,
+    "enabled": true,
+    "source": "url"
+  },
+  {
+    "name": "Lunar Guard - 1k Textures-75349-1-3-1677929786",
+    "required": true,
+    "enabled": true,
+    "source": "url"
+  },
+  {
+    "name": "Mad Modders Assets V3-83445-SEAE-3-0-1706901477",
+    "required": true,
+    "enabled": true,
+    "source": "url"
+  },
+  {
+    "name": "More to do in Hammerfell - ESP Version-62599-1-1-0-1682120576",
+    "required": true,
+    "enabled": true,
+    "source": "url"
+  },
+  {
+    "name": "Morrowind Imperial Keep Set-133090-1-0-1730675084",
+    "required": true,
+    "enabled": true,
+    "source": "url"
+  },
+  {
+    "name": "Morrowind Map Fix-114518-i1-0-0-1723650683",
+    "required": true,
+    "enabled": true,
+    "source": "url"
+  },
+  {
+    "name": "Murkmire Official Housing Pack 194072 1.0.0 2026-10-04T22-28Z Ks18n0Uwl",
+    "required": true,
+    "enabled": true,
+    "source": "url"
+  },
+  {
+    "name": "Nord Steelheart Armor-110922-1-1707196512",
+    "required": true,
+    "enabled": true,
+    "source": "url"
+  },
+  {
+    "name": "Patch for the 10th Anniversary Version-62599-1-1-0-1739576825",
+    "required": true,
+    "enabled": true,
+    "source": "url"
+  },
+  {
+    "name": "STATICS - Stalls (Meshes)-19275-1-0-1587586877",
+    "required": true,
+    "enabled": true,
+    "source": "url"
+  },
+  {
+    "name": "Seascale - My Patches SE by Xtudo - MY FIXES-91576-1-1-1684436914",
+    "required": true,
+    "enabled": true,
+    "source": "url"
+  },
+  {
+    "name": "Seascale Set-91506-1-0-1684350408",
+    "required": true,
+    "enabled": true,
+    "source": "url"
+  },
+  {
+    "name": "Skaal Heavy Armor SE-62256-1-0-1642674969",
+    "required": true,
+    "enabled": true,
+    "source": "url"
+  },
+  {
+    "name": "Striding Silt Strider-109619-1-3-1707062998",
+    "required": true,
+    "enabled": true,
+    "source": "url"
+  },
+  {
+    "name": "Summerset Isle SE - Combined Updated-72004-v1-6-1721222714",
+    "required": true,
+    "enabled": true,
+    "source": "url"
+  },
+  {
+    "name": "Textures Medium-29559-1-0-1570631023",
+    "required": true,
+    "enabled": true,
+    "source": "url"
+  },
+  {
+    "name": "The Gray Cowl of Nocturnal-141327-1-51-1774565910",
+    "required": true,
+    "enabled": true,
+    "source": "url"
+  },
+  {
+    "name": "The Shadow Scale Set 2.0 for SSE-4410-SE-3-1",
+    "required": true,
+    "enabled": true,
+    "source": "url"
+  },
+  {
+    "name": "VickusDickus' Apex Khajiit Armory Reforged 1K-17114-2-2-2-1756268126",
+    "required": true,
+    "enabled": true,
+    "source": "url"
+  },
+  {
+    "name": "Yoku Armory 2.0 - Crowns and Forebears-150208-2-0-1768085951",
+    "required": true,
+    "enabled": true,
+    "source": "url"
+  },
+  {
+    "name": "Forgotten Armory - Crude - Weapon Pack 10 in One-120944--3-1717361141",
+    "required": true,
+    "enabled": true,
+    "source": "url"
+  },
+  {
+    "name": "Kwama Creatures SE-39218-newerthanold-1597075563",
+    "required": true,
+    "enabled": true,
+    "source": "url"
+  },
+  {
+    "name": "Dwemer Mantis Prototype-168216-1-1-1766916237",
+    "required": true,
+    "enabled": true,
+    "source": "url"
+  },
+  {
+    "name": "Pig Iron Set ESL-126178-1-0-1725478971",
+    "required": true,
+    "enabled": true,
+    "source": "url"
+  },
+  {
+    "name": "Adamantium Addon-71740-1-0-0-1658303257",
+    "required": true,
+    "enabled": true,
+    "source": "url"
   }
 ]
