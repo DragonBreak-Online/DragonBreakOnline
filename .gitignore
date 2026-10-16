@@ -108,6 +108,8 @@ playtester-boost.json.tmp
 # play time per account and the character slots earned with it (playtime.js)
 playtime-slots.json
 playtime-slots.json.tmp
+referrals.json
+referrals.json.tmp
 item-snapshots.json
 item-snapshots.json.tmp
 journal/

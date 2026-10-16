@@ -8229,6 +8229,13 @@ try {
   delete require.cache[PLAYTIME_JS];
   require(PLAYTIME_JS)({ mp, log, personal, system, registerChatCommand, audit, who, display, profileOf, isAdmin, findAnyByName, onlineActors, every, creationPending, cfg });
 } catch (e) { log('playtime.js failed to load:', e.stack || e.message); }
+// ---- referral links and their boosts (server\referrals.js, config "referrals"; the backend's routes/referrals.js binds new accounts) ----
+// After playtime.js: its records tell referrals.js which accounts were seen before referrals opened
+try {
+  const REFERRALS_JS = path.resolve('referrals.js');
+  delete require.cache[REFERRALS_JS];
+  require(REFERRALS_JS)({ mp, log, personal, system, registerChatCommand, audit, who, display, profileOf, discordOf, isAdmin, isLeadStaff, findAnyByName, onlineActors, every, creationPending, cfg });
+} catch (e) { log('referrals.js failed to load:', e.stack || e.message); globalThis.__dboReferralSkillRate = null; }
 
 // ---- vampirism and lycanthropy (server\supernatural.js) ------------------------------------------------
 try {
