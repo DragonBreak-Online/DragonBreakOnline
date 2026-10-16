@@ -182,6 +182,8 @@ function deleteByProfileId(profileId) {
   save(data)
   try { require('./deviceChecks').forgetAccount(discordId) }
   catch (err) { console.error('[players] device check entry not erased; it is deleted under the 30-day rule unless the account is banned:', err.message) }
+  try { require('./referrals').forgetProfile(profileId) }
+  catch (err) { console.error('[players] referral rows not erased; they are dropped after 30 days:', err.message) }
   profiles.deleteByDiscordId(discordId)
   return { discordId }
 }
