@@ -1,5 +1,23 @@
 [
   {
+    "title": "Writing spell tomes",
+    "date": "2026-10-16",
+    "version": "Server update",
+    "tag": "New",
+    "sections": [
+      {
+        "heading": "Master Scholars write spell tomes",
+        "items": [
+          "A Master Scholar can now write a spell tome of a spell they know, at a Scholars' Ledger: choose Write a spell tome.",
+          "Novice tomes need no scrolls. Apprentice tomes need 1 scroll of the same spell, Adept 2, Expert 4 and Master 5; the scrolls are used up.",
+          "A Master tome also needs a Master mage of that school who knows the spell, standing beside you and agreeing to help.",
+          "Each rank has its own wait after a tome is written: a day for Novice, 2 days for Apprentice, 4 for Adept, a week for Expert and two weeks for Master.",
+          "Tomes of raising the dead and of calling or banishing Daedra can only be written by senior college ranks."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Spell tomes from reading",
     "date": "2026-10-16",
     "version": "Hotfix",

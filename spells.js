@@ -27,10 +27,14 @@
 // same student rules. The class costs its teacher one lesson credit (a tome of the spell, else the day's tome purchase),
 // spent when the first student accepts; the rest of that class learn it on the same credit (Nate, 11 Oct: "fix the hole").
 //
+// A Master Scholar writes a tome of a spell they know at a Scholars' Ledger (tomeWriting; Nate, 16 Oct), from scrolls of
+// that spell by its rank, a cooldown per rank, and for a Master tome a Master mage of the school beside them.
+//
 // State, on the character:
 //   private.dboStudied       { arcane: [spell desc...], priest: [...] }  the spellbook: every spell learned through this system
 //   private.dboPrepared      [spell desc...]                           the prepared ones, at most `prepared`
 //   private.dboTomeBoughtAt  ms of the last shop purchase
+//   private.dboTomeWrites    { rank: ms } the last tome written of each rank
 
 const fs = require('fs');
 const path = require('path');
@@ -1165,12 +1169,127 @@ module.exports = (api) => {
     audit(`TEACH ${who(o.teacher)} taught ${descOf(sp.id)} ${sp.name} to ${who(student)} at a class (${paidWith}; book ${knownIds(student).length}, prepared ${preparedIds(student).length}/${MAXP()})`);
   };
 
+  // ---- writing spell tomes (Nate, 16 Oct) ------------------------------------------------------------------------------
+  // A Master Scholar writes a tome of a spell they know at a Scholars' Ledger (salvage.js "Write a spell tome"). By the
+  // spell's rank (tomeWriting.scrolls, .cooldownDays): Novice no scroll, a day; Apprentice 1 scroll of the spell, 2 days;
+  // Adept 2, 4 days; Expert 4, a week; Master 5 and a Master mage of the school who knows the spell, standing by and
+  // accepting, two weeks. Scrolls of the spell are matched by name (FireboltScroll for Firebolt). Each rank has its own
+  // cooldown on the writer (private.dboTomeWrites). The restricted arts only for a Senior rank, as the shop and reading.
+  const WRITE = Object.assign({ enabled: true, scholarTier: 4, scrolls: [0, 1, 2, 4, 5], cooldownDays: [1, 2, 4, 7, 14], helperMeters: 5, offerSeconds: 60 }, CFG.tomeWriting || {});
+  const WRITES = 'private.dboTomeWrites';
+  // spell id -> a tome that teaches it; spell id -> the scroll bases of the same spell
+  // The ordinary SpellTome* book wins over a quest reward copy (MGRDestructionFinal is also Fire Storm)
+  const TOME_OF_SPELL = new Map();
+  for (const t of TOMES.values()) { const had = TOME_OF_SPELL.get(t.spellId >>> 0); if (!had || (!/^SpellTome/i.test(had.edid) && /^SpellTome/i.test(t.edid))) TOME_OF_SPELL.set(t.spellId >>> 0, t); }
+  const SCROLLS_OF_SPELL = new Map();
+  {
+    const byEdid = new Map();
+    for (const t of TOME_LIST) { const id = idOf(canonToDesc(t.spellId)); if (id && t.spell) byEdid.set(String(t.spell).toLowerCase(), id >>> 0); }
+    for (const s of ((readJson('readables.json') || {}).scrolls || [])) {
+      const base = String(s.name || '').replace(/scroll$/i, '').toLowerCase(); const spell = byEdid.get(base); const id = idOf(canonToDesc(s.id));
+      if (spell && id) SCROLLS_OF_SPELL.set(spell, (SCROLLS_OF_SPELL.get(spell) || []).concat([id]));
+    }
+  }
+  const scrollsHeld = (a, spellId) => { const ids = SCROLLS_OF_SPELL.get(spellId >>> 0) || []; return inventoryOf(a).filter((e) => e && !e.worn && ids.includes(Number(e.baseId) >>> 0)).reduce((n, e) => n + (Number(e.count) || 0), 0); };
+  const takeScrolls = (a, spellId, n) => {
+    const ids = SCROLLS_OF_SPELL.get(spellId >>> 0) || [];
+    const entries = inventoryOf(a).map((e) => Object.assign({}, e));
+    let left = n;
+    for (const e of entries) { if (!left) break; if (e.worn || !ids.includes(Number(e.baseId) >>> 0)) continue; const k = Math.min(left, Number(e.count) || 0); e.count -= k; left -= k; }
+    return !left && set(a, 'inventory', { entries: entries.filter((e) => Number(e.count) > 0) });
+  };
+  const writtenAt = (a, rank) => Number((get(a, WRITES, {}) || {})[rank]) || 0;
+  const writeWait = (a, rank) => Math.max(0, writtenAt(a, rank) + (Number(WRITE.cooldownDays[rank]) || 0) * DAY - Date.now());
+  // What `a` may write: the spells they know that have a tome, restricted arts only for a Senior rank
+  const writable = (a) => [...new Set([].concat(ownLearned(a), knownIds(a)))].map(classifySpell)
+    .filter((sp) => sp && TOME_OF_SPELL.has(sp.id) && !removed(sp.id) && (!restrictedTome(TOME_OF_SPELL.get(sp.id)) || isSenior(a)))
+    .sort((x, y) => x.school.localeCompare(y.school) || x.rank - y.rank || x.name.localeCompare(y.name));
+  const writeRefusal = (a, sp) => {
+    if (!WRITE.enabled) return 'Spell tomes are not written just now.';
+    if (tierOf(a, 'scholar') < Number(WRITE.scholarTier)) return 'Only a Master Scholar writes spell tomes.';
+    if (!writable(a).some((x) => x.id === sp.id)) return restrictedTome(TOME_OF_SPELL.get(sp.id)) && !isSenior(a) ? `${RESTRICTED_LINE}.` : `You can only write a tome of a spell you know.`;
+    const wait = writeWait(a, sp.rank);
+    if (wait > 0) return `You wrote ${/^[AEIOU]/.test(RANKS[sp.rank]) ? 'an' : 'a'} ${RANKS[sp.rank]} tome not long ago; the next is yours in ${waitText(wait)}.`;
+    const need = Number(WRITE.scrolls[sp.rank]) || 0;
+    if (need && scrollsHeld(a, sp.id) < need) return `${sp.name} needs ${plural(need, 'scroll')} of ${sp.name}; you carry ${scrollsHeld(a, sp.id)}.`;
+    return null;
+  };
+  // A Master mage of the spell's school who knows it, near the writer
+  const helpers = (a, sp) => onlineActors().filter((b) => b !== (a >>> 0) && distanceMeters(a, b) <= Number(WRITE.helperMeters)
+    && (inBook(b, sp.id) || knows(b, sp.id)) && !slotRefusal(b, Object.assign({}, sp, { rank: 4 }), display(b)));
+  const finishWrite = (a, sp, helper) => {
+    const why = writeRefusal(a, sp);
+    if (why) return why;
+    const need = Number(WRITE.scrolls[sp.rank]) || 0;
+    if (need && !takeScrolls(a, sp.id, need)) return 'Your scrolls could not be used. Try again.';
+    const t = TOME_OF_SPELL.get(sp.id);
+    if (!giveItem(a, t.bookId, 1)) { log(`spells: ${who(a)} wrote ${sp.name} but the tome could not be given; ${need} scroll(s) spent`); return 'The tome could not be handed to you. Ask a GM.'; }
+    set(a, WRITES, Object.assign({}, get(a, WRITES, {}) || {}, { [sp.rank]: Date.now() }));
+    audit(`TOMEWRITE ${who(a)} wrote ${descOf(t.bookId)} ${t.title} (${RANKS[sp.rank]}) from ${plural(need, 'scroll')}${helper ? ` with ${who(helper)}` : ''}`);
+    return `You write ${t.title}. ${need ? `${plural(need, 'scroll')} of ${sp.name} ${need === 1 ? 'is' : 'are'} spent. ` : ''}Your next ${RANKS[sp.rank]} tome in ${waitText((Number(WRITE.cooldownDays[sp.rank]) || 0) * DAY)}.`;
+  };
+  const writeRow = (a, sp) => {
+    const need = Number(WRITE.scrolls[sp.rank]) || 0; const wait = writeWait(a, sp.rank);
+    const cost = need ? `${need} scroll${need === 1 ? '' : 's'} (${scrollsHeld(a, sp.id)} carried)` : 'no scroll';
+    return { id: `write:${descOf(sp.id)}`, label: `${spellLabel(sp)}: ${wait > 0 ? `ready in ${waitText(wait)}` : cost}${sp.rank === 4 ? ', with a Master mage' : ''}` };
+  };
+  const openWrite = (a, place, note, page) => {
+    const all = writable(a);
+    const pg = Math.max(0, Number(page) || 0); const per = MAX_ROWS - 2;
+    const rows = all.slice(pg * per, pg * per + per).map((sp) => writeRow(a, sp));
+    if (all.length > (pg + 1) * per) rows.push({ id: `wpage:${pg + 1}`, label: 'More spells' });
+    rows.push({ id: 'cancel', label: 'Close' });
+    menu(a, MENU_ID, note || (all.length ? 'Write a tome of which spell?' : 'You know no spell that has a tome to write.'), rows, { kind: 'write', place: place >>> 0, page: pg });
+    return true;
+  };
+  const atPlace = (a, place) => { try { return distanceMeters(a, place) <= LEDGER_REACH_M; } catch (e) { return false; } };
+  const writeOffers = globalThis.__dboTomeWriteOffers instanceof Map ? globalThis.__dboTomeWriteOffers : (globalThis.__dboTomeWriteOffers = new Map()); // helper -> offer
+  const chooseWrite = (a, choice, p) => {
+    if (!atPlace(a, p.place)) { closeWidget(a, MENU_ID); return personal(a, 'You walked away from the ledger.'); }
+    if (choice.startsWith('wpage:')) return openWrite(a, p.place, null, Number(choice.slice(6)));
+    if (choice.startsWith('write:')) {
+      const sp = classifySpell(idOf(choice.slice(6)));
+      if (!sp) return openWrite(a, p.place, 'That spell cannot be written.', p.page);
+      const why = writeRefusal(a, sp);
+      if (why) return openWrite(a, p.place, why, p.page);
+      if (sp.rank < 4) return openWrite(a, p.place, finishWrite(a, sp, 0), p.page);
+      const list = helpers(a, sp);
+      if (!list.length) return openWrite(a, p.place, `A Master tome needs a Master of ${sp.school} who knows ${sp.name}, standing beside you.`, p.page);
+      return menu(a, MENU_ID, `Who helps you write ${sp.name}?`, list.slice(0, MAX_ROWS - 1).map((b) => ({ id: `whelp:${b.toString(16)}:${descOf(sp.id)}`, label: display(b) })).concat([{ id: 'wback', label: 'Back' }]), p);
+    }
+    if (choice === 'wback') return openWrite(a, p.place, null, p.page);
+    if (choice.startsWith('whelp:')) {
+      const [, h16, ...d] = choice.split(':'); const helper = parseInt(h16, 16) >>> 0; const sp = classifySpell(idOf(d.join(':')));
+      if (!sp || !helpers(a, sp).includes(helper)) return openWrite(a, p.place, 'They cannot help with that just now.', p.page);
+      writeOffers.set(helper, { writer: a >>> 0, spellId: sp.id, place: p.place, at: Date.now() });
+      openWidget(helper, { type: 'contextMenu', id: MENU_ID, mode: 'menu', targetName: `${display(a)} asks your help to write a tome of ${sp.name}`,
+        actions: [{ id: 'accept', label: 'Help write it' }, { id: 'decline', label: 'Decline' }], events: { action: 'dbo:spellsWriteHelp', close: 'dbo:spellsWriteHelpClose' } }, true);
+      return openWrite(a, p.place, `You ask ${display(helper)} to help you write ${sp.name}.`, p.page);
+    }
+    closeWidget(a, MENU_ID);
+  };
+  const answerWriteHelp = (helper, accept) => {
+    const o = writeOffers.get(helper >>> 0); writeOffers.delete(helper >>> 0); closeWidget(helper, MENU_ID);
+    if (!o) return;
+    if (Date.now() - o.at > Number(WRITE.offerSeconds) * 1000) return personal(helper, 'The request has lapsed.');
+    if (!accept) return personal(o.writer, `${display(helper)} declines to help.`);
+    const sp = classifySpell(o.spellId);
+    if (!sp || !helpers(o.writer, sp).includes(helper >>> 0)) { personal(helper, 'You cannot help with that just now.'); return personal(o.writer, `${display(helper)} could not help after all.`); }
+    if (!atPlace(o.writer, o.place)) { personal(helper, `${display(o.writer)} has left the ledger.`); return personal(o.writer, 'You walked away from the ledger.'); }
+    const text = finishWrite(o.writer, sp, helper);
+    personal(o.writer, text); personal(helper, /^You write/.test(text) ? `You help ${display(o.writer)} write a tome of ${sp.name}.` : text);
+  };
+  onUi('spellsWriteHelp', (a, args) => answerWriteHelp(a, String(args[0] || '') === 'accept'));
+  onUi('spellsWriteHelpClose', (a) => answerWriteHelp(a, false));
+  globalThis.__dboTomeWriteActions = (a) => (WRITE.enabled && tierOf(a, 'scholar') >= Number(WRITE.scholarTier) ? [{ id: 'write', label: 'Write a spell tome' }] : []);
+  globalThis.__dboTomeWriteOpen = (a, place) => openWrite(a, Number(place) >>> 0);
+
   // ---- menu answers ----------------------------------------------------------------------------------
   onUi('spellsChoose', (a, args) => {
     const p = pending.get(a >>> 0); const choice = String(args[0] || '');
     // Picking a spell to forget or a student reopens this widget id as the next menu; closing it first in the same tick
     // loses the cursor (the inn prompt, 2026-09-25), so those paths reopen with no close in between.
-    const reopening = !!p && ((p.kind === 'teach' && choice.startsWith('student:')) || p.kind === 'college' || (p.kind === 'lecternRoot' && choice !== 'cancel'));
+    const reopening = !!p && ((p.kind === 'teach' && choice.startsWith('student:')) || p.kind === 'college' || ((p.kind === 'lecternRoot' || p.kind === 'write') && choice !== 'cancel'));
     if (reopening) pending.delete(a >>> 0); else closeMenu(a);
     if (!p || choice === 'cancel') return;
     // A Class Lectern's first question: the class panel opens before this menu closes (panel handoff), or teaching
@@ -1181,6 +1300,7 @@ module.exports = (api) => {
       if (!done) personal(a, 'The lectern cannot be used just now.');
       return;
     }
+    if (p.kind === 'write') return chooseWrite(a, choice, p);
     if (p.kind === 'college') {
       // The teacher must still be at the ledger or lectern to choose; a lesson is offered from there
       if (!inRoomOf(p.place, a)) { closeWidget(a, MENU_ID); return personal(a, 'You walked away from the ledger.'); }
@@ -1201,7 +1321,7 @@ module.exports = (api) => {
     }
   });
   onUi('spellsClose', (a) => closeMenu(a));
-  onUi('close', (a, args, widgetId) => { if (widgetId === MENU_ID) { pending.delete(a >>> 0); offers.delete(a >>> 0); } if (widgetId === SHOP_ID) { shopNonces.delete(a >>> 0); shopLedger.delete(a >>> 0); } if (widgetId === BOOK_ID) { bookNonces.delete(a >>> 0); bookLedger.delete(a >>> 0); } });
+  onUi('close', (a, args, widgetId) => { if (widgetId === MENU_ID) { pending.delete(a >>> 0); offers.delete(a >>> 0); writeOffers.delete(a >>> 0); } if (widgetId === SHOP_ID) { shopNonces.delete(a >>> 0); shopLedger.delete(a >>> 0); } if (widgetId === BOOK_ID) { bookNonces.delete(a >>> 0); bookLedger.delete(a >>> 0); } });
 
   // For the F3 Magic tab (schools.js __dboMagicTab): the book, the prepared spells and the spells held outside the book
   // (granted outright, never studied: they take no prepared place), and whether they may be changed where `a` stands
