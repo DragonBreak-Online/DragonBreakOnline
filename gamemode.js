@@ -8262,7 +8262,7 @@ try {
   const BANK_JS = path.resolve('bank.js');
   delete require.cache[BANK_JS];
   require(BANK_JS)({ mp, log, personal, audit, who, cfg, openWidget, closeWidget, onUi, registerChatCommand, takeGold, giveItem,
-    goldOf, depositToTreasury, zoneById, zoneList, zoneOfActor, ranksOf, profileOf, distanceMeters, every });
+    goldOf, depositToTreasury, zoneById, zoneList, zoneOfActor, ranksOf, profileOf, distanceMeters, every, onlineActors });
 } catch (e) { log('bank.js failed to load:', e.stack || e.message); globalThis.__dboBankActivate = null; }
 // ---- #gm-approval-requests: a forum post per request a GM decides, its events as replies (server\approvalforum.js) ----
 let approvalForum = () => {};

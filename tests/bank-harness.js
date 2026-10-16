@@ -113,7 +113,8 @@ cmd(GUILDMASTER, 'withdraw 500'); cmd(GUILDMASTER, 'treasury fighters -500'); cm
 check('there is no way to take gold out of a treasury: withdraw uses only your own balance, negative pay-ins are refused',
   treasury() === chestBefore && JSON.parse(fs.readFileSync('bank.json', 'utf8')).factions['fighters-guild'] === 1000 && goldOf(GUILDMASTER) === gmGold);
 check('the panel has no treasury withdrawal event, and the module exports none',
-  [...handlers.keys()].sort().join(',') === '/bank,bankClose,bankDeposit,bankTreasury,bankWithdraw,uiCaps' && Object.keys(mod).sort().join(',') === 'balanceOf,deposit,payIn,treasuriesOf,withdraw');
+  [...handlers.keys()].sort().join(',') === '/bank,bankClose,bankDeposit,bankRent,bankStore,bankTake,bankTreasury,bankVaultEnd,bankVaultPay,bankWithdraw,uiCaps'
+  && Object.keys(mod).filter((k) => !k.startsWith('vault') && k !== 'settle' && k !== 'weightOf').sort().join(',') === 'balanceOf,deposit,payIn,treasuriesOf,withdraw');
 
 // The panel, for a UI that has it
 handlers.get('uiCaps')(COUNT, ['bank']);
