@@ -1,5 +1,24 @@
 # DragonBreak Online checklist (2026-09-14)
 
+## Added 2026-10-16: the people of open Skyrim (town spawns, NPC pass 2's replacements) - NOT DEPLOYED, ships with pass 2
+
+Nate, 16 Oct: "the npcs in skyrim needs to work like how bruma is". Branch `skyrim-townspawns-1016` (server, off e4ecd27f).
+- How Bruma does it: every plugin-placed living actor disabled (Edit Scripts DBO_DisableBrumaActors.pas, DBO_BrumaInteriors.pas);
+  creatures come back as server wild:* zones (wildlife.json, owned-spawns.json); its people (guards, townsfolk, merchants,
+  named NPCs, 175 outdoors and 162 in town interiors) were never replaced. Law there is players (officials, jail.js).
+- `tools/spawns/town_spawns.py` -> `town-spawns.json`: 1,353 spots from list 2's 3,493 (Whiterun 210, Windhelm 218,
+  Riften 205, Solitude 203, Markarth 178, Falkreath 114, Dawnstar 94, Winterhold 68, Morthal 63).
+- `townspawns.js`: town:* zones, each written only once its own plugin actor is Initially Disabled in the loaded plugins
+  (lookupEspmRecordById), so nothing doubles before pass 2's restart. Defaults: children and horses off, 4E 211 lore
+  exclusions (war camps, CW garrisons, Helgen intro, Northwatch, Penitus Oculatus, Tullius/Ulfric/Galmar/Rikke),
+  24 a town outdoors, 10 an interior, 12 an exterior cell: 983 zones. Hostile false; ff_factions without crime or
+  service factions (no arrests, no barter); bodies emptied on death (gamemode.js deathHook).
+- [ ] Nate: the questions in the hand-off (children, horses, Thalmor Embassy, named NPCs, caps).
+- [ ] Release: rerun the generator on the final list 2 with `--replace` for the shipping DLE and Nexus Patches; harness.
+- [ ] After pass 2's restart: the boot line `townspawns on: ... N town zones ...; plugin check M refs, T ms` (N > 0), no
+  "at the budget" lines from NpcSpawnSystem; in game, Whiterun's market and the Bannered Mare populated, nobody doubled.
+- ROLLBACK: `townSpawns.enabled` false (hot reload; the town:* zones go and their NPCs despawn), or a hold to false.
+
 ## Added 2026-10-15: Blackreach, the open-world dungeon (Skyrim release check 5) - NOT DEPLOYED, waits on Nate
 
 Nate, 14 Oct: "super hard and the loot really worth it". Branch `skyrim-blackreach-1015` (on skyrim-hub-1015).

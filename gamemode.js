@@ -5778,6 +5778,7 @@ const deathHook = (actorId, killerId, ...rest) => {
   try { if (globalThis.__dboSuperDeath) globalThis.__dboSuperDeath(Number(actorId) >>> 0, Number(killerId) >>> 0); } catch (e) { log('supernatural death failed', e.message); }
   try { if (globalThis.__dboContractKill && killerId) globalThis.__dboContractKill(Number(actorId) >>> 0, Number(killerId) >>> 0); } catch (e) { log('contract kill failed', e.message); }
   try { if (globalThis.__dboBlackreachDeath) globalThis.__dboBlackreachDeath(Number(actorId) >>> 0, Number(killerId) >>> 0); } catch (e) { log('blackreach death failed', e.message); }
+  try { if (globalThis.__dboTownDeath) globalThis.__dboTownDeath(Number(actorId) >>> 0); } catch (e) { log('town spawn death failed', e.message); }
   try { if (globalThis.__dboTrimCorpse) globalThis.__dboTrimCorpse(Number(actorId) >>> 0); } catch (e) { log('corpse trim failed', e.message); }
   try { if (globalThis.__dboStatsDeath) globalThis.__dboStatsDeath(Number(actorId) >>> 0, Number(killerId) >>> 0); } catch (e) { log('journal stats death failed', e.message); }
   try { if (globalThis.__dboDogDayDeath) globalThis.__dboDogDayDeath(Number(actorId) >>> 0, Number(killerId) >>> 0); } catch (e) { log('dog day death failed', e.message); }
@@ -7331,6 +7332,13 @@ try {
   delete require.cache[WILDLIFE_JS];
   require(WILDLIFE_JS)({ mp, log, personal, system, registerChatCommand, giveItem, profileOf, display, who, audit, onlineActors, isAdmin, cfg, sendPacket });
 } catch (e) { log('wildlife.js failed to load:', e.stack || e.message); }
+
+// ---- the people of open Skyrim (server\townspawns.js, town-spawns.json; town:* zones, live only where NPC pass 2 disabled the plugin's) ----
+try {
+  const TOWNSPAWNS_JS = path.resolve('townspawns.js');
+  delete require.cache[TOWNSPAWNS_JS];
+  require(TOWNSPAWNS_JS)({ mp, log, cfg });
+} catch (e) { log('townspawns.js failed to load:', e.stack || e.message); globalThis.__dboTownDeath = null; }
 
 // ---- Blackreach, the open-world dungeon (server\blackreach.js; its zones are wildlife.js's) -------------------------------
 try {
