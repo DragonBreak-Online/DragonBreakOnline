@@ -5213,12 +5213,12 @@ const trophyFor = (actorId) => {
 // spiders, trolls, chaurus, horkers, mammoths, slaughterfish, hares, chickens, ice wraiths, wisps, netch, rats and dogs
 // (tests/fixtures/wildlife-skin-census.json, from tools/skinning/skin_census.py). Such a creature now gives the part its
 // own death item carries, which is what the base game drops for it, so the part is canon: its chitin, tail, scales, tusk,
-// fat, teeth, venom, wrappings or leather, and failing those its meat. The part moves from the body into the skinning
-// stash, as a pelt does, so it is not handed out twice. creature is a pattern on the dead body's own editor id (first
+// fat, teeth, venom, wrappings or leather. The part moves from the body into the skinning stash, as a pelt does, so it
+// is not handed out twice. Food is never taken: a creature whose only drop is meat (chickens, hares, rats, dogs) keeps it
+// on the body to loot (Nate's players, 16 Oct: "you have to skin a chicken to get its meat"), and so does every other. creature is a pattern on the dead body's own editor id (first
 // match wins); take lists patterns on the death item's editor ids in order of preference (the first that matches an item
 // the body holds wins); give hands over items the body does not carry (a wisp's glow dust, which the base game's wisp
-// mother drops). A creature with no rule takes its first animal part (__dboAnimalBody's isAnimalPart), the non-food ones
-// first. People and machines are never skinned (SKIN_NOT_ANIMAL): goblins, rieklings and Falmer are people, Dwemer
+// mother drops). A creature with no rule takes its first animal part that is not food (__dboAnimalBody's isAnimalPart). People and machines are never skinned (SKIN_NOT_ANIMAL): goblins, rieklings and Falmer are people, Dwemer
 // automatons are machines, and giants and ogres keep their own trophies. gamemode-config.json "skinParts" replaces the list.
 const SKIN_PARTS_DEFAULT = [
   { creature: 'Mudcrab', take: ['MudcrabChitin$'] },
@@ -5234,9 +5234,6 @@ const SKIN_PARTS_DEFAULT = [
   { creature: 'Wisp', take: ['WispWrappings$', 'glowDust$'], give: [{ desc: '3ad73:Skyrim.esm', count: 1 }] }, // glowDust
   { creature: 'Netch', take: ['NetchLeather$', 'NetchJelly$'] },
   { creature: 'Lurker', take: ['NetchLeather$'] },
-  { creature: 'Hare|Rabbit', take: ['^FoodRabbit$'] },
-  { creature: 'Chicken', take: ['^FoodChicken$'] },
-  { creature: 'Rat$', take: ['RatMeat$'] },
 ];
 const SKIN_NOT_ANIMAL = /Goblin|Riekling|Falmer|Dwarven|Dwemer|Centurion|Sphere|Ballista|Burrower|Sentry|EncGiant|LvlGiant|GiantBoss|StoneGiant|HerderGiant|Ogre|Spriggan|Hagraven|Atronach|Draugr|Skeleton|Bandit|Forsworn|Vampire|Necromancer|Warlock/i;
 const SKIN_PARTS = (Array.isArray(cfg.skinParts) ? cfg.skinParts : SKIN_PARTS_DEFAULT).map((rule) => {
@@ -5262,7 +5259,7 @@ const skinPartsFor = (creatureEdid, entries) => {
     if (given.length) return given;
   }
   const parts = held.filter((h) => isAnimalPart(h.r));
-  const pick = parts.find((h) => !/Food|Meat/.test(edidOf(h))) || parts[0];
+  const pick = parts.find((h) => !/Food|Meat/.test(edidOf(h)));
   return pick ? [{ baseId: pick.baseId, count: pick.count }] : [];
 };
 // A spawned body whose pelts are not stashed yet: the stash runs 50 ms after death (the death item lands a tick late),
