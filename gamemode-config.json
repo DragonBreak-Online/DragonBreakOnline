@@ -1521,14 +1521,13 @@
   "testProfiles": []
  },
  "bank": {
-  "_comment": "bank.js. storage: vaults for goods, one per hold, rented by weight (Nate, 16 Oct: up to 1000). weekly is gold a week, taken from the account, else from gold carried, into the treasury of the vault's hold. arrearsCapWeeks: unpaid weeks stop adding to the debt after this many. maxStacks: kinds of goods one vault keeps.",
+  "_comment": "bank.js. storage: vaults for goods, one per hold, rented by weight at a gold per weight a week (Nate, 16 Oct). weekly is taken from the account, else from gold carried, into the treasury of the vault's hold. arrearsCapWeeks: unpaid weeks stop adding to the debt after this many. seizeAfterDays after the first unpaid week the goods are sold to the hold at base value (the sale clears the debt); seizeWarnDays: letters and chat that many days before. maxStacks: kinds of goods one vault keeps.",
   "storage": {
-   "enabled": true, "maxStacks": 200, "arrearsCapWeeks": 4,
+   "enabled": true, "maxStacks": 200, "arrearsCapWeeks": 4, "seizeAfterDays": 30, "seizeWarnDays": [21, 14, 7, 3],
    "tiers": [
-    { "id": "strongbox", "name": "Strongbox", "weight": 100, "weekly": 25 },
-    { "id": "coffer", "name": "Coffer", "weight": 250, "weekly": 50 },
-    { "id": "vault", "name": "Vault", "weight": 500, "weekly": 90 },
-    { "id": "strongroom", "name": "Strongroom", "weight": 1000, "weekly": 150 }
+    { "id": "strongbox", "name": "Strongbox", "weight": 100, "weekly": 100 },
+    { "id": "coffer", "name": "Coffer", "weight": 250, "weekly": 250 },
+    { "id": "vault", "name": "Vault", "weight": 500, "weekly": 500 }
    ]
   }
  }

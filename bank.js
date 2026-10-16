@@ -21,8 +21,10 @@
 // in at Whiterun come out only at a bank in Whiterun's hold; a character may rent one vault in every hold, each with its own
 // tier. A vault is kept on the character (private.bankStorage[zoneId]), never a container in the world. The weekly fee is
 // taken from the account, else from gold carried, and goes to that hold's treasury; a week that cannot be paid is owed
-// (arrears), and nothing comes out of that vault until the debt is paid. Goods are never removed for debt. The hold of a
+// (arrears), and nothing comes out of that vault until the debt is paid. seizeAfterDays after the first unpaid week the
+// goods are sold to the hold at their base value, which settles the debt (warned by letter and chat before). The hold of a
 // bank is the zone its cell resolves to (zone-cells.json pins every bank cell); a bank with no hold keeps no vaults.
+// Vaults are used only in the bank panel (Nate, 16 Oct); a client without it is told it needs the update.
 
 const fs = require('fs');
 const path = require('path');
@@ -36,17 +38,18 @@ module.exports = (api) => {
     activators: ['5:DragonBreak.esp'], reachMeters: 8, sessionMinutes: 15, maxTransaction: 10000000,
     rulerRanks: ['jarl', 'count', 'chieftain'], historyKept: 20,
   }, cfg.bank || {});
-  // Vault tiers by carry weight (Nate, 16 Oct: up to 1000), priced a week; arrears stop growing after arrearsCapWeeks
+  // Vault tiers by carry weight, a gold per weight a week (Nate, 16 Oct). The fee owed stops growing after arrearsCapWeeks;
+  // seizeAfterDays after the first unpaid week the goods are sold to the hold, with letters seizeWarnDays before
   const V = Object.assign({
-    enabled: true, maxStacks: 200, arrearsCapWeeks: 4,
+    enabled: true, maxStacks: 200, arrearsCapWeeks: 4, seizeAfterDays: 30, seizeWarnDays: [21, 14, 7, 3],
     tiers: [
-      { id: 'strongbox', name: 'Strongbox', weight: 100, weekly: 25 },
-      { id: 'coffer', name: 'Coffer', weight: 250, weekly: 50 },
-      { id: 'vault', name: 'Vault', weight: 500, weekly: 90 },
-      { id: 'strongroom', name: 'Strongroom', weight: 1000, weekly: 150 },
+      { id: 'strongbox', name: 'Strongbox', weight: 100, weekly: 100 },
+      { id: 'coffer', name: 'Coffer', weight: 250, weekly: 250 },
+      { id: 'vault', name: 'Vault', weight: 500, weekly: 500 },
     ],
   }, (cfg.bank || {}).storage || {});
-  const WEEK = 7 * 86400000;
+  const DAY = 86400000, WEEK = 7 * DAY;
+  const NOTICES = 'private.bankNotices';
   const STORAGE = 'private.bankStorage';
   const WIDGET_ID = 48;
   const GOLD = 0x0000000f;
@@ -359,7 +362,57 @@ module.exports = (api) => {
     return paid;
   };
 
-  // Each week that fell due is paid if it can be, in full, else owed; a vault in arrears pays nothing more until settled
+  // Who keeps a vault, so the fees and seizures reach characters who are offline too (bank.json vaultHolders)
+  const holders = () => { const d = data(); if (!d.vaultHolders || typeof d.vaultHolders !== 'object') d.vaultHolders = {}; return d.vaultHolders; };
+  const noteHolder = (a) => {
+    const key = (a >>> 0).toString(16); const has = Object.keys(vaultsOf(a)).length > 0;
+    if (has === !!holders()[key]) return;
+    if (has) holders()[key] = 1; else delete holders()[key];
+    try { save(); } catch (e) { log('bank: bank.json write failed', e.message); }
+  };
+
+  // A word for the character: in chat now if they are online, else at their next login; a letter at the boards as well
+  const isOnline = (a) => { try { return onlineActors().map((x) => x >>> 0).includes(a >>> 0); } catch (e) { return false; } };
+  const tell = (a, zone, text) => {
+    // boardLetter tells an online recipient itself
+    let lettered = false; const p = P();
+    try { if (p && typeof p.boardLetter === 'function') { p.boardLetter(a >>> 0, zone.name, text, undefined, undefined, `The Bank of ${zone.name}`); lettered = true; } } catch (e) { log(`bank: a letter to ${who(a)} failed`, e.message); }
+    if (isOnline(a)) { if (!lettered) personal(a, text); return; }
+    try { const list = mp.get(a, NOTICES); mp.set(a, NOTICES, (Array.isArray(list) ? list : []).concat([text]).slice(-10)); } catch (e) { /* the letter still waits */ }
+  };
+  const dateText = (at) => new Date(at).toUTCString().slice(5, 16);
+  const seizeAtOf = (v) => (Number(v.arrearsSince) > 0 ? Number(v.arrearsSince) + Math.max(1, Number(V.seizeAfterDays) || 30) * DAY : 0);
+  const valueOf = (id) => { try { return Math.max(0, Math.floor(Number(globalThis.__dboBaseValue(Number(id) >>> 0)) || 0)); } catch (e) { return 0; } };
+
+  // The goods are sold to the hold at their base value: the sale settles the debt, and the hold keeps it all
+  const seize = (a, zone, all) => {
+    const v = all[zone.id];
+    if (typeof globalThis.__dboBaseValue !== 'function') { log(`bank: seizing the ${zone.id} vault of ${who(a)} waits for couriers.js (__dboBaseValue)`); return false; }
+    const p = P(); const name = (id) => (p ? p.nameOfItem(id) : (id >>> 0).toString(16));
+    const rows = (v.items || []).map((e) => { const id = Number(e.baseId) >>> 0; const n = Number(e.count) || 0; const each = valueOf(id); return { id, n, each, sum: each * n, name: name(id) }; });
+    const total = rows.reduce((t, r) => t + r.sum, 0);
+    if (!payHold(zone, total)) { log(`bank: seizing the ${zone.id} vault of ${who(a)} could not pay the hold; tried again next hour`); return false; }
+    delete all[zone.id]; saveVaults(a, all); noteHolder(a);
+    for (const r of rows) audit(`BANK VAULT SEIZED ${who(a)} ${zone.id}: ${r.n}x ${r.name} (${r.id.toString(16)}) at ${r.each} = ${r.sum}`);
+    audit(`BANK VAULT SEIZED ${who(a)} ${zone.id}: ${v.tier} vault, ${rows.length} kind(s) of goods sold for ${total} gold to ${zone.id}, ${Math.floor(Number(v.owed) || 0)} gold owed cleared, unpaid since ${new Date(Number(v.arrearsSince)).toISOString()}`);
+    tell(a, zone, `The Bank of ${zone.name} has sold the goods in your vault for ${total} gold to the hold, for fees unpaid since ${dateText(Number(v.arrearsSince))}. The debt is cleared and the vault is closed.`);
+    return true;
+  };
+  // The letters before a seizure: only the latest one due is sent, so a character away for long gets one, not four
+  const warn = (a, zone, v, now) => {
+    const at = seizeAtOf(v); if (!at) return false;
+    const sent = Array.isArray(v.warned) ? v.warned : [];
+    const due = (Array.isArray(V.seizeWarnDays) ? V.seizeWarnDays : []).map(Number).filter((d) => d > 0 && now >= at - d * DAY && !sent.includes(d));
+    if (!due.length) return false;
+    v.warned = sent.concat(due);
+    const days = Math.max(1, Math.ceil((at - now) / DAY));
+    tell(a, zone, `Your vault at the Bank of ${zone.name} is held for ${Math.floor(Number(v.owed) || 0)} gold unpaid. Pay it at a bank of ${zone.name} within ${days} day${days === 1 ? '' : 's'} (by ${dateText(at)}), or its goods are sold to the hold.`);
+    audit(`BANK VAULT ${who(a)} warned of the ${zone.id} seizure on ${new Date(at).toISOString()} (${Math.min(...due)} day notice)`);
+    return true;
+  };
+
+  // Each week that fell due is paid if it can be, in full, else owed; a vault in arrears pays nothing more until settled.
+  // The seizure clock runs from the first unpaid week. Returns the vault, or null when there is none (or it was seized)
   const settle = (a, zoneId, now) => {
     const all = vaultsOf(a); const v = all[zoneId]; const zone = zoneById(zoneId);
     if (!v || !v.tier || !zone) return v || null;
@@ -369,18 +422,36 @@ module.exports = (api) => {
       const fee = weeklyOf(v);
       if (!(Number(v.owed) > 0) && feeFor(a, zone, fee, `a week of the ${v.tier} vault`)) {
         note(a, 'vault', fee, zone.name);
-      } else if ((Number(v.weeksOwed) || 0) < Math.max(1, Number(V.arrearsCapWeeks) || 1)) {
-        v.owed = (Number(v.owed) || 0) + fee; v.weeksOwed = (Number(v.weeksOwed) || 0) + 1;
-        audit(`BANK VAULT ${who(a)} owes ${v.owed} gold for the ${zoneId} vault (${v.weeksOwed} week(s) unpaid)`);
+      } else {
+        if (!(Number(v.arrearsSince) > 0)) { v.arrearsSince = Number(v.paidUntil); v.warned = []; }
+        if ((Number(v.weeksOwed) || 0) < Math.max(1, Number(V.arrearsCapWeeks) || 1)) {
+          v.owed = (Number(v.owed) || 0) + fee; v.weeksOwed = (Number(v.weeksOwed) || 0) + 1;
+          audit(`BANK VAULT ${who(a)} owes ${v.owed} gold for the ${zoneId} vault (${v.weeksOwed} week(s) unpaid)`);
+        }
       }
       v.paidUntil = Number(v.paidUntil) + WEEK; changed = true;
     }
+    if (Number(v.owed) > 0 && seizeAtOf(v) && now >= seizeAtOf(v) && seize(a, zone, all)) return null;
+    if (Number(v.owed) > 0 && warn(a, zone, v, now)) changed = true;
     if (changed) saveVaults(a, all);
     return v;
   };
+  const settleAll = (a) => { for (const zid of Object.keys(vaultsOf(a))) settle(a, zid); };
+  const gone = (id) => { try { return typeof globalThis.__dboFormGone === 'function' && !!globalThis.__dboFormGone(id); } catch (e) { return false; } };
   if (typeof every === 'function') every('bankVaultFees', 3600000, () => {
-    for (const a of onlineActors()) { try { for (const zid of Object.keys(vaultsOf(a))) settle(a, zid); } catch (e) { log('bank: vault fees failed', e.message); } }
+    const ids = new Set(onlineActors().map((x) => x >>> 0));
+    for (const k of Object.keys(holders())) { const id = parseInt(k, 16) >>> 0; if (id) ids.add(id); }
+    for (const a of ids) {
+      if (gone(a)) { delete holders()[a.toString(16)]; continue; }
+      try { settleAll(a); } catch (e) { log('bank: vault fees failed', e.message); }
+    }
   });
+  // At login: the fees, and any word about a vault that came while they were away
+  globalThis.__dboBankLogin = (a) => {
+    try { settleAll(a); } catch (e) { log('bank: vault fees at login failed', e.message); }
+    let list = null; try { list = mp.get(a, NOTICES); } catch (e) { list = null; }
+    if (Array.isArray(list) && list.length) { for (const t of list) personal(a, String(t)); mp.set(a, NOTICES, []); }
+  };
 
   const vaultRent = (a, tierId) => {
     if (!V.enabled) return { ok: false, text: 'The vaults are closed for now.' };
@@ -399,8 +470,8 @@ module.exports = (api) => {
     const price = Math.max(0, Math.floor(Number(t.weekly)) - credit);
     if (!feeFor(a, zone, price, `renting a ${t.id} vault`)) return { ok: false, text: `A ${t.name} costs ${price} gold for its first week, and you have ${balanceOf(a)} banked and ${goldOf(a)} carried.` };
     const fresh = vaultsOf(a);
-    const v = Object.assign(fresh[zone.id] || { items: [] }, { tier: t.id, cap: Number(t.weight), weekly: Math.floor(Number(t.weekly)), since: now, paidUntil: now + WEEK, owed: 0, weeksOwed: 0, where: zone.name });
-    fresh[zone.id] = v; saveVaults(a, fresh);
+    const v = Object.assign(fresh[zone.id] || { items: [] }, { tier: t.id, cap: Number(t.weight), weekly: Math.floor(Number(t.weekly)), since: now, paidUntil: now + WEEK, owed: 0, weeksOwed: 0, arrearsSince: 0, warned: [], where: zone.name });
+    fresh[zone.id] = v; saveVaults(a, fresh); noteHolder(a);
     note(a, 'vault', price, zone.name);
     audit(`BANK VAULT ${who(a)} rents a ${t.id} vault (${t.weight} weight) in ${zone.id}${had && had.tier ? `, was ${had.tier}` : ''}, paid ${price}`);
     return { ok: true, text: `You rent a ${t.name} in ${zone.name}: ${t.weight} weight, ${t.weekly} gold a week, taken from your account (or what you carry). Paid ${price} gold.` };
@@ -412,7 +483,7 @@ module.exports = (api) => {
     if (!v || !(Number(v.owed) > 0)) return { ok: false, text: 'You owe nothing for a vault here.' };
     const n = Math.floor(Number(v.owed));
     if (!feeFor(a, zone, n, 'vault arrears')) return { ok: false, text: `You owe ${n} gold, and have ${balanceOf(a)} banked and ${goldOf(a)} carried.` };
-    const all = vaultsOf(a); all[zone.id].owed = 0; all[zone.id].weeksOwed = 0; saveVaults(a, all);
+    const all = vaultsOf(a); Object.assign(all[zone.id], { owed: 0, weeksOwed: 0, arrearsSince: 0, warned: [] }); saveVaults(a, all);
     note(a, 'vault', n, zone.name);
     return { ok: true, text: `Paid the ${n} gold you owed. Your vault in ${zone.name} is open to you again.` };
   };
@@ -423,7 +494,7 @@ module.exports = (api) => {
     if (!v || !v.tier) return { ok: false, text: 'You rent no vault here.' };
     if (Number(v.owed) > 0) return { ok: false, text: `Settle the ${v.owed} gold you owe first.` };
     if ((v.items || []).length) return { ok: false, text: 'Empty the vault before you give it up.' };
-    const all = vaultsOf(a); delete all[zone.id]; saveVaults(a, all);
+    const all = vaultsOf(a); delete all[zone.id]; saveVaults(a, all); noteHolder(a);
     audit(`BANK VAULT ${who(a)} gave up the ${v.tier} vault in ${zone.id}`);
     return { ok: true, text: `You gave up your vault in ${zone.name}. The week already paid is not returned.` };
   };
@@ -435,7 +506,7 @@ module.exports = (api) => {
     const zone = zoneOfBank(a); if (!zone) return { ok: false, text: noHold };
     const p = P(); if (!p || typeof p.takeItems !== 'function') return { ok: false, text: 'The vault clerk is away. Try again later.' };
     const v = settle(a, zone.id);
-    if (!v || !v.tier) return { ok: false, text: `You rent no vault in ${zone.name}. /bank rent <tier> takes one.` };
+    if (!v || !v.tier) return { ok: false, text: `You rent no vault in ${zone.name}.` };
     const id = Number(baseRaw) >>> 0;
     if (!id || !p.sendableBase(id)) return { ok: false, text: 'The clerk will not take that into a vault.' };
     const have = p.looseCount(a, id); const n = countOf(countRaw, have);
@@ -465,7 +536,7 @@ module.exports = (api) => {
     const v = settle(a, zone.id);
     if (!v || !(v.items || []).length) return { ok: false, text: `You keep nothing in a vault in ${zone.name}.` };
     const before = v.items.map((x) => Object.assign({}, x));
-    if (Number(v.owed) > 0) return { ok: false, text: `Your vault is held for ${v.owed} gold unpaid. Pay it (/bank pay) to take anything out.` };
+    if (Number(v.owed) > 0) return { ok: false, text: `Your vault is held for ${v.owed} gold unpaid. Pay it to take anything out.` };
     const row = Number(rowRaw); const e = Number.isInteger(row) ? v.items[row] : null;
     if (!e || (baseRaw !== undefined && baseRaw !== null && baseRaw !== '' && (Number(e.baseId) >>> 0) !== (Number(baseRaw) >>> 0))) return { ok: false, text: 'That is no longer in your vault.' };
     const n = countOf(countRaw, Number(e.count));
@@ -492,7 +563,7 @@ module.exports = (api) => {
     const out = { enabled: !!V.enabled, zone: zone ? zone.id : '', zoneName: zone ? zone.name : '', tiers: tierList(), rented: false, elsewhere: [] };
     if (zone) {
       const v = settle(a, zone.id);
-      if (v && v.tier) Object.assign(out, { rented: true, tier: v.tier, cap: capOf(v), used: usedOf(v), weekly: weeklyOf(v), paidUntil: Number(v.paidUntil) || 0, owed: Math.floor(Number(v.owed) || 0) });
+      if (v && v.tier) Object.assign(out, { rented: true, tier: v.tier, cap: capOf(v), used: usedOf(v), weekly: weeklyOf(v), paidUntil: Number(v.paidUntil) || 0, owed: Math.floor(Number(v.owed) || 0), seizeAt: Number(v.owed) > 0 ? seizeAtOf(v) : 0 });
       out.items = ((v && v.items) || []).map((e, i) => ({ row: i, baseId: Number(e.baseId) >>> 0, name: name(Number(e.baseId) >>> 0), count: Number(e.count) || 0, weight: weightOf(e.baseId) || 0, special: !Object.keys(e).every((k) => k === 'baseId' || k === 'count') }));
       const counts = new Map();
       try { for (const e of (mp.get(a, 'inventory') || {}).entries || []) { const id = Number(e.baseId) >>> 0; if (!e.worn && !e.wornLeft && Number(e.count) > 0 && p && p.sendableBase(id)) counts.set(id, (counts.get(id) || 0) + Number(e.count)); } } catch (e) { /* no pack */ }
@@ -500,30 +571,16 @@ module.exports = (api) => {
     }
     for (const zid of Object.keys(vaultsOf(a))) {
       if (zone && zid === zone.id) continue;
-      const z = zoneById(zid); const v = settle(a, zid) || {};
+      const z = zoneById(zid); const v = settle(a, zid); if (!v) continue;
       out.elsewhere.push({ zone: zid, name: z ? z.name : zid, tier: v.tier || '', items: (v.items || []).length, used: usedOf(v), owed: Math.floor(Number(v.owed) || 0) });
     }
     return out;
   };
-  const chatVault = (a) => {
-    const v = vaultView(a);
-    if (!v.zone) return personal(a, noHold);
-    if (!v.rented) personal(a, `Vaults in ${v.zoneName}: ${v.tiers.map((t) => `${t.id} ${t.weight} weight for ${t.weekly} gold a week`).join('; ')}. /bank rent <tier>.`);
-    else {
-      personal(a, `Your ${(tierById(v.tier) || { name: v.tier }).name} in ${v.zoneName}: ${v.used} of ${v.cap} weight, ${v.weekly} gold a week, paid to ${new Date(v.paidUntil).toUTCString().slice(5, 22)} UTC.${v.owed ? ` You owe ${v.owed} gold: /bank pay. Nothing comes out until it is paid.` : ''}`);
-      personal(a, v.items.length ? `In it: ${v.items.map((e, i) => `${i + 1}) ${e.count} ${e.name}${e.special ? '*' : ''}`).join(', ')}. /bank take <number> [count|all]` : 'It is empty.');
-      if (v.carry.length) personal(a, `You carry: ${v.carry.slice(0, 30).map((e, i) => `${i + 1}) ${e.count} ${e.name} (${e.weight} each)`).join(', ')}. /bank store <number> [count|all]`);
-    }
-    for (const o of v.elsewhere) personal(a, `Stored in ${o.name}: ${o.items} kind(s) of goods, ${o.used} weight${o.owed ? `, ${o.owed} gold owed` : ''}. Only a bank of that hold opens it.`);
-  };
-  // Chat rows are numbered from 1, in the order chatVault lists them
-  const storeByNumber = (a, num, count) => { const v = vaultView(a); const e = (v.carry || [])[Number(num) - 1]; return e ? vaultStore(a, e.baseId, count) : { ok: false, text: 'No such number. /bank vault lists what you carry.' }; };
-  const takeByNumber = (a, num, count) => { const v = vaultView(a); const e = (v.items || [])[Number(num) - 1]; return e ? vaultTake(a, e.row, e.baseId, count) : { ok: false, text: 'No such number. /bank vault lists your vault.' }; };
-
   // ---- the panel and the chat bank -------------------------------------------------------------------------------------
   const hasPanel = (a) => { const c = S.caps.get(a >>> 0); return !!c && c.has('bank'); };
-  // A panel that draws vaults says 'bankVault'; any other gets them in chat (/bank vault)
+  // A panel that draws vaults says 'bankVault'; vaults are used only there, and any other client is told it needs the update
   const hasVaultPanel = (a) => { const c = S.caps.get(a >>> 0); return !!c && c.has('bankVault'); };
+  const vaultPanelOnly = 'Vaults for your goods open in the bank window, which needs the latest client update.';
   const openPanel = (a, result, kind) => {
     const nonce = `${(a >>> 0).toString(16)}-${Date.now().toString(36)}`;
     S.nonces.set(a >>> 0, nonce);
@@ -536,7 +593,8 @@ module.exports = (api) => {
     }, true);
   };
   const chatBank = (a) => {
-    personal(a, `Bank: your balance is ${balanceOf(a)} gold, and you carry ${goldOf(a)}. /bank deposit <gold|all>, /bank withdraw <gold|all>.${V.enabled ? ' /bank vault: goods kept in this hold.' : ''}`);
+    personal(a, `Bank: your balance is ${balanceOf(a)} gold, and you carry ${goldOf(a)}. /bank deposit <gold|all>, /bank withdraw <gold|all>.`);
+    if (V.enabled) personal(a, vaultPanelOnly);
     for (const t of treasuriesOf(a)) personal(a, `${t.name}: ${t.balance} gold (${t.why}). /bank treasury ${t.key.split(':')[1]} <gold|all> pays in; no one can take it out.`);
   };
 
@@ -547,7 +605,7 @@ module.exports = (api) => {
     try { const z = zoneById(zoneOfActor(caster)); where = z ? z.name : ''; zone = z ? z.id : ''; } catch (e) { /* unnamed */ }
     S.at.set(caster >>> 0, { bank: target >>> 0, since: Date.now(), where, zone });
     if (hasPanel(caster)) openPanel(caster); else chatBank(caster);
-    if (hasPanel(caster) && !hasVaultPanel(caster) && V.enabled) personal(caster, 'Vaults for your goods: /bank vault.');
+    if (hasPanel(caster) && !hasVaultPanel(caster) && V.enabled) personal(caster, vaultPanelOnly);
     return true;
   };
 
@@ -559,11 +617,11 @@ module.exports = (api) => {
   onUi('bankDeposit', (a, args) => { if (fresh(a, args)) answer(a, deposit(a, args[1])); });
   onUi('bankWithdraw', (a, args) => { if (fresh(a, args)) answer(a, withdraw(a, args[1])); });
   onUi('bankTreasury', (a, args) => { if (fresh(a, args)) answer(a, payIn(a, String(args[1] || ''), args[2])); });
-  onUi('bankRent', (a, args) => { if (fresh(a, args)) answer(a, vaultRent(a, args[1])); });
-  onUi('bankVaultPay', (a, args) => { if (fresh(a, args)) answer(a, vaultPay(a)); });
-  onUi('bankVaultEnd', (a, args) => { if (fresh(a, args)) answer(a, vaultEnd(a)); });
-  onUi('bankStore', (a, args) => { if (fresh(a, args)) answer(a, vaultStore(a, args[1], args[2])); });
-  onUi('bankTake', (a, args) => { if (fresh(a, args)) answer(a, vaultTake(a, args[1], args[2], args[3])); });
+  onUi('bankRent', (a, args) => { if (fresh(a, args) && hasVaultPanel(a)) answer(a, vaultRent(a, args[1])); });
+  onUi('bankVaultPay', (a, args) => { if (fresh(a, args) && hasVaultPanel(a)) answer(a, vaultPay(a)); });
+  onUi('bankVaultEnd', (a, args) => { if (fresh(a, args) && hasVaultPanel(a)) answer(a, vaultEnd(a)); });
+  onUi('bankStore', (a, args) => { if (fresh(a, args) && hasVaultPanel(a)) answer(a, vaultStore(a, args[1], args[2])); });
+  onUi('bankTake', (a, args) => { if (fresh(a, args) && hasVaultPanel(a)) answer(a, vaultTake(a, args[1], args[2], args[3])); });
   onUi('bankClose', (a) => { S.nonces.delete(a >>> 0); closeWidget(a, WIDGET_ID); });
 
   registerChatCommand('bank', (a, args) => {
@@ -573,13 +631,9 @@ module.exports = (api) => {
     if (s === 'deposit') return personal(a, deposit(a, x).text);
     if (s === 'withdraw') return personal(a, withdraw(a, x).text);
     if (s === 'treasury') return personal(a, payIn(a, x, y).text);
-    if (s === 'vault') { if (!atBank(a)) return personal(a, notAtBank); if ((x || '').toLowerCase() === 'end') return personal(a, vaultEnd(a).text); return chatVault(a); }
-    if (s === 'rent') return personal(a, vaultRent(a, x).text);
-    if (s === 'pay') return personal(a, vaultPay(a).text);
-    if (s === 'store') return personal(a, storeByNumber(a, x, y).text);
-    if (s === 'take') return personal(a, takeByNumber(a, x, y).text);
-    personal(a, 'Usage at a bank: /bank, /bank deposit <gold|all>, /bank withdraw <gold|all>, /bank treasury <name> <gold|all>; vaults: /bank vault, /bank rent <tier>, /bank store <n> [count|all], /bank take <n> [count|all], /bank pay, /bank vault end');
-  }, { help: 'at a bank: your account (the same in every town); deposit, withdraw, or pay into a treasury you answer for; a vault for goods in each hold' });
+    if (['vault', 'rent', 'pay', 'store', 'take'].includes(s)) return personal(a, vaultPanelOnly);
+    personal(a, 'Usage at a bank: /bank, /bank deposit <gold|all>, /bank withdraw <gold|all>, /bank treasury <name> <gold|all>');
+  }, { help: 'at a bank: your account (the same in every town); deposit, withdraw, or pay into a treasury you answer for' });
 
   log(`bank loaded: ${bankBases().size} bank activator base(s), ${Object.keys(data().factions).length} faction treasury balance(s), vaults ${V.enabled ? tierList().map((t) => `${t.weight}/${t.weekly}g`).join(' ') : 'off'}`);
   return { balanceOf, treasuriesOf, deposit, withdraw, payIn, vaultRent, vaultPay, vaultEnd, vaultStore, vaultTake, vaultView, settle, weightOf };

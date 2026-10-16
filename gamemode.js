@@ -2946,6 +2946,8 @@ const onCharacterReady = (userId, a) => {
     try { if (globalThis.__dboSchoolsLogin) globalThis.__dboSchoolsLogin(a); } catch (e) { log('schools login failed', e.message); }
     // The election notice of the current phase for a citizen of a hold that is choosing its Jarl, once per character (citizenship.js)
     try { if (globalThis.__dboCitizenLogin) globalThis.__dboCitizenLogin(a); } catch (e) { log('citizen notice login failed', e.message); }
+    // Vault fees, and any word of a vault warned or seized while they were away (bank.js)
+    try { if (globalThis.__dboBankLogin) globalThis.__dboBankLogin(a); } catch (e) { log('bank login failed', e.message); }
     // A free appearance change waiting, once per character, never while one is still being made (appearance.js)
     try { if (globalThis.__dboAppearanceFreeLogin && !creationPending(a) && !inCreatorRealm(a)) globalThis.__dboAppearanceFreeLogin(a); } catch (e) { log('free appearance notice failed', e.message); }
   }), 8000);
