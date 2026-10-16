@@ -130,6 +130,32 @@ std::vector<espm::Effects::Effect> GetRestorativeEffects(
   return result;
 }
 
+// Whether a spell has a hostile or detrimental effect of its own (no area), which on a self spell lands on the caster
+bool HasHarmfulEffectOnTarget(WorldState* worldState, uint32_t spellId)
+{
+  const auto spellLookup =
+    worldState->GetEspm().GetBrowser().LookupById(spellId);
+  if (!espm::IsSpellItem(spellLookup.rec)) {
+    return false;
+  }
+  const auto spellData =
+    espm::GetSpellItemData(spellLookup.rec, worldState->GetEspmCache());
+  for (const auto& effect : spellData.effects) {
+    if (!effect.effectItem || effect.effectFormId == 0 ||
+        effect.effectItem->areaOfEffect != 0) {
+      continue;
+    }
+    const auto data = espm::GetData<espm::MGEF>(
+                        spellLookup.ToGlobalId(effect.effectFormId), worldState)
+                        .data;
+    if (data.IsFlagSet(espm::MGEF::Flags::Hostile) ||
+        data.IsFlagSet(espm::MGEF::Flags::Detrimental)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 // Learned, NPC_/template/race and currently equipped spells
 std::vector<uint32_t> GetKnownSpells(const MpActor& actor)
 {
@@ -2474,6 +2500,17 @@ void ActionListener::OnSpellCast(const RawMessageData& rawMsgData,
       spellData.spellItem->castType == espm::SPEL::CastType::Concentration);
   auto restoreEffects = GetRestorativeEffects(
     &partOne.worldState, spellCastData.spell, false, ownSelfCast);
+
+  // A self spell that also costs its caster is left whole to the caster's game, its gain is never applied apart from its cost
+  if (selfDelivery && !restoreEffects.empty() &&
+      HasHarmfulEffectOnTarget(&partOne.worldState, spellCastData.spell)) {
+    if (!spellCastData.keepAlive) {
+      spdlog::info("ActionListener::OnSpellCast - self spell {:x} of {:x} "
+                   "has a cost on its caster, left to the client",
+                   spellCastData.spell, caster->GetFormId());
+    }
+    return;
+  }
 
   // A hosted NPC heals itself at npcSelfHealMult of the spell (enemy mages healed to full on Adept+)
   if (NpcSelfHeal::Applies(caster == myActor, targetActor == caster)) {
