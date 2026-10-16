@@ -120,6 +120,7 @@ export class PageInputDiagService extends ClientListener {
       `bBorderless=${read(() => sp.Utility.getINIBool("bBorderless:Display"))}`,
       `cursorMenu=${read(() => sp.Ui.isMenuOpen("Cursor Menu"))}`,
       `bGamepadEnable=${read(() => sp.Utility.getINIBool("bGamepadEnable:MAIN") || sp.Utility.getINIBool("bGamepadEnable:Main"))}`,
+      `usingGamepad=${read(() => sp.Game.usingGamepad())}`,
     ].join(" ");
   }
 

@@ -155,6 +155,7 @@ function makeGame() {
       settings: {},
       Utility: { isInMenuMode: () => [...g.open].some((m) => m !== 'HUD Menu' && m !== CURSOR), getINIBool: (k) => /^bGamepadEnable:/i.test(k) ? g.controllerMode : false },
       Ui: { isMenuOpen: (n) => g.open.has(n) },
+      Game: { usingGamepad: () => g.controllerMode },
     };
     let bs = null;
     const controller = {
@@ -238,7 +239,7 @@ function makeGame() {
     w.g.openMenu('ContainerMenu'); w.run(100);
     check('a container the game opens while the chat has focus loses its pointer to the release (needs SkyrimPlatform)', w.g.open.has('ContainerMenu') && !w.g.focus && !w.pointer());
     w.run(2000);
-    check('...which the diag relay reports, with the focus named', w.notes.some((n) => /^cursor ContainerMenu open \d+ ms, no pointer for \d+ ms; browser had focus when it opened true; controller mode false$/.test(n)), w.notes);
+    check('...which the diag relay reports, with the focus named', w.notes.some((n) => /^cursor ContainerMenu open \d+ ms, no pointer for \d+ ms; browser had focus when it opened true; controller mode false; gamepad in use false$/.test(n)), w.notes);
     w.button(1, 256);
     check('...and no controller notice for it', globalThis.__harnessNotices.length === 0);
   }
@@ -295,7 +296,7 @@ function makeGame() {
     const w = world({ controllerMode: true });
     w.g.openMenu('InventoryMenu'); w.run(2000);
     check('in controller mode the inventory has no pointer (the game\'s own choice)', w.g.open.has('InventoryMenu') && !w.pointer());
-    check('...which the diag relay reports, controller mode named', w.notes.some((n) => /^cursor InventoryMenu open \d+ ms, no pointer for \d+ ms; browser had focus when it opened false; controller mode true$/.test(n)), w.notes);
+    check('...which the diag relay reports, controller mode named', w.notes.some((n) => /^cursor InventoryMenu open \d+ ms, no pointer for \d+ ms; browser had focus when it opened false; controller mode true; gamepad in use true$/.test(n)), w.notes);
     w.button(0, 15);
     check('a key press there is not a reason to say anything', globalThis.__harnessNotices.length === 0);
     w.button(1, 256);
@@ -321,7 +322,8 @@ function makeGame() {
     check('the inventory closed and reopened in one frame keeps its pointer and is not reported', w.g.open.has('InventoryMenu') && w.pointer() && !w.notes.some((n) => /^cursor /.test(n)));
   }
   check('every login\'s ini line in the diag relay says whether the game is in controller mode',
-    /`bGamepadEnable=\$\{read\(\(\) => sp\.Utility\.getINIBool\("bGamepadEnable:MAIN"\) \|\| sp\.Utility\.getINIBool\("bGamepadEnable:Main"\)\)\}`/.test(src('pageInputDiagService.ts')));
+    /`bGamepadEnable=\$\{read\(\(\) => sp\.Utility\.getINIBool\("bGamepadEnable:MAIN"\) \|\| sp\.Utility\.getINIBool\("bGamepadEnable:Main"\)\)\}`/.test(src('pageInputDiagService.ts'))
+    && /`usingGamepad=\$\{read\(\(\) => sp\.Game\.usingGamepad\(\)\)\}`/.test(src('pageInputDiagService.ts')));
 
   Date.now = realNow;
   fs.rmSync(out, { recursive: true, force: true });

@@ -214,6 +214,15 @@ export class BrowserService extends ClientListener {
     }
   }
 
+  // SKSE Game.UsingGamepad: whether the game reads a gamepad now, which the setting alone does not say
+  private gamepadInUse(): boolean | null {
+    try {
+      return this.sp.Game.usingGamepad();
+    } catch (e) {
+      return null;
+    }
+  }
+
   // Capped: the relay's per-session line budget is shared with every other diagnostic
   private diagNote(kind: string, text: string): void {
     if (this.cursorNotes >= MAX_CURSOR_NOTES) return;
@@ -262,7 +271,7 @@ export class BrowserService extends ClientListener {
     }
     if (checkVanillaMenu(w, this.cursorMenuOpen(), now) !== "report") return;
     this.diagNote("cursor", `${w.name} open ${now - w.openedAt} ms, no pointer for ${now - w.missingSince} ms; ` +
-      `browser had focus when it opened ${w.focusedAtOpen}; controller mode ${this.gamepadEnabled()}`);
+      `browser had focus when it opened ${w.focusedAtOpen}; controller mode ${this.gamepadEnabled()}; gamepad in use ${this.gamepadInUse()}`);
   }
 
   // A mouse press in a vanilla menu that has no pointer
