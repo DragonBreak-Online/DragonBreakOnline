@@ -7518,6 +7518,13 @@ try {
   require(RUINBUTTONS_JS)({ mp, log, personal, audit, who, cfg, sendPacket });
 } catch (e) { log('ruinbuttons.js failed to load:', e.stack || e.message); globalThis.__dboRuinButton = null; globalThis.__dboRuinLeaseEnded = null; globalThis.__dboRuinDoorUsed = null; }
 
+// ---- Skyrim's plugin-placed people and animals, kept disabled (server\npcoff.js, npc-off.json, config "npcOff") ----
+try {
+  const NPCOFF_JS = path.resolve('npcoff.js');
+  delete require.cache[NPCOFF_JS];
+  require(NPCOFF_JS)({ mp, log, cfg });
+} catch (e) { log('npcoff.js failed to load:', e.stack || e.message); }
+
 // ---- jails, cell doors and sentences (server\jail.js, config "jail", jails.json) ------------------
 try {
   const JAIL_JS = path.resolve('jail.js');
