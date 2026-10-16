@@ -149,6 +149,7 @@ const world = S.world.view(PLAYER);
 ok(world.groups.map((g) => g.name).join() === 'Who is about,The open world,The time', 'World reads the loaded commands, in order, leaving out the silent and the missing', world.groups.map((g) => g.name));
 ok(world.groups[2].lines[0] === 'It is the 4th hour of Morndas, 12th of Frostfall, 4E 211.', '...with colour codes taken out', world.groups[2].lines);
 ok(chat.length === 0, '...and nothing it reads reaches chat', chat);
+ok(world.groups[0].lines.length === 1 && /^\d+ (person is|people are) about in the world\.$/.test(world.groups[0].lines[0]) && !/Dagny|Strangers/.test(world.groups[0].lines.join(' ')), 'Who is about gives a count and names nobody (Nate, 16 Oct)', world.groups[0].lines);
 
 // ---- the chat handler: a lone "/" opens the panel ----
 ok(/if \(!cmd && hasPlayerMenu\(a\)\) return openPlayerMenu\(a, '', ''\);/.test(src), 'a lone "/" in chat opens the panel at its search (handleChat)');

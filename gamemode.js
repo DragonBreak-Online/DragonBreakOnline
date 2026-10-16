@@ -3607,6 +3607,8 @@ const WORLD_GROUPS = [['players', 'Who is about'], ['officials', 'Who rules'], [
 const plainLine = (t) => String(t).replace(/#\{[0-9a-fA-F]{6}\}/g, '').replace(/\[\[[A-Z]+\]\]/g, '').trim();
 const worldView = (a) => ({
   groups: WORLD_GROUPS.map(([cmd, name]) => {
+    // Who is about gives only a count: the World tab names nobody (Nate, 16 Oct)
+    if (cmd === 'players') { const n = onlineActors().length; return { name, command: cmd, lines: [`${n} ${n === 1 ? 'person is' : 'people are'} about in the world.`] }; }
     const lines = commands.has(cmd) ? (globalThis.__dboRunCommand(a, cmd, '', true) || []).map(plainLine).filter(Boolean) : [];
     return lines.length ? { name, command: cmd, lines } : null;
   }).filter(Boolean),
