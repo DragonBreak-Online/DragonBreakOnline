@@ -40,7 +40,7 @@ const STUBS = {
   remoteServer: 'class RemoteServer {} module.exports = { RemoteServer };',
   messages: 'module.exports = { MsgType: { Activate: 6 } };',
   inventory: 'module.exports = { getInventory: () => { if (globalThis.__invThrows) throw new TypeError("Cannot read properties of null (reading \'getFormID\')"); return { entries: [] }; } };',
-  worldViewMisc: 'module.exports = { localIdToRemoteId: (id) => (id >= 0xff000000 ? (id + 0x100000) >>> 0 : id) };',
+  worldViewMisc: 'module.exports = { localIdToRemoteId: (id) => (id >= 0xff000000 ? (id + 0x100000) >>> 0 : id), getViewFromStorage: () => globalThis.__wv };',
   lastInv: 'class LastInvService {} module.exports = { LastInvService };',
   selfActivation: 'module.exports = { selfActivated() {} };',
   customPacketUtil: 'module.exports = { parseCustomPacket: () => null };',
@@ -165,6 +165,13 @@ async function main() {
         getWorldSpace: () => null, getParentCell: () => ({ getFormID: () => 0x806c40f }) };
       return d;
     };
+    // WorldView holding a FormView for each local id in streamed; its id lookups throw for plugin ids, as FormViewArray's do
+    const streamed = new Set();
+    globalThis.__wv = {
+      getLocalRefrId: (id) => { if (id < 0xff000000) throw new Error('This function is only for 0xff forms'); return 0; },
+      getRemoteRefrId: (id) => { if (id < 0xff000000) throw new Error('This function is only for 0xff forms'); return 0; },
+      getFormViews: () => { const ids = [...streamed]; return { getFormViewsArrayLength: () => ids.length, getNthFormView: (i) => ({ getLocalRefrId: () => ids[i], getRemoteRefrId: () => ids[i] }) }; },
+    };
     const lastInv = {};
     const activate = (caster, target) => {
       const c = controller({ LastInvService: lastInv });
@@ -173,10 +180,11 @@ async function main() {
       return c.sent;
     };
     {
+      streamed.add(0x806c473);
       const d = door({ state: 2, blocked: false });
       const sent = activate(player, d);
       check('the engine took an unblocked load door itself (state Opening): the server still hears it', sent.length === 1 && sent[0].data.target === 0x806c473 && sent[0].data.caster === 0x14, sent);
-      check('...and the door is activation-blocked again', d.blocks.includes(true));
+      check('...and, as WorldView holds its FormView, the door is activation-blocked again', d.blocks.includes(true), d.blocks);
     }
     check('a blocked door still animating from the server stays ignored, as before', activate(player, door({ state: 2, blocked: true })).length === 0);
     check('a blocked closed door is sent, as before', activate(player, door({ state: 3, blocked: true })).length === 1);
