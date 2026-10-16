@@ -876,7 +876,7 @@ const STAFF_HELP = [
     ['officials', '[zone]: who holds which rank where'],
     ['property', 'at a door, as an official: sell <price> | list <deposit> <weekly> | unlist | offer <name> | remind | grace | evict']] },
   { key: 'beasts', title: 'Beasts and the supernatural', items: ['beastform', 'curse', 'makesuper', 'vlremote', 'wwremote', 'feedpair', 'raid', 'warband'] },
-  { key: 'magic', title: 'Magic and crafts', items: ['schools', 'classteacher', 'preacher', 'manual', 'smithing', 'tailoring'] },
+  { key: 'magic', title: 'Magic and crafts', items: ['schools', 'shoutclean', 'classteacher', 'preacher', 'manual', 'smithing', 'tailoring'] },
   { key: 'law', title: 'Law', items: ['jail', ['concordat', '[races]: Concordat arrests standing, or the Thalmor outside the race rule'],
     ['dossier', 'list | read <name|#TAG> | reports | add <name|#TAG> <text> | strike <name|#TAG> <n>: the Thalmor dossiers and informant reports (add and strike: Lead GM)']] },
   { key: 'world', title: 'World', items: ['settime', 'setweather', 'timescale', 'region', ['dungeon end', '<dungeon id|name>: end a dungeon claim now'],
@@ -968,6 +968,27 @@ registerChatCommand('kick', (a, args) => {
   try { mp.kick(userOf(t)); broadcast(`[[S]]#{${C.SYS}}${nameOf(t)} was kicked by ${nameOf(a)}.`); audit(`GM ${who(a)} kicked ${who(t)} via /kick`); }
   catch (e) { personal(a, 'Kick failed: ' + e.message); }
 }, { admin: true, help: '<player>' });
+// Give all Shouts taught every SHOU in the load order until 16 Oct (dragon breaths, Miraak's, Greybeard copies; Nate:
+// "it gave me every shout that you shouldnt have"). The server cannot remove a shout (no RemoveShout in PapyrusActor) and
+// keeps none: the client holds them until its next login, which loads a fresh game, and adminSystem then teaches
+// admin-powers.json again, now only player-shouts.json's 27. The gate in combat.js already refuses the others' hits.
+// This reconnects the holders so they come back with the right list; off unless combat.shoutCleanup is true.
+registerChatCommand('shoutclean', (a, args) => {
+  const granted = (t) => { try { return mp.get(t, 'private.dboAllShouts') === true; } catch (e) { return false; } };
+  const holders = onlineActors().filter(granted);
+  const want = String(args || '').trim();
+  if (!want) return personal(a, holders.length ? `Given all shouts, online: ${holders.map(display).join(', ')}. /shoutclean <player|all> reconnects them.` : 'Nobody online was given all shouts.');
+  if ((cfg.combat || {}).shoutCleanup !== true) return personal(a, 'Shout clean-up is off (gamemode-config.json combat.shoutCleanup).');
+  const targets = want.toLowerCase() === 'all' ? holders : [findByName(want)].filter(Boolean);
+  if (!targets.length) return personal(a, want.toLowerCase() === 'all' ? 'Nobody online was given all shouts.' : 'No such player.');
+  for (const t of targets) {
+    if (!granted(t)) { personal(a, `${display(t)} was never given all shouts.`); continue; }
+    personal(t, 'Your shouts are being set right: you will be reconnected in a moment.');
+    setTimeout(() => { try { const u = userOf(t); if (u >= 0) mp.kick(u); } catch (e) { log('shoutclean: kick failed', e.message); } }, 3000);
+    audit(`GM ${who(a)} reconnected ${who(t)} via /shoutclean`);
+  }
+  personal(a, `Reconnecting ${targets.filter(granted).length} player(s); they are taught the player shouts again at login.`);
+}, { admin: true, help: '[player|all] who holds the old all-shouts list; reconnect them to clear it' });
 // Players cannot reopen character creation themselves; an admin does it for them by tag.
 registerChatCommand('chargen', (a, args) => {
   // A Trial GM opens it for their own character only (Nate, 12 Oct); a GM and above for anyone. No name: oneself

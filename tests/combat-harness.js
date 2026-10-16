@@ -162,6 +162,7 @@ ok(statuses.length === 0 && unequips().length === 0, 'an ordinary spell neither 
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'claude-nate-shoutgate-'));
   const here = process.cwd(); process.chdir(dir);
   fs.writeFileSync('admin-powers.json', JSON.stringify({ shouts: [{ shout: '13e07:Skyrim.esm', name: 'UnrelentingForceShout', words: [] }] }));
+  fs.copyFileSync(path.join(__dirname, '..', 'player-shouts.json'), 'player-shouts.json');
   const spit = (type) => { const d = new Uint8Array(36); new DataView(d.buffer).setUint32(8, type, true); return d; };
   const snam = (spell) => { const d = new Uint8Array(12); new DataView(d.buffer).setUint32(4, spell, true); return d; };
   const DRAGON_BREATH = 0x252c1, HOWL = 0xcf791;

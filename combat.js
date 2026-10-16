@@ -235,6 +235,11 @@ module.exports = (api) => {
     allowedWords = new Set();
     let list = [];
     try { list = JSON.parse(fs.readFileSync(path.resolve('admin-powers.json'), 'utf8')).shouts || []; } catch (e) { log('combat: admin-powers.json unreadable, no shout is allowed', e.message); }
+    // Only a shout on player-shouts.json counts, so a regenerated admin-powers.json (every SHOU: dragon breaths, Miraak's,
+    // Greybeard copies) cannot open the gate again (Nate, 16 Oct). No allow-list file: no shout is allowed.
+    let allow = new Set();
+    try { allow = new Set((JSON.parse(fs.readFileSync(path.resolve('player-shouts.json'), 'utf8')).shouts || []).map(([n, p]) => `${n}|${p}`)); } catch (e) { log('combat: player-shouts.json unreadable, no shout is allowed', e.message); }
+    list = list.filter((sh) => allow.has(`${sh.name}|${String(sh.shout).slice(String(sh.shout).indexOf(':') + 1)}`));
     for (const sh of list) {
       const r = recordOf(idOfDesc(sh.shout));
       if (!r || String(r.record.type) !== 'SHOU') continue;
