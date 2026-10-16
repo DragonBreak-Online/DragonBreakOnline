@@ -28,6 +28,8 @@ const POS_EPS = 1;
 const ROT_EPS = 0.5;
 
 const angleOff = (a: number, b: number): number => { const d = Math.abs((((a - b) % 360) + 360) % 360); return Math.min(d, 360 - d); };
+const vec3 = (v: unknown): number[] | undefined => (Array.isArray(v) && v.length === 3 && v.every((n) => Number.isFinite(Number(n))) ? v.map(Number) : undefined);
+const angles = (v: unknown): number[] | undefined => (Array.isArray(v) && v.length === 3 ? v.map((n) => Number(n) || 0) : undefined);
 
 export class WorldEditService extends ClientListener {
   constructor(private sp: Sp, private controller: CombinedController) {
@@ -50,15 +52,21 @@ export class WorldEditService extends ClientListener {
     for (const raw of content["edits"] as Array<Record<string, unknown>>) {
       const ref = Number(raw && raw.ref) >>> 0;
       if (!ref || ref >= 0xff000000) continue;
-      const pos = Array.isArray(raw.pos) && raw.pos.length === 3 && raw.pos.every((n) => Number.isFinite(Number(n))) ? raw.pos.map(Number) : undefined;
-      const rot = Array.isArray(raw.rot) && raw.rot.length === 3 ? raw.rot.map((n) => Number(n) || 0) : undefined;
+      const pos = vec3(raw.pos);
+      const rot = angles(raw.rot);
       next.set(ref, { hide: raw.hide === true, pos, rot: pos ? (rot || [0, 0, 0]) : undefined });
+      // The plugin's pose from the server, kept for the put back: a server SpSnippet may have moved it before any sweep here
+      const orig = (raw.orig || {}) as Record<string, unknown>;
+      const origPos = pos ? vec3(orig.pos) : undefined;
+      if (origPos) this.done.set(ref, { hid: false, ...this.done.get(ref), origin: [...origPos, ...(angles(orig.rot) || [0, 0, 0])] });
     }
     // Gone from the list: put back on the next sweep
     this.edits.forEach((_, ref) => { if (!next.has(ref)) this.dropped.add(ref); });
     next.forEach((_, ref) => this.dropped.delete(ref));
     this.edits = next;
     this.queue = this.pending();
+    // Swept on the next update, before the VM runs a server SetPosition that came with the list
+    this.lastSweep = 0;
     logTrace(this, `worldEdits: ${next.size} edits, ${this.dropped.size} to put back`);
   }
 
