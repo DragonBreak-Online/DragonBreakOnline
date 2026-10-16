@@ -2,9 +2,10 @@ import { ClientListener, CombinedController, Sp } from "./clientListener";
 import { parseCustomPacket } from "./customPacketUtil";
 import { ConnectionMessage } from "../events/connectionMessage";
 import { CustomPacketMessage } from "../messages/customPacketMessage";
-import { ActiveEffectApplyRemoveEvent, Actor, Armor, ButtonEvent, DxScanCode, EquipEvent, GlobalVariable, InputDeviceType, Perk, Race, Shout, Spell, SpellCastEvent, WordOfPower } from "skyrimPlatform";
+import { ActiveEffectApplyRemoveEvent, Actor, Armor, ButtonEvent, DxScanCode, EquipEvent, GlobalVariable, HitEvent, InputDeviceType, Perk, Race, Shout, Spell, SpellCastEvent, WordOfPower } from "skyrimPlatform";
 import { sendCustomPacket } from "./customPacketUtil";
 import { logError, logTrace } from "../../logging";
+import { hex, trace } from "../../lib/clientDiag";
 import { adoptHeld, isForeignBeastGear } from "./beastLoadout";
 import { howlShoutIds, mayHoldHowl, stripDue } from "./beastHowl";
 import { parseBeastBodies, setBeastBodies } from "../../sync/beastBody";
@@ -25,6 +26,8 @@ const BEAST_EFFECT_TO_POWER = new Map<number, number>([
 
 // spellCast and effectStart can both land for one cast; the server only needs to hear once
 const REQUEST_DEBOUNCE_MS = 1500;
+// The race read this soon after a change may still be the old one, so the lost-form trace waits
+const LOST_FORM_SETTLE_MS = 3000;
 
 // What the beast actually gets. The vanilla transform is a Papyrus script on the change spell's magic effect,
 // and those script events never reach this client, so a race swap alone leaves the player with fists: no spells,
@@ -85,6 +88,7 @@ export class BeastFormService extends ClientListener {
     this.controller.on("effectStart", (e) => this.onEffectStart(e));
     this.controller.on("buttonEvent", (e) => this.onButtonEvent(e));
     this.controller.on("equip", (e) => this.onEquip(e));
+    this.controller.on("hit", (e) => this.onHit(e));
     this.controller.on("update", () => this.onCameraCheck());
     this.controller.on("update", () => this.onHowlCheck());
     // The plugin beast races resolve in the first update, before a dboBeastBody list (read where natives cannot run) needs them
@@ -104,6 +108,7 @@ export class BeastFormService extends ClientListener {
       const may = this.howlAllowed();
       if (stripDue(may, this.howlMay, this.howlStrippedAt, now, forced)) this.stripHowls();
       this.howlMay = may;
+      if (!may) this.noteLostForm(now);
     } catch (e) { logError(this, "howl check failed", e); }
   }
 
@@ -132,6 +137,27 @@ export class BeastFormService extends ClientListener {
     if (removed) logTrace(this, "Howl removed outside the form", removed);
   }
 
+  // A form whose race is gone while the player is up is traced once, with the last hit on them (Purr, 16 Oct: spell hits)
+  private noteLostForm(now: number): void {
+    if (!this.beastRace || this.lostNoted || now - this.formAt < LOST_FORM_SETTLE_MS) return;
+    const player = this.sp.Game.getPlayer();
+    if (!player || player.isDead() || player.isBleedingOut()) return;
+    const race = player.getRace();
+    const raceId = race ? race.getFormID() >>> 0 : 0;
+    if (raceId === this.beastRace) return;
+    this.lostNoted = true;
+    const h = this.lastHit;
+    trace(`beast lost form=${hex(this.beastRace)} race=${hex(raceId)} hit=${h ? `${hex(h.source)} ${now - h.at}ms` : "-"}`);
+  }
+
+  private onHit(e: HitEvent): void {
+    if (!this.beastRace || !e.target || e.target.getFormID() !== 0x14) return;
+    this.lastHit = { source: e.source ? e.source.getFormID() >>> 0 : 0, at: Date.now() };
+  }
+
+  private lostNoted = false;
+  private lastHit: { source: number; at: number } | null = null;
+  private formAt = 0;
   private learnedHowls = new Set<number>();
   private howlMay: boolean | undefined = undefined;
   private howlStrippedAt = 0;
@@ -192,6 +218,7 @@ export class BeastFormService extends ClientListener {
     if (!player || !item || !player.isEquipped(item)) return;
     try { player.unequipItem(item, false, true); } catch (e) { logError(this, "beast gear unequip failed", e); return; }
     logTrace(this, "Took gear off the beast form", id.toString(16));
+    trace(`beast gear off ${hex(id)}`);
   }
 
   // The form's own outfit (dboBeast wear, beastform.js WEAR); empty outside a form
@@ -248,6 +275,9 @@ export class BeastFormService extends ClientListener {
         // The server puts the form's outfit in the inventory and lists it here (beastform.js WEAR);
         const wear = Array.isArray(content["wear"]) ? (content["wear"] as unknown[]).map((x) => Number(x) >>> 0) : [];
         this.wear = new Set(beast ? wear : []);
+        this.formAt = Date.now();
+        this.lostNoted = false;
+        this.lastHit = null;
         for (const id of beast ? wear : []) {
           const armor = Armor.from(this.sp.Game.getFormEx(id));
           if (!armor) { logError(this, "beast outfit not in the load order", id.toString(16)); continue; }

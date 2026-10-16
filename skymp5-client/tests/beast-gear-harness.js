@@ -3,7 +3,8 @@
 // nothing worn, the server took that for the naked login report and re-dressed her, and the practice arrows went back on
 // the werewolf (equipment at 23:07:31.708). The real BeastFormService is bundled with esbuild and driven by a fake engine:
 // equips that land on the werewolf (the re-dress, inventory.ts's ammo re-equip) come off on the next update, the Vampire
-// Lord's robe from the server's wear list stays, and after the revert the re-dress is left alone. Run from skymp5-client:
+// Lord's robe from the server's wear list stays, and after the revert the re-dress is left alone. A form whose race goes
+// while the player is up is traced with the last hit (the spell-hit report of 16 Oct, not reproduced). Run from skymp5-client:
 //
 //   node tests/beast-gear-harness.js [path to esbuild's package dir]
 // BEAST_SERVICE=<a .ts path> bundles another copy of the service instead (the harness's own check against the old code).
@@ -26,6 +27,7 @@ const check = (name, ok, got) => {
 const WEREWOLF = 0x000cdd84, VL = 0x0200283a, KHAJIIT = 0x00013745;
 const ARMOR = 26, LIGHT = 31, WEAPON = 41, AMMO = 42, SPELL_T = 22, POTION = 46;
 // Her outfit, the practice arrows (dunArcherPracticeArrow), a pickaxe, a torch and the Vampire Lord's robe (beastform.js WEAR)
+const SPARKS = 0x0002dd2a;
 const CUIRASS = 0x1001, BOOTS = 0x1002, ARROWS = 0x1003, PICKAXE = 0x1004, TORCH = 0x1005, ROBE = 0x02011a85, POTION_ID = 0x1006;
 const TYPES = { [CUIRASS]: ARMOR, [BOOTS]: ARMOR, [ARROWS]: AMMO, [PICKAXE]: WEAPON, [TORCH]: LIGHT, [ROBE]: ARMOR, [POTION_ID]: POTION };
 
@@ -78,6 +80,8 @@ function run({ BeastFormService }) {
   let now = 1792192051000;
   Date.now = () => now;
   globalThis.__errors = [];
+  const traces = [];
+  globalThis.__dboTrace = (t) => traces.push(t);
   let race = KHAJIIT;
   const worn = new Set();
   const form = (id) => (TYPES[id] !== undefined ? { kind: TYPES[id] === ARMOR ? 'ARMO' : 'ITEM', getFormID: () => id, getType: () => TYPES[id] } : null);
@@ -147,6 +151,16 @@ function run({ BeastFormService }) {
   update();
   check('a potion is not gear', worn.has(POTION_ID), [...worn]);
   worn.delete(POTION_ID);
+  check('each take-off is in the client diagnostics', traces.includes('beast gear off 1003') && traces.includes('beast gear off 1004'), traces);
+
+  // A spell hit, then the werewolf race gone while she is up (Purr, 16 Oct): traced once, naming the hit
+  now += 4000;
+  fire('hit', { target: player, aggressor: null, source: { getFormID: () => SPARKS } });
+  race = KHAJIIT;
+  update(600); update(600);
+  const lost = traces.filter((t) => /^beast lost /.test(t));
+  check('a form whose race went while she is up is traced once, with the last hit', lost.length === 1 && /^beast lost form=cdd84 race=13745 hit=2dd2a \d+ms$/.test(lost[0]), lost);
+  race = WEREWOLF;
 
   // The revert (time up): her own race again, and beastform.js re-dresses her 1.5 s later
   beast(KHAJIIT, false);
