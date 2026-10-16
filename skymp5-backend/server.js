@@ -98,6 +98,10 @@ app.use('/api/modlist',    modlistRoute)
 app.use('/api/install-manifest', installManifestRoute)
 app.use('/api/nexus-downloads',  nexusDownloadsRoute)
 app.use('/api/servers',    serversRoute)
+// Referral links: the tap sees each Discord login before the login routes (routes/referrals.js)
+const referralsRoute = require('./routes/referrals')
+app.use('/api/join', referralsRoute.join)
+app.use('/api/users/login-discord', referralsRoute.loginTap)
 // SkyMP client Master-API compat: mount before /api/servers so /api/users/login-discord/status is not swallowed by a shorter prefix
 app.use('/api/users',      skympCompatRoute)
 app.use('/auth',           masterApiRoute)   // POST /auth/session
