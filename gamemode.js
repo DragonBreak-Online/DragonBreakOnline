@@ -1588,6 +1588,28 @@ const treasuryRefused = (caster, target) => {
   }
   return true;
 };
+// Gold lying in the world from the plugins (banks, shops, homes) is set dressing, never loot (Nate, 16 Oct: 500 gold from
+// the Riften bank's coin piles). Gold a player dropped (a dynamic ref) can still be picked up. Config placedGold.pickup
+const placedGoldBase = new Map(); // baseId -> true for gold
+const isPlacedGold = (target) => {
+  if (target >= 0xff000000 || ((cfg.placedGold || {}).pickup) === true) return false;
+  let baseId = 0; try { baseId = mp.getIdFromDesc(String(mp.get(target, 'baseDesc'))) >>> 0; } catch (e) { return false; }
+  if (!baseId) return false;
+  if (placedGoldBase.has(baseId)) return placedGoldBase.get(baseId);
+  let yes = baseId === 0xf;
+  if (!yes) { const rec = recordOf(baseId); yes = !!(rec && String(rec.record.type) === 'MISC' && /^gold0\d\d$|coin_?pile|gold_?(pile|stack|coins)/i.test(String(rec.record.editorId || ''))); }
+  placedGoldBase.set(baseId, yes);
+  return yes;
+};
+const placedGoldRefused = (caster, target) => {
+  if (!isPlacedGold(target)) return false;
+  if (Date.now() - (lastPickupDeny.get(caster) || 0) > 1500) {
+    lastPickupDeny.set(caster, Date.now());
+    try { personal(caster, 'That gold is not yours to take.'); } catch (e) { /* not a player */ }
+    audit(`GOLD ${who(caster)} was refused placed gold ${target.toString(16)}`);
+  }
+  return true;
+};
 // Review of acf20eac (the coordinator, 2026-09-30): the engine takes a thrown activate handler as "allowed"
 // (ScampServerListener.cpp), so a throw in ANY gamemode hook of the chain below skipped every gate after it: bound hands, the treasury,
 // leases, loot guards, rented chests. Fail closed instead. A thrown hook means the gates did not all get their say, so the
@@ -1629,6 +1651,7 @@ mp.onActivate = (targetId, casterId) => {
     }
   } catch (e) { }
   if (treasuryRefused(caster, target)) return false;
+  if (placedGoldRefused(caster, target)) return false;
   // The region lock's closed doors come before reach: an automatic door fires anywhere in its 1200-unit trigger (Serpents Trail, 7 Oct)
   if (globalThis.__dboPlaytestActivate && globalThis.__dboPlaytestActivate(targetId >>> 0, casterId >>> 0) === false) return false;
   // Reach applies to actors only; a lever or trap linker activates its gate from any distance
