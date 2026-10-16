@@ -527,7 +527,8 @@ export class RemoteServer extends ClientListener {
 
             ModelApplyUtils.applyModelNodeTextureSet(refr, msg.props.setNodeTextureSet);
 
-            ModelApplyUtils.applyModelIsDisabled(refr, !!msg.props['disabled']);
+            // The server sends isDisabled since the message refactor; disabled is the name before it
+            ModelApplyUtils.applyModelIsDisabled(refr, !!(msg.props['isDisabled'] ?? msg.props['disabled']));
 
             // TODO: move to a separate module
             const animation = msg.props.lastAnimation;
