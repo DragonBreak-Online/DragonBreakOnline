@@ -7,6 +7,11 @@ import { ClientListener, CombinedController, Sp } from '../services/services/cli
 import { logTrace } from "../logging";
 import { SinglePlayerService } from "../services/services/singlePlayerService";
 import { RemoteServer } from "../services/services/remoteServer";
+import { FormViewGate, GATE_FALLBACK_SECONDS } from "./formViewGate";
+
+const diagNote = (kind: string, text: string): void => {
+  try { const note = (globalThis as { __dboDiagNote?: (k: string, t: string) => void }).__dboDiagNote; if (typeof note === "function") note(kind, text); } catch { /* diagnostics only */ }
+};
 
 export class WorldView extends ClientListener {
   constructor(private sp: Sp, private controller: CombinedController) {
@@ -54,6 +59,7 @@ export class WorldView extends ClientListener {
   }
 
   private onUpdate() {
+    this.openGateIfDue();
     this.resetAllFormViewsIfPlayerChangedWorld();
 
     const singlePlayerService = this.controller.lookupListener(SinglePlayerService);
@@ -93,17 +99,31 @@ export class WorldView extends ClientListener {
   // If other players are spawning when we show this menu
   // TODO: separate listener
   public waitGameTimeAndAllowFormViewUpdate(seconds: number) {
-    // Wait 1s game time (time spent in Race Menu isn't counted)
-    this.sp.Utility.wait(seconds).then(() => {
-      this.state.allowUpdate = true;
-      logTrace(this, 'Update is now allowed');
-    });
+    // Counted on updates in openGateIfDue (time spent in Race Menu isn't counted); the Papyrus wait only reports when it returns
+    const armedAt = Date.now();
+    this.gate.arm(seconds, armedAt);
+    this.sp.Utility.wait(seconds).then(() => diagNote("fv:gate", `papyrus wait returned after ${Date.now() - armedAt} ms`));
   }
 
   public setFormViewUpdateAllowed(allowed: boolean) {
     this.state.allowUpdate = allowed;
+    if (allowed) this.gate.disarm();
+    else this.gate.arm(GATE_FALLBACK_SECONDS, Date.now());
     logTrace(this, 'Update is now', allowed ? 'allowed' : 'disallowed');
   }
+
+  private openGateIfDue() {
+    if (this.state.allowUpdate || !this.gate.isArmed()) return;
+    let paused = false;
+    try { paused = this.sp.Ui.isMenuOpen("RaceSex Menu") || this.sp.Ui.isMenuOpen("Loading Menu"); } catch (e) { /* counted as play */ }
+    const now = Date.now();
+    if (!this.gate.tick(now, paused)) return;
+    this.state.allowUpdate = true;
+    logTrace(this, 'Update is now allowed');
+    diagNote("fv:gate", `open after ${this.gate.ageMs(now)} ms`);
+  }
+
+  private gate = new FormViewGate();
 
   private updateWorld(model: WorldModel): void {
     const { settings } = this.sp;

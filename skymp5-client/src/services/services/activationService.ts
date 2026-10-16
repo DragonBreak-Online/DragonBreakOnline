@@ -1,4 +1,4 @@
-import { ActivateEvent, Actor, FormType } from "skyrimPlatform";
+import { ActivateEvent, Actor, FormType, ObjectReference } from "skyrimPlatform";
 import { ClientListener, CombinedController, Sp } from "./clientListener";
 import { MsgType } from "../../messages";
 import { getInventory } from "../../sync/inventory";
@@ -9,6 +9,20 @@ import { localIdToRemoteId } from "../../view/worldViewMisc";
 import { LastInvService } from "./lastInvService";
 import { selfActivated } from "../../sync/selfActivation";
 import { logError, logTrace } from "../../logging";
+import { ObjectReferenceEx } from "../../extensions/objectReferenceEx";
+
+const diagNote = (kind: string, text: string): void => {
+  try { const note = (globalThis as { __dboDiagNote?: (k: string, t: string) => void }).__dboDiagNote; if (typeof note === "function") note(kind, text); } catch { /* diagnostics only */ }
+};
+
+const isUnblockedServerDoor = (ref: ObjectReference): boolean => {
+  try {
+    const base = ref.getBaseObject();
+    return !!base && base.getType() === FormType.Door && ObjectReferenceEx.wantsActivationBlock(base) && !ref.isActivationBlocked();
+  } catch {
+    return false;
+  }
+};
 
 export class ActivationService extends ClientListener {
     constructor(private sp: Sp, private controller: CombinedController) {
@@ -18,7 +32,14 @@ export class ActivationService extends ClientListener {
 
     private onActivate(e: ActivateEvent) {
         const lastInvService = this.controller.lookupListener(LastInvService);
-        lastInvService.lastInv = getInventory(this.sp.Game.getPlayer() as Actor);
+        // A player whose base reads null threw here and the activation was never sent; ContainersService reads its own when unset
+        try {
+          lastInvService.lastInv = getInventory(this.sp.Game.getPlayer() as Actor);
+        } catch (err) {
+          lastInvService.lastInv = undefined;
+          logError(this, "Inventory read failed before an activation, sending it anyway", err);
+          try { const report = (globalThis as { __dboReportError?: (w: string, e: unknown) => void }).__dboReportError; if (typeof report === "function") report("on:activate:inv", err); } catch { /* diagnostics only */ }
+        }
 
         let caster = e.caster ? e.caster.getFormID() : 0;
         let target = e.target ? e.target.getFormID() : 0;
@@ -63,7 +84,11 @@ export class ActivationService extends ClientListener {
             Closing,
         }
 
-        if (openState === OpenState.Opening || openState === OpenState.Closing) {
+        // A server-run door that was not activation-blocked has already been opened or walked through by the engine, so the server must hear it
+        if (isPlayer && isUnblockedServerDoor(e.target)) {
+            try { e.target.blockActivation(true); } catch { /* unloaded ref */ }
+            diagNote("door:unblocked", `${target.toString(16)} state ${openState}`);
+        } else if (openState === OpenState.Opening || openState === OpenState.Closing) {
             logTrace(this, "Ignoring activation of door because it's already opening or closing");
             return;
         }
