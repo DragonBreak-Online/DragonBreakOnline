@@ -1,5 +1,30 @@
 [
   {
+    "title": "Gold piles, respawns and smithing",
+    "date": "2026-10-16",
+    "version": "Hotfix",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Fixes",
+        "items": [
+          "Gold and coin piles lying in banks, shops and homes are set dressing now and can't be picked up. Gold a player drops can still be picked up.",
+          "Dying in Blackreach, Shadowgreen Cavern or Alftand no longer sends you back to Bruma: you wake at the nearest temple.",
+          "Sun-Hallowed and Blood-Cursed Elven Arrows no longer turn up in dungeon loot."
+        ]
+      },
+      {
+        "heading": "Smithing",
+        "items": [
+          "Ancient Imperial armour is no longer Imperial-only: any smith who has learned Schematics: Ancient Imperial can make it. The schematic is found by reading in Cyrodiil's forts, or very rarely in their chests. It is the only way to learn the craft, for Imperials too.",
+          "Black Bear Ancient Nord armour now counts at its tier: the light pieces match Scaled armour and the heavy cuirass counts 41.",
+          "Knight-Errant and Gryphon Rider armour stay Breton-only: they belong to High Rock's knightly orders.",
+          "Staff can now place a Blacksmith's Ledger at any forge that lacks one."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Every wild animal can be skinned",
     "date": "2026-10-16",
     "version": "Hotfix",
