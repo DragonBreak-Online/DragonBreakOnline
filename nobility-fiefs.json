@@ -240,6 +240,222 @@
      ]
     }
    ]
+  },
+  {
+   "id": "underarch-harbor",
+   "name": "Underarch Harbor",
+   "hold": "solitude",
+   "location": "35ed:DragonBreak.esp",
+   "edid": "SolitudeDocksLocation1",
+   "county": "HaafingarHoldLocation",
+   "world": "3c:Skyrim.esm",
+   "center": [
+    -56576,
+    108800
+   ],
+   "grid": [
+    [
+     -16,
+     23
+    ],
+    [
+     -16,
+     24
+    ],
+    [
+     -16,
+     25
+    ],
+    [
+     -15,
+     23
+    ],
+    [
+     -15,
+     24
+    ],
+    [
+     -15,
+     25
+    ],
+    [
+     -14,
+     24
+    ],
+    [
+     -14,
+     25
+    ],
+    [
+     -14,
+     26
+    ],
+    [
+     -14,
+     27
+    ],
+    [
+     -14,
+     28
+    ],
+    [
+     -14,
+     29
+    ],
+    [
+     -13,
+     27
+    ],
+    [
+     -13,
+     28
+    ],
+    [
+     -13,
+     29
+    ],
+    [
+     -13,
+     30
+    ]
+   ],
+   "cells": [
+    "16bf1:DragonBreak.esp",
+    "238da:DragonBreak.esp",
+    "3579:DragonBreak.esp",
+    "357a:DragonBreak.esp",
+    "357b:DragonBreak.esp",
+    "357c:DragonBreak.esp",
+    "423b:DragonBreak.esp",
+    "423c:DragonBreak.esp",
+    "423d:DragonBreak.esp",
+    "4305:DragonBreak.esp",
+    "7036:DragonBreak.esp",
+    "7b7ab:Skyrim.esm",
+    "8223:DragonBreak.esp",
+    "aa48:DragonBreak.esp",
+    "be10:DragonBreak.esp",
+    "be11:DragonBreak.esp",
+    "dad3:DragonBreak.esp"
+   ],
+   "buildings": [
+    {
+     "id": "10b5:DragonBreak.esp",
+     "name": "01SolitudeDocksArchBarracks",
+     "doors": [
+      "10b5:DragonBreak.esp",
+      "16bcd:DragonBreak.esp"
+     ]
+    },
+    {
+     "id": "b868:DragonBreak.esp",
+     "name": "01SolitudeDocksBreakwaterFarmInt",
+     "doors": [
+      "b868:DragonBreak.esp",
+      "b869:DragonBreak.esp"
+     ]
+    },
+    {
+     "id": "2fc6:DragonBreak.esp",
+     "name": "01SolitudeDocksChapelofMaraInt",
+     "doors": [
+      "2fc6:DragonBreak.esp"
+     ]
+    },
+    {
+     "id": "1e7aa:DragonBreak.esp",
+     "name": "01SolitudeDocksEthlamsHouse",
+     "doors": [
+      "1e7aa:DragonBreak.esp"
+     ]
+    },
+    {
+     "id": "2fc5:DragonBreak.esp",
+     "name": "01SolitudeDocksInnInt",
+     "doors": [
+      "2fc5:DragonBreak.esp",
+      "3550:DragonBreak.esp"
+     ]
+    },
+    {
+     "id": "19ac:DragonBreak.esp",
+     "name": "01SolitudeDocksMyrnasRevenge",
+     "doors": [
+      "19ac:DragonBreak.esp"
+     ]
+    },
+    {
+     "id": "2fc2:DragonBreak.esp",
+     "name": "01SolitudeDocksResInt01",
+     "doors": [
+      "2fc2:DragonBreak.esp"
+     ]
+    },
+    {
+     "id": "2fc4:DragonBreak.esp",
+     "name": "01SolitudeDocksResInt02",
+     "doors": [
+      "2fc4:DragonBreak.esp"
+     ]
+    },
+    {
+     "id": "2fc3:DragonBreak.esp",
+     "name": "01SolitudeDocksResInt03",
+     "doors": [
+      "2fc3:DragonBreak.esp"
+     ]
+    },
+    {
+     "id": "2fc8:DragonBreak.esp",
+     "name": "01SolitudeDocksResInt04",
+     "doors": [
+      "2fc8:DragonBreak.esp"
+     ]
+    },
+    {
+     "id": "2fc7:DragonBreak.esp",
+     "name": "01SolitudeDocksResInt05",
+     "doors": [
+      "2fc7:DragonBreak.esp"
+     ]
+    },
+    {
+     "id": "2fca:DragonBreak.esp",
+     "name": "01SolitudeDocksResInt07",
+     "doors": [
+      "2fca:DragonBreak.esp"
+     ]
+    },
+    {
+     "id": "b27c:DragonBreak.esp",
+     "name": "01SolitudeDocksSeaSideFarmInt",
+     "doors": [
+      "b27c:DragonBreak.esp"
+     ]
+    },
+    {
+     "id": "dacb:DragonBreak.esp",
+     "name": "01SolitudeDocksSmithShop",
+     "doors": [
+      "dacb:DragonBreak.esp"
+     ]
+    },
+    {
+     "id": "2fc9:DragonBreak.esp",
+     "name": "01SolitudeDocksWarehouse",
+     "doors": [
+      "2fc9:DragonBreak.esp",
+      "2fcb:DragonBreak.esp"
+     ]
+    },
+    {
+     "id": "7b91e:Skyrim.esm",
+     "name": "DaintySload01",
+     "doors": [
+      "7b91e:Skyrim.esm"
+     ]
+    }
+   ]
   }
  ]
 }

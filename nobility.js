@@ -9,6 +9,8 @@
 //             Knight / Dame      an honour, no land
 //   Skyrim    Lord / Lady        holds a fief (a holding)
 //             Thane              an honour
+// A fief may style its holder otherwise, with the same powers (config fiefTitles): Underarch Harbor, Solitude's eastern
+// harbor, is held by a Harbormaster (Nate, 16 Oct).
 // Titles belong to one character (its actor id, as property does once property-per-character ships), one title per character
 // per hold and one holder per fief. Every grant, change and revocation is audited and announced in the words of a decree.
 // A fief's holder has powers only inside it, enforced by the fork's housingSystem.ts through __dboNobility below: they manage
@@ -49,6 +51,10 @@ module.exports = (api) => {
     // One-time grants made when the switch is on (the migration: Lord Elion, Baron of Mountain Watch): { fief | hold, title,
     // profile, name }; each is applied once, to the account's character carrying that name, and only to a vacant fief
     seed: [],
+    // fief id -> { m, f }: the style of that fief's holder in place of the realm's fief title (Lord, Baron), with the same
+    // powers. Underarch Harbor, Solitude's eastern harbor, is held by a Harbormaster (Nate, 16 Oct; #suggestions
+    // 1560585290286891069)
+    fiefTitles: { 'underarch-harbor': { m: 'Harbormaster', f: 'Harbormaster' } },
   }, (cfg && cfg.nobility) || {});
   const FILE = path.resolve('nobility.json');
   const FIEFS_FILE = path.resolve('nobility-fiefs.json');
@@ -69,6 +75,13 @@ module.exports = (api) => {
   const RULER = { cyrodiil: { m: 'Count', f: 'Countess' }, skyrim: { m: 'Jarl', f: 'Jarl' } };
   const realmOf = (zid) => (C.realms && C.realms[zid] === 'cyrodiil' ? 'cyrodiil' : 'skyrim');
   const titleDef = (zid, id) => TITLES[realmOf(zid)].find((t) => t.id === String(id || '').toLowerCase()) || null;
+  // A fief whose holder has a style of their own (config fiefTitles): the word for this holder, '' for the realm's title
+  const fiefWord = (fid, female) => {
+    const t = C.fiefTitles && typeof C.fiefTitles === 'object' ? C.fiefTitles[String(fid || '')] : null;
+    if (!t || typeof t !== 'object') return '';
+    const pick = (v) => (typeof v === 'string' ? v.trim() : '');
+    return (female ? pick(t.f) || pick(t.m) : pick(t.m) || pick(t.f));
+  };
   // "The Rift" reads "of the Rift" inside a sentence
   const ofPlace = (name) => String(name || '').replace(/^The /, 'the ');
 
@@ -132,7 +145,7 @@ module.exports = (api) => {
     const def = titleDef(n.hold, n.title); if (!def) return n.title;
     const female = exists(n.actor) ? isFemale(n.actor, n.female) : !!n.female;
     const word = female ? def.f : def.m;
-    if (def.fief) { const f = fiefById(n.fief); return `${word} of ${f ? f.name : n.fief}`; }
+    if (def.fief) { const f = fiefById(n.fief); return `${fiefWord(n.fief, female) || word} of ${f ? f.name : n.fief}`; }
     if (def.estate) return n.estate ? `${word} of ${n.estate}` : word;
     const z = zoneById(n.hold);
     return `${word} of ${ofPlace(z ? z.name : n.hold)}`;

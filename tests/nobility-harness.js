@@ -5,12 +5,15 @@
 // and one title per character per hold; a changed title says what it was; estates named and filtered; the decrees' words;
 // the fork's questions (holdsFiefAt, holderOf); the 25% fief share of the weekly tax into a deposit-only fief treasury, the
 // hold keeping the rest and the tithe counting what it kept; the migration seed for Lord Elion applied once; Skyrim's Lord
-// and Thane under a Jarl; the tab's views; a deleted character's title lapsing; the pending patch note.
+// and Thane under a Jarl; Underarch Harbor, Solitude's eastern harbor (Nate, 16 Oct): where it starts and ends, and its
+// holder styled Harbormaster; the Bruma fiefs unchanged by it; the tab's views; a deleted character's title lapsing; the
+// pending patch note.
 //
 //   node tests/nobility-harness.js   (from server/)
 'use strict';
 const fs = require('fs');
 const os = require('os');
+const crypto = require('crypto');
 const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..');
@@ -31,7 +34,7 @@ Date.now = () => now;
 // ---- the world ----------------------------------------------------------------------------------------------------------
 const HL = 'a764b:BSHeartland.esm';
 const MW = FIEFS.find((f) => f.id === 'mountain-watch'), AW = FIEFS.find((f) => f.id === 'applewatch');
-const COUNTESS = 0x14, ELION = 0x15, ELION_ALT = 0x19, STEWARD = 0x16, ADMIN = 0x10, DAME = 0x17, OUT = 0x18, JARL = 0x1a, GONE = 0x1b;
+const COUNTESS = 0x14, ELION = 0x15, ELION_ALT = 0x19, STEWARD = 0x16, ADMIN = 0x10, DAME = 0x17, OUT = 0x18, JARL = 0x1a, GONE = 0x1b, HJARL = 0x1d;
 const chars = new Map([
   [COUNTESS, { pid: 11, name: 'Narina Carvain', female: true, online: true }],
   [ELION, { pid: 49, name: 'Lord Elion', female: false, online: true }],
@@ -42,6 +45,7 @@ const chars = new Map([
   [OUT, { pid: 15, name: 'Outsider', female: false, online: true }],
   [JARL, { pid: 20, name: 'Laila', female: true, online: true }],
   [GONE, { pid: 21, name: 'Brief', female: false, online: false }],
+  [HJARL, { pid: 22, name: 'Elisif', female: true, online: true }],
 ]);
 const deleted = new Set();
 // References: a Mountain Watch house door (its interior cell), its door outside (a worldspace cell of the town), a house in
@@ -54,6 +58,27 @@ const places = {
   [AW_DOOR]: [HL, [AW.grid[0][0] * 4096 + 5, AW.grid[0][1] * 4096 + 5, 0]],
   [BRUMA_DOOR]: [HL, [57750, 202700, 0]],
 };
+// Solitude's harbor, at the doors' real positions (doors-pos.json): Tamriel is 3c:Skyrim.esm, the walled city SolitudeWorld
+const TAM = '3c:skyrim.esm', SOLW = '37edf:skyrim.esm';
+const UH = FIEFS.find((f) => f.id === 'underarch-harbor');
+const harbor = {
+  0x600: ['the docks inn\'s door', TAM, [-59744.62, 101446.84, -13649.57], true],
+  0x601: ['the Ondiel warehouse door', TAM, [-61906.61, 102202.52, -13438.46], true],
+  0x602: ['the docks smithy\'s door', TAM, [-55891.69, 106007.19, -13669.96], true],
+  0x603: ['the Breakwater farm\'s door', TAM, [-53373.05, 114667.05, -13516.31], true],
+  0x604: ['the Dainty Sload\'s door', TAM, [-51949.44, 122067.12, -13693.74], true],
+  0x605: ['inside the docks smithy', 'dad3:DragonBreak.esp', [0, 0, 0], true],
+  0x606: ['the East Empire Warehouse\'s door (the line: Solitude keeps it)', TAM, [-67169, 99878, -13749], false],
+  0x607: ['the Red Wave, west harbor', TAM, [-66175.26, 94445.03, -13663.72], false],
+  0x608: ['the docks barracks west of the warehouse', TAM, [-67882.09, 97525.12, -12790.03], false],
+  0x609: ['Katla\'s Farm', TAM, [-75489.09, 96292.72, -11404.86], false],
+  0x60a: ['the prison across the water', TAM, [-56850.52, 93913.97, -14010.26], false],
+  0x60b: ['the Katariah, at anchor off the harbor', TAM, [-49224, 105932, -13592], false],
+  0x60c: ['the Bank of Solitude, in the city above the same cells', SOLW, [-60312.5, 104131.85, -8216.74], false],
+  0x60d: ['inside Beirand\'s smithy (a city interior)', '37ee0:skyrim.esm', [0, 0, 0], false],
+  0x60e: ['inside the Red Wave (west harbor)', 'a1793:skyrim.esm', [0, 0, 0], false],
+};
+for (const [id, [, w, pos]] of Object.entries(harbor)) places[id] = [w, pos];
 const props = new Map();
 const mp = {
   get: (id, k) => {
@@ -75,9 +100,10 @@ const mp = {
 const zones = [
   { id: 'bruma', name: 'Bruma', treasury: '79b22:BSHeartland.esm', officials: ['count', 'steward', 'captain', 'courtmage', 'guard'] },
   { id: 'riften', name: 'The Rift', officials: ['jarl', 'steward', 'commander', 'courtmage', 'guardcaptain', 'guard'] },
+  { id: 'solitude', name: 'Haafingar', officials: ['jarl', 'steward', 'commander', 'courtmage', 'guardcaptain', 'guard'] },
 ];
 const zoneById = (id) => zones.find((z) => z.id === String(id)) || null;
-let officials = { bruma: { count: [11], steward: [12] }, riften: { jarl: [20] } };
+let officials = { bruma: { count: [11], steward: [12] }, riften: { jarl: [20] }, solitude: { jarl: [22] } };
 const ranksOf = (pid) => { const out = []; for (const z of zones) for (const r of z.officials) if (((officials[z.id] || {})[r] || []).includes(pid)) out.push({ zone: z, rank: r }); return out; };
 const online = () => [...chars.entries()].filter(([id, c]) => c.online && !deleted.has(id)).map(([id]) => id);
 const profileOf = (a) => (chars.get(a) || { pid: -1 }).pid;
@@ -108,6 +134,7 @@ globalThis.__dboGuildsOf = (a) => (a === JARL ? [{ id: 'hold-riften', role: 'lea
 
 let nob;
 const load = (cfg) => { api.cfg = cfg; handlers.clear(); delete require.cache[NOB]; nob = require(NOB)(api); };
+const SEC0 = () => globalThis.__dboJournalSections.nobility;
 const ui = (ev, a, ...args) => { answers.length = 0; handlers.get(ev)(a, ['N', ...args]); return answers[0] || {}; };
 
 // ---- off by default -------------------------------------------------------------------------------------------------------
@@ -123,7 +150,19 @@ ok('on: the tab is registered as Nobility', !!globalThis.__dboJournalSections.no
 
 // ---- where a fief is ----------------------------------------------------------------------------------------------------
 const N = globalThis.__dboNobility;
-ok('the fiefs are the four towns of the Bruma lock (Greenwood since Nate\'s go), all Bruma\'s', FIEFS.map((f) => f.id).sort().join() === 'aleswell,applewatch,greenwood,mountain-watch' && FIEFS.every((f) => f.hold === 'bruma' && f.cells.length && f.grid.length));
+ok('the fiefs are the four towns of the Bruma lock (Greenwood since Nate\'s go), all Bruma\'s, and Underarch Harbor, Haafingar\'s',
+  FIEFS.map((f) => f.id).sort().join() === 'aleswell,applewatch,greenwood,mountain-watch,underarch-harbor'
+  && FIEFS.filter((f) => f.id !== 'underarch-harbor').every((f) => f.hold === 'bruma') && FIEFS.every((f) => f.cells.length && f.grid.length) && UH.hold === 'solitude');
+// The Bruma fiefs exactly as they were before Underarch Harbor was added (sha1 of each entry's compact JSON)
+const BEFORE = {"applewatch": "78f8195397e4e41ef90f0c501d023613f2dfce3c", "aleswell": "2c0142e282c1a4bdbd0c0cab250ef0fecae8eda6", "mountain-watch": "a7724e015f30c3da39d43437a804e4f39fa9f957", "greenwood": "04bc8b82c444cf84dbd371ece8c0bdd605b1ed05"};
+for (const [id, sha] of Object.entries(BEFORE)) {
+  const f = FIEFS.find((x) => x.id === id);
+  ok(`${id} is unchanged by the harbor`, !!f && crypto.createHash('sha1').update(JSON.stringify(f)).digest('hex') === sha);
+}
+ok('Underarch Harbor lies in Tamriel, outside the city\'s own worldspace', UH.world.toLowerCase() === TAM && UH.cells.every((c) => !/^37edf:/i.test(c)));
+ok('no exterior cell or interior belongs to two fiefs', (() => { const seen = new Set(); for (const f of FIEFS) for (const k of f.grid.map((g) => `${f.world.toLowerCase()}|${g}`).concat(f.cells.map((c) => c.toLowerCase()))) { if (seen.has(k)) return false; seen.add(k); } return true; })());
+ok('Solitude keeps the East Empire Warehouse\'s cell column (x -17) and everything west of it', UH.grid.every((g) => g[0] >= -16));
+for (const [id, [label, , , inside]] of Object.entries(harbor)) ok(`${label} is ${inside ? '' : 'not '}in Underarch Harbor`, N.fiefOf([Number(id)]) === (inside ? 'underarch-harbor' : ''), N.fiefOf([Number(id)]));
 ok('a house door inside Mountain Watch\'s interiors is in the fief', N.fiefOf([MW_DOOR]) === 'mountain-watch');
 ok('a chest in the same interior, its desc in another case, too', N.fiefOf([MW_CHEST]) === 'mountain-watch');
 ok('a door outside in the town\'s worldspace cells is in it', N.fiefOf([MW_OUT]) === 'mountain-watch');
@@ -199,7 +238,7 @@ chars.get(COUNTESS).female = true;
 officials = { bruma: { steward: [12] }, riften: {} };
 globalThis.__dboGuildsOf = (a) => (a === JARL ? [{ id: 'hold-riften', role: 'leader' }] : a === STEWARD ? [{ id: 'county-bruma', role: 'leader' }] : []);
 ok('the hold faction\'s leader rules too, without the office', ui('nobilityGrant', STEWARD, 'bruma', 'Outsider', 'knight').kind === 'ok');
-officials = { bruma: { count: [11], steward: [12] }, riften: { jarl: [20] } };
+officials = { bruma: { count: [11], steward: [12] }, riften: { jarl: [20] }, solitude: { jarl: [22] } };
 globalThis.__dboGuildsOf = (a) => (a === JARL ? [{ id: 'hold-riften', role: 'leader' }] : []);
 
 // ---- Skyrim -----------------------------------------------------------------------------------------------------------------
@@ -209,6 +248,27 @@ ui('nobilityGrant', JARL, 'riften', 'Kesta', 'thane');
 ok('a Thane is named by the Jarl of the Rift', announced[0] === 'By decree of the Jarl of the Rift, Kesta is named Thane of the Rift.', announced);
 ok('a title in another hold is a second title', JSON.parse(fs.readFileSync('nobility.json', 'utf8')).nobles.filter((n) => n.actor === DAME).length === 2);
 ok('the Jarl has no say in Bruma', /Only the Count or Countess/.test(ui('nobilityGrant', JARL, 'bruma', 'Kesta', 'knight').text));
+
+// ---- Underarch Harbor: a Harbormaster, with a Lord's powers (Nate, 16 Oct) ------------------------------------------------
+ok('the Jarl of the Rift cannot grant Haafingar\'s harbor', /Only the Jarl of Haafingar/.test(ui('nobilityGrant', JARL, 'solitude', 'Outsider', 'lord', 'underarch-harbor').text));
+ok('Haafingar grants no Bruma fief', /Choose one of the fiefs of Haafingar/.test(ui('nobilityGrant', HJARL, 'solitude', 'Outsider', 'lord', 'applewatch').text));
+announced.length = 0;
+const hm = ui('nobilityGrant', HJARL, 'solitude', 'Kesta', 'lord', 'underarch-harbor');
+ok('a woman granted the harbor is its Harbormaster, by the Jarl\'s decree', hm.kind === 'ok' && hm.text === 'Kesta is now Harbormaster of Underarch Harbor.'
+  && announced[0] === 'By decree of the Jarl of Haafingar, Kesta is named Harbormaster of Underarch Harbor.', [hm, announced]);
+ok('she holds the harbor\'s buildings and none of Solitude\'s', N.holdsFiefAt(DAME, [0x600]) && N.holdsFiefAt(DAME, [0x605]) && !N.holdsFiefAt(DAME, [0x606]) && !N.holdsFiefAt(DAME, [0x60c]) && N.holderOf('underarch-harbor').actor === DAME);
+announced.length = 0;
+ui('nobilityRevoke', HJARL, 'solitude', DAME.toString(16));
+ok('revoked in the same style', announced[0] === 'By decree of the Jarl of Haafingar, Kesta is no longer Harbormaster of Underarch Harbor.', announced);
+announced.length = 0;
+ui('nobilityGrant', HJARL, 'solitude', 'Outsider', 'lord', 'underarch-harbor');
+ok('a man is Harbormaster too', announced[0] === 'By decree of the Jarl of Haafingar, Outsider is named Harbormaster of Underarch Harbor.', announced);
+ok('the roll and his own view say Harbormaster', SEC0().view(OUT).holds.find((h) => h.id === 'solitude').roll.map((n) => n.label).join() === 'Harbormaster of Underarch Harbor'
+  && SEC0().view(OUT).mine.some((m) => m.hold === 'solitude' && m.label === 'Harbormaster of Underarch Harbor' && m.fief.id === 'underarch-harbor'));
+ok('the harbor pays a quarter of its tax to its own treasury', JSON.stringify(globalThis.__dboNobilityFiefCut(0x602, { partner: 0 }, 100)) === JSON.stringify({ id: 'underarch-harbor', name: 'Underarch Harbor', share: 25 }));
+ok('the Jarl\'s titles stay Lord and Thane: the style follows the fief', SEC0().view(HJARL).holds.find((h) => h.id === 'solitude').titles.map((t) => t.label).join() === 'Lord / Lady,Thane');
+ok('fiefTitles in the config replaces the default', (() => { load({ nobility: { enabled: true, fiefTitles: { 'underarch-harbor': { m: 'Reeve', f: 'Reeve' } } } }); const l = SEC0().view(OUT).mine.find((m) => m.hold === 'solitude').label; load({ nobility: { enabled: true, realms: { bruma: 'cyrodiil' } } }); return l === 'Reeve of Underarch Harbor'; })());
+ok('the Bruma Barons keep their style', nob.labelOf({ hold: 'bruma', title: 'baron', fief: 'mountain-watch', actor: ELION }) === 'Baron of Mountain Watch');
 
 // ---- the tab (bank.js gives the fief treasuries) ---
 delete require.cache[BANK];
