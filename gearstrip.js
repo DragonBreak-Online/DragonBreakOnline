@@ -4,7 +4,7 @@
 // of Anvil, Bravil, Cheydinhal, Chorrol, Kvatch, Leyawiin and Skingrad (BSHeartland.esm), whose models do not show in
 // game (the wearer looks invisible or bald). Bruma's set is never listed. regions-overrides.json forgeNever already stops
 // new ones; this removes the ones made before.
-// Every listed item is removed from players (at login, and every sweepSeconds for whoever is online) and from containers
+// Every listed item is removed from players and their bank vaults (at login, and every sweepSeconds for whoever is online) and from containers
 // (the listed ones on a timer, any other as it is opened). A copy taken from a player refunds that player the item's
 // recipe (its refund list; an item no recipe makes refunds nothing), when refundTo is "holder", the holder's profile is
 // in crafters (an empty list lets every holder), and fewer than maxRefunds copies have been refunded. A copy found in a
@@ -175,6 +175,31 @@ module.exports = (api) => {
     return total;
   };
 
+  // Copies parked in a bank vault (bank.js __dboVaultTake), removed like a container's: no refund, a swapTo given to the
+  // holder (bank review R10)
+  const stripVault = (a) => {
+    a = a >>> 0;
+    if (S.readOnly || typeof globalThis.__dboVaultHas !== 'function' || typeof globalThis.__dboVaultTake !== 'function') return 0;
+    const removed = new Map();
+    for (const id of IDS) { const n = Number(globalThis.__dboVaultHas(a, id)) || 0; if (n > 0) removed.set(id, n); }
+    if (!removed.size) return 0;
+    let total = 0;
+    for (const [id, n] of removed) {
+      const it = ITEMS.get(id);
+      const snap = snapshot(); const st = state();
+      st.removed[it.desc] = (st.removed[it.desc] || 0) + n;
+      st.log.push({ at: new Date().toISOString(), where: `vaults of actor ${a.toString(16)}`, items: { [it.desc]: n }, refunded: 0, swapped: it.swap ? { [it.swap.name]: n } : {} });
+      if (!save()) { S.state = snap; continue; }
+      let took = 0;
+      try { took = globalThis.__dboVaultTake(a, id, n, 'gearstrip'); } catch (e) { took = 0; }
+      if (took !== n) { restore(snap); log('gearstrip: vault removal fell short, state put back'); continue; }
+      if (it.swap) giveItem(a, it.swap.id, n);
+      total += n;
+      audit(`GEARSTRIP removed ${n} x ${it.name} from the bank vaults of ${who(a)}${it.swap ? `; swapped for ${n} ${it.swap.name}` : ' (no refund)'}`);
+    }
+    return total;
+  };
+
   // A replacement owed for a copy taken before its item had swapTo: given once, to the actor online or into the container
   const OWED = (C.owed || []).map((o, i) => ({ key: `${String(o.to)}|${String(o.give)}|${i}`, to: parseInt(String(o.to), 16) >>> 0, give: idOf(String(o.give)), n: Math.max(1, Number(o.n) || 1), name: String(o.name || o.give) }))
     .filter((o) => o.to && o.give);
@@ -194,11 +219,11 @@ module.exports = (api) => {
   };
 
   const sweep = () => {
-    for (const a of onlineActors()) { stripActor(a); payOwed(a, true); }
+    for (const a of onlineActors()) { stripActor(a); stripVault(a); payOwed(a, true); }
     for (const d of C.containers || []) { const ref = idOf(d); if (ref) { stripContainer(ref); payOwed(ref, false); } }
   };
 
-  globalThis.__dboGearStripLogin = (a) => { stripActor(a); payOwed(a, true); };
+  globalThis.__dboGearStripLogin = (a) => { stripActor(a); stripVault(a); payOwed(a, true); };
   globalThis.__dboGearStripContainer = (ref) => { stripContainer(ref); payOwed(ref, false); };
   globalThis.__dboGearStripState = () => snapshot();
   every('gearStrip', Math.max(10, Number(C.sweepSeconds) || 60) * 1000, sweep);

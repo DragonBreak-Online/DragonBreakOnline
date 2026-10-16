@@ -1,7 +1,7 @@
 'use strict';
 // The Dawnguard War Axe SPR taken back (Nate, 11 Oct 2026: "strip the axe from everyone refund materials to the
 // blacksmith"). JK's Fort Dawnguard.esp gives XJKFDDLC1DawnguardAxe (f0d) base damage 111; a Dawnguard smith forged 13
-// on 10-11 Oct before regions.js forgeNever refused it. Every copy is removed from players (at login, and every
+// on 10-11 Oct before regions.js forgeNever refused it. Every copy is removed from players and their bank vaults (at login, and every
 // sweepSeconds for whoever is online) and from containers (the listed ones on a timer, any other as it is opened). For
 // each copy removed, up to maxRefunds, the smith who made them gets the recipe's materials back (at once if online,
 // else at his next login). Give only, never take.
@@ -113,6 +113,21 @@ module.exports = (api) => {
     return p.removed;
   };
 
+  // Copies parked in a bank vault (bank.js __dboVaultTake), removed like a container's: no refund (bank review R10)
+  const stripVault = (a) => {
+    a = a >>> 0;
+    if (S.readOnly || typeof globalThis.__dboVaultHas !== 'function' || typeof globalThis.__dboVaultTake !== 'function') return 0;
+    const n = Number(globalThis.__dboVaultHas(a, ITEM)) || 0;
+    if (!(n > 0)) return 0;
+    const snap = snapshot();
+    if (!record(`vaults of actor ${a.toString(16)}`, n)) return 0;
+    let took = 0;
+    try { took = globalThis.__dboVaultTake(a, ITEM, n, 'sprstrip'); } catch (e) { took = 0; }
+    if (took !== n) { restore(snap); if (took > 0) record(`vaults of actor ${a.toString(16)}`, took); log('sprstrip: vault removal fell short, state put back'); return took; }
+    audit(`SPRSTRIP removed ${n} x ${C.itemName} from the bank vaults of ${who(a)}`);
+    return n;
+  };
+
   const isSmith = (a) => (a >>> 0) === SMITH && Number(mp.get(a, 'profileId')) === SMITH_PROFILE;
   const payRefund = (a) => {
     if (!isSmith(a) || S.readOnly) return 0;
@@ -128,11 +143,11 @@ module.exports = (api) => {
   };
 
   const sweep = () => {
-    for (const a of onlineActors()) { stripActor(a); payRefund(a); }
+    for (const a of onlineActors()) { stripActor(a); stripVault(a); payRefund(a); }
     for (const d of C.containers || []) { const ref = idOf(d); if (ref) stripContainer(ref); }
   };
 
-  globalThis.__dboSprStripLogin = (a) => { stripActor(a); payRefund(a); };
+  globalThis.__dboSprStripLogin = (a) => { stripActor(a); stripVault(a); payRefund(a); };
   globalThis.__dboSprStripContainer = (ref) => { stripContainer(ref); };
   globalThis.__dboSprStripState = () => snapshot();
   every('sprStrip', Math.max(10, Number(C.sweepSeconds) || 60) * 1000, sweep);
