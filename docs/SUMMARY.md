@@ -29,6 +29,7 @@
 - [Properties System](docs_properties_system.md)
 - [Events System](docs_events_system.md)
 - [Skyrim Platform](docs_skyrim_platform.md)
+- [Native UI Evaluation](native-ui-evaluation.md)
 - [Server Data Directory](docs_server_data_directory.md)
 
 ## Game Mechanics
