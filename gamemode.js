@@ -608,7 +608,10 @@ globalThis.__dboDiscordBan = (info) => {
   const modName = banOneLine(mod.name, 40).replace(/[^A-Za-z0-9_. -]+/g, '').trim();
   const by = modChars && modChars.length ? banCharText(modChars[0]) : modName ? `Discord user ${modName}${mod.bot === true ? ' (a bot)' : ''}` : 'an unknown moderator';
   const reason = banOneLine(String(info.reason || '').replace(BAN_ID_RX, '[id]'), 200);
-  const targets = [...banAccountsOf(info.discordId, online).values()].map((list) => `${banCharText(list[0])}${list.length > 1 ? `, ${list.length - 1} more character${list.length > 2 ? 's' : ''}` : ''}`);
+  const accounts = banAccountsOf(info.discordId, online);
+  // A ban revokes the banned account's referrals as a referee (referrals.js)
+  if (op === 'ban' && typeof globalThis.__dboReferralBan === 'function') { try { globalThis.__dboReferralBan([...accounts.keys()]); } catch (e) { log('referral ban hook failed:', e.message); } }
+  const targets = [...accounts.values()].map((list) => `${banCharText(list[0])}${list.length > 1 ? `, ${list.length - 1} more character${list.length > 2 ? 's' : ''}` : ''}`);
   if (!targets.length) targets.push('a Discord account with no character');
   for (const target of targets) audit(`BAN Discord ${op} (${via}) on ${target} by ${by}${reason ? `: ${reason}` : ''}`);
   return targets.length;

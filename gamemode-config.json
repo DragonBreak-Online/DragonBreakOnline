@@ -1193,12 +1193,14 @@
   "slots": 1
  },
  "referrals": {
-  "_comment": "Referral links (referrals.js, Nate 16 Oct 2026; docs/referrals.md). Off until the backend's routes/referrals.js is live. A referral counts once the new account has played qualifyHours on qualifyDays UTC days and its Discord account was accountAgeDays old (Nate 16 Oct: 90); never from the referrer's PC or another referred account's (backend device-ids.json; unchecked while that store is absent); a shared last address with the referrer holds it for a Lead GM (/referral held, approve, refuse); the referrer earns firstMult and +100 carry weight (carrySpell, empty until the DLE ability exists) for the first, laterMult for each later one; the new player gets welcomeMult. Every boost lasts boostHours of play, queued one at a time, at most queueCap. /referral; staff /referral profile <id>, /referral revoke <id>.",
+  "_comment": "Referral links (referrals.js, Nate 16 Oct 2026; docs/referrals.md). Off until the backend's REFERRAL_LINKS is on. A referral counts once the new account has played qualifyHours on qualifyDays UTC days (a day counts for a session begun on it, qualifyDayMinutes of play; a break over sessionGapMinutes begins a new session) and its Discord account was accountAgeDays old (Nate 16 Oct: 90). deviceCheck (off until the Privacy Policy names the PC code for it; Jake 16 Oct): a PC shared with the referrer or another live referral of the same referrer holds it for a Lead GM (/referral held, approve, refuse). The referrer earns firstMult and +carryWeight carry weight (carrySpell, set after the DLE ability ships; 'remove' takes it back) for the first, once, laterMult for each later one; the new player gets welcomeMult. Every boost lasts boostHours of play, queued one at a time, at most queueCap. /referral; staff /referral profile|revoke|forget <id>.",
   "enabled": false,
-  "linkBase": "https://dragonbreakonline.com/api/join/",
+  "linkBase": "https://dragonbreakonline.com/api/users/login-discord/join/",
   "bindingsFile": "/opt/alduinak/skymp5-backend/data/referrals.jsonl",
   "qualifyHours": 5,
   "qualifyDays": 2,
+  "qualifyDayMinutes": 30,
+  "sessionGapMinutes": 60,
   "accountAgeDays": 90,
   "firstMult": 1.15,
   "laterMult": 1.05,
@@ -1206,9 +1208,11 @@
   "boostHours": 8,
   "queueCap": 10,
   "commandWindowHours": 24,
+  "deviceCheck": false,
   "playersFile": "/opt/alduinak/skymp5-backend/data/players.json",
   "devicesFile": "/opt/alduinak/skymp5-backend/data/device-ids.json",
-  "carrySpell": ""
+  "carrySpell": "",
+  "carryWeight": 50
  },
  "snowElfRace": {
   "_comment": "The DLE's DBOSnowElfRace and its vampire (Nat, 13 Oct). racial.js gives the creator's snowelf slug this race (__dboRaceOverrides) and the Snow Elf's gifts (racial.snowelf).",
