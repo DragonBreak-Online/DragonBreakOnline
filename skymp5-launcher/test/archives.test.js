@@ -86,3 +86,31 @@ test('a slow download still being written keeps the wait alive past its timeout'
   assert.ok(Date.now() - started > 250, 'it waited longer than the 100 ms timeout')
   assert.equal(paths[0], path.join(downloads, 'Mod C-7-1-0.7z'))
 })
+
+// The failure players hit when installing from a Nexus collection: Vortex owns the nxm:// handler,
+// so the archive lands in Vortex's downloads and never in ours. Scanning only our own folder timed
+// the install out after 15 minutes with the file sitting right there - "Vortex says it is
+// downloaded, the launcher says it is not".
+test('the download wait sees an archive that landed in Vortex\'s folder', async () => {
+  const V = Buffer.alloc(4096, 7)
+  fs.mkdirSync(vortex, { recursive: true })
+  fs.writeFileSync(path.join(vortex, 'Collection Mod-77-1-0.7z'), V)
+
+  const wanted = [{ name: 'Collection Mod', hash: sha(V), size: V.length }]
+  const paths = await mo2.waitForDownloads(wanted, () => {}, undefined, 20, 400, [vortex])
+
+  assert.equal(paths[0], path.join(vortex, 'Collection Mod-77-1-0.7z'),
+    'the archive is used where it lies, so Vortex keeps ownership of its own downloads')
+})
+
+test('without the extra folder the same wait times out, which is the bug', async () => {
+  const V = Buffer.alloc(2048, 9)
+  fs.mkdirSync(vortex, { recursive: true })
+  fs.writeFileSync(path.join(vortex, 'Only In Vortex-78-1-0.7z'), V)
+
+  await assert.rejects(
+    () => mo2.waitForDownloads([{ name: 'Only In Vortex', hash: sha(V), size: V.length }], () => {}, undefined, 20, 200),
+    /Timed out waiting to download/,
+    'the old behaviour: our folder only, so the file is invisible',
+  )
+})
