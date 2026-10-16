@@ -376,7 +376,7 @@ module.exports = (api) => {
   act('supplyDeliver', (a, z, [id, count]) => deliver(a, z, id, count), 'supply');
   act('supplyCancel', (a, z, [id]) => cancel(a, id), 'supply');
 
-  // couriers.js packs goods with takeParcel, hands them over with giveEntries and posts them with boardLetter
-  globalThis.__dboPostApi = { prepare, takeParcel, giveEntries, collect, view, itemsText, boardLetter, sendableBase, looseCount, nameOfItem, enabled: () => !!C.enabled };
+  // couriers.js packs goods with takeParcel, hands them over with giveEntries and posts them with boardLetter; bank.js vaults use takeItems
+  globalThis.__dboPostApi = { prepare, takeParcel, takeItems, giveEntries, collect, view, itemsText, boardLetter, sendableBase, looseCount, nameOfItem, enabled: () => !!C.enabled };
   log(`post: parcels ${C.enabled ? `on (tax ${Math.round(C.taxRate * 100)}% of gold, ${C.itemFee} gold a stack, ${C.maxStacks} stacks)` : 'off'}, supply orders ${data().orders.filter(open).length} open`);
 };
