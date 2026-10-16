@@ -3,7 +3,7 @@
 // (and sync/spell.ts, sync/loginClock.ts) against a fake game:
 //   - a login whose Papyrus Utility.wait calls never come back (server log 11-16 Oct: about 1 fresh login in 8 never
 //     restored and never snapshotted) still restores, on the login clock;
-//   - a prepared spell the server's list holds but the game lacks at the restore is imposed again and favourited;
+//   - a prepared spell the server's list holds but the game lacks at the restore is added again and favourited;
 //   - one the game still lacks after that stays in the saved list and is favourited, hotkey and all, once the game has it;
 //   - the login clock itself, and that remoteServer runs the spell passes and the arrival watch on it.
 // Bundles with esbuild (skymp5-server's), skyrimPlatform replaced by the fake. Run from skymp5-client:
@@ -32,7 +32,8 @@ const ITEM2 = 0x13982;     // a potion
 const SPELL = 0x2b96b;     // Frostbite, a prepared spell
 const SPELL2 = 0x12fcc;    // Healing
 const PLAYER = 0x14;
-const SPELLS = new Set([SPELL, SPELL2, 0x12fcd]);
+const BEAST = 0x92c48;     // a beast power the client grants itself, not on the server's list
+const SPELLS = new Set([SPELL, SPELL2, 0x12fcd, BEAST]);
 
 const realNow = Date.now;
 function makeWorld() {
@@ -206,14 +207,15 @@ async function main() {
 
     // 3. A prepared spell the server's list holds, missing from the game at the restore
     {
-      const w = makeWorld(); freshPlayer(w);
+      const w = makeWorld(); freshPlayer(w); w.known.add(BEAST);
       const t = load(w);
       t.m.rememberServerSpells([SPELL, SPELL2]);
       t.login(); await t.frames(8); t.packet(SAVED.items, SAVED.spells); await t.frames(32);
-      check('missing prepared spell: imposed again from the server\'s list', w.known.has(SPELL), [...w.known]);
+      check('missing prepared spell: added again from the server\'s list', w.known.has(SPELL), [...w.known]);
+      check('missing prepared spell: a spell the client granted itself (a beast power) is not taken away', w.known.has(BEAST), [...w.known]);
       check('missing prepared spell: favourited again with its hotkey', w.fav.get(SPELL) === 1, [...w.fav]);
       const r = t.sent('favoritesRestored');
-      check('missing prepared spell: the report says 4 of 4 and one re-imposed', r.length === 1 && r[0].confirmed === 4 && r[0].reenforced >= 1, r);
+      check('missing prepared spell: the report says 4 of 4 and one spell added', r.length === 1 && r[0].confirmed === 4 && r[0].spellsAdded === 1, r);
       const s = t.sent('favorites');
       check('missing prepared spell: no snapshot drops it from the server\'s copy', s.every((x) => x.spells.some((e) => e.id === SPELL && e.hotkey === 1)), s);
     }

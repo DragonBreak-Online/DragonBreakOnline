@@ -5,7 +5,7 @@ import { ConnectionMessage } from "../events/connectionMessage";
 import { CustomPacketMessage } from "../messages/customPacketMessage";
 import { CreateActorMessage } from "../messages/createActorMessage";
 import { SPELL_ENFORCE_PASSES, loginClock } from "../../sync/loginClock";
-import { getServerSpells, reenforceServerSpells } from "../../sync/spell";
+import { addMissingServerSpells, getServerSpells } from "../../sync/spell";
 import { getInventory } from "../../sync/inventory";
 import { logError, logTrace } from "../../logging";
 
@@ -87,14 +87,14 @@ export class FavoritesService extends ClientListener {
     this.pending = null;
     if (!snapshot) return this.enableSnapshots();
     const missing = this.apply(snapshot);
-    // A spell the server lists but the game lacks: the list is imposed again before the retry
-    const reenforced = missing.spells.some((e) => this.serverKnows(e.id)) ? this.reenforceSpells() : 0;
-    logTrace(this, "restored", snapshot.items.length + snapshot.spells.length, "favorite(s),", missing.items.length + missing.spells.length, "not present yet,", reenforced, "spell change(s) re-imposed");
+    // A spell the server lists but the game lacks: the server's spells the game lacks are added before the retry
+    const spellsAdded = missing.spells.some((e) => this.serverKnows(e.id)) ? this.addServerSpells() : 0;
+    logTrace(this, "restored", snapshot.items.length + snapshot.spells.length, "favorite(s),", missing.items.length + missing.spells.length, "not present yet,", spellsAdded, "server spell(s) added");
     loginClock.after(RETRY_AFTER_S, () => {
       if (gen !== this.loginGen) return;
       const stillMissing = missing.items.length + missing.spells.length > 0 ? this.apply(missing) : missing;
       this.carry = stillMissing.spells.filter((e) => this.serverKnows(e.id));
-      this.report(snapshot, stillMissing, reenforced);
+      this.report(snapshot, stillMissing, spellsAdded);
       this.enableSnapshots();
     });
   }
@@ -104,12 +104,12 @@ export class FavoritesService extends ClientListener {
     return !!list && list.indexOf(id >>> 0) !== -1;
   }
 
-  private reenforceSpells(): number {
+  private addServerSpells(): number {
     try {
       const player = Game.getPlayer();
-      return player ? reenforceServerSpells(player) : 0;
+      return player ? addMissingServerSpells(player) : 0;
     } catch (err) {
-      logError(this, "spell re-enforcement failed", String(err));
+      logError(this, "adding the server's spells failed", String(err));
       return 0;
     }
   }
@@ -135,7 +135,7 @@ export class FavoritesService extends ClientListener {
   }
 
   // The server's log is the only place a restore can be checked from, so it is told how many came back
-  private report(snapshot: FavoritesSnapshot, missing: FavoritesSnapshot, reenforced: number): void {
+  private report(snapshot: FavoritesSnapshot, missing: FavoritesSnapshot, spellsAdded: number): void {
     const wanted = snapshot.items.length + snapshot.spells.length;
     if (!wanted) return;
     try {
@@ -147,7 +147,7 @@ export class FavoritesService extends ClientListener {
       }
       sendCustomPacket(this.controller, {
         customPacketType: "dbo", event: "favoritesRestored",
-        args: [{ wanted, confirmed, missing: missingIds.size, missingIds: Array.from(missingIds).slice(0, 10), reenforced, carried: this.carry.length }],
+        args: [{ wanted, confirmed, missing: missingIds.size, missingIds: Array.from(missingIds).slice(0, 10), spellsAdded, carried: this.carry.length }],
       });
     } catch (err) {
       logError(this, "restore report failed", String(err));
