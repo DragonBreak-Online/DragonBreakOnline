@@ -119,6 +119,7 @@ export class PageInputDiagService extends ClientListener {
       `bFullScreen=${read(() => sp.Utility.getINIBool("bFull Screen:Display"))}`,
       `bBorderless=${read(() => sp.Utility.getINIBool("bBorderless:Display"))}`,
       `cursorMenu=${read(() => sp.Ui.isMenuOpen("Cursor Menu"))}`,
+      `bGamepadEnable=${read(() => sp.Utility.getINIBool("bGamepadEnable:MAIN") || sp.Utility.getINIBool("bGamepadEnable:Main"))}`,
     ].join(" ");
   }
 
