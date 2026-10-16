@@ -22,6 +22,7 @@ const check = (name, ok, got) => { console.log(`${ok ? 'ok  ' : 'FAIL'} ${name}$
 const PLAIN = 0x080cf4e8, LOAD = 0x08085ef0, CHEST = 0x08012345, RUNTIME = 0xff00a001, BROKEN = 0x08099999;
 const DOOR_BASE = 0x00042035, CONT_BASE = 0x00012000;
 const NPC1 = 0xff00221d, NPC2 = 0xff00221e, PLAYER = 0xff000014;
+const LEVER = 0x481b5fc3, PLUGIN_NPC = 0x0801d4b1;
 const refs = {
   [PLAIN]: { base: DOOR_BASE, fields: [{ type: 'NAME', data: [] }, { type: 'DATA', data: [] }, { type: 'XLRL', data: [] }] },
   [LOAD]: { base: DOOR_BASE, fields: [{ type: 'NAME', data: [] }, { type: 'XTEL', data: [] }] },
@@ -45,6 +46,8 @@ const mp = {
     id >>>= 0;
     if (id === DOOR_BASE) return { record: { type: 'DOOR', fields: [] } };
     if (id === CONT_BASE) return { record: { type: 'CONT', fields: [] } };
+    if (id === LEVER) return { record: { type: 'REFR', fields: [{ type: 'XAPR', data: [] }] } };
+    if (id === PLUGIN_NPC) return { record: { type: 'ACHR', fields: [] } };
     const r = refs[id];
     if (!r || r.fields === null) return {};
     if (r.throws) throw new Error('record unreadable');
@@ -64,7 +67,7 @@ const users = new Map([[PLAYER, 0]]);
 const userOf = (actor) => (users.has(actor >>> 0) ? users.get(actor >>> 0) : -1);
 const logged = [];
 const load = (keep) => {
-  if (!keep) delete globalThis.__dboNpcDoorKind;
+  if (!keep) { delete globalThis.__dboNpcDoorKind; delete globalThis.__dboNpcCasterKind; }
   mp.onActivate = (t, c) => chain(t, c);
   new Function('mp', 'userOf', 'logCapped', 'globalThis', ruleSrc)(mp, userOf, (key, n, ...parts) => logged.push([key, parts.join(' ')]), globalThis);
   return mp.onActivate;
@@ -97,6 +100,14 @@ isOpen.set(RUNTIME, true);
 check('a runtime (0xff) door is never refused', act(RUNTIME, NPC1) === true);
 isOpen.set(BROKEN, true);
 check('a door whose record cannot be read is never refused', act(BROKEN, NPC1) === true);
+
+// 3b. A lever drives its gate both ways (Nate, 16 Oct: the Bruma Castle gate went up and never came down)
+isOpen.set(PLAIN, false);
+chainCalls = 0;
+check('a lever (a plugin REFR caster) opens a plain door', act(PLAIN, LEVER) === true && isOpen.get(PLAIN) === true);
+check('...and closes it again', act(PLAIN, LEVER) === true && isOpen.get(PLAIN) === false && chainCalls === 2, chainCalls);
+isOpen.set(PLAIN, true);
+check('a plugin-placed NPC (ACHR) is still held to the rule', act(PLAIN, PLUGIN_NPC) === false && isOpen.get(PLAIN) === true);
 
 // 4. The chain's own refusal passes through for everyone
 mp.onActivate = () => false;

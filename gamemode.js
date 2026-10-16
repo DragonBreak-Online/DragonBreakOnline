@@ -1774,10 +1774,26 @@ mp.onActivate = (targetId, casterId) => {
     npcDoorKind.set(ref, plain);
     return plain;
   };
+  // Only an actor is held to the rule. A lever or button drives its door through ActivateChilds with itself as the
+  // caster, and was refused every close (Nate, 16 Oct: the Bruma Castle gate 1b5fc4 went up and never came down; lever
+  // 1b5fc3 logged "npc door: actor 481b5fc3 would close ... refused"). A runtime (0xff) caster is a spawned NPC; a plugin
+  // caster is an actor only when its own record is an ACHR, and an unreadable one is still treated as an actor.
+  const npcCasterKind = globalThis.__dboNpcCasterKind instanceof Map ? globalThis.__dboNpcCasterKind : (globalThis.__dboNpcCasterKind = new Map());
+  const actorCaster = (c) => {
+    if (c >= 0xff000000) return true;
+    if (npcCasterKind.has(c)) return npcCasterKind.get(c);
+    let actor = true;
+    try {
+      const own = mp.lookupEspmRecordById(c);
+      if (own && own.record) actor = String(own.record.type) === 'ACHR';
+    } catch (e) { actor = true; }
+    npcCasterKind.set(c, actor);
+    return actor;
+  };
   mp.onActivate = (targetId, casterId) => {
     const t = targetId >>> 0, c = casterId >>> 0;
     let refuse = false;
-    try { refuse = userOf(c) < 0 && plainDoor(t) && mp.get(t, 'isOpen') === true; } catch (e) { refuse = false; }
+    try { refuse = userOf(c) < 0 && actorCaster(c) && plainDoor(t) && mp.get(t, 'isOpen') === true; } catch (e) { refuse = false; }
     if (refuse) {
       logCapped(`npcdoor:${t}`, 2, `npc door: actor ${c.toString(16)} would close ${mp.getDescFromId(t)} again; refused (NPCs only open doors)`);
       return false;

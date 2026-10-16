@@ -1,5 +1,19 @@
 [
   {
+    "title": "Lever gates close again",
+    "date": "2026-10-16",
+    "version": "Hotfix",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Fixes",
+        "items": [
+          "A gate worked by a lever (such as Bruma Castle's) now comes down again when the lever is pulled a second time. It used to open once and stay up."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Respawns in Dawnstar, Morthal and Winterhold",
     "date": "2026-10-16",
     "version": "Server update",
