@@ -1,0 +1,3084 @@
+{
+ "world": "3c:Skyrim.esm",
+ "worldEditorId": "Tamriel",
+ "generated": "2026-10-16T02:41:07Z",
+ "generator": "tools/realm-map/render.py --world 3c:Skyrim.esm --name skyrim --centre 8192 12288 --radius 59 --ppc 8 --crop-to-land --check",
+ "landFrom": {
+  "Skyrim.esm": 9177,
+  "Update.esm": 1422,
+  "BSHeartland.esm": 10,
+  "DragonBreak.esp": 81,
+  "Dawnguard.esm": 170,
+  "Helgen Reborn.esp": 39,
+  "JK's Riften Outskirts.esp": 10,
+  "Riften Expansion.esp": 5,
+  "The Great Cities of JK's North - Patch.esp": 16,
+  "COTN - Falkreath.esp": 12,
+  "DragonBreak Online Edits.esp": 49,
+  "COTN Falkreath - JKs Skyrim - TGCF Patch.esp": 5,
+  "HearthFires.esm": 32,
+  "man_DaedricShrines.esp": 5,
+  "JKs Skyrim.esp": 22,
+  "Dragonborn.esm": 10,
+  "JK's Whiterun's Outskirts.esp": 25,
+  "SurWR.esp": 5,
+  "JK's Markarth Outskirts.esp": 12,
+  "The Great City of Rorikstead.esp": 2,
+  "unofficial skyrim special edition patch.esp": 2,
+  "WindhelmSSE.esp": 20,
+  "COTN - Morthal.esp": 2,
+  "COTN Morthal - JKs Skyrim - The Great City of Morthal Patch.esp": 2,
+  "The Great City of Winterhold v4.esp": 17,
+  "COTN Dawnstar - JK's Skyrim - TGC Dawnstar Patch.esp": 10,
+  "TGCotN Winterhold - JKs Skyrim patch.esp": 3,
+  "JK's Castle Volkihar.esp": 21
+ },
+ "cellUnits": 4096,
+ "cellMin": [
+  -57,
+  -43
+ ],
+ "cellMax": [
+  61,
+  50
+ ],
+ "bounds": {
+  "xMin": -233472,
+  "xMax": 253952,
+  "yMin": -176128,
+  "yMax": 208896
+ },
+ "pixelsPerCell": 8,
+ "unitsPerPixel": 512.0,
+ "width": 952,
+ "height": 752,
+ "affine": {
+  "a": 0.001953125,
+  "b": 0.0,
+  "c": 456.0,
+  "d": 0.0,
+  "e": -0.001953125,
+  "f": 408.0
+ },
+ "transform": "pixelX = a*gameX + b*gameY + c, pixelY = d*gameX + e*gameY + f; pixel (0,0) is the top-left corner of the image, north (game +Y) is up, so gameX = xMin + pixelX*unitsPerPixel and gameY = yMax - pixelY*unitsPerPixel",
+ "heightRange": [
+  -13848.0,
+  28464.0
+ ],
+ "defaultWater": -14000.0,
+ "shading": {
+  "azimuth": 315,
+  "altitude": 45,
+  "zFactor": 1.0,
+  "ambient": 0.45
+ },
+ "transparent": "cells with no LAND record (outside the worldspace's landscape) are fully transparent",
+ "places": [
+  {
+   "location": "05254B:Skyrim.esm",
+   "edid": "AbandonedShackLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "05254D:Skyrim.esm",
+   "game": [
+    -34081.8,
+    93829.6,
+    -13859.0
+   ],
+   "pixel": [
+    389.4,
+    224.7
+   ],
+   "ground": -13894.9,
+   "onLand": true
+  },
+  {
+   "location": "018EE1:Skyrim.esm",
+   "edid": "AlftandLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "015D4A:Skyrim.esm",
+   "game": [
+    78347.0,
+    77408.6,
+    -4243.4
+   ],
+   "pixel": [
+    609.0,
+    256.8
+   ],
+   "ground": -4620.5,
+   "onLand": true
+  },
+  {
+   "location": "0D9537:Skyrim.esm",
+   "edid": "AnisesCabinLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "0D9531:Skyrim.esm",
+   "game": [
+    667.7,
+    -52576.5,
+    1728.0
+   ],
+   "pixel": [
+    457.3,
+    510.7
+   ],
+   "ground": 1728.0,
+   "onLand": true
+  },
+  {
+   "location": "018EE4:Skyrim.esm",
+   "edid": "AutumnshadeClearingLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "01620C:Skyrim.esm",
+   "game": [
+    153153.2,
+    -79512.0,
+    9558.5
+   ],
+   "pixel": [
+    755.1,
+    563.3
+   ],
+   "ground": 9391.3,
+   "onLand": true
+  },
+  {
+   "location": "00308A:HearthFires.esm",
+   "edid": "BYOHHouse1Location",
+   "name": null,
+   "markerType": "map",
+   "marker": "0030AA:HearthFires.esm",
+   "game": [
+    -9652.3,
+    -69336.6,
+    3408.9
+   ],
+   "pixel": [
+    437.1,
+    543.4
+   ],
+   "ground": 2325.7,
+   "onLand": true
+  },
+  {
+   "location": "018EE7:Skyrim.esm",
+   "edid": "BardsLeapSummitLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "01620E:Skyrim.esm",
+   "game": [
+    -91689.1,
+    -35972.2,
+    1956.1
+   ],
+   "pixel": [
+    276.9,
+    478.3
+   ],
+   "ground": -231.2,
+   "onLand": true
+  },
+  {
+   "location": "018EEA:Skyrim.esm",
+   "edid": "BleakcoastCaveLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "01620F:Skyrim.esm",
+   "game": [
+    145834.1,
+    90932.2,
+    -13663.9
+   ],
+   "pixel": [
+    740.8,
+    230.4
+   ],
+   "ground": -13676.8,
+   "onLand": true
+  },
+  {
+   "location": "018EEB:Skyrim.esm",
+   "edid": "BleakwindBasinLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "016211:Skyrim.esm",
+   "game": [
+    1538.9,
+    1306.0,
+    -5795.6
+   ],
+   "pixel": [
+    459.0,
+    405.4
+   ],
+   "ground": -5929.6,
+   "onLand": true
+  },
+  {
+   "location": "018EED:Skyrim.esm",
+   "edid": "BlindCliffCaveLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "016213:Skyrim.esm",
+   "game": [
+    -141784.8,
+    23524.7,
+    -7998.2
+   ],
+   "pixel": [
+    179.1,
+    362.1
+   ],
+   "ground": -8082.5,
+   "onLand": true
+  },
+  {
+   "location": "018EEE:Skyrim.esm",
+   "edid": "BlizzardRestLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "016214:Skyrim.esm",
+   "game": [
+    39159.9,
+    39374.9,
+    -8700.8
+   ],
+   "pixel": [
+    532.5,
+    331.1
+   ],
+   "ground": -8683.7,
+   "onLand": true
+  },
+  {
+   "location": "018EEF:Skyrim.esm",
+   "edid": "BloatedMansGrottoLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "016215:Skyrim.esm",
+   "game": [
+    -37646.5,
+    -36967.4,
+    -3587.1
+   ],
+   "pixel": [
+    382.5,
+    480.2
+   ],
+   "ground": -3587.1,
+   "onLand": true
+  },
+  {
+   "location": "0FDA46:Skyrim.esm",
+   "edid": "BonechillPassageLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "0FDA48:Skyrim.esm",
+   "game": [
+    2534.9,
+    -90975.3,
+    8741.4
+   ],
+   "pixel": [
+    461.0,
+    585.7
+   ],
+   "ground": 8651.3,
+   "onLand": true
+  },
+  {
+   "location": "018C8F:Skyrim.esm",
+   "edid": "BrandyMugFarmLocation",
+   "name": "Brandy-Mug Farm",
+   "markerType": "map",
+   "marker": "016339:Skyrim.esm",
+   "game": [
+    140367.3,
+    25866.9,
+    -12879.4
+   ],
+   "pixel": [
+    730.2,
+    357.5
+   ],
+   "ground": -12883.7,
+   "onLand": true
+  },
+  {
+   "location": "0192A0:Skyrim.esm",
+   "edid": "BrinehammerLocation",
+   "name": "Wreck of the Brinehammer",
+   "markerType": "map",
+   "marker": "0162AB:Skyrim.esm",
+   "game": [
+    -2369.1,
+    119364.4,
+    -13169.8
+   ],
+   "pixel": [
+    451.4,
+    174.9
+   ],
+   "ground": -14105.1,
+   "onLand": false
+  },
+  {
+   "location": "019197:Skyrim.esm",
+   "edid": "BrittleshinPassLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "016265:Skyrim.esm",
+   "game": [
+    -23244.1,
+    -34273.7,
+    -4087.9
+   ],
+   "pixel": [
+    410.6,
+    474.9
+   ],
+   "ground": -4490.2,
+   "onLand": true
+  },
+  {
+   "location": "01914D:Skyrim.esm",
+   "edid": "BrokenFangCaveLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "016218:Skyrim.esm",
+   "game": [
+    -50831.6,
+    -14939.2,
+    -5548.5
+   ],
+   "pixel": [
+    356.7,
+    437.2
+   ],
+   "ground": -5788.6,
+   "onLand": true
+  },
+  {
+   "location": "019153:Skyrim.esm",
+   "edid": "BrokenOarGrottoLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "0B77C3:Skyrim.esm",
+   "game": [
+    -66962.9,
+    141812.0,
+    -13643.3
+   ],
+   "pixel": [
+    325.2,
+    131.0
+   ],
+   "ground": -13931.5,
+   "onLand": true
+  },
+  {
+   "location": "01914F:Skyrim.esm",
+   "edid": "BrokenTowerRedoubtLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "01621A:Skyrim.esm",
+   "game": [
+    -108568.0,
+    40085.2,
+    -5231.6
+   ],
+   "pixel": [
+    244.0,
+    329.7
+   ],
+   "ground": -5653.9,
+   "onLand": true
+  },
+  {
+   "location": "019150:Skyrim.esm",
+   "edid": "BroodCavernLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "01621B:Skyrim.esm",
+   "game": [
+    -55217.3,
+    43482.8,
+    -8381.2
+   ],
+   "pixel": [
+    348.2,
+    323.1
+   ],
+   "ground": -9166.5,
+   "onLand": true
+  },
+  {
+   "location": "019154:Skyrim.esm",
+   "edid": "ChillwindDepthsLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "016220:Skyrim.esm",
+   "game": [
+    -101071.1,
+    58377.4,
+    -11934.0
+   ],
+   "pixel": [
+    258.6,
+    294.0
+   ],
+   "ground": -12179.4,
+   "onLand": false
+  },
+  {
+   "location": "019156:Skyrim.esm",
+   "edid": "ClearpinePondLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "016222:Skyrim.esm",
+   "game": [
+    -108572.2,
+    96024.7,
+    -7680.6
+   ],
+   "pixel": [
+    243.9,
+    220.5
+   ],
+   "ground": -7687.7,
+   "onLand": true
+  },
+  {
+   "location": "0B238D:Skyrim.esm",
+   "edid": "CliffsideRetreatLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "0B238B:Skyrim.esm",
+   "game": [
+    -107785.1,
+    56745.6,
+    -7608.0
+   ],
+   "pixel": [
+    245.5,
+    297.2
+   ],
+   "ground": -7676.1,
+   "onLand": true
+  },
+  {
+   "location": "0B239F:Skyrim.esm",
+   "edid": "CradleStoneTowerLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "0B23A1:Skyrim.esm",
+   "game": [
+    -99712.8,
+    -33860.9,
+    2535.0
+   ],
+   "pixel": [
+    261.2,
+    474.1
+   ],
+   "ground": 2528.0,
+   "onLand": true
+  },
+  {
+   "location": "019158:Skyrim.esm",
+   "edid": "CradlecrushRockLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "016225:Skyrim.esm",
+   "game": [
+    92382.3,
+    -5393.0,
+    -8357.1
+   ],
+   "pixel": [
+    636.4,
+    418.5
+   ],
+   "ground": -8733.0,
+   "onLand": true
+  },
+  {
+   "location": "019159:Skyrim.esm",
+   "edid": "CragslaneCavernLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "016226:Skyrim.esm",
+   "game": [
+    167053.7,
+    -34010.2,
+    -1629.7
+   ],
+   "pixel": [
+    782.3,
+    474.4
+   ],
+   "ground": -1815.1,
+   "onLand": true
+  },
+  {
+   "location": "01915A:Skyrim.esm",
+   "edid": "CragwallowSlopeLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "016227:Skyrim.esm",
+   "game": [
+    155934.0,
+    -2257.9,
+    -6263.5
+   ],
+   "pixel": [
+    760.6,
+    412.4
+   ],
+   "ground": -6574.5,
+   "onLand": true
+  },
+  {
+   "location": "01915B:Skyrim.esm",
+   "edid": "CronvangrHallLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "016228:Skyrim.esm",
+   "game": [
+    119817.6,
+    -5293.9,
+    -11938.0
+   ],
+   "pixel": [
+    690.0,
+    418.3
+   ],
+   "ground": -12271.1,
+   "onLand": true
+  },
+  {
+   "location": "01915C:Skyrim.esm",
+   "edid": "CrystaldriftCaveLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "016229:Skyrim.esm",
+   "game": [
+    161077.4,
+    -119789.0,
+    11427.2
+   ],
+   "pixel": [
+    770.6,
+    642.0
+   ],
+   "ground": 11391.5,
+   "onLand": true
+  },
+  {
+   "location": "03444E:Skyrim.esm",
+   "edid": "DarkBrotherhoodSanctuaryLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "01C3B0:Skyrim.esm",
+   "game": [
+    -41600.0,
+    -83776.0,
+    -4368.0
+   ],
+   "pixel": [
+    374.7,
+    571.6
+   ],
+   "ground": -4408.0,
+   "onLand": true
+  },
+  {
+   "location": "01915F:Skyrim.esm",
+   "edid": "DarkwaterCavernLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "01622C:Skyrim.esm",
+   "game": [
+    113334.2,
+    -46457.7,
+    -6516.3
+   ],
+   "pixel": [
+    677.4,
+    498.7
+   ],
+   "ground": -7018.1,
+   "onLand": false
+  },
+  {
+   "location": "019161:Skyrim.esm",
+   "edid": "DeadMensRespiteLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "01622E:Skyrim.esm",
+   "game": [
+    -67284.1,
+    52917.9,
+    -10688.0
+   ],
+   "pixel": [
+    324.6,
+    304.6
+   ],
+   "ground": -10713.6,
+   "onLand": true
+  },
+  {
+   "location": "019162:Skyrim.esm",
+   "edid": "DeepwoodRedoubtLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "01622F:Skyrim.esm",
+   "game": [
+    -132981.6,
+    80260.7,
+    -4936.6
+   ],
+   "pixel": [
+    196.3,
+    251.2
+   ],
+   "ground": -4951.7,
+   "onLand": true
+  },
+  {
+   "location": "0D5673:Skyrim.esm",
+   "edid": "DoomstoneApprenticeLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "01BAB9:Skyrim.esm",
+   "game": [
+    -55914.3,
+    79726.1,
+    -13908.8
+   ],
+   "pixel": [
+    346.8,
+    252.3
+   ],
+   "ground": -13970.5,
+   "onLand": true
+  },
+  {
+   "location": "0D5675:Skyrim.esm",
+   "edid": "DoomstoneAtronachLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "0E0F4C:Skyrim.esm",
+   "game": [
+    130939.1,
+    -28770.1,
+    -10558.6
+   ],
+   "pixel": [
+    711.7,
+    464.2
+   ],
+   "ground": -10706.8,
+   "onLand": true
+  },
+  {
+   "location": "10FE43:Skyrim.esm",
+   "edid": "DoomstoneGuardianStoneLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "01BABD:Skyrim.esm",
+   "game": [
+    2807.0,
+    -59215.8,
+    1436.5
+   ],
+   "pixel": [
+    461.5,
+    523.7
+   ],
+   "ground": 1391.4,
+   "onLand": true
+  },
+  {
+   "location": "0D5676:Skyrim.esm",
+   "edid": "DoomstoneLadyLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "0DED90:Skyrim.esm",
+   "game": [
+    -32442.3,
+    -55637.4,
+    719.0
+   ],
+   "pixel": [
+    392.6,
+    516.7
+   ],
+   "ground": 717.6,
+   "onLand": true
+  },
+  {
+   "location": "0D5678:Skyrim.esm",
+   "edid": "DoomstoneLoverLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "01BABB:Skyrim.esm",
+   "game": [
+    -150412.8,
+    20214.9,
+    -3143.4
+   ],
+   "pixel": [
+    162.2,
+    368.5
+   ],
+   "ground": -3250.7,
+   "onLand": true
+  },
+  {
+   "location": "0D567A:Skyrim.esm",
+   "edid": "DoomstoneRitualLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "0DD9D5:Skyrim.esm",
+   "game": [
+    50863.0,
+    -5304.2,
+    -1391.6
+   ],
+   "pixel": [
+    555.3,
+    418.4
+   ],
+   "ground": -1435.9,
+   "onLand": true
+  },
+  {
+   "location": "0D567B:Skyrim.esm",
+   "edid": "DoomstoneSerpentLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "0E0F69:Skyrim.esm",
+   "game": [
+    151704.3,
+    116451.3,
+    -12614.3
+   ],
+   "pixel": [
+    752.3,
+    180.6
+   ],
+   "ground": -12645.3,
+   "onLand": true
+  },
+  {
+   "location": "0D567C:Skyrim.esm",
+   "edid": "DoomstoneShadowLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "0D3935:Skyrim.esm",
+   "game": [
+    171146.2,
+    -110243.1,
+    12722.6
+   ],
+   "pixel": [
+    790.3,
+    623.3
+   ],
+   "ground": 12725.6,
+   "onLand": true
+  },
+  {
+   "location": "0D567D:Skyrim.esm",
+   "edid": "DoomstoneSteedLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "01BAC0:Skyrim.esm",
+   "game": [
+    -96270.0,
+    115525.7,
+    -4179.0
+   ],
+   "pixel": [
+    268.0,
+    182.4
+   ],
+   "ground": -4538.8,
+   "onLand": true
+  },
+  {
+   "location": "0D567E:Skyrim.esm",
+   "edid": "DoomstoneTowerLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "0E0ED5:Skyrim.esm",
+   "game": [
+    71827.4,
+    106133.6,
+    -11041.5
+   ],
+   "pixel": [
+    596.3,
+    200.7
+   ],
+   "ground": -13864.2,
+   "onLand": true
+  },
+  {
+   "location": "0B2395:Skyrim.esm",
+   "edid": "DragonBridgeOverlookLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "0B2393:Skyrim.esm",
+   "game": [
+    -104248.1,
+    68533.1,
+    -7767.8
+   ],
+   "pixel": [
+    252.4,
+    274.1
+   ],
+   "ground": -7763.1,
+   "onLand": true
+  },
+  {
+   "location": "019163:Skyrim.esm",
+   "edid": "DragonLair01Location",
+   "name": null,
+   "markerType": "map",
+   "marker": "016230:Skyrim.esm",
+   "game": [
+    -141731.9,
+    50230.1,
+    -3654.3
+   ],
+   "pixel": [
+    179.2,
+    309.9
+   ],
+   "ground": -4390.0,
+   "onLand": true
+  },
+  {
+   "location": "019166:Skyrim.esm",
+   "edid": "DragonLair02Location",
+   "name": null,
+   "markerType": "map",
+   "marker": "016231:Skyrim.esm",
+   "game": [
+    -1541.3,
+    -99092.7,
+    15533.4
+   ],
+   "pixel": [
+    453.0,
+    601.5
+   ],
+   "ground": 15066.2,
+   "onLand": true
+  },
+  {
+   "location": "019168:Skyrim.esm",
+   "edid": "DragonLair04Location",
+   "name": null,
+   "markerType": "map",
+   "marker": "016233:Skyrim.esm",
+   "game": [
+    84059.3,
+    -99526.1,
+    15997.8
+   ],
+   "pixel": [
+    620.2,
+    602.4
+   ],
+   "ground": 15453.6,
+   "onLand": true
+  },
+  {
+   "location": "019169:Skyrim.esm",
+   "edid": "DragonLair06Location",
+   "name": null,
+   "markerType": "map",
+   "marker": "016234:Skyrim.esm",
+   "game": [
+    151002.8,
+    -53453.4,
+    13232.5
+   ],
+   "pixel": [
+    750.9,
+    512.4
+   ],
+   "ground": 13176.0,
+   "onLand": true
+  },
+  {
+   "location": "01916A:Skyrim.esm",
+   "edid": "DragonLair07Location",
+   "name": null,
+   "markerType": "map",
+   "marker": "016235:Skyrim.esm",
+   "game": [
+    173660.0,
+    -124358.8,
+    17320.3
+   ],
+   "pixel": [
+    795.2,
+    650.9
+   ],
+   "ground": 16624.9,
+   "onLand": true
+  },
+  {
+   "location": "01916B:Skyrim.esm",
+   "edid": "DragonLair08Location",
+   "name": null,
+   "markerType": "map",
+   "marker": "0162B6:Skyrim.esm",
+   "game": [
+    132782.6,
+    -12013.7,
+    -7878.2
+   ],
+   "pixel": [
+    715.3,
+    431.5
+   ],
+   "ground": -8048.9,
+   "onLand": true
+  },
+  {
+   "location": "01916C:Skyrim.esm",
+   "edid": "DragonLair09Location",
+   "name": null,
+   "markerType": "map",
+   "marker": "016237:Skyrim.esm",
+   "game": [
+    69754.0,
+    19533.8,
+    1406.8
+   ],
+   "pixel": [
+    592.2,
+    369.8
+   ],
+   "ground": 1163.5,
+   "onLand": true
+  },
+  {
+   "location": "019164:Skyrim.esm",
+   "edid": "DragonLair10Location",
+   "name": null,
+   "markerType": "map",
+   "marker": "016238:Skyrim.esm",
+   "game": [
+    -41375.2,
+    35963.9,
+    2602.3
+   ],
+   "pixel": [
+    375.2,
+    337.8
+   ],
+   "ground": 2472.3,
+   "onLand": true
+  },
+  {
+   "location": "0E66AB:Skyrim.esm",
+   "edid": "DrelasCottageLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "0E66AD:Skyrim.esm",
+   "game": [
+    -30648.6,
+    26970.1,
+    -4338.4
+   ],
+   "pixel": [
+    396.1,
+    355.3
+   ],
+   "ground": -4331.5,
+   "onLand": true
+  },
+  {
+   "location": "019171:Skyrim.esm",
+   "edid": "DushnikhYalLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "01623E:Skyrim.esm",
+   "game": [
+    -145542.7,
+    -22742.3,
+    -1052.3
+   ],
+   "pixel": [
+    171.7,
+    452.4
+   ],
+   "ground": -1064.0,
+   "onLand": true
+  },
+  {
+   "location": "019172:Skyrim.esm",
+   "edid": "DuskglowCreviceLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "01623F:Skyrim.esm",
+   "game": [
+    46034.1,
+    59378.5,
+    -7431.8
+   ],
+   "pixel": [
+    545.9,
+    292.0
+   ],
+   "ground": -7678.6,
+   "onLand": true
+  },
+  {
+   "location": "0192AC:Skyrim.esm",
+   "edid": "EldergleamSanctuaryLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "0162B7:Skyrim.esm",
+   "game": [
+    119987.5,
+    -22521.1,
+    -9735.2
+   ],
+   "pixel": [
+    690.4,
+    452.0
+   ],
+   "ground": -9987.2,
+   "onLand": true
+  },
+  {
+   "location": "019175:Skyrim.esm",
+   "edid": "FaldarsToothLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "016242:Skyrim.esm",
+   "game": [
+    145743.6,
+    -92383.4,
+    12444.6
+   ],
+   "pixel": [
+    740.7,
+    588.4
+   ],
+   "ground": 11546.7,
+   "onLand": true
+  },
+  {
+   "location": "019177:Skyrim.esm",
+   "edid": "FellglowKeepLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "016244:Skyrim.esm",
+   "game": [
+    63808.3,
+    9247.3,
+    -818.0
+   ],
+   "pixel": [
+    580.6,
+    389.9
+   ],
+   "ground": -818.0,
+   "onLand": true
+  },
+  {
+   "location": "019179:Skyrim.esm",
+   "edid": "FolgunthurLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "016246:Skyrim.esm",
+   "game": [
+    -47866.5,
+    91436.5,
+    -13388.6
+   ],
+   "pixel": [
+    362.5,
+    229.4
+   ],
+   "ground": -13394.0,
+   "onLand": true
+  },
+  {
+   "location": "01917B:Skyrim.esm",
+   "edid": "ForsakenCaveLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "016248:Skyrim.esm",
+   "game": [
+    87222.7,
+    50363.6,
+    -6457.2
+   ],
+   "pixel": [
+    626.4,
+    309.6
+   ],
+   "ground": -6456.9,
+   "onLand": true
+  },
+  {
+   "location": "0B23AC:Skyrim.esm",
+   "edid": "FourSkullLookoutLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "0B23A7:Skyrim.esm",
+   "game": [
+    -132699.8,
+    22432.1,
+    -4205.0
+   ],
+   "pixel": [
+    196.8,
+    364.2
+   ],
+   "ground": -4437.1,
+   "onLand": true
+  },
+  {
+   "location": "0D5663:Skyrim.esm",
+   "edid": "FrokisShackLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "0D392D:Skyrim.esm",
+   "game": [
+    95860.4,
+    -101620.6,
+    18788.7
+   ],
+   "pixel": [
+    643.2,
+    606.5
+   ],
+   "ground": 18734.7,
+   "onLand": true
+  },
+  {
+   "location": "019187:Skyrim.esm",
+   "edid": "GallowsRockLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "016254:Skyrim.esm",
+   "game": [
+    100513.7,
+    5877.5,
+    -7900.2
+   ],
+   "pixel": [
+    652.3,
+    396.5
+   ],
+   "ground": -8114.1,
+   "onLand": true
+  },
+  {
+   "location": "019188:Skyrim.esm",
+   "edid": "GeirmundsHallLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "016255:Skyrim.esm",
+   "game": [
+    89472.7,
+    -64540.5,
+    11001.9
+   ],
+   "pixel": [
+    630.8,
+    534.1
+   ],
+   "ground": 10996.4,
+   "onLand": true
+  },
+  {
+   "location": "018E32:Skyrim.esm",
+   "edid": "GoldenglowEstateLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "01A710:Skyrim.esm",
+   "game": [
+    155666.2,
+    -97516.9,
+    11119.6
+   ],
+   "pixel": [
+    760.0,
+    598.5
+   ],
+   "ground": 10840.4,
+   "onLand": true
+  },
+  {
+   "location": "01918B:Skyrim.esm",
+   "edid": "GraywinterWatchLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "016259:Skyrim.esm",
+   "game": [
+    49824.2,
+    -2452.3,
+    -2803.7
+   ],
+   "pixel": [
+    553.3,
+    412.8
+   ],
+   "ground": -2919.7,
+   "onLand": true
+  },
+  {
+   "location": "01919B:Skyrim.esm",
+   "edid": "GreenspringHollowLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "016269:Skyrim.esm",
+   "game": [
+    -27123.6,
+    15155.5,
+    -6969.8
+   ],
+   "pixel": [
+    403.0,
+    378.4
+   ],
+   "ground": -7497.8,
+   "onLand": true
+  },
+  {
+   "location": "01918E:Skyrim.esm",
+   "edid": "GuldunRockLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "01625C:Skyrim.esm",
+   "game": [
+    72850.6,
+    -10225.9,
+    -368.6
+   ],
+   "pixel": [
+    598.3,
+    428.0
+   ],
+   "ground": -589.7,
+   "onLand": true
+  },
+  {
+   "location": "01918F:Skyrim.esm",
+   "edid": "HaemarsShameLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "01625D:Skyrim.esm",
+   "game": [
+    54739.7,
+    -81395.8,
+    15404.8
+   ],
+   "pixel": [
+    562.9,
+    567.0
+   ],
+   "ground": 15362.4,
+   "onLand": true
+  },
+  {
+   "location": "019192:Skyrim.esm",
+   "edid": "HalldirsCairnLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "016260:Skyrim.esm",
+   "game": [
+    -42999.4,
+    -96533.4,
+    137.1
+   ],
+   "pixel": [
+    372.0,
+    596.5
+   ],
+   "ground": -7.3,
+   "onLand": true
+  },
+  {
+   "location": "019193:Skyrim.esm",
+   "edid": "HaltedStreamCampLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "016261:Skyrim.esm",
+   "game": [
+    16500.3,
+    18919.0,
+    -4177.4
+   ],
+   "pixel": [
+    488.2,
+    371.0
+   ],
+   "ground": -4609.6,
+   "onLand": true
+  },
+  {
+   "location": "0EF0A2:Skyrim.esm",
+   "edid": "HamvirsRestLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "0EE79C:Skyrim.esm",
+   "game": [
+    -18760.4,
+    21080.1,
+    -6528.7
+   ],
+   "pixel": [
+    419.4,
+    366.8
+   ],
+   "ground": -6872.0,
+   "onLand": true
+  },
+  {
+   "location": "019194:Skyrim.esm",
+   "edid": "HarmugstahlLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "016262:Skyrim.esm",
+   "game": [
+    -137142.5,
+    55392.1,
+    -7762.9
+   ],
+   "pixel": [
+    188.1,
+    299.8
+   ],
+   "ground": -8050.6,
+   "onLand": true
+  },
+  {
+   "location": "018E33:Skyrim.esm",
+   "edid": "HeartwoodMillLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "01634F:Skyrim.esm",
+   "game": [
+    133151.1,
+    -95797.2,
+    10726.1
+   ],
+   "pixel": [
+    716.1,
+    595.1
+   ],
+   "ground": 10718.6,
+   "onLand": true
+  },
+  {
+   "location": "0192A1:Skyrim.esm",
+   "edid": "HelasFollyLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "0162AC:Skyrim.esm",
+   "game": [
+    51131.5,
+    124633.0,
+    -14000.0
+   ],
+   "pixel": [
+    555.9,
+    164.6
+   ],
+   "ground": -14380.8,
+   "onLand": false
+  },
+  {
+   "location": "018A4A:Skyrim.esm",
+   "edid": "HelgenLocation",
+   "name": null,
+   "markerType": "center",
+   "marker": "055E4F:Skyrim.esm",
+   "game": [
+    19736.5,
+    -79337.1,
+    8449.1
+   ],
+   "pixel": [
+    494.5,
+    563.0
+   ],
+   "ground": 8435.8,
+   "onLand": true
+  },
+  {
+   "location": "019195:Skyrim.esm",
+   "edid": "HighGateRuinsLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "016263:Skyrim.esm",
+   "game": [
+    -19007.6,
+    106130.2,
+    -12634.5
+   ],
+   "pixel": [
+    418.9,
+    200.7
+   ],
+   "ground": -12790.3,
+   "onLand": true
+  },
+  {
+   "location": "018E34:Skyrim.esm",
+   "edid": "HighHrothgarLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "016352:Skyrim.esm",
+   "game": [
+    52070.8,
+    -36267.1,
+    22569.3
+   ],
+   "pixel": [
+    557.7,
+    478.8
+   ],
+   "ground": 22838.7,
+   "onLand": true
+  },
+  {
+   "location": "018E35:Skyrim.esm",
+   "edid": "HlaaluFarmLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "016355:Skyrim.esm",
+   "game": [
+    146687.1,
+    33898.2,
+    -13689.4
+   ],
+   "pixel": [
+    742.5,
+    341.8
+   ],
+   "ground": -13689.4,
+   "onLand": true
+  },
+  {
+   "location": "019198:Skyrim.esm",
+   "edid": "HobsFallCaveLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "016266:Skyrim.esm",
+   "game": [
+    68591.0,
+    96020.1,
+    -12168.0
+   ],
+   "pixel": [
+    590.0,
+    220.5
+   ],
+   "ground": -12167.8,
+   "onLand": true
+  },
+  {
+   "location": "018E36:Skyrim.esm",
+   "edid": "HollyfrostFarmLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "016358:Skyrim.esm",
+   "game": [
+    149758.3,
+    35760.8,
+    -13237.0
+   ],
+   "pixel": [
+    748.5,
+    338.2
+   ],
+   "ground": -13237.0,
+   "onLand": true
+  },
+  {
+   "location": "0F52B0:Skyrim.esm",
+   "edid": "HuntersRestLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "0F52B2:Skyrim.esm",
+   "game": [
+    -56671.7,
+    -54925.4,
+    1559.1
+   ],
+   "pixel": [
+    345.3,
+    515.3
+   ],
+   "ground": 1518.8,
+   "onLand": true
+  },
+  {
+   "location": "01919C:Skyrim.esm",
+   "edid": "IlinaltasDeepLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "01626A:Skyrim.esm",
+   "game": [
+    -30266.2,
+    -49106.4,
+    760.5
+   ],
+   "pixel": [
+    396.9,
+    503.9
+   ],
+   "ground": 363.6,
+   "onLand": false
+  },
+  {
+   "location": "01919D:Skyrim.esm",
+   "edid": "IrkngthandLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "01626B:Skyrim.esm",
+   "game": [
+    77330.6,
+    26481.1,
+    -6476.4
+   ],
+   "pixel": [
+    607.0,
+    356.3
+   ],
+   "ground": -8082.5,
+   "onLand": true
+  },
+  {
+   "location": "0EF54C:Skyrim.esm",
+   "edid": "JourneymansNookLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "0EF549:Skyrim.esm",
+   "game": [
+    132555.2,
+    80185.9,
+    -9758.5
+   ],
+   "pixel": [
+    714.9,
+    251.4
+   ],
+   "ground": -9896.4,
+   "onLand": true
+  },
+  {
+   "location": "0233EE:Skyrim.esm",
+   "edid": "KagrenzelLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "080E56:Skyrim.esm",
+   "game": [
+    191763.4,
+    -29428.8,
+    8280.3
+   ],
+   "pixel": [
+    830.5,
+    465.5
+   ],
+   "ground": 8061.5,
+   "onLand": true
+  },
+  {
+   "location": "0DCC03:Journey to Baan Malur.esp",
+   "edid": "KalbthurzSkyrimLocation",
+   "name": "Kalbthurz",
+   "markerType": "map",
+   "marker": "1C8DDD:Journey to Baan Malur.esp",
+   "game": [
+    168342.6,
+    44442.3,
+    -12016.0
+   ],
+   "pixel": [
+    784.8,
+    321.2
+   ],
+   "ground": -12228.0,
+   "onLand": true
+  },
+  {
+   "location": "018A54:Skyrim.esm",
+   "edid": "KarthwastenLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "01779A:Skyrim.esm",
+   "game": [
+    -132747.6,
+    38548.6,
+    -6193.7
+   ],
+   "pixel": [
+    196.7,
+    332.7
+   ],
+   "ground": -6199.3,
+   "onLand": true
+  },
+  {
+   "location": "0C2EF1:Skyrim.esm",
+   "edid": "KjenstagRuinsLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "0C2EEF:Skyrim.esm",
+   "game": [
+    -18316.0,
+    72236.7,
+    -12779.0
+   ],
+   "pixel": [
+    420.2,
+    266.9
+   ],
+   "ground": -13103.2,
+   "onLand": true
+  },
+  {
+   "location": "08E1B7:Skyrim.esm",
+   "edid": "KnifepointRidgeLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "08E03C:Skyrim.esm",
+   "game": [
+    -70131.3,
+    -66860.7,
+    2777.2
+   ],
+   "pixel": [
+    319.0,
+    538.6
+   ],
+   "ground": 2773.9,
+   "onLand": true
+  },
+  {
+   "location": "018E39:Skyrim.esm",
+   "edid": "KolskeggrMineLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "02051D:Skyrim.esm",
+   "game": [
+    -148569.3,
+    14191.6,
+    -5988.9
+   ],
+   "pixel": [
+    165.8,
+    380.3
+   ],
+   "ground": -6117.3,
+   "onLand": true
+  },
+  {
+   "location": "019261:Skyrim.esm",
+   "edid": "KorvanjundLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "016224:Skyrim.esm",
+   "game": [
+    55348.7,
+    34571.2,
+    -8172.4
+   ],
+   "pixel": [
+    564.1,
+    340.5
+   ],
+   "ground": -9337.0,
+   "onLand": true
+  },
+  {
+   "location": "019264:Skyrim.esm",
+   "edid": "LiarsRetreatLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "016270:Skyrim.esm",
+   "game": [
+    -113431.4,
+    50797.2,
+    -6208.0
+   ],
+   "pixel": [
+    234.5,
+    308.8
+   ],
+   "ground": -6279.9,
+   "onLand": true
+  },
+  {
+   "location": "018E3B:Skyrim.esm",
+   "edid": "LoreiusFarmLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "016367:Skyrim.esm",
+   "game": [
+    32789.3,
+    26084.5,
+    -6761.4
+   ],
+   "pixel": [
+    520.0,
+    357.1
+   ],
+   "ground": -6778.4,
+   "onLand": true
+  },
+  {
+   "location": "019267:Skyrim.esm",
+   "edid": "LostKnifeHideoutLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "016273:Skyrim.esm",
+   "game": [
+    95321.0,
+    -28958.4,
+    -9470.9
+   ],
+   "pixel": [
+    642.2,
+    464.6
+   ],
+   "ground": -9496.2,
+   "onLand": true
+  },
+  {
+   "location": "019268:Skyrim.esm",
+   "edid": "LostValleyRedoubtLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "016274:Skyrim.esm",
+   "game": [
+    -89949.9,
+    -36677.4,
+    1867.6
+   ],
+   "pixel": [
+    280.3,
+    479.6
+   ],
+   "ground": 1435.7,
+   "onLand": true
+  },
+  {
+   "location": "0E66A5:Skyrim.esm",
+   "edid": "LundsHutLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "0E66A3:Skyrim.esm",
+   "game": [
+    -91151.8,
+    17541.6,
+    -3784.3
+   ],
+   "pixel": [
+    278.0,
+    373.7
+   ],
+   "ground": -3784.3,
+   "onLand": true
+  },
+  {
+   "location": "0ECF53:Skyrim.esm",
+   "edid": "MarasEyePondLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "0ECF51:Skyrim.esm",
+   "game": [
+    108486.8,
+    8720.0,
+    -9378.9
+   ],
+   "pixel": [
+    667.9,
+    391.0
+   ],
+   "ground": -9728.5,
+   "onLand": false
+  },
+  {
+   "location": "0F6F13:Skyrim.esm",
+   "edid": "MeekosShackLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "0F6F11:Skyrim.esm",
+   "game": [
+    -72132.4,
+    76174.1,
+    -12659.5
+   ],
+   "pixel": [
+    315.1,
+    259.2
+   ],
+   "ground": -12666.0,
+   "onLand": true
+  },
+  {
+   "location": "019270:Skyrim.esm",
+   "edid": "MilitaryCampFalkreathImperialLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "016283:Skyrim.esm",
+   "game": [
+    -68047.1,
+    -51560.1,
+    462.7
+   ],
+   "pixel": [
+    323.1,
+    508.7
+   ],
+   "ground": 463.0,
+   "onLand": true
+  },
+  {
+   "location": "01926F:Skyrim.esm",
+   "edid": "MilitaryCampFalkreathSonsLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "016282:Skyrim.esm",
+   "game": [
+    39501.4,
+    -74989.6,
+    13427.4
+   ],
+   "pixel": [
+    533.2,
+    554.5
+   ],
+   "ground": 13421.8,
+   "onLand": true
+  },
+  {
+   "location": "019275:Skyrim.esm",
+   "edid": "MilitaryCampHjaalmarchImperialLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "016279:Skyrim.esm",
+   "game": [
+    -19539.5,
+    79464.1,
+    -13767.7
+   ],
+   "pixel": [
+    417.8,
+    252.8
+   ],
+   "ground": -13852.1,
+   "onLand": true
+  },
+  {
+   "location": "019276:Skyrim.esm",
+   "edid": "MilitaryCampHjaalmarchSonsLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "01627A:Skyrim.esm",
+   "game": [
+    -10857.7,
+    84544.6,
+    -12792.0
+   ],
+   "pixel": [
+    434.8,
+    242.9
+   ],
+   "ground": -12788.5,
+   "onLand": true
+  },
+  {
+   "location": "019277:Skyrim.esm",
+   "edid": "MilitaryCampPaleImperialLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "01627B:Skyrim.esm",
+   "game": [
+    -2159.3,
+    101148.7,
+    -11094.8
+   ],
+   "pixel": [
+    451.8,
+    210.4
+   ],
+   "ground": -11131.4,
+   "onLand": true
+  },
+  {
+   "location": "019278:Skyrim.esm",
+   "edid": "MilitaryCampPaleSonsLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "01627C:Skyrim.esm",
+   "game": [
+    87883.6,
+    35185.6,
+    -8427.8
+   ],
+   "pixel": [
+    627.6,
+    339.3
+   ],
+   "ground": -8438.6,
+   "onLand": true
+  },
+  {
+   "location": "019273:Skyrim.esm",
+   "edid": "MilitaryCampReachImperialLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "016277:Skyrim.esm",
+   "game": [
+    -161881.9,
+    35446.2,
+    -2923.7
+   ],
+   "pixel": [
+    139.8,
+    338.8
+   ],
+   "ground": -2933.2,
+   "onLand": true
+  },
+  {
+   "location": "01926D:Skyrim.esm",
+   "edid": "MilitaryCampRiftSonsLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "016280:Skyrim.esm",
+   "game": [
+    115540.9,
+    -64977.6,
+    11120.0
+   ],
+   "pixel": [
+    681.7,
+    534.9
+   ],
+   "ground": 11120.0,
+   "onLand": true
+  },
+  {
+   "location": "019271:Skyrim.esm",
+   "edid": "MilitaryCampWhiterunImperialLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "016284:Skyrim.esm",
+   "game": [
+    -62784.1,
+    2443.5,
+    -5406.2
+   ],
+   "pixel": [
+    333.4,
+    403.2
+   ],
+   "ground": -5448.3,
+   "onLand": true
+  },
+  {
+   "location": "019272:Skyrim.esm",
+   "edid": "MilitaryCampWhiterunSonsLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "095885:Skyrim.esm",
+   "game": [
+    51979.8,
+    -16247.3,
+    -693.9
+   ],
+   "pixel": [
+    557.5,
+    439.7
+   ],
+   "ground": -697.4,
+   "onLand": true
+  },
+  {
+   "location": "019279:Skyrim.esm",
+   "edid": "MilitaryCampWinterholdImperialLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "01627D:Skyrim.esm",
+   "game": [
+    51947.7,
+    95472.1,
+    -6868.5
+   ],
+   "pixel": [
+    557.5,
+    221.5
+   ],
+   "ground": -6928.0,
+   "onLand": true
+  },
+  {
+   "location": "01927A:Skyrim.esm",
+   "edid": "MilitaryCampWinterholdSonsLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "01627E:Skyrim.esm",
+   "game": [
+    145204.5,
+    55116.4,
+    -11376.0
+   ],
+   "pixel": [
+    739.6,
+    300.4
+   ],
+   "ground": -11394.4,
+   "onLand": true
+  },
+  {
+   "location": "01927B:Skyrim.esm",
+   "edid": "MistwatchLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "016286:Skyrim.esm",
+   "game": [
+    137472.0,
+    -34240.0,
+    -9749.4
+   ],
+   "pixel": [
+    724.5,
+    474.9
+   ],
+   "ground": -10104.0,
+   "onLand": true
+  },
+  {
+   "location": "018E3D:Skyrim.esm",
+   "edid": "MixwaterMillLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "01636D:Skyrim.esm",
+   "game": [
+    109029.1,
+    -6468.9,
+    -13170.5
+   ],
+   "pixel": [
+    668.9,
+    420.6
+   ],
+   "ground": -13180.6,
+   "onLand": true
+  },
+  {
+   "location": "01927C:Skyrim.esm",
+   "edid": "MorKhazgurLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "016287:Skyrim.esm",
+   "game": [
+    -151658.5,
+    81847.0,
+    -5580.8
+   ],
+   "pixel": [
+    159.8,
+    248.1
+   ],
+   "ground": -6542.7,
+   "onLand": true
+  },
+  {
+   "location": "01927D:Skyrim.esm",
+   "edid": "MorvunskarLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "016288:Skyrim.esm",
+   "game": [
+    119160.6,
+    19394.4,
+    -10174.1
+   ],
+   "pixel": [
+    688.7,
+    370.1
+   ],
+   "ground": -10298.9,
+   "onLand": true
+  },
+  {
+   "location": "01927E:Skyrim.esm",
+   "edid": "MossMotherCavernLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "016289:Skyrim.esm",
+   "game": [
+    -56529.5,
+    -49859.1,
+    1304.0
+   ],
+   "pixel": [
+    345.6,
+    505.4
+   ],
+   "ground": 1304.0,
+   "onLand": true
+  },
+  {
+   "location": "01927F:Skyrim.esm",
+   "edid": "MountAnthorLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "01628A:Skyrim.esm",
+   "game": [
+    95163.1,
+    67274.7,
+    259.4
+   ],
+   "pixel": [
+    641.9,
+    276.6
+   ],
+   "ground": -435.7,
+   "onLand": true
+  },
+  {
+   "location": "019282:Skyrim.esm",
+   "edid": "NarzulburLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "01628D:Skyrim.esm",
+   "game": [
+    158053.6,
+    10036.1,
+    -3723.5
+   ],
+   "pixel": [
+    764.7,
+    388.4
+   ],
+   "ground": -4398.7,
+   "onLand": true
+  },
+  {
+   "location": "0192B9:Skyrim.esm",
+   "edid": "NightcallerTempleLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "017082:Skyrim.esm",
+   "game": [
+    40560.0,
+    101184.0,
+    -6384.0
+   ],
+   "pixel": [
+    535.2,
+    210.4
+   ],
+   "ground": -6964.5,
+   "onLand": true
+  },
+  {
+   "location": "019284:Skyrim.esm",
+   "edid": "NilheimLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "01628F:Skyrim.esm",
+   "game": [
+    100682.9,
+    -58661.6,
+    11858.0
+   ],
+   "pixel": [
+    652.6,
+    522.6
+   ],
+   "ground": 11779.3,
+   "onLand": true
+  },
+  {
+   "location": "019286:Skyrim.esm",
+   "edid": "OrotheimLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "016291:Skyrim.esm",
+   "game": [
+    -67686.0,
+    36949.4,
+    -8254.7
+   ],
+   "pixel": [
+    323.8,
+    335.8
+   ],
+   "ground": -8311.4,
+   "onLand": true
+  },
+  {
+   "location": "019287:Skyrim.esm",
+   "edid": "OrphanRockLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "016292:Skyrim.esm",
+   "game": [
+    36185.9,
+    -69266.6,
+    13044.3
+   ],
+   "pixel": [
+    526.7,
+    543.3
+   ],
+   "ground": 12831.3,
+   "onLand": true
+  },
+  {
+   "location": "0192A2:Skyrim.esm",
+   "edid": "PilgrimsTrenchLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "0162AD:Skyrim.esm",
+   "game": [
+    83391.3,
+    117696.3,
+    -17464.6
+   ],
+   "pixel": [
+    618.9,
+    178.1
+   ],
+   "ground": -17630.3,
+   "onLand": false
+  },
+  {
+   "location": "0EF0BC:Skyrim.esm",
+   "edid": "PinefrostTowerLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "0EF0BA:Skyrim.esm",
+   "game": [
+    -142901.3,
+    99301.4,
+    -3970.8
+   ],
+   "pixel": [
+    176.9,
+    214.1
+   ],
+   "ground": -4567.7,
+   "onLand": true
+  },
+  {
+   "location": "019288:Skyrim.esm",
+   "edid": "PinemoonCaveLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "016293:Skyrim.esm",
+   "game": [
+    -116902.4,
+    92399.1,
+    -7318.2
+   ],
+   "pixel": [
+    227.7,
+    227.5
+   ],
+   "ground": -7317.8,
+   "onLand": true
+  },
+  {
+   "location": "019289:Skyrim.esm",
+   "edid": "PinepeakCavernLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "016294:Skyrim.esm",
+   "game": [
+    75298.4,
+    -54368.8,
+    10257.1
+   ],
+   "pixel": [
+    603.1,
+    514.2
+   ],
+   "ground": 10308.8,
+   "onLand": true
+  },
+  {
+   "location": "01928A:Skyrim.esm",
+   "edid": "PinewatchLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "016295:Skyrim.esm",
+   "game": [
+    -9403.5,
+    -76357.0,
+    2787.1
+   ],
+   "pixel": [
+    437.6,
+    557.1
+   ],
+   "ground": 2216.0,
+   "onLand": true
+  },
+  {
+   "location": "01928F:Skyrim.esm",
+   "edid": "RagnvaldLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "01629A:Skyrim.esm",
+   "game": [
+    -173684.1,
+    26640.2,
+    -131.0
+   ],
+   "pixel": [
+    116.8,
+    356.0
+   ],
+   "ground": -184.7,
+   "onLand": true
+  },
+  {
+   "location": "090576:Skyrim.esm",
+   "edid": "RaldbtharLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "0F81D9:Skyrim.esm",
+   "game": [
+    89745.9,
+    28146.2,
+    -5810.0
+   ],
+   "pixel": [
+    631.3,
+    353.0
+   ],
+   "ground": -5983.2,
+   "onLand": true
+  },
+  {
+   "location": "019290:Skyrim.esm",
+   "edid": "RannveigsFastLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "01629B:Skyrim.esm",
+   "game": [
+    -47295.5,
+    26143.6,
+    -3912.4
+   ],
+   "pixel": [
+    363.6,
+    356.9
+   ],
+   "ground": -5024.1,
+   "onLand": true
+  },
+  {
+   "location": "019291:Skyrim.esm",
+   "edid": "RavenscarHollowLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "01629C:Skyrim.esm",
+   "game": [
+    -91591.1,
+    126460.2,
+    -13796.8
+   ],
+   "pixel": [
+    277.1,
+    161.0
+   ],
+   "ground": -13891.4,
+   "onLand": true
+  },
+  {
+   "location": "019293:Skyrim.esm",
+   "edid": "ReachwaterRockLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "01629E:Skyrim.esm",
+   "game": [
+    -140947.8,
+    -3609.0,
+    -7281.0
+   ],
+   "pixel": [
+    180.7,
+    415.0
+   ],
+   "ground": -7305.3,
+   "onLand": true
+  },
+  {
+   "location": "0B23A5:Skyrim.esm",
+   "edid": "ReachwindEyrieLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "0B23A3:Skyrim.esm",
+   "game": [
+    -139694.9,
+    -12857.3,
+    -1336.5
+   ],
+   "pixel": [
+    183.2,
+    433.1
+   ],
+   "ground": -1419.7,
+   "onLand": true
+  },
+  {
+   "location": "0A828B:Skyrim.esm",
+   "edid": "RebelsCairnLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "0B629F:Skyrim.esm",
+   "game": [
+    -109696.0,
+    23216.0,
+    -26.7
+   ],
+   "pixel": [
+    241.8,
+    362.7
+   ],
+   "ground": -31.0,
+   "onLand": true
+  },
+  {
+   "location": "019295:Skyrim.esm",
+   "edid": "RedoransRetreatLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "01629F:Skyrim.esm",
+   "game": [
+    -15254.3,
+    7226.9,
+    -7369.2
+   ],
+   "pixel": [
+    426.2,
+    393.9
+   ],
+   "ground": -7496.5,
+   "onLand": true
+  },
+  {
+   "location": "0ECF4D:Skyrim.esm",
+   "edid": "RiversideShackLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "0ECF4F:Skyrim.esm",
+   "game": [
+    121265.5,
+    6841.4,
+    -13584.5
+   ],
+   "pixel": [
+    692.8,
+    394.6
+   ],
+   "ground": -13586.7,
+   "onLand": true
+  },
+  {
+   "location": "0D5667:Skyrim.esm",
+   "edid": "RkundLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "0D3939:Skyrim.esm",
+   "game": [
+    154614.4,
+    -125430.3,
+    14898.9
+   ],
+   "pixel": [
+    758.0,
+    653.0
+   ],
+   "ground": 14729.8,
+   "onLand": true
+  },
+  {
+   "location": "01929B:Skyrim.esm",
+   "edid": "RobbersGorgeLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "0162A7:Skyrim.esm",
+   "game": [
+    -80784.0,
+    47328.0,
+    -12288.0
+   ],
+   "pixel": [
+    298.2,
+    315.6
+   ],
+   "ground": -12473.5,
+   "onLand": true
+  },
+  {
+   "location": "019299:Skyrim.esm",
+   "edid": "SaarthalLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "0162A5:Skyrim.esm",
+   "game": [
+    92005.1,
+    91812.2,
+    -11427.0
+   ],
+   "pixel": [
+    635.7,
+    228.7
+   ],
+   "ground": -12779.7,
+   "onLand": true
+  },
+  {
+   "location": "018E41:Skyrim.esm",
+   "edid": "SarethiFarmLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "016379:Skyrim.esm",
+   "game": [
+    112594.9,
+    -70922.4,
+    11517.5
+   ],
+   "pixel": [
+    675.9,
+    546.5
+   ],
+   "ground": 11509.9,
+   "onLand": true
+  },
+  {
+   "location": "0D5669:Skyrim.esm",
+   "edid": "ShorsWatchtowerLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "0D3934:Skyrim.esm",
+   "game": [
+    168745.7,
+    -51129.5,
+    5648.0
+   ],
+   "pixel": [
+    785.6,
+    507.9
+   ],
+   "ground": 5648.0,
+   "onLand": true
+  },
+  {
+   "location": "0F5BA7:Skyrim.esm",
+   "edid": "ShrineofBoethiahLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "04D8DA:Skyrim.esm",
+   "game": [
+    161866.3,
+    26717.7,
+    -4000.3
+   ],
+   "pixel": [
+    772.1,
+    355.8
+   ],
+   "ground": -4322.7,
+   "onLand": true
+  },
+  {
+   "location": "0240E6:Skyrim.esm",
+   "edid": "ShrineofMehrunesDagonLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "0246A5:Skyrim.esm",
+   "game": [
+    -624.8,
+    51727.0,
+    531.3
+   ],
+   "pixel": [
+    454.8,
+    307.0
+   ],
+   "ground": 507.6,
+   "onLand": true
+  },
+  {
+   "location": "0F5BA5:Skyrim.esm",
+   "edid": "ShrineofPeryiteLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "0AD066:Skyrim.esm",
+   "game": [
+    -145330.0,
+    39731.7,
+    -186.5
+   ],
+   "pixel": [
+    172.2,
+    330.4
+   ],
+   "ground": -212.8,
+   "onLand": true
+  },
+  {
+   "location": "0192A9:Skyrim.esm",
+   "edid": "SilentMoonsCampLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "0162B4:Skyrim.esm",
+   "game": [
+    2903.7,
+    15858.5,
+    -4342.3
+   ],
+   "pixel": [
+    461.7,
+    377.0
+   ],
+   "ground": -5023.7,
+   "onLand": true
+  },
+  {
+   "location": "0192AA:Skyrim.esm",
+   "edid": "SilverdriftLairLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "0162B5:Skyrim.esm",
+   "game": [
+    59246.5,
+    53587.2,
+    -7717.8
+   ],
+   "pixel": [
+    571.7,
+    303.3
+   ],
+   "ground": -8088.6,
+   "onLand": true
+  },
+  {
+   "location": "04B679:Skyrim.esm",
+   "edid": "SkyboundWatchLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "0479BB:Skyrim.esm",
+   "game": [
+    21065.0,
+    -69234.7,
+    10892.4
+   ],
+   "pixel": [
+    497.1,
+    543.2
+   ],
+   "ground": 10884.2,
+   "onLand": true
+  },
+  {
+   "location": "0EF0B0:Skyrim.esm",
+   "edid": "SkytempleRuinsLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "0EF0AE:Skyrim.esm",
+   "game": [
+    119881.5,
+    121615.3,
+    -10542.8
+   ],
+   "pixel": [
+    690.1,
+    170.5
+   ],
+   "ground": -10549.1,
+   "onLand": true
+  },
+  {
+   "location": "0192AD:Skyrim.esm",
+   "edid": "SleepingTreeCampLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "0162B8:Skyrim.esm",
+   "game": [
+    -39379.3,
+    -18163.8,
+    -5478.8
+   ],
+   "pixel": [
+    379.1,
+    443.5
+   ],
+   "ground": -6113.3,
+   "onLand": false
+  },
+  {
+   "location": "018E43:Skyrim.esm",
+   "edid": "SnowShodFarmLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "01634C:Skyrim.esm",
+   "game": [
+    165899.8,
+    -108707.4,
+    11257.9
+   ],
+   "pixel": [
+    780.0,
+    620.3
+   ],
+   "ground": 11222.9,
+   "onLand": true
+  },
+  {
+   "location": "01916D:Skyrim.esm",
+   "edid": "SteamcragCampLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "01623A:Skyrim.esm",
+   "game": [
+    143525.1,
+    -9970.8,
+    -9515.9
+   ],
+   "pixel": [
+    736.3,
+    427.5
+   ],
+   "ground": -10178.3,
+   "onLand": true
+  },
+  {
+   "location": "0192B5:Skyrim.esm",
+   "edid": "SteepfallBurrowLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "0162BF:Skyrim.esm",
+   "game": [
+    -128561.1,
+    114960.9,
+    -10558.6
+   ],
+   "pixel": [
+    204.9,
+    183.5
+   ],
+   "ground": -10558.5,
+   "onLand": true
+  },
+  {
+   "location": "0192B6:Skyrim.esm",
+   "edid": "StillbornCaveLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "0162C0:Skyrim.esm",
+   "game": [
+    128704.0,
+    64120.9,
+    -6085.8
+   ],
+   "pixel": [
+    707.4,
+    282.8
+   ],
+   "ground": -6074.9,
+   "onLand": true
+  },
+  {
+   "location": "0192B7:Skyrim.esm",
+   "edid": "StonehillBluffLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "0162C1:Skyrim.esm",
+   "game": [
+    16748.3,
+    43798.6,
+    -1172.5
+   ],
+   "pixel": [
+    488.7,
+    322.5
+   ],
+   "ground": -1665.2,
+   "onLand": true
+  },
+  {
+   "location": "018A52:Skyrim.esm",
+   "edid": "StonehillsLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "0177E4:Skyrim.esm",
+   "game": [
+    -7283.3,
+    64266.8,
+    -11461.7
+   ],
+   "pixel": [
+    441.8,
+    282.5
+   ],
+   "ground": -11489.2,
+   "onLand": true
+  },
+  {
+   "location": "080F28:Skyrim.esm",
+   "edid": "StonyCreekCaveLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "080F13:Skyrim.esm",
+   "game": [
+    174742.0,
+    -24827.8,
+    -3350.1
+   ],
+   "pixel": [
+    797.3,
+    456.5
+   ],
+   "ground": -3427.3,
+   "onLand": false
+  },
+  {
+   "location": "0192BA:Skyrim.esm",
+   "edid": "TalkingStoneCampLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "0162C3:Skyrim.esm",
+   "game": [
+    -70775.6,
+    21483.2,
+    -5596.7
+   ],
+   "pixel": [
+    317.8,
+    366.0
+   ],
+   "ground": -5598.1,
+   "onLand": true
+  },
+  {
+   "location": "0192BB:Skyrim.esm",
+   "edid": "ThroatoftheWorldLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "0162C4:Skyrim.esm",
+   "game": [
+    56368.2,
+    -48511.4,
+    36378.6
+   ],
+   "pixel": [
+    566.1,
+    502.7
+   ],
+   "ground": 36201.9,
+   "onLand": true
+  },
+  {
+   "location": "01914B:Skyrim.esm",
+   "edid": "TwilightSepulcherLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "016216:Skyrim.esm",
+   "game": [
+    -70966.1,
+    -80572.6,
+    -458.8
+   ],
+   "pixel": [
+    317.4,
+    565.4
+   ],
+   "ground": -460.5,
+   "onLand": true
+  },
+  {
+   "location": "0192BF:Skyrim.esm",
+   "edid": "UstengravLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "01621F:Skyrim.esm",
+   "game": [
+    -23079.8,
+    88176.7,
+    -13778.2
+   ],
+   "pixel": [
+    410.9,
+    235.8
+   ],
+   "ground": -14420.7,
+   "onLand": false
+  },
+  {
+   "location": "0192C2:Skyrim.esm",
+   "edid": "VolskyggeLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "0162CA:Skyrim.esm",
+   "game": [
+    -130324.4,
+    92287.1,
+    -6759.7
+   ],
+   "pixel": [
+    201.5,
+    227.8
+   ],
+   "ground": -7062.7,
+   "onLand": true
+  },
+  {
+   "location": "0192C3:Skyrim.esm",
+   "edid": "VolunruudLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "016264:Skyrim.esm",
+   "game": [
+    10419.3,
+    31079.8,
+    -831.5
+   ],
+   "pixel": [
+    476.4,
+    347.3
+   ],
+   "ground": -1535.7,
+   "onLand": true
+  },
+  {
+   "location": "0C2EFC:Skyrim.esm",
+   "edid": "WaywardPassLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "0C2EFA:Skyrim.esm",
+   "game": [
+    76030.9,
+    62787.9,
+    -806.7
+   ],
+   "pixel": [
+    604.5,
+    285.4
+   ],
+   "ground": -806.8,
+   "onLand": true
+  },
+  {
+   "location": "0BC0AC:Skyrim.esm",
+   "edid": "WeynonStonesLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "0BC0AA:Skyrim.esm",
+   "game": [
+    44570.1,
+    46989.3,
+    -8945.8
+   ],
+   "pixel": [
+    543.1,
+    316.2
+   ],
+   "ground": -9165.5,
+   "onLand": true
+  },
+  {
+   "location": "0192C5:Skyrim.esm",
+   "edid": "WhiteRiverWatchLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "0162CD:Skyrim.esm",
+   "game": [
+    41828.3,
+    -14683.1,
+    -1806.9
+   ],
+   "pixel": [
+    537.7,
+    436.7
+   ],
+   "ground": -1854.2,
+   "onLand": true
+  },
+  {
+   "location": "0C2EED:Skyrim.esm",
+   "edid": "WindwardRuinsLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "0C2EEC:Skyrim.esm",
+   "game": [
+    19349.8,
+    92519.4,
+    -11686.6
+   ],
+   "pixel": [
+    493.8,
+    227.3
+   ],
+   "ground": -11776.0,
+   "onLand": true
+  },
+  {
+   "location": "0192C7:Skyrim.esm",
+   "edid": "WitchmistGroveLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "0E1B80:Skyrim.esm",
+   "game": [
+    134199.8,
+    -3132.1,
+    -9668.8
+   ],
+   "pixel": [
+    718.1,
+    414.1
+   ],
+   "ground": -9808.3,
+   "onLand": true
+  },
+  {
+   "location": "0C3428:Skyrim.esm",
+   "edid": "YorgrimOverlookLocation",
+   "name": null,
+   "markerType": "map",
+   "marker": "0C33FF:Skyrim.esm",
+   "game": [
+    94301.6,
+    53066.9,
+    -3544.3
+   ],
+   "pixel": [
+    640.2,
+    304.4
+   ],
+   "ground": -3590.5,
+   "onLand": true
+  }
+ ]
+}

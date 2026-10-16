@@ -56,6 +56,8 @@ module.exports = (api) => {
     // config seats { factionId: { name, world, pos, radius, cells } } are staff defaults under what leaders choose
     musterRadius: 3000, seats: {}, capitalChangeDays: 7,
     treatyMinWeeks: 1, treatyMaxWeeks: 8,
+    // The Realm map's worldspaces in the client (see onClientMap): Cyrodiil's until the Skyrim map ships in a client update
+    mapWorlds: ['a764b:BSHeartland.esm'],
   }, cfg.war || {});
   const DAY = 86400000;
   const TERRITORIES = path.resolve('territories.json');
@@ -135,7 +137,23 @@ module.exports = (api) => {
   const territoriesOf = (fid) => territories().filter((t) => ownerOf(t.id) === fid);
   const worldOf = (a) => { try { return String(mp.get(a, 'worldOrCellDesc') || ''); } catch (e) { return ''; } };
   const posOf = (a) => { try { return mp.get(a, 'pos'); } catch (e) { return null; } };
-  const sameWorld = (w, desc) => { try { return (mp.getIdFromDesc(w) >>> 0) === (mp.getIdFromDesc(desc) >>> 0); } catch (e) { return w === desc; } };
+  // A worldspace that counts as another for territories (territories.json worldAliases: Skyrim's five walled cities are
+  // child worldspaces drawn in Tamriel's coordinates), by form id; built again when the file changes
+  const aliasIds = () => {
+    const f = territoryFile();
+    if (!S.aliasFor || S.aliasFor.file !== f) {
+      const m = new Map();
+      for (const [from, to] of Object.entries(f.worldAliases || {})) { try { m.set(mp.getIdFromDesc(from) >>> 0, mp.getIdFromDesc(to) >>> 0); } catch (e) { /* a plugin not loaded */ } }
+      S.aliasFor = { file: f, map: m };
+    }
+    return S.aliasFor.map;
+  };
+  const worldKey = (w) => { const id = mp.getIdFromDesc(w) >>> 0; const to = aliasIds().get(id); return to === undefined ? id : to; };
+  const sameWorld = (w, desc) => { try { return worldKey(w) === worldKey(desc); } catch (e) { return w === desc; } };
+  // The worldspaces the client's Realm map draws (config war.mapWorlds; empty for every one). The front has one terrain
+  // image (Bruma's) and colours by the nearest marker of any worldspace, so territories elsewhere stay out of the panel
+  // until a client ships their map; they are owned, taxed and fought over all the same.
+  const onClientMap = (w) => !Array.isArray(C.mapWorlds) || !C.mapWorlds.length || C.mapWorlds.some((m) => sameWorld(w, m));
   // The territory a point belongs to: the nearest land marker in that worldspace
   const territoryAt = (world, pos) => {
     if (!Array.isArray(pos)) return null;
@@ -531,7 +549,7 @@ module.exports = (api) => {
       if (!f || (f.secret && !isAdmin(a) && !seesLayerOf(a, fid))) continue;
       const seat = seatOf(fid);
       if (!seat) continue;
-      const onMap = !seat.territory && territories().some((t) => sameWorld(seat.world, t.marker.world));
+      const onMap = !seat.territory && onClientMap(seat.world) && territories().some((t) => sameWorld(seat.world, t.marker.world));
       out.push({ faction: fid, factionName: nameOfFaction(fid), name: seat.name, territory: seat.territory || null, x: onMap ? seat.pos[0] : null, y: onMap ? seat.pos[1] : null });
     }
     return out;
@@ -539,12 +557,12 @@ module.exports = (api) => {
   const realmView = (a) => {
     const led = factionsLedBy(a);
     return {
-      territories: territories().map((t) => ({ id: t.id, name: t.name, kind: t.kind, owner: ownerOf(t.id), ownerName: nameOfFaction(ownerOf(t.id)),
+      territories: territories().filter((t) => onClientMap(t.marker.world)).map((t) => ({ id: t.id, name: t.name, kind: t.kind, owner: ownerOf(t.id), ownerName: nameOfFaction(ownerOf(t.id)),
         world: t.marker.world, x: t.marker.pos[0], y: t.marker.pos[1], icon: Number.isFinite(t.icon) ? t.icon : null })),
       // Every faction's capital that this viewer may know of: a territory (crowned on the map) or a chosen spot
       capitals: capitalsSeenBy(a),
       // Hidden layers: only members of a listed secret faction (and staff) are sent these
-      secret: (territoryFile().secret || []).filter((t) => t && t.marker && Array.isArray(t.layer) && (isAdmin(a) || t.layer.some((f) => seesLayerOf(a, f))))
+      secret: (territoryFile().secret || []).filter((t) => t && t.marker && Array.isArray(t.layer) && onClientMap(t.marker.world) && (isAdmin(a) || t.layer.some((f) => seesLayerOf(a, f))))
         .map((t) => ({ id: t.id, name: t.name, kind: t.kind || 'secret', layer: t.layer.filter((f) => isAdmin(a) || seesLayerOf(a, f)).map(nameOfFaction), x: t.marker.pos[0], y: t.marker.pos[1] })),
       // Map colours by faction: staff's lore table (config war.colours); a faction not in it shows grey until one is set
       colours: Object.assign({}, C.colours || {}),

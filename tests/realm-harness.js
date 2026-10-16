@@ -72,8 +72,11 @@ const standAt = (list, id) => { for (const a of list) pos.set(a, marker(id).slic
 const tickFor = (seconds) => { for (let s = 0; s < seconds; s += 2) { now += 2000; timers.get('realm')(); } };
 
 // Territories start with the hold
-check('the forts start with the Imperial Legion', T.filter((t) => t.kind === 'fort').length === 2 && T.filter((t) => t.kind === 'fort').every((t) => realm.ownerOf(t.id) === 'imperial-legion'));
-check('every other territory starts with the County of Bruma', T.filter((t) => t.kind !== 'fort').every((t) => realm.ownerOf(t.id) === 'county-bruma'), T.length + ' territories');
+// (County Bruma's land; Skyrim's territories are checked in tests/skyrim-territories-harness.js)
+const TB = T.filter((t) => t.marker.world === 'a764b:BSHeartland.esm');
+check('the forts start with the Imperial Legion', TB.filter((t) => t.kind === 'fort').length === 2 && TB.filter((t) => t.kind === 'fort').every((t) => realm.ownerOf(t.id) === 'imperial-legion'));
+check('every other territory starts with the County of Bruma', TB.filter((t) => t.kind !== 'fort').every((t) => realm.ownerOf(t.id) === 'county-bruma'), TB.length + ' territories');
+check('the Realm panel shows only the land of the map the client has (Bruma\'s)', realm.realmView(GM).territories.map((t) => t.id).sort().join() === TB.map((t) => t.id).sort().join(), T.length + ' in the file');
 check('a point belongs to the nearest marker', realm.territoryAt('a764b:BSHeartland.esm', [36000, 210000, 0]).id === 'applewatch');
 
 // Declaration rules

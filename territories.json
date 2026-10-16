@@ -1,5 +1,5 @@
 {
-  "_comment": "Territories and their land markers (WAR_DESIGN.md section 2; server/realm.js). A point belongs to the nearest land marker in its worldspace. Whoever holds a marker owns its territory; at first every territory belongs to its zone's hold faction (guild-defs.json kind 'hold'). marker: the war standard's spot (world desc, position in game units, capture radius in units, 70 units = 1 m). The positions are the places' map markers in BSHeartland.esm (LCTN LCSR MapMarkerRefType, or the location centre for Aleswell), read 2026-09-26. kind 'capital' is the hold's seat: taking it takes the hold. icon: the map marker type (REFR TNAM) of the place's in-game map marker, so the Realm map shows the same icon as the game's map (the icon art is exported from the game's map.swf on the PC into the front's img/mapicons/<type>.png); Castle Bruma's 224 and Bruma's 102 are Beyond Skyrim's own types. Aleswell and Fort Caractacus have no map marker: Aleswell is a town (icon 2, Nate found it in game on 2026-09-27) at its location centre, and the fort next to it stands at its exterior door (CYRFortCaractacus01's door out). seatCells: a capital's interiors (Castle Bruma's great hall, Lord's Manor, barracks, service hall, guest wing and dungeon); with the grounds around its marker they are where a hold's members muster to declare war. owner: the faction that holds the territory until someone takes it; without one it starts with its zone's hold faction (Nate, 2026-09-27: the Imperial Legion owns the forts).",
+  "_comment": "Territories and their land markers (WAR_DESIGN.md section 2; server/realm.js). A point belongs to the nearest land marker in its worldspace. Whoever holds a marker owns its territory; at first every territory belongs to its zone's hold faction (guild-defs.json kind 'hold'). marker: the war standard's spot (world desc, position in game units, capture radius in units, 70 units = 1 m). The positions are the places' map markers in BSHeartland.esm (LCTN LCSR MapMarkerRefType, or the location centre for Aleswell), read 2026-09-26. kind 'capital' is the hold's seat: taking it takes the hold. icon: the map marker type (REFR TNAM) of the place's in-game map marker, so the Realm map shows the same icon as the game's map (the icon art is exported from the game's map.swf on the PC into the front's img/mapicons/<type>.png); Castle Bruma's 224 and Bruma's 102 are Beyond Skyrim's own types. Aleswell and Fort Caractacus have no map marker: Aleswell is a town (icon 2, Nate found it in game on 2026-09-27) at its location centre, and the fort next to it stands at its exterior door (CYRFortCaractacus01's door out). seatCells: a capital's interiors (Castle Bruma's great hall, Lord's Manor, barracks, service hall, guest wing and dungeon); with the grounds around its marker they are where a hold's members muster to declare war. owner: the faction that holds the territory until someone takes it; without one it starts with its zone's hold faction (Nate, 2026-09-27: the Imperial Legion owns the forts). Skyrim (Nate, 16 Oct, after Skyrim opened): the nine hold capitals, the vanilla towns and villages, one or two forts per hold and the six orc strongholds, in Tamriel (3c:Skyrim.esm), each at its map marker REFR's position with that marker's TNAM as icon (read from the 140-plugin load order on 2026-10-16; tests/fixtures/skyrim-territory-markers.json names each marker). The five walled capitals' markers stand in their city worldspaces (WhiterunWorld, RiftenWorld, SolitudeWorld, WindhelmWorld, MarkarthWorld), which share Tamriel's coordinates; worldAliases makes realm.js count a point in one of them as Tamriel. A Skyrim territory's zone is its hold by lore, which for Rorikstead (Whiterun), Ivarstead (the Rift), Fort Sungard (the Reach) and Fort Kastav (Winterhold) is not the nearest capital zones.json would give. Skyrim's forts have no owner: in the server's lore (4E 211) the Legion withdrew from Skyrim, so they start with their holds. Strongholds (kind 'stronghold') start with their clans. Helgen is left out: Helgen Reborn rebuilds it only through its quests, so here it is the ruin. Gol-Kharzum has no location record of its own (it is built on the Bilegulch Mine's land).",
   "territories": [
     {
       "id": "bruma",
@@ -112,8 +112,618 @@
         "radius": 1500
       },
       "icon": 6
+    },
+    {
+      "id": "whiterun",
+      "name": "Whiterun",
+      "zone": "whiterun",
+      "kind": "capital",
+      "location": "WhiterunLocation",
+      "marker": {
+        "world": "3c:Skyrim.esm",
+        "pos": [
+          19855,
+          -7423,
+          -3583
+        ],
+        "radius": 1500
+      },
+      "icon": 40,
+      "seatCells": [
+        "165a3:Skyrim.esm",
+        "80c6a:Skyrim.esm"
+      ]
+    },
+    {
+      "id": "riften",
+      "name": "Riften",
+      "zone": "riften",
+      "kind": "capital",
+      "location": "RiftenLocation",
+      "marker": {
+        "world": "3c:Skyrim.esm",
+        "pos": [
+          173415,
+          -96600,
+          11104
+        ],
+        "radius": 1500
+      },
+      "icon": 36,
+      "seatCells": [
+        "16bd2:Skyrim.esm",
+        "3b87d:Skyrim.esm",
+        "45a1d:Skyrim.esm"
+      ]
+    },
+    {
+      "id": "solitude",
+      "name": "Solitude",
+      "zone": "solitude",
+      "kind": "capital",
+      "location": "SolitudeLocation",
+      "marker": {
+        "world": "3c:Skyrim.esm",
+        "pos": [
+          -64943,
+          104648,
+          -8426
+        ],
+        "radius": 1500
+      },
+      "icon": 42,
+      "seatCells": [
+        "16a04:Skyrim.esm",
+        "9b238:Skyrim.esm"
+      ]
+    },
+    {
+      "id": "windhelm",
+      "name": "Windhelm",
+      "zone": "windhelm",
+      "kind": "capital",
+      "location": "WindhelmLocation",
+      "marker": {
+        "world": "3c:Skyrim.esm",
+        "pos": [
+          135026,
+          35597,
+          -12469
+        ],
+        "radius": 1500
+      },
+      "icon": 38,
+      "seatCells": [
+        "1677c:Skyrim.esm",
+        "97299:Skyrim.esm",
+        "97298:Skyrim.esm",
+        "1677a:Skyrim.esm"
+      ]
+    },
+    {
+      "id": "markarth",
+      "name": "Markarth",
+      "zone": "markarth",
+      "kind": "capital",
+      "location": "MarkarthLocation",
+      "marker": {
+        "world": "3c:Skyrim.esm",
+        "pos": [
+          -174024,
+          5255,
+          -3322
+        ],
+        "radius": 1500
+      },
+      "icon": 44,
+      "seatCells": [
+        "16df2:Skyrim.esm"
+      ]
+    },
+    {
+      "id": "falkreath",
+      "name": "Falkreath",
+      "zone": "falkreath",
+      "kind": "capital",
+      "location": "FalkreathLocation",
+      "marker": {
+        "world": "3c:Skyrim.esm",
+        "pos": [
+          -30296,
+          -86284,
+          -3107
+        ],
+        "radius": 1500
+      },
+      "icon": 50,
+      "seatCells": [
+        "13a79:Skyrim.esm",
+        "1f1302:COTN - Falkreath.esp"
+      ]
+    },
+    {
+      "id": "morthal",
+      "name": "Morthal",
+      "zone": "morthal",
+      "kind": "capital",
+      "location": "MorthalLocation",
+      "marker": {
+        "world": "3c:Skyrim.esm",
+        "pos": [
+          -38640,
+          66734,
+          -13244
+        ],
+        "radius": 1500
+      },
+      "icon": 48,
+      "seatCells": [
+        "138cc:Skyrim.esm"
+      ]
+    },
+    {
+      "id": "dawnstar",
+      "name": "Dawnstar",
+      "zone": "dawnstar",
+      "kind": "capital",
+      "location": "DawnstarLocation",
+      "marker": {
+        "world": "3c:Skyrim.esm",
+        "pos": [
+          30808,
+          106138,
+          -13921
+        ],
+        "radius": 1500
+      },
+      "icon": 52,
+      "seatCells": [
+        "13a80:Skyrim.esm"
+      ]
+    },
+    {
+      "id": "winterhold",
+      "name": "Winterhold",
+      "zone": "winterhold",
+      "kind": "capital",
+      "location": "WinterholdLocation",
+      "marker": {
+        "world": "3c:Skyrim.esm",
+        "pos": [
+          110836,
+          102918,
+          -9013
+        ],
+        "radius": 1500
+      },
+      "icon": 46,
+      "seatCells": [
+        "13818:Skyrim.esm",
+        "12ba88:COTN - Winterhold.esp"
+      ]
+    },
+    {
+      "id": "riverwood",
+      "name": "Riverwood",
+      "zone": "whiterun",
+      "kind": "town",
+      "location": "RiverwoodLocation",
+      "marker": {
+        "world": "3c:Skyrim.esm",
+        "pos": [
+          21941,
+          -44792,
+          -140
+        ],
+        "radius": 1500
+      },
+      "icon": 2
+    },
+    {
+      "id": "rorikstead",
+      "name": "Rorikstead",
+      "zone": "whiterun",
+      "kind": "town",
+      "location": "RoriksteadLocation",
+      "marker": {
+        "world": "3c:Skyrim.esm",
+        "pos": [
+          -84302,
+          6952,
+          -4298
+        ],
+        "radius": 1500
+      },
+      "icon": 2
+    },
+    {
+      "id": "ivarstead",
+      "name": "Ivarstead",
+      "zone": "riften",
+      "kind": "town",
+      "location": "IvarsteadLocation",
+      "marker": {
+        "world": "3c:Skyrim.esm",
+        "pos": [
+          76375,
+          -64263,
+          10819
+        ],
+        "radius": 1500
+      },
+      "icon": 2
+    },
+    {
+      "id": "shors-stone",
+      "name": "Shor's Stone",
+      "zone": "riften",
+      "kind": "town",
+      "location": "ShorsStoneLocation",
+      "marker": {
+        "world": "3c:Skyrim.esm",
+        "pos": [
+          162924,
+          -60530,
+          7162
+        ],
+        "radius": 1500
+      },
+      "icon": 2
+    },
+    {
+      "id": "dragon-bridge",
+      "name": "Dragon Bridge",
+      "zone": "solitude",
+      "kind": "town",
+      "location": "DragonBridgeLocation",
+      "marker": {
+        "world": "3c:Skyrim.esm",
+        "pos": [
+          -102023,
+          83072,
+          -12210
+        ],
+        "radius": 1500
+      },
+      "icon": 2
+    },
+    {
+      "id": "karthwasten",
+      "name": "Karthwasten",
+      "zone": "markarth",
+      "kind": "town",
+      "location": "KarthwastenLocation",
+      "marker": {
+        "world": "3c:Skyrim.esm",
+        "pos": [
+          -132748,
+          38549,
+          -6194
+        ],
+        "radius": 1500
+      },
+      "icon": 2
+    },
+    {
+      "id": "kynesgrove",
+      "name": "Kynesgrove",
+      "zone": "windhelm",
+      "kind": "village",
+      "location": "KynesgroveLocation",
+      "marker": {
+        "world": "3c:Skyrim.esm",
+        "pos": [
+          134947,
+          11395,
+          -12200
+        ],
+        "radius": 1500
+      },
+      "icon": 3
+    },
+    {
+      "id": "old-hroldan",
+      "name": "Old Hroldan",
+      "zone": "markarth",
+      "kind": "village",
+      "location": "OldHroldanLocation",
+      "marker": {
+        "world": "3c:Skyrim.esm",
+        "pos": [
+          -114542,
+          -6796,
+          -5304
+        ],
+        "radius": 1500
+      },
+      "icon": 3
+    },
+    {
+      "id": "fort-greymoor",
+      "name": "Fort Greymoor",
+      "zone": "whiterun",
+      "kind": "fort",
+      "location": "FortGreymoorLocation",
+      "marker": {
+        "world": "3c:Skyrim.esm",
+        "pos": [
+          -13759,
+          -8448,
+          -5552
+        ],
+        "radius": 1500
+      },
+      "icon": 6
+    },
+    {
+      "id": "fort-greenwall",
+      "name": "Fort Greenwall",
+      "zone": "riften",
+      "kind": "fort",
+      "location": "FortGreenwallLocation",
+      "marker": {
+        "world": "3c:Skyrim.esm",
+        "pos": [
+          167976,
+          -72409,
+          9118
+        ],
+        "radius": 1500
+      },
+      "icon": 6
+    },
+    {
+      "id": "fort-hraggstad",
+      "name": "Fort Hraggstad",
+      "zone": "solitude",
+      "kind": "fort",
+      "location": "FortHraggstadLocation",
+      "marker": {
+        "world": "3c:Skyrim.esm",
+        "pos": [
+          -112292,
+          114083,
+          -5402
+        ],
+        "radius": 1500
+      },
+      "icon": 6
+    },
+    {
+      "id": "fort-amol",
+      "name": "Fort Amol",
+      "zone": "windhelm",
+      "kind": "fort",
+      "location": "FortAmolLocation",
+      "marker": {
+        "world": "3c:Skyrim.esm",
+        "pos": [
+          100336,
+          -22861,
+          -9313
+        ],
+        "radius": 1500
+      },
+      "icon": 6
+    },
+    {
+      "id": "fort-sungard",
+      "name": "Fort Sungard",
+      "zone": "markarth",
+      "kind": "fort",
+      "location": "FortSungardLocation",
+      "marker": {
+        "world": "3c:Skyrim.esm",
+        "pos": [
+          -72571,
+          -24475,
+          183
+        ],
+        "radius": 1500
+      },
+      "icon": 6
+    },
+    {
+      "id": "fort-neugrad",
+      "name": "Fort Neugrad",
+      "zone": "falkreath",
+      "kind": "fort",
+      "location": "FortNeugradLocation",
+      "marker": {
+        "world": "3c:Skyrim.esm",
+        "pos": [
+          33279,
+          -91842,
+          13182
+        ],
+        "radius": 1500
+      },
+      "icon": 6
+    },
+    {
+      "id": "fort-snowhawk",
+      "name": "Fort Snowhawk",
+      "zone": "morthal",
+      "kind": "fort",
+      "location": "FortSnowhawkLocation",
+      "marker": {
+        "world": "3c:Skyrim.esm",
+        "pos": [
+          -58669,
+          67925,
+          -12444
+        ],
+        "radius": 1500
+      },
+      "icon": 6
+    },
+    {
+      "id": "fort-dunstad",
+      "name": "Fort Dunstad",
+      "zone": "dawnstar",
+      "kind": "fort",
+      "location": "FortDunstadLocation",
+      "marker": {
+        "world": "3c:Skyrim.esm",
+        "pos": [
+          28971,
+          61699,
+          -8536
+        ],
+        "radius": 1500
+      },
+      "icon": 6
+    },
+    {
+      "id": "fort-fellhammer",
+      "name": "Fort Fellhammer",
+      "zone": "dawnstar",
+      "kind": "fort",
+      "location": "FortFellhammerLocation",
+      "marker": {
+        "world": "3c:Skyrim.esm",
+        "pos": [
+          42939,
+          70896,
+          -8815
+        ],
+        "radius": 1500
+      },
+      "icon": 6
+    },
+    {
+      "id": "fort-kastav",
+      "name": "Fort Kastav",
+      "zone": "winterhold",
+      "kind": "fort",
+      "location": "FortKastavLocation",
+      "marker": {
+        "world": "3c:Skyrim.esm",
+        "pos": [
+          112486,
+          53761,
+          -3032
+        ],
+        "radius": 1500
+      },
+      "icon": 6
+    },
+    {
+      "id": "largashbur",
+      "name": "Largashbur",
+      "zone": "largashbur",
+      "owner": "clan-largashbur",
+      "kind": "stronghold",
+      "location": "LargashburLocation",
+      "marker": {
+        "world": "3c:Skyrim.esm",
+        "pos": [
+          135308,
+          -110597,
+          11142
+        ],
+        "radius": 1500
+      },
+      "icon": 28
+    },
+    {
+      "id": "narzulbur",
+      "name": "Narzulbur",
+      "zone": "narzulbur",
+      "owner": "clan-narzulbur",
+      "kind": "stronghold",
+      "location": "NarzulburLocation",
+      "marker": {
+        "world": "3c:Skyrim.esm",
+        "pos": [
+          158054,
+          10036,
+          -3724
+        ],
+        "radius": 1500
+      },
+      "icon": 28
+    },
+    {
+      "id": "dushnikh-yal",
+      "name": "Dushnikh Yal",
+      "zone": "dushnikh-yal",
+      "owner": "clan-dushnikh-yal",
+      "kind": "stronghold",
+      "location": "DushnikhYalLocation",
+      "marker": {
+        "world": "3c:Skyrim.esm",
+        "pos": [
+          -145543,
+          -22742,
+          -1052
+        ],
+        "radius": 1500
+      },
+      "icon": 28
+    },
+    {
+      "id": "mor-khazgur",
+      "name": "Mor Khazgur",
+      "zone": "mor-khazgur",
+      "owner": "clan-mor-khazgur",
+      "kind": "stronghold",
+      "location": "MorKhazgurLocation",
+      "marker": {
+        "world": "3c:Skyrim.esm",
+        "pos": [
+          -151658,
+          81847,
+          -5581
+        ],
+        "radius": 1500
+      },
+      "icon": 28
+    },
+    {
+      "id": "gol-kharzum",
+      "name": "Gol-Kharzum",
+      "zone": "gol-kharzum",
+      "owner": "clan-gol-kharzum",
+      "kind": "stronghold",
+      "marker": {
+        "world": "3c:Skyrim.esm",
+        "pos": [
+          -74648,
+          -44610,
+          1689
+        ],
+        "radius": 1500
+      },
+      "icon": 28
+    },
+    {
+      "id": "cracked-tusk-keep",
+      "name": "Cracked Tusk Keep",
+      "zone": "cracked-tusk",
+      "owner": "clan-cracked-tusk",
+      "kind": "stronghold",
+      "location": "CrackedTuskKeepLocation",
+      "marker": {
+        "world": "3c:Skyrim.esm",
+        "pos": [
+          -55070,
+          -87686,
+          -2352
+        ],
+        "radius": 1500
+      },
+      "icon": 6
     }
   ],
+  "_worldAliasesComment": "worldAliases: a worldspace whose points count as another's for territories (the nearest land marker, standing at a marker, a seat outdoors). The five walled cities of Skyrim (Whiterun, Riften, Solitude, Windhelm, Markarth) are child worldspaces of Tamriel drawn in its coordinates, as zones.json already treats them.",
+  "worldAliases": {
+    "1a26f:Skyrim.esm": "3c:Skyrim.esm",
+    "16bb4:Skyrim.esm": "3c:Skyrim.esm",
+    "37edf:Skyrim.esm": "3c:Skyrim.esm",
+    "1691d:Skyrim.esm": "3c:Skyrim.esm",
+    "16d71:Skyrim.esm": "3c:Skyrim.esm"
+  },
   "_secretComment": "Hidden layers (WAR_DESIGN.md section 3): places only members of the listed secret factions (and staff) see on the Realm map, such as a cult's shrine, a vampire clan's lair or a pack's hunting grounds. They are never part of land ownership, taxes, raids or wars. Namira's shrine position is from daedric-sites.json (its statue, CYRMountainCliffNamira).",
   "secret": [
     {

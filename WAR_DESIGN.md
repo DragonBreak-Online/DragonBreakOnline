@@ -43,7 +43,10 @@ village square, a stronghold's longhouse). Whoever holds the marker owns the ter
 
 - Every zone today becomes at least one territory: its capital. Holds are then split into smaller territories (forts,
   villages, mines, farms) so a war can take land piece by piece. The list is curated by hand in `territories.json` and
-  starts with Bruma and the nearby Cyrodiil lands while the playtest is locked to Bruma.
+  starts with Bruma and the nearby Cyrodiil lands while the playtest is locked to Bruma. Skyrim's were added when it opened (16 Oct): the nine hold capitals, the vanilla towns, one or two forts per hold and
+  the six orc strongholds (kind `stronghold`, owned by their clans); the five walled cities' worldspaces count as Tamriel
+  (`worldAliases`), and the Realm panel lists only the worldspaces the client has a map for (`war.mapWorlds`, Bruma's until
+  the Skyrim terrain in `tools/realm-map/out/skyrim.*` ships in a client update).
 - **Borders follow the markers.** A point on the map belongs to the nearest land marker, which is the rule zones use today
   with capitals ("nearest capital"), now applied to every marker. Stronghold radii keep their override. So when a marker
   changes hands, its whole area changes colour on the map and the border moves, as Nate described. Where the nearest-marker

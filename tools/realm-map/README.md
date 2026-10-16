@@ -12,6 +12,8 @@ On CT 115 (plugins in `/opt/skyrim-data`), from the root of the `server` repo:
 python3 tools/realm-map/render.py --crop-to-land      # Cyrodiil around Bruma (the in-game map): 16 px per cell -> out/bruma.*
 python3 tools/realm-map/render.py --name bruma-24 --ppc 24
 python3 tools/realm-map/render.py --world 3c:Skyrim.esm --name whiterun --centre 20000 -10000 --radius 10
+python3 tools/realm-map/render.py --world 3c:Skyrim.esm --name skyrim --centre 8192 12288 --radius 59 --ppc 8 --crop-to-land --check
+                                                      # all of Skyrim -> out/skyrim.* (cells -57,-43 .. 61,50, 952 x 752, 512 units/px)
 ```
 
 | Option | Default | Meaning |
