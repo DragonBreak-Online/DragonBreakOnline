@@ -1,6 +1,7 @@
 // Staff hits for hitService.ts, import-free so a harness can drive it.
 // A staff hit is sent with source = its ENCH, whether the engine names the staff or the enchantment; the server checks the staff is held.
-// The staff trace writes one "staff shot" line per shot while the server holds a window open; only plain numbers are kept.
+// The staff trace writes one "staff shot" line per shot while the server holds a window open (staves, spells, scrolls and other
+// sources, and hits blamed on a reference that is not an actor); only plain numbers are kept.
 //   Server -> Client: { customPacketType: "dboStaffDiag", seconds: <30..900> }
 //   Client -> Server: { customPacketType: "dbo", event: "staffShot", args: ["<line>"] }
 
@@ -66,10 +67,9 @@ export function routeHit(f: HitFacts): HitRoute {
   return { kind: "drop", why: "other source" };
 }
 
-/** Whether the trace looks at this hit: anything staff-like, and anything that is not a weapon, spell or scroll */
+/** Whether the trace looks at this hit: anything but a weapon that is not a staff */
 export function traced(f: HitFacts): boolean {
-  if (f.isWeapon) return f.weaponType === STAFF_WEAPON_TYPE;
-  return !f.isSpell && !f.isScroll;
+  return !f.isWeapon || f.weaponType === STAFF_WEAPON_TYPE;
 }
 
 /** The window the server asked for, clamped, or null when the packet is not a request */
@@ -85,11 +85,18 @@ const hex = (n: number) => (n >>> 0).toString(16);
 function sourceLabel(f: HitFacts): string {
   if (f.isWeapon) return `WEAP ${hex(f.sourceId)} (type ${f.sourceType}, weapon type ${f.weaponType}, ench ${f.weaponEnchId ? hex(f.weaponEnchId) : "-"})`;
   if (f.isEnchantment) return `ENCH ${hex(f.sourceId)} (type ${f.sourceType})`;
+  if (f.isSpell) return `SPEL ${hex(f.sourceId)}`;
+  if (f.isScroll) return `SCRL ${hex(f.sourceId)}`;
   return `OTHER ${f.sourceId ? hex(f.sourceId) : "none"} (type ${f.sourceType})`;
 }
 
 function handLabel(w: HeldWeapon | null): string {
   return w ? `${hex(w.id)} (weapon type ${w.weaponType}) ench ${w.enchId ? hex(w.enchId) : "-"}` : "-";
+}
+
+// A spell or scroll hit never reads the hands, so its line leaves them out
+function handsLabel(f: HitFacts): string {
+  return f.isSpell || f.isScroll ? "" : ` | equipped R ${handLabel(f.right)}, L ${handLabel(f.left)}`;
 }
 
 function sentLabel(r: HitRoute): string {
@@ -128,7 +135,7 @@ export class StaffShotTrace {
     if (!shot) {
       shot = {
         firstAt: now,
-        head: `aggr ${hex(aggressor)} -> tgt ${hex(target)} | source ${source} proj ${projectile ? hex(projectile) : "-"} | equipped R ${handLabel(f.right)}, L ${handLabel(f.left)}`,
+        head: `aggr ${hex(aggressor)} -> tgt ${hex(target)} | source ${source} proj ${projectile ? hex(projectile) : "-"}${handsLabel(f)}`,
         sources: new Set([source]), events: 0, deduped: 0, sent: deduped ? "dropped (dedupe)" : sentLabel(route),
       };
       this.shots.set(key, shot);
