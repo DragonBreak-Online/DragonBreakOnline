@@ -1,4 +1,4 @@
-import { Actor, Debug, Form, Game, Input, ObjectReference, Utility } from "skyrimPlatform";
+import { Actor, Debug, Form, FormType, Game, Input, ObjectReference, Utility } from "skyrimPlatform";
 import { ClientListener, CombinedController, Sp } from "./clientListener";
 import { BrowserMessageEvent } from "skyrimPlatform";
 import { sendCustomPacket, parseCustomPacket } from "./customPacketUtil";
@@ -70,6 +70,11 @@ const norm = (deg: number): number => ((deg % 360) + 360) % 360;
 // Below these the preview is left where it is (units, degrees)
 const GHOST_MOVE_EPS = 2;
 const GHOST_TURN_EPS = 0.5;
+
+// What the select tool picks ahead of the GM when the crosshair has nothing (statics have no crosshair prompt)
+const PICK_TYPES = [FormType.Static, FormType.MovableStatic, FormType.Furniture, FormType.Activator, FormType.Container, FormType.Flora, FormType.Tree, FormType.Light];
+const PICK = { range: 1500, cone: 12, maxRefs: 6000 };
+const angleOff = (a: number, b: number): number => { const d = norm(a - b); return Math.min(d, 360 - d); };
 
 // -180..180, for showing a tilt
 const signed = (deg: number): number => { const d = norm(deg); return d > 180 ? d - 360 : d; };
@@ -323,7 +328,7 @@ export class PlacementService extends ClientListener {
       lines.push(`← → turn   ↑ ↓ nearer / further${this.pick.kind === "object" ? "   Shift+arrows tilt" : ""}   PgUp PgDn height   Home aim ${this.aim ? "off" : "on"}   ${step}`);
       lines.push(`Enter ${this.edit ? "move it here" : "place"}   Delete remove aimed   End undo   Backspace stop`);
     } else {
-      lines.push("SELECT TOOL  aim at something you placed");
+      lines.push("SELECT TOOL  aim at something placed, or at a plugin object");
       lines.push("Enter edit it   Delete remove it   End undo   Backspace stop");
     }
     if (Date.now() < this.flashUntil) lines.push(this.flashText);
@@ -360,11 +365,12 @@ export class PlacementService extends ClientListener {
     ghost.setAngle(rot[0], rot[1], rot[2]);
   }
 
-  // The remote id of the reference under the crosshair, or null with the reason shown
+  // The remote id of the reference under the crosshair (or the plugin object straight ahead), or null with the reason shown
   private aimedRemote(): number | null {
-    const ref = Game.getCurrentCrosshairRef();
-    if (!ref || ref.getFormID() === this.ghostId) {
-      Debug.notification("Aim at something you placed first.");
+    const aimed = Game.getCurrentCrosshairRef();
+    const ref = aimed && aimed.getFormID() !== this.ghostId ? aimed : this.pluginRefAhead();
+    if (!ref) {
+      Debug.notification("Aim at something first.");
       return null;
     }
     const remote = localIdToRemoteId(ref.getFormID());
@@ -373,6 +379,32 @@ export class PlacementService extends ClientListener {
       return null;
     }
     return remote;
+  }
+
+  // The plugin reference in the GM's cell nearest the line they face (by its origin); the server names what was picked
+  private pluginRefAhead(): ObjectReference | null {
+    const player = Game.getPlayer();
+    const cell = player ? player.getParentCell() : null;
+    if (!player || !cell) return null;
+    const px = player.getPositionX(), py = player.getPositionY(), yaw = player.getAngleZ();
+    let best: ObjectReference | null = null, bestScore = Infinity, seen = 0;
+    for (const type of PICK_TYPES) {
+      const n = cell.getNumRefs(type);
+      for (let i = 0; i < n && seen < PICK.maxRefs; i++, seen++) {
+        const ref = cell.getNthRef(i, type);
+        if (!ref) continue;
+        const id = ref.getFormID() >>> 0;
+        if (id >= 0xff000000 || id === this.ghostId || ref.isDisabled() || !ref.is3DLoaded()) continue;
+        const dx = ref.getPositionX() - px, dy = ref.getPositionY() - py;
+        const dist = Math.hypot(dx, dy);
+        if (dist > PICK.range) continue;
+        const off = angleOff((Math.atan2(dx, dy) * 180) / Math.PI, yaw);
+        if (off > PICK.cone) continue;
+        const score = dist + off * 40;
+        if (score < bestScore) { bestScore = score; best = ref; }
+      }
+    }
+    return best;
   }
 
   private deleteAimed(): void {

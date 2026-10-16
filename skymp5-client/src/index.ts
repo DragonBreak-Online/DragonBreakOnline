@@ -83,6 +83,7 @@ import { SearchService } from "./services/services/searchService";
 import { VoiceService } from "./services/services/voiceService";
 import { AdminMenuService } from "./services/services/adminMenuService";
 import { PlacementService } from "./services/services/placementService";
+import { WorldEditService } from "./services/services/worldEditService";
 import { AdminModeService } from "./services/services/adminModeService";
 import { ExecutionService } from "./services/services/executionService";
 // U: the player menu, the server's help topics as a panel (Nate, 2026-09-28)
@@ -239,6 +240,7 @@ const main = () => {
       new PersonalMenuService(sp, controller),
       new GamepadPointerService(sp, controller),
       new PlacementService(sp, controller),
+      new WorldEditService(sp, controller),
       new AdminModeService(sp, controller),
       new FactionService(sp, controller),
       new TradeService(sp, controller),

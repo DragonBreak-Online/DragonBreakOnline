@@ -518,16 +518,21 @@ export class RemoteServer extends ClientListener {
               ModelApplyUtils.applyModelInventory(refr, msg.props.inventory);
             }
             ModelApplyUtils.applyModelIsOpen(refr, !!msg.props['isOpen']);
-            ModelApplyUtils.applyModelIsHarvested(
-              refr,
-              !!msg.props['isHarvested'],
-            );
+            // The server sends isDisabled since the message refactor; disabled is the name before it
+            const isDisabled = !!(msg.props['isDisabled'] ?? msg.props['disabled']);
+            // The harvest check takes a disabled non-flora reference for harvested and enables it again
+            if (!isDisabled) {
+              ModelApplyUtils.applyModelIsHarvested(
+                refr,
+                !!msg.props['isHarvested'],
+              );
+            }
 
             ModelApplyUtils.applyModelNodeScale(refr, msg.props.setNodeScale);
 
             ModelApplyUtils.applyModelNodeTextureSet(refr, msg.props.setNodeTextureSet);
 
-            ModelApplyUtils.applyModelIsDisabled(refr, !!msg.props['disabled']);
+            ModelApplyUtils.applyModelIsDisabled(refr, isDisabled);
 
             // TODO: move to a separate module
             const animation = msg.props.lastAnimation;
