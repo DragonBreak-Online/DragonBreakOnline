@@ -5065,9 +5065,18 @@ const zoneAtPlace = (world, pos) => {
   for (const h of ZONES.holds || []) { if (!Array.isArray(h.capital)) continue; const d = Math.hypot(pos[0] - h.capital[0], pos[1] - h.capital[1]); if (d < bestD) { bestD = d; best = h.id; } }
   return best;
 };
+// Only a worldspace that has a zone counts as the last outdoor spot. Blackreach, ShadowgreenCavernWorld (the Solitude
+// Sewers exit) and AlftandWorld are worldspaces with none, and recording them overwrote the real one, so a death there
+// kept the old spawn point and woke at the Bruma cathedral (16 Oct: Dreams-In-Twilight #RGEZ, Masked Person #LBRF)
+const noteOutside = (a) => {
+  const w = String(mp.get(a, 'worldOrCellDesc') || '');
+  if (!w || !isWorldspace(w)) return;
+  const pos = mp.get(a, 'pos');
+  if (zoneAtPlace(w, pos)) mp.set(a, 'private.lastOutside', { world: w, pos });
+};
 every('outside', 10000, () => {
   for (const a of onlineActors()) {
-    try { const w = String(mp.get(a, 'worldOrCellDesc') || ''); if (w && isWorldspace(w)) mp.set(a, 'private.lastOutside', { world: w, pos: mp.get(a, 'pos') }); } catch (e) { /* next tick */ }
+    try { noteOutside(a); } catch (e) { /* next tick */ }
   }
 });
 // The zone a player is in: by worldspace or nearest hold capital outdoors, by zone-cells.json or owning plugin
@@ -5171,7 +5180,7 @@ const setDeathTemple = (a) => {
   try { if (!(Number(mp.get(a, 'profileId')) >= 0)) return; } catch (e) { return; }
   const zone = zoneOfActor(a);
   const t = zone ? templeFor(zone) : null;
-  if (!t) return;
+  if (!t) { log(`${display(a)} fell in ${zone || 'a place with no zone'} at ${(() => { try { return String(mp.get(a, 'worldOrCellDesc') || '?'); } catch (e) { return '?'; } })()}; the spawn point stays as it was`); return; }
   try { mp.set(a, 'spawnPoint', { cellOrWorldDesc: t.world, pos: t.pos, rot: [0, 0, Number(t.rotZ) || 0] }); log(`${display(a)} fell in ${zone}; wakes at its temple`); } catch (e) { log('respawn temple failed', e.message); }
 };
 
