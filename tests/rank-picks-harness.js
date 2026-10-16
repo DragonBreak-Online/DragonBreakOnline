@@ -200,7 +200,7 @@ const xpOf = (a, school) => rec(a).levels[school].xp;
 check('casting past 25 stops at 25, the meter full: the Apprentice spell must be chosen first', level(RP, 'Destruction') === 25 && xpOf(RP, 'Destruction') >= 99.99, rec(RP).levels.Destruction);
 let d = view(RP).schools.find((x) => x.name === 'Destruction');
 check('the Magic tab offers the Apprentice pick in the first spell\'s place, with its stage and level', d.firstSpell.state === 'open' && d.firstSpell.stage === 'Apprentice' && d.firstSpell.at === 25 && d.firstSpell.held === true && d.firstSpell.choices.some((c) => c.name === 'Firebolt') && !d.firstSpell.choices.some((c) => c.name === 'Sparks'), d.firstSpell);
-check('...and the player is told once, with where to choose it', saidAny(RP, /has reached 25: choose your Apprentice spell of Destruction \([^)]*Firebolt[^)]*\); it rises no further until you do\. Choose it in your journal's Magic tab \(F3\)/), out.said.filter((x) => x[0] === RP).map((x) => x[1]));
+check('...and the player is told once, with where to choose it', saidAny(RP, /has reached 25: choose your Apprentice spell of Destruction \([^)]*Firebolt[^)]*\); it rises no further until you do\. Choose it in the panel, your journal's Magic tab \(F3\)/), out.said.filter((x) => x[0] === RP).map((x) => x[1]));
 const toldN = out.said.filter((x) => x[0] === RP && /Apprentice spell/.test(x[1])).length;
 tick('schools.first'); tick('schools.first');
 check('...not again on the next checks', out.said.filter((x) => x[0] === RP && /Apprentice spell/.test(x[1])).length === toldN);

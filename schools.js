@@ -512,7 +512,7 @@ module.exports = (api) => {
   const ST0 = globalThis.__dboSchoolsState || (globalThis.__dboSchoolsState = {});
   const pickNonces = ST0.pickNonces instanceof Map ? ST0.pickNonces : (ST0.pickNonces = new Map()); // actor -> { nonce, school, ref, options }
   // The pick panel: Study Magic's choose mode with its lead line (client 0.3.75); `ref` is the shelf or ledger it opened at
-  const openPick = (a, ref, school, result, resultKind) => {
+  const openPick = (a, ref, school, result, resultKind, focus = true) => {
     const options = pickOptions(a, school);
     if (!options.length) return false;
     const nonce = mkNonce('f', a);
@@ -527,7 +527,7 @@ module.exports = (api) => {
       choices: options.map((o) => ({ name: o.name, blurb: o.blurb || SPELL_BLURB[o.key] || '', confirm: `Do you want ${o.name} as your ${stageWord(st)} of ${school}?${o.from ? ` You keep ${o.from}.` : ''}${options.length > 1 ? ` The other${options.length > 2 ? 's' : ''} you can still learn from a tome or a teacher.` : ''}` })),
       result: result || '', resultKind: resultKind || '',
       events: { choose: 'dbo:firstSpellPick', start: 'dbo:firstSpellPick', stop: 'dbo:firstSpellPick', close: 'dbo:firstSpellClose' },
-    }, true);
+    }, focus !== false);
     return true;
   };
   // When each online character arrived (the character ready, the login check, or the first check that saw them); a
@@ -668,7 +668,9 @@ module.exports = (api) => {
     const line = `${school === RESTORATION ? 'Priest' : `Your study of ${school}`} has reached ${stageAt(st)}: ${st === 'first' ? 'you may choose' : 'choose'} your ${stageWord(st)} of ${school} (${names})${st !== 'first' ? '; it rises no further until you do' : ''}.`;
     const at = ref || (why === 'study' ? studyAt.get(a >>> 0) || 0 : 0);
     if (at || why === 'login') { personal(a, told ? `Your ${stageWord(st)} of ${school} waits to be chosen.` : line); return openPick(a, at, school); }
-    if (!told) personal(a, `${line} Choose it in your journal's Magic tab (F3), at a Study Magic shelf or a Scholars' Ledger, or when you next log in.`);
+    // In the field the panel opens at once without the keyboard (Nate 16 Oct: players missed the chat line), so a fight is
+    // never interrupted; a click into it chooses, and the journal, a shelf, a ledger and the next login still offer it
+    if (!told) { personal(a, `${line} Choose it in the panel, your journal's Magic tab (F3), at a Study Magic shelf or a Scholars' Ledger, or when you next log in.`); return openPick(a, 0, school, '', '', false); }
     return false;
   };
 

@@ -193,7 +193,7 @@ check('Priest 24: nothing yet', !out.said.some((x) => x[0] === PRIESTLY));
 priestOf(PRIESTLY, 25);
 const pp = widgetsOf(PRIESTLY, 73).length;
 tick('schools.first');
-check('Priest 25 in the field: the line names the three spells and where to choose them, no panel thrust open', said(PRIESTLY) === "Priest has reached 25: you may choose your first spell of Restoration (Healing, Lesser Ward or Insect Swarm). Choose it in your journal's Magic tab (F3), at a Study Magic shelf or a Scholars' Ledger, or when you next log in." && widgetsOf(PRIESTLY, 73).length === pp, said(PRIESTLY));
+check('Priest 25 in the field: the line names the three spells and where to choose them, and the pick panel opens without the keyboard (Nate 16 Oct)', said(PRIESTLY) === "Priest has reached 25: you may choose your first spell of Restoration (Healing, Lesser Ward or Insect Swarm). Choose it in the panel, your journal's Magic tab (F3), at a Study Magic shelf or a Scholars' Ledger, or when you next log in." && widgetsOf(PRIESTLY, 73).length === pp + 1 && widgetsOf(PRIESTLY, 73).slice(-1)[0].focus === false && widgetsOf(PRIESTLY, 73).slice(-1)[0].w.mode === 'choose', said(PRIESTLY));
 activate(BOOKCASE, PRIESTLY);
 let w = lastWidget(PRIESTLY, 'studyMagic');
 check('...at a Study Magic shelf the pick opens: Healing, Lesser Ward or Insect Swarm', w.title === 'Your First Spell' && w.lead === 'Priest has reached 25: choose your first spell of Restoration. It goes into your spellbook, no tome needed.' && w.choices.map((c) => c.name).join() === 'Healing,Lesser Ward,Insect Swarm' && /The others you can still learn/.test(w.choices[0].confirm), w);
