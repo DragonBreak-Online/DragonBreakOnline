@@ -3,8 +3,10 @@ import { Actor, Flora, Form, FormType, Menu, TreeObject, interruptCast, castSpel
 import {
   Cell,
   Debug,
+  DxScanCode,
   EquipEvent,
   Game,
+  Input,
   ObjectReference,
   TESModPlatform,
   Ui,
@@ -26,6 +28,7 @@ import { applyAppearanceToPlayer } from '../../sync/appearance';
 import { OwnLookQueue } from '../../sync/ownLook';
 import { applyEquipment, isBadMenuShown } from '../../sync/equipment';
 import { Inventory, applyInventory, getDiff, getInventory, isBoundItem, removeSimpleItemsAsManyAsPossible } from '../../sync/inventory';
+import { ContainerGhost, containerMenuWatch, totalsOf } from '../../sync/containerMenuWatch';
 import { Movement } from '../../sync/movement';
 import { reenforceServerSpells, rememberServerSpells } from '../../sync/spell';
 import { wasSelfActivated } from '../../sync/selfActivation';
@@ -120,7 +123,47 @@ export const holdPcInventoryApply = (ms: number): void => {
 export const requestPcInventoryApply = (): void => {
   pcInvLastApply = 0;
 };
+
+const CONTAINER_CLOSE_NOTICE_MS = 60000;
+let containerCloseNoticeAt = -Infinity;
+
+const readPackTotals = () => {
+  const player = Game.getPlayer();
+  return player ? totalsOf(getInventory(player).entries) : new Map<number, number>();
+};
+
+const isLocalOnlyItem = (baseId: number): boolean => {
+  const f = Game.getFormEx(baseId);
+  return !f || isBoundItem(f);
+};
+
+const noteContainerClosed = (ghosts: ContainerGhost[]): void => {
+  const note = (globalThis as { __dboDiagNote?: (kind: string, text: string) => void }).__dboDiagNote;
+  const list = ghosts.slice(0, 6).map((g) => `${(g.baseId >>> 0).toString(16)} x${g.excess}`).join(", ") + (ghosts.length > 6 ? ` +${ghosts.length - 6} more` : "");
+  try {
+    if (typeof note === "function") note("containerResync", `closed the container window (try ${containerMenuWatch.closesTried}): the pack showed ${list} the server no longer holds`);
+  } catch { /* diagnostics only */ }
+};
+
+// The pack is not written under an open container window, so one the server changed is closed and the change applied at once
+const watchContainerMenu = (): void => {
+  const open = Ui.isMenuOpen("ContainerMenu");
+  const ghosts = containerMenuWatch.frame(Date.now(), open, readPackTotals, isLocalOnlyItem);
+  if (!ghosts) {
+    return;
+  }
+  pcInvLastApply = 0;
+  // No close-menu API: the game's own cancel key, as SearchService taps it
+  Input.tapKey(DxScanCode.Tab);
+  noteContainerClosed(ghosts);
+  if (Date.now() - containerCloseNoticeAt >= CONTAINER_CLOSE_NOTICE_MS) {
+    containerCloseNoticeAt = Date.now();
+    Debug.notification("Your pack changed while the container was open, so it was closed to show your items as they are now.");
+  }
+};
+
 on('update', () => {
+  watchContainerMenu();
   if (isBadMenuShown()) {
     return;
   }
@@ -249,6 +292,7 @@ export class RemoteServer extends ClientListener {
     const msg = event.message;
     once('update', () => {
       setPcInventory(msg.inventory);
+      containerMenuWatch.serverInventory(Date.now(), totalsOf(msg.inventory.entries));
 
       let blocked = false;
 
