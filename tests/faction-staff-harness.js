@@ -69,7 +69,7 @@ ok('staff payload: staff, roles, counts and the edit flags', payload(LEAD).staff
 const gmf = payload(GM).factions.find((f) => f.id === FID);
 ok('a plain GM sees it read-only', payload(GM).staff === true && !gmf.canEditRanks && !gmf.canAdd && !gmf.canRename);
 const bf = payload(BOSS).factions.find((f) => f.id === FID);
-ok('the leader may rename, not add or move', bf.canRename && !bf.canEditRanks && !bf.canAdd && payload(BOSS).staff === false);
+ok('the leader may rename, add, move and remove ranks (Nate, 16 Oct), not add members', bf.canRename && bf.canEditRanks && !bf.canAdd && payload(BOSS).staff === false);
 ok('hold factions carry court: true', payload(LEAD).factions.find((f) => f.id === 'county-bruma').court === true && fl.court === false);
 
 // ---- the leader renames -----------------------------------------------------------------------------------------------
@@ -83,8 +83,17 @@ p = send('factionRanksEdit', BOSS, FID, renamed);
 ok('the leader renames a title (trimmed)', p.resultKind === 'ok' && ranksNow()[1].title === 'Shield-Brother', [p && p.result, ranksNow()[1]]);
 ok('the wage keyed by the old title moves with it', wageRenamed && wageRenamed[1] === before[1].title && wageRenamed[2] === 'Shield-Brother', wageRenamed);
 const swapped = ranksNow().map((r, i) => ({ title: r.title, role: r.role, from: i })); [swapped[1], swapped[2]] = [swapped[2], swapped[1]];
-ok('the leader cannot reorder', send('factionRanksEdit', BOSS, FID, swapped).resultKind === 'refused' && ranksNow()[1].title === 'Shield-Brother');
-ok('the leader cannot add a rank', send('factionRanksEdit', BOSS, FID, ranksNow().map((r, i) => ({ title: r.title, role: r.role, from: i })).concat([{ title: 'Squire', role: 'member', from: -1 }])).resultKind === 'refused');
+const swappedTitle = swapped[1].title;
+ok('the leader reorders ranks', send('factionRanksEdit', BOSS, FID, swapped).resultKind === 'ok' && ranksNow()[1].title === swappedTitle && ranksNow()[2].title === 'Shield-Brother', ranksNow().map((r) => r.title));
+const back = ranksNow().map((r, i) => ({ title: r.title, role: r.role, from: i })); [back[1], back[2]] = [back[2], back[1]];
+ok('...and puts them back', send('factionRanksEdit', BOSS, FID, back).resultKind === 'ok' && ranksNow()[1].title === 'Shield-Brother');
+const nBefore = ranksNow().length;
+ok('the leader adds a rank', send('factionRanksEdit', BOSS, FID, ranksNow().map((r, i) => ({ title: r.title, role: r.role, from: i })).concat([{ title: 'Page', role: 'member', from: -1 }])).resultKind === 'ok' && ranksNow().length === nBefore + 1 && ranksNow()[nBefore].title === 'Page');
+ok('...and removes an empty one', send('factionRanksEdit', BOSS, FID, ranksNow().map((r, i) => ({ title: r.title, role: r.role, from: i })).filter((r) => r.title !== 'Page')).resultKind === 'ok' && ranksNow().length === nBefore && !ranksNow().some((r) => r.title === 'Page'));
+ok('the leader cannot make a second leader rank', send('factionRanksEdit', BOSS, FID, ranksNow().map((r, i) => ({ title: r.title, role: i === 1 ? 'leader' : r.role, from: i }))).resultKind === 'refused' && ranksNow()[1].role !== 'leader');
+ok('...nor move the leader rank off the top', send('factionRanksEdit', BOSS, FID, (() => { const l = ranksNow().map((r, i) => ({ title: r.title, role: r.role, from: i })); [l[0], l[1]] = [l[1], l[0]]; return l; })()).resultKind === 'refused' && ranksNow()[0].role === 'leader');
+payload(MATE);
+ok('a plain member cannot change the ranks', send('factionRanksEdit', MATE, FID, ranksNow().map((r, i) => ({ title: r.title, role: r.role, from: i })).concat([{ title: 'Page', role: 'member', from: -1 }])).resultKind === 'refused' && ranksNow().length === nBefore);
 globalThis.__dboProseProblem = (t) => (/badword/i.test(t) ? 'badword' : null);
 ok('a title the prose filter refuses is refused, naming the word', /badword/.test(send('factionRanksEdit', BOSS, FID, ranksNow().map((r, i) => ({ title: i === 2 ? 'Badword' : r.title, role: r.role, from: i }))).result));
 delete globalThis.__dboProseProblem;
