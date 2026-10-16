@@ -24,3 +24,17 @@ export const calendarOf = (gameDays: number, startYear: number = DEFAULT_START_Y
   }
   return { year, month, day };
 };
+
+// The engine's weekday: whole GameDaysPassed mod 7, 0 Sundas (CommonLibSSE RE::Calendar::GetDayOfWeek); server worldclock.js weekday()
+export const WEEKDAYS = ["Sundas", "Morndas", "Tirdas", "Middas", "Turdas", "Fredas", "Loredas"];
+export const weekdayOf = (gameDays: number): number => {
+  const d = Math.floor(Number(gameDays));
+  return Number.isFinite(d) ? ((d % 7) + 7) % 7 : 0;
+};
+
+// The moons' phase as the engine draws it: three days a phase (every Bruma and Skyrim climate), eight phases, 0 full
+export const MOON_PHASES = ["full", "waning gibbous", "third quarter", "waning crescent", "new", "waxing crescent", "first quarter", "waxing gibbous"];
+export const moonPhaseOf = (gameDays: number): number => {
+  const d = Math.floor(Number(gameDays) / 3);
+  return Number.isFinite(d) ? ((d % 8) + 8) % 8 : 0;
+};
