@@ -2,10 +2,10 @@ import { ClientListener, CombinedController, Sp } from "./clientListener";
 import { parseCustomPacket } from "./customPacketUtil";
 import { ConnectionMessage } from "../events/connectionMessage";
 import { CustomPacketMessage } from "../messages/customPacketMessage";
-import { ActiveEffectApplyRemoveEvent, Actor, Armor, ButtonEvent, DxScanCode, GlobalVariable, InputDeviceType, Perk, Race, Shout, Spell, SpellCastEvent, WordOfPower } from "skyrimPlatform";
+import { ActiveEffectApplyRemoveEvent, Actor, Armor, ButtonEvent, DxScanCode, EquipEvent, GlobalVariable, InputDeviceType, Perk, Race, Shout, Spell, SpellCastEvent, WordOfPower } from "skyrimPlatform";
 import { sendCustomPacket } from "./customPacketUtil";
 import { logError, logTrace } from "../../logging";
-import { adoptHeld } from "./beastLoadout";
+import { adoptHeld, isForeignBeastGear } from "./beastLoadout";
 import { howlShoutIds, mayHoldHowl, stripDue } from "./beastHowl";
 import { parseBeastBodies, setBeastBodies } from "../../sync/beastBody";
 import { resolveBeastRaces, vanillaBeastRaceOf } from "../../sync/beastRaces";
@@ -84,6 +84,7 @@ export class BeastFormService extends ClientListener {
     this.controller.on("spellCast", (e) => this.onSpellCast(e));
     this.controller.on("effectStart", (e) => this.onEffectStart(e));
     this.controller.on("buttonEvent", (e) => this.onButtonEvent(e));
+    this.controller.on("equip", (e) => this.onEquip(e));
     this.controller.on("update", () => this.onCameraCheck());
     this.controller.on("update", () => this.onHowlCheck());
     // The plugin beast races resolve in the first update, before a dboBeastBody list (read where natives cannot run) needs them
@@ -176,6 +177,26 @@ export class BeastFormService extends ClientListener {
 
   private lastRequestAt = new Map<number, number>();
 
+  // Gear put on a beast behind the player's back (a server re-dress, inventory.ts's ammo re-equip) comes off on the next update
+  private onEquip(e: EquipEvent): void {
+    if (!this.beastRace || !e.actor || !e.baseObj || e.actor.getFormID() !== 0x14) return;
+    const id = e.baseObj.getFormID() >>> 0;
+    if (!isForeignBeastGear(e.baseObj.getType(), id, this.wear)) return;
+    this.controller.once("update", () => this.takeOffGear(id));
+  }
+
+  private takeOffGear(id: number): void {
+    if (!this.beastRace || this.wear.has(id)) return;
+    const player = this.sp.Game.getPlayer();
+    const item = this.sp.Game.getFormEx(id);
+    if (!player || !item || !player.isEquipped(item)) return;
+    try { player.unequipItem(item, false, true); } catch (e) { logError(this, "beast gear unequip failed", e); return; }
+    logTrace(this, "Took gear off the beast form", id.toString(16));
+  }
+
+  // The form's own outfit (dboBeast wear, beastform.js WEAR); empty outside a form
+  private wear = new Set<number>();
+
   private restoreControls(): void {
     try { this.sp.Game.enablePlayerControls(true, true, true, true, true, true, true, true, 0); } catch { /* menu */ }
   }
@@ -226,6 +247,7 @@ export class BeastFormService extends ClientListener {
         this.applyLoadout(player, raceId, beast);
         // The server puts the form's outfit in the inventory and lists it here (beastform.js WEAR);
         const wear = Array.isArray(content["wear"]) ? (content["wear"] as unknown[]).map((x) => Number(x) >>> 0) : [];
+        this.wear = new Set(beast ? wear : []);
         for (const id of beast ? wear : []) {
           const armor = Armor.from(this.sp.Game.getFormEx(id));
           if (!armor) { logError(this, "beast outfit not in the load order", id.toString(16)); continue; }
