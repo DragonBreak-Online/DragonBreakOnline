@@ -65,7 +65,10 @@ const initial = (name: string): string => (name || '?').trim().charAt(0).toUpper
 const CharacterSelect = ({ data }: { data: CharacterSelectData }) => {
   const max = Math.max(1, Number(data.maxCharacters) || 1);
   const characters = data.characters || [];
-  const locked = Array.isArray(data.lockedCharacters) ? data.lockedCharacters : [];
+  // Object entries only, so one bad entry cannot take down the whole UI
+  const locked = Array.isArray(data.lockedCharacters)
+    ? data.lockedCharacters.filter((c) => !!c && typeof c === 'object' && !Array.isArray(c))
+    : [];
   const s = data.strings || {};
   const ev = data.events || {};
   const [shown, setShown] = useState(false);
@@ -164,19 +167,21 @@ const CharacterSelect = ({ data }: { data: CharacterSelectData }) => {
             );
           })}
           {locked.map((c, i) => (
-            <div key={`locked-${i}`} className="dboSelect__slot dboSelect__slot--locked">
+            <div key={`locked-${i}`} className={'dboSelect__slot dboSelect__slot--locked' + (c.dead ? ' dboSelect__slot--dead' : '')}>
               <div className="dboSelect__sigil"><LockIcon /></div>
               <div className="dboSelect__who">
                 <div className="dboSelect__slotLabel">
                   {typeof c.slot === 'number' ? `${s.slot || 'Slot'} ${c.slot + 1}` : (s.locked || 'Locked')}
                 </div>
                 <div className="dboSelect__name">{c.name || 'Character'}</div>
-                <div className="dboSelect__meta">{c.race || c.info || ''}</div>
+                <div className="dboSelect__meta">{c.dead ? (s.dead || 'Dead') : (c.race || c.info || '')}</div>
               </div>
               <div className="dboSelect__slotActions">
-                <span className="dboSelect__lockNote">
-                  {c.reason === 'staff' ? (s.lockedStaff || 'Staff role needed') : (s.resubscribe || 'Resubscribe to play')}
-                </span>
+                {c.dead ? null : (
+                  <span className="dboSelect__lockNote">
+                    {c.reason === 'staff' ? (s.lockedStaff || 'Staff role needed') : (s.resubscribe || 'Resubscribe to play')}
+                  </span>
+                )}
               </div>
             </div>
           ))}
