@@ -98,6 +98,8 @@
   "_comment": "Spell study (server\\spells.js). A tome is learned only at a skills.json spellStudyPoints entry, by a reader with the school's skill (arcane or priest) taken up, a tier that allows the tome's rank, and a free slot; slots 0 uses the skill's spellSlots (3). /teach: a teacher at teacherMinTier (4 = Master; Nate 2026-10-06) teaches a known spell of teachMinRank (2 = Adept) or higher to a player within teachMeters at studentMinTier (1 = Apprentice) or higher who could learn it now by a tome read's checks (the tier for the rank, the study of the school); teachAtStudyPoint also requires both at a study point. /tomes: the court mage's shop in shopCells (the Synod Conclave and its basement), for members of shopFactions with arcane or priest at shopMinTier or higher, ranks up to their tier and never above shopMaxRank (3 = Expert), one tome per shopCooldownDays; the shelf lists only shopStock (4) tomes the buyer can learn now, chosen per UTC week (from Monday 00:00) by a seed of the week and the shop, so everyone at the shop sees the same rotation (Nate 2026-10-06), price = tome value x shopPriceMultiplier, paid to the shopTreasury zone.",
   "enabled": true,
   "slots": 0,
+  "_suspendedSpells": "Held back for a while: kept in the spellbook, taken off the prepared list and out of the engine, never prepared, read, taught or given until taken off this list (spells.js suspendedSpells).",
+  "suspendedSpells": ["da746:Skyrim.esm", "8dcec:Druadach.esm", "94fca:Druadach.esm"],
   "teachMeters": 5,
   "teacherMinTier": 4,
   "teachMinRank": 2,

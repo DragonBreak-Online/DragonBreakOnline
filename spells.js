@@ -50,6 +50,10 @@ module.exports = (api) => {
     // Spells taken out of the game (Nate, 11 Oct: Transmute Mineral Ore "breaks economies", turning iron into silver and gold):
     // never sold, read, taught or given, and taken from anyone who knows them at their next login
     removedSpells: ['109111:Skyrim.esm'],
+    // Spells held back for a while (staff, for a fix): they stay in the spellbook but are taken off the prepared list and out
+    // of the engine at login and at the next check, cannot be prepared, and are not read, taught, given or passed on. Taking
+    // one off this list changes nothing on the characters: it is prepared again at a college as usual.
+    suspendedSpells: [],
     prepareCells: ['20ff:BSHeartland.esm', '6c152:BSHeartland.esm',                             // the Synod Conclave, Bruma
       '12cb:BSHeartland.esm', '5f78c:BSHeartland.esm', '5f78d:BSHeartland.esm',                 // the Cathedral of St Martin, Bruma
       '1380e:Skyrim.esm', '1380f:Skyrim.esm', 'cab91:Skyrim.esm', '13810:Skyrim.esm', 'cab92:Skyrim.esm'], // College of Winterhold halls
@@ -321,6 +325,13 @@ module.exports = (api) => {
 
   const REMOVED = new Set((CFG.removedSpells || []).map(idOf).filter(Boolean));
   const removed = (spellId) => REMOVED.has(Number(spellId) >>> 0);
+  const SUSPENDED = new Set((CFG.suspendedSpells || []).map(idOf).filter(Boolean));
+  const suspended = (spellId) => SUSPENDED.has(Number(spellId) >>> 0);
+  const nameOf = (spellId) => { const sp = classifySpell(spellId); return sp ? sp.name : 'That spell'; };
+  const heldLine = (spellId) => `${nameOf(spellId)} is held back for a short while; it stays in your spellbook.`;
+  // A held spell the engine had but the spellbook does not (known before study began, or given outside it) is listed here,
+  // so it goes back into the engine once it is no longer held
+  const HELD = 'private.dboHeldSpells';
 
   // ---- the spellbook (studied spells, per skill) ----------------------------------------------------------------
   const studiedOf = (a) => { const s = get(a, STUDIED, null); return s && typeof s === 'object' ? s : {}; };
@@ -423,6 +434,7 @@ module.exports = (api) => {
     };
     if (tome.unknown) { log(`spells: tome ${descOf(bookId)} ${tome.edid} teaches a spell that could not be classified`); return refuse('this tome belongs to no school we know.'); }
     if (removed(tome.spellId)) return refuse('this spell is no longer taught anywhere in the realm.');
+    if (suspended(tome.spellId)) return refuse(`${tome.name} is held back for a short while.`);
     if (knows(a, tome.spellId)) return null; // the engine keeps the tome and changes nothing
     if (inBook(a, tome.spellId)) {
       personal(a, `${tome.name} is already in your spellbook. You keep the tome. ${COLLEGE_HINT}`);
@@ -535,6 +547,7 @@ module.exports = (api) => {
     if (!atCollege(a)) return { ok: false, text: COLLEGE_HINT };
     if (!inBook(a, spellId)) return { ok: false, text: 'That spell is not in your spellbook.' };
     if (want && typeof globalThis.__dboCastBlocked === 'function' && globalThis.__dboCastBlocked(spellId)) return { ok: false, text: 'That spell is disabled for now.' };
+    if (want && suspended(spellId)) return { ok: false, text: heldLine(spellId) };
     const sp = classifySpell(spellId) || { id: spellId, name: descOf(spellId) };
     const prep = preparedIds(a);
     if (want) {
@@ -572,10 +585,42 @@ module.exports = (api) => {
   globalThis.__dboSpellsClassify = (id) => classifySpell(Number(id) >>> 0);
   // The spell a tome teaches (0 when it is not a spell tome): the reading's tome pick skips tomes the reader already knows
   globalThis.__dboSpellsTomeSpell = (bookId) => { try { const t = tomeOf(Number(bookId) >>> 0); return t && t.spellId ? t.spellId >>> 0 : 0; } catch (e) { return 0; } };
+  // A held spell (suspendedSpells) leaves the prepared list and the engine; the spellbook keeps it. One the spellbook does
+  // not hold is noted on the character and given back to the engine once it is no longer held. Returns how many were held.
+  const heldOf = (a) => { const h = get(a, HELD, null); return Array.isArray(h) ? h.map(idOf).filter(Boolean) : []; };
+  const holdSuspended = (a) => {
+    a >>>= 0;
+    const back = heldOf(a).filter((id) => !suspended(id));
+    if (!SUSPENDED.size && !back.length) return 0;
+    const engine = learnedIds(a);
+    if (!engine) return 0; // the engine could not say; the next check tries again
+    let held = heldOf(a), n = 0;
+    for (const id of back) {
+      if (!engine.includes(id)) papyrus(a, 'AddSpell', id, [false]);
+      held = held.filter((x) => x !== id);
+      audit(`SPELL ${who(a)} had ${descOf(id)} ${nameOf(id)} given back (no longer held)`);
+    }
+    for (const id of SUSPENDED) {
+      const inEngine = engine.includes(id), prepped = preparedIds(a).includes(id);
+      if (!inEngine && !prepped) continue;
+      if (prepped) writePrepared(a, preparedIds(a).filter((x) => x !== id));
+      if (inEngine) papyrus(a, 'RemoveSpell', id);
+      if (inEngine && !inBook(a, id) && !held.includes(id)) held.push(id);
+      personal(a, heldLine(id));
+      audit(`SPELL ${who(a)} had ${descOf(id)} ${nameOf(id)} held back (suspended; engine ${inEngine}, prepared ${prepped}, book ${inBook(a, id)})`);
+      n++;
+    }
+    if (back.length || n) set(a, HELD, held.map(descOf).filter(Boolean));
+    return n;
+  };
+  globalThis.__dboSpellsHoldSuspended = holdSuspended;
+  if (typeof api.every === 'function') api.every('spells.hold', 15000, () => { if (!SUSPENDED.size && !onlineActors().some((a) => heldOf(a).length)) return; for (const a of onlineActors()) { try { holdSuspended(a); } catch (e) { log('spells: hold failed', e.message); } } });
+
   // A spell given outright into one skill's book, as a lesson adds it (schools.js: a new mage's first spell). No tier or
   // school check: the giver has decided. { ok, name, line }, or null when the spell is unknown here.
   // At login (gamemode.js): a removed spell leaves the engine, the spellbook and the prepared list
   globalThis.__dboSpellsStripRemoved = (a) => {
+    try { holdSuspended(a); } catch (e) { log('spells: hold failed', e.message); }
     if (!REMOVED.size) return 0;
     let n = 0;
     for (const id of REMOVED) {
@@ -596,6 +641,7 @@ module.exports = (api) => {
     const skill = skillDef(String(skillId || 'arcane'));
     if (!sp || !skill) return null;
     if (removed(sp.id)) return { ok: false, name: sp.name, line: `${sp.name} is no longer taught.` };
+    if (suspended(sp.id)) return { ok: false, name: sp.name, line: heldLine(sp.id) };
     if (inBook(a, sp.id)) return { ok: false, name: sp.name, line: `${sp.name} is already in your spellbook.` };
     migrate(a);
     writeStudied(a, skill.id, studiedIds(a, skill.id).concat([sp.id]));
@@ -631,13 +677,14 @@ module.exports = (api) => {
     if (!skills.length) return [];
     const ids = new Set(ownLearned(a));
     for (const s of skills) for (const id of studiedIds(a, s.id)) ids.add(id);
-    return [...ids].map(classifySpell).filter((sp) => sp && !removed(sp.id) && Number(sp.rank) >= CFG.teachMinRank && pathsOf(a, sp.school).some((skill) => skills.includes(skill)));
+    return [...ids].map(classifySpell).filter((sp) => sp && !removed(sp.id) && !suspended(sp.id) && Number(sp.rank) >= CFG.teachMinRank && pathsOf(a, sp.school).some((skill) => skills.includes(skill)));
   };
   const near = (a, b) => distanceMeters(a, b) <= CFG.teachMeters;
   const rankWord = (r) => RANKS[Math.max(0, Math.min(RANKS.length - 1, Number(r) || 0))];
   // Why the student cannot take this spell from this teacher now, or null. The student's checks are a tome read's
   // (slotRefusal: the tier for the rank, the study of the school), without the study point: the teacher stands in for it.
   const teachRefusal = (teacher, student, sp) => {
+    if (suspended(sp.id)) return `${sp.name} is held back for a short while and is not taught.`;
     if (Number(sp.rank) < CFG.teachMinRank) return `Only spells of ${rankWord(CFG.teachMinRank)} rank and above may be taught; ${sp.name} is ${/^[AEIOU]/.test(rankWord(sp.rank)) ? 'an' : 'a'} ${rankWord(sp.rank)} spell.`;
     if (!onlineActors().includes(student)) return `${display(student)} is not here.`;
     if (!near(teacher, student)) return `${display(student)} must stand within ${CFG.teachMeters} m.`;
@@ -1027,6 +1074,7 @@ module.exports = (api) => {
   };
   // Why this lesson cannot happen now, or ''
   const collegeTeachRefusal = (teacher, student, sp, place, fid) => {
+    if (suspended(sp.id)) return `${sp.name} is held back for a short while and is not taught.`;
     const c = teachCollege(teacher, place);
     if (c.why) return c.why;
     if (String(c.m.id) !== String(fid)) return "A spell is taught at your own college's ledger or lectern.";
@@ -1117,6 +1165,7 @@ module.exports = (api) => {
     return Math.min(Number(CFG.shopMaxRank), Math.max(Number(TEACH.studentMinCap) || 0, ...mine.map(rankCapIn)));
   };
   const classRefusal = (teacher, student, sp) => {
+    if (suspended(sp.id)) return `${sp.name} is held back for a short while and is not taught.`;
     if (!onlineActors().includes(student >>> 0)) return `${display(student)} is not here.`;
     if (!((knows(teacher, sp.id) && !onLoan(teacher, sp.id)) || inBook(teacher, sp.id))) return `${display(teacher)} can no longer teach ${sp.name}.`;
     if (restrictedSpell(sp.id) && !isSenior(student)) return `${RESTRICTED_LINE}.`;
@@ -1394,6 +1443,7 @@ module.exports = (api) => {
   globalThis.__dboSpellsOpenTo = (a, spellId) => {
     const id = Number(spellId) >>> 0;
     if (removed(id)) return 'no longer taught';
+    if (suspended(id)) return 'held back for a short while';
     if (!TOME_SPELLS.has(id)) return 'not a spell of the tomes';
     if (restrictedSpell(id) && !isSenior(a)) return RESTRICTED_LINE;
     try { if (typeof globalThis.__dboCastBlocked === 'function' && globalThis.__dboCastBlocked(id)) return 'switched off'; } catch (e) { /* no gate */ }

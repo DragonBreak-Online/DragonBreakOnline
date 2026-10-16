@@ -571,6 +571,53 @@ check('closing the panel closes widget 44', out.closed.some((c) => c[0] === OTHE
   check('a staff grant of it is refused', globalThis.__dboSpellsGrant(W, idOf(TRANSMUTE[1]), 'priest').ok === false);
 }
 
+// ---- spells held back for a while (suspendedSpells): kept in the book, off the prepared list and out of the engine ----
+{
+  const EQ = ['f4997:Skyrim.esm', 'da746:Skyrim.esm'], eq = idOf(EQ[1]);
+  const TRANSMUTE_ID = idOf('109111:Skyrim.esm');
+  const H = 0x41, L = 0x42, N = 0x43, TCH = 0x44;
+  for (const x of [H, L, N, TCH]) { put(x, 'profileId', x); at(x, SYNOD, [0, 0, 0]); online.push(x); }
+  mastery(H, { priest: 1 }); mastery(L, { priest: 1 }); mastery(N, { priest: 1 }); mastery(TCH, { priest: 4 });
+  // H: studied and prepared; L: in the engine only (known before study began); N: never had it
+  known(H).add(eq); put(H, 'private.dboStudied', { priest: [EQ[1]] }); put(H, 'private.dboPrepared', [EQ[1]]);
+  known(L).add(eq); put(L, 'private.dboPrepared', []);
+  put(N, 'private.dboPrepared', []);
+  out.audits.length = 0;
+  load({ suspendedSpells: [EQ[1]], teachMinRank: 0 });
+  check('a held spell at login: off the prepared list and out of the engine, kept in the book', globalThis.__dboSpellsStripRemoved(H) === 0 && !known(H).has(eq) && prepared(H).length === 0 && studied(H, 'priest').join() === EQ[1] && /Equilibrium is held back for a short while; it stays in your spellbook/.test(said(H)), [prepared(H), studied(H, 'priest'), said(H)]);
+  check('...audited as held back (suspended)', out.audits.some((l) => /^SPELL P41 had da746:Skyrim.esm Equilibrium held back \(suspended/.test(l)), out.audits);
+  const told = out.said.filter((p) => p[0] === H).length;
+  check('...and nothing more on the next check', globalThis.__dboSpellsHoldSuspended(H) === 0 && out.said.filter((p) => p[0] === H).length === told);
+  check('the check while online does the same for one known outside the book, and notes it', globalThis.__dboSpellsHoldSuspended(L) === 1 && !known(L).has(eq) && (props.get(L + '|private.dboHeldSpells') || []).join() === EQ[1], props.get(L + '|private.dboHeldSpells'));
+  check('a character without it is untouched', globalThis.__dboSpellsHoldSuspended(N) === 0 && !props.has(N + '|private.dboHeldSpells'));
+  for (const x of [H, L, N, TCH]) ui('uiCaps', x, ['spellbook']);
+  cmd('spells', H); const hb = lastWidget(H);
+  ui('spellbookPrepare', H, [hb.nonce, EQ[1]], 58);
+  check('preparing it is refused with the hold line', !known(H).has(eq) && prepared(H).length === 0 && /Equilibrium is held back for a short while; it stays in your spellbook/.test(JSON.stringify(lastWidget(H))), lastWidget(H));
+  check('reading its tome is refused and the tome kept', (await read(N, EQ)) === false && /held back for a short while\. You keep the tome/.test(said(N)) && !known(N).has(eq) && !studied(N, 'priest').length, said(N));
+  check('a staff grant is refused', globalThis.__dboSpellsGrant(N, eq, 'priest').ok === false && !known(N).has(eq));
+  check('an apprenticeship does not pass it on', /held back/.test(globalThis.__dboSpellsOpenTo(N, eq)));
+  put(TCH, 'private.dboStudied', { priest: [EQ[1]] }); put(TCH, 'private.dboPrepared', []);
+  cmd('teach', TCH);
+  check('/teach does not offer it', /You know no spell/.test(said(TCH)), said(TCH));
+  check('a class does not hand it out', globalThis.__dboSpellsClassOffer(TCH, N, eq, 'k1') === false && /held back/.test(said(N)), said(N));
+  check('removedSpells still strips Transmute the same way', (() => { known(N).add(TRANSMUTE_ID); return globalThis.__dboSpellsStripRemoved(N) === 1 && !known(N).has(TRANSMUTE_ID); })());
+  // lifted: taken off the list
+  out.audits.length = 0;
+  load({ teachMinRank: 0 });
+  check('lifted: the spellbook one stays put away, nothing is forced back', globalThis.__dboSpellsHoldSuspended(H) === 0 && !known(H).has(eq) && prepared(H).length === 0 && studied(H, 'priest').join() === EQ[1]);
+  for (const x of [H, L, N, TCH]) ui('uiCaps', x, ['spellbook']);
+  cmd('spells', H); ui('spellbookPrepare', H, [lastWidget(H).nonce, EQ[1]], 58);
+  check('...and is prepared again at a college as usual', known(H).has(eq) && prepared(H).join() === EQ[1], [prepared(H), lastWidget(H)]);
+  check('one held from outside the book goes back into the engine once', globalThis.__dboSpellsHoldSuspended(L) === 0 && known(L).has(eq) && (props.get(L + '|private.dboHeldSpells') || []).length === 0 && out.audits.some((l) => /P42 had da746:Skyrim.esm Equilibrium given back/.test(l)), out.audits);
+  check('...and is not touched again', (() => { const n = papyrus.length; globalThis.__dboSpellsHoldSuspended(L); return papyrus.filter((p, i) => i >= n && p[0] !== 'GetSpellCount' && p[0] !== 'GetNthSpell').length === 0; })());
+  const toldT = out.said.filter((p) => p[0] === TCH).length;
+  cmd('teach', TCH);
+  check('...and /teach can offer it again (the Teach whom? menu opens)', out.said.filter((p) => p[0] === TCH).length === toldT && /Teach whom/.test(JSON.stringify(lastWidget(TCH))), [said(TCH), lastWidget(TCH)]);
+  check('a lifted spell is open to apprenticeship again', !/held back/.test(globalThis.__dboSpellsOpenTo(N, eq)));
+  online = online.filter((x) => ![H, L, N, TCH].includes(x));
+}
+
 console.log(`\n${checks - failures}/${checks} passed`);
 process.chdir(os.tmpdir());
 fs.rmSync(dir, { recursive: true, force: true });
