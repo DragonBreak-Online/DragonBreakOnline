@@ -49,12 +49,14 @@ check('pathfinder after one', left(4), 1);
 reroll(4);
 check('pathfinder after two', left(3), 0);
 
-// Grand Champion: 1 per character
+// Grand Champion: 2 per character (Nate 16 Oct: never fewer on one character than Pathfinder's 2 in total)
 actors[5] = { profile: 30, roles: [roleOf('grandchampion')] };
 actors[6] = { profile: 30, roles: [roleOf('grandchampion')] };
 reroll(5);
+check('grand champion, character after one', left(5), 1);
+reroll(5);
 check('grand champion, spent character', left(5), 0);
-check('grand champion, fresh character', left(6), 1);
+check('grand champion, fresh character', left(6), 2);
 
 // GM and Owner: unlimited
 actors[7] = { profile: 40, roles: [roleOf('gm')] };
@@ -94,7 +96,7 @@ check('stats group: no tier, nothing', group(9), null);
 check('stats group: a spent tier still shows (a neutral 0)', group(8) !== null, true);
 check('...the spent traveler reads 0 of 1', val(8, 'Tokens left'), '0 of 1 across your characters');
 check('...a pathfinder with one spent reads 1 of 2', (actors[14] = { profile: 100, roles: [roleOf('pathfinder')] }, reroll(14), val(14, 'Tokens left')), '1 of 2 across your characters');
-check('...grand champion, per character', val(6, 'Tokens left'), '1 of 1 for this character');
+check('...grand champion, per character', val(6, 'Tokens left'), '2 of 2 for this character');
 check('...gm', val(7, 'Tokens left'), 'Unlimited');
 check('...group name', group(14).name, 'Reroll Tokens');
 check('...says how one is used', val(14, 'To use one'), '/reroll, then /reroll confirm');

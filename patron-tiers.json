@@ -4,7 +4,7 @@
   "tiers": [
     { "id": "owner", "label": "Owner", "roleId": "1494126527489507369", "extraSlots": 5, "rerolls": "unlimited", "priority": true },
     { "id": "gm", "label": "GM", "roleId": "1494126618065506425", "extraSlots": 4, "rerolls": "unlimited", "priority": true },
-    { "id": "grandchampion", "label": "Grand Champion", "roleId": "1552079468837740635", "extraSlots": 4, "rerolls": { "perCharacter": 1 }, "priority": true },
+    { "id": "grandchampion", "label": "Grand Champion", "roleId": "1552079468837740635", "extraSlots": 4, "rerolls": { "perCharacter": 2 }, "priority": true },
     { "id": "pathfinder", "label": "Pathfinder", "roleId": "1494127642448891914", "extraSlots": 3, "rerolls": { "total": 2 } },
     { "id": "adventurer", "label": "Adventurer", "roleId": "1552074942131216484", "extraSlots": 2, "rerolls": { "total": 1 } },
     { "id": "traveler", "label": "Traveler", "roleId": "1552074922598076447", "extraSlots": 1, "rerolls": { "total": 1 } }
