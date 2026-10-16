@@ -68,7 +68,7 @@ module.exports = (api) => {
   };
   for (const f of (readJson(PLAYER_PATH, { factions: [] }).factions || [])) addPlayerFaction(f);
 
-  // ---- rank overrides: titles renamed and ranks added, moved or removed in game (F3 Faction tab, staff view) ---------
+  // ---- rank overrides: titles renamed and ranks added, moved or removed in game (F3 Faction tab: the leader, or staff) ---
   // guild-overrides.json (runtime, gitignored): { factionId: { ranks: [{ title, role }], by, at } }. A faction's ranks are
   // replaced whole, never edited in place, since factions of one template share its rank array.
   const OVR_PATH = path.resolve('guild-overrides.json');
@@ -456,7 +456,8 @@ module.exports = (api) => {
       // The journal's Faction tab: holds and strongholds are shown on the Court tab instead (Nate, 3 Oct, Q3); a leader
       // renames the titles, a Lead GM also adds, moves and removes ranks and adds members
       court: f.kind === 'hold' || f.kind === 'stronghold', count: Object.keys(rosterOf(fid)).length, player: !!f.player,
-      canRename: isLeadStaff(a) || (rankOf(fid, a) || {}).role === 'leader', canEditRanks: isLeadStaff(a), canAdd: isLeadStaff(a),
+      // A faction's leader runs its ranks too (Nate, 16 Oct): renames, adds, moves and removes them
+      canRename: isLeadStaff(a) || (rankOf(fid, a) || {}).role === 'leader', canEditRanks: isLeadStaff(a) || (rankOf(fid, a) || {}).role === 'leader', canAdd: isLeadStaff(a),
     };
   };
   // The panel's content, also the Character Journal's Faction tab (journal.js); keepNonce: a journal redraw keeps the
@@ -891,18 +892,18 @@ module.exports = (api) => {
     reply(a, r.error || r.text, fid, !!r.error);
   });
   // The whole rank list at once: [{ title, role, from }], from = the rank's index before the edit, or -1 for a new one.
-  // A leader may only rename; a Lead GM may also add, move and remove ranks. Members keep their rank through a move
+  // The leader or a Lead GM adds, moves, removes and renames ranks (Nate, 16 Oct); only a Lead GM gives a staff name. The
+  // leader's rank stays first and the only leader rank (ranksProblem). Members keep their rank through a move
   // (they are stored by index, so the roster is renumbered in the same write); a rank somebody holds cannot go.
   const editRanks = (a, fid, list) => {
     const f = FACTIONS.get(fid);
     if (!f) return { error: 'No such faction.' };
     const lead = isLeadStaff(a);
-    if (!lead && (rankOf(fid, a) || {}).role !== 'leader') return { error: 'Only the leader renames ranks, and only a Lead GM adds, moves or removes them.' };
+    if (!lead && (rankOf(fid, a) || {}).role !== 'leader') return { error: 'Only the leader of the faction changes its ranks.' };
     if (!Array.isArray(list)) return { error: 'That rank list is not possible.' };
     const next = list.slice(0, RANKS_MAX + 1).map((r) => ({ title: cleanTitle(r && r.title), role: String((r && r.role) || ''), from: Number.isInteger(r && r.from) ? r.from : -1 }));
     const froms = next.map((r) => r.from).filter((x) => x >= 0);
     if (froms.some((x) => x >= f.ranks.length) || new Set(froms).size !== froms.length) return { error: 'That rank list is not possible.' };
-    if (!lead && (next.length !== f.ranks.length || next.some((r, i) => r.from !== i || r.role !== f.ranks[i].role))) return { error: 'You may rename your ranks. A Lead GM adds, moves or removes them.' };
     // The editor shows each rank as it is shown (rolenames.js). A row left alone keeps the rank's own title. A Lead GM's
     // new title for a rank is a staff name: the rank keeps its own title, so court offices, wages and the roster stamps
     // never move (without rolenames.js it renames the rank, as before). A leader renames the rank's own title, but not

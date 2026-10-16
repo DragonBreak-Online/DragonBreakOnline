@@ -1,5 +1,20 @@
 [
   {
+    "title": "Faction ranks",
+    "date": "2026-10-16",
+    "version": "Server update",
+    "tag": "Change",
+    "sections": [
+      {
+        "heading": "Leaders run their ranks",
+        "items": [
+          "A faction's leader can now add, remove, reorder and rename its ranks, and set each rank's role, from the Faction tab of the F3 Journal. Before, only staff could add or remove ranks.",
+          "A rank someone holds cannot be removed until they are moved to another rank. The leader's own rank always stays at the top, and there is only one."
+        ]
+      }
+    ]
+  },
+  {
     "title": "The Great Faiths in Solitude",
     "date": "2026-10-19",
     "version": "Server update",
