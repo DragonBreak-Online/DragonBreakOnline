@@ -6684,8 +6684,11 @@ const DEFENSE = Object.assign({ enabled: true, armorMultByTier: [1, 1.25, 1.75, 
 // needs to be stronger than ebony"). Dragonplate already beats Ebony piece for piece (Update.esm); Dragonscale did not.
 // Only ever raises. The engine keeps the record's rating, so it counts where Defense and tempering do: defenseDamageMult
 // and the inventory numbers. Config "armorMaterials": { enabled, ratingBySlot: { keyword editor id: { body, hands, feet,
-// head, shield } } }.
-const ARMOR_MATERIALS = Object.assign({ enabled: true, ratingBySlot: {} }, cfg.armorMaterials || {});
+// head, shield } }, ratingByEditorId: { ARMO editor id: rating } }.
+// ratingByEditorId sets one piece's counted rating outright, lower too: a set out of line with its craft tier is counted
+// at the tier's numbers until its records are patched (Nate, 16 Oct: Black Bear above the other tier 3 sets; the PC's
+// Nexus Patches carries the same values, after which the entries change nothing)
+const ARMOR_MATERIALS = Object.assign({ enabled: true, ratingBySlot: {}, ratingByEditorId: {} }, cfg.armorMaterials || {});
 const slotOfMask = (mask) => (mask & 0x4 ? 'body' : mask & 0x200 ? 'shield' : mask & 0x8 ? 'hands' : mask & 0x80 ? 'feet' : mask & 0x1003 ? 'head' : '');
 const materialRatingOf = (r, slot) => {
   if (!ARMOR_MATERIALS.enabled || !slot) return 0;
@@ -6700,8 +6703,10 @@ const materialRatingOf = (r, slot) => {
   }
   return best;
 };
-// Cache renamed with the counted rating, so a reload never keeps entries made before it
-const armorPieceCache = globalThis.__dboArmorPiece3 instanceof Map ? globalThis.__dboArmorPiece3 : (globalThis.__dboArmorPiece3 = new Map());
+// Cache renamed with the counted rating (and again with ratingByEditorId), so a reload never keeps entries made before it;
+// emptied when the armorMaterials config it was built under changes, so a hot-reloaded rating counts at once
+const armorPieceCache = globalThis.__dboArmorPiece4 instanceof Map ? globalThis.__dboArmorPiece4 : (globalThis.__dboArmorPiece4 = new Map());
+{ const key = JSON.stringify(ARMOR_MATERIALS); if (globalThis.__dboArmorPiece4Key !== key) { armorPieceCache.clear(); globalThis.__dboArmorPiece4Key = key; } }
 const armorPieceOf = (baseId) => {
   if (armorPieceCache.has(baseId)) return armorPieceCache.get(baseId);
   let piece = null;
@@ -6714,6 +6719,9 @@ const armorPieceOf = (baseId) => {
       clothing: !!bod2 && bod2.data.byteLength >= 8 && u32(bod2, 4) === 2, chest: !!bod2 && bod2.data.byteLength >= 4 && (u32(bod2, 0) & 0x4) !== 0 };
     // counted: the rating the server counts it at (the material's, when that is higher)
     if (piece) piece.counted = Math.max(piece.rating, materialRatingOf(r, bod2 && bod2.data.byteLength >= 4 ? slotOfMask(u32(bod2, 0)) : ''));
+    // ...or the one config names for this piece, which wins either way
+    const own = piece && ARMOR_MATERIALS.enabled ? Number((ARMOR_MATERIALS.ratingByEditorId || {})[String(r.record.editorId || '')]) : NaN;
+    if (own > 0) piece.counted = own;
   }
   armorPieceCache.set(baseId, piece);
   return piece;

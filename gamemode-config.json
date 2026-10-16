@@ -399,6 +399,14 @@
   "enabled": true,
   "ratingBySlot": {
    "ArmorMaterialDragonscale": { "body": 44, "hands": 17, "feet": 17, "head": 22, "shield": 33 }
+  },
+  "_ratingByEditorId": "One piece counted at this rating outright, lower too (gamemode.js armorPieceOf). Nate, 16 Oct: Black Bear Ancient Nord (craft tier 3) was above the other tier 3 sets; its light pieces (35/10/10/20) beat Scaled (32/9/9/14) and the tier 4 Apex Khajiit light set, close to Glass, and its heavy cuirass (43) sits above the approved Nordic 41 (tools/materials/ladder.tsv). Counted at Scaled's numbers (light) and Nordic's (heavy cuirass) here; the PC patches the same values into DragonBreak Nexus Patches.esp, after which these entries change nothing. Hot reload.",
+  "ratingByEditorId": {
+   "BlackBearAncientNordCuirass": 41,
+   "BlackBearAncientNordCuirassLight": 32, "BlackBearAncientNordCuirassBerserker": 32,
+   "BlackBearAncientNordGauntletsLight": 9, "BlackBearAncientNordGauntletsBerserker": 9,
+   "BlackBearAncientNordBootsLight": 9, "BlackBearAncientNordBootsBerserker": 9,
+   "BlackBearAncientNordHelmetBerserker": 14, "BlackBearAncientNordHelemtHoodLight": 14
   }
  },
  "pickpocket": {

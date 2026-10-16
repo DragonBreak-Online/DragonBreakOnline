@@ -73,7 +73,7 @@ if (i > 0 && j > i) {
     armo(++id, PLATE[slot], mask, true, 0x6bbd5); pieces[`plate:${slot}`] = id;
     armo(++id, EBONY[slot], mask, true, 0x6bbd8); pieces[`ebony:${slot}`] = id;
   }
-  delete globalThis.__dboArmorPiece3;
+  delete globalThis.__dboArmorPiece4; delete globalThis.__dboArmorPiece4Key;
   const fieldsOf = (lr, t) => ((lr && lr.record.fields) || []).filter((f) => f.type === t);
   const u32At = (f, off) => (f && f.data.byteLength >= off + 4 ? new DataView(f.data.buffer, f.data.byteOffset, f.data.byteLength).getUint32(off, true) : 0);
   const globalAt = (lr, local) => (local ? lr.toGlobalRecordId(local) >>> 0 : 0);
