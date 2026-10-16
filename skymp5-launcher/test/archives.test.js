@@ -114,3 +114,65 @@ test('without the extra folder the same wait times out, which is the bug', async
     'the old behaviour: our folder only, so the file is invisible',
   )
 })
+
+// Vortex keeps the older version of a mod after an update, so its folder often holds a file with the right name and the
+// wrong size. That is one of the player's own downloads, not a wrong file they handed us: the wait must never tell
+// them "<file> is not the exact file the server expects" about it. Outside our folder only an exact sha256 match counts.
+test('an older version in Vortex\'s folder is never shown to the player as a wrong file, and the right one still resolves', async () => {
+  const NEW = Buffer.alloc(6001, 25)
+  const older = path.join(vortex, 'SkyUI_5_1_SE-12604-5-1SE.7z')
+  const sameSize = path.join(vortex, 'SkyUI_5_2_SE-12604-5-2SE-repack.7z')
+  fs.writeFileSync(older, Buffer.alloc(5003, 25))      // an older version: the name matches, the size does not
+  fs.writeFileSync(sameSize, Buffer.alloc(6001, 26))   // the right size and name, other bytes
+  const messages = []
+  let k = 0
+  try {
+    const paths = await mo2.waitForDownloads(
+      [{ name: 'SkyUI', hash: sha(NEW), size: NEW.length, namePattern: /(?:^|[^0-9])12604(?:[^0-9]|$)|skyui/i }],
+      (done, total, message) => {
+        messages.push(message)
+        if (++k === 4) fs.writeFileSync(path.join(downloads, 'SkyUI_5_2_SE-12604-5-2SE.7z'), NEW)
+      }, undefined, 20, 2000, [vortex])
+    assert.equal(paths[0], path.join(downloads, 'SkyUI_5_2_SE-12604-5-2SE.7z'), 'the right file in our folder resolves')
+  } finally {
+    fs.rmSync(older)
+    fs.rmSync(sameSize)
+  }
+  assert.ok(messages.length >= 5, `the wait ran a few ticks first (${messages.length})`)
+  assert.deepEqual(messages.filter(m => /SkyUI_5_1_SE|repack/.test(m)), [], 'no progress message names a file in Vortex\'s folder')
+  assert.ok(messages.every(m => !m.includes('is not the exact file the server expects')), 'and none says "not the exact file"')
+})
+
+// Vortex's folder holds the player's whole mod history (153 archives on Jake's PC). Each of them used to write a
+// "[wait]" line for every wanted item (size still changing, then size mismatch): 20 items against 300 archives made
+// about 12,000 install.log lines per wait. A file there that is not the size of a wanted item is passed over without
+// a line, and a wanted archive among them is still found.
+test('unrelated archives in Vortex\'s folder write no [wait] line, and a wanted one among them is still found', async () => {
+  const many = path.join(root, 'VortexMany', 'downloads', 'skyrimse')
+  fs.mkdirSync(many, { recursive: true })
+  const N = 20, M = 300
+  for (let j = 0; j < M; j++) {
+    const f = path.join(many, `Other Mod ${j}-${1000 + j}-1-0.7z`)
+    fs.writeFileSync(f, '')
+    fs.truncateSync(f, 10000 + j)   // sparse: the wait only looks at the size of a file that cannot match
+  }
+  const HIT = Buffer.alloc(777, 27)
+  fs.writeFileSync(path.join(many, 'Need0-2000-1-0.7z'), HIT)
+  const wanted = [{ name: 'Need0', hash: sha(HIT), size: HIT.length },
+    ...Array.from({ length: N - 1 }, (_, i) => ({ name: `Need${i + 1}`, hash: sha(Buffer.from(`n${i + 1}`)), size: 500 + i }))]
+  const lines = []
+  let sawHit = false
+  mo2.setLogger((...a) => lines.push(a.join(' ')))
+  try {
+    await assert.rejects(
+      mo2.waitForDownloads(wanted, (done, total, message, found) => { if (found[0]) sawHit = true }, undefined, 20, 150, [many]),
+      /Timed out waiting to download: Need1, /)
+  } finally {
+    mo2.setLogger(() => {})
+    fs.rmSync(path.join(root, 'VortexMany'), { recursive: true, force: true })
+  }
+  assert.ok(sawHit, 'the wanted archive in that folder was found')
+  assert.ok(lines.some(l => l.includes('"Need0" found in')), 'and the log says where it was found')
+  const noisy = lines.filter(l => l.includes('[wait]') && l.includes('Other Mod'))
+  assert.equal(noisy.length, 0, `no [wait] line names an unrelated archive (got ${noisy.length}, e.g. ${noisy[0]})`)
+})

@@ -1314,6 +1314,7 @@ function waitForDownloads(wanted, onProgress, signal, intervalMs = 1000, timeout
       for (const a of listArchivesIn(dir)) {
         if (seen.has(a.full)) continue
         seen.add(a.full)
+        a.extra = true   // not our folder: the player's other downloads live here too
         out.push(a)
       }
     }
@@ -1330,8 +1331,11 @@ function waitForDownloads(wanted, onProgress, signal, intervalMs = 1000, timeout
       const w = wanted[i]
       for (const a of archives) {
         if (w.hash) {
+          // In Vortex's folder only an exact-size file is a candidate; the rest are other downloads, so they are
+          // neither logged per wanted item nor reported to the player as a wrong version
+          if (a.extra && typeof w.size === 'number' && w.size > 0 && a.st.size !== w.size) continue
           if (!settled(a)) { why(i, a, 'size still changing - copy in progress'); continue }
-          const nameHit = w.namePattern && w.namePattern.test(a.file)
+          const nameHit = !a.extra && w.namePattern && w.namePattern.test(a.file)
           if (typeof w.size === 'number' && w.size > 0 && a.st.size !== w.size) {
             why(i, a, `size mismatch (want ${w.size}, file is ${a.st.size})${nameHit ? ' - name matches, so likely a different version' : ''}`)
             if (nameHit) suspect.push(a)
@@ -1344,7 +1348,7 @@ function waitForDownloads(wanted, onProgress, signal, intervalMs = 1000, timeout
               continue
             }
           } catch { why(i, a, 'unreadable right now (locked?)'); continue }   // retry next tick
-        } else if (w.namePattern) {
+        } else if (w.namePattern && !a.extra) {   // outside our folder only a sha256 match counts
           if (consumed.has(a.full)) continue
           if (!w.namePattern.test(a.file)) { why(i, a, `filename does not match ${w.namePattern}`); continue }
           const listing = await listArchiveContents(a.full, a.st)   // null while locked or incomplete
