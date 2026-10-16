@@ -47,14 +47,14 @@ const enumsOf = (src) => {
 const ENUMS = enumsOf(fs.readFileSync(DTS, 'utf8'));
 const { DxScanCode, InputDeviceType, Menu } = ENUMS;
 
-const H = { notes: [], notified: [], js: [], focus: [], packets: [], file: [], lookups: {} };
+const H = { notes: [], notified: [], js: [], focus: [], packets: [], file: [], lookups: {}, failSend: false, sendFails: 0 };
 globalThis.__ekH = H;
 const STUBS = {
   skyrimPlatform: `module.exports = Object.assign(${JSON.stringify(ENUMS)}, { once: (ev, fn) => globalThis.__ekH.spOnce = fn });`,
   clientListener: 'class ClientListener {} module.exports = { ClientListener };',
   customPacketUtil: `module.exports = {
     parseCustomPacket: (e) => { try { return JSON.parse(e.message.contentJsonDump); } catch { return null; } },
-    sendCustomPacket: (_c, p) => globalThis.__ekH.packets.push(p),
+    sendCustomPacket: (_c, p) => { if (globalThis.__ekH.failSend) { globalThis.__ekH.sendFails++; throw new Error('send failed'); } globalThis.__ekH.packets.push(p); },
     notifyNextUpdate: (_c, _sp, text) => globalThis.__ekH.notified.push(text) };`,
   logging: 'module.exports = { logTrace() {}, logError() {} };',
   browserService: 'class BrowserService {} module.exports = { BrowserService };',
@@ -355,6 +355,32 @@ const wheelPushed = () => H.js.some((s) => /emoteWheel/.test(s));
     check('host-change lines still go out six in full, then one summary a window', fv.length === 7 && fv[6] === 'fv:host +1 more (7 this session), latest: npc 6', fv.slice(5));
   } finally {
     Date.now = realNow;
+  }
+
+  // ---- A launch whose connection drops and whose sends fail: the put-back neither loses nor repeats a line, and 50 still holds
+  Date.now = () => clock;
+  try {
+    reset();
+    let up = true;
+    H.lookups = { NetworkingService: { isConnected: () => up } };
+    const pc4 = makeController();
+    new P.PageInputDiagService(sp, pc4);
+    const note4 = globalThis.__dboDiagNote;
+    for (let i = 0; i < 400; i++) {
+      // Offline for the first 20, so the first send after it fails with more than a packet waiting
+      up = i >= 20 && i % 7 !== 3 && i % 11 !== 5; H.failSend = i === 20 || i % 5 === 1;
+      note4('emote', `step ${i}`); clock += 300 + (i % 3) * 2400;
+      if (i % 4 === 0) pc4.fire('tick');
+    }
+    up = true; H.failSend = false;
+    for (let i = 0; i < 20; i++) { clock += 6000; pc4.fire('tick'); }
+    const rel4 = H.packets.reduce((a, p) => a.concat(p.lines || []), []).filter((l) => /^emote /.test(l));
+    const full4 = rel4.filter((l) => !/^emote \+\d+ more /.test(l));
+    check('connection drops and failed sends: the first 40 still arrive in full, in order, once each, then 10 summaries',
+      H.sendFails > 0 && JSON.stringify(full4) === JSON.stringify(Array.from({ length: 40 }, (_, i) => `emote step ${i}`))
+      && rel4.length === 50 && new Set(rel4).size === 50, [H.sendFails, full4.length, rel4.length, new Set(rel4).size]);
+  } finally {
+    Date.now = realNow; H.failSend = false;
   }
 
   console.log(failures ? `${failures} FAILED` : 'all passed');
