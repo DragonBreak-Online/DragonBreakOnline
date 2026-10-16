@@ -24,6 +24,12 @@ interface CharacterSlot {
   dead?: boolean;
 }
 
+// A character past the slots the player has now (a lapsed tier): shown greyed after the slots, never playable here.
+interface LockedCharacter extends CharacterSlot {
+  slot?: number | null;
+  reason?: string;
+}
+
 const WIDGET_ID = 7;
 const SAW_GAMEPLAY_KEY = "dboCharSelectSawGameplay";
 const MENU_REQUEST_RETRY_MS = 4000;
@@ -89,6 +95,7 @@ type TranslationStrings = { [K in keyof typeof translations['ru']]: string };
 let strings: TranslationStrings = translations['en'];
 let characters: (CharacterSlot | null)[] = [];
 let maxCharacters = 3;
+let lockedCharacters: LockedCharacter[] = [];
 let selectedSlot: number | null = null;
 let confirmDeleteSlot: number | null = null;
 
@@ -101,7 +108,8 @@ let confirmDeleteSlot: number | null = null;
  *   Server -> Client, open the menu:
  *     { "customPacketType": "characterSelectMenu",
  *       "maxCharacters": 3,
- *       "characters": [ { "name": "Lydia", "info": "..." }, null, null ] }
+ *       "characters": [ { "name": "Lydia", "info": "..." }, null, null ],
+ *       "lockedCharacters": [ { "slot": 3, "name": "Brelyna", "race": "Dark Elf", "reason": "slots" } ] }   (optional)
  *
  *   Server -> Client, close without a choice (optional):
  *     { "customPacketType": "characterSelectMenuClose" }
@@ -143,6 +151,7 @@ export class CharacterSelectService extends ClientListener {
       case 'characterSelectMenu':
         characters = Array.isArray(content["characters"]) ? content["characters"] as (CharacterSlot | null)[] : [];
         maxCharacters = typeof content["maxCharacters"] === 'number' ? content["maxCharacters"] : Math.max(characters.length, 1);
+        lockedCharacters = Array.isArray(content["lockedCharacters"]) ? content["lockedCharacters"] as LockedCharacter[] : [];
         selectedSlot = null;
         confirmDeleteSlot = null;
         this.menuOpen = true;
@@ -286,7 +295,7 @@ export class CharacterSelectService extends ClientListener {
   }
 
   private menuArgs(): Record<string, unknown> {
-    return { characters, maxCharacters, selectedSlot, confirmDeleteSlot, events, strings, WIDGET_ID };
+    return { characters, maxCharacters, lockedCharacters, selectedSlot, confirmDeleteSlot, events, strings, WIDGET_ID };
   }
 
   private renderMenu(): void {
@@ -307,6 +316,7 @@ export class CharacterSelectService extends ClientListener {
     (globalThis as any).__dboCharacterSelectOpen = false;
     characters = [];
     maxCharacters = 3;
+    lockedCharacters = [];
     selectedSlot = null;
     confirmDeleteSlot = null;
     this.menuOpen = false;
@@ -332,6 +342,7 @@ export class CharacterSelectService extends ClientListener {
       id: WIDGET_ID,
       characters,
       maxCharacters,
+      lockedCharacters,
       selectedSlot,
       confirmDeleteSlot,
       strings,
