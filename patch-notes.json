@@ -8,7 +8,8 @@
       {
         "heading": "Changes",
         "items": [
-          "The journal's World page now shows how many people are about in the world, without naming them."
+          "The journal's World page now shows how many people are about in the world, without naming them.",
+          "/players is no longer a player command: you find out who is about by meeting them."
         ]
       }
     ]
