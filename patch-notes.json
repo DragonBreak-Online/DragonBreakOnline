@@ -1,5 +1,19 @@
 [
   {
+    "title": "Equilibrium held back",
+    "date": "2026-10-16",
+    "version": "Hotfix",
+    "tag": "Change",
+    "sections": [
+      {
+        "heading": "Changes",
+        "items": [
+          "Equilibrium is held back for a short while for a fix. If you know it, it stays in your spellbook; you can prepare it again at a college once it returns."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Mining fixes",
     "date": "2026-10-16",
     "version": "Server update",
