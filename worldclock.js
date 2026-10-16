@@ -43,11 +43,15 @@ module.exports = (api) => {
   const setGameDays = (d) => { ST.epochRealMs = Date.now(); ST.epochGameDays = d; save(); };
   const hour = () => { const d = gameDays(); return (d - Math.floor(d)) * 24; };
   const isNight = () => { const h = hour(); return h >= 20 || h < 6; };
-  // The engine's moons: eight phases of three days each, phase 0 full (Masser and Secunda share the cycle)
-  const moonPhase = () => Math.floor(gameDays() / 3) % 8;
+  // The engine's moons, which the client draws from the GameDaysPassed it is sent: eight phases of three days (every
+  // climate in the load order has phase length 3), phase 0 full at day 0 (CommonLibSSE RE::Moon::Phase, CS wiki Climates)
+  const moonPhase = () => ((Math.floor(gameDays() / 3) % 8) + 8) % 8;
   const isFullMoon = () => moonPhase() === 0;
   const PHASES = ['full', 'waning gibbous', 'third quarter', 'waning crescent', 'new', 'waxing crescent', 'first quarter', 'waxing gibbous'];
 
+  // The engine's weekday: whole GameDaysPassed mod 7, 0 Sundas (CommonLibSSE RE::Calendar::GetDayOfWeek; client calendar.ts weekdayOf)
+  const WEEKDAYS = ['Sundas', 'Morndas', 'Tirdas', 'Middas', 'Turdas', 'Fredas', 'Loredas'];
+  const weekday = () => ((Math.floor(gameDays()) % 7) + 7) % 7;
   const MONTHS = ['Morning Star', "Sun's Dawn", 'First Seed', "Rain's Hand", 'Second Seed', 'Midyear', "Sun's Height", 'Last Seed', 'Hearthfire', 'Frostfall', "Sun's Dusk", 'Evening Star'];
   const MONTH_DAYS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
   const calendar = () => {
@@ -57,7 +61,7 @@ module.exports = (api) => {
   };
   const clockText = () => {
     const c = calendar(); const h = hour(); const hh = Math.floor(h), mm = Math.floor((h - hh) * 60);
-    return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}, ${c.day} ${MONTHS[c.month]} 4E ${c.year}. The moons are ${PHASES[moonPhase()]}.`;
+    return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}, ${WEEKDAYS[weekday()]} ${c.day} ${MONTHS[c.month]} 4E ${c.year}. The moons are ${PHASES[moonPhase()]}.`;
   };
 
   // ---- weather -------------------------------------------------------------------------------------
@@ -85,15 +89,15 @@ module.exports = (api) => {
     if (!(h >= 0 && h < 24) || !inCreator(a)) return { gameDays: d, timeScale: ST.timeScale };
     return { gameDays: Math.round(d - h / 24) + h / 24, timeScale: 1 };
   };
-  // startYear lets a client set the engine's year from the server (client TimeService still starts from 4E 201 by itself)
+  // startYear sets the engine's year (client calendar.ts); the engine derives the weekday and the moons from gameDays itself
   const packetFor = (a) => Object.assign({ customPacketType: 'dboClock', serverNow: Date.now() }, clockFor(a), { weather: weatherFor(a), startYear: Math.floor(Number(C.startYear)) || 211 });
   const broadcast = () => { for (const a of onlineActors()) sendPacket(a, packetFor(a)); };
   every('worldClock', C.broadcastSeconds * 1000, broadcast);
 
   globalThis.__dboClock = {
-    gameDays, hour, isNight, isFullMoon, moonPhase, weatherFor, text: clockText, sendTo: (a) => sendPacket(a, packetFor(a)),
+    gameDays, hour, isNight, isFullMoon, moonPhase, weekday, weekdayName: () => WEEKDAYS[weekday()], weatherFor, text: clockText, sendTo: (a) => sendPacket(a, packetFor(a)),
     // For the launcher Stats window (worldstats.js)
-    summary: () => { const c = calendar(); return { gameDays: gameDays(), timeScale: ST.timeScale, hour: hour(), day: c.day, month: MONTHS[c.month], year: c.year, phase: moonPhase(), phaseName: PHASES[moonPhase()], night: isNight(), weather: KINDS[weatherOf('bruma')] }; },
+    summary: () => { const c = calendar(); return { gameDays: gameDays(), timeScale: ST.timeScale, hour: hour(), day: c.day, month: MONTHS[c.month], year: c.year, weekday: weekday(), weekdayName: WEEKDAYS[weekday()], phase: moonPhase(), phaseName: PHASES[moonPhase()], night: isNight(), weather: KINDS[weatherOf('bruma')] }; },
   };
 
   registerChatCommand('time', (a) => personal(a, `It is ${clockText()}`), { help: 'the time, date and the moons' });
