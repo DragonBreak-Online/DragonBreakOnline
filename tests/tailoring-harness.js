@@ -40,6 +40,8 @@ ok(craft(A, 30) === false && /Fine clothes are Apprentice Tailor's work; you are
 ok(craft(A, 100) === false && audits.some((t) => /TAILOR craft refused #20 at Tailor tier 1: recipe b003/.test(t) || /TAILOR craft refused/.test(t)), '...and Noble, audited');
 tailor(A, 1); told.length = 0;
 ok(craft(A, 30) === true && craft(A, 100) === false, 'an Apprentice makes Fine, not Noble');
+globalThis.__dboTailorState.told.clear(); craft(A, 100);
+ok(/you are an Apprentice Tailor/.test(last()), '...and is told "you are an Apprentice Tailor", never "a Apprentice"', last());
 tailor(A, 2);
 ok(craft(A, 100) === true && craft(A, 300) === false, 'an Adept makes Noble, not Scaled');
 tailor(A, 3);

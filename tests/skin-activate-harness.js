@@ -72,6 +72,7 @@ check('a skinned deer: E opens the corpse (its venison), with no refusal', r.res
 
 r = run({ pelts: pelt, worth: 80, cap: 12 });
 check('a hide beyond the skinner: says so, and the corpse still opens', r.result === null && r.said.length === 1 && /beyond your hand/.test(r.said[0]) && r.opened.length === 0);
+check('...naming the rank with the right article ("An Adept Skinner", 16 Oct log: "A Adept")', /An Adept Skinner could take it/.test(r.said[0] || ''), r.said[0]);
 
 r = run({ pelts: [] });
 check('a mudcrab (no pelt): the corpse opens', r.result === null && r.opened.length === 0);

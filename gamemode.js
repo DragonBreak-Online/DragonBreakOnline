@@ -5608,7 +5608,8 @@ globalThis.__dboSkin = (targetId, casterId) => {
   if (worth > tierCap(tier)) {
     const need = rankForValue(worth);
     skinSay(casterId, pelts.some((p) => p && p.dragon) ? 'Only a Master Skinner can take the bones and scales of a dragon.'
-      : `This hide is beyond your hand. A ${RANK_NAMES[Math.min(need, RANK_NAMES.length - 1)]} Skinner could take it.`);
+      // "An Apprentice", never "A Apprentice" (the 16 Oct log: 103 of 105 refusals named Apprentice or Adept)
+      : `This hide is beyond your hand. ${((r) => `${/^[AEIOU]/.test(r) ? 'An' : 'A'} ${r}`)(RANK_NAMES[Math.min(need, RANK_NAMES.length - 1)])} Skinner could take it.`);
     return null;
   }
   const round = skinRound(casterId, tier, targetId, creatureName(targetId));

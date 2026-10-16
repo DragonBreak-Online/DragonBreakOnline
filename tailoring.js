@@ -100,7 +100,7 @@ module.exports = (api) => {
     try { if (typeof globalThis.__dboFactionGearMember === 'function' && globalThis.__dboFactionGearMember(a, itemId) === true) return true; } catch (e) { /* the usual gate */ }
     const need = tierOfItem(itemId), have = tailorTier(a);
     if (have >= need) return true;
-    tell(a, `${TIERS[need - 1]} are ${RANKS[need - 1]} Tailor's work; ${have ? `you are a ${RANKS[have - 1]} Tailor` : 'you have not taken up the Tailor'}. Your materials come back when you close the menu.`);
+    tell(a, `${TIERS[need - 1]} are ${RANKS[need - 1]} Tailor's work; ${have ? `you are ${/^[AEIOU]/.test(RANKS[have - 1]) ? 'an' : 'a'} ${RANKS[have - 1]} Tailor` : 'you have not taken up the Tailor'}. Your materials come back when you close the menu.`);
     audit(`TAILOR craft refused ${who(a)} at Tailor tier ${have}: recipe ${(recipeId >>> 0).toString(16)} needs tier ${need} (${LIST.has(descOf(itemId)) ? 'by name' : `by value ${valueOf(itemId)}`})`);
     return false;
   };
