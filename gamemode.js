@@ -2741,6 +2741,8 @@ try {
 // Puts the saved outfit back on: the client is asked to equip each remembered item, then reports
 // it worn, and the engine stores that report. Nothing to do when the player is already dressed.
 const redress = (a) => {
+  // A beast form wears only its own outfit and its revert re-dresses, so the form's undressing is never a naked login
+  try { const beast = mp.get(a, 'private.beast'); if (beast && beast.form) return; } catch (e) { return; }
   let saved = []; try { saved = mp.get(a, 'private.lastWorn') || []; } catch (e) { return; }
   if (!Array.isArray(saved) || !saved.length) return;
   let entries = []; try { const inv = mp.get(a, 'inventory'); entries = inv && Array.isArray(inv.entries) ? inv.entries : []; } catch (e) { return; }
