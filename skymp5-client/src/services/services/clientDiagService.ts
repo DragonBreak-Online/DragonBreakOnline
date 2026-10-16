@@ -14,20 +14,26 @@ const LOG_MAX_LINES = 400;
 
 type Reporter = (where: unknown, err: unknown, urgent?: boolean) => void;
 
-// Observe only: uncaughtExceptionMonitor leaves Node's own handling as it is, and SkyrimPlatform starts Node with no
-// --unhandled-rejections flag, so an unhandled rejection reaches it too (origin "unhandledRejection")
+// Without a listener Node (started with no --unhandled-rejections flag) ends the whole game with exit(1) and no crash log
 const installProcessHook = (): void => {
   try {
     const g = globalThis as any;
-    if (g.__dboProcessHookInstalled) return;
+    if (g.__dboProcessHookVersion >= 2) return;
     const proc = g.process;
     if (!proc || typeof proc.on !== "function") return;
-    proc.on("uncaughtExceptionMonitor", (err: unknown, origin: unknown) => {
+    // An older bundle hot-reloaded under this one keeps its uncaughtExceptionMonitor, which already reports uncaught errors
+    const monitorReports = !!g.__dboProcessHookInstalled;
+    const report = (where: string, err: unknown): void => {
       try {
-        const report = g.__dboReportError as Reporter | undefined;
-        if (typeof report === "function") report(origin === "unhandledRejection" ? "rejection" : "uncaught", err, true);
-      } catch (e) { /* never in the way of the runtime's own handling */ }
+        const r = g.__dboReportError as Reporter | undefined;
+        if (typeof r === "function") r(where, err, true);
+      } catch (e) { /* never in the way of the game going on */ }
+    };
+    proc.on("unhandledRejection", (reason: unknown) => report("rejection", reason));
+    proc.on("uncaughtException", (err: unknown, origin: unknown) => {
+      if (!monitorReports) report(origin === "unhandledRejection" ? "rejection" : "uncaught", err);
     });
+    g.__dboProcessHookVersion = 2;
     g.__dboProcessHookInstalled = true;
   } catch (e) { /* a runtime without it: no uncaught or rejection reports, the client starts as before */ }
 };

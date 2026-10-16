@@ -171,12 +171,14 @@ const bundle = async (rel, dir, plugins) => {
     emitter: { on: (ev, fn) => (emits[ev] = emits[ev] || []).push(fn) },
     lookupListener: () => ({ isConnected: () => H.connected }),
   };
-  const before = process.listenerCount('uncaughtExceptionMonitor');
+  const before = ['uncaughtExceptionMonitor', 'uncaughtException', 'unhandledRejection'].map((e) => process.listenerCount(e));
   const sp = { writeLogs: (_n, line) => H.logs.push(line), getPlatformVersion: () => '2.9.0' };
   new S.ClientDiagService(sp, Object.assign({}, controller, { on: () => {}, emitter: { on: () => {} } }));
   new S.ClientDiagService(sp, controller);
-  check('the process hook is uncaughtExceptionMonitor (observe only), installed once', process.listenerCount('uncaughtExceptionMonitor') === before + 1
-    && process.listenerCount('uncaughtException') === 0 && process.listenerCount('unhandledRejection') === 0);
+  // Node ends the process on an unhandled rejection or uncaught exception only while nobody listens for it (rejection-exit-harness.js)
+  check('the process hook listens for unhandledRejection and uncaughtException, installed once (no monitor)',
+    process.listenerCount('unhandledRejection') === before[2] + 1 && process.listenerCount('uncaughtException') === before[1] + 1
+    && process.listenerCount('uncaughtExceptionMonitor') === before[0], ['uncaughtExceptionMonitor', 'uncaughtException', 'unhandledRejection'].map((e) => process.listenerCount(e)));
   const tick = () => (ons.tick || []).forEach((f) => f());
   H.connected = false;
   for (let i = 0; i < 12; i++) globalThis.__dboTrace(`rmp ask have=${i}`);
@@ -203,11 +205,20 @@ const bundle = async (rel, dir, plugins) => {
   check('...and is written to the local dbo-diag log too, without the user name', H.logs.some((l) => /^cerr .* m=RangeError: bad index/.test(l)) && !H.logs.some((l) => /Users/.test(l)));
   H.packets = [];
   const e2 = new Error('async boom'); e2.stack = 'Error: async boom\n    at h (skymp5-client.js:9:9)';
-  process.emit('uncaughtExceptionMonitor', e2, 'unhandledRejection');
-  check('an unhandled rejection (through the monitor) is sent at once, as at=rejection', H.packets.length === 1 && /at=rejection n=1 m=Error: async boom/.test(H.packets[0].lines[0]), H.packets);
+  process.emit('unhandledRejection', e2, Promise.resolve());
+  check('an unhandled rejection is sent at once, as at=rejection', H.packets.length === 1 && /at=rejection n=1 m=Error: async boom/.test(H.packets[0].lines[0]), H.packets);
   H.packets = [];
-  process.emit('uncaughtExceptionMonitor', new Error('sync boom'), 'uncaughtException');
+  process.emit('uncaughtException', new Error('sync boom'), 'uncaughtException');
   check('an uncaught exception as at=uncaught', H.packets.length === 1 && /at=uncaught n=1 m=Error: sync boom/.test(H.packets[0].lines[0]), H.packets);
+  H.packets = [];
+  process.emit('unhandledRejection', 'not an Error', Promise.resolve());
+  check('a rejection with a reason that is not an Error is sent too', H.packets.length === 1 && /at=rejection n=1 m=.*not an Error/.test(H.packets[0].lines[0]), H.packets);
+  H.packets = [];
+  // A real one: no listener of the harness's own, so only the hook keeps this process alive
+  Promise.reject(new Error('real rejection'));
+  await new Promise((r) => setTimeout(r, 20));
+  check('a real unhandled rejection reaches the hook and this process goes on', H.packets.length === 1 && /at=rejection n=1 m=Error: real rejection/.test(H.packets[0].lines[0]), H.packets);
+  H.packets = [];
   threw = null;
   try { globalThis.__dboReportError({ toString() { throw new Error('x'); } }, { get stack() { throw new Error('y'); } }); globalThis.__dboTrace({ toString() { throw new Error('z'); } }); } catch (e) { threw = e; }
   check('the hooks never throw', threw === null, threw && threw.message);
@@ -223,12 +234,37 @@ const bundle = async (rel, dir, plugins) => {
     // A runtime whose process.on throws: the service still starts
     const realOn = process.on;
     delete globalThis.__dboProcessHookInstalled;
+    delete globalThis.__dboProcessHookVersion;
     process.on = () => { throw new Error('no process events here'); };
     let threw = null;
     try { new S.ClientDiagService(sp, Object.assign({}, controller, { on: () => {}, emitter: { on: () => {} } })); } catch (e) { threw = e; }
     process.on = realOn;
-    check('a runtime whose process.on throws: the service starts anyway (the client must start)', threw === null && !globalThis.__dboProcessHookInstalled, threw && threw.message);
+    check('a runtime whose process.on throws: the service starts anyway (the client must start)', threw === null && !globalThis.__dboProcessHookInstalled
+      && !globalThis.__dboProcessHookVersion, threw && threw.message);
     globalThis.__dboProcessHookInstalled = true;
+    globalThis.__dboProcessHookVersion = 2;
+  }
+  {
+    // Hot-reloaded over a 0.3.95-0.3.101 bundle: its monitor stays and reports uncaught errors, the new listeners keep the game up
+    const saved = ['uncaughtException', 'unhandledRejection'].map((e) => [e, process.listeners(e)]);
+    saved.forEach(([e]) => process.removeAllListeners(e));
+    delete globalThis.__dboProcessHookVersion;
+    globalThis.__dboProcessHookInstalled = true;
+    let monitorSaw = 0;
+    const oldMonitor = (err, origin) => { monitorSaw++; globalThis.__dboReportError(origin === 'unhandledRejection' ? 'rejection' : 'uncaught', err, true); };
+    process.on('uncaughtExceptionMonitor', oldMonitor);
+    new S.ClientDiagService(sp, Object.assign({}, controller, { on: () => {}, emitter: { on: () => {} } }));
+    const sentBefore = H.logs.length;
+    process.emit('uncaughtExceptionMonitor', new Error('reload boom'), 'uncaughtException');
+    process.emit('uncaughtException', new Error('reload boom'), 'uncaughtException');
+    process.emit('unhandledRejection', new Error('reload async'), Promise.resolve());
+    const lines = H.logs.slice(sentBefore);
+    check('over an older bundle: both listeners are added, an uncaught error is reported once (by the old monitor), a rejection once',
+      process.listenerCount('uncaughtException') === 1 && process.listenerCount('unhandledRejection') === 1 && monitorSaw === 1
+      && lines.filter((l) => /reload boom/.test(l)).length === 1 && lines.filter((l) => /at=rejection n=1 m=Error: reload async/.test(l)).length === 1, lines);
+    process.removeListener('uncaughtExceptionMonitor', oldMonitor);
+    saved.forEach(([e, fns]) => { process.removeAllListeners(e); fns.forEach((f) => process.on(e, f)); });
+    globalThis.__dboProcessHookVersion = 2;
   }
 
   // ---- the controller's on/once ----
