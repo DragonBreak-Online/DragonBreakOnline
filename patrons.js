@@ -29,9 +29,18 @@ module.exports = (api) => {
     return store.profiles[p] || (store.profiles[p] = { used: 0, chars: {} });
   };
   const charKey = (a) => (a >>> 0).toString(16);
+  // One free reroll for each character that existed before the Skyrim transition (transition-rerolls.json, Nate 16 Oct)
+  const TRANSITION = (() => { const t = readJson(path.resolve('transition-rerolls.json'), {}); return { until: Date.parse(t.until || '') || 0, chars: new Set((t.chars || []).map(String)) }; })();
+  if (!store.transition) store.transition = {};
+  const transitionFree = (a) => Date.now() < TRANSITION.until && TRANSITION.chars.has(charKey(a)) && !store.transition[charKey(a)];
 
   // { left: number | Infinity, tier, rule } for the character the player is on
   const rerollsLeft = (a) => {
+    const r = patronRerollsLeft(a);
+    if (!transitionFree(a) || r.left === Infinity) return r;
+    return { ...r, left: r.left + 1, free: true, text: `1 free for the Skyrim transition${r.left > 0 ? `, then ${r.text}` : ''}` };
+  };
+  const patronRerollsLeft = (a) => {
     const tier = tierOf(a);
     const rule = tier ? tier.rerolls : null;
     const rec = recOf(a);
@@ -112,8 +121,11 @@ module.exports = (api) => {
     if (!pending(a)) return;
     setPending(a, false);
     const rec = recOf(a);
-    rec.used = (rec.used || 0) + 1;
-    rec.chars[charKey(a)] = (rec.chars[charKey(a)] || 0) + 1;
+    if (transitionFree(a)) store.transition[charKey(a)] = Date.now();
+    else {
+      rec.used = (rec.used || 0) + 1;
+      rec.chars[charKey(a)] = (rec.chars[charKey(a)] || 0) + 1;
+    }
     save();
     audit(`REROLL ${who(a)} changed identity (${rerollsLeft(a).text} left)`);
     // A vampire keeps the vampire variant of the new race

@@ -1,5 +1,20 @@
 [
   {
+    "title": "A free identity change for the Skyrim move",
+    "date": "2026-10-16",
+    "version": "Hotfix",
+    "tag": "Feature",
+    "sections": [
+      {
+        "heading": "Characters",
+        "items": [
+          "Every character made before today's Skyrim update gets one free identity change: race, face, body and name. Type /reroll to use it. Your skills, gear and progress stay.",
+          "It is spent before any Patreon reroll and is open until 30 October. Yokudan armour also now counts at its tier, and Dwarven Sphere and Soul Cairn arrows no longer turn up in loot."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Gold piles, respawns and smithing",
     "date": "2026-10-16",
     "version": "Hotfix",
