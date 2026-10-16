@@ -192,7 +192,7 @@ const bundle = async (rel, dir, plugins) => {
   NOW += 1000; tick();
   check('the rest next second, with the client line (version and platform)', H.packets.length === 2
     && H.packets[1].lines.some((l) => l === `apr client v=${D.DBO_CLIENT_VERSION} sp=2.9.0`), H.packets[1]);
-  check('the client version in every apr client and cerr line is the package version, 0.3.99', D.DBO_CLIENT_VERSION === '0.3.99', D.DBO_CLIENT_VERSION);
+  check('the client version in every apr client and cerr line is the package version, 0.3.100', D.DBO_CLIENT_VERSION === '0.3.100', D.DBO_CLIENT_VERSION);
   H.packets = [];
   const e1 = new RangeError('bad index'); e1.stack = 'RangeError: bad index\n    at g (C:\\Users\\P\\skymp5-client.js:5:6)';
   globalThis.__dboReportError('on:update', e1);
