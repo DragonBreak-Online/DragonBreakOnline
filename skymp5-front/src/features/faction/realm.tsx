@@ -10,6 +10,8 @@ export interface RealmTerritory {
   owner: string;
   ownerName: string;
   world: string;
+  // The worldspace the map draws it in (a walled city's counts as Tamriel); older servers send only world
+  mapWorld?: string;
   x: number;
   y: number;
   icon?: number | null;
@@ -30,9 +32,9 @@ export interface RealmWar {
   captures: number;
 }
 
-export interface RealmSecret { id: string; name: string; kind: string; layer: string[]; x: number; y: number }
+export interface RealmSecret { id: string; name: string; kind: string; layer: string[]; x: number; y: number; world?: string }
 // A faction's capital: one of its territories (crowned on the map), or a seat at a spot (x, y null when indoors)
-export interface RealmCapital { faction: string; factionName: string; name: string; territory: string | null; x: number | null; y: number | null }
+export interface RealmCapital { faction: string; factionName: string; name: string; territory: string | null; x: number | null; y: number | null; world?: string | null }
 export interface RealmRaids {
   rules: { enabled?: boolean; minDefendersOnline: number; cooldownDays: number; raidMinutes: number };
   raids: { raider: string; raiderName: string; owner: string; territory: string; territoryName: string; until: number; breakIns: number }[];
@@ -223,13 +225,40 @@ const CapitalControl = ({ lead, realm, act, busy }: { lead: RealmData['leads'][n
   );
 };
 
-export const RealmTab = ({ realm, background, act, busy }: { realm: RealmData | null; background?: { src: string; bounds: [number, number, number, number] }; act: Send; busy: boolean }) => {
+export interface RealmMapDef { world: string; name: string; src: string; bounds: [number, number, number, number] }
+const sameWorld = (a?: string | null, b?: string | null) => !!a && !!b && a.toLowerCase() === b.toLowerCase();
+// The part of the realm one map draws. A place with no world (an older server) is the first map's, as before
+export const realmOnMap = (realm: RealmData, map: RealmMapDef, first: RealmMapDef): RealmData => {
+  const isHere = (w?: string | null) => (w ? sameWorld(w, map.world) : map === first);
+  const territories = (realm.territories || []).filter((t) => isHere(t.mapWorld || t.world));
+  const ids = new Set(territories.map((t) => t.id));
+  return Object.assign({}, realm, {
+    territories,
+    capitals: (realm.capitals || []).filter((c) => (c.territory ? ids.has(c.territory) : isHere(c.world))),
+    secret: (realm.secret || []).filter((t) => isHere(t.world)),
+  });
+};
+
+export const RealmTab = ({ realm, maps, act, busy }: { realm: RealmData | null; maps: RealmMapDef[]; act: Send; busy: boolean }) => {
+  const [mapWorld, setMapWorld] = useState('');
   if (!realm || !(realm.territories || []).length) return <p className="faction__empty">No land has been charted yet.</p>;
   const owners = Array.from(new Set(realm.territories.map((t) => t.owner)));
   const capitals = realm.capitals || [];
+  // The maps with at least one territory; the switch shows only when there is more than one
+  const shown = maps.filter((m) => realmOnMap(realm, m, maps[0]).territories.length > 0);
+  const map = shown.find((m) => m.world === mapWorld) || shown[0];
   return (
     <div className="realm">
-      <RealmMap realm={realm} background={background} />
+      <div className="realm__mapcol">
+        {shown.length > 1 && (
+          <div className="realm__maps">
+            {shown.map((m) => (
+              <button key={m.world} className={'realm__mapbtn' + (m === map ? ' realm__mapbtn--on' : '')} onClick={() => setMapWorld(m.world)}>{m.name}</button>
+            ))}
+          </div>
+        )}
+        {map ? <RealmMap key={map.world} realm={realmOnMap(realm, map, maps[0])} background={map} /> : <RealmMap realm={realm} />}
+      </div>
       <div className="realm__side">
         <div className="realm__legend">
           {owners.map((o) => (
