@@ -1446,6 +1446,9 @@ const GATES = (() => {
     const mine = Array.isArray(o.spots) ? o.spots.filter(validSpot).map((q) => q.slice(0, 3).map(Number)) : [];
     out[id] = [String(o.name || name), mine.length ? mine : spots, Number.isFinite(Number(o.rotZ)) ? Number(o.rotZ) : rotZ];
   }
+  // One line a load, for the Skyrim window's verify (chain-skyrim): which gates take their spots from the config
+  const fromCfg = Object.keys(GATE_DEFAULTS).filter((id) => over[id] && Array.isArray(over[id].spots) && over[id].spots.some(validSpot));
+  try { log(`hub gates: ${Object.keys(out).length} gates, ${Object.values(out).reduce((n, g) => n + g[1].length, 0)} spots, config spots for ${fromCfg.length ? fromCfg.join(' ') : 'none'}`); } catch (e) { /* log not up */ }
   return out;
 })();
 const TAMRIEL = (() => { try { return mp.getDescFromId(0x3c); } catch (e) { return '3c:Skyrim.esm'; } })();
