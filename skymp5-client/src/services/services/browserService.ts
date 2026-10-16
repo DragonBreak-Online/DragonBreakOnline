@@ -242,6 +242,13 @@ export class BrowserService extends ClientListener {
     return live;
   }
 
+  // The recorded menus as they stand, the engine not asked and nothing pruned (diagnostic lines)
+  recordedBlockingMenus(): string[] {
+    const recorded: string[] = [];
+    this.badMenusOpen.forEach((name) => recorded.push(name));
+    return recorded;
+  }
+
   private badMenusOpen = new Set<string>();
   private uiHidden = false;
 

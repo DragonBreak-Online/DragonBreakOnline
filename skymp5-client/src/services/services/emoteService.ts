@@ -1,6 +1,6 @@
 import { ClientListener, CombinedController, Sp } from "./clientListener";
 import { notifyNextUpdate } from "./customPacketUtil";
-import { openFormMenu, closeFormMenu, readMenuKeyCode, isGameInputBlocked, isMenuKeyPressBlocked } from "./widgetMenuUtil";
+import { openFormMenu, closeFormMenu, readMenuKeyCode, isGameInputBlocked, isMenuKeyPressBlocked, menuKeyBlockReason, isConsoleOpen } from "./widgetMenuUtil";
 import { buttonKeyCode } from "./mouseKeys";
 import { GamepadButton, isGamepadChord } from "./gamepadKeys";
 import { RestraintService } from "./restraintService";
@@ -230,13 +230,25 @@ export class EmoteService extends ClientListener {
       return;
     }
     if (isMenuKeyPressBlocked(this.sp, this.controller, e)) {
+      this.noteRefusedKey(e);
       return;
     }
     if (this.isPoseLocked()) {
       notifyNextUpdate(this.controller, this.sp, "You cannot use emotes while restrained.");
+      emoteNote("key refused: restrained");
       return;
     }
     this.openMenu();
+  }
+
+  // Nothing on screen says why the key did nothing, so the diagnostic line names the gate; a B typed in the console is no refusal
+  private noteRefusedKey(e: ButtonEvent): void {
+    try {
+      if (isConsoleOpen(this.sp)) return;
+      emoteNote(`key refused: ${menuKeyBlockReason(this.sp, this.controller, e)}`);
+    } catch {
+      // diagnostics never break the key
+    }
   }
 
   private onBrowserMessage(e: BrowserMessageEvent): void {
