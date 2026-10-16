@@ -1,5 +1,21 @@
 [
   {
+    "title": "Every wild animal can be skinned",
+    "date": "2026-10-16",
+    "version": "Hotfix",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Skinning",
+        "items": [
+          "Every wild creature can now be skinned. Animals without a pelt give their own part instead: mudcrabs their chitin, skeevers their tail, spiders their venom, trolls their fat, chaurus their chitin, horkers and mammoths their tusks, slaughterfish their scales, ice wraiths their teeth, wisps their wrappings or glow dust, netch their leather or jelly, and hares, chickens, rats and dogs their meat.",
+          "The part comes from skinning now, not from searching the body. Anything else the animal carried is still on the body.",
+          "Small parts and meat can be skinned by anyone. Prized parts need a trained Skinner, as rare pelts do: a mammoth's tusk takes a Master."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Lever gates close again",
     "date": "2026-10-16",
     "version": "Hotfix",
