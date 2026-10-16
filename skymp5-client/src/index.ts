@@ -23,6 +23,7 @@ import { CraftService } from "./services/services/craftService";
 import { CraftedExtrasService } from "./services/services/craftedExtrasService";
 import { DropItemService } from "./services/services/dropItemService";
 import { HitService } from "./services/services/hitService";
+import { MeleeReachDiagService } from "./services/services/meleeReachDiagService";
 import { CloneSpellGuardService } from "./services/services/cloneSpellGuardService";
 import { RagdollService } from "./services/services/ragdollService";
 import { DeathService } from "./services/services/deathService";
@@ -168,6 +169,7 @@ const main = () => {
       new CraftedExtrasService(sp, controller),
       new DropItemService(sp, controller),
       new HitService(sp, controller),
+      new MeleeReachDiagService(sp, controller),
       new CloneSpellGuardService(sp, controller),
       new RagdollService(sp, controller),
       new DeathService(sp, controller),
