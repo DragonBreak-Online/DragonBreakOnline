@@ -1,6 +1,6 @@
 // Scripted test for the login-inside-an-interior door bug (16 Oct, Bruma's Great Hall 6c40f and other interiors): WorldView
 // must start its FormViews on update events even when the Papyrus Utility.wait never returns, and a door the engine took
-// itself is still sent to the server. Run from skymp5-client:
+// itself is still sent to the server, then blocked again only when WorldView holds its FormView. Run from skymp5-client:
 //
 //   node tests/door-activation-harness.js [path to esbuild's package dir]
 'use strict';
@@ -185,6 +185,26 @@ async function main() {
       const sent = activate(player, d);
       check('the engine took an unblocked load door itself (state Opening): the server still hears it', sent.length === 1 && sent[0].data.target === 0x806c473 && sent[0].data.caster === 0x14, sent);
       check('...and, as WorldView holds its FormView, the door is activation-blocked again', d.blocks.includes(true), d.blocks);
+    }
+    {
+      // A plugin door the server never streams (disabled or deleted in its plugin): WorldView holds FormViews, none for it
+      const o = { id: 0x806c4e0, state: 3, blocked: false };
+      const d = door(o);
+      const press = () => {
+        const moved = !o.blocked;
+        if (moved) o.state = o.state === 1 ? 4 : 2;
+        const sent = activate(player, d).filter((m) => m.data.target === o.id).length;
+        if (o.state === 2) o.state = 1; else if (o.state === 4) o.state = 3;
+        return { moved, sent };
+      };
+      const presses = [press(), press(), press()];
+      check('a door with no FormView (one the server never streams) is sent on every press', presses.every((p) => p.sent === 1), presses);
+      check('...and the engine still moves it on the second press and after', presses.every((p) => p.moved) && !d.blocks.includes(true), { presses, blocks: d.blocks });
+      const held = globalThis.__wv;
+      globalThis.__wv = undefined;
+      const early = press();
+      globalThis.__wv = held;
+      check('...and a door pressed before any WorldView exists is sent and left to the engine too', early.sent === 1 && early.moved && !o.blocked, early);
     }
     check('a blocked door still animating from the server stays ignored, as before', activate(player, door({ state: 2, blocked: true })).length === 0);
     check('a blocked closed door is sent, as before', activate(player, door({ state: 3, blocked: true })).length === 1);
