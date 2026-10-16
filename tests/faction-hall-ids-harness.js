@@ -4,6 +4,8 @@
 // faction-halls-1016 worker found in the live load order, not deleted (tests/fixtures/faction-hall-ids.json, with the
 // plugin whose record wins); no door belongs to two halls unless all of them but one are marked shared (Bruma Castle,
 // the Palace of the Kings); and the Thalmor sit in their Bruma embassy, not in Bruma Castle.
+// The Daedric cults (Nate, 16 Oct: "give the cults their shrines"): each cult whose lore shrine stands inside a cell has
+// it as its hall; the open-air shrines (Azura, Hircine, Mephala, Sanguine, Sheogorath) give none (section 6).
 //
 //   node tests/faction-hall-ids-harness.js   (from server/)
 'use strict';
@@ -27,6 +29,9 @@ const EXPECT = {
   'vigil-of-stendarr': 'dawnstar', 'college-of-winterhold': 'winterhold', 'companions': 'whiterun',
   'bards-college': 'solitude', 'stormcloaks': 'windhelm', 'dawnguard': 'riften', 'clan-volkihar': 'solitude',
   'silver-hand': 'dawnstar', 'thalmor': 'bruma', 'cult-nocturnal': 'falkreath',
+  'cult-mehrunes-dagon': 'dawnstar', 'cult-namira': 'markarth', 'cult-molag-bal': 'markarth', 'cult-meridia': 'solitude',
+  'cult-vaermina': 'dawnstar', 'cult-clavicus-vile': 'whiterun', 'cult-peryite': 'markarth', 'cult-hermaeus-mora': 'winterhold',
+  'cult-boethiah': 'windhelm',
 };
 const NAMES = {
   'vigil-of-stendarr': /Hall of the Vigilant/, 'college-of-winterhold': /College of Winterhold/, companions: /^Jorrvaskr$/,
@@ -36,6 +41,9 @@ const NAMES = {
   'hold-solitude': /Blue Palace/, 'hold-markarth': /^Understone Keep$/, 'hold-morthal': /^Highmoon Hall$/,
   'hold-dawnstar': /White Hall/, 'hold-falkreath': /Jarl's Longhouse/, 'hold-winterhold': /Jarl's Longhouse/,
   'clan-cracked-tusk': /^Cracked Tusk Keep$/,
+  'cult-mehrunes-dagon': /Mythic Dawn Museum/, 'cult-namira': /^Reachcliff Cave$/, 'cult-molag-bal': /Abandoned House, Markarth/,
+  'cult-meridia': /^Kilkreath Temple$/, 'cult-vaermina': /^Nightcaller Temple$/, 'cult-clavicus-vile': /^Haemar's Shame$/,
+  'cult-peryite': /^Bthardamz$/, 'cult-hermaeus-mora': /^Septimus Signus's Outpost$/, 'cult-boethiah': /Boethiah Cultist Hideout/,
 };
 
 // ---- 1. every faction in the table has a whole hall ----
@@ -45,7 +53,7 @@ for (const [fid, zone] of Object.entries(EXPECT)) {
   if (!h) continue;
   ok(h.zone === zone, `${fid}'s hall stands in zone ${zone}`, h.zone);
   ok(Array.isArray(h.doors) && h.doors.length > 0, `${fid}'s hall lists its doors`, h.doors);
-  ok(Array.isArray(h.cells) && h.cells.length > 0, `${fid}'s hall lists its cells`, h.cells);
+  if (fid !== 'cult-mehrunes-dagon') ok(Array.isArray(h.cells) && h.cells.length > 0, `${fid}'s hall lists its cells`, h.cells);
   ok(typeof h.note === 'string' && h.note.length > 0 && !/Bruma lock|not reachable/.test(h.note), `${fid}'s hall says where it is`, h.note);
   if (NAMES[fid]) ok(NAMES[fid].test(h.name), `${fid} sits in ${NAMES[fid]}`, h.name);
 }
@@ -96,6 +104,21 @@ ok(!th.shared && !th.doors.includes('b46a8:BSHeartland.esm') && !/Legion|Bruma C
 // ---- 5. the old "outside the Bruma lock" notes are gone (Skyrim opened on 16 Oct) ----
 const stale = halls.filter((f) => /Bruma lock|not reachable/.test(f.hall.note || '')).map((f) => f.id);
 ok(!stale.length, 'no hall note says it is outside the Bruma lock', stale);
+
+// ---- 6. the cults: a hall only where the shrine is indoors ----
+const cults = DEFS.factions.filter((f) => f.kind === 'cult');
+for (const f of cults) ok(f.secret === true, `${f.id} stays secret`);
+// Open-air shrines (Azura's statue, Hircine's, Mephala's, Sanguine's and Sheogorath's in man_DaedricShrines.esp) are no
+// hall; Misty Grove is Sanguine's realm behind a quest door that starts disabled
+for (const id of ['cult-azura', 'cult-hircine', 'cult-mephala', 'cult-sanguine', 'cult-sheogorath']) ok(!byId.get(id).hall, `${id} has no hall (its shrine stands in the open)`);
+ok(cults.filter((f) => f.hall).length === 10, 'ten cults have a hall', cults.filter((f) => f.hall).map((f) => f.id));
+for (const f of cults.filter((x) => x.hall && x.id !== 'cult-mehrunes-dagon')) {
+  ok(!f.hall.shared, `${f.id}'s hall is its own`);
+  ok(f.hall.cells.every((c) => FIX.cells[c] && FIX.cells[c].edid), `${f.id}'s cells carry their editor ids in the fixture`);
+}
+// Doors that open only through a quest (an enable parent with the opposite-state flag): never a way in
+const questDoors = ['dae8e:Skyrim.esm', '27eef:Skyrim.esm'];
+ok(!halls.some((f) => (f.hall.doors || []).some((d) => questDoors.includes(d))), 'no hall uses a door its quest opens (Reachcliff dae8e, Kilkreath DA09FrontDoor 27eef)');
 
 console.log(fail ? `${fail} of ${n} checks FAILED` : `all ${n} checks passed`);
 process.exit(fail ? 1 : 0);

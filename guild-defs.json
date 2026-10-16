@@ -1767,7 +1767,18 @@
           "title": "Initiate",
           "role": "member"
         }
-      ]
+      ],
+      "hall": {
+        "name": "the Boethiah Cultist Hideout",
+        "zone": "windhelm",
+        "doors": [
+          "ab024:DragonBreak Online Edits.esp"
+        ],
+        "cells": [
+          "ab026:DragonBreak Online Edits.esp"
+        ],
+        "note": "the cultists' hideout in the hills east of Windhelm"
+      }
     },
     {
       "id": "cult-clavicus-vile",
@@ -1775,7 +1786,20 @@
       "kind": "cult",
       "prince": "Clavicus Vile",
       "secret": true,
-      "template": "cult"
+      "template": "cult",
+      "hall": {
+        "name": "Haemar's Shame",
+        "zone": "whiterun",
+        "doors": [
+          "52537:Skyrim.esm",
+          "5253e:Skyrim.esm"
+        ],
+        "cells": [
+          "15268:Skyrim.esm",
+          "216bb:Skyrim.esm"
+        ],
+        "note": "the cave high in the mountains south-east of Whiterun, with Clavicus Vile's shrine in its depths"
+      }
     },
     {
       "id": "cult-hermaeus-mora",
@@ -1816,7 +1840,18 @@
           "title": "Initiate",
           "role": "member"
         }
-      ]
+      ],
+      "hall": {
+        "name": "Septimus Signus's Outpost",
+        "zone": "winterhold",
+        "doors": [
+          "e8e46:Skyrim.esm"
+        ],
+        "cells": [
+          "2d4e4:Skyrim.esm"
+        ],
+        "note": "the ice cave on the Sea of Ghosts north of Winterhold, where Hermaeus Mora speaks to his seekers"
+      }
     },
     {
       "id": "cult-hircine",
@@ -1988,7 +2023,21 @@
           "title": "Initiate",
           "role": "member"
         }
-      ]
+      ],
+      "hall": {
+        "name": "Kilkreath Temple",
+        "zone": "solitude",
+        "doors": [
+          "26cfa:Skyrim.esm",
+          "465a1:Skyrim.esm"
+        ],
+        "cells": [
+          "15255:Skyrim.esm",
+          "4624f:Skyrim.esm",
+          "27d1c:Skyrim.esm"
+        ],
+        "note": "Meridia's temple under her statue on the mountain west of Solitude, with its ruins and catacombs"
+      }
     },
     {
       "id": "cult-molag-bal",
@@ -2029,7 +2078,18 @@
           "title": "Thrall",
           "role": "member"
         }
-      ]
+      ],
+      "hall": {
+        "name": "the Abandoned House, Markarth",
+        "zone": "markarth",
+        "doors": [
+          "1cdd2:Skyrim.esm"
+        ],
+        "cells": [
+          "18be9:Skyrim.esm"
+        ],
+        "note": "the boarded-up house in Markarth with Molag Bal's shrine in its cellar"
+      }
     },
     {
       "id": "cult-namira",
@@ -2070,7 +2130,18 @@
           "title": "Initiate",
           "role": "member"
         }
-      ]
+      ],
+      "hall": {
+        "name": "Reachcliff Cave",
+        "zone": "markarth",
+        "doors": [
+          "15ee0:Skyrim.esm"
+        ],
+        "cells": [
+          "15227:Skyrim.esm"
+        ],
+        "note": "Namira's shrine in the cave in the hills south-east of Markarth, where Eola's circle keeps its feasts"
+      }
     },
     {
       "id": "cult-nocturnal",
@@ -2164,7 +2235,24 @@
           "title": "Initiate",
           "role": "member"
         }
-      ]
+      ],
+      "hall": {
+        "name": "Bthardamz",
+        "zone": "markarth",
+        "doors": [
+          "15d77:Skyrim.esm",
+          "3e1db:Skyrim.esm"
+        ],
+        "cells": [
+          "361fa:Skyrim.esm",
+          "5a857:Skyrim.esm",
+          "5a856:Skyrim.esm",
+          "361f9:Skyrim.esm",
+          "5912d:Skyrim.esm",
+          "30442:Skyrim.esm"
+        ],
+        "note": "the Dwemer ruin north of Markarth where the Afflicted hide, near Peryite's shrine"
+      }
     },
     {
       "id": "cult-sanguine",
@@ -2287,7 +2375,18 @@
           "title": "Initiate",
           "role": "member"
         }
-      ]
+      ],
+      "hall": {
+        "name": "Nightcaller Temple",
+        "zone": "dawnstar",
+        "doors": [
+          "17081:Skyrim.esm"
+        ],
+        "cells": [
+          "9aa4a:Skyrim.esm"
+        ],
+        "note": "Vaermina's temple on the cliff above Dawnstar, to the east"
+      }
     },
     {
       "id": "house-hlaalu",
