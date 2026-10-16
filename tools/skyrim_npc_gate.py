@@ -7,15 +7,19 @@
 #    xEdit re-save side effect (memory xedit-resave-mutates-unrelated-records) and FAILS. A CELL/WRLD the pass ADDS (xEdit
 #    copies a ref's parent with it) and an --allow-match record must equal the version it overrides (the last plugin before
 #    it in the order with that record, master indices mapped, subrecord order and the region list order ignored): an older
-#    copy would revert a later mod's edit of that cell or world.
+#    copy would revert a later mod's edit of that cell or world. A localized source's FULL (a string id) is compared as the
+#    text its Strings table gives (the DLE is not localized, so xEdit writes the text inline); a WRLD copy may lack OFST
+#    and RNAM, which xEdit drops on every world copy. A record whose only change is a master index moved by the masters
+#    xEdit appended (Nexus Patches' own 0x24 -> 0x32), at form id positions, counts as unchanged.
 # 2. the count of newly disabled actors per plugin against tooling/xedit-scripts/DBO_SkyrimActorsList.txt (targets).
 # 3. the package with the two returned plugins (a link farm in <scratch>/pkg) judged by tools/skyrim_actor_narrow.py, then
 #    tools/skyrim_actor_check.py on the result (0 troublesome actors left, the keep baseline, wildlife, the DLE ship gate).
 # Exit 0 = PASS. Reads only; writes only under <scratch>.
-import sys, os, json, struct, subprocess, collections
+import sys, os, json, struct, subprocess, collections, zlib
 here = os.path.dirname(os.path.abspath(__file__)); srv = os.path.dirname(here)
 sys.path.insert(0, os.path.expanduser('~nate/dragonbreak/ck-mcp'))
 import esplib
+from bsastrings import Strings
 
 DISABLED, DELETED, COMPRESSED = 0x800, 0x20, 0x40000
 fails = 0
@@ -39,6 +43,33 @@ def load(path):
 
 
 ORDER = []
+ALT_TEX = {b'MODS', b'MO2S', b'MO3S', b'MO4S', b'MO5S'}
+
+
+def fid_tops(sg, v):
+    # the offsets of form id top bytes in a subrecord: an alternate-texture list (count; per entry a u32-length name, the
+    # TXST id, the 3D index) holds them unaligned; elsewhere only the aligned u32 slots are taken as form ids
+    if sg in ALT_TEX:
+        out = set(); n = struct.unpack_from('<I', v, 0)[0]; o = 4
+        for _ in range(n):
+            o += 4 + struct.unpack_from('<I', v, o)[0]; out.add(o + 3); o += 8
+        return out if o == len(v) else set()
+    return set(range(3, len(v), 4))
+
+
+def moved_only(osubs, nsubs, mv):
+    # same subrecords in the same order, every differing byte an old master index -> its new index at a form id top byte
+    if not mv or len(osubs) != len(nsubs): return False
+    for (s1, v1), (s2, v2) in zip(osubs, nsubs):
+        if s1 != s2 or len(v1) != len(v2): return False
+        if v1 == v2: continue
+        try: tops = fid_tops(s1, v1)
+        except struct.error: return False
+        if any(v1[i] != v2[i] and (i not in tops or mv.get(v1[i]) != v2[i]) for i in range(len(v1))): return False
+    return True
+
+
+STATS = collections.defaultdict(list)
 
 
 def diff(before, after, name):
@@ -51,9 +82,15 @@ def diff(before, after, name):
     ok(all(m in am for m in bm) and all(m in before for m in extra), '%s: masters %d -> %d, none dropped%s' % (name, len(bm), len(am), (', added (all load before it): ' + ', '.join(extra)) if extra else ''))
     removed = [k for k in b if k not in a]
     ok(not removed, '%s: no record removed%s' % (name, (': ' + ', '.join('%s %s:%06X' % (k[0], k[1][0], k[1][1]) for k in removed[:8])) if removed else ''))
-    bad, disabled, containers = [], 0, []
+    # masters only grow, so an old index can still move (Nexus Patches' own 0x24 -> 0x32 when xEdit appended 14 masters):
+    # a record whose only differences are such moves, each at a form id's top byte, is unchanged
+    me = os.path.basename(before_name).lower(); nb, na = bm + [me], am + [me]
+    mv = {i: na.index(n) for i, n in enumerate(nb) if n in na and na.index(n) != i}
+    same = lambda o, n: o == n or moved_only(o, n, mv)
+    bad, disabled, containers, moved = [], 0, [], collections.Counter()
     for k, (fl, subs) in a.items():
         if k in b and (b[k][0] & ~COMPRESSED, b[k][1]) == (fl & ~COMPRESSED, subs): continue
+        if k in b and b[k][0] & ~COMPRESSED == fl & ~COMPRESSED and same(b[k][1], subs): moved[k[0]] += 1; continue
         tag = '%s %s:%06X' % (k[0], k[1][0], k[1][1])
         if k[0] in ('CELL', 'WRLD') and k not in b: containers.append(k); continue      # the parent xEdit copies with a ref
         if k in ALLOW_MATCH: containers.append(k); continue                              # may change, to what it overrides
@@ -63,11 +100,15 @@ def diff(before, after, name):
         if k in b:
             ofl, osubs = b[k]
             if (fl & ~COMPRESSED & ~DISABLED) != (ofl & ~COMPRESSED & ~DISABLED): bad.append('%s other flags changed %X -> %X' % (tag, ofl, fl)); continue
-            if [x for x in subs if x[0] != b'XESP'] != [x for x in osubs if x[0] != b'XESP']: bad.append(tag + ' subrecords changed'); continue
+            ns, os_ = [x for x in subs if x[0] != b'XESP'], [x for x in osubs if x[0] != b'XESP']
+            if not same(os_, ns):
+                d = collections.Counter(ns), collections.Counter(os_)
+                bad.append('%s subrecords changed (%s)' % (tag, ','.join(sorted({x[0].decode() for x in (d[0] - d[1]) + (d[1] - d[0])})) or 'order')); continue
             if ofl & DISABLED: continue          # it was disabled already; only its Enable Parent went
         disabled += 1
-    ok(not bad, '%s: every changed or added record is an actor made Initially Disabled with its Enable Parent removed%s' % (name, (': ' + '; '.join(bad[:10])) if bad else ''))
+    ok(not bad, '%s: every changed or added record is an actor made Initially Disabled with its Enable Parent removed%s' % (name, (' (%d not): ' % len(bad) + '; '.join(bad[:10])) if bad else ''))
     print('      %s: %d actors newly disabled, %d parent CELL/WRLD overrides added' % (name, disabled, len(containers)))
+    if moved: print('      %s: changed only by moved master indices %s (%s): %s' % (name, ' '.join('%02X->%02X' % x for x in sorted(mv.items())), ','.join(sorted({nb[i] for i in mv})), dict(sorted(moved.items()))))
     return disabled, containers, ap, a
 
 
@@ -75,6 +116,53 @@ def diff(before, after, name):
 # (the window passes the two WRLD overrides of Nexus Patches that must take the DLE's world map: Tamriel and Solstheim)
 ALLOW_MATCH = set()
 NOISE = {b'MODT', b'MO2T', b'MO3T', b'MO4T', b'MO5T', b'XRGD', b'DMDT'}
+LOCALIZED = 0x80
+# xEdit drops these on every WRLD copy: OFST is the source file's own table of cell offsets, RNAM its large-reference LOD
+# list; the engine rebuilds both. A copy that keeps them must still match.
+WRLD_DROPPABLE = {b'OFST', b'RNAM'}
+_strings = {}
+
+
+def lstring(order, upto, plugin, sig, key, sid):
+    # A localized plugin (header flag 0x80) stores FULL as a uint32 id into its own Strings/<plugin>_english.*STRINGS;
+    # xEdit writes the text inline into a non-localized copy. Resolve the id through the plugin's own tables; when this
+    # box has none for it (the Creation Club masters' tables live in their BSAs, which are not here) take the newest earlier
+    # localized plugin in the order that has the same record with the SAME id and a table for it. Returns (text, via).
+    data = os.environ.get('DBO_DATA', '/opt/skyrim-data')
+    S = _strings.setdefault(data, Strings(data))
+    t = S.text(plugin, sid)
+    if t is not None or S.count(plugin): return t, plugin
+    for n in reversed(order[:upto]):
+        if n.lower() == plugin.lower() or not S.count(n): continue
+        v = _same_id(n, sig, key)
+        if v == sid: return S.text(n, sid), n
+    return None, None
+
+
+_idcache = {}
+
+
+def _same_id(n, sig, key):
+    # the FULL id plugin n gives record key, or None
+    path = os.path.join(os.environ.get('DBO_DATA', '/opt/skyrim-data'), n)
+    if n not in _idcache:
+        _idcache[n] = {}
+        if os.path.exists(path):
+            p = esplib.Plugin(path); selfi = len(p.masters)
+            with open(path, 'rb') as fh:
+                for sg, fid, fl, off, sz, ctx in p.index:
+                    if sg not in ('CELL', 'WRLD'): continue
+                    k = (sg, ((p.masters[fid >> 24].lower() if (fid >> 24) < selfi else n.lower()), fid & 0xFFFFFF))
+                    _idcache[n][k] = (off, sz, fl)
+    hit = _idcache[n].get((sig, key))
+    if not hit: return None
+    off, sz, fl = hit
+    with open(path, 'rb') as fh:
+        fh.seek(off); d = fh.read(sz)
+    if fl & COMPRESSED: d = zlib.decompress(d[4:])
+    for sg, v in esplib.subrecords(d):
+        if sg == b'FULL' and len(v) == 4: return struct.unpack('<I', bytes(v))[0]
+    return None
 
 
 def norm(sg, v):
@@ -100,9 +188,11 @@ def containers_check(pkg, order, target_name, tp, trecs, keys):
             k = (sig, ((p.masters[fid >> 24].lower() if (fid >> 24) < selfi else n.lower()), fid & 0xFFFFFF))
             if k in want: found[k] = (path, off, sz, fl)
     out = []
+    tloc = bool(tp.hflags & LOCALIZED); pos = {n.lower(): i for i, n in enumerate(order)}; plugs = {}
     for k in keys:
         if k not in found: out.append('%s %s:%06X (overrides nothing before it)' % (k[0], k[1][0], k[1][1])); continue
-        path, off, sz, fl = found[k]; p = esplib.Plugin(path)
+        path, off, sz, fl = found[k]
+        p = plugs.get(path) or plugs.setdefault(path, esplib.Plugin(path))
         names = [m.lower() for m in p.masters] + [os.path.basename(path).lower()]
         remap = {i: tmast[nm] for i, nm in enumerate(names) if nm in tmast}
         def mapb(v, step):
@@ -112,6 +202,23 @@ def containers_check(pkg, order, target_name, tp, trecs, keys):
             return bytes(a)
         with open(path, 'rb') as fh: src = [(sg, bytes(v)) for sg, v in esplib.subrecords(p.data_at(fh, off, sz, fl)) if sg not in NOISE]
         dst = [(sg, norm(sg, v)) for sg, v in trecs[k][1] if sg not in NOISE]
+        if k[0] == 'WRLD':      # dropped by xEdit on the copy: allowed absent, compared when present
+            have = {sg for sg, _ in dst}
+            gone = sorted({sg.decode() for sg, _ in src if sg in WRLD_DROPPABLE and sg not in have})
+            if gone: STATS['wrld dropped'].append('%s %s:%06X %s' % (k[0], k[1][0], k[1][1], '+'.join(gone)))
+            src = [x for x in src if not (x[0] in WRLD_DROPPABLE and x[0] not in have)]
+        if p.hflags & LOCALIZED and not tloc:   # lstring id against inline text
+            tfull = [v for sg, v in dst if sg == b'FULL']
+            for i, (sg, v) in enumerate(src):
+                if sg != b'FULL' or len(v) != 4: continue
+                sid = struct.unpack('<I', v)[0]
+                txt, via = lstring(order, pos[os.path.basename(path).lower()], os.path.basename(path), k[0], k[1], sid)
+                if txt is None:
+                    out.append('%s %s:%06X FULL id %08X of %s resolves through no Strings table here' % (k[0], k[1][0], k[1][1], sid, os.path.basename(path)))
+                    continue
+                cand = [txt.encode(e, 'replace') + b'\0' for e in ('cp1252', 'utf-8')]
+                src[i] = (sg, next((c for c in cand if c in tfull), cand[0]))
+                STATS['FULL resolved' if via.lower() == os.path.basename(path).lower() else 'FULL resolved via ' + via].append(k)
         # xEdit writes the subrecords in its own order, so they are compared as a multiset
         left = collections.Counter(dst); mapped = []
         for sg, v in src:
@@ -138,7 +245,9 @@ def main():
     nd, cd, dp, dr = diff(os.path.join(pkg, 'plugins', 'DragonBreak Online Edits.esp'), dle, 'DLE')
     nn, cn, np_, nr = diff(os.path.join(pkg, 'plugins', 'DragonBreak Nexus Patches.esp'), nex, 'Nexus Patches')
     for nm, tp, trecs, keys in (('DragonBreak Online Edits.esp', dp, dr, cd), ('DragonBreak Nexus Patches.esp', np_, nr, cn)):
-        bad = containers_check(pkg, order, nm, tp, trecs, keys)
+        STATS.clear(); bad = containers_check(pkg, order, nm, tp, trecs, keys)
+        for what, xs in sorted(STATS.items()):
+            print('      %s: %s %d%s' % (nm, what, len(xs), (': ' + '; '.join(xs)) if what == 'wrld dropped' else ''))
         ok(not bad, '%s: the %d parent CELL/WRLD overrides it added are the versions they override%s' % (nm, len(keys), (': ' + '; '.join(bad[:10])) if bad else ''))
     lst = [l.split('|') for l in open(os.path.join(srv, 'tooling', 'xedit-scripts', 'DBO_SkyrimActorsList.txt'), encoding='utf-8').read().splitlines() if l.startswith('disable|')]
     want = collections.Counter(x[4] for x in lst)
