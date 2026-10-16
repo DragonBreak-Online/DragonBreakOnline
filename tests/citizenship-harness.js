@@ -81,7 +81,7 @@ const api = () => ({
   personal: (a, t) => said.push([a >>> 0, t]), nameOf: (a) => chars.get(a >>> 0).name, ownNameOf: (a) => chars.get(a >>> 0).name, tagOf: (a) => `T${(a >>> 0).toString(16)}`,
   onUi: (n, f) => { ui[n] = f; }, onlineActors: () => online.slice(), isAdmin: (a) => a === STAFF || a === GM || a === GMJARL, isLeadStaff: (a) => a === STAFF,
   profileOf: (a) => { const c = chars.get(a >>> 0); return c ? c.pid : -1; },
-  cfg: { citizenship: { discordRoles: { bruma: '1500000000000000001', whiterun: 'not-an-id' } } },
+  cfg: { citizenship: { discordRoles: { bruma: '1500000000000000001', whiterun: 'not-an-id' }, election: { voterRules: { enabled: false } } } },  // the voter rules: tests/election-antialt-harness.js
   every: (n, ms, f) => { timer = f; },
   zoneList: () => ZONES, zoneById: (id) => ZONES.find((z) => z.id === String(id)) || null, readOfficials: () => officials,
   rankTitle: (r) => ({ count: 'Count', jarl: 'Jarl', steward: 'Steward', commander: 'Lord Commander' })[r] || r,

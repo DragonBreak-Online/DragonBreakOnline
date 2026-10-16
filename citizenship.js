@@ -23,6 +23,11 @@
 // with a member who lost it is dropped unless the candidate replaced them; in voting such a seat starts empty, and a Jarl
 // candidate who lost it strikes the court off and voids its votes. The winner is seated (officials.json and the household
 // rank), the result shown with each court's count. Every phase's start and end are stored, so a restart resumes the clock.
+// Who may vote, and who counts toward the threshold (Nate, 16 Oct: no Discord alts voting; config election.voterRules): a
+// Discord account at least discordAgeDays (90) old, playHours (10) of play on playDays (3) different days (playtime.js),
+// and a character that was a citizen there citizenDays (7), each judged when the vote opens; accounts the launcher's PC code
+// links share one vote (no launcher sends the code yet); accounts voting from one address go to the staff review list
+// (/electionreview), never refused, and a Lead GM strikes a vote with /strikevote.
 // Those standing in a court on the ballot (Jarl candidate, Steward, Lord Commander, Housecarl, and their accounts' other
 // characters) do not vote (Nate, 14 Oct: "cabinets cant vote"). Each phase is announced (Nate, 14 Oct): registration open,
 // reopened, voting open, revote and the result go to the hold's online citizens, to each citizen character once at login
@@ -67,6 +72,8 @@ module.exports = (api) => {
   const boardZoneNear = typeof api.boardZoneNear === 'function' ? api.boardZoneNear : () => null;
   const raceEdidOf = typeof api.raceEdidOf === 'function' ? api.raceEdidOf : () => '';
   const unseatOfficialBy = typeof api.unseatOfficialBy === 'function' ? api.unseatOfficialBy : null;
+  const discordOf = typeof api.discordOf === 'function' ? api.discordOf : () => '';
+  const registerChatCommand = typeof api.registerChatCommand === 'function' ? api.registerChatCommand : null;
 
   // announceChannel: the Discord channel of the election notices (#server-updates); resultLoginDays: how long a citizen logging
   // in is still told the result
@@ -79,6 +86,14 @@ module.exports = (api) => {
   const C = Object.assign({ enabled: true, rulerOffices: ['jarl', 'count'], stewardOffices: ['steward'], maxHolds: 2, cooldownDays: 7, maxFee: 100000,
     defaultPolicy: 'free', requestDays: 14, auto: ['bruma'], noElection: ['bruma'], discordRoles: {} }, (cfg && cfg.citizenship) || {});
   C.election = Object.assign({}, E0, C.election || {});
+  // Who may vote, and who counts toward the threshold (Nate, 16 Oct: "make sure people can't make multiple Discord accounts
+  // just to vote"). Judged when the vote opens; before that, now. discordAgeDays: the Discord account's age (from its id);
+  // playHours on playDays different days (playtime.js, server-measured); citizenDays: the voting character's citizenship of
+  // the hold; oneVotePerDevice: accounts the backend's device store (deviceFile, launcher PC codes) links share one vote;
+  // sharedAddress: accounts voting from one address (players.json lastIp) go to the staff review list, never refused
+  const VR0 = { enabled: true, discordAgeDays: 90, playHours: 10, playDays: 3, citizenDays: 7, oneVotePerDevice: true, sharedAddress: true,
+    playersFile: '/opt/alduinak/skymp5-backend/data/players.json', deviceFile: '/opt/alduinak/skymp5-backend/data/device-ids.json', cacheMinutes: 10 };
+  C.election.voterRules = Object.assign({}, VR0, C.election.voterRules || {});
   const PANEL_ID = 84;
   const FILE = path.resolve('citizenship.json');
   const DAY = 86400000, HOUR = 3600000;
@@ -413,25 +428,140 @@ module.exports = (api) => {
   const EL = C.election;
   const electing = (z) => !!z && grants(z) && !(C.noElection || []).includes(z.id);
   const elOf = (zid) => data().elections[zid] || null;
-  // The accounts with a citizen character in z: explicit entries, and the auto holds' faction members and officials
-  const citizenAccounts = (z) => {
-    const pids = new Set();
+  // The accounts with a citizen character in z: pid -> [{ actor, since }] (explicit entries; the auto holds' faction members
+  // and officials with since 0, as their citizenship has no date)
+  const citizenPids = (z) => {
+    const pids = new Map();
+    const put = (pid, actor, since) => { if (!(pid >= 0)) return; if (!pids.has(pid)) pids.set(pid, []); pids.get(pid).push({ actor: actor >>> 0, since: Number(since) || 0 }); };
     for (const [k, e] of Object.entries(data().chars)) {
-      if (!e || !Array.isArray(e.holds) || !e.holds.some((h) => h.zone === z.id)) continue;
+      const h = e && Array.isArray(e.holds) ? e.holds.find((x) => x.zone === z.id) : null;
+      if (!h) continue;
       if (!exists(unhex(k))) continue;
-      const pid = Number(profileOf(unhex(k))); pids.add(pid >= 0 ? pid : Number(e.pid));
+      const pid = Number(profileOf(unhex(k))); put(pid >= 0 ? pid : Number(e.pid), unhex(k), h.since);
     }
     if ((C.auto || []).includes(z.id)) {
-      for (const o of z.officials || []) for (const pid of seated(z, o)) pids.add(pid);
+      for (const o of z.officials || []) for (const pid of seated(z, o)) if (!pids.has(pid)) put(pid, accountActors(pid)[0] || 0, 0);
       try {
         for (const fid of (typeof globalThis.__dboFactionList === 'function' ? globalThis.__dboFactionList() : []).concat(courtFaction(z.id) || [])) {
           const info = typeof globalThis.__dboGuildInfo === 'function' ? globalThis.__dboGuildInfo(fid) : null;
           if (!info || String(info.zone || (info.hall && info.hall.zone) || '') !== z.id) continue;
-          for (const m of (typeof globalThis.__dboGuildMembers === 'function' ? globalThis.__dboGuildMembers(fid) : [])) { const p = Number(profileOf(m)); if (p >= 0) pids.add(p); }
+          for (const m of (typeof globalThis.__dboGuildMembers === 'function' ? globalThis.__dboGuildMembers(fid) : [])) { const p = Number(profileOf(m)); if (p >= 0 && !pids.has(p)) put(p, m, 0); }
         }
       } catch (e) { /* no guilds */ }
     }
-    return pids.size;
+    return pids;
+  };
+
+  // ---- who may vote (Nate, 16 Oct: no Discord alts voting) -------------------------------------------------------------
+  const VR = EL.voterRules;
+  // The backend's records, read-only, as journalstats.js reads players.json (the game server runs as root): profileId ->
+  // { discordId, ip }, and Discord id -> the PC codes the launcher reported (sources/deviceChecks.js; empty until a
+  // launcher sends them)
+  const BK = S.backend || (S.backend = { at: 0, players: new Map(), devAt: 0, devices: new Map(), devSeen: false, warned: {} });
+  const players = (force) => {
+    if (force || Date.now() - BK.at > VR.cacheMinutes * 60000) {
+      BK.at = Date.now();
+      try {
+        const rows = JSON.parse(fs.readFileSync(VR.playersFile, 'utf8')); const m = new Map();
+        for (const r of Object.values(rows || {})) { const p = Number(r && r.profileId); if (Number.isInteger(p) && p >= 0) m.set(p, { discordId: String(r.discordId || ''), ip: String(r.lastIp || '') }); }
+        BK.players = m;
+      } catch (e) { if (!BK.warned.players) { BK.warned.players = true; log(`citizenship: ${VR.playersFile} cannot be read (${e.code || e.message}); Discord ids come from the characters only, and no shared address is noticed`); } }
+    }
+    return BK.players;
+  };
+  const devices = () => {
+    if (Date.now() - BK.devAt > VR.cacheMinutes * 60000) {
+      BK.devAt = Date.now();
+      try {
+        const d = JSON.parse(fs.readFileSync(VR.deviceFile, 'utf8')); const m = new Map();
+        for (const [id, acct] of Object.entries((d && d.accounts) || {})) { const hs = (acct && Array.isArray(acct.d) ? acct.d : []).map((x) => String(x && x.h || '')).filter(Boolean); if (hs.length) m.set(String(id), hs); }
+        BK.devices = m; BK.devSeen = true;
+      } catch (e) { BK.devices = new Map(); if (!BK.warned.devices) { BK.warned.devices = true; log(`citizenship: no device codes (${VR.deviceFile}: ${e.code || e.message}); one vote per device waits for a launcher that sends them`); } }
+    }
+    return BK.devices;
+  };
+  const discordIdOfPid = (pid, actor) => {
+    let id = '';
+    if (actor) { try { id = String(discordOf(actor >>> 0) || ''); } catch (e) { id = ''; } }
+    if (!/^\d{17,20}$/.test(id)) { const r = players().get(Number(pid)); id = r ? r.discordId : ''; }
+    return /^\d{17,20}$/.test(id) ? id : '';
+  };
+  // The Discord account's creation time, read from its id (a snowflake); 0 when unknown
+  const discordCreated = (id) => { try { const t = Number((BigInt(id) >> 22n) + 1420070400000n); return t > Date.UTC(2015, 0, 1) && t <= Date.now() ? t : 0; } catch (e) { return 0; } };
+  const playOf = (pid) => { try { return typeof globalThis.__dboPlaytimeOf === 'function' ? globalThis.__dboPlaytimeOf(Number(pid)) : undefined; } catch (e) { return undefined; } };
+  const hm = (ms) => { const m = Math.floor(Math.max(0, ms) / 60000); return `${Math.floor(m / 60)} h ${m % 60} m`; };
+  const dayText = (t) => new Date(Number(t) || 0).toISOString().slice(0, 10);
+  // When the vote opens: the first voting round's start, else now (registration, or the count toward the threshold)
+  const refTime = (E) => (E && E.phase === 'voting' && Number(E.voteOpenedAt) ? Number(E.voteOpenedAt) : Date.now());
+  // Why this account (and, with since, its character's citizenship) may not vote, or ''. The text is the player's own.
+  const voterWhy = (pid, actor, since, E, z) => {
+    if (!VR.enabled) return '';
+    const at = refTime(E); const opened = E && E.phase === 'voting';
+    const when = opened ? 'when the vote opened' : 'when the vote opens';
+    if (Number(VR.discordAgeDays) > 0) {
+      const id = discordIdOfPid(pid, actor); const born = id ? discordCreated(id) : 0;
+      if (!born) return 'Your Discord account could not be checked, so you cannot vote. Ask the staff on Discord.';
+      const need = born + VR.discordAgeDays * DAY;
+      if (need > at) return `Only Discord accounts at least ${VR.discordAgeDays} days old ${when} may vote. Yours ${need > Date.now() ? 'will be' : 'was'} ${VR.discordAgeDays} days old on ${dayText(need)}.`;
+    }
+    if (Number(VR.playHours) > 0 || Number(VR.playDays) > 0) {
+      const snap = opened && E.voterPlay && E.voterPlay[String(pid)];
+      const p = snap ? { ms: snap[0], days: snap[1] } : playOf(pid);
+      if (p === undefined) { if (!BK.warned.play) { BK.warned.play = true; log('citizenship: no play time source (playtime.js); the play time rule is not applied'); } }
+      else {
+        const ms = Number(p && p.ms) || 0, days = Number(p && p.days) || 0;
+        if (ms < VR.playHours * HOUR || days < VR.playDays) return `To vote you need ${VR.playHours} hours of play, on at least ${VR.playDays} different days, before the vote opens. Your account had ${hm(ms)} on ${days} day${days === 1 ? '' : 's'}${opened ? ' when it opened' : ' so far'}.`;
+      }
+    }
+    if (Number(VR.citizenDays) > 0 && since !== undefined && Number(since) > 0) {
+      const need = Number(since) + VR.citizenDays * DAY;
+      if (need > at) return `Only those who were citizens of ${ofPlace(z.name)} for ${VR.citizenDays} days ${when} may vote. This character became one on ${dayText(since)}.`;
+    }
+    return '';
+  };
+  // Accounts that share a PC (the launcher's device code) count once: groups of pids
+  const deviceGroups = (pids) => {
+    const dev = VR.enabled && VR.oneVotePerDevice ? devices() : new Map();
+    const parent = new Map(pids.map((p) => [p, p]));
+    const find = (p) => { while (parent.get(p) !== p) p = parent.get(p); return p; };
+    if (dev.size) {
+      const owner = new Map();
+      for (const p of pids) {
+        const id = discordIdOfPid(p); for (const h of (id && dev.get(id)) || []) { if (owner.has(h)) parent.set(find(p), find(owner.get(h))); else owner.set(h, p); }
+      }
+    }
+    return find;
+  };
+  const sharesDevice = (pidA, pidB) => {
+    if (!VR.enabled || !VR.oneVotePerDevice) return false;
+    const dev = devices(); if (!dev.size) return false;
+    const a = discordIdOfPid(pidA), b = discordIdOfPid(pidB);
+    const ha = (a && dev.get(a)) || []; const hb = new Set((b && dev.get(b)) || []);
+    return ha.some((h) => hb.has(h));
+  };
+  // The accounts that count toward the threshold: those with a citizen character there that passes the rules; accounts on
+  // one PC count once
+  const eligiblePids = (z, E) => {
+    const out = [];
+    for (const [pid, list] of citizenPids(z)) if (list.some((c) => !voterWhy(pid, c.actor, c.since, E, z))) out.push(pid);
+    if (!VR.enabled || !VR.oneVotePerDevice || out.length < 2) return out;
+    const find = deviceGroups(out); const seen = new Set();
+    return out.filter((p) => { const g = find(p); if (seen.has(g)) return false; seen.add(g); return true; });
+  };
+  const citizenAccounts = (z, E) => eligiblePids(z, E === undefined ? elOf(z.id) : E).length;
+  // At the vote's opening: each citizen account's play time then, so hours played during the vote do not count
+  const snapPlay = (z, E) => {
+    E.voteOpenedAt = E.phaseStartedAt; E.voterPlay = {};
+    for (const pid of citizenPids(z).keys()) { const p = playOf(pid); if (p) E.voterPlay[String(pid)] = [Number(p.ms) || 0, Number(p.days) || 0]; }
+  };
+  // A one-way mark of an address, kept on the election for the review list; the address itself is never stored
+  const addrMark = (E, ip) => { if (!ip) return ''; if (!E.salt) E.salt = require('crypto').randomBytes(8).toString('hex'); return require('crypto').createHash('sha256').update(`${E.salt}:${ip}`).digest('hex').slice(0, 16); };
+  const voterLabel = (E, pid) => { const v = E.voters && E.voters[String(pid)]; return v ? `${v.name}${v.tag ? ` #${v.tag}` : ''}` : `profile ${pid}`; };
+  // The staff review list: groups of accounts that voted from one address in this election
+  const sharedGroups = (E) => {
+    const by = new Map();
+    for (const [pid, v] of Object.entries(E.voters || {})) { if (!v || !v.addr || E.votes[pid] === undefined) continue; if (!by.has(v.addr)) by.set(v.addr, []); by.get(v.addr).push(pid); }
+    return [...by.values()].filter((g) => g.length > 1);
   };
   const isJarlRace = (a) => { const r = String(raceEdidOf(a) || ''); return (EL.jarlRaces || []).some((p) => new RegExp(`^${p}(Vampire)?$`).test(r)); };
   // Why a character cannot stand for a seat of z's ballot, or ''
@@ -466,6 +596,7 @@ module.exports = (api) => {
     const pidV = String(Number(profileOf(a)));
     const home = data().voterHold[pidV] || Object.keys(data().elections).find((zid) => zid !== z.id && data().elections[zid] && data().elections[zid].votes && data().elections[zid].votes[pidV] !== undefined);
     if (home && home !== z.id) { const h = holdOf(home); return `Your account votes in ${h ? ofPlace(h.name) : 'another hold'}. One hold per player, whichever of your characters you play.`; }
+    if (E && E.struckVotes && E.struckVotes[pidV]) return 'Your vote in this election was struck by the staff after a review. If you think this is wrong, ask the staff on Discord.';
     if (EL.noFactionVoters && !factionFree(a)) return 'Those who serve a faction or a court cannot vote in this first election.';
     const cab = cabinetOf(E, a);
     if (cab) {
@@ -473,6 +604,13 @@ module.exports = (api) => {
       const where = cab.seat.id === 'jarl' ? 'You stand for Jarl on this ballot' : `You stand on this ballot as ${cab.seat.label} in the court of ${jarl}`;
       return cab.self ? `${where}. Those who stand in a court do not vote in its election.`
         : `Another of your characters stands on this ballot (${cab.court.members[cab.seat.id].name}, ${cab.seat.id === 'jarl' ? 'for Jarl' : `${cab.seat.label} in the court of ${jarl}`}). Those who stand in a court do not vote in its election.`;
+    }
+    const own = explicit(a).find((h) => h.zone === z.id);
+    const why = voterWhy(Number(pidV), a, own ? own.since : 0, E, z);
+    if (why) return why;
+    // One vote per PC: an account the launcher's device code links to one that has voted here already
+    if (E && E.phase === 'voting' && VR.enabled && VR.oneVotePerDevice && E.votes[pidV] === undefined && Object.keys(E.votes || {}).some((p) => sharesDevice(Number(pidV), Number(p)))) {
+      return 'A vote has already been cast in this election from the computer you play on. One vote per computer, as well as one per account.';
     }
     return '';
   };
@@ -492,7 +630,7 @@ module.exports = (api) => {
     switch (kind) {
       case 'registration': return {
         game: `The citizens of ${place} are to choose their Jarl. Until ${until}, any citizen who would rule may put forward a full court (${SEATLIST()}) ${at}. When that time is up, the vote begins.`,
-        discord: `**${z.name} will choose its Jarl.** The hold counts ${citizenAccounts(z)} citizens. Until ${when(E.phaseEndsAt)}, any citizen who would rule may put forward a full court (${SEATLIST()}) at a notice board of the hold, Voting tab. The vote opens when that time is up.` };
+        discord: `**${z.name} will choose its Jarl.** The hold counts ${citizenAccounts(z, E)} citizens who may vote. Until ${when(E.phaseEndsAt)}, any citizen who would rule may put forward a full court (${SEATLIST()}) at a notice board of the hold, Voting tab. The vote opens when that time is up.` };
       case 'reopened': return {
         game: `No full court stood before the citizens of ${place}, so the call goes out again. Until ${until}, any citizen who would rule may put forward a court (${SEATLIST()}) ${at}.`,
         discord: `**${z.name}: the call for courts goes out again.** No full court stood for the vote. Until ${when(E.phaseEndsAt)}, any citizen may put forward a court (${SEATLIST()}) at a notice board of the hold, Voting tab.` };
@@ -603,8 +741,8 @@ module.exports = (api) => {
       // Members who lost their eligibility were not replaced in time: their courts drop
       const ok = (E.courts || []).filter((c) => complete(c, z));
       if (ok.length) {
-        E.courts = ok; E.ballot = ok.map((c) => c.id); E.votes = {};
-        startPhase(E, 'voting', EL.votingHours); save();
+        E.courts = ok; E.ballot = ok.map((c) => c.id); E.votes = {}; E.voters = {};
+        startPhase(E, 'voting', EL.votingHours); snapPlay(z, E); save();
         audit(`ELECTION ${z.name}: ${ok.length} court(s) on the ballot; the vote closes ${dateText(E.phaseEndsAt)}`);
         announce(z, E, 'voting');
         return true;
@@ -628,7 +766,7 @@ module.exports = (api) => {
       const counts = tally(E);
       log(`citizenship: ${z.id} round ${E.round} closed: ${JSON.stringify(counts)}`);
       if (!E.ballot.length) {
-        E.courts = []; E.ballot = []; E.votes = {};
+        E.courts = []; E.ballot = []; E.votes = {}; E.voters = {};
         if (citizenAccounts(z) >= EL.threshold) { startPhase(E, 'registration', EL.registrationHours); E.revote = false; save(); audit(`ELECTION ${z.name}: no court left on the ballot; registration reopened`); announce(z, E, 'reopened'); }
         else cancel(z, 'no court left on the ballot');
         return true;
@@ -636,13 +774,13 @@ module.exports = (api) => {
       const top = Math.max(...E.ballot.map((id) => counts[id]));
       const best = E.ballot.filter((id) => counts[id] === top);
       if (E.ballot.length === 1 && top < 1) {
-        E.courts = []; E.ballot = []; E.votes = {};
+        E.courts = []; E.ballot = []; E.votes = {}; E.voters = {};
         if (citizenAccounts(z) >= EL.threshold) { startPhase(E, 'registration', EL.registrationHours); E.revote = false; save(); audit(`ELECTION ${z.name}: the one court had no vote; registration reopened`); announce(z, E, 'reopened'); }
         else cancel(z, 'the one court had no vote');
         return true;
       }
       if (best.length > 1) {
-        E.round = (Number(E.round) || 1) + 1; E.ballot = best; E.votes = {}; E.revote = true;
+        E.round = (Number(E.round) || 1) + 1; E.ballot = best; E.votes = {}; E.voters = {}; E.revote = true;
         E.courts = E.courts.filter((c) => best.includes(c.id));
         startPhase(E, 'voting', EL.votingHours); save();
         audit(`ELECTION ${z.name}: a tie between ${best.length} courts; a revote between them until ${dateText(E.phaseEndsAt)}`);
@@ -757,19 +895,66 @@ module.exports = (api) => {
     const pid = String(Number(profileOf(a)));
     if (E.votes[pid] !== undefined) return { error: 'Your vote is cast. One vote per player.' };
     if (!E.ballot.includes(String(courtId || ''))) return { error: 'That court is not on the ballot.' };
-    E.votes[pid] = String(courtId); if (!data().voterHold[pid]) data().voterHold[pid] = z.id; save();
+    E.votes[pid] = String(courtId); if (!data().voterHold[pid]) data().voterHold[pid] = z.id;
+    // For the staff review list: who voted, and a one-way mark of the address they voted from (never the address)
+    if (!E.voters || typeof E.voters !== 'object') E.voters = {};
+    const rec = (VR.enabled && VR.sharedAddress) ? players(true).get(Number(pid)) : null;
+    E.voters[pid] = { name: nameNow(a), tag: tagSafe(a), at: Date.now(), addr: rec ? addrMark(E, rec.ip) : '' };
+    save();
     // The ballot is secret: the audit says that a vote was cast, never for whom
     audit(`ELECTION ${z.name}: ${who(a)} voted (round ${E.round})`);
+    const mark = E.voters[pid].addr;
+    const same = mark ? Object.keys(E.voters).filter((p) => p !== pid && E.voters[p] && E.voters[p].addr === mark && E.votes[p] !== undefined) : [];
+    if (same.length) audit(`ELECTION ${z.name}: shared address: ${[pid].concat(same).map((p) => voterLabel(E, p)).join(', ')} voted from one address (round ${E.round}). Not refused: review with /electionreview ${z.id}, strike with /strikevote ${z.id} <name or #TAG>`);
     return { text: 'Your vote is cast. The result is known when the vote closes.' };
   };
-  const staffAct = (a, zid, what) => {
+  const staffAct = (a, zid, what, extra) => {
     if (!isLeadStaff(a)) return { error: 'Only a Lead GM or above changes an election.' };
     const z = holdOf(zid); if (!z || !electing(z)) return { error: 'That hold holds no election.' };
     const E = elOf(z.id);
     if (what === 'cancel') { if (!E || E.phase === 'held') return { error: 'There is no election running there.' }; cancel(z, `by ${who(a)}`, true); return { text: `The election of ${ofPlace(z.name)} is held until staff restart it.` }; }
     if (what === 'restart') { delete data().elections[z.id]; save(); startElection(z, `restarted by ${who(a)}`); return { text: `The election of ${ofPlace(z.name)} starts again: registration is open for ${EL.registrationHours} hours.` }; }
+    if (what === 'strikevote') return strikeVote(a, zid, extra);
+    if (what === 'review') return reviewText(a, zid);
     if (what === 'resume') { if (!E || E.phase !== 'held') return { error: 'That election is not held.' }; delete data().elections[z.id]; save(); return { text: `The hold is back on its own clock: an election starts when it has ${EL.threshold} citizens.` }; }
     return { error: 'That cannot be done.' };
+  };
+
+  // Lead GM and above, during the vote: strike an account's vote (the review list's accounts, or any other). Its other
+  // characters cannot vote again in this election.
+  const strikeVote = (a, zid, q) => {
+    if (!isLeadStaff(a)) return { error: 'Only a Lead GM or above strikes a vote.' };
+    const z = holdOf(zid); const E = z && elOf(z.id);
+    if (!E || E.phase !== 'voting') return { error: 'No vote is open there.' };
+    const s = String(q || '').trim(); if (!s) return { error: 'Name the voter: a character name or #TAG.' };
+    let pid = -1, label = s;
+    const m = /^profile\s+(\d+)$/i.exec(s);
+    if (m) pid = Number(m[1]);
+    else { const tg = officialTarget(s); if (tg.error) return tg; pid = Number(tg.pid); label = tg.label; }
+    const k = String(pid);
+    if (!(pid >= 0) || E.votes[k] === undefined) return { error: `${label} has cast no vote in this round.` };
+    delete E.votes[k];
+    if (!E.struckVotes || typeof E.struckVotes !== 'object') E.struckVotes = {};
+    E.struckVotes[k] = { by: who(a), at: Date.now(), round: E.round, name: voterLabel(E, k) };
+    if (data().voterHold[k] === z.id && !Object.entries(data().elections).some(([id, x]) => id !== z.id && x && x.votes && x.votes[k] !== undefined)) delete data().voterHold[k];
+    save();
+    audit(`ELECTION STAFF ${who(a)} struck the vote of ${voterLabel(E, k)} in ${z.name} (round ${E.round})`);
+    for (const x of accountActors(pid)) tell(x, `Your vote in the election of ${ofPlace(z.name)} was struck by the staff after a review. If you think this is wrong, ask the staff on Discord.`);
+    return { text: `The vote of ${voterLabel(E, k)} is struck. That account cannot vote again in this election.` };
+  };
+  // The review list, for staff: accounts that voted from one address, and the votes struck so far
+  const reviewText = (a, zid) => {
+    if (!isLeadStaff(a)) return { error: 'Only a Lead GM or above sees the review list.' };
+    const list = zid ? [holdOf(zid)].filter(Boolean) : holds().filter(electing);
+    if (!list.length) return { error: 'There is no such hold.' };
+    const lines = [];
+    for (const z of list) {
+      const E = elOf(z.id); if (!E || !E.voters) continue;
+      const groups = sharedGroups(E);
+      for (const g of groups) lines.push(`${z.name}, round ${E.round}: one address: ${g.map((p) => voterLabel(E, p)).join(', ')}`);
+      for (const v of Object.values(E.struckVotes || {})) lines.push(`${z.name}: struck ${v.name} (by ${v.by}, round ${v.round})`);
+    }
+    return { text: lines.length ? lines.join('\n') : 'No shared addresses or struck votes in the running elections.' };
   };
 
   // ---- views -------------------------------------------------------------------------------------------------------------
@@ -857,7 +1042,8 @@ module.exports = (api) => {
     accept: (a, z, x) => answerInvite(a, z, x, true),
     refuse: (a, z, x) => answerInvite(a, z, x, false),
     vote: (a, z, x) => vote(a, z, x),
-    staff: (a, z, x) => staffAct(a, z, String(x || '')),
+    staff: (a, z, x, y) => staffAct(a, z, String(x || ''), y),
+    strikevote: (a, z, x) => strikeVote(a, z, x),
     revoke: (a, z, x) => revoke(a, z, unhex((String(x || '')))),
   };
   const run = (a, zone, args) => {
@@ -958,10 +1144,23 @@ module.exports = (api) => {
   globalThis.__dboCitizenRoleIds = (a) => { const ids = roleIds(); return C.enabled ? holdsOf(Number(a) >>> 0).map((h) => ids[h.zone]).filter(Boolean) : []; };
   globalThis.__dboCitizenManagedRoleIds = () => Object.values(roleIds());
 
+  // Staff (Lead GM and above): the election review list, and striking a vote
+  if (registerChatCommand) {
+    registerChatCommand('electionreview', (a, args) => {
+      const r = reviewText(a, String(args || '').trim().split(/\s+/)[0] || '');
+      for (const line of String(r.error || r.text).split('\n')) personal(a, line);
+    }, { admin: true, help: 'elections: accounts that voted from one address, and struck votes (Lead GM+). /electionreview [hold]' });
+    registerChatCommand('strikevote', (a, args) => {
+      const m = /^(\S+)\s+(.+)$/.exec(String(args || '').trim());
+      if (!m) return personal(a, 'Use /strikevote <hold> <name or #TAG>, for example /strikevote whiterun #AB12.');
+      const r = strikeVote(a, m[1].toLowerCase(), m[2]);
+      personal(a, r.error || r.text);
+    }, { admin: true, help: "elections: strike an account's vote during the vote (Lead GM+). /strikevote <hold> <name or #TAG>" });
+  }
   if (typeof every === 'function') every('citizenship', 60000, tick);
   // Staff releases in config, each applied once (at this load, or the first one after it was added)
   if (C.enabled) { try { staffReleases(); } catch (e) { log('citizenship: staff releases failed', e.stack || e.message); } }
   log(`citizenship ${C.enabled ? 'on' : 'off'}: ${holds().length} holds grant it, ${Object.keys(data().chars).length} characters on the rolls, ${Object.keys(data().elections).length} election(s)`);
-  return { join, grant, decline, renounce, makePrimary, revoke, staffReleases, setPolicy, register, replace, withdraw, answerInvite, vote, staffAct, tick, advance,
+  return { join, grant, decline, renounce, makePrimary, revoke, staffReleases, setPolicy, register, replace, withdraw, answerInvite, vote, staffAct, strikeVote, reviewText, voterWhy, tick, advance,
     holdsOf, citizenOf, factionFree, citizenAccounts, canVote, noticeLogin, boardPayload, journalView, votingView, citizenshipView, data, PANEL_ID };
 };

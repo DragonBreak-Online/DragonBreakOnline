@@ -8134,7 +8134,7 @@ try {
   delete require.cache[CITIZENSHIP_JS];
   require(CITIZENSHIP_JS)({ mp, log, ownNameOf, ownDisplay, personal, system, audit, who, display, nameOf, tagOf, onUi, onlineActors, isAdmin, isLeadStaff, profileOf, cfg, every,
     zoneList, zoneById, readOfficials, rankTitle, officialTarget, accountActors, seatOfficial, unseatOfficialBy, takeGold, depositToTreasury, openWidget, closeWidget,
-    boardZoneNear, raceEdidOf });
+    boardZoneNear, raceEdidOf, discordOf, registerChatCommand });
 } catch (e) {
   log('citizenship.js failed to load:', e.stack || e.message);
   for (const k of ['__dboCitizenMenuEntries', '__dboCitizenMenuAction', '__dboCitizenLogin', '__dboCitizenOf', '__dboCitizenGates', '__dboCitizenHolds', '__dboCitizenRoleIds', '__dboCitizenManagedRoleIds']) globalThis[k] = null;

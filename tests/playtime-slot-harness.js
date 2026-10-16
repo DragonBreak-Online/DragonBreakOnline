@@ -58,7 +58,7 @@ const api = (cfgOver) => ({
   isAdmin: (a) => (a >>> 0) === STAFF, findAnyByName: (q) => ({ five: A5, seven: A7, both: -2 })[q] || 0,
   onlineActors: () => online.slice(), every: (name, ms, fn) => timers.set(name, { ms, fn }),
   creationPending: (a) => creating.has(a >>> 0),
-  cfg: { playtimeSlot: Object.assign({}, P, cfgOver || {}) },
+  cfg: { playtimeSlot: Object.assign({ sessionNotesFile: path.join(tmp, 'session-ends.jsonl') }, P, cfgOver || {}) },
 });
 const load = (cfgOver) => { delete require.cache[MODULE]; require(MODULE)(api(cfgOver)); };
 const tick = () => timers.get('playtimeSlot').fn();
@@ -225,6 +225,31 @@ fs.writeFileSync(path.join(tmp, 'journal', 'not-a-key.json'), '{"playMs": 999999
     ok('fork: a throwing hook keeps the last answer', sys.slotsFor(2) === 2, sys.slotsFor(2));
     delete globalThis.__dboEarnedSlots;
     ok('fork: a missing hook keeps the last answer', sys.slotsFor(2) === 2 && sys.slotsFor(4) === 1, [sys.slotsFor(2), sys.slotsFor(4)]);
+  }
+
+  // ---- play days for the election's voter rule (citizenship.js, 16 Oct) ---------------------------------------------
+  {
+    delete globalThis.__dboPlaytime; delete globalThis.__dboPlaytimeOf;
+    try { fs.unlinkSync(path.join(tmp, 'playtime-slots.json')); } catch (e) { /* none */ }
+    const D = 24 * H, t0 = Date.parse('2026-10-10T10:00:00Z');
+    const notes = [{ profileId: 7, startedAt: t0, endedAt: t0 + H }, { profileId: 7, startedAt: t0 + D, endedAt: t0 + D + 5 * 60000 },
+      { profileId: 7, startedAt: t0 + 2 * D, endedAt: t0 + 2 * D + 20 * 60000 }, { profileId: 7, startedAt: t0 + 2 * D + H, endedAt: t0 + 2 * D + 2 * H }, { bad: 1 }];
+    fs.writeFileSync(path.join(tmp, 'session-ends.jsonl'), notes.map((x) => JSON.stringify(x)).join('\n') + '\nnot json\n');
+    clock = Date.parse('2026-10-16T08:00:00Z'); Date.now = () => clock;
+    load({ enabled: true });
+    const p7 = globalThis.__dboPlaytimeOf(7);
+    ok('days: seeded from the session notes, a session under 15 minutes left out, one day once', p7.days === 2, rec(7) && rec(7).days);
+    ok('days: an account with no record has 0', globalThis.__dboPlaytimeOf(42).ms === 0 && globalThis.__dboPlaytimeOf(42).days === 0);
+    online = [A7];
+    tick(); for (let i = 0; i < 20; i++) step(30000);
+    ok('days: 10 minutes today is not yet a play day', globalThis.__dboPlaytimeOf(7).days === 2, rec(7).days);
+    for (let i = 0; i < 12; i++) step(30000);
+    ok('days: 15 minutes today makes it one', globalThis.__dboPlaytimeOf(7).days === 3 && rec(7).days.includes('2026-10-16'), rec(7).days);
+    load({ enabled: true });
+    ok('days: the seed runs once', globalThis.__dboPlaytimeOf(7).days === 3, rec(7).days);
+    load({ enabled: false });
+    ok('days: counting off answers undefined, so the voter rule is not applied', globalThis.__dboPlaytimeOf(7) === undefined);
+    delete globalThis.__dboPlaytime; delete globalThis.__dboPlaytimeOf; online = [];
   }
 
   fs.rmSync(tmp, { recursive: true, force: true });

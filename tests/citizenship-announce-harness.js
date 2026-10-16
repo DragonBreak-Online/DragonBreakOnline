@@ -57,7 +57,7 @@ const said = [], logs = [];
 const ui = {};
 let timer = null;
 const ROLES = { bruma: '1553067344442433757', whiterun: '1559949568513155193', riften: '1559950618733580418' };
-let citizenCfg = { discordRoles: ROLES };
+let citizenCfg = { discordRoles: ROLES, election: { voterRules: { enabled: false } } };
 const api = () => ({
   mp, log: (...x) => logs.push(x.join(' ')), audit: () => {}, who: (a) => (chars.get(a >>> 0) || {}).name || `actor ${a}`,
   personal: (a, t) => said.push([a >>> 0, t]), nameOf: (a) => chars.get(a >>> 0).name, ownNameOf: (a) => chars.get(a >>> 0).name, tagOf: (a) => `T${(a >>> 0).toString(16)}`,
@@ -238,11 +238,11 @@ const mentionsOnly = (p, role) => !!p && !!p.body && p.body.allowed_mentions && 
   timer();
   ok(M.data().elections.dawnstar.phase === 'registration' && toldSince(n0, pa[0]).length === 1, 'the Pale opens registration and tells its citizens in game');
   ok(posts.length === posts4 && logs.some((l) => /no Discord notice for registration in dawnstar: no citizen role/.test(l)), 'with no Citizen role id for the hold nothing is posted, and the log says so', logs);
-  delete globalThis.__dboCitizen; citizenCfg = { discordRoles: ROLES, election: { announceChannel: '' } }; M = load();
+  delete globalThis.__dboCitizen; citizenCfg = { discordRoles: ROLES, election: { announceChannel: '', voterRules: { enabled: false } } }; M = load();
   logs.length = 0;
   now += 24 * HOUR; timer();
   ok(posts.length === posts4 && logs.some((l) => /no Discord notice for reopened in riften: no announceChannel/.test(l)), 'with no channel set nothing is posted, and the log says so', logs.filter((l) => /Discord/.test(l)));
-  citizenCfg = { discordRoles: ROLES };
+  citizenCfg = { discordRoles: ROLES, election: { voterRules: { enabled: false } } };
 
   // ---- 9. a failing Discord post is logged and changes nothing in game -------------------------------------------------------
   delete globalThis.__dboCitizen; M = load();

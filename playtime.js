@@ -4,6 +4,7 @@
 // Play time is counted per account (profile), summed over all its characters: every sampleSeconds, each account with a
 // character in the world (character creation excluded) gains the time since its last sample, at most two samples' worth,
 // so a restart, a stall or a logout adds nothing. Idle time counts as play until the AFK kick (afkKickMinutes, 20).
+// Play days (distinct UTC days with dayMinutes of play) are kept for the election's voter rule (citizenship.js).
 // The first load seeds each account from the Character Journal's per-character play time (journal/*.json and
 // journal/removed, journalstats.js, counted since the alpha opened on 1 October), so the hours already played count.
 //
@@ -31,6 +32,11 @@ module.exports = (api) => {
     sampleSeconds: Number(raw.sampleSeconds) >= 5 ? Number(raw.sampleSeconds) : 30,
     flushSeconds: Number(raw.flushSeconds) >= 10 ? Number(raw.flushSeconds) : 120,
     journalDir: String(raw.journalDir || 'journal'),
+    // A day counts as a play day once the account has played dayMinutes on it (UTC); the election's voter rule asks for
+    // them (citizenship.js). The first load seeds past days once from the launcher's session notes (sessionNotesFile)
+    dayMinutes: Number(raw.dayMinutes) > 0 ? Number(raw.dayMinutes) : 15,
+    keepDays: 120,
+    sessionNotesFile: String(raw.sessionNotesFile || '/opt/alduinak/skymp5-backend/data/session-ends.jsonl'),
   };
   const STORE_PATH = path.resolve('playtime-slots.json');
   const readJson = (p) => { try { return JSON.parse(fs.readFileSync(p, 'utf8')); } catch (e) { return null; } };
@@ -93,6 +99,36 @@ module.exports = (api) => {
     log(`playtime: seeded ${add.size} account(s) from ${files} journal file(s)${unplaced ? `, ${unplaced} with no account left out` : ''}`);
   };
 
+  // Play days: r.days the distinct UTC days with at least dayMinutes of play, r.dayNow [day, ms] the day being counted
+  const addDay = (r, d) => {
+    if (!Array.isArray(r.days)) r.days = [];
+    if (r.days.includes(d)) return;
+    r.days.push(d); r.days.sort();
+    if (r.days.length > C.keepDays) r.days = r.days.slice(-C.keepDays);
+  };
+  const countDay = (r, now, ms) => {
+    const d = day(now);
+    if (!Array.isArray(r.dayNow) || r.dayNow[0] !== d) r.dayNow = [d, 0];
+    r.dayNow[1] += ms;
+    if (r.dayNow[1] >= C.dayMinutes * 60000) addDay(r, d);
+  };
+  // Once: the days already played, from the launcher's notes of each game session (backend data/session-ends.jsonl,
+  // newest 5000, since 4 Oct). Only a session of dayMinutes or more counts, on the day it started
+  const seedDays = () => {
+    if (store.daysSeededAt) return;
+    let text = ''; try { text = fs.readFileSync(C.sessionNotesFile, 'utf8'); } catch (e) { log(`playtime: no session notes for play days (${e.code || e.message}); days count from now`); store.daysSeededAt = Date.now(); S.dirty = true; return; }
+    let n = 0; const accounts = new Set();
+    for (const line of text.split('\n')) {
+      let o = null; try { o = line ? JSON.parse(line) : null; } catch (e) { o = null; }
+      if (!o || !validPid(Number(o.profileId))) continue;
+      const a = Number(o.startedAt), b = Number(o.endedAt);
+      if (!(Number.isFinite(a) && Number.isFinite(b) && b - a >= C.dayMinutes * 60000 && b <= Date.now() + 60000)) continue;
+      const r = recOf(Number(o.profileId), true); addDay(r, day(a)); n++; accounts.add(Number(o.profileId));
+    }
+    store.daysSeededAt = Date.now(); S.dirty = true;
+    log(`playtime: seeded play days of ${accounts.size} account(s) from ${n} session note(s)`);
+  };
+
   // Grants the slot at the threshold, once; says so to the account's character in the world once the build counts it
   const check = (pid, r, a) => {
     if (C.enabled && !earnedOf(r) && r.ms >= C.hours * HOUR_MS) {
@@ -120,7 +156,7 @@ module.exports = (api) => {
       if (!r) continue;
       if (C.enabled) {
         const prev = S.last.get(pid);
-        if (prev !== undefined) { r.ms += Math.max(0, Math.min(now - prev, cap)); S.dirty = true; }
+        if (prev !== undefined) { const add = Math.max(0, Math.min(now - prev, cap)); r.ms += add; countDay(r, now, add); S.dirty = true; }
         S.last.set(pid, now);
       }
       check(pid, r, a);
@@ -130,6 +166,13 @@ module.exports = (api) => {
 
   // patronTiers.ts asks this for every character list, selection and creation
   globalThis.__dboEarnedSlots = (profileId) => earnedOf(store.profiles[String(profileId)]);
+  // citizenship.js's voter rule: the account's play time and play days. undefined when nothing is counted (feature off), so
+  // the rule is not applied rather than refusing everyone
+  globalThis.__dboPlaytimeOf = (profileId) => {
+    if (!C.enabled) return undefined;
+    const r = store.profiles[String(profileId)];
+    return { ms: r ? r.ms : 0, days: r && Array.isArray(r.days) ? r.days.length : 0 };
+  };
 
   const describe = (pid, self) => {
     const r = recOf(pid, false);
@@ -155,6 +198,7 @@ module.exports = (api) => {
   }, { help: 'your play time, and the extra character slot at 150 hours' });
 
   seed();
+  seedDays();
   for (const [pid, r] of Object.entries(store.profiles)) if (r) check(Number(pid), r, null);
   every('playtimeSlot', C.sampleSeconds * 1000, tick);
   every('playtimeSlotFlush', C.flushSeconds * 1000, flush);
