@@ -1192,6 +1192,22 @@
   "hours": 150,
   "slots": 1
  },
+ "referrals": {
+  "_comment": "Referral links (referrals.js, Nate 16 Oct 2026; docs/referrals.md). Off until the backend's routes/referrals.js is live. A referral counts once the new account has played qualifyHours on qualifyDays UTC days and its Discord account was accountAgeDays old; the referrer earns firstMult and +100 carry weight (carrySpell, empty until the DLE ability exists) for the first, laterMult for each later one; the new player gets welcomeMult. Every boost lasts boostHours of play, queued one at a time, at most queueCap. /referral; staff /referral profile <id>, /referral revoke <id>.",
+  "enabled": false,
+  "linkBase": "https://dragonbreakonline.com/api/join/",
+  "bindingsFile": "/opt/alduinak/skymp5-backend/data/referrals.jsonl",
+  "qualifyHours": 5,
+  "qualifyDays": 2,
+  "accountAgeDays": 30,
+  "firstMult": 1.15,
+  "laterMult": 1.05,
+  "welcomeMult": 1.05,
+  "boostHours": 8,
+  "queueCap": 10,
+  "commandWindowHours": 24,
+  "carrySpell": ""
+ },
  "snowElfRace": {
   "_comment": "The DLE's DBOSnowElfRace and its vampire (Nat, 13 Oct). racial.js gives the creator's snowelf slug this race (__dboRaceOverrides) and the Snow Elf's gifts (racial.snowelf).",
   "race": "1ac9ff:DragonBreak Online Edits.esp",
