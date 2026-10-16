@@ -161,10 +161,10 @@ check('without doors-pos.json no door is found and nothing is loaded', /Stand at
 const shipped = JSON.parse(fs.readFileSync(path.join(home, 'doors-pos.json'), 'utf8')).doors;
 const listed = Object.keys(JSON.parse(fs.readFileSync(path.join(home, 'doors.json'), 'utf8')).doors);
 const keys = Object.keys(shipped);
-check('doors-pos.json places the 3911 doors the live server placed (4049 less 138 initially disabled)', keys.length === 3911, keys.length);
+check('doors-pos.json places the 3927 doors the live server places (4059 in doors.json on the 140-plugin order of 16 Oct, less 131 deleted or initially disabled and 177f9c, which no plugin has)', keys.length === 3927, keys.length);
 check('...each one a doors.json door', keys.every((k) => listed.includes(k)));
 const offList = JSON.parse(fs.readFileSync(path.join(home, 'doors-pos.json'), 'utf8')).off || [];
-check('...and the 138 disabled ones listed off, so the background fallback loads nothing on the live server', offList.length === 138 && listed.every((k) => shipped[k] || offList.includes(k)), offList.length);
+check('...and the 131 disabled ones listed off, so the background fallback loads nothing on the live server', offList.length === 131 && listed.every((k) => shipped[k] || offList.includes(k) || k === '177f9c:DragonBreak Online Edits.esp'), offList.length);
 check('...each a position and a lower-case <hex>:<plugin> world or cell', keys.every((k) => { const p = shipped[k]; return p.length === 4 && p.slice(0, 3).every(Number.isFinite) && /^[0-9a-f]+:[^A-Z]+\.es[mpl]$/.test(p[3]); }));
 check('...Beasts Maw\'s door stands in BS Heartland, the world players there report', shipped['8aeef:BSHeartland.esm'] && shipped['8aeef:BSHeartland.esm'][3] === 'a764b:bsheartland.esm');
 
