@@ -162,10 +162,12 @@ const rules = (CONFIG.raceCraft || {}).rules || [];
 const rule = (rid) => rules.find((r) => r.id === rid) || {};
 ok(JSON.stringify(rule('gild').races) === '["DBOGoblin"]' && JSON.stringify(rule('pigIron').races) === '["OrcRace"]', 'config: Gild crude Goblins, Pig Iron Orcs (Nate, 14 Oct)');
 ok(!rules.some((r) => /Adam/i.test(JSON.stringify(r))), 'config: no rule names the Adamantium Addon (every race)');
-for (const [rid, race] of [['yoku', 'RedguardRace'], ['apex', 'KhajiitRace'], ['lunarGuard', 'KhajiitRace'], ['blackBear', 'NordRace'], ['steelheart', 'NordRace'], ['ancientImperial', 'ImperialRace'],
+for (const [rid, race] of [['yoku', 'RedguardRace'], ['apex', 'KhajiitRace'], ['lunarGuard', 'KhajiitRace'], ['blackBear', 'NordRace'], ['steelheart', 'NordRace'],
   ['gryphonKnight', 'BretonRace'], ['knightErrant', 'BretonRace'], ['floraDruid', 'BretonRace'], ['seascale', 'MaormerRace']]) {
   ok((rule(rid).races || []).includes(race), `config: ${rid} is ${race}'s (Nat, 13 Oct)`);
 }
+// Nate, 16 Oct: Ancient Imperial is schematic learning only, no longer the Imperials' own (tests/ancient-imperial-schematic-harness.js)
+ok(!rules.some((r) => r.id === 'ancientImperial' || (r.plugins || []).some((x) => /^1AncientImperial\.esp$/i.test(x))), 'config: no race rule for 1AncientImperial.esp (Nate, 16 Oct)');
 const ovr = readJson('regions-overrides.json');
 const mantis = Object.keys(ovr.forgeNever).filter((k) => /:DragonBreak Armory\.esp$/.test(k) && /^8(1d|1e|1f|20|21|22|23|24):/.test(k));
 ok(mantis.length === 8, 'forgeNever lists the 8 Dwemer Mantis pieces (Armory 81D-824)', mantis);

@@ -206,7 +206,7 @@
   }
  },
  "raceCraft": {
-  "_comment": "A people's own armoury (regions.js raceCraft; Nat's race-only list, 13 Oct, ~/inbox/2026-10-13-races-and-armory/README.md section 3; Nate, 14 Oct: Gild crude Goblins only, Pig Iron Orcs only; the Adamantium Addon is every race's, so it has no rule; the Dwemer Mantis armour is in regions-overrides.json forgeNever, GM-given). A rule matches the product by its plugin (plugins) or editor id (edid); only races whose RACE editor id starts with one of races make it (so the vampire race counts), anywhere, before the Orcish and faction rules. Tempering stays open; staff pass with regions.adminBypass. Hot reload. enabled false turns it off.",
+  "_comment": "A people's own armoury (regions.js raceCraft; Nat's race-only list, 13 Oct, ~/inbox/2026-10-13-races-and-armory/README.md section 3; Nate, 14 Oct: Gild crude Goblins only, Pig Iron Orcs only; the Adamantium Addon is every race's, so it has no rule; the Dwemer Mantis armour is in regions-overrides.json forgeNever, GM-given); Nate, 16 Oct: Ancient Imperial (1AncientImperial.esp) is no longer the Imperials' own, any smith who has read Schematics: Ancient Imperial makes it, smithing.json held). A rule matches the product by its plugin (plugins) or editor id (edid); only races whose RACE editor id starts with one of races make it (so the vampire race counts), anywhere, before the Orcish and faction rules. Tempering stays open; staff pass with regions.adminBypass. Hot reload. enabled false turns it off.",
   "enabled": true,
   "rules": [
    {"id": "gild", "name": "Gild's crude arms", "people": "Goblin", "plugins": ["GildForgottenArmoryCrude.esp"], "races": ["DBOGoblin"], "why": "Nate, 14 Oct: Goblins only (Armory also locks the 11 forge recipes)"},
@@ -217,7 +217,6 @@
    {"id": "lunarGuard", "name": "Lunar Guard armour", "people": "Khajiit", "plugins": ["LunarGuardArmor.esp"], "races": ["KhajiitRace"], "why": "Nat, 13 Oct race-only list (with the Khajiit set)"},
    {"id": "blackBear", "name": "Black Bear Ancient Nord armour", "people": "Nord", "plugins": ["Black Bear Ancient Nord Armor.esp"], "races": ["NordRace"], "why": "Nat, 13 Oct race-only list"},
    {"id": "steelheart", "name": "Nord Steelheart armour", "people": "Nord", "plugins": ["SteelheartArmors.esp"], "races": ["NordRace"], "why": "Nat, 13 Oct (Armory lock too)"},
-   {"id": "ancientImperial", "name": "Ancient Imperial armour", "people": "Imperial", "plugins": ["1AncientImperial.esp"], "races": ["ImperialRace"], "why": "Nat, 13 Oct race-only list"},
    {"id": "gryphonKnight", "name": "Gryphonknight regalia", "people": "Breton", "plugins": ["GVLT_Gryphonknight.esp"], "races": ["BretonRace"], "why": "Nat, 13 Oct race-only list"},
    {"id": "knightErrant", "name": "Knight-Errant armour", "people": "Breton", "plugins": ["knighterrant.esp"], "races": ["BretonRace"], "why": "Nat, 13 Oct (Armory lock too)"},
    {"id": "floraDruid", "name": "Flora Druid armour", "people": "Breton", "plugins": ["Summer Druid Armor Set.esp"], "races": ["BretonRace"], "why": "Nat, 13 Oct (Armory lock too)"},

@@ -15,7 +15,7 @@
   { "id": "guard", "name": "Guard and Soldier", "tier": 2, "technique": "steel" },
   { "id": "ancient_nord", "name": "Ancient Nord", "tier": 2, "where": "learned by reading in Nordic barrows, or found very rarely in their chests", "bookId": "192e48:DragonBreak Online Edits.esp" },
   { "id": "ancient_nord_honed", "name": "Honed Ancient Nord", "tier": 2, "where": "learned by reading in Nordic barrows, or found very rarely in their chests", "bookId": "192e49:DragonBreak Online Edits.esp" },
-  { "id": "ancient_imperial", "name": "Ancient Imperial", "tier": 2, "where": "learned by reading in Cyrodiil's forts, or found very rarely in their chests", "bookId": "192e60:DragonBreak Online Edits.esp" },
+  { "id": "ancient_imperial", "name": "Ancient Imperial", "tier": 2, "held": true, "where": "learned by reading in Cyrodiil's forts, or found very rarely in their chests; only the schematic teaches it, to any people (Nate, 16 Oct: \"schematic learning only\")", "bookId": "192e60:DragonBreak Online Edits.esp" },
   { "id": "brass", "name": "Brass", "tier": 2, "free": true },
   { "id": "goblin", "name": "Goblin", "tier": 2, "free": true, "bookId": "192e4a:DragonBreak Online Edits.esp" },
   { "id": "nordic", "name": "Nordic", "tier": 3, "where": "a rare find when reading, or in the chests of Nordic barrows", "bookId": "192e4b:DragonBreak Online Edits.esp" },
