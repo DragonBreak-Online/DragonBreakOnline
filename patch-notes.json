@@ -1,5 +1,20 @@
 [
   {
+    "title": "Spell picks and Grand Champion rerolls",
+    "date": "2026-10-16",
+    "version": "Hotfix",
+    "tag": "Change",
+    "sections": [
+      {
+        "heading": "Changes",
+        "items": [
+          "When your magic reaches a new spell pick out in the world, the choice now opens on screen straight away instead of only a chat line. It doesn't take your keyboard, so you can finish a fight first; your journal (F3), Study Magic shelves, Scholars' Ledgers and your next login still offer it.",
+          "Grand Champion supporters get 2 identity rerolls on every character (was 1). Rerolls already used are kept, so a character that used one has one more."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Spell tomes from reading",
     "date": "2026-10-16",
     "version": "Hotfix",
