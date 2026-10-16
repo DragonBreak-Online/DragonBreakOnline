@@ -4,7 +4,7 @@ import { MsgType } from "../../messages";
 import { getInventory } from "../../sync/inventory";
 
 // TODO: refactor this out
-import { localIdToRemoteId } from "../../view/worldViewMisc";
+import { getViewFromStorage, localIdToRemoteId } from "../../view/worldViewMisc";
 
 import { LastInvService } from "./lastInvService";
 import { selfActivated } from "../../sync/selfActivation";
@@ -19,6 +19,21 @@ const isUnblockedServerDoor = (ref: ObjectReference): boolean => {
   try {
     const base = ref.getBaseObject();
     return !!base && base.getType() === FormType.Door && ObjectReferenceEx.wantsActivationBlock(base) && !ref.isActivationBlocked();
+  } catch {
+    return false;
+  }
+};
+
+// WorldView holds a FormView bound to this ref, so the server streams it (WorldView.getLocalRefrId throws for plugin ids)
+const hasFormView = (ref: ObjectReference): boolean => {
+  try {
+    const views = getViewFromStorage()?.getFormViews();
+    if (!views) return false;
+    const localId = ref.getFormID();
+    for (let i = 0; i < views.getFormViewsArrayLength(); i++) {
+      if (views.getNthFormView(i)?.getLocalRefrId() === localId) return true;
+    }
+    return false;
   } catch {
     return false;
   }
@@ -86,8 +101,10 @@ export class ActivationService extends ClientListener {
 
         // A server-run door that was not activation-blocked has already been opened or walked through by the engine, so the server must hear it
         if (isPlayer && isUnblockedServerDoor(e.target)) {
-            try { e.target.blockActivation(true); } catch { /* unloaded ref */ }
-            diagNote("door:unblocked", `${target.toString(16)} state ${openState}`);
+            // Only a door the server streams is blocked again; a door it never streams (disabled or deleted in its plugin) keeps the engine's activation
+            const streamed = hasFormView(e.target);
+            if (streamed) { try { e.target.blockActivation(true); } catch { /* unloaded ref */ } }
+            diagNote("door:unblocked", `${target.toString(16)} state ${openState}${streamed ? "" : ", no view"}`);
         } else if (openState === OpenState.Opening || openState === OpenState.Closing) {
             logTrace(this, "Ignoring activation of door because it's already opening or closing");
             return;
