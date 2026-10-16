@@ -2685,6 +2685,15 @@ try {
   delete require.cache[SPAWNWATCH_JS];
   globalThis.__dboSpawnWatch = require(SPAWNWATCH_JS)({ mp, log, personal, display, userOf, creationPending, worldIdOf, cfg });
 } catch (e) { log('spawnwatch.js failed to load:', e.stack || e.message); globalThis.__dboSpawnWatch = null; }
+// ---- door sync: a game that crossed a load door the server never heard of (server\doorsync.js, 16 Oct) ----
+// Logged in inside a Bruma interior, walked out, and the server kept them in the room (the revolving door): its heartbeat
+// names the place its body is in, and the door it stands at is activated on the server for it
+try {
+  const DOORSYNC_JS = path.resolve('doorsync.js');
+  delete require.cache[DOORSYNC_JS];
+  let doorsPos = {}; try { doorsPos = JSON.parse(fs.readFileSync(path.resolve('doors-pos.json'), 'utf8')); } catch (e) { log('door sync: doors-pos.json unreadable', e.message); }
+  globalThis.__dboDoorSync = require(DOORSYNC_JS)({ mp, log, display, cfg, doors: doorsPos, skip: (a) => creationPending(a) || inCreatorRealm(a) });
+} catch (e) { log('doorsync.js failed to load:', e.stack || e.message); globalThis.__dboDoorSync = null; }
 // Puts the saved outfit back on: the client is asked to equip each remembered item, then reports
 // it worn, and the engine stores that report. Nothing to do when the player is already dressed.
 const redress = (a) => {
@@ -3706,6 +3715,7 @@ onUi('npcDrift', (a, args) => {
   let note = '';
   try { note = driftNote(a, r); } catch (e) { /* diagnostics only */ }
   log(`npcDrift ${display(a)} ${String(r.kind).slice(0, 24)}: ${JSON.stringify(r).slice(0, 900)}${note}`);
+  if (r.kind === 'heartbeat' && globalThis.__dboDoorSync) { try { globalThis.__dboDoorSync.heartbeat(a, r); } catch (e) { log('door sync failed', e.message); } }
 });
 // The staff trace (client staffHit.ts): a window the server opens for one player, by /staffdiag or at login while
 // config staffHitDiag.enabled; each staff shot arrives as one line, at most STAFF_DIAG_MAX_LINES a window
