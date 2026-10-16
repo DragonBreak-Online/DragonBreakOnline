@@ -86,7 +86,7 @@ module.exports = (api) => {
   const S = globalThis.__dboCitizen || (globalThis.__dboCitizen = { data: null });
   if (!(S.panels instanceof Map)) S.panels = new Map(); // actor -> { zone, nonce, tab }
   const fill = (d) => {
-    for (const k of ['chars', 'policies', 'elections']) if (!d[k] || typeof d[k] !== 'object' || Array.isArray(d[k])) d[k] = {};
+    for (const k of ['chars', 'policies', 'elections', 'voterHold']) if (!d[k] || typeof d[k] !== 'object' || Array.isArray(d[k])) d[k] = {};
     if (!Array.isArray(d.requests)) d.requests = [];
     return d;
   };
@@ -333,6 +333,10 @@ module.exports = (api) => {
   };
   const canVote = (a, z, E) => {
     if (!citizenOf(a, z.id)) return `Only the citizens of ${ofPlace(z.name)} vote here.`;
+    // One hold per player (Nate, 16 Oct): an account votes in the hold of its first vote only, whichever character it uses
+    const pidV = String(Number(profileOf(a)));
+    const home = data().voterHold[pidV] || Object.keys(data().elections).find((zid) => zid !== z.id && data().elections[zid] && data().elections[zid].votes && data().elections[zid].votes[pidV] !== undefined);
+    if (home && home !== z.id) { const h = holdOf(home); return `Your account votes in ${h ? ofPlace(h.name) : 'another hold'}. One hold per player, whichever of your characters you play.`; }
     if (EL.noFactionVoters && !factionFree(a)) return 'Those who serve a faction or a court cannot vote in this first election.';
     const cab = cabinetOf(E, a);
     if (cab) {
@@ -624,7 +628,7 @@ module.exports = (api) => {
     const pid = String(Number(profileOf(a)));
     if (E.votes[pid] !== undefined) return { error: 'Your vote is cast. One vote per player.' };
     if (!E.ballot.includes(String(courtId || ''))) return { error: 'That court is not on the ballot.' };
-    E.votes[pid] = String(courtId); save();
+    E.votes[pid] = String(courtId); if (!data().voterHold[pid]) data().voterHold[pid] = z.id; save();
     // The ballot is secret: the audit says that a vote was cast, never for whom
     audit(`ELECTION ${z.name}: ${who(a)} voted (round ${E.round})`);
     return { text: 'Your vote is cast. The result is known when the vote closes.' };

@@ -258,6 +258,13 @@ ok(r.error && /One vote/.test(r.error), 'no second vote');
 r = M.vote(altV1, 'whiterun', K2);
 ok(r.error && /One vote per player/.test(r.error), "an alt of a voter's account cannot vote again", r);
 ok(!audits.slice(-1)[0].includes(K1) && /voted/.test(audits.slice(-1)[0]), 'the audit records that a vote was cast, not for whom', audits.slice(-1)[0]);
+// one hold per player (Nate, 16 Oct): an alt who is a citizen of another hold cannot vote there once the account voted here
+const riftV1 = add(0x2f2, chars.get(V1).pid, 'Riftener alt'); online.push(riftV1); M.join(riftV1, 'riften');
+M.data().elections.riften = JSON.parse(JSON.stringify(Object.assign({}, M.data().elections.whiterun, { votes: {} })));
+r = M.vote(riftV1, 'riften', K1);
+ok(r.error && /votes in/.test(r.error), "an account that voted in Whiterun cannot vote in Riften's election with another character", r);
+ok(M.data().voterHold[String(chars.get(V1).pid)] === 'whiterun', 'the account is bound to the hold of its first vote');
+delete M.data().elections.riften;
 M.vote(V2, 'whiterun', K2);
 const V3 = voters[10];
 vv = M.votingView(V1, WR);

@@ -1,5 +1,19 @@
 [
   {
+    "title": "One hold's vote per player",
+    "date": "2026-10-16",
+    "version": "Hotfix",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Elections",
+        "items": [
+          "A player votes in one hold only: the hold where their account first votes. Other characters on the same account can't vote in another hold's election, even if they are citizens there."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Underarch Harbor",
     "date": "2026-10-16",
     "version": "Hotfix",
