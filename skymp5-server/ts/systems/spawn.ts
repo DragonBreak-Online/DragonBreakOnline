@@ -119,7 +119,8 @@ function parseCharCreatorSettings(raw: unknown): CharCreatorSettings {
 // CharacterSelectService). Flag off (default) keeps the original
 // single-character behaviour, so enabling can never brick login on its own.
 //   Server -> Client:
-//     { customPacketType: "characterSelectMenu", maxCharacters, characters: [ {name,info} | null ] }
+//     { customPacketType: "characterSelectMenu", maxCharacters, characters: [ {name,info} | null ],
+//       lockedCharacters: [ {slot,name,race,info,detail,dead,reason} ] }   (shown greyed, never playable; older clients ignore it)
 //   Client -> Server:
 //     { customPacketType: "characterSelectResult", action: "play"|"create"|"delete", slot }
 export class Spawn implements System {
@@ -363,7 +364,7 @@ export class Spawn implements System {
     return n < 10 ? n : -1;
   }
 
-  // Characters past a lapsed tier's slots are not deleted, only left off the list until the slots return
+  // Characters past a lapsed tier's slots are not deleted, only listed locked (lockedCharacters) until the slots return
   // findFormsByPropertyValue only answers for private.indexed.* properties, which the world state keeps in a map
   private nameTaken(ctx: SystemContext, key: string, selfId: number): boolean {
     if (!key) return false;
@@ -379,8 +380,10 @@ export class Spawn implements System {
   }
 
   // staffSlot: a Trial GM's staff slot (staffSlotOf), -1 for everyone else (then nothing below changes). That slot holds the
-  // staff character alone and the staff character no other slot, so it follows the slot when the player slots grow or shrink
-  private slotMap(ctx: SystemContext, profileId: number, max: number, staffSlot = -1): (number | undefined)[] {
+  // staff character alone and the staff character no other slot, so it follows the slot when the player slots grow or shrink.
+  // locked collects the characters left out: one stored past the player slots (a lapsed tier, a lost staff role) keeps its
+  // charSlot and waits there, so deleting a lower character never pulls it in; one with no free slot waits the same way
+  private slotMap(ctx: SystemContext, profileId: number, max: number, staffSlot = -1, locked?: number[]): (number | undefined)[] {
     const mp = ctx.svr as unknown as Mp;
     const slots: (number | undefined)[] = new Array(max).fill(undefined);
     const unassigned: number[] = [];
@@ -397,15 +400,26 @@ export class Spawn implements System {
         unassigned.push(a);
       }
     }
+    const playerMax = staffSlot >= 0 ? Math.min(staffSlot, max) : max;
     for (const a of unassigned) {
+      const staff = staffSlot >= 0 && staffOf(a);
+      let s: unknown;
+      try { s = mp.get(a, "private.charSlot"); } catch { s = undefined; }
+      if (!staff && Number.isInteger(s) && (s as number) >= playerMax) { locked?.push(a); continue; }
       const free = staffSlot < 0 ? slots.indexOf(undefined)
-        : staffOf(a) ? (slots[staffSlot] === undefined ? staffSlot : -1)
+        : staff ? (slots[staffSlot] === undefined ? staffSlot : -1)
           : slots.findIndex((x, i) => x === undefined && i !== staffSlot);
-      if (free < 0) { if (staffSlot < 0) break; continue; }
+      if (free < 0) { locked?.push(a); continue; }
       slots[free] = a;
       try { mp.set(a, "private.charSlot", free); } catch { /* form vanished */ }
     }
     return slots;
+  }
+
+  // A locked character is refused by its own stored slot too, so no client slot number can reach it
+  private isLockedPick(mp: Mp, actorId: number, slot: number, locked: number[]): boolean {
+    if (locked.includes(actorId)) return true;
+    try { return mp.get(actorId, "private.charSlot") !== slot; } catch { return true; }
   }
 
   private isPermaDead(mp: Mp, actorId: number): boolean {
@@ -483,7 +497,8 @@ export class Spawn implements System {
     const mp = ctx.svr as unknown as Mp;
     const max = this.slotsFor(userId);
     const auth = this.authCache.get(userId);
-    const characters = this.slotMap(ctx, profileId, max, auth ? this.staffSlotOf(auth) : -1).map((actorId, i) =>
+    const locked: number[] = [];
+    const characters = this.slotMap(ctx, profileId, max, auth ? this.staffSlotOf(auth) : -1, locked).map((actorId, i) =>
       actorId !== undefined
         ? {
           name: this.characterName(ctx, actorId) || `Character ${i + 1}`,
@@ -493,8 +508,22 @@ export class Spawn implements System {
           detail: this.characterDetail(mp, actorId),
         }
         : null);
+    const lockedCharacters = locked.map((actorId) => {
+      let s: unknown;
+      let staff = false;
+      try { s = mp.get(actorId, "private.charSlot"); staff = mp.get(actorId, "private.dboStaffChar") === true; } catch { /* form vanished */ }
+      return {
+        slot: Number.isInteger(s) ? s as number : null,
+        name: this.characterName(ctx, actorId) || "Character",
+        dead: this.isPermaDead(mp, actorId),
+        race: this.characterRace(mp, actorId),
+        info: this.characterInfo(mp, actorId),
+        detail: this.characterDetail(mp, actorId),
+        reason: staff ? "staff" : "slots",
+      };
+    }).sort((a, b) => (a.slot ?? 99) - (b.slot ?? 99));
     ctx.svr.sendCustomPacket(userId, JSON.stringify({
-      customPacketType: "characterSelectMenu", maxCharacters: max, characters,
+      customPacketType: "characterSelectMenu", maxCharacters: max, characters, lockedCharacters,
     }));
   }
 
@@ -504,9 +533,16 @@ export class Spawn implements System {
 
     const mp = ctx.svr as unknown as Mp;
     const staffSlot = this.staffSlotOf(auth);
-    const slots = this.slotMap(ctx, auth.profileId, this.slotsFor(userId), staffSlot);
+    const locked: number[] = [];
+    const slots = this.slotMap(ctx, auth.profileId, this.slotsFor(userId), staffSlot, locked);
     let actorId = slots[slot];
     const isNew = actorId === undefined;
+
+    if (actorId !== undefined && this.isLockedPick(mp, actorId, slot, locked)) {
+      this.log("Refusing to play locked character", actorId.toString(16), "in slot", slot);
+      this.sendCharacterList(ctx, userId, auth.profileId);
+      return;
+    }
 
     // Permanently dead characters are locked: the body remains in the world but can never be played again
     if (!isNew && actorId !== undefined && this.isPermaDead(mp, actorId)) {
@@ -789,8 +825,12 @@ export class Spawn implements System {
     const auth = this.pending.get(userId);
     if (!auth || !Number.isInteger(slot) || slot < 0 || slot >= this.slotsFor(userId)) return;
 
-    const actorId = this.slotMap(ctx, auth.profileId, this.slotsFor(userId), this.staffSlotOf(auth))[slot];
-    if (actorId !== undefined) {
+    const mp = ctx.svr as unknown as Mp;
+    const locked: number[] = [];
+    const actorId = this.slotMap(ctx, auth.profileId, this.slotsFor(userId), this.staffSlotOf(auth), locked)[slot];
+    if (actorId !== undefined && this.isLockedPick(mp, actorId, slot, locked)) {
+      this.log("Refusing to delete locked character", actorId.toString(16), "in slot", slot);
+    } else if (actorId !== undefined) {
       // Perma-dead characters may be deleted too (destroying the body) so a perma-death cannot lock the slot forever
       this.cancelPark(actorId);
       ctx.svr.destroyActor(actorId);
