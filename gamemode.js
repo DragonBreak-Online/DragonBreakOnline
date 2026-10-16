@@ -7771,7 +7771,7 @@ try {
   delete require.cache[PLACEMENT_JS];
   // Every staff tier sees the Place tab; placing, hostile NPCs and other GMs' placements go by tier inside
   // (config placement.rights; placing is Lead GM and above by default, as it was here)
-  require(PLACEMENT_JS)({ mp, log, personal, audit, who, onUi, sendPacket, isAdmin, tierOf, registerChatCommand, cfg });
+  require(PLACEMENT_JS)({ mp, log, personal, audit, who, onUi, sendPacket, isAdmin, tierOf, registerChatCommand, cfg, every, onlineActors });
 } catch (e) { log('placement.js failed to load:', e.stack || e.message); }
 
 // ---- breaking free of bound hands, /struggle (server\struggle.js, config "struggle") --------------

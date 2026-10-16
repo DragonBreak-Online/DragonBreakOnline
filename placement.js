@@ -28,6 +28,11 @@
 //                     { customPacketType: "adminPlaceSets", sets: [{ name, count, by, at }] }
 //                     { customPacketType: "adminPlacements", items: [{ id, name, kind, hostile, dist, by, at }], total, here }
 //
+// What the plugins placed (worldedit.js, 16 Oct): placeSelect, placeDelete and placeMove on a plugin reference (an id
+// below 0xff000000 that is not on the list) describe, hide and (client 0.3.102, config placement.worldEdit.client) move
+// it; its row in adminPlacements has an id 'w<ref>', and placeDelete/placeGoto on that row put it back / go to it. Those
+// steps share each GM's Undo. Rights: placement.rights.world (Developer and above by default, as "others").
+//
 // Every placeObject and placeDelete that arrives is logged with its outcome, refusals included: for three days the tab was
 // opened and nothing ever reached this file, and the log could not tell "never sent" from "refused" (2026-09-28).
 //
@@ -113,7 +118,8 @@ module.exports = (api) => {
   // Staff tiers, highest first (gamemode.js tierOf). Without tierOf every admin counts as senior.
   const TIER_RANK = { senior: 4, developer: 3, leadgm: 2, gm: 1 };
   const TIER_LABEL = { senior: 'Senior', developer: 'Developer', leadgm: 'Lead GM', gm: 'GM' };
-  const RIGHTS = Object.assign({ place: 'leadgm', hostile: 'leadgm', others: 'developer' }, P.rights || {});
+  // world: hiding (and, with client 0.3.102, moving) what the plugins placed (worldedit.js); by default as "others"
+  const RIGHTS = Object.assign({ place: 'leadgm', hostile: 'leadgm', others: 'developer', world: 'developer' }, P.rights || {});
   const tierOf = (a) => (typeof api.tierOf === 'function' ? api.tierOf(a) : (isAdmin(a) ? 'senior' : null));
   const can = (a, right) => { const t = tierOf(a); return !!t && (TIER_RANK[t] || 0) >= (TIER_RANK[RIGHTS[right]] || 99); };
   const needs = (right) => `${TIER_LABEL[RIGHTS[right]] || RIGHTS[right]} and above`;
@@ -240,6 +246,22 @@ module.exports = (api) => {
     }
     mp.set(id, 'isDisabled', true);
     mp.set(id, 'isDisabled', false);
+  };
+
+  // What the plugins placed (worldedit.js): the select tool, the list and Undo below hand it plugin references. A module
+  // required from here, so its cache entry goes on every reload as this one's does in gamemode.js
+  const WE = (() => {
+    try {
+      const p = path.resolve('worldedit.js');
+      delete require.cache[p];
+      return require(p)({ mp, log, audit, who, personal, sendPacket, can, needs, profile, papyrus, sameWhere, stateDir: stateDir(), every: api.every, onlineActors: api.onlineActors, cfg: P.worldEdit || {} });
+    } catch (e) { log('placement: worldedit.js failed to load', e.stack || e.message); return null; }
+  })();
+  // A plugin reference the tab did not place (an id below 0xff000000 with no list entry and no tag)
+  const worldTarget = (raw) => {
+    if (!WE || !WE.isPluginRef(raw)) return false;
+    const { entry, tag } = resolveTarget(raw);
+    return !entry && !tag;
   };
 
   // Each GM's last places, moves and removals (by profile), for Undo; in memory only, so a restart forgets them
@@ -373,7 +395,9 @@ module.exports = (api) => {
     const act = l.pop();
     if (!act) return { ok: false, text: 'Nothing to undo.' };
     let r;
-    if (act.op === 'placed') {
+    if (act.op === 'world') {
+      r = WE ? WE.undo(a, act) : { ok: false, text: 'World edits are not loaded.' };
+    } else if (act.op === 'placed') {
       const entry = registry().find((p) => p.id === act.id);
       // Removed since (by another GM, or by the list): nothing to take back, the step is used up
       if (!entry) r = { ok: false, text: 'Skipped a placement that is already gone; press Undo again for the step before.' };
@@ -512,11 +536,15 @@ module.exports = (api) => {
   };
   const sendList = (a) => {
     const { rows, here, total } = nearby(a, 50);
-    const items = rows.map(({ p, d }) => ({ id: p.id, base: p.base, name: p.name, kind: p.kind, hostile: p.hostile, dist: Math.round(d / 70), by: p.by, at: p.at, pos: p.pos, rot: p.rot || [0, 0, 0], mine: p.by === profile(a), group: p.group || '' }));
-    sendPacket(a, { customPacketType: 'adminPlacements', items, here, total });
+    const placed = rows.map(({ p, d }) => ({ d, row: { id: p.id, base: p.base, name: p.name, kind: p.kind, hostile: p.hostile, dist: Math.round(d / 70), by: p.by, at: p.at, pos: p.pos, rot: p.rot || [0, 0, 0], mine: p.by === profile(a), group: p.group || '' } }));
+    // Plugin objects hidden or moved here (worldedit.js) share the list, nearest first; their ids start with 'w'
+    const world = WE ? WE.rows(a) : [];
+    const items = placed.concat(world).sort((x, y) => x.d - y.d).slice(0, 50).map((x) => x.row);
+    sendPacket(a, { customPacketType: 'adminPlacements', items, here: here + world.length, total: total + (WE ? Object.keys(WE.data().edits).length : 0) });
   };
 
   const goTo = (a, idHex) => {
+    if (WE && WE.isKey(idHex)) return WE.goTo(a, idHex);
     const p = registry().find((x) => x.id === String(idHex || '').toLowerCase());
     if (!p) return { ok: false, text: 'That placement is not on the list.' };
     // 2 m to the south of it, facing north toward it (Skyrim's heading 0 is +Y)
@@ -551,7 +579,13 @@ module.exports = (api) => {
   onUi('placeDelete', (a, args) => {
     if (!isAdmin(a)) { log(`placement: placeDelete ${String(args[0] || '?')} from ${who(a)} refused: not an admin`); return; }
     let r;
-    try { r = remove(a, args[0]); }
+    try {
+      // A world row of the list puts that plugin object back; the select tool's Delete on a plugin object hides it
+      if (WE && WE.isKey(args[0])) r = WE.reset(a, args[0]);
+      else if (worldTarget(args[0])) r = WE.hide(a, args[0]);
+      else r = remove(a, args[0]);
+      if (r.ok && r.step) pushUndo(a, r.step);
+    }
     catch (e) { log('placement removal failed', e.stack || e.message); r = { ok: false, text: 'Removal failed; see the server log.' }; }
     log(`placement: placeDelete ${String(args[0] || '?')} from ${who(a)}: ${r.ok ? 'removed' : 'refused'} (${r.text})`);
     personal(a, r.text);
@@ -567,7 +601,7 @@ module.exports = (api) => {
       customPacketType: 'adminPlaceMeta',
       categories: S.catalog.map((c) => ({ id: c.id, label: c.label || c.id, kind: c.kind, count: (c.items || []).length })),
       plugins,
-      rights: { place: can(a, 'place'), hostile: can(a, 'hostile'), others: can(a, 'others'), tier: TIER_LABEL[tierOf(a)] || '', placeNeeds: needs('place') },
+      rights: { place: can(a, 'place'), hostile: can(a, 'hostile'), others: can(a, 'others'), world: can(a, 'world'), tier: TIER_LABEL[tierOf(a)] || '', placeNeeds: needs('place') },
     });
   });
 
@@ -596,7 +630,10 @@ module.exports = (api) => {
     let r;
     if (pos.length !== 3 || rot.length !== 3 || pos.concat(rot).some(Number.isNaN)) r = { ok: false, text: 'Move refused: a bad position.' };
     else {
-      try { r = move(a, idHex, pos, rot); }
+      try {
+        if (worldTarget(idHex)) { r = WE.move(a, idHex, pos, rot); if (r.ok && r.step) pushUndo(a, r.step); }
+        else r = move(a, idHex, pos, rot);
+      }
       catch (e) { log('placement move failed', e.stack || e.message); r = { ok: false, text: 'The move failed; see the server log.' }; }
     }
     log(`placement: placeMove ${idHex} to ${pos.map((n) => Math.round(n)).join(',')} from ${who(a)}: ${r.ok ? 'moved' : 'refused'} (${r.text})`);
@@ -606,6 +643,14 @@ module.exports = (api) => {
   // The select tool aimed at something: if it was placed with the tab and this GM may change it, the client edits it
   onUi('placeSelect', (a, args) => {
     if (!isAdmin(a)) return;
+    // Something a plugin placed: what it is and what Delete does; with client 0.3.102 also the edit mode to move it
+    if (worldTarget(args[0])) {
+      let d;
+      try { d = WE.describe(a, args[0]); } catch (e) { log('placement: world select failed', e.stack || e.message); d = { ok: false, text: 'That failed; see the server log.' }; }
+      log(`placement: placeSelect ${String(args[0])} (plugin) from ${who(a)}: ${d.text}`);
+      if (d.ok && d.info && WE.client && can(a, 'world')) sendPacket(a, WE.editPacket(d.info));
+      return personal(a, d.text);
+    }
     const { entry, tag } = resolveTarget(args[0]);
     const tagged = !!tag;
     if (!entry) return personal(a, tagged ? 'That was placed with the tab but is missing from the list.' : 'Only things placed with the Place tab can be edited.');
@@ -660,6 +705,28 @@ module.exports = (api) => {
     catch (e) { log('placement goto failed', e.stack || e.message); r = { ok: false, text: 'Could not move you there; see the server log.' }; }
     personal(a, r.text);
   });
+
+  // Any client may ask for the world edits it applies (client 0.3.102 WorldEditService; nothing before config client)
+  onUi('worldEditsRequest', (a) => { if (WE) WE.answerRequest(a); });
+
+  // The same world edits by reference id, for what the crosshair cannot reach
+  const worldCommand = (name, fn, help) => registerChatCommand(name, (a, args) => {
+    const raw = String((Array.isArray(args) ? args[0] : args) || '').trim().toLowerCase().replace(/^0x/, '');
+    let r;
+    try { r = WE ? fn(a, raw) : { ok: false, text: 'World edits are not loaded.' }; }
+    catch (e) { log(`placement /${name} failed`, e.stack || e.message); r = { ok: false, text: 'That failed; see the server log.' }; }
+    if (r.ok && r.step) pushUndo(a, r.step);
+    log(`placement: /${name} ${raw} from ${who(a)}: ${r.ok ? 'done' : 'refused'} (${r.text})`);
+    personal(a, r.text);
+  }, { admin: true, help });
+  worldCommand('worldhide', (a, ref) => (WE.isPluginRef(ref) ? WE.hide(a, ref) : { ok: false, text: 'Use: /worldhide <reference id in hex>' }), 'hide something a plugin placed, by reference id');
+  worldCommand('worldshow', (a, ref) => WE.reset(a, 'w' + ref.replace(/^w/, '')), 'put a hidden or moved plugin object back as its plugin has it');
+  registerChatCommand('worldedits', (a) => {
+    if (!WE) return personal(a, 'World edits are not loaded.');
+    const rows = WE.rows(a).sort((x, y) => x.d - y.d).slice(0, 10);
+    personal(a, `${Object.keys(WE.data().edits).length} plugin objects edited in all; nearest here:`);
+    for (const { row } of rows) personal(a, `${row.name.replace(/ \(Remove puts it back\)$/, '')}, ${row.dist} m away, ref ${row.id.slice(1)}`);
+  }, { admin: true, help: 'plugin objects hidden or moved near you' });
 
   registerChatCommand('placeundo', (a) => {
     const r = undo(a);
