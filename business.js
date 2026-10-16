@@ -10,7 +10,7 @@
 //     is its renter's alone; when the rent runs out the renter has chestGraceHours to empty it or pay again, then it
 //     falls back to the owner, who clears it before it can be rented again.
 // The hold takes its tax from every rent. The rate is the hold's own (/tax), set by its Jarl, Count or Steward (taxRanks),
-// from 0 to maxTax; until one is set, rest.holdShare (10 %) stands. Each change is logged with who made it.
+// from minTax (10%) to maxTax (40%); until one is set, rest.holdShare (10 %) stands. Each change is logged with who made it.
 //
 // BEFORE STORAGE FOR RENT IS UN-PAUSED (chestRentPaused), from the review of rent-fail-closed (finding 1): two door claims
 // in one inn are two businesses, and both can list the same chest. chestIndex() keeps one business per chest (the last
@@ -36,7 +36,7 @@ module.exports = (api) => {
   // the #TAG drawn under it stays the mask; a beast is its own name
   const publicDisplay = typeof api.publicDisplay === 'function' ? api.publicDisplay : display;
   const C = Object.assign({
-    enabled: true, minRent: 1, maxRent: 200, maxChestPrice: 200, chestGraceHours: 72, maxTax: 0.3,
+    enabled: true, minRent: 1, maxRent: 200, maxChestPrice: 200, chestGraceHours: 72, minTax: 0.1, maxTax: 0.4,
     taxRanks: ['jarl', 'count', 'steward'], maxStaff: 12, maxNote: 300, logKeep: 300, notesKeep: 200, perPage: 8,
     armSeconds: 60,
     // Storage for rent is paused (review A2-1). A rented chest's own record now keeps it its renter's even with the claim
@@ -130,8 +130,10 @@ module.exports = (api) => {
   // ---- the hold's tax ---------------------------------------------------------------------------------
   const taxRate = (zone, dflt) => {
     const t = zone && taxes()[zone];
-    if (t && Number.isFinite(Number(t.rate))) return Math.max(0, Math.min(C.maxTax, Number(t.rate)));
-    return Number.isFinite(Number(dflt)) ? Number(dflt) : (Number.isFinite(DEFAULT_TAX) ? DEFAULT_TAX : 0.1);
+    // Never below minTax (Nate, 16 Oct: a hold's gold comes only from tax, so no hold may tax at 0%)
+    const clamp = (r) => Math.max(C.minTax, Math.min(C.maxTax, r));
+    if (t && Number.isFinite(Number(t.rate))) return clamp(Number(t.rate));
+    return clamp(Number.isFinite(Number(dflt)) ? Number(dflt) : (Number.isFinite(DEFAULT_TAX) ? DEFAULT_TAX : 0.1));
   };
   const canTax = (a, zone) => isAdmin(a) || ranksOf(profileOf(a)).some((r) => r.zone && r.zone.id === zone && C.taxRanks.includes(r.rank));
   const zoneName = (zone) => { const z = zoneById(zone); return (z && (z.name || z.label)) || zone || 'no hold'; };
@@ -616,8 +618,9 @@ module.exports = (api) => {
   // Who may set it: the hold's taxRanks (Jarl, Count, Steward) and staff, from /tax, the Court tab and the faction panel
   globalThis.__dboCanSetHoldTax = (a, zone) => !!zone && canTax(a, zone);
   globalThis.__dboHoldTaxMax = () => C.maxTax;
+  globalThis.__dboHoldTaxMin = () => C.minTax;
   globalThis.__dboSetHoldTax = (zone, pct, byName, byWho) => {
-    if (!zone || !Number.isFinite(Number(pct)) || pct < 0 || pct > C.maxTax * 100) return null;
+    if (!zone || !Number.isFinite(Number(pct)) || pct < C.minTax * 100 || pct > C.maxTax * 100) return null;
     return setHoldTax(zone, Number(pct), byName, byWho);
   };
 
@@ -629,12 +632,12 @@ module.exports = (api) => {
     if (!arg) {
       personal(a, `${zoneName(zone)} takes ${Math.round(taxRate(zone) * 100)}% of every rent (inn beds and storage) and, each week, of every property's value${t && t.by ? `, set by ${t.by} on ${stamp(t.at)}` : ', the standard rate'}.`);
       (t && t.log ? t.log.slice(-3).reverse() : []).forEach((e) => personal(a, `  ${stamp(e.at)}  ${e.text}`));
-      if (canTax(a, zone)) personal(a, `As an official of ${zoneName(zone)}: /tax <percent> sets it, 0 to ${Math.round(C.maxTax * 100)}.`);
+      if (canTax(a, zone)) personal(a, `As an official of ${zoneName(zone)}: /tax <percent> sets it, ${Math.round(C.minTax * 100)} to ${Math.round(C.maxTax * 100)}.`);
       return;
     }
     if (!canTax(a, zone)) return personal(a, `Only the ${C.taxRanks.join(', ')} of ${zoneName(zone)} set its tax.`);
     const pct = Number(arg);
-    if (!Number.isFinite(pct) || pct < 0 || pct > C.maxTax * 100) return personal(a, `Set a rate from 0 to ${Math.round(C.maxTax * 100)}: /tax <percent>`);
+    if (!Number.isFinite(pct) || pct < C.minTax * 100 || pct > C.maxTax * 100) return personal(a, `Set a rate from ${Math.round(C.minTax * 100)} to ${Math.round(C.maxTax * 100)}: /tax <percent>`);
     const rate = setHoldTax(zone, pct, ownDisplay(a), who(a));
     personal(a, `${zoneName(zone)} now takes ${Math.round(rate * 100)}% of every rent, and of every property's value at the weekly reckoning.`);
   }, { help: "the hold's tax on rents where you stand; officials: /tax <percent>" });

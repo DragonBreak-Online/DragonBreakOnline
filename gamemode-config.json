@@ -313,7 +313,8 @@
   "maxRent": 200,
   "maxChestPrice": 200,
   "chestGraceHours": 72,
-  "maxTax": 0.3,
+  "minTax": 0.1,
+  "maxTax": 0.4,
   "taxRanks": ["jarl", "count", "steward"],
   "maxStaff": 12
  },
@@ -1071,6 +1072,7 @@
   "trace": { "perMinute": 20, "perHour": 1500 }
  },
  "war": {
+    "mapWorlds": ["a764b:BSHeartland.esm", "3c:Skyrim.esm"],
   "_comment": "War and raids stay off (Nate, 12 Oct 04:12Z: \"war and raids needs to be turned off. it's too early\"; closed during the alpha from 2026-09-26). enabled true opens declarations and battles (hot reload); the map, owners and treaties work either way; raids.enabled the same for raids. colours: the Realm map's lore colour per faction (Nate's picks; the cults' and the Vigil's chosen by the Prince's or the order's motif); \"base/stripe\" draws a stripe (the Companions). seats: where a faction that is not a hold musters to declare, { id: { name, world, pos, radius, cells } }.",
   "enabled": false,
   "seats": {},
@@ -1090,7 +1092,7 @@
  "raids": { "_comment": "Raids and pillage (raids.js, WAR_DESIGN.md section 5): off with war (Nate, 12 Oct 04:12Z: \"too early\"). enabled true opens them (hot reload). The 3-day cooldown is kept in memory only: a restart resets it.", "enabled": false },
  "economy": { "_comment": "Weekly taxes and wages (economy.js). On from 2026-09-28 (Nate: \"economy needs to fully be turned on\"); the review B2 guards are in economy.js.", "enabled": true,
   "_dominionStipend": "Nate, 11 Oct: the Aldmeri Dominion pays its Thalmor in the Empire a stipend each weekly reckoning (economy.js), into the dominionStipendTo treasury before wages, in the faction report as stipend. It is NEW gold, made by no one's work, so it is kept modest; 0 turns it off. Hot reload.",
-  "dominionStipend": 300, "dominionStipendTo": "thalmor", "imperialStipend": 300, "imperialStipendTo": "imperial-legion", "imperialStipendFrom": "the Imperial City" },
+  "dominionStipend": 0, "dominionStipendTo": "thalmor", "imperialStipend": 0, "imperialStipendTo": "imperial-legion", "imperialStipendFrom": "the Imperial City" },
  "nobility": {
   "_comment": "Fiefs and titles (nobility.js, docs/nobility/DESIGN.md; Nate, 10 Oct). On from release 1012 (Nate, 12 Oct: built features ship enabled). Rollback: enabled false (hot reload): no F3 Nobility tab, no fief powers in the fork's housing, no tax share; titles stay in nobility.json. The hold's ruler grants titles (a Lead GM may only revoke, in an emergency); a fief's holder manages, assesses and rents out its buildings like a steward and their own there are not capped; fiefShare of the weekly property tax on a fief's buildings goes to the fief's treasury (deposit only). realms: zone id -> cyrodiil (Baron, Lord, Knight under a Count) or skyrim (Lord, Thane under a Jarl), Skyrim when not listed.",
   "enabled": true,

@@ -197,7 +197,7 @@ const overOld = (label, loadOld) => {
   load();
   const legion = treasuries['imperial-legion'], fails = logs.filter((l) => /fail/.test(l)).length;
   week(10);
-  check(`${label}: the new economy.js tithes and reports after the reload`, treasuries['imperial-legion'] - legion === 240 && report('county-bruma').tithe === 240 && report('county-bruma').balance > 0 && state().lastReckoning === now && logs.filter((l) => /fail/.test(l)).length === fails, [treasuries['imperial-legion'] - legion, report('county-bruma'), logs.slice(-3)]);
+  check(`${label}: the new economy.js tithes and reports after the reload`, treasuries['imperial-legion'] - legion === 240 + ((report('imperial-legion') || {}).income || 0) && report('county-bruma').tithe === 240 && report('county-bruma').balance > 0 && state().lastReckoning === now && logs.filter((l) => /fail/.test(l)).length === fails, [treasuries['imperial-legion'] - legion, report('county-bruma'), logs.slice(-3)]);
 };
 overOld('a cache without titheOwed', () => { globalThis.__dboEconomy = { data: { rates: { 'county-bruma': 0.2 }, wages: {}, values: { [0x101]: 10000 }, owed: {}, overdue: {}, reports: {}, assessed: {}, balanceAfter: {}, lastReckoning: SUNDAY + 9 * WEEK } }; });
 // The real module from before the tithe (release-1004-gameplay fc29a26c), when git can show it

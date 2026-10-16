@@ -107,7 +107,7 @@ ok(panelRate('county-bruma') === 0.1, 'the faction panel shows the hold rate', p
 reckonAt(SUNDAY);
 ok(bank(LYDIA) === 4800 && treasuries['county-bruma'] === 200, "Lydia's Bruma house pays 10% of 2,000 to the County", [bank(LYDIA), treasuries['county-bruma']]);
 ok(bank(OLAF) === 4600 && treasuries['fighters-guild'] === 400, 'a guild still taxes its land at its own panel rate (20%)', [bank(OLAF), treasuries['fighters-guild']]);
-ok(bank(ULF) === 4900 && treasuries['hold-whiterun'] === 100, 'a hold that never set /tax keeps its panel rate (5%)', [bank(ULF), treasuries['hold-whiterun']]);
+ok(bank(ULF) === 4800 && treasuries['hold-whiterun'] === 200, 'a hold that never set /tax and has a 5% panel rate taxes at the 10% floor (Nate, 16 Oct)', [bank(ULF), treasuries['hold-whiterun']]);
 
 // ---- the panel sets the same number ----
 ui.econRate(COUNT, ['nonce', 'county-bruma', 15]);
@@ -117,25 +117,29 @@ ok(panelRate('county-bruma') === 0.15, 'the panel reads it back', panelRate('cou
 reckonAt(SUNDAY + 7 * 86400000);
 ok(bank(LYDIA) === 4500 && treasuries['county-bruma'] === 500, 'the next reckoning charges 15% (300)', [bank(LYDIA), treasuries['county-bruma']]);
 
-// ---- /tax 0 stops it; a rate over the cap is refused ----
+// ---- a hold taxes from 10% to 40% (Nate, 16 Oct): /tax 0 is refused, so the rate stands; over 40% is refused ----
 cmds.tax(COUNT, '0');
+ok(taxes().bruma.rate === 0.15 && /from 10 to 40/.test(last(COUNT)), '/tax 0 is refused and the rate stays 15%', [taxes().bruma.rate, last(COUNT)]);
 reckonAt(SUNDAY + 14 * 86400000);
-ok(bank(LYDIA) === 4500 && treasuries['county-bruma'] === 500, '/tax 0 taxes no property', [bank(LYDIA), treasuries['county-bruma']]);
-ok(globalThis.__dboSetHoldTax('bruma', 31, 'X', 'X') === null && taxes().bruma.rate === 0, 'the shared setter refuses a rate over 30%', taxes().bruma.rate);
+ok(bank(LYDIA) === 4200 && treasuries['county-bruma'] === 800, '...so the next reckoning still charges 15%', [bank(LYDIA), treasuries['county-bruma']]);
+ok(globalThis.__dboSetHoldTax('bruma', 41, 'X', 'X') === null && globalThis.__dboSetHoldTax('bruma', 9, 'X', 'X') === null && taxes().bruma.rate === 0.15, 'the shared setter refuses a rate over 40% or under 10%', taxes().bruma.rate);
+ok(globalThis.__dboSetHoldTax('bruma', 40, 'X', 'X') === 0.4 && globalThis.__dboSetHoldTax('bruma', 15, 'X', 'X') === 0.15, '...and takes 40% and 15%', taxes().bruma.rate);
 
 // ---- a Steward keeps the books from the faction panel too: the rate and the wages ----
 const stewardView = globalThis.__dboEconomyView(STEWARD).factions.find((f) => f.id === 'county-bruma');
 ok(stewardView && stewardView.ranks.includes('steward') && stewardView.rate >= 0, "the Steward's panel lists Bruma with its rate and offices", stewardView);
 ui.econRate(STEWARD, ['nonce', 'county-bruma', 8]);
-ok(taxes().bruma.rate === 0.08 && /Steward Mira set the tax to 8%/.test(taxes().bruma.log.slice(-1)[0].text), 'the Steward sets 8% from the panel', taxes().bruma);
+ok(taxes().bruma.rate === 0.15, 'the Steward cannot set 8% (under the 10% floor)', taxes().bruma.rate);
+ui.econRate(STEWARD, ['nonce', 'county-bruma', 12]);
+ok(taxes().bruma.rate === 0.12 && /Steward Mira set the tax to 12%/.test(taxes().bruma.log.slice(-1)[0].text), 'the Steward sets 12% from the panel', taxes().bruma);
 ui.econWage(STEWARD, ['nonce', 'county-bruma', 'steward', 900]);
 ok(!((globalThis.__dboEconomy.data.wages['county-bruma'] || {}).steward), 'the Steward cannot set their own wage', globalThis.__dboEconomy.data.wages);
 ui.econWage(STEWARD, ['nonce', 'county-bruma', 'guard', 60]);
 ok((globalThis.__dboEconomy.data.wages['county-bruma'] || {}).guard === 60, "the Steward sets the guards' wage", globalThis.__dboEconomy.data.wages);
 ui.econWage(ULF, ['nonce', 'county-bruma', 'guard', 999]);
 ok(globalThis.__dboEconomy.data.wages['county-bruma'].guard === 60, 'someone with no office there cannot');
-ui.econRate(ULF, ['nonce', 'county-bruma', 1]);
-ok(taxes().bruma.rate === 0.08, 'someone with no office there cannot set it');
+ui.econRate(ULF, ['nonce', 'county-bruma', 30]);
+ok(taxes().bruma.rate === 0.12, 'someone with no office there cannot set it');
 ok(!globalThis.__dboEconomyView(ULF).factions.some((f) => f.id === 'county-bruma'), 'and does not see it');
 
 // ---- a house bought from the hold is taxed on its price ----

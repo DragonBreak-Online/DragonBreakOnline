@@ -77,7 +77,7 @@ const ui = (ev, a, ...args) => { replies.length = 0; handlers.get(ev)(a, ['nonce
 
 // Settings
 check('a non-leader cannot set the tax rate', !ui('econRate', 100, 'county-bruma', 10).ok);
-check('the rate is at most 30%', !ui('econRate', 1, 'county-bruma', 31).ok && /0% to 30%/.test(replies[0].text));
+check('the rate is from 10% to 40% (Nate, 16 Oct)', !ui('econRate', 1, 'county-bruma', 41).ok && /10% to 40%/.test(replies[0].text) && !ui('econRate', 1, 'county-bruma', 0).ok && !ui('econRate', 1, 'county-bruma', 9).ok);
 check('the Count sets 10%', ui('econRate', 1, 'county-bruma', 10).ok);
 check('the guild leader sets 20% on its land', ui('econRate', 100, 'fighters-guild', 20).ok);
 check('the Count sets the guard\'s wage', ui('econWage', 1, 'county-bruma', 'guard', 50).ok);
@@ -120,7 +120,7 @@ check('an overdue property counts its weeks', r2['county-bruma'].overdue[0].week
 
 // The view
 const v = globalThis.__dboEconomyView(1);
-check('the Count\'s panel shows the rate, the wages and the hold\'s ranks', v.factions.length === 1 && v.factions[0].rate === 0.1 && v.factions[0].wages.guard === 50 && v.factions[0].ranks.join(',') === 'count,steward,guard' && v.maxTaxRate === 0.3);
+check('the Count\'s panel shows the rate, the wages and the hold\'s ranks', v.factions.length === 1 && v.factions[0].rate === 0.1 && v.factions[0].wages.guard === 50 && v.factions[0].ranks.join(',') === 'count,steward,guard' && v.maxTaxRate === 0.4 && v.minTaxRate === 0.1);
 check('a guild leader\'s panel shows its rank titles', globalThis.__dboEconomyView(100).factions[0].ranks.join(',') === 'Harbinger,Warden,Associate');
 
 // A hot reload keeps it all

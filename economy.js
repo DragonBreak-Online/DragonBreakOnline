@@ -60,7 +60,7 @@ module.exports = (api) => {
   // Who set the hold's tax is kept by their own name, never a beast's, and a mask's only while rosterPrivacy.masks is
   // off (gamemode.js ownDisplay)
   const ownDisplay = typeof api.ownDisplay === 'function' ? api.ownDisplay : display;
-  const C = Object.assign({ enabled: false, maxTaxRate: 0.30, defaultPropertyValue: 2000, maxPropertyValue: 1000000, maxWage: 100000, reckonDay: 0, reckonHour: 0,
+  const C = Object.assign({ enabled: false, minTaxRate: 0.10, maxTaxRate: 0.40, defaultPropertyValue: 2000, maxPropertyValue: 1000000, maxWage: 100000, reckonDay: 0, reckonHour: 0,
     wageShare: 0.25, wageIncomeShare: 0.75, wageSavingsShare: 0.25, assessEveryDays: 7, assessMaxStep: 2,
     titheRate: 0.10, titheTo: 'imperial-legion', titheProvinces: ['cyrodiil'],
     dominionStipend: 300, dominionStipendTo: 'thalmor', dominionStipendFrom: 'the Aldmeri Dominion',
@@ -174,7 +174,7 @@ module.exports = (api) => {
     const zone = holdZoneOf(fid);
     let r = own;
     try { if (zone && fn('__dboHoldTax')) r = Number(fn('__dboHoldTax')(zone, own)); } catch (e) { r = own; }
-    return Math.min(C.maxTaxRate, Math.max(0, Number.isFinite(r) ? r : 0));
+    return Math.min(C.maxTaxRate, Math.max(C.minTaxRate, Number.isFinite(r) ? r : 0));
   };
   const valueOf = (ref) => { const v = Number(data().values[String(ref)]); return Number.isFinite(v) && v >= 0 ? v : C.defaultPropertyValue; };
 
@@ -417,7 +417,7 @@ module.exports = (api) => {
     if (!fromPanel(a, args)) return;
     const fid = String(args[1] || ''); const pct = Number(args[2]);
     if (!leads(a, fid) && !setsHoldTax(a, fid)) return reply(a, false, 'Only the leader, or a hold official who sets its tax, sets the tax rate.');
-    if (!Number.isFinite(pct) || pct < 0 || pct > C.maxTaxRate * 100) return reply(a, false, `The tax rate is from 0% to ${Math.round(C.maxTaxRate * 100)}%.`);
+    if (!Number.isFinite(pct) || pct < C.minTaxRate * 100 || pct > C.maxTaxRate * 100) return reply(a, false, `The tax rate is from ${Math.round(C.minTaxRate * 100)}% to ${Math.round(C.maxTaxRate * 100)}%.`);
     data().rates[fid] = Math.round(pct) / 100; save();
     const zone = holdZoneOf(fid);
     if (zone && fn('__dboSetHoldTax')) fn('__dboSetHoldTax')(zone, Math.round(pct), ownDisplay(a), who(a));
@@ -536,7 +536,7 @@ module.exports = (api) => {
       }
     } catch (e) { /* no officials yet */ }
     return {
-      enabled: !!C.enabled, maxTaxRate: C.maxTaxRate, nextReckoning: nextAfter(data().lastReckoning || Date.now()),
+      enabled: !!C.enabled, minTaxRate: C.minTaxRate, maxTaxRate: C.maxTaxRate, nextReckoning: nextAfter(data().lastReckoning || Date.now()),
       factions: led.concat(keeps).map((fid) => {
         const f = info(fid) || {};
         let ranks = [];

@@ -32,7 +32,7 @@ ok('arrest: First Emissary, Justiciar, Inquisitor (leader, officer, sergeant); d
 const RR = CFG.factions.raceRules;
 ok('race rule on: High Elves, Wood Elves, Khajiit; no Maormer; Altmer-led', RR.enabled === true && JSON.stringify(RR.rules.thalmor.races) === '["HighElfRace","WoodElfRace","KhajiitRace"]'
   && RR.rules.thalmor.notRp.includes('maormer') && JSON.stringify(RR.rules.thalmor.leadRaces) === '["HighElfRace"]' && JSON.stringify(RR.rules.thalmor.leadRoles) === '["leader","officer"]');
-ok('the Dominion stipend is 300 gold to the Thalmor', CFG.economy.dominionStipend === 300 && CFG.economy.dominionStipendTo === 'thalmor');
+ok('no stipend from nothing: the Dominion and Imperial stipends are 0 in the live config (Nate, 16 Oct: treasury gold comes only from tax)', CFG.economy.dominionStipend === 0 && CFG.economy.imperialStipend === 0);
 const DEFS = JSON.parse(SRC('guild-defs.json'));
 const TR = DEFS.factions.find((f) => f.id === 'thalmor').ranks;
 ok('the Thalmor ranks are as the rule names them', TR.map((r) => `${r.title}/${r.role}`).join(',') === 'First Emissary/leader,Justiciar/officer,Inquisitor/sergeant,Thalmor Wizard/mage,Thalmor Smith/blacksmith,Robe-Maker/tailor,Thalmor Soldier/member,Agent/member', TR);
@@ -287,7 +287,13 @@ globalThis.__dboHousing = null;
 globalThis.__dboRealmLeads = (a, f) => a === ALT && f === 'thalmor';
 told.length = 0;
 const loadEcon = (cfg) => { delete require.cache[ECON]; return require(ECON)(Object.assign({}, api, { cfg: cfg || CFG })); };
-let E = loadEcon();
+{
+  const live = loadEcon(); live.reckon();
+  ok('with the live config the reckoning pays no stipend to anyone', !treasuries.thalmor && !treasuries['imperial-legion'], treasuries);
+}
+// The mechanism, should staff ever turn a stipend back on
+const ON = JSON.parse(JSON.stringify(CFG)); ON.economy.dominionStipend = 300; ON.economy.imperialStipend = 300;
+let E = loadEcon(ON);
 const rep1 = E.reckon();
 ok('the reckoning pays the Thalmor 300 gold from the Dominion', treasuries.thalmor === 300 && rep1.thalmor && rep1.thalmor.stipend === 300 && rep1.thalmor.stipendFrom === 'the Aldmeri Dominion', rep1.thalmor);
 ok('it is in the saved faction report', JSON.parse(fs.readFileSync('economy.json', 'utf8')).reports.thalmor.stipend === 300);
@@ -297,10 +303,10 @@ ok('the stipend is audited as new gold', audits.some((x) => /^ECONOMY Thalmor: s
 ok('the reckoning pays the Imperial Legion 300 gold from the Imperial City', treasuries['imperial-legion'] === 300 && rep1['imperial-legion'] && rep1['imperial-legion'].stipend === 300 && rep1['imperial-legion'].stipendFrom === 'the Imperial City', rep1['imperial-legion']);
 ok('...audited as new gold, and the Thalmor are still paid their own', audits.some((x) => /stipend of 300 gold from the Imperial City \(new gold\)/.test(x)) && treasuries.thalmor === 300);
 {
-  const off = JSON.parse(JSON.stringify(CFG)); off.economy.dominionStipend = 0;
+  const off = JSON.parse(JSON.stringify(ON)); off.economy.dominionStipend = 0;
   E = loadEcon(off); E.reckon();
   ok('dominionStipend 0 pays nothing', treasuries.thalmor === 300);
-  const off2 = JSON.parse(JSON.stringify(CFG)); off2.economy.imperialStipend = 0; const before = treasuries['imperial-legion'];
+  const off2 = JSON.parse(JSON.stringify(ON)); off2.economy.imperialStipend = 0; const before = treasuries['imperial-legion'];
   E = loadEcon(off2); E.reckon();
   ok('imperialStipend 0 pays the Legion nothing', treasuries['imperial-legion'] === before);
 }
