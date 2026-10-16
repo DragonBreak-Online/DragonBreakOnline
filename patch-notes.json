@@ -1,5 +1,19 @@
 [
   {
+    "title": "The Legion's stipend",
+    "date": "2026-10-16",
+    "version": "Hotfix",
+    "tag": "Change",
+    "sections": [
+      {
+        "heading": "Changes",
+        "items": [
+          "The Empire now pays the Imperial Legion a stipend of 300 gold into its treasury at each weekly reckoning, as the Aldmeri Dominion pays its Thalmor. The first one comes with Sunday's reckoning."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Who is about",
     "date": "2026-10-16",
     "version": "Hotfix",
