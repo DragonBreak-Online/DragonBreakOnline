@@ -33,9 +33,9 @@ const PEERS = [['ArmorScaledCuirass', 32, false, 0x4], ['ArmorScaledGauntlets', 
   ['ArmorOrcishCuirass', 40, true, 0x4], ['KhajiitiApexCuirassHeavy', 40, true, 0x4]];
 
 const table = (cfg.armorMaterials || {}).ratingByEditorId || {};
-const named = Object.keys(table).filter((k) => k[0] !== '_');
+const named = Object.keys(table).filter((k) => /^BlackBearAncientNord/.test(k));
 ok(named.length === 9 && named.every((k) => BEAR.some(([e, r, , , want]) => e === k && want !== r && table[k] === want)), 'config names the 9 Black Bear pieces that change, each at its new rating', table);
-ok(named.every((k) => /^BlackBearAncientNord/.test(k)), '...and nothing else');
+ok(Object.keys(table).every((k) => /^(BlackBearAncientNord|0_)/.test(k)), '...and nothing but Black Bear and Yokudan (0_) pieces');
 
 // ---- the lifted armorPieceOf --------------------------------------------------------------------------------------
 const i = gm.indexOf('const ARMOR_MATERIALS = '), j = gm.indexOf('  armorPieceCache.set(baseId, piece);\n  return piece;\n};', i);
