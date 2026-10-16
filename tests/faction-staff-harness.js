@@ -20,9 +20,9 @@ process.chdir(dir);
 let fails = 0;
 const ok = (label, cond, got) => { console.log(`${cond ? 'ok  ' : 'FAIL'} ${label}${!cond && got !== undefined ? `: got ${JSON.stringify(got)}` : ''}`); if (!cond) fails++; };
 
-const LEAD = 0x10, GM = 0x11, BOSS = 0x14, MATE = 0x15, AWAY = 0xff000300, NEW = 0x16;
-const chars = new Map([[LEAD, 'Lead'], [GM, 'Plain GM'], [BOSS, 'Boss'], [MATE, 'Mate'], [AWAY, 'Away'], [NEW, 'Newcomer']]);
-const onlineSet = new Set([LEAD, GM, BOSS, MATE, NEW]);
+const LEAD = 0x10, GM = 0x11, BOSS = 0x14, MATE = 0x15, AWAY = 0xff000300, NEW = 0x16, LORE = 0x17, RECRUIT = 0x18;
+const chars = new Map([[LEAD, 'Lead'], [GM, 'Plain GM'], [BOSS, 'Boss'], [MATE, 'Mate'], [AWAY, 'Away'], [NEW, 'Newcomer'], [LORE, 'Lore Master'], [RECRUIT, 'Recruit']]);
+const onlineSet = new Set([LEAD, GM, BOSS, MATE, NEW, LORE, RECRUIT]);
 const told = [], audits = [], drawn = [];
 const handlers = {};
 const props = new Map();
@@ -190,6 +190,19 @@ fs.writeFileSync(path.join(dir, 'guild-overrides.json'), JSON.stringify({ [FID]:
 load();
 ok('an override that cannot stand is ignored at load', ranksNow()[0].role === 'leader' && ranksNow().length > 1);
 
+// ---- a faction manager role (config factions.managerRoles; Nate, 16 Oct: the Lore Master) --------------------------------
+api.cfg = { factions: { managerRoles: ['1560117570990907503'] } };
+api.rolesOf = (a) => (a === LORE ? ['1560117570990907503'] : []);
+load();
+payload(LORE);
+let lp = send('factionAdd', LORE, FID, 'Recruit');
+ok('the Lore Master adds a member like a Lead GM', roster()[String(RECRUIT)] && lp && lp.resultKind === 'ok', lp && lp.result);
+const lf = payload(LORE).factions.find((f) => f.id === FID);
+ok('...sees the panel as staff, with add, rename and rank edits', payload(LORE).staff === true && lf && lf.canAdd && lf.canEditRanks && lf.canRename, lf);
+ok('...and every faction, secret ones too', payload(LORE).factions.length === payload(LEAD).factions.length, [payload(LORE).factions.length, payload(LEAD).factions.length]);
+payload(NEW);
+ok('a player without the role still cannot add', send('factionAdd', NEW, FID, 'Boss').resultKind === 'refused');
+delete api.rolesOf; api.cfg = {};
 delete globalThis.__dboEconomyRanksRenamed;
 try { fs.rmSync(dir, { recursive: true, force: true }); } catch (e) { /* temp */ }
 console.log(fails ? `${fails} FAILED` : 'all passed');

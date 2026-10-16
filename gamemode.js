@@ -7889,7 +7889,7 @@ try {
 try {
   const GUILDS_JS = path.resolve('guilds.js');
   delete require.cache[GUILDS_JS];
-  require(GUILDS_JS)({ mp, log, ownNameOf, ownDisplay, publicNameOf, personal, system, registerChatCommand, onUi, openWidget, closeWidget, display, nameOf, tagOf, onlineActors, isAdmin, isLeadStaff, findByName, findAnyByName, audit, who, cfg, profileOf, readOfficials });
+  require(GUILDS_JS)({ mp, log, ownNameOf, ownDisplay, publicNameOf, personal, system, registerChatCommand, onUi, openWidget, closeWidget, display, nameOf, tagOf, onlineActors, isAdmin, isLeadStaff, rolesOf, findByName, findAnyByName, audit, who, cfg, profileOf, readOfficials });
 } catch (e) { log('guilds.js failed to load:', e.stack || e.message); globalThis.__dboFactionMenu = null; globalThis.__dboFactionMenuEntries = null; globalThis.__dboFactionMenuAction = null; globalThis.__dboFactionLogin = null; }
 
 // ---- territories, land markers and official war (server\realm.js, territories.json, WAR_DESIGN.md) ---------------------

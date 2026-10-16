@@ -17,8 +17,9 @@ module.exports = (api) => {
   const fs = require('fs');
   const path = require('path');
   const { mp, log, personal, system, registerChatCommand, onUi, openWidget, closeWidget, display, nameOf, tagOf,
-    onlineActors, isAdmin, findByName, audit, who, cfg, profileOf } = api;
+    onlineActors, isAdmin: isStaff, findByName, audit, who, cfg, profileOf } = api;
   // Online first, then offline characters too (Add member); an older gamemode passes only findByName
+  const isAdmin = (a) => isStaff(a) || factionManager(a);
   const findAnyByName = typeof api.findAnyByName === 'function' ? api.findAnyByName : findByName;
   // Rosters, invitations and the news of who joined or leads name people by their own name, never a beast's, and a
   // mask's only while rosterPrivacy.masks is off (gamemode.js ownNameOf; tracker 1559074270959640676): a pack's leader
@@ -29,7 +30,13 @@ module.exports = (api) => {
   // under it stays the mask; a beast is its own name
   const publicNameOf = typeof api.publicNameOf === 'function' ? api.publicNameOf : nameOf;
   // A GM observes; the powers below are for a Lead GM and above (claude-jake's review A3). Fails closed with an old gamemode.
-  const isLeadStaff = typeof api.isLeadStaff === 'function' ? api.isLeadStaff : () => false;
+  const leadStaff = typeof api.isLeadStaff === 'function' ? api.isLeadStaff : () => false;
+  // Faction managers (config factions.managerRoles, Discord role ids; Nate, 16 Oct: the Lore Master) hold every faction power
+  // a Lead GM has here: add and remove members, name leaders, edit ranks, mark halls, and see every roster in F3
+  const MANAGER_ROLES = new Set((((cfg.factions || {}).managerRoles) || []).map(String));
+  const rolesOfActor = typeof api.rolesOf === 'function' ? api.rolesOf : () => [];
+  const factionManager = (a) => { if (!MANAGER_ROLES.size) return false; try { return (rolesOfActor(a) || []).some((r) => MANAGER_ROLES.has(String(r))); } catch (e) { return false; } };
+  const isLeadStaff = (a) => leadStaff(a) || factionManager(a);
 
   const WIDGET_ID = 37;
   const INVITE_MS = 2 * 60000;

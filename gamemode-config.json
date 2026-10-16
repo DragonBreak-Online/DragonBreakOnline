@@ -1283,6 +1283,8 @@
   "goldMax": 12
  },
  "factions": {
+  "managerRoles": ["1560117570990907503"],
+  "_managerRoles": "Discord roles that manage every faction like a Lead GM (Nate, 16 Oct: the Lore Master): add and remove members, name leaders, edit ranks, mark halls, see every roster in F3.",
    "raceRules": {
     "_comment": "Who a faction takes by race (server\\guilds.js, Nate 11 Oct). races and leadRaces: RACE editor id prefixes (HighElfRace matches HighElfRaceVampire); notRp: creator race keys refused even on an allowed record (the Maormer, the Dominion's enemies, stand on the High Elf record until the DLE's MaormerRace resolves); leadRoles: the ranks only leadRaces may hold. The Thalmor: High Elves, Wood Elves and Khajiit (the Aldmeri Dominion's peoples), vampires of them too, and Altmer-led (First Emissary and Justiciar High Elves only). Checked at invite, accept, Add member, /faction leader and rank changes; nobody is removed, and a member from before the rule keeps their rank (/concordat races lists them). A Lead GM lifts it once with /faction override. enabled false turns it off. Hot reload.",
     "enabled": true,
