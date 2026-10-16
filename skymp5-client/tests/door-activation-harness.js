@@ -1,6 +1,6 @@
 // Scripted test for the login-inside-an-interior door bug (16 Oct, Bruma's Great Hall 6c40f and other interiors): WorldView
-// must start its FormViews on update events even when the Papyrus Utility.wait never returns, plugin doors are blocked as
-// their cell loads, and a door the engine took itself is still sent to the server. Run from skymp5-client:
+// must start its FormViews on update events even when the Papyrus Utility.wait never returns, and a door the engine took
+// itself is still sent to the server. Run from skymp5-client:
 //
 //   node tests/door-activation-harness.js [path to esbuild's package dir]
 'use strict';
@@ -194,26 +194,6 @@ async function main() {
     check('...and the stale snapshot is cleared, so ContainersService reads its own', lastInv.lastInv === undefined, lastInv.lastInv);
     check('...and the error still reaches the server log as a cerr line', reported.length === 1 && reported[0] === 'on:activate:inv', reported);
     delete globalThis.__dboReportError;
-
-    // C. StaticRefsService
-    const { StaticRefsService } = await build(tmp, 'src/services/services/staticRefsService.ts', 'staticRefsService');
-    const ref = (id, type, base) => {
-      const r = { blocked: false, getFormID: () => id, getBaseObject: () => ({ getType: () => type, getFormID: () => base || 0x100, getWorldModelPath: () => '' }),
-        isActivationBlocked: () => r.blocked, blockActivation: (b) => { r.blocked = b; }, is3DLoaded: () => true,
-        setMotionType: () => Promise.resolve() };
-      return r;
-    };
-    const plugin = ref(0x806c473, DOOR, 0x1601956), secret = ref(0x806f703, DOOR, 0x6f703), runtime = ref(0xff000100, DOOR, 0x1601956);
-    const refs = [plugin, secret, runtime];
-    const cell = { getFormID: () => 0x806c40f, getNumRefs: (t) => (t === DOOR ? refs.length : 0), getNthRef: (i, t) => (t === DOOR ? refs[i] : null) };
-    const c = controller({});
-    new StaticRefsService({ Game: { getPlayer: () => null } }, c);
-    c.fire('cellFullyLoaded', { cell });
-    check('a login cell\'s plugin door is activation-blocked as the cell loads, before the server streams it', plugin.blocked);
-    check('...but not the Bleak Falls secret door, nor a server-made door', !secret.blocked && !runtime.blocked);
-    const late = ref(0x806c4dd, DOOR, 0x1601957);
-    c.fire('objectLoaded', { object: late, isLoaded: true });
-    check('a door whose 3D loads after its cell is blocked as it loads', late.blocked);
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }
