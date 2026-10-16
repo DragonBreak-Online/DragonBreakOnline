@@ -1,5 +1,20 @@
 [
   {
+    "title": "Daedric cults and Skyrim's lands",
+    "date": "2026-10-16",
+    "version": "Hotfix",
+    "tag": "World",
+    "sections": [
+      {
+        "heading": "Changes",
+        "items": [
+          "Some of the Daedric cults now keep a hidden place of their own. Members will know where.",
+          "Skyrim's holds, towns, forts and Orc strongholds are now recorded as lands of the realm, each held by its Jarl or its clan, ready for the day wars come to Skyrim. Nothing changes in play yet."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Faction halls in Skyrim",
     "date": "2026-10-16",
     "version": "Hotfix",
