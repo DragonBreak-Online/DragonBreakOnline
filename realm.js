@@ -154,6 +154,8 @@ module.exports = (api) => {
   // image (Bruma's) and colours by the nearest marker of any worldspace, so territories elsewhere stay out of the panel
   // until a client ships their map; they are owned, taxed and fought over all the same.
   const onClientMap = (w) => !Array.isArray(C.mapWorlds) || !C.mapWorlds.length || C.mapWorlds.some((m) => sameWorld(w, m));
+  // The worldspace the client draws a place in: its mapWorlds entry (a walled city's is Tamriel's), else its own
+  const mapWorldOf = (w) => (Array.isArray(C.mapWorlds) && C.mapWorlds.find((m) => sameWorld(w, m))) || w;
   // The territory a point belongs to: the nearest land marker in that worldspace
   const territoryAt = (world, pos) => {
     if (!Array.isArray(pos)) return null;
@@ -550,7 +552,7 @@ module.exports = (api) => {
       const seat = seatOf(fid);
       if (!seat) continue;
       const onMap = !seat.territory && onClientMap(seat.world) && territories().some((t) => sameWorld(seat.world, t.marker.world));
-      out.push({ faction: fid, factionName: nameOfFaction(fid), name: seat.name, territory: seat.territory || null, x: onMap ? seat.pos[0] : null, y: onMap ? seat.pos[1] : null });
+      out.push({ faction: fid, factionName: nameOfFaction(fid), name: seat.name, territory: seat.territory || null, x: onMap ? seat.pos[0] : null, y: onMap ? seat.pos[1] : null, world: onMap ? mapWorldOf(seat.world) : null });
     }
     return out;
   };
@@ -558,12 +560,12 @@ module.exports = (api) => {
     const led = factionsLedBy(a);
     return {
       territories: territories().filter((t) => onClientMap(t.marker.world)).map((t) => ({ id: t.id, name: t.name, kind: t.kind, owner: ownerOf(t.id), ownerName: nameOfFaction(ownerOf(t.id)),
-        world: t.marker.world, x: t.marker.pos[0], y: t.marker.pos[1], icon: Number.isFinite(t.icon) ? t.icon : null })),
+        world: t.marker.world, mapWorld: mapWorldOf(t.marker.world), x: t.marker.pos[0], y: t.marker.pos[1], icon: Number.isFinite(t.icon) ? t.icon : null })),
       // Every faction's capital that this viewer may know of: a territory (crowned on the map) or a chosen spot
       capitals: capitalsSeenBy(a),
       // Hidden layers: only members of a listed secret faction (and staff) are sent these
       secret: (territoryFile().secret || []).filter((t) => t && t.marker && Array.isArray(t.layer) && onClientMap(t.marker.world) && (isAdmin(a) || t.layer.some((f) => seesLayerOf(a, f))))
-        .map((t) => ({ id: t.id, name: t.name, kind: t.kind || 'secret', layer: t.layer.filter((f) => isAdmin(a) || seesLayerOf(a, f)).map(nameOfFaction), x: t.marker.pos[0], y: t.marker.pos[1] })),
+        .map((t) => ({ id: t.id, name: t.name, kind: t.kind || 'secret', layer: t.layer.filter((f) => isAdmin(a) || seesLayerOf(a, f)).map(nameOfFaction), x: t.marker.pos[0], y: t.marker.pos[1], world: mapWorldOf(t.marker.world) })),
       // Map colours by faction: staff's lore table (config war.colours); a faction not in it shows grey until one is set
       colours: Object.assign({}, C.colours || {}),
       wars: live().filter((w) => memberOf(a, w.attacker) || memberOf(a, w.defender) || isAdmin(a)).map(warView),

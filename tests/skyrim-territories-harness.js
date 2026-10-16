@@ -120,6 +120,10 @@ const ids = (v) => v.territories.map((t) => t.id).sort().join();
 ok(ids(realm.realmView(1)) === T.filter((t) => t.marker.world === CYRODIIL).map((t) => t.id).sort().join(), 'the Realm panel lists only Bruma\'s land (the map the client has)');
 realm = load({ war: { mapWorlds: [CYRODIIL, TAMRIEL] } });
 ok(realm.realmView(1).territories.length === T.length, 'with Tamriel in war.mapWorlds the panel lists Skyrim too');
+{
+  const v = realm.realmView(1).territories;
+  ok(v.every((t) => t.mapWorld === (t.world === CYRODIIL ? CYRODIIL : TAMRIEL)), 'every territory is sent with the mapWorld it is drawn on', v.filter((t) => !t.mapWorld).map((t) => t.id));
+}
 realm = load({ war: { mapWorlds: [] } });
 ok(realm.realmView(1).territories.length === T.length, 'and an empty war.mapWorlds lists every worldspace');
 process.chdir(cwd);
