@@ -533,8 +533,10 @@ module.exports = (api) => {
   // any cap, 'none' too, the arrows under it: loottiers.js aboveCap): they leave the
   // pool rather than turn into steel or iron, so a roll draws among what is left and its chance stays as it was (as
   // steel, the materials roll's Dwarven, Quicksilver, Moonstone, Malachite and Adamantium would make steel ingots a third
-  // of all Cyrodiil material finds)
-  const pool = (name, maxValue, ok) => (LOOT[name] || []).filter((it) => !ARTIFACT.test(String(it.name || '')) && !DRAGON_LOOT.test(String(it.name || '')) && !BANNED_LOOT.test(String(it.name || '')) && (!GEAR_POOLS.has(name) || TIERS.lootable(it.id)) && !TIERS.aboveCap(it.id, CAP_KIND[name]) && (!maxValue || Number(it.value) <= maxValue) && (!ok || ok(it)));
+  // of all Cyrodiil material finds). An item loot-overrides.json names as never is left out of every pool, not only the
+  // gear ones: the Sun-Hallowed and Blood-Cursed Elven Arrows (Dawnguard quest ammunition, value 0) came out of Novice
+  // chests through the arrows pool (Nate, 16 Oct)
+  const pool = (name, maxValue, ok) => (LOOT[name] || []).filter((it) => !ARTIFACT.test(String(it.name || '')) && !DRAGON_LOOT.test(String(it.name || '')) && !BANNED_LOOT.test(String(it.name || '')) && (GEAR_POOLS.has(name) ? TIERS.lootable(it.id) : TIERS.classOf(it.id).kind !== 'never') && !TIERS.aboveCap(it.id, CAP_KIND[name]) && (!maxValue || Number(it.value) <= maxValue) && (!ok || ok(it)));
   // Vanilla names potions by numeric strength, not by word: RestoreHealth01 is Minor, 03 Plentiful, 05
   // Extreme, 06 Ultimate; Resist* uses 25/50/75/100. The old word-matching tiers returned an empty array at
   // all four tiers against the live pool, so no potion dropped at any difficulty.

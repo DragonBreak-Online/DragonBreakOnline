@@ -684,6 +684,8 @@
     "d0db:Dawnguard.esm": "DLC1EnchDwarvenCrossbowFire03: faction gear, enchanted of Dwarven Crossbow (Dawnguard), never loot like its base (Nate, 11 Oct)",
     "d0dc:Dawnguard.esm": "DLC1EnchDwarvenCrossbowFire04: faction gear, enchanted of Dwarven Crossbow (Dawnguard), never loot like its base (Nate, 11 Oct)",
     "d0dd:Dawnguard.esm": "DLC1EnchDwarvenCrossbowFire05: faction gear, enchanted of Dwarven Crossbow (Dawnguard), never loot like its base (Nate, 11 Oct)",
-    "d3837:BSHeartland.esm": "CYRFortPalePassPreciliusVaroSword: faction gear, enchanted of Imperial Sword (Imperial Legion), never loot like its base (Nate, 11 Oct)"
+    "d3837:BSHeartland.esm": "CYRFortPalePassPreciliusVaroSword: faction gear, enchanted of Imperial Sword (Imperial Legion), never loot like its base (Nate, 11 Oct)",
+    "98a1:Dawnguard.esm": "DLC1ElvenArrowBlessed (Sun-Hallowed Elven Arrow): Dawnguard quest ammunition, came out of Novice chests through the arrows pool at value 0; never loot (Nate, 16 Oct)",
+    "98a0:Dawnguard.esm": "DLC1ElvenArrowBlood (Blood-Cursed Elven Arrow): Dawnguard quest ammunition, came out of Novice chests through the arrows pool at value 0; never loot (Nate, 16 Oct)"
   }
 }
