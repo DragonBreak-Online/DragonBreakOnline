@@ -72,6 +72,7 @@ import {
 } from '../../view/worldViewMisc';
 import { TimeService } from './timeService';
 import { logTrace, logError } from '../../logging';
+import { trace, hex } from '../../lib/clientDiag';
 
 import { sayShout } from "../../sync/shoutVoice";
 import { isReanimateSpell } from "../../sync/reanimateSpells";
@@ -337,6 +338,7 @@ export class RemoteServer extends ClientListener {
 
       const baseObject = refr.getBaseObject();
       const baseType = baseObject?.getType();
+      const baseId = baseObject ? baseObject.getFormID() : 0;
 
       // The server has put the produce in the pack and marks the plant harvested; a local activation would add it again
       if (isServerHarvested(baseType)) {
@@ -391,6 +393,7 @@ export class RemoteServer extends ClientListener {
         }
         if (!functionChecker()) {
           logTrace(this, "onOpenContainerMesage - sit never seen, releasing", remoteId.toString(16));
+          trace(`wb nosit ${hex(remoteId)} base=${hex(baseId)}`);
         }
 
         logTrace(this, "onOpenContainerMesage - waiting for", factName, "to be false");
