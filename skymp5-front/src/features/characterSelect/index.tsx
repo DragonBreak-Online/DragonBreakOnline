@@ -14,6 +14,7 @@ import { startInputDiag, stopInputDiag } from '../../utils/InputDiag';
 //   characterSelect:delete <slot>        ask to delete
 //   characterSelect:confirmDelete <slot> / characterSelect:cancelDelete <slot>
 //   characterSelect:quit                 leave the game
+//   characterSelect:shown <gate>         this login's screen is drawn, so the client may hold Play until it is ready
 export interface CharacterSlotData {
   name?: string;
   // One line under the name, e.g. "Nord . 6d 19h played"
@@ -31,6 +32,14 @@ export interface LockedCharacterData extends CharacterSlotData {
   reason?: string;
 }
 
+// The client's wait before Play may start a load (clientReadiness.ts); an older client sends none and never waits
+export interface ReadinessData {
+  gate: number;
+  ready: boolean;
+  done: number;
+  total: number;
+}
+
 export interface CharacterSelectData {
   id: number;
   characters: (CharacterSlotData | null)[];
@@ -38,6 +47,7 @@ export interface CharacterSelectData {
   lockedCharacters?: LockedCharacterData[];
   selectedSlot: number | null;
   confirmDeleteSlot: number | null;
+  readiness?: ReadinessData;
   strings: Record<string, string>;
   // Event keys, passed through from the client so both sides stay in step
   events: Record<string, string>;
@@ -69,6 +79,9 @@ const CharacterSelect = ({ data }: { data: CharacterSelectData }) => {
   const s = data.strings || {};
   const ev = data.events || {};
   const [shown, setShown] = useState(false);
+  const r = data.readiness;
+  const waiting = !!r && r.ready === false;
+  const gate = (r && r.gate) || 0;
 
   // Fade the screen in once, so it does not pop over the loading screen.
   useEffect(() => {
@@ -83,10 +96,23 @@ const CharacterSelect = ({ data }: { data: CharacterSelectData }) => {
     return () => stopInputDiag();
   }, []);
 
+  // Answers once this login's screen is drawn (fonts in, a frame painted); the timer answers if a frame never comes
+  useEffect(() => {
+    if (!gate || !ev.shown) return undefined;
+    let live = true;
+    const answer = () => { if (live) { live = false; send(ev.shown, gate); } };
+    const t = window.setTimeout(answer, 1500);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const fonts = (document as any).fonts;
+    Promise.resolve(fonts && fonts.ready).then(() => window.requestAnimationFrame(() => window.requestAnimationFrame(answer)));
+    return () => { live = false; window.clearTimeout(t); };
+  }, [gate, ev.shown]);
+
   const selected = data.selectedSlot;
   const confirming = data.confirmDeleteSlot;
   const selectedChar = selected !== null && selected !== undefined ? characters[selected] : null;
-  const canPlay = selected !== null && selected !== undefined && !(selectedChar && selectedChar.dead);
+  const canPlay = !waiting && selected !== null && selected !== undefined && !(selectedChar && selectedChar.dead);
+  const progress = r && r.total > 0 ? Math.round((100 * r.done) / r.total) : 0;
   const playLabel = selectedChar ? (s.play || 'Play') : (s.create || 'Create');
 
   return (
@@ -187,12 +213,23 @@ const CharacterSelect = ({ data }: { data: CharacterSelectData }) => {
             {s.quit || 'Quit'}
           </button>
           <button
-            className="dboSelect__play"
+            className={'dboSelect__play' + (waiting ? ' dboSelect__play--waiting' : '')}
             disabled={!canPlay}
+            aria-busy={waiting}
             onClick={() => { if (canPlay) send(ev.play || 'characterSelect:play'); }}
           >
-            <span className="dboSelect__playLabel">{playLabel}</span>
-            <span className="dboSelect__playName">{selectedChar ? (selectedChar.name || '') : (s.newCharacter || 'A new life')}</span>
+            {waiting && r ? (
+              <>
+                <span className="dboSelect__playLabel">{s.wait || 'Please wait'}</span>
+                <span className="dboSelect__playName">{`${s.loadingWorld || 'Loading the world...'} ${r.done} ${s.of || 'of'} ${r.total}`}</span>
+                <span className="dboSelect__playBar" style={{ width: `${progress}%` }} />
+              </>
+            ) : (
+              <>
+                <span className="dboSelect__playLabel">{playLabel}</span>
+                <span className="dboSelect__playName">{selectedChar ? (selectedChar.name || '') : (s.newCharacter || 'A new life')}</span>
+              </>
+            )}
           </button>
         </div>
       </div>

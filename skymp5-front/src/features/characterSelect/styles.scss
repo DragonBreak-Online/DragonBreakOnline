@@ -313,6 +313,8 @@
 
   // The one big commitment on the screen.
   &__play {
+    position: relative;
+    overflow: hidden;
     flex: 1;
     display: flex;
     flex-direction: column;
@@ -335,6 +337,24 @@
       opacity: 0.4;
       cursor: default;
     }
+
+    // Held while the client gets ready: readable, with a progress bar along the bottom
+    &--waiting:disabled {
+      opacity: 0.85;
+      cursor: progress;
+
+      .dboSelect__playName { animation: dboSelectWait 1.6s ease-in-out infinite; }
+    }
+  }
+
+  &__playBar {
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    height: 3px;
+    background: $dbo-aqua;
+    box-shadow: 0 0 8px dbo-accent(0.6);
+    transition: width 300ms ease;
   }
 
   &__playLabel {
@@ -349,4 +369,9 @@
     letter-spacing: 0.2em;
     text-transform: uppercase;
   }
+}
+
+@keyframes dboSelectWait {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
 }
