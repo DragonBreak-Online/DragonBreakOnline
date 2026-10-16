@@ -32,6 +32,7 @@
 // State in citizenship.json (runtime, gitignored):
 //   { chars: { <actor hex>: { pid, name, holds: [{ zone, since, how }], cooldownUntil, renounced: [{ zone, at }] } },
 //     requests: [{ zone, actor, pid, name, at }], policies: { zone: { policy, fee, by, at } },
+//     staffApplied: [{ id, pid, by, why, at, removed: [{ actor, name, zone, since, how }], requests: [...], kept: [...] }],
 //     elections: { zone: { phase, round, startedAt, phaseStartedAt, phaseEndsAt, courts: [court], ballot: [id], votes: { pid: id },
 //                          result?: { winner, counts, at }, held?, notice?: { key, kind, text, at, until }, noticed?: { <actor hex>: key } } } }
 //   court: { id, at, members: { jarl|steward|commander|housecarl: { actor, pid, name, accepted } | null }, struck? }
@@ -45,6 +46,8 @@
 // actions: join, renounce <zone>, primary <zone>, policy <policy> <fee>, grant <actorHex>, decline <actorHex>,
 //   register <steward> <commander> <housecarl>, replace <seat> <name>, withdraw, accept <courtId>, refuse <courtId>,
 //   vote <courtId>, staff <cancel|restart|resume>, revoke <actorHex>
+// Staff releases (Jake, 16 Oct): config staffReleases, a staff revoke written in config and applied once at load; see the
+// section after revoke().
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -88,6 +91,7 @@ module.exports = (api) => {
   const fill = (d) => {
     for (const k of ['chars', 'policies', 'elections', 'voterHold']) if (!d[k] || typeof d[k] !== 'object' || Array.isArray(d[k])) d[k] = {};
     if (!Array.isArray(d.requests)) d.requests = [];
+    if (!Array.isArray(d.staffApplied)) d.staffApplied = [];
     return d;
   };
   const data = () => {
@@ -263,6 +267,122 @@ module.exports = (api) => {
     audit(`CITIZEN STAFF ${who(by)} revoked the citizenship of ${z.name} from ${e.name} (character ${hex(actor)})`);
     tell(actor, `Your citizenship of ${ofPlace(z.name)} was revoked by the staff.`);
     return { text: `${e.name} is no longer a citizen of ${ofPlace(z.name)}.` };
+  };
+  // ---- staff releases (Jake, 16 Oct 2026): a staff revoke written in config, for when no Lead GM is in game ----------------
+  // citizenship.staffReleases = [{ id, pid, actors?: [hex], zones?: [zone], by, why }]. At load, and so at every hot reload
+  // of the config, each entry whose id is not yet in data().staffApplied takes from every character of profile pid (or only
+  // the listed ones) every citizenship it holds on the rolls (or only those of the listed holds), as revoke() does: no
+  // cooldown is started or changed. The profile's pending requests (to those holds) are withdrawn. One audit line per
+  // removal, and the character is told if online. The id is then kept with what was removed, so the entry never applies
+  // again: another load, a hot reload, or the player joining again later changes nothing (a new release needs a new id), and
+  // a removed hold can be put back by hand from that record. A citizenship through a faction or court based in the hold
+  // (auto) is no entry on the rolls and lasts while the membership does: the audit names it, nothing removes it. A bad entry
+  // (no id, no pid, an unknown hold, a character not of that profile) is skipped with a log line and stays unapplied.
+  // Audit lines carry character names, hexes and the entry's by/why with any Discord mention or id taken out.
+  const clean = (s, n) => String(s == null ? '' : s).replace(/<[@#][!&]?\d+>/g, '').replace(/\d{15,22}/g, '').replace(/\s+/g, ' ').trim().slice(0, n || 80);
+  const andList = (xs) => (xs.length > 1 ? `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}` : xs[0] || '');
+  const holdName = (zid) => { const z = holdOf(zid) || zoneById(zid); return z ? ofPlace(z.name) : String(zid); };
+  // The characters of a profile: those on the rolls under it, and those the server knows for it
+  const charsOfProfile = (pid) => {
+    const out = new Set();
+    for (const [k, e] of Object.entries(data().chars)) if (e && Number(e.pid) === pid) out.add(k);
+    try { for (const a of (typeof accountActors === 'function' ? accountActors(pid) : null) || []) out.add(hex(a)); } catch (e) { /* the rolls alone */ }
+    return out;
+  };
+  const RELEASE_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$/;
+  const releaseCheck = (x) => {
+    if (!x || typeof x !== 'object' || Array.isArray(x)) return { error: 'not an object' };
+    const id = typeof x.id === 'string' ? x.id.trim() : '';
+    if (!RELEASE_ID.test(id)) return { error: id ? 'a bad id (letters, digits and . _ : - only, at most 64)' : 'no id' };
+    const pid = typeof x.pid === 'number' || (typeof x.pid === 'string' && /^\d+$/.test(x.pid)) ? Number(x.pid) : NaN;
+    if (!Number.isInteger(pid) || pid < 0) return { id, error: 'no profile id (pid)' };
+    let zones = null;
+    if (x.zones !== undefined) {
+      if (!Array.isArray(x.zones) || !x.zones.length) return { id, error: 'zones is given but is no list of holds' };
+      zones = new Set();
+      for (const z of x.zones) { if (!holdOf(z)) return { id, error: `unknown hold ${clean(z, 32) || '(empty)'}: not a land that grants citizenship` }; zones.add(String(z)); }
+    }
+    let actors = null;
+    if (x.actors !== undefined) {
+      if (!Array.isArray(x.actors) || !x.actors.length) return { id, error: 'actors is given but is no list of characters' };
+      const mine = charsOfProfile(pid);
+      actors = new Set();
+      for (const s of x.actors) {
+        const t = String(s == null ? '' : s).trim().toLowerCase().replace(/^0x/, '');
+        if (!/^[0-9a-f]{1,8}$/.test(t)) return { id, error: `a bad character ${clean(s, 16) || '(empty)'}: a form id in hex` };
+        const k = hex(unhex(t));
+        if (!mine.has(k)) return { id, error: `character ${k} is not one of profile ${pid}'s` };
+        actors.add(k);
+      }
+    }
+    return { id, pid, zones, actors, by: clean(x.by, 80) || 'staff', why: clean(x.why, 120) };
+  };
+  // Changes the rolls for one checked entry and returns its record; the audit and the players are told after. Everything is
+  // worked out first and the rolls change only at the end, so a failure part way leaves them as they were
+  const releaseApply = (r) => {
+    const d = data();
+    const inZone = (zid) => !r.zones || r.zones.has(zid);
+    const targets = [...(r.actors || charsOfProfile(r.pid))].sort();
+    const removed = [], kept = [], requests = [], cut = [];
+    for (const k of targets) {
+      const a = unhex(k); const e = d.chars[k];
+      const take = e && Array.isArray(e.holds) ? explicit(a).filter((h) => inZone(h.zone)) : [];
+      if (take.length) cut.push([e, new Set(take.map((h) => h.zone))]);
+      for (const h of take) removed.push({ actor: k, name: clean(e.name, 64), zone: h.zone, since: Number(h.since) || 0, how: String(h.how || '') });
+      let auto = []; try { auto = autoHolds(a).filter(inZone); } catch (err) { auto = []; }
+      for (const zid of auto) kept.push({ actor: k, name: clean(e ? e.name : nameNow(a, ''), 64), zone: zid });
+    }
+    const keys = new Set(targets);
+    const hit = (q) => !!q && inZone(q.zone) && (keys.has(hex(q.actor)) || (!r.actors && Number(q.pid) === r.pid));
+    for (const q of d.requests) if (hit(q)) requests.push({ actor: hex(q.actor), name: clean(q.name, 64), zone: q.zone, at: Number(q.at) || 0 });
+    const rec = { id: r.id, pid: r.pid, by: r.by, why: r.why, at: Date.now(), removed, requests, kept };
+    for (const [e, zs] of cut) e.holds = e.holds.filter((h) => !zs.has(h.zone));
+    d.requests = d.requests.filter((q) => !hit(q));
+    d.staffApplied.push(rec);
+    return rec;
+  };
+  const releaseTell = (rec) => {
+    const tag = `staff release ${rec.id}${rec.why ? `: ${rec.why}` : ''}`;
+    const say = (t) => { try { audit(t); } catch (e) { log('citizenship: audit failed', e.message); } };
+    for (const x of rec.removed) say(`CITIZEN STAFF ${rec.by} released ${x.name || 'a character'} from the citizenship of ${holdName(x.zone)} (character ${x.actor}; ${tag})`);
+    for (const x of rec.requests) say(`CITIZEN STAFF ${rec.by} withdrew ${x.name || 'a character'}'s request for the citizenship of ${holdName(x.zone)} (character ${x.actor}; ${tag})`);
+    for (const x of rec.kept) say(`CITIZEN STAFF ${rec.by} could not release ${x.name || 'a character'} from the citizenship of ${holdName(x.zone)} (character ${x.actor}): it comes from a faction or court based there and lasts while that membership does (${tag})`);
+    if (!rec.removed.length && !rec.requests.length && !rec.kept.length) say(`CITIZEN STAFF ${rec.by}: ${tag} found no citizenship of profile ${rec.pid} to release`);
+    const told = new Map();
+    const slot = (k) => told.get(k) || told.set(k, { gone: [], asked: [], kept: [] }).get(k);
+    for (const x of rec.removed) slot(x.actor).gone.push(holdName(x.zone));
+    for (const x of rec.requests) slot(x.actor).asked.push(holdName(x.zone));
+    for (const x of rec.kept) if (told.has(x.actor)) slot(x.actor).kept.push(holdName(x.zone));
+    for (const [k, t] of told) {
+      const text = [t.gone.length ? `The staff have released you from the citizenship of ${andList(t.gone)}.` : '',
+        t.asked.length ? `Your request for the citizenship of ${andList(t.asked)} was withdrawn by the staff.` : '',
+        t.kept.length ? `You remain a citizen of ${andList(t.kept)} through a faction or court based there.` : ''].filter(Boolean).join(' ');
+      try { tell(unhex(k), text); } catch (e) { log('citizenship: telling a released character failed', e.message); }
+    }
+  };
+  // Applies every new entry of the config, saves once. Never throws: a load must not fail over a staff entry
+  const staffReleases = () => {
+    const out = { applied: [], before: 0, skipped: [] };
+    const list = C.staffReleases;
+    if (list === undefined || list === null) return out;
+    if (!Array.isArray(list)) { log('citizenship: config staffReleases is not a list; nothing released'); return out; }
+    const d = data();
+    const done = new Set(d.staffApplied.map((x) => String((x && x.id) || '')));
+    list.forEach((x, i) => {
+      try {
+        const id = x && typeof x.id === 'string' ? x.id.trim() : '';
+        if (id && done.has(id)) { out.before++; return; }
+        const r = releaseCheck(x);
+        if (r.error) { out.skipped.push({ at: i, id: r.id || '', error: r.error }); log(`citizenship: staff release ${r.id ? `${r.id} ` : ''}(entry ${i + 1}) skipped: ${r.error}`); return; }
+        const rec = releaseApply(r); done.add(r.id); out.applied.push(rec);
+      } catch (e) { out.skipped.push({ at: i, id: '', error: e.message }); log(`citizenship: staff release (entry ${i + 1}) failed`, e.stack || e.message); }
+    });
+    if (out.applied.length) save();
+    for (const rec of out.applied) { try { releaseTell(rec); } catch (e) { log('citizenship: staff release notices failed', e.stack || e.message); } }
+    if (out.applied.length || out.skipped.length) {
+      log(`citizenship: staff releases: ${out.applied.length} applied now (${out.applied.map((x) => `${x.id}: ${x.removed.length} released, ${x.requests.length} request(s) withdrawn, ${x.kept.length} faction or court citizenship(s) kept`).join('; ') || 'none'}), ${out.before} applied before, ${out.skipped.length} skipped`);
+    }
+    return out;
   };
   const setPolicy = (by, zid, policy, fee) => {
     const z = holdOf(zid); if (!z) return { error: 'This land grants no citizenship.' };
@@ -830,7 +950,9 @@ module.exports = (api) => {
   globalThis.__dboCitizenManagedRoleIds = () => Object.values(roleIds());
 
   if (typeof every === 'function') every('citizenship', 60000, tick);
+  // Staff releases in config, each applied once (at this load, or the first one after it was added)
+  if (C.enabled) { try { staffReleases(); } catch (e) { log('citizenship: staff releases failed', e.stack || e.message); } }
   log(`citizenship ${C.enabled ? 'on' : 'off'}: ${holds().length} holds grant it, ${Object.keys(data().chars).length} characters on the rolls, ${Object.keys(data().elections).length} election(s)`);
-  return { join, grant, decline, renounce, makePrimary, revoke, setPolicy, register, replace, withdraw, answerInvite, vote, staffAct, tick, advance,
+  return { join, grant, decline, renounce, makePrimary, revoke, staffReleases, setPolicy, register, replace, withdraw, answerInvite, vote, staffAct, tick, advance,
     holdsOf, citizenOf, factionFree, citizenAccounts, canVote, noticeLogin, boardPayload, journalView, votingView, citizenshipView, data, PANEL_ID };
 };
