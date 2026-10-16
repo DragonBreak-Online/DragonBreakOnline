@@ -2279,10 +2279,6 @@ disable|Skyrim.esm|0FF0AF|GuardWindhelmImperialJail|DragonBreak Online Edits.esp
 disable|Skyrim.esm|0FF0B0|GuardWindhelmImperial|DragonBreak Online Edits.esp|guard: WindhelmWorld
 disable|Skyrim.esm|0FF0B1|GuardWindhelmImperial|DragonBreak Online Edits.esp|guard: WindhelmWorld
 disable|DragonBreak.esp|06AAFA|HorseForCarriageNew|DragonBreak Online Edits.esp|creature: SolitudeDocksLocation1
-disable|DragonBreak.esp|014B58|PlayerHouseMannequin|DragonBreak Online Edits.esp|other: mannequin, SolitudeDocksLocation1
-disable|DragonBreak.esp|014C6A|PlayerHouseMannequin|DragonBreak Online Edits.esp|other: mannequin, SolitudeDocksLocation1
-disable|DragonBreak.esp|013850|PlayerHouseMannequin|DragonBreak Online Edits.esp|other: mannequin, SolitudeDocksLocation1
-disable|DragonBreak.esp|013851|PlayerHouseMannequin|DragonBreak Online Edits.esp|other: mannequin, SolitudeDocksLocation1
 disable|WindhelmSSE.esp|172CB7|0WHExtGrayCommonerVoiceElf|DragonBreak Nexus Patches.esp|townsfolk: WindhelmLocation
 disable|WindhelmSSE.esp|172CA4|0WHExtGrayDepressedElf|DragonBreak Nexus Patches.esp|townsfolk: WindhelmLocation
 disable|WindhelmSSE.esp|172CA7|0WHExtGrayColdRedeemedElf|DragonBreak Nexus Patches.esp|merchant: WindhelmLocation
@@ -2360,16 +2356,6 @@ disable|SurWR.esp|14C800|0WRExtRoadhouseOwner|DragonBreak Nexus Patches.esp|merc
 disable|SurWR.esp|06CBC5|0WRTheArcher|DragonBreak Nexus Patches.esp|townsfolk: WhiterunLocation
 disable|SurWR.esp|0CD977|0WRImperialVeternan|DragonBreak Nexus Patches.esp|townsfolk: WhiterunLocation
 disable|SurWR.esp|0D2B5B|0WRHorseGirl|DragonBreak Nexus Patches.esp|townsfolk: WhiterunLocation
-disable|SurWR.esp|05D422|PlayerHouseMannequin|DragonBreak Nexus Patches.esp|other: mannequin, WhiterunLocation
-disable|SurWR.esp|05D5BE|PlayerHouseMannequin|DragonBreak Nexus Patches.esp|other: mannequin, WhiterunLocation
-disable|SurWR.esp|05D5C2|PlayerHouseMannequin|DragonBreak Nexus Patches.esp|other: mannequin, WhiterunLocation
-disable|SurWR.esp|05D5C7|PlayerHouseMannequin|DragonBreak Nexus Patches.esp|other: mannequin, WhiterunLocation
-disable|SurWR.esp|05D5CB|PlayerHouseMannequin|DragonBreak Nexus Patches.esp|other: mannequin, WhiterunLocation
-disable|SurWR.esp|05D5D0|PlayerHouseMannequin|DragonBreak Nexus Patches.esp|other: mannequin, WhiterunLocation
-disable|SurWR.esp|05D5D2|PlayerHouseMannequin|DragonBreak Nexus Patches.esp|other: mannequin, WhiterunLocation
-disable|SurWR.esp|05D5D6|PlayerHouseMannequin|DragonBreak Nexus Patches.esp|other: mannequin, WhiterunLocation
-disable|SurWR.esp|0E6F7C|PlayerHouseMannequin|DragonBreak Nexus Patches.esp|other: mannequin, WhiterunLocation
-disable|SurWR.esp|0E6F7F|PlayerHouseMannequin|DragonBreak Nexus Patches.esp|other: mannequin, WhiterunLocation
 disable|SurWR.esp|189869|0WRSewerLizard|DragonBreak Nexus Patches.esp|townsfolk
 disable|SurWR.esp|1DFD02|GuardWhiterunCityGenericWRBraindead|DragonBreak Nexus Patches.esp|guard
 disable|SurWR.esp|0390F0|0WRSurSuspiciousNeighbour|DragonBreak Nexus Patches.esp|townsfolk: WhiterunLocation
@@ -2632,7 +2618,6 @@ disable|Skyrim.esm|03DC56|dunDA14DrinkingNPC01|DragonBreak Online Edits.esp|frie
 disable|Dawnguard.esm|00E0A0|LvlHunter|DragonBreak Online Edits.esp|merchant
 disable|Dawnguard.esm|00E0A4|LvlHunter|DragonBreak Online Edits.esp|merchant
 disable|Dawnguard.esm|00E0A6|LvlHunter|DragonBreak Online Edits.esp|merchant
-disable|Dawnguard.esm|01467C|PlayerHouseMannequin|DragonBreak Online Edits.esp|other: mannequin
 disable|Dawnguard.esm|015C15|DLC1Celann|DragonBreak Online Edits.esp|guard
 disable|Dawnguard.esm|015C16|DLC1Durak|DragonBreak Online Edits.esp|guard
 disable|Dawnguard.esm|01AA7B|DLC1HireableHunterDog1|DragonBreak Online Edits.esp|townsfolk
@@ -2647,13 +2632,6 @@ disable|Dawnguard.esm|008D23|DLC1dunRedwaterDenAddictCWMaleCommander|DragonBreak
 disable|Dawnguard.esm|008E1D|DLC1dunRedwaterDenAddict3|DragonBreak Online Edits.esp|friendly: dungeons.json spot
 disable|Dawnguard.esm|00D1B7|DLC1dunHarkonFontActor|DragonBreak Online Edits.esp|creature
 disable|Dawnguard.esm|0145A8|DLC1VQ02VampLordLoadDummy|DragonBreak Online Edits.esp|creature
-disable|JK's Castle Volkihar.esp|000AAC|PlayerHouseMannequin|DragonBreak Nexus Patches.esp|other: mannequin
-disable|JK's Castle Volkihar.esp|000B8E|PlayerHouseMannequin|DragonBreak Nexus Patches.esp|other: mannequin
-disable|JK's Castle Volkihar.esp|000B91|PlayerHouseMannequin|DragonBreak Nexus Patches.esp|other: mannequin
-disable|JK's Castle Volkihar.esp|000B95|PlayerHouseMannequin|DragonBreak Nexus Patches.esp|other: mannequin
-disable|JK's Castle Volkihar.esp|000B99|PlayerHouseMannequin|DragonBreak Nexus Patches.esp|other: mannequin
-disable|JK's Castle Volkihar.esp|000B9F|PlayerHouseMannequin|DragonBreak Nexus Patches.esp|other: mannequin
-disable|JK's Castle Volkihar.esp|000BA2|PlayerHouseMannequin|DragonBreak Nexus Patches.esp|other: mannequin
 disable|Skyrim.esm|01BDE7|Arnbjorn|DragonBreak Online Edits.esp|friendly: DarkBrotherhoodSanctuaryLocation
 disable|Skyrim.esm|01BDEB|Gabriella|DragonBreak Online Edits.esp|friendly: DarkBrotherhoodSanctuaryLocation
 disable|Skyrim.esm|01C3AD|Nazir|DragonBreak Online Edits.esp|friendly: DarkBrotherhoodSanctuaryLocation
@@ -2681,7 +2659,6 @@ disable|Skyrim.esm|0877B0|Edith|DragonBreak Online Edits.esp|townsfolk: Dawnstar
 disable|Skyrim.esm|0877B3|Borgny|DragonBreak Online Edits.esp|townsfolk: DawnstarLocation
 disable|Skyrim.esm|01A6BE|Rustleif|DragonBreak Online Edits.esp|merchant: DawnstarLocation
 disable|Skyrim.esm|01A6BF|Seren|DragonBreak Online Edits.esp|merchant: DawnstarLocation
-disable|Skyrim.esm|107EDE|PlayerHouseMannequin|DragonBreak Online Edits.esp|other: mannequin, DawnstarSanctuaryLocation
 disable|Skyrim.esm|015D0B|DBTortureVictim1|DragonBreak Online Edits.esp|friendly: DawnstarSanctuaryLocation
 disable|Skyrim.esm|015D0F|DBTortureVictim2|DragonBreak Online Edits.esp|friendly: DawnstarSanctuaryLocation
 disable|Skyrim.esm|037D9B|DBTortureVictim3|DragonBreak Online Edits.esp|friendly: DawnstarSanctuaryLocation
@@ -2883,7 +2860,6 @@ disable|Skyrim.esm|0199B1|Skaggi|DragonBreak Online Edits.esp|townsfolk: Markart
 disable|Skyrim.esm|0199B2|Sosia|DragonBreak Online Edits.esp|townsfolk: MarkarthLocation
 disable|Skyrim.esm|01A6B2|VantusLoreius|DragonBreak Online Edits.esp|townsfolk
 disable|Skyrim.esm|01A6B4|Curwe|DragonBreak Online Edits.esp|townsfolk
-disable|MoreCraftableEquipment.esp|0008A7|PlayerHouseMannequin|DragonBreak Nexus Patches.esp|other: mannequin
 disable|Skyrim.esm|0198EA|Lisbet|DragonBreak Online Edits.esp|merchant: MarkarthLocation
 disable|Skyrim.esm|0198EB|Imedhnain|DragonBreak Online Edits.esp|merchant: MarkarthLocation
 disable|Skyrim.esm|0198F1|Endon|DragonBreak Online Edits.esp|merchant: MarkarthLocation
@@ -2934,7 +2910,6 @@ disable|Skyrim.esm|060ABB|MarkarthImperialThalmor|DragonBreak Online Edits.esp|t
 disable|Skyrim.esm|060ABC|MarkarthImperialThalmor|DragonBreak Online Edits.esp|townsfolk: MarkarthLocation
 disable|Skyrim.esm|0CF468|EncDog|DragonBreak Online Edits.esp|creature: MarkarthLocation
 disable|Skyrim.esm|0CF469|EncDog|DragonBreak Online Edits.esp|creature: MarkarthLocation
-disable|Skyrim.esm|102D4C|PlayerHouseMannequin|DragonBreak Online Edits.esp|other: mannequin, MarkarthLocation
 disable|Skyrim.esm|0198FA|Cosnach|DragonBreak Online Edits.esp|merchant: MarkarthLocation
 disable|Skyrim.esm|0198FB|Hathrasil|DragonBreak Online Edits.esp|townsfolk: MarkarthLocation
 disable|Skyrim.esm|0198FC|Omluag|DragonBreak Online Edits.esp|townsfolk: MarkarthLocation
@@ -3063,8 +3038,6 @@ disable|Skyrim.esm|019DE0|Niluva|DragonBreak Online Edits.esp|townsfolk: RiftenL
 disable|Skyrim.esm|04E0B3|Grelka|DragonBreak Online Edits.esp|merchant: RiftenLocation
 disable|Riften Expansion.esp|160715|Bjoruld|DragonBreak Nexus Patches.esp|merchant: RiftenLocation
 disable|Riften Expansion.esp|179C40|Sethesi|DragonBreak Nexus Patches.esp|merchant: RiftenLocation
-disable|Skyrim.esm|102BDF|PlayerHouseMannequin|DragonBreak Online Edits.esp|other: mannequin, RiftenLocation
-disable|Skyrim.esm|102BE2|PlayerHouseMannequin|DragonBreak Online Edits.esp|other: mannequin, RiftenLocation
 disable|Skyrim.esm|019DE4|Grelod|DragonBreak Online Edits.esp|townsfolk: RiftenLocation
 disable|Skyrim.esm|019DE5|ConstanceMichel|DragonBreak Online Edits.esp|townsfolk: RiftenLocation
 disable|Skyrim.esm|019DE6|Francois|DragonBreak Online Edits.esp|child: RiftenLocation
@@ -3220,8 +3193,6 @@ disable|Skyrim.esm|0198BE|Bjartur|DragonBreak Online Edits.esp|friendly: Solitud
 disable|Skyrim.esm|0198AF|Jala|DragonBreak Online Edits.esp|merchant: SolitudeLocation
 disable|Skyrim.esm|0198B0|Ahtar|DragonBreak Online Edits.esp|townsfolk: SolitudeLocation
 disable|Skyrim.esm|0198AE|Mazaka|DragonBreak Online Edits.esp|townsfolk
-disable|Skyrim.esm|102AE9|PlayerHouseMannequin|DragonBreak Online Edits.esp|other: mannequin, SolitudeLocation
-disable|Skyrim.esm|102AEC|PlayerHouseMannequin|DragonBreak Online Edits.esp|other: mannequin, SolitudeLocation
 disable|Skyrim.esm|0198AC|Taarie|DragonBreak Online Edits.esp|merchant: SolitudeLocation
 disable|Skyrim.esm|0198AD|Endarie|DragonBreak Online Edits.esp|merchant: SolitudeLocation
 disable|Skyrim.esm|0A17A4|Safia|DragonBreak Online Edits.esp|townsfolk: SolitudeLocation
@@ -3421,9 +3392,6 @@ disable|Skyrim.esm|047CB2|Luaffyn|DragonBreak Online Edits.esp|townsfolk: Windhe
 disable|Skyrim.esm|0B998C|HirelingStenvar|DragonBreak Online Edits.esp|townsfolk: WindhelmLocation
 disable|Skyrim.esm|01B13D|OrthusEndario|DragonBreak Online Edits.esp|townsfolk: WindhelmLocation
 disable|Skyrim.esm|01B11E|Helgird|DragonBreak Online Edits.esp|townsfolk: WindhelmLocation
-disable|Skyrim.esm|1028FD|PlayerHouseMannequin|DragonBreak Online Edits.esp|other: mannequin, WindhelmLocation
-disable|Skyrim.esm|102902|PlayerHouseMannequin|DragonBreak Online Edits.esp|other: mannequin, WindhelmLocation
-disable|Skyrim.esm|102906|PlayerHouseMannequin|DragonBreak Online Edits.esp|other: mannequin, WindhelmLocation
 disable|Skyrim.esm|01B12D|Grimvar|DragonBreak Online Edits.esp|child: WindhelmLocation
 disable|Skyrim.esm|01B12E|Hillevi|DragonBreak Online Edits.esp|merchant: WindhelmLocation
 disable|Skyrim.esm|01B12F|IdesaSadri|DragonBreak Online Edits.esp|merchant: WindhelmLocation
@@ -3444,7 +3412,6 @@ disable|Skyrim.esm|01B115|Nurelion|DragonBreak Online Edits.esp|merchant: Windhe
 disable|Skyrim.esm|01B116|QuintusNavale|DragonBreak Online Edits.esp|merchant: WindhelmLocation
 disable|Skyrim.esm|01C1B4|UraggroShub|DragonBreak Online Edits.esp|merchant: WinterholdLocation
 disable|Skyrim.esm|01C1B8|SavosAren|DragonBreak Online Edits.esp|townsfolk: WinterholdLocation
-disable|OCW_Obscure's_CollegeofWinterhold.esp|372631|PlayerHouseMannequin|DragonBreak Nexus Patches.esp|other: mannequin, WinterholdLocation
 disable|OCW_Obscure's_CollegeofWinterhold.esp|08E817|CWHCM_ThelsaAndalas|DragonBreak Nexus Patches.esp|merchant: WinterholdLocation
 disable|Skyrim.esm|01C1A1|Tolfdir|DragonBreak Online Edits.esp|merchant: WinterholdLocation
 disable|Skyrim.esm|01C1A2|Onmund|DragonBreak Online Edits.esp|townsfolk: WinterholdLocation
