@@ -66,7 +66,7 @@ module.exports = (api) => {
     // Iron 5 (was 3) and corundum 3 (was 2): more iron (Nate, 4 Oct). The config's labour block is merged shallowly, so a
     // config oreYieldByOre would replace this whole map: the defaults are changed here.
     // Meteoric iron 2, as orichalcum and moonstone (Nate, 4 Oct: three Bleak-Frost Mine veins; see oreByRef)
-    oreYieldByOre: { copper: 3, tin: 3, iron: 5, corundum: 3, silver: 2, quicksilver: 2, orichalcum: 2, moonstone: 2, gold: 1, ebony: 1, malachite: 1, stalhrim: 1, salt: 4, meteoriciron: 2, adamantium: 1 },
+    oreYieldByOre: { copper: 3, tin: 3, iron: 5, corundum: 3, silver: 2, quicksilver: 2, orichalcum: 2, moonstone: 2, gold: 1, ebony: 1, malachite: 1, stalhrim: 1, salt: 4, meteoriciron: 2, adamantium: 1, zinc: 2, mithril: 1, amber: 1 },
     // A placed vein that gives another ore than its base says, keyed by the reference's desc (never the base: the same
     // MineOreIron04 is placed all over Cyrodiil). No vein activator for meteoric iron exists in the load order, so three
     // iron veins of the Bleak-Frost Mine (CYRBleakFrostMine01, DLE v13), the three furthest from its door by the cell's
@@ -102,7 +102,12 @@ module.exports = (api) => {
     // Sea Salt Deposits (Saltdeposits.esp, copied into DragonBreak.esp) and the geodes of Whistling Mine: the Miner tier (0 based)
     // that opens them, the chance of a rarer salt with the salt, and the cells whose geodes give soul gems. Tin at 0 with copper,
     // for Bronze (no tin vein stands in the world yet: BSAssets' BSKMineOreTin veins are only in its test cell)
-    extraOreTier: { salt: 0, tin: 0, adamantium: 3, geode: 1, amethyst: 1, topaz: 1, ruby: 2, sapphire: 2, emerald: 3, diamond: 4 },
+    // The DLE's own Skyrim veins (16 Oct: 35 zinc, 14 mithril and 14 amber, MineOreZinc / MineOreMithril / MineOreAmber) gave
+    // "You do not know what to do with this seam": no ore item and no tier. Zinc smelts into Brass (BSAssets'
+    // BSKRecipeIngotBrass, a tier 2 metal), so it opens with silver; Mithril (DBO_RecipeIngotMithril) is a tier 4 metal
+    // beside Glass, so it opens with malachite; Amber (ccBGSSSE025_RecipeIngotAmber) is tier 5 in smithing.json, so it
+    // opens with ebony. Nate may move them.
+    extraOreTier: { salt: 0, tin: 0, adamantium: 3, geode: 1, amethyst: 1, topaz: 1, ruby: 2, sapphire: 2, emerald: 3, diamond: 4, zinc: 1, mithril: 3, amber: 4 },
     // Every other geode gives the gem it is named for (the CYR ones name it in their MineOreScript Ore property)
     gemOre: { amethyst: '63b46:Skyrim.esm', topaz: '602427:BSAssets.esm', ruby: '63b42:Skyrim.esm', sapphire: '63b44:Skyrim.esm', emerald: '63b43:Skyrim.esm', diamond: '63b47:Skyrim.esm' },
     saltBonusChance: 0.1,
@@ -141,6 +146,9 @@ module.exports = (api) => {
     copper: '601c50:BSAssets.esm',
     meteoriciron: '601c92:BSAssets.esm',   // BSKOreMeteoricIron; smelted 2:1 into BSKIngotMeteoricIron at any smelter
     tin: '601c4f:BSAssets.esm',
+    zinc: '601c88:BSAssets.esm',                      // "Zinc Ore", the Ore of the DLE's MineOreZinc veins; BSKRecipeIngotBrass smelts it
+    mithril: '1ac98b:DragonBreak Online Edits.esp',   // DBO_OreMithril, the Ore of the DLE's MineOreMithril veins
+    amber: 'bc6:ccBGSSSE025-AdvDSGS.esm',             // "Amber", the Ore of the DLE's MineOreAmber veins
     salt: '34cdf:Skyrim.esm',
     firewood: '6f993:Skyrim.esm',
     charcoal: '33760:Skyrim.esm',
