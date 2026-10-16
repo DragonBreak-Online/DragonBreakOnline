@@ -2019,7 +2019,8 @@ const diagConnectionKey = (userId) => `u${userId}`;
 // The client's appearance trace ("apr ...") and error reports ("cerr ...", client 0.3.91) each have their own allowance, so
 // they neither use up nor are starved by the shared one (most players spend all 60 on page and world lines); so does the
 // login save's "loadGame" line (client loadGameDiag.ts), written just before a BGSLoadFormBuffer crash would hit
-const DIAG_KIND_MAX = { apr: 400, cerr: 120, loadGame: 10 };
+// The emote wheel's steps too ("emote ...", emoteDiag.ts): three game launches had spent Elaava's 60 by 07:41 (16 Oct)
+const DIAG_KIND_MAX = { apr: 400, cerr: 120, loadGame: 10, emote: 200 };
 const diagKindOf = (text) => { const k = text.slice(0, text.indexOf(' ')); return Object.prototype.hasOwnProperty.call(DIAG_KIND_MAX, k) ? k : null; };
 const resetDiagForConnection = (userId) => {
   const key = diagConnectionKey(userId);
