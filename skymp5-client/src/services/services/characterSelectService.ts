@@ -66,6 +66,9 @@ const translations = {
     quit: 'Выйти',
     dead: 'Мёртв',
     slot: 'Слот',
+    locked: 'Заблокирован',
+    lockedStaff: 'Нужна роль персонала',
+    resubscribe: 'Продлите подписку',
     create: 'Создать',
     selected: 'Выбран',
     newCharacter: 'Новая жизнь',
@@ -83,6 +86,9 @@ const translations = {
     quit: 'Quit',
     dead: 'Dead',
     slot: 'Slot',
+    locked: 'Locked',
+    lockedStaff: 'Staff role needed',
+    resubscribe: 'Resubscribe to play',
     create: 'Create',
     selected: 'Selected',
     newCharacter: 'A new life',
@@ -151,7 +157,10 @@ export class CharacterSelectService extends ClientListener {
       case 'characterSelectMenu':
         characters = Array.isArray(content["characters"]) ? content["characters"] as (CharacterSlot | null)[] : [];
         maxCharacters = typeof content["maxCharacters"] === 'number' ? content["maxCharacters"] : Math.max(characters.length, 1);
-        lockedCharacters = Array.isArray(content["lockedCharacters"]) ? content["lockedCharacters"] as LockedCharacter[] : [];
+        // Object entries only, so one bad entry cannot take down the whole UI
+        lockedCharacters = Array.isArray(content["lockedCharacters"])
+          ? (content["lockedCharacters"] as unknown[]).filter((c): c is LockedCharacter => !!c && typeof c === 'object' && !Array.isArray(c))
+          : [];
         selectedSlot = null;
         confirmDeleteSlot = null;
         this.menuOpen = true;
