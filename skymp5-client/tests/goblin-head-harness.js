@@ -230,6 +230,20 @@ function run(fresh) {
   login(B, look());
   for (let i = 0; i < 4; i++) { inUpdate(() => B.applyAppearanceToPlayer(look({ skinColor: 0x100000 + i }), true, 'update')); runFor(5000); }
   check('...looked up once and kept: five DLE lookups over four looks', G.dleLookups === 5, G.dleLookups);
+  setWorld({});
+  B = fresh().APP;
+  inUpdate(() => B.applyAppearanceToPlayer(look(), false, 'load'));
+  runFor(6000);
+  check('a login looks nothing up in the DLE and paints nothing', G.dleLookups === 0 && paints().length === 0, { n: G.dleLookups, e: G.events });
+  setWorld({ dle: 'missing' });
+  B = fresh().APP;
+  login(B, look());
+  inUpdate(() => B.applyAppearanceToPlayer(look({ skinColor: PALE }), true, 'update'));
+  runFor(5000);
+  G.dle = 'new';
+  inUpdate(() => B.applyAppearanceToPlayer(look({ skinColor: 0x6b8e23 }), true, 'update'));
+  runFor(5000);
+  check('an empty lookup is not kept: the races found on a later look paint that look', paints().length === 2 && paints()[0].args[6] === 0x6b8e23, paints());
   for (const dle of ['missing', 'old', 'throws']) {
     setWorld({ dle });
     B = fresh().APP;
