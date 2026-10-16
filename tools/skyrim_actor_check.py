@@ -36,7 +36,7 @@ gate = os.path.join(here, 'alpha', 'dle_ship_gate.py')
 if os.path.exists(gate):
     r = subprocess.run([sys.executable, gate, dle], capture_output=True, text=True)
     print(r.stdout[-3000:])
-    ok(r.returncode == 0, 'the DLE ship gate (tools/alpha/dle_ship_gate.py) passes (known false positive: the border WNAM, skyrim-check-1.md)')
+    ok(r.returncode == 0, 'the DLE ship gate (tools/alpha/dle_ship_gate.py) passes (the border WNAM is read by name since 471c88bb)')
 else:
     ok(False, 'tools/alpha/dle_ship_gate.py not found')
 print('FAILED %d' % fails if fails else 'PASS'); sys.exit(1 if fails else 0)
