@@ -177,9 +177,11 @@ function runService(Service) {
   makeRef(S1, P0, R0); makeRef(M1, P0, R0);
   t.me(true);
   t.run(60000, 250);
+  const nativesBefore = t.W.natives;
   t.loaded(S1); t.loaded(M1);
   t.unloadCell(M1); t.loadCell(M1); t.run(5000, 250);
   check('no worldEdits from the server: a minute of play and cell loads change nothing (no disable, enable or move)', t.W.calls.length === 0, t.W.calls);
+  check('...and a reference loading makes no native call at all', t.W.natives === nativesBefore, t.W.natives - nativesBefore);
   check('...and the sweep looks nothing up (no getFormEx)', t.W.getFormEx === 0, t.W.getFormEx);
   t.packet([]);
   t.run(5000, 250);

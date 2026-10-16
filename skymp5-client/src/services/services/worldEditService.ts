@@ -72,7 +72,8 @@ export class WorldEditService extends ClientListener {
 
   // Natives are fine in this event; the reference is put right at once so it never shows where it should not be
   private onObjectLoaded(e: ObjectLoadedEvent): void {
-    if (!e.isLoaded || !e.object) return;
+    // With no list a reference that loads costs no native call
+    if (!e.isLoaded || !e.object || (!this.edits.size && !this.dropped.size)) return;
     const id = e.object.getFormID() >>> 0;
     if (id >= 0xff000000 || (!this.edits.has(id) && !this.dropped.has(id))) return;
     try {
