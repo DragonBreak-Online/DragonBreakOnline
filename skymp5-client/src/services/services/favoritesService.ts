@@ -1,4 +1,4 @@
-import { Actor, Form, Game, Menu, Shout, TESModPlatform, once } from "skyrimPlatform";
+import { Actor, Form, Game, Menu, Shout, TESModPlatform, Utility, once } from "skyrimPlatform";
 import { ClientListener, CombinedController, Sp } from "./clientListener";
 import { sendCustomPacket, parseCustomPacket } from "./customPacketUtil";
 import { ConnectionMessage } from "../events/connectionMessage";
@@ -8,6 +8,7 @@ import { SPELL_ENFORCE_PASSES, loginClock } from "../../sync/loginClock";
 import { addMissingServerSpells, getServerSpells } from "../../sync/spell";
 import { getInventory } from "../../sync/inventory";
 import { logError, logTrace } from "../../logging";
+import { trace } from "../../lib/clientDiag";
 
 interface FavoriteEntry { id: number; hotkey: number }
 interface FavoritesSnapshot { items: FavoriteEntry[]; spells: FavoriteEntry[] }
@@ -27,6 +28,8 @@ const NO_PACKET_GRACE_S = 8;
 const SNAPSHOT_MENUS: string[] = [Menu.Favorites, Menu.Inventory, Menu.Magic];
 // How often a carried spell (below) is looked for while snapshots run
 const CARRY_CHECK_MS = 2000;
+// Diagnostic only: a Papyrus wait started beside the restore timer; the restore's trace line says if it came back
+const PAPYRUS_PROBE_S = 1;
 
 /**
  * The login rebuild removes and re-adds every item and spell, which drops favorites and hotkeys 1-8.
@@ -60,6 +63,13 @@ export class FavoritesService extends ClientListener {
     this.carry = [];
     // Same clock and start point as the login spell passes, so this always runs after the last one
     once("update", () => {
+      this.probeBack = false;
+      this.probeStartedAt = Date.now();
+      try {
+        Utility.wait(PAPYRUS_PROBE_S).then(() => { if (gen === this.loginGen) this.probeBack = true; });
+      } catch (err) {
+        // diagnostics only
+      }
       loginClock.after(RESTORE_AFTER_LOGIN_S, () => {
         if (gen !== this.loginGen) return;
         this.restoreReady = true;
@@ -149,6 +159,9 @@ export class FavoritesService extends ClientListener {
         customPacketType: "dbo", event: "favoritesRestored",
         args: [{ wanted, confirmed, missing: missingIds.size, missingIds: Array.from(missingIds).slice(0, 10), spellsAdded, carried: this.carry.length }],
       });
+      // A dboDiag line in the server log; in= is wall seconds since the login's first update
+      const since = this.probeStartedAt ? Math.round((Date.now() - this.probeStartedAt) / 1000) : -1;
+      trace(`favorites restore wanted=${wanted} ok=${confirmed} missing=${missingIds.size} added=${spellsAdded} carried=${this.carry.length} wait=${this.probeBack ? "back" : "lost"} in=${since}s`);
     } catch (err) {
       logError(this, "restore report failed", String(err));
     }
@@ -285,4 +298,7 @@ export class FavoritesService extends ClientListener {
   // Saved spell favourites the server's list holds and the game does not have yet
   private carry: FavoriteEntry[] = [];
   private carryCheckAt = 0;
+  // The diagnostic Papyrus wait (PAPYRUS_PROBE_S) of the current login
+  private probeBack = false;
+  private probeStartedAt = 0;
 }

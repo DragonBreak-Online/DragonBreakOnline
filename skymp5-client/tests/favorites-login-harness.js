@@ -40,7 +40,7 @@ function makeWorld() {
   const w = {
     now: 1000000, waitMode: 'resolve', waits: [], gameMs: 0,
     forms: new Map(), known: new Set(), inv: new Map(), fav: new Map(), hotkeys: new Array(8).fill(0),
-    addSpellOk: true, spHandlers: {}, ctlHandlers: {}, emitHandlers: {}, sent: [], logs: [],
+    addSpellOk: true, spHandlers: {}, ctlHandlers: {}, emitHandlers: {}, sent: [], logs: [], traces: [],
   };
   w.form = (id) => {
     id = id >>> 0;
@@ -113,6 +113,8 @@ const flush = async () => { for (let i = 0; i < 5; i++) await Promise.resolve();
 let BUNDLE = '';
 function load(w) {
   globalThis.__fakeWorld = w;
+  // lib/clientDiag's trace() hands its lines to the client diag service through this hook
+  globalThis.__dboTrace = (text) => w.traces.push(String(text));
   Date.now = () => w.now;
   delete require.cache[BUNDLE];
   const m = require(BUNDLE);
@@ -186,6 +188,7 @@ async function main() {
       const r = t.sent('favoritesRestored');
       check('control: the restore is reported, 4 of 4', r.length === 1 && r[0].wanted === 4 && r[0].confirmed === 4, r);
       check('control: an unchanged list is not sent back', t.sent('favorites').length === 0, t.sent('favorites'));
+      check('control: the trace line says the diagnostic Papyrus wait came back', w.traces.some((x) => /^favorites restore wanted=4 ok=4 missing=0 added=0 carried=0 wait=back in=\d+s$/.test(x)), w.traces);
     }
 
     // 2. The login whose Papyrus waits never come back (the save load took them)
@@ -199,6 +202,7 @@ async function main() {
       check('waits dropped: the favourites and hotkeys still come back', w.fav.get(ITEM) === 0 && w.fav.get(SPELL) === 1 && w.fav.has(ITEM2) && w.fav.has(SPELL2), [...w.fav]);
       const r = t.sent('favoritesRestored');
       check('waits dropped: the restore is reported to the server', r.length === 1 && r[0].confirmed === 4, r);
+      check('waits dropped: the trace line says the diagnostic Papyrus wait was lost', w.traces.some((x) => /^favorites restore wanted=4 ok=4 .*wait=lost in=\d+s$/.test(x)), w.traces);
       TESModPlatformUnfavorite(w, ITEM2);
       await t.frames(31);
       const s = t.sent('favorites');
@@ -216,6 +220,7 @@ async function main() {
       check('missing prepared spell: favourited again with its hotkey', w.fav.get(SPELL) === 1, [...w.fav]);
       const r = t.sent('favoritesRestored');
       check('missing prepared spell: the report says 4 of 4 and one spell added', r.length === 1 && r[0].confirmed === 4 && r[0].spellsAdded === 1, r);
+      check('missing prepared spell: the trace line says one spell added', w.traces.some((x) => / added=1 carried=0 /.test(x)), w.traces);
       const s = t.sent('favorites');
       check('missing prepared spell: no snapshot drops it from the server\'s copy', s.every((x) => x.spells.some((e) => e.id === SPELL && e.hotkey === 1)), s);
     }
@@ -304,7 +309,9 @@ async function main() {
     const watch = (rs.match(/private watchArrival\([\s\S]*?\n  \}\n/) || [''])[0].replace(/\/\/.*/g, '');
     check('remoteServer: the arrival watch polls on the login clock (the server holds favourites saves until it reports)', /loginClock\.after\(ARRIVAL_POLL_SECONDS,/.test(watch) && !/Utility\.wait/.test(watch) && /i \+ 1 < ARRIVAL_POLLS/.test(watch), watch.slice(0, 300));
     const fs2 = read('services/services/favoritesService.ts');
-    check('favoritesService: no Utility.wait left', fs2.length > 0 && !/Utility\.wait/.test(fs2.replace(/\/\/.*|\/\*[\s\S]*?\*\//g, '')));
+    const fsCode = fs2.replace(/\/\/.*|\/\*[\s\S]*?\*\//g, '');
+    check('favoritesService: no login step waits on Utility.wait (only the diagnostic probe)', fs2.length > 0 && (fsCode.match(/Utility\.wait\(/g) || []).length === 1 &&
+      /Utility\.wait\(PAPYRUS_PROBE_S\)\.then\(\(\) => \{ if \(gen === this\.loginGen\) this\.probeBack = true; \}\)/.test(fsCode));
     check('favoritesService: the restore waits for the last spell pass plus 2 s, on the same clock', /RESTORE_AFTER_LOGIN_S = Math\.max\(\.\.\.SPELL_ENFORCE_PASSES\) \+ 2/.test(fs2) && /from "\.\.\/\.\.\/sync\/loginClock"/.test(fs2));
   } finally {
     Date.now = realNow;
