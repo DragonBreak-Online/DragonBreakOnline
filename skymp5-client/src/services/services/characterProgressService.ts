@@ -73,6 +73,8 @@ interface State {
   report?: string[];
   reportVisited?: string[];
   want?: boolean;
+  // Set by a hot reload over a 0.3.101 session, whose markers the old client put back entered; cleared by the next restore
+  legacy?: boolean;
 }
 
 export class CharacterProgressService extends ClientListener {
@@ -119,7 +121,10 @@ export class CharacterProgressService extends ClientListener {
       this.sp.storage[STORAGE_KEY] = s;
     }
     // A hot reload over a state kept before 0.3.102
-    if (!s.visited) s.visited = {};
+    if (!s.visited) {
+      s.visited = {};
+      s.legacy = true;
+    }
     return s;
   }
 
@@ -203,6 +208,7 @@ export class CharacterProgressService extends ClientListener {
     s.ingredients = {};
     s.queue = [];
     s.restored = false;
+    s.legacy = false;
     this.restoreArmed = false;
     s.report = [];
     s.want = true;
@@ -354,6 +360,8 @@ export class CharacterProgressService extends ClientListener {
       const desc = localId.toString(16) + ":" + plugin;
       if (s.visited[desc]) continue;
       const known = !!s.markers[desc];
+      // In a 0.3.101 session a known marker's entered look proves no visit
+      if (known && s.legacy) continue;
       let entered = false;
       try {
         const ref = this.sp.ObjectReference.from(this.formFromDesc(desc));

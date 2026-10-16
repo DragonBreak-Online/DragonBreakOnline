@@ -189,6 +189,21 @@ const same = (got, want) => JSON.stringify([...got].sort()) === JSON.stringify([
   await s4.tick(4, 11000);
   check('a hot reload over the old state shape restores and scans with no client error', H.errors.length === 0 && s4.look(A) === 'seen', [H.errors, s4.look(A)]);
 
+  // A hot reload over a 0.3.101 session: the old client put every marker back entered, so that look proves no visit
+  H.sent = [];
+  delete FILE[FILE_NAME];
+  const old2 = { characterProgressState: { key: KEY, myIdx: 0, markers: { [A]: true, [B]: true }, ingredients: {}, queue: [], restored: true, dirty: false, report: [], want: false } };
+  const s4b = session(Cls, old2);
+  s4b.set(A, 'entered');
+  s4b.set(B, 'entered');
+  s4b.set(C, 'entered');
+  await s4b.tick(4, 11000);
+  check('a hot reload over a 0.3.101 session takes none of its restored markers as visited', !field(H.sent, 'visited').includes(A) && !field(H.sent, 'visited').includes(B), H.sent);
+  check('...while a marker the engine discovered this session is reported as visited', field(H.sent, 'visited').includes(C), H.sent);
+  s4b.disconnect();
+  const f4 = readFile();
+  check('...and the file keeps the old markers but none as visited', !!f4 && same(f4.markers, [A, B, C]) && same(f4.visited || [], [C]), f4);
+
   // ---- big lists stay inside the server's packet limit (perPacket 500 over visited and markers together) ----
   const many = Array.from({ length: 900 }, (_, i) => (0xb000 + i).toString(16) + ':Skyrim.esm');
   FILE[FILE_NAME] = '//' + JSON.stringify({ version: 1, characters: { [KEY]: { name: '', updatedAt: 1, markers: many, visited: many.slice(0, 450), ingredients: {} } } });
