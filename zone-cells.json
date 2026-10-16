@@ -1,4 +1,15 @@
 {
-  "_comment": "Interior cells that belong to a zone (zones.json id), for interiors a plugin of our own adds that the plugin rule in gamemode.js (REGION_PLUGINS) cannot place. Read by gamemode.js zoneOfActor on every load. Keys are mp descs.",
-  "130040:DragonBreak Online Edits.esp": "bruma"
+  "_comment": "Interior cells that belong to a zone (zones.json id), for interiors a plugin of our own adds that the plugin rule in gamemode.js (REGION_PLUGINS) cannot place. Read by gamemode.js zoneOfActor on every load. Keys are mp descs. Every bank (TheBank, DragonBreak.esp 0x000005) has its cell pinned here, so a player at it always resolves to the bank's hold (per-hold storage, bank.js), never to wherever they last stood outside (bank audit 16 Oct, ck-mcp scan of the 140-plugin order).",
+  "130040:DragonBreak Online Edits.esp": "bruma",
+  "1a97:DragonBreak.esp": "whiterun",
+  "1fb39:DragonBreak.esp": "riften",
+  "e6114:Riften Expansion.esp": "riften",
+  "6053:DragonBreak.esp": "solitude",
+  "b93c:DragonBreak.esp": "windhelm",
+  "613a:DragonBreak.esp": "markarth",
+  "7b62:DragonBreak.esp": "falkreath",
+  "7d80:DragonBreak.esp": "morthal",
+  "1b5f3f:DragonBreak Online Edits.esp": "dawnstar",
+  "e682:DragonBreak.esp": "winterhold",
+  "26228:DragonBreak Online Edits.esp": "winterhold"
 }
