@@ -859,7 +859,7 @@ const helpLine = (n) => { const c = commands.get(n); return `/${n}${c && c.help 
 // power inside a player command. An entry shows only while its command exists; an admin-only command missing here is
 // listed under Other staff tools.
 const STAFF_HELP = [
-  { key: 'players', title: 'Players', items: ['kick', 'discipline', 'tp', 'fixloc', 'chargen', 'grantappearance', 'rename', 'sethunger', 'wipechars',
+  { key: 'players', title: 'Players', items: ['players', 'kick', 'discipline', 'tp', 'fixloc', 'chargen', 'grantappearance', 'rename', 'sethunger', 'wipechars',
     ['tokens', '<player|#TAG>: someone\'s Patreon tier and identity rerolls left'], 'stats', 'charstats', 'bugs', 'realnames'] },
   { key: 'calls', title: 'GM calls from players', items: [['gm list', '[all]: the open calls (all: and the last ten closed)'],
     ['gm take', '<n>: the call is yours; the player is told you are on the way, other staff who took it'],
@@ -960,7 +960,7 @@ registerChatCommand('adminhelp', (a, args) => staffHelp(a, String(args || '').tr
 // A beast by its own name, a mask as the mask (publicDisplay): the #TAG drawn under a mask beside the own name here took
 // the mask off for anyone who typed /players
 // A staff member with real names on (playermenu.js) reads "Aldric (masked) #TAG" behind a disguise; everyone else as before
-registerChatCommand('players', (a) => { const n = onlineActors().map((t) => (typeof globalThis.__dboRealNamesDisplay === 'function' && String(globalThis.__dboRealNamesDisplay(a, t) || '')) || publicDisplay(t)); personal(a, `${n.length} online: ${n.join(', ')}`); }, { help: 'who is online' });
+registerChatCommand('players', (a) => { const n = onlineActors().map((t) => (typeof globalThis.__dboRealNamesDisplay === 'function' && String(globalThis.__dboRealNamesDisplay(a, t) || '')) || publicDisplay(t)); personal(a, `${n.length} online: ${n.join(', ')}`); }, { admin: true, help: 'who is online (staff: players learn who is about by meeting them, Nate 16 Oct)' });
 registerChatCommand('whoami', (a) => personal(a, `${display(a)}  actor ff${a.toString(16)}  profile ${profileOf(a)}${discordOf(a) ? '  discord ' + discordOf(a) : ''}  tier ${staffTierOf(a) || 'player'}`), { help: 'your name, tag and ids' });
 registerChatCommand('ping', (a) => personal(a, 'Pong!'), { help: 'connection test' });
 registerChatCommand('kick', (a, args) => {

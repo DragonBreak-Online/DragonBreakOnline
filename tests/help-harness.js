@@ -51,7 +51,7 @@ const api = new Function(...args, section + panelSection + '\nreturn { commands,
   (a) => `P${a} #T${a}`, (a) => `T${a}`);
 const { commands, registerChatCommand, aliasChatCommand, helpGroupsFor, panelTabsFor, openPlayerMenu } = api;
 const ui = (event, a, ...rest) => (uiHandlers.get(event) || []).forEach((fn) => fn(a, rest));
-registerChatCommand('players', () => {}, { help: 'who is online' });
+registerChatCommand('players', () => {}, { admin: true, help: 'who is online' });
 registerChatCommand('status', () => {}, { help: 'your hunger, rest, and anything else weighing on your character' });
 registerChatCommand('pray', () => {}, { help: 'pray at a shrine' });
 registerChatCommand('time', () => {}, { help: 'the hour and the date' });
@@ -91,7 +91,7 @@ const staffOut = (a, args) => { said.length = 0; commands.get('help').fn(a, args
 let lines = staffOut(STAFF, 'admin');
 check('/help admin answers in the admin tab only', lines.length > 1 && lines.every((l) => l.tab === 'admin'), JSON.stringify(lines.map((l) => l.tab)));
 const text = lines.map((l) => l.text.replace(/#\{[0-9a-f]{6}\}/g, '').replace('[[A]]', ''));
-check('topics come one per line: Players with /kick and /tp', text.some((l) => l === 'Players (/help admin players): /kick  /tp'), text.find((l) => l.startsWith('Players')));
+check('topics come one per line: Players with /players (staff only since 16 Oct), /kick and /tp', text.some((l) => l === 'Players (/help admin players): /players  /kick  /tp'), text.find((l) => l.startsWith('Players')));
 check('admin powers inside player commands are listed (Factions)', text.some((l) => l.startsWith('Factions (/help admin factions): /faction leader  /faction remove  /faction hallmark  /faction list  /ledgerpoint')), text.find((l) => l.startsWith('Factions')));
 check('Beasts lists /curse', text.some((l) => l.startsWith('Beasts and the supernatural') && l.includes('/curse')));
 check('an admin command no topic lists lands under Other staff tools', text.some((l) => l.startsWith('Other staff tools') && l.includes('/newtool') && !l.includes('/adminhelp')), text.find((l) => l.startsWith('Other staff')));
@@ -112,7 +112,7 @@ check('/help staff works the same as /help admin', lines.length === 2 && lines[1
 lines = staffOut(STAFF, 'admin nonsense');
 check('an unknown staff topic lists the topics', /No staff topic "nonsense"\. Topics: players, announce, factions/.test(lines[0].text), lines[0].text);
 said.length = 0; commands.get('adminhelp').fn(STAFF, 'players');
-check('/adminhelp <topic> is the same list', said.length === 3 && said.every((l) => l.tab === 'admin'), JSON.stringify(said.map((l) => l.text)));
+check('/adminhelp <topic> is the same list', said.length === 4 && said.every((l) => l.tab === 'admin'), JSON.stringify(said.map((l) => l.text)));
 check('/adminhelp is staff-only', commands.get('adminhelp').admin === true);
 lines = staffOut(PLAYER, 'admin');
 check('a player asking /help admin gets nothing in the admin tab', lines.every((l) => l.tab !== 'admin') && /No command or topic "admin"/.test(lines[0].text), JSON.stringify(lines));
@@ -212,11 +212,11 @@ check('a button runs its command through chat, checks and all', chatted.length =
 check('...for the player who pressed it', chatted.length === 1 && chatted[0].userId === PANELIST);
 check('...and the panel closes behind it', closed.some((c) => c.a === PANELIST));
 chatted.length = 0;
-ui('menuRun', PANELIST, nonce, 'players', '');
+ui('menuRun', PANELIST, nonce, 'time', '');
 check('...so the window that just ran is spent', chatted.length === 0, JSON.stringify(chatted));
 chatted.length = 0;
-ui('menuRun', PANELIST, openFor(PANELIST).widget.nonce, 'players', '');
-check('a button with no words sends the bare command', chatted.length === 1 && chatted[0].text === '/players', JSON.stringify(chatted));
+ui('menuRun', PANELIST, openFor(PANELIST).widget.nonce, 'time', '');
+check('a button with no words sends the bare command', chatted.length === 1 && chatted[0].text === '/time', JSON.stringify(chatted));
 chatted.length = 0;
 ui('menuRun', PANELIST, 'not-the-nonce', 'players', '');
 check('a stale window is ignored', chatted.length === 0, JSON.stringify(chatted));
