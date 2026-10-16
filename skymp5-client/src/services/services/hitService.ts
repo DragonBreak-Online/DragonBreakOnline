@@ -8,7 +8,7 @@ import { Hit } from "../messages/hitMessage";
 import { ConnectionMessage } from "../events/connectionMessage";
 import { CustomPacketMessage } from "../messages/customPacketMessage";
 import { parseCustomPacket, sendCustomPacket } from "./customPacketUtil";
-import { HeldWeapon, HitFacts, readStaffDiagRequest, routeHit, StaffShotTrace, STAFF_WEAPON_TYPE } from "./staffHit";
+import { HeldWeapon, HitFacts, HitRoute, readStaffDiagRequest, routeHit, StaffShotTrace, STAFF_WEAPON_TYPE } from "./staffHit";
 
 export class HitService extends ClientListener {
     constructor(private sp: Sp, private controller: CombinedController) {
@@ -27,10 +27,10 @@ export class HitService extends ClientListener {
     private onHit(e: HitEvent) {
         // TODO: add more logging in case of 'return'
         const aggressor = e.aggressor.getFormID();
-        if (aggressor < 0xff000000 && aggressor !== 0x14) return; // all skymp npcs are FF+
+        if (aggressor < 0xff000000 && aggressor !== 0x14) return this.traceNonActorHit(e, aggressor); // all skymp npcs are FF+
 
         if (aggressor >= 0xff000000 && !isHostedByMe(aggressor)) {
-            return;
+            return this.traceNonActorHit(e, aggressor);
         }
 
         const base = e.target.getBaseObject();
@@ -75,6 +75,15 @@ export class HitService extends ClientListener {
         });
     }
 
+    // A hit blamed on a reference that is not an actor (a hazard, a trap) is never sent; the open trace still writes it
+    private traceNonActorHit(e: HitEvent, aggressor: number) {
+        const now = Date.now();
+        if (!this.staffTrace.isOpen(now) || this.sp.Actor.from(e.aggressor)) return;
+        const facts = this.readFacts(e);
+        const route: HitRoute = { kind: "drop", why: "aggressor is not an actor" };
+        this.staffTrace.record(now, aggressor, e.target.getFormID(), e.projectile ? e.projectile.getFormID() : 0, facts, route, false);
+    }
+
     // The hit's source and the aggressor's hands, as numbers. Native objects expire with the frame, so none is kept.
     private readFacts(e: HitEvent): HitFacts {
         const sp = this.sp;
@@ -93,7 +102,7 @@ export class HitService extends ClientListener {
             right: null,
             left: null,
         };
-        // The hands are read only when they can matter: a staff, an enchantment, or a source the trace looks at
+        // The hands are read only when they can matter: a staff, an enchantment, or any other source that is not a spell or scroll
         const staffLike = weapon ? weaponType === STAFF_WEAPON_TYPE : !isSpell && !isScroll;
         if (staffLike) {
             const actor = sp.Actor.from(e.aggressor);

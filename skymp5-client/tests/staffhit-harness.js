@@ -1,5 +1,6 @@
-// Scripted test for staff hits: hitService.ts reports a staff hit with source = its enchantment, and the staff trace
-// (staffHit.ts) writes one "staff shot" line per shot while the server holds a window open.
+// Scripted test for staff hits: hitService.ts reports a staff hit with source = its enchantment, the magic dedupe stays
+// per aggressor and target (a hazard's tick within 100 ms is dropped), and the trace (staffHit.ts) writes one "staff shot"
+// line per shot while the server holds a window open, spells and hits blamed on a non-actor (a hazard reference) included.
 // The real HitService is bundled with esbuild and driven by fake hit events; native objects expire with their frame,
 // as in the game, so anything kept past the event throws. Run it from skymp5-client:
 //
@@ -176,6 +177,33 @@ function run({ HitService }) {
   check('an area staff hits every target in the same frame', hits().length === 2, hits());
   reset();
 
+  // ---- the dedupe stays per aggressor and target, whatever the source: a hazard's tick, the other hand's spell -------
+  // Toxic Cloud (BSAssets 002308) and the spell of the hazard its impact leaves (005e80), at load index 07
+  const TOXIC_CLOUD = 0x7002308, TOXIC_HAZARD = 0x7005e80, FIREBOLT = 0x12fcb, ICE_SPIKE = 0x2b96c;
+  hit({ source: () => SPEL(TOXIC_CLOUD), proj: 0x7002876 });
+  later(30);
+  hit({ source: () => SPEL(TOXIC_HAZARD) });
+  check("a hazard's tick 30 ms after its spell's hit on the same target is dropped by the dedupe", hits().length === 1 && hits()[0].data.source === TOXIC_CLOUD, hits());
+  later(30);
+  hit({ source: () => SPEL(TOXIC_HAZARD) });
+  check("...and so is the hazard's own double hit", hits().length === 1, hits());
+  reset();
+  hit({ source: () => SPEL(FIREBOLT) });
+  hit({ source: () => SPEL(ICE_SPIKE) });
+  check('two hands casting different spells that land in the same frame are one hit, the first', hits().length === 1 && hits()[0].data.source === FIREBOLT, hits());
+  hit({ source: () => SPEL(FIREBOLT) });
+  check('...and a double hit of either is still dropped', hits().length === 1, hits());
+  reset();
+  hit({ source: () => SCRL(0x12fcf) });
+  hit({ source: () => SPEL(FIREBOLT) });
+  check('a scroll and a spell landing together are one hit, the first', hits().length === 1 && hits()[0].data.source === 0x12fcf, hits());
+  reset();
+  hit({ source: () => WEAP(STAFF, 8, SPARKS), hands: STAFF_R });
+  later(20);
+  hit({ source: () => ENCH(SPARKS), hands: STAFF_R });
+  check('one staff shot named once as the staff and once as its enchantment is still one hit', hits().length === 1 && hits()[0].data.source === SPARKS, hits());
+  reset();
+
   // ---- who may report --------------------------------------------------------------------------------------------
   hit({ aggr: 0xff000500, source: () => WEAP(STAFF, 8, SPARKS), hands: STAFF_R, tgt: 0x14 });
   check('an NPC this client does not host is not reported', hits().length === 0, hits());
@@ -218,7 +246,7 @@ function run({ HitService }) {
   hit({ source: () => WEAP(SWORD, 1, 0) });
   hit({ source: () => SPEL(0x12fcd), tgt: 0xff000302 });
   later(250); update();
-  check('sword and spell hits are not traced', shots().length === 0, shots());
+  check('a sword hit is not traced, a spell hit is (as SPEL, without hands)', shots().length === 1 && shots()[0].includes('aggr 14 -> tgt ff000302 | source SPEL 12fcd proj - | events 1') && !shots()[0].includes('equipped'), shots());
   reset();
   hit({ source: () => OTHER(0x123) });
   later(250); update();
@@ -258,6 +286,43 @@ function run({ HitService }) {
   hit({ source: () => WEAP(STAFF, 8, SPARKS), hands: STAFF_R });
   later(250); update();
   check('junk seconds give the 10 minute default', shots().length === 1, shots());
+
+  // ---- the trace and hazards: the hazard tick beside its spell, a hit blamed on a non-actor --------------------------
+  sent.length = 0;
+  server({ customPacketType: 'dboStaffDiag', seconds: 600 });
+  hit({ source: () => SPEL(TOXIC_CLOUD), proj: 0x7002876 });
+  later(30);
+  hit({ source: () => SPEL(TOXIC_HAZARD) });
+  later(250); update();
+  const tl = shots()[0] || '';
+  check('a spell shot is one line naming the spell and its projectile', shots().length === 1 && tl.includes('aggr 14 -> tgt ff000301 | source SPEL 7002308 proj 7002876 | events 2'), shots());
+  check('...with the hazard tick that landed in the same shot, counted as deduped, and only the spell sent', tl.includes('events 2 (1 deduped)') && tl.includes('also SPEL 7005e80') && tl.endsWith('sent spell') && hits().length === 1 && hits()[0].data.source === TOXIC_CLOUD, tl);
+  reset();
+  // The in-game timing: a hazard's first tick lands about 300 ms after the cast, past the dedupe and the 200 ms shot
+  hit({ source: () => SPEL(TOXIC_CLOUD), proj: 0x7002876 });
+  later(300);
+  hit({ source: () => SPEL(TOXIC_HAZARD) });
+  later(250); update();
+  check('a hazard tick 300 ms after its spell (the in-game timing) is sent, and traced on a line of its own', hits().length === 2 && hits()[1].data.source === TOXIC_HAZARD && shots().length === 2 && shots()[0].endsWith('| events 1 | sent spell') && shots()[1].includes('aggr 14 -> tgt ff000301 | source SPEL 7005e80 proj - | events 1 | sent spell'), [hits(), shots()]);
+  reset();
+  // A runtime hazard reference: FF id, hosted by no one, not an actor (hands null)
+  hit({ aggr: 0xff000a10, source: () => SPEL(TOXIC_HAZARD) });
+  later(250); update();
+  check('a hit blamed on a hazard reference is not sent', hits().length === 0, hits());
+  check('...but the open trace writes it as dropped, aggressor not an actor', (shots()[0] || '').includes('aggr ff000a10 -> tgt ff000301 | source SPEL 7005e80') && (shots()[0] || '').endsWith('sent dropped (aggressor is not an actor)'), shots());
+  reset();
+  hit({ aggr: 0x5caa8, source: () => SPEL(0x109ce6) });
+  later(250); update();
+  check('...and so is a plugin trap reference', hits().length === 0 && (shots()[0] || '').includes('aggr 5caa8 -> tgt ff000301 | source SPEL 109ce6'), shots());
+  reset();
+  hit({ aggr: 0xff000a11, hands: { right: null, left: null }, source: () => SPEL(TOXIC_CLOUD) });
+  later(250); update();
+  check("a remote actor's hit (the caster reports it) is neither sent nor traced", hits().length === 0 && shots().length === 0, [hits(), shots()]);
+  sent.length = 0;
+  later(700000);
+  hit({ aggr: 0xff000a10, source: () => SPEL(TOXIC_HAZARD) });
+  later(250); update();
+  check('with no window open a hazard reference hit writes nothing', hits().length === 0 && shots().length === 0, [hits(), shots()]);
   check('no native object was used after its frame (every update above ran without a throw)', true);
 
   console.log(failures ? `\n${failures} FAILED` : '\nall passed');
