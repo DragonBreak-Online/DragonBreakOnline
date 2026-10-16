@@ -232,6 +232,31 @@ citizenCfg = { staffReleases: [{ id: 'while-off', pid: 57 }] };
 load();
 ok(!threw && applied().some((x) => x.id === 'while-off') && !C(P57B, 'whiterun'), '...it applies once citizenship is on again');
 
+// ---- a pid is matched as a number only (review, 16 Oct): a roll entry or request saved with pid null (a NaN profile in JSON)
+// is no profile 0
+const NULLPID = add(0xff006000, -1, 'Null Pid');
+M.data().chars[hx(NULLPID)] = { pid: null, name: 'Null Pid', holds: [{ zone: 'whiterun', since: now, how: 'free (no ruler)' }], renounced: [] };
+M.data().requests.push({ zone: 'bruma', actor: NULLPID, pid: null, name: 'Null Pid', at: now });
+citizenCfg = { staffReleases: [{ id: 'pid-zero', pid: 0, by: 'staff' }] };
+load();
+ok(!threw && applied().some((x) => x.id === 'pid-zero') && M.data().chars[hx(NULLPID)].holds.length === 1 && M.data().requests.some((q) => (q.actor >>> 0) === NULLPID),
+  'a release of profile 0 leaves an entry and a request saved with pid null alone', [threw && threw.message, M.data().chars[hx(NULLPID)], applied().slice(-1)]);
+
+// ---- an unreadable citizenship.json (review, 16 Oct): the rolls are empty in memory, so a release waits rather than save
+// that empty roll over the file
+const FILE = path.join(dir, 'citizenship.json');
+const good = fs.readFileSync(FILE, 'utf8');
+realWrite.call(fs, FILE, good.slice(0, 40));
+const broken = fs.readFileSync(FILE, 'utf8');
+citizenCfg = { staffReleases: [{ id: 'after-corrupt', pid: 57, by: 'staff' }] };
+logs.length = 0; writes = 0;
+restart();
+ok(!threw && writes === 0 && fs.readFileSync(FILE, 'utf8') === broken && !applied().some((x) => x.id === 'after-corrupt') && logs.some((l) => /citizenship\.json could not be read; staff releases wait/.test(l)),
+  'an unreadable citizenship.json at a restart: no release, and the file is not written over', [threw && threw.message, writes, logs.filter((l) => /staff release/.test(l))]);
+realWrite.call(fs, FILE, good);
+restart();
+ok(!threw && applied().some((x) => x.id === 'after-corrupt') && applied().filter((x) => x.id === TODAY.id).length === 1, '...it applies at the next load that reads the file, and today\'s entry still only once', applied().map((x) => x.id));
+
 // ---- the staff revoke still works as before ---------------------------------------------------------------------------------
 r = M.revoke(STAFF, 'whiterun', SECOND);
 ok(!r.error && !C(SECOND, 'whiterun'), "the in-game revoke is unchanged");

@@ -282,10 +282,13 @@ module.exports = (api) => {
   const clean = (s, n) => String(s == null ? '' : s).replace(/<[@#][!&]?\d+>/g, '').replace(/\d{15,22}/g, '').replace(/\s+/g, ' ').trim().slice(0, n || 80);
   const andList = (xs) => (xs.length > 1 ? `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}` : xs[0] || '');
   const holdName = (zid) => { const z = holdOf(zid) || zoneById(zid); return z ? ofPlace(z.name) : String(zid); };
+  // A profile id as saved on the rolls or a request, matched as a number only: a pid saved while the profile was unknown
+  // (NaN, which JSON keeps as null) or an empty one is no profile 0
+  const samePid = (v, pid) => (typeof v === 'number' || (typeof v === 'string' && /^\d+$/.test(v))) && Number(v) === pid;
   // The characters of a profile: those on the rolls under it, and those the server knows for it
   const charsOfProfile = (pid) => {
     const out = new Set();
-    for (const [k, e] of Object.entries(data().chars)) if (e && Number(e.pid) === pid) out.add(k);
+    for (const [k, e] of Object.entries(data().chars)) if (e && samePid(e.pid, pid)) out.add(k);
     try { for (const a of (typeof accountActors === 'function' ? accountActors(pid) : null) || []) out.add(hex(a)); } catch (e) { /* the rolls alone */ }
     return out;
   };
@@ -333,7 +336,7 @@ module.exports = (api) => {
       for (const zid of auto) kept.push({ actor: k, name: clean(e ? e.name : nameNow(a, ''), 64), zone: zid });
     }
     const keys = new Set(targets);
-    const hit = (q) => !!q && inZone(q.zone) && (keys.has(hex(q.actor)) || (!r.actors && Number(q.pid) === r.pid));
+    const hit = (q) => !!q && inZone(q.zone) && (keys.has(hex(q.actor)) || (!r.actors && samePid(q.pid, r.pid)));
     for (const q of d.requests) if (hit(q)) requests.push({ actor: hex(q.actor), name: clean(q.name, 64), zone: q.zone, at: Number(q.at) || 0 });
     const rec = { id: r.id, pid: r.pid, by: r.by, why: r.why, at: Date.now(), removed, requests, kept };
     for (const [e, zs] of cut) e.holds = e.holds.filter((h) => !zs.has(h.zone));
@@ -366,6 +369,10 @@ module.exports = (api) => {
     const list = C.staffReleases;
     if (list === undefined || list === null) return out;
     if (!Array.isArray(list)) { log('citizenship: config staffReleases is not a list; nothing released'); return out; }
+    // An unreadable citizenship.json leaves the rolls empty in memory (data()), and the save of a release would then write
+    // that empty roll over the file at once. A release waits for a load that reads the file
+    try { if (fs.existsSync(FILE)) JSON.parse(fs.readFileSync(FILE, 'utf8')); }
+    catch (e) { log('citizenship: citizenship.json could not be read; staff releases wait for the next load'); return out; }
     const d = data();
     const done = new Set(d.staffApplied.map((x) => String((x && x.id) || '')));
     list.forEach((x, i) => {
