@@ -1,0 +1,4 @@
+{
+ "_comment": "Skyrim NPC pass 2 (16 Oct): living plugin actors in open Skyrim that stay enabled, as 'localhex:plugin' (lowercase) -> why. Only what the server relies on as a live, loaded actor, or closed land. Checked 16 Oct on the live 140 order (DLE 4bb30e63, Nexus Patches 94cd9935): no server system or gameplay data needs any of the 3,526 enabled (refs named in wildlife.json src, dungeons.json zone npcs and blackreach.json are mirrors or optional anchors, see tools/skyrim_actor_all.py NAMED_WHY; officials, guards, jailers, vendors and innkeepers are players or furniture), so the list is empty. tools/skyrim_actor_all.py leaves these out of DBO_SkyrimActorsList2.txt and skyrim_actor_check.py --pass2 requires them still enabled.",
+ "refs": {}
+}

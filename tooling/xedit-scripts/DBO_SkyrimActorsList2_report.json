@@ -1,0 +1,84 @@
+{
+ "listed": 3526,
+ "excluded": 0,
+ "byReason": {
+  "friendly": 431,
+  "creature": 912,
+  "kept-decision": 80,
+  "townsfolk": 957,
+  "guard": 822,
+  "merchant": 252,
+  "child": 39,
+  "other": 33
+ },
+ "byTarget": {
+  "DragonBreak Nexus Patches.esp": 389,
+  "DragonBreak Online Edits.esp": 3137
+ },
+ "byReasonTarget": {
+  "friendly -> Nexus Patches": 18,
+  "creature -> Nexus Patches": 108,
+  "friendly -> DLE": 413,
+  "kept-decision -> DLE": 80,
+  "creature -> DLE": 804,
+  "townsfolk -> DLE": 875,
+  "guard -> DLE": 717,
+  "merchant -> DLE": 199,
+  "guard -> Nexus Patches": 105,
+  "townsfolk -> Nexus Patches": 82,
+  "merchant -> Nexus Patches": 53,
+  "child -> DLE": 35,
+  "other -> DLE": 14,
+  "child -> Nexus Patches": 4,
+  "other -> Nexus Patches": 19
+ },
+ "copied": {
+  "DragonBreak Nexus Patches.esp": 389,
+  "DragonBreak Online Edits.esp": 3070
+ },
+ "exterior": {
+  "friendly": 153,
+  "creature": 893,
+  "kept-decision": 38,
+  "townsfolk": 514,
+  "guard": 606,
+  "merchant": 75,
+  "child": 1
+ },
+ "ownRecord": {
+  "DragonBreak Online Edits.esp": 67
+ },
+ "interior": {
+  "creature": 19,
+  "other": 33,
+  "townsfolk": 443,
+  "merchant": 177,
+  "friendly": 278,
+  "guard": 216,
+  "child": 38,
+  "kept-decision": 42
+ },
+ "excludedRefs": [],
+ "namedInServerData": {
+  "blackreach.json .chests[].guards[]": [
+   1,
+   "mapped to the guards' wild:br* zones (blackreach.js), never to the plugin actor"
+  ],
+  "blackreach.json .spots[].src": [
+   2,
+   "the plugin actor a wild:br* zone mirrors; spawned on its own anchor"
+  ],
+  "dungeons.json .dungeons[].zones[].npcs[].ref": [
+   77,
+   "a lease's enemy spot; dungeons.js anchors on it only if the server loads it, else spawns at the baked pos (a disabled ACHR is not loaded, as for the 2,342 pass 1 disabled)"
+  ],
+  "wildlife.json .placements[].src": [
+   757,
+   "the plugin creature wildlife.js mirrors; the zone spawns on its own anchor (.ref), never on src"
+  ]
+ },
+ "parentsToCopy": {
+  "DragonBreak Nexus Patches.esp": 143,
+  "DragonBreak Online Edits.esp": 520
+ }
+}

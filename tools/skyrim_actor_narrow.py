@@ -134,9 +134,12 @@ def judge(cfg, gm_path, order, closed):
                 pos = struct.unpack('<6f', sub[b'DATA'][:24]) if len(sub.get(b'DATA', b'')) >= 24 else None
                 base = nm(struct.unpack('<I', sub[b'NAME'][:4])[0]) if b'NAME' in sub else None
                 rec = {'base': base, 'pos': [round(x, 1) for x in pos[:3]] if pos else None, 'flags': fl, 'by': n,
-                       'world': nm(ctx[0]) if ctx[0] else None, 'cell': nm(ctx[1]) if ctx[1] else None, 'xesp': b'XESP' in sub}
+                       'world': nm(ctx[0]) if ctx[0] else None, 'cell': nm(ctx[1]) if ctx[1] else None, 'xesp': b'XESP' in sub,
+                       'refEdid': edid_of(sub)}
+                ovr = (achr[key].get('ovr') if key in achr else None) or []
                 if key in achr and not rec['pos']: achr[key].update(flags=fl, by=n)
                 else: achr[key] = rec
+                achr[key]['ovr'] = ovr + [n]      # every plugin with this ref, in load order (pass 2: does the target override it)
                 continue
             subs = list(esplib.subrecords(d))
             sub = {}
@@ -257,6 +260,7 @@ def judge(cfg, gm_path, order, closed):
         if CITY_WORLDS.match(wname or ''): town = wname
         else: town = town_loc(loc)
         row = {'ref': key, 'by': r['by'], 'base': r['base'], 'baseEdid': bedid, 'place': where, 'placeEdid': wname, 'interior': interior,
+               'cell': r['cell'], 'world': r['world'], 'refEdid': r.get('refEdid', ''), 'ovr': r.get('ovr', []),
                'pos': r['pos'], 'xesp': r['xesp'], 'kind': kind, 'town': town, 'near': near, 'hostile': host,
                'races': sorted({t[2] for t in traits if t[2]})}
         row['reason'] = reason_of(row)

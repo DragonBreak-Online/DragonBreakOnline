@@ -15,7 +15,14 @@
 # 3. the package with the two returned plugins (a link farm in <scratch>/pkg) judged by tools/skyrim_actor_narrow.py, then
 #    tools/skyrim_actor_check.py on the result (0 troublesome actors left, the keep baseline, wildlife, the DLE ship gate).
 # Exit 0 = PASS. Reads only; writes only under <scratch>.
-import sys, os, json, struct, subprocess, collections, zlib
+#
+# --pass2 (Skyrim NPC pass 2, 16 Oct, "server spawns only": DBO_SkyrimActors2.pas with DBO_SkyrimActorsList2.txt):
+#   python3 tools/skyrim_npc_gate.py --pass2 live <returned DLE> <returned Nexus Patches> <scratch dir>
+# 'live' = before is the LIVE pair in /opt/skyrim-data (DLE 4bb30e63, Nexus Patches 94cd9935; checked by sha256) in the live
+# 140 order (a link farm in <scratch>/live). Same record diff and parent CELL/WRLD rule; the newly disabled counts must
+# equal list 2's targets exactly; then skyrim_actor_narrow.py + skyrim_actor_check.py --pass2 (0 living plugin actors
+# left in open Skyrim except DBO_SkyrimActors2Exclusions.json, wildlife, the DLE ship gate).
+import sys, os, json, struct, subprocess, collections, zlib, hashlib
 here = os.path.dirname(os.path.abspath(__file__)); srv = os.path.dirname(here)
 sys.path.insert(0, os.path.expanduser('~nate/dragonbreak/ck-mcp'))
 import esplib
@@ -238,8 +245,23 @@ def main():
         for x in a[i + 1].split(','):
             sig, plug, loc = x.split(':'); ALLOW_MATCH.add((sig, (plug.lower(), int(loc, 16))))
         del a[i:i + 2]
+    pass2 = '--pass2' in a
+    a = [x for x in a if x != '--pass2']
     pkg, dle, nex, scratch = a[:4]
     os.makedirs(scratch, exist_ok=True)
+    if pass2 and pkg == 'live':
+        data = os.environ.get('DBO_DATA', '/opt/skyrim-data')
+        pkg = os.path.join(scratch, 'live'); os.makedirs(os.path.join(pkg, 'skyrim-data'), exist_ok=True); os.makedirs(os.path.join(pkg, 'plugins'), exist_ok=True)
+        for src, dst in ((os.path.join(data, 'loadorder.txt'), os.path.join(pkg, 'skyrim-data', 'loadorder.txt')),
+                         (os.path.join(data, 'DragonBreak Online Edits.esp'), os.path.join(pkg, 'plugins', 'DragonBreak Online Edits.esp')),
+                         (os.path.join(data, 'DragonBreak Nexus Patches.esp'), os.path.join(pkg, 'plugins', 'DragonBreak Nexus Patches.esp'))):
+            if os.path.lexists(dst): os.remove(dst)
+            os.symlink(src, dst)
+    if pass2:
+        want_sha = {'DragonBreak Online Edits.esp': os.environ.get('DBO_PASS2_DLE', '4bb30e63'), 'DragonBreak Nexus Patches.esp': os.environ.get('DBO_PASS2_NEXUS', '94cd9935')}
+        for n, pre in want_sha.items():
+            h = hashlib.sha256(open(os.path.join(pkg, 'plugins', n), 'rb').read()).hexdigest()
+            ok(h.startswith(pre), 'before %s is the build list 2 was made from: sha256 %s (want %s)' % (n, h[:8], pre))
     order = [l.strip().lstrip('*') for l in open(os.path.join(pkg, 'skyrim-data', 'loadorder.txt'), encoding='utf-8-sig') if l.strip() and not l.startswith('#')]
     ORDER[:] = order
     nd, cd, dp, dr = diff(os.path.join(pkg, 'plugins', 'DragonBreak Online Edits.esp'), dle, 'DLE')
@@ -249,11 +271,16 @@ def main():
         for what, xs in sorted(STATS.items()):
             print('      %s: %s %d%s' % (nm, what, len(xs), (': ' + '; '.join(xs)) if what == 'wrld dropped' else ''))
         ok(not bad, '%s: the %d parent CELL/WRLD overrides it added are the versions they override%s' % (nm, len(keys), (': ' + '; '.join(bad[:10])) if bad else ''))
-    lst = [l.split('|') for l in open(os.path.join(srv, 'tooling', 'xedit-scripts', 'DBO_SkyrimActorsList.txt'), encoding='utf-8').read().splitlines() if l.startswith('disable|')]
+    lst = [l.split('|') for l in open(os.path.join(srv, 'tooling', 'xedit-scripts', 'DBO_SkyrimActorsList2.txt' if pass2 else 'DBO_SkyrimActorsList.txt'), encoding='utf-8').read().splitlines() if l.startswith('disable|')]
     want = collections.Counter(x[4] for x in lst)
-    # a listed actor that the plugin already had disabled is not "newly" disabled, so the counts may sit a little under the list
-    ok(nd <= want['DragonBreak Online Edits.esp'] and nd >= want['DragonBreak Online Edits.esp'] * 0.95, 'DLE: %d newly disabled, the list targets %d' % (nd, want['DragonBreak Online Edits.esp']))
-    ok(nn <= want['DragonBreak Nexus Patches.esp'] and nn >= want['DragonBreak Nexus Patches.esp'] * 0.95, 'Nexus Patches: %d newly disabled, the list targets %d' % (nn, want['DragonBreak Nexus Patches.esp']))
+    if pass2:   # list 2 holds only actors enabled in the live pair, so every line is one newly disabled actor
+        print('      list 2 by reason: %s' % dict(collections.Counter(x[5].split(':')[0] for x in lst)))
+        ok(nd == want['DragonBreak Online Edits.esp'], 'DLE: %d newly disabled, list 2 targets %d' % (nd, want['DragonBreak Online Edits.esp']))
+        ok(nn == want['DragonBreak Nexus Patches.esp'], 'Nexus Patches: %d newly disabled, list 2 targets %d' % (nn, want['DragonBreak Nexus Patches.esp']))
+    else:
+        # a listed actor that the plugin already had disabled is not "newly" disabled, so the counts may sit a little under the list
+        ok(nd <= want['DragonBreak Online Edits.esp'] and nd >= want['DragonBreak Online Edits.esp'] * 0.95, 'DLE: %d newly disabled, the list targets %d' % (nd, want['DragonBreak Online Edits.esp']))
+        ok(nn <= want['DragonBreak Nexus Patches.esp'] and nn >= want['DragonBreak Nexus Patches.esp'] * 0.95, 'Nexus Patches: %d newly disabled, the list targets %d' % (nn, want['DragonBreak Nexus Patches.esp']))
     # the package with the two returned plugins, judged by the same rule that made the list
     farm = os.path.join(scratch, 'pkg'); pl = os.path.join(farm, 'plugins'); os.makedirs(pl, exist_ok=True)
     os.path.lexists(os.path.join(farm, 'skyrim-data')) or os.symlink(os.path.join(pkg, 'skyrim-data'), os.path.join(farm, 'skyrim-data'))
@@ -266,7 +293,7 @@ def main():
     r = subprocess.run(['nice', '-n', '19', sys.executable, os.path.join(here, 'skyrim_actor_narrow.py'), os.path.join(srv, 'gamemode-config.json'), os.path.join(srv, 'gamemode.js'), scan], env=env, capture_output=True, text=True)
     print('\n'.join('      ' + l for l in r.stdout.splitlines()))
     ok(r.returncode == 0, 'skyrim_actor_narrow.py judged the returned plugins')
-    r = subprocess.run([sys.executable, os.path.join(here, 'skyrim_actor_check.py'), scan, dle], capture_output=True, text=True)
+    r = subprocess.run([sys.executable, os.path.join(here, 'skyrim_actor_check.py')] + (['--pass2'] if pass2 else []) + [scan, dle], capture_output=True, text=True)
     print('\n'.join('      ' + l for l in r.stdout.splitlines()[-30:]))
     ok(r.returncode == 0, 'skyrim_actor_check.py PASS')
     print('FAILED %d' % fails if fails else 'PASS'); sys.exit(1 if fails else 0)
