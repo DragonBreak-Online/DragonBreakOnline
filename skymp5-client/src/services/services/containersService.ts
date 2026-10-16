@@ -9,6 +9,7 @@ import { PutItemMessage } from "../messages/putItemMessage";
 import { TakeItemMessage } from "../messages/takeItemMessage";
 import { SweetTaffySweetCantDropService } from "./sweetTaffySweetCantDropService";
 import { localIdToRemoteId } from "../../view/worldViewMisc";
+import { containerMenuWatch } from "../../sync/containerMenuWatch";
 
 export class ContainersService extends ClientListener {
     constructor(private sp: Sp, private controller: CombinedController) {
@@ -76,10 +77,13 @@ export class ContainersService extends ClientListener {
                             return msg;
                         });
 
-                    msgs.forEach((msg) => this.controller.emitter.emit("sendMessage", {
-                        message: msg,
-                        reliability: "reliable"
-                    }));
+                    msgs.forEach((msg) => {
+                        containerMenuWatch.moveSent(Date.now(), msg.baseId, msg.t === MsgType.PutItem ? "put" : "take");
+                        this.controller.emitter.emit("sendMessage", {
+                            message: msg,
+                            reliability: "reliable"
+                        });
+                    });
 
                     // Turn 1,2,3,4,5 changes into 1,1,1,1,1 when moving items one by one
                     diff.entries.forEach((entry) => {
