@@ -145,6 +145,16 @@
       }
     }
 
+    // A character past the player's current slots: greyed, inert, waiting for the slots to return
+    &--locked {
+      cursor: default;
+      opacity: 0.5;
+      filter: grayscale(0.85);
+      border-style: dashed;
+
+      &:hover { transform: none; border-color: $dbo-border; background: $dbo-panel-soft; }
+    }
+
     &--dead {
       cursor: default;
       opacity: 0.55;
@@ -228,6 +238,23 @@
     text-transform: uppercase;
     border: 1px solid dbo-accent(0.45);
     background: dbo-accent(0.1);
+  }
+
+  &__lock {
+    width: 22px;
+    height: 22px;
+    fill: none;
+    stroke: $dbo-silver;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+  }
+
+  &__lockNote {
+    color: $dbo-text-dim;
+    font-size: 11px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    white-space: nowrap;
   }
 
   &__warn {

@@ -24,10 +24,18 @@ export interface CharacterSlotData {
   dead?: boolean;
 }
 
+// A character past the slots the player has now; shown greyed and never playable from here
+export interface LockedCharacterData extends CharacterSlotData {
+  slot?: number | null;
+  // "slots" for a lapsed tier, "staff" for a lost staff role
+  reason?: string;
+}
+
 export interface CharacterSelectData {
   id: number;
   characters: (CharacterSlotData | null)[];
   maxCharacters: number;
+  lockedCharacters?: LockedCharacterData[];
   selectedSlot: number | null;
   confirmDeleteSlot: number | null;
   strings: Record<string, string>;
@@ -45,11 +53,19 @@ const send = (key: string, ...args: unknown[]): void => {
   }
 };
 
+const LockIcon = () => (
+  <svg className="dboSelect__lock" viewBox="0 0 24 24" aria-hidden="true">
+    <rect x="5" y="10.5" width="14" height="10" rx="1.5" />
+    <path d="M8 10.5V7.5a4 4 0 0 1 8 0v3" />
+  </svg>
+);
+
 const initial = (name: string): string => (name || '?').trim().charAt(0).toUpperCase() || '?';
 
 const CharacterSelect = ({ data }: { data: CharacterSelectData }) => {
   const max = Math.max(1, Number(data.maxCharacters) || 1);
   const characters = data.characters || [];
+  const locked = Array.isArray(data.lockedCharacters) ? data.lockedCharacters : [];
   const s = data.strings || {};
   const ev = data.events || {};
   const [shown, setShown] = useState(false);
@@ -147,6 +163,23 @@ const CharacterSelect = ({ data }: { data: CharacterSelectData }) => {
               </div>
             );
           })}
+          {locked.map((c, i) => (
+            <div key={`locked-${i}`} className="dboSelect__slot dboSelect__slot--locked">
+              <div className="dboSelect__sigil"><LockIcon /></div>
+              <div className="dboSelect__who">
+                <div className="dboSelect__slotLabel">
+                  {typeof c.slot === 'number' ? `${s.slot || 'Slot'} ${c.slot + 1}` : (s.locked || 'Locked')}
+                </div>
+                <div className="dboSelect__name">{c.name || 'Character'}</div>
+                <div className="dboSelect__meta">{c.race || c.info || ''}</div>
+              </div>
+              <div className="dboSelect__slotActions">
+                <span className="dboSelect__lockNote">
+                  {c.reason === 'staff' ? (s.lockedStaff || 'Staff role needed') : (s.resubscribe || 'Resubscribe to play')}
+                </span>
+              </div>
+            </div>
+          ))}
         </div>
 
         <div className="dboSelect__actions">
