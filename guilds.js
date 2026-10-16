@@ -576,6 +576,11 @@ module.exports = (api) => {
   const readMarks = () => { const m = readJson(MARKS_PATH, {}); return m && typeof m === 'object' && !Array.isArray(m) ? m : {}; };
   const HALL_DOORS = new Map();
   for (const f of FACTIONS.values()) for (const d of (hallOf(f) || { doors: [] }).doors) { const k = String(d).toLowerCase(); HALL_DOORS.set(k, (HALL_DOORS.get(k) || []).concat([f.id])); }
+  // The hall door keys are lower case and getIdFromDesc matches a plugin's name exactly, so a door is spelled as the
+  // halls spell its plugin before it is looked up (until 16 Oct every hall lookup by door threw: no root, no grant)
+  const DOOR_SPELLING = new Map();
+  for (const f of FACTIONS.values()) for (const d of (hallOf(f) || { doors: [] }).doors) { const t = String(d), i = t.indexOf(':'); if (i > 0) DOOR_SPELLING.set(t.slice(i + 1).toLowerCase(), t.slice(i + 1)); }
+  const spelledDoor = (desc) => { const t = String(desc), i = t.indexOf(':'); return i > 0 ? `${t.slice(0, i)}:${DOOR_SPELLING.get(t.slice(i + 1).toLowerCase()) || t.slice(i + 1)}` : t; };
   const hallFactionsAt = (desc) => {
     const marks = readMarks();
     const out = new Set((HALL_DOORS.get(desc) || []).filter((fid) => !((marks[fid] || {}).off || []).includes(desc)));
@@ -609,7 +614,7 @@ module.exports = (api) => {
       for (const m of Object.values(readMarks())) for (const d of ((m && m.doors) || [])) descs.add(String(d).toLowerCase());
       for (const d of descs) {
         let id = 0, root = 0;
-        try { id = Number(mp.getIdFromDesc(d)) >>> 0; root = id ? Number(H.primaryOf(id)) >>> 0 : 0; } catch (e) { continue; }
+        try { id = Number(mp.getIdFromDesc(spelledDoor(d))) >>> 0; root = id ? Number(H.primaryOf(id)) >>> 0 : 0; } catch (e) { continue; }
         if (root && root !== id) out.set(root, (out.get(root) || []).concat([d]));
       }
     }
@@ -682,7 +687,7 @@ module.exports = (api) => {
       const off = ((readMarks()[f.id] || {}).off) || [];
       const descs = [...new Set(h.doors.map((d) => String(d).toLowerCase()).concat(marked))].filter((d) => !off.includes(d));
       for (const d of descs) {
-        let id = 0; try { id = Number(mp.getIdFromDesc(d)) >>> 0; } catch (e) { id = 0; }
+        let id = 0; try { id = Number(mp.getIdFromDesc(spelledDoor(d))) >>> 0; } catch (e) { id = 0; }
         if (!id) continue;
         let root = 0, rec = null;
         try { root = Number(H.primaryOf(id)) >>> 0; rec = root ? H.recordOf(root) : null; } catch (e) { continue; }

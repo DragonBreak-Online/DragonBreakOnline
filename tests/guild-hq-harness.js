@@ -24,7 +24,10 @@ const PROFILE = { [COUNTESS]: 70, [KOJUS]: 80, [AYLIN]: 81, [STIBBONS]: 33, [GUA
 // Load order index of the stub: BSHeartland 0x08, Dawnguard 0x02, everything else 0x30
 const IDX = { 'bsheartland.esm': 0x08, 'dawnguard.esm': 0x02 };
 const idOf = (desc) => { const [hex, ...p] = String(desc).toLowerCase().split(':'); const i = IDX[p.join(':')]; return (((i === undefined ? 0x30 : i) << 24) | parseInt(hex, 16)) >>> 0; };
-const descOf = (id) => { id >>>= 0; const top = id >>> 24; const plug = Object.keys(IDX).find((k) => IDX[k] === top) || 'other.esp'; return `${(id & 0xffffff).toString(16)}:${plug}`; };
+// The engine matches a plugin's name exactly ("bsheartland.esm not found in loaded files"): the stub does too
+const SPELLED = { 'bsheartland.esm': 'BSHeartland.esm', 'dawnguard.esm': 'Dawnguard.esm' };
+const exactIdOf = (desc) => { const p = String(desc).split(':').slice(1).join(':'); const want = SPELLED[p.toLowerCase()]; if (want && p !== want) throw new Error(`${p} not found in loaded files`); return idOf(desc); };
+const descOf = (id) => { id >>>= 0; const top = id >>> 24; const plug = Object.keys(IDX).find((k) => IDX[k] === top) || 'other.esp'; return `${(id & 0xffffff).toString(16)}:${SPELLED[plug] || plug}`; };
 
 const CASTLE = idOf('6c473:BSHeartland.esm'), CASTLE_FAR = idOf('6c4d9:BSHeartland.esm');
 const B46A8 = idOf('b46a8:BSHeartland.esm'), C726F2 = idOf('726f2:BSHeartland.esm');
@@ -60,7 +63,7 @@ fs.writeFileSync('housing.json', JSON.stringify([CASTLE, SPIRE, FG]));
 const logs = [], audits = [];
 const noop = () => {};
 const api = {
-  mp: { get: () => undefined, set: noop, getDescFromId: (id) => descOf(id), getIdFromDesc: (d) => idOf(d) },
+  mp: { get: () => undefined, set: noop, getDescFromId: (id) => descOf(id), getIdFromDesc: (d) => exactIdOf(d) },
   log: (...a) => logs.push(a.join(' ')), personal: noop, system: noop, audit: (t) => audits.push(t),
   registerChatCommand: noop, onUi: noop, openWidget: noop, closeWidget: noop,
   display: (a) => `P${(a >>> 0).toString(16)}`, who: (a) => `P${(a >>> 0).toString(16)}`, nameOf: (a) => `P${(a >>> 0).toString(16)}`,
