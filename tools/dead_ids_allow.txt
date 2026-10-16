@@ -1,0 +1,40 @@
+# tools/dead_ids_check.py allow list: file<TAB>desc<TAB>why. Known, deliberate or pre-release leftovers (checked 16 Oct against the 140 order).
+admin-items.json	173fb:DragonBreak.esp	Nat keeps it (fba84466: Godrel's Notes); Deleted in DragonBreak.esp before the release too
+admin-items.json	18f48:DragonBreak.esp	Nat keeps it (fba84466: Odaira's Chest Key); same
+admin-items.json	18f4c:DragonBreak.esp	Nat keeps it (fba84466: Odaira's Notes); same
+admin-items.json	aaaf:DragonBreak.esp	Nat keeps it (fba84466: Remembrance of the Brave); same
+wildlife.json	5edb2:DragonBreak Online Edits.esp	anchor removed by Nate (Bilegulch); placement marked anchorGone, skipped but counted so later wild:* names keep (fba84466)
+buildings.json	d62:DragonBreak.esp	CELL Deleted in DragonBreak.esp before the release (105 order too)
+doors-pos.json	d62:dragonbreak.esp	same cell
+doors-pos.json	d9643:BSHeartland.esm	REFR Deleted before the release (105 order too); a housing claim's door
+doors.json	d9643:BSHeartland.esm	same
+doors.json	177f9c:DragonBreak Online Edits.esp	absent from the DLE before the release (check-1); a name only
+dungeons.json	d9643:BSHeartland.esm	pre-release, same door
+dungeons.json	e59c3:BSHeartland.esm	ACHR Deleted before the release (105 order too)
+dungeons.json	e59c7:BSHeartland.esm	same
+dungeons.json	e59d7:BSHeartland.esm	same
+dungeons.json	e59d8:BSHeartland.esm	same
+dungeons.json	e59df:BSHeartland.esm	same
+dungeons.json	e59e1:BSHeartland.esm	same
+dungeons.json	e59e2:BSHeartland.esm	same
+dungeons.json	e59ff:BSHeartland.esm	same
+dungeons.json	e5a00:BSHeartland.esm	same
+dungeons.json	e5a01:BSHeartland.esm	same
+dungeons.json	e5a02:BSHeartland.esm	same
+dungeons.json	e5a03:BSHeartland.esm	same
+dungeons.json	eb135:BSHeartland.esm	same
+ruin-buttons.json	aa6ad:BSHeartland.esm	REFR Deleted before the release (105 order too)
+ruin-buttons.json	aa6ae:BSHeartland.esm	same
+ruin-buttons.json	aa6b1:BSHeartland.esm	same
+ruin-buttons.json	aa6b2:BSHeartland.esm	same
+ruin-buttons.json	aa6b3:BSHeartland.esm	same
+ruin-buttons.json	aa6b4:BSHeartland.esm	same
+ruin-buttons.json	aa6b9:BSHeartland.esm	same
+ruin-buttons.json	ac427:BSHeartland.esm	same
+ruin-buttons.json	ac428:BSHeartland.esm	same
+ruin-buttons.json	ac429:BSHeartland.esm	same
+ruin-buttons.json	ac42a:BSHeartland.esm	same
+ruin-buttons.json	ac42b:BSHeartland.esm	same
+NPC-Spawns.json	79d6d:BSHeartland.esm	REFR Deleted before the release; NPC-Spawns.json is rewritten by the server at run time
+gamemode-config.json	29:Dragonbone and Dragonscale above Ebony. Dragonplate (Update.esm	prose in a comment, not a desc
+playerlog-rules.js	a764b:X.esm	an example in a comment
