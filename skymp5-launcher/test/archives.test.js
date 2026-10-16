@@ -176,3 +176,62 @@ test('unrelated archives in Vortex\'s folder write no [wait] line, and a wanted 
   const noisy = lines.filter(l => l.includes('[wait]') && l.includes('Other Mod'))
   assert.equal(noisy.length, 0, `no [wait] line names an unrelated archive (got ${noisy.length}, e.g. ${noisy[0]})`)
 })
+
+// From the review of the Vortex fix (R1, R2, R4, R5): what the wait must still do with a second folder to watch.
+
+test('a copy in our own folder wins over the same archive in Vortex\'s', async () => {
+  const X = Buffer.alloc(3001, 21)
+  fs.writeFileSync(path.join(vortex, 'X-1-1-0.7z'), X)
+  fs.writeFileSync(path.join(downloads, 'X-1-1-0.7z'), X)
+  const p = await mo2.waitForDownloads([{ name: 'X', hash: sha(X), size: X.length }], () => {}, undefined, 20, 400, [vortex])
+  assert.equal(p[0], path.join(downloads, 'X-1-1-0.7z'))
+})
+
+// Vortex writes a download under a temporary name with no extension (__vortex_tmp_<n>) and renames it when it is done
+test('a file Vortex is still downloading is not taken; the renamed file is, once its size has held', async () => {
+  const Y = Buffer.alloc(5001, 22)
+  const tmp = path.join(vortex, '__vortex_tmp_00000001')
+  fs.writeFileSync(tmp, Y.subarray(0, 1000))
+  const seen = []
+  const p = await mo2.waitForDownloads([{ name: 'Y', hash: sha(Y), size: Y.length }], (d, t, m, found) => {
+    seen.push(found[0])
+    if (seen.length === 3) fs.writeFileSync(tmp, Y)   // all the bytes, still under the temporary name
+    if (seen.length === 6) fs.renameSync(tmp, path.join(vortex, 'Y-2-1-0.7z'))
+  }, undefined, 20, 2000, [vortex])
+  assert.ok(seen.slice(0, 7).every(x => !x), `not taken before the renamed file has held its size: ${JSON.stringify(seen)}`)
+  assert.equal(p[0], path.join(vortex, 'Y-2-1-0.7z'))
+})
+
+test('a file still growing in Vortex\'s folder is not hashed or taken while its size changes', async () => {
+  const G = Buffer.alloc(4000, 23)
+  const f = path.join(vortex, 'G-4-1-0.7z')
+  fs.writeFileSync(f, G.subarray(0, 500))
+  let n = 500
+  const seen = []
+  const p = await mo2.waitForDownloads([{ name: 'G', hash: sha(G), size: G.length }], (d, t, m, found) => {
+    seen.push(found[0])
+    if (n < G.length) { fs.appendFileSync(f, G.subarray(n, n + 500)); n += 500 }
+  }, undefined, 20, 2000, [vortex])
+  assert.ok(seen.indexOf(true) >= 7, `taken only after the copy finished: ${JSON.stringify(seen)}`)
+  assert.equal(p[0], f)
+})
+
+// Any size change in Vortex's folder counts as activity and slides the deadline, so a player's other downloads there
+// could keep a wait alive that can never finish: the hard cap of three timeout windows must still end it. It is
+// counted in ticks, not milliseconds, so a slow disk cannot fail it: a stall only means fewer ticks.
+test('churn in Vortex\'s folder slides the deadline, but the hard cap still ends the wait', async () => {
+  const W = Buffer.alloc(1001, 24)
+  const churn = path.join(vortex, 'Unrelated-9-1-0.7z')
+  fs.writeFileSync(churn, Buffer.alloc(1))
+  let ticks = 0
+  const started = Date.now()
+  try {
+    await assert.rejects(mo2.waitForDownloads([{ name: 'Never', hash: sha(W), size: W.length }], () => {
+      // the Vortex folder changes on every tick; without the hard cap the wait would go on, so the churn stops at 300
+      if (++ticks < 300) fs.appendFileSync(churn, Buffer.alloc(1))
+    }, undefined, 10, 150, [vortex]), /Timed out waiting to download: Never/)
+  } finally { fs.rmSync(churn) }
+  const took = Date.now() - started
+  assert.ok(took >= 300, `it slid past the 150 ms deadline (took ${took} ms)`)
+  assert.ok(ticks < 300, `the 450 ms hard cap ended it while the churn went on (${ticks} ticks in ${took} ms)`)
+})
