@@ -4230,7 +4230,12 @@ async function runMO2Install(opts = {}) {
                 : message
             send('install:progress', { phase: 'mods', file: line, index: done, total, skipped: false })
           },
-          installAbort?.signal)
+          installAbort?.signal,
+          undefined, undefined,
+          // Watch Vortex's downloads as well as ours. A player installing from a Nexus collection
+          // downloads through Vortex by design, and the launcher can lose the nxm:// handler back
+          // to it mid-wait, so the archives land there and this wait used to time out beside them.
+          otherArchiveDirs())
         needBrowser.forEach((a, i) => { archivePaths[a.id] = paths[i] })
       } finally {
         nxmWaiting = false

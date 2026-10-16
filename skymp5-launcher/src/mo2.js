@@ -1274,7 +1274,12 @@ async function listArchiveEntries(archivePath) {
  *
  *   wanted: [{ name, hash?, size?, namePattern?, expect? }]
  */
-function waitForDownloads(wanted, onProgress, signal, intervalMs = 1000, timeoutMs = 900_000) {
+// extraDirs: folders a player's downloads may land in instead of ours - Vortex's, above all. The
+// launcher takes the nxm:// handler for the wait and hands it back afterwards, but Vortex can win it
+// again, and a player following a Nexus COLLECTION downloads through Vortex by design. Scanning only
+// our own folder then times the install out after 15 minutes while the archives sit in Vortex's,
+// which is what players see as "Vortex says it is downloaded, the launcher says it is not".
+function waitForDownloads(wanted, onProgress, signal, intervalMs = 1000, timeoutMs = 900_000, extraDirs = []) {
   let deadline   = Date.now() + timeoutMs
   // The sliding deadline keeps an actively-staging user alive, but any churn
   // in the downloads folder (a crawling browser download, antivirus rewrites)
@@ -1298,8 +1303,25 @@ function waitForDownloads(wanted, onProgress, signal, intervalMs = 1000, timeout
     _log(`[wait] "${wanted[i].name}" vs "${a.file}": ${reason}`)
   }
 
+  // Our folder first, so an archive we already hold wins over a copy elsewhere and nothing is adopted
+  // needlessly. Duplicates by full path are dropped; a same-named file in two folders stays as two
+  // candidates on purpose, since only one of them may be the right version.
+  const scanDirs = () => {
+    const out = listDownloadArchives()
+    const seen = new Set(out.map(a => a.full))
+    for (const dir of extraDirs) {
+      if (!dir) continue
+      for (const a of listArchivesIn(dir)) {
+        if (seen.has(a.full)) continue
+        seen.add(a.full)
+        out.push(a)
+      }
+    }
+    return out
+  }
+
   const scan = async () => {
-    const archives = listDownloadArchives()
+    const archives = scanDirs()
     const settled  = a => prevSize.get(a.full) === a.st.size
     const consumed = new Set(found.filter(Boolean))
     const suspect  = []
@@ -1335,6 +1357,11 @@ function waitForDownloads(wanted, onProgress, signal, intervalMs = 1000, timeout
           }
         } else {
           continue
+        }
+        // Used where it lies, as findArchiveByHash already does for the install step - nothing is
+        // copied or linked, so Vortex stays the owner of its own downloads.
+        if (path.dirname(path.resolve(a.full)) !== path.resolve(getDownloadsDir())) {
+          _log(`[wait] "${w.name}" found in ${path.dirname(a.full)}`)
         }
         _log(`[wait] "${w.name}" matched by "${a.file}"`)
         found[i] = a.full
