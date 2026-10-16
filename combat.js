@@ -42,9 +42,11 @@ module.exports = (api) => {
     staggerSpells: ['CYRForceRune'],
     // Shouts that knock back (Nate, 2026-09-28): the push is physics on the shouter's screen only, so the server tells
     // the victim's client to push its own player (client ShoutPushService, dboPush). Word spell editor id -> force,
-    // 0 = a stagger. From anyone, a draugr's shout included; one push per target every pushCooldownSeconds.
+    // 0 = a stagger. From players; an NPC's shout only while npcShoutPush is on; one push per target every pushCooldownSeconds.
     pushSpells: { VoiceUnrelentingForce1: 0, VoiceUnrelentingForce2: 4, VoiceUnrelentingForce3: 8 },
     pushCooldownSeconds: 2,
+    // An NPC's shout (a draugr's Fus Ro) knocks nobody back; its damage still lands (Jake, 16 Oct: "REMOVE SHOUT KNOCKBACK")
+    npcShoutPush: false,
     // After a stagger or a push, the target shrugs off either for this long: the two had their own cooldowns, so two
     // attackers alternating blows and shouts kept a player staggered about every second (combat review, 2026-09-29)
     knockImmunitySeconds: 3,
@@ -263,6 +265,8 @@ module.exports = (api) => {
     let granted = false; try { granted = mp.get(a, C.shoutGrantProp) === true; } catch (e) { granted = false; }
     return granted && allowedShoutWords().has(spellId >>> 0);
   };
+  // True when an NPC's shout word would knock its target back and npcShoutPush is off: no push, ragdoll or stagger is sent
+  const npcShoutNoPush = (a, spellId) => !C.npcShoutPush && !isPlayer(a) && isVoiceSpell(spellId);
 
   // A player's shout to show the players around (Nate, 2026-09-29: "the animation from the shouts happen but that's it").
   // The server stopped taking a player's shout word as a cast (review A4-1), so the cast is never relayed; the client
@@ -298,6 +302,7 @@ module.exports = (api) => {
   const pushNpc = (agg, tgt, spellId) => {
     const force = pushForceOf(spellId);
     if (force < 0 || C.pushNpcs === false || typeof sendPacket !== 'function' || !shoutAllowed(agg, spellId)) return;
+    if (npcShoutNoPush(agg, spellId)) return;
     let host = 0; try { host = typeof mp.getHoster === 'function' ? mp.getHoster(tgt) >>> 0 : 0; } catch (e) { host = 0; }
     if (!host || host === (agg >>> 0)) return;
     const s = st(tgt), now = Date.now();
@@ -328,6 +333,8 @@ module.exports = (api) => {
       return;
     }
     if (force >= 0 && typeof sendPacket === 'function') {
+      // Before pushedAt is set, so a skipped NPC shout uses up no knock immunity
+      if (npcShoutNoPush(agg, spellId)) { if (C.log) log(`combat ${display(agg)} -> ${display(tgt)}: npc shout, no push (spell ${spellId.toString(16)})`); return; }
       const s = st(tgt), now = Date.now();
       if (now - Math.max(s.pushedAt || 0, s.staggerAt) < Math.max(C.pushCooldownSeconds, Number(C.knockImmunitySeconds) || 0) * 1000) return;
       s.pushedAt = now;

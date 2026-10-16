@@ -133,10 +133,10 @@ load3().onAttempt(1, 3, SWORD, 20, { power: true, unblockedDamage: 20 }, 1);
 ok(staggers() === 1, 'one attacker cannot stagger a second player inside its own cooldown');
 load3().onAttempt(3, 2, SWORD, 20, { power: true, unblockedDamage: 20 }, 1);
 ok(staggers() === 1, 'the target cooldown still holds against another attacker');
-// Shouts: Unrelenting Force pushes its victim on their own screen, from a draugr too; word one only staggers
-reset(); pushes.length = 0; load().onSpellHit(9, 2, UF3);
-ok(pushes.length === 1 && pushes[0][0] === 2 && pushes[0][1].from === 9 && pushes[0][1].force === 8, "a draugr's third word pushes a player hard");
-load().onSpellHit(9, 2, UF3);
+// Shouts: Unrelenting Force pushes its victim on their own screen; word one only staggers (an NPC's shout: the gate block below)
+reset(); pushes.length = 0; load().onSpellHit(1, 2, UF3);
+ok(pushes.length === 1 && pushes[0][0] === 2 && pushes[0][1].from === 1 && pushes[0][1].force === 8, "a player's third word pushes another player hard");
+load().onSpellHit(1, 2, UF3);
 ok(pushes.length === 1, 'one push per target inside the cooldown');
 reset(); pushes.length = 0; load().onSpellHit(1, 2, UF1);
 ok(pushes.length === 1 && pushes[0][1].force === 0, 'the first word only staggers');
@@ -194,6 +194,28 @@ ok(statuses.length === 0 && unequips().length === 0, 'an ordinary spell neither 
   ok(c.shoutAllowed(2, FIREBALL) === true, 'an ordinary spell is not a shout');
   c.onSpellHit(1, 2, UF3);
   ok(pushes.length === 1, "the granted player's push lands");
+  // An NPC's shout knocks nobody back (Jake, 16 Oct: "REMOVE SHOUT KNOCKBACK"). Here the words carry SPIT 11 as the live
+  // records do, so these cases test the voice check (above this block a word has no SPIT and is not a shout word)
+  reset(); pushes.length = 0; c = load(); c.onSpellHit(9, 2, UF3);
+  ok(pushes.length === 0, "a draugr's third word pushes no player");
+  reset(); pushes.length = 0; c = load(); c.onSpellHit(9, 2, UF1);
+  ok(pushes.length === 0 && staggers() === 0, "a draugr's first word does not stagger a player either");
+  reset(); pushes.length = 0; c = load(); c.onSpellHit(9, 2, UF3); c.onSpellHit(1, 2, UF3);
+  ok(pushes.length === 1 && pushes[0][1].from === 1, "a skipped draugr shout uses up no knock immunity: a player's push lands right after");
+  RECS[RUNE].fields = [{ type: 'SPIT', data: spit(0) }];
+  reset(); pushes.length = 0; c = load(); c.onSpellHit(9, 2, RUNE);
+  ok(pushes.length === 1 && pushes[0][1].force === 10 && pushes[0][1].from === 9, "an NPC's Force Rune, not a shout, still pushes at force 10");
+  reset(); HOSTS = { 8: 2 }; npcPushes.length = 0; c = load(); c.onSpellHit(9, 8, UF3);
+  ok(npcPushes.length === 0, "a draugr's shout on another NPC sends its host no push");
+  reset(); HOSTS = { 9: 2 }; npcPushes.length = 0; c = load(); c.onSpellHit(1, 9, UF3);
+  ok(npcPushes.length === 1 && npcPushes[0][0] === 2 && npcPushes[0][1].target === 9 && npcPushes[0][1].force === 8 && npcPushes[0][1].from === 1, "a granted player's shout still pushes an NPC another player hosts");
+  HOSTS = {};
+  reset(); EQ[2] = [SWORD]; c = load(); c.onSpellHit(9, 2, DISARM2);
+  ok(calls.filter((x) => x[2] === 'UnequipItem').length === 1, "a draugr's Disarm still unequips the player's sword");
+  (cfg.combat = cfg.combat || {}).npcShoutPush = true;
+  reset(); pushes.length = 0; c = load(); c.onSpellHit(9, 2, UF3);
+  ok(pushes.length === 1 && pushes[0][1].force === 8 && pushes[0][1].from === 9, 'with npcShoutPush on (the undo), a draugr shout pushes again');
+  delete cfg.combat.npcShoutPush;
   // The relay of a shout to the players around (dboShoutCast -> dboShoutFx): the same gate, and a cleaned message
   c = load();
   const cast = (o) => Object.assign({ caster: 0xdead, target: 2, spell: UF3, isDualCasting: true, interruptCast: false, keepAlive: false, castingSource: 2,
@@ -213,16 +235,17 @@ ok(statuses.length === 0 && unequips().length === 0, 'an ordinary spell neither 
   mp.get = origGet; API.recordOf = origRecordOf;
   process.chdir(here); fs.rmSync(dir, { recursive: true, force: true });
 }
-// staggers and pushes share one immunity (knockImmunitySeconds): two attackers alternating could stagger-lock a player
+// staggers and pushes share one immunity (knockImmunitySeconds): two attackers alternating could stagger-lock a player.
+// The push is an NPC's Force Rune: an NPC's shout pushes nobody now
 {
   reset(); pushes.length = 0;
   const c = load();
   c.onAttempt(1, 2, SWORD, 20, { power: true }, 1);
   ok(staggers() === 1, 'a power attack staggers');
-  c.onSpellHit(9, 2, UF3);
-  ok(pushes.length === 0, "a shout's push right after a stagger is shrugged off");
+  c.onSpellHit(9, 2, RUNE);
+  ok(pushes.length === 0, "a rune's push right after a stagger is shrugged off");
   globalThis.__dboCombat.get(2).staggerAt = Date.now() - 3100;
-  c.onSpellHit(9, 2, UF3);
+  c.onSpellHit(9, 2, RUNE);
   ok(pushes.length === 1, '...and lands once the immunity is over');
   // the attacker's own stagger cooldown cleared, as for a second attacker
   calls.length = 0; globalThis.__dboCombat.get(1).causedStaggerAt = 0;
