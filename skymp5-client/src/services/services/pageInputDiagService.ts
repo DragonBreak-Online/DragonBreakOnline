@@ -38,6 +38,9 @@ const EVENT_MAX_LINES = 40;
 const EVENT_FULL_PER_KIND = 6;
 // Kinds relayed under an allowance of their own, so host-change lines cannot spend it (as gamemode.js DIAG_KIND_MAX)
 const EVENT_KIND_MAX: Record<string, number> = { emote: 40 };
+// Summary lines relayed past such a kind's allowance: 40 + 10 a launch, a quarter of the server's emote 200 a player a run
+const EVENT_KIND_SUMMARY_MAX = 10;
+const ownAllowance = (kind: string): number | null => (Object.prototype.hasOwnProperty.call(EVENT_KIND_MAX, kind) ? EVENT_KIND_MAX[kind] : null);
 const EVENT_SUMMARY_MS = 5000;
 // An event line is queued because something happened that may be about to crash the client, so it does not wait for
 // the next tick: it goes out at once. GroundedPasta's 04:32 crash came within 5 s of six NPCs being handed to him,
@@ -151,25 +154,28 @@ export class PageInputDiagService extends ClientListener {
   public note(kind: string, text: string): void {
     const seen = (this.eventSeen.get(kind) || 0) + 1;
     this.eventSeen.set(kind, seen);
-    if (seen <= EVENT_FULL_PER_KIND) {
+    // A kind with an allowance of its own goes out in full until that allowance is spent
+    const full = ownAllowance(kind) ?? EVENT_FULL_PER_KIND;
+    if (seen <= full) {
       this.queueEvent(`${kind} ${text}`, kind);
       return;
     }
     // Past that, count them and send one line a window saying how many were skipped
     const now = Date.now();
     const last = this.eventSummaryAt.get(kind) || 0;
-    const since = (this.eventSummarySeen.get(kind) || EVENT_FULL_PER_KIND);
+    const since = (this.eventSummarySeen.get(kind) || full);
     if (now - last < EVENT_SUMMARY_MS) return;
     this.eventSummaryAt.set(kind, now);
     this.eventSummarySeen.set(kind, seen);
-    this.queueEvent(`${kind} +${seen - since} more (${seen} this session), latest: ${text}`, kind);
+    this.queueEvent(`${kind} +${seen - since} more (${seen} this session), latest: ${text}`, kind, true);
   }
 
-  private queueEvent(line: string, kind = ""): void {
+  private queueEvent(line: string, kind = "", summary = false): void {
     this.write(line);
-    if (Object.prototype.hasOwnProperty.call(EVENT_KIND_MAX, kind)) {
+    const allowance = ownAllowance(kind);
+    if (allowance !== null) {
       const taken = this.kindQueued.get(kind) || 0;
-      if (taken >= EVENT_KIND_MAX[kind]) return;
+      if (taken >= allowance + (summary ? EVENT_KIND_SUMMARY_MAX : 0)) return;
       this.kindQueued.set(kind, taken + 1);
       this.kindQueue.push(line.slice(0, 400));
     } else {

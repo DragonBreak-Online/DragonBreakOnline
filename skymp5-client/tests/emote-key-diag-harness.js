@@ -242,11 +242,11 @@ const wheelPushed = () => H.js.some((s) => /emoteWheel/.test(s));
       relayed().includes('emote wheel open'), relayed().slice(-3));
     check('...and so does a refusal', relayed().includes('emote key refused: menus InventoryMenu (closed)'), relayed().slice(-3));
 
-    // The emote allowance is bounded on its own: a flood of emote notes, one summary a window past the first six
+    // The emote allowance is bounded on its own: a flood of emote notes, one summary a window past the first 40
     for (let i = 0; i < 400; i++) { note('emote', `step ${i}`); clock += 5100; if (i % 4 === 0) tick(); }
     for (let i = 0; i < 20; i++) tick();
     const emoteRelayed = relayed().filter((l) => /^emote /.test(l)).length;
-    check('emote lines stop at their own 40 a session', emoteRelayed === 40, emoteRelayed);
+    check('emote lines stop at their own 40 in full plus 10 summaries a launch', emoteRelayed === 50, emoteRelayed);
     check('a packet carries at most 8 lines', H.packets.every((p) => p.lines.length <= 8), H.packets.map((p) => p.lines.length));
 
     // A fresh session: the emote lines leave the shared room alone
