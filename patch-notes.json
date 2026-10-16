@@ -1,5 +1,20 @@
 [
   {
+    "title": "Blocking and vampire silver",
+    "date": "2026-10-16",
+    "version": "Hotfix",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Fixes",
+        "items": [
+          "Once a blocker's stamina is gone, their guard breaks every time: every blow lands in full until they have stamina again. That goes for bandits and other NPCs too.",
+          "A vampire's silver is no longer sent to the mailbox while a chest is still open. Silver you put back stays in the chest; only silver you walk off with goes to your mailbox."
+        ]
+      }
+    ]
+  },
+  {
     "title": "A free identity change for the Skyrim move",
     "date": "2026-10-16",
     "version": "Hotfix",
