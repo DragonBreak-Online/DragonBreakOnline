@@ -1,5 +1,34 @@
 [
   {
+    "title": "Skyrim's towns, the Snow Elven Arsenal and more",
+    "date": "2026-10-16",
+    "version": "Update",
+    "tag": "Update",
+    "sections": [
+      {
+        "heading": "The world",
+        "items": [
+          "Skyrim's towns now work like Bruma: the people and animals that came with the mods are gone, so every NPC you meet is the server's own. Enemies and wildlife come from the server's spawns.",
+          "The College of Winterhold's main gate opens again.",
+          "Carrots can be picked again."
+        ]
+      },
+      {
+        "heading": "Smithing",
+        "items": [
+          "The Snow Elven Arsenal: Snow Elf smiths can forge the Scout, Noble and Heavy sets and their weapons and arrows (Glass, Ebony and Elven smithing). Anyone can temper them. The Ancient One's gear is staff-only.",
+          "Black Bear Ancient Nord armour now carries its new ratings in the game files too."
+        ]
+      },
+      {
+        "heading": "Guilds",
+        "items": [
+          "A guild's leader now holds their guild's hall: Castle Bruma is recognised as the County's, and an unowned hall goes to its faction's leader."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Spell picks and Grand Champion rerolls",
     "date": "2026-10-16",
     "version": "Hotfix",
