@@ -1,12 +1,14 @@
 // TODO: refactor this out
 import { localIdToRemoteId } from "../../view/worldViewMisc";
 
-import { Actor, ContainerChangedEvent, MenuCloseEvent } from "skyrimPlatform";
+import { Actor, ContainerChangedEvent, MenuCloseEvent, MenuOpenEvent, ObjectReference } from "skyrimPlatform";
 import { ClientListener, CombinedController, Sp } from "./clientListener";
 import { Inventory } from "../../sync/inventory";
 import { PROPERTY_KEY_BASE_ID } from "../../sync/propertyKey";
 import { MsgType } from "../../messages";
 import { logTrace, logError } from "../../logging";
+import { trace } from "../../lib/clientDiag";
+import { SeatInfo, WORKBENCH_KEYWORD, WorkbenchDiag } from "./workbenchDiag";
 
 type FurnitureId = number;
 
@@ -15,6 +17,7 @@ export class CraftService extends ClientListener {
         super();
         controller.on('containerChanged', (e) => this.onContainerChanged(e));
         controller.on('menuClose', (e) => this.onMenuClose(e));
+        controller.on('menuOpen', (e) => this.onMenuOpen(e));
         controller.on('update', () => this.onUpdate());
     }
 
@@ -25,23 +28,32 @@ export class CraftService extends ClientListener {
         if (e.name === CRAFTING_MENU && this.furnitureStreak.size > 0) this.menuClosedAt = Date.now();
     }
 
+    private onMenuOpen(e: MenuOpenEvent) {
+        if (e.name === CRAFTING_MENU) this.workbenchDiag.menuOpened(Date.now());
+    }
+
     private onUpdate() {
-        if (this.furnitureStreak.size === 0) return;
         const now = Date.now();
         if (now < this.nextCheckAt) return;
         this.nextCheckAt = now + CHECK_EVERY_MS;
-        const closed = this.menuClosedAt > 0 && now - this.menuClosedAt >= FLUSH_AFTER_CLOSE_MS;
-        if (closed) this.menuClosedAt = 0;
         let seatedAt = 0;
+        let furnitureRef: ObjectReference | null = null;
         try {
-            const furnitureRef = (this.sp.Game.getPlayer() as Actor).getFurnitureReference();
+            furnitureRef = (this.sp.Game.getPlayer() as Actor).getFurnitureReference();
             seatedAt = furnitureRef ? furnitureRef.getFormID() : 0;
         } catch (e) {
             return;
         }
-        for (const furnitureId of Array.from(this.furnitureStreak.keys())) {
-            if (closed || furnitureId !== seatedAt) this.sendCraft(furnitureId, 0, closed ? 'menu closed' : 'left the furniture');
+        if (this.furnitureStreak.size > 0) {
+            const closed = this.menuClosedAt > 0 && now - this.menuClosedAt >= FLUSH_AFTER_CLOSE_MS;
+            if (closed) this.menuClosedAt = 0;
+            for (const furnitureId of Array.from(this.furnitureStreak.keys())) {
+                if (closed || furnitureId !== seatedAt) this.sendCraft(furnitureId, 0, closed ? 'menu closed' : 'left the furniture');
+            }
         }
+        // After the flush, so a report sent on leaving counts for the seat being left
+        const seatLine = this.workbenchDiag.seat(seatedAt, now, () => describeSeat(furnitureRef));
+        if (seatLine) trace(seatLine);
     }
 
     // Sends the report bundled for this furniture, if it holds anything, and forgets it
@@ -67,6 +79,7 @@ export class CraftService extends ClientListener {
             },
             reliability: "reliable"
         });
+        this.workbenchDiag.sent(furnitureId);
     }
 
     private onContainerChanged(e: ContainerChangedEvent) {
@@ -89,6 +102,8 @@ export class CraftService extends ClientListener {
         }
 
         const furnitureId = furnitureRef.getFormID();
+
+        this.workbenchDiag.moved(oldContainerId === 0x14 ? "out" : "in");
 
         if (oldContainerId === 0x14 && newContainerId === 0) {
             let craftInputObjects = this.furnitureStreak.get(furnitureId);
@@ -115,7 +130,20 @@ export class CraftService extends ClientListener {
     private furnitureStreak = new Map<FurnitureId, Inventory>();
     private menuClosedAt = 0;
     private nextCheckAt = 0;
+    private workbenchDiag = new WorkbenchDiag();
 }
+
+const describeSeat = (furnitureRef: ObjectReference | null): SeatInfo | null => {
+    if (!furnitureRef) return null;
+    const base = furnitureRef.getBaseObject();
+    let keyword = "";
+    const n = base ? Math.min(base.getNumKeywords(), 16) : 0;
+    for (let i = 0; i < n && !keyword; i++) {
+        const name = base?.getNthKeyword(i)?.getString() || "";
+        if (WORKBENCH_KEYWORD.test(name)) keyword = name;
+    }
+    return { remoteId: localIdToRemoteId(furnitureRef.getFormID()), baseId: base ? base.getFormID() : 0, keyword };
+};
 
 const CRAFTING_MENU = "Crafting Menu";
 const CHECK_EVERY_MS = 250;
