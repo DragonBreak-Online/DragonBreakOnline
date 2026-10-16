@@ -1,5 +1,21 @@
 [
   {
+    "title": "Mining fixes",
+    "date": "2026-10-16",
+    "version": "Server update",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Mining and crafting",
+        "items": [
+          "The zinc, mithril and amber veins in Skyrim can now be mined. They used to say \"You do not know what to do with this seam\".",
+          "Zinc opens to an Apprentice Miner, mithril to an Expert Miner and amber to a Master Miner. Smelt them at any smelter.",
+          "Skinning and loom messages now read \"An Apprentice\" and \"An Adept\" instead of \"A Apprentice\"."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Writing spell tomes",
     "date": "2026-10-16",
     "version": "Server update",
