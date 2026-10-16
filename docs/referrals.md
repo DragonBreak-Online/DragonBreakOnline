@@ -39,7 +39,7 @@ Approved by Nate on 16 Oct 2026 ("Go for it"). Built on branches and tested. Not
 | Everything else | server `referrals.js` | Reads `referrals.jsonl` every minute (byte offset), owns the codes, counts play time (30 s samples, as `playtime.js` does), qualifies, queues and runs the boosts, gives the carry weight ability, and handles `/referral`. Records: `referrals.json` (runtime, gitignored) |
 | The boost | server `skillrates.js` | `rateFor` multiplies by `globalThis.__dboReferralSkillRate(actor)`: the running boost's mult, else 1. It does not use `private.xpBoost`, whose `until` is wall clock and which `playtesterboost.js` owns |
 | Carry weight | DLE (PC) + `referrals.carrySpell` | A constant-effect ability, given once a session on every character of the account through Papyrus `AddSpell` (as `racial.js` does), and marked in `private.dboReferralCarry`. Empty config = nothing given and nothing promised |
-| The panel | journal section `referrals` | Registered in `__dboJournalSections`; shown only to a front that lists `journalTab:referrals` in its caps. Until then: `/referral` and the Status line |
+| The panel | journal section `referrals` | Registered in `__dboJournalSections`; shown only to a front that lists `journalTab:referrals` in its caps (fork branch `client-referrals-front`). It shows the link, the friends, the queue and the carry weight, and a code box (`referralCode [nonce, code]`) while the player may still enter one. Until that front ships: `/referral` and the Status line |
 
 **Why the cookie route.** The launcher's Discord login always runs through the player's default browser on our own
 domain, and that is the browser a shared link opens in. The cookie therefore reaches the login with no launcher change
@@ -56,5 +56,5 @@ on a phone.
 
 ## Tests
 
-- `node tests/referrals-harness.js` (server).
-- `node --test test/referrals.test.js` (fork `skymp5-backend`).
+- `node tests/referrals-harness.js` (server, 68 checks).
+- `node --test test/referrals.test.js` (fork `skymp5-backend`, 8 tests).

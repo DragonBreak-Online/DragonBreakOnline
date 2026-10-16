@@ -23,7 +23,7 @@ module.exports = (api) => {
   const fs = require('fs');
   const path = require('path');
   const crypto = require('crypto');
-  const { mp, log, personal, system, registerChatCommand, audit, who, display, profileOf, discordOf, isAdmin, isLeadStaff, findAnyByName, onlineActors, every, creationPending, cfg } = api;
+  const { mp, log, personal, system, registerChatCommand, audit, who, display, profileOf, discordOf, isAdmin, isLeadStaff, findAnyByName, onlineActors, every, creationPending, onUi, cfg } = api;
 
   const HOUR = 3600000, DAY = 24 * HOUR;
   const raw = (cfg && cfg.referrals) || {};
@@ -349,17 +349,19 @@ module.exports = (api) => {
     return '';
   };
   const enterCode = (a, code) => {
+    const no = (text) => ({ ok: false, text });
     const pid = profileOf(a);
-    if (!validPid(pid)) return 'Your account cannot take a referral.';
+    if (!C.enabled) return no('Referrals are not open yet.');
+    if (!validPid(pid)) return no('Your account cannot take a referral.');
     const why = canEnter(a, pid);
-    if (why) return why;
-    const c = String(code).trim().toUpperCase();
-    if (!CODE_RE.test(c) || store.codes[c] === undefined) return 'That is not a referral code.';
+    if (why) return no(why);
+    const c = String(code || '').trim().toUpperCase();
+    if (!CODE_RE.test(c) || store.codes[c] === undefined) return no('That is not a referral code.');
     const accountAt = typeof discordOf === 'function' ? accountCreatedAt(discordOf(a)) : 0;
     const res = bind({ referee: pid, code: c, at: Date.now(), via: 'command', accountAt, fresh: true });
     flush();
-    if (!res.ok) return res.why === 'self' ? 'That is your own code.' : res.why === 'seen' ? 'Referral codes are for new accounts.' : 'That code could not be used.';
-    return `Thank you! Your friend will be credited once you have played ${C.qualifyHours} hours on ${C.qualifyDays} different days.${res.ineligible ? ' (Your Discord account is too new for it to count for them.)' : ''}`;
+    if (!res.ok) return no(res.why === 'self' ? 'That is your own code.' : res.why === 'seen' ? 'Referral codes are for new accounts.' : 'That code could not be used.');
+    return { ok: true, text: `Thank you! Your friend will be credited once you have played ${C.qualifyHours} hours on ${C.qualifyDays} different days.${res.ineligible ? ' (Your Discord account is too new for it to count for them.)' : ''}` };
   };
 
   registerChatCommand('referral', (a, args) => {
@@ -383,7 +385,7 @@ module.exports = (api) => {
       if (was === 'already') return personal(a, `Profile ${pid}'s referral was already revoked.`);
       return personal(a, `Profile ${pid}'s referral (was ${was}) is revoked, and its boosts are taken back.`);
     }
-    if (/^[a-z0-9]{8}$/i.test(body)) return personal(a, enterCode(a, body));
+    if (/^[a-z0-9]{8}$/i.test(body)) return personal(a, enterCode(a, body).text);
     if (isAdmin(a)) {
       const t = findAnyByName(body);
       if (t > 0) return personal(a, `${display(t)}: profile ${profileOf(t)}. Type /referral profile ${profileOf(t)}.`);
@@ -394,6 +396,11 @@ module.exports = (api) => {
   // The Character Journal: a Referrals tab for a front that can draw it (journalTab:referrals); the status line meanwhile
   const sections = globalThis.__dboJournalSections && typeof globalThis.__dboJournalSections === 'object' ? globalThis.__dboJournalSections : (globalThis.__dboJournalSections = {});
   sections.referrals = { visible: () => C.enabled, view: (a) => view(a), label: () => 'Referrals' };
+  // The tab's code box: referralCode [nonce, code], answered in the journal's footer
+  if (typeof onUi === 'function') onUi('referralCode', (a, args) => {
+    if (typeof globalThis.__dboJournalFresh !== 'function' || !globalThis.__dboJournalFresh(a, (args || [])[0])) return;
+    globalThis.__dboJournalLimited(a, () => { const r = enterCode(a, (args || [])[1]); return { tab: 'referrals', text: r.text, kind: r.ok ? 'ok' : 'refused' }; });
+  });
   const addStatus = (key, order, fn) => { try { if (typeof globalThis.__dboRegisterStatus === 'function') globalThis.__dboRegisterStatus(key, order, fn); } catch (e) { /* gamemode older than /status */ } };
   addStatus('referral', 62, (a) => {
     const pid = profileOf(a);

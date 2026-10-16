@@ -8234,7 +8234,7 @@ try {
 try {
   const REFERRALS_JS = path.resolve('referrals.js');
   delete require.cache[REFERRALS_JS];
-  require(REFERRALS_JS)({ mp, log, personal, system, registerChatCommand, audit, who, display, profileOf, discordOf, isAdmin, isLeadStaff, findAnyByName, onlineActors, every, creationPending, cfg });
+  require(REFERRALS_JS)({ mp, log, personal, system, registerChatCommand, audit, who, display, profileOf, discordOf, isAdmin, isLeadStaff, findAnyByName, onlineActors, every, creationPending, onUi, cfg });
 } catch (e) { log('referrals.js failed to load:', e.stack || e.message); globalThis.__dboReferralSkillRate = null; }
 
 // ---- vampirism and lycanthropy (server\supernatural.js) ------------------------------------------------

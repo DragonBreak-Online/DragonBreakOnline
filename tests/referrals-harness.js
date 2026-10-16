@@ -52,11 +52,14 @@ for (const [a, p] of Object.entries(PID)) mp.set(Number(a), 'profileId', p);
 const snowflake = (ms) => String(BigInt(ms - 1420070400000) << 22n);
 const OLD_DISCORD = snowflake(Date.parse('2024-01-01T00:00:00Z'));
 const NEW_DISCORD = snowflake(clock - 3 * D);
-const discord = { [A.n24]: OLD_DISCORD, [A.n30]: NEW_DISCORD, [A.v5]: OLD_DISCORD };
+const discord = { [A.n24]: OLD_DISCORD, [A.n30]: NEW_DISCORD, [0xff000040]: OLD_DISCORD, [A.v5]: OLD_DISCORD };
 let online = [];
 const timers = new Map();
 const said = [], audits = [];
 const commands = new Map();
+const ui = new Map(), answers = [];
+globalThis.__dboJournalFresh = (a, nonce) => nonce === 'n1';
+globalThis.__dboJournalLimited = (a, fn) => answers.push(fn());
 const api = (over) => ({
   mp, log: () => {},
   personal: (a, t) => said.push({ a, t }), system: (a, t) => said.push({ a, t, sys: true }),
@@ -67,6 +70,7 @@ const api = (over) => ({
   isAdmin: (a) => (a >>> 0) === A.staff, isLeadStaff: (a) => (a >>> 0) === A.staff,
   findAnyByName: () => 0, onlineActors: () => online.slice(), every: (name, ms, fn) => timers.set(name, { ms, fn }),
   creationPending: () => false,
+  onUi: (ev, fn) => ui.set(ev, fn),
   cfg: { referrals: Object.assign({}, R, { enabled: true, bindingsFile: BIND }, over || {}) },
 });
 let M;
@@ -173,6 +177,17 @@ const settle = () => new Promise((r) => setTimeout(r, 30));
   const firstLeft = q5[0].leftMs;
   play(firstLeft + 60000);
   ok('one after the other: the first ran out, the second runs, the overflow minute taken from it', rec(5).queue.length === 1 && near(rate(A.v5), 1.05) && Math.abs(rec(5).queue[0].leftMs - (8 * H - 60000)) <= 30000, rec(5).queue);
+
+  // ---- the journal tab's code box ----
+  const A40 = 0xff000040; mp.set(A40, 'profileId', 40);
+  online = [A40]; tick();
+  ok('the tab offers the code box to a new account', globalThis.__dboJournalSections.referrals.view(A40).canEnter === true);
+  ui.get('referralCode')(A40, ['stale', c5]);
+  ok('a stale nonce is ignored', answers.length === 0 && !rec(40).ref);
+  ui.get('referralCode')(A40, ['n1', c5.toLowerCase()]);
+  ok('the tab enters a code, answered in the footer', answers.length === 1 && answers[0].tab === 'referrals' && answers[0].kind === 'ok' && rec(40).ref && rec(40).ref.by === 5 && rec(40).ref.status === 'pending', answers);
+  ui.get('referralCode')(A40, ['n1', c7]);
+  ok('...once', answers[1] && answers[1].kind === 'refused' && /already/.test(answers[1].text) && globalThis.__dboJournalSections.referrals.view(A40).canEnter === false);
 
   // ---- the command window ----
   online = [A.n30]; tick();
