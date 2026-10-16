@@ -249,8 +249,15 @@ module.exports = (api) => {
   // Kinds whose bases' own AI would leave them peaceful but which must attack on sight (Nate, 9 Oct: the minotaurs of Sancre
   // Tor 'aren't fighting back'); gamemode-config.json ownedSpawns.hostileKinds, written into each zone as Hostile: true
   const HOSTILE_KINDS = new Set((((cfg.ownedSpawns || {}).hostileKinds) || []).map(String));
+  // Blackreach's spawns (blackreach.js, wild:br<kind>:b<id>-<plugin>) all take the "blackreach" list, whatever their kind.
+  // Nate, 16 Oct: "IN BLACKREACH GIANTS ARE KILLING EACHOTHER". Druadach's DD_StoneGiant has only DD_StoneSentinelFaction,
+  // which has no relation to GiantFaction (DA06GiantBoss, EncGiant0x), so the raised Aggression 2 had them attack each
+  // other on the hoster's client, and the Falmer, Dwemer, giants, trolls and wisps likewise (no relation between those
+  // factions either). The server already refused their hits (gamemode.js dungeonAllies), but the fights ran on. One list
+  // for every kind makes them allies: FalmerFaction is allied to itself and has no relation to players.
   const OWNED_FACTIONS = Object.assign({
     goblin: ['13:Skyrim.esm', '877f5:BSHeartland.esm'],   // CreatureFaction, CYRGoblinFaction (allied to itself)
+    blackreach: ['13:Skyrim.esm', '2997e:Skyrim.esm'],    // CreatureFaction, FalmerFaction (allied to itself)
   }, ((cfg.ownedSpawns || {}).factions) || {});
   // All or nothing per kind: CreatureFaction alone (a list that only partly resolves) would bring the infighting back
   const factionIds = {};
@@ -261,6 +268,9 @@ module.exports = (api) => {
     else log(`ownedSpawns.factions.${kind}: ${missing.length ? `${missing.join(', ')} not in the load order` : 'empty'}; the ${kind} spawns are left as the plugin made them`);
   }
   const SPAWNED_IDS_FILE = path.resolve('zone-spawns.json');
+  // Version 2 adds Blackreach: version 1 recorded every live Blackreach spawn as done with no factions, so a hot reload
+  // over it starts afresh (an actor given the same list again is a no-op on the client, formView.applyFactions)
+  if (globalThis.__dboOwnedFactionedVersion !== 2) { globalThis.__dboOwnedFactioned = undefined; globalThis.__dboOwnedFactionState = undefined; globalThis.__dboOwnedFactionedVersion = 2; }
   const factioned = globalThis.__dboOwnedFactioned instanceof Map ? globalThis.__dboOwnedFactioned : (globalThis.__dboOwnedFactioned = new Map());
   // The sidecar is read again only when it changed, or when an apply failed and is waiting for its retry
   const factionState = globalThis.__dboOwnedFactionState || (globalThis.__dboOwnedFactionState = { mtime: 0, retry: false });
@@ -279,10 +289,11 @@ module.exports = (api) => {
       if (factioned.has(id)) continue;
       let tag = ''; try { tag = String(mp.get(id, 'private.npcSpawner') || ''); } catch (e) { continue; }
       const m = /^wild:([^:]+):p/.exec(tag);
-      const want = m && factionIds[m[1]];
+      const kind = m ? m[1] : /^wild:br[a-z]+:b[0-9a-f]+-/.test(tag) ? 'blackreach' : '';
+      const want = kind && factionIds[kind];
       if (!want) { factioned.set(id, ''); continue; }
       // Recorded only once applied: a failed apply is tried again on the next tick
-      try { mp.set(id, 'ff_factions', { f: want.map((f) => [f, 0]), c: 0 }); factioned.set(id, m[1]); }
+      try { mp.set(id, 'ff_factions', { f: want.map((f) => [f, 0]), c: 0 }); factioned.set(id, kind); }
       catch (e) { factionState.retry = true; log('owned-spawn factions failed, will retry', id.toString(16), e.message); }
     }
   };
