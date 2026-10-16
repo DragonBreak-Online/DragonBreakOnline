@@ -135,12 +135,19 @@ class Client {
   // keys from the next frame on, one every `gap` ms
   press(keys, gap = 16) { let t = clock.now + 16; for (const k of keys) { this.keys.push({ at: t, k }); t += gap; } }
   resetCounts() { Object.assign(this, { commands: [], notes: [], closeCalls: 0, maxRun: 0, openFrames: 0, errors: [] }); }
+  // Options for section 10, all off by default (the sections above run as before):
+  // - toggle: ~ with the Console open closes it (the game's own toggle)
+  // - keepLine: a line typed and not run stays in the console when it is hidden and shown again
+  // - inputFirst: a frame's keys reach the console before the frame's 'update' (the other order)
+  // - history: Up puts the last line run back on the line (the game's console history)
+  // - no 'update' on a loading screen: SkyrimPlatform's update comes from the Papyrus tick, and none of 73,518 input
+  //   reports (polled from 'update') in the last 300 MB of the server log was taken with the Loading Menu open
   frame() {
     const q = this.ui; this.ui = [];
     for (const m of q) {
       if (m.show) this.menus.add(m.show);
       else if (this.ignoreHides > 0) this.ignoreHides--;
-      else if (this.menus.delete(m.hide) && m.hide === 'Console') this.line = '';
+      else if (this.menus.delete(m.hide) && m.hide === 'Console' && !this.keepLine) this.line = '';
     }
     if (this.nextModel) { this.model = this.nextModel; this.nextModel = null; this.modelSet = true; }
     while (this.inbox.length && this.inbox[0].at <= clock.now) {
@@ -148,20 +155,28 @@ class Client {
       if (m.create) this.nextModel = Object.assign({}, m.create);
       else if (m.set) { const target = this.nextModel || this.model; if (target) target[m.set[0]] = m.set[1]; }
     }
-    if (this.modelSet && this.model) {
+    if (this.inputFirst) this.typeKeys();
+    if (this.modelSet && this.model && !this.menus.has('Loading Menu')) {
+      // skew: this player's own clock (Date.now in the client code) set apart from the server's
+      const realNow = clock.now; clock.now += this.skew || 0;
       for (const k of Object.keys(this.funcs)) {
         const v = this.model[k]; if (v === undefined) continue;
         this.ctx.value = v;
         try { this.funcs[k](this.ctx); } catch (e) { this.errors.push(String(e.message)); }
       }
+      clock.now = realNow;
     }
+    if (!this.inputFirst) this.typeKeys();
+    if (this.menus.has('Console')) { this.openRun++; this.openFrames++; if (this.openRun > this.maxRun) this.maxRun = this.openRun; } else this.openRun = 0;
+  }
+  typeKeys() {
     while (this.keys.length && this.keys[0].at <= clock.now) {
       const { k } = this.keys.shift();
-      if (k === '~') { if (!this.menus.has('Console')) this.ui.push({ show: 'Console' }); }
-      else if (k === 'Enter') { if (this.menus.has('Console') && this.line) this.commands.push(this.line); this.line = ''; }
+      if (k === '~') { if (!this.menus.has('Console')) this.ui.push({ show: 'Console' }); else if (this.toggle) this.ui.push({ hide: 'Console' }); }
+      else if (k === 'Enter') { if (this.menus.has('Console') && this.line) { this.commands.push(this.line); (this.ran = this.ran || []).push(this.line); } if (this.menus.has('Console')) this.line = ''; }
+      else if (k === 'Up') { if (this.history && this.menus.has('Console') && this.ran && this.ran.length) this.line = this.ran[this.ran.length - 1]; }
       else if (this.menus.has('Console')) this.line += k;
     }
-    if (this.menus.has('Console')) { this.openRun++; this.openFrames++; if (this.openRun > this.maxRun) this.maxRun = this.openRun; } else this.openRun = 0;
   }
 }
 
@@ -212,7 +227,8 @@ const makeWorld = (cfg) => {
   w.disconnect = (u) => { if (!w.clients.has(u)) return; try { w.g.__dboHandlers.disconnect(u); } catch (e) { w.errors.push(`disconnect: ${e.message}`); } w.users.delete(u); w.clients.delete(u); };
   // The server process dies: no disconnect handler runs, the saved values stay as they were
   w.crash = () => { w.sched.clearAll(); w.users.clear(); w.clients.clear(); w.connected.clear(); w.g = freshGlobal(); };
-  w.run = (ms) => { const end = clock.now + ms; while (clock.now < end) { clock.now += 16; w.sched.fire(w.errors); for (const c of w.clients.values()) c.frame(); } };
+  // frameMs: the game's frame time (16 ms, about 60 fps; a frame cap in the graphics driver makes it longer)
+  w.run = (ms, frameMs = 16) => { const end = clock.now + ms; while (clock.now < end) { clock.now += frameMs; w.sched.fire(w.errors); for (const c of w.clients.values()) c.frame(); } };
   w.value = (p) => w.forms.get(p.id)[CONSOLE_PROP];
   // A full login: connect, character select, the character, the login waiter's turn
   w.login = (p, o = {}) => { w.add(p); const c = w.connect(p.user, p.name, o.lag); w.run(o.select || 300); w.assign(p.user, o.actor || p.id, o.roles === undefined ? p.roles : o.roles === 'none' ? undefined : o.roles); w.run(o.after === undefined ? 700 : o.after); return c; };
@@ -473,6 +489,101 @@ const tryCommand = (w, c, cmd = 'tgm') => { const before = c.commands.length; c.
   check('onCharacterReady writes it first, before anything that could throw', /loginStep\('console gate', \(\) => consoleGateWrite\(a, true\)\)/.test(first), first.trim());
   check('the logout writes null', /if \(a\) \{ try \{ consoleGateClear\(a\); \}/.test(src.slice(src.indexOf('globalThis.__dboHandlers.disconnect = '), src.indexOf('globalThis.__dboHandlers.disconnect = ') + 6000)));
   check('the consoleRights loop writes it when it changes', /every\('consoleRights', 15000, [^\n]*consoleGateWrite\(a, false\)/.test(src));
+}
+
+// ---- 10. other ways in (independent review, 16 Oct: can a normal player still get in) -------------------------------------------
+{
+  let w = makeWorld();
+  const bob = w.login(P.bob);
+  // over another menu, and with the chat (the browser) focused: the gate asks for the Console menu, whatever else is open
+  for (const m of ['InventoryMenu', 'MapMenu', 'Journal Menu', 'TweenMenu', 'Cursor Menu', 'RaceSex Menu', 'Dialogue Menu', 'MessageBoxMenu', 'Crafting Menu', 'Fader Menu', 'Sleep/Wait Menu', 'Lockpicking Menu', 'Book Menu', 'Container Menu', 'BarterMenu']) {
+    bob.menus.add(m); bob.resetCounts();
+    const ran = tryCommand(w, bob);
+    check(`over the ${m}: ~ tgm Enter never runs, open one frame at most`, !ran && bob.maxRun <= 1, { ran, maxRun: bob.maxRun });
+    bob.menus.delete(m);
+  }
+  bob.sp.browser = { isFocused: () => true, isVisible: () => true }; bob.resetCounts();
+  check('with the chat open (the browser focused): closed the same', !tryCommand(w, bob) && bob.maxRun <= 1, bob.maxRun);
+  delete bob.sp.browser;
+  // shown some other way (the console key rebound in controlmap.txt, a mod's hotkey): the gate looks at the menu, not the key
+  bob.resetCounts(); bob.ui.push({ show: 'Console' }); bob.press(['t', 'g', 'm', 'Enter']); w.run(400);
+  check('a Console shown without the ~ key (a rebind) is closed the same, the command never runs', bob.commands.length === 0 && bob.maxRun <= 1 && bob.closeCalls >= 1, { cmds: bob.commands, maxRun: bob.maxRun });
+  bob.resetCounts(); bob.ui.push({ show: 'Console Native UI Menu' }); w.run(100);
+  check('the Console Native UI Menu open on its own is closed too', !bob.menus.has('Console Native UI Menu') && bob.closeCalls >= 1, bob.closeCalls);
+  // the game's own toggle: ~ while it is open closes it as well
+  bob.toggle = true; bob.resetCounts();
+  bob.press(['~', 't', '~', 'g', '~', 'm', '~', 'Enter', '~', '~', '~', '~'], 16); w.run(600);
+  check('~ and letters mashed one a frame, with the game\'s own toggle: open one frame at most, nothing runs', bob.commands.length === 0 && bob.maxRun <= 1, { cmds: bob.commands, maxRun: bob.maxRun });
+  bob.resetCounts(); bob.press(Array(20).fill('~'), 8); w.run(600);
+  check('~ pressed twice a frame for 20 presses: open one frame at most', bob.maxRun <= 1 && !bob.menus.has('Console'), { maxRun: bob.maxRun, open: bob.menus.has('Console') });
+  bob.toggle = false;
+  // the other order inside a frame (keys before 'update'): still one key in at most, so a person typing cannot run a line
+  bob.inputFirst = true; bob.resetCounts();
+  check('keys reaching the console before the frame\'s update: ~ tgm Enter still never runs', !tryCommand(w, bob) && bob.maxRun <= 1, { cmds: bob.commands, maxRun: bob.maxRun });
+  bob.inputFirst = false;
+  // a loading screen: no update runs, so the gate cannot act there; when it ends, a console left open is closed at once
+  bob.resetCounts(); bob.menus.add('Loading Menu');
+  const ranLoading = tryCommand(w, bob); bob.press(['~']); w.run(200);
+  const openAtEnd = bob.menus.has('Console');
+  bob.menus.delete('Loading Menu'); w.run(48);
+  note(`known limit (whether the console opens on a loading screen is not known; check in game): the gate cannot run there (no 'update'), so a line typed on one ${ranLoading ? 'runs' : 'did not run'}`);
+  check('...the load ends with the console open: it is closed on the first frame after', openAtEnd && !bob.menus.has('Console') && bob.closeCalls >= 1, { openAtEnd, open: bob.menus.has('Console') });
+  // keys that land in the one frame the console is open before the gate's close takes effect
+  bob.resetCounts(); bob.press(['~']); w.run(16); bob.keys.push({ at: clock.now + 4, k: 'Up' }, { at: clock.now + 10, k: 'Enter' });
+  bob.history = true; bob.ran = ['setgs fjumpheightmin 500'];
+  w.run(200);
+  note(`known limit: a line run before the gate (the main menu, a loading screen) is in the console's history; ~ then Up and Enter together inside the next frame (16 ms at 60 fps) ${bob.commands.length ? 'runs it again' : 'did not run it'}`);
+  bob.resetCounts(); bob.press(['~']); w.run(250, 250); bob.press(['t', 'm', 'Enter'], 40); w.run(1000, 250);
+  note(`known limit: with the frame rate capped at 4 fps (a graphics driver setting), ~ then a short line and Enter typed inside one frame ${bob.commands.length ? 'runs it' : 'did not run it'}`);
+  bob.history = false; bob.ran = [];
+  bob.keepLine = true; bob.resetCounts();
+  bob.press(['~', 't'], 16); w.run(200); bob.press(['~', 'm'], 16); w.run(200); bob.press(['~', 'Enter'], 16); w.run(200);
+  note(`unknown (check in game): if the console keeps an unfinished line when it is hidden, a line built one key per ~ press ${bob.commands.length ? `runs (${bob.commands.join()})` : 'did not run'}`);
+  bob.keepLine = false; bob.line = '';
+  // the player's own clock set back while a close was lost: the retry wait is read from that clock
+  bob.resetCounts(); bob.ignoreHides = 1; bob.press(['~']); w.run(32); bob.skew = -3600 * 1000; w.run(1000);
+  check('the player\'s clock set back an hour just after a lost close: the next try still comes within 100 ms', !bob.menus.has('Console') && bob.maxRun * 16 <= 160, { open: bob.menus.has('Console'), maxRun: bob.maxRun });
+  bob.skew = 0; w.run(200);
+  bob.resetCounts(); bob.ignoreHides = 1; bob.press(['~']); w.run(32); bob.skew = 3600 * 1000; w.run(400);
+  check('...and set forward an hour: the same', !bob.menus.has('Console') && bob.maxRun * 16 <= 160, { open: bob.menus.has('Console'), maxRun: bob.maxRun });
+  bob.skew = 0; w.run(200);
+  // a check of the native menu that throws must not leave an open Console alone
+  {
+    const realOpen = bob.sp.Ui.isMenuOpen;
+    bob.sp.Ui.isMenuOpen = (n) => { if (n === 'Console Native UI Menu') throw new Error('native'); return realOpen(n); };
+    bob.resetCounts();
+    check('isMenuOpen("Console Native UI Menu") throws: the open Console is still closed, nothing runs', !tryCommand(w, bob) && bob.maxRun <= 1 && bob.closeCalls >= 1 && bob.errors.length === 0, { cmds: bob.commands, maxRun: bob.maxRun, closeCalls: bob.closeCalls, errors: bob.errors });
+    bob.sp.Ui.isMenuOpen = realOpen;
+  }
+  // a reconnect in the same game (Skyrim not restarted): gamemodeUpdateService keeps the last owner model and never
+  // clears ownerModelSet, and the logout's null is written after the connection is gone, so it never reaches the client
+  w = makeWorld();
+  const lyd = w.login(P.lydia);
+  w.clients.delete(P.lydia.user); w.g.__dboHandlers.disconnect(P.lydia.user); w.users.delete(P.lydia.user);
+  check('a dropped connection: the server wrote null, the client still holds false', w.value(P.lydia) === null && lyd.model[CONSOLE_PROP] === false);
+  w.clients.set(P.lydia.user, lyd); lyd.gamemodeData(w.registry); w.g.__dboHandlers.connect(P.lydia.user); lyd.resetCounts();
+  check('...reconnected in the same game, at character select: the console is still closed (the last character\'s false)', !tryCommand(w, lyd) && lyd.maxRun <= 1, { cmds: lyd.commands, maxRun: lyd.maxRun });
+  w.assign(P.lydia.user, P.lydia.id, P.lydia.roles); w.run(700); lyd.resetCounts();
+  check('...and once her character is back: closed', w.value(P.lydia) === false && !tryCommand(w, lyd) && lyd.maxRun <= 1);
+  // every way to look like an admin that is not a staff rank: none of them is read
+  w = makeWorld();
+  const look = (label, setup) => {
+    const p = w.add(person(`Look ${label}`, 0xff000e00 + (++user), 50 + user, [ROLE.player]));
+    w.forms.get(p.id)['private.discordRoles'] = p.roles; setup(w.forms.get(p.id), p);
+    const v = HAS_GATE ? w.api.consoleGateValue(p.id) : 'no gate';
+    check(`a player who ${label}: false`, v === false, v);
+  };
+  look('has the isAdmin flag true', (f) => { f.isAdmin = true; });
+  look('has consoleCommandsAllowed true (a stale grant, or console commands opened for all)', (f) => { f.consoleCommandsAllowed = true; });
+  look('has admin modes mirrored (ff_adminModes)', (f) => { f.ff_adminModes = { god: true, invis: true }; });
+  look('is named like a staff member', (f) => { f.appearance = { name: 'Jake' }; });
+  look('holds role ids that only look like staff ones', (f) => { f['private.discordRoles'] = [ROLE.player, ' ' + ROLE.gm, ROLE.gm + ' ', ROLE.gm.toUpperCase(), ROLE.gm + 'x', 'role-trialgm2']; });
+  look('was given a staff character\'s private flag', (f) => { f['private.dboStaffChar'] = true; });
+  look('has an ff_console true saved on the character from before', (f) => { f[CONSOLE_PROP] = true; });
+  // a profile id that is not a number cannot match an admin profile
+  const q = w.add(person('Look profile', 0xff000eff, 'x900', [ROLE.player])); w.forms.get(q.id)['private.discordRoles'] = q.roles;
+  const qv = HAS_GATE ? w.api.consoleGateValue(q.id) : 'no gate';
+  check('a player whose profile id is not a number: false', qv === false, qv);
 }
 
 global.Date = RealDate;

@@ -709,15 +709,14 @@ try {
     updateOwner: `
       if (ctx.value !== false) return;
       var ui = ctx.sp.Ui, names = [];
-      try {
-        if (ui.isMenuOpen('Console')) names.push('Console');
-        if (ui.isMenuOpen('Console Native UI Menu')) names.push('Console Native UI Menu');
-      } catch (e) { return; }
+      // One try each: a failed check of the native menu must not leave an open Console alone
+      try { if (ui.isMenuOpen('Console')) names.push('Console'); } catch (e) {}
+      try { if (ui.isMenuOpen('Console Native UI Menu')) names.push('Console Native UI Menu'); } catch (e) {}
       if (!names.length) { ctx.state.dboConsoleRetry = 0; return; }
       // Closed on the frame it is seen open; tried again at most every 100 ms while it stays open. No key tap: an
-      // Escape could open the pause menu
+      // Escape could open the pause menu. The wait never runs past 100 ms from now, so a clock set back cannot stretch it
       var now = Date.now();
-      if (ctx.state.dboConsoleRetry && now < ctx.state.dboConsoleRetry) return;
+      if (ctx.state.dboConsoleRetry && now < ctx.state.dboConsoleRetry && ctx.state.dboConsoleRetry - now <= 100) return;
       ctx.state.dboConsoleRetry = now + 100;
       var tm = ctx.sp.TESModPlatform;
       if (!tm || typeof tm.closeMenu !== 'function') return;
