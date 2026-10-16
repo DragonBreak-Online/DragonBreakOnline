@@ -1,4 +1,4 @@
-// One diag line per sit at a crafting station: menu opened or not, items moved, crafts sent (grain mill and oven: seated, no craft)
+// One diag line per sit at a crafting station that sent no craft (grain mill and oven): menu opened or not, items moved
 import { hex } from "../../lib/clientDiag";
 
 // Keyword editor ids of crafting stations; chairs and benches have none
@@ -57,9 +57,11 @@ export class WorkbenchDiag {
   }
 
   private finish(s: Seat, now: number): string | null {
+    // A craft that went out is already in the server log ("tries to craft"); only a seat with none says where it stopped
+    if (s.sent) return null;
     const keyword = s.info ? s.info.keyword : "";
-    // A chair says nothing unless something a bench does happened on it
-    if (!keyword && !s.menuAt && !s.out && !s.in && !s.sent) return null;
+    // A chair says nothing unless the Crafting Menu opened on it: food eaten or items moved while sitting are no craft
+    if (!keyword && !s.menuAt) return null;
     const remote = s.info && s.info.remoteId ? hex(s.info.remoteId) : `local:${hex(s.localId)}`;
     const base = s.info && s.info.baseId ? hex(s.info.baseId) : "?";
     const menu = s.menuAt ? (Math.max(0, s.menuAt - s.at) / 1000).toFixed(1) : "no";

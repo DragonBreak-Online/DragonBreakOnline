@@ -1,5 +1,5 @@
 // Scripted test for workbenchDiag.ts and its wiring in craftService.ts: one "wb seat" trace line per sit at a crafting station
-// (did the Crafting Menu open, items out and in, crafts sent), none for a chair where nothing happened. Run from skymp5-client:
+// that sent no craft (did the Crafting Menu open, items out and in), none for a chair without the menu. Run from skymp5-client:
 //
 //   node tests/workbenchdiag-harness.js [path to esbuild's package dir]
 'use strict';
@@ -109,7 +109,7 @@ function run({ CraftService }, { WorkbenchDiag }, { TraceGate }) {
       t.leave(0x64b42); t.leave(0x34cdf); t.arrive(0xf431c);
       t.close(); t.tick(300); t.world.seat = null; t.tick(300);
       check('the craft report still goes to the server', t.sent.length === 1 && t.sent[0].data.resultObjectId === 0xf431c && t.sent[0].data.workbench === 0x80717dd, t.sent);
-      check('...and the line counts two out, one in, one sent', t.lines.length === 1 && / kw=CraftingCookpot .* menu=0\.0 out=2 in=1 sent=1$/.test(t.lines[0]), t.lines);
+      check('...and a seat whose craft went out writes no line (the server log has it)', t.lines.length === 0, t.lines);
     }
     // ---- a report sent on standing up (a disenchant: nothing comes back) counts for the bench left -------------------
     {
@@ -118,7 +118,7 @@ function run({ CraftService }, { WorkbenchDiag }, { TraceGate }) {
       t.leave(0x13989); t.tick(300);
       t.world.seat = null; t.tick(300);
       check('the report goes out on standing up', t.sent.length === 1 && t.sent[0].data.workbench === 0xbad0d && t.sent[0].data.resultObjectId === 0, t.sent);
-      check('...and counts for that seat', t.lines.length === 1 && /^wb seat bad0d .* kw=CraftingEnchanting .* out=1 in=0 sent=1$/.test(t.lines[0]), t.lines);
+      check('...and counts for that seat, so no line', t.lines.length === 0, t.lines);
     }
     // ---- a report still waiting when the player moves straight to the mill counts for the first bench --------------
     {
@@ -127,7 +127,15 @@ function run({ CraftService }, { WorkbenchDiag }, { TraceGate }) {
       t.world.seat = GRAIN_MILL; t.tick(300); t.tick(2000);
       t.world.seat = null; t.tick(300);
       check('the waiting report goes out with the first bench', t.sent.length === 1 && t.sent[0].data.workbench === 0xbad0d, t.sent);
-      check('...and counts for it, not for the mill', t.lines.length === 2 && / sent=1$/.test(t.lines[0]) && /^wb seat 5cabc base=9c6df kw=isGrainMill .* menu=no out=0 in=0 sent=0$/.test(t.lines[1]), t.lines);
+      check('...and the mill still writes its own line, sent=0', t.lines.length === 1 && /^wb seat 5cabc base=9c6df kw=isGrainMill .* menu=no out=0 in=0 sent=0$/.test(t.lines[0]), t.lines);
+    }
+    // ---- food eaten on a chair: the report goes as before, no line ---------------------------------------------------
+    {
+      const t = make(); t.tick(300);
+      t.world.seat = CHAIR; t.tick(300); t.leave(0x64b42); t.tick(300);
+      t.world.seat = null; t.tick(300);
+      check('food eaten on a chair writes no line', t.lines.length === 0, t.lines);
+      check('...and the chair report is unchanged', t.sent.length === 1 && t.sent[0].data.workbench === 0x80b5d59, t.sent);
     }
     // ---- a chair where nothing happened says nothing; a key rebuild on it is not counted ------------------------------
     {
