@@ -1,4 +1,5 @@
 // One diag line per sit at a crafting station: menu opened or not, items moved, crafts sent (grain mill and oven: seated, no craft)
+import { hex } from "../../lib/clientDiag";
 
 // Keyword editor ids of crafting stations; chairs and benches have none
 export const WORKBENCH_KEYWORD = /^(Crafting|BYOHCrafting|isGrainMill|isCraftingOven|CYRproxy_HF_BYOHCrafting|WICrafting)/i;
@@ -21,8 +22,6 @@ interface Seat {
   in: number;
   sent: number;
 }
-
-const hex = (n: number): string => (Number.isFinite(n) ? (n >>> 0).toString(16) : "?");
 
 export class WorkbenchDiag {
   // Returns the line for a seat that has just ended; describe runs once per new seat and may throw
