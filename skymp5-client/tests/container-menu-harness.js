@@ -124,7 +124,8 @@ function session(bundlePath, { pingMs = 100, serverPack = {}, refuse = () => fal
     return forms.get(id);
   };
   const writesInMenu = [];
-  const write = (what) => { if (menus.has('ContainerMenu')) writesInMenu.push(what); };
+  const ITEM_MENUS = ['ContainerMenu', 'BarterMenu', 'GiftMenu'];
+  const write = (what) => { const m = ITEM_MENUS.find((x) => menus.has(x)); if (m) writesInMenu.push(`${m}: ${what}`); };
   const player = {
     getFormID: () => PLAYER, isEquipped: () => false, modActorValue() {}, equipItem() {},
     getItemCount: (f) => pack.get(f.getFormID()) || 0,
@@ -323,6 +324,17 @@ async function main() {
     s.openChest({ [IRON_SWORD]: 1 }); s.run(300);
     s.take(IRON_SWORD); s.run(8000);
     check('an excess the game showed before the window opened does not close it', !s.tabbed(), s.taps);
+  }
+
+  // 8. The barter and gift windows list the pack too: the server's pack waits for them to close, as for the container window
+  for (const menu of ['BarterMenu', 'GiftMenu']) {
+    const s = session(bundle, { serverPack: { [GOLD]: 100, [IRON_SWORD]: 1 } });
+    s.sendPackNow(); s.run(200);
+    s.menus.add(menu); s.run(300);
+    s.server.pack.set(GOLD, 40); s.server.pack.delete(IRON_SWORD); s.sendPackNow(); s.run(8000);
+    check(`the pack is not written while ${menu} is open`, s.writesInMenu.length === 0, s.writesInMenu);
+    s.menus.delete(menu); s.run(500);
+    check(`...and the server's pack is applied once ${menu} closes`, s.count(GOLD) === 40 && s.count(IRON_SWORD) === 0, [...s.pack]);
   }
 
   console.log(failures ? `\n${failures} FAILED` : '\nall passed');
