@@ -41,7 +41,9 @@ const timers = new Map();
 const discord = [];
 let discordFail = false;
 const commands = {};
-const sayOf = (a, tab) => said.filter((x) => x[0] === a && (!tab || x[1] === tab)).map((x) => x[2]);
+// A message may carry several lines (a list is one message: lines sent in one tick overwrite each other on the client)
+const sayOf = (a, tab) => said.filter((x) => x[0] === a && (!tab || x[1] === tab)).flatMap((x) => String(x[2]).split('\n'));
+const messagesOf = (a, tab) => said.filter((x) => x[0] === a && (!tab || x[1] === tab)).map((x) => x[2]);
 const bannersOf = (a) => packets.filter((x) => x[0] === a && x[1].customPacketType === 'dboBanner').map((x) => x[1].text);
 const noticesOf = (a) => packets.filter((x) => x[0] === a && x[1].customPacketType === 'dboNotice').map((x) => x[1].text);
 const reset = () => { said.length = 0; packets.length = 0; audits.length = 0; notes.length = 0; teleports.length = 0; discord.length = 0; };
@@ -132,6 +134,7 @@ const flush = () => new Promise((r) => setImmediate(r));
 
   // ---- staff --------------------------------------------------------------------------------------------------------
   reset(); gm(ADMIN, 'list');
+  check('/gm list is one message, its lines joined (Drakstas, 16 Oct: nine calls showed as one)', messagesOf(ADMIN, 'admin').some((t) => /^\d+ open GM calls?:\n {2}#1 /.test(t)), messagesOf(ADMIN, 'admin'));
   check('/gm list shows the open call to staff', sayOf(ADMIN, 'admin').some((t) => /^ {2}#1 Argosh gro-Shatul #ARGO at Whiterun Hold, Tamriel, 3 min ago, waiting: "I am stuck .* \/ also my horse is gone"$/.test(t)), sayOf(ADMIN).join(' | '));
   reset(); gm(ADMIN, 'please help');
   check('staff words that are no subcommand give the usage, not a call', /\/gm list \[all\] \| take <n>/.test(sayOf(ADMIN, 'admin').join(' ')) && globalThis.__dboGmCalls.open.length === 1);

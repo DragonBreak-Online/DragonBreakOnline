@@ -232,14 +232,18 @@ module.exports = (api) => {
     return c;
   };
   const staffName = (a) => display(a);
+  // One message with line breaks: several chat lines in the same tick overwrite each other on the client, so only the last
+  // call showed (Drakstas, 16 Oct: nine calls open, /gm list showed #131 alone)
   const list = (a, all) => {
-    if (!S.open.length) say(a, 'No open GM calls.');
-    else { say(a, `${S.open.length} open GM call${S.open.length === 1 ? '' : 's'}:`); for (const c of S.open) say(a, '  ' + callLine(c)); }
+    const lines = [];
+    if (!S.open.length) lines.push('No open GM calls.');
+    else { lines.push(`${S.open.length} open GM call${S.open.length === 1 ? '' : 's'}:`); for (const c of S.open) lines.push('  ' + callLine(c)); }
     if (all) {
       const recent = S.closed.slice(-10).reverse();
-      if (recent.length) say(a, 'Lately closed:');
-      for (const c of recent) say(a, `  #${c.n} ${c.name}, ${c.closedHow}${c.closedBy ? ' by ' + c.closedBy : ''} ${ago(c.closedAt)}${c.note ? ': ' + c.note : ''}`);
+      if (recent.length) lines.push('Lately closed:');
+      for (const c of recent) lines.push(`  #${c.n} ${c.name}, ${c.closedHow}${c.closedBy ? ' by ' + c.closedBy : ''} ${ago(c.closedAt)}${c.note ? ': ' + c.note : ''}`);
     }
+    say(a, lines.join('\n'));
   };
   const take = (a, c, quietly) => {
     if (c.takenBy && c.takenBy.profile === Number(profileOf(a))) { if (!quietly) say(a, `You already have GM call #${c.n}.`); return true; }
@@ -343,8 +347,7 @@ module.exports = (api) => {
         seen.told = true;
         if (!S.open.length) continue;
         const waiting = S.open.filter((c) => !c.takenBy).length;
-        say(s, `${S.open.length} open GM call${S.open.length === 1 ? '' : 's'} (${waiting} waiting):`);
-        for (const c of S.open) say(s, '  ' + callLine(c));
+        say(s, [`${S.open.length} open GM call${S.open.length === 1 ? '' : 's'} (${waiting} waiting):`].concat(S.open.map((c) => '  ' + callLine(c))).join('\n'));
         if (waiting && !quiet(s)) { const t = `${waiting} GM call${waiting === 1 ? '' : 's'} waiting: /gm list`; banner(s, t, 8); notice(s, t); }
       }
     }
