@@ -675,6 +675,77 @@ mp._onScaleReport = (pcFormId, reported) => {
   } catch (e) { log('scale report failed', e.message); }
 };
 
+// ---- the ~ console: closed for players, open for staff (Jake, 16 Oct) ---------------------------------------------------
+// "Disable the ~ for normal users but keep it live for admins". No server setting keeps the console from opening
+// (enableConsoleCommandsForAll covers only the commands the server runs), but an owner property's updateOwner code runs on
+// the player's own client on every frame, with the Console open too (ff_scale above calls Ui.isMenuOpen the same way).
+// ff_console is true for every staff rank from Trial GM up (staffCan 'adminchat': the people the F7 panel and the isAdmin
+// flag answer), false for everyone else, and null while the gate is off or the character's roles are not loaded. The
+// client closes the Console only on an exact false: undefined, null, true, a missing closeMenu or any error close nothing,
+// so a late, lost or failed write never closes a staff member's console. It does not read isAdmin, which resyncAdminFlag
+// turns false for 2 s after every staff login. What staff may run in the console is unchanged (consoleCommandsAllowed and
+// the client's wrappers), and the server's own checks stay the authority: this deters, it does not secure.
+// Written at the character's assignment (spawn.ts writes this login's roles first, in the same call), again first thing
+// in onCharacterReady (before anything there can throw), by the consoleRights loop when it changes, for everyone online
+// at load, and null at logout so no stale answer is saved. The code reaches a client at its next connect (clientside hot
+// reload is off); a value reaches it at once.
+// gamemode-config.json "consoleGate": { enabled (a missing key is on; false is the off switch: everyone online is written
+// null at the next load), testProfiles: [profile ids that get false whatever their rank, to check it in game as staff] }
+const CONSOLE_PROP = 'ff_console';
+const CONSOLE_GATE_ON = cfg.consoleGate !== false && (cfg.consoleGate || {}).enabled !== false;
+const CONSOLE_TEST_PROFILES = new Set((Array.isArray((cfg.consoleGate || {}).testProfiles) ? cfg.consoleGate.testProfiles : []).map(Number).filter(Number.isFinite));
+const consoleGateValue = (a) => {
+  if (!CONSOLE_GATE_ON) return null;
+  const profile = profileOf(a);
+  let roles; try { roles = mp.get(a, 'private.discordRoles'); } catch (e) { return null; }
+  if (!Array.isArray(roles) && !ADMIN_PROFILES.has(profile)) return null;
+  if (CONSOLE_TEST_PROFILES.has(profile)) return false;
+  return staffCan(a, 'adminchat') ? true : false;
+};
+// Every ctx.state key starts with dboConsole: ctx.state is one object shared by every owner property's code
+try {
+  mp.makeProperty(CONSOLE_PROP, {
+    isVisibleByOwner: true, isVisibleByNeighbors: false,
+    updateOwner: `
+      if (ctx.value !== false) return;
+      var ui = ctx.sp.Ui, names = [];
+      try {
+        if (ui.isMenuOpen('Console')) names.push('Console');
+        if (ui.isMenuOpen('Console Native UI Menu')) names.push('Console Native UI Menu');
+      } catch (e) { return; }
+      if (!names.length) { ctx.state.dboConsoleRetry = 0; return; }
+      // Closed on the frame it is seen open; tried again at most every 100 ms while it stays open. No key tap: an
+      // Escape could open the pause menu
+      var now = Date.now();
+      if (ctx.state.dboConsoleRetry && now < ctx.state.dboConsoleRetry) return;
+      ctx.state.dboConsoleRetry = now + 100;
+      var tm = ctx.sp.TESModPlatform;
+      if (!tm || typeof tm.closeMenu !== 'function') return;
+      for (var i = 0; i < names.length; i++) { try { tm.closeMenu(names[i]); } catch (e) {} }
+      if (!(now < (ctx.state.dboConsoleToldAt || 0) + 10000)) {
+        ctx.state.dboConsoleToldAt = now;
+        try { ctx.sp.Debug.notification('The console is for staff.'); } catch (e) {}
+      }`,
+    updateNeighbor: '',
+  });
+} catch (e) { log('makeProperty:', e.message); }
+// force: write even when unchanged (a login). Returns the value written or kept.
+const consoleGateWrite = (a, force) => {
+  const v = consoleGateValue(a);
+  let cur; try { cur = mp.get(a, CONSOLE_PROP); } catch (e) { return v; }
+  if (cur === undefined) cur = null;
+  if (!force && cur === v) return v;
+  try { mp.set(a, CONSOLE_PROP, v); } catch (e) { log('console gate write failed', e.message); return cur; }
+  if (!force) log(`console gate: ${display(a)} now ${v} (was ${cur})`);
+  return v;
+};
+const consoleGateClear = (a) => { try { mp.set(a, CONSOLE_PROP, null); } catch (e) { /* gone with the character */ } };
+try {
+  const counts = { true: 0, false: 0, null: 0 };
+  for (const a of onlineActors()) counts[String(consoleGateWrite(a, true))]++;
+  log(`console gate ${CONSOLE_GATE_ON ? 'on' : 'off'}: online now ${counts.true} staff (open), ${counts.false} closed, ${counts.null} undecided${CONSOLE_TEST_PROFILES.size ? `, ${CONSOLE_TEST_PROFILES.size} test profile(s)` : ''}`);
+} catch (e) { log('console gate load pass failed', e.message); }
+
 // ---- name / permission change watch ----------------------------------------------------------
 const seen = new Map(); // profileId -> { name, tier, roles }
 // The chat's Admin tab follows the owner property isAdmin, and the client writes it into the page only when the value it
@@ -2784,6 +2855,7 @@ const loginStep = (name, fn) => {
   if (ms > LOGIN_STEP_WARN_MS) log(`slow login step ${name}: ${ms.toFixed(1)} ms`);
 };
 const onCharacterReady = (userId, a) => {
+  loginStep('console gate', () => consoleGateWrite(a, true));
   try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('login', userId, a); } catch (e) { /* the player log is optional */ }
   connectedAt.set(a, Date.now());
   // The drift switches before the login's looks (the beast revert below), so ownLook "off" or "name" covers a look sent at login
@@ -2889,6 +2961,9 @@ const assignHook = (userId, a) => {
   // When each actor was last handed to a user, the same character picked again included (racemenupresets.js sends a plugin race again after it)
   try { (globalThis.__dboAssignedAt instanceof Map ? globalThis.__dboAssignedAt : (globalThis.__dboAssignedAt = new Map())).set(Number(a) >>> 0, Date.now()); } catch (e) { /* nothing here may throw */ }
   loginStep('real names on assign', () => { if (typeof globalThis.__dboRealNamesLogin === 'function') globalThis.__dboRealNamesLogin(a, true); });
+  // The ~ console gate in the same turn as the assignment: spawn.ts wrote this login's roles just before this call, and the
+  // value saved at the last logout (null, or a crash's leftover) is corrected before the client's first frame with it
+  loginStep('console gate on assign', () => consoleGateWrite(a, true));
   // spawn.ts does its own bookkeeping after this call returns, so nothing here may throw
   try { if (typeof globalThis.__dboPrevAssign === 'function') globalThis.__dboPrevAssign(userId, a); } catch (e) { log('onUserAssignActor (previous) failed', e.message); }
 };
@@ -2924,6 +2999,8 @@ globalThis.__dboHandlers.disconnect = (userId) => {
   if (a) { try { globalThis.__dboNoteLogout(a); } catch (e) { log('logout note failed', e.message); } }
   // The player log (playerlog.js), before the beast revert and the unmask below change the name
   if (a) { try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('logout', userId, a); } catch (e) { /* the player log is optional */ } }
+  // No ~ console answer is saved with the character: the next login decides it afresh (null closes nothing)
+  if (a) { try { consoleGateClear(a); } catch (e) { log('console gate logout failed', e.message); } }
   // Before the revert below clears the beast state: a drop with the Journal closed may be a crash next to a
   // Vampire Lord, and the breaker needs the position and the state while they still exist
   if (a && globalThis.__dboVlBreakerDrop) {
@@ -6007,7 +6084,8 @@ onUi('consoleLocal', (a, args) => {
 });
 // The console can spawn anything, so a GM (base tier) has none, whatever AdminSystem granted at connect
 const gmConsoleOff = (a) => { try { if (tierOf(a) === 'gm' && mp.get(a, 'consoleCommandsAllowed') === true) mp.set(a, 'consoleCommandsAllowed', false); } catch (e) { /* not an actor */ } };
-every('consoleRights', 15000, () => { for (const a of onlineActors()) { gmConsoleOff(a); sendConsoleRights(a, false); } });
+// The ~ console gate too (the ~ console section near the top), written only when it changes: a rank changed in the session
+every('consoleRights', 15000, () => { for (const a of onlineActors()) { gmConsoleOff(a); sendConsoleRights(a, false); try { consoleGateWrite(a, false); } catch (e) { /* next round */ } } });
 // ---- item guards on drop, put and take (server\itemguards.js; server-authority audit B1/B2) -------------------------
 try {
   const ITEMGUARDS_JS = path.resolve('itemguards.js');

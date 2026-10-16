@@ -1514,5 +1514,10 @@
  "placement": {
   "_comment": "The F7 Place tab (placement.js); every key defaults in code. worldEdit (worldedit.js): client true = 0.3.102+ clients apply staff edits of plugin-placed objects (hide and move, statics too) from the worldEdits list; resendMs 0 stops the 0.3.101 hide resend. Nate 16 Oct: turn it on. Hot reload.",
   "worldEdit": {"client": true, "resendMs": 0}
+ },
+ "consoleGate": {
+  "_comment": "The ~ console closed for players and open for staff from Trial GM up (gamemode.js ff_console; Jake, 16 Oct). enabled false is the off switch: the next hot reload writes everyone online null and nothing is closed any more. testProfiles: profile ids whose console is closed whatever their rank, to check it in game as staff. A missing key is on.",
+  "enabled": true,
+  "testProfiles": []
  }
 }
