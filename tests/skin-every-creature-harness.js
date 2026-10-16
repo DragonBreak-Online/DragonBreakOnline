@@ -71,24 +71,32 @@ for (const c of census) {
   const s = stashFor(c);
   if (NOT_WILDLIFE.test(c.npcEdid)) { people.push(c.npcEdid); if (s.how === 'part' && s.items.length) empty.push(`${c.npcEdid} is not wildlife but would be skinned for ${s.items.join(', ')}`); continue; }
   rows.push(`${c.npcEdid.padEnd(44)} ${s.how.padEnd(6)} ${s.items.join(', ')}`);
-  if (!s.items.length) empty.push(`${c.npcEdid} (death item ${c.deathItem || 'none'}: ${c.items.map((i) => i.edid).join(', ') || 'nothing'})`);
+  // A creature whose only part is food keeps it on the body to loot (16 Oct: players had to skin a chicken for its meat)
+  const foodOnly = c.items.length && c.items.every((i) => /Food|Meat/.test(i.edid) || !/^(MISC|INGR|ALCH)$/.test(i.type || 'ALCH') || /Gold|Gem|Jewelry/.test(i.edid));
+  if (!s.items.length && !foodOnly) empty.push(`${c.npcEdid} (death item ${c.deathItem || 'none'}: ${c.items.map((i) => i.edid).join(', ') || 'nothing'})`);
+  if (s.items.some((e) => /Food|Meat/.test(e))) empty.push(`${c.npcEdid} would be skinned for food (${s.items.join(', ')}), which stays on the body`);
   else if (s.how === 'part' && !s.held && !/Wisp/.test(c.npcEdid)) empty.push(`${c.npcEdid} gives ${s.items.join(', ')}, which is not its own`);
 }
 console.log(rows.sort().join('\n'));
-check(`every wild creature of ${census.length - people.length} gives the skinner something of its own${empty.length ? ': ' + empty.join('; ') : ''}`, !empty.length);
+check(`every wild creature of ${census.length - people.length} gives the skinner its own part, or keeps its meat on the body${empty.length ? ': ' + empty.join('; ') : ''}`, !empty.length);
 check(`the ${people.length} not skinned are people and machines (goblins, rieklings, Falmer, Dwemer automatons) or giants and ogres`, people.every((e) => NOT_WILDLIFE.test(e)));
 
 // Lore spot checks: the part is the creature's own, never its meat when it has a better part
 const want = { EncMudcrabMedium: 'MudcrabChitin', EncSkeever: 'SkeeverTail', EncFrostbiteSpider: 'FrostbiteVenom', EncTroll: 'TrollFat',
   EncChaurus: 'ChaurusChitin', EncHorker: 'HorkerTusk', EncMammothTamed: 'MammothTusk', EncSlaughterfish: 'SlaughterfishScales',
   EncIceWraith: 'IceWraithTeeth', EncWispMother: 'WispWrappings', EncWisp: 'glowDust', DLC2EncNetchBull: 'DLC2NetchLeather',
-  DLC2EncNetchCalf: 'DLC2NetchJelly', EncHare: 'FoodRabbit', EncChicken: 'FoodChicken', BSKEncRat: 'BSKFoodRatMeat',
+  DLC2EncNetchCalf: 'DLC2NetchJelly',
   EncWolf: 'WolfPelt', CYREncWolf: 'CYRWolfPelt', EncSabreCat: 'SabreCatPelt', EncBear: 'BearPelt', EncDeer: 'DeerHide02' };
 for (const [npc, part] of Object.entries(want)) {
   const c = census.find((x) => x.npcEdid === npc);
   if (!c) { check(`${npc} is in the census`, false); continue; }
   const s = stashFor(c);
   check(`${npc} gives ${part}`, s.items.length === 1 && s.items[0] === part);
+}
+// Meat-only creatures are not skinned: their meat stays lootable on the body
+for (const npc of ['EncHare', 'EncChicken', 'BSKEncRat', 'EncDog']) {
+  const c = census.find((x) => x.npcEdid === npc);
+  check(`${npc}: nothing to skin, its meat stays on the body`, !!c && stashFor(c).items.length === 0, c && stashFor(c));
 }
 // A boar is a trophy (tusk and leather); an ogre its tooth
 check('a Bawn boar keeps its trophy', stashFor(census.find((x) => x.npcEdid === 'BSKEncBoar01') || { npcEdid: 'BSKEncBoar01', items: [] }).how === 'trophy');
