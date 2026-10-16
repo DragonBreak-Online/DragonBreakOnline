@@ -1284,12 +1284,121 @@ module.exports = (api) => {
   globalThis.__dboTomeWriteActions = (a) => (WRITE.enabled && tierOf(a, 'scholar') >= Number(WRITE.scholarTier) ? [{ id: 'write', label: 'Write a spell tome' }] : []);
   globalThis.__dboTomeWriteOpen = (a, place) => openWrite(a, Number(place) >>> 0);
 
+  // ---- writing scrolls (Nate, 16 Oct) ----------------------------------------------------------------------------------
+  // The sibling of tome writing above, and its supply: a Master Scholar writes scrolls of a spell they know at a Scholars'
+  // Ledger, for paper, on a cooldown of its own per rank. MASTER SCROLLS ARE NEVER WRITTEN (Nate): a Master tome's five
+  // scrolls still have to be found, which is what keeps Master spells rare.
+  //
+  // Why a write makes more than one scroll (Nate, 16 Oct, "fix loops"): tome writing SPENDS scrolls - 1 at Apprentice, 2 at
+  // Adept, 4 at Expert - so one scroll per cooldown would have made an Expert tome four writes of three days each, twelve
+  // days of scroll writing before its own week-long tome cooldown even began. perWrite is instead the number that rank's
+  // tome needs, so one scroll-writing cycle feeds one tome: Apprentice 1, Adept 2, Expert 2 (half of its four, so an Expert
+  // tome is two cycles, six days, not twelve). Novice tomes need no scroll at all, so Novice scrolls are written three at a
+  // time purely to be cast.
+  //
+  // Cooldowns are SEPARATE from the tome ones and neither reads the other: private.dboScrollWrites { rank: ms } against
+  // private.dboTomeWrites. Removed spells never, restricted arts only for a Senior rank, as everywhere else.
+  const SWRITE = Object.assign({
+    enabled: true, scholarTier: 4,
+    cooldownDays: [1, 2, 2, 3, 0],   // Novice, Apprentice, Adept, Expert; Master never (see maxRank)
+    perWrite: [3, 1, 2, 2, 0],       // what one write makes, by rank
+    paper: [1, 1, 2, 3, 0],          // what it costs, by rank
+    paperId: '7cba1:BSHeartland.esm',
+    maxRank: 3,                      // the highest rank that can be written at all: Expert
+  }, CFG.scrollWriting || {});
+  const SWRITES = 'private.dboScrollWrites';
+  // Takes n of one base from the inventory, as takeScrolls does for a spell's scrolls
+  const takeItems = (a, baseId, n) => {
+    const entries = inventoryOf(a).map((e) => Object.assign({}, e));
+    let left = n;
+    for (const e of entries) { if (!left) break; if (e.worn || (Number(e.baseId) >>> 0) !== (baseId >>> 0)) continue; const k = Math.min(left, Number(e.count) || 0); e.count -= k; left -= k; }
+    return !left && set(a, 'inventory', { entries: entries.filter((e) => Number(e.count) > 0) });
+  };
+  const sWrittenAt = (a, rank) => Number((get(a, SWRITES, {}) || {})[rank]) || 0;
+  const sWriteWait = (a, rank) => Math.max(0, sWrittenAt(a, rank) + (Number(SWRITE.cooldownDays[rank]) || 0) * DAY - Date.now());
+  const scrollBaseOf = (spellId) => (SCROLLS_OF_SPELL.get(spellId >>> 0) || [])[0] || 0;
+  const paperHeld = (a) => { const id = idOf(SWRITE.paperId); return id ? inventoryOf(a).filter((e) => e && !e.worn && (Number(e.baseId) >>> 0) === (id >>> 0)).reduce((n, e) => n + (Number(e.count) || 0), 0) : 0; };
+  // What `a` may write a scroll of: a spell they know that has a scroll in the game, below Master
+  const scrollable = (a) => [...new Set([].concat(ownLearned(a), knownIds(a)))].map(classifySpell)
+    .filter((sp) => sp && sp.rank <= Number(SWRITE.maxRank) && scrollBaseOf(sp.id) && !removed(sp.id)
+      && (!TOME_OF_SPELL.has(sp.id) || !restrictedTome(TOME_OF_SPELL.get(sp.id)) || isSenior(a)))
+    .sort((x, y) => x.school.localeCompare(y.school) || x.rank - y.rank || x.name.localeCompare(y.name));
+  const sWriteRefusal = (a, sp) => {
+    if (!SWRITE.enabled) return 'Scrolls are not written just now.';
+    if (tierOf(a, 'scholar') < Number(SWRITE.scholarTier)) return 'Only a Master Scholar writes scrolls.';
+    if (sp.rank > Number(SWRITE.maxRank)) return `${sp.name} is a ${RANKS[sp.rank]} spell, and no scroll of one is ever written; they are only found.`;
+    if (!scrollable(a).some((x) => x.id === sp.id)) {
+      if (!scrollBaseOf(sp.id)) return `No scroll of ${sp.name} exists to copy.`;
+      return TOME_OF_SPELL.has(sp.id) && restrictedTome(TOME_OF_SPELL.get(sp.id)) && !isSenior(a) ? `${RESTRICTED_LINE}.` : 'You can only write a scroll of a spell you know.';
+    }
+    const wait = sWriteWait(a, sp.rank);
+    if (wait > 0) return `You wrote ${/^[AEIOU]/.test(RANKS[sp.rank]) ? 'an' : 'a'} ${RANKS[sp.rank]} scroll not long ago; the next is yours in ${waitText(wait)}.`;
+    const paper = Number(SWRITE.paper[sp.rank]) || 0;
+    if (paper && paperHeld(a) < paper) return `A ${RANKS[sp.rank]} scroll takes ${paper} paper; you carry ${paperHeld(a)}.`;
+    return null;
+  };
+  const finishScrollWrite = (a, sp) => {
+    const why = sWriteRefusal(a, sp);
+    if (why) return why;
+    const paper = Number(SWRITE.paper[sp.rank]) || 0;
+    const made = Math.max(1, Number(SWRITE.perWrite[sp.rank]) || 1);
+    const paperId = idOf(SWRITE.paperId);
+    if (paper && !takeItems(a, paperId, paper)) return 'Your paper could not be used. Try again.';
+    if (!giveItem(a, scrollBaseOf(sp.id), made)) {
+      if (paper) giveItem(a, paperId, paper);
+      log(`spells: ${who(a)} wrote ${sp.name} scrolls but they could not be given; the paper is returned`);
+      return 'The scrolls could not be handed to you. Your paper is returned.';
+    }
+    set(a, SWRITES, Object.assign({}, get(a, SWRITES, {}) || {}, { [sp.rank]: Date.now() }));
+    audit(`SCROLLWRITE ${who(a)} wrote ${made} ${sp.name} scroll(s) (${RANKS[sp.rank]}) for ${paper} paper`);
+    return `You write ${made} scroll${made === 1 ? '' : 's'} of ${sp.name}.${paper ? ` ${paper} paper is spent.` : ''} Your next ${RANKS[sp.rank]} scroll in ${waitText((Number(SWRITE.cooldownDays[sp.rank]) || 0) * DAY)}.`;
+  };
+  const sWriteRow = (a, sp) => {
+    const wait = sWriteWait(a, sp.rank); const paper = Number(SWRITE.paper[sp.rank]) || 0;
+    const made = Math.max(1, Number(SWRITE.perWrite[sp.rank]) || 1);
+    const cost = `${made} for ${paper ? `${paper} paper` : 'nothing'} (${paperHeld(a)} carried)`;
+    return { id: `swrite:${descOf(sp.id)}`, label: `${spellLabel(sp)}: ${wait > 0 ? `ready in ${waitText(wait)}` : cost}` };
+  };
+  const openScrollWrite = (a, place, note, page) => {
+    const all = scrollable(a);
+    const pg = Math.max(0, Number(page) || 0); const per = MAX_ROWS - 2;
+    const rows = all.slice(pg * per, pg * per + per).map((sp) => sWriteRow(a, sp));
+    if (all.length > (pg + 1) * per) rows.push({ id: `spage:${pg + 1}`, label: 'More spells' });
+    rows.push({ id: 'cancel', label: 'Close' });
+    menu(a, MENU_ID, note || (all.length ? 'Write scrolls of which spell?' : 'You know no spell below Master that has a scroll to copy.'), rows, { kind: 'swrite', place: place >>> 0, page: pg });
+    return true;
+  };
+  const chooseScrollWrite = (a, choice, p) => {
+    if (!atPlace(a, p.place)) { closeWidget(a, MENU_ID); return personal(a, 'You walked away from the ledger.'); }
+    if (choice.startsWith('spage:')) return openScrollWrite(a, p.place, null, Number(choice.slice(6)));
+    if (choice.startsWith('swrite:')) {
+      const sp = classifySpell(idOf(choice.slice(7)));
+      if (!sp) return openScrollWrite(a, p.place, 'That spell cannot be written.', p.page);
+      // The menu stays open with what happened as its note, as the tome one does, so a Scholar writes several in a row
+      return openScrollWrite(a, p.place, finishScrollWrite(a, sp), p.page);
+    }
+    closeWidget(a, MENU_ID);
+  };
+  globalThis.__dboScrollWriteActions = (a) => (SWRITE.enabled && tierOf(a, 'scholar') >= Number(SWRITE.scholarTier) ? [{ id: 'swrite', label: 'Write scrolls' }] : []);
+  globalThis.__dboScrollWriteOpen = (a, place) => openScrollWrite(a, Number(place) >>> 0);
+  // Both cooldown sets for the Scholar page of the F3 Skills tab (journalskills.js). Separate lists, never merged.
+  globalThis.__dboScholarWriteView = (a) => {
+    const now = Date.now();
+    const row = (conf, waitOf, rank) => ({ rank: RANKS[rank], days: Number((conf.cooldownDays || [])[rank]) || 0, readyInMs: waitOf(a, rank) });
+    return {
+      tomes: (WRITE.enabled ? [0, 1, 2, 3, 4] : []).map((r) => row(WRITE, writeWait, r)),
+      scrolls: (SWRITE.enabled ? [0, 1, 2, 3] : []).map((r) => Object.assign(row(SWRITE, sWriteWait, r), { perWrite: Number(SWRITE.perWrite[r]) || 0, paper: Number(SWRITE.paper[r]) || 0 })),
+      masterScrolls: false,   // never written; the page says so rather than showing an empty row
+      now,
+    };
+  };
+
   // ---- menu answers ----------------------------------------------------------------------------------
   onUi('spellsChoose', (a, args) => {
     const p = pending.get(a >>> 0); const choice = String(args[0] || '');
     // Picking a spell to forget or a student reopens this widget id as the next menu; closing it first in the same tick
     // loses the cursor (the inn prompt, 2026-09-25), so those paths reopen with no close in between.
-    const reopening = !!p && ((p.kind === 'teach' && choice.startsWith('student:')) || p.kind === 'college' || ((p.kind === 'lecternRoot' || p.kind === 'write') && choice !== 'cancel'));
+    const reopening = !!p && ((p.kind === 'teach' && choice.startsWith('student:')) || p.kind === 'college' || ((p.kind === 'lecternRoot' || p.kind === 'write' || p.kind === 'swrite') && choice !== 'cancel'));
     if (reopening) pending.delete(a >>> 0); else closeMenu(a);
     if (!p || choice === 'cancel') return;
     // A Class Lectern's first question: the class panel opens before this menu closes (panel handoff), or teaching
@@ -1301,6 +1410,7 @@ module.exports = (api) => {
       return;
     }
     if (p.kind === 'write') return chooseWrite(a, choice, p);
+    if (p.kind === 'swrite') return chooseScrollWrite(a, choice, p);
     if (p.kind === 'college') {
       // The teacher must still be at the ledger or lectern to choose; a lesson is offered from there
       if (!inRoomOf(p.place, a)) { closeWidget(a, MENU_ID); return personal(a, 'You walked away from the ledger.'); }

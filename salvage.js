@@ -261,7 +261,7 @@ module.exports = (api) => {
     log(`salvage: ${who(a)} opened the ${station.label} menu at ${descOf(target)}${note ? ` (${note})` : ''}`);
     openWidget(a, {
       type: 'contextMenu', id: WIDGET_ID, mode: 'menu', targetName: note || station.label,
-      actions: [{ id: 'spellbook', label: 'Open your Spell Book' }].concat(schoolActions(a), [{ id: 'books', label: 'Break down old books' }], manualActions(a), tomeActions(a), teachActions(a, target), writeActions(a)),
+      actions: [{ id: 'spellbook', label: 'Open your Spell Book' }].concat(schoolActions(a), [{ id: 'books', label: 'Break down old books' }], manualActions(a), tomeActions(a), teachActions(a, target), writeActions(a), scrollActions(a)),
       events: { action: 'dbo:salvageChoose', close: 'dbo:salvageClose' },
     }, true);
   };
@@ -279,6 +279,8 @@ module.exports = (api) => {
   const tomeActions = (a) => { try { return typeof globalThis.__dboTomeShopHere === 'function' && globalThis.__dboTomeShopHere(a) ? [{ id: 'tomes', label: 'Buy spell tomes' }] : []; } catch (e) { return []; } };
   // Writing a spell tome (spells.js; a Master Scholar, Nate 16 Oct)
   const writeActions = (a) => { try { return typeof globalThis.__dboTomeWriteActions === 'function' ? (globalThis.__dboTomeWriteActions(a) || []) : []; } catch (e) { return []; } };
+  // Writing scrolls (spells.js; a Master Scholar, Nate 16 Oct), the sibling of the tome button
+  const scrollActions = (a) => { try { return typeof globalThis.__dboScrollWriteActions === 'function' ? (globalThis.__dboScrollWriteActions(a) || []) : []; } catch (e) { return []; } };
   // Teaching a spell at a college's own ledger (spells.js; Senior ranks and above, Nate 11 Oct)
   const teachActions = (a, target) => { try { return typeof globalThis.__dboTeachLedgerActions === 'function' ? (globalThis.__dboTeachLedgerActions(a, target) || []) : []; } catch (e) { return []; } };
   // A blacksmith's ledger: the schematics it sells, each row sb:<book id>. Its title names the hall's faction where known
@@ -387,6 +389,16 @@ module.exports = (api) => {
       // spells.js's menu opens first and takes the cursor; this one closes after it (panel handoff)
       const done = typeof globalThis.__dboTomeWriteOpen === 'function' && globalThis.__dboTomeWriteOpen(a, p.target);
       if (!done) return openLedgerMenu(a, p.target, station, 'Spell tomes are not written here.');
+      S.pending.delete(a >>> 0);
+      closeWidget(a, WIDGET_ID);
+      return;
+    }
+    if (station.dedicated && id === 'swrite') {
+      try { if (distanceMeters(a, p.target) > CFG.reachMeters) { closePanel(a); personal(a, `You walked away from the ${station.label}.`); return; } } catch (e) { /* no position */ }
+      log(`salvage: ${who(a)} chose swrite at the ${station.label}`);
+      // spells.js's menu opens first and takes the cursor; this one closes after it (panel handoff)
+      const done = typeof globalThis.__dboScrollWriteOpen === 'function' && globalThis.__dboScrollWriteOpen(a, p.target);
+      if (!done) return openLedgerMenu(a, p.target, station, 'Scrolls are not written here.');
       S.pending.delete(a >>> 0);
       closeWidget(a, WIDGET_ID);
       return;

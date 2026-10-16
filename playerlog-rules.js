@@ -408,6 +408,8 @@ clean_(`SCHOOLS MANUAL SKILLBOOK SCHEMATIC READ CONTRACT CHAMPION CHILL REVIVE F
   RUINBUTTON TAX SUPPLY BOOST STAFF APPEARANCE RECIPE BREW TREASURY ENCH-RESTORE ENCH-LEARNED-REPAIR CLOCK SPELL
   CITIZEN ELECTION BLACKREACH`);
 // Name #TAG parties with no profile (display()): resolved by name and tag, never by the tag alone
+// A Master Scholar's scroll writing (spells.js; Nate, 16 Oct): spell names come from the records, never a player's words
+clean_('SCROLLWRITE');
 clean_('LEVEL ROPE STRUGGLE', { display: true });
 // The client-judged minigame mismatches: clean, and a security signal
 clean_('LABOUR-MISMATCH LOCKPICK-MISMATCH PRAYER-MISMATCH RITE-MISMATCH SKINNING-MISMATCH STRUGGLE-MISMATCH', { signal: 'mismatch', display: true });
@@ -1498,6 +1500,7 @@ spells.js SPELL 3f46006a clean
 spells.js SPELL 6eca2fef clean
 spells.js TEACH acada6bd parsed
 spells.js TEACH d52977b9 parsed
+spells.js SCROLLWRITE 7c09274e clean
 sprstrip.js SPRSTRIP ac1572f1 parsed
 sprstrip.js SPRSTRIP a7b3a299 parsed
 sprstrip.js SPRSTRIP d281443a parsed
