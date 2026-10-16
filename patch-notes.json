@@ -1,5 +1,20 @@
 [
   {
+    "title": "Respawns in Dawnstar, Morthal and Winterhold",
+    "date": "2026-10-16",
+    "version": "Server update",
+    "tag": "Change",
+    "sections": [
+      {
+        "heading": "Death",
+        "items": [
+          "If you fall in Dawnstar or Morthal, you now wake by the town's Shrine of Arkay and its graves, not in another city.",
+          "If you fall in Winterhold, you now wake at Winterhold's own temple, beside the Hall of the Dead."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Daedric cults and Skyrim's lands",
     "date": "2026-10-16",
     "version": "Hotfix",

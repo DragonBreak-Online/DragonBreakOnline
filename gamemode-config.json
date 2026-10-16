@@ -929,7 +929,10 @@
     7560.6
    ],
    "rotZ": 0
-  }
+  },
+    "dawnstar": {"world": "3c:Skyrim.esm", "pos": [30418.2, 99510.3, -12523.7], "rotZ": 175.6},
+    "morthal": {"world": "3c:Skyrim.esm", "pos": [-42133.3, 64256.0, -13174.5], "rotZ": 29.0},
+    "winterhold": {"world": "3c:Skyrim.esm", "pos": [112088.77, 104301.34, -8966.56], "rotZ": 154.7}
  },
  "gearSwap": {
   "_comment": "version: bump to sweep every character and container once more at its next login/open (gearswap.js). steelcap-2026-10-04: second pass after containers were found unswept (Nate, 4 Oct).",
