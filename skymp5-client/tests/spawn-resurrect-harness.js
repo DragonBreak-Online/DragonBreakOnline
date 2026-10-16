@@ -3,7 +3,9 @@
 // rejection every time (cerr 3c759f09, 93 on 13 Oct). The earlier steps (enable, resurrect) already look the copy up
 // again and stop when it is gone; the last one now does too. Latent natives resolve in Skyrim Platform's update (jsThrQ,
 // then the promise jobs, all with the VM set), so the continuation may call getFormEx; this fake game resolves them inside
-// an update and throws on natives outside one. Runs the real spawnProcess.ts. Run from skymp5-client:
+// an update and throws on natives outside one. Runs the real spawnProcess.ts. A step that throws (applyTints, a native, the
+// callback) must not become an unhandled rejection either: one closes the whole game (rejection-exit-harness.js), so the spawn
+// reports it (cerr at=spawn) instead, and a copy whose tints failed is still enabled. Run from skymp5-client:
 //
 //   node tests/spawn-resurrect-harness.js [path to esbuild's package dir]
 'use strict';
@@ -23,7 +25,8 @@ const check = (name, ok, got) => {
 };
 
 // The game: a native works only inside an update; a latent one returns a promise resolved on a later update
-const G = globalThis.__sres = { inUpdate: false, forms: new Map(), latent: [], collisions: [], tints: [], flyerBits: 0 };
+const G = globalThis.__sres = { inUpdate: false, forms: new Map(), latent: [], collisions: [], tints: [], flyerBits: 0, tintsThrow: false, formExThrows: 0, reported: [] };
+globalThis.__dboReportError = (where, e) => G.reported.push([String(where), String(e && e.message)]);
 const native = (name, fn) => (...args) => {
   if (!G.inUpdate) throw new Error(`'${name}' can't be called in this context`);
   return fn(...args);
@@ -43,12 +46,13 @@ const STUBS = {
     const native = (name, fn) => (...a) => { if (!G().inUpdate) throw new Error("'" + name + "' can't be called in this context"); return fn(...a); };
     const player = { getWorldSpace: native('ObjectReference.getWorldSpace', () => ({ id: 0x3c })), getParentCell: native('ObjectReference.getParentCell', () => null) };
     module.exports = {
-      Game: { getFormEx: native('Game.getFormEx', (id) => G().forms.get(id >>> 0) || null), getPlayer: () => player },
+      Game: { getFormEx: native('Game.getFormEx', (id) => { if (G().formExThrows === (id >>> 0)) throw new Error("Expected 'objectTypeInfo' to not to be nullptr"); return G().forms.get(id >>> 0) || null; }), getPlayer: () => player },
       ObjectReference: { from: (f) => (f && f.isRef ? f : null) }, Actor: { from: (f) => (f && f.isActor ? f : null) },
       TESModPlatform: { moveRefrToPosition: native('TESModPlatform.moveRefrToPosition', () => {}) },
       MotionType: { Keyframed: 4 }, Cell: {}, WorldSpace: {},
     };`,
-  appearance: `module.exports = { applyTints: (ac, look) => globalThis.__sres.tints.push(ac.id) };`,
+  // applyTints reads the player's base, which a load can leave null (cerr ac8fc2a4, 16 Oct)
+  appearance: `module.exports = { applyTints: (ac, look) => { if (globalThis.__sres.tintsThrow) throw new TypeError("Cannot read properties of null (reading 'getFormID')"); globalThis.__sres.tints.push(ac.id); } };`,
   // Skyrim Platform's setCollision: TESForm::LookupByID, no VM needed, throws on a missing ref (ObjectReferenceApi.cpp)
   animation: `module.exports = { setRefrCollision: (id, on) => {
     if (!globalThis.__sres.forms.has(id >>> 0)) throw new Error("'refr' nullptr");
@@ -98,7 +102,7 @@ async function main() {
 
 async function run({ SpawnProcess }) {
   const LOOK = { name: 'Lydia' };
-  const reset = () => { G.forms.clear(); G.latent = []; G.collisions = []; G.tints = []; G.flyerBits = 0; rejections.length = 0; };
+  const reset = () => { G.forms.clear(); G.latent = []; G.collisions = []; G.tints = []; G.flyerBits = 0; G.tintsThrow = false; G.formExThrows = 0; G.reported = []; rejections.length = 0; };
   // formView starts the process from its update
   const start = (id, done) => { G.inUpdate = true; try { new SpawnProcess(LOOK, [10, 20, 30], id, done); } finally { G.inUpdate = false; } };
 
@@ -145,6 +149,37 @@ async function run({ SpawnProcess }) {
   check('a dragon\'s copy told not to be resurrected gets its collision and is born without a resurrect', born === 1
     && JSON.stringify(G.collisions) === JSON.stringify([[0xff000104, true]]) && pending().length === 0 && rejections.length === 0,
   { born, collisions: G.collisions, pending: pending(), rejections });
+
+  reset();
+  born = 0;
+  G.tintsThrow = true;
+  copy(0xff000105);
+  start(0xff000105, () => born++);
+  await frame();
+  check('applyTints throws: no unhandled rejection, it is reported as at=spawn:tints', rejections.length === 0
+    && JSON.stringify(G.reported) === JSON.stringify([['spawn:tints', "Cannot read properties of null (reading 'getFormID')"]]), { rejections, reported: G.reported });
+  check('...and the copy is still enabled', JSON.stringify(pending()) === '["ObjectReference.enable"]', pending());
+  await frame(); await frame();
+  check('...resurrected, its collision on and born', born === 1 && JSON.stringify(G.collisions) === JSON.stringify([[0xff000105, true]]) && rejections.length === 0,
+    { born, collisions: G.collisions, rejections });
+
+  reset();
+  copy(0xff000106);
+  start(0xff000106, () => { throw new Error('born failed'); });
+  await frame(); await frame(); await frame();
+  check('the callback throws: no unhandled rejection, it is reported as at=spawn', rejections.length === 0
+    && JSON.stringify(G.reported) === JSON.stringify([['spawn', 'born failed']]), { rejections, reported: G.reported });
+
+  reset();
+  born = 0;
+  copy(0xff000107);
+  start(0xff000107, () => born++);
+  await frame();
+  G.formExThrows = 0xff000107; // a native that refuses the copy's id in the enable's continuation (cerr 892f9724, 13 Oct)
+  await frame();
+  check('a native throws after the enable: no unhandled rejection, it is reported as at=spawn, nothing more is done', rejections.length === 0
+    && JSON.stringify(G.reported) === JSON.stringify([['spawn', "Expected 'objectTypeInfo' to not to be nullptr"]]) && born === 0 && pending().length === 0,
+  { rejections, reported: G.reported, born, pending: pending() });
 }
 
 main().catch((e) => { console.error(e); process.exit(1); });

@@ -5,6 +5,7 @@ import { ObjectReferenceEx } from "../extensions/objectReferenceEx";
 import { setRefrCollision } from "../sync/animation";
 import { FLYER_NO_RESURRECT, guardOn } from "./flyerGuard";
 import { noteFlyer, takeSpawnGuard } from "./flyerRuntime";
+import { reportError } from "../lib/clientDiag";
 
 // "moveTo" seats the new copy at its spot natively before its first load, so a reload cannot put it back at the player
 export type SpawnPlaceMode = "moveTo" | "setPosition";
@@ -28,7 +29,8 @@ export class SpawnProcess {
     this.note("pre-seat", refrId, `at ${pos.map(Math.round).join(",")}`);
     if (SpawnProcess.placeMode === "moveTo") SpawnProcess.seat(refr, pos);
     this.note("pre-setPosition", refrId);
-    refr.setPosition(...pos).then(() => this.enable(appearance, refrId));
+    // A step that throws ends this spawn; left unhandled, its rejection would close the game
+    refr.setPosition(...pos).then(() => this.enable(appearance, refrId)).catch((e) => reportError("spawn", e));
   }
 
   private flyer: { bits: number; remoteId: number; bornAt: number } | undefined;
@@ -54,10 +56,11 @@ export class SpawnProcess {
 
     const ac = Actor.from(refr);
     if (ac && appearance) {
-      applyTints(ac, appearance);
+      // A copy without its tints still beats one that is never enabled
+      try { applyTints(ac, appearance); } catch (e) { reportError("spawn:tints", e); }
     }
     this.note("pre-enable", refrId);
-    refr.enable(false).then(() => this.resurrect(refrId));
+    return refr.enable(false).then(() => this.resurrect(refrId));
   }
 
   private resurrect(refrId: number) {
