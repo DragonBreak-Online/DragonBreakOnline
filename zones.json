@@ -165,6 +165,7 @@
     {
       "id": "dawnstar",
       "name": "The Pale",
+      "treasury": "1b5f88:DragonBreak Online Edits.esp",
       "officials": [
         "jarl",
         "steward",
