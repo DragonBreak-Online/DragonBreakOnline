@@ -1235,10 +1235,13 @@ module.exports = (api) => {
     const rank = mine ? mine.reduce((n, m) => Math.max(n, readCapIn(m)), -1) : -1;
     return Math.min(top, Math.max(floor, rank));
   };
-  // Whether a Scholar's reading must pass over this tome for `a`: a restricted art (seniorOnlyTomes) for one below Senior
+  // Whether a Scholar's reading must pass over this tome for `a`: a spell taken out of the game (removedSpells) for everyone,
+  // whatever the gate (#bugs 1559198426200150027, 15 Oct: a Transmute tome pressed between the pages that nobody can read);
+  // a restricted art (seniorOnlyTomes) for one below Senior
   globalThis.__dboSpellsReadRestricted = (a, bookId) => {
-    if (!READ_GATE.enabled || READ_GATE.restricted === false) return false;
     let t = null; try { t = tomeOf(Number(bookId) >>> 0); } catch (e) { t = null; }
+    if (t && removed(t.spellId)) return true;
+    if (!READ_GATE.enabled || READ_GATE.restricted === false) return false;
     return !!t && restrictedTome(t) && !isSenior(a);
   };
   // The highest spell rank `skillId`'s tier lets `a` learn, -1 when the skill is not taken up

@@ -301,6 +301,14 @@ load(Object.assign(baseCfg(), { spells: Object.assign({}, baseCfg().spells, { sh
   check('gate end to end: a Master Scholar with no college finds Novice to Adept tomes, never restricted', dn.ranks === '0,1,2' && dn.restricted === 0 && dn.none === 0, dn);
   check('gate end to end: ...an Associate the same', da.ranks === '0,1,2' && da.restricted === 0, da);
   check('gate end to end: a Senior Magister finds Expert too: never Master below Scholar 100', ds.ranks === '0,1,2,3' && ds.none === 0, ds);
+  // A spell taken out of the game (removedSpells: Transmute) is never pressed between the pages, gate or not (#bugs 15 Oct)
+  const TRANSMUTE = idOf(canon(TOMES.find((x) => x.name === 'SpellTomeTransmuteOreMineral').id));
+  check('removed: the Transmute tome is passed over for everyone, a Senior too', globalThis.__dboSpellsReadRestricted(SENIOR, TRANSMUTE) === true && globalThis.__dboSpellsReadRestricted(NOBODY, TRANSMUTE) === true);
+  let transmuteFinds = 0; for (const a of [NOBODY, SENIOR]) for (let i = 0; i < 4000; i++) { const t = pickOf(a, 4); if (t && /Transmute/i.test(t.name)) transmuteFinds++; }
+  check('removed end to end: 8000 Master Scholar readings never find the Transmute tome', transmuteFinds === 0, transmuteFinds);
+  load(Object.assign(baseCfg(), { spells: Object.assign({}, baseCfg().spells, { readGate: Object.assign({}, CONFIG.spells.readGate, { enabled: false }) }) }));
+  check('removed: ...and with the reading gate off', globalThis.__dboSpellsReadRestricted(NOBODY, TRANSMUTE) === true);
+  load();
   for (const a of [LEADER, MAGISTER, NOBODY, WIZARD]) delete MEMBERS[a];
   load(Object.assign(baseCfg(), { spells: Object.assign({}, baseCfg().spells, { shopSeniorWindowDays: 1, shopSeniorPerWindow: 1 }) }));   // back to section 4's one-a-day mode
 }
