@@ -337,6 +337,80 @@ async function main() {
     check(`...and the server's pack is applied once ${menu} closes`, s.count(GOLD) === 40 && s.count(IRON_SWORD) === 0, [...s.pack]);
   }
 
+  // 9. A take the server accepts and then lowers (dungeons.js hands a party its share of a chest's gold 50 ms later): by design
+  // the window closes, so the shares already handed on cannot be put back
+  {
+    const s = session(bundle, { serverPack: { [GOLD]: 10 } });
+    s.sendPackNow(); s.run(200);
+    s.openChest({ [GOLD]: 90, [SALT]: 2 }); s.run(300);
+    s.take(GOLD, 90);
+    s.serverAt(150, () => { s.server.pack.set(GOLD, 40); s.sendPackNow(); });
+    s.run(6000);
+    check('a taken item the server lowers right after (party gold share) closes the window once, and the pack ends at the server count',
+      s.taps.length === 1 && s.count(GOLD) === 40 && s.writesInMenu.length === 0, { taps: s.taps.length, gold: s.count(GOLD), writes: s.writesInMenu });
+  }
+
+  // 10. A 2 s round trip with an unrelated pack landing between the take and its answer: no close
+  {
+    const s = session(bundle, { pingMs: 2000, serverPack: { [GOLD]: 10 } });
+    s.sendPackNow(); s.run(2500);
+    s.openChest({ [IRON_SWORD]: 1 }); s.run(300);
+    s.take(IRON_SWORD); s.run(32);
+    s.serverAt(200, () => s.sendPackNow());
+    s.run(12000);
+    check('a 2 s round trip with an unrelated pack in between does not close the window', !s.tabbed() && s.count(IRON_SWORD) === 1, { taps: s.taps, sword: s.count(IRON_SWORD) });
+  }
+
+  // 11. The game ignores the close (a slider or message box on top): tried twice at most, never once the window is shut
+  {
+    const s = session(bundle, { serverPack: { [GOLD]: 10 }, refuse: (m) => m.baseId === ARROW });
+    globalThis.__h.tapKey = (k) => { s.taps.push({ k, t: s.now }); };
+    s.sendPackNow(); s.run(200);
+    s.openChest({ [ARROW]: 0 }); s.chest.set(ARROW, 5); s.run(300);
+    s.take(ARROW, 5); s.run(15000);
+    check('a close the game ignores is tried at most twice in one opening', s.taps.length === 2, s.taps);
+    s.closeByPlayer(); s.run(6000);
+    check('...no tap once the window is shut, and the ghost arrows then go', s.taps.length === 2 && s.count(ARROW) === 0, { taps: s.taps.length, arrows: s.count(ARROW) });
+    s.openChest({ [SALT]: 1 }); s.run(8000);
+    check('...and a reopen with nothing changed does not tap', s.taps.length === 2, s.taps.length);
+  }
+
+  // 12. Reopened straight after an auto close: no second close, no second notice
+  {
+    const s = session(bundle, { serverPack: { [GOLD]: 100 } });
+    s.sendPackNow(); s.run(200);
+    s.openChest({ [SILVER_SWORD]: 2 }); s.run(300);
+    s.take(SILVER_SWORD, 2); s.run(3000);
+    s.serverMail(SILVER_SWORD); s.run(4000);
+    const first = s.taps.length;
+    s.openChest({ [SALT]: 1 }); s.run(300);
+    s.take(SALT); s.run(6000);
+    check('a reopen after an auto close does not close again, and the notice shows once', first === 1 && s.taps.length === 1 && s.notes.length === 1,
+      { first, taps: s.taps.length, notes: s.notes });
+  }
+
+  // 13. Moves sent from another window (BarterMenu) before the chest opens never close the chest
+  {
+    const s = session(bundle, { serverPack: { [GOLD]: 100 } });
+    s.sendPackNow(); s.run(200);
+    s.menus.add('BarterMenu'); s.take(IRON_SWORD); s.run(500); s.menus.delete('BarterMenu'); s.run(200);
+    s.openChest({ [SALT]: 1 }); s.run(8000);
+    check('a move made outside the chest window does not close a later chest window', !s.tabbed(), s.taps);
+  }
+
+  // 14. A player still moving items is not interrupted; the close waits until they stop
+  {
+    const s = session(bundle, { serverPack: { [GOLD]: 100 } });
+    s.sendPackNow(); s.run(200);
+    s.openChest({ [SILVER_SWORD]: 1, [SALT]: 20 }); s.run(300);
+    s.take(SILVER_SWORD); s.run(500);
+    s.serverMail(SILVER_SWORD);
+    for (let i = 0; i < 5; i++) { s.take(SALT); s.run(1500); }
+    const during = s.taps.length;
+    s.run(4000);
+    check('no close while the player keeps moving items, one close once they stop', during === 0 && s.taps.length === 1, { during, after: s.taps.length });
+  }
+
   console.log(failures ? `\n${failures} FAILED` : '\nall passed');
   process.exit(failures ? 1 : 0);
 }
