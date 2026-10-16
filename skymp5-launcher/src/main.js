@@ -3384,7 +3384,12 @@ ipcMain.handle('install:uninstall', async () => {
 async function perFileClientUpdate(skyrimPath, version, files, directRun) {
   // The extra files own every path they list (the plugins), so the client list never fetches those
   let ev = null
-  try { ev = await fetchExtraManifest() } catch { /* no extra list: nothing excluded */ }
+  try { ev = await fetchExtraManifest() } catch (err) {
+    // Swallowing this used to cost the player the whole package: with no extra list nothing is
+    // excluded, the first extra-owned path 404s on the client endpoint, and the per-file update
+    // bails to a 170 MB zip. Say so, so the log explains the download instead of hiding it.
+    log(`[install] the extra file list could not be fetched (${err.message}); per-file update may ask for paths the extras own`)
+  }
   const owned = new Set(extraEntries(ev, skyrimPath).map(x => x.path.toLowerCase()))
   const list = (Array.isArray(files) ? files : []).filter(f => f && typeof f.path === 'string' && f.sha256 && !f.path.split('/').includes('..') && !CLIENT_OWN_FILE_RES.some(re => re.test(f.path.toLowerCase())) && !owned.has(f.path.toLowerCase()))
   if (!list.length || !version) return null
@@ -3404,6 +3409,7 @@ async function perFileClientUpdate(skyrimPath, version, files, directRun) {
   }
   const all = list.reduce((n, f) => n + (Number(f.size) || 0), 0)
   const need = changed.reduce((n, f) => n + (Number(f.size) || 0), 0)
+  const skipped = []
   if (!changed.length) { log('[install] client files already match the server list'); return { count: 0 } }
   if (need > all * 0.6) return null
   log(`[install] updating ${changed.length} changed client file(s), ${(need / 1048576).toFixed(1)} MB, instead of the whole zip`)
@@ -3424,14 +3430,29 @@ async function perFileClientUpdate(skyrimPath, version, files, directRun) {
       await writeRetry(full, fs.readFileSync(tmpFile))
     } catch (err) {
       try { fs.rmSync(tmpFile, { force: true }) } catch {}
+      // A 404 means this path is not served by the client channel - almost always because the extra
+      // files own it and the exclusion missed it. That is not a reason to re-download the whole
+      // 170 MB package: skip the file and let the extra sync, which does own it, deliver it.
+      // Anything else (network, checksum, a locked file) is a real failure and still falls back.
+      if (err.statusCode === 404) {
+        skipped.push(f.path)
+        log(`[install] ${f.path} is not on the client channel (404); leaving it to the extra files`)
+        continue
+      }
       log(`[install] per-file update stopped at ${f.path} (${err.message}); falling back to the zip`)
       return null
     }
     try { fs.rmSync(tmpFile, { force: true }) } catch {}
     done++
   }
-  log(`[install] updated ${done} client file(s) one by one`)
-  return { count: done }
+  // Every file 404ing means the list and the channel disagree about everything, so the per-file
+  // route achieved nothing and the zip is genuinely needed.
+  if (!done && skipped.length) {
+    log(`[install] every per-file fetch 404'd (${skipped.length} file(s)); falling back to the zip`)
+    return null
+  }
+  log(`[install] updated ${done} client file(s) one by one${skipped.length ? `, ${skipped.length} left to the extra files` : ''}`)
+  return { count: done, skipped: skipped.length }
 }
 
 // Partial client zips of other packages in the temp folder (download.js keeps <zip>.part to resume)
