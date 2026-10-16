@@ -216,6 +216,28 @@ ok(statuses.length === 0 && unequips().length === 0, 'an ordinary spell neither 
   reset(); pushes.length = 0; c = load(); c.onSpellHit(9, 2, UF3);
   ok(pushes.length === 1 && pushes[0][1].force === 8 && pushes[0][1].from === 9, 'with npcShoutPush on (the undo), a draugr shout pushes again');
   delete cfg.combat.npcShoutPush;
+  // The second word, which nearly every live draugr push used (13f39, force 4): no push from an NPC, a player's still lands
+  const UF2 = 0x13f39, DRAGON_UF = 0x16d45, shoutRec = RECS[0x13e07];
+  RECS[UF2] = { type: 'SPEL', editorId: 'VoiceUnrelentingForce2', fields: [{ type: 'SPIT', data: spit(11) }] };
+  RECS[0x13e07] = { type: 'SHOU', editorId: 'UnrelentingForceShout', fields: shoutRec.fields.concat([{ type: 'SNAM', data: snam(UF2) }]) };
+  reset(); pushes.length = 0; c = load(); c.onSpellHit(9, 2, UF2);
+  ok(pushes.length === 0 && staggers() === 0, "a draugr's second word pushes no player");
+  reset(); HOSTS = { 8: 2 }; npcPushes.length = 0; c = load(); c.onSpellHit(9, 8, UF2);
+  ok(npcPushes.length === 0, "...nor an NPC another player hosts");
+  HOSTS = {};
+  reset(); pushes.length = 0; c = load(); c.onSpellHit(1, 2, UF2);
+  ok(pushes.length === 1 && pushes[0][1].force === 4 && pushes[0][1].from === 1, "a granted player's second word still pushes at force 4");
+  // A reload keeps the knock state (globalThis) and still pushes nobody for an NPC, logging the line the live check reads
+  const logs = [], origLog = API.log; API.log = (...x) => logs.push(x.join(' '));
+  reset(); pushes.length = 0; load().onSpellHit(9, 2, UF2); c = load(); c.onSpellHit(9, 2, UF2);
+  ok(pushes.length === 0 && logs.filter((l) => /^combat 9 -> 2: npc shout, no push \(spell 13f39\)$/.test(l)).length === 2, 'after a reload an NPC shout still pushes nobody, and each is logged as "npc shout, no push"');
+  API.log = origLog;
+  // A dragon's own Unrelenting Force, even were it put in pushSpells: an NPC's voice word pushes nobody
+  RECS[DRAGON_UF] = { type: 'SPEL', editorId: 'DragonVoiceUnrelentingForce', fields: [{ type: 'SPIT', data: spit(11) }] };
+  const origPush = cfg.combat.pushSpells; cfg.combat.pushSpells = Object.assign({}, origPush, { DragonVoiceUnrelentingForce: 8 });
+  reset(); pushes.length = 0; HOSTS = { 8: 2 }; npcPushes.length = 0; c = load(); c.onSpellHit(9, 2, DRAGON_UF); c.onSpellHit(9, 8, DRAGON_UF);
+  ok(pushes.length === 0 && npcPushes.length === 0, "a dragon's Unrelenting Force pushes no player and no NPC, even listed in pushSpells");
+  cfg.combat.pushSpells = origPush; HOSTS = {}; RECS[0x13e07] = shoutRec;
   // The relay of a shout to the players around (dboShoutCast -> dboShoutFx): the same gate, and a cleaned message
   c = load();
   const cast = (o) => Object.assign({ caster: 0xdead, target: 2, spell: UF3, isDualCasting: true, interruptCast: false, keepAlive: false, castingSource: 2,
