@@ -145,7 +145,7 @@ module.exports = (api) => {
     const total = Math.round((Number(s.hour) || 0) * 60) % 1440;
     const hh = Math.floor(total / 60), mm = total % 60;
     const part = hh >= 5 && hh < 12 ? 'in the morning' : hh >= 12 && hh < 17 ? 'in the afternoon' : hh >= 17 && hh < 22 ? 'in the evening' : 'at night';
-    return { date: `${ordinal(Number(s.day) || 1)} of ${s.month}, 4E ${s.year}`, time: `${hh % 12 || 12}:${String(mm).padStart(2, '0')} ${part}`,
+    return { date: `${s.weekdayName ? s.weekdayName + ', ' : ''}${ordinal(Number(s.day) || 1)} of ${s.month}, 4E ${s.year}`, time: `${hh % 12 || 12}:${String(mm).padStart(2, '0')} ${part}`,
       moons: s.phaseName ? `The moons are ${s.phaseName}.` : '' };
   };
   const RACE_NAMES = globalThis.__dboRaceNames instanceof Map ? globalThis.__dboRaceNames : (globalThis.__dboRaceNames = new Map());
