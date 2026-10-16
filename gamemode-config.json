@@ -221,7 +221,8 @@
    {"id": "knightErrant", "name": "Knight-Errant armour", "people": "Breton", "plugins": ["knighterrant.esp"], "races": ["BretonRace"], "why": "Nat, 13 Oct (Armory lock too)"},
    {"id": "floraDruid", "name": "Flora Druid armour", "people": "Breton", "plugins": ["Summer Druid Armor Set.esp"], "races": ["BretonRace"], "why": "Nat, 13 Oct (Armory lock too)"},
    {"id": "seascale", "name": "Maormer Seascale", "people": "Maormer", "plugins": ["Seascale.esl"], "races": ["MaormerRace"], "why": "Nat, 13 Oct (Armory lock too)"},
-   {"id": "ancientArgonian", "name": "Ancient Argonian armour", "people": "Argonian", "plugins": ["1AncArgArm.esl", "King of the Murkmire - Ancient Argonian Armor.esp"], "races": ["ArgonianRace"], "why": "Nat, 13 Oct race-only list (Murkmire is closed for now)"}
+   {"id": "ancientArgonian", "name": "Ancient Argonian armour", "people": "Argonian", "plugins": ["1AncArgArm.esl", "King of the Murkmire - Ancient Argonian Armor.esp"], "races": ["ArgonianRace"], "why": "Nat, 13 Oct race-only list (Murkmire is closed for now)"},
+   {"id": "snowElvenArsenal", "name": "Snow Elven Arsenal", "people": "Snow Elf", "edid": "^DBOArm_SEA_", "races": ["DBOSnowElfRace"], "why": "Nat, 16 Oct: \"add this mod for snow elf race only\" (Tumbajamba's Snow Elven Arsenal in DragonBreak Armory.esp v12, ids 83F-8BE; the Armory also locks its 23 forge recipes to DBOSnowElfRace and its vampire, GetIsRace DLE 1AC9FF/1ACA00; the Ancient One set, his blade, the staffs and the mage robes have no forge recipe, GM-given)"}
   ]
  },
  "factionGear": {

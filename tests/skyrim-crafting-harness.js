@@ -46,6 +46,8 @@ const raceId = {};
 for (const [k, [h, e]] of Object.entries(RACES)) { raceId[k] = SKY(h); rec(raceId[k], 'RACE', e); }
 raceId.goblin = id('DragonBreak Online Edits.esp', 0x1b0001); rec(raceId.goblin, 'RACE', 'DBOGoblinRace');
 raceId.goblinVamp = id('DragonBreak Online Edits.esp', 0x1b0002); rec(raceId.goblinVamp, 'RACE', 'DBOGoblinRaceVampire');
+raceId.snowElf = id('DragonBreak Online Edits.esp', 0x1ac9ff); rec(raceId.snowElf, 'RACE', 'DBOSnowElfRace');
+raceId.snowElfVamp = id('DragonBreak Online Edits.esp', 0x1aca00); rec(raceId.snowElfVamp, 'RACE', 'DBOSnowElfRaceVampire');
 
 const item = (plugin, local, type, edid, kws = []) => { const x = id(plugin, local); rec(x, type, edid, kws.length ? [{ type: 'KWDA', data: u32(...kws) }] : []); return x; };
 const recipe = (plugin, local, edid, bench) => { const x = id(plugin, local); rec(x, 'COBJ', edid, [{ type: 'BNAM', data: u32(bench) }]); return x; };
@@ -76,6 +78,12 @@ const R_SKAAL_TEMPER = recipe('Skaal Heavy Armor SE.esp', 0x8813, 'TemperArmorSk
 const GOLD = SKY('5ad9e'); rec(GOLD, 'MISC', 'IngotGold');
 const R_GOLD = recipe('DragonBreak Nexus Patches.esp', 0xb75, 'DBOSM_Res_GoldIngotDB', KW_FORGE);
 const APEX_SWORD = item('Apex_Khajiit.esp', 0x80a, 'WEAP', 'KhajiitiSword');
+// Tumbajamba's Snow Elven Arsenal in DragonBreak Armory.esp v12 (df094148, 16 Oct): Snow Elves only (Nat)
+const SEA_CUIRASS = item('DragonBreak Armory.esp', 0x858, 'ARMO', 'DBOArm_SEA_ArmorSnowElvenScoutCuirass');
+const R_SEA = recipe('DragonBreak Armory.esp', 0x8ab, 'DBOArm_SEA_RecipeArmorSnowElvenScoutCuirass', KW_FORGE);
+const R_SEA_TEMPER = recipe('DragonBreak Armory.esp', 0x894, 'DBOArm_SEA_TemperArmorSnowElvenScoutArmor', KW_TABLE);
+const SEA_ARROW = item('DragonBreak Armory.esp', 0x88b, 'AMMO', 'DBOArm_SEA_SnowElvenArrow');
+const R_SEA_ARROW = recipe('DragonBreak Armory.esp', 0x8be, 'DBOArm_SEA_RecipeSnowElvenArrow', KW_FORGE);
 
 const props = new Map(), said = [], audits = [], chain = [];
 const SKYRIM_WORLD = '3c:Skyrim.esm';
@@ -85,7 +93,7 @@ const mp = {
   lookupEspmRecordById: (x) => recs.get(x >>> 0) || null, callPapyrusFunction: () => null,
 };
 const ACT = {}; let n = 0x101;
-for (const r of ['nord', 'orc', 'orcVamp', 'redguard', 'breton', 'khajiit', 'goblin', 'goblinVamp', 'staff', 'nobody']) {
+for (const r of ['nord', 'orc', 'orcVamp', 'redguard', 'breton', 'khajiit', 'goblin', 'goblinVamp', 'snowElf', 'snowElfVamp', 'staff', 'nobody']) {
   ACT[r] = (0xff000000 | n++) >>> 0;
   if (raceId[r] || r === 'staff') props.set(ACT[r] + '|appearance', { raceId: raceId[r] || raceId.nord });
   props.set(ACT[r] + '|worldOrCellDesc', SKYRIM_WORLD); props.set(ACT[r] + '|pos', [0, 0, 0]);
@@ -125,6 +133,16 @@ ok(!craft('breton', BEAR_CUIRASS, R_BEAR), '...a Breton cannot');
 ok(craft('nord', BEAR_HOOD, R_BEAR_HOOD) && !craft('breton', BEAR_HOOD, R_BEAR_HOOD), 'the Black Bear light hood is forgeable again (Armory v9 fe2eb7dd fixed its input), by Nords');
 ok(!Object.keys(readJson('regions-overrides.json').recipes).some((k) => /^d9[79]:Black Bear/i.test(k)), '...and regions-overrides.json no longer refuses d99 / d97');
 ok(!craft('nord', GOLD, R_GOLD), 'the bank-vault gold ingot never smelts to gold');
+ok(craft('snowElf', SEA_CUIRASS, R_SEA) && craft('snowElfVamp', SEA_CUIRASS, R_SEA), 'Snow Elven Arsenal: a Snow Elf (and a vampire Snow Elf) forges it (edid rule)');
+ok(!craft('nord', SEA_CUIRASS, R_SEA) && !craft('breton', SEA_CUIRASS, R_SEA) && !craft('orc', SEA_CUIRASS, R_SEA), '...a Nord, a Breton and an Orc cannot');
+ok(!craft('khajiit', SEA_CUIRASS, R_SEA) && said.some(([, t]) => /Snow Elf work/.test(t) && /materials come back/.test(t)), '...told it is Snow Elf work and the materials come back', said);
+ok(!craft('nord', SEA_ARROW, R_SEA_ARROW) && craft('snowElf', SEA_ARROW, R_SEA_ARROW), '...the arrows too');
+ok(craft('nord', SEA_CUIRASS, R_SEA_TEMPER) && craft('staff', SEA_CUIRASS, R_SEA), '...anyone may temper it; staff pass');
+{
+  const adm = new Set(readJson('admin-items.json').categories.flatMap((c) => c.items.map((it) => String(it[0]).toLowerCase())));
+  const want = []; for (const x of [[0x83f, 0x84a], [0x855, 0x86a], [0x88b, 0x88b]]) for (let i = x[0]; i <= x[1]; i++) want.push(`${i.toString(16)}:dragonbreak armory.esp`);
+  ok(want.length === 35 && want.every((d) => adm.has(d)), 'the admin item lists carry the 35 Snow Elven Arsenal pieces (22 armour, 12 weapons, the arrow)', want.filter((d) => !adm.has(d)));
+}
 load({ raceCraft: { enabled: false } });
 ok(craft('nord', GILD_AXE, R_GILD), 'raceCraft.enabled false turns the race rule off');
 ok(!craft('nord', PIG_CUIRASS, R_PIG) && craft('orc', PIG_CUIRASS, R_PIG), '...and Pig Iron is still an Orc\'s through the Orcish rule (its keyword)');
