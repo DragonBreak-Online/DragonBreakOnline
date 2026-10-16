@@ -32,6 +32,8 @@ module.exports = (api) => {
     rangedShieldChip: 0,
     blockStaminaMult: 1, shieldStaminaMult: 0.5, powerIntoShieldStaminaMult: 2,
     guardBreakSeconds: 2,
+    // A blocker at or under this share of stamina when the blow lands has no guard: the blow lands in full (no stagger)
+    emptyStamina: 0.01,
     bashDamageMult: 0.25, bashStaggerResistRank: 3,
     powerStaggerThroughWeaponBlockRank: 4,
     staggerCooldownSeconds: 1.5, attackerStaggerCooldownSeconds: 3, staggerEvent: 'staggerStart',
@@ -136,6 +138,12 @@ module.exports = (api) => {
       const raw = Math.max(0, Number(flags.unblockedDamage) || 0) * (flags.bash ? C.bashDamageMult : 1) * (Number(mult) || 1);
       if (!(raw > 0)) return 1;
       const shield = hasShield(tgt);
+      // Already out of stamina when the blow lands (ghostmantle, luckystefan, 12-16 Oct: "you can block forever without
+      // stamina"): the guard is broken now, not after this blow. Before, the blow that found the blocker empty still only
+      // chipped and re-broke the guard, so with guardBreakSeconds between swings every other blow at 0 stamina was stopped.
+      let staminaNow = null; try { const p = mp.get(tgt, 'percentages'); staminaNow = p && typeof p.stamina === 'number' ? p.stamina : null; } catch (e) { staminaNow = null; }
+      const empty = staminaNow !== null && staminaNow <= (Number(C.emptyStamina) || 0) && Number(flags.targetMaxStamina) > 0;
+      if (empty && !(st(tgt).guardBrokenUntil > now)) { st(tgt).guardBrokenUntil = now + C.guardBreakSeconds * 1000; events.push('guard broken (no stamina)'); }
       const broken = st(tgt).guardBrokenUntil > now;
       const ranged = !flags.bash && weaponSkillOf(src) === 'archery';
       const share = broken ? 1 : shield && ranged ? Math.max(0, Number(C.rangedShieldChip) || 0)
