@@ -16,7 +16,8 @@
 //   damageTaken/Dealt   in beast form, multiplies the hits (0.8 .. 1 taken, 1 .. 1.2 dealt), like the skill tiers
 //   changesPerDay       beast form uses per game day (1 .. 3)
 //   forcedMult          multiplies the chance of a forced change, feral or under the full moon (1 .. 0.25)
-// Howls are heard across the land: every player online reads "A howl echoes through <place>", once a minute per howler.
+// Howls are heard across the hold: every player online in the howler's hold (zoneOfActor; Bruma is its own zone, an
+// interior counts as its hold) reads "A howl echoes through <place>", once a minute per howler (Nate 16 Oct, Skyrim open).
 // A cure, or the end of the curse, starts the next werewolf again as a Fledgling (supernatural.js clears the state).
 // /hunt shows a werewolf their rank, renown and what the next rank brings.
 'use strict';
@@ -152,15 +153,22 @@ module.exports = (api) => {
       earn: `Feed in beast form: an animal ${C.points.animal}, a person ${C.points.humanoid}, a player you bring down outside the walls ${C.points.player}. A kill in the beast ${C.points.kill}, a change ${C.points.change}.`,
     };
   };
-  // A howl is heard across the land, and hunters learn where
+  // A howl is heard across the hold, and hunters there learn where
+  const zoneKey = (z) => (z && typeof z === 'object' ? z.id : z) || null;
   globalThis.__dboHuntHowled = (a, name) => {
     const last = S.howledAt.get(a) || 0;
     if (Date.now() - last < C.howlEverySeconds * 1000) return;
     S.howledAt.set(a, Date.now());
-    let place = null;
-    try { const z = zoneOfActor(a); const zone = z ? zoneById(z) : null; place = zone ? zone.name : null; } catch (e) { /* unknown */ }
+    let place = null, here = null;
+    try { here = zoneKey(zoneOfActor(a)); const zone = here ? zoneById(here) : null; place = zone ? zone.name : null; } catch (e) { /* unknown */ }
     const text = `A howl echoes through ${place || 'the wilds'}.`;
-    for (const o of onlineActors()) if (o !== a) personal(o, text);
+    // Only the howler's hold hears it. With no hold known, only those in the same worldspace or cell do.
+    const world = here ? null : worldOf(a);
+    for (const o of onlineActors()) {
+      if (o === a) continue;
+      try { if (here ? zoneKey(zoneOfActor(o)) !== here : !world || !sameWorld(worldOf(o), world)) continue; } catch (e) { continue; }
+      personal(o, text);
+    }
     audit(`HUNT ${who(a)} howled (${name || 'a howl'}) in ${place || 'the wilds'}`);
   };
 
