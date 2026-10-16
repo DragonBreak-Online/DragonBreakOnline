@@ -502,19 +502,21 @@ export class RemoteServer extends ClientListener {
     sendCustomPacket(this.controller, { customPacketType: 'dbo', event: 'arrived', args: [worldOrCell] });
   }
 
+  // Polls on the login clock: a Utility.wait started in the update before the login save loads can be dropped with it
   private watchArrival(worldOrCell: number): void {
     const watch = ++this.arrivalWatch;
-    (async () => {
-      for (let i = 0; i < ARRIVAL_POLLS; i++) {
-        await Utility.wait(ARRIVAL_POLL_SECONDS);
+    const poll = (i: number): void => {
+      loginClock.after(ARRIVAL_POLL_SECONDS, () => {
         if (watch !== this.arrivalWatch) return;
         const pl = Game.getPlayer();
         if (pl && pl.is3DLoaded() && ObjectReferenceEx.getWorldOrCell(pl) === worldOrCell) {
           this.reportArrival(worldOrCell);
           return;
         }
-      }
-    })();
+        if (i + 1 < ARRIVAL_POLLS) poll(i + 1);
+      });
+    };
+    poll(0);
   }
 
   private arrivalWatch = 0;

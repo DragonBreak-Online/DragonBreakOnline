@@ -5,7 +5,7 @@
 //     restored and never snapshotted) still restores, on the login clock;
 //   - a prepared spell the server's list holds but the game lacks at the restore is imposed again and favourited;
 //   - one the game still lacks after that stays in the saved list and is favourited, hotkey and all, once the game has it;
-//   - the login clock itself, and that remoteServer runs the spell passes on it.
+//   - the login clock itself, and that remoteServer runs the spell passes and the arrival watch on it.
 // Bundles with esbuild (skymp5-server's), skyrimPlatform replaced by the fake. Run from skymp5-client:
 //
 //   node tests/favorites-login-harness.js [path to esbuild's package dir]
@@ -299,6 +299,8 @@ async function main() {
     const block = (rs.match(/rememberServerSpells\(learnedSpells\);[\s\S]*?\n    \}\n/) || [''])[0].replace(/\/\/.*/g, '');
     check('remoteServer: the login spell passes run on the login clock, not Utility.wait', /SPELL_ENFORCE_PASSES\.forEach\(\(seconds\) => \{\s*loginClock\.after\(seconds,/.test(block) && !/Utility\.wait/.test(block), block.slice(0, 400));
     check('remoteServer: every update feeds the clock with whether the player\'s 3D is loaded', /on\('update', \(\) => \{\s*let live = false;[\s\S]{0,200}is3DLoaded\(\)[\s\S]{0,200}loginClock\.frame\(Date\.now\(\), live\)/.test(rs));
+    const watch = (rs.match(/private watchArrival\([\s\S]*?\n  \}\n/) || [''])[0].replace(/\/\/.*/g, '');
+    check('remoteServer: the arrival watch polls on the login clock (the server holds favourites saves until it reports)', /loginClock\.after\(ARRIVAL_POLL_SECONDS,/.test(watch) && !/Utility\.wait/.test(watch) && /i \+ 1 < ARRIVAL_POLLS/.test(watch), watch.slice(0, 300));
     const fs2 = read('services/services/favoritesService.ts');
     check('favoritesService: no Utility.wait left', fs2.length > 0 && !/Utility\.wait/.test(fs2.replace(/\/\/.*|\/\*[\s\S]*?\*\//g, '')));
     check('favoritesService: the restore waits for the last spell pass plus 2 s, on the same clock', /RESTORE_AFTER_LOGIN_S = Math\.max\(\.\.\.SPELL_ENFORCE_PASSES\) \+ 2/.test(fs2) && /from "\.\.\/\.\.\/sync\/loginClock"/.test(fs2));
