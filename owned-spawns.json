@@ -3,7 +3,7 @@
  "spawns": [
   {
    "src": "15404f:DragonBreak Online Edits.esp",
-   "loadId": "3c15404f",
+   "loadId": "4815404f",
    "kind": "boar",
    "base": "60242e:BSAssets.esm",
    "edid": "BSKEncBoar01",
@@ -27,7 +27,7 @@
   },
   {
    "src": "154051:DragonBreak Online Edits.esp",
-   "loadId": "3c154051",
+   "loadId": "48154051",
    "kind": "boar",
    "base": "60242e:BSAssets.esm",
    "edid": "BSKEncBoar01",
@@ -51,7 +51,7 @@
   },
   {
    "src": "154052:DragonBreak Online Edits.esp",
-   "loadId": "3c154052",
+   "loadId": "48154052",
    "kind": "boar",
    "base": "60242e:BSAssets.esm",
    "edid": "BSKEncBoar01",
@@ -75,7 +75,7 @@
   },
   {
    "src": "154055:DragonBreak Online Edits.esp",
-   "loadId": "3c154055",
+   "loadId": "48154055",
    "kind": "boar",
    "base": "60242e:BSAssets.esm",
    "edid": "BSKEncBoar01",
@@ -99,7 +99,7 @@
   },
   {
    "src": "154056:DragonBreak Online Edits.esp",
-   "loadId": "3c154056",
+   "loadId": "48154056",
    "kind": "boar",
    "base": "60242e:BSAssets.esm",
    "edid": "BSKEncBoar01",
@@ -123,7 +123,7 @@
   },
   {
    "src": "15405d:DragonBreak Online Edits.esp",
-   "loadId": "3c15405d",
+   "loadId": "4815405d",
    "kind": "boar",
    "base": "60242e:BSAssets.esm",
    "edid": "BSKEncBoar01",
@@ -147,7 +147,7 @@
   },
   {
    "src": "15405e:DragonBreak Online Edits.esp",
-   "loadId": "3c15405e",
+   "loadId": "4815405e",
    "kind": "boar",
    "base": "60242e:BSAssets.esm",
    "edid": "BSKEncBoar01",
@@ -171,7 +171,7 @@
   },
   {
    "src": "154063:DragonBreak Online Edits.esp",
-   "loadId": "3c154063",
+   "loadId": "48154063",
    "kind": "boar",
    "base": "60242e:BSAssets.esm",
    "edid": "BSKEncBoar01",
@@ -195,7 +195,7 @@
   },
   {
    "src": "154064:DragonBreak Online Edits.esp",
-   "loadId": "3c154064",
+   "loadId": "48154064",
    "kind": "boar",
    "base": "60242e:BSAssets.esm",
    "edid": "BSKEncBoar01",
@@ -219,7 +219,7 @@
   },
   {
    "src": "154069:DragonBreak Online Edits.esp",
-   "loadId": "3c154069",
+   "loadId": "48154069",
    "kind": "boar",
    "base": "60242e:BSAssets.esm",
    "edid": "BSKEncBoar01",
@@ -243,7 +243,7 @@
   },
   {
    "src": "15406a:DragonBreak Online Edits.esp",
-   "loadId": "3c15406a",
+   "loadId": "4815406a",
    "kind": "boar",
    "base": "60242e:BSAssets.esm",
    "edid": "BSKEncBoar01",
@@ -267,7 +267,7 @@
   },
   {
    "src": "15406f:DragonBreak Online Edits.esp",
-   "loadId": "3c15406f",
+   "loadId": "4815406f",
    "kind": "boar",
    "base": "60242e:BSAssets.esm",
    "edid": "BSKEncBoar01",
@@ -291,7 +291,7 @@
   },
   {
    "src": "154070:DragonBreak Online Edits.esp",
-   "loadId": "3c154070",
+   "loadId": "48154070",
    "kind": "boar",
    "base": "60242e:BSAssets.esm",
    "edid": "BSKEncBoar01",
@@ -315,7 +315,7 @@
   },
   {
    "src": "154071:DragonBreak Online Edits.esp",
-   "loadId": "3c154071",
+   "loadId": "48154071",
    "kind": "goblin",
    "base": "6025f5:BSAssets.esm",
    "edid": "BSKEncGoblin00Template",
@@ -339,7 +339,7 @@
   },
   {
    "src": "154072:DragonBreak Online Edits.esp",
-   "loadId": "3c154072",
+   "loadId": "48154072",
    "kind": "goblin",
    "base": "602939:BSAssets.esm",
    "edid": "BSKEncGoblin01aTemplateBerserker",
@@ -363,7 +363,7 @@
   },
   {
    "src": "154073:DragonBreak Online Edits.esp",
-   "loadId": "3c154073",
+   "loadId": "48154073",
    "kind": "goblin",
    "base": "60260c:BSAssets.esm",
    "edid": "BSKEncGoblin01TemplateBossMelee",
@@ -387,7 +387,7 @@
   },
   {
    "src": "154074:DragonBreak Online Edits.esp",
-   "loadId": "3c154074",
+   "loadId": "48154074",
    "kind": "goblin",
    "base": "60262a:BSAssets.esm",
    "edid": "BSKEncGoblin03TemplateMissile",
@@ -411,7 +411,7 @@
   },
   {
    "src": "154075:DragonBreak Online Edits.esp",
-   "loadId": "3c154075",
+   "loadId": "48154075",
    "kind": "goblin",
    "base": "60262a:BSAssets.esm",
    "edid": "BSKEncGoblin03TemplateMissile",
@@ -435,7 +435,7 @@
   },
   {
    "src": "154076:DragonBreak Online Edits.esp",
-   "loadId": "3c154076",
+   "loadId": "48154076",
    "kind": "goblin",
    "base": "602655:BSAssets.esm",
    "edid": "BSKEncGoblin04TemplateBerserker",
@@ -459,7 +459,7 @@
   },
   {
    "src": "154077:DragonBreak Online Edits.esp",
-   "loadId": "3c154077",
+   "loadId": "48154077",
    "kind": "goblin",
    "base": "602661:BSAssets.esm",
    "edid": "BSKEncGoblin06TemplateBossMagic",
@@ -483,7 +483,7 @@
   },
   {
    "src": "154078:DragonBreak Online Edits.esp",
-   "loadId": "3c154078",
+   "loadId": "48154078",
    "kind": "goblin",
    "base": "d6d81:BSHeartland.esm",
    "edid": "CYREncGoblin01aBerserker",
@@ -507,7 +507,7 @@
   },
   {
    "src": "17857f:DragonBreak Online Edits.esp",
-   "loadId": "3c17857f",
+   "loadId": "4817857f",
    "kind": "minotaur",
    "base": "8b600:BSHeartland.esm",
    "edid": "CYREncMinotaur",
@@ -531,7 +531,7 @@
   },
   {
    "src": "178580:DragonBreak Online Edits.esp",
-   "loadId": "3c178580",
+   "loadId": "48178580",
    "kind": "minotaur",
    "base": "d6fe5:BSHeartland.esm",
    "edid": "CYREncMinotaur02Lord",
@@ -555,7 +555,7 @@
   },
   {
    "src": "178581:DragonBreak Online Edits.esp",
-   "loadId": "3c178581",
+   "loadId": "48178581",
    "kind": "minotaur",
    "base": "8b600:BSHeartland.esm",
    "edid": "CYREncMinotaur",
@@ -579,7 +579,7 @@
   },
   {
    "src": "183380:DragonBreak Online Edits.esp",
-   "loadId": "3c183380",
+   "loadId": "48183380",
    "kind": "minotaur",
    "base": "d6fe5:BSHeartland.esm",
    "edid": "CYREncMinotaur02Lord",
@@ -603,7 +603,7 @@
   },
   {
    "src": "183381:DragonBreak Online Edits.esp",
-   "loadId": "3c183381",
+   "loadId": "48183381",
    "kind": "minotaur",
    "base": "8b600:BSHeartland.esm",
    "edid": "CYREncMinotaur",
@@ -627,7 +627,7 @@
   },
   {
    "src": "183382:DragonBreak Online Edits.esp",
-   "loadId": "3c183382",
+   "loadId": "48183382",
    "kind": "minotaur",
    "base": "8b600:BSHeartland.esm",
    "edid": "CYREncMinotaur",
@@ -651,7 +651,7 @@
   },
   {
    "src": "183385:DragonBreak Online Edits.esp",
-   "loadId": "3c183385",
+   "loadId": "48183385",
    "kind": "minotaur",
    "base": "8b600:BSHeartland.esm",
    "edid": "CYREncMinotaur",
@@ -675,7 +675,7 @@
   },
   {
    "src": "183386:DragonBreak Online Edits.esp",
-   "loadId": "3c183386",
+   "loadId": "48183386",
    "kind": "minotaur",
    "base": "8b600:BSHeartland.esm",
    "edid": "CYREncMinotaur",
@@ -699,7 +699,7 @@
   },
   {
    "src": "1833b1:DragonBreak Online Edits.esp",
-   "loadId": "3c1833b1",
+   "loadId": "481833b1",
    "kind": "minotaur",
    "base": "d6fe5:BSHeartland.esm",
    "edid": "CYREncMinotaur02Lord",
@@ -723,7 +723,7 @@
   },
   {
    "src": "1833b2:DragonBreak Online Edits.esp",
-   "loadId": "3c1833b2",
+   "loadId": "481833b2",
    "kind": "minotaur",
    "base": "d6fe5:BSHeartland.esm",
    "edid": "CYREncMinotaur02Lord",
@@ -747,7 +747,7 @@
   },
   {
    "src": "1833b3:DragonBreak Online Edits.esp",
-   "loadId": "3c1833b3",
+   "loadId": "481833b3",
    "kind": "minotaur",
    "base": "8b600:BSHeartland.esm",
    "edid": "CYREncMinotaur",
@@ -771,7 +771,7 @@
   },
   {
    "src": "1833b4:DragonBreak Online Edits.esp",
-   "loadId": "3c1833b4",
+   "loadId": "481833b4",
    "kind": "minotaur",
    "base": "8b600:BSHeartland.esm",
    "edid": "CYREncMinotaur",
@@ -795,7 +795,7 @@
   },
   {
    "src": "1833b5:DragonBreak Online Edits.esp",
-   "loadId": "3c1833b5",
+   "loadId": "481833b5",
    "kind": "minotaur",
    "base": "8b600:BSHeartland.esm",
    "edid": "CYREncMinotaur",
@@ -819,7 +819,7 @@
   },
   {
    "src": "1833b6:DragonBreak Online Edits.esp",
-   "loadId": "3c1833b6",
+   "loadId": "481833b6",
    "kind": "minotaur",
    "base": "8b600:BSHeartland.esm",
    "edid": "CYREncMinotaur",
@@ -843,7 +843,7 @@
   },
   {
    "src": "1833b7:DragonBreak Online Edits.esp",
-   "loadId": "3c1833b7",
+   "loadId": "481833b7",
    "kind": "minotaur",
    "base": "8b600:BSHeartland.esm",
    "edid": "CYREncMinotaur",
@@ -867,7 +867,7 @@
   },
   {
    "src": "1833b8:DragonBreak Online Edits.esp",
-   "loadId": "3c1833b8",
+   "loadId": "481833b8",
    "kind": "minotaur",
    "base": "8b600:BSHeartland.esm",
    "edid": "CYREncMinotaur",
@@ -891,7 +891,7 @@
   },
   {
    "src": "1833bf:DragonBreak Online Edits.esp",
-   "loadId": "3c1833bf",
+   "loadId": "481833bf",
    "kind": "minotaur",
    "base": "8b600:BSHeartland.esm",
    "edid": "CYREncMinotaur",
@@ -915,7 +915,7 @@
   },
   {
    "src": "1833c0:DragonBreak Online Edits.esp",
-   "loadId": "3c1833c0",
+   "loadId": "481833c0",
    "kind": "minotaur",
    "base": "8b600:BSHeartland.esm",
    "edid": "CYREncMinotaur",
@@ -939,7 +939,7 @@
   },
   {
    "src": "1833c1:DragonBreak Online Edits.esp",
-   "loadId": "3c1833c1",
+   "loadId": "481833c1",
    "kind": "minotaur",
    "base": "8b600:BSHeartland.esm",
    "edid": "CYREncMinotaur",
@@ -963,7 +963,7 @@
   },
   {
    "src": "1833c2:DragonBreak Online Edits.esp",
-   "loadId": "3c1833c2",
+   "loadId": "481833c2",
    "kind": "minotaur",
    "base": "8b600:BSHeartland.esm",
    "edid": "CYREncMinotaur",
@@ -987,7 +987,7 @@
   },
   {
    "src": "1833d1:DragonBreak Online Edits.esp",
-   "loadId": "3c1833d1",
+   "loadId": "481833d1",
    "kind": "minotaur",
    "base": "8b600:BSHeartland.esm",
    "edid": "CYREncMinotaur",
@@ -1011,7 +1011,7 @@
   },
   {
    "src": "1833d2:DragonBreak Online Edits.esp",
-   "loadId": "3c1833d2",
+   "loadId": "481833d2",
    "kind": "minotaur",
    "base": "8b600:BSHeartland.esm",
    "edid": "CYREncMinotaur",
@@ -1035,7 +1035,7 @@
   },
   {
    "src": "1833d6:DragonBreak Online Edits.esp",
-   "loadId": "3c1833d6",
+   "loadId": "481833d6",
    "kind": "minotaur",
    "base": "8b600:BSHeartland.esm",
    "edid": "CYREncMinotaur",
@@ -1059,7 +1059,7 @@
   },
   {
    "src": "1833de:DragonBreak Online Edits.esp",
-   "loadId": "3c1833de",
+   "loadId": "481833de",
    "kind": "minotaur",
    "base": "8b600:BSHeartland.esm",
    "edid": "CYREncMinotaur",
@@ -1183,7 +1183,7 @@
    "chests": [
     {
      "ref": "154079:DragonBreak Online Edits.esp",
-     "loadId": "3c154079",
+     "loadId": "48154079",
      "edid": "CYRTreasGoblinChestMagicBoss",
      "pos": [
       70161.82,
@@ -1201,7 +1201,7 @@
    "chests": [
     {
      "ref": "178582:DragonBreak Online Edits.esp",
-     "loadId": "3c178582",
+     "loadId": "48178582",
      "edid": "CYRTreasBanditChestBoss",
      "pos": [
       124165.49,
@@ -1219,7 +1219,7 @@
    "chests": [
     {
      "ref": "1833cf:DragonBreak Online Edits.esp",
-     "loadId": "3c1833cf",
+     "loadId": "481833cf",
      "edid": "CYRTreasExplorerLootChestSnow",
      "pos": [
       728.71,
@@ -1229,7 +1229,7 @@
     },
     {
      "ref": "1833df:DragonBreak Online Edits.esp",
-     "loadId": "3c1833df",
+     "loadId": "481833df",
      "edid": "CYRTreasExplorerLootChestSnow",
      "pos": [
       2009.47,
@@ -1239,7 +1239,7 @@
     },
     {
      "ref": "1833da:DragonBreak Online Edits.esp",
-     "loadId": "3c1833da",
+     "loadId": "481833da",
      "edid": "CYRTreasRuinsChestBossSnow",
      "pos": [
       352.81,
@@ -1249,7 +1249,7 @@
     },
     {
      "ref": "1833cd:DragonBreak Online Edits.esp",
-     "loadId": "3c1833cd",
+     "loadId": "481833cd",
      "edid": "CYRTreasExplorerLootChestSnow",
      "pos": [
       -2994.33,
@@ -1259,7 +1259,7 @@
     },
     {
      "ref": "1833aa:DragonBreak Online Edits.esp",
-     "loadId": "3c1833aa",
+     "loadId": "481833aa",
      "edid": "CYRTreasRuinsChestBossSnow",
      "pos": [
       -5014.08,
@@ -1269,7 +1269,7 @@
     },
     {
      "ref": "1833a9:DragonBreak Online Edits.esp",
-     "loadId": "3c1833a9",
+     "loadId": "481833a9",
      "edid": "CYRTreasRuinsChestBossSnow",
      "pos": [
       -4813.71,
@@ -1279,7 +1279,7 @@
     },
     {
      "ref": "1833d0:DragonBreak Online Edits.esp",
-     "loadId": "3c1833d0",
+     "loadId": "481833d0",
      "edid": "CYRTreasExplorerLootChestSnow",
      "pos": [
       -175.31,
@@ -1289,7 +1289,7 @@
     },
     {
      "ref": "1833ce:DragonBreak Online Edits.esp",
-     "loadId": "3c1833ce",
+     "loadId": "481833ce",
      "edid": "CYRTreasExplorerLootChestSnow",
      "pos": [
       -2278.99,

@@ -16,7 +16,7 @@ const O = JSON.parse(fs.readFileSync(path.join(ROOT, 'owned-spawns.json'), 'utf8
 const count = (k) => O.spawns.filter((s) => s.kind === k).length;
 ok(O.spawns.length === 45 && count('goblin') === 8 && count('boar') === 13 && count('minotaur') === 24, 'owned-spawns.json lists the 8 goblins and 13 boars of DLE v5, and the 24 minotaurs of Sancre Tor Ruins and Minotaur\'s Rest (DLE 12393628)', { n: O.spawns.length, goblin: count('goblin'), boar: count('boar'), minotaur: count('minotaur') });
 ok(W.placements.every((p) => p.kind !== 'goblin' && p.kind !== 'boar') && !W.giantCamps.some((c) => c.name === 'Dusk Thorn Camp'), 'wildlife.json no longer carries them by hand (3,184 generated placements, 13 giant camps)', { n: W.placements.length, camps: W.giantCamps.length });
-ok(O.spawns.every((s) => /:DragonBreak Online Edits\.esp$/.test(s.src) && /^3c/.test(s.loadId)), 'each comes from a DLE ACHR (load-order id 3Cxxxxxx)');
+ok(O.spawns.every((s) => /:DragonBreak Online Edits\.esp$/.test(s.src) && /^48/.test(s.loadId)), 'each comes from a DLE ACHR (load-order id 48xxxxxx in the 140-plugin order of the Skyrim release; 3Cxxxxxx before)');
 // Sancre Tor Ruins and Minotaur's Rest are nearly all Nat's own placements, so the nearest untouched ref can be 6.6 km off; placeNpc re-enables after the move
 ok(O.spawns.every((s) => /:BSHeartland\.esm$/.test(s.ref) && s.anchorDist <= (s.kind === 'minotaur' ? 7000 : 2500)), 'every anchor is a Beyond Skyrim ref no plugin of ours touches, within 2500 units (7000 for the minotaurs\' ruins)', O.spawns.filter((s) => s.anchorDist > 2500).map((s) => [s.ref, s.anchorDist, s.group]));
 ok(O.spawns.every((s) => s.world === 'a764b:BSHeartland.esm' && !s.interior && Number.isFinite(s.heading) && s.options.length), 'all outdoors in the Bruma world, each with a heading and a concrete NPC');
@@ -33,7 +33,7 @@ const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'claude-nate-owned-'));
 const cwd = process.cwd();
 try {
   for (const f of ['wildlife.json', 'owned-spawns.json', 'loot.json', 'artifacts.json']) fs.copyFileSync(path.join(ROOT, f), path.join(dir, f));
-  const PLUGINS = { 'skyrim.esm': 0x00, 'bsheartland.esm': 0x08, 'bsassets.esm': 0x07, 'dragonbreak online edits.esp': 0x3c, 'dragonbreak.esp': 0x3b };
+  const PLUGINS = { 'skyrim.esm': 0x00, 'bsheartland.esm': 0x08, 'bsassets.esm': 0x07, 'dragonbreak online edits.esp': 0x48, 'dragonbreak.esp': 0x40 };
   const idOf = (d) => { const [h, p] = String(d).split(':'); const i = PLUGINS[String(p || '').toLowerCase()]; return i === undefined ? 0x7f000000 | (parseInt(h, 16) & 0xffffff) : ((i << 24) | (parseInt(h, 16) & 0xffffff)) >>> 0; };
   const props = new Map(), said = [];
   global.setInterval = () => ({ unref() {} }); global.clearInterval = () => {};
