@@ -55,6 +55,7 @@ import { hostBackoff, hostStartSettle, isHandedToDelete, noteActorCall, queueRes
 import { OpenContainerMessage } from '../messages/openContainerMessage';
 import { ActivateMessage } from '../messages/activateMessage';
 import { ClientListener, CombinedController, Sp } from './clientListener';
+import { releaseFocusBeforeVanillaMenu } from './widgetMenuUtil';
 import { HostStartMessage } from '../messages/hostStartMessage';
 import { HostStopMessage } from '../messages/hostStopMessage';
 import { ConnectionMessage } from '../events/connectionMessage';
@@ -409,6 +410,7 @@ export class RemoteServer extends ClientListener {
         return;
       }
 
+      if (baseType === FormType.Container) releaseFocusBeforeVanillaMenu(this.sp, this.controller);
       refr.activate(Game.getPlayer(), true);
 
       let functionChecker: (() => boolean) | null = null;

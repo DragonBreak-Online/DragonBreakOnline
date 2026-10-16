@@ -117,6 +117,16 @@ export function closeFormMenu(sp: Sp, widgetId: number): void {
   sp.browser.setFocused(false);
 }
 
+// Before the client opens a vanilla menu itself: a focus released after it opened would close its pointer (cursorKeeper.ts)
+export function releaseFocusBeforeVanillaMenu(sp: Sp, controller: CombinedController): void {
+  if (!sp.browser.isFocused()) return;
+  try {
+    controller.lookupListener(BrowserService).releaseFocus();
+  } catch {
+    sp.browser.setFocused(false);
+  }
+}
+
 // Clears the hide UI toggle before a server-initiated screen is shown.
 export function showUi(controller: CombinedController): void {
   try {

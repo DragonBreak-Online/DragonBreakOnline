@@ -8,7 +8,10 @@ import { forgetDeferredFocus, isConsoleOpen, keybindOverride, readMenuKeyCode, t
 import { badMenuAction } from "./badMenuPolicy";
 import { logTrace } from "../../logging";
 import { PlacementService } from "./placementService";
-import { BrowserMessageEvent, DxScanCode, Menu, MenuCloseEvent, MenuOpenEvent } from "skyrimPlatform";
+import { BrowserMessageEvent, ButtonEvent, DxScanCode, InputDeviceType, Menu, MenuCloseEvent, MenuOpenEvent } from "skyrimPlatform";
+import { CONTROLLER_NOTICE, MAX_FAILED_RESHOWS, VanillaMenuWatch, checkVanillaMenu, controllerNoticeDue, initialPanelCursorState, keepPanelCursor, watchVanillaMenu } from "./cursorKeeper";
+
+const MAX_CURSOR_NOTES = 8;
 
 export const unfocusEventString = `window.dispatchEvent(new CustomEvent('skymp5-client:browserUnfocused', {}))`;
 export const focusEventString = `window.dispatchEvent(new CustomEvent('skymp5-client:browserFocused', {}))`;
@@ -51,6 +54,8 @@ export class BrowserService extends ClientListener {
     this.controller.on("menuOpen", (e) => this.onMenuOpen(e));
     this.controller.on("menuClose", (e) => this.onMenuClose(e));
     this.controller.emitter.on("connectionDisconnect", () => this.dropDeferredFocus("disconnected"));
+    this.controller.on("update", () => this.onUpdateCursor());
+    this.controller.on("buttonEvent", (e) => this.onButtonEventCursor(e));
   }
 
   private onQueryKeyCodeBindings(e: QueryKeyCodeBindings) {
@@ -153,6 +158,7 @@ export class BrowserService extends ClientListener {
         ownPanelHasScreen: this.ownPanelHasScreen(),
       });
       if (action === 'ignore') return;   // nothing recorded either, so canFocus stays true
+      this.vanillaWatch = watchVanillaMenu(e.name, Date.now(), this.sp.browser.isFocused()) ?? this.vanillaWatch;
       // A hidden browser that keeps focus swallows every key with no cursor to show it
       this.unfocus();
       this.sp.browser.setVisible(false);
@@ -163,6 +169,7 @@ export class BrowserService extends ClientListener {
   }
 
   private onMenuClose(e: MenuCloseEvent) {
+    if (this.vanillaWatch && this.vanillaWatch.name === e.name) this.vanillaWatch = null;
     if (this.badMenusOpen.delete(e.name)) {
       // Asked of the engine, not of the record: a menu whose close never arrived must not hold the cursor for ever
       const live = this.liveBlockingMenus();
@@ -183,6 +190,97 @@ export class BrowserService extends ClientListener {
       this.sp.browser.setFocused(false);
       this.sp.browser.executeJavaScript(unfocusEventString);
     }
+  }
+
+  // Hands the keyboard back to the game the way Escape does (widgetMenuUtil releaseFocusBeforeVanillaMenu)
+  releaseFocus(): void {
+    this.unfocus();
+  }
+
+  private cursorMenuOpen(): boolean {
+    try {
+      return this.sp.Ui.isMenuOpen(Menu.Cursor);
+    } catch (e) {
+      return true;   // unreadable: never act on a guess
+    }
+  }
+
+  // The launcher writes it off; the game turns it back on when it sees a controller
+  private gamepadEnabled(): boolean | null {
+    try {
+      return this.sp.Utility.getINIBool("bGamepadEnable:MAIN") || this.sp.Utility.getINIBool("bGamepadEnable:Main");
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // SKSE Game.UsingGamepad: whether the game reads a gamepad now, which the setting alone does not say
+  private gamepadInUse(): boolean | null {
+    try {
+      return this.sp.Game.usingGamepad();
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // Capped: the relay's per-session line budget is shared with every other diagnostic
+  private diagNote(kind: string, text: string): void {
+    if (this.cursorNotes >= MAX_CURSOR_NOTES) return;
+    this.cursorNotes++;
+    const note = (globalThis as any).__dboDiagNote;
+    if (typeof note === "function") note(kind, text);
+  }
+
+  // cursorKeeper.ts: a vanilla menu closing under a focused panel takes the panel's pointer, which SkyrimPlatform never reopens
+  private onUpdateCursor(): void {
+    const now = Date.now();
+    if (this.vanillaWatch) this.watchVanillaCursor(now);
+    let focused = false;
+    try {
+      focused = this.sp.browser.isFocused();
+    } catch (e) {
+      return;
+    }
+    if (!focused && this.panelCursor.missingSince === 0) return;
+    const input = focused
+      ? { focused, visible: this.sp.browser.isVisible(), cursorMenuOpen: this.cursorMenuOpen(), blockingMenuOpen: this.liveBlockingMenus().length > 0, now }
+      : { focused, visible: false, cursorMenuOpen: false, blockingMenuOpen: false, now };
+    const failedBefore = this.panelCursor.failedReshows;
+    const { action, state } = keepPanelCursor(input, this.panelCursor);
+    const since = state.missingSince;
+    this.panelCursor = state;
+    if (state.failedReshows >= MAX_FAILED_RESHOWS && failedBefore < MAX_FAILED_RESHOWS) {
+      this.diagNote("cursor", `panel pointer did not come back ${MAX_FAILED_RESHOWS} times, no more repairs until it is up again`);
+    }
+    if (action !== "reshow") return;
+    this.panelReshows++;
+    this.sp.browser.setFocused(false);
+    this.sp.browser.setFocused(true);
+    this.diagNote("cursor", `panel pointer put back after ${now - since} ms closed under focus (${this.panelReshows} this session)`);
+  }
+
+  private watchVanillaCursor(now: number): void {
+    const w = this.vanillaWatch as VanillaMenuWatch;
+    let open = true;
+    try {
+      open = this.sp.Ui.isMenuOpen(w.name);
+    } catch (e) { /* unreadable: keep watching */ }
+    if (!open) {
+      this.vanillaWatch = null;
+      return;
+    }
+    if (checkVanillaMenu(w, this.cursorMenuOpen(), now) !== "report") return;
+    this.diagNote("cursor", `${w.name} open ${now - w.openedAt} ms, no pointer for ${now - w.missingSince} ms; ` +
+      `browser had focus when it opened ${w.focusedAtOpen}; controller mode ${this.gamepadEnabled()}; gamepad in use ${this.gamepadInUse()}`);
+  }
+
+  // A mouse press in a vanilla menu that has no pointer
+  private onButtonEventCursor(e: ButtonEvent): void {
+    if (this.controllerNoticeShown || !this.vanillaWatch || !e.isDown || e.device !== InputDeviceType.Mouse) return;
+    if (!controllerNoticeDue(this.vanillaWatch, Date.now(), this.gamepadEnabled(), this.controllerNoticeShown)) return;
+    this.controllerNoticeShown = true;
+    showSystemNotification(this.sp, CONTROLLER_NOTICE);
+    this.diagNote("cursor", `controller notice shown in ${this.vanillaWatch.name}`);
   }
 
   private isBadMenu(menu: string) {
@@ -251,6 +349,11 @@ export class BrowserService extends ClientListener {
 
   private badMenusOpen = new Set<string>();
   private uiHidden = false;
+  private panelCursor = initialPanelCursorState();
+  private panelReshows = 0;
+  private vanillaWatch: VanillaMenuWatch | null = null;
+  private controllerNoticeShown = false;
+  private cursorNotes = 0;
 
   private nametagKey: DxScanCode = DxScanCode.F1;
   private hideUiKey: DxScanCode = DxScanCode.F2;
