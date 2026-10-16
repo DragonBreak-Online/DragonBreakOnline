@@ -32,7 +32,14 @@ export class ActivationService extends ClientListener {
 
     private onActivate(e: ActivateEvent) {
         const lastInvService = this.controller.lookupListener(LastInvService);
-        lastInvService.lastInv = getInventory(this.sp.Game.getPlayer() as Actor);
+        // A player whose base reads null threw here and the activation was never sent; ContainersService reads its own when unset
+        try {
+          lastInvService.lastInv = getInventory(this.sp.Game.getPlayer() as Actor);
+        } catch (err) {
+          lastInvService.lastInv = undefined;
+          logError(this, "Inventory read failed before an activation, sending it anyway", err);
+          try { const report = (globalThis as { __dboReportError?: (w: string, e: unknown) => void }).__dboReportError; if (typeof report === "function") report("on:activate:inv", err); } catch { /* diagnostics only */ }
+        }
 
         let caster = e.caster ? e.caster.getFormID() : 0;
         let target = e.target ? e.target.getFormID() : 0;
