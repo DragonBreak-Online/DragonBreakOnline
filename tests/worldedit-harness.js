@@ -193,6 +193,7 @@ reset(); ui.placeMove(GM, [h(FORGE), [1150, 2010, 300], [0, 0, 45]]);
 const sp = papyrus('SetPosition');
 const we2 = out.packets.filter((p) => p[1].customPacketType === 'worldEdits');
 check('the edit mode\'s Enter moves it: server pose and the list for clients', sp.length === 1 && sp[0][2].join() === '1150,2010,300' && papyrus('SetAngle')[0][2].join() === '0,0,45' && we2.length && we2[0][1].edits.find((e) => e.ref === FORGE).pos.join() === '1150,2010,300', JSON.stringify(calls));
+check('a moved entry carries its plugin pose (orig), so a client can undo it in view', (we2[0][1].edits.find((e) => e.ref === FORGE).orig || {}).pos.join() === '1100,2000,300', JSON.stringify(we2[0][1].edits));
 check('it stays hidden while moved', file().edits['1a2b3'].hidden === true && file().edits['1a2b3'].moved.rot[2] === 45);
 reset(); ui.placeUndo(GM, []);
 check('Undo moves it back to the plugin pose', papyrus('SetPosition').length === 1 && papyrus('SetPosition')[0][2].join() === '1100,2000,300' && !file().edits['1a2b3'].moved, JSON.stringify(calls));

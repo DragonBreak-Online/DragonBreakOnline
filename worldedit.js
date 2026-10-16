@@ -242,7 +242,7 @@ module.exports = (api) => {
 
   const packet = () => ({ customPacketType: 'worldEdits', edits: Object.values(data().edits).map((e) => {
     const o = { ref: parseInt(e.ref, 16) >>> 0, hide: !!e.hidden };
-    if (e.moved) { o.pos = e.moved.pos; o.rot = e.moved.rot; }
+    if (e.moved) { o.pos = e.moved.pos; o.rot = e.moved.rot; if (e.orig) o.orig = e.orig; }
     return o;
   }) });
   // Only a client with WorldEditService does anything with the list
