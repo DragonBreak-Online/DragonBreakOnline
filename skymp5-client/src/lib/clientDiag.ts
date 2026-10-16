@@ -3,7 +3,8 @@
 //   apr ...   the appearance trace: what the client put on the player's own base and read back, and each RaceMenu
 //             face/extras step (ask, answer, apply, capture, upload, refusal). Codes, numbers and hashes only: no names,
 //             no paths, no free text.
-//   cerr ...  client errors: uncaught exceptions, unhandled rejections and errors thrown in a controller on/once handler,
+//   cerr ...  client errors: uncaught exceptions, unhandled rejections, errors thrown in a controller on/once handler and
+//             errors a service caught and reported (reportError),
 //             deduplicated with counts and at most ERROR_LINES_PER_MINUTE lines a minute.
 // No imports, so a harness loads it on its own (tests/client-diag-harness.js). Nothing here ever throws.
 
@@ -261,6 +262,14 @@ export const trace = (text: string): void => {
   try {
     const t = (globalThis as { __dboTrace?: (text: string) => void }).__dboTrace;
     if (typeof t === "function") t(text);
+  } catch (e) { /* diagnostics never break the caller */ }
+};
+
+// For the services: an error they caught and carry on after, one cerr line at=<where> through ClientDiagService. Never throws.
+export const reportError = (where: string, err: unknown): void => {
+  try {
+    const r = (globalThis as { __dboReportError?: (where: unknown, err: unknown) => void }).__dboReportError;
+    if (typeof r === "function") r(where, err);
   } catch (e) { /* diagnostics never break the caller */ }
 };
 
