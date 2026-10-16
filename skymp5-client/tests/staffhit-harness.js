@@ -298,6 +298,13 @@ function run({ HitService }) {
   check('a spell shot is one line naming the spell and its projectile', shots().length === 1 && tl.includes('aggr 14 -> tgt ff000301 | source SPEL 7002308 proj 7002876 | events 2'), shots());
   check('...with the hazard tick that landed in the same shot, counted as deduped, and only the spell sent', tl.includes('events 2 (1 deduped)') && tl.includes('also SPEL 7005e80') && tl.endsWith('sent spell') && hits().length === 1 && hits()[0].data.source === TOXIC_CLOUD, tl);
   reset();
+  // The in-game timing: a hazard's first tick lands about 300 ms after the cast, past the dedupe and the 200 ms shot
+  hit({ source: () => SPEL(TOXIC_CLOUD), proj: 0x7002876 });
+  later(300);
+  hit({ source: () => SPEL(TOXIC_HAZARD) });
+  later(250); update();
+  check('a hazard tick 300 ms after its spell (the in-game timing) is sent, and traced on a line of its own', hits().length === 2 && hits()[1].data.source === TOXIC_HAZARD && shots().length === 2 && shots()[0].endsWith('| events 1 | sent spell') && shots()[1].includes('aggr 14 -> tgt ff000301 | source SPEL 7005e80 proj - | events 1 | sent spell'), [hits(), shots()]);
+  reset();
   // A runtime hazard reference: FF id, hosted by no one, not an actor (hands null)
   hit({ aggr: 0xff000a10, source: () => SPEL(TOXIC_HAZARD) });
   later(250); update();
