@@ -4,9 +4,11 @@ import { sendCustomPacket, parseCustomPacket } from "./customPacketUtil";
 import { ConnectionMessage } from "../events/connectionMessage";
 import { CustomPacketMessage } from "../messages/customPacketMessage";
 import { CreateActorMessage } from "../messages/createActorMessage";
-import { SPELL_ENFORCE_PASSES } from "./remoteServer";
+import { SPELL_ENFORCE_PASSES, loginClock } from "../../sync/loginClock";
+import { addMissingServerSpells, getServerSpells } from "../../sync/spell";
 import { getInventory } from "../../sync/inventory";
 import { logError, logTrace } from "../../logging";
+import { trace } from "../../lib/clientDiag";
 
 interface FavoriteEntry { id: number; hotkey: number }
 interface FavoritesSnapshot { items: FavoriteEntry[]; spells: FavoriteEntry[] }
@@ -24,6 +26,10 @@ const RETRY_AFTER_S = 5;
 // Without a server list, snapshots wait this long past the restore point in case it arrives late
 const NO_PACKET_GRACE_S = 8;
 const SNAPSHOT_MENUS: string[] = [Menu.Favorites, Menu.Inventory, Menu.Magic];
+// How often a carried spell (below) is looked for while snapshots run
+const CARRY_CHECK_MS = 2000;
+// Diagnostic only: a Papyrus wait started beside the restore timer; the restore's trace line says if it came back
+const PAPYRUS_PROBE_S = 1;
 
 /**
  * The login rebuild removes and re-adds every item and spell, which drops favorites and hotkeys 1-8.
@@ -33,6 +39,7 @@ const SNAPSHOT_MENUS: string[] = [Menu.Favorites, Menu.Inventory, Menu.Magic];
  *   Client -> Server: { customPacketType: "dbo", event: "favorites", args: [{ items, spells }] }
  *   Server -> Client: { customPacketType: "dboFavorites", items, spells }
  *   Entries are { id: base form id, hotkey: 0..7 or -1 }
+ *   A spell the server lists but the game lacks after the retry is carried: kept in snapshots until the game has it
  */
 export class FavoritesService extends ClientListener {
   constructor(private sp: Sp, private controller: CombinedController) {
@@ -53,13 +60,21 @@ export class FavoritesService extends ClientListener {
     this.restoreReady = false;
     // A respawn rebuilds the inventory too; with no fresh server list the last snapshot is re-applied
     this.pending = this.lastSent;
+    this.carry = [];
     // Same clock and start point as the login spell passes, so this always runs after the last one
     once("update", () => {
-      Utility.wait(RESTORE_AFTER_LOGIN_S).then(() => {
+      this.probeBack = false;
+      this.probeStartedAt = Date.now();
+      try {
+        Utility.wait(PAPYRUS_PROBE_S).then(() => { if (gen === this.loginGen) this.probeBack = true; });
+      } catch (err) {
+        // diagnostics only
+      }
+      loginClock.after(RESTORE_AFTER_LOGIN_S, () => {
         if (gen !== this.loginGen) return;
         this.restoreReady = true;
         if (this.pending) return this.restore(gen);
-        Utility.wait(NO_PACKET_GRACE_S).then(() => {
+        loginClock.after(NO_PACKET_GRACE_S, () => {
           if (gen !== this.loginGen || this.snapshotsEnabled) return;
           if (this.pending) return this.restore(gen);
           this.enableSnapshots();
@@ -82,17 +97,55 @@ export class FavoritesService extends ClientListener {
     this.pending = null;
     if (!snapshot) return this.enableSnapshots();
     const missing = this.apply(snapshot);
-    logTrace(this, "restored", snapshot.items.length + snapshot.spells.length, "favorite(s),", missing.items.length + missing.spells.length, "not present yet");
-    Utility.wait(RETRY_AFTER_S).then(() => {
+    // A spell the server lists but the game lacks: the server's spells the game lacks are added before the retry
+    const spellsAdded = missing.spells.some((e) => this.serverKnows(e.id)) ? this.addServerSpells() : 0;
+    logTrace(this, "restored", snapshot.items.length + snapshot.spells.length, "favorite(s),", missing.items.length + missing.spells.length, "not present yet,", spellsAdded, "server spell(s) added");
+    loginClock.after(RETRY_AFTER_S, () => {
       if (gen !== this.loginGen) return;
       const stillMissing = missing.items.length + missing.spells.length > 0 ? this.apply(missing) : missing;
-      this.report(snapshot, stillMissing);
+      this.carry = stillMissing.spells.filter((e) => this.serverKnows(e.id));
+      this.report(snapshot, stillMissing, spellsAdded);
       this.enableSnapshots();
     });
   }
 
+  private serverKnows(id: number): boolean {
+    const list = getServerSpells();
+    return !!list && list.indexOf(id >>> 0) !== -1;
+  }
+
+  private addServerSpells(): number {
+    try {
+      const player = Game.getPlayer();
+      return player ? addMissingServerSpells(player) : 0;
+    } catch (err) {
+      logError(this, "adding the server's spells failed", String(err));
+      return 0;
+    }
+  }
+
+  // Favourites carried spells the game has now (hotkey only if still free), drops those the server put away
+  private settleCarry(player: Actor): FavoriteEntry[] {
+    const keep: FavoriteEntry[] = [];
+    for (const e of this.carry) {
+      if (!this.serverKnows(e.id)) continue;
+      const form = Game.getFormEx(e.id);
+      if (!form || !player.hasSpell(form)) {
+        keep.push(e);
+        continue;
+      }
+      if (Game.isObjectFavorited(form)) continue;
+      const bound = e.hotkey >= 0 ? Game.getHotkeyBoundObject(e.hotkey) : null;
+      const hotkey = bound && (bound.getFormID() >>> 0) !== e.id ? -1 : e.hotkey;
+      favoriteNatives.setSpellFavorite(form, hotkey);
+      logTrace(this, "carried favorite", e.id.toString(16), "restored with hotkey", hotkey);
+    }
+    this.carry = keep;
+    return keep;
+  }
+
   // The server's log is the only place a restore can be checked from, so it is told how many came back
-  private report(snapshot: FavoritesSnapshot, missing: FavoritesSnapshot): void {
+  private report(snapshot: FavoritesSnapshot, missing: FavoritesSnapshot, spellsAdded: number): void {
     const wanted = snapshot.items.length + snapshot.spells.length;
     if (!wanted) return;
     try {
@@ -104,8 +157,11 @@ export class FavoritesService extends ClientListener {
       }
       sendCustomPacket(this.controller, {
         customPacketType: "dbo", event: "favoritesRestored",
-        args: [{ wanted, confirmed, missing: missingIds.size, missingIds: Array.from(missingIds).slice(0, 10) }],
+        args: [{ wanted, confirmed, missing: missingIds.size, missingIds: Array.from(missingIds).slice(0, 10), spellsAdded, carried: this.carry.length }],
       });
+      // A dboDiag line in the server log; in= is wall seconds since the login's first update
+      const since = this.probeStartedAt ? Math.round((Date.now() - this.probeStartedAt) / 1000) : -1;
+      trace(`favorites restore wanted=${wanted} ok=${confirmed} missing=${missingIds.size} added=${spellsAdded} carried=${this.carry.length} wait=${this.probeBack ? "back" : "lost"} in=${since}s`);
     } catch (err) {
       logError(this, "restore report failed", String(err));
     }
@@ -139,11 +195,24 @@ export class FavoritesService extends ClientListener {
   private onUpdate(): void {
     if (!this.snapshotsEnabled) return;
     const now = Date.now();
+    if (this.carry.length > 0 && now >= this.carryCheckAt) {
+      this.carryCheckAt = now + CARRY_CHECK_MS;
+      const player = Game.getPlayer();
+      const before = this.carry.length;
+      try {
+        if (player && !player.isDead()) this.settleCarry(player);
+      } catch (err) {
+        logError(this, "carried favorites check failed", String(err));
+      }
+      // One that came back (or was put away) is snapshotted at once, so the server's copy follows
+      if (this.carry.length < before) this.snapshotAt = 0;
+    }
     if (now < this.snapshotAt) return;
     this.snapshotAt = now + SNAPSHOT_EVERY_MS;
     const player = Game.getPlayer();
     if (!player || player.isDead()) return;
     try {
+      if (this.carry.length > 0) this.settleCarry(player);
       const snapshot = this.snapshot(player);
       if (this.lastSent && JSON.stringify(snapshot) === JSON.stringify(this.lastSent)) return;
       this.lastSent = snapshot;
@@ -169,7 +238,13 @@ export class FavoritesService extends ClientListener {
     const spellIds = this.knownSpellIds(player);
     // Shouts cannot be listed, so only the hotkeyed ones are kept
     hotkeys.forEach((_, id) => { if (!itemIds.has(id)) spellIds.add(id); });
-    return { items: favorited(itemIds), spells: favorited(spellIds) };
+    const spells = favorited(spellIds);
+    // Carried spells the game does not have yet stay as they were saved
+    const listed = new Set(spells.map((e) => e.id));
+    const usedSlots = new Set(hotkeys.values());
+    const carried = this.carry.filter((e) => !listed.has(e.id) && !spellIds.has(e.id))
+      .map((e) => (e.hotkey >= 0 && usedSlots.has(e.hotkey) ? { id: e.id, hotkey: -1 } : e));
+    return { items: favorited(itemIds), spells: carried.length ? spells.concat(carried).sort((a, b) => a.id - b.id) : spells };
   }
 
   private ownedItemIds(player: Actor): Set<number> {
@@ -207,6 +282,7 @@ export class FavoritesService extends ClientListener {
 
   private reset(): void {
     this.loginGen++;
+    this.carry = [];
     this.snapshotsEnabled = false;
     this.restoreReady = false;
     this.pending = null;
@@ -219,4 +295,10 @@ export class FavoritesService extends ClientListener {
   private snapshotAt = 0;
   private pending: FavoritesSnapshot | null = null;
   private lastSent: FavoritesSnapshot | null = null;
+  // Saved spell favourites the server's list holds and the game does not have yet
+  private carry: FavoriteEntry[] = [];
+  private carryCheckAt = 0;
+  // The diagnostic Papyrus wait (PAPYRUS_PROBE_S) of the current login
+  private probeBack = false;
+  private probeStartedAt = 0;
 }

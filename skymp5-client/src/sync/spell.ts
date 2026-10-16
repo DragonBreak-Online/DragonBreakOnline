@@ -101,6 +101,19 @@ export const noteServerSpellSnippet = (snippet: { class: unknown; function: unkn
 export const reenforceServerSpells = (actor: Actor): number =>
   serverSpells ? enforceSpells(actor, serverSpells) : 0;
 
+// Adds the remembered list's spells the actor lacks and removes nothing, so local grants (beast powers) stay
+export const addMissingServerSpells = (actor: Actor): number => {
+  let added = 0;
+  for (const id of serverSpells || []) {
+    const spell = Spell.from(Game.getFormEx(id));
+    if (spell && !actor.hasSpell(spell)) {
+      actor.addSpell(spell, false);
+      added++;
+    }
+  }
+  return added;
+};
+
 export const learnSpells = (actor: Actor, spellsIds: Array<number>) => {
   for (let spellId of spellsIds) {
     const spell = Spell.from(Game.getFormEx(spellId));

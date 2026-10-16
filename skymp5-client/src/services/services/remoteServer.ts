@@ -85,6 +85,7 @@ import { MsgType } from '../../messages';
 import { CustomPacketMessage } from '../messages/customPacketMessage';
 import { parseCustomPacket, sendCustomPacket } from './customPacketUtil';
 import { forgetHostAttempts, resetHostAttempts, sameRemoteId } from '../../view/hostAttempts';
+import { SPELL_ENFORCE_PASSES, loginClock } from '../../sync/loginClock';
 
 export const getPcInventory = (): Inventory | undefined => {
   const res = storage['pcInv'];
@@ -110,8 +111,20 @@ const SPAWN_MAX_ATTEMPTS = 30;
 // A teleported player is checked this often, for this many polls, before the server hears it arrived
 const ARRIVAL_POLL_SECONDS = 0.5;
 const ARRIVAL_POLLS = 40;
-// Seconds after spawn at which the server's spell list is re-imposed, because the engine grants the race defaults late
-export const SPELL_ENFORCE_PASSES = [1, 3, 6, 10, 15, 20];
+// Seconds after spawn at which the server's spell list is re-imposed (sync/loginClock.ts)
+export { SPELL_ENFORCE_PASSES };
+// The login clock counts the frames the player is in the world with its 3D loaded (sync/loginClock.ts)
+loginClock.onError = (err) => logError('LoginClock', 'a login step threw', err);
+on('update', () => {
+  let live = false;
+  try {
+    const player = Game.getPlayer();
+    live = !!player && player.is3DLoaded();
+  } catch {
+    // counts as not live; the clock still moves on after NOT_LIVE_GIVE_UP_MS
+  }
+  loginClock.frame(Date.now(), live);
+});
 const isRaceMenuSettling = (): boolean =>
   Ui.isMenuOpen("RaceSex Menu") || Date.now() - (Number((globalThis as any).__dboRaceMenuClosedAt) || 0) < RACE_MENU_SETTLE_MS;
 
@@ -536,19 +549,21 @@ export class RemoteServer extends ClientListener {
     sendCustomPacket(this.controller, { customPacketType: 'dbo', event: 'arrived', args: [worldOrCell] });
   }
 
+  // Polls on the login clock: a Utility.wait started in the update before the login save loads can be dropped with it
   private watchArrival(worldOrCell: number): void {
     const watch = ++this.arrivalWatch;
-    (async () => {
-      for (let i = 0; i < ARRIVAL_POLLS; i++) {
-        await Utility.wait(ARRIVAL_POLL_SECONDS);
+    const poll = (i: number): void => {
+      loginClock.after(ARRIVAL_POLL_SECONDS, () => {
         if (watch !== this.arrivalWatch) return;
         const pl = Game.getPlayer();
         if (pl && pl.is3DLoaded() && ObjectReferenceEx.getWorldOrCell(pl) === worldOrCell) {
           this.reportArrival(worldOrCell);
           return;
         }
-      }
-    })();
+        if (i + 1 < ARRIVAL_POLLS) poll(i + 1);
+      });
+    };
+    poll(0);
   }
 
   private arrivalWatch = 0;
@@ -752,8 +767,9 @@ export class RemoteServer extends ClientListener {
 
       once('update', () => {
         logTrace(this, `player learnedSpells:`, JSON.stringify(learnedSpells));
+        // Not Utility.wait: a save load can drop a Papyrus wait started here
         SPELL_ENFORCE_PASSES.forEach((seconds) => {
-          Utility.wait(seconds).then(() => {
+          loginClock.after(seconds, () => {
             const player = Game.getPlayer();
             if (!player) {
               return;
