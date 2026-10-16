@@ -82,7 +82,7 @@ begin
     rec := RecordByFormID(f, fid, True);
     if not Assigned(rec) then begin slLog.Add('FAIL   not found          ' + tag); Inc(cFail); Continue; end;
 
-    base := LinksTo(ElementByPath(rec, 'NAME'));
+    base := LinksTo(ElementByPath(WinningOverride(rec), 'NAME'));
     got := '';
     if Assigned(base) then got := EditorID(base);
     if (want <> '*') and (not SameText(got, want)) then begin
