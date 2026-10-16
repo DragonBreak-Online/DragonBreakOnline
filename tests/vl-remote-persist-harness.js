@@ -14,7 +14,7 @@ const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vl-persist-'));
 process.chdir(dir);
 process.on('exit', () => { try { fs.rmSync(dir, { recursive: true, force: true }); } catch (e) { /* left for the OS */ } });
 
-const VL = 0x14, NEAR = 0x15;
+const VL = 0x14, NEAR = 0x15, NEAR2 = 0x16;
 const CELL = 'a764b:BSHeartland.esm';
 let props, timers, commands, logs;
 const api = (cfg) => ({
@@ -28,9 +28,9 @@ const api = (cfg) => ({
   },
   log: (...a) => logs.push(a.join(' ')), personal: () => {}, audit: () => {},
   display: (a) => `P${a.toString(16)}`, who: (a) => `P${a.toString(16)}`, sendPacket: () => true,
-  registerChatCommand: (n, fn) => commands.set(n, fn), onlineActors: () => [VL, NEAR],
+  registerChatCommand: (n, fn) => commands.set(n, fn), onlineActors: () => [VL, NEAR, NEAR2],
   every: (n, ms, fn) => timers.set(n, fn), findByName: () => 0, redress: () => undefined, isAdmin: () => true, cfg,
-  hasUiCap: (a, c) => c === 'beastBody' && a === NEAR,
+  hasUiCap: (a, c) => c === 'beastBody' && (a === NEAR || a === NEAR2),
 });
 const reload = (cfg) => { props = props || new Map(); timers = new Map(); commands = new Map(); logs = []; delete require.cache[BEASTFORM]; require(BEASTFORM)(api(cfg)); };
 let keepWorld = false;
@@ -63,15 +63,15 @@ commands.get('vlremote')(NEAR, 'on');
 restart({ beastform: { vampireLordRemoteRace: false } });
 ok(on() && saved().setBy === 'admin', '/vlremote on survives a restart, over a config that says off', saved());
 
-// Two crash-like drops beside a shown Lord trip its own body: nothing goes to the file, the switch stays on
+// Two watchers' crash-like drops beside a shown Lord trip its own body: nothing goes to the file, the switch stays on
 fs.rmSync('beastform-state.json', { force: true });
 restart(TRACKED);
 props.set(VL + '|private.beast', { form: 'vampirelord', original: { raceId: 0x13746 }, at: Date.now(), until: 0 });
-for (const [a, x] of [[VL, 1000], [NEAR, 1200]]) { props.set(a + '|worldOrCellDesc', CELL); props.set(a + '|pos', [x, 1000, 0]); }
+for (const [a, x] of [[VL, 1000], [NEAR, 1200], [NEAR2, 1300]]) { props.set(a + '|worldOrCellDesc', CELL); props.set(a + '|pos', [x, 1000, 0]); }
 timers.get('beastForms')();
 ok(globalThis.__dboVlBreakerDrop(NEAR, false) === false, 'one drop beside a shown Lord trips nothing');
 timers.get('beastForms')();
-ok(globalThis.__dboVlBreakerDrop(NEAR, false) === true && on(), 'the second trips that Lord alone; the body stays on for everyone');
+ok(globalThis.__dboVlBreakerDrop(NEAR2, false) === true && on(), 'the second trips that Lord alone; the body stays on for everyone');
 ok(saved() === null && props.get(VL + '|private.vlBodyOff'), 'the trip is on the character, not in the file', saved());
 keepWorld = true;
 restart(TRACKED);

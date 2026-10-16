@@ -467,7 +467,7 @@ module.exports = (api) => {
   // ── the per-beast breaker (wwwatch:, vlwatch:) ──
   // A drop is not proof: the old Vampire Lord breaker tripped on Onny, who crashed twice more that day with no Lord near,
   // and it hid every Lord from everyone. So every drop near a beast is logged with its distance and timing (the body off
-  // included, as the control), and only breakerDrops drops by watchers shown that beast's body, inside
+  // included, as the control), and only breakerDrops drops by different watchers shown that beast's body, inside
   // breakerWindowSeconds, turn its body off, for that character alone (private.wwBodyOff / private.vlBodyOff, through
   // reloads and restarts) for its form's hold minutes, or until an admin says /wwremote or /vlremote clear.
   const UNITS = Number(CFG.breakerUnits) || 6000;
@@ -549,9 +549,13 @@ module.exports = (api) => {
       if (!shown || bodyTripped(b, form)) { log(`${B.tag}: ${display(a)} dropped near ${display(b)}, not counted: ${parts.join('; ')}`); continue; }
       const count = () => {
         const at = Date.now();
-        const drops = (counted.get(b >>> 0) || []).filter((d) => at - d.at <= WINDOW_MS).concat([{ at, who: display(a) }]);
+        // One watcher's drops count once, so a single crashing player cannot turn a beast's body off for everyone
+        const same = (d) => d.id === (a >>> 0) || (d.id === undefined && d.who === display(a));
+        const before = (counted.get(b >>> 0) || []).filter((d) => at - d.at <= WINDOW_MS);
+        const again = before.some(same);
+        const drops = before.filter((d) => !same(d)).concat([{ at, who: display(a), id: a >>> 0 }]);
         counted.set(b >>> 0, drops);
-        log(`${B.tag}: ${display(a)} dropped near ${display(b)}, drop ${drops.length} of ${DROPS} in ${secs(WINDOW_MS)} s: ${parts.join('; ')}`);
+        log(`${B.tag}: ${display(a)} dropped near ${display(b)}, drop ${drops.length} of ${DROPS} in ${secs(WINDOW_MS)} s${again ? ' (the same watcher again, counted once)' : ''}: ${parts.join('; ')}`);
         return drops.length >= DROPS && tripBody(b, form, drops, String(cell));
       };
       // breakerReconnectSeconds (0: off): a watcher back within it reconnected rather than crashed and is not counted
