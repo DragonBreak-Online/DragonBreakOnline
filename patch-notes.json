@@ -1,5 +1,19 @@
 [
   {
+    "title": "The Lore Master",
+    "date": "2026-10-16",
+    "version": "Hotfix",
+    "tag": "Staff",
+    "sections": [
+      {
+        "heading": "Staff",
+        "items": [
+          "The Lore Master can now manage every faction from the faction panel (F3) like a Lead GM: add and remove members, name leaders and edit ranks."
+        ]
+      }
+    ]
+  },
+  {
     "title": "One hold's vote per player",
     "date": "2026-10-16",
     "version": "Hotfix",
