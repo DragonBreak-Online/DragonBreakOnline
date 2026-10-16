@@ -168,7 +168,7 @@ export const casterRacePasses = (effect: SpellEffect, raceId: number): boolean =
 };
 
 // Skyrim.esm NordRace: the human summon of a spell with one per race
-const NORD_RACE = 0x13746;
+export const NORD_RACE = 0x13746;
 
 // Which summon a caster of this race conjures, and the effect whose duration it keeps: the caster's own race's, else the
 // human one (gated on NordRace), else the first; an effect with no duration of its own (Summon Skeleton's later ones)
