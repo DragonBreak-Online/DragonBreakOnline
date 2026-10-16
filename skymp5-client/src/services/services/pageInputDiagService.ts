@@ -36,6 +36,8 @@ const EVENT_MAX_LINES = 40;
 // First few of each kind go out in full; after that they are counted and one summary line is sent per window, so a
 // doorway that arms ten zones and moves eight hosts in two ticks cannot flood the relay
 const EVENT_FULL_PER_KIND = 6;
+// Kinds relayed under an allowance of their own, so host-change lines cannot spend it (as gamemode.js DIAG_KIND_MAX)
+const EVENT_KIND_MAX: Record<string, number> = { emote: 40 };
 const EVENT_SUMMARY_MS = 5000;
 // An event line is queued because something happened that may be about to crash the client, so it does not wait for
 // the next tick: it goes out at once. GroundedPasta's 04:32 crash came within 5 s of six NPCs being handed to him,
@@ -150,7 +152,7 @@ export class PageInputDiagService extends ClientListener {
     const seen = (this.eventSeen.get(kind) || 0) + 1;
     this.eventSeen.set(kind, seen);
     if (seen <= EVENT_FULL_PER_KIND) {
-      this.queueEvent(`${kind} ${text}`);
+      this.queueEvent(`${kind} ${text}`, kind);
       return;
     }
     // Past that, count them and send one line a window saying how many were skipped
@@ -160,13 +162,20 @@ export class PageInputDiagService extends ClientListener {
     if (now - last < EVENT_SUMMARY_MS) return;
     this.eventSummaryAt.set(kind, now);
     this.eventSummarySeen.set(kind, seen);
-    this.queueEvent(`${kind} +${seen - since} more (${seen} this session), latest: ${text}`);
+    this.queueEvent(`${kind} +${seen - since} more (${seen} this session), latest: ${text}`, kind);
   }
 
-  private queueEvent(line: string): void {
+  private queueEvent(line: string, kind = ""): void {
     this.write(line);
-    if (this.eventsRelayed + this.eventQueue.length >= EVENT_MAX_LINES) return;
-    this.eventQueue.push(line.slice(0, 400));
+    if (Object.prototype.hasOwnProperty.call(EVENT_KIND_MAX, kind)) {
+      const taken = this.kindQueued.get(kind) || 0;
+      if (taken >= EVENT_KIND_MAX[kind]) return;
+      this.kindQueued.set(kind, taken + 1);
+      this.kindQueue.push(line.slice(0, 400));
+    } else {
+      if (this.eventsRelayed + this.eventQueue.length >= EVENT_MAX_LINES) return;
+      this.eventQueue.push(line.slice(0, 400));
+    }
     // Out now, not on the next tick. This covers a burst of host changes in one tick by definition: the first line
     // of the burst leaves immediately, and the rest follow a quarter second later at the latest.
     const now = Date.now();
@@ -207,7 +216,7 @@ export class PageInputDiagService extends ClientListener {
   }
 
   private flushRelay(): void {
-    if (!this.queue.length && !this.eventQueue.length) return;
+    if (!this.queue.length && !this.eventQueue.length && !this.kindQueue.length) return;
     try {
       if (!this.controller.lookupListener(NetworkingService).isConnected()) return;
     } catch (e) {
@@ -218,6 +227,8 @@ export class PageInputDiagService extends ClientListener {
     const events = this.eventQueue.splice(0, Math.min(RELAY_MAX_PER_PACKET, eventRoom));
     this.eventsRelayed += events.length;
     lines.push(...events);
+    const own = this.kindQueue.splice(0, RELAY_MAX_PER_PACKET - lines.length);
+    lines.push(...own);
     const room = Math.max(0, RELAY_MAX_LINES - this.relayed);
     const page = this.queue.splice(0, Math.min(RELAY_MAX_PER_PACKET - lines.length, room));
     this.relayed += page.length;
@@ -230,6 +241,7 @@ export class PageInputDiagService extends ClientListener {
       this.eventsRelayed -= events.length;
       this.relayed -= page.length;
       this.eventQueue.unshift(...events);
+      this.kindQueue.unshift(...own);
       this.queue.unshift(...page);
     }
   }
@@ -291,6 +303,9 @@ export class PageInputDiagService extends ClientListener {
   private execCalls = -1;
   private eventQueue: string[] = [];
   private eventsRelayed = 0;
+  private kindQueue: string[] = [];
+  // Lines admitted per EVENT_KIND_MAX kind this session
+  private kindQueued = new Map<string, number>();
   private eventSeen = new Map<string, number>();
   private eventSummaryAt = new Map<string, number>();
   private eventSummarySeen = new Map<string, number>();
