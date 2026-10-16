@@ -46,6 +46,7 @@ const oauth     = require('../sources/discord/oauth')
 const { visitorIp } = require('../sources/visitorIp')
 const { createLoginStore, TTL } = require('../sources/launcherLogins')
 const loginFlowCounts = require('../sources/loginFlowCounts')
+const referrals = require('../sources/referrals')
 
 // Launcher-supplied hardware id: printable chars only, capped length; returns '' when unusable
 function sanitizeHwid(value) {
@@ -156,6 +157,8 @@ router.get('/login-discord', browserLimiter, (req, res) => {
     return res.status(400).send(authPage({ ok: false, title: 'Login link used', message: 'This login link was already used. Return to the launcher and press Discord Login again.' }))
   }
 
+  // A referral link's code for this accepted login (sources/referrals.js; nothing unless REFERRAL_LINKS=on)
+  try { referrals.noteLogin({ state, cookieCode: referrals.readCookie(req, referrals.COOKIE) }) } catch (err) { console.error('[referral] note failed:', err.message) }
   res.redirect(oauth.authorizeUrl({ redirectUri: config.discordRedirectUri, state, prompt: 'consent' }))
 })
 
@@ -251,7 +254,7 @@ router.post('/login-discord/confirm', express.urlencoded({ extended: false, limi
 })
 
 // One login's session, made only now that the device that started it has proved itself; a login ends the account's older sessions
-function deliverLogin(res, user, flow) {
+function deliverLogin(res, user, flow, state) {
   const { createSession } = require('./master-api')
   let made
   try {
@@ -261,6 +264,7 @@ function deliverLogin(res, user, flow) {
     return res.status(503).json({ error: 'sessionsUnavailable' })
   }
   loginFlowCounts.bump(flow)
+  try { referrals.deliver({ state, profileId: made.profileId, player: () => players.getByProfileId(made.profileId) }) } catch (err) { console.error('[referral] deliver failed:', err.message) }
   console.log(`[launcher-login] ${flow} login delivered for profile ${made.profileId}${made.ended ? `, ${made.ended} older session(s) ended` : ''}`)
   res.json({
     token:                made.session,
@@ -277,7 +281,7 @@ router.post('/login-discord/token', exchangeLimiter, (req, res) => {
   const { state, code, code_verifier: verifier } = req.body || {}
   const user = logins.exchange(state, code, verifier)
   if (!user) return res.status(400).json({ error: 'invalid_grant' })
-  deliverLogin(res, user, 'loopback')
+  deliverLogin(res, user, 'loopback', state)
 })
 
 // POST /api/users/login-discord/poll
@@ -287,7 +291,7 @@ router.post('/login-discord/poll', pollLimiter, (req, res) => {
   const r = logins.poll(state, deviceCode)
   if (r.gone) return res.status(403).json({ error: 'expired_token' })
   if (r.pending) return res.status(401).json({ error: 'authorization_pending' })
-  deliverLogin(res, r.user, 'device')
+  deliverLogin(res, r.user, 'device', state)
 })
 
 // GET /api/users/login-discord/status
@@ -301,7 +305,7 @@ router.get('/login-discord/status', (req, res) => {
   const r = logins.legacyStatus(state)
   if (r.gone)    return res.status(403).json({ error: 'Unknown or expired state.' })
   if (r.pending) return res.status(401).json({ error: 'Auth not completed yet.' })
-  deliverLogin(res, r.user, 'legacy')
+  deliverLogin(res, r.user, 'legacy', state)
 })
 
 // POST /api/users/me/play/:serverKey

@@ -16,6 +16,10 @@ const fakeDiscord = require('./helpers/fakeDiscord')
 require.cache[require.resolve('dotenv')] = { exports: { config: () => ({}) } }
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'launcher-login-'))
 process.env.LOGIN_FLOWS_FILE = path.join(tmp, 'login-flows.json')
+// Referral links on, so the login's referral hook runs in every test here (sources/referrals.js)
+process.env.REFERRAL_LINKS = 'on'
+process.env.REFERRAL_PENDING_FILE = path.join(tmp, 'referral-pending.json')
+process.env.REFERRALS_FILE = path.join(tmp, 'referrals.jsonl')
 function stub(rel, exports) {
   const file = require.resolve(rel)
   require.cache[file] = { id: file, filename: file, loaded: true, exports }
@@ -536,4 +540,29 @@ test('F1: the login rate limits run on Cloudflare\'s visitor header, per visitor
   assert.equal(over.status, 429)
   assert.match(over.json.error, /Too many login attempts/)
   assert.equal((await start(visitor(2))).status, 200, 'another visitor is not held back')
+})
+
+test('referrals: a refused, malformed or rate-limited browser step with a cookie notes nothing; an accepted one only as a hash', async () => {
+  const file = process.env.REFERRAL_PENDING_FILE
+  const hash = s => crypto.createHash('sha256').update(s, 'utf8').digest('hex')
+  const noted = s => { try { return Object.prototype.hasOwnProperty.call(JSON.parse(fs.readFileSync(file, 'utf8')).states, hash(s)) } catch { return false } }
+  const cookie = { cookie: 'dbo_ref=BCDF2345' }
+  const unissued = crypto.randomBytes(32).toString('hex')
+  await withConfig({ launcherLoginLegacy: 'off' }, async () => {
+    assert.equal((await get(`/api/users/login-discord?state=${unissued}`, { headers: cookie })).status, 410)
+  })
+  assert.equal(noted(unissued), false, 'an unissued state is not noted')
+  assert.equal((await get('/api/users/login-discord?state=a', { headers: cookie })).status, 400)
+  assert.equal(noted('a'), false)
+  const issue = async () => (await post('/api/users/login-discord/start', { client: 'launcher', code_challenge: pkce().challenge, code_challenge_method: 'S256', redirect_port: 48126 })).json.state
+  const visitor = { ...cookie, 'cf-connecting-ip': '2001:db8:77::1' }
+  for (let i = 0; i < 20; i++) {
+    const state = await issue()
+    assert.equal((await get(`/api/users/login-discord?state=${state}`, { headers: visitor })).status, 302, `browser step ${i + 1} of 20`)
+    assert.equal(noted(state), true, 'an accepted login is noted')
+  }
+  const limited = await issue()
+  assert.equal((await get(`/api/users/login-discord?state=${limited}`, { headers: visitor })).status, 429)
+  assert.equal(noted(limited), false, 'a rate-limited step is not noted')
+  assert.ok(!fs.readFileSync(file, 'utf8').includes(limited.slice(0, 16)), 'no state in the clear')
 })
