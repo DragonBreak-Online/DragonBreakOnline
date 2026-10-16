@@ -1853,7 +1853,11 @@ mp.onActivate = (targetId, casterId) => {
     try {
       const desc = String(mp.get(targetId >>> 0, 'baseDesc') || '');
       const rec = desc && mp.lookupEspmRecordById(mp.getIdFromDesc(desc));
-      if (rec && rec.record && rec.record.type === 'DOOR') log(`doortrace ${display(casterId)} door ${mp.getDescFromId(targetId >>> 0)} (${desc}) allowed=${allowed}`);
+      if (rec && rec.record && rec.record.type === 'DOOR') {
+        log(`doortrace ${display(casterId)} door ${mp.getDescFromId(targetId >>> 0)} (${desc}) allowed=${allowed}`);
+        // The door sync holds back while this move settles, so a heartbeat from before it never pulls them back
+        try { const ds = globalThis.__dboDoorSync; if (ds && typeof ds.doorUsed === 'function') ds.doorUsed(casterId, targetId, allowed); } catch (e) { log('door sync doorUsed failed', e.message); }
+      }
     } catch (e) { /* not a door */ }
     return allowed;
   };

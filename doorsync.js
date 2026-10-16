@@ -20,6 +20,10 @@
 // landed from yet: its report still names the place it came from), nor within cooldownSeconds of the last assist, nor for a
 // character in creation, dead, bound or carried. Config "doorSync": { enabled, radius, settleSeconds, cooldownSeconds }.
 // enabled:false is the undo (on a reload).
+//
+// Nor within settleSeconds of a load door the server walked them through (doorUsed, from gamemode.js's door trace). The cell
+// is only read at heartbeats, so an out-and-back between two of them looked settled, and a heartbeat composed before the
+// second door pulled the character back the wrong way (Drink-In-Lean #F7ZC 06:06:33; Elaava #Z63J 08:14:46 and 13:44:06).
 'use strict';
 
 module.exports = (api) => {
@@ -32,6 +36,8 @@ module.exports = (api) => {
 
   // actorId -> { cell, since, assistAt }; kept across reloads
   const S = globalThis.__dboDoorSyncState instanceof Map ? globalThis.__dboDoorSyncState : (globalThis.__dboDoorSyncState = new Map());
+  // actorId -> when the server last walked them through a load door; kept across reloads
+  const M = globalThis.__dboDoorSyncMoved instanceof Map ? globalThis.__dboDoorSyncMoved : (globalThis.__dboDoorSyncMoved = new Map());
 
   // Load doors by the cell they stand in (lower case), from doors-pos.json (tools/door-positions.py): no engine call
   const byCell = new Map();
@@ -95,6 +101,7 @@ module.exports = (api) => {
     if (!held || held === reported) return null;
     // The server moved them here just now; the game's report may still name where it came from
     if (t - s.since < (Number(C.settleSeconds) || 0) * 1000) return null;
+    if (t - (M.get(a) || 0) < (Number(C.settleSeconds) || 0) * 1000) return null;
     if (t - (s.assistAt || 0) < (Number(C.cooldownSeconds) || 0) * 1000) return null;
     try { if (mp.get(a, 'isDead') === true) return null; } catch (e) { return null; }
     try { if (mp.get(a, 'private.restrained')) return null; } catch (e) { /* free */ }   // bound or carried: the capture system moves them
@@ -114,5 +121,16 @@ module.exports = (api) => {
     return door.desc;
   };
 
-  return { heartbeat, C, partnerOf, reportedPlace };
+  // Every door activation the server answered; only an allowed load door moves the character
+  const doorUsed = (actorId, doorId, allowed) => {
+    if (allowed === false) return false;
+    const a = actorId >>> 0;
+    if (!a || !partnerOf(doorId >>> 0)) return false;
+    const t = now();
+    M.set(a, t);
+    if (M.size > 2000) for (const [k, v] of M) if (t - v > 6 * 3600000) M.delete(k);
+    return true;
+  };
+
+  return { heartbeat, doorUsed, C, partnerOf, reportedPlace };
 };
