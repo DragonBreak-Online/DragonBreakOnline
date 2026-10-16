@@ -2,6 +2,7 @@
 // Cases: Bruma only (war.mapWorlds Cyrodiil), an older server (no mapWorld), the Skyrim war map (Cyrodiil + Tamriel, 39 places).
 //   LD_LIBRARY_PATH=$(cat ~/claude-c-layout/ldpath) node tests/realm-map-panel-harness.js [front dir] [out dir]
 // Env: PUPPETEER_DIR (and PUPPETEER_CACHE_DIR or PUPPETEER_EXECUTABLE_PATH), ESBUILD_DIR, FRONT_NM, RES=1280x720,...
+//   UISCALE=<n> (the in-game Interface size), PANELSCALE=<n> (Ctrl + wheel on the panel), LEGACY=1 (Chromium's pre-128 zoom, as CEF 108)
 // Writes <out>/<context>-<case>-<map>-<w>x<h>.png and <out>/layout.json; prints ok/FAIL lines and exits 1 on a FAIL.
 'use strict';
 const fs = require('fs');
@@ -60,8 +61,8 @@ const root = () => document.getElementById('root');
 window.show = (ctx, data) => {
   ReactDOM.unmountComponentAtNode(root());
   ReactDOM.render(ctx === 'panel'
-    ? <div className="dbo-domain" data-domain="bronze"><Faction data={data} /></div>
-    : <div className="dbo-domain" data-domain="dragonbreak"><Journal data={{ id: 24, nonce: 'j1', tab: 'faction', profile: { name: 'Hrolfdir', title: 'Jarl of Whiterun', race: 'Nord' }, faction: data }} /></div>, root());
+    ? <div className={"dbo-domain" + (window.__ps ? " dbo-domain--scaled" : "")} style={window.__ps ? { "--dbo-panel-scale": window.__ps } : undefined} data-domain="bronze"><Faction data={data} /></div>
+    : <div className={"dbo-domain" + (window.__ps ? " dbo-domain--scaled" : "")} style={window.__ps ? { "--dbo-panel-scale": window.__ps } : undefined} data-domain="dragonbreak"><Journal data={{ id: 24, nonce: 'j1', tab: 'faction', profile: { name: 'Hrolfdir', title: 'Jarl of Whiterun', race: 'Nord' }, faction: data }} /></div>, root());
 };
 `);
 esbuild.build({
@@ -117,12 +118,15 @@ const SIZES = (process.env.RES || '1280x720,1366x768,1600x900,1920x1080,2560x144
 
 // ---- the measure ------------------------------------------------------------------------------------------------------
 const measure = (ctx) => {
-  const R = (el) => { if (!el) return null; const q = el.getBoundingClientRect(); return { l: q.left, t: q.top, r: q.right, b: q.bottom, w: q.width, h: q.height }; };
+  // Screen px: the old zoom (LEGACY) reports rects in layout px, so they are scaled back; ZE is screen px per layout px
+  const LZ = window.__legacyZ || 1, ZE = window.__Zeff || 1;
+  const R = (el) => { if (!el) return null; const q = el.getBoundingClientRect(); return { l: q.left * LZ, t: q.top * LZ, r: q.right * LZ, b: q.bottom * LZ, w: q.width * LZ, h: q.height * LZ }; };
   const vw = window.innerWidth, vh = window.innerHeight;
   const frame = document.querySelector(ctx === 'panel' ? '.faction__panel' : '.journal__frame');
   const body = document.querySelector('.faction__body--wide');
   const scroller = ctx === 'panel' ? body : document.querySelector('.journal__body');
   if (scroller) scroller.scrollTop = 0;
+  { const pnl = document.querySelector('.faction__panel'); if (pnl) pnl.scrollTop = 0; }
   const side = document.querySelector('.realm__side');
   if (side) side.scrollTop = 0;
   const btns = Array.from(document.querySelectorAll(ctx === 'panel' ? '.faction__footer button' : '.journal__footer button, .faction__footer button'));
@@ -131,7 +135,7 @@ const measure = (ctx) => {
   const tabs = Array.from(document.querySelectorAll('.faction__tab'));
   const mapBtns = Array.from(document.querySelectorAll('.realm__mapbtn'));
   const markers = Array.from(document.querySelectorAll('.realm-map__marker')).filter((m) => !/--secret|--guildseat/.test(m.className))
-    .map((m) => { const q = map.getBoundingClientRect(); return { x: q.left + map.clientLeft + parseFloat(m.style.left), y: q.top + map.clientTop + parseFloat(m.style.top), name: (m.querySelector('.realm-map__label') || {}).textContent }; });
+    .map((m) => { const q = R(map); return { x: q.l + (map.clientLeft + parseFloat(m.style.left)) * ZE, y: q.t + (map.clientTop + parseFloat(m.style.top)) * ZE, name: (m.querySelector('.realm-map__label') || {}).textContent }; });
   const visible = (q, box) => q && box && q.t >= box.t - 1 && q.b <= box.b + 1 && q.l >= box.l - 1 && q.r <= box.r + 1;
   const screen = { l: 0, t: 0, r: vw, b: vh };
   const scrollBox = scroller ? R(scroller) : screen;
@@ -147,13 +151,14 @@ const measure = (ctx) => {
     lastReach = holders.every((h) => visible(lr, h)) && visible(lr, screen);
     if (scroller) scroller.scrollTop = 0;
     if (side) side.scrollTop = 0;
+    const pnl = document.querySelector('.faction__panel'); if (pnl) pnl.scrollTop = 0;
   }
   // A map too tall for the room under the page's top: the switch and the map still fit the page's view once it scrolls
   const col = document.querySelector('.realm__mapcol');
   const cs = scroller && getComputedStyle(scroller);
-  const mapReach = !!(col && cs && col.getBoundingClientRect().height <= scroller.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom) + 1);
+  const mapReach = !!(col && cs && R(col).h <= (scroller.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom)) * ZE + 1);
   return {
-    mapReach, colH: col ? col.getBoundingClientRect().height : null, realmH: (R(document.querySelector('.realm')) || { h: null }).h,
+    zoom: ZE, mapReach, colH: col ? R(col).h : null, realmH: (R(document.querySelector('.realm')) || { h: null }).h,
     scale: getComputedStyle(document.documentElement).getPropertyValue('--dbo-ui-scale').trim(),
     frame: R(frame), body: R(body), scroller: scrollBox, map: mapR, side: R(side), close: R(close),
     frameOnScreen: visible(R(frame), screen), closeOnScreen: ctx === 'panel' ? visible(R(close), screen) : null,
@@ -168,7 +173,7 @@ const measure = (ctx) => {
 };
 
 async function run() {
-  const b = await puppeteer.launch({ headless: 'shell', args: ['--no-sandbox', '--disable-gpu', '--allow-file-access-from-files'] });
+  const b = await puppeteer.launch({ headless: 'shell', args: ['--no-sandbox', '--disable-gpu', '--allow-file-access-from-files'].concat(process.env.LEGACY ? ['--disable-blink-features=StandardizedBrowserZoom'] : []) });
   const pg = await b.newPage();
   const html = `<!doctype html><html><head><meta charset="utf-8"><style>body { background: linear-gradient(180deg, #7d8fa3 0%, #a9b4bd 38%, #5d6650 40%, #3b4434 100%); }</style>
 <script>window.require = { context: () => { const I = ${JSON.stringify(icons)}; const f = (k) => { if (!(k in I)) throw new Error('no ' + k); return I[k]; }; f.keys = () => Object.keys(I); return f; } };</script>
@@ -177,10 +182,17 @@ async function run() {
   const layout = [];
   const errors = [];
   pg.on('pageerror', (e) => errors.push(String(e && e.message || e)));
+  pg.on('console', (m) => { if (m.type() === 'error') errors.push('console: ' + m.text()); });
   for (const [w, h] of SIZES) {
     await pg.setViewport({ width: w, height: h });
     await pg.goto('file://' + path.join(TMP, 'page.html'), { waitUntil: 'load', timeout: 180000 });
     await pg.evaluate(() => document.fonts.ready);
+    await pg.evaluate((ui, ps, legacy) => {
+      if (ui) window.dboSetUiScaleInGame(ui);
+      window.__ps = Number(ps) || 0;
+      window.__Zeff = (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--dbo-ui-scale')) || 1) * (window.__ps || 1);
+      window.__legacyZ = legacy ? window.__Zeff : 1;
+    }, process.env.UISCALE || '', process.env.PANELSCALE || '', !!process.env.LEGACY);
     for (const ctx of ['panel', 'journal']) {
       for (const [name, c] of Object.entries(CASES)) {
         await pg.evaluate((x, d) => window.show(x, d), ctx, c.data);
@@ -228,19 +240,21 @@ async function run() {
               if (!side || !last) return { opts: opts.length, ok: false };
               last.scrollIntoView({ block: 'nearest' });
               const a = last.getBoundingClientRect(), b = side.getBoundingClientRect();
-              const res = { opts: opts.length, ok: a.top >= b.top - 1 && a.bottom <= b.bottom + 1 && a.bottom <= window.innerHeight };
+              const res = { opts: opts.length, ok: a.top >= b.top - 1 && a.bottom <= b.bottom + 1 && a.bottom * (window.__legacyZ || 1) <= window.innerHeight };
               document.body.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
               const btn = document.querySelector('.realm__side .dbo-picker--open .dbo-picker__button');
               if (btn) btn.click();
-              document.querySelectorAll('.journal__body, .faction__body--wide, .realm__side').forEach((x) => { x.scrollTop = 0; });
+              document.querySelectorAll('.journal__body, .faction__panel, .faction__body--wide, .realm__side').forEach((x) => { x.scrollTop = 0; });
               return res;
             });
             ok(pick.found && seen.ok && seen.opts > 0, `${L}: the capital choice list opens in the place list with its last choice in reach (${seen.opts} choices)`);
           }
           ok(m.markers.length === c.places[mapName], `${L}: the map draws ${m.markers.length} places (want ${c.places[mapName]})`);
           // The fit settles: no further resize a moment later
-          await new Promise((r) => setTimeout(r, 250));
-          const again = await pg.evaluate(() => { const q = document.querySelector('.realm-map'); const r = q && q.getBoundingClientRect(); return r ? [Math.round(r.width), Math.round(r.height)] : null; });
+          const seq = [];
+          for (let i = 0; i < 8; i++) { await new Promise((r) => setTimeout(r, 50)); seq.push(await pg.evaluate(() => { const q = document.querySelector('.realm-map'); return q ? q.offsetWidth : -1; })); }
+          ok(seq.every((x) => x === seq[0]), `${L}: the map does not change size over 400 ms (${seq.join(',')})`);
+          const again = await pg.evaluate(() => { const q = document.querySelector('.realm-map'); const r = q && q.getBoundingClientRect(); const z = window.__legacyZ || 1; return r ? [Math.round(r.width * z), Math.round(r.height * z)] : null; });
           ok(!!m.map && !!again && Math.abs(again[0] - m.map.w) < 1 && Math.abs(again[1] - m.map.h) < 1, `${L}: the map keeps its size (${m.map ? Math.round(m.map.w) + 'x' + Math.round(m.map.h) : '-'} then ${again ? again.join('x') : '-'})`);
           ok(!m.markersInside.length, `${L}: every place sits inside the map${m.markersInside.length ? ' (outside: ' + m.markersInside.join(', ') + ')' : ''}`);
           // The pointer on the place farthest from any other names that place (the map's pixels and its hover agree at any width)
@@ -250,7 +264,9 @@ async function run() {
             await pg.mouse.move(probe.x, probe.y);
             await new Promise((r) => setTimeout(r, 30));
             const tip = await pg.evaluate(() => (document.querySelector('.realm-map__tip') || {}).textContent || '');
-            ok(tip.startsWith(probe.name + ':'), `${L}: hovering ${probe.name} names it (${JSON.stringify(tip)})`);
+            // At a UI or panel scale other than 1 the tooltip is offset: onMouseMove mixes screen and layout px (as in 0.3.100, not this change)
+            if (Math.abs(m.zoom - 1) > 0.001) console.log(`known ${L}: hovering ${probe.name} at zoom ${m.zoom} shows ${JSON.stringify(tip)} (the hover offset at a scale other than 1, unchanged since 0.3.100)`);
+            else ok(tip.startsWith(probe.name + ':'), `${L}: hovering ${probe.name} names it (${JSON.stringify(tip)})`);
             await pg.mouse.move(1, 1);
           }
         }
