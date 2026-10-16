@@ -157,8 +157,8 @@ module.exports = (api) => {
     // Priest held at an Apprentice or Adept pick until that spell is chosen (schools.js, Arcane Mastery)
     try { if (typeof globalThis.__dboSchoolsSkillHeld === 'function' && globalThis.__dboSchoolsSkillHeld(actorId >>> 0, skillId)) return 0; } catch (e) { /* never blocks on error */ }
     let rate = baseRate(actorId, skillId, kind, detail);
-    // A referral or welcome boost (referrals.js) runs through here, never through private.xpBoost
-    if (rate > 0 && typeof globalThis.__dboReferralSkillRate === 'function') {
+    // A referral or welcome boost (referrals.js) runs through here, never through private.xpBoost; normal play only, never an award (staff, alchemy)
+    if (rate > 0 && kind !== 'award' && typeof globalThis.__dboReferralSkillRate === 'function') {
       try { const r = Number(globalThis.__dboReferralSkillRate(actorId >>> 0)); if (Number.isFinite(r) && r >= 1 && r <= 3) rate *= r; } catch (e) { /* no referral boost */ }
     }
     if (kind !== 'award' || typeof globalThis.__dboSchoolsAwardRate !== 'function') return rate;

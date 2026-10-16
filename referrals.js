@@ -5,7 +5,9 @@
 // writes one line to its data/referrals.jsonl when a Discord login that came through a link creates a brand-new account;
 // this module reads that file, and /referral <code> is the fallback for a player in their first 24 hours of play.
 // A referral qualifies once the new account has played qualifyHours on qualifyDays different UTC days and its Discord
-// account was accountAgeDays old when it was referred. Then the referrer earns a boost: x firstMult and the carry weight
+// account was accountAgeDays old when it was referred, and it passes the alt checks: its PC (the backend's device-ids.json,
+// keyed HMACs of the launcher's machine id) is neither the referrer's nor any other referred account's, else it never counts;
+// a shared last address with the referrer (players.json lastIp) holds it for a Lead GM to approve or refuse. Then the referrer earns a boost: x firstMult and the carry weight
 // ability for the first, x laterMult for each later one. The new player gets x welcomeMult as soon as the referral is
 // recorded. Every boost lasts boostHours of PLAY (only while a character of the account is in the world); they queue,
 // one at a time, at most queueCap waiting. A boost runs through skillrates.js (__dboReferralSkillRate), so it never
@@ -17,6 +19,8 @@
 //   /referral <code>               enter a friend's code (once, in your first 24 hours of play)
 //   /referral profile <id>         an account's referrals (staff)
 //   /referral revoke <id> [why]    take back the referral of the new account <id> and its rewards (Lead GM and above)
+//   /referral held                 the referrals held for review (staff)
+//   /referral approve|refuse <id> [why]   decide a held referral (Lead GM and above)
 'use strict';
 
 module.exports = (api) => {
@@ -35,7 +39,9 @@ module.exports = (api) => {
     bindingsFile: String(raw.bindingsFile || '/opt/alduinak/skymp5-backend/data/referrals.jsonl'),
     qualifyHours: pos(raw.qualifyHours, 5),
     qualifyDays: Number.isInteger(raw.qualifyDays) && raw.qualifyDays >= 1 ? raw.qualifyDays : 2,
-    accountAgeDays: Number(raw.accountAgeDays) >= 0 ? Number(raw.accountAgeDays) : 30,
+    accountAgeDays: Number(raw.accountAgeDays) >= 0 ? Number(raw.accountAgeDays) : 90,
+    playersFile: String(raw.playersFile || '/opt/alduinak/skymp5-backend/data/players.json'),
+    devicesFile: String(raw.devicesFile || '/opt/alduinak/skymp5-backend/data/device-ids.json'),
     firstMult: mult(raw.firstMult, 1.15),
     laterMult: mult(raw.laterMult, 1.05),
     welcomeMult: mult(raw.welcomeMult, 1.05),
@@ -157,7 +163,7 @@ module.exports = (api) => {
     return { ok: true, by, ineligible: !!age };
   };
 
-  const qualify = (pid, r, now) => {
+  const qualify = (pid, r, now, note) => {
     r.ref.status = 'qualified'; r.ref.qualifiedAt = now;
     const by = r.ref.by;
     const first = countedOf(by).filter((f) => f.pid !== pid).length === 0;
@@ -165,7 +171,7 @@ module.exports = (api) => {
     const queued = queueBoost(by, { mult: m, kind: first ? 'first' : 'later', from: pid });
     if (first) recOf(by, true).carryFrom = pid;
     touch();
-    audit(`REFERRAL profile ${pid} qualified for profile ${by} (${hm(r.ms)} on ${r.days.length} days): ${first ? 'first' : 'later'} boost ${pct(m)}${queued ? '' : ' (queue full)'}${first ? ', carry weight' : ''}`);
+    audit(`REFERRAL profile ${pid} qualified for profile ${by} (${hm(r.ms)} on ${r.days.length} days${note ? `; ${note}` : ''}): ${first ? 'first' : 'later'} boost ${pct(m)}${queued ? '' : ' (queue full)'}${first ? ', carry weight' : ''}`);
     tellLater(by, `A friend you invited has now played ${C.qualifyHours} hours and counts as your referral. ${queued ? `You earned ${pct(m)} skill progress for ${C.boostHours} hours of play` : 'Your boost queue was full, so no boost was added'}${first ? `, and +100 carry weight for good${C.carrySpell ? '' : ' (it arrives with a coming update)'}` : ''}. Type /referral to see it.`);
   };
 
@@ -183,6 +189,64 @@ module.exports = (api) => {
     touch();
     audit(`REFERRAL profile ${pid} (referred by profile ${ref}, was ${was}) revoked by ${by}${why ? `: ${why}` : ''}; its boosts taken back${hasCarry(ref) ? '' : ', carry weight taken back'}`);
     return was;
+  };
+
+  // ---- the alt checks: the PC and the address, read from the backend's stores; nothing of them is kept here -------------
+  const readStore = async (file) => { try { return JSON.parse(await fs.promises.readFile(file, 'utf8')); } catch (e) { return null; } };
+  const runChecks = async () => {
+    if (S.checking) { S.checkAgain = true; return; }
+    S.checking = true;
+    try {
+      do {
+        S.checkAgain = false;
+        const due = Object.entries(store.profiles).filter(([, r]) => r && r.ref && r.ref.status === 'checking');
+        if (!due.length) break;
+        const players = await readStore(C.playersFile);
+        const devices = await readStore(C.devicesFile);
+        const byPid = new Map();
+        for (const row of Object.values((players && typeof players === 'object' && players) || {})) if (row && validPid(Number(row.profileId))) byPid.set(Number(row.profileId), row);
+        const accts = devices && devices.accounts && typeof devices.accounts === 'object' ? devices.accounts : null;
+        const pcsOf = (pid) => { const row = byPid.get(pid); const a = row && accts ? accts[String(row.discordId)] : null; return new Set(a && Array.isArray(a.d) ? a.d.map((x) => x && x.h).filter(Boolean) : []); };
+        for (const [k, r] of due) {
+          if (!r.ref || r.ref.status !== 'checking') continue;
+          const pid = Number(k), by = r.ref.by;
+          const mine = pcsOf(pid);
+          const pcNote = !accts ? 'PC not checked: no device store' : mine.size ? 'PC checked' : 'PC not checked: no device seen for this account';
+          let shared = '';
+          if (mine.size) {
+            if ([...pcsOf(by)].some((h) => mine.has(h))) shared = 'same PC as the referrer';
+            else for (const [ok, or] of Object.entries(store.profiles)) {
+              if (Number(ok) === pid || !or || !or.ref) continue;
+              if ([...pcsOf(Number(ok))].some((h) => mine.has(h))) { shared = 'same PC as another referred account'; break; }
+            }
+          }
+          if (shared) {
+            r.ref.status = 'ineligible'; r.ref.reason = shared; touch();
+            audit(`REFERRAL profile ${pid} (referred by profile ${by}) refused: ${shared}`);
+            continue;
+          }
+          const ipA = byPid.get(pid) && byPid.get(pid).lastIp, ipB = byPid.get(by) && byPid.get(by).lastIp;
+          if (ipA && ipB && String(ipA) === String(ipB)) {
+            r.ref.status = 'held'; r.ref.heldAt = Date.now(); r.ref.reason = 'shares an address with the referrer'; touch();
+            audit(`REFERRAL held for review: profile ${pid} (referred by profile ${by}) shares an address with its referrer; ${pcNote}. /referral approve|refuse ${pid}`);
+            continue;
+          }
+          if (!players) audit(`REFERRAL profile ${pid}: address not checked (players.json unreadable)`);
+          qualify(pid, r, Date.now(), pcNote);
+        }
+        flush();
+      } while (S.checkAgain);
+    } catch (e) { log('referrals: the alt checks failed', e.message); } finally { S.checking = false; }
+  };
+  S.runChecks = runChecks;
+
+  // Staff: a held referral approved (it counts now) or refused (it never counts; the welcome stays)
+  const decide = (pid, approve, why, byWho) => {
+    const r = recOf(pid, false);
+    if (!r || !r.ref || r.ref.status !== 'held') return false;
+    if (approve) { audit(`REFERRAL profile ${pid} approved by ${byWho} after review`); qualify(pid, r, Date.now(), 'approved after review'); }
+    else { r.ref.status = 'refused'; r.ref.reason = `refused by staff${why ? `: ${String(why).slice(0, 200)}` : ''}`; touch(); audit(`REFERRAL profile ${pid} (referred by profile ${r.ref.by}) refused by ${byWho} after review${why ? `: ${why}` : ''}`); }
+    return true;
   };
 
   // ---- the backend's bindings ------------------------------------------------------------------------------------------
@@ -293,7 +357,7 @@ module.exports = (api) => {
       if (r.ref && r.ref.status === 'pending' && d > 0) {
         const today = day(now);
         if (!r.days.includes(today)) { r.days.push(today); if (r.days.length > 10) r.days.shift(); touch(); }
-        if (r.ms >= C.qualifyHours * HOUR && r.days.length >= C.qualifyDays) qualify(pid, r, now);
+        if (r.ms >= C.qualifyHours * HOUR && r.days.length >= C.qualifyDays) { r.ref.status = 'checking'; touch(); runChecks(); }
       }
       if (r.queue.length && !behind(a)) {
         if (r.queue[0].kind === 'welcome' && r.welcomeTold === false) { r.welcomeTold = true; touch(); system(a, `Welcome to DragonBreak Online! A friend invited you, so your skills rise ${pct(r.queue[0].mult)} faster for your first ${C.boostHours} hours of play.`); }
@@ -302,6 +366,7 @@ module.exports = (api) => {
       if (Array.isArray(r.notes) && r.notes.length) { for (const t of r.notes.splice(0)) system(a, t); touch(); }
       carryTick(a, pid);
     }
+    if (!S.checking && Object.values(store.profiles).some((r) => r && r.ref && r.ref.status === 'checking')) runChecks();
     for (const pid of [...S.last.keys()]) if (!seen.has(pid)) S.last.delete(pid);
     for (const a of [...S.carryOn]) if (!here.has(a)) S.carryOn.delete(a);
   };
@@ -312,6 +377,8 @@ module.exports = (api) => {
     if (s === 'qualified') return { n: i + 1, status: 'counted', text: `Friend ${i + 1}: counted` };
     if (s === 'pending') return { n: i + 1, status: 'playing', text: `Friend ${i + 1}: ${hm(Math.min(f.r.ms, C.qualifyHours * HOUR))} of ${C.qualifyHours} h, ${Math.min(f.r.days.length, C.qualifyDays)} of ${C.qualifyDays} days` };
     if (s === 'revoked') return { n: i + 1, status: 'revoked', text: `Friend ${i + 1}: taken back by staff` };
+    if (s === 'checking' || s === 'held') return { n: i + 1, status: 'review', text: `Friend ${i + 1}: played enough, being checked by staff` };
+    if (s === 'refused') return { n: i + 1, status: 'ineligible', text: `Friend ${i + 1}: not counted after review` };
     return { n: i + 1, status: 'ineligible', text: `Friend ${i + 1}: cannot count (${f.r.ref.reason || 'not eligible'})` };
   };
   const view = (a) => {
@@ -368,7 +435,12 @@ module.exports = (api) => {
     const body = String(args || '').trim();
     if (!C.enabled) return personal(a, 'Referrals are not open yet.');
     if (!body) return personal(a, describe(a));
-    const m = /^(profile|revoke)\s+(\d+)\s*(.*)$/i.exec(body);
+    if (/^held$/i.test(body)) {
+      if (!isAdmin(a)) return personal(a, 'That is for staff.');
+      const held = Object.entries(store.profiles).filter(([, r]) => r && r.ref && r.ref.status === 'held');
+      return personal(a, held.length ? `Held for review: ${held.map(([k, r]) => `profile ${k} (referred by ${r.ref.by}, ${r.ref.reason}, held ${day(r.ref.heldAt || 0)})`).join('; ')}. A Lead GM types /referral approve <id> or /referral refuse <id> [why].` : 'No referral is held for review.');
+    }
+    const m = /^(profile|revoke|approve|refuse)\s+(\d+)\s*(.*)$/i.exec(body);
     if (m) {
       const pid = Number(m[2]);
       if (m[1].toLowerCase() === 'profile') {
@@ -379,6 +451,12 @@ module.exports = (api) => {
         return personal(a, `Profile ${pid}: code ${r.code || '-'}; ${r.ref ? `referred by ${r.ref.by} (${r.ref.via}, ${r.ref.status}${r.ref.reason ? `, ${r.ref.reason}` : ''})` : 'not referred'}; played ${hm(r.ms)}${r.days && r.days.length ? ` on ${r.days.length} day(s)` : ''}; friends ${fr}; queue ${r.queue.map((b) => `${pct(b.mult)} ${hm(b.leftMs)}`).join(', ') || 'empty'}${hasCarry(pid) ? '; carry weight' : ''}.`);
       }
       if (!isLeadStaff(a)) return personal(a, 'That is for a Lead GM and above.');
+      const verb = m[1].toLowerCase();
+      if (verb === 'approve' || verb === 'refuse') {
+        const done = decide(pid, verb === 'approve', m[3], who(a));
+        flush();
+        return personal(a, done ? `Profile ${pid}'s referral is ${verb === 'approve' ? 'approved: it counts now' : 'refused: it will not count'}.` : `Profile ${pid} has no referral held for review.`);
+      }
       const was = revoke(pid, m[3], who(a));
       flush();
       if (was === null) return personal(a, `Profile ${pid} was not referred.`);
@@ -416,5 +494,5 @@ module.exports = (api) => {
 
   const all = Object.values(store.profiles);
   log(`referrals ${C.enabled ? 'on' : 'off'}: ${Object.keys(store.codes).length} code(s), ${all.filter((r) => r && r.ref).length} referred, ${all.filter((r) => r && r.ref && r.ref.status === 'qualified').length} counted; carry weight ${carryId() ? 'live' : 'waiting for its record'}`);
-  return { tick, readBindings, bind, revoke, view, enterCode, codeOf, flush, runningOf, C };
+  return { tick, readBindings, bind, revoke, decide, runChecks, view, enterCode, codeOf, flush, runningOf, C };
 };

@@ -20,7 +20,7 @@ const near = (a, b) => Math.abs(a - b) < 1e-9;
 // ---- what ships ----------------------------------------------------------------------------------------------------
 const R = CONFIG.referrals || {};
 ok('config: shipped off, Nate\'s numbers', R.enabled === false && R.firstMult === 1.15 && R.laterMult === 1.05 && R.welcomeMult === 1.05 && R.boostHours === 8 && R.queueCap === 10
-  && R.qualifyHours === 5 && R.qualifyDays === 2 && R.accountAgeDays === 30 && R.carrySpell === '', R);
+  && R.qualifyHours === 5 && R.qualifyDays === 2 && R.accountAgeDays === 90 && /players\.json$/.test(R.playersFile) && /device-ids\.json$/.test(R.devicesFile) && R.carrySpell === '', R);
 ok('gitignore keeps the records out of the public repo', /^referrals\.json$/m.test(IGNORE) && /^referrals\.json\.tmp$/m.test(IGNORE));
 ok('gamemode loads referrals.js after playtime.js with what it needs', /require\(PLAYTIME_JS\)[\s\S]*require\(REFERRALS_JS\)\(\{[^}]*discordOf[^}]*isLeadStaff[^}]*creationPending[^}]*cfg \}\)/.test(GAMEMODE));
 ok('a failed load clears the rate hook', /log\('referrals\.js failed to load:', e\.stack \|\| e\.message\); globalThis\.__dboReferralSkillRate = null; \}/.test(GAMEMODE));
@@ -29,6 +29,12 @@ ok('a failed load clears the rate hook', /log\('referrals\.js failed to load:', 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'claude-nate-referrals-'));
 process.chdir(tmp);
 const BIND = path.join(tmp, 'referrals.jsonl');
+const PLAYERS = path.join(tmp, 'players.json'), DEVICES = path.join(tmp, 'device-ids.json');
+// The backend's player store: every account its own address; no device store yet (the live box has none, 16 Oct)
+const playerRows = {};
+for (const p of [1, 5, 7, 20, 21, 22, 23, 24, 30, 40, ...Array.from({ length: 12 }, (_, i) => 100 + i), 50, 51, 52, 53, 54]) playerRows[`d${p}`] = { profileId: p, discordId: `d${p}`, lastIp: `10.0.0.${p}` };
+const writePlayers = () => fs.writeFileSync(PLAYERS, JSON.stringify(playerRows));
+writePlayers();
 const H = 3600000, D = 24 * H;
 let clock = Date.parse('2026-10-20T10:00:00Z');
 Date.now = () => clock;
@@ -71,7 +77,7 @@ const api = (over) => ({
   findAnyByName: () => 0, onlineActors: () => online.slice(), every: (name, ms, fn) => timers.set(name, { ms, fn }),
   creationPending: () => false,
   onUi: (ev, fn) => ui.set(ev, fn),
-  cfg: { referrals: Object.assign({}, R, { enabled: true, bindingsFile: BIND }, over || {}) },
+  cfg: { referrals: Object.assign({}, R, { enabled: true, bindingsFile: BIND, playersFile: PLAYERS, devicesFile: DEVICES }, over || {}) },
 });
 let M;
 const status = new Map();
@@ -84,7 +90,7 @@ const rec = (pid) => globalThis.__dboReferrals.store.profiles[String(pid)];
 const rate = (a) => globalThis.__dboReferralSkillRate(a);
 const cmd = (a, args) => { const n = said.length; commands.get('referral')(a, args); return said.slice(n).map((x) => x.t).join(' | '); };
 const bindLine = (o) => fs.appendFileSync(BIND, JSON.stringify(Object.assign({ kind: 'bind', v: 1, at: clock, via: 'cookie', accountCreatedAt: Date.parse('2024-01-01T00:00:00Z') }, o)) + '\n');
-const settle = () => new Promise((r) => setTimeout(r, 30));
+const settle = () => new Promise((r) => setTimeout(r, 60));
 
 (async () => {
   load();
@@ -103,13 +109,13 @@ const settle = () => new Promise((r) => setTimeout(r, 30));
   bindLine({ code: c5, profileId: 20 });
   bindLine({ code: 'BBBBBBBB', profileId: 21 });     // unknown code
   bindLine({ code: c5, profileId: 5 });              // own code
-  bindLine({ code: c7, profileId: 22, accountCreatedAt: clock - 10 * D });   // young Discord account
+  bindLine({ code: c7, profileId: 22, accountCreatedAt: clock - 60 * D });   // 60 days: old enough under 30, young under 90
   fs.appendFileSync(BIND, '{"kind":"bind","code":"half');               // a line still being written
   ok('the backend\'s lines are read', (await M.readBindings()) === 4);
   ok('20 is referred by 5, pending, with its welcome queued', rec(20).ref.by === 5 && rec(20).ref.status === 'pending' && rec(20).queue.length === 1 && rec(20).queue[0].kind === 'welcome' && near(rec(20).queue[0].mult, 1.05), rec(20));
   ok('an unknown code binds nothing', !rec(21) || !rec(21).ref);
   ok('a referral with your own code is refused', !rec(5).ref && audits.some((t) => /profile 5 code .* refused: own code/.test(t)));
-  ok('a young Discord account is recorded but cannot count, and still gets the welcome', rec(22).ref.status === 'ineligible' && /under 30 days/.test(rec(22).ref.reason) && rec(22).queue.length === 1);
+  ok('a young Discord account is recorded but cannot count, and still gets the welcome', rec(22).ref.status === 'ineligible' && /under 90 days/.test(rec(22).ref.reason) && rec(22).queue.length === 1);
   fs.appendFileSync(BIND, 'x"}\n');
   bindLine({ code: c7, profileId: 20 });
   await M.readBindings();
@@ -145,8 +151,9 @@ const settle = () => new Promise((r) => setTimeout(r, 30));
   play(3 * H);
   ok('5 h on one day do not qualify', r20.ref.status === 'pending' && r20.ms >= 5 * H, [r20.ms, r20.days]);
   online = []; clock = Date.parse('2026-10-21T09:00:00Z'); tick(); online = [A.n20]; tick();
-  play(60000);
+  play(60000); await settle();
   ok('5 h on two days qualify', r20.ref.status === 'qualified', [r20.ms, r20.days, r20.ref.status]);
+  ok('...saying the PC could not be checked while the backend has no device store', audits.some((t) => /profile 20 qualified .*PC not checked: no device store/.test(t)));
   ok('the referrer\'s first boost is +15% for 8 h of play, with the carry weight', rec(5).queue.length === 1 && near(rec(5).queue[0].mult, 1.15) && rec(5).queue[0].kind === 'first' && rec(5).queue[0].leftMs === 8 * H && rec(5).carryFrom === 20);
   ok('the welcome still runs', near(rate(A.n20), 1.05) && rec(20).queue.length === 1);
   play(rec(20).queue[0].leftMs + 30000);
@@ -169,7 +176,7 @@ const settle = () => new Promise((r) => setTimeout(r, 30));
   ok('nobody enters their own code', /own code/.test(cmd(A.n24, M.codeOf(24))) && !rec(24).ref);
   ok('24 enters 5\'s code', /Thank you/.test(cmd(A.n24, c5)) && rec(24).ref.status === 'pending');
   play(5 * H);
-  online = []; clock = Date.parse('2026-10-22T09:00:00Z'); tick(); online = [A.v5, A.n24]; tick(); play(60000);
+  online = []; clock = Date.parse('2026-10-22T09:00:00Z'); tick(); online = [A.v5, A.n24]; tick(); play(60000); await settle();
   ok('24 qualifies', rec(24).ref.status === 'qualified');
   const q5 = rec(5).queue;
   ok('the later boost is +5%, queued behind the first', q5.length === 2 && near(q5[1].mult, 1.05) && q5[1].kind === 'later');
@@ -199,10 +206,35 @@ const settle = () => new Promise((r) => setTimeout(r, 30));
   for (let i = 0; i < 12; i++) M.bind({ referee: 100 + i, code: c7, at: clock, via: 'link', accountAt: Date.parse('2024-01-01T00:00:00Z') });
   for (let i = 0; i < 12; i++) { const r = rec(100 + i); r.ms = 5 * H; r.days = ['2026-10-20', '2026-10-21']; }
   online = []; for (let i = 0; i < 12; i++) { mp.set(0xff000100 + i, 'profileId', 100 + i); online.push(0xff000100 + i); }
-  clock += 60000; tick(); clock += 30000; tick();
+  clock += 60000; tick(); clock += 30000; tick(); await settle();
   ok('12 referrals qualify', Array.from({ length: 12 }, (_, i) => rec(100 + i).ref.status).every((s) => s === 'qualified'));
   ok('at most 10 boosts wait; the rest are audited, the referrals still count', rec(7).queue.length === 10 && rec(7).dropped === 2 && audits.filter((t) => /profile 7 boost .* not queued: 10 already waiting/.test(t)).length === 2);
   ok('only the first of them is +15%', near(rec(7).queue[0].mult, 1.15) && rec(7).queue.slice(1).every((b) => near(b.mult, 1.05)));
+
+  // ---- the alt checks ----
+  // 50: same PC as its referrer 5; 51: same PC as referred account 24; 52: same address as 5; 53: clean; 54: same address, refused
+  fs.writeFileSync(DEVICES, JSON.stringify({ v: 1, accounts: { d5: { d: [{ h: 'pc-five' }] }, d24: { d: [{ h: 'pc-24' }] }, d50: { d: [{ h: 'pc-five' }] }, d51: { d: [{ h: 'pc-x' }, { h: 'pc-24' }] }, d52: { d: [{ h: 'pc-52' }] }, d53: { d: [{ h: 'pc-53' }] } } }));
+  playerRows.d52.lastIp = playerRows.d5.lastIp; playerRows.d54.lastIp = playerRows.d5.lastIp; writePlayers();
+  for (const p of [50, 51, 52, 53, 54]) {
+    M.bind({ referee: p, code: c5, at: clock, via: 'link', accountAt: Date.parse('2024-01-01T00:00:00Z') });
+    const r = rec(p); r.ms = 5 * H; r.days = ['2026-10-20', '2026-10-21'];
+    mp.set(0xff000000 + p, 'profileId', p);
+  }
+  const q5before = rec(5).queue.length;
+  online = [50, 51, 52, 53, 54].map((p) => 0xff000000 + p);
+  clock += 30000; tick(); clock += 30000; tick(); await settle();
+  ok('the referrer\'s own PC never counts', rec(50).ref.status === 'ineligible' && rec(50).ref.reason === 'same PC as the referrer' && audits.some((t) => /profile 50 .* refused: same PC as the referrer/.test(t)));
+  ok('another referred account\'s PC never counts', rec(51).ref.status === 'ineligible' && rec(51).ref.reason === 'same PC as another referred account');
+  ok('a shared address holds it for review', rec(52).ref.status === 'held' && audits.some((t) => /^REFERRAL held for review: profile 52 \(referred by profile 5\)/.test(t)));
+  ok('a clean PC and address count, saying the PC was checked', rec(53).ref.status === 'qualified' && audits.some((t) => /profile 53 qualified .*PC checked/.test(t)));
+  ok('...and a shared address with no device seen is held too', rec(54).ref.status === 'held');
+  ok('refused and held referrals earn nothing yet', rec(5).queue.length === q5before + 1);
+  ok('the referrer sees them being checked', /being checked by staff/.test(cmd(A.v5, '')));
+  ok('staff list the held ones', /profile 52 .*shares an address/.test(cmd(A.staff, 'held')) && /profile 54/.test(cmd(A.staff, 'held')));
+  ok('a GM below Lead cannot decide', /Lead GM/.test(cmd(A.v5, 'approve 52')) && rec(52).ref.status === 'held');
+  ok('a Lead GM approves: it counts and earns its boost', /approved/.test(cmd(A.staff, 'approve 52')) && rec(52).ref.status === 'qualified' && rec(5).queue.length === q5before + 2 && audits.some((t) => /profile 52 approved by/.test(t)));
+  ok('a Lead GM refuses: it never counts, the welcome stays', /refused/.test(cmd(A.staff, 'refuse 54 same household')) && rec(54).ref.status === 'refused' && rec(54).queue.some((b) => b.kind === 'welcome') && audits.some((t) => /profile 54 .*refused by .*after review: same household/.test(t)));
+  ok('only a held referral can be decided', /no referral held/.test(cmd(A.staff, 'approve 53')));
 
   // ---- carry weight ----
   online = [A.v5]; papyrus.length = 0;
@@ -217,6 +249,9 @@ const settle = () => new Promise((r) => setTimeout(r, 30));
   ok('...its boost leaves the queue, the carry stays (20 still counts)', rec(5).queue.every((b) => b.from !== 24) && papyrus.every((p) => p.fn !== 'RemoveSpell'));
   ok('...audited with who and why', audits.some((t) => /^REFERRAL profile 24 \(referred by profile 5, was qualified\) revoked by whoff000001: alt account/.test(t)), audits.filter((t) => /revoked/.test(t)));
   cmd(A.staff, 'revoke 20');
+  tick();
+  ok('the carry stays while a later referral still counts', papyrus.every((p) => p.fn !== 'RemoveSpell'));
+  cmd(A.staff, 'revoke 52'); cmd(A.staff, 'revoke 53');
   tick();
   ok('revoking the last counted referral takes the carry weight back', papyrus.some((p) => p.fn === 'RemoveSpell' && p.spell === CARRY_DESC) && !mp.get(A.v5, 'private.dboReferralCarry'));
   ok('a revoked referral cannot be revoked twice', /already revoked/.test(cmd(A.staff, 'revoke 20')));
@@ -243,6 +278,11 @@ const settle = () => new Promise((r) => setTimeout(r, 30));
   globalThis.__dboReferralSkillRate = () => 1.15;
   ok('skillrates: a referral boost multiplies the rate', near(sr.rateFor(A.v5, 'miner', 'mine', {}), 2.3) && near(sr.rateFor(A.v5, 'cook', 'kill', {}), 1.15));
   beast = true;
+  const withBoost = [sr.rateFor(A.v5, 'alchemist', 'award', {}), sr.rateFor(A.v5, 'miner', 'award', {})];
+  globalThis.__dboReferralSkillRate = () => 1;
+  const without = [sr.rateFor(A.v5, 'alchemist', 'award', {}), sr.rateFor(A.v5, 'miner', 'award', {})];
+  globalThis.__dboReferralSkillRate = () => 1.15;
+  ok('skillrates: never on an award (staff, alchemy)', near(withBoost[0], without[0]) && near(withBoost[1], without[1]), [withBoost, without]);
   ok('skillrates: the beast still trains nothing', sr.rateFor(A.v5, 'miner', 'mine', {}) === 0);
   beast = false;
   globalThis.__dboReferralSkillRate = () => 9;
