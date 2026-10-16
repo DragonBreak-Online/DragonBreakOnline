@@ -23,6 +23,7 @@ export const resolveRaceIds = (list: ReadonlyArray<readonly [string, number, str
 };
 
 // skee64 NiOverride.AddSkinOverrideInt(ref, isFemale, firstPerson, slotMask, key, index, value, persist) after the ref
+// The mask picks the item worn on slot 30, else the skin; skee tints every skin-tint shape of that armour's addons, head and body
 export const SLOT_30_MASK = 0x1;
 export const KEY_TINT_COLOR = 7;
 export const headTintArgs = (isFemale: boolean, skinColor: number): [boolean, boolean, number, number, number, number, boolean] =>
