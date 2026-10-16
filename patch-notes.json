@@ -11,7 +11,8 @@
           "Skyrim is open to everyone, alongside Bruma. Solstheim, Hammerfell, Summerset, Murkmire and the other far lands stay closed for now; boats and roads that lead there will not take you.",
           "After you make a new character you are asked where to begin: Cyrodiil (the Pale Pass road down to Bruma) or Skyrim. If you close the question it comes back a minute later. Choosing Skyrim, or walking through a hold gate, keeps you in the Realm to pick one of the nine hold gates: Whiterun, Solitude, Windhelm, Riften, Markarth, Falkreath, Morthal, Dawnstar and Winterhold.",
           "Each gate now lands you on clear ground near its city, and Solitude, Markarth, Morthal and Dawnstar land in better places than before.",
-          "The bandits, wild animals and monsters the old world placed around the gates and inside the towns are gone; the server places Skyrim's creatures and enemies itself. Guards, townsfolk, merchants and children stay where they live."
+          "The bandits, wild animals and monsters the old world placed around the gates and inside the towns are gone; the server places Skyrim's creatures and enemies itself. Guards, townsfolk, merchants and children stay where they live.",
+          "Skyrim's lands are a big download. Updating an install you already have fetches about 16 GB of new mods and needs about 40 GB more free space; a new install downloads about 33 GB and needs about 100 GB free. The launcher does it for you before you can join."
         ]
       },
       {
@@ -55,11 +56,10 @@
         "heading": "Blackreach",
         "items": [
           "Blackreach is an open dungeon under Skyrim, and very hard: its Falmer, Dwemer machines, chaurus, spiders, trolls and giants shrug off a quarter of your damage. They come back 20 minutes after they fall, their bosses after 30.",
-          "Ten guarded chests stand in Blackreach. Defeat a chest's guards (its boss, if it has one) with your party, and within the hour the chest gives you one roll every 20 hours: Glass, Dwarven and honed Falmer gear among it, never Ebony, Daedric, Stalhrim or dragon materials."
+          "Ten guarded chests stand in Blackreach. Defeat a chest's guards (its boss, if it has one) with your party, and within the hour the chest gives you one roll every 20 hours: Glass, Amber, Dwarven and honed Falmer gear among it, never Ebony, Daedric, Stalhrim or dragon materials."
         ]
       }
-    ],
-    "_staff": "NOT for the launcher until the Skyrim window has run (strip this key on publish). Live-true only once the 140-plugin release is deployed (DLE 641f3719, Armory v9 fe2eb7dd, Nexus Patches 995433b2 and the new plugins), the client package with the creator's new races is out, and the server restarts with this branch. Needs the plugins: the races and the Goblin vampire (DLE races), Black Bear hoods and Battlemage Glass (Armory v9), the vault bars (DLE), the alchemy records (DLE), the narrowed actor pass (xEdit on the PC, not run yet). The start question, gates, closed lands, levels, crafting locks and Blackreach are server-side and live with the restart. The Reachman gifts were PROPOSED; ship only if Nate approved them. Amber is allowed in Blackreach chests but loot.json has no Amber piece yet, so the note does not promise it."
+    ]
   },
   {
     "title": "Priest training rate",
