@@ -9,7 +9,8 @@
 // Nate's book breakdown ledger (BookBreakdown, config bookBreakdownBases) first asks: "Your spellbook" (anyone; spells.js
 // lets spells be prepared beside a ledger) or "Break down books" (a Scholar, told why when nothing can be done). Where
 // spells.js keeps its tome shop (the Synod Conclave) it also offers "Buy spell tomes" (Nate, 10 Oct, in place of /tomes).
-// A Senior rank or above at their own college's ledger also sees "Teach a spell to a student" (spells.js; Nate, 11 Oct).
+// A Senior rank or above at their own college's ledger also sees "Teach a spell to a student" (spells.js; Nate, 11 Oct),
+// and a Master Scholar "Write a spell tome" (spells.js; Nate, 16 Oct).
 // A blacksmith's ledger (DragonBreak Online Edits.esp ACTI BlacksmithLedger, config smithLedgerBases; Nate, 10 Oct) opens
 // a list of the basic schematics manuals.js sells there; nothing happens where the plugin does not carry it.
 //
@@ -260,7 +261,7 @@ module.exports = (api) => {
     log(`salvage: ${who(a)} opened the ${station.label} menu at ${descOf(target)}${note ? ` (${note})` : ''}`);
     openWidget(a, {
       type: 'contextMenu', id: WIDGET_ID, mode: 'menu', targetName: note || station.label,
-      actions: [{ id: 'spellbook', label: 'Open your Spell Book' }].concat(schoolActions(a), [{ id: 'books', label: 'Break down old books' }], manualActions(a), tomeActions(a), teachActions(a, target)),
+      actions: [{ id: 'spellbook', label: 'Open your Spell Book' }].concat(schoolActions(a), [{ id: 'books', label: 'Break down old books' }], manualActions(a), tomeActions(a), teachActions(a, target), writeActions(a)),
       events: { action: 'dbo:salvageChoose', close: 'dbo:salvageClose' },
     }, true);
   };
@@ -276,6 +277,8 @@ module.exports = (api) => {
   };
   // The tome shop (spells.js) where it stands: a button in place of /tomes
   const tomeActions = (a) => { try { return typeof globalThis.__dboTomeShopHere === 'function' && globalThis.__dboTomeShopHere(a) ? [{ id: 'tomes', label: 'Buy spell tomes' }] : []; } catch (e) { return []; } };
+  // Writing a spell tome (spells.js; a Master Scholar, Nate 16 Oct)
+  const writeActions = (a) => { try { return typeof globalThis.__dboTomeWriteActions === 'function' ? (globalThis.__dboTomeWriteActions(a) || []) : []; } catch (e) { return []; } };
   // Teaching a spell at a college's own ledger (spells.js; Senior ranks and above, Nate 11 Oct)
   const teachActions = (a, target) => { try { return typeof globalThis.__dboTeachLedgerActions === 'function' ? (globalThis.__dboTeachLedgerActions(a, target) || []) : []; } catch (e) { return []; } };
   // A blacksmith's ledger: the schematics it sells, each row sb:<book id>. Its title names the hall's faction where known
@@ -374,6 +377,16 @@ module.exports = (api) => {
       // The shop opens first and takes the cursor; this menu closes after it (panel handoff)
       const done = typeof globalThis.__dboTomeShopOpen === 'function' && globalThis.__dboTomeShopOpen(a, p.target);
       if (!done) return openLedgerMenu(a, p.target, station, 'Spell tomes are not sold here.');
+      S.pending.delete(a >>> 0);
+      closeWidget(a, WIDGET_ID);
+      return;
+    }
+    if (station.dedicated && id === 'write') {
+      try { if (distanceMeters(a, p.target) > CFG.reachMeters) { closePanel(a); personal(a, `You walked away from the ${station.label}.`); return; } } catch (e) { /* no position */ }
+      log(`salvage: ${who(a)} chose write at the ${station.label}`);
+      // spells.js's menu opens first and takes the cursor; this one closes after it (panel handoff)
+      const done = typeof globalThis.__dboTomeWriteOpen === 'function' && globalThis.__dboTomeWriteOpen(a, p.target);
+      if (!done) return openLedgerMenu(a, p.target, station, 'Spell tomes are not written here.');
       S.pending.delete(a >>> 0);
       closeWidget(a, WIDGET_ID);
       return;
