@@ -1,5 +1,19 @@
 [
   {
+    "title": "Who is about",
+    "date": "2026-10-16",
+    "version": "Hotfix",
+    "tag": "Change",
+    "sections": [
+      {
+        "heading": "Changes",
+        "items": [
+          "The journal's World page now shows how many people are about in the world, without naming them."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Equilibrium held back",
     "date": "2026-10-16",
     "version": "Hotfix",
