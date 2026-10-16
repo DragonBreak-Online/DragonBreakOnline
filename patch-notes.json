@@ -1,5 +1,22 @@
 [
   {
+    "title": "Faction halls in Skyrim",
+    "date": "2026-10-16",
+    "version": "Hotfix",
+    "tag": "World",
+    "sections": [
+      {
+        "heading": "Changes",
+        "items": [
+          "Skyrim's factions now own their usual halls: the Companions in Jorrvaskr, the College of Winterhold, the Bards College, the Vigil of Stendarr's Hall of the Vigilant, the Stormcloaks in the Palace of the Kings, the Dawnguard at Fort Dawnguard, Clan Volkihar's castle, the Silver Hand at Driftshade Refuge and the Nightingales at the Twilight Sepulcher.",
+          "Each hold's Jarl holds their seat (Dragonsreach, Mistveil Keep, the Blue Palace, the Palace of the Kings, Understone Keep, Highmoon Hall, the White Hall and the Jarls' longhouses), and each Orc clan its chief's longhouse.",
+          "The Thalmor now keep their own embassy in Bruma, near Fort Caractacus.",
+          "A faction's hall is where its strongbox, teaching lecterns and Scholars' Ledger work for that faction."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Skyrim opens",
     "date": "2026-10-16",
     "version": "Skyrim release",
