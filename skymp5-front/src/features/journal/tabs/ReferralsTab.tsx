@@ -19,7 +19,7 @@ export interface ReferralsSection {
   carryLive: boolean;
   canEnter: boolean;
   referredBy: string | null;
-  rules: { qualifyHours: number; qualifyDays: number; boostHours: number; firstMult: number; laterMult: number; welcomeMult: number; queueCap: number };
+  rules: { qualifyHours: number; qualifyDays: number; boostHours: number; firstMult: number; laterMult: number; welcomeMult: number; queueCap: number; carryWeight?: number; commandWindowHours?: number };
 }
 
 const pct = (m: number): string => `+${Math.round((m - 1) * 100)}%`;
@@ -36,6 +36,8 @@ export const ReferralsTab = ({ section, busy, act }: JournalTabProps<ReferralsSe
   useEffect(() => { if (!busy && sent) { setCode(''); setSent(false); } }, [busy]);
   if (!s) return null;
   const r = s.rules;
+  const carry = r.carryWeight || 50;
+  const codeHours = r.commandWindowHours || 24;
   const clean = code.trim().toUpperCase();
   const send = (): void => { if (clean.length !== 8 || busy) return; setSent(true); act('referralCode', clean); };
 
@@ -44,7 +46,7 @@ export const ReferralsTab = ({ section, busy, act }: JournalTabProps<ReferralsSe
       <h2 className="journal__heading">Invite a friend</h2>
       <p className="journal__hint">
         Share your link. A friend who joins with it and plays {r.qualifyHours} hours on {r.qualifyDays} different days counts as your referral:
-        your first earns {pct(r.firstMult)} skill progress for {r.boostHours} hours of play and +100 carry weight for good, each later one {pct(r.laterMult)} for {r.boostHours} hours.
+        your first earns {pct(r.firstMult)} skill progress for {r.boostHours} hours of play and +{carry} carry weight for good, each later one {pct(r.laterMult)} for {r.boostHours} hours.
         Your friend gets {pct(r.welcomeMult)} for their first {r.boostHours} hours.
       </p>
       <div className="jref__link">
@@ -70,12 +72,12 @@ export const ReferralsTab = ({ section, busy, act }: JournalTabProps<ReferralsSe
           ))}
         </ol>
       ) : <p className="journal__empty">No boosts waiting. Boosts run one at a time, only while you play, {r.queueCap} at most in line.</p>}
-      {s.carry ? <p className="jref__carry">{s.carryLive ? 'Carry weight +100: yours for good.' : 'Carry weight +100 earned: it arrives with a coming update.'}</p> : null}
+      {s.carry ? <p className="jref__carry">{s.carryLive ? `Carry weight +${carry}: yours for good.` : `Carry weight +${carry} earned: it arrives with a coming update.`}</p> : null}
 
       {s.canEnter ? (
         <>
           <h3 className="journal__heading">Did a friend invite you?</h3>
-          <p className="journal__hint">Enter their code once, in your first 24 hours of play.</p>
+          <p className="journal__hint">Enter their code once, in your first {codeHours} hours of play.</p>
           <div className="jref__enter">
             <input className="jref__input jref__input--code" maxLength={8} value={code} placeholder="CODE" onKeyDown={(e) => { keep(e); if (e.key === 'Enter') send(); }}
               onChange={(e) => setCode(e.target.value.replace(/[^a-zA-Z0-9]/g, ''))} aria-label="A friend's referral code" />
