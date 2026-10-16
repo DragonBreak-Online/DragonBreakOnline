@@ -93,7 +93,7 @@ export class BeastFormService extends ClientListener {
     this.controller.on("update", () => this.onHowlCheck());
     // The plugin beast races resolve in the first update, before a dboBeastBody list (read where natives cannot run) needs them
     this.controller.on("update", () => resolveBeastRaces());
-    this.controller.emitter.on("connectionAccepted", () => { this.howlForced = true; setBeastBodies([]); });
+    this.controller.emitter.on("connectionAccepted", () => { this.howlForced = true; setBeastBodies([]); this.gearGuard = false; });
   }
 
   // No howl outside the form (beastHowl.ts): a revert, a death or down in the form, a relog, a lost end packet, or a
@@ -205,17 +205,20 @@ export class BeastFormService extends ClientListener {
 
   // Gear put on a beast behind the player's back (a server re-dress, inventory.ts's ammo re-equip) comes off on the next update
   private onEquip(e: EquipEvent): void {
-    if (!this.beastRace || !e.actor || !e.baseObj || e.actor.getFormID() !== 0x14) return;
+    if (!this.beastRace || !this.gearGuard || !e.actor || !e.baseObj || e.actor.getFormID() !== 0x14) return;
     const id = e.baseObj.getFormID() >>> 0;
     if (!isForeignBeastGear(e.baseObj.getType(), id, this.wear)) return;
     this.controller.once("update", () => this.takeOffGear(id));
   }
 
   private takeOffGear(id: number): void {
-    if (!this.beastRace || this.wear.has(id)) return;
+    if (!this.beastRace || !this.gearGuard || this.wear.has(id)) return;
     const player = this.sp.Game.getPlayer();
     const item = this.sp.Game.getFormEx(id);
     if (!player || !item || !player.isEquipped(item)) return;
+    // Only on the form's own body: a race that did not hold, or the own race back, keeps its gear
+    const race = player.getRace();
+    if (!race || (race.getFormID() >>> 0) !== this.beastRace) return;
     try { player.unequipItem(item, false, true); } catch (e) { logError(this, "beast gear unequip failed", e); return; }
     logTrace(this, "Took gear off the beast form", id.toString(16));
     trace(`beast gear off ${hex(id)}`);
@@ -223,6 +226,8 @@ export class BeastFormService extends ClientListener {
 
   // The form's own outfit (dboBeast wear, beastform.js WEAR); empty outside a form
   private wear = new Set<number>();
+  // On only for a form begun on this connection: the server reverts at every logout, and that packet never reaches a dropped one
+  private gearGuard = false;
 
   private restoreControls(): void {
     try { this.sp.Game.enablePlayerControls(true, true, true, true, true, true, true, true, 0); } catch { /* menu */ }
@@ -275,6 +280,7 @@ export class BeastFormService extends ClientListener {
         // The server puts the form's outfit in the inventory and lists it here (beastform.js WEAR);
         const wear = Array.isArray(content["wear"]) ? (content["wear"] as unknown[]).map((x) => Number(x) >>> 0) : [];
         this.wear = new Set(beast ? wear : []);
+        this.gearGuard = beast;
         this.formAt = Date.now();
         this.lostNoted = false;
         this.lastHit = null;

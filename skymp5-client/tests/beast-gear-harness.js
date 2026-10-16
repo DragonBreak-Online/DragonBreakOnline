@@ -183,6 +183,23 @@ function run({ BeastFormService }) {
   equip(ARROWS);
   update();
   check('a take-off that runs after the revert leaves the item on', worn.has(ARROWS) && race === KHAJIIT, [...worn]);
+
+  // A dropped connection in the form: the logout revert went to the old connection, so the form is still remembered here
+  beast(WEREWOLF, true);
+  fire('connectionAccepted', {});
+  equip(CUIRASS);
+  update();
+  check('after a reconnect the server\'s login re-dress stays on (no form on this connection)', worn.has(CUIRASS), [...worn]);
+  beast(WEREWOLF, true);
+  equip(BOOTS);
+  update();
+  check('a form begun on the new connection takes gear off again', !worn.has(BOOTS), [...worn]);
+  // The form's race did not hold (or her own came back): gear stays on her own body
+  race = KHAJIIT;
+  equip(BOOTS);
+  update();
+  check('with her own race on the player nothing is taken off', worn.has(BOOTS), [...worn]);
+  race = WEREWOLF;
   check('no gear errors were logged', !globalThis.__errors.some((e) => /gear/.test(e)), globalThis.__errors.filter((e) => /gear/.test(e)));
 
   console.log(failures ? `\n${failures} FAILED` : '\nall passed');
