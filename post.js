@@ -172,10 +172,10 @@ module.exports = (api) => {
   };
 
   // A letter from the board itself (supply goods, a refund), to a character online or not
-  const boardLetter = (to, zoneName, text, parcel, supplyOrder) => {
+  const boardLetter = (to, zoneName, text, parcel, supplyOrder, fromName) => {
     const box = lettersOf(to);
     const at = Date.now();
-    box.push({ id: `${at.toString(36)}${Math.floor(Math.random() * 1296).toString(36)}`, from: `The ${zoneName} notice board`, fromProfile: -1, text, at, read: false, parcel, supplyOrder });
+    box.push({ id: `${at.toString(36)}${Math.floor(Math.random() * 1296).toString(36)}`, from: fromName || `The ${zoneName} notice board`, fromProfile: -1, text, at, read: false, parcel, supplyOrder });
     saveLetters(to, box);
     if (onlineActors().includes(to)) { personal(to, `A letter waits for you at the notice boards: ${text}`); try { sendMailState(to); } catch (e) { /* marker */ } }
   };

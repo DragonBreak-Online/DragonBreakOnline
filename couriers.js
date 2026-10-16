@@ -145,8 +145,8 @@ module.exports = (api) => {
   };
 
   // A base value in gold, as the record keeps it (item-value-layout.json, ck-mcp/itemvalues.py: DATA at 0 for most
-  // types, AMMO DATA 12, BOOK DATA 8, ALCH ENIT 0). A type it does not know counts 0, which only lowers what can be insured.
-  const VALUE_AT = { WEAP: ['DATA', 0], ARMO: ['DATA', 0], MISC: ['DATA', 0], INGR: ['DATA', 0], SLGM: ['DATA', 0], SCRL: ['DATA', 0], AMMO: ['DATA', 12], BOOK: ['DATA', 8], ALCH: ['ENIT', 0] };
+  // types, AMMO DATA 12, BOOK DATA 8, LIGH DATA 40, ALCH ENIT 0). A type it does not know counts 0, which only lowers what can be insured.
+  const VALUE_AT = { WEAP: ['DATA', 0], ARMO: ['DATA', 0], MISC: ['DATA', 0], INGR: ['DATA', 0], SLGM: ['DATA', 0], SCRL: ['DATA', 0], AMMO: ['DATA', 12], BOOK: ['DATA', 8], LIGH: ['DATA', 40], ALCH: ['ENIT', 0] };
   const valueCache = new Map();
   const baseValue = (id) => {
     id >>>= 0;
