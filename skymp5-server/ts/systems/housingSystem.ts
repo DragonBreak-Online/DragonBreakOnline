@@ -1410,8 +1410,17 @@ export class HousingSystem implements System {
   // A building in the fief this character holds: the one-building cap never counts it
   private fiefExempt(ctx: SystemContext, primary: number, profileId: number, actorId: number): boolean {
     if (!primary) return false;
+    if (this.hallExempt(ctx, primary, actorId)) return true;
     const h = this.fiefHolderOf(ctx, primary);
     return !!h && h.profile === profileId && (!actorId || h.actor === (actorId >>> 0));
+  }
+
+  // A hall this character leads (guilds.js __dboHallLeader) is outside the one-building cap
+  private hallExempt(ctx: SystemContext, primary: number, actorId: number): boolean {
+    if (!primary || !actorId || !this.placesOn()) return false;
+    const leader = (globalThis as any).__dboHallLeader;
+    if (typeof leader !== "function") return false;
+    try { return leader([primary, this.partnerOf(ctx, primary)].filter(Boolean), actorId >>> 0) === true; } catch { return false; }
   }
 
   // A jarl, steward or other manager rank of the hold the property stands in
