@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Picker } from '../../components/Picker/Picker';
 
 // The Realm and War tabs of the faction panel (server realm.js sends `realm` with the panel). The map colours every
@@ -106,7 +106,11 @@ const Banner = () => (
 );
 
 // ---- the map -------------------------------------------------------------------------------------------------------
-export const RealmMap = ({ realm, background }: { realm: RealmData; background?: { src: string; bounds: [number, number, number, number] } }) => {
+// The map's width: 520 px, or narrower (not under 320 px) to fit under what is above it, else to fit its page's view
+const MAP_MAX_W = 520;
+const MAP_MIN_W = 320;
+interface RealmMapFit { room: number; view: number }
+export const RealmMap = ({ realm, background, fit }: { realm: RealmData; background?: { src: string; bounds: [number, number, number, number] }; fit?: RealmMapFit }) => {
   const canvas = useRef<HTMLCanvasElement>(null);
   const [hover, setHover] = useState<RealmTerritory | null>(null);
   const ts = realm.territories || [];
@@ -116,7 +120,8 @@ export const RealmMap = ({ realm, background }: { realm: RealmData; background?:
   const bounds: [number, number, number, number] = background ? background.bounds
     : [Math.min(...xs) - margin, Math.min(...ys) - margin, Math.max(...xs) + margin, Math.max(...ys) + margin];
   const [minX, minY, maxX, maxY] = bounds;
-  const W = 520;
+  const widthFor = (h: number) => Math.min(MAP_MAX_W, Math.floor(h * (maxX - minX) / (maxY - minY)));
+  const W = !fit ? MAP_MAX_W : widthFor(fit.room) >= MAP_MIN_W ? widthFor(fit.room) : Math.max(MAP_MIN_W, widthFor(fit.view));
   const H = Math.round(W * (maxY - minY) / (maxX - minX));
   const scale = W / (maxX - minX);
   const toPx = (x: number, y: number): [number, number] => [(x - minX) * scale, H - (y - minY) * scale];
@@ -154,7 +159,7 @@ export const RealmMap = ({ realm, background }: { realm: RealmData; background?:
       if ((a && b && a.owner !== b.owner) || (a && d && a.owner !== d.owner)) g.fillRect(px, py, 1.5, 1.5);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [JSON.stringify(ts.map((t) => [t.id, t.owner])), JSON.stringify(realm.colours)]);
+  }, [JSON.stringify(ts.map((t) => [t.id, t.owner])), JSON.stringify(realm.colours), W]);
 
   return (
     <div className="realm-map" style={{ width: W, height: H }}
@@ -239,16 +244,60 @@ export const realmOnMap = (realm: RealmData, map: RealmMapDef, first: RealmMapDe
   });
 };
 
+// The Realm tab's page view (panel 37's body at its max-height, or the journal's page) and the room below the tab's top, in layout px
+const roomFor = (el: HTMLElement): RealmMapFit | null => {
+  const journal = el.closest('.journal__body') as HTMLElement | null;
+  const body = el.closest('.faction__body--wide') as HTMLElement | null;
+  const panel = journal ? null : (el.closest('.faction__panel') as HTMLElement | null);
+  const page = journal || body;
+  if (!page || !page.offsetHeight || (!journal && !panel)) return null;
+  // Screen px per layout px: a CSS zoom on the page scales getBoundingClientRect in newer Chromium
+  const k = page.getBoundingClientRect().height / page.offsetHeight || 1;
+  const cs = getComputedStyle(page);
+  const pad = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
+  const max = panel ? parseFloat(getComputedStyle(panel).maxHeight) : 0;
+  if (panel && !Number.isFinite(max)) return null;
+  const view = page.clientHeight - pad + (panel ? Math.max(0, max - panel.offsetHeight) : 0);
+  const above = (el.getBoundingClientRect().top - page.getBoundingClientRect().top) / k - page.clientTop - parseFloat(cs.paddingTop) + page.scrollTop;
+  return { room: view - above, view };
+};
+
 export const RealmTab = ({ realm, maps, act, busy }: { realm: RealmData | null; maps: RealmMapDef[]; act: Send; busy: boolean }) => {
   const [mapWorld, setMapWorld] = useState('');
-  if (!realm || !(realm.territories || []).length) return <p className="faction__empty">No land has been charted yet.</p>;
+  const ref = useRef<HTMLDivElement>(null);
+  const [fit, setFit] = useState<RealmMapFit | null>(null);
+  const [, setTick] = useState(0);
+  const hasLand = !!realm && (realm.territories || []).length > 0;
+  // Measured again after a resize, a late font or a line that wraps: they change the room without a render
+  useEffect(() => {
+    const el = ref.current;
+    let frame = 0;
+    const bump = () => { cancelAnimationFrame(frame); frame = requestAnimationFrame(() => setTick((n) => n + 1)); };
+    window.addEventListener('resize', bump);
+    const ro = el && typeof ResizeObserver === 'function' ? new ResizeObserver(bump) : null;
+    if (ro && el) ['.journal__body, .faction__panel', '.journal__faction', '.faction__body--wide'].forEach((q) => { const x = el.closest(q); if (x) ro.observe(x); });
+    return () => { cancelAnimationFrame(frame); window.removeEventListener('resize', bump); if (ro) ro.disconnect(); };
+  }, [hasLand]);
+  // The map's height that keeps the whole tab on screen: the room less the switch above the map
+  useLayoutEffect(() => {
+    const el = ref.current;
+    const col = el && (el.querySelector('.realm__mapcol') as HTMLElement | null);
+    const box = el && (el.querySelector('.realm-map') as HTMLElement | null);
+    if (!el || !col || !box) return;
+    const room = roomFor(el);
+    const extra = col.offsetHeight - box.offsetHeight;
+    const next = room ? { room: Math.floor(room.room - extra), view: Math.floor(room.view - extra) } : null;
+    const same = !next || !fit ? next === fit : Math.abs(next.room - fit.room) <= 1 && Math.abs(next.view - fit.view) <= 1;
+    if (!same) setFit(next);
+  });
+  if (!realm || !hasLand) return <p className="faction__empty">No land has been charted yet.</p>;
   const owners = Array.from(new Set(realm.territories.map((t) => t.owner)));
   const capitals = realm.capitals || [];
   // The maps with at least one territory; the switch shows only when there is more than one
   const shown = maps.filter((m) => realmOnMap(realm, m, maps[0]).territories.length > 0);
   const map = shown.find((m) => m.world === mapWorld) || shown[0];
   return (
-    <div className="realm">
+    <div className="realm" ref={ref}>
       <div className="realm__mapcol">
         {shown.length > 1 && (
           <div className="realm__maps">
@@ -257,7 +306,7 @@ export const RealmTab = ({ realm, maps, act, busy }: { realm: RealmData | null; 
             ))}
           </div>
         )}
-        {map ? <RealmMap key={map.world} realm={realmOnMap(realm, map, maps[0])} background={map} /> : <RealmMap realm={realm} />}
+        {map ? <RealmMap key={map.world} realm={realmOnMap(realm, map, maps[0])} background={map} fit={fit || undefined} /> : <RealmMap realm={realm} fit={fit || undefined} />}
       </div>
       <div className="realm__side">
         <div className="realm__legend">
