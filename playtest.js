@@ -7,7 +7,7 @@
 //    the hub worldspace, the worldspaces in `allowedWorlds`, and interior cells whose form comes from a
 //    plugin in `allowedPlugins` (or is listed in `allowedCells`). The Skyrim landing point is allowed
 //    for `graceSeconds` after connect, so character creation and the move into the hub still work.
-//  - border doors refuse everyone; admins are never bounced (they can /tp anywhere to test).
+//  - border doors refuse everyone but Lead GMs and above; staff are never bounced (they can /tp anywhere to test).
 //
 // gamemode-config.json "playtest": { enabled, name, arrival: { world, pos, rotZ }, allowedWorlds: [desc],
 //   allowedPlugins: [name], allowedCells: [desc], blockedDoors: [desc], graceSeconds, checkSeconds,
@@ -19,6 +19,7 @@
 
 module.exports = (api) => {
   const { mp, log, personal, system, registerChatCommand, display, who, audit, onlineActors, isAdmin, sendPacket, cfg, hubDesc, connectedAt, every } = api;
+  const isLeadStaff = typeof api.isLeadStaff === 'function' ? api.isLeadStaff : () => false;
   const C = Object.assign({ enabled: false, name: 'the playtest region', arrival: null, allowedWorlds: [], allowedPlugins: [], allowedCells: [], blockedDoors: [], graceSeconds: 60, checkSeconds: 5, closedPlugins: [], gatesToArrival: true, closedMessage: 'The road to Skyrim is closed for now.' }, cfg.playtest || {});
 
   const normDesc = (d) => { const s = String(d || ''); const i = s.indexOf(':'); if (i < 0) return s.toLowerCase(); const n = parseInt(s.slice(0, i), 16); return (Number.isFinite(n) ? n.toString(16) : s.slice(0, i).toLowerCase()) + ':' + s.slice(i + 1).toLowerCase(); };
@@ -84,8 +85,15 @@ module.exports = (api) => {
       return Array.isArray(p) && Array.isArray(q) && Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]) <= 1200;
     } catch (e) { return false; }
   };
+  const leadPassed = new Map();
   globalThis.__dboPlaytestActivate = (targetId, casterId) => {
     if (!active() || !blockedDoors.has(targetId)) return null;
+    // Lead GMs and above cross into the closed lands (Nate, 16 Oct); other staff and players are refused as before
+    if (isLeadStaff(casterId >>> 0)) {
+      const now = Date.now();
+      if (now - (leadPassed.get(casterId >>> 0) || 0) > 10000) { leadPassed.set(casterId >>> 0, now); system(casterId, 'Staff: this crossing is closed to players; it is open to you.'); audit(`PLAYTEST ${who(casterId)} (lead staff) crossed a closed border door ${targetId.toString(16)}`); }
+      return null;
+    }
     // A refused automatic door (FNAM 0x02) leaves its half-started load open and the player frozen until a relog
     // (Serpents Trail, 7 Oct), so the player is taken back to the arrival point instead
     const trip = autoDoors.has(targetId) && atDoor(casterId, targetId);

@@ -8196,7 +8196,7 @@ try {
 try {
   const PLAYTEST_JS = path.resolve('playtest.js');
   delete require.cache[PLAYTEST_JS];
-  require(PLAYTEST_JS)({ mp, log, personal, system, registerChatCommand, display, who, audit, onlineActors, isAdmin, sendPacket, cfg, hubDesc: HUB.cellOrWorldDesc, connectedAt, every });
+  require(PLAYTEST_JS)({ mp, log, personal, system, registerChatCommand, display, who, audit, onlineActors, isAdmin, isLeadStaff, sendPacket, cfg, hubDesc: HUB.cellOrWorldDesc, connectedAt, every });
 } catch (e) { log('playtest.js failed to load:', e.stack || e.message); globalThis.__dboPlaytestActivate = null; globalThis.__dboPlaytestGate = null; }
 
 // ---- TEMPORARY movement speed recorder (server\movetrace.js), remove once the C++ ceiling is set ---

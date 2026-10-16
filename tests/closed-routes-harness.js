@@ -12,11 +12,13 @@ const PT = cfg.playtest;
 const ids = new Map(); const idOf = (d) => { const k = String(d).toLowerCase(); if (!ids.has(k)) ids.set(k, 0x01000000 + ids.size); return ids.get(k); };
 const said = [], audits = []; let tick = null; const P = 0xff000200; let place = '3c:Skyrim.esm', pos = [141000, 34000, -13990]; const moves = [];
 const admins = new Set();
+const LEAD = 0xff000777;
+const leads = new Set([LEAD]);
 require(path.join(SERVER, 'playtest.js'))({
   mp: { get: (a, k) => (k === 'worldOrCellDesc' ? place : k === 'locationalData' ? { cellOrWorldDesc: place, pos, rot: [0, 0, 0] } : k === 'pos' ? pos : undefined),
     set: (a, k, v) => { if (k === 'locationalData') moves.push(v); }, getIdFromDesc: idOf },
   log: () => {}, personal: (a, t) => said.push(t), system: (a, t) => said.push(t), registerChatCommand: () => {}, display: String, who: String,
-  audit: (t) => audits.push(t), onlineActors: () => [P], isAdmin: (a) => admins.has(a), sendPacket: () => {}, cfg, hubDesc: '17482:DragonBreak Hub.esp',
+  audit: (t) => audits.push(t), onlineActors: () => [P], isAdmin: (a) => admins.has(a) || leads.has(a), isLeadStaff: (a) => leads.has(a), sendPacket: () => {}, cfg, hubDesc: '17482:DragonBreak Hub.esp',
   connectedAt: new Map([[P, 0]]), every: (n, ms, fn) => { tick = fn; },
 });
 // a different player each time: the lock says its line once per 1.5 s per player (it still refuses in between)
@@ -37,6 +39,11 @@ for (const [d, what] of ROUTES) ok(refused(d), `${what} (${d}) is refused with t
 ok(['1a4d:Gray Fox Cowl.esm', '30d90:Druadach.esm', '374e:Druadach.esm', '9a87dc:King of the Murkmire.esp'].every(refused), 'the other closed lands\' doors too (Hammerfell, Druadach, Murkmire)');
 ok(globalThis.__dboPlaytestActivate(idOf('877c2:BSHeartland.esm'), P) === null && globalThis.__dboPlaytestActivate(idOf('656df:BSHeartland.esm'), P) === null, 'the Pale Pass road between Skyrim and Bruma is open');
 ok(globalThis.__dboPlaytestActivate(idOf('1691d:Skyrim.esm'), P) === null, 'an ordinary ref is not ours to refuse');
+// Lead GMs and above cross the closed borders (Nate, 16 Oct), told once and audited; plain staff and players are still refused
+said.length = 0; audits.length = 0;
+ok(globalThis.__dboPlaytestActivate(idOf('16fe0:Dragonborn.esm'), LEAD) === null && /open to you/.test(said.join(' ')) && audits.some((t) => /lead staff\) crossed a closed border door/.test(t)), 'a Lead GM goes through the Solstheim hatch', [said, audits]);
+ok(globalThis.__dboPlaytestActivate(idOf('1a4d:Gray Fox Cowl.esm'), LEAD) === null, '...and any closed land\'s door');
+ok(refused('16fe0:Dragonborn.esm'), 'a player is still refused at the same hatch');
 // carried there anyway (dialogue travel runs in the game): put back where they last stood in Skyrim, told why
 tick(); place = '800:Dragonborn.esm'; pos = [30883, 35049, 466]; said.length = 0; tick();
 ok(moves.length === 1 && moves[0].cellOrWorldDesc === '3c:Skyrim.esm' && moves[0].pos[0] === 141000, 'a player found in Solstheim is put back at the Windhelm docks where they stood', moves);
