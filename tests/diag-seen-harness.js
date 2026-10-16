@@ -103,6 +103,17 @@ check('trace lines before an actor count under the connection, and a reconnect r
   count(() => writeDiagLines(11, lines(450, 'apr c'))) === 200 && count(() => { writeDiagLines(11, lines(200, 'apr c')); writeDiagLines(11, lines(200, 'apr c')); }) === 200
   && count(() => writeDiagLines(11, lines(5, 'apr c'))) === 0 && (resetDiagForConnection(11), count(() => writeDiagLines(11, lines(5, 'apr c')))) === 5);
 
+// The emote wheel's steps (client emoteDiag.ts) have their own allowance: Elaava's 60 were spent by 07:41 on 16 Oct, and her
+// "emotes dont open" report from Dragonsreach at 10:47 had no emote line to read
+actors.set(12, 0xff000301);
+check('a player whose shared 60 lines are spent', count(() => writeDiagLines(12, lines(60, 'open'))) === 60 && count(() => writeDiagLines(12, ['fov x'])) === 0);
+check('...still gets the emote wheel lines, written as before', count(() => writeDiagLines(12, ['emote wheel open', 'emote key refused: menus InventoryMenu (closed)'])) === 2
+  && logged[logged.length - 1] === '[dboDiag] profile 30 Purr #7DJT emote key refused: menus InventoryMenu (closed)');
+check('emote lines stop at 200 a player', DIAG_KIND_MAX.emote === 200 && count(() => { for (let i = 0; i < 3; i++) writeDiagLines(12, lines(100, 'emote s')); }) === 198);
+check('a word that only starts like it is a shared line ("emoted")', count(() => writeDiagLines(12, ['emoted 1'])) === 0);
+actors.set(13, 0xff000302);
+check('emote lines leave the shared allowance alone', count(() => writeDiagLines(13, lines(50, 'emote t'))) === 50 && count(() => writeDiagLines(13, lines(70, 'page'))) === 60);
+
 const connectLine = src.split('\n').find((l) => l.startsWith('globalThis.__dboHandlers.connect = '));
 check('the connect handler resets the connection\'s allowance', !!connectLine && connectLine.includes('resetDiagForConnection(userId)'));
 
