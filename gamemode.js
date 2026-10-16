@@ -5176,6 +5176,63 @@ const trophyFor = (actorId) => {
   const items = t.items.map((i) => { let baseId = 0; try { baseId = mp.getIdFromDesc(i.desc) >>> 0; } catch (e) { /* not loaded */ } return { baseId, count: i.count }; }).filter((i) => i.baseId);
   return items.length ? items : null;
 };
+// Every wild creature gives the skinner something (Nate, 16 Oct, the night Skyrim opened: "all wild life needs to b able to
+// be skinned for pelts etc."). A creature whose death item holds no pelt had nothing to skin at all: mudcrabs, skeevers,
+// spiders, trolls, chaurus, horkers, mammoths, slaughterfish, hares, chickens, ice wraiths, wisps, netch, rats and dogs
+// (tests/fixtures/wildlife-skin-census.json, from tools/skinning/skin_census.py). Such a creature now gives the part its
+// own death item carries, which is what the base game drops for it, so the part is canon: its chitin, tail, scales, tusk,
+// fat, teeth, venom, wrappings or leather, and failing those its meat. The part moves from the body into the skinning
+// stash, as a pelt does, so it is not handed out twice. creature is a pattern on the dead body's own editor id (first
+// match wins); take lists patterns on the death item's editor ids in order of preference (the first that matches an item
+// the body holds wins); give hands over items the body does not carry (a wisp's glow dust, which the base game's wisp
+// mother drops). A creature with no rule takes its first animal part (__dboAnimalBody's isAnimalPart), the non-food ones
+// first. People and machines are never skinned (SKIN_NOT_ANIMAL): goblins, rieklings and Falmer are people, Dwemer
+// automatons are machines, and giants and ogres keep their own trophies. gamemode-config.json "skinParts" replaces the list.
+const SKIN_PARTS_DEFAULT = [
+  { creature: 'Mudcrab', take: ['MudcrabChitin$'] },
+  { creature: 'Chaurus', take: ['^ChaurusChitin$'] },
+  { creature: 'Spider', take: ['Venom$', 'SpiderEgg'] },
+  { creature: 'Troll', take: ['TrollFat$'] },
+  { creature: 'Skeever', take: ['SkeeverTail$'] },
+  { creature: 'Slaughterfish', take: ['SlaughterfishScales$'] },
+  { creature: 'Horker', take: ['HorkerTusk$'] },
+  { creature: 'Mammoth', take: ['^MammothTusk$'] },
+  { creature: 'IceWraith', take: ['IceWraithTeeth$'] },
+  { creature: 'WispMother', take: ['WispWrappings$'] },
+  { creature: 'Wisp', take: ['WispWrappings$', 'glowDust$'], give: [{ desc: '3ad73:Skyrim.esm', count: 1 }] }, // glowDust
+  { creature: 'Netch', take: ['NetchLeather$', 'NetchJelly$'] },
+  { creature: 'Lurker', take: ['NetchLeather$'] },
+  { creature: 'Hare|Rabbit', take: ['^FoodRabbit$'] },
+  { creature: 'Chicken', take: ['^FoodChicken$'] },
+  { creature: 'Rat$', take: ['RatMeat$'] },
+];
+const SKIN_NOT_ANIMAL = /Goblin|Riekling|Falmer|Dwarven|Dwemer|Centurion|Sphere|Ballista|Burrower|Sentry|EncGiant|LvlGiant|GiantBoss|StoneGiant|HerderGiant|Ogre|Spriggan|Hagraven|Atronach|Draugr|Skeleton|Bandit|Forsworn|Vampire|Necromancer|Warlock/i;
+const SKIN_PARTS = (Array.isArray(cfg.skinParts) ? cfg.skinParts : SKIN_PARTS_DEFAULT).map((rule) => {
+  const rx = (x) => { try { return new RegExp(String(x)); } catch (e) { log(`skinParts: bad pattern ${x}`); return null; } };
+  const creature = rule && rx(rule.creature);
+  if (!creature) return null;
+  return { creature, take: (Array.isArray(rule.take) ? rule.take : []).map(rx).filter(Boolean), give: Array.isArray(rule.give) ? rule.give : [] };
+}).filter(Boolean);
+// The parts a pelt-less creature gives the skinner, from what its body holds: [{ baseId, count }], [] for none
+const skinPartsFor = (creatureEdid, entries) => {
+  const edid = String(creatureEdid || '');
+  if (!edid || SKIN_NOT_ANIMAL.test(edid)) return [];
+  const held = (entries || []).filter((e) => (Number(e.baseId) >>> 0) && Number(e.count) > 0)
+    .map((e) => ({ baseId: Number(e.baseId) >>> 0, count: Number(e.count) || 1, r: recordOf(Number(e.baseId) >>> 0) }));
+  const edidOf = (h) => String((h.r && h.r.record.editorId) || '');
+  const rule = SKIN_PARTS.find((x) => x.creature.test(edid));
+  if (rule) {
+    for (const want of rule.take) {
+      const hit = held.filter((h) => want.test(edidOf(h)));
+      if (hit.length) return hit.map((h) => ({ baseId: h.baseId, count: h.count }));
+    }
+    const given = rule.give.map((i) => { let baseId = 0; try { baseId = mp.getIdFromDesc(String(i.desc)) >>> 0; } catch (e) { /* not loaded */ } return { baseId, count: Number(i.count) || 1 }; }).filter((i) => i.baseId);
+    if (given.length) return given;
+  }
+  const parts = held.filter((h) => isAnimalPart(h.r));
+  const pick = parts.find((h) => !/Food|Meat/.test(edidOf(h))) || parts[0];
+  return pick ? [{ baseId: pick.baseId, count: pick.count }] : [];
+};
 // A spawned body whose pelts are not stashed yet: the stash runs 50 ms after death (the death item lands a tick late),
 // and a modified client that opened the body on the death event took the pelt past the Skinner's tier (loot review,
 // 2026-09-29). __dboSkin refuses the body until the stash has run, for 2 s at most.
@@ -5205,8 +5262,13 @@ const stashPelts = (actorId) => {
   if (trophy) { try { mp.set(actorId, 'private.dboPelts', trophy); } catch (e) { log('trophy stash failed', e.message); } return; }
   let entries = []; try { const inv = mp.get(actorId, 'inventory'); entries = inv && Array.isArray(inv.entries) ? inv.entries : []; } catch (e) { return; }
   const pelts = entries.filter((e) => { const r = recordOf(Number(e.baseId) >>> 0); return r && String(r.record.type) === 'MISC' && PELT.test(String(r.record.editorId || '')); }).map((e) => ({ baseId: Number(e.baseId) >>> 0, count: Number(e.count) || 1 }));
+  // No pelt: the creature's own part instead (skinPartsFor), so every wild animal can be skinned
+  if (!pelts.length) {
+    let creature = ''; try { const r = recordOf(mp.getIdFromDesc(String(mp.get(actorId, 'baseDesc')))); creature = r ? String(r.record.editorId || '') : ''; } catch (e) { creature = ''; }
+    for (const p of skinPartsFor(creature, entries)) pelts.push(p);
+  }
   if (!pelts.length && !tag.startsWith('wild:')) return;
-  // Only the pelts move to the skinning stash; gold and gems from the death item stay lootable
+  // Only the pelts (or the part) move to the skinning stash; gold and gems from the death item stay lootable
   try { mp.set(actorId, 'private.dboPelts', pelts); if (pelts.length) mp.set(actorId, 'inventory', { entries: entries.filter((e) => !pelts.some((p) => p.baseId === (Number(e.baseId) >>> 0))) }); } catch (e) { log('pelt stash failed', e.message); }
 };
 // ---- skinning: a Skinner takes the pelt through a mini-game (front widget "skinning") ------------
@@ -5280,7 +5342,10 @@ const peltValue = (baseId) => {
   if (peltValueCache.has(baseId)) return peltValueCache.get(baseId);
   let v = 0;
   const rec = recordOf(baseId);
-  const data = rec && (rec.record.fields || []).find((f) => f.type === 'DATA' && f.data instanceof Uint8Array && f.data.byteLength >= 4);
+  // A potion's (meat's, venom's) DATA is its weight alone; its value is ENIT offset 0 (FoodChicken 3, FrostbiteVenom 21).
+  // Read as a value, a chicken breast's weight said 1045220557 gold and asked for a Master Skinner.
+  const field = rec && String(rec.record.type) === 'ALCH' ? 'ENIT' : 'DATA';
+  const data = rec && (rec.record.fields || []).find((f) => f.type === field && f.data instanceof Uint8Array && f.data.byteLength >= 4);
   if (data) { try { v = new DataView(data.data.buffer, data.data.byteOffset, data.data.byteLength).getUint32(0, true); } catch (e) { v = 0; } }
   peltValueCache.set(baseId, v);
   return v;
