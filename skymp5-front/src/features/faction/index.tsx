@@ -1,13 +1,20 @@
 import React, { useEffect, useState } from 'react';
 
 import './styles.scss';
-import { EconomyData, RealmData, RealmTab, TreasuryTab, WarTab } from './realm';
+import { EconomyData, RealmData, RealmMapDef, RealmTab, TreasuryTab, WarTab } from './realm';
 // County Bruma's shaded relief from the game's own landscape (server tools/realm-map/render.py, --name bruma): 41 x 41 cells
 // at 256 game units a pixel, pixelX = x / 256 + 96 and pixelY = 1120 - y / 256, so these are its edges in game units
 import realmBruma from '../../img/realm-bruma.png';
 import { Picker } from '../../components/Picker/Picker';
 import { FactionStaffView, RankEditor } from './staff';
-const BRUMA_MAP = { src: realmBruma, bounds: [-16384, 122880, 143360, 266240] as [number, number, number, number] };
+// Skyrim's (render.py --world 3c:Skyrim.esm --name skyrim): cells -57,-43 to 61,50 at 512 game units a pixel, 952 x 752
+import realmSkyrim from '../../img/realm-skyrim.png';
+// One map per worldspace (a territory's mapWorld, server realm.js): Bruma's and Skyrim's coordinates overlap, so each map
+// draws only its own world's places
+const REALM_MAPS: RealmMapDef[] = [
+  { world: 'a764b:BSHeartland.esm', name: 'Cyrodiil', src: realmBruma, bounds: [-16384, 122880, 143360, 266240] },
+  { world: '3c:Skyrim.esm', name: 'Skyrim', src: realmSkyrim, bounds: [-233472, -176128, 253952, 208896] },
+];
 
 // Faction menu (server guilds.js, F3); actions go back as dbo:faction* events with the menu nonce
 export interface FactionMember {
@@ -127,7 +134,7 @@ export const FactionContent = ({ data, embedded, readOnly }: { data: FactionData
           )}
         </div>
 
-        {tab === 'realm' && <div className="faction__body faction__body--wide"><RealmTab realm={data.realm || null} background={BRUMA_MAP} act={act} busy={busy} /></div>}
+        {tab === 'realm' && <div className="faction__body faction__body--wide"><RealmTab realm={data.realm || null} maps={REALM_MAPS} act={act} busy={busy} /></div>}
         {tab === 'war' && <div className="faction__body faction__body--wide"><WarTab realm={data.realm || null} act={act} busy={busy} /></div>}
         {tab === 'treasury' && <div className="faction__body faction__body--wide"><TreasuryTab economy={data.economy || null} act={act} busy={busy} /></div>}
 

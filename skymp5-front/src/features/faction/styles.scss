@@ -265,7 +265,20 @@
 .faction__input--small { width: 120px; flex: none; }
 
 .realm { display: flex; gap: 14px; align-items: flex-start; }
-.realm__side { flex: 1; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+// The place list scrolls beside the map, so a long realm never makes the tab taller than its map
+.realm__side { flex: 1; display: flex; flex-direction: column; gap: 10px; min-width: 0; align-self: stretch; contain: size; overflow-y: auto; padding-right: 4px; }
+// A capital's choice list opens in the list's flow, so the scroll never cuts it
+.realm__side .dbo-picker--open { display: block; }
+.realm__side .dbo-picker--open .dbo-picker__list { position: static; margin-top: 4px; max-height: none; }
+.realm__mapcol { display: flex; flex-direction: column; gap: 6px; flex: none; }
+.realm__maps { display: flex; gap: 6px; }
+.realm__mapbtn {
+  @include dbo-button;
+  padding: 3px 12px;
+  font-size: 13px;
+  opacity: 0.7;
+  &--on { opacity: 1; }
+}
 .realm__legend { display: flex; flex-wrap: wrap; gap: 8px; font-size: 13px; }
 .realm__legend-item { display: inline-flex; align-items: center; gap: 5px; }
 .realm__swatch { width: 12px; height: 12px; border-radius: 2px; border: 1px solid rgba(255, 255, 255, 0.4); }
