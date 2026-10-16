@@ -18,6 +18,7 @@ export interface VaultData {
   weekly?: number;
   paidUntil?: number;
   owed?: number;
+  seizeAt?: number;
   items?: VaultItem[];
   carry?: VaultCarry[];
   elsewhere: VaultElsewhere[];
@@ -42,7 +43,7 @@ const Vault = ({ vault, busy, act }: { vault: VaultData; busy: boolean; act: (ev
   if (!vault.rented) {
     return (
       <div className="bank__section">
-        <p className="bank__note">Rent a vault in {vault.zoneName} for your goods. It opens only at a bank of this hold. The fee is taken each week from your account, or from the gold you carry, and goes to the hold&apos;s treasury.</p>
+        <p className="bank__note">Rent a vault in {vault.zoneName} for your goods. It opens only at a bank of this hold. The fee is taken each week from your account, or from the gold you carry, and goes to the hold&apos;s treasury. Goods left unpaid for a month are sold to the hold.</p>
         {vault.tiers.map((t) => (
           <div key={t.id} className="bank__row bank__vault-row">
             <span className="bank__vault-name">{t.name}</span>
@@ -64,7 +65,7 @@ const Vault = ({ vault, busy, act }: { vault: VaultData; busy: boolean; act: (ev
       <div className="bank__vault-bar"><span style={{ width: `${cap > 0 ? Math.min(100, (used / cap) * 100) : 0}%` }} /></div>
       {owed > 0 && (
         <div className="bank__row">
-          <span className="bank__result bank__result--refused">{owed} gold owed. Nothing comes out until it is paid.</span>
+          <span className="bank__result bank__result--refused">{owed} gold owed. Nothing comes out until it is paid{vault.seizeAt ? `, and on ${dayText(Number(vault.seizeAt))} the goods are sold to the hold` : ''}.</span>
           <button className="bank__button" disabled={busy} onClick={() => act('dbo:bankVaultPay')}>Pay</button>
         </div>
       )}
