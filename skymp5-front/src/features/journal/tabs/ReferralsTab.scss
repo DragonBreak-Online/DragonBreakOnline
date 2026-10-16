@@ -1,0 +1,41 @@
+// The journal's Referrals tab: the link, the friends, the boost queue and the code box, in one column
+@import '../../../dbo-theme.scss';
+
+.jref {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 760px;
+  height: 100%;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 12px;
+
+  &__link, &__enter { display: flex; gap: 12px; align-items: center; }
+  &__input {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 6px 10px;
+    border: 1px solid dbo-accent(0.35);
+    background: rgba(0, 0, 0, 0.35);
+    color: $dbo-silver;
+    font-size: 15px;
+  }
+  &__input--code { flex: 0 0 160px; letter-spacing: 0.2em; text-transform: uppercase; }
+  &__code { color: $dbo-text-dim; font-size: 13px; white-space: nowrap; }
+  &__list { margin: 0; padding: 0; list-style: none; }
+  &__friend, &__boost {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 5px 4px;
+    border-bottom: 1px solid dbo-accent(0.12);
+    font-size: 15px;
+    color: $dbo-text;
+  }
+  &__friend--counted { color: $dbo-gold; }
+  &__friend--ineligible, &__friend--revoked { color: $dbo-text-dim; }
+  &__boost--running { color: $dbo-silver; }
+  &__left { color: $dbo-text-dim; font-size: 13px; }
+  &__carry { margin: 4px 0 0; color: $dbo-gold; }
+}

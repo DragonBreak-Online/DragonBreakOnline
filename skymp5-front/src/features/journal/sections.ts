@@ -12,3 +12,4 @@ import '../court';
 import '../nobility';
 import './tabs/KeysTab';
 import './tabs/CitizenTab';
+import './tabs/ReferralsTab';
