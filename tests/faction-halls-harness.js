@@ -49,9 +49,10 @@ api.cfg.playtest = { enabled: true };
 ok(/Bruma Fighters Guild/.test(faction(LEADER, 'hall fighters-guild')), 'the Fighters Guild sits in the Bruma Fighters Guild');
 ok(/Bruma Synod Conclave/.test(faction(LEADER, 'hall synod')), 'the Synod sits in the Bruma Synod Conclave');
 ok(/Bruma Castle/.test(faction(LEADER, 'hall county-bruma')), 'the County sits in Bruma Castle');
+// The Thalmor have their own embassy in Bruma (Nate, 16 Oct), no longer a share of Bruma Castle
 const thalmor = faction(LEADER, 'hall thalmor');
-ok(/Bruma Castle/.test(thalmor) && /shared/.test(thalmor), 'the Thalmor share Bruma Castle with the Legion', thalmor);
-ok(/alongside the Imperial Legion/.test(thalmor), '...and the reason is carried with it');
+ok(/the Thalmor Embassy, Bruma/.test(thalmor) && !/shared/.test(thalmor), 'the Thalmor sit in their own embassy in Bruma', thalmor);
+ok(/Fort Caractus/.test(thalmor) && !/Bruma Castle|Imperial Legion/.test(thalmor), '...and the note says where it stands', thalmor);
 ok(/Frostcrag Spire/.test(faction(LEADER, 'hall college-of-whispers')), 'the College of Whispers holds Frostcrag Spire');
 const dawn = faction(LEADER, 'hall cult-mehrunes-dagon');
 ok(/Mythic Dawn Museum/.test(dawn), 'the Mythic Dawn keep the museum in Dawnstar', dawn);
@@ -74,7 +75,9 @@ api.cfg.playtest = { enabled: false };
 ok(!/not reachable yet/.test(faction(LEADER, 'hall cult-mehrunes-dagon')) && !/not reachable yet/.test(faction(LEADER, 'hall blades')), 'with the region lock off no seat says it cannot be reached');
 delete api.cfg.playtest;
 // Every faction with a seat now has one, so the no-seat path is checked against a faction that has none.
-ok(/no seat at all/.test(faction(LEADER, 'hall hold-whiterun')), 'a faction with no seat still says so');
+// (the holds have their Jarls' seats since 16 Oct; the Daedric cults but Nocturnal's are still without one)
+ok(/no seat at all/.test(faction(LEADER, 'hall cult-azura')), 'a faction with no seat still says so');
+ok(/Dragonsreach/.test(faction(LEADER, 'hall hold-whiterun')), 'Whiterun Hold sits in Dragonsreach');
 ok(/No such faction/.test(faction(LEADER, 'hall not-a-faction')), 'an unknown faction is refused');
 
 // ---- storage: only a leader records it, and only a property of their own ----
