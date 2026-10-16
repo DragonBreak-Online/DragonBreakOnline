@@ -293,10 +293,16 @@ ok('the reckoning pays the Thalmor 300 gold from the Dominion', treasuries.thalm
 ok('it is in the saved faction report', JSON.parse(fs.readFileSync('economy.json', 'utf8')).reports.thalmor.stipend === 300);
 ok('the First Emissary is told in the reckoning line', /300 gold stipend from the Aldmeri Dominion/.test(lastSaid(ALT)), lastSaid(ALT));
 ok('the stipend is audited as new gold', audits.some((x) => /^ECONOMY Thalmor: stipend of 300 gold from the Aldmeri Dominion \(new gold\)/.test(x)));
+// The Empire pays its Legion the same way (Nate, 16 Oct: the Legion had no income beside Bruma's tithe)
+ok('the reckoning pays the Imperial Legion 300 gold from the Imperial City', treasuries['imperial-legion'] === 300 && rep1['imperial-legion'] && rep1['imperial-legion'].stipend === 300 && rep1['imperial-legion'].stipendFrom === 'the Imperial City', rep1['imperial-legion']);
+ok('...audited as new gold, and the Thalmor are still paid their own', audits.some((x) => /stipend of 300 gold from the Imperial City \(new gold\)/.test(x)) && treasuries.thalmor === 300);
 {
   const off = JSON.parse(JSON.stringify(CFG)); off.economy.dominionStipend = 0;
   E = loadEcon(off); E.reckon();
   ok('dominionStipend 0 pays nothing', treasuries.thalmor === 300);
+  const off2 = JSON.parse(JSON.stringify(CFG)); off2.economy.imperialStipend = 0; const before = treasuries['imperial-legion'];
+  E = loadEcon(off2); E.reckon();
+  ok('imperialStipend 0 pays the Legion nothing', treasuries['imperial-legion'] === before);
 }
 
 // ---- patch notes -----------------------------------------------------------------------------------------------------

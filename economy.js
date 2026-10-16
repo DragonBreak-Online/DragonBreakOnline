@@ -64,6 +64,7 @@ module.exports = (api) => {
     wageShare: 0.25, wageIncomeShare: 0.75, wageSavingsShare: 0.25, assessEveryDays: 7, assessMaxStep: 2,
     titheRate: 0.10, titheTo: 'imperial-legion', titheProvinces: ['cyrodiil'],
     dominionStipend: 300, dominionStipendTo: 'thalmor', dominionStipendFrom: 'the Aldmeri Dominion',
+    imperialStipend: 0, imperialStipendTo: 'imperial-legion', imperialStipendFrom: 'the Imperial City',
     // A hold's offices are paid these each week until its ruler or Steward sets another (Nate, 12 Oct); rulers are never paid
     defaultWages: { guard: 50, strongholdguard: 50, captain: 100, guardcaptain: 100, commander: 100, strongholdcommander: 100,
       courtmage: 100, shaman: 100, wisewoman: 100, steward: 150, bane: 150 } }, cfg.economy || {});
@@ -209,19 +210,23 @@ module.exports = (api) => {
     }
   };
 
-  // ---- the Dominion's stipend (Nate, 11 Oct) ------------------------------------------------------------------------------
-  // New gold into one faction's treasury each reckoning; a treasury that refuses it is logged and nothing is paid
-  const stipendGold = () => { const n = Math.floor(Number(C.dominionStipend)); return Number.isFinite(n) ? Math.min(100000, Math.max(0, n)) : 0; };
+  // ---- stipends: the Dominion's (Nate, 11 Oct) and the Empire's to its Legion (Nate, 16 Oct) ----------------------------
+  // New gold into a faction's treasury each reckoning; a treasury that refuses it is logged and nothing is paid
+  const goldOf = (v) => { const n = Math.floor(Number(v)); return Number.isFinite(n) ? Math.min(100000, Math.max(0, n)) : 0; };
+  const STIPENDS = () => [
+    { gold: goldOf(C.dominionStipend), to: String(C.dominionStipendTo || ''), from: String(C.dominionStipendFrom || 'the Aldmeri Dominion') },
+    { gold: goldOf(C.imperialStipend), to: String(C.imperialStipendTo || ''), from: String(C.imperialStipendFrom || 'the Imperial City') },
+  ];
   const payStipend = (T, report) => {
-    const n = stipendGold(); const to = String(C.dominionStipendTo || '');
-    if (!n || !to) return;
-    try {
-      if (!info(to) || !T.keyOf || !T.keyOf(to)) { log(`economy: no treasury for ${to}, no Dominion stipend paid`); return; }
-      const from = String(C.dominionStipendFrom || 'the Aldmeri Dominion');
-      if (!T.deposit(to, n, `stipend from ${from}`)) { log(`economy: ${nameOfFaction(to)}'s treasury refused the stipend of ${n} gold`); return; }
-      const r = report(to); r.stipend = (r.stipend || 0) + n; r.stipendFrom = from;
-      audit(`ECONOMY ${nameOfFaction(to)}: stipend of ${n} gold from ${from} (new gold)`);
-    } catch (e) { log('economy: the Dominion stipend failed, skipped this week', e.message); }
+    for (const s of STIPENDS()) {
+      if (!s.gold || !s.to) continue;
+      try {
+        if (!info(s.to) || !T.keyOf || !T.keyOf(s.to)) { log(`economy: no treasury for ${s.to}, no stipend from ${s.from} paid`); continue; }
+        if (!T.deposit(s.to, s.gold, `stipend from ${s.from}`)) { log(`economy: ${nameOfFaction(s.to)}'s treasury refused the stipend of ${s.gold} gold`); continue; }
+        const r = report(s.to); r.stipend = (r.stipend || 0) + s.gold; r.stipendFrom = s.from;
+        audit(`ECONOMY ${nameOfFaction(s.to)}: stipend of ${s.gold} gold from ${s.from} (new gold)`);
+      } catch (e) { log(`economy: the stipend from ${s.from} failed, skipped this week`, e.message); }
+    }
   };
 
   // ---- wages -----------------------------------------------------------------------------------------------------------
