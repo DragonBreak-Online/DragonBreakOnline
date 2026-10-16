@@ -1,14 +1,30 @@
 [
   {
-    "title": "The Legion's stipend",
+    "title": "Taxes, treasuries and client 0.3.102",
     "date": "2026-10-16",
-    "version": "Hotfix",
+    "version": "Client 0.3.102",
     "tag": "Change",
     "sections": [
       {
-        "heading": "Changes",
+        "heading": "Taxes and treasuries",
         "items": [
-          "The Empire now pays the Imperial Legion a stipend of 300 gold into its treasury at each weekly reckoning, as the Aldmeri Dominion pays its Thalmor. The first one comes with Sunday's reckoning."
+          "Every hold and county now taxes between 10% and 40%. A Jarl, Count or Steward can no longer set the tax to 0%, and a rate that was never set counts as 10%.",
+          "Treasury gold now comes only from taxes. The weekly stipends from the Aldmeri Dominion and the Empire have ended.",
+          "New characters start with no gold, only their clothes and their tools."
+        ]
+      },
+      {
+        "heading": "Client 0.3.102",
+        "items": [
+          "Fixed: after some logins you couldn't see people or use doors. The world now starts showing about a second into play.",
+          "Character select waits a moment until the game is ready before Play works.",
+          "The game no longer closes without a crash report when a script error happens.",
+          "The mouse pointer comes back when a message or fade closes over an open panel.",
+          "If your pack changes while a chest, barter or gift window is open, the window closes so you always see what you carry.",
+          "Spells and favourites restore reliably after login.",
+          "The map no longer shows places you've only seen as visited. Places you entered before this update show as seen until you visit them again.",
+          "Gear that ends up on a werewolf or Vampire Lord, like the arrows on its back, comes off again.",
+          "The faction panel's Realm map now has a Cyrodiil and Skyrim switch, with Skyrim's own map and its holds, towns, forts and strongholds."
         ]
       }
     ]
