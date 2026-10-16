@@ -304,6 +304,35 @@ async function partTwo(CharacterSelectService) {
     w.page_('characterSelect:select', 0);
     const drawn = w.page.widgets.find((x) => x.type === 'characterSelect');
     check('a re-drawn widget carries readiness and the shown event', !!drawn && drawn.readiness && drawn.readiness.gate === 1 && drawn.events && drawn.events.shown === 'characterSelect:shown' && drawn.strings.wait === 'Please wait', drawn && { readiness: drawn.readiness, events: drawn.events });
+
+    // A new front whose answer is lost: the page holds Play, and the cap still tells the page it may play
+    T = 0;
+    w = world(CharacterSelectService);
+    const runC = (until) => { while (T < until) { T += 16; w.tick(); } };
+    runC(5000);
+    w.menu([{ name: 'Lydia' }]);
+    const opened4 = T;
+    w.page_('characterSelect:select', 0);
+    runC(opened4 + 29900);
+    check('a lost answer: the page still holds Play at 29.9 s', w.widget().readiness.ready === false, w.widget().readiness);
+    runC(opened4 + 30100);
+    check('a lost answer: the cap tells the page it may play by 30.1 s', w.widget().readiness.ready === true, w.widget().readiness);
+    check('...with a warning line naming the front', /^ready by the cap after 300\d\d ms, still waiting for front/.test(w.readyNotes()[0] || ''), w.readyNotes());
+    w.page_('characterSelect:play');
+    check('...and Play goes out', w.results().length === 1);
+
+    // Play sent every frame from the moment the screen opens (a stuck key or pad): one result, no earlier than 1 s after the list
+    T = 0;
+    w = world(CharacterSelectService);
+    runC(5000);
+    w.menu([{ name: 'Lydia' }]);
+    const opened5 = T;
+    w.page_('characterSelect:select', 0);
+    w.page_('characterSelect:shown', 1);
+    let firstAt = null;
+    while (T < opened5 + 3000) { T += 16; w.tick(); w.page_('characterSelect:play'); if (firstAt === null && w.results().length) firstAt = T; }
+    check('Play spam: the first result goes out 1 s to 1.1 s after the list', firstAt !== null && firstAt - opened5 >= 1000 && firstAt - opened5 <= 1100, firstAt && firstAt - opened5);
+    check('Play spam: exactly one result for the login', w.results().length === 1, w.results().length);
   } finally {
     Date.now = realNow;
     delete globalThis.__dboDiagNote;
