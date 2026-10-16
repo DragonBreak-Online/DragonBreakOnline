@@ -211,6 +211,32 @@ async function run() {
           ok(m.realmH !== null && m.colH !== null && m.realmH <= m.colH + 1, `${L}: the place list scrolls beside the map (tab ${Math.round(m.realmH)}px, map column ${Math.round(m.colH)}px)`);
           ok(m.lastReach === true, `${L}: the side list's last row can be scrolled into view`);
           if (c.maps.length > 1) ok(m.mapBtns.filter((x) => x.on).map((x) => x.text).join() === mapName, `${L}: the ${mapName} button is the one lit`);
+          // A leader's capital choice list opens inside the place list, and its last choice can be scrolled to
+          if (c.data.realm.leads.length) {
+            const pick = await pg.evaluate(() => {
+              const btn = document.querySelector('.realm__side .realm__capital .dbo-picker__button');
+              if (!btn) return { found: false };
+              btn.scrollIntoView({ block: 'nearest' });
+              btn.click();
+              return { found: true };
+            });
+            await new Promise((r) => setTimeout(r, 40));
+            const seen = await pg.evaluate(() => {
+              const side = document.querySelector('.realm__side');
+              const opts = Array.from(document.querySelectorAll('.realm__side .dbo-picker--open .dbo-picker__option'));
+              const last = opts[opts.length - 1];
+              if (!side || !last) return { opts: opts.length, ok: false };
+              last.scrollIntoView({ block: 'nearest' });
+              const a = last.getBoundingClientRect(), b = side.getBoundingClientRect();
+              const res = { opts: opts.length, ok: a.top >= b.top - 1 && a.bottom <= b.bottom + 1 && a.bottom <= window.innerHeight };
+              document.body.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+              const btn = document.querySelector('.realm__side .dbo-picker--open .dbo-picker__button');
+              if (btn) btn.click();
+              document.querySelectorAll('.journal__body, .faction__body--wide, .realm__side').forEach((x) => { x.scrollTop = 0; });
+              return res;
+            });
+            ok(pick.found && seen.ok && seen.opts > 0, `${L}: the capital choice list opens in the place list with its last choice in reach (${seen.opts} choices)`);
+          }
           ok(m.markers.length === c.places[mapName], `${L}: the map draws ${m.markers.length} places (want ${c.places[mapName]})`);
           // The fit settles: no further resize a moment later
           await new Promise((r) => setTimeout(r, 250));
