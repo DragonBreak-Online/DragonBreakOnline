@@ -346,11 +346,13 @@ module.exports = (api) => {
   };
   const releaseTell = (rec) => {
     const tag = `staff release ${rec.id}${rec.why ? `: ${rec.why}` : ''}`;
-    const say = (t) => { try { audit(t); } catch (e) { log('citizenship: audit failed', e.message); } };
-    for (const x of rec.removed) say(`CITIZEN STAFF ${rec.by} released ${x.name || 'a character'} from the citizenship of ${holdName(x.zone)} (character ${x.actor}; ${tag})`);
-    for (const x of rec.requests) say(`CITIZEN STAFF ${rec.by} withdrew ${x.name || 'a character'}'s request for the citizenship of ${holdName(x.zone)} (character ${x.actor}; ${tag})`);
-    for (const x of rec.kept) say(`CITIZEN STAFF ${rec.by} could not release ${x.name || 'a character'} from the citizenship of ${holdName(x.zone)} (character ${x.actor}): it comes from a faction or court based there and lasts while that membership does (${tag})`);
-    if (!rec.removed.length && !rec.requests.length && !rec.kept.length) say(`CITIZEN STAFF ${rec.by}: ${tag} found no citizenship of profile ${rec.pid} to release`);
+    // Each audit( takes its template literally, so tests/playerlog-audit-harness.js reads and pins every site (playerlog-rules.js
+    // AUDIT_SITES); a variable there is a site nobody reviewed
+    const say = (f) => { try { f(); } catch (e) { log('citizenship: audit failed', e.message); } };
+    for (const x of rec.removed) say(() => audit(`CITIZEN STAFF ${rec.by} released ${x.name || 'a character'} from the citizenship of ${holdName(x.zone)} (character ${x.actor}; ${tag})`));
+    for (const x of rec.requests) say(() => audit(`CITIZEN STAFF ${rec.by} withdrew ${x.name || 'a character'}'s request for the citizenship of ${holdName(x.zone)} (character ${x.actor}; ${tag})`));
+    for (const x of rec.kept) say(() => audit(`CITIZEN STAFF ${rec.by} could not release ${x.name || 'a character'} from the citizenship of ${holdName(x.zone)} (character ${x.actor}): it comes from a faction or court based there and lasts while that membership does (${tag})`));
+    if (!rec.removed.length && !rec.requests.length && !rec.kept.length) say(() => audit(`CITIZEN STAFF ${rec.by}: ${tag} found no citizenship of profile ${rec.pid} to release`));
     const told = new Map();
     const slot = (k) => told.get(k) || told.set(k, { gone: [], asked: [], kept: [] }).get(k);
     for (const x of rec.removed) slot(x.actor).gone.push(holdName(x.zone));
