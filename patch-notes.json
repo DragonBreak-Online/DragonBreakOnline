@@ -1,5 +1,20 @@
 [
   {
+    "title": "The Pale's treasury",
+    "date": "2026-10-16",
+    "version": "Server update",
+    "tag": "Change",
+    "sections": [
+      {
+        "heading": "Treasuries",
+        "items": [
+          "The Pale now has a treasury at the Dawnstar bank. It starts with 10,000 gold, the same starting treasury every other hold received.",
+          "Taxes and fees paid in The Pale now go into that treasury, so the Jarl of the Pale has tax income like the other holds."
+        ]
+      }
+    ]
+  },
+  {
     "title": "More spells held or removed",
     "date": "2026-10-17",
     "version": "Hotfix",
