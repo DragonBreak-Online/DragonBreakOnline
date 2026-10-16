@@ -61,6 +61,7 @@ const mp = {
 let skipped = false;
 const load = (cfg) => {
   delete globalThis.__dboDoorSyncState;
+  delete globalThis.__dboDoorSyncMoved;
   delete require.cache[MOD];
   return require(MOD)({ mp, log: (...a) => logs.push(a.join(' ')), display: () => 'Lord Lewin Ashcroft #QD7X', cfg: cfg || {}, doors: doorsPos,
     skip: () => skipped, now: () => clock, setTimeout: (fn) => timers.push(fn) });
@@ -121,6 +122,33 @@ const real = mp.callPapyrusFunction; mp.callPapyrusFunction = () => { throw new 
 let threw = false; try { ds.heartbeat(LEWIN, outside); run(); } catch (e) { threw = true; }
 mp.callPapyrusFunction = real;
 check('a failing activation is logged', !threw && logs.some((l) => /activating 6c473:BSHeartland.esm for .* failed: boom/.test(l)), logs.slice(-1));
+
+// 7. Elaava #Z63J, 16 Oct 08:14: out through the Merry inn's door and straight back in, both heard, between two heartbeats;
+// the heartbeat that came with the second door was composed before it and still named the street
+const trace = gm.slice(gm.indexOf('TEMPORARY door trace'), gm.indexOf('TEMPORARY door trace') + 1200);
+check('the door trace hands every answered door activation to the door sync', /ds\.doorUsed\(casterId, targetId, allowed\)/.test(trace));
+const DOOR_IN = BSH | 0x6c4d9, DOOR_OUT = BSH | 0x6c473, PLAIN = BSH | 0x6c999;   // 6c999: a hall door with no XTEL in this stand-in
+reset(); ds = load();
+const used = (door, allowed) => (typeof ds.doorUsed === 'function' ? ds.doorUsed(LEWIN, door, allowed) : undefined);
+ds.heartbeat(LEWIN, inside); clock += 30_000;
+ds.heartbeat(LEWIN, inside); clock += 26_000;
+actor.worldOrCellDesc = 'a764b:BSHeartland.esm'; actor.pos = [53418, 203881, 8567]; used(DOOR_OUT, true);   // out, heard
+clock += 4_000;
+actor.worldOrCellDesc = '6c40f:BSHeartland.esm'; actor.pos = [-2600, 3260, 2369]; used(DOOR_IN, true);       // back in, heard
+ds.heartbeat(LEWIN, outside); run();
+check('out and back in between two heartbeats, the stale one names the street: nothing', activated().length === 0, activated());
+clock += 25_000; ds.heartbeat(LEWIN, outside); run();
+check('25 s after the last heard door the game still reports the street: the assist comes', JSON.stringify(activated()) === JSON.stringify([['6c473:BSHeartland.esm', 'ff000e2e', false]]), activated());
+
+// 8. A refused door, a door that is not a load door, or no door at all hold nothing back
+for (const [name, door, allowed] of [['a refused load door', DOOR_OUT, false], ['an allowed door with no teleport', PLAIN, true]]) {
+  reset(); ds = load(); ds.heartbeat(LEWIN, inside); clock += 60_000;
+  const held = used(door, allowed);
+  ds.heartbeat(LEWIN, outside); run();
+  check(`${name}: not counted as a move, the assist still comes`, held === false && activated().length === 1, { held, a: activated() });
+}
+reset(); ds = load();
+check('doorUsed ignores an empty caster', used(DOOR_OUT, true) === true && ds.doorUsed(0, DOOR_OUT, true) === false);
 
 console.log(`\n${failures ? failures + ' failure(s)' : 'all passed'}`);
 process.exit(failures ? 1 : 0);
