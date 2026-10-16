@@ -41,6 +41,19 @@ globalThis.__dboMapSync(B, { markers: ['a001:Skyrim.esm', '1234:BSHeartland.esm'
 ok(props.get(`${B}|private.mapMarkers`).length === 1, 'maxMarkers caps the list');
 load({ mapProgress: { enabled: false } });
 ok(globalThis.__dboMapSync(B, { markers: ['1234:BSHeartland.esm'], want: true }) === undefined && props.get(`${B}|private.mapMarkers`).length === 1, 'enabled false: nothing kept or sent');
+// Discovered is not visited (Purr #7DJT, 16 Oct: "every cave is shown as entered on the map"): the visited ones are kept
+// apart, and come back apart, so the client can restore a marker it only saw with addToMap(false)
+const C2 = 0xff000103;
+load();
+sent.length = 0;
+ok(globalThis.__dboMapSync(C2, { markers: ['a001:Skyrim.esm'], visited: ['1234:BSHeartland.esm', 'a002:Skyrim.esm'] }) === 2, 'a visited marker is a discovered one too (and a non-marker is refused there as well)');
+ok(JSON.stringify(props.get(`${C2}|private.mapVisited`)) === '["1234:BSHeartland.esm"]', '...and only the visited one is kept as visited', props.get(`${C2}|private.mapVisited`));
+globalThis.__dboMapSync(C2, { markers: [], want: true });
+const ans = sent.length && sent[sent.length - 1][1];
+ok(ans && ans.markers.length === 2 && Array.isArray(ans.visited) && ans.visited.length === 1 && ans.visited[0] === '1234:BSHeartland.esm', 'want: the visited list goes back beside the markers', ans);
+sent.length = 0;
+globalThis.__dboMapSync(A, { markers: [], want: true });
+ok(sent.length === 1 && Array.isArray(sent[0][1].visited) && sent[0][1].visited.length === 0, 'a character with no visited list (an old client) is answered with an empty one', sent);
 const gm = fs.readFileSync(path.join(SERVER, 'gamemode.js'), 'utf8');
 ok(/content\.customPacketType === 'dboMapSync'[\s\S]{0,200}globalThis\.__dboMapSync\(a, content\)/.test(gm) && /require\(MAPPROGRESS_JS\)\(\{ mp, log, sendPacket, cfg \}\)/.test(gm), 'gamemode.js loads it and routes dboMapSync');
 console.log(fails ? `${fails} failed` : 'all passed');

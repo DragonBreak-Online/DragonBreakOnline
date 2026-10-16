@@ -13,17 +13,27 @@
 // when the server can read the reference, a REFR placed from the MapMarker STAT (Skyrim.esm 0x10); a reference the server
 // cannot read (a light plugin's) is kept on its form. At most maxMarkers a character, at most perPacket a packet.
 // State on the character: private.mapMarkers [desc...]. Config "mapProgress": { enabled, maxMarkers, perPacket }.
+//
+// Discovered is not visited (Purr #7DJT, 16 Oct: "every cave is shown as entered on the map"). The client kept one list,
+// every marker its map showed (isMapMarkerVisible), and put each back with addToMap(true), which also marks it as a place
+// the character has been (abAllowFastTravel, the map's entered look). So every cave seen from the road came back entered
+// at the next login. A client that knows the difference (canFastTravelToMarker) reports the visited ones in visited: [...]
+// (they are markers too), kept in private.mapVisited, and the answer carries visited back, so it restores a marker seen
+// but never entered with addToMap(false). A client that sends no visited list is answered as before, plus the empty list.
 'use strict';
 
 module.exports = (api) => {
   const { mp, log, sendPacket, cfg } = api;
   const C = Object.assign({ enabled: true, maxMarkers: 3000, perPacket: 500 }, (cfg && cfg.mapProgress) || {});
   const PROP = 'private.mapMarkers';
+  const VISITED = 'private.mapVisited';
   const MAP_MARKER_STAT = 0x10;
   const DESC = /^[0-9a-f]{1,6}:[^:/\\]{1,120}\.(esm|esp|esl)$/i;
   const checked = globalThis.__dboMapMarkerChecked instanceof Map ? globalThis.__dboMapMarkerChecked : (globalThis.__dboMapMarkerChecked = new Map());
 
-  const listOf = (a) => { try { const v = mp.get(a >>> 0, PROP); return Array.isArray(v) ? v.filter((x) => typeof x === 'string') : []; } catch (e) { return []; } };
+  const listIn = (prop) => (a) => { try { const v = mp.get(a >>> 0, prop); return Array.isArray(v) ? v.filter((x) => typeof x === 'string') : []; } catch (e) { return []; } };
+  const listOf = listIn(PROP);
+  const visitedOf = listIn(VISITED);
   const u32 = (f) => (f && f.data && f.data.byteLength >= 4 ? new DataView(f.data.buffer, f.data.byteOffset, f.data.byteLength).getUint32(0, true) : 0);
   // true: keep, false: refuse
   const markerOk = (desc) => {
@@ -46,9 +56,9 @@ module.exports = (api) => {
     return ok;
   };
 
-  // Adds what is new; the number added
-  const add = (a, markers) => {
-    const have = listOf(a);
+  // Adds what is new to the list in prop (the markers, or the visited ones); the number added
+  const add = (a, markers, prop = PROP) => {
+    const have = prop === PROP ? listOf(a) : visitedOf(a);
     const seen = new Set(have.map((d) => d.toLowerCase()));
     const max = Math.max(0, Number(C.maxMarkers) || 3000);
     let added = 0;
@@ -59,20 +69,24 @@ module.exports = (api) => {
       if (!d || seen.has(d.toLowerCase()) || !markerOk(d)) continue;
       seen.add(d.toLowerCase()); have.push(d); added++; fresh.push(d);
     }
-    if (added) { try { mp.set(a >>> 0, PROP, have); } catch (e) { log('mapprogress: save failed', e.message); return 0; } }
+    if (added) { try { mp.set(a >>> 0, prop, have); } catch (e) { log('mapprogress: save failed', e.message); return 0; } }
     // the player log (playerlog.js): the places discovered (the markers, checked above)
-    if (added) { try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('map', a >>> 0, fresh); } catch (e) { /* the player log is optional */ } }
+    if (added && prop === PROP) { try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('map', a >>> 0, fresh); } catch (e) { /* the player log is optional */ } }
     return added;
   };
 
   globalThis.__dboMapSync = (a, content) => {
     if (C.enabled === false || !a) return;
-    const added = add(a, content && content.markers);
+    const visited = content && Array.isArray(content.visited) ? content.visited : [];
+    // A visited marker is a discovered one as well
+    const added = add(a, visited.concat(content && Array.isArray(content.markers) ? content.markers : []));
+    if (visited.length) add(a, visited, VISITED);
     if (content && content.want === true) {
-      try { sendPacket(a >>> 0, { customPacketType: 'dboMapMarkers', markers: listOf(a) }); } catch (e) { /* offline */ }
+      try { sendPacket(a >>> 0, { customPacketType: 'dboMapMarkers', markers: listOf(a), visited: visitedOf(a) }); } catch (e) { /* offline */ }
     }
     return added;
   };
   globalThis.__dboMapMarkersOf = listOf;
+  globalThis.__dboMapVisitedOf = visitedOf;
   log(`mapprogress ${C.enabled === false ? 'off' : 'on'}: discovered map markers kept per character (max ${C.maxMarkers})`);
 };
