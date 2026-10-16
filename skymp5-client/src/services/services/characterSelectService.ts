@@ -8,6 +8,7 @@ import { CustomPacketMessage } from "../messages/customPacketMessage";
 import { logTrace } from "../../logging";
 import { NetworkingService } from "./networkingService";
 import { SinglePlayerService } from "./singlePlayerService";
+import { ClientReadiness } from "./clientReadiness";
 
 // for browsersideWidgetSetter (executed inside the CEF browser)
 declare const window: any;
@@ -40,6 +41,18 @@ const MAIN_MENU_SILENCE_MS = 2500;
 const MAIN_MENU_SILENT_TICKS = 30;
 // The journal must have been open this close to the last update, so a load screen from a door never counts
 const JOURNAL_QUIT_WINDOW_MS = 500;
+// Play waits until the game loop has run this long since the client started ("update" never fires at the main menu)
+const STARTUP_MIN_MS = 2000;
+const STARTUP_MIN_TICKS = 60;
+// and until the screen has been up this long, so a click or key meant for the screen before cannot start a load
+const MENU_MIN_MS = 1000;
+const MENU_MIN_TICKS = 20;
+
+// One line to the client's diag log and the server log; never breaks the caller
+const diagNote = (kind: string, text: string): void => {
+  const n = (globalThis as { __dboDiagNote?: (kind: string, text: string) => void }).__dboDiagNote;
+  try { if (typeof n === "function") n(kind, text); } catch { /* diagnostics only */ }
+};
 
 // Event keys exchanged with the browser; namespaced to avoid collisions with other "browserMessage" listeners.
 const events = {
@@ -50,6 +63,7 @@ const events = {
   confirmDelete: 'characterSelect:confirmDelete', // arg: delete check
   cancelDelete: 'characterSelect:cancelDelete',
   quit: 'characterSelect:quit',
+  shown: 'characterSelect:shown',           // arg: gate id, the front has drawn the screen
 };
 
 const translations = {
@@ -69,6 +83,9 @@ const translations = {
     create: 'Создать',
     selected: 'Выбран',
     newCharacter: 'Новая жизнь',
+    wait: 'Подождите',
+    loadingWorld: 'Загрузка мира...',
+    of: 'из',
   },
   "en": {
     selectCharacter: 'Choose your character',
@@ -86,6 +103,9 @@ const translations = {
     create: 'Create',
     selected: 'Selected',
     newCharacter: 'A new life',
+    wait: 'Please wait',
+    loadingWorld: 'Loading the world...',
+    of: 'of',
   },
 } as const;
 
@@ -98,6 +118,8 @@ let maxCharacters = 3;
 let lockedCharacters: LockedCharacter[] = [];
 let selectedSlot: number | null = null;
 let confirmDeleteSlot: number | null = null;
+// Whether Play may start a load yet (clientReadiness.ts); the front shows the wait while ready is false
+let readiness = { gate: 0, ready: true, done: 0, total: 0 };
 
 /**
  * Character-selection menu. Inert until the server opens it, so it has no effect
@@ -154,6 +176,9 @@ export class CharacterSelectService extends ClientListener {
         lockedCharacters = Array.isArray(content["lockedCharacters"]) ? content["lockedCharacters"] as LockedCharacter[] : [];
         selectedSlot = null;
         confirmDeleteSlot = null;
+        // A list sent again while the screen is up (after a delete) keeps the wait it had
+        if (!this.menuOpen) this.beginGate();
+        this.syncReadiness();
         this.menuOpen = true;
         this.wantMenuSince = 0;
         // remoteServer reads this: our own body being parked must not quit the game to the main menu
@@ -164,7 +189,7 @@ export class CharacterSelectService extends ClientListener {
         openFormMenu(this.sp, this.browsersideWidgetSetter, this.menuArgs(), this.controller, true);
         break;
       case 'characterSelectMenuClose':
-        if (this.menuOpen) this.closeMenu();
+        if (this.menuOpen) this.closeMenu("the server");
         break;
       default:
         break;
@@ -184,11 +209,19 @@ export class CharacterSelectService extends ClientListener {
         if (Number.isInteger(slot) && !characters[slot]?.dead) { selectedSlot = slot; this.renderMenu(); }
         break;
       case events.play:
+        if (!this.playAllowed()) break;
         // Play loads the selection or starts creation if empty; dead slots refused, server is the authority.
         if (selectedSlot !== null && !characters[selectedSlot]?.dead) {
           const action = characters[selectedSlot] ? 'play' : 'create';
           this.sendResult(action, selectedSlot);
-          this.closeMenu();
+          this.closeMenu("play");
+        }
+        break;
+      case events.shown:
+        if (slot === this.readyGate.gate && this.frontAck !== slot) {
+          this.frontAck = slot;
+          this.frontDrawn(Date.now());
+          if (this.syncReadiness()) this.renderMenu();
         }
         break;
       case events.edit:
@@ -256,6 +289,8 @@ export class CharacterSelectService extends ClientListener {
 
   // "update" never fires in the main menu; "tick" does
   private onTick(): void {
+    this.ticks++;
+    if (this.menuOpen && this.syncReadiness()) this.renderMenu();
     this.ticksSinceUpdate++;
     const now = Date.now();
     if (!this.wantMenuSince && this.leftToMainMenu(now)) {
@@ -289,13 +324,41 @@ export class CharacterSelectService extends ClientListener {
     }
   }
 
+  // The character list arrived: Play waits for these parts (clientReadiness.ts)
+  private beginGate(): void {
+    const openedAt = Date.now();
+    const ticksAtOpen = this.ticks;
+    this.readyGate.begin(openedAt);
+    this.readyGate.add("list")(openedAt);
+    this.readyGate.add("startup", (now) => now - this.startedAt >= STARTUP_MIN_MS && this.ticks >= STARTUP_MIN_TICKS);
+    this.readyGate.add("menu", (now) => now - openedAt >= MENU_MIN_MS && this.ticks - ticksAtOpen >= MENU_MIN_TICKS);
+    this.frontDrawn = this.readyGate.add("front");
+    this.frontAck = 0;
+  }
+
+  // The widget's copy of the wait; true when it moved on
+  private syncReadiness(): boolean {
+    const s = this.readyGate.poll(Date.now());
+    const changed = s.gate !== readiness.gate || s.ready !== readiness.ready || s.done !== readiness.done;
+    readiness = { gate: s.gate, ready: s.ready, done: s.done, total: s.total };
+    return changed;
+  }
+
+  // Only a front that answered for this login shows the wait, so only then is Play held; an older front plays as before
+  private playAllowed(): boolean {
+    if (this.frontAck !== this.readyGate.gate) return true;
+    const s = this.readyGate.poll(Date.now());
+    if (!s.ready) logTrace(this, 'Play held, the client is not ready yet:', s.waiting.join(', '));
+    return s.ready;
+  }
+
   private sendResult(action: 'play' | 'create' | 'delete', slot: number): void {
     logTrace(this, `Sending character select result:`, action, slot);
     sendCustomPacket(this.controller, { customPacketType: 'characterSelectResult', action, slot });
   }
 
   private menuArgs(): Record<string, unknown> {
-    return { characters, maxCharacters, lockedCharacters, selectedSlot, confirmDeleteSlot, events, strings, WIDGET_ID };
+    return { characters, maxCharacters, lockedCharacters, selectedSlot, confirmDeleteSlot, readiness, events, strings, WIDGET_ID };
   }
 
   private renderMenu(): void {
@@ -319,10 +382,14 @@ export class CharacterSelectService extends ClientListener {
     lockedCharacters = [];
     selectedSlot = null;
     confirmDeleteSlot = null;
+    this.readyGate.end(Date.now(), "disconnected");
+    this.syncReadiness();
     this.menuOpen = false;
   }
 
-  private closeMenu(): void {
+  private closeMenu(why: string): void {
+    this.readyGate.end(Date.now(), why);
+    this.syncReadiness();
     this.menuOpen = false;
     (globalThis as any).__dboCharacterSelectOpen = false;
     selectedSlot = null;
@@ -345,6 +412,7 @@ export class CharacterSelectService extends ClientListener {
       lockedCharacters,
       selectedSlot,
       confirmDeleteSlot,
+      readiness,
       strings,
       events,
     };
@@ -371,6 +439,12 @@ export class CharacterSelectService extends ClientListener {
   }
 
   private sawGameplayFallback = false;
+  private readyGate = new ClientReadiness((line) => diagNote("ready", line));
+  // Constructed in the client's first tick, so this is when the game loop started running the client
+  private startedAt = Date.now();
+  private ticks = 0;
+  private frontDrawn: (now: number) => void = () => { };
+  private frontAck = 0;
   private wantMenuSince = 0;
   private lastMenuAttempt = 0;
   private lastReconnect = 0;
