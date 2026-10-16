@@ -2,7 +2,7 @@ import { ClientListener, CombinedController, Sp } from "./clientListener";
 import { ConnectionMessage } from "../events/connectionMessage";
 import { CustomPacketMessage } from "../messages/customPacketMessage";
 import { sendCustomPacket, parseCustomPacket, notifyNextUpdate } from "./customPacketUtil";
-import { openFormMenu, closeFormMenu } from "./widgetMenuUtil";
+import { openFormMenu, closeFormMenu, releaseFocusBeforeVanillaMenu } from "./widgetMenuUtil";
 import { TimersService } from "./timersService";
 import { Actor, BrowserMessageEvent, DxScanCode } from "skyrimPlatform";
 import { remoteIdToLocalId } from "../../view/worldViewMisc";
@@ -137,6 +137,7 @@ export class SearchService extends ClientListener {
           actor.removeItem(form, -d, true, null);
         }
       });
+      releaseFocusBeforeVanillaMenu(this.sp, this.controller);
       actor.openInventory(true);
     });
   }
