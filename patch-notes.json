@@ -1,5 +1,38 @@
 [
   {
+    "title": "Scribing: spell tomes and scrolls",
+    "date": "2026-10-17",
+    "version": "Server update",
+    "tag": "New",
+    "sections": [
+      {
+        "heading": "Writing spell tomes",
+        "items": [
+          "Master Scholars write spell tomes at a Scholars' Ledger: choose Write a spell tome. You can write a tome of a spell you know, as long as a tome of it exists.",
+          "Novice tomes need no scrolls. Apprentice tomes need 1 scroll, Adept 2 and Expert 4. These can be any scrolls you carry, and the cheapest go first.",
+          "A Master tome needs 5 scrolls of that same spell, and a co-writer: a Master of the spell's school (a Master Priest for Restoration) who knows the spell, stands within 10 metres of you and agrees. You do not need to know a Master spell yourself.",
+          "After you write a tome, you wait before you can write another, whatever its rank: a day after a Novice tome, 2 days after Apprentice, 4 after Adept, a week after Expert and two weeks after Master. A co-writer waits the two weeks too.",
+          "Tomes of raising the dead and of calling or banishing Daedra are still written only by senior college ranks."
+        ]
+      },
+      {
+        "heading": "Writing scrolls",
+        "items": [
+          "Master Scholars also write scrolls of the spells they know, at the same ledger: choose Write a scroll. Master scrolls cannot be written.",
+          "Each scroll uses 1 Linen Wrap, 1 Charcoal (from woodcutting) and 1 filled soul gem of any size. The smallest gem is used first.",
+          "Scrolls have their own wait, apart from tomes: a day after a Novice scroll, 2 days after Apprentice, 3 after Adept and 4 after Expert.",
+          "Both waits are shown on the Scholar page of the Skills tab in your journal (F3), and at the top of both lists."
+        ]
+      },
+      {
+        "heading": "Colleges",
+        "items": [
+          "Any magic college now counts the same as the Synod, the College of Winterhold and the College of Whispers: its leader and officers can teach classes at a Class Lectern and take on more apprentices."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Client 0.3.103: field of view, referrals and the bank",
     "date": "2026-10-17",
     "version": "Client 0.3.103",

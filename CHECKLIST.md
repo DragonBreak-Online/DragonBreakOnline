@@ -1,5 +1,21 @@
 # DragonBreak Online checklist (2026-09-14)
 
+## Added 2026-10-17: Scribing, Master Scholars write spell tomes and scrolls - NOT DEPLOYED, waits on Nate
+
+Nate and Swag, 17 Oct. `scribing.js` (config `scribing`) replaces spells.js's tome writing of 16 Oct; the Scholars' Ledger
+(salvage.js) shows "Write a spell tome" and "Write a scroll" to a Master Scholar (Scholar tier 4) and hands over to widget 93.
+- Tomes: one shared timer (24 h / 48 h / 4 d / 7 d / 14 d by rank); Apprentice-Expert spend any scrolls (1/2/4, cheapest
+  first); Master spends 5 of its own scroll and needs a co-writer (Master of the school, Priest for Restoration, knows the
+  spell, within 10 m, own tome timer ready, accepts); both take the 14 days; the writer need not know a Master spell.
+- Scrolls: `spell-scrolls.json` from `sudo python3 -I tools/scribing/spell_scrolls.py /opt/skyrim-data <loadorder.txt>
+  spell-scrolls.json` (rerun after a plugin that adds scrolls or spells); Linen Wrap + Charcoal + a filled soul gem; own
+  timer 1-4 days; no Master scrolls.
+- Timers on the F3 Skills tab's Scholar page (journalskills.js appends them to the description; no client change).
+- `guild-defs.json` `"college": true` on the Synod, Winterhold and Whispers; schools.js classes and apprenticeship accept any
+  college (`collegeGuilds`), guilds.js `__dboGuildIsCollege`.
+- `tests/scribing-harness.js` (replaces `tests/tome-writing-harness.js`).
+- [ ] In game: a Master tome with a co-writer, a scroll from a soul-trapped gem (checks the entry's soul field), the F3 page.
+
 ## Added 2026-10-15: Blackreach, the open-world dungeon (Skyrim release check 5) - NOT DEPLOYED, waits on Nate
 
 Nate, 14 Oct: "super hard and the loot really worth it". Branch `skyrim-blackreach-1015` (on skyrim-hub-1015).

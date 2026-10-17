@@ -8328,7 +8328,7 @@ try {
   const SPELLS_JS = path.resolve('spells.js');
   delete require.cache[SPELLS_JS];
   require(SPELLS_JS)({ mp, log, personal, system, audit, display, who, cfg, openWidget, closeWidget, onUi, registerChatCommand, onlineActors, distanceMeters, takeGold, giveItem, depositToTreasury, every });
-} catch (e) { log('spells.js failed to load:', e.stack || e.message); for (const k of ['__dboOpenSpellbook', '__dboSpellsRankOptions', '__dboSpellsOpenTo', '__dboSpellsBook', '__dboSpellsKnown', '__dboSpellsClassify', '__dboGuildWorkshop', '__dboSpellsGrant', '__dboSpellsTab', '__dboSpellsRankCap', '__dboSpellsChangePrepared', '__dboSpellsTomesFor', '__dboTomeShopHere', '__dboTomeShopOpen', '__dboTeachHere', '__dboTeachLedgerActions', '__dboTeachOpen', '__dboTeachLecternMenu', '__dboSpellsClassOffer', '__dboSpellsLearned', '__dboSpellsLearnedChanged']) globalThis[k] = null; }
+} catch (e) { log('spells.js failed to load:', e.stack || e.message); for (const k of ['__dboOpenSpellbook', '__dboSpellsRankOptions', '__dboSpellsOpenTo', '__dboSpellsBook', '__dboSpellsKnown', '__dboSpellsClassify', '__dboGuildWorkshop', '__dboSpellsGrant', '__dboSpellsTab', '__dboSpellsRankCap', '__dboSpellsChangePrepared', '__dboSpellsTomesFor', '__dboTomeShopHere', '__dboTomeShopOpen', '__dboTeachHere', '__dboTeachLedgerActions', '__dboTeachOpen', '__dboTeachLecternMenu', '__dboSpellsClassOffer', '__dboSpellsLearned', '__dboSpellsLearnedChanged', '__dboSpellsTomeOf', '__dboSpellsTomeSpells']) globalThis[k] = null; }
 // ---- smithing manuals and smithing skill books (server\manuals.js, manuals.json, config "manuals"): spells.js's read hook,
 // the Scholar's reading, dungeons.js's boss chests and salvage.js's Scholars' Ledger ask it at runtime ----
 try {
@@ -8353,7 +8353,14 @@ try {
   const SCHOOLS_JS = path.resolve('schools.js');
   delete require.cache[SCHOOLS_JS];
   require(SCHOOLS_JS)({ mp, log, personal, audit, display, who, cfg, openWidget, closeWidget, onUi, registerChatCommand, onlineActors, distanceMeters, every, sendPacket, isAdmin, findByName, isWorldspace, profileOf });
-} catch (e) { log('schools.js failed to load:', e.stack || e.message); for (const k of ['__dboSchoolsRefusal', '__dboSchoolsCast', '__dboSchoolsProgress', '__dboSchoolsProgressSend', '__dboSchoolsActivate', '__dboSchoolsAlteration', '__dboCastSkill', '__dboSchoolsGrandfathered', '__dboSchoolsLogin', '__dboSchoolsLedgerActions', '__dboSchoolsLedgerChoose', '__dboMagicTab', '__dboMagicView', '__dboMagicAction', '__dboAdminSetSchool', '__dboSchoolsArrived', '__dboSchoolsLeave', '__dboSchoolRank', '__dboSchoolsOpenLectern', '__dboSchoolsAwardRate', '__dboSchoolsMenuEntries', '__dboSchoolsMenuAction', '__dboSchoolsSkillHeld', '__dboSchoolsApprenticeView', '__dboSchoolsOnLoan', '__dboMagicOpen']) globalThis[k] = null; }
+} catch (e) { log('schools.js failed to load:', e.stack || e.message); for (const k of ['__dboSchoolsRefusal', '__dboSchoolsCast', '__dboSchoolsProgress', '__dboSchoolsProgressSend', '__dboSchoolsActivate', '__dboSchoolsAlteration', '__dboCastSkill', '__dboSchoolsGrandfathered', '__dboSchoolsLogin', '__dboSchoolsLedgerActions', '__dboSchoolsLedgerChoose', '__dboMagicTab', '__dboMagicView', '__dboMagicAction', '__dboAdminSetSchool', '__dboSchoolsArrived', '__dboSchoolsLeave', '__dboSchoolRank', '__dboSchoolsOpenLectern', '__dboSchoolsAwardRate', '__dboSchoolsMenuEntries', '__dboSchoolsMenuAction', '__dboSchoolsSkillHeld', '__dboSchoolsApprenticeView', '__dboSchoolsOnLoan', '__dboMagicOpen', '__dboSchoolRankOf']) globalThis[k] = null; }
+// ---- scribing: a Master Scholar writes spell tomes and scrolls at a Scholars' Ledger (server\scribing.js, spell-scrolls.json,
+// config "scribing"; Nate and Swag, 17 Oct): after spells.js and schools.js, whose spellbook and school ranks it reads ----
+try {
+  const SCRIBING_JS = path.resolve('scribing.js');
+  delete require.cache[SCRIBING_JS];
+  require(SCRIBING_JS)({ mp, log, personal, audit, display, who, cfg, openWidget, closeWidget, onUi, onlineActors, distanceMeters, giveItem });
+} catch (e) { log('scribing.js failed to load:', e.stack || e.message); for (const k of ['__dboScribingActions', '__dboScribingOpen', '__dboScribingBrief']) globalThis[k] = null; }
 
 // ---- the bank: one account per character in every town's bank, treasuries pay-in only (server\bank.js, WAR_DESIGN.md) ----
 try {

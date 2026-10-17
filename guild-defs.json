@@ -500,6 +500,7 @@
       "id": "college-of-winterhold",
       "name": "College of Winterhold",
       "kind": "guild",
+      "college": true,
       "ranks": [
         {
           "title": "Arch-Mage",
@@ -572,6 +573,7 @@
       "id": "synod",
       "name": "The Synod",
       "kind": "guild",
+      "college": true,
       "ranks": [
         {
           "title": "Chancellor of the Synod",
@@ -623,6 +625,7 @@
       "id": "college-of-whispers",
       "name": "College of Whispers",
       "kind": "guild",
+      "college": true,
       "ranks": [
         {
           "title": "Master of Whispers",

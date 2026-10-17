@@ -425,6 +425,22 @@
   "bookStrips": 1,
   "notePaper": 1
  },
+ "scribing": {
+  "_comment": "Scribing (scribing.js; Nate and Swag, 17 Oct): a Master Scholar (Scholar tier scholarTier, 4 = Master) writes at a Scholars' Ledger. Tomes of spells they know that a tome teaches, by rank Novice..Master: tome.scrolls scrolls (any scrolls carried, the cheapest first; Master: that spell's own scrolls), one tome timer of tome.cooldownHours[rank]. A Master tome needs a co-writer within tome.coWriterMeters who is a Master (coWriterRank) of the school (Priest for Restoration), knows the spell, has their own tome writing ready and accepts within tome.offerSeconds; both take the wait; the writer of a Master tome need not know the spell. Scrolls of spells they know below Master that have a scroll (spell-scrolls.json, tools/scribing/spell_scrolls.py): scroll.materials plus scroll.soulGems filled soul gems (filledGems, or emptyGems holding a soul; the smallest first), one scroll timer of scroll.cooldownHours[rank] (Novice..Expert). Hot reload.",
+  "enabled": true,
+  "scholarTier": 4,
+  "ledgerMeters": 6.5,
+  "tome": { "enabled": true, "scrolls": [0, 1, 2, 4, 5], "cooldownHours": [24, 48, 96, 168, 336], "coWriterMeters": 10, "coWriterRank": 4, "offerSeconds": 60 },
+  "scroll": {
+   "enabled": true,
+   "cooldownHours": [24, 48, 72, 96],
+   "materials": [{ "id": "34cd6:Skyrim.esm", "name": "Linen Wrap", "count": 1 }, { "id": "33760:Skyrim.esm", "name": "Charcoal", "count": 1 }],
+   "soulGems": 1,
+   "_filledGems": "SoulGemPettyFilled, SoulGemLesserFilled, SoulGemCommonFilled, SoulGemGreaterFilled, SoulGemGrandFilled, SoulGemBlackFilled (SOUL 1-5, Skyrim.esm), smallest first; emptyGems are their empty bases (NAM0 links each to its filled one), counted when the pack entry holds a soul",
+   "filledGems": ["2e4e3:Skyrim.esm", "2e4e5:Skyrim.esm", "2e4f3:Skyrim.esm", "2e4fb:Skyrim.esm", "2e4ff:Skyrim.esm", "2e504:Skyrim.esm"],
+   "emptyGems": ["2e4e2:Skyrim.esm", "2e4e4:Skyrim.esm", "2e4e6:Skyrim.esm", "2e4f4:Skyrim.esm", "2e4fc:Skyrim.esm", "2e500:Skyrim.esm"]
+  }
+ },
  "martialArts": {
   "_comment": "Martial Arts (martial.js; the skill id stays unarmed). staminaDamage: every melee blow (fists and weapons, not bows or spells, NPCs' too) is full at fullAt of the attacker's stamina or more and falls linearly to minMult at none. fists.drainByTier: stamina points a landed fist takes from its target by the attacker's Martial Arts rank (untrainedDrain without the skill), x powerDrainMult for a power attack; armorExtra: how much more the target's armour counts against fists; powerDisarm: a landed unarmed power attack unequips a player's weapons (combat.js disarm cooldown), from powerDisarmMinRank. staves.armorPierce: the share of the armour's reduction a staff ignores. Fist tier damage is mastery.damage.fistByTier; staves use byTier.",
   "enabled": true,

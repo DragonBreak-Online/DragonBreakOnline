@@ -512,6 +512,9 @@ module.exports = (api) => {
   // title is the rank's own title (economy.js keys wages by it), shown what it is shown as (rolenames.js)
   globalThis.__dboGuildsOf = (a) => membershipsOf(a >>> 0).map((m) => { const f = FACTIONS.get(m.fid); const r = f.ranks[m.e.rank] || {}; return { id: m.fid, name: f.name, title: r.title || '', shown: shownAt(f, m.e.rank), role: r.role || '', kind: f.kind || '', zone: f.zone || '', secret: !!f.secret, player: !!f.player, hall: hallOf(f) }; });
   globalThis.__dboGuildExists = (id) => FACTIONS.has(String(id));
+  // A magic college (guild-defs.json "college": true; Swag, 17 Oct: "any future magical colleges and current"): schools.js lets its
+  // leader and officers hold classes and take more apprentices, as the colleges it names
+  globalThis.__dboGuildIsCollege = (id) => { const f = FACTIONS.get(String(id)); return !!(f && f.college === true); };
   // When a faction was founded, for realm.js's protectDays: its first member's joining; a hold or stronghold is as old as
   // the land (review m6: nothing defined this, so the rule never applied)
   globalThis.__dboGuildFoundedAt = (id) => {
