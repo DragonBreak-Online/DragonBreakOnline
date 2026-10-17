@@ -187,6 +187,39 @@ Those four are the entire honest case for going native, so they are worth measur
 native work is funded - but they change the *justification*, not the conclusion that this is not
 a streaming problem.
 
+### Procedure for the in-game pass
+
+Roughly ten minutes once in world. Record the answer to each, not an impression - these decide
+whether a months-long port is worth funding, so "feels laggy" is not a result.
+
+**1. Cursor tracking.** Press F8 (`freeCursorKey`, `browserService.ts:24`) to free the cursor.
+Move in a slow circle, then flick corner to corner.
+*Pass:* the overlay cursor sits under the OS cursor at all speeds.
+*Fail:* it trails on fast movement or settles at an offset. Note which, and whether it worsens
+near screen edges - an offset that scales with distance from centre is a DPI/scaling bug, not a
+latency one, and that distinction decides whether it is fixable without going native.
+
+**2. Input deafness on focus.** Open any focused panel (F7 admin menu, `adminMenuService.ts:98`).
+With it open, press a bound game key - sheathe, jump, a shout hotkey.
+*Pass:* the game responds, or ignores it deliberately.
+*Fail:* nothing happens and nothing appears in the log. Then press Escape and retry the same key
+to confirm input returns, which separates "browser swallowed it" from "key was unbound".
+
+**3. Panel over panel.** With the admin menu open, trigger a second panel that takes focus (walk
+into an interact prompt, or open chat with Enter/T).
+Record which panel owns keyboard input afterwards, whether Escape closes the top panel or both,
+and whether the first panel is still interactive underneath. The overlay stacks widgets by id
+(`dboRelayService.ts:11-12`), so this is where a single-CustomMenu native port would most
+obviously break - if stacking is already broken here, that removes one argument for porting.
+
+**4. Controller.** With a controller connected, open any panel and try to move the selection with
+the stick and confirm with A.
+*Pass:* the panel responds. *Fail:* nothing - the overlay is mouse/keyboard only, which is a real
+point for native, since Scaleform menus get controller input for free.
+
+Also worth noting in passing: whether the overlay renders while the game is alt-tabbed behind
+another window, and whether `ForegroundGuard` visibly fights for focus on panel open.
+
 ## How the numbers were taken
 
 - Install sizes: `find`/`du -sb` under `C:\DragonBreak\skyrim\Data\Platform`.
