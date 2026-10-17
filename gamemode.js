@@ -1891,6 +1891,22 @@ mp.onActivate = (targetId, casterId) => {
     return allowed;
   };
 }
+// Gates held shut (gamemode-config heldClosedDoors). A load door stays open after its first use, and an open HelgenGate01
+// on the Pale Pass border shows a wide-open gateway that players run through, its two leaves folded back at the hinges,
+// where the only activation spot is (Nate, 17 Oct). Closed again at every reload and a moment after each use, which
+// still takes the player through.
+{
+  const heldClosed = () => { const ids = []; for (const d of (cfg.heldClosedDoors || [])) { try { const id = mp.getIdFromDesc(String(d)) >>> 0; if (id) ids.push(id); } catch (e) { /* not in this load order */ } } return ids; };
+  const shut = (id) => { try { if (mp.get(id, 'isOpen') === true) mp.set(id, 'isOpen', false); } catch (e) { log('held door: close failed', id.toString(16), e.message); } };
+  for (const id of heldClosed()) shut(id);
+  const activateBeforeHeldDoors = mp.onActivate;
+  mp.onActivate = (targetId, casterId) => {
+    const allowed = activateBeforeHeldDoors(targetId, casterId);
+    const t = targetId >>> 0;
+    if (heldClosed().includes(t)) setTimeout(() => shut(t), 1500);
+    return allowed;
+  };
+}
 // NPCs open doors but never close them (2026-10-04). Each server activation of a plain door flips it (SetOpen(!IsOpen())).
 // The client blocks the engine's own door opening and waits for the server, so an NPC's AI keeps activating a closed door
 // until the server's "open" reaches its hoster. Every activation after the first closed the door again. In Fort Cutpurse
