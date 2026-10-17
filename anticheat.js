@@ -42,7 +42,11 @@ const DEFAULTS = {
   alerts: { staffInGame: true, minTier: 'gm', staffEveryMinutes: 10, logPerMinute: 1 },
   // A kind, or kind:tier (speed_sustained:foot is the foot tier at 650 u/s; the 850 u/s tier of the same kind alerts)
   shadowKinds: ['speed_sustained:foot', 'speed_sustained60', 'speed_blink', 'speed_slow', 'stamina_free', 'magicka_debt', 'stamina_debt',
-    'power_unmatched', 'spellhit_nocast'],
+    'power_unmatched', 'spellhit_nocast',
+    // the fork's own kinds (mp.onAnticheat), shadow until each has its measurement week: speed_bucket is every refused,
+    // would-refuse or accepted (landing, admin mode) line of the main bucket, snapback_ignored also counts the packets
+    // already in flight when a snap back or a server teleport is sent
+    'speed_bucket', 'speed_shadow', 'snapback_ignored', 'movement_nonfinite', 'vitals_nonfinite', 'vitals_refused', 'fork_other'],
   // the module's own guard against server freezes: a timer this late, or this many players with the same kind this close
   // together, holds flags for holdMs and logs one 'stall-held' line instead; the rings restart for reseedMs
   stall: { lateMs: 1500, burstPlayers: 3, burstMs: 2000, holdMs: 10000, reseedMs: 3000 },
@@ -182,17 +186,28 @@ module.exports = (api) => {
     st.wT = 0; st.wD = 0; st.wFastA = 0; st.wFastB = 0; st.wStart = 0;
     if (st.n < 2) return;
     const R = st.ring, i0 = st.head * 4, t0 = R[i0];
-    let fastA = 0, fastB = 0, age = 0, si = i0;
+    let fastA = 0, fastB = 0, age = 0, si = i0, start = 0;
     for (let k = 0; k < st.n - 1; k++) {
       const j = slot(st, k);
       const dt = st.sdt[j], v = st.spd[j];
       if (v >= thrA) fastA += dt;
       if (v >= thrB) fastB += dt;
-      si = slot(st, k + 1) * 4;
+      start = k + 1;
+      si = slot(st, start) * 4;
       age = t0 - R[si];
       if (age >= W) break;
     }
     if (age < W * num(SP.minSpan, 0.9)) return;
+    // A start sample the server's position had not left (a lag spike held it stale, then the backlog caught up): that
+    // position was last true at the first sample of the still run, so the window is timed from there. Otherwise a horse
+    // at 720 u/s with 2 s of packet loss reads 864 over 10 s (review 17 Oct). Moves nothing, only lengthens the time.
+    while (start < st.n - 1) {
+      const j = slot(st, start);
+      if (!(st.spd[j] === 0 && st.sdt[j] > 0)) break;
+      start++;
+      si = slot(st, start) * 4;
+      age = t0 - R[si];
+    }
     const dx = R[i0 + 1] - R[si + 1], dy = R[i0 + 2] - R[si + 2];
     st.wT = age; st.wD = Math.sqrt(dx * dx + dy * dy); st.wFastA = fastA; st.wFastB = fastB; st.wStart = si;
   };
@@ -214,6 +229,9 @@ module.exports = (api) => {
   // and marked staff.
   const MOVE_MODES = new Set(['noclip']);
   const exemptMode = (a) => { const m = ST.modes.size ? ST.modes.get(profileOf(a)) : null; return !!(m && m.size); };
+  // AdminSystem's God mode (tgm on the client: no magicka or stamina is spent) is a server-granted mode, mirrored on the
+  // actor in ff_adminModes (gamemode.js makeProp): its casts and sprints are not judged, they would always look free
+  const godMode = (a) => { try { const m = mp.get(a, 'ff_adminModes'); return !!(m && typeof m === 'object' && m.god === true); } catch (e) { return false; } };
   const restrained = (a) => {
     try { if (typeof globalThis.__dboIsDowned === 'function' && globalThis.__dboIsDowned(a)) return true; } catch (e) { /* not downed */ }
     try { const r = mp.get(a, 'private.restrained'); if (r && (r.boundHands || r.carried || r.captorActorId)) return true; } catch (e) { /* free */ }
@@ -484,6 +502,7 @@ module.exports = (api) => {
     if (!isOn('magicka') || s.rtype !== 'SPEL' || s.type !== 0 || s.cost < MG.minCost) return;
     if (t - st.lastRefill < MG.refillSkipMs) return;
     try { const w = globalThis.__dboWellRegen; if (w instanceof Map && (Number(w.get(a)) || 0) + MG.refillSkipMs > t) return; } catch (e) { /* no wells */ }
+    if (godMode(a)) return;
     const p = pctOf(a);
     const m = p ? Number(p.magicka) : NaN;
     if (!(m >= MG.fullAt)) return;
@@ -543,7 +562,7 @@ module.exports = (api) => {
       drop = Math.max(drop, maxSta - s);
       lo = Math.min(lo, s);
     }
-    if (maxSta < 0 || drop >= STA.dropBy) return;
+    if (maxSta < 0 || drop >= STA.dropBy || godMode(a)) return;
     acFlag(a, 'stamina_free', { window: STA.windowSeconds, speed: Math.round((st.v10 || 0)) }, `${Math.round(fast / 1000)} s of foot sprint at ${STA.sprintSpeed} u/s or faster in ${STA.windowSeconds} s, `
       + `stored stamina ${lo.toFixed(3)}-${maxSta.toFixed(3)} (no drop of ${STA.dropBy} or more); server: flag only`, {});
   };

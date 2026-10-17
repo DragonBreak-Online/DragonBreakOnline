@@ -1796,7 +1796,8 @@
   "_comment": "Anti-cheat flags (anticheat.js; Jake 17 Oct: infinite stamina, infinite magicka and speed running were not flagged). Flags only: no kick, no ban, nothing to the flagged player. A flag is one '[gamemode] ANTICHEAT <kind> [shadow ]<Name> #TAG (profile N[, staff]): ...' server-log line (dbo-monitor posts it to #server-monitor), a sec.signal in the player log and an admin-tab line to online GM+ at most once per 10 min. Kinds or kind:tier in shadowKinds only log (the measurement week). Instant off: /anticheat off <all|alerts|speed|rubberband|vitals|magicka|stamina|refusehits|fork> (Lead GM+, until a restart), or enabled false + hot reload. rubberBand and refuseHits stay false until their gates (24-48 h with no honest alert; refuseHits only with Jake's or Nate's GO).",
   "enabled": true,
   "alerts": { "staffInGame": true, "minTier": "gm", "staffEveryMinutes": 10, "logPerMinute": 1 },
-  "shadowKinds": ["speed_sustained:foot", "speed_sustained60", "speed_blink", "speed_slow", "stamina_free", "magicka_debt", "stamina_debt", "power_unmatched", "spellhit_nocast"],
+  "shadowKinds": ["speed_sustained:foot", "speed_sustained60", "speed_blink", "speed_slow", "stamina_free", "magicka_debt", "stamina_debt", "power_unmatched", "spellhit_nocast",
+   "speed_bucket", "speed_shadow", "snapback_ignored", "movement_nonfinite", "vitals_nonfinite", "vitals_refused", "fork_other"],
   "stall": { "lateMs": 1500, "burstPlayers": 3, "burstMs": 2000, "holdMs": 10000, "reseedMs": 3000 },
   "speed": {
    "_comment": "u/s over the net displacement of 10 s and 60 s of server-accepted positions, with 80% continuity. Measured honest on foot (2 s windows): p99.9 560-580, max 590; MOVT sprint 500, horse 600, werewolf 531. Mount detection is LIKELY until a staff horse test.",

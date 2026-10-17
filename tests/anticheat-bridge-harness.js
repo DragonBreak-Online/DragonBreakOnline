@@ -94,14 +94,25 @@ const acLines = (H) => H.logs.filter((l) => l.startsWith('ANTICHEAT '));
   H.tick(0);
   const r = W.mp.onAnticheat(A, 'vitals_nonfinite', JSON.stringify({ debt: 0.6, cost: 120, ratio: 1.5, cls: 'foot', ip: '10.1.2.3', userId: 3, hwid: 'abc', actorId: A, note: 'x <@1> y' }));
   const L = acLines(H);
-  ok(L.length === 1 && /^ANTICHEAT vitals_nonfinite Rowan #PGDB \(profile 1\): debt=0\.6, cost=120, ratio=1\.5, cls=foot; source: fork$/.test(L[0]), 'a fork flag is one ANTICHEAT line with the name and #TAG and the numbers', L);
+  ok(L.length === 1 && /^ANTICHEAT vitals_nonfinite shadow Rowan #PGDB \(profile 1\): debt=0\.6, cost=120, ratio=1\.5, cls=foot; source: fork$/.test(L[0]), 'a fork flag is one ANTICHEAT line with the name and #TAG and the numbers (the fork kinds start in shadowKinds)', L);
   ok(!/10\.1\.2\.3|hwid|userId|actorId|<@|ff000014|4278190100/.test(L.join(' ') + H.staff.map(([, l]) => l).join(' ')), '...and none of the ids, the address or the text the fork sent');
   ok(original === 1 && r === 'theirs', 'over three loads the earlier handler runs once, its answer returned (no double handling)', original);
   W.mp.onAnticheat(A, 'magicka_debt', { debt: 0.7 });
   ok(acLines(H).length === 2 && / magicka_debt shadow Rowan #PGDB/.test(acLines(H)[1]), 'magicka_debt starts in shadowKinds: a shadow line', acLines(H)[1]);
   W.mp.onAnticheat(0x0001b0e2, 'magicka_debt', { debt: 0.7 });
   W.mp.onAnticheat(A, 'Bad Kind!', {});
-  ok(acLines(H).length === 3 && / fork_other Rowan/.test(acLines(H)[2]), 'an NPC is ignored; a malformed kind becomes fork_other', acLines(H).slice(2));
+  ok(acLines(H).length === 3 && / fork_other shadow Rowan/.test(acLines(H)[2]), 'an NPC is ignored; a malformed kind becomes fork_other (shadow)', acLines(H).slice(2));
+}
+
+{
+  // once a fork kind is taken out of shadowKinds, its staff line carries none of what the fork sent either
+  const { W, H } = setup({ shadowKinds: [] }, true);
+  F.load(H.api, true);
+  H.tick(0);
+  W.mp.onAnticheat(A, 'vitals_nonfinite', JSON.stringify({ debt: 0.6, ip: '10.1.2.3', userId: 3, hwid: 'abc', actorId: A, note: 'x <@1> y' }));
+  ok(acLines(H).length === 1 && /^ANTICHEAT vitals_nonfinite Rowan #PGDB \(profile 1\): debt=0\.6; source: fork$/.test(acLines(H)[0]) && H.staff.length > 0,
+    'a fork kind out of shadowKinds alerts: one live line and a staff line', { lines: acLines(H), staff: H.staff });
+  ok(!/10\.1\.2\.3|hwid|userId|actorId|<@|ff000014|4278190100/.test(acLines(H).join(' ') + H.staff.map(([, l]) => l).join(' ')), '...and none of the ids, the address or the text the fork sent');
 }
 
 // ---- /acstate ------------------------------------------------------------------------------------------------------------------
