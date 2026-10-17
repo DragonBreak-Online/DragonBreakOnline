@@ -1563,8 +1563,30 @@ module.exports = (K) => {
     for (const [id, c] of cur) if (!prev.cur.has(id)) emit('social.companion', a, { op: 'spawned', kind: c.kind, base: recordName(c.base) }, { src: 'poll:companions' });
     for (const [id, c] of prev.cur) if (!cur.has(id)) emit('social.companion', a, { op: 'ended', kind: c.kind, base: recordName(c.base) }, { src: 'poll:companions' });
   };
+  // A character deleted at the character select while it stood in the world ("Deleted character ff0012c5 from slot 0",
+  // 16 Oct 21:08) never sends a logout, so the 2 s poll read its health and restraint on every tick and the engine logged
+  // each read: 16,000 "resolved context ... reason=exception" lines in 16 h (bugsweep 17 Oct). An id the world has not
+  // counted online for UNSEEN_DROP_MS is dropped the way a resync drops it (no logout line: none was seen)
+  const UNSEEN_DROP_MS = 30000;
+  const unseenSince = new Map();
+  const reconcileOnline = () => {
+    if (typeof api.onlineActors !== 'function' || !S.online.size) { unseenSince.clear(); return; }
+    let on = null;
+    try { on = new Set((api.onlineActors() || []).map(u32).filter(Boolean)); } catch (e) { return; }
+    const t = now();
+    for (const a of [...S.online]) {
+      if (on.has(a)) { unseenSince.delete(a); continue; }
+      if (!unseenSince.has(a)) { unseenSince.set(a, t); continue; }
+      if (t - unseenSince.get(a) < UNSEEN_DROP_MS) continue;
+      unseenSince.delete(a); S.containers.delete(a); forget(a);
+      log(`playerlog: dropped ${hex(a)}, not in the world for ${Math.round(UNSEEN_DROP_MS / 1000)} s and no logout seen`);
+    }
+    for (const a of [...unseenSince.keys()]) if (!S.online.has(a)) unseenSince.delete(a);
+  };
+  G.reconcileOnline = reconcileOnline;
   const slowTick = () => {
     if (!S.on) return;
+    try { reconcileOnline(); } catch (e) { err('poll:slow.reconcile', e); }
     const list = [...S.online];
     if (!list.length) return;
     const per = Math.max(1, Math.ceil(list.length / Math.max(1, Number(C.polls.slowSlices) || 12)));
