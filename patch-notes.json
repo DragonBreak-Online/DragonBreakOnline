@@ -1,5 +1,20 @@
 [
   {
+    "title": "Stepping down from a court",
+    "date": "2026-10-17",
+    "version": "Hotfix",
+    "tag": "Change",
+    "sections": [
+      {
+        "heading": "Courts",
+        "items": [
+          "You can now leave a court you serve on your own: type /court resign followed by the hold's name (for example /court resign Bruma). You give up your post and leave its household, and a citizenship that came with the post ends with it. A ruler steps down through the staff.",
+          "A Step down button in your journal's Court tab (F3) follows with the next client update."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Scribing: spell tomes and scrolls",
     "date": "2026-10-17",
     "version": "Server update",
