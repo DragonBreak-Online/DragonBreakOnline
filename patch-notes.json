@@ -1,5 +1,32 @@
 [
   {
+    "title": "Falkreath, Dawnguard crossbows and Summon Skeleton",
+    "date": "2026-10-17",
+    "version": "Update",
+    "tag": "Update",
+    "sections": [
+      {
+        "heading": "The world",
+        "items": [
+          "Falkreath is fully back to its Cities of the North layout: the floating slabs and rocks, the hole by the wall and the white streak are gone."
+        ]
+      },
+      {
+        "heading": "Smithing",
+        "items": [
+          "Dawnguard smiths can forge the Dawnguard crossbows and bolts again, the enhanced and exploding ones included."
+        ]
+      },
+      {
+        "heading": "Magic",
+        "items": [
+          "Summon Skeleton works for every caster again: everyone gets the regular skeleton until the beast-race skeletons are added.",
+          "The admin panel's Give all spells and Give all shouts are gone for good."
+        ]
+      }
+    ]
+  },
+  {
     "title": "The Pale's treasury",
     "date": "2026-10-16",
     "version": "Server update",
