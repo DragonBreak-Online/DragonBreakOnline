@@ -91,6 +91,24 @@ module.exports = (api) => {
     log(`dungeons: ${skillBooks.length} skill book(s) for Hermaeus Mora's blessing`);
     return skillBooks;
   };
+  // Ebony from the hardest dungeons (Nate, 17 Oct: "just needs to be severely rare"; the ebony thread asked for it in
+  // Expert and Master only). Ebony is a mined metal, kept out of every loot pool and swapped out of opened chests
+  // (loottiers.js LOOT_ONLY_METALS, gearswap.js), so it is handed to whoever opens the chest first or loots the master,
+  // one ingot, by the lease's difficulty. About 1 in 1,000 Expert and 1 in 400 Master chests, 1 in 200 and 1 in 100
+  // masters. Config dungeons.ebonyDrop; chance 0 or enabled false: none.
+  const EBONY = Object.assign({ enabled: true, item: '5ad9d:Skyrim.esm', chest: { hard: 0.001, nightmare: 0.0025 }, master: { hard: 0.005, nightmare: 0.01 } }, C.ebonyDrop || {});
+  const ebonyGift = (a, lease, kind) => {
+    try {
+      if (!EBONY.enabled || !lease) return;
+      const chance = Number(((kind === 'master' ? EBONY.master : EBONY.chest) || {})[lease.difficulty]) || 0;
+      if (!(chance > 0) || Math.random() >= chance) return;
+      const id = idOf(String(EBONY.item)); if (!id) return;
+      if (giveItem(a, id, 1)) {
+        personal(a, kind === 'master' ? 'Among the master\'s things, wrapped in oilcloth: an Ebony Ingot.' : 'Under a false bottom in the chest: an Ebony Ingot.');
+        audit(`EBONY ${who(a)} found an Ebony Ingot ${kind === 'master' ? 'on a master' : 'in a chest'} in ${lease.name} (${lease.difficulty}, 1 in ${Math.round(1 / chance)})`);
+      }
+    } catch (e) { log('dungeons: ebony gift failed', e.message); }
+  };
   const scholarGift = (a, chance, where) => {
     try {
       if (!globalThis.__dboBlessedWith || !globalThis.__dboBlessedWith(a, 'scholarBoon') || Math.random() >= chance) return;
@@ -1626,7 +1644,7 @@ module.exports = (api) => {
       if (!lease) { glowOff(casterId, [targetId]); return null; }
       // Only the party that holds the claim: a party that stayed inside after clearing looted the next claim's refill
       if (!lease.members.has(profileOf(casterId))) return deny(casterId, `This belongs to the party that claimed ${lease.name}.`, `${chest.d.id} chest, not in the claiming party`);
-      const opened = () => { if (!lease.looted.has(targetId)) { lease.looted.add(targetId); if (!lease.stocked) { for (const pid of lease.members) { const a = actorByProfile(pid); if (a) glow(a, [targetId], false); } } scholarGift(casterId, SCHOLAR_CHEST, 'among the chest\'s things'); } };
+      const opened = () => { if (!lease.looted.has(targetId)) { lease.looted.add(targetId); if (!lease.stocked) { for (const pid of lease.members) { const a = actorByProfile(pid); if (a) glow(a, [targetId], false); } } scholarGift(casterId, SCHOLAR_CHEST, 'among the chest\'s things'); ebonyGift(casterId, lease, 'chest'); } };
       if (!lease.locked.has(targetId) || lease.unlocked.has(targetId)) { opened(); return null; }
       const level = lease.locked.get(targetId);
       const tier = lockpickingTier(casterId);
@@ -2053,6 +2071,7 @@ module.exports = (api) => {
     try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('loot', 'dungeon_body', casterId, targetId, gave, goldKept, shares); } catch (e) { /* the player log is optional */ }
     personal(casterId, got.length ? `You find ${got.join(', ')}.` : 'You find nothing of use.');
     scholarGift(casterId, SCHOLAR_BODY, 'in their pack');
+    if (master) ebonyGift(casterId, lease, 'master');
     return false;
   };
 

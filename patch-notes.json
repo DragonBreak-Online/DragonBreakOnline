@@ -1,5 +1,19 @@
 [
   {
+    "title": "Ebony in the hardest dungeons",
+    "date": "2026-10-17",
+    "version": "Gameplay",
+    "tag": "Update",
+    "sections": [
+      {
+        "heading": "Ebony",
+        "items": [
+          "Expert and Master dungeons can very rarely hold an Ebony Ingot: about 1 in 1,000 Expert chests and 1 in 400 Master chests, and 1 in 200 Expert and 1 in 100 Master bosses. It goes to whoever opens the chest first or loots the boss."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Orcish smithing for every Orc",
     "date": "2026-10-17",
     "version": "Hotfix",
