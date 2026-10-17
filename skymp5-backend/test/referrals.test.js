@@ -275,3 +275,46 @@ test('a deleted account\'s binding rows are dropped, and rows older than 30 days
   assert.deepEqual(rows().map(r => r.profileId), [3], 'the 31-day-old row is gone')
   assert.equal(fs.statSync(path.join(dir, 'b.jsonl')).mode & 0o777, 0o600)
 })
+
+test('R-TRIM: a 31-day-old row is dropped with no new binding and with REFERRAL_LINKS off, at first use and then daily', () => {
+  const was = process.env.REFERRAL_LINKS
+  process.env.REFERRAL_LINKS = 'off'
+  try {
+    const dir = fs.mkdtempSync(path.join(tmp, 'trim-'))
+    const file = path.join(dir, 'b.jsonl')
+    const D = 24 * 3600 * 1000
+    let t = Date.UTC(2026, 9, 1)
+    const row = (profileId, at) => JSON.stringify({ kind: 'bind', v: 1, at, code: 'BCDF2345', profileId, accountCreatedAt: AT_2024, via: 'cookie' }) + '\n'
+    fs.writeFileSync(file, row(1, t - 31 * D) + row(2, t - 2 * D), { mode: 0o600 })
+    const timers = []
+    let unrefd = 0
+    const every = (fn, ms) => { timers.push({ fn, ms }); return { unref: () => { unrefd++ } } }
+    const store = createReferralStore({ pendingFile: path.join(dir, 'p.json'), bindingsFile: file, now: () => t, log: () => {}, every })
+    const rows = () => fs.readFileSync(file, 'utf8').trim().split('\n').filter(Boolean).map(l => JSON.parse(l).profileId)
+    store.startTrim()
+    assert.deepEqual(rows(), [2], 'the first use drops the 31-day-old row at once')
+    assert.equal(timers.length, 1)
+    assert.equal(timers[0].ms, D, 'a daily timer')
+    assert.equal(unrefd, 1, 'the timer never keeps the process alive')
+    store.startTrim()
+    assert.equal(timers.length, 1, 'a second start makes no second timer')
+    // No binding arrives; a day later another row passes 30 days and the timer drops it
+    t += 29 * D
+    timers[0].fn()
+    assert.deepEqual(rows(), [], 'the daily timer drops it with no new binding')
+    // The timer runs even if a binding trimmed less than a day ago
+    fs.appendFileSync(file, row(3, t - 31 * D) + row(4, t))
+    t += 1000
+    assert.equal(store.trim(), 0, 'a binding\'s trim still waits a day')
+    timers[0].fn()
+    assert.deepEqual(rows(), [4])
+  } finally { process.env.REFERRAL_LINKS = was }
+})
+
+test('R-TRIM: the shared store starts the daily drop on its first use, unref\'d', () => {
+  const { store } = require('../sources/referrals')
+  const timer = store()._trimTimer()
+  assert.ok(timer, 'the shared store has a trim timer')
+  assert.equal(typeof timer.hasRef === 'function' ? timer.hasRef() : false, false)
+  assert.equal(store()._trimTimer(), timer, 'one timer only')
+})
