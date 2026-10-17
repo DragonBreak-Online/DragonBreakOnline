@@ -109,8 +109,8 @@ every('tickSummary', 60000, () => {
 const SAVES = globalThis.__dboSaves instanceof Map ? globalThis.__dboSaves : (globalThis.__dboSaves = new Map());
 const saveSoon = (file, snapshot) => { const s = SAVES.get(file) || { dirty: false, busy: false, seq: 0 }; s.snapshot = snapshot; s.dirty = true; SAVES.set(file, s); };
 const writeSaveSync = (file, s) => { const tmp = `${file}.${++s.seq}.tmp`; fs.writeFileSync(tmp, s.snapshot()); fs.renameSync(tmp, file); s.dirty = false; };
-// Money moves write at once: a crash inside the debounce would bring back a paid contract to be paid again
-const saveNow = (file, snapshot) => { saveSoon(file, snapshot); try { writeSaveSync(file, SAVES.get(file)); } catch (e) { log('save failed', path.basename(file), e.message); } };
+// Money moves write at once: a crash inside the debounce would bring back a paid contract to be paid again; the world save (saveIntervalMs) goes on the next tick too
+const saveNow = (file, snapshot) => { saveSoon(file, snapshot); try { writeSaveSync(file, SAVES.get(file)); } catch (e) { log('save failed', path.basename(file), e.message); } try { mp.requestSaveNow?.(); } catch (e) { log('requestSaveNow failed', e.message); } };
 const writeSave = (file, s) => {
   if (!s.dirty || s.busy) return;
   let text; try { text = s.snapshot(); } catch (e) { return log('save snapshot failed', path.basename(file), e.message); }

@@ -10,8 +10,9 @@
 //      pays or takes gold or items must use saveNow on those paths, as contracts.js does.
 //   2. gamemode.js calls saveSoon only for the files listed in GAMEMODE_SOON (cooldowns, not money).
 //   3. No paying module writes its state with an async fs write, or saves from a timer that a crash could skip.
-// The server's own record of a character (inventory included) is written every tick by WorldState::TickSaveStorage,
-// so gold in a purse is never behind by more than a tick; the gap this lint closes is a JSON file behind the purse.
+// The server's own record of a character (inventory included) is saved at most every saveIntervalMs (5 s) by
+// WorldState::TickSaveStorage, and on the next tick after a saveNow, which calls mp.requestSaveNow, so after a money
+// write the purse is never behind by more than a tick; the gap this lint closes is a JSON file behind the purse.
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -45,6 +46,9 @@ for (const f of modules) {
     check(`${f}: no save left to a timer`, !/setTimeout\s*\(\s*(\(\)\s*=>\s*)?\{?[^}]{0,80}\bsave\w*\s*\(/.test(src));
   }
 }
+
+const gamemode = fs.readFileSync(path.join(ROOT, 'gamemode.js'), 'utf8');
+check('gamemode.js: saveNow asks for the world save on the next tick', /const saveNow = [^\n]*\bmp\.requestSaveNow\?\.\(\)/.test(gamemode));
 
 // contracts.js in particular: the kill payout and the expiry refund write first
 const contracts = fs.readFileSync(path.join(ROOT, 'contracts.js'), 'utf8');
