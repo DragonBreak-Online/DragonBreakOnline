@@ -5,6 +5,8 @@
 //   /monitor            the last 15 minutes: counts by kind, the worst of each, the latest alerts, the players
 //   /monitor <minutes>  the same over up to 24 hours
 //   /monitor npc        NPC kinds only
+//   /monitor cheat      anti-cheat flags only: counts by kind (live and shadow, held back in a stall) and the latest
+//                       cheat alerts (dbo-monitor reads the gamemode's ANTICHEAT lines, design 17 Oct 2026)
 
 const fs = require('fs');
 
@@ -20,7 +22,12 @@ module.exports = (api) => {
     'player.crash': 'possible crashes', 'server.restart': 'restarts', 'server.update': 'updates',
     'server.update_failed': 'FAILED updates', 'server.load_failed': 'FAILED module loads', 'server.script_error': 'script errors',
     'server.cpp_error': 'server errors', 'client.error': 'client errors', 'client.error_keyword': 'known client error (fixed next client)',
+    'cheat.held': 'cheat flags held back in a server stall', 'cheat.other': 'other anti-cheat lines',
   };
+  // dbo-monitor counts each anti-cheat kind as cheat.<kind> (live) or cheat_shadow.<kind> (shadow: counted, never posted)
+  const label = (k) => LABELS[k] || (k.startsWith('cheat.') ? `cheat flags: ${k.slice(6).replace(/_/g, ' ')}`
+    : k.startsWith('cheat_shadow.') ? `shadow cheat flags: ${k.slice(13).replace(/_/g, ' ')}` : k);
+  const isCheat = (k) => k.startsWith('cheat.') || k.startsWith('cheat_shadow.');
 
   registerChatCommand('monitor', (a, args) => {
     if (!isAdmin(a)) return personal(a, 'The monitor is for staff.');
@@ -28,6 +35,7 @@ module.exports = (api) => {
     try { st = JSON.parse(fs.readFileSync(FILE, 'utf8')); } catch (e) { return personal(a, 'The monitor has no data yet (is dbo-monitor running?).'); }
     const words = String(args || '').trim().toLowerCase().split(/\s+/).filter(Boolean);
     const npcOnly = words.includes('npc');
+    const cheatOnly = !npcOnly && words.includes('cheat');
     const minutes = Math.max(5, Math.min(1440, parseInt(words.find((w) => /^\d+$/.test(w)), 10) || 15));
     const since = Date.now() / 1000 - minutes * 60;
     const counts = {}; const worst = {};
@@ -39,17 +47,18 @@ module.exports = (api) => {
     const age = Math.round(Date.now() / 1000 - (st.updatedAt || 0));
     personal(a, `Monitor, last ${minutes} min (data ${age < 120 ? 'live' : age + ' s old'}):`);
     const keys = Object.keys(counts).filter((k) => k !== 'noise' && !k.startsWith('player.join') && !k.startsWith('player.leave'))
-      .filter((k) => !npcOnly || k.startsWith('npc.')).sort((x, y) => counts[y] - counts[x]);
+      .filter((k) => (!npcOnly || k.startsWith('npc.')) && (!cheatOnly || isCheat(k))).sort((x, y) => counts[y] - counts[x]);
     if (!keys.length) personal(a, '  nothing to report');
     for (const k of keys.slice(0, 14)) {
       const w = worst[k];
-      personal(a, `  ${LABELS[k] || k}: ${counts[k]}${w && w[0] ? ` (worst ${w[0]}: ${w[1]})` : ''}`);
+      personal(a, `  ${label(k)}: ${counts[k]}${w && w[0] ? ` (worst ${w[0]}: ${w[1]})` : ''}`);
     }
     if (!npcOnly) {
-      const recent = (st.recent || []).slice(-5).map((r) => r.replace(/[`*]/g, ''));
+      const recent = (st.recent || []).filter((r) => !cheatOnly || /\*\*Cheat flag/.test(r)).slice(-5)
+        .map((r) => r.replace(/[`*]/g, '').replace(/\\(.)/g, '$1'));
       if (recent.length) { personal(a, 'Latest alerts:'); for (const r of recent) personal(a, `  ${r.slice(0, 180)}`); }
     }
     const online = Object.entries(st.online || {});
-    if (online.length) personal(a, 'Hosting: ' + online.map(([n, o]) => `${n} ${o.hosted || 0} (${o.unloaded || 0} unloaded)`).join(', '));
-  }, { admin: true, help: '[minutes] [npc]: server, player and NPC problems from the monitor (staff)' });
+    if (online.length && !cheatOnly) personal(a, 'Hosting: ' + online.map(([n, o]) => `${n} ${o.hosted || 0} (${o.unloaded || 0} unloaded)`).join(', '));
+  }, { admin: true, help: '[minutes] [npc|cheat]: server, player, NPC and anti-cheat problems from the monitor (staff)' });
 };
