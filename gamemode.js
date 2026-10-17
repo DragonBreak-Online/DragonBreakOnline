@@ -1679,6 +1679,12 @@ const treasuryRefused = (caster, target) => {
 // Gold lying in the world from the plugins (banks, shops, homes) is set dressing, never loot (Nate, 16 Oct: 500 gold from
 // the Riften bank's coin piles). Gold a player dropped (a dynamic ref) can still be picked up. Config placedGold.pickup
 const placedGoldBase = new Map(); // baseId -> true for gold
+const modelOf = (rec) => {
+  const f = rec && rec.record && (rec.record.fields || []).find((x) => x && x.type === 'MODL' && x.data instanceof Uint8Array);
+  if (!f) return '';
+  let t = ''; for (const c of f.data) { if (!c) break; t += String.fromCharCode(c); }
+  return t;
+};
 const isPlacedGold = (target) => {
   if (target >= 0xff000000 || ((cfg.placedGold || {}).pickup) === true) return false;
   let baseId = 0; try { baseId = mp.getIdFromDesc(String(mp.get(target, 'baseDesc'))) >>> 0; } catch (e) { return false; }
@@ -1686,6 +1692,11 @@ const isPlacedGold = (target) => {
   if (placedGoldBase.has(baseId)) return placedGoldBase.get(baseId);
   let yes = baseId === 0xf;
   if (!yes) { const rec = recordOf(baseId); yes = !!(rec && String(rec.record.type) === 'MISC' && /^gold0\d\d$|coin_?pile|gold_?(pile|stack|coins)/i.test(String(rec.record.editorId || ''))); }
+  // Any base whose model is coins, whatever its type (Nate, 17 Oct: Dragonborn's DLC2GoldPile activators in the banks paid
+  // out by script). A 140-plugin model scan found them as ACTI (DLC2CoinPile01/02), FLOR (coin purses, Summerset's coin
+  // stacks, Druadach's harvest coin) and MISC (coins and pouches); every coin model's file name has "coin" in it, and no
+  // other model's does. Gold Kanet and the golden Thieves Guild treasures are not coins and stay as they are.
+  if (!yes) { const rec = recordOf(baseId); yes = /coin|goldpile/i.test(modelOf(rec).split(/[\\/]/).pop()); }
   placedGoldBase.set(baseId, yes);
   return yes;
 };
