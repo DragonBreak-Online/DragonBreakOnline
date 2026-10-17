@@ -10,9 +10,10 @@ const GAME_YEAR = 0x35, GAME_MONTH = 0x36, GAME_DAY = 0x37, GAME_HOUR = 0x38, GA
 // A weather kind the region has no weather for falls back along these (0 pleasant, 1 cloudy, 2 rainy, 3 snow)
 const WEATHER_FALLBACK: Record<number, number[]> = { 0: [0, 1], 1: [1, 0], 2: [2, 3, 1], 3: [3, 2, 1] };
 
-// Server -> Client: { customPacketType: "dboClock", serverNow, gameDays, timeScale, weather, startYear } (server\worldclock.js)
-// The server owns the clock, so night, date and moon phase are the same for everyone; weather comes as a kind and
-// the region's own weather list supplies the look. Before the first packet the old real-time clock is used.
+// Server -> Client: { customPacketType: "dboClock", serverNow, gameDays, timeScale, weather, weatherId, startYear } (server\worldclock.js)
+// The server owns the clock, so night, date and moon phase are the same for everyone. weatherId ("hex:Plugin") is the exact
+// weather of the player's zone, the same for everyone there; an older server sends only the kind, and the region's own
+// list supplies the look. Before the first packet the old real-time clock is used.
 export class TimeService extends ClientListener {
   constructor(private sp: Sp, private controller: CombinedController) {
     super();
@@ -41,6 +42,8 @@ export class TimeService extends ClientListener {
     this.clock = { gameDays, timeScale, localAt: Date.now(), startYear: startYearOf(content["startYear"]) };
     const kind = Number(content["weather"]);
     this.weatherKind = Number.isInteger(kind) && kind >= 0 && kind <= 3 ? kind : -1;
+    const m = /^([0-9a-fA-F]{1,6}):(.+)$/.exec(String(content["weatherId"] || ""));
+    this.weatherId = m ? { id: parseInt(m[1], 16), file: m[2], key: m[0] } : null;
     this.lastTimeUpd = 0;
   }
 
@@ -90,6 +93,19 @@ export class TimeService extends ClientListener {
     if (!player || !cell || cell.isInterior()) { this.appliedKey = ""; return; }
     const current = Weather.getCurrentWeather();
     const place = cell.getFormID().toString(16);
+    // The server's exact weather: applied as is, so a region with no weather of the kind cannot keep an old one on
+    if (this.weatherId) {
+      const exact = Weather.from(this.sp.Game.getFormFromFile(this.weatherId.id, this.weatherId.file));
+      if (exact) {
+        const key = `${this.weatherId.key}|${place}`;
+        if (key === this.appliedKey && current && current.getFormID() === this.appliedWeatherId) return;
+        if (!current || current.getFormID() !== exact.getFormID()) exact.setActive(true, place !== this.appliedKey.split("|").pop());
+        this.appliedKey = key;
+        this.appliedWeatherId = exact.getFormID();
+        logTrace(this, "Weather set to", this.weatherId.key);
+        return;
+      }
+    }
     const key = `${this.weatherKind}|${place}`;
     // Re-apply on a new kind, a new cell, or when the region's own weather took over again
     if (key === this.appliedKey && current && current.getFormID() === this.appliedWeatherId) return;
@@ -102,6 +118,8 @@ export class TimeService extends ClientListener {
       logTrace(this, "Weather set to kind", kind, "for", this.weatherKind);
       return;
     }
+    // No weather of the kind here: let the region's own weather go on rather than keep the last one forced
+    if (this.appliedKey !== key) { Weather.releaseOverride(); this.appliedKey = key; this.appliedWeatherId = 0; }
   }
 
   private onUpdate() {
@@ -113,6 +131,7 @@ export class TimeService extends ClientListener {
   private lastTimeUpd = 0;
   private clock: { gameDays: number; timeScale: number; localAt: number; startYear: number } | null = null;
   private weatherKind = -1;
+  private weatherId: { id: number; file: string; key: string } | null = null;
   private appliedKey = "";
   private appliedWeatherId = 0;
 }
