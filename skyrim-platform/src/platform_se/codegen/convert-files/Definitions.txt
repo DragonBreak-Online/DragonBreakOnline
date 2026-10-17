@@ -50,6 +50,8 @@ export interface ChangeFormNpc {
 export declare function loadGame(pos: number[], angle: number[], worldOrCell: number, changeFormNpc?: ChangeFormNpc, loadOrder?: string[], time?: { seconds: number, minutes: number, hours: number }): void
 
 export declare function worldPointToScreenPoint(...args: number[][]): number[][]
+export declare function getCameraFov(): { world: number, firstPerson: number }
+export declare function setCameraFov(world: number | null, firstPerson: number | null): { world: number, firstPerson: number }
 
 // A Scaleform menu of our own (DboMenuApi.cpp), usable from "tick": the main menu, before the world loads. One at a time.
 // flags: UI_MENU_FLAGS bits (1 PausesGame, 4 UsesCursor, 8 UsesMenuContext, 16 Modal...); depth: the menu's depthPriority
