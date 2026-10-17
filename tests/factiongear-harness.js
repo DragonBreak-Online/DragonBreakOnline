@@ -28,7 +28,8 @@ check('each item names at least one faction and a role', Object.values(gear).eve
 const ids = new Map(); const descs = new Map(); let next = 0x100;
 // Case-insensitive, as the server's desc lookup is (the module lower-cases plugin names)
 const idOf = (desc) => { const k = String(desc).toLowerCase(); if (!ids.has(k)) { ids.set(k, next); descs.set(next, desc); next++; } return ids.get(k); };
-const IMP_HELM = idOf(itemNamed('Imperial Helmet')), THALMOR = idOf(itemNamed('Thalmor Robes')), ORC = idOf(itemNamed('Orcish Armor'));
+const IMP_HELM = idOf(itemNamed('Imperial Helmet')), THALMOR = idOf(itemNamed('Thalmor Robes')), ORC = idOf(itemNamed('Orcish Clan Cuirass'));
+const ORC_BASE = idOf('orcish-armor-not-listed:Skyrim.esm');
 const WR_ARMOR = idOf(itemNamed("Whiterun Guard's Armor")), VAMP = idOf(itemNamed('Vampire Armor', 'Vampire clans'));
 const IRON = idOf('12e46:Skyrim.esm');
 
@@ -85,9 +86,12 @@ for (const [desc, v] of thalmor) {
   check(`${v.name}: an outsider is refused and told only the Thalmor's tailors make it; the Robe-Maker and the First Emissary make it; a Thalmor Soldier is told the rank`,
     out && craft(A.TH_TAILOR, id) === true && craft(21, id) === true && craft(20, id) === false && /You are one of them, but it takes their Tailor rank or their leader/.test(lastTo(20)), [lastTo(A.OUT), lastTo(20)]);
 }
-check("Orcish Armor: any stronghold's smith", craft(A.ORC_SMITH, ORC) === true);
+check("Orcish Clan Cuirass: any stronghold's smith", craft(A.ORC_SMITH, ORC) === true);
 fresh();
 check("...no one else, and the line names the strongholds", craft(A.OUT, ORC) === false && /made only by the strongholds' smiths/.test(lastTo(A.OUT)), lastTo(A.OUT));
+// Nate, 17 Oct: the base Orcish set is any Orc's (regions.js orcishCraft keeps it to Orcs), not the strongholds' alone
+check('the base Orcish set is not faction gear', !Object.values(gear).some((v) => v.set === 'Orcish'), Object.values(gear).filter((v) => v.set === 'Orcish').map((v) => v.name));
+check('...so a smith outside every stronghold passes the faction rule', craft(A.OUT, ORC_BASE) === true);
 check("Whiterun Guard's Armor: Whiterun's Hold Smith", craft(A.WR_SMITH, WR_ARMOR) === true);
 check("...not Riften's", craft(A.RF_SMITH, WR_ARMOR) === false && /Whiterun Hold's smiths/.test(lastTo(A.RF_SMITH)), lastTo(A.RF_SMITH));
 check('Vampire Armor: a Crimson Scars smith, one of the vampire clans', craft(A.VAMP_SMITH, VAMP) === true);

@@ -44,7 +44,8 @@ SETS = [
     ('College of Winterhold', ['college-of-winterhold'], r"^((Hooded )?Arch-Mage's|College Boots|College of Winterhold)", None),
     ('Vampire clans (royal)', ['clan-volkihar'], r"^Vampire Royal Armor$", None),
     ('Vampire clans', VAMPIRES, r"^Vampire (Armor|Boots|Gauntlets|Gloves|Hood|Robes)$", None),
-    ('Orcish', CLANS, r"^Orcish (?!Arrow|Bolt)", None),
+    # The base Orcish set is not here (Nate, 17 Oct): any Orc forges it, wherever they live (regions.js orcishCraft keeps
+    # it to Orcs); only the Orcish Clan pieces are the strongholds' own
     # The Vigil's own kit from Sentinel (Nate, 12 Oct, Roland EbonShield: any tier 5 smith could make these, which left
     # the faction nothing to recruit with). Four of the fifteen were listed by hand on 28 Sep; the rest were not, so the
     # mail, plate, coif, shield and the two Vigilant weapons were open to anyone. Sentinel.esp only: "Vigilant" also
