@@ -119,6 +119,41 @@ void InstallQueuedActorDisableHook()
   spdlog::info("QueuedActorDisable: hook installed");
 }
 
+// The face morph job (AE id 26999) holds its own reference to a head's BSFaceGenNiNode and runs on a job thread. When the
+// head is rebuilt or unloaded before it runs, the node is detached (parent null), and the morph update (26988) calls a
+// virtual on that parent without a null check (26988+0x399, 29 crashes 3-13 Oct). A detached head is not drawn, so its
+// update is skipped.
+struct FaceMorphJobUpdate
+{
+  static void thunk(RE::NiAVObject* faceNode, bool a_arg)
+  {
+    if (faceNode && !faceNode->parent) {
+      return;
+    }
+    func(faceNode, a_arg);
+  };
+  static inline REL::Relocation<decltype(&thunk)> func;
+};
+
+// AE 1.6.1170 only: the job's one call to the morph update, checked before it is patched
+void InstallFaceMorphJobHook()
+{
+  if (!REL::Module::IsAE()) {
+    return;
+  }
+  const auto site = REL::ID(26999).address() + 0x13;
+  const auto update = REL::ID(26988).address();
+  const auto bytes = reinterpret_cast<const std::uint8_t*>(site);
+  const auto target =
+    site + 5 + *reinterpret_cast<const std::int32_t*>(bytes + 1);
+  if (bytes[0] != 0xE8 || target != update) {
+    spdlog::warn("FaceMorphJobUpdate: call site not found, hook not installed");
+    return;
+  }
+  Hooks::write_thunk_call<FaceMorphJobUpdate>(site);
+  spdlog::info("FaceMorphJobUpdate: hook installed");
+}
+
 void BindNativeMethod(RE::BSScript::Internal::VirtualMachine* thisArg,
                       RE::BSScript::IFunction* func);
 
@@ -190,6 +225,7 @@ void Hooks::Install()
   InstallOnConsoleVPrintHook();
   InstallJumpHandlerHook();
   InstallQueuedActorDisableHook();
+  InstallFaceMorphJobHook();
   HookVirtualMachineBind();
 
   logger::info("CommonLib hooks installed.");
