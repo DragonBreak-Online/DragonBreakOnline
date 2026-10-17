@@ -1,6 +1,7 @@
 #include "Hooks.h"
 #include "EventHandler.h"
 #include <chrono>
+#include <intrin.h>
 #include <mutex>
 
 namespace hook::internal {
@@ -137,6 +138,25 @@ struct ProbeGarbageCollectorAdd
   static inline REL::Relocation<decltype(&thunk)> func;
 };
 
+// Every form id change on a Character (vtable slot 0x38), from any path: a copy's id goes to 0 when the engine really
+// tears it down. The caller's offset in SkyrimSE.exe names the path (Address Library lookup offline).
+struct ProbeSetFormID
+{
+  static void thunk(RE::Character* actor, RE::FormID a_id, bool a_updateFile)
+  {
+    if (actor && LifecycleProbe::Watched(actor)) {
+      const auto caller = reinterpret_cast<std::uintptr_t>(_ReturnAddress());
+      spdlog::info("LifecycleProbe set-form-id id={:X} new={:X} rc={} "
+                   "caller=SkyrimSE.exe+{:X} t={} tid={}",
+                   actor->GetFormID(), a_id, LifecycleProbe::RefCount(actor),
+                   caller - REL::Module::get().base(), LifecycleProbe::Now(),
+                   GetCurrentThreadId());
+    }
+    func(actor, a_id, a_updateFile);
+  };
+  static inline REL::Relocation<decltype(&thunk)> func;
+};
+
 // A call site is patched only when it is a 5-byte call to the expected function
 bool IsCallTo(std::uintptr_t site, std::uintptr_t target)
 {
@@ -152,6 +172,7 @@ void InstallLifecycleProbe()
   }
   REL::Relocation<std::uintptr_t> vtbl{ RE::VTABLE_Character[0] };
   ProbeActorDisable::func = vtbl.write_vfunc(0x89, ProbeActorDisable::thunk);
+  ProbeSetFormID::func = vtbl.write_vfunc(0x38, ProbeSetFormID::thunk);
   // The Papyrus Delete functor's call to GarbageCollector::Add (36459)
   const auto site = REL::ID(56116).address() + 0x78;
   if (IsCallTo(site, REL::ID(36459).address())) {
