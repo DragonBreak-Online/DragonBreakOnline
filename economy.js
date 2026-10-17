@@ -142,6 +142,13 @@ module.exports = (api) => {
       const seat = zone && fn('__dboRealmSeatTerritoryOf') ? fn('__dboRealmSeatTerritoryOf')(zone) : null;
       if (seat) return seat;
     } catch (e) { /* no hold */ }
+    // ...or the staff's word for it, when no door of it leads outside and the housing knows no hold (config
+    // economy.propertyTerritory: { "<ref hex>": "<territory id>" }; Fort Dawnguard 200f359, every door inside: the Rift)
+    try {
+      const tid = (C.propertyTerritory || {})[Number(ref).toString(16)];
+      const t = tid && fn('__dboRealmTerritory') ? fn('__dboRealmTerritory')(String(tid)) : null;
+      if (t) return t;
+    } catch (e) { /* no override */ }
     return null;
   };
   // The claims a reckoning taxes: one per building (Nate, 4 Oct: the building is the property, not its doors or what is inside

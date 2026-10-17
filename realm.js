@@ -598,6 +598,7 @@ module.exports = (api) => {
   globalThis.__dboRealmTerritoryName = (tid) => (territory(tid) || { name: tid }).name;
   // A hold's seat territory (its id is the zone's, or it holds the seat's cells): where a building with no door out in the open
   // pays its tax (economy.js, Nate 17 Oct: "tax guild HQs too"; Fort Dawnguard's doors all stand in its interiors)
+  globalThis.__dboRealmTerritory = (tid) => territory(tid);
   globalThis.__dboRealmSeatTerritoryOf = (zone) => { const ts = territories().filter((t) => t.zone === zone); return ts.find((t) => t.id === zone) || ts.find((t) => Array.isArray(t.seatCells) && t.seatCells.length) || null; };
   globalThis.__dboRealmFactionsLedBy = (a) => factionsLedBy(a);
   globalThis.__dboRealmTerritoriesOf = (fid) => territoriesOf(fid).map((t) => t.id);
