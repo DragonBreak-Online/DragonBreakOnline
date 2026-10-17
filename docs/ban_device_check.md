@@ -124,6 +124,15 @@ since the last line. An hour with nothing counted prints nothing.
   and is safe while the backend runs.
 - The script finds the entry only through profiles.json. If the profile is already gone it cannot find it, and the
   entry is deleted under the 30-day rule: within 30 days of the player's last PLAY, unless the account is banned.
+- **Referral record, on every account deletion** (Privacy Policy 2026-10-17, section 5: "erased when your account is
+  deleted"): write down the profile number before the deletion. Once `players.deleteByProfileId` has succeeded (the
+  server-manager's player delete reported success), a Lead GM or above types `/referral forget <N>` in game with that
+  number. The backend's deletion does not reach this record: it lives in the game server's `referrals.json`. Either
+  answer is done: `Profile <N>'s referral record and code are erased.` or `Profile <N> has no referral record.` Run it
+  after the deletion, never before, so the account cannot play again and make a new record in between. If it answers
+  `Referrals are not open yet.` or `Referrals are paused: ...`, nothing was erased: keep the number with the ticket and
+  run it again as soon as referrals are on. The deleted account's number stays in other referral data: a referrer's
+  carry weight and boosts, its friends' "referred by", and the go-live list of accounts that already existed.
 - **Never move or delete `data/bans.json` while the backend runs**, and never start the backend with it moved aside. A
   missing file counts as no bans, so the hourly prune (and the one at start-up) deletes banned accounts' PCs older
   than 30 days, and putting the file back does not restore them.
