@@ -393,6 +393,38 @@ module.exports = (api) => {
     return reports;
   };
 
+  // Tax coverage (Nate, 17 Oct: "make sure all of the houses follow taxation in bruma, some were bought before the
+  // system"): once after a load, every owned building as the reckoning sees it, logged, so a house the weekly tax would
+  // skip is found before the reckoning: no territory at its doors, no ruling faction there, or a rate of 0. Read only:
+  // nothing is charged, nothing saved (buildings() gets a throwaway overdue map).
+  const taxCoverage = () => {
+    const d = data(); const H = housing(); if (!H) return log('economy: tax coverage: no housing');
+    const rows = []; const skipped = {};
+    for (const { ref, rec } of buildings(H, { values: d.values, overdue: {} })) {
+      let why = '', fid = null, rate = 0, territory = '';
+      try {
+        const t = territoryOfProperty(ref, rec);
+        if (!t) why = 'no territory at its doors';
+        else {
+          territory = String(t.name || t.id);
+          fid = fn('__dboRealmOwnerOf') ? fn('__dboRealmOwnerOf')(t.id) : null;
+          if (!fid) why = `no faction rules ${territory}`;
+          else { rate = rateOf(fid); if (!rate) why = `${nameOfFaction(fid)} taxes at 0`; }
+        }
+      } catch (e) { why = `unreadable: ${e.message}`; }
+      const owners = ownerActors(H, rec).map((x) => { try { return who(x); } catch (e) { return x.toString(16); } }).join(', ') || 'no owner online record';
+      const tax = why ? 0 : Math.floor(valueOf(ref) * rate);
+      if (why) { skipped[why] = (skipped[why] || 0) + 1; log(`economy: tax coverage: UNTAXED ${ref.toString(16)} (${owners}): ${why}`); }
+      rows.push({ ref, why, tax, territory, fid });
+    }
+    const byTerritory = {};
+    for (const r of rows) if (!r.why) byTerritory[r.territory] = (byTerritory[r.territory] || 0) + 1;
+    log(`economy: tax coverage: ${rows.length} owned building(s), ${rows.filter((r) => !r.why).length} taxed (${Object.entries(byTerritory).map(([k, v]) => `${k} ${v}`).join(', ') || 'none'}), ${rows.filter((r) => r.why).length} untaxed${Object.keys(skipped).length ? ` (${Object.entries(skipped).map(([k, v]) => `${v} ${k}`).join('; ')})` : ''}; ${rows.reduce((n, r) => n + r.tax, 0)} gold a week`);
+    return rows;
+  };
+  globalThis.__dboEconomyTaxCoverage = taxCoverage;
+  { const tc = setTimeout(() => { try { taxCoverage(); } catch (e) { log('economy: tax coverage failed', e.message); } }, 90000); if (tc && typeof tc.unref === 'function') tc.unref(); }
+
   every('economy', 60000, () => {
     if (!C.enabled) return;
     try {
