@@ -1,5 +1,19 @@
 [
   {
+    "title": "Castle Bruma's gate lever",
+    "date": "2026-10-17",
+    "version": "Hotfix",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Bruma",
+        "items": [
+          "Only the Countess's court (anyone holding a seat in Bruma's court, or in the County household) and the staff can work the lever of Castle Bruma's north gate. Anyone else is told it is not theirs to pull."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Hunting contracts: for citizens, at the hold's price",
     "date": "2026-10-17",
     "version": "Gameplay",

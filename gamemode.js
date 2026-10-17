@@ -1833,6 +1833,31 @@ mp.onActivate = (targetId, casterId) => {
   // "allowed" (housingSystem.ts); that policy is the fork's to change, so a throw out of it still allows, now logged.
   try { return prev.call(mp, targetId, casterId) !== false; } catch (e) { logActivateThrow('systems', e); return true; }
 };
+// A court's own levers (Countess Frigga, 17 Oct: anyone in town could work Castle Bruma's north gate and shut her out):
+// only the court of the lever's zone pulls it, a seat in its offices or its household, and staff. config courtLevers
+// { "<lever desc>": "<zone id>" } replaces the list
+{
+  const activateBeforeCourtLevers = mp.onActivate;
+  const LEVERS = (cfg.courtLevers && typeof cfg.courtLevers === 'object') ? cfg.courtLevers : { '1b5fc3:DragonBreak Online Edits.esp': 'bruma' };
+  const leverZone = new Map();
+  for (const [desc, zone] of Object.entries(LEVERS)) { try { leverZone.set(mp.getIdFromDesc(desc) >>> 0, String(zone)); } catch (e) { log(`court levers: ${desc} not found`); } }
+  const servesCourt = (a, zone) => {
+    const pid = Number(profileOf(a));
+    const seats = (readOfficials() || {})[zone] || {};
+    if (pid >= 0 && Object.values(seats).some((list) => (list || []).map(Number).includes(pid))) return true;
+    try { const fid = typeof globalThis.__dboHoldFactionOf === 'function' ? globalThis.__dboHoldFactionOf(zone) : null; if (fid && typeof globalThis.__dboGuildsOf === 'function' && (globalThis.__dboGuildsOf(a) || []).some((g) => g.id === fid)) return true; } catch (e) { /* no household */ }
+    return false;
+  };
+  mp.onActivate = (targetId, casterId) => {
+    const zone = leverZone.get(targetId >>> 0);
+    if (zone && userOf(casterId) >= 0 && !isAdmin(casterId) && !servesCourt(casterId >>> 0, zone)) {
+      const z = (ZONES.holds || []).concat(ZONES.regions || []).find((x) => x.id === zone);
+      personal(casterId, `Only the court of ${z ? z.name : zone} works this lever.`);
+      return false;
+    }
+    return activateBeforeCourtLevers(targetId, casterId);
+  };
+}
 // Any throw in the chain above is refused, not allowed (see activateThrew)
 {
   const activateChain = mp.onActivate;
