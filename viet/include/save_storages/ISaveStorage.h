@@ -35,6 +35,9 @@ public:
     std::vector<std::optional<T>>& changeForms) = 0;
 
   virtual const std::string& GetName() const = 0;
+
+  // Clean stop: writes every batch handed over so far, oldest first, then `pending`, on the calling thread; failures come from the next Tick
+  virtual void FlushSync(std::vector<std::optional<T>>&& pending) = 0;
 };
 
 namespace ISaveStorageUtils {
