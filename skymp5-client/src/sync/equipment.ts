@@ -1,6 +1,7 @@
 import {
   Actor,
   Ammo,
+  Form,
   Game,
   ObjectReference,
   Spell,
@@ -155,10 +156,30 @@ export const npcSidearmFor = (ac: Actor): number => {
   return 0;
 };
 
+// Actor.UnequipAll unequips from inside the engine's worn-item walk (Address Library 16096). An unequip that drops an
+// inventory entry frees the list node the walk reads next, and the walk then crashes taking that node's lock (68233).
+// The worn forms are collected first and unequipped one by one, with no walk running.
+const unequipAllOutsideWalk = (ac: Actor): void => {
+  const forms = new Map<number, Form>();
+  for (let slot = 0; slot < 31; slot++) {
+    const form = ac.getWornForm(2 ** slot);
+    if (form) forms.set(form.getFormID(), form);
+  }
+  for (const hand of [0, 1]) {
+    const form = ac.getEquippedObject(hand);
+    if (form && !Spell.from(form)) forms.set(form.getFormID(), form);
+  }
+  forms.forEach((form) => ac.unequipItem(form, false, true));
+  for (const hand of [0, 1]) {
+    const spell = ac.getEquippedSpell(hand);
+    if (spell) ac.unequipSpell(spell, hand);
+  }
+};
+
 export const applyEquipment = (ac: Actor, eq: Equipment, opts?: { npcAmmo?: boolean }): boolean => {
   ac.removeAllItems(null, false, true);
 
-  ac.unequipAll();
+  unequipAllOutsideWalk(ac);
 
   ac.removeAllItems(null, false, true);
 
