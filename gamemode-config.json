@@ -1800,15 +1800,16 @@
    "speed_bucket", "speed_shadow", "snapback_ignored", "movement_nonfinite", "vitals_nonfinite", "vitals_refused", "fork_other"],
   "stall": { "lateMs": 1500, "burstPlayers": 3, "burstMs": 2000, "holdMs": 10000, "reseedMs": 3000 },
   "speed": {
-   "_comment": "u/s over the net displacement of 10 s and 60 s of server-accepted positions, with 80% continuity. Measured honest on foot (2 s windows): p99.9 560-580, max 590; MOVT sprint 500, horse 600, werewolf 531. Mount detection is LIKELY until a staff horse test.",
+   "_comment": "u/s over the net displacement of 10 s and 60 s of server-accepted positions, with 80% continuity. A Whirlwind Sprint or Voice hit exempts 10 s, at most once per exemptEveryMs; a teleport restarts the windows at most jumpRestarts times in jumpRestartWindowMs, past that its step is taken out of them. speed_sustained60 tier pulse: 60 s above pulseSpeed with pulseContinuity of the time at pulseStepShare x pulseSpeed (stop-and-go; shadow while speed_sustained60 is). Measured honest on foot (2 s windows): p99.9 560-580, max 590; MOVT sprint 500, horse 600, werewolf 531. Mount detection is LIKELY until a staff horse test.",
    "enabled": true, "alertSpeed": 850,
    "limit10": { "foot": 650, "mount": 850, "beast": 850, "unknown": 850 },
    "limit60": { "foot": 540, "other": 750 },
    "continuity": 0.8, "blinkUnits": 2000, "blinkWithinMs": 1500, "blinkCount": 3, "blinkWindowMs": 600000, "jumpUnits": 3000, "dashExemptMs": 10000,
+   "exemptEveryMs": 60000, "jumpRestarts": 3, "jumpRestartWindowMs": 600000, "pulseSpeed": 850, "pulseContinuity": 0.3, "pulseStepShare": 0.5,
    "rubberBand": false, "rubberBandSpeed": 1000, "rubberBandMaxPerMin": 3
   },
   "magicka": {
-   "_comment": "magicka_free (interim until the fork's vitals budget): costly casts (SPIT cost >= minCost) at stored magicka >= fullAt after which it never went below dropBelow within holdMs (15 s for concentration; longer while the stored value is unchanged to the bit, the client's own report hold, up to heldMaxMs). Flag at flagCount in flagWindowMs with flagMinCost summed. Skipped: 6 s after an eat, a well, a refill; Fortify gear or a potion of the school.",
+   "_comment": "magicka_free (interim until the fork's vitals budget): costly casts (SPIT cost >= minCost) at stored magicka >= fullAt after which it never went below dropBelow within holdMs (15 s for concentration; longer while the stored value is unchanged to the bit, the client's own report hold, up to heldMaxMs). Flag at flagCount in flagWindowMs with flagMinCost summed. Skipped: 6 s after eating something that can raise magicka (an ingredient: its first effect), a well, a refill; Fortify gear or a potion of the school.",
    "enabled": true, "minCost": 30, "fullAt": 0.995, "dropBelow": 0.99, "holdMs": 6000, "concentrationHoldMs": 15000, "heldMaxMs": 30000,
    "refillSkipMs": 6000, "flagCount": 8, "flagWindowMs": 600000, "flagMinCost": 1200, "refuseHits": false, "refuseMinutes": 10
   },

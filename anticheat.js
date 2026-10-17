@@ -64,8 +64,15 @@ const DEFAULTS = {
     // a step this long with a step a third its length or less on each side is a teleport: the windows restart after it
     jumpUnits: 3000,
     slowMinMs: 4000,
-    // Whirlwind Sprint cast, or a Voice spell taken: no judging for this long
-    dashExemptMs: 10000,
+    // Whirlwind Sprint cast, or a Voice spell taken: no judging for this long, at most once per exemptEveryMs (a friend's or
+    // a hosted NPC's shout every few seconds kept a runner exempt for good)
+    dashExemptMs: 10000, exemptEveryMs: 60000,
+    // A teleport restarts the windows at most jumpRestarts times in jumpRestartWindowMs; past that its step is only taken
+    // out of them, so a client's own hops cannot restart the windows at will
+    jumpRestarts: 3, jumpRestartWindowMs: 600000,
+    // speed_sustained60 tier 'pulse' (shadow while speed_sustained60 is): 60 s above pulseSpeed with only pulseContinuity of
+    // the time in steps at pulseStepShare x pulseSpeed, the stop-and-go pattern that never meets the 10 s continuity
+    pulseSpeed: 850, pulseContinuity: 0.3, pulseStepShare: 0.5,
     mountNear: 300, mountFar: 600, mountFarSamples: 3,
     rubberBand: false, rubberBandSpeed: 1000, rubberBandMaxPerMin: 3,
   },
@@ -159,8 +166,10 @@ module.exports = (api) => {
     a, born: t, seen: 0,
     // per sample: t, x, y, z; the step into it (u/s and ms, 0 for the first after a restart); the stored stamina when read
     ring: new Float64Array(RING * 4), spd: new Float32Array(RING), sdt: new Float32Array(RING), sta: new Float32Array(RING), head: -1, n: 0,
+    // a step taken out of the windows (a teleport past the restart budget), and the restarts' times
+    jmp: new Uint8Array(RING), jumpTimes: new Float64Array(8), jumpHead: 0,
     cell: '', lastStep: 0, pendingJump: 0,
-    exemptUntil: 0, slowFrom: 0, slowUntil: 0, slowFactor: 1,
+    exemptUntil: 0, exemptAt: 0, slowFrom: 0, slowUntil: 0, slowFactor: 1,
     cls: 'foot', clsAt: 0, horse: 0, horseFar: 0, mounted: false,
     blinks: new Float64Array(16), blinkHead: 0,
     rbTimes: new Float64Array(8), rbHead: 0, rbCount: 0,
@@ -173,12 +182,23 @@ module.exports = (api) => {
   const keepLast = (st) => { if (st.n > 1) st.n = 1; if (st.head >= 0) { st.spd[st.head] = 0; st.sdt[st.head] = 0; } };
   const push = (st, t, x, y, z, sta, spd, dt) => {
     st.head = (st.head + 1) % RING; const i = st.head * 4;
-    st.ring[i] = t; st.ring[i + 1] = x; st.ring[i + 2] = y; st.ring[i + 3] = z; st.sta[st.head] = sta;
+    st.ring[i] = t; st.ring[i + 1] = x; st.ring[i + 2] = y; st.ring[i + 3] = z; st.sta[st.head] = sta; st.jmp[st.head] = 0;
     st.spd[st.head] = st.n > 0 ? spd : 0; st.sdt[st.head] = st.n > 0 ? dt : 0;
     if (st.n < RING) st.n++;
   };
   // the k-th newest sample's slot (k = 0 is the newest)
   const slot = (st, k) => ((st.head - k) % RING + RING) % RING;
+  const jumpRestartFree = (st, t) => {
+    let n = 0; for (let i = 0; i < st.jumpTimes.length; i++) if (st.jumpTimes[i] > 0 && t - st.jumpTimes[i] < num(SP.jumpRestartWindowMs, 600000)) n++;
+    if (n >= num(SP.jumpRestarts, 3)) return false;
+    st.jumpTimes[st.jumpHead] = t; st.jumpHead = (st.jumpHead + 1) % st.jumpTimes.length;
+    return true;
+  };
+  // a Whirlwind Sprint cast or a Voice hit taken: at most one exemption per exemptEveryMs
+  const exemptFor = (st, t) => {
+    if (st.exemptAt && t - st.exemptAt < num(SP.exemptEveryMs, 60000)) return;
+    st.exemptAt = t; st.exemptUntil = Math.max(st.exemptUntil, t + SP.dashExemptMs);
+  };
 
   // Over the newest samples spanning W ms: st.wT (ms spanned, 0 when the ring is too short), st.wD (net horizontal units),
   // st.wFastA / st.wFastB (ms spent in steps at thrA / thrB u/s or faster). Allocation-free.
@@ -186,14 +206,17 @@ module.exports = (api) => {
     st.wT = 0; st.wD = 0; st.wFastA = 0; st.wFastB = 0; st.wStart = 0;
     if (st.n < 2) return;
     const R = st.ring, i0 = st.head * 4, t0 = R[i0];
-    let fastA = 0, fastB = 0, age = 0, si = i0, start = 0;
+    let fastA = 0, fastB = 0, age = 0, si = i0, start = 0, jx = 0, jy = 0;
     for (let k = 0; k < st.n - 1; k++) {
       const j = slot(st, k);
-      const dt = st.sdt[j], v = st.spd[j];
-      if (v >= thrA) fastA += dt;
-      if (v >= thrB) fastB += dt;
+      const pi = slot(st, k + 1) * 4;
+      if (st.jmp[j]) { jx += R[j * 4 + 1] - R[pi + 1]; jy += R[j * 4 + 2] - R[pi + 2]; } else {
+        const dt = st.sdt[j], v = st.spd[j];
+        if (v >= thrA) fastA += dt;
+        if (v >= thrB) fastB += dt;
+      }
       start = k + 1;
-      si = slot(st, start) * 4;
+      si = pi;
       age = t0 - R[si];
       if (age >= W) break;
     }
@@ -208,7 +231,7 @@ module.exports = (api) => {
       si = slot(st, start) * 4;
       age = t0 - R[si];
     }
-    const dx = R[i0 + 1] - R[si + 1], dy = R[i0 + 2] - R[si + 2];
+    const dx = R[i0 + 1] - R[si + 1] - jx, dy = R[i0 + 2] - R[si + 2] - jy;
     st.wT = age; st.wD = Math.sqrt(dx * dx + dy * dy); st.wFastA = fastA; st.wFastB = fastB; st.wStart = si;
   };
 
@@ -494,11 +517,34 @@ module.exports = (api) => {
   // ---- vitals: magicka_free and stamina_free -------------------------------------------------------------------------------
   const pctOf = (a) => { try { const p = mp.get(a, 'percentages'); return p && typeof p === 'object' ? p : null; } catch (e) { return null; } };
   const refill = (st, t) => { st.lastRefill = t; st.casts.length = 0; };
+  // Whether eating it can raise magicka: an effect of the potion or food (an ingredient eaten raw applies its first effect
+  // only) on Magicka, MagickaRate or MagickaRateMult (AV 25, 28, 156). Anything else eaten (a cabbage after each cast) is no
+  // refill; a record that cannot be read counts as one. Cached per base id
+  const MAGICKA_AVS = new Set([25, 28, 156]);
+  const eatRefills = (baseId) => {
+    const key = `i${baseId >>> 0}`;
+    if (ST.gear.has(key)) return ST.gear.get(key);
+    let yes = true;
+    try {
+      const r = recordOf(baseId);
+      const type = r ? String(r.record.type) : '';
+      if (type === 'ALCH' || type === 'INGR') {
+        const efids = fieldsOf(r, 'EFID');
+        yes = (type === 'INGR' ? efids.slice(0, 1) : efids).some((f) => {
+          const d = fieldsOf(recordOf(globalOf(r, u32(f, 0))), 'DATA')[0];
+          return !d || d.data.byteLength < 0x48 || MAGICKA_AVS.has(u32(d, 0x44));
+        });
+      }
+    } catch (e) { yes = true; }
+    if (ST.gear.size > 8000) ST.gear.clear();
+    ST.gear.set(key, yes);
+    return yes;
+  };
   const onCast = (a, spellId, t) => {
     const st = playerOf(a);
     if (!st) return;
     const s = spellInfo(spellId);
-    if (s.ws) st.exemptUntil = Math.max(st.exemptUntil, t + SP.dashExemptMs);
+    if (s.ws) exemptFor(st, t);
     if (!isOn('magicka') || s.rtype !== 'SPEL' || s.type !== 0 || s.cost < MG.minCost) return;
     if (t - st.lastRefill < MG.refillSkipMs) return;
     try { const w = globalThis.__dboWellRegen; if (w instanceof Map && (Number(w.get(a)) || 0) + MG.refillSkipMs > t) return; } catch (e) { /* no wells */ }
@@ -583,7 +629,7 @@ module.exports = (api) => {
     let target = -1, fast = 0;
     for (let k = 0; k < st.n - 1; k++) {
       const j = slot(st, k);
-      if (st.spd[j] < thr) { target = j * 4; break; }
+      if (st.spd[j] < thr || st.jmp[j]) { target = j * 4; break; }
       fast += st.sdt[j];
     }
     if (target < 0) target = slot(st, st.n - 1) * 4;
@@ -643,7 +689,15 @@ module.exports = (api) => {
     if (t60 > 0) {
       const lim60 = cls === 'foot' ? num(SP.limit60.foot, 540) : num(SP.limit60.other, 750);
       const c = cls === 'foot' ? c60foot : c60other;
-      if (st.v60 > lim60 && c >= K) speedFlag(st, a, t, 'speed_sustained60', cls, st.v60, lim60, 60000, c);
+      const flagged60 = st.v60 > lim60 && c >= K;
+      if (flagged60) speedFlag(st, a, t, 'speed_sustained60', cls, st.v60, lim60, 60000, c);
+      const pulse = num(SP.pulseSpeed, 850);
+      if (!flagged60 && st.n > 0 && pulse > 0 && st.v60 > pulse) {
+        const v60 = st.v60;
+        windowStats(st, 60000, num(SP.pulseStepShare, 0.5) * pulse, num(SP.pulseStepShare, 0.5) * pulse);
+        const cp = st.wT > 0 ? st.wFastA / st.wT : 0;
+        if (cp >= num(SP.pulseContinuity, 0.3)) speedFlag(st, a, t, 'speed_sustained60', 'pulse', v60, pulse, 60000, cp);
+      }
     }
     if (slowed && st.n > 0) {
       const W = Math.min(10000, t - (st.slowFrom + 1000));
@@ -670,7 +724,8 @@ module.exports = (api) => {
     let step = 0, dt = 0;
     if (st.n > 0) { const i = st.head * 4; dt = t - st.ring[i]; const dx = x - st.ring[i + 1], dy = y - st.ring[i + 2]; step = Math.sqrt(dx * dx + dy * dy); }
     // the previous step was a long one: with this step far shorter it was a teleport, and the windows restart at its end
-    if (st.pendingJump > 0) { if (step < st.pendingJump / 3) keepLast(st); st.pendingJump = 0; }
+    // (within the restart budget; past it the step is only taken out of the windows)
+    if (st.pendingJump > 0) { if (step < st.pendingJump / 3) { if (jumpRestartFree(st, t)) keepLast(st); else if (st.head >= 0) st.jmp[st.head] = 1; } st.pendingJump = 0; }
     let judgeNow = true;
     if (st.n > 0 && step >= SP.jumpUnits && st.lastStep < step / 3) { st.pendingJump = step; judgeNow = false; }
     if (st.n > 0 && step >= SP.blinkUnits && dt > 0 && dt <= SP.blinkWithinMs && isOn('speed')) {
@@ -767,7 +822,7 @@ module.exports = (api) => {
         const out = inner.call(this, aggressorId, targetId, spellId, ...rest);
         try {
           const st = playerOf(Number(targetId) >>> 0);
-          if (st && spellInfo(Number(spellId) >>> 0).voice) st.exemptUntil = Math.max(st.exemptUntil, now() + SP.dashExemptMs);
+          if (st && spellInfo(Number(spellId) >>> 0).voice) exemptFor(st, now());
         } catch (e) { err('spell hit', e); }
         return out;
       };
@@ -778,7 +833,7 @@ module.exports = (api) => {
     if (typeof inner === 'function') {
       mp.onEatItem = function (actorId, baseId, ...rest) {
         const out = inner.call(this, actorId, baseId, ...rest);
-        try { const st = playerOf(Number(actorId) >>> 0); if (st && out !== false) refill(st, now()); } catch (e) { err('eat', e); }
+        try { const st = playerOf(Number(actorId) >>> 0); if (st && out !== false && eatRefills(Number(baseId) >>> 0)) refill(st, now()); } catch (e) { err('eat', e); }
         return out;
       };
     }
@@ -869,6 +924,8 @@ module.exports = (api) => {
       if (!a) continue;
       let st = ST.players.get(a);
       if (!st) { st = newPlayer(a, t); ST.players.set(a, st); }
+      // a player watched since before a reload of an older anticheat.js
+      if (!st.jmp) { st.jmp = new Uint8Array(RING); st.jumpTimes = new Float64Array(8); st.jumpHead = 0; st.exemptAt = 0; }
       st.seen = ST.tickNo;
       try {
         if (isOn('speed') || isOn('stamina')) sample(st, a, t);
