@@ -96,15 +96,15 @@ module.exports = (api) => {
   // server-measured); citizenDays: the voting character's citizenship of the hold; oneVotePerDevice: accounts the backend's
   // device store (deviceFile, launcher PC codes) links share one vote. That one is OFF by owner decision (Jake, 16 Oct) until
   // the Privacy Policy names this use and players have re-accepted it; turning it on needs Jake, and only a strict true does
-  // newHolds + citizenDaysFirstElection: the citizenship a JUST-OPENED hold's FIRST election asks for (Nate, 17 Oct:
-  // "7 days citizen needs to change for the first vote bc skyrim just opened"). A hold open for days has no seven-day
-  // citizens, so its first vote would have no electorate at all.
-  // It is a NAMED list, not "any hold that has never voted": Bruma has been open since launch, and a first election there
-  // should still ask for the seven days, because its citizens could have met them. Only a hold whose gates have just
-  // opened needs the exception, and only until it has held one (E.firstEver, stamped when the election starts). Empty by
-  // default: nothing changes anywhere until a hold is named. Everything else - the Discord age, the hours and days of
-  // play - is judged exactly as always, first election or not.
-  const VR0 = { enabled: true, discordAgeDays: 90, playHours: 10, playDays: 3, citizenDays: 7, citizenDaysFirstElection: 0, newHolds: [], oneVotePerDevice: false,
+  // citizenDaysFirstElection: the citizenship a hold's FIRST election asks for (Nate, 17 Oct: "waive the 7 day rule for
+  // every first election"). Every hold's first vote waives it; every election after that hold's first asks for
+  // citizenDays again, so it expires hold by hold with nothing to switch back.
+  // It has to be waived for a hold with NO election yet as well, not only one already running: the hold's citizen count
+  // and the 15 it needs to begin are ELIGIBLE voters (citizenAccounts -> eligiblePids), judged with no election in hand.
+  // Waiving only once an election existed would have left every hold at nought and unable to start one, which is what
+  // Whiterun and Solitude reported ("our citizen number count has been reset to 0 even though we had at least 11"):
+  // 13 each on the roll, none a citizen for seven days, so nought eligible. Nothing had been reset.
+  const VR0 = { enabled: true, discordAgeDays: 90, playHours: 10, playDays: 3, citizenDays: 7, citizenDaysFirstElection: 0, oneVotePerDevice: false,
     playersFile: '/opt/alduinak/skymp5-backend/data/players.json', deviceFile: '/opt/alduinak/skymp5-backend/data/device-ids.json', cacheMinutes: 10 };
   C.election.voterRules = Object.assign({}, VR0, C.election.voterRules || {});
   const PANEL_ID = 84;
@@ -117,7 +117,7 @@ module.exports = (api) => {
   const S = globalThis.__dboCitizen || (globalThis.__dboCitizen = { data: null });
   if (!(S.panels instanceof Map)) S.panels = new Map(); // actor -> { zone, nonce, tab }
   const fill = (d) => {
-    for (const k of ['chars', 'policies', 'elections', 'voterHold']) if (!d[k] || typeof d[k] !== 'object' || Array.isArray(d[k])) d[k] = {};
+    for (const k of ['chars', 'policies', 'elections', 'voterHold', 'heldEver']) if (!d[k] || typeof d[k] !== 'object' || Array.isArray(d[k])) d[k] = {};
     if (!Array.isArray(d.requests)) d.requests = [];
     if (!Array.isArray(d.staffApplied)) d.staffApplied = [];
     return d;
@@ -554,17 +554,10 @@ module.exports = (api) => {
         if (ms < VR.playHours * HOUR || days < VR.playDays) return `To vote you need ${VR.playHours} hours of play, on at least ${VR.playDays} different days, before the vote opens. Your account had ${hm(ms)} on ${days} day${days === 1 ? '' : 's'}${opened ? ' when it opened' : ' so far'}.`;
       }
     }
-    // A just-opened hold's first election asks for citizenDaysFirstElection instead (VR.newHolds). Every election after
-    // it, and every hold not named there, asks for citizenDays as before.
-    // NO ELECTION YET COUNTS AS THE FIRST ONE, and it has to: the hold's citizen count and the 15 it needs to start are
-    // eligible voters (citizenAccounts -> eligiblePids), judged with no election in hand. Waiving only once an election
-    // exists would mean no named hold could ever reach the threshold to begin one - which is what Whiterun was reporting
-    // on 17 Oct ("our citizen number count has been reset to 0 even though we had at least 11"): 13 on the roll, none of
-    // them a citizen for seven days, so nought eligible. A record that exists without firstEver is one that has already
-    // held an election, and asks for the seven days as before.
-    const isNew = Array.isArray(VR.newHolds) && VR.newHolds.map((h) => String(h).toLowerCase()).includes(String(z.id).toLowerCase());
-    const firstOne = !E || E.firstEver === 1;
-    const needDays = firstOne && isNew ? Math.max(0, Number(VR.citizenDaysFirstElection) || 0) : Number(VR.citizenDays);
+    // EVERY hold's first election asks for citizenDaysFirstElection instead of citizenDays (Nate, 17 Oct). A hold with no
+    // election record has never held one, so it is its first too; a record without firstEver has already held one.
+    const firstOne = E ? E.firstEver === 1 : !data().heldEver[z.id];
+    const needDays = firstOne ? Math.max(0, Number(VR.citizenDaysFirstElection) || 0) : Number(VR.citizenDays);
     if (needDays > 0 && since !== undefined && Number(since) > 0) {
       const need = Number(since) + needDays * DAY;
       if (need > at) return `Only those who were citizens of ${ofPlace(z.name)} for ${needDays} day${needDays === 1 ? '' : 's'} ${when} may vote. This character became one on ${dayText(since)}.`;
@@ -747,8 +740,9 @@ module.exports = (api) => {
     // A hold that has already held one keeps its record with phase 'held' (cancel), so this is its first ever when there
     // is no such record. Stamped once, at the start, so the answer cannot change under a running election.
     const before = elOf(z.id);
+    const votedBefore = !!data().heldEver[z.id] || (before && before.phase === 'held');
     const E = { phase: '', round: 1, startedAt: Date.now(), courts: [], ballot: [], votes: {} };
-    if (!before || before.phase !== 'held') E.firstEver = 1;
+    if (!votedBefore) E.firstEver = 1;   // a restart deletes the record, so the hold's own history decides, not the record
     // The voter rules apply to an election stamped at its start (one already running at the deploy keeps the old rules)
     if (VR.enabled === true) E.rules = 1;
     startPhase(E, 'registration', EL.registrationHours);
@@ -759,7 +753,7 @@ module.exports = (api) => {
   };
   const cancel = (z, why, held) => {
     const E = elOf(z.id); if (!E) return;
-    if (held) { E.phase = 'held'; E.phaseEndsAt = 0; forgetVoters(E, true); } else delete data().elections[z.id];
+    if (held) { E.phase = 'held'; E.phaseEndsAt = 0; forgetVoters(E, true); data().heldEver[z.id] = Date.now(); } else delete data().elections[z.id];
     save();
     audit(`ELECTION ${z.name}: cancelled (${why})`);
   };
@@ -850,7 +844,9 @@ module.exports = (api) => {
       const winner = courtById(E, best[0]);
       const empty = seatWinner(z, E, winner);
       E.result = { winner: winner.id, counts, at: Date.now(), empty };
-      E.phase = 'seated'; E.phaseEndsAt = 0; E.revote = false; forgetVoters(E, true); save();
+      E.phase = 'seated'; E.phaseEndsAt = 0; E.revote = false; forgetVoters(E, true);
+      data().heldEver[z.id] = Date.now();   // it has held one now: its next asks for the seven days again
+      save();
       const j = winner.members.jarl; const struck = struckCount(E);
       audit(`ELECTION ${z.name}: ${j.name} is elected Jarl with a court of ${SEATS.filter((s) => s.id !== 'jarl').map((s) => `${s.label} ${winner.members[s.id] ? winner.members[s.id].name : '(empty)'}`).join(', ')}${empty.length ? `; empty: ${empty.join(', ')}` : ''}; ${struck} vote(s) struck by staff`);
       announce(z, E, 'result', { struck, jarl: j.name, empty, court: SEATS.filter((s) => s.id !== 'jarl' && winner.members[s.id] && !empty.includes(s.label)).map((s) => `${s.label} ${winner.members[s.id].name}`).join(', ') });

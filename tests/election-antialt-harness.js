@@ -115,6 +115,12 @@ now = T0;
 deviceAccounts = { [backend.get(100).discordId]: { d: [{ h: 'aaaa' }] }, [backend.get(204).discordId]: { d: [{ h: 'bbbb' }, { h: 'aaaa' }] } };
 writeDevices();
 
+// From 17 Oct a hold's FIRST election waives the seven days (its own block below), so every case here - which is
+// about that rule and about the threshold it gates - runs against a hold that has ALREADY held one.
+const SECOND = { phase: 'registration', rules: 1 };   // an election that is not the hold's first
+const held = () => { M.data().elections.whiterun = { phase: 'held', rules: 1, votes: {}, courts: [], ballot: [] }; };
+const unheld = () => { const E = M.data().elections.whiterun; if (E && E.phase === 'held') delete M.data().elections.whiterun; };
+held();
 // ---- each rule, as the player reads it -----------------------------------------------------------------------------------
 const why = (a) => M.canVote(a, WR, M.data().elections.whiterun || null);
 ok(why(good[0]) === '', 'an old Discord account with 20 h on 5 days, a citizen for 30 days, may vote', why(good[0]));
@@ -130,21 +136,25 @@ ok(why(PCALT) === '', '(d) before anyone votes, an account on a shared PC may vo
 // 13 good + FALLBACK = 14; PCALT shares Citizen 0's PC: still 14; the refused five do not count
 ok(M.citizenAccounts(WR) === 14, '(threshold) 21 citizen accounts, 14 count: the refused ones out, the shared PC once', M.citizenAccounts(WR));
 timer();
-ok(!M.data().elections.whiterun, '(threshold) 14 eligible accounts start no election');
+ok(M.data().elections.whiterun.phase === 'held', '(threshold) 14 eligible accounts start no election');
 // Without the device file the PC rule cannot see the link: PCALT counts, and the log says why
 fs.unlinkSync(path.join(dir, 'device-ids.json'));
-M = load();
+M = load(); held();
 ok(M.citizenAccounts(WR) === 15 && logs.some((l) => /no device codes/.test(l)), '(d) with no device codes the rule is inert, and logged', M.citizenAccounts(WR));
-writeDevices(); M = load();
+writeDevices(); M = load(); held();
 ok(M.citizenAccounts(WR) === 14, 'the device file back: 14 again');
 // The young account comes of age: 15, the election starts
 backend.get(200).discordId = OLD;
-writeBackend(); M = load();
+writeBackend(); M = load(); held();
 ok(M.citizenAccounts(WR) === 14, "the character's own Discord id comes first: the young account still does not count");
-chars.get(YOUNG).discord = snow(Date.UTC(2021, 0, 1)); M = load();
+chars.get(YOUNG).discord = snow(Date.UTC(2021, 0, 1)); M = load(); held();
 ok(M.citizenAccounts(WR) === 15, 'an old enough Discord account makes 15', M.citizenAccounts(WR));
+unheld();
 timer();
 let E = M.data().elections.whiterun;
+// The hold's own first election waives the seven days (Nate, 17 Oct), and everything below is about that rule, so from
+// here it is judged as a hold's second: the waiver has its own block further down.
+if (E) delete E.firstEver;
 ok(E && E.phase === 'registration', '(threshold) 15 eligible accounts start registration', E && E.phase);
 ok(audits.some((t) => /registration opened/.test(t)), 'audited');
 chars.get(YOUNG).discord = snow(T0 - 10 * DAY); // young again for the vote below
@@ -278,36 +288,29 @@ ok(M.canVote(NEWCIT, WR, E) === '' && M.canVote(SIXHALF, WR, E) === '', '...and 
 
 // ---- the rules can be switched off -------------------------------------------------------------------------------------------
 rules = { enabled: false, oneVotePerDevice: true }; M = load();
-ok(M.canVote(YOUNG, WR, null) === '' && M.canVote(NEWCIT, WR, null) === '', 'voterRules.enabled false: every citizen votes again');
+ok(M.canVote(YOUNG, WR, SECOND) === '' && M.canVote(NEWCIT, WR, SECOND) === '', 'voterRules.enabled false: every citizen votes again');
 rules = { discordAgeDays: 0, playHours: 0, playDays: 0, oneVotePerDevice: true }; M = load();
 const NEWER = account(209, 'Newer Citizen'); writeBackend(); online.push(NEWER); M.join(NEWER, 'whiterun');
 chars.get(YOUNG).discord = snow(now - 10 * DAY); play.set(201, { ms: 5 * HOUR, days: 4 });
-ok(M.canVote(YOUNG, WR, null) === '' && M.canVote(SHORT, WR, null) === '' && /7 days/.test(M.canVote(NEWER, WR, null)), 'each rule has its own number (0 turns it off): the Discord and play rules off, the citizenship rule still on', M.canVote(NEWER, WR, null));
+ok(M.canVote(YOUNG, WR, SECOND) === '' && M.canVote(SHORT, WR, SECOND) === '' && /7 days/.test(M.canVote(NEWER, WR, SECOND)), 'each rule has its own number (0 turns it off): the Discord and play rules off, the citizenship rule still on', M.canVote(NEWER, WR, SECOND));
 
-// ---- a just-opened hold's first election (Nate, 17 Oct: Skyrim opened, nobody can have been a citizen for 7 days) ------
-// The waiver is a NAMED list, not "any hold that has never voted": a first election in a hold open since launch still
-// asks for the seven days. It only lifts the citizenship rule; the Discord age and the play time are judged as always.
+// ---- every hold's first election (Nate, 17 Oct: "waive the 7 day rule for every first election") -------------------
+// A hold's first vote does not ask for the seven days; the election after it does. A hold with NO election yet is its
+// first too, and has to be, or its citizen count stays at nought and it can never reach the 15 it needs to begin one.
+// Nothing else is lifted: the Discord age and the play time are judged at a first election as always.
 const FIRST = { phase: 'registration', rules: 1, firstEver: 1 };   // the hold has never held one
 const AGAIN = { phase: 'registration', rules: 1 };                 // it has
-rules = { oneVotePerDevice: true }; M = load();
-ok(/7 days/.test(M.canVote(NEWER, WR, FIRST)), 'with no hold named, a first election still asks for the seven days');
-// The count a hold shows, and the 15 it needs to start, are judged with NO election in hand (citizenAccounts), so a
-// named hold has to be waived there too or it can never begin one (Whiterun, 17 Oct: "reset to 0 even though we had 11")
-ok(/7 days/.test(M.canVote(NEWER, WR, null)), 'with no hold named, a hold with no election asks for the seven days');
-rules = { newHolds: ['whiterun'], citizenDaysFirstElection: 0, oneVotePerDevice: true }; M = load();
-ok(M.canVote(NEWER, WR, FIRST) === '', 'a named hold waives them at its first election', M.canVote(NEWER, WR, FIRST));
-ok(M.canVote(NEWER, WR, null) === '', '...and waives them with no election yet, so the hold can reach its threshold', M.canVote(NEWER, WR, null));
-ok(/7 days/.test(M.canVote(NEWER, WR, AGAIN)), '...and asks for them again at its next one');
+rules = { citizenDaysFirstElection: 0, oneVotePerDevice: true }; M = load();
+ok(M.canVote(NEWER, WR, FIRST) === '', 'a first election does not ask for the seven days', M.canVote(NEWER, WR, FIRST));
+// Whiterun has seated a court by now, so its own history says it has voted: this case is about a hold that has not
+delete M.data().elections.whiterun; delete M.data().heldEver.whiterun;
+ok(M.canVote(NEWER, WR, null) === '', 'nor does a hold with no election yet, so its count is not nought', M.canVote(NEWER, WR, null));
+M.data().heldEver.whiterun = Date.now();
+ok(/7 days/.test(M.canVote(NEWER, WR, null)), '...but a hold that has already voted asks for them, with no election in hand');
+ok(/7 days/.test(M.canVote(NEWER, WR, AGAIN)), '...and the election after it asks for them again');
 ok(/Discord/.test(M.canVote(YOUNG, WR, FIRST)), '...while the Discord age is judged at a first election as always', M.canVote(YOUNG, WR, FIRST));
-rules = { newHolds: ['markarth'], citizenDaysFirstElection: 0, oneVotePerDevice: true }; M = load();
-ok(/7 days/.test(M.canVote(NEWER, WR, FIRST)), 'another hold being named does nothing for this one');
-const shippedVR = JSON.parse(fs.readFileSync(path.resolve(__dirname, '..', 'gamemode-config.json'), 'utf8')).citizenship.election.voterRules;
-// Every hold is named, because NO hold has a seven-day citizen: the earliest citizenship record on the server, in Bruma,
-// was 2.3 days old when this shipped, and Skyrim's holds were a day. The waiver expires hold by hold at its own first
-// election, so naming them all needs no undoing.
-ok(Array.isArray(shippedVR.newHolds) && shippedVR.newHolds.length === 8
-  && ['bruma', 'whiterun', 'riften', 'solitude', 'winterhold', 'windhelm', 'dawnstar', 'markarth'].every((h) => shippedVR.newHolds.includes(h)),
-  'gamemode-config.json names every hold that has citizens', shippedVR.newHolds);
+rules = { citizenDaysFirstElection: 7, oneVotePerDevice: true }; M = load();
+ok(/7 days/.test(M.canVote(NEWER, WR, FIRST)), 'citizenDaysFirstElection 7 puts the old rule back everywhere (the rollback)');
 
 // ---- stamping an election that began before the rules (Nate, 17 Oct: restarting it would cost the courts and 5 hours) --
 // Riften's election opened before the voter rules existed, so it carries no stamp and voterWhy lets everyone through.
