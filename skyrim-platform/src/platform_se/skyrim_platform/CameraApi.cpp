@@ -52,3 +52,43 @@ Napi::Value CameraApi::WorldPointToScreenPoint(const Napi::CallbackInfo& info)
 
   return res;
 }
+
+namespace {
+// Live PlayerCamera fields, the ones SKSE's Camera.SetWorldFieldOfView writes
+RE::PlayerCamera* FovCamera()
+{
+  auto camera = RE::PlayerCamera::GetSingleton();
+  if (!camera)
+    throw NullPointerException("camera");
+  return camera;
+}
+
+Napi::Value FovObject(Napi::Env env, RE::PlayerCamera* camera)
+{
+  auto res = Napi::Object::New(env);
+  res.Set("world", Napi::Number::New(env, camera->worldFOV));
+  res.Set("firstPerson", Napi::Number::New(env, camera->firstPersonFOV));
+  return res;
+}
+
+bool IsSet(const Napi::Value& v)
+{
+  return !v.IsUndefined() && !v.IsNull();
+}
+}
+
+Napi::Value CameraApi::GetCameraFov(const Napi::CallbackInfo& info)
+{
+  return FovObject(info.Env(), FovCamera());
+}
+
+// Either argument may be null or undefined to leave that half as it is
+Napi::Value CameraApi::SetCameraFov(const Napi::CallbackInfo& info)
+{
+  auto camera = FovCamera();
+  if (IsSet(info[0]))
+    camera->worldFOV = NapiHelper::ExtractFloat(info[0], "world");
+  if (IsSet(info[1]))
+    camera->firstPersonFOV = NapiHelper::ExtractFloat(info[1], "firstPerson");
+  return FovObject(info.Env(), camera);
+}
