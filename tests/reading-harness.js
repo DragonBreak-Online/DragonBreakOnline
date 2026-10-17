@@ -465,7 +465,7 @@ console.log('client-judged:');
   for (const k of ['scholarCopies', 'scholarScrolls', 'scholarTomes', 'scholarReads']) props.delete(READER + '|private.' + k);
 }
 // Tomes and scrolls (Nate and Swag, 17 Oct): each rank its own fixed chance, open from its Scholar level, one roll for all
-// so a reading gives at most one, no halving, no cap, no pity; the college gate still holds Expert and Master tomes
+// so a reading gives at most one, no halving, no cap, no pity, no college gate (Nate, 17 Oct)
 {
   READ.clientJudged = true;
   const realRandom = Math.random;
@@ -520,12 +520,9 @@ console.log('client-judged:');
   at(90);
   globalThis.__dboSpellsReadRankCap = () => 2;
   g = readAt(bandStart(90, 'tome', 3) + eps);
-  check('gate: a Scholar 90 with no Senior rank (cap Adept) rolls the Expert band and gets nothing', !g.tomes.length && !g.scrolls.length, g);
-  globalThis.__dboSpellsReadRankCap = () => 3;
-  g = readAt(bandStart(90, 'tome', 3) + eps);
-  check('gate: ...a Senior rank gets the Expert tome', g.tomes.join() === '3', g);
+  check('no college gate (Nate, 17 Oct): a Scholar 90 with no Senior rank gets the Expert tome from its band', g.tomes.join() === '3', g);
   g = readAt(bandStart(90, 'tome', 4) + eps);
-  check('gate: ...and a Master tome from its band at Scholar 90', g.tomes.join() === '4', g);
+  check('...and a Master tome from its band', g.tomes.join() === '4', g);
   g = readAt(bandStart(90, 'scroll', 4) + eps);
   check('Scholar 90: the Master scroll band gives a scroll', g.scrolls.length === 1 && !g.tomes.length, g);
   delete globalThis.__dboSpellsReadRankCap;

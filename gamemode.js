@@ -4628,19 +4628,13 @@ const wheelRoom = (a, skill, now = Date.now()) => {
 globalThis.__dboWheelRoom = wheelRoom;
 globalThis.__dboScholarNoRoom = scholarNoRoom;
 // The tome a reading presses between the pages, of the rank the reading's roll chose (Nate and Swag, 17 Oct):
-// - by college rank (Nate, 11 Oct: "RP gate-keep the high tiers"; spells.js readGate, __dboSpellsReadRankCap): anyone reads
-//   up to Adept (floorRank, Nate 14 Oct), Expert and Master tomes only a Senior rank; the restricted arts only for Senior
-//   ranks (__dboSpellsReadRestricted). Without spells.js: Apprentice;
+// - no college rank gate on the rank (Nate, 17 Oct: "remove the college gate for reading drops"); the restricted arts
+//   still only for Senior ranks (__dboSpellsReadRestricted);
 // - never a tome whose spell the reader already knows, nor one they are carrying;
 // - a tome of a school the reader's own magic skills cover (arcane: Destruction, Conjuration, Illusion; priest:
 //   Restoration, Alteration, from skills.json vanillaSkills) is READ.tomeSchoolWeight times as likely.
 // null when nothing of that rank is left to give: the reading then gives nothing.
 const scholarTomePick = (a, rank) => {
-  let collegeRank = 1;
-  try { if (typeof globalThis.__dboSpellsReadRankCap === 'function') collegeRank = Number(globalThis.__dboSpellsReadRankCap(a)); } catch (e) { collegeRank = 1; }
-  if (!Number.isFinite(collegeRank)) collegeRank = 1;
-  // The college gate: a Master tome only for a Senior rank (college cap at Expert), as an Expert tome is
-  if (rank > (collegeRank >= 3 ? 4 : collegeRank)) return null;
   const maxRank = rank; const minRank = rank;
   const restricted = typeof globalThis.__dboSpellsReadRestricted === 'function' ? globalThis.__dboSpellsReadRestricted : () => false;
   let carried = new Set();

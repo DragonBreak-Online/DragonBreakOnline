@@ -1,6 +1,6 @@
 // The reading's tome pick (gamemode.js scholarTomePick): a tome of the rank the reading's roll chose (Nate and Swag, 17 Oct),
-// no known or carried tome, the reader's own schools weighted (Nate, 10 Oct); the college rank's cap (spells.js
-// __dboSpellsReadRankCap, 11 Oct): Expert and Master only for a Senior rank, and the restricted arts (__dboSpellsReadRestricted).
+// no known or carried tome, the reader's own schools weighted (Nate, 10 Oct), no college rank gate (Nate, 17 Oct), and the
+// restricted arts (__dboSpellsReadRestricted).
 // Lifts the function out of gamemode.js with stubs.
 //   node tests/scholar-tome-pick-harness.js   (from server/)
 'use strict';
@@ -31,21 +31,17 @@ const draw = (rank, n = 4000) => { const c = {}; for (let i = 0; i < n; i++) { c
 let c = draw(0); ok('rank 0: Novice tomes only', !c.A3 && !c.A4 && !c.A5 && !c.A6 && c.A1 > 0 && c.A2 > 0, c);
 c = draw(1); ok('rank 1: the Apprentice tome only', c.A3 === 4000, c);
 c = draw(2); ok('rank 2: the Adept tome only', c.A4 === 4000, c);
-c = draw(3); ok('rank 3: the Expert tome, for a Senior', c.A5 === 4000, c);
-c = draw(4); ok('rank 4: the Master tome, for a Senior', c.A6 === 4000, c);
+c = draw(3); ok('rank 3: the Expert tome', c.A5 === 4000, c);
+c = draw(4); ok('rank 4: the Master tome', c.A6 === 4000, c);
 c = draw(0); ok('a Priest draws Restoration about 3x as often as Illusion', c.A2 > 2 * c.A1, c);
 known = [0x1a2]; c = draw(0); ok('a known spell is never handed out', !c.A2 && c.A1 > 0, c);
 known = []; inv = [{ baseId: 0xa1, count: 1 }]; c = draw(0); ok('a carried tome is never handed out', !c.A1 && c.A2 > 0, c);
 known = [0x1a2]; inv = [{ baseId: 0xa1, count: 1 }]; ok('nothing left of the rank: null', pick(1, 0) === null);
 known = []; inv = [];
-// ---- the college rank gate (Nate, 11 Oct; floor Adept since 14 Oct) ----
-collegeCap = 2; ok('gate: below Senior (cap Adept) no Expert tome', pick(1, 3) === null);
-ok('gate: ...nor a Master tome', pick(1, 4) === null);
-c = draw(2); ok('gate: ...but Adept still', c.A4 === 4000, c);
-collegeCap = 0; ok('gate: a cap of Novice gives no Apprentice tome', pick(1, 1) === null && draw(0).A1 > 0);
-collegeCap = 1; delete globalThis.__dboSpellsReadRankCap; ok('gate: without spells.js the cap is Apprentice', pick(1, 2) === null && draw(1).A3 === 4000);
-globalThis.__dboSpellsReadRankCap = () => collegeCap;
-collegeCap = 3; restrictedBooks = new Set([0xa2]); c = draw(0); ok('gate: a restricted art (for one below Senior) is passed over', !c.A2 && c.A1 > 0, c);
+// ---- no college rank gate on reading drops (Nate, 17 Oct) ----
+collegeCap = 0; ok('no gate: a reader with no college rank gets the Expert tome', pick(1, 3) && pick(1, 3).id.endsWith('A5'));
+ok('no gate: ...and the Master tome', pick(1, 4) && pick(1, 4).id.endsWith('A6'));
+restrictedBooks = new Set([0xa2]); c = draw(0); ok('gate: a restricted art (for one below Senior) is passed over', !c.A2 && c.A1 > 0, c);
 restrictedBooks = new Set([0xa1, 0xa2]); ok('gate: nothing allowed left: null', pick(1, 0) === null);
 restrictedBooks = new Set();
 console.log(fails ? `${fails} FAILED` : 'all checks passed'); process.exit(fails ? 1 : 0);
