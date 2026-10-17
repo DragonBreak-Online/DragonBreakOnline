@@ -1351,7 +1351,8 @@
   "ownLook": "apply"
  },
  "coinPurses": {
-  "_comment": "Coin purses (gamemode.js PURSE): goldMin..goldMax per purse before the Harvesting multiplier, a purse rests restMinutes for everyone (in a claimed dungeon it is full again for the next claim). Gold cut (Nate, 4 Oct; gold-cut-1004): was 8-30.",
+  "_comment": "Coin purses (gamemode.js PURSE): goldMin..goldMax per purse before the Harvesting multiplier, a purse rests restMinutes for everyone (in a claimed dungeon it is full again for the next claim). Gold cut (Nate, 4 Oct; gold-cut-1004): was 8-30. enabled false: every gold pile and purse in the world is refused, none pays out (Nate, 17 Oct). Hot reload.",
+  "enabled": false,
   "goldMin": 3,
   "goldMax": 12
  },

@@ -4962,8 +4962,37 @@ const isCoinPurse = (targetId) => {
 };
 const harvestingTier = (a) => { const r = masteryOf(a); if (!r || !Array.isArray(r.order) || !r.order.includes('harvesting')) return -1; return Math.max(0, Number((r.skills && r.skills.harvesting || {}).rank) || 0); };
 const purseDeny = new Map();
+// A gold pile or purse is flora whose produce is gold itself or a leveled list; isCoinPurse caught only the leveled ones and
+// the purse names, so a pile with Gold001 as its produce was harvested by the engine (Nate, GM Nate in the Riften bank,
+// 17 Oct). Read the same way, once per base.
+const goldFloraKind = new Map(); // baseId -> true when FLOR that yields gold
+const isGoldFlora = (targetId) => {
+  if (targetId >= 0xff000000) return false;
+  if (isCoinPurse(targetId)) return true;
+  let baseId = 0; try { baseId = mp.getIdFromDesc(String(mp.get(targetId, 'baseDesc'))) >>> 0; } catch (e) { return false; }
+  if (goldFloraKind.has(baseId)) return goldFloraKind.get(baseId);
+  let yes = false;
+  const rec = recordOf(baseId);
+  if (rec && String(rec.record.type) === 'FLOR') {
+    const pfig = (rec.record.fields || []).find((f) => f.type === 'PFIG');
+    if (pfig && pfig.data instanceof Uint8Array && pfig.data.byteLength >= 4) {
+      const local = new DataView(pfig.data.buffer, pfig.data.byteOffset, 4).getUint32(0, true);
+      let id = local; try { id = rec.toGlobalRecordId ? rec.toGlobalRecordId(local) >>> 0 : local; } catch (e) { id = local; }
+      yes = id === 0xf;
+    }
+    if (!yes) yes = /coin|gold(pile|stack|pouch|bag|purse)/i.test(String(rec.record.editorId || ''));
+  }
+  goldFloraKind.set(baseId, yes);
+  return yes;
+};
 globalThis.__dboCoinPurse = (targetId, casterId) => {
-  if (!PURSE.enabled || !isCoinPurse(targetId)) return false;
+  // coinPurses.enabled false: no gold pile or purse pays out, every one is refused (Nate, 17 Oct: "all gold piles cannot be picked up")
+  if (!PURSE.enabled) {
+    if (!isGoldFlora(targetId)) return false;
+    if (Date.now() - (purseDeny.get(casterId) || 0) > 1500) { purseDeny.set(casterId, Date.now()); personal(casterId, 'There is nothing here to take. Gold comes from work, trade and taxes.'); }
+    return true;
+  }
+  if (!isCoinPurse(targetId)) return false;
   const say = (t) => { if (Date.now() - (purseDeny.get(casterId) || 0) > 1500) { purseDeny.set(casterId, Date.now()); personal(casterId, t); } return true; };
   const until = restUntil(purseRest, targetId);
   // In a claimed dungeon a purse emptied before the claim began is full again for the new party (dungeons.js); back to
