@@ -119,7 +119,7 @@ module.exports = (api) => {
     // apprentice's school rank (Priest's for Restoration) must be at least the spell's.
     apprenticeship: {
       enabled: true, teacherArcaneLevel: 75, teacherPriestLevel: 75, radiusMeters: 60, xpPerCast: 1, castGapSeconds: 2, dailyXp: 20,
-      daysByRank: [1, 2, 3, 5, 15], max: 1, seniorMax: 3, seniorGuilds: ['synod', 'college-of-winterhold', 'college-of-whispers', 'house-telvanni'],
+      daysByRank: [1, 2, 3, 5, 15], max: 1, seniorMax: 3, seniorGuilds: ['synod', 'college-of-winterhold', 'college-of-whispers'],
       collegeGuilds: true,
       seniorRoles: ['leader', 'officer'], offerMinutes: 5, tickSeconds: 3,
     },
