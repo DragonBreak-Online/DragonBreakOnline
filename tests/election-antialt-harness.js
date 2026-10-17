@@ -1,8 +1,9 @@
 // Scripted test for the election's voter rules in server\citizenship.js (Nate, 16 Oct 2026: "make sure people can't make
 // multiple Discord accounts just to vote"; config citizenship.election.voterRules). Loads the real module in a scratch
 // folder against a mock world (Whiterun, no Jarl yet), fake backend files (players.json, device-ids.json) in that folder,
-// and a mock playtime.js. Covers each rule, the 15-account threshold, the one-vote-per-PC rule, the shared-address review
-// list and /strikevote.
+// and a mock playtime.js. Covers each rule, the 15-account threshold, the one-vote-per-PC rule (off by default: Jake,
+// 16 Oct; its cases switch it on), /strikevote, /unstrikevote and /electionreview, what is forgotten when a round closes,
+// a round nobody votes in, an election started before the rules, and the shipped config's defaults.
 //
 //   node tests/election-antialt-harness.js   (from server/)
 'use strict';
@@ -52,15 +53,21 @@ const mp = { get: (id, p) => { const c = chars.get(id >>> 0); if (!c) throw new 
 const said = [], audits = [], logs = [];
 const cmds = {};
 let timer = null;
-let rules = {};
+// The one-vote-per-PC cases below switch the rule on explicitly; the shipped default is off (checked at the end)
+let rules = { oneVotePerDevice: true };
+const leads = new Set();
+let cfgOverride = null;
 const api = () => ({
-  mp, log: (...x) => logs.push(x.join(' ')), audit: (t) => audits.push(t), who: (a) => (chars.get(a >>> 0) || {}).name || `actor ${a}`,
+  mp, log: (...x) => logs.push(x.join(' ')), audit: (t) => audits.push(t),
+  // Built like gamemode.js's: who() carries the Discord mention, display() never does
+  who: (a) => { const c = chars.get(a >>> 0); return c ? `${c.name} #T${(a >>> 0).toString(16)} (profile ${c.pid}${c.discord ? `, <@${c.discord}>` : ''})` : `actor ${a}`; },
+  display: (a) => `${(chars.get(a >>> 0) || {}).name} #T${(a >>> 0).toString(16)}`,
   personal: (a, t) => said.push([a >>> 0, t]), nameOf: (a) => chars.get(a >>> 0).name, ownNameOf: (a) => chars.get(a >>> 0).name, tagOf: (a) => `T${(a >>> 0).toString(16)}`,
-  onUi: () => {}, onlineActors: () => online.slice(), isAdmin: (a) => a === STAFF || a === GM, isLeadStaff: (a) => a === STAFF,
+  onUi: () => {}, onlineActors: () => online.slice(), isAdmin: (a) => a === STAFF || a === GM, isLeadStaff: (a) => a === STAFF || leads.has(a),
   profileOf: (a) => { const c = chars.get(a >>> 0); return c ? c.pid : -1; },
   discordOf: (a) => (chars.get(a >>> 0) || {}).discord || '',
   registerChatCommand: (name, fn, o) => { cmds[name] = { fn, o }; },
-  cfg: { citizenship: { election: { voterRules: Object.assign({ playersFile: path.join(dir, 'players.json'), deviceFile: path.join(dir, 'device-ids.json'), cacheMinutes: 0 }, rules) } } },
+  cfg: cfgOverride || { citizenship: { election: { voterRules: Object.assign({ playersFile: path.join(dir, 'players.json'), deviceFile: path.join(dir, 'device-ids.json'), cacheMinutes: 0 }, rules) } } },
   every: (nm, ms, f) => { timer = f; },
   zoneList: () => ZONES, zoneById: (id) => ZONES.find((z) => z.id === String(id)) || null, readOfficials: () => officials,
   rankTitle: (r) => ({ jarl: 'Jarl', steward: 'Steward', commander: 'Lord Commander' })[r] || r,
@@ -168,47 +175,144 @@ now += 2 * HOUR;
 r = M.vote(YOUNG, 'whiterun', K);
 ok(r.error && /90 days/.test(r.error), '(a) an account that turns 90 days old during the vote is still refused', r);
 
-// ---- shared address: never refused, listed for staff ---------------------------------------------------------------------
+// ---- no address is read or kept --------------------------------------------------------------------------------------------
 r = M.vote(good[1], 'whiterun', K);
-ok(!r.error, '(e) the first of a household votes', r);
+ok(!r.error, 'a second citizen votes', r);
 r = M.vote(good[2], 'whiterun', K);
-ok(!r.error, '(e) the second, from the same address, is not refused', r);
-ok(audits.some((t) => /^ELECTION Whiterun: shared address: Citizen 2 #T\w+, Citizen 1 #T\w+ voted from one address/.test(t)), '(e) the audit names both for review', audits.filter((t) => /shared/.test(t)));
-ok(!audits.some((t) => /192\.0\.2\.7/.test(t)) && !JSON.stringify(M.data()).includes('192.0.2.7'), '(e) the address itself is in no audit line and not stored');
-ok(!/address/.test(last(good[2])), '(e) the player is told nothing about it');
+ok(!r.error, 'a third, whose account shares the household address, is not refused', r);
+ok(!audits.some((t) => /shared address|192\.0\.2\.7/.test(t)) && !JSON.stringify(M.data()).includes('192.0.2.7') && !/"addr"|"salt"/.test(JSON.stringify(M.data())),
+  'no shared-address audit, and no address or address mark stored');
 r = M.reviewText(GM, 'whiterun');
 ok(r.error && /Lead GM/.test(r.error), 'a GM below Lead sees no review list', r);
-r = M.reviewText(STAFF, 'whiterun');
-ok(/one address: Citizen 1 #T\w+, Citizen 2 #T\w+/.test(r.text), 'the review list shows the household', r);
-cmds.electionreview.fn(STAFF, 'whiterun');
-ok(/one address/.test(last(STAFF)) && cmds.electionreview.o.admin && cmds.strikevote.o.admin, '/electionreview answers in chat; both commands are staff-only');
+ok(M.reviewText(STAFF, 'whiterun').text === 'No struck votes.', 'the review list starts empty');
+ok(cmds.electionreview.o.admin && cmds.strikevote.o.admin && cmds.unstrikevote.o.admin, 'the three staff commands are staff-only');
 
 // ---- striking a vote -----------------------------------------------------------------------------------------------------
-r = M.strikeVote(GM, 'whiterun', nm(good[2]));
+r = M.strikeVote(GM, 'whiterun', `${nm(good[2])} alt`);
 ok(r.error && /Lead GM/.test(r.error), 'a GM cannot strike a vote', r);
-r = M.strikeVote(STAFF, 'whiterun', nm(good[5]));
+r = M.strikeVote(STAFF, 'whiterun', `${nm(good[5])} alt`);
 ok(r.error && /no vote/.test(r.error), 'striking an account that has not voted says so', r);
-cmds.strikevote.fn(STAFF, `whiterun ${nm(good[2])}`);
+r = M.strikeVote(STAFF, 'whiterun', nm(good[2]));
+ok(r.error && /reason/.test(r.error) && M.data().elections.whiterun.votes['102'] !== undefined, '(a) a strike without a reason is refused', r);
+leads.add(J);
+r = M.strikeVote(J, 'whiterun', `${nm(good[2])} alt`);
+ok(r.error && /stands on this ballot/.test(r.error), '(c) a Lead GM whose account stands on the ballot cannot strike', r);
+leads.delete(J);
+cmds.strikevote.fn(STAFF, `whiterun ${nm(good[2])} same person as Citizen 1, admitted on Discord`);
 E = M.data().elections.whiterun;
-ok(E.votes['102'] === undefined && E.struckVotes['102'] && /is struck/.test(last(STAFF)), 'a Lead GM strikes the vote with /strikevote', last(STAFF));
+ok(E.votes['102'] === undefined && E.struckVotes['102'] && E.struckVotes['102'].reason === 'same person as Citizen 1, admitted on Discord' && /is struck/.test(last(STAFF)), 'a Lead GM strikes the vote with /strikevote and a reason', last(STAFF));
 ok(/struck by the staff/.test(last(good[2])), 'the voter is told, plainly');
-ok(audits.some((t) => /^ELECTION STAFF Lead Staff struck the vote of Citizen 2/.test(t)), 'audited');
+ok(audits.some((t) => /^ELECTION STAFF Lead Staff #T\w+ \(profile 1.*\) struck the vote of Citizen 2 #T\w+ in Whiterun \(round 1\): same person as Citizen 1/.test(t)), 'audited, with the reason');
+ok(M.data().voterHold['102'] === 'whiterun', '(d) the struck account stays bound to this hold');
 const ALT2 = 0x1fff; chars.set(ALT2, { pid: 102, name: 'Citizen 2 Again', race: 'NordRace', discord: backend.get(102).discordId }); online.push(ALT2); M.join(ALT2, 'whiterun');
 ok(/struck by the staff/.test(M.canVote(good[2], WR, E)) && /struck by the staff/.test(M.canVote(ALT2, WR, E)), 'that account cannot vote again, with any character');
-ok(/struck Citizen 2/.test(M.reviewText(STAFF, 'whiterun').text), 'the review list shows the struck vote');
+r = M.reviewText(STAFF, 'whiterun');
+ok(/struck Citizen 2 #T\w+ \(by Lead Staff #T\w+, round 1\): same person/.test(r.text), 'the review list shows the struck vote, who struck it and why', r.text);
+ok(!r.text.includes('<@') && !JSON.stringify(M.data()).includes('<@'), '(f) no Discord mention in the review list or citizenship.json', r.text);
 cmds.strikevote.fn(STAFF, 'whiterun');
-ok(/Use \/strikevote <hold>/.test(last(STAFF)), '/strikevote without a name explains its use');
+ok(/Use \/strikevote <hold> <name or #TAG> <reason>/.test(last(STAFF)), '/strikevote without a name explains its use');
+// An offline voter is told once at the next login, on any character
+r = M.vote(good[3], 'whiterun', K);
+online = online.filter((x) => x !== good[3]);
+const toldBefore = said.filter(([x]) => x === good[3]).length;
+r = M.strikeVote(STAFF, 'whiterun', `#T${good[3].toString(16)} voted for a friend's alt`);
+ok(!r.error && said.filter(([x]) => x === good[3]).length === toldBefore, 'an offline voter is struck and told nothing yet', r);
+online.push(good[3]); M.noticeLogin(good[3]);
+ok(/struck by the staff/.test(last(good[3])), '(e) the struck voter is told at the next login');
+const toldOnce = said.filter(([x]) => x === good[3]).length; M.noticeLogin(good[3]);
+ok(said.filter(([x]) => x === good[3]).length === toldOnce, '...once');
+// Undo
+r = M.unstrikeVote(GM, 'whiterun', nm(good[3]));
+ok(r.error && /Lead GM/.test(r.error), 'a GM cannot undo a strike', r);
+cmds.unstrikevote.fn(STAFF, `whiterun ${nm(good[3])}`);
+ok(/undone/.test(last(STAFF)) && !M.data().elections.whiterun.struckVotes['103'] && /no longer struck/.test(last(good[3])), '(b) /unstrikevote undoes it, and the voter is told', last(STAFF));
+ok(audits.some((t) => /^ELECTION STAFF Lead Staff #T\w+ .*undid the struck vote of Citizen 3/.test(t)), 'audited');
+r = M.vote(good[3], 'whiterun', K);
+ok(!r.error, 'the restored account votes again in the open round', r);
 
 // ---- the vote closes; counts are the votes left ----------------------------------------------------------------------------
 now += 24 * HOUR; timer();
 E = M.data().elections.whiterun;
-ok(E.phase === 'seated' && E.result.counts[K] === 2, 'one court with 2 votes (the struck one gone) takes office', E.result);
+ok(E.phase === 'seated' && E.result.counts[K] === 3, 'one court with 3 votes (the struck one gone) takes office', E.result);
+ok(audits.some((t) => /is elected Jarl .*; 1 vote\(s\) struck by staff$/.test(t)) && /1 vote was struck after a staff review/.test(E.notice.text), '(h) the result audit and notice give the number of struck votes, no names', E.notice.text);
+ok(E.voters === undefined && E.voterPlay === undefined && E.salt === undefined, 'after the result no voter list or play-time snapshot is kept', Object.keys(E));
+ok(/struck Citizen 2/.test(M.reviewText(STAFF, 'whiterun').text), '(g) the struck vote is still listed with no voter list');
+
+// ---- a round nobody votes in: no endless revote ------------------------------------------------------------------------------
+const twoCourts = () => {
+  M.staffAct(STAFF, 'whiterun', 'restart');
+  for (const g of [good.slice(9, 13), good.slice(5, 9)]) {
+    const rr = M.register(g[0], 'whiterun', g.slice(1).map(nm)); if (rr.error) throw new Error(rr.error);
+    const c = M.data().elections.whiterun.courts.find((x) => x.members.jarl.actor === g[0]);
+    for (const a of g.slice(1)) M.answerInvite(a, 'whiterun', c.id, true);
+  }
+  now += 25 * HOUR; timer();
+};
+twoCourts();
+E = M.data().elections.whiterun;
+ok(E.phase === 'voting' && E.ballot.length === 2 && E.rules === 1, 'two courts on the ballot, stamped with the rules', E.phase);
+for (let i = 0; i < 3; i++) { now += 25 * HOUR; timer(); }
+E = M.data().elections.whiterun;
+ok(!E || (E.round === 1 && E.phase !== 'voting'), 'a 0-0 round with two courts never goes to a revote', E && { round: E.round, phase: E.phase });
+ok(audits.some((t) => /^ELECTION Whiterun: (no vote was cast; registration reopened|cancelled \(no vote was cast\))/.test(t)), "audited as 'no vote was cast'");
+
+// ---- registration judges against the opening -------------------------------------------------------------------------------
+const SIXHALF = account(208, 'Six And A Half');
+writeBackend();
+M.staffAct(STAFF, 'whiterun', 'restart');
+now -= 5.5 * DAY; online.push(SIXHALF); M.join(SIXHALF, 'whiterun'); now += 5.5 * DAY;
+E = M.data().elections.whiterun;
+const atReg = M.canVote(SIXHALF, WR, E);
+ok(/7 days when the vote opens/.test(atReg), 'a citizen of 5.5 days (6.5 at the opening) is refused during registration', atReg);
+{ const g = good.slice(9, 13); M.register(g[0], 'whiterun', g.slice(1).map(nm)); const c = M.data().elections.whiterun.courts[0]; for (const a of g.slice(1)) M.answerInvite(a, 'whiterun', c.id, true); }
+now += 25 * HOUR; timer();
+E = M.data().elections.whiterun;
+r = M.vote(SIXHALF, 'whiterun', E.ballot[0]);
+ok(E.phase === 'voting' && r.error && /7 days when the vote opened/.test(r.error), '...and the same at the vote', r);
+
+// ---- an election started before the rules finishes under the old rules -----------------------------------------------------
+delete E.rules;
+r = M.vote(YOUNG, 'whiterun', E.ballot[0]);
+ok(!r.error, 'with no rules stamp (started on the old code) the young account votes, as before', r);
+ok(M.canVote(NEWCIT, WR, E) === '' && M.canVote(SIXHALF, WR, E) === '', '...and so does every citizen');
 
 // ---- the rules can be switched off -------------------------------------------------------------------------------------------
-rules = { enabled: false }; M = load();
+rules = { enabled: false, oneVotePerDevice: true }; M = load();
 ok(M.canVote(YOUNG, WR, null) === '' && M.canVote(NEWCIT, WR, null) === '', 'voterRules.enabled false: every citizen votes again');
-rules = { discordAgeDays: 0, playHours: 0, playDays: 0 }; M = load();
-ok(M.canVote(YOUNG, WR, null) === '' && /7 days/.test(M.canVote(NEWCIT, WR, null)), 'each rule has its own number (0 turns it off): the Discord and play rules off, the citizenship rule still on', M.canVote(NEWCIT, WR, null));
+rules = { discordAgeDays: 0, playHours: 0, playDays: 0, oneVotePerDevice: true }; M = load();
+const NEWER = account(209, 'Newer Citizen'); writeBackend(); online.push(NEWER); M.join(NEWER, 'whiterun');
+chars.get(YOUNG).discord = snow(now - 10 * DAY); play.set(201, { ms: 5 * HOUR, days: 4 });
+ok(M.canVote(YOUNG, WR, null) === '' && M.canVote(SHORT, WR, null) === '' && /7 days/.test(M.canVote(NEWER, WR, null)), 'each rule has its own number (0 turns it off): the Discord and play rules off, the citizenship rule still on', M.canVote(NEWER, WR, null));
+
+// ---- the shipped config: one vote per PC is off, and the device store is never opened -------------------------------------
+const realCfg = JSON.parse(fs.readFileSync(path.resolve(__dirname, '..', 'gamemode-config.json'), 'utf8'));
+const shipped = JSON.parse(JSON.stringify(realCfg.citizenship));
+ok(shipped.election.voterRules.oneVotePerDevice === false, 'gamemode-config.json ships oneVotePerDevice: false');
+shipped.election.voterRules = Object.assign({}, shipped.election.voterRules, { playersFile: path.join(dir, 'players.json'), deviceFile: path.join(dir, 'device-ids.json') });
+shipped.discordRoles = {}; shipped.staffReleases = [];
+fs.rmSync(path.join(dir, 'citizenship.json'), { force: true });
+writeDevices();
+const opened = []; const realRead = fs.readFileSync;
+fs.readFileSync = function (f, ...rest) { opened.push(String(f)); return realRead.call(this, f, ...rest); };
+try {
+  cfgOverride = { citizenship: shipped }; rules = {}; M = load();
+  for (const a of good.concat([PCALT, FALLBACK, SIXHALF])) { if (!online.includes(a)) online.push(a); M.join(a, 'whiterun'); }
+  chars.get(YOUNG).discord = snow(Date.UTC(2021, 0, 1));
+  now += 8 * DAY;
+  ok(M.citizenAccounts(WR) >= 15, 'default config: the PC-linked account counts toward the threshold', M.citizenAccounts(WR));
+  timer(); E = M.data().elections.whiterun;
+  { const g = good.slice(9, 13); M.register(g[0], 'whiterun', g.slice(1).map(nm)); const c = E.courts[0]; for (const a of g.slice(1)) M.answerInvite(a, 'whiterun', c.id, true); }
+  now += 25 * HOUR; timer(); E = M.data().elections.whiterun;
+  r = M.vote(good[0], 'whiterun', E.ballot[0]);
+  const r2 = M.vote(PCALT, 'whiterun', E.ballot[0]);
+  ok(E.phase === 'voting' && !r.error && !r2.error, 'default config: both accounts on one PC vote', [r, r2]);
+  ok(!opened.some((f) => /device-ids\.json$/.test(f)), 'default config: device-ids.json is never opened', opened.filter((f) => /device/.test(f)));
+} finally { fs.readFileSync = realRead; cfgOverride = null; }
+// Only a strict true turns it on
+rules = { oneVotePerDevice: 'false' }; opened.length = 0;
+fs.readFileSync = function (f, ...rest) { opened.push(String(f)); return realRead.call(this, f, ...rest); };
+try { M = load(); M.citizenAccounts(WR); M.canVote(PCALT, WR, M.data().elections.whiterun); } finally { fs.readFileSync = realRead; }
+ok(!opened.some((f) => /device-ids\.json$/.test(f)), 'oneVotePerDevice: "false" (a string) stays off');
 
 console.log(fails ? `\n${fails} FAILED` : '\nall passed');
 process.exitCode = fails ? 1 : 0;

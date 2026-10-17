@@ -113,20 +113,25 @@ module.exports = (api) => {
     if (r.dayNow[1] >= C.dayMinutes * 60000) addDay(r, d);
   };
   // Once: the days already played, from the launcher's notes of each game session (backend data/session-ends.jsonl,
-  // newest 5000, since 4 Oct). Only a session of dayMinutes or more counts, on the day it started
+  // newest 5000, since 4 Oct). The sessions of an account are added up per UTC day they started, and a day of dayMinutes or
+  // more counts, as live counting does. These notes are the launcher's own word, so they give only days, never hours
   const seedDays = () => {
     if (store.daysSeededAt) return;
     let text = ''; try { text = fs.readFileSync(C.sessionNotesFile, 'utf8'); } catch (e) { log(`playtime: no session notes for play days (${e.code || e.message}); days count from now`); store.daysSeededAt = Date.now(); S.dirty = true; return; }
-    let n = 0; const accounts = new Set();
+    let n = 0; const accounts = new Set(); const sums = new Map();
     for (const line of text.split('\n')) {
       let o = null; try { o = line ? JSON.parse(line) : null; } catch (e) { o = null; }
       if (!o || !validPid(Number(o.profileId))) continue;
       const a = Number(o.startedAt), b = Number(o.endedAt);
-      if (!(Number.isFinite(a) && Number.isFinite(b) && b - a >= C.dayMinutes * 60000 && b <= Date.now() + 60000)) continue;
-      const r = recOf(Number(o.profileId), true); addDay(r, day(a)); n++; accounts.add(Number(o.profileId));
+      if (!(Number.isFinite(a) && Number.isFinite(b) && b > a && b <= Date.now() + 60000)) continue;
+      const k = `${Number(o.profileId)} ${day(a)}`; sums.set(k, (sums.get(k) || 0) + (b - a));
+    }
+    for (const [k, ms] of sums) {
+      if (ms < C.dayMinutes * 60000) continue;
+      const [pid, d] = k.split(' '); const r = recOf(Number(pid), true); addDay(r, d); n++; accounts.add(Number(pid));
     }
     store.daysSeededAt = Date.now(); S.dirty = true;
-    log(`playtime: seeded play days of ${accounts.size} account(s) from ${n} session note(s)`);
+    log(`playtime: seeded ${n} play day(s) of ${accounts.size} account(s) from the session notes`);
   };
 
   // Grants the slot at the threshold, once; says so to the account's character in the world once the build counts it

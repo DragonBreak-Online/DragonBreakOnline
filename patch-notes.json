@@ -1,5 +1,23 @@
 [
   {
+    "title": "Who may vote in hold elections",
+    "date": "2026-10-17",
+    "version": "Hotfix",
+    "tag": "Change",
+    "sections": [
+      {
+        "heading": "Elections",
+        "items": [
+          "To vote for a Jarl, your Discord account must be at least 90 days old, you need 10 hours of play on at least 3 different days, and your character must have been a citizen of the hold for 7 days. All three are judged when the vote opens; the hold's Voting tab tells you which one you are missing and when you will meet it.",
+          "Only those who may vote count toward the 15 citizens a hold needs to start an election.",
+          "Staff can strike a vote, with a reason, when one person has voted from more than one account, and can undo it. If your vote is struck you are told, at once or the next time you log in.",
+          "An election already running keeps the old rules, and votes already cast stand.",
+          "Citizenship began on 16 October, so no hold can start an election before about 23 October."
+        ]
+      }
+    ]
+  },
+  {
     "title": "The Lore Master",
     "date": "2026-10-16",
     "version": "Hotfix",

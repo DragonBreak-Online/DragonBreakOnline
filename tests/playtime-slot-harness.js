@@ -233,12 +233,17 @@ fs.writeFileSync(path.join(tmp, 'journal', 'not-a-key.json'), '{"playMs": 999999
     try { fs.unlinkSync(path.join(tmp, 'playtime-slots.json')); } catch (e) { /* none */ }
     const D = 24 * H, t0 = Date.parse('2026-10-10T10:00:00Z');
     const notes = [{ profileId: 7, startedAt: t0, endedAt: t0 + H }, { profileId: 7, startedAt: t0 + D, endedAt: t0 + D + 5 * 60000 },
-      { profileId: 7, startedAt: t0 + 2 * D, endedAt: t0 + 2 * D + 20 * 60000 }, { profileId: 7, startedAt: t0 + 2 * D + H, endedAt: t0 + 2 * D + 2 * H }, { bad: 1 }];
+      { profileId: 7, startedAt: t0 + 2 * D, endedAt: t0 + 2 * D + 20 * 60000 }, { profileId: 7, startedAt: t0 + 2 * D + H, endedAt: t0 + 2 * D + 2 * H },
+      { profileId: 8, startedAt: t0, endedAt: t0 + 10 * 60000 }, { profileId: 8, startedAt: t0 + H, endedAt: t0 + H + 10 * 60000 },
+      { profileId: 9, startedAt: t0, endedAt: t0 + 5 * 60000 }, { profileId: 9, startedAt: t0 + H, endedAt: t0 + H + 5 * 60000 }, { bad: 1 }];
     fs.writeFileSync(path.join(tmp, 'session-ends.jsonl'), notes.map((x) => JSON.stringify(x)).join('\n') + '\nnot json\n');
     clock = Date.parse('2026-10-16T08:00:00Z'); Date.now = () => clock;
     load({ enabled: true });
     const p7 = globalThis.__dboPlaytimeOf(7);
     ok('days: seeded from the session notes, a session under 15 minutes left out, one day once', p7.days === 2, rec(7) && rec(7).days);
+    ok('days: two 10-minute sessions on one day add up to a play day, as live counting does', globalThis.__dboPlaytimeOf(8).days === 1, rec(8) && rec(8).days);
+    ok('days: the seed gives days, never hours', globalThis.__dboPlaytimeOf(8).ms === 0, rec(8) && rec(8).ms);
+    ok('days: two 5-minute sessions on one day are not one', globalThis.__dboPlaytimeOf(9).days === 0);
     ok('days: an account with no record has 0', globalThis.__dboPlaytimeOf(42).ms === 0 && globalThis.__dboPlaytimeOf(42).days === 0);
     online = [A7];
     tick(); for (let i = 0; i < 20; i++) step(30000);
