@@ -79,6 +79,45 @@ void InstallJumpHandlerHook()
     vtbl.write_vfunc(0x4, JumpHandlerProcessButton::thunk);
 }
 
+// Actor::Disable (AE id 37267) only queues the disable as BSTaskPool task 0x50, which holds its own reference and runs
+// later on a job thread. An actor deleted in between is still disabled by that task with its form id already 0; the
+// Disable then builds a MovementControllerNPC for it, the controller finds no actor by that id, and its motion-driven
+// update reads through null (AE 41702+0x22, 9 crashes 12-17 Oct). A reference that no longer resolves to itself is on its
+// way out and has nothing to disable.
+struct QueuedActorDisable
+{
+  static void thunk(RE::TESObjectREFR* ref)
+  {
+    if (ref && RE::TESForm::LookupByID(ref->GetFormID()) != ref) {
+      spdlog::warn("QueuedActorDisable: skipped a queued Disable on a "
+                   "reference that no longer resolves (form id {:X})",
+                   ref->GetFormID());
+      return;
+    }
+    func(ref);
+  };
+  static inline REL::Relocation<decltype(&thunk)> func;
+};
+
+// AE 1.6.1170 only: the call in the task dispatcher (id 36991) to the task 0x50 handler (id 37268, a jump to
+// TESObjectREFR::Disable). The site is checked before it is patched, so another executable is left alone.
+void InstallQueuedActorDisableHook()
+{
+  if (!REL::Module::IsAE()) {
+    return;
+  }
+  const auto site = REL::ID(36991).address() + 0x1128;
+  const auto handler = REL::ID(37268).address();
+  const auto bytes = reinterpret_cast<const std::uint8_t*>(site);
+  const auto target =
+    site + 5 + *reinterpret_cast<const std::int32_t*>(bytes + 1);
+  if (bytes[0] != 0xE8 || target != handler) {
+    spdlog::warn("QueuedActorDisable: call site not found, hook not installed");
+    return;
+  }
+  Hooks::write_thunk_call<QueuedActorDisable>(site);
+}
+
 void BindNativeMethod(RE::BSScript::Internal::VirtualMachine* thisArg,
                       RE::BSScript::IFunction* func);
 
@@ -149,6 +188,7 @@ void Hooks::Install()
   // InstallOnFrameUpdateHook();
   InstallOnConsoleVPrintHook();
   InstallJumpHandlerHook();
+  InstallQueuedActorDisableHook();
   HookVirtualMachineBind();
 
   logger::info("CommonLib hooks installed.");
