@@ -6886,6 +6886,13 @@ try {
   delete require.cache[RACIAL_JS];
   racial = require(RACIAL_JS)({ mp, log, personal, giveItem, profileOf, display, recordOf, every, onlineActors, weaponHandsOf, sourceResistsOf, gmstFloat, cfg, sendPacket, hasUiCap });
 } catch (e) { log('racial.js failed to load:', e.stack || e.message); racial = null; globalThis.__dboRaceGold = null; globalThis.__dboRaceOf = null; }
+// ---- how tough a family of creatures is against players, by race (server\npctoughness.js, config "npcToughness") ----
+let toughness = null;
+try {
+  const TOUGHNESS_JS = path.resolve('npctoughness.js');
+  delete require.cache[TOUGHNESS_JS];
+  toughness = require(TOUGHNESS_JS)({ mp, cfg, log, profileOf, recordOf });
+} catch (e) { log('npctoughness.js failed to load:', e.stack || e.message); toughness = null; }
 // How much a Defense tier multiplies a piece's rating: heavy by the tier's factor, light by lightShare of the gain
 const defensePieceMult = (targetId) => {
   const none = { heavy: 1, light: 1 };
@@ -7401,6 +7408,8 @@ const hitDamageAttemptHook =(aggressorId, targetId, sourceId, damage, flags) => 
     mult *= npcKindDamageMult(agg, tgt, dmg);
     // An enemy of a claimed dungeon by the lease's difficulty, and any NPC's spell (npcDamage.byDifficulty, spellMult)
     mult *= npcDifficultyDamageMult(agg, tgt, dmg, flags);
+    // A family of creatures by race, on a player (npcToughness.kinds.<kind>.dealt; the draugr, 17 Oct)
+    if (toughness) { try { mult *= toughness.dealtMult(agg, tgt, dmg); } catch (e) { log('toughness dealt failed', e.message); } }
     // A player's summon takes less by its owner's Conjuration rank (summonBuff.takenByTier)
     mult *= summonTakenMult(agg, tgt, dmg);
     try { npcHitLog(agg, tgt, src, dmg, mult, flags); } catch (e) { log('npc hit log failed', e.message); }
@@ -7417,7 +7426,10 @@ const hitDamageAttemptHook =(aggressorId, targetId, sourceId, damage, flags) => 
     const before = mp.get(tgt, 'percentages');
     // A player's hit on a kind of creature or NPC (npcDamage.takenByKind): more lands before the engine's hit when it can
     // (weapon hits), else it joins the give-back's mult like any other factor
-    const taken = npcTakenDamageMult(agg, tgt, dmg) * summonDealtMult(agg, tgt, dmg);
+    // and on a family of creatures whose health the server leaves far above their level's (npcToughness; the draugr, 17 Oct)
+    let toughTaken = 1;
+    if (toughness) { try { toughTaken = toughness.takenMult(agg, tgt, dmg, flags); } catch (e) { log('toughness taken failed', e.message); } }
+    const taken = npcTakenDamageMult(agg, tgt, dmg) * summonDealtMult(agg, tgt, dmg) * toughTaken;
     if (!(taken > 1 && npcTakenLowerFirst(tgt, dmg, taken, flags))) mult *= taken;
     if (mult !== 1 && dmg > 0) {
       if (before && before.health > 0) globalThis.__dboMasteryPending = { agg, tgt, mult, health: before.health };
