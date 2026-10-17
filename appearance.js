@@ -238,7 +238,7 @@ module.exports = (api) => {
     const before = get(a, 'appearance');
     if (!before || typeof before !== 'object') return personal(a, 'Your appearance could not be read. Ask a GM for help.');
     try {
-      mp.set(a, EDIT, Object.assign({ at: Date.now(), before: copy(before) }, left ? { free: true } : {}));
+      mp.set(a, EDIT, Object.assign({ at: Date.now(), before: copy(before), realName: ownName(a, before) }, left ? { free: true } : {}));
       mp.setRaceMenuOpen(a, true);
       noteEditorOpened(a);
     } catch (e) {
@@ -527,6 +527,10 @@ module.exports = (api) => {
   });
   const NOT_KEPT_NOTE = ' RaceMenu-only details (extra sliders, sculpt, overlays) are not saved yet and are gone when you log out.';
 
+  // The mask state from playermenu.js ({ masked, real, shown, isMaskName }), or null without it
+  const maskOf = (a) => { try { return typeof globalThis.__dboMaskOf === 'function' ? globalThis.__dboMaskOf(a) : null; } catch (e) { return null; } };
+  // The character's own name: the one kept behind a mask, else the look's
+  const ownName = (a, look) => { const m = maskOf(a); return String((m && m.masked && m.real) || (look && look.name) || ''); };
   // The editor closed with this appearance (gamemode.js appearanceHook, the engine has already applied it). True when it
   // was ours to handle.
   const finish = (a, appearance) => {
@@ -540,6 +544,15 @@ module.exports = (api) => {
     const after = appearance && typeof appearance === 'object' ? copy(appearance) : null;
     closeSaveWindow(a);
     if (!after) return true;
+    // The name kept is the character's own (e.realName from the open), or the mask's while a mask is on now; never a mask
+    // name saved behind a mask at the open, which an editor left open over a logout (it unmasks) put back for good (#VKRS)
+    const m = maskOf(a);
+    let keep = String((m && m.isMaskName(before.name) ? (e.realName || '') : before.name) || '');
+    if (!keep || (m && m.isMaskName(keep))) keep = m && !m.isMaskName(after.name) ? String(after.name || '') : '';
+    if (m && m.masked) keep = m.shown;
+    if (!keep) { keep = String(before.name || ''); log(`appearance: ${who(a)} has no own name to keep after the editor; staff can /rename`); }
+    // The look before carries it too: it is compared with the new one and put back when a change is refused
+    before.name = keep;
     // Opened as a free change and one is still left (the switch may have gone off, or a RaceMenu save used it, meanwhile)
     const free = e.free === true && freeLeft(a) > 0;
     // Opened free but none is left now: that editor skipped the gold and the daily wait, so nothing from it is charged
@@ -558,8 +571,8 @@ module.exports = (api) => {
     const look = guarded ? guarded.look : after;
     if (guarded) audit(`APPEARANCE ${who(a)} editor swapped in ${raceName(guarded.from)}'s default head; kept their own`);
     const headNote = guarded ? ` ${HEAD_NOTE}` : '';
-    const nameKept = String(look.name || '') !== String(before.name || '');
-    if (nameKept) look.name = before.name;
+    const nameKept = String(look.name || '') !== keep;
+    if (nameKept) look.name = keep;
     if (sameLook(look, before)) {
       if (nameKept || guarded) { mp.set(a, 'appearance', before); resendAfterSettle(a, appearance); }
       if (!raceMenuKept(a)) {

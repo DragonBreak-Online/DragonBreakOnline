@@ -656,6 +656,8 @@ module.exports = (api) => {
     try { unmask(a, true); } catch (e) { log('unmask on leave failed', e.message); }
     try { endReveal(a, 'logout', true); } catch (e) { log('real names on leave failed', e.message); }
   };
+  // appearance.js: the editor keeps the character's own name, never the mask's (#VKRS, 17 Oct)
+  globalThis.__dboMaskOf = (a) => ({ masked: isMasked(Number(a) >>> 0), real: realName(Number(a) >>> 0), shown: String(C.maskName || ''), isMaskName });
   globalThis.__dboPlayerMenuReady = (a) => { try { unmask(a, true); realNamesOn.delete(Number(a) >>> 0); ensureKnown(a); refreshLawful(a); } catch (e) { log('player menu login failed', e.message); } };
   // At arrival (gamemode.js onUserAssignActor with assigned, then onCharacterReady), not 8 s later; assigned leaves a mode still on alone (the same character picked again)
   globalThis.__dboRealNamesLogin = (a, assigned) => { try { a = Number(a) >>> 0; if (assigned && revealing(a)) return; realNamesOn.delete(a); restoreLeftover(a, get(a, KNOWN_PROP, null)); } catch (e) { log('realnames: login check failed', e.message); } };

@@ -77,6 +77,32 @@ ok(gold() === 800 && props.get(`${A}|appearance`).isFemale === false && /Sex can
 m = reset(800); run(); finish(Object.assign(look(), { name: 'Brandy', hairColor: 9 }));
 ok(gold() === 300 && props.get(`${A}|appearance`).name === 'Brand Stoneborn' && props.get(`${A}|appearance`).hairColor === 9 && /name stays the same/.test(sys.at(-1)), 'a renamed look keeps the old name and the new hair', props.get(`${A}|appearance`));
 
+// 5b. The mask (#VKRS, 17 Oct): opened behind a mask, saved after the mask came off (a logout unmasks), the own name is
+// kept, never "Masked Person"; saved while still masked, the mask's name stays on and the own name stays behind it
+{
+  let maskOn = true;
+  const MASK = 'Masked Person';
+  globalThis.__dboMaskOf = () => ({ masked: maskOn, real: maskOn ? 'Brand Stoneborn' : '', shown: MASK, isMaskName: (n) => String(n || '').toLowerCase() === MASK.toLowerCase() });
+  m = reset(800, Object.assign(look(), { name: MASK })); run();
+  maskOn = false; props.set(`${A}|appearance`, look());
+  finish(Object.assign(look(), { name: MASK, hairColor: 9 }));
+  ok(props.get(`${A}|appearance`).name === 'Brand Stoneborn' && props.get(`${A}|appearance`).hairColor === 9, 'mask: opened masked, saved unmasked: the own name, never the mask\'s', props.get(`${A}|appearance`));
+  maskOn = true;
+  m = reset(800, Object.assign(look(), { name: MASK })); run();
+  finish(Object.assign(look(), { name: MASK, hairColor: 9 }));
+  ok(props.get(`${A}|appearance`).name === MASK && gold() === 300, 'mask: saved still masked, the mask name stays on and the look is paid for', [props.get(`${A}|appearance`), gold()]);
+  maskOn = false;
+  m = reset(800, Object.assign(look(), { name: MASK })); run();
+  const e = props.get(`${A}|private.dboAppearanceEdit`) || props.get(`${A}|private.appearanceEdit`);
+  if (e) delete e.realName;
+  finish(Object.assign(look(), { name: 'Brand Stoneborn', hairColor: 9 }));
+  ok(props.get(`${A}|appearance`).name === 'Brand Stoneborn', 'mask: an editor opened before this fix (no own name kept) takes the name it sends back', props.get(`${A}|appearance`));
+  maskOn = true; m = reset(800, Object.assign(look(), { name: MASK })); run(); maskOn = false;
+  finish(Object.assign(look(), { name: MASK, raceId: 0x13745 }));
+  ok(props.get(`${A}|appearance`).name === 'Brand Stoneborn', 'mask: a refused race change puts the look back with the own name', props.get(`${A}|appearance`));
+  delete globalThis.__dboMaskOf;
+}
+
 // 6. Not enough gold: refused before opening; gold spent meanwhile: previous look back
 m = reset(100); said = []; run();
 ok(opened === 0 && /costs 500 gold. You have 100/.test(said.at(-1)), 'not enough gold: the editor does not open', said.at(-1));
