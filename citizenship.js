@@ -467,6 +467,25 @@ module.exports = (api) => {
 
   // ---- who may vote (Nate, 16 Oct: no Discord alts voting) -------------------------------------------------------------
   const VR = EL.voterRules;
+  // An election that began before the voter rules existed carries no rules stamp, and voterWhy lets everyone through: no
+  // Discord age, no play time, no citizenship. Riften's did (opened 16 Oct 23:36Z, the rules shipped the next day).
+  // Restarting it would apply them, but it deletes the election: the courts formed so far would have to form again and
+  // the registration clock would start over, five hours later than it stands (Nate, 17 Oct: he would rather not).
+  // So a hold named in voterRules.stampRunning has its RUNNING election stamped in place instead - rules, and firstEver,
+  // so it is judged as a first election and does not ask for the seven days. Once only, and never when a vote has already
+  // been cast, so no vote already made can be invalidated by it. Empty by default.
+  const stampRunning = () => {
+    const names = Array.isArray(VR.stampRunning) ? VR.stampRunning.map((h) => String(h).toLowerCase()) : [];
+    if (!names.length || VR.enabled !== true) return;
+    for (const zid of names) {
+      const E = data().elections[zid];
+      if (!E || E.rules || (E.phase !== 'registration' && E.phase !== 'voting')) continue;
+      if (E.votes && Object.keys(E.votes).length) { log(`citizenship: ${zid}'s election already has votes cast; left under the old rules`); continue; }
+      E.rules = 1; E.firstEver = 1; save();
+      audit(`ELECTION ${zid}: the voter rules now apply to the election already running, as its first (no vote had been cast)`);
+      log(`citizenship: stamped ${zid}'s running election with the voter rules, as a first election`);
+    }
+  };
   // The backend's records, read-only, as journalstats.js reads players.json (the game server runs as root): profileId ->
   // { discordId } (nothing else is kept), and, only with oneVotePerDevice true, Discord id -> the PC codes the launcher
   // reported (sources/deviceChecks.js)
@@ -1232,6 +1251,8 @@ module.exports = (api) => {
   // Staff releases in config, each applied once (at this load, or the first one after it was added)
   if (C.enabled) { try { staffReleases(); } catch (e) { log('citizenship: staff releases failed', e.stack || e.message); } }
   log(`citizenship ${C.enabled ? 'on' : 'off'}: ${holds().length} holds grant it, ${Object.keys(data().chars).length} characters on the rolls, ${Object.keys(data().elections).length} election(s)`);
+  try { stampRunning(); } catch (e) { log('citizenship: stampRunning failed', e.message); }
+
   return { join, grant, decline, renounce, makePrimary, revoke, staffReleases, setPolicy, register, replace, withdraw, answerInvite, vote, staffAct, strikeVote, unstrikeVote, reviewText, voterWhy, tick, advance,
     holdsOf, citizenOf, factionFree, citizenAccounts, canVote, noticeLogin, boardPayload, journalView, votingView, citizenshipView, data, PANEL_ID };
 };

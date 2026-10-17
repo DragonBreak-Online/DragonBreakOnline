@@ -305,6 +305,38 @@ ok(Array.isArray(shippedVR.newHolds) && shippedVR.newHolds.length === 8
   && ['bruma', 'whiterun', 'riften', 'solitude', 'winterhold', 'windhelm', 'dawnstar', 'markarth'].every((h) => shippedVR.newHolds.includes(h)),
   'gamemode-config.json names every hold that has citizens', shippedVR.newHolds);
 
+// ---- stamping an election that began before the rules (Nate, 17 Oct: restarting it would cost the courts and 5 hours) --
+// Riften's election opened before the voter rules existed, so it carries no stamp and voterWhy lets everyone through.
+// A named hold has its running election stamped in place: the rules apply, and as a FIRST election, so the seven days
+// are not asked for. Never when a vote has already been cast.
+{
+  const STORE = path.join(dir, 'citizenship.json');
+  const seed = (election) => {
+    const d = JSON.parse(fs.readFileSync(STORE, 'utf8'));
+    d.elections = Object.assign({}, d.elections, { markarth: election });
+    fs.writeFileSync(STORE, JSON.stringify(d));
+  };
+  const MK = { id: 'markarth', name: 'Markarth' };
+  const running = (extra) => Object.assign({ phase: 'registration', round: 1, startedAt: Date.now(), courts: [{ id: 'c1' }], ballot: [], votes: {} }, extra || {});
+
+  seed(running());
+  rules = { stampRunning: ['markarth'], newHolds: ['markarth'], citizenDaysFirstElection: 0, oneVotePerDevice: true };
+  M = load();
+  let E = M.data().elections.markarth;
+  ok(E && E.rules === 1 && E.firstEver === 1, 'a running election of a named hold is stamped in place', E && { rules: E.rules, firstEver: E.firstEver });
+  ok(E && E.courts.length === 1 && E.phase === 'registration', '...and keeps its courts and its phase', E && { courts: E.courts.length, phase: E.phase });
+  ok(M.canVote(NEWER, MK, E) === '' || /citizens of/.test(M.canVote(NEWER, MK, E)), '...and does not refuse a new citizen for the seven days', M.canVote(NEWER, MK, E));
+
+  seed(running({ votes: { 77: 'someone' } }));
+  M = load();
+  E = M.data().elections.markarth;
+  ok(!E.rules, 'an election with a vote already cast is left under the old rules', E && { rules: E.rules });
+
+  seed(running());
+  rules = { stampRunning: [], oneVotePerDevice: true }; M = load();
+  ok(!M.data().elections.markarth.rules, 'a hold not named is left alone');
+}
+
 // ---- the shipped config: one vote per PC is off, and the device store is never opened -------------------------------------
 const realCfg = JSON.parse(fs.readFileSync(path.resolve(__dirname, '..', 'gamemode-config.json'), 'utf8'));
 const shipped = JSON.parse(JSON.stringify(realCfg.citizenship));
