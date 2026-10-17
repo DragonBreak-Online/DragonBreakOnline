@@ -115,7 +115,7 @@ ok(REMOVE.length === 121 && new Set(REMOVE).size === 121, 'its remove list: the 
 ok(!REMOVE.some((d) => KEEP.includes(d)), 'no spell is on both lists');
 ok(REMOVE.includes('8dcec:Druadach.esm') && !REMOVE.includes('da746:Skyrim.esm') && !KEEP.includes('8dcec:Druadach.esm'),
   'the held spell the grant added goes; the one held from before stays');
-ok(Array.isArray(E.keepShouts) && E.keepShouts.length === 0 && E.offline === 'apply', 'it takes off the all-shouts grant and trims the saved form while offline');
+ok(E.keepShouts === undefined && E.offline === 'apply', 'it leaves shouts alone (they never slow the server) and trims the saved form while offline', E.keepShouts);
 ok(/^[\w .,;:()'-]+$/.test(String(E.by) + String(E.why)) && !/\d{15,}/.test(String(E.by) + String(E.why)), 'by and why carry no Discord id', [E.by, E.why]);
 // The character's spellbook and prepared spells as saved on 17 Oct: all in the keep list
 const BOOK = { arcane: ['2dd2a:Skyrim.esm', '45f9d:Skyrim.esm', '2dd29:Skyrim.esm', '7e8e5:Skyrim.esm'] };
@@ -148,14 +148,14 @@ const after = learnedDescs(GM);
 ok(after.length === 211 && KEEP.every((d) => after.includes(d)), 'what is left is exactly the 211 of the keep list', after.length);
 ok(ACTORS.get(BYSTANDER).learned.size === 331 && propOf(BYSTANDER, 'private.dboAllShouts') === true && propOf(BYSTANDER, 'private.dboHeldSpells').length === 1, 'the other character keeps every spell, its shouts and its held list');
 ok(JSON.stringify(propOf(GM, 'private.dboHeldSpells')) === JSON.stringify(['da746:Skyrim.esm']), 'the held list keeps only the spell held from before', propOf(GM, 'private.dboHeldSpells'));
-ok(propOf(GM, 'private.dboAllShouts') === null, 'the all-shouts grant is taken off', propOf(GM, 'private.dboAllShouts'));
+ok(propOf(GM, 'private.dboAllShouts') === true, 'the all-shouts grant is left as it was', propOf(GM, 'private.dboAllShouts'));
 ok(JSON.stringify(propOf(GM, 'private.dboStudied')) === JSON.stringify(BOOK) && JSON.stringify(propOf(GM, 'private.dboPrepared')) === JSON.stringify(PREP), 'the spellbook and prepared list are untouched');
 const rec = (propOf(GM, 'private.dboSpellTrims') || {})['jake-1017-trim-ff001473'];
-ok(rec && rec.removed.length === 120 && rec.notLearned === 1 && rec.spared.length === 0 && rec.heldDropped.join() === '8dcec:Druadach.esm' && rec.shouts === 'grant taken off',
-  'the result is kept on the character: 120 removed, 1 not learned, the held one dropped, the grant off', rec && { n: rec.removed.length, notLearned: rec.notLearned, held: rec.heldDropped, shouts: rec.shouts });
+ok(rec && rec.removed.length === 120 && rec.notLearned === 1 && rec.spared.length === 0 && rec.heldDropped.join() === '8dcec:Druadach.esm' && rec.shouts === 'untouched',
+  'the result is kept on the character: 120 removed, 1 not learned, the held one dropped, shouts untouched', rec && { n: rec.removed.length, notLearned: rec.notLearned, held: rec.heldDropped, shouts: rec.shouts });
 ok(rec && rec.removed.every((d) => REMOVE.includes(d)), 'the kept record lists the removed spells by desc, for a rollback');
 const done = out.audits.find((l) => / done: /.test(l)) || '';
-ok(/SPELL TRIM jake-1017-trim-ff001473 Cff001473 \(profile 47\) done: 120 spell\(s\) removed, 1 not learned, 0 kept as spellbook, prepared or on loan, 1 off the held list \(8dcec:Druadach.esm\), shouts: grant taken off; by Jake \(owner\) via claude-jake: Give all spells/.test(done), 'a summary audit line', done);
+ok(/SPELL TRIM jake-1017-trim-ff001473 Cff001473 \(profile 47\) done: 120 spell\(s\) removed, 1 not learned, 0 kept as spellbook, prepared or on loan, 1 off the held list \(8dcec:Druadach.esm\), shouts: untouched; by Jake \(owner\) via claude-jake: Give all spells/.test(done), 'a summary audit line', done);
 ok(out.said.length === 0, 'an offline character is told nothing', out.said);
 // Applied once: a reload (or a restart) changes nothing
 clearOut();
@@ -191,6 +191,20 @@ clearOut();
 load({ staffTrims: [entry({ id: 'no-shouts', actor: 'ff00a002', removeSpells: spells(5, 10) })] });
 run();
 ok(propOf(B, 'private.dboAllShouts') === true && (propOf(B, 'private.dboSpellTrims') || {})['no-shouts'].shouts === 'untouched', 'no keepShouts leaves the grant alone');
+// keepShouts []: the grant is taken off
+const B2 = addActor(0xff00a00a, 9, spells(0, 10), { 'private.dboAllShouts': true });
+clearOut();
+load({ staffTrims: [entry({ id: 'shouts-off', actor: 'ff00a00a', keepShouts: [], removeSpells: spells(5, 10) })] });
+run();
+ok(propOf(B2, 'private.dboAllShouts') === null && (propOf(B2, 'private.dboSpellTrims') || {})['shouts-off'].shouts === 'grant taken off', 'keepShouts [] takes the grant off', propOf(B2, 'private.dboAllShouts'));
+
+// Two entries at once, for two characters: still one batch a run in all, the second after the first
+const P1 = addActor(0xff00a00b, 21, spells(0, 40)), P2 = addActor(0xff00a00c, 22, spells(0, 40));
+clearOut();
+load({ staffTrims: [entry({ id: 'pair-1', actor: 'ff00a00b', profile: 21, keepSpells: [], removeSpells: spells(0, 40) }), entry({ id: 'pair-2', actor: 'ff00a00c', profile: 22, keepSpells: [], removeSpells: spells(0, 40) })] });
+const pairRuns = [];
+while (live().length && pairRuns.length < 20) { calls.length = 0; tick(); pairRuns.push(calls.filter((c) => c[0] === 'RemoveSpell').length); }
+ok(Math.max(...pairRuns) <= 20 && ACTORS.get(P1).learned.size === 0 && ACTORS.get(P2).learned.size === 0, 'two runs share the timer: never more than one batch a run', pairRuns);
 
 // A profile that does not match: nothing touched, stays unapplied, said in the log
 const C = addActor(0xff00a003, 10, spells(0, 50));
