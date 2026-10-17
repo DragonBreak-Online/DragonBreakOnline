@@ -1158,6 +1158,7 @@ std::optional<uint32_t> WorldState::DestroyedFormIdx(uint32_t formId) const
 
 void WorldState::ReleaseHeldFormIdx(bool all)
 {
+  // Keep it above DatabaseFactory::kMaxSaveIntervalMs: a destroyed form's last save waits at its index until the next hand-off
   constexpr auto kHoldFor = std::chrono::seconds(10);
   const auto now = std::chrono::steady_clock::now();
   while (!heldFormIdx.empty() &&

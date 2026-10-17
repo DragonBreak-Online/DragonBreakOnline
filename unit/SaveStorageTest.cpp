@@ -403,7 +403,7 @@ TEST_CASE("saveIntervalMs is read from the server settings", "[save]")
 
   warning.clear();
   REQUIRE(DatabaseFactory::GetSaveIntervalMs(
-            J{ { "saveIntervalMs", 3600000 } }, &warning) == 60000);
+            J{ { "saveIntervalMs", 10000 } }, &warning) == 8000);
   REQUIRE(!warning.empty());
 }
 
