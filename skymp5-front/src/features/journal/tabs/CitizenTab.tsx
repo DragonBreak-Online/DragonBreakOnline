@@ -1,8 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 
 import '../../citizenBoard/styles.scss';
 import './CitizenTab.scss';
-import { Ask, HoldsList, HoldLine, RequestLine, whenText } from '../../citizenBoard';
+import { Ask, HoldsList, HoldLine, RequestLine, TextBox, whenText } from '../../citizenBoard';
 import { JournalTabProps, registerJournalTab } from '../tabs';
 
 // The F3 hub's Citizen tab (server citizenship.js, Nate 14 Oct): your citizenships, Primary first, and what you can do with
@@ -17,7 +17,38 @@ export interface CitizenSection {
   elections: Array<{ zone: string; name: string; phase: string; endsAt: number; revote: boolean; voted: boolean; mine: boolean }>;
   manage: Array<{ zone: string; name: string; policy: string; fee: number; requests: RequestLine[] }>;
   staff: Array<{ zone: string; name: string; phase: string; endsAt: number; citizens: number; threshold: number }> | null;
+  lookup?: { actor: string; name: string; tag: string; holds: Array<HoldLine & { via: string }> } | null;
 }
+
+// A Lead GM looks up one character's citizenships and revokes one; a faction or court citizenship names what holds it
+const StaffLookup = ({ s, busy, J }: { s: CitizenSection; busy: boolean; J: (action: string, zone: string, ...args: unknown[]) => void }) => {
+  const [q, setQ] = useState('');
+  const l = s.lookup;
+  return (
+    <div className="citizen__section citizen__section--officials">
+      <span className="citizen__heading">Staff: a character's citizenships</span>
+      <div className="citizen__entry">
+        <TextBox value={q} onChange={setQ} placeholder="Name or #TAG" onEnter={() => q.trim() && J('lookup', '', q.trim())} />
+        <span className="citizen__actions">
+          <button type="button" className="citizen__button citizen__button--small" disabled={busy || !q.trim()} onClick={() => J('lookup', '', q.trim())}>Look up</button>
+          {l ? <button type="button" className="citizen__link" disabled={busy} onClick={() => { setQ(''); J('lookup', '', ''); }}>Clear</button> : null}
+        </span>
+      </div>
+      {l ? (
+        <>
+          <span>{l.name}{l.tag ? <span className="citizen__muted"> #{l.tag}</span> : null}</span>
+          {l.holds.length ? l.holds.map((h) => (
+            <div key={h.zone} className="citizen__entry">
+              <span>{h.name} <span className="citizen__muted">· {h.auto ? `through ${h.via || 'a faction or court'}` : h.how}{h.since ? `, since ${whenText(h.since)}` : ''}</span></span>
+              {h.auto ? <span className="citizen__muted">Ends when they leave it</span>
+                : <Ask label="Revoke" danger busy={busy} onYes={() => J('revoke', h.zone, l.actor)} question={`Revoke ${l.name}'s citizenship of ${h.name}?`} />}
+            </div>
+          )) : <span className="citizen__empty">No citizenship.</span>}
+        </>
+      ) : null}
+    </div>
+  );
+};
 
 const PHASE: Record<string, string> = { none: 'no election yet', registration: 'courts are being entered', voting: 'the vote is open', seated: 'the Jarl is elected', held: 'held by the staff' };
 const POLICY: Record<string, string> = { manual: 'manual approval', paid: 'paid', free: 'free' };
@@ -86,6 +117,7 @@ export const CitizenTab = ({ section, busy, act }: JournalTabProps<CitizenSectio
         </div>
       ))}
 
+      {s.staff ? <StaffLookup s={s} busy={busy} J={J} /> : null}
       {s.staff ? (
         <div className="citizen__section citizen__section--officials">
           <span className="citizen__heading">Staff: elections</span>
