@@ -116,6 +116,7 @@ void InstallQueuedActorDisableHook()
     return;
   }
   Hooks::write_thunk_call<QueuedActorDisable>(site);
+  spdlog::info("QueuedActorDisable: hook installed");
 }
 
 void BindNativeMethod(RE::BSScript::Internal::VirtualMachine* thisArg,
