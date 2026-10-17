@@ -12,6 +12,9 @@
 namespace {
 constexpr std::uint32_t kGiveUpFrames = 3600;  // ~60 s of updates: tear down anyway, the 36991 hook is the net
 constexpr std::uint32_t kSettleFrames = 2;     // updates between the Disable having run and the teardown
+// The old deferred delete also waited for the 3D to go (kill moves, ragdolls: Havok still stepping the copy);
+// a copy whose 3D stays is torn down this many updates after its Disable ran
+constexpr std::uint32_t kMax3DWaitFrames = 30;
 
 struct Retire
 {
@@ -90,7 +93,9 @@ Napi::Value CopyLifecycleApi::ProcessCopyRetires(const Napi::CallbackInfo& info)
       if (r.disableRan) {
         ++r.framesSinceDisable;
       }
-      const bool settled = r.disableRan && r.framesSinceDisable > kSettleFrames;
+      const bool settled = r.disableRan &&
+        r.framesSinceDisable > kSettleFrames &&
+        (!r.ref->Get3D() || r.framesSinceDisable > kMax3DWaitFrames);
       if (settled || r.frames > kGiveUpFrames) {
         how.push_back(settled ? "disabled" : "gave-up");
         ready.push_back(std::move(r));
