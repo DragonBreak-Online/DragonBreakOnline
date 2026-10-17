@@ -711,6 +711,28 @@ module.exports = (api) => {
     }, { admin: true, help: '<player|#TAG> give someone one more free /appearance change' });
   }
 
+  // /appearancecancel <name|#TAG>: a GM closes an /appearance editor left open over a logout (The Plague Doctor #VKRS, 17 Oct:
+  // the open edit reopened RaceMenu at every login with the Nord default head and another race in it). Nothing from the
+  // editor is saved: the edit and the server's RaceMenu are closed, the stored look stays as it is (with anything written to
+  // it since, such as a vampire's tells), and a free change is not used. A close the player's client sends afterwards
+  // arrives with RaceMenu shut and is dropped (guard 2).
+  if (typeof api.findByName === 'function') {
+    registerChatCommand('appearancecancel', (a, args) => {
+      a = a >>> 0;
+      const q = String(args || '').trim();
+      if (!q) return personal(a, 'Use /appearancecancel <name|#TAG>.');
+      const t = Number(api.findByName(q)) >>> 0;
+      if (!t) return personal(a, 'No such player online. Use their name or #TAG.');
+      const name = typeof api.display === 'function' ? api.display(t) : who(t);
+      if (!pending(t)) return personal(a, `${name} has no appearance edit open.`);
+      const openedAt = Number((get(t, EDIT) || {}).at) || 0;
+      try { mp.set(t, EDIT, null); mp.setRaceMenuOpen(t, false); } catch (e) { log('appearance: cancel failed for', who(t), e.message); return personal(a, 'The edit could not be closed. Try again.'); }
+      personal(a, `${name}'s appearance edit is closed. Their look is unchanged and no free change was used.`);
+      if (t !== a) system(t, 'A GM closed your open appearance editor. Your look is as it was; close the editor if it is still showing. Nothing was spent.');
+      audit(`APPEARANCE ${who(a)} cancelled ${who(t)}'s open appearance edit (opened ${new Date(openedAt).toISOString()})`);
+    }, { admin: true, help: '<player|#TAG> close an /appearance editor left open, saving nothing' });
+  }
+
   globalThis.__dboAppearanceEdit = { pending, finish, blocked, chargenOpened, chargenFinish, refused, raceMenuClosed, freeLeft, freeNotice };
   log(`appearance ${C.enabled ? 'on' : 'off'}: /appearance costs ${cost} gold, every ${Number(C.cooldownHours) || 0} h, ${freeChanges} free per character, race ${C.allowRace === true ? 'free' : 'kept'}, sex ${C.allowSex === true ? 'free' : 'kept'}, head guard ${C.headGuard === false ? 'off' : `on (${HEADS.raceOf.size} race ids)`}`);
   return { pending, finish, blocked, goldOf, takeGold, C, chargenOpened, chargenFinish, refused, guardHead, sameLook, SETTLE_RESEND_MS, raceMenuClosed, raceMenuSaveGate, raceMenuRefused,
