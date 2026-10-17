@@ -2049,6 +2049,8 @@ module.exports = (api) => {
   };
   const magicView = (a) => { try { return magicTabOf(a); } catch (e) { log(`schools: magic view for ${display(a)} failed: ${e.message}`); return null; } };
   globalThis.__dboMagicView = magicView;
+  // journal.js asks this first, so a tab check never builds the Magic view (which reads the whole spell list)
+  globalThis.__dboMagicOpen = (a) => { try { return !!(ready(a) && isPlayer(a) && (arcaneOf(a).held || priestOf(a).held)); } catch (e) { return false; } };
   globalThis.__dboMagicTab = magicView;
   // { ok, text } of one Magic tab action
   globalThis.__dboMagicAction = (a, op, args) => {
