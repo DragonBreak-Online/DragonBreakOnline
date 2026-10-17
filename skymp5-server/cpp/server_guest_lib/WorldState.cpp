@@ -50,6 +50,9 @@ struct WorldState::Impl
     saveStorage;
   std::shared_ptr<IScriptStorage> scriptStorage;
   bool saveStorageBusy = false;
+  std::chrono::milliseconds saveInterval{ 0 };
+  std::optional<std::chrono::steady_clock::time_point> lastSaveHandoff;
+  bool saveNowRequested = false;
   std::shared_ptr<VirtualMachine> vm;
   uint32_t nextId = 0xff000000;
   std::shared_ptr<IPapyrusCompatibilityPolicy> policy;
@@ -802,12 +805,8 @@ void WorldState::LoadActivationChilds(uint32_t activationParentId,
   }
 }
 
-void WorldState::TickSaveStorage(const std::chrono::system_clock::time_point&)
+bool WorldState::PumpSaveStorage()
 {
-  if (!pImpl->saveStorage) {
-    return;
-  }
-
   try {
     pImpl->saveStorage->Tick();
   } catch (
@@ -851,21 +850,43 @@ void WorldState::TickSaveStorage(const std::chrono::system_clock::time_point&)
     spdlog::info("TickSaveStorage - requested re-save for {} forms in buffer "
                  "with size {}",
                  numRequested, forms.size());
+    return true;
 
   } catch (std::exception& e) {
     spdlog::error(
       "TickSaveStorage - received std::exception {}, can't request re-save",
       e.what());
     pImpl->saveStorageBusy = false;
+    return true;
   }
+  return false;
+}
+
+void WorldState::TickSaveStorage(const std::chrono::system_clock::time_point&)
+{
+  if (!pImpl->saveStorage) {
+    return;
+  }
+
+  PumpSaveStorage();
 
   if (pImpl->saveStorageBusy) {
     return;
   }
 
   if (pImpl->changesByIdxEmpty) {
+    pImpl->saveNowRequested = false;
     return;
   }
+
+  const auto steadyNow = std::chrono::steady_clock::now();
+  if (pImpl->saveInterval.count() > 0 && !pImpl->saveNowRequested &&
+      pImpl->lastSaveHandoff &&
+      steadyNow - *pImpl->lastSaveHandoff < pImpl->saveInterval) {
+    return;
+  }
+  pImpl->lastSaveHandoff = steadyNow;
+  pImpl->saveNowRequested = false;
 
   pImpl->saveStorageBusy = true;
 
@@ -891,6 +912,68 @@ void WorldState::TickSaveStorage(const std::chrono::system_clock::time_point&)
     // Just resize to previous size, at least not to resize every RequestSave
     pImpl->changesByIdx.resize(previousSize);
   }
+}
+
+void WorldState::SetSaveInterval(std::chrono::milliseconds interval)
+{
+  pImpl->saveInterval = interval;
+}
+
+std::chrono::milliseconds WorldState::GetSaveInterval() const
+{
+  return pImpl->saveInterval;
+}
+
+void WorldState::RequestSaveNow()
+{
+  pImpl->saveNowRequested = true;
+}
+
+void WorldState::FlushSaveStorageSync()
+{
+  if (!pImpl->saveStorage) {
+    return;
+  }
+
+  constexpr int kMaxAttempts = 3;
+  constexpr int kMaxErrorsPerPump = 64;
+  auto pumpUntilClean = [&] {
+    for (int i = 0; i < kMaxErrorsPerPump && PumpSaveStorage(); ++i) {
+    }
+  };
+
+  const auto start = std::chrono::steady_clock::now();
+  size_t numRecords = 0;
+
+  // A failed batch turns into a re-save of its records' current state, flushed in the next attempt
+  pumpUntilClean();
+  for (int attempt = 1;; ++attempt) {
+    numRecords +=
+      std::count_if(pImpl->changesByIdx.begin(), pImpl->changesByIdx.end(),
+                    [](const auto& changeForm) { return !!changeForm; });
+    pImpl->saveStorage->FlushSync(std::move(pImpl->changesByIdx));
+    pImpl->changesByIdx.clear();
+    pImpl->changesByIdxEmpty = true;
+    pImpl->saveNowRequested = false;
+    pumpUntilClean();
+
+    if (pImpl->changesByIdxEmpty) {
+      break;
+    }
+    if (attempt == kMaxAttempts) {
+      spdlog::error("FlushSaveStorageSync - records still failing after {} "
+                    "attempts keep their last saved copy",
+                    kMaxAttempts);
+      break;
+    }
+  }
+
+  auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+              std::chrono::steady_clock::now() - start)
+              .count();
+  spdlog::info("FlushSaveStorageSync - done in {} ms, {} records were "
+               "waiting for the next batch",
+               ms, numRecords);
 }
 
 void WorldState::TickTimers(const std::chrono::system_clock::time_point&)

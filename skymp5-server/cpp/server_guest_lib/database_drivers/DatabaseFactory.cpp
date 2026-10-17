@@ -22,8 +22,10 @@ DatabaseFactory::Create(nlohmann::json settings,
       ? settings["databaseName"].get<std::string>()
       : std::string("world");
 
-    logger->info("Using file with name '" + databaseName + "'");
-    return std::make_shared<FileDatabase>(databaseName, logger);
+    bool batchedSync = GetSaveIntervalMs(settings) != 0;
+    logger->info("Using file with name '{}', {} sync", databaseName,
+                 batchedSync ? "batched" : "per-file");
+    return std::make_shared<FileDatabase>(databaseName, logger, batchedSync);
   }
 
   if (databaseDriver == "mongodb") {
@@ -54,4 +56,32 @@ DatabaseFactory::Create(nlohmann::json settings,
   }
 
   throw std::runtime_error("Unrecognized databaseDriver: " + databaseDriver);
+}
+
+uint32_t DatabaseFactory::GetSaveIntervalMs(const nlohmann::json& settings,
+                                            std::string* outWarning)
+{
+  auto it = settings.find("saveIntervalMs");
+  if (it == settings.end()) {
+    return kDefaultSaveIntervalMs;
+  }
+
+  if (!it->is_number_integer() || it->get<int64_t>() < 0) {
+    if (outWarning) {
+      *outWarning = fmt::format("saveIntervalMs must be a whole number of "
+                                "milliseconds, 0 or more, not {}; using {}",
+                                it->dump(), kDefaultSaveIntervalMs);
+    }
+    return kDefaultSaveIntervalMs;
+  }
+
+  auto value = it->get<int64_t>();
+  if (value > kMaxSaveIntervalMs) {
+    if (outWarning) {
+      *outWarning = fmt::format("saveIntervalMs {} is above the cap; using {}",
+                                value, kMaxSaveIntervalMs);
+    }
+    return kMaxSaveIntervalMs;
+  }
+  return static_cast<uint32_t>(value);
 }
