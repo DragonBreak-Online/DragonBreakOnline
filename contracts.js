@@ -2,6 +2,10 @@
 // are drawn from the creatures that actually spawn in the zone, so a Bruma notice never asks for a
 // horker. Officials post their own with /contract post. Loaded by gamemode.js like champions.js.
 // Players find, take and give up work on the Contracts tab of the expedition board (Nate, 2026-09-30); /contract stays.
+// Nate, 17 Oct: a hold's standing (automatic) contracts are taken only by its citizens where it grants citizenship, pay
+// what its officials set per danger tier (/contract price), and commit at most a weekly budget (/contract budget, UTC
+// week from Monday); /contract standing on|off stops them. Work an official posts by hand is open to all and outside the
+// budget. Anyone reads the terms with /contract status.
 'use strict';
 
 module.exports = (api) => {
@@ -26,6 +30,15 @@ module.exports = (api) => {
     treasuryFloor: { gold: 200, share: 0.25 },
     // A champion kill counts for this many
     championWorth: 2,
+    // Nate, 17 Oct (Ohoom's suggestion; Bruma paid ~17,100 gold a week to standing contracts against ~2,100 of tax):
+    // a hold's standing contracts are for its own citizens (citizenship.js), where the hold grants citizenship at all
+    citizensOnly: true,
+    // Gold a hold's standing contracts may commit in one UTC week (Monday 00:00), each hunter's copy counted when taken;
+    // its officials change it with /contract budget. 0: no standing contract is paid
+    weeklyBudget: 1000,
+    budgetMax: 100000,
+    // What an official may set the pay per kill to (/contract price), for each danger tier
+    priceBounds: { min: 1, max: 200 },
   }, cfg.contracts || {});
 
   // How dangerous each creature kind is: tier 3 is worth real money and real risk
@@ -53,6 +66,9 @@ module.exports = (api) => {
   })();
   if (!Array.isArray(state.contracts)) state.contracts = [];
   if (!state.taken || typeof state.taken !== 'object') state.taken = {};
+  // Per hold, what its officials set and what its standing work committed this week:
+  // state.holds[zone] = { prices: { 1, 2, 3 }?, budget?, standing?, week, spent, by, at }; an unset field follows the config
+  if (!state.holds || typeof state.holds !== 'object') state.holds = {};
   // A kill would otherwise write the file on every hit of progress, per player
   const save = () => saveSoon(FILE, () => JSON.stringify(state, null, 2));
   // Whenever gold moves: the file must already say so, or a crash inside the debounce brings the notice back to pay twice
@@ -187,6 +203,58 @@ module.exports = (api) => {
   const canSpare = (zone, amount) => !!zone && amount > 0 && treasuryGold(zone) - amount >= floorOf(zone);
   const TREASURY_TEXT = "The hold's treasury cannot spare more bounties right now.";
 
+  // ---- the hold's own terms for standing work (Nate, 17 Oct) ---------------------------------------------------------
+  // A notice an official posted by hand carries its poster (c.by); every other notice is standing work
+  const isStanding = (c) => !!c && (c.standing === true || (c.standing === undefined && c.by === undefined));
+  const num = (v, d) => (Number.isFinite(Number(v)) ? Number(v) : d);
+  const bounds = () => { const b = CFG.priceBounds || {}; const min = Math.max(1, Math.floor(num(b.min, 1))); return { min, max: Math.max(min, Math.floor(num(b.max, 200))) }; };
+  const budgetMax = () => Math.max(0, Math.floor(num(CFG.budgetMax, 100000)));
+  const defaultBudget = () => Math.max(0, Math.floor(num(CFG.weeklyBudget, 1000)));
+  // The UTC week a moment falls in, by its Monday 00:00
+  const weekStart = (t = Date.now()) => { const d = new Date(t); const day = (d.getUTCDay() + 6) % 7; return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() - day); };
+  const weekKey = (t) => new Date(weekStart(t)).toISOString().slice(0, 10);
+  const resetsAt = () => weekStart() + 7 * 86400000;
+  const untilText = (t) => { const ms = Math.max(0, t - Date.now()); const d = Math.floor(ms / 86400000), h = Math.floor((ms % 86400000) / 3600000), m = Math.ceil((ms % 3600000) / 60000);
+    return d ? `${d}d ${h}h` : h ? `${h}h ${m}m` : `${m}m`; };
+  const RESET_TEXT = () => `Monday 00:00 UTC (in ${untilText(resetsAt())})`;
+  // A hold's record, rolled over to this week (spent back to 0) on first touch in a new week
+  const holdState = (zid) => {
+    const h = state.holds[zid] || (state.holds[zid] = {});
+    const wk = weekKey();
+    if (h.week !== wk) { h.week = wk; h.spent = 0; }
+    return h;
+  };
+  const priceOf = (zid, tier) => {
+    const set = (state.holds[zid] || {}).prices || {};
+    const { min, max } = bounds();
+    const v = Number.isFinite(Number(set[tier])) ? Number(set[tier]) : Number(CFG.rewardPerKill[tier]) || 12;
+    return Math.max(min, Math.min(max, Math.floor(v)));
+  };
+  const budgetOf = (zid) => { const b = (state.holds[zid] || {}).budget; return Math.min(budgetMax(), Number.isFinite(Number(b)) ? Math.max(0, Math.floor(Number(b))) : defaultBudget()); };
+  const standingOn = (zid) => (state.holds[zid] || {}).standing !== false;
+  const budgetLeft = (zid) => Math.max(0, budgetOf(zid) - (Number(holdState(zid).spent) || 0));
+  // Charged when a hunter takes a standing notice; given back when that copy is given up or runs out in the same week
+  const charge = (w, zid, amount) => { const h = holdState(zid); h.spent = (Number(h.spent) || 0) + amount; w.standing = true; w.charged = amount; w.week = h.week; };
+  const uncharge = (w) => {
+    if (!w || !(Number(w.charged) > 0)) return;
+    const h = holdState(w.zone);
+    if (w.week === h.week) h.spent = Math.max(0, (Number(h.spent) || 0) - Number(w.charged));
+    w.charged = 0;
+  };
+  // Citizens only: only where citizenship.js runs and this hold grants it (__dboCitizenGates); elsewhere open to all
+  const citizensOnly = (zid) => {
+    if (CFG.citizensOnly === false) return false;
+    try { return typeof globalThis.__dboCitizenGates === 'function' && !!globalThis.__dboCitizenGates(zid); } catch (e) { return false; }
+  };
+  const isCitizen = (a, zid) => { try { return typeof globalThis.__dboCitizenOf === 'function' && !!globalThis.__dboCitizenOf(a, zid); } catch (e) { return false; } };
+  const mayTakeStanding = (a, zid) => !citizensOnly(zid) || isCitizen(a, zid);
+  // Who sets a hold's terms: whoever may set its tax (business.js taxRanks: Jarl, Count, Steward; and staff)
+  const setsTerms = (a, zid) => { try { return typeof globalThis.__dboCanSetHoldTax === 'function' && !!globalThis.__dboCanSetHoldTax(a, zid); } catch (e) { return false; } };
+  const refusals = globalThis.__dboContractRefusals || (globalThis.__dboContractRefusals = {});
+  const refused = (reason, a, zid) => { refusals[reason] = (refusals[reason] || 0) + 1; log(`contracts: refused ${reason} for ${who(a)} in ${zid} (${refusals[reason]} since start)`); };
+  const citizensText = (zone) => `Standing contracts of ${zone.name} are for citizens of ${zone.name} only. Become a citizen there to take them; work an official posts by hand is open to all.`;
+  const budgetText = (zone) => `${zone.name} has spent this week's budget for standing contracts (${budgetOf(zone.id)} gold). It resets ${RESET_TEXT()}.`;
+
   const nextId = () => `${Date.now().toString(36)}${Math.floor(Math.random() * 1296).toString(36)}`;
 
   const makeContract = (zone) => {
@@ -198,10 +266,12 @@ module.exports = (api) => {
     const [lo, hi] = CFG.countRange;
     // Fewer of the dangerous things
     const count = Math.max(2, Math.round((lo + Math.random() * (hi - lo)) / danger));
-    const reward = count * (Number(CFG.rewardPerKill[danger]) || 12);
+    const reward = count * priceOf(zone.id, danger);
+    // No new standing notice the week's budget could not pay for, nor one the treasury's floor forbids
+    if (reward > budgetLeft(zone.id)) return null;
     if (!canSpare(zone, reward)) return null;
     return {
-      id: nextId(), zone: zone.id, kind, count, reward,
+      id: nextId(), zone: zone.id, kind, count, reward, standing: true,
       postedAt: Date.now(), expiresAt: Date.now() + (Number(CFG.expiryHours) || 12) * 3600000,
     };
   };
@@ -215,13 +285,16 @@ module.exports = (api) => {
     const before = state.contracts.length;
     const kept = [];
     const expired = [];
-    for (const c of state.contracts) (c.expiresAt > Date.now() ? kept : expired).push(c);
+    // A hold whose officials switched standing work off takes its standing notices down; copies already taken run on
+    for (const c of state.contracts) (c.expiresAt > Date.now() && !(isStanding(c) && !standingOn(c.zone)) ? kept : expired).push(c);
     state.contracts = kept;
     // A hunter's own copy that ran out gives its share back to the hold; the hunter is told when next they look (closeIfOver)
     for (const key of Object.keys(state.taken)) {
       for (const w of [].concat(state.taken[key] || [])) {
         if (w && w.kind && !w.expired && !(Number(w.expiresAt) > Date.now())) {
           expired.push({ label: `${key}'s contract`, zone: w.zone, held: Number(w.held) || 0 });
+          // Unspent: its share of the week's budget comes back with its gold
+          if (Number(w.held) > 0) uncharge(w);
           w.held = 0; w.expired = true;
         }
       }
@@ -234,7 +307,7 @@ module.exports = (api) => {
     // Off: what is already posted stays listed so nobody loses work in hand, but no new notice goes up
     if (!CFG.enabled) { if (state.contracts.length !== before) save(); return; }
     for (const zone of zoneList()) {
-      if (!zone.treasury) continue;
+      if (!zone.treasury || !standingOn(zone.id)) continue;
       let have = zoneContracts(zone.id).length;
       for (let i = have; i < perZone; i++) {
         const c = makeContract(zone);
@@ -317,7 +390,7 @@ module.exports = (api) => {
       if (w !== old) changed = true;
       if (!w) { if (tell) personal(a, GONE_TEXT); continue; }
       if (w.expired || !(Number(w.expiresAt) > Date.now())) {
-        if (Number(w.held) > 0) refunds.push(w);
+        if (Number(w.held) > 0) { refunds.push(w); uncharge(w); }
         changed = true;
         if (tell) personal(a, ranOutText(w));
         continue;
@@ -432,9 +505,13 @@ module.exports = (api) => {
     if (work.some((w) => w.id === c.id)) return 'You already hold that contract.';
     if (postedBy(c, a)) return 'You posted that notice yourself. Someone else does the hunting.';
     if (doneBy(c, a)) return 'You have already done the work on that notice. Take another.';
+    const standing = isStanding(c);
+    if (standing && !mayTakeStanding(a, zone.id)) { refused('not a citizen', a, zone.id); return citizensText(zone); }
+    if (standing && (Number(c.reward) || 0) > budgetLeft(zone.id)) { refused('budget spent', a, zone.id); return budgetText(zone); }
     const w = copyFor(c);
     w.held = shareFor(c);
     if (!(w.held > 0)) return TREASURY_TEXT;
+    if (standing) charge(w, zone.id, w.held);
     putList(keyOf(a), work.concat([w]));
     saveNow();
     audit(`CONTRACT ${who(a)} took ${c.count} ${plural(c.kind)} for ${zone.name}`);
@@ -454,6 +531,7 @@ module.exports = (api) => {
     }
     if (!w) return 'No such contract. /contract lists the ones you hold.';
     putList(keyOf(a), work.filter((x) => x !== w));
+    if (Number(w.held) > 0) uncharge(w);
     saveNow();
     // the player log (playerlog.js): a contract given up, which nothing recorded before
     try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('contract', 'abandon', a, w.kind, w.count, w.zone, 0); } catch (e) { /* the player log is optional */ }
@@ -475,17 +553,30 @@ module.exports = (api) => {
     const list = zone ? zoneContracts(zone.id).filter((c) => !doneBy(c, a)) : [];
     const hours = (c) => Math.max(0, Math.ceil((c.expiresAt - Date.now()) / 3600000));
     const zoneName = (id) => { const z = zoneById(id); return z ? z.name : id; };
+    // The hold's terms for standing work (Nate, 17 Oct). The board of client 0.3.77+ draws a notice's state as its stamp
+    // when it is not one it knows, and offers Take only on 'open', so a notice this hunter may not take carries its reason
+    // as the stamp ('Citizens only', 'Budget spent') and, for citizens only, the hold in its name. The budget left is
+    // spoken in the note, which that board shows when nothing is listed; budget/citizensOnly are there for a later board.
+    const restricted = zone ? citizensOnly(zone.id) : false;
+    const citizen = zone ? mayTakeStanding(a, zone.id) : true;
+    const left = zone ? budgetLeft(zone.id) : 0;
+    const budgetNote = zone ? (standingOn(zone.id) ? ` Standing work this week: ${left} of ${budgetOf(zone.id)} gold left, renewed ${RESET_TEXT()}.` : ` ${zone.name}'s officials have stopped its standing work.`) : '';
+    const standingState = (c) => (!isStanding(c) ? 'open' : !citizen ? 'Citizens only' : (Number(c.reward) || 0) > left ? 'Budget spent' : 'open');
     return {
       enabled: !!CFG.enabled,
       zone: zone ? zone.name : '',
       treasury: zone ? treasuryGold(zone) : 0,
       note: !CFG.enabled ? OFF_TEXT : !zone ? 'No hold claims this ground, so there is no hunting work posted here.'
-        : list.length ? '' : `${zone.name} has no hunting work posted. Its coffers may be empty.`,
+        : list.length ? '' : `${zone.name} has no hunting work posted. Its coffers may be empty, or its budget for standing work spent.${budgetNote}`,
+      citizensOnly: restricted,
+      citizen,
+      budget: zone ? { total: budgetOf(zone.id), left, standing: standingOn(zone.id), resetsAt: resetsAt() } : null,
       heldAll: work.map((w) => ({ id: w.id, what: `${w.count} ${plural(w.kind)}`, zone: zoneName(w.zone), progress: Math.min(w.count, Number(w.progress) || 0), count: w.count, reward: w.reward, hoursLeft: hours(w) })),
       maxActive: maxActive(),
       held: hc ? { id: hc.id, what: `${hc.count} ${plural(hc.kind)}`, zone: zoneName(hc.zone), progress: Math.min(hc.count, Number(held.progress) || 0), count: hc.count, reward: hc.reward, hoursLeft: hours(hc) } : null,
-      list: list.map((c) => ({ id: c.id, what: `${c.count} ${plural(c.kind)}`, count: c.count, reward: c.reward, danger: DANGER[c.kind] || 1, hoursLeft: hours(c),
-        state: work.some((w) => w.id === c.id) ? 'yours' : postedBy(c, a) ? 'posted' : 'open' })),
+      list: list.map((c) => ({ id: c.id, what: `${c.count} ${plural(c.kind)}${isStanding(c) && restricted ? ` (citizens of ${zone.name} only)` : ''}`, count: c.count, reward: c.reward, danger: DANGER[c.kind] || 1, hoursLeft: hours(c),
+        standing: isStanding(c),
+        state: work.some((w) => w.id === c.id) ? 'yours' : postedBy(c, a) ? 'posted' : standingState(c) })),
       canPost: !!(zone && isOfficial(a, zone.id)),
     };
   };
@@ -503,6 +594,64 @@ module.exports = (api) => {
     onUi('contractAbandon', (a, args) => { if (!boardOpen(a)) return; personal(a, abandonContract(a, (args || [])[0])); reopen(a); });
   }
 
+  // ---- /contract status, price, budget, standing ----------------------------------------------------------------------
+  const TIER_WORD = { 1: 'pests', 2: 'dangerous beasts', 3: 'deadly beasts' };
+  const statusLines = (a, zone) => {
+    const out = [];
+    const on = standingOn(zone.id);
+    out.push(`Standing contracts of ${zone.name}: ${!CFG.enabled ? 'closed everywhere for now' : on ? 'on' : 'stopped by its officials'}.`);
+    out.push(`  Pay per kill: ${[1, 2, 3].map((t) => `tier ${t} (${TIER_WORD[t]}) ${priceOf(zone.id, t)} gold`).join(', ')}.`);
+    out.push(`  This week's budget: ${budgetLeft(zone.id)} of ${budgetOf(zone.id)} gold left; it renews ${RESET_TEXT()}.`);
+    out.push(`  ${citizensOnly(zone.id) ? `Only citizens of ${zone.name} take its standing contracts${mayTakeStanding(a, zone.id) ? ' (you are one)' : ' (you are not one)'}.` : 'Its standing contracts are open to every hunter.'} Work an official posts by hand is open to all.`);
+    const h = state.holds[zone.id] || {};
+    if (h.by) out.push(`  Last set by ${h.by} on ${new Date(Number(h.at) || 0).toISOString().slice(0, 16).replace('T', ' ')} UTC.`);
+    if (setsTerms(a, zone.id)) { const { min, max } = bounds(); out.push(`  As an official: /contract price <1|2|3> <gold> (${min} to ${max}), /contract budget <gold a week> (0 to ${budgetMax()}), /contract standing on|off.`); }
+    return out;
+  };
+  // An official's change to the hold's terms: { text } or { error }. Shared by the chat and any later panel
+  const setTerms = (a, zone, what, args) => {
+    if (!setsTerms(a, zone.id)) { refused('not an official', a, zone.id); return { error: `Only those who set ${zone.name}'s tax set the terms of its standing contracts.` }; }
+    const h = holdState(zone.id);
+    let text;
+    if (what === 'price') {
+      const tier = Number(args[0]), gold = Number(args[1]);
+      const { min, max } = bounds();
+      if (![1, 2, 3].includes(tier) || !Number.isInteger(gold)) return { error: `Use: /contract price <1|2|3> <gold>, from ${min} to ${max} gold a kill.` };
+      if (gold < min || gold > max) return { error: `Pay per kill runs from ${min} to ${max} gold.` };
+      const was = priceOf(zone.id, tier);
+      h.prices = Object.assign({}, h.prices, { [tier]: gold });
+      // Notices already up at the old price come down (their gold back to the treasury) and fresh ones go up at the new
+      const old = state.contracts.filter((c) => c.zone === zone.id && isStanding(c) && (DANGER[c.kind] || 1) === tier);
+      state.contracts = state.contracts.filter((c) => old.indexOf(c) === -1);
+      saveNow();
+      for (const c of old) if (Number(c.held) > 0 && !refundToTreasury(zone, Number(c.held))) log(`contracts: ${c.held} gold of re-priced notice ${c.id} could not go back to ${zone.id}`);
+      text = `${zone.name} now pays ${gold} gold a kill for ${TIER_WORD[tier]} (tier ${tier}; was ${was}). Contracts already taken keep their pay.`;
+    } else if (what === 'budget') {
+      const gold = Number(args[0]);
+      if (!Number.isInteger(gold) || gold < 0 || gold > budgetMax()) return { error: `Use: /contract budget <gold a week>, from 0 to ${budgetMax()}. 0 pays no standing contracts.` };
+      const was = budgetOf(zone.id);
+      h.budget = gold;
+      text = `${zone.name}'s standing contracts may now commit ${gold} gold a week (was ${was}); ${budgetLeft(zone.id)} is left this week.`;
+    } else {
+      const v = String(args[0] || '').toLowerCase();
+      if (v !== 'on' && v !== 'off') return { error: 'Use: /contract standing on|off' };
+      h.standing = v === 'on';
+      text = v === 'on' ? `${zone.name} posts standing contracts again.` : `${zone.name} posts no standing contracts; those up now come down and their gold goes back to the treasury. Contracts already taken run on.`;
+    }
+    h.by = ownName(a); h.at = Date.now();
+    saveNow();
+    audit(`CONTRACT ${who(a)} set ${zone.name} ${what} ${args.join(' ')}: ${text}`);
+    refresh();
+    return { text };
+  };
+  const ownName = (a) => { try { return String(display(a) || who(a)); } catch (e) { return String(who(a)); } };
+  // For a later panel (the Court tab): the same view and the same rules as the chat
+  globalThis.__dboContractTerms = {
+    view: (a, zid) => { const z = zoneById(zid); return z ? { prices: { 1: priceOf(z.id, 1), 2: priceOf(z.id, 2), 3: priceOf(z.id, 3) }, budget: budgetOf(z.id), left: budgetLeft(z.id), standing: standingOn(z.id),
+      citizensOnly: citizensOnly(z.id), resetsAt: resetsAt(), canSet: setsTerms(a, z.id), bounds: bounds(), budgetMax: budgetMax() } : null; },
+    set: (a, zid, what, args) => { const z = zoneById(zid); return z ? setTerms(a, z, String(what), [].concat(args || []).map(String)) : { error: 'There is no such hold.' }; },
+  };
+
   // The list is its own function so /contract with no words can show it, and /contracts survives as an alias
   const listContracts = (a) => {
     refresh();
@@ -510,8 +659,9 @@ module.exports = (api) => {
     if (!zone) return personal(a, 'No hold claims this ground, so there is no work posted here.');
     const list = zoneContracts(zone.id);
     if (!list.length) return personal(a, `${zone.name} has no work posted. Its coffers may be empty.`);
-    personal(a, `Work posted in ${zone.name} (treasury ${treasuryGold(zone)} gold):`);
-    list.forEach((c, i) => personal(a, `  ${i + 1}. ${describe(c)}`));
+    personal(a, `Work posted in ${zone.name} (treasury ${treasuryGold(zone)} gold; standing work ${budgetLeft(zone.id)} of ${budgetOf(zone.id)} gold left this week):`);
+    const restricted = citizensOnly(zone.id);
+    list.forEach((c, i) => personal(a, `  ${i + 1}. ${describe(c)}${isStanding(c) ? (restricted ? `, standing, citizens of ${zone.name} only` : ', standing') : ', posted by an official, open to all'}`));
     personal(a, CFG.enabled ? 'Take one on the Contracts tab of the expedition board, or with /contract take <number>.' : OFF_TEXT);
   };
 
@@ -558,7 +708,7 @@ module.exports = (api) => {
       const most = count * (Number(CFG.rewardPerKill[danger]) || 12);
       if (reward > most) return personal(a, `${count} ${plural(kind)} is worth at most ${most} gold. Post it for that or less.`);
       if (!escrow(zone, reward)) return personal(a, `The ${zone.name} treasury holds ${treasuryGold(zone)} gold, less than the reward.`);
-      const c = { id: nextId(), zone: zone.id, kind, count, reward, held: reward, by: profileOf(a), byAccount: accountOf(a),
+      const c = { id: nextId(), zone: zone.id, kind, count, reward, held: reward, standing: false, by: profileOf(a), byAccount: accountOf(a),
         postedAt: Date.now(), expiresAt: Date.now() + (Number(CFG.expiryHours) || 12) * 3600000 };
       state.contracts.push(c);
       saveNow();
@@ -566,8 +716,23 @@ module.exports = (api) => {
       return audit(`CONTRACT ${who(a)} posted ${c.count} ${plural(c.kind)} for ${zone.name} at ${c.reward} gold`);
     }
 
-    return personal(a, 'Use: /contract, /contract take <n>, /contract abandon [n], /contract post <creature> <count> <reward>.');
-  }, { help: 'take or post hunting work' });
+    if (verb === 'status') {
+      const named = parts.slice(1).join(' ').toLowerCase();
+      const zone = named ? zoneList().find((z) => z.id === named || String(z.name || '').toLowerCase() === named) || null : playerZone(a);
+      if (!zone) return personal(a, named ? `No hold is called ${parts.slice(1).join(' ')}.` : 'You stand outside any hold. /contract status <hold> names one.');
+      for (const line of statusLines(a, zone)) personal(a, line);
+      return;
+    }
+
+    if (verb === 'price' || verb === 'budget' || verb === 'standing') {
+      const zone = playerZone(a);
+      if (!zone) return personal(a, 'You stand outside any hold.');
+      const r = setTerms(a, zone, verb, parts.slice(1));
+      return personal(a, r.error || r.text);
+    }
+
+    return personal(a, 'Use: /contract, /contract take <n>, /contract abandon [n], /contract status [hold], /contract post <creature> <count> <reward>; officials: /contract price <1|2|3> <gold>, /contract budget <gold>, /contract standing on|off.');
+  }, { help: 'take or post hunting work; /contract status shows a hold\'s pay, budget and who may take its standing work' });
 
   // Contracts taken under the one-notice rule keep working, as copies with their progress
   {

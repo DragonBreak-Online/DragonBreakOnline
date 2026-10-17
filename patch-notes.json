@@ -1,5 +1,30 @@
 [
   {
+    "title": "Hunting contracts: for citizens, at the hold's price",
+    "date": "2026-10-17",
+    "version": "Gameplay",
+    "tag": "Change",
+    "sections": [
+      {
+        "heading": "For hunters",
+        "items": [
+          "The hold's own standing hunting contracts on the expedition board are now for its citizens. If you are not a citizen of that hold you still see them, stamped \"Citizens only\", but cannot take them. A hold that grants no citizenship keeps them open to everyone.",
+          "Work an official posts by hand stays open to every hunter.",
+          "Each hold has a weekly budget for its standing contracts, 1,000 gold to start. Once a week's budget is taken up, no more standing contracts can be taken there until Monday 00:00 UTC. A contract you give up, or one that runs out, gives its share back to the week's budget.",
+          "Type /contract status to see a hold's pay per kill, how much of this week's budget is left, and who may take its standing work. Contracts you already hold keep their pay."
+        ]
+      },
+      {
+        "heading": "For hold officials",
+        "items": [
+          "Whoever may set a hold's tax (its Jarl or Count and its Steward) now sets the pay per kill for each kind of danger: /contract price 1, 2 or 3 and the gold, from 1 to 200. It starts at 12 for pests, 25 for dangerous beasts and 60 for deadly ones.",
+          "They also set the weekly budget with /contract budget and the gold (0 posts no standing work), and can stop or restart the hold's standing contracts with /contract standing off or on.",
+          "The treasury's safety floor still applies: no contract may take the treasury below it."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Guild halls pay property tax",
     "date": "2026-10-17",
     "version": "Gameplay",

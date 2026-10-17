@@ -1172,7 +1172,12 @@
   "_comment": "Hunting contracts (server\\contracts.js). Off 2026-09-28 to 2026-09-30 (claude-jake review A1-1: officials could post and take their own contracts and drain the hold treasury). On again (Nate, 2026-09-30) with the poster, cap and escrow rules in place, kills counted only in the notice's own hold, and players taking work on the Contracts tab of the expedition board.",
   "enabled": true,
   "maxActive": 3,
-  "treasuryFloor": { "gold": 200, "share": 0.25 }
+  "treasuryFloor": { "gold": 200, "share": 0.25 },
+  "_comment_terms": "Nate, 17 Oct (Ohoom's suggestion; Bruma paid ~17,100 gold a week to standing contracts against ~2,100 of tax): citizensOnly: a hold's standing (automatic) contracts are taken only by its citizens where citizenship.js runs and the hold grants citizenship; elsewhere they stay open to all. Work an official posts by hand (/contract post) is open to all and outside the budget. weeklyBudget: gold a hold's standing contracts may commit per UTC week (Monday 00:00), each hunter's copy counted when taken and given back when it is given up or runs out that week; 0 pays none. The hold's tax-setters (business.js taxRanks and staff) change it with /contract budget <gold> (0..budgetMax), the pay per kill with /contract price <1|2|3> <gold> (priceBounds; default rewardPerKill 12/25/60), and switch it with /contract standing on|off; state per hold in contracts.json holds. Anyone: /contract status [hold]. treasuryFloor still applies on top. Rollback: citizensOnly false and weeklyBudget 100000 (hot reload).",
+  "citizensOnly": true,
+  "weeklyBudget": 1000,
+  "budgetMax": 100000,
+  "priceBounds": { "min": 1, "max": 200 }
  },
  "tickets": {
   "_comment": "In-game /ticket (gameticket.js, consolidation C9): the players who were within 40 m when a ticket opens are posted to this staff-only channel (#ticket-archive, named by claude-jake 2026-09-28), never into the ticket the reporter reads.",
