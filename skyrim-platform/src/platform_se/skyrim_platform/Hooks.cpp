@@ -1,4 +1,5 @@
 #include "Hooks.h"
+#include "CopyLifecycleApi.h"
 #include "EventHandler.h"
 #include <mutex>
 
@@ -95,6 +96,7 @@ struct QueuedActorDisable
       return;
     }
     func(ref);
+    CopyLifecycleApi::OnQueuedDisableRan(ref);
   };
   static inline REL::Relocation<decltype(&thunk)> func;
 };
