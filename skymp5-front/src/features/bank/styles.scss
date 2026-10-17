@@ -95,6 +95,20 @@
 
   &__section { display: flex; flex-direction: column; gap: 10px; }
 
+  &__vault-row { gap: 10px; font-size: 14px; }
+  &__vault-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  &__vault-figure { flex: none; min-width: 64px; color: $dbo-text-dim; text-align: right; }
+
+  &__vault-bar {
+    height: 6px;
+    border: 1px solid $dbo-border;
+    border-radius: 3px;
+    background: rgba(0, 0, 0, 0.35);
+    overflow: hidden;
+
+    span { display: block; height: 100%; background: $dbo-gold; }
+  }
+
   &__note { margin: 0; color: $dbo-text-dim; font-size: 13px; line-height: 1.4; }
 
   &__row {

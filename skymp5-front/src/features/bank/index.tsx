@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 
 import './styles.scss';
+import Vault, { VaultData } from './vault';
 
 // The bank (server bank.js, widget 48): your account, the same in every town, and any treasury you answer for, which
 // takes deposits but gives nothing back. Actions go to the server as dbo:bank* events with the window's nonce; the
@@ -14,7 +15,7 @@ export interface BankTreasury {
 
 export interface BankEntry {
   at: number;
-  kind: 'deposit' | 'withdraw' | 'treasury';
+  kind: 'deposit' | 'withdraw' | 'treasury' | 'vault';
   amount: number;
   where: string;
 }
@@ -29,6 +30,7 @@ export interface BankData {
   treasuries: BankTreasury[];
   result: string;
   resultKind: '' | 'ok' | 'refused';
+  vault?: VaultData;
 }
 
 const send = (key: string, ...args: unknown[]): void => {
@@ -43,7 +45,7 @@ const send = (key: string, ...args: unknown[]): void => {
 
 const BUSY_TIMEOUT_MS = 8000;
 const goldText = (n: number): string => (Number(n) || 0).toLocaleString('en-US');
-const KIND_LABEL: Record<string, string> = { deposit: 'Deposited', withdraw: 'Withdrew', treasury: 'Paid into' };
+const KIND_LABEL: Record<string, string> = { deposit: 'Deposited', withdraw: 'Withdrew', treasury: 'Paid into', vault: 'Vault fee,' };
 const whenText = (at: number): string => {
   const d = new Date(Number(at) || 0);
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' ' + d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
@@ -88,7 +90,8 @@ const Bank = ({ data }: { data: BankData }) => {
   }, [busy]);
 
   const treasury = treasuries.find((t) => t.key === tab) || null;
-  const activeTab = treasury ? tab : 'account';
+  const vaultOn = !!data.vault && tab === 'vault';
+  const activeTab = treasury || vaultOn ? tab : 'account';
   const n = Number(amount) || 0;
 
   const act = (event: string, ...args: unknown[]): void => {
@@ -111,16 +114,17 @@ const Bank = ({ data }: { data: BankData }) => {
           <span className="bank__figure"><span className="bank__label">You carry</span><span className="bank__gold"><Coin />{goldText(data.carried)}</span></span>
         </div>
 
-        {treasuries.length > 0 && (
+        {(treasuries.length > 0 || data.vault) && (
           <div className="bank__tabs">
             <button className={'bank__tab' + (activeTab === 'account' ? ' bank__tab--on' : '')} onClick={() => { setTab('account'); setAmount(''); }}>Your account</button>
+            {data.vault && <button className={'bank__tab' + (activeTab === 'vault' ? ' bank__tab--on' : '')} onClick={() => { setTab('vault'); setAmount(''); }}>Vault</button>}
             {treasuries.map((t) => (
               <button key={t.key} className={'bank__tab' + (activeTab === t.key ? ' bank__tab--on' : '')} onClick={() => { setTab(t.key); setAmount(''); }}>{t.name}</button>
             ))}
           </div>
         )}
 
-        {!treasury ? (
+        {vaultOn && data.vault ? <Vault vault={data.vault} busy={busy} act={act} /> : !treasury ? (
           <div className="bank__section">
             <p className="bank__note">Your account is the same at every bank in the land. Gold kept here cannot be stolen, looted or raided.</p>
             <div className="bank__row">
@@ -156,7 +160,7 @@ const Bank = ({ data }: { data: BankData }) => {
           {(data.history || []).map((h, i) => (
             <div key={i} className="bank__entry">
               <span>{whenText(h.at)}</span>
-              <span>{KIND_LABEL[h.kind] || h.kind} {h.kind === 'treasury' ? h.where : ''}</span>
+              <span>{KIND_LABEL[h.kind] || h.kind} {h.kind === 'treasury' || h.kind === 'vault' ? h.where : ''}</span>
               <span className="bank__gold"><Coin />{goldText(h.amount)}</span>
             </div>
           ))}
