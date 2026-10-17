@@ -51,5 +51,16 @@ const JOKES = {
 };
 for (const [d, what] of Object.entries(JOKES)) check(`joke summon removed: ${what}`, removed.includes(d));
 
+// Spells that run only on the caster's game: a script places an object (turrets, walls) or a hazard lingers, and the
+// server never sees a hit from them; held until each has a server-side version (17 Oct)
+const LOCAL_ONLY = {
+  '8313c:arnima.esm': 'ArnimaShockTurretSpell (Storm Vanguard)', '8bebb:arnima.esm': 'ArnimaFireTurretSpell (Infernal Watcher)',
+  '8bebc:arnima.esm': 'ArnimaFrostTurretSpell (Frigid Bulwark)', '8bec9:arnima.esm': 'ArnimaHealTurretSpell',
+  '83c5a:Druadach.esm': 'DRVC_RaiseWallSpell (Earthen Barrier)', '83c5b:Druadach.esm': 'DRVC_RaisePillarSpell (Earthen Pillar)',
+  '83c59:Druadach.esm': 'DRVC_ProtectionSphereSpell (Protective Vortex)',
+  '1aee56:arnima.esm': 'ArnimaCircleMaraSpellDark (hazard)', '96d52:Druadach.esm': 'DRVC_ThousandCuts (hazard)',
+};
+for (const [d, what] of Object.entries(LOCAL_ONLY)) check(`local-only spell held with a reason: ${what}`, held.includes(d) && !!reasons[d], reasons[d]);
+
 console.log(`\n${pass}/${pass + fail} passed`);
 process.exit(fail ? 1 : 0);
