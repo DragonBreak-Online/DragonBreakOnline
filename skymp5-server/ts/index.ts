@@ -359,6 +359,18 @@ const main = async () => {
     process.exit(-1);
   }
 
+  // Changes waiting for the next save batch reach the disk before the gamemode's SIGTERM handler exits the process
+  process.prependListener("SIGTERM", () => {
+    try {
+      server.flushSaveStorage();
+    } catch (e) {
+      console.error("flushSaveStorage on SIGTERM failed:", e);
+    }
+    if (process.listenerCount("SIGTERM") <= 1) {
+      process.exit(0);
+    }
+  });
+
   try {
     ctx.gm.emit(WORLD_LOADED_EVENT);
   } catch (e) {
