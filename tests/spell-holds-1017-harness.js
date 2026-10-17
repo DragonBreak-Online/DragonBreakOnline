@@ -62,5 +62,18 @@ const LOCAL_ONLY = {
 };
 for (const [d, what] of Object.entries(LOCAL_ONLY)) check(`local-only spell held with a reason: ${what}`, held.includes(d) && !!reasons[d], reasons[d]);
 
+// Then (Nate 17 Oct, "do what you recommend"): two more joke summons removed, and the caster-screen-only spells that act on
+// other characters (or open locks the server keeps) held
+for (const [d, what] of Object.entries({ 'a188e:summersetisles.esp': 'SummonSirRodericSpell (a slaughterfish)', '867:YokuWeapons.esp': '0_JarSpell2 (a jar bomb)' })) check(`joke summon removed: ${what}`, removed.includes(d));
+const ON_OTHERS = {
+  '933e6:Druadach.esm': 'DRVC_InciteHysteria (a decoy enemies attack)', '8dceb:Druadach.esm': 'DRVC_SplitTheMind (an ability on its target)',
+  '8dce8:Druadach.esm': 'DRVC_BlindingMist (blinds those in it)', '960a7:Druadach.esm': 'DRVC_ShroudOfEndurance (links to a target)',
+  '960a8:Druadach.esm': 'DRVC_ShroudOfFortitude (links to a target)', '20698:Gray Fox Cowl.esm': 'manny_GF_Spell_UnlockContainer',
+  '6028cd:BSAssets.esm': 'BSKOpenSpell2', '6028cf:BSAssets.esm': 'BSKOpenSpell4', '6028d0:BSAssets.esm': 'BSKOpenSpell5',
+};
+for (const [d, what] of Object.entries(ON_OTHERS)) check(`held with a reason: ${what}`, held.includes(d) && !!reasons[d], reasons[d]);
+const LEFT = { '8dce4:Druadach.esm': 'Concealing Fog', '94fc8:Druadach.esm': 'Drain Dead', '3e18:BSAssets.esm': 'Slowfall', '3e27:BSAssets.esm': 'Sanctuary', '3e28:BSAssets.esm': 'Danger Sense', '83c8f:BSHeartland.esm': 'Detect Traps', '302d:Gray Fox Cowl.esm': 'Ancient Vision', '3055ca:summersetisles.esp': 'Sustenance' };
+check('the self or cosmetic ones stay free: ' + Object.values(LEFT).join(', '), Object.keys(LEFT).every((d) => !held.includes(d) && !removed.includes(d)));
+
 console.log(`\n${pass}/${pass + fail} passed`);
 process.exit(fail ? 1 : 0);
