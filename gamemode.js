@@ -1957,6 +1957,9 @@ mp.onActivate = (targetId, casterId) => {
       logCapped(`npcdoor:${t}`, 2, `npc door: actor ${c.toString(16)} would close ${mp.getDescFromId(t)} again; refused (NPCs only open doors)`);
       return false;
     }
+    // A known gate lever: refused while the gate it drives is locked to someone else, and the gate is played for
+    // everyone in the cell afterwards, since isOpen alone moves nothing on the puller's screen (gates.js)
+    try { if (globalThis.__dboGateLever && globalThis.__dboGateLever(t, c) === false) return false; } catch (e) { log('gate lever failed', e.message); }
     return activateBeforeNpcDoors(targetId, casterId);
   };
 }
@@ -7935,6 +7938,13 @@ try {
   delete require.cache[NPCMOOD_JS];
   require(NPCMOOD_JS)({ mp, log, every, profileOf, userOf, sendPacket, cfg });
 } catch (e) { log('npcmood.js failed to load:', e.stack || e.message); globalThis.__dboNpcMoodHit = null; }
+
+// ---- levered gates: the lock on a gate governs its lever, and the gate is played for everyone (server\gates.js) ---------
+try {
+  const GATES_JS = path.resolve('gates.js');
+  delete require.cache[GATES_JS];
+  require(GATES_JS)({ mp, log, personal, display, who, audit, cfg });
+} catch (e) { log('gates.js failed to load:', e.stack || e.message); globalThis.__dboGateLever = null; }
 
 // ---- GM warbands and raids: catalog NPCs that follow the GM (server\warband.js; companionSystem.ts __dboCompanions) ------
 try {
