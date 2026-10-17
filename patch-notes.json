@@ -1,5 +1,19 @@
 [
   {
+    "title": "Guild halls pay property tax",
+    "date": "2026-10-17",
+    "version": "Gameplay",
+    "tag": "Update",
+    "sections": [
+      {
+        "heading": "Property tax",
+        "items": [
+          "A guild hall or other property whose doors are all indoors, such as Fort Dawnguard, now pays the weekly property tax like any house. It goes to the treasury of the hold it belongs to."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Reading: new tome and scroll odds",
     "date": "2026-10-17",
     "version": "Hotfix",

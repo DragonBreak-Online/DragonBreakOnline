@@ -135,6 +135,13 @@ module.exports = (api) => {
     for (const r of [ref, rec && rec.partner].filter(Boolean)) {
       try { const t = at(String(mp.get(r, 'worldOrCellDesc') || ''), mp.get(r, 'pos')); if (t) return t; } catch (e) { /* not loaded */ }
     }
+    // No door out in the open (a guild HQ inside a fort, Fort Dawnguard): its hold's seat territory taxes it (Nate, 17 Oct:
+    // "tax guild HQs too")
+    try {
+      const H = housing(); const zone = H && typeof H.holdOf === 'function' ? String(H.holdOf(ref) || '') : '';
+      const seat = zone && fn('__dboRealmSeatTerritoryOf') ? fn('__dboRealmSeatTerritoryOf')(zone) : null;
+      if (seat) return seat;
+    } catch (e) { /* no hold */ }
     return null;
   };
   // The claims a reckoning taxes: one per building (Nate, 4 Oct: the building is the property, not its doors or what is inside
@@ -404,7 +411,7 @@ module.exports = (api) => {
       let why = '', fid = null, rate = 0, territory = '';
       try {
         const t = territoryOfProperty(ref, rec);
-        if (!t) why = 'no territory at its doors';
+        if (!t) why = 'no territory at its doors and no hold';
         else {
           territory = String(t.name || t.id);
           fid = fn('__dboRealmOwnerOf') ? fn('__dboRealmOwnerOf')(t.id) : null;
