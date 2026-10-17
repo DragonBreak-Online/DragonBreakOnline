@@ -456,10 +456,14 @@ TEST_CASE("A record changed on every tick is saved at most once per interval",
     std::this_thread::sleep_for(std::chrono::milliseconds(2));
   }
   auto elapsed = std::chrono::steady_clock::now() - start;
+  auto numBatches = st->GetNumFinishedUpserts() - numUpserts;
+
+  // A batch still in flight wrote into the next test's fresh unit/data, or failed there and aborted the run
+  p.worldState.FlushSaveStorageSync();
 
   // The batch handed over at the start may finish late, hence one extra
   auto maxBatches = static_cast<uint32_t>(elapsed / kInterval) + 2;
-  REQUIRE(st->GetNumFinishedUpserts() - numUpserts <= maxBatches);
+  REQUIRE(numBatches <= maxBatches);
 }
 
 TEST_CASE("FlushSaveStorageSync writes the changes still waiting for the "
