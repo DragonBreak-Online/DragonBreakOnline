@@ -43,7 +43,7 @@ ok(load({ npcDamage: { byKind: { boar: 0.4 } } }).npcKindDamageMult(BEAR, PLAYER
 
 const C = JSON.parse(fs.readFileSync(path.join(SERVER, 'gamemode-config.json'), 'utf8'));
 const bb = C.npcDamage.byBase;
-ok(['EncBear', 'EncBearCave', 'EncBearSnow', 'CYREncBearBrown', 'CYREncBearBlack'].every((k) => bb[k] === 0.75), 'shipped: every bear base at 0.75', bb);
+ok(Object.keys(bb).length === 0, 'shipped: byBase empty, bears hit at full strength (Nate 17 Oct: players like the danger)', bb);
 ok(Object.keys(bb).every((k) => /Bear/.test(k)), 'shipped byBase names bears only (no draugr, no undead)');
 // measured 16-17 Oct: bear hits 13.9-31.6% of a player's health (median 21.3%, 603 hits)
 console.log(`  a bear's worst measured hit 31.6% -> ${(31.6 * 0.75).toFixed(1)}%, median 21.3% -> ${(21.3 * 0.75).toFixed(1)}%`);
