@@ -291,8 +291,12 @@ const FIRST = { phase: 'registration', rules: 1, firstEver: 1 };   // the hold h
 const AGAIN = { phase: 'registration', rules: 1 };                 // it has
 rules = { oneVotePerDevice: true }; M = load();
 ok(/7 days/.test(M.canVote(NEWER, WR, FIRST)), 'with no hold named, a first election still asks for the seven days');
+// The count a hold shows, and the 15 it needs to start, are judged with NO election in hand (citizenAccounts), so a
+// named hold has to be waived there too or it can never begin one (Whiterun, 17 Oct: "reset to 0 even though we had 11")
+ok(/7 days/.test(M.canVote(NEWER, WR, null)), 'with no hold named, a hold with no election asks for the seven days');
 rules = { newHolds: ['whiterun'], citizenDaysFirstElection: 0, oneVotePerDevice: true }; M = load();
 ok(M.canVote(NEWER, WR, FIRST) === '', 'a named hold waives them at its first election', M.canVote(NEWER, WR, FIRST));
+ok(M.canVote(NEWER, WR, null) === '', '...and waives them with no election yet, so the hold can reach its threshold', M.canVote(NEWER, WR, null));
 ok(/7 days/.test(M.canVote(NEWER, WR, AGAIN)), '...and asks for them again at its next one');
 ok(/Discord/.test(M.canVote(YOUNG, WR, FIRST)), '...while the Discord age is judged at a first election as always', M.canVote(YOUNG, WR, FIRST));
 rules = { newHolds: ['markarth'], citizenDaysFirstElection: 0, oneVotePerDevice: true }; M = load();

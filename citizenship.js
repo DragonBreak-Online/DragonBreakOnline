@@ -556,8 +556,15 @@ module.exports = (api) => {
     }
     // A just-opened hold's first election asks for citizenDaysFirstElection instead (VR.newHolds). Every election after
     // it, and every hold not named there, asks for citizenDays as before.
+    // NO ELECTION YET COUNTS AS THE FIRST ONE, and it has to: the hold's citizen count and the 15 it needs to start are
+    // eligible voters (citizenAccounts -> eligiblePids), judged with no election in hand. Waiving only once an election
+    // exists would mean no named hold could ever reach the threshold to begin one - which is what Whiterun was reporting
+    // on 17 Oct ("our citizen number count has been reset to 0 even though we had at least 11"): 13 on the roll, none of
+    // them a citizen for seven days, so nought eligible. A record that exists without firstEver is one that has already
+    // held an election, and asks for the seven days as before.
     const isNew = Array.isArray(VR.newHolds) && VR.newHolds.map((h) => String(h).toLowerCase()).includes(String(z.id).toLowerCase());
-    const needDays = E && E.firstEver && isNew ? Math.max(0, Number(VR.citizenDaysFirstElection) || 0) : Number(VR.citizenDays);
+    const firstOne = !E || E.firstEver === 1;
+    const needDays = firstOne && isNew ? Math.max(0, Number(VR.citizenDaysFirstElection) || 0) : Number(VR.citizenDays);
     if (needDays > 0 && since !== undefined && Number(since) > 0) {
       const need = Number(since) + needDays * DAY;
       if (need > at) return `Only those who were citizens of ${ofPlace(z.name)} for ${needDays} day${needDays === 1 ? '' : 's'} ${when} may vote. This character became one on ${dayText(since)}.`;
