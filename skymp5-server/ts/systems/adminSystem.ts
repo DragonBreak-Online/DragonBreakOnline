@@ -30,6 +30,7 @@ type Mp = any;
 // A Trial GM (adminRoles.trialgm, no admin tier) gets the menu (who is online, without Discord ids, addresses or hardware
 // ids), TP to a player or a location, Rename and the Invisible and Ghost modes (TRIAL_GM_ACTIONS / TRIAL_GM_MODES; Ghost
 // from 12 Oct, Nate: "trial gms need to use the ghost form button in the admin panel"); anything else is refused here and logged.
+// Give all spells and Give all shouts are refused for every tier (GIVE_ALL_OFF; Jake, 17 Oct: a give-all character froze the server).
 // Bans post to the backend (master key + auth token), which snapshots discordId/hwid/ip into bans.json; connection-check then refuses the player permanently.
 //
 // Wire protocol (CustomPacket JSON):
@@ -52,7 +53,7 @@ type Mp = any;
 //                     { customPacketType: "adminItemsRequest" }  -> adminItems
 //                     { customPacketType: "adminLocationsRequest" }  -> adminLocations  (settings locations + admin-locations.json map markers)
 //                     { customPacketType: "adminAction", action: "giveItem", item, count, targetName? }
-//                     { customPacketType: "adminAction", action: "giveSpells" | "giveShouts" | "giveWerewolf" | "giveVampireLord", targetName? }
+//                     { customPacketType: "adminAction", action: "giveWerewolf" | "giveVampireLord", targetName? }  ("giveSpells" and "giveShouts" are refused)
 //                     { customPacketType: "adminAction", action: "beastForm", form: "werewolf" | "vampirelord", op: "now" | "revert" | "revoke", targetName? }
 //                     { customPacketType: "adminAction", action: "giveDisease", kind: "vampire" | "werewolf", targetName? }
 //                     { customPacketType: "adminAction", action: "setSchool", school, level, targetName? }  level 0..100 (schools.js)
@@ -87,8 +88,13 @@ const ADMIN_MODES: Array<{ id: string; label: string }> = [
 
 // Lead GM and above only (TIER_CAPS.spawn); a GM keeps teleports, kick, observing modes and the roster
 const SPAWN_ACTIONS = new Set(["kill", "deleteCharacter", "masteryGrant", "masteryReset", "masterySetTier", "masteryDrop",
-  "giveItem", "giveSpells", "giveShouts", "giveWerewolf", "giveVampireLord", "giveDisease", "setSchool", "beastForm", "npcZoneAdd", "npcZoneDelete", "npcZoneReset"]);
+  "giveItem", "giveWerewolf", "giveVampireLord", "giveDisease", "setSchool", "beastForm", "npcZoneAdd", "npcZoneDelete", "npcZoneReset"]);
 const SPAWN_MODES = new Set(["smite", "healhit"]);
+// Turned off for every tier: each learned-spell read costs the square of the list, and a give-all character froze the server
+const GIVE_ALL_OFF = new Map<string, string>([
+  ["giveSpells", "Give all spells is turned off: it froze the server. Give single spell tomes from the Items tab instead."],
+  ["giveShouts", "Give all shouts is turned off with Give all spells after the server froze."],
+]);
 // Ranks whose roster rows carry each account's Discord id and name (d, dn): Lead GM and above; a GM's rows have them blank
 const DISCORD_ROSTER_TIERS = new Set<AdminTier>(["senior", "developer", "leadgm"]);
 
@@ -424,6 +430,14 @@ export class AdminSystem implements System {
     try { myActorId = mp.getUserActor(userId); } catch { }
     // A Trial GM passes for the menu and the actions in TRIAL_GM_ACTIONS / TRIAL_GM_MODES alone
     const trial = !!myActorId && !this.isAdminActor(mp, myActorId) && isTrialGm(mp, myActorId, this.roleCfg);
+    const giveAllOff = type === "adminAction" ? GIVE_ALL_OFF.get(String(content["action"] ?? "")) : undefined;
+    if (giveAllOff && (trial || (!!myActorId && this.isAdminActor(mp, myActorId)))) {
+      let profile = 0;
+      try { profile = Number(mp.get(myActorId, "profileId")) || 0; } catch { }
+      this.adminLog(`profile ${profile} (${trial ? "trialgm" : this.tierOf(mp, myActorId)}) was refused ${String(content["action"])} (turned off)`);
+      this.reply(mp, userId, false, giveAllOff);
+      return;
+    }
     if (trial && !this.trialMay(type, content)) {
       let profile = 0;
       try { profile = Number(mp.get(myActorId, "profileId")) || 0; } catch { }
@@ -543,7 +557,7 @@ export class AdminSystem implements System {
       this.reply(mp, userId, !!lifted, lifted ? `Ban on ${lifted.name || lifted.ip} lifted` : "No such ban");
       return;
     }
-    if (["masterySetTier", "masteryDrop", "giveItem", "giveSpells", "giveShouts", "giveWerewolf", "giveVampireLord", "giveDisease", "setSchool", "beastForm"].indexOf(action) !== -1) {
+    if (["masterySetTier", "masteryDrop", "giveItem", "giveWerewolf", "giveVampireLord", "giveDisease", "setSchool", "beastForm"].indexOf(action) !== -1) {
       const who = this.resolveTarget(mp, myActorId, content);
       if (!who) { this.reply(mp, userId, false, "No online player by that name"); return; }
       this.selfServiceAction(ctx, mp, userId, myActorId, adminProfile, action, who, content);
@@ -788,26 +802,19 @@ export class AdminSystem implements System {
       }
       const powers = this.powers();
       if (!powers) { this.reply(mp, userId, false, "admin-powers.json is missing on the server"); return; }
-      if (action === "giveSpells" || action === "giveWerewolf" || action === "giveVampireLord") {
-        const list: string[] = action === "giveSpells" ? powers.spells.map((x) => x[0]) : [action === "giveWerewolf" ? powers.werewolf : powers.vampirelord].filter((x): x is string => !!x);
+      if (action === "giveWerewolf" || action === "giveVampireLord") {
+        const desc = action === "giveWerewolf" ? powers.werewolf : powers.vampirelord;
         let n = 0;
-        for (const desc of list) {
+        if (desc) {
           try {
             mp.callPapyrusFunction("method", "Actor", "AddSpell", { type: "form", desc: mp.getDescFromId(who.actorId) }, [{ type: "espm", desc }, false]);
             n++;
           } catch (e) { this.log(`AdminSystem: AddSpell ${desc} failed: ${e}`); }
         }
         const formName = action === "giveWerewolf" ? "werewolf beast form" : "Vampire Lord form";
-        if (action !== "giveSpells") { try { mp.set(who.actorId, action === "giveWerewolf" ? "private.werewolfGrant" : "private.vampireLordGrant", true); } catch { /* offline */ } }
-        this.adminLog(`profile ${adminProfile} gave ${action === "giveSpells" ? `${n} spells` : formName} to ${whom}`);
-        this.reply(mp, userId, n > 0, action === "giveSpells" ? `${n} spells given to ${who.name}` : `${who.name} can now take ${formName}`);
-        return;
-      }
-      if (action === "giveShouts") {
-        mp.set(who.actorId, "private.dboAllShouts", true);
-        this.teachShouts(mp, who.userId);
-        this.adminLog(`profile ${adminProfile} gave every shout to ${whom}`);
-        this.reply(mp, userId, true, `${powers.shouts.length} shouts taught to ${who.name}`);
+        try { mp.set(who.actorId, action === "giveWerewolf" ? "private.werewolfGrant" : "private.vampireLordGrant", true); } catch { /* offline */ }
+        this.adminLog(`profile ${adminProfile} gave ${formName} to ${whom}`);
+        this.reply(mp, userId, n > 0, `${who.name} can now take ${formName}`);
       }
     } catch (e) {
       this.log(`AdminSystem: action '${action}' by profile ${adminProfile} failed: ${e}`);
@@ -822,8 +829,8 @@ export class AdminSystem implements System {
     catch (e) { this.log(`AdminSystem: dboTeachShouts failed: ${e}`); }
   }
 
-  // admin-powers.json from ck-mcp/admin_powers.py: tome spells, shouts with their words, the werewolf power
-  private powers(): { spells: Array<[string, string]>; shouts: Array<{ shout: string; name: string; words: string[] }>; werewolf: string; vampirelord?: string } | null {
+  // admin-powers.json from ck-mcp/admin_powers.py: shouts with their words (taught again at login to those given all shouts), the beast powers
+  private powers(): { spells?: Array<[string, string]>; shouts: Array<{ shout: string; name: string; words: string[] }>; werewolf: string; vampirelord?: string } | null {
     try { return JSON.parse(fs.readFileSync(path.resolve("admin-powers.json"), "utf8")); } catch { return null; }
   }
 
