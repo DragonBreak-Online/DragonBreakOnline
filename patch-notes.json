@@ -1,5 +1,19 @@
 [
   {
+    "title": "Orcish smithing for every Orc",
+    "date": "2026-10-17",
+    "version": "Hotfix",
+    "tag": "Change",
+    "sections": [
+      {
+        "heading": "Smithing",
+        "items": [
+          "Any Orc can now forge Orcish armour and weapons, whether or not they belong to a stronghold. Only Orcs can make them. The Orcish Clan pieces stay with the strongholds' own smiths."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Stepping down from a court",
     "date": "2026-10-17",
     "version": "Hotfix",
