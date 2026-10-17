@@ -1,5 +1,6 @@
 #include "Hooks.h"
 #include "EventHandler.h"
+#include <chrono>
 #include <mutex>
 
 namespace hook::internal {
@@ -79,6 +80,89 @@ void InstallJumpHandlerHook()
     vtbl.write_vfunc(0x4, JumpHandlerProcessButton::thunk);
 }
 
+// Lifecycle probe (dev builds only, branch platform-lifecycle-probe-1017; never shipped): logs when an actor's
+// Disable is queued, when the queued task runs and when a Papyrus Delete tears it down, with the reference count
+// (BSHandleRefObject low 10 bits at +0x28), a microsecond clock and the thread, for the lifecycle layer plan.
+namespace LifecycleProbe {
+long long Now()
+{
+  static const auto start = std::chrono::steady_clock::now();
+  return std::chrono::duration_cast<std::chrono::microseconds>(
+           std::chrono::steady_clock::now() - start)
+    .count();
+}
+
+std::uint32_t RefCount(const RE::TESObjectREFR* ref)
+{
+  return *reinterpret_cast<const std::uint32_t*>(
+           reinterpret_cast<std::uintptr_t>(ref) + 0x28) &
+    0x3FF;
+}
+
+bool Watched(const RE::TESObjectREFR* ref)
+{
+  const auto id = ref->GetFormID();
+  return ref->GetFormType() == RE::FormType::ActorCharacter &&
+    (id == 0 || id >= 0xFF000000);
+}
+
+void Log(const char* what, const RE::TESObjectREFR* ref)
+{
+  if (ref && Watched(ref)) {
+    spdlog::info("LifecycleProbe {} id={:X} rc={} disabled={} 3d={} t={} "
+                 "tid={}",
+                 what, ref->GetFormID(), RefCount(ref), ref->IsDisabled(),
+                 ref->Get3D() != nullptr, Now(), GetCurrentThreadId());
+  }
+}
+}
+
+struct ProbeActorDisable
+{
+  static void thunk(RE::Character* actor)
+  {
+    LifecycleProbe::Log("disable-queued", actor);
+    func(actor);
+  };
+  static inline REL::Relocation<decltype(&thunk)> func;
+};
+
+struct ProbeGarbageCollectorAdd
+{
+  static void thunk(void* collector, RE::TESObjectREFR* ref, bool a_remove)
+  {
+    LifecycleProbe::Log("gc-add", ref);
+    func(collector, ref, a_remove);
+  };
+  static inline REL::Relocation<decltype(&thunk)> func;
+};
+
+// A call site is patched only when it is a 5-byte call to the expected function
+bool IsCallTo(std::uintptr_t site, std::uintptr_t target)
+{
+  const auto bytes = reinterpret_cast<const std::uint8_t*>(site);
+  return bytes[0] == 0xE8 &&
+    site + 5 + *reinterpret_cast<const std::int32_t*>(bytes + 1) == target;
+}
+
+void InstallLifecycleProbe()
+{
+  if (!REL::Module::IsAE()) {
+    return;
+  }
+  REL::Relocation<std::uintptr_t> vtbl{ RE::VTABLE_Character[0] };
+  ProbeActorDisable::func = vtbl.write_vfunc(0x89, ProbeActorDisable::thunk);
+  // The Papyrus Delete functor's call to GarbageCollector::Add (36459)
+  const auto site = REL::ID(56116).address() + 0x78;
+  if (IsCallTo(site, REL::ID(36459).address())) {
+    Hooks::write_thunk_call<ProbeGarbageCollectorAdd>(site);
+  } else {
+    spdlog::warn("LifecycleProbe: GarbageCollector::Add call site not found");
+  }
+  spdlog::info("LifecycleProbe: installed, main thread {}",
+               GetCurrentThreadId());
+}
+
 // Actor::Disable (AE id 37267) only queues the disable as BSTaskPool task 0x50, which holds its own reference and runs
 // later on a job thread. An actor deleted in between is still disabled by that task with its form id already 0; the
 // Disable then builds a MovementControllerNPC for it, the controller finds no actor by that id, and its motion-driven
@@ -88,6 +172,7 @@ struct QueuedActorDisable
 {
   static void thunk(RE::TESObjectREFR* ref)
   {
+    LifecycleProbe::Log("disable-task", ref);
     if (ref && RE::TESForm::LookupByID(ref->GetFormID()) != ref) {
       spdlog::warn("QueuedActorDisable: skipped a queued Disable on a "
                    "reference that no longer resolves (form id {:X})",
@@ -128,6 +213,8 @@ struct FaceMorphJobUpdate
   static void thunk(RE::NiAVObject* faceNode, bool a_arg)
   {
     if (faceNode && !faceNode->parent) {
+      spdlog::info("LifecycleProbe face-job-detached t={} tid={}",
+                   LifecycleProbe::Now(), GetCurrentThreadId());
       return;
     }
     func(faceNode, a_arg);
@@ -226,6 +313,7 @@ void Hooks::Install()
   InstallJumpHandlerHook();
   InstallQueuedActorDisableHook();
   InstallFaceMorphJobHook();
+  InstallLifecycleProbe();
   HookVirtualMachineBind();
 
   logger::info("CommonLib hooks installed.");
