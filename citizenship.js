@@ -117,7 +117,7 @@ module.exports = (api) => {
   const S = globalThis.__dboCitizen || (globalThis.__dboCitizen = { data: null });
   if (!(S.panels instanceof Map)) S.panels = new Map(); // actor -> { zone, nonce, tab }
   const fill = (d) => {
-    for (const k of ['chars', 'policies', 'elections', 'voterHold', 'heldEver']) if (!d[k] || typeof d[k] !== 'object' || Array.isArray(d[k])) d[k] = {};
+    for (const k of ['chars', 'policies', 'elections', 'voterHold', 'elected']) if (!d[k] || typeof d[k] !== 'object' || Array.isArray(d[k])) d[k] = {};
     if (!Array.isArray(d.requests)) d.requests = [];
     if (!Array.isArray(d.staffApplied)) d.staffApplied = [];
     return d;
@@ -465,25 +465,32 @@ module.exports = (api) => {
     return pids;
   };
 
+  // A hold that has seated a court by election: data().elected (written when a court is seated, kept apart from the
+  // record, which staff restart and resume delete), or a record that still carries its result
+  const electedOnce = (zid) => !!data().elected[zid] || !!(data().elections[zid] && data().elections[zid].result);
   // ---- who may vote (Nate, 16 Oct: no Discord alts voting) -------------------------------------------------------------
   const VR = EL.voterRules;
   // An election that began before the voter rules existed carries no rules stamp, and voterWhy lets everyone through: no
   // Discord age, no play time, no citizenship. Riften's did (opened 16 Oct 23:36Z, the rules shipped the next day).
   // Restarting it would apply them, but it deletes the election: the courts formed so far would have to form again and
   // the registration clock would start over, five hours later than it stands (Nate, 17 Oct: he would rather not).
-  // So a hold named in voterRules.stampRunning has its RUNNING election stamped in place instead - rules, and firstEver,
-  // so it is judged as a first election and does not ask for the seven days. Once only, and never when a vote has already
+  // So a hold named in voterRules.stampRunning has its RUNNING election stamped in place instead - rules, and firstEver
+  // unless the hold has already seated a court (electedOnce), so it is judged as a first election and does not ask for
+  // the seven days. Once only, and never when a vote has already
   // been cast, so no vote already made can be invalidated by it. Empty by default.
   const stampRunning = () => {
     const names = Array.isArray(VR.stampRunning) ? VR.stampRunning.map((h) => String(h).toLowerCase()) : [];
     if (!names.length || VR.enabled !== true) return;
     for (const zid of names) {
+      // Only a hold that holds elections (not one in noElection, nor an unknown id): anything else is skipped and logged
+      if (!electing(holdOf(zid))) { log(`citizenship: stampRunning names ${zid}, which holds no election; skipped`); continue; }
       const E = data().elections[zid];
       if (!E || E.rules || (E.phase !== 'registration' && E.phase !== 'voting')) continue;
       if (E.votes && Object.keys(E.votes).length) { log(`citizenship: ${zid}'s election already has votes cast; left under the old rules`); continue; }
-      E.rules = 1; E.firstEver = 1; save();
-      audit(`ELECTION ${zid}: the voter rules now apply to the election already running, as its first (no vote had been cast)`);
-      log(`citizenship: stamped ${zid}'s running election with the voter rules, as a first election`);
+      const first = !electedOnce(zid);
+      E.rules = 1; if (first) E.firstEver = 1; save();
+      audit(`ELECTION ${zid}: the voter rules now apply to the election already running${first ? ', as its first' : ''} (no vote had been cast)`);
+      log(`citizenship: stamped ${zid}'s running election with the voter rules${first ? ', as a first election' : ''}`);
     }
   };
   // The backend's records, read-only, as journalstats.js reads players.json (the game server runs as root): profileId ->
@@ -554,10 +561,11 @@ module.exports = (api) => {
         if (ms < VR.playHours * HOUR || days < VR.playDays) return `To vote you need ${VR.playHours} hours of play, on at least ${VR.playDays} different days, before the vote opens. Your account had ${hm(ms)} on ${days} day${days === 1 ? '' : 's'}${opened ? ' when it opened' : ' so far'}.`;
       }
     }
-    // EVERY hold's first election asks for citizenDaysFirstElection instead of citizenDays (Nate, 17 Oct). A hold with no
-    // election record has never held one, so it is its first too; a record without firstEver has already held one.
-    const firstOne = E ? E.firstEver === 1 : !data().heldEver[z.id];
-    const needDays = firstOne ? Math.max(0, Number(VR.citizenDaysFirstElection) || 0) : Number(VR.citizenDays);
+    // EVERY hold's first election asks for citizenDaysFirstElection instead of citizenDays (Nate, 17 Oct). With no election
+    // in hand (the hold's count, and the threshold that starts one) a hold that has never seated a court is at its first;
+    // a running record decides by its own firstEver, stamped at its start.
+    const first = E ? !!E.firstEver : !electedOnce(z.id);
+    const needDays = first ? Math.max(0, Number(VR.citizenDaysFirstElection) || 0) : Number(VR.citizenDays);
     if (needDays > 0 && since !== undefined && Number(since) > 0) {
       const need = Number(since) + needDays * DAY;
       if (need > at) return `Only those who were citizens of ${ofPlace(z.name)} for ${needDays} day${needDays === 1 ? '' : 's'} ${when} may vote. This character became one on ${dayText(since)}.`;
@@ -737,12 +745,10 @@ module.exports = (api) => {
   };
   const startPhase = (E, phase, hours) => { E.phase = phase; E.phaseStartedAt = Date.now(); E.phaseEndsAt = Date.now() + hours * HOUR; };
   const startElection = (z, why) => {
-    // A hold that has already held one keeps its record with phase 'held' (cancel), so this is its first ever when there
-    // is no such record. Stamped once, at the start, so the answer cannot change under a running election.
-    const before = elOf(z.id);
-    const votedBefore = !!data().heldEver[z.id] || (before && before.phase === 'held');
+    // Its first ever unless the hold has seated a court by election (electedOnce: kept apart from the record, which staff
+    // restart and resume delete). Stamped once, at the start, so the answer cannot change under a running election.
     const E = { phase: '', round: 1, startedAt: Date.now(), courts: [], ballot: [], votes: {} };
-    if (!votedBefore) E.firstEver = 1;   // a restart deletes the record, so the hold's own history decides, not the record
+    if (!electedOnce(z.id)) E.firstEver = 1;
     // The voter rules apply to an election stamped at its start (one already running at the deploy keeps the old rules)
     if (VR.enabled === true) E.rules = 1;
     startPhase(E, 'registration', EL.registrationHours);
@@ -753,7 +759,7 @@ module.exports = (api) => {
   };
   const cancel = (z, why, held) => {
     const E = elOf(z.id); if (!E) return;
-    if (held) { E.phase = 'held'; E.phaseEndsAt = 0; forgetVoters(E, true); data().heldEver[z.id] = Date.now(); } else delete data().elections[z.id];
+    if (held) { E.phase = 'held'; E.phaseEndsAt = 0; forgetVoters(E, true); } else delete data().elections[z.id];
     save();
     audit(`ELECTION ${z.name}: cancelled (${why})`);
   };
@@ -844,9 +850,8 @@ module.exports = (api) => {
       const winner = courtById(E, best[0]);
       const empty = seatWinner(z, E, winner);
       E.result = { winner: winner.id, counts, at: Date.now(), empty };
-      E.phase = 'seated'; E.phaseEndsAt = 0; E.revote = false; forgetVoters(E, true);
-      data().heldEver[z.id] = Date.now();   // it has held one now: its next asks for the seven days again
-      save();
+      data().elected[z.id] = Date.now();   // it has seated a court: every later election there asks for the seven days
+      E.phase = 'seated'; E.phaseEndsAt = 0; E.revote = false; forgetVoters(E, true); save();
       const j = winner.members.jarl; const struck = struckCount(E);
       audit(`ELECTION ${z.name}: ${j.name} is elected Jarl with a court of ${SEATS.filter((s) => s.id !== 'jarl').map((s) => `${s.label} ${winner.members[s.id] ? winner.members[s.id].name : '(empty)'}`).join(', ')}${empty.length ? `; empty: ${empty.join(', ')}` : ''}; ${struck} vote(s) struck by staff`);
       announce(z, E, 'result', { struck, jarl: j.name, empty, court: SEATS.filter((s) => s.id !== 'jarl' && winner.members[s.id] && !empty.includes(s.label)).map((s) => `${s.label} ${winner.members[s.id].name}`).join(', ') });

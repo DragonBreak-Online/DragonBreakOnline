@@ -303,14 +303,59 @@ const AGAIN = { phase: 'registration', rules: 1 };                 // it has
 rules = { citizenDaysFirstElection: 0, oneVotePerDevice: true }; M = load();
 ok(M.canVote(NEWER, WR, FIRST) === '', 'a first election does not ask for the seven days', M.canVote(NEWER, WR, FIRST));
 // Whiterun has seated a court by now, so its own history says it has voted: this case is about a hold that has not
-delete M.data().elections.whiterun; delete M.data().heldEver.whiterun;
+delete M.data().elections.whiterun; delete M.data().elected.whiterun;
 ok(M.canVote(NEWER, WR, null) === '', 'nor does a hold with no election yet, so its count is not nought', M.canVote(NEWER, WR, null));
-M.data().heldEver.whiterun = Date.now();
+M.data().elected.whiterun = Date.now();
 ok(/7 days/.test(M.canVote(NEWER, WR, null)), '...but a hold that has already voted asks for them, with no election in hand');
 ok(/7 days/.test(M.canVote(NEWER, WR, AGAIN)), '...and the election after it asks for them again');
 ok(/Discord/.test(M.canVote(YOUNG, WR, FIRST)), '...while the Discord age is judged at a first election as always', M.canVote(YOUNG, WR, FIRST));
 rules = { citizenDaysFirstElection: 7, oneVotePerDevice: true }; M = load();
 ok(/7 days/.test(M.canVote(NEWER, WR, FIRST)), 'citizenDaysFirstElection 7 puts the old rule back everywhere (the rollback)');
+
+// ---- a first election's whole life (review 17 Oct, item 4) --------------------------------------------------------------
+// From a hold that has never seated a court: the tick starts it on 15 one-day citizens; reopened registration and a revote
+// keep the waiver; once a court is seated (data().elected, which survives a reload), staff restart and cancel-then-resume
+// give no firstEver, and a 0-day citizen is refused for the seven days.
+{
+  const STORE = path.join(dir, 'citizenship.json');
+  fs.rmSync(STORE, { force: true });
+  rules = { oneVotePerDevice: false }; M = load();
+  const FRESH = [];
+  for (let i = 0; i < 15; i++) FRESH.push(account(300 + i, `Fresh ${i}`));
+  writeBackend();
+  now -= DAY; for (const a of FRESH) join(a); now += DAY;
+  M.data().elected.whiterun = now;
+  ok(M.citizenAccounts(WR) === 0, '(life) a hold that has seated a court counts no one-day citizen', M.citizenAccounts(WR));
+  timer();
+  ok(!M.data().elections.whiterun, '(life) ...and its tick starts nothing');
+  delete M.data().elected.whiterun;
+  ok(M.citizenAccounts(WR) === 15, '(life) a hold that never has counts all 15 one-day citizens', M.citizenAccounts(WR));
+  timer();
+  let L = M.data().elections.whiterun;
+  ok(L && L.phase === 'registration' && L.firstEver === 1 && L.rules === 1, '(life) ...and its tick starts its first election', L && { phase: L.phase, firstEver: L.firstEver });
+  now += 25 * HOUR; timer(); L = M.data().elections.whiterun;
+  ok(L && L.phase === 'registration' && L.reopened === 1 && L.firstEver === 1 && M.canVote(FRESH[14], WR, L) === '', '(life) reopened registration keeps the waiver', L && { phase: L.phase, reopened: L.reopened, why: M.canVote(FRESH[14], WR, L) });
+  const courtOf = (g) => { const rr = M.register(g[0], 'whiterun', g.slice(1).map(nm)); if (rr.error) throw new Error(rr.error); const c = M.data().elections.whiterun.courts.find((x) => x.members.jarl.actor === g[0]); for (const a of g.slice(1)) M.answerInvite(a, 'whiterun', c.id, true); return c.id; };
+  const KA = courtOf(FRESH.slice(0, 4)), KB = courtOf(FRESH.slice(4, 8));
+  now += 25 * HOUR; timer(); L = M.data().elections.whiterun;
+  ok(L.phase === 'voting' && !M.vote(FRESH[8], 'whiterun', KA).error && !M.vote(FRESH[9], 'whiterun', KB).error, '(life) two-day citizens vote at the first election');
+  now += 25 * HOUR; timer(); L = M.data().elections.whiterun;
+  ok(L.phase === 'voting' && L.revote && L.firstEver === 1 && M.canVote(FRESH[10], WR, L) === '', '(life) a tie goes to a revote that keeps the waiver', { phase: L.phase, revote: L.revote, firstEver: L.firstEver });
+  ok(!M.vote(FRESH[10], 'whiterun', KA).error, '(life) and a citizen votes in it');
+  now += 25 * HOUR; timer(); L = M.data().elections.whiterun;
+  ok(L.phase === 'seated' && M.data().elected.whiterun > 0, '(life) the court is seated and the hold marked as elected', { phase: L.phase, elected: M.data().elected.whiterun });
+  M = load();
+  ok(M.data().elected.whiterun > 0, '(life) the marker survives a restart of the module');
+  const ZERO = account(320, 'Zero Day'); writeBackend(); join(ZERO);
+  M.staffAct(STAFF, 'whiterun', 'restart'); L = M.data().elections.whiterun;
+  ok(L && L.phase === 'registration' && !L.firstEver && /7 days/.test(M.canVote(ZERO, WR, L)), '(life) staff restart after a seated election: no firstEver, a 0-day citizen refused', L && { firstEver: L.firstEver, why: M.canVote(ZERO, WR, L) });
+  M.staffAct(STAFF, 'whiterun', 'cancel'); M.staffAct(STAFF, 'whiterun', 'resume');
+  ok(!M.data().elections.whiterun && /7 days/.test(M.canVote(ZERO, WR, null)), '(life) cancel then resume: a 0-day citizen is still refused with no election in hand', M.canVote(ZERO, WR, null));
+  now += 8 * DAY;
+  const ZERO2 = account(321, 'Zero Day Two'); writeBackend(); join(ZERO2);
+  timer(); L = M.data().elections.whiterun;
+  ok(L && L.phase === 'registration' && !L.firstEver && /7 days/.test(M.canVote(ZERO2, WR, L)), '(life) the next election the tick starts after resume has no firstEver, and a 0-day citizen is refused', L && { firstEver: L.firstEver, why: M.canVote(ZERO2, WR, L) });
+}
 
 // ---- stamping an election that began before the rules (Nate, 17 Oct: restarting it would cost the courts and 5 hours) --
 // Riften's election opened before the voter rules existed, so it carries no stamp and voterWhy lets everyone through.
@@ -323,16 +368,18 @@ ok(/7 days/.test(M.canVote(NEWER, WR, FIRST)), 'citizenDaysFirstElection 7 puts 
     d.elections = Object.assign({}, d.elections, { markarth: election });
     fs.writeFileSync(STORE, JSON.stringify(d));
   };
-  const MK = { id: 'markarth', name: 'Markarth' };
+  const MK = { id: 'markarth', name: 'Markarth', treasury: 'y', officials: ['jarl', 'steward', 'commander', 'courtmage', 'guardcaptain', 'guard'] };
+  ZONES.push(MK);
   const running = (extra) => Object.assign({ phase: 'registration', round: 1, startedAt: Date.now(), courts: [{ id: 'c1' }], ballot: [], votes: {} }, extra || {});
 
   seed(running());
-  rules = { stampRunning: ['markarth'], newHolds: ['markarth'], citizenDaysFirstElection: 0, oneVotePerDevice: true };
+  rules = { stampRunning: ['markarth'], citizenDaysFirstElection: 0, oneVotePerDevice: true };
   M = load();
   let E = M.data().elections.markarth;
+  M.join(NEWER, 'markarth');   // a citizen of the stamped hold since now: 0 days
   ok(E && E.rules === 1 && E.firstEver === 1, 'a running election of a named hold is stamped in place', E && { rules: E.rules, firstEver: E.firstEver });
   ok(E && E.courts.length === 1 && E.phase === 'registration', '...and keeps its courts and its phase', E && { courts: E.courts.length, phase: E.phase });
-  ok(M.canVote(NEWER, MK, E) === '' || /citizens of/.test(M.canVote(NEWER, MK, E)), '...and does not refuse a new citizen for the seven days', M.canVote(NEWER, MK, E));
+  ok(M.canVote(NEWER, MK, E) === '', '...and a 0-day citizen of that hold may vote in it', M.canVote(NEWER, MK, E));
 
   seed(running({ votes: { 77: 'someone' } }));
   M = load();
@@ -342,6 +389,27 @@ ok(/7 days/.test(M.canVote(NEWER, WR, FIRST)), 'citizenDaysFirstElection 7 puts 
   seed(running());
   rules = { stampRunning: [], oneVotePerDevice: true }; M = load();
   ok(!M.data().elections.markarth.rules, 'a hold not named is left alone');
+
+  // A hold that has already seated a court is stamped with the rules but NOT as a first election
+  seed(running());
+  { const d = JSON.parse(fs.readFileSync(STORE, 'utf8')); d.elected = Object.assign({}, d.elected, { markarth: 1 }); fs.writeFileSync(STORE, JSON.stringify(d)); }
+  rules = { stampRunning: ['markarth'], oneVotePerDevice: true }; M = load();
+  E = M.data().elections.markarth;
+  ok(E.rules === 1 && !E.firstEver && /7 days/.test(M.canVote(NEWER, MK, E)), 'a hold that has seated a court is stamped, but not as a first: the seven days apply', { rules: E.rules, firstEver: E.firstEver });
+  // A hold that holds no election (noElection, or an unknown id) is skipped and logged
+  logs.length = 0;
+  rules = { stampRunning: ['nowhere'], oneVotePerDevice: true }; M = load();
+  ok(logs.some((l) => /stampRunning names nowhere, which holds no election; skipped/.test(l)), 'a stampRunning hold that holds no election is skipped and logged', logs.filter((l) => /stamp/.test(l)));
+  ZONES.pop();
+}
+// The shipped stampRunning names only holds that elect (every entry is a known hold, none in noElection), and only Riften
+{
+  const cz = JSON.parse(fs.readFileSync(path.resolve(__dirname, '..', 'gamemode-config.json'), 'utf8')).citizenship;
+  const sr = cz.election.voterRules.stampRunning || [];
+  const known = Object.keys(cz.discordRoles || {});
+  ok(sr.every((h) => known.includes(h) && !(cz.noElection || []).includes(h)) && JSON.stringify(sr) === '["riften"]',
+    'gamemode-config.json stampRunning is ["riften"], a hold that elects', sr);
+  ok(cz.election.voterRules.citizenDaysFirstElection === 0 && cz.election.voterRules.newHolds === undefined, 'gamemode-config.json waives the seven days at every first election (no named list)', cz.election.voterRules);
 }
 
 // ---- the shipped config: one vote per PC is off, and the device store is never opened -------------------------------------

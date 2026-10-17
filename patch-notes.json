@@ -8,10 +8,10 @@
       {
         "heading": "Elections",
         "items": [
-          "The seven days of citizenship are not asked for at a hold's FIRST election. Skyrim has only just opened and no character anywhere has been a citizen for a week, so the rule was leaving every hold with nought voters - and because a hold's citizen count is the number who may vote, it was reading as nought citizens too. Nobody was removed from any roll.",
+          "A hold's first election does not ask for seven days of citizenship, and that includes whether it starts: the 15 citizens a hold needs to begin its first election are counted without the seven days. No character has yet been a citizen of a hold for a week, so the rule was leaving every hold with nought voters - and because a hold's citizen count is the number who may vote, it read as nought citizens too. Nobody was removed from any roll.",
           "Everything else still holds for a first vote: the Discord account's age and the hours and days of play are judged as always, and the hold's Voting tab still tells you which one you are missing and when you will meet it.",
-          "Every election after a hold's first asks for the seven days again, so nothing has to be switched back.",
-          "The Rift's election, which opened before these rules existed, keeps its courts and its closing time: the rules were applied to it where it stands rather than starting it again. Nobody has to re-enter a court."
+          "Once a hold has seated a court by election, every later election there asks for the seven days, including one that staff restart.",
+          "The Rift's election, which opened before these rules existed, keeps its courts and its closing time: the rules were applied to it where it stands, as its first election, rather than starting it again. From the vote's opening a Rift voter needs the Discord account's age and the hours and days of play above; the seven days are not asked. Nobody has to re-enter a court."
         ]
       }
     ]
