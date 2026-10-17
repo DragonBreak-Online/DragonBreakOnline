@@ -56,6 +56,20 @@ const timed = (name, fn) => function (...args) {
     if (ms > SLOW_TICK_MS) { s.slow++; log(`slow tick ${name}: ${ms.toFixed(1)} ms`); }
   }
 };
+// A player's UI event (each onUi handler, and F3's journal) is timed the same way, per call: one slower than SLOW_UI_MS
+// logs the event, the actor and the time (17 Oct: an X press ran 14 s, 13 queued presses held the loop 3 minutes, and no
+// timer line showed it)
+const SLOW_UI_MS = Number((cfg.debug || {}).slowUiMs) || 250;
+const uiTimed = (event, a, fn) => {
+  const t0 = performance.now();
+  try { return fn(); } finally {
+    const ms = performance.now() - t0;
+    if (ms > SLOW_UI_MS) {
+      let name = ''; try { name = display(a); } catch (e) { name = ''; }
+      log(`slow ui ${String(event).slice(0, 60)} ${name ? `${name} ` : ''}(${(Number(a) >>> 0).toString(16)}): ${ms.toFixed(1)} ms`);
+    }
+  }
+};
 const stopTimer = (name) => { const t = TIMERS.get(name); if (!t) return; clearTimeout(t.start); clearInterval(t.interval); TIMERS.delete(name); };
 // Start offsets are spread over the first second so timers made in one load do not fire together
 let timerSlot = 0;
@@ -2176,7 +2190,7 @@ globalThis.__dboHandlers.customPacket = (userId, rawContent) => {
     // Front widgets driven by this file talk back through the client's DboRelayService.
     if (content.customPacketType === 'dbo') {
       const a = actorOf(userId); const hs = (globalThis.__dboUiEvents && globalThis.__dboUiEvents.get(String(content.event))) || [];
-      for (const h of hs) { if (!a) break; try { h(a, Array.isArray(content.args) ? content.args : [], Number(content.widget) || 0); } catch (e) { logCapped(`uifail:${userId}`, 6, 'ui event failed', String(content.event).slice(0, 60), e.message); } }
+      for (const h of hs) { if (!a) break; try { uiTimed(content.event, a, () => h(a, Array.isArray(content.args) ? content.args : [], Number(content.widget) || 0)); } catch (e) { logCapped(`uifail:${userId}`, 6, 'ui event failed', String(content.event).slice(0, 60), e.message); } }
       return;
     }
     // The client saw a beast power cast (BeastFormService); the server decides and transforms.
@@ -2240,8 +2254,10 @@ globalThis.__dboHandlers.customPacket = (userId, rawContent) => {
       let journal = false;
       // A newer client may name the tab it wants (K hands over to Skills); the hub otherwise reopens the last one
       const tab = typeof content.tab === 'string' ? content.tab.slice(0, 32) : undefined;
-      try { journal = typeof globalThis.__dboJournalRequest === 'function' && globalThis.__dboJournalRequest(a, tab) === true; } catch (e) { log('journal open failed', e.message); }
-      if (!journal && typeof globalThis.__dboFactionMenu === 'function') globalThis.__dboFactionMenu(a);
+      uiTimed('F3', a, () => {
+        try { journal = typeof globalThis.__dboJournalRequest === 'function' && globalThis.__dboJournalRequest(a, tab) === true; } catch (e) { log('journal open failed', e.message); }
+        if (!journal && typeof globalThis.__dboFactionMenu === 'function') globalThis.__dboFactionMenu(a);
+      });
       return;
     }
     // Mirror admin panel actions (F7) into the audit log; AdminSystem enforces them.
@@ -8214,7 +8230,7 @@ try {
   const SPELLS_JS = path.resolve('spells.js');
   delete require.cache[SPELLS_JS];
   require(SPELLS_JS)({ mp, log, personal, system, audit, display, who, cfg, openWidget, closeWidget, onUi, registerChatCommand, onlineActors, distanceMeters, takeGold, giveItem, depositToTreasury, every });
-} catch (e) { log('spells.js failed to load:', e.stack || e.message); for (const k of ['__dboOpenSpellbook', '__dboSpellsRankOptions', '__dboSpellsOpenTo', '__dboSpellsBook', '__dboSpellsKnown', '__dboSpellsClassify', '__dboGuildWorkshop', '__dboSpellsGrant', '__dboSpellsTab', '__dboSpellsRankCap', '__dboSpellsChangePrepared', '__dboSpellsTomesFor', '__dboTomeShopHere', '__dboTomeShopOpen', '__dboTeachHere', '__dboTeachLedgerActions', '__dboTeachOpen', '__dboTeachLecternMenu', '__dboSpellsClassOffer']) globalThis[k] = null; }
+} catch (e) { log('spells.js failed to load:', e.stack || e.message); for (const k of ['__dboOpenSpellbook', '__dboSpellsRankOptions', '__dboSpellsOpenTo', '__dboSpellsBook', '__dboSpellsKnown', '__dboSpellsClassify', '__dboGuildWorkshop', '__dboSpellsGrant', '__dboSpellsTab', '__dboSpellsRankCap', '__dboSpellsChangePrepared', '__dboSpellsTomesFor', '__dboTomeShopHere', '__dboTomeShopOpen', '__dboTeachHere', '__dboTeachLedgerActions', '__dboTeachOpen', '__dboTeachLecternMenu', '__dboSpellsClassOffer', '__dboSpellsLearned', '__dboSpellsLearnedChanged']) globalThis[k] = null; }
 // ---- smithing manuals and smithing skill books (server\manuals.js, manuals.json, config "manuals"): spells.js's read hook,
 // the Scholar's reading, dungeons.js's boss chests and salvage.js's Scholars' Ledger ask it at runtime ----
 try {
@@ -8239,7 +8255,7 @@ try {
   const SCHOOLS_JS = path.resolve('schools.js');
   delete require.cache[SCHOOLS_JS];
   require(SCHOOLS_JS)({ mp, log, personal, audit, display, who, cfg, openWidget, closeWidget, onUi, registerChatCommand, onlineActors, distanceMeters, every, sendPacket, isAdmin, findByName, isWorldspace, profileOf });
-} catch (e) { log('schools.js failed to load:', e.stack || e.message); for (const k of ['__dboSchoolsRefusal', '__dboSchoolsCast', '__dboSchoolsProgress', '__dboSchoolsProgressSend', '__dboSchoolsActivate', '__dboSchoolsAlteration', '__dboCastSkill', '__dboSchoolsGrandfathered', '__dboSchoolsLogin', '__dboSchoolsLedgerActions', '__dboSchoolsLedgerChoose', '__dboMagicTab', '__dboMagicView', '__dboMagicAction', '__dboAdminSetSchool', '__dboSchoolsArrived', '__dboSchoolsLeave', '__dboSchoolRank', '__dboSchoolsOpenLectern', '__dboSchoolsAwardRate', '__dboSchoolsMenuEntries', '__dboSchoolsMenuAction', '__dboSchoolsSkillHeld', '__dboSchoolsApprenticeView', '__dboSchoolsOnLoan']) globalThis[k] = null; }
+} catch (e) { log('schools.js failed to load:', e.stack || e.message); for (const k of ['__dboSchoolsRefusal', '__dboSchoolsCast', '__dboSchoolsProgress', '__dboSchoolsProgressSend', '__dboSchoolsActivate', '__dboSchoolsAlteration', '__dboCastSkill', '__dboSchoolsGrandfathered', '__dboSchoolsLogin', '__dboSchoolsLedgerActions', '__dboSchoolsLedgerChoose', '__dboMagicTab', '__dboMagicView', '__dboMagicAction', '__dboAdminSetSchool', '__dboSchoolsArrived', '__dboSchoolsLeave', '__dboSchoolRank', '__dboSchoolsOpenLectern', '__dboSchoolsAwardRate', '__dboSchoolsMenuEntries', '__dboSchoolsMenuAction', '__dboSchoolsSkillHeld', '__dboSchoolsApprenticeView', '__dboSchoolsOnLoan', '__dboMagicOpen']) globalThis[k] = null; }
 
 // ---- the bank: one account per character in every town's bank, treasuries pay-in only (server\bank.js, WAR_DESIGN.md) ----
 try {
