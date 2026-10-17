@@ -1772,6 +1772,17 @@ module.exports = (K) => {
   };
   const SIGNAL_WHY = R.EVENT_TYPES['sec.signal'].f.why.e;
   H2.signal = (a, game, why) => emit('sec.signal', a, { kind: 'minigame_refused', game: String(game || '').replace(/[^a-z_]/g, '').slice(0, 24) || 'other', why: SIGNAL_WHY.has(why) ? why : 'other' }, { src: 'hook:signal' });
+  // anticheat.js acFlag (a kind not in shadowKinds, at most one a minute per player and kind): the kind as it is, the fold
+  // count and the numbers the schema keeps; a kind the schema does not list is not written (never minigame_refused)
+  const AC_KINDS = new Set(R.AC_SIGNAL_KINDS || []);
+  const SIGNAL_NUMS = Object.keys(R.EVENT_TYPES['sec.signal'].f.nums.o);
+  H2.anticheat = (a, kind, sig) => {
+    if (!AC_KINDS.has(kind)) return;
+    const s = sig && typeof sig === 'object' ? sig : {};
+    const nums = {};
+    if (s.nums && typeof s.nums === 'object') for (const k of SIGNAL_NUMS) if (s.nums[k] !== undefined) nums[k] = s.nums[k];
+    emit('sec.signal', a, { kind, game: 'anticheat', n: Number.isFinite(Number(s.n)) ? Number(s.n) : undefined, nums: Object.keys(nums).length ? nums : undefined }, { src: 'hook:anticheat' });
+  };
   H2.itemflow = (a, kind, baseId, delta) => emit('item.flow', a, { kind, item: baseId ? itemOf(baseId, Math.abs(Number(delta) || 1)) : undefined, k: Number(delta) || undefined }, { src: 'hook:itemflow' });
 
   // ---- the online set against the world: at load, and when capture comes back on (safety review R1) ------------------------

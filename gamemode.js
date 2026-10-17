@@ -3686,6 +3686,8 @@ const sendPacket = (a, payload) => {
     const t = String((payload && payload.customPacketType) || 'other');
     c.byType[t] = (c.byType[t] || 0) + 1;
     c.total++;
+    // The anticheat speed watch reads the gamemode's own slows (armour swaps, terror, dismay) from here (anticheat.js)
+    if (t === 'dboStatus') { try { const f = globalThis.__dboAcStatus; if (typeof f === 'function') f(a, payload); } catch (e) { /* the anticheat watch is optional */ } }
     return true;
   } catch (e) { log('sendCustomPacket failed', e.message); return false; }
 };
@@ -9009,6 +9011,21 @@ try {
   delete require.cache[PLAYTEST_JS];
   require(PLAYTEST_JS)({ mp, log, personal, system, registerChatCommand, display, who, audit, onlineActors, isAdmin, isLeadStaff, sendPacket, cfg, hubDesc: HUB.cellOrWorldDesc, connectedAt, every });
 } catch (e) { log('playtest.js failed to load:', e.stack || e.message); globalThis.__dboPlaytestActivate = null; globalThis.__dboPlaytestGate = null; }
+
+// ---- anticheat: speed, magicka and stamina flags for staff, the fork's flags (server\anticheat.js, config "anticheat") ----
+// After every module that wraps an engine slot (it observes after them and returns their verdict) and before playerlog.js
+// (outermost). Flags only: no kick, no ban, nothing to the flagged player. Instant off: /anticheat off all (Lead GM+).
+try {
+  const ANTICHEAT_JS = path.resolve('anticheat.js');
+  delete require.cache[ANTICHEAT_JS];
+  require(ANTICHEAT_JS)({ mp, log, cfg, every, onlineActors, display, tagOf, profileOf, tierOf, staffTierOf, staffCharOf, isLeadStaff, staffSay, personal, audit,
+    registerChatCommand, findByName, recordOf, TIER_RANK });
+} catch (e) {
+  log('anticheat.js failed to load:', e.stack || e.message);
+  // nothing of the last good load keeps running against this gamemode: its timer, the slow hook, the flag entry point
+  stopTimer('acSpeedWatch'); globalThis.__dboAcStatus = null; globalThis.__dboAcFlag = null;
+  if ('__dboPrevAnticheat' in globalThis) mp.onAnticheat = globalThis.__dboPrevAnticheat || undefined;
+}
 
 // ---- TEMPORARY movement speed recorder (server\movetrace.js), remove once the C++ ceiling is set ---
 try {

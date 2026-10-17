@@ -1791,5 +1791,28 @@
  "traps": {
   "_comment": "Dungeon traps run by the server (traps.js, traps.json). only: all = anyone sets them off; staff = staff only (testing). Nate 20 Oct: on for everyone. ROLLBACK: only staff, hot reload.",
   "only": "all"
+ },
+ "anticheat": {
+  "_comment": "Anti-cheat flags (anticheat.js; Jake 17 Oct: infinite stamina, infinite magicka and speed running were not flagged). Flags only: no kick, no ban, nothing to the flagged player. A flag is one '[gamemode] ANTICHEAT <kind> [shadow ]<Name> #TAG (profile N[, staff]): ...' server-log line (dbo-monitor posts it to #server-monitor), a sec.signal in the player log and an admin-tab line to online GM+ at most once per 10 min. Kinds or kind:tier in shadowKinds only log (the measurement week). Instant off: /anticheat off <all|alerts|speed|rubberband|vitals|magicka|stamina|refusehits|fork> (Lead GM+, until a restart), or enabled false + hot reload. rubberBand and refuseHits stay false until their gates (24-48 h with no honest alert; refuseHits only with Jake's or Nate's GO).",
+  "enabled": true,
+  "alerts": { "staffInGame": true, "minTier": "gm", "staffEveryMinutes": 10, "logPerMinute": 1 },
+  "shadowKinds": ["speed_sustained:foot", "speed_sustained60", "speed_blink", "speed_slow", "stamina_free", "magicka_debt", "stamina_debt", "power_unmatched", "spellhit_nocast"],
+  "stall": { "lateMs": 1500, "burstPlayers": 3, "burstMs": 2000, "holdMs": 10000, "reseedMs": 3000 },
+  "speed": {
+   "_comment": "u/s over the net displacement of 10 s and 60 s of server-accepted positions, with 80% continuity. Measured honest on foot (2 s windows): p99.9 560-580, max 590; MOVT sprint 500, horse 600, werewolf 531. Mount detection is LIKELY until a staff horse test.",
+   "enabled": true, "alertSpeed": 850,
+   "limit10": { "foot": 650, "mount": 850, "beast": 850, "unknown": 850 },
+   "limit60": { "foot": 540, "other": 750 },
+   "continuity": 0.8, "blinkUnits": 2000, "blinkWithinMs": 1500, "blinkCount": 3, "blinkWindowMs": 600000, "jumpUnits": 3000, "dashExemptMs": 10000,
+   "rubberBand": false, "rubberBandSpeed": 1000, "rubberBandMaxPerMin": 3
+  },
+  "magicka": {
+   "_comment": "magicka_free (interim until the fork's vitals budget): costly casts (SPIT cost >= minCost) at stored magicka >= fullAt after which it never went below dropBelow within holdMs (15 s for concentration; longer while the stored value is unchanged to the bit, the client's own report hold, up to heldMaxMs). Flag at flagCount in flagWindowMs with flagMinCost summed. Skipped: 6 s after an eat, a well, a refill; Fortify gear or a potion of the school.",
+   "enabled": true, "minCost": 30, "fullAt": 0.995, "dropBelow": 0.99, "holdMs": 6000, "concentrationHoldMs": 15000, "heldMaxMs": 30000,
+   "refillSkipMs": 6000, "flagCount": 8, "flagWindowMs": 600000, "flagMinCost": 1200, "refuseHits": false, "refuseMinutes": 10
+  },
+  "stamina": { "enabled": true, "sprintSpeed": 500, "sprintSeconds": 20, "windowSeconds": 30, "fullAt": 0.95, "dropBy": 0.02 },
+  "fork": {},
+  "bridge": { "pushClasses": false }
  }
 }

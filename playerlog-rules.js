@@ -100,7 +100,12 @@ const TIER = E('senior', 'developer', 'leadgm', 'gm', 'trialgm', 'none');
 const SIDE = O({ hits: 'int', dmg: 'num', by: A(NAME, 8) });
 const REFUSAL_REASONS = ['god', 'ethereal', 'offline_body', 'login_grace', 'bound', 'paralysed', 'armour_change', 'damage_cap',
   'spell_rate', 'dungeon_ally', 'warband', 'companion_pvp', 'silver', 'recovering', 'downed', 'shout_not_given',
-  'friendly_lethal', 'duel_pause', 'duel_rules', 'duel_beaten', 'duel_scaled', 'duel_outsider', 'unknown'];
+  'friendly_lethal', 'duel_pause', 'duel_rules', 'duel_beaten', 'duel_scaled', 'duel_outsider', 'anticheat', 'unknown'];
+
+// The anticheat kinds a sec.signal may carry (anticheat.js acFlag and the fork's onAnticheat through it; ANTI-CHEAT DESIGN
+// 17 Oct). playerlog-taps.js's anticheat hook writes these and no other kind.
+const AC_SIGNAL_KINDS = ['speed_sustained', 'speed_sustained60', 'speed_blink', 'speed_slow', 'snapback_ignored', 'magicka_free', 'stamina_free',
+  'magicka_debt', 'stamina_debt', 'vitals_nonfinite', 'power_unmatched', 'spellhit_nocast'];
 
 // ---- the event types (DESIGN.md 1.5) ------------------------------------------------------------------------------------
 // p: priority (0 never dropped before the hard cap, 1, 2 first to go); place: 'pos' (cell and coordinates), 'cell' (cell
@@ -148,7 +153,7 @@ const EVENT_TYPES = {
   // movement and world
   'move.cell': T(1, 'cell', { from: PLACE, to: PLACE, own: OWN, access: ACCESS }),
   'move.zone': T(1, 'cell', { from: 'zid', to: 'zid' }),
-  'move.teleport': T(1, 'pos', { reason: E('gate', 'unstuck', 'staff_tp', 'fixloc', 'gm_goto', 'panel_tp', 'summon', 'dungeon', 'playtest', 'creation', 'temple', 'crash', 'spawnwatch', 'unknown'), dist: 'int' }),
+  'move.teleport': T(1, 'pos', { reason: E('gate', 'unstuck', 'staff_tp', 'fixloc', 'gm_goto', 'panel_tp', 'summon', 'dungeon', 'playtest', 'creation', 'temple', 'crash', 'spawnwatch', 'anticheat', 'unknown'), dist: 'int' }),
   'move.door': T(2, 'cell', { door: 'hex', dest: NAME64, allowed: 'bool', own: OWN, access: ACCESS }, { near: true }),
   'move.dungeon': T(1, 'cell', { op: E('claim', 'enter', 'leave', 'end', 'boss', 'moved_out'), dungeon: NAME64, difficulty: NAME, members: PARTIES, why: 'code' }),
   'move.map': T(2, '', { n: 'int', names: A(NAME, 5) }),
@@ -232,11 +237,13 @@ const EVENT_TYPES = {
   'social.commission': T(1, '', { op: E('post', 'take', 'done', 'refuse', 'rule', 'cancel', 'abandon', 'expire', 'unjudged'), id: 'int', reward: 'int' }),
   'social.charter': T(1, '', { op: E('draft', 'pitch_set', 'seat', 'kind', 'invite', 'confirm', 'leave', 'submit', 'withdraw', 'approve', 'deny', 'edit', 'dissolve', 'disband_ask', 'disband_ok', 'disband_no', 'paid', 'lapsed', 'other'), number: 'int', gold: 'int' }),
   'social.lock': T(1, '', { op: E('picked', 'failed', 'cancel', 'refused'), why: E('fast', 'far', 'expired', 'superseded', 'inconsistent', 'replay', 'nonce', 'other'), snaps: 'int', level: 'int', target: 'hex', own: OWN }),
-  'sec.signal': T(0, '', { kind: E('minigame_refused', 'mismatch', 'console_blocked', 'relog_grew', 'movement_refused', 'lockpick_refused'), game: 'code',
+  // with the anticheat kinds (AC_SIGNAL_KINDS): the kind, the fold count n, the numbers
+  'sec.signal': T(0, '', { kind: E('minigame_refused', 'mismatch', 'console_blocked', 'relog_grew', 'movement_refused', 'lockpick_refused', ...AC_SIGNAL_KINDS), game: 'code',
     // the minigame judges' own refusal codes (gamemode.js reading and skinning, labour.js, minigames.js, prayer.js, struggle.js)
     why: E('fast', 'far', 'replay', 'nonce', 'expired', 'superseded', 'inconsistent', 'speed', 'tries', 'attempts', 'clock', 'flood', 'range', 'order', 'extra',
       'submit', 'future', 'late', 'mismatch', 'malformed', 'cooldown', 'away', 'count', 'early', 'faltered', 'overlap', 'overtime', 'parse', 'precise', 'released',
-      'rested', 'shape', 'slow', 'stall', 'other'), n: 'int', nums: O({ dxy: 'num', dz: 'num', speed: 'num', budget: 'num', enforced: 'bool' }) }),
+      'rested', 'shape', 'slow', 'stall', 'other'), n: 'int', nums: O({ dxy: 'num', dz: 'num', speed: 'num', budget: 'num', enforced: 'bool',
+      limit: 'num', ratio: 'num', window: 'num', casts: 'int', cost: 'num', debt: 'num', cls: 'code' }) }),
   // commands, console and staff
   'cmd.run': T(1, '', { name: 'code', sub: 'code', nums: A('num', 3), route: E('chat', 'upanel', 'journal', 'quiet', 'xmenu', 'warband', 'console'), outcome: E('ok', 'refused', 'error', 'async'), via: E('alias', 'nested'), mirror: 'bool' }),
   'cmd.info': T(2, '', { name: 'code', n: 'int' }),
@@ -453,6 +460,10 @@ excluded('PLACE', 'staff-written set names: the command wrapper');
 excluded('LEDGER', 'ledger names: the command wrapper');
 excluded('ORPHAN', 'staff only');
 excluded('DISCORD', 'roles: session.perm');
+// anticheat.js: a Lead GM's /anticheat off|on <part> (the part and the word from fixed lists) is clean; the daily counts
+// name no player
+clean_('ANTICHEAT', { display: true });
+excluded('ANTICHEAT-DAILY', 'counts per kind only, no player');
 excluded('WWBREAKER VLBREAKER', 'the beastform breaker names who dropped');
 excluded('REMOTE', 'the remote staff console (console.js): staff command text and a Discord handle; the command wrapper records the run (route console)');
 
@@ -1029,6 +1040,8 @@ const COMMAND_SCHEMA = {
   staffdiag: { target: { from: 0, to: 1, lookup: 'online' }, nums: [1] },
   voicediag: { target: { from: 0, to: 1, lookup: 'online' }, nums: [1] },
   charstats: { target: { from: 0, lookup: 'any' }, info: true, staffView: 'charstats' },
+  anticheat: { subs: S_('status off on recent') },
+  acstate: { target: { from: 0, lookup: 'online' }, info: true },
   gearswap: { target: { from: 0, lookup: 'online' }, info: true, staffView: 'gearswap' },
   playtime: { target: { from: 0, lookup: 'any' }, info: true },
   tokens: { target: { from: 0, lookup: 'online' }, info: true },
@@ -1128,6 +1141,8 @@ alchemy.js DISENCHANT-AMBIGUOUS 95471a94 parsed
 alchemy.js DISENCHANT 6a0e1f03 parsed
 alchemy.js ENCH-RESTORE 76a26bc3 clean
 alchemy.js ENCH-LEARNED-REPAIR 1b77b634 clean
+anticheat.js ANTICHEAT-DAILY 1c03c505 excluded
+anticheat.js ANTICHEAT ae791c2e clean
 appearance.js APPEARANCE 856fcf43 clean
 appearance.js APPEARANCE d9f800c2 clean
 appearance.js APPEARANCE 2163cbb1 clean
@@ -1630,7 +1645,7 @@ worldclock.js CLOCK ccc4cdd1 clean
 `.trim().split('\n').filter(Boolean).map((l) => { const [file, verb, hash, cls] = l.trim().split(/\s+/); return { file, verb, hash, cls }; });
 
 module.exports = {
-  VERSION, EVENT_TYPES, typeOf, clean, validate, REFUSAL_REASONS, AUDIT_SITES, siteHash,
+  VERSION, EVENT_TYPES, typeOf, clean, validate, REFUSAL_REASONS, AUDIT_SITES, siteHash, AC_SIGNAL_KINDS,
   AUDIT_VERBS, auditVerbOf, parseAudit, unquote, partiesOf, itemsFromText, namesFromText,
   parseTradeSummary, parseClientVersion,
   CHAT_VERBS, COMMAND_SCHEMA, REFUSAL_RX, CONSOLE_VERBS, PACKET_TYPES, PROPERTY_ACTIONS, COMPANION_COMMANDS, ADMIN_ACTIONS, ADMIN_ACTOR_TARGET,
