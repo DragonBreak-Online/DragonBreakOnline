@@ -8,7 +8,7 @@
 //   node tests/fov-harness.js /tmp/dbo-fov/fovCamera.js
 'use strict';
 const path = require('path');
-const { pickFovCamera, fovNumber, fovMoved, fovMatches, describeFov } = require(path.resolve(process.argv[2] || '/tmp/dbo-fov/fovCamera.js'));
+const { pickFovCamera, fovNumber, fovMoved, fovMatches, describeFov, readSavedFov, chooseFov, saneFov } = require(path.resolve(process.argv[2] || '/tmp/dbo-fov/fovCamera.js'));
 
 let failures = 0;
 const check = (name, ok, got) => {
@@ -84,6 +84,35 @@ check('matches needs a reading for a set half', fovMatches({ world: 90, first: n
 // ---- numbers ----------------------------------------------------------------------------------------------------
 check('fovNumber keeps a number', fovNumber(80) === 80);
 check('fovNumber drops NaN, strings and objects', [NaN, '80', {}, undefined].every((v) => fovNumber(v) === null));
+
+// ---- the F3 slider's saved choice ------------------------------------------------------------------------------
+check('a saved 95 reads back', JSON.stringify(readSavedFov({ value: 95, launcher: 80 })) === JSON.stringify({ value: 95, launcher: 80 }), readSavedFov({ value: 95, launcher: 80 }));
+check('a saved value outside 50-140 is dropped', readSavedFov({ value: 30, launcher: 80 }) === null && readSavedFov({ value: 200 }) === null);
+check('nothing saved, a string or a reset (null) is none', [undefined, null, '95', { value: '95' }].every((v) => readSavedFov(v) === null));
+check('a saved launcher outside the range counts as unknown', readSavedFov({ value: 95, launcher: 0 }).launcher === null);
+check('saneFov takes the ends', saneFov(50) && saneFov(140) && !saneFov(49.9) && !saneFov(NaN));
+{
+  const r = chooseFov(80, { value: 95, launcher: 80 });
+  check('the saved choice wins over an unchanged launcher value', r.value === 95 && r.from === 'saved', r);
+}
+{
+  const r = chooseFov(100, { value: 95, launcher: 80 });
+  check('a launcher value changed since the save wins', r.value === 100 && r.from === 'launcher', r);
+}
+{
+  const r = chooseFov(80.2, { value: 95, launcher: 80 });
+  check('the launcher value is compared rounded', r.value === 95, r);
+}
+{
+  const r = chooseFov(null, { value: 95, launcher: 80 });
+  check('no readable launcher value keeps the saved one', r.value === 95 && r.from === 'saved', r);
+}
+{
+  const r = chooseFov(90, null);
+  check('nothing saved: the launcher value', r.value === 90 && r.from === 'launcher', r);
+  check('nothing at all: unset', chooseFov(null, null).value === null);
+  check('an out of range launcher value is unset', chooseFov(30, null).value === null);
+}
 
 console.log(failures ? `\n${failures} FAILED` : '\nall passed');
 process.exit(failures ? 1 : 0);

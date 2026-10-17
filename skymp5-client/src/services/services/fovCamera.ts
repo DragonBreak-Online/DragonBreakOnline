@@ -55,3 +55,27 @@ export function pickFovCamera(sp: FovSp): FovCamera {
     },
   };
 }
+
+// ---- the player's own choice (F3, Settings, Camera) --------------------------------------------------------------
+
+// Anything outside this is not a field of view the player chose (the launcher's range too)
+export const FOV_MIN = 50, FOV_MAX = 140;
+export const saneFov = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v) && v >= FOV_MIN && v <= FOV_MAX;
+
+// Kept as ui.fov in the chat settings file (chat-settings-no-load), beside the other F3 settings. launcher is the
+// launcher's value when the choice was made.
+export interface SavedFov { value: number; launcher: number | null }
+
+export const readSavedFov = (raw: unknown): SavedFov | null => {
+  const r = raw as { value?: unknown; launcher?: unknown } | null | undefined;
+  if (!r || typeof r !== "object" || !saneFov(r.value)) return null;
+  return { value: Math.round(r.value), launcher: saneFov(r.launcher) ? Math.round(r.launcher) : null };
+};
+
+// The saved choice wins over the launcher's ini value, unless the launcher's value has changed since it was saved:
+// then the player changed it in the launcher after, and that is the newer choice (the interface size works the same)
+export const chooseFov = (launcher: number | null, saved: SavedFov | null): { value: number | null; from: "saved" | "launcher" } => {
+  const l = saneFov(launcher) ? Math.round(launcher) : null;
+  if (saved && (l === null || saved.launcher === l)) return { value: saved.value, from: "saved" };
+  return { value: l, from: "launcher" };
+};
