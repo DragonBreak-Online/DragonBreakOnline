@@ -41,7 +41,7 @@ const DEFAULTS = {
   enabled: true,
   alerts: { staffInGame: true, minTier: 'gm', staffEveryMinutes: 10, logPerMinute: 1 },
   // A kind, or kind:tier (speed_sustained:foot is the foot tier at 650 u/s; the 850 u/s tier of the same kind alerts)
-  shadowKinds: ['speed_sustained:foot', 'speed_sustained60', 'speed_blink', 'speed_slow', 'stamina_free', 'magicka_debt', 'stamina_debt',
+  shadowKinds: ['speed_sustained:foot', 'speed_sustained:pulse', 'speed_sustained60', 'speed_blink', 'speed_slow', 'stamina_free', 'magicka_debt', 'stamina_debt',
     'power_unmatched', 'spellhit_nocast',
     // the fork's own kinds (mp.onAnticheat), shadow until each has its measurement week: speed_bucket is every refused,
     // would-refuse or accepted (landing, admin mode) line of the main bucket, snapback_ignored also counts the packets
@@ -70,8 +70,9 @@ const DEFAULTS = {
     // A teleport restarts the windows at most jumpRestarts times in jumpRestartWindowMs; past that its step is only taken
     // out of them, so a client's own hops cannot restart the windows at will
     jumpRestarts: 3, jumpRestartWindowMs: 600000,
-    // speed_sustained60 tier 'pulse' (shadow while speed_sustained60 is): 60 s above pulseSpeed with only pulseContinuity of
-    // the time in steps at pulseStepShare x pulseSpeed, the stop-and-go pattern that never meets the 10 s continuity
+    // speed_sustained tier 'pulse' (shadowKinds speed_sustained:pulse until its measurement week): 60 s above pulseSpeed with
+    // pulseContinuity of the time in steps at pulseStepShare x pulseSpeed, the stop-and-go pattern that never meets the 10 s
+    // continuity (5 s at 2999 u/s and 3 s still is 1874 u/s on average)
     pulseSpeed: 850, pulseContinuity: 0.3, pulseStepShare: 0.5,
     mountNear: 300, mountFar: 600, mountFarSamples: 3,
     rubberBand: false, rubberBandSpeed: 1000, rubberBandMaxPerMin: 3,
@@ -696,7 +697,7 @@ module.exports = (api) => {
         const v60 = st.v60;
         windowStats(st, 60000, num(SP.pulseStepShare, 0.5) * pulse, num(SP.pulseStepShare, 0.5) * pulse);
         const cp = st.wT > 0 ? st.wFastA / st.wT : 0;
-        if (cp >= num(SP.pulseContinuity, 0.3)) speedFlag(st, a, t, 'speed_sustained60', 'pulse', v60, pulse, 60000, cp);
+        if (cp >= num(SP.pulseContinuity, 0.3)) speedFlag(st, a, t, 'speed_sustained', 'pulse', v60, pulse, 60000, cp);
       }
     }
     if (slowed && st.n > 0) {

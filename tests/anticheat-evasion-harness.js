@@ -96,14 +96,18 @@ for (const [mult, expect] of [[2, 'ALERT'], [3, 'ALERT'], [1.5, 'SHADOW'], [1.25
   ok(got === 'SHADOW' && shadows(H, 'speed_blink').length > 0, 'alternating hops (2730 u/s average): residual, speed_blink (shadow) only; the fork bucket holds it', acLines(H).slice(0, 3));
 }
 // purpose-built: stutter, 3 s at 1900 u/s then 2 s still. Continuity (80% of the window in fast steps) is never met
-// (1140 u/s average): the alert tier misses it; the new 60 s pulse tier logs it (shadow) for the measurement week
+// (1140 u/s average): the alert tier misses it; the new 60 s pulse tier (speed_sustained:pulse) logs it in shadow for the
+// measurement week, and alerts once it leaves shadowKinds
 {
   const { W, H } = setup({});
   drive(H, W, A, 300, (s) => 1900 * (Math.floor(s / 5) * 3 + Math.min(3, s % 5)));
   const got = verdict(H, 'speed_');
   note('stutter: 3 s at 1900 u/s, 2 s still, 5 min', got, '1140 u/s average; the 60 s pulse tier, shadow');
   ok(got !== 'ALERT', 'stutter (1140 u/s average): no alert (residual until the fork bucket enforces)', alerts(H, 'speed_sustained'));
-  ok(shadows(H, 'speed_sustained60').some((l) => /over 60 s, limit 850/.test(l)), '...the 60 s pulse tier (850 u/s over 60 s, continuity 30% at 425) logs it in shadow', acLines(H).slice(0, 3));
+  ok(shadows(H, 'speed_sustained').some((l) => /over 60 s, limit 850/.test(l)), '...the 60 s pulse tier (850 u/s over 60 s, continuity 30% at 425) logs it in shadow', acLines(H).slice(0, 3));
+  const { W: W2, H: H2 } = setup({ shadowKinds: ['speed_sustained:foot', 'speed_sustained60', 'speed_blink'] });
+  drive(H2, W2, A, 300, (s) => 2999 * (Math.floor(s / 8) * 5 + Math.min(5, s % 8)));
+  ok(alerts(H2, 'speed_sustained').some((l) => /over 60 s, limit 850/.test(l)), '...5 s at 2999 u/s and 3 s still (1874 u/s): with speed_sustained:pulse out of shadowKinds the pulse tier alerts', acLines(H2).slice(0, 3));
 }
 // collusion or a hosted NPC: a Voice hit (Unrelenting Force) on the runner every 9 s, while running 2000 u/s. Each hit
 // exempted 10 s and restarted the ring; now at most one Voice or dash exemption a minute
@@ -137,7 +141,7 @@ for (const [mult, expect] of [[2, 'ALERT'], [3, 'ALERT'], [1.5, 'SHADOW'], [1.25
   let x = 0; const xs = [];
   for (let s = 1; s <= 420; s++) { x += s % 50 === 25 ? 12000 : 600; xs[s] = x; }
   drive(H, W, A, 420, (s) => xs[s]);
-  ok(alerts(H, 'speed_\\w*').length === 0 && !acLines(H).some((l) => /speed_sustained60 shadow .*limit 850/.test(l)), 'honest: a 600 u/s sprint with a 12000 u server teleport every 50 s: no alert and no pulse line', acLines(H).slice(0, 3));
+  ok(alerts(H, 'speed_\\w*').length === 0 && !acLines(H).some((l) => /over 60 s, limit 850/.test(l)), 'honest: a 600 u/s sprint with a 12000 u server teleport every 50 s: no alert and no pulse line', acLines(H).slice(0, 3));
 }
 // a player watched since before a reload of the older anticheat.js (no jmp ring): judged, no tick error
 {
