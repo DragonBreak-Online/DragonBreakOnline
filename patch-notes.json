@@ -1,5 +1,19 @@
 [
   {
+    "title": "Indrik summon held back",
+    "date": "2026-10-17",
+    "version": "Hotfix",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Fixes",
+        "items": [
+          "Summon Indrik is held back for a short while: riding a summoned Indrik could crash the game. If you know it, it stays in your spellbook; you can prepare it again at a college once it returns."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Orcish smithing for every Orc",
     "date": "2026-10-17",
     "version": "Hotfix",
