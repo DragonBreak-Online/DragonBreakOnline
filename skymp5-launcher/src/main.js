@@ -34,6 +34,7 @@ const bugLogs = require('./bugLogs')
 const debloat = require('./debloat')
 const selfRepair = require('./selfRepair')
 const downloadLib = require('./download')
+const { createInstallManifest } = require('./installManifest')
 const selfUpdate = require('./selfUpdate')
 const nxmLinks = require('./nxm')
 const legalLib = require('./legal')
@@ -3270,7 +3271,7 @@ async function checkFilesImpl() {
   // Modlist
   progress('Fetching the install manifest…')
   let manifest = null
-  try { manifest = await fetchJSON(`${config.apiUrl}/api/install-manifest`) }
+  try { manifest = await installManifest().get() }
   catch (err) { notes.push(`Modlist: could not fetch the install manifest (${err.serverError || err.message}), section skipped.`) }
   if (manifest && Array.isArray(manifest.mods)) {
     const modsDir  = mo2.getModsDir()
@@ -3841,7 +3842,7 @@ async function handleNxmLinkNow(link) {
   if (!key || !expires) return nxmLog('That link has no download key; use the Mod Manager Download button on the Nexus file page.')
   let expected = null
   try {
-    const manifest = await fetchJSON(`${config.apiUrl}/api/install-manifest`)
+    const manifest = await installManifest().get({ reuse: true })
     expected = (manifest.archives || []).find(a => a.source && a.source.type === 'nexus' && Number(a.source.modId) === modId && Number(a.source.fileId) === fileId) || null
   } catch { /* the name comes from Nexus instead */ }
   if (!expected) {
@@ -4022,7 +4023,7 @@ async function runMO2Install(opts = {}) {
 
     // 3. Mods from the compiled install manifest
     let manifest
-    try { manifest = await fetchJSON(`${config.apiUrl}/api/install-manifest`) }
+    try { manifest = await installManifest().get() }
     catch (err) {
       // A 404 means the backend never compiled (or lost, after a fresh
       // deploy) its manifest - surface the backend's own explanation.
@@ -4482,6 +4483,12 @@ function writeClientSettings(destPath, srv, serverInfo) {
 
   fs.mkdirSync(path.dirname(destPath), { recursive: true })
   fs.writeFileSync(destPath, JSON.stringify(settings, null, 2) + '\n')
+}
+
+let installManifestSource = null
+function installManifest() {
+  if (!installManifestSource) installManifestSource = createInstallManifest({ apiUrl: config.apiUrl, fetchJSON, log: m => log(`[install] ${m}`) })
+  return installManifestSource
 }
 
 function fetchJSON(url, headers = {}, redirectsLeft = 3) {
