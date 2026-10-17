@@ -22,7 +22,9 @@
 // data/referrals.jsonl (0600, append only): { kind: 'bind', v: 1, at, code, profileId, accountCreatedAt, via }. Rows of a
 // deleted account are dropped (forgetProfile, from players.deleteByProfileId) and rows older than 30 days are dropped
 // (the gameplay reads the file every minute, so it read them long before); a rewritten file is a new inode, which the
-// gameplay reads again from the start, skipping bindings it already has.
+// gameplay reads again from the start, skipping bindings it already has. The 30-day drop runs whatever REFERRAL_LINKS
+// is and whether or not new bindings arrive: once when the shared store is first used (at the latest a minute after
+// the backend starts), then from an unref'd daily timer, and at a new binding at most once a day.
 
 const crypto = require('crypto')
 const fs     = require('fs')
@@ -70,7 +72,7 @@ function readCookie(req, name) {
 
 const stateOk = s => typeof s === 'string' && s.length > 0 && s.length <= 512
 
-function createReferralStore({ pendingFile = PENDING_FILE, bindingsFile = BINDINGS_FILE, now = () => Date.now(), log = console.log } = {}) {
+function createReferralStore({ pendingFile = PENDING_FILE, bindingsFile = BINDINGS_FILE, now = () => Date.now(), log = console.log, every = setInterval } = {}) {
   let data = null
   const load = () => {
     if (data) return data
@@ -119,14 +121,25 @@ function createReferralStore({ pendingFile = PENDING_FILE, bindingsFile = BINDIN
     return lines.length - kept.length
   }
   let trimmedAt = 0
-  const trim = () => {
-    if (now() - trimmedAt < DAY) return 0
+  // force: the daily timer and the first use run it whenever they fire; a binding runs it at most once a day
+  const trim = (force = false) => {
+    if (!force && now() - trimmedAt < DAY) return 0
     trimmedAt = now()
     try {
       const n = rewrite(r => r && Number(r.at) > now() - TTL.binding)
       if (n) log(`[referral] ${n} binding row(s) older than 30 days dropped`)
       return n
     } catch (err) { log(`[referral] old binding rows not dropped: ${err.message}`); return 0 }
+  }
+
+  // The drop once now, then daily from a timer that never keeps the process alive; a second call does nothing
+  let trimTimer = null
+  function startTrim() {
+    if (trimTimer) return trimTimer
+    trim(true)
+    trimTimer = every(() => trim(true), DAY)
+    if (trimTimer && typeof trimTimer.unref === 'function') trimTimer.unref()
+    return trimTimer
   }
 
   // An account deleted (players.deleteByProfileId): its binding rows go
@@ -169,12 +182,18 @@ function createReferralStore({ pendingFile = PENDING_FILE, bindingsFile = BINDIN
     return { result: 'bound', row }
   }
 
-  return { noteLogin, pendingFor, deliver, forgetProfile, trim, prune, _data: () => load() }
+  return { noteLogin, pendingFor, deliver, forgetProfile, trim, startTrim, prune, _data: () => load(), _trimTimer: () => trimTimer }
 }
 
-// The one store the routes use, made on first use
+// The one store the routes use, made on first use, which starts the 30-day drop
 let shared = null
-const store = () => (shared = shared || createReferralStore())
+const store = () => {
+  if (!shared) { shared = createReferralStore(); shared.startTrim() }
+  return shared
+}
+// With the switch off nothing else uses the store, so it is made a minute after start (unref'd: never holds the process)
+const kick = setTimeout(() => { try { store() } catch (err) { console.log(`[referral] old binding rows not checked: ${err.message}`) } }, 60 * 1000)
+if (typeof kick.unref === 'function') kick.unref()
 
 // The hooks routes/skymp-compat.js calls; they return at once while REFERRAL_LINKS is not 'on'
 const noteLogin = (args) => (linksOn() ? store().noteLogin(args) : null)
