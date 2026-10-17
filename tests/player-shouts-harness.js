@@ -35,7 +35,9 @@ const NPC_NAME = /^(Dragon(?!rend)|L_|LShout|MQ|dun|DA13|dlc2MK)|Miraak|Greybear
 const npcNamed = shouts.filter((s) => NPC_NAME.test(s.name)).map((s) => s.name);
 ok(npcNamed.length === 0, `no dragon, Miraak, Greybeard, quest, racial or howl copy (${npcNamed.join(', ')})`);
 ok(shouts.every((s) => ['Skyrim.esm', 'Dawnguard.esm', 'Dragonborn.esm'].includes(pluginOf(s.shout))), 'no mod creature shout');
-ok((powers.spells || []).length > 0 && !!powers.werewolf, 'the spells and the werewolf power are untouched');
+// Give all spells has nothing to give (Jake, 17 Oct: it froze the server); the list waits in spellsGiveAllOff
+ok(Array.isArray(powers.spells) && powers.spells.length === 0 && (powers.spellsGiveAllOff || []).length > 0, 'Give all spells has nothing to give, and the old list is kept aside');
+ok(!!powers.werewolf && !!powers.vampirelord, 'the werewolf and Vampire Lord powers are untouched');
 
 // ---- the combat gate reads the allow-list too -------------------------------------------------------------------
 {
