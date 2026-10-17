@@ -158,6 +158,47 @@ TEST_CASE(
   REQUIRE(previousInventory == newInventory);
 }
 
+TEST_CASE("A HearthFires oven makes its recipes (the bench keyword is global)",
+          "[Craft][espm]")
+{
+  // BYOHRecipeFoodBread (HearthFires 0x117F6): salt, a sack of flour, a jug of
+  // milk and wheat at BYOHCraftingOven. The oven (CraftingOvenMarker) keeps that
+  // keyword as 0x020117F7 in HearthFires.esm, the recipe resolves it to
+  // 0x030117F7: read raw, no oven recipe matched (Purr, 17 Oct)
+  const uint32_t kOven = 0x03011ce2, kBread = 0x65c97;
+  const Inventory inputs = Inventory()
+                             .AddItem(0x34cdf, 1)
+                             .AddItem(0x03003534, 1)
+                             .AddItem(0x03003538, 1)
+                             .AddItem(0x23d77, 1);
+
+  PartOne& p = GetPartOne();
+  auto& oven = p.worldState.GetFormAt<MpObjectReference>(kOven);
+
+  DoConnect(p, 0);
+  p.CreateActor(0xff000000, oven.GetPos(), 0,
+                oven.GetCellOrWorld().ToFormId(p.worldState.espmFiles));
+  p.SetUserActor(0, 0xff000000);
+  auto& ac = p.worldState.GetFormAt<MpActor>(0xff000000);
+  for (auto entry : inputs.entries)
+    ac.AddItem(entry.baseId, entry.count);
+
+  RawMessageData msgData;
+  msgData.userId = 0;
+  const uint32_t breadBefore = ac.GetInventory().GetItemCount(kBread);
+  CraftItemMessage msg;
+  msg.data.craftInputObjects = inputs;
+  msg.data.workbench = kOven;
+  msg.data.resultObjectId = kBread;
+  p.GetActionListener().OnCraftItem(msgData, msg);
+
+  REQUIRE(ac.GetInventory().GetItemCount(kBread) == breadBefore + 1);
+  REQUIRE(ac.GetInventory().GetItemCount(0x03003534) == 0);
+
+  p.DestroyActor(0xff000000);
+  DoDisconnect(p, 0);
+}
+
 TEST_CASE("DLC Dragonborn recipes are working", "[Craft][espm]")
 {
 
