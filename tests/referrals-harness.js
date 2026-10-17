@@ -308,7 +308,8 @@ const settle = () => new Promise((r) => setTimeout(r, 60));
   ok('revoking the last counted referral takes the carry weight back', papyrus.some((p) => p.fn === 'RemoveSpell' && p.spell === CARRY_DESC) && !mp.get(A.v5, 'private.dboReferralCarry'));
   ok('a revoked referral cannot be revoked twice', /already revoked/.test(cmd(A.staff, 'revoke 20')));
   ok('staff see an account', /referred by 5 .*revoked/.test(cmd(A.staff, 'profile 20')));
-  ok('the friends list shows them taken back', /taken back by staff/.test(cmd(A.v5, '')));
+  const friendsPart = (t) => ((/Friends: (.*?)\.(?: Boosts:| Carry weight:|$)/.exec(t) || [])[1] || '').split('; ');
+  ok('the friends list shows them only as "cannot count", never why', friendsPart(cmd(A.v5, '')).some((t) => /^Friend \d+: cannot count$/.test(t)) && !/taken back|after review|alt account|cannot count \(/.test(cmd(A.v5, '')), cmd(A.v5, ''));
 
   // ---- the first boost once only ----
   setup(55, c5); online = [A.v5, 0xff000000 + 55];
@@ -326,6 +327,23 @@ const settle = () => new Promise((r) => setTimeout(r, 60));
   // ---- the journal and the switch ----
   const v = globalThis.__dboJournalSections.referrals.view(A.v5);
   ok('journal section: link, friends, queue', v && v.link.endsWith(c5) && Array.isArray(v.friends) && v.friends.length >= 3 && Array.isArray(v.queue));
+  // R1 (Jake's decision 2): ineligible (23, Discord age unknown), refused (51), revoked by staff (24) and by a ban (58)
+  // all show exactly 'Friend N: cannot count', in /referral and in the journal, and no reason reaches the player
+  const R1 = { ineligible: 23, refused: 51, revoked: 24, banned: 58 };
+  ok('R1: each non-counting state is in place', rec(23).ref.status === 'ineligible' && rec(51).ref.status === 'refused' && rec(24).ref.status === 'revoked' && rec(58).ref.status === 'revoked' && rec(58).ref.reason === 'banned');
+  const mine = Object.entries(globalThis.__dboReferrals.store.profiles).filter(([, r]) => r && r.ref && r.ref.by === 5);
+  const notCounting = mine.filter(([, r]) => ['ineligible', 'refused', 'revoked'].includes(r.ref.status)).length;
+  const neutral = v.friends.filter((f) => /^Friend \d+: cannot count$/.test(f.text));
+  ok('R1: journal, every ineligible, refused and revoked friend is exactly "Friend N: cannot count"', neutral.length === notCounting && notCounting >= 4 && neutral.every((f) => f.status === 'ineligible') && v.friends.filter((f) => !['counted', 'playing', 'review'].includes(f.status)).every((f) => /^Friend \d+: cannot count$/.test(f.text)), v.friends);
+  for (const [state, pid] of Object.entries(R1)) {
+    const sorted = mine.map(([id, r]) => ({ id: Number(id), at: r.ref.at })).sort((x, y) => x.at - y.at);
+    const line = v.friends.find((f) => f.text.startsWith(`Friend ${sorted.findIndex((x) => x.id === pid) + 1}:`));
+    ok(`R1: the ${state} friend (${pid}) reads "cannot count"`, line && /^Friend \d+: cannot count$/.test(line.text) && line.status === 'ineligible', line);
+  }
+  const cmdLines = friendsPart(cmd(A.v5, ''));
+  ok('R1: /referral shows the same neutral lines', cmdLines.filter((t) => /^Friend \d+: cannot count$/.test(t)).length === notCounting && cmdLines.every((t) => !/cannot count ./.test(t)), cmdLines);
+  const vj = JSON.stringify(v);
+  ok('R1: the view JSON holds no reason text', !/under 90 days|age unknown|not eligible|banned|alt account|same household|PC check|after review|taken back|by staff/i.test(vj.replace(/being checked by staff/g, '')), vj);
   papyrus.length = 0;
   load({ enabled: false }); tick();
   ok('off: no rate, no section, the command says so', rate(A.v5) === 1 && globalThis.__dboJournalSections.referrals.visible() === false && /not open yet/.test(cmd(A.v5, '')));

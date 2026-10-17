@@ -450,10 +450,10 @@ module.exports = (api) => {
     const s = f.r.ref.status;
     if (s === 'qualified') return { n: i + 1, status: 'counted', text: `Friend ${i + 1}: counted` };
     if (s === 'pending') return { n: i + 1, status: 'playing', text: `Friend ${i + 1}: ${hm(Math.min(f.r.ms, C.qualifyHours * HOUR))} of ${C.qualifyHours} h, ${Math.min(f.r.days.length, C.qualifyDays)} of ${C.qualifyDays} days` };
-    if (s === 'revoked') return { n: i + 1, status: 'revoked', text: `Friend ${i + 1}: taken back by staff` };
     if (s === 'checking' || s === 'held') return { n: i + 1, status: 'review', text: `Friend ${i + 1}: played enough, being checked by staff` };
-    if (s === 'refused') return { n: i + 1, status: 'ineligible', text: `Friend ${i + 1}: not counted after review` };
-    return { n: i + 1, status: 'ineligible', text: `Friend ${i + 1}: cannot count (${f.r.ref.reason || 'not eligible'})` };
+    // every state that does not count (revoked, a ban included; refused; ineligible) shows the same neutral line: the
+    // reason (r.ref.reason) is for staff only (/referral profile, /referral held, the audit), Jake's decision 2
+    return { n: i + 1, status: 'ineligible', text: `Friend ${i + 1}: cannot count` };
   };
   const view = (a) => {
     const pid = profileOf(a);

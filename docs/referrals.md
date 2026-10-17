@@ -19,6 +19,9 @@ Changed after claude-jake's review of 16 Oct (internal: `/opt/dragonbreak-handov
 - **A referral counts** once the new account has played 5 hours on at least 2 different UTC days, and only if its Discord
   account was at least 90 days old when it was referred (Nate, 16 Oct). The age comes from the Discord id (snowflake). A
   younger, or unknown, account is recorded as "cannot count". It still gets the welcome (Nate: "the welcome stays either way").
+  The referrer's friends list shows every referral that does not count (too young or unknown, refused after review,
+  revoked by staff or by a ban) as exactly "Friend N: cannot count", with no reason (Jake, 17 Oct); the reason is kept
+  in the record for staff only (`/referral profile`, `/referral held`, the audit).
   A day counts only for a **session that began on it** (a break of more than 60 minutes, `sessionGapMinutes`, begins a new
   one) with at least 30 minutes of play (`qualifyDayMinutes`), so one evening session from 22:00 to 03:01 UTC is one day.
 - **No alts** (Nate, 16 Oct), within what the Privacy Policy allows:
@@ -32,7 +35,7 @@ Changed after claude-jake's review of 16 Oct (internal: `/opt/dragonbreak-handov
     lists the held ones for staff, and a Lead GM types `/referral approve <id>` (it counts now) or `/referral refuse <id>
     [why]` (it never counts; the welcome stays). The PC code comes from the player's own PC, so a modified launcher
     defeats it: a filter, not proof.
-  - What a player sees of a check is only "being checked by staff" or "not counted after review". The match itself is
+  - What a player sees of a check is only "being checked by staff", then "counted" or "cannot count". The match itself is
     written only to the staff audit (`REFERRAL held for review ... shares a PC with ...`); the record keeps `reason: 'PC
     check'`, which only staff see. No PC code or address is stored by the gameplay.
 - **Rewards:**
