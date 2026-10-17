@@ -4,7 +4,7 @@
   "changes": [
     "The Privacy Policy now lets the one-way PC code from the ban check, the age of your Discord account and your play time be used to keep referral rewards fair and hold elections to one vote per person.",
     "Referrals: once this version is in effect, a referral from the same PC as its inviter, or as another player they invited, is held for a Lead GM to decide; it is never refused for that alone. Addresses are not checked. The inviter sees only that it cannot count, never why.",
-    "Elections: once this version is in effect, a vote from a PC that has already voted is never refused automatically. It is held for staff review: a Lead GM decides with a reason and can undo it, and you are told the outcome.",
+    "Elections: once this version is in effect and the PC check is in use, a vote from a PC that has already voted is never refused automatically. It is held for staff review: a Lead GM decides with a reason and can undo it, and you are told the outcome.",
     "Once our server can see the address each player really connects from, staff may also review votes from one address. This is not used yet.",
     "A referral link sets a cookie with its code for 30 days, sent only to our Discord login. Referral records are deleted with your account. Staff see the results of these checks; other players never see your PC code or address."
   ],
