@@ -96,7 +96,15 @@ module.exports = (api) => {
   // server-measured); citizenDays: the voting character's citizenship of the hold; oneVotePerDevice: accounts the backend's
   // device store (deviceFile, launcher PC codes) links share one vote. That one is OFF by owner decision (Jake, 16 Oct) until
   // the Privacy Policy names this use and players have re-accepted it; turning it on needs Jake, and only a strict true does
-  const VR0 = { enabled: true, discordAgeDays: 90, playHours: 10, playDays: 3, citizenDays: 7, oneVotePerDevice: false,
+  // newHolds + citizenDaysFirstElection: the citizenship a JUST-OPENED hold's FIRST election asks for (Nate, 17 Oct:
+  // "7 days citizen needs to change for the first vote bc skyrim just opened"). A hold open for days has no seven-day
+  // citizens, so its first vote would have no electorate at all.
+  // It is a NAMED list, not "any hold that has never voted": Bruma has been open since launch, and a first election there
+  // should still ask for the seven days, because its citizens could have met them. Only a hold whose gates have just
+  // opened needs the exception, and only until it has held one (E.firstEver, stamped when the election starts). Empty by
+  // default: nothing changes anywhere until a hold is named. Everything else - the Discord age, the hours and days of
+  // play - is judged exactly as always, first election or not.
+  const VR0 = { enabled: true, discordAgeDays: 90, playHours: 10, playDays: 3, citizenDays: 7, citizenDaysFirstElection: 0, newHolds: [], oneVotePerDevice: false,
     playersFile: '/opt/alduinak/skymp5-backend/data/players.json', deviceFile: '/opt/alduinak/skymp5-backend/data/device-ids.json', cacheMinutes: 10 };
   C.election.voterRules = Object.assign({}, VR0, C.election.voterRules || {});
   const PANEL_ID = 84;
@@ -527,9 +535,13 @@ module.exports = (api) => {
         if (ms < VR.playHours * HOUR || days < VR.playDays) return `To vote you need ${VR.playHours} hours of play, on at least ${VR.playDays} different days, before the vote opens. Your account had ${hm(ms)} on ${days} day${days === 1 ? '' : 's'}${opened ? ' when it opened' : ' so far'}.`;
       }
     }
-    if (Number(VR.citizenDays) > 0 && since !== undefined && Number(since) > 0) {
-      const need = Number(since) + VR.citizenDays * DAY;
-      if (need > at) return `Only those who were citizens of ${ofPlace(z.name)} for ${VR.citizenDays} days ${when} may vote. This character became one on ${dayText(since)}.`;
+    // A just-opened hold's first election asks for citizenDaysFirstElection instead (VR.newHolds). Every election after
+    // it, and every hold not named there, asks for citizenDays as before.
+    const isNew = Array.isArray(VR.newHolds) && VR.newHolds.map((h) => String(h).toLowerCase()).includes(String(z.id).toLowerCase());
+    const needDays = E && E.firstEver && isNew ? Math.max(0, Number(VR.citizenDaysFirstElection) || 0) : Number(VR.citizenDays);
+    if (needDays > 0 && since !== undefined && Number(since) > 0) {
+      const need = Number(since) + needDays * DAY;
+      if (need > at) return `Only those who were citizens of ${ofPlace(z.name)} for ${needDays} day${needDays === 1 ? '' : 's'} ${when} may vote. This character became one on ${dayText(since)}.`;
     }
     return '';
   };
@@ -706,7 +718,11 @@ module.exports = (api) => {
   };
   const startPhase = (E, phase, hours) => { E.phase = phase; E.phaseStartedAt = Date.now(); E.phaseEndsAt = Date.now() + hours * HOUR; };
   const startElection = (z, why) => {
+    // A hold that has already held one keeps its record with phase 'held' (cancel), so this is its first ever when there
+    // is no such record. Stamped once, at the start, so the answer cannot change under a running election.
+    const before = elOf(z.id);
     const E = { phase: '', round: 1, startedAt: Date.now(), courts: [], ballot: [], votes: {} };
+    if (!before || before.phase !== 'held') E.firstEver = 1;
     // The voter rules apply to an election stamped at its start (one already running at the deploy keeps the old rules)
     if (VR.enabled === true) E.rules = 1;
     startPhase(E, 'registration', EL.registrationHours);

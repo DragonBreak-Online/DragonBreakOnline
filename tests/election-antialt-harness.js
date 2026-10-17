@@ -284,6 +284,22 @@ const NEWER = account(209, 'Newer Citizen'); writeBackend(); online.push(NEWER);
 chars.get(YOUNG).discord = snow(now - 10 * DAY); play.set(201, { ms: 5 * HOUR, days: 4 });
 ok(M.canVote(YOUNG, WR, null) === '' && M.canVote(SHORT, WR, null) === '' && /7 days/.test(M.canVote(NEWER, WR, null)), 'each rule has its own number (0 turns it off): the Discord and play rules off, the citizenship rule still on', M.canVote(NEWER, WR, null));
 
+// ---- a just-opened hold's first election (Nate, 17 Oct: Skyrim opened, nobody can have been a citizen for 7 days) ------
+// The waiver is a NAMED list, not "any hold that has never voted": a first election in a hold open since launch still
+// asks for the seven days. It only lifts the citizenship rule; the Discord age and the play time are judged as always.
+const FIRST = { phase: 'registration', rules: 1, firstEver: 1 };   // the hold has never held one
+const AGAIN = { phase: 'registration', rules: 1 };                 // it has
+rules = { oneVotePerDevice: true }; M = load();
+ok(/7 days/.test(M.canVote(NEWER, WR, FIRST)), 'with no hold named, a first election still asks for the seven days');
+rules = { newHolds: ['whiterun'], citizenDaysFirstElection: 0, oneVotePerDevice: true }; M = load();
+ok(M.canVote(NEWER, WR, FIRST) === '', 'a named hold waives them at its first election', M.canVote(NEWER, WR, FIRST));
+ok(/7 days/.test(M.canVote(NEWER, WR, AGAIN)), '...and asks for them again at its next one');
+ok(/Discord/.test(M.canVote(YOUNG, WR, FIRST)), '...while the Discord age is judged at a first election as always', M.canVote(YOUNG, WR, FIRST));
+rules = { newHolds: ['markarth'], citizenDaysFirstElection: 0, oneVotePerDevice: true }; M = load();
+ok(/7 days/.test(M.canVote(NEWER, WR, FIRST)), 'another hold being named does nothing for this one');
+const shippedVR = JSON.parse(fs.readFileSync(path.resolve(__dirname, '..', 'gamemode-config.json'), 'utf8')).citizenship.election.voterRules;
+ok(Array.isArray(shippedVR.newHolds) && shippedVR.newHolds.length === 0, 'gamemode-config.json ships an empty newHolds list');
+
 // ---- the shipped config: one vote per PC is off, and the device store is never opened -------------------------------------
 const realCfg = JSON.parse(fs.readFileSync(path.resolve(__dirname, '..', 'gamemode-config.json'), 'utf8'));
 const shipped = JSON.parse(JSON.stringify(realCfg.citizenship));
