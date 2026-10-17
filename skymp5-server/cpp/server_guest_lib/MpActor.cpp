@@ -95,6 +95,24 @@ struct MpActor::Impl
 
   std::optional<std::chrono::steady_clock::time_point> potionCooldownStart;
   uint32_t potionCooldownBaseId = 0;
+
+  // EvaluateBaseSpells reads only these inputs and the load order, which does
+  // not change while the server runs. Spell list reads used to evaluate it
+  // once per learned spell, so a character with 331 spells froze the server
+  // for seconds per read (17 Oct).
+  struct BaseSpellsCache
+  {
+    bool valid = false;
+    const WorldState* worldState = nullptr;
+    uint32_t baseId = 0;
+    int32_t profileId = -1;
+    bool playersInheritBaseSpells = false;
+    std::vector<FormDesc> templateChain;
+    std::string appearanceDump;
+    std::vector<uint32_t> spells;       // EvaluateBaseSpells order
+    std::vector<uint32_t> sortedSpells; // for binary_search
+  };
+  BaseSpellsCache baseSpellsCache;
 };
 
 namespace {
@@ -1032,11 +1050,77 @@ bool MpActor::IsSpellLearned(const uint32_t spellId) const
 
 bool MpActor::IsSpellLearnedFromBase(const uint32_t spellId) const
 {
-  const auto spells = GetBaseSpells();
-  return std::find(spells.begin(), spells.end(), spellId) != spells.end();
+  if (!RefreshBaseSpellsCache()) {
+    return false;
+  }
+  const auto& sorted = pImpl->baseSpellsCache.sortedSpells;
+  return std::binary_search(sorted.begin(), sorted.end(), spellId);
 }
 
 std::vector<uint32_t> MpActor::GetBaseSpells() const
+{
+  if (!RefreshBaseSpellsCache()) {
+    return {};
+  }
+  return pImpl->baseSpellsCache.spells;
+}
+
+std::vector<uint32_t> MpActor::GetSpellsLearnedDuringGameplay() const
+{
+  std::vector<uint32_t> spells = GetSpellList();
+  if (!RefreshBaseSpellsCache()) {
+    return spells;
+  }
+  const auto& sorted = pImpl->baseSpellsCache.sortedSpells;
+  spells.erase(std::remove_if(spells.begin(), spells.end(),
+                              [&](uint32_t spellId) {
+                                return std::binary_search(
+                                  sorted.begin(), sorted.end(), spellId);
+                              }),
+               spells.end());
+  return spells;
+}
+
+bool MpActor::RefreshBaseSpellsCache() const
+{
+  auto& cache = pImpl->baseSpellsCache;
+
+  const WorldState* worldState = GetParent();
+  if (!worldState || !worldState->HasEspm()) {
+    cache.valid = false;
+    return false;
+  }
+
+  const auto& changeForm = ChangeForm();
+  const bool playersInheritBaseSpells = worldState->PlayersInheritBaseSpells();
+
+  if (cache.valid && cache.worldState == worldState &&
+      cache.baseId == GetBaseId() &&
+      cache.profileId == changeForm.profileId &&
+      cache.playersInheritBaseSpells == playersInheritBaseSpells &&
+      cache.templateChain == changeForm.templateChain &&
+      cache.appearanceDump == changeForm.appearanceDump) {
+    return true;
+  }
+
+  cache.spells = EvaluateBaseSpells();
+  cache.sortedSpells = cache.spells;
+  std::sort(cache.sortedSpells.begin(), cache.sortedSpells.end());
+  cache.sortedSpells.erase(
+    std::unique(cache.sortedSpells.begin(), cache.sortedSpells.end()),
+    cache.sortedSpells.end());
+
+  cache.worldState = worldState;
+  cache.baseId = GetBaseId();
+  cache.profileId = changeForm.profileId;
+  cache.playersInheritBaseSpells = playersInheritBaseSpells;
+  cache.templateChain = changeForm.templateChain;
+  cache.appearanceDump = changeForm.appearanceDump;
+  cache.valid = true;
+  return true;
+}
+
+std::vector<uint32_t> MpActor::EvaluateBaseSpells() const
 {
   std::vector<uint32_t> result;
 

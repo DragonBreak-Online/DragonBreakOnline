@@ -687,16 +687,10 @@ VarValue PapyrusActor::GetSpellCount(VarValue self,
     return VarValue(0);
   }
 
-  std::vector<uint32_t> spellList = actor->GetSpellList();
-
-  int countLearnedDuringGameplay = 0;
-  for (auto spellId : spellList) {
-    if (!actor->IsSpellLearnedFromBase(spellId)) {
-      countLearnedDuringGameplay++;
-    }
-  }
-
-  return VarValue(countLearnedDuringGameplay);
+  // One base spell evaluation per call: evaluating it for every spell made a
+  // whole-list read cost N squared record parses (17 Oct)
+  return VarValue(
+    static_cast<int>(actor->GetSpellsLearnedDuringGameplay().size()));
 }
 
 VarValue PapyrusActor::GetNthSpell(VarValue self,
@@ -716,15 +710,8 @@ VarValue PapyrusActor::GetNthSpell(VarValue self,
     return VarValue::None();
   }
 
-  std::vector<uint32_t> spellList = actor->GetSpellList();
-
-  std::vector<uint32_t> spellsLearnedDuringGameplay;
-  spellsLearnedDuringGameplay.reserve(spellList.size());
-  for (auto spellId : spellList) {
-    if (!actor->IsSpellLearnedFromBase(spellId)) {
-      spellsLearnedDuringGameplay.push_back(spellId);
-    }
-  }
+  const std::vector<uint32_t> spellsLearnedDuringGameplay =
+    actor->GetSpellsLearnedDuringGameplay();
 
   if (n >= static_cast<int>(spellsLearnedDuringGameplay.size())) {
     return VarValue::None();

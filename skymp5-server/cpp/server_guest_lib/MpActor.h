@@ -36,6 +36,8 @@ public:
   bool IsSpellLearnedFromBase(uint32_t spellId) const;
   std::vector<uint32_t> GetSpellList() const;
   std::vector<uint32_t> GetBaseSpells() const; // NPC_ record + race spells
+  // GetSpellList() without the spells GetBaseSpells() gives, in the same order
+  std::vector<uint32_t> GetSpellsLearnedDuringGameplay() const;
 
   std::unique_ptr<const Appearance> GetAppearance() const;
   const std::string& GetAppearanceAsJson();
@@ -216,6 +218,12 @@ private:
   struct Impl;
   std::shared_ptr<Impl> pImpl;
   bool factionsLoaded = false;
+
+  // Base spells come from the NPC_, template and RACE records, so they are
+  // evaluated again only when the race, template chain or profile changes.
+  // Returns false without espm, when there are no base spells.
+  bool RefreshBaseSpellsCache() const;
+  std::vector<uint32_t> EvaluateBaseSpells() const;
 
   void SendAndSetDeathState(bool isDead, bool shouldTeleport);
 
