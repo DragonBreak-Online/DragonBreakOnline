@@ -118,6 +118,16 @@ for (const [mult, expect] of [[2, 'ALERT'], [3, 'ALERT'], [1.5, 'SHADOW'], [1.25
   note('a Voice hit every 9 s from a friend or a hosted NPC, running 1900 u/s', got);
   ok(got === 'ALERT', 'a Voice hit every 9 s does not keep a 1900 u/s runner exempt: one exemption a minute', acLines(H).slice(0, 2));
 }
+// a character named 'shadow Wolf' (naming.js allows it): its live flag must not read as a shadow one to dbo-monitor
+{
+  const { W, H } = setup({});
+  H.players.get(A).name = 'shadow Wolf';
+  drive(H, W, A, 30, (s) => 2000 * s);
+  const line = acLines(H).find((l) => /^ANTICHEAT speed_sustained /.test(l)) || '';
+  const AC = require(F.MODULE);
+  const m = new RegExp(AC.LOGGER_RX_SRC + AC.LINE_RX.source).exec(F.LOGGER + '[gamemode] ' + line);
+  ok(!!m && m[2] === undefined && /^Shadow Wolf #PGDB$/.test(m[3]), "a live flag of a character named 'shadow Wolf' is written 'Shadow Wolf', so no reader takes it for a shadow line", line);
+}
 // a spoofed mount: the cheater activates a horse it hosts and drags it along (class mount, limit 850 = the alert speed)
 {
   const { W, H } = setup({});

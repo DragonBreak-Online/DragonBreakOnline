@@ -363,7 +363,10 @@ module.exports = (api) => {
     const body = scrub(L.text || '', 600);
     L.text = body;
     const who = `${name} (profile ${prof}${staff ? ', staff' : ''})`;
-    log(`ANTICHEAT ${L.kind} ${L.shadow ? 'shadow ' : ''}${who}: ${body}${folded ? ` (${folded} more folded)` : ''}`);
+    // A character may be named 'shadow Wolf' (naming.js allows a lowercase first word): written as is, every live flag of
+    // it reads as a shadow one to dbo-monitor, which posts none. The line spells it 'Shadow Wolf'; the TAG is the identity
+    const lineWho = /^shadow /.test(who) ? `S${who.slice(1)}` : who;
+    log(`ANTICHEAT ${L.kind} ${L.shadow ? 'shadow ' : ''}${lineWho}: ${body}${folded ? ` (${folded} more folded)` : ''}`);
     ST.recent.push({ t, a, kind: L.kind, shadow: L.shadow, tag: tagOf(a), name, text: body.slice(0, 160), folded });
     if (ST.recent.length > 100) ST.recent.shift();
     if (L.shadow || !isOn('alerts')) return;
