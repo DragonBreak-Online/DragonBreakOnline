@@ -362,7 +362,10 @@ module.exports = (api) => {
   const SUSPENDED = new Set((CFG.suspendedSpells || []).map(idOf).filter(Boolean));
   const suspended = (spellId) => SUSPENDED.has(Number(spellId) >>> 0);
   const nameOf = (spellId) => { const sp = classifySpell(spellId); return sp ? sp.name : 'That spell'; };
-  const heldLine = (spellId) => `${nameOf(spellId)} is held back for a short while; it stays in your spellbook.`;
+  // suspendedReasons { desc: why } says why a spell is held, in the line its caster reads (Nate, 17 Oct: the mount summons)
+  const HELD_WHY = new Map(Object.entries(CFG.suspendedReasons && typeof CFG.suspendedReasons === 'object' ? CFG.suspendedReasons : {})
+    .filter(([k]) => !k.startsWith('_')).map(([k, v]) => [idOf(k), String(v || '').trim()]).filter(([k, v]) => k && v));
+  const heldLine = (spellId) => { const why = HELD_WHY.get(Number(spellId) >>> 0); return `${nameOf(spellId)} is held back for a short while${why ? ` (${why})` : ''}; it stays in your spellbook.`; };
   // A held spell the engine had but the spellbook does not (known before study began, or given outside it) is listed here,
   // so it goes back into the engine once it is no longer held
   const HELD = 'private.dboHeldSpells';

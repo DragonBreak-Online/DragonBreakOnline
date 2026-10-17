@@ -601,6 +601,10 @@ check('closing the panel closes widget 44', out.closed.some((c) => c[0] === OTHE
   cmd('teach', TCH);
   check('/teach does not offer it', /You know no spell/.test(said(TCH)), said(TCH));
   check('a class does not hand it out', globalThis.__dboSpellsClassOffer(TCH, N, eq, 'k1') === false && /held back/.test(said(N)), said(N));
+  // suspendedReasons: the hold line says why (17 Oct, the mount summons)
+  load({ suspendedSpells: [EQ[1]], suspendedReasons: { _c: 'a comment', [EQ[1]]: 'testing the reason' }, teachMinRank: 0 });
+  check('a held spell with a reason names it in the hold line', (() => { known(L).add(eq); return globalThis.__dboSpellsHoldSuspended(L) === 1 && /Equilibrium is held back for a short while \(testing the reason\); it stays in your spellbook/.test(said(L)); })(), said(L));
+  load({ suspendedSpells: [EQ[1]], teachMinRank: 0 });
   check('removedSpells still strips Transmute the same way', (() => { known(N).add(TRANSMUTE_ID); return globalThis.__dboSpellsStripRemoved(N) === 1 && !known(N).has(TRANSMUTE_ID); })());
   // lifted: taken off the list
   out.audits.length = 0;
