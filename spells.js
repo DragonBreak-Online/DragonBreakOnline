@@ -35,6 +35,7 @@
 //   private.dboPrepared      [spell desc...]                           the prepared ones, at most `prepared`
 //   private.dboTomeBoughtAt  ms of the last shop purchase
 //   private.dboTomeWrites    { rank: ms } the last tome written of each rank
+//   private.dboSpellTrims    { id: { at, by, why, removed, ... } } the staff trims applied to the character (staffTrims below)
 
 const fs = require('fs');
 const path = require('path');
@@ -1514,6 +1515,178 @@ module.exports = (api) => {
       .map((t) => ({ spell: t.name, school: t.school, rank: t.rank, rankName: RANKS[t.rank],
         where: shop.has(t.bookId) && soldHere(R, t) ? 'Sold by the Synod in Bruma (members of the Synod or a College)' : soldIn(R, t) ? `Sold in ${soldIn(R, t)}` : 'Found, not sold' }));
   };
+
+  // ---- staff trims (Jake, 17 Oct 2026): a staff removal of learned spells written in config, applied once per id ----------
+  // Why: the admin panel's Give all spells (adminSystem.ts) adds every tome spell, and reading a learned list costs the fork
+  // N squared (PapyrusActor GetSpellCount and GetNthSpell run IsSpellLearnedFromBase on every spell, and MpActor reads the
+  // base spells again each time). A character with 331 spells froze the main loop about 4.5 s a read (17 Oct).
+  // spells.staffTrims = [{ id, actor: 'ff001473', profile, keepSpells: [desc...], removeSpells: [desc...], keepShouts?: [],
+  // by, why }]. At load, and so at every hot reload, each entry not yet applied to its character removes every spell of
+  // removeSpells (computed offline from the character's saved form and a backup from before the grant) that is not in
+  // keepSpells, the spellbook (private.dboStudied), the prepared list or on loan from a teacher. It uses Actor.RemoveSpell,
+  // the engine's own path, which also tells the client when the character is online, trimBatch (20) spells a run every
+  // trimEveryMs (1000), so the removal never holds the loop. The learned list is never read. A character who is offline is
+  // trimmed on the saved form (the engine keeps every saved character loaded and drops the client message while nobody
+  // plays it), so the next login reads the short list; offline: 'wait' waits instead until they have been online for
+  // trimSettleMs. The removed spells also leave private.dboHeldSpells, so the end of a suspension does not give them back.
+  // keepShouts [] takes off the all-shouts grant (private.dboAllShouts, the only shout state the server keeps: the client is
+  // taught them at login); the grant cannot be kept in part, so a non-empty list leaves it on; no keepShouts leaves shouts
+  // alone. One audit line per batch and a summary. The result is kept on the character (private.dboSpellTrims[id]), so the
+  // entry never applies again (a new trim needs a new id). A bad entry (no id, an actor that is not a player character, a
+  // profile that does not match it, a desc this load order cannot resolve or that is not a spell) is skipped with a log
+  // line and stays unapplied. Only the named character is touched.
+  const TRIMS = 'private.dboSpellTrims';
+  const ALL_SHOUTS = 'private.dboAllShouts';
+  const TRIM_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$/;
+  const TRIM_BATCH = Math.max(1, Math.min(50, Math.floor(Number(CFG.trimBatch) || 20)));
+  const TRIM_EVERY_MS = Math.max(250, Number(CFG.trimEveryMs) || 1000);
+  const TRIM_SETTLE_MS = Math.max(0, Number(CFG.trimSettleMs) || 20000);
+  const trimText = (s, n) => String(s == null ? '' : s).replace(/<[@#][!&]?\d+>/g, '').replace(/\d{15,22}/g, '').replace(/\s+/g, ' ').trim().slice(0, n || 80);
+  // id -> the run in progress; kept over a reload, so a reload mid-run goes on where it was. One timer for every run
+  const trimRuns = globalThis.__dboSpellTrimRuns instanceof Map ? globalThis.__dboSpellTrimRuns : (globalThis.__dboSpellTrimRuns = new Map());
+  const trimSeen = globalThis.__dboSpellTrimSeen instanceof Map ? globalThis.__dboSpellTrimSeen : (globalThis.__dboSpellTrimSeen = new Map()); // actor -> first seen online
+  if (globalThis.__dboSpellTrimTimer) { clearInterval(globalThis.__dboSpellTrimTimer); globalThis.__dboSpellTrimTimer = null; }
+  // A saved character: reading a form that does not exist throws
+  const trimExists = (a) => { try { mp.get(a, 'profileId'); return true; } catch (e) { return false; } };
+  const trimsOf = (a) => { const r = get(a, TRIMS, null); return r && typeof r === 'object' && !Array.isArray(r) ? r : {}; };
+  const isSpellRec = (id) => { const r = lookup(id); return !!r && String(r.record.type) === 'SPEL'; };
+  const trimCheck = (x) => {
+    if (!x || typeof x !== 'object' || Array.isArray(x)) return { error: 'not an object' };
+    const id = typeof x.id === 'string' ? x.id.trim() : '';
+    if (!TRIM_ID.test(id)) return { error: id ? 'a bad id (letters, digits and . _ : - only, at most 64)' : 'no id' };
+    const hexStr = String(x.actor == null ? '' : x.actor).trim().toLowerCase().replace(/^0x/, '');
+    const actor = /^[0-9a-f]{1,8}$/.test(hexStr) ? parseInt(hexStr, 16) >>> 0 : 0;
+    if (actor < 0xff000000) return { id, error: 'actor is not a player character id (ff......)' };
+    const profile = typeof x.profile === 'number' || (typeof x.profile === 'string' && /^\d+$/.test(x.profile)) ? Number(x.profile) : NaN;
+    if (!Number.isInteger(profile) || profile < 0) return { id, error: 'no profile' };
+    if (!Array.isArray(x.keepSpells)) return { id, error: 'keepSpells is not a list' };
+    if (!Array.isArray(x.removeSpells) || !x.removeSpells.length) return { id, error: 'removeSpells is not a list of spells' };
+    if (x.keepShouts !== undefined && !Array.isArray(x.keepShouts)) return { id, error: 'keepShouts is not a list' };
+    if (x.offline !== undefined && x.offline !== 'apply' && x.offline !== 'wait') return { id, error: "offline is neither 'apply' nor 'wait'" };
+    const keep = new Set();
+    for (const d of x.keepSpells) { const s = idOf(d); if (!s) return { id, error: `keep spell ${trimText(d, 60)} is not in this load order` }; keep.add(s); }
+    const remove = [];
+    for (const d of x.removeSpells) {
+      const s = idOf(d);
+      if (!s) return { id, error: `spell ${trimText(d, 60)} is not in this load order` };
+      if (!remove.includes(s)) remove.push(s);
+    }
+    return { id, actor, profile, keep, remove, keepShouts: x.keepShouts, wait: x.offline === 'wait', by: trimText(x.by), why: trimText(x.why, 160) };
+  };
+  // A run: the spells to take off, decided once from the config and the saved character, never from the learned list
+  const trimStart = (r) => {
+    const a = r.actor;
+    if (!trimExists(a)) return { error: `character ${a.toString(16)} not found` };
+    const pid = Number(get(a, 'profileId', NaN));
+    if (pid !== r.profile) return { error: `character ${a.toString(16)} is of profile ${Number.isFinite(pid) ? pid : 'unknown'}, not ${r.profile}` };
+    // Each listed form must be a spell in this load order (a record read each, only while the entry is unapplied)
+    const notSpell = r.remove.find((s) => !isSpellRec(s));
+    if (notSpell !== undefined) return { error: `${descOf(notSpell) || notSpell.toString(16)} is not a spell` };
+    const book = new Set([].concat(knownIds(a), preparedIds(a)).map((s) => s >>> 0));
+    const list = [], spared = [];
+    for (const s of r.remove) {
+      if (r.keep.has(s)) continue;
+      if (book.has(s) || onLoan(a, s)) { spared.push(s); continue; }
+      list.push(s);
+    }
+    const old = trimRuns.get(r.id);
+    const carry = old && old.actor === a ? old : null;
+    const run = { id: r.id, entry: r, actor: a, list, spared, i: 0, batch: 0, removed: carry ? carry.removed : [], absent: carry ? carry.absent : [],
+      failed: [], stuck: 0, startedAt: carry ? carry.startedAt : Date.now(), wait: r.wait };
+    if (carry) { const done = new Set([].concat(run.removed, run.absent)); run.list = list.filter((s) => !done.has(s)); }
+    trimRuns.set(r.id, run);
+    return { run };
+  };
+  const trimFinish = (run) => {
+    trimRuns.delete(run.id);
+    const a = run.actor, r = run.entry;
+    if (run.failed.length) {
+      log(`spells: staff trim ${run.id}: ${run.failed.length} spell(s) could not be removed (${run.lastError || 'no reason'}); it stays unapplied and runs again at the next load`);
+      audit(`SPELL TRIM ${run.id} ${who(a)} stopped: ${run.removed.length} removed, ${run.failed.length} failed; runs again at the next load`);
+      return;
+    }
+    // The held list: a removed spell is not given back when its suspension ends
+    const gone = new Set(r.remove.filter((s) => !r.keep.has(s) && !run.spared.includes(s)));
+    const held = heldOf(a);
+    const heldDropped = held.filter((s) => gone.has(s));
+    if (heldDropped.length) set(a, HELD, held.filter((s) => !gone.has(s)).map(descOf).filter(Boolean));
+    let shouts = 'untouched';
+    if (Array.isArray(r.keepShouts)) {
+      const granted = get(a, ALL_SHOUTS, null) === true;
+      if (!granted) shouts = 'none granted';
+      else if (r.keepShouts.length) { shouts = 'grant kept (it cannot be kept in part)'; log(`spells: staff trim ${run.id}: keepShouts lists shouts, so the all-shouts grant stays on`); }
+      else shouts = set(a, ALL_SHOUTS, null) ? 'grant taken off' : 'grant could not be taken off';
+    }
+    const rec = { at: Date.now(), by: r.by, why: r.why, removed: run.removed.map(descOf), notLearned: run.absent.length, spared: run.spared.map(descOf),
+      heldDropped: heldDropped.map(descOf), shouts, ms: Date.now() - run.startedAt };
+    set(a, TRIMS, Object.assign({}, trimsOf(a), { [run.id]: rec }));
+    audit(`SPELL TRIM ${run.id} ${who(a)} done: ${run.removed.length} spell(s) removed, ${run.absent.length} not learned, ${run.spared.length} kept as spellbook, prepared or on loan${heldDropped.length ? `, ${heldDropped.length} off the held list (${rec.heldDropped.join(', ')})` : ''}, shouts: ${shouts}; by ${r.by || 'staff'}${r.why ? `: ${r.why}` : ''}`);
+    log(`spells: staff trim ${run.id} applied to ${a.toString(16)}: ${run.removed.length} removed, ${run.absent.length} not learned, ${run.spared.length} spared, ${heldDropped.length} held dropped, shouts ${shouts}, ${run.batch} batch(es)`);
+    if (run.removed.length && onlineActors().map((x) => x >>> 0).includes(a)) {
+      personal(a, `The staff have taken ${plural(run.removed.length, 'spell')} given by the admin panel's Give all spells off this character: a spell list that long slowed the whole server. The spells you had before are kept.`);
+    }
+  };
+  // One batch a run, of the first run that can go: RemoveSpell costs one base-spell read, not a read of the list
+  const trimTick = () => {
+    const online = new Set(onlineActors().map((x) => x >>> 0));
+    for (const k of trimSeen.keys()) if (!online.has(k)) trimSeen.delete(k);
+    for (const k of online) if (!trimSeen.has(k)) trimSeen.set(k, Date.now());
+    for (const run of trimRuns.values()) {
+      if (run.wait && !(online.has(run.actor) && Date.now() - trimSeen.get(run.actor) >= TRIM_SETTLE_MS)) continue;
+      if (run.i >= run.list.length) { trimFinish(run); break; }
+      const ids = run.list.slice(run.i, run.i + TRIM_BATCH);
+      const t0 = Date.now();
+      const self = { type: 'form', desc: descOf(run.actor) };
+      const gone = [], absent = [], failed = [];
+      for (const s of ids) {
+        let ok;
+        try { ok = mp.callPapyrusFunction('method', 'Actor', 'RemoveSpell', self, [{ type: 'espm', desc: descOf(s) }]) === true; }
+        catch (e) { failed.push(s); run.lastError = e.message; continue; }
+        (ok ? gone : absent).push(s);
+      }
+      // Nothing went through: the character is not there right now. The same batch again next run, then give up for this load
+      if (failed.length === ids.length) {
+        if (++run.stuck >= 3) { run.failed = failed; trimFinish(run); }
+        break;
+      }
+      run.stuck = 0; run.i += ids.length; run.batch++;
+      run.removed.push(...gone); run.absent.push(...absent); run.failed.push(...failed);
+      const total = Math.ceil(run.list.length / TRIM_BATCH);
+      audit(`SPELL TRIM ${run.id} ${who(run.actor)} batch ${run.batch}/${total} (${Date.now() - t0} ms): ${gone.length} removed${gone.length ? ` (${gone.map(descOf).join(', ')})` : ''}${absent.length ? `, ${absent.length} not learned` : ''}${failed.length ? `, ${failed.length} failed` : ''}`);
+      if (run.i >= run.list.length) trimFinish(run);
+      break;
+    }
+    if (!trimRuns.size && globalThis.__dboSpellTrimTimer) { clearInterval(globalThis.__dboSpellTrimTimer); globalThis.__dboSpellTrimTimer = null; }
+  };
+  // Starts every new entry of the config. Never throws: a load must not fail over a staff entry
+  const staffTrims = () => {
+    const out = { started: [], before: 0, skipped: [] };
+    const list = CFG.staffTrims;
+    if (list === undefined || list === null) return out;
+    if (!Array.isArray(list)) { log('spells: config staffTrims is not a list; nothing trimmed'); return out; }
+    const seenIds = new Set();
+    list.forEach((x, i) => {
+      try {
+        const r = trimCheck(x);
+        if (r.error) { out.skipped.push({ at: i, id: r.id || '', error: r.error }); log(`spells: staff trim ${r.id ? `${r.id} ` : ''}(entry ${i + 1}) skipped: ${r.error}`); return; }
+        if (seenIds.has(r.id)) { out.skipped.push({ at: i, id: r.id, error: 'a second entry with this id' }); log(`spells: staff trim ${r.id} (entry ${i + 1}) skipped: a second entry with this id`); return; }
+        seenIds.add(r.id);
+        if (trimExists(r.actor) && trimsOf(r.actor)[r.id]) { trimRuns.delete(r.id); out.before++; return; }
+        const s = trimStart(r);
+        if (s.error) { trimRuns.delete(r.id); out.skipped.push({ at: i, id: r.id, error: s.error }); log(`spells: staff trim ${r.id} (entry ${i + 1}) skipped: ${s.error}`); return; }
+        out.started.push(s.run);
+      } catch (e) { out.skipped.push({ at: i, id: '', error: e.message }); log(`spells: staff trim (entry ${i + 1}) failed`, e.stack || e.message); }
+    });
+    // A run whose entry left the config stops
+    for (const id of [...trimRuns.keys()]) if (!seenIds.has(id)) trimRuns.delete(id);
+    if (trimRuns.size) globalThis.__dboSpellTrimTimer = setInterval(() => { try { trimTick(); } catch (e) { log('spells: staff trim tick failed', e.stack || e.message); } }, TRIM_EVERY_MS);
+    if (out.started.length || out.skipped.length) {
+      log(`spells: staff trims: ${out.started.length} started (${out.started.map((run) => `${run.id}: ${run.list.length} to remove from ${run.actor.toString(16)}, ${run.spared.length} spared${run.wait ? ', waits for login' : ''}`).join('; ') || 'none'}), ${out.before} applied before, ${out.skipped.length} skipped`);
+    }
+    return out;
+  };
+  globalThis.__dboSpellsStaffTrims = () => [...trimRuns.values()].map((run) => ({ id: run.id, actor: run.actor, left: run.list.length - run.i, removed: run.removed.length, wait: run.wait }));
+  try { staffTrims(); } catch (e) { log('spells: staff trims failed', e.stack || e.message); }
 
   const R0 = regions();
   log(`spells ${CFG.enabled ? 'on' : 'off'}: ${TOMES.size} tomes known, ${STUDY_POINTS.length} study point(s), ${SHOP.length} tomes in the Synod shop, ${MAXP()} prepared, changed in ${COLLEGE_CELLS.size} college cell(s)${R0 ? `, ${SHOP.filter((t) => soldHere(R0, t)).length} stocked for ${R0.provinceName(CFG.shopProvince)}` : ''}`);
