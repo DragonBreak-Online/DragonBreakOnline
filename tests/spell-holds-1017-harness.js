@@ -38,5 +38,18 @@ for (const [d, what] of Object.entries(MOUNTS)) {
 }
 check('Conjure Ent (Summer Druid Armor Set) held with a reason', held.includes('5e31:Summer Druid Armor Set.esp') && /crash/.test(reasons['5e31:Summer Druid Armor Set.esp'] || ''));
 
+// Summerset Isles' joke summons, removed for lore (Nate's standing rule; 17 Oct)
+const JOKES = {
+  '685735:summersetisles.esp': 'SummonTolfdirSpell (a bloody skeleton named Tolfdir)',
+  'c3cd49:summersetisles.esp': 'SummonTolfdirSpell2',
+  'e30712:summersetisles.esp': 'SummonHeroOfSheoCharlesSpell (a fancy mudcrab)',
+  '14c8bc:summersetisles.esp': 'SummonBabyDaedricTableSpell',
+  '99ccc8:summersetisles.esp': 'SummonMimicChestSSISpell',
+  '99ccc3:summersetisles.esp': 'SummonBookSSISpell (mimic book)',
+  '99ccc2:summersetisles.esp': 'SummonOrbSSISpell (angry orb)',
+  '68572b:summersetisles.esp': 'SummonSlugSpell',
+};
+for (const [d, what] of Object.entries(JOKES)) check(`joke summon removed: ${what}`, removed.includes(d));
+
 console.log(`\n${pass}/${pass + fail} passed`);
 process.exit(fail ? 1 : 0);
