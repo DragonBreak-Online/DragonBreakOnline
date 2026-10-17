@@ -1,5 +1,21 @@
 [
   {
+    "title": "More spells held or removed",
+    "date": "2026-10-17",
+    "version": "Hotfix",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Spells",
+        "items": [
+          "Incite Hysteria, Split the Mind, Blinding Mist, Shroud of Endurance and Shroud of Fortitude are held back for now: their effect on other people and creatures only happened on the caster's own screen. They stay in your spellbook.",
+          "The unlocking spells (Unlock Container and Open) are held back for now: locks are kept by the server, and these spells only work on the caster's own screen.",
+          "Two more joke summons have left the realm's magic: Sir Roderic the slaughterfish and the jar bomb."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Draugr, summons and new spells",
     "date": "2026-10-17",
     "version": "Hotfix",
