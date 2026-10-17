@@ -183,6 +183,20 @@ const HouseholdPane = ({ court, household, busy, act }: { court: CourtView; hous
   );
 };
 
+// Leaving your own court (server court.js courtResign): the office seat, then the household; asked twice
+const StepDown = ({ court, busy, act }: { court: CourtView; busy: boolean; act: JournalTabProps['act'] }) => {
+  const [sure, setSure] = useState(false);
+  useEffect(() => { setSure(false); }, [court.id]);
+  if (!sure) return <button type="button" className="journal__button journal__button--small" disabled={busy} onClick={() => setSure(true)}>Step down</button>;
+  return (
+    <span className="court__note">
+      Leave the court of {court.name}, your post and the household? Only its ruler can take you back.{' '}
+      <button type="button" className="journal__button journal__button--small" disabled={busy} onClick={() => { setSure(false); act('dbo:courtResign', court.id); }}>Step down</button>
+      <button type="button" className="journal__button journal__button--small" onClick={() => setSure(false)}>Stay</button>
+    </span>
+  );
+};
+
 export const CourtTab = ({ section, busy, act }: JournalTabProps<CourtSection>) => {
   const s = section || { staff: false, outright: false, courts: [], selected: '', offers: [] };
   const [zone, setZone] = useState(s.selected || (s.courts[0] ? s.courts[0].id : ''));
@@ -209,6 +223,7 @@ export const CourtTab = ({ section, busy, act }: JournalTabProps<CourtSection>) 
         {court ? (
           <>
             <h2 className="court__title">{court.kind === 'region' ? 'Court of ' : ''}{court.name}</h2>
+            {court.mine && court.household && court.household.myRank >= 0 && (court.household.ranks[court.household.myRank] || { role: '' }).role !== 'leader' ? <StepDown court={court} busy={busy} act={act} /> : null}
             {court.treasury !== null ? <p className="court__muted">The treasury holds {court.treasury} gold.</p> : null}
             {court.tax ? (
               <div className="court__tax">
