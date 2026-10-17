@@ -47,26 +47,45 @@ export class FovService extends ClientListener {
     this.controller.on("browserMessage", (e) => this.onBrowserMessage(e));
   }
 
-  // The F3 slider: each step goes to the camera at once; the saved file is the page's to write (ui.fov)
+  // The F3 slider: each step goes to the camera on the next frame; the saved file is the page's to write (ui.fov).
+  // browserMessage arrives as a tick task, where Papyrus natives (Utility.wait and setINIFloat, Ui.isMenuOpen, the SKSE
+  // Camera natives) throw "can't be called in this context", so "set" and "reset" run on the next update, as the
+  // admin menu's refresh does. Steps that arrive before that update are applied once, with the newest value.
   private onBrowserMessage(e: BrowserMessageEvent): void {
     if (e.arguments[0] !== FOV_MESSAGE) return;
     const what = String(e.arguments[1] ?? "");
     if (what === "set") {
       const v = Number(e.arguments[2]);
       if (!saneFov(v)) return;
-      this.world = this.first = Math.round(v);
-      this.apply("the slider", false);
-      const token = ++this.sliderToken;
-      this.later(SLIDER_REST_S, "the slider rested", () => token === this.sliderToken);
+      this.onNextUpdate(() => {
+        this.world = this.first = Math.round(v);
+        this.apply("the slider", false);
+        const token = ++this.sliderToken;
+        this.later(SLIDER_REST_S, "the slider rested", () => token === this.sliderToken);
+      });
     } else if (what === "reset") {
-      this.world = this.launcherWorld;
-      this.first = this.launcherFirst;
-      ++this.sliderToken;
-      this.apply("reset to the launcher's value");
-      this.tellPage();
+      this.onNextUpdate(() => {
+        this.world = this.launcherWorld;
+        this.first = this.launcherFirst;
+        ++this.sliderToken;
+        this.apply("reset to the launcher's value");
+        this.tellPage();
+      });
     } else if (what === "query") {
       this.tellPage();
     }
+  }
+
+  // The newest slider request runs once on the next update; one still waiting is replaced
+  private onNextUpdate(f: () => void): void {
+    const queued = this.sliderPending !== null;
+    this.sliderPending = f;
+    if (queued) return;
+    this.controller.once("update", () => {
+      const run = this.sliderPending;
+      this.sliderPending = null;
+      if (run) run();
+    });
   }
 
   private tellPage(): void {
@@ -189,6 +208,7 @@ export class FovService extends ClientListener {
   private launcherWorld: number | null = null;
   private launcherFirst: number | null = null;
   private sliderToken = 0;
+  private sliderPending: (() => void) | null = null;
   private lastBounce = 0;
   private world: number | null = null;
   private first: number | null = null;
