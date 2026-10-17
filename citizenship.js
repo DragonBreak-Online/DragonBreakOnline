@@ -188,6 +188,13 @@ module.exports = (api) => {
     }
     return out;
   };
+  // Why an auto hold counts this character: the factions based there and the offices held, for staff
+  const autoWhy = (a, z) => {
+    const out = guildsOf(a).filter((g) => factionZone(g) === z.id).map((g) => String(g.name || g.id));
+    const pid = Number(profileOf(a));
+    if (pid >= 0) for (const o of z.officials || []) if (seated(z, o).includes(pid)) out.push(`its ${o} seat`);
+    return out.join(', ');
+  };
   // Every hold of the character, Primary first: { zone, since, how, auto }
   const holdsOf = (a) => {
     const list = explicit(a).map((h) => ({ zone: h.zone, since: h.since, how: h.how, auto: false }));
@@ -290,7 +297,10 @@ module.exports = (api) => {
   const revoke = (by, zid, actor) => {
     if (!isLeadStaff(by)) return { error: 'Only a Lead GM or above revokes a citizenship.' };
     const z = holdOf(zid); const e = entryOf(actor);
-    if (!z || !e || !explicit(actor).some((h) => h.zone === z.id)) return { error: 'That character holds no such citizenship, or holds it through a faction.' };
+    if (z && autoHolds(actor).includes(z.id) && !explicit(actor).some((h) => h.zone === z.id)) {
+      return { error: `${nameNow(actor, e ? e.name : '')} is a citizen of ${ofPlace(z.name)} through ${autoWhy(actor, z) || 'a faction or court based there'}. It ends when they leave it.` };
+    }
+    if (!z || !e || !explicit(actor).some((h) => h.zone === z.id)) return { error: 'That character holds no such citizenship.' };
     e.holds = e.holds.filter((h) => h.zone !== z.id); save();
     audit(`CITIZEN STAFF ${who(by)} revoked the citizenship of ${z.name} from ${e.name} (character ${hex(actor)})`);
     tell(actor, `Your citizenship of ${ofPlace(z.name)} was revoked by the staff.`);
@@ -1137,6 +1147,7 @@ module.exports = (api) => {
     strikevote: (a, z, x) => strikeVote(a, z, x),
     unstrikevote: (a, z, x) => unstrikeVote(a, z, x),
     revoke: (a, z, x) => revoke(a, z, unhex((String(x || '')))),
+    lookup: (a, z, x) => lookup(a, x),
   };
   const run = (a, zone, args) => {
     const name = String(args[0] || '');
@@ -1161,6 +1172,24 @@ module.exports = (api) => {
   onUi('close', (a, args, widgetId) => { if (Number(widgetId) === PANEL_ID) S.panels.delete(a >>> 0); });
 
   // ---- the F3 Citizen tab --------------------------------------------------------------------------------------------------
+  // Staff look up one character's citizenships (Nate, 17 Oct: a Revoke button for Lead GMs); kept per staff member until cleared
+  if (!(S.lookups instanceof Map)) S.lookups = new Map();
+  const lookup = (a, q) => {
+    if (!isLeadStaff(a)) return { error: 'Only a Lead GM or above looks up a citizenship.' };
+    if (!String(q || '').trim()) { S.lookups.delete(a >>> 0); return { text: '' }; }
+    const tg = officialTarget(String(q).trim());
+    if (tg.error) return tg;
+    if (!tg.actor || !exists(tg.actor)) return { error: `${q}: no such character.` };
+    S.lookups.set(a >>> 0, tg.actor >>> 0);
+    return { text: '' };
+  };
+  const lookupView = (a) => {
+    const t = S.lookups.get(a >>> 0);
+    if (!t || !exists(t)) return null;
+    const e = entryOf(t);
+    return { actor: hex(t), name: nameNow(t, e ? e.name : ''), tag: tagSafe(t),
+      holds: holdsOf(t).map((h) => { const z = holdOf(h.zone); return Object.assign(holdLine(h), { via: h.auto && z ? autoWhy(t, z) : '' }); }) };
+  };
   const journalView = (a) => {
     const mine = holdsOf(a).map(holdLine);
     const v = { holds: mine, maxHolds: C.maxHolds, cooldownUntil: cooldownLeft(a) ? Date.now() + cooldownLeft(a) : 0,
@@ -1180,6 +1209,7 @@ module.exports = (api) => {
         requests: liveRequests().filter((r) => r.zone === z.id).map((r) => ({ actor: hex(r.actor), name: r.name, tag: tagSafe(r.actor), at: r.at })) });
       if (v.staff && electing(z)) v.staff.push({ zone: z.id, name: z.name, phase: E ? E.phase : 'none', endsAt: E ? Number(E.phaseEndsAt) || 0 : 0, citizens: citizenAccounts(z), threshold: EL.threshold });
     }
+    if (v.staff) v.lookup = lookupView(a);
     return v;
   };
   const sections = globalThis.__dboJournalSections || (globalThis.__dboJournalSections = {});
@@ -1261,6 +1291,6 @@ module.exports = (api) => {
   log(`citizenship ${C.enabled ? 'on' : 'off'}: ${holds().length} holds grant it, ${Object.keys(data().chars).length} characters on the rolls, ${Object.keys(data().elections).length} election(s)`);
   try { stampRunning(); } catch (e) { log('citizenship: stampRunning failed', e.message); }
 
-  return { join, grant, decline, renounce, makePrimary, revoke, staffReleases, setPolicy, register, replace, withdraw, answerInvite, vote, staffAct, strikeVote, unstrikeVote, reviewText, voterWhy, tick, advance,
+  return { join, grant, decline, renounce, makePrimary, revoke, lookup, staffReleases, setPolicy, register, replace, withdraw, answerInvite, vote, staffAct, strikeVote, unstrikeVote, reviewText, voterWhy, tick, advance,
     holdsOf, citizenOf, factionFree, citizenAccounts, canVote, noticeLogin, boardPayload, journalView, votingView, citizenshipView, data, PANEL_ID };
 };

@@ -420,6 +420,30 @@ ok(nb.grants === false && /no citizenship/.test(nb.why), 'a stronghold board say
 ok(M.revoke(COUNT, 'bruma', BJORN).error, 'a ruler cannot revoke a citizenship');
 ok(!M.revoke(STAFF, 'bruma', BJORN).error && !M.citizenOf(BJORN, 'bruma'), 'a Lead GM can');
 
+// ---- staff lookup in the F3 Citizen tab (Nate, 17 Oct: a Revoke button for Lead GMs) ------------------------------------------
+{
+  const GUARD = add(0x60, 60, 'Dreams'); online.push(GUARD);
+  officials.bruma.guard = [60];
+  ok(!M.join(GUARD, 'whiterun').error && M.citizenOf(GUARD, 'whiterun') && M.citizenOf(GUARD, 'bruma'), 'lookup: Dreams is a Whiterun citizen and, as a Bruma Guard, a Bruma one');
+  ok(M.journalView(GM).lookup === undefined && /Lead GM/.test(R(M.lookup(GM, 'Dreams'))), 'lookup: a plain GM has no lookup and is refused');
+  journalAnswers.length = 0;
+  ui.citizenJ(STAFF, ['n', 'lookup', '', 'Dreams']);
+  let lv = M.journalView(STAFF).lookup;
+  ok(lv && lv.name === 'Dreams' && lv.holds.length === 2, 'lookup: through the F3 tab the Lead GM sees both citizenships', lv);
+  const auto = lv && lv.holds.find((h) => h.zone === 'bruma');
+  ok(auto && auto.auto && /guard seat/.test(auto.via), 'lookup: Bruma is marked auto, through its guard seat', auto);
+  r = M.revoke(STAFF, 'bruma', GUARD);
+  ok(r.error && /through its guard seat/.test(r.error) && M.citizenOf(GUARD, 'bruma'), 'revoke: an auto citizenship is refused with the reason', r);
+  ui.citizenJ(STAFF, ['n', 'revoke', 'whiterun', (0x60).toString(16)]);
+  lv = M.journalView(STAFF).lookup;
+  ok(!M.citizenOf(GUARD, 'whiterun') && lv.holds.length === 1 && /no longer a citizen of Whiterun/.test(journalAnswers[journalAnswers.length - 1].text), 'revoke: the Revoke button takes Whiterun, and the lookup shows Bruma only', [lv, journalAnswers]);
+  officials.bruma.guard = [];
+  ok(!M.citizenOf(GUARD, 'bruma') && M.journalView(STAFF).lookup.holds.length === 0, 'unseated from the guard, Dreams is no Bruma citizen');
+  ok(/no character/i.test(R(M.lookup(STAFF, 'Nobody Here'))), 'lookup: an unknown name is refused');
+  ui.citizenJ(STAFF, ['n', 'lookup', '', '']);
+  ok(M.journalView(STAFF).lookup === null, 'lookup: an empty search clears it');
+}
+
 // ---- Lord Commander (coordinator's decision, 14 Oct): the commander office reads Lord Commander to players ---------------------
 const GM_SRC = fs.readFileSync(path.resolve(__dirname, '..', 'gamemode.js'), 'utf8');
 const RT = GM_SRC.slice(GM_SRC.indexOf('const RANK_TITLES = '), GM_SRC.indexOf('\n', GM_SRC.indexOf('const RANK_TITLES = ')));
