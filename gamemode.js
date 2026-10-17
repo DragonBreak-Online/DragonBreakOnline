@@ -7087,14 +7087,31 @@ const npcKindOf = (id) => {
   let tag = ''; try { tag = String(mp.get(id, 'private.npcSpawner') || ''); } catch (e) { return ''; }
   return tag.startsWith('wild:') ? (tag.split(':')[1] || '') : '';
 };
+// npcDamage.byBase { <editor id of the attacker's base>: mult } does the same by the creature itself, wherever it was spawned:
+// a spawn tag names the placement's kind, not what its leveled list rolled, so the bears of the Rift stood in wild:skeever
+// zones (wildlife-density-1017). Both apply when both match. Editor ids are looked up once per base desc.
+const npcBaseEdidCache = new Map();
+const npcBaseEdidOf = (id) => {
+  let base = ''; try { base = String(mp.get(id, 'baseDesc') || ''); } catch (e) { return ''; }
+  if (!base) return '';
+  if (npcBaseEdidCache.has(base)) return npcBaseEdidCache.get(base);
+  let edid = ''; try { const r = recordOf(mp.getIdFromDesc(base) >>> 0); edid = r && r.record ? String(r.record.editorId || '') : ''; } catch (e) { /* not a record */ }
+  if (npcBaseEdidCache.size > 4096) npcBaseEdidCache.clear();
+  npcBaseEdidCache.set(base, edid);
+  return edid;
+};
 const npcKindDamageMult = (agg, tgt, dmg) => {
-  const by = (cfg.npcDamage || {}).byKind;
-  if (!by || typeof by !== 'object' || !(dmg > 0) || agg === tgt) return 1;
+  const nd = cfg.npcDamage || {};
+  const by = nd.byKind, byBase = nd.byBase;
+  const hasKind = by && typeof by === 'object', hasBase = byBase && typeof byBase === 'object' && Object.keys(byBase).some((k) => !k.startsWith('_'));
+  if ((!hasKind && !hasBase) || !(dmg > 0) || agg === tgt) return 1;
   if (profileOf(agg) >= 0 || profileOf(tgt) < 0) return 1;
-  const kind = npcKindOf(agg);
-  if (!kind || !Object.prototype.hasOwnProperty.call(by, kind)) return 1;
-  const m = Number(by[kind]);
-  return m > 0 ? m : 1;
+  let m = 1;
+  const kind = hasKind ? npcKindOf(agg) : '';
+  if (kind && Object.prototype.hasOwnProperty.call(by, kind)) { const v = Number(by[kind]); if (v > 0) m *= v; }
+  const edid = hasBase ? npcBaseEdidOf(agg) : '';
+  if (edid && Object.prototype.hasOwnProperty.call(byBase, edid)) { const v = Number(byBase[edid]); if (v > 0) m *= v; }
+  return m;
 };
 // ---- NPC damage by dungeon difficulty, and NPC spells ------------------------------------------------------------------
 // gamemode-config npcDamage.byDifficulty { story, normal, hard, nightmare: mult } scales every hit (weapon, fists, spells) an
