@@ -1,5 +1,28 @@
 [
   {
+    "title": "Draugr, summons and new spells",
+    "date": "2026-10-17",
+    "version": "Hotfix",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Draugr",
+        "items": [
+          "Draugr are no longer far tougher than other foes of their rank, and their blows and shouts land a quarter softer. Deathlords are still the hardest fight of their level."
+        ]
+      },
+      {
+        "heading": "Spells",
+        "items": [
+          "Summoned mounts (Summon Indrik, Ethereal Strider, Arvak) are held back for now: riding a summoned mount wasn't shown to other players and could crash the game. They stay in your spellbook.",
+          "Conjure Ent is held back for now: it could crash the game when it appeared.",
+          "Spells that only worked on the caster's own screen are held back until they work for everyone: the Arnima turrets, Earthen Barrier, Earthen Pillar, Protective Vortex, Dark Circle and Thousand Cuts.",
+          "Some joke summons from Summerset Isles have left the realm's magic (Summon Tolfdir, Hero of Sheo Charles, Baby Daedric Table, the mimics, Slug)."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Fewer bears on Skyrim's roads",
     "date": "2026-10-17",
     "version": "Hotfix",
