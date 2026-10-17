@@ -244,7 +244,7 @@ module.exports = (api) => {
     if (allowedWords) return allowedWords;
     allowedWords = new Set();
     let list = [];
-    try { list = JSON.parse(fs.readFileSync(path.resolve('admin-powers.json'), 'utf8')).shouts || []; } catch (e) { log('combat: admin-powers.json unreadable, no shout is allowed', e.message); }
+    try { list = (() => { const d = JSON.parse(fs.readFileSync(path.resolve('admin-powers.json'), 'utf8')); return d.shoutsGate || d.shouts || []; })(); } catch (e) { log('combat: admin-powers.json unreadable, no shout is allowed', e.message); }
     // Only a shout on player-shouts.json counts, so a regenerated admin-powers.json (every SHOU: dragon breaths, Miraak's,
     // Greybeard copies) cannot open the gate again (Nate, 16 Oct). No allow-list file: no shout is allowed.
     let allow = new Set();
