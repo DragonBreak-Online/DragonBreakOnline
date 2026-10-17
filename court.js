@@ -32,7 +32,7 @@ const path = require('path');
 module.exports = (api) => {
   const { mp, log, system, audit, who, display, nameOf, tagOf, onUi, onlineActors, isAdmin, profileOf, cfg,
     zoneList, zoneById, readOfficials, rankTitle, appointCap, appointCheck, appointFrom, seatOfficial, unseatOfficial,
-    officialTarget, officialName, accountActors, ranksOf, APPOINT_RULES, findByName } = api;
+    officialTarget, officialName, accountActors, ranksOf, APPOINT_RULES, findByName, unseatOfficialBy } = api;
   const personal = typeof api.personal === 'function' ? api.personal : () => {};
   // The staff override on appointments (seat outright, offer anyone, withdraw anyone's offer) is a Lead GM's and above,
   // like /appoint (gamemode.js appointCap). Any staff tier still sees every court; a GM acts in one only as its office allows
@@ -299,6 +299,25 @@ module.exports = (api) => {
       return unseatOfficial(a, z, tg);
     });
   });
+  // A member steps down from their own court (Nate, 17 Oct: "people need the ability to leave factions on their own"): the
+  // office, then the household. The ruler's seat stays with the staff, so one click never empties a hold
+  const resign = (a, zoneId) => {
+    const z = zoneFor(a, zoneId); if (!z || !courtZoneIds(a).has(z.id)) return NO_COURT;
+    const pid = Number(profileOf(a));
+    const zo = readOfficials()[z.id] || {};
+    const had = Object.keys(zo).find((r) => (zo[r] || []).map(Number).includes(pid));
+    if (had && isRulerOffice(had)) return { error: `The ${rankTitle(had, z.id)} of ${z.name} steps down through the staff. Ask a Lead GM.` };
+    if (had) {
+      if (typeof unseatOfficialBy !== 'function') return { error: 'You cannot step down just now.' };
+      const tg = target(String(pid)); if (tg.error) return tg;
+      const r = unseatOfficialBy(z, tg, `${who(a)} (stepped down)`); if (r.error) return r;
+    }
+    const fid = holdFactionOf(z.id);
+    const left = !!fid && typeof globalThis.__dboGuildLeave === 'function' && globalThis.__dboGuildLeave(a, fid) === true;
+    if (!had && !left) return { error: `You hold no post in ${z.name}.` };
+    return { text: `You have stepped down from the court of ${z.name}${had ? `, and are no longer its ${rankTitle(had, z.id)}` : ''}.` };
+  };
+  onUi('courtResign', (a, args) => { if (fresh(a, args)) answer(a, () => resign(a, args[1])); });
   onUi('courtMove', (a, args) => {
     if (!fresh(a, args)) return;
     answer(a, () => {

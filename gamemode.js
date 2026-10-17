@@ -8205,7 +8205,7 @@ try {
   const COURT_JS = path.resolve('court.js');
   delete require.cache[COURT_JS];
   require(COURT_JS)({ mp, log, ownNameOf, ownDisplay, system, personal, registerChatCommand, audit, who, display, nameOf, tagOf, onUi, onlineActors, isAdmin, isLeadStaff, profileOf, cfg, findByName,
-    zoneList, zoneById, readOfficials, rankTitle, appointCap, appointCheck, appointFrom, seatOfficial, unseatOfficial, officialTarget,
+    zoneList, zoneById, readOfficials, rankTitle, appointCap, appointCheck, appointFrom, seatOfficial, unseatOfficial, unseatOfficialBy, officialTarget,
     officialName, accountActors, ranksOf, APPOINT_RULES });
 } catch (e) { log('court.js failed to load:', e.stack || e.message); globalThis.__dboCourtOffer = null; globalThis.__dboCourtOfficeSync = null; if (globalThis.__dboJournalSections) delete globalThis.__dboJournalSections.court; }
 // ---- the nobility: fiefs, titles granted by the hold's ruler, the fief's tax share (server\nobility.js, config "nobility") --

@@ -850,12 +850,18 @@ module.exports = (api) => {
   globalThis.__dboGuildKick = (a, fid, t) => kickMember(a >>> 0, String(fid), Number(t) >>> 0);
   globalThis.__dboGuildSetRank = (a, fid, t, rank, court) => setRankOf(a >>> 0, String(fid), Number(t) >>> 0, Math.floor(Number(rank)), !!court);
   globalThis.__dboGuildInvite = (a, t, fid) => { const text = invite(a >>> 0, Number(t) >>> 0, String(fid)); return /^You invited/.test(text) ? { text } : { error: text }; };
+  const leave = (a, fid) => {
+    const f = FACTIONS.get(fid);
+    if (!f || !entryOf(fid, a)) return false;
+    removeMember(fid, a);
+    audit(`FACTION ${who(a)} left ${f.name}`);
+    return true;
+  };
+  globalThis.__dboGuildLeave = (a, fid) => leave(a >>> 0, String(fid));
   onUi('factionLeave', (a, args) => {
     if (!fresh(a, args)) return;
     const fid = String(args[1] || ''); const f = FACTIONS.get(fid);
-    if (!f || !entryOf(fid, a)) return reply(a, 'You are not in that faction.', fid, true);
-    removeMember(fid, a);
-    audit(`FACTION ${who(a)} left ${f.name}`);
+    if (!leave(a, fid)) return reply(a, 'You are not in that faction.', fid, true);
     reply(a, `You have left ${f.name}.`, '', false);
   });
   // A Lead GM adds a character, online or offline, at the lowest rank (the Faction tab's staff view)
