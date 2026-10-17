@@ -466,19 +466,36 @@ module.exports = (api) => {
     entries: mode === 'inspect' ? [] : menuFor(a, t), lines: lines || [],
   });
 
+  // A press inside PRESS_GAP_MS of this player's last answer finishing is dropped when that answer was slow (PRESS_SLOW_MS
+  // or more): 17 Oct, presses made while a slow menu was being built queued up and ran back to back, and 13 in a row held
+  // the server 3 minutes. The usual answer takes a few ms and drops nothing. Timed on the monotonic clock.
+  const PRESS_GAP_MS = 1000, PRESS_SLOW_MS = 100;
+  const lastPress = new Map(); // actor -> { done, took } (performance.now() ms) of its last playerMenu answer
   onUi('playerMenu', (a, args) => {
     const t = Number(args[0]) >>> 0;
-    refreshLawful(a); ensureKnown(a);
-    // One line per X press on a player: whether a menu went out, or why not (#bugs 'X not worky', 2026-09-26)
-    if (!validTarget(a, t)) {
-      log(`playerMenu ${display(a)} -> ${t.toString(16)}: refused (${!t || t === a ? 'no target' : !isOnline(t) ? 'target offline' : `${Math.round(distance(a, t))} units away`})`);
-      // A player who logged out stays in the world through the logout grace (5 min): "get closer" sent three players
-      // pressing X on one five and six times in a row (log, 27-29 Sep)
-      if (t && t !== a && !isOnline(t)) return personal(a, 'They have stepped out of the world. Their body stays a short while before it fades.');
-      return personal(a, 'Get closer to them first.');
+    const t0 = performance.now();
+    const last = lastPress.get(a >>> 0);
+    if (last && last.took >= PRESS_SLOW_MS && t0 - last.done < PRESS_GAP_MS) {
+      log(`playerMenu ${display(a)} -> ${t.toString(16)}: dropped (${Math.round(t0 - last.done)} ms after an answer that took ${Math.round(last.took)} ms)`);
+      return;
     }
-    const sent = openMenu(a, t, 'menu');
-    log(`playerMenu ${display(a)} -> ${display(t)}: ${sent === false ? 'menu packet failed' : 'menu sent'}`);
+    try {
+      refreshLawful(a); ensureKnown(a);
+      // One line per X press on a player: whether a menu went out, or why not (#bugs 'X not worky', 2026-09-26)
+      if (!validTarget(a, t)) {
+        log(`playerMenu ${display(a)} -> ${t.toString(16)}: refused (${!t || t === a ? 'no target' : !isOnline(t) ? 'target offline' : `${Math.round(distance(a, t))} units away`})`);
+        // A player who logged out stays in the world through the logout grace (5 min): "get closer" sent three players
+        // pressing X on one five and six times in a row (log, 27-29 Sep)
+        if (t && t !== a && !isOnline(t)) return personal(a, 'They have stepped out of the world. Their body stays a short while before it fades.');
+        return personal(a, 'Get closer to them first.');
+      }
+      const sent = openMenu(a, t, 'menu');
+      log(`playerMenu ${display(a)} -> ${display(t)}: ${sent === false ? 'menu packet failed' : 'menu sent'}`);
+    } finally {
+      const done = performance.now();
+      lastPress.set(a >>> 0, { done, took: done - t0 });
+      if (lastPress.size > 256) for (const [k, p] of lastPress) if (done - p.done >= PRESS_GAP_MS) lastPress.delete(k);
+    }
   });
   onUi('playerAction', (a, args) => {
     const id = String(args[0] || ''); const t = Number(args[1]) >>> 0;
