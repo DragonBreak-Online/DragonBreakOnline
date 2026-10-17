@@ -485,18 +485,6 @@ export const PowersTab = ({ events, who, beast, canSpawn }: { events: Record<str
         </span>
       </div>
       <div className="admin-panel__powers">
-        {canSpawn ? (
-          <>
-            <div className="admin-panel__power">
-              <Button text="Give all spells" width={200} height={40} onClick={() => adminAction(events, 'giveSpells', fields())} />
-              <span className="admin-panel__hint">Every spell a spell tome teaches, kept on the character</span>
-            </div>
-            <div className="admin-panel__power">
-              <Button text="Give all shouts" width={200} height={40} onClick={() => adminAction(events, 'giveShouts', fields())} />
-              <span className="admin-panel__hint">Every shout with all three words unlocked, taught again at each login</span>
-            </div>
-          </>
-        ) : null}
         {BEASTS.map((b) => (
           <div key={b.key} className="admin-panel__power">
             <span className="admin-panel__label">{b.label} <span className="admin-panel__hint">{state(b.key)}</span></span>
