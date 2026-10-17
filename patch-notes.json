@@ -8,7 +8,8 @@
       {
         "heading": "Property tax",
         "items": [
-          "A guild hall or other property whose doors are all indoors, such as Fort Dawnguard, now pays the weekly property tax like any house. It goes to the treasury of the hold it belongs to."
+          "A guild hall or other property whose doors are all indoors, such as Fort Dawnguard, now pays the weekly property tax like any house. It goes to the treasury of the hold it belongs to.",
+          "A property no Steward has assessed is now valued at 500 gold for tax (it was 2,000), so it pays 50 gold a week at the lowest rate. A hold can raise its rate or have a Steward assess a house."
         ]
       }
     ]
