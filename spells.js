@@ -301,26 +301,59 @@ module.exports = (api) => {
     return out;
   };
 
-  // Spells the server has learned for the actor (not race or base spells), or null when it cannot tell
+  // Spells the server has learned for the actor (not race or base spells), or null when it cannot tell.
+  // One read serves the rest of the server tick, and never more than LEARNED_KEEP_MS (17 Oct): the fork's GetNthSpell
+  // walks the whole list and re-reads the actor's base records for every index, so N spells cost about N x N record reads
+  // (331 spells: about 4.5 s a read), and one Magic tab draw read the list three times. A kept list is used only while
+  // GetSpellCount (one walk, about 1/N of a read) still gives the count it was read at, and an AddSpell or RemoveSpell
+  // through this file's papyrus(), manuals.js's or schools.js's forgets it at once (__dboSpellsLearnedChanged; only a
+  // RemoveSpell the engine confirms here takes just that spell off instead, see papyrus), so a swap that keeps the count is
+  // never missed. manuals.js reads through here (__dboSpellsLearned).
+  const LEARNED_KEEP_MS = 1000;
+  const learnedKept = new Map(); // actor -> { n, ids, at (performance.now) }
+  let learnedSweep = false;
+  const forgetLearned = (a) => { learnedKept.delete(Number(a) >>> 0); };
+  const keepLearned = (a, n, ids) => {
+    learnedKept.set(Number(a) >>> 0, { n, ids: ids.slice(), at: performance.now() });
+    if (learnedSweep) return;
+    learnedSweep = true;
+    // The end of this tick: the server's loop (and the timers due with it) gives way before an immediate runs
+    const later = typeof setImmediate === 'function' ? setImmediate : (f) => setTimeout(f, 0);
+    later(() => { learnedSweep = false; learnedKept.clear(); });
+  };
   const learnedIds = (a) => {
     try {
       const self = { type: 'form', desc: descOf(a) };
       const n = Number(mp.callPapyrusFunction('method', 'Actor', 'GetSpellCount', self, [])) || 0;
+      const kept = learnedKept.get(Number(a) >>> 0);
+      if (kept && kept.n === n && performance.now() - kept.at <= LEARNED_KEEP_MS) return kept.ids.slice();
       const out = [];
       for (let i = 0; i < n; i++) {
         const s = mp.callPapyrusFunction('method', 'Actor', 'GetNthSpell', self, [i]);
         if (s && s.desc) out.push(idOf(s.desc));
       }
+      keepLearned(a, n, out);
       return out;
     } catch (e) { log('spells: learned list failed', e.message); return null; }
   };
+  globalThis.__dboSpellsLearned = learnedIds;
+  globalThis.__dboSpellsLearnedChanged = forgetLearned;
   const knows = (a, spellId) => { const l = learnedIds(a); return !!l && l.includes(spellId >>> 0); };
   // A spell an apprentice holds on loan from their teacher (schools.js apprenticeship) is not theirs to pass on
   const onLoan = (a, spellId) => { try { return typeof globalThis.__dboSchoolsOnLoan === 'function' && !!globalThis.__dboSchoolsOnLoan(a, spellId >>> 0); } catch (e) { return false; } };
   const ownLearned = (a) => (learnedIds(a) || []).filter((id) => !onLoan(a, id));
+  // A RemoveSpell the engine confirms (true only when it held that spell, learned in play: PapyrusActor::RemoveSpell) leaves
+  // the kept list less that one spell, so a login that holds back a spell and then strips a removed one reads the list once.
+  // Anything else forgets it.
   const papyrus = (a, fn, spellId, extra) => {
-    try { return mp.callPapyrusFunction('method', 'Actor', fn, { type: 'form', desc: descOf(a) }, [{ type: 'espm', desc: descOf(spellId) }].concat(extra || [])) === true; }
+    let ok = false;
+    try { ok = mp.callPapyrusFunction('method', 'Actor', fn, { type: 'form', desc: descOf(a) }, [{ type: 'espm', desc: descOf(spellId) }].concat(extra || [])) === true; return ok; }
     catch (e) { log(`spells: ${fn} ${descOf(spellId)} failed`, e.message); return false; }
+    finally {
+      const kept = learnedKept.get(Number(a) >>> 0), id = Number(spellId) >>> 0;
+      if (ok && fn === 'RemoveSpell' && kept && kept.ids.filter((x) => x === id).length === 1) { kept.ids = kept.ids.filter((x) => x !== id); kept.n -= 1; }
+      else forgetLearned(a);
+    }
   };
 
   const REMOVED = new Set((CFG.removedSpells || []).map(idOf).filter(Boolean));
@@ -634,7 +667,9 @@ module.exports = (api) => {
   // school check: the giver has decided. { ok, name, line }, or null when the spell is unknown here.
   // At login (gamemode.js): a removed spell leaves the engine, the spellbook and the prepared list
   globalThis.__dboSpellsStripRemoved = (a) => {
-    try { holdSuspended(a); } catch (e) { log('spells: hold failed', e.message); }
+    // Held here, so spells.hold does not read the whole list again a few seconds after the login (it marks a character
+    // the same way once it has held them; 17 Oct: a read is about 4.5 s for a character with 331 spells)
+    try { holdSuspended(a); holdChecked.add(a >>> 0); } catch (e) { log('spells: hold failed', e.message); }
     if (!REMOVED.size) return 0;
     let n = 0;
     for (const id of REMOVED) {

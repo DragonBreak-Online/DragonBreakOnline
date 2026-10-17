@@ -110,11 +110,18 @@ module.exports = (api) => {
   const BY_BOOK = new Map(READY.map((m) => [m.bookId, m]));
 
   // ---- the engine's spell list ----------------------------------------------------------------------------------
+  // A change forgets spells.js's kept read of the list (one read serves a tick: about 4.5 s a read at 331 spells, 17 Oct)
+  const changed = (a) => { try { if (typeof globalThis.__dboSpellsLearnedChanged === 'function') globalThis.__dboSpellsLearnedChanged(a); } catch (e) { /* spells.js not loaded */ } };
   const papyrus = (a, fn, spellId, extra) => {
     try { return mp.callPapyrusFunction('method', 'Actor', fn, { type: 'form', desc: descOf(a) }, [{ type: 'espm', desc: descOf(spellId) }].concat(extra || [])) === true; }
     catch (e) { log(`manuals: ${fn} ${descOf(spellId)} failed`, e.message); return false; }
+    finally { changed(a); }
   };
+  // spells.js's read when it is loaded (gamemode.js loads it first), which the rest of the tick shares; else the engine's
   const learnedIds = (a) => {
+    if (typeof globalThis.__dboSpellsLearned === 'function') {
+      try { const l = globalThis.__dboSpellsLearned(a); return Array.isArray(l) ? new Set(l) : null; } catch (e) { return null; }
+    }
     try {
       const self = { type: 'form', desc: descOf(a) };
       const n = Number(mp.callPapyrusFunction('method', 'Actor', 'GetSpellCount', self, [])) || 0;

@@ -544,7 +544,11 @@ module.exports = (api) => {
   // player sitting in a menu can outlast starterSettleSeconds. Two checks, so the client cannot run the add before the
   // remove: taken back, then given again (a relog, or putting it away and preparing it, does the same by hand). Only a
   // spell still prepared is sent; s.resend { desc: { due, taken, say } } holds the ones waiting.
-  const papyrusSpell = (a, fn, id, extra) => { try { return mp.callPapyrusFunction('method', 'Actor', fn, { type: 'form', desc: descOf(a) }, [{ type: 'espm', desc: descOf(id) }].concat(extra || [])) === true; } catch (e) { log(`schools: ${fn} ${descOf(id)} failed`, e.message); return false; } };
+  // A change forgets spells.js's kept read of the list (__dboSpellsLearnedChanged: one read serves a tick, 17 Oct)
+  const papyrusSpell = (a, fn, id, extra) => {
+    try { return mp.callPapyrusFunction('method', 'Actor', fn, { type: 'form', desc: descOf(a) }, [{ type: 'espm', desc: descOf(id) }].concat(extra || [])) === true; } catch (e) { log(`schools: ${fn} ${descOf(id)} failed`, e.message); return false; }
+    finally { try { if (typeof globalThis.__dboSpellsLearnedChanged === 'function') globalThis.__dboSpellsLearnedChanged(a); } catch (e) { /* spells.js not loaded */ } }
+  };
   const queueResend = (s, desc, afterMs, say) => { s.resend = Object.assign({}, s.resend || {}, { [descOf(idOf(desc)) || desc]: { due: Date.now() + afterMs, taken: false, say: say || '' } }); };
   // The line to tell, or ''; saves the record when it changed anything
   const runResends = (a, s) => {
