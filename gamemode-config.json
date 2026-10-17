@@ -1194,7 +1194,7 @@
  },
  "referrals": {
   "_comment": "Referral links (referrals.js, Nate 16 Oct 2026; docs/referrals.md). Off until the backend's REFERRAL_LINKS is on. A referral counts once the new account has played qualifyHours on qualifyDays UTC days (a day counts for a session begun on it, qualifyDayMinutes of play; a break over sessionGapMinutes begins a new session) and its Discord account was accountAgeDays old (Nate 16 Oct: 90). deviceCheck (off until the Privacy Policy names the PC code for it; Jake 16 Oct): a PC shared with the referrer or another live referral of the same referrer holds it for a Lead GM (/referral held, approve, refuse). The referrer earns firstMult and +carryWeight carry weight (carrySpell, set after the DLE ability ships; 'remove' takes it back) for the first, once, laterMult for each later one; the new player gets welcomeMult. Every boost lasts boostHours of play, queued one at a time, at most queueCap. /referral; staff /referral profile|revoke|forget <id>.",
-  "enabled": false,
+  "enabled": true,
   "linkBase": "https://dragonbreakonline.com/api/users/login-discord/join/",
   "bindingsFile": "/opt/alduinak/skymp5-backend/data/referrals.jsonl",
   "qualifyHours": 5,
@@ -1211,7 +1211,7 @@
   "deviceCheck": false,
   "playersFile": "/opt/alduinak/skymp5-backend/data/players.json",
   "devicesFile": "/opt/alduinak/skymp5-backend/data/device-ids.json",
-  "carrySpell": "",
+  "carrySpell": "1d1fa7:DragonBreak Online Edits.esp",
   "carryWeight": 50
  },
  "snowElfRace": {

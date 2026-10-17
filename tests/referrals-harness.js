@@ -19,8 +19,8 @@ const near = (a, b) => Math.abs(a - b) < 1e-9;
 
 // ---- what ships ----------------------------------------------------------------------------------------------------
 const R = CONFIG.referrals || {};
-ok('config: shipped off, Nate\'s numbers', R.enabled === false && R.firstMult === 1.15 && R.laterMult === 1.05 && R.welcomeMult === 1.05 && R.boostHours === 8 && R.queueCap === 10
-  && R.qualifyHours === 5 && R.qualifyDays === 2 && R.accountAgeDays === 90 && /players\.json$/.test(R.playersFile) && /device-ids\.json$/.test(R.devicesFile) && R.carrySpell === ''
+ok('config: on since 17 Oct (Nate: push referrals), Nate\'s numbers', R.enabled === true && R.firstMult === 1.15 && R.laterMult === 1.05 && R.welcomeMult === 1.05 && R.boostHours === 8 && R.queueCap === 10
+  && R.qualifyHours === 5 && R.qualifyDays === 2 && R.accountAgeDays === 90 && /players\.json$/.test(R.playersFile) && /device-ids\.json$/.test(R.devicesFile) && R.carrySpell === '1d1fa7:DragonBreak Online Edits.esp'
   && R.deviceCheck === false && R.carryWeight === 50 && R.qualifyDayMinutes >= 30 && R.sessionGapMinutes >= 30 && R.linkBase === 'https://dragonbreakonline.com/api/users/login-discord/join/', R);
 ok('a Discord ban revokes the banned account\'s referrals', /if \(op === 'ban' && typeof globalThis\.__dboReferralBan === 'function'\)/.test(GAMEMODE));
 ok('gitignore keeps the records out of the public repo', /^referrals\.json$/m.test(IGNORE) && /^referrals\.json\.tmp$/m.test(IGNORE));
