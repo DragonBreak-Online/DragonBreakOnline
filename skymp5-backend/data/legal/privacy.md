@@ -1,6 +1,6 @@
 # DragonBreak Online Privacy Policy
 
-**Effective date: October 15, 2026**
+**Effective date: October 17, 2026**
 
 DragonBreak Online is a free, unofficial roleplay server for *The Elder Scrolls V: Skyrim Special Edition*, operated by the DragonBreak Online team ("we," "us," or "our") from the United States. DragonBreak Online is for players **18 and over**.
 
@@ -30,6 +30,26 @@ Our game server, launcher downloads, and website may receive or record:
 ### Ban enforcement check
 
 When you press Play, the launcher sends a one-way code made on your PC from its Windows machine ID. The launcher never sends the machine ID itself for this check, and we store only a keyed scramble of the code that means nothing outside DragonBreak. Older launchers, released before this check, also try to send the machine ID itself when you log in; our servers turn that request away and do not keep the ID. We use the code only to spot a banned player who comes back on another account. A match is never proof on its own: staff review it, and players who share a PC are not banned because of it. We also read the date your Discord account was created, which is part of your Discord user ID. We keep the code for 30 days after the PC was last used to play, or for as long as a ban lasts when it belongs to a banned account, and we delete it when your account is deleted unless the account is banned.
+
+### Referral rewards
+
+While referrals are open, every account that plays gets a referral code and a referral link, which is an address on our website that ends in the code. We keep a referral record for each such account: its code, when it was first seen in the game, when it last played and, for an account that is new to the game, its play time in its first 24 hours of play (and after that for as long as its referral is waiting to count). The record also holds the account's referral boosts, how much of each is left, and referral messages waiting to be shown to it. For a player who invites others, it holds when their first referral counted and which referral gave them the carry weight. When referrals open, the game also notes which accounts already exist, so that only accounts made after that can be referred.
+
+When a new account joins with someone else's link or code, its record also holds which account invited it, the code, when and how it was used (through the link, or typed in the game), the date the new player's Discord account was created (read from the Discord user ID), and how far the referral has come: waiting, counted, cannot count or taken back, with when it was counted or taken back. The record also keeps the days the new account played while its referral was waiting, and how long it played on each (the 10 most recent).
+
+When you open a referral link in your browser, we set a cookie that holds the code (see Website cookies) and send you on to our website. Opening the link records nothing else about you or your visit, apart from our normal connection logs. When you then log in through Discord from the launcher, the login opens in your browser, and the cookie tells our sign-in service which code you came with. While that login is in progress, the sign-in service keeps the code next to a one-way scramble of the login's one-time reference, never the reference itself. If the login creates a brand-new DragonBreak account, the sign-in service records the new account, the code, the time and the date your Discord account was created, and passes them to the game server. An account that existed before that login is never linked to a referral through the link. If your browser loses the cookie, or you opened the link on another device, you can type the code in the game instead, in your first 24 hours of play.
+
+A referral counts only for a brand-new account whose Discord account was at least 90 days old when it was referred, once it has played 5 hours on at least 2 different days. Referrals do not use your PC code or your IP address. Staff can take a referral back, and a referral is taken back automatically when the new account is banned; the record keeps when and why. Each step of a referral, and each referral boost or carry weight given or taken back, is also logged for staff, with the accounts, characters and codes involved, but never a PC code or an address. Only staff see the reasons. When your account is deleted, its referral record and code are erased; other players' referral records may still hold your account number as the account that invited them, or that they invited. We use this information only as reasonably necessary to run referral rewards and keep them fair.
+
+### Hold elections
+
+To keep hold elections fair, an account may vote in a hold's election, and counts toward the number of citizens the hold needs to start one, only if its Discord account is at least 90 days old (read from the Discord user ID), it has played at least 10 hours on at least 3 different days, and the voting character has been a citizen of the hold for at least 7 days. The game server counts the play time and the days; for days before this check began, the days were taken once from the launcher's session reports. For this, the game server keeps a list of the days each account played (the 120 most recent) with the account's other game data. If a rule stops you, the game tells you which one.
+
+When a vote opens, the election notes the play time and play days of each citizen account at that moment. When you vote, the election keeps which court your account voted for, and, while that round of voting is open, the name of the character that voted and when. An account votes in one hold only, and we keep which hold that is. Other players never see whom you voted for, and our logs record only that you voted. Elections do not use your PC code or your IP address.
+
+Only a Lead GM or above can strike a vote, and must give a reason; they can also undo it. The election keeps a record of each struck vote: whose vote it was, who struck it, when, in which round and why. You are told when your vote is struck or restored, at once or the next time you log in.
+
+We use this information only as reasonably necessary to keep hold elections fair.
 
 ### Characters and game activity
 
@@ -119,7 +139,7 @@ Other players may independently record gameplay or voice using their own softwar
 
 ### Website cookies
 
-Our website sets a short-lived cookie while you sign in with Discord, and a session cookie while you are signed in. We do not use tracking or advertising cookies.
+Our website sets a short-lived cookie while you sign in with Discord, and a session cookie while you are signed in. While referrals are open, opening a referral link in your browser also sets a cookie that holds that referral code for 30 days. Your browser sends it back to us only when it opens our Discord login or another referral link, and we use it only to credit the player who invited you when that login creates a new account. We do not use tracking or advertising cookies.
 
 ### Information we do not receive
 
@@ -138,6 +158,8 @@ We use collected information to:
 * Connect players to the service and protect the service from abuse.
 * Investigate cheating, exploits, harassment, and other rule violations.
 * Enforce bans and other moderation decisions.
+* Run referral rewards: credit the player who invited you, and keep the rewards for inviting new players.
+* Keep hold elections fair.
 * Diagnose crashes and technical problems.
 * Improve server stability and gameplay systems.
 * Respond to support requests and bug reports.
@@ -177,6 +199,8 @@ Bug reports or moderation information may be shared with appropriate staff or po
 
 You may mark a launcher problem report as private when that option is available.
 
+Staff see referral records and struck votes, including the reasons. Other players never see why a referral did not count or why a vote was struck. The player who invited you sees only how far your referral has come (the hours and days played toward it, without your name) and whether it counted. If it cannot count, they see only that it "cannot count", with no reason.
+
 We do not share personal information outside the DragonBreak team except when necessary to operate the service through a service provider, when you ask us to do so, or when required by law.
 
 ## 5. How Long We Keep Information
@@ -191,6 +215,15 @@ Our current target retention periods are:
 | World backups                        | 30 days |
 | Server activity and connection logs  | 90 days |
 | Ban enforcement check codes | 30 days after the PC was last used to play; for a banned account, while the ban lasts |
+| Referral records in the game         | While your account exists; erased when your account is deleted |
+| Referral sign-ups noted by our sign-in service | 30 days; deleted sooner when your account is deleted |
+| Referral logins in progress          | Until the login finishes; one that never finishes is dropped once it is 30 minutes old, at the next referral login |
+| Referral cookie in your browser      | 30 days |
+| Days you played, for elections (the 120 most recent) | While your account exists |
+| The hold your account votes in       | While your account exists |
+| Names of the characters that voted in a round | Until that round of voting closes |
+| Play time noted when a vote opens    | Until that election ends |
+| Election votes (which court each account voted for) and struck votes | Kept with the hold's election record until staff clear it |
 | Launcher session and problem reports | 180 days |
 | Bug-report snapshots                 | 180 days |
 | Thalmor dossier notes                | Until struck in game, or by staff |
@@ -231,4 +264,4 @@ The current version will be published with its effective date. Significant chang
 **Support:**
 DragonBreak Online Discord tickets
 
-**Last updated:** October 15, 2026
+**Last updated:** October 17, 2026

@@ -1,8 +1,12 @@
 {
-  "version": "2026-10-15",
-  "effective": "2026-10-15",
+  "version": "2026-10-17",
+  "effective": "2026-10-17",
   "changes": [
-    "The Privacy Policy now describes the ban enforcement check: a one-way code made from your PC's machine ID, kept as a keyed scramble for 30 days after you last play, used only to spot returning banned players."
+    "Referrals: while referrals are open, a referral link sets a cookie with its code for 30 days, sent only to our Discord login. The game keeps a referral record for your account (code, play time toward a referral, boosts), erased when your account is deleted.",
+    "A referral counts only for a new account whose Discord account was at least 90 days old and which has played 5 hours on 2 days. The player who invited you sees your progress without your name, and only \"cannot count\" if it does not count.",
+    "Hold elections: to vote, your Discord account must be at least 90 days old, you must have played 10 hours on 3 days, and your character must have been a citizen of the hold for 7 days. The game keeps the days you played (the 120 most recent).",
+    "A Lead GM can strike a vote, giving a reason, and can undo it; you are told either way. The names of voters are forgotten when each round of voting closes.",
+    "Referrals and elections do not use your PC code or your IP address. The PC code is still used only for the ban check."
   ],
   "files": {
     "terms": "terms.md",
