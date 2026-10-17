@@ -6,6 +6,7 @@ import './tabs/MagicTab';
 import './tabs/SettingsTab';
 import './tabs/SettingsKeys';
 import './tabs/SettingsVoice';
+import './tabs/SettingsCamera';
 import './tabs/WorldTab';
 import './skillsTab';
 import '../court';

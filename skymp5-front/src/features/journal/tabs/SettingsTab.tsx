@@ -9,7 +9,7 @@ import {
 } from '../../../utils/uiSettings';
 
 // The F3 hub's Settings tab (specs/f3-hub-design.md 3.7). Settings belong to the player's PC: nothing here is sent to
-// the server but a problem report. A rail of sections on the left (General, Controls, Voice, Interface, Help); each
+// the server but a problem report. A rail of sections on the left (General, Controls, Camera, Voice, Interface, Help); each
 // section is a component registered with registerSettingsSection, so the key and voice pieces add theirs.
 
 // What the server sends in the settings section (journal.js settingsView, plus what other modules add)
@@ -29,7 +29,7 @@ export interface SettingsPartProps {
 
 interface Part { id: string; label: string; order: number; component: React.ComponentType<SettingsPartProps>; shown?: (s: SettingsSection) => boolean }
 const PARTS: Part[] = [];
-const ORDER: Record<string, number> = { general: 1, controls: 2, voice: 3, interface: 4, help: 5 };
+const ORDER: Record<string, number> = { general: 1, controls: 2, camera: 2.5, voice: 3, interface: 4, help: 5 };
 export const registerSettingsSection = (id: string, label: string, component: React.ComponentType<SettingsPartProps>, shown?: (s: SettingsSection) => boolean): void => {
   const at = PARTS.findIndex((p) => p.id === id);
   const part = { id, label, order: ORDER[id] || 9, component, shown };
