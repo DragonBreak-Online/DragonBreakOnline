@@ -100,11 +100,16 @@ void DX11RenderHandler::Render(
 
   if (Visible() && focusFlag) {
     if (m_pCursorTexture && m_cursorX >= 0 && m_cursorY >= 0) {
+      // The sprite scales with the backbuffer, so the hotspot has to scale with it. A fixed 24/25
+      // offset put the click point off by (1 - scale) * 24: zero at 1920 wide, about -8 px at 1280
+      // and +24 px at 3840, which is why it looks correct at 1080p and drifts at 1440p and 4K.
+      const float cursorScale = m_width / 1920.f;
       m_pSpriteBatch->Draw(
         m_pCursorTexture.Get(),
-        DirectX::SimpleMath::Vector2(m_cursorX - 24, m_cursorY - 25), nullptr,
-        DirectX::Colors::White, 0.f, DirectX::SimpleMath::Vector2(0, 0),
-        m_width / 1920.f);
+        DirectX::SimpleMath::Vector2(m_cursorX - 24 * cursorScale,
+                                     m_cursorY - 25 * cursorScale),
+        nullptr, DirectX::Colors::White, 0.f,
+        DirectX::SimpleMath::Vector2(0, 0), cursorScale);
     }
   }
 
