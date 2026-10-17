@@ -2007,6 +2007,27 @@ const activateAllowed = (caster) => {
   };
 }
 every('activatePrune', 60000, () => { const now = Date.now(); for (const [k, b] of activateBuckets) if (now - b.at > 120000) activateBuckets.delete(k); });
+// Doors that start open (2026-10-17). The server keeps every door's open state itself and never reads a reference's "open by
+// default" (ONAM), so a door it has not seen before starts closed. Each listed door is opened once and marked
+// private.dboStartedOpen; after that its state belongs to the players and the levers, and is kept over restarts.
+// Castle Bruma's north gate (its lever 1b5fc3 lowers it).
+{
+  const pendingStartOpen = new Set(['1b5fc4:DragonBreak Online Edits.esp']);
+  every('doorsStartOpen', 30000, () => {
+    for (const desc of [...pendingStartOpen]) {
+      try {
+        const id = mp.getIdFromDesc(desc) >>> 0;
+        if (mp.get(id, 'private.dboStartedOpen') !== true) {
+          mp.set(id, 'isOpen', true);
+          mp.set(id, 'private.dboStartedOpen', true);
+          log(`doors: ${desc} opened once (it starts open)`);
+        }
+        pendingStartOpen.delete(desc);
+      } catch (e) { logCapped(`startopen:${desc}`, 2, `doors: ${desc} not opened yet: ${e.message}`); }
+    }
+    if (!pendingStartOpen.size) stopTimer('doorsStartOpen');
+  });
+}
 
 // ---- bank treasuries -----------------------------------------------------------------------
 // Every zone with a "treasury" in zones.json starts with 10,000 gold, seeded once; board fees are paid into it.
