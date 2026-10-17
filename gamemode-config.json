@@ -99,7 +99,7 @@
   "enabled": true,
   "slots": 0,
   "_suspendedSpells": "Held back for a while: kept in the spellbook, taken off the prepared list and out of the engine, never prepared, read, taught or given until taken off this list (spells.js suspendedSpells).",
-  "suspendedSpells": ["da746:Skyrim.esm", "8dcec:Druadach.esm", "94fca:Druadach.esm"],
+  "suspendedSpells": ["da746:Skyrim.esm", "8dcec:Druadach.esm", "94fca:Druadach.esm", "a11ae:Druadach.esm"],
   "teachMeters": 5,
   "teacherMinTier": 4,
   "teachMinRank": 2,
