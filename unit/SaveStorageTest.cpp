@@ -443,12 +443,13 @@ TEST_CASE("A record changed on every tick is saved at most once per interval",
   auto& actor = p.worldState.GetFormAt<MpActor>(0xff000a01);
   WaitForNextUpsert(*st, p.worldState);
 
-  constexpr auto kInterval = std::chrono::milliseconds(250);
+  // Well above the saver's own cadence (100 ms sleep plus the write), so a missing gate shows
+  constexpr auto kInterval = std::chrono::milliseconds(700);
   p.worldState.SetSaveInterval(kInterval);
   auto numUpserts = st->GetNumFinishedUpserts();
   auto start = std::chrono::steady_clock::now();
   for (int i = 0; std::chrono::steady_clock::now() - start <
-       std::chrono::milliseconds(1500);
+       std::chrono::milliseconds(2100);
        ++i) {
     actor.SetPercentages({ 1.f, (i % 100 + 1) / 128.f, 1.f });
     p.worldState.Tick();
@@ -489,8 +490,7 @@ TEST_CASE("FlushSaveStorageSync writes the changes still waiting for the "
   REQUIRE(CountFilesWithExtension("unit/data/changeForms", ".tmp") == 0);
 }
 
-TEST_CASE("FlushSync writes the batches already handed over first, so the "
-          "newest copy wins",
+TEST_CASE("FlushSync writes older batches first so the newest copy wins",
           "[save]")
 {
   auto db = std::make_shared<RecordingDatabase>();
