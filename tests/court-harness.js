@@ -360,6 +360,11 @@ Date.now = realNow;
     r = ev('courtResign', rulerActor[0], 'N', 'bruma');
     ok('resign: the ruler cannot step down by a click', r && r.kind === 'refused' && /through the staff/.test(r.text) && seated('bruma', 'count').includes(rulerActor[1].pid), r);
   }
+  ev('courtAppoint', ADMIN, 'N', 'bruma', 'Hilde', 'guard');
+  said.length = 0; commands.get('court')(TG1, 'resign');
+  ok('/court resign without a hold names the courts and does nothing', /court resign Bruma/.test(said[said.length - 1] || '') && seated('bruma', 'guard').includes(21), said);
+  said.length = 0; commands.get('court')(TG1, 'resign Bruma');
+  ok('/court resign Bruma steps her down', !seated('bruma', 'guard').includes(21) && /stepped down/.test(said[said.length - 1] || ''), said);
   ok('resign: someone who serves no court cannot', ev('courtResign', TG2, 'N', 'bruma').kind === 'refused');
 }
 

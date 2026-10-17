@@ -406,8 +406,16 @@ module.exports = (api) => {
         const r = answerOffer(a, o.id, s === 'accept');
         return personal(a, r.error || r.text);
       }
-      personal(a, 'Usage: /court (your journal\'s Court tab), /court offers, /court accept [number], /court decline [number]');
-    }, { help: '[offers|accept|decline] the posts a court offers you (F3 Court shows them too)' });
+      // Until the Court tab has its Step down button: the hold is named in full, so a slip of the keys resigns nothing
+      if (s === 'resign') {
+        const q = rest.join(' ').toLowerCase();
+        const z = zoneList().find((x) => courtZoneIds(a).has(x.id) && (x.id === q || String(x.name).toLowerCase() === q));
+        if (!z) { const names = zoneList().filter((x) => courtZoneIds(a).has(x.id)).map((x) => x.name); return personal(a, names.length ? `Name the court to step down from: /court resign ${names.join(' | ')}` : 'You serve no court.'); }
+        const r = resign(a, z.id);
+        return personal(a, r.error || r.text);
+      }
+      personal(a, 'Usage: /court (your journal\'s Court tab), /court offers, /court accept [number], /court decline [number], /court resign <hold>');
+    }, { help: '[offers|accept|decline|resign <hold>] the posts a court offers you, or step down from your own (F3 Court shows them too)' });
   }
 
   log(`court ${C.enabled ? 'on' : 'off'}: ${zoneList().length} courts, ${live().length} open offers`);
