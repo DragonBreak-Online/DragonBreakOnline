@@ -152,6 +152,41 @@ Do not port the UI to Scaleform as a streaming optimisation - the premise does n
    considered - and then argued on the 246 MB of CEF and the input model, funded as a
    months-long project.
 
+## Status of the in-game pass
+
+Everything above is measured from code, the live endpoints and the installed files. The in-game
+observation pass - watching the overlay behave while playing - was attempted on 2026-10-16 and is
+still outstanding.
+
+The launcher (v2.1.49) is up and signed in, but it gates Play behind a completed update, and the
+update needs two mods this PC does not have:
+
+| Mod | Nexus | Size |
+|---|---|---|
+| King of the Murkmire - Main | 190459 | 717 MB |
+| Murkmire Official Housing Pack | 194072 | 145 KB |
+
+Both are in the server's 154-entry install manifest, so the client cannot connect without them.
+The Nexus account is non-Premium (`"Premium": false`), so each needs a manual "Slow download"
+click; with no click the installer waited and aborted cleanly after its 15-minute idle timeout
+("Timed out waiting to download"). Nothing was left half-written.
+
+Checked and ruled out: this is *not* the Vortex-mismatch bug. Neither mod is in
+`Vortex\downloads\skyrimse` (146 files, no match), the launcher's own downloads folder, or
+Downloads. They genuinely are not on the machine.
+
+What the in-game pass is still needed for - none of it affects the recommendation above, which
+rests on measured sizes and code facts:
+
+1. whether the overlay cursor visibly lags or desyncs from the OS cursor,
+2. whether `Input.isKeyPressed` goes deaf once a panel takes focus,
+3. how the panels behave when a second panel opens over one that already has focus,
+4. whether controller input reaches the overlay at all.
+
+Those four are the entire honest case for going native, so they are worth measuring before any
+native work is funded - but they change the *justification*, not the conclusion that this is not
+a streaming problem.
+
 ## How the numbers were taken
 
 - Install sizes: `find`/`du -sb` under `C:\DragonBreak\skyrim\Data\Platform`.
