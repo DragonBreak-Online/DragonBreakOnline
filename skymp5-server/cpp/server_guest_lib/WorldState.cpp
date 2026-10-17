@@ -1158,12 +1158,18 @@ std::optional<uint32_t> WorldState::DestroyedFormIdx(uint32_t formId) const
 
 void WorldState::ReleaseHeldFormIdx(bool all)
 {
-  // Keep it above DatabaseFactory::kMaxSaveIntervalMs: a destroyed form's last save waits at its index until the next hand-off
+  // Keep it above DatabaseFactory::kMaxSaveIntervalMs, so the check below rarely holds an index longer
   constexpr auto kHoldFor = std::chrono::seconds(10);
   const auto now = std::chrono::steady_clock::now();
   while (!heldFormIdx.empty() &&
          (all || now - heldFormIdx.front().second >= kHoldFor)) {
     const uint32_t idx = heldFormIdx.front().first;
+    // A destroyed form's last save (isDeleted) waits at its index until the next hand-off to the saver: a new form
+    // given the index first overwrote it, and the form came back after a restart (slow ticks, or a stall over 10 s)
+    if (!all && pImpl->saveStorage && idx < pImpl->changesByIdx.size() &&
+        pImpl->changesByIdx[idx]) {
+      break;
+    }
     heldFormIdx.pop_front();
     if (!formIdxManager || !formIdxManager->DestroyID(idx)) {
       spdlog::error("WorldState::ReleaseHeldFormIdx - index {} was not in use",

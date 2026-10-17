@@ -522,3 +522,46 @@ TEST_CASE("FlushSync writes older batches first so the newest copy wins",
   st.Upsert(version(4.f), [] {});
   REQUIRE(db->writes.back() == 4.f);
 }
+
+TEST_CASE("A destroyed actor's last save keeps its index until it is handed "
+          "to the saver",
+          "[save]")
+{
+  auto st = MakeSaveStorageFile();
+  PartOne p;
+  p.AttachSaveStorage(st);
+  p.CreateActor(0xff000a01, { 1, 1, 1 }, 1, 0x3c);
+  WaitForNextUpsert(*st, p.worldState);
+
+  // At the 8000 ms cap with the main thread ticking every 2.6 s, the first hand-off after the destroy came 10.4 s
+  // later, past the 10 s index hold: the new actor given the index overwrote the pending isDeleted save
+  p.worldState.SetSaveInterval(std::chrono::milliseconds(8000));
+  auto& actor = p.worldState.GetFormAt<MpActor>(0xff000a01);
+  const auto idx = actor.GetIdx();
+  actor.SetPercentages({ 1.f, 0.5f, 1.f });
+  p.worldState.RequestSaveNow();
+  WaitForNextUpsert(*st, p.worldState);
+
+  p.DestroyActor(0xff000a01);
+  const auto destroyedAt = std::chrono::steady_clock::now();
+  for (int i = 1; i <= 3; ++i) {
+    std::this_thread::sleep_until(destroyedAt +
+                                  i * std::chrono::milliseconds(2600));
+    p.worldState.Tick();
+  }
+  std::this_thread::sleep_until(destroyedAt +
+                                std::chrono::milliseconds(10200));
+  p.CreateActor(0xff000a02, { 1, 1, 1 }, 1, 0x3c);
+
+  // Once the save is handed over, the index is free again
+  p.worldState.RequestSaveNow();
+  WaitForNextUpsert(*st, p.worldState);
+  p.CreateActor(0xff000a03, { 1, 1, 1 }, 1, 0x3c);
+  REQUIRE((p.worldState.GetFormAt<MpActor>(0xff000a02).GetIdx() == idx ||
+           p.worldState.GetFormAt<MpActor>(0xff000a03).GetIdx() == idx));
+
+  p.worldState.FlushSaveStorageSync();
+  auto res = ReadFromDisk("unit/data");
+  REQUIRE(res.count(FormDesc::FromString("ff000a01")) == 1);
+  REQUIRE(res[FormDesc::FromString("ff000a01")].isDeleted);
+}
