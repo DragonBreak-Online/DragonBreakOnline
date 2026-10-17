@@ -10,9 +10,11 @@
 //      pays or takes gold or items must use saveNow on those paths, as contracts.js does.
 //   2. gamemode.js calls saveSoon only for the files listed in GAMEMODE_SOON (cooldowns, not money).
 //   3. No paying module writes its state with an async fs write, or saves from a timer that a crash could skip.
-// The server's own record of a character (inventory included) is saved at most every saveIntervalMs (5 s) by
-// WorldState::TickSaveStorage, and on the next tick after a saveNow, which calls mp.requestSaveNow, so after a money
-// write the purse is never behind by more than a tick; the gap this lint closes is a JSON file behind the purse.
+// The server's own record of a character (inventory included) is saved at most every saveIntervalMs by
+// WorldState::TickSaveStorage. saveNow also calls mp.requestSaveNow, so after a saveNow money write the purse goes to
+// the saver on the next tick. A module that writes its own file at once without saveNow (bank, post and others) can,
+// after a crash, leave the purse up to saveIntervalMs plus one batch's write behind that file. The gap this lint
+// closes is the other one: a JSON file behind the purse.
 'use strict';
 const fs = require('fs');
 const path = require('path');
