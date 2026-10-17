@@ -298,7 +298,12 @@ ok(/Discord/.test(M.canVote(YOUNG, WR, FIRST)), '...while the Discord age is jud
 rules = { newHolds: ['markarth'], citizenDaysFirstElection: 0, oneVotePerDevice: true }; M = load();
 ok(/7 days/.test(M.canVote(NEWER, WR, FIRST)), 'another hold being named does nothing for this one');
 const shippedVR = JSON.parse(fs.readFileSync(path.resolve(__dirname, '..', 'gamemode-config.json'), 'utf8')).citizenship.election.voterRules;
-ok(Array.isArray(shippedVR.newHolds) && shippedVR.newHolds.length === 0, 'gamemode-config.json ships an empty newHolds list');
+// Every hold is named, because NO hold has a seven-day citizen: the earliest citizenship record on the server, in Bruma,
+// was 2.3 days old when this shipped, and Skyrim's holds were a day. The waiver expires hold by hold at its own first
+// election, so naming them all needs no undoing.
+ok(Array.isArray(shippedVR.newHolds) && shippedVR.newHolds.length === 8
+  && ['bruma', 'whiterun', 'riften', 'solitude', 'winterhold', 'windhelm', 'dawnstar', 'markarth'].every((h) => shippedVR.newHolds.includes(h)),
+  'gamemode-config.json names every hold that has citizens', shippedVR.newHolds);
 
 // ---- the shipped config: one vote per PC is off, and the device store is never opened -------------------------------------
 const realCfg = JSON.parse(fs.readFileSync(path.resolve(__dirname, '..', 'gamemode-config.json'), 'utf8'));
