@@ -13,6 +13,12 @@
           "A reading gives at most one tome or scroll. There is no daily limit, and finding one does not lower your chances afterwards.",
           "Expert and Master spell tomes no longer need a rank in a college: your Scholar level is enough."
         ]
+      },
+      {
+        "heading": "Fixes",
+        "items": [
+          "Saving a new look in the appearance editor no longer leaves your name as \"Masked Person\" when you opened the editor behind a mask and saved it after logging back in. If this happened to you, a GM can give your name back with /rename."
+        ]
       }
     ]
   },
