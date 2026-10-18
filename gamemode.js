@@ -5074,6 +5074,8 @@ globalThis.__dboCoinPurse = (targetId, casterId) => {
   if (giveItem(casterId, 0xf, gold)) {
     try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('loot', 'coin_purse', casterId, targetId, [], gold); } catch (e) { /* the player log is optional */ }
     personal(casterId, `You pocket ${gold} gold from the purse.`);
+    // Imperial Luck (racial.js goldBonus): a purse is loot, so it pays the Imperial's share like a chest (Nate, 18 Oct)
+    try { if (typeof globalThis.__dboRaceGold === 'function') globalThis.__dboRaceGold(casterId, gold, 'a coin purse'); } catch (e) { log('racial gold failed', e.message); }
     try { if (typeof globalThis.__alduinakMasteryEvent === 'function') globalThis.__alduinakMasteryEvent('activate', casterId, { refrId: targetId }); } catch (e) { /* no skill system */ }
   }
   return true;
