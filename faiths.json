@@ -245,14 +245,19 @@
       "kind": "aedra",
       "sphere": "Lorkhan, the dead god: chief of the Nordic gods, who keeps the Hall of Valor in Sovngarde for the brave dead.",
       "boon": "Heavy Armor +10",
-      "blessing": null,
-      "blessingSource": "pending",
-      "blessingPlan": "SPEL on AlchFortifyHeavyArmor (PC)",
+      "blessing": "1d1faa:DragonBreak Online Edits.esp",
+      "blessingSource": "vanilla",
+      "blessingPlan": "SPEL 1D1FAA:DragonBreak Online Edits.esp (PC pantheons DLE 80dc558d, 18 Oct)",
       "alsoKnownAs": [
         "Lorkhan"
       ],
-      "inBruma": 0,
-      "placements": []
+      "inBruma": 1,
+      "placements": [
+        "1d1fc8:DragonBreak Online Edits.esp"
+      ],
+      "shrines": [
+        "1d1fb6:DragonBreak Online Edits.esp"
+      ]
     },
     {
       "id": "tsun",
@@ -260,11 +265,16 @@
       "kind": "aedra",
       "sphere": "The Shield-Thane, god of trials against adversity, who guards the Whalebone Bridge into Sovngarde.",
       "boon": "Block +10, Stamina +15",
-      "blessing": null,
-      "blessingSource": "pending",
-      "blessingPlan": "SPEL on FortifyBlockFFSelf + FortifyStaminaFFSelf (PC)",
-      "inBruma": 0,
-      "placements": []
+      "blessing": "1d1fab:DragonBreak Online Edits.esp",
+      "blessingSource": "vanilla",
+      "blessingPlan": "SPEL 1D1FAB:DragonBreak Online Edits.esp (PC pantheons DLE 80dc558d, 18 Oct)",
+      "inBruma": 1,
+      "placements": [
+        "1d1fcc:DragonBreak Online Edits.esp"
+      ],
+      "shrines": [
+        "1d1fb7:DragonBreak Online Edits.esp"
+      ]
     },
     {
       "id": "magnus",
@@ -272,14 +282,20 @@
       "kind": "aedra",
       "sphere": "The god-architect of the world, who fled creation and left the sun; the source of all magic.",
       "boon": "Alteration +10",
-      "blessing": null,
-      "blessingSource": "pending",
-      "blessingPlan": "SPEL on AlchFortifyAlteration (PC)",
+      "blessing": "1d1fac:DragonBreak Online Edits.esp",
+      "blessingSource": "vanilla",
+      "blessingPlan": "SPEL 1D1FAC:DragonBreak Online Edits.esp (PC pantheons DLE 80dc558d, 18 Oct)",
       "alsoKnownAs": [
         "Magrus"
       ],
-      "inBruma": 0,
-      "placements": []
+      "inBruma": 1,
+      "placements": [
+        "1d1fc9:DragonBreak Online Edits.esp",
+        "1d1fd7:DragonBreak Online Edits.esp"
+      ],
+      "shrines": [
+        "1d1fb8:DragonBreak Online Edits.esp"
+      ]
     },
     {
       "id": "syrabane",
@@ -287,11 +303,17 @@
       "kind": "aedra",
       "sphere": "The warden-god of magic and apprentices, who saved Firsthold with his ring; patron of the Psijics.",
       "boon": "Enchanting +10",
-      "blessing": null,
-      "blessingSource": "pending",
-      "blessingPlan": "SPEL on AlchFortifyEnchanting (PC)",
-      "inBruma": 0,
-      "placements": []
+      "blessing": "1d1fad:DragonBreak Online Edits.esp",
+      "blessingSource": "vanilla",
+      "blessingPlan": "SPEL 1D1FAD:DragonBreak Online Edits.esp (PC pantheons DLE 80dc558d, 18 Oct)",
+      "inBruma": 1,
+      "placements": [
+        "1d1fca:DragonBreak Online Edits.esp",
+        "1d1fd8:DragonBreak Online Edits.esp"
+      ],
+      "shrines": [
+        "1d1fb9:DragonBreak Online Edits.esp"
+      ]
     },
     {
       "id": "xarxes",
@@ -301,10 +323,16 @@
       "boon": "what you read teaches you more (half of Hermaeus Mora's gift)",
       "blessing": null,
       "blessingSource": "server",
-      "inBruma": 0,
-      "placements": [],
+      "inBruma": 1,
+      "placements": [
+        "1d1fc5:DragonBreak Online Edits.esp",
+        "1d1fd9:DragonBreak Online Edits.esp"
+      ],
       "blessingPlan": "server: a finished reading counts twice half the time; a boss chest book at half Hermaeus Mora's chance",
-      "scholarBoon": 0.5
+      "scholarBoon": 0.5,
+      "shrines": [
+        "1d1fba:DragonBreak Online Edits.esp"
+      ]
     },
     {
       "id": "phynaster",
@@ -312,11 +340,17 @@
       "kind": "aedra",
       "sphere": "The hero-god who taught the Altmer a path a hundred feet shorter, and so gave them their long lives.",
       "boon": "Health +25",
-      "blessing": null,
-      "blessingSource": "pending",
-      "blessingPlan": "SPEL on FortifyHealthFFSelf (PC)",
-      "inBruma": 0,
-      "placements": []
+      "blessing": "1d1fae:DragonBreak Online Edits.esp",
+      "blessingSource": "vanilla",
+      "blessingPlan": "SPEL 1D1FAE:DragonBreak Online Edits.esp (PC pantheons DLE 80dc558d, 18 Oct)",
+      "inBruma": 1,
+      "placements": [
+        "1d1fcb:DragonBreak Online Edits.esp",
+        "1d1fda:DragonBreak Online Edits.esp"
+      ],
+      "shrines": [
+        "1d1fbb:DragonBreak Online Edits.esp"
+      ]
     },
     {
       "id": "yffre",
@@ -327,9 +361,14 @@
       "blessing": null,
       "blessingSource": "server",
       "meatBoon": 2,
-      "inBruma": 0,
-      "placements": [],
-      "blessingPlan": "server: meat restores twice the hunger (gamemode.js onEat)"
+      "inBruma": 1,
+      "placements": [
+        "1d1fc6:DragonBreak Online Edits.esp"
+      ],
+      "blessingPlan": "server: meat restores twice the hunger (gamemode.js onEat)",
+      "shrines": [
+        "1d1fbc:DragonBreak Online Edits.esp"
+      ]
     },
     {
       "id": "jephre",
@@ -337,11 +376,16 @@
       "kind": "aedra",
       "sphere": "The god of song, said to have taught the birds to sing; often held to be Y'ffre's other voice.",
       "boon": "Illusion +10",
-      "blessing": null,
-      "blessingSource": "pending",
-      "blessingPlan": "SPEL on AlchFortifyIllusion (PC)",
-      "inBruma": 0,
-      "placements": []
+      "blessing": "1d1faf:DragonBreak Online Edits.esp",
+      "blessingSource": "vanilla",
+      "blessingPlan": "SPEL 1D1FAF:DragonBreak Online Edits.esp (PC pantheons DLE 80dc558d, 18 Oct)",
+      "inBruma": 1,
+      "placements": [
+        "1d1fce:DragonBreak Online Edits.esp"
+      ],
+      "shrines": [
+        "1d1fbd:DragonBreak Online Edits.esp"
+      ]
     },
     {
       "id": "baandar",
@@ -349,11 +393,16 @@
       "kind": "aedra",
       "sphere": "The Bandit God, the pariah god of thieves and the desperate, who always finds a way.",
       "boon": "Lockpicking +10",
-      "blessing": null,
-      "blessingSource": "pending",
-      "blessingPlan": "SPEL on AlchFortifyLockpicking (PC)",
-      "inBruma": 0,
-      "placements": []
+      "blessing": "1d1fb0:DragonBreak Online Edits.esp",
+      "blessingSource": "vanilla",
+      "blessingPlan": "SPEL 1D1FB0:DragonBreak Online Edits.esp (PC pantheons DLE 80dc558d, 18 Oct)",
+      "inBruma": 1,
+      "placements": [
+        "1d1fd1:DragonBreak Online Edits.esp"
+      ],
+      "shrines": [
+        "1d1fbe:DragonBreak Online Edits.esp"
+      ]
     },
     {
       "id": "alkosh",
@@ -365,10 +414,15 @@
       "blessingSource": "server",
       "unarmedBoon": 1.1,
       "aspectOf": "akatosh",
-      "inBruma": 0,
-      "placements": [],
+      "inBruma": 1,
+      "placements": [
+        "1d1fcd:DragonBreak Online Edits.esp"
+      ],
       "blessingPlan": "server: unarmed hits x1.1 (gamemode.js blessingCombat attacker.alkosh)",
-      "combatBoon": true
+      "combatBoon": true,
+      "shrines": [
+        "1d1fc0:DragonBreak Online Edits.esp"
+      ]
     },
     {
       "id": "rajhin",
@@ -376,13 +430,18 @@
       "kind": "aedra",
       "sphere": "The Footpad, the Purring Liar: the thief-god of Senchal, who stole the Empress Kintyra's necklace while she slept.",
       "boon": "Sneak +10",
-      "blessing": null,
-      "blessingSource": "pending",
-      "blessingPlan": "SPEL on FortifySneakFFSelf (PC)",
+      "blessing": "1d1fb1:DragonBreak Online Edits.esp",
+      "blessingSource": "vanilla",
+      "blessingPlan": "SPEL 1D1FB1:DragonBreak Online Edits.esp (PC pantheons DLE 80dc558d, 18 Oct)",
       "lawful": false,
       "unlawfulWhere": "Criminal in the Empire and in Skyrim: the thief-god's followers are thieves.",
-      "inBruma": 0,
-      "placements": []
+      "inBruma": 1,
+      "placements": [
+        "1d1fd2:DragonBreak Online Edits.esp"
+      ],
+      "shrines": [
+        "1d1fbf:DragonBreak Online Edits.esp"
+      ]
     },
     {
       "id": "leki",
@@ -390,11 +449,17 @@
       "kind": "aedra",
       "sphere": "The saint of the spirit sword, daughter of Tall Papa; the Sword-singers' goddess.",
       "boon": "One-handed +10",
-      "blessing": null,
-      "blessingSource": "pending",
-      "blessingPlan": "SPEL on FortifyOneHandedFFSelf (PC)",
-      "inBruma": 0,
-      "placements": []
+      "blessing": "1d1fb2:DragonBreak Online Edits.esp",
+      "blessingSource": "vanilla",
+      "blessingPlan": "SPEL 1D1FB2:DragonBreak Online Edits.esp (PC pantheons DLE 80dc558d, 18 Oct)",
+      "inBruma": 1,
+      "placements": [
+        "1d1fc7:DragonBreak Online Edits.esp",
+        "1d1fd4:DragonBreak Online Edits.esp"
+      ],
+      "shrines": [
+        "1d1fc1:DragonBreak Online Edits.esp"
+      ]
     },
     {
       "id": "onsi",
@@ -402,11 +467,17 @@
       "kind": "aedra",
       "sphere": "The Boneshaver, the warrior god who taught Mankind to push their knives into swords.",
       "boon": "Smithing +10",
-      "blessing": null,
-      "blessingSource": "pending",
-      "blessingPlan": "SPEL on AlchFortifySmithing (PC)",
-      "inBruma": 0,
-      "placements": []
+      "blessing": "1d1fb3:DragonBreak Online Edits.esp",
+      "blessingSource": "vanilla",
+      "blessingPlan": "SPEL 1D1FB3:DragonBreak Online Edits.esp (PC pantheons DLE 80dc558d, 18 Oct)",
+      "inBruma": 1,
+      "placements": [
+        "1d1fcf:DragonBreak Online Edits.esp",
+        "1d1fd5:DragonBreak Online Edits.esp"
+      ],
+      "shrines": [
+        "1d1fc2:DragonBreak Online Edits.esp"
+      ]
     },
     {
       "id": "satakal",
@@ -414,11 +485,17 @@
       "kind": "aedra",
       "sphere": "The Worldskin, the god who sheds and eats himself and is renewed; the Walkabout is his.",
       "boon": "Health regenerates 25% faster",
-      "blessing": null,
-      "blessingSource": "pending",
-      "blessingPlan": "SPEL on AlchFortifyHealRate (PC)",
-      "inBruma": 0,
-      "placements": []
+      "blessing": "1d1fb4:DragonBreak Online Edits.esp",
+      "blessingSource": "vanilla",
+      "blessingPlan": "SPEL 1D1FB4:DragonBreak Online Edits.esp (PC pantheons DLE 80dc558d, 18 Oct)",
+      "inBruma": 1,
+      "placements": [
+        "1d1fd0:DragonBreak Online Edits.esp",
+        "1d1fd6:DragonBreak Online Edits.esp"
+      ],
+      "shrines": [
+        "1d1fc3:DragonBreak Online Edits.esp"
+      ]
     },
     {
       "id": "sithis",
@@ -426,13 +503,19 @@
       "kind": "other",
       "sphere": "The Void and the start of all things; the Argonians say they come from Sithis, and the Dark Brotherhood worships Sithis as its Dread Father.",
       "boon": "Sneak +10, Alchemy +10",
-      "blessing": null,
-      "blessingSource": "pending",
-      "blessingPlan": "SPEL on FortifySneakFFSelf + AlchFortifyAlchemy (PC)",
+      "blessing": "1d1fb5:DragonBreak Online Edits.esp",
+      "blessingSource": "vanilla",
+      "blessingPlan": "SPEL 1D1FB5:DragonBreak Online Edits.esp (PC pantheons DLE 80dc558d, 18 Oct)",
       "lawful": false,
       "unlawfulWhere": "Hunted: Sithis is the Dread Father of the Dark Brotherhood, whose members are put to death.",
-      "inBruma": 0,
-      "placements": []
+      "inBruma": 1,
+      "placements": [
+        "1d1fd3:DragonBreak Online Edits.esp",
+        "1d1fdb:DragonBreak Online Edits.esp"
+      ],
+      "shrines": [
+        "1d1fc4:DragonBreak Online Edits.esp"
+      ]
     }
   ]
 }
