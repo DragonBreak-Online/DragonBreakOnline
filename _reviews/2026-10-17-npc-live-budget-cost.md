@@ -296,7 +296,7 @@ most likely the same reach dynamics plus the `!before` logging hole, which is no
 
 ### What came out of it
 
-Two branches, both local, neither pushed, both verified in the sandbox running the **current** server bundle with
+Two branches, both verified in the sandbox running the **current** server bundle with
 the **current** gameplay layer:
 
 - `npcspawn-skip-report-1018` (`d55f539a`, fork, from `origin/main`): a `SkipTally` threaded through `fillSlots`,
@@ -324,3 +324,20 @@ Read the code that is running, not the code that is checked out. This PC's two r
 behind on purpose, and an evening of log archaeology went into eliminating gates that the live server does not
 have and inventing an anchor fault it does not suffer. Anything here that reasons from local source needs the same
 check: `git show origin/<branch>:<file>`, not the working tree.
+
+### Where the two branches stand (18 Oct, 06:10Z)
+
+| Branch | Commit | State |
+|---|---|---|
+| `dungeon-reach-report-1018` (server) | `021aae78` | **pushed to origin** and handed to the CT 115 session with the
+deploy brief. Gated on no open dungeon leases, because the deploy is one hot reload. |
+| `npcspawn-skip-report-1018` (fork) | `d55f539a` | local only. Server-TS, so it needs a `main` push, the native
+rebuild and a restart, which the protocol gates on `/api/servers` showing `online:0`. |
+
+Live's `dungeons.js` was byte-identical to `d1a16b46` when handed over, so only the three dungeon changes travel
+with the gameplay deploy. The PC must never run `deploy-gameplay`: it copies this working tree, 319 commits behind,
+with other sessions' uncommitted edits in it.
+
+A lease watcher ran from 05:46Z to 06:03Z and never saw an empty window: open leases went 3, 3, 3, 2, 2, 3, 3, 2, 3
+with 32 to 35 players on. An empty moment is unlikely at that hour, so the deploy wants a quiet one or a deliberate
+mid-lease reload.

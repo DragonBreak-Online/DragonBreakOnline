@@ -43,7 +43,7 @@ once`. Mzulft and Forelhost agree. There is no anchor fault.
 `origin/main`) and `dungeons.js` (**319** behind `origin/server`). Neither has reach, `givenUp`, `strayHeld` or
 `unseenFalls`. Read the code that runs - `git show origin/<branch>:<file>` - not the working tree.
 
-Two branches came out of it, local and unpushed, both verified in the sandbox on the **current** bundle and the
+Two branches came out of it, both verified in the sandbox on the **current** bundle and the
 **current** gameplay layer:
 - `npcspawn-skip-report-1018` (`d55f539a`, fork, off `origin/main`): the pre-spawn logs one line naming every gate
   that held a slot back (`placed 6/13 slot(s): ambush=1 reachWaiting=6`), and a partly filled zone no longer fills
