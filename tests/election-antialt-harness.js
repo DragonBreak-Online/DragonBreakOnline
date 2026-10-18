@@ -67,7 +67,8 @@ const api = () => ({
   profileOf: (a) => { const c = chars.get(a >>> 0); return c ? c.pid : -1; },
   discordOf: (a) => (chars.get(a >>> 0) || {}).discord || '',
   registerChatCommand: (name, fn, o) => { cmds[name] = { fn, o }; },
-  cfg: cfgOverride || { citizenship: { election: { voterRules: Object.assign({ playersFile: path.join(dir, 'players.json'), deviceFile: path.join(dir, 'device-ids.json'), cacheMinutes: 0 }, rules) } } },
+  // One court runs the vote here, so the unopposed rule (a lone court takes office with no vote) is off
+  cfg: cfgOverride || { citizenship: { election: { unopposedWins: false, voterRules: Object.assign({ playersFile: path.join(dir, 'players.json'), deviceFile: path.join(dir, 'device-ids.json'), cacheMinutes: 0 }, rules) } } },
   every: (nm, ms, f) => { timer = f; },
   zoneList: () => ZONES, zoneById: (id) => ZONES.find((z) => z.id === String(id)) || null, readOfficials: () => officials,
   rankTitle: (r) => ({ jarl: 'Jarl', steward: 'Steward', commander: 'Lord Commander' })[r] || r,
@@ -418,6 +419,7 @@ const shipped = JSON.parse(JSON.stringify(realCfg.citizenship));
 ok(shipped.election.voterRules.oneVotePerDevice === false, 'gamemode-config.json ships oneVotePerDevice: false');
 shipped.election.voterRules = Object.assign({}, shipped.election.voterRules, { playersFile: path.join(dir, 'players.json'), deviceFile: path.join(dir, 'device-ids.json') });
 shipped.discordRoles = {}; shipped.staffReleases = [];
+shipped.election.unopposedWins = false; // one court runs the vote here (a lone court is otherwise seated unopposed)
 fs.rmSync(path.join(dir, 'citizenship.json'), { force: true });
 writeDevices();
 const opened = []; const realRead = fs.readFileSync;

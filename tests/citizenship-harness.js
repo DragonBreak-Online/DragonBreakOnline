@@ -76,12 +76,14 @@ const said = [], audits = [], widgets = [], closed = [], seats = [], unseats = [
 const ui = {};
 let timer = null;
 let nearBoard = new Map();
+// A lone complete court takes office unopposed by default (otome, 18 Oct); the checks below that run a one-court vote turn it off
+const ELECTION = { unopposedWins: false };
 const api = () => ({
   mp, log: () => {}, audit: (t) => audits.push(t), who: (a) => (chars.get(a >>> 0) || {}).name || `actor ${a}`,
   personal: (a, t) => said.push([a >>> 0, t]), nameOf: (a) => chars.get(a >>> 0).name, ownNameOf: (a) => chars.get(a >>> 0).name, tagOf: (a) => `T${(a >>> 0).toString(16)}`,
   onUi: (n, f) => { ui[n] = f; }, onlineActors: () => online.slice(), isAdmin: (a) => a === STAFF || a === GM || a === GMJARL, isLeadStaff: (a) => a === STAFF,
   profileOf: (a) => { const c = chars.get(a >>> 0); return c ? c.pid : -1; },
-  cfg: { citizenship: { discordRoles: { bruma: '1500000000000000001', whiterun: 'not-an-id' }, election: { voterRules: { enabled: false } } } },  // the voter rules: tests/election-antialt-harness.js
+  cfg: { citizenship: { discordRoles: { bruma: '1500000000000000001', whiterun: 'not-an-id' }, election: { voterRules: { enabled: false }, unopposedWins: ELECTION.unopposedWins } } },  // the voter rules: tests/election-antialt-harness.js
   every: (n, ms, f) => { timer = f; },
   zoneList: () => ZONES, zoneById: (id) => ZONES.find((z) => z.id === String(id)) || null, readOfficials: () => officials,
   rankTitle: (r) => ({ count: 'Count', jarl: 'Jarl', steward: 'Steward', commander: 'Lord Commander' })[r] || r,
@@ -341,11 +343,13 @@ ok(E.phase === 'registration' && E.courts.length === 0, 'the one court got no vo
 M.register(rif[0], 'riften', [nm(rif[1]), nm(rif[2]), nm(rif[4])]);
 const k3 = M.data().elections.riften.courts[0].id;
 for (const a of [rif[1], rif[2], rif[4]]) M.answerInvite(a, 'riften', k3, true);
-now += 24 * HOUR; timer();
-M.vote(rif[9], 'riften', k3);
+// From here a lone court is unopposed (the default): it takes office at the close of registration, with no vote
+ELECTION.unopposedWins = true; delete globalThis.__dboCitizen; M = load();
 now += 24 * HOUR; timer();
 E = M.data().elections.riften;
-ok(E.phase === 'seated' && E.result.winner === k3, 'a single court with one vote takes office', E.phase);
+ok(E.phase === 'seated' && E.result.winner === k3 && E.result.unopposed === true && !Object.keys(E.votes || {}).length, 'a single complete court at the close of registration takes office unopposed, no vote', E.phase);
+ok(audits.some((t) => /one complete court at the close of registration; it takes office unopposed/.test(t)), '...audited as unopposed');
+ELECTION.unopposedWins = false; delete globalThis.__dboCitizen; M = load();
 
 // ---- the Jarl candidate loses eligibility: struck off, votes void; and cancel below 15 ----------------------------------
 const FK = { id: 'falkreath', name: 'Falkreath', treasury: 'f', officials: ['jarl', 'steward', 'commander'] };

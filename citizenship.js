@@ -81,7 +81,7 @@ module.exports = (api) => {
 
   // announceChannel: the Discord channel of the election notices (#server-updates); resultLoginDays: how long a citizen logging
   // in is still told the result
-  const E0 = { threshold: 15, registrationHours: 24, votingHours: 24, jarlRaces: ['BretonRace', 'NordRace', 'ImperialRace'], noFactionVoters: true,
+  const E0 = { threshold: 15, registrationHours: 24, votingHours: 24, unopposedWins: true, jarlRaces: ['BretonRace', 'NordRace', 'ImperialRace'], noFactionVoters: true,
     announceChannel: '1555017562700390602', resultLoginDays: 7,
     // The ballot's four seats and where the winner sits: an office of zones.json ('@ruler' = the hold's first office) or a
     // rank of the hold's household (guild-defs.json)
@@ -810,6 +810,13 @@ module.exports = (api) => {
     if (E.phase === 'registration' && now >= E.phaseEndsAt) {
       // Members who lost their eligibility were not replaced in time: their courts drop
       const ok = (E.courts || []).filter((c) => complete(c, z));
+      // A single complete court takes office with no vote: nobody runs against it (otome, 18 Oct)
+      if (ok.length === 1 && EL.unopposedWins !== false) {
+        E.courts = ok; E.ballot = [ok[0].id]; E.votes = {};
+        audit(`ELECTION ${z.name}: one complete court at the close of registration; it takes office unopposed`);
+        elect(z, E, ok[0], { [ok[0].id]: 0 }, true);
+        return true;
+      }
       if (ok.length) {
         E.courts = ok; E.ballot = ok.map((c) => c.id); E.votes = {}; E.voters = {};
         startPhase(E, 'voting', EL.votingHours); snapPlay(z, E); save();
@@ -858,17 +865,21 @@ module.exports = (api) => {
         announce(z, E, 'revote');
         return true;
       }
-      const winner = courtById(E, best[0]);
-      const empty = seatWinner(z, E, winner);
-      E.result = { winner: winner.id, counts, at: Date.now(), empty };
-      data().elected[z.id] = Date.now();   // it has seated a court: every later election there asks for the seven days
-      E.phase = 'seated'; E.phaseEndsAt = 0; E.revote = false; forgetVoters(E, true); save();
-      const j = winner.members.jarl; const struck = struckCount(E);
-      audit(`ELECTION ${z.name}: ${j.name} is elected Jarl with a court of ${SEATS.filter((s) => s.id !== 'jarl').map((s) => `${s.label} ${winner.members[s.id] ? winner.members[s.id].name : '(empty)'}`).join(', ')}${empty.length ? `; empty: ${empty.join(', ')}` : ''}; ${struck} vote(s) struck by staff`);
-      announce(z, E, 'result', { struck, jarl: j.name, empty, court: SEATS.filter((s) => s.id !== 'jarl' && winner.members[s.id] && !empty.includes(s.label)).map((s) => `${s.label} ${winner.members[s.id].name}`).join(', ') });
+      elect(z, E, courtById(E, best[0]), counts, false);
       return true;
     }
     return false;
+  };
+  // The winning court takes office: seated, recorded, audited and announced. unopposed: the only complete court at the close of
+  // registration, seated with no vote (otome, 18 Oct; config election.unopposedWins)
+  const elect = (z, E, winner, counts, unopposed) => {
+    const empty = seatWinner(z, E, winner);
+    E.result = { winner: winner.id, counts, at: Date.now(), empty, unopposed: !!unopposed };
+    data().elected[z.id] = Date.now();   // it has seated a court: every later election there asks for the seven days
+    E.phase = 'seated'; E.phaseEndsAt = 0; E.revote = false; forgetVoters(E, true); save();
+    const j = winner.members.jarl; const struck = struckCount(E);
+    audit(`ELECTION ${z.name}: ${j.name} is elected Jarl with a court of ${SEATS.filter((s) => s.id !== 'jarl').map((s) => `${s.label} ${winner.members[s.id] ? winner.members[s.id].name : '(empty)'}`).join(', ')}${empty.length ? `; empty: ${empty.join(', ')}` : ''}; ${struck} vote(s) struck by staff`);
+    announce(z, E, 'result', { struck, jarl: j.name, empty, court: SEATS.filter((s) => s.id !== 'jarl' && winner.members[s.id] && !empty.includes(s.label)).map((s) => `${s.label} ${winner.members[s.id].name}`).join(', ') });
   };
   const tick = () => {
     if (!C.enabled) return;
