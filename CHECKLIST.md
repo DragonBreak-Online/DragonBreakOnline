@@ -20,6 +20,18 @@ is the known position-desync path and a mechanism for "enemies not where the ser
 Open: 1) the pre-spawn needs to report its skip reasons (`{zones, ambush, notReady, fallen, budget, noAnchor,
 failed, placed}`) - server-TS, not this session's to deploy; 2) decide what a spawn anchors to: drop the dead
 `Anchor` path and own the player-anchor behaviour, or give the server a real per-spot marker.
+
+**Lead 2 (21 of 64 slots), same day:** answered, and it is **exploration, not a failure** - for that lease 21 zones
+were entered, 21 spawned and 21 despawned, so every zone the player walked into produced its enemy and the other 43
+were never visited. Generalising across the window found 671 zones entered and 20 entered-but-never-spawned, of which
+11 are log-rotation artefacts, leaving 9 in dungeons claimed inside the window (CYRFingerbowlCave, Forelhost, Mzulft).
+That residue is **not** sound evidence: `fillSlots` logs a spawn only when the zone was empty on entry (`if (!before)`),
+so filling a second slot logs nothing. The hole is narrow (3 of 37 live dungeon zones are multi-slot), so most of the 9
+are probably real, but it cannot be proven per zone now their rosters have rotated away. The carry theory died too:
+Forelhost slots 3 and 7 were despawned the night before, and `despawn` maps `at < 0` back to `0`.
+
+So both leads end in the same place: **two observability defects**, both server-TS. (1) `fillSlots` has five silent
+skips and no counter. (2) The spawn line is suppressed whenever the zone already held an npc.
 ## Added 2026-10-17: the npc live budget costs latency, not bandwidth - PC session (load test)
 
 Two things, both written up in `_reviews/2026-10-17-npc-live-budget-cost.md`.

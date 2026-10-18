@@ -205,3 +205,55 @@ possible at all: with no anchor of its own, a dungeon's whole pre-spawn hangs on
 
 Not changed: nothing here touches code. The anchor question is a design call, and the instrument needs a server
 build and a deploy, neither of which is this session's.
+
+## 7. Lead 2: the crypt was unexplored, and the log cannot be trusted to prove the rest (18 Oct)
+
+The question: only 21 of Dustman's Cairn's 64 slots ever spawned. Had the player explored a third of it, or
+did two thirds of the ambushes never fire? The spawn system logs zone entry, so the two separate cleanly.
+
+**Answered: exploration.** For that lease, 21 slots were entered, 21 spawned and 21 despawned. Every zone the
+player walked into produced its enemy. The other 43 were never entered. The ambush mechanism is not at fault,
+and nothing in that dungeon failed.
+
+### Generalising it found a residue, and then undermined itself
+
+Across every dungeon in the window: 671 distinct zones entered, 696 spawned, and **20 entered but never**
+**spawned** (the 45 spawned-without-entry are the pre-spawned ones).
+
+Eleven of the 20 are log-rotation artefacts: ShimmermistCave's zones were entered at 00:01-00:02 against a log
+that starts at 00:00:49, and its lease was claimed at 23:41 the night before. That leaves **9 zones in three**
+**dungeons whose leases were claimed inside the window** - CYRFingerbowlCave (claimed 00:28:23, zones entered
+00:28:24), Forelhost (claimed 00:59:40, zones entered the same second and later at 01:06 and 01:22) and Mzulft
+(claimed 04:01:10, zone entered 04:02:47). A player stood inside each and the log shows no spawn.
+
+**But the measurement is not sound, and the reason is a second observability hole.** `fillSlots` logs a spawn
+only when the zone was empty when it started:
+
+```ts
+if (!changed) return;
+if (!before) {                       // before = zone.spawned.length on entry
+  this.log(`... spawned ${zone.spawned.length}/${zone.total} npc(s) ...`);
+}
+```
+
+So filling a second slot in a zone that already holds an NPC logs nothing at all. The hole is narrow - 3 of 37
+live dungeon zones are multi-slot, 34 of 3270 wild ones, and the death-refill path logs separately (121
+`respawned` lines) - so most of the 9 are probably real silent non-spawns. It cannot be proven per zone, because
+those leases' rosters have rotated out of the log.
+
+### Why this stops here
+
+Every candidate for the 9 is eliminated the same way as in section 6: the player was inside, so `anchorIn`
+returns them and the anchor gate cannot fire; `spawnOne` logs every throw and there are none; no budget lines; no
+fallen-spot records. And the carry theory - a re-claimed dungeon inheriting `NEVER_READY` through
+`replaceZones` - does not survive its own test: Forelhost slots 3 and 7 were **despawned** at 20:26:49 the night
+before, and `despawn` maps `at < 0` back to `0`, so they were ready.
+
+Two observability defects, both worth fixing before anyone theorises further:
+
+1. `fillSlots` has five silent `continue`/`break` paths and no counter. It should report
+   `{zones, ambush, notReady, fallen, budget, noAnchor, failed, placed}` per pass.
+2. The spawn line is suppressed whenever `before > 0`. A zone that fills its second slot should say so, or the
+   log cannot be used to ask "did this zone ever produce its enemy".
+
+Both are server-TS, so neither is this session's to deploy.
