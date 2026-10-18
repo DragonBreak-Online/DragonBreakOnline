@@ -123,6 +123,17 @@ module.exports = (api) => {
     // within radiusMeters of it. The student learns as a lesson does; a member is taught up to the rank they may buy, and
     // never below studentMinCap (Apprentice), so an Initiate or a smith can still be taught their first spells.
     collegeTeach: { enabled: true, radiusMeters: 15, studentMinCap: 1 },
+    // Teaching a spell from a tome at a class (Nate, 18 Oct, from Swag's lectern spec). The rules the spell half of a
+    // class answers to, kept apart from the class's own progression and from the tome shop:
+    //   tomeOnly      the teacher must HOLD a tome of the spell; the day's tome purchase no longer stands in for one
+    //   maxRank       the highest spell rank that may be taught at all (2 = Adept; Expert and Master never)
+    //   teacherRank   the teacher's rank needed IN THE SPELL'S OWN SCHOOL, by the spell's rank: a Novice spell wants an
+    //                 Adept, an Apprentice spell an Expert, an Adept spell a Master. A high rank in another school is
+    //                 nothing here.
+    //   teacherHours / studentHours   cooldowns of this system alone, kept in their own records
+    //                 (private.dboTomeClassTaught, private.dboTomeClassLearned), so using this never delays a regular
+    //                 class and a regular class never delays this.
+    tomeClass: { enabled: true, tomeOnly: true, maxRank: 2, teacherRank: [2, 3, 4], teacherHours: 6, studentHours: 20 },
     // Tomes the Synod sells to Senior ranks although the province does not stock them (Elion and Aldemar: Banish Daedra
     // is a Skyrim tome, so the conjuration teacher could never buy it). Tome editor ids.
     shopSeniorTomes: ['SpellTomeBanishDaedra'],
@@ -1102,6 +1113,11 @@ module.exports = (api) => {
     }
     return 0;
   };
+  // This system's own waits, in records nothing else reads (Nate, 18 Oct: completely independent of the regular class)
+  const TOME_CLASS_PROP = { taught: 'private.dboTomeClassTaught', learned: 'private.dboTomeClassLearned' };
+  const tomeClassAt = (a, which) => Number(get(a, TOME_CLASS_PROP[which], 0)) || 0;
+  const tomeClassWait = (a, which, hours) => Math.max(0, tomeClassAt(a, which) + (Number(hours) || 0) * 3600000 - Date.now());
+  const markTomeClass = (a, which) => { try { set(a, TOME_CLASS_PROP[which], Date.now()); } catch (e) { /* offline */ } };
   const takeOneItem = (a, baseId) => {
     const entries = inventoryOf(a).map((e) => Object.assign({}, e));
     const i = entries.findIndex((e) => (Number(e.baseId) >>> 0) === (baseId >>> 0) && !e.worn && Number(e.count) > 0);
@@ -1222,6 +1238,22 @@ module.exports = (api) => {
     if (!onlineActors().includes(student >>> 0)) return `${display(student)} is not here.`;
     if (!((knows(teacher, sp.id) && !onLoan(teacher, sp.id)) || inBook(teacher, sp.id))) return `${display(teacher)} can no longer teach ${sp.name}.`;
     if (restrictedSpell(sp.id) && !isSenior(student)) return `${RESTRICTED_LINE}.`;
+    const TC = Object.assign({ enabled: true, tomeOnly: true, maxRank: 2, teacherRank: [2, 3, 4], teacherHours: 6, studentHours: 20 }, CFG.tomeClass || {});
+    if (TC.enabled !== false) {
+      // Only Novice to Adept spells are ever taught this way
+      if (Number(sp.rank) > Number(TC.maxRank)) return `${RANKS[sp.rank]} spells are not taught from a tome; ${sp.name} must be studied.`;
+      // The teacher's rank in THE SPELL'S OWN school, never another's
+      const want = Number((TC.teacherRank || [])[Number(sp.rank)]);
+      const skill = bookSkillFor(teacher, sp);
+      const have = skill && skill.id ? tierOf(teacher, skill.id) : -1;
+      if (Number.isFinite(want) && have < want) return `${display(teacher)} must be ${RANKS[want]} in ${sp.school} to teach ${RANKS[sp.rank]} spells of it.`;
+      // The tome has to be in the teacher's hands, not bought from the day's allowance
+      if (TC.tomeOnly && !heldTomeOf(teacher, sp.id)) return `${display(teacher)} carries no tome of ${sp.name}.`;
+      const tWait = tomeClassWait(teacher, 'taught', TC.teacherHours);
+      if (tWait > 0) return `${display(teacher)} taught from a tome not long ago; the next is theirs in ${waitText(tWait)}.`;
+      const sWait = tomeClassWait(student, 'learned', TC.studentHours);
+      if (sWait > 0) return `${display(student)} learned from a tome not long ago; the next is theirs in ${waitText(sWait)}.`;
+    }
     const cap = classStudentCap(student);
     if (Number(sp.rank) > cap) return `At your rank you may be taught spells up to ${RANKS[cap]}; ${sp.name} is ${/^[AEIOU]/.test(rankWord(sp.rank)) ? 'an' : 'a'} ${rankWord(sp.rank)} spell.`;
     if (knows(student, sp.id) || inBook(student, sp.id)) return 'known';
@@ -1265,6 +1297,8 @@ module.exports = (api) => {
     const skill = bookSkillFor(student, sp);
     migrate(student);
     writeStudied(student, skill.id, studiedIds(student, skill.id).concat([sp.id]));
+    // This system's own waits start only now, when the spell has actually been handed over (Nate, 18 Oct)
+    if ((CFG.tomeClass || {}).enabled !== false) { markTomeClass(o.teacher, 'taught'); markTomeClass(student, 'learned'); }
     const line = settleNew(student, sp, false);
     personal(student, `${display(o.teacher)} teaches you ${spellLabel(sp)}. ${line}`);
     if (onlineActors().includes(o.teacher)) personal(o.teacher, `${display(student)} learned ${sp.name} from your class.`);
