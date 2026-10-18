@@ -156,6 +156,124 @@ void InstallFaceMorphJobHook()
   spdlog::info("FaceMorphJobUpdate: hook installed");
 }
 
+// TESTrapListener updates each trap's hit on a target through TrapTargetEntry vtable slot 1 (AE 26032), which reads the
+// trap's Havok object (TrapEntry +0x18) without checking that the trap still exists. A trap whose reference was
+// deleted, disabled or unloaded under a live hit (a RemovableTorch01's flame, 16 Oct) leaves that object freed, and
+// 26034+0x1C1 reads through it. The slot already reports "done" (*a_done = 1) when the target is gone; a trap that no
+// longer resolves, or has no 3D, gets the same answer.
+struct TrapTargetUpdate
+{
+  static void thunk(void* a_target, void* a_trap, std::uint8_t* a_done)
+  {
+    if (a_trap) {
+      const auto handle = *reinterpret_cast<const RE::RefHandle*>(
+        reinterpret_cast<std::uintptr_t>(a_trap) + 0x20);
+      auto ref = RE::TESObjectREFR::LookupByHandle(handle);
+      if (!ref || ref->IsDisabled() || ref->IsDeleted() || !ref->Get3D()) {
+        if (a_done) {
+          *a_done = 1;
+        }
+        return;
+      }
+    }
+    func(a_target, a_trap, a_done);
+  };
+  static inline REL::Relocation<decltype(&thunk)> func;
+};
+
+// The animation file manager's completion job (AE 63997, called from 63974 and 63980) walks its load requests and calls
+// each active one back through a raw pointer: a function (+0x48) or a listener's vtable slot 1 (+0x40). A listener freed
+// while its load was pending (an animation graph torn down with its actor) leaves that pointer dangling, and the call
+// jumps to address 0 (crash 17 Oct, 63997+0xC4). Before the job runs, a request whose callback does not lead into a
+// loaded module is marked inactive (+0x60), which every loop of the job checks, so it is neither locked nor called.
+namespace AnimLoadGuard {
+bool InModule(std::uintptr_t p)
+{
+  HMODULE m = nullptr;
+  return p && GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
+                                   GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+                                 reinterpret_cast<LPCSTR>(p), &m) &&
+    m;
+}
+
+bool CallbackValid(std::uintptr_t req)
+{
+  const auto fn = *reinterpret_cast<std::uintptr_t*>(req + 0x48);
+  if (fn) {
+    return InModule(fn);
+  }
+  const auto listener = *reinterpret_cast<std::uintptr_t*>(req + 0x40);
+  if (!listener || IsBadReadPtr(reinterpret_cast<void*>(listener), 8)) {
+    return false;
+  }
+  const auto vtbl = *reinterpret_cast<std::uintptr_t*>(listener);
+  if (!InModule(vtbl) || IsBadReadPtr(reinterpret_cast<void*>(vtbl), 16)) {
+    return false;
+  }
+  return InModule(*reinterpret_cast<std::uintptr_t*>(vtbl + 8));
+}
+}
+
+struct AnimLoadJob
+{
+  static std::uint64_t thunk(std::uintptr_t job)
+  {
+    if (job) {
+      const auto count = *reinterpret_cast<std::uint32_t*>(job + 0x98);
+      const auto reqs = *reinterpret_cast<std::uintptr_t**>(job + 0x88);
+      for (std::uint32_t i = 0; reqs && i < count; ++i) {
+        const auto req = reqs[i];
+        if (req && *reinterpret_cast<std::uint8_t*>(req + 0x60) &&
+            !AnimLoadGuard::CallbackValid(req)) {
+          *reinterpret_cast<std::uint8_t*>(req + 0x60) = 0;
+          spdlog::warn("AnimLoadJob: skipped a load request whose listener "
+                       "no longer exists");
+        }
+      }
+    }
+    return func(job);
+  };
+  static inline REL::Relocation<decltype(&thunk)> func;
+};
+
+void InstallAnimLoadJobHook()
+{
+  if (!REL::Module::IsAE()) {
+    return;
+  }
+  const auto job = REL::ID(63997).address();
+  const std::uintptr_t sites[] = { REL::ID(63974).address() + 0x22a,
+                                   REL::ID(63980).address() + 0x1a0 };
+  for (const auto site : sites) {
+    const auto bytes = reinterpret_cast<const std::uint8_t*>(site);
+    if (bytes[0] != 0xE8 ||
+        site + 5 + *reinterpret_cast<const std::int32_t*>(bytes + 1) != job) {
+      spdlog::warn("AnimLoadJob: call site not found, hook not installed");
+      return;
+    }
+  }
+  for (const auto site : sites) {
+    Hooks::write_thunk_call<AnimLoadJob>(site);
+  }
+  spdlog::info("AnimLoadJob: hook installed");
+}
+
+void InstallTrapTargetHook()
+{
+  if (!REL::Module::IsAE()) {
+    return;
+  }
+  REL::Relocation<std::uintptr_t> vtbl{ RE::VTABLE_TrapTargetEntry[0] };
+  if (vtbl.address() == 0 ||
+      *reinterpret_cast<std::uintptr_t*>(vtbl.address() + 8) !=
+        REL::ID(26032).address()) {
+    spdlog::warn("TrapTargetUpdate: vtable slot not found, hook not installed");
+    return;
+  }
+  TrapTargetUpdate::func = vtbl.write_vfunc(1, TrapTargetUpdate::thunk);
+  spdlog::info("TrapTargetUpdate: hook installed");
+}
+
 void BindNativeMethod(RE::BSScript::Internal::VirtualMachine* thisArg,
                       RE::BSScript::IFunction* func);
 
@@ -228,6 +346,8 @@ void Hooks::Install()
   InstallJumpHandlerHook();
   InstallQueuedActorDisableHook();
   InstallFaceMorphJobHook();
+  InstallTrapTargetHook();
+  InstallAnimLoadJobHook();
   HookVirtualMachineBind();
 
   logger::info("CommonLib hooks installed.");
