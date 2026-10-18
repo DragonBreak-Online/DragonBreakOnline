@@ -1,5 +1,27 @@
 [
   {
+    "title": "Poisons work",
+    "date": "2026-10-18",
+    "version": "Hotfix",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Weapon poisons",
+        "items": [
+          "A poison you put on a weapon now takes effect when the blow lands. It does its damage at once, and lingering poisons keep draining for their duration. Each coat is used up by one blow. A blocked blow carries no poison.",
+          "Poison damage is a share of the target's own health, so it hurts a large creature and a small one alike. A poison never lands the killing blow: it leaves the target on its last sliver of health, and your next strike finishes them."
+        ]
+      },
+      {
+        "heading": "Poison and burning spells",
+        "items": [
+          "Spells that do damage over time, such as Toxic Missile, Toxic Volley, Searing Poison and Ignite, now do their full damage. Before, only the first second landed, so a 10-second poison did a tenth of what it says.",
+          "Casting the spell again restarts the effect rather than stacking it. A held spell like Toxic Volley keeps its lingering damage until you let go. Like weapon poisons, this lingering damage never lands the killing blow."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Skinning tells you when a hide is beyond you",
     "date": "2026-10-18",
     "version": "Hotfix",

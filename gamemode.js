@@ -6210,6 +6210,7 @@ const hitDamageHook = (aggressorId, targetId, sourceId, damage, ...rest) => {
   try { if (globalThis.__dboAggroHit && dealt > 0) globalThis.__dboAggroHit(agg, tgt); } catch (e) { log('aggro hit failed', e.message); }
   try { if (globalThis.__dboCompanionHitLanded) globalThis.__dboCompanionHitLanded(agg, tgt); } catch (e) { log('companion hit log failed', e.message); }
   try { if (globalThis.__dboNpcMoodHit) globalThis.__dboNpcMoodHit(agg, tgt, Number(sourceId) >>> 0); } catch (e) { log('npc mood hit failed', e.message); }
+  try { if (globalThis.__dboSpellDotLanded) globalThis.__dboSpellDotLanded(agg, tgt, Number(sourceId) >>> 0); } catch (e) { log('spell dot failed', e.message); }
   const prev = globalThis.__dboPrevHitDamage;
   if (prev) { try { return prev(aggressorId, targetId, sourceId, dealt, ...rest); } catch (e) { log('hit damage chain failed', e.message); } }
   return undefined;
@@ -7609,6 +7610,8 @@ const hitDamageAttemptHook =(aggressorId, targetId, sourceId, damage, flags) => 
     }
     // The health before anything below changes it: the give-back measures the hit from here
     const before = mp.get(tgt, 'percentages');
+    // A player's damage-over-time spell measures its ticks from here too (spelldot.js)
+    try { if (globalThis.__dboSpellDotAttempt && before) globalThis.__dboSpellDotAttempt(agg, tgt, src, Number(before.health)); } catch (e) { log('spell dot attempt failed', e.message); }
     // A player's hit on a kind of creature or NPC (npcDamage.takenByKind): more lands before the engine's hit when it can
     // (weapon hits), else it joins the give-back's mult like any other factor
     // and on a family of creatures whose health the server leaves far above their level's (npcToughness; the draugr, 17 Oct)
@@ -8536,6 +8539,12 @@ try {
   require(CHARTERS_JS)({ mp, log, ownNameOf, ownDisplay, displayFor, personal, audit, who, display, nameOf, cfg, registerChatCommand, onlineActors, isAdmin, isLeadStaff,
     findByName, profileOf, takeGold, giveItem, every, staffNote, approvalForum });
 } catch (e) { log('charters.js failed to load:', e.stack || e.message); }
+// ---- damage over time from a player's spell: the duration the spell formula never deals (server\spelldot.js) --------
+try {
+  const SPELLDOT_JS = path.resolve('spelldot.js');
+  delete require.cache[SPELLDOT_JS];
+  require(SPELLDOT_JS)({ mp, log, cfg, every, recordOf, profileOf, display });
+} catch (e) { log('spelldot.js failed to load:', e.stack || e.message); globalThis.__dboSpellDotAttempt = null; globalThis.__dboSpellDotLanded = null; }
 // ---- alchemy at the ordinary labs: the nearest vanilla potion for a client-side mix (server alchemy.js) ------------
 try {
   const ALCHEMY_JS = path.resolve('alchemy.js');
