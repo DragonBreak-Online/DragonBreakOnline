@@ -5,6 +5,8 @@
 #include <chrono>
 #include <cstdlib>
 #include <cstring>
+#include <iterator>
+#include <unordered_set>
 
 namespace {
 constexpr float kFullRateUnits = 2000.f;
@@ -13,12 +15,15 @@ constexpr float kGridSquareUnits = 4096.f;
 constexpr uint32_t kMidIntervalMs = 500;   // 2/s within one grid square
 constexpr uint32_t kFarIntervalMs = 2000;  // 0.5/s in the rest of the block
 constexpr uint64_t kCombatPinMs = 10000;
-constexpr uint64_t kFlushEveryMs = 50;
+constexpr uint64_t kFlushEveryMs = 100;
 constexpr uint64_t kWindowMs = 1000;
 constexpr uint64_t kForgetMs = 10000;
 // About 32 movers at the clients' 130 ms send rate
 constexpr uint32_t kFullSendsPerSecond = 250;
 constexpr uint32_t kCoalescedSendsPerSecond = 200;
+// Each flush spends an even slice of the per-second budget, so one flush can't take a whole second's worth
+constexpr uint32_t kCoalescedPerFlush =
+  (kCoalescedSendsPerSecond * kFlushEveryMs + kWindowMs - 1) / kWindowMs;
 
 uint64_t PairKey(uint32_t a, uint32_t b)
 {
@@ -99,23 +104,16 @@ void MovementRelay::Submit(MpActor& emitter, Networking::UserId senderUserId,
       continue;
     }
 
+    // Coalesced: only the newest position waits, overwriting the last. Flush sends it, oldest-waiting first, so arrival
+    // order can't decide who gets the budget
     auto& p = pending[key];
     p.userId = userId;
     p.lastTouchedMs = now;
     p.intervalMs = dist2 <= kGridSquareUnits * kGridSquareUnits
       ? kMidIntervalMs
       : kFarIntervalMs;
-    if (now - p.lastSentMs >= p.intervalMs &&
-        ls.coalescedSentThisSecond < kCoalescedSendsPerSecond) {
-      Send(userId, data, length);
-      ++ls.coalescedSentThisSecond;
-      p.lastSentMs = now;
-      p.dirty = false;
-    } else {
-      // Coalesced: only the newest position waits, overwriting the last
-      p.data.assign(data, data + length);
-      p.dirty = true;
-    }
+    p.data.assign(data, data + length);
+    p.dirty = true;
   }
 }
 
@@ -131,6 +129,14 @@ void MovementRelay::RetuneWindow(uint64_t now)
     }
     ls.fullThisWindow = 0;
     ls.coalescedSentThisSecond = 0;
+  }
+  // A listener with nothing waiting is dropped; Submit recreates it with the full radius
+  std::unordered_set<Networking::UserId> waiting;
+  for (auto& [key, p] : pending) {
+    waiting.insert(p.userId);
+  }
+  for (auto it = listeners.begin(); it != listeners.end();) {
+    it = waiting.count(it->first) ? std::next(it) : listeners.erase(it);
   }
   for (auto it = pending.begin(); it != pending.end();) {
     if (now - it->second.lastTouchedMs > kForgetMs) {
@@ -159,17 +165,33 @@ void MovementRelay::Flush()
     windowStartMs = now;
     RetuneWindow(now);
   }
+  // Due positions per listener; when there are more than the budget allows, the ones that waited longest go first, and
+  // each one sent goes to the back of the line: round-robin, so a crowd slows everyone instead of freezing a fixed tail
+  std::unordered_map<Networking::UserId, std::vector<Pending*>> due;
   for (auto& [key, p] : pending) {
-    if (!p.dirty || now - p.lastSentMs < p.intervalMs) {
-      continue;
+    if (p.dirty && now - p.lastSentMs >= p.intervalMs) {
+      due[p.userId].push_back(&p);
     }
-    auto& ls = listeners[p.userId];
+  }
+  for (auto& [userId, list] : due) {
+    auto& ls = listeners[userId]; // exists: Submit created it with the entry
     if (ls.coalescedSentThisSecond >= kCoalescedSendsPerSecond) {
       continue;
     }
-    Send(p.userId, p.data.data(), p.data.size());
-    ++ls.coalescedSentThisSecond;
-    p.lastSentMs = now;
-    p.dirty = false;
+    const uint32_t left = std::min<uint32_t>(
+      kCoalescedPerFlush, kCoalescedSendsPerSecond - ls.coalescedSentThisSecond);
+    if (list.size() > left) {
+      std::nth_element(list.begin(), list.begin() + left, list.end(),
+                       [](const Pending* a, const Pending* b) {
+                         return a->lastSentMs < b->lastSentMs;
+                       });
+      list.resize(left);
+    }
+    for (auto p : list) {
+      Send(p->userId, p->data.data(), p->data.size());
+      ++ls.coalescedSentThisSecond;
+      p->lastSentMs = now;
+      p->dirty = false;
+    }
   }
 }
