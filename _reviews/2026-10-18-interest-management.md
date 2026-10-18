@@ -233,3 +233,31 @@ See `2026-10-18-250-and-500.md`. Three numbers above are wrong and one argument 
   client, with the evictions counted.
 
 The ladder itself survives unchanged in shape. What changed is its size, and the reason for it.
+
+## 9. The spread row is now measured, not modelled (same day)
+
+The harness can now place bots in groups across the worldspace (`--scatter`, `--groups`), with anchors taken from
+vanilla wildlife placements and thinned so no two clusters are inside each other's 3x3 block. Section 3's spread
+column was a model; here are the measurements, same server, same 180 s window:
+
+| 250 players | crowded | spread, 25 groups of 10 |
+|---|---|---|
+| total movement | 407,938/s | **18,553/s** |
+| per client | 1,632/s | **74/s** |
+| server CPU | 1.11 cores | 0.43 cores |
+| tick p99 | 62.1 ms | 17.8 ms |
+| loop lag p99 | 70.2 ms (**fails** the gate) | 25.8 ms (**passes**) |
+
+At 50 players the same comparison is 43,269/s crowded against 1,835/s in 10 groups of 5.
+
+**The same 250 players pass the capacity gate spread and fail it crowded.** The relay's problem is crowding, not
+population, which is the premise of this whole design and is now measured rather than argued.
+
+The per-emitter view shows the mechanism directly. For one bot in the 250-player spread run: its nine
+cluster-mates at 101 to 781 units delivered about 1,500 messages each over the window (7.1/s, full rate), and
+then a cliff - 4 messages each from bots at about 11,800 units, which is a boundary crossing or a login, nothing
+more. Beyond one grid cell the traffic is already effectively zero without any interest management at all.
+
+Which sharpens what the ladder is for: it does nothing for a spread server, and everything for a crowd. The
+budget should therefore be judged against the crowded case only, and the mid and far tiers exist to make a crowd
+behave like a spread - not to save bandwidth on a quiet night.

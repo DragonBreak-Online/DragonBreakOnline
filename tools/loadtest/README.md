@@ -161,6 +161,23 @@ Honest limits, measured rather than assumed:
   with 12 bots: near 44.5/s from 6.3 movers, mid 32.2/s from 4.6, own echo 7/s, and every mover in the busiest
   list on exactly 492 messages in 70 s (7.0/s) whether it stood 307 units away or 2,615.
 
+- **Two scenarios: crowded and spread.** By default every bot stands in one place (`--spread city`), which is the
+  worst case for the movement relay and the only one the harness could do before 18 Oct. `--scatter [units]`
+  instead spreads them in groups across the worldspace, and `--groups N` says how many groups, so 250 bots with
+  `--groups 25` is 25 clusters of 10. Anchors are taken from the vanilla wildlife placements in
+  `NPC-Spawns.json`, which are known-good ground in the right world, thinned greedily so no two are inside each
+  other's 3x3 grid block: the default separation of 8192 units is two grid cells, and the block only reaches one
+  cell out, so clusters cannot see each other at all.
+
+  The difference is the whole point of interest management. 50 bots, same server, 90 s:
+
+      crowded            43,269 msg/s total, 865 per bot
+      10 groups of 5      1,835 msg/s total,  37 per bot
+
+  and the interest check shows why: inside a cluster each neighbour still arrives at 7.1/s, while the mid and far
+  bands deliver 0/s because the other groups are outside the block. The report names the scenario in its Mode
+  line, so no number is ever ambiguous about which one produced it.
+
 ## Options
 
     --target sandbox|live     default sandbox
@@ -169,6 +186,9 @@ Honest limits, measured rather than assumed:
     --bots N                  for "dry"
     --dungeons                claim the dungeons in config.json ("--dungeons id1,id2" for your own, "none" for off)
     --spread city|arrival     where the bots play (config.json "places")
+    --scatter [units]         spread the bots in groups instead of one crowd (default 8192 = two grid cells)
+    --groups N                how many groups to use (default: as many anchors as exist)
+    --cluster-radius 600      how far a bot wanders from its group anchor
     --full-units 2000         the interest check: near band, in game units (passed to BotHost)
     --mid-units 4096          the interest check: mid band; beyond it is far
     --measure-bytes           route every bot through a counting UDP relay for real wire bytes (costs a hop,

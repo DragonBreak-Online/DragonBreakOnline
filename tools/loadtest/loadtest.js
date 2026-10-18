@@ -262,6 +262,26 @@ class Runner {
       },
     });
     this.place = CFG.places[args.spread || CFG.spread] || CFG.places.city;
+    // --scatter [units]: groups spread across the world instead of one crowd (default 2 grid cells apart)
+    // --scatter alone arrives as true, and Number(true) is 1, which would thin nothing
+    this.scatterSep = args.scatter === undefined ? 0
+      : (args.scatter === true ? 8192 : (Number(args.scatter) || 8192));
+    this.clusterRadius = Number(args.clusterRadius || 600);
+    this.anchors = null;
+    if (this.scatterSep > 0) {
+      try {
+        this.anchors = scatterAnchors(this.place.world, this.scatterSep);
+        // --groups N uses only N of them, so each cluster has members: N groups of bots/N
+        const groups = Number(this.args.groups || 0);
+        if (groups > 0 && groups < this.anchors.length) this.anchors = this.anchors.slice(0, groups);
+        if (!this.anchors.length) { this.anchors = null; log('scatter: no anchors in ' + this.place.world + ', staying crowded'); }
+        else log('scatter: ' + this.anchors.length + ' anchor(s) at least ' + this.scatterSep + ' units apart, cluster radius ' + this.clusterRadius);
+      } catch (e) { log('scatter: cannot read NPC-Spawns.json (' + e.message + '), staying crowded'); }
+    }
+    // the report says which scenario produced its numbers
+    this.cfg.scatter = this.anchors
+      ? { anchors: this.anchors.length, separation: this.scatterSep, clusterRadius: this.clusterRadius }
+      : null;
     // Verified through the creation-kit MCP on 2026-09-19: 13746:Skyrim.esm is RACE NordRace
     this.raceId = Number(args.raceId || 0x00013746);
     this.jobs = [];
@@ -280,7 +300,7 @@ class Runner {
   }
 
   makeBot(i) {
-    const home = spreadPoint(this.place, i);
+    const home = this.anchors ? scatterPoint(this.anchors, i, this.clusterRadius) : spreadPoint(this.place, i);
     const bot = new Bot({
       id: i,
       profileId: Number(this.args.profileBase || CFG.profileIdBase) + i,
@@ -291,7 +311,7 @@ class Runner {
       seed: 1000 + i,
       raceId: this.raceId,
       home,
-      homeRadius: Math.min(1200, this.place.radius),
+      homeRadius: this.anchors ? this.clusterRadius : Math.min(1200, this.place.radius),
       useWarp: !this.args.noWarp,
       botActorIds: this.botActorIds,
       targetWorld: this.targetWorld,
@@ -377,6 +397,37 @@ class Runner {
     for (const bot of this.bots) { if (bot) states[bot.state] = (states[bot.state] || 0) + 1; }
     return { totals, host, states };
   }
+}
+
+// The scatter scenario: small groups spread across the worldspace instead of one crowd, so the fan-out can be
+// measured when players are NOT all in one 3x3 grid block. Anchors come from the vanilla wildlife placements in
+// NPC-Spawns.json, which are known-good ground in the right world, thinned greedily so no two are inside each
+// other's block (>= 8192 units, two grid cells; the block only reaches one cell out).
+function scatterAnchors(world, separation) {
+  const file = path.join(SERVER_DIR, 'NPC-Spawns.json');
+  const parsed = JSON.parse(fs.readFileSync(file, 'utf8'));
+  const key = Array.isArray(parsed) ? null : Object.keys(parsed).find((k) => k.toLowerCase() === 'zones');
+  const list = Array.isArray(parsed) ? parsed : (key ? parsed[key] : []);
+  const want = String(world).toLowerCase();
+  const pts = (list || [])
+    .filter((z) => z && Array.isArray(z.POS) && String(z.ID || '').toLowerCase() === want)
+    .map((z) => [Number(z.POS[0]), Number(z.POS[1]), Number(z.POS[2])])
+    .filter((p) => p.every(Number.isFinite));
+  pts.sort((a, b) => (a[0] - b[0]) || (a[1] - b[1]));   // deterministic, so a run is repeatable
+  const out = [];
+  for (const p of pts) {
+    if (out.every((q) => Math.hypot(p[0] - q[0], p[1] - q[1]) >= separation)) out.push(p);
+  }
+  return out;
+}
+
+// One bot's standing place: a point in its cluster when scattering, otherwise the ring inside the place
+function scatterPoint(anchors, i, clusterRadius) {
+  const a = anchors[i % anchors.length];
+  const golden = 2.399963229728653;
+  const ang = i * golden;
+  const r = clusterRadius * Math.sqrt(((i / anchors.length | 0) % 16) / 16);
+  return [a[0] + Math.cos(ang) * r, a[1] + Math.sin(ang) * r, a[2]];
 }
 
 function spreadPoint(place, i) {
