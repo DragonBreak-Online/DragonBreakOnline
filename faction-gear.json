@@ -6435,6 +6435,160 @@
    "recipes": [
     "231d9:Hothtrooper44_ArmorCompilation.esp"
    ]
+  },
+  "84136:BSHeartland.esm": {
+   "name": "College of Whispers Hood",
+   "set": "College of Whispers",
+   "factions": [
+    "college-of-whispers"
+   ],
+   "role": "tailor",
+   "recipes": [
+    "864:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "8e2:Sentinel.esp": {
+   "name": "Wolf Armor",
+   "set": "Companions",
+   "factions": [
+    "companions"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "aa6:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "8e1:Sentinel.esp": {
+   "name": "Wolf Boots",
+   "set": "Companions",
+   "factions": [
+    "companions"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "aa5:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "8e3:Sentinel.esp": {
+   "name": "Wolf Gauntlets",
+   "set": "Companions",
+   "factions": [
+    "companions"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "aa7:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "8da:Sentinel.esp": {
+   "name": "Wolf Shield",
+   "set": "Companions",
+   "factions": [
+    "companions"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "a9e:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "50c6:Dawnguard.esm": {
+   "name": "Dawnguard Armor",
+   "set": "Dawnguard",
+   "factions": [
+    "dawnguard"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "948:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "50c5:Dawnguard.esm": {
+   "name": "Dawnguard Boots",
+   "set": "Dawnguard",
+   "factions": [
+    "dawnguard"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "949:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "50c7:Dawnguard.esm": {
+   "name": "Dawnguard Gauntlets",
+   "set": "Dawnguard",
+   "factions": [
+    "dawnguard"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "947:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "f0d:JK's Fort Dawnguard.esp": {
+   "name": "Dawnguard War Axe SPR",
+   "set": "Dawnguard",
+   "factions": [
+    "dawnguard"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "afe:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "b31:Sentinel.esp": {
+   "name": "Stormcloak Battleaxe",
+   "set": "Stormcloaks",
+   "factions": [
+    "stormcloaks"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "ad2:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "b30:Sentinel.esp": {
+   "name": "Stormcloak Bearded Axe",
+   "set": "Stormcloaks",
+   "factions": [
+    "stormcloaks"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "ad1:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "b2f:Sentinel.esp": {
+   "name": "Stormcloak Greatsword",
+   "set": "Stormcloaks",
+   "factions": [
+    "stormcloaks"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "ad0:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "b2e:Sentinel.esp": {
+   "name": "Stormcloak Sword",
+   "set": "Stormcloaks",
+   "factions": [
+    "stormcloaks"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "acf:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "b40:Sentinel.esp": {
+   "name": "Stormcloak War Axe",
+   "set": "Stormcloaks",
+   "factions": [
+    "stormcloaks"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "ad7:DragonBreak Nexus Patches.esp"
+   ]
   }
  },
  "_uniformsComment": "War uniforms (realm.js, config war.uniforms): in a battle only fighters wearing a body piece of their faction's uniform count at a standard. A faction's uniform is its items above plus these worn-only extras; a faction with neither (the Fighters Guild today) is not held to it.",
