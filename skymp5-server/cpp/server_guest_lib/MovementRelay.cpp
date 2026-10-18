@@ -122,10 +122,13 @@ void MovementRelay::RetuneWindow(uint64_t now)
   for (auto& [userId, ls] : listeners) {
     const float max2 = kFullRateUnits * kFullRateUnits;
     const float min2 = kMinFullRateUnits * kMinFullRateUnits;
+    // Shrink fast when over the full-rate allowance, regrow gently while clearly under it. Regrowing only below 60%
+    // left a crowd's full tier at ~160 of 250 sends a second (Worker B, 500 crowded): a dense crowd's movers scale with
+    // radius squared, so the radius settled at the bottom of the band
     if (ls.fullThisWindow > kFullSendsPerSecond) {
-      ls.fullRadius2 = std::max(min2, ls.fullRadius2 * 0.7f);
-    } else if (ls.fullThisWindow < kFullSendsPerSecond * 6 / 10) {
-      ls.fullRadius2 = std::min(max2, ls.fullRadius2 * 1.3f);
+      ls.fullRadius2 = std::max(min2, ls.fullRadius2 * 0.8f);
+    } else if (ls.fullThisWindow < kFullSendsPerSecond * 85 / 100) {
+      ls.fullRadius2 = std::min(max2, ls.fullRadius2 * 1.1f);
     }
     ls.fullThisWindow = 0;
     ls.coalescedSentThisSecond = 0;
