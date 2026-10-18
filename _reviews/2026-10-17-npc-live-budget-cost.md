@@ -154,3 +154,54 @@ selection works.
 NOT verified in game: the partial-count wording (the same correct `waiting` choosing the other template), and
 that the chat line reaches a player - the bots count chat messages but do not keep their text. It uses the same
 `system()` helper as the claim messages beside it.
+
+## 6. Lead 1: why a claim pre-spawns nothing, and a feature that cannot work (18 Oct)
+
+The question: Dustman's Cairn is 46 of 64 in ambush, so 18 enemies stand in the open, and the 03:44 claim
+pre-spawned **0**. Ambush does not explain that dungeon. What skipped the 18?
+
+### Eliminated, each from the live log
+
+| Candidate | Evidence against |
+|---|---|
+| The npc budget | Not one `at the budget of` line in the whole log. Live budget is 600 and was never reached |
+| A zone-file load race | `3359/3359 zone(s) loaded (gamemode), carried 3295` at 03:44:52.839, two ms before the claim. 3359-3295 = 64, exactly the new zones, so they were loaded and fresh |
+| Slot cooldowns (`NEVER_READY` carried from an earlier lease) | Those 64 zones were **not** carried, so `slotReadyAt` was `0` for every slot |
+| Fallen spots | `npc-fallen-spots.json` holds **no** `dungeon:` records at all (`MAX_SPOT_FALLS` 2, and one fall is enough to need a player within 2500 units) |
+| A spawn failure | `spawnOne` logs `failed to spawn` on any throw. **Zero** such lines anywhere in the log |
+
+So `spawnOne` was never reached and nothing logged: one of `fillSlots`'s five silent `continue`/`break`
+paths took all 18. By elimination only `if (anchor === undefined) break` is left, which needs both
+`zone.anchorId` falsy and the `online[0]` fallback undefined. The first half is now proven (below); the
+second cannot be observed, because nothing records it.
+
+### The feature that cannot work
+
+`dungeons.js` means to anchor each spawn to Bethesda's own disabled actor on the spot: *"Anchor = Bethesda's
+own (disabled) actor ref on that spot: the spawn appears there, not at a player."* It never does.
+
+- **0 of 6** live dungeon zones carry an `Anchor` key. **0 of 5** in the sandbox. They carry `Placed`, not `Anchor`.
+- **621** `dungeon anchor <ref> is not in the server's world` lines on live in a five-hour window.
+- The cause is structural, not data drift. `anchorExists` requires `mp.get(id, "baseDesc")` to succeed on a
+  **disabled vanilla ACHR**, and those are exactly the plugin-placed actors this project disables on purpose so
+  the server owns every spawn. The anchor it wants can never be in the server's world, so the test can never pass.
+
+Every dungeon enemy therefore takes the fallback: `PlaceAtMe` at an arbitrary online player (`online[0]`, who may
+be in another hold), then a move to the spot. That is the documented desync path - a spawn placed at a player and
+then teleported never reaches watchers correctly - which is a mechanism that produces exactly what players report:
+enemies that are not where the server believes, or not drawn at all. It also explains why `0 prespawned` is
+possible at all: with no anchor of its own, a dungeon's whole pre-spawn hangs on one unrelated player resolving.
+
+### What it needs next
+
+1. **An instrument, before any more theorising.** The pre-spawn pass should report why it placed nothing:
+   `{zones, ambush, notReady, fallen, budget, noAnchor, failed, placed}`. Five silent skips and no counter is why
+   this took a log archaeology session instead of reading one line. Server-TS change, so it belongs to whoever
+   builds `skymp5-server`.
+2. **Decide what a spawn anchors to.** The honest options are to drop the `Anchor` path as dead code and own the
+   player-anchor behaviour, or to give the server a real anchor (a kept, server-side marker per spot) so the
+   `PlaceAtMe`-then-move desync stops being the normal case for every dungeon enemy.
+3. The 621 log lines a night are a symptom of 1 and 2, not a problem of their own.
+
+Not changed: nothing here touches code. The anchor question is a design call, and the instrument needs a server
+build and a deploy, neither of which is this session's.

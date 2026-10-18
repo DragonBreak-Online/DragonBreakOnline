@@ -1,4 +1,25 @@
 # DragonBreak Online checklist (2026-09-14)
+
+## Added 2026-10-18: dungeon anchors never resolve, and a pre-spawn that cannot say why - PC session (load test)
+
+Lead 1 (the Dustman's Cairn claim that pre-spawned 0 of its 18 standing enemies). Full work in
+`_reviews/2026-10-17-npc-live-budget-cost.md` section 6.
+
+**Eliminated from the live log:** the npc budget (not one `at the budget of` line; 600 never reached), a zone-load
+race (`3359/3359 loaded (gamemode), carried 3295` two ms before the claim, and 3359-3295 = the 64 new zones),
+carried `NEVER_READY` cooldowns (those zones were not carried), fallen spots (no `dungeon:` records at all), and a
+spawn failure (`spawnOne` logs one; there are zero). So one of `fillSlots`'s five silent skips took all 18.
+
+**Found instead, and it is structural:** `dungeons.js` means to anchor each spawn to Bethesda's own disabled actor
+on the spot. It never can. 0 of 6 live dungeon zones carry an `Anchor` (0 of 5 in the sandbox), and live logged 621
+`dungeon anchor ... is not in the server's world` lines in five hours, because `anchorExists` needs
+`mp.get(id, "baseDesc")` on a **disabled vanilla ACHR** - exactly the plugin-placed actors we disable on purpose so
+the server owns spawning. So every dungeon enemy is `PlaceAtMe`d at an arbitrary online player and then moved, which
+is the known position-desync path and a mechanism for "enemies not where the server thinks, or not drawn".
+
+Open: 1) the pre-spawn needs to report its skip reasons (`{zones, ambush, notReady, fallen, budget, noAnchor,
+failed, placed}`) - server-TS, not this session's to deploy; 2) decide what a spawn anchors to: drop the dead
+`Anchor` path and own the player-anchor behaviour, or give the server a real per-spot marker.
 ## Added 2026-10-17: the npc live budget costs latency, not bandwidth - PC session (load test)
 
 Two things, both written up in `_reviews/2026-10-17-npc-live-budget-cost.md`.
