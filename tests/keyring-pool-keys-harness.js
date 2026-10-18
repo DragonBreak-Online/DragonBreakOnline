@@ -96,6 +96,19 @@ const fresh = async (esbuild, scratch) => {
     check('a pool key left in a container goes onto the ring of whoever opens it',
       (t.mp.get(HOLDER, t.RING) || []).some((k) => k.n === KEY) && !((t.mp.get(CHEST, 'inventory') || {}).entries || []).length);
 
+    // A key no lock accepts (its lock was recut) stayed in a container and could not be taken out (GM ticket 152, 17 Oct):
+    // whoever opens it takes it into the pack, never onto the ring and never destroyed (fork dead-keys-out)
+    t = await fresh(esbuild, scratch);
+    t.mp.set(CHEST, 'inventory', { entries: [{ baseId: KEY_BASE, count: 1, name: 'Key to Nowhere (recut 9)' }, { baseId: 0xf, count: 3 }] });
+    t.mp.set(HOLDER, 'inventory', { entries: [] });
+    t.housing.takeKeysFrom(t.ctx, CHEST, HOLDER);
+    const chestLeft = (t.mp.get(CHEST, 'inventory') || {}).entries || [], packNow = (t.mp.get(HOLDER, 'inventory') || {}).entries || [];
+    if (typeof t.housing.ringFromItems === 'function' && (t.housing.ringFromItems(t.ctx, [], HOLDER) || {}).dead) {
+      check('a key that opens nothing leaves the container for the opener\'s pack (gold stays)',
+        !chestLeft.some((e) => e.name === 'Key to Nowhere (recut 9)') && chestLeft.some((e) => e.baseId === 0xf) && packNow.some((e) => e.name === 'Key to Nowhere (recut 9)'), { chestLeft, packNow });
+      check('...and never onto the key ring', !(t.mp.get(HOLDER, t.RING) || []).some((k) => k.n === 'Key to Nowhere (recut 9)'));
+    } else console.log('skipped: this fork keeps dead keys in containers (before dead-keys-out)');
+
     t = await fresh(esbuild, scratch);
     t.mp.set(HOLDER, 'inventory', { entries: [{ baseId: KEY_BASE, count: 1, name: KEY }] });
     const r = t.rec();
