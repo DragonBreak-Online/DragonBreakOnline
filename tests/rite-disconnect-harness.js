@@ -94,6 +94,15 @@ ok(logs.some((l) => /even or ahead: cancelled, the shrine waits/.test(l)), '...a
 r = startEmbrace(); play(r, 0, 0, false); leave();
 ok(!rite() && !dead() && !failedAt(), 'embrace, never touched: abandoned, no wait', failedAt());
 
+// ---- closing the window before any round is not a forfeit (ticket #0235) ----
+r = startFever(); ui.riteClose(A);
+ok(!rite() && !dead() && state().disease && !state().kind, 'fever closed untouched: abandoned, alive, the disease stays', state());
+globalThis.__dboConnectedAt = new Map([[A, Date.now() - 600000]]); online = [A]; timers.superSlow(); online = [];
+ok(!!rite(), '...and the fever comes back on a later tick');
+if (rite()) ui.riteClose(A);
+r = startEmbrace(); ui.riteClose(A);
+ok(!rite() && !dead() && !permaDead() && !failedAt(), 'embrace closed untouched: abandoned, no death, no wait', { dead: dead(), failedAt: failedAt() });
+
 // ---- closing the rite window on purpose is still a forfeit ----
 r = startEmbrace(); play(r, 1, 0, true);
 ui.riteClose(A);
