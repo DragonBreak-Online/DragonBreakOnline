@@ -120,6 +120,16 @@ Napi::Value CopyLifecycleApi::ProcessCopyRetires(const Napi::CallbackInfo& info)
   return out;
 }
 
+// isCopyRetiring(localFormId): true while that exact object is waiting to be torn down. Keyed by the object, not the
+// id, so a new copy that reuses a retired copy's local id (they come back within seconds) reads false
+Napi::Value CopyLifecycleApi::IsCopyRetiring(const Napi::CallbackInfo& info)
+{
+  const auto id = NapiHelper::ExtractUInt32(info[0], "localFormId");
+  auto ref = RE::TESForm::LookupByID<RE::TESObjectREFR>(id);
+  std::lock_guard lock(g_mutex);
+  return Napi::Boolean::New(info.Env(), ref && g_retires.count(ref) > 0);
+}
+
 void CopyLifecycleApi::OnQueuedDisableRan(RE::TESObjectREFR* ref)
 {
   std::lock_guard lock(g_mutex);
