@@ -31,6 +31,7 @@ export const hostBackoff = new HostAttemptBackoff();
 interface RetireSp {
   retireCopy?: (localFormId: number) => boolean;
   processCopyRetires?: () => Array<{ id: number; frames: number; how: string }>;
+  isCopyRetiring?: (localFormId: number) => boolean;
 }
 const retireSp = sp as unknown as RetireSp;
 const hasNatives: boolean = typeof retireSp.retireCopy === "function" && typeof retireSp.processCopyRetires === "function";
@@ -38,6 +39,9 @@ const localOverride: boolean = (() => {
   try { return (sp.settings["skymp5-client"] as Record<string, unknown> | undefined)?.["nativeCopyLifecycle"] === true; } catch (e) { return false; }
 })();
 // Read at each delete, so the server's switch takes effect without a relog
+// The native registry's own answer, by object, so a copy that reuses a retired copy's local id is not mistaken for it
+const isNativelyRetiring = (id: number): boolean =>
+  typeof retireSp.isCopyRetiring === "function" && read(() => retireSp.isCopyRetiring!(id));
 const nativeRetireOn = (): boolean => hasNatives && (localOverride || driftConfig.nativeRetire);
 let lastNativeRetire: boolean | null = null;
 
@@ -174,8 +178,11 @@ export const maySpawnCopy = (remoteId: number, urgent: boolean): boolean => {
 // disabled it: touch nothing on it
 export const isHandedToDelete = (id: number): boolean => {
   const now = Date.now();
-  return pendingDeletes.has(id) || recentDeletes.has(id, now) || recentDisables.has(id, now) || copyWork.has("delete", id) || copyWork.has("disable", id);
+  return pendingDeletes.has(id) || recentDeletes.has(id, now) || recentDisables.has(id, now) || copyWork.has("delete", id) || copyWork.has("disable", id)
+    || isNativelyRetiring(id);
 };
+
+(globalThis as any).__dboIsHandedToDelete = isHandedToDelete;
 
 // A new copy placed under an id the engine has reused is not the one that was deleted
 export const noteCopyPlaced = (id: number): void => { recentDeletes.forget(id); };

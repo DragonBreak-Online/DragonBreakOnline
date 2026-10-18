@@ -267,9 +267,13 @@ export class HostedDriftService extends ClientListener {
     if (mode === "setPosition") ac.setPosition(ref[0], ref[1], ref[2]);
     else if (mode === "moveTo") ac.moveTo(ac, 0, 0, 0, true);
     else if (mode === "disableEnable") {
-      // The disable resolves in a later frame, where the Actor fetched now is no longer valid
+      // The disable resolves in a later frame, where the Actor fetched now is no longer valid. A copy being deleted is left
+      // alone: its re-enable would bring it back, and a queued Disable must not meet the delete
       const localId = ac.getFormID();
-      ac.disable(false).then(() => Actor.from(Game.getFormEx(localId))?.enable(false));
+      // npcLifetimeRuntime's isHandedToDelete, through globalThis so this service's harness needs no game stubs for it
+      const handed = (id: number): boolean => { const f = (globalThis as any).__dboIsHandedToDelete; return typeof f === "function" && !!f(id); };
+      if (handed(localId)) return;
+      ac.disable(false).then(() => { if (!handed(localId)) Actor.from(Game.getFormEx(localId))?.enable(false); });
     }
     this.pending.set(remoteId, { due: now + REPAIR_CHECK_MS, mode, node, limit, ref, bone, late: false });
   }
