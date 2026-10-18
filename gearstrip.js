@@ -50,7 +50,7 @@ module.exports = (api) => {
   const C = Object.assign({}, DEFAULTS, (api.cfg || {}).gearStrip || {});
   const S = globalThis.__dboGearStripS || (globalThis.__dboGearStripS = {});
   const off = () => { globalThis.__dboGearStripLogin = null; globalThis.__dboGearStripContainer = null; };
-  if (C.enabled !== true) { off(); if (typeof api.stopTimer === 'function') api.stopTimer('gearStrip'); log('gearstrip: off'); return; }
+  if (C.enabled !== true) { off(); if (typeof api.stopTimer === 'function') { api.stopTimer('gearStrip'); api.stopTimer('gearStripStep'); } log('gearstrip: off'); return; }
 
   const idOf = (desc) => { try { return mp.getIdFromDesc(desc) >>> 0; } catch (e) { return 0; } };
   // id -> { desc, name, refund: [[id, n, name]], reason }; items not in the load order are skipped (logged). An item's own
@@ -218,14 +218,26 @@ module.exports = (api) => {
     }
   };
 
+  // Every online player's inventory and vaults in one go stalled the loop 868 ms at 500 players (gearStrip's first sweep,
+  // server/_reviews/2026-10-18-gamemode-at-500.md). A sweep queues them and works through sweepBatch at once, the rest
+  // one batch a second; a login is still stripped at once
+  const BATCH = Math.max(1, Number(C.sweepBatch) || 25);
+  let queue = [];
+  const step = () => {
+    if (!queue.length) return;
+    const on = new Set(onlineActors());
+    for (const a of queue.splice(0, BATCH)) { if (on.has(a)) { stripActor(a); stripVault(a); payOwed(a, true); } }
+  };
   const sweep = () => {
-    for (const a of onlineActors()) { stripActor(a); stripVault(a); payOwed(a, true); }
+    if (!queue.length) queue = onlineActors().slice();
+    step();
     for (const d of C.containers || []) { const ref = idOf(d); if (ref) { stripContainer(ref); payOwed(ref, false); } }
   };
 
   globalThis.__dboGearStripLogin = (a) => { stripActor(a); stripVault(a); payOwed(a, true); };
   globalThis.__dboGearStripContainer = (ref) => { stripContainer(ref); payOwed(ref, false); };
   globalThis.__dboGearStripState = () => snapshot();
+  every('gearStripStep', 1000, step);
   every('gearStrip', Math.max(10, Number(C.sweepSeconds) || 60) * 1000, sweep);
   log(`gearstrip on: ${ITEMS.size} item(s); removed ${Object.values(state().removed).reduce((n, v) => n + v, 0)}, refunded ${state().refunded} of at most ${MAX_REFUNDS}; ${(C.containers || []).length} container(s) listed`);
 };

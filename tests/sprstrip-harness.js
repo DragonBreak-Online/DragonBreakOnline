@@ -24,15 +24,17 @@ const world = () => {
 };
 const load = (W, online, cfg) => {
   delete require.cache[MOD];
-  let timer = null;
+  let timer = null; const timers = {};
   const giveItem = (a, id, n) => { const inv = W.get(a, 'inventory') || { entries: [] }; const e = inv.entries.find((x) => x.baseId === id); if (e) e.count += n; else inv.entries.push({ baseId: id, count: n }); W.set(a, 'inventory', inv); return true; };
   require(MOD)({
     mp: { get: W.get, set: W.set, getIdFromDesc: (d) => { if (!(d in DESC)) throw new Error('no ' + d); return DESC[d]; }, getDescFromId: (id) => id.toString(16), callPapyrusFunction: (...a) => W.papyrus.push(a) },
     log: () => {}, personal: (a, t) => W.said.push([a, t]), audit: (t) => W.audits.push(t), who: (a) => a.toString(16),
-    onlineActors: () => online.slice(), every: (n, ms, fn) => { timer = fn; }, stopTimer: () => { timer = null; }, giveItem,
+    onlineActors: () => online.slice(), every: (n, ms, fn) => { timers[n] = fn; if (n === 'sprStrip') timer = fn; }, stopTimer: (n) => { delete timers[n]; if (n === 'sprStrip') timer = null; }, giveItem,
     cfg: { sprStrip: Object.assign({}, CFG.sprStrip, { stateFile: path.join(tmp, 'state.json') }, cfg || {}) }
   });
-  return () => timer && timer();
+  const sweep = () => timer && timer();
+  sweep.step = () => timers.sprStripStep && timers.sprStripStep();
+  return sweep;
 };
 const count = (W, id, base) => ((W.get(id, 'inventory') || { entries: [] }).entries.filter((e) => e.baseId === base).reduce((n, e) => n + e.count, 0));
 
@@ -112,6 +114,20 @@ const { without } = require(MOD);
 const w = without([{ baseId: AXE, count: 2, wornLeft: true }, { baseId: OTHER, count: 1 }], AXE);
 ok(w.removed === 2 && w.worn === true && w.entries.length === 1, 'without(): counts, finds a left-hand worn copy, keeps the rest');
 
+// a sweep works through sweepBatch players at once and the rest a batch a second (868 ms stall at 500, 18 Oct)
+{
+  const Wb = world(); const many = [];
+  for (let i = 0; i < 60; i++) { const a = 0xff010000 + i; many.push(a); Wb.set(a, 'profileId', 500 + i); Wb.set(a, 'inventory', { entries: [{ baseId: AXE, count: 1 }] }); }
+  const sw = load(Wb, many, { sweepBatch: 25, maxRefunds: 0, stateFile: path.join(tmp, 'batch-state.json') });
+  sw();
+  const held = () => many.filter((a) => count(Wb, a, AXE) > 0).length;
+  ok(held() === 35, 'a sweep strips the first 25 players at once', held());
+  sw.step(); ok(held() === 10, 'each step strips the next 25', held());
+  sw(); ok(held() === 0, 'a sweep while players are still queued carries on with them', held());
+  sw.step(); ok(held() === 0 && Wb.audits.length === 60, 'and strips nobody twice', Wb.audits.length);
+}
+
 fs.rmSync(tmp, { recursive: true, force: true });
 console.log(fails ? `${fails} FAILED` : 'all passed');
+
 process.exit(fails ? 1 : 0);

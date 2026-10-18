@@ -92,6 +92,8 @@ const dzOf = (t, z) => (z < t.lo ? z - t.lo : z > t.hi ? z - t.hi : 0);
 module.exports = (api) => {
   const { mp, log, every, onlineActors, display } = api;
   const FIX = ((api.cfg || {}).npcGround || {}).fix !== false;
+  // The per-player terrain line every 5 s is a debugging aid: 500 players wrote 100 lines a second (Worker B, 18 Oct)
+  const PLAYER_LOG = ((api.cfg || {}).npcGround || {}).playerLog === true;
   const file = path.resolve(FILE);
   let mtime = 0;
   try { mtime = fs.statSync(file).mtimeMs; } catch (e) { /* no file */ }
@@ -168,11 +170,20 @@ module.exports = (api) => {
   // Players stand on the real ground, so their height against the terrain data measures the data itself
   // (the lift floated an ogre the data put 212 under while it stood on the path, 2026-09-25)
   const playerCheck = globalThis.__dboNpcGroundPlayers || (globalThis.__dboNpcGroundPlayers = { at: 0 });
+  // The server's grid square (WorldState GetGridPos truncates toward zero): every player in one square has the same 3x3
+  // block of neighbours, so actorNeighbors is read once per occupied square, not once per player. Per player it cost
+  // 75 ms a second at 500 crowded players (server/_reviews/2026-10-18-gamemode-at-500.md)
+  const squareOf = (p) => {
+    try {
+      const pp = mp.get(p, 'pos');
+      return `${String(mp.get(p, 'worldOrCellDesc') || '')}|${Math.trunc(pp[0] / CELL_UNITS)}|${Math.trunc(pp[1] / CELL_UNITS)}`;
+    } catch (e) { return null; }
+  };
   every('npcGround', EVERY_MS, () => {
     if (!terrain) return;
     const now = Date.now();
     const players = onlineActors();
-    if (now - playerCheck.at >= 5000) {
+    if (PLAYER_LOG && now - playerCheck.at >= 5000) {
       playerCheck.at = now;
       for (const p of players) {
         try {
@@ -184,7 +195,11 @@ module.exports = (api) => {
       }
     }
     const skip = new Set(players);
+    const squares = new Set();
     for (const p of players) {
+      const sq = squareOf(p);
+      if (sq === null || squares.has(sq)) continue;
+      squares.add(sq);
       let near = [];
       try { near = mp.get(p, 'actorNeighbors') || []; } catch (e) { continue; }
       for (const id of near) {

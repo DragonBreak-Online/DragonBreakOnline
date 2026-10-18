@@ -38,7 +38,7 @@ module.exports = (api) => {
   const C = Object.assign({}, DEFAULTS, (api.cfg || {}).sprStrip || {});
   const S = globalThis.__dboSprStripS || (globalThis.__dboSprStripS = {});
   const off = () => { globalThis.__dboSprStripLogin = null; globalThis.__dboSprStripContainer = null; };
-  if (C.enabled !== true) { off(); if (typeof api.stopTimer === 'function') api.stopTimer('sprStrip'); log('sprstrip: off'); return; }
+  if (C.enabled !== true) { off(); if (typeof api.stopTimer === 'function') { api.stopTimer('sprStrip'); api.stopTimer('sprStripStep'); } log('sprstrip: off'); return; }
 
   const idOf = (desc) => { try { return mp.getIdFromDesc(desc) >>> 0; } catch (e) { return 0; } };
   const ITEM = idOf(C.item);
@@ -142,14 +142,26 @@ module.exports = (api) => {
     return n;
   };
 
+  // Every online player's inventory and vaults in one go stalled the loop 868 ms at 500 players (gearStrip's first sweep,
+  // server/_reviews/2026-10-18-gamemode-at-500.md). A sweep queues them and works through sweepBatch at once, the rest
+  // one batch a second; a login is still stripped at once
+  const BATCH = Math.max(1, Number(C.sweepBatch) || 25);
+  let queue = [];
+  const step = () => {
+    if (!queue.length) return;
+    const on = new Set(onlineActors());
+    for (const a of queue.splice(0, BATCH)) { if (on.has(a)) { stripActor(a); stripVault(a); payRefund(a); } }
+  };
   const sweep = () => {
-    for (const a of onlineActors()) { stripActor(a); stripVault(a); payRefund(a); }
+    if (!queue.length) queue = onlineActors().slice();
+    step();
     for (const d of C.containers || []) { const ref = idOf(d); if (ref) stripContainer(ref); }
   };
 
   globalThis.__dboSprStripLogin = (a) => { stripActor(a); stripVault(a); payRefund(a); };
   globalThis.__dboSprStripContainer = (ref) => { stripContainer(ref); };
   globalThis.__dboSprStripState = () => snapshot();
+  every('sprStripStep', 1000, step);
   every('sprStrip', Math.max(10, Number(C.sweepSeconds) || 60) * 1000, sweep);
   log(`sprstrip on: ${C.itemName} ${ITEM.toString(16)}; removed ${state().removed}, refunded ${state().refunded} of ${state().owed} owed; ${(C.containers || []).length} container(s) listed`);
 };
