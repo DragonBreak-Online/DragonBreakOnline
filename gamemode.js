@@ -1835,6 +1835,8 @@ mp.onActivate = (targetId, casterId) => {
   if (globalThis.__dboJailActivate && globalThis.__dboJailActivate(targetId >>> 0, casterId >>> 0)) return false;
   if (globalThis.__dboRestActivate && globalThis.__dboRestActivate(targetId >>> 0, casterId >>> 0)) return false;
   if (globalThis.__dboSuperActivate && globalThis.__dboSuperActivate(targetId >>> 0, casterId >>> 0)) return false;
+  // The Green Pact (greenpact.js): a sworn wood elf partakes of the slain, and is refused a living plant
+  if (globalThis.__dboGreenPactActivate) { try { if (globalThis.__dboGreenPactActivate(targetId >>> 0, casterId >>> 0)) return false; } catch (e) { log('green pact activate failed', e.message); } }
   if (globalThis.__dboCoinPurse && globalThis.__dboCoinPurse(targetId >>> 0, casterId >>> 0)) return false;
   if (globalThis.__dboWispStalk && globalThis.__dboWispStalk(targetId >>> 0, casterId >>> 0)) return false;
   if (globalThis.__dboAyleidWell && globalThis.__dboAyleidWell(targetId >>> 0, casterId >>> 0)) return false;
@@ -3375,6 +3377,11 @@ const foodKindOf = (baseId) => {
   foodKindCache.set(baseId, kind);
   return kind;
 };
+// Meat by editor id (needs.meatWords): raw and cooked meat, fish and the stews made of them
+const MEAT_WORDS = (Array.isArray(NEEDS.meatWords) ? NEEDS.meatWords : ['meat', 'beef', 'chicken', 'goat', 'horker', 'horse', 'mammoth', 'mudcrab',
+  'pheasant', 'rabbit', 'salmon', 'venison', 'clam', 'steak', 'slaughterfish', 'mutton', 'sausage', 'bear', 'boar', 'trout', 'turkey', 'fish',
+  'skeever', 'elk', 'dog', 'wolf']).map((w) => String(w).toLowerCase());
+const isMeat = (baseId) => { const r = recordOf(baseId); const e = String((r && r.record.editorId) || '').toLowerCase(); return MEAT_WORDS.some((w) => e.indexOf(w) !== -1); };
 const vampireAteAt = new Map(); // actorId -> ms of the last "ash" line
 const onEat = (a, baseId) => {
   if (!NEEDS.enabled) return;
@@ -3388,6 +3395,8 @@ const onEat = (a, baseId) => {
     restore *= foodMult;
     if (Date.now() - (vampireAteAt.get(a) || 0) > 600000) { vampireAteAt.set(a, Date.now()); system(a, 'Food sits like ash on your tongue. It barely touches your hunger.'); }
   }
+  // Y'ffre's blessing (faiths.json meatBoon): meat restores twice the hunger
+  try { const m = globalThis.__dboBlessingValue ? Number(globalThis.__dboBlessingValue(a, 'meatBoon')) : 0; if (m > 1 && isMeat(baseId)) restore *= m; } catch (e) { /* no prayer */ }
   // Eating takes time: the hunger counts when the meal is finished (startMeal, under the ui events below)
   if (NEEDS.mealTime !== false && startMeal(a, baseId, kind, restore)) return;
   creditMeal(a, [{ baseId, kind, restore }]);
@@ -4961,7 +4970,8 @@ onUi('reading', (a, args) => {
     // book. Same correction as the mining/chopping rounds in labour.js.
     try { if (typeof globalThis.__alduinakMasteryEvent === 'function') globalThis.__alduinakMasteryEvent('read', a, { refrId: ses.refId }); } catch (e) { /* no skill system */ }
     // Hermaeus Mora's blessing: what you read teaches you more, so the round counts twice (the skill's caps still hold)
-    try { if (globalThis.__dboBlessedWith && globalThis.__dboBlessedWith(a, 'scholarBoon') && typeof globalThis.__alduinakMasteryEvent === 'function') globalThis.__alduinakMasteryEvent('read', a, { refrId: ses.refId }); } catch (e) { /* no skill system */ }
+    // Xarxes' (faiths.json scholarBoon 0.5) counts twice half the time
+    try { const sb = globalThis.__dboBlessingValue ? Number(globalThis.__dboBlessingValue(a, 'scholarBoon')) : (globalThis.__dboBlessedWith && globalThis.__dboBlessedWith(a, 'scholarBoon') ? 1 : 0); if (sb > 0 && Math.random() < sb && typeof globalThis.__alduinakMasteryEvent === 'function') globalThis.__alduinakMasteryEvent('read', a, { refrId: ses.refId }); } catch (e) { /* no skill system */ }
     // A smithing skill book is Blacksmith work too, once a book; a manual on a shelf is learned (manuals.js)
     try { const line = globalThis.__dboManualsReadWon ? globalThis.__dboManualsReadWon(a, ses.baseId) : ''; if (line) results.push(line); } catch (e) { log('manuals read failed', e.message); }
     // A smithing schematic, now and then (manuals.js, config smithing.discovery; Nate, 11 Oct): the rarer, the rarer
@@ -6167,6 +6177,7 @@ const deathHook = (actorId, killerId, ...rest) => {
   try { if (globalThis.__dboStatsDeath) globalThis.__dboStatsDeath(Number(actorId) >>> 0, Number(killerId) >>> 0); } catch (e) { log('journal stats death failed', e.message); }
   try { if (globalThis.__dboDurabilityDeath) globalThis.__dboDurabilityDeath(Number(actorId) >>> 0); } catch (e) { log('durability death failed', e.message); }
   try { if (globalThis.__dboDogDayDeath) globalThis.__dboDogDayDeath(Number(actorId) >>> 0, Number(killerId) >>> 0); } catch (e) { log('dog day death failed', e.message); }
+  try { if (globalThis.__dboGreenPactDeath) globalThis.__dboGreenPactDeath(Number(actorId) >>> 0, Number(killerId) >>> 0); } catch (e) { log('green pact death failed', e.message); }
   const prev = globalThis.__dboPrevDeath;
   if (prev) { try { return prev(actorId, killerId, ...rest); } catch (e) { log('death chain failed', e.message); } }
   return undefined;
@@ -6743,7 +6754,7 @@ const masteryDamageMult = (aggressorId, sourceId) => {
 // Block (Stendarr, Malacath) and poison (Peryite) are not here: the server does not know a hit was blocked or poisoned.
 const BLESS_COMBAT = Object.assign({ enabled: true,
   attacker: { talos: { hands: 'two', mult: 1.1 }, boethiah: { hands: 'one', mult: 1.1 }, auriel: { hands: 'bow', mult: 1.1 },
-    malacath: { hands: 'any', mult: 1.1 }, mehrunes: { spell: true, mult: 1.1 } },
+    malacath: { hands: 'any', mult: 1.1 }, mehrunes: { spell: true, mult: 1.1 }, alkosh: { hands: 'unarmed', mult: 1.1 } },
   target: { azura: { spell: true, mult: 0.9 }, trinimac: { spell: true, mult: 0.75 }, ancestors: { element: 'fire', mult: 0.75 } } }, cfg.blessingCombat || {});
 const ELEMENT_RESIST = { fire: 41, shock: 42, frost: 43 };
 const sourceResistCache = new Map();
@@ -6789,7 +6800,8 @@ const blessingAttackMult = (aggressorId, sourceId) => {
   const atk = (BLESS_COMBAT.attacker || {})[blessedDeityOf(aggressorId)];
   if (!atk) return 1;
   const hands = weaponHandsOf(sourceId);
-  const fits = atk.spell ? isSpellSource(sourceId) : atk.hands === 'any' ? !!hands : hands === atk.hands;
+  // 'unarmed' is the engine's fist source 0x1f4 (Alkosh, faiths.json); 'any' is any weapon
+  const fits = atk.spell ? isSpellSource(sourceId) : atk.hands === 'unarmed' ? (sourceId >>> 0) === 0x1f4 : atk.hands === 'any' ? !!hands : hands === atk.hands;
   return fits ? Number(atk.mult) || 1 : 1;
 };
 const blessingTargetMult = (targetId, sourceId) => {
@@ -8322,6 +8334,13 @@ try {
   require(OUTLAWS_JS)({ mp, log, personal, system, audit, who, display, cfg, registerChatCommand, zoneOfActor, zoneById, readOfficials,
     profileOf, officialTarget, onlineActors, giveItem, isLeadStaff, onUi });
 } catch (e) { log('outlaws.js failed to load:', e.stack || e.message); globalThis.__dboOutlawJailed = null; }
+// ---- the Green Pact: the wood elves' taboo on plants and the Partaking of the slain (server\greenpact.js) ----------------
+try {
+  const GREENPACT_JS = path.resolve('greenpact.js');
+  delete require.cache[GREENPACT_JS];
+  require(GREENPACT_JS)({ mp, log, personal, audit, who, cfg, registerChatCommand, recordOf, nameOf, profileOf, onlineActors, distanceMeters,
+    sendPacket, isGoldFlora, sate: (a) => { if (!NEEDS.enabled) return; const n = needsOf(a); n.hunger = 0; applyNeedsStage(a, n, true); saveNeeds(a, n); } });
+} catch (e) { log('greenpact.js failed to load:', e.stack || e.message); for (const k of ['__dboGreenPactActivate', '__dboGreenPactDeath', '__dboGreenPactRefusal']) globalThis[k] = null; }
 // ---- the journal's Court tab: offices, offers and the household (server\court.js, config "court") ------------------------
 try {
   const COURT_JS = path.resolve('court.js');
