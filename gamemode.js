@@ -306,6 +306,8 @@ const staffTierOf = (actorId) => staffTierFrom(profileOf(actorId), rolesOf(actor
 // etc"): no seat in an election court (citizenship.js), no leading court office (appointCheck), no faction leader or officer
 // rank (guilds.js setMember). By the account's Discord roles, kept on the character, so it holds for an offline one too
 globalThis.__dboIsStaff = (actorId) => { try { return staffTierOf(Number(actorId) >>> 0) !== null; } catch (e) { return false; } };
+// The staff tier of a character ('senior', 'developer', 'leadgm', 'gm', 'trialgm' or null), for modules that show staff-only lines
+globalThis.__dboStaffTier = (actorId) => { try { return staffTierOf(Number(actorId) >>> 0); } catch (e) { return null; } };
 // Chat commands a Trial GM may run, and the right each needs (the command gate in handleChat)
 const TRIAL_COMMANDS = { rename: 'rename', chargen: 'chargen', tp: 'tp', charstats: 'playerinfo', bugs: 'bugs', realnames: 'realnames' };
 const staffRolesSeen = (a, roles) => {

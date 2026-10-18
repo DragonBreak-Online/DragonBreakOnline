@@ -906,7 +906,14 @@ module.exports = (api) => {
       const waiting = zones.reduce((n, z) => n + (z && z.Ambush ? 1 : 0), 0);
       const asleep = zones.reduce((n, z) => n + (z && !z.Ambush && z.Reach && !z.Prespawn ? 1 : 0), 0);
       const ready = zones.length - waiting - asleep;
-      const tell = (msg) => { for (const a of inside) system(a, msg); };
+      // Lead GM and up only (Nate, 18 Oct: "make them staff only ... meaning Lead GM and Owner"): out-of-character lines at a
+      // claim's start spoiled what lies ahead for players, and the shortfall one still guesses at a fault the server cannot
+      // name yet. A Lead GM, Developer or Senior in the party sees them; everyone else is told nothing. Always logged.
+      const LEAD = new Set(['senior', 'developer', 'leadgm']);
+      const tell = (msg) => {
+        log(`dungeon ${d.id} (Lead GM+ only): ${msg}`);
+        for (const a of inside) { let t = null; try { t = typeof globalThis.__dboStaffTier === 'function' ? globalThis.__dboStaffTier(a) : null; } catch (e) { t = null; } if (LEAD.has(t)) system(a, `[staff] ${msg}`); }
+      };
       if (waiting) log(`dungeon ${d.id}: ${waiting} of ${zones.length} enemies lie in wait within ${AMBUSH_REACH} units of their spot`);
       if (asleep) log(`dungeon ${d.id}: ${asleep} of ${zones.length} enemies wake when somebody comes within ${REACH.reach} units`);
       if (zones.length && waiting + asleep === zones.length) {
