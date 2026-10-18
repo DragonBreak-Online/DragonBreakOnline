@@ -1,0 +1,553 @@
+ench,edid,winner,edit_in,effect_index,mgef,category,magnitude,new_magnitude,items,acts
+017362:Skyrim.esm,MGArchMageRobeHoodedEnchant,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyAlterationConstantSelf,spell cost (Fortify school),15.0,8,3,client: spell cost
+017362:Skyrim.esm,MGArchMageRobeHoodedEnchant,Skyrim.esm,DragonBreak Online Edits.esp (override),1,EnchFortifyConjurationConstantSelf,spell cost (Fortify school),15.0,8,3,client: spell cost
+017362:Skyrim.esm,MGArchMageRobeHoodedEnchant,Skyrim.esm,DragonBreak Online Edits.esp (override),2,EnchFortifyDestructionConstantSelf,spell cost (Fortify school),15.0,8,3,client: spell cost
+017362:Skyrim.esm,MGArchMageRobeHoodedEnchant,Skyrim.esm,DragonBreak Online Edits.esp (override),3,EnchFortifyRestorationConstantSelf,spell cost (Fortify school),15.0,8,3,client: spell cost
+017362:Skyrim.esm,MGArchMageRobeHoodedEnchant,Skyrim.esm,DragonBreak Online Edits.esp (override),4,EnchFortifyIllusionConstantSelf,spell cost (Fortify school),15.0,8,3,client: spell cost
+017362:Skyrim.esm,MGArchMageRobeHoodedEnchant,Skyrim.esm,DragonBreak Online Edits.esp (override),5,EnchFortifyMagickaRateConstantSelf,magicka regen,100.0,50,3,client
+017362:Skyrim.esm,MGArchMageRobeHoodedEnchant,Skyrim.esm,DragonBreak Online Edits.esp (override),6,EnchFortifyMagickaConstantSelf,fortify magicka,50.0,25,3,client
+01729e:Skyrim.esm,EnchDragonPriestMaskMoonstone,Skyrim.esm,DragonBreak Online Edits.esp (override),1,EnchFortifyMagickaRateConstantSelf,magicka regen,100.0,50,1,client
+017299:Skyrim.esm,EnchYsgramorShield,Skyrim.esm,DragonBreak Online Edits.esp (override),1,EnchFortifyHealthConstantSelf,fortify health,20.0,10,2,client max; server damage judge unverified
+0170f2:Skyrim.esm,MS11NecromancersAmuletEnchantment,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyConjurationConstantSelf,spell cost (Fortify school),25.0,13,2,client: spell cost
+0170f2:Skyrim.esm,MS11NecromancersAmuletEnchantment,Skyrim.esm,DragonBreak Online Edits.esp (override),1,EnchFortifyMagickaConstantSelf,fortify magicka,50.0,25,2,client
+0170f2:Skyrim.esm,MS11NecromancersAmuletEnchantment,Skyrim.esm,DragonBreak Online Edits.esp (override),2,AbDamageHealRateVisible,health regen,75.0,38,2,client
+0170f2:Skyrim.esm,MS11NecromancersAmuletEnchantment,Skyrim.esm,DragonBreak Online Edits.esp (override),3,AbDamageStaminaRateVisible,stamina regen,75.0,38,2,client
+10fcf3:Skyrim.esm,StaffEnchIncinerate,Skyrim.esm,DragonBreak Online Edits.esp (override),0,FireDamageFFAimed75,fortify health,60.0,30,2,client max; server damage judge unverified
+10fb9b:Skyrim.esm,EnchWeaponStaminaDamageBase,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchStaminaDamageFFContact,fortify stamina,15.0,8,0,client
+10fb97:Skyrim.esm,EnchWeaponMagickaDamageBase,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchMagickaDamageFFContact,fortify magicka,15.0,8,0,client
+10fb95:Skyrim.esm,EnchWeaponFireDamageBase,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFireDamageFFContact,fortify health,10.0,5,0,client max; server damage judge unverified
+10fb87:Skyrim.esm,EnchArmorFortifyTwoHandedBase,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyTwoHandedConstantSelf,fortify two-handed,13.0,7,0,server gear-fortify (set perPoint 0.01 after this edit)
+10fb86:Skyrim.esm,EnchArmorFortifyStaminaRateBase,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyStaminaRateConstantSelf,stamina regen,10.0,5,0,client
+10fb85:Skyrim.esm,EnchArmorFortifyStaminaBase,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyStaminaConstantSelf,fortify stamina,20.0,10,0,client
+10fb84:Skyrim.esm,EnchArmorFortifySpeechcraftBase,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifySpeechcraftConstantSelf,fortify speech,8.0,4,0,client
+10fb83:Skyrim.esm,EnchArmorFortifySneakBase,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifySneakConstantSelf,fortify sneak,13.0,7,0,client
+10fb82:Skyrim.esm,EnchArmorFortifySmithingBase,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifySmithingConstantSelf,fortify smithing,8.0,4,0,client tempering; server Blacksmith tiers ignore it
+10fb81:Skyrim.esm,EnchArmorFortifyRestorationBase,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyRestorationConstantSelf,spell cost (Fortify school),8.0,4,0,client: spell cost
+10fb80:Skyrim.esm,EnchArmorFortifyPickpocketBase,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyPickpocketConstantSelf,fortify pickpocket,13.0,7,0,client
+10fb7f:Skyrim.esm,EnchArmorFortifyOneHandedBase,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyOneHandedConstantSelf,fortify one-handed,13.0,7,0,server gear-fortify (set perPoint 0.01 after this edit)
+10fb7e:Skyrim.esm,EnchArmorFortifyMarksmanBase,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyArcheryConstantSelf,fortify archery,13.0,7,0,server gear-fortify (set perPoint 0.01 after this edit)
+10fb7d:Skyrim.esm,EnchArmorFortifyMagickaRateBase,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyMagickaRateConstantSelf,magicka regen,20.0,10,0,client
+10fb7c:Skyrim.esm,EnchArmorFortifyMagickaBase,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyMagickaConstantSelf,fortify magicka,20.0,10,0,client
+10fb7b:Skyrim.esm,EnchArmorFortifyLockpickingBase,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyLockpickingConstantSelf,fortify lockpicking,13.0,7,0,client
+10fb7a:Skyrim.esm,EnchArmorFortifyLightArmorBase,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyLightArmorConstantSelf,fortify light armor,8.0,4,0,"client only, server armour ignores it"
+10fb79:Skyrim.esm,EnchArmorFortifyIllusionBase,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyIllusionConstantSelf,spell cost (Fortify school),8.0,4,0,client: spell cost
+10fb78:Skyrim.esm,EnchArmorFortifyHeavyArmorBase,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyHeavyArmorConstantSelf,fortify heavy armor,8.0,4,0,"client only, server armour ignores it"
+10fb77:Skyrim.esm,EnchArmorFortifyHealthBase,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyHealthConstantSelf,fortify health,20.0,10,0,client max; server damage judge unverified
+10fb76:Skyrim.esm,EnchArmorFortifyHealRateBase,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyHealRateConstantSelf,health regen,10.0,5,0,client
+10fb75:Skyrim.esm,EnchArmorFortifyDestructionBase,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyDestructionConstantSelf,spell cost (Fortify school),8.0,4,0,client: spell cost
+10fb74:Skyrim.esm,EnchArmorFortifyConjurationBase,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyConjurationConstantSelf,spell cost (Fortify school),8.0,4,0,client: spell cost
+10fb73:Skyrim.esm,EnchArmorFortifyCarryBase,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyCarryConstantSelf,carry weight,15.0,8,0,client
+10fb72:Skyrim.esm,EnchArmorFortifyBlockBase,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyBlockConstantSelf,fortify block,13.0,7,0,"client only, server block ignores it"
+10fb71:Skyrim.esm,EnchArmorFortifyAlterationBase,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyAlterationConstantSelf,spell cost (Fortify school),8.0,4,0,client: spell cost
+10fb6f:Skyrim.esm,EnchArmorArticulationBase,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyArticulation,fortify speech,4.0,2,0,client
+10eb6a:Skyrim.esm,MS06EnchShieldL25,unofficial skyrim special edition patch.esp,DragonBreak Online Edits.esp (override),1,EnchFortifyBlockConstantSelf,fortify block,25.0,13,3,"client only, server block ignores it"
+10eb69:Skyrim.esm,MS06EnchShieldL18,unofficial skyrim special edition patch.esp,DragonBreak Online Edits.esp (override),1,EnchFortifyBlockConstantSelf,fortify block,20.0,10,2,"client only, server block ignores it"
+10eb68:Skyrim.esm,MS06EnchShieldL40,unofficial skyrim special edition patch.esp,DragonBreak Online Edits.esp (override),1,EnchFortifyBlockConstantSelf,fortify block,35.0,18,2,"client only, server block ignores it"
+10eb67:Skyrim.esm,MS06EnchShieldL32,unofficial skyrim special edition patch.esp,DragonBreak Online Edits.esp (override),1,EnchFortifyBlockConstantSelf,fortify block,30.0,15,1,"client only, server block ignores it"
+10eb66:Skyrim.esm,MS06EnchShieldL12,unofficial skyrim special edition patch.esp,DragonBreak Online Edits.esp (override),1,EnchFortifyBlockConstantSelf,fortify block,15.0,8,2,"client only, server block ignores it"
+10ead5:Skyrim.esm,EnchRobesRestorationBase,unofficial skyrim special edition patch.esp,DragonBreak Online Edits.esp (override),0,EnchRobesFortifyRestorationConstantSelf,spell cost (Fortify school),5.0,3,0,client: spell cost
+10ead5:Skyrim.esm,EnchRobesRestorationBase,unofficial skyrim special edition patch.esp,DragonBreak Online Edits.esp (override),1,EnchRobesFortifyMagickaRateConstantSelf,magicka regen,10.0,5,0,client
+10ead4:Skyrim.esm,EnchRobesIllusionBase,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchRobesFortifyIllusionConstantSelf,spell cost (Fortify school),5.0,3,0,client: spell cost
+10ead4:Skyrim.esm,EnchRobesIllusionBase,Skyrim.esm,DragonBreak Online Edits.esp (override),1,EnchRobesFortifyMagickaRateConstantSelf,magicka regen,10.0,5,0,client
+10ead3:Skyrim.esm,EnchRobesDestructionBase,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchRobesFortifyDestructionConstantSelf,spell cost (Fortify school),5.0,3,0,client: spell cost
+10ead3:Skyrim.esm,EnchRobesDestructionBase,Skyrim.esm,DragonBreak Online Edits.esp (override),1,EnchRobesFortifyMagickaRateConstantSelf,magicka regen,10.0,5,0,client
+10ead2:Skyrim.esm,EnchRobesConjurationBase,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchRobesFortifyConjurationConstantSelf,spell cost (Fortify school),5.0,3,0,client: spell cost
+10ead2:Skyrim.esm,EnchRobesConjurationBase,Skyrim.esm,DragonBreak Online Edits.esp (override),1,EnchRobesFortifyMagickaRateConstantSelf,magicka regen,10.0,5,0,client
+10ead1:Skyrim.esm,EnchRobesAlterationBase,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchRobesFortifyAlterationConstantSelf,spell cost (Fortify school),5.0,3,0,client: spell cost
+10ead1:Skyrim.esm,EnchRobesAlterationBase,Skyrim.esm,DragonBreak Online Edits.esp (override),1,EnchRobesFortifyMagickaRateConstantSelf,magicka regen,10.0,5,0,client
+10e318:Skyrim.esm,EnchRobesCollegeIllusion05,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchRobesFortifyIllusionConstantSelf,spell cost (Fortify school),22.0,11,1,client: spell cost
+10e318:Skyrim.esm,EnchRobesCollegeIllusion05,Skyrim.esm,DragonBreak Online Edits.esp (override),1,EnchRobesFortifyMagickaRateConstantSelf,magicka regen,150.0,75,1,client
+10e317:Skyrim.esm,EnchRobesCollegeIllusion04,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchRobesFortifyIllusionConstantSelf,spell cost (Fortify school),20.0,10,1,client: spell cost
+10e317:Skyrim.esm,EnchRobesCollegeIllusion04,Skyrim.esm,DragonBreak Online Edits.esp (override),1,EnchRobesFortifyMagickaRateConstantSelf,magicka regen,125.0,63,1,client
+10e316:Skyrim.esm,EnchRobesCollegeIllusion03,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchRobesFortifyIllusionConstantSelf,spell cost (Fortify school),17.0,9,1,client: spell cost
+10e316:Skyrim.esm,EnchRobesCollegeIllusion03,Skyrim.esm,DragonBreak Online Edits.esp (override),1,EnchRobesFortifyMagickaRateConstantSelf,magicka regen,100.0,50,1,client
+10e315:Skyrim.esm,EnchRobesCollegeIllusion02,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchRobesFortifyIllusionConstantSelf,spell cost (Fortify school),15.0,8,1,client: spell cost
+10e315:Skyrim.esm,EnchRobesCollegeIllusion02,Skyrim.esm,DragonBreak Online Edits.esp (override),1,EnchRobesFortifyMagickaRateConstantSelf,magicka regen,75.0,38,1,client
+10e314:Skyrim.esm,EnchRobesCollegeMagickaRate05,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyMagickaRateConstantSelf,magicka regen,150.0,75,1,client
+10e313:Skyrim.esm,EnchRobesCollegeMagickaRate04,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyMagickaRateConstantSelf,magicka regen,125.0,63,4,client
+10e312:Skyrim.esm,EnchRobesCollegeMagickaRate03,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyMagickaRateConstantSelf,magicka regen,100.0,50,1,client
+10e311:Skyrim.esm,EnchRobesCollegeMagickaRate02,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyMagickaRateConstantSelf,magicka regen,75.0,38,2,client
+10e310:Skyrim.esm,EnchRobesCollegeRestoration05,unofficial skyrim special edition patch.esp,DragonBreak Online Edits.esp (override),0,EnchRobesFortifyRestorationConstantSelf,spell cost (Fortify school),22.0,11,1,client: spell cost
+10e310:Skyrim.esm,EnchRobesCollegeRestoration05,unofficial skyrim special edition patch.esp,DragonBreak Online Edits.esp (override),1,EnchRobesFortifyMagickaRateConstantSelf,magicka regen,150.0,75,1,client
+10e30f:Skyrim.esm,EnchRobesCollegeRestoration04,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchRobesFortifyRestorationConstantSelf,spell cost (Fortify school),20.0,10,1,client: spell cost
+10e30f:Skyrim.esm,EnchRobesCollegeRestoration04,Skyrim.esm,DragonBreak Online Edits.esp (override),1,EnchRobesFortifyMagickaRateConstantSelf,magicka regen,125.0,63,1,client
+10e30e:Skyrim.esm,EnchRobesCollegeRestoration03,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchRobesFortifyRestorationConstantSelf,spell cost (Fortify school),17.0,9,1,client: spell cost
+10e30e:Skyrim.esm,EnchRobesCollegeRestoration03,Skyrim.esm,DragonBreak Online Edits.esp (override),1,EnchRobesFortifyMagickaRateConstantSelf,magicka regen,100.0,50,1,client
+10e30d:Skyrim.esm,EnchRobesCollegeRestoration02,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchRobesFortifyRestorationConstantSelf,spell cost (Fortify school),15.0,8,1,client: spell cost
+10e30d:Skyrim.esm,EnchRobesCollegeRestoration02,Skyrim.esm,DragonBreak Online Edits.esp (override),1,EnchRobesFortifyMagickaRateConstantSelf,magicka regen,75.0,38,1,client
+10e30c:Skyrim.esm,EnchRobesCollegeRestoration01,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchRobesFortifyRestorationConstantSelf,spell cost (Fortify school),12.0,6,1,client: spell cost
+10e30c:Skyrim.esm,EnchRobesCollegeRestoration01,Skyrim.esm,DragonBreak Online Edits.esp (override),1,EnchRobesFortifyMagickaRateConstantSelf,magicka regen,50.0,25,1,client
+10e30b:Skyrim.esm,EnchRobesCollegeMagickaRate01,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyMagickaRateConstantSelf,magicka regen,50.0,25,4,client
+10e30a:Skyrim.esm,EnchRobesCollegeIllusion01,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchRobesFortifyIllusionConstantSelf,spell cost (Fortify school),12.0,6,1,client: spell cost
+10e30a:Skyrim.esm,EnchRobesCollegeIllusion01,Skyrim.esm,DragonBreak Online Edits.esp (override),1,EnchRobesFortifyMagickaRateConstantSelf,magicka regen,50.0,25,1,client
+10e309:Skyrim.esm,EnchRobesCollegeDestruction05,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchRobesFortifyDestructionConstantSelf,spell cost (Fortify school),22.0,11,1,client: spell cost
+10e309:Skyrim.esm,EnchRobesCollegeDestruction05,Skyrim.esm,DragonBreak Online Edits.esp (override),1,EnchRobesFortifyMagickaRateConstantSelf,magicka regen,150.0,75,1,client
+10e308:Skyrim.esm,EnchRobesCollegeDestruction04,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchRobesFortifyDestructionConstantSelf,spell cost (Fortify school),20.0,10,1,client: spell cost
+10e308:Skyrim.esm,EnchRobesCollegeDestruction04,Skyrim.esm,DragonBreak Online Edits.esp (override),1,EnchRobesFortifyMagickaRateConstantSelf,magicka regen,125.0,63,1,client
+10e307:Skyrim.esm,EnchRobesCollegeDestruction03,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchRobesFortifyDestructionConstantSelf,spell cost (Fortify school),17.0,9,1,client: spell cost
+10e307:Skyrim.esm,EnchRobesCollegeDestruction03,Skyrim.esm,DragonBreak Online Edits.esp (override),1,EnchRobesFortifyMagickaRateConstantSelf,magicka regen,100.0,50,1,client
+10e306:Skyrim.esm,EnchRobesCollegeDestruction02,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchRobesFortifyDestructionConstantSelf,spell cost (Fortify school),15.0,8,2,client: spell cost
+10e306:Skyrim.esm,EnchRobesCollegeDestruction02,Skyrim.esm,DragonBreak Online Edits.esp (override),1,EnchRobesFortifyMagickaRateConstantSelf,magicka regen,75.0,38,2,client
+10e305:Skyrim.esm,EnchRobesCollegeDestruction01,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchRobesFortifyDestructionConstantSelf,spell cost (Fortify school),12.0,6,1,client: spell cost
+10e305:Skyrim.esm,EnchRobesCollegeDestruction01,Skyrim.esm,DragonBreak Online Edits.esp (override),1,EnchRobesFortifyMagickaRateConstantSelf,magicka regen,50.0,25,1,client
+10e304:Skyrim.esm,EnchRobesCollegeConjuration05,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchRobesFortifyConjurationConstantSelf,spell cost (Fortify school),22.0,11,1,client: spell cost
+10e304:Skyrim.esm,EnchRobesCollegeConjuration05,Skyrim.esm,DragonBreak Online Edits.esp (override),1,EnchRobesFortifyMagickaRateConstantSelf,magicka regen,150.0,75,1,client
+10e303:Skyrim.esm,EnchRobesCollegeConjuration04,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchRobesFortifyConjurationConstantSelf,spell cost (Fortify school),20.0,10,1,client: spell cost
+10e303:Skyrim.esm,EnchRobesCollegeConjuration04,Skyrim.esm,DragonBreak Online Edits.esp (override),1,EnchRobesFortifyMagickaRateConstantSelf,magicka regen,125.0,63,1,client
+10e302:Skyrim.esm,EnchRobesCollegeConjuration03,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchRobesFortifyConjurationConstantSelf,spell cost (Fortify school),17.0,9,1,client: spell cost
+10e302:Skyrim.esm,EnchRobesCollegeConjuration03,Skyrim.esm,DragonBreak Online Edits.esp (override),1,EnchRobesFortifyMagickaRateConstantSelf,magicka regen,100.0,50,1,client
+10e301:Skyrim.esm,EnchRobesCollegeConjuration02,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchRobesFortifyConjurationConstantSelf,spell cost (Fortify school),15.0,8,1,client: spell cost
+10e301:Skyrim.esm,EnchRobesCollegeConjuration02,Skyrim.esm,DragonBreak Online Edits.esp (override),1,EnchRobesFortifyMagickaRateConstantSelf,magicka regen,75.0,38,1,client
+10e300:Skyrim.esm,EnchRobesCollegeConjuration01,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchRobesFortifyConjurationConstantSelf,spell cost (Fortify school),12.0,6,1,client: spell cost
+10e300:Skyrim.esm,EnchRobesCollegeConjuration01,Skyrim.esm,DragonBreak Online Edits.esp (override),1,EnchRobesFortifyMagickaRateConstantSelf,magicka regen,50.0,25,1,client
+10e2ff:Skyrim.esm,EnchRobesCollegeAlteration05,unofficial skyrim special edition patch.esp,DragonBreak Online Edits.esp (override),0,EnchRobesFortifyAlterationConstantSelf,spell cost (Fortify school),22.0,11,1,client: spell cost
+10e2ff:Skyrim.esm,EnchRobesCollegeAlteration05,unofficial skyrim special edition patch.esp,DragonBreak Online Edits.esp (override),1,EnchRobesFortifyMagickaRateConstantSelf,magicka regen,150.0,75,1,client
+10e2fe:Skyrim.esm,EnchRobesCollegeAlteration04,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchRobesFortifyAlterationConstantSelf,spell cost (Fortify school),20.0,10,1,client: spell cost
+10e2fe:Skyrim.esm,EnchRobesCollegeAlteration04,Skyrim.esm,DragonBreak Online Edits.esp (override),1,EnchRobesFortifyMagickaRateConstantSelf,magicka regen,125.0,63,1,client
+10e2fd:Skyrim.esm,EnchRobesCollegeAlteration03,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchRobesFortifyAlterationConstantSelf,spell cost (Fortify school),17.0,9,1,client: spell cost
+10e2fd:Skyrim.esm,EnchRobesCollegeAlteration03,Skyrim.esm,DragonBreak Online Edits.esp (override),1,EnchRobesFortifyMagickaRateConstantSelf,magicka regen,100.0,50,1,client
+10e2fc:Skyrim.esm,EnchRobesCollegeAlteration02,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchRobesFortifyAlterationConstantSelf,spell cost (Fortify school),15.0,8,1,client: spell cost
+10e2fc:Skyrim.esm,EnchRobesCollegeAlteration02,Skyrim.esm,DragonBreak Online Edits.esp (override),1,EnchRobesFortifyMagickaRateConstantSelf,magicka regen,75.0,38,1,client
+10e2fb:Skyrim.esm,EnchRobesCollegeAlteration01,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchRobesFortifyAlterationConstantSelf,spell cost (Fortify school),12.0,6,1,client: spell cost
+10e2fb:Skyrim.esm,EnchRobesCollegeAlteration01,Skyrim.esm,DragonBreak Online Edits.esp (override),1,EnchRobesFortifyMagickaRateConstantSelf,magicka regen,50.0,25,1,client
+10cf26:Skyrim.esm,EnchArmorFortifyHealRate01,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyHealRateConstantSelf,health regen,10.0,5,1,client
+10a262:Skyrim.esm,TrapDartPoisonWeapEnchDwe06,Skyrim.esm,DragonBreak Online Edits.esp (override),0,TrapPoisonFFContactEffect,fortify health,1.0,1,1,client max; server damage judge unverified
+10a261:Skyrim.esm,TrapDartPoisonWeapEnchDwe05,Skyrim.esm,DragonBreak Online Edits.esp (override),0,TrapPoisonFFContactEffect,fortify health,1.0,1,1,client max; server damage judge unverified
+10a260:Skyrim.esm,TrapDartPoisonWeapEnchDwe04,Skyrim.esm,DragonBreak Online Edits.esp (override),0,TrapPoisonFFContactEffect,fortify health,1.0,1,1,client max; server damage judge unverified
+10a25f:Skyrim.esm,TrapDartPoisonWeapEnchDwe03,Skyrim.esm,DragonBreak Online Edits.esp (override),0,TrapPoisonFFContactEffect,fortify health,1.0,1,1,client max; server damage judge unverified
+10a25e:Skyrim.esm,TrapDartPoisonWeapEnchDwe02,Skyrim.esm,DragonBreak Online Edits.esp (override),0,TrapPoisonFFContactEffect,fortify health,1.0,1,1,client max; server damage judge unverified
+10a25d:Skyrim.esm,TrapDartPoisonWeapEnchDwe01,Skyrim.esm,DragonBreak Online Edits.esp (override),0,TrapPoisonFFContactEffect,fortify health,1.0,1,1,client max; server damage judge unverified
+1098c5:Skyrim.esm,TrapDartPoisonWeapEnch06,Skyrim.esm,DragonBreak Online Edits.esp (override),0,TrapPoisonFFContactEffect,fortify health,6.0,3,1,client max; server damage judge unverified
+1098c4:Skyrim.esm,TrapDartPoisonWeapEnch05,Skyrim.esm,DragonBreak Online Edits.esp (override),0,TrapPoisonFFContactEffect,fortify health,6.0,3,1,client max; server damage judge unverified
+1098c3:Skyrim.esm,TrapDartPoisonWeapEnch04,Skyrim.esm,DragonBreak Online Edits.esp (override),0,TrapPoisonFFContactEffect,fortify health,5.0,3,1,client max; server damage judge unverified
+1098c2:Skyrim.esm,TrapDartPoisonWeapEnch03,Skyrim.esm,DragonBreak Online Edits.esp (override),0,TrapPoisonFFContactEffect,fortify health,5.0,3,1,client max; server damage judge unverified
+1098ba:Skyrim.esm,TrapDartPoisonWeapEnch02,Skyrim.esm,DragonBreak Online Edits.esp (override),0,TrapPoisonFFContactEffect,fortify health,4.0,2,1,client max; server damage judge unverified
+10854b:Skyrim.esm,TGLinweHelmetEnchant,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyArcheryConstantSelf,fortify archery,15.0,8,2,server gear-fortify (set perPoint 0.01 after this edit)
+10854a:Skyrim.esm,TGLinweGauntletsEnchant,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyOneHandedConstantSelf,fortify one-handed,15.0,8,2,server gear-fortify (set perPoint 0.01 after this edit)
+108549:Skyrim.esm,TGLinweBootsEnchant,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifySneakConstantSelf,fortify sneak,15.0,8,2,client
+108548:Skyrim.esm,TGLinweCuirassEnchant,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyStaminaConstantSelf,fortify stamina,15.0,8,2,client
+107e2e:Skyrim.esm,dunHunterQstEnchAmulet,Skyrim.esm,DragonBreak Online Edits.esp (override),1,EnchFortifyArcheryConstantSelf,fortify archery,5.0,3,2,server gear-fortify (set perPoint 0.01 after this edit)
+106fcc:Skyrim.esm,dunEnchGauldurAmuletFortifyStats,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyMagickaConstantSelf,fortify magicka,30.0,15,2,client
+106fcc:Skyrim.esm,dunEnchGauldurAmuletFortifyStats,Skyrim.esm,DragonBreak Online Edits.esp (override),1,EnchFortifyHealthConstantSelf,fortify health,30.0,15,2,client max; server damage judge unverified
+106fcc:Skyrim.esm,dunEnchGauldurAmuletFortifyStats,Skyrim.esm,DragonBreak Online Edits.esp (override),2,EnchFortifyStaminaConstantSelf,fortify stamina,30.0,15,2,client
+106fcb:Skyrim.esm,dunEnchGauldurAmuletFragmentGeirmundFortifyStamina,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyStaminaConstantSelf,fortify stamina,30.0,15,2,client
+106fca:Skyrim.esm,dunEnchGauldurAmuletFragmentSaarthalFortifyMagicka,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyMagickaConstantSelf,fortify magicka,30.0,15,2,client
+106fc9:Skyrim.esm,dunEnchGauldurAmuletFragmentFolgunthurFortifyHealth,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyHealthConstantSelf,fortify health,30.0,15,2,client max; server damage judge unverified
+10660a:Skyrim.esm,DA03ClavicusMaskEnch,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifySpeechcraftConstantSelf,fortify speech,20.0,10,2,client
+10660a:Skyrim.esm,DA03ClavicusMaskEnch,Skyrim.esm,DragonBreak Online Edits.esp (override),1,EnchFortifyPersuasionConstantSelf,fortify speech,10.0,5,2,client
+10660a:Skyrim.esm,DA03ClavicusMaskEnch,Skyrim.esm,DragonBreak Online Edits.esp (override),2,EnchFortifyMagickaRateConstantSelf,magicka regen,5.0,3,2,client
+105833:Skyrim.esm,dunAnsilvundGhostbladeENCH,Skyrim.esm,DragonBreak Online Edits.esp (override),0,dunAnsilvundDamageFFContact,fortify health,3.0,2,1,client max; server damage judge unverified
+105830:Skyrim.esm,dunHaltedStreamtAxeENCH,Skyrim.esm,DragonBreak Online Edits.esp (override),0,dunHaltedStreamDamageFFContact,fortify health,3.0,2,2,client max; server damage judge unverified
+10582d:Skyrim.esm,dunLostValleyRedoubtAxeENCH,Skyrim.esm,DragonBreak Online Edits.esp (override),0,dunLostValleyDamageFFContact,fortify health,5.0,3,1,client max; server damage judge unverified
+105250:Skyrim.esm,EnchRobesFortifyMagickaRate02,Dragonborn.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyMagickaRateConstantSelf,magicka regen,75.0,38,30,client
+104d91:Skyrim.esm,EnchRobesFortifyMagickaRate05,Dragonborn.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyMagickaRateConstantSelf,magicka regen,150.0,75,7,client
+104d90:Skyrim.esm,EnchRobesFortifyMagickaRate04,unofficial skyrim special edition patch.esp,DragonBreak Online Edits.esp (override),0,EnchFortifyMagickaRateConstantSelf,magicka regen,125.0,63,6,client
+104d8f:Skyrim.esm,EnchRobesFortifyMagickaRate03,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyMagickaRateConstantSelf,magicka regen,100.0,50,6,client
+104d8e:Skyrim.esm,EnchRobesFortifyIllusion06,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchRobesFortifyIllusionConstantSelf,spell cost (Fortify school),25.0,13,4,client: spell cost
+104d8e:Skyrim.esm,EnchRobesFortifyIllusion06,Skyrim.esm,DragonBreak Online Edits.esp (override),1,EnchRobesFortifyMagickaRateConstantSelf,magicka regen,50.0,25,4,client
+104d8d:Skyrim.esm,EnchRobesFortifyIllusion05,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchRobesFortifyIllusionConstantSelf,spell cost (Fortify school),22.0,11,4,client: spell cost
+104d8d:Skyrim.esm,EnchRobesFortifyIllusion05,Skyrim.esm,DragonBreak Online Edits.esp (override),1,EnchRobesFortifyMagickaRateConstantSelf,magicka regen,50.0,25,4,client
+104d8c:Skyrim.esm,EnchRobesFortifyIllusion04,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchRobesFortifyIllusionConstantSelf,spell cost (Fortify school),20.0,10,4,client: spell cost
+104d8c:Skyrim.esm,EnchRobesFortifyIllusion04,Skyrim.esm,DragonBreak Online Edits.esp (override),1,EnchRobesFortifyMagickaRateConstantSelf,magicka regen,50.0,25,4,client
+104d8b:Skyrim.esm,EnchRobesFortifyIllusion03,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchRobesFortifyIllusionConstantSelf,spell cost (Fortify school),17.0,9,4,client: spell cost
+104d8b:Skyrim.esm,EnchRobesFortifyIllusion03,Skyrim.esm,DragonBreak Online Edits.esp (override),1,EnchRobesFortifyMagickaRateConstantSelf,magicka regen,50.0,25,4,client
+104d8a:Skyrim.esm,EnchRobesFortifyIllusion02,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchRobesFortifyIllusionConstantSelf,spell cost (Fortify school),15.0,8,4,client: spell cost
+104d8a:Skyrim.esm,EnchRobesFortifyIllusion02,Skyrim.esm,DragonBreak Online Edits.esp (override),1,EnchRobesFortifyMagickaRateConstantSelf,magicka regen,50.0,25,4,client
+104d84:Skyrim.esm,EnchRobesFortifyDestruction06,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchRobesFortifyDestructionConstantSelf,spell cost (Fortify school),25.0,13,6,client: spell cost
+104d84:Skyrim.esm,EnchRobesFortifyDestruction06,Skyrim.esm,DragonBreak Online Edits.esp (override),1,EnchRobesFortifyMagickaRateConstantSelf,magicka regen,50.0,25,6,client
+104d83:Skyrim.esm,EnchRobesFortifyDestruction05,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchRobesFortifyDestructionConstantSelf,spell cost (Fortify school),22.0,11,6,client: spell cost
+104d83:Skyrim.esm,EnchRobesFortifyDestruction05,Skyrim.esm,DragonBreak Online Edits.esp (override),1,EnchRobesFortifyMagickaRateConstantSelf,magicka regen,50.0,25,6,client
+104d82:Skyrim.esm,EnchRobesFortifyDestruction04,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchRobesFortifyDestructionConstantSelf,spell cost (Fortify school),20.0,10,6,client: spell cost
+104d82:Skyrim.esm,EnchRobesFortifyDestruction04,Skyrim.esm,DragonBreak Online Edits.esp (override),1,EnchRobesFortifyMagickaRateConstantSelf,magicka regen,50.0,25,6,client
+104d81:Skyrim.esm,EnchRobesFortifyDestruction03,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchRobesFortifyDestructionConstantSelf,spell cost (Fortify school),17.0,9,6,client: spell cost
+104d81:Skyrim.esm,EnchRobesFortifyDestruction03,Skyrim.esm,DragonBreak Online Edits.esp (override),1,EnchRobesFortifyMagickaRateConstantSelf,magicka regen,50.0,25,6,client
+104d80:Skyrim.esm,EnchRobesFortifyDestruction02,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchRobesFortifyDestructionConstantSelf,spell cost (Fortify school),15.0,8,6,client: spell cost
+104d80:Skyrim.esm,EnchRobesFortifyDestruction02,Skyrim.esm,DragonBreak Online Edits.esp (override),1,EnchRobesFortifyMagickaRateConstantSelf,magicka regen,50.0,25,6,client
+104d7f:Skyrim.esm,EnchRobesFortifyConjuration06,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchRobesFortifyConjurationConstantSelf,spell cost (Fortify school),25.0,13,6,client: spell cost
+104d7f:Skyrim.esm,EnchRobesFortifyConjuration06,Skyrim.esm,DragonBreak Online Edits.esp (override),1,EnchRobesFortifyMagickaRateConstantSelf,magicka regen,50.0,25,6,client
+104d7e:Skyrim.esm,EnchRobesFortifyConjuration05,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchRobesFortifyConjurationConstantSelf,spell cost (Fortify school),22.0,11,6,client: spell cost
+104d7e:Skyrim.esm,EnchRobesFortifyConjuration05,Skyrim.esm,DragonBreak Online Edits.esp (override),1,EnchRobesFortifyMagickaRateConstantSelf,magicka regen,50.0,25,6,client
+104d7d:Skyrim.esm,EnchRobesFortifyConjuration04,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchRobesFortifyConjurationConstantSelf,spell cost (Fortify school),20.0,10,6,client: spell cost
+104d7d:Skyrim.esm,EnchRobesFortifyConjuration04,Skyrim.esm,DragonBreak Online Edits.esp (override),1,EnchRobesFortifyMagickaRateConstantSelf,magicka regen,50.0,25,6,client
+104d7c:Skyrim.esm,EnchRobesFortifyConjuration03,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchRobesFortifyConjurationConstantSelf,spell cost (Fortify school),17.0,9,6,client: spell cost
+104d7c:Skyrim.esm,EnchRobesFortifyConjuration03,Skyrim.esm,DragonBreak Online Edits.esp (override),1,EnchRobesFortifyMagickaRateConstantSelf,magicka regen,50.0,25,6,client
+104d7b:Skyrim.esm,EnchRobesFortifyConjuration02,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchRobesFortifyConjurationConstantSelf,spell cost (Fortify school),15.0,8,6,client: spell cost
+104d7b:Skyrim.esm,EnchRobesFortifyConjuration02,Skyrim.esm,DragonBreak Online Edits.esp (override),1,EnchRobesFortifyMagickaRateConstantSelf,magicka regen,50.0,25,6,client
+104d7a:Skyrim.esm,EnchRobesFortifyAlteration06,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchRobesFortifyAlterationConstantSelf,spell cost (Fortify school),25.0,13,4,client: spell cost
+104d7a:Skyrim.esm,EnchRobesFortifyAlteration06,Skyrim.esm,DragonBreak Online Edits.esp (override),1,EnchRobesFortifyMagickaRateConstantSelf,magicka regen,50.0,25,4,client
+104d79:Skyrim.esm,EnchRobesFortifyAlteration05,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchRobesFortifyAlterationConstantSelf,spell cost (Fortify school),22.0,11,4,client: spell cost
+104d79:Skyrim.esm,EnchRobesFortifyAlteration05,Skyrim.esm,DragonBreak Online Edits.esp (override),1,EnchRobesFortifyMagickaRateConstantSelf,magicka regen,50.0,25,4,client
+104d78:Skyrim.esm,EnchRobesFortifyAlteration04,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchRobesFortifyAlterationConstantSelf,spell cost (Fortify school),20.0,10,4,client: spell cost
+104d78:Skyrim.esm,EnchRobesFortifyAlteration04,Skyrim.esm,DragonBreak Online Edits.esp (override),1,EnchRobesFortifyMagickaRateConstantSelf,magicka regen,50.0,25,4,client
+104d77:Skyrim.esm,EnchRobesFortifyAlteration03,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchRobesFortifyAlterationConstantSelf,spell cost (Fortify school),17.0,9,4,client: spell cost
+104d77:Skyrim.esm,EnchRobesFortifyAlteration03,Skyrim.esm,DragonBreak Online Edits.esp (override),1,EnchRobesFortifyMagickaRateConstantSelf,magicka regen,50.0,25,4,client
+104d76:Skyrim.esm,EnchRobesFortifyAlteration02,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchRobesFortifyAlterationConstantSelf,spell cost (Fortify school),15.0,8,4,client: spell cost
+104d76:Skyrim.esm,EnchRobesFortifyAlteration02,Skyrim.esm,DragonBreak Online Edits.esp (override),1,EnchRobesFortifyMagickaRateConstantSelf,magicka regen,50.0,25,4,client
+104d75:Skyrim.esm,EnchRobesFortifyIllusion01,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchRobesFortifyIllusionConstantSelf,spell cost (Fortify school),12.0,6,4,client: spell cost
+104d75:Skyrim.esm,EnchRobesFortifyIllusion01,Skyrim.esm,DragonBreak Online Edits.esp (override),1,EnchRobesFortifyMagickaRateConstantSelf,magicka regen,50.0,25,4,client
+104d74:Skyrim.esm,EnchRobesFortifyRestoration06,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchRobesFortifyRestorationConstantSelf,spell cost (Fortify school),25.0,13,4,client: spell cost
+104d74:Skyrim.esm,EnchRobesFortifyRestoration06,Skyrim.esm,DragonBreak Online Edits.esp (override),1,EnchRobesFortifyMagickaRateConstantSelf,magicka regen,50.0,25,4,client
+104d73:Skyrim.esm,EnchRobesFortifyRestoration05,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchRobesFortifyRestorationConstantSelf,spell cost (Fortify school),22.0,11,4,client: spell cost
+104d73:Skyrim.esm,EnchRobesFortifyRestoration05,Skyrim.esm,DragonBreak Online Edits.esp (override),1,EnchRobesFortifyMagickaRateConstantSelf,magicka regen,50.0,25,4,client
+104d72:Skyrim.esm,EnchRobesFortifyRestoration04,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchRobesFortifyRestorationConstantSelf,spell cost (Fortify school),20.0,10,4,client: spell cost
+104d72:Skyrim.esm,EnchRobesFortifyRestoration04,Skyrim.esm,DragonBreak Online Edits.esp (override),1,EnchRobesFortifyMagickaRateConstantSelf,magicka regen,50.0,25,4,client
+104d71:Skyrim.esm,EnchRobesFortifyRestoration03,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchRobesFortifyRestorationConstantSelf,spell cost (Fortify school),17.0,9,4,client: spell cost
+104d71:Skyrim.esm,EnchRobesFortifyRestoration03,Skyrim.esm,DragonBreak Online Edits.esp (override),1,EnchRobesFortifyMagickaRateConstantSelf,magicka regen,50.0,25,4,client
+104d70:Skyrim.esm,EnchRobesFortifyRestoration02,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchRobesFortifyRestorationConstantSelf,spell cost (Fortify school),15.0,8,4,client: spell cost
+104d70:Skyrim.esm,EnchRobesFortifyRestoration02,Skyrim.esm,DragonBreak Online Edits.esp (override),1,EnchRobesFortifyMagickaRateConstantSelf,magicka regen,50.0,25,4,client
+104d6f:Skyrim.esm,EnchRobesFortifyRestoration01,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchRobesFortifyRestorationConstantSelf,spell cost (Fortify school),12.0,6,4,client: spell cost
+104d6f:Skyrim.esm,EnchRobesFortifyRestoration01,Skyrim.esm,DragonBreak Online Edits.esp (override),1,EnchRobesFortifyMagickaRateConstantSelf,magicka regen,50.0,25,4,client
+104d6d:Skyrim.esm,EnchRobesFortifyAlteration01,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchRobesFortifyAlterationConstantSelf,spell cost (Fortify school),12.0,6,4,client: spell cost
+104d6d:Skyrim.esm,EnchRobesFortifyAlteration01,Skyrim.esm,DragonBreak Online Edits.esp (override),1,EnchRobesFortifyMagickaRateConstantSelf,magicka regen,50.0,25,4,client
+104d6c:Skyrim.esm,EnchRobesFortifyConjuration01,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchRobesFortifyConjurationConstantSelf,spell cost (Fortify school),12.0,6,6,client: spell cost
+104d6c:Skyrim.esm,EnchRobesFortifyConjuration01,Skyrim.esm,DragonBreak Online Edits.esp (override),1,EnchRobesFortifyMagickaRateConstantSelf,magicka regen,50.0,25,6,client
+104d6b:Skyrim.esm,EnchRobesFortifyDestruction01,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchRobesFortifyDestructionConstantSelf,spell cost (Fortify school),12.0,6,6,client: spell cost
+104d6b:Skyrim.esm,EnchRobesFortifyDestruction01,Skyrim.esm,DragonBreak Online Edits.esp (override),1,EnchRobesFortifyMagickaRateConstantSelf,magicka regen,50.0,25,6,client
+101bdb:Skyrim.esm,dunClearspringTarnEnchDmg,Skyrim.esm,DragonBreak Online Edits.esp (override),0,dunClearspringTarnDmgFFContact,fortify health,20.0,10,2,client max; server damage judge unverified
+101a68:Skyrim.esm,MG02AmuletEnchant,Skyrim.esm,DragonBreak Online Edits.esp (override),0,MG02FortifyAlteration,spell cost (Fortify school),3.0,2,2,client: spell cost
+101a68:Skyrim.esm,MG02AmuletEnchant,Skyrim.esm,DragonBreak Online Edits.esp (override),1,MG02FortifyConjuration,spell cost (Fortify school),3.0,2,2,client: spell cost
+101a68:Skyrim.esm,MG02AmuletEnchant,Skyrim.esm,DragonBreak Online Edits.esp (override),2,MG02FortifyDestruction,spell cost (Fortify school),3.0,2,2,client: spell cost
+101a68:Skyrim.esm,MG02AmuletEnchant,Skyrim.esm,DragonBreak Online Edits.esp (override),3,MG02FortifyIllusion,spell cost (Fortify school),3.0,2,2,client: spell cost
+101a68:Skyrim.esm,MG02AmuletEnchant,Skyrim.esm,DragonBreak Online Edits.esp (override),4,MG02FortifyRestoration,spell cost (Fortify school),3.0,2,2,client: spell cost
+101932:Skyrim.esm,TrapDartPoisonWeapEnch01,Skyrim.esm,DragonBreak Online Edits.esp (override),0,TrapPoisonFFContactEffect,fortify health,3.0,2,2,client max; server damage judge unverified
+0ff9f6:Skyrim.esm,MQ203WeaponDragonDamage5,Skyrim.esm,DragonBreak Online Edits.esp (override),0,MQ203DragonDamageFFContact,fortify health,40.0,20,3,client max; server damage judge unverified
+0ff9f5:Skyrim.esm,MQ203WeaponDragonDamage4,Skyrim.esm,DragonBreak Online Edits.esp (override),0,MQ203DragonDamageFFContact,fortify health,35.0,18,3,client max; server damage judge unverified
+0ff9f4:Skyrim.esm,MQ203WeaponDragonDamage3,unofficial skyrim special edition patch.esp,DragonBreak Online Edits.esp (override),0,MQ203DragonDamageFFContact,fortify health,30.0,15,2,client max; server damage judge unverified
+0ff9f3:Skyrim.esm,MQ203WeaponDragonDamage2,Skyrim.esm,DragonBreak Online Edits.esp (override),0,MQ203DragonDamageFFContact,fortify health,25.0,13,3,client max; server damage judge unverified
+0fee34:Skyrim.esm,DA09EncDawnbreaker,Skyrim.esm,DragonBreak Online Edits.esp (override),1,DA09EnchDawnbreakerEnchFireDamageFFContact,fortify health,10.0,5,2,client max; server damage judge unverified
+0fcc0a:Skyrim.esm,TGNightingaleArmorChest03,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyStaminaConstantSelf,fortify stamina,40.0,20,2,client
+0fcc09:Skyrim.esm,TGNightingaleArmorChest02,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyStaminaConstantSelf,fortify stamina,30.0,15,2,client
+0fcc08:Skyrim.esm,TGNightingaleArmorChest01,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyStaminaConstantSelf,fortify stamina,20.0,10,2,client
+0fcc04:Skyrim.esm,TGNightingaleArmorGloves03,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyLockpickingConstantSelf,fortify lockpicking,25.0,13,2,client
+0fcc04:Skyrim.esm,TGNightingaleArmorGloves03,Skyrim.esm,DragonBreak Online Edits.esp (override),1,EnchFortifyOneHandedConstantSelf,fortify one-handed,25.0,13,2,server gear-fortify (set perPoint 0.01 after this edit)
+0fcc03:Skyrim.esm,TGNightingaleArmorGloves02,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyLockpickingConstantSelf,fortify lockpicking,20.0,10,2,client
+0fcc03:Skyrim.esm,TGNightingaleArmorGloves02,Skyrim.esm,DragonBreak Online Edits.esp (override),1,EnchFortifyOneHandedConstantSelf,fortify one-handed,20.0,10,2,server gear-fortify (set perPoint 0.01 after this edit)
+0fcc02:Skyrim.esm,TGNightingaleArmorGloves01,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyLockpickingConstantSelf,fortify lockpicking,15.0,8,2,client
+0fcc02:Skyrim.esm,TGNightingaleArmorGloves01,Skyrim.esm,DragonBreak Online Edits.esp (override),1,EnchFortifyOneHandedConstantSelf,fortify one-handed,15.0,8,2,server gear-fortify (set perPoint 0.01 after this edit)
+0fcc01:Skyrim.esm,TGNightingaleArmorHelmet01,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyIllusionConstantSelf,spell cost (Fortify school),12.0,6,2,client: spell cost
+0fcc00:Skyrim.esm,TGNightingaleArmorHelmet02,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyIllusionConstantSelf,spell cost (Fortify school),15.0,8,2,client: spell cost
+0fcbff:Skyrim.esm,TGNightingaleArmorHelmet03,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyIllusionConstantSelf,spell cost (Fortify school),17.0,9,2,client: spell cost
+0f9916:Skyrim.esm,EnchDragonPriestMaskBronze,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyLockpickingConstantSelf,fortify lockpicking,20.0,10,1,client
+0f9916:Skyrim.esm,EnchDragonPriestMaskBronze,Skyrim.esm,DragonBreak Online Edits.esp (override),1,EnchFortifyArcheryConstantSelf,fortify archery,20.0,10,1,server gear-fortify (set perPoint 0.01 after this edit)
+0f9903:Skyrim.esm,EnchAllMagicSchoolsMinor,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyAlterationConstantSelf,spell cost (Fortify school),5.0,3,2,client: spell cost
+0f9903:Skyrim.esm,EnchAllMagicSchoolsMinor,Skyrim.esm,DragonBreak Online Edits.esp (override),1,EnchFortifyConjurationConstantSelf,spell cost (Fortify school),5.0,3,2,client: spell cost
+0f9903:Skyrim.esm,EnchAllMagicSchoolsMinor,Skyrim.esm,DragonBreak Online Edits.esp (override),2,EnchFortifyDestructionConstantSelf,spell cost (Fortify school),5.0,3,2,client: spell cost
+0f9903:Skyrim.esm,EnchAllMagicSchoolsMinor,Skyrim.esm,DragonBreak Online Edits.esp (override),3,EnchFortifyRestorationConstantSelf,spell cost (Fortify school),5.0,3,2,client: spell cost
+0f9903:Skyrim.esm,EnchAllMagicSchoolsMinor,Skyrim.esm,DragonBreak Online Edits.esp (override),4,EnchFortifyIllusionConstantSelf,spell cost (Fortify school),5.0,3,2,client: spell cost
+0f8464:Skyrim.esm,EnchDragonPriestMaskCorundrum,Skyrim.esm,DragonBreak Online Edits.esp (override),1,EnchFortifySpeechcraftConstantSelf,fortify speech,20.0,10,2,client
+0f8464:Skyrim.esm,EnchDragonPriestMaskCorundrum,Skyrim.esm,DragonBreak Online Edits.esp (override),2,EnchFortifyCarryConstantSelf,carry weight,20.0,10,2,client
+0f8463:Skyrim.esm,EnchDragonPriestMaskSteel,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyConjurationConstantSelf,spell cost (Fortify school),20.0,10,2,client: spell cost
+0f8463:Skyrim.esm,EnchDragonPriestMaskSteel,Skyrim.esm,DragonBreak Online Edits.esp (override),1,EnchFortifyIllusionConstantSelf,spell cost (Fortify school),20.0,10,2,client: spell cost
+0f8463:Skyrim.esm,EnchDragonPriestMaskSteel,Skyrim.esm,DragonBreak Online Edits.esp (override),2,EnchFortifyAlterationConstantSelf,spell cost (Fortify school),20.0,10,2,client: spell cost
+0f8460:Skyrim.esm,EnchDragonPriestMaskEbony,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyMagickaConstantSelf,fortify magicka,50.0,25,2,client
+0f8460:Skyrim.esm,EnchDragonPriestMaskEbony,Skyrim.esm,DragonBreak Online Edits.esp (override),1,EnchFortifyDestructionConstantSelf,spell cost (Fortify school),20.0,10,2,client: spell cost
+0f8460:Skyrim.esm,EnchDragonPriestMaskEbony,Skyrim.esm,DragonBreak Online Edits.esp (override),2,EnchFortifyRestorationConstantSelf,spell cost (Fortify school),20.0,10,2,client: spell cost
+0f690c:Skyrim.esm,EnchArmorArticulation07,unofficial skyrim special edition patch.esp,DragonBreak Online Edits.esp (override),0,EnchFortifyArticulation,fortify speech,35.0,18,2,client
+0f690b:Skyrim.esm,EnchArmorArticulation06,unofficial skyrim special edition patch.esp,DragonBreak Online Edits.esp (override),0,EnchFortifyArticulation,fortify speech,30.0,15,2,client
+0f690a:Skyrim.esm,EnchArmorArticulation05,unofficial skyrim special edition patch.esp,DragonBreak Online Edits.esp (override),0,EnchFortifyArticulation,fortify speech,25.0,13,2,client
+0f6909:Skyrim.esm,EnchArmorArticulation04,unofficial skyrim special edition patch.esp,DragonBreak Online Edits.esp (override),0,EnchFortifyArticulation,fortify speech,20.0,10,2,client
+0f6908:Skyrim.esm,EnchArmorArticulation03,unofficial skyrim special edition patch.esp,DragonBreak Online Edits.esp (override),0,EnchFortifyArticulation,fortify speech,15.0,8,2,client
+0f6907:Skyrim.esm,EnchArmorArticulation02,unofficial skyrim special edition patch.esp,DragonBreak Online Edits.esp (override),0,EnchFortifyArticulation,fortify speech,10.0,5,2,client
+0f6905:Skyrim.esm,EnchArmorArticulation01,unofficial skyrim special edition patch.esp,DragonBreak Online Edits.esp (override),0,EnchFortifyArticulation,fortify speech,5.0,3,2,client
+0f6513:Skyrim.esm,TGArmorFortifySpeechcraftMaster,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifySpeechcraftConstantSelf,fortify speech,20.0,10,2,client
+0f6512:Skyrim.esm,TGArmorFortifyPickpocketMaster,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyPickpocketConstantSelf,fortify pickpocket,35.0,18,3,client
+0f6511:Skyrim.esm,TGArmorFortifyLockpickingMaster,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyLockpickingConstantSelf,fortify lockpicking,35.0,18,2,client
+0f6510:Skyrim.esm,TGArmorFortifyCarryMaster,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyCarryConstantSelf,carry weight,50.0,25,2,client
+0f5d32:Skyrim.esm,dunEnchDeepwoodMuffle,unofficial skyrim special edition patch.esp,DragonBreak Online Edits.esp (override),1,EnchFortifyStaminaRateConstantSelf,stamina regen,100.0,50,1,client
+0f5d19:Skyrim.esm,EnchBloatedMan,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchStaminaDamageFFContact,fortify stamina,25.0,13,2,client
+0f5d18:Skyrim.esm,EnchRedEagle,Skyrim.esm,DragonBreak Online Edits.esp (override),0,dunRedEagleFireDamageFFContact,fortify health,10.0,5,1,client max; server damage judge unverified
+0f5d17:Skyrim.esm,dunEnchTrollsBaneFireDamage,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchTrollsbaneFireDamageFFContact,fortify health,15.0,8,1,client max; server damage judge unverified
+0f1b2b:Skyrim.esm,MGArchMageRobeEnchant,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyAlterationConstantSelf,spell cost (Fortify school),15.0,8,5,client: spell cost
+0f1b2b:Skyrim.esm,MGArchMageRobeEnchant,Skyrim.esm,DragonBreak Online Edits.esp (override),1,EnchFortifyConjurationConstantSelf,spell cost (Fortify school),15.0,8,5,client: spell cost
+0f1b2b:Skyrim.esm,MGArchMageRobeEnchant,Skyrim.esm,DragonBreak Online Edits.esp (override),2,EnchFortifyDestructionConstantSelf,spell cost (Fortify school),15.0,8,5,client: spell cost
+0f1b2b:Skyrim.esm,MGArchMageRobeEnchant,Skyrim.esm,DragonBreak Online Edits.esp (override),3,EnchFortifyRestorationConstantSelf,spell cost (Fortify school),15.0,8,5,client: spell cost
+0f1b2b:Skyrim.esm,MGArchMageRobeEnchant,Skyrim.esm,DragonBreak Online Edits.esp (override),4,EnchFortifyIllusionConstantSelf,spell cost (Fortify school),15.0,8,5,client: spell cost
+0f1b2b:Skyrim.esm,MGArchMageRobeEnchant,Skyrim.esm,DragonBreak Online Edits.esp (override),5,EnchFortifyMagickaRateConstantSelf,magicka regen,100.0,50,5,client
+0f1ac3:Skyrim.esm,MQ203WeaponDragonDamage1,Skyrim.esm,DragonBreak Online Edits.esp (override),0,MQ203DragonDamageFFContact,fortify health,20.0,10,4,client max; server damage judge unverified
+0d3ac0:Skyrim.esm,TGArmorFortifySpeechcraftImproved,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifySpeechcraftConstantSelf,fortify speech,15.0,8,2,client
+0d3abf:Skyrim.esm,TGArmorFortifyPickpocketImproved,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyPickpocketConstantSelf,fortify pickpocket,25.0,13,2,client
+0d3abe:Skyrim.esm,TGArmorFortifyCarryImproved,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyCarryConstantSelf,carry weight,35.0,18,2,client
+0d3abd:Skyrim.esm,TGArmorFortifyLockpickingImproved,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyLockpickingConstantSelf,fortify lockpicking,25.0,13,2,client
+0d3abc:Skyrim.esm,TGArmorFortifySpeechcraft,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifySpeechcraftConstantSelf,fortify speech,10.0,5,2,client
+0d3abb:Skyrim.esm,TGArmorFortifyPickpocket,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyPickpocketConstantSelf,fortify pickpocket,15.0,8,2,client
+0d3aba:Skyrim.esm,TGArmorFortifyLockpicking,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyLockpickingConstantSelf,fortify lockpicking,15.0,8,2,client
+0d3ab9:Skyrim.esm,TGArmorFortifyCarry,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyCarryConstantSelf,carry weight,20.0,10,2,client
+064930:Skyrim.esm,DBEnchantJesterCicero,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifySpeechcraftConstantSelf,fortify speech,20.0,10,1,client
+064930:Skyrim.esm,DBEnchantJesterCicero,Skyrim.esm,DragonBreak Online Edits.esp (override),1,EnchFortifyOneHandedConstantSelf,fortify one-handed,20.0,10,1,server gear-fortify (set perPoint 0.01 after this edit)
+064929:Skyrim.esm,DBEnchantJester,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifySpeechcraftConstantSelf,fortify speech,12.0,6,2,client
+064929:Skyrim.esm,DBEnchantJester,Skyrim.esm,DragonBreak Online Edits.esp (override),1,EnchFortifyOneHandedConstantSelf,fortify one-handed,12.0,6,2,server gear-fortify (set perPoint 0.01 after this edit)
+064928:Skyrim.esm,DBEnchantShroudedRobes,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyDestructionConstantSelf,spell cost (Fortify school),15.0,8,2,client: spell cost
+0dc44e:Skyrim.esm,DBEnchantNightWeaveBand,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifySneakConstantSelf,fortify sneak,10.0,5,2,client
+0dc44e:Skyrim.esm,DBEnchantNightWeaveBand,Skyrim.esm,DragonBreak Online Edits.esp (override),1,EnchFortifyDestructionConstantSelf,spell cost (Fortify school),10.0,5,2,client: spell cost
+029b6e:Skyrim.esm,StaffEnchHealOther,Skyrim.esm,DragonBreak Online Edits.esp (override),0,RestoreHealthFFActor,fortify health,45.0,23,2,client max; server damage judge unverified
+029b64:Skyrim.esm,StaffEnchRally,unofficial skyrim special edition patch.esp,DragonBreak Online Edits.esp (override),2,ConfUpAreaFortifyHealth50,fortify health,25.0,13,1,client max; server damage judge unverified
+029b64:Skyrim.esm,StaffEnchRally,unofficial skyrim special edition patch.esp,DragonBreak Online Edits.esp (override),3,ConfUpAreaFortifyStamina50,fortify stamina,25.0,13,1,client
+029b64:Skyrim.esm,StaffEnchRally,unofficial skyrim special edition patch.esp,DragonBreak Online Edits.esp (override),4,PerkMasterMindAreaFortifyHealth50,fortify health,25.0,13,1,client max; server damage judge unverified
+029b64:Skyrim.esm,StaffEnchRally,unofficial skyrim special edition patch.esp,DragonBreak Online Edits.esp (override),5,PerkMasterMindAreaFortifyStamina50,fortify stamina,25.0,13,1,client
+029b5d:Skyrim.esm,StaffEnchWallOfFlames,Skyrim.esm,DragonBreak Online Edits.esp (override),0,BarrierFireConcAimed,fortify health,8.0,4,3,client max; server damage judge unverified
+029b59:Skyrim.esm,StaffEnchFireball,Skyrim.esm,DragonBreak Online Edits.esp (override),0,FireDamageFFAimedArea,fortify health,40.0,20,4,client max; server damage judge unverified
+0be039:Skyrim.esm,EnchArmorFortifyAlteration06,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyAlterationConstantSelf,spell cost (Fortify school),25.0,13,12,client: spell cost
+0be038:Skyrim.esm,EnchArmorFortifyAlteration05,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyAlterationConstantSelf,spell cost (Fortify school),22.0,11,25,client: spell cost
+0be037:Skyrim.esm,EnchArmorFortifyAlteration04,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyAlterationConstantSelf,spell cost (Fortify school),20.0,10,42,client: spell cost
+0be036:Skyrim.esm,EnchArmorFortifyBlock06,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyBlockConstantSelf,fortify block,40.0,20,5,"client only, server block ignores it"
+0be035:Skyrim.esm,EnchArmorFortifyBlock05,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyBlockConstantSelf,fortify block,35.0,18,10,"client only, server block ignores it"
+0be034:Skyrim.esm,EnchArmorFortifyBlock04,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyBlockConstantSelf,fortify block,30.0,15,13,"client only, server block ignores it"
+0be027:Skyrim.esm,EnchArmorFortifyTwoHanded06,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyTwoHandedConstantSelf,fortify two-handed,40.0,20,7,server gear-fortify (set perPoint 0.01 after this edit)
+0be026:Skyrim.esm,EnchArmorFortifyTwoHanded05,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyTwoHandedConstantSelf,fortify two-handed,35.0,18,14,server gear-fortify (set perPoint 0.01 after this edit)
+0be025:Skyrim.esm,EnchArmorFortifyTwoHanded04,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyTwoHandedConstantSelf,fortify two-handed,30.0,15,23,server gear-fortify (set perPoint 0.01 after this edit)
+0be024:Skyrim.esm,EnchArmorFortifyStaminaRate06,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyStaminaRateConstantSelf,stamina regen,50.0,25,8,client
+0be023:Skyrim.esm,EnchArmorFortifyStamina06,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyStaminaConstantSelf,fortify stamina,70.0,35,9,client
+0be022:Skyrim.esm,EnchArmorFortifyStamina05,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyStaminaConstantSelf,fortify stamina,60.0,30,17,client
+0be021:Skyrim.esm,EnchArmorFortifyStamina04,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyStaminaConstantSelf,fortify stamina,50.0,25,23,client
+0be020:Skyrim.esm,EnchArmorFortifySpeechcraft06,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifySpeechcraftConstantSelf,fortify speech,25.0,13,1,client
+0be01f:Skyrim.esm,EnchArmorFortifySpeechcraft05,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifySpeechcraftConstantSelf,fortify speech,22.0,11,1,client
+0be01e:Skyrim.esm,EnchArmorFortifySpeechcraft04,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifySpeechcraftConstantSelf,fortify speech,20.0,10,1,client
+0be01d:Skyrim.esm,EnchArmorFortifySneak06,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifySneakConstantSelf,fortify sneak,40.0,20,4,client
+0be01c:Skyrim.esm,EnchArmorFortifySneak05,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifySneakConstantSelf,fortify sneak,35.0,18,8,client
+0be01b:Skyrim.esm,EnchArmorFortifySneak04,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifySneakConstantSelf,fortify sneak,30.0,15,12,client
+0be01a:Skyrim.esm,EnchArmorFortifySmithing06,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifySmithingConstantSelf,fortify smithing,25.0,13,7,client tempering; server Blacksmith tiers ignore it
+0be019:Skyrim.esm,EnchArmorFortifySmithing05,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifySmithingConstantSelf,fortify smithing,22.0,11,13,client tempering; server Blacksmith tiers ignore it
+0be018:Skyrim.esm,EnchArmorFortifySmithing04,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifySmithingConstantSelf,fortify smithing,20.0,10,25,client tempering; server Blacksmith tiers ignore it
+0be017:Skyrim.esm,EnchArmorFortifyRestoration06,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyRestorationConstantSelf,spell cost (Fortify school),25.0,13,12,client: spell cost
+0be016:Skyrim.esm,EnchArmorFortifyRestoration05,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyRestorationConstantSelf,spell cost (Fortify school),22.0,11,26,client: spell cost
+0be015:Skyrim.esm,EnchArmorFortifyRestoration04,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyRestorationConstantSelf,spell cost (Fortify school),20.0,10,41,client: spell cost
+0be014:Skyrim.esm,EnchArmorFortifyPickpocket06,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyPickpocketConstantSelf,fortify pickpocket,40.0,20,3,client
+0be013:Skyrim.esm,EnchArmorFortifyPickpocket05,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyPickpocketConstantSelf,fortify pickpocket,35.0,18,6,client
+0be012:Skyrim.esm,EnchArmorFortifyPickpocket04,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyPickpocketConstantSelf,fortify pickpocket,30.0,15,11,client
+0be011:Skyrim.esm,EnchArmorFortifyOneHanded06,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyOneHandedConstantSelf,fortify one-handed,40.0,20,8,server gear-fortify (set perPoint 0.01 after this edit)
+0be010:Skyrim.esm,EnchArmorFortifyOneHanded05,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyOneHandedConstantSelf,fortify one-handed,35.0,18,14,server gear-fortify (set perPoint 0.01 after this edit)
+0be00f:Skyrim.esm,EnchArmorFortifyOneHanded04,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyOneHandedConstantSelf,fortify one-handed,30.0,15,24,server gear-fortify (set perPoint 0.01 after this edit)
+0be00e:Skyrim.esm,EnchArmorFortifyMarksman06,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyArcheryConstantSelf,fortify archery,40.0,20,13,server gear-fortify (set perPoint 0.01 after this edit)
+0be00d:Skyrim.esm,EnchArmorFortifyMarksman05,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyArcheryConstantSelf,fortify archery,35.0,18,26,server gear-fortify (set perPoint 0.01 after this edit)
+0be00c:Skyrim.esm,EnchArmorFortifyMarksman04,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyArcheryConstantSelf,fortify archery,30.0,15,41,server gear-fortify (set perPoint 0.01 after this edit)
+0be00b:Skyrim.esm,EnchArmorFortifyMagickaRate06,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyMagickaRateConstantSelf,magicka regen,100.0,50,9,client
+0be00a:Skyrim.esm,EnchArmorFortifyLockpicking06,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyLockpickingConstantSelf,fortify lockpicking,40.0,20,3,client
+0be009:Skyrim.esm,EnchArmorFortifyLockpicking05,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyLockpickingConstantSelf,fortify lockpicking,35.0,18,6,client
+0be008:Skyrim.esm,EnchArmorFortifyLockpicking04,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyLockpickingConstantSelf,fortify lockpicking,30.0,15,11,client
+0be007:Skyrim.esm,EnchArmorFortifyLightArmor06,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyLightArmorConstantSelf,fortify light armor,25.0,13,4,"client only, server armour ignores it"
+0be006:Skyrim.esm,EnchArmorFortifyLightArmor05,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyLightArmorConstantSelf,fortify light armor,22.0,11,12,"client only, server armour ignores it"
+0be005:Skyrim.esm,EnchArmorFortifyLightArmor04,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyLightArmorConstantSelf,fortify light armor,20.0,10,14,"client only, server armour ignores it"
+0be004:Skyrim.esm,EnchArmorFortifyIllusion06,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyIllusionConstantSelf,spell cost (Fortify school),25.0,13,13,client: spell cost
+0be003:Skyrim.esm,EnchArmorFortifyIllusion05,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyIllusionConstantSelf,spell cost (Fortify school),22.0,11,26,client: spell cost
+0be002:Skyrim.esm,EnchArmorFortifyIllusion04,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyIllusionConstantSelf,spell cost (Fortify school),20.0,10,40,client: spell cost
+0be001:Skyrim.esm,EnchArmorFortifyHeavyArmor06,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyHeavyArmorConstantSelf,fortify heavy armor,25.0,13,6,"client only, server armour ignores it"
+0be000:Skyrim.esm,EnchArmorFortifyHeavyArmor05,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyHeavyArmorConstantSelf,fortify heavy armor,22.0,11,11,"client only, server armour ignores it"
+0bdfff:Skyrim.esm,EnchArmorFortifyHeavyArmor04,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyHeavyArmorConstantSelf,fortify heavy armor,20.0,10,12,"client only, server armour ignores it"
+0bdffe:Skyrim.esm,EnchArmorFortifyHealth06,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyHealthConstantSelf,fortify health,70.0,35,8,client max; server damage judge unverified
+0bdffd:Skyrim.esm,EnchArmorFortifyHealth05,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyHealthConstantSelf,fortify health,60.0,30,14,client max; server damage judge unverified
+0bdffc:Skyrim.esm,EnchArmorFortifyHealth04,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyHealthConstantSelf,fortify health,50.0,25,21,client max; server damage judge unverified
+0b7a33:Skyrim.esm,EnchArmorFortifyMagicka06,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyMagickaConstantSelf,fortify magicka,70.0,35,15,client
+0b7a32:Skyrim.esm,EnchArmorFortifyMagicka05,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyMagickaConstantSelf,fortify magicka,60.0,30,18,client
+0b7a31:Skyrim.esm,EnchArmorFortifyMagicka04,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyMagickaConstantSelf,fortify magicka,50.0,25,28,client
+0b62e2:Skyrim.esm,StaffEnchHealingHands,Skyrim.esm,DragonBreak Online Edits.esp (override),0,RestoreHealthConcActor,fortify health,4.0,2,1,client max; server damage judge unverified
+0b602f:Skyrim.esm,StaffEnchCourage,unofficial skyrim special edition patch.esp,DragonBreak Online Edits.esp (override),2,ConfUpFortifyHealth00,fortify health,25.0,13,1,client max; server damage judge unverified
+0b602f:Skyrim.esm,StaffEnchCourage,unofficial skyrim special edition patch.esp,DragonBreak Online Edits.esp (override),3,ConfUpFortifyStamina00,fortify stamina,25.0,13,1,client
+0b602f:Skyrim.esm,StaffEnchCourage,unofficial skyrim special edition patch.esp,DragonBreak Online Edits.esp (override),4,PerkMasterMindFortifyHealth00,fortify health,25.0,13,1,client max; server damage judge unverified
+0b602f:Skyrim.esm,StaffEnchCourage,unofficial skyrim special edition patch.esp,DragonBreak Online Edits.esp (override),5,PerkMasterMindFortifyStamina00,fortify stamina,25.0,13,1,client
+0ad4a2:Skyrim.esm,EnchArmorFortifyBlock03,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyBlockConstantSelf,fortify block,25.0,13,18,"client only, server block ignores it"
+0ad4a1:Skyrim.esm,EnchArmorFortifyBlock02,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyBlockConstantSelf,fortify block,20.0,10,13,"client only, server block ignores it"
+0ad4a0:Skyrim.esm,EnchArmorFortifyAlteration03,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyAlterationConstantSelf,spell cost (Fortify school),17.0,9,59,client: spell cost
+0ad49f:Skyrim.esm,EnchArmorFortifyAlteration02,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyAlterationConstantSelf,spell cost (Fortify school),15.0,8,45,client: spell cost
+0ad493:Skyrim.esm,EnchArmorFortifyHealRate06,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyHealRateConstantSelf,health regen,50.0,25,9,client
+0ad482:Skyrim.esm,EnchArmorFortifyTwoHanded03,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyTwoHandedConstantSelf,fortify two-handed,25.0,13,29,server gear-fortify (set perPoint 0.01 after this edit)
+0ad481:Skyrim.esm,EnchArmorFortifyTwoHanded02,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyTwoHandedConstantSelf,fortify two-handed,20.0,10,23,server gear-fortify (set perPoint 0.01 after this edit)
+0ad480:Skyrim.esm,EnchArmorFortifyStaminaRate03,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyStaminaRateConstantSelf,stamina regen,20.0,10,7,client
+0ad47f:Skyrim.esm,EnchArmorFortifyStaminaRate05,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyStaminaRateConstantSelf,stamina regen,40.0,20,12,client
+0ad47e:Skyrim.esm,EnchArmorFortifyStamina03,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyStaminaConstantSelf,fortify stamina,40.0,20,25,client
+0ad47d:Skyrim.esm,EnchArmorFortifyStamina02,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyStaminaConstantSelf,fortify stamina,30.0,15,16,client
+0ad47c:Skyrim.esm,EnchArmorFortifySpeechcraft03,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifySpeechcraftConstantSelf,fortify speech,17.0,9,3,client
+0ad47b:Skyrim.esm,EnchArmorFortifySpeechcraft02,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifySpeechcraftConstantSelf,fortify speech,15.0,8,1,client
+0ad47a:Skyrim.esm,EnchArmorFortifySneak03,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifySneakConstantSelf,fortify sneak,25.0,13,22,client
+0ad479:Skyrim.esm,EnchArmorFortifySneak02,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifySneakConstantSelf,fortify sneak,20.0,10,20,client
+0ad478:Skyrim.esm,EnchArmorFortifySmithing03,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifySmithingConstantSelf,fortify smithing,17.0,9,31,client tempering; server Blacksmith tiers ignore it
+0ad477:Skyrim.esm,EnchArmorFortifySmithing02,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifySmithingConstantSelf,fortify smithing,15.0,8,26,client tempering; server Blacksmith tiers ignore it
+0ad476:Skyrim.esm,EnchArmorFortifyRestoration03,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyRestorationConstantSelf,spell cost (Fortify school),17.0,9,50,client: spell cost
+0ad475:Skyrim.esm,EnchArmorFortifyRestoration02,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyRestorationConstantSelf,spell cost (Fortify school),15.0,8,38,client: spell cost
+0ad474:Skyrim.esm,EnchArmorFortifyPickpocket03,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyPickpocketConstantSelf,fortify pickpocket,25.0,13,17,client
+0ad473:Skyrim.esm,EnchArmorFortifyPickpocket02,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyPickpocketConstantSelf,fortify pickpocket,20.0,10,14,client
+0ad472:Skyrim.esm,EnchArmorFortifyOneHanded03,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyOneHandedConstantSelf,fortify one-handed,25.0,13,30,server gear-fortify (set perPoint 0.01 after this edit)
+0ad471:Skyrim.esm,EnchArmorFortifyOneHanded02,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyOneHandedConstantSelf,fortify one-handed,20.0,10,24,server gear-fortify (set perPoint 0.01 after this edit)
+0ad470:Skyrim.esm,EnchArmorFortifyMarksman03,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyArcheryConstantSelf,fortify archery,25.0,13,52,server gear-fortify (set perPoint 0.01 after this edit)
+0ad46f:Skyrim.esm,EnchArmorFortifyMarksman02,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyArcheryConstantSelf,fortify archery,20.0,10,48,server gear-fortify (set perPoint 0.01 after this edit)
+0ad46e:Skyrim.esm,EnchArmorFortifyMagickaRate03,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyMagickaRateConstantSelf,magicka regen,40.0,20,5,client
+0ad46d:Skyrim.esm,EnchArmorFortifyMagickaRate05,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyMagickaRateConstantSelf,magicka regen,80.0,40,11,client
+0ad46c:Skyrim.esm,EnchArmorFortifyMagicka03,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyMagickaConstantSelf,fortify magicka,40.0,20,31,client
+0ad46b:Skyrim.esm,EnchArmorFortifyMagicka02,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyMagickaConstantSelf,fortify magicka,30.0,15,28,client
+0ad46a:Skyrim.esm,EnchArmorFortifyLockpicking03,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyLockpickingConstantSelf,fortify lockpicking,25.0,13,17,client
+0ad469:Skyrim.esm,EnchArmorFortifyLockpicking02,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyLockpickingConstantSelf,fortify lockpicking,20.0,10,16,client
+0ad468:Skyrim.esm,EnchArmorFortifyLightArmor03,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyLightArmorConstantSelf,fortify light armor,17.0,9,21,"client only, server armour ignores it"
+0ad467:Skyrim.esm,EnchArmorFortifyLightArmor02,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyLightArmorConstantSelf,fortify light armor,15.0,8,17,"client only, server armour ignores it"
+0ad466:Skyrim.esm,EnchArmorFortifyIllusion03,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyIllusionConstantSelf,spell cost (Fortify school),17.0,9,53,client: spell cost
+0ad465:Skyrim.esm,EnchArmorFortifyIllusion02,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyIllusionConstantSelf,spell cost (Fortify school),15.0,8,40,client: spell cost
+0ad464:Skyrim.esm,EnchArmorFortifyHeavyArmor03,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyHeavyArmorConstantSelf,fortify heavy armor,17.0,9,16,"client only, server armour ignores it"
+0ad463:Skyrim.esm,EnchArmorFortifyHeavyArmor02,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyHeavyArmorConstantSelf,fortify heavy armor,15.0,8,14,"client only, server armour ignores it"
+0ad462:Skyrim.esm,EnchArmorFortifyHealth03,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyHealthConstantSelf,fortify health,40.0,20,34,client max; server damage judge unverified
+0ad461:Skyrim.esm,EnchArmorFortifyHealth02,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyHealthConstantSelf,fortify health,30.0,15,27,client max; server damage judge unverified
+0ad460:Skyrim.esm,EnchArmorFortifyHealRate03,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyHealRateConstantSelf,health regen,20.0,10,10,client
+0ad45f:Skyrim.esm,EnchArmorFortifyHealRate05,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyHealRateConstantSelf,health regen,40.0,20,12,client
+0ad45c:Skyrim.esm,EnchArmorFortifyDestruction06,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyDestructionConstantSelf,spell cost (Fortify school),25.0,13,13,client: spell cost
+0ad45b:Skyrim.esm,EnchArmorFortifyDestruction05,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyDestructionConstantSelf,spell cost (Fortify school),22.0,11,25,client: spell cost
+0ad45a:Skyrim.esm,EnchArmorFortifyDestruction04,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyDestructionConstantSelf,spell cost (Fortify school),20.0,10,42,client: spell cost
+0ad459:Skyrim.esm,EnchArmorFortifyDestruction03,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyDestructionConstantSelf,spell cost (Fortify school),17.0,9,58,client: spell cost
+0ad458:Skyrim.esm,EnchArmorFortifyDestruction02,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyDestructionConstantSelf,spell cost (Fortify school),15.0,8,48,client: spell cost
+0ad457:Skyrim.esm,EnchArmorFortifyConjuration06,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyConjurationConstantSelf,spell cost (Fortify school),25.0,13,13,client: spell cost
+0ad456:Skyrim.esm,EnchArmorFortifyConjuration05,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyConjurationConstantSelf,spell cost (Fortify school),22.0,11,26,client: spell cost
+0ad455:Skyrim.esm,EnchArmorFortifyConjuration04,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyConjurationConstantSelf,spell cost (Fortify school),20.0,10,44,client: spell cost
+0ad454:Skyrim.esm,EnchArmorFortifyConjuration03,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyConjurationConstantSelf,spell cost (Fortify school),17.0,9,61,client: spell cost
+0ad453:Skyrim.esm,EnchArmorFortifyConjuration02,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyConjurationConstantSelf,spell cost (Fortify school),15.0,8,48,client: spell cost
+0ad450:Skyrim.esm,EnchArmorFortifyCarry06,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyCarryConstantSelf,carry weight,50.0,25,5,client
+0ad44f:Skyrim.esm,EnchArmorFortifyCarry05,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyCarryConstantSelf,carry weight,45.0,23,11,client
+0ad44e:Skyrim.esm,EnchArmorFortifyCarry04,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyCarryConstantSelf,carry weight,40.0,20,18,client
+0ad44d:Skyrim.esm,EnchArmorFortifyCarry03,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyCarryConstantSelf,carry weight,35.0,18,25,client
+0ad44c:Skyrim.esm,EnchArmorFortifyCarry02,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyCarryConstantSelf,carry weight,30.0,15,19,client
+0a0d9b:Skyrim.esm,DA16SkullofCorruptionEnchantment,Skyrim.esm,DragonBreak Online Edits.esp (override),1,DA16Skull04WakingMajor,fortify health,40.0,20,2,client max; server damage judge unverified
+0a0d9b:Skyrim.esm,DA16SkullofCorruptionEnchantment,Skyrim.esm,DragonBreak Online Edits.esp (override),2,DA16Skull03WakingMinor,fortify health,15.0,8,2,client max; server damage judge unverified
+09b245:Skyrim.esm,DA15StaffEnchWabbajack,Skyrim.esm,DragonBreak Online Edits.esp (override),0,DA15WabbajackFF,fortify health,1.0,1,2,client max; server damage judge unverified
+091ae8:Skyrim.esm,DA11RingofNamiraEnchantment,Skyrim.esm,DragonBreak Online Edits.esp (override),0,DA11NamiraBlessingEffect,fortify stamina,50.0,25,2,client
+091ae4:Skyrim.esm,DA10MaceofMolagBalEnchantment,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchStaminaDamageFFContact,fortify stamina,25.0,13,2,client
+091ae4:Skyrim.esm,DA10MaceofMolagBalEnchantment,Skyrim.esm,DragonBreak Online Edits.esp (override),1,EnchMagickaDamageFFContact,fortify magicka,25.0,13,2,client
+08850c:Skyrim.esm,EnchReligiousZenithar,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifySpeechcraftConstantSelf,fortify speech,10.0,5,4,client
+08850a:Skyrim.esm,EnchReligiousStendarr,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyBlockConstantSelf,fortify block,10.0,5,3,"client only, server block ignores it"
+088509:Skyrim.esm,EnchReligiousMara,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyRestorationConstantSelf,spell cost (Fortify school),10.0,5,5,client: spell cost
+088508:Skyrim.esm,EnchReligiousKynareth,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyStaminaConstantSelf,fortify stamina,10.0,5,3,client
+088506:Skyrim.esm,EnchReligiousDibella,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyPersuasionConstantSelf,fortify speech,15.0,8,3,client
+088504:Skyrim.esm,EnchReligiousArkay,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyHealthConstantSelf,fortify health,10.0,5,5,client max; server damage judge unverified
+088503:Skyrim.esm,EnchReligiousAkatosh,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyMagickaRateConstantSelf,magicka regen,25.0,13,4,client
+088501:Skyrim.esm,EnchReligiousJulianos,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyMagickaConstantSelf,fortify magicka,10.0,5,3,client
+07a11b:Skyrim.esm,EnchArmorFortifyTwoHanded01,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyTwoHandedConstantSelf,fortify two-handed,15.0,8,15,server gear-fortify (set perPoint 0.01 after this edit)
+07a11a:Skyrim.esm,EnchArmorFortifyStaminaRate04,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyStaminaRateConstantSelf,stamina regen,30.0,15,12,client
+07a119:Skyrim.esm,EnchArmorFortifySpeechcraft01,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifySpeechcraftConstantSelf,fortify speech,12.0,6,1,client
+07a118:Skyrim.esm,EnchArmorFortifySneak01,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifySneakConstantSelf,fortify sneak,15.0,8,14,client
+07a117:Skyrim.esm,EnchArmorFortifySmithing01,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifySmithingConstantSelf,fortify smithing,12.0,6,16,client tempering; server Blacksmith tiers ignore it
+07a116:Skyrim.esm,EnchArmorFortifyRestoration01,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyRestorationConstantSelf,spell cost (Fortify school),12.0,6,23,client: spell cost
+07a115:Skyrim.esm,EnchArmorFortifyPickpocket01,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyPickpocketConstantSelf,fortify pickpocket,15.0,8,9,client
+07a114:Skyrim.esm,EnchArmorFortifyOneHanded01,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyOneHandedConstantSelf,fortify one-handed,15.0,8,14,server gear-fortify (set perPoint 0.01 after this edit)
+07a113:Skyrim.esm,EnchArmorFortifyMarksman01,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyArcheryConstantSelf,fortify archery,15.0,8,23,server gear-fortify (set perPoint 0.01 after this edit)
+07a112:Skyrim.esm,EnchArmorFortifyMagickaRate04,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyMagickaRateConstantSelf,magicka regen,60.0,30,10,client
+07a111:Skyrim.esm,EnchArmorFortifyLockpicking01,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyLockpickingConstantSelf,fortify lockpicking,15.0,8,9,client
+07a110:Skyrim.esm,EnchArmorFortifyLightArmor01,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyLightArmorConstantSelf,fortify light armor,12.0,6,13,"client only, server armour ignores it"
+07a10f:Skyrim.esm,EnchArmorFortifyIllusion01,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyIllusionConstantSelf,spell cost (Fortify school),12.0,6,28,client: spell cost
+07a10e:Skyrim.esm,EnchArmorFortifyHeavyArmor01,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyHeavyArmorConstantSelf,fortify heavy armor,12.0,6,10,"client only, server armour ignores it"
+07a10d:Skyrim.esm,EnchArmorFortifyHealRate04,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyHealRateConstantSelf,health regen,30.0,15,12,client
+07a10b:Skyrim.esm,EnchArmorFortifyDestruction01,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyDestructionConstantSelf,spell cost (Fortify school),12.0,6,36,client: spell cost
+07a10a:Skyrim.esm,EnchArmorFortifyConjuration01,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyConjurationConstantSelf,spell cost (Fortify school),12.0,6,32,client: spell cost
+07a109:Skyrim.esm,EnchArmorFortifyCarry01,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyCarryConstantSelf,carry weight,25.0,13,14,client
+07a108:Skyrim.esm,EnchArmorFortifyBlock01,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyBlockConstantSelf,fortify block,15.0,8,10,"client only, server block ignores it"
+07a107:Skyrim.esm,EnchArmorFortifyAlteration01,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyAlterationConstantSelf,spell cost (Fortify school),12.0,6,31,client: spell cost
+04950a:Skyrim.esm,EnchArmorFortifyStamina01,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyStaminaConstantSelf,fortify stamina,20.0,10,9,client
+049509:Skyrim.esm,EnchArmorFortifyHealth01,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyHealthConstantSelf,fortify health,20.0,10,21,client max; server damage judge unverified
+049508:Skyrim.esm,EnchArmorFortifyMagicka01,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyMagickaConstantSelf,fortify magicka,20.0,10,21,client
+040003:Skyrim.esm,EnchFierySouls,Skyrim.esm,DragonBreak Online Edits.esp (override),1,EnchFireDamageFFContact,fortify health,10.0,5,1,client max; server damage judge unverified
+05b45e:Skyrim.esm,EnchWeaponStaminaDamage06,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchStaminaDamageFFContact,fortify stamina,30.0,15,26,client
+05b45d:Skyrim.esm,EnchWeaponStaminaDamage05,Dawnguard.esm,DragonBreak Online Edits.esp (override),0,EnchStaminaDamageFFContact,fortify stamina,25.0,13,52,client
+05b45c:Skyrim.esm,EnchWeaponStaminaDamage04,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchStaminaDamageFFContact,fortify stamina,20.0,10,71,client
+05b45b:Skyrim.esm,EnchWeaponStaminaDamage03,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchStaminaDamageFFContact,fortify stamina,15.0,8,93,client
+05b45a:Skyrim.esm,EnchWeaponStaminaDamage02,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchStaminaDamageFFContact,fortify stamina,10.0,5,67,client
+05b459:Skyrim.esm,EnchWeaponStaminaDamage01,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchStaminaDamageFFContact,fortify stamina,5.0,3,48,client
+05b458:Skyrim.esm,EnchWeaponMagickaDamage06,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchMagickaDamageFFContact,fortify magicka,60.0,30,26,client
+05b457:Skyrim.esm,EnchWeaponMagickaDamage05,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchMagickaDamageFFContact,fortify magicka,50.0,25,53,client
+05b456:Skyrim.esm,EnchWeaponMagickaDamage04,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchMagickaDamageFFContact,fortify magicka,40.0,20,70,client
+05b455:Skyrim.esm,EnchWeaponMagickaDamage03,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchMagickaDamageFFContact,fortify magicka,30.0,15,82,client
+05b454:Skyrim.esm,EnchWeaponMagickaDamage02,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchMagickaDamageFFContact,fortify magicka,20.0,10,59,client
+05b453:Skyrim.esm,EnchWeaponMagickaDamage01,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchMagickaDamageFFContact,fortify magicka,10.0,5,40,client
+04deda:Skyrim.esm,StaffEnchFlames,Skyrim.esm,DragonBreak Online Edits.esp (override),0,FireDamageConcAimed,fortify health,8.0,4,4,client max; server damage judge unverified
+04c6cb:Skyrim.esm,StaffEnchFirebolt,Skyrim.esm,DragonBreak Online Edits.esp (override),0,FireDamageFFAimed,fortify health,25.0,13,6,client max; server damage judge unverified
+045c35:Skyrim.esm,EnchWeaponFireDamage06,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFireDamageFFContact,fortify health,30.0,15,22,client max; server damage judge unverified
+045c30:Skyrim.esm,EnchWeaponFireDamage05,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFireDamageFFContact,fortify health,25.0,13,48,client max; server damage judge unverified
+045c2d:Skyrim.esm,EnchWeaponFireDamage04,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFireDamageFFContact,fortify health,20.0,10,65,client max; server damage judge unverified
+045c2c:Skyrim.esm,EnchWeaponFireDamage03,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFireDamageFFContact,fortify health,15.0,8,95,client max; server damage judge unverified
+045c2a:Skyrim.esm,EnchWeaponFireDamage02,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFireDamageFFContact,fortify health,10.0,5,62,client max; server damage judge unverified
+049bb7:Skyrim.esm,EnchWeaponFireDamage01,Skyrim.esm,DragonBreak Online Edits.esp (override),0,EnchFireDamageFFContact,fortify health,5.0,3,45,client max; server damage judge unverified
+00e802:Dawnguard.esm,DLC1nVampireBloodMagicRingEruditeEnch,Dawnguard.esm,DragonBreak Online Edits.esp (override),0,AbFortifyMagickaHighElf,fortify magicka,100.0,50,1,client
+00e801:Dawnguard.esm,DLC1nVampireBloodMagicRingBeastEnch,Dawnguard.esm,DragonBreak Online Edits.esp (override),1,AbFortifyHealth,fortify health,100.0,50,2,client max; server damage judge unverified
+01951a:Dawnguard.esm,DLC1EnchArmorJiubNecklace,Dawnguard.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyCarryConstantSelf,carry weight,50.0,25,1,client
+01951a:Dawnguard.esm,DLC1EnchArmorJiubNecklace,Dawnguard.esm,DragonBreak Online Edits.esp (override),1,EnchFortifyStaminaConstantSelf,fortify stamina,50.0,25,1,client
+01668f:Dawnguard.esm,DLC1DawnguardRuneAxeExtraDamage,Dawnguard.esm,DragonBreak Online Edits.esp (override),1,DLC1DawnguardRuneAxeDamageEffect,fortify health,10.0,5,2,client max; server damage judge unverified
+01668f:Dawnguard.esm,DLC1DawnguardRuneAxeExtraDamage,Dawnguard.esm,DragonBreak Online Edits.esp (override),2,DLC1DawnguardRuneAxeDamageEffect,fortify health,20.0,10,2,client max; server damage judge unverified
+01668f:Dawnguard.esm,DLC1DawnguardRuneAxeExtraDamage,Dawnguard.esm,DragonBreak Online Edits.esp (override),3,DLC1DawnguardRuneAxeDamageEffect,fortify health,30.0,15,2,client max; server damage judge unverified
+01668f:Dawnguard.esm,DLC1DawnguardRuneAxeExtraDamage,Dawnguard.esm,DragonBreak Online Edits.esp (override),4,DLC1DawnguardRuneAxeDamageEffect,fortify health,40.0,20,2,client max; server damage judge unverified
+01668f:Dawnguard.esm,DLC1DawnguardRuneAxeExtraDamage,Dawnguard.esm,DragonBreak Online Edits.esp (override),5,DLC1DawnguardRuneAxeDamageEffect,fortify health,50.0,25,2,client max; server damage judge unverified
+01668f:Dawnguard.esm,DLC1DawnguardRuneAxeExtraDamage,Dawnguard.esm,DragonBreak Online Edits.esp (override),6,DLC1DawnguardRuneAxeDamageEffect,fortify health,60.0,30,2,client max; server damage judge unverified
+01668f:Dawnguard.esm,DLC1DawnguardRuneAxeExtraDamage,Dawnguard.esm,DragonBreak Online Edits.esp (override),7,DLC1DawnguardRuneAxeDamageEffect,fortify health,70.0,35,2,client max; server damage judge unverified
+01668f:Dawnguard.esm,DLC1DawnguardRuneAxeExtraDamage,Dawnguard.esm,DragonBreak Online Edits.esp (override),8,DLC1DawnguardRuneAxeDamageEffect,fortify health,80.0,40,2,client max; server damage judge unverified
+01668f:Dawnguard.esm,DLC1DawnguardRuneAxeExtraDamage,Dawnguard.esm,DragonBreak Online Edits.esp (override),9,DLC1DawnguardRuneAxeDamageEffect,fortify health,90.0,45,2,client max; server damage judge unverified
+01668f:Dawnguard.esm,DLC1DawnguardRuneAxeExtraDamage,Dawnguard.esm,DragonBreak Online Edits.esp (override),10,DLC1DawnguardRuneAxeDamageEffect,fortify health,100.0,50,2,client max; server damage judge unverified
+0071df:Dawnguard.esm,DLCEnchAurielsBow,Dawnguard.esm,DragonBreak Online Edits.esp (override),0,DLC1EnchSunDamage,fortify health,10.0,5,2,client max; server damage judge unverified
+0071df:Dawnguard.esm,DLCEnchAurielsBow,Dawnguard.esm,DragonBreak Online Edits.esp (override),1,DLC1EnchSunDamageUndead,fortify health,20.0,10,2,client max; server damage judge unverified
+03a3d3:Dragonborn.esm,dlc2MKEncMiraakStaffTentacles1,Dragonborn.esm,DragonBreak Online Edits.esp (override),0,DLC2MiraaksStaffTentaclesEffect,fortify health,40.0,20,1,client max; server damage judge unverified
+039fa9:Dragonborn.esm,dlc2MKEncMiraakStaff3,Dragonborn.esm,DragonBreak Online Edits.esp (override),0,DLC2MiraaksStaffTentaclesEffect,fortify health,20.0,10,1,client max; server damage judge unverified
+039fa8:Dragonborn.esm,dlc2MKEncMiraakStaff2,Dragonborn.esm,DragonBreak Online Edits.esp (override),0,DLC2MiraaksStaffTentaclesEffect,fortify health,20.0,10,1,client max; server damage judge unverified
+039fa7:Dragonborn.esm,dlc2MKEncMiraakStaff1,Dragonborn.esm,DragonBreak Online Edits.esp (override),0,DLC2MiraaksStaffTentaclesEffect,fortify health,20.0,10,7,client max; server damage judge unverified
+039d24:Dragonborn.esm,dlc2MKEncMiraakRobe01,Dragonborn.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyAlterationConstantSelf,spell cost (Fortify school),5.0,3,6,client: spell cost
+039d24:Dragonborn.esm,dlc2MKEncMiraakRobe01,Dragonborn.esm,DragonBreak Online Edits.esp (override),1,EnchFortifyConjurationConstantSelf,spell cost (Fortify school),5.0,3,6,client: spell cost
+039d24:Dragonborn.esm,dlc2MKEncMiraakRobe01,Dragonborn.esm,DragonBreak Online Edits.esp (override),2,EnchFortifyDestructionConstantSelf,spell cost (Fortify school),5.0,3,6,client: spell cost
+039d24:Dragonborn.esm,dlc2MKEncMiraakRobe01,Dragonborn.esm,DragonBreak Online Edits.esp (override),3,EnchFortifyRestorationConstantSelf,spell cost (Fortify school),5.0,3,6,client: spell cost
+039d24:Dragonborn.esm,dlc2MKEncMiraakRobe01,Dragonborn.esm,DragonBreak Online Edits.esp (override),4,EnchFortifyIllusionConstantSelf,spell cost (Fortify school),5.0,3,6,client: spell cost
+039d24:Dragonborn.esm,dlc2MKEncMiraakRobe01,Dragonborn.esm,DragonBreak Online Edits.esp (override),5,EnchFortifyMagickaRateConstantSelf,magicka regen,75.0,38,6,client
+038058:Dragonborn.esm,DLC2dunHaknirEnchScimitar02NP,Dragonborn.esm,DragonBreak Online Edits.esp (override),1,DLC2dunHaknirScimitarDispelMagic,fortify health,1.0,1,2,client max; server damage judge unverified
+038051:Dragonborn.esm,DLC2dunHaknirEnchScimitar02,Dragonborn.esm,DragonBreak Online Edits.esp (override),1,DLC2dunHaknirScimitarDispelMagic,fortify health,1.0,1,2,client max; server damage judge unverified
+02c472:Dragonborn.esm,DLC2EnchWeaponChaosDamage06,Dragonborn.esm,DragonBreak Online Edits.esp (override),0,DLC2EnchFireDamageFFContact50,fortify health,30.0,15,8,client max; server damage judge unverified
+02c471:Dragonborn.esm,DLC2EnchWeaponChaosDamage05,Dragonborn.esm,DragonBreak Online Edits.esp (override),0,DLC2EnchFireDamageFFContact50,fortify health,25.0,13,18,client max; server damage judge unverified
+02c470:Dragonborn.esm,DLC2EnchWeaponChaosDamage04,Dragonborn.esm,DragonBreak Online Edits.esp (override),0,DLC2EnchFireDamageFFContact50,fortify health,20.0,10,16,client max; server damage judge unverified
+02c46f:Dragonborn.esm,DLC2EnchWeaponChaosDamage03,Dragonborn.esm,DragonBreak Online Edits.esp (override),0,DLC2EnchFireDamageFFContact50,fortify health,15.0,8,8,client max; server damage judge unverified
+02c46e:Dragonborn.esm,DLC2EnchWeaponChaosDamageBase,Dragonborn.esm,DragonBreak Online Edits.esp (override),0,DLC2EnchFireDamageFFContact50,fortify health,10.0,5,0,client max; server damage judge unverified
+02ad38:Dragonborn.esm,DLC2TGArmorFortifySpeechcraftBlackguard,Dragonborn.esm,DragonBreak Online Edits.esp (override),0,EnchFortifySpeechcraftConstantSelf,fortify speech,25.0,13,2,client
+02ad37:Dragonborn.esm,DLC2TGArmorFortifyPickpocketBlackguard,Dragonborn.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyPickpocketConstantSelf,fortify pickpocket,40.0,20,2,client
+02ad36:Dragonborn.esm,DLC2TGArmorFortifyLockpickingBlackguard,Dragonborn.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyLockpickingConstantSelf,fortify lockpicking,40.0,20,2,client
+02ad35:Dragonborn.esm,DLC2TGArmorFortifyCarryBlackguard,Dragonborn.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyCarryConstantSelf,carry weight,50.0,25,2,client
+024020:Dragonborn.esm,DLC2dunHaknirEnchCuirass,Dragonborn.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyStaminaConstantSelf,fortify stamina,15.0,8,2,client
+024020:Dragonborn.esm,DLC2dunHaknirEnchCuirass,Dragonborn.esm,DragonBreak Online Edits.esp (override),1,EnchFortifyStaminaConstantSelf,fortify stamina,30.0,15,2,client
+024020:Dragonborn.esm,DLC2dunHaknirEnchCuirass,Dragonborn.esm,DragonBreak Online Edits.esp (override),2,EnchFortifyStaminaConstantSelf,fortify stamina,45.0,23,2,client
+024020:Dragonborn.esm,DLC2dunHaknirEnchCuirass,Dragonborn.esm,DragonBreak Online Edits.esp (override),3,EnchFortifyStaminaConstantSelf,fortify stamina,60.0,30,2,client
+02401f:Dragonborn.esm,DLC2dunHaknirEnchGauntlets,Dragonborn.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyOneHandedConstantSelf,fortify one-handed,10.0,5,2,server gear-fortify (set perPoint 0.01 after this edit)
+02401f:Dragonborn.esm,DLC2dunHaknirEnchGauntlets,Dragonborn.esm,DragonBreak Online Edits.esp (override),1,EnchFortifyOneHandedConstantSelf,fortify one-handed,20.0,10,2,server gear-fortify (set perPoint 0.01 after this edit)
+02401f:Dragonborn.esm,DLC2dunHaknirEnchGauntlets,Dragonborn.esm,DragonBreak Online Edits.esp (override),2,EnchFortifyOneHandedConstantSelf,fortify one-handed,30.0,15,2,server gear-fortify (set perPoint 0.01 after this edit)
+02401f:Dragonborn.esm,DLC2dunHaknirEnchGauntlets,Dragonborn.esm,DragonBreak Online Edits.esp (override),3,EnchFortifyOneHandedConstantSelf,fortify one-handed,40.0,20,2,server gear-fortify (set perPoint 0.01 after this edit)
+02401e:Dragonborn.esm,DLC2dunHaknirEnchBoots,Dragonborn.esm,DragonBreak Online Edits.esp (override),0,EnchFortifyCarryConstantSelf,carry weight,10.0,5,2,client
+02401e:Dragonborn.esm,DLC2dunHaknirEnchBoots,Dragonborn.esm,DragonBreak Online Edits.esp (override),1,EnchFortifyCarryConstantSelf,carry weight,20.0,10,2,client
+02401e:Dragonborn.esm,DLC2dunHaknirEnchBoots,Dragonborn.esm,DragonBreak Online Edits.esp (override),2,EnchFortifyCarryConstantSelf,carry weight,30.0,15,2,client
+02401e:Dragonborn.esm,DLC2dunHaknirEnchBoots,Dragonborn.esm,DragonBreak Online Edits.esp (override),3,EnchFortifyCarryConstantSelf,carry weight,40.0,20,2,client
+000c02:ccBGSSSE001-Fish.esm,ccBGSSSE001_ArtifactRingMentorEnch,ccBGSSSE001-Fish.esm,DragonBreak Nexus Patches.esp (override),0,EnchFortifyAlterationConstantSelf,spell cost (Fortify school),10.0,5,1,client: spell cost
+000c02:ccBGSSSE001-Fish.esm,ccBGSSSE001_ArtifactRingMentorEnch,ccBGSSSE001-Fish.esm,DragonBreak Nexus Patches.esp (override),1,EnchFortifyConjurationConstantSelf,spell cost (Fortify school),10.0,5,1,client: spell cost
+000c02:ccBGSSSE001-Fish.esm,ccBGSSSE001_ArtifactRingMentorEnch,ccBGSSSE001-Fish.esm,DragonBreak Nexus Patches.esp (override),2,EnchFortifyDestructionConstantSelf,spell cost (Fortify school),10.0,5,1,client: spell cost
+000c02:ccBGSSSE001-Fish.esm,ccBGSSSE001_ArtifactRingMentorEnch,ccBGSSSE001-Fish.esm,DragonBreak Nexus Patches.esp (override),3,EnchFortifyIllusionConstantSelf,spell cost (Fortify school),10.0,5,1,client: spell cost
+000c02:ccBGSSSE001-Fish.esm,ccBGSSSE001_ArtifactRingMentorEnch,ccBGSSSE001-Fish.esm,DragonBreak Nexus Patches.esp (override),4,EnchFortifyRestorationConstantSelf,spell cost (Fortify school),10.0,5,1,client: spell cost
+000e60:ccBGSSSE001-Fish.esm,ccBGSSSE001_EnchReligiousDibellaStudent,ccBGSSSE001-Fish.esm,DragonBreak Nexus Patches.esp (override),0,EnchFortifyPersuasionConstantSelf,fortify speech,15.0,8,2,client
+000e60:ccBGSSSE001-Fish.esm,ccBGSSSE001_EnchReligiousDibellaStudent,ccBGSSSE001-Fish.esm,DragonBreak Nexus Patches.esp (override),1,EnchFortifyStaminaConstantSelf,fortify stamina,40.0,20,2,client
+000c04:ccBGSSSE001-Fish.esm,ccBGSSSE001_ArtifactRingSurroundingsEnch,ccBGSSSE001-Fish.esm,DragonBreak Nexus Patches.esp (override),0,EnchFortifySneakConstantSelf,fortify sneak,20.0,10,1,client
+000c05:ccBGSSSE001-Fish.esm,ccBGSSSE001_ArtifactRingWarlockEnch,ccBGSSSE001-Fish.esm,DragonBreak Nexus Patches.esp (override),1,EnchFortifyHealRateConstantSelf,health regen,30.0,15,1,client
+000f12:ccBGSSSE001-Fish.esm,ccBGSSSE001_CharmMudcrabEnch,ccBGSSSE001-Fish.esm,DragonBreak Nexus Patches.esp (override),1,EnchFortifyLightArmorConstantSelf,fortify light armor,22.0,11,1,"client only, server armour ignores it"
+000f12:ccBGSSSE001-Fish.esm,ccBGSSSE001_CharmMudcrabEnch,ccBGSSSE001-Fish.esm,DragonBreak Nexus Patches.esp (override),2,EnchFortifyHeavyArmorConstantSelf,fortify heavy armor,22.0,11,1,"client only, server armour ignores it"
+07040c:BSHeartland.esm,CYREnchReligiousReman,BSHeartland.esm,DragonBreak Nexus Patches.esp (override),0,EnchFortifyOneHandedConstantSelf,fortify one-handed,10.0,5,1,server gear-fortify (set perPoint 0.01 after this edit)
+0df0f1:BSHeartland.esm,CYREnchGoldbrand,BSHeartland.esm,DragonBreak Nexus Patches.esp (override),0,EnchFireDamageFFContact,fortify health,50.0,25,1,client max; server damage judge unverified
+0d383f:BSHeartland.esm,CYRHvitbrandEnchantmentWithAdditional,BSHeartland.esm,DragonBreak Nexus Patches.esp (override),0,CYRHvitbrandEnchantmentEffect,fortify health,3.0,2,1,client max; server damage judge unverified
+0d383c:BSHeartland.esm,CYRHvitbrandEnchantment,BSHeartland.esm,DragonBreak Nexus Patches.esp (override),0,CYRHvitbrandEnchantmentEffect,fortify health,2.0,1,1,client max; server damage judge unverified
+0d3835:BSHeartland.esm,CYRFortPalePassLariusVarroEnchantment,BSHeartland.esm,DragonBreak Nexus Patches.esp (override),0,CYRBurnBanditsEnchantment,fortify health,15.0,8,2,client max; server damage judge unverified
+06c149:BSHeartland.esm,CYRdunFrostfireSpecialWeaponEnch,BSHeartland.esm,DragonBreak Nexus Patches.esp (override),1,EnchFireDamageFFContact,fortify health,25.0,13,1,client max; server damage judge unverified
+070145:BSHeartland.esm,CYRWoodenStaffOfAwesomeConflagrationEnch,BSHeartland.esm,DragonBreak Nexus Patches.esp (override),0,CYRWoodenStaffOfAwesomeConflagrationFireDamageSelfEffect2,fortify health,100.0,50,1,client max; server damage judge unverified
+0722fe:BSHeartland.esm,CYRRaaslanSwordEnch,BSHeartland.esm,DragonBreak Nexus Patches.esp (override),0,EnchFireDamageFFContact,fortify health,10.0,5,1,client max; server damage judge unverified
+0722fe:BSHeartland.esm,CYRRaaslanSwordEnch,BSHeartland.esm,DragonBreak Nexus Patches.esp (override),1,CYREnchDragonFireDamageFFContact,fortify health,10.0,5,1,client max; server damage judge unverified
+0867cb:BSHeartland.esm,CYRdunRielleFlamelightSpireEnch,BSHeartland.esm,DragonBreak Nexus Patches.esp (override),0,CYRdunRielleFlamelightSpireEffect,fortify health,20.0,10,1,client max; server damage judge unverified
+0867cb:BSHeartland.esm,CYRdunRielleFlamelightSpireEnch,BSHeartland.esm,DragonBreak Nexus Patches.esp (override),1,CYRdunRielleFlamelightSpireEffectUndead,fortify health,20.0,10,1,client max; server damage judge unverified
+020af5:Journey to Baan Malur.esp,EnchWeaponWindDamage03,Journey to Baan Malur.esp,DragonBreak Nexus Patches.esp (override),0,EnchWindDamageFFContact,fortify health,15.0,8,0,client max; server damage judge unverified
+0239c4:Journey to Baan Malur.esp,EnchWeaponWindDamage06,Journey to Baan Malur.esp,DragonBreak Nexus Patches.esp (override),0,EnchWindDamageFFContact,fortify health,30.0,15,0,client max; server damage judge unverified
+0239c2:Journey to Baan Malur.esp,EnchWeaponWindDamage05,Journey to Baan Malur.esp,DragonBreak Nexus Patches.esp (override),0,EnchWindDamageFFContact,fortify health,25.0,13,0,client max; server damage judge unverified
+020af0:Journey to Baan Malur.esp,EnchWeaponWindDamageBase,Journey to Baan Malur.esp,DragonBreak Nexus Patches.esp (override),0,EnchWindDamageFFContact,fortify health,10.0,5,0,client max; server damage judge unverified
+020af3:Journey to Baan Malur.esp,EnchWeaponWindDamage01,Journey to Baan Malur.esp,DragonBreak Nexus Patches.esp (override),0,EnchWindDamageFFContact,fortify health,5.0,3,0,client max; server damage judge unverified
+020af4:Journey to Baan Malur.esp,EnchWeaponWindDamage02,Journey to Baan Malur.esp,DragonBreak Nexus Patches.esp (override),0,EnchWindDamageFFContact,fortify health,10.0,5,0,client max; server damage judge unverified
+0239c1:Journey to Baan Malur.esp,EnchWeaponWindDamage04,Journey to Baan Malur.esp,DragonBreak Nexus Patches.esp (override),0,EnchWindDamageFFContact,fortify health,20.0,10,0,client max; server damage judge unverified
+020119:Gray Fox Cowl.esm,manny_GF_Ench_GrayCowl,Gray Fox Cowl.esm,DragonBreak Nexus Patches.esp (override),0,EnchFortifySneakConstantSelf,fortify sneak,25.0,13,1,client
+020119:Gray Fox Cowl.esm,manny_GF_Ench_GrayCowl,Gray Fox Cowl.esm,DragonBreak Nexus Patches.esp (override),1,EnchFortifyCarryConstantSelf,carry weight,200.0,100,1,client
+60a32c:Gray Fox Cowl.esm,manny_GF_Ench_DraukiirTorch,Gray Fox Cowl.esm,DragonBreak Nexus Patches.esp (override),0,manny_GF_Effect_DraukiirTorchFX,fortify health,3.0,2,1,client max; server damage judge unverified
+0303bb:Gray Fox Cowl.esm,manny_GF_Ench_IrlavPenitence,Gray Fox Cowl.esm,DragonBreak Nexus Patches.esp (override),3,EnchFortifyConjurationConstantSelf,spell cost (Fortify school),10.0,5,1,client: spell cost
+03a218:Gray Fox Cowl.esm,manny_GF_Ench_ForgottenChaosBow,Gray Fox Cowl.esm,DragonBreak Nexus Patches.esp (override),0,EnchFireDamageFFContact,fortify health,30.0,15,2,client max; server damage judge unverified
+32584b:WindhelmSSE.esp,0WHUniqueMagicStaff,WindhelmSSE.esp,DragonBreak Nexus Patches.esp (override),2,DLC2IgniteFireDamageFFAimed,fortify health,1.0,1,1,client max; server damage judge unverified
+26e2b2:SurWR.esp,0WRThalmorAmulet,SurWR.esp,DragonBreak Nexus Patches.esp (override),0,AbFortifyHealth,fortify health,20.0,10,1,client max; server damage judge unverified
+01cd84:DragonBreak Hub.esp,DBO_EnchZahkriiDoBormahu,DragonBreak Hub.esp,DragonBreak Nexus Patches.esp (override),0,DBO_ZahkriiFireBurnFFContact,fortify health,3.0,2,1,client max; server damage judge unverified
+00a9be:Immersive Weapons.esp,IWStaffEnchDragonFire,Immersive Weapons.esp,DragonBreak Nexus Patches.esp (override),0,FireDamageFFAimedArea,fortify health,40.0,20,1,client max; server damage judge unverified
+000843:Armors of the Velothi Pt2.esp,_EnchLightFrontDUPLICATE003,Armors of the Velothi Pt2.esp,DragonBreak Nexus Patches.esp (override),0,EnchFortifyCarryConstantSelf,carry weight,100.0,50,1,client
+000844:Armors of the Velothi Pt2.esp,_EnchLightFront2,Armors of the Velothi Pt2.esp,DragonBreak Nexus Patches.esp (override),1,EnchFortifyCarryConstantSelf,carry weight,100.0,50,1,client
+1c8963:DragonBreak Online Edits.esp,DBO_EnchBagCarryBackpack75,DragonBreak Online Edits.esp,DragonBreak Online Edits.esp (in place),0,EnchFortifyCarryConstantSelf,carry weight,75.0,38,1,client
+192eec:DragonBreak Online Edits.esp,DBO_EnchBagCarryBackpack50,DragonBreak Online Edits.esp,DragonBreak Online Edits.esp (in place),0,EnchFortifyCarryConstantSelf,carry weight,50.0,25,17,client
+192eed:DragonBreak Online Edits.esp,DBO_EnchBagCarrySatchel25,DragonBreak Online Edits.esp,DragonBreak Online Edits.esp (in place),0,EnchFortifyCarryConstantSelf,carry weight,25.0,13,6,client
+192eee:DragonBreak Online Edits.esp,DBO_EnchBagCarryPouch10,DragonBreak Online Edits.esp,DragonBreak Online Edits.esp (in place),0,EnchFortifyCarryConstantSelf,carry weight,10.0,5,4,client
