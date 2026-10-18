@@ -35,6 +35,18 @@ Open: decide the budget against the player cap (300-400, or scale it with the co
 same C++ interest-management work as the fan-out finding (NPC_REBUILD phase 4); a `__alduinakNpcLive` hook would
 let the claim line name the cause and let `dungeons.js` defer a claim it cannot populate.
 
+**Amended the same day, after reading the live log:** players reported empty dungeons, and **the budget is not what
+they hit** - not one `at the budget of` line on live, and dungeon zones spawned 1230 times. `0 prespawned` is usually
+correct: `npcSpawnSystem` holds an ambush zone back until somebody is inside its radius, and `isAmbusher` marks
+everything that lay in a coffin in vanilla (1024 placements across 99 dungeons; Dustman's Cairn 46 of 64). The claim
+now says **"N of M lie in wait"**, an all-ambush dungeon gets its own wording, and only a genuinely starved spawn is
+told it is still filling - the first version of the fix would have lied to a Nordic-crypt party.
+
+Still open, and the real leads for "no npcs": Dustman's Cairn leaves 18 enemies standing in the open and still
+pre-spawned 0 (suspect the prespawn anchor - `fillSlots` breaks when none resolves and the party is still outside the
+cell); only 21 of that lease's 64 slots ever spawned; and **a server spawn count does not prove the client drew the
+actor**, so this class of report needs `npcDrift` to report client-side actor counts before it can be closed.
+
 
 ## Added 2026-10-17: Scribing, Master Scholars write spell tomes and scrolls - NOT DEPLOYED, waits on Nate
 

@@ -892,16 +892,34 @@ module.exports = (api) => {
       }
       audit(`DUNGEON ${who(leaderActor)} claimed ${d.name} on ${diff.label} with ${members.size} member(s), ${zones.length} enemies (${placed >= 0 ? placed + ' placed before entry' : 'placed on entry'}), ${filled} containers filled (${lease.rolledGold instanceof Map ? [...lease.rolledGold.values()].reduce((n, g) => n + g, 0) : 0} gold), ${lease.locked.size} locked`);
       log(`dungeon ${d.id} claimed by ${display(leaderActor)}: ${diff.id}, party level ${lease.partyLevel} x${lease.partySize}, ${moved} moved in, ${zones.length} enemies, ${placed} prespawned, ${filled} containers`);
-      // A claim that prespawned nothing (2026-10-17, found by the load test at 14 concurrent leases): placed 0
-      // means the spawn pass ran and placed no enemy at all, where -1 is the designed 'placed on entry' path.
-      // npcSpawnSystem retries each spot BUDGET_RETRY_MS (10 s) later, so the ruin fills late rather than never -
-      // but nothing said so: the line read '0 prespawned' and the party walked into an empty dungeon. The cause is
-      // not readable from here (the system exposes only __alduinakNpcSpawnNow), and npcLiveBudget being full across
-      // every zone is the one the load test reproduced; a spot not ready or a fallen spot can do it too.
-      if (placed === 0 && zones.length) {
-        log(`dungeon ${d.id} prespawned none of its ${zones.length} enemies: the spawn pass placed nothing, so they`
-          + ` arrive as npcSpawnSystem retries its spots. Check the npc budget (npcLiveBudget) against the live count`);
-        for (const a of inside) system(a, 'The ruin is still filling: its enemies are taking their places and will arrive shortly.');
+      // What a claim that pre-spawned little or nothing means (2026-10-17). `placed` is three-valued: -1 is the
+      // designed 'placed on entry' path, a count is what the spawn pass placed, and 0 used to say nothing at all -
+      // the line read '0 prespawned' and the party walked into what looked like an empty dungeon.
+      //
+      // Two different things make a ruin look empty, and they need different words:
+      //  - AMBUSH, by design. npcSpawnSystem skips an ambush zone until somebody is inside its radius
+      //    (zone.ambush && zone.inside.size === 0), and isAmbusher marks everything that lay in a coffin or pod in
+      //    vanilla. A Nordic crypt is nearly all ambushers, so 0 pre-spawned there is correct: Dustman's Cairn is
+      //    46 of 64. Telling the party makes an empty-looking ruin read as intended instead of broken.
+      //  - A STARVED SPAWN. Enemies that stand in the open should pre-spawn and did not. npcSpawnSystem retries
+      //    each spot BUDGET_RETRY_MS (10 s) later, so they arrive late rather than never. The cause is not
+      //    readable from here (the system exposes only __alduinakNpcSpawnNow): npcLiveBudget full across every zone
+      //    is the one the load test reproduced, and a spot not ready or a fallen spot can do it too.
+      const waiting = zones.reduce((n, z) => n + (z && z.Ambush ? 1 : 0), 0);
+      const standing = zones.length - waiting;
+      const tell = (msg) => { for (const a of inside) system(a, msg); };
+      if (waiting) log(`dungeon ${d.id}: ${waiting} of ${zones.length} enemies lie in wait within ${AMBUSH_REACH} units of their spot`);
+      if (zones.length && waiting === zones.length) {
+        tell(`Every one of the ${zones.length} enemies here lies in wait. The ruin looks empty until you come close enough to disturb them.`);
+      } else if (placed === 0 && zones.length) {
+        log(`dungeon ${d.id} pre-spawned none of its ${standing} enemies that stand in the open (${waiting} lie in`
+          + ` wait): the spawn pass placed nothing, so they arrive as npcSpawnSystem retries its spots. Check the npc`
+          + ` budget (npcLiveBudget) against the live count`);
+        tell(waiting
+          ? `${waiting} of the ${zones.length} enemies here lie in wait, and the rest are still taking their places.`
+          : 'The ruin is still filling: its enemies are taking their places and will arrive shortly.');
+      } else if (waiting) {
+        tell(`${waiting} of the ${zones.length} enemies here lie in wait.`);
       }
       // the player log (playerlog.js): the claim on every member's post (the audit names only the leader)
       try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('dungeon', 'claim', [...members].map((pid) => actorByProfile(pid)).filter(Boolean), d.name, diff.label); } catch (e) { /* the player log is optional */ }

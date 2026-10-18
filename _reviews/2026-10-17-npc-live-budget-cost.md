@@ -112,3 +112,45 @@ and `doorsStartOpen` logs one every 30 s forever in any world where
 reads are wrapped everywhere; `gamemode.js:1685` is inside a try whose own line is capped at 2), but the
 addon logs the exception context at error level uncapped. Harmless, except that the harness's classifier
 counts them, so "errors: 6-11" in every report above is this noise and not a fault.
+
+## 5. What the live log says, and why the budget is NOT what players hit (18 Oct)
+
+Players reported empty dungeons, so I read the live log rather than assuming this finding explained it.
+
+- **Zero budget exhaustion.** Not one `at the budget of` line in the window (00:00-03:46, the log has rotated).
+  `npcLiveBudget` on live is 600 and was never reached. Section 2 measures what the setting costs; it is not
+  what anybody is hitting today.
+- **Dungeon zones do spawn**: 1230 spawn lines, including in the dungeon that logged `0 prespawned`.
+- **`0 prespawned` is usually correct.** `npcSpawnSystem` skips an ambush zone until somebody stands inside its
+  radius (`zone.ambush && zone.inside.size === 0`), and `isAmbusher` marks every enemy that lay in a coffin or
+  pod in vanilla. The audit counts 1024 such placements across 99 dungeons: Dustman's Cairn 46 of 64, Forelhost
+  24 of 46, Potema's 21 of 30, Ansilvund 15 of 25. A Nordic crypt pre-spawning nothing is the design.
+
+So the claim now says which it is. `waiting` counts `zone.Ambush`; an all-ambush dungeon gets its own wording
+("every one of the N enemies here lies in wait"), a partial one is told the count, and only a genuinely starved
+spawn gets "still taking their places". The first version of this fix would have told a Dustman's Cairn party
+their dungeon was still filling, which is false.
+
+### Two things this does not explain, and one it cannot
+
+- **Dustman's Cairn: 46 of 64 wait in ambush, so 18 stand in the open - and the claim pre-spawned 0.** Ambush
+  does not account for that dungeon. The likeliest candidate is the anchor: `fillSlots` breaks out of its loop
+  when no anchor resolves, and at claim time the party is still outside the interior cell, so the pass falls back
+  to the first online player, who may be anywhere. Unmeasured.
+- **21 of that lease's 64 slots ever spawned.** Either the player explored a third of the crypt, or two thirds of
+  the ambushes never fired. Counts alone cannot tell the two apart.
+- **A server spawn count does not prove the client drew the actor.** "No NPCs" cannot be closed from the server
+  log at all: spawn-then-move desync is a known failure mode here and `STATE.md` already lists enemies separating
+  from their positions. The `npcDrift` diagnostic should report how many actors the client has near the player
+  against what the server believes. That is the instrument this class of report actually needs.
+
+### What was verified, and what was not
+
+Verified in the sandbox, with `isAmbusher` forced so the case was deterministic (a throwaway copy; `sandbox init`
+restores it): CYRAngaLocation, 16 of 16 forced to ambush, generator and claim agreeing independently -
+`16 enemies, 0 prespawned`, then `16 of 16 enemies lie in wait within 1200 units of their spot`, with the
+"still filling" message correctly suppressed. So `zone.Ambush` reads correctly at claim time and the branch
+selection works.
+NOT verified in game: the partial-count wording (the same correct `waiting` choosing the other template), and
+that the chat line reaches a player - the bots count chat messages but do not keep their text. It uses the same
+`system()` helper as the claim messages beside it.
