@@ -6997,6 +6997,61 @@ const arcaneDamageMult = (aggressorId, sourceId) => {
   const bonus = Number((ARCANE_DMG.byTier || [])[rank]) || 0;
   return bonus > 0 ? 1 + bonus : 1;
 };
+// Worn Fortify One-handed, Two-handed and Archery (Nate, 18 Oct: an enchanted hood that "never worked"; "tone down
+// enchantments so they're not too op"): vanilla raises OneHanded/TwoHanded/MarksmanModifier (AV 96/97/98) by a percent the
+// server never read. Each point adds perPoint (half of vanilla's 1%), all worn gear together at most cap, players only.
+// Config "gearFortify": { enabled, perPoint, cap }.
+const GEAR_FORT = Object.assign({ enabled: true, perPoint: 0.005, cap: 0.25 }, cfg.gearFortify || {});
+const GEAR_FORT_AV = { 96: 'one', 97: 'two', 98: 'archery' };
+const gearFortEffects = globalThis.__dboGearFortEffects instanceof Map ? globalThis.__dboGearFortEffects : (globalThis.__dboGearFortEffects = new Map()); // MGEF -> hook or ''
+const gearFortHookOf = (mgefId) => {
+  const id = mgefId >>> 0;
+  if (gearFortEffects.has(id)) return gearFortEffects.get(id);
+  const data = fieldsOf(recordOf(id), 'DATA')[0];
+  // MGEF DATA: archetype at 0x40 (0 value modifier, 34 peak value modifier), actor value at 0x44
+  const arch = u32At(data, 0x40), av = u32At(data, 0x44);
+  const hook = (arch === 0 || arch === 34) && GEAR_FORT_AV[av] ? GEAR_FORT_AV[av] : '';
+  gearFortEffects.set(id, hook);
+  return hook;
+};
+// [{ effect, magnitude }] of an ENCH record (EFID then its EFIT, magnitude a float at 0)
+const enchEffectsOf = (enchId) => {
+  const lr = recordOf(enchId); const out = [];
+  if (!lr || lr.record.type !== 'ENCH') return out;
+  let effect = 0;
+  for (const f of lr.record.fields || []) {
+    if (!(f.data instanceof Uint8Array)) continue;
+    if (f.type === 'EFID') effect = globalAt(lr, u32At(f, 0));
+    else if (f.type === 'EFIT' && effect && f.data.byteLength >= 4) { out.push({ effect, magnitude: new DataView(f.data.buffer, f.data.byteOffset, 4).getFloat32(0, true) }); effect = 0; }
+  }
+  return out;
+};
+const wornEnchEffectsOf = (e) => {
+  if (Array.isArray(e.enchantmentEffects) && e.enchantmentEffects.length) return e.enchantmentEffects.map((x) => ({ effect: Number(x.effectId) >>> 0, magnitude: Number(x.magnitude) || 0 }));
+  const own = Number(e.enchantmentId) >>> 0;
+  if (own) return enchEffectsOf(own);
+  const base = recordOf(Number(e.baseId) >>> 0);
+  if (!base || (base.record.type !== 'ARMO' && base.record.type !== 'WEAP')) return [];
+  return enchEffectsOf(globalAt(base, u32At(fieldsOf(base, 'EITM')[0], 0)));
+};
+// The share worn gear adds to a hook, capped
+const gearFortBonus = (a, hook) => {
+  if (GEAR_FORT.enabled === false || profileOf(a) < 0) return 0;
+  let entries = []; try { const inv = mp.get(a, 'inventory'); entries = inv && Array.isArray(inv.entries) ? inv.entries : []; } catch (e) { return 0; }
+  let points = 0;
+  for (const e of entries) {
+    if (!e || !(e.worn || e.wornLeft)) continue;
+    for (const x of wornEnchEffectsOf(e)) if (x.magnitude > 0 && gearFortHookOf(x.effect) === hook) points += x.magnitude;
+  }
+  return Math.min(Math.max(0, Number(GEAR_FORT.cap) || 0), points * (Number(GEAR_FORT.perPoint) || 0));
+};
+globalThis.__dboGearFortBonus = gearFortBonus;
+const gearAttackMult = (aggressorId, sourceId) => {
+  if (GEAR_FORT.enabled === false || isSpellSource(sourceId)) return 1;
+  const hands = weaponHandsOf(sourceId);
+  const hook = weaponSkillOf(sourceId) === 'archery' ? 'archery' : hands === 'one' || hands === 'two' ? hands : '';
+  return hook ? 1 + gearFortBonus(aggressorId, hook) : 1;
+};
 // Fortify potions (alchemy rework, Nate 14 Oct: "only where the server can honour them"; alchemy.js __dboPotionBonus): a
 // weapon potion adds its share to that weapon's blows (Blade, Blunt, Archery by the DBO weapon skill; a vanilla One- or
 // Two-handed potion by the weapon's hands, as its text says), a Destruction or Restoration potion to that school's spell
@@ -7703,6 +7758,7 @@ const hitDamageAttemptHook =(aggressorId, targetId, sourceId, damage, flags) => 
     let raceAtk = 1;
     if (racial && !beastAgg) { try { raceAtk = racial.attackMult(agg, tgt, src, dmg); } catch (e) { log('racial attack failed', e.message); } }
     let mult = (beastAgg ? 1 : masteryDamageMult(agg, src) * potionAttackMult(agg, src)) * potionTakenMult(tgt, flags) * arcaneDamageMult(agg, src) * materialDamageMult(agg, src) * temperDamageMult(agg, src) * arrowDamageMult(agg, src) * targetSide * blessingAttackMult(agg, src) * raceAtk * huntDamageMult(agg, tgt) * pvp;
+    if (!beastAgg) mult *= gearAttackMult(agg, src);
     // Tired blows, fists into armour, staves through it, the fist's stamina drain and disarm (martial.js)
     if (martial && !beastAgg) { try { mult *= martial.onAttempt(agg, tgt, src, dmg, flags); } catch (e) { log('martial failed', e.message); } }
     // Block chip and stamina, guard breaks, bash, stagger (combat.js); a bash's blow comes back scaled down
