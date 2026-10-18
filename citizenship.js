@@ -245,7 +245,7 @@ module.exports = (api) => {
     }
     if (chk.how === 'paid') {
       if (!takeGold(a, chk.fee)) return { error: `The citizenship of ${ofPlace(z.name)} costs ${chk.fee} gold, and you do not carry it.` };
-      const paid = depositToTreasury(z.id, chk.fee);
+      const paid = depositToTreasury(z.id, chk.fee, { income: 'citizenship fees' });
       if (paid !== chk.fee) log(`citizenship: the treasury of ${z.id} took ${paid} of a ${chk.fee} gold fee`);
     }
     addHold(a, z, chk.noRuler ? 'free (no ruler)' : chk.how === 'paid' ? `paid ${chk.fee}` : 'free');

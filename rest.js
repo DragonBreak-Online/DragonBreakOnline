@@ -326,7 +326,7 @@ module.exports = (api) => {
     const ownerCut = price - holdCut;
     let toOwner = ownerCut ? payOwner(owner, ownerCut) : null;
     if (ownerCut && !toOwner) { log(`rest: owner profile ${owner.owner} could not be paid; ${ownerCut} gold goes to ${zone || 'no hold'}`); holdCut = price; toOwner = null; }
-    const toHold = holdCut ? depositToTreasury(zone, holdCut) : 0;
+    const toHold = holdCut ? depositToTreasury(zone, holdCut, { income: 'inn rent' }) : 0;
     const until = Date.now() + CFG.rentHours * HOUR;
     set(bed, 'private.dboRent', { renter: a >>> 0, name: display(a), until });
     set(a, 'private.dboRentBed', { bed: bed >>> 0, until });

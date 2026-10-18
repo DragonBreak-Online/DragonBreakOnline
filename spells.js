@@ -1033,7 +1033,7 @@ module.exports = (api) => {
       try { const r = globalThis.__dboLedgerSale({ buyer: a, place: shopLedger.get(a >>> 0) || a, price, what: t.title }); return `split: ${r.text}`; }
       catch (e) { log('spells: tome sale payout failed', e.message); return 'the payout failed'; }
     }
-    return `${depositToTreasury(CFG.shopTreasury, price)} to ${CFG.shopTreasury} treasury`;
+    return `${depositToTreasury(CFG.shopTreasury, price, { income: 'sales' })} to ${CFG.shopTreasury} treasury`;
   };
 
   // { ok, text } of a purchase

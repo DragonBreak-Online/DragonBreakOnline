@@ -19,7 +19,9 @@
 //           Empire"): titheRate of the property tax each faction collected on land in titheProvinces (Cyrodiil, by the
 //           land marker's worldspace in regions.js) goes to the titheTo faction's treasury (the Imperial Legion), which
 //           pays none on its own land. Skyrim's Holds are independent (4E 211) and pay nothing. What a treasury cannot
-//           pay is arrears, taken first the next week. titheRate 0 turns it off.
+//           pay is arrears, taken first the next week. titheRate 0 turns it off. Nate, 18 Oct: 25%, of all of a Cyrodiil
+//           hold's income, not only its property tax: rent, sales, fees, postage, bounties (bank.js counts each deposit
+//           its caller marks as income), so the Legion is funded without new gold.
 //   stipend the Aldmeri Dominion pays its Thalmor in the Empire (Nate, 11 Oct: lore advantages for the Thalmor, whom the
 //           playerbase is against): dominionStipend gold (default 300) into the dominionStipendTo treasury each reckoning,
 //           before wages. It is NEW gold, not taken from anyone, so it is kept modest; 0 turns it off. In the report as
@@ -199,15 +201,36 @@ module.exports = (api) => {
     const R = globalThis.__dboRegions; if (!R || typeof R.placeOf !== 'function' || !t || !t.marker) return false;
     try { return (C.titheProvinces || []).includes(R.placeOf(String(t.marker.world || '')).province); } catch (e) { return false; }
   };
-  // Moves each payer's tithe (and its arrears) to the recipient's treasury; bases: { fid: property tax on tithed land }
-  const payTithes = (T, bases, report) => {
+  // A hold's other income since the last reckoning (bank.js counts each deposit its caller marks as income: rent, sales, fees,
+  // postage, bounties; Nate 18 Oct): { zone: { fid, tithed, total, kinds, seen } }, by the hold's seat territory
+  const holdIncome = () => {
+    const Z = globalThis.__dboTreasuryZone; if (!Z || typeof Z.income !== 'function') return {};
+    const out = {};
+    for (const [zone, e] of Object.entries(Z.income() || {})) {
+      const total = Math.floor(Number(e && e.total) || 0); if (total <= 0) { out[zone] = { fid: null, tithed: false, total: 0, kinds: {}, seen: e }; continue; }
+      let fid = null, tithed = false;
+      try { fid = fn('__dboHoldFactionOf') ? fn('__dboHoldFactionOf')(zone) : null; } catch (x) { fid = null; }
+      try { const t = fn('__dboRealmSeatTerritoryOf') ? fn('__dboRealmSeatTerritoryOf')(zone) : null; tithed = !!t && tithedLand(t); } catch (x) { tithed = false; }
+      out[zone] = { fid, tithed, total, kinds: Object.assign({}, (e && e.kinds) || {}), seen: e };
+    }
+    return out;
+  };
+  const clearHoldIncome = (seen) => {
+    const Z = globalThis.__dboTreasuryZone; if (!Z || typeof Z.clearIncome !== 'function') return;
+    for (const [zone, x] of Object.entries(seen)) { try { Z.clearIncome(zone, x.seen); } catch (e) { log(`economy: clearing the income of ${zone} failed`, e.message); } }
+  };
+  const kindsText = (k) => Object.entries(k || {}).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]).map(([n, v]) => `${n} ${v}`).join(', ');
+  // Moves each payer's tithe (and its arrears) to the recipient's treasury; bases: { fid: property tax on tithed land };
+  // other: { fid: { total, kinds } }, the hold income it is also taken on
+  const payTithes = (T, bases, report, other = {}) => {
     const d = data(); const rate = titheRate(); const to = String(C.titheTo || '');
     if (!d.titheOwed || typeof d.titheOwed !== 'object') d.titheOwed = {};
     if (!to || !info(to) || !T.keyOf || !T.keyOf(to)) { if (rate) log(`economy: no treasury for ${to || 'the tithe'}, no Imperial tithe taken`); return; }
-    for (const fid of new Set(Object.keys(bases).concat(Object.keys(d.titheOwed)))) {
+    for (const fid of new Set(Object.keys(bases).concat(Object.keys(other), Object.keys(d.titheOwed)))) {
       if (fid === to) { delete d.titheOwed[fid]; continue; }
       try {
-        const base = bases[fid] || 0; const owedBefore = Math.floor(Number(d.titheOwed[fid]) || 0);
+        const tax = bases[fid] || 0; const oth = other[fid] || { total: 0, kinds: {} };
+        const base = tax + oth.total; const owedBefore = Math.floor(Number(d.titheOwed[fid]) || 0);
         const due = Math.floor(base * rate) + owedBefore; if (due <= 0) continue;
         const r = report(fid);
         const take = Math.min(due, Math.floor(T.balance(fid)));
@@ -216,10 +239,12 @@ module.exports = (api) => {
           if (T.deposit(to, take, `Imperial tithe from ${nameOfFaction(fid)}`)) paid = take;
           else T.deposit(fid, take, `Imperial tithe returned: ${nameOfFaction(to)}'s treasury refused it`);
         }
-        r.tithe = paid; r.titheBase = base; r.titheOwed = due - paid; r.titheTo = nameOfFaction(to);
+        r.tithe = paid; r.titheBase = base; r.titheTax = tax; r.titheOther = oth.total; r.titheOtherKinds = oth.kinds; r.titheRate = rate;
+        r.titheOwed = due - paid; r.titheTo = nameOfFaction(to);
         if (due - paid > 0) d.titheOwed[fid] = due - paid; else delete d.titheOwed[fid];
         if (paid) report(to).tithesIn = (report(to).tithesIn || 0) + paid;
-        try { audit(`ECONOMY ${nameOfFaction(fid)}: Imperial tithe ${paid} gold to ${nameOfFaction(to)} (${Math.round(rate * 100)}% of ${base} in taxes${owedBefore ? `, ${owedBefore} in arrears` : ''})${due - paid > 0 ? `; ${due - paid} owed` : ''}`); } catch (e) { log('economy: tithe audit failed', e.message); }
+        const split = oth.total ? `${base}: ${tax} in property tax, ${oth.total} in other income (${kindsText(oth.kinds)})` : `${base} in taxes`;
+        try { audit(`ECONOMY ${nameOfFaction(fid)}: Imperial tithe ${paid} gold to ${nameOfFaction(to)} (${Math.round(rate * 100)}% of ${split}${owedBefore ? `, ${owedBefore} in arrears` : ''})${due - paid > 0 ? `; ${due - paid} owed` : ''}`); } catch (e) { log('economy: tithe audit failed', e.message); }
       } catch (e) { log(`economy: the Imperial tithe of ${nameOfFaction(fid)} failed, skipped this week`, e.message); }
     }
   };
@@ -342,8 +367,17 @@ module.exports = (api) => {
         } catch (e) { log(`economy: the tax on ${Number(ref).toString(16)} failed, skipped this week`, e.message); }
       }
     }
-    // The Empire's share comes out before wages, so the week's wage budget counts the income left after it
-    if (T && titheRate() > 0) payTithes(T, titheBases, report);
+    // The Empire's share comes out before wages, so the week's wage budget counts the income left after it. It is taken on the
+    // property tax kept above and on each Cyrodiil hold's other income since the last reckoning (never the Legion's own)
+    const incomes = holdIncome(); const other = {};
+    for (const x of Object.values(incomes)) {
+      if (!x.fid || !x.tithed || !(x.total > 0)) continue;
+      const o = other[x.fid] = other[x.fid] || { total: 0, kinds: {} };
+      o.total += x.total; for (const [k, v] of Object.entries(x.kinds)) o.kinds[k] = (o.kinds[k] || 0) + (Math.floor(Number(v) || 0));
+    }
+    if (T && titheRate() > 0) payTithes(T, titheBases, report, other);
+    // Every hold's count starts again from here, tithed or not, so it is always the income since the last reckoning
+    clearHoldIncome(incomes);
     // The Dominion's stipend, before wages so they can be paid from it
     if (T) payStipend(T, report);
     // Wages: owed first, then this week's
@@ -401,7 +435,7 @@ module.exports = (api) => {
       d.balanceAfter[fid] = r.balance;
       d.reports[fid] = r;
       audit(`ECONOMY ${nameOfFaction(fid)}: taxes ${r.income} gold from ${r.taxed} properties, ${r.overdue.length} overdue;${r.stipend ? ` stipend ${r.stipend} from ${r.stipendFrom};` : ''} wages ${r.wagesPaid} paid, ${r.owed} owed; treasury ${r.balance}`);
-      for (const a of onlineActors()) if (leads(a, fid)) personal(a, `The week's reckoning for ${nameOfFaction(fid)}: ${r.income} gold in taxes${r.fiefShares ? ` (and ${r.fiefShares} gold to its fiefs' treasuries)` : ''}${r.tithesIn ? `, ${r.tithesIn} gold in Imperial tithes` : ''}${r.tithe || r.titheOwed ? `, ${r.tithe} gold Imperial tithe to ${r.titheTo}${r.titheOwed ? ` (${r.titheOwed} gold still owed)` : ''}` : ''}${r.stipend ? `, ${r.stipend} gold stipend from ${r.stipendFrom}` : ''}, ${r.wagesPaid} gold in wages${r.owed ? `, ${r.owed} gold of wages owed` : ''}${r.capped ? ` (wages take at most ${Math.round(C.wageIncomeShare * 100)}% of the week's income and ${Math.round(C.wageShare * 100)}% of the treasury: ${r.wageBudget} gold this week)` : ''}${r.overdue.length ? `, ${r.overdue.length} properties overdue` : ''}. The treasury holds ${r.balance} gold.`);
+      for (const a of onlineActors()) if (leads(a, fid)) personal(a, `The week's reckoning for ${nameOfFaction(fid)}: ${r.income} gold in taxes${r.fiefShares ? ` (and ${r.fiefShares} gold to its fiefs' treasuries)` : ''}${r.tithesIn ? `, ${r.tithesIn} gold in Imperial tithes` : ''}${r.tithe || r.titheOwed ? `, ${r.tithe} gold Imperial tithe to ${r.titheTo}${r.titheOther ? ` (${Math.round((r.titheRate || 0) * 100)}% of ${r.titheTax} gold in property tax and ${r.titheOther} gold in other income: ${kindsText(r.titheOtherKinds)})` : ''}${r.titheOwed ? ` (${r.titheOwed} gold still owed)` : ''}` : ''}${r.stipend ? `, ${r.stipend} gold stipend from ${r.stipendFrom}` : ''}, ${r.wagesPaid} gold in wages${r.owed ? `, ${r.owed} gold of wages owed` : ''}${r.capped ? ` (wages take at most ${Math.round(C.wageIncomeShare * 100)}% of the week's income and ${Math.round(C.wageShare * 100)}% of the treasury: ${r.wageBudget} gold this week)` : ''}${r.overdue.length ? `, ${r.overdue.length} properties overdue` : ''}. The treasury holds ${r.balance} gold.`);
     }
     save();
     return reports;

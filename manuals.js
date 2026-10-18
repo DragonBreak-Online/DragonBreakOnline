@@ -363,7 +363,7 @@ module.exports = (api) => {
     const price = priceOf(m);
     if (!takeGold(a, price)) return { ok: false, text: `${m.title} costs ${price} gold, and you do not have it.` };
     if (!giveItem(a, m.bookId, 1)) { giveItem(a, 0xf, price); return { ok: false, text: 'The book could not be handed over. Your gold is returned.' }; }
-    let paid = 0; try { paid = depositToTreasury(C.shop.treasury, price); } catch (e) { paid = 0; }
+    let paid = 0; try { paid = depositToTreasury(C.shop.treasury, price, { income: 'sales' }); } catch (e) { paid = 0; }
     audit(`MANUAL ${who(a)} bought ${m.name} (T${m.tier}) from the Synod for ${price} gold (${paid} to ${C.shop.treasury})`);
     try { if (typeof notify === 'function') notify(a, `${m.title} added`); } catch (e) { /* offline */ }
     return { ok: true, text: `You buy ${m.title} for ${price} gold. Read it to learn it; the book is used up as you learn.` };

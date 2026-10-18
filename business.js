@@ -146,7 +146,7 @@ module.exports = (api) => {
   // Splits a rent between the hold and the owner; returns the log text
   const splitRent = (b, zone, price) => {
     const tax = Math.round(price * taxRate(zone));
-    const toHold = tax ? depositToTreasury(zone, tax) : 0;
+    const toHold = tax ? depositToTreasury(zone, tax, { income: 'business tax' }) : 0;
     const net = price - (toHold ? tax : 0);
     const toOwner = payOwner(b, net);
     earned(b, net);

@@ -1,5 +1,21 @@
 [
   {
+    "title": "The Imperial tithe is now a quarter of all hold income",
+    "date": "2026-10-18",
+    "version": "Gameplay",
+    "tag": "Change",
+    "sections": [
+      {
+        "heading": "Cyrodiil's holds and the Imperial Legion",
+        "items": [
+          "The Empire's share of a Cyrodiil hold's income is now 25% (it was 10%), and it is taken on all of the hold's income, not only its property tax: taxes, rent, house sales, shop and sales taxes, notice and postage fees, bounties paid and other payments into the hold's treasury.",
+          "It is paid each Sunday at the weekly reckoning to the Imperial Legion's treasury. No new gold is made: the Legion is funded only from this share. Money a treasury gets back from its own spending, such as returned contract rewards or refunds, is not counted.",
+          "Skyrim's Holds pay no tithe, and the Legion pays none on its own income. A hold's weekly report now shows the tithe split between property tax and its other income."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Founding a guild takes 10 members",
     "date": "2026-10-18",
     "version": "Gameplay",

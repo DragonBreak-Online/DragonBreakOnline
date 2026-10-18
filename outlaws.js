@@ -131,7 +131,7 @@ module.exports = (api) => {
     const paid = collect(a, amount, `bounty ${holdName(zid)}`);
     if (paid < amount) { if (paid > 0) giveItem(a, GOLD, paid); return 'The payment did not go through. Nothing was taken.'; }
     delete list[key]; save();
-    try { if (globalThis.__dboTreasuryZone) globalThis.__dboTreasuryZone.deposit(zid, paid); } catch (e) { log('outlaws: treasury deposit failed', e.message); }
+    try { if (globalThis.__dboTreasuryZone) globalThis.__dboTreasuryZone.deposit(zid, paid, { income: 'bounties' }); } catch (e) { log('outlaws: treasury deposit failed', e.message); }
     audit(`BOUNTY paid: ${who(a)} paid their ${amount} gold bounty in ${holdName(zid)} to its treasury`);
     return `You pay your bounty of ${amount} gold to ${holdName(zid)}. You are no longer wanted there.`;
   };

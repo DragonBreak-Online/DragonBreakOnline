@@ -121,13 +121,13 @@ module.exports = (api) => {
     let zone = ''; try { zone = zoneIdOf(zoneOfActor(place)) || zoneIdOf(zoneOfActor(buyer)); } catch (e) { zone = ''; }
     const rate = taxRateOf(zone);
     const s = split(o.price, rate, C.sinkShare);
-    const toHold = (n) => { if (!(n > 0) || !zone) return 0; try { return Number(depositToTreasury(zone, n)) || 0; } catch (e) { return 0; } };
+    const toHold = (n) => { if (!(n > 0) || !zone) return 0; try { return Number(depositToTreasury(zone, n, { income: 'sales' })) || 0; } catch (e) { return 0; } };
     const taxPaid = toHold(s.tax);
     const r = recipientOf(place);
     let ownerPaid = 0, ownerTo = '';
     if (s.owner > 0 && r.kind === 'bank') { if (credit(r.actor, s.owner)) { ownerPaid = s.owner; ownerTo = `${r.name}'s bank account`; } }
     if (s.owner > 0 && !ownerPaid && r.kind === 'faction') {
-      try { const T = globalThis.__dboTreasury; if (T && typeof T.deposit === 'function' && T.deposit(r.fid, s.owner, `ledger sale: ${o.what || 'goods'}`)) { ownerPaid = s.owner; ownerTo = `the treasury of ${r.name}`; } else r.why = `the treasury of ${r.name} would not take it`; } catch (e) { /* bank.js not loaded */ }
+      try { const T = globalThis.__dboTreasury; if (T && typeof T.deposit === 'function' && T.deposit(r.fid, s.owner, `ledger sale: ${o.what || 'goods'}`, { income: 'sales' })) { ownerPaid = s.owner; ownerTo = `the treasury of ${r.name}`; } else r.why = `the treasury of ${r.name} would not take it`; } catch (e) { /* bank.js not loaded */ }
     }
     if (s.owner > 0 && !ownerPaid) { ownerPaid = toHold(s.owner); ownerTo = `the ${zone || 'no'} treasury${r.why ? ` (${r.why})` : r.kind !== 'hold' ? ' (the owner could not be paid)' : ''}`; }
     const lost = (s.tax - taxPaid) + (s.owner - ownerPaid);

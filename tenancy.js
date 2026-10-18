@@ -247,7 +247,7 @@ module.exports = (api) => {
     if (!takeGold(a, cost)) return `Moving in takes the ${L.deposit} gold deposit and the first week's ${L.weekly}. You do not have ${cost} gold.`;
     const err = housing().grant(h.door, a);
     if (err) { giveGold(a, cost); return err; }
-    depositToTreasury(L.zone, L.weekly);
+    depositToTreasury(L.zone, L.weekly, { income: 'rent' });
     L.tenant = p;
     L.depositHeld = L.deposit;
     L.paidUntil = Date.now() + WEEK;
@@ -296,7 +296,7 @@ module.exports = (api) => {
     if (!takeGold(a, price)) return `It costs ${price} gold, and you do not have it.`;
     const err = housing().grant(h.door, a);
     if (err) { giveGold(a, price); return err; }
-    const paidIn = depositToTreasury(L.zone, price);
+    const paidIn = depositToTreasury(L.zone, price, { income: 'house sales' });
     if (paidIn !== price) { log(`tenancy: the treasury of ${L.zone} took ${paidIn} of a ${price} gold sale (${h.key})`); audit(`PROPERTY the treasury of ${L.zone} took ${paidIn} of the ${price} gold paid for ${h.key}`); }
     const p = me(a);
     try { if (globalThis.__dboEconomySaleValue) globalThis.__dboEconomySaleValue(h.door, price, p.name); } catch (e) { log('tenancy: setting the sale value failed', e.message); }
@@ -359,7 +359,7 @@ module.exports = (api) => {
     weeks = Math.max(1, Math.min(8, Math.floor(Number(weeks) || 1)));
     const cost = weeks * L.weekly;
     if (!takeGold(a, cost)) return `${weeks} week(s) of rent is ${cost} gold, and you do not have it.`;
-    depositToTreasury(L.zone, cost);
+    depositToTreasury(L.zone, cost, { income: 'rent' });
     L.paidUntil = Math.max(Date.now(), L.paidUntil) + weeks * WEEK;
     delete L.overdueSince;
     save();
@@ -389,7 +389,7 @@ module.exports = (api) => {
     else { returnDeposit = false; audit(`PROPERTY ${L.tenant.name} no longer holds rented ${hex(L.door)} (owner profile ${owner}); left with its owner, deposit kept by ${L.zone}`); }
     const dep = L.depositHeld || 0;
     if (returnDeposit) pay(L.tenant, dep, `your deposit back (${why})`);
-    else depositToTreasury(L.zone, dep);
+    else depositToTreasury(L.zone, dep, { income: 'rent' });
     const was = L.tenant;
     delete L.tenant; delete L.depositHeld; delete L.paidUntil; delete L.overdueSince;
     L.interest = [];

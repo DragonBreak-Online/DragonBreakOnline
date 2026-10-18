@@ -258,7 +258,7 @@ module.exports = (api) => {
       giveItem(a, GOLD_BASE, reward + fee);
       return { ok: false, text: 'The board could not take the order just now. Your gold is returned.' };
     }
-    const paid = depositToTreasury(zone.id, fee);
+    const paid = depositToTreasury(zone.id, fee, { income: 'board fees' });
     audit(`SUPPLY ${who(a)} posted #${o.id} at ${zone.name}: ${count}x ${o.name} for ${reward} gold (fee ${fee}, ${paid ? 'to the treasury' : 'no treasury'})`);
     return { ok: true, text: `Posted: ${count} ${o.name} for ${reward} gold. ${fee} gold went to ${zone.name} for the notice. The goods come to your mailbox.` };
   };

@@ -1246,10 +1246,11 @@ const takeGold = (a, amount) => {
   } catch (e) { log('gold take failed', e.message); return false; }
 };
 // Returns what was deposited; a zone without a treasury keeps nothing
-const depositToTreasury = (zoneId, amount) => {
+// opts { income: '<kind>' } marks the hold's income, which the Imperial tithe counts (bank.js); without it, never tithed
+const depositToTreasury = (zoneId, amount, opts) => {
   // A hold's treasury is its balance in the bank (bank.js); the chest is only the fallback if bank.js is not loaded
   const T = globalThis.__dboTreasuryZone;
-  if (T && typeof T.deposit === 'function') return T.deposit(typeof zoneId === 'object' && zoneId ? zoneId.id : zoneId, Math.floor(Number(amount) || 0));
+  if (T && typeof T.deposit === 'function') return T.deposit(typeof zoneId === 'object' && zoneId ? zoneId.id : zoneId, Math.floor(Number(amount) || 0), opts);
   const zone = zoneId ? zoneById(zoneId) : null;
   if (!zone || !zone.treasury || amount <= 0) return 0;
   try {
@@ -1389,7 +1390,7 @@ const sendPigeon = (a, to, rawText, zoneId, goldRaw, itemsRaw) => {
     }
     const taxed = price + (prep ? prep.tax + prep.fee : 0);
     notePigeonSent(p);
-    if (isBlocked) { if (taxed > 0) depositToTreasury(zoneId, taxed); return { ok: true, text: 'Your pigeon flew off and never came back.' }; }
+    if (isBlocked) { if (taxed > 0) depositToTreasury(zoneId, taxed, { income: 'postage' }); return { ok: true, text: 'Your pigeon flew off and never came back.' }; }
     const at = Date.now();
     const sig = nextSignature.get(a);
     nextSignature.delete(a);
@@ -1406,7 +1407,7 @@ const sendPigeon = (a, to, rawText, zoneId, goldRaw, itemsRaw) => {
       if (items.length) P.giveEntries(a, items);
       throw e;
     }
-    const paid = taxed > 0 ? depositToTreasury(zoneId, taxed) : 0;
+    const paid = taxed > 0 ? depositToTreasury(zoneId, taxed, { income: 'postage' }) : 0;
     if (sig) audit(`PIGEON ${who(a)} sent ${nameOf(to)} a letter signed "${from}"`);
     if (prep) audit(`POST ${who(a)} sent ${who(to)} ${[prep.gold ? `${prep.gold} gold` : '', P.itemsText(items)].filter(Boolean).join(', ')} (tax ${prep.tax + prep.fee}, flight ${price})`);
     // the player log: that a letter went, its parcel and how it was signed; never the text or the signature
@@ -7786,7 +7787,7 @@ try {
   delete require.cache[PRAYER_JS];
   require(PRAYER_JS)({ mp, log, personal, audit, display, who, cfg, openWidget, closeWidget, onUi, registerChatCommand, onlineActors, every, skills: SKILLS_DEF,
     isLeadStaff, findAnyByName, sendPacket, distanceMeters, hasUiCap,
-    takeGold, treasuryHere: (a, gold) => { const z = zoneOfActor(a); return depositToTreasury(z && typeof z === 'object' ? z.id : z, gold); } });
+    takeGold, treasuryHere: (a, gold) => { const z = zoneOfActor(a); return depositToTreasury(z && typeof z === 'object' ? z.id : z, gold, { income: 'temple offerings' }); } });
 } catch (e) { log('prayer.js failed to load:', e.stack || e.message); globalThis.__dboPrayerActivate = null; globalThis.__dboPrayerLogin = null; }
 
 // ---- beds, inn rooms, Well Rested and Well Fed (server\rest.js, config "rest", beds.json) ---------

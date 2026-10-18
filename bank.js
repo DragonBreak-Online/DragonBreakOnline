@@ -137,10 +137,24 @@ module.exports = (api) => {
     } catch (e) { log(`bank: sweeping the ${zone.id} treasury chest failed`, e.message); }
   };
   const zoneGold = (zone) => { sweepChest(zone); return Math.floor(Number(data().zones[zone.id]) || 0); };
-  const zoneAdd = (zone, n) => {
+  // A hold's income since the last reckoning (economy.js tithes it, Nate 18 Oct): { zone: { total, kinds: { kind: gold } } }.
+  // Only a deposit whose caller names it income counts ({ income: '<kind>' }); refunds, returns, transfers, gifts and the
+  // chest sweep pass none and are never tithed
+  const incomeKind = (o) => (o && typeof o === 'object' && typeof o.income === 'string' && o.income.trim() ? o.income.trim().slice(0, 40) : '');
+  const incomeMap = () => { const d = data(); if (!d.income || typeof d.income !== 'object') d.income = {}; return d.income; };
+  const zoneAdd = (zone, n, opts) => {
     const had = Math.floor(Number(data().zones[zone.id]) || 0);
+    const kind = incomeKind(opts); const inc = incomeMap(); const was = inc[zone.id] ? JSON.parse(JSON.stringify(inc[zone.id])) : undefined;
     data().zones[zone.id] = had + n;
-    try { save(); return true; } catch (e) { data().zones[zone.id] = had; log('bank: bank.json write failed', e.message); return false; }
+    if (kind) {
+      const e = inc[zone.id] = inc[zone.id] && typeof inc[zone.id] === 'object' ? inc[zone.id] : { total: 0, kinds: {} };
+      if (!e.kinds || typeof e.kinds !== 'object') e.kinds = {};
+      e.total = Math.floor(Number(e.total) || 0) + n; e.kinds[kind] = Math.floor(Number(e.kinds[kind]) || 0) + n;
+    }
+    try { save(); return true; } catch (e) {
+      data().zones[zone.id] = had; if (kind) { if (was === undefined) delete inc[zone.id]; else inc[zone.id] = was; }
+      log('bank: bank.json write failed', e.message); return false;
+    }
   };
   const zoneTake = (zone, n) => {
     const had = zoneGold(zone);
@@ -160,8 +174,20 @@ module.exports = (api) => {
   // For gamemode.js depositToTreasury and contracts.js: a hold's treasury by zone id
   globalThis.__dboTreasuryZone = {
     balance: (zoneId) => { const z = zoneById(zoneId); return z && z.treasury ? zoneGold(z) : 0; },
-    deposit: (zoneId, n) => { n = Math.floor(Number(n) || 0); const z = zoneById(zoneId); return z && z.treasury && n > 0 && zoneAdd(z, n) ? n : 0; },
+    deposit: (zoneId, n, opts) => { n = Math.floor(Number(n) || 0); const z = zoneById(zoneId); return z && z.treasury && n > 0 && zoneAdd(z, n, opts) ? n : 0; },
     spend: (zoneId, n) => { n = Math.floor(Number(n) || 0); const z = zoneById(zoneId); return !!(z && z.treasury && n > 0 && zoneTake(z, n)); },
+    // economy.js: every hold's counted income, a copy
+    income: () => JSON.parse(JSON.stringify(incomeMap())),
+    // economy.js after the reckoning: takes off what it read (a deposit made since stays counted for next week)
+    clearIncome: (zoneId, seen) => {
+      const inc = incomeMap(); const e = inc[zoneId]; if (!e) return true;
+      const was = JSON.parse(JSON.stringify(e));
+      const left = Math.max(0, Math.floor(Number(e.total) || 0) - Math.floor(Number(seen && seen.total) || 0));
+      const kinds = {};
+      for (const [k, v] of Object.entries(e.kinds || {})) { const r = Math.floor(Number(v) || 0) - Math.floor(Number(((seen && seen.kinds) || {})[k]) || 0); if (r > 0) kinds[k] = r; }
+      if (left > 0) inc[zoneId] = { total: left, kinds }; else delete inc[zoneId];
+      try { save(); return true; } catch (x) { inc[zoneId] = was; log('bank: bank.json write failed', x.message); return false; }
+    },
   };
   if (typeof every === 'function' && typeof zoneList === 'function') every('bankSweep', 60000, () => { for (const z of zoneList()) if (z.treasury) sweepChest(z); });
   // The treasuries a character answers for: the holds they rule, and the factions they lead (a hold faction's is its hold's)
@@ -215,10 +241,11 @@ module.exports = (api) => {
       audit(`BANK treasury of ${fid} spent ${n} gold (${why || 'unspecified'})`);
       return true;
     },
-    deposit: (fid, n, why) => {
+    // opts { income: '<kind>' }: a hold's income, tithed (see incomeKind); a landless faction's treasury counts none
+    deposit: (fid, n, why, opts) => {
       n = Math.floor(Number(n) || 0); const key = treasuryKeyOf(fid);
       if (!key || n <= 0) return false;
-      if (key.startsWith('zone:')) { if (depositToTreasury(key.slice(5), n) !== n) return false; }
+      if (key.startsWith('zone:')) { if (depositToTreasury(key.slice(5), n, opts) !== n) return false; }
       else {
         const id = key.slice(8); const have = Math.floor(Number(data().factions[id]) || 0);
         data().factions[id] = have + n;
@@ -388,8 +415,8 @@ module.exports = (api) => {
   // The fee goes to the hold's treasury; a hold without one keeps it in its bank.json balance
   const payHold = (zone, n) => {
     if (n <= 0) return true;
-    if (depositToTreasury(zone.id, n) === n) return true;
-    if (zoneAdd(zone, n)) { audit(`BANK VAULT ${n} gold kept for ${zone.id} in bank.json (the hold has no treasury yet)`); return true; }
+    if (depositToTreasury(zone.id, n, { income: 'vault fees' }) === n) return true;
+    if (zoneAdd(zone, n, { income: 'vault fees' })) { audit(`BANK VAULT ${n} gold kept for ${zone.id} in bank.json (the hold has no treasury yet)`); return true; }
     return false;
   };
   const feeFor = (a, zone, n, why) => {
