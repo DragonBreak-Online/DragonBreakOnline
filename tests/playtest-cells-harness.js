@@ -55,6 +55,9 @@ ok(after('3c:Skyrim.esm') === 1, 'and so is Skyrim');
   ok(globalThis.__dboPlaytestGate(P2) === false, 'the hub gates go to gamemode.js (the Skyrim holds), not the arrival');
   ok(globalThis.__dboPlaytestActivate(0x877c2, P2) === null && globalThis.__dboPlaytestActivate(0x656df, P2) === null, 'the Pale Pass doors are open both ways');
   ok(globalThis.__dboPlaytestActivate(0x16fe0, P2) === false, 'the ship to Solstheim refuses');
+  ok(pk[0].refs.includes(0x5eb06), 'the Helgen escape cave door is among the doors the client blocks itself (its load hung, 18 Oct)');
+  P2 += 1; said.length = 0;
+  ok(globalThis.__dboPlaytestActivate(0x5eb06, P2) === false && /tunnel has collapsed/.test(said[0] || '') && !/only Skyrim and Bruma/.test(said[0] || ''), '...the server refuses it with its own line, not the closed lands\'', said[0]);
 }
 console.log(fails ? `${fails} failed` : 'all checks passed');
 process.exit(fails ? 1 : 0);

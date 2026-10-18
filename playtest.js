@@ -34,6 +34,8 @@ module.exports = (api) => {
   const REFUSE_LINE = OWN_LINE ? C.closedMessage : `${C.closedMessage} The alpha begins in ${C.name}.`;
   const closedPlugins = new Set((C.closedPlugins || []).map((p) => String(p).toLowerCase()));
   const blockedDoors = new Set((C.blockedDoors || []).map(idOf).filter(Boolean));
+  // A door sealed for its own reason says its own line (doorMessages { desc: text }), not the closed lands' one
+  const doorLines = new Map(Object.entries(C.doorMessages || {}).filter(([d]) => d[0] !== '_').map(([d, t]) => [idOf(d) >>> 0, String(t)]).filter(([id]) => id));
   // blockedDoors that are automatic load doors (walked into, not activated): refused ones send the player back
   const autoDoors = new Set((C.autoDoors || ['877c2:BSHeartland.esm']).map(idOf).filter(Boolean));
   const arrival = C.arrival && C.arrival.world && Array.isArray(C.arrival.pos) ? { cellOrWorldDesc: C.arrival.world, pos: C.arrival.pos, rot: [0, 0, Number(C.arrival.rotZ) || 0] } : null;
@@ -112,7 +114,7 @@ module.exports = (api) => {
             if (sendToArrival(casterId, 'border')) audit(`PLAYTEST ${who(casterId)} walked into the closed automatic door ${door} and was taken back to ${C.name}`);
           } catch (e) { log('playtest: border return failed', e.message); }
         }, 300);
-      } else personal(casterId, REFUSE_LINE);
+      } else personal(casterId, doorLines.get(targetId >>> 0) || REFUSE_LINE);
     }
     return false;
   };
