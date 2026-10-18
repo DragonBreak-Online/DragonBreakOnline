@@ -1,5 +1,20 @@
 [
   {
+    "title": "Skinning tells you when a hide is beyond you",
+    "date": "2026-10-18",
+    "version": "Hotfix",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Skinning",
+        "items": [
+          "When a hide such as a bear's or a sabre cat's needs a higher Skinner rank than yours, the first E on the body now only tells you so, on screen and in chat, and names the rank it takes. Before, the body's loot window opened at once and hid the message.",
+          "Press E again to search the body for its meat and anything else on it."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Repairs take materials",
     "date": "2026-10-19",
     "version": "Server update",

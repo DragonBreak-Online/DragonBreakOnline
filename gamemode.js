@@ -5615,6 +5615,8 @@ const skinSpent = globalThis.__dboSkinSpent || (globalThis.__dboSkinSpent = new 
 // reliable but not ordered and a report sent before the Stop can land after it (DESIGN.md section 13). nonce -> { a, round, how }
 const skinClosing = globalThis.__dboSkinClosing instanceof Map ? globalThis.__dboSkinClosing : (globalThis.__dboSkinClosing = new Map());
 const skinDeny = new Map();
+const skinRefused = new Map(); // `${skinner}:${body}` -> when the hide was refused; a second E within SKIN_REFUSE_MS opens the body
+const SKIN_REFUSE_MS = 15000;
 const skinSay = (a, text) => { if (Date.now() - (skinDeny.get(a) || 0) > 1500) { skinDeny.set(a, Date.now()); personal(a, text); } return false; };
 // Anyone may skin a simple animal (Nat's call, 2026-09-20). Holding the trade is no longer the price
 // of entry: it widens the seam, slows the blade, raises the chance of a second pelt, and is what lets
@@ -5874,10 +5876,19 @@ globalThis.__dboSkin = (targetId, casterId) => {
   const worth = peltsWorth(pelts);
   if (worth > tierCap(tier)) {
     const need = rankForValue(worth);
-    skinSay(casterId, pelts.some((p) => p && p.dragon) ? 'Only a Master Skinner can take the bones and scales of a dragon.'
+    // The first E only refuses, so the line is not hidden behind the body's loot window; E again searches the body
+    // (SkaldsChosen, 18 Oct: "the warning doesnt always appear" on bears and sabre cats)
+    const key = `${casterId}:${targetId}`;
+    if (Date.now() - (skinRefused.get(key) || 0) < SKIN_REFUSE_MS) return null;
+    skinRefused.set(key, Date.now());
+    if (skinRefused.size > 512) for (const [k, at] of skinRefused) if (Date.now() - at > SKIN_REFUSE_MS) skinRefused.delete(k);
+    const why = pelts.some((p) => p && p.dragon) ? 'Only a Master Skinner can take the bones and scales of a dragon.'
       // "An Apprentice", never "A Apprentice" (the 16 Oct log: 103 of 105 refusals named Apprentice or Adept)
-      : `This hide is beyond your hand. ${((r) => `${/^[AEIOU]/.test(r) ? 'An' : 'A'} ${r}`)(RANK_NAMES[Math.min(need, RANK_NAMES.length - 1)])} Skinner could take it.`);
-    return null;
+      : `This hide is beyond your hand. ${((r) => `${/^[AEIOU]/.test(r) ? 'An' : 'A'} ${r}`)(RANK_NAMES[Math.min(need, RANK_NAMES.length - 1)])} Skinner could take it.`;
+    skinDeny.delete(casterId);
+    skinSay(casterId, `${why} Press E again to search the body.`);
+    try { sendPacket(casterId, { customPacketType: 'dboBanner', text: why, seconds: 4 }); } catch (e) { /* old client */ }
+    return false;
   }
   const round = skinRound(casterId, tier, targetId, creatureName(targetId));
   if (MG.clientJudged(SKIN)) {

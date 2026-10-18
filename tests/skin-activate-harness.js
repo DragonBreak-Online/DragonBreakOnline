@@ -20,6 +20,7 @@ const code = src.slice(start + 1, end + 3);
 let failures = 0;
 const check = (label, ok) => { if (!ok) failures++; console.log(`${ok ? 'ok  ' : 'FAIL'} ${label}`); };
 
+const refused = new Map(); // shared across runs: the second E on a refused hide
 const run = ({ pelts, dead = true, skinned = false, worth = 5, cap = 12, pendingSince }) => {
   const said = [];
   const opened = [];
@@ -28,6 +29,10 @@ const run = ({ pelts, dead = true, skinned = false, worth = 5, cap = 12, pending
     globalThis: {},
     mp: { get: (id, key) => props[key] },
     skinSay: (a, text) => { said.push(text); return false; },
+    skinDeny: new Map(),
+    skinRefused: refused,
+    SKIN_REFUSE_MS: 15000,
+    sendPacket: (a, p) => said.push('banner: ' + p.text),
     skinnerTier: () => 0,
     peltsWorth: () => worth,
     tierCap: () => cap,
@@ -71,7 +76,10 @@ r = run({ pelts: pelt, skinned: true });
 check('a skinned deer: E opens the corpse (its venison), with no refusal', r.result === null && r.said.length === 0 && r.opened.length === 0);
 
 r = run({ pelts: pelt, worth: 80, cap: 12 });
-check('a hide beyond the skinner: says so, and the corpse still opens', r.result === null && r.said.length === 1 && /beyond your hand/.test(r.said[0]) && r.opened.length === 0);
+check('a hide beyond the skinner: says so in chat and a banner, and the first E is taken (the loot window hid the line)', r.result === false && r.said.length === 2 && /beyond your hand.*Press E again/.test(r.said[0]) && /^banner: This hide/.test(r.said[1]) && r.opened.length === 0);
+const again = run({ pelts: pelt, worth: 80, cap: 12 });
+check('...and E again on that body opens it, with no second refusal', again.result === null && again.said.length === 0 && again.opened.length === 0);
+refused.clear();
 check('...naming the rank with the right article ("An Adept Skinner", 16 Oct log: "A Adept")', /An Adept Skinner could take it/.test(r.said[0] || ''), r.said[0]);
 
 r = run({ pelts: [] });
@@ -85,8 +93,9 @@ check('a body with no pelt record (a player, a dungeon humanoid): not a skinning
 
 // A dragon's bones and scales (Nate, 11 Oct): a Master's work, and the refusal says so
 const dragon = [{ baseId: 0x3ada4, count: 2, dragon: true }];
+refused.clear();
 r = run({ pelts: dragon, worth: 500, cap: 100 });
-check('a dragon below Master: told only a Master Skinner can take its bones and scales', r.result === null && r.said.length === 1 && /Only a Master Skinner can take the bones and scales of a dragon/.test(r.said[0]));
+check('a dragon below Master: told only a Master Skinner can take its bones and scales', r.result === false && r.said.length === 2 && /Only a Master Skinner can take the bones and scales of a dragon/.test(r.said[0]));
 r = run({ pelts: dragon, worth: 500, cap: 1000000 });
 check('...a Master: the skinning game opens', r.result === false && r.opened.length === 1);
 
