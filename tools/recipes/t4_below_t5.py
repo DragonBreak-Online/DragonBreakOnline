@@ -84,7 +84,7 @@ VANILLA = {'skyrim.esm', 'update.esm', 'dawnguard.esm', 'hearthfires.esm', 'drag
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--data', default='/opt/skyrim-data')
-    ap.add_argument('--order', default=os.path.expanduser('~nate/dragonbreak/fork/deploy/skyrim-data/loadorder.txt'))
+    ap.add_argument('--order', default='/opt/alduinak/deploy/skyrim-data/loadorder.txt')
     ap.add_argument('--config', default=os.path.join(ROOT, 'gamemode-config.json'))
     ap.add_argument('--artifacts', default=os.path.join(ROOT, 'artifacts.json'))
     ap.add_argument('--replace', action='append', default=[])

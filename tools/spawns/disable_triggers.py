@@ -29,7 +29,7 @@ DISABLED, DELETED = 0x800, 0x20
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--data', default='/opt/skyrim-data')
-    ap.add_argument('--order', default=os.path.expanduser('~nate/dragonbreak/fork/deploy/skyrim-data/loadorder.txt'))
+    ap.add_argument('--order', default='/opt/alduinak/deploy/skyrim-data/loadorder.txt')
     ap.add_argument('--replace', action='append', default=[])
     ap.add_argument('--out', default=os.path.join(SERVER, 'disable-triggers.json'))
     a = ap.parse_args()

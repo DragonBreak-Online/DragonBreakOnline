@@ -47,7 +47,7 @@ def jl(name, dflt):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--data', default='/opt/skyrim-data')
-    ap.add_argument('--order', default=os.path.expanduser('~nate/dragonbreak/fork/deploy/skyrim-data/loadorder.txt'))
+    ap.add_argument('--order', default='/opt/alduinak/deploy/skyrim-data/loadorder.txt')
     ap.add_argument('--replace', action='append', default=[])
     ap.add_argument('--json')
     ap.add_argument('--md')

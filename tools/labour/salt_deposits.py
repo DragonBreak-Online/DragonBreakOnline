@@ -21,7 +21,7 @@ DELETED, DISABLED = 0x20, 0x800
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--data', default='/opt/skyrim-data')
-    ap.add_argument('--order', default=os.path.expanduser('~nate/dragonbreak/fork/deploy/skyrim-data/loadorder.txt'))
+    ap.add_argument('--order', default='/opt/alduinak/deploy/skyrim-data/loadorder.txt')
     ap.add_argument('--replace', action='append', default=[])
     ap.add_argument('--out', default=os.path.join(SERVER, 'salt-deposits.json'))
     ap.add_argument('--check', action='store_true')

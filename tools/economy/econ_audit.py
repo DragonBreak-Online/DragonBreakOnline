@@ -5,7 +5,7 @@ sys.path.insert(0, os.environ.get('ESPLIB_DIR', os.path.expanduser('~nate/dragon
 import esplib
 
 DATA = '/opt/skyrim-data'
-ORDER = [l.strip() for l in open(os.path.expanduser('~nate/dragonbreak/fork/deploy/skyrim-data/loadorder.txt')) if l.strip() and not l.startswith('#')]
+ORDER = [l.strip() for l in open('/opt/alduinak/deploy/skyrim-data/loadorder.txt') if l.strip() and not l.startswith('#')]
 CF = '/opt/skymp-state/world/changeForms'
 SERVER = '/opt/alduinak/build/dist/server'
 

@@ -8,7 +8,7 @@ sys.path.insert(0, os.environ.get('ESPLIB_DIR', os.path.expanduser('~/dragonbrea
 import esplib
 
 BASE = os.environ.get('DATA_DIR', '/opt/skyrim-data')
-ORDER = [l.strip() for l in open(os.environ.get('LOADORDER', os.path.expanduser('~/dragonbreak/fork/deploy/skyrim-data/loadorder.txt'))) if l.strip() and not l.startswith('#')]
+ORDER = [l.strip() for l in open(os.environ.get('LOADORDER', '/opt/alduinak/deploy/skyrim-data/loadorder.txt')) if l.strip() and not l.startswith('#')]
 ALL = '--all' in sys.argv
 
 final = {}      # (srcplugin, loc) -> (type, plugin, edid, flags, subs list, pluginobj)

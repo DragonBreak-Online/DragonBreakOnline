@@ -27,7 +27,7 @@ import argparse, collections, json, math, os, re, struct, sys
 
 sys.path.insert(0, os.path.expanduser('~nate/dragonbreak/ck-mcp'))
 DATA = '/opt/skyrim-data'
-ORDER_FILE = os.path.expanduser('~nate/dragonbreak/fork/deploy/skyrim-data/loadorder.txt')
+ORDER_FILE = '/opt/alduinak/deploy/skyrim-data/loadorder.txt'
 # the generator's own "not an enemy" words (dungeons_build.py SKIP), with Undead taken out first as it does
 SKIP = ('corpse', 'dead', 'dummy', 'marker', 'rigid', 'testnpc', 'victim', 'prisoner', 'captive', 'sleeping')
 UNDEAD = re.compile(r'Undead|undead|UNDEAD')

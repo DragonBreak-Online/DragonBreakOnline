@@ -10,4 +10,4 @@ damage by material, with the plugin whose override sets each value. Used for BLA
 - `canonical_sets.py`: the base game, DLC and Beyond Skyrim sets by editor id, final override.
 
 Environment: `ESPLIB_DIR` (default `~/dragonbreak/ck-mcp`), `DATA_DIR` (default `/opt/skyrim-data`), `LOADORDER`
-(default `~/dragonbreak/fork/deploy/skyrim-data/loadorder.txt`). A full run takes a few minutes; run with `nice`.
+(default `/opt/alduinak/deploy/skyrim-data/loadorder.txt`, the live server's). A full run takes a few minutes; run with `nice`.

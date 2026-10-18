@@ -49,7 +49,7 @@ RADIUS = {
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--data', default='/opt/skyrim-data')
-    ap.add_argument('--order', default=os.path.expanduser('~nate/dragonbreak/fork/deploy/skyrim-data/loadorder.txt'))
+    ap.add_argument('--order', default='/opt/alduinak/deploy/skyrim-data/loadorder.txt')
     ap.add_argument('--replace', action='append', default=[], help='"<load-order name>=<path>"')
     ap.add_argument('--skills', default=os.path.join(SERVER, 'skills.json'))
     ap.add_argument('--check', action='store_true')

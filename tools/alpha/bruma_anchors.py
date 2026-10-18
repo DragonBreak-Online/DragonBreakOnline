@@ -41,7 +41,7 @@ def dkey(desc):
 
 class World:
     def __init__(self, dle_path=None):
-        order = [l.strip().lstrip('*') for l in open(os.path.expanduser('~nate/dragonbreak/fork/deploy/skyrim-data/loadorder.txt'), encoding='utf-8-sig')
+        order = [l.strip().lstrip('*') for l in open('/opt/alduinak/deploy/skyrim-data/loadorder.txt', encoding='utf-8-sig')
                  if l.strip() and not l.startswith('#')]
         cfg = json.load(open(os.path.join(SERVER, 'gamemode-config.json')))
         pt = cfg.get('playtest') or {}

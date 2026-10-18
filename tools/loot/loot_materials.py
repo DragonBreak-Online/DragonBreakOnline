@@ -17,7 +17,7 @@ import argparse, json, os, re, struct, sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 SERVER = os.path.abspath(os.path.join(HERE, '..', '..'))
 DATA = os.environ.get('DBO_DATA', '/opt/skyrim-data')
-ORDER = os.environ.get('DBO_LOADORDER', os.path.expanduser('~nate/dragonbreak/fork/deploy/skyrim-data/loadorder.txt'))
+ORDER = os.environ.get('DBO_LOADORDER', '/opt/alduinak/deploy/skyrim-data/loadorder.txt')
 ESPLIB = os.environ.get('DBO_ESPLIB', os.path.expanduser('~nate/dragonbreak/ck-mcp'))
 
 # keyword editor id -> family (first match wins, except that a banned family anywhere in the list wins)
