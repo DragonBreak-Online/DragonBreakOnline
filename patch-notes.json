@@ -1,5 +1,34 @@
 [
   {
+    "title": "Faiths of Tamriel and the Green Pact",
+    "date": "2026-10-18",
+    "version": "Hotfix",
+    "tag": "New",
+    "sections": [
+      {
+        "heading": "Faiths",
+        "items": [
+          "Every god now belongs to a faith: the Imperial Cult, the Old Ways of the Nords, the Aldmeri Pantheon, the Green Pact, the Reclamations of the Dunmer, the Riddle'Thar of the Khajiit, the Yokudan gods of the Redguards, the Hist and Sithis, the Orcish Faith, the Old Gods of the Reach, the Deep of the Maormer, Daedric worship and the cults. Your god places you in a faith, the one of your people first when it fits.",
+          "You can pray at the shrine of any god of your faith. Your own god answers more often.",
+          "Changing to another god of your faith takes one day. Changing your faith still takes the week.",
+          "Fifteen gods from the lore join the roster, among them Shor, Tsun, Magnus, Xarxes, Y'ffre, Jephre, Baan Dar, Alkosh, Rajhin, Leki, Onsi, Satakal and Sithis. Sithis is hunted and Rajhin is a criminal's god. Gods also go by their other names, such as Kyne and Khenarthi for Kynareth.",
+          "Three of the new gods already bless their followers. Xarxes: what you read teaches you more, at half of Hermaeus Mora's gift. Y'ffre: meat fills your hunger twice as much. Alkosh: your unarmed blows land 10% harder. The other new gods' blessings and shrines are still being made.",
+          "With the next client update, the Deity tab in your journal (F3) will let you choose your faith first and then a god in it."
+        ]
+      },
+      {
+        "heading": "The Green Pact",
+        "items": [
+          "A wood elf sworn to the Green Pact may not cut wood at a chopping block or pick plants. Y'ffre forbids it.",
+          "Under the Meat Mandate, a sworn wood elf can press E on a person they or their party killed in the last three game days to eat of the body. A short kneel fills their hunger. After that, E on the same body searches it as usual. /partake off makes E search instead of eat.",
+          "A player's body is never eaten without that player's consent. They are asked, and only /partake yes allows it.",
+          "Eating the dead is a crime in the Empire. Guards within 30 metres are told what they saw.",
+          "Wood elves who chose their god before today are not bound. They join with /greenpact swear. Wood elves who choose a god of the Pact from now on are sworn by that choice."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Player shops",
     "date": "2026-10-19",
     "version": "Gameplay",
