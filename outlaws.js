@@ -15,7 +15,7 @@ const path = require('path');
 
 module.exports = (api) => {
   const { mp, log, personal, system, audit, who, display, cfg, registerChatCommand, zoneOfActor, zoneById, readOfficials,
-    profileOf, officialTarget, onlineActors, giveItem, isLeadStaff } = api;
+    profileOf, officialTarget, onlineActors, giveItem, isLeadStaff, onUi } = api;
   const C = Object.assign({ enabled: true, max: 1000, goldPerMinute: 10, maxExtraMinutes: 240 }, cfg.outlaws || {});
   const FILE = path.resolve('outlaws.json');
   const GOLD = 0xf;
@@ -135,6 +135,55 @@ module.exports = (api) => {
     audit(`BOUNTY paid: ${who(a)} paid their ${amount} gold bounty in ${holdName(zid)} to its treasury`);
     return `You pay your bounty of ${amount} gold to ${holdName(zid)}. You are no longer wanted there.`;
   };
+  // A bounty lifted from the journal names its outlaw by profile id, not by a name to look up again
+  const clearByPid = (a, zid, pid) => {
+    if (!zid) return 'Stand in the hold whose bounty you clear.';
+    if (!mayDeclare(a, zid)) return `Only the ruler or the Steward of ${holdName(zid)} clears a bounty there.`;
+    const list = data().zones[zid] || {}; const b = list[String(Number(pid))];
+    if (!b) return 'That bounty is already gone.';
+    delete list[String(Number(pid))]; save();
+    audit(`BOUNTY cleared: ${who(a)} lifted the bounty on ${b.name} (profile ${pid}) in ${holdName(zid)}`);
+    return `The bounty on ${b.name} in ${holdName(zid)} is lifted.`;
+  };
+
+  // ---- the F3 Wanted tab (front journal tab 'wanted'): the wanted list of the hold you stand in, your own bounties with
+  // Pay where you stand, and for its ruler or Steward the form to set one and Clear on each ----------------------------------
+  const tabView = (a) => {
+    const zid = zoneOfActor(a);
+    const pid = String(pidOf(a));
+    return {
+      hold: zid ? { id: zid, name: holdName(zid) } : null,
+      wanted: zid ? Object.entries(data().zones[zid] || {}).map(([p, b]) => ({ pid: Number(p), name: b.name, amount: b.amount, reason: b.reason, by: b.by, at: b.at }))
+        .sort((x, y) => y.amount - x.amount) : [],
+      mine: Object.entries(data().zones).filter(([, l]) => l[pid]).map(([z, l]) => ({ zone: z, name: holdName(z), amount: l[pid].amount, reason: l[pid].reason, here: z === zid })),
+      canDeclare: !!zid && mayDeclare(a, zid), max: Number(C.max), goldPerMinute: Number(C.goldPerMinute) || 10,
+    };
+  };
+  const sections = globalThis.__dboJournalSections || (globalThis.__dboJournalSections = {});
+  if (C.enabled) sections.wanted = {
+    // Shown where a hold has outlaws, to an outlaw, and to a ruler or Steward; a badge while you are wanted
+    visible: (a) => { const v = tabView(a); return v.mine.length ? { badge: v.mine.length } : (v.wanted.length || v.canDeclare); },
+    view: (a) => tabView(a), label: () => 'Wanted',
+  };
+  else delete sections.wanted;
+  const journalFresh = (a, args) => typeof globalThis.__dboJournalFresh === 'function' && !!globalThis.__dboJournalFresh(a, String((args || [])[0] || ''));
+  if (typeof onUi === 'function') onUi('outlawJ', (a, args) => {
+    if (!C.enabled || !journalFresh(a, args)) return;
+    const act = () => {
+      const zid = zoneOfActor(a); const what = String(args[1] || '');
+      let text = '';
+      try {
+        if (what === 'set') text = setBounty(a, zid, `${String(args[2] || '').trim()} ${Math.floor(Number(args[3]) || 0)} ${String(args[4] || '').trim().slice(0, 120)}`);
+        else if (what === 'clear') text = clearByPid(a, zid, args[2]);
+        else if (what === 'pay') text = payBounty(a, zid);
+        else text = 'That cannot be done.';
+      } catch (e) { log('outlaws: tab action failed', e.stack || e.message); text = 'That cannot be done just now.'; }
+      const refused = !/is wanted in|is lifted|no longer wanted/.test(text);
+      return { tab: 'wanted', text, kind: refused ? 'refused' : 'ok' };
+    };
+    if (typeof globalThis.__dboJournalLimited === 'function') globalThis.__dboJournalLimited(a, act);
+  });
+
   if (typeof registerChatCommand === 'function') {
     registerChatCommand('bounty', (a, args) => {
       if (!C.enabled) return personal(a, 'Outlaw bounties are not in force.');
@@ -149,5 +198,5 @@ module.exports = (api) => {
     }, { help: '[set|clear|pay] outlaw bounties of the hold you stand in' });
   }
   log(`outlaws ${C.enabled ? 'on' : 'off'}: ${Object.values(data().zones).reduce((n, l) => n + Object.keys(l).length, 0)} bounties, up to ${C.max} gold, ${C.goldPerMinute} gold a minute unpaid`);
-  return { setBounty, clearBounty, payBounty, listText, mayDeclare };
+  return { setBounty, clearBounty, clearByPid, payBounty, listText, mayDeclare, tabView };
 };

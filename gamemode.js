@@ -8230,7 +8230,7 @@ try {
   const OUTLAWS_JS = path.resolve('outlaws.js');
   delete require.cache[OUTLAWS_JS];
   require(OUTLAWS_JS)({ mp, log, personal, system, audit, who, display, cfg, registerChatCommand, zoneOfActor, zoneById, readOfficials,
-    profileOf, officialTarget, onlineActors, giveItem, isLeadStaff });
+    profileOf, officialTarget, onlineActors, giveItem, isLeadStaff, onUi });
 } catch (e) { log('outlaws.js failed to load:', e.stack || e.message); globalThis.__dboOutlawJailed = null; }
 // ---- the journal's Court tab: offices, offers and the household (server\court.js, config "court") ------------------------
 try {
