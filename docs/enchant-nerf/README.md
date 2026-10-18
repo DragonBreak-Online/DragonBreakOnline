@@ -4,7 +4,7 @@
 to local claude for xedits".
 
 **Who does what:**
-- The server session wrote this from the live load order (`/opt/skyrim-data`, 105 plugins).
+- The server session wrote this from the live load order (`/opt/alduinak/deploy/skyrim-data/loadorder.txt`, 140 plugins).
 - The PC session makes the edits in xEdit.
 
 **What is here:**
@@ -29,7 +29,7 @@ The server decides most combat numbers itself, so an enchantment matters only wh
 
 - **Fortify school** (spell cost):
   - 25% each, and four slots reach 100%, so spells become free.
-  - This is the biggest one: 138 effects.
+  - This is the biggest one: 148 effects.
 - **Magicka regen:**
   - the College robes give 150%;
   - health and stamina regen.
@@ -53,7 +53,7 @@ The server decides most combat numbers itself, so an enchantment matters only wh
 
 ## The proposal: halve group 1 and group 2
 
-`enchant-nerf.csv` covers 552 effects in 412 ENCH records:
+`enchant-nerf.csv` covers 590 effects in 441 ENCH records:
 - every enchantment an item carries;
 - plus the player families (`EnchWeapon*` / `EnchArmor*` / `EnchRobes*`, `*Base`), because those set what a player can
   craft.
@@ -67,12 +67,12 @@ starts reading them.
 
 | Category | Effects | Example |
 |---|---|---|
-| Spell cost (Fortify school, AV 108-112, armour and robes) | 138 | 25 -> 13 |
-| Fortify Health / Magicka / Stamina | 105 / 22 / 34 | 70 -> 35 |
-| Magicka regen (AV 156) | 80 | College robes 150 -> 75 |
+| Spell cost (Fortify school, AV 108-112, armour and robes) | 148 | 25 -> 13 |
+| Fortify Health / Magicka / Stamina | 116 / 30 / 36 | 70 -> 35 |
+| Magicka regen (AV 156) | 82 | College robes 150 -> 75 |
 | Health / stamina regen | 8 / 7 | 50 -> 25 |
-| Fortify One-handed / Two-handed / Archery | 18 / 7 / 10 | 40 -> 20 |
-| Speech, carry weight, lockpicking, block, sneak, pickpocket, light/heavy armour, smithing | 27, 24, 15, 13, 11, 11, 8, 8, 7 | carry weight 200 -> 100 |
+| Fortify One-handed / Two-handed / Archery | 19 / 7 / 10 | 40 -> 20 |
+| Speech, carry weight, lockpicking, block, sneak, pickpocket, heavy/light armour, smithing | 29, 24, 15, 13, 11, 11, 9, 8, 7 | carry weight 200 -> 100 |
 
 Left out on purpose:
 - Creation Club horse armour, which has Fortify Health 1000 on a horse;
@@ -82,9 +82,10 @@ Left out on purpose:
 ## How to apply on the PC
 
 The `edit_in` column says where each record goes. Never edit a Nexus mod's own file.
-- **Base game** (Skyrim, Update, Dawnguard, HearthFires, Dragonborn): 512 effects. Override in
+- **Base game** (Skyrim, Update, Dawnguard, HearthFires, Dragonborn): 508 effects. Override in
   **DragonBreak Online Edits.esp**.
-- **Third-party** (Beyond Skyrim, Gray Fox Cowl and others): 40 effects. Override in
+- **Our own plugins:** 4 effects already in DragonBreak Online Edits. Edit in place.
+- **Third-party** (Beyond Skyrim, Gray Fox Cowl and others): 78 effects. Override in
   **DragonBreak Nexus Patches.esp**.
 
 Edit only `EFIT` magnitude of effect number `effect_index` (0-based, in record order). Leave area, duration, cost and
@@ -92,7 +93,7 @@ everything else alone.
 - Keep the ENCH's `ENIT` "Enchant cost" as it is, so charge use and prices do not move. A cost override is a separate
   decision.
 - Check the `magnitude` column against the winning record before writing.
-  - The table was read from CT 115's `/opt/skyrim-data` on 18 Oct.
+  - The table was read from CT 115's `/opt/skyrim-data` with the live 140-plugin load order on 18 Oct.
   - A differing value means the PC's load order differs.
   - Stop and regenerate rather than guess.
 

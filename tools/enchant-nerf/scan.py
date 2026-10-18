@@ -1,7 +1,7 @@
 import sys, struct, os, json, collections
 sys.path.insert(0, os.path.expanduser('~/dragonbreak/ck-mcp'))
 from esplib import Plugin, subrecords, edid_of
-order=[l.strip() for l in open(os.path.expanduser('~/dragonbreak/fork/deploy/skyrim-data/loadorder.txt')) if l.strip() and not l.startswith('#')]
+order=[l.strip() for l in open('/opt/alduinak/deploy/skyrim-data/loadorder.txt') if l.strip() and not l.startswith('#')]
 ench={}; mgef={}; users=collections.defaultdict(list)
 def gkey(p,fid):
     top=fid>>24; m=p.masters

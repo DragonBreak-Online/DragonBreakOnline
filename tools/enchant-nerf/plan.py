@@ -1,7 +1,7 @@
 import json, csv, collections
 E=json.load(open('ench.json'))
 BASE={'Skyrim.esm','Update.esm','Dawnguard.esm','HearthFires.esm','Dragonborn.esm'}
-OWN={'DragonBreak Online Edits.esp','DragonBreak.esp','DragonBreak Nexus Patches.esp'}
+OWN={'DragonBreak Online Edits.esp','DragonBreak.esp','DragonBreak Nexus Patches.esp','DragonBreak Armory.esp'}
 # (arch, av) -> (category, factor, where it acts today)
 C={}
 for av in (108,109,110,111,112): C[av]=('spell cost (Fortify school)',0.5,'client: spell cost')
