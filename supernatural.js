@@ -1189,12 +1189,15 @@ module.exports = (api) => {
     const at = MG.ms(args[3]);
     judge(a, r, false, 'too late', `the widget's ${C.rite.timeoutMs} ms ran out at=${Number.isFinite(at) ? at : '-'}${MG.tail({ judge: 'client' })}`);
   });
-  const forfeit = (a) => { const r = rites.get(a); if (r) { r.acted = true; r.misses = C.rite.rounds; finishRite(a, r, false); } };
+  // Closing the window before any round was played is not a forfeit (ticket #0235, 2026-10-18: Escape meant for the
+  // forge closed a Hircine's Hunt that had just opened, 0/5 with nothing pressed, and the hunt took the disease).
+  // Untouched, it is abandoned like a rite that never got input, and the fever offers it again on a later tick.
+  const forfeit = (a) => { const r = rites.get(a); if (!r || untouchedAbandon(a, r)) return; r.acted = true; r.misses = C.rite.rounds; finishRite(a, r, false); };
   // A disconnect mid-rite (a game crash, a dropped connection, or Alt-F4) used to forfeit it: death, and for the two
   // voluntary rites the permadeath roll, so a crash could end a character for good (2026-09-29). Now the rounds played
   // decide. Behind on them (more misses than hits): lost, so quitting is no escape, but never a permadeath. Even or
   // ahead: cancelled, no death; a voluntary rite takes only its shrine's wait, and a fever comes back on a later tick.
-  // A rite never touched is abandoned as before. Closing the rite window is still a forfeit (riteClose, close).
+  // A rite never touched is abandoned as before. Closing the rite window after a round is still a forfeit (riteClose, close).
   // Known and accepted (the release session, 2026-09-29): quitting a Blood Fever or Hircine's Hunt fever rite while
   // even or ahead gets another try on a later tick, since the disease stays. A second chance for a quitter costs less
   // than a character lost to a crash, and crashes are common.
