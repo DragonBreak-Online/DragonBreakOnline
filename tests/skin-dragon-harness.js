@@ -16,7 +16,7 @@ let failures = 0;
 const check = (label, ok, got) => { if (!ok) failures++; console.log(`${ok ? 'ok  ' : 'FAIL'} ${label}${got !== undefined ? '   ' + JSON.stringify(got) : ''}`); };
 
 const BONE = 0x3ada4, SCALES = 0x3ada3, GOLD = 0xf, GEM = 0x63b45, DEERPELT = 0x80679bd;
-const run = (entries, tag) => {
+const run = (entries, tag, race = 'BearBrownRace') => {
   const props = new Map([['inventory', { entries }], ['private.npcSpawner', tag]]);
   const sb = {
     mp: { get: (id, k) => props.get(k), set: (id, k, v) => props.set(k, v) },
@@ -25,6 +25,7 @@ const run = (entries, tag) => {
     trophyFor: () => null,
     recordOf: (id) => ({ [DEERPELT]: { record: { type: 'MISC', editorId: 'DeerPelt' } }, [GEM]: { record: { type: 'MISC', editorId: 'GemAmethyst' } } }[id] || null),
     PELT: /pelt|hide|skin$|fur$|pelts$/i,
+    skinRaceEdid: () => race, NO_SKIN_RACE: new RegExp(src.match(/const NO_SKIN_RACE = \/(.*)\/i;/)[1], 'i'),
   };
   sb.globalThis = sb; vm.runInNewContext(code + '\nglobalThis.stashPelts = stashPelts;', sb);
   sb.stashPelts(0xff000200);
@@ -39,6 +40,12 @@ r = run([{ baseId: DEERPELT, count: 1 }, { baseId: GOLD, count: 3 }], 'wild:deer
 check('a deer is stashed as before (its pelt, not marked dragon)', r.pelts.length === 1 && r.pelts[0].baseId === DEERPELT && !r.pelts[0].dragon && r.left.length === 1, r);
 r = run([{ baseId: GOLD, count: 3 }], undefined);
 check('an untagged body with no dragon parts is left alone', r.pelts === undefined && r.left.length === 1, r);
+r = run([{ baseId: DEERPELT, count: 1 }, { baseId: GOLD, count: 5 }], 'dungeon:X:1', 'HighElfRace');
+check('a Thalmor (HighElfRace) carrying a pelt is not skinned: nothing stashed, the pelt stays loot (18 Oct)', r.pelts === undefined && r.left.length === 2, r);
+r = run([{ baseId: DEERPELT, count: 1 }], 'wild:giant:1', 'GiantRace');
+check('...nor a giant with the Deer Hide it held', r.pelts === undefined && r.left.length === 1, r);
+r = run([{ baseId: DEERPELT, count: 1 }], 'wild:bear:1', 'BearBrownRace');
+check('...while a bear still is', Array.isArray(r.pelts) && r.pelts.length === 1, r);
 
 // The bands: DragonBone (500 gold) and DragonScales (250) are past Expert's cap, so only a Master takes them
 const caps = (src.match(/tierValueCap: \[([^\]]+)\]/) || [])[1].split(',').map(Number);
