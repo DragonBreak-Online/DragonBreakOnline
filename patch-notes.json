@@ -1,5 +1,19 @@
 [
   {
+    "title": "Founding a guild takes 10 members",
+    "date": "2026-10-18",
+    "version": "Gameplay",
+    "tag": "Update",
+    "sections": [
+      {
+        "heading": "Faction charters",
+        "items": [
+          "A new guild or faction now needs 10 founding members, each on a different account, before its charter can be submitted (it was 3). A charter can have up to 15 founders. The Founder, an Officer and a Sergeant are still required among them."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Vampire and werewolf turning",
     "date": "2026-10-18",
     "version": "Server update",

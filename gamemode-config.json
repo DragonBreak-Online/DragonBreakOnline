@@ -174,7 +174,7 @@
   "_comment": "Smelters burn firewood and charcoal (server\\regions.js craft hook; Nate 6 Oct: 2 firewood per ingot; 7 Oct: charcoal required): a craft at a CraftingSmelter bench costs firewoodPerIngot Firewood (6f993:Skyrim.esm) and charcoal by the ingot's metal (regions.js charcoalByMetal, the longest metal name in the product's editor id: iron/copper/tin 0, steel/silver/corundum/dwarven 1, gold/orichalcum/moonstone/quicksilver/malachite 2, ebony/stalhrim 3) of Charcoal (33760:Skyrim.esm) per item made; woodcutters get charcoal at the chopping block (labour charcoalByTier). Short of charcoal, firewoodPerCharcoal (3) firewood stands in for each one missing; short of firewood the craft is refused and the materials come back. firewoodPerIngot 0 turns firewood off.",
   "firewoodPerIngot": 2
  },
- "charters": {
+ "charters": { "_founders": "Nate 18 Oct: a guild needs 10 founding members on 10 accounts to be chartered (was 3, max 5); up to 15. Hot reload.", "minFounders": 10, "maxFounders": 15,
   "_comment": "Faction charters (server\\charters.js, Jake's to-do \"Faction button\", 1 Oct): a player founds a faction (a company or a cult) by charter; a GM approves it. Founder, Officer and Sergeant on three accounts before it is submitted, up to maxFounders (5); the ranks are the seven roles of the faction guide; a seat only a property a founding member owns; no fee (fee 0); the lore's factions refused; disbanding by a GM's approval, its treasury to the Founder. Every other key (charters.js DEFAULTS) may be set here too. Off until switched on.",
   "approvalForum": "1555227516891828344",
   "enabled": true
