@@ -1745,11 +1745,23 @@ const modelOf = (rec) => {
   let t = ''; for (const c of f.data) { if (!c) break; t += String.fromCharCode(c); }
   return t;
 };
+// A coin purse (Nate, 18 Oct: "make the ability to harvest gold purses again. NO LOOTING GOLD PILES"): harvestable flora with a
+// coin bag model (CoinBagSmall/Med/Large.nif) or CoinPurse/CoinPouch in its name, in every plugin of the load order. It goes to
+// __dboCoinPurse below; every other coin model (piles, stacks, loose coins) is placed gold, refused.
+const purseBase = new Map(); // baseId -> true for a coin purse
+const isPurseBase = (baseId) => {
+  if (purseBase.has(baseId)) return purseBase.get(baseId);
+  const rec = recordOf(baseId);
+  const yes = !!(rec && String(rec.record.type) === 'FLOR' && (/^coinbag/i.test(modelOf(rec).split(/[\\/]/).pop()) || /coin_?(purse|pouch)/i.test(String(rec.record.editorId || ''))));
+  purseBase.set(baseId, yes);
+  return yes;
+};
 const isPlacedGold = (target) => {
   if (target >= 0xff000000 || ((cfg.placedGold || {}).pickup) === true) return false;
   let baseId = 0; try { baseId = mp.getIdFromDesc(String(mp.get(target, 'baseDesc'))) >>> 0; } catch (e) { return false; }
   if (!baseId) return false;
   if (placedGoldBase.has(baseId)) return placedGoldBase.get(baseId);
+  if (isPurseBase(baseId)) { placedGoldBase.set(baseId, false); return false; }
   let yes = baseId === 0xf;
   if (!yes) { const rec = recordOf(baseId); yes = !!(rec && String(rec.record.type) === 'MISC' && /^gold0\d\d$|coin_?pile|gold_?(pile|stack|coins)/i.test(String(rec.record.editorId || ''))); }
   // Any base whose model is coins, whatever its type (Nate, 17 Oct: Dragonborn's DLC2GoldPile activators in the banks paid
@@ -5113,8 +5125,10 @@ globalThis.__dboCoinPurse = (targetId, casterId) => {
     if (Date.now() - (purseDeny.get(casterId) || 0) > 1500) { purseDeny.set(casterId, Date.now()); personal(casterId, 'There is nothing here to take. Gold comes from work, trade and taxes.'); }
     return true;
   }
-  if (!isCoinPurse(targetId)) return false;
   const say = (t) => { if (Date.now() - (purseDeny.get(casterId) || 0) > 1500) { purseDeny.set(casterId, Date.now()); personal(casterId, t); } return true; };
+  // Only a coin purse pays; a gold pile that is flora (its produce gold, or a leveled list) is refused like placed gold
+  const purse = isCoinPurse(targetId) && isPurseBase(baseIdOf(targetId));
+  if (!purse) return isGoldFlora(targetId) ? say('There is nothing here to take. Gold comes from work, trade and taxes.') : false;
   const until = restUntil(purseRest, targetId);
   // In a claimed dungeon a purse emptied before the claim began is full again for the new party (dungeons.js); back to
   // back claims found every purse resting from the last one (G64E, 4 Oct)
