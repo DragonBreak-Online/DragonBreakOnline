@@ -1,0 +1,437 @@
+{
+  "_comment": "Faiths (pantheons) and the gods skills.json does not hold (prayer.js, Nate 18 Oct: 'survey all possible deities in Elder Scrolls lore and create religion selection based off of pantheon of a religion'; ~/claude-nate-release/for-local-claude-1018-pantheons.md). A character takes a faith, then a patron in it; they pray at any shrine of their faith's gods, their patron's answering more often. peoples are race editor id fragments: a suggestion for the picker, never a lock. Read at every load of prayer.js (hot reload).",
+  "patronChangeDays": 1,
+  "otherShrineChanceMult": 0.5,
+  "faiths": [
+    {
+      "id": "imperial",
+      "name": "The Imperial Cult",
+      "peoples": [
+        "Imperial",
+        "Breton",
+        "Nord",
+        "Redguard"
+      ],
+      "patrons": [
+        "akatosh",
+        "arkay",
+        "dibella",
+        "julianos",
+        "kynareth",
+        "mara",
+        "stendarr",
+        "talos",
+        "zenithar"
+      ]
+    },
+    {
+      "id": "oldways",
+      "name": "The Old Ways",
+      "peoples": [
+        "Nord"
+      ],
+      "patrons": [
+        "shor",
+        "tsun",
+        "kynareth",
+        "stendarr",
+        "mara",
+        "dibella",
+        "talos",
+        "dragoncult"
+      ]
+    },
+    {
+      "id": "aldmeri",
+      "name": "The Aldmeri Pantheon",
+      "peoples": [
+        "HighElf",
+        "SnowElf"
+      ],
+      "patrons": [
+        "auriel",
+        "trinimac",
+        "magnus",
+        "syrabane",
+        "xarxes",
+        "phynaster",
+        "mara",
+        "stendarr"
+      ]
+    },
+    {
+      "id": "greenpact",
+      "name": "The Green Pact",
+      "peoples": [
+        "WoodElf"
+      ],
+      "patrons": [
+        "yffre",
+        "jephre",
+        "baandar",
+        "zenithar",
+        "hircine",
+        "auriel"
+      ]
+    },
+    {
+      "id": "reclamations",
+      "name": "The Reclamations",
+      "peoples": [
+        "DarkElf"
+      ],
+      "patrons": [
+        "azura",
+        "boethiah",
+        "mephala",
+        "ancestors"
+      ]
+    },
+    {
+      "id": "riddlethar",
+      "name": "The Riddle'Thar",
+      "peoples": [
+        "Khajiit"
+      ],
+      "patrons": [
+        "riddlethar",
+        "alkosh",
+        "azura",
+        "kynareth",
+        "rajhin",
+        "stendarr",
+        "mara",
+        "baandar"
+      ]
+    },
+    {
+      "id": "yokudan",
+      "name": "The Crowns' Yokudan Gods",
+      "peoples": [
+        "Redguard"
+      ],
+      "patrons": [
+        "yokudan",
+        "leki",
+        "onsi",
+        "satakal",
+        "arkay",
+        "talos",
+        "mara"
+      ]
+    },
+    {
+      "id": "hist",
+      "name": "The Hist and Sithis",
+      "peoples": [
+        "Argonian"
+      ],
+      "patrons": [
+        "hist",
+        "sithis"
+      ]
+    },
+    {
+      "id": "orcish",
+      "name": "The Orcish Faith",
+      "peoples": [
+        "Orc",
+        "Goblin"
+      ],
+      "patrons": [
+        "malacath",
+        "trinimac"
+      ]
+    },
+    {
+      "id": "reach",
+      "name": "The Reach Old Gods",
+      "peoples": [
+        "Reachman"
+      ],
+      "patrons": [
+        "hircine",
+        "namira",
+        "molagbal",
+        "malacath"
+      ]
+    },
+    {
+      "id": "deep",
+      "name": "The Deep",
+      "peoples": [
+        "Maormer",
+        "SeaElf"
+      ],
+      "patrons": [
+        "deep-serpents"
+      ]
+    },
+    {
+      "id": "daedric",
+      "name": "Daedric Worship",
+      "peoples": [],
+      "patrons": [
+        "azura",
+        "boethiah",
+        "clavicusvile",
+        "hermaeusmora",
+        "hircine",
+        "malacath",
+        "mehrunes",
+        "mephala",
+        "meridia",
+        "molagbal",
+        "namira",
+        "nocturnal",
+        "peryite",
+        "sanguine",
+        "sheogorath",
+        "vaermina",
+        "ithelia"
+      ]
+    },
+    {
+      "id": "cults",
+      "name": "The Cults",
+      "peoples": [],
+      "patrons": [
+        "dragoncult",
+        "wormcult"
+      ]
+    }
+  ],
+  "aliases": {
+    "kynareth": [
+      "Kyne",
+      "Khenarthi",
+      "Tava"
+    ],
+    "stendarr": [
+      "Stuhn",
+      "S'rendarr"
+    ],
+    "julianos": [
+      "Jhunal"
+    ],
+    "talos": [
+      "Ysmir",
+      "HoonDing"
+    ],
+    "zenithar": [
+      "Z'en",
+      "Zeht"
+    ],
+    "arkay": [
+      "Tu'whacca"
+    ],
+    "mara": [
+      "Morwha"
+    ],
+    "azura": [
+      "Azurah"
+    ],
+    "hermaeusmora": [
+      "Herma-Mora"
+    ],
+    "malacath": [
+      "Mauloch"
+    ]
+  },
+  "deities": [
+    {
+      "id": "shor",
+      "name": "Shor",
+      "kind": "aedra",
+      "sphere": "Lorkhan, the dead god: chief of the Nordic gods, who keeps the Hall of Valor in Sovngarde for the brave dead.",
+      "boon": "Heavy Armor +10",
+      "blessing": null,
+      "blessingSource": "pending",
+      "blessingPlan": "SPEL on AlchFortifyHeavyArmor (PC)",
+      "alsoKnownAs": [
+        "Lorkhan"
+      ],
+      "inBruma": 0,
+      "placements": []
+    },
+    {
+      "id": "tsun",
+      "name": "Tsun",
+      "kind": "aedra",
+      "sphere": "The Shield-Thane, god of trials against adversity, who guards the Whalebone Bridge into Sovngarde.",
+      "boon": "Block +10, Stamina +15",
+      "blessing": null,
+      "blessingSource": "pending",
+      "blessingPlan": "SPEL on FortifyBlockFFSelf + FortifyStaminaFFSelf (PC)",
+      "inBruma": 0,
+      "placements": []
+    },
+    {
+      "id": "magnus",
+      "name": "Magnus",
+      "kind": "aedra",
+      "sphere": "The god-architect of the world, who fled creation and left the sun; the source of all magic.",
+      "boon": "Alteration +10",
+      "blessing": null,
+      "blessingSource": "pending",
+      "blessingPlan": "SPEL on AlchFortifyAlteration (PC)",
+      "alsoKnownAs": [
+        "Magrus"
+      ],
+      "inBruma": 0,
+      "placements": []
+    },
+    {
+      "id": "syrabane",
+      "name": "Syrabane",
+      "kind": "aedra",
+      "sphere": "The warden-god of magic and apprentices, who saved Firsthold with his ring; patron of the Psijics.",
+      "boon": "Enchanting +10",
+      "blessing": null,
+      "blessingSource": "pending",
+      "blessingPlan": "SPEL on AlchFortifyEnchanting (PC)",
+      "inBruma": 0,
+      "placements": []
+    },
+    {
+      "id": "xarxes",
+      "name": "Xarxes",
+      "kind": "aedra",
+      "sphere": "The scribe of Auri-El, who keeps the record of every Aldmeri ancestor and their deeds.",
+      "boon": "what you read teaches you more (half of Hermaeus Mora's gift)",
+      "blessing": null,
+      "blessingSource": "pending",
+      "inBruma": 0,
+      "placements": [],
+      "plannedScholarBoon": 0.5,
+      "blessingPlan": "server: scholarBoon 0.5 (step 2)"
+    },
+    {
+      "id": "phynaster",
+      "name": "Phynaster",
+      "kind": "aedra",
+      "sphere": "The hero-god who taught the Altmer a path a hundred feet shorter, and so gave them their long lives.",
+      "boon": "Health +25",
+      "blessing": null,
+      "blessingSource": "pending",
+      "blessingPlan": "SPEL on FortifyHealthFFSelf (PC)",
+      "inBruma": 0,
+      "placements": []
+    },
+    {
+      "id": "yffre",
+      "name": "Y'ffre",
+      "kind": "aedra",
+      "sphere": "The Storyteller, god of the forest and of the Green Pact: never harm the plants of Valenwood, eat only meat, and eat the enemies you slay.",
+      "boon": "meat sates your hunger twice as long",
+      "blessing": null,
+      "blessingSource": "pending",
+      "meatBoon": 2,
+      "inBruma": 0,
+      "placements": [],
+      "blessingPlan": "server: meat sates twice as long (step 2)"
+    },
+    {
+      "id": "jephre",
+      "name": "Jephre",
+      "kind": "aedra",
+      "sphere": "The god of song, said to have taught the birds to sing; often held to be Y'ffre's other voice.",
+      "boon": "Illusion +10",
+      "blessing": null,
+      "blessingSource": "pending",
+      "blessingPlan": "SPEL on AlchFortifyIllusion (PC)",
+      "inBruma": 0,
+      "placements": []
+    },
+    {
+      "id": "baandar",
+      "name": "Baan Dar",
+      "kind": "aedra",
+      "sphere": "The Bandit God, the pariah god of thieves and the desperate, who always finds a way.",
+      "boon": "Lockpicking +10",
+      "blessing": null,
+      "blessingSource": "pending",
+      "blessingPlan": "SPEL on AlchFortifyLockpicking (PC)",
+      "inBruma": 0,
+      "placements": []
+    },
+    {
+      "id": "alkosh",
+      "name": "Alkosh",
+      "kind": "aedra",
+      "sphere": "The Dragon King of Cats, Akatosh to the Khajiit, who drove off Pelinal and the Dwarf-Bards.",
+      "boon": "unarmed blows land 10% harder",
+      "blessing": null,
+      "blessingSource": "pending",
+      "unarmedBoon": 1.1,
+      "aspectOf": "akatosh",
+      "inBruma": 0,
+      "placements": [],
+      "blessingPlan": "server: unarmed damage x1.1 (step 2)"
+    },
+    {
+      "id": "rajhin",
+      "name": "Rajhin",
+      "kind": "aedra",
+      "sphere": "The Footpad, the Purring Liar: the thief-god of Senchal, who stole the Empress Kintyra's necklace while she slept.",
+      "boon": "Sneak +10",
+      "blessing": null,
+      "blessingSource": "pending",
+      "blessingPlan": "SPEL on FortifySneakFFSelf (PC)",
+      "lawful": false,
+      "unlawfulWhere": "Criminal in the Empire and in Skyrim: the thief-god's followers are thieves.",
+      "inBruma": 0,
+      "placements": []
+    },
+    {
+      "id": "leki",
+      "name": "Leki",
+      "kind": "aedra",
+      "sphere": "The saint of the spirit sword, daughter of Tall Papa; the Sword-singers' goddess.",
+      "boon": "One-handed +10",
+      "blessing": null,
+      "blessingSource": "pending",
+      "blessingPlan": "SPEL on FortifyOneHandedFFSelf (PC)",
+      "inBruma": 0,
+      "placements": []
+    },
+    {
+      "id": "onsi",
+      "name": "Onsi",
+      "kind": "aedra",
+      "sphere": "The Boneshaver, the warrior god who taught Mankind to push their knives into swords.",
+      "boon": "Smithing +10",
+      "blessing": null,
+      "blessingSource": "pending",
+      "blessingPlan": "SPEL on AlchFortifySmithing (PC)",
+      "inBruma": 0,
+      "placements": []
+    },
+    {
+      "id": "satakal",
+      "name": "Satakal",
+      "kind": "aedra",
+      "sphere": "The Worldskin, the god who sheds and eats himself and is renewed; the Walkabout is his.",
+      "boon": "Health regenerates 25% faster",
+      "blessing": null,
+      "blessingSource": "pending",
+      "blessingPlan": "SPEL on AlchFortifyHealRate (PC)",
+      "inBruma": 0,
+      "placements": []
+    },
+    {
+      "id": "sithis",
+      "name": "Sithis",
+      "kind": "other",
+      "sphere": "The Void and the start of all things; the Argonians say they come from Sithis, and the Dark Brotherhood worships Sithis as its Dread Father.",
+      "boon": "Sneak +10, Alchemy +10",
+      "blessing": null,
+      "blessingSource": "pending",
+      "blessingPlan": "SPEL on FortifySneakFFSelf + AlchFortifyAlchemy (PC)",
+      "lawful": false,
+      "unlawfulWhere": "Hunted: Sithis is the Dread Father of the Dark Brotherhood, whose members are put to death.",
+      "inBruma": 0,
+      "placements": []
+    }
+  ]
+}

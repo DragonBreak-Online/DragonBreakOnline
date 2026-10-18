@@ -66,7 +66,7 @@ const api = {
   who: () => 'Tester #ABCD (profile 1)',
   // The cases up to "client-judged" are today's server-judged rules: they run with the rollback switch, which so proves
   // prayer.clientJudged false behaves exactly as before. The client-judged cases are at the end.
-  cfg: { prayer: { clientJudged: false } },
+  cfg: { prayer: { clientJudged: false, faiths: false } },
   distanceMeters: () => nearM,
   openWidget: (a, w) => { out.widgets.push(w); return true; },
   closeWidget: () => true,
