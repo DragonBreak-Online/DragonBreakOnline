@@ -906,6 +906,11 @@ module.exports = (api) => {
       const waiting = zones.reduce((n, z) => n + (z && z.Ambush ? 1 : 0), 0);
       const asleep = zones.reduce((n, z) => n + (z && !z.Ambush && z.Reach && !z.Prespawn ? 1 : 0), 0);
       const ready = zones.length - waiting - asleep;
+      // What the report calls asleep: with a count from the spawn pass, whatever it did not place and does not lie in wait,
+      // so placed + waiting + asleep is the total. The pass also places a reach group when a player already stands near it
+      // at the landing (Niryastare, Bawn, Silorn 18 Oct: 2-3 counted twice from the flags alone). The shortfall below still
+      // judges by the flags.
+      const asleepNow = placed >= 0 ? Math.max(0, zones.length - waiting - placed) : asleep;
       // Lead GM and up only (Nate, 18 Oct: "make them staff only ... meaning Lead GM and Owner"): out-of-character lines at a
       // claim's start spoiled what lies ahead for players, and the shortfall one still guesses at a fault the server cannot
       // name yet. A Lead GM, Developer or Senior in the party sees them; everyone else is told nothing. Always logged.
@@ -915,15 +920,15 @@ module.exports = (api) => {
         for (const a of inside) { let t = null; try { t = typeof globalThis.__dboStaffTier === 'function' ? globalThis.__dboStaffTier(a) : null; } catch (e) { t = null; } if (LEAD.has(t)) system(a, `[staff] ${msg}`); }
       };
       if (waiting) log(`dungeon ${d.id}: ${waiting} of ${zones.length} enemies lie in wait within ${AMBUSH_REACH} units of their spot`);
-      if (asleep) log(`dungeon ${d.id}: ${asleep} of ${zones.length} enemies wake when somebody comes within ${REACH.reach} units`);
-      if (zones.length && waiting + asleep === zones.length) {
+      if (asleepNow) log(`dungeon ${d.id}: ${asleepNow} of ${zones.length} enemies wake when somebody comes within ${REACH.reach} units`);
+      if (zones.length && waiting + asleepNow === zones.length) {
         tell(`None of the ${zones.length} enemies here stand in the open: they wait for you to come to them.`);
       } else if (placed >= 0 && placed < ready) {
         log(`dungeon ${d.id} pre-spawned ${placed} of the ${ready} enemies that should stand ready (${waiting} lie in`
           + ` wait, ${asleep} wake when approached): the server's pre-spawn line names the gate that held the rest`);
         tell('Part of the ruin is still filling: those enemies are taking their places.');
-      } else if (waiting || asleep) {
-        tell(`${waiting + asleep} of the ${zones.length} enemies here are waiting for you rather than standing in the open.`);
+      } else if (waiting || asleepNow) {
+        tell(`${waiting + asleepNow} of the ${zones.length} enemies here are waiting for you rather than standing in the open.`);
       }
       // the player log (playerlog.js): the claim on every member's post (the audit names only the leader)
       try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('dungeon', 'claim', [...members].map((pid) => actorByProfile(pid)).filter(Boolean), d.name, diff.label); } catch (e) { /* the player log is optional */ }
