@@ -685,7 +685,7 @@ export class FormView {
               const d = Math.round(ObjectReferenceEx.getDistance(ObjectReferenceEx.getPos(refr), movement.pos));
               this.noteFlyer(this.refrId, "move", `z=${Math.round(movement.pos[2])} d=${d} run=${movement.runMode} jump=${!!movement.isInJumpState} dead=${!!movement.isDead}${flyer.offset ? "" : " no-offset"}`);
             }
-            applyMovement(refr, movement, !!model.isMyClone, !model.appearance && !model.isMyClone, flyer ? { noOffset: !flyer.offset } : undefined);
+            applyMovement(refr, movement, !!model.isMyClone, !model.appearance && !model.isMyClone, { noOffset: flyer ? !flyer.offset : undefined, gapMs: model.movementGapMs });
             this.movState.offsetApplied = true;
             restoreSitCollisionIfMoving(refr, movement);
           } catch (e) {
