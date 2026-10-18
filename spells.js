@@ -1233,7 +1233,7 @@ module.exports = (api) => {
     const mine = collegesOf(student) || [];
     return Math.min(Number(CFG.shopMaxRank), Math.max(Number(TEACH.studentMinCap) || 0, ...mine.map(rankCapIn)));
   };
-  const classRefusal = (teacher, student, sp) => {
+  const classRefusal = (teacher, student, sp, classKey) => {
     if (suspended(sp.id)) return `${sp.name} is held back for a short while and is not taught.`;
     if (!onlineActors().includes(student >>> 0)) return `${display(student)} is not here.`;
     if (!((knows(teacher, sp.id) && !onLoan(teacher, sp.id)) || inBook(teacher, sp.id))) return `${display(teacher)} can no longer teach ${sp.name}.`;
@@ -1242,15 +1242,23 @@ module.exports = (api) => {
     if (TC.enabled !== false) {
       // Only Novice to Adept spells are ever taught this way
       if (Number(sp.rank) > Number(TC.maxRank)) return `${RANKS[sp.rank]} spells are not taught from a tome; ${sp.name} must be studied.`;
-      // The teacher's rank in THE SPELL'S OWN school, never another's
+      // The teacher's rank in THE SPELL'S OWN school, never another's. schools.js owns school ranks and already answers
+      // this question with a sentence of its own (__dboSchoolsRefusal), so it is asked rather than guessed at from the
+      // Wheel's path skill, which is Arcane Arts and would have let a Master of one school teach any of them.
       const want = Number((TC.teacherRank || [])[Number(sp.rank)]);
-      const skill = bookSkillFor(teacher, sp);
-      const have = skill && skill.id ? tierOf(teacher, skill.id) : -1;
-      if (Number.isFinite(want) && have < want) return `${display(teacher)} must be ${RANKS[want]} in ${sp.school} to teach ${RANKS[sp.rank]} spells of it.`;
-      // The tome has to be in the teacher's hands, not bought from the day's allowance
-      if (TC.tomeOnly && !heldTomeOf(teacher, sp.id)) return `${display(teacher)} carries no tome of ${sp.name}.`;
-      const tWait = tomeClassWait(teacher, 'taught', TC.teacherHours);
-      if (tWait > 0) return `${display(teacher)} taught from a tome not long ago; the next is theirs in ${waitText(tWait)}.`;
+      if (Number.isFinite(want) && typeof globalThis.__dboSchoolsRefusal === 'function') {
+        const whyRank = globalThis.__dboSchoolsRefusal(teacher, sp.school, want, display(teacher));
+        if (whyRank) return whyRank;
+      }
+      // Both the tome and the teacher's wait are asked only of a NEW class: once a class's tome has been spent, everyone
+      // else in that same class still learns on it, which is the whole point of one tome for the class. The caller
+      // passes the class's key; without one, every offer is its own class.
+      if (!classKey || !classPaid(classKey)) {
+        // The tome has to be in the teacher's hands, not bought from the day's allowance
+        if (TC.tomeOnly && !heldTomeOf(teacher, sp.id)) return `${display(teacher)} carries no tome of ${sp.name}.`;
+        const tWait = tomeClassWait(teacher, 'taught', TC.teacherHours);
+        if (tWait > 0) return `${display(teacher)} taught from a tome not long ago; the next is theirs in ${waitText(tWait)}.`;
+      }
       const sWait = tomeClassWait(student, 'learned', TC.studentHours);
       if (sWait > 0) return `${display(student)} learned from a tome not long ago; the next is theirs in ${waitText(sWait)}.`;
     }
@@ -1264,7 +1272,7 @@ module.exports = (api) => {
       if (!CFG.enabled) return false;
       const sp = classifySpell(Number(spellId) >>> 0);
       if (!sp) return false;
-      const why = classRefusal(teacher >>> 0, student >>> 0, sp);
+      const why = classRefusal(teacher >>> 0, student >>> 0, sp, String(classKey || ''));
       if (why === 'known') return false;
       if (why) { personal(student, `${display(teacher)} would teach you ${sp.name}, but: ${why}`); return false; }
       const key = String(classKey || `${teacher >>> 0}:${sp.id}:${Math.floor(Date.now() / 60000)}`);
@@ -1281,7 +1289,7 @@ module.exports = (api) => {
   };
   const answerClass = (student, o) => {
     const sp = classifySpell(o.spellId);
-    const why = sp ? classRefusal(o.teacher, student, sp) : 'That spell cannot be taught.';
+    const why = sp ? classRefusal(o.teacher, student, sp, o.classKey) : 'That spell cannot be taught.';
     if (why) { personal(student, why === 'known' ? `You already know ${sp.name}.` : why); return; }
     // The class's one credit: the first student to accept spends it, the rest learn on it
     let paidWith = 'the class\'s tome';
