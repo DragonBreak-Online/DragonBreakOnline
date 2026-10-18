@@ -111,7 +111,8 @@ module.exports = (api) => {
   };
   const scholarGift = (a, chance, where) => {
     try {
-      if (!globalThis.__dboBlessedWith || !globalThis.__dboBlessedWith(a, 'scholarBoon') || Math.random() >= chance) return;
+      const sb = globalThis.__dboBlessingValue ? Number(globalThis.__dboBlessingValue(a, 'scholarBoon')) : (globalThis.__dboBlessedWith && globalThis.__dboBlessedWith(a, 'scholarBoon') ? 1 : 0);
+      if (!(sb > 0) || Math.random() >= chance * sb) return; // Xarxes (0.5) at half Hermaeus Mora's chance
       const b = pickFrom(skillBooksOf());
       if (b && giveItem(a, b.id, 1)) { personal(a, `Tucked ${where}, a book: ${b.name}. Hermaeus Mora collects, and sometimes he gives.`); try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('itemflow', a, 'scholar_gift', b.id, 1); } catch (e) { /* the player log is optional */ } }
     } catch (e) { log('dungeons: scholar gift failed', e.message); }

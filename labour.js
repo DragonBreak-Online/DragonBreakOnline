@@ -470,7 +470,13 @@ module.exports = (api) => {
     const type = String(rec.record.type || '');
     const edid = String(rec.record.editorId || '');
     if (type === 'ACTI' && (VEIN.test(edid) || nodeOf(targetId, edid))) return mine(targetId, casterId, rec);
-    if (type === 'FURN' && /^(DLC2)?WoodChoppingBlock/i.test(edid)) { endGathering(targetId); return chop(targetId, casterId); }
+    if (type === 'FURN' && /^(DLC2)?WoodChoppingBlock/i.test(edid)) {
+      endGathering(targetId);
+      // A wood elf sworn to the Green Pact cuts no wood (greenpact.js)
+      const pact = typeof globalThis.__dboGreenPactRefusal === 'function' ? globalThis.__dboGreenPactRefusal(casterId, 'chop') : '';
+      if (pact) return deny(casterId, pact);
+      return chop(targetId, casterId);
+    }
     // A seam's pickaxe marker pays out through the vanilla mining script: no round, no skill, no rest (Nate on Falcius,
     // 2026-09-28: refused at a gold seam, then mined it from its PickaxeMiningFloorMarker). The round on the seam
     // replaces it, so a player never sits at one; NPCs keep them for their idles.
