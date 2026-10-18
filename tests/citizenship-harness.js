@@ -483,5 +483,17 @@ ok(M.votingView(V1, WR).seats.find((s) => s.id === 'commander').label === 'Lord 
   ok(!M.grant(GMJARL, 'riften', asker2).error && M.citizenOf(asker2, 'riften'), 'caps: and grants it');
 }
 
+// ---- staff hold no leadership (Nate, 18 Oct): a staff member is unfit for any seat of an election court -------------------
+{
+  const STAFFER = add(0x70, 70, 'Trial Tess'); online.push(STAFFER);
+  M.join(STAFFER, 'riften');
+  globalThis.__dboIsStaff = (a) => a === STAFFER;
+  const Z = { id: 'riften', name: 'The Rift' };
+  ok(typeof M.unfit === 'function' && /is on the staff: staff take no seat in a court/.test(M.unfit(STAFFER, Z, 'housecarl')), 'staff rule: a staff member is unfit for a court seat', typeof M.unfit === 'function' ? M.unfit(STAFFER, Z, 'housecarl') : 'no unfit');
+  globalThis.__dboIsStaff = () => false;
+  ok(!/on the staff/.test(M.unfit(STAFFER, Z, 'housecarl')), 'staff rule: ...and not unfit for that reason once off the staff');
+  delete globalThis.__dboIsStaff;
+}
+
 console.log(fails ? `\n${fails} FAILED` : '\nall passed');
 process.exit(fails ? 1 : 0);

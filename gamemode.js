@@ -302,6 +302,10 @@ const staffCan = (actorId, what) => isAdmin(actorId) || (TRIAL_CAN.has(what) && 
 // The tier for logs and the role sync: an admin tier, 'trialgm', or null
 const staffTierFrom = (profile, roles) => tierFrom(profile, roles) || (trialFrom(profile, roles) ? 'trialgm' : null);
 const staffTierOf = (actorId) => staffTierFrom(profileOf(actorId), rolesOf(actorId));
+// Staff of any rank, Trial GMs too, hold no leadership (Nate, 18 Oct: "GMs of any kind cannot be in leadership in any faction
+// etc"): no seat in an election court (citizenship.js), no leading court office (appointCheck), no faction leader or officer
+// rank (guilds.js setMember). By the account's Discord roles, kept on the character, so it holds for an offline one too
+globalThis.__dboIsStaff = (actorId) => { try { return staffTierOf(Number(actorId) >>> 0) !== null; } catch (e) { return false; } };
 // Chat commands a Trial GM may run, and the right each needs (the command gate in handleChat)
 const TRIAL_COMMANDS = { rename: 'rename', chargen: 'chargen', tp: 'tp', charstats: 'playerinfo', bugs: 'bugs', realnames: 'realnames' };
 const staffRolesSeen = (a, roles) => {
@@ -4270,12 +4274,15 @@ const raceEdidOf = (actor) => {
 // "DarkElfRaceVampire" -> "a Dark Elf"
 const raceLabel = (edid) => { const n = String(edid).replace(/Race(Vampire)?$/, '').replace(/([a-z])([A-Z])/g, '$1 $2'); return n ? `${/^[AEIOU]/.test(n) ? 'an' : 'a'} ${n}` : 'of no known race'; };
 // The rules of /appoint, shared with the Court tab (court.js): { error } or { cap, overridden }. tg is officialTarget's.
+const STAFF_MAY_HOLD = new Set(['guard', 'strongholdguard', 'courtmage', 'shaman', 'wisewoman']);
 const appointCheck = (a, z, rank, tg, override) => {
   if (!(z.officials || []).includes(rank)) return { error: `${z.name} has the ranks: ${(z.officials || []).map((r) => rankTitle(r, z.id)).join(', ')}.` };
   if (!tg.actor) return { error: `Profile ${tg.pid} has no characters.` };
   const cap = appointCap(a, z, rank);
   if (!cap) return { error: `Only a Lead GM or above, or a seat that may name a ${rankTitle(rank, z.id)}, can appoint one in ${z.name}.` };
   if (override && tierOf(a) !== 'senior') return { error: 'Only the Owners can override the Jarl rule.' };
+  // Plain guards and the court's advisers are no leadership; every other office is
+  if (!STAFF_MAY_HOLD.has(rank) && typeof globalThis.__dboIsStaff === 'function' && globalThis.__dboIsStaff(tg.actor)) return { error: `${tg.label} is on the staff. Staff hold no leading office in a court.` };
   let overridden = '';
   if (rank === 'jarl') {
     const race = raceEdidOf(tg.actor);

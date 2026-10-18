@@ -221,6 +221,7 @@ module.exports = (api) => {
   const setMember = (fid, a, rank, by) => {
     const f = FACTIONS.get(fid);
     const role = (f.ranks[rank] || {}).role;
+    if ((role === 'leader' || role === 'officer') && typeof globalThis.__dboIsStaff === 'function' && globalThis.__dboIsStaff(a)) return `${ownNameOf(a)} is on the staff. Staff hold no ${role === 'leader' ? 'leader' : 'officer'} rank in a faction.`;
     const cap = Number(CAPS[role]) || 0;
     const had = entryOf(fid, a);
     if (cap && (!had || (f.ranks[had.rank] || {}).role !== role) && roleCount(fid, role) >= cap) return `${f.name} already has ${cap} ${shownAt(f, rank)}${cap === 1 ? '' : 's'}.`;

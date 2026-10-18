@@ -1,5 +1,19 @@
 [
   {
+    "title": "Staff hold no leadership",
+    "date": "2026-10-18",
+    "version": "Hotfix",
+    "tag": "Staff",
+    "sections": [
+      {
+        "heading": "Staff",
+        "items": [
+          "Staff of every rank, Trial GMs included, cannot stand in an election court, cannot be appointed to a leading office of a court (they can still serve as a guard or a court mage), and cannot hold a leader or officer rank in any faction."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Outlaw bounties",
     "date": "2026-10-18",
     "version": "Hotfix",

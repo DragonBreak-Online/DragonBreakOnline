@@ -625,6 +625,7 @@ module.exports = (api) => {
   // Why a character cannot stand for a seat of z's ballot, or ''
   const unfit = (a, z, seat) => {
     if (!exists(a)) return 'no longer exists';
+    if (typeof globalThis.__dboIsStaff === 'function' && globalThis.__dboIsStaff(a)) return 'is on the staff: staff take no seat in a court';
     if (!citizenOf(a, z.id)) return `is no citizen of ${ofPlace(z.name)}`;
     if (!factionFree(a)) return 'serves a faction';
     if (seat === 'jarl' && !isJarlRace(a)) return 'is no Breton, Nord or Imperial: only they may be Jarl';
@@ -1291,6 +1292,6 @@ module.exports = (api) => {
   log(`citizenship ${C.enabled ? 'on' : 'off'}: ${holds().length} holds grant it, ${Object.keys(data().chars).length} characters on the rolls, ${Object.keys(data().elections).length} election(s)`);
   try { stampRunning(); } catch (e) { log('citizenship: stampRunning failed', e.message); }
 
-  return { join, grant, decline, renounce, makePrimary, revoke, lookup, staffReleases, setPolicy, register, replace, withdraw, answerInvite, vote, staffAct, strikeVote, unstrikeVote, reviewText, voterWhy, tick, advance,
+  return { join, grant, decline, renounce, makePrimary, revoke, lookup, unfit, staffReleases, setPolicy, register, replace, withdraw, answerInvite, vote, staffAct, strikeVote, unstrikeVote, reviewText, voterWhy, tick, advance,
     holdsOf, citizenOf, factionFree, citizenAccounts, canVote, noticeLogin, boardPayload, journalView, votingView, citizenshipView, data, PANEL_ID };
 };

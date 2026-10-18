@@ -368,6 +368,21 @@ Date.now = realNow;
   ok('resign: someone who serves no court cannot', ev('courtResign', TG2, 'N', 'bruma').kind === 'refused');
 }
 
+// ---- staff hold no leadership (Nate, 18 Oct: "GMs of any kind cannot be in leadership in any faction etc") --------------
+{
+  globalThis.__dboIsStaff = (a) => a === TG2;
+  let r = ev('courtAppoint', ADMIN, 'N', 'bruma', 'Ivar', 'steward');
+  ok('staff rule: a staff member cannot be appointed Steward', r && r.kind === 'refused' && /on the staff\. Staff hold no leading office/.test(r.text) && !seated('bruma', 'steward').includes(22), r);
+  r = ev('courtAppoint', ADMIN, 'N', 'bruma', 'Ivar', 'guard');
+  ok('staff rule: ...but may serve as a plain guard', r && r.kind === 'ok' && seated('bruma', 'guard').includes(22), r);
+  r = ev('courtRank', ADMIN, 'N', 'bruma', TG2, 3);
+  ok('staff rule: a staff member in the household cannot be made Knight (an officer rank)', r && r.kind === 'refused' && /Staff hold no officer rank in a faction/.test(r.text) && hhTitle(TG2) === 'Guard', [r, hhTitle(TG2)]);
+  r = ev('courtRank', ADMIN, 'N', 'bruma', TG2, 6);
+  ok('staff rule: ...but can be its Armorer', r && r.kind === 'ok' && hhTitle(TG2) === 'Armorer', [r, hhTitle(TG2)]);
+  ev('courtDismiss', ADMIN, 'N', 'bruma', '22');
+  delete globalThis.__dboIsStaff;
+}
+
 for (const k of ['__dboJournalFresh', '__dboJournalLimited']) delete globalThis[k];
 try { fs.rmSync(dir, { recursive: true, force: true }); } catch (e) { /* temp */ }
 console.log(fails ? `${fails} FAILED` : 'all passed');
