@@ -130,6 +130,50 @@ Napi::Value CopyLifecycleApi::IsCopyRetiring(const Napi::CallbackInfo& info)
   return Napi::Boolean::New(info.Env(), ref && g_retires.count(ref) > 0);
 }
 
+// createCopy(baseId, x, y, z, rotXDeg, rotYDeg, rotZDeg, worldOrCellId): the local form id of a new persistent
+// reference created at its final spot, or 0. LIFECYCLE_PLAN.md phase 2b: PlaceAtMe(..., initiallyDisabled) runs
+// Actor::Disable, which queues task 0x50 at every copy's birth (a copy destroyed at once then had a Disable run on a
+// deleted actor), and the copy then had to be moved, which watchers missed. CreateReferenceAtLocation (AE 13723) places
+// it where it belongs instead: an interior cell is used as given; for a worldspace the engine finds the exterior cell
+// from the position (cell argument used only when it is an interior, checked in Ghidra). Not disabled, so no task.
+Napi::Value CopyLifecycleApi::CreateCopy(const Napi::CallbackInfo& info)
+{
+  auto env = info.Env();
+  if (!REL::Module::IsAE()) {
+    return Napi::Number::New(env, 0);
+  }
+  const auto baseId = NapiHelper::ExtractUInt32(info[0], "baseId");
+  const RE::NiPoint3 pos{ NapiHelper::ExtractFloat(info[1], "x"),
+                          NapiHelper::ExtractFloat(info[2], "y"),
+                          NapiHelper::ExtractFloat(info[3], "z") };
+  constexpr float kDegToRad = 3.14159265358979f / 180.f;
+  const RE::NiPoint3 rot{ NapiHelper::ExtractFloat(info[4], "rotX") * kDegToRad,
+                          NapiHelper::ExtractFloat(info[5], "rotY") * kDegToRad,
+                          NapiHelper::ExtractFloat(info[6], "rotZ") * kDegToRad };
+  const auto placeId = NapiHelper::ExtractUInt32(info[7], "worldOrCellId");
+
+  auto base = RE::TESForm::LookupByID<RE::TESBoundObject>(baseId);
+  auto place = RE::TESForm::LookupByID(placeId);
+  auto handler = RE::TESDataHandler::GetSingleton();
+  if (!base || !place || !handler) {
+    return Napi::Number::New(env, 0);
+  }
+  auto cell = place->As<RE::TESObjectCELL>();
+  auto world = place->As<RE::TESWorldSpace>();
+  if (cell && !cell->IsInteriorCell()) {
+    world = cell->GetRuntimeData().worldSpace;
+    cell = nullptr;
+  }
+  if (!cell && !world) {
+    return Napi::Number::New(env, 0);
+  }
+  const auto handle = handler->CreateReferenceAtLocation(
+    base, pos, rot, cell, world, nullptr, nullptr, RE::ObjectRefHandle(),
+    /*forcePersist*/ true, /*arg11, as PlaceObjectAtMe*/ true);
+  auto ref = handle.get();
+  return Napi::Number::New(env, ref ? ref->GetFormID() : 0);
+}
+
 void CopyLifecycleApi::OnQueuedDisableRan(RE::TESObjectREFR* ref)
 {
   std::lock_guard lock(g_mutex);

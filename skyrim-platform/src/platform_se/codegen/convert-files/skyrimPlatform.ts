@@ -60,6 +60,7 @@ export declare function setCameraFov(world: number | null, firstPerson: number |
 export declare function retireCopy(localFormId: number): boolean
 export declare function processCopyRetires(): { id: number, frames: number, how: string }[]
 export declare function isCopyRetiring(localFormId: number): boolean
+export declare function createCopy(baseId: number, x: number, y: number, z: number, rotX: number, rotY: number, rotZ: number, worldOrCellId: number): number
 
 export type PacketType = 'message' | 'disconnect' | 'connectionAccepted' | 'connectionFailed' | 'connectionDenied'
 
