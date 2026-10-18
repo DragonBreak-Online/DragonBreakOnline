@@ -341,3 +341,14 @@ with other sessions' uncommitted edits in it.
 A lease watcher ran from 05:46Z to 06:03Z and never saw an empty window: open leases went 3, 3, 3, 2, 2, 3, 3, 2, 3
 with 32 to 35 players on. An empty moment is unlikely at that hour, so the deploy wants a quiet one or a deliberate
 mid-lease reload.
+
+### The claim lines are staff-only (d5cf2d72, Nate, 18 Oct)
+
+Everything above describes these lines as player-facing chat. They are not, as of `d5cf2d72`: a Lead GM, Developer
+or Senior in the party sees them and nobody else, and they are always written to the log. Nate's reason, and it is
+the right call: out-of-character text at a claim spoiled what lay ahead for the party, and the shortfall line still
+guesses at a fault the server cannot name yet - it will only stop guessing when the pre-spawn tally
+(`npcspawn-skip-report-1018`, `d55f539a`) is deployed and the gate is named instead of inferred.
+
+So the useful audience for all of this is the log and whoever reads it, not the players. The counting and the
+three-way split (ambush, asleep, ready) are unchanged.

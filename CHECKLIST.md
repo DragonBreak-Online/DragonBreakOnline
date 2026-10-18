@@ -51,6 +51,11 @@ Two branches came out of it, both verified in the sandbox on the **current** bun
 - `dungeon-reach-report-1018` (`021aae78`, server, off `origin/server`): the claim counts ambush, asleep (reach) and
   ready separately and stops blaming `npcLiveBudget`. This fixes `bbbfce50`, which was mine and told a reach dungeon
   it was "still filling".
+
+**Superseded the same day by `d5cf2d72` (Nate):** those claim lines are **staff-only** now - a Lead GM, Developer or
+Senior in the party sees them, everyone else is told nothing, and they are always logged. The out-of-character text
+spoiled what lay ahead for the party, and the shortfall line still guesses at a fault the server cannot name until
+the pre-spawn tally (`d55f539a`) ships. The counting is unchanged; the audience is the log.
 ## Added 2026-10-17: the npc live budget costs latency, not bandwidth - PC session (load test)
 
 Two things, both written up in `_reviews/2026-10-17-npc-live-budget-cost.md`.
