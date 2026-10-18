@@ -229,6 +229,11 @@ class Runner {
     this.slots = slots;
     this.cfg = {
       movementMs: Number(args.movementMs || CFG.movementMs),
+      // --heartbeat makes the bots behave like the client from fork 2e12c0d1: sample every movementMs, but
+      // only send when something changed, or when heartbeatMs has passed. Absent means send every sample,
+      // which is the control for measuring that change.
+      heartbeatMs: args.heartbeat === undefined ? 0
+        : (args.heartbeat === true ? 700 : (Number(args.heartbeat) || 700)),
       runSpeed: Number(args.runSpeed || CFG.runSpeed),
       pauseMs: CFG.pauseMs,
       avEveryMs: args.noAv ? 0 : Number(args.avEveryMs || CFG.avEveryMs),
@@ -721,6 +726,10 @@ function buildStep(x) {
   const movesSent = d('movesSent');
   const traffic = {
     movesSent,
+    // What the heartbeat rule held back. movementHzPerBot below is what was actually sent, so the pair gives
+    // both the client-side saving and the rate the server really saw.
+    movesSkipped: d('movesSkipped'),
+    movementSampledHzPerBot: connected ? (movesSent + d('movesSkipped')) / connected / seconds : null,
     chatSent: d('chatSent'),
     avSent: d('avSent'),
     activateSent: d('activateSent'),

@@ -70,6 +70,14 @@ function writeMarkdown(dir, run) {
     lines.push('- sent: ' + s.traffic.movesSent + ' movement, ' + s.traffic.chatSent + ' chat, ' +
       s.traffic.avSent + ' actor-value, ' + s.traffic.activateSent + ' activate' +
       (s.traffic.warpSteps ? ', ' + s.traffic.warpSteps + ' warp steps' : ''));
+    // With the heartbeat rule on, what the bots sampled and what they sent are different numbers
+    if (s.traffic.movesSkipped) {
+      lines.push('- unchanged movement held back: ' + s.traffic.movesSkipped + ' of ' +
+        (s.traffic.movesSent + s.traffic.movesSkipped) + ' samples (' +
+        r1(100 * s.traffic.movesSkipped / Math.max(1, s.traffic.movesSent + s.traffic.movesSkipped)) +
+        '%), so each bot sampled ' + r1(s.traffic.movementSampledHzPerBot) + '/s and sent ' +
+        r1(s.traffic.movementHzPerBot) + '/s');
+    }
     lines.push('- received: ' + s.traffic.rxMessages + ' messages, ' + r1(s.traffic.rxKiB) + ' KiB of JSON, ' +
       s.traffic.chatReceived + ' chat lines, ' + s.traffic.createActorSeen + ' createActor, ' +
       s.traffic.teleports + ' teleports');

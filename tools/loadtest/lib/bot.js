@@ -16,6 +16,30 @@ const SAY_LINES = [
   '/say Anyone seen the Count about?',
 ];
 
+// The real client (fork 2e12c0d1, client-copy-lifecycle-1017) still samples movement every 130 ms but skips the
+// packet when nothing has changed since the one it last SENT, with a heartbeat so an idle player is not taken
+// for a stale one. The bots have to apply the same rule or a measurement of that change sees only the server's
+// half of it: a bot that re-sends an unchanged position gives the server work a real client would not send.
+// Thresholds are the client's. lookAt is not in UpdateMovementMessage, so there is nothing to compare for it.
+const HEARTBEAT_MS = 700;
+const movementUnchanged = (a, b) => {
+  if (!a) return false;
+  if (a.worldOrCell !== b.worldOrCell) return false;
+  for (let i = 0; i < 3; i++) if (Math.abs(a.pos[i] - b.pos[i]) > 2) return false;
+  for (let i = 0; i < 3; i++) if (Math.abs(a.rot[i] - b.rot[i]) > 1) return false;
+  if ((a.runMode || 'Standing') !== (b.runMode || 'Standing')) return false;
+  if (Math.abs((a.healthPercentage === undefined ? 1 : a.healthPercentage) -
+               (b.healthPercentage === undefined ? 1 : b.healthPercentage)) > 0.005) return false;
+  if (Math.abs((a.direction || 0) - (b.direction || 0)) > 1) return false;
+  if (Math.abs((a.speed || 0) - (b.speed || 0)) > 1) return false;
+  // The bots never jump, sneak, block, draw or die, so those flags are constant; compared anyway so that a
+  // scenario which starts changing them does not silently keep skipping
+  for (const f of ['isInJumpState', 'isSneaking', 'isBlocking', 'isWeapDrawn', 'isDead']) {
+    if (!!a[f] !== !!b[f]) return false;
+  }
+  return true;
+};
+
 class Bot {
   constructor(opts) {
     this.id = opts.id;
@@ -55,7 +79,7 @@ class Bot {
     this.stats = {
       connectAttempts: 0, connected: 0, denied: 0, failed: 0, disconnects: 0,
       loginSent: 0, selectSent: 0, spawned: 0, appearanceSent: 0,
-      movesSent: 0, chatSent: 0, avSent: 0, activateSent: 0, hostAsked: 0,
+      movesSent: 0, movesSkipped: 0, chatSent: 0, avSent: 0, activateSent: 0, hostAsked: 0,
       chatReceived: 0, widgets: 0, notices: 0, teleports: 0, snapBacks: 0,
       createActorSeen: 0, destroyActorSeen: 0, snippets: 0, hostGranted: 0,
       inventorySets: 0, raceMenuOpens: 0, deaths: 0, kicked: 0, loginFailures: [],
@@ -359,8 +383,21 @@ class Bot {
       }
       m.worldOrCell = this.worldOrCell;
       m.healthPercentage = 1;
-      this.pool.send(this.id, P.movement(this.idx, m), false);
-      this.stats.movesSent++;
+      // cfg.heartbeatMs 0 or absent sends every sample, which is what the client did before 2e12c0d1 and is
+      // the control for measuring it. Hosted-NPC movement below keeps sending: this run has no hosted actors,
+      // and the two halves should not be mixed in one number.
+      const hb = Number(this.cfg.heartbeatMs) || 0;
+      if (hb > 0 && now - (this.lastSentMoveAt || 0) < hb && movementUnchanged(this.lastSentMove, m)) {
+        this.stats.movesSkipped++;
+      } else {
+        this.pool.send(this.id, P.movement(this.idx, m), false);
+        this.stats.movesSent++;
+        this.lastSentMove = {
+          worldOrCell: m.worldOrCell, pos: m.pos.slice(), rot: m.rot.slice(), runMode: m.runMode,
+          healthPercentage: m.healthPercentage, direction: m.direction, speed: m.speed,
+        };
+        this.lastSentMoveAt = now;
+      }
 
       // Hosted NPCs ride the same path in the real client: one movement message each, same rate
       if (this.cfg.hostNpcs) this.tickHosting(now, m);
