@@ -902,12 +902,13 @@ const HELP_GROUPS = [
       'A house you own or rent: look at its door and press X.', 'Your money: a bank counter.',
       'Your business: its ledger book.', 'Where you are: /whereami.'] },
   { key: 'rule', title: 'Rule and property', names: ['officials', 'appoint', 'dismiss', 'tax', 'ledgerpoint'], role: 'official',
-    hints: ['Your court: F3, the Court tab. A post you appoint someone to is offered, and they accept it.'] },
+    hints: ['Your court: F3, the Court tab. A post you appoint someone to is offered, and they accept it.',
+      'An outlaw of your hold (ruler or Steward): /bounty set <name or #TAG> <gold, up to 1000> <reason>; the jailer collects it.'] },
   { key: 'groups', title: 'Groups and dungeons', names: ['party', 'court', 'charter', 'nobility'],
     hints: ['Your factions and your court: F3, the Faction and Court tabs. The nobles of your hold: F3, the Nobility tab.',
       'A dungeon: its door. The party leader picks Novice, Adept, Expert or Master; /dungeon says what is claimed.',
       'An expedition: the board in the Synod Conclave, the Fighters Guild or Frostcrag Spire.'] },
-  { key: 'trouble', title: 'Trouble and help', names: ['gm', 'unstuck', 'struggle', 'bug', 'ticket', 'name', 'help', 'syncenchant'],
+  { key: 'trouble', title: 'Trouble and help', names: ['gm', 'unstuck', 'struggle', 'bug', 'ticket', 'name', 'help', 'syncenchant', 'bounty'],
     hints: ['Where you stand, your ids and the effects on you: press F7.',
       'Your keys: F3, Settings. A new key works from the next time you start the game.'] },
 ];
@@ -8224,6 +8225,13 @@ try {
   delete require.cache[JOURNALSKILLS_JS];
   require(JOURNALSKILLS_JS)({ log, onUi });
 } catch (e) { log('journalskills.js failed to load:', e.stack || e.message); if (globalThis.__dboJournalSections) delete globalThis.__dboJournalSections.skills; }
+// ---- outlaw bounties: a hold's ruler or Steward sets them, the outlaw pays them to the jailer (server\outlaws.js) --------
+try {
+  const OUTLAWS_JS = path.resolve('outlaws.js');
+  delete require.cache[OUTLAWS_JS];
+  require(OUTLAWS_JS)({ mp, log, personal, system, audit, who, display, cfg, registerChatCommand, zoneOfActor, zoneById, readOfficials,
+    profileOf, officialTarget, onlineActors, giveItem, isLeadStaff });
+} catch (e) { log('outlaws.js failed to load:', e.stack || e.message); globalThis.__dboOutlawJailed = null; }
 // ---- the journal's Court tab: offices, offers and the household (server\court.js, config "court") ------------------------
 try {
   const COURT_JS = path.resolve('court.js');

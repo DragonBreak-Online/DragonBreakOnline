@@ -217,6 +217,8 @@ module.exports = (api) => {
     if (occupantOf(door)) return personal(guard, 'Someone is already locked in that cell.');
     const cell = cellOf(door);
     const now = Date.now();
+    // An outlaw's bounty in this hold (outlaws.js): paid to the jailer as far as they can, the rest served as extra minutes
+    if (!concordat) { try { if (typeof globalThis.__dboOutlawJailed === 'function') mins += Math.max(0, Number(globalThis.__dboOutlawJailed(guard >>> 0, prisoner >>> 0)) || 0); } catch (e) { log(`jail: outlaw bounty failed: ${e.message}`); } }
     set(prisoner, 'private.dboSentence', Object.assign({ door: door >>> 0, cell, totalMs: mins * MIN, servedMs: 0, by: display(guard), at: now },
       concordat ? { concordat: { by: who(guard), at: now } } : {}));
     set(door, 'private.dboCell', { prisoner: prisoner >>> 0, name: display(prisoner), picked: false });

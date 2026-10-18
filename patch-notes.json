@@ -1,5 +1,21 @@
 [
   {
+    "title": "Outlaw bounties",
+    "date": "2026-10-18",
+    "version": "Hotfix",
+    "tag": "New",
+    "sections": [
+      {
+        "heading": "Law",
+        "items": [
+          "A hold's ruler or Steward can put a bounty of up to 1,000 gold on a wrongdoer: /bounty set <name or #TAG> <gold> <reason>. /bounty shows who is wanted in the hold you stand in, and any bounty on you.",
+          "A bounty belongs to its hold. When an outlaw is jailed in that hold, they pay it as a fine, from the gold they carry and then from their bank account, and it goes to whoever locked them in. What they cannot pay, they serve as extra time in the cell: a minute for every 10 gold.",
+          "An outlaw can settle their own bounty first with /bounty pay, standing in the hold; the gold goes to its treasury."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Hunting contracts pay the hold back",
     "date": "2026-10-18",
     "version": "Hotfix",

@@ -148,6 +148,15 @@ module.exports = (api) => {
     data().zones[zone.id] = had - n;
     try { save(); return true; } catch (e) { data().zones[zone.id] = had; log('bank: bank.json write failed', e.message); return false; }
   };
+  // outlaws.js: take up to n gold from a character's account for a fine; the gold taken
+  globalThis.__dboBankTake = (a, n, where) => {
+    n = Math.floor(Number(n) || 0); if (n <= 0) return 0;
+    const take = Math.min(balanceOf(a), n); if (take <= 0) return 0;
+    setBalance(a, balanceOf(a) - take);
+    note(a, 'fine', take, where);
+    audit(`BANK ${who(a)} paid ${take} gold from their account: ${where || 'a fine'} (balance ${balanceOf(a)})`);
+    return take;
+  };
   // For gamemode.js depositToTreasury and contracts.js: a hold's treasury by zone id
   globalThis.__dboTreasuryZone = {
     balance: (zoneId) => { const z = zoneById(zoneId); return z && z.treasury ? zoneGold(z) : 0; },
