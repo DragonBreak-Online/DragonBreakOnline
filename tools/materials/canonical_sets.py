@@ -6,7 +6,7 @@ import sys, os, re, struct
 sys.path.insert(0, os.environ.get('ESPLIB_DIR', os.path.expanduser('~/dragonbreak/ck-mcp')))
 import esplib
 BASE = os.environ.get('DATA_DIR', '/opt/skyrim-data')
-ORDER = [l.strip() for l in open(os.environ.get('LOADORDER', os.path.expanduser('~/dragonbreak/fork/deploy/skyrim-data/loadorder.txt'))) if l.strip() and not l.startswith('#')]
+ORDER = [l.strip() for l in open(os.environ.get('LOADORDER', '/opt/alduinak/deploy/skyrim-data/loadorder.txt')) if l.strip() and not l.startswith('#')]
 A = ['Iron', 'Steel', 'SteelA', 'Dwarven', 'Orcish', 'SteelPlate', 'Ebony', 'Dragonplate', 'Daedric', 'Hide', 'Leather', 'Elven', 'Scaled', 'Glass',
      'Dragonscale', 'Studded', 'ElvenLight', 'ImperialHeavy', 'Imperial', 'ImperialLight', 'Blades', 'Falmer', 'Stormcloak']
 WANT_A = re.compile(r'^Armor(%s)(Cuirass|CuirassA|Boots|BootsA|Gauntlets|GauntletsA|Helmet|HelmetA|Shield)$' % '|'.join(A))

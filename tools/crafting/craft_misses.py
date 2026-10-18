@@ -87,7 +87,7 @@ def main():
     sys.path.insert(0, os.path.expanduser('~nate/dragonbreak/ck-mcp'))
     import esplib
     data = '/opt/skyrim-data'
-    order = [l.strip() for l in open(os.path.expanduser('~nate/dragonbreak/fork/deploy/skyrim-data/loadorder.txt')) if l.strip() and not l.startswith('#')]
+    order = [l.strip() for l in open('/opt/alduinak/deploy/skyrim-data/loadorder.txt') if l.strip() and not l.startswith('#')]
     gid, plugs = {}, []
     full = light = 0
     for n in order:

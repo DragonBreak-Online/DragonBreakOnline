@@ -27,7 +27,7 @@ sys.path.insert(0, a.esplib)
 import esplib  # noqa: E402
 
 order_file = a.order or next((f for f in [os.path.join(os.environ.get('FORK', ''), 'deploy', 'skyrim-data', 'loadorder.txt'),
-    os.path.expanduser('~nate/dragonbreak/fork/deploy/skyrim-data/loadorder.txt')] if os.path.isfile(f)), '')
+    '/opt/alduinak/deploy/skyrim-data/loadorder.txt'] if os.path.isfile(f)), '')
 if not order_file: sys.exit('no loadorder.txt (give --order)')
 order = [l.strip() for l in open(order_file) if l.strip() and not l.startswith('#')]
 

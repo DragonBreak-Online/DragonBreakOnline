@@ -8,7 +8,7 @@
 const fs = require('fs');
 const path = require('path');
 const SERVER = path.resolve(__dirname, '..', '..');
-const [dir = '/opt/skymp-state/world/changeForms', order = path.join(process.env.HOME || '/home/nate', 'dragonbreak/fork/deploy/skyrim-data/loadorder.txt'), data = '/opt/skyrim-data',
+const [dir = '/opt/skymp-state/world/changeForms', order = '/opt/alduinak/deploy/skyrim-data/loadorder.txt', data = '/opt/skyrim-data',
   houseCellsFile = '', settingsFile = '/opt/alduinak/build/dist/server/server-settings.json', configFile = '/opt/alduinak/build/dist/server/gamemode-config.json'] = process.argv.slice(2);
 const readJson = (f, fb) => { try { return JSON.parse(fs.readFileSync(f, 'utf8')); } catch (e) { return fb; } };
 

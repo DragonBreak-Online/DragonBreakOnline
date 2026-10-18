@@ -144,7 +144,7 @@ class LoadOrder:
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--data', default='/opt/skyrim-data')
-    ap.add_argument('--order', default=os.path.expanduser('~nate/dragonbreak/fork/deploy/skyrim-data/loadorder.txt'))
+    ap.add_argument('--order', default='/opt/alduinak/deploy/skyrim-data/loadorder.txt')
     ap.add_argument('--replace', action='append', default=[], help='"<plugin name>=<path>": read this copy instead')
     ap.add_argument('--out', default='owned-spawns.json')
     ap.add_argument('--dungeons', default=os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'dungeons.json'),
