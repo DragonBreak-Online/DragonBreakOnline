@@ -32,6 +32,25 @@ Forelhost slots 3 and 7 were despawned the night before, and `despawn` maps `at 
 
 So both leads end in the same place: **two observability defects**, both server-TS. (1) `fillSlots` has five silent
 skips and no counter. (2) The spawn line is suppressed whenever the zone already held an npc.
+
+**Lead 1 CLOSED 2026-10-18, and my section 6 conclusion was wrong.** It is the **reach feature, working as
+designed**: `applyReach` (on by default, reach 4500, groupRadius 1000, minEnemies 12) gives every non-ambush enemy a
+`Reach`, and only a group within 4500 units of an entrance landing or holding a boss keeps `Prespawn`. The live log
+had said so all along: `dungeon DustmansCairnLocation: 18 enemies in 9 group(s) wake within 4500 units, 0 placed at
+once`. Mzulft and Forelhost agree. There is no anchor fault.
+
+**Why I got it wrong, and the rule that follows:** I read this PC's `npcSpawnSystem.ts` (**842** commits behind
+`origin/main`) and `dungeons.js` (**319** behind `origin/server`). Neither has reach, `givenUp`, `strayHeld` or
+`unseenFalls`. Read the code that runs - `git show origin/<branch>:<file>` - not the working tree.
+
+Two branches came out of it, local and unpushed, both verified in the sandbox on the **current** bundle and the
+**current** gameplay layer:
+- `npcspawn-skip-report-1018` (`d55f539a`, fork, off `origin/main`): the pre-spawn logs one line naming every gate
+  that held a slot back (`placed 6/13 slot(s): ambush=1 reachWaiting=6`), and a partly filled zone no longer fills
+  in silence.
+- `dungeon-reach-report-1018` (`021aae78`, server, off `origin/server`): the claim counts ambush, asleep (reach) and
+  ready separately and stops blaming `npcLiveBudget`. This fixes `bbbfce50`, which was mine and told a reach dungeon
+  it was "still filling".
 ## Added 2026-10-17: the npc live budget costs latency, not bandwidth - PC session (load test)
 
 Two things, both written up in `_reviews/2026-10-17-npc-live-budget-cost.md`.

@@ -157,6 +157,10 @@ that the chat line reaches a player - the bots count chat messages but do not ke
 
 ## 6. Lead 1: why a claim pre-spawns nothing, and a feature that cannot work (18 Oct)
 
+> **Corrected by section 8.** The eliminations below were reasoned against this PC's copies of
+> `npcSpawnSystem.ts` (842 commits behind origin) and `dungeons.js` (319 behind), which have neither the reach
+> gate nor `givenUp`, `strayHeld` and `unseenFalls`. The log evidence holds; the conclusion drawn from it does not.
+
 The question: Dustman's Cairn is 46 of 64 in ambush, so 18 enemies stand in the open, and the 03:44 claim
 pre-spawned **0**. Ambush does not explain that dungeon. What skipped the 18?
 
@@ -208,6 +212,10 @@ build and a deploy, neither of which is this session's.
 
 ## 7. Lead 2: the crypt was unexplored, and the log cannot be trusted to prove the rest (18 Oct)
 
+> **Corrected by section 8.** The eliminations below were reasoned against this PC's copies of
+> `npcSpawnSystem.ts` (842 commits behind origin) and `dungeons.js` (319 behind), which have neither the reach
+> gate nor `givenUp`, `strayHeld` and `unseenFalls`. The log evidence holds; the conclusion drawn from it does not.
+
 The question: only 21 of Dustman's Cairn's 64 slots ever spawned. Had the player explored a third of it, or
 did two thirds of the ambushes never fire? The spawn system logs zone entry, so the two separate cleanly.
 
@@ -257,3 +265,62 @@ Two observability defects, both worth fixing before anyone theorises further:
    log cannot be used to ask "did this zone ever produce its enemy".
 
 Both are server-TS, so neither is this session's to deploy.
+
+## 8. Lead 1 answered: it was the reach feature, and the server had already said so (18 Oct)
+
+Sections 6 and 7 eliminated five gates and concluded the anchor must be at fault. That was wrong, and the reason
+is worth recording: both files were read on this PC, where `npcSpawnSystem.ts` is **842** commits behind
+`origin/main` and `dungeons.js` is **319** behind `origin/server`. The live server runs neither.
+
+What the current code has that this PC's does not:
+
+- `prespawnZones` skips `zone.reach && !zone.prespawn && zone.inside.size === 0`, a third pre-spawn gate.
+- `fillSlots` skips on `givenUp(spot)`, `zone.strayHeld` and `unseenFalls` as well, so there are **seven** silent
+  skips, not five.
+- `dungeons.js` has `applyReach` (default on, reach 4500, groupRadius 1000, minEnemies 12): every non-ambush enemy
+  gets `Reach`, groups form within 1000 units of each other, and only a group within 4500 units of an entrance
+  landing or holding a boss keeps `Prespawn`. The rest wake when a player comes near.
+
+**So Dustman's Cairn was never a fault, and the log said so in a line section 6 never grepped for:**
+
+```
+03:44:52  dungeon DustmansCairnLocation: 18 enemies in 9 group(s) wake within 4500 units, 0 placed at once
+```
+
+Eighteen standing enemies in nine groups, none near the landing, so nothing was placed at once and all of them
+wake on approach. Mzulft agrees exactly (25 enemies, 21 groups, 2 placed, and its claim logged 2 prespawned), and
+Forelhost placed 8 of 22. Lead 1 is **closed: working as designed.**
+
+Lead 2's conclusion survives - 21 entered, 21 spawned, 21 despawned is exploration - and its residue of 9 zones is
+most likely the same reach dynamics plus the `!before` logging hole, which is now fixed.
+
+### What came out of it
+
+Two branches, both local, neither pushed, both verified in the sandbox running the **current** server bundle with
+the **current** gameplay layer:
+
+- `npcspawn-skip-report-1018` (`d55f539a`, fork, from `origin/main`): a `SkipTally` threaded through `fillSlots`,
+  and one line from `prespawnZones` when it placed fewer slots than it looked at, naming every gate. Also fixes the
+  spawn line that was suppressed whenever the zone already held an npc.
+- `dungeon-reach-report-1018` (`021aae78`, server, from `origin/server`): the claim report counts ambush, asleep
+  (reach) and ready separately, calls only a shortfall of the ready ones a shortfall, and stops pointing at
+  `npcLiveBudget`. This corrects `bbbfce50`, which was mine and which told a reach dungeon it was "still filling".
+
+One claim, four numbers, three independent sources, all agreeing:
+
+```
+[gamemode] dungeon CYRRielleLocation: 12 enemies in 11 group(s) wake within 4500 units, 6 placed at once
+NpcSpawnSystem: pre-spawn 'dungeon:CYRRielleLocation:' placed 6/13 slot(s): ambush=1 reachWaiting=6
+[gamemode] dungeon CYRRielleLocation claimed by ...: 13 enemies, 6 prespawned, 52 containers
+[gamemode] dungeon CYRRielleLocation: 1 of 13 enemies lie in wait within 1200 units of their spot
+[gamemode] dungeon CYRRielleLocation: 6 of 13 enemies wake when somebody comes within 4500 units
+```
+
+13 = 1 ambush + 6 asleep + 6 ready, with every unplaced slot accounted for.
+
+### The lesson, which is not about dungeons
+
+Read the code that is running, not the code that is checked out. This PC's two repos are 842 and 319 commits
+behind on purpose, and an evening of log archaeology went into eliminating gates that the live server does not
+have and inventing an anchor fault it does not suffer. Anything here that reasons from local source needs the same
+check: `git show origin/<branch>:<file>`, not the working tree.
