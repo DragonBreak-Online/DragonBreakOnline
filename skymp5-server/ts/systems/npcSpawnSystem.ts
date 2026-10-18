@@ -86,6 +86,8 @@ const LEASH_RADII = 3;
 const WATCH_UNITS = 8192;
 // Slot cooldown marker for Respawn 0: the slot stays empty until the zone despawns or an admin resets it
 const NEVER_READY = -1;
+// Why a slot was not filled, counted per pre-spawn pass
+type SkipTally = Record<string, number>;
 // A corpse is removed this long after death, whatever its zone does. Overridable via "npcCorpseSeconds".
 const DEFAULT_CORPSE_SECONDS = 300;
 // The server hands a destroyed form's index to the next form it creates, while the old NPC's host can still be
@@ -313,6 +315,8 @@ export class NpcSpawnSystem implements System {
   // The claim's pre-spawn of every zone named with prefix; returns the NPCs placed
   prespawnZones(prefix: string): number {
     let placed = 0;
+    let want = 0;
+    const tally: SkipTally = {};
     let fallback: number | undefined;
     try {
       const online = this.mp.get(0, "onlinePlayers");
@@ -320,12 +324,18 @@ export class NpcSpawnSystem implements System {
     } catch {}
     for (const zone of this.zones) {
       if (!zone.name.startsWith(prefix)) continue;
+      want += zone.total;
       // An ambush is not part of the pre-spawn: it waits for somebody to walk into its own radius
-      if (zone.ambush && zone.inside.size === 0) continue;
+      if (zone.ambush && zone.inside.size === 0) { tally.ambush = (tally.ambush || 0) + zone.total; continue; }
       // ...nor is a zone that waits for somebody to come near (unless the gameplay prespawns it: the landing, the boss)
-      if (zone.reach && !zone.prespawn && zone.inside.size === 0) continue;
-      this.fillSlots(this.mp, zone, Date.now(), fallback);
+      if (zone.reach && !zone.prespawn && zone.inside.size === 0) { tally.reachWaiting = (tally.reachWaiting || 0) + zone.total; continue; }
+      this.fillSlots(this.mp, zone, Date.now(), fallback, tally);
       placed += zone.spawned.length;
+    }
+    // A pre-spawn that placed less than it looked at says which gate held the rest back
+    if (placed < want) {
+      const why = Object.keys(tally).sort().map((k) => `${k}=${tally[k]}`).join(" ");
+      this.log(`NpcSpawnSystem: pre-spawn '${prefix}' placed ${placed}/${want} slot(s)${why ? `: ${why}` : ""}`);
     }
     return placed;
   }
@@ -766,35 +776,39 @@ export class NpcSpawnSystem implements System {
   }
 
   // Places every slot that is empty or holds a corpse once its cooldown has run out
-  private fillSlots(mp: Mp, zone: Zone, now: number, fallbackAnchor?: number): void {
+  private fillSlots(mp: Mp, zone: Zone, now: number, fallbackAnchor?: number, tally?: SkipTally): void {
     const before = zone.spawned.length;
+    const note = (why: string) => { if (tally) tally[why] = (tally[why] || 0) + 1; };
     let changed = false;
+    let added = 0;
     let live = this.liveCount();
     for (let slot = 0; slot < zone.total; slot++) {
       const entry = zone.spawned.find((e) => e.slot === slot);
-      if (entry && !entry.diedAt) continue;
+      if (entry && !entry.diedAt) { note("alive"); continue; }
       const at = zone.slotReadyAt[slot];
-      if (at < 0 || at > now) continue;
+      if (at < 0 || at > now) { note(at < 0 ? "neverReady" : "cooldown"); continue; }
       // A spot that has dropped its quota of npcs into the void has no floor, in this run or any other
       // (or it dropped too many with nobody near, in this run)
       const spot = this.spotKey(zone, slot);
-      if (this.givenUp(spot)) continue;
-      if (zone.strayHeld.has(slot)) continue;
-      if ((this.fallenSpots.has(spot) || this.unseenFalls.has(spot)) && !this.playerNear(mp, zone, this.slotPos(zone, slot), SAFE_RESPAWN_UNITS)) continue;
+      if (this.givenUp(spot)) { note("givenUp"); continue; }
+      if (zone.strayHeld.has(slot)) { note("strayHeld"); continue; }
+      if ((this.fallenSpots.has(spot) || this.unseenFalls.has(spot)) && !this.playerNear(mp, zone, this.slotPos(zone, slot), SAFE_RESPAWN_UNITS)) { note("fallenNobodyNear"); continue; }
       if (!entry && live >= this.maxLive) {
         if (now - this.budgetLoggedAt > BUDGET_LOG_MS) {
           this.budgetLoggedAt = now;
           this.log(`NpcSpawnSystem: ${live} npcs alive, at the budget of ${this.maxLive}; '${zone.name}' waits for room`);
         }
         zone.slotReadyAt[slot] = now + BUDGET_RETRY_MS;
+        note("budget");
         continue;
       }
       const anchor = this.anchorIn(zone) ?? (zone.anchorId > 0 ? zone.anchorId : undefined) ?? fallbackAnchor;
-      if (anchor === undefined) break;
+      if (anchor === undefined) { note("noAnchor"); break; }
       const npc = zone.slots[slot];
       const id = this.spawnOne(mp, zone, npc, slot, anchor, fallbackAnchor);
       if (id === null) {
         zone.slotReadyAt[slot] = now + RETRY_MS;
+        note("spawnFailed");
         continue;
       }
       if (entry) {
@@ -805,12 +819,14 @@ export class NpcSpawnSystem implements System {
       } else {
         zone.spawned.push({ id, slot, diedAt: 0 });
         live++;
+        added++;
       }
       zone.slotReadyAt[slot] = 0;
       changed = true;
     }
     if (!changed) return;
-    if (!before) {
+    // Logged on every new npc, not only the first: a partly filled zone used to fill in silence
+    if (added) {
       const summary = zone.npcs.map((n) => `${n.baseDesc} x${n.count}`).join(", ");
       this.log(`NpcSpawnSystem: '${zone.name}' spawned ${zone.spawned.length}/${zone.total} npc(s): ${summary}`);
     }
