@@ -56,6 +56,7 @@ type Mp = any;
 //                     { customPacketType: "adminAction", action: "giveWerewolf" | "giveVampireLord", targetName? }  ("giveSpells" and "giveShouts" are refused)
 //                     { customPacketType: "adminAction", action: "beastForm", form: "werewolf" | "vampirelord", op: "now" | "revert" | "revoke", targetName? }
 //                     { customPacketType: "adminAction", action: "giveDisease", kind: "vampire" | "werewolf", targetName? }
+//                     { customPacketType: "adminAction", action: "giveCurse", kind: "vampire" | "purevampire" | "werewolf" | "blessedwerewolf" | "cure" | "stage", stage?, targetName? }
 //                     { customPacketType: "adminAction", action: "setSchool", school, level, targetName? }  level 0..100 (schools.js)
 //                     A missing target/targetName means the admin themself; targetName takes a name, a name prefix or #TAG.
 //   Server -> Client: { customPacketType: "adminMastery", targetName, detail }  detail.schools: [{ name, level, role, roleLabel }], or null without magic data
@@ -88,7 +89,7 @@ const ADMIN_MODES: Array<{ id: string; label: string }> = [
 
 // Lead GM and above only (TIER_CAPS.spawn); a GM keeps teleports, kick, observing modes and the roster
 const SPAWN_ACTIONS = new Set(["kill", "deleteCharacter", "masteryGrant", "masteryReset", "masterySetTier", "masteryDrop",
-  "giveItem", "giveWerewolf", "giveVampireLord", "giveDisease", "setSchool", "beastForm", "npcZoneAdd", "npcZoneDelete", "npcZoneReset"]);
+  "giveItem", "giveWerewolf", "giveVampireLord", "giveDisease", "giveCurse", "setSchool", "beastForm", "npcZoneAdd", "npcZoneDelete", "npcZoneReset"]);
 const SPAWN_MODES = new Set(["smite", "healhit"]);
 // Turned off for every tier: each learned-spell read costs the square of the list, and a give-all character froze the server
 const GIVE_ALL_OFF = new Map<string, string>([
@@ -557,7 +558,7 @@ export class AdminSystem implements System {
       this.reply(mp, userId, !!lifted, lifted ? `Ban on ${lifted.name || lifted.ip} lifted` : "No such ban");
       return;
     }
-    if (["masterySetTier", "masteryDrop", "giveItem", "giveWerewolf", "giveVampireLord", "giveDisease", "setSchool", "beastForm"].indexOf(action) !== -1) {
+    if (["masterySetTier", "masteryDrop", "giveItem", "giveWerewolf", "giveVampireLord", "giveDisease", "giveCurse", "setSchool", "beastForm"].indexOf(action) !== -1) {
       const who = this.resolveTarget(mp, myActorId, content);
       if (!who) { this.reply(mp, userId, false, "No online player by that name"); return; }
       this.selfServiceAction(ctx, mp, userId, myActorId, adminProfile, action, who, content);
@@ -783,6 +784,19 @@ export class AdminSystem implements System {
         catch (e) { this.log(`AdminSystem: giveDisease ${kind} failed: ${e}`); this.reply(mp, userId, false, "Giving the disease failed, see server log"); return; }
         const ok = said.indexOf("now carries") !== -1;
         this.adminLog(`profile ${adminProfile} gave the ${kind} disease to ${whom}: ${said}`);
+        this.reply(mp, userId, ok, said || "Done");
+        return;
+      }
+      // The whole curse at once, a cure, or a vampire's stage (Nate, 18 Oct): server\supernatural.js does it and audits it
+      if (action === "giveCurse") {
+        const kind = String(content["kind"] ?? "");
+        const curse = (globalThis as any).__dboSuperAdminCurse;
+        if (typeof curse !== "function") { this.reply(mp, userId, false, "supernatural.js on the server has no Curse row yet"); return; }
+        let said = "";
+        try { said = String(curse(who.actorId, kind, Number(content["stage"]), `profile ${adminProfile}`) ?? ""); }
+        catch (e) { this.log(`AdminSystem: giveCurse ${kind} failed: ${e}`); this.reply(mp, userId, false, "The curse failed, see server log"); return; }
+        const ok = /^.+ is (now|mortal again)/.test(said);
+        this.adminLog(`profile ${adminProfile} ran curse ${kind}${kind === "stage" ? ` ${content["stage"]}` : ""} on ${whom}: ${said}`);
         this.reply(mp, userId, ok, said || "Done");
         return;
       }
