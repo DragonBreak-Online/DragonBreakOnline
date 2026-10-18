@@ -1,5 +1,20 @@
 [
   {
+    "title": "Vampire and werewolf turning",
+    "date": "2026-10-18",
+    "version": "Server update",
+    "tag": "Change",
+    "sections": [
+      {
+        "heading": "No trial at the end of the fever",
+        "items": [
+          "When Sanguinare Vampiris or Sanies Lupinus has run its course, you now become a vampire or a werewolf straight away. The Blood Fever and Hircine's Hunt trials at the peak of the fever are gone, and nobody dies at the end of the incubation any more.",
+          "The fever can still be cured before it peaks. Molag Bal's Embrace and Hircine's Great Hunt at the shrines are unchanged."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Hunting contracts in the Court tab",
     "date": "2026-10-18",
     "version": "Next client update",

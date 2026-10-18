@@ -73,9 +73,13 @@ ok(Math.abs(played() - 0.25) < 0.01, 'an hour lying dead counts nothing', played
 play(10 * 3600000);
 ok(played() > 2.7 && played() < 3 && !globalThis.__dboRites.has(A), 'eleven hours of play: 2.75 game days, the fever has not peaked', played());
 play(3600000 + 30000);
-ok(played() >= 3 && globalThis.__dboRites.has(A), 'twelve hours of play: three game days, the fever peaks', played());
+// The peak turns the carrier, with no rite (Nate, 18 Oct)
+{
+  const st = store.get(`${A}|private.supernatural`) || {};
+  ok(st.kind === 'vampire' && !st.disease && !globalThis.__dboRites.has(A), 'twelve hours of play: three game days, the fever peaks and they turn, no rite', st);
+}
 said.length = 0; cmds.curse(A, 'me status');
-ok(said.some((t) => /3\.0 of 3 game days played/.test(t)), '/curse status shows the played days', said);
+ok(said.some((t) => /vampire stage 1/.test(t)), '/curse status shows the new vampire', said);
 globalThis.__dboRites.delete(A);
 store.set(`${A}|private.supernatural`, { kind: null, disease: { kind: 'werewolf', since: 0, played: 0.5 } });
 cmds.curse(A, 'me fever');

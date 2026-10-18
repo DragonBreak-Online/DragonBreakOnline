@@ -222,33 +222,19 @@ ok(!rite() && logs.some((l) => /Molag Bal's Embrace declined: the client cannot 
   ok(panel.rite && panel.rite.available === false && /latest game client/.test(panel.rite.reason), "the shrine panel's Perform the Rite is unavailable, with the reason", panel.rite);
   globalThis.__dboShrinePanels && globalThis.__dboShrinePanels.clear();
 }
-// A fever rite still runs (the fever has to break), but losing it by arrival does not kill
-r = startFever();
-ok(!!r && r.type === 'fever_vampire' && r.client === false && r.legacySafe === true && /began The Blood Fever judge=legacy, a loss does not kill/.test(logs.join(' | ')), 'a Blood Fever on a client without riteJudge runs, judged by arrival, and its loss will not kill', logs.slice(-1)[0]);
-// Every strike misses: the zone is moved out of the marker's reach before it lands
-for (let i = 0; i < 5 && rite(); i++) { rite().current.width = 0; rite().current.center = 5; strikeOld(rite(), 1000, 0); }
-{
+// No fever rite since 18 Oct (Nate): at the peak the carrier turns, on either client, and nothing can kill them there
+for (const judge of [false, true]) {
+  if (judge) caps.add('riteJudge'); else caps.delete('riteJudge');
+  r = startFever();
   const st2 = store.get(`${A}|private.supernatural`) || {};
-  ok(!rite() && store.get(`${A}|isDead`) !== true && !st2.disease && !st2.kind && said.some((t) => /You live through it/.test(t)) && audits.some((t) => /judged by arrival \(no riteJudge\): the fever broke, no death/.test(t)), '...lost: the fever breaks, the carrier lives and is not turned', { dead: store.get(`${A}|isDead`), st: st2 });
+  ok(!r && store.get(`${A}|isDead`) !== true && st2.kind === 'vampire' && !st2.disease, `a peaked fever turns the carrier with no rite (${judge ? 'riteJudge' : 'older'} client)`, st2);
 }
-// Disconnecting behind on the same rite is not lethal either
-r = startFever();
-r.current.width = 0; r.current.center = 5; strikeOld(r, 1000, 0);
-globalThis.__dboSuperLeave(A);
-ok(!rite() && store.get(`${A}|isDead`) !== true && !(store.get(`${A}|private.supernatural`) || {}).disease, '...and disconnecting behind on it ends it the same way, alive', store.get(`${A}|isDead`));
-// A riteJudge client: the fever rite kills on a loss, as it always has
-caps.add('riteJudge');
-r = startFever();
-ok(r && r.client === true && !r.legacySafe, 'with riteJudge the Blood Fever is judged by the widget');
-for (let i = 0; i < 5 && rite(); i++) { const rr = rite(); strikeNew(rr, offAt(rr.current)); }
-ok(!rite() && store.get(`${A}|isDead`) === true, '...and losing it kills, as before (the widget judged, lag did not)', store.get(`${A}|isDead`));
+caps.delete('riteJudge');
 // legacyDeadly 'allow': the arrival-judged deadly rites as before
 caps.delete('riteJudge');
 cfg = { supernatural: { rite: { legacyDeadly: 'allow' } } }; load();
 r = begin();
 ok(!!r && r.type === 'embrace' && !r.legacySafe, "legacyDeadly 'allow': the Embrace runs for a client without riteJudge, as before");
-r = startFever();
-ok(!!r && !r.legacySafe, '...and a fever rite it loses kills again');
 globalThis.__dboRites.clear();
 // Rollback (clientJudged false) is today's rite for everyone: nothing is declined
 cfg = { supernatural: { rite: { clientJudged: false } } }; load();

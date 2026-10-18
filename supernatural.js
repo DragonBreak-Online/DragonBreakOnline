@@ -4,8 +4,8 @@
 //   Infection  a vampire's hit (3%) carries Sanguinare Vampiris, a werewolf's bite (0.5%, Nate 2026-10-03) Sanies Lupinus; both incubate
 //              three game days of the carrier's own play (Nate 2026-09-29: time offline does not count) and are cured by a
 //              Cure Disease potion, an ingredient whose first effect cures, or a prayer at a Divine shrine.
-//   Turning    when the fever peaks the Blood Fever / Hircine's Hunt trial opens (front widget "rite"); failing kills
-//              and burns the disease out. Molag Bal's Embrace and Hircine's rite are chosen at their shrines (/rite)
+//   Turning    when the fever peaks the carrier turns, with no trial (Nate, 18 Oct; it was the Blood Fever / Hircine's
+//              Hunt rite, whose failure killed). Molag Bal's Embrace and Hircine's rite are chosen at their shrines (/rite)
 //              and failing those can end the character for good (private.permaDead). Surviving Hircine's rite gives Sanies
 //              Lupinus at huntMarkChance (the turning follows its fever), else the survivor waits riteFailCooldownHours to
 //              run again; surviving Molag Bal's makes a pure-blood at once. The waits are per account (markRiteWait).
@@ -889,24 +889,31 @@ module.exports = (api) => {
     if (globalThis.__dboSuperFeeds instanceof Map) globalThis.__dboSuperFeeds.delete(a >>> 0);
     refreshRates(a);
   };
-  const becomeVampire = (a, pure) => {
+  // The popups when an incubation completes (Nate, 18 Oct)
+  const FEVER_TURNED = {
+    vampire: 'You feel a profound change within your body. The warmth of life fades as an insatiable hunger awakens within you. The transformation is complete. You have become a Vampire.',
+    werewolf: 'You feel a profound change within your body. The incubation is complete, and the beast within you awakens. You have become a werewolf, good hunting.',
+  };
+  const becomeVampire = (a, pure, fromFever) => {
     endCurse(a, 'became a vampire');
     const s = stateOf(a);
     Object.assign(s, { kind: 'vampire', disease: null, stage: 1, lastFed: gameDays(), pure: !!pure, unfed: pure ? null : { played: 0, wither: 0 }, sated: null });
     saveState(a, s); removeSpell(a, SANGUINARE); setLookRace(a, true);
     syncVampSpells(a, s); showTells(a, stateOf(a));
-    personal(a, pure ? 'You rise from Molag Bal\'s embrace a pure-blood.' : 'The fever passes, and a cold hunger takes its place. You are a vampire.');
+    if (fromFever) onScreen(a, FEVER_TURNED.vampire, 8);
+    else personal(a, pure ? 'You rise from Molag Bal\'s embrace a pure-blood.' : 'The fever passes, and a cold hunger takes its place. You are a vampire.');
     if (!pure) personal(a, `Your gifts sleep until you have fed. Find blood within ${C.firstMealHours} hours, or your body begins to wither: a fresh body, or a captive who cannot fight you off.`);
     audit(`SUPERNATURAL ${who(a)} became a ${pure ? 'pure-blood ' : ''}vampire`);
     if (pure && !crownHolder()) takeCrown(a, 'claimed the vacant Blood Crown');
     else if (pure && crownHolder() !== (a >>> 0)) personal(a, crownLine(a));
     flushStageSpells(a, stateOf(a), 'became a vampire');
   };
-  const becomeWerewolf = (a, blessed) => {
+  const becomeWerewolf = (a, blessed, fromFever) => {
     endCurse(a, 'became a werewolf');
     const s = stateOf(a); Object.assign(s, { kind: 'werewolf', disease: null, stage: 0, blessed: !!blessed, beastDay: -1 });
     saveState(a, s); addSpell(a, BEAST_POWER); ensureTells(a, stateOf(a));
-    personal(a, blessed ? 'Hircine marks you as his own. The beast answers when you call, and only then.' : 'The fever breaks into a howl. You are a werewolf. Beast Form is yours once a day, and the hungrier you are, the more often the beast takes you whether you will it or not.');
+    if (fromFever) { onScreen(a, FEVER_TURNED.werewolf, 8); personal(a, 'Beast Form is yours once a day, and the hungrier you are, the more often the beast takes you whether you will it or not.'); }
+    else personal(a, blessed ? 'Hircine marks you as his own. The beast answers when you call, and only then.' : 'The fever breaks into a howl. You are a werewolf. Beast Form is yours once a day, and the hungrier you are, the more often the beast takes you whether you will it or not.');
     audit(`SUPERNATURAL ${who(a)} became a ${blessed ? 'Hircine-blessed ' : ''}werewolf`);
   };
   // Across the middle of the screen (dboBanner, client 0.3.26+), Skyrim's notification for older clients, and chat
@@ -1082,7 +1089,7 @@ module.exports = (api) => {
     // Nate 2026-09-26: and only at huntMarkChance; an unmarked survivor waits as long as one who failed before running again.
     if (won && r.type === 'hunt') {
       if (Math.random() < C.huntMarkChance) {
-        if (infect(a, 'werewolf', null, true)) return personal(a, 'Hircine lets you go, marked. Sanies Lupinus burns in the wound; when the fever peaks, the beast will try to come out.');
+        if (infect(a, 'werewolf', null, true)) return personal(a, 'Hircine lets you go, marked. Sanies Lupinus burns in the wound; when the fever peaks, the beast comes out.');
         return personal(a, 'Hircine lets you go, but his mark finds no room in you.');
       }
       markRiteWait(a, 'unmarked');
@@ -1252,7 +1259,7 @@ module.exports = (api) => {
       if (s.kind === 'vampire') return { reason: 'Hircine hunts the living, not the dead. Be cured first.' };
       if (s.disease) return { reason: s.disease.kind === 'werewolf' ? 'Sanies Lupinus is already in your blood. Wait for the fever.' : 'Another fever holds you. Be cured first.' };
       if (riteLegacySafe(a)) return { reason: legacyDeclined('The Great Hunt') };
-      return { type: 'hunt', title: 'The Great Hunt', confirm: 'Run the Hunt', warning: 'Hircine chases you, and if you run true he may mark you with Sanies Lupinus; when its fever peaks, the beast tries to come out. If he catches you, you may never rise.' };
+      return { type: 'hunt', title: 'The Great Hunt', confirm: 'Run the Hunt', warning: 'Hircine chases you, and if you run true he may mark you with Sanies Lupinus; when its fever peaks, the beast comes out. If he catches you, you may never rise.' };
     }
     if (deity === 'arkay' || deity === 'stendarr') {
       if (!s.kind) return { reason: s.disease ? 'Pray here to break the fever; the rite is for those already turned.' : 'You carry no curse to lift.' };
@@ -2252,24 +2259,21 @@ module.exports = (api) => {
     const wolf = s.disease.kind === 'werewolf';
     const played = Math.min(C.incubationDays, playedOf(s.disease));
     const left = Math.max(0, C.incubationDays - played);
-    const rite = wolf ? "Hircine's Hunt" : 'The Blood Fever';
     return {
       kind: `fever-${wolf ? 'werewolf' : 'vampire'}`, group: 'The Fever', label: wolf ? 'Sanies Lupinus' : 'Sanguinare Vampiris',
       epithet: left > 0 ? 'Incubating' : 'At its peak',
-      creed: wolf ? "Hircine's sickness is in your blood. When the fever peaks, the beast tries to come out."
-        : "Molag Bal's sickness is in your blood. When the fever peaks, it tries to make you his.",
+      creed: wolf ? "Hircine's sickness is in your blood. When the fever peaks, the beast comes out."
+        : "Molag Bal's sickness is in your blood. When the fever peaks, you become his.",
       ladder: null,
       rows: [
         {
           label: 'The fever', value: `${Math.round((played / C.incubationDays) * 100)}% grown`,
           hint: left > 0 ? `It grows only while you play: about ${inWords(realMinutes(left))} more. Time away from the game does not count.`
-            : 'It has peaked. The trial comes as soon as you are settled in the world.',
+            : 'It has peaked. You turn as soon as you are settled in the world.',
         },
         {
-          label: 'When it peaks', value: rite,
-          // As finishRite judges a loss: a client timed across the network (legacyDeadly 'safe') lives, one that times its own strikes dies
-          hint: `${rite} begins wherever you are. Strike true ${C.rite.needFever} times in ${C.rite.rounds}, and the curse takes you. ${riteLegacySafe(a)
-            ? 'Fail, and the fever breaks: you live, free of it.' : 'Fail, and the fever takes your life with it.'}`,
+          label: 'When it peaks', value: wolf ? 'You become a werewolf' : 'You become a vampire',
+          hint: 'There is no trial: when the fever has run its course, the curse takes you wherever you are (unless it is cured first).',
         },
         { label: 'A cure', value: 'Still possible', hint: 'A held prayer at a shrine of the Divines, a Cure Disease potion, or food or a potion that cures disease breaks the fever (an ingredient only when curing disease is its first effect). Prayers to the Daedric Princes or the older faiths, or away from a shrine, do not.' },
       ],
@@ -2375,15 +2379,16 @@ module.exports = (api) => {
       try { if (mp.get(a, 'isDead')) { playTicks.delete(a >>> 0); continue; } } catch (e) { continue; }
       if (s.disease) countPlay(a, s, day, s.disease);
       if (s.disease && playedOf(s.disease) >= C.incubationDays && !rites.has(a)) {
-        // Not in the first moments of a session: the client is still settling, the cursor is not the player's
-        // yet, and this trial kills. It waits for the next tick instead; the fever is not going anywhere.
+        // Not in the first moments of a session: the client is still settling and the turning changes the look. It waits
+        // for the next tick instead; the fever is not going anywhere.
         const since = Date.now() - (Number((globalThis.__dboConnectedAt || new Map()).get(a >>> 0)) || 0);
         if (since < RITE_LOGIN_GRACE_MS) {
-          log(`supernatural: ${display(a)} fever peaked ${Math.round(since / 1000)} s after joining; holding the rite until they have settled`);
+          log(`supernatural: ${display(a)} fever peaked ${Math.round(since / 1000)} s after joining; holding the turning until they have settled`);
           continue;
         }
-        personal(a, s.disease.kind === 'vampire' ? 'The fever peaks. Your heart stumbles.' : 'The fever peaks. Something inside you wants out.');
-        startRite(a, s.disease.kind === 'vampire' ? 'fever_vampire' : 'fever_werewolf');
+        // The incubation done, the carrier turns: no trial (Nate, 18 Oct)
+        log(`supernatural: ${display(a)} fever peaked; they turn`);
+        if (s.disease.kind === 'vampire') becomeVampire(a, false, true); else becomeWerewolf(a, false, true);
         continue;
       }
       if (s.kind === 'vampire' && s.unfed) tickUnfed(a, s, day);

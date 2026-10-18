@@ -101,14 +101,14 @@ globalThis.__dboRites.delete(A);
 online.push(A);
 globalThis.__dboConnectedAt = new Map([[A, Date.now()]]);   // just joined
 timers.superSlow();
-ok(!globalThis.__dboRites.has(A), 'a fever that peaks moments after joining does not open the rite yet');
+// No trial at the peak since 18 Oct (Nate): the carrier turns, still not in the first moments of a session
+const kindNow = () => ((store.get(`${A}|private.supernatural`) || {}).kind || null);
+ok(!globalThis.__dboRites.has(A) && kindNow() !== 'vampire', 'a fever that peaks moments after joining does not turn them yet');
 globalThis.__dboConnectedAt = new Map([[A, Date.now() - 600000]]);   // settled in
 timers.superSlow();
-ok(globalThis.__dboRites.has(A), '...and opens once the player has settled');
-for (let i = 0; i < 8 && globalThis.__dboRites.has(A); i++) fireTimeout();
-ok(!globalThis.__dboRites.has(A), '...and a Blood Fever nobody touched closes itself');
-ok(store.get(`${A}|isDead`) !== true, '...without killing the character who never saw it');
-ok(said.some((t) => /moment swims and passes you by/.test(t)), '...telling them it will come again');
+ok(!globalThis.__dboRites.has(A) && kindNow() === 'vampire', '...once settled they turn, with no rite (Nate, 18 Oct)');
+ok(store.get(`${A}|isDead`) !== true, '...and live');
+ok(said.some((t) => /The transformation is complete\. You have become a Vampire\./.test(t)), '...told with the popup');
 
 // A werewolf does not catch vampirism from a vampire's bite: swag, 2026-09-27, an established werewolf was
 // handed the Blood Fever, and surviving it would have overwritten his lycanthropy. The voluntary paths still
