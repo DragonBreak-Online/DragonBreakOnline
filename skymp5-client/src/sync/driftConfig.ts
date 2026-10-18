@@ -18,6 +18,9 @@ export const driftConfig = {
   // A remote copy's face-tint 3D rebuild (view/onScreenRebuild.ts): "load" once per 3D load (0.3.96, the face-morph crash
   // SkyrimSE+04328E9), "entry" on every return to the screen past the interval (0.3.95 and older), the quick undo
   faceRebuild: "load" as "load" | "entry",
+  // NPC copies retired by SkyrimPlatform's retireCopy (view/npcLifetimeRuntime.ts, LIFECYCLE_PLAN.md phase 1); the
+  // server's /driftset nativeRetire, off by default
+  nativeRetire: false,
 };
 
 export type DriftConfig = typeof driftConfig;
@@ -51,6 +54,7 @@ const RULES: Record<keyof DriftConfig, (v: unknown) => boolean> = {
   rehostClock: oneOf("packet", "apply"),
   rehostAfterMs: range(1000, 10000),
   faceRebuild: oneOf("load", "entry"),
+  nativeRetire: isBool,
 };
 
 // Copies the known keys that pass their check; anything else in the packet is ignored

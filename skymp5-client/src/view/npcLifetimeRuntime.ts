@@ -2,6 +2,7 @@
 import { Actor, Game, ObjectReference, Ui, on } from "skyrimPlatform";
 import * as sp from "skyrimPlatform";
 import { CopyWork, FrameBudget, SpawnLine, WorkQueue } from "./copyBudget";
+import { driftConfig } from "../sync/driftConfig";
 import { ActorTrail, CopyState, HostAttemptBackoff, LineBudget, PendingDelete, RecentDeletes, deleteDecision, deletePlan, dropRelayedRagdoll, newPendingDelete, reseatDecision, trailLine } from "./npcLifetime";
 
 // The file the launcher collects (report.js DIAG_LOG_REL); writeLogs ends every line with a flush, so a line written before a crash is kept
@@ -24,19 +25,21 @@ const spawnLine = new SpawnLine();
 export const hostBackoff = new HostAttemptBackoff();
 
 // LIFECYCLE_PLAN.md phase 1: SkyrimPlatform's retireCopy disables a copy and tears it down only after the engine's
-// queued Disable has run (the 41702 crash was a Delete landing before it). Used when the platform has it and
-// skymp5-client-settings.txt sets "nativeCopyLifecycle": true; otherwise the Papyrus path below, as before
+// queued Disable has run (the 41702 crash was a Delete landing before it). Used when the platform has it and either the
+// server's drift switch nativeRetire or skymp5-client-settings.txt "nativeCopyLifecycle": true (a dev install's own
+// override) asks for it; otherwise the Papyrus path below, as before
 interface RetireSp {
   retireCopy?: (localFormId: number) => boolean;
   processCopyRetires?: () => Array<{ id: number; frames: number; how: string }>;
 }
 const retireSp = sp as unknown as RetireSp;
-const nativeRetire: boolean = (() => {
-  try {
-    const on = (sp.settings["skymp5-client"] as Record<string, unknown> | undefined)?.["nativeCopyLifecycle"] === true;
-    return on && typeof retireSp.retireCopy === "function" && typeof retireSp.processCopyRetires === "function";
-  } catch (e) { return false; }
+const hasNatives: boolean = typeof retireSp.retireCopy === "function" && typeof retireSp.processCopyRetires === "function";
+const localOverride: boolean = (() => {
+  try { return (sp.settings["skymp5-client"] as Record<string, unknown> | undefined)?.["nativeCopyLifecycle"] === true; } catch (e) { return false; }
 })();
+// Read at each delete, so the server's switch takes effect without a relog
+const nativeRetireOn = (): boolean => hasNatives && (localOverride || driftConfig.nativeRetire);
+let lastNativeRetire: boolean | null = null;
 
 const baseOf = (id: number): number => {
   try { return ObjectReference.from(Game.getFormEx(id))?.getBaseObject()?.getFormID() || 0; } catch (e) { return 0; }
@@ -122,7 +125,7 @@ const deleteOrDefer = (refr: ObjectReference, defer: boolean): void => {
     loadingScreen: isLoadingScreen(),
   }, now);
   if (plan === "skip") { noteActorCall("delete-skipped", id); return; }
-  if (nativeRetire && id >= 0xff000000 && read(() => retireSp.retireCopy!(id))) {
+  if (nativeRetireOn() && id >= 0xff000000 && read(() => retireSp.retireCopy!(id))) {
     noteActorCall("retire", id, plan);
     recentDeletes.note(id, now);
     forget(id);
@@ -186,7 +189,10 @@ const onUpdate = (): void => {
   const stepMs = lastUpdateAt ? now - lastUpdateAt : 0;
   lastUpdateAt = now;
   copyWork.drain(frame, copyBudget);
-  if (nativeRetire) {
+  // Copies already handed over finish even after the switch goes off
+  if (hasNatives) {
+    const on = nativeRetireOn();
+    if (on !== lastNativeRetire) { lastNativeRetire = on; noteActorCall("lifecycle", 0, on ? "native retire" : "papyrus delete"); }
     try {
       for (const r of retireSp.processCopyRetires!()) noteActorCall("retired", r.id, `${r.how} after ${r.frames} updates`);
     } catch (e) { /* never break the frame */ }
@@ -224,7 +230,6 @@ const onUpdate = (): void => {
 
 if (!(globalThis as any).__dboNpcLifetimeOn) {
   (globalThis as any).__dboNpcLifetimeOn = true;
-  noteActorCall("lifecycle", 0, nativeRetire ? "native retire" : "papyrus delete");
   on("tick", () => { frame++; });
   on("update", () => { try { onUpdate(); } catch (e) { /* never break the frame */ } });
 }
