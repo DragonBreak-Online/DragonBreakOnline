@@ -25,6 +25,10 @@
 //   courtRename  [nonce, zoneId, 'office'|'rank', officeId|rankIndex, name]   a Lead GM's name for it ('' = the default)
 //   courtTax     [nonce, zoneId, percent]          the hold's one tax rate (business.js /tax), by Jarl, Count, Steward or staff
 //   courtWage    [nonce, zoneId, office, gold]     an office's weekly wage (economy.js), by the ruler or Steward
+//   courtContractPrice    [nonce, zoneId, tier, gold]   the hold's pay per kill for a danger tier (contracts.js /contract price)
+//   courtContractBudget   [nonce, zoneId, gold]         its weekly budget for standing contracts (/contract budget)
+//   courtContractStanding [nonce, zoneId, 'on'|'off']   standing contracts on or off (/contract standing); all three by
+//                                                       whoever sets its tax, with /contract's bounds and audit
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -210,7 +214,10 @@ module.exports = (api) => {
       if (globalThis.__dboHoldTax) tax = { pct: Math.round(Number(globalThis.__dboHoldTax(z.id)) * 100), max: Math.round(Number(globalThis.__dboHoldTaxMax ? globalThis.__dboHoldTaxMax() : 0.3) * 100),
         canSet: !!(globalThis.__dboCanSetHoldTax && globalThis.__dboCanSetHoldTax(a, z.id)) };
     } catch (e) { tax = null; }
-    return { id: z.id, name: z.name, kind: z.center ? 'stronghold' : z.capital ? 'hold' : 'region', mine: !!mine, offices, outgoing, household, treasury, tax, keepsBooks,
+    // The hold's terms for its standing hunting contracts (contracts.js __dboContractTerms), only where a treasury pays them
+    let contracts = null;
+    try { if (z.treasury && globalThis.__dboContractTerms) contracts = globalThis.__dboContractTerms.view(a, z.id) || null; } catch (e) { contracts = null; }
+    return { id: z.id, name: z.name, kind: z.center ? 'stronghold' : z.capital ? 'hold' : 'region', mine: !!mine, offices, outgoing, household, treasury, tax, keepsBooks, contracts,
       appointable: offices.filter((o) => o.canAppoint).map((o) => ({ rank: o.rank, title: o.title })), canName };
   };
   const visible = (a) => {
@@ -277,6 +284,16 @@ module.exports = (api) => {
     return { text: `${z.name} now taxes ${Math.round(rate * 100)}% of every rent and, each week, of every property's value.` };
   };
   onUi('courtTax', (a, args) => { if (fresh(a, args)) answer(a, () => setTax(a, args)); });
+  // courtContractPrice/Budget/Standing: the hold's terms for standing hunting contracts, by the same people and rules as
+  // /contract price|budget|standing (contracts.js setTerms: who may, the bounds, the audit line)
+  const setContract = (a, args, what, rest) => {
+    const z = zoneFor(a, args[1]); if (!z) return NO_COURT;
+    if (!z.treasury || !globalThis.__dboContractTerms) return { error: `${z.name} posts no hunting contracts.` };
+    return globalThis.__dboContractTerms.set(a, z.id, what, rest) || { error: 'That cannot be done just now.' };
+  };
+  onUi('courtContractPrice', (a, args) => { if (fresh(a, args)) answer(a, () => setContract(a, args, 'price', [args[2], args[3]])); });
+  onUi('courtContractBudget', (a, args) => { if (fresh(a, args)) answer(a, () => setContract(a, args, 'budget', [args[2]])); });
+  onUi('courtContractStanding', (a, args) => { if (fresh(a, args)) answer(a, () => setContract(a, args, 'standing', [args[2] === true || args[2] === 'on' ? 'on' : args[2] === false || args[2] === 'off' ? 'off' : String(args[2])])); });
   // courtWage [nonce, zoneId, office, gold]: economy.js's rules (the ruler or Steward; nobody sets their own)
   onUi('courtWage', (a, args) => {
     if (!fresh(a, args)) return;

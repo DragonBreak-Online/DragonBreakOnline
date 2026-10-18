@@ -667,10 +667,17 @@ module.exports = (api) => {
     return { text };
   };
   const ownName = (a) => { try { return String(display(a) || who(a)); } catch (e) { return String(who(a)); } };
-  // For a later panel (the Court tab): the same view and the same rules as the chat
+  // The creatures of each danger tier, for the Court tab's labels (plural names, the zero tier left out)
+  const kindsOfTier = (t) => Object.keys(DANGER).filter((k) => DANGER[k] === t).map(plural);
+  // For the Court tab (court.js courtContract*): the same view and the same rules as the chat. spent, tiers, by and at
+  // were added for that tab (18 Oct); by/at are the official who last changed the terms and when ('' / 0: never)
   globalThis.__dboContractTerms = {
-    view: (a, zid) => { const z = zoneById(zid); return z ? { prices: { 1: priceOf(z.id, 1), 2: priceOf(z.id, 2), 3: priceOf(z.id, 3) }, budget: budgetOf(z.id), left: budgetLeft(z.id), standing: standingOn(z.id),
-      citizensOnly: citizensOnly(z.id), resetsAt: resetsAt(), canSet: setsTerms(a, z.id), bounds: bounds(), budgetMax: budgetMax() } : null; },
+    view: (a, zid) => { const z = zoneById(zid); if (!z) return null; const h = state.holds[z.id] || {};
+      return { prices: { 1: priceOf(z.id, 1), 2: priceOf(z.id, 2), 3: priceOf(z.id, 3) }, budget: budgetOf(z.id), left: budgetLeft(z.id), standing: standingOn(z.id),
+        citizensOnly: citizensOnly(z.id), resetsAt: resetsAt(), canSet: setsTerms(a, z.id), bounds: bounds(), budgetMax: budgetMax(),
+        spent: Math.max(0, Math.floor(Number(holdState(z.id).spent) || 0)), enabled: CFG.enabled !== false,
+        tiers: [1, 2, 3].map((t) => ({ tier: t, name: TIER_WORD[t], price: priceOf(z.id, t), kinds: kindsOfTier(t) })),
+        by: h.by ? String(h.by) : '', at: Number(h.at) || 0 }; },
     set: (a, zid, what, args) => { const z = zoneById(zid); return z ? setTerms(a, z, String(what), [].concat(args || []).map(String)) : { error: 'There is no such hold.' }; },
   };
 

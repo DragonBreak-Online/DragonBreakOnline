@@ -1,5 +1,20 @@
 [
   {
+    "title": "Hunting contracts in the Court tab",
+    "date": "2026-10-18",
+    "version": "Next client update",
+    "tag": "New",
+    "sections": [
+      {
+        "heading": "Court",
+        "items": [
+          "With the next client update, your journal's Court tab (F3) shows a hold's terms for its standing hunting contracts: the pay per kill for pests, dangerous beasts and deadly beasts, the weekly budget, how much of it is spent and left this week and when it renews, whether the contracts are for its citizens only, and who last changed them.",
+          "Those who set the hold's tax (its Jarl or Count, its Steward, and the staff) can change the pay for each kind, the weekly budget, and switch standing contracts on or off right there, with the same limits as /contract price, /contract budget and /contract standing, which keep working."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Staff hold no leadership",
     "date": "2026-10-18",
     "version": "Hotfix",
