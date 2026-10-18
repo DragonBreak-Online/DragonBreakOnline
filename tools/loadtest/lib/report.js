@@ -62,7 +62,7 @@ function writeMarkdown(dir, run) {
       (s.gateActivations ? ', ' + s.gateActivations + ' hub gate activations' : ''));
     lines.push('- connected ' + s.bots_connected + ', spawned ' + s.bots_spawned +
       ', disconnects ' + s.bots_disconnects + ', login failures ' + s.bots_loginFailures +
-      ', snap-backs (refused movement) ' + s.traffic.snapBacks);
+      ', Teleport2 corrections ' + s.traffic.snapBacks);
     lines.push('- sent: ' + s.traffic.movesSent + ' movement, ' + s.traffic.chatSent + ' chat, ' +
       s.traffic.avSent + ' actor-value, ' + s.traffic.activateSent + ' activate' +
       (s.traffic.warpSteps ? ', ' + s.traffic.warpSteps + ' warp steps' : ''));

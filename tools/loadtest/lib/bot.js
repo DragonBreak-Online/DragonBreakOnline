@@ -125,6 +125,10 @@ class Bot {
     if (t === P.MsgType.Teleport || t === P.MsgType.Teleport2) {
       const mine = t === P.MsgType.Teleport2 || msg.idx === undefined || msg.idx === this.idx;
       if (!mine) return;
+      // Teleport2 has one sender: MovementValidation. Its speed check does not enforce by default
+      // (movementValidation.enforce false), but its FIRST check always does - a cell change or a jump of
+      // 4096 units or more is corrected for everybody. A warping bot trips that on nearly every step, so
+      // this counts the harness correcting itself far more often than it counts anything about the server.
       if (t === P.MsgType.Teleport2) this.stats.snapBacks++; else this.stats.teleports++;
       this.worldOrCell = msg.worldOrCell >>> 0;
       this.warper = null;
