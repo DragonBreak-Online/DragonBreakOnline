@@ -48,6 +48,7 @@ function shouldCopy(name) {
 
 class Sandbox {
   constructor(opts) {
+    this.env = opts.env || {};   // environment for the server process (see start)
     this.root = opts.root;                 // tools\loadtest\sandbox
     this.serverDir = opts.serverDir;       // the live server folder, the source of truth
     this.log = opts.log || (() => { });
@@ -235,9 +236,15 @@ class Sandbox {
     }
     const out = fs.openSync(this.logPath, 'a');
     // detached so "sandbox start" can hand the server over and exit; stop() finds it again by pid
+    // Env for the server process: a build may gate a feature behind one (SKYMP_MOVEMENT_RELAY=1 for the
+    // interest-management relay), and measuring it on and off needs the same build started twice.
+    const env = Object.assign({}, process.env, this.env || {});
     const child = spawn(process.execPath, ['dist_back/' + BUNDLE], {
-      cwd: this.root, stdio: ['ignore', out, out], detached: true,
+      cwd: this.root, stdio: ['ignore', out, out], detached: true, env,
     });
+    if (this.env && Object.keys(this.env).length) {
+      this.log('sandbox env: ' + Object.keys(this.env).map((k) => k + '=' + this.env[k]).join(' '));
+    }
     child.unref();
     fs.writeFileSync(this.pidPath, String(child.pid));
     this.child = child;

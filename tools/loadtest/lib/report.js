@@ -93,14 +93,31 @@ function writeMarkdown(dir, run) {
     // quadratic; a ladder shows itself here as the mid and far bands dropping while full stays put.
     const it = s.traffic.interest;
     if (it && it.perBot && it.perBot.full !== null) {
-      const band = (k) => r1(it.perBot[k]) + '/s from ' + r1(it.emitters[k]) + ' mover(s)';
+      const band = (k) => r1(it.perBot[k]) + '/s from ' + r1(it.emitters[k]) + ' mover(s)' +
+        (it.perBotNew && it.perBotNew[k] !== null && it.perBotNew[k] !== undefined
+          ? ' (' + r1(it.perBotNew[k]) + '/s new)' : '');
       lines.push('- interest per bot: near (<=' + it.fullUnits + 'u) ' + band('full') +
         ', mid (<=' + it.midUnits + 'u) ' + band('mid') +
         ', far ' + band('far') + (it.emitters.unknown > 0.05 ? ', unplaced ' + band('unknown') : '') +
         ', own echo ' + r1(it.selfEchoPerSec / Math.max(1, s.bots_connected)) + '/s');
+      // A repeat of a position the bot was already told is wire cost that taught it nothing
+      if (it.newPosPerBot !== null && it.newPosPerBot !== undefined) {
+        lines.push('- of that, new positions ' + r1(it.newPosPerBot) + '/s per bot, repeats ' +
+          r1(it.dupPerBot) + '/s, createActor for a mover ' + r1(it.createsPerBot) + '/s' +
+          '; own echo new ' + r1(it.selfEchoNewPerSec / Math.max(1, s.bots_connected)) + '/s, repeat ' +
+          r1(it.selfEchoDupPerSec / Math.max(1, s.bots_connected)) + '/s');
+      }
       if (it.top && it.top.length) {
-        lines.push('- busiest movers for bot ' + it.top[0].bot + ' (idx:messages:units): ' +
-          it.top[0].top.split(',').slice(0, 12).join(' '));
+        // Rates, not counts: the counts are this step's, and dividing a run-long count by a step's
+        // length is what once made these emitters look faster than the clients that sent them
+        const secs = Math.max(1, s.durationMs / 1000);
+        const movers = it.top[0].top.split(',').slice(0, 12).map((f) => {
+          const c = f.split(':');
+          return c[0] + ':' + r1(Number(c[1]) / secs) + '/s:' + c[2] + 'u:' + r1(Number(c[3]) / secs) +
+            '/s new' + (Number(c[4]) ? ':' + c[4] + ' created' : '');
+        });
+        lines.push('- busiest movers for bot ' + it.top[0].bot + ' this step (idx:rate:distance:new): ' +
+          movers.join('  '));
       }
     }
     if (s.server.tickP50ms !== null) {

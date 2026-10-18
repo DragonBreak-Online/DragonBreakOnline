@@ -116,6 +116,12 @@ class HostPool {
     this.write(botId, 'close ' + botId);
   }
 
+  // Starts a new window for the per-emitter counters, which run from the bot's connect. Without it the
+  // busiest-mover list in a report covers the whole run and its rates read high for the step.
+  mark() {
+    for (const host of this.hosts) if (host.alive) host.child.stdin.write('mark\n');
+  }
+
   requestStats() {
     for (const host of this.hosts) if (host.alive) host.child.stdin.write('stats\n');
   }

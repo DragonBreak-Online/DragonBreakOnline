@@ -54,6 +54,9 @@ internal class Bot
     public double PosX, PosY;
     public bool HasPos;
     public long SelfEcho;
+    public long SelfEchoNew, SelfEchoDup;
+    public double SelfLastX, SelfLastY;
+    public bool SelfHasLast;
     public Dictionary<int, Emitter> Movers = new Dictionary<int, Emitter>();
 }
 
@@ -61,6 +64,21 @@ internal class Emitter
 {
     public long Count;      // UpdateMovement messages received about this emitter
     public double Dist;     // XY distance at the last one, in game units
+
+    // A listener cannot legitimately be told a position more often than the emitter sends one, so the
+    // messages that carry a position we were already told are counted apart: Count is what the wire cost,
+    // NewPos is what the client actually learned, and a ladder has to be judged on NewPos.
+    public long NewPos;
+    public long Dup;
+    public long Creates;    // CreateActor messages for this emitter: resubscription churn, which reseeds position
+    public double LastX, LastY;
+    public bool HasLast;
+
+    // These counters run from the moment the bot connected, but a report measures one window. 'mark' copies
+    // them here at the window's start so the busiest-mover list is that window's and not the whole run's:
+    // dividing a run-long count by a step's length overstates the rate, which is how the first 500-bot
+    // reports came to show emitters above the send rate.
+    public long BaseCount, BaseNewPos, BaseDup, BaseCreates;
 }
 
 internal static class Program
@@ -181,6 +199,7 @@ internal static class Program
                 case "send": CmdSend(rest); break;
                 case "close": CmdClose(int.Parse(rest.Trim(), CultureInfo.InvariantCulture)); break;
                 case "self": CmdSelf(rest); break;
+                case "mark": CmdMark(); break;
                 case "stats": EmitStats(); break;
                 case "quit": _quit = true; break;
                 default: Emit("log unknown command " + verb); break;
@@ -272,6 +291,22 @@ internal static class Program
 
     // "self <botId> <idx>": the bot's own form index, so its echo is counted apart and its own sent
     // position can be read from the movement it sends
+    // "mark": start a new measurement window for the per-emitter counters. The runner sends it once, to every
+    // host, just before the window it is about to measure.
+    private static void CmdMark()
+    {
+        foreach (var bot in Bots.Values)
+        {
+            foreach (var e in bot.Movers.Values)
+            {
+                e.BaseCount = e.Count;
+                e.BaseNewPos = e.NewPos;
+                e.BaseDup = e.Dup;
+                e.BaseCreates = e.Creates;
+            }
+        }
+    }
+
     private static void CmdSelf(string rest)
     {
         var sp = rest.IndexOf(' ');
@@ -333,6 +368,7 @@ internal static class Program
         // Done here rather than in the runner because UpdateMovement is normally not forwarded at all: at
         // 620 a second per bot the line protocol would cost more than the measurement is worth.
         if (msgType == 2) CountMover(bot, rawContent, len);
+        else if (msgType == 33) CountCreate(bot, rawContent, len);
 
         if (!Forward.Contains(msgType)) return;
 
@@ -379,20 +415,53 @@ internal static class Program
     {
         var idx = ReadIntField(p, len, "idx");
         if (idx < 0) return;
-        if (idx == bot.SelfIdx) { bot.SelfEcho++; return; }
+
+        double x, y;
+        var gotPos = ReadPosXY(p, len, out x, out y);
+
+        if (idx == bot.SelfIdx)
+        {
+            bot.SelfEcho++;
+            if (gotPos)
+            {
+                if (bot.SelfHasLast && x == bot.SelfLastX && y == bot.SelfLastY) bot.SelfEchoDup++;
+                else bot.SelfEchoNew++;
+                bot.SelfLastX = x; bot.SelfLastY = y; bot.SelfHasLast = true;
+            }
+            return;
+        }
 
         Emitter e;
         if (!bot.Movers.TryGetValue(idx, out e)) { e = new Emitter(); bot.Movers[idx] = e; }
         e.Count++;
 
-        // XY only: the server streams by an X/Y grid, so XY is the distance the ladder would use
-        double x, y;
-        if (bot.HasPos && ReadPosXY(p, len, out x, out y))
+        if (gotPos)
         {
-            var dx = x - bot.PosX;
-            var dy = y - bot.PosY;
-            e.Dist = Math.Sqrt(dx * dx + dy * dy);
+            // Exact equality is the right test: a repeat of the same position is the same serialized packet,
+            // and any real movement at 350 u/s changes the decimals
+            if (e.HasLast && x == e.LastX && y == e.LastY) e.Dup++;
+            else e.NewPos++;
+            e.LastX = x; e.LastY = y; e.HasLast = true;
+
+            // XY only: the server streams by an X/Y grid, so XY is the distance the ladder would use
+            if (bot.HasPos)
+            {
+                var dx = x - bot.PosX;
+                var dy = y - bot.PosY;
+                e.Dist = Math.Sqrt(dx * dx + dy * dy);
+            }
         }
+    }
+
+    // CreateActor per emitter. A Subscribe reseeds the actor's position, so this is the other thing that can
+    // raise an emitter's apparent update rate above what it sends.
+    private static void CountCreate(Bot bot, IntPtr p, long len)
+    {
+        var idx = ReadIntField(p, len, "idx");
+        if (idx < 0 || idx == bot.SelfIdx) return;
+        Emitter e;
+        if (!bot.Movers.TryGetValue(idx, out e)) { e = new Emitter(); bot.Movers[idx] = e; }
+        e.Creates++;
     }
 
     // Finds "name" and returns the index just past its closing quote, or -1
@@ -482,31 +551,61 @@ internal static class Program
 
             // The interest check: emitters and messages by distance band, plus the busiest emitters so a
             // ladder can be judged per actor and not only by its total
+            // m and the totals stay run-long because the runner subtracts the window's start from them; the
+            // emitter counts cannot be subtracted that way (an emitter is not a quantity), so those are
+            // counted for this window only, from the 'mark' baseline.
             long fullE = 0, fullM = 0, midE = 0, midM = 0, farE = 0, farM = 0, unknownE = 0, unknownM = 0;
+            long newPos = 0, dup = 0, creates = 0, fullNew = 0, midNew = 0, farNew = 0;
+            long movers = 0;
             foreach (var kv in bot.Movers)
             {
                 var d = kv.Value.Dist;
                 var c = kv.Value.Count;
-                if (d <= 0) { unknownE++; unknownM += c; }
-                else if (d <= _fullUnits) { fullE++; fullM += c; }
-                else if (d <= _midUnits) { midE++; midM += c; }
-                else { farE++; farM += c; }
+                var cw = c - kv.Value.BaseCount;   // this window
+                // An actor we only ever saw a CreateActor for has not moved, so it is not a mover: counting it
+                // would put every spawned NPC in the 'unplaced' band
+                if (c == 0) continue;
+                newPos += kv.Value.NewPos;
+                dup += kv.Value.Dup;
+                creates += kv.Value.Creates;
+                if (d <= 0) { unknownM += c; } else if (d <= _fullUnits) { fullM += c; fullNew += kv.Value.NewPos; }
+                else if (d <= _midUnits) { midM += c; midNew += kv.Value.NewPos; }
+                else { farM += c; farNew += kv.Value.NewPos; }
+                // An emitter that said nothing in this window is not one of this window's movers
+                if (cw == 0) continue;
+                movers++;
+                if (d <= 0) unknownE++;
+                else if (d <= _fullUnits) fullE++;
+                else if (d <= _midUnits) midE++;
+                else farE++;
             }
             sb.Append(",\"selfEcho\":").Append(bot.SelfEcho);
-            sb.Append(",\"movers\":").Append(bot.Movers.Count);
+            sb.Append(",\"selfEchoNew\":").Append(bot.SelfEchoNew).Append(",\"selfEchoDup\":").Append(bot.SelfEchoDup);
+            sb.Append(",\"moverNewPos\":").Append(newPos).Append(",\"moverDup\":").Append(dup);
+            sb.Append(",\"moverCreates\":").Append(creates);
+            sb.Append(",\"tiersNew\":{\"full\":").Append(fullNew).Append(",\"mid\":").Append(midNew)
+              .Append(",\"far\":").Append(farNew).Append("}");
+            sb.Append(",\"movers\":").Append(movers);
             sb.Append(",\"tiers\":{\"full\":{\"e\":").Append(fullE).Append(",\"m\":").Append(fullM).Append("}");
             sb.Append(",\"mid\":{\"e\":").Append(midE).Append(",\"m\":").Append(midM).Append("}");
             sb.Append(",\"far\":{\"e\":").Append(farE).Append(",\"m\":").Append(farM).Append("}");
             sb.Append(",\"unknown\":{\"e\":").Append(unknownE).Append(",\"m\":").Append(unknownM).Append("}}");
 
+            // The busiest emitters of THIS window, so dividing a count here by the window's length gives a
+            // rate that can be compared against what an emitter sends
             var top = new List<KeyValuePair<int, Emitter>>(bot.Movers);
-            top.Sort((a, b) => b.Value.Count.CompareTo(a.Value.Count));
+            top.Sort((a, b) => (b.Value.Count - b.Value.BaseCount).CompareTo(a.Value.Count - a.Value.BaseCount));
             sb.Append(",\"top\":\"");
             for (var i = 0; i < top.Count && i < 40; i++)
             {
+                var e = top[i].Value;
+                var cw = e.Count - e.BaseCount;
+                if (cw <= 0) break;
                 if (i > 0) sb.Append(",");
-                sb.Append(top[i].Key).Append(":").Append(top[i].Value.Count).Append(":")
-                  .Append(((long)top[i].Value.Dist).ToString(CultureInfo.InvariantCulture));
+                // idx:messages:units:newPositions:createActors, all for this window
+                sb.Append(top[i].Key).Append(":").Append(cw).Append(":")
+                  .Append(((long)e.Dist).ToString(CultureInfo.InvariantCulture)).Append(":")
+                  .Append(e.NewPos - e.BaseNewPos).Append(":").Append(e.Creates - e.BaseCreates);
             }
             sb.Append("\"}");
             Emit(sb.ToString());
