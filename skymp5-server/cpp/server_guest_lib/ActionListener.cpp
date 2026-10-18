@@ -981,6 +981,37 @@ void ActionListener::OnCustomPacket(const RawMessageData& rawMsgData,
   }
 }
 
+void ActionListener::RelayMovement(uint32_t idx,
+                                   const RawMessageData& rawMsgData)
+{
+  if (!movementRelay && MovementRelay::EnabledFromEnv()) {
+    movementRelay = std::make_unique<MovementRelay>(partOne);
+    spdlog::info("MovementRelay: interest management on");
+  }
+  if (!movementRelay) {
+    SendToNeighbours(idx, rawMsgData);
+    return;
+  }
+  MpActor* myActor = partOne.serverState.ActorByUser(rawMsgData.userId);
+  MpForm* form = partOne.worldState.LookupFormByIdx(idx);
+  MpActor* actor = form ? form->AsActor() : nullptr;
+  if (!myActor || !actor) {
+    SendToNeighbours(idx, rawMsgData);
+    return;
+  }
+  // As SendToNeighbours: a hosted NPC's own hoster is not told, a player's own movement is echoed back
+  const bool skipSender = idx != myActor->GetIdx();
+  movementRelay->Submit(*actor, rawMsgData.userId, skipSender,
+                        rawMsgData.unparsed, rawMsgData.unparsedLength);
+}
+
+void ActionListener::TickMovementRelay()
+{
+  if (movementRelay) {
+    movementRelay->Flush();
+  }
+}
+
 void ActionListener::OnUpdateMovement(const RawMessageData& rawMsgData,
                                       const UpdateMovementMessage& msg)
 {
@@ -1020,7 +1051,7 @@ void ActionListener::OnUpdateMovement(const RawMessageData& rawMsgData,
     // (kInfinityPos); it was sent before the hoster saw the teleport, so
     // watchers are not shown that stale position either
     if (!actor->GetTeleportFlag()) {
-      SendToNeighbours(msg.idx, rawMsgData);
+      RelayMovement(msg.idx, rawMsgData);
     }
   }
   if (actor) {
@@ -1050,7 +1081,7 @@ void ActionListener::OnUpdateMovement(const RawMessageData& rawMsgData,
     }
 
     if (isOwnActor) {
-      SendToNeighbours(msg.idx, rawMsgData);
+      RelayMovement(msg.idx, rawMsgData);
     }
 
     if (!msg.data.isBlocking) {
@@ -2080,6 +2111,9 @@ void ActionListener::OnHit(const RawMessageData& rawMsgData,
   MpForm* targetForm = partOne.worldState.LookupFormById(hitData.target).get();
   MpObjectReference* targetRef =
     targetForm ? targetForm->AsObjectReference() : nullptr;
+  if (movementRelay && targetRef) {
+    movementRelay->NoteCombat(aggressor->GetFormId(), targetRef->GetFormId());
+  }
   if (!targetRef) {
     spdlog::error("ActionListener::OnHit - MpObjectReference not found for "
                   "hitData.target {:x}",

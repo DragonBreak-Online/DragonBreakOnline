@@ -151,6 +151,7 @@ void PartOne::Tick()
   TickDeferredMessages();
   TickHostReleases();
   TickStaleHosts();
+  GetActionListener().TickMovementRelay();
   worldState.Tick();
 }
 
