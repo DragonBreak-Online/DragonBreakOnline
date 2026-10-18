@@ -882,16 +882,27 @@ module.exports = (api) => {
     const filled = fillChests(d, diff, lease);
     const moveIn = (placed) => {
       if (ST.leases.get(d.id) !== lease) return;
-      let moved = 0;
+      let moved = 0; const inside = [];
       // The claimer first; in a staggered ruin each other member is queued behind them
       for (const pid of [...members].sort((x, y) => (x === leaderPid ? -1 : y === leaderPid ? 1 : 0))) {
         const a = actorByProfile(pid); if (!a) continue;
         if (a !== leaderActor && !atEntrance(a, entrance)) { system(a, `${display(leaderActor)} has claimed ${d.name}. Use the entrance to join them.`); continue; }
         if (entryWait(lease, d, pid) > 0) { queueEntry(a, lease, d, diff, entrance, pid); continue; }
-        if (goIn(a, lease, d, diff, entrance)) moved++;
+        if (goIn(a, lease, d, diff, entrance)) { moved++; inside.push(a); }
       }
       audit(`DUNGEON ${who(leaderActor)} claimed ${d.name} on ${diff.label} with ${members.size} member(s), ${zones.length} enemies (${placed >= 0 ? placed + ' placed before entry' : 'placed on entry'}), ${filled} containers filled (${lease.rolledGold instanceof Map ? [...lease.rolledGold.values()].reduce((n, g) => n + g, 0) : 0} gold), ${lease.locked.size} locked`);
       log(`dungeon ${d.id} claimed by ${display(leaderActor)}: ${diff.id}, party level ${lease.partyLevel} x${lease.partySize}, ${moved} moved in, ${zones.length} enemies, ${placed} prespawned, ${filled} containers`);
+      // A claim that prespawned nothing (2026-10-17, found by the load test at 14 concurrent leases): placed 0
+      // means the spawn pass ran and placed no enemy at all, where -1 is the designed 'placed on entry' path.
+      // npcSpawnSystem retries each spot BUDGET_RETRY_MS (10 s) later, so the ruin fills late rather than never -
+      // but nothing said so: the line read '0 prespawned' and the party walked into an empty dungeon. The cause is
+      // not readable from here (the system exposes only __alduinakNpcSpawnNow), and npcLiveBudget being full across
+      // every zone is the one the load test reproduced; a spot not ready or a fallen spot can do it too.
+      if (placed === 0 && zones.length) {
+        log(`dungeon ${d.id} prespawned none of its ${zones.length} enemies: the spawn pass placed nothing, so they`
+          + ` arrive as npcSpawnSystem retries its spots. Check the npc budget (npcLiveBudget) against the live count`);
+        for (const a of inside) system(a, 'The ruin is still filling: its enemies are taking their places and will arrive shortly.');
+      }
       // the player log (playerlog.js): the claim on every member's post (the audit names only the leader)
       try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('dungeon', 'claim', [...members].map((pid) => actorByProfile(pid)).filter(Boolean), d.name, diff.label); } catch (e) { /* the player log is optional */ }
     };

@@ -1,4 +1,40 @@
 # DragonBreak Online checklist (2026-09-14)
+## Added 2026-10-17: the npc live budget costs latency, not bandwidth - PC session (load test)
+
+Two things, both written up in `_reviews/2026-10-17-npc-live-budget-cost.md`.
+
+**A dungeon claim that pre-spawns nothing now says so** (`dungeons.js`). `placed === 0` meant the spawn pass
+placed no enemy at all and only ever printed "0 prespawned": the party walked into an empty ruin with nothing
+in the log. It now logs the count against the zone total, points at `npcLiveBudget` as the thing to check (the
+cause is not readable from the gameplay layer) and tells the players who went in that the ruin is still filling.
+Correction to the 20 Sep write-up: the enemies arrive **late, not never** - `npcSpawnSystem` retries each spot
+after 10 s. Verified in the sandbox at `npcLiveBudget: 1`. **Needs a `server` push + `deploy-gameplay`** (server
+session); inert on this PC until something touches `gamemode.js`.
+
+**`npcLiveBudget` is 600, not the 150 the September sweep measured.** Two arms, 1000 seeded one-NPC zones,
+both confirmed binding (the first attempt seeded 300, so 600 could never bind and measured nothing):
+
+| | 50 players | 100 players |
+|---|---|---|
+| messages in | 43,269 -> 46,297/s (+7%) | 154,905 -> 180,138/s (+16%) |
+| createActor | +73% | +67% |
+| CPU of one core | 20.6 -> 25.6% | 42.3 -> 52.5% |
+| tick p99 | 19.9 -> 24.67 ms (+24%) | 27.08 -> 39.83 ms (+47%) |
+| loop lag max | 60.8 -> 159.9 ms | 142.9 -> **389.8 ms** |
+
+Four times the NPCs is not four times the cost, and the cost is not bandwidth: only actors near a player are
+streamed. What grows is churn - createActor/DestroyActor up two thirds as a dense population streams in and out
+of the 3x3 grid block - and it lands on the event loop. The penalty grows with the player count (+24% tick p99
+at 50, +47% at 100), so 600 is comfortable at the 50 the alpha gate asks for and is the largest latency cost
+measured at 100.
+
+**Also a correction:** the 20 Sep figure of 67,454 msg/s at 100 players was a nearly empty world. Populated it
+is 180,138 - 2.7x. Every capacity number from that sweep is a floor, not an expectation.
+
+Open: decide the budget against the player cap (300-400, or scale it with the connected count); the churn is the
+same C++ interest-management work as the fan-out finding (NPC_REBUILD phase 4); a `__alduinakNpcLive` hook would
+let the claim line name the cause and let `dungeons.js` defer a claim it cannot populate.
+
 
 ## Added 2026-10-17: Scribing, Master Scholars write spell tomes and scrolls - NOT DEPLOYED, waits on Nate
 
