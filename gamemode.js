@@ -4037,6 +4037,9 @@ const DRIFT_KEYS = {
   // Disable, then tear down. Off unless gamemode-config.json drift.nativeRetire is true; /driftset nativeRetire true|false
   // switches it live. A client without the platform natives keeps the Papyrus delete whatever this says
   nativeRetire: { def: !!(cfg && cfg.drift && cfg.drift.nativeRetire === true), ok: (v) => typeof v === 'boolean' },
+  // NPC copies created by SkyrimPlatform's createCopy at their final spot (LIFECYCLE_PLAN.md phase 2b), instead of
+  // placeAtMe(initially disabled) and a move. Off unless gamemode-config.json drift.nativeCreate; /driftset nativeCreate
+  nativeCreate: { def: !!(cfg && cfg.drift && cfg.drift.nativeCreate === true), ok: (v) => typeof v === 'boolean' },
   // A remote copy's face-tint rebuild (client 0.3.96 view/onScreenRebuild.ts): "load" once per 3D load (the face-morph crash
   // SkyrimSE+04328E9), "entry" on every return to the screen as before 0.3.96, the quick undo (claude-jake's review of
   // 6b7a3c59). Its default is gamemode-config.json drift.faceRebuild when set; /driftset faceRebuild entry switches it live.
