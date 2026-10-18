@@ -48,7 +48,11 @@ function writeMarkdown(dir, run) {
   lines.push('Mode: ' + run.mode + ', movement every ' + run.cfg.movementMs + ' ms, run speed ' +
     run.cfg.runSpeed + ' u/s, chat every ' + Math.round(run.cfg.chatEveryMs[0] / 1000) + '-' +
     Math.round(run.cfg.chatEveryMs[1] / 1000) + ' s per bot' +
-    (run.cfg.hostNpcs ? ', NPC hosting emulated' : ', no NPC hosting') + '.');
+    (run.cfg.hostNpcs ? ', NPC hosting emulated' : ', no NPC hosting') +
+    (run.cfg.scatter
+      ? ', SCATTERED across ' + run.cfg.scatter.anchors + ' groups at least ' + run.cfg.scatter.separation +
+        ' units apart (cluster radius ' + run.cfg.scatter.clusterRadius + ')'
+      : ', crowded into one place') + '.');
   lines.push('');
   lines.push('| bots | length | connected | move Hz/bot | msg/s to server | msg/s to bots | KiB/s to bots (JSON) | UDP dgram/s | server CPU | RSS MB | tick p50 ms | tick p99 ms | loop lag p99 ms | log errors |');
   lines.push('|---|---|---|---|---|---|---|---|---|---|---|---|---|---|');
