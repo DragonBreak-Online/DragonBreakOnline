@@ -216,3 +216,20 @@ the distance-blind relay of section 1, measured per actor rather than inferred f
 control the ladder will be judged against: **near must stay at 7/s, mid must fall to 2/s, far to 0.5/s, and the
 mover counts must not collapse** (a ladder that simply drops distant actors would show the same traffic saving
 and would be wrong). `own echo 7/s` is also the self-echo of `2026-10-18-self-echo.md`, measured directly.
+
+## 8. Corrected by measurement at 250 and 500 (same day)
+
+See `2026-10-18-250-and-500.md`. Three numbers above are wrong and one argument was framed wrongly.
+
+- **The per-send cost is 2.7 microseconds, not 3.3.** Measured at 250 players before saturation (1.11 cores for
+  405,415 messages a second). The 5.2 us seen at 500 is queue management and GC on top, not the real cost.
+- **The per-client budget of 426/s is too high by about double.** Delivered movement plateaus near **420,000 a
+  second** on this machine, so 1,000 clients at 426/s is exactly the ceiling it already fails at. A budget near
+  **200/s** leaves headroom: roughly 16 near at full rate, 48 mid at 1/s, 128 far at 0.25/s.
+- **Threading is a dependency, not a later step.** One thread delivers about 370k/s before overhead.
+- **The coalescing is the safety mechanism, not an optimisation.** At 500 players the server queued what it could
+  not send and its memory went from 2.4 GB to 35 GB, growing 123 MB/s and still climbing. Overwriting the pending
+  movement per emitter is what prevents that, and it needs an explicit cap on queued bytes and emitters per
+  client, with the evictions counted.
+
+The ladder itself survives unchanged in shape. What changed is its size, and the reason for it.
