@@ -46,7 +46,7 @@ const common = { mp, log: () => {}, personal: (a, t) => told.push([a, t]), displ
   onlineActors: () => [HUB, OLD, STAFF], isAdmin: (a) => a === STAFF };
 require(path.resolve('journal.js'))(Object.assign({}, common, { nameOf: (a) => (props.get(`${a}|appearance`) || {}).name, sendPacket: () => {}, cfg: {}, skills: SKILLS.skills,
   hasCap: (a, cap) => !!(caps.get(a) && caps.get(a).has(cap)) }));
-require(path.resolve('prayer.js'))(Object.assign({}, common, { audit: (t) => audits.push(t), cfg: {}, registerChatCommand: (n, fn) => commands.set(n, fn), skills: SKILLS,
+require(path.resolve('prayer.js'))(Object.assign({}, common, { audit: (t) => audits.push(t), cfg: { prayer: { faiths: false } }, registerChatCommand: (n, fn) => commands.set(n, fn), skills: SKILLS,
   distanceMeters: () => 2, takeGold: () => true, treasuryHere: (a, n) => n }));
 
 // ---- skills.json: the lore fixes ----
