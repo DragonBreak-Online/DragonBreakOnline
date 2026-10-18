@@ -159,6 +159,16 @@ module.exports = (api) => {
       // Any college (guild-defs.json "college": true) as well as the teacherGuilds named (Swag, 17 Oct)
       collegeGuilds: true,
       units: 25, wheelEvents: 8, wheelValue: 150, maxStudents: 12,
+      // Fixed school LEVELS rather than a flat parcel of units (Nate, 18 Oct). levelsByRank is read by the STUDENT's own
+      // rank, not the class's: a Novice gains 10 levels of the school, a Master 2. A class one rank either way gives
+      // adjacentShare (0.5) of the student's own figure; further than that, nothing. units stays for the old behaviour
+      // and is used when levelsByRank is empty.
+      // WHAT THE CAPS DO TO IT (Nate, 18 Oct: "we need caps and cooldowns"). The school half is exact - schools.js owns
+      // those levels - but credit() still stops dead at a rank pick the student has not made, so a class can never carry
+      // anyone past a choice they owe. The Arcane Arts half CANNOT be exact: it goes through the Wheel's own award
+      // (__alduinakMasteryAward), which takes a weight and applies the hourly and daily caps, so arcaneWeight aims at
+      // about arcaneLevels and the Wheel gives what its caps allow. That is the capped behaviour, deliberately.
+      levelsByRank: [10, 7, 5, 3, 2], adjacentShare: 0.5, arcaneLevels: 2, arcaneWeight: 3,
       // Elion and Aldemar's proposal (Nate, 11 Oct): Arcane Arts at teacherArcaneLevel also qualifies a teacher, as Expert
       // study (teacherMinRank) in a school does. Students short of their first spell (Arcane Arts below firstSchoolAt, no
       // school yet) are paid Arcane Arts while they sit the class: every firstEverySeconds in the classroom, firstWeight
@@ -284,6 +294,16 @@ module.exports = (api) => {
   };
   // Units of work from nothing to `level`, as skillPoints.ts unitsForLevel
   const unitsForLevel = (level) => { let u = 0; for (let l = 0; l < Math.max(0, Math.min(level, 100)); l++) u += 100 / xpPerUnitAt(l); return u; };
+  // The units it costs to climb `levels` (which may be a half) from `from`. unitsForLevel counts whole levels only, so a
+  // half level is added at the rate of the band it lands in - without this, 2.5 levels cost the same as 3.
+  const unitsForLevels = (from, levels) => {
+    const start = Math.max(0, Math.min(100, Number(from) || 0));
+    const whole = Math.max(0, Math.floor(Number(levels) || 0));
+    let u = Math.max(0, unitsForLevel(Math.min(100, start + whole)) - unitsForLevel(start));
+    const frac = (Number(levels) || 0) - whole;
+    if (frac > 0 && start + whole < 100) u += frac * (100 / xpPerUnitAt(start + whole));
+    return u;
+  };
   const FLOORS = [1, 25, 50, 75, 90];
   const rankOfLevel = (level) => { if (!(level >= 1)) return -1; let r = 0; for (let i = 0; i < FLOORS.length; i++) if (level >= FLOORS[i]) r = i; return r; };
 
@@ -1564,10 +1584,20 @@ module.exports = (api) => {
       if (next > Date.now()) return W.teacherCooldown(inWords(next - Date.now()));
       return '';
     };
+    // What share of the student's own reward a class at classRank pays. With levelsByRank set (Nate, 18 Oct) it is the
+    // same both ways - full at the student's own rank, adjacentShare one rank either side, nothing beyond - rather than
+    // the old matrix, which paid 0.7 for a class one rank ABOVE and 0.5 for one below. conf.scale still wins where it
+    // gives a figure, so a hand-tuned row can override this.
     const scaleFor = (studentRank, classRank) => {
       const row = (conf.scale || [])[studentRank];
-      const v = Array.isArray(row) ? Number(row[classRank]) : 0;
-      return Number.isFinite(v) && v > 0 ? v : 0;
+      const v = Array.isArray(row) ? Number(row[classRank]) : NaN;
+      if (Number.isFinite(v) && v > 0 && !Array.isArray(conf.levelsByRank)) return v;
+      if (!Array.isArray(conf.levelsByRank) || !conf.levelsByRank.length) return Number.isFinite(v) && v > 0 ? v : 0;
+      const away = Math.abs(Number(studentRank) - Number(classRank));
+      if (!(Number(studentRank) >= 0) || !(Number(classRank) >= 0)) return 0;
+      if (away === 0) return 1;
+      if (away === 1) return Math.max(0, Number(conf.adjacentShare) || 0);
+      return 0;
     };
     // Where it is held: the lectern's interior cell, or `radiusMeters` around it outdoors
     const inRoom = (k, a) => {
@@ -1876,7 +1906,15 @@ module.exports = (api) => {
     },
     pay: (st, s, k, f) => {
       const before = levelOf(s, k.spell.school);
-      credit(s, k.spell.school, C.classes.units * f);
+      // Fixed levels by the STUDENT's rank (Nate, 18 Oct), turned into the units those levels cost from where they
+      // stand, so a Novice's ten levels and a Master's two are both honest. credit() still halts at an unmade rank pick.
+      const byRank = Array.isArray(C.classes.levelsByRank) ? C.classes.levelsByRank : null;
+      let units = C.classes.units * f;
+      if (byRank && byRank.length) {
+        const want = Math.max(0, Number(byRank[Math.max(0, Math.min(byRank.length - 1, rankOfLevel(before)))]) || 0) * f;
+        if (want > 0) units = unitsForLevels(before, want);
+      }
+      credit(s, k.spell.school, units);
       s.paidAt = Date.now();
       save(st, s);
       const w = wheel(st, idOf(k.spell.desc), C.classes.wheelValue, Math.max(1, Math.round(C.classes.wheelEvents * f)));
