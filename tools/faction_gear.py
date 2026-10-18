@@ -51,6 +51,9 @@ SETS = [
     # mail, plate, coif, shield and the two Vigilant weapons were open to anyone. Sentinel.esp only: "Vigilant" also
     # names unrelated gear in other mods.
     ('Vigilants of Stendarr', ['vigil-of-stendarr'], r"^Vigil(ant)? ", lambda n, e, p: '_TH_' in e),
+    # The Tribunal Temple's robes, mantles, hoods and masks (Immersive Armors; Nate, 18 Oct: "locked behind faction"):
+    # House Indoril is the Temple's own house, its Ordinators drawn from it
+    ('Tribunal Temple', ['house-indoril'], r"^Tribunal ", lambda n, e, p: p == 'Hothtrooper44_ArmorCompilation.esp'),
     # Modded silver only: Immersive Weapons' silver weapons and Immersive Armors' mantles, not the base game's
     ('Silver Hand', ['silver-hand'], r"(Silver (Longsword|Battle Staff|War Axe|Battleaxe|Scimitar|Nodachi|Katana|Wakizashi|Tanto|Hawk Bow|Sword)|Mantle of the Silver Hand)$",
      lambda n, e, p: p in ('Immersive Weapons.esp', 'Hothtrooper44_ArmorCompilation.esp')),
