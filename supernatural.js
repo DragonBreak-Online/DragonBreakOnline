@@ -1962,6 +1962,36 @@ module.exports = (api) => {
     if (!t) return personal(a, `No player online called ${name}.`);
     personal(a, giveCurse(t >>> 0, kind, extra, display(a)));
   }, { admin: true, help: 'vampire|werewolf [pure|blessed] [player] the whole curse at once (default: you)' });
+  // A vampire's thirst set to a stage (1-4) by staff: lastFed moved back so the slow tick reads the same stage, the first meal
+  // counted as had (a stage means a fed vampire's thirst)
+  const setVampStage = (t, n) => {
+    const s = stateOf(t);
+    if (s.kind !== 'vampire') return false;
+    const rate = Math.max(1e-6, Number(bloodRate(t, '__dboBloodThirstRate')) || 1);
+    Object.assign(s, { stage: n, lastFed: gameDays() - (n - 1 + 0.01) / rate, unfed: null, sated: null });
+    saveState(t, s); syncVampSpells(t, s); flushStageSpells(t, s, 'stage set by staff'); showTells(t, stateOf(t));
+    return true;
+  };
+  // The F7 panel's Curse row (adminSystem.ts giveCurse; Nate, 18 Oct): the whole curse at once, a vampire's stage, or a cure.
+  // The line for the panel; audited
+  const ADMIN_CURSES = ['vampire', 'purevampire', 'werewolf', 'blessedwerewolf', 'cure', 'stage'];
+  globalThis.__dboSuperAdminCurse = (t, what, stage, gm) => {
+    t = Number(t) >>> 0; const w = String(what || '').toLowerCase(); const by = String(gm || 'unknown');
+    if (!ADMIN_CURSES.includes(w)) return `There is no ${w} curse.`;
+    if (w === 'stage') {
+      const n = Math.floor(Number(stage));
+      if (!(n >= 1 && n <= 4)) return 'A vampire\'s stage is 1 to 4.';
+      if (!setVampStage(t, n)) return `${display(t)} is not a vampire.`;
+      audit(`SUPERNATURAL GM ${by} set ${who(t)} to vampire stage ${n}`);
+      personal(t, n > 1 ? `Your thirst shifts. (stage ${n})` : 'Your thirst eases. (stage 1)');
+      return `${display(t)} is now a stage ${n} vampire.`;
+    }
+    if (w === 'cure') { cureDisease(t, `GM ${by}`); endCurse(t, `cured by GM ${by}`); }
+    else if (w === 'vampire' || w === 'purevampire') becomeVampire(t, w === 'purevampire');
+    else becomeWerewolf(t, w === 'blessedwerewolf');
+    audit(`SUPERNATURAL GM ${by} made ${who(t)} ${w === 'cure' ? 'mortal (cured)' : w}`);
+    return w === 'cure' ? `${display(t)} is mortal again.` : `${display(t)} is now ${{ vampire: 'a vampire', purevampire: 'a pure-blood vampire', werewolf: 'a werewolf', blessedwerewolf: 'a Hircine-blessed werewolf' }[w]}.`;
+  };
   globalThis.__dboSuperAdminInfect = (t, kind, gm) => (kind === 'vampire' || kind === 'werewolf' ? giveDisease(t >>> 0, kind, String(gm || 'unknown')) : `There is no ${kind} disease.`);
   // Staff (Nate, 8 Oct): an admin's X menu on a cursed or feverish player lifts the curse or the fever, as the shrine rite
   // and a Cure Disease would; audited with the admin's name
@@ -2491,7 +2521,7 @@ module.exports = (api) => {
 
   // ---- admin -----------------------------------------------------------------------------------------------
   registerChatCommand('curse', (a, args) => {
-    const [name, what] = String(args || '').trim().split(/\s+/);
+    const [name, what, arg] = String(args || '').trim().split(/\s+/);
     const t = name === 'me' || !name ? a : findByName(name);
     const w = String(what || '').toLowerCase();
     if (w === 'restore') {
@@ -2499,7 +2529,8 @@ module.exports = (api) => {
       if (!c) return personal(a, 'No such character: use their #TAG for someone offline.');
       return personal(a, restoreCharacter(c, `GM ${nameOf(a)}`) ? `${display(c)} is restored and can be played again.` : `${display(c)} is not permanently dead.`);
     }
-    if (!t || !['vampire', 'purevampire', 'werewolf', 'blessedwerewolf', 'infectvampire', 'infectwerewolf', 'cure', 'crown', 'status', 'fever', 'bloody', 'wash', 'riteclear'].includes(w)) return personal(a, 'Usage: /curse <player|me> <vampire|purevampire|werewolf|blessedwerewolf|infectvampire|infectwerewolf|fever|cure|crown|bloody|wash|riteclear|status|restore>');
+    if (!t || !['vampire', 'purevampire', 'werewolf', 'blessedwerewolf', 'infectvampire', 'infectwerewolf', 'cure', 'crown', 'status', 'fever', 'bloody', 'wash', 'riteclear', 'stage'].includes(w)) return personal(a, 'Usage: /curse <player|me> <vampire|purevampire|werewolf|blessedwerewolf|infectvampire|infectwerewolf|fever|cure|crown|bloody|wash|riteclear|status|restore|stage 1-4>');
+    if (w === 'stage') return personal(a, globalThis.__dboSuperAdminCurse(t, 'stage', arg, nameOf(a)));
     if (w === 'status') { const s = stateOf(t); return personal(a, `${display(t)}: ${s.kind || 'mortal'}${s.kind === 'vampire' ? ` stage ${s.stage}${s.pure ? ', pure-blood' : ''}${s.unfed ? `, not yet fed (${(playedOf(s.unfed) * 24).toFixed(1)} of ${C.firstMealHours} game hours played${Number(s.unfed.wither) > 0 ? `, withering ${pct(Number(s.unfed.wither))}%` : ''})` : ''}${s.sated && Number(s.sated.until) > gameDays() ? ', deep-fed' : ''}${s.blood ? ', blood on the face' : ''}` : ''}${s.blessed ? ', blessed' : ''}${s.disease ? `, carrying ${s.disease.kind} disease: ${playedOf(s.disease).toFixed(1)} of ${C.incubationDays} game days played (${(gameDays() - s.disease.since).toFixed(1)} since infection)` : ''}${crownHolder() === t ? ', holds the Blood Crown' : ''}. Crown: ${G.crown ? G.crown.name : 'unclaimed'}.`); }
     if (w === 'vampire' || w === 'purevampire') becomeVampire(t, w === 'purevampire');
     else if (w === 'werewolf' || w === 'blessedwerewolf') becomeWerewolf(t, w === 'blessedwerewolf');
@@ -2523,7 +2554,7 @@ module.exports = (api) => {
     }
     audit(`SUPERNATURAL GM ${who(a)} /curse ${display(t)} ${w}`);
     personal(a, `Done: ${display(t)} ${w}.`);
-  }, { admin: true, help: '<player|me|#TAG> <vampire|purevampire|werewolf|blessedwerewolf|infectvampire|infectwerewolf|fever|cure|crown|bloody|wash|riteclear|status|restore>' });
+  }, { admin: true, help: '<player|me|#TAG> <vampire|purevampire|werewolf|blessedwerewolf|infectvampire|infectwerewolf|fever|cure|crown|bloody|wash|riteclear|status|restore|stage 1-4>' });
 
   log(`supernatural on: sanguinare ${SANGUINARE.toString(16)}, ${VAMPIRE_RACES.size} vampire races, crown ${G.crown ? G.crown.name : 'unclaimed'}, cure effects ${CURE_EFFECTS.size}, pale shader ${PALE_SHADER.toString(16)}`);
 };
