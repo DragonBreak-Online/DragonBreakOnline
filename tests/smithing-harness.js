@@ -193,7 +193,8 @@ ok(globalThis.__dboManualsShop(A).some((x) => /^Schematics: Ancient Imperial \(T
 const REAL = JSON.parse(fs.readFileSync(path.join(SERVER, 'smithing.json'), 'utf8')).families;
 const noBook = REAL.filter((f) => f.tier > 1 && !f.bookId && !f.free && !f.technique && f.book !== 'staff' && f.book !== 'race').map((f) => f.id);
 // A people's own armoury (book 'race': Yokudan, Black Bear, Apex Khajiit; Skyrim release 15 Oct) has no book by design
-ok(noBook.join() === 'orcish' && REAL.filter((f) => f.bookId).every((f) => /^[0-9a-f]+:DragonBreak Online Edits\.esp$/.test(f.bookId)), 'every family above T1 has a DLE book except Orcish (apprentice only) and the peoples\' own armouries', noBook);
+// Dragon Priest (18 Oct) waits on its DLE book from the PC: gated, never found until then
+ok(noBook.join() === 'orcish,dragon_priest' && REAL.filter((f) => f.bookId).every((f) => /^[0-9a-f]+:DragonBreak Online Edits\.esp$/.test(f.bookId)), 'every family above T1 has a DLE book except Orcish (apprentice only), Dragon Priest (book pending) and the peoples\' own armouries', noBook);
 const steelBook = mp.getIdFromDesc(REAL.find((f) => f.id === 'steel').bookId);
 rec(steelBook, 'BOOK', 'DBO_Schematics_steel', [{ type: 'DATA', data: bookData() }]);
 load({ enabled: true, drops: {} });
@@ -349,6 +350,9 @@ ok(!globalThis.__dboManualsShop(A).some((x) => /Brass|Adamantium/.test(x.label))
   ok(r1 === null, 'Ancient Nord comes only to a reader in a Nordic barrow', r1);
   r1 = roll(5, 'nordRuin', [0.999, 0.999, 0.999, 0.999, 0.999, 0, 0]);
   ok(r1 && r1.row === 'ancientNord' && /Ancient Nord/.test(r1.name), '...where it does', r1);
+  give(); r1 = roll(5, 'nordRuin|priestLair', [0.999, 0.999, 0.999, 0.999, 0.999, 0.999, 0, 0]);
+  ok(r1 && r1.row === 'ancientNord', 'a Dragon Priest lair is a barrow too: Ancient Nord still comes there (no priest book yet, so its row passes)', r1);
+  ok(row('dragonPriest') && row('dragonPriest').where === 'priestLair' && row('dragonPriest').families.join() === 'dragon_priest', 'live: Dragon Priest Armor is read only in a priest lair (18 Oct)');
   give(); r1 = roll(1, '', [0.999, 0.999, 0.999, 0, 0]);
   ok(r1 && r1.row === 'rare' && !/Chitin/.test(r1.name), 'a Rare find (never Chitin while it is withheld)', r1);
   give(); r1 = roll(5, '', []);
@@ -369,7 +373,7 @@ ok(/verdict !== false && typeof globalThis\.__dboSmithCrafted === 'function'/.te
 const dsrc = fs.readFileSync(path.join(SERVER, 'dungeons.js'), 'utf8'), wsrc = fs.readFileSync(path.join(SERVER, 'wildlife.js'), 'utf8');
 ok(/'ayleidRuin'/.test(dsrc) && /'dwemerRuin'/.test(dsrc) && /'falmerRuin'/.test(dsrc) && /isCyrodiilFort\(d\) \? 'fort'/.test(dsrc) && /__dboTechniqueDrop\(techniqueRuin\(d\), diff\.id\)/.test(dsrc) && /__dboTechniqueDrop\('goblinCamp'\)/.test(wsrc), 'ruin chests (Ayleid, Dwemer, Falmer, Cyrodiil forts) and goblin camps ask for a technique drop');
 const gsrc = fs.readFileSync(path.join(SERVER, 'gamemode.js'), 'utf8');
-ok(/__dboSchematicFind\(a, tier \+ 1, where\)/.test(gsrc) && /globalThis\.__dboTechniqueRuinAt = \(a\) => techniqueRuin\(dungeonAround\(a\)\)/.test(dsrc), 'a won reading rolls for a schematic with the Scholar tier (1-5) and the ruin it is read in');
+ok(/__dboSchematicFind\(a, tier \+ 1, where\)/.test(gsrc) && /globalThis\.__dboTechniqueRuinAt = \(a\) => \{\n    const d = dungeonAround\(a\), kind = techniqueRuin\(d\);/.test(dsrc) && /LocTypeDragonPriestLair'\) \? \[kind, 'priestLair'\]/.test(dsrc), 'a won reading rolls for a schematic with the Scholar tier (1-5) and the ruin it is read in');
 ok(/__dboSmithCraft\(actorId, itemId, recipeId\) === false\) return false;\n(?:[^\n]*\n){0,2}    \/\/ Faction gear first/.test(src), 'regions.js asks the smithing gate (then the tailor gate) before faction gear');
 console.log(fails ? `${fails} failed` : 'all passed');
 process.exit(fails ? 1 : 0);

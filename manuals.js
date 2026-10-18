@@ -323,14 +323,15 @@ module.exports = (api) => {
   // ---- schematics found by reading (Nate, 11 Oct: recipe rarity by rows) ---------------------------------------------
   // Each won reading rolls the rows of config smithing.discovery.rows in turn, rarest first, and the first hit hands over
   // one of its families' schematic books, picked evenly (a book, not the knowledge: a Scholar who is no smith sells it or
-  // passes it on). A row { id, families, chance (a reading), where (a dungeons.js ruin kind: only read inside one),
+  // passes it on). A row { id, families, chance (a reading), where (a dungeons.js ruin kind: only read inside one; a place
+  // of two kinds, 'nordRuin|priestLair', counts as either),
   // minScholar (the reader's Scholar tier, 1 Novice..5 Master) }. Withheld and staff-only books never come.
   // Returns { id, name, row } or null
   globalThis.__dboSchematicFind = (a, scholarTierNow, where) => {
     const D2 = SMC.discovery || {};
     if (!C.enabled || !SMITH || D2.enabled === false || !isPlayer(a)) return null;
     for (const r of (Array.isArray(D2.rows) ? D2.rows : [])) {
-      if (!r || (r.where && r.where !== where) || (Number(r.minScholar) || 0) > (Number(scholarTierNow) || 0)) continue;
+      if (!r || (r.where && !String(where || '').split('|').includes(r.where)) || (Number(r.minScholar) || 0) > (Number(scholarTierNow) || 0)) continue;
       if (!(Math.random() < (Number(r.chance) || 0))) continue;
       const allowed = new Set((r.families || []).map(String));
       const pool = READY.filter((m) => allowed.has(m.key) && !m.staffOnly && !m.withheld);

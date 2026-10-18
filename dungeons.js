@@ -765,7 +765,11 @@ module.exports = (api) => {
   // Nordic barrows give the ancient Nord techniques (Nate, 10 Oct: lore-accurate drop places)
   const techniqueRuin = (d) => (isAyleidRuin(d) ? 'ayleidRuin' : d && d.type === 'dwemer' ? 'dwemerRuin' : (d && d.keywords || []).includes('LocTypeFalmerHive') ? 'falmerRuin' : isCyrodiilFort(d) ? 'fort' : d && d.type === 'nordic' ? 'nordRuin' : '');
   // The ruin kind a reader stands in, for the schematics found by reading (manuals.js __dboSchematicFind)
-  globalThis.__dboTechniqueRuinAt = (a) => techniqueRuin(dungeonAround(a));
+  // A Dragon Priest's lair (LocTypeDragonPriestLair) is a barrow too: its readings roll both kinds, 'nordRuin|priestLair'
+  globalThis.__dboTechniqueRuinAt = (a) => {
+    const d = dungeonAround(a), kind = techniqueRuin(d);
+    return d && (d.keywords || []).includes('LocTypeDragonPriestLair') ? [kind, 'priestLair'].filter(Boolean).join('|') : kind;
+  };
   const fillChests = (d, diff, lease) => {
     let filled = 0;
     if (lease) lease.stocked = new Set();
