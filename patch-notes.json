@@ -1,5 +1,21 @@
 [
   {
+    "title": "Fortify Alchemy gear counts again",
+    "date": "2026-10-18",
+    "version": "Hotfix",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Alchemy",
+        "items": [
+          "Fortify Alchemy on the gear you wear helps your brewing again. Each point is a 1% chance that a potion comes out one strength above your Alchemist rank. Four 25% pieces make it every brew.",
+          "It never lifts a potion more than one strength. It never opens an effect your rank has not reached, and it never adds strength to a combination potion.",
+          "Each piece counts for at most 25%, and all your gear together for at most 100%. Fortify Enchanting potions are still not brewed, so the old potion-and-enchanting loop cannot build on itself."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Poisons work",
     "date": "2026-10-18",
     "version": "Hotfix",

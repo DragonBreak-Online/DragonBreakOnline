@@ -732,7 +732,10 @@ module.exports = (api) => {
       return tell(a, 'These ingredients share no effect that makes a potion you know. You keep them.');
     }
     const tier = alchemistTier(a);   // 0 without the trade, 1..5 by rank
-    const { potion, passed } = choose(shared, tier);
+    const chosen = choose(shared, tier);
+    const passed = chosen.passed;
+    const step = gearStep(a, chosen.potion, tier);
+    const potion = step.potion;
     if (shared.length > 1) log(`alchemy: ${display(a)} shared ${shared.map((e) => { const r = lookup(e); return `${r ? r.record.editorId : e.toString(16)}@${Math.round(baseCost(e))}`; }).join(', ')}; took ${potion ? potion.edid : 'none (locked)'}`);
     if (!potion) {
       log(`alchemy: ${display(a)} mixed ${used.map((id) => { const r = lookup(id); return r ? r.record.editorId : id.toString(16); }).join(' + ')} at tier ${tier}: every shared effect opens later`);
@@ -742,9 +745,9 @@ module.exports = (api) => {
     give(entries, potion.id, 1);
     try { mp.set(a, 'inventory', { entries: entries.filter((e) => Number(e.count) > 0) }); } catch (e) { log(`alchemy: inventory write failed for ${display(a)}: ${e.message}`); return; }
     const does = doesText(potion.id);
-    tell(a, `You brew ${/^[AEIOU]/.test(potion.name) ? 'an' : 'a'} ${potion.name}${does ? ` (${does})` : ''}.${lockedHint(passed)}${hint}`);
+    tell(a, `You brew ${/^[AEIOU]/.test(potion.name) ? 'an' : 'a'} ${potion.name}${does ? ` (${does})` : ''}.${step.up ? ' Your enchanted gear steadies your hand: it comes out a strength above your rank.' : ''}${lockedHint(passed)}${hint}`);
     creditBrew(a, potion.id, tier, ingredientValue(used.map((id) => [id, 1])));
-    log(`alchemy: ${display(a)} brewed ${potion.edid} (${potion.name}, tier ${tier}) from ${used.map((id) => { const r = lookup(id); return r ? r.record.editorId : id.toString(16); }).join(' + ')}`);
+    log(`alchemy: ${display(a)} brewed ${potion.edid} (${potion.name}, tier ${tier}${step.pct ? `, gear +${Math.round(step.pct)}%${step.up ? ' stepped up' : ''}` : ''}) from ${used.map((id) => { const r = lookup(id); return r ? r.record.editorId : id.toString(16); }).join(' + ')}`);
     audit(`ALCHEMY ${who(a)} brewed ${potion.edid}`);
     try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('brew', a, potion.id, tier, used.map((id) => ({ baseId: id, count: 1 }))); } catch (e) { /* the player log is optional */ }
     if (S.panels.has(a)) showBrewable(a);
@@ -794,6 +797,53 @@ module.exports = (api) => {
     if (isPluginId(x)) return x;
     return item.ench;
   };
+  // ---- Fortify Alchemy on worn gear (Nate, 18 Oct: "bring back fortify alchemy gear ... make sure you cant abuse the system")
+  // The worn copies' Fortify Alchemy (EnchFortifyAlchemyConstantSelf, the only gear effect for it in the load order), each
+  // copy at most perItemCap, all together at most totalCap: a plugin enchantment's magnitude from its ENCH record, a player's
+  // from the copy's effects (the client's numbers, so the cap is what bounds them). The total is the chance a brew comes out
+  // one strength above the brewer's rank: never more than one step, never an effect the rank has not opened, never a
+  // combination. Fortify Enchanting is never brewed here, so no potion can feed the enchantments that feed the potions.
+  const GEAR = Object.assign({ enabled: true, effects: ['08b65c'], perItemCap: 25, totalCap: 100 }, RW.fortifyGear || {});
+  const GEAR_EFFECTS = new Set((GEAR.effects || []).map(effectRef).filter(Boolean));
+  const enchFortify = (ench) => {
+    const er = typeof ench === 'number' && ench ? lookup(ench) : null;
+    if (!er || String(er.record.type) !== 'ENCH') return 0;
+    let effect = 0, sum = 0;
+    for (const f of er.record.fields || []) {
+      if (f.type === 'EFID') { try { effect = er.toGlobalRecordId(u32(f, 0)) >>> 0; } catch (e) { effect = 0; } continue; }
+      if (f.type === 'EFIT' && GEAR_EFFECTS.has(effect)) sum += Math.max(0, f32(f, 0));
+      if (f.type === 'EFIT') effect = 0;
+    }
+    return sum;
+  };
+  const gearFortifyAlchemy = (a) => {
+    if (!GEAR.enabled || !GEAR_EFFECTS.size) return 0;
+    let total = 0;
+    for (const e of invOf(a)) {
+      if (!e || !(e.worn || e.wornLeft)) continue;
+      let v = 0;
+      if (Array.isArray(e.enchantmentEffects) && e.enchantmentEffects.length) {
+        for (const x of e.enchantmentEffects) if (x && GEAR_EFFECTS.has(Number(x.effectId) >>> 0)) v += Math.max(0, Number(x.magnitude) || 0);
+      } else {
+        const item = itemOf(Number(e.baseId) >>> 0);
+        if (item) v = enchFortify(copyEnch(e, item));
+      }
+      total += Math.min(Math.max(0, Number(GEAR.perItemCap) || 0), v);
+    }
+    return Math.min(Math.max(0, Number(GEAR.totalCap) || 0), total);
+  };
+  // The brew one strength up when the gear's roll lands; the same potion otherwise
+  const gearStep = (a, potion, tier) => {
+    const t = Math.max(1, Math.min(5, Number(tier) || 1));
+    if (!potion || t >= 5) return { potion, up: false };
+    const same = chooseFor(potion.effect, t);
+    if (!same || same.id !== potion.id) return { potion, up: false };
+    const pct = gearFortifyAlchemy(a);
+    if (!(pct > 0) || Math.random() >= pct / 100) return { potion, up: false, pct };
+    const up = chooseFor(potion.effect, t + 1);
+    return up && up.id && !up.locked && !up.dropped ? { potion: up, up: true, pct } : { potion, up: false, pct };
+  };
+  globalThis.__dboGearFortifyAlchemy = gearFortifyAlchemy;
   const isSoulGem = (id) => { const lr = lookup(id); return !!lr && String(lr.record.type) === 'SLGM'; };
   // Azura's Star and the Black Star (keyword ReusableSoulGem, ed2f1:Skyrim.esm) enchant without being used up, so whether
   // one shows in the report is not known; holding one means a plain item may have been enchanted with no gem reported

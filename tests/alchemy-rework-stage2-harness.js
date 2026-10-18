@@ -249,6 +249,27 @@ const ticks = (n) => { for (let i = 0; i < n; i++) globalThis.__dboAlchemyRunTic
   await drink(pid('FortifySkillLockpicking04'), { health: 1, magicka: 1, stamina: 1 });
   check('...50% as two', globalThis.__dboPotionLockpickTiers(A) === 2);
 
+  // ---- Fortify Alchemy on worn gear (Nate, 18 Oct): one strength up at most, capped per item and in all ----
+  {
+    load({ records: MAPPED });
+    const FA = idOf('08b65c:Skyrim.esm');
+    const ring = (mag) => ({ baseId: 0x9000, count: 1, worn: true, enchantmentEffects: [{ effectId: FA, magnitude: mag, duration: 0, area: 0 }] });
+    const realRandom = Math.random;
+    const brewWith = (worn, roll, tier = 3) => { tierOf(A, tier); stockAll(); const e = props.get(A + '|inventory').entries; props.set(A + '|inventory', { entries: e.concat(worn) }); Math.random = () => roll; const m = craft([ONE_A, ONE_B]); Math.random = realRandom; return m; };
+    let m = brewWith([], 0);
+    check('gear: none worn, an Adept brews the Solution as before', count(pid('FortifySkillOneHanded02')) === 1 && !/steadies/.test(m), m);
+    m = brewWith([ring(20)], 0.1);
+    check('gear: a 20% ring and a roll under it: one strength up, and told why', count(pid('FortifySkillOneHanded02')) === 0 && /steadies your hand/.test(m), m);
+    m = brewWith([ring(20)], 0.3);
+    check('gear: a roll over it brews as the rank does', count(pid('FortifySkillOneHanded02')) === 1 && !/steadies/.test(m), m);
+    props.set(A + '|inventory', { entries: [ring(500)] });
+    check('gear: a forged 500% ring counts as 25% (perItemCap)', globalThis.__dboGearFortifyAlchemy(A) === 25);
+    const bag = props.get(A + '|inventory').entries;
+    props.set(A + '|inventory', { entries: bag.concat([ring(25), ring(25), ring(25), ring(25), ring(25), Object.assign(ring(25), { worn: false })]) });
+    check('gear: all worn together count at most 100%, and an unworn copy not at all', globalThis.__dboGearFortifyAlchemy(A) === 100, globalThis.__dboGearFortifyAlchemy(A));
+    m = brewWith([ring(25), ring(25), ring(25), ring(25)], 0.99, 5);
+    check('gear: a Master gains nothing past Master strength', /steadies/.test(m) === false, m);
+  }
   // ---- poisons ----
   put(A, 'inventory', { entries: [{ baseId: WEAPON, count: 1, worn: true, poisonId: DBO('a30'), poisonCount: 1 }] });
   put(B, 'percentages', { health: 1, magicka: 1, stamina: 1 });
