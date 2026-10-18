@@ -21,6 +21,9 @@ export const driftConfig = {
   // NPC copies retired by SkyrimPlatform's retireCopy (view/npcLifetimeRuntime.ts, LIFECYCLE_PLAN.md phase 1); the
   // server's /driftset nativeRetire, off by default
   nativeRetire: false,
+  // NPC copies created by SkyrimPlatform's createCopy at their final spot (view/nativeCreate.ts, phase 2b); the server's
+  // /driftset nativeCreate, off by default
+  nativeCreate: false,
 };
 
 export type DriftConfig = typeof driftConfig;
@@ -55,6 +58,7 @@ const RULES: Record<keyof DriftConfig, (v: unknown) => boolean> = {
   rehostAfterMs: range(1000, 10000),
   faceRebuild: oneOf("load", "entry"),
   nativeRetire: isBool,
+  nativeCreate: isBool,
 };
 
 // Copies the known keys that pass their check; anything else in the packet is ignored

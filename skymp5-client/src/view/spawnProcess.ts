@@ -18,6 +18,8 @@ export class SpawnProcess {
     pos: NiPoint3,
     refrId: number,
     private callback: () => void,
+    // Created by createCopy at its spot and enabled (view/nativeCreate.ts): nothing to seat, move or enable
+    placedNatively: boolean = false,
   ) {
     const refr = ObjectReference.from(Game.getFormEx(refrId));
     if (!refr || refr.getFormID() !== refrId) {
@@ -26,6 +28,11 @@ export class SpawnProcess {
 
     // A dragon's copy (flyerGuard.ts): a line before every step, and the switches a staff test turned on
     this.flyer = takeSpawnGuard(refrId);
+    if (placedNatively) {
+      this.note("placed-natively", refrId, `at ${pos.map(Math.round).join(",")}`);
+      try { this.afterEnable(appearance, refrId); } catch (e) { reportError("spawn", e); }
+      return;
+    }
     this.note("pre-seat", refrId, `at ${pos.map(Math.round).join(",")}`);
     if (SpawnProcess.placeMode === "moveTo") SpawnProcess.seat(refr, pos);
     this.note("pre-setPosition", refrId);
@@ -61,6 +68,20 @@ export class SpawnProcess {
     }
     this.note("pre-enable", refrId);
     return refr.enable(false).then(() => this.resurrect(refrId));
+  }
+
+  // The native path: tints, then the same resurrect step; the copy is already where it belongs and enabled
+  private afterEnable(appearance: Appearance | null, refrId: number) {
+    const refr = ObjectReference.from(Game.getFormEx(refrId));
+    if (!refr || refr.getFormID() !== refrId) {
+      return;
+    }
+    const ac = Actor.from(refr);
+    if (ac && appearance) {
+      try { applyTints(ac, appearance); } catch (e) { reportError("spawn:tints", e); }
+    }
+    const done = this.resurrect(refrId);
+    if (done && typeof (done as Promise<void>).catch === "function") (done as Promise<void>).catch((e) => reportError("spawn", e));
   }
 
   private resurrect(refrId: number) {
