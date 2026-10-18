@@ -300,11 +300,11 @@
       "sphere": "The scribe of Auri-El, who keeps the record of every Aldmeri ancestor and their deeds.",
       "boon": "what you read teaches you more (half of Hermaeus Mora's gift)",
       "blessing": null,
-      "blessingSource": "pending",
+      "blessingSource": "server",
       "inBruma": 0,
       "placements": [],
-      "plannedScholarBoon": 0.5,
-      "blessingPlan": "server: scholarBoon 0.5 (step 2)"
+      "blessingPlan": "server: a finished reading counts twice half the time; a boss chest book at half Hermaeus Mora's chance",
+      "scholarBoon": 0.5
     },
     {
       "id": "phynaster",
@@ -325,11 +325,11 @@
       "sphere": "The Storyteller, god of the forest and of the Green Pact: never harm the plants of Valenwood, eat only meat, and eat the enemies you slay.",
       "boon": "meat sates your hunger twice as long",
       "blessing": null,
-      "blessingSource": "pending",
+      "blessingSource": "server",
       "meatBoon": 2,
       "inBruma": 0,
       "placements": [],
-      "blessingPlan": "server: meat sates twice as long (step 2)"
+      "blessingPlan": "server: meat restores twice the hunger (gamemode.js onEat)"
     },
     {
       "id": "jephre",
@@ -362,12 +362,13 @@
       "sphere": "The Dragon King of Cats, Akatosh to the Khajiit, who drove off Pelinal and the Dwarf-Bards.",
       "boon": "unarmed blows land 10% harder",
       "blessing": null,
-      "blessingSource": "pending",
+      "blessingSource": "server",
       "unarmedBoon": 1.1,
       "aspectOf": "akatosh",
       "inBruma": 0,
       "placements": [],
-      "blessingPlan": "server: unarmed damage x1.1 (step 2)"
+      "blessingPlan": "server: unarmed hits x1.1 (gamemode.js blessingCombat attacker.alkosh)",
+      "combatBoon": true
     },
     {
       "id": "rajhin",

@@ -313,7 +313,7 @@ module.exports = (api) => {
   // A boon the server keeps with no spell at all: Sanguine's appetite, Hermaeus Mora's reading, and since 2026-10-01 the
   // regeneration of the Hist and the Yokudan gods (blessingRegen, held by the regeneration tick below) and the Ancestors'
   // ward against fire (combatBoon: gamemode.js blessingCombat, target.ancestors)
-  const serverBoonOf = (d) => !!(d && (d.hungerHalf || d.scholarBoon || d.blessingRegen || d.combatBoon));
+  const serverBoonOf = (d) => !!(d && (d.hungerHalf || d.scholarBoon || d.blessingRegen || d.combatBoon || d.meatBoon));
   // Sheogorath has no blessing of his own and should not have one. The Madgod gives what he feels
   // like, so his worshipper is handed another god's blessing at random - a different one each time.
   // This is the only boon in the list that is more lore-accurate as code than as a record, and it is
@@ -505,6 +505,16 @@ module.exports = (api) => {
       const d = deityById(b.deity);
       return !!(d && d[flag]);
     } catch (e) { return false; }
+  };
+  // The flag's own value (Xarxes' scholarBoon 0.5 is half of Hermaeus Mora's true; Y'ffre's meatBoon 2), 0 when not blessed
+  globalThis.__dboBlessingValue = (a, flag) => {
+    try {
+      const b = blessingOf(a);
+      if (!b || Number(b.until) <= Date.now()) return 0;
+      const d = deityById(b.deity);
+      const v = d ? d[flag] : 0;
+      return v === true ? 1 : Math.max(0, Number(v) || 0);
+    } catch (e) { return 0; }
   };
 
   // A blessing is worn, not held: nothing else expires it, so the module does. The same sweep keeps a cast blessing on
@@ -1535,7 +1545,21 @@ module.exports = (api) => {
   };
   globalThis.__dboDeityView = (a, staff) => deityView(a >>> 0, !!staff);
   // The faith and patron a character holds ({ faith, patron } ids, or null): gamemode.js's Green Pact asks
-  globalThis.__dboFaithOf = (a) => { const f = faithOf(Number(a) >>> 0); return f ? { faith: faithIdOf(Number(a) >>> 0, f), patron: f.id } : null; };
+  // sworn: the faith stored on the character (every choice since the faiths, 18 Oct), '' for a god taken before them
+  globalThis.__dboFaithOf = (a) => { const f = faithOf(Number(a) >>> 0); return f ? { faith: faithIdOf(Number(a) >>> 0, f), patron: f.id, sworn: String(f.faith || '') } : null; };
+  // Swearing to the faith one's god already places one in (greenpact.js /greenpact swear): a god taken before the faiths
+  // carries none, and the Green Pact asks for the vow. No new god and no new faith, so no waiting days. '' when sworn.
+  globalThis.__dboSwearFaith = (a, faithId) => {
+    a = Number(a) >>> 0;
+    const f = faithOf(a), want = faithById(faithId);
+    if (!f) return 'You hold no god yet. Take one of the faith first.';
+    if (!want || !(want.patrons || []).includes(f.id) || !faithFits(want, raceEdid(a))) return `${f.name} does not place you in ${want ? want.name : 'that faith'}.`;
+    if (f.faith === want.id) return `You are already sworn to ${want.name}.`;
+    if (f.faith && f.faith !== want.id) return `You are sworn to ${(faithById(f.faith) || {}).name || 'another faith'}. Choose your faith again in the Deity tab to change it.`;
+    setFaith(a, Object.assign({}, f, { faith: want.id }));
+    audit(`DEITY ${who(a)} swore to ${want.name} (${f.name})`);
+    return '';
+  };
   const journalSections = globalThis.__dboJournalSections && typeof globalThis.__dboJournalSections === 'object'
     ? globalThis.__dboJournalSections : (globalThis.__dboJournalSections = {});
   journalSections.deity = { visible: () => !!CFG.enabled && DEITIES.length > 0, view: (a, o) => deityView(a >>> 0, !!(o && o.staff)) };
