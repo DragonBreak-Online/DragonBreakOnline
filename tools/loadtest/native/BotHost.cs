@@ -46,6 +46,21 @@ internal class Bot
     public long Tx;             // messages sent
     public long TxBytes;        // JSON bytes handed to the serializer
     public Dictionary<int, long> RxByType = new Dictionary<int, long>();
+
+    // Per-emitter movement counting, for checking an interest-management ladder (see README, Interest check).
+    // SelfIdx is told to us by the runner; PosX/PosY are this bot's own last sent position, so the distance
+    // to each emitter is measured from where the bot actually is rather than from where it was placed.
+    public int SelfIdx = -1;
+    public double PosX, PosY;
+    public bool HasPos;
+    public long SelfEcho;
+    public Dictionary<int, Emitter> Movers = new Dictionary<int, Emitter>();
+}
+
+internal class Emitter
+{
+    public long Count;      // UpdateMovement messages received about this emitter
+    public double Dist;     // XY distance at the last one, in game units
 }
 
 internal static class Program
@@ -60,6 +75,7 @@ internal static class Program
     private static string _workDir;
     private static int _hostId;
     private static bool _quit;
+    private static double _fullUnits, _midUnits;
 
     private static int Main(string[] args)
     {
@@ -68,6 +84,9 @@ internal static class Program
         _hostId = 0;
         var tickMs = 1;
         var statsMs = 1000;
+        // The ladder being checked: full rate inside this, mid rate out to one grid square, far beyond
+        _fullUnits = 2000;
+        _midUnits = 4096;
 
         for (var i = 0; i < args.Length - 1; i++)
         {
@@ -76,6 +95,8 @@ internal static class Program
             else if (args[i] == "--id") _hostId = int.Parse(args[i + 1], CultureInfo.InvariantCulture);
             else if (args[i] == "--tick-ms") tickMs = int.Parse(args[i + 1], CultureInfo.InvariantCulture);
             else if (args[i] == "--stats-ms") statsMs = int.Parse(args[i + 1], CultureInfo.InvariantCulture);
+            else if (args[i] == "--full-units") _fullUnits = double.Parse(args[i + 1], CultureInfo.InvariantCulture);
+            else if (args[i] == "--mid-units") _midUnits = double.Parse(args[i + 1], CultureInfo.InvariantCulture);
             else if (args[i] == "--forward")
             {
                 foreach (var part in args[i + 1].Split(','))
@@ -159,6 +180,7 @@ internal static class Program
                 case "connect": CmdConnect(rest); break;
                 case "send": CmdSend(rest); break;
                 case "close": CmdClose(int.Parse(rest.Trim(), CultureInfo.InvariantCulture)); break;
+                case "self": CmdSelf(rest); break;
                 case "stats": EmitStats(); break;
                 case "quit": _quit = true; break;
                 default: Emit("log unknown command " + verb); break;
@@ -225,9 +247,39 @@ internal static class Program
         Bot bot;
         if (!Bots.TryGetValue(id, out bot)) return;
         var bytes = Cstr(json);
+        // Remember where this bot says it is, so inbound movement can be measured against it. Only its own
+        // movement counts: with --host-npcs a bot also sends movement for actors it hosts.
+        if (bot.SelfIdx >= 0 && json.IndexOf("\"t\":2", StringComparison.Ordinal) >= 0 &&
+            json.IndexOf("\"idx\":" + bot.SelfIdx.ToString(CultureInfo.InvariantCulture), StringComparison.Ordinal) >= 0)
+        {
+            var at = json.IndexOf("\"pos\":[", StringComparison.Ordinal);
+            if (at >= 0)
+            {
+                var parts = json.Substring(at + 7).Split(new[] { ',', ']' });
+                double px, py;
+                if (parts.Length >= 2 &&
+                    double.TryParse(parts[0], NumberStyles.Float, CultureInfo.InvariantCulture, out px) &&
+                    double.TryParse(parts[1], NumberStyles.Float, CultureInfo.InvariantCulture, out py))
+                {
+                    bot.PosX = px; bot.PosY = py; bot.HasPos = true;
+                }
+            }
+        }
         bot.Send(bytes, reliable);
         bot.Tx++;
         bot.TxBytes += bytes.Length - 1;
+    }
+
+    // "self <botId> <idx>": the bot's own form index, so its echo is counted apart and its own sent
+    // position can be read from the movement it sends
+    private static void CmdSelf(string rest)
+    {
+        var sp = rest.IndexOf(' ');
+        if (sp < 0) return;
+        var id = int.Parse(rest.Substring(0, sp), CultureInfo.InvariantCulture);
+        Bot bot;
+        if (!Bots.TryGetValue(id, out bot)) return;
+        bot.SelfIdx = int.Parse(rest.Substring(sp + 1).Trim(), CultureInfo.InvariantCulture);
     }
 
     private static void CmdClose(int id)
@@ -277,6 +329,11 @@ internal static class Program
         bot.RxByType.TryGetValue(msgType, out n);
         bot.RxByType[msgType] = n + 1;
 
+        // Movement is the only type worth counting per emitter, and it is the one the ladder throttles.
+        // Done here rather than in the runner because UpdateMovement is normally not forwarded at all: at
+        // 620 a second per bot the line protocol would cost more than the measurement is worth.
+        if (msgType == 2) CountMover(bot, rawContent, len);
+
         if (!Forward.Contains(msgType)) return;
 
         var buf = new byte[len];
@@ -318,6 +375,93 @@ internal static class Program
         return -1;
     }
 
+    private static void CountMover(Bot bot, IntPtr p, long len)
+    {
+        var idx = ReadIntField(p, len, "idx");
+        if (idx < 0) return;
+        if (idx == bot.SelfIdx) { bot.SelfEcho++; return; }
+
+        Emitter e;
+        if (!bot.Movers.TryGetValue(idx, out e)) { e = new Emitter(); bot.Movers[idx] = e; }
+        e.Count++;
+
+        // XY only: the server streams by an X/Y grid, so XY is the distance the ladder would use
+        double x, y;
+        if (bot.HasPos && ReadPosXY(p, len, out x, out y))
+        {
+            var dx = x - bot.PosX;
+            var dy = y - bot.PosY;
+            e.Dist = Math.Sqrt(dx * dx + dy * dy);
+        }
+    }
+
+    // Finds "name" and returns the index just past its closing quote, or -1
+    private static int FindKey(IntPtr p, long len, string name)
+    {
+        var n = (int)Math.Min(len, int.MaxValue);
+        for (var i = 0; i + name.Length + 2 <= n; i++)
+        {
+            if (Marshal.ReadByte(p, i) != (byte)'"') continue;
+            var hit = true;
+            for (var j = 0; j < name.Length; j++)
+            {
+                if (Marshal.ReadByte(p, i + 1 + j) != (byte)name[j]) { hit = false; break; }
+            }
+            if (!hit) continue;
+            if (Marshal.ReadByte(p, i + 1 + name.Length) != (byte)'"') continue;
+            return i + 2 + name.Length;
+        }
+        return -1;
+    }
+
+    private static int ReadIntField(IntPtr p, long len, string name)
+    {
+        var i = FindKey(p, len, name);
+        if (i < 0) return -1;
+        while (i < len)
+        {
+            var c = Marshal.ReadByte(p, i);
+            if (c == (byte)':' || c == (byte)' ') { i++; continue; }
+            break;
+        }
+        long v = 0;
+        var any = false;
+        while (i < len)
+        {
+            var c = Marshal.ReadByte(p, i);
+            if (c < (byte)'0' || c > (byte)'9') break;
+            v = v * 10 + (c - (byte)'0');
+            any = true;
+            i++;
+        }
+        return any ? (int)v : -1;
+    }
+
+    // "pos":[x,y,z] -> x and y. nlohmann writes plain decimals, and an exponent is handled by TryParse
+    private static bool ReadPosXY(IntPtr p, long len, out double x, out double y)
+    {
+        x = 0; y = 0;
+        var i = FindKey(p, len, "pos");
+        if (i < 0) return false;
+        while (i < len && Marshal.ReadByte(p, i) != (byte)'[') i++;
+        i++;
+        return ReadDouble(p, len, ref i, out x) && ReadDouble(p, len, ref i, out y);
+    }
+
+    private static bool ReadDouble(IntPtr p, long len, ref int i, out double value)
+    {
+        value = 0;
+        var sb = new StringBuilder(32);
+        while (i < len)
+        {
+            var c = (char)Marshal.ReadByte(p, i);
+            if (c == ',' || c == ']') { i++; break; }
+            if (sb.Length < 32) sb.Append(c);
+            i++;
+        }
+        return double.TryParse(sb.ToString().Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out value);
+    }
+
     private static void EmitStats()
     {
         foreach (var bot in Bots.Values)
@@ -334,7 +478,37 @@ internal static class Program
                 first = false;
                 sb.Append('"').Append(kv.Key).Append("\":").Append(kv.Value);
             }
-            sb.Append("}}");
+            sb.Append("}");
+
+            // The interest check: emitters and messages by distance band, plus the busiest emitters so a
+            // ladder can be judged per actor and not only by its total
+            long fullE = 0, fullM = 0, midE = 0, midM = 0, farE = 0, farM = 0, unknownE = 0, unknownM = 0;
+            foreach (var kv in bot.Movers)
+            {
+                var d = kv.Value.Dist;
+                var c = kv.Value.Count;
+                if (d <= 0) { unknownE++; unknownM += c; }
+                else if (d <= _fullUnits) { fullE++; fullM += c; }
+                else if (d <= _midUnits) { midE++; midM += c; }
+                else { farE++; farM += c; }
+            }
+            sb.Append(",\"selfEcho\":").Append(bot.SelfEcho);
+            sb.Append(",\"movers\":").Append(bot.Movers.Count);
+            sb.Append(",\"tiers\":{\"full\":{\"e\":").Append(fullE).Append(",\"m\":").Append(fullM).Append("}");
+            sb.Append(",\"mid\":{\"e\":").Append(midE).Append(",\"m\":").Append(midM).Append("}");
+            sb.Append(",\"far\":{\"e\":").Append(farE).Append(",\"m\":").Append(farM).Append("}");
+            sb.Append(",\"unknown\":{\"e\":").Append(unknownE).Append(",\"m\":").Append(unknownM).Append("}}");
+
+            var top = new List<KeyValuePair<int, Emitter>>(bot.Movers);
+            top.Sort((a, b) => b.Value.Count.CompareTo(a.Value.Count));
+            sb.Append(",\"top\":\"");
+            for (var i = 0; i < top.Count && i < 40; i++)
+            {
+                if (i > 0) sb.Append(",");
+                sb.Append(top[i].Key).Append(":").Append(top[i].Value.Count).Append(":")
+                  .Append(((long)top[i].Value.Dist).ToString(CultureInfo.InvariantCulture));
+            }
+            sb.Append("\"}");
             Emit(sb.ToString());
         }
     }

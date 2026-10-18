@@ -84,6 +84,21 @@ function writeMarkdown(dir, run) {
       lines.push('- busiest message types in: ' + s.traffic.topTypes
         .map((x) => x.name + ' ' + x.count + ' (' + r1(x.perSec) + '/s)').join(', '));
     }
+    // The interest check: what one bot is told about, by how far away the mover is. With no interest
+    // management every band runs at the sender's rate (7.7/s each), which is what makes the traffic
+    // quadratic; a ladder shows itself here as the mid and far bands dropping while full stays put.
+    const it = s.traffic.interest;
+    if (it && it.perBot && it.perBot.full !== null) {
+      const band = (k) => r1(it.perBot[k]) + '/s from ' + r1(it.emitters[k]) + ' mover(s)';
+      lines.push('- interest per bot: near (<=' + it.fullUnits + 'u) ' + band('full') +
+        ', mid (<=' + it.midUnits + 'u) ' + band('mid') +
+        ', far ' + band('far') + (it.emitters.unknown > 0.05 ? ', unplaced ' + band('unknown') : '') +
+        ', own echo ' + r1(it.selfEchoPerSec / Math.max(1, s.bots_connected)) + '/s');
+      if (it.top && it.top.length) {
+        lines.push('- busiest movers for bot ' + it.top[0].bot + ' (idx:messages:units): ' +
+          it.top[0].top.split(',').slice(0, 12).join(' '));
+      }
+    }
     if (s.server.tickP50ms !== null) {
       lines.push('- server tick: p50 ' + r2(s.server.tickP50ms) + ' ms, p90 ' + r2(s.server.tickP90ms) +
         ' ms, p99 ' + r2(s.server.tickP99ms) + ' ms, ' + r1(s.server.ticksPerSec) + ' ticks/s');

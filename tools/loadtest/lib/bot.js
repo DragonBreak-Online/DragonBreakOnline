@@ -202,6 +202,7 @@ class Bot {
       return;
     }
     this.idx = msg.idx;
+    try { this.pool.self(this.id, msg.idx); } catch (e) { /* an older host build has no self command */ }
     this.refrId = (msg.refrId || 0) >>> 0;
     this.botActorIds.add(this.refrId);
     this.worldOrCell = (msg.transform && msg.transform.worldOrCell) >>> 0;

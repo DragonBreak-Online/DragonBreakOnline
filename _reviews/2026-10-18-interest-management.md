@@ -194,3 +194,25 @@ Pass criteria, per `CAPACITY_PLAN.md`, measured by the bot harness (task 3 cover
    each packet matter more. Should the far tier be reliable, given it is only 52 messages a second per client?
 4. Does `NPC_REBUILD` phase 4 already plan a per-listener structure? If so this should fold into it rather than
    introduce a second one.
+
+### The instrument exists now, and here is the baseline it measures
+
+Built 2026-10-18 in the harness: every inbound `UpdateMovement` is counted per emitter inside `BotHost.exe`,
+with the XY distance from where the bot last said it was, bucketed into near / mid / far (`--full-units`,
+`--mid-units`). The counting is native because movement is never forwarded to the runner; at 620 a second per bot
+the line protocol would cost more than the measurement.
+
+The baseline on the current server, 12 bots spread over the city radius, 70 s:
+
+```
+interest per bot: near (<=2000u) 44.5/s from 6.3 mover(s), mid (<=4096u) 32.2/s from 4.6 mover(s),
+                  far 0.6/s from 0.1 mover(s), own echo 7/s
+busiest movers for bot 0 (idx:messages:units): 195:492:2359 225:492:2615 212:492:1275 224:492:1765
+                                               226:492:1594 178:492:1070 231:492:649 1:492:571 478:492:307
+```
+
+Every mover is on exactly 492 messages in 70 s - 7.0 a second - at 307 units and at 2,615 units alike. That is
+the distance-blind relay of section 1, measured per actor rather than inferred from a total, and it is the
+control the ladder will be judged against: **near must stay at 7/s, mid must fall to 2/s, far to 0.5/s, and the
+mover counts must not collapse** (a ladder that simply drops distant actors would show the same traffic saving
+and would be wrong). `own echo 7/s` is also the self-echo of `2026-10-18-self-echo.md`, measured directly.

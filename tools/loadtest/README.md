@@ -148,6 +148,19 @@ Honest limits, measured rather than assumed:
   no rate or speed validation (`SERVER_AUTHORITY.md` item 2, still open). Each step counts as a warp step in
   the report; the gamemode's own `movetrace` will log them as teleports.
 
+- **The interest check: who a bot is told about, by distance.** Every inbound `UpdateMovement` is counted per
+  emitter, with the XY distance from where the bot last said it was, and bucketed into near (<= `--full-units`,
+  2000 by default), mid (<= `--mid-units`, 4096) and far. The counting happens inside `BotHost.exe` because
+  movement is not forwarded to the runner at all: at 620 messages a second per bot the line protocol would cost
+  more than the measurement is worth. The report prints a per-bot rate and mover count for each band, the own
+  echo rate, and the busiest movers for one bot as `idx:messages:units`.
+
+  This is the instrument for judging interest management (`server/_reviews/2026-10-18-interest-management.md`).
+  Total traffic cannot tell a correct ladder from one that throttles the wrong actors; the per-emitter list can.
+  With no interest management every band runs at the sender rate, which is the baseline measured on 2026-10-18
+  with 12 bots: near 44.5/s from 6.3 movers, mid 32.2/s from 4.6, own echo 7/s, and every mover in the busiest
+  list on exactly 492 messages in 70 s (7.0/s) whether it stood 307 units away or 2,615.
+
 ## Options
 
     --target sandbox|live     default sandbox
@@ -156,6 +169,8 @@ Honest limits, measured rather than assumed:
     --bots N                  for "dry"
     --dungeons                claim the dungeons in config.json ("--dungeons id1,id2" for your own, "none" for off)
     --spread city|arrival     where the bots play (config.json "places")
+    --full-units 2000         the interest check: near band, in game units (passed to BotHost)
+    --mid-units 4096          the interest check: mid band; beyond it is far
     --measure-bytes           route every bot through a counting UDP relay for real wire bytes (costs a hop,
                               so use it on the smaller steps: bytes per client per second is what extrapolates)
     --host-npcs               also host and drive NPCs that stream in (sandbox only). An npc is recognised

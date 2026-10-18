@@ -251,6 +251,8 @@ class Runner {
     this.pool = new HostPool({
       exe: EXE, dll: DLL, workDir: WORK, cwd: ROOT,
       botsPerHost: Number(args.botsPerHost || CFG.botsPerHost),
+      fullUnits: Number(args.fullUnits || CFG.fullUnits || 2000),
+      midUnits: Number(args.midUnits || CFG.midUnits || 4096),
       forward: P.FORWARDED,
       handlers: {
         event: (id, name, err) => { const b = this.bots[id]; if (b) b.onEvent(name, err); },
@@ -348,10 +350,28 @@ class Runner {
         totals[k] = (totals[k] || 0) + bot.stats[k];
       }
     }
-    const host = { rx: 0, rxBytes: 0, tx: 0, txBytes: 0, byType: {} };
-    for (const stat of this.stats.values()) {
+    // interest: what each bot was told about, by distance band. The host counts it because UpdateMovement
+    // is not forwarded to this process at all (libhost.js FORWARDED): at 620 a second per bot it would cost
+    // more than the measurement is worth. 'unknown' is an emitter seen before the bot had sent a position.
+    const band = () => ({ e: 0, m: 0 });
+    const host = {
+      rx: 0, rxBytes: 0, tx: 0, txBytes: 0, byType: {},
+      selfEcho: 0, movers: 0,
+      tiers: { full: band(), mid: band(), far: band(), unknown: band() },
+      top: [],
+    };
+    for (const [botId, stat] of this.stats) {
       host.rx += stat.rx; host.rxBytes += stat.rxBytes; host.tx += stat.tx; host.txBytes += stat.txBytes;
       for (const t of Object.keys(stat.rxByType || {})) host.byType[t] = (host.byType[t] || 0) + stat.rxByType[t];
+      host.selfEcho += Number(stat.selfEcho) || 0;
+      host.movers += Number(stat.movers) || 0;
+      for (const k of Object.keys(host.tiers)) {
+        const t = (stat.tiers || {})[k];
+        if (!t) continue;
+        host.tiers[k].e += Number(t.e) || 0;
+        host.tiers[k].m += Number(t.m) || 0;
+      }
+      if (stat.top && host.top.length < 3) host.top.push({ bot: botId, top: String(stat.top) });
     }
     const states = {};
     for (const bot of this.bots) { if (bot) states[bot.state] = (states[bot.state] || 0) + 1; }
@@ -648,6 +668,19 @@ function buildStep(x) {
     rxMsgsPerSec: hostD('rx') / seconds,
     rxKiBPerSec: hostD('rxBytes') / 1024 / seconds,
     topTypes,
+    // The interest check (README): emitters and movement messages per bot by distance band, so a ladder can
+    // be judged per actor. Deltas, like everything else here. connected scales it to a per-bot figure.
+    interest: (() => {
+      const bands = ["full", "mid", "far", "unknown"];
+      const out = { perBot: {}, emitters: {}, selfEchoPerSec: hostD("selfEcho") / seconds, top: x.now.host.top,
+        fullUnits: x.runner.pool.fullUnits, midUnits: x.runner.pool.midUnits };
+      for (const b of bands) {
+        const m = x.now.host.tiers[b].m - x.previous.host.tiers[b].m;
+        out.perBot[b] = connected ? m / connected / seconds : null;
+        out.emitters[b] = connected ? x.now.host.tiers[b].e / connected : null;
+      }
+      return out;
+    })(),
   };
 
   // Real wire bytes, when the run went through the counting relay
