@@ -38,7 +38,9 @@ module.exports = (api) => {
   // Halved on 1 Oct (Jake and Nate, with the steel ceiling): goldMult 0.6 -> 0.3, bodyGoldMult 0.3 -> 0.15, and a body's
   // own purse by corpseGoldMult 0.5. arrowChance scales every arrow roll (0.25: a quarter of before), arrowStack and
   // containerArrowStack are the stacks of an untrimmed chest and urn (were 5-15 and 3-8).
-  const C = Object.assign({ enabled: true, restoreOutfits: false, leaseMinutes: 60, cooldownMinutes: 60, warnMinutes: 5, graceMinutes: 3, bossReturnMinutes: 10, partyMax: 6, raidMax: 12, raidXpMult: 0.5, partyKeepHours: 12, entranceReach: 2500, goldChance: 0.35, goldMult: 0.3, bodyGoldChance: 0.4, bodyGoldMult: 0.15, corpseGoldMult: 0.5, arrowChance: 0.25, arrowStack: [2, 5], containerArrowStack: [1, 3], corpseArrows: [1, 3], lockedShare: { story: 0, normal: 0.2, hard: 0.35, nightmare: 0.5 } }, cfg.dungeons || {});
+  const C = Object.assign({ enabled: true,
+    extraChests: { WhiteRiverWatchLocation: [{ ref: '3d2ee:Skyrim.esm', edid: 'TreasBanditChestBoss', big: true }], KilkreathRuinsLocation: [{ ref: 'f8b48:Skyrim.esm', edid: 'TreasDraugrChestBoss', big: true }] },
+    restoreOutfits: false, leaseMinutes: 60, cooldownMinutes: 60, warnMinutes: 5, graceMinutes: 3, bossReturnMinutes: 10, partyMax: 6, raidMax: 12, raidXpMult: 0.5, partyKeepHours: 12, entranceReach: 2500, goldChance: 0.35, goldMult: 0.3, bodyGoldChance: 0.4, bodyGoldMult: 0.15, corpseGoldMult: 0.5, arrowChance: 0.25, arrowStack: [2, 5], containerArrowStack: [1, 3], corpseArrows: [1, 3], lockedShare: { story: 0, normal: 0.2, hard: 0.35, nightmare: 0.5 } }, cfg.dungeons || {});
   const ARROW_CHANCE = Math.max(0, Number(C.arrowChance));
   const stackOr = (v, dflt) => (Array.isArray(v) && v.length === 2 && Number(v[0]) >= 0 && Number(v[1]) >= Number(v[0]) ? [Number(v[0]), Number(v[1])] : dflt);
   const GOLD_CHANCE = Math.max(0, Math.min(1, Number(C.goldChance)));
@@ -198,11 +200,15 @@ module.exports = (api) => {
       if (i) insideDoors.set(i, { d, entrance: e });
     }
     for (const c of d.cells || []) cellToDungeon.set(normDesc(c.desc), d);
+    // A boss chest Bethesda placed outside the dungeon's cells (craigieg/otome, 17 Oct: "no Big Chest Reward" at White River
+    // Watch and Kilkreath): config extraChests { dungeonId: [{ ref, edid, big }] } joins the dungeon's own list
+    for (const ch of (C.extraChests || {})[d.id] || []) if (ch && ch.ref && !(d.chests || []).some((x) => normDesc(x.ref) === normDesc(ch.ref))) d.chests = (d.chests || []).concat([Object.assign({ big: true }, ch)]);
     for (const ch of d.chests || []) { const id = idOf(ch.ref); if (!id) continue; chestRefs.set(id, { d, chest: ch }); d.chestIds.push(id); if (ch.big) d.bigChestIds.push(id); }
   }
 
-  // gamemode.js leaves containers in these cells alone (dungeons.js fills them per lease).
+  // gamemode.js leaves containers in these cells alone (dungeons.js fills them per lease), and these chests wherever they stand
   globalThis.__dboDungeonCells = new Set(cellToDungeon.keys());
+  globalThis.__dboDungeonChestIds = new Set(chestRefs.keys());
 
   // ---- state (survives hot reloads) -------------------------------------------------------------
   const ST = globalThis.__dboDungeons = globalThis.__dboDungeons || { leases: new Map(), parties: new Map(), memberOf: new Map(), invites: new Map(), pending: new Map() };
@@ -2067,14 +2073,37 @@ module.exports = (api) => {
     }
     if (ids.length) ST.bodyGear.set(actorId >>> 0, { at: now, ids });
   };
+  // People and the undead by race, for a body whose placement id says neither (riekling and the like stay creatures)
+  const HUMAN_RACE = /^(Nord|Imperial|Breton|Redguard|HighElf|WoodElf|DarkElf|Orc|Argonian|Khajiit|Elder)Race(Vampire)?$|Falmer|Goblin/i;
+  const UNDEAD_RACE = /Draugr|Skeleton|Zombie|DragonPriest|Lich/i;
+  // The editor id of a spawned body's race: its base NPC_ record's RNAM, '' when unreadable
+  const bodyRaceEdid = (id) => {
+    try {
+      const base = mp.lookupEspmRecordById(mp.getIdFromDesc(String(mp.get(id, 'baseDesc') || '')));
+      const f = base && base.record && (base.record.fields || []).find((x) => x && x.type === 'RNAM' && x.data && x.data.byteLength >= 4);
+      if (!f) return '';
+      const local = new DataView(f.data.buffer, f.data.byteOffset, 4).getUint32(0, true);
+      const race = mp.lookupEspmRecordById(base.toGlobalRecordId(local) >>> 0);
+      return String((race && race.record && race.record.editorId) || '');
+    } catch (e) { return ''; }
+  };
   // false = handled (nothing opens), null = not a lease humanoid
   globalThis.__dboCorpseLoot = (targetId, casterId) => {
     if (targetId < 0xff000000) return null;
     let tag = ''; try { tag = String(mp.get(targetId, 'private.npcSpawner') || ''); } catch (e) { return null; }
     if (!tag.startsWith(ZONE_PREFIX)) return null;
     const master = isMasterTag(tag);
-    const undead = !master && !isHumanoidTag(tag) && isUndeadTag(tag);
-    if (!master && !isHumanoidTag(tag) && !undead) return null;
+    let humanoid = !master && isHumanoidTag(tag);
+    let undead = !master && !humanoid && isUndeadTag(tag);
+    // The placement's editor id often names no people (dunCragslaneBartender, dunRannveigGhostLvlBandit: 'ghost' reads as a
+    // creature), and those bodies gave nothing (Jake, 18 Oct: "this has been happening to people in the dungeons"): the
+    // body's own race decides then
+    if (!master && !humanoid && !undead) {
+      const race = bodyRaceEdid(targetId);
+      if (HUMAN_RACE.test(race)) humanoid = true;
+      else if (UNDEAD_RACE.test(race)) undead = true;
+    }
+    if (!master && !humanoid && !undead) return null;
     try { if (mp.get(targetId, 'isDead') !== true) return null; } catch (e) { return null; }
     let looted = false; try { looted = mp.get(targetId, 'private.dboLooted') === true; } catch (e) { /* fresh */ }
     if (looted) return deny(casterId, 'Nothing more to find on this one.');

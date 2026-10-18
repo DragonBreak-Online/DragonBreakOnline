@@ -5197,7 +5197,8 @@ globalThis.__dboEmptyWorldContainer = (targetId) => {
   let done = false; try { done = mp.get(targetId, 'private.dboEmptied') === true || mp.get(targetId, 'private.treasurySeeded') === true; } catch (e) { return; }
   if (done) return;
   const here = (() => { try { const d = String(mp.get(targetId, 'worldOrCellDesc') || ''); const i = d.indexOf(':'); const n = parseInt(d.slice(0, i), 16); return (Number.isFinite(n) ? n.toString(16) : d.slice(0, i).toLowerCase()) + ':' + d.slice(i + 1).toLowerCase(); } catch (e) { return ''; } })();
-  const inDungeon = globalThis.__dboDungeonCells ? globalThis.__dboDungeonCells.has(here) : false;
+  // A dungeon's own chest outside its cells (dungeons.js extraChests) is dungeons.js's too
+  const inDungeon = (globalThis.__dboDungeonCells ? globalThis.__dboDungeonCells.has(here) : false) || !!(globalThis.__dboDungeonChestIds && globalThis.__dboDungeonChestIds.has(targetId >>> 0));
   try {
     if (!inDungeon) mp.set(targetId, 'inventory', { entries: [] }); // dungeons.js owns those
     mp.set(targetId, 'private.dboEmptied', true);

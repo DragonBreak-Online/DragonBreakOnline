@@ -39,11 +39,18 @@ for (const f of ['loot.json', 'ayleid-loot.json', 'expeditions.json']) fs.copyFi
 fs.writeFileSync('dungeons.json', JSON.stringify({ dungeons: [] }));
 const props = new Map([[`${idOf('boardref')}|baseDesc`, '6:DragonBreak.esp'], [`${A}|worldOrCellDesc`, 'f8d:BSHeartland.esm'], [`${A}|pos`, [0, -500, -221]]]);
 const given = [], said = [];
+// NPC_ bases with their race (RNAM), and the races: the body's race decides when its placement id names no people
+const u32 = (n) => { const b = new Uint8Array(4); new DataView(b.buffer).setUint32(0, n >>> 0, true); return b; };
+const RECS = {};
+const race = (id, edid) => { RECS[id] = { type: 'RACE', editorId: edid, fields: [] }; return id; };
+const npc = (id, raceId) => { RECS[id] = { type: 'NPC_', editorId: `npc${id.toString(16)}`, fields: [{ type: 'RNAM', data: u32(raceId) }] }; return id; };
+const NORD = race(idOf('13746:Skyrim.esm'), 'NordRace'), WOLFR = race(idOf('1320a:Skyrim.esm'), 'WolfRace'), DRAUGR = race(idOf('d53:Skyrim.esm'), 'DraugrRace');
+const NPC_NORD = npc(idOf('770001:Test.esp'), NORD), NPC_WOLF = npc(idOf('770002:Test.esp'), WOLFR), NPC_DRAUGR = npc(idOf('770003:Test.esp'), DRAUGR);
 const ui = new Map(); const savedTimeout = global.setTimeout; global.setTimeout = () => 0;
 globalThis.__dboDungeons = undefined; globalThis.__dboExpeditionPending = undefined;
 require(path.join(ROOT, 'dungeons.js'))({
   mp: { get: (id, p) => (p === 'profileId' ? (id === A ? 1 : -1) : props.get(`${id}|${p}`)), set: (id, p, v) => props.set(`${id}|${p}`, v), getIdFromDesc: idOf,
-    lookupEspmRecordById: (id) => (id === idOf('6:DragonBreak.esp') ? { record: { editorId: 'ExpeditionBoard' } } : { record: null }) },
+    lookupEspmRecordById: (id) => (id === idOf('6:DragonBreak.esp') ? { record: { editorId: 'ExpeditionBoard' } } : RECS[id >>> 0] ? { record: RECS[id >>> 0], toGlobalRecordId: (x) => x } : { record: null }) },
   log: () => {}, personal: (a, t) => said.push(t), system: () => {}, audit: () => {}, registerChatCommand: () => {}, onUi: (n, fn) => { const l = ui.get(n) || []; l.push(fn); ui.set(n, l); },
   openWidget: () => true, closeWidget: () => true, sendPacket: () => true, findByName: () => 0, display: String, who: String, profileOf: (a) => (a === A ? 1 : -1), nameOf: () => 'P',
   onlineActors: () => [A], isAdmin: () => false, giveItem: (a, base, n) => { given.push([base, n]); return true; }, cfg: { dungeons: {} }, every: () => {},
@@ -72,6 +79,14 @@ for (const [label, tag] of [['a dungeons.json goblin (CYRLvlGoblinMelee)', GOB],
   check(`${label}: its corpse is emptied at death, as a bandit's is`, (props.get(`${corpse}|inventory`) || { entries: [1] }).entries.length === 0);
 }
 check('a wolf of the same lease is not the server\'s to search (null)', lootBody(WOLF).r === null);
+// Jake, 18 Oct ("this has been happening to people in the dungeons"): placement ids that name no people gave nothing
+const raced = (kind, n, base) => { const tag = zone(kind, n); return () => { const id = body++; props.set(`${id}|private.npcSpawner`, tag); props.set(`${id}|isDead`, true); props.set(`${id}|baseDesc`, descs.get(base)); given.length = 0; return globalThis.__dboCorpseLoot(id, A); }; };
+const bartender = raced('dunCragslaneBartender', 11, NPC_NORD), ghostBandit = raced('DunRannveigGhostLvlBandit01Melee1H', 12, NPC_NORD);
+const pitWolf = raced('dunCragslaneLvlPitWolf', 13, NPC_WOLF), cryptGuard = raced('dunCryptHollowLvlRestless', 14, NPC_DRAUGR);
+check('a Nord bartender (dunCragslaneBartender, no people in the id) is searched as a person', bartender() === false);
+check('...and a "ghost" bandit (DunRannveigGhostLvlBandit, "ghost" read as a creature) too', ghostBandit() === false);
+check('...a pit wolf by its WolfRace is still the engine\'s body (null)', pitWolf() === null);
+check('...and a body of DraugrRace whose id names nothing gets the undead search', cryptGuard() === false);
 check('a bandit still is', lootBody(BANDIT).r === false);
 global.setTimeout = savedTimeout; process.chdir(here); fs.rmSync(dir, { recursive: true, force: true });
 
