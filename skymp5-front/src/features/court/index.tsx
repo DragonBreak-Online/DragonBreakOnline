@@ -27,6 +27,13 @@ export interface CourtView {
   household: Household | null; treasury: number | null; appointable: Array<{ rank: string; title: string }>; canName?: boolean;
   // The hold's one tax rate (business.js) and who keeps its books (economy.js wages)
   tax?: { pct: number; max: number; canSet: boolean } | null; keepsBooks?: boolean;
+  // The hold's terms for its standing hunting contracts (contracts.js; null or missing where no treasury pays them)
+  contracts?: CourtContracts | null;
+}
+export interface CourtContractTier { tier: number; name: string; price: number; kinds?: string[] }
+export interface CourtContracts {
+  tiers: CourtContractTier[]; bounds: { min: number; max: number }; budget: number; budgetMax: number; spent: number; left: number;
+  resetsAt: number; standing: boolean; citizensOnly: boolean; canSet: boolean; by: string; at: number; enabled?: boolean;
 }
 export interface CourtSection { staff: boolean; outright: boolean; courts: CourtView[]; selected: string; offers: CourtOfferIn[] }
 
@@ -76,21 +83,68 @@ const RenameControl = ({ court, kind, id, title, fallback, busy, act }: {
   );
 };
 
-// A whole number with a Set button, for the tax rate and the wages
-const NumberSet = ({ value, max, suffix, busy, onSet }: { value: number; max: number; suffix: string; busy: boolean; onSet: (n: number) => void }) => {
+// A whole number with a Set button, for the tax rate, the wages and the contract terms
+const NumberSet = ({ value, min = 0, max, suffix, busy, onSet }: { value: number; min?: number; max: number; suffix: string; busy: boolean; onSet: (n: number) => void }) => {
   const [text, setText] = useState(String(value));
   useEffect(() => { setText(String(value)); }, [value]);
   const n = Number(text);
+  const bad = text === '' || n < min || n > max || n === value;
   return (
     <span className="court__set">
       <input className="court__input court__input--number" inputMode="numeric" value={text} maxLength={6}
         onChange={(e) => setText(e.target.value.replace(/[^0-9]/g, ''))}
-        onKeyDown={(e) => { e.stopPropagation(); if (e.key === 'Enter' && text !== '' && n <= max && n !== value) onSet(n); }} />
+        onKeyDown={(e) => { e.stopPropagation(); if (e.key === 'Enter' && !bad) onSet(n); }} />
       <span className="court__muted">{suffix}</span>
-      <button type="button" className="journal__button journal__button--small" disabled={busy || text === '' || n > max || n === value} onClick={() => onSet(n)}>Set</button>
+      <button type="button" className="journal__button journal__button--small" disabled={busy || bad} onClick={() => onSet(n)}>Set</button>
     </span>
   );
 };
+
+// When the week's budget renews (server: Monday 00:00 UTC), as "Monday 00:00 UTC, in 2d 5h"
+const untilText = (t: number): string => {
+  const ms = Math.max(0, t - Date.now());
+  const d = Math.floor(ms / 86400000);
+  const h = Math.floor((ms % 86400000) / 3600000);
+  const m = Math.ceil((ms % 3600000) / 60000);
+  return d ? `${d}d ${h}h` : h ? `${h}h ${m}m` : `${m}m`;
+};
+const dateText = (t: number): string => new Date(t).toISOString().slice(0, 16).replace('T', ' ') + ' UTC';
+
+// The hold's standing hunting contracts (server contracts.js, set through court.js courtContract*): the pay per kill by
+// danger tier, the weekly budget and standing on/off for those who set its tax; read-only lines for everyone else
+const ContractTerms = ({ court, terms, busy, act }: { court: CourtView; terms: CourtContracts; busy: boolean; act: JournalTabProps['act'] }) => (
+  <div className="court__contracts">
+    <h3 className="court__heading">Hunting contracts</h3>
+    {terms.enabled === false ? <p className="court__muted">Hunting contracts are closed everywhere for now.</p> : null}
+    <p className="court__muted court__term-line">Pay per kill</p>
+    {terms.tiers.map((t) => (
+      <div key={t.tier} className="court__term">
+        <span className="court__term-label" title={t.kinds && t.kinds.length ? t.kinds.join(', ') : undefined}>{t.name.charAt(0).toUpperCase() + t.name.slice(1)}</span>
+        {terms.canSet
+          ? <NumberSet value={t.price} min={terms.bounds.min} max={terms.bounds.max} suffix="gold" busy={busy} onSet={(n) => act('dbo:courtContractPrice', court.id, t.tier, n)} />
+          : <span>{t.price} gold</span>}
+      </div>
+    ))}
+    {terms.canSet ? <p className="court__muted court__term-hint">Pay per kill runs from {terms.bounds.min} to {terms.bounds.max} gold; contracts already taken keep their pay.</p> : null}
+    <div className="court__term">
+      <span className="court__term-label">Weekly budget</span>
+      {terms.canSet
+        ? <NumberSet value={terms.budget} max={terms.budgetMax} suffix="gold" busy={busy} onSet={(n) => act('dbo:courtContractBudget', court.id, n)} />
+        : <span>{terms.budget} gold</span>}
+    </div>
+    <div className="court__term">
+      <span className="court__term-label">Standing contracts</span>
+      <span>{terms.standing ? 'On' : 'Stopped by its officials'}</span>
+      {terms.canSet ? (
+        <button type="button" className="journal__button journal__button--small" disabled={busy}
+          onClick={() => act('dbo:courtContractStanding', court.id, terms.standing ? 'off' : 'on')}>{terms.standing ? 'Stop them' : 'Post them again'}</button>
+      ) : null}
+    </div>
+    <p className="court__muted court__term-line">This week: {terms.spent} gold spent, {terms.left} left. It renews Monday 00:00 UTC, in {untilText(terms.resetsAt)}.</p>
+    <p className="court__muted court__term-line">{terms.citizensOnly ? `Citizens of ${court.name} only.` : 'Open to every hunter.'} Work an official posts by hand is open to all.</p>
+    <p className="court__muted court__term-line">{terms.by ? `Last set by ${terms.by}, ${dateText(terms.at)}.` : 'Never changed: the realm\'s defaults.'}</p>
+  </div>
+);
 
 const OfficeRow = ({ court, office, outright, busy, act }: { court: CourtView; office: CourtOffice; outright: boolean; busy: boolean; act: JournalTabProps['act'] }) => {
   const [name, setName] = useState('');
@@ -231,6 +285,7 @@ export const CourtTab = ({ section, busy, act }: JournalTabProps<CourtSection>) 
                 {court.tax.canSet ? <NumberSet value={court.tax.pct} max={court.tax.max} suffix="%" busy={busy} onSet={(n) => act('dbo:courtTax', court.id, n)} /> : null}
               </div>
             ) : null}
+            {court.contracts ? <ContractTerms court={court} terms={court.contracts} busy={busy} act={act} /> : null}
             {court.keepsBooks ? <p className="court__note">Wages are paid every Sunday from the treasury into each holder's bank account; the ruler is never paid, and nobody sets their own.</p> : null}
             <div className="court__offices">
               {court.offices.map((o) => <OfficeRow key={o.rank} court={court} office={o} outright={s.outright} busy={busy} act={act} />)}
