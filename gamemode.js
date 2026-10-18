@@ -5541,6 +5541,18 @@ const skinnerTier = (a) => { const r = masteryOf(a); if (!r || !Array.isArray(r.
 // A pelt's gold value is the honest rarity signal, and it is already in the record: MISC keeps it at
 // DATA offset 0 (measured over the whole load order by ck-mcp\itemvalues.py). The census that set the
 // bands is ck-mcp\pelts.py: 38 skinnable records running 0 (fox, goat) to 300 (a Windhelm cave bear).
+// The hold's share of a contract kill (contracts.js, Nate 18 Oct: "bounties pay back"): the body's pelts and hides, never a
+// small creature's part (chitin, tails) nor a dragon's, come off the stash so nobody skins them; { value } of what was taken
+globalThis.__dboClaimPelts = (actorId) => {
+  const id = Number(actorId) >>> 0;
+  let stash = null; try { stash = mp.get(id, 'private.dboPelts'); } catch (e) { return null; }
+  if (!Array.isArray(stash)) return null;
+  const isPelt = (p) => { const r = recordOf(Number(p.baseId) >>> 0); return !p.dragon && !!r && String(r.record.type) === 'MISC' && PELT.test(String(r.record.editorId || '')); };
+  const taken = stash.filter(isPelt);
+  if (!taken.length) return { value: 0, count: 0 };
+  try { mp.set(id, 'private.dboPelts', stash.filter((p) => !isPelt(p))); } catch (e) { return null; }
+  return { value: taken.reduce((n, p) => n + peltValue(Number(p.baseId) >>> 0) * (Number(p.count) || 1), 0), count: taken.reduce((n, p) => n + (Number(p.count) || 1), 0) };
+};
 const peltValueCache = new Map();
 const peltValue = (baseId) => {
   if (peltValueCache.has(baseId)) return peltValueCache.get(baseId);

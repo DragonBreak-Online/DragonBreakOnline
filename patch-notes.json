@@ -1,5 +1,21 @@
 [
   {
+    "title": "Hunting contracts pay the hold back",
+    "date": "2026-10-18",
+    "version": "Hotfix",
+    "tag": "Change",
+    "sections": [
+      {
+        "heading": "Contracts",
+        "items": [
+          "When you kill a creature for a hunting contract, the hold takes its pelt or hide as proof of the kill and sells it on: three quarters of its value goes back into the hold's treasury. You are told when it happens, and you are paid as before.",
+          "That body cannot be skinned for its pelt, but its meat and anything else it carried stay with it.",
+          "Creatures without a pelt (skeevers, mudcrabs and the like) are paid exactly as before. The rule is the same for contracts an official posts by hand."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Castle Bruma's gate lever",
     "date": "2026-10-17",
     "version": "Hotfix",

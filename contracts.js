@@ -39,6 +39,10 @@ module.exports = (api) => {
     budgetMax: 100000,
     // What an official may set the pay per kill to (/contract price), for each danger tier
     priceBounds: { min: 1, max: 200 },
+    // Nate, 18 Oct ("bounties pay back, not an expense but a transaction"): the hold claims the pelts and hides of every
+    // contract kill and sells them on, so holdShare of their value goes back into its treasury. A creature with no pelt
+    // (skeevers, mudcrabs) pays as before. 0 turns it off
+    holdShare: 0.75,
   }, cfg.contracts || {});
 
   // How dangerous each creature kind is: tier 3 is worth real money and real risk
@@ -431,6 +435,23 @@ module.exports = (api) => {
     } catch (e) { /* not a companion */ }
     return killerId;
   };
+  // The pelts of a counted kill go to the hold, which sells them: its treasury gets holdShare of their value. The body's pelts
+  // are set aside 50 ms after the death (gamemode.js stashPelts), so the claim waits for them
+  const claimForHold = (npcId, zoneId, hunter) => {
+    const share = Math.max(0, Math.min(1, Number(CFG.holdShare) || 0));
+    if (!share || typeof globalThis.__dboClaimPelts !== 'function') return;
+    setTimeout(() => {
+      try {
+        const r = globalThis.__dboClaimPelts(npcId);
+        if (!r || !r.count) return;
+        const zone = zoneById(zoneId);
+        const gold = Math.floor(r.value * share);
+        if (gold > 0) refundToTreasury(zone, gold);
+        personal(hunter, `${zone ? zone.name : 'The hold'} takes the ${r.count === 1 ? 'pelt' : `${r.count} pelts`} as proof of the kill.`);
+        audit(`CONTRACT PELTS ${who(hunter)}'s kill: ${r.count} pelt(s) worth ${r.value} claimed by ${zone ? zone.name : zoneId}, ${gold} gold to its treasury`);
+      } catch (e) { log('contracts: pelt claim failed', e.message); }
+    }, 400);
+  };
   globalThis.__dboContractKill = (npcId, killer) => {
     if (!CFG.enabled) return;
     const killerId = creditedTo(Number(killer) >>> 0);
@@ -465,6 +486,7 @@ module.exports = (api) => {
       w.counted.push(body);
       if (w.counted.length > 60) w.counted.splice(0, w.counted.length - 60);
       counted++;
+      if (counted === 1) claimForHold(npcId, w.zone, killerId);
       w.progress = (Number(w.progress) || 0) + worth;
       if (w.progress < w.count) { personal(killerId, `Contract: ${w.progress}/${w.count} ${plural(w.kind)}.`); continue; }
       const zone = zoneById(w.zone);
