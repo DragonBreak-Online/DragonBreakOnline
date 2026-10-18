@@ -117,6 +117,7 @@ import { MenuMediaService } from "./services/services/menuMediaService";
 import { CharacterProgressService } from "./services/services/characterProgressService";
 import { StaticRefsService } from "./services/services/staticRefsService";
 import { DeadCritterService } from "./services/services/deadCritterService";
+import { LocalTorchService } from "./services/services/localTorchService";
 import { LipSyncService } from "./services/services/lipSyncService";
 import { RacemenuPresetService } from "./services/services/racemenuPresetService";
 import { FavoritesService } from "./services/services/favoritesService";
@@ -238,6 +239,7 @@ const main = () => {
       new RacemenuPresetService(sp, controller),
       new StaticRefsService(sp, controller),
       new DeadCritterService(sp, controller),
+      new LocalTorchService(sp, controller),
       new AdminMenuService(sp, controller),
       new PersonalMenuService(sp, controller),
       new GamepadPointerService(sp, controller),
