@@ -130,6 +130,8 @@ module.exports = (api) => {
     const sa = sideOf(agg), st = sideOf(tgt);
     if (!isPlayer(sa) || !isPlayer(st)) return false;
     if (sa === st) return true;
+    // Two party members fighting a duel strike at full strength (duel.js keeps the duel non-lethal)
+    try { if (typeof globalThis.__dboDuelPair === 'function' && globalThis.__dboDuelPair(sa, st)) return false; } catch (e) { /* duel.js not loaded */ }
     const pa = partyOf(sa);
     return pa !== null && pa !== undefined && pa === partyOf(st);
   };

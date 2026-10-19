@@ -12,6 +12,7 @@
 //   whoever carries the target: Put down
 //   while sneaking:            Pickpocket (pickpocket.js)
 //   when the target can answer: Rob (robbery.js; the target answers in a panel)
+//   Challenge to a Duel, or Yield the duel on the opponent (duel.js; the target answers in a panel)
 //   a Thalmor of an arresting rank in the Empire: Arrest under the Concordat (thalmor.js)
 //   a Dawnguard, Silver Hand or Vigil member with a silver weapon: Silver Test (silvertest.js; the target answers in a panel)
 // Trade, Search, Restrain, Uncuff, Carry and Put down go from the client straight to the server systems,
@@ -451,6 +452,7 @@ module.exports = (api) => {
     // Pickpocket, only while the viewer sneaks (pickpocket.js reads the server's sneak flag)
     try { if (typeof globalThis.__dboPickpocketEntries === 'function') entries.push(...globalThis.__dboPickpocketEntries(a, t)); } catch (e) { /* pickpocket not loaded */ }
     try { if (typeof globalThis.__dboRobEntries === 'function') entries.push(...globalThis.__dboRobEntries(a, t)); } catch (e) { /* robbery not loaded */ }
+    try { if (typeof globalThis.__dboDuelEntries === 'function') entries.push(...globalThis.__dboDuelEntries(a, t)); } catch (e) { /* duel.js not loaded */ }
     try { if (typeof globalThis.__dboKeyRingEntries === 'function') entries.push(...globalThis.__dboKeyRingEntries(a, t)); } catch (e) { /* key ring not loaded */ }
     try { if (typeof globalThis.__dboCourierEntries === 'function') entries.push(...globalThis.__dboCourierEntries(a, t)); } catch (e) { /* couriers not loaded */ }
     try { if (typeof globalThis.__dboConcordatEntries === 'function') entries.push(...globalThis.__dboConcordatEntries(a, t)); } catch (e) { /* thalmor.js not loaded */ }
@@ -531,6 +533,7 @@ module.exports = (api) => {
     if (id.startsWith('voice:')) return sendPacket(a, { customPacketType: 'dboVoicePeer', identity: (t >>> 0).toString(16), op: id.slice(6), name: nameFor(a, t) });
     if (typeof globalThis.__dboPickpocketAction === 'function' && globalThis.__dboPickpocketAction(a, id, t, nameFor)) return;
     if (typeof globalThis.__dboRobAction === 'function' && globalThis.__dboRobAction(a, id, t, nameFor)) return;
+    if (typeof globalThis.__dboDuelAction === 'function' && globalThis.__dboDuelAction(a, id, t)) return;
     if (typeof globalThis.__dboKeyRingAction === 'function' && globalThis.__dboKeyRingAction(a, id, t, nameFor)) return;
     if (typeof globalThis.__dboCourierAction === 'function' && globalThis.__dboCourierAction(a, id, t, nameFor)) return;
     if (typeof globalThis.__dboConcordatAction === 'function' && globalThis.__dboConcordatAction(a, id, t, nameFor)) return;
