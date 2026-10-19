@@ -17,6 +17,7 @@ import { FLYER_NO_AI, flyerGuardOf, flyerPlan, guardOn } from "./flyerGuard";
 import { forgetFlyer, isDragonCopy, noteFlyer, setSpawnGuard } from "./flyerRuntime";
 import { HOST_TRY_GHOST_AFTER, isSettling } from "./npcLifetime";
 import { hostBackoff, maySpawnCopy, noteActorCall, noteCopyBorn, noteCopyPlaced, safeDelete } from "./npcLifetimeRuntime";
+import { nativeCreateCopy } from "./nativeCreate";
 import { driftConfig } from "../sync/driftConfig";
 import { Movement } from "../sync/movement";
 import { SpawnProcess } from "./spawnProcess";
@@ -248,8 +249,16 @@ export class FormView {
 
         const player = Game.getPlayer() as Actor;
 
+        // Phase 2b: created natively at its spot when nativeCreate is on (view/nativeCreate.ts), placeAtMe otherwise
+        let placedNatively = false;
+        const spawnWorldOrCell = model.movement?.worldOrCell || 0;
         const spawnMethodOriginal = {
-          spawn(baseForm: Form, _spawnPosition: [number, number, number], _spawnRotation: [number, number, number]): ObjectReference {
+          spawn(baseForm: Form, spawnPosition: [number, number, number], spawnRotation: [number, number, number]): ObjectReference {
+            const native = nativeCreateCopy(baseForm, spawnPosition, spawnRotation, spawnWorldOrCell);
+            if (native) {
+              placedNatively = true;
+              return native;
+            }
             return player.placeAtMe(
               baseForm,
               1,
@@ -263,7 +272,8 @@ export class FormView {
               appearance,
               spawnPosition,
               spawningRefr.getFormID(),
-              callback
+              callback,
+              placedNatively
             );
           }
         };

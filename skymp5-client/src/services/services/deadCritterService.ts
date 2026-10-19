@@ -2,6 +2,7 @@ import { Game, ObjectLoadedEvent, ObjectReference } from "skyrimPlatform";
 import { ClientListener, CombinedController, Sp } from "./clientListener";
 import { DeadBody, deadBodiesToRemove, isSpawnedBody } from "../../view/deadCritterPolicy";
 import { logError, logTrace } from "../../logging";
+import { safeDelete } from "../../view/npcLifetimeRuntime";
 
 // Dead hawks' bodies: fcHawkGO (Skyrim.esm, also overridden by BSHeartland) and Dawnguard's DLC1BoneHawkGO
 const DEAD_BODY_BASES: [number, string][] = [[0x105821, "Skyrim.esm"], [0x002992, "Dawnguard.esm"]];
@@ -50,8 +51,9 @@ export class DeadCritterService extends ClientListener {
       this.bodies.delete(id);
       const ref = ObjectReference.from(Game.getFormEx(id));
       if (!ref) continue;
-      ref.disableNoWait(false);
-      ref.delete();
+      // Was DisableNoWait then Delete in the same frame: the queued Disable could then run on the deleted body (the 41702
+      // crash). safeDelete orders the two, natively when the lifecycle switch is on
+      safeDelete(ref);
       logTrace(this, `removed a dead hawk's body ${id.toString(16)}`);
     }
   }

@@ -89,12 +89,15 @@ export interface DeleteFacts {
 export type DeletePlan = "skip" | "delete" | "defer";
 
 // skip: queue nothing on it; delete: Delete() now; defer: disableNoWait now, Delete() once its 3D is gone. No 3D is deleted outright,
-// except during a loading screen, when nothing is deleted at once
+// except during a loading screen, when nothing is deleted at once.
+// A non-actor with its 3D is always deferred: a torch (RemovableTorch01) deleted while the player stood in its flame freed
+// the hazard's physics body under a live trap hit (TESTrapListener, SkyrimSE 26034+0x1C1, 16 Oct); disabled first, it leaves
+// the physics world before it is deleted
 export const deletePlan = (f: DeleteFacts, now: number): DeletePlan => {
   if (f.handedToDelete || f.queued || f.deleted) return "skip";
   if (f.loadingScreen) return "defer";
   if (!f.is3DLoaded) return "delete";
-  if (!f.state) return f.defer ? "defer" : "delete";
+  if (!f.state) return "defer";
   return deleteNow(f.state, now, f.defer) ? "delete" : "defer";
 };
 

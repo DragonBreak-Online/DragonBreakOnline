@@ -207,11 +207,50 @@ export class HostedDriftService extends ClientListener {
         remote: { on: driftConfig.remote, tracked: this.remote.size, sent: this.remoteSent, capped: this.remoteCapped },
         fr: this.frameReport(),
       };
+      if (pc && pcPos) {
+        try { report.drawn = this.drawnCensus(pc, pcPos); } catch (e) { report.drawn = { error: String(e) }; }
+      }
       this.remoteSent = 0;
       this.remoteCapped = 0;
       report.ids = this.fitIds(report, pairs);
       this.send(report);
     }
+  }
+
+  // The server's NPCs this client should be drawing near the player, against what it draws. A server spawn count never
+  // proved a client drew the actor, so "no NPCs here" could not be settled from the server log (Worker B, 18 Oct).
+  // streamed: NPC forms in the player's world or cell within remoteRadius, not disabled by the server; drawn: their
+  // local copy is enabled with 3D; any other is counted by why (noCopy, noRef, deleted, disabled, no3D), and the
+  // first few are listed. A copy still in the spawn budget's queue reads noCopy for a heartbeat; one that stays so is the finding
+  private drawnCensus(pc: Actor, pcPos: number[]): Record<string, unknown> {
+    const where = pc.getWorldSpace()?.getFormID() || pc.getParentCell()?.getFormID() || 0;
+    const counts: Record<string, number> = { streamed: 0, drawn: 0, dead: 0, serverDisabled: 0 };
+    const missing: string[] = [];
+    for (const form of this.controller.lookupListener(RemoteServer).getWorldModel().forms) {
+      if (!form || form.appearance || form.isMyClone || !form.movement || !form.refrId || form.refrId < 0xff000000) continue;
+      if (form.movement.worldOrCell !== where) continue;
+      if (this.dist(form.movement.pos, pcPos) > driftConfig.remoteRadius) continue;
+      if (form.isDisabled || form.disabled) { counts.serverDisabled++; continue; }
+      counts.streamed++;
+      if (form.isDead) counts.dead++;
+      const remoteId = Number(form.refrId) % 0x100000000;
+      const state = this.copyState(remoteId);
+      if (state === "drawn") { counts.drawn++; continue; }
+      counts[state] = (counts[state] || 0) + 1;
+      if (missing.length < 6) missing.push(`${remoteId.toString(16)}:${state}`);
+    }
+    return { ...counts, missing: missing.join(",") };
+  }
+
+  private copyState(remoteId: number): string {
+    const localId = remoteIdToLocalId(remoteId);
+    if (!localId) return "noCopy";
+    const ac = Actor.from(Game.getFormEx(localId));
+    if (!ac) return "noRef";
+    if (ac.isDeleted()) return "deleted";
+    if (ac.isDisabled()) return "disabled";
+    if (!ac.is3DLoaded()) return "no3D";
+    return "drawn";
   }
 
   // "id:distance" pairs, nearest first, as many as fit the logged length; -1 is an id that no longer resolves
@@ -267,9 +306,13 @@ export class HostedDriftService extends ClientListener {
     if (mode === "setPosition") ac.setPosition(ref[0], ref[1], ref[2]);
     else if (mode === "moveTo") ac.moveTo(ac, 0, 0, 0, true);
     else if (mode === "disableEnable") {
-      // The disable resolves in a later frame, where the Actor fetched now is no longer valid
+      // The disable resolves in a later frame, where the Actor fetched now is no longer valid. A copy being deleted is left
+      // alone: its re-enable would bring it back, and a queued Disable must not meet the delete
       const localId = ac.getFormID();
-      ac.disable(false).then(() => Actor.from(Game.getFormEx(localId))?.enable(false));
+      // npcLifetimeRuntime's isHandedToDelete, through globalThis so this service's harness needs no game stubs for it
+      const handed = (id: number): boolean => { const f = (globalThis as any).__dboIsHandedToDelete; return typeof f === "function" && !!f(id); };
+      if (handed(localId)) return;
+      ac.disable(false).then(() => { if (!handed(localId)) Actor.from(Game.getFormEx(localId))?.enable(false); });
     }
     this.pending.set(remoteId, { due: now + REPAIR_CHECK_MS, mode, node, limit, ref, bone, late: false });
   }
