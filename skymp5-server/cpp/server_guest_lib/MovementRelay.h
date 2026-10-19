@@ -35,13 +35,21 @@ public:
 private:
   struct Pending
   {
-    std::vector<unsigned char> data;
     uint64_t lastSentMs = 0;
     uint64_t lastTouchedMs = 0;
     uint32_t intervalMs = 0;
+    uint32_t emitterId = 0; // Flush sends this emitter's newest packet (latest)
     Networking::UserId userId = Networking::InvalidUserId;
     bool dirty = false;
     bool queued = false; // in its listener's waiting list
+  };
+
+  // An emitter's newest movement packet, stored once and shared by every listener waiting for it. Copying it into each
+  // listener's entry was a 100-byte copy per listener per packet (relaySubmit 136 ms/s at 500 crowded, TickProfile)
+  struct Latest
+  {
+    std::vector<unsigned char> data;
+    uint64_t touchedMs = 0;
   };
 
   struct ListenerState
@@ -68,6 +76,8 @@ private:
   PartOne& partOne;
   std::unordered_map<uint64_t, Pending> pending;      // (listener user << 32) | emitter form id
   std::unordered_map<uint64_t, uint64_t> combat;      // (min form id << 32) | max form id -> last hit ms
+  std::unordered_map<uint32_t, uint64_t> combatAt;    // form id -> its last hit ms, so most packets skip the pair lookups
+  std::unordered_map<uint32_t, Latest> latest;        // emitter form id -> newest packet
   std::unordered_map<Networking::UserId, ListenerState> listeners;
   std::vector<Pending*> dueScratch;  // reused by FlushListener
   std::vector<uint64_t> pruneScratch; // reused by PrunePendingSlice
