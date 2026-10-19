@@ -440,7 +440,7 @@ export class BountyBoardSystem implements System {
 
   // officials.json first, then the backend faction rows "hold:<zone>:<rank>" on the actor.
   private rankIn(ctx: SystemContext, actorId: number, zone: Zone): string | null {
-    const fromFile = this.zones.rankOf(this.profileIdOf(ctx, actorId), zone.id);
+    const fromFile = this.zones.rankOf(this.profileIdOf(ctx, actorId), zone.id, actorId);
     if (fromFile) return fromFile;
     try {
       const access = (ctx.svr as Mp).get(actorId, "private.skympAccess");
