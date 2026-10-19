@@ -112,6 +112,7 @@ const R = (r) => (r && (r.error || r.text)) || '';
 // ---- policies ------------------------------------------------------------------------------------------------------------
 let r = M.join(ANNA, 'bruma');
 ok(!r.error && M.citizenOf(ANNA, 'bruma'), 'free (the default): Anna becomes a citizen of Bruma at once', r);
+ok(/bars a new one for 7 days/.test(r.text || ''), '...and is told renouncing bars a new citizenship for seven days (#0218)', r);
 ok(M.holdsOf(ANNA)[0].zone === 'bruma', "Bruma is Anna's Primary");
 r = M.setPolicy(ANNA, 'bruma', 'paid', 100);
 ok(r.error && /Count or the Steward/.test(r.error), 'a citizen cannot set the policy', r);
