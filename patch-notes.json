@@ -16,9 +16,9 @@
       {
         "heading": "Bounty hunting",
         "items": [
-          "When an outlaw with a hold bounty is locked up in that hold's jail, the bounty they pay now goes into the hold's treasury, and a quarter of it goes to the treasury of the faction of whoever brought them in (the one carrying or holding them, otherwise the guard who locks the door). Hunting factions such as the Imperial Legion and the Fighters Guild are chosen first.",
-          "Nobody is paid personally, and no new gold is made: the share comes out of the bounty paid. If the outlaw cannot pay and serves extra time instead, there is no share. The hold's own guards and officials, staff, and players in no faction earn no share; it all stays with the hold. A faction never earns a share for bringing in one of its own members.",
-          "Faction leaders who are online are told when their faction earns a share."
+          "When an outlaw with a hold bounty is locked up in that hold's jail, a quarter of the bounty they pay goes to the treasury of the faction that brought the outlaw in (whoever was carrying or holding them, otherwise the guard who locks the door). The guard who jails them keeps the rest. Hunting factions such as the Imperial Legion and the Fighters Guild are chosen first.",
+          "No new gold is made: the share comes out of the bounty paid. If the outlaw cannot pay and serves extra time instead, there is no share. When the outlaw is brought in by staff, by the hold's own guards and officials, or by a player in no faction, the guard who jails them keeps it all. A faction never earns a share for bringing in one of its own members.",
+          "Faction leaders who are online are told when their faction earns a share. Paying your own bounty with /bounty pay works as before."
         ]
       }
     ]

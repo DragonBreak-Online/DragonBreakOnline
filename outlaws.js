@@ -3,17 +3,17 @@
 //
 // A hold's ruler or Steward (a Lead GM too) puts a bounty of up to max gold on a character, with a reason: /bounty set.
 // The bounty is the hold's own: it is claimed only when the outlaw is jailed in that hold (hold only, Nate). The outlaw
-// then pays it as a fine, from the gold they carry and then from their bank account, into the hold's treasury (payJailer
-// true restores the first design, where it all went to the guard who locked them in). What they cannot pay is served as
-// extra time in the cell, a minute for every goldPerMinute gold. An outlaw may pay their own bounty first (/bounty pay,
+// then pays it as a fine, from the gold they carry and then from their bank account, and it goes to the one who locked
+// them in (less a bounty hunting share, below). What they cannot pay is served as extra time in the cell, a minute for
+// every goldPerMinute gold. An outlaw may pay their own bounty first (/bounty pay,
 // standing in the hold); that gold goes to the hold's treasury. The hold itself never pays a bounty.
 //
 // Bounty hunting shares (Nate, 18-19 Oct: factions earn through roleplay, no new gold): of a bounty PAID at the jail,
 // hunterShare (0.25) goes to the treasury of the faction of whoever brought the outlaw in (jail.js: the one carrying
-// them, else the one who bound them, else the guard at the door); the hold keeps the rest, and only what it keeps is
-// marked as its income for the Imperial tithe. Time served pays no share. The faction: one in hunterFactions the arrester
-// belongs to, else their only faction, else the one they rank highest in; never the outlaw's own, never for staff. An
-// official of the hold itself (its guards) or a member of no faction leaves it all with the hold: no personal payout.
+// them, else the one who bound them, else the guard at the door); the guard who jails them keeps the rest (Nate, 19 Oct:
+// the hold takes no cut). Time served pays no share. The faction: one in hunterFactions the arrester belongs to, else
+// their only faction, else the one they rank highest in; never the outlaw's own. No share (the jailer keeps it all) for a
+// staff arrester, an official of the hold itself, a member of no faction, the hold's own faction, or a refused deposit.
 //
 // State: outlaws.json beside the server, { zones: { <zone id>: { <profile id>: { amount, reason, name, by, at } } } }
 'use strict';
@@ -24,7 +24,7 @@ module.exports = (api) => {
   const { mp, log, personal, system, audit, who, display, cfg, registerChatCommand, zoneOfActor, zoneById, readOfficials,
     profileOf, officialTarget, onlineActors, giveItem, isLeadStaff, onUi } = api;
   const C = Object.assign({ enabled: true, max: 1000, goldPerMinute: 10, maxExtraMinutes: 240,
-    payJailer: false, hunterShare: 0.25, hunterFactions: ['imperial-legion', 'fighters-guild'] }, cfg.outlaws || {});
+    hunterShare: 0.25, hunterFactions: ['imperial-legion', 'fighters-guild'] }, cfg.outlaws || {});
   const FILE = path.resolve('outlaws.json');
   const GOLD = 0xf;
   const S = globalThis.__dboOutlaws || (globalThis.__dboOutlaws = { data: null });
@@ -99,10 +99,9 @@ module.exports = (api) => {
   };
   // Leaders of a faction who are online hear of a share
   const tellLeaders = (fid, text) => { for (const x of onlineActors()) if (guildsOf(x).some((g) => g.id === fid && g.role === 'leader')) personal(x, text); };
-  const toHold = (zid, n) => { if (!(n > 0)) return 0; try { return globalThis.__dboTreasuryZone ? Number(globalThis.__dboTreasuryZone.deposit(zid, n, { income: 'bounties' })) || 0 : 0; } catch (e) { log('outlaws: treasury deposit failed', e.message); return 0; } };
 
   // ---- the jail: jail.js asks how many minutes to add when it locks someone in -----------------------------------------
-  // The bounty of the hold the cell stands in is claimed: paid as far as the outlaw can (the hold's, less the hunter's
+  // The bounty of the hold the cell stands in is claimed: paid as far as the outlaw can (to the jailer, less the hunter's
   // faction share), the rest served. arrester: who brought them in (jail.js), else the guard
   globalThis.__dboOutlawJailed = (guard, prisoner, arrester) => {
     if (!C.enabled) return 0;
@@ -113,34 +112,32 @@ module.exports = (api) => {
     const amount = Math.max(0, Math.floor(Number(b.amount) || 0));
     const paid = collect(prisoner, amount, `bounty ${holdName(zid)}`);
     const by = Number(arrester) >>> 0 || guard >>> 0;
-    let where = '', share = 0, fac = null, kept = 0;
-    if (C.payJailer === true) {
-      if (paid > 0) giveItem(guard, GOLD, paid);
-      where = `${paid} paid to the jailer`;
-    } else if (paid > 0) {
+    // A share to the bringer's faction when one is due; the jailer keeps the rest (all of it when none is due)
+    let share = 0, fac = null, why = '';
+    if (paid > 0) {
       const h = hunterFactionOf(by, prisoner, zid);
       share = h.fid ? Math.min(paid, Math.floor(paid * shareRate())) : 0;
+      why = h.why || '';
       if (share > 0) {
         let okShare = false;
         try { const T = globalThis.__dboTreasury; okShare = !!(T && typeof T.deposit === 'function' && T.deposit(h.fid, share, `bounty share: ${b.name} brought in to ${holdName(zid)} by ${who(by)}`, { income: 'bounty share' })); } catch (e) { log('outlaws: share deposit failed', e.message); }
-        if (okShare) fac = h; else { share = 0; h.why = `the treasury of ${h.name} would not take it`; }
-      }
-      kept = toHold(zid, paid - share);
-      where = `${kept}/${paid - share} to the ${holdName(zid)} treasury, ${fac ? `${share} share to ${fac.fid}` : `no share (${h.why || 'none due'})`}`;
-      if (fac) {
-        audit(`BOUNTY share: ${share} gold of ${who(prisoner)}'s ${paid} gold bounty paid in ${holdName(zid)} to the treasury of ${fac.fid}, brought in by ${who(by)} (${Math.round(shareRate() * 100)}%)`);
-        tellLeaders(fac.fid, `${display(by)} brought ${display(prisoner)} in to ${holdName(zid)}'s jail: ${share} gold of the bounty went to the treasury of ${fac.name}.`);
-      }
+        if (okShare) fac = h; else { share = 0; why = `the treasury of ${h.name} would not take it`; }
+      } else if (h.fid) why = 'nothing to share';
+    }
+    const toJailer = paid - share;
+    if (toJailer > 0) giveItem(guard, GOLD, toJailer);
+    const where = `${toJailer} paid to the jailer, ${fac ? `${share} share to ${fac.fid}` : `no share (${why || 'none due'})`}`;
+    if (fac) {
+      audit(`BOUNTY share: ${share} gold of ${who(prisoner)}'s ${paid} gold bounty paid in ${holdName(zid)} to the treasury of ${fac.fid}, brought in by ${who(by)} (${Math.round(shareRate() * 100)}%); the jailer ${who(guard)} kept ${toJailer}`);
+      tellLeaders(fac.fid, `${display(by)} brought ${display(prisoner)} in to ${holdName(zid)}'s jail: ${share} gold of the bounty went to the treasury of ${fac.name}.`);
     }
     const short = amount - paid;
     const extra = short > 0 ? Math.min(Number(C.maxExtraMinutes) || 0, Math.ceil(short / Math.max(1, Number(C.goldPerMinute) || 10))) : 0;
     system(prisoner, `Your bounty in ${holdName(zid)} (${amount} gold) is settled: ${paid} gold paid${extra ? `, and ${extra} more minutes in the cell for the ${short} you could not pay` : ''}.`);
-    const told = C.payJailer === true
-      ? (paid ? `You collect ${paid} gold of the bounty.` : 'They had no gold to pay it.')
-      : (paid ? `${paid} gold of the bounty is paid to ${holdName(zid)}${fac ? `, ${share} of it to the treasury of ${fac.name}` : ''}.` : 'They had no gold to pay it.');
+    const told = paid ? `You collect ${toJailer} gold of the bounty${fac ? `; ${share} went to the treasury of ${fac.name}, who brought them in` : ''}.` : 'They had no gold to pay it.';
     personal(guard, `${display(prisoner)} was wanted in ${holdName(zid)} for ${amount} gold. ${told}${extra ? ` They serve ${extra} more minutes for the rest.` : ''}`);
     if (fac && by !== (guard >>> 0)) { try { if (onlineActors().map((x) => x >>> 0).includes(by)) personal(by, `${display(prisoner)} is in ${holdName(zid)}'s jail: ${share} gold of the bounty went to the treasury of ${fac.name}.`); } catch (e) { /* offline */ } }
-    audit(`BOUNTY claimed: ${who(prisoner)} jailed in ${holdName(zid)} by ${who(guard)}${by !== (guard >>> 0) ? `, brought in by ${who(by)}` : ''}: ${amount} gold, ${paid} paid (${where || 'nothing'}), ${extra} min added`);
+    audit(`BOUNTY claimed: ${who(prisoner)} jailed in ${holdName(zid)} by ${who(guard)}${by !== (guard >>> 0) ? `, brought in by ${who(by)}` : ''}: ${amount} gold, ${paid} paid (${where}), ${extra} min added`);
     return extra;
   };
 

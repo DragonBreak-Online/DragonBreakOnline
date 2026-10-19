@@ -1,7 +1,7 @@
-// Bounty hunting shares (server\outlaws.js, Nate 18-19 Oct): a bounty paid at the hold's jail goes to the hold's treasury,
-// less outlaws.hunterShare (0.25) to the treasury of the faction of whoever brought the outlaw in. Time served pays no
-// share; staff, the hold's own officials and members of no faction leave it all with the hold; never the outlaw's own
-// faction. Only what the hold keeps is marked as its income. Run from server/ with a temp state folder:
+// Bounty hunting shares (server\outlaws.js, Nate 18-19 Oct): of a bounty paid at the hold's jail, outlaws.hunterShare
+// (0.25) goes to the treasury of the faction of whoever brought the outlaw in and the guard who locks the door keeps the
+// rest; the hold takes no cut. Time served pays no share; staff, the hold's own officials, members of no faction, the
+// hold's own faction, the outlaw's own faction and a refused deposit leave it all with the jailer. /bounty pay is unchanged. Run from server/ with a temp state folder:
 //   node tests/bounty-share-harness.js
 'use strict';
 const fs = require('fs'); const os = require('os'); const path = require('path');
@@ -51,67 +51,52 @@ const jailWith = (amount, carry, by) => {
   return globalThis.__dboOutlawJailed(GUARD, OUTLAW, by);
 };
 
-// A legionary brings Rogue in: 400 paid, 100 to the Legion (a hunter faction, picked over the Bards), 300 to Bruma
+// A legionary brings Rogue in: 400 paid, 100 to the Legion (a hunter faction, picked over the Bards), 300 to the jailer
 let extra = jailWith(400, 400, LEGIONARY);
-ok('legionary: 25% of the paid bounty to the Imperial Legion\'s treasury', facIn.length === 1 && facIn[0].fid === 'imperial-legion' && facIn[0].n === 100, facIn);
-ok('...the hold keeps the rest, 300, marked as its income', holdIn.length === 1 && holdIn[0].z === 'bruma' && holdIn[0].n === 300 && holdIn[0].income === 'bounties', holdIn);
-ok('...no gold is printed: 100 + 300 = the 400 paid, and the jailer gets nothing personally', gold(GUARD) === 0 && gold(OUTLAW) === 0 && extra === 0);
-ok('...the share is audited', audits.some((t) => /BOUNTY share: 100 gold .* imperial-legion, brought in by Pell/.test(t)));
-ok('...the claim audit names who brought them in', audits.some((t) => /BOUNTY claimed: .*by Dreams, brought in by Pell/.test(t)));
+ok('legionary: 25% of the paid bounty to the Imperial Legion\'s treasury', facIn.length === 1 && facIn[0].fid === 'imperial-legion' && facIn[0].n === 100 && facIn[0].income === 'bounty share', facIn);
+ok('...the guard who locked the door keeps the other 300, personally', gold(GUARD) === 300, gold(GUARD));
+ok('...the hold gets no cut, and no gold is printed (100 + 300 = 400)', holdIn.length === 0 && gold(OUTLAW) === 0 && extra === 0, holdIn);
+ok('...the share is audited', audits.some((t) => /BOUNTY share: 100 gold .* imperial-legion, brought in by Pell .*jailer Dreams kept 300/.test(t)), audits);
+ok('...the claim audit names who brought them in', audits.some((t) => /BOUNTY claimed: .*by Dreams, brought in by Pell: 400 gold, 400 paid \(300 paid to the jailer, 100 share to imperial-legion\)/.test(t)), audits);
+ok('...the jailer is told', said.some(([a, t]) => a === GUARD && /You collect 300 gold of the bounty; 100 went to the treasury of Imperial Legion/.test(t)));
 ok('...and the arrester hears where the share went', said.some(([a, t]) => a === LEGIONARY && /100 gold of the bounty went to the treasury of Imperial Legion/.test(t)));
 
 // Partly paid: 200 of 400, the rest served. Share only of what was paid
 extra = jailWith(400, 200, FG_LEAD);
-ok('partly paid: 50 (25% of the 200 paid) to the Fighters Guild, 150 to Bruma', facIn[0] && facIn[0].fid === 'fighters-guild' && facIn[0].n === 50 && holdIn[0].n === 150, [facIn, holdIn]);
+ok('partly paid: 50 (25% of the 200 paid) to the Fighters Guild, 150 to the jailer', facIn[0] && facIn[0].fid === 'fighters-guild' && facIn[0].n === 50 && gold(GUARD) === 150 && !holdIn.length, [facIn, gold(GUARD)]);
 ok('...the unpaid 200 is 20 minutes', extra === 20, extra);
 ok('...the Fighters Guild\'s leader (online) is told', said.some(([a, t]) => a === FG_LEAD && /50 gold of the bounty went to the treasury of Fighters Guild/.test(t)));
 
 // Nothing paid: served as time, no share
 extra = jailWith(300, 0, LEGIONARY);
-ok('served as time: no share, nothing to the hold', facIn.length === 0 && holdIn.length === 0 && extra === 30, [facIn, holdIn, extra]);
+ok('served as time: no share, nothing to anyone', facIn.length === 0 && holdIn.length === 0 && gold(GUARD) === 0 && extra === 30, [facIn, holdIn, extra]);
 
 // No hunter faction, several memberships: the highest ranked (Harbinger, the Companions' leader, over a Bard)
 jailWith(100, 100, MULTI);
-ok('several factions, none a hunter faction: the one they rank highest in', facIn[0] && facIn[0].fid === 'companions' && facIn[0].n === 25, facIn);
+ok('several factions, none a hunter faction: the one they rank highest in', facIn[0] && facIn[0].fid === 'companions' && facIn[0].n === 25 && gold(GUARD) === 75, facIn);
 
 // Exactly one faction
 jailWith(100, 100, FG_LEAD);
-ok('one faction: that one', facIn[0] && facIn[0].fid === 'fighters-guild');
+ok('one faction: that one', facIn[0] && facIn[0].fid === 'fighters-guild' && gold(GUARD) === 75);
 
-// No faction: the hold keeps it all, no personal payout
-jailWith(100, 100, LONER);
-ok('no faction: all 100 to the hold, nothing to the arrester', facIn.length === 0 && holdIn[0].n === 100 && gold(LONER) === 0 && audits.some((t) => /no share \(Lone belongs to no faction\)/.test(t)), audits);
+// No share: the jailer keeps all of it, the hold nothing
+const allToJailer = (label, by, re) => { jailWith(100, 100, by); ok(label, facIn.length === 0 && holdIn.length === 0 && gold(GUARD) === 100 && (!re || audits.some((t) => re.test(t))), [facIn, holdIn, gold(GUARD), audits]); };
+allToJailer('no faction: all 100 to the jailer, nothing to the arrester', LONER, /100 paid to the jailer, no share \(Lone belongs to no faction\)/);
+ok('...the arrester gets nothing personally', gold(LONER) === 0);
+allToJailer('a guard of the hold brought them in: all to the jailer', GUARD, /serves Bruma itself/);
+allToJailer('the hold\'s own faction: all to the jailer', SWORD, /County of Bruma is Bruma's own/);
+allToJailer('staff arrest: no share, all to the jailer', STAFFER, /staff arrests earn no share/);
+allToJailer('the outlaw\'s own faction: no share, all to the jailer', CULTIST, /the outlaw shares their factions/);
+allToJailer('no arrester given (an older jail.js): the guard at the door counts, all to the jailer', undefined);
+refuse = true; allToJailer('a refused share: all 100 to the jailer', LEGIONARY, /would not take it/); refuse = false;
 
-// The hold's own guard: all to the hold
-jailWith(100, 100, GUARD);
-ok('a guard of the hold: all to the hold', facIn.length === 0 && holdIn[0].n === 100 && audits.some((t) => /serves Bruma itself/.test(t)));
-// A citizen of the County (the hold's own faction) brings them in: the hold keeps it
-jailWith(100, 100, SWORD);
-ok('the hold\'s own faction: all to the hold', facIn.length === 0 && holdIn[0].n === 100);
-
-// Staff: no share
-jailWith(100, 100, STAFFER);
-ok('staff arrest: no share', facIn.length === 0 && holdIn[0].n === 100 && audits.some((t) => /staff arrests earn no share/.test(t)));
-
-// Never the outlaw's own faction
-jailWith(100, 100, CULTIST);
-ok('the outlaw\'s own faction: no share', facIn.length === 0 && holdIn[0].n === 100);
-
-// No arrester passed (an older jail.js): the guard who locked the door, an official, so the hold keeps it
-jailWith(100, 100, undefined);
-ok('no arrester given: the guard at the door counts, and the hold keeps it', facIn.length === 0 && holdIn[0].n === 100);
-
-// A faction treasury that refuses: the hold keeps it all
-refuse = true; jailWith(100, 100, LEGIONARY); refuse = false;
-ok('a refused share: all 100 to the hold', holdIn[0] && holdIn[0].n === 100 && audits.some((t) => /would not take it/.test(t)), [holdIn, audits]);
-
-// Self-paid (/bounty pay): nobody brought them in, all to the hold
+// Self-paid (/bounty pay): as live, all to the hold's treasury, no share
 cmd(COUNTESS, 'set Rogue 80 again'); setGold(OUTLAW, 80); reset(); cmd(OUTLAW, 'pay');
-ok('/bounty pay: all to the hold, no share', facIn.length === 0 && holdIn[0].n === 80);
+ok('/bounty pay: all to the hold\'s treasury as before, no share', facIn.length === 0 && holdIn.length === 1 && holdIn[0].n === 80 && holdIn[0].income === 'bounties');
 
-// Rounding: 7 gold paid, 25% = 1 (rounded down), the hold 6
+// Rounding: 7 gold paid, 25% = 1 (rounded down), the jailer 6
 jailWith(7, 7, LEGIONARY);
-ok('rounding: share rounded down, the two add up to the paid', facIn[0].n === 1 && holdIn[0].n === 6);
+ok('rounding: share rounded down, the two add up to the paid', facIn[0].n === 1 && gold(GUARD) === 6);
 
 try { fs.rmSync(dir, { recursive: true, force: true }); } catch (e) { /* temp */ }
 console.log(fails ? `${fails} FAILED` : 'all checks passed'); process.exit(fails ? 1 : 0);
