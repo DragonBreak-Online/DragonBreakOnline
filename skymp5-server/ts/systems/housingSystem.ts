@@ -1917,12 +1917,14 @@ export class HousingSystem implements System {
 
   // Key items that open a claimed lock move onto the ring (the name joins the lock's issued ones, so it opens exactly)
   // A key that opens nothing known stays where it is: a record not loaded yet proves nothing
-  private ringFromItems(ctx: SystemContext, entries: any[], actorId: number): { kept: any[]; moved: string[] } {
+  private ringFromItems(ctx: SystemContext, entries: any[], actorId: number): { kept: any[]; moved: string[]; dead: any[] } {
     this.keyPoolReady(ctx);
-    const kept: any[] = [], moved: string[] = [];
+    const kept: any[] = [], moved: string[] = [], dead: any[] = [];
     for (const e of entries) {
       const name = isPropertyKeyBase(Number(e?.baseId)) && typeof e?.name === "string" ? e.name : "";
       const lock = name ? this.lockOfKeyName(ctx, name) : null;
+      // A named key no lock accepts any more (its lock was recut or released)
+      if (name && !lock) dead.push(e);
       if (!lock || !this.ringHasRoom(ctx, actorId, name)) { kept.push(e); continue; }
       const { primary, rec } = lock;
       if (!(rec.issued || []).includes(name) && !(rec.keyAliases || []).includes(name)) rec.issued = (rec.issued || []).concat([name]);
@@ -1931,7 +1933,7 @@ export class HousingSystem implements System {
       this.addToRing(ctx, actorId, { n: name, p: primary, at: Date.now(), by: "" });
       moved.push(name);
     }
-    return { kept, moved };
+    return { kept, moved, dead };
   }
 
   // At login: key items in the pack move onto the ring, and ring keys that no longer open their lock are dropped
@@ -1962,9 +1964,20 @@ export class HousingSystem implements System {
     const entries: any[] = inv && Array.isArray(inv.entries) ? inv.entries : [];
     this.keyPoolReady(ctx);
     if (!entries.some((e) => isPropertyKeyBase(Number(e?.baseId)))) return;
-    const { kept, moved } = this.ringFromItems(ctx, entries, casterId);
+    const { kept, moved, dead } = this.ringFromItems(ctx, entries, casterId);
+    // Keys that open nothing stayed in the container and could not be taken out (GM ticket 152, 17 Oct): they go to the opener's
+    // pack as items, never destroyed, in case the locks only read as missing for a moment
+    const left = dead.length ? kept.filter((e) => !dead.includes(e)) : kept;
+    if (!moved.length && !dead.length) return;
+    mp.set(targetId, "inventory", { entries: left });
+    if (dead.length) {
+      const pack = mp.get(casterId, "inventory");
+      const packEntries: any[] = pack && Array.isArray(pack.entries) ? pack.entries.slice() : [];
+      mp.set(casterId, "inventory", { entries: packEntries.concat(dead) });
+      this.log(`[housing] ${casterId.toString(16)} took ${dead.length} key(s) that open nothing from container ${targetId.toString(16)}`);
+      this.notice(ctx, this.userOf(ctx, casterId), `You take ${dead.map((e) => e.name).join(", ")}. Their locks have been changed: they open nothing now.`);
+    }
     if (!moved.length) return;
-    mp.set(targetId, "inventory", { entries: kept });
     this.log(`[housing] ${casterId.toString(16)} took ${moved.length} key(s) from container ${targetId.toString(16)} onto the key ring`);
     this.notice(ctx, this.userOf(ctx, casterId), `You take ${moved.join(", ")} onto your key ring.`);
   }
