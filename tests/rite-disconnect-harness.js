@@ -83,11 +83,7 @@ r = startEmbrace(); play(r, 0, 0, false); leave();
 ok(!rite() && !dead() && !failedAt(), 'embrace, never touched: abandoned, no wait', failedAt());
 
 // ---- closing the window before any round is not a forfeit (ticket #0235) ----
-r = startFever(); ui.riteClose(A);
-ok(!rite() && !dead() && state().disease && !state().kind, 'fever closed untouched: abandoned, alive, the disease stays', state());
-globalThis.__dboConnectedAt = new Map([[A, Date.now() - 600000]]); online = [A]; timers.superSlow(); online = [];
-ok(!!rite(), '...and the fever comes back on a later tick');
-if (rite()) ui.riteClose(A);
+// (the fever case is gone: since 18 Oct a peaked fever opens no rite, it turns the carrier)
 r = startEmbrace(); ui.riteClose(A);
 ok(!rite() && !dead() && !permaDead() && !failedAt(), 'embrace closed untouched: abandoned, no death, no wait', { dead: dead(), failedAt: failedAt() });
 
