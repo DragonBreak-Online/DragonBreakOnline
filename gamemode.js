@@ -1099,8 +1099,19 @@ registerChatCommand('grantproperty', (a, args) => {
   if (!id) return personal(a, `${door} is not a form id I can read.`);
   const H = globalThis.__dboHousing;
   if (!H || typeof H.grant !== 'function') return personal(a, 'The housing system is not loaded.');
+  // A door whose pair key is a reference the server no longer has (the Mountainwatch mine: the housing pairs the outside door
+  // 80d97a2 with the original inside door 80d9643 that DLE deleted and replaced, and the lower id is the key, so every
+  // write failed): an empty record on the given door first makes it its own key, and the deleted one is never written
+  let seeded = false;
+  try {
+    const key = typeof H.primaryOf === 'function' ? (Number(H.primaryOf(id)) >>> 0) : 0;
+    let keyGone = false; if (key && key !== id) { try { mp.get(key, 'type'); } catch (e) { keyGone = /doesn't exist/.test(String(e && e.message)); } }
+    let own = null; try { own = mp.get(id, 'private.housing'); } catch (e) { own = null; }
+    if (keyGone && !own) { mp.set(id, 'private.housing', { owner: 0, ownerName: '', name: null, locked: false, serial: 1, partner: 0, containers: [], issued: [] }); seeded = true; }
+  } catch (e) { log(`grantproperty: could not prepare ${id.toString(16)}: ${e.message}`); }
   let err = ''; try { err = String(H.grant(id, t) || ''); } catch (e) { err = e.message || 'failed'; }
-  if (err) { log(`grantproperty: ${who(a)} -> ${who(t)} at ${id.toString(16)} refused: ${err}`); return personal(a, `Not granted: ${err}`); }
+  if (err) { log(`grantproperty: ${who(a)} -> ${who(t)} at ${id.toString(16)} refused: ${err}${seeded ? ' (after seeding its own record)' : ''}`); return personal(a, `Not granted: ${err}`); }
+  if (seeded) log(`grantproperty: ${id.toString(16)} keyed on itself (its pair key no longer exists)`);
   audit(`HOUSING ${who(a)} granted ${id.toString(16)} (${door}) to ${who(t)} with /grantproperty`);
   personal(a, `${display(t)} now owns ${door}.`);
   try { personal(t, 'A property has been granted to you by the staff.'); } catch (e) { /* offline */ }
