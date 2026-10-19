@@ -3203,7 +3203,7 @@ globalThis.__dboHandlers.disconnect = (userId) => {
     try { globalThis.__dboVlBreakerDrop(a, globalThis.__dboJournalOpen.get(a >>> 0) === true); } catch (e) { log('vl breaker failed', e.message); }
   }
   try { if (a && globalThis.__dboDurabilityLeave) globalThis.__dboDurabilityLeave(a); } catch (e) { log('durability leave failed', e.message); }
-  if (a) editorOpenAt.delete(a >>> 0);
+  if (a && globalThis.__dboEditorOpenAt instanceof Map) globalThis.__dboEditorOpenAt.delete(a >>> 0);
   if (a) globalThis.__dboJournalOpen.delete(a >>> 0);
   // A beast race must never be saved as the character's own
   if (a && globalThis.__dboBeastRevert) { try { globalThis.__dboBeastRevert(a, 'logout'); } catch (e) { log('beast revert on logout failed', e.message); } }
