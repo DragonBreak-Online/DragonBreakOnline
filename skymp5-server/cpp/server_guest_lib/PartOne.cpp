@@ -14,6 +14,7 @@
 #include "SetRaceMenuOpenMessage.h"
 #include "UpdateGameModeDataMessage.h"
 
+#include "TickProfile.h"
 #include "ActionListener.h"
 #include "FormCallbacks.h"
 #include "MessageSerializerFactory.h"
@@ -30,6 +31,10 @@ void PartOneSendTargetWrapper::Send(Networking::UserId targetUserId,
                                     Networking::PacketData data, size_t length,
                                     bool reliable)
 {
+  TickProfile::Scope profile(TickProfile::kSend);
+  if (TickProfile::Enabled()) {
+    TickProfile::AddSendBytes(length);
+  }
   return underlyingSendTarget.Send(targetUserId, data, length, reliable);
 }
 
@@ -147,10 +152,24 @@ bool PartOne::IsConnected(Networking::UserId userId) const
 
 void PartOne::Tick()
 {
-  TickPacketHistoryPlaybacks();
-  TickDeferredMessages();
-  TickHostReleases();
-  TickStaleHosts();
+  {
+    TickProfile::Scope profile(TickProfile::kPlaybacks);
+    TickPacketHistoryPlaybacks();
+  }
+  {
+    TickProfile::Scope profile(TickProfile::kDeferred);
+    TickDeferredMessages();
+  }
+  {
+    TickProfile::Scope profile(TickProfile::kHostReleases);
+    TickHostReleases();
+  }
+  {
+    TickProfile::Scope profile(TickProfile::kStaleHosts);
+    TickStaleHosts();
+  }
+  GetActionListener().TickMovementRelay();
+  TickProfile::Scope profile(TickProfile::kWorld);
   worldState.Tick();
 }
 

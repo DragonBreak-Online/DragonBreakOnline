@@ -3,6 +3,7 @@
 #include "ConsoleCommands.h"
 #include "CraftService.h"
 #include "Messages.h"
+#include "MovementRelay.h"
 #include "MovementValidation.h"
 #include "MpActor.h"
 #include "PartOne.h"
@@ -299,6 +300,15 @@ private:
   bool TakeRiderHit(uint32_t casterId, uint32_t spellId, uint32_t targetId);
 
   MovementValidation::Tracker movementTracker;
+
+  // Interest management for UpdateMovement, when SKYMP_MOVEMENT_RELAY=1 (MovementRelay.h); null otherwise
+  std::unique_ptr<MovementRelay> movementRelay;
+  // Relays a validated movement packet: through movementRelay when it is on, SendToNeighbours otherwise
+  void RelayMovement(uint32_t idx, const RawMessageData& rawMsgData);
+
+public:
+  // Called from PartOne::Tick: sends the coalesced positions that are due
+  void TickMovementRelay();
 
   // TODO: inverse dependency
   std::shared_ptr<CraftService> craftService;
