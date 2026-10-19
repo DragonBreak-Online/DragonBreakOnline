@@ -1,5 +1,29 @@
 [
   {
+    "title": "Factions can earn gold from businesses and bounties",
+    "date": "2026-10-19",
+    "version": "Gameplay",
+    "tag": "New",
+    "sections": [
+      {
+        "heading": "Faction businesses",
+        "items": [
+          "A faction can now run a business. Its takings (bed rent, rented storage and sales at its ledger) go into the faction's treasury instead of the owner's pocket, after the hold's usual tax. No new gold is made: it is the same money customers already pay.",
+          "To set one up, the owner of a business who belongs to the faction stands inside it and types /business faction <faction name>. A leader or officer of the faction then accepts inside the business with the same command. A leader who owns the business, or a business in the faction's own hall, can be registered straight away.",
+          "The faction's leader and officers can keep the business ledger and name other members as staff (/business staff add <name>). A business belongs to one faction at a time. The leader, an officer or the owner can hand it back with /business faction off, and the takings go to the owner again."
+        ]
+      },
+      {
+        "heading": "Bounty hunting",
+        "items": [
+          "When an outlaw with a hold bounty is locked up in that hold's jail, the bounty they pay now goes into the hold's treasury, and a quarter of it goes to the treasury of the faction of whoever brought them in (the one carrying or holding them, otherwise the guard who locks the door). Hunting factions such as the Imperial Legion and the Fighters Guild are chosen first.",
+          "Nobody is paid personally, and no new gold is made: the share comes out of the bounty paid. If the outlaw cannot pay and serves extra time instead, there is no share. The hold's own guards and officials, staff, and players in no faction earn no share; it all stays with the hold. A faction never earns a share for bringing in one of its own members.",
+          "Faction leaders who are online are told when their faction earns a share."
+        ]
+      }
+    ]
+  },
+  {
     "title": "The Imperial tithe is now a quarter of all hold income",
     "date": "2026-10-18",
     "version": "Gameplay",

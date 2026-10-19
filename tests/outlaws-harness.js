@@ -1,6 +1,7 @@
 // Outlaw bounties (server\outlaws.js, Nate 18 Oct): the ruler or Steward sets them (up to 1000 gold), they are claimed only
 // in their own hold's jail, the outlaw pays the jailer from carried gold then the bank, the rest is served as extra minutes,
-// and an outlaw may pay their own to the treasury. Run from server/ with a temp state folder.
+// and an outlaw may pay their own to the treasury. Run from server/ with a temp state folder. This one runs the first
+// design (outlaws.payJailer true: the jailer is paid); tests/bounty-share-harness.js the default (the hold, less a share).
 //   node tests/outlaws-harness.js
 'use strict';
 const fs = require('fs'); const os = require('os'); const path = require('path');
@@ -19,7 +20,7 @@ globalThis.__dboBankTake = (a, n) => { const b = Number(props.get(`${a}|private.
 globalThis.__dboTreasuryZone = { deposit: (z, n) => { deposits.push([z, n]); return n; } };
 const M = require(MODULE)({
   mp, log: () => {}, personal: (a, t) => said.push([a, t]), system: (a, t) => sys.push([a, t]), audit: (t) => audits.push(t),
-  who: (a) => chars[a][1], display: (a) => chars[a][1], cfg: {}, registerChatCommand: (n, f) => { cmd = f; },
+  who: (a) => chars[a][1], display: (a) => chars[a][1], cfg: { outlaws: { payJailer: true } }, registerChatCommand: (n, f) => { cmd = f; },
   zoneOfActor: () => here, zoneById: (id) => ({ bruma: { id: 'bruma', name: 'Bruma', officials: ['count', 'steward', 'guard'] }, whiterun: { id: 'whiterun', name: 'Whiterun', officials: ['jarl', 'steward'] } })[id] || null,
   readOfficials: () => ({ bruma: { count: [70], steward: [71], guard: [191] } }), profileOf: (a) => (chars[a] ? chars[a][0] : -1),
   officialTarget: (q) => { const e = Object.entries(chars).find(([, c]) => c[1].toLowerCase() === String(q).toLowerCase()); return e ? { pid: e[1][0], actor: Number(e[0]), online: Number(e[0]), label: e[1][1], who: e[1][1] } : { error: `No character called ${q}.` }; },

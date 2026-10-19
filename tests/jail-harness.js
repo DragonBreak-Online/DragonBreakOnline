@@ -101,7 +101,9 @@ ui('jailChoose', GUARD, ['who:15']);
 check('then the lengths', ids().join() === 'time:15:5,time:15:10,time:15:15,time:15:30,time:15:60,time:15:120', ids());
 check('...labelled in hours past an hour', lastWidget().w.actions.map((x) => x.label).slice(-2).join() === '1 hour,2 hours');
 put(CELL_DOOR, 'isOpen', true);
-put(PRISONER, 'private.restrained', { boundHands: true });
+put(PRISONER, 'private.restrained', { boundHands: true, captorActorId: OTHER, carrierActorId: 0 });
+const outlawCalls = [];
+globalThis.__dboOutlawJailed = (g, p, by) => { outlawCalls.push([g, p, by]); return 0; };
 const uncuffed = [];
 globalThis.__dboUncuff = (id) => { uncuffed.push(id); put(id, 'private.restrained', null); return true; };
 ui('jailChoose', GUARD, ['time:15:5']);
@@ -111,6 +113,8 @@ check('the door closes', props.get(CELL_DOOR + '|isOpen') === false);
 check('the prisoner is told where and for how long', /sentences you to 5 minutes in Bruma Castle Dungeon/.test(said(PRISONER)), said(PRISONER));
 check('a bound prisoner is uncuffed as the door locks', uncuffed.join() === String(PRISONER) && /bonds are taken off/.test(said(PRISONER)), uncuffed);
 delete globalThis.__dboUncuff;
+check('who bound them is the one who brought them in: kept on the sentence and passed to the bounty', sentence().arrester === OTHER && outlawCalls.length === 1 && outlawCalls[0][2] === OTHER, [sentence().arrester, outlawCalls]);
+delete globalThis.__dboOutlawJailed;
 check('a made-up length is refused', (() => { ui('jailChoose', GUARD, ['time:16:9999']); return !props.get(OTHER + '|private.dboSentence'); })());
 
 // ---- the lock ----
@@ -193,6 +197,7 @@ at(OTHER, PLAIN_CELL, [0, 0, 0]);
 
 // ---- a login mid-sentence ----
 act(CELL_DOOR, GUARD); ui('jailChoose', GUARD, ['who:15']); ui('jailChoose', GUARD, ['time:15:10']);
+check('with nobody holding them, the guard at the door brought them in', sentence().arrester === GUARD, sentence().arrester);
 globalThis.__dboJailLogin(PRISONER);
 check('a login mid-sentence says what is left', /still have 10 minutes to serve/.test(said(PRISONER)), said(PRISONER));
 
