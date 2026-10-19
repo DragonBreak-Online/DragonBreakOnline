@@ -9,6 +9,8 @@
 //   - the owner or staff can put a container inside the business up for rent as storage, at a price a day. A rented chest
 //     is its renter's alone; when the rent runs out the renter has chestGraceHours to empty it or pay again, then it
 //     falls back to the owner, who clears it before it can be rented again.
+// A business can keep a SHOP (shops.js, Nate 19 Oct): owner or staff make one container inside it the shop chest, which
+// opens for them alone; they price what is in it, and anyone buys at the ledger's public page (or /shop), taxed by the hold.
 // A faction can run a business (Nate, 18-19 Oct; /business faction, see payFaction): its takings go to the faction's
 // treasury instead of the owner, and the faction's leader and officers keep its ledger and name its staff.
 // The hold takes its tax from every rent. The rate is the hold's own (/tax), set by its Jarl, Count or Steward (taxRanks),
@@ -191,6 +193,7 @@ module.exports = (api) => {
   // rest.js writes each bed rental here, with the owner's share
   globalThis.__dboBusinessLog = (cell, text, ownerGold) => { const { biz } = bizAt(cell); if (biz) { note(biz, text); earned(biz, Number(ownerGold) || 0); save(); } };
   globalThis.__dboBusinessLogin = (a) => {
+    try { if (shops) shops.login(a); } catch (e) { log('shops: login refund failed', e.message); }
     for (const b of Object.values(data().businesses)) {
       if (!isOwner(a, b) || !(Number(b.owed) > 0)) continue;
       const n = Number(b.owed);
@@ -204,8 +207,22 @@ module.exports = (api) => {
     }
   };
 
+  // ---- player shops (shops.js, config "shops") ---------------------------------------------------------
+  // Loaded from beside this file, afresh on every reload. If it fails, the shop chests stay guarded by the hook below and
+  // nothing is sold or priced until it loads again.
+  let shops = null;
+  if (!(S.shopLists instanceof Map)) S.shopLists = new Map();
+  try {
+    const SHOPS_JS = path.join(__dirname, 'shops.js');
+    delete require.cache[SHOPS_JS];
+    shops = require(SHOPS_JS)({ mp, log, personal, audit, who, display, cfg, takeGold, giveGold, data, save, note, earned, hex, get, cellOf,
+      bizAt, isStaff, armSeconds: C.armSeconds, armed: S.armed, lists: S.shopLists, onlineActors, profileOf });
+  } catch (e) { log('shops.js failed to load:', e.stack || e.message); shops = null; }
+
   // ---- rented chests ----------------------------------------------------------------------------------
   // chest ref -> the business it belongs to
+  // Every business record naming this container its shop chest ([[claimHex, record]]), whether or not shops.js loaded
+  const shopRecordsOf = (ref) => { const k = hex(Number(ref) >>> 0), out = []; for (const [id, b] of Object.entries(data().businesses || {})) if (b && b.shop && b.shop.chest === k) out.push([id, b]); return out; };
   const chestIndex = () => { const m = new Map(); for (const [id, b] of Object.entries(data().businesses)) for (const r of Object.keys(b.chests || {})) m.set(r, id); return m; };
   const chestState = (c) => {
     if (!c || !c.renter) return c && c.lapsed ? 'lapsed' : 'free';
@@ -249,8 +266,16 @@ module.exports = (api) => {
     if (ledgerTag && ledgerTag.claim) { if (C.enabled) openLedger(a, ref, ledgerTag); else personal(a, 'Business ledgers are closed for now.'); return true; }
     // An owner or staff member who asked to put a chest up (or take it down) picks it by opening it
     const arm = C.enabled ? S.armed.get(a) : null;
-    if (arm && arm.until > Date.now() && isContainer(ref)) {
+    // ...or the shop chest (shops.js): the next container they open inside that business
+    if (arm && arm.kind === 'shop' && arm.until > Date.now() && isContainer(ref)) {
       S.armed.delete(a);
+      if (!shops) { personal(a, 'Shops are closed for now.'); return true; }
+      return shops.designate(a, ref, arm) !== false;
+    }
+    if (arm && arm.kind !== 'shop' && arm.until > Date.now() && isContainer(ref)) {
+      S.armed.delete(a);
+      // A shop chest is never storage for rent (shops.js)
+      if (shopRecordsOf(ref).length) { personal(a, 'That is a shop chest. Make it a plain chest first, or choose another.'); return true; }
       const { claim, biz } = bizAt(cellOf(ref));
       if (!biz || !isStaff(a, biz)) { personal(a, 'That container is not inside your business.'); return true; }
       biz.chests = biz.chests || {};
@@ -270,6 +295,23 @@ module.exports = (api) => {
       note(biz, `${display(a)} put a chest up for rent at ${arm.price} gold a day`); save();
       audit(`BUSINESS ${who(a)} ${biz.name}: chest ${hex(ref)} for rent at ${arm.price} gold a day (claim ${hex(claim.primary)})`);
       personal(a, `The chest is for rent at ${arm.price} gold a day. Anyone who opens it is offered it.`);
+      return true;
+    }
+    // A shop chest (shops.js) opens for its business's owner and staff alone. Every record that names it must agree, read
+    // whether or not the business is still valid (as the rented chests below); with no valid business its owner of record
+    // and whoever holds the claim now may still open it to empty it. Not shops.js's word: this holds with it unloaded.
+    const shopRecs = shopRecordsOf(ref);
+    if (shopRecs.length) {
+      const may = shopRecs.every(([claimHex, raw]) => {
+        const b = bizOf(Number.parseInt(claimHex, 16) >>> 0);
+        if (b) return isStaff(a, b);
+        if (isOwner(a, raw)) return true;
+        const c = claimOf(Number.parseInt(claimHex, 16) >>> 0);
+        return !!c && ownsClaim(a, c);
+      });
+      if (may) return false;
+      const b = bizOf(Number.parseInt(shopRecs[0][0], 16) >>> 0) || shopRecs[0][1];
+      personal(a, `This is ${b.name || 'a business'}'s shop chest, for its owner and staff. To buy its goods, use the ledger book on the counter.`);
       return true;
     }
     const bizId = chestIndex().get(hex(ref));
@@ -355,7 +397,7 @@ module.exports = (api) => {
     const chests = Object.values(b.chests || {});
     const rented = chests.filter((c) => chestState(c) === 'rented').length;
     personal(a, `${b.name} (owner ${b.ownerName}${factionOf(b) ? `, its takings go to ${factionOf(b).name}` : ''}). Staff: ${staffNames(b)}. Bed rent: ${Number(b.rentGold) > 0 ? b.rentGold + ' gold' : 'the hold\'s standard'}. Chests for rent: ${chests.length} (${rented} rented). Tax to ${zoneName(b.zone)}: ${Math.round(taxRate(b.zone) * 100)}%.${isOwner(a, b) && Number(b.owed) > 0 ? ` Takings held: ${b.owed} gold (/business collect).` : ''}`);
-    personal(a, 'Ledger: /business log, /business notes, /business note <text>, /business rent <gold>, /business chest <gold a day> (then open the chest) or /business chest off. Owner: /business staff add|remove <name>, /business ledger (place it here), /business rename <name>, /business close. A faction: /business faction <faction> | off.');
+    personal(a, 'Ledger: /business log, /business notes, /business note <text>, /business rent <gold>, /business chest <gold a day> (then open the chest) or /business chest off. Shop: /business shop (stock and prices), /business shop chest (then open it) or chest off, /business shop price <number> <gold each|off>. Owner: /business staff add|remove <name>, /business ledger (place it here), /business rename <name>, /business close. A faction: /business faction <faction> | off.');
   };
   // What anyone may read in the ledger's first pages
   const publicLine = (b) => {
@@ -508,12 +550,20 @@ module.exports = (api) => {
       if (Object.values(b.chests || {}).some((c) => ['rented', 'grace'].includes(chestState(c)))) return R(false, 'Chests are still rented here. Close once their rent and grace have run out.');
       if (Number(b.owed) > 0 && !giveGold(a, Number(b.owed))) return R(false, 'Collect the takings first.');
       removeLedger(b);
+      const shopChest = b.shop && b.shop.chest;
       delete data().businesses[hex(claim.primary)]; save();
-      audit(`BUSINESS ${who(a)} closed ${b.name} (claim ${hex(claim.primary)})`);
-      return R(true, `${b.name} is closed. The property is a plain home again.`);
+      audit(`BUSINESS ${who(a)} closed ${b.name} (claim ${hex(claim.primary)})${shopChest ? `; its shop chest ${shopChest} is a plain chest again, its goods still in it` : ''}`);
+      return R(true, `${b.name} is closed. The property is a plain home again.${shopChest ? ' The shop chest is a plain chest again; its goods are still in it.' : ''}`);
     },
     place: (a, claim, b) => placeLedger(a, claim, b),
     nudge: (a, claim, b, dir, dist) => nudgeLedger(a, claim, b, dir, dist),
+    // The shop (shops.js): '' arms "Make a shop chest", 'off' makes it a plain chest again
+    shopChest: (a, claim, b, v) => {
+      if (!shops) return R(false, 'Shops are closed for now.');
+      return String(v || '').toLowerCase() === 'off' ? shops.unmarkChest(a, claim, b) : shops.armChest(a, claim, b);
+    },
+    // A price per single item of one kind in the shop chest (gold each), or 'off'
+    shopPrice: (a, claim, b, key, gold) => (shops ? shops.setPrice(a, claim, b, key, gold) : R(false, 'Shops are closed for now.')),
   };
   const OWNER_ONLY = new Set(['staffAdd', 'staffRemove', 'collect', 'rename', 'close', 'place', 'nudge']);
   const runAction = (a, name, claim, b, args) => {
@@ -532,6 +582,8 @@ module.exports = (api) => {
   const caps = S.caps instanceof Map ? S.caps : (S.caps = new Map());
   onUi('uiCaps', (a, args) => { caps.set(a >>> 0, new Set((args || []).map(String))); });
   const hasPanel = (a) => (caps.get(a >>> 0) || new Set()).has('businessLedger');
+  // A front whose ledger panel draws the shop's pages (front businessLedger with the Buy and Shop pages)
+  const hasShopPanel = (a) => (caps.get(a >>> 0) || new Set()).has('playerShop');
   const panels = S.panels instanceof Map ? S.panels : (S.panels = new Map()); // actor -> { claim, nonce }
   const takings = (b, days) => { const since = Date.now() - days * 24 * HOUR; return (b.income || []).filter((e) => e.at >= since).reduce((n, e) => n + (Number(e.gold) || 0), 0); };
   const sendPanel = (a, claim, b, res) => {
@@ -555,7 +607,16 @@ module.exports = (api) => {
         ledgerPlaced: !!ledgerRef(b), armSeconds: C.armSeconds,
       });
     }
+    // The shop (shops.js): the Buy list for everyone, the stock and its prices for the owner and staff. A front without the
+    // shop pages (no 'playerShop' in its uiCaps) ignores these and is told about /shop in chat instead
+    if (shops) { try { Object.assign(w, shops.panelFields(a, b, staff)); } catch (e) { log('shops: panel fields failed', e.message); } }
     openWidget(a, w, true);
+    if (shops && !hasShopPanel(a)) {
+      try {
+        const line = staff ? (b.shop && b.shop.chest ? 'The shop: /business shop lists its chest and prices; /business shop price <number> <gold each>.' : '') : shops.publicShopLine(b);
+        if (line && !(res && res.text)) personal(a, line);
+      } catch (e) { /* chat is a nicety */ }
+    }
   };
   const closePanel = (a) => { panels.delete(a >>> 0); closeWidget(a, PANEL_ID); };
   const openLedger = (a, ref, tag) => {
@@ -571,7 +632,8 @@ module.exports = (api) => {
     }
     if (hasPanel(a)) return sendPanel(a, claim, b);
     if (isStaff(a, b) || isAdmin(a)) return summary(a, claim, b);
-    return personal(a, publicLine(b));
+    personal(a, publicLine(b));
+    try { const line = shops ? shops.publicShopLine(b) : ''; if (line) personal(a, line); } catch (e) { /* chat is a nicety */ }
   };
   onUi('bizLedger', (a, args) => {
     const p = panels.get(a >>> 0);
@@ -580,6 +642,12 @@ module.exports = (api) => {
     if (!b) { closePanel(a); return personal(a, 'This business is closed.'); }
     if (!inside(a, claim)) { closePanel(a); return personal(a, 'You have left the business.'); }
     const name = String(args[1] || '');
+    // Buying from the shop is open to anyone at the ledger: [key, count, the unit price shown]
+    if (name === 'buy') {
+      let res;
+      try { res = shops ? shops.buy(a, claim, b, String(args[2] || ''), Number(args[3]), Number(args[4])) : R(false, 'Shops are closed for now.'); } catch (e) { log('shops: buy failed', e.stack || e.message); res = R(false, 'Something went wrong there. Try again in a moment.'); }
+      return sendPanel(a, claim, b, res);
+    }
     const res = runAction(a, name, claim, b, args.slice(2));
     if (name === 'close' && res.ok) { closePanel(a); return personal(a, res.text); }
     sendPanel(a, claim, b, res);
@@ -690,6 +758,16 @@ module.exports = (api) => {
       case 'chest': return say(a, runAction(a, 'chest', claim, biz, [rest]));
       case 'collect': return say(a, runAction(a, 'collect', claim, biz, []));
       case 'ledger': return say(a, runAction(a, 'place', claim, biz, []));
+      case 'shop': {
+        if (!shops) return personal(a, 'Shops are closed for now.');
+        const w2 = rest.split(/\s+/).filter(Boolean);
+        const op = (w2[0] || '').toLowerCase();
+        // The changes go through the ledger's actions (staff, the player log); the stock list is read here
+        if (op === 'chest') return say(a, runAction(a, 'shopChest', claim, biz, [(w2[1] || '').toLowerCase() === 'off' ? 'off' : '']));
+        if (op === 'price') { if (w2.length < 3) return personal(a, 'Price an item from the stock list: /business shop price <number> <gold each> (or off)'); return say(a, runAction(a, 'shopPrice', claim, biz, [w2[1], w2[2]])); }
+        if (!isStaff(a, biz)) return personal(a, 'The shop\'s stock is for its owner and staff.');
+        return shops.chatBusinessShop(a, claim, biz, '');
+      }
       case 'staff': {
         const op = (words.shift() || '').toLowerCase(), q = words.join(' ');
         if (!['add', 'remove'].includes(op) || !q) return personal(a, 'Name someone who is online: /business staff add <name or #TAG>, /business staff remove <name or #TAG>');
@@ -699,7 +777,15 @@ module.exports = (api) => {
       case 'close': return say(a, runAction(a, 'close', claim, biz, []));
       default: return hasPanel(a) ? sendPanel(a, claim, biz) : summary(a, claim, biz);
     }
-  }, { help: 'the business ledger where you stand (its book opens the same panel): open, log, notes, note, rent, chest, staff, ledger, collect, rename, close, faction' });
+  }, { help: 'the business ledger where you stand (its book opens the same panel): open, log, notes, note, rent, chest, shop, staff, ledger, collect, rename, close, faction' });
+
+  // ---- /shop: a business's goods, for a customer without the panel's Buy page ----------------------------------------
+  registerChatCommand('shop', (a, args) => {
+    if (!C.enabled || !shops) return personal(a, 'Shops are closed for now.');
+    const { claim, biz } = bizHere(a);
+    if (!biz) return personal(a, 'Stand inside a business to see what it sells.');
+    try { return shops.chatShop(a, claim, biz, args); } catch (e) { log('shops: /shop failed', e.stack || e.message); return personal(a, 'Something went wrong there. Try again in a moment.'); }
+  }, { help: 'what the business where you stand sells: /shop, then /shop buy <number> [how many]' });
 
   // ---- /tax ------------------------------------------------------------------------------------------
   // One hold rate (Nate, 12 Oct: "everything in bruma that can be owned"): every rent here, and economy.js's weekly property

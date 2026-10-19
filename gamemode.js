@@ -906,7 +906,7 @@ const HELP_GROUPS = [
       'Smelting ore into ingots: a smelter. Enchanting and disenchanting: an arcane enchanter.',
       'Breaking gear down, with its skill: the station of its trade (a smelter, a tanning rack, a loom; books at a writing desk).',
       'A house you own or rent: look at its door and press X.', 'Your money: a bank counter.',
-      'Your business: its ledger book.', 'Where you are: /whereami.'] },
+      'Your business: its ledger book. A shop\'s goods: its ledger book, or /shop inside it.', 'Where you are: /whereami.'] },
   { key: 'rule', title: 'Rule and property', names: ['officials', 'appoint', 'dismiss', 'tax', 'ledgerpoint'], role: 'official',
     hints: ['Your court: F3, the Court tab. A post you appoint someone to is offered, and they accept it.',
       'An outlaw of your hold (ruler or Steward): /bounty set <name or #TAG> <gold, up to 1000> <reason>; the jailer collects it.'] },
@@ -927,7 +927,7 @@ const HELP_GROUPS = [
 const HELP_BY_OBJECT = new Set(['bank', 'board', 'business', 'faction', 'deity', 'rite', 'tomes', 'respawn', 'skills',
   'ledger', 'chill', 'sentence', 'hunger', 'rest', 'tokens', 'whoami', 'pigeonblock', 'sign', 'level', 'spells',
   'teach', 'reroll', 'offer', 'contract', 'commission', 'wildlife', 'champions', 'whereami', 'playtest', 'dungeon', 'ping',
-  'expedition', 'expeditions', 'blackreach']);
+  'expedition', 'expeditions', 'blackreach', 'shop']);
 const helpRoleOk = (a, role) => {
   if (!role) return true;
   try {
@@ -7811,6 +7811,8 @@ function businessFailClosed(targetId, casterId) {
   // Every record that lists the chest counts: two door claims in one inn can both list it (the reviewer's finding 1)
   const recs = [];
   for (const b of Object.values((d && d.businesses) || {})) if (b && b.chests && b.chests[key]) recs.push(b.chests[key]);
+  // A business's shop chest (shops.js) holds goods for sale: shut to everyone, its staff too, until business.js is back
+  for (const b of Object.values((d && d.businesses) || {})) if (b && b.shop && b.shop.chest === key) { personal(casterId, 'This shop chest is closed for a moment. Try again shortly.'); return true; }
   if (!recs.length) return false;
   const g = Number((cfg.business || {}).chestGraceHours), grace = (Number.isFinite(g) ? g : 72) * 3600000;
   const held = recs.filter((c) => !!c.renter && Number(c.until) + grace > Date.now());

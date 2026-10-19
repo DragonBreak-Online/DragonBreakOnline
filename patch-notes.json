@@ -1,5 +1,44 @@
 [
   {
+    "title": "Player shops",
+    "date": "2026-10-19",
+    "version": "Gameplay",
+    "tag": "New",
+    "sections": [
+      {
+        "heading": "Opening a shop",
+        "items": [
+          "Any business can now sell its owner's own goods. If you do not have a business yet, stand inside a property you own and type /business open <name>, then set its ledger book on the counter.",
+          "Choose a shop chest: type /business shop chest, then within a minute open the chest inside your business that should hold your goods. A chest that is rented out as storage cannot be a shop chest.",
+          "Only you and your staff can open the shop chest. Put your goods in it, then give each kind of item a price per item: /business shop shows the stock with numbers, and /business shop price <number> <gold each> sets a price (or off to take it off sale). Anything without a price is not for sale.",
+          "Enchanted and improved items are priced separately from plain ones and keep their enchantment when sold. Artifacts and keys can never be sold.",
+          "To stop selling, make it a plain chest again with /business shop chest off. Closing the business does the same. Your goods stay in the chest either way."
+        ]
+      },
+      {
+        "heading": "Buying",
+        "items": [
+          "Inside a business, type /shop to see what it sells, how many are left and the price of each, then /shop buy <number> <how many>. The ledger book also tells you when a shop has goods for sale.",
+          "You pay with the gold in your pack. You always pay the price you were shown. If the price changed in the meantime, the sale is stopped and you are shown the new price.",
+          "The shop works when its owner is offline. If a sale cannot be finished, everything is put back and you get your gold back."
+        ]
+      },
+      {
+        "heading": "Where the gold goes",
+        "items": [
+          "Each sale pays the hold's tax at the rate its rulers set, and a tenth of the price leaves the game to keep gold from piling up. The rest goes into the owner's bank account, or into the faction's treasury if the business belongs to a faction.",
+          "Every sale is written in the business ledger."
+        ]
+      },
+      {
+        "heading": "Coming with the next game update",
+        "items": [
+          "With the next game update the ledger panel gets a Buy list for customers and a Shop page for owners and staff (choose the chest, set prices with a click). The commands above keep working."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Factions can earn gold from businesses and bounties",
     "date": "2026-10-19",
     "version": "Gameplay",

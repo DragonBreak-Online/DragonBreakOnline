@@ -405,6 +405,18 @@
   "copy": { "enabled": true, "paperId": "7cba1:BSHeartland.esm", "paper": 1 },
   "skillBooks": { "enabled": true, "av": 10, "weight": 3 }
  },
+ "shops": {
+  "_comment": "Player shops (shops.js, loaded by business.js; Nate 19 Oct). A business's owner or staff make one container inside it the shop chest (the ledger panel's Shop page or /business shop chest, then open it within armSeconds; 0 = business.armSeconds); it opens for them alone. They price its goods per item kind (minPrice..maxPrice gold each); anyone buys at the ledger (or /shop), up to maxPerBuy at once, from the pack's gold. Each sale pays out through ledgerSale (hold tax marked as sales income, sinkShare, the rest to the owner's bank or the faction's treasury). Never listed: artifacts.json, bannedTypes (record types), bannedPattern (editor id regex). enabled false stops choosing chests, pricing and buying; shop chests stay shut to customers. Hot reload. ROLLBACK: enabled false.",
+  "enabled": true,
+  "minPrice": 1,
+  "maxPrice": 100000,
+  "maxPerBuy": 1000,
+  "listMax": 60,
+  "maxPrices": 200,
+  "bannedTypes": ["KEYM"],
+  "bannedPattern": "",
+  "armSeconds": 0
+ },
  "ledgerSale": {
   "_comment": "Where a ledger sale's gold goes (ledgersale.js; Nate 10 Oct): the hold's tax (its /tax rate, else rest.holdShare, else defaultTax) to the hold's treasury, sinkShare of the price removed from the game, the rest to the treasury of the faction whose hall the ledger stands in (hallCells, then guild-defs' halls; Nate 10 Oct: Frostcrag to the College of Whispers, the Synod to the Synod; 12 Oct: the Cathedral of St Martin to the Great Faiths), else to the bank account of the building's owner, else (no owner) to the hold's treasury. Used by the blacksmith's ledger and the tome shop (spells.shopSplit). Hot reload. ROLLBACK (the Cathedral, 12 Oct): remove 12cb, 5f78c and 5f78d from both hallCells here and guild-defs.json's great-faiths hall.cells, since either one alone still pays the Great Faiths (this also ends teaching at the Cathedral's ledger), and ship both files (a release or a gameplay hotfix; a live-only edit lasts only until the next deploy); or revert fix/hall-cells-1012.",
   "enabled": true,
