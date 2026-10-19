@@ -1021,7 +1021,8 @@ const COMMAND_SCHEMA = {
   tp: { target: { from: 0, lookup: 'online' } },
   chargen: { target: { from: 0, lookup: 'online' } },
   grantappearance: { target: { from: 0, lookup: 'online' } },
-  rename: { target: { from: 0, to: 1, lookup: 'online' } },
+  rename: { target: { from: 0, to: 1, lookup: 'any' } },
+  chars: { target: { from: 0, lookup: 'any' }, info: true },
   fixloc: { target: { from: 0, lookup: 'online' } },
   sethunger: { target: { from: 0, to: 1, lookup: 'online' }, nums: [-1] },
   wipechars: { target: { from: 0, lookup: 'any' } },
@@ -1075,7 +1076,7 @@ const COMMAND_SCHEMA = {
   realnames: { subs: S_('on off status') },
   forget: {}, concordat: {}, dossier: { subs: S_('add strike view') },
   // staff world commands: a staff.world action, never their text
-  announce: { world: 'announce' }, schedule: { world: 'schedule' }, rolename: { world: 'rolename' },
+  announce: { world: 'announce' }, event: { world: 'announce' }, schedule: { world: 'schedule' }, rolename: { world: 'rolename' },
   settime: { world: 'clock', nums: [0] }, timescale: { world: 'timescale', nums: [0] }, setweather: { world: 'weather' },
   placeundo: { world: 'place' }, placeexport: { world: 'place' },
   driftspawn: { world: 'drift' }, driftrepair: { world: 'drift' }, driftset: { world: 'drift' },

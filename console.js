@@ -57,14 +57,16 @@ const MARKUP_RE = /\[\[(?:PM\]\][^|\]]{0,64}\||S\]\]|A\]\]|B[0-9a-fA-F]{1,8}\]\]
 
 // ---- the v1 allowlist (DESIGN section 8.1). Widening it is a code change and a review; gamemode-config can only narrow it.
 // rule: switch = none | on | off | clear #TAG; tag = #TAG (noArg: what the empty form would do); tagName = #TAG <new name>;
-// load = none | reset; none = no argument. There is no free-text rule: the only free text any allowed form carries is
+// load = none | reset; none = no argument. offline: the #TAG may name an offline character (one live form in the tag index).
+// There is no free-text rule: the only free text any allowed form carries is
 // /rename's new name, held to NAME_RE (review SEC-2: /players took 'any', and its words reached #staff-commands)
 const ALLOW = Object.freeze({
   wwremote: { usage: '/wwremote [on|off|clear #TAG]', rule: 'switch' },
   vlremote: { usage: '/vlremote [on|off|clear #TAG]', rule: 'switch' },
   kick: { usage: '/kick #TAG', rule: 'tag', noArg: 'needTag' },
   fixloc: { usage: '/fixloc #TAG', rule: 'tag', noArg: 'self' },
-  rename: { usage: '/rename #TAG <new name>', rule: 'tagName' },
+  rename: { usage: '/rename #TAG <new name>', rule: 'tagName', offline: true },
+  chars: { usage: '/chars #TAG', rule: 'tag', noArg: 'needTag', offline: true },
   chargen: { usage: '/chargen #TAG', rule: 'tag', noArg: 'self', noBeast: true },
   players: { usage: '/players', rule: 'none' },
   load: { usage: '/load [reset]', rule: 'load' },
@@ -81,6 +83,7 @@ const BUILTIN = new Set(['say', 'low', 'whisper', 'wide', 'shout', 'me', 'melow'
 const TEXT = {
   needTag: () => 'Name the player by #TAG from the console.',
   target: (x) => `${x} is not online (or no such tag).`,
+  targetAny: (x) => `No character carries ${x} (or more than one does).`,
   beast: (x) => `${x} is in a beast form. /chargen waits until they change back.`,
   inWorld: (cmd) => `/${cmd} needs you standing in the world. Run it in game.`,
   self: (cmd) => `/${cmd} acts on your own character. Run it in game.`,
@@ -295,6 +298,11 @@ module.exports = (api) => {
 
   // The admin's own character (DESIGN 7.5): online first; else the one whose stamped tier matches the fresh one; else the
   // lowest form id. Only actors of the profile that carry the requester's Discord id
+  // Live characters carrying a tag in the index, offline ones included (a deleted one stays there until a restart)
+  const offlineByTag = (want) => {
+    let ids = []; try { ids = mp.findFormsByPropertyValue('private.indexed.tagKey', want) || []; } catch (e) { return []; }
+    return ids.map((x) => Number(x) >>> 0).filter((id) => id && !(typeof globalThis.__dboFormGone === 'function' && globalThis.__dboFormGone(id)));
+  };
   const callerOf = (profileId, discordId, fresh) => {
     let ids = [];
     try { ids = (mp.getActorsByProfileId(profileId) || []).map((x) => Number(x) >>> 0); } catch (e) { ids = []; }
@@ -386,8 +394,9 @@ module.exports = (api) => {
     let target = 0;
     if (line.tag) {
       const want = line.tag.slice(1).toLowerCase();
-      const hits = onlineActors().filter((o) => { try { return String(tagOf(o)).toLowerCase() === want; } catch (e) { return false; } });
-      if (hits.length !== 1) return refuse(key, r, 'target', { subject: line.tag, fields: as });
+      let hits = onlineActors().filter((o) => { try { return String(tagOf(o)).toLowerCase() === want; } catch (e) { return false; } });
+      if (!hits.length && ALLOW[line.cmd].offline) hits = offlineByTag(want);
+      if (hits.length !== 1) return refuse(key, r, ALLOW[line.cmd].offline ? 'targetAny' : 'target', { subject: line.tag, fields: as });
       target = hits[0];
       if (ALLOW[line.cmd].noBeast) {
         let beast = false;
