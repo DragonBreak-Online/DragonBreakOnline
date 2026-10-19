@@ -71,6 +71,8 @@ place(MOORSIDE_BED, '30091:Skyrim.esm', MOORSIDE);
 place(HOME_BED, '30091:Skyrim.esm', HOME_CELL);
 place(WILD_BEDROLL, '1899d:Skyrim.esm', TAMRIEL);
 place(CHAIR, 'f:Skyrim.esm', INN_CELL);
+const CHILD_BED = 0x30c7;
+place(CHILD_BED, 'fedc3:Skyrim.esm', HOME_CELL);
 place(HOME_DOOR, 'f:Skyrim.esm', TAMRIEL);
 place(HOME_DOOR_OUT, 'f:Skyrim.esm', HOME_CELL);
 place(INN_DOOR, 'f:Skyrim.esm', OWNED_INN_CELL);
@@ -108,7 +110,7 @@ const api = {
     set: (id, prop, v) => props.set(id + '|' + prop, v),
     kick: (user) => out.kicks.push(user),
     setEnabled: (id, on) => out.enabled.push([id, on]),
-    lookupEspmRecordById: (id) => (CELLS[id] ? { record: { type: CELLS[id] } } : null),
+    lookupEspmRecordById: (id) => (CELLS[id] ? { record: { type: CELLS[id] } } : id === 0xfedc3 ? { record: { type: 'FURN', editorId: 'NobleBedChildSingle01L' } } : null),
     getActorsByProfileId: (pid) => Object.keys(PROFILE).map(Number).filter((a) => PROFILE[a] === pid),
   },
   log: (...a) => out.logs.push(a.join(' ')),
@@ -464,5 +466,10 @@ check('every inn cell marks a rent bed or belongs to an inn that does', Object.v
 globalThis.setTimeout = realSetTimeout;
 process.chdir(os.tmpdir());
 fs.rmSync(dir, { recursive: true, force: true });
+// Why a bed gives no rest is said (#bugs 18 Oct, Kahu #LLX8): a child's bed, and a bed in someone else's home
+out.personals.length = 0;
+check("a child's bed gives no rest and says so", activate(CHILD_BED, THIRD) === false && out.personals.some(([a, t]) => a === THIRD && /child's bed/.test(t)), out.personals);
+out.personals.length = 0;
+check('a bed in someone else\'s home says it is not yours', activate(HOME_BED, OTHER) === false && out.personals.some(([a, t]) => a === OTHER && /not yours/.test(t)), out.personals);
 console.log(`\n${checks - failures}/${checks} passed`);
 process.exit(failures ? 1 : 0);
