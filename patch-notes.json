@@ -1,5 +1,20 @@
 [
   {
+    "title": "Gear wear paused",
+    "date": "2026-10-19",
+    "version": "Server update",
+    "tag": "Change",
+    "sections": [
+      {
+        "heading": "Wear is off for now",
+        "items": [
+          "Weapon and armour wear is switched off until more players are online. Gear no longer wears down, Worn and Damaged gear works at full strength, and Broken gear can be worn again.",
+          "Item names keep their Worn, Damaged or Broken tag for now; it does nothing while wear is off."
+        ]
+      }
+    ]
+  },
+  {
     "title": "A stuck dungeon load no longer costs you the dungeon",
     "date": "2026-10-19",
     "version": "Hotfix",

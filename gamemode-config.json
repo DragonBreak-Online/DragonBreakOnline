@@ -235,7 +235,7 @@
  },
  "durability": {
   "_comment": "Weapon and armour wear (server\\durability.js, Nate 19 Oct). Tiers tierNames (Intact, Worn, Damaged, Broken) show in the item's name in the inventory; Worn and Damaged cost effectMult of the piece's damage or armour rating, Broken cannot be worn. Wear points a tier: pointsPerTier.weapon / .armor; a landed blow wears the weapon by hitPoints, a hit taken one worn armour piece (in turn) by hitPoints, a blocked hit the shield by blockPoints, a death every worn piece a whole tier. Repair at a sharpening wheel (wheelKeywords, weapons) or an armorer's bench (benchKeywords, armour): the smith's Blacksmith craft tier must reach the piece's family tier (smithing.json); each tier repaired costs feePerTier of the piece's base value (at least feeMin) and that gold is destroyed; a Broken piece also takes its recipe's materials (salvage.json). Hot reload.",
-  "enabled": true,
+  "enabled": false,
   "tierNames": ["", "Worn", "Damaged", "Broken"],
   "effectMult": [1, 0.9, 0.75, 0.5],
   "pointsPerTier": { "weapon": 150, "armor": 60 },
