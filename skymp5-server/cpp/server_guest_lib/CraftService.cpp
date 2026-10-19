@@ -52,8 +52,12 @@ void CraftService::OnCraftItem(const RawMessageData& rawMsgData,
                          workbench.GetFormId());
   }
 
+  // Global like the recipe's: a HearthFires oven's BYOHCraftingOven stayed file-local and matched no oven recipe
   std::vector<uint32_t> workbenchKeywordIds =
     workbenchBase.rec->GetKeywordIds(cache);
+  for (auto& id : workbenchKeywordIds) {
+    id = workbenchBase.ToGlobalId(id);
+  }
 
   auto recipesList =
     FindRecipe(me, workbenchKeywordIds, br, inputObjects, resultObjectId);
