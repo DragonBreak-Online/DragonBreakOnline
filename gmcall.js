@@ -9,6 +9,7 @@
 //           the screen, a Skyrim notification and a line in the admin chat tab. Unclaimed calls are shown again every
 //           remindMinutes, all of them in one line; staff who come online while calls are open are given the list.
 //           /gm list [all]   /gm take <n>   /gm goto <n>   /gm release <n>   /gm close <n> [note]   /gm quiet [on|off]
+//           The F7 admin panel's GM Calls tab shows the same list and buttons (staffData widget, dbo:staffGmCalls).
 //           take tells the player who is coming and every other staff member who took it. goto moves the GM to the
 //           caller (to where they called from when the caller is offline) and takes the call if nobody has. The note on
 //           close is for staff: it goes into the audit and the Discord mirror, never to the player.
@@ -43,6 +44,9 @@ module.exports = (api) => {
   const teleportTo = fn(api.teleportTo, null);
   const creationPending = fn(api.creationPending, () => false);
   const sendJson = fn(api.sendJson, null);
+  const openWidget = fn(api.openWidget, null);
+  const closeWidget = fn(api.closeWidget, () => {});
+  const onUi = fn(api.onUi, null);
   const C = Object.assign({
     enabled: true, cooldownSeconds: 120, minText: 5, maxText: 300, maxLines: 5, remindMinutes: 5, expireHours: 24,
     filter: true, staffRoleIds: [], openTicket: false, discord: false, discordChannelId: '', discordPingRoleId: '',
@@ -50,6 +54,8 @@ module.exports = (api) => {
   }, (cfg && cfg.gmCalls) || {});
   const FILE = path.resolve('gm-calls.json');
   const UNITS_PER_METER = 70;
+  // A data-only widget the admin panel's GM Calls tab reads (front staffData); never drawn on its own
+  const GMCALLS_DATA_WIDGET_ID = 140;
   const fresh = () => ({ counter: 0, open: [], closed: [], quiet: [] });
   // A restart reads the file once; a hot reload keeps what the last generation held
   const S = globalThis.__dboGmCalls || (globalThis.__dboGmCalls = (() => {
@@ -65,8 +71,12 @@ module.exports = (api) => {
   })());
   // Not saved: per player, the last send; per staff actor, when they were first seen online and whether they were told
   const R = globalThis.__dboGmCallsRun || (globalThis.__dboGmCallsRun = { lastSend: new Map(), seen: new Map() });
+  // Staff with the admin panel's GM Calls tab open: actor -> the last list sent to them
+  if (!(R.watch instanceof Map)) R.watch = new Map();
   const save = () => {
     const snap = () => JSON.stringify({ counter: S.counter, open: S.open, closed: S.closed, quiet: S.quiet });
+    // Every change to a call is saved, so the open tabs hear of it here
+    setImmediate(() => { try { pushWatchers(); } catch (e) { log('gm calls: panel update failed', e.message); } });
     if (saveSoon) return saveSoon(FILE, snap);
     fs.writeFile(FILE, snap(), (e) => { if (e) log('gm calls: saving failed', e.message); });
   };
@@ -399,7 +409,60 @@ module.exports = (api) => {
       }
     }
     if (changed) save();
+    // The admin panel's tab: whose callers and GMs are in the game moves without a save
+    pushWatchers();
   });
+
+  // ---- the admin panel's GM Calls tab (F7): the same calls and the same take, goto, release and close ------------------
+  // The tab asks with dbo:staffGmCalls watch|unwatch|take|goto|release|close [n] [note]; while it is open the list comes
+  // as a staffData widget each time it changes. Times are the server's; now lets the tab count from them.
+  const view = (a) => {
+    const me = Number(profileOf(a));
+    return {
+      open: S.open.map((c) => ({
+        n: c.n, name: c.name, online: !!callerOnline(c), place: placeText(c.place), at: c.at,
+        lines: c.lines.map((l) => ({ at: l.at, text: l.text })),
+        takenBy: c.takenBy ? c.takenBy.name : '', mine: !!c.takenBy && c.takenBy.profile === me, ticket: c.ticket || '',
+      })),
+      closed: S.closed.slice(-10).reverse().map((c) => ({ n: c.n, name: c.name, how: c.closedHow || '', by: c.closedBy || '', at: c.closedAt || 0, note: c.note || '' })),
+      canGoto: (() => { try { return !!isAdmin(a) || canAnswer(a); } catch (e) { return false; } })(),
+      quiet: quiet(a),
+    };
+  };
+  const pushTo = (a, force) => {
+    if (!openWidget) return;
+    const v = view(a);
+    const key = JSON.stringify(v);
+    if (!force && R.watch.get(a >>> 0) === key) return;
+    R.watch.set(a >>> 0, key);
+    openWidget(a, Object.assign({ type: 'staffData', id: GMCALLS_DATA_WIDGET_ID, kind: 'gmCalls', now: Date.now() }, v), false);
+  };
+  const pushWatchers = () => {
+    if (!R.watch.size) return;
+    const on = new Set(onlineActors().map((x) => x >>> 0));
+    for (const k of [...R.watch.keys()]) {
+      if (!on.has(k) || !isStaff(k)) { R.watch.delete(k); continue; }
+      pushTo(k, false);
+    }
+  };
+  const panelOp = (a, op, arg, note) => {
+    if (!isStaff(a)) return;
+    if (op === 'watch') { R.watch.set(a >>> 0, ''); return pushTo(a, true); }
+    if (op === 'unwatch') { R.watch.delete(a >>> 0); return closeWidget(a, GMCALLS_DATA_WIDGET_ID); }
+    if (op === 'quiet') { setQuiet(a, String(arg || '').toLowerCase()); return pushTo(a, false); }
+    if (!['take', 'goto', 'release', 'close'].includes(op)) return;
+    const c = numberOf(a, String(arg == null ? '' : arg));
+    if (!c) return pushTo(a, true);
+    if (op === 'take') take(a, c);
+    else if (op === 'goto') goto(a, c);
+    else if (op === 'release') release(a, c);
+    else closeBy(a, c, String(note || ''));
+    pushTo(a, false);
+  };
+  if (onUi) onUi('staffGmCalls', (a, args) => panelOp(a, String(args[0] || ''), args[1], args[2]));
+  // For any other staff screen: the calls as the tab sees them, and its actions
+  globalThis.__dboGmCallsView = (a) => (isStaff(a) ? view(a) : null);
+  globalThis.__dboGmCallsAct = panelOp;
 
   globalThis.__dboGmCallsOpen = () => S.open.length;
   return { call, command, placeOf, state: S };

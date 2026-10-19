@@ -989,7 +989,7 @@ const STAFF_HELP = [
     ['property', 'at a door, as an official: sell <price> | list <deposit> <weekly> | unlist | offer <name> | remind | grace | evict']] },
   { key: 'elections', title: 'Hold elections', items: ['electionreview', 'strikevote', 'unstrikevote'] },
   { key: 'beasts', title: 'Beasts and the supernatural', items: ['beastform', 'curse', 'makesuper', 'vlremote', 'wwremote', 'feedpair', 'raid', 'warband'] },
-  { key: 'magic', title: 'Magic and crafts', items: ['schools', 'shoutclean', 'classteacher', 'preacher', 'manual', 'smithing', 'tailoring'] },
+  { key: 'magic', title: 'Magic and crafts', items: ['schools', 'shoutclean', 'classteacher', 'preacher', 'manual', 'smithing', 'tailoring', 'enchant'] },
   { key: 'law', title: 'Law', items: ['jail', ['concordat', '[races]: Concordat arrests standing, or the Thalmor outside the race rule'],
     ['dossier', 'list | read <name|#TAG> | reports | add <name|#TAG> <text> | strike <name|#TAG> <n>: the Thalmor dossiers and informant reports (add and strike: Lead GM)']] },
   { key: 'world', title: 'World', items: ['settime', 'setweather', 'timescale', 'region', ['dungeon end', '<dungeon id|name>: end a dungeon claim now'],
@@ -8156,8 +8156,17 @@ try {
   const auth = serverSettings.discordAuth || {};
   require(GMCALL_JS)({ mp, log, personal, staffSay, audit, staffNote, who, display, profileOf, discordOf, rolesOf, onlineActors, registerChatCommand,
     isAdmin, staffCan, every, saveSoon, sendPacket, zoneOfActor, zoneById, recordOf, teleportTo: staffTeleport, creationPending, sendJson, cfg,
-    token: (cfg.discord || {}).botToken || auth.botToken });
-} catch (e) { log('gmcall.js failed to load:', e.stack || e.message); globalThis.__dboGmCallsOpen = null; }
+    openWidget, closeWidget, onUi, token: (cfg.discord || {}).botToken || auth.botToken });
+} catch (e) { log('gmcall.js failed to load:', e.stack || e.message); globalThis.__dboGmCallsOpen = null; globalThis.__dboGmCallsView = null; globalThis.__dboGmCallsAct = null; }
+
+// ---- /enchant and the F7 Enchant tab: staff enchant one piece for an event (server\staffenchant.js, config "staffEnchant") --
+try {
+  const STAFFENCHANT_JS = path.resolve('staffenchant.js');
+  delete require.cache[STAFFENCHANT_JS];
+  require(STAFFENCHANT_JS)({ mp, log, personal, audit, staffNote, who, display, onlineActors, registerChatCommand, staffTierOf, findByName,
+    onUi, openWidget, closeWidget, sendPacket, itemName: (id) => globalThis.__alduinakItemName(id), cfg });
+} catch (e) { log('staffenchant.js failed to load:', e.stack || e.message); }
+
 // ---- /event and /chars: quick staff tools (server\stafftools.js, config "events") ------------------------------------
 try {
   const STAFFTOOLS_JS = path.resolve('stafftools.js');
