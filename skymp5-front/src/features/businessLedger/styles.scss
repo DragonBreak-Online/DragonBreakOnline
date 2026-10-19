@@ -168,6 +168,29 @@
     & > span:last-child { overflow-wrap: anywhere; }
   }
 
+  // the shop: a kind of goods, its price, and how many to buy (or the price to set)
+  &__shopRow {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 4px 10px;
+    padding: 4px 0;
+    font-size: 14px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  }
+
+  &__shopName { display: flex; flex-direction: column; overflow-wrap: anywhere; }
+  &__shopLeft { color: $dbo-text-dim; font-size: 12px; }
+
+  &__shopBuy {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+
+    .bizLedger__input { flex: 0 0 120px; }
+  }
+
   &__when { color: $dbo-text-dim; }
   &__by { color: $dbo-gold; }
 
