@@ -7,7 +7,6 @@
 #include <cstdlib>
 #include <cstring>
 #include <iterator>
-#include <unordered_set>
 
 namespace {
 constexpr float kFullRateUnits = 2000.f;
@@ -19,6 +18,8 @@ constexpr uint64_t kCombatPinMs = 10000;
 constexpr uint64_t kFlushEveryMs = 100;
 constexpr uint64_t kWindowMs = 1000;
 constexpr uint64_t kForgetMs = 10000;
+// Flush runs every tick (about 100 a second at load); the prune covers the pending map in this many calls
+constexpr size_t kPruneSlicesPerSecond = 100;
 // About 32 movers at the clients' 130 ms send rate
 constexpr uint32_t kFullSendsPerSecond = 250;
 constexpr uint32_t kCoalescedSendsPerSecond = 200;
@@ -110,7 +111,11 @@ void MovementRelay::Submit(MpActor& emitter, Networking::UserId senderUserId,
 
     // Coalesced: only the newest position waits, overwriting the last. Flush sends it, oldest-waiting first, so arrival
     // order can't decide who gets the budget
-    auto& p = pending[key];
+    auto [slot, created] = pending.try_emplace(key);
+    if (created) {
+      ++ls.pendingCount;
+    }
+    auto& p = slot->second;
     p.userId = userId;
     p.lastTouchedMs = now;
     p.intervalMs = dist2 <= kGridSquareUnits * kGridSquareUnits
@@ -141,20 +146,9 @@ void MovementRelay::RetuneWindow(uint64_t now)
     ls.fullThisWindow = 0;
     ls.coalescedSentThisSecond = 0;
   }
-  // A listener with nothing waiting is dropped; Submit recreates it with the full radius
-  std::unordered_set<Networking::UserId> waiting;
-  for (auto& [key, p] : pending) {
-    waiting.insert(p.userId);
-  }
+  // A listener with no pending entry is dropped; Submit recreates it with the full radius
   for (auto it = listeners.begin(); it != listeners.end();) {
-    it = waiting.count(it->first) ? std::next(it) : listeners.erase(it);
-  }
-  for (auto it = pending.begin(); it != pending.end();) {
-    if (now - it->second.lastTouchedMs > kForgetMs) {
-      it = pending.erase(it);
-    } else {
-      ++it;
-    }
+    it = it->second.pendingCount ? std::next(it) : listeners.erase(it);
   }
   for (auto it = combat.begin(); it != combat.end();) {
     if (now - it->second > kCombatPinMs) {
@@ -163,20 +157,38 @@ void MovementRelay::RetuneWindow(uint64_t now)
       ++it;
     }
   }
-  // Entries were erased above: rebuild the waiting lists so none points at a freed entry
-  for (auto& [userId, ls] : listeners) {
-    ls.waiting.clear();
+}
+
+// Forgets entries untouched for kForgetMs, a slice of the map's buckets per call so the whole map is covered about once
+// a second without one tick paying for it (a full pass in RetuneWindow cost 50-63 ms once a second, 500 crowded).
+// Queued entries are kept: their listener's waiting list points at them, and Flush sends or drops them first
+void MovementRelay::PrunePendingSlice(uint64_t now)
+{
+  const size_t buckets = pending.bucket_count();
+  if (!buckets || pending.empty()) {
+    return;
   }
-  for (auto& [key, p] : pending) {
-    p.queued = false;
-    if (!p.dirty) {
+  const size_t slice = std::max<size_t>(1, buckets / kPruneSlicesPerSecond);
+  pruneScratch.clear();
+  for (size_t i = 0; i < slice; ++i) {
+    const size_t b = (pruneCursor + i) % buckets;
+    for (auto it = pending.begin(b); it != pending.end(b); ++it) {
+      if (!it->second.queued && now - it->second.lastTouchedMs > kForgetMs) {
+        pruneScratch.push_back(it->first);
+      }
+    }
+  }
+  pruneCursor = (pruneCursor + slice) % buckets;
+  for (uint64_t key : pruneScratch) {
+    auto it = pending.find(key);
+    if (it == pending.end()) {
       continue;
     }
-    auto it = listeners.find(p.userId);
-    if (it != listeners.end()) {
-      p.queued = true;
-      it->second.waiting.push_back(&p);
+    auto ls = listeners.find(it->second.userId);
+    if (ls != listeners.end() && ls->second.pendingCount) {
+      --ls->second.pendingCount;
     }
+    pending.erase(it);
   }
 }
 
@@ -188,6 +200,7 @@ void MovementRelay::Flush()
     windowStartMs = now;
     RetuneWindow(now);
   }
+  PrunePendingSlice(now);
   for (auto& [userId, ls] : listeners) {
     if (now < ls.nextFlushMs) {
       continue;

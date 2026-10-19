@@ -50,9 +50,10 @@ private:
     uint32_t fullThisWindow = 0;
     uint32_t coalescedSentThisSecond = 0;
     uint64_t nextFlushMs = 0;
+    uint32_t pendingCount = 0; // pending entries keyed to this listener
     // The pending entries that may be waiting for this listener. Flush visits only these, not the whole pending map
     // (TickProfile, 500 crowded: scanning the map cost 150-185 ms a second, 50-66 ms per flush). Pointers stay valid
-    // because unordered_map never moves its nodes; RetuneWindow rebuilds the lists after it erases entries.
+    // because unordered_map never moves its nodes, and an entry is only erased while it is in no list.
     std::vector<Pending*> waiting;
   };
 
@@ -62,11 +63,14 @@ private:
             size_t length);
   void RetuneWindow(uint64_t now);
   void FlushListener(ListenerState& ls, uint64_t now);
+  void PrunePendingSlice(uint64_t now);
 
   PartOne& partOne;
   std::unordered_map<uint64_t, Pending> pending;      // (listener user << 32) | emitter form id
   std::unordered_map<uint64_t, uint64_t> combat;      // (min form id << 32) | max form id -> last hit ms
   std::unordered_map<Networking::UserId, ListenerState> listeners;
-  std::vector<Pending*> dueScratch; // reused by FlushListener
+  std::vector<Pending*> dueScratch;  // reused by FlushListener
+  std::vector<uint64_t> pruneScratch; // reused by PrunePendingSlice
+  size_t pruneCursor = 0;
   uint64_t windowStartMs = 0;
 };
