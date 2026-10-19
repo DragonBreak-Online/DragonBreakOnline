@@ -111,6 +111,13 @@
   }
 
   &__ask { margin-right: auto; font-size: 15px; color: $dbo-gold; }
+
+  // Faiths: each opens to its patrons, indented under it
+  &__pick--faith { font-size: 17px; }
+  &__faith--open > &__pick { color: $dbo-silver; }
+  &__patrons { margin: 2px 0 8px 14px; border-left: 1px solid dbo-accent(0.2); }
+  &__mark--people { color: dbo-accent(0.7); text-transform: none; letter-spacing: 0; font-style: italic; }
+  &__faithname { margin: 0 0 4px; font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: dbo-accent(0.8); }
 }
 
 @media (max-width: 1180px), (max-height: 720px) {
