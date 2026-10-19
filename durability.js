@@ -169,11 +169,13 @@ module.exports = (api) => {
       const key = keyOf(w);
       if (!(key in l)) continue;
       const tier = tierOf(a, w);
-      delete l[key]; changed = true;
-      if (tier !== tierOfName(w.name)) {
-        try { if (!renameOne(a, w.baseId, w.name, tier)) log(`durability: ${who(a)} ${descOf(w.baseId)} left the pack before its ${NAMES[tier]} could be marked`); }
+      // The wear stays kept until the name holds it: the login's empty report "takes off" pieces still worn (19 Oct log)
+      let marked = tier === tierOfName(w.name);
+      if (!marked) {
+        try { marked = renameOne(a, w.baseId, w.name, tier); if (!marked) log(`durability: ${who(a)} ${descOf(w.baseId)} not in the pack unworn yet; its ${NAMES[tier]} stays kept`); }
         catch (e) { log('durability: rename failed', e.message); }
       }
+      if (marked) { delete l[key]; changed = true; }
     }
     if (changed) { try { writeLedger(a, l); } catch (e) { /* kept for the next look */ } }
   };
@@ -252,9 +254,13 @@ module.exports = (api) => {
     return true;
   };
   // Pieces of this kind in the pack that wear has marked: [{ baseId, name, tier, entry }]
+  // (the name's tier plus any wear still kept for it, as when its name could not be written yet)
   const damagedOf = (a, kind) => (get(a, 'inventory', { entries: [] }).entries || [])
-    .filter((e) => e && !e.worn && !e.wornLeft && Number(e.count) > 0 && tierOfName(e.name) > 0 && kindOf(Number(e.baseId) >>> 0) === kind)
-    .map((e) => ({ baseId: Number(e.baseId) >>> 0, name: String(e.name), tier: tierOfName(e.name), entry: e }));
+    .filter((e) => e && !e.worn && !e.wornLeft && Number(e.count) > 0 && kindOf(Number(e.baseId) >>> 0) === kind)
+    .map((e) => { const w = { baseId: Number(e.baseId) >>> 0, name: e.name ? String(e.name) : '', entry: e }; return Object.assign(w, { tier: tierOf(a, w) }); })
+    .filter((w) => w.tier > 0);
+  // Worn pieces of this kind that need a repair: listed, so the bench says to take them off
+  const wornDamagedOf = (a, kind) => wornOf(a).filter((w) => kindOf(w.baseId) === kind).map((w) => Object.assign(w, { tier: tierOf(a, w) })).filter((w) => w.tier > 0);
   const smithTier = (a) => { try { return typeof globalThis.__dboSmithCraftTier === 'function' ? Number(globalThis.__dboSmithCraftTier(a >>> 0)) || 0 : 7; } catch (e) { return 0; } };
   const itemTier = (id) => { try { return typeof globalThis.__dboSmithItemTier === 'function' ? Number(globalThis.__dboSmithItemTier(id >>> 0)) || 1 : 1; } catch (e) { return 1; } };
   const nameOfMat = (d) => itemName(d);
@@ -262,7 +268,8 @@ module.exports = (api) => {
   const openList = (a, target, kind, note) => {
     const list = damagedOf(a, kind).slice(0, 8);
     const actions = [{ id: 'use', label: `Work the ${LABEL[kind]} (use it again)` }];
-    for (const it of list) actions.push({ id: `r:${it.baseId}:${encodeURIComponent(it.name)}`, label: it.name });
+    for (const it of list) actions.push({ id: `r:${it.baseId}:${encodeURIComponent(it.name)}`, label: nameAt(it.entry, it.tier) });
+    for (const w of wornDamagedOf(a, kind).slice(0, 8)) actions.push({ id: `w:${w.baseId}`, label: `${nameAt(w.entry, w.tier)}: take it off to repair it` });
     S.pending.set(a >>> 0, { target: target >>> 0, kind });
     openWidget(a, { type: 'contextMenu', id: WIDGET_ID, mode: 'menu', targetName: note || `Repair at the ${LABEL[kind]}: choose a piece`,
       actions, events: { action: 'dbo:repairChoose', close: 'dbo:repairClose' } }, true);
@@ -274,7 +281,7 @@ module.exports = (api) => {
     const fee = feeOf(baseId, it.tier);
     const mats = matsFor(baseId, it.tier);
     const need = itemTier(baseId);
-    const lines = [`${it.name}: back to Intact for ${fee} gold`];
+    const lines = [`${nameAt(it.entry, it.tier)}: back to Intact for ${fee} gold`];
     if (mats && mats.length) lines.push(`and ${mats.map(([d, n]) => `${n} ${nameOfMat(d)}`).join(', ')}`);
     else if (it.tier >= BROKEN) lines.push('and its materials (none known: ask a GM)');
     lines.push(`Needs Blacksmith craft tier ${need}`);
@@ -297,6 +304,7 @@ module.exports = (api) => {
     if ((mats || []).length && !takeMaterials(a, mats)) return 'The materials could not be taken. Nothing was charged.';
     if (!takeGold(a, fee)) return `The repair costs ${fee} gold, and you do not have it.`;
     if (!renameOne(a, it.baseId, it.name, 0)) { log(`durability: ${who(a)} paid for a repair that found no piece: ${descOf(it.baseId)}`); return 'The piece slipped from the bench. Ask a GM.'; }
+    { const l = ledger(a); const k = keyOf(it); if (k in l) { delete l[k]; try { writeLedger(a, l); } catch (e) { /* the name is Intact already */ } } }
     log(`durability: ${who(a)} repaired ${descOf(it.baseId)} from ${NAMES[it.tier]} for ${fee} gold (destroyed)${(mats || []).length ? ` and ${mats.map(([d, n]) => `${n} ${d}`).join(', ')}` : ''}`);
     return `${bareName(it.entry)} repaired for ${fee} gold.`;
   };
@@ -308,7 +316,7 @@ module.exports = (api) => {
     if (!kind) return false;
     const pass = S.pass.get(caster >>> 0);
     if (pass) { S.pass.delete(caster >>> 0); if (pass.target === (target >>> 0) && pass.until > Date.now()) return false; }
-    if (!damagedOf(caster, kind).length) return false;
+    if (!damagedOf(caster, kind).length && !wornDamagedOf(caster, kind).length) return false;
     openList(caster, target, kind);
     return true;
   };
@@ -319,6 +327,7 @@ module.exports = (api) => {
     if (id === 'use') { S.pass.set(a >>> 0, { target: p.target, until: Date.now() + C.useWindowSeconds * 1000 }); S.pending.delete(a >>> 0); closeWidget(a, WIDGET_ID); return; }
     try { if (distanceMeters(a, p.target) > C.reachMeters) { S.pending.delete(a >>> 0); closeWidget(a, WIDGET_ID); personal(a, `You walked away from the ${LABEL[p.kind]}.`); return; } } catch (e) { /* no position */ }
     if (id === 'list') { openList(a, p.target, p.kind); return; }
+    if (/^w:\d+$/.test(id)) { openList(a, p.target, p.kind, 'Take the piece off first, then choose it here'); return; }
     const m = /^r:(\d+):(.*)$/.exec(id);
     if (m) { openItem(a, p.target, p.kind, Number(m[1]) >>> 0, decodeURIComponent(m[2])); return; }
     if (id === 'fix' && p.item) {

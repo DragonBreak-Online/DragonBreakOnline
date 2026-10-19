@@ -140,6 +140,31 @@ globalThis.__dboDurabilityEquip(P, mp.get(P, 'equipment'));
   globalThis.__dboRepairActivate(WHEEL, P); ui('repairChoose', P, ['use']);
   ok(globalThis.__dboRepairActivate(WHEEL, P) === false, '"use it again" lets the next use reach the wheel (tempering)');
 
+  // ---- the login's empty report (19 Oct log: "left the pack before its Worn could be marked", the wear then lost) -------
+  put(P, 'private.dboWear', {});
+  dress([{ baseId: SWORD, count: 1, worn: true }, { baseId: GOLD, count: 100 }]);
+  globalThis.__dboDurabilityEquip(P, mp.get(P, 'equipment'));
+  for (let i = 0; i < 150; i++) globalThis.__dboDurabilityHit(P, NPC, SWORD, {});
+  // the client reports nothing worn while the pack still holds the sword as worn, then the server dresses it again
+  put(P, 'equipment', { inv: { entries: [{ baseId: GOLD, count: 100 }] } });
+  globalThis.__dboDurabilityEquip(P, mp.get(P, 'equipment'));
+  await wait(500);
+  ok(Object.keys(mp.get(P, 'private.dboWear') || {}).includes(`${SWORD}|`), 'login: the empty report cannot rename a sword still worn, and its wear stays kept', mp.get(P, 'private.dboWear'));
+  dress([{ baseId: SWORD, count: 1, worn: true }, { baseId: GOLD, count: 100 }]);
+  globalThis.__dboDurabilityEquip(P, mp.get(P, 'equipment'));
+  ok(globalThis.__dboDurabilityMult(P, SWORD, false, '') === 0.9, '...so dressed again it is still Worn, not Intact');
+  // worn at the wheel: listed, to be taken off first
+  globalThis.__dboRepairActivate(WHEEL, P);
+  ok(lastWidget().actions.some((x) => x.label === 'Iron Sword (Worn): take it off to repair it'), 'the wheel lists a worn sword that needs repair, to take off first', lastWidget().actions);
+  ui('repairChoose', P, [lastWidget().actions.find((x) => /take it off/.test(x.label)).id]);
+  ok(/Take the piece off first/.test(lastWidget().targetName), '...and choosing it says so', lastWidget().targetName);
+  // taken off while its name cannot be written: the kept wear still lists it, and the repair clears the wear
+  dress([{ baseId: SWORD, count: 1 }, { baseId: INGOT, count: 1 }, { baseId: GOLD, count: 100 }]);
+  globalThis.__dboRepairActivate(WHEEL, P);
+  const kept = lastWidget().actions.find((x) => x.label === 'Iron Sword (Worn)');
+  ok(!!kept, 'a piece with kept wear and no tier in its name is still listed by its tier', lastWidget().actions);
+  ui('repairChoose', P, [kept.id]); ui('repairChoose', P, ['fix']);
+  ok(count(P, SWORD, '') === 1 && count(P, GOLD) < 100 && !Object.keys(mp.get(P, 'private.dboWear') || {}).includes(`${SWORD}|`), '...repaired, its kept wear is gone', [inv(P), mp.get(P, 'private.dboWear')]);
   // ---- gamemode.js wiring -----------------------------------------------------------------------------------------
   const gm = fs.readFileSync(path.join(SERVER, 'gamemode.js'), 'utf8');
   ok(/__dboDurabilityMult\(a, Number\(e\.baseId\) >>> 0, !!e\.wornLeft, e\.name \|\| ''\)/.test(gm) && (gm.match(/\* \(w\.cond \|\| 1\);/g) || []).length === 2 && /\* \(\(w && w\.cond\) \|\| 1\)/.test(gm),

@@ -1,5 +1,21 @@
 [
   {
+    "title": "Gear wear is kept, and the bench shows what to repair",
+    "date": "2026-10-19",
+    "version": "Hotfix",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Repairs",
+        "items": [
+          "Logging in no longer resets your gear's wear. Before, some pieces went back to an earlier tier at login, then wore down all over again.",
+          "Using a sharpening wheel (weapons) or an armorer's bench (armour) while you carry worn gear opens the repair list. Choose \"Work the wheel\" or \"Work the bench\" in that list to use it as usual.",
+          "Gear you are wearing now shows in the list too, marked \"take it off to repair it\". Take it off and choose it again to see the price."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Fortify Alchemy gear counts again",
     "date": "2026-10-18",
     "version": "Hotfix",
