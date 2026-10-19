@@ -40,10 +40,10 @@ ok('the Thalmor still never take a Blade', L.conflicts.some((c) => (c.a || []).i
 // ---- the stub server ------------------------------------------------------------------------------------------------
 const LEAD = 0x10, GM = 0x11;
 const LEG = 0x20, STORM = 0x21, COUNT = 0x22, CIT = 0x23, SYN = 0x24, WHIS = 0x25, THIEF = 0x26, DB = 0x27, CULT = 0x28,
-  VIG = 0x29, VAMP = 0x2a, DG = 0x2b, VOLK = 0x2c, FG = 0x2d, KOJUS = 0x2e, BOSS = 0x2f;
+  VIG = 0x29, VAMP = 0x2a, DG = 0x2b, VOLK = 0x2c, FG = 0x2d, KOJUS = 0x2e, BOSS = 0x2f, CHIEF = 0x30, ORC = 0x31;
 const names = { [LEAD]: 'Lead', [GM]: 'Plain GM', [LEG]: 'Legionary', [STORM]: 'Stormy', [COUNT]: 'Count', [CIT]: 'Citizen', [SYN]: 'Synodic',
   [WHIS]: 'Whisperer', [THIEF]: 'Thief', [DB]: 'Assassin', [CULT]: 'Cultist', [VIG]: 'Vigilant', [VAMP]: 'Vampire', [DG]: 'Guardian',
-  [VOLK]: 'Volkihar', [FG]: 'Fighter', [KOJUS]: 'Kojus', [BOSS]: 'Boss' };
+  [VOLK]: 'Volkihar', [FG]: 'Fighter', [KOJUS]: 'Kojus', [BOSS]: 'Boss', [CHIEF]: 'Chief', [ORC]: 'Grunt' };
 const chars = new Map(Object.entries(names).map(([k, v]) => [Number(k), v]));
 const told = [], audits = [], said = [];
 const handlers = {}, commands = {};
@@ -86,8 +86,18 @@ ok('Kojus is listed as breaking the allegiance rule', br.some((b) => b.actor ===
 put('imperial-legion', LEG); put('imperial-legion', BOSS, 0); put('county-bruma', COUNT, 0); put('stormcloaks', STORM, 0);
 put('synod', SYN, 0); put('college-of-whispers', WHIS, 0); put('thieves-guild', THIEF); put('dark-brotherhood', DB, 0);
 put('cult-boethiah', CULT); put('vigil-of-stendarr', VIG, 0); put('dawnguard', DG, 0); put('clan-volkihar', VOLK, 0); put('fighters-guild', FG, 0);
+put('clan-largashbur', CHIEF, 0); put('clan-largashbur', ORC);
 
 // ---- allegiance ----------------------------------------------------------------------------------------------------
+// The Orc stronghold clans are an allegiance, any member (Nate, 19 Oct)
+ok('the six Orc clans are allegiance ids, not officials-only', ['clan-gol-kharzum', 'clan-mor-khazgur', 'clan-dushnikh-yal', 'clan-largashbur', 'clan-narzulbur', 'clan-cracked-tusk']
+  .every((c) => L.categories.allegiance.ids.includes(c) && !(L.categories.allegiance.officialsOnly || []).includes(c)));
+let ro = invite(BOSS, ORC, 'imperial-legion');
+ok('a clan member cannot be invited to the Legion, and the refusal names the clan', ro.error && /already serves .*Largashbur.*must leave it first/.test(ro.error), ro);
+ro = invite(CHIEF, LEG, 'clan-largashbur');
+ok('nor a Legion soldier to a clan', ro.error && /already serves the Imperial Legion/.test(ro.error), ro);
+ro = invite(FG, ORC, 'fighters-guild');
+ok('a clan member may still join a guild', !ro.error, ro);
 let r = invite(STORM, LEG, 'stormcloaks');
 ok('a Legion soldier cannot be invited to the Stormcloaks, and the refusal names the Legion', r.error && /already serves the Imperial Legion; they must leave it first/.test(r.error), r);
 r = invite(COUNT, LEG, 'county-bruma');
