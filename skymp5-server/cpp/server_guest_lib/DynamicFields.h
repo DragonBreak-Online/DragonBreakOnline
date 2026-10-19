@@ -17,7 +17,7 @@ public:
   template <class F>
   void ForEachValueDump(const F& f) const
   {
-    for (auto [propName, valueDump] : propDumps) {
+    for (const auto& [propName, valueDump] : propDumps) {
       f(propName, valueDump);
     }
   }
