@@ -8032,8 +8032,8 @@ try {
 try {
   const CHARLEVEL_JS = path.resolve('charlevel.js');
   delete require.cache[CHARLEVEL_JS];
-  require(CHARLEVEL_JS)({ mp, log, personal, system, audit, display, cfg, openWidget, closeWidget, onUi, registerChatCommand, onlineActors, every, sendPacket });
-} catch (e) { log('charlevel.js failed to load:', e.stack || e.message); globalThis.__dboCharLevel = null; globalThis.__dboCharLevelLogin = null; }
+  require(CHARLEVEL_JS)({ mp, log, personal, system, audit, display, cfg, openWidget, closeWidget, onUi, registerChatCommand, onlineActors, every, sendPacket, isAdmin, findByName });
+} catch (e) { log('charlevel.js failed to load:', e.stack || e.message); globalThis.__dboCharLevel = null; globalThis.__dboCharLevelLogin = null; globalThis.__dboCharLevelRefund = null; }
 
 // ---- interaction animations: a notice board, an introduction, rope (server\idles.js) -----------------------------
 try {

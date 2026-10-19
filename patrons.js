@@ -128,6 +128,8 @@ module.exports = (api) => {
     }
     save();
     audit(`REROLL ${who(a)} changed identity (${rerollsLeft(a).text} left)`);
+    // A new race may want other vitals: the level points come back to spend again (charlevel.js refundOnReroll)
+    try { if (typeof globalThis.__dboCharLevelRefund === 'function') globalThis.__dboCharLevelRefund(a, 'reroll'); } catch (e) { log('level refund failed', e.message); }
     // A vampire keeps the vampire variant of the new race
     try { if (typeof globalThis.__dboSuperReapplyLook === 'function') globalThis.__dboSuperReapplyLook(a); } catch (e) { log('reroll look fix failed', e.message); }
     setTimeout(() => { try { personal(a, 'Your new identity is set.'); } catch (e) { /* gone */ } }, 1500);

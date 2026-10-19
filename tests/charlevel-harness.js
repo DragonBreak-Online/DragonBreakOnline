@@ -8,6 +8,7 @@ const api = {
   openWidget: (a, w) => widgets.push(w), closeWidget: () => {}, onUi: (e, fn) => { handlers[e] = fn; },
   registerChatCommand: (n, fn) => { cmds[n] = fn; }, onlineActors: () => [1], every: () => {},
   sendPacket: (a, p) => packets.push(p),
+  isAdmin: (a) => a === 9, findByName: (q) => (q === 'one' ? 1 : 0),
 };
 require(path.resolve(__dirname, '..', 'charlevel.js'))(api);
 let fails = 0; const ok = (c, m) => { console.log(`${c ? 'PASS' : 'FAIL'}  ${m}`); if (!c) fails++; };
@@ -56,5 +57,19 @@ ok(api.mp.get(2, 'private.dboAvBonus').health === 25 && api.mp.get(2, 'private.d
 ok(packets.length === 1 && packets[0].health === 15 && packets[0].magicka === undefined, 'the client is told only the +15 difference');
 globalThis.__dboCharLevelLogin(2);
 ok(api.mp.get(2, 'private.dboAvBonus').health === 25 && packets.length === 1, 'the top-up happens once');
+// Refunds (Moderation Help #0240): a reroll, or staff with /level reset, hand every spent point back
+{
+  const before = api.mp.get(1, 'private.dboLevel'); const spentPts = Object.values(before.spent).reduce((n, v) => n + v / 25, 0);
+  const back = globalThis.__dboCharLevelRefund(1, 'reroll');
+  const after = api.mp.get(1, 'private.dboLevel');
+  ok(back === spentPts && after.pending === before.pending + spentPts && JSON.stringify(api.mp.get(1, 'private.dboAvBonus')) === '{"health":0,"magicka":0,"stamina":0}', 'a reroll refunds every spent point and zeroes private.dboAvBonus');
+  ok(globalThis.__dboCharLevel(1) === 5, '...the level stays');
+  ok(globalThis.__dboCharLevelRefund(1, 'reroll') === 0, '...and a second refund has nothing to give');
+  cmds.level(1, 'magicka 1');
+  cmds.level(1, 'reset one');
+  ok(api.mp.get(1, 'private.dboAvBonus').magicka === 25, 'a player cannot use /level reset');
+  cmds.level(9, 'reset one');
+  ok(api.mp.get(1, 'private.dboAvBonus').magicka === 0 && api.mp.get(1, 'private.dboLevel').pending === after.pending, 'staff /level reset <player> refunds');
+}
 console.log(fails ? `${fails} FAILURES` : 'all passed');
 process.exit(fails ? 1 : 0);
