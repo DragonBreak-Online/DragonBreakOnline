@@ -1,5 +1,19 @@
 [
   {
+    "title": "Bank coin purses",
+    "date": "2026-10-19",
+    "version": "Server update",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Banks keep their coin",
+        "items": [
+          "Coin purses inside the banks can no longer be taken. They belong to the bank."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Gear wear paused",
     "date": "2026-10-19",
     "version": "Server update",

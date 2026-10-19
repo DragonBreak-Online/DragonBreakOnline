@@ -5161,6 +5161,9 @@ globalThis.__dboCoinPurse = (targetId, casterId) => {
   // Only a coin purse pays; a gold pile that is flora (its produce gold, or a leveled list) is refused like placed gold
   const purse = isCoinPurse(targetId) && isPurseBase(baseIdOf(targetId));
   if (!purse) return isGoldFlora(targetId) ? say('There is nothing here to take. Gold comes from work, trade and taxes.') : false;
+  // A bank's purses are the bank's (Nate, 19 Oct): every cell with a TheBank teller (coinPurses.refuseCells, the bank audit)
+  let cell = ''; try { cell = normPlace(mp.get(targetId, 'worldOrCellDesc')); } catch (e) { cell = ''; }
+  if (cell && (PURSE.refuseCells || []).map(normPlace).includes(cell)) return say('That purse belongs to the bank.');
   const until = restUntil(purseRest, targetId);
   // In a claimed dungeon a purse emptied before the claim began is full again for the new party (dungeons.js); back to
   // back claims found every purse resting from the last one (G64E, 4 Oct)

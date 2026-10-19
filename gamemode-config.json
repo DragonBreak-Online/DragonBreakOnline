@@ -1402,7 +1402,9 @@
   "_comment": "Coin purses (gamemode.js PURSE): goldMin..goldMax per purse before the Harvesting multiplier, a purse rests restMinutes for everyone (in a claimed dungeon it is full again for the next claim). Gold cut (Nate, 4 Oct; gold-cut-1004): was 8-30. Only coin purses pay (Nate, 18 Oct: 'harvest gold purses again, no looting gold piles'): gold piles, stacks and loose coins stay refused whatever this says; enabled false refuses the purses too. Hot reload.",
   "enabled": true,
   "goldMin": 3,
-  "goldMax": 12
+  "goldMax": 12,
+  "_refuseCells": "Cells whose purses never pay (Nate, 19 Oct): every bank interior with a TheBank teller (the 16 Oct bank audit, bank-vault-harness BANK_CELLS).",
+  "refuseCells": ["1a97:DragonBreak.esp", "1fb39:DragonBreak.esp", "e6114:Riften Expansion.esp", "6053:DragonBreak.esp", "b93c:DragonBreak.esp", "613a:DragonBreak.esp", "7b62:DragonBreak.esp", "7d80:DragonBreak.esp", "1b5f3f:DragonBreak Online Edits.esp", "e682:DragonBreak.esp", "26228:DragonBreak Online Edits.esp", "130040:DragonBreak Online Edits.esp"]
  },
  "factions": {
   "managerRoles": ["1560117570990907503"],
