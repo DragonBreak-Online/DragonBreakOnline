@@ -1,5 +1,28 @@
 [
   {
+    "title": "Faction rules: allegiances and faiths",
+    "date": "2026-10-19",
+    "version": "Server update",
+    "tag": "Changed",
+    "sections": [
+      {
+        "heading": "Allegiances",
+        "items": [
+          "The Orc strongholds' clans, the Imperial Civil Commission and the Penitus Oculatus are now allegiances: a member of one cannot also serve the Legion, the Stormcloaks, the Thalmor, a Great House, a court, or another of them.",
+          "Nobody loses a membership they already hold."
+        ]
+      },
+      {
+        "heading": "Faiths",
+        "items": [
+          "The Imperial Cult and the Great Faiths are now a faith, not a guild: you can belong to one of them as well as to a guild.",
+          "Only followers of the Eight Divines may join them. Choose your god at their shrine first.",
+          "The Vigil of Stendarr stays a guild, as a militant order."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Cooked Dog Meat",
     "date": "2026-10-19",
     "version": "Server update",
