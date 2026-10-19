@@ -1107,7 +1107,9 @@ registerChatCommand('grantproperty', (a, args) => {
     const key = typeof H.primaryOf === 'function' ? (Number(H.primaryOf(id)) >>> 0) : 0;
     let keyGone = false; if (key && key !== id) { try { mp.get(key, 'type'); } catch (e) { keyGone = /doesn't exist/.test(String(e && e.message)); } }
     let own = null; try { own = mp.get(id, 'private.housing'); } catch (e) { own = null; }
-    if (keyGone && !own) { mp.set(id, 'private.housing', { owner: 0, ownerName: '', name: null, locked: false, serial: 1, partner: 0, containers: [], issued: [] }); seeded = true; }
+    // ...or it holds only a pointer to that key ({ primary: <gone> }, what the place rules wrote: d97a2 -> 80d9643)
+    const pointsAtGone = keyGone && own && typeof own === 'object' && (Number(own.primary) >>> 0) === key;
+    if (keyGone && (!own || pointsAtGone)) { mp.set(id, 'private.housing', { owner: 0, ownerName: '', name: null, locked: false, serial: 1, partner: 0, containers: [], issued: [] }); seeded = true; }
   } catch (e) { log(`grantproperty: could not prepare ${id.toString(16)}: ${e.message}`); }
   let err = ''; try { err = String(H.grant(id, t) || ''); } catch (e) { err = e.message || 'failed'; }
   if (err) { log(`grantproperty: ${who(a)} -> ${who(t)} at ${id.toString(16)} refused: ${err}${seeded ? ' (after seeding its own record)' : ''}`); return personal(a, `Not granted: ${err}`); }
