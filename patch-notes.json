@@ -1,5 +1,19 @@
 [
   {
+    "title": "Repairs take materials",
+    "date": "2026-10-19",
+    "version": "Server update",
+    "tag": "Change",
+    "sections": [
+      {
+        "heading": "Every repair uses some of what the item is made from",
+        "items": [
+          "Repairing Worn gear now takes a quarter of the materials the item is made from, Damaged gear half, and Broken gear all of them, along with the gold fee. Amounts round down, but always at least one of the main material."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Faction rules: allegiances and faiths",
     "date": "2026-10-19",
     "version": "Server update",

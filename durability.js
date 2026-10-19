@@ -15,7 +15,7 @@
 // Repair: using a sharpening wheel (weapons) or an armorer's bench (armour) shows "Repair your gear" over the bench's own
 // use. The smith's Blacksmith craft tier (smithing.js) must reach the piece's family tier. Each tier repaired costs
 // feePerTier of the piece's base value (at least feeMin), and that gold is destroyed. A Broken piece also takes the
-// materials of the recipe that makes it (salvage.json).
+// materials of the recipe that makes it (salvage.json); Worn and Damaged take materialShare of them.
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -29,6 +29,7 @@ module.exports = (api) => {
     pointsPerTier: { weapon: 150, armor: 60 },
     hitPoints: 1, blockPoints: 2,
     feePerTier: 0.05, feeMin: 5,
+    materialShare: [0, 0.25, 0.5, 1],
     reachMeters: 6.5, useWindowSeconds: 20,
     wheelKeywords: ['CraftingSmithingSharpeningWheel'],
     benchKeywords: ['CraftingSmithingArmorTable'],
@@ -229,6 +230,15 @@ module.exports = (api) => {
     const hit = Object.entries(recipes).find(([k]) => { const kk = k.toLowerCase(); const j = kk.indexOf(':'); return ((parseInt(kk.slice(0, j), 16) || 0).toString(16) + kk.slice(j)) === key; });
     return hit && Array.isArray(hit[1][2]) ? hit[1][2].map(([dd, n]) => [dd, Math.max(1, Math.ceil(Number(n) || 1))]) : null;
   };
+  // A tier's share of the recipe's materials (materialShare by tier, Broken all of it), at least one of the main one
+  const matsFor = (id, tier) => {
+    const share = Number((C.materialShare || [])[tier]) || 0;
+    const rec = share > 0 ? recipeOf(id) : null;
+    if (!rec || !rec.length) return tier >= BROKEN ? rec : [];
+    const out = rec.map(([d, n]) => [d, Math.floor(n * share)]);
+    if (!out.some(([, n]) => n > 0)) { let m = 0; rec.forEach(([, n], i) => { if (n > rec[m][1]) m = i; }); out[m][1] = 1; }
+    return out.filter(([, n]) => n > 0);
+  };
   const countOf = (a, id) => (get(a, 'inventory', { entries: [] }).entries || []).filter((e) => (Number(e.baseId) >>> 0) === (id >>> 0) && !e.worn && !e.wornLeft && !e.name).reduce((n, e) => n + (Number(e.count) || 0), 0);
   const takeMaterials = (a, mats) => {
     const inv = get(a, 'inventory', { entries: [] });
@@ -262,14 +272,15 @@ module.exports = (api) => {
     const it = damagedOf(a, kind).find((x) => x.baseId === baseId && x.name === name);
     if (!it) return openList(a, target, kind, note);
     const fee = feeOf(baseId, it.tier);
-    const mats = it.tier >= BROKEN ? recipeOf(baseId) : [];
+    const mats = matsFor(baseId, it.tier);
     const need = itemTier(baseId);
     const lines = [`${it.name}: back to Intact for ${fee} gold`];
-    if (it.tier >= BROKEN) lines.push(mats && mats.length ? `and ${mats.map(([d, n]) => `${n} ${nameOfMat(d)}`).join(', ')}` : 'and its materials (none known: ask a GM)');
+    if (mats && mats.length) lines.push(`and ${mats.map(([d, n]) => `${n} ${nameOfMat(d)}`).join(', ')}`);
+    else if (it.tier >= BROKEN) lines.push('and its materials (none known: ask a GM)');
     lines.push(`Needs Blacksmith craft tier ${need}`);
     S.pending.set(a >>> 0, { target: target >>> 0, kind, item: { baseId, name } });
     openWidget(a, { type: 'contextMenu', id: WIDGET_ID, mode: 'menu', targetName: `${note ? `${note}. ` : ''}${lines.join(', ')}`,
-      actions: [{ id: 'fix', label: `Repair it (${fee} gold${it.tier >= BROKEN ? ' and the materials' : ''})` }, { id: 'list', label: 'Back to the list' }],
+      actions: [{ id: 'fix', label: `Repair it (${fee} gold${mats && mats.length ? ' and the materials' : ''})` }, { id: 'list', label: 'Back to the list' }],
       events: { action: 'dbo:repairChoose', close: 'dbo:repairClose' } }, true);
     return 1;
   };
@@ -279,10 +290,10 @@ module.exports = (api) => {
     const need = itemTier(it.baseId);
     if (smithTier(a) < need) return `Repairing this takes a Blacksmith of craft tier ${need}; yours is ${smithTier(a) || 'none'}.`;
     const fee = feeOf(it.baseId, it.tier);
-    const mats = it.tier >= BROKEN ? recipeOf(it.baseId) : [];
+    const mats = matsFor(it.baseId, it.tier);
     if (it.tier >= BROKEN && !(mats && mats.length)) return 'Nobody knows what this was made from. Ask a GM.';
     if ((Number(goldOf(a)) || 0) < fee) return `The repair costs ${fee} gold, and you do not have it.`;
-    for (const [d, n] of mats || []) if (countOf(a, idOf(d)) < n) return `A broken piece is remade from its materials: you need ${n} ${nameOfMat(d)}.`;
+    for (const [d, n] of mats || []) if (countOf(a, idOf(d)) < n) return `This repair needs ${n} ${nameOfMat(d)}.`;
     if ((mats || []).length && !takeMaterials(a, mats)) return 'The materials could not be taken. Nothing was charged.';
     if (!takeGold(a, fee)) return `The repair costs ${fee} gold, and you do not have it.`;
     if (!renameOne(a, it.baseId, it.name, 0)) { log(`durability: ${who(a)} paid for a repair that found no piece: ${descOf(it.baseId)}`); return 'The piece slipped from the bench. Ask a GM.'; }
