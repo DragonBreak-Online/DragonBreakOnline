@@ -25,6 +25,8 @@ export interface PigeonContact {
   name: string;
   tag: string;
   online: boolean;
+  // both have met and share their whereabouts (gamemode.js presenceMutual); without it nothing is known of them
+  shared?: boolean;
   price: number;
 }
 
@@ -337,7 +339,7 @@ const Pigeon = ({ data }: { data: PigeonData }) => {
                 <span className="pigeon__contact-name">{c.name} <span className="pigeon__contact-tag">#{c.tag}</span></span>
                 <span className="pigeon__contact-meta">
                   <span className={'pigeon__dot' + (c.online ? ' pigeon__dot--online' : '')} />
-                  {c.online ? 'In the land' : 'Away'} · {c.price} gold
+                  {c.online ? 'In the land' : c.shared ? 'Away' : 'Whereabouts not shared'} · {c.price} gold
                 </span>
               </button>
               ))
