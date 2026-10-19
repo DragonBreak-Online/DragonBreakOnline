@@ -87,6 +87,8 @@ void MovementRelay::Submit(MpActor& emitter, Networking::UserId senderUserId,
     auto& ls = listeners[userId];
     if (ls.fullRadius2 <= 0.f) {
       ls.fullRadius2 = kFullRateUnits * kFullRateUnits;
+      // Listeners flush on staggered slots, so one tick doesn't carry them all
+      ls.nextFlushMs = now + (static_cast<uint64_t>(userId) * 37) % kFlushEveryMs;
     }
 
     const float dist2 = (listener->GetPos() - emitterPos).SqrLength();
@@ -116,6 +118,10 @@ void MovementRelay::Submit(MpActor& emitter, Networking::UserId senderUserId,
       : kFarIntervalMs;
     p.data.assign(data, data + length);
     p.dirty = true;
+    if (!p.queued) {
+      p.queued = true;
+      ls.waiting.push_back(&p);
+    }
   }
 }
 
@@ -157,47 +163,87 @@ void MovementRelay::RetuneWindow(uint64_t now)
       ++it;
     }
   }
+  // Entries were erased above: rebuild the waiting lists so none points at a freed entry
+  for (auto& [userId, ls] : listeners) {
+    ls.waiting.clear();
+  }
+  for (auto& [key, p] : pending) {
+    p.queued = false;
+    if (!p.dirty) {
+      continue;
+    }
+    auto it = listeners.find(p.userId);
+    if (it != listeners.end()) {
+      p.queued = true;
+      it->second.waiting.push_back(&p);
+    }
+  }
 }
 
 void MovementRelay::Flush()
 {
   TickProfile::Scope profile(TickProfile::kRelayFlush);
   const uint64_t now = NowMs();
-  if (now - lastFlushMs < kFlushEveryMs) {
-    return;
-  }
-  lastFlushMs = now;
   if (now - windowStartMs >= kWindowMs) {
     windowStartMs = now;
     RetuneWindow(now);
   }
-  // Due positions per listener; when there are more than the budget allows, the ones that waited longest go first, and
-  // each one sent goes to the back of the line: round-robin, so a crowd slows everyone instead of freezing a fixed tail
-  std::unordered_map<Networking::UserId, std::vector<Pending*>> due;
-  for (auto& [key, p] : pending) {
-    if (p.dirty && now - p.lastSentMs >= p.intervalMs) {
-      due[p.userId].push_back(&p);
-    }
-  }
-  for (auto& [userId, list] : due) {
-    auto& ls = listeners[userId]; // exists: Submit created it with the entry
-    if (ls.coalescedSentThisSecond >= kCoalescedSendsPerSecond) {
+  for (auto& [userId, ls] : listeners) {
+    if (now < ls.nextFlushMs) {
       continue;
     }
-    const uint32_t left = std::min<uint32_t>(
-      kCoalescedPerFlush, kCoalescedSendsPerSecond - ls.coalescedSentThisSecond);
-    if (list.size() > left) {
-      std::nth_element(list.begin(), list.begin() + left, list.end(),
-                       [](const Pending* a, const Pending* b) {
-                         return a->lastSentMs < b->lastSentMs;
-                       });
-      list.resize(left);
+    // Keep the listener's slot; one that fell a whole period behind starts again from now
+    ls.nextFlushMs = now - ls.nextFlushMs >= kFlushEveryMs
+      ? now + kFlushEveryMs
+      : ls.nextFlushMs + kFlushEveryMs;
+    FlushListener(ls, now);
+  }
+}
+
+void MovementRelay::FlushListener(ListenerState& ls, uint64_t now)
+{
+  // Due positions for this listener; when there are more than the budget allows, the ones that waited longest go
+  // first, and each one sent goes to the back of the line: round-robin, so a crowd slows everyone instead of freezing
+  // a fixed tail. Entries not due yet, or over budget, stay waiting
+  auto& due = dueScratch;
+  due.clear();
+  size_t keep = 0;
+  for (Pending* p : ls.waiting) {
+    if (!p->dirty) {
+      p->queued = false; // sent at full rate since it was queued
+      continue;
     }
-    for (auto p : list) {
-      Send(p->userId, p->data.data(), p->data.size());
-      ++ls.coalescedSentThisSecond;
-      p->lastSentMs = now;
-      p->dirty = false;
+    if (now - p->lastSentMs >= p->intervalMs) {
+      due.push_back(p);
+    } else {
+      ls.waiting[keep++] = p;
     }
+  }
+  ls.waiting.resize(keep);
+  if (due.empty()) {
+    return;
+  }
+
+  const uint32_t left = ls.coalescedSentThisSecond >= kCoalescedSendsPerSecond
+    ? 0
+    : std::min<uint32_t>(kCoalescedPerFlush,
+                         kCoalescedSendsPerSecond - ls.coalescedSentThisSecond);
+  if (due.size() > left) {
+    std::nth_element(due.begin(), due.begin() + left, due.end(),
+                     [](const Pending* a, const Pending* b) {
+                       return a->lastSentMs < b->lastSentMs;
+                     });
+  }
+  const size_t sendCount = std::min<size_t>(due.size(), left);
+  for (size_t i = 0; i < sendCount; ++i) {
+    Pending* p = due[i];
+    Send(p->userId, p->data.data(), p->data.size());
+    ++ls.coalescedSentThisSecond;
+    p->lastSentMs = now;
+    p->dirty = false;
+    p->queued = false;
+  }
+  for (size_t i = sendCount; i < due.size(); ++i) {
+    ls.waiting.push_back(due[i]);
   }
 }
