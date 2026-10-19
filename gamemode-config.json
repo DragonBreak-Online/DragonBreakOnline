@@ -559,8 +559,9 @@
  "labour": {
   "_comment": "Mining and woodcutting mini-game: seconds per round, strike band half-width in percent of the bar by tier, seconds the marker takes to cross the bar by tier, how many strikes a vein needs, ore per vein before the tier multiplier, firewood per block by tier, and the rest each node takes afterwards.",
   "enabled": true,
-  "perPlayerNodes": false,
-  "_perPlayerNodes": "Shared node rests again from 13 Oct, when Skyrim opens (Nate, 7 Oct: per-player rests only while the alpha is just Bruma; labour.js perPlayer). ROLLBACK: true, hot reload.",
+  "perPlayerNodes": true,
+  "perPlayerOres": ["wood"],
+  "_perPlayerNodes": "Chopping blocks rest per player (Nate, 19 Oct: \"not everyone having to wait\"); ore veins keep the shared rest since Skyrim opened (13 Oct). ROLLBACK: perPlayerNodes false, hot reload.",
   "seconds": 30,
   "bandByTier": [
    7,
