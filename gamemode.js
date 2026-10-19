@@ -1355,7 +1355,11 @@ const saveLetters = (a, list) => {
   const kept = spare > 0 ? sorted.reverse().filter((m) => !(spare > 0 && m.read && !m.parcel && spare--)).reverse() : sorted;
   mp.set(a, 'private.pigeons', kept);
 };
-const pigeonsWaiting = (a) => lettersOf(a).filter((m) => !m.read || m.parcel).length;
+// A parcel its reader can never keep (a vampire's own silver, supernatural.js): it can be burned with its letter and does not
+// hold the waiting-mail marker; collecting it only mailed it back again (karta.gina, 19 Oct)
+const parcelUnbearable = (a, m) => { const p = m && m.parcel; const f = globalThis.__dboCannotCarry; return !!(p && typeof f === 'function' && !(Number(p.gold) > 0) && Array.isArray(p.items) && p.items.length && p.items.every((e) => f(a, Number(e.baseId) >>> 0))); };
+globalThis.__dboParcelUnbearable = parcelUnbearable;
+const pigeonsWaiting = (a) => lettersOf(a).filter((m) => !m.read || (m.parcel && !parcelUnbearable(a, m))).length;
 // Board positions for the client's floating letter marker (notice-board-spots.json, the same list bountyBoardSystem reads)
 const BOARD_REFS = (() => {
   try {
@@ -4185,10 +4189,12 @@ const updateLetter = (a, args, change) => {
   if (String(args[0]) !== pigeonNonces.get(a)) return;
   const id = String(args[1] || ''); const box = lettersOf(a); const i = box.findIndex((m) => m.id === id);
   if (i < 0) return;
-  if (change === 'delete' && box[i].parcel) return openPigeonCoop(a, 'Collect the parcel before you burn the letter.', 'refused', 'letters');
+  const burnsParcel = change === 'delete' && parcelUnbearable(a, box[i]);
+  if (change === 'delete' && box[i].parcel && !burnsParcel) return openPigeonCoop(a, 'Collect the parcel before you burn the letter.', 'refused', 'letters');
+  if (burnsParcel) audit(`POST ${who(a)} burned a letter with a parcel they cannot carry: ${JSON.stringify(box[i].parcel.items.map((e) => [Number(e.baseId).toString(16), e.count]))}`);
   if (change === 'delete') box.splice(i, 1); else if (box[i].read) return; else box[i].read = true;
   saveLetters(a, box); sendMailState(a);
-  openPigeonCoop(a, change === 'delete' ? 'The letter goes into the fire.' : undefined, change === 'delete' ? 'sent' : undefined, 'letters');
+  openPigeonCoop(a, burnsParcel ? 'The letter and the silver go into the fire.' : change === 'delete' ? 'The letter goes into the fire.' : undefined, change === 'delete' ? 'sent' : undefined, 'letters');
 };
 onUi('pigeonRead', (a, args) => updateLetter(a, args, 'read'));
 onUi('pigeonDelete', (a, args) => updateLetter(a, args, 'delete'));

@@ -158,6 +158,8 @@ module.exports = (api) => {
     const box = lettersOf(a);
     const m = box.find((x) => x.id === String(letterId));
     if (!m || !m.parcel) return { ok: false, text: 'That letter carries nothing.' };
+    // Silver a vampire or werewolf cannot keep would only be mailed back again: burn the letter instead (gamemode.js)
+    try { if (typeof globalThis.__dboParcelUnbearable === 'function' && globalThis.__dboParcelUnbearable(a, m)) return { ok: false, text: 'The silver would only burn you again. Burn the letter to be rid of it.' }; } catch (e) { /* collect as usual */ }
     const parcel = m.parcel;
     delete m.parcel;
     m.collected = true;

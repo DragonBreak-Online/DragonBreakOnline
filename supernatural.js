@@ -717,6 +717,8 @@ module.exports = (api) => {
     silverCache.set(id, v); return v;
   };
   const silverWarned = new Map();
+  // Whether a can never keep this item (a vampire's or werewolf's silver): the post lets them burn such a parcel unopened
+  globalThis.__dboCannotCarry = (a, baseId) => { const s = stateOf(Number(a) >>> 0); return !!(s && s.kind) && C.silverCarry !== false && isSilverItem(baseId); };
   // Silver they carry goes to their own mailbox: what the post can send, never a worn piece (the pass above takes it off first)
   const carrySilver = (a, s) => {
     const P = globalThis.__dboPostApi;

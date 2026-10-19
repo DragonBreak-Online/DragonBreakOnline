@@ -112,5 +112,8 @@ store.set(`${WOLF}|inventory`, { entries: [{ baseId: RING, count: 1, worn: true 
 papyrusCalls.length = 0; timers.superSilver();
 ok(papyrusCalls.some((c) => /UnequipItem/.test(JSON.stringify(c))), 'a worn real silver ring is still taken off', papyrusCalls);
 
+// The loop (karta.gina, 19 Oct): a parcel of silver its vampire can never keep is burned unopened; a human keeps theirs
+ok(globalThis.__dboCannotCarry(VAMP, INGOT) && globalThis.__dboCannotCarry(WOLF, RING) && !globalThis.__dboCannotCarry(HUMAN, INGOT) && !globalThis.__dboCannotCarry(VAMP, IRON),
+  'the post asks whether a reader can never keep an item: silver for a vampire or werewolf only');
 console.log(fail ? `${fail} FAILED` : 'all passed');
 process.exit(fail ? 1 : 0);
