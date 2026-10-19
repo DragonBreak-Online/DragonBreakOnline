@@ -1,5 +1,20 @@
 [
   {
+    "title": "Arrests stay in their own hold",
+    "date": "2026-10-19",
+    "version": "Server update",
+    "tag": "Change",
+    "sections": [
+      {
+        "heading": "Cuffs per hold",
+        "items": [
+          "A hold's guards and officials can restrain, carry and jail only inside their own hold. Outside it they have no arrest powers.",
+          "The Imperial Legion's officers and sergeants arrest anywhere, and the Thalmor within the Empire, as before. Other factions no longer arrest on their own authority."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Offices belong to one character",
     "date": "2026-10-19",
     "version": "Server update",

@@ -36,7 +36,10 @@ const api = {
   findByName: () => 0, findAnyByName: () => 0, who: (a) => names[a], cfg: CFG, profileOf: (a) => a,
   ranksOf: (pid) => zoneRanks[pid] || [], giveItem: () => {}, makeProp: () => {}, runCommand: () => {},
   every: (name, ms, fn) => { timers[name] = { ms, fn }; },
+  // where each stands (Nate 19 Oct: cuffs are per hold): everyone in Whiterun but the Bruma captain, unless moved
+  zoneOfActor: (a) => standAt[a] || 'whiterun',
 };
+const standAt = {};
 fs.writeFileSync(path.join(dir, 'guilds.json'), '{}');
 require(GUILDS)(api);
 let menuOk = true;
@@ -68,19 +71,28 @@ ok('the lawful refresh runs every 15 s', timers.lawful && timers.lawful.ms === 1
 tick();
 ok('a Legion officer (Legate) is lawful', lawful(OFFICER));
 ok('a Legion soldier (Legionnaire, member) is not', !lawful(SOLDIER));
-ok('a Stormcloak leader is lawful', lawful(STORMLEAD));
+ok('a Stormcloak leader is not (19 Oct: only the Legion and the Thalmor arrest outside a hold\'s own officials)', !lawful(STORMLEAD));
 ok('a hold Guard is lawful', lawful(GUARD));
-ok('a Guard Captain of Bruma is lawful', lawful(CAPTAIN));
+ok('a Guard Captain of Bruma in Whiterun is not lawful there', !lawful(CAPTAIN));
 ok('a hold Citizen is not', !lawful(CITIZEN));
 ok('a Court Mage (zone rank) is still not', !lawful(MAGE));
 ok('a zone-official guard is still lawful', lawful(JARLGUARD));
-ok('a Magistrate of the Civil Commission (officer) is lawful', lawful(MAGI));
+ok('a Magistrate of the Civil Commission (officer) is not (19 Oct)', !lawful(MAGI));
 ok('a Commission Clerk (member) is not', !lawful(CLERK));
-ok('a Penitus Oculatus Agent (sergeant) is lawful', lawful(AGENT));
+ok('a Penitus Oculatus Agent (sergeant) is not (19 Oct)', !lawful(AGENT));
 ok('a Penitus Oculatus Recruit (member) is not', !lawful(RECRUIT));
 ok('instant restraint: a Legion officer cuffs at once', globalThis.__dboInstantRestraint(OFFICER, TARGET) === true);
 ok('instant restraint: a Legion soldier does not', globalThis.__dboInstantRestraint(SOLDIER, TARGET) === false);
 ok('instant restraint: a hold Guard cuffs at once', globalThis.__dboInstantRestraint(GUARD, TARGET) === true);
+// Cuffs per hold (Nate, 19 Oct): a hold's guards and officials only in their own hold; the Legion anywhere
+standAt[CAPTAIN] = 'bruma'; standAt[GUARD] = 'riften'; standAt[JARLGUARD] = 'riften'; standAt[OFFICER] = 'riften';
+tick();
+ok('the Guard Captain of Bruma is lawful in Bruma', lawful(CAPTAIN));
+ok('a Whiterun Guard in Riften is not', !lawful(GUARD));
+ok('a Whiterun official guard in Riften is not', !lawful(JARLGUARD));
+ok('a Legion officer in Riften still is', lawful(OFFICER));
+standAt[GUARD] = 'whiterun'; standAt[JARLGUARD] = 'whiterun'; standAt[OFFICER] = 'whiterun'; standAt[CAPTAIN] = 'whiterun';
+tick();
 
 // A rank change, no relog: the next refresh sees it
 let r = globalThis.__dboGuildSetRank(CAPTAIN + 0x10, 'imperial-legion', SOLDIER, rankOf('imperial-legion', 'Centurion'));

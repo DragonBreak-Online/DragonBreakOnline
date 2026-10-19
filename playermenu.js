@@ -42,6 +42,8 @@ module.exports = (api) => {
     giveItem, makeProp, runCommand, cfg, every } = api;
   // A GM observes; the powers below are for a Lead GM and above (claude-jake's review A3). Fails closed with an old gamemode.
   const isLeadStaff = typeof api.isLeadStaff === 'function' ? api.isLeadStaff : () => false;
+  // Which zone (hold) a character stands in: a hold's officials and guards arrest only there (Nate, 19 Oct)
+  const zoneOfActor = typeof api.zoneOfActor === 'function' ? api.zoneOfActor : null;
   // Staff rights by name (gamemode.js staffCan: every admin tier, and a Trial GM for the rights on its allowlist). An old
   // gamemode without it lets admins only, never wider
   const staffCan = typeof api.staffCan === 'function' ? api.staffCan : (a) => isAdmin(a);
@@ -91,8 +93,10 @@ module.exports = (api) => {
   const UNLAWFUL_RANKS = new Set(['courtmage', 'shaman', 'wisewoman']);
   // Faction ranks that arrest too (Nate, 6 Oct; guilds.js __dboGuildsOf, the rank's own title and role): an allegiance's
   // leaders, officers and sergeants, and a hold's guards by title. A plain member or a Citizen is not lawful.
-  const LAWFUL_FACTIONS = new Set(C.lawfulFactions || ['imperial-legion', 'imperial-civil-commission', 'penitus-oculatus', 'stormcloaks', 'thalmor', 'blades',
-    'house-hlaalu', 'house-redoran', 'house-telvanni', 'house-indoril', 'house-dres', 'house-sadras']);
+  // Cuffs are per hold (Nate, 19 Oct: "Cuffs should be per hold. Legion and dominion are the exception"): a hold's officials
+  // and guards arrest only in their own hold; only the Legion and the Thalmor (lawfulFactionRegions still keeps the Thalmor
+  // to the Empire) arrest wherever they stand. config playerMenu.lawfulFactions restores a longer list.
+  const LAWFUL_FACTIONS = new Set(C.lawfulFactions || ['imperial-legion', 'thalmor']);
   const LAWFUL_ROLES = new Set(C.lawfulRoles || ['leader', 'officer', 'sergeant']);
   const GUARD_FACTIONS = new Set(C.guardFactions || ['hold-whiterun', 'hold-riften', 'hold-solitude', 'hold-windhelm', 'hold-markarth',
     'hold-falkreath', 'hold-morthal', 'hold-dawnstar', 'hold-winterhold', 'county-bruma']);
@@ -104,12 +108,22 @@ module.exports = (api) => {
   const FACTION_REGIONS = C.lawfulFactionRegions && typeof C.lawfulFactionRegions === 'object' ? C.lawfulFactionRegions : { thalmor: ['cyrodiil'] };
   const provinceHere = (a) => { const R = globalThis.__dboRegions; try { return R && typeof R.provinceAt === 'function' ? String((R.provinceAt(a) || {}).province || '') : ''; } catch (e) { return ''; } };
   const inFactionLand = (fid, a) => { const list = FACTION_REGIONS[fid]; return !Array.isArray(list) || list.includes(provinceHere(a)); };
-  const lawfulByFaction = (a) => {
+  // The hold (zone) a character stands in, '' when unknown: a hold's officials and guards arrest only there
+  const zoneHere = (a) => { try { const z = typeof zoneOfActor === 'function' ? zoneOfActor(a) : null; return z ? String(z) : ''; } catch (e) { return ''; } };
+  // A hold guard faction's own zone: hold-whiterun -> whiterun, county-bruma -> bruma
+  const guardZone = (fid) => String(fid).replace(/^(hold|county|stronghold)-/, '');
+  const lawfulByFaction = (a, here = zoneHere(a)) => {
     if (typeof globalThis.__dboGuildsOf !== 'function') return false;
     return (globalThis.__dboGuildsOf(a) || []).some((g) => (LAWFUL_FACTIONS.has(g.id) && LAWFUL_ROLES.has(g.role) && inFactionLand(g.id, a))
-      || (GUARD_FACTIONS.has(g.id) && GUARD_TITLES.has(String(g.title || '').toLowerCase())));
+      || (GUARD_FACTIONS.has(g.id) && GUARD_TITLES.has(String(g.title || '').toLowerCase()) && !!here && guardZone(g.id) === here));
   };
-  const isLawful = (a) => { try { return isLeadStaff(a) || ranksOf(profileOf(a), a).some((m) => !UNLAWFUL_RANKS.has(m.rank)) || lawfulByFaction(a); } catch (e) { return false; } };
+  const isLawful = (a) => {
+    try {
+      if (isLeadStaff(a)) return true;
+      const here = zoneHere(a);
+      return (!!here && ranksOf(profileOf(a), a).some((m) => !UNLAWFUL_RANKS.has(m.rank) && m.zone && String(m.zone.id || m.zone) === here)) || lawfulByFaction(a, here);
+    } catch (e) { return false; }
+  };
   // A player in a beast form is the beast to everyone (beastform.js __dboBeastName)
   const beastName = (a) => { try { return typeof globalThis.__dboBeastName === 'function' ? String(globalThis.__dboBeastName(a) || '') : ''; } catch (e) { return ''; } };
   // A staff member with real names on sees the own name, and "Aldric (masked)" behind a disguise (staffLabel below); the

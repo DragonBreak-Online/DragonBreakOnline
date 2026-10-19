@@ -51,8 +51,8 @@ const api = {
   cfg: CONFIG, onlineActors: () => online, every: (n, ms, fn) => { timers[n] = fn; }, sendPacket: (a, p) => packets.push([a, p]),
   distanceMeters, onUi: (n, fn) => ui.set(n, fn), registerChatCommand: (n, fn) => commands.set(n, fn),
   openWidget: (a, w) => { widgets.push([a, w]); return true; }, closeWidget: () => {}, isAdmin: () => false, isLeadStaff: () => false,
-  tagOf: () => 'AB12', profileOf: (a) => a, ranksOf: (p) => (p === GUARD ? [{ rank: 'guard' }] : []),
-  giveItem: () => true, makeProp: () => {}, runCommand: () => {}, zones: {}, zoneOfActor: () => null,
+  tagOf: () => 'AB12', profileOf: (a) => a, ranksOf: (p) => (p === GUARD ? [{ zone: 'whiterun', rank: 'guard' }] : []),
+  giveItem: () => true, makeProp: () => {}, runCommand: () => {}, zones: {}, zoneOfActor: () => 'whiterun',
 };
 const load = (file, cfg) => { const f = path.join(ROOT, file); delete require.cache[f]; require(f)(Object.assign({}, api, cfg ? { cfg } : {})); };
 load('rope.js'); load('struggle.js'); load('playermenu.js');

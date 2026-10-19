@@ -73,7 +73,7 @@ const findByName = (n) => Number(Object.keys(names).find((k) => names[k].toLower
     mp: { get: (id, p) => props.get(`${id}|${p}`), set: (id, p, v) => props.set(`${id}|${p}`, v), getIdFromDesc: () => 0, getDescFromId: (id) => id.toString(16), callPapyrusFunction: noop, lookupEspmRecordById: () => null },
     log: noop, personal: noop, system: noop, registerChatCommand: noop, onUi: noop, sendPacket: noop, display: (a) => names[a], nameOf: (a) => names[a], tagOf: () => 'TAG',
     profileOf: (a) => a, onlineActors: () => [PLAYER, GM, LEAD, GUARD], isAdmin, isLeadStaff, ranksOf: (pid) => RANKS[pid] || [],
-    giveItem: () => true, makeProp: noop, runCommand: noop, zones: [], zoneOfActor: () => null, cfg: {}, every: noop,
+    giveItem: () => true, makeProp: noop, runCommand: noop, zones: [], zoneOfActor: () => 'bruma', cfg: {}, every: noop,
   });
   const lawful = (a) => props.get(`${a}|private.dboLawful`) === true;
   ok(!lawful(GM), 'a GM holding no rank is not lawful (no guard at a cell door, no freeing the bound)');
