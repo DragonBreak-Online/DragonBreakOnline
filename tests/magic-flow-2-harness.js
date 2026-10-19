@@ -436,6 +436,14 @@ check('/schools shows resting schools, the picks and the last change', /Illusion
   check('...its first spell already chosen: the confirm does not promise one', !!contextOf(LEDGER) && contextOf(LEDGER).targetName === 'Do you want to choose Destruction as your secondary school of magic? It starts at 44; the remaining schools close to you.', contextOf(LEDGER) && contextOf(LEDGER).targetName);
   if (contextOf(LEDGER)) menuChoose(LEDGER, 'takeup:Destruction');
   check('...Destruction the secondary at 44; the menu says so', rec(LEDGER).secondary === 'Destruction' && level(LEDGER, 'Destruction') === 44 && !!contextOf(LEDGER) && contextOf(LEDGER).targetName === said(LEDGER) && /Destruction is your secondary school of magic\. The remaining schools are closed to you\./.test(said(LEDGER)), [rec(LEDGER), said(LEDGER)]);
+  // The primary and the secondary trade places (#bugs 19 Oct): levels as they are, the change's wait starts
+  if (contextOf(LEDGER)) menuChoose(LEDGER, 'swap');
+  check('the change list offers the trade first', !!contextOf(LEDGER) && contextOf(LEDGER).actions[0].label === 'Make Destruction your primary and Illusion your secondary', contextOf(LEDGER) && contextOf(LEDGER).actions.map((x) => x.label));
+  if (contextOf(LEDGER)) menuChoose(LEDGER, 'trade');
+  check('...traded: Destruction the primary at 44, Illusion the secondary at 60, the wait begun', rec(LEDGER).primary === 'Destruction' && rec(LEDGER).secondary === 'Illusion' && level(LEDGER, 'Destruction') === 44 && level(LEDGER, 'Illusion') === 60 && rec(LEDGER).swapAt > 0, rec(LEDGER));
+  if (contextOf(LEDGER)) menuChoose(LEDGER, 'swap');
+  check('...and a second change waits', !!contextOf(LEDGER) && /not long ago/.test(contextOf(LEDGER).targetName), contextOf(LEDGER) && contextOf(LEDGER).targetName);
+  if (contextOf(LEDGER)) menuChoose(LEDGER, 'leave');
   // A shelf whose books are still open: the menu comes first, with Study
   const OPENBOOK = 0x36; put(OPENBOOK, 'profileId', OPENBOOK); at(OPENBOOK, SYNOD, [0, 0, 0]); online.push(OPENBOOK); ui('uiCaps', OPENBOOK, ['bank', 'spellbook', 'schools']); arcane(OPENBOOK, 76);
   put(OPENBOOK, 'private.dboSchools', { v: 1, primary: 'Alteration', secondary: null, grandfathered: [], levels: { Alteration: { level: 20, xp: 0 } }, study: { log: [] }, priestStudy: { log: [] }, cast: { day: '', units: {} }, ring: [], classAt: 0, paidAt: 0, teacher: null, picks: {}, firstOffered: 1, secondaryTold: 1 });
