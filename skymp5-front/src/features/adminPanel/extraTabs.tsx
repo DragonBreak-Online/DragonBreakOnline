@@ -237,10 +237,26 @@ export const PlayerCare = ({ events, who, selfId, name, masteryTarget, canSpawn 
   return (
     <div className="admin-panel__care">
       <div className="admin-panel__power">
-        <span className="admin-panel__label">Disease <span className="admin-panel__hint">for {name || 'you'}: the fever runs its days, then the rite decides</span></span>
+        <span className="admin-panel__label">Disease <span className="admin-panel__hint">for {name || 'you'}: the fever runs its days, then they turn</span></span>
         <div className="admin-panel__actions">
           <Confirm text="Sanguinare Vampiris" width={240} onConfirm={() => adminAction(events, 'giveDisease', fields({ kind: 'vampire' }))} />
           <Confirm text="Sanies Lupinus" width={200} onConfirm={() => adminAction(events, 'giveDisease', fields({ kind: 'werewolf' }))} />
+        </div>
+      </div>
+      <div className="admin-panel__power">
+        <span className="admin-panel__label">Curse <span className="admin-panel__hint">for {name || 'you'}: the whole curse at once, no fever; Cure makes them mortal</span></span>
+        <div className="admin-panel__actions">
+          <Confirm text="Vampire" width={130} onConfirm={() => adminAction(events, 'giveCurse', fields({ kind: 'vampire' }))} />
+          <Confirm text="Pure-blood" width={140} onConfirm={() => adminAction(events, 'giveCurse', fields({ kind: 'purevampire' }))} />
+          <Confirm text="Werewolf" width={140} onConfirm={() => adminAction(events, 'giveCurse', fields({ kind: 'werewolf' }))} />
+          <Confirm text="Blessed werewolf" width={200} onConfirm={() => adminAction(events, 'giveCurse', fields({ kind: 'blessedwerewolf' }))} />
+          <Confirm text="Cure" width={100} onConfirm={() => adminAction(events, 'giveCurse', fields({ kind: 'cure' }))} />
+        </div>
+      </div>
+      <div className="admin-panel__power">
+        <span className="admin-panel__label">Vampire stage <span className="admin-panel__hint">their thirst, 1 (fed) to 4 (starving); only on a vampire</span></span>
+        <div className="admin-panel__actions">
+          {[1, 2, 3, 4].map((n) => <Confirm key={n} text={`Stage ${n}`} width={110} onConfirm={() => adminAction(events, 'giveCurse', fields({ kind: 'stage', stage: n }))} />)}
         </div>
       </div>
       <div className="admin-panel__power">
