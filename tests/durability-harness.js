@@ -165,52 +165,64 @@ globalThis.__dboDurabilityEquip(P, mp.get(P, 'equipment'));
   ok(!!kept, 'a piece with kept wear and no tier in its name is still listed by its tier', lastWidget().actions);
   ui('repairChoose', P, [kept.id]); ui('repairChoose', P, ['fix']);
   ok(count(P, SWORD, '') === 1 && count(P, GOLD) < 100 && !Object.keys(mp.get(P, 'private.dboWear') || {}).includes(`${SWORD}|`), '...repaired, its kept wear is gone', [inv(P), mp.get(P, 'private.dboWear')]);
-  // ---- field kits and the smith's price (19 Oct) ------------------------------------------------------------------
+  // ---- field tools (Nate, 19 Oct: a share, never whole; Oblivion's hammers for the model) and the smith's price -------
   {
     const KIT = 0x777, given = [];
     api.giveItem = (a, id, n) => { given.push([id, n]); return true; };
     api.cfg = JSON.parse(JSON.stringify(api.cfg));
     api.cfg.durability = Object.assign({}, api.cfg.durability, { fieldKits: { '777:Skyrim.esm': { kind: 'weapon', maxTier: 1 } } });
-    delete require.cache[path.join(SERVER, 'durability.js')];
-    require(path.join(SERVER, 'durability.js'))(api);
+    const reload = () => { delete require.cache[path.join(SERVER, 'durability.js')]; require(path.join(SERVER, 'durability.js'))(api); };
+    reload();
+    const realRandom = Math.random;
+    const use = (id, roll) => { given.length = 0; Math.random = () => roll; const r = globalThis.__dboDurabilityKit(P, id); Math.random = realRandom; return r; };
+    const wear = () => mp.get(P, 'private.dboWear') || {};
+    smithTier = 0;
     put(P, 'private.dboWear', {});
-    dress([{ baseId: SWORD, count: 1, worn: true, name: 'Iron Sword (Worn)' }, { baseId: CUIRASS, count: 1, worn: true }, { baseId: GOLD, count: 100 }]);
+    // A sword in hand worn 150 + 100 = 250 points: Worn (150 a tier), 100 into the tier
+    dress([{ baseId: SWORD, count: 1, worn: true }, { baseId: GOLD, count: 100 }]);
     globalThis.__dboDurabilityEquip(P, mp.get(P, 'equipment'));
-    ok(globalThis.__dboDurabilityMult(P, SWORD, false, 'Iron Sword (Worn)') === 0.9, 'kit: a worn sword named Worn counts as Worn');
-    ok(globalThis.__dboDurabilityKit(P, KIT) === true && globalThis.__dboDurabilityMult(P, SWORD, false, 'Iron Sword (Worn)') === 1 && /mend your Iron Sword/.test(lastSaid()), 'a whetstone mends the Worn sword in hand to whole', lastSaid());
-    dress([{ baseId: SWORD, count: 1, name: 'Iron Sword (Worn)' }, { baseId: GOLD, count: 100 }]);
+    for (let i = 0; i < 250; i++) globalThis.__dboDurabilityHit(P, NPC, SWORD, {});
+    ok(globalThis.__dboDurabilityMult(P, SWORD, false, '') === 0.9, 'tools: the sword in hand is Worn, 100 points into the tier');
+    ok(use(KIT, 0.99) === true && wear()[`${SWORD}|`] === 220 && /20% of its wear mended/.test(lastSaid()) && given.some(([id]) => id === KIT), 'a whetstone with no smithing: 20% of a tier (30 points) mended, and the tool kept (roll over the 30% break chance)', [wear(), lastSaid()]);
+    ok(use(KIT, 0.1) === true && wear()[`${SWORD}|`] === 190 && /The tool breaks/.test(lastSaid()) && !given.some(([id]) => id === KIT), 'a roll under 30%: it mends, then breaks', [wear(), lastSaid()]);
+    smithTier = 7;
+    ok(use(KIT, 0) === true && given.some(([id]) => id === KIT) && wear()[`${SWORD}|`] === 150, 'a Master (craft tier 7): 55% of a tier, stopped at the start of Worn, and the tool never breaks', [wear(), lastSaid()]);
+    ok(globalThis.__dboDurabilityMult(P, SWORD, false, '') === 0.9 && /as far as a tool can take it/.test(lastSaid()), '...still Worn: only a smith brings it back to whole');
+    ok(use(KIT, 0) === true && given.some(([id]) => id === KIT) && /as good as a tool can make it/.test(lastSaid()), 'nothing left a tool can mend: the tool is handed back');
+    // Wear inside the tier survives taking the piece off (it was cleared before)
+    smithTier = 0;
+    for (let i = 0; i < 40; i++) globalThis.__dboDurabilityHit(P, NPC, SWORD, {});
+    dress([{ baseId: SWORD, count: 1 }, { baseId: GOLD, count: 100 }]);
     globalThis.__dboDurabilityEquip(P, mp.get(P, 'equipment'));
     await wait(500);
-    ok(count(P, SWORD, '') === 1 && count(P, SWORD, 'Iron Sword (Worn)') === 0, '...and taken off it is plain "Iron Sword" again', inv(P));
+    ok(count(P, SWORD, 'Iron Sword (Worn)') === 1 && wear()[`${SWORD}|Iron Sword (Worn)`] === 40, 'taken off: "Iron Sword (Worn)", its 40 points inside the tier kept under the new name', wear());
+    ok(use(KIT, 0.99) === true && wear()[`${SWORD}|Iron Sword (Worn)`] === 10, 'a whetstone works on it in the pack too', wear());
+    ok(globalThis.__dboDurabilityKit(P, 0x778) === false, 'anything else eaten is not a tool');
     dress([{ baseId: SWORD, count: 1, name: 'Iron Sword (Damaged)' }, { baseId: GOLD, count: 100 }]);
-    ok(globalThis.__dboDurabilityKit(P, KIT) === true && count(P, SWORD, 'Iron Sword (Damaged)') === 1 && given.some(([id]) => id === KIT) && /cannot mend worse/.test(lastSaid()), 'a Damaged sword is beyond a kit: the kit is handed back', lastSaid());
-    ok(globalThis.__dboDurabilityKit(P, 0x778) === false, 'anything else eaten is not a kit');
-    // a hammer of a lower grade than the piece (smithing tier 2 here) mends nothing and is handed back
-    api.cfg.durability.fieldKits = { '777:Skyrim.esm': { kind: 'any', maxTier: 1, gearTier: 1 }, '779:Skyrim.esm': { kind: 'any', maxTier: 1, gearTier: 2 } };
-    delete require.cache[path.join(SERVER, 'durability.js')];
-    require(path.join(SERVER, 'durability.js'))(api);
-    given.length = 0;
-    dress([{ baseId: SWORD, count: 1, name: 'Iron Sword (Worn)' }, { baseId: GOLD, count: 100 }]);
-    ok(globalThis.__dboDurabilityKit(P, KIT) === true && count(P, SWORD, 'Iron Sword (Worn)') === 1 && given.some(([id]) => id === KIT) && /grade/.test(lastSaid()), 'a T1 hammer on a tier 2 piece: refused and handed back', lastSaid());
-    ok(globalThis.__dboDurabilityKit(P, 0x779) === true && count(P, SWORD, '') === 1, 'a T2 hammer mends it');
-    // a smith at the piece's own tier: 10% off
+    put(P, 'private.dboWear', { [`${SWORD}|Iron Sword (Damaged)`]: 50 });
+    await wait(60);
+    ok(use(KIT, 0) === true && given.some(([id]) => id === KIT) && /needs a smith/.test(lastSaid()), 'a Damaged sword is beyond a tool: handed back', lastSaid());
+    // Grades and kinds
+    api.cfg.durability.fieldKits = { '781:Skyrim.esm': { kind: 'light', maxTier: 1 }, '782:Skyrim.esm': { kind: 'heavy', maxTier: 1 }, '783:Skyrim.esm': { kind: 'any', maxTier: 1, gearTier: 1 } };
+    reload();
+    RECORDS[0x9001] = { type: 'ARMO', editorId: 'ArmorLeatherCuirass', fields: [(() => { const b = new Uint8Array(8); new DataView(b.buffer).setUint32(0, 0x4, true); new DataView(b.buffer).setUint32(4, 0, true); return { type: 'BOD2', data: b }; })()] };
+    RECORDS[0x9002] = { type: 'ARMO', editorId: 'ArmorSteelCuirass', fields: [(() => { const b = new Uint8Array(8); new DataView(b.buffer).setUint32(0, 0x4, true); new DataView(b.buffer).setUint32(4, 1, true); return { type: 'BOD2', data: b }; })()] };
+    dress([{ baseId: 0x9002, count: 1, name: 'Steel Armor (Worn)' }, { baseId: SWORD, count: 1, name: 'Iron Sword (Worn)' }, { baseId: GOLD, count: 100 }]);
+    put(P, 'private.dboWear', { [`${0x9002}|Steel Armor (Worn)`]: 30, [`${SWORD}|Iron Sword (Worn)`]: 30 });
+    await wait(60); // the module reads the wear afresh after 50 ms
+    ok(use(0x781, 0.99) === true && wear()[`${0x9002}|Steel Armor (Worn)`] === 30 && /needs this tool/.test(lastSaid()), 'a sewing kit will not touch heavy armour or a sword', [wear(), lastSaid()]);
+    ok(use(0x782, 0.99) === true && wear()[`${0x9002}|Steel Armor (Worn)`] === 18 && wear()[`${SWORD}|Iron Sword (Worn)`] === 30, 'a hammer mends the heavy armour (20% of 60) and leaves the sword', wear());
+    ok(use(0x783, 0.99) === true && wear()[`${SWORD}|Iron Sword (Worn)`] === 30, 'a grade-1 tool will not touch a tier 2 piece', wear());
+    dress([{ baseId: 0x9001, count: 1, name: 'Leather Armor (Worn)' }, { baseId: GOLD, count: 100 }]);
+    put(P, 'private.dboWear', { [`${0x9001}|Leather Armor (Worn)`]: 30 });
+    await wait(60);
+    ok(use(0x781, 0.99) === true && wear()[`${0x9001}|Leather Armor (Worn)`] === 18, 'a sewing kit mends light armour', wear());
+    // the smith's price at the piece's own tier: the original fee
     smithTier = 2;
     dress([{ baseId: SWORD, count: 1, name: 'Iron Sword (Worn)' }, { baseId: INGOT, count: 1 }, { baseId: GOLD, count: 100 }]);
     globalThis.__dboRepairActivate(WHEEL, P);
     ui('repairChoose', P, [lastWidget().actions.find((x) => x.label === 'Iron Sword (Worn)').id]);
     ok(/for 5 gold/.test(lastWidget().targetName) && /craft tier 2/.test(lastWidget().targetName), 'a smith at the piece\'s tier: 1 tier at the 5 gold minimum', lastWidget().targetName);
-    // the kits by kind: a sewing kit mends light armour and clothing, a hammer heavy armour, neither a weapon
-    RECORDS[0x9001] = { type: 'ARMO', editorId: 'ArmorLeatherCuirass', fields: [(() => { const b = new Uint8Array(8); new DataView(b.buffer).setUint32(0, 0x4, true); new DataView(b.buffer).setUint32(4, 0, true); return { type: 'BOD2', data: b }; })()] };
-    RECORDS[0x9002] = { type: 'ARMO', editorId: 'ArmorSteelCuirass', fields: [(() => { const b = new Uint8Array(8); new DataView(b.buffer).setUint32(0, 0x4, true); new DataView(b.buffer).setUint32(4, 1, true); return { type: 'BOD2', data: b }; })()] };
-    api.cfg.durability.fieldKits = { '781:Skyrim.esm': { kind: 'light', maxTier: 1 }, '782:Skyrim.esm': { kind: 'heavy', maxTier: 1 } };
-    delete require.cache[path.join(SERVER, 'durability.js')];
-    require(path.join(SERVER, 'durability.js'))(api);
-    given.length = 0;
-    dress([{ baseId: 0x9002, count: 1, name: 'Steel Armor (Worn)' }, { baseId: SWORD, count: 1, name: 'Iron Sword (Worn)' }, { baseId: GOLD, count: 100 }]);
-    ok(globalThis.__dboDurabilityKit(P, 0x781) === true && given.some(([id]) => id === 0x781) && /light armour or clothing/.test(lastSaid()), 'a sewing kit will not touch heavy armour or a sword: handed back', lastSaid());
-    ok(globalThis.__dboDurabilityKit(P, 0x782) === true && count(P, 0x9002, 'Steel Armor') === 1 && count(P, SWORD, 'Iron Sword (Worn)') === 1, 'a hammer mends the heavy armour and leaves the sword');
-    dress([{ baseId: 0x9001, count: 1, name: 'Leather Armor (Worn)' }, { baseId: GOLD, count: 100 }]);
-    ok(globalThis.__dboDurabilityKit(P, 0x781) === true && count(P, 0x9001, 'Leather Armor') === 1, 'a sewing kit mends light armour');
   }
   // ---- gamemode.js wiring -----------------------------------------------------------------------------------------
   const gm = fs.readFileSync(path.join(SERVER, 'gamemode.js'), 'utf8');

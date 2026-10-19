@@ -30,7 +30,8 @@
         "heading": "Repairs",
         "items": [
           "Repairs at a sharpening wheel or an armorer's bench are a Blacksmith's work: the smith must hold the rank the piece needs. Without it, bring your gear to a smith.",
-          "Field tools for mending Worn gear yourself are on their way: a whetstone for weapons, a sewing kit for light armour and clothing, and a hammer for heavy armour. They mend Worn gear only; Damaged and Broken gear still needs a smith."
+          "Taking gear off no longer forgets how worn it was inside its tier.",
+          "Field tools are on their way: a whetstone for weapons, a sewing kit for light armour and clothing, and a hammer for heavy armour. Each use mends part of a Worn piece's wear, more for a better Blacksmith, but never brings it back to whole: that is a smith's job. Tools can break, except in a Master's hands."
         ]
       },
       {
@@ -74,9 +75,9 @@
       {
         "heading": "Repairs",
         "items": [
-          "Logging in no longer resets your gear's wear. Before, some pieces went back to an earlier tier at login, then wore down all over again.",
-          "Using a sharpening wheel (weapons) or an armorer's bench (armour) while you carry worn gear opens the repair list. Choose \"Work the wheel\" or \"Work the bench\" in that list to use it as usual.",
-          "Gear you are wearing now shows in the list too, marked \"take it off to repair it\". Take it off and choose it again to see the price."
+          "Repairs at a sharpening wheel or an armorer's bench are a Blacksmith's work: the smith must hold the rank the piece needs. Without it, bring your gear to a smith.",
+          "Taking gear off no longer forgets how worn it was inside its tier.",
+          "Field tools are on their way: a whetstone for weapons, a sewing kit for light armour and clothing, and a hammer for heavy armour. Each use mends part of a Worn piece's wear, more for a better Blacksmith, but never brings it back to whole: that is a smith's job. Tools can break, except in a Master's hands."
         ]
       }
     ]

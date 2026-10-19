@@ -41,6 +41,12 @@ module.exports = (api) => {
     // PC has made the records. gearTier: the highest smithing family tier it works on (smithing.json: iron 1, steel 2 ..
     // steel plate 5, ebony 6, daedric 7), so a tier of hammers (dangerbush, 19 Oct): Iron-Steel 2, Steel-Plate 5, Plate+ 99
     fieldKits: {},
+    // A tool mends a share of the wear, never the whole (Nate, 19 Oct: "just a percentage"; Oblivion's hammers mend Armorer
+    // skill + 3 points a use): kitMendShare of a tier's points, plus kitMendPerSmithTier for each Blacksmith craft tier, and
+    // never below the start of the piece's tier: only a smith brings a piece back up a tier. A tool breaks on a use at
+    // kitBreakChance, less with each craft tier, and never for a Master (craft tier kitUnbreakableTier; Oblivion: an
+    // Apprentice's hammers last twice as long, a Master's never break). A tool that mends nothing is handed back.
+    kitMendShare: 0.2, kitMendPerSmithTier: 0.05, kitBreakChance: 0.3, kitUnbreakableTier: 7,
     wheelKeywords: ['CraftingSmithingSharpeningWheel'],
     benchKeywords: ['CraftingSmithingArmorTable'],
   }, cfg.durability || {});
@@ -185,7 +191,14 @@ module.exports = (api) => {
         try { marked = renameOne(a, w.baseId, w.name, tier); if (!marked) log(`durability: ${who(a)} ${descOf(w.baseId)} not in the pack unworn yet; its ${NAMES[tier]} stays kept`); }
         catch (e) { log('durability: rename failed', e.message); }
       }
-      if (marked) { delete l[key]; changed = true; }
+      if (marked) {
+        // The wear inside the tier stays with the piece under its new name, so a tool's partial mend and a half-worn piece
+        // are not forgotten when it comes off (before, taking a piece off quietly cleared everything short of a tier)
+        const per = perTier(kindOf(w.baseId));
+        const inside = (tierOfName(w.name) * per + (Number(l[key]) || 0)) - tier * per;
+        delete l[key]; changed = true;
+        if (tier > 0 && tier < BROKEN && inside > 0) { const nk = keyOf({ baseId: w.baseId, name: nameAt(w.entry, tier) }); l[nk] = (Number(l[nk]) || 0) + inside; }
+      }
     }
     if (changed) { try { writeLedger(a, l); } catch (e) { /* kept for the next look */ } }
   };
@@ -369,29 +382,38 @@ module.exports = (api) => {
   const kindFits = (kind, id) => kind === 'any' || kindOf(id) === kind || (kind === 'light' && (armorClass(id) === 0 || armorClass(id) === 2)) || (kind === 'heavy' && armorClass(id) === 1);
   const kitFits = (k, id) => kindFits(k.kind, id) && itemTier(id) <= k.gearTier;
   // gamemode.js eat hook: true when baseId is a kit (used up by the game: a kit that mends nothing is handed back)
+  // The wear inside a piece's tier (points past the start of its tier): name tier plus kept points, less the whole tiers
+  const insideWear = (a, w) => { const per = perTier(kindOf(w.baseId)); return (tierOfName(w.name) * per + (Number(ledger(a)[keyOf(w)]) || 0)) - tierOf(a, w) * per; };
+  // gamemode.js eat hook: true when baseId is a tool (used up by the game, so one that mends nothing or does not break is handed back)
   globalThis.__dboDurabilityKit = (a, baseId) => {
     const k = C.enabled ? KITS.get(baseId >>> 0) : null;
     if (!k) return false;
     a >>>= 0;
     const fits = (w) => kitFits(k, w.baseId) && w.tier >= 1 && w.tier <= k.maxTier;
     const worn = wornOf(a).map((w) => Object.assign(w, { tier: tierOf(a, w) })).filter(fits);
-    if (worn.length) {
-      const w = worn[0];
-      const l = ledger(a); l[keyOf(w)] = -tierOfName(w.name) * perTier(kindOf(w.baseId));
-      try { writeLedger(a, l); } catch (e) { giveItem(a, baseId, 1); return true; }
-      notice(a, `You mend your ${bareName(w.entry)} in the field. It is whole again.`);
-      log(`durability: ${who(a)} field-mended worn ${descOf(w.baseId)} from ${NAMES[w.tier]} with ${descOf(baseId)}`);
-      return true;
-    }
     const packed = ['weapon', 'armor'].flatMap((kind) => damagedOf(a, kind)).filter(fits);
-    if (packed.length && renameOne(a, packed[0].baseId, packed[0].name, 0)) {
-      const l = ledger(a); const key = keyOf(packed[0]); if (key in l) { delete l[key]; try { writeLedger(a, l); } catch (e) { /* the name is Intact */ } }
-      notice(a, `You mend your ${bareName(packed[0].entry)} in the field. It is whole again.`);
-      log(`durability: ${who(a)} field-mended ${descOf(packed[0].baseId)} from ${NAMES[packed[0].tier]} with ${descOf(baseId)}`);
+    // The piece with the most wear to mend: worn first, then the pack
+    const pick = worn.concat(packed).map((w) => Object.assign(w, { inside: insideWear(a, w) })).filter((w) => w.inside > 0).sort((x, y) => y.inside - x.inside)[0];
+    const what = k.kind === 'any' ? '' : ` ${({ weapon: 'weapon', light: 'light armour or clothing', heavy: 'heavy armour', armor: 'armour' })[k.kind] || k.kind}`;
+    if (!pick) {
+      giveItem(a, baseId, 1);
+      notice(a, worn.length || packed.length
+        ? `Your${what} is as good as a tool can make it. Only a smith can bring it back to whole.`
+        : `Nothing you carry needs this tool: it mends ${NAMES[1] || 'worn'}${what} only. Worse than that needs a smith.`);
       return true;
     }
-    giveItem(a, baseId, 1);
-    notice(a, `Nothing you carry is only ${NAMES[1] || 'worn'}${k.kind === 'any' ? '' : ` (${({ weapon: 'a weapon', light: 'light armour or clothing', heavy: 'heavy armour', armor: 'armour' })[k.kind] || k.kind})`}${Number.isFinite(k.gearTier) ? ' and within this tool\'s grade' : ''}. It cannot mend worse than that; take it to a smith.`);
+    const tier = smithTier(a);
+    const per = perTier(kindOf(pick.baseId));
+    const mend = Math.min(pick.inside, Math.round(per * Math.min(0.95, (Number(C.kitMendShare) || 0) + (Number(C.kitMendPerSmithTier) || 0) * tier)));
+    const l = ledger(a); l[keyOf(pick)] = (Number(l[keyOf(pick)]) || 0) - mend;
+    try { writeLedger(a, l); } catch (e) { giveItem(a, baseId, 1); return true; }
+    const top = Math.max(1, Number(C.kitUnbreakableTier) || 7);
+    const breakChance = Math.max(0, (Number(C.kitBreakChance) || 0) * (1 - tier / top));
+    const broke = Math.random() < breakChance;
+    if (!broke) giveItem(a, baseId, 1);
+    const left = pick.inside - mend;
+    notice(a, `You work your ${bareName(pick.entry)} over: ${Math.round((mend / per) * 100)}% of its wear mended${left > 0 ? '' : ', as far as a tool can take it'}.${broke ? ' The tool breaks.' : ''}`);
+    log(`durability: ${who(a)} mended ${descOf(pick.baseId)} by ${mend} of ${per} (${NAMES[pick.tier]}, ${left} left in the tier) with ${descOf(baseId)}${broke ? ', which broke' : ''}`);
     return true;
   };
   onUi('repairClose', (a) => { S.pending.delete(a >>> 0); closeWidget(a, WIDGET_ID); });
