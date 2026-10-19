@@ -36,7 +36,8 @@ module.exports = (api) => {
     anyoneRepairs: true, unskilledFeeMult: 1.5, smithDiscountPerTier: 0.1, smithMinFeeMult: 0.5,
     // Field kits (xophor, otome, 19 Oct): an item used from the pack (eaten, as an ALCH) that mends one Worn piece of its
     // kind, never a Damaged or Broken one. { "<item desc>": { kind: weapon | armor | any, maxTier: 1 } }, filled once the
-    // PC has made the records (whetstone, sewing kit, armourer's hammer)
+    // PC has made the records. gearTier: the highest smithing family tier it works on (smithing.json: iron 1, steel 2 ..
+    // steel plate 5, ebony 6, daedric 7), so a tier of hammers (dangerbush, 19 Oct): Iron-Steel 2, Steel-Plate 5, Plate+ 99
     fieldKits: {},
     wheelKeywords: ['CraftingSmithingSharpeningWheel'],
     benchKeywords: ['CraftingSmithingArmorTable'],
@@ -355,8 +356,8 @@ module.exports = (api) => {
   });
   // ---- field kits ---------------------------------------------------------------------------------------------------
   const KITS = new Map();
-  for (const [d, k] of Object.entries(C.fieldKits || {})) { const id = idOf(d); if (id && k) KITS.set(id, { kind: String(k.kind || 'any'), maxTier: Math.max(1, Number(k.maxTier) || 1) }); }
-  const kitFits = (k, id) => k.kind === 'any' || kindOf(id) === k.kind;
+  for (const [d, k] of Object.entries(C.fieldKits || {})) { const id = idOf(d); if (id && k) KITS.set(id, { kind: String(k.kind || 'any'), maxTier: Math.max(1, Number(k.maxTier) || 1), gearTier: Number(k.gearTier) > 0 ? Number(k.gearTier) : Infinity }); }
+  const kitFits = (k, id) => (k.kind === 'any' || kindOf(id) === k.kind) && itemTier(id) <= k.gearTier;
   // gamemode.js eat hook: true when baseId is a kit (used up by the game: a kit that mends nothing is handed back)
   globalThis.__dboDurabilityKit = (a, baseId) => {
     const k = C.enabled ? KITS.get(baseId >>> 0) : null;
@@ -380,7 +381,7 @@ module.exports = (api) => {
       return true;
     }
     giveItem(a, baseId, 1);
-    notice(a, `Nothing you carry is only ${NAMES[1] || 'worn'}${k.kind === 'any' ? '' : ` (${k.kind === 'weapon' ? 'a weapon' : 'armour'})`}. A kit cannot mend worse than that; take it to a smith.`);
+    notice(a, `Nothing you carry is only ${NAMES[1] || 'worn'}${k.kind === 'any' ? '' : ` (${k.kind === 'weapon' ? 'a weapon' : 'armour'})`}${Number.isFinite(k.gearTier) ? ' and within this tool\'s grade' : ''}. It cannot mend worse than that; take it to a smith.`);
     return true;
   };
   onUi('repairClose', (a) => { S.pending.delete(a >>> 0); closeWidget(a, WIDGET_ID); });

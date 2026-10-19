@@ -185,6 +185,14 @@ globalThis.__dboDurabilityEquip(P, mp.get(P, 'equipment'));
     dress([{ baseId: SWORD, count: 1, name: 'Iron Sword (Damaged)' }, { baseId: GOLD, count: 100 }]);
     ok(globalThis.__dboDurabilityKit(P, KIT) === true && count(P, SWORD, 'Iron Sword (Damaged)') === 1 && given.some(([id]) => id === KIT) && /cannot mend worse/.test(lastSaid()), 'a Damaged sword is beyond a kit: the kit is handed back', lastSaid());
     ok(globalThis.__dboDurabilityKit(P, 0x778) === false, 'anything else eaten is not a kit');
+    // a hammer of a lower grade than the piece (smithing tier 2 here) mends nothing and is handed back
+    api.cfg.durability.fieldKits = { '777:Skyrim.esm': { kind: 'any', maxTier: 1, gearTier: 1 }, '779:Skyrim.esm': { kind: 'any', maxTier: 1, gearTier: 2 } };
+    delete require.cache[path.join(SERVER, 'durability.js')];
+    require(path.join(SERVER, 'durability.js'))(api);
+    given.length = 0;
+    dress([{ baseId: SWORD, count: 1, name: 'Iron Sword (Worn)' }, { baseId: GOLD, count: 100 }]);
+    ok(globalThis.__dboDurabilityKit(P, KIT) === true && count(P, SWORD, 'Iron Sword (Worn)') === 1 && given.some(([id]) => id === KIT) && /grade/.test(lastSaid()), 'a T1 hammer on a tier 2 piece: refused and handed back', lastSaid());
+    ok(globalThis.__dboDurabilityKit(P, 0x779) === true && count(P, SWORD, '') === 1, 'a T2 hammer mends it');
     // a smith at the piece's own tier: 10% off
     smithTier = 2;
     dress([{ baseId: SWORD, count: 1, name: 'Iron Sword (Worn)' }, { baseId: INGOT, count: 1 }, { baseId: GOLD, count: 100 }]);
