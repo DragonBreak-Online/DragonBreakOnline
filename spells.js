@@ -57,6 +57,7 @@ module.exports = (api) => {
     suspendedSpells: [],
     prepareCells: ['20ff:BSHeartland.esm', '6c152:BSHeartland.esm',                             // the Synod Conclave, Bruma
       '12cb:BSHeartland.esm', '5f78c:BSHeartland.esm', '5f78d:BSHeartland.esm',                 // the Cathedral of St Martin, Bruma
+      '16a02:Skyrim.esm',                                                                       // Solitude's Temple of the Divines
       '1380e:Skyrim.esm', '1380f:Skyrim.esm', 'cab91:Skyrim.esm', '13810:Skyrim.esm', 'cab92:Skyrim.esm'], // College of Winterhold halls
     teachMeters: 5,
     // Only a Master teaches, and only spells of Adept rank and above (Nate, 2026-10-06); the student must be able to learn
@@ -75,7 +76,8 @@ module.exports = (api) => {
     // and teaches (none: every school); exclusive: its factions buy only there, not at the Synod. A cell not listed in a
     // place is the Synod's: every shop faction no exclusive place holds, every school.
     shopPlaces: [
-      { name: 'The Great Faiths', cells: ['12cb:BSHeartland.esm', '5f78c:BSHeartland.esm', '5f78d:BSHeartland.esm'], factions: ['great-faiths'], schools: ['Restoration', 'Alteration'], exclusive: true },  // the Cathedral of St Martin, Bruma
+      // the Cathedral of St Martin, Bruma, and Solitude's Temple of the Divines (Nate, 19 Oct)
+      { name: 'The Great Faiths', cells: ['12cb:BSHeartland.esm', '5f78c:BSHeartland.esm', '5f78d:BSHeartland.esm', '16a02:Skyrim.esm'], factions: ['great-faiths'], schools: ['Restoration', 'Alteration'], exclusive: true },
       { name: 'The College of Whispers', cells: ['781ad:BSHeartland.esm', '6ff7d:BSHeartland.esm'], factions: ['college-of-whispers'] },  // Frostcrag Spire
     ],
     shopMinTier: 1,

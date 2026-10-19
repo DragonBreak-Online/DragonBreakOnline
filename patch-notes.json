@@ -1,5 +1,20 @@
 [
   {
+    "title": "The Great Faiths in Solitude",
+    "date": "2026-10-19",
+    "version": "Server update",
+    "tag": "Change",
+    "sections": [
+      {
+        "heading": "Solitude's Temple of the Divines",
+        "items": [
+          "Solitude's Temple of the Divines is now a house of the Great Faiths, as the Cathedral of St Martin in Bruma is. Its Scholars' Ledger sells the faith's Restoration and Alteration tomes to its members, and the faith's senior ranks can teach a spell there.",
+          "Prepared spells can be changed anywhere in the temple."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Player shops",
     "date": "2026-10-19",
     "version": "Gameplay",
