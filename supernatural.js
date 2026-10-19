@@ -737,7 +737,11 @@ module.exports = (api) => {
     try { items = P.takeParcel(a, { items: [...want] }); } catch (e) { log('supernatural: silver could not be taken from the pack', e.message); return; }
     if (!items || !items.length) return;
     const what = P.itemsText(items);
-    try { P.boardLetter(a, C.silverMailFrom || 'Bruma', `Silver you could not bear to carry: ${what}.`, { gold: 0, items }); }
+    // Into the silver letter already waiting, if there is one: a new letter each time filled the coop
+    const SILVER_TEXT = 'Silver you could not bear to carry';
+    let merged = false;
+    try { merged = typeof P.addToBoardLetter === 'function' && P.addToBoardLetter(a, (m) => String(m.text || '').startsWith(SILVER_TEXT), items, (all) => `${SILVER_TEXT}: ${P.itemsText(all)}.`); } catch (e) { merged = false; }
+    if (!merged) try { P.boardLetter(a, C.silverMailFrom || 'Bruma', `${SILVER_TEXT}: ${what}.`, { gold: 0, items }); }
     catch (e) { try { P.giveEntries(a, items); } catch (x) { /* logged below */ } log('supernatural: the silver letter failed; the silver was put back', e.message); return; }
     personal(a, s.kind === 'vampire' ? `The silver sears you through the pack. You cannot carry it; it waits in your mailbox at the notice boards: ${what}.`
       : `The silver burns even through the pack. The beast will not carry it; it waits in your mailbox at the notice boards: ${what}.`);

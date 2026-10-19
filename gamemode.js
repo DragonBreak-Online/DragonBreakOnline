@@ -1260,6 +1260,11 @@ every('meet', MEET_TICK_MS, () => {
   }
   for (const a of changed) { try { mp.set(a, 'private.metActors', metCache.get(a).list.slice()); } catch (e) { metCache.delete(a); } }
 });
+// Who a pigeon can reach: those met in person, and those who introduced themselves (playermenu.js ff_knownIds, the
+// ids that introduced themselves to a). The coop read only the met list, so an introduction never made a contact, and a
+// player who is always masked could be met by no one (#7DJT's /bug, 19 Oct: "people try to send me pigeons")
+const introducedTo = (a) => { try { const v = mp.get(a, 'ff_knownIds'); return Array.isArray(v) ? v.map((x) => Number(x) >>> 0).filter(Boolean) : []; } catch (e) { return []; } };
+const pigeonContactsOf = (a) => [...new Set(metOf(a).map((x) => Number(x) >>> 0).concat(introducedTo(a)))].filter((x) => x !== (Number(a) >>> 0));
 // The ledger's "forget": struck out of one side only, and written back in by the next meeting in person
 const forgetMet = (a, b) => {
   try { mp.set(a, 'private.metActors', metOf(a).filter((x) => x !== b)); } catch (e) { log('forget failed', e.message); }
@@ -1426,7 +1431,7 @@ const sendPigeon = (a, to, rawText, zoneId, goldRaw, itemsRaw) => {
   const p = profileOf(a); const left = PIGEON_COOLDOWN_MS - (Date.now() - (pigeonLastSent.get(p) || 0));
   if (left > 0 && !admin) return { ok: false, text: `Your pigeon is still out. Next one in ${Math.ceil(left / 60000)} min.` };
   if (!to || to === a) return { ok: false, text: 'Choose who the letter is for.' };
-  if (!admin && !metOf(a).includes(to)) return { ok: false, text: 'Your pigeon does not know the way to someone you have never met.' };
+  if (!admin && !pigeonContactsOf(a).includes(to >>> 0)) return { ok: false, text: 'Your pigeon does not know the way to someone you have never met.' };
   if (prep && typeof globalThis.__dboFormGone === 'function' && globalThis.__dboFormGone(to)) return { ok: false, text: 'Your pigeon finds no one there to take a parcel.' };
   try {
     // Every letter lands at the notice boards and waits there; nobody reads a pigeon in the field
@@ -1484,7 +1489,7 @@ const openPigeonCoop = (a, result, resultKind, view) => {
   const online = new Set(onlineActors());
   const price = admin ? 0 : pigeonFee();
   const contacts = [];
-  for (const id of metOf(a)) {
+  for (const id of pigeonContactsOf(a)) {
     try { if (!mp.get(id, 'appearance')) continue; } catch (e) { continue; }
     // Who they met: a contact behind a mask or in a beast form keeps their own name here
     contacts.push({ id, name: ownNameOf(id), tag: tagOf(id), online: presenceShown(a, id, online), shared: presenceMutual(a, id), price });

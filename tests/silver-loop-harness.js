@@ -77,6 +77,11 @@ let box = lettersOf(VAMP);
 ok(count(VAMP, INGOT) === 0 && count(VAMP, IRON) === 1 && box.length === 1 && box[0].parcel && box[0].parcel.items.some((e) => e.baseId === INGOT),
   'the vampire\'s 2 Silver Ingots are mailed to their own mailbox; the iron stays', { inv: inv(VAMP), box });
 ok(count(HUMAN, INGOT) === 5 && lettersOf(HUMAN).length === 0, 'a human keeps their silver');
+// 1b. More silver later goes into the same letter, not a new one (a werewolf's coop held 12 silver letters, 19 Oct)
+set(VAMP, 'inventory', { entries: inv(VAMP).concat([{ baseId: INGOT, count: 3 }]) });
+timers.superSilver();
+box = lettersOf(VAMP);
+ok(box.length === 1 && box[0].parcel.items.filter((e) => e.baseId === INGOT).reduce((n, e) => n + e.count, 0) === 5 && /5x|5 /.test(box[0].text) && !box[0].read, 'more silver joins the waiting letter: one letter, 5 Silver Ingots, marked unread again', box);
 // 2. The mail marker: lit while unread, out once read, though the parcel is still in the letter
 ok(rules.pigeonsWaiting(VAMP) === 1, 'the unread letter lights the mail marker');
 box[0].read = true; saveLetters(VAMP, box);

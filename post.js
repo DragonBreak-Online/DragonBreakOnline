@@ -182,6 +182,21 @@ module.exports = (api) => {
     if (onlineActors().includes(to)) { personal(to, `A letter waits for you at the notice boards: ${text}`); try { sendMailState(to); } catch (e) { /* marker */ } }
   };
 
+  // Goods the board holds for a reader gather in one letter of theirs (match: a letter it wrote, still carrying a parcel), so
+  // a stream of small parcels cannot fill a coop (a werewolf's silver, 19 Oct: 12 letters). false when there is none yet
+  const addToBoardLetter = (to, match, items, text) => {
+    const box = lettersOf(to);
+    const m = box.slice().reverse().find((x) => x && x.parcel && x.fromProfile === -1 && typeof match === 'function' && match(x));
+    if (!m) return false;
+    const merged = (m.parcel.items || []).map((e) => Object.assign({}, e));
+    for (const it of items) { const same = merged.find((e) => (Number(e.baseId) >>> 0) === (Number(it.baseId) >>> 0) && Object.keys(e).length === 2 && Object.keys(it).length === 2); if (same) same.count = Number(same.count) + Number(it.count); else merged.push(Object.assign({}, it)); }
+    m.parcel.items = merged;
+    if (text) m.text = text(merged);
+    m.read = false; m.at = Date.now();
+    saveLetters(to, box);
+    if (onlineActors().includes(to)) { try { sendMailState(to); } catch (e) { /* marker */ } }
+    return true;
+  };
   // An order's goods gather in one letter while it waits uncollected, so deliveries one at a time cannot flood a mailbox
   const supplyLetter = (o, by, n, items) => {
     const box = lettersOf(o.poster);
@@ -379,6 +394,6 @@ module.exports = (api) => {
   act('supplyCancel', (a, z, [id]) => cancel(a, id), 'supply');
 
   // couriers.js packs goods with takeParcel, hands them over with giveEntries and posts them with boardLetter; bank.js vaults use takeItems
-  globalThis.__dboPostApi = { prepare, takeParcel, takeItems, giveEntries, collect, view, itemsText, boardLetter, sendableBase, looseCount, nameOfItem, enabled: () => !!C.enabled };
+  globalThis.__dboPostApi = { prepare, takeParcel, takeItems, giveEntries, collect, view, itemsText, boardLetter, addToBoardLetter, sendableBase, looseCount, nameOfItem, enabled: () => !!C.enabled };
   log(`post: parcels ${C.enabled ? `on (tax ${Math.round(C.taxRate * 100)}% of gold, ${C.itemFee} gold a stack, ${C.maxStacks} stacks)` : 'off'}, supply orders ${data().orders.filter(open).length} open`);
 };

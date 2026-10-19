@@ -1,5 +1,20 @@
 [
   {
+    "title": "Pigeons reach more of the people you know",
+    "date": "2026-10-19",
+    "version": "Hotfix",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Pigeons",
+        "items": [
+          "Anyone who has introduced themselves to you is now in your pigeon coop's list, as well as the people you have met in person. That includes introductions from before today.",
+          "Silver a vampire or werewolf can't carry now gathers in one letter in their mailbox, instead of a new letter every time."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Arrests stay in their own hold",
     "date": "2026-10-19",
     "version": "Server update",
