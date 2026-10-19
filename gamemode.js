@@ -3216,7 +3216,7 @@ globalThis.__dboHandlers.disconnect = (userId) => {
   if (a && globalThis.__dboDungeonLeave) { try { globalThis.__dboDungeonLeave(a); } catch (e) { log('dungeon logout move failed', e.message); } }
   if (a && globalThis.__dboPartyLogout) { try { globalThis.__dboPartyLogout(a); } catch (e) { log('party logout failed', e.message); } }
   // What a UI said it can draw, and a deity offer already made, belong to this session (review C6, PRAY-1)
-  for (const k of ['__dboItemLeave', '__dboBankLeave', '__dboRobLeave', '__dboDeityForget', '__dboPanelLeave', '__dboManualsLeave', '__dboLabourLeave', '__dboPrayerLeave', '__dboSkinLeave', '__dboSchoolsLeave', '__dboKeyRingLeave', '__dboRacialLeave', '__dboStartLeave']) { if (a && typeof globalThis[k] === 'function') { try { globalThis[k](a); } catch (e) { log(`${k} failed`, e.message); } } }
+  for (const k of ['__dboItemLeave', '__dboBankLeave', '__dboRobLeave', '__dboSilverTestLeave', '__dboDeityForget', '__dboPanelLeave', '__dboManualsLeave', '__dboLabourLeave', '__dboPrayerLeave', '__dboSkinLeave', '__dboSchoolsLeave', '__dboKeyRingLeave', '__dboRacialLeave', '__dboStartLeave']) { if (a && typeof globalThis[k] === 'function') { try { globalThis[k](a); } catch (e) { log(`${k} failed`, e.message); } } }
   connected.delete(userId);
   const wait = globalThis.__dboLoginWaits.get(userId);
   if (wait) { clearInterval(wait); globalThis.__dboLoginWaits.delete(userId); }
@@ -7642,6 +7642,9 @@ const hitDamageAttemptHook =(aggressorId, targetId, sourceId, damage, flags) => 
   // friendly GMs never harm each other. Before companionSystem's hook, so a refused hit sets no band on anyone.
   globalThis.__dboHitRefusal = 'warband';
   try { if (agg !== tgt && typeof globalThis.__dboWarbandRefusesHit === 'function' && globalThis.__dboWarbandRefusesHit(agg, tgt)) return false; } catch (e) { log('warband hit check failed', e.message); }
+  // 2e. An accepted silver test's strike gives its result and lands no damage (silvertest.js)
+  globalThis.__dboHitRefusal = 'silver_test';
+  try { if (agg !== tgt && typeof globalThis.__dboSilverTestStrike === 'function' && globalThis.__dboSilverTestStrike(agg, tgt, src, dmg, flags)) return false; } catch (e) { log('silver test hit failed', e.message); }
   // past the gameplay's own gates: a refusal from here on is the fork chain's or the summon guard's, unnamed
   globalThis.__dboHitRefusal = null;
 
@@ -8282,6 +8285,13 @@ try {
   require(ROBBERY_JS)({ mp, log, personal, audit, who, onlineActors, recordOf, adminItemName, openWidget, closeWidget, onUi, sendPacket, every, cfg });
 } catch (e) { log('robbery.js failed to load:', e.stack || e.message); globalThis.__dboRobEntries = null; globalThis.__dboRobAction = null; }
 
+// ---- Silver Test in the X menu: a hunter's silver on a consenting subject's blood (server\silvertest.js) ----------------
+try {
+  const SILVERTEST_JS = path.resolve('silvertest.js');
+  delete require.cache[SILVERTEST_JS];
+  require(SILVERTEST_JS)({ mp, log, personal, audit, who, onlineActors, openWidget, closeWidget, onUi, sendPacket, every, cfg });
+} catch (e) { log('silvertest.js failed to load:', e.stack || e.message); for (const k of ['__dboSilverTestEntries', '__dboSilverTestAction', '__dboSilverTestStrike', '__dboSilverTestLeave']) globalThis[k] = null; }
+
 // ---- the Key Ring panel: house keys as records on the character (server\keyring.js; housingSystem.ts housingKeyRing) ------
 try {
   const KEYRING_JS = path.resolve('keyring.js');
@@ -8552,7 +8562,7 @@ try {
   // Feeding counts as a meal for the hunger meter
   const needsFeed = (a) => { if (!NEEDS.enabled) return; const n = needsOf(a); n.hunger = Math.max(0, n.hunger - (Number((NEEDS.restore || {}).meal) || 0)); saveNeeds(a, n); applyNeedsStage(a, n, false); };
   require(SUPERNATURAL_JS)({ mp, log, personal, registerChatCommand, onUi, openWidget, closeWidget, sendPacket, display, who, audit, isAdmin, findByName, onlineActors, every, profileOf, nameOf, isWorldspace, needsFeed, hungerOf: (a) => needsOf(a).hunger, cfg, hasUiCap, sourceResistsOf });
-} catch (e) { log('supernatural.js failed to load:', e.stack || e.message); for (const k of ['__dboSuperDamageMult', '__dboSuperHit', '__dboSuperEat', '__dboSuperPrayed', '__dboSuperPrayWarning', '__dboSuperDeath', '__dboSuperActivate', '__dboSuperMenuEntries', '__dboSuperMenuAction', '__dboSuperAdminInfect', '__dboBeastAllow', '__dboBeastChanged', '__dboSuperKind', '__dboSuperLogin', '__dboSuperLeave', '__dboSuperProgress', '__dboSuperProgressSend', '__dboSuperRateMult', '__dboSuperFoodMult', '__dboTellsRetake', '__dboVampHealCast', '__dboVampHealRefusal', '__dboVampHealBlocks', '__dboSuperBloodPotion']) globalThis[k] = null; }
+} catch (e) { log('supernatural.js failed to load:', e.stack || e.message); for (const k of ['__dboSuperDamageMult', '__dboSuperHit', '__dboSuperEat', '__dboSuperPrayed', '__dboSuperPrayWarning', '__dboSuperDeath', '__dboSuperActivate', '__dboSuperMenuEntries', '__dboSuperMenuAction', '__dboSuperAdminInfect', '__dboBeastAllow', '__dboBeastChanged', '__dboSuperKind', '__dboSuperIsSilverWeapon', '__dboSuperLogin', '__dboSuperLeave', '__dboSuperProgress', '__dboSuperProgressSend', '__dboSuperRateMult', '__dboSuperFoodMult', '__dboTellsRetake', '__dboVampHealCast', '__dboVampHealRefusal', '__dboVampHealBlocks', '__dboSuperBloodPotion']) globalThis[k] = null; }
 
 // ---- friendly fire and the down state (server\downed.js): after supernatural.js, whose hooks it wraps -------
 try {

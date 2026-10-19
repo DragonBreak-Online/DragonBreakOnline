@@ -2141,6 +2141,8 @@ module.exports = (api) => {
     for (const o of onlineActors()) sendPacket(o, { customPacketType: 'dboPale', actor: a >>> 0, shader: PALE_SHADER, on: !!on });
   };
   globalThis.__dboSuperKind = (a) => kindOf(a);
+  // The silver weapon test the weaknesses use (keyword or silverWeapons), for silvertest.js
+  globalThis.__dboSuperIsSilverWeapon = (id) => isSilverSource(Number(id) >>> 0);
   // After an identity reroll a vampire wears the vampire variant of the race just chosen
   globalThis.__dboSuperReapplyLook = (a) => { if (kindOf(a) === 'vampire') setLookRace(a, true); };
   globalThis.__dboSuperCrownHolder = () => crownHolder();

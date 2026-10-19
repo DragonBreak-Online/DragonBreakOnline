@@ -301,6 +301,10 @@
    "_comment": "Spells refused before the server systems see the cast (gamemode.js castHook), with what the caster is told. For spells that crash the game.",
    "782c5:BSHeartland.esm": "Summon Will-o-the-Wisp is disabled for now: the wisp crashes the game when it appears. It will come back once that is fixed."
  },
+ "silverTest": {
+   "_comment": "silvertest.js: Silver Test in the X menu for Dawnguard, Silver Hand and Vigil of Stendarr members carrying a silver weapon (mestreugway 16 Oct, Nate 19 Oct). The target accepts or chooses Fight or Flee; an accepted test's silver strike within strikeSeconds gives the result to the two of them and, with harmless true, deals no damage. enabled false takes it off the menu. Other keys and defaults in the file header.",
+   "enabled": true
+ },
  "supernatural": {
    "_comment": "Overrides for supernatural.js defaults. huntMarkChance: the chance that surviving Hircine's Great Hunt (/rite) gives Sanies Lupinus; an unmarked survivor waits riteFailCooldownHours to run it again. infectWerewolf: a werewolf's bite's chance to pass it on. Nate, 2026-09-27: werewolf harder to come by than vampirism, 0.5 -> 0.25 and 0.05 -> 0.02. Nate, 2026-10-03: both rarer, lycanthropy rarest: 0.25 -> 0.1 and 0.02 -> 0.005 (infectVampire 0.03 and infectFeed 0.05 are the supernatural.js defaults).",
    "huntMarkChance": 0.1,
