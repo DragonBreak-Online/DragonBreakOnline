@@ -12,6 +12,7 @@
 #include "MsgType.h"
 #include "NpcSelfHeal.h"
 #include "Overloaded.h"
+#include "TickProfile.h"
 #include "WeaponHitGate.h"
 #include "WorldState.h"
 #include "gamemode_events/CustomEvent.h"
@@ -1012,9 +1013,67 @@ void ActionListener::TickMovementRelay()
   }
 }
 
+namespace {
+// One UpdateMovement call timed step by step, for the rare 0.7-1 s stall at 500 crowded bots (CAPACITY_PLAN.md: one
+// call in about 40 minutes, outside the relay). With SKYMP_TICK_PROFILE=1 a call over kSlowMovementNs logs its steps,
+// the actor, its grid square before and after, and its listener count before and after
+constexpr uint64_t kSlowMovementNs = 100'000'000;
+
+struct MovementSteps
+{
+  enum Step : uint8_t { kHosted, kValidate, kRelayOwn, kSetPos, kRest, kCount };
+  uint64_t start = TickProfile::Enabled() ? TickProfile::NowNs() : 0;
+  uint64_t last = start;
+  uint64_t ns[kCount] = {};
+  uint32_t formId = 0;
+  bool own = false;
+  int16_t gridBefore[2] = {};
+  int16_t gridAfter[2] = {};
+  size_t listenersBefore = 0;
+  size_t listenersAfter = 0;
+  bool positioned = false;
+
+  void Mark(Step step)
+  {
+    if (!start) {
+      return;
+    }
+    const uint64_t now = TickProfile::NowNs();
+    ns[step] += now - last;
+    last = now;
+  }
+
+  ~MovementSteps()
+  {
+    if (!start) {
+      return;
+    }
+    Mark(kRest);
+    const uint64_t total = last - start;
+    if (total < kSlowMovementNs) {
+      return;
+    }
+    const auto ms = [](uint64_t v) { return static_cast<double>(v) / 1e6; };
+    spdlog::warn(
+      "slow UpdateMovement {:.1f} ms: actor {:x} {} | hosted {:.1f} validate {:.1f} relayOwn {:.1f} setPos {:.1f} "
+      "rest {:.1f} | grid {},{} -> {},{} | listeners {} -> {}",
+      ms(total), formId, own ? "own" : "hosted", ms(ns[kHosted]), ms(ns[kValidate]), ms(ns[kRelayOwn]),
+      ms(ns[kSetPos]), ms(ns[kRest]), gridBefore[0], gridBefore[1],
+      positioned ? gridAfter[0] : gridBefore[0], positioned ? gridAfter[1] : gridBefore[1], listenersBefore,
+      positioned ? listenersAfter : listenersBefore);
+  }
+};
+
+int16_t GridOf(float v)
+{
+  return static_cast<int16_t>(v / 4096.f);
+}
+}
+
 void ActionListener::OnUpdateMovement(const RawMessageData& rawMsgData,
                                       const UpdateMovementMessage& msg)
 {
+  MovementSteps steps;
   // A paralysed player stays put until it ends or the server teleports them
   if (!paralyzedUntil.empty()) {
     MpActor* myActor = partOne.serverState.ActorByUser(rawMsgData.userId);
@@ -1033,6 +1092,7 @@ void ActionListener::OnUpdateMovement(const RawMessageData& rawMsgData,
   // validated before it is relayed. A hosted NPC is checked for an impossible
   // jump before it is relayed; everything else about it keeps the old order
   MpActor* actor = myActor;
+  steps.own = isOwnActor;
   if (!isOwnActor) {
     actor = SendToNeighbours(msg.idx, rawMsgData, false, true);
     if (!actor) {
@@ -1054,7 +1114,15 @@ void ActionListener::OnUpdateMovement(const RawMessageData& rawMsgData,
       RelayMovement(msg.idx, rawMsgData);
     }
   }
+  steps.Mark(MovementSteps::kHosted);
   if (actor) {
+    if (steps.start) {
+      steps.formId = actor->GetFormId();
+      const auto& p = actor->GetPos();
+      steps.gridBefore[0] = GridOf(p.x);
+      steps.gridBefore[1] = GridOf(p.y);
+      steps.listenersBefore = actor->GetActorListeners().size();
+    }
     bool teleportFlag = actor->GetTeleportFlag();
     actor->SetTeleportFlag(false);
 
@@ -1070,19 +1138,26 @@ void ActionListener::OnUpdateMovement(const RawMessageData& rawMsgData,
     const auto& currentRot = actor->GetAngle();
     const auto& currentCellOrWorld = actor->GetCellOrWorld();
 
-    if (!MovementValidation::Validate(
-          partOne, currentPos, currentRot, currentCellOrWorld,
-          teleportFlag
-            ? kInfinityPos
-            : NiPoint3{ msg.data.pos[0], msg.data.pos[1], msg.data.pos[2] },
-          FormDesc::FromFormId(msg.data.worldOrCell, espmFiles),
-          rawMsgData.userId, actor, espmFiles, &movementTracker)) {
+    bool valid;
+    {
+      TickProfile::Scope profile(TickProfile::kMoveValidate);
+      valid = MovementValidation::Validate(
+        partOne, currentPos, currentRot, currentCellOrWorld,
+        teleportFlag
+          ? kInfinityPos
+          : NiPoint3{ msg.data.pos[0], msg.data.pos[1], msg.data.pos[2] },
+        FormDesc::FromFormId(msg.data.worldOrCell, espmFiles),
+        rawMsgData.userId, actor, espmFiles, &movementTracker);
+    }
+    steps.Mark(MovementSteps::kValidate);
+    if (!valid) {
       return;
     }
 
     if (isOwnActor) {
       RelayMovement(msg.idx, rawMsgData);
     }
+    steps.Mark(MovementSteps::kRelayOwn);
 
     if (!msg.data.isBlocking) {
       actor->IncreaseBlockCount();
@@ -1090,12 +1165,22 @@ void ActionListener::OnUpdateMovement(const RawMessageData& rawMsgData,
       actor->ResetBlockCount();
     }
 
-    actor->SetPos(
-      NiPoint3{ msg.data.pos[0], msg.data.pos[1], msg.data.pos[2] },
-      SetPosMode::CalledByUpdateMovement);
-    actor->SetAngle(
-      NiPoint3{ msg.data.rot[0], msg.data.rot[1], msg.data.rot[2] },
-      SetAngleMode::CalledByUpdateMovement);
+    {
+      TickProfile::Scope profile(TickProfile::kMoveSetPos);
+      actor->SetPos(
+        NiPoint3{ msg.data.pos[0], msg.data.pos[1], msg.data.pos[2] },
+        SetPosMode::CalledByUpdateMovement);
+      actor->SetAngle(
+        NiPoint3{ msg.data.rot[0], msg.data.rot[1], msg.data.rot[2] },
+        SetAngleMode::CalledByUpdateMovement);
+    }
+    steps.Mark(MovementSteps::kSetPos);
+    if (steps.start) {
+      steps.positioned = true;
+      steps.gridAfter[0] = GridOf(msg.data.pos[0]);
+      steps.gridAfter[1] = GridOf(msg.data.pos[1]);
+      steps.listenersAfter = actor->GetActorListeners().size();
+    }
     actor->SetAnimationVariableBool(
       AnimationVariableBool::kVariable_bInJumpState, msg.data.isInJumpState);
     actor->SetAnimationVariableBool(

@@ -16,6 +16,7 @@ constexpr size_t kMsgTypes = static_cast<size_t>(MsgType::Max);
 const char* const kSectionNames[TickProfile::kSectionCount] = {
   "net",        "relaySubmit",  "relayFlush", "send",  "playbacks",
   "deferred",   "hostReleases", "staleHosts", "world",
+  "moveValidate", "moveSetPos",
 };
 
 const char* MsgName(size_t t)

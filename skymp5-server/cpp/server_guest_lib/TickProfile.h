@@ -22,6 +22,8 @@ enum Section : uint8_t
   kHostReleases, // PartOne::TickHostReleases
   kStaleHosts,   // PartOne::TickStaleHosts
   kWorld,        // WorldState::Tick
+  kMoveValidate, // UpdateMovement: MovementValidation::Validate
+  kMoveSetPos,   // UpdateMovement: SetPos and SetAngle (grid moves, listener changes)
   kSectionCount
 };
 
