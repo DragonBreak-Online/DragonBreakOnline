@@ -356,20 +356,38 @@ const distanceMeters = (a, b) => {
 };
 // distanceMeters costs four engine reads per pair; a message to everyone in range reads the
 // speaker once and skips anyone in another world on a single read
+// Where each online player stands, read at most every PLACES_MS and shared by every caller in between: at 500 crowded
+// players those two reads per player were 71% of a chat line's cost (CPU profile 19 Oct, 595 of 838 ms under handleChat;
+// sendNear and bubbleNear each walked everyone). A range check against a position up to 250 ms old is fine for chat.
+// Only who is online is read each call, so a player who just logged in is read fresh and one who left is skipped
+const PLACES_MS = 250;
+let placesAt = 0;
+let places = new Map();
+const placeOf = (a, now) => {
+  if (now - placesAt >= PLACES_MS) { places = new Map(); placesAt = now; }
+  let pl = places.get(a);
+  if (pl === undefined) {
+    try { const p = mp.get(a, 'pos'); pl = Array.isArray(p) ? { world: mp.get(a, 'worldOrCellDesc'), pos: p } : null; } catch (e) { pl = null; }
+    places.set(a, pl);
+  }
+  return pl;
+};
 const actorsNear = (fromActor, rangeM, includeSelf) => {
   const out = [];
   let world = null; let from = null;
   try { world = mp.get(fromActor, 'worldOrCellDesc'); from = mp.get(fromActor, 'pos'); } catch (e) { return out; }
   if (!Array.isArray(from)) return out;
   const reach = rangeM * UNITS_PER_METER;
+  const now = Date.now();
   for (const a of onlineActors()) {
     if (a === fromActor && !includeSelf) continue;
-    try {
-      if (mp.get(a, 'worldOrCellDesc') !== world) continue;
-      const p = mp.get(a, 'pos');
+    if (a !== fromActor) {
+      const pl = placeOf(a, now);
+      if (!pl || pl.world !== world) continue;
+      const p = pl.pos;
       const dx = p[0] - from[0]; const dy = p[1] - from[1]; const dz = p[2] - from[2];
       if (dx * dx + dy * dy + dz * dz > reach * reach) continue;
-    } catch (e) { continue; }
+    }
     out.push(a);
   }
   return out;
