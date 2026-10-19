@@ -341,6 +341,16 @@ module.exports = (api) => {
       if (m) return say(FACTIONS.get(m.fid), holds(m.fid));
     }
     if (had) return null;
+    // A church takes only a follower of one of its gods (factions.limits.requiresFaith; Nate, 19 Oct): checked when they
+    // join, from the god chosen at a shrine (prayer.js private.dboDeity)
+    const req = (LIM.requiresFaith || {})[fid];
+    if (req && Array.isArray(req.deities) && req.deities.length) {
+      let faith = null; try { faith = mp.get(t, 'private.dboDeity'); } catch (e) { faith = null; }
+      if (!(faith && req.deities.includes(String(faith.id)))) {
+        const gods = req.label || 'its gods';
+        return { text: self ? `${TheName(f.name)} takes only those who follow ${gods}. Choose one of them at their shrine first.` : `${name} does not follow ${gods}; ${TheName(f.name)} takes only those who do.`, hidden: false };
+      }
+    }
     for (const c of LIM.conflicts || []) {
       const A = (c.a || []).map(String), B = (c.b || []).map(String);
       const other = A.includes(fid) ? B : B.includes(fid) ? A : null;
