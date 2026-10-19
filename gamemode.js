@@ -950,7 +950,7 @@ const helpRoleOk = (a, role) => {
   if (!role) return true;
   try {
     if (isAdmin(a)) return true;   // staff see every topic, rank or no rank
-    if (role === 'official') return (ranksOf(profileOf(a)) || []).length > 0;
+    if (role === 'official') return (ranksOf(profileOf(a), a) || []).length > 0;
     if (role === 'beast') return typeof globalThis.__dboSuperKind === 'function' && !!globalThis.__dboSuperKind(a);
   } catch (e) { return false; }
   return true;
@@ -1926,7 +1926,7 @@ mp.onActivate = (targetId, casterId) => {
   const servesCourt = (a, zone) => {
     const pid = Number(profileOf(a));
     const seats = (readOfficials() || {})[zone] || {};
-    if (pid >= 0 && Object.values(seats).some((list) => (list || []).map(Number).includes(pid))) return true;
+    if (pid >= 0 && Object.entries(seats).some(([r, list]) => (list || []).map(Number).includes(pid) && (() => { const held = typeof seatHolder === 'function' ? seatHolder(zone, r, pid) : 0; return !held || held === (a >>> 0); })())) return true;
     try { const fid = typeof globalThis.__dboHoldFactionOf === 'function' ? globalThis.__dboHoldFactionOf(zone) : null; if (fid && typeof globalThis.__dboGuildsOf === 'function' && (globalThis.__dboGuildsOf(a) || []).some((g) => g.id === fid)) return true; } catch (e) { /* no household */ }
     return false;
   };
@@ -4319,11 +4319,45 @@ const rankTitle = (r, zoneId) => {
   if (zoneId && typeof zoneId === 'string' && RN && typeof RN.officeName === 'function') { try { const n = RN.officeName(zoneId, r); if (n) return n; } catch (e) { /* the default */ } }
   return String(RANK_TITLES[r] || r);
 };
-const ranksOf = (profileId) => {
+// Which character holds an account's seat (Nate, 19 Oct: Misfit_Panda's every character was Whiterun's Steward). officials.json
+// stays per account (the fork reads it); officials-seats.json { zone: { office: { profileId: actorId } } } names the character.
+// A seat with no character recorded counts for the whole account, as before, until it is bound (seatOfficial binds it).
+const SEATS_PATH = path.resolve('officials-seats.json');
+let seatsText = null, seatsMtime = -1, seatsCheckedAt = 0;
+const readSeats = () => {
+  if (seatsText === null || Date.now() - seatsCheckedAt > 1000) {
+    seatsCheckedAt = Date.now();
+    try { const m = fs.statSync(SEATS_PATH).mtimeMs; if (m !== seatsMtime) { seatsText = fs.readFileSync(SEATS_PATH, 'utf8'); seatsMtime = m; } } catch (e) { if (seatsText === null) seatsText = '{}'; }
+  }
+  try { return JSON.parse(seatsText) || {}; } catch (e) { return {}; }
+};
+const writeSeats = (o) => {
+  const text = JSON.stringify(o, null, 1);
+  fs.writeFileSync(SEATS_PATH + '.tmp', text); fs.renameSync(SEATS_PATH + '.tmp', SEATS_PATH);
+  seatsText = text; seatsCheckedAt = Date.now();
+  try { seatsMtime = fs.statSync(SEATS_PATH).mtimeMs; } catch (e) { seatsMtime = -1; }
+};
+// The character seated for pid in zone z's office r: an actor id, or 0 when none is recorded
+const seatHolder = (zid, r, pid) => Number((((readSeats()[zid] || {})[r] || {})[pid])) >>> 0;
+const bindSeat = (zid, r, pid, actor) => {
+  const o = readSeats(); o[zid] = o[zid] || {};
+  for (const k of Object.keys(o[zid])) if (o[zid][k] && typeof o[zid][k] === 'object') delete o[zid][k][pid];
+  if (r && actor) { o[zid][r] = o[zid][r] || {}; o[zid][r][pid] = actor >>> 0; }
+  try { writeSeats(o); } catch (e) { log('officials-seats.json write failed', e.message); }
+};
+// ranksOf(profileId): every seat of the account (lists, staff views). ranksOf(profileId, actorId): only the seats that
+// character holds (every check of what someone may do passes the actor)
+const ranksOf = (profileId, actor) => {
+  const pid = Number(profileId); const me = Number(actor) >>> 0;
   const o = readOfficials(); const out = [];
-  for (const z of zoneList()) for (const r of (z.officials || [])) if (((o[z.id] || {})[r] || []).map(Number).includes(profileId)) out.push({ zone: z, rank: r });
+  for (const z of zoneList()) for (const r of (z.officials || [])) {
+    if (!((o[z.id] || {})[r] || []).map(Number).includes(pid)) continue;
+    if (me && typeof seatHolder === 'function') { const held = seatHolder(z.id, r, pid); if (held && held !== me) continue; }
+    out.push({ zone: z, rank: r });
+  }
   return out;
 };
+globalThis.__dboSeatHolder = seatHolder;
 // Seat holders appoint their own officers (config appointRules: holder rank -> { appointable rank: max per zone; null
 // in the config = no limit }). Bruma is ruled by a Count; count stands in for the Baron until a baron rank exists.
 // Guards have no limit (Nate, 5 Oct: a hold's guard was capped at 20)
@@ -4339,7 +4373,7 @@ for (const rules of Object.values(APPOINT_RULES)) for (const k of Object.keys(ru
 const appointCap = (a, z, rank) => {
   if (isLeadStaff(a)) return Infinity;
   let cap = 0;
-  for (const m of ranksOf(profileOf(a))) if (m.zone.id === z.id) cap = Math.max(cap, Number((APPOINT_RULES[m.rank] || {})[rank]) || 0);
+  for (const m of ranksOf(profileOf(a), a)) if (m.zone.id === z.id) cap = Math.max(cap, Number((APPOINT_RULES[m.rank] || {})[rank]) || 0);
   // The leader of a faction that took this hold's capital in war names its new ruler and whoever the ruler names (realm.js)
   try {
     if (typeof globalThis.__dboConquerorLeads === 'function' && globalThis.__dboConquerorLeads(a, z.id)) {
@@ -4365,7 +4399,9 @@ const officialTarget = (query) => {
     actor = t; pid = profileOf(t);
     if (!(pid >= 0)) return { error: 'That character has no profile id.' };
   }
-  return { pid, actor, online: onlineActors().find((x) => profileOf(x) === pid) || 0,
+  // the named character is told when online; an account named by profile id: whichever of its characters is online
+  const on = onlineActors();
+  return { pid, actor, online: (actor && on.includes(actor >>> 0) ? actor >>> 0 : 0) || (/^\d+$/.test(q) ? on.find((x) => profileOf(x) === pid) || 0 : 0),
     // The answer names a masked character as the mask shows them: the #TAG asked for may be the one drawn under the mask
     label: actor ? publicDisplay(actor) : `profile ${pid}`, who: actor ? who(actor) : `profile ${pid}` };
 };
@@ -4431,6 +4467,7 @@ const seatOfficial = (z, rank, tg, by) => {
   for (const r of Object.keys(o[z.id])) o[z.id][r] = (o[z.id][r] || []).filter((x) => Number(x) !== tg.pid);
   o[z.id][rank] = (o[z.id][rank] || []).concat([tg.pid]);
   try { writeOfficials(o); } catch (e) { return { error: 'Could not write officials.json: ' + e.message }; }
+  if (typeof bindSeat === 'function') bindSeat(z.id, rank, tg.pid, tg.actor);
   if (tg.online) system(tg.online, `You have been appointed ${rankTitle(rank, z.id)} of ${z.name}.`);
   audit(`${by.staff ? 'GM' : 'OFFICIAL'} ${by.who} appointed ${tg.who} ${rankTitle(rank, z.id)} of ${z.name}${tg.online ? '' : ' (offline)'}${by.via || ''}${by.overridden ? ` (Jarl rule overridden by an Owner: ${by.overridden})` : ''}`);
   if (had) courtOfficeSync(z, tg, had, false);
@@ -4444,6 +4481,7 @@ const unseatOfficial = (a, z, tg) => {
   if (!had) return { error: `${tg.label} holds no rank in ${z.name}.` };
   if (!appointCap(a, z, had)) return { error: `You cannot dismiss a ${rankTitle(had, z.id)} of ${z.name}.` };
   try { writeOfficials(o); } catch (e) { return { error: 'Could not write officials.json: ' + e.message }; }
+  if (typeof bindSeat === 'function') bindSeat(z.id, null, tg.pid, 0);
   if (tg.online) system(tg.online, `You are no longer ${rankTitle(had, z.id)} of ${z.name}.`);
   audit(`${isAdmin(a) ? 'GM' : 'OFFICIAL'} ${who(a)} dismissed ${tg.who} as ${rankTitle(had, z.id)} of ${z.name}${tg.online ? '' : ' (offline)'}`);
   courtOfficeSync(z, tg, had, false);
@@ -4456,6 +4494,7 @@ const unseatOfficialBy = (z, tg, byWho) => {
   for (const r of Object.keys(o[z.id] || {})) { if ((o[z.id][r] || []).map(Number).includes(tg.pid)) had = r; o[z.id][r] = (o[z.id][r] || []).filter((x) => Number(x) !== tg.pid); }
   if (!had) return { error: `${tg.label} holds no rank in ${z.name}.` };
   try { writeOfficials(o); } catch (e) { return { error: 'Could not write officials.json: ' + e.message }; }
+  if (typeof bindSeat === 'function') bindSeat(z.id, null, tg.pid, 0);
   if (tg.online) system(tg.online, `You are no longer ${rankTitle(had, z.id)} of ${z.name}.`);
   audit(`OFFICIAL ${byWho} unseated ${tg.who} as ${rankTitle(had, z.id)} of ${z.name}${tg.online ? '' : ' (offline)'}`);
   courtOfficeSync(z, tg, had, false);
@@ -4503,7 +4542,7 @@ registerChatCommand('officials', (a, args) => {
   if (!args.trim() && typeof globalThis.__dboCourtOpen === 'function' && globalThis.__dboCourtOpen(a)) return;
   const lines = officialsLines(a, args.trim());
   personal(a, lines.length ? lines.join('  |  ') : 'No officials appointed yet. Admins: /appoint <player> <zone> <rank>.');
-  const mine = ranksOf(profileOf(a)); if (mine.length) personal(a, 'You hold: ' + mine.map((m) => `${rankTitle(m.rank, m.zone.id)} of ${m.zone.name}`).join(', '));
+  const mine = ranksOf(profileOf(a), a); if (mine.length) personal(a, 'You hold: ' + mine.map((m) => `${rankTitle(m.rank, m.zone.id)} of ${m.zone.name}`).join(', '));
 }, { help: '[zone] who rules where' });
 
 // ---- Scholar: books are nodes, reading is a mini-game -----------------------------------------

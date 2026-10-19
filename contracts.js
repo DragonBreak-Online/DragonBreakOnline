@@ -423,7 +423,7 @@ module.exports = (api) => {
   };
 
   const isOfficial = (a, zoneId) => {
-    try { return ranksOf(profileOf(a)).some((r) => r.zone && r.zone.id === zoneId); } catch (e) { return false; }
+    try { return ranksOf(profileOf(a), a).some((r) => r.zone && r.zone.id === zoneId); } catch (e) { return false; }
   };
 
   // Death of a spawned creature: every one of the killer's contracts it matches moves on, each at most once per body

@@ -149,3 +149,4 @@ discipline.json
 # Citizenship rolls, requests, policies and elections (citizenship.js)
 /citizenship.json
 /citizenship.json.tmp
+officials-seats.json

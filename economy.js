@@ -487,7 +487,13 @@ module.exports = (api) => {
   // leaves out every account that leads, alts included; this only tells a leader why their own rank cannot be paid.)
   const holdsRank = (a, fid, rank) => {
     const f = info(fid);
-    if (f && f.kind === 'hold' && f.zone) { const pid = profileOfActor(a); return pid >= 0 && ((((readOfficials() || {})[f.zone] || {})[rank]) || []).map(Number).includes(pid); }
+    if (f && f.kind === 'hold' && f.zone) {
+      const pid = profileOfActor(a);
+      if (!(pid >= 0 && ((((readOfficials() || {})[f.zone] || {})[rank]) || []).map(Number).includes(pid))) return false;
+      // the seat is the character's, not the account's (gamemode.js officials-seats.json)
+      let held = 0; try { held = typeof globalThis.__dboSeatHolder === 'function' ? globalThis.__dboSeatHolder(f.zone, rank, pid) : 0; } catch (e) { held = 0; }
+      return !held || held === (a >>> 0);
+    }
     return (fn('__dboGuildsOf') ? fn('__dboGuildsOf')(a) : []).some((g) => g.id === fid && g.title === rank);
   };
   const days = (ms) => { const d = Math.ceil(ms / 86400000); return `${d} day${d === 1 ? '' : 's'}`; };

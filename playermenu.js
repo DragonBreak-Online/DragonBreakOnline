@@ -109,7 +109,7 @@ module.exports = (api) => {
     return (globalThis.__dboGuildsOf(a) || []).some((g) => (LAWFUL_FACTIONS.has(g.id) && LAWFUL_ROLES.has(g.role) && inFactionLand(g.id, a))
       || (GUARD_FACTIONS.has(g.id) && GUARD_TITLES.has(String(g.title || '').toLowerCase())));
   };
-  const isLawful = (a) => { try { return isLeadStaff(a) || ranksOf(profileOf(a)).some((m) => !UNLAWFUL_RANKS.has(m.rank)) || lawfulByFaction(a); } catch (e) { return false; } };
+  const isLawful = (a) => { try { return isLeadStaff(a) || ranksOf(profileOf(a), a).some((m) => !UNLAWFUL_RANKS.has(m.rank)) || lawfulByFaction(a); } catch (e) { return false; } };
   // A player in a beast form is the beast to everyone (beastform.js __dboBeastName)
   const beastName = (a) => { try { return typeof globalThis.__dboBeastName === 'function' ? String(globalThis.__dboBeastName(a) || '') : ''; } catch (e) { return ''; } };
   // A staff member with real names on sees the own name, and "Aldric (masked)" behind a disguise (staffLabel below); the
@@ -180,7 +180,7 @@ module.exports = (api) => {
     try {
       if (isLeadStaff(captor)) return true;
       if (isAdmin(target)) return false;
-      return ranksOf(profileOf(captor)).some((m) => !UNLAWFUL_RANKS.has(m.rank)) || lawfulByFaction(captor);
+      return ranksOf(profileOf(captor), captor).some((m) => !UNLAWFUL_RANKS.has(m.rank)) || lawfulByFaction(captor);
     } catch (e) { log('instant restraint check failed', e.message); return false; }
   };
 
@@ -373,7 +373,7 @@ module.exports = (api) => {
     // A mask kept from before the change is not on the beast's face: it would tie the beast to the masked one
     if (isMasked(t) && !beast) lines.push('Face hidden behind a mask');
     if (!isMasked(t) && !beast && (revealing(viewer) || knownBy(viewer).includes(t >>> 0))) {
-      const ranks = ranksOf(profileOf(t));
+      const ranks = ranksOf(profileOf(t), t);
       for (const r of ranks.slice(0, 3)) lines.push(`${rankTitle(r)} of ${r.zone.name}`);
     }
     const r = get(t, RESTRAINED_PROP, null);

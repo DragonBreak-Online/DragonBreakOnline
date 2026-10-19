@@ -75,7 +75,12 @@ module.exports = (api) => {
   const guildsOf = (a) => { try { return typeof globalThis.__dboGuildsOf === 'function' ? globalThis.__dboGuildsOf(a >>> 0) || [] : []; } catch (e) { return []; } };
   const isStaffActor = (a) => { try { if (typeof globalThis.__dboIsStaff === 'function') return globalThis.__dboIsStaff(a >>> 0) === true; } catch (e) { /* no gamemode */ } return !!isLeadStaff(a); };
   // An office of this hold (its ruler, Steward, guards...): the hold's own man, so the hold keeps it all
-  const holdOfficial = (a, zid) => { const pid = pidOf(a); const seats = (readOfficials() || {})[zid] || {}; return pid >= 0 && Object.values(seats).some((l) => Array.isArray(l) && l.map(Number).includes(pid)); };
+  // the seat is the character's (gamemode.js officials-seats.json): an account's other characters are not the hold's
+  const holdOfficial = (a, zid) => {
+    const pid = pidOf(a); const seats = (readOfficials() || {})[zid] || {};
+    const sh = typeof globalThis.__dboSeatHolder === 'function' ? globalThis.__dboSeatHolder : null;
+    return pid >= 0 && Object.entries(seats).some(([r, l]) => Array.isArray(l) && l.map(Number).includes(pid) && (() => { const held = sh ? sh(zid, r, pid) : 0; return !held || held === (a >>> 0); })());
+  };
   const shareRate = () => { const r = Number(C.hunterShare); return Number.isFinite(r) ? Math.max(0, Math.min(1, r)) : 0; };
   // Rank standing within a faction, 0 the leader .. 1 the lowest rank (guild-defs lists the leader first)
   const standing = (g) => {

@@ -197,7 +197,7 @@ module.exports = (api) => {
       const z = zoneById(zoneId); if (!z || !z.treasury || out.has('zone:' + z.id)) return;
       out.set('zone:' + z.id, { key: 'zone:' + z.id, name: `${z.name} treasury`, why, balance: zoneGold(z) });
     };
-    try { for (const m of ranksOf(profileOf(a)) || []) if (C.rulerRanks.includes(m.rank)) addZone(m.zone.id, 'you rule it'); } catch (e) { /* no ranks */ }
+    try { for (const m of ranksOf(profileOf(a), a) || []) if (C.rulerRanks.includes(m.rank)) addZone(m.zone.id, 'you rule it'); } catch (e) { /* no ranks */ }
     // A faction leader whose faction holds a hold's capital by conquest (realm.js)
     try { if (typeof globalThis.__dboConqueredZonesLedBy === 'function') for (const zid of globalThis.__dboConqueredZonesLedBy(a) || []) addZone(zid, 'your faction took it'); } catch (e) { /* no realm */ }
     const guilds = typeof globalThis.__dboGuildsOf === 'function' ? (globalThis.__dboGuildsOf(a) || []) : [];

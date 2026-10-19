@@ -46,7 +46,7 @@ module.exports = (api) => {
   const actorOfTag = (tag) => onlineActors().find((x) => tagOf(x) === tag) || 0;
   const byId = (id) => data().list.find((c) => c.id === Number(String(id).replace(/^#/, '')));
   const live = (c) => c.state === 'open' || c.state === 'taken' || c.state === 'refused';
-  const isOfficialOf = (a, zoneId) => ranksOf(Number(profileOf(a))).some((r) => r.zone.id === zoneId);
+  const isOfficialOf = (a, zoneId) => ranksOf(profileOf(a), a).some((r) => r.zone.id === zoneId);
 
   // Pays now if that character is online, else keeps it for their next login
   const pay = (party, gold, why) => {

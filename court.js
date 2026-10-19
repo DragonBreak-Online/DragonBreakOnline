@@ -159,7 +159,7 @@ module.exports = (api) => {
   // ---- the view -------------------------------------------------------------------------------------------------------
   const courtZoneIds = (a) => {
     const ids = new Set();
-    try { for (const m of ranksOf(profileOf(a)) || []) ids.add(m.zone.id); } catch (e) { /* no ranks */ }
+    try { for (const m of ranksOf(profileOf(a), a) || []) ids.add(m.zone.id); } catch (e) { /* no ranks */ }
     const guilds = typeof globalThis.__dboGuildsOf === 'function' ? (globalThis.__dboGuildsOf(a) || []) : [];
     for (const g of guilds) if ((g.kind === 'hold' || g.kind === 'stronghold') && g.zone) ids.add(g.zone);
     for (const o of live()) if (o.pid === profileOf(a)) ids.add(o.zone);
@@ -172,15 +172,18 @@ module.exports = (api) => {
     const n = Number(((APPOINT_RULES || {})[top] || {})[rank]);
     return n > 0 && Number.isFinite(n) ? n : null; // null: no limit (guards)
   };
-  const holderView = (pid) => {
-    const on = onlineOf(pid);
+  const holderView = (pid, zid, rank) => {
+    // The seated character (gamemode.js officials-seats.json) when one is recorded, else the account as before
+    let seated = 0; try { seated = zid && typeof globalThis.__dboSeatHolder === 'function' ? globalThis.__dboSeatHolder(zid, rank, Number(pid)) : 0; } catch (e) { seated = 0; }
+    const live = onlineOf(pid);
+    const on = seated ? (live === seated ? seated : 0) : live;
     const ids = accountActors(pid);
-    const actor = on || ids[0] || 0;
+    const actor = seated || on || ids[0] || 0;
     let tag = '';
     try { tag = actor ? String(tagOf(actor) || '') : ''; } catch (e) { tag = ''; }
     // The own name: the live one was "Werewolf" or "Vampire Lord" while the official was in a beast form, telling anyone who
     // read the roster who the beast was (tracker 1559074270959640676), and "Masked Person" behind a mask
-    return { pid: Number(pid), name: on ? ownNameOf(on) : officialName(pid), tag, online: !!on };
+    return { pid: Number(pid), name: on ? ownNameOf(on) : seated ? ownNameOf(seated) : officialName(pid), tag, online: !!on };
   };
   // The ruler's office (its household rank is the leader's) is never paid a wage (economy.js payroll)
   const isRulerOffice = (rank) => ((C.factionRanks || {})[rank] || []).includes('@leader');
@@ -198,7 +201,7 @@ module.exports = (api) => {
       const cap = appointCap(a, z, rank);
       // default, only on an office staff renamed (rolenames.js): what zones.json calls it
       const named = RN() && RN().officeName(z.id, rank) ? { named: true, default: RN().officeDefault(rank) } : {};
-      return Object.assign({ rank, title: rankTitle(rank, z.id), seats: seatsOf(z, rank), holders: (zo[rank] || []).map(holderView), canAppoint: cap > 0 }, named,
+      return Object.assign({ rank, title: rankTitle(rank, z.id), seats: seatsOf(z, rank), holders: (zo[rank] || []).map((pid) => holderView(pid, z.id, rank)), canAppoint: cap > 0 }, named,
         wages && !isRulerOffice(rank) ? { wage: Math.floor(Number(wages[rank]) || 0) } : {});
     });
     const pid = profileOf(a);

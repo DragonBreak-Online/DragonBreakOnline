@@ -161,7 +161,7 @@ module.exports = (api) => {
       if (fid && guilds.some((g) => g.id === fid && g.role === 'leader')) return true;
     } catch (e) { /* no guilds */ }
     const top = (z.officials || [])[0];
-    try { return !!top && (ranksOf(profileOf(a)) || []).some((m) => m.zone && m.zone.id === z.id && m.rank === top); } catch (e) { return false; }
+    try { return !!top && (ranksOf(profileOf(a), a) || []).some((m) => m.zone && m.zone.id === z.id && m.rank === top); } catch (e) { return false; }
   };
   // "the Countess of Bruma": the style of whoever rules, by the character acting, else the seated account's first character
   const rulerStyle = (zid, actor) => {

@@ -1,5 +1,19 @@
 [
   {
+    "title": "Offices belong to one character",
+    "date": "2026-10-19",
+    "version": "Server update",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Your seat is your character's",
+        "items": [
+          "A court office (Jarl, Steward, Guard and the rest) now belongs to the character who was elected or appointed, not to every character on the account. Your other characters no longer hold your office's powers."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Goblin racial gifts",
     "date": "2026-10-19",
     "version": "Server update",
