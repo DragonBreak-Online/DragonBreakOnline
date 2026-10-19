@@ -324,7 +324,9 @@ module.exports = (api) => {
     const owner = innOwner(cell);
     let holdCut = owner ? Math.round(price * holdShareIn(zone)) : price;
     const ownerCut = price - holdCut;
-    let toOwner = ownerCut ? payOwner(owner, ownerCut) : null;
+    // A business that keeps its books for a faction (business.js) pays the owner's share into the faction's treasury
+    let toFaction = ''; try { toFaction = ownerCut && typeof globalThis.__dboBusinessPayFaction === 'function' ? globalThis.__dboBusinessPayFaction(cell, ownerCut, 'bed rent') || '' : ''; } catch (e) { toFaction = ''; }
+    let toOwner = ownerCut ? (toFaction || payOwner(owner, ownerCut)) : null;
     if (ownerCut && !toOwner) { log(`rest: owner profile ${owner.owner} could not be paid; ${ownerCut} gold goes to ${zone || 'no hold'}`); holdCut = price; toOwner = null; }
     const toHold = holdCut ? depositToTreasury(zone, holdCut, { income: 'inn rent' }) : 0;
     const until = Date.now() + CFG.rentHours * HOUR;
