@@ -17,6 +17,11 @@ export interface LedgerEntry { at: number; text: string; by?: string }
 
 export interface LedgerStaff { profile: number; name: string }
 
+// The shop (server shops.js): one kind of goods in the shop chest. key names it to the server; tags say what its extra
+// data is (enchanted, improved, poisoned, filled, named)
+export interface ShopItem { key: string; name: string; tags: string[]; price: number; count: number }
+export interface ShopStockItem extends ShopItem { banned: string }
+
 export interface BusinessLedgerData {
   id: number;
   nonce: string;
@@ -43,6 +48,18 @@ export interface BusinessLedgerData {
   notes?: LedgerEntry[];
   ledgerPlaced?: boolean;
   armSeconds?: number;
+  // the shop, for everyone: what is for sale (priced, in stock)
+  shopOpen?: boolean;
+  shopItems?: ShopItem[];
+  maxPerBuy?: number;
+  // the shop, owner and staff only: the chest, every kind of goods in it with its price (0 = not for sale)
+  shopChest?: boolean;
+  shopEnabled?: boolean;
+  minPrice?: number;
+  maxPrice?: number;
+  shopArmSeconds?: number;
+  shopStock?: ShopStockItem[];
+  shopUnreadable?: boolean;
 }
 
 const send = (key: string, ...args: unknown[]): void => {
@@ -85,10 +102,50 @@ const TextInput = ({ value, onChange, onEnter, placeholder, max, digits }: {
   />
 );
 
-const PublicPage = ({ data }: { data: BusinessLedgerData }) => {
+const itemText = (r: ShopItem): string => r.name + (r.tags && r.tags.length ? ` (${r.tags.join(', ')})` : '');
+
+// The shop's Buy list: each kind for sale with its price and stock, how many to buy, and the total. The price shown is
+// sent with the buy, so the server refuses a price changed since this page was drawn
+const ShopBuy = ({ data, busy, act, qty, setQty }: {
+  data: BusinessLedgerData; busy: boolean; act: (action: string, ...args: unknown[]) => void;
+  qty: Record<string, string>; setQty: (key: string, v: string) => void;
+}) => {
+  const items = data.shopItems || [];
+  const max = data.maxPerBuy || 1000;
+  return (
+    <div className="bizLedger__section">
+      <span className="bizLedger__label">For sale</span>
+      {items.length === 0 && <span className="bizLedger__empty">Nothing for sale just now.</span>}
+      {items.length > 0 && (
+        <div className="bizLedger__list">
+          {items.map((r) => {
+            const n = Math.min(Number(qty[r.key] || '1') || 0, r.count, max);
+            return (
+              <div key={r.key} className="bizLedger__shopRow">
+                <span className="bizLedger__shopName">{itemText(r)}<span className="bizLedger__shopLeft">{r.count} left</span></span>
+                <span className="bizLedger__gold"><Coin />{goldText(r.price)} each</span>
+                <span className="bizLedger__shopBuy">
+                  <TextInput digits value={qty[r.key] ?? '1'} onChange={(v) => setQty(r.key, v)} placeholder="1" max={4} onEnter={() => n > 0 && act('buy', r.key, n, r.price)} />
+                  <button className="bizLedger__button" disabled={busy || !(n > 0) || !data.shopOpen} onClick={() => act('buy', r.key, n, r.price)}>Buy{n > 1 ? ` ${n}` : ''}: {goldText(r.price * n)}</button>
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+      {items.length > 0 && <p className="bizLedger__note">Paid from the gold in your pack. {data.hold} takes {data.taxPct}% of every sale.</p>}
+    </div>
+  );
+};
+
+const PublicPage = ({ data, busy, act, qty, setQty }: {
+  data: BusinessLedgerData; busy: boolean; act: (action: string, ...args: unknown[]) => void;
+  qty: Record<string, string>; setQty: (key: string, v: string) => void;
+}) => {
   const free = data.chests.filter((c) => c.state === 'free');
   return (
     <div className="bizLedger__section">
+      {(data.shopOpen || (data.shopItems || []).length > 0) && <ShopBuy data={data} busy={busy} act={act} qty={qty} setQty={setQty} />}
       <div className="bizLedger__figures">
         <span className="bizLedger__figure"><span className="bizLedger__label">A bed for the night</span>
           {data.rent > 0 ? <span className="bizLedger__gold"><Coin />{goldText(data.rent)}</span> : <span className="bizLedger__plain">The hold's standard rent</span>}
@@ -105,7 +162,7 @@ const PublicPage = ({ data }: { data: BusinessLedgerData }) => {
   );
 };
 
-type Tab = 'overview' | 'logbook' | 'log' | 'staff' | 'storage' | 'book';
+type Tab = 'overview' | 'logbook' | 'log' | 'staff' | 'storage' | 'shop' | 'book';
 
 const BusinessLedger = ({ data }: { data: BusinessLedgerData }) => {
   const owner = data.role === 'owner';
@@ -119,11 +176,16 @@ const BusinessLedger = ({ data }: { data: BusinessLedgerData }) => {
   const [rename, setRename] = useState('');
   const [step, setStep] = useState(5);
   const [confirmClose, setConfirmClose] = useState(false);
+  // the shop: how many to buy of each kind, and the price typed for each kind (by key)
+  const [qty, setQtyAll] = useState<Record<string, string>>({});
+  const [prices, setPricesAll] = useState<Record<string, string>>({});
+  const setQty = (key: string, v: string) => setQtyAll((q) => ({ ...q, [key]: v }));
+  const setPrice = (key: string, v: string) => setPricesAll((q) => ({ ...q, [key]: v }));
 
   // A re-sent panel ends the action in flight; a successful one clears what was typed for it
   useEffect(() => {
     setBusy(false);
-    if (data.resultKind === 'ok') { setRent(''); setNote(''); setHire(''); setChestPrice(''); setRename(''); }
+    if (data.resultKind === 'ok') { setRent(''); setNote(''); setHire(''); setChestPrice(''); setRename(''); setQtyAll({}); setPricesAll({}); }
   }, [data]);
 
   useEffect(() => {
@@ -140,6 +202,7 @@ const BusinessLedger = ({ data }: { data: BusinessLedgerData }) => {
   const nudge = (dir: string) => act('nudge', dir, step);
 
   const tabs: Array<[Tab, string]> = [['overview', 'Overview'], ['logbook', 'Logbook'], ['log', 'Ledger'], ['staff', 'Staff'], ['storage', 'Storage']];
+  if (data.shopStock !== undefined) tabs.push(['shop', 'Shop']);
   if (owner) tabs.push(['book', 'The book']);
   const rentN = Number(rent) || 0;
   const priceN = Number(chestPrice) || 0;
@@ -151,7 +214,7 @@ const BusinessLedger = ({ data }: { data: BusinessLedgerData }) => {
         <h2 className="bizLedger__title">{data.name}</h2>
         <p className="bizLedger__sub">Kept by {data.ownerName} · {data.hold}</p>
 
-        {!staffView && <PublicPage data={data} />}
+        {!staffView && <PublicPage data={data} busy={busy} act={act} qty={qty} setQty={setQty} />}
 
         {staffView && (
           <div className="bizLedger__tabs">
@@ -245,6 +308,47 @@ const BusinessLedger = ({ data }: { data: BusinessLedgerData }) => {
               <button className="bizLedger__link" disabled={busy} onClick={() => act('chest', 'off')}>Take a chest off the list</button>
             </div>
             <p className="bizLedger__note">Then close the ledger and open the chest within {data.armSeconds || 60} seconds. A rented chest is its renter's alone.</p>
+          </div>
+        )}
+
+        {staffView && tab === 'shop' && (
+          <div className="bizLedger__section">
+            <div className="bizLedger__row bizLedger__row--quick">
+              <span className="bizLedger__plain">{data.shopChest ? 'The shop chest is chosen. Only you and the staff can open it.' : 'No shop chest yet.'}</span>
+              <span className="bizLedger__shopBuy">
+                <button className="bizLedger__button" disabled={busy || data.shopEnabled === false} onClick={() => act('shopChest', '')}>{data.shopChest ? 'Choose another' : 'Make a shop chest'}</button>
+                {data.shopChest && <button className="bizLedger__link" disabled={busy} onClick={() => act('shopChest', 'off')}>Make it a plain chest</button>}
+              </span>
+            </div>
+            <p className="bizLedger__note">To choose it, press the button, close the ledger and open the chest within {data.shopArmSeconds || data.armSeconds || 60} seconds. A chest rented out as storage cannot be the shop chest.</p>
+            {data.shopChest && (
+              <>
+                <span className="bizLedger__label">In the shop chest (a price is gold for one item, {data.minPrice || 1} to {goldText(data.maxPrice || 100000)})</span>
+                {data.shopUnreadable && <span className="bizLedger__empty">The shop chest cannot be read just now. Try again shortly.</span>}
+                {!data.shopUnreadable && (data.shopStock || []).length === 0 && <span className="bizLedger__empty">The shop chest is empty. Put goods in it, then price them here.</span>}
+                <div className="bizLedger__list">
+                  {(data.shopStock || []).map((r) => {
+                    const typed = Number(prices[r.key] || '') || 0;
+                    return (
+                      <div key={r.key} className="bizLedger__shopRow">
+                        <span className="bizLedger__shopName">{itemText(r)}<span className="bizLedger__shopLeft">x{r.count}</span></span>
+                        {r.banned
+                          ? <span className="bizLedger__plain">Not for sale: {r.banned}</span>
+                          : <span className="bizLedger__plain">{r.price > 0 ? <span className="bizLedger__gold"><Coin />{goldText(r.price)} each</span> : 'No price'}</span>}
+                        {!r.banned && (
+                          <span className="bizLedger__shopBuy">
+                            <TextInput digits value={prices[r.key] || ''} onChange={(v) => setPrice(r.key, v)} placeholder="Gold each" max={6} onEnter={() => typed && act('shopPrice', r.key, typed)} />
+                            <button className="bizLedger__button" disabled={busy || !typed} onClick={() => act('shopPrice', r.key, typed)}>Set</button>
+                            {r.price > 0 && <button className="bizLedger__link" disabled={busy} onClick={() => act('shopPrice', r.key, 'off')}>Off sale</button>}
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+                <p className="bizLedger__note">Anything without a price is not for sale. Customers buy at this ledger; {data.hold} takes {data.taxPct}% of every sale and a tenth leaves the game, the rest goes to {data.ownerName.includes(', for ') ? 'the faction\'s treasury' : 'the owner\'s bank account'}.</p>
+              </>
+            )}
           </div>
         )}
 
