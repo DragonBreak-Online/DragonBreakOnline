@@ -247,13 +247,13 @@
       "boon": "Heavy Armor +10",
       "blessing": "1d1faa:DragonBreak Online Edits.esp",
       "blessingSource": "vanilla",
-      "blessingPlan": "SPEL 1D1FAA:DragonBreak Online Edits.esp (PC pantheons DLE c4eedd94 (v3), 18 Oct)",
+      "blessingPlan": "SPEL 1D1FAA:DragonBreak Online Edits.esp (PC pantheons DLE 4cccdd6f (plinths), 19 Oct)",
       "alsoKnownAs": [
         "Lorkhan"
       ],
       "inBruma": 1,
       "placements": [
-        "1d1fd1:DragonBreak Online Edits.esp"
+        "1d1fce:DragonBreak Online Edits.esp"
       ],
       "shrines": [
         "1d1fb6:DragonBreak Online Edits.esp"
@@ -267,10 +267,10 @@
       "boon": "Block +10, Stamina +15",
       "blessing": "1d1fab:DragonBreak Online Edits.esp",
       "blessingSource": "vanilla",
-      "blessingPlan": "SPEL 1D1FAB:DragonBreak Online Edits.esp (PC pantheons DLE c4eedd94 (v3), 18 Oct)",
+      "blessingPlan": "SPEL 1D1FAB:DragonBreak Online Edits.esp (PC pantheons DLE 4cccdd6f (plinths), 19 Oct)",
       "inBruma": 1,
       "placements": [
-        "1d1fe6:DragonBreak Online Edits.esp"
+        "1d1fda:DragonBreak Online Edits.esp"
       ],
       "shrines": [
         "1d1fb7:DragonBreak Online Edits.esp"
@@ -284,14 +284,14 @@
       "boon": "Alteration +10",
       "blessing": "1d1fac:DragonBreak Online Edits.esp",
       "blessingSource": "vanilla",
-      "blessingPlan": "SPEL 1D1FAC:DragonBreak Online Edits.esp (PC pantheons DLE c4eedd94 (v3), 18 Oct)",
+      "blessingPlan": "SPEL 1D1FAC:DragonBreak Online Edits.esp (PC pantheons DLE 4cccdd6f (plinths), 19 Oct)",
       "alsoKnownAs": [
         "Magrus"
       ],
       "inBruma": 1,
       "placements": [
-        "1d1fd7:DragonBreak Online Edits.esp",
-        "1d201b:DragonBreak Online Edits.esp"
+        "1d1fd1:DragonBreak Online Edits.esp",
+        "1d1ffb:DragonBreak Online Edits.esp"
       ],
       "shrines": [
         "1d1fb8:DragonBreak Online Edits.esp"
@@ -305,11 +305,11 @@
       "boon": "Enchanting +10",
       "blessing": "1d1fad:DragonBreak Online Edits.esp",
       "blessingSource": "vanilla",
-      "blessingPlan": "SPEL 1D1FAD:DragonBreak Online Edits.esp (PC pantheons DLE c4eedd94 (v3), 18 Oct)",
+      "blessingPlan": "SPEL 1D1FAD:DragonBreak Online Edits.esp (PC pantheons DLE 4cccdd6f (plinths), 19 Oct)",
       "inBruma": 1,
       "placements": [
-        "1d1fdb:DragonBreak Online Edits.esp",
-        "1d2021:DragonBreak Online Edits.esp"
+        "1d1fd4:DragonBreak Online Edits.esp",
+        "1d1ffe:DragonBreak Online Edits.esp"
       ],
       "shrines": [
         "1d1fb9:DragonBreak Online Edits.esp"
@@ -326,7 +326,7 @@
       "inBruma": 1,
       "placements": [
         "1d1fc5:DragonBreak Online Edits.esp",
-        "1d2027:DragonBreak Online Edits.esp"
+        "1d2001:DragonBreak Online Edits.esp"
       ],
       "blessingPlan": "server: a finished reading counts twice half the time; a boss chest book at half Hermaeus Mora's chance",
       "scholarBoon": 0.5,
@@ -342,11 +342,11 @@
       "boon": "Health +25",
       "blessing": "1d1fae:DragonBreak Online Edits.esp",
       "blessingSource": "vanilla",
-      "blessingPlan": "SPEL 1D1FAE:DragonBreak Online Edits.esp (PC pantheons DLE c4eedd94 (v3), 18 Oct)",
+      "blessingPlan": "SPEL 1D1FAE:DragonBreak Online Edits.esp (PC pantheons DLE 4cccdd6f (plinths), 19 Oct)",
       "inBruma": 1,
       "placements": [
-        "1d1fe1:DragonBreak Online Edits.esp",
-        "1d202d:DragonBreak Online Edits.esp"
+        "1d1fd7:DragonBreak Online Edits.esp",
+        "1d2004:DragonBreak Online Edits.esp"
       ],
       "shrines": [
         "1d1fbb:DragonBreak Online Edits.esp"
@@ -363,7 +363,7 @@
       "meatBoon": 2,
       "inBruma": 1,
       "placements": [
-        "1d1fcb:DragonBreak Online Edits.esp"
+        "1d1fc8:DragonBreak Online Edits.esp"
       ],
       "blessingPlan": "server: meat restores twice the hunger (gamemode.js onEat)",
       "shrines": [
@@ -378,10 +378,10 @@
       "boon": "Illusion +10",
       "blessing": "1d1faf:DragonBreak Online Edits.esp",
       "blessingSource": "vanilla",
-      "blessingPlan": "SPEL 1D1FAF:DragonBreak Online Edits.esp (PC pantheons DLE c4eedd94 (v3), 18 Oct)",
+      "blessingPlan": "SPEL 1D1FAF:DragonBreak Online Edits.esp (PC pantheons DLE 4cccdd6f (plinths), 19 Oct)",
       "inBruma": 1,
       "placements": [
-        "1d1ff1:DragonBreak Online Edits.esp"
+        "1d1fe0:DragonBreak Online Edits.esp"
       ],
       "shrines": [
         "1d1fbd:DragonBreak Online Edits.esp"
@@ -395,10 +395,10 @@
       "boon": "Lockpicking +10",
       "blessing": "1d1fb0:DragonBreak Online Edits.esp",
       "blessingSource": "vanilla",
-      "blessingPlan": "SPEL 1D1FB0:DragonBreak Online Edits.esp (PC pantheons DLE c4eedd94 (v3), 18 Oct)",
+      "blessingPlan": "SPEL 1D1FB0:DragonBreak Online Edits.esp (PC pantheons DLE 4cccdd6f (plinths), 19 Oct)",
       "inBruma": 1,
       "placements": [
-        "1d2000:DragonBreak Online Edits.esp"
+        "1d1fe9:DragonBreak Online Edits.esp"
       ],
       "shrines": [
         "1d1fbe:DragonBreak Online Edits.esp"
@@ -416,7 +416,7 @@
       "aspectOf": "akatosh",
       "inBruma": 1,
       "placements": [
-        "1d1feb:DragonBreak Online Edits.esp"
+        "1d1fdd:DragonBreak Online Edits.esp"
       ],
       "blessingPlan": "server: unarmed hits x1.1 (gamemode.js blessingCombat attacker.alkosh)",
       "combatBoon": true,
@@ -432,12 +432,12 @@
       "boon": "Sneak +10",
       "blessing": "1d1fb1:DragonBreak Online Edits.esp",
       "blessingSource": "vanilla",
-      "blessingPlan": "SPEL 1D1FB1:DragonBreak Online Edits.esp (PC pantheons DLE c4eedd94 (v3), 18 Oct)",
+      "blessingPlan": "SPEL 1D1FB1:DragonBreak Online Edits.esp (PC pantheons DLE 4cccdd6f (plinths), 19 Oct)",
       "lawful": false,
       "unlawfulWhere": "Criminal in the Empire and in Skyrim: the thief-god's followers are thieves.",
       "inBruma": 1,
       "placements": [
-        "1d2009:DragonBreak Online Edits.esp"
+        "1d1fef:DragonBreak Online Edits.esp"
       ],
       "shrines": [
         "1d1fbf:DragonBreak Online Edits.esp"
@@ -451,11 +451,11 @@
       "boon": "One-handed +10",
       "blessing": "1d1fb2:DragonBreak Online Edits.esp",
       "blessingSource": "vanilla",
-      "blessingPlan": "SPEL 1D1FB2:DragonBreak Online Edits.esp (PC pantheons DLE c4eedd94 (v3), 18 Oct)",
+      "blessingPlan": "SPEL 1D1FB2:DragonBreak Online Edits.esp (PC pantheons DLE 4cccdd6f (plinths), 19 Oct)",
       "inBruma": 1,
       "placements": [
-        "1d1fce:DragonBreak Online Edits.esp",
-        "1d200d:DragonBreak Online Edits.esp"
+        "1d1fcb:DragonBreak Online Edits.esp",
+        "1d1ff2:DragonBreak Online Edits.esp"
       ],
       "shrines": [
         "1d1fc1:DragonBreak Online Edits.esp"
@@ -469,11 +469,11 @@
       "boon": "Smithing +10",
       "blessing": "1d1fb3:DragonBreak Online Edits.esp",
       "blessingSource": "vanilla",
-      "blessingPlan": "SPEL 1D1FB3:DragonBreak Online Edits.esp (PC pantheons DLE c4eedd94 (v3), 18 Oct)",
+      "blessingPlan": "SPEL 1D1FB3:DragonBreak Online Edits.esp (PC pantheons DLE 4cccdd6f (plinths), 19 Oct)",
       "inBruma": 1,
       "placements": [
-        "1d1ff7:DragonBreak Online Edits.esp",
-        "1d2013:DragonBreak Online Edits.esp"
+        "1d1fe3:DragonBreak Online Edits.esp",
+        "1d1ff5:DragonBreak Online Edits.esp"
       ],
       "shrines": [
         "1d1fc2:DragonBreak Online Edits.esp"
@@ -487,11 +487,11 @@
       "boon": "Health regenerates 25% faster",
       "blessing": "1d1fb4:DragonBreak Online Edits.esp",
       "blessingSource": "vanilla",
-      "blessingPlan": "SPEL 1D1FB4:DragonBreak Online Edits.esp (PC pantheons DLE c4eedd94 (v3), 18 Oct)",
+      "blessingPlan": "SPEL 1D1FB4:DragonBreak Online Edits.esp (PC pantheons DLE 4cccdd6f (plinths), 19 Oct)",
       "inBruma": 1,
       "placements": [
-        "1d1ffd:DragonBreak Online Edits.esp",
-        "1d2017:DragonBreak Online Edits.esp"
+        "1d1fe6:DragonBreak Online Edits.esp",
+        "1d1ff8:DragonBreak Online Edits.esp"
       ],
       "shrines": [
         "1d1fc3:DragonBreak Online Edits.esp"
@@ -505,13 +505,13 @@
       "boon": "Sneak +10, Alchemy +10",
       "blessing": "1d1fb5:DragonBreak Online Edits.esp",
       "blessingSource": "vanilla",
-      "blessingPlan": "SPEL 1D1FB5:DragonBreak Online Edits.esp (PC pantheons DLE c4eedd94 (v3), 18 Oct)",
+      "blessingPlan": "SPEL 1D1FB5:DragonBreak Online Edits.esp (PC pantheons DLE 4cccdd6f (plinths), 19 Oct)",
       "lawful": false,
       "unlawfulWhere": "Hunted: Sithis is the Dread Father of the Dark Brotherhood, whose members are put to death.",
       "inBruma": 1,
       "placements": [
-        "1d2006:DragonBreak Online Edits.esp",
-        "1d2033:DragonBreak Online Edits.esp"
+        "1d1fec:DragonBreak Online Edits.esp",
+        "1d2007:DragonBreak Online Edits.esp"
       ],
       "shrines": [
         "1d1fc4:DragonBreak Online Edits.esp"

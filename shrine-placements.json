@@ -68,12 +68,12 @@
       "inBruma": 1,
       "sample": [
         {
-          "refr": "DragonBreak Online Edits.esp:1D1FEB",
+          "refr": "DragonBreak Online Edits.esp:1D1FDD",
           "where": "BSHeartland",
           "pos": [
             62336.0,
             196736.0,
-            7347.8
+            7353.4
           ]
         }
       ]
@@ -284,12 +284,12 @@
       "inBruma": 1,
       "sample": [
         {
-          "refr": "DragonBreak Online Edits.esp:1D2000",
+          "refr": "DragonBreak Online Edits.esp:1D1FE9",
           "where": "BSHeartland",
           "pos": [
             45184.0,
             204928.0,
-            8064.7
+            8070.3
           ]
         }
       ]
@@ -527,12 +527,12 @@
       "inBruma": 1,
       "sample": [
         {
-          "refr": "DragonBreak Online Edits.esp:1D1FF1",
+          "refr": "DragonBreak Online Edits.esp:1D1FE0",
           "where": "BSHeartland",
           "pos": [
             59904.0,
             196736.0,
-            7414.0
+            7419.6
           ]
         }
       ]
@@ -673,12 +673,12 @@
       "inBruma": 1,
       "sample": [
         {
-          "refr": "DragonBreak Online Edits.esp:1D1FCE",
+          "refr": "DragonBreak Online Edits.esp:1D1FCB",
           "where": "BSHeartland",
           "pos": [
             56960.0,
             205952.0,
-            7825.8
+            7831.4
           ]
         }
       ]
@@ -695,12 +695,12 @@
       "inBruma": 1,
       "sample": [
         {
-          "refr": "DragonBreak Online Edits.esp:1D1FD7",
+          "refr": "DragonBreak Online Edits.esp:1D1FD1",
           "where": "BSHeartland",
           "pos": [
             56576.0,
             201472.0,
-            7801.6
+            7807.2
           ]
         }
       ]
@@ -1033,12 +1033,12 @@
       "inBruma": 1,
       "sample": [
         {
-          "refr": "DragonBreak Online Edits.esp:1D1FF7",
+          "refr": "DragonBreak Online Edits.esp:1D1FE3",
           "where": "BSHeartland",
           "pos": [
-            58112.0,
-            196736.0,
-            7410.7
+            58111.0,
+            196614.0,
+            7424.5
           ]
         }
       ]
@@ -1077,12 +1077,12 @@
       "inBruma": 1,
       "sample": [
         {
-          "refr": "DragonBreak Online Edits.esp:1D1FE1",
+          "refr": "DragonBreak Online Edits.esp:1D1FD7",
           "where": "BSHeartland",
           "pos": [
             54784.0,
             200960.0,
-            8304.0
+            8309.6
           ]
         }
       ]
@@ -1099,12 +1099,12 @@
       "inBruma": 1,
       "sample": [
         {
-          "refr": "DragonBreak Online Edits.esp:1D2009",
+          "refr": "DragonBreak Online Edits.esp:1D1FEF",
           "where": "BSHeartland",
           "pos": [
             44160.0,
             207104.0,
-            7391.4
+            7397.0
           ]
         }
       ]
@@ -1143,12 +1143,12 @@
       "inBruma": 1,
       "sample": [
         {
-          "refr": "DragonBreak Online Edits.esp:1D1FFD",
+          "refr": "DragonBreak Online Edits.esp:1D1FE6",
           "where": "BSHeartland",
           "pos": [
             60925.7,
             200378.6,
-            7111.0
+            7116.6
           ]
         }
       ]
@@ -1187,12 +1187,12 @@
       "inBruma": 1,
       "sample": [
         {
-          "refr": "DragonBreak Online Edits.esp:1D1FD1",
+          "refr": "DragonBreak Online Edits.esp:1D1FCE",
           "where": "BSHeartland",
           "pos": [
             53376.0,
             200960.0,
-            8363.4
+            8389.6
           ]
         }
       ]
@@ -1209,12 +1209,12 @@
       "inBruma": 1,
       "sample": [
         {
-          "refr": "DragonBreak Online Edits.esp:1D2006",
+          "refr": "DragonBreak Online Edits.esp:1D1FEC",
           "where": "BSHeartland",
           "pos": [
             48683.8,
             207416.6,
-            7760.7
+            7766.3
           ]
         }
       ]
@@ -1293,12 +1293,12 @@
       "inBruma": 1,
       "sample": [
         {
-          "refr": "DragonBreak Online Edits.esp:1D1FDB",
+          "refr": "DragonBreak Online Edits.esp:1D1FD4",
           "where": "BSHeartland",
           "pos": [
             54016.0,
             200960.0,
-            8287.8
+            8293.4
           ]
         }
       ]
@@ -1399,12 +1399,12 @@
       "inBruma": 1,
       "sample": [
         {
-          "refr": "DragonBreak Online Edits.esp:1D1FE6",
+          "refr": "DragonBreak Online Edits.esp:1D1FDA",
           "where": "BSHeartland",
           "pos": [
             61696.0,
             196992.0,
-            7355.3
+            7360.9
           ]
         }
       ]
@@ -1448,7 +1448,7 @@
           "pos": [
             56192.0,
             204928.0,
-            7796.7
+            7802.3
           ]
         }
       ]
@@ -1465,12 +1465,12 @@
       "inBruma": 1,
       "sample": [
         {
-          "refr": "DragonBreak Online Edits.esp:1D1FCB",
+          "refr": "DragonBreak Online Edits.esp:1D1FC8",
           "where": "BSHeartland",
           "pos": [
             53938.9,
             206046.4,
-            8205.5
+            8211.1
           ]
         }
       ]
