@@ -54,7 +54,10 @@ uint64_t MovementRelay::NowMs()
 
 void MovementRelay::NoteCombat(uint32_t formIdA, uint32_t formIdB)
 {
-  combat[PairKey(formIdA, formIdB)] = NowMs();
+  const uint64_t now = NowMs();
+  combat[PairKey(formIdA, formIdB)] = now;
+  combatAt[formIdA] = now;
+  combatAt[formIdB] = now;
 }
 
 bool MovementRelay::InCombat(uint32_t a, uint32_t b, uint64_t now) const
@@ -77,6 +80,17 @@ void MovementRelay::Submit(MpActor& emitter, Networking::UserId senderUserId,
   const uint64_t now = NowMs();
   const uint32_t emitterId = emitter.GetFormId();
   const auto& emitterPos = emitter.GetPos();
+  // Pair lookups only for an emitter that fought in the last kCombatPinMs; most packets come from movers that didn't
+  auto combatIt = combatAt.find(emitterId);
+  const bool emitterFought =
+    combatIt != combatAt.end() && now - combatIt->second < kCombatPinMs;
+  // Stored on every packet, one copy, so a waiting entry is always sent the emitter's newest position, even after its
+  // listener received newer ones at full rate
+  {
+    auto& l = latest[emitterId];
+    l.data.assign(data, data + length);
+    l.touchedMs = now;
+  }
 
   for (auto listener : emitter.GetActorListeners()) {
     const auto userId = partOne.serverState.UserByActor(listener);
@@ -94,20 +108,17 @@ void MovementRelay::Submit(MpActor& emitter, Networking::UserId senderUserId,
 
     const float dist2 = (listener->GetPos() - emitterPos).SqrLength();
     const bool full = listener == &emitter || dist2 <= ls.fullRadius2 ||
-      InCombat(listener->GetFormId(), emitterId, now);
+      (emitterFought && InCombat(listener->GetFormId(), emitterId, now));
 
-    const uint64_t key = (static_cast<uint64_t>(userId) << 32) | emitterId;
+    // A full send leaves any waiting entry alone: Flush always sends the emitter's newest packet, so the worst case is
+    // one repeat of a position the listener already has, never an older one
     if (full) {
       Send(userId, data, length);
       ++ls.fullThisWindow;
-      auto it = pending.find(key);
-      if (it != pending.end()) {
-        it->second.dirty = false;
-        it->second.lastSentMs = now;
-        it->second.lastTouchedMs = now;
-      }
       continue;
     }
+
+    const uint64_t key = (static_cast<uint64_t>(userId) << 32) | emitterId;
 
     // Coalesced: only the newest position waits, overwriting the last. Flush sends it, oldest-waiting first, so arrival
     // order can't decide who gets the budget
@@ -117,11 +128,11 @@ void MovementRelay::Submit(MpActor& emitter, Networking::UserId senderUserId,
     }
     auto& p = slot->second;
     p.userId = userId;
+    p.emitterId = emitterId;
     p.lastTouchedMs = now;
     p.intervalMs = dist2 <= kGridSquareUnits * kGridSquareUnits
       ? kMidIntervalMs
       : kFarIntervalMs;
-    p.data.assign(data, data + length);
     p.dirty = true;
     if (!p.queued) {
       p.queued = true;
@@ -156,6 +167,13 @@ void MovementRelay::RetuneWindow(uint64_t now)
     } else {
       ++it;
     }
+  }
+  for (auto it = combatAt.begin(); it != combatAt.end();) {
+    it = now - it->second > kCombatPinMs ? combatAt.erase(it) : std::next(it);
+  }
+  // One entry per mover, so this pass is small; a waiting entry whose packet is gone is dropped by FlushListener
+  for (auto it = latest.begin(); it != latest.end();) {
+    it = now - it->second.touchedMs > kForgetMs ? latest.erase(it) : std::next(it);
   }
 }
 
@@ -250,7 +268,10 @@ void MovementRelay::FlushListener(ListenerState& ls, uint64_t now)
   const size_t sendCount = std::min<size_t>(due.size(), left);
   for (size_t i = 0; i < sendCount; ++i) {
     Pending* p = due[i];
-    Send(p->userId, p->data.data(), p->data.size());
+    auto l = latest.find(p->emitterId);
+    if (l != latest.end()) {
+      Send(p->userId, l->second.data.data(), l->second.data.size());
+    }
     ++ls.coalescedSentThisSecond;
     p->lastSentMs = now;
     p->dirty = false;
