@@ -1,5 +1,21 @@
 [
   {
+    "title": "Better boss loot",
+    "date": "2026-10-19",
+    "version": "Server update",
+    "tag": "Change",
+    "sections": [
+      {
+        "heading": "Bosses carry more",
+        "items": [
+          "The boss of every dungeon now carries a proper boss's loot when you search the body with E, not only the masters of the Cyrodiil expeditions.",
+          "Dragon priests are no longer skinned like animals. A dragon priest always carries a filled soul gem (Grand at Expert and Master), often a flawless gem, and now and then something rare: a Dragon Priest Dagger or a dragon priest's staff. The higher the difficulty, the better the odds.",
+          "Other bosses sometimes carry a flawless gem as well. Dragon priest masks stay artifacts, given by staff only."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Bank coin purses",
     "date": "2026-10-19",
     "version": "Server update",

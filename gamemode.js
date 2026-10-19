@@ -5543,7 +5543,7 @@ const SKIN_PARTS_DEFAULT = [
   { creature: 'Netch', take: ['NetchLeather$', 'NetchJelly$'] },
   { creature: 'Lurker', take: ['NetchLeather$'] },
 ];
-const SKIN_NOT_ANIMAL = /Goblin|Riekling|Falmer|Dwarven|Dwemer|Centurion|Sphere|Ballista|Burrower|Sentry|EncGiant|LvlGiant|GiantBoss|StoneGiant|HerderGiant|Ogre|Spriggan|Hagraven|Atronach|Draugr|Skeleton|Bandit|Forsworn|Vampire|Necromancer|Warlock/i;
+const SKIN_NOT_ANIMAL = /DragonPriest|Goblin|Riekling|Falmer|Dwarven|Dwemer|Centurion|Sphere|Ballista|Burrower|Sentry|EncGiant|LvlGiant|GiantBoss|StoneGiant|HerderGiant|Ogre|Spriggan|Hagraven|Atronach|Draugr|Skeleton|Bandit|Forsworn|Vampire|Necromancer|Warlock/i;
 const SKIN_PARTS = (Array.isArray(cfg.skinParts) ? cfg.skinParts : SKIN_PARTS_DEFAULT).map((rule) => {
   const rx = (x) => { try { return new RegExp(String(x)); } catch (e) { log(`skinParts: bad pattern ${x}`); return null; } };
   const creature = rule && rx(rule.creature);

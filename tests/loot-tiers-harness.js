@@ -166,7 +166,8 @@ const run = (d, expedition, diffId, claims, modulePath = path.join(ROOT, 'dungeo
     // The enemies, as the spawn system places them: humanoids are armed by the arm tick, then fall carrying the worst gear
     const spawned = [];
     for (const z of lease.zones) {
-      const master = lease.bossZones && lease.bossZones.has(z.Name);
+      // an expedition's boss zone, or (19 Oct, boss trophies) an ordinary dungeon's boss or a dragon priest: the master's roll
+      const master = (lease.bossZones && lease.bossZones.has(z.Name)) || /boss|dragon ?priest/i.test(z.Kind || '');
       const humanoid = HUMANOID.test(z.Kind || '') && !ANIMAL.test(z.Kind || '');
       const id = body++; props.set(`${id}|private.npcSpawner`, z.Name); props.set(`${id}|inventory`, { entries: [] });
       spawned.push({ id, master, humanoid, boss: master || /boss/i.test(z.Kind || '') });

@@ -1155,7 +1155,7 @@ module.exports = (api) => {
   // like any humanoid's (#bugs 1555083068547797072, Purr 1 Oct: a lease's goblins dropped nothing; only a boss or a guard
   // kind matched here, and only wild:* bodies are searched otherwise)
   const HUMANOID = /goblin|bandit|highwayman|marauder|outlaw|thug|forsworn|draugr|falmer|orc|soldier|guard|thalmor|vampire|hunter|warlock|necromancer|conjurer|mage|cultist|silverhand|reaver|smuggler|pirate|warrior|dremora|boss/i;
-  const ANIMAL = /wolf|bear|skeever|spider|chaurus|troll|sabre|mudcrab|horker|slaughterfish|deer|elk|goat|fox|hare|dog|mammoth|giant|atronach|wisp|spriggan|hagraven|sphere|centurion|ballista|ghost|dragon|frostbite|netch|riekling|ashhopper|ogre|minotaur|dreugh|gargoyle|werewolf|werebear|ashspawn|lurker|seeker|scamp|clannfear|daedroth|dragonpriest|horse|cow|chicken/i;
+  const ANIMAL = /wolf|bear|skeever|spider|chaurus|troll|sabre|mudcrab|horker|slaughterfish|deer|elk|goat|fox|hare|dog|mammoth|giant|atronach|wisp|spriggan|hagraven|sphere|centurion|ballista|ghost|dragon(?! ?priest)|frostbite|netch|riekling|ashhopper|ogre|minotaur|dreugh|gargoyle|werewolf|werebear|ashspawn|lurker|seeker|scamp|clannfear|daedroth|horse|cow|chicken/i;
   const CASTER = /mage|wizard|sorcerer|warlock|necromancer|conjurer|witch|priest|cultist|shaman/i;
   const BAD_WEAPON = /dun|Favor|^FF|LD_|NPC$|Trap|^FX|Unarmed|POI|Freeform|DragonPriest|Giant|Lurker|Riekling|Nightingale|^MG|^T0|^C0|SSD|weapBasic|BYOH|Skyforge|Bound|Projectile|dlc2DB|Wrathman|Keeper|Ysgramor|Horksbane|Longhammer|Relic|Illusion|Pickaxe|Catapult|Ballista|Sphere|Knife|Fork|Scimitar|Executioner|Katana|Akaviri|Prelate|Aetherium|Dawnguard|^Axe01|Cross[Bb]ow|Stalhrim|Dragonbone|Daedric|Wooden|Follower|Imperial|Silver|NordHero|Honed|Supple|Enhanced|^MFD/;
   const weaponFor = (edid, diffId, lease) => {
@@ -2024,13 +2024,65 @@ module.exports = (api) => {
     } catch (e) { log('gold split failed', e.message); }
   };
 
+  // ---- boss trophies (Nate, 19 Oct: "make sure its reasonable and some stuff rare drops. Like dragon priest items") --------
+  // On top of a master's boss roll: tables matched on the boss's kind. always: by difficulty, given every time; rolls: each a
+  // chance by difficulty for one item by weight. These are their own pool (like the Ayleid table): the Dragon Priest Dagger is
+  // in BANNED_LOOT for every other pool, but a dragon priest may carry one. Artifacts (the masks, Valthume's staff) never.
+  // Config dungeons.bossTrophies { ordinaryBosses, tables: [{ id, match, always, rolls }] }
+  const SOUL = { common: '2e4f3:Skyrim.esm', greater: '2e4fb:Skyrim.esm', grand: '2e4ff:Skyrim.esm' };
+  const FLAWLESS = [['6851e:Skyrim.esm', 1], ['6851f:Skyrim.esm', 1], ['68520:Skyrim.esm', 1], ['68521:Skyrim.esm', 1], ['68523:Skyrim.esm', 1]];
+  const TROPHY = Object.assign({
+    ordinaryBosses: true,
+    tables: [
+      { id: 'dragonPriest', match: 'dragon ?priest',
+        always: { story: [[SOUL.common, 1]], normal: [[SOUL.greater, 1]], hard: [[SOUL.grand, 1]], nightmare: [[SOUL.grand, 1]] },
+        rolls: [
+          { chance: { story: 0.25, normal: 0.4, hard: 0.6, nightmare: 0.8 }, items: FLAWLESS },
+          { chance: { story: 0.02, normal: 0.05, hard: 0.08, nightmare: 0.12 }, rare: true,
+            items: [['1c1fe:Skyrim.esm', 3], ['7e5bb:Skyrim.esm', 1], ['4de5b:Skyrim.esm', 1]] },
+        ] },
+      { id: 'anyBoss', match: '.', exceptMatch: 'dragon ?priest', rolls: [{ chance: { story: 0.1, normal: 0.2, hard: 0.3, nightmare: 0.4 }, items: FLAWLESS }] },
+    ],
+  }, C.bossTrophies || {});
+  const trophyRe = (src) => { try { return new RegExp(String(src), 'i'); } catch (e) { return /$^/; } };
+  const pickWeighted = (items) => {
+    const list = (items || []).filter((x) => Array.isArray(x) && x[0] && Number(x[1]) > 0);
+    let r = Math.random() * list.reduce((n, x) => n + Number(x[1]), 0);
+    for (const x of list) { r -= Number(x[1]); if (r < 0) return x[0]; }
+    return list.length ? list[list.length - 1][0] : null;
+  };
+  // [{ baseId, count, rare }] for a master of this kind at this difficulty
+  const bossTrophies = (kind, diffId) => {
+    const out = [];
+    const add = (desc, count, rare) => {
+      const id = idOf(desc); if (!id) return;
+      const r = recordOf(id); const edid = String((r && r.editorId) || '');
+      if (ARTIFACT.test(edid) || DRAGON_LOOT.test(edid)) return;
+      out.push({ baseId: id, count: Math.max(1, Number(count) || 1), rare: !!rare });
+    };
+    for (const t of TROPHY.tables || []) {
+      if (!trophyRe(t.match).test(kind) || (t.exceptMatch && trophyRe(t.exceptMatch).test(kind))) continue;
+      for (const [desc, n] of ((t.always || {})[diffId] || [])) add(desc, n, false);
+      for (const roll of t.rolls || []) if (Math.random() < (Number((roll.chance || {})[diffId]) || 0)) add(pickWeighted(roll.items), 1, roll.rare);
+    }
+    return out;
+  };
+  globalThis.__dboBossTrophies = bossTrophies;
+
   // ---- humanoid bodies: E hands over a small roll, once per body -----------------------------------
   const leaseOfTag = (tag) => [...ST.leases.values()].find((x) => tag.startsWith(`${ZONE_PREFIX}${x.id}:`)) || null;
   // An expedition's master (a boss zone of the lease): its body carries the boss chest's roll, handed over with E
   // (Nate, 2026-09-28: "the lich needs good boss loot that drops from him when you loot him")
-  function isMasterTag(tag) { const l = leaseOfTag(tag); const d = l ? byId.get(l.id) : null; return !!(l && d && d.expedition && l.bossZones && l.bossZones.has(tag)); }
+  function isMasterTag(tag) {
+    const l = leaseOfTag(tag); const d = l ? byId.get(l.id) : null;
+    if (!l || !d) return false;
+    if (d.expedition && l.bossZones && l.bossZones.has(tag)) return true;
+    // An ordinary dungeon's boss (its kind says boss) or any dragon priest: the boss roll too (Nate, 19 Oct: "better loot pool for
+    // boss creatures"; Rahgot was skinned for Bone Meal, his kind matched neither humanoid nor undead)
+    return TROPHY.ordinaryBosses !== false && (/boss/i.test(String((l.kinds || {})[tag] || '')) || /dragon ?priest/i.test(String((l.kinds || {})[tag] || '')));
+  }
   // Skeletons and zombies carried nothing (Catticus, 7 Oct): their bodies give a small undead roll; draugr stay humanoid
-  const UNDEAD = /skeleton|zombie|undead|revenant|bonewalker|lich/i;
+  const UNDEAD = /skeleton|zombie|undead|revenant|bonewalker|lich|dragon ?priest/i;
   function isUndeadTag(tag) { const l = leaseOfTag(tag); const kind = l && l.kinds ? l.kinds[tag] || '' : ''; return UNDEAD.test(kind) && !HUMANOID.test(kind) && !ANIMAL.test(kind); }
   function isHumanoidTag(tag) { const l = leaseOfTag(tag); const kind = l && l.kinds ? l.kinds[tag] || '' : ''; return HUMANOID.test(kind) && !ANIMAL.test(kind); }
   const itemName = (baseId) => { const r = recordOf(baseId); return String((r && r.editorId) || 'something').replace(/^(Food|Potion)/, '').replace(/([a-z])([A-Z])/g, '$1 $2').replace(/\d+$/, '').trim() || 'something'; };
@@ -2112,7 +2164,14 @@ module.exports = (api) => {
     try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('loot', 'dungeon_body', casterId, targetId, gave, goldKept, shares); } catch (e) { /* the player log is optional */ }
     personal(casterId, got.length ? `You find ${got.join(', ')}.` : 'You find nothing of use.');
     scholarGift(casterId, SCHOLAR_BODY, 'in their pack');
-    if (master) ebonyGift(casterId, lease, 'master');
+    if (master) {
+      ebonyGift(casterId, lease, 'master');
+      for (const t of bossTrophies(String(((lease && lease.kinds) || {})[tag] || ''), diff.id)) {
+        if (!giveItem(casterId, t.baseId, t.count)) continue;
+        personal(casterId, t.rare ? `Among the master's remains, something rare: ${itemName(t.baseId)}.` : `You also find ${t.count > 1 ? t.count + ' ' : ''}${itemName(t.baseId)}.`);
+        if (t.rare) audit(`BOSS TROPHY ${who(casterId)} took ${descOfId(t.baseId)} (${itemName(t.baseId)}) from a master in ${lease ? lease.name : '?'} (${diff.id})`);
+      }
+    }
     return false;
   };
 
