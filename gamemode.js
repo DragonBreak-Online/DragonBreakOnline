@@ -3061,6 +3061,8 @@ const onCharacterReady = (userId, a) => {
   // A crash mid-transform leaves the beast race stored; put the real one back before anything reads it
   loginStep('beast revert on login', () => { if (globalThis.__dboBeastRevert) globalThis.__dboBeastRevert(a, 'login'); });
   loginStep('supernatural login', () => { if (globalThis.__dboSuperLogin) globalThis.__dboSuperLogin(a); });
+  // A duel's wager a restart or a failed payment left held (duel.js) goes back
+  loginStep('duel escrow', () => { if (globalThis.__dboDuelLogin) globalThis.__dboDuelLogin(a); });
   try { if (globalThis.__dboClock) globalThis.__dboClock.sendTo(a); } catch (e) { /* clock later */ }
   // A new character is carried through the landing into the hub behind a black screen
   if (creationPending(a)) { creation.set(a, 'spawning'); setFade(a, true); if (inHub(a)) setCreatorHidden(a, true); setTimeout(() => fallBackToLanding(a), HUB_SPAWN_WAIT_MS); }
@@ -3216,7 +3218,7 @@ globalThis.__dboHandlers.disconnect = (userId) => {
   if (a && globalThis.__dboDungeonLeave) { try { globalThis.__dboDungeonLeave(a); } catch (e) { log('dungeon logout move failed', e.message); } }
   if (a && globalThis.__dboPartyLogout) { try { globalThis.__dboPartyLogout(a); } catch (e) { log('party logout failed', e.message); } }
   // What a UI said it can draw, and a deity offer already made, belong to this session (review C6, PRAY-1)
-  for (const k of ['__dboItemLeave', '__dboBankLeave', '__dboRobLeave', '__dboDeityForget', '__dboPanelLeave', '__dboManualsLeave', '__dboLabourLeave', '__dboPrayerLeave', '__dboSkinLeave', '__dboSchoolsLeave', '__dboKeyRingLeave', '__dboRacialLeave', '__dboStartLeave']) { if (a && typeof globalThis[k] === 'function') { try { globalThis[k](a); } catch (e) { log(`${k} failed`, e.message); } } }
+  for (const k of ['__dboItemLeave', '__dboBankLeave', '__dboRobLeave', '__dboDeityForget', '__dboPanelLeave', '__dboManualsLeave', '__dboLabourLeave', '__dboPrayerLeave', '__dboSkinLeave', '__dboSchoolsLeave', '__dboKeyRingLeave', '__dboRacialLeave', '__dboStartLeave', '__dboDuelLeave']) { if (a && typeof globalThis[k] === 'function') { try { globalThis[k](a); } catch (e) { log(`${k} failed`, e.message); } } }
   connected.delete(userId);
   const wait = globalThis.__dboLoginWaits.get(userId);
   if (wait) { clearInterval(wait); globalThis.__dboLoginWaits.delete(userId); }
@@ -8560,6 +8562,12 @@ try {
   delete require.cache[DOWNED_JS];
   require(DOWNED_JS)({ mp, log, personal, sendPacket, audit, who, display, profileOf, nameOf, onlineActors, every, registerChatCommand, cfg, openWidget, closeWidget, onUi, redress });
 } catch (e) { log('downed.js failed to load:', e.stack || e.message); globalThis.__dboReviveWith = null; globalThis.__dboIsDowned = null; globalThis.__dboLabDraught = null; }
+// ---- duels between two players (server\duel.js, config "duel"): after downed.js, whose hit, death, cast and eat hooks it wraps ----
+try {
+  const DUEL_JS = path.resolve('duel.js');
+  delete require.cache[DUEL_JS];
+  require(DUEL_JS)({ mp, log, personal, audit, who, display, profileOf, onlineActors, every, registerChatCommand, cfg, openWidget, closeWidget, onUi, sendPacket, takeGold, giveItem, goldOf, recordOf, findByName, isAdmin });
+} catch (e) { log('duel.js failed to load:', e.stack || e.message); for (const k of ['__dboDuelPair', '__dboInDuel', '__dboDuelEntries', '__dboDuelAction', '__dboDuelLogin', '__dboDuelLeave']) globalThis[k] = null; }
 // ---- province rules for crafting and the tome shop (server\regions.js, config "regions"): before spells.js, which asks it ----
 try {
   const REGIONS_JS = path.resolve('regions.js');
