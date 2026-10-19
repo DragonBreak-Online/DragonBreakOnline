@@ -1144,6 +1144,7 @@ registerChatCommand('chargen', (a, args) => {
   if (trialOnly && (t >>> 0) !== (a >>> 0)) return personal(a, 'As a Trial GM you can open character creation for your own character only: /chargen');
   try {
     mp.setRaceMenuOpen(t, true);
+    markEditorOpen(t);
     // An existing character's look as it stands, so the close can undo the editor's swapped-in head (appearance.js). Once
     // the menu is open (its close comes back from the client later), so a menu that failed to open leaves no snapshot
     try { if (globalThis.__dboAppearanceEdit && typeof globalThis.__dboAppearanceEdit.chargenOpened === 'function') globalThis.__dboAppearanceEdit.chargenOpened(t); } catch (e) { log('chargen look snapshot failed', e.message); }
@@ -2456,6 +2457,24 @@ const creationPending = (a) => {
   try { return mp.get(a, 'private.creationPending') === true || mp.get(a, 'appearance') == null; }
   catch (e) { return false; }
 };
+// A player in the character editor (RaceMenu) cannot be hit, and hits no one (karta.gina, 19 Oct: "I nearly died while
+// creating my character"): creation, a patron reroll, /appearance (private.dboAppearanceEdit, at most EDITOR_GUARD_MS from
+// its opening) and a staff /chargen (marked below until the look comes back from the client)
+const EDITOR_GUARD_MS = 30 * 60000;
+const editorOpenAt = globalThis.__dboEditorOpenAt instanceof Map ? globalThis.__dboEditorOpenAt : (globalThis.__dboEditorOpenAt = new Map());
+const markEditorOpen = (a) => { editorOpenAt.set(Number(a) >>> 0, Date.now()); };
+const inEditor = (a) => {
+  a = Number(a) >>> 0;
+  if (!(profileOf(a) >= 0)) return false;
+  if (Date.now() - (editorOpenAt.get(a) || 0) < EDITOR_GUARD_MS) return true;
+  try {
+    if (creationPending(a) || mp.get(a, 'private.rerollPending') === true) return true;
+    const e = mp.get(a, 'private.dboAppearanceEdit');
+    return !!(e && Date.now() - (Number(e.at) || 0) < EDITOR_GUARD_MS);
+  } catch (e) { return false; }
+};
+globalThis.__dboInEditor = inEditor;
+globalThis.__dboMarkEditorOpen = markEditorOpen;
 // actorId -> 'spawning' | 'landing' | 'hub' | 'open' while a new character is carried to the creator. The client reports
 // 'arrived' when its body is really in a world, so each step waits exactly as long as that machine needs;
 // the old fixed timers stay behind as fallbacks for a client that never reports.
@@ -2577,6 +2596,7 @@ const openCreator = (a) => {
     mp.setRaceMenuOpen(a, true);
     // appearance.js / racemenupresets.js: when the editor opened, against when a saved face was put back
     if (globalThis.__dboRaceMenuOpenedAt instanceof Map) globalThis.__dboRaceMenuOpenedAt.set(a >>> 0, Date.now());
+    markEditorOpen(a);
     log(`opened character creation for ${display(a)}`);
   } catch (e) { log('creator open failed', e.message); }
 };
@@ -2906,6 +2926,7 @@ const goblinLook = (a, appearance) => {
 const appearanceHook = (actorId, appearance, isAllowed) => {
   // the player log (playerlog.js): every RaceMenu close, allowed or not; it reads the race and sex, never the name
   try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('appearance', actorId, appearance, isAllowed); } catch (e) { /* the player log is optional */ }
+  if (isAllowed) editorOpenAt.delete(actorId >>> 0);
   if (isAllowed) { try { goblinLook(actorId >>> 0, appearance); } catch (e) { log('goblin look check failed', e.message); } }
   let result = true;
   // A player's own /appearance edit (appearance.js): settled there (charge, locks), and none of creation's steps below run
@@ -3180,6 +3201,7 @@ globalThis.__dboHandlers.disconnect = (userId) => {
     try { globalThis.__dboVlBreakerDrop(a, globalThis.__dboJournalOpen.get(a >>> 0) === true); } catch (e) { log('vl breaker failed', e.message); }
   }
   try { if (a && globalThis.__dboDurabilityLeave) globalThis.__dboDurabilityLeave(a); } catch (e) { log('durability leave failed', e.message); }
+  if (a) editorOpenAt.delete(a >>> 0);
   if (a) globalThis.__dboJournalOpen.delete(a >>> 0);
   // A beast race must never be saved as the character's own
   if (a && globalThis.__dboBeastRevert) { try { globalThis.__dboBeastRevert(a, 'logout'); } catch (e) { log('beast revert on logout failed', e.message); } }
@@ -7522,6 +7544,10 @@ const hitDamageAttemptHook =(aggressorId, targetId, sourceId, damage, flags) => 
   // 0b. A logged-out player's body cannot be harmed, by players or creatures, unless they left mid-fight
   globalThis.__dboHitRefusal = 'offline_body';
   if (agg !== tgt && offlineBodyProtected(tgt)) { refuseOfflineBody(agg, tgt); return false; }
+
+  // 0b2. A player in the character editor is never hit, and hits no one from it (spell hits come through here too)
+  globalThis.__dboHitRefusal = 'in_editor';
+  if (agg !== tgt && (inEditor(tgt) || inEditor(agg))) return false;
 
   // 0c. Just logged in: no creature harms the player yet; their own attack ends the grace
   globalThis.__dboHitRefusal = 'login_grace';

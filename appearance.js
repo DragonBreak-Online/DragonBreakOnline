@@ -240,6 +240,7 @@ module.exports = (api) => {
     try {
       mp.set(a, EDIT, Object.assign({ at: Date.now(), before: copy(before), realName: ownName(a, before) }, left ? { free: true } : {}));
       mp.setRaceMenuOpen(a, true);
+      try { if (typeof globalThis.__dboMarkEditorOpen === 'function') globalThis.__dboMarkEditorOpen(a); } catch (e) { /* the edit flag guards it too */ }
       noteEditorOpened(a);
     } catch (e) {
       try { mp.set(a, EDIT, null); } catch (e2) { /* nothing more to undo */ }

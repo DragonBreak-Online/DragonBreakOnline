@@ -80,7 +80,7 @@ module.exports = (api) => {
 
   const open = (a) => {
     setPending(a, true);
-    try { mp.setRaceMenuOpen(a, false); mp.setRaceMenuOpen(a, true); }
+    try { mp.setRaceMenuOpen(a, false); mp.setRaceMenuOpen(a, true); if (typeof globalThis.__dboMarkEditorOpen === 'function') globalThis.__dboMarkEditorOpen(a); }
     catch (e) { setPending(a, false); return personal(a, 'The creator would not open: ' + e.message); }
     // The look as it stands: a close that keeps race and sex can come back with the Nord head in place of the race's own,
     // as an /appearance or /chargen close can, and the appearance hook puts it back (appearance.js chargenFinish)
