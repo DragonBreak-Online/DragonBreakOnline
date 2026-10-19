@@ -29,9 +29,8 @@
       {
         "heading": "Repairs",
         "items": [
-          "Anyone can repair their gear at a sharpening wheel or an armorer's bench now. Without the Blacksmith rank the piece needs, a repair costs half as much again.",
-          "A Blacksmith at or above the piece's rank pays 10% less for each rank, from their rank at the piece's own, down to half the price.",
-          "Field kits for mending Worn gear on the road are on their way. They will be made by smiths and tailors, and mend Worn gear only, never Damaged or Broken."
+          "Repairs at a sharpening wheel or an armorer's bench are a Blacksmith's work: the smith must hold the rank the piece needs. Without it, bring your gear to a smith.",
+          "Field tools for mending Worn gear yourself are on their way: a whetstone for weapons, a sewing kit for light armour and clothing, and a hammer for heavy armour. They mend Worn gear only; Damaged and Broken gear still needs a smith."
         ]
       },
       {

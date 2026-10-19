@@ -31,11 +31,13 @@ module.exports = (api) => {
     feePerTier: 0.05, feeMin: 5,
     materialShare: [0, 0.25, 0.5, 1],
     reachMeters: 6.5, useWindowSeconds: 20,
-    // Anyone may repair (lorvanack and others, 19 Oct): below the piece's tier at unskilledFeeMult of the fee; a smith of
-    // its tier or above pays less, smithDiscountPerTier a tier from their own tier at the piece's, never under smithMinFeeMult
-    anyoneRepairs: true, unskilledFeeMult: 1.5, smithDiscountPerTier: 0.1, smithMinFeeMult: 0.5,
-    // Field kits (xophor, otome, 19 Oct): an item used from the pack (eaten, as an ALCH) that mends one Worn piece of its
-    // kind, never a Damaged or Broken one. { "<item desc>": { kind: weapon | armor | any, maxTier: 1 } }, filled once the
+    // Repairs at the wheel and bench are a smith's work (Nate, 19 Oct: "blacksmiths paramount ... adds economy"); a player
+    // without the rank brings the piece to one. anyoneRepairs true would let anyone repair at unskilledFeeMult of the fee;
+    // smithDiscountPerTier above 0 would let a smith above the piece's tier pay less (never under smithMinFeeMult)
+    anyoneRepairs: false, unskilledFeeMult: 1.5, smithDiscountPerTier: 0, smithMinFeeMult: 0.5,
+    // Field kits (xophor, otome, 19 Oct; Nate: the hammer, the sewing kit): an item used from the pack (eaten, as an ALCH)
+    // that mends one Worn piece of its kind, never a Damaged or Broken one. kind: weapon (whetstone), light (sewing kit: light
+    // armour and clothing), heavy (hammer: heavy armour), armor, any. { "<item desc>": { kind, maxTier: 1 } }, filled once the
     // PC has made the records. gearTier: the highest smithing family tier it works on (smithing.json: iron 1, steel 2 ..
     // steel plate 5, ebony 6, daedric 7), so a tier of hammers (dangerbush, 19 Oct): Iron-Steel 2, Steel-Plate 5, Plate+ 99
     fieldKits: {},
@@ -278,7 +280,7 @@ module.exports = (api) => {
     const need = itemTier(baseId), mine = smithTier(a);
     if (mine >= need) {
       const mult = Math.max(Number(C.smithMinFeeMult) || 0.5, 1 - (Number(C.smithDiscountPerTier) || 0) * (mine - need + 1));
-      return { fee: Math.max(1, Math.round(base * mult)), why: `a Blacksmith of tier ${mine}: ${Math.round((1 - mult) * 100)}% off` };
+      return { fee: Math.max(1, Math.round(base * mult)), why: mult < 1 ? `a Blacksmith of tier ${mine}: ${Math.round((1 - mult) * 100)}% off` : `Blacksmith craft tier ${need}` };
     }
     if (C.anyoneRepairs === false) return { fee: base, refused: `Repairing this takes a Blacksmith of craft tier ${need}; yours is ${mine || 'none'}.` };
     return { fee: Math.max(1, Math.round(base * (Number(C.unskilledFeeMult) || 1))), why: `a smith of tier ${need} or above would pay less` };
@@ -357,7 +359,15 @@ module.exports = (api) => {
   // ---- field kits ---------------------------------------------------------------------------------------------------
   const KITS = new Map();
   for (const [d, k] of Object.entries(C.fieldKits || {})) { const id = idOf(d); if (id && k) KITS.set(id, { kind: String(k.kind || 'any'), maxTier: Math.max(1, Number(k.maxTier) || 1), gearTier: Number(k.gearTier) > 0 ? Number(k.gearTier) : Infinity }); }
-  const kitFits = (k, id) => (k.kind === 'any' || kindOf(id) === k.kind) && itemTier(id) <= k.gearTier;
+  // An armour's weight class from its BOD2 (armour type u32 at 4) or older BODT (at 8): 0 light, 1 heavy, 2 clothing
+  const armorClass = (id) => {
+    const r = recordOf(id >>> 0); if (!r || String(r.record.type) !== 'ARMO') return -1;
+    const b2 = fieldsOf(r, 'BOD2')[0]; if (b2 && b2.data.byteLength >= 8) return new DataView(b2.data.buffer, b2.data.byteOffset, b2.data.byteLength).getUint32(4, true);
+    const bt = fieldsOf(r, 'BODT')[0]; if (bt && bt.data.byteLength >= 12) return new DataView(bt.data.buffer, bt.data.byteOffset, bt.data.byteLength).getUint32(8, true);
+    return -1;
+  };
+  const kindFits = (kind, id) => kind === 'any' || kindOf(id) === kind || (kind === 'light' && (armorClass(id) === 0 || armorClass(id) === 2)) || (kind === 'heavy' && armorClass(id) === 1);
+  const kitFits = (k, id) => kindFits(k.kind, id) && itemTier(id) <= k.gearTier;
   // gamemode.js eat hook: true when baseId is a kit (used up by the game: a kit that mends nothing is handed back)
   globalThis.__dboDurabilityKit = (a, baseId) => {
     const k = C.enabled ? KITS.get(baseId >>> 0) : null;
@@ -381,7 +391,7 @@ module.exports = (api) => {
       return true;
     }
     giveItem(a, baseId, 1);
-    notice(a, `Nothing you carry is only ${NAMES[1] || 'worn'}${k.kind === 'any' ? '' : ` (${k.kind === 'weapon' ? 'a weapon' : 'armour'})`}${Number.isFinite(k.gearTier) ? ' and within this tool\'s grade' : ''}. It cannot mend worse than that; take it to a smith.`);
+    notice(a, `Nothing you carry is only ${NAMES[1] || 'worn'}${k.kind === 'any' ? '' : ` (${({ weapon: 'a weapon', light: 'light armour or clothing', heavy: 'heavy armour', armor: 'armour' })[k.kind] || k.kind})`}${Number.isFinite(k.gearTier) ? ' and within this tool\'s grade' : ''}. It cannot mend worse than that; take it to a smith.`);
     return true;
   };
   onUi('repairClose', (a) => { S.pending.delete(a >>> 0); closeWidget(a, WIDGET_ID); });
