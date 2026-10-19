@@ -339,6 +339,9 @@ const Constructor = props => {
       return <TradeInvite data={rend} />;
     case 'journal':
       return <Journal data={rend} />;
+    case 'staffData':
+      // Data for the F7 panel's gameplay tabs (adminPanel/staffTabs.tsx), never drawn
+      return null;
     case 'death':
       return (
         <DeathScreen seconds={rend.seconds} onChoice={rend.onChoice} />

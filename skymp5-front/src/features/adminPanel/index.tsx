@@ -4,6 +4,7 @@ import Button from '../../constructorComponents/button';
 import './styles.scss';
 import { PlayerPunish, DeityReset, SkillsTab, ItemsTab, PowersTab, TeleportTab, PlaceTab, PlayerCare, TargetPicker, PanelBan, MasteryTarget, TargetOption, BeastState, PanelPlacements, PlaceMeta, PlaceResults, PlaceSet } from './extraTabs';
 import { SearchBar, fuzzyFilter } from '../../components/SearchBar/SearchBar';
+import { GmCallsTab, EnchantTab } from './staffTabs';
 
 // One roster row as merged by the server (online actor data + backend record).
 interface PanelPlayer {
@@ -115,16 +116,20 @@ const send = (key: string, ...args: unknown[]): void => {
   }
 };
 
-type Tab = 'debug' | 'players' | 'skills' | 'items' | 'powers' | 'teleport' | 'place' | 'modes' | 'npcs';
+type Tab = 'debug' | 'players' | 'gmcalls' | 'skills' | 'items' | 'enchant' | 'powers' | 'teleport' | 'place' | 'modes' | 'npcs';
 
 // Debug is open to every player; the rest render only while data.admin is true. The rail lists them top to bottom
 // (F3 design 3.10); the tabs that act on somebody act on the one named in the status strip.
-const ACTS_ON: Tab[] = ['players', 'skills', 'items', 'powers'];
+const ACTS_ON: Tab[] = ['players', 'skills', 'items', 'enchant', 'powers'];
+// Tabs the gamemode answers (staffTabs.tsx); it checks the rights, so a Trial GM's tab list does not hide GM Calls
+const GAMEPLAY_TABS: Tab[] = ['gmcalls'];
 const TABS: Array<{ id: Tab; label: string }> = [
   { id: 'debug', label: 'Debug' },
   { id: 'players', label: 'Players' },
+  { id: 'gmcalls', label: 'GM Calls' },
   { id: 'skills', label: 'Skills' },
   { id: 'items', label: 'Items' },
+  { id: 'enchant', label: 'Enchant' },
   { id: 'powers', label: 'Powers' },
   { id: 'teleport', label: 'Teleport' },
   { id: 'place', label: 'Place' },
@@ -273,7 +278,7 @@ const AdminPanel = ({ data }: { data: AdminPanelData }) => {
   // A demoted or not yet confirmed admin, or a Trial GM, never stays on a hidden tab
   const allowedTabs = data.caps && Array.isArray(data.caps.tabs) ? data.caps.tabs : null;
   useEffect(() => {
-    if (tab !== 'debug' && (!data.admin || (allowedTabs && allowedTabs.indexOf(tab) === -1))) setTab('debug');
+    if (tab !== 'debug' && (!data.admin || (allowedTabs && allowedTabs.indexOf(tab) === -1 && GAMEPLAY_TABS.indexOf(tab) === -1))) setTab('debug');
   }, [data.admin, allowedTabs, tab]);
 
   const ev = data.events || {};
@@ -281,7 +286,7 @@ const AdminPanel = ({ data }: { data: AdminPanelData }) => {
   const modes = data.modes || [];
   const npcZones = data.npcZones || [];
   const debug = data.debug || null;
-  const shownTabs = data.admin ? TABS.filter((t) => !allowedTabs || t.id === 'debug' || allowedTabs.indexOf(t.id) !== -1) : TABS.filter((t) => t.id === 'debug');
+  const shownTabs = data.admin ? TABS.filter((t) => !allowedTabs || t.id === 'debug' || GAMEPLAY_TABS.indexOf(t.id) !== -1 || allowedTabs.indexOf(t.id) !== -1) : TABS.filter((t) => t.id === 'debug');
   // Seconds since the client gathered the debug block, added to each effect's elapsed time
   const debugDrift = debug ? Math.max(0, Math.round((now - (debug.updatedAt || now)) / 1000)) : 0;
 
@@ -576,6 +581,8 @@ const AdminPanel = ({ data }: { data: AdminPanelData }) => {
         ) : null}
 
         {tab === 'skills' ? <SkillsTab events={ev} masteryTarget={data.masteryTarget || null} who={actingOn} canSpawn={canSpawn} /> : null}
+        {tab === 'gmcalls' ? <GmCallsTab /> : null}
+        {tab === 'enchant' ? <EnchantTab who={actingOn} /> : null}
         {tab === 'items' ? <ItemsTab events={ev} itemsVersion={data.itemsVersion || 0} who={actingOn} canSpawn={canSpawn} /> : null}
         {tab === 'powers' ? <PowersTab events={ev} who={actingOn} beast={acting ? acting.beast : undefined} canSpawn={canSpawn} /> : null}
 
