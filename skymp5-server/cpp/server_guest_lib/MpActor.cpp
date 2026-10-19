@@ -429,20 +429,11 @@ void MpActor::RemoveFromFaction(FormDesc factionForm, bool lazyLoad)
 void MpActor::VisitProperties(CreateActorMessage& message,
                               VisitPropertiesMode mode)
 {
-  const auto baseId = GetBaseId();
-  const uint32_t raceId = GetAppearance() ? GetAppearance()->raceId : 0;
-
-  BaseActorValues baseActorValues;
   WorldState* worldState = GetParent();
-  // this "if" is needed for unit testing: tests can call VisitProperties
-  // without espm attached, which will cause tests to fail
-  if (worldState && worldState->HasEspm()) {
-    baseActorValues = GetBaseActorValues(worldState, baseId, raceId,
-                                         ChangeForm().templateChain);
-    AddLevelBonus(baseActorValues);
-  }
-
-  MpChangeForm changeForm = GetChangeForm();
+  // Read in place: this runs once per neighbour on every stream-in (a login at 500 crowded bots makes ~1,000), and a
+  // copy of the whole change form each time, every prop included, was most of a login's cost (ramp CPU profile,
+  // 19 Oct). Only the owner's own CreateActor (mode All, once per login) needs the base values and a copy
+  const MpChangeForm& changeForm = ChangeForm();
 
   MpObjectReference::VisitProperties(message, mode);
 
@@ -451,8 +442,19 @@ void MpActor::VisitProperties(CreateActorMessage& message,
   }
 
   if (mode == VisitPropertiesMode::All) {
+    const auto baseId = GetBaseId();
+    const uint32_t raceId = GetAppearance() ? GetAppearance()->raceId : 0;
+    BaseActorValues baseActorValues;
+    // this "if" is needed for unit testing: tests can call VisitProperties
+    // without espm attached, which will cause tests to fail
+    if (worldState && worldState->HasEspm()) {
+      baseActorValues = GetBaseActorValues(worldState, baseId, raceId,
+                                           changeForm.templateChain);
+      AddLevelBonus(baseActorValues);
+    }
+    MpChangeForm ownerCopy = GetChangeForm();
     baseActorValues.VisitBaseActorValuesAndPercentages(baseActorValues,
-                                                       changeForm, message);
+                                                       ownerCopy, message);
   }
 
   // Base NPC_/race spells ride along so the client's spell reconciliation does not wipe Flames/Healing

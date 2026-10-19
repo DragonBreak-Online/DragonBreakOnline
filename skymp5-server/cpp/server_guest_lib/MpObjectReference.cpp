@@ -441,9 +441,17 @@ void MpObjectReference::VisitProperties(CreateActorMessage& message,
   }
 
   // Property flags (isVisibleByOwner, isVisibleByNeighbor) are expected to be
-  // checked by a caller (PartOne.cpp in this case)
+  // checked by a caller (PartOne.cpp in this case). private.* props are
+  // dropped by that caller for every recipient, the owner included, so they
+  // are skipped here instead of copied first: at 500 crowded bots a login
+  // pays one CreateActor per neighbour each way, and the characters' private
+  // props were most of what each one copied (ramp CPU profile, 19 Oct)
+  static const std::string kPrivatePrefix = GetPropertyPrefixPrivate();
   ChangeForm().dynamicFields.ForEachValueDump(
     [&](const std::string& propName, const std::string& valueDump) {
+      if (propName.compare(0, kPrivatePrefix.size(), kPrivatePrefix) == 0) {
+        return;
+      }
       CustomPropsEntry customPropsEntry;
       customPropsEntry.propName = propName;
       customPropsEntry.propValueJsonDump = valueDump;
