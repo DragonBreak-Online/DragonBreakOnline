@@ -15,9 +15,13 @@ ok(/const SKIN_NOT_ANIMAL = \/DragonPriest\|/.test(GM), 'gamemode.js skinning re
 
 const block = SRC.slice(SRC.indexOf('  const SOUL = {'), SRC.indexOf('  globalThis.__dboBossTrophies = bossTrophies;'));
 const names = { '1c1fe:skyrim.esm': 'DragonPriestDagger', '7e5bb:skyrim.esm': 'dunForelhostDragonPriestStaff', '4de5b:skyrim.esm': 'MQ303DragonPriestStaff' };
-const make = (cfg) => new Function('C', 'idOf', 'recordOf', 'ARTIFACT', 'DRAGON_LOOT', `${block}; return { bossTrophies, TROPHY };`)(
-  cfg, (d) => (d ? String(d).toLowerCase() : 0), (id) => ({ editorId: names[id] || 'Gem' }), /^ArmorDragonPriestMask/i, /$^/);
-const { bossTrophies } = make({});
+let store = { dropped: {} };
+const readJson = () => JSON.parse(JSON.stringify(store));
+const memfs = { writeFileSync: (f, t) => { store = JSON.parse(t); }, renameSync: () => {} };
+const make = (cfg) => new Function('C', 'idOf', 'recordOf', 'ARTIFACT', 'DRAGON_LOOT', 'readJson', 'fs', 'log', `${block}; return { bossTrophies, TROPHY, markDropped, droppedTrophies };`)(
+  cfg, (d) => (d ? String(d).toLowerCase() : 0), (id) => ({ editorId: names[id] || (/^61c/.test(id) ? 'ArmorDragonPriestMaskX' : 'Gem') }), /^ArmorDragonPriestMask/i, /$^/, readJson, memfs, () => {});
+const { bossTrophies, markDropped } = make({});
+const MASK = (id) => /^61c/.test(String(id));
 const run = (kind, diff, n) => { const c = new Map(); for (let i = 0; i < n; i++) for (const t of bossTrophies(kind, diff)) c.set(t.baseId, (c.get(t.baseId) || 0) + 1); return c; };
 const priestM = run('DunForelhostDragonPriestRahgot', 'nightmare', 4000);
 ok(priestM.get('2e4ff:skyrim.esm') === 4000, 'a Master dragon priest always holds a filled Grand soul gem');
@@ -35,4 +39,16 @@ const masked = make({ bossTrophies: { tables: [{ id: 't', match: '.', always: { 
 names['61cd6:skyrim.esm'] = 'ArmorDragonPriestMaskUltraHelmet';
 ok(masked.bossTrophies('x', 'normal').length === 0, 'an artifact (a dragon priest mask) is never handed out, whatever the config says');
 ok(/TROPHY\.ordinaryBosses !== false && \(\/boss\/i\.test/.test(SRC) && /dragon \?priest\/i\.test/.test(SRC), "isMasterTag: an ordinary dungeon's boss or a dragon priest gets the master's roll");
+// The masks (Nate, 19 Oct: "1% Master, 0.5% Expert, one each")
+const maskRun = (diff, n) => { let c = 0; for (let i = 0; i < n; i++) c += bossTrophies('DunForelhostDragonPriestRahgot', diff).filter((t) => MASK(t.baseId)).length; return c; };
+ok(maskRun('story', 20000) === 0 && maskRun('normal', 20000) === 0, 'no mask below Expert');
+const mH = maskRun('hard', 40000), mM = maskRun('nightmare', 40000);
+ok(mH > 40000 * 0.003 && mH < 40000 * 0.007 && mM > 40000 * 0.0075 && mM < 40000 * 0.0125, 'a mask about 0.5% at Expert and 1% at Master', { mH, mM });
+const all = ['61cc9', '61cc2', '61cc1', '61cc0', '61cb9', '61cab', '61ca5', '61c8b'];
+for (const m of all.slice(0, 7)) markDropped(`${m}:Skyrim.esm`, 'p', 'x');
+let left = new Set(); for (let i = 0; i < 40000; i++) for (const t of bossTrophies('dragonpriest', 'nightmare')) if (MASK(t.baseId)) left.add(t.baseId);
+ok(left.size === 1 && left.has('61c8b:skyrim.esm'), 'a mask already in the world never drops again: with seven out, only the eighth can', [...left]);
+markDropped('61c8b:Skyrim.esm', 'p', 'x');
+ok(maskRun('nightmare', 20000) === 0, '...and with all eight out, none');
+ok(!bossTrophies('dragonpriest', 'nightmare').some((t) => /61cd6|61cca/.test(String(t.baseId))), 'never Konahrik or the Wooden Mask');
 console.log(fail ? `${fail} failed` : 'all checks passed'); process.exit(fail ? 1 : 0);

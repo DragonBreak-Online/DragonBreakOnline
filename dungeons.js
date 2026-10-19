@@ -2040,6 +2040,11 @@ module.exports = (api) => {
           { chance: { story: 0.25, normal: 0.4, hard: 0.6, nightmare: 0.8 }, items: FLAWLESS },
           { chance: { story: 0.02, normal: 0.05, hard: 0.08, nightmare: 0.12 }, rare: true,
             items: [['1c1fe:Skyrim.esm', 3], ['7e5bb:Skyrim.esm', 1], ['4de5b:Skyrim.esm', 1]] },
+          // A dragon priest's mask (Nate, 19 Oct: "1% Master, 0.5% Expert, one each"): an artifact allowed from this roll only,
+          // each mask once in the world (boss-trophies.json dropped; staff remove a line to free one). Not Konahrik, not the Wooden Mask
+          { chance: { hard: 0.005, nightmare: 0.01 }, rare: true, artifact: true, unique: true,
+            items: [['61cc9:Skyrim.esm', 1], ['61cc2:Skyrim.esm', 1], ['61cc1:Skyrim.esm', 1], ['61cc0:Skyrim.esm', 1],
+              ['61cb9:Skyrim.esm', 1], ['61cab:Skyrim.esm', 1], ['61ca5:Skyrim.esm', 1], ['61c8b:Skyrim.esm', 1]] },
         ] },
       { id: 'anyBoss', match: '.', exceptMatch: 'dragon ?priest', rolls: [{ chance: { story: 0.1, normal: 0.2, hard: 0.3, nightmare: 0.4 }, items: FLAWLESS }] },
     ],
@@ -2051,19 +2056,39 @@ module.exports = (api) => {
     for (const x of list) { r -= Number(x[1]); if (r < 0) return x[0]; }
     return list.length ? list[list.length - 1][0] : null;
   };
-  // [{ baseId, count, rare }] for a master of this kind at this difficulty
+  // Unique trophies already in the world: boss-trophies.json { dropped: { "<desc lower case>": { at, by, where } } }
+  const TROPHY_FILE = 'boss-trophies.json';
+  const droppedTrophies = () => { const j = readJson(TROPHY_FILE, { dropped: {} }); return (j && typeof j.dropped === 'object' && j.dropped) || {}; };
+  const markDropped = (desc, by, where) => {
+    const j = readJson(TROPHY_FILE, { dropped: {} }); if (!j.dropped || typeof j.dropped !== 'object') j.dropped = {};
+    j._comment = 'Unique boss trophies already handed out (dungeons.js bossTrophies, the dragon priest masks): each drops once. Remove a line to let that one drop again.';
+    j.dropped[String(desc).toLowerCase()] = { at: new Date().toISOString(), by, where };
+    try { fs.writeFileSync(TROPHY_FILE + '.tmp', JSON.stringify(j, null, 1)); fs.renameSync(TROPHY_FILE + '.tmp', TROPHY_FILE); return true; }
+    catch (e) { log(`${TROPHY_FILE} write failed`, e.message); return false; }
+  };
+  const unmarkDropped = (desc) => {
+    const j = readJson(TROPHY_FILE, { dropped: {} }); if (!j.dropped) return;
+    delete j.dropped[String(desc).toLowerCase()];
+    try { fs.writeFileSync(TROPHY_FILE + '.tmp', JSON.stringify(j, null, 1)); fs.renameSync(TROPHY_FILE + '.tmp', TROPHY_FILE); } catch (e) { log(`${TROPHY_FILE} write failed`, e.message); }
+  };
+  // [{ baseId, count, rare, unique, desc }] for a master of this kind at this difficulty
   const bossTrophies = (kind, diffId) => {
     const out = [];
-    const add = (desc, count, rare) => {
+    const add = (desc, count, roll) => {
       const id = idOf(desc); if (!id) return;
       const r = recordOf(id); const edid = String((r && r.editorId) || '');
-      if (ARTIFACT.test(edid) || DRAGON_LOOT.test(edid)) return;
-      out.push({ baseId: id, count: Math.max(1, Number(count) || 1), rare: !!rare });
+      if ((ARTIFACT.test(edid) && !(roll && roll.artifact)) || DRAGON_LOOT.test(edid)) return;
+      out.push({ baseId: id, count: Math.max(1, Number(count) || 1), rare: !!(roll && roll.rare), unique: !!(roll && roll.unique), desc: String(desc) });
     };
     for (const t of TROPHY.tables || []) {
       if (!trophyRe(t.match).test(kind) || (t.exceptMatch && trophyRe(t.exceptMatch).test(kind))) continue;
-      for (const [desc, n] of ((t.always || {})[diffId] || [])) add(desc, n, false);
-      for (const roll of t.rolls || []) if (Math.random() < (Number((roll.chance || {})[diffId]) || 0)) add(pickWeighted(roll.items), 1, roll.rare);
+      for (const [desc, n] of ((t.always || {})[diffId] || [])) add(desc, n, null);
+      for (const roll of t.rolls || []) {
+        if (!(Math.random() < (Number((roll.chance || {})[diffId]) || 0))) continue;
+        const gone = roll.unique ? droppedTrophies() : null;
+        const items = gone ? (roll.items || []).filter((x) => Array.isArray(x) && !gone[String(x[0]).toLowerCase()]) : roll.items;
+        if (items && items.length) add(pickWeighted(items), 1, roll);
+      }
     }
     return out;
   };
@@ -2167,7 +2192,9 @@ module.exports = (api) => {
     if (master) {
       ebonyGift(casterId, lease, 'master');
       for (const t of bossTrophies(String(((lease && lease.kinds) || {})[tag] || ''), diff.id)) {
-        if (!giveItem(casterId, t.baseId, t.count)) continue;
+        // a unique trophy is written down before it is given, so a second body can never hand out the same mask
+        if (t.unique && (droppedTrophies()[t.desc.toLowerCase()] || !markDropped(t.desc, who(casterId), lease ? lease.name : '?'))) continue;
+        if (!giveItem(casterId, t.baseId, t.count)) { if (t.unique) unmarkDropped(t.desc); continue; }
         personal(casterId, t.rare ? `Among the master's remains, something rare: ${itemName(t.baseId)}.` : `You also find ${t.count > 1 ? t.count + ' ' : ''}${itemName(t.baseId)}.`);
         if (t.rare) audit(`BOSS TROPHY ${who(casterId)} took ${descOfId(t.baseId)} (${itemName(t.baseId)}) from a master in ${lease ? lease.name : '?'} (${diff.id})`);
       }
