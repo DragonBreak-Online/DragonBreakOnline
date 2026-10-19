@@ -1420,6 +1420,11 @@
    "limits": {
     "_comment": "Faction membership limits (server\\guilds.js, Nate 6 Oct): at most one faction per category, per character; ids listed by name, never from guild-defs kind. allegiance counts a hold's or county's court officials only (officialsOnly + exemptRoles: a Citizen or Guard takes no slot), so a Legion soldier may live in a hold but not sit in its court. conflicts: refused whatever the category (supernatural: refused for that kind too, supernatural.js). The six Orc stronghold clans, the Imperial Civil Commission and the Penitus Oculatus are allegiances (Nate, 19 Oct), any member. Unplaced, so unlimited: the Silver Hand, the four vampire clans, the two Hircine packs, charter factions. Checked on a new membership or a rank that newly takes a slot; nobody is removed. A Lead GM lifts it once with /faction override <player> <id> (audited).",
     "enabled": true,
+    "requiresFaith": {
+     "_comment": "A church takes only a follower of one of its gods, checked when they join (guilds.js; prayer.js private.dboDeity). Both honour the Eight: under the White-Gold Concordat, not Talos (Nate, 19 Oct).",
+     "imperial-cult": { "label": "the Eight Divines", "deities": ["akatosh", "arkay", "dibella", "julianos", "kynareth", "mara", "stendarr", "zenithar"] },
+     "great-faiths": { "label": "the Eight Divines", "deities": ["akatosh", "arkay", "dibella", "julianos", "kynareth", "mara", "stendarr", "zenithar"] }
+    },
     "categories": {
      "allegiance": {
       "ids": [
@@ -1476,10 +1481,12 @@
        "bards-college",
        "synod",
        "vigil-of-stendarr",
-       "dawnguard",
-       "imperial-cult",
-       "great-faiths"
+       "dawnguard"
       ]
+     },
+     "faith": {
+      "_comment": "One organized religion (Nate, 19 Oct): the churches of the Eight Divines, beside a guild. The Vigil of Stendarr is a militant order and stays a guild.",
+      "ids": ["imperial-cult", "great-faiths"]
      },
      "secret": {
       "ids": [

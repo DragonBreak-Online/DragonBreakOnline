@@ -40,10 +40,10 @@ ok('the Thalmor still never take a Blade', L.conflicts.some((c) => (c.a || []).i
 // ---- the stub server ------------------------------------------------------------------------------------------------
 const LEAD = 0x10, GM = 0x11;
 const LEG = 0x20, STORM = 0x21, COUNT = 0x22, CIT = 0x23, SYN = 0x24, WHIS = 0x25, THIEF = 0x26, DB = 0x27, CULT = 0x28,
-  VIG = 0x29, VAMP = 0x2a, DG = 0x2b, VOLK = 0x2c, FG = 0x2d, KOJUS = 0x2e, BOSS = 0x2f, CHIEF = 0x30, ORC = 0x31;
+  VIG = 0x29, VAMP = 0x2a, DG = 0x2b, VOLK = 0x2c, FG = 0x2d, KOJUS = 0x2e, BOSS = 0x2f, CHIEF = 0x30, ORC = 0x31, PRIMATE = 0x32, PRIOR = 0x33;
 const names = { [LEAD]: 'Lead', [GM]: 'Plain GM', [LEG]: 'Legionary', [STORM]: 'Stormy', [COUNT]: 'Count', [CIT]: 'Citizen', [SYN]: 'Synodic',
   [WHIS]: 'Whisperer', [THIEF]: 'Thief', [DB]: 'Assassin', [CULT]: 'Cultist', [VIG]: 'Vigilant', [VAMP]: 'Vampire', [DG]: 'Guardian',
-  [VOLK]: 'Volkihar', [FG]: 'Fighter', [KOJUS]: 'Kojus', [BOSS]: 'Boss', [CHIEF]: 'Chief', [ORC]: 'Grunt' };
+  [VOLK]: 'Volkihar', [FG]: 'Fighter', [KOJUS]: 'Kojus', [BOSS]: 'Boss', [CHIEF]: 'Chief', [ORC]: 'Grunt', [PRIMATE]: 'Primate', [PRIOR]: 'Prior' };
 const chars = new Map(Object.entries(names).map(([k, v]) => [Number(k), v]));
 const told = [], audits = [], said = [];
 const handlers = {}, commands = {};
@@ -87,6 +87,7 @@ put('imperial-legion', LEG); put('imperial-legion', BOSS, 0); put('county-bruma'
 put('synod', SYN, 0); put('college-of-whispers', WHIS, 0); put('thieves-guild', THIEF); put('dark-brotherhood', DB, 0);
 put('cult-boethiah', CULT); put('vigil-of-stendarr', VIG, 0); put('dawnguard', DG, 0); put('clan-volkihar', VOLK, 0); put('fighters-guild', FG, 0);
 put('clan-largashbur', CHIEF, 0); put('clan-largashbur', ORC);
+put('imperial-cult', PRIMATE, 0); put('great-faiths', PRIOR, 0);
 
 // ---- allegiance ----------------------------------------------------------------------------------------------------
 // The Orc stronghold clans are an allegiance, any member (Nate, 19 Oct)
@@ -98,6 +99,21 @@ ro = invite(CHIEF, LEG, 'clan-largashbur');
 ok('nor a Legion soldier to a clan', ro.error && /already serves the Imperial Legion/.test(ro.error), ro);
 ok('the Imperial Civil Commission and the Penitus Oculatus are allegiances too (Nate, 19 Oct)', ['imperial-civil-commission', 'penitus-oculatus'].every((c) => L.categories.allegiance.ids.includes(c)
   && !(L.categories.allegiance.officialsOnly || []).includes(c) && !Object.entries(L.categories).some(([k, v]) => k !== 'allegiance' && (v.ids || []).includes(c))));
+// A faith of its own beside a guild, one at a time, and only for a follower of the Eight (Nate, 19 Oct)
+ok('the churches are a faith, not a guild; the Vigil stays a guild', L.categories.faith.ids.join() === 'imperial-cult,great-faiths' && L.categories.guild.ids.includes('vigil-of-stendarr')
+  && !L.categories.guild.ids.includes('imperial-cult') && !L.categories.guild.ids.includes('great-faiths'));
+props.delete(`${FG}|private.dboDeity`);
+ro = invite(PRIMATE, FG, 'imperial-cult');
+ok('a Fighter who follows no god is refused by the Imperial Cult, told why', ro.error && /does not follow the Eight Divines/.test(ro.error), ro);
+props.set(`${FG}|private.dboDeity`, { id: 'talos', kind: 'divine' });
+ro = invite(PRIMATE, FG, 'imperial-cult');
+ok('...and so is a follower of Talos (the Concordat)', ro.error && /does not follow the Eight Divines/.test(ro.error), ro);
+props.set(`${FG}|private.dboDeity`, { id: 'akatosh', kind: 'divine' });
+ro = invite(PRIMATE, FG, 'imperial-cult');
+ok('a Fighter who follows Akatosh may join the Imperial Cult beside the Fighters Guild', !ro.error, ro);
+ok('...and accepts', /You are now/.test(accept(FG, 'imperial-cult')) && inF('imperial-cult', FG) && inF('fighters-guild', FG));
+ro = invite(PRIOR, FG, 'great-faiths');
+ok('one faith at a time: the Great Faiths refuse an Imperial Cult member', ro.error && /already serves the Imperial Cult/.test(ro.error), ro);
 ro = invite(FG, ORC, 'fighters-guild');
 ok('a clan member may still join a guild', !ro.error, ro);
 let r = invite(STORM, LEG, 'stormcloaks');
