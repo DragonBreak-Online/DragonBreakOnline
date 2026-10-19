@@ -1,0 +1,16 @@
+// The F3 Wanted tab: the citizen panel's rows (citizenBoard/styles.scss) in one column of the journal's page
+.jwanted {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 760px;
+
+  .journal__heading { margin: 6px 0 0; }
+}
+
+.jwanted__form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
