@@ -4796,6 +4796,61 @@
    "recipes": [
     "835:LEITEUHTThalmor.esp"
    ]
+  },
+  "815:Sentinel - City Guards.esp": {
+   "name": "Eastmarch Guard's Armor",
+   "set": "Windhelm Guard",
+   "factions": [
+    "hold-windhelm"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "d7f:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "816:Sentinel - City Guards.esp": {
+   "name": "Eastmarch Guard's Heavy Armor",
+   "set": "Windhelm Guard",
+   "factions": [
+    "hold-windhelm"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "d80:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "819:Sentinel - City Guards.esp": {
+   "name": "Eastmarch Guard's Helmet",
+   "set": "Windhelm Guard",
+   "factions": [
+    "hold-windhelm"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "d81:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "81a:Sentinel - City Guards.esp": {
+   "name": "Eastmarch Guard's Closed Helmet",
+   "set": "Windhelm Guard",
+   "factions": [
+    "hold-windhelm"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "d82:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "81b:Sentinel - City Guards.esp": {
+   "name": "Eastmarch Guard's Heavy Helmet",
+   "set": "Windhelm Guard",
+   "factions": [
+    "hold-windhelm"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "d83:DragonBreak Nexus Patches.esp"
+   ]
   }
  },
  "_uniformsComment": "War uniforms (realm.js, config war.uniforms): in a battle only fighters wearing a body piece of their faction's uniform count at a standard. A faction's uniform is its items above plus these worn-only extras; a faction with neither (the Fighters Guild today) is not held to it.",
