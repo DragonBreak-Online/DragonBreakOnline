@@ -1,5 +1,19 @@
 [
   {
+    "title": "Cooked Dog Meat",
+    "date": "2026-10-19",
+    "version": "Server update",
+    "tag": "New",
+    "sections": [
+      {
+        "heading": "At any cooking pot",
+        "items": [
+          "Cook raw dog meat with a pinch of salt at any cooking pot."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Faiths of Tamriel and the Green Pact",
     "date": "2026-10-18",
     "version": "Hotfix",
