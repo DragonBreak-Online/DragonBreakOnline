@@ -73,7 +73,7 @@ export const TargetPicker = ({ targets, value, onChange, label }: {
 
 // Long lists reveal a page at a time instead of stopping dead at a cap
 // step: how many one press adds (a server page); without it, as many again as are shown
-const MoreRow = ({ shown, total, onMore, step }: { shown: number; total: number; onMore: () => void; step?: number }) => (
+export const MoreRow = ({ shown, total, onMore, step }: { shown: number; total: number; onMore: () => void; step?: number }) => (
   total <= shown ? null : (
     <div className="admin-panel__more">
       <span className="admin-panel__hint">{shown} of {total}</span>
@@ -96,7 +96,7 @@ export interface PanelBan {
 const BAN_LENGTHS: Array<[string, number]> = [['1 hour', 1], ['6 hours', 6], ['1 day', 24], ['3 days', 72], ['1 week', 168], ['30 days', 720]];
 
 // Anything that cannot be undone asks once. The second press within five seconds does it.
-const Confirm = ({ text, width, disabled, onConfirm }: { text: string; width: number; disabled?: boolean; onConfirm: () => void }) => {
+export const Confirm = ({ text, width, disabled, onConfirm }: { text: string; width: number; disabled?: boolean; onConfirm: () => void }) => {
   const [armed, setArmed] = useState(false);
   useEffect(() => {
     if (!armed) return undefined;
