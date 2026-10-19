@@ -110,10 +110,10 @@ globalThis.__dboDurabilityEquip(P, mp.get(P, 'equipment'));
   ok(globalThis.__dboRepairActivate(WHEEL, P) === true && lastWidget().actions.some((x) => x.label === 'Iron Sword (Damaged)'), 'the wheel lists the damaged sword');
   const row = lastWidget().actions.find((x) => x.label === 'Iron Sword (Damaged)').id;
   ui('repairChoose', P, [row]);
-  ok(/back to Intact for 10 gold/.test(lastWidget().targetName) && /craft tier 2/.test(lastWidget().targetName), 'its page: 2 tiers at 5% of 100 gold = 10 gold, Blacksmith craft tier 2', lastWidget().targetName);
+  ok(/back to Intact for 15 gold/.test(lastWidget().targetName) && /tier 2 or above would pay less/.test(lastWidget().targetName), 'its page for a smith below the piece\'s tier (anyone repairs, 19 Oct): 2 tiers at 5% of 100 gold = 10, x1.5 = 15 gold', lastWidget().targetName);
   smithTier = 1;
   ui('repairChoose', P, ['fix']);
-  ok(count(P, SWORD, 'Iron Sword (Damaged)') === 1 && count(P, GOLD) === 100 && /craft tier 2; yours is 1/.test(lastWidget().targetName), 'a smith below the piece\'s tier is refused and pays nothing', lastWidget().targetName);
+  ok(count(P, SWORD, 'Iron Sword (Damaged)') === 1 && count(P, GOLD) === 100 && /needs 1 Iron Ingot/.test(lastWidget().targetName), 'without the materials nobody repairs it, and nothing is charged', lastWidget().targetName);
   smithTier = 3;
   ui('repairChoose', P, [row]);
   ok(/1 Iron Ingot/.test(lastWidget().targetName) && !/Leather Strips/.test(lastWidget().targetName), 'Damaged: half the materials rounded down, at least one of the main one (1 Iron Ingot)', lastWidget().targetName);
@@ -122,19 +122,19 @@ globalThis.__dboDurabilityEquip(P, mp.get(P, 'equipment'));
   dress([{ baseId: SWORD, count: 1, name: 'Iron Sword (Damaged)' }, { baseId: INGOT, count: 1 }, { baseId: GOLD, count: 100 }]);
   globalThis.__dboRepairActivate(WHEEL, P);
   ui('repairChoose', P, [lastWidget().actions.find((x) => x.label === 'Iron Sword (Damaged)').id]); ui('repairChoose', P, ['fix']);
-  ok(count(P, SWORD, '') === 1 && count(P, SWORD, 'Iron Sword (Damaged)') === 0 && count(P, GOLD) === 90 && count(P, INGOT) === 0, 'a tier 3 smith repairs it for 10 gold and 1 Iron Ingot: plain "Iron Sword" again', inv(P));
-  ok(/repaired for 10 gold/.test(lastWidget().targetName), '...and is told', lastWidget().targetName);
+  ok(count(P, SWORD, '') === 1 && count(P, SWORD, 'Iron Sword (Damaged)') === 0 && count(P, GOLD) === 92 && count(P, INGOT) === 0, 'a tier 3 smith (a tier above the piece: 20% off) repairs it for 8 gold and 1 Iron Ingot: plain "Iron Sword" again', inv(P));
+  ok(/repaired for 8 gold/.test(lastWidget().targetName), '...and is told', lastWidget().targetName);
   // A Broken piece needs its recipe's materials too
   dress([{ baseId: SWORD, count: 1, name: 'Iron Sword (Broken)' }, { baseId: GOLD, count: 100 }]);
   globalThis.__dboRepairActivate(WHEEL, P);
   ui('repairChoose', P, [lastWidget().actions.find((x) => x.label === 'Iron Sword (Broken)').id]);
-  ok(/15 gold/.test(lastWidget().targetName) && /1 Iron Ingot, 1 Leather Strips/.test(lastWidget().targetName), 'Broken: 3 tiers (15 gold) and the materials it is made from', lastWidget().targetName);
+  ok(/12 gold/.test(lastWidget().targetName) && /1 Iron Ingot, 1 Leather Strips/.test(lastWidget().targetName), 'Broken: 3 tiers (15 gold, 20% off for this smith: 12) and the materials it is made from', lastWidget().targetName);
   ui('repairChoose', P, ['fix']);
   ok(count(P, SWORD, 'Iron Sword (Broken)') === 1 && count(P, GOLD) === 100 && /needs 1 Iron Ingot/.test(lastWidget().targetName), 'without the materials it is refused, and nothing is charged', lastWidget().targetName);
   dress([{ baseId: SWORD, count: 1, name: 'Iron Sword (Broken)' }, { baseId: INGOT, count: 2 }, { baseId: STRIPS, count: 1 }, { baseId: GOLD, count: 100 }]);
   globalThis.__dboRepairActivate(WHEEL, P);
   ui('repairChoose', P, [lastWidget().actions.find((x) => x.label === 'Iron Sword (Broken)').id]); ui('repairChoose', P, ['fix']);
-  ok(count(P, SWORD, '') === 1 && count(P, INGOT) === 1 && count(P, STRIPS) === 0 && count(P, GOLD) === 85, 'with them: the materials and 15 gold are taken, the sword is whole', inv(P));
+  ok(count(P, SWORD, '') === 1 && count(P, INGOT) === 1 && count(P, STRIPS) === 0 && count(P, GOLD) === 88, 'with them: the materials and 12 gold are taken, the sword is whole', inv(P));
   ok(globalThis.__dboRepairActivate(WHEEL, P) === false, 'with nothing to repair the wheel works as usual');
   dress([{ baseId: SWORD, count: 1, name: 'Iron Sword (Worn)' }, { baseId: GOLD, count: 100 }]);
   globalThis.__dboRepairActivate(WHEEL, P); ui('repairChoose', P, ['use']);
@@ -165,6 +165,33 @@ globalThis.__dboDurabilityEquip(P, mp.get(P, 'equipment'));
   ok(!!kept, 'a piece with kept wear and no tier in its name is still listed by its tier', lastWidget().actions);
   ui('repairChoose', P, [kept.id]); ui('repairChoose', P, ['fix']);
   ok(count(P, SWORD, '') === 1 && count(P, GOLD) < 100 && !Object.keys(mp.get(P, 'private.dboWear') || {}).includes(`${SWORD}|`), '...repaired, its kept wear is gone', [inv(P), mp.get(P, 'private.dboWear')]);
+  // ---- field kits and the smith's price (19 Oct) ------------------------------------------------------------------
+  {
+    const KIT = 0x777, given = [];
+    api.giveItem = (a, id, n) => { given.push([id, n]); return true; };
+    api.cfg = JSON.parse(JSON.stringify(api.cfg));
+    api.cfg.durability = Object.assign({}, api.cfg.durability, { fieldKits: { '777:Skyrim.esm': { kind: 'weapon', maxTier: 1 } } });
+    delete require.cache[path.join(SERVER, 'durability.js')];
+    require(path.join(SERVER, 'durability.js'))(api);
+    put(P, 'private.dboWear', {});
+    dress([{ baseId: SWORD, count: 1, worn: true, name: 'Iron Sword (Worn)' }, { baseId: CUIRASS, count: 1, worn: true }, { baseId: GOLD, count: 100 }]);
+    globalThis.__dboDurabilityEquip(P, mp.get(P, 'equipment'));
+    ok(globalThis.__dboDurabilityMult(P, SWORD, false, 'Iron Sword (Worn)') === 0.9, 'kit: a worn sword named Worn counts as Worn');
+    ok(globalThis.__dboDurabilityKit(P, KIT) === true && globalThis.__dboDurabilityMult(P, SWORD, false, 'Iron Sword (Worn)') === 1 && /mend your Iron Sword/.test(lastSaid()), 'a whetstone mends the Worn sword in hand to whole', lastSaid());
+    dress([{ baseId: SWORD, count: 1, name: 'Iron Sword (Worn)' }, { baseId: GOLD, count: 100 }]);
+    globalThis.__dboDurabilityEquip(P, mp.get(P, 'equipment'));
+    await wait(500);
+    ok(count(P, SWORD, '') === 1 && count(P, SWORD, 'Iron Sword (Worn)') === 0, '...and taken off it is plain "Iron Sword" again', inv(P));
+    dress([{ baseId: SWORD, count: 1, name: 'Iron Sword (Damaged)' }, { baseId: GOLD, count: 100 }]);
+    ok(globalThis.__dboDurabilityKit(P, KIT) === true && count(P, SWORD, 'Iron Sword (Damaged)') === 1 && given.some(([id]) => id === KIT) && /cannot mend worse/.test(lastSaid()), 'a Damaged sword is beyond a kit: the kit is handed back', lastSaid());
+    ok(globalThis.__dboDurabilityKit(P, 0x778) === false, 'anything else eaten is not a kit');
+    // a smith at the piece's own tier: 10% off
+    smithTier = 2;
+    dress([{ baseId: SWORD, count: 1, name: 'Iron Sword (Worn)' }, { baseId: INGOT, count: 1 }, { baseId: GOLD, count: 100 }]);
+    globalThis.__dboRepairActivate(WHEEL, P);
+    ui('repairChoose', P, [lastWidget().actions.find((x) => x.label === 'Iron Sword (Worn)').id]);
+    ok(/for 5 gold/.test(lastWidget().targetName) && /10% off/.test(lastWidget().targetName), 'a smith at the piece\'s tier: 1 tier (5 gold) at 10% off, at least the minimum', lastWidget().targetName);
+  }
   // ---- gamemode.js wiring -----------------------------------------------------------------------------------------
   const gm = fs.readFileSync(path.join(SERVER, 'gamemode.js'), 'utf8');
   ok(/__dboDurabilityMult\(a, Number\(e\.baseId\) >>> 0, !!e\.wornLeft, e\.name \|\| ''\)/.test(gm) && (gm.match(/\* \(w\.cond \|\| 1\);/g) || []).length === 2 && /\* \(\(w && w\.cond\) \|\| 1\)/.test(gm),

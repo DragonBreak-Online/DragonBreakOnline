@@ -3459,6 +3459,8 @@ const eatHook = (actorId, baseId, ...rest) => {
   let verdict;
   const prev = globalThis.__dboPrevEat;
   if (prev) { try { verdict = prev(actorId, baseId, ...rest); } catch (e) { log('eat hook chain failed', e.message); } }
+  // A field repair kit (durability.js) is used, not eaten
+  if (verdict !== false) { try { if (globalThis.__dboDurabilityKit && globalThis.__dboDurabilityKit(Number(actorId) >>> 0, Number(baseId) >>> 0)) return verdict; } catch (e) { log('repair kit failed', e.message); } }
   if (verdict !== false) { try { onEat(Number(actorId) >>> 0, Number(baseId) >>> 0); } catch (e) { log('eat handling failed', e.message); } try { if (globalThis.__dboSuperEat) globalThis.__dboSuperEat(Number(actorId) >>> 0, Number(baseId) >>> 0); } catch (e) { log('supernatural eat failed', e.message); } }
   return verdict;
 };

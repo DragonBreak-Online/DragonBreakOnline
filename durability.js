@@ -31,6 +31,13 @@ module.exports = (api) => {
     feePerTier: 0.05, feeMin: 5,
     materialShare: [0, 0.25, 0.5, 1],
     reachMeters: 6.5, useWindowSeconds: 20,
+    // Anyone may repair (lorvanack and others, 19 Oct): below the piece's tier at unskilledFeeMult of the fee; a smith of
+    // its tier or above pays less, smithDiscountPerTier a tier from their own tier at the piece's, never under smithMinFeeMult
+    anyoneRepairs: true, unskilledFeeMult: 1.5, smithDiscountPerTier: 0.1, smithMinFeeMult: 0.5,
+    // Field kits (xophor, otome, 19 Oct): an item used from the pack (eaten, as an ALCH) that mends one Worn piece of its
+    // kind, never a Damaged or Broken one. { "<item desc>": { kind: weapon | armor | any, maxTier: 1 } }, filled once the
+    // PC has made the records (whetstone, sewing kit, armourer's hammer)
+    fieldKits: {},
     wheelKeywords: ['CraftingSmithingSharpeningWheel'],
     benchKeywords: ['CraftingSmithingArmorTable'],
   }, cfg.durability || {});
@@ -74,7 +81,7 @@ module.exports = (api) => {
   const tierOf = (a, w) => {
     const base = tierOfName(w.name);
     const pts = Number(ledger(a)[keyOf(w)]) || 0;
-    return Math.min(BROKEN, base + Math.floor(pts / perTier(kindOf(w.baseId))));
+    return Math.max(0, Math.min(BROKEN, base + Math.floor(pts / perTier(kindOf(w.baseId)))));
   };
 
   // gamemode.js wornWithHealth: a worn piece's damage or armour multiplier
@@ -264,6 +271,17 @@ module.exports = (api) => {
   const smithTier = (a) => { try { return typeof globalThis.__dboSmithCraftTier === 'function' ? Number(globalThis.__dboSmithCraftTier(a >>> 0)) || 0 : 7; } catch (e) { return 0; } };
   const itemTier = (id) => { try { return typeof globalThis.__dboSmithItemTier === 'function' ? Number(globalThis.__dboSmithItemTier(id >>> 0)) || 1 : 1; } catch (e) { return 1; } };
   const nameOfMat = (d) => itemName(d);
+  // What a repair costs this player: { fee, why, refused }
+  const priceFor = (a, baseId, tier) => {
+    const base = feeOf(baseId, tier);
+    const need = itemTier(baseId), mine = smithTier(a);
+    if (mine >= need) {
+      const mult = Math.max(Number(C.smithMinFeeMult) || 0.5, 1 - (Number(C.smithDiscountPerTier) || 0) * (mine - need + 1));
+      return { fee: Math.max(1, Math.round(base * mult)), why: `a Blacksmith of tier ${mine}: ${Math.round((1 - mult) * 100)}% off` };
+    }
+    if (C.anyoneRepairs === false) return { fee: base, refused: `Repairing this takes a Blacksmith of craft tier ${need}; yours is ${mine || 'none'}.` };
+    return { fee: Math.max(1, Math.round(base * (Number(C.unskilledFeeMult) || 1))), why: `a smith of tier ${need} or above would pay less` };
+  };
 
   const openList = (a, target, kind, note) => {
     const list = damagedOf(a, kind).slice(0, 8);
@@ -278,13 +296,13 @@ module.exports = (api) => {
   const openItem = (a, target, kind, baseId, name, note) => {
     const it = damagedOf(a, kind).find((x) => x.baseId === baseId && x.name === name);
     if (!it) return openList(a, target, kind, note);
-    const fee = feeOf(baseId, it.tier);
+    const price = priceFor(a, baseId, it.tier);
+    const fee = price.fee;
     const mats = matsFor(baseId, it.tier);
-    const need = itemTier(baseId);
     const lines = [`${nameAt(it.entry, it.tier)}: back to Intact for ${fee} gold`];
     if (mats && mats.length) lines.push(`and ${mats.map(([d, n]) => `${n} ${nameOfMat(d)}`).join(', ')}`);
     else if (it.tier >= BROKEN) lines.push('and its materials (none known: ask a GM)');
-    lines.push(`Needs Blacksmith craft tier ${need}`);
+    lines.push(price.refused || `(${price.why})`);
     S.pending.set(a >>> 0, { target: target >>> 0, kind, item: { baseId, name } });
     openWidget(a, { type: 'contextMenu', id: WIDGET_ID, mode: 'menu', targetName: `${note ? `${note}. ` : ''}${lines.join(', ')}`,
       actions: [{ id: 'fix', label: `Repair it (${fee} gold${mats && mats.length ? ' and the materials' : ''})` }, { id: 'list', label: 'Back to the list' }],
@@ -294,9 +312,9 @@ module.exports = (api) => {
   const repair = (a, p) => {
     const it = damagedOf(a, p.kind).find((x) => x.baseId === p.item.baseId && x.name === p.item.name);
     if (!it) return 'That piece is no longer in your pack.';
-    const need = itemTier(it.baseId);
-    if (smithTier(a) < need) return `Repairing this takes a Blacksmith of craft tier ${need}; yours is ${smithTier(a) || 'none'}.`;
-    const fee = feeOf(it.baseId, it.tier);
+    const price = priceFor(a, it.baseId, it.tier);
+    if (price.refused) return price.refused;
+    const fee = price.fee;
     const mats = matsFor(it.baseId, it.tier);
     if (it.tier >= BROKEN && !(mats && mats.length)) return 'Nobody knows what this was made from. Ask a GM.';
     if ((Number(goldOf(a)) || 0) < fee) return `The repair costs ${fee} gold, and you do not have it.`;
@@ -335,6 +353,36 @@ module.exports = (api) => {
       if (!openList(a, p.target, p.kind, text)) { S.pending.delete(a >>> 0); closeWidget(a, WIDGET_ID); personal(a, text); }
     }
   });
+  // ---- field kits ---------------------------------------------------------------------------------------------------
+  const KITS = new Map();
+  for (const [d, k] of Object.entries(C.fieldKits || {})) { const id = idOf(d); if (id && k) KITS.set(id, { kind: String(k.kind || 'any'), maxTier: Math.max(1, Number(k.maxTier) || 1) }); }
+  const kitFits = (k, id) => k.kind === 'any' || kindOf(id) === k.kind;
+  // gamemode.js eat hook: true when baseId is a kit (used up by the game: a kit that mends nothing is handed back)
+  globalThis.__dboDurabilityKit = (a, baseId) => {
+    const k = C.enabled ? KITS.get(baseId >>> 0) : null;
+    if (!k) return false;
+    a >>>= 0;
+    const fits = (w) => kitFits(k, w.baseId) && w.tier >= 1 && w.tier <= k.maxTier;
+    const worn = wornOf(a).map((w) => Object.assign(w, { tier: tierOf(a, w) })).filter(fits);
+    if (worn.length) {
+      const w = worn[0];
+      const l = ledger(a); l[keyOf(w)] = -tierOfName(w.name) * perTier(kindOf(w.baseId));
+      try { writeLedger(a, l); } catch (e) { giveItem(a, baseId, 1); return true; }
+      notice(a, `You mend your ${bareName(w.entry)} in the field. It is whole again.`);
+      log(`durability: ${who(a)} field-mended worn ${descOf(w.baseId)} from ${NAMES[w.tier]} with ${descOf(baseId)}`);
+      return true;
+    }
+    const packed = ['weapon', 'armor'].flatMap((kind) => damagedOf(a, kind)).filter(fits);
+    if (packed.length && renameOne(a, packed[0].baseId, packed[0].name, 0)) {
+      const l = ledger(a); const key = keyOf(packed[0]); if (key in l) { delete l[key]; try { writeLedger(a, l); } catch (e) { /* the name is Intact */ } }
+      notice(a, `You mend your ${bareName(packed[0].entry)} in the field. It is whole again.`);
+      log(`durability: ${who(a)} field-mended ${descOf(packed[0].baseId)} from ${NAMES[packed[0].tier]} with ${descOf(baseId)}`);
+      return true;
+    }
+    giveItem(a, baseId, 1);
+    notice(a, `Nothing you carry is only ${NAMES[1] || 'worn'}${k.kind === 'any' ? '' : ` (${k.kind === 'weapon' ? 'a weapon' : 'armour'})`}. A kit cannot mend worse than that; take it to a smith.`);
+    return true;
+  };
   onUi('repairClose', (a) => { S.pending.delete(a >>> 0); closeWidget(a, WIDGET_ID); });
   onUi('close', (a, args, widgetId) => { if (widgetId === WIDGET_ID) S.pending.delete(a >>> 0); });
 
