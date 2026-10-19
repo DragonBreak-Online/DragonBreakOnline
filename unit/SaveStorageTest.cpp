@@ -2,10 +2,13 @@
 
 #include "FormDesc.h"
 #include "MpChangeForms.h"
+#include "database_drivers/DatabaseFactory.h"
 #include "database_drivers/FileDatabase.h"
 #include "database_drivers/ZipDatabase.h"
 #include "save_storages/AsyncSaveStorage.h"
+#include <atomic>
 #include <filesystem>
+#include <map>
 
 std::shared_ptr<
   Viet::ISaveStorage<MpChangeForm, FormDesc, std::vector<FormDesc>>>
@@ -246,11 +249,12 @@ TEST_CASE("Changes are transferred to SaveStorage", "[save]")
 TEST_CASE("FileDatabase writes a batch whole and leaves no temp files",
           "[save]")
 {
+  const bool batchedSync = GENERATE(true, false);
   auto directory = "unit/data";
   if (std::filesystem::exists(directory)) {
     std::filesystem::remove_all(directory);
   }
-  FileDatabase db(directory, spdlog::default_logger());
+  FileDatabase db(directory, spdlog::default_logger(), batchedSync);
 
   auto makeBatch = [](float x) {
     std::vector<std::optional<MpChangeForm>> forms;
@@ -283,4 +287,281 @@ TEST_CASE("FileDatabase writes a batch whole and leaves no temp files",
   for (auto& cf : loaded) {
     REQUIRE(cf.position.x == 7.f);
   }
+}
+
+namespace {
+size_t CountFilesWithExtension(const std::filesystem::path& dir,
+                               const std::string& extension)
+{
+  size_t n = 0;
+  for (auto& entry : std::filesystem::directory_iterator(dir)) {
+    if (entry.path().extension() == extension) {
+      ++n;
+    }
+  }
+  return n;
+}
+
+std::map<FormDesc, MpChangeForm> ReadFromDisk(const std::string& directory)
+{
+  std::map<FormDesc, MpChangeForm> res;
+  FileDatabase db(directory, spdlog::default_logger());
+  db.Iterate([&](const MpChangeForm& cf) { res[cf.formDesc] = cf; },
+             std::nullopt);
+  return res;
+}
+
+void TickFor(WorldState& wst, std::chrono::milliseconds duration)
+{
+  auto end = std::chrono::steady_clock::now() + duration;
+  while (std::chrono::steady_clock::now() < end) {
+    wst.Tick();
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  }
+}
+
+// Records the order of writes; the first Upsert is slow, so a batch is still being written when FlushSync starts
+class RecordingDatabase
+  : public Viet::IDatabase<MpChangeForm, FormDesc, std::vector<FormDesc>>
+{
+public:
+  std::atomic<int> numUpserts = 0;
+  std::vector<float> writes;
+  std::map<FormDesc, MpChangeForm> stored;
+
+  void Iterate(const IterateCallback& cb,
+               std::optional<std::vector<FormDesc>>) override
+  {
+    for (auto& [desc, cf] : stored) {
+      cb(cf);
+    }
+  }
+
+private:
+  std::vector<std::optional<MpChangeForm>>&& UpsertImpl(
+    std::vector<std::optional<MpChangeForm>>&& changeForms,
+    size_t& outNumUpserted) override
+  {
+    if (numUpserts++ == 0) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(300));
+    }
+    for (auto& cf : changeForms) {
+      if (cf) {
+        writes.push_back(cf->position.x);
+        stored[cf->formDesc] = *cf;
+        ++outNumUpserted;
+      }
+    }
+    return std::move(changeForms);
+  }
+};
+}
+
+TEST_CASE("FileDatabase syncs a batch bigger than one chunk", "[save]")
+{
+  const bool batchedSync = GENERATE(true, false);
+  auto directory = "unit/data";
+  if (std::filesystem::exists(directory)) {
+    std::filesystem::remove_all(directory);
+  }
+  FileDatabase db(directory, spdlog::default_logger(), batchedSync);
+
+  std::vector<std::optional<MpChangeForm>> forms;
+  for (int i = 0; i < 130; ++i) {
+    MpChangeForm cf =
+      CreateChangeForm(fmt::format("{:x}", 0xff000000 + i).data());
+    cf.position = { static_cast<float>(i), 0.f, 0.f };
+    forms.push_back(cf);
+  }
+  REQUIRE(db.Upsert(std::move(forms)) == 130);
+
+  auto dir = std::filesystem::path(directory) / "changeForms";
+  REQUIRE(CountFilesWithExtension(dir, ".json") == 130);
+  REQUIRE(CountFilesWithExtension(dir, ".tmp") == 0);
+  auto res = ReadFromDisk(directory);
+  REQUIRE(res.size() == 130);
+  REQUIRE(res[FormDesc::FromString("ff000081")].position.x == 129.f);
+}
+
+TEST_CASE("saveIntervalMs is read from the server settings", "[save]")
+{
+  using J = nlohmann::json;
+  std::string warning;
+  REQUIRE(DatabaseFactory::GetSaveIntervalMs(J::object(), &warning) == 5000);
+  REQUIRE(DatabaseFactory::GetSaveIntervalMs(J{ { "saveIntervalMs", 0 } },
+                                             &warning) == 0);
+  REQUIRE(DatabaseFactory::GetSaveIntervalMs(J{ { "saveIntervalMs", 2500 } },
+                                             &warning) == 2500);
+  REQUIRE(warning.empty());
+
+  for (J bad : { J(-1), J("5000"), J(1.5), J(nullptr) }) {
+    warning.clear();
+    REQUIRE(DatabaseFactory::GetSaveIntervalMs(J{ { "saveIntervalMs", bad } },
+                                               &warning) == 5000);
+    REQUIRE(!warning.empty());
+  }
+
+  warning.clear();
+  REQUIRE(DatabaseFactory::GetSaveIntervalMs(
+            J{ { "saveIntervalMs", 10000 } }, &warning) == 8000);
+  REQUIRE(!warning.empty());
+}
+
+TEST_CASE("Changes inside the save interval reach the saver in one batch",
+          "[save]")
+{
+  auto st = MakeSaveStorageFile();
+  PartOne p;
+  p.AttachSaveStorage(st);
+  p.worldState.SetSaveInterval(std::chrono::minutes(1));
+
+  // The first change after a quiet spell goes at once
+  p.CreateActor(0xff000a01, { 1, 1, 1 }, 1, 0x3c);
+  WaitForNextUpsert(*st, p.worldState);
+  REQUIRE(Viet::ISaveStorageUtils::CountSync(*st) == 1);
+
+  p.CreateActor(0xff000a02, { 1, 1, 1 }, 1, 0x3c);
+  p.CreateActor(0xff000a03, { 1, 1, 1 }, 1, 0x3c);
+  auto numUpserts = st->GetNumFinishedUpserts();
+  TickFor(p.worldState, std::chrono::milliseconds(300));
+  REQUIRE(st->GetNumFinishedUpserts() == numUpserts);
+  REQUIRE(Viet::ISaveStorageUtils::CountSync(*st) == 1);
+
+  p.worldState.RequestSaveNow();
+  WaitForNextUpsert(*st, p.worldState);
+  REQUIRE(st->GetNumFinishedUpserts() == numUpserts + 1);
+  REQUIRE(Viet::ISaveStorageUtils::CountSync(*st) == 3);
+}
+
+TEST_CASE("A record changed on every tick is saved at most once per interval",
+          "[save]")
+{
+  auto st = MakeSaveStorageFile();
+  PartOne p;
+  p.AttachSaveStorage(st);
+  p.CreateActor(0xff000a01, { 1, 1, 1 }, 1, 0x3c);
+  auto& actor = p.worldState.GetFormAt<MpActor>(0xff000a01);
+  WaitForNextUpsert(*st, p.worldState);
+
+  // Well above the saver's own cadence (100 ms sleep plus the write), so a missing gate shows
+  constexpr auto kInterval = std::chrono::milliseconds(700);
+  p.worldState.SetSaveInterval(kInterval);
+  auto numUpserts = st->GetNumFinishedUpserts();
+  auto start = std::chrono::steady_clock::now();
+  for (int i = 0; std::chrono::steady_clock::now() - start <
+       std::chrono::milliseconds(2100);
+       ++i) {
+    actor.SetPercentages({ 1.f, (i % 100 + 1) / 128.f, 1.f });
+    p.worldState.Tick();
+    std::this_thread::sleep_for(std::chrono::milliseconds(2));
+  }
+  auto elapsed = std::chrono::steady_clock::now() - start;
+  auto numBatches = st->GetNumFinishedUpserts() - numUpserts;
+
+  // A batch still in flight wrote into the next test's fresh unit/data, or failed there and aborted the run
+  p.worldState.FlushSaveStorageSync();
+
+  // The batch handed over at the start may finish late, hence one extra
+  auto maxBatches = static_cast<uint32_t>(elapsed / kInterval) + 2;
+  REQUIRE(numBatches <= maxBatches);
+}
+
+TEST_CASE("FlushSaveStorageSync writes the changes still waiting for the "
+          "interval",
+          "[save]")
+{
+  auto st = MakeSaveStorageFile();
+  PartOne p;
+  p.AttachSaveStorage(st);
+  p.worldState.SetSaveInterval(std::chrono::minutes(1));
+
+  p.CreateActor(0xff000a01, { 1, 1, 1 }, 1, 0x3c);
+  WaitForNextUpsert(*st, p.worldState);
+
+  auto& actor = p.worldState.GetFormAt<MpActor>(0xff000a01);
+  actor.SetPercentages({ 1.f, 0.5f, 1.f });
+  p.CreateActor(0xff000a02, { 1, 1, 1 }, 1, 0x3c);
+  p.worldState.Tick();
+  REQUIRE(ReadFromDisk("unit/data").size() == 1);
+
+  p.worldState.FlushSaveStorageSync();
+
+  auto res = ReadFromDisk("unit/data");
+  REQUIRE(res.size() == 2);
+  REQUIRE(
+    res[FormDesc::FromString("ff000a01")].actorValues.magickaPercentage ==
+    0.5f);
+  REQUIRE(CountFilesWithExtension("unit/data/changeForms", ".tmp") == 0);
+}
+
+TEST_CASE("FlushSync writes older batches first so the newest copy wins",
+          "[save]")
+{
+  auto db = std::make_shared<RecordingDatabase>();
+  Viet::AsyncSaveStorage<MpChangeForm, FormDesc, std::vector<FormDesc>> st(
+    db, spdlog::default_logger(), "recording", 1);
+
+  auto version = [](float x) {
+    MpChangeForm cf = CreateChangeForm("1");
+    cf.position = { x, 0.f, 0.f };
+    return std::vector<std::optional<MpChangeForm>>{ cf };
+  };
+
+  st.Upsert(version(1.f), [] {});
+  for (int i = 0; db->numUpserts == 0; ++i) {
+    REQUIRE(i < 2000);
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  }
+  st.Upsert(version(2.f), [] {});
+  st.FlushSync(version(3.f));
+
+  REQUIRE(db->writes == std::vector<float>{ 1.f, 2.f, 3.f });
+  REQUIRE(db->stored[FormDesc::FromString("1")].position.x == 3.f);
+
+  // Saves after the flush are written before Upsert returns
+  st.Upsert(version(4.f), [] {});
+  REQUIRE(db->writes.back() == 4.f);
+}
+
+TEST_CASE("A destroyed actor's last save keeps its index until it is handed "
+          "to the saver",
+          "[save]")
+{
+  auto st = MakeSaveStorageFile();
+  PartOne p;
+  p.AttachSaveStorage(st);
+  p.CreateActor(0xff000a01, { 1, 1, 1 }, 1, 0x3c);
+  WaitForNextUpsert(*st, p.worldState);
+
+  // At the 8000 ms cap with the main thread ticking every 2.6 s, the first hand-off after the destroy came 10.4 s
+  // later, past the 10 s index hold: the new actor given the index overwrote the pending isDeleted save
+  p.worldState.SetSaveInterval(std::chrono::milliseconds(8000));
+  auto& actor = p.worldState.GetFormAt<MpActor>(0xff000a01);
+  const auto idx = actor.GetIdx();
+  actor.SetPercentages({ 1.f, 0.5f, 1.f });
+  p.worldState.RequestSaveNow();
+  WaitForNextUpsert(*st, p.worldState);
+
+  p.DestroyActor(0xff000a01);
+  const auto destroyedAt = std::chrono::steady_clock::now();
+  for (int i = 1; i <= 3; ++i) {
+    std::this_thread::sleep_until(destroyedAt +
+                                  i * std::chrono::milliseconds(2600));
+    p.worldState.Tick();
+  }
+  std::this_thread::sleep_until(destroyedAt +
+                                std::chrono::milliseconds(10200));
+  p.CreateActor(0xff000a02, { 1, 1, 1 }, 1, 0x3c);
+
+  // Once the save is handed over, the index is free again
+  p.worldState.RequestSaveNow();
+  WaitForNextUpsert(*st, p.worldState);
+  p.CreateActor(0xff000a03, { 1, 1, 1 }, 1, 0x3c);
+  REQUIRE((p.worldState.GetFormAt<MpActor>(0xff000a02).GetIdx() == idx ||
+           p.worldState.GetFormAt<MpActor>(0xff000a03).GetIdx() == idx));
+
+  p.worldState.FlushSaveStorageSync();
+  auto res = ReadFromDisk("unit/data");
+  REQUIRE(res.count(FormDesc::FromString("ff000a01")) == 1);
+  REQUIRE(res[FormDesc::FromString("ff000a01")].isDeleted);
 }

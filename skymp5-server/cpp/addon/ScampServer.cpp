@@ -86,6 +86,8 @@ Napi::Object ScampServer::Init(Napi::Env env, Napi::Object exports)
     env, "ScampServer",
     { InstanceMethod("_setSelf", &ScampServer::_SetSelf),
       InstanceMethod("attachSaveStorage", &ScampServer::AttachSaveStorage),
+      InstanceMethod("flushSaveStorage", &ScampServer::FlushSaveStorage),
+      InstanceMethod("requestSaveNow", &ScampServer::RequestSaveNow),
       InstanceMethod("tick", &ScampServer::Tick),
       InstanceMethod("on", &ScampServer::On),
       InstanceMethod("createActor", &ScampServer::CreateActor),
@@ -322,6 +324,16 @@ ScampServer::ScampServer(const Napi::CallbackInfo& info)
           "Unexpected value of regenerationMultiplier, should be a number");
       }
     }
+
+    std::string saveIntervalWarning;
+    auto saveIntervalMs =
+      DatabaseFactory::GetSaveIntervalMs(serverSettings, &saveIntervalWarning);
+    if (!saveIntervalWarning.empty()) {
+      spdlog::error("{}", saveIntervalWarning);
+    }
+    partOne->worldState.SetSaveInterval(
+      std::chrono::milliseconds(saveIntervalMs));
+    spdlog::info("saveIntervalMs is {}", saveIntervalMs);
 
     if (serverSettings.contains("spellSync")) {
       const auto& spellSync = serverSettings["spellSync"];
@@ -619,6 +631,22 @@ Napi::Value ScampServer::AttachSaveStorage(const Napi::CallbackInfo& info)
   } catch (std::exception& e) {
     throw Napi::Error::New(info.Env(), (std::string)e.what());
   }
+  return info.Env().Undefined();
+}
+
+Napi::Value ScampServer::FlushSaveStorage(const Napi::CallbackInfo& info)
+{
+  try {
+    partOne->worldState.FlushSaveStorageSync();
+  } catch (std::exception& e) {
+    throw Napi::Error::New(info.Env(), (std::string)e.what());
+  }
+  return info.Env().Undefined();
+}
+
+Napi::Value ScampServer::RequestSaveNow(const Napi::CallbackInfo& info)
+{
+  partOne->worldState.RequestSaveNow();
   return info.Env().Undefined();
 }
 

@@ -7,8 +7,9 @@ class FileDatabase
   : public Viet::IDatabase<MpChangeForm, FormDesc, std::vector<FormDesc>>
 {
 public:
-  FileDatabase(std::string directory_,
-               std::shared_ptr<spdlog::logger> logger_);
+  // batchedSync false: each file is written and synced on its own (the save path before 17 Oct 2026)
+  FileDatabase(std::string directory_, std::shared_ptr<spdlog::logger> logger_,
+               bool batchedSync_ = true);
 
   void Iterate(const IterateCallback& iterateCallback,
                std::optional<std::vector<FormDesc>> filter) override;

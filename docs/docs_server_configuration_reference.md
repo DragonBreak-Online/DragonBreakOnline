@@ -189,6 +189,27 @@ Name of a database driver which would be used to store server data. `file` by de
 }
 ```
 
+## saveIntervalMs
+
+How often, in milliseconds, changed world records (characters, NPCs,
+containers) are handed to the saver. `5000` by default, at most `8000`: a
+destroyed record's last save waits at its index, which is held back for 10 s
+before another record may take it. The first change after a quiet spell still
+goes on the next tick, and `mp.requestSaveNow()` sends the next batch at once.
+A process crash can lose up to about this long plus the time to write one
+batch; a clean stop (SIGTERM) writes everything first. With the `file` driver
+the files of a batch are synced together. `0` restores the save path from
+before 17 Oct 2026: a hand-off on every tick and each file synced on its own.
+Read by the native server at boot.
+
+```json5
+{
+  // ...
+  "saveIntervalMs": 5000
+  // ...
+}
+```
+
 ## reloot
 
 A time before a game object restores its original state in milliseconds. Unlike Skyrim SE, Skyrim Multiplayer doesn't have a built-in Cell Reset mechanism. The server resets every object in the world every hour instead. With this option, you can change this time interval for every kind of game object. `"CONT"`, for example, means "Container" - chests, barrels, etc. See "record types" on [UESP](https://en.uesp.net/wiki/Skyrim_Mod:Mod_File_Format).

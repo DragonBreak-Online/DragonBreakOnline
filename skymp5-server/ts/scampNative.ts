@@ -19,6 +19,10 @@ export interface ScampServer {
     handler: (userId: number, content: string) => void
   ): void;
   attachSaveStorage(): void;
+  // Writes every pending world change before it returns (clean stop)
+  flushSaveStorage(): void;
+  // The next tick hands changed records to the saver even inside saveIntervalMs
+  requestSaveNow(): void;
   tick(): void;
 
   createActor(

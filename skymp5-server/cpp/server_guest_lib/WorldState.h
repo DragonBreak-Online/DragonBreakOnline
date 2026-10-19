@@ -89,6 +89,16 @@ public:
   void RequestSave(MpObjectReference& ref);
   bool HasEspmFile(std::string_view filename) const noexcept;
 
+  // Changed records go to the saver at most once per interval; 0 hands them over on every tick
+  void SetSaveInterval(std::chrono::milliseconds interval);
+  std::chrono::milliseconds GetSaveInterval() const;
+
+  // The next tick hands changed records to the saver even inside the interval (money and item moves)
+  void RequestSaveNow();
+
+  // Clean stop: every change made so far is on disk when this returns
+  void FlushSaveStorageSync();
+
   // Loads a parent's activation children in its world or cell, near or far
   void LoadActivationChilds(uint32_t activationParentId,
                             uint32_t parentWorldOrCell);
@@ -342,6 +352,8 @@ private:
   bool LoadForm(uint32_t formId,
                 std::stringstream* optionalOutTrace = nullptr);
   void TickSaveStorage(const std::chrono::system_clock::time_point& now);
+  // Returns true when the save storage reported an error
+  bool PumpSaveStorage();
   void TickTimers(const std::chrono::system_clock::time_point& now);
   [[nodiscard]] bool NpcSourceFilesOverriden() const noexcept;
   [[nodiscard]] bool IsNpcAllowed(uint32_t refrId) const noexcept;

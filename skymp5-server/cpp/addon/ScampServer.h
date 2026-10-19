@@ -33,6 +33,8 @@ public:
 
   // public API methods
   Napi::Value AttachSaveStorage(const Napi::CallbackInfo& info);
+  Napi::Value FlushSaveStorage(const Napi::CallbackInfo& info);
+  Napi::Value RequestSaveNow(const Napi::CallbackInfo& info);
   Napi::Value Tick(const Napi::CallbackInfo& info);
   Napi::Value On(const Napi::CallbackInfo& info);
   Napi::Value CreateActor(const Napi::CallbackInfo& info);

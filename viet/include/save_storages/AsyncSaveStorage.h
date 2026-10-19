@@ -79,11 +79,7 @@ public:
     pImpl->thr = std::make_unique<std::thread>([p] { SaverThreadMain(p); });
   }
 
-  ~AsyncSaveStorage()
-  {
-    pImpl->destroyed = true;
-    pImpl->thr->join();
-  }
+  ~AsyncSaveStorage() { StopSaverThread(); }
 
   void IterateSync(const IterateSyncCallback& cb) override
   {
@@ -94,15 +90,36 @@ public:
   void Upsert(std::vector<std::optional<T>>&& changeForms,
               const UpsertCallback& cb) override
   {
-    std::lock_guard l(pImpl->share3.m);
-    pImpl->share3.upsertTasks.push_back({ std::move(changeForms), cb });
+    {
+      std::lock_guard l(pImpl->share3.m);
+      pImpl->share3.upsertTasks.push_back({ std::move(changeForms), cb });
+    }
+    if (pImpl->saverStopped) {
+      ProcessUpserts(pImpl.get());
+    }
   }
 
   void Iterate(const IterateCallback& cb,
                const std::optional<FilterType>& filter) override
   {
-    std::lock_guard l(pImpl->share6.m);
-    pImpl->share6.iterateTasks.push_back({ filter, cb });
+    {
+      std::lock_guard l(pImpl->share6.m);
+      pImpl->share6.iterateTasks.push_back({ filter, cb });
+    }
+    if (pImpl->saverStopped) {
+      ProcessIterates(pImpl.get());
+    }
+  }
+
+  void FlushSync(std::vector<std::optional<T>>&& pending) override
+  {
+    // The saver first finishes the batches it holds: written after `pending`, they would put older copies back on disk
+    StopSaverThread();
+    {
+      std::lock_guard l(pImpl->share3.m);
+      pImpl->share3.upsertTasks.push_back({ std::move(pending), nullptr });
+    }
+    ProcessUpserts(pImpl.get());
   }
 
   uint32_t GetNumFinishedUpserts() const override
@@ -294,10 +311,21 @@ private:
 
     std::unique_ptr<std::thread> thr;
     std::atomic<bool> destroyed = false;
+    // Owner thread only: once set, Upsert and Iterate run on the caller's thread
+    bool saverStopped = false;
     uint32_t sleepTimeMs = 100;
   };
 
   std::shared_ptr<Impl> pImpl;
+
+  void StopSaverThread()
+  {
+    pImpl->destroyed = true;
+    if (pImpl->thr && pImpl->thr->joinable()) {
+      pImpl->thr->join();
+    }
+    pImpl->saverStopped = true;
+  }
 
   static void ProcessUpserts(Impl* pImpl)
   {
