@@ -199,6 +199,8 @@ module.exports = (api) => {
   globalThis.__dboSmithBookNeeds = (familyId) => { const f = BY_FAMILY.get(familyId); return f ? { tier: f.tier, scholar: Number(C.scholarForBook[f.tier]) || 0 } : null; };
   globalThis.__dboSmithScholarTier = scholarTier;
   globalThis.__dboSmithCraftTier = craftTier;
+  // durability.js: the craft tier a piece's family needs to repair it (1 when it has no family)
+  globalThis.__dboSmithItemTier = (itemId) => { const fam = familyOfItem(itemId >>> 0); return fam ? fam.tier : 1; };
   // manuals.js: a technique this smith knows by birth (Bonemold and Chitin for a Dunmer, Orcish for an Orc), so its book
   // is not read and used up for nothing (live 11 Oct: a Dunmer spent a Bonemold schematic)
   globalThis.__dboSmithRaceKnows = (actorId, familyId) => { const f = BY_FAMILY.get(familyId); return !!f && raceKnows(actorId >>> 0, f); };

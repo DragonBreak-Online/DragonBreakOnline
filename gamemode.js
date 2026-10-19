@@ -1831,6 +1831,7 @@ mp.onActivate = (targetId, casterId) => {
     if (refused) return false;
   }
   if (globalThis.__dboSalvageActivate && globalThis.__dboSalvageActivate(targetId >>> 0, casterId >>> 0)) return false;
+  if (globalThis.__dboRepairActivate && globalThis.__dboRepairActivate(targetId >>> 0, casterId >>> 0)) return false;
   try { if (globalThis.__dboEnchanterTouched) globalThis.__dboEnchanterTouched(targetId >>> 0, casterId >>> 0); } catch (e) { log('enchanter resend failed', e.message); }
   // An alchemy lab also shows what the pack can brew (alchemy.js); the lab's own menu still opens
   if (globalThis.__dboAlchemyLab) { try { if (globalThis.__dboAlchemyLab(targetId >>> 0, casterId >>> 0) === true) return false; } catch (e) { log('alchemy lab panel failed', e.message); } }
@@ -3142,6 +3143,7 @@ globalThis.__dboHandlers.disconnect = (userId) => {
   if (a && globalThis.__dboVlBreakerDrop) {
     try { globalThis.__dboVlBreakerDrop(a, globalThis.__dboJournalOpen.get(a >>> 0) === true); } catch (e) { log('vl breaker failed', e.message); }
   }
+  try { if (a && globalThis.__dboDurabilityLeave) globalThis.__dboDurabilityLeave(a); } catch (e) { log('durability leave failed', e.message); }
   if (a) globalThis.__dboJournalOpen.delete(a >>> 0);
   // A beast race must never be saved as the character's own
   if (a && globalThis.__dboBeastRevert) { try { globalThis.__dboBeastRevert(a, 'logout'); } catch (e) { log('beast revert on logout failed', e.message); } }
@@ -6145,6 +6147,7 @@ const deathHook = (actorId, killerId, ...rest) => {
   try { if (globalThis.__dboBlackreachDeath) globalThis.__dboBlackreachDeath(Number(actorId) >>> 0, Number(killerId) >>> 0); } catch (e) { log('blackreach death failed', e.message); }
   try { if (globalThis.__dboTrimCorpse) globalThis.__dboTrimCorpse(Number(actorId) >>> 0); } catch (e) { log('corpse trim failed', e.message); }
   try { if (globalThis.__dboStatsDeath) globalThis.__dboStatsDeath(Number(actorId) >>> 0, Number(killerId) >>> 0); } catch (e) { log('journal stats death failed', e.message); }
+  try { if (globalThis.__dboDurabilityDeath) globalThis.__dboDurabilityDeath(Number(actorId) >>> 0); } catch (e) { log('durability death failed', e.message); }
   try { if (globalThis.__dboDogDayDeath) globalThis.__dboDogDayDeath(Number(actorId) >>> 0, Number(killerId) >>> 0); } catch (e) { log('dog day death failed', e.message); }
   const prev = globalThis.__dboPrevDeath;
   if (prev) { try { return prev(actorId, killerId, ...rest); } catch (e) { log('death chain failed', e.message); } }
@@ -6510,6 +6513,8 @@ const equipHook = (actorId, equipment, isAllowed, ...rest) => {
     // supernatural.js notes a vampire spell the client holds before the server strips an unlearned one
     if (typeof globalThis.__dboSuperEquipSeen === 'function') globalThis.__dboSuperEquipSeen(a, equipment);
     if (typeof globalThis.__dboBeastStaleSpells === 'function') globalThis.__dboBeastStaleSpells(a, equipment);
+    // durability.js: a piece taken off gets its wear in its name; a Broken one put on comes off
+    if (isAllowed && typeof globalThis.__dboDurabilityEquip === 'function') { try { globalThis.__dboDurabilityEquip(a, equipment); } catch (e) { log('durability equip failed', e.message); } }
     // spawnwatch.js: the game has loaded, so its arrival report is due; until it comes its outfit is not remembered
     const spawnWatch = globalThis.__dboSpawnWatch;
     if (spawnWatch) { try { spawnWatch.report(a); } catch (e) { log('spawn watch report failed', e.message); } }
@@ -6974,7 +6979,9 @@ const temperBonus = (health, chest) => { const q = Math.round((Number(health) - 
 const wornWithHealth = (a) => {
   let entries = [];
   try { const eq = mp.get(a, 'equipment'); entries = eq && eq.inv && Array.isArray(eq.inv.entries) ? eq.inv.entries : []; } catch (e) { return []; }
-  return entries.filter((e) => e && (e.worn || e.wornLeft)).map((e) => ({ baseId: Number(e.baseId) >>> 0, health: Number(e.health) || 1 }));
+  // cond: what wear leaves of the piece (durability.js; 1 when it is not loaded)
+  const cond = (e) => { try { const m = typeof globalThis.__dboDurabilityMult === 'function' ? Number(globalThis.__dboDurabilityMult(a, Number(e.baseId) >>> 0, !!e.wornLeft, e.name || '')) : 1; return Number.isFinite(m) && m > 0 ? m : 1; } catch (err) { return 1; } };
+  return entries.filter((e) => e && (e.worn || e.wornLeft)).map((e) => ({ baseId: Number(e.baseId) >>> 0, health: Number(e.health) || 1, cond: cond(e) }));
 };
 // A tempered weapon's blow: base damage plus the game's tempering bonus, over base damage
 const temperDamageMult = (aggressorId, sourceId) => {
@@ -6982,7 +6989,7 @@ const temperDamageMult = (aggressorId, sourceId) => {
   if (!(base > 0)) return 1;
   const w = wornWithHealth(aggressorId).find((e) => e.baseId === (sourceId >>> 0));
   const bonus = w ? temperBonus(w.health, false) : 0;
-  return bonus > 0 ? (base + bonus) / base : 1;
+  return (bonus > 0 ? (base + bonus) / base : 1) * ((w && w.cond) || 1);
 };
 const gmstFloat = (id, fallback) => {
   const key = `gmst:${id}`;
@@ -7048,7 +7055,7 @@ const defenseDamageMult = (targetId) => {
     for (const w of wornWithHealth(targetId)) {
       const p = armorPieceOf(w.baseId); if (!p) continue;
       bare += p.rating;
-      counted += ((p.counted || p.rating) + temperBonus(w.health, p.chest)) * (p.heavy ? pm.heavy : pm.light);
+      counted += ((p.counted || p.rating) + temperBonus(w.health, p.chest)) * (p.heavy ? pm.heavy : pm.light) * (w.cond || 1);
     }
   } catch (e) { return 1; }
   // A Fortify Armor potion (alchemy.js, hook armor): the worn armour counts for that much more while it lasts
@@ -7125,7 +7132,7 @@ const fleshDamageMult = (targetId, sourceId) => {
   try {
     for (const w of wornWithHealth(targetId)) {
       const p = armorPieceOf(w.baseId); if (!p) continue;
-      counted += ((p.counted || p.rating) + temperBonus(w.health, p.chest)) * (p.heavy ? pm.heavy : pm.light);
+      counted += ((p.counted || p.rating) + temperBonus(w.health, p.chest)) * (p.heavy ? pm.heavy : pm.light) * (w.cond || 1);
     }
   } catch (e) { counted = 0; }
   const scale = gmstFloat(0x21a72, 0.12), cap = gmstFloat(0x37deb, 80);
@@ -7516,6 +7523,8 @@ const hitDamageAttemptHook =(aggressorId, targetId, sourceId, damage, flags) => 
   if (dmg > 0 && agg !== tgt && globalThis.__dboHostCooldown) { if (profileOf(agg) < 0) globalThis.__dboHostCooldown.noteFight(agg); if (profileOf(tgt) < 0) globalThis.__dboHostCooldown.noteFight(tgt); }
   // Any landed blow, PvE included, puts the players in it in combat for the armour swap timer
   if (dmg > 0 && agg !== tgt && armourSwap) armourSwap.onHit(agg, tgt);
+  // Weapons wear with blows landed, armour with hits taken, a shield with blocks (durability.js)
+  if (dmg > 0 && agg !== tgt && globalThis.__dboDurabilityHit) { try { globalThis.__dboDurabilityHit(agg >>> 0, tgt >>> 0, src >>> 0, flags); } catch (e) { log('durability hit failed', e.message); } }
   // Fire or silver on a vampire, silver or poison on a werewolf in beast form: note the health now, the extra comes off in
   // onHitDamage, after the mastery give-back, so it multiplies the capped target side rather than joining it
   globalThis.__dboSuperPending = null;
@@ -7884,6 +7893,16 @@ try {
   require(SALVAGE_JS)({ mp, log, personal, who, cfg, openWidget, closeWidget, onUi, masteryOf, recordOf, fieldsOf, giveItem, distanceMeters,
     itemName: (d) => adminItemName(d) });
 } catch (e) { log('salvage.js failed to load:', e.stack || e.message); globalThis.__dboSalvageActivate = null; }
+// ---- weapon and armour wear, repair at the wheel and the bench (server\durability.js, config "durability") -----------
+try {
+  const DURABILITY_JS = path.resolve('durability.js');
+  delete require.cache[DURABILITY_JS];
+  require(DURABILITY_JS)({ mp, log, personal, who, cfg, openWidget, closeWidget, onUi, recordOf, fieldsOf, giveItem, takeGold, goldOf, distanceMeters, sendPacket,
+    itemName: (d) => adminItemName(d) });
+} catch (e) {
+  log('durability.js failed to load:', e.stack || e.message);
+  for (const k of ['__dboDurabilityMult', '__dboDurabilityHit', '__dboDurabilityDeath', '__dboDurabilityEquip', '__dboDurabilityLeave', '__dboRepairActivate']) globalThis[k] = null;
+}
 
 // ---- the expedition ruins' buttons and levers (server\ruinbuttons.js, ruin-buttons.json, config "ruinButtons") ----
 try {
