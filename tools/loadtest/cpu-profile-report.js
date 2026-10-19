@@ -27,15 +27,23 @@ for (const n of prof.nodes) for (const c of n.children || []) parent.set(c, n.id
 let bundleLines = null;
 if (bundleFile) { try { bundleLines = fs.readFileSync(bundleFile, 'utf8').split('\n'); } catch (e) { console.error(`bundle unreadable: ${e.message}`); } }
 const classCache = new Map();
-const classAt = (line) => {
+// The nearest "class X" before line:column, then a "...System" name in a string after it (a log line), which names an
+// esbuild-minified class (they are renamed to two letters)
+const classAt = (line, col) => {
   if (!bundleLines || line < 0) return '';
-  if (classCache.has(line)) return classCache.get(line);
-  let name = '';
-  for (let i = Math.min(line, bundleLines.length - 1); i >= 0 && i > line - 4000; i--) {
-    const m = /\bclass\s+([A-Za-z_$][\w$]*)/.exec(bundleLines[i]);
-    if (m) { name = m[1]; break; }
+  const k = `${line}:${col}`;
+  if (classCache.has(k)) return classCache.get(k);
+  let text = (bundleLines[line] || '').slice(0, col);
+  for (let i = line - 1; i >= 0 && text.length < 200000; i--) text = bundleLines[i] + '\n' + text;
+  const tail = text.slice(-200000);
+  const classes = [...tail.matchAll(/\bclass\b(?:\s+([A-Za-z_$][\w$]*))?/g)]; // esbuild also writes var X=class{...}
+  let name = classes.length ? classes[classes.length - 1][1] || '' : '';
+  if (classes.length) {
+    const after = tail.slice(classes[classes.length - 1].index);
+    const sys = /"([A-Z][A-Za-z]*System)\b/.exec(after) || /systemName\s*=\s*"([^"]+)"/.exec(after);
+    if (sys) name = sys[1];
   }
-  classCache.set(line, name);
+  classCache.set(k, name);
   return name;
 };
 const label = (id) => {
@@ -43,8 +51,8 @@ const label = (id) => {
   const base = cf.url ? path.basename(cf.url.replace(/^file:\/\/\/?/, '')) : '';
   const fn = cf.functionName || '(anonymous)';
   if (!base) return fn;
-  const cls = bundleLines && /skymp5-server|dist_back/.test(cf.url) ? classAt(cf.lineNumber) : '';
-  return `${cls ? cls + '.' : ''}${fn} ${base}:${cf.lineNumber + 1}`;
+  const cls = bundleLines && base === path.basename(bundleFile) ? classAt(cf.lineNumber, cf.columnNumber) : '';
+  return `${cls ? cls + '.' : ''}${fn} ${base}:${cf.lineNumber + 1}:${cf.columnNumber + 1}`;
 };
 const isIdle = (id) => nodes.get(id).callFrame.functionName === '(idle)';
 const stackOf = (id) => { const s = []; for (let n = id; n !== undefined; n = parent.get(n)) s.push(n); return s; };
