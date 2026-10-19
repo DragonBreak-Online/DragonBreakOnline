@@ -96,6 +96,8 @@ let ro = invite(BOSS, ORC, 'imperial-legion');
 ok('a clan member cannot be invited to the Legion, and the refusal names the clan', ro.error && /already serves .*Largashbur.*must leave it first/.test(ro.error), ro);
 ro = invite(CHIEF, LEG, 'clan-largashbur');
 ok('nor a Legion soldier to a clan', ro.error && /already serves the Imperial Legion/.test(ro.error), ro);
+ok('the Imperial Civil Commission and the Penitus Oculatus are allegiances too (Nate, 19 Oct)', ['imperial-civil-commission', 'penitus-oculatus'].every((c) => L.categories.allegiance.ids.includes(c)
+  && !(L.categories.allegiance.officialsOnly || []).includes(c) && !Object.entries(L.categories).some(([k, v]) => k !== 'allegiance' && (v.ids || []).includes(c))));
 ro = invite(FG, ORC, 'fighters-guild');
 ok('a clan member may still join a guild', !ro.error, ro);
 let r = invite(STORM, LEG, 'stormcloaks');
