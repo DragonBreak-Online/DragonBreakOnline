@@ -93,10 +93,11 @@ module.exports = (api) => {
   const UNLAWFUL_RANKS = new Set(['courtmage', 'shaman', 'wisewoman']);
   // Faction ranks that arrest too (Nate, 6 Oct; guilds.js __dboGuildsOf, the rank's own title and role): an allegiance's
   // leaders, officers and sergeants, and a hold's guards by title. A plain member or a Citizen is not lawful.
-  // Cuffs are per hold (Nate, 19 Oct: "Cuffs should be per hold. Legion and dominion are the exception"): a hold's officials
-  // and guards arrest only in their own hold; only the Legion and the Thalmor (lawfulFactionRegions still keeps the Thalmor
-  // to the Empire) arrest wherever they stand. config playerMenu.lawfulFactions restores a longer list.
-  const LAWFUL_FACTIONS = new Set(C.lawfulFactions || ['imperial-legion', 'thalmor']);
+  // Cuffs are per hold (Nate, 19 Oct): a hold's officials and guards arrest only in their own hold. The Empire's factions and the
+  // Thalmor arrest anywhere; the Stormcloaks only in Skyrim and the Great Houses only on Solstheim (config
+  // playerMenu.lawfulFactionRegions). The Blades are not listed: no arrest powers.
+  const LAWFUL_FACTIONS = new Set(C.lawfulFactions || ['imperial-legion', 'imperial-civil-commission', 'penitus-oculatus', 'thalmor', 'stormcloaks',
+    'house-hlaalu', 'house-redoran', 'house-telvanni', 'house-indoril', 'house-dres', 'house-sadras']);
   const LAWFUL_ROLES = new Set(C.lawfulRoles || ['leader', 'officer', 'sergeant']);
   const GUARD_FACTIONS = new Set(C.guardFactions || ['hold-whiterun', 'hold-riften', 'hold-solitude', 'hold-windhelm', 'hold-markarth',
     'hold-falkreath', 'hold-morthal', 'hold-dawnstar', 'hold-winterhold', 'county-bruma']);

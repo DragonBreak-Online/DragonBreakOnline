@@ -71,15 +71,15 @@ ok('the lawful refresh runs every 15 s', timers.lawful && timers.lawful.ms === 1
 tick();
 ok('a Legion officer (Legate) is lawful', lawful(OFFICER));
 ok('a Legion soldier (Legionnaire, member) is not', !lawful(SOLDIER));
-ok('a Stormcloak leader is not (19 Oct: only the Legion and the Thalmor arrest outside a hold\'s own officials)', !lawful(STORMLEAD));
+ok('a Stormcloak leader with no regions.js is not (their power is Skyrim\'s only and fails closed)', !lawful(STORMLEAD));
 ok('a hold Guard is lawful', lawful(GUARD));
 ok('a Guard Captain of Bruma in Whiterun is not lawful there', !lawful(CAPTAIN));
 ok('a hold Citizen is not', !lawful(CITIZEN));
 ok('a Court Mage (zone rank) is still not', !lawful(MAGE));
 ok('a zone-official guard is still lawful', lawful(JARLGUARD));
-ok('a Magistrate of the Civil Commission (officer) is not (19 Oct)', !lawful(MAGI));
+ok('a Magistrate of the Civil Commission (officer) is lawful anywhere', lawful(MAGI));
 ok('a Commission Clerk (member) is not', !lawful(CLERK));
-ok('a Penitus Oculatus Agent (sergeant) is not (19 Oct)', !lawful(AGENT));
+ok('a Penitus Oculatus Agent (sergeant) is lawful anywhere', lawful(AGENT));
 ok('a Penitus Oculatus Recruit (member) is not', !lawful(RECRUIT));
 ok('instant restraint: a Legion officer cuffs at once', globalThis.__dboInstantRestraint(OFFICER, TARGET) === true);
 ok('instant restraint: a Legion soldier does not', globalThis.__dboInstantRestraint(SOLDIER, TARGET) === false);
@@ -106,28 +106,36 @@ delete M['hold-whiterun'][String(GUARD)];
 tick();
 ok('a Guard who leaves the hold is not lawful at the next refresh', !lawful(GUARD));
 
-// The Thalmor's authority stops at the Empire's border (Nate, 11 Oct: playerMenu.lawfulFactionRegions)
-const JUST = 0x50, JTARGET = 0x51;
-Object.assign(names, { [JUST]: 'Justiciar', [JTARGET]: 'Nord' });
+// Where a faction arrests (Nate, 19 Oct): the Empire's and the Thalmor anywhere, the Stormcloaks in Skyrim, the Great Houses on Solstheim
+const JUST = 0x50, JTARGET = 0x51, HOUSE = 0x52;
+Object.assign(names, { [JUST]: 'Justiciar', [JTARGET]: 'Nord', [HOUSE]: 'Councilor' });
 put('thalmor', JUST, 'Justiciar');
 put('imperial-legion', OFFICER, 'Legate');
+const hl = globalThis.__dboGuildRankList('house-redoran'); M['house-redoran'] = M['house-redoran'] || {};
+M['house-redoran'][String(HOUSE)] = { rank: hl.findIndex((r) => r.role === 'leader' || r.role === 'officer'), name: 'Councilor', tag: 'T52', since: 1 };
 const where = {};
 globalThis.__dboRegions = { provinceAt: (a) => ({ province: where[a] || 'cyrodiil' }) };
-ok('config: the Thalmor are lawful only in Cyrodiil', JSON.stringify((CFG.playerMenu || {}).lawfulFactionRegions) === '{"thalmor":["cyrodiil"]}');
+const R = (CFG.playerMenu || {}).lawfulFactionRegions || {};
+ok('config: no region rule for the Thalmor, Stormcloaks Skyrim only, Great Houses Solstheim only',
+  !R.thalmor && JSON.stringify(R.stormcloaks) === '["skyrim"]' && JSON.stringify(R['house-redoran']) === '["solstheim"]');
 tick();
 ok('a Justiciar in Cyrodiil is lawful', lawful(JUST));
 ok('...and restrains at once there', globalThis.__dboInstantRestraint(JUST, JTARGET) === true);
-where[JUST] = 'skyrim'; where[OFFICER] = 'skyrim';
+ok('a Stormcloak General in Cyrodiil is not', !lawful(STORMLEAD));
+ok('a Redoran councilor in Cyrodiil is not', !lawful(HOUSE));
+where[JUST] = 'skyrim'; where[OFFICER] = 'skyrim'; where[STORMLEAD] = 'skyrim'; where[HOUSE] = 'skyrim';
 tick();
-ok('a Justiciar in Skyrim is not lawful', !lawful(JUST));
-ok('...and restrains nobody without their yes', globalThis.__dboInstantRestraint(JUST, JTARGET) === false);
-ok('a Legate in Skyrim is still lawful (no region rule for the Legion)', lawful(OFFICER));
-where[JUST] = 'solstheim'; tick();
-ok('nor on Solstheim', !lawful(JUST));
+ok('a Justiciar in Skyrim is lawful (the Dominion arrests anywhere)', lawful(JUST));
+ok('a Legate in Skyrim is lawful', lawful(OFFICER));
+ok('a Stormcloak General in Skyrim is lawful', lawful(STORMLEAD));
+ok('a Redoran councilor in Skyrim is not', !lawful(HOUSE));
+where[JUST] = 'solstheim'; where[STORMLEAD] = 'solstheim'; where[HOUSE] = 'solstheim'; tick();
+ok('on Solstheim: the Justiciar is lawful', lawful(JUST));
+ok('...the Stormcloak General is not', !lawful(STORMLEAD));
+ok('...and the Redoran councilor is', lawful(HOUSE));
 delete globalThis.__dboRegions; tick();
-ok('with no regions.js the Thalmor power fails closed', !lawful(JUST));
-where[JUST] = 'cyrodiil'; globalThis.__dboRegions = { provinceAt: (a) => ({ province: where[a] || 'cyrodiil' }) }; tick();
-ok('back in Cyrodiil the next refresh gives it back', lawful(JUST));
+ok('with no regions.js the regional powers fail closed (Stormcloaks, Great Houses)', !lawful(STORMLEAD) && !lawful(HOUSE));
+ok('...the Thalmor, with no region rule, stay lawful', lawful(JUST));
 
 fs.rmSync(dir, { recursive: true, force: true });
 console.log(fails ? `${fails} FAILED` : 'all ok');
