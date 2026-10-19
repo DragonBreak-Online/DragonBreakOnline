@@ -8,6 +8,7 @@
 #include "MpActor.h"
 #include "MsgType.h"
 #include "SpellCastData.h"
+#include "TickProfile.h"
 #include <simdjson.h>
 #include <slikenet/BitStream.h>
 
@@ -39,8 +40,22 @@ void PacketParser::TransformPacketIntoAction(Networking::UserId userId,
     userId,
   };
 
+  // Times the message by type, deserialisation included, whichever way the handler leaves
+  struct MessageTimer
+  {
+    uint64_t start = TickProfile::Enabled() ? TickProfile::NowNs() : 0;
+    uint8_t msgType = 0;
+    ~MessageTimer()
+    {
+      if (start) {
+        TickProfile::AddMessage(msgType, TickProfile::NowNs() - start);
+      }
+    }
+  } timer;
+
   auto result = pImpl->serializer->Deserialize(data, length);
   if (result != std::nullopt) {
+    timer.msgType = static_cast<uint8_t>(result->msgType);
     if (result->format == DeserializeInputFormat::Json) {
       std::call_once(pImpl->jsonWarning, [&] {
         spdlog::warn("PacketParser::TransformPacketIntoAction - 1-st time "

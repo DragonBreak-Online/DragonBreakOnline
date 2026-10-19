@@ -1,6 +1,7 @@
 #include "MovementRelay.h"
 #include "MpActor.h"
 #include "PartOne.h"
+#include "TickProfile.h"
 #include <algorithm>
 #include <chrono>
 #include <cstdlib>
@@ -71,6 +72,7 @@ void MovementRelay::Submit(MpActor& emitter, Networking::UserId senderUserId,
                            bool skipSender, Networking::PacketData data,
                            size_t length)
 {
+  TickProfile::Scope profile(TickProfile::kRelaySubmit);
   const uint64_t now = NowMs();
   const uint32_t emitterId = emitter.GetFormId();
   const auto& emitterPos = emitter.GetPos();
@@ -159,6 +161,7 @@ void MovementRelay::RetuneWindow(uint64_t now)
 
 void MovementRelay::Flush()
 {
+  TickProfile::Scope profile(TickProfile::kRelayFlush);
   const uint64_t now = NowMs();
   if (now - lastFlushMs < kFlushEveryMs) {
     return;

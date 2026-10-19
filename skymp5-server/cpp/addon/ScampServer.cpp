@@ -13,6 +13,7 @@
 #include "PacketHistoryWrapper.h"
 #include "PapyrusUtils.h"
 #include "ScampServerListener.h"
+#include "TickProfile.h"
 #include "condition_functions/ConditionFunctionFactory.h"
 #include "formulas/DamageMultConditionalFormula.h"
 #include "formulas/DamageMultFormula.h"
@@ -625,12 +626,16 @@ Napi::Value ScampServer::Tick(const Napi::CallbackInfo& info)
 {
   ANTIGO_CONTEXT_INIT(ctx);
 
+  const uint64_t tickStart =
+    TickProfile::Enabled() ? TickProfile::NowNs() : 0;
+
   try {
     tickEnv = info.Env();
 
     bool tickFinished = false;
     while (!tickFinished) {
       try {
+        TickProfile::Scope profile(TickProfile::kNet);
         server->Tick(PartOne::HandlePacket, partOne.get());
         tickFinished = true;
       } catch (const std::exception& e) {
@@ -643,6 +648,9 @@ Napi::Value ScampServer::Tick(const Napi::CallbackInfo& info)
     }
 
     partOne->Tick();
+    if (tickStart) {
+      TickProfile::EndTick(TickProfile::NowNs() - tickStart);
+    }
   } catch (const std::exception& e) {
     std::string msg = e.what();
     while (antigo::HasExceptionWitness()) {
