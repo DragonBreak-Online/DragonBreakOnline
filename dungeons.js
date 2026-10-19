@@ -946,7 +946,7 @@ module.exports = (api) => {
   // ---- a crash inside a claim (crash-wave-1001 §2): logging back in put the player in the same fight, which crashed
   // 12 more times on 1 Oct. A member whose newest launcher note (downed.js) is a recent crash wakes at the entrance,
   // still a member; the empty claim waits keepClaimMinutes for them, and ending empty costs them no rest.
-  const CL = Object.assign({ enabled: true, withinMinutes: 15, lateSeconds: 30, keepClaimMinutes: 10 }, C.crashLoop || {});
+  const CL = Object.assign({ enabled: true, withinMinutes: 15, lateSeconds: 30, keepClaimMinutes: 10, earlyLeaveMinutes: 5 }, C.crashLoop || {});
   ST.crashMoved = ST.crashMoved instanceof Map ? ST.crashMoved : new Map(); // `${pid}:${note time}` -> when it was acted on
   const noteTime = (n) => Number(n.at) || Number(n.endedAt) || 0;
   const lastNote = (pid) => { try { return typeof globalThis.__dboLastSessionNote === 'function' ? globalThis.__dboLastSessionNote(pid) : null; } catch (e) { return null; } };
@@ -963,6 +963,7 @@ module.exports = (api) => {
     if (!CL.enabled) return false;
     if (lease.looted instanceof Set && lease.looted.size > 0) return false;
     if (lease.crashMoved instanceof Set && lease.crashMoved.has(pid)) return true;
+    if (lease.earlyLeft instanceof Set && lease.earlyLeft.has(pid)) return true;
     const n = lastNote(pid);
     return !!(n && n.outcome === 'crash' && Date.now() - noteTime(n) <= CL.withinMinutes * 60000);
   };
@@ -1000,7 +1001,7 @@ module.exports = (api) => {
     if (isRaidRuin(byId.get(lease.id))) { const p = partyOf(lease.leader); if (p) pushParty(p); }
     for (const pid of lease.members) {
       const spared = why === 'left' && crashSpared(lease, pid);
-      if (spared) log(`dungeon ${lease.id}: no rest for profile ${pid}, who crashed inside it`);
+      if (spared) log(`dungeon ${lease.id}: no rest for profile ${pid}, who crashed inside it or left just after the claim`);
       else setAccountRest(pid, lease.id, Date.now() + C.cooldownMinutes * 60000);
       const a = actorByProfile(pid);
       if (!a) continue;
@@ -1018,7 +1019,8 @@ module.exports = (api) => {
         try { if (globalThis.__dboStatsAdd) globalThis.__dboStatsAdd(a, 'dungeonsCleared'); } catch (e) { /* journal stats only */ }
         system(a, `${lease.name} is cleared. Take your time leaving; it rests ${C.cooldownMinutes} minutes for you afterwards.`);
       } else {
-        system(a, `Your claim on ${lease.name} has ended. It rests ${C.cooldownMinutes} minutes for you.`);
+        system(a, spared ? `Your claim on ${lease.name} lapsed while you were away. It does not rest for you: claim it again when you're ready.`
+          : `Your claim on ${lease.name} has ended. It rests ${C.cooldownMinutes} minutes for you.`);
       }
     }
     // Anyone else still inside (not in the party, or joined late) is walked out to the same door when time runs out
@@ -2259,6 +2261,18 @@ module.exports = (api) => {
   // Runs after the actor has left the online list, so the others' panels drop the member until they return
   globalThis.__dboPartyLogout = (a) => {
     const pid = profileOf(a);
+    // Left within earlyLeaveMinutes of the claim (a load that never finished: Marcus, 19 Oct, Rielle): the claim waits
+    // keepClaimMinutes for them as after a crash, and if it lapses it costs them no rest
+    try {
+      const early = CL.enabled ? Math.max(0, Number(CL.earlyLeaveMinutes ?? 5)) * 60000 : 0;
+      for (const lease of ST.leases.values()) {
+        if (!lease.members.has(pid) || !(Date.now() - lease.startedAt < early)) continue;
+        lease.crashKeepUntil = Math.max(Number(lease.crashKeepUntil) || 0, Date.now() + CL.keepClaimMinutes * 60000);
+        if (!(lease.earlyLeft instanceof Set)) lease.earlyLeft = new Set();
+        lease.earlyLeft.add(pid);
+        log(`dungeon ${lease.id}: profile ${pid} left ${Math.round((Date.now() - lease.startedAt) / 1000)} s after the claim; it waits ${CL.keepClaimMinutes} min, and a lapse costs them no rest`);
+      }
+    } catch (e) { log('dungeon early leave failed', e.message); }
     if (partyOf(pid)) setTimeout(() => { const p = partyOf(pid); if (p) pushParty(p); }, 2000);
   };
   registerChatCommand('dungeon', (a, args) => {

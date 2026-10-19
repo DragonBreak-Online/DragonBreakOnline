@@ -1,5 +1,20 @@
 [
   {
+    "title": "A stuck dungeon load no longer costs you the dungeon",
+    "date": "2026-10-19",
+    "version": "Hotfix",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Dungeons",
+        "items": [
+          "If you have to quit within 5 minutes of claiming a dungeon (for example, stuck on its loading screen), your claim is kept for 10 minutes so you can come straight back in.",
+          "If the claim runs out before you return, the dungeon no longer rests for you for an hour, unless something in it was already looted."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Coin purses, safe character editing and other fixes",
     "date": "2026-10-19",
     "version": "Hotfix",
