@@ -12,6 +12,20 @@
         ]
       },
       {
+        "heading": "Repairs",
+        "items": [
+          "Anyone can repair their gear at a sharpening wheel or an armorer's bench now. Without the Blacksmith rank the piece needs, a repair costs half as much again.",
+          "A Blacksmith at or above the piece's rank pays 10% less for each rank, from their rank at the piece's own, down to half the price.",
+          "Field kits for mending Worn gear on the road are on their way. They will be made by smiths and tailors, and mend Worn gear only, never Damaged or Broken."
+        ]
+      },
+      {
+        "heading": "Woodcutting",
+        "items": [
+          "Each chopping block now rests for you alone after you split its logs. Others can still use it while you wait."
+        ]
+      },
+      {
         "heading": "Character editing",
         "items": [
           "While you are making your character, rerolling, or changing your look with /appearance, nothing can hurt you, and you cannot attack anyone."
