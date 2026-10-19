@@ -108,6 +108,27 @@ module.exports = (api) => {
   globalThis.__dboCanReroll = (a) => { try { return !blocker(a) && (pending(a) || rerollsLeft(a).left > 0); } catch (e) { return false; } };
   const addStatus = (key, order, fn) => { try { if (typeof globalThis.__dboRegisterStatus === 'function') globalThis.__dboRegisterStatus(key, order, fn); } catch (e) { /* gamemode older than /status */ } };
   addStatus('rerolls', 60, (a) => { const r = rerollsLeft(a); return r && r.text ? `Rerolls ${r.text}` : null; });
+  // A reroll given back by the staff (karta.gina, 19 Oct: one spent on an editor that would not close): the character's
+  // count and the account's go down by one. Online by name or #TAG; offline as "profile <id> [character id]"
+  registerChatCommand('rerollrefund', (a, args) => {
+    const arg = String(args || '').trim();
+    let pid = 0, ck = '', label = '';
+    const m = /^profile\s+(\d+)(?:\s+(?:ff)?([0-9a-f]{1,8}))?$/i.exec(arg);
+    if (m) { pid = Number(m[1]); ck = m[2] ? (parseInt(m[2], 16) | 0xff000000) >>> 0 : 0; ck = ck ? ck.toString(16) : ''; label = `profile ${pid}`; }
+    else {
+      const t = arg ? findByName(arg) : 0;
+      if (!t) return personal(a, 'Use: /rerollrefund <name or #TAG> (online), or /rerollrefund profile <id> [character id]');
+      pid = Number(profileOf(t)); ck = charKey(t); label = who(t);
+    }
+    const rec = store.profiles[String(pid)];
+    if (!rec || !(Number(rec.used) > 0)) return personal(a, `${label} has no spent reroll to give back.`);
+    if (!ck) ck = Object.keys(rec.chars || {}).find((k) => Number(rec.chars[k]) > 0) || '';
+    rec.used = Number(rec.used) - 1;
+    if (ck && Number((rec.chars || {})[ck]) > 0) rec.chars[ck] = Number(rec.chars[ck]) - 1;
+    save();
+    audit(`REROLL ${who(a)} gave back a reroll to ${label}${ck ? ` (character ${ck})` : ''}: ${rec.used} used now`);
+    personal(a, `A reroll is given back to ${label}.`);
+  }, { admin: true, help: '<name|#TAG> or profile <id> [character id]: give back one spent identity reroll (Lead GM+)' });
   registerChatCommand('tokens', (a, args) => {
     const t = String(args || '').trim() && isAdmin(a) ? findByName(String(args).trim()) : a;
     if (!t) return personal(a, 'No such player.');

@@ -325,7 +325,7 @@ const TIER_LABEL = { senior: 'Senior', developer: 'Developer', leadgm: 'Lead GM'
 // appoint and dismiss are here because an official's powers are real money: a rank lets its holder post work paid
 // out of the hold treasury, so a GM who could appoint himself could pay himself (claude-jake's review, A1-1).
 // /chargen is open to every GM (Nate, 12 Oct), and to a Trial GM through TRIAL_COMMANDS
-const LEAD_ONLY = new Set(['beastform', 'vlremote', 'wwremote', 'feedpair', 'sethunger', 'wipechars', 'driftspawn', 'driftrepair', 'driftset',
+const LEAD_ONLY = new Set(['rerollrefund', 'beastform', 'vlremote', 'wwremote', 'feedpair', 'sethunger', 'wipechars', 'driftspawn', 'driftrepair', 'driftset',
   'jail', 'placeexport', 'staffstats', 'war', 'curse', 'schedule', 'warband', 'raid', 'settime', 'timescale', 'setweather', 'npc remove', 'dungeon end',
   'appoint', 'dismiss',
   // Handing out a smithing manual is handing out an item (the T5 ones are given in roleplay, like artifacts)
@@ -2926,7 +2926,7 @@ const goblinLook = (a, appearance) => {
 const appearanceHook = (actorId, appearance, isAllowed) => {
   // the player log (playerlog.js): every RaceMenu close, allowed or not; it reads the race and sex, never the name
   try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('appearance', actorId, appearance, isAllowed); } catch (e) { /* the player log is optional */ }
-  if (isAllowed) editorOpenAt.delete(actorId >>> 0);
+  if (isAllowed && globalThis.__dboEditorOpenAt instanceof Map) globalThis.__dboEditorOpenAt.delete(actorId >>> 0);
   if (isAllowed) { try { goblinLook(actorId >>> 0, appearance); } catch (e) { log('goblin look check failed', e.message); } }
   let result = true;
   // A player's own /appearance edit (appearance.js): settled there (charge, locks), and none of creation's steps below run
