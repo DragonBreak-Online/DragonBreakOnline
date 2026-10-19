@@ -1268,7 +1268,9 @@
  "goblinRace": {
   "_comment": "The DLE's DBOGoblinRace (Nat, 13 Oct) and its vampire DBOGoblinRaceVampire (PC, 15 Oct). racial.js gives the creator's goblin slug this race (__dboRaceOverrides) and the Goblin's gifts (racial.goblin, the vampire too); supernatural.js turns it into its vampire and back, and a goblin vampire's tells are its skin tone alone (the Goblin has no eyes). Its colour is its skin tone (the race's ten Skin Tone presets); variants: { slug: race desc } would add more goblin races, which stay mortal.",
   "race": "1aca01:DragonBreak Online Edits.esp",
-  "vampire": "1d1fa2:DragonBreak Online Edits.esp"
+  "vampire": "1d1fa2:DragonBreak Online Edits.esp",
+  "_variants": "The creator's goblin skin colours (private.rp.race slug -> race), each its own RACE in the DLE. Without them a swamp, ash or ochre goblin had no racial gift or power (Nate, 19 Oct).",
+  "variants": { "goblinswamp": "1aca09:DragonBreak Online Edits.esp", "goblinash": "1aca11:DragonBreak Online Edits.esp", "goblinochre": "1aca19:DragonBreak Online Edits.esp" }
  },
  "reachmanRace": {
   "_comment": "The DLE's DBOReachmanRace and its vampire (Nat, 14 Oct; from Reachman Race.esp v2, Nexus 39844, Breton morph, vanilla heads). racial.js gives the creator's reachfolk slug this race (__dboRaceOverrides) and the Reachman's gifts (racial.reachman); supernatural.js turns it into its vampire and back.",

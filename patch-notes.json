@@ -1,5 +1,19 @@
 [
   {
+    "title": "Goblin racial gifts",
+    "date": "2026-10-19",
+    "version": "Server update",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Every goblin colour",
+        "items": [
+          "Goblins with swamp, ash or ochre skin now have the Goblin's racial gift and the Feeding Frenzy power, like green goblins already did."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Better boss loot",
     "date": "2026-10-19",
     "version": "Server update",
