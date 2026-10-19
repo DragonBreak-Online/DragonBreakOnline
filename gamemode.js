@@ -5585,7 +5585,9 @@ const skinSpent = globalThis.__dboSkinSpent || (globalThis.__dboSkinSpent = new 
 // reliable but not ordered and a report sent before the Stop can land after it (DESIGN.md section 13). nonce -> { a, round, how }
 const skinClosing = globalThis.__dboSkinClosing instanceof Map ? globalThis.__dboSkinClosing : (globalThis.__dboSkinClosing = new Map());
 const skinDeny = new Map();
-const skinSay = (a, text) => { if (Date.now() - (skinDeny.get(a) || 0) > 1500) { skinDeny.set(a, Date.now()); personal(a, text); } return false; };
+// On screen as well as in chat (Moderation Help #0207, 18 Oct: a bear beyond the skinner's rank opened as a body and the
+// chat line went unseen behind the container), as smithing.js tells a refused craft
+const skinSay = (a, text) => { if (Date.now() - (skinDeny.get(a) || 0) > 1500) { skinDeny.set(a, Date.now()); personal(a, text); try { sendPacket(a, { customPacketType: 'dboNotice', text }); } catch (e) { /* chat said it */ } } return false; };
 // Anyone may skin a simple animal (Nat's call, 2026-09-20). Holding the trade is no longer the price
 // of entry: it widens the seam, slows the blade, raises the chance of a second pelt, and is what lets
 // you take the rarer beasts at all.
