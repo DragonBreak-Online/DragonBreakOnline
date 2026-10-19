@@ -1279,10 +1279,12 @@ const togglePresenceShare = (a, b) => {
   return i < 0;
 };
 // c shows as about to v only when online, met both ways and shared both ways (L2-2: anyone met once saw it); online: a Set
+// Both have met and both share their whereabouts with each other: only then may v learn c is online or away
+const presenceMutual = (v, c) => { v = Number(v) >>> 0; c = Number(c) >>> 0; return v !== c && presenceSharesOf(c).includes(v) && presenceSharesOf(v).includes(c) && metOf(c).includes(v) && metOf(v).includes(c); };
 const presenceShown = (v, c, online) => {
   v = Number(v) >>> 0; c = Number(c) >>> 0;
   if (v === c || !(online instanceof Set ? online : new Set(onlineActors())).has(c)) return false;
-  return presenceSharesOf(c).includes(v) && presenceSharesOf(v).includes(c) && metOf(c).includes(v) && metOf(v).includes(c);
+  return presenceMutual(v, c);
 };
 const takeGold = (a, amount) => {
   // A negative amount would add gold and NaN would empty the purse; every caller checks today, this is the backstop
@@ -1485,7 +1487,7 @@ const openPigeonCoop = (a, result, resultKind, view) => {
   for (const id of metOf(a)) {
     try { if (!mp.get(id, 'appearance')) continue; } catch (e) { continue; }
     // Who they met: a contact behind a mask or in a beast form keeps their own name here
-    contacts.push({ id, name: ownNameOf(id), tag: tagOf(id), online: presenceShown(a, id, online), price });
+    contacts.push({ id, name: ownNameOf(id), tag: tagOf(id), online: presenceShown(a, id, online), shared: presenceMutual(a, id), price });
   }
   contacts.sort((x, y) => x.name.localeCompare(y.name));
   const left = PIGEON_COOLDOWN_MS - (Date.now() - (pigeonLastSent.get(profileOf(a)) || 0));

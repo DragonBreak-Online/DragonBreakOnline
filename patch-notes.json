@@ -1,5 +1,43 @@
 [
   {
+    "title": "Coin purses, safe character editing and other fixes",
+    "date": "2026-10-19",
+    "version": "Hotfix",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Coin purses",
+        "items": [
+          "Coin purses can be harvested again, and the Harvesting skill's purse bonuses count once more. Loose gold piles still give nothing: gold comes from work, trade and taxes."
+        ]
+      },
+      {
+        "heading": "Character editing",
+        "items": [
+          "While you are making your character, rerolling, or changing your look with /appearance, nothing can hurt you, and you cannot attack anyone."
+        ]
+      },
+      {
+        "heading": "Vampires, werewolves and silver",
+        "items": [
+          "Silver you cannot carry still goes to your mailbox, but you can now burn that letter with the silver in it, and it no longer keeps your mail marker lit. Taking it out only sent it straight back before."
+        ]
+      },
+      {
+        "heading": "Dungeons",
+        "items": [
+          "Rannveig's Fast can't be claimed for now: a hole in its floor drops you out of the world. It comes back once the hole is closed."
+        ]
+      },
+      {
+        "heading": "Pigeon contacts",
+        "items": [
+          "A contact you have met can see whether you are in the land only when you have both shared your whereabouts with /ledger share. With the next client update, the coop will say \"Whereabouts not shared\" for such contacts instead of the misleading \"Away\"."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Gear wear is kept, and the bench shows what to repair",
     "date": "2026-10-19",
     "version": "Hotfix",
