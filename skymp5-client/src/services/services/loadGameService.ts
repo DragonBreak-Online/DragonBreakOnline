@@ -16,19 +16,28 @@ export class LoadGameService extends ClientListener {
         let line = "";
         try { line = loadGameLine(pos, rot, worldOrCell, changeFormNpc, loadOrder, time); } catch (e) { line = `unreadable: ${e}`; }
         diagNote("loadGame", line);
+        // Services that repeat Papyrus calls hold them until the game reports this load done: a call still queued in the
+        // VM when the load starts runs after it against the reset VM (DisableDifficultySelectionService, 19 Oct)
+        (globalThis as { __dboLoadPending?: boolean }).__dboLoadPending = true;
         try {
             // @ts-ignore
             this.sp.loadGame(pos, rot, worldOrCell, changeFormNpc, loadOrder, time);
         } catch (e) {
             diagNote("loadGame", `threw (${String(e).slice(0, 120)}); retried without the character`);
             // Hotfix non-vanilla headparts bug
-            // @ts-ignore
-            this.sp.loadGame(pos, rot, worldOrCell, undefined, loadOrder, time);
+            try {
+                // @ts-ignore
+                this.sp.loadGame(pos, rot, worldOrCell, undefined, loadOrder, time);
+            } catch (e2) {
+                (globalThis as { __dboLoadPending?: boolean }).__dboLoadPending = false;
+                throw e2;
+            }
         }
         this._isCausedBySkyrimPlatform = true;
     }
 
     private onLoadGame() {
+        (globalThis as { __dboLoadPending?: boolean }).__dboLoadPending = false;
         try {
             const gameLoadEvent = {
                 isCausedBySkyrimPlatform: this._isCausedBySkyrimPlatform
