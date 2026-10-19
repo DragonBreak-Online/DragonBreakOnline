@@ -167,6 +167,11 @@ module.exports = (api) => {
   };
 
   // ---- zones --------------------------------------------------------------------------------
+  // Placements left out by their source ref (config excludeSrc). Default: the four town dogs the Great City of Falkreath
+  // and Minor Cities and Towns place in Falkreath on the wild EncDog base, so they spawned hostile in the streets
+  // (#bugs 19 Oct 'aggressive falkreath city dogs')
+  const EXCLUDE_SRC = new Set((Array.isArray(C.excludeSrc) ? C.excludeSrc : ['9af7:The Great Cities - Minor Cities and Towns.esp',
+    '9af8:The Great Cities - Minor Cities and Towns.esp', '9af7:The Great City of Falkreath.esp', '9af8:The Great City of Falkreath.esp']).map((x) => String(x).toLowerCase()));
   const buildZones = () => {
     const out = [];
     const plan = densityPlan();
@@ -178,7 +183,7 @@ module.exports = (api) => {
       // No navmesh in the placement's cell (BSHeartland covers 524 of 2381 Cyrodiil cells): the creature cannot path
       // and sinks or slides. Skipped, but still counted, so every later wild:* zone keeps its name. anchorGone: the anchor ref
       // left the plugins (the Skyrim release DLE removed 5edb2 at Bilegulch); skipped and counted the same way.
-      if (pl.noNavmesh || pl.anchorGone) { n++; continue; }
+      if (pl.noNavmesh || pl.anchorGone || EXCLUDE_SRC.has(String(pl.src || '').toLowerCase())) { n++; continue; }
       // The density plan's creature unless the crash guard refuses it; then the usual pick from the options the guard keeps
       const planned = plan.get(pl);
       const fromPlan = planned && !(CRASHY && CRASHY.on && CRASHY.check(planned.opt[1])) ? planned : null;
