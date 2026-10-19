@@ -1,5 +1,20 @@
 [
   {
+    "title": "Weapon and armour wear",
+    "date": "2026-10-19",
+    "version": "Server update",
+    "tag": "New",
+    "sections": [
+      {
+        "heading": "Gear wears down",
+        "items": [
+          "Weapons and armour now wear down: Worn, Damaged, then Broken, shown in the item's name. Worn gear loses a little of its damage or armour, Damaged more, and Broken gear cannot be worn.",
+          "Repair them at a sharpening wheel (weapons) or an armorer's bench (armour): a smith of the item's tier, a small fee, and for broken gear the materials it is made from."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Faction ranks",
     "date": "2026-10-16",
     "version": "Server update",
