@@ -1154,6 +1154,13 @@ registerChatCommand('chargen', (a, args) => {
   } catch (e) { personal(a, 'Failed: ' + e.message); }
 }, { admin: true, help: '[player|#TAG] reopen character creation for someone (a Trial GM: yourself only)' });
 const NAME_RE = /^[A-Za-z][A-Za-z' \-]{1,30}$/;
+// An offline character by its #TAG ("#ABCD" or "Name #ABCD"): only when exactly one live character carries it in the index
+const offlineByTag = (q) => {
+  const m = String(q || '').trim().match(/(?:^|\s)#([A-Za-z0-9]{4})$/); if (!m) return 0;
+  let ids = []; try { ids = mp.findFormsByPropertyValue('private.indexed.tagKey', m[1].toLowerCase()) || []; } catch (e) { return 0; }
+  const live = ids.map((x) => Number(x) >>> 0).filter((id) => id && !(typeof globalThis.__dboFormGone === 'function' && globalThis.__dboFormGone(id)));
+  return live.length === 1 ? live[0] : 0;
+};
 // A staff rename, for /rename and the F7 panel's Rename (fork adminSystem.ts calls __dboAdminRename): { ok, text }
 const renameCharacter = (a, t, rawName) => {
   const newName = String(rawName || '').trim().replace(/\s+/g, ' ');
@@ -1176,9 +1183,12 @@ globalThis.__dboAdminRename = (a, t, name) => (staffCan(Number(a) >>> 0, 'rename
 registerChatCommand('rename', (a, args) => {
   const m = args.trim().match(/^(\S+(?:\s+#[A-Za-z0-9]{4})?|#[A-Za-z0-9]{4})\s+(.+)$/);
   if (!m) return personal(a, 'Usage: /rename <player|#TAG> <new name>');
-  const t = findByName(m[1]); if (!t) return personal(a, 'No such player. Use their name or #TAG.');
+  // A typed #TAG binds: findByName falls back to a name prefix when the tag is not online, which may be someone else
+  const tagIn = (m[1].match(/#([A-Za-z0-9]{4})$/) || [])[1];
+  let t = findByName(m[1]); if (t && tagIn && tagOf(t).toLowerCase() !== tagIn.toLowerCase()) t = 0;
+  t = t || offlineByTag(m[1]); if (!t) return personal(a, 'No such player. Use their name or #TAG (an offline character: its #TAG).');
   personal(a, renameCharacter(a, t, m[2]).text);
-}, { admin: true, help: '<player|#TAG> <new name>' });
+}, { admin: true, help: '<player|#TAG> <new name> (offline: by #TAG; /chars #TAG lists the account\'s characters)' });
 // The staff teleport: /tp, and /gm goto (gmcall.js). '' when it went, else why not
 const staffTeleport = (a, place) => {
   try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('travel', a, 'staff_tp', a); } catch (e) { /* the player log is optional */ }
@@ -8141,6 +8151,13 @@ try {
     isAdmin, staffCan, every, saveSoon, sendPacket, zoneOfActor, zoneById, recordOf, teleportTo: staffTeleport, creationPending, sendJson, cfg,
     token: (cfg.discord || {}).botToken || auth.botToken });
 } catch (e) { log('gmcall.js failed to load:', e.stack || e.message); globalThis.__dboGmCallsOpen = null; }
+// ---- /event and /chars: quick staff tools (server\stafftools.js, config "events") ------------------------------------
+try {
+  const STAFFTOOLS_JS = path.resolve('stafftools.js');
+  delete require.cache[STAFFTOOLS_JS];
+  require(STAFFTOOLS_JS)({ mp, log, personal, system, audit, who, tagOf, profileOf, rolesOf, onlineActors, registerChatCommand, isAdmin, cfg,
+    staffTier: staffTierOf, realNameOf, userOf, findByName, offlineByTag, sendJson, token: (cfg.discord || {}).botToken || (serverSettings.discordAuth || {}).botToken });
+} catch (e) { log('stafftools.js failed to load:', e.stack || e.message); }
 
 // ---- update controls: version log, /update, /schedule restart|shutdown|update (server\updates.js, config "updates") -----
 try {

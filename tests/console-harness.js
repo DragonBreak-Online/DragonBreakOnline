@@ -93,7 +93,7 @@ const body = [
   cut("registerChatCommand('load'", '// The spawned npcs near you', '/load'),
   `return { deliver, system, personal, captureFor, actorOf, userOf, nameOf, profileOf, discordOf, tagOf, display, who, tierFrom, tierOf, isAdmin,
     isLeadStaff, staffTierFrom, staffTierOf, TIER_RANK, TIER_LABEL, LEAD_ONLY, broadcast, findByName, audit, commands, registerChatCommand, staffSay,
-    handleChat, handleLine, NAME_RE };`,
+    handleChat, handleLine, NAME_RE, offlineByTag };`,
 ].join('\n');
 const world = { online };
 const G = new Function('mp', 'log', 'cfg', 'fs', 'path', 'world', 'CHAT_PROP', 'US', 'noteTold', 'ADMIN_PROFILES', 'TIERS', 'tierRoles', 'legacyAdminRoles',
@@ -125,6 +125,10 @@ new Function('mp', 'log', 'personal', 'registerChatCommand', 'display', 'who', '
 const neverRan = [];
 for (const [n, admin] of [['tp', true], ['npc', true], ['bugs', true], ['wipechars', true], ['schedule', true], ['announce', true], ['dungeon', false], ['beastform', true]]) G.registerChatCommand(n, (a, b) => neverRan.push([n, b]), { admin, help: 'test' });
 globalThis.__dboNameKey = (n) => n.toLowerCase(); globalThis.__dboNameTaken = () => false;
+// stafftools.js registers /chars (on the console allowlist) and /event (not on it)
+require(path.join(ROOT, 'stafftools.js'))({ mp, log, personal: G.personal, system: G.system, audit: G.audit, who: G.who, tagOf: G.tagOf, profileOf: G.profileOf,
+  onlineActors: online, registerChatCommand: G.registerChatCommand, isAdmin: G.isAdmin, cfg: {}, staffTier: G.staffTierOf, realNameOf: G.nameOf, userOf: G.userOf,
+  findByName: G.findByName, offlineByTag: G.offlineByTag });
 globalThis.__dboBeastOriginalRace = () => 0;
 
 // ---- requests, signed as the backend writes them (DESIGN 6.2) -------------------------------------------------------------
@@ -183,7 +187,7 @@ const send = (text, o = {}) => {
 ticker();
 const allow = JSON.parse(fs.readFileSync(path.join(SPOOL, 'allow.json'), 'utf8'));
 check('16. allow.json is written at the first tick, 0600', (fs.statSync(path.join(SPOOL, 'allow.json')).mode & 0o777) === 0o600);
-check('16. ...and lists the nine commands, wwremote and vlremote included', allow.map((x) => x.name).sort().join() === 'chargen,fixloc,kick,load,players,rename,vlremote,whoami,wwremote', allow.map((x) => x.name));
+check('16. ...and lists the ten commands, wwremote, vlremote and chars included', allow.map((x) => x.name).sort().join() === 'chargen,chars,fixloc,kick,load,players,rename,vlremote,whoami,wwremote', allow.map((x) => x.name));
 check('16. ...each with its console usage and the registry help', allow.every((x) => x.usage.startsWith(`/${x.name}`) && typeof x.help === 'string'), allow[0]);
 
 // ---- 1. signature and shape ----------------------------------------------------------------------------------------------
@@ -361,7 +365,7 @@ reset();
   check('5b. ...and nothing in it that console.js does not read (besides a comment)', Object.keys(rc).every((k) => ['_comment', 'enabled', 'discordIds', 'minTier', 'deny'].includes(k)), Object.keys(rc));
   logs.length = 0;
   loadConsole(repoCfg);
-  check('5b. console.js loads the repo config as a game pin of 8, floor leadgm, all nine commands', logs.some((l) => /console: reader on .*, 9 commands, floor leadgm, game pin 8$/.test(l)), logs);
+  check('5b. console.js loads the repo config as a game pin of 8, floor leadgm, all ten commands', logs.some((l) => /console: reader on .*, 10 commands, floor leadgm, game pin 8$/.test(l)), logs);
   const owner = actor(0xff000d01, { name: 'Jacob', tag: 'JKOW', profile: 21, discord: D1[0], roles: [ROLE.owner] });
   const leadOnly = actor(0xff000d02, { name: 'Icara', tag: 'ICED', profile: 22, discord: D1[2], roles: [ROLE.lead] });
   let rep = send('/whoami', { discordId: D1[0], profileId: 21, user: 'jake', roles: [ROLE.owner] }).rep;
@@ -433,8 +437,9 @@ reset();
   check('G1. a real name, a unique prefix, a profile id and an actor id still resolve', G.findByName('Lydia') === A.lydia && G.findByName('lyd') === A.lydia
     && G.findByName('6') === A.lydia && G.findByName(A.lydia.toString(16)) === A.lydia && G.findByName('#LLX8') === A.lydia);
   const before = JSON.stringify(store.get(A.lydia));
-  const offline = ['/kick #8KWH', '/rename #8KWH Bobby', '/chargen #8KWH', '/fixloc #8KWH', '/wwremote clear #8KWH', '/kick #8KWJ'];
-  const hit = offline.map((t) => [t, send(t).rep]).filter(([, rep]) => !rep || rep.why !== 'target');
+  const offline = ['/kick #8KWH', '/rename #8KWH Bobby', '/chars #8KWH', '/chargen #8KWH', '/fixloc #8KWH', '/wwremote clear #8KWH', '/kick #8KWJ'];
+  // /rename and /chars may name an offline character, found in the tag index; with none there they are refused as targetAny
+  const hit = offline.map((t) => [t, send(t).rep]).filter(([t, rep]) => !rep || rep.why !== (/^\/(rename|chars) /.test(t) ? 'targetAny' : 'target'));
   check('7. with #8KWH offline and one undisguised player online, each targeted form is refused as target', !hit.length, hit.map(([t, r]) => [t, r && r.why]));
   check('7. ...and nobody was kicked, renamed, moved or cleared', !kicked.length && !raceMenus.length && JSON.stringify(store.get(A.lydia)) === before);
   check('7. the reply says the tag is not online', /#8KWH is not online/.test(send('/kick #8KWH').rep.lines[0].text));
@@ -526,6 +531,40 @@ reset();
   const sw = send('/kick #8KWH').rep;
   check('11. the switch at dry-run forces a dry run whatever the request says', sw.state === 'dry-run' && !kicked.length, sw);
   setSwitch('on\n');
+}
+
+// ---- 7b. offline characters by #TAG: /rename and /chars (staff suggestion, aussiepie 9 Oct) ----------------------------------
+reset();
+{
+  // The engine's tag index, as indexName writes it: the lower-case tag of every character
+  mp.findFormsByPropertyValue = (k, v) => (k === 'private.indexed.tagKey' ? [...store].filter(([, o]) => String(o['private.charTag'] || '').toLowerCase() === v).map(([id]) => id) : []);
+  const alt = actor(0xff000b02, { name: 'Bobette', tag: 'BOB2', profile: 5, discord: ID.bob });
+  setOnline(A.bob, false);
+  const chars = send('/chars #8KWH').rep;
+  const text = chars.lines.map((l) => l.text).join(' | ');
+  check('7b. /chars #8KWH with Bob offline lists both characters of his account with their tags', chars.state === 'ran' && chars.target === 'Bob #8KWH' && /2 characters/.test(text) && /Bob #8KWH/.test(text) && /Bobette #BOB2/.test(text), chars);
+  check('7b. ...and no other account\'s character', !/Lydia|Jake/.test(text), text);
+  const rn = send('/rename #BOB2 Roberta').rep;
+  check('7b. /rename #BOB2 renames the offline character that carries it', rn.state === 'ran' && rn.target === 'Bobette #BOB2' && store.get(alt).appearance.name === 'Roberta' && store.get(A.bob).appearance.name === 'Bob', rn);
+  check('7b. ...with the rename\'s own audit line', audits().some((l) => /renamed "Bobette" -> "Roberta"/.test(l)), audits());
+  check('7b. /kick #8KWH with Bob offline is still refused as target (only /rename and /chars reach offline characters)', send('/kick #8KWH').rep.why === 'target');
+  store.get(alt)['private.charTag'] = '8KWH';
+  const dup = send('/rename #8KWH Bobby').rep;
+  check('7b. a tag two offline characters carry is refused (targetAny), nobody renamed', dup.why === 'targetAny' && store.get(A.bob).appearance.name === 'Bob' && /or more than one does/.test(header(dup)), dup);
+  store.get(alt)['private.charTag'] = 'BOB2';
+  globalThis.__dboFormGone = (id) => (id >>> 0) === alt;
+  check('7b. a deleted character in the index is not a target', send('/rename #BOB2 Robin').rep.why === 'targetAny' && store.get(alt).appearance.name === 'Roberta');
+  globalThis.__dboFormGone = undefined;
+  for (const [t, why] of [['/chars', 'needTag'], ['/chars Bob', 'needTag'], ['/chars #8KWH #BOB2', 'needTag']]) check(`7b. ${t} is refused as ${why}`, send(t).rep.why === why);
+  // The typed /rename in game: a typed #TAG binds, never a name prefix of someone else online
+  setOnline(A.bob, true); reset();
+  G.commands.get('rename').fn(A.jake, 'Lyd #ZZZZ Lyddie');
+  check('7b. typed /rename "Lyd #ZZZZ" (tag nobody carries) renames nobody, not the online Lydia', store.get(A.lydia).appearance.name === 'Lydia');
+  setOnline(A.bob, false);
+  G.commands.get('rename').fn(A.jake, 'Bob #BOB2 Robyn');
+  check('7b. typed /rename "Bob #BOB2" renames the offline Bobette, by her tag', store.get(alt).appearance.name === 'Robyn' && store.get(A.bob).appearance.name === 'Bob');
+  setOnline(A.bob, true);
+  store.delete(alt); delete mp.findFormsByPropertyValue;
 }
 
 // ---- 12. reply state is "ran", with the handler's own first line ------------------------------------------------------------------------

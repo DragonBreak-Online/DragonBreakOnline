@@ -1672,5 +1672,18 @@
     { "id": "vault", "name": "Vault", "weight": 500, "weekly": 500 }
    ]
   }
+ },
+ "events": {
+  "_comment": "/event <message> (server\\stafftools.js; aussiepie's #staff-suggestions, 8 Oct): staff of any rank (Trial GMs included) and holders of a Discord role in hostRoleIds announce an event to every online player, on screen and in chat, with an audit line. cooldownSeconds is per host, globalCooldownSeconds across all hosts. showHost names the host's character. discord true also posts it to discordChannelId (proposed: #events in Server Entrance), pinging discordPingRoleId if set; off until Nate approves the channel and the bot can post there.",
+  "enabled": true,
+  "cooldownSeconds": 300,
+  "globalCooldownSeconds": 60,
+  "minText": 5,
+  "maxText": 300,
+  "hostRoleIds": [],
+  "showHost": true,
+  "discord": false,
+  "discordChannelId": "1549181668516954174",
+  "discordPingRoleId": ""
  }
 }
