@@ -1418,7 +1418,7 @@
     }
    },
    "limits": {
-    "_comment": "Faction membership limits (server\\guilds.js, Nate 6 Oct): at most one faction per category, per character; ids listed by name, never from guild-defs kind. allegiance counts a hold's or county's court officials only (officialsOnly + exemptRoles: a Citizen or Guard takes no slot), so a Legion soldier may live in a hold but not sit in its court. conflicts: refused whatever the category (supernatural: refused for that kind too, supernatural.js). The six Orc stronghold clans are an allegiance (Nate, 19 Oct: they answer only to their Chief), any member. Unplaced, so unlimited: the Silver Hand, the four vampire clans, the two Hircine packs, charter factions. Checked on a new membership or a rank that newly takes a slot; nobody is removed. A Lead GM lifts it once with /faction override <player> <id> (audited).",
+    "_comment": "Faction membership limits (server\\guilds.js, Nate 6 Oct): at most one faction per category, per character; ids listed by name, never from guild-defs kind. allegiance counts a hold's or county's court officials only (officialsOnly + exemptRoles: a Citizen or Guard takes no slot), so a Legion soldier may live in a hold but not sit in its court. conflicts: refused whatever the category (supernatural: refused for that kind too, supernatural.js). The six Orc stronghold clans, the Imperial Civil Commission and the Penitus Oculatus are allegiances (Nate, 19 Oct), any member. Unplaced, so unlimited: the Silver Hand, the four vampire clans, the two Hircine packs, charter factions. Checked on a new membership or a rank that newly takes a slot; nobody is removed. A Lead GM lifts it once with /faction override <player> <id> (audited).",
     "enabled": true,
     "categories": {
      "allegiance": {
@@ -1447,7 +1447,9 @@
        "clan-dushnikh-yal",
        "clan-largashbur",
        "clan-narzulbur",
-       "clan-cracked-tusk"
+       "clan-cracked-tusk",
+       "imperial-civil-commission",
+       "penitus-oculatus"
       ],
       "officialsOnly": [
        "hold-whiterun",
