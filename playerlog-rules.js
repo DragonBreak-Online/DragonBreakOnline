@@ -100,7 +100,7 @@ const TIER = E('senior', 'developer', 'leadgm', 'gm', 'trialgm', 'none');
 const SIDE = O({ hits: 'int', dmg: 'num', by: A(NAME, 8) });
 const REFUSAL_REASONS = ['god', 'ethereal', 'offline_body', 'login_grace', 'bound', 'paralysed', 'armour_change', 'damage_cap',
   'spell_rate', 'dungeon_ally', 'warband', 'companion_pvp', 'silver', 'recovering', 'downed', 'shout_not_given',
-  'friendly_lethal', 'unknown'];
+  'friendly_lethal', 'duel_pause', 'duel_rules', 'duel_beaten', 'duel_scaled', 'duel_outsider', 'unknown'];
 
 // ---- the event types (DESIGN.md 1.5) ------------------------------------------------------------------------------------
 // p: priority (0 never dropped before the hard cap, 1, 2 first to go); place: 'pos' (cell and coordinates), 'cell' (cell
