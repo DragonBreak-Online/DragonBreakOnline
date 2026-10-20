@@ -6951,6 +6951,8 @@ const potionResistMult = (targetId, sourceId) => {
   }
   return share > 0 ? Math.max(0, 1 - Math.min(1, share)) : 1;
 };
+// Worn Resist Fire, Frost, Shock, Magic and Poison (gearench.js; the client's own copy never reached this judge)
+const gearResistMult = (targetId, sourceId) => { try { return gearEnch ? Number(gearEnch.resistMult(targetId >>> 0, sourceId >>> 0)) || 1 : 1; } catch (e) { return 1; } };
 const blessingDamageMult = (aggressorId, targetId, sourceId) => blessingAttackMult(aggressorId, sourceId) * blessingTargetMult(targetId, sourceId);
 // The server's hit formula counts only the bow's WEAP damage; vanilla adds the worn arrow's (AMMO DATA float at byte 8)
 const ARROWS = Object.assign({ enabled: true, scale: 1 }, cfg.arrows || {});
@@ -7769,7 +7771,8 @@ const hitDamageAttemptHook =(aggressorId, targetId, sourceId, damage, flags) => 
     // so a werewolf also took the Master fist bonus, the fist's stamina drain and its disarm (combat review, 2026-09-29)
     let beastAgg = false; try { const b = mp.get(agg, 'private.beast'); beastAgg = !!(b && b.form); } catch (e) { /* not an actor */ }
     // The target's side (Defense, a blessing, the race's resistance) is capped together: racial.js reductionCap
-    let targetSide = defenseDamageMult(tgt) * fleshDamageMult(tgt, src) * blessingTargetMult(tgt, src) * potionResistMult(tgt, src);
+    // Worn resistances join the race's, a potion's and a blessing's under racial.js reductionCap (gearench.js resistMult)
+    let targetSide = defenseDamageMult(tgt) * fleshDamageMult(tgt, src) * blessingTargetMult(tgt, src) * potionResistMult(tgt, src) * gearResistMult(tgt, src);
     if (racial) { try { targetSide = racial.capTargetSide(targetSide * racial.targetMult(agg, tgt, src, dmg)); } catch (e) { log('racial target failed', e.message); } }
     let raceAtk = 1;
     if (racial && !beastAgg) { try { raceAtk = racial.attackMult(agg, tgt, src, dmg); } catch (e) { log('racial attack failed', e.message); } }
