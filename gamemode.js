@@ -5515,6 +5515,8 @@ const inLoginGrace = (a) => {
 const unstuckActor = (a, by) => {
   const admin = staffCan(by, 'unstuck');
   try { if (mp.get(a, 'isDead')) return personal(by, 'You cannot use /unstuck while dead.'); } catch (e) { /* alive */ }
+  // Frozen in the engine's bleed-out after a temple wake (camera locked, no movement): /unstuck ends it first, cooldown or not
+  try { if (typeof globalThis.__dboBleedOutStop === 'function') globalThis.__dboBleedOutStop(a); } catch (e) { /* the move still runs */ }
   try { const r = mp.get(a, 'private.restrained'); if (r && (r.boundHands || r.carried || r.captorActorId)) return personal(by, 'You cannot use /unstuck while restrained or carried.'); } catch (e) { /* free */ }
   // No walking out of a jail, or out of a sentence (jail.js)
   if (!admin && globalThis.__dboJailUnstuck) { const why = globalThis.__dboJailUnstuck(a); if (why) return personal(by, why); }

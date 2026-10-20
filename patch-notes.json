@@ -1,5 +1,20 @@
 [
   {
+    "title": "No more frozen temple wakes",
+    "date": "2026-10-20",
+    "version": "Hotfix",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Death and respawn",
+        "items": [
+          "Waking at the temple sometimes left you frozen in place, unable to move or look around, until you relogged. Waking now ends the bleed-out properly.",
+          "If it still happens, /unstuck now frees you too."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Opening a shop you bought",
     "date": "2026-10-20",
     "version": "Hotfix",
