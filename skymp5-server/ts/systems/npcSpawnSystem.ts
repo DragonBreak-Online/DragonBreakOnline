@@ -19,6 +19,7 @@ const POLL_MS = 2000;
 const ZONES_FILE = "./NPC-Spawns.json";
 const SPAWNS_FILE = "./zone-spawns.json";
 const FALLEN_FILE = "./npc-fallen-spots.json";
+const STRANDED_FILE = "./npc-stranded-spots.json";
 const DESPAWN_HYSTERESIS = 1.5;
 const DEFAULT_SIZE = 2000;
 const DEFAULT_DESPAWN = 120;
@@ -47,6 +48,8 @@ const MAX_SPOT_FALLS = 2;
 // Falls nobody saw do not count against the spot, but this many give it up until a restart or an admin reset,
 // or a spot players keep walking away from would drop an NPC every time one comes back
 const MAX_UNSEEN_FALLS = 3;
+// Strandings on one spot before it is given up, as for falls: one bad spot looped every 10 s for three days
+const MAX_SPOT_STRANDS = 2;
 // A copy created before the client has the room loaded drops through the missing collision, so a spot
 // that has dropped an actor is only tried again once a player is this close to it
 const SAFE_RESPAWN_UNITS = 2500;
@@ -303,6 +306,7 @@ export class NpcSpawnSystem implements System {
     const rawBudget = Number(all?.["npcLiveBudget"]);
     if (Number.isFinite(rawBudget) && rawBudget > 0) this.maxLive = Math.floor(rawBudget);
     this.loadFallen();
+    this.loadStranded();
     this.cleanupLeftovers(this.mp);
     ctx.gm.once(WORLD_LOADED_EVENT, () => this.removeLeftovers());
     await this.queueLoad("boot");
@@ -926,7 +930,8 @@ export class NpcSpawnSystem implements System {
   }
 
   private givenUp(spot: string): boolean {
-    return (this.fallenSpots.get(spot) ?? 0) >= MAX_SPOT_FALLS || (this.unseenFalls.get(spot) ?? 0) >= MAX_UNSEEN_FALLS;
+    return (this.fallenSpots.get(spot) ?? 0) >= MAX_SPOT_FALLS || (this.unseenFalls.get(spot) ?? 0) >= MAX_UNSEEN_FALLS
+      || (this.strandedSpots.get(spot) ?? 0) >= MAX_SPOT_STRANDS;
   }
 
   // Slots of zones named with this prefix that will not be filled again (dungeons.js leaves them out of a lease's
@@ -1050,6 +1055,16 @@ export class NpcSpawnSystem implements System {
           if (unseen >= MAX_UNSEEN_FALLS) this.log(`NpcSpawnSystem: ${where} has dropped ${unseen} npcs with nobody near; leaving it empty until a restart or reset`);
         }
         if (this.givenUp(key)) zone.slotReadyAt[entry.slot] = NEVER_READY;
+      } else if (stranded) {
+        const key = this.spotKey(zone, entry.slot);
+        const where = `'${zone.name}' slot ${entry.slot} at [${slot.map((n) => Math.round(n)).join(", ")}]`;
+        const strands = (this.strandedSpots.get(key) ?? 0) + 1;
+        this.strandedSpots.set(key, strands);
+        this.saveStranded();
+        if (strands >= MAX_SPOT_STRANDS) {
+          this.log(`NpcSpawnSystem: ${where} has stranded ${strands} npcs above it; leaving it empty`);
+          zone.slotReadyAt[entry.slot] = NEVER_READY;
+        }
       }
     }
   }
@@ -1143,6 +1158,8 @@ export class NpcSpawnSystem implements System {
   private fallenSpots = new Map<string, number>();
   // spotKey -> falls with nobody near, this run only
   private unseenFalls = new Map<string, number>();
+  // spotKey -> actors left hanging above it. A spot whose anchor strands its actor does it to the next one too
+  private strandedSpots = new Map<string, number>();
 
   private loadFallen(): void {
     try {
@@ -1157,6 +1174,24 @@ export class NpcSpawnSystem implements System {
       if (this.fallenSpots.size) this.log(`NpcSpawnSystem: ${this.fallenSpots.size} spot(s) have dropped npcs before, ${dead} of them given up`);
       if (legacy) this.log(`NpcSpawnSystem: ignored ${legacy} fallen-spot entr${legacy === 1 ? "y" : "ies"} keyed by zone and slot number in ${FALLEN_FILE}`);
     } catch { /* no file yet */ }
+  }
+
+  private loadStranded(): void {
+    try {
+      const raw = JSON.parse(fs.readFileSync(STRANDED_FILE, "utf8")) as Record<string, number>;
+      for (const [key, strands] of Object.entries(raw)) {
+        if (!key.includes("@")) continue;
+        if (typeof strands === "number" && strands > 0) this.strandedSpots.set(key, strands);
+      }
+      const dead = [...this.strandedSpots.values()].filter((n) => n >= MAX_SPOT_STRANDS).length;
+      if (this.strandedSpots.size) this.log(`NpcSpawnSystem: ${this.strandedSpots.size} spot(s) have stranded npcs before, ${dead} of them given up`);
+    } catch { /* no file yet */ }
+  }
+
+  private strandedFile = new LaterWrite(STRANDED_FILE, () => JSON.stringify(Object.fromEntries(this.strandedSpots), null, 1), (msg) => this.log(msg), SLOW_POLL_MS);
+
+  private saveStranded(): void {
+    this.strandedFile.save();
   }
 
   private fallenFile = new LaterWrite(FALLEN_FILE, () => JSON.stringify(Object.fromEntries(this.fallenSpots), null, 1), (msg) => this.log(msg), SLOW_POLL_MS);
@@ -1270,8 +1305,10 @@ export class NpcSpawnSystem implements System {
         const spot = this.spotKey(zone, slot);
         this.fallenSpots.delete(spot);
         this.unseenFalls.delete(spot);
+        this.strandedSpots.delete(spot);
       }
       this.saveFallen();
+      this.saveStranded();
     }
     this.saveSpawns();
   }
