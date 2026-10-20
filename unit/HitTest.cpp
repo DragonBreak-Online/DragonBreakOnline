@@ -862,7 +862,7 @@ TEST_CASE("A staff's enchantment hits only from a staff the aggressor holds or "
 }
 
 
-TEST_CASE("A creature's melee lands its race's attack spell, a player's "
+TEST_CASE("A creature's melee lands its attack data spell, a player's "
           "never does",
           "[Hit]")
 {
@@ -875,6 +875,10 @@ TEST_CASE("A creature's melee lands its race's attack spell, a player's "
   constexpr uint32_t kFlameMeleePower = 0x00050cf8;
   // ChaurusRace's bite, another race's attack spell
   constexpr uint32_t kChaurusBite = 0x00053474;
+  // EncVampire02BretonF: its own ATKD (not its race's) carries AAAFrostTouch
+  constexpr uint32_t kVampire = 0xff000002;
+  constexpr uint32_t kVampireBase = 0x00033853;
+  constexpr uint32_t kFrostTouch = 0x0003384a;
 
   DoConnect(p, 0);
   p.CreateActor(kPlayer, { 0, 0, 0 }, 0, 0x3c, 1);
@@ -890,6 +894,15 @@ TEST_CASE("A creature's melee lands its race's attack spell, a player's "
     kAtronach);
   p.worldState.GetFormAt<MpActor>(kAtronach).SetEquipment(Equipment());
   p.worldState.hosters[kAtronach] = kPlayer;
+  p.worldState.AddForm(
+    std::unique_ptr<MpActor>(new MpActor(
+      { { 100, 0, 0 },
+        { 0, 0, 0 },
+        FormDesc::FromFormId(0x3c, p.worldState.espmFiles) },
+      FormCallbacks::DoNothing(), kVampireBase)),
+    kVampire);
+  p.worldState.GetFormAt<MpActor>(kVampire).SetEquipment(Equipment());
+  p.worldState.hosters[kVampire] = kPlayer;
 
   // Health one hit takes (the unit PartOne's fake formula), 0 when refused
   auto hit = [&](uint32_t aggressor, uint32_t target, uint32_t source) {
@@ -911,8 +924,12 @@ TEST_CASE("A creature's melee lands its race's attack spell, a player's "
   REQUIRE(hit(kAtronach, 0x14, kChaurusBite) == Catch::Approx(0.f));
   // A player's own hit naming a creature's attack spell stays refused
   REQUIRE(hit(0x14, kAtronach, kFlameMelee) == Catch::Approx(0.f));
+  REQUIRE(hit(kVampire, 0x14, kFrostTouch) > 0.f);
+  REQUIRE(hit(kAtronach, 0x14, kFrostTouch) == Catch::Approx(0.f));
 
   p.worldState.hosters.erase(kAtronach);
+  p.worldState.hosters.erase(kVampire);
+  p.DestroyActor(kVampire);
   p.DestroyActor(kAtronach);
   p.DestroyActor(kPlayer);
   DoDisconnect(p, 0);

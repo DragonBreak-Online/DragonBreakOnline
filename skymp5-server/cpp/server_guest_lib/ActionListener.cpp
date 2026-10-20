@@ -627,34 +627,45 @@ bool IsSpellGrantedBy(WorldState* worldState, uint32_t parentSpellId,
   return granted;
 }
 
-// A creature's melee carries its race's attack spell (RACE ATKD at 8: a Flame Atronach's fire, a spider's poison)
-bool IsRaceAttackSpell(const MpActor& actor, uint32_t spellId)
+// A creature's melee carries an attack spell from its attack data (ATKD at 8): the race's (a Flame Atronach's fire, a
+// spider's poison) or the NPC_'s own, which replaces it (a vampire's AAAFrostTouch)
+bool IsAttackDataSpell(const MpActor& actor, uint32_t spellId)
 {
   WorldState* worldState = actor.GetParent();
   if (!worldState || !worldState->HasEspm()) {
     return false;
   }
-  uint32_t raceId = 0;
+  std::vector<uint32_t> owners = { actor.GetBaseId() };
+  for (const auto& desc : actor.GetTemplateChain()) {
+    owners.push_back(desc.ToFormId(worldState->espmFiles));
+  }
   try {
-    raceId = actor.GetRaceId();
+    owners.push_back(actor.GetRaceId());
   } catch (const std::exception&) {
-    return false;
   }
-  const auto raceLookup = worldState->GetEspm().GetBrowser().LookupById(raceId);
-  if (!raceLookup.rec || !(raceLookup.rec->GetType() == "RACE")) {
-    return false;
-  }
+  auto& browser = worldState->GetEspm().GetBrowser();
   bool found = false;
-  espm::RecordHeaderAccess::IterateFields(
-    raceLookup.rec,
-    [&](const char* type, uint32_t size, const char* data) {
-      if (!found && !std::memcmp(type, "ATKD", 4) && size >= 12) {
-        const uint32_t raw = *reinterpret_cast<const uint32_t*>(data + 8);
-        found = raw != 0 && raceLookup.ToGlobalId(raw) == spellId;
-      }
-    },
-    worldState->GetEspmCache());
-  return found;
+  for (uint32_t ownerId : owners) {
+    const auto lookup = browser.LookupById(ownerId);
+    const bool isOwner = lookup.rec &&
+      (lookup.rec->GetType() == "RACE" || lookup.rec->GetType() == "NPC_");
+    if (!isOwner) {
+      continue;
+    }
+    espm::RecordHeaderAccess::IterateFields(
+      lookup.rec,
+      [&](const char* type, uint32_t size, const char* data) {
+        if (!found && !std::memcmp(type, "ATKD", 4) && size >= 12) {
+          const uint32_t raw = *reinterpret_cast<const uint32_t*>(data + 8);
+          found = raw != 0 && lookup.ToGlobalId(raw) == spellId;
+        }
+      },
+      worldState->GetEspmCache());
+    if (found) {
+      return true;
+    }
+  }
+  return false;
 }
 
 // Projectiles, cloaks and hazards may land after the spell left the hand
@@ -666,7 +677,7 @@ bool CanHitWithSpell(const MpActor& actor, uint32_t spellId)
   }
   if (actor.GetProfileId() == -1 &&
       (IsSpellInTemplateTree(actor, spellId) ||
-       IsRaceAttackSpell(actor, spellId))) {
+       IsAttackDataSpell(actor, spellId))) {
     return true;
   }
   if (actor.GetProfileId() != -1 &&
