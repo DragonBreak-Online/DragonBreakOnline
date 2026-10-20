@@ -1,5 +1,74 @@
 # DragonBreak Online checklist (2026-09-14)
 
+## 2026-10-20 - hosted positions ARE stored, `strayed` cannot be client-driven, hoster churn is normal (Worker 4, PC)
+
+**The server stores a hosted actor's reported position.** Sandbox 7787, 2 bots, 180 s, 20 seeded wildlife
+zones, x drift at 120 u/s, read through the gamemode's `/npc` (which prints `mp.getActorPos`). 5 of the 11
+listed actors moved, every one **x-only, dy and dz exactly 0**: `+2782 +2077 +2038 +1215 +1094`. The moves are
+not refused. Two earlier runs that read as null were the instrument, not the server (see the harness bugs
+below).
+
+**`strayed` can never be fired by a client driving an actor it hosts.** The leash is
+`max(LEASH_MIN 8000, zone.radius * 3)`, 9000 for these zones, but `PartOne.cpp` releases hosting the moment
+the actor leaves the hoster's stream: `ReleaseHost(..., "its hoster no longer has it (unsubscribed)")`, with
+`"no movement for {kStaleHostSeconds} s"` (5 s) as the other rule. Driving at **900 u/s**, just under
+MovementValidation's 1000 u/s horizontal ceiling: 44 hoster changes, 22 releases (**20 unsubscribed, 2
+stale**), **strayed 0, fallen 0, stranded 0**, furthest reach before release ~7.5k units. This is on
+`origin/main`, so it is live behaviour; our local checkout is 873 commits behind and lacks it.
+
+So **a drift run with no strays is the correct result, not a broken detector**, and the 516 production strays
+have to be server-side movement, which matches 167 of them sitting in the single goat zone `wild:goat:3124`.
+The stray half of the stranding commit (`54fc170e`) stays covered by inspection only, because inspection is
+the only way it can be covered.
+
+**Hoster churn is normal, not thrash.** `/var/log/skymp-server.log`, 18-20 Oct (70.2 h): **215,727** changes,
+0.85/s, peak minute 211. **57,301 distinct targets, all dynamic `ff` ids, zero static.** By change count:
+1 = 25,403 (44%), 2-5 = 17,192 (30%), 6-20 = 14,378 (25%), 21-100 = 324, **>100 = 4**. Busiest actor 147
+changes in 70 h; gaps for the top five average 22-33 minutes, with only 7-13 sub-5s gaps each (the normal
+release-then-grant pair inside one second). Grants 146,628 vs releases 69,099, 2.1:1, so most handoffs go
+host to host without passing through 0. The volume is **breadth**, not frequency. Nothing to fix.
+
+**Two harness bugs fixed** in `tools/loadtest/lib/bot.js`, both of which had been corrupting drift runs: the
+drift log printed `z` whatever the axis, so every `--drift-axis x` run read as a z drift (the code sent x
+correctly all along), and the chat filter `/npc|spawn|up [-+]?d/i` dropped every `/npc` row, because rows say
+"above its spot" and not "npc" or "spawn", so only the header ever reached the log.
+
+**Also noted:** `/npc` is admin-gated and the harness preflight refuses a bot whose profileId is an admin id;
+both are correct, so the sandbox runs used `--force` rather than weakening either. Sandbox boot logged
+`zone-spawns.json write took 19278 ms, off the game loop` with 3,216 zones - no stall, but it will grow.
+
+## 2026-10-20 - the dungeon anchor bug measured and CLOSED, not fixed (Worker 4, PC)
+
+**It never costs a spawn.** Measured against `/var/log/skymp-server.log`, 18-20 Oct, 3.9M lines, **887 dungeon
+claims**: `failed to spawn` **0**, `placed in X, expected Y` **2** (both self-corrected by `assertPlacedIn`'s
+retry), `stayed N units from its spot` **0**. `noAnchor` appears in **0 of the 317** pre-spawn reports.
+
+**The misses are real but harmless.** 4,672 `dungeon anchor ... is not in the server's world` lines, **2,311
+unique refs of the 3,562** placement refs in the deployed `dungeons.json` (218 dungeons, 3,608 placements), so
+**65% of placements have no anchor**. That is `anchorExists` correctly discovering what `DragonBreak Online
+Edits` disabled on purpose, so the server owns spawning. It is a report, not a failure.
+
+**A resolvable anchor is already preferred, including during play.** `spawnOne` does
+`attempt(zone.anchorId || anchorId)`, so the zone's own anchor wins over the player `fillSlots` picked. An
+earlier reading of the `const anchor =` line in `fillSlots` suggested a player beat the anchor once the party
+was inside; that is wrong, and the one-line reorder it implied would have been a no-op.
+
+**So two proposals were dropped rather than built**: reordering `fillSlots` (no effect), and re-running
+`ck-mcp\dungeons_anchor.py` to give the other 65% a loadable anchor. The second would regenerate
+`dungeons.json`, which every dungeon worker shares, for a measured benefit of about **two placements per three
+days**. Not worth the disruption; revisit only if the placement failure counts rise.
+
+**What the same window says is actually wrong with spawned NPCs**, in volume order: `strayed` **516**,
+`too distant` **376**, `Bad hoster` **306**, `hung` **194**, `riding a translation` **163**, `different cells`
+**86**, `has dropped` **20**. `strayed` and `hung` are `checkMisplaced` destroying and replacing an actor, so
+**710 destructions in three days**: either real misplacement or a net tight enough to kill healthy enemies
+mid-fight. Being measured next (Worker 4). `too distant`, `different cells` and `Bad hoster` belong to the
+NPC-cell and hosting work (Worker 2), and the counts were handed over.
+
+**The diagnostic half of this item was already shipped**: `d55f539a` is in `origin/main` via `991bcc82`, live,
+and producing the 317 reports the numbers above come from. The 18 Oct worktree on `npcspawn-skip-report-1018`
+is stale; nothing is pending there.
+
 ## 19 Oct, late - the missing doorways, and the gate list stops being a script input (Worker A, PC)
 
 Nat: "theres missing doorways etc, i feel like in the draugr ruins its from when we removed the blade
@@ -103,6 +172,8 @@ which has no door base near it. All three need the Creation Kit - ck-mcp cannot 
 The 13 sunk world-building items stay as they are, per Nat.
 
 ## Added 2026-10-18: dungeon anchors never resolve, and a pre-spawn that cannot say why - PC session (load test)
+
+*Superseded 20 Oct: the anchors do not resolve, but it never costs a spawn. See the closeout block above.*
 
 Lead 1 (the Dustman's Cairn claim that pre-spawned 0 of its 18 standing enemies). Full work in
 `_reviews/2026-10-17-npc-live-budget-cost.md` section 6.
