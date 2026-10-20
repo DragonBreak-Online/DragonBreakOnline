@@ -712,7 +712,7 @@ module.exports = (api) => {
       // An owned mine's share (mines.js): cut of the yield goes into the mine's store for its owner, once the miner's part is in hand
       const item = gem || ITEMS[round.ore];
       let share = null;
-      try { if (typeof globalThis.__dboMineShareQuote === 'function') share = globalThis.__dboMineShareQuote(round.refId, a, item, count, gem ? itemName(gem) : round.ore === 'salt' ? 'Salt Pile' : `${oreName(round.ore)} Ore`); } catch (e) { share = null; }
+      try { if (typeof globalThis.__dboMineShareQuote === 'function') share = globalThis.__dboMineShareQuote(round.refId, a, item, count, gem ? itemName(gem) : round.ore === 'salt' ? 'Salt Pile' : (CFG.gemOre || {})[round.ore] ? titleCase(round.ore) : `${oreName(round.ore)} Ore`); } catch (e) { share = null; }
       const cut = share && share.cut > 0 ? Math.min(count, share.cut) : 0;
       const ok = count - cut > 0 ? giveItem(a, idOf(item), count - cut) : true;
       if (ok && cut) { try { share.commit(); } catch (e) { log('labour: the mine share failed', e.message); } }
