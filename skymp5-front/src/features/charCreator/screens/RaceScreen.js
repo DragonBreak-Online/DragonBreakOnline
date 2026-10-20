@@ -31,6 +31,9 @@ const RaceScreen = ({ species, selected, disabledRaces, lockedRaces, onSelect })
           );
         })}
       </div>
+      {races.filter(r => r.lockedNote && lockedRaces.includes(r.id)).map(r => (
+        <div key={r.id} className='charCreator__note'>{r.name}: {r.lockedNote}</div>
+      ))}
       {current
         ? (
           <div className='charCreator__lore'>
