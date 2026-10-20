@@ -4,10 +4,11 @@
 // Who: only a member of an approved thief faction (config factions, plus /burglary approve by a Lead GM) burgles. Nobody
 // else is ever offered anything here: their activation falls through to housingSystem.ts, which keeps its locks.
 // Breaking in: crouched, a thief uses the locked door of a player's home, or a chest of it they have no access to. They work
-// the lock for forceSeconds (players near the door and the owner are told; a hit, a step away or anyone else using the door
-// stops it), then pick it (lockpick.js) at lockLevel. A won lock is a breach of that home for breachMinutes: its load doors
+// the lock for forceSeconds, seen working (idleKey, an idles.js crouch); players near the door and the owner are told, and a
+// hit, a step away or anyone else using the door stops it. Then they pick it (lockpick.js) at lockLevel. A won lock is a breach of that home for breachMinutes: its load doors
 // take the thief through (a teleport; the lock itself never opens) and its chests open the steal panel. Its doors always let
 // that thief back out. One breach of a home per homeCooldownHours.
+// Never a rented chest, a shop chest or a faction's storage.
 // Stealing: the steal panel lists the chest's things; a whole stack is one kind, and a thief takes at most takeTypes kinds
 // per takeWindowHours. Never keys, artifacts (artifacts.json), worn things, or gold unless goldStealable. Each take is kept in
 // the stolen ledger with its owner.
@@ -32,7 +33,7 @@ const STEALABLE = new Set(['WEAP', 'ARMO', 'AMMO', 'MISC', 'ALCH', 'INGR', 'BOOK
 const HOUR = 3600000, DAY = 86400000;
 const DEFAULTS = {
   enabled: false, factions: [], requireSneak: true, requireOwnerOnline: true,
-  forceSeconds: 30, moveTolerance: 150, noticeRadius: 2000, tellOwner: true, lockLevel: 3,
+  forceSeconds: 30, moveTolerance: 150, idleKey: 'skin', noticeRadius: 2000, tellOwner: true, lockLevel: 3,
   breachMinutes: 10, homeCooldownHours: 12,
   takeTypes: 2, takeWindowHours: 12, goldStealable: false, listMax: 30,
   fenceDays: 14, payShare: 0.3, noticeHours: 24, freezeMaxHours: 72, maxEvidence: 600,
@@ -178,6 +179,8 @@ const factory = (api) => {
     // A faction's storage, a rented chest or a weapon rack is no home's: their own modules keep them
     try { if (typeof globalThis.__dboGuildStorageAt === 'function' && globalThis.__dboGuildStorageAt(ref)) return null; } catch (e) { return null; }
     try { if (typeof globalThis.__dboBusinessChestOf === 'function' && globalThis.__dboBusinessChestOf(ref)) return null; } catch (e) { return null; }
+    // A shop chest (shops.js) is sold from at its ledger, never rifled
+    try { const B = globalThis.__dboBusiness; if (B && B.data && Object.values(B.data.businesses || {}).some((b) => b && b.shop && b.shop.chest === hex(ref))) return null; } catch (e) { return null; }
     return { p, rec, kind: t === 'DOOR' ? 'door' : 'chest' };
   };
   const homeLabel = (rec) => (rec && typeof rec.name === 'string' && rec.name.trim() ? rec.name.trim() : 'a home');
@@ -241,9 +244,13 @@ const factory = (api) => {
       try { personal(o, text(o)); } catch (e) { /* gone */ }
     }
   };
+  // The visible work at the lock: an interaction idle (idles.js) held while it lasts, which other players see through the
+  // animation sync; idleKey '' plays none
+  const holdIdle = (a) => { try { return C.idleKey && typeof globalThis.__dboHoldIdle === 'function' ? globalThis.__dboHoldIdle(a, C.idleKey) : null; } catch (e) { return null; } };
+  const endChannel = (ch) => { S.channels.delete(ch.a); try { if (ch.idle && typeof globalThis.__dboStopIdle === 'function') globalThis.__dboStopIdle(ch.a, ch.idle); } catch (e) { /* offline */ } };
   const interrupt = (a, why) => {
     const ch = S.channels.get(a >>> 0); if (!ch) return;
-    S.channels.delete(a >>> 0);
+    endChannel(ch);
     personal(a, why);
     audit(`BURGLARY ${who(a)} stopped at ${homeLabel(ch.rec)} (${hex(ch.p)}): ${why}`);
   };
@@ -278,6 +285,7 @@ const factory = (api) => {
     const now = Date.now();
     const ch = { a: a >>> 0, ref: ref >>> 0, p: home.p, rec: home.rec, kind: home.kind, at: now, until: now + C.forceSeconds * 1000, pos: posOf(a), cell: cellOf(a) };
     S.channels.set(a >>> 0, ch);
+    ch.idle = holdIdle(a);
     const label = homeLabel(home.rec);
     personal(a, `You set to work on the lock of ${label}. Hold still for ${C.forceSeconds} seconds; anyone near can see you, and a blow or a step away stops you.`);
     tellNear(a, ref, (o) => `${displayFor(o, a)} is forcing the lock of ${label}. Use the ${home.kind === 'door' ? 'door' : 'chest'} or strike them to stop it.`);
@@ -312,11 +320,11 @@ const factory = (api) => {
     const now = Date.now();
     for (const ch of [...S.channels.values()]) {
       const a = ch.a;
-      if (!online(a)) { S.channels.delete(a); continue; }
+      if (!online(a)) { endChannel(ch); continue; }
       if (hitSince(a, ch.at)) { interrupt(a, 'A blow breaks your work on the lock.'); continue; }
       if (downed(a) || restrained(a) || get(a, 'isDead', false) === true) { interrupt(a, 'Your work on the lock is over.'); continue; }
       if (cellOf(a) !== ch.cell || units(posOf(a), ch.pos) > C.moveTolerance) { interrupt(a, 'You stepped away from the lock.'); continue; }
-      if (now >= ch.until) { S.channels.delete(a); forced(ch); }
+      if (now >= ch.until) { endChannel(ch); forced(ch); }
     }
     return S.channels.size;
   });
