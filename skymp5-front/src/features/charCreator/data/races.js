@@ -91,6 +91,15 @@ export const SPECIES = [
         lore: 'Clans of the Reach: hedge-witches and hunters who keep the old gods, scorned by outsiders as Forsworn.'
       },
       {
+        id: 'halfgiant',
+        name: 'Half-Giant',
+        raceId: NORD,
+        raceEditorId: 'NordRace',
+        faceGen: true,
+        lockedNote: 'Unlocks after 150 hours played, like the extra character slot.',
+        lore: 'Born of Nord and giant blood: towering, hardy against frost, slow to fall and quick to hunger.'
+      },
+      {
         id: 'akaviri',
         name: 'Akaviri',
         raceId: IMPERIAL,
