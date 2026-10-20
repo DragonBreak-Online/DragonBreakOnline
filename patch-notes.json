@@ -1,5 +1,35 @@
 [
   {
+    "title": "Own a mine",
+    "date": "2026-10-20",
+    "version": "Server update",
+    "tag": "New",
+    "sections": [
+      {
+        "heading": "Mines are property",
+        "items": [
+          "Every mine in Skyrim, Bruma's lands and Solstheim can be owned. The hold's officials sell a mine at its door, as they sell a house, and a citizen of the hold can buy it.",
+          "A mine pays the weekly property tax like any building. It does not count as your home, so you can own a house and a mine.",
+          "The owner sets who may work its seams: anyone, a faction and named people, named people only, or nobody else.",
+          "The owner can take a share of what others mine there, up to half. That ore waits in the mine's store for the owner to collect. You see the share leave your yield as you mine.",
+          "Open the mine's panel from its door's property menu, or type /mine while you are at the mine."
+        ]
+      },
+      {
+        "heading": "Orc strongholds",
+        "items": [
+          "Each stronghold's mine belongs to its clan, like the longhouse. It is never sold. Clan members mine it freely and the Chief and officers set its rules."
+        ]
+      },
+      {
+        "heading": "Not for sale",
+        "items": [
+          "A mine that is also a dungeon you can lease stays a lair, not property."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Enchantments rebalanced",
     "date": "2026-10-20",
     "version": "Server update",
