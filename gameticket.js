@@ -10,6 +10,10 @@
 // Kinds (the panel's): pk Player Kill Request, mod Moderation Help, report Report Player. Bugs and map problems are not
 // tickets any more (plan J4): /ticket bug and /ticket map point to /bug, which files them in #bug-tracker.
 // Numbers are the game's own (G0001...), kept in game-tickets.json, so the backend's counter is never written from here.
+// Every ticket opened from the game is also kept there (number, kind, who, where, channel) so staff can read the queue in
+// the game (gmcall.js's staff panel, Nate 20 Oct). Closing happens on Discord, which the game never hears, so a row is
+// dropped by hand from the panel or ages out after panelKeepHours. Tickets opened from the Discord panel itself are the
+// backend's and are not listed here.
 
 const fs = require('fs');
 const path = require('path');
@@ -23,6 +27,7 @@ module.exports = (api) => {
     enabled: true, cooldownMinutes: 5, nearbyMeters: 40, minText: 10, maxText: 1000,
     staffRoleIds: ['1494126527489507369', '1494491999305338981', '1494126618065506425'], pingRoleId: '1494126618065506425',
     staffChannelId: '',   // where the nearby-players block goes; unset, it is only written to the server log
+    panelKeepHours: 72,   // how long an open ticket stays in the staff panel's list before it ages out (0: for ever)
   }, cfg.tickets || {});
   const KINDS = [
     { id: 'pk', names: ['pk', 'kill'], label: 'Player Kill Request', category: 'Player Kill Requests', emoji: '⚔️' },
@@ -34,7 +39,20 @@ module.exports = (api) => {
   const USE_BUG = 'Use /bug <what happened>';
   const FILE = path.resolve('game-tickets.json');
   const UNITS_PER_METER = 70;
-  const S = globalThis.__dboGameTickets || (globalThis.__dboGameTickets = { last: new Map() });
+  const S = globalThis.__dboGameTickets || (globalThis.__dboGameTickets = { last: new Map(), open: null });
+  // The file holds { counter, open: [...] }. The list is read once per process and written with the counter.
+  const readFile = () => { try { const v = JSON.parse(fs.readFileSync(FILE, 'utf8')); return v && typeof v === 'object' ? v : {}; } catch (e) { return {}; } };
+  const writeFile = (st) => {
+    try { fs.writeFileSync(FILE + '.tmp', JSON.stringify(st)); fs.renameSync(FILE + '.tmp', FILE); return true; }
+    catch (e) { log('tickets: saving failed', e.message); return false; }
+  };
+  const openList = () => {
+    if (!Array.isArray(S.open)) S.open = (readFile().open || []).filter((t) => t && t.n);
+    const keep = Math.max(0, Number(C.panelKeepHours) || 0) * 3600000;
+    if (keep) S.open = S.open.filter((t) => Date.now() - (Number(t.at) || 0) < keep);
+    return S.open;
+  };
+  const saveOpen = () => { const st = readFile(); st.open = openList(); writeFile(st); };
 
   const request = (method, route, body) => new Promise((resolve, reject) => {
     const data = body === undefined ? '' : JSON.stringify(body);
@@ -52,10 +70,10 @@ module.exports = (api) => {
   });
 
   const nextNumber = () => {
-    let st = { counter: 0 };
-    try { st = JSON.parse(fs.readFileSync(FILE, 'utf8')); } catch (e) { /* first ticket */ }
+    const st = readFile();
     st.counter = (Number(st.counter) || 0) + 1;
-    try { fs.writeFileSync(FILE + '.tmp', JSON.stringify(st)); fs.renameSync(FILE + '.tmp', FILE); } catch (e) { log('tickets: saving the counter failed', e.message); }
+    st.open = openList();
+    writeFile(st);
     return 'G' + String(st.counter).padStart(4, '0');
   };
 
@@ -69,6 +87,13 @@ module.exports = (api) => {
   };
 
   // What staff would ask for: the place, and every player within earshot with their distance (staff eyes only)
+  // Where the ticket was opened, as the staff panel's teleport needs it
+  const placeOf = (a) => {
+    try {
+      const pos = mp.get(a, 'pos'); const desc = String(mp.get(a, 'worldOrCellDesc') || '');
+      return { desc, pos: Array.isArray(pos) ? pos.map((n) => Math.round(Number(n) || 0)) : null };
+    } catch (e) { return { desc: '', pos: null }; }
+  };
   const context = (a) => {
     let where = '?', near = [];
     try {
@@ -128,6 +153,9 @@ module.exports = (api) => {
       components: [{ type: 1, components: [{ type: 2, style: 4, label: 'Close', custom_id: 'ticket:close' }] }],
     });
     audit(`TICKET opened ${kind.label} #${number} in game by ${who(a)} in #${channel.name}`);
+    openList().push({ n: number, kind: kind.id, label: kind.label, profile: Number(profileOf(a)), name: display(a),
+      where, place: placeOf(a), channel: String(channel.name || ''), at: Date.now() });
+    saveOpen();
     await nearbyToStaff(a, kind, number, channel, near);
     return { number, channel };
   };
@@ -139,6 +167,19 @@ module.exports = (api) => {
     if (!kind || !C.enabled || !token || !guildId) return Promise.reject(new Error('tickets are off'));
     if (!/^\d{15,22}$/.test(discordOf(a))) return Promise.reject(new Error('no Discord account linked'));
     return open(a, kind, String(text || '').slice(0, C.maxText));
+  };
+
+  // The staff panel (gmcall.js) reads the queue and drops a row staff have dealt with on Discord
+  globalThis.__dboGameTicketQueue = {
+    open: () => openList().map((t) => Object.assign({}, t)),
+    forget: (n) => {
+      const list = openList();
+      const i = list.findIndex((t) => String(t.n).toLowerCase() === String(n).toLowerCase());
+      if (i < 0) return null;
+      const [gone] = list.splice(i, 1);
+      saveOpen();
+      return gone;
+    },
   };
 
   registerChatCommand('ticket', (a, args) => {

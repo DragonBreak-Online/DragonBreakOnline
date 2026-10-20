@@ -100,6 +100,27 @@ const run = async (a, args) => {
   check('a Discord failure is reported to the player, not lost', /could not be opened/.test(r), r);
   check('the counter survives in game-tickets.json', JSON.parse(fs.readFileSync('game-tickets.json', 'utf8')).counter === 3);
 
+  // ---- the staff queue in the game reads the tickets opened from it (gmcall.js's panel, Nate 20 Oct) ----------------
+  const Q = globalThis.__dboGameTicketQueue;
+  const q = Q.open();
+  check('every ticket opened in game is in the queue, with its number, kind, who and where',
+    q.length === 2 && q[0].n === 'G0001' && q[1].n === 'G0002' && q[1].kind === 'pk' && q[1].label === 'Player Kill Request'
+    && /Argosh gro-Shatul/.test(q[0].name) && /at /.test(q[0].where) && q[0].place.desc === 'tamriel' && Array.isArray(q[0].place.pos),
+    q.map((t) => [t.n, t.kind, t.name, t.where, JSON.stringify(t.place)]));
+  check('a ticket Discord refused is not in it', !q.some((t) => /fails at Discord/.test(t.where || '')), q.length);
+  check('the queue is in game-tickets.json beside the counter, so a restart keeps it',
+    (JSON.parse(fs.readFileSync('game-tickets.json', 'utf8')).open || []).map((t) => t.n).join() === 'G0001,G0002');
+  check('forgetting one takes it out and leaves the rest', Q.forget('g0001') && Q.open().map((t) => t.n).join() === 'G0002'
+    && (JSON.parse(fs.readFileSync('game-tickets.json', 'utf8')).open || []).map((t) => t.n).join() === 'G0002');
+  check('forgetting one that is not there answers nothing', Q.forget('G9999') === null);
+  // panelKeepHours: a row older than that is gone from the list
+  globalThis.__dboGameTickets.open[0].at = Date.now() - 100 * 3600000;
+  load({ panelKeepHours: 72 });
+  check('a ticket older than panelKeepHours ages out of the list', globalThis.__dboGameTicketQueue.open().length === 0);
+  load({ panelKeepHours: 0 });
+  globalThis.__dboGameTickets.open = null;
+  check('panelKeepHours 0 keeps them for ever', globalThis.__dboGameTicketQueue.open().length === 1);
+
   // With the staff channel configured, the nearby block is posted there and nowhere else
   load({ staffChannelId: STAFF_CH });
   delete globalThis.__dboGameTickets.last; globalThis.__dboGameTickets.last = new Map();
