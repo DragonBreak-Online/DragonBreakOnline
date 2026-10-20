@@ -677,7 +677,7 @@
       "id": "vivec",
       "name": "Vivec",
       "kind": "faith",
-      "sphere": "The Warrior-Poet of the Tribunal, guardian of Morrowind, who vanished in 3E 427. His sermons are still read by those who keep the old Temple.",
+      "sphere": "The Warrior-Poet of the Tribunal, guardian of Morrowind, who was gone before the Red Year. His sermons are still read by those who keep the old Temple.",
       "alsoKnownAs": [
         "Vehk",
         "The Warrior-Poet"
@@ -971,7 +971,7 @@
       "id": "orkey",
       "name": "Orkey",
       "kind": "faith",
-      "sphere": "An old god of the Nords, who cut their lives short until Shor and Tsun won them back. Some say he is Malacath by another name.",
+      "sphere": "An old god of the Nords, remembered in their legends for cutting short the lives of men. Some say he is Malacath by another name.",
       "alsoKnownAs": [],
       "skillBoon": {
         "woodcutter": 1.15
@@ -1044,10 +1044,8 @@
       "id": "ius",
       "name": "Ius",
       "kind": "faith",
-      "sphere": "The Bosmer animal god of compromise, the Lord of Interventions.",
-      "alsoKnownAs": [
-        "Lord of Interventions"
-      ],
+      "sphere": "An animal god of the Bosmer, honoured among the spirits of Valenwood.",
+      "alsoKnownAs": [],
       "skillBoon": {
         "alchemist": 1.15
       },
