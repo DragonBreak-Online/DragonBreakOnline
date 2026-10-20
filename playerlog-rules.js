@@ -445,6 +445,7 @@ excluded('JOIN LEAVE', 'the session hooks');
 excluded('PIGEON', 'the letter: social.letter comes from the A2 hook');
 excluded('BODY', 'items by custom name: the A2 loot hook');
 excluded('ANNOUNCE', 'broadcast text: the command wrapper');
+excluded('FRONT', 'staff-run war records with leader- and staff-written reasons and notes (frontline.js)');
 excluded('THALMOR', 'dossier notes: the A2 dossier hook');
 excluded('SCHEDULE', 'staff-written reasons: the command wrapper');
 excluded('GIFT', 'staff-written reasons');
@@ -1309,6 +1310,15 @@ execution.js EXECUTION 151542a7 clean
 execution.js EXECUTION 10d27374 clean
 execution.js EXECUTION 76ea358d clean
 factiongear.js FACTIONGEAR 79b8dc7c clean
+frontline.js FRONT 47c8f819 excluded
+frontline.js FRONT 0621b331 excluded
+frontline.js FRONT 40e8941a excluded
+frontline.js FRONT b3376c51 excluded
+frontline.js FRONT 655f3a1d excluded
+frontline.js FRONT d413ecdc excluded
+frontline.js FRONT 809e592e excluded
+frontline.js FRONT 1297d01f excluded
+frontline.js FRONT 26ea33d4 excluded
 gamemode.js STAFF 6fcfd67a clean
 gamemode.js GM b82067a4 parsed
 gamemode.js BAN 50b88b35 parsed

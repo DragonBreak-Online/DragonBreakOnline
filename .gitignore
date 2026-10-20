@@ -25,6 +25,7 @@ charters.json
 player-factions.json
 economy.json
 wars.json
+frontline.json
 territory-owners.json
 *.log
 *.log.*

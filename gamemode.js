@@ -928,7 +928,7 @@ const HELP_GROUPS = [
   { key: 'rule', title: 'Rule and property', names: ['officials', 'appoint', 'dismiss', 'tax', 'ledgerpoint'], role: 'official',
     hints: ['Your court: F3, the Court tab. A post you appoint someone to is offered, and they accept it.',
       'An outlaw of your hold (ruler or Steward): /bounty set <name or #TAG> <gold, up to 1000> <reason>; the jailer collects it.'] },
-  { key: 'groups', title: 'Groups and dungeons', names: ['party', 'court', 'charter', 'nobility'],
+  { key: 'groups', title: 'Groups and dungeons', names: ['party', 'court', 'charter', 'nobility', 'front'],
     hints: ['Your factions and your court: F3, the Faction and Court tabs. The nobles of your hold: F3, the Nobility tab.',
       'A dungeon: its door. The party leader picks Novice, Adept, Expert or Master; /dungeon says what is claimed.',
       'An expedition: the board in the Synod Conclave, the Fighters Guild or Frostcrag Spire.'] },
@@ -8478,7 +8478,15 @@ try {
   delete require.cache[REALM_JS];
   require(REALM_JS)({ mp, log, personal, system, audit, who, display, cfg, onUi, registerChatCommand, isAdmin, onlineActors, every,
     sendPacket, ranksOf, profileOf, zoneById, readOfficials, writeOfficials });
-} catch (e) { log('realm.js failed to load:', e.stack || e.message); globalThis.__dboWarFinish = null; globalThis.__dboRealmView = null; globalThis.__dboConquerorLeads = null; globalThis.__dboConqueredZonesLedBy = null; }
+} catch (e) { log('realm.js failed to load:', e.stack || e.message); globalThis.__dboWarFinish = null; globalThis.__dboRealmView = null; globalThis.__dboConquerorLeads = null; globalThis.__dboConqueredZonesLedBy = null; globalThis.__dboRealmSeatOf = null; }
+
+// ---- staff-run frontline wars: sign-up, the line, battles recorded by staff (server\frontline.js, config "frontline") ----
+try {
+  const FRONTLINE_JS = path.resolve('frontline.js');
+  delete require.cache[FRONTLINE_JS];
+  require(FRONTLINE_JS)({ mp, log, personal, system, audit, who, display, tagOf, profileOf, realNameOf, cfg, onUi, openWidget, closeWidget, sendPacket,
+    registerChatCommand, isAdmin, onlineActors, sendJson, token: (cfg.discord || {}).botToken || (serverSettings.discordAuth || {}).botToken });
+} catch (e) { log('frontline.js failed to load:', e.stack || e.message); globalThis.__dboFrontDown = null; globalThis.__dboFrontFinish = null; }
 
 // ---- taxes, wages and the weekly reckoning (server\economy.js, WAR_DESIGN.md section 7) -----------------------------------
 try {

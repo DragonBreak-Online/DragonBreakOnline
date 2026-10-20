@@ -602,6 +602,8 @@ module.exports = (api) => {
   globalThis.__dboRealmSeatTerritoryOf = (zone) => { const ts = territories().filter((t) => t.zone === zone); return ts.find((t) => t.id === zone) || ts.find((t) => Array.isArray(t.seatCells) && t.seatCells.length) || null; };
   globalThis.__dboRealmFactionsLedBy = (a) => factionsLedBy(a);
   globalThis.__dboRealmTerritoriesOf = (fid) => territoriesOf(fid).map((t) => t.id);
+  // frontline.js: where a Final Stand against a faction is fought
+  globalThis.__dboRealmSeatOf = (fid) => { const s = seatOf(fid); return s ? { name: s.name, territory: s.territory } : null; };
   const reply = (a, r) => { if (!(typeof globalThis.__dboFactionRefresh === 'function' && globalThis.__dboFactionRefresh(a, r.text, r.ok))) personal(a, r.text); };
   // Every war action comes from the faction panel with its nonce first, so a stale window cannot act
   const fromPanel = (a, args) => typeof globalThis.__dboFactionNonceOk === 'function' && globalThis.__dboFactionNonceOk(a, (args || [])[0]);

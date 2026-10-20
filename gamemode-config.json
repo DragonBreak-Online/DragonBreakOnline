@@ -1211,6 +1211,21 @@
    "cult-nocturnal": "#1b1f3a", "cult-peryite": "#9bb33c", "cult-sanguine": "#7b1e3a", "cult-sheogorath": "#b0308f", "cult-vaermina": "#5d4b8a"
   }
  },
+ "frontline": {
+  "_comment": "Staff-run frontline wars (frontline.js; mestreugway's War System post, Nate picked it 20 Oct). Off until Nate opens it (war stays closed for now). enabled true lets leaders declare from /front or the U panel; confirm 'gm' (staff confirm each war and name the starting stage and point) or 'none'. stages: steps each way from the start before a Final Stand (1-10). kinds and factions: who may wage war (guild-defs kind, and ids besides). warsPerFaction: wars a faction may fight at once. openEnlist: anyone may enlist (a member of one side never for the other; one account on one side); false: members of a side only. enlistDuringBattle: may join while staff have a battle open. announce: every online player sees declarations, battles and outcomes; discord also posts them to discordChannelId (pinging discordPingRoleId). Nothing changes land, gold or lives by itself: staff apply terms by hand (/war owner). Hot reload.",
+  "enabled": false,
+  "confirm": "gm",
+  "stages": 3,
+  "kinds": ["hold", "stronghold"],
+  "factions": ["imperial-legion", "stormcloaks", "thalmor", "penitus-oculatus", "house-hlaalu", "house-redoran", "house-telvanni", "house-indoril", "house-dres", "house-sadras"],
+  "warsPerFaction": 1,
+  "openEnlist": true,
+  "enlistDuringBattle": false,
+  "announce": true,
+  "discord": false,
+  "discordChannelId": "",
+  "discordPingRoleId": ""
+ },
  "raids": { "_comment": "Raids and pillage (raids.js, WAR_DESIGN.md section 5): off with war (Nate, 12 Oct 04:12Z: \"too early\"). enabled true opens them (hot reload). The 3-day cooldown is kept in memory only: a restart resets it.", "enabled": false },
  "economy": { "_comment": "Weekly taxes and wages (economy.js). On from 2026-09-28 (Nate: \"economy needs to fully be turned on\"); the review B2 guards are in economy.js.", "enabled": true, "_propertyTerritory": "A building whose doors are all inside and whose hold the housing does not know is taxed by the territory named here (Nate 17 Oct: tax guild HQs too). Fort Dawnguard 200f359: the Rift (Riften's seat). Hot reload.", "propertyTerritory": { "200f359": "riften" }, "_defaultPropertyValue": "The tax value of a property no Steward has assessed (economy.js; was 2,000): 500, so 50 gold a week at the 10% minimum rate (Nate 17 Oct: \"the 2k -> 500 is fine\"). Hot reload.", "defaultPropertyValue": 500, "_titheRate": "Nate 18 Oct: the Imperial tithe is 25% (was 10%) of ALL of a Cyrodiil hold's income, not only its property tax: rent, house sales, shop tax, sales tax, board fees, postage, bounties (economy.js, bank.js income counter). No stipends, no new gold. Hot reload.", "titheRate": 0.25,
   "_dominionStipend": "Nate, 11 Oct: the Aldmeri Dominion pays its Thalmor in the Empire a stipend each weekly reckoning (economy.js), into the dominionStipendTo treasury before wages, in the faction report as stipend. It is NEW gold, made by no one's work, so it is kept modest; 0 turns it off. Hot reload.",
