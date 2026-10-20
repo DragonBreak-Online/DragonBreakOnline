@@ -3079,8 +3079,6 @@ const onCharacterReady = (userId, a) => {
   // A crash mid-transform leaves the beast race stored; put the real one back before anything reads it
   loginStep('beast revert on login', () => { if (globalThis.__dboBeastRevert) globalThis.__dboBeastRevert(a, 'login'); });
   loginStep('supernatural login', () => { if (globalThis.__dboSuperLogin) globalThis.__dboSuperLogin(a); });
-  // A duel's wager a restart or a failed payment left held (duel.js) goes back
-  loginStep('duel escrow', () => { if (globalThis.__dboDuelLogin) globalThis.__dboDuelLogin(a); });
   try { if (globalThis.__dboClock) globalThis.__dboClock.sendTo(a); } catch (e) { /* clock later */ }
   // A new character is carried through the landing into the hub behind a black screen
   if (creationPending(a)) { creation.set(a, 'spawning'); setFade(a, true); if (inHub(a)) setCreatorHidden(a, true); setTimeout(() => fallBackToLanding(a), HUB_SPAWN_WAIT_MS); }
@@ -3147,6 +3145,8 @@ const onCharacterReady = (userId, a) => {
     try { if (globalThis.__dboCitizenLogin) globalThis.__dboCitizenLogin(a); } catch (e) { log('citizen notice login failed', e.message); }
     // Vault fees, and any word of a vault warned or seized while they were away (bank.js)
     try { if (globalThis.__dboBankLogin) globalThis.__dboBankLogin(a); } catch (e) { log('bank login failed', e.message); }
+    // A duel's wager a restart or a failed payment left held goes back (duel.js)
+    try { if (globalThis.__dboDuelLogin) globalThis.__dboDuelLogin(a); } catch (e) { log('duel login failed', e.message); }
     // A free appearance change waiting, once per character, never while one is still being made (appearance.js)
     try { if (globalThis.__dboAppearanceFreeLogin && !creationPending(a) && !inCreatorRealm(a)) globalThis.__dboAppearanceFreeLogin(a); } catch (e) { log('free appearance notice failed', e.message); }
   }), 8000);
@@ -3236,7 +3236,9 @@ globalThis.__dboHandlers.disconnect = (userId) => {
   if (a && globalThis.__dboDungeonLeave) { try { globalThis.__dboDungeonLeave(a); } catch (e) { log('dungeon logout move failed', e.message); } }
   if (a && globalThis.__dboPartyLogout) { try { globalThis.__dboPartyLogout(a); } catch (e) { log('party logout failed', e.message); } }
   // What a UI said it can draw, and a deity offer already made, belong to this session (review C6, PRAY-1)
-  for (const k of ['__dboItemLeave', '__dboBankLeave', '__dboRobLeave', '__dboSilverTestLeave', '__dboDeityForget', '__dboPanelLeave', '__dboManualsLeave', '__dboLabourLeave', '__dboPrayerLeave', '__dboSkinLeave', '__dboSchoolsLeave', '__dboKeyRingLeave', '__dboRacialLeave', '__dboStartLeave', '__dboDuelLeave']) { if (a && typeof globalThis[k] === 'function') { try { globalThis[k](a); } catch (e) { log(`${k} failed`, e.message); } } }
+  for (const k of ['__dboItemLeave', '__dboBankLeave', '__dboRobLeave', '__dboSilverTestLeave', '__dboDeityForget', '__dboPanelLeave', '__dboManualsLeave', '__dboLabourLeave', '__dboPrayerLeave', '__dboSkinLeave', '__dboSchoolsLeave', '__dboKeyRingLeave', '__dboRacialLeave', '__dboStartLeave']) { if (a && typeof globalThis[k] === 'function') { try { globalThis[k](a); } catch (e) { log(`${k} failed`, e.message); } } }
+  // A duel ends with its duellist's logout (duel.js)
+  if (a && typeof globalThis.__dboDuelLeave === 'function') { try { globalThis.__dboDuelLeave(a); } catch (e) { log('duel leave failed', e.message); } }
   connected.delete(userId);
   const wait = globalThis.__dboLoginWaits.get(userId);
   if (wait) { clearInterval(wait); globalThis.__dboLoginWaits.delete(userId); }
