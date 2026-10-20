@@ -34,11 +34,14 @@ const mp = {
   set: (id, p, v) => { store.set(`${id}|${p}`, v); },
   getDescFromId: (id) => `${id.toString(16)}:x`,
   getIdFromDesc: (d) => { if (DESCS[d]) return DESCS[d]; const [hex, plugin] = String(d).split(':'); return plugin === 'Skyrim.esm' ? parseInt(hex, 16) : 0x1234; },
-  callPapyrusFunction: () => null,
+  callPapyrusFunction: (...args) => { papyrus.push(args); return null; },
   lookupEspmRecordById: (id) => (RECORDS.has(id >>> 0) ? { record: RECORDS.get(id >>> 0), toGlobalRecordId: (l) => l } : null),
 };
 const V = 0x2f6;
-const cfg = { goblinRace: cfgFile.goblinRace, snowElfRace: cfgFile.snowElfRace, racial: { enabled: true, overhaul: true } };
+const papyrus = [];
+const cfg = { goblinRace: cfgFile.goblinRace, snowElfRace: cfgFile.snowElfRace, racial: { enabled: true, overhaul: true },
+  supernatural: { goblinEyes: { node: 'mesh001:1:2:3:3', txst: 'aaa:DragonBreak Online Edits.esp', txstMortal: 'bbb:DragonBreak Online Edits.esp' } } };
+const eyeCalls = () => papyrus.filter((x) => x[1] === 'NetImmerse' && x[2] === 'SetNodeTextureSet').map((x) => `${x[4][1]}=${x[4][2].desc}`);
 const api = {
   mp, log: noop, audit: noop, personal: (a, t) => told.push({ a, t }), system: noop, registerChatCommand: (n, f) => { cmds[n] = f; },
   onUi: noop, openWidget: noop, closeWidget: noop, sendPacket: (a, p) => packets.push(p), display: String, who: String, isAdmin: () => true,
@@ -68,6 +71,7 @@ cmds.curse(V, 'me vampire');
 ok((app().raceId >>> 0) === GOBV, 'turned, the goblin wears DBOGoblinRaceVampire', app().raceId.toString(16));
 ok(packets.some((p) => p.customPacketType === 'dboBeast' && (p.race >>> 0) === GOBV && p.beast === false), 'the client is sent the vampire race');
 ok(!!sup().unfed && sup().look && sup().look.skinOnly === true, 'unfed, the tells are laid as skin only', sup().look);
+ok(sup().look.eyeGlow === true && eyeCalls().join() === 'mesh001:1:2:3:3=aaa:DragonBreak Online Edits.esp', '...and the eyes glow: the eye shape takes the glowing texture set (20 Oct)', eyeCalls());
 ok((app().skinColor >>> 0) !== SKIN && (app().tints[0].argb >>> 0) !== (TONE >>> 0), 'the skin colour and the skin tone tint go pale', [app().skinColor.toString(16), (app().tints[0].argb >>> 0).toString(16)]);
 ok(Array.isArray(app().headpartIds) && app().headpartIds.length === 0, 'no head part is added (no eyes on a goblin)', app().headpartIds);
 const paled = app().skinColor;
@@ -87,6 +91,7 @@ ok(globalThis.__dboTellsRetake(V, JSON.parse(JSON.stringify(app()))) === true &&
 // Cured: the race and the colour come back
 cmds.curse(V, 'me cure');
 ok((app().raceId >>> 0) === GOB, 'cured, the goblin is DBOGoblinRace again', app().raceId.toString(16));
+ok(eyeCalls().slice(-1)[0] === 'mesh001:1:2:3:3=bbb:DragonBreak Online Edits.esp', 'cured, the eye shape takes its own texture set back', eyeCalls());
 ok((app().skinColor >>> 0) === SKIN && (app().tints[0].argb >>> 0) === (TONE >>> 0), 'cured, the goblin has its own colour back', [app().skinColor.toString(16), (app().tints[0].argb >>> 0).toString(16)]);
 
 // A goblin werewolf shows no tells and keeps its look
