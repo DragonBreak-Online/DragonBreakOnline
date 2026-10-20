@@ -107,6 +107,11 @@ module.exports = (api) => {
     // Nate, 5 Oct (ticket #0064): a fed vampire passes for mortal, as Cyrodiil's vampires do. The eyes and the pallor
     // show from this stage of thirst; a vampire the fever turned shows them until the first meal. 1 = always
     vampireTellsStage: 3,
+    // A goblin vampire's eyes (Nate, 20 Oct: "goblin vampire eyes need to glow when they are hungry"). Goblins have no eye
+    // head parts: the eyes are in headparts.dds on the head mesh's shape mesh001:1:2:3:3 (every Goblin Head.nif variant).
+    // While the tells show, that shape takes txst (a TXST of a glowing headparts texture), and txstMortal when they go.
+    // Both are DLE records the PC makes; empty, nothing is swapped and the pallor alone shows, as before
+    goblinEyes: { node: 'mesh001:1:2:3:3', txst: '', txstMortal: '' },
     // Nat: covering up shields a vampire from the sun. Share of the burn each covered part takes away (sums to 1),
     // and how much of the burn full cover removes
     sunCover: { head: 0.35, body: 0.35, hands: 0.15, feet: 0.15 }, sunCoverMax: 0.8,
@@ -358,6 +363,17 @@ module.exports = (api) => {
     }
     return { next, look };
   };
+  // The goblin's eye shape retextured for every watcher (NetImmerse.SetNodeTextureSet, kept in the change form, so new
+  // watchers and relogs get it too): the glowing set when on, the mortal set when off. true when it was sent
+  const goblinEyes = (a, on) => {
+    const G = C.goblinEyes || {}; const desc = String((on ? G.txst : G.txstMortal) || '');
+    if (!desc || !G.node) return false;
+    try {
+      mp.callPapyrusFunction('global', 'NetImmerse', 'SetNodeTextureSet', null, [{ type: 'form', desc: mp.getDescFromId(a >>> 0) }, String(G.node), { type: 'form', desc }, false]);
+      log(`supernatural: ${display(a)}'s goblin eyes ${on ? 'glow' : 'are their own again'}`);
+      return true;
+    } catch (e) { log(`supernatural: goblin eyes for ${display(a)} failed: ${e.message}`); return false; }
+  };
   // Idempotent: run on every slow tick, so a reroll, a relog or a beast revert gets the tells back
   const ensureTells = (a, s) => {
     if (!s || !s.kind || beastForm(a)) return;
@@ -365,7 +381,11 @@ module.exports = (api) => {
     if (!app || !Array.isArray(app.headpartIds)) return;
     const { fam, want } = tellEyeFor(app, s);
     if (!want && !skinOnly(fam, s)) return;
-    if (!want && s.look) return; // a goblin's pallor is laid once, as eyes are
+    if (!want && s.look) {
+      // a goblin's pallor is laid once, as eyes are; the glow joins one laid before it was configured
+      if (s.look.skinOnly && !s.look.eyeGlow && s.kind === 'vampire' && goblinEyes(a, true)) { s.look.eyeGlow = true; saveState(a, s); }
+      return;
+    }
     if (want && app.headpartIds.includes(want)) {
       // Shown before the eyes' extras went with them (2026-09-29): take the stray overlay off once, keeping it for the cure
       const look = s.look;
@@ -381,6 +401,7 @@ module.exports = (api) => {
     }
     const laid = layTells(app, s, fam, want);
     if (!laid) return;
+    if (laid.look.skinOnly && s.kind === 'vampire' && goblinEyes(a, true)) laid.look.eyeGlow = true;
     s.look = laid.look; saveState(a, s);
     mp.set(a, 'appearance', laid.next);
     log(`supernatural: ${display(a)} shows the ${s.kind}'s tells`);
@@ -406,6 +427,7 @@ module.exports = (api) => {
   const clearTells = (a, s) => {
     const look = s && s.look; if (!look) return;
     s.look = null;
+    if (look.eyeGlow) goblinEyes(a, false);
     let app = null; try { app = mp.get(a, 'appearance'); } catch (e) { return; }
     if (!app || !Array.isArray(app.headpartIds)) return;
     const extras = (Array.isArray(look.prevExtras) ? look.prevExtras : []).filter((x) => !app.headpartIds.some((h) => (Number(h) >>> 0) === x));
@@ -460,6 +482,8 @@ module.exports = (api) => {
       const laid = want ? (!mortal.headpartIds.includes(want) ? layTells(mortal, s, fam, want) : null) : (skinOnly(fam, s) ? layTells(mortal, s, fam, 0) : null);
       if (laid) { s.look = laid.look; next = laid.next; }
     }
+    // A goblin's glowing eyes are on the mesh, not in the look: they stay with the new look, or go when it shows none
+    if (look && look.eyeGlow) { if (s.look && s.look.skinOnly) s.look.eyeGlow = true; else goblinEyes(a, false); }
     if (!look && !s.look && !bloodTaken) return false;
     saveState(a, s);
     if (JSON.stringify(next) !== JSON.stringify(app)) mp.set(a, 'appearance', next);
