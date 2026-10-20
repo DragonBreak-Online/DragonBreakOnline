@@ -26,9 +26,6 @@ const PENDING = {};
 // Player commands the menu leaves out on purpose, and why. A name here that the menu lists after all, or that is no
 // longer registered, fails: the list is kept true.
 const EXCLUDED = {
-  burglary: 'thief factions only; the break-in and steal panels open at a home\'s door or chest (thievery.js, off by default)',
-  fence: 'guards report a fence; thieves use the Fence Chest panel (thievery.js)',
-  stolen: 'guards only, on a bound, downed or jailed thief (thievery.js)',
   bank: 'opened at a bank counter (hint: Your money)',
   blackreach: 'a status line for those in Blackreach; its chests tell the rest when used (blackreach.js, Skyrim release)',
   board: 'opened at a notice board (hints: work for pay, pigeons)',
