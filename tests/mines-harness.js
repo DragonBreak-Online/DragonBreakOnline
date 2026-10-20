@@ -162,7 +162,7 @@ atMine.set(STRANGER, KOL);
 choose(STRANGER, 'Buy it from its owner');
 check('...whose Buy button opens the property panel', out.widgets.some(([, w]) => w.type === 'propertyMarket'));
 
-// The weekly tax and the Imperial tithe on a Bruma mine (economy.js)
+// The weekly tax on every mine, and the Legion's tithe only on Cyrodiil's (economy.js)
 claims.set(door(BLEAK), { owner: 11, ownerChar: OWNER, ownerName: 'Owner' });
 fs.writeFileSync('housing.json', JSON.stringify([door(KOL), door(BLEAK)]));
 props.set(`${OWNER}|private.bankGold`, 10000);
@@ -187,6 +187,9 @@ globalThis.__dboGuildInfo = (id) => ({ id, name: ({ 'clan-narzulbur': 'Clan Narz
 const bleakTax = Math.floor((1000 + 50 * BLEAK.veins.length) * 0.1);
 check('the Reach taxes the Kolskeggr Mine on its vein value, 1,850: 185 gold', T['hold-markarth'] === 185, T);
 check(`Bruma taxes the Bleak-Frost Mine on its vein value: ${bleakTax} gold, less the Imperial tithe`, T['county-bruma'] + T['imperial-legion'] === bleakTax && T['imperial-legion'] === Math.floor(bleakTax * 0.25), T);
+const econReports = (() => { try { return JSON.parse(fs.readFileSync('economy.json', 'utf8')).reports || {}; } catch (e) { return {}; } })();
+check('a Skyrim mine\'s tax is outside the Legion\'s tithe base: the Reach pays no tithe', !!econReports['hold-markarth'] && !(econReports['hold-markarth'] || {}).tithe && !(econReports['hold-markarth'] || {}).titheTax, econReports['hold-markarth']);
+check('a Bruma mine\'s tax is in the tithe base', (econReports['county-bruma'] || {}).titheTax === bleakTax, econReports['county-bruma']);
 check('the owner paid both from the bank', props.get(`${OWNER}|private.bankGold`) === 10000 - 185 - bleakTax, props.get(`${OWNER}|private.bankGold`));
 
 // ---- access rules ----------------------------------------------------------------------------------------------------------

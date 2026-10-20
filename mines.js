@@ -3,7 +3,7 @@
 //
 // A mine is a building of buildings.json, listed in mines.json (tools/mines_build.py). It is owned the way a house is: the
 // housing registry's claim on its way in (fork housingSystem.ts), so the hold's officials sell it at its door and a
-// citizen buys it (tenancy.js), it pays the weekly property tax and the Imperial tithe like any building (economy.js), and
+// citizen buys it (tenancy.js), it pays the weekly property tax in every hold and the Legion's tithe only in Cyrodiil (economy.js), and
 // its owner may resell it. It is not a home: __dboHousingNotHome keeps it outside the one-building cap (fork 1020+).
 // An Orc stronghold's mine is its clan's, as the clan's longhouse is (guilds.js reads the clan mines out of mines.json and
 // treats their doors as the clan's hall): never sold, its members work it freely, its Chief and officers set its rules.
