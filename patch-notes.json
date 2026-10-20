@@ -1,5 +1,20 @@
 [
   {
+    "title": "Creatures hit at full strength",
+    "date": "2026-10-20",
+    "version": "Server update",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Creature attacks",
+        "items": [
+          "Creatures hit with their full strength again: a Flame Atronach's punch burns, spider and chaurus bites poison, Chaurus Hunter spit lands, wisps drain magicka and Death Hounds chill, as in the base game.",
+          "Wall of Flames, Frost and Storms, and the staves that cast them, now hurt enemies who stand in the burning, freezing or crackling ground they leave."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Castle gates and their levers",
     "date": "2026-10-17",
     "version": "Hotfix",
