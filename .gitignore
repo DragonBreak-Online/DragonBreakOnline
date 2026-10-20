@@ -153,3 +153,5 @@ officials-seats.json
 
 # mines.js: mine rules and the owners' stores of ore
 mines-state.json
+thievery.json
+thievery.json.tmp

@@ -928,8 +928,9 @@ const HELP_GROUPS = [
   { key: 'rule', title: 'Rule and property', names: ['officials', 'appoint', 'dismiss', 'tax', 'ledgerpoint'], role: 'official',
     hints: ['Your court: F3, the Court tab. A post you appoint someone to is offered, and they accept it.',
       'An outlaw of your hold (ruler or Steward): /bounty set <name or #TAG> <gold, up to 1000> <reason>; the jailer collects it.'] },
-  { key: 'groups', title: 'Groups and dungeons', names: ['party', 'court', 'charter', 'nobility'],
+  { key: 'groups', title: 'Groups and dungeons', names: ['party', 'court', 'charter', 'nobility', 'burglary', 'fence', 'stolen'],
     hints: ['Your factions and your court: F3, the Faction and Court tabs. The nobles of your hold: F3, the Nobility tab.',
+      'Thieves of a guild the staff approved: crouch at the locked door of a player\'s home to break in, and fence what you take at your guild\'s Fence Chest (/fence). Guards: /fence report a fence, /stolen to search a captured thief.',
       'A dungeon: its door. The party leader picks Novice, Adept, Expert or Master; /dungeon says what is claimed.',
       'An expedition: the board in the Synod Conclave, the Fighters Guild or Frostcrag Spire.'] },
   { key: 'trouble', title: 'Trouble and help', names: ['gm', 'unstuck', 'struggle', 'bug', 'ticket', 'name', 'help', 'syncenchant', 'bounty'],
@@ -1862,6 +1863,9 @@ mp.onActivate = (targetId, casterId) => {
   if (globalThis.__dboWeaponRack && globalThis.__dboWeaponRack(target, caster)) return false;
   // A raider breaking into a home or its container during a raid (raids.js); the take comes straight out, no lock opens
   if (globalThis.__dboRaidActivate && globalThis.__dboRaidActivate(target, caster)) return false;
+  // Burglary by an approved thief faction (thievery.js): a break-in, a theft or the Fence Chest; nothing opens, and anyone
+  // it does not handle falls through to the housing locks
+  if (globalThis.__dboBurglaryActivate) { try { if (globalThis.__dboBurglaryActivate(target, caster)) return false; } catch (e) { log('burglary activate failed', e.message); } }
   // Study Magic and the Class Lectern (schools.js): their own panels, before a book on the shelf can start a reading
   if (globalThis.__dboSchoolsActivate && globalThis.__dboSchoolsActivate(target, caster)) return false;
   // A guild's own workshop (spells.js): the Synod Conclave's enchanting table, for Synod and College members
@@ -8950,6 +8954,13 @@ try {
   require(CHARTERS_JS)({ mp, log, ownNameOf, ownDisplay, displayFor, personal, audit, who, display, nameOf, cfg, registerChatCommand, onlineActors, isAdmin, isLeadStaff,
     findByName, profileOf, takeGold, giveItem, every, staffNote, approvalForum });
 } catch (e) { log('charters.js failed to load:', e.stack || e.message); }
+// ---- thievery and burglary: thief factions, break-ins, the Fence Chest, guard raids (server\thievery.js, config "thievery") ----
+try {
+  const THIEVERY_JS = path.resolve('thievery.js');
+  delete require.cache[THIEVERY_JS];
+  require(THIEVERY_JS)({ mp, log, personal, system, staffSay, audit, who, display, displayFor, cfg, onUi, openWidget, closeWidget, onlineActors, every,
+    recordOf, adminItemName, registerChatCommand, isAdmin, isLeadStaff, findByName, profileOf, sendPacket, distanceMeters, approvalForum, saveSoon, saveNow });
+} catch (e) { log('thievery.js failed to load:', e.stack || e.message); globalThis.__dboBurglaryActivate = null; }
 // ---- dungeon traps, run by the server: plates, tripwires and trigger boxes, their traps' swings and blows (server\traps.js)
 try {
   const TRAPS_JS = path.resolve('traps.js');
