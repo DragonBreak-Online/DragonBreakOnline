@@ -22,6 +22,7 @@
 #include "script_objects/EspmGameObject.h"
 #include "libespm/RecordHeaderAccess.h"
 #include <chrono>
+#include <optional>
 #include <cstring>
 #include <fmt/format.h>
 #include <fmt/ranges.h>
@@ -184,6 +185,19 @@ void ForEachSpellEffectData(WorldState* worldState, uint32_t spellId,
   }
 }
 
+// ForEachEffectData for a SPEL, SCRL or ENCH (a staff's hit names its enchantment)
+template <class Callback>
+void ForEachHitEffectData(WorldState* worldState, uint32_t sourceId,
+                          const Callback& callback)
+{
+  const auto sourceLookup =
+    worldState->GetEspm().GetBrowser().LookupById(sourceId);
+  if (espm::IsSpellItem(sourceLookup.rec) ||
+      espm::Convert<espm::ENCH>(sourceLookup.rec)) {
+    ForEachEffectData(worldState, sourceLookup, callback);
+  }
+}
+
 // Calls callback(effectType, associatedItem, projectile) with global ids for each effect of a SPEL
 template <class Callback>
 void ForEachSpellEffect(WorldState* worldState, uint32_t spellId,
@@ -232,6 +246,14 @@ struct SpellRiders
   bool commands = false;
 };
 
+// Calm, Demoralize, Frenzy, Turn Undead, Rally: only the game hosting an NPC applies them
+bool IsAiRiderEffect(espm::MGEF::EffectType type)
+{
+  using Type = espm::MGEF::EffectType;
+  return type == Type::Calm || type == Type::Demoralize ||
+    type == Type::Frenzy || type == Type::TurnUndead || type == Type::Rally;
+}
+
 void AddSpellRider(SpellRiders& riders, const espm::SPEL::EFIT& effectItem,
                    const espm::MGEF::DATA& data)
 {
@@ -240,19 +262,13 @@ void AddSpellRider(SpellRiders& riders, const espm::SPEL::EFIT& effectItem,
     ((data.IsFlagSet(espm::MGEF::Flags::Hostile) ||
       data.IsFlagSet(espm::MGEF::Flags::Detrimental)) &&
      data.primaryAV == espm::ActorValue::Health);
+  riders.ai = riders.ai || IsAiRiderEffect(data.effectType);
   switch (data.effectType) {
     case Type::Paralysis:
       if (!data.IsFlagSet(espm::MGEF::Flags::HideInUI)) {
         riders.paralysisSeconds =
           std::max(riders.paralysisSeconds, effectItem.duration);
       }
-      break;
-    case Type::Calm:
-    case Type::Demoralize:
-    case Type::Frenzy:
-    case Type::TurnUndead:
-    case Type::Rally:
-      riders.ai = true;
       break;
     case Type::Stagger:
       riders.staggerAny = true;
@@ -280,7 +296,7 @@ void AddSpellRider(SpellRiders& riders, const espm::SPEL::EFIT& effectItem,
 SpellRiders GetSpellRiders(WorldState* worldState, uint32_t spellId)
 {
   SpellRiders riders;
-  ForEachSpellEffectData(
+  ForEachHitEffectData(
     worldState, spellId,
     [&](const espm::SPEL::EFIT* effectItem, const espm::MGEF::DATA& data,
         const espm::LookupResult&) {
@@ -340,6 +356,171 @@ SpellRiders GetExplosionRiders(WorldState* worldState, uint32_t spellId)
   return riders;
 }
 
+// The effects of a SPEL, SCRL or ENCH with global MGEF ids; harmsHealth and commands as in SpellRiders
+struct EffectList
+{
+  struct Entry
+  {
+    uint32_t effectId = 0;
+    espm::MGEF::EffectType type = espm::MGEF::EffectType::ValueMod;
+    float magnitude = 0.f;
+    uint32_t area = 0;
+  };
+  std::vector<Entry> entries;
+  bool harmsHealth = false;
+  bool commands = false;
+
+  bool Has(uint32_t effectId) const
+  {
+    return std::any_of(entries.begin(), entries.end(),
+                       [&](const Entry& e) { return e.effectId == effectId; });
+  }
+};
+
+EffectList GetEffectList(WorldState* worldState,
+                         const espm::LookupResult& itemLookup)
+{
+  EffectList result;
+  ForEachEffectData(
+    worldState, itemLookup,
+    [&](const espm::SPEL::EFIT* effectItem, const espm::MGEF::DATA& data,
+        const espm::LookupResult& mgefLookup) {
+      SpellRiders riders;
+      if (effectItem) {
+        AddSpellRider(riders, *effectItem, data);
+      }
+      result.harmsHealth = result.harmsHealth || riders.damagesHealth;
+      result.commands = result.commands || riders.commands;
+      result.entries.push_back(
+        { mgefLookup.ToGlobalId(mgefLookup.rec->GetId()), data.effectType,
+          effectItem ? effectItem->magnitude : 0.f,
+          effectItem ? effectItem->areaOfEffect : 0 });
+    });
+  return result;
+}
+
+// A spell carrying an enchantment's AI riders, which DoCombatSpellApply can replay (Staff of Calm: VampireCharm). For
+// each AI effect of the enchantment it has one of the same type, no wider; it harms no Health and commands nothing.
+// The closest at or below the enchantment's magnitudes wins (Nate: balance everything), then the same magic effect,
+// then the fewest unshared effects, then the lower form id; the weakest above only when none is at or below
+uint32_t StandInSpellOf(WorldState* worldState, uint32_t enchantmentId)
+{
+  using Type = espm::MGEF::EffectType;
+  struct Index
+  {
+    std::unordered_map<Type, std::vector<espm::LookupResult>> spellsByType;
+    std::unordered_map<uint32_t, uint32_t> answers;
+  };
+  static std::unordered_map<const WorldState*, Index> indexByWorld;
+  auto [indexIt, built] = indexByWorld.try_emplace(worldState);
+  Index& index = indexIt->second;
+  auto& browser = worldState->GetEspm().GetBrowser();
+  if (built) {
+    for (const auto& spell : browser.GetDistinctRecordsByType("SPEL")) {
+      ForEachEffectData(
+        worldState, spell,
+        [&](const espm::SPEL::EFIT*, const espm::MGEF::DATA& data,
+            const espm::LookupResult&) {
+          if (IsAiRiderEffect(data.effectType)) {
+            auto& spells = index.spellsByType[data.effectType];
+            if (spells.empty() || spells.back().rec != spell.rec) {
+              spells.push_back(spell);
+            }
+          }
+        });
+    }
+    spdlog::info("ActionListener: {} AI effect types carried by spells",
+                 index.spellsByType.size());
+  }
+  if (const auto it = index.answers.find(enchantmentId);
+      it != index.answers.end()) {
+    return it->second;
+  }
+
+  const auto enchantment =
+    GetEffectList(worldState, browser.LookupById(enchantmentId));
+  std::vector<EffectList::Entry> aiEffects;
+  for (const auto& entry : enchantment.entries) {
+    if (IsAiRiderEffect(entry.type)) {
+      aiEffects.push_back(entry);
+    }
+  }
+
+  // stronger, magnitude distance, other magic effects, unshared effects, form id
+  using Rank = std::tuple<bool, float, int, int, uint32_t>;
+  std::optional<Rank> best;
+  const auto candidatesIt = aiEffects.empty()
+    ? index.spellsByType.end()
+    : index.spellsByType.find(aiEffects.front().type);
+  if (candidatesIt != index.spellsByType.end()) {
+    for (const auto& spell : candidatesIt->second) {
+      const auto candidate = GetEffectList(worldState, spell);
+      if (candidate.harmsHealth || candidate.commands) {
+        continue;
+      }
+      bool stronger = false, hasAll = true;
+      float distance = 0.f;
+      int otherEffects = 0;
+      for (const auto& wanted : aiEffects) {
+        // The strongest of the type, of the same magic effect when it has one
+        const EffectList::Entry* match = nullptr;
+        for (const auto& entry : candidate.entries) {
+          if (entry.type != wanted.type ||
+              (entry.area > 0 && wanted.area == 0)) {
+            continue;
+          }
+          const bool same = entry.effectId == wanted.effectId;
+          const bool matchSame = match && match->effectId == wanted.effectId;
+          if (!match || (same && !matchSame) ||
+              (same == matchSame && entry.magnitude > match->magnitude)) {
+            match = &entry;
+          }
+        }
+        if (!match) {
+          hasAll = false;
+          break;
+        }
+        stronger = stronger || match->magnitude > wanted.magnitude;
+        distance += std::abs(match->magnitude - wanted.magnitude);
+        otherEffects += match->effectId == wanted.effectId ? 0 : 1;
+      }
+      if (!hasAll) {
+        continue;
+      }
+      int unshared = 0;
+      for (const auto& entry : candidate.entries) {
+        unshared += enchantment.Has(entry.effectId) ? 0 : 1;
+      }
+      for (const auto& entry : enchantment.entries) {
+        unshared += candidate.Has(entry.effectId) ? 0 : 1;
+      }
+      const Rank rank{ stronger, distance, otherEffects, unshared,
+                       spell.ToGlobalId(spell.rec->GetId()) };
+      if (!best || rank < *best) {
+        best = rank;
+      }
+    }
+  }
+  const uint32_t spellId = best ? std::get<4>(*best) : 0;
+  if (!best) {
+    spdlog::warn("ActionListener: no spell carries the AI riders of "
+                 "enchantment {:x}, they are not replayed",
+                 enchantmentId);
+  } else if (std::get<0>(*best)) {
+    spdlog::warn("ActionListener: enchantment {:x} replays as spell {:x}, "
+                 "which is stronger (none is at or below it)",
+                 enchantmentId, spellId);
+  } else {
+    spdlog::info("ActionListener: enchantment {:x} replays as spell {:x}",
+                 enchantmentId, spellId);
+  }
+  if (index.answers.size() > 4096) {
+    index.answers.clear();
+  }
+  index.answers.emplace(enchantmentId, spellId);
+  return spellId;
+}
+
 // Absorb Health's part of a spell's damage on target, counted like the damage formula counts it (visible effects
 // first, damage over time whole on an NPC)
 float AbsorbHealthShare(WorldState* worldState, uint32_t spellId,
@@ -348,7 +529,7 @@ float AbsorbHealthShare(WorldState* worldState, uint32_t spellId,
   const bool wholeDamageOverTime = CountsWholeDamageOverTime(
     worldState, espm::GetSpellItemData(spellId, worldState).spellItem, target);
   float absorbVisible = 0.f, absorbTotal = 0.f, visible = 0.f, total = 0.f;
-  ForEachSpellEffectData(
+  ForEachHitEffectData(
     worldState, spellId,
     [&](const espm::SPEL::EFIT* effectItem, const espm::MGEF::DATA& data,
         const espm::LookupResult&) {
@@ -3153,38 +3334,59 @@ void ActionListener::ApplySpellRiders(MpActor& aggressor, MpActor& target,
   const SpellRiders riders = GetSpellRiders(worldState, spellId);
   const bool ridersOn = worldState->spellSync.riders;
   const bool isPlayer = target.GetUserId() != Networking::InvalidUserId;
-  // A rune's paralysis sits on its explosion's enchantment (Ash Rune), which DoCombatSpellApply cannot apply: an NPC
-  // is held on the server and kept still on its host. Players get dboParalyse from the gamemode
-  const uint64_t explosionKey =
+  // A staff hit names its enchantment, which DoCombatSpellApply cannot take
+  const bool isEnchantment = static_cast<bool>(espm::Convert<espm::ENCH>(
+    partOne.GetEspm().GetBrowser().LookupById(spellId).rec));
+  // A rune's paralysis sits on its explosion's enchantment (Ash Rune), a staff's on its own: an NPC is held on the
+  // server and kept still on its host. Players get dboParalyse from the gamemode
+  const uint64_t holdKey =
     (static_cast<uint64_t>(aggressor.GetFormId()) << 32) | target.GetFormId();
   const auto now = std::chrono::steady_clock::now();
-  const auto readyIt = explosionHoldReady.find(explosionKey);
-  const bool explosionReady =
+  const auto readyIt = explosionHoldReady.find(holdKey);
+  const bool hostHoldReady =
     readyIt == explosionHoldReady.end() || now >= readyIt->second;
-  const uint32_t explosionHoldSeconds =
-    worldState->spellSync.explosionRiders && !isPlayer && explosionReady
-    ? GetExplosionRiders(worldState, spellId).paralysisSeconds
-    : 0;
+  uint32_t hostHoldSeconds = 0;
+  if (!isPlayer && hostHoldReady) {
+    if (isEnchantment) {
+      hostHoldSeconds = ridersOn ? riders.paralysisSeconds : 0;
+    } else if (worldState->spellSync.explosionRiders) {
+      hostHoldSeconds =
+        GetExplosionRiders(worldState, spellId).paralysisSeconds;
+    }
+  }
   const uint32_t spellHoldSeconds =
-    riders.damagesHealth ? 0 : riders.paralysisSeconds;
-  const uint32_t holdSeconds = std::max(spellHoldSeconds, explosionHoldSeconds);
+    riders.damagesHealth || isEnchantment ? 0 : riders.paralysisSeconds;
+  const uint32_t holdSeconds = std::max(spellHoldSeconds, hostHoldSeconds);
+  // An enchantment's AI riders replay as a spell that carries them
+  uint32_t replayId = spellId;
+  if (isEnchantment) {
+    const bool replayAi = ridersOn && !isPlayer && riders.ai &&
+      !riders.damagesHealth && !riders.commands;
+    replayId = replayAi ? StandInSpellOf(worldState, spellId) : 0;
+  }
   // Replaying a spell that also damages Health on the target's game would damage it twice. A player's own client
   // takes the stagger and slow from the clone replay already, and the base game applies AI effects to NPCs only
-  const bool replaySpell = !riders.damagesHealth && !riders.commands &&
-    (spellHoldSeconds > 0 ||
-     (ridersOn && !isPlayer &&
-      (riders.staggerAny || riders.slowAny || riders.ai)));
-  // Such a spell's unconditional stagger and slow go to an NPC's host on their own
-  const bool applyApart = ridersOn && riders.damagesHealth && !isPlayer &&
+  const bool replaySpell = isEnchantment
+    ? replayId != 0
+    : !riders.damagesHealth && !riders.commands &&
+      (spellHoldSeconds > 0 ||
+       (ridersOn && !isPlayer &&
+        (riders.staggerAny || riders.slowAny || riders.ai)));
+  // Such a spell's unconditional stagger and slow go to an NPC's host on their own, as do an enchantment's not replayed
+  const bool applyApart = ridersOn && !isPlayer &&
+    (riders.damagesHealth || (isEnchantment && !replaySpell)) &&
     (riders.stagger || riders.slow > 0.f);
-  if (!replaySpell && !applyApart && explosionHoldSeconds == 0) {
+  if (!replaySpell && !applyApart && hostHoldSeconds == 0) {
     return;
   }
   if (holdSeconds > 0 && IsParalyzed(target)) {
     return;
   }
-  // Only a hit of a spell the caster cast lately, at most once a kRiderHitInterval per target
-  if (!CastRecently(aggressor.GetFormId(), spellId) ||
+  // Only a hit of a spell the caster cast lately or of a staff it holds, at most once a kRiderHitInterval per target
+  const bool sourceUsed = isEnchantment
+    ? CanHitWithStaffEnchantment(aggressor, spellId)
+    : CastRecently(aggressor.GetFormId(), spellId);
+  if (!sourceUsed ||
       !TakeRiderHit(aggressor.GetFormId(), spellId, target.GetFormId())) {
     spdlog::info("OnSpellHit - riders of spell {:x} of {:x} on {:x} refused "
                  "(no recent cast, or too soon)",
@@ -3210,13 +3412,13 @@ void ActionListener::ApplySpellRiders(MpActor& aggressor, MpActor& target,
                  spellId, aggressor.GetFormId(), target.GetFormId(),
                  holdSeconds);
   }
-  if (explosionHoldSeconds > 0) {
+  if (hostHoldSeconds > 0) {
     if (explosionHoldReady.size() > 1024) {
       std::erase_if(explosionHoldReady,
                     [&](const auto& entry) { return entry.second <= now; });
     }
-    explosionHoldReady[explosionKey] = now +
-      std::chrono::seconds(explosionHoldSeconds) + kExplosionHoldCooldown;
+    explosionHoldReady[holdKey] =
+      now + std::chrono::seconds(hostHoldSeconds) + kExplosionHoldCooldown;
   }
 
   // A player's own client, or the host of an NPC
@@ -3226,9 +3428,8 @@ void ActionListener::ApplySpellRiders(MpActor& aggressor, MpActor& target,
     return;
   }
 
-  if (explosionHoldSeconds > 0) {
-    StartHostEffect(HostEffect::Hold, executor, target, 0.f,
-                    explosionHoldSeconds);
+  if (hostHoldSeconds > 0) {
+    StartHostEffect(HostEffect::Hold, executor, target, 0.f, hostHoldSeconds);
   }
   if (applyApart) {
     if (riders.stagger) {
@@ -3256,24 +3457,25 @@ void ActionListener::ApplySpellRiders(MpActor& aggressor, MpActor& target,
 
   // DoCombatSpellApply takes a Spell; a Scroll is another form type in Papyrus, so a scroll's riders are kept on the
   // server only (review SCH1-R4)
-  const auto sourceLookup = partOne.GetEspm().GetBrowser().LookupById(spellId);
-  if (!espm::Convert<espm::SPEL>(sourceLookup.rec)) {
+  const auto replayLookup = partOne.GetEspm().GetBrowser().LookupById(replayId);
+  if (!espm::Convert<espm::SPEL>(replayLookup.rec)) {
     spdlog::info("OnSpellHit - riders of {:x} on {:x} are not replayed on "
                  "{:x}'s client (not a SPEL)",
                  spellId, target.GetFormId(), executor.GetFormId());
     return;
   }
   SpSnippetObjectArgument spellArg;
-  spellArg.formId = spellId;
+  spellArg.formId = replayId;
   spellArg.type = "Spell";
   SnippetArgs args;
   args.push_back(spellArg);
   args.push_back(SnippetActorArgument(worldState, executor, target, "Actor"));
   SpSnippet("Actor", "DoCombatSpellApply", args, aggressor.GetFormId())
     .Execute(&executor, SpSnippetMode::kNoReturnResult);
-  spdlog::info("OnSpellHit - spell {:x} of {:x} replayed on {:x} for {:x}",
+  spdlog::info("OnSpellHit - spell {:x} of {:x} replayed on {:x} for {:x} "
+               "(as {:x})",
                spellId, aggressor.GetFormId(), executor.GetFormId(),
-               target.GetFormId());
+               target.GetFormId(), replayId);
 }
 
 void ActionListener::StartHostEffect(HostEffect effect, MpActor& executor,
