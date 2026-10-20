@@ -214,21 +214,24 @@ const LM = JSON.parse(fs.readFileSync(path.join(SERVER, 'loot-materials.json'), 
 const noItems = REAL.filter((f) => !LM[f.id]).map((f) => f.id);
 ok(noItems.join() === '' && LM.madness && LM.amber && LM.glacial_crystal && LM.ancient_imperial, 'every smithing family has loot-materials items (the PC reskins gave Bronze, Copper, Brass and Adamantium their own)', noItems);
 
-// The PC's reskins (9 Oct): Brass needs no technique (a common alloy), Adamantium is worked with the Steel Plate technique
+// The PC's reskins (9 Oct): Brass needs no technique (a common alloy). Adamantium has its own rare schematic since 20 Oct (Nat)
 load(ON); props.set(`${A}|private.dboManuals`, {}); props.set(`${SUP}|private.dboManuals`, {});
 smith(A, 20);
 ok(craft(A, BRASS_SWORD, R_BRASS) !== false, 'Brass (T2, free): a tier 2 smith forges it with no technique');
 smith(A, 10);
 ok(craft(A, BRASS_SWORD, R_BRASS) === false, '...but not below tier 2');
 smith(A, 80);
-ok(craft(A, ADAM_SWORD, R_ADAM) === false && /Steel Plate/.test(lastTold(A)), 'Adamantium (T5) without the Steel Plate technique: refused, told so', lastTold(A));
+ok(craft(A, ADAM_SWORD, R_ADAM) === false && /Schematics: Adamantium/.test(lastTold(A)) && /Sancre Tor/.test(lastTold(A)), 'Adamantium (T5) without its schematic: refused, told where the book is', lastTold(A));
 props.set(`${A}|private.dboManuals`, { steelplate: { at: 1, how: 'book' } });
-ok(craft(A, ADAM_SWORD, R_ADAM) !== false, '...with the Steel Plate technique: forged');
+ok(craft(A, ADAM_SWORD, R_ADAM) === false, '...the Steel Plate technique no longer teaches it');
+props.set(`${A}|private.dboManuals`, { adamantium: { at: 1, how: 'book' } });
+ok(craft(A, ADAM_SWORD, R_ADAM) !== false, '...its own schematic does: forged');
 smith(A, 50);
 ok(craft(A, ADAM_SWORD, R_ADAM) === false, '...but only at tier 5');
 const rv = globalThis.__dboSmithView(SUP).families;
-ok(rv.find((f) => f.id === 'brass').learnHint === '' && /Worked with the Steel Plate technique/.test(rv.find((f) => f.id === 'adamantium').learnHint), 'the view: Brass needs nothing, Adamantium points at Steel Plate', rv.filter((f) => /brass|adamantium/.test(f.id)));
-ok(!globalThis.__dboManualsShop(A).some((x) => /Brass|Adamantium/.test(x.label)), 'neither has a book of its own');
+ok(rv.find((f) => f.id === 'brass').learnHint === '' && /Sancre Tor/.test(rv.find((f) => f.id === 'adamantium').learnHint) && /No smith teaches it/.test(rv.find((f) => f.id === 'adamantium').learnHint), 'the view: Brass needs nothing, Adamantium points at its book at Sancre Tor (held: no teacher)', rv.filter((f) => /brass|adamantium/.test(f.id)));
+ok(!globalThis.__dboManualsShop(A).some((x) => /Brass|Adamantium/.test(x.label)), 'neither is sold (Adamantium is tier 5, above the shop)');
+ok(JSON.stringify(globalThis.__dboSmithBookNeeds('adamantium')) === JSON.stringify({ tier: 5, scholar: 2 }), 'its book is tier 5: a Scholar of tier 2 reads it (smithing.scholarForBook)', globalThis.__dboSmithBookNeeds('adamantium'));
 
 // Carry-over: a smith from before the techniques learns, once, every family up to their craft tier
 {
@@ -357,6 +360,18 @@ ok(!globalThis.__dboManualsShop(A).some((x) => /Brass|Adamantium/.test(x.label))
   give(); r1 = roll(5, '', []);
   ok(r1 === null && !give().length, 'no hit, no book');
   ok(audits.some((t) => /^SCHEMATIC .* found Schematics: /.test(t)), 'finds are audited');
+  // Adamantium's own schematic in Sancre Tor's boss chests (Nat, 20 Oct): a roll per player per day, the book handed over
+  const SANCRE = mp.getIdFromDesc('1833aa:DragonBreak Online Edits.esp'), site = (rs) => { seq = rs.slice(); Math.random = () => (seq.length ? seq.shift() : 0.999); try { return globalThis.__dboSchematicSiteFind(B, SANCRE); } finally { Math.random = real; } };
+  give(); props.set(`${B}|private.dboSiteFinds`, {});
+  ok(globalThis.__dboSchematicSiteFind(B, 0x12345) === null, 'another chest is no site');
+  r1 = site([0.999]);
+  ok(r1 === null && !give().length && Number((props.get(`${B}|private.dboSiteFinds`) || {}).sancreTor) > 0, 'a miss at Sancre Tor hands nothing and starts the wait', props.get(`${B}|private.dboSiteFinds`));
+  r1 = site([0, 0]);
+  ok(r1 === null, '...and no second roll within the day', r1);
+  props.set(`${B}|private.dboSiteFinds`, {});
+  r1 = site([0, 0]);
+  ok(r1 && /Adamantium/.test(r1.name) && give().some((g) => JSON.stringify(g).includes(String(BOOKS.adamantium))), 'a hit hands over Schematics: Adamantium', r1);
+  ok(audits.some((t) => /^SCHEMATIC .* found Schematics: Adamantium in a chest at Sancre Tor/.test(t)), '...audited');
   load(ON);
 }
 

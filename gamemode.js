@@ -1901,6 +1901,8 @@ mp.onActivate = (targetId, casterId) => {
   // The Sleeping Tree's sap spigot: a Master Alchemist's daily tap (alchemy.js; off until Skyrim opens)
   if (globalThis.__dboSleepingTreeTap) { try { if (globalThis.__dboSleepingTreeTap(targetId >>> 0, casterId >>> 0) === true) return false; } catch (e) { log('sleeping tree tap failed', e.message); } }
   if (globalThis.__dboEmptyWorldContainer) globalThis.__dboEmptyWorldContainer(targetId >>> 0);
+  // A site's chest may hold a schematic (manuals.js smithing.sites: Adamantium at Sancre Tor)
+  try { if (globalThis.__dboSchematicSiteFind) globalThis.__dboSchematicSiteFind(casterId >>> 0, targetId >>> 0); } catch (e) { log('schematic site find failed', e.message); }
   // Gear above the loot cap in a container becomes its steel equivalent before the container opens (gearswap.js)
   if (globalThis.__dboGearSwapContainer) globalThis.__dboGearSwapContainer(targetId >>> 0);
   try { if (globalThis.__dboSprStripContainer) globalThis.__dboSprStripContainer(targetId >>> 0); } catch (e) { log('spr strip container failed', e.message); }

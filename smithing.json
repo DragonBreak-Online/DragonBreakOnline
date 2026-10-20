@@ -36,7 +36,7 @@
   { "id": "steelplate", "name": "Steel Plate", "tier": 5, "where": "a rare find when reading, or in boss chests", "bookId": "192e58:DragonBreak Online Edits.esp" },
   { "id": "elven_gilded", "name": "Gilded Elven", "tier": 5, "technique": "elven", "bookId": "192e59:DragonBreak Online Edits.esp" },
   { "id": "ayleid", "name": "Ayleid", "tier": 5, "held": true, "where": "learned by reading in Ayleid ruins, or found very rarely in their chests", "bookId": "192e5a:DragonBreak Online Edits.esp" },
-  { "id": "adamantium", "name": "Adamantium", "tier": 5, "technique": "steelplate" },
+  { "id": "adamantium", "name": "Adamantium", "tier": 5, "held": true, "where": "a very rare find in the boss chests of Sancre Tor, and nowhere else", "bookId": "1d1fa8:DragonBreak Online Edits.esp" },
   { "id": "glacial_crystal", "name": "Glacial Crystal", "tier": 5, "held": true, "noLoot": true, "where": "an exceptionally rare find when reading", "bookId": "192e56:DragonBreak Online Edits.esp" },
   { "id": "amber", "name": "Amber", "tier": 5, "where": "a Valenwood craft: apprentice under a Blacksmith who knows it", "bookId": "192e57:DragonBreak Online Edits.esp" },
   { "id": "EBONY", "name": "Ebony", "tier": 6, "held": true, "noLoot": true, "where": "an extremely rare find, and only for a Master Scholar's reading", "bookId": "192e5b:DragonBreak Online Edits.esp" },
