@@ -233,28 +233,28 @@ daedric landscape.esp|01D5C1|NorPortcullis
 daedric landscape.esp|02D383|NorPortcullis
 daedric landscape.esp|03D6D8|NorPortcullis
 daedric landscape.esp|03D6CE|NorPortcullis
-skyrim.esm|0B64A5|NorHallExSmPortcullis01
+# skyrim.esm|0B64A5|NorHallExSmPortcullis01   <- 20 Oct: floor restored, the hall piece has no bars; Nat via the Local Leader; DLE child DragonBreak Map Fixes.esp
 skyrim.esm|0B7465|NorSecRmSmDoorSm02
 skyrim.esm|10A192|NorPortcullisStatic
-skyrim.esm|050E6A|NorHallExSmPortcullis01
-skyrim.esm|0DE077|NorHallExSmPortcullis01
-skyrim.esm|0DE088|NorHallExSmPortcullis01
-skyrim.esm|0E730C|NorHallExSmPortcullis01
+# skyrim.esm|050E6A|NorHallExSmPortcullis01   <- 20 Oct: floor restored, the hall piece has no bars; Nat via the Local Leader; DLE child DragonBreak Map Fixes.esp
+# skyrim.esm|0DE077|NorHallExSmPortcullis01   <- 20 Oct: floor restored, the hall piece has no bars; Nat via the Local Leader; DLE child DragonBreak Map Fixes.esp
+# skyrim.esm|0DE088|NorHallExSmPortcullis01   <- 20 Oct: floor restored, the hall piece has no bars; Nat via the Local Leader; DLE child DragonBreak Map Fixes.esp
+# skyrim.esm|0E730C|NorHallExSmPortcullis01   <- 20 Oct: floor restored, the hall piece has no bars; Nat via the Local Leader; DLE child DragonBreak Map Fixes.esp
 # left in place by Nat's choice, 19 Oct (never removed; a full run would sink it for the first time): skyrim.esm|036413|NorHallExSmPortcullis01
 # left in place by Nat's choice, 19 Oct (never removed; a full run would sink it for the first time): skyrim.esm|036411|NorHallExSmPortcullis01
 # left in place by Nat's choice, 19 Oct (never removed; a full run would sink it for the first time): skyrim.esm|03640E|NorHallExSmPortcullis01
-skyrim.esm|039B21|NorHallExSmPortcullis01
-skyrim.esm|039B20|NorHallExSmPortcullis01
-skyrim.esm|09A678|NorHallExSmPortcullis01
-skyrim.esm|09A67C|NorHallExSmPortcullis01
-skyrim.esm|02C400|NorHallExSmPortcullis01
+# skyrim.esm|039B21|NorHallExSmPortcullis01   <- 20 Oct: floor restored, the hall piece has no bars; Nat via the Local Leader; DLE child DragonBreak Map Fixes.esp
+# skyrim.esm|039B20|NorHallExSmPortcullis01   <- 20 Oct: floor restored, the hall piece has no bars; Nat via the Local Leader; DLE child DragonBreak Map Fixes.esp
+# skyrim.esm|09A678|NorHallExSmPortcullis01   <- 20 Oct: floor restored, the hall piece has no bars; Nat via the Local Leader; DLE child DragonBreak Map Fixes.esp
+# skyrim.esm|09A67C|NorHallExSmPortcullis01   <- 20 Oct: floor restored, the hall piece has no bars; Nat via the Local Leader; DLE child DragonBreak Map Fixes.esp
+# skyrim.esm|02C400|NorHallExSmPortcullis01   <- 20 Oct: floor restored, the hall piece has no bars; Nat via the Local Leader; DLE child DragonBreak Map Fixes.esp
 skyrim.esm|0637A9|NorPortcullis
 # skyrim.esm|063758|NorHallExSmPortcullis01   <- 20 Oct: floor restored; players fell through; Nat via the server session; DLE child DragonBreak Dungeon Floors.esp
 # skyrim.esm|063756|NorHallExSmPortcullis01   <- 20 Oct: floor restored; players fell through; Nat via the server session; DLE child DragonBreak Dungeon Floors.esp
-skyrim.esm|032B32|NorHallExSmPortcullis01ice
-skyrim.esm|032B31|NorHallExSmPortcullis01ice
-skyrim.esm|072B56|NorHallExSmPortcullis01ice
-skyrim.esm|072B38|NorHallExSmPortcullis01ice
+# skyrim.esm|032B32|NorHallExSmPortcullis01ice   <- 20 Oct: floor restored, the hall piece has no bars; Nat via the Local Leader; DLE child DragonBreak Map Fixes.esp
+# skyrim.esm|032B31|NorHallExSmPortcullis01ice   <- 20 Oct: floor restored, the hall piece has no bars; Nat via the Local Leader; DLE child DragonBreak Map Fixes.esp
+# skyrim.esm|072B56|NorHallExSmPortcullis01ice   <- 20 Oct: floor restored, the hall piece has no bars; Nat via the Local Leader; DLE child DragonBreak Map Fixes.esp
+# skyrim.esm|072B38|NorHallExSmPortcullis01ice   <- 20 Oct: floor restored, the hall piece has no bars; Nat via the Local Leader; DLE child DragonBreak Map Fixes.esp
 skyrim.esm|0AB10B|NorSecRmSmDoorSm01
 # skyrim.esm|072D02|NorHallExSmPortcullis01   <- 20 Oct: floor restored; players fell through; Nat via the server session; DLE child DragonBreak Dungeon Floors.esp
 # skyrim.esm|072D03|NorHallExSmPortcullis01   <- 20 Oct: floor restored; players fell through; Nat via the server session; DLE child DragonBreak Dungeon Floors.esp
@@ -265,12 +265,12 @@ skyrim.esm|0AB10B|NorSecRmSmDoorSm01
 # left in place by Nat's choice, 19 Oct (never removed; a full run would sink it for the first time): skyrim.esm|03D936|NorHallExSmPortcullis01
 # left in place by Nat's choice, 19 Oct (never removed; a full run would sink it for the first time): skyrim.esm|03D917|NorHallExSmPortcullis01
 # left in place by Nat's choice, 19 Oct (never removed; a full run would sink it for the first time): skyrim.esm|03D916|NorHallExSmPortcullis01
-skyrim.esm|03D915|NorHallExSmPortcullis01
-skyrim.esm|0285C1|NorHallExSmPortcullis01
-skyrim.esm|04634C|NorHallExSmPortcullis01
-skyrim.esm|04660C|NorHallExSmPortcullis01
-skyrim.esm|09A5E7|NorHallExSmPortcullis01
-skyrim.esm|09A5E6|NorHallExSmPortcullis01
+# skyrim.esm|03D915|NorHallExSmPortcullis01   <- 20 Oct: floor restored, the hall piece has no bars; Nat via the Local Leader; DLE child DragonBreak Map Fixes.esp
+# skyrim.esm|0285C1|NorHallExSmPortcullis01   <- 20 Oct: floor restored, the hall piece has no bars; Nat via the Local Leader; DLE child DragonBreak Map Fixes.esp
+# skyrim.esm|04634C|NorHallExSmPortcullis01   <- 20 Oct: floor restored, the hall piece has no bars; Nat via the Local Leader; DLE child DragonBreak Map Fixes.esp
+# skyrim.esm|04660C|NorHallExSmPortcullis01   <- 20 Oct: floor restored, the hall piece has no bars; Nat via the Local Leader; DLE child DragonBreak Map Fixes.esp
+# skyrim.esm|09A5E7|NorHallExSmPortcullis01   <- 20 Oct: floor restored, the hall piece has no bars; Nat via the Local Leader; DLE child DragonBreak Map Fixes.esp
+# skyrim.esm|09A5E6|NorHallExSmPortcullis01   <- 20 Oct: floor restored, the hall piece has no bars; Nat via the Local Leader; DLE child DragonBreak Map Fixes.esp
 # skyrim.esm|0A1EDB|NorHallExSmPortcullis01   <- 20 Oct: floor restored; players fell through; Nat via the server session; DLE child DragonBreak Dungeon Floors.esp
 # skyrim.esm|0A23FB|NorHallExSmPortcullis01   <- 20 Oct: floor restored; players fell through; Nat via the server session; DLE child DragonBreak Dungeon Floors.esp
 # skyrim.esm|0A23FA|NorHallExSmPortcullis01   <- 20 Oct: floor restored; players fell through; Nat via the server session; DLE child DragonBreak Dungeon Floors.esp
@@ -279,34 +279,34 @@ skyrim.esm|0A5E6A|NorSecRmSmDoorSm01
 # left in place by Nat's choice, 19 Oct (never removed; a full run would sink it for the first time): skyrim.esm|0A5F67|NorHallExSmPortcullis01
 # left in place by Nat's choice, 19 Oct (never removed; a full run would sink it for the first time): skyrim.esm|0A5F66|NorHallExSmPortcullis01
 # left in place by Nat's choice, 19 Oct (never removed; a full run would sink it for the first time): skyrim.esm|0A5F65|NorHallExSmPortcullis01
-skyrim.esm|03E6AE|NorHallExSmPortcullis01
+# skyrim.esm|03E6AE|NorHallExSmPortcullis01   <- 20 Oct: floor restored, the hall piece has no bars; Nat via the Local Leader; DLE child DragonBreak Map Fixes.esp
 # left in place by Nat's choice, 19 Oct (never removed; a full run would sink it for the first time): skyrim.esm|044E4D|NorHallExSmPortcullis01
 # left in place by Nat's choice, 19 Oct (never removed; a full run would sink it for the first time): skyrim.esm|02D0C5|NorHallExSmPortcullis01
 # left in place by Nat's choice, 19 Oct (never removed; a full run would sink it for the first time): skyrim.esm|02D0B6|NorHallExSmPortcullis01
 # left in place by Nat's choice, 19 Oct (never removed; a full run would sink it for the first time): skyrim.esm|02D096|NorHallExSmPortcullis01
 skyrim.esm|08DB07|NorSecRmSmDoorSm01
 skyrim.esm|048596|NorPortcullisStatic
-skyrim.esm|05AF5D|NorHallExSmPortcullis01
+# skyrim.esm|05AF5D|NorHallExSmPortcullis01   <- 20 Oct: floor restored, the hall piece has no bars; Nat via the Local Leader; DLE child DragonBreak Map Fixes.esp
 skyrim.esm|09E547|NorSecRmSmDoorSm01
-skyrim.esm|0A4785|NorHallExSmPortcullis01
+# skyrim.esm|0A4785|NorHallExSmPortcullis01   <- 20 Oct: floor restored, the hall piece has no bars; Nat via the Local Leader; DLE child DragonBreak Map Fixes.esp
 # left in place by Nat's choice, 19 Oct (never removed; a full run would sink it for the first time): skyrim.esm|0A4784|NorHallExSmPortcullis01
 # left in place by Nat's choice, 19 Oct (never removed; a full run would sink it for the first time): skyrim.esm|0A4783|NorHallExSmPortcullis01
 # skyrim.esm|035AB9|NorHallExSmPortcullis01   <- 20 Oct: floor restored; players fell through; Nat via the server session; DLE child DragonBreak Dungeon Floors.esp
 skyrim.esm|06FCCF|NorPortcullisStatic
-skyrim.esm|02FE39|NorHallExSmPortcullis01
+# skyrim.esm|02FE39|NorHallExSmPortcullis01   <- 20 Oct: floor restored, the hall piece has no bars; Nat via the Local Leader; DLE child DragonBreak Map Fixes.esp
 skyrim.esm|09D750|NorSecRmSmDoorSm01
 # left in place by Nat's choice, 19 Oct (never removed; a full run would sink it for the first time): skyrim.esm|01B6AC|NorHallExSmPortcullis01
-skyrim.esm|0278A2|NorHallExSmPortcullis01
-skyrim.esm|098530|NorHallExSmPortcullis01
+# skyrim.esm|0278A2|NorHallExSmPortcullis01   <- 20 Oct: floor restored, the hall piece has no bars; Nat via the Local Leader; DLE child DragonBreak Map Fixes.esp
+# skyrim.esm|098530|NorHallExSmPortcullis01   <- 20 Oct: floor restored, the hall piece has no bars; Nat via the Local Leader; DLE child DragonBreak Map Fixes.esp
 # left in place by Nat's choice, 19 Oct (never removed; a full run would sink it for the first time): skyrim.esm|09852F|NorHallExSmPortcullis01
-skyrim.esm|05EBBF|NorHallExSmPortcullis01
+# skyrim.esm|05EBBF|NorHallExSmPortcullis01   <- 20 Oct: floor restored, the hall piece has no bars; Nat via the Local Leader; DLE child DragonBreak Map Fixes.esp
 # skyrim.esm|0230D6|NorHallExSmPortcullis01   <- 20 Oct: floor restored; players fell through; Nat via the server session; DLE child DragonBreak Dungeon Floors.esp
 # skyrim.esm|0230CA|NorHallExSmPortcullis01   <- 20 Oct: floor restored; players fell through; Nat via the server session; DLE child DragonBreak Dungeon Floors.esp
 # skyrim.esm|03A4C9|NorHallExSmPortcullis01   <- 20 Oct: floor restored; players fell through; Nat via the server session; DLE child DragonBreak Dungeon Floors.esp
 # skyrim.esm|07A2C0|NorHallExSmPortcullis01   <- 20 Oct: floor restored; players fell through; Nat via the server session; DLE child DragonBreak Dungeon Floors.esp
 # left in place by Nat's choice, 19 Oct (never removed; a full run would sink it for the first time): skyrim.esm|086266|NorHallExSmPortcullis01
 # left in place by Nat's choice, 19 Oct (never removed; a full run would sink it for the first time): skyrim.esm|086267|NorHallExSmPortcullis01
-skyrim.esm|072415|NorHallExSmPortcullis01
+# skyrim.esm|072415|NorHallExSmPortcullis01   <- 20 Oct: floor restored, the hall piece has no bars; Nat via the Local Leader; DLE child DragonBreak Map Fixes.esp
 skyrim.esm|0578B4|NorSecRmSmDoorSm01
 skyrim.esm|08CE75|NorSecRmSmDoorSm01
 # skyrim.esm|040C72|NorHallExSmPortcullis01   <- 20 Oct: floor restored; players fell through; Nat via the server session; DLE child DragonBreak Dungeon Floors.esp
@@ -315,53 +315,53 @@ skyrim.esm|08CE75|NorSecRmSmDoorSm01
 skyrim.esm|0557BB|NorPortcullisStatic
 skyrim.esm|08615B|NorSecRmSmDoorSm01
 skyrim.esm|0ED3C4|NorSecRmSmDoorSm01
-skyrim.esm|0ED7DA|NorHallExSmPortcullis01
+# skyrim.esm|0ED7DA|NorHallExSmPortcullis01   <- 20 Oct: floor restored, the hall piece has no bars; Nat via the Local Leader; DLE child DragonBreak Map Fixes.esp
 # skyrim.esm|03A30A|NorHallExSmPortcullis01   <- 20 Oct: floor restored; players fell through; Nat via the server session; DLE child DragonBreak Dungeon Floors.esp
-skyrim.esm|02E1FD|NorHallExSmPortcullis01
-skyrim.esm|0B63F8|NorHallExSmPortcullis01
+# skyrim.esm|02E1FD|NorHallExSmPortcullis01   <- 20 Oct: floor restored, the hall piece has no bars; Nat via the Local Leader; DLE child DragonBreak Map Fixes.esp
+# skyrim.esm|0B63F8|NorHallExSmPortcullis01   <- 20 Oct: floor restored, the hall piece has no bars; Nat via the Local Leader; DLE child DragonBreak Map Fixes.esp
 # left in place by Nat's choice, 19 Oct (never removed; a full run would sink it for the first time): skyrim.esm|0236E6|NorHallExSmPortcullis01
 # left in place by Nat's choice, 19 Oct (never removed; a full run would sink it for the first time): skyrim.esm|0236E5|NorHallExSmPortcullis01
 # left in place by Nat's choice, 19 Oct (never removed; a full run would sink it for the first time): skyrim.esm|0236E4|NorHallExSmPortcullis01
-skyrim.esm|023314|NorHallExSmPortcullis01
+# skyrim.esm|023314|NorHallExSmPortcullis01   <- 20 Oct: floor restored, the hall piece has no bars; Nat via the Local Leader; DLE child DragonBreak Map Fixes.esp
 skyrim.esm|0DB044|NorSecRmSmDoorSm01
 skyrim.esm|07F720|NorSecRmSmDoorSm01
 # left in place by Nat's choice, 19 Oct (never removed; a full run would sink it for the first time): skyrim.esm|081A12|NorHallExSmPortcullis01
 # left in place by Nat's choice, 19 Oct (never removed; a full run would sink it for the first time): skyrim.esm|081A11|NorHallExSmPortcullis01
-skyrim.esm|081A0F|NorHallExSmPortcullis01
-skyrim.esm|081A0D|NorHallExSmPortcullis01
-skyrim.esm|03275B|NorHallExSmPortcullis01
+# skyrim.esm|081A0F|NorHallExSmPortcullis01   <- 20 Oct: floor restored, the hall piece has no bars; Nat via the Local Leader; DLE child DragonBreak Map Fixes.esp
+# skyrim.esm|081A0D|NorHallExSmPortcullis01   <- 20 Oct: floor restored, the hall piece has no bars; Nat via the Local Leader; DLE child DragonBreak Map Fixes.esp
+# skyrim.esm|03275B|NorHallExSmPortcullis01   <- 20 Oct: floor restored, the hall piece has no bars; Nat via the Local Leader; DLE child DragonBreak Map Fixes.esp
 # left in place by Nat's choice, 19 Oct (never removed; a full run would sink it for the first time): skyrim.esm|022F89|NorHallExSmPortcullis01
 # left in place by Nat's choice, 19 Oct (never removed; a full run would sink it for the first time): skyrim.esm|022F88|NorHallExSmPortcullis01
 # left in place by Nat's choice, 19 Oct (never removed; a full run would sink it for the first time): skyrim.esm|082C77|NorHallExSmPortcullis01
 # skyrim.esm|082C84|NorHallExSmPortcullis01   <- 20 Oct: floor restored; players fell through; Nat via the server session; DLE child DragonBreak Dungeon Floors.esp
-skyrim.esm|02A868|NorHallExSmPortcullis01
-skyrim.esm|035641|NorHallExSmPortcullis01
-skyrim.esm|03F3AF|NorHallExSmPortcullis01
-skyrim.esm|01D3DE|NorHallExSmPortcullis01
+# skyrim.esm|02A868|NorHallExSmPortcullis01   <- 20 Oct: floor restored, the hall piece has no bars; Nat via the Local Leader; DLE child DragonBreak Map Fixes.esp
+# skyrim.esm|035641|NorHallExSmPortcullis01   <- 20 Oct: floor restored, the hall piece has no bars; Nat via the Local Leader; DLE child DragonBreak Map Fixes.esp
+# skyrim.esm|03F3AF|NorHallExSmPortcullis01   <- 20 Oct: floor restored, the hall piece has no bars; Nat via the Local Leader; DLE child DragonBreak Map Fixes.esp
+# skyrim.esm|01D3DE|NorHallExSmPortcullis01   <- 20 Oct: floor restored, the hall piece has no bars; Nat via the Local Leader; DLE child DragonBreak Map Fixes.esp
 # left in place by Nat's choice, 19 Oct (never removed; a full run would sink it for the first time): skyrim.esm|01D3E1|NorHallExSmPortcullis01
 # left in place by Nat's choice, 19 Oct (never removed; a full run would sink it for the first time): skyrim.esm|01D3E3|NorHallExSmPortcullis01
-skyrim.esm|0375D6|NorHallExSmPortcullis01
+# skyrim.esm|0375D6|NorHallExSmPortcullis01   <- 20 Oct: floor restored, the hall piece has no bars; Nat via the Local Leader; DLE child DragonBreak Map Fixes.esp
 # left in place by Nat's choice, 19 Oct (never removed; a full run would sink it for the first time): skyrim.esm|0375D5|NorHallExSmPortcullis01
 # left in place by Nat's choice, 19 Oct (never removed; a full run would sink it for the first time): skyrim.esm|0375D2|NorHallExSmPortcullis01
 # left in place by Nat's choice, 19 Oct (never removed; a full run would sink it for the first time): skyrim.esm|03AC36|NorHallExSmPortcullis01
 # left in place by Nat's choice, 19 Oct (never removed; a full run would sink it for the first time): skyrim.esm|03AC34|NorHallExSmPortcullis01
 # left in place by Nat's choice, 19 Oct (never removed; a full run would sink it for the first time): skyrim.esm|03AC32|NorHallExSmPortcullis01
-skyrim.esm|02AD1F|NorHallExSmPortcullis01
-skyrim.esm|026564|NorHallExSmPortcullis01
-skyrim.esm|026568|NorHallExSmPortcullis01
-skyrim.esm|02656A|NorHallExSmPortcullis01
-skyrim.esm|026AF1|NorHallExSmPortcullis01
+# skyrim.esm|02AD1F|NorHallExSmPortcullis01   <- 20 Oct: floor restored, the hall piece has no bars; Nat via the Local Leader; DLE child DragonBreak Map Fixes.esp
+# skyrim.esm|026564|NorHallExSmPortcullis01   <- 20 Oct: floor restored, the hall piece has no bars; Nat via the Local Leader; DLE child DragonBreak Map Fixes.esp
+# skyrim.esm|026568|NorHallExSmPortcullis01   <- 20 Oct: floor restored, the hall piece has no bars; Nat via the Local Leader; DLE child DragonBreak Map Fixes.esp
+# skyrim.esm|02656A|NorHallExSmPortcullis01   <- 20 Oct: floor restored, the hall piece has no bars; Nat via the Local Leader; DLE child DragonBreak Map Fixes.esp
+# skyrim.esm|026AF1|NorHallExSmPortcullis01   <- 20 Oct: floor restored, the hall piece has no bars; Nat via the Local Leader; DLE child DragonBreak Map Fixes.esp
 skyrim.esm|0347D9|NorHallExSmPortcullis01
 skyrim.esm|0347D8|NorHallExSmPortcullis01
 skyrim.esm|034746|NorHallExSmPortcullis01
 skyrim.esm|0AA71E|NorPortcullisStatic
-skyrim.esm|02B3DA|NorHallExSmPortcullis01
-skyrim.esm|02B3CA|NorHallExSmPortcullis01
+# skyrim.esm|02B3DA|NorHallExSmPortcullis01   <- 20 Oct: floor restored, the hall piece has no bars; Nat via the Local Leader; DLE child DragonBreak Map Fixes.esp
+# skyrim.esm|02B3CA|NorHallExSmPortcullis01   <- 20 Oct: floor restored, the hall piece has no bars; Nat via the Local Leader; DLE child DragonBreak Map Fixes.esp
 skyrim.esm|080A99|PortGatePole06
 skyrim.esm|080A98|PortGatePole06
 skyrim.esm|080A97|PortGatePole06
-skyrim.esm|022731|NorHallExSmPortcullis01
-skyrim.esm|0222A4|NorHallExSmPortcullis01
+# skyrim.esm|022731|NorHallExSmPortcullis01   <- 20 Oct: floor restored, the hall piece has no bars; Nat via the Local Leader; DLE child DragonBreak Map Fixes.esp
+# skyrim.esm|0222A4|NorHallExSmPortcullis01   <- 20 Oct: floor restored, the hall piece has no bars; Nat via the Local Leader; DLE child DragonBreak Map Fixes.esp
 skyrim.esm|10436C|PortGatePole01
 skyrim.esm|10436D|PortGatePole01
 skyrim.esm|10436E|PortGatePole01
@@ -374,15 +374,15 @@ dawnguard.esm|00CC11|NorPortcullis
 dawnguard.esm|00DF28|CasPortcullis
 dawnguard.esm|00DF27|CasPortcullis
 dawnguard.esm|00B248|NorPortcullis
-dawnguard.esm|009A2D|NorHallExSmPortcullis01
+# dawnguard.esm|009A2D|NorHallExSmPortcullis01   <- 20 Oct: floor restored, the hall piece has no bars; Nat via the Local Leader; DLE child DragonBreak Map Fixes.esp
 # left in place by Nat's choice, 19 Oct (never removed; a full run would sink it for the first time): dawnguard.esm|0099C1|NorHallExSmPortcullis01
 # left in place by Nat's choice, 19 Oct (never removed; a full run would sink it for the first time): dawnguard.esm|0099C0|NorHallExSmPortcullis01
 # left in place by Nat's choice, 19 Oct (never removed; a full run would sink it for the first time): dawnguard.esm|0099BF|NorHallExSmPortcullis01
 # left in place by Nat's choice, 19 Oct (never removed; a full run would sink it for the first time): dawnguard.esm|0099BE|NorHallExSmPortcullis01
 # left in place by Nat's choice, 19 Oct (never removed; a full run would sink it for the first time): dawnguard.esm|0099BD|NorHallExSmPortcullis01
-dawnguard.esm|00996D|NorHallExSmPortcullis01
-dawnguard.esm|00619D|NorHallExSmPortcullis01
-dawnguard.esm|006184|NorHallExSmPortcullis01
+# dawnguard.esm|00996D|NorHallExSmPortcullis01   <- 20 Oct: floor restored, the hall piece has no bars; Nat via the Local Leader; DLE child DragonBreak Map Fixes.esp
+# dawnguard.esm|00619D|NorHallExSmPortcullis01   <- 20 Oct: floor restored, the hall piece has no bars; Nat via the Local Leader; DLE child DragonBreak Map Fixes.esp
+# dawnguard.esm|006184|NorHallExSmPortcullis01   <- 20 Oct: floor restored, the hall piece has no bars; Nat via the Local Leader; DLE child DragonBreak Map Fixes.esp
 dawnguard.esm|00A5BC|NorSecRmSmDoorSm01
 dawnguard.esm|000FC9|NorPortcullis
 dawnguard.esm|000FC8|NorPortcullis
@@ -417,10 +417,10 @@ dragonborn.esm|01AD2E|NorPortcullisLarge01
 dragonborn.esm|01AD2D|NorPortcullisLarge01
 dragonborn.esm|017382|NorPortcullis
 dragonborn.esm|024C21|NorPortcullisLarge01
-dragonborn.esm|01AD3D|NorHallExSmPortcullis01
-dragonborn.esm|01ABAB|NorHallExSmPortcullis01
-dragonborn.esm|01ABAA|NorHallExSmPortcullis01
-dragonborn.esm|02683A|NorHallExSmPortcullis01
+# dragonborn.esm|01AD3D|NorHallExSmPortcullis01   <- 20 Oct: floor restored, the hall piece has no bars; Nat via the Local Leader; DLE child DragonBreak Map Fixes.esp
+# dragonborn.esm|01ABAB|NorHallExSmPortcullis01   <- 20 Oct: floor restored, the hall piece has no bars; Nat via the Local Leader; DLE child DragonBreak Map Fixes.esp
+# dragonborn.esm|01ABAA|NorHallExSmPortcullis01   <- 20 Oct: floor restored, the hall piece has no bars; Nat via the Local Leader; DLE child DragonBreak Map Fixes.esp
+# dragonborn.esm|02683A|NorHallExSmPortcullis01   <- 20 Oct: floor restored, the hall piece has no bars; Nat via the Local Leader; DLE child DragonBreak Map Fixes.esp
 dragonborn.esm|0292E7|PortGatePoleDwemer
 dragonborn.esm|0292E6|PortGatePoleDwemer
 dragonborn.esm|0292E5|PortGatePoleDwemer
