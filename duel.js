@@ -64,6 +64,8 @@ module.exports = (api) => {
     { id: 'nomagic', label: 'no magic', magic: false, potions: true },
     { id: 'nopotions', label: 'no potions', magic: true, potions: false },
     { id: 'both', label: 'no magic, no potions', magic: false, potions: false },
+    // Beast forms may be taken mid-fight (Purr, 20 Oct: a werewolf duel lost the round on the turn); both still start in their own form
+    { id: 'beasts', label: 'anything goes, beast forms too', magic: true, potions: true, beasts: true },
   ];
   const TYPES = {
     practice: { label: 'Practice fight', winner: false, wager: false },
@@ -691,7 +693,7 @@ module.exports = (api) => {
         continue;
       }
       if (d.phase === 'deathblow') continue;
-      if ([d.a, d.b].some((x) => beast(x))) { const x = beast(d.a) ? d.a : d.b; if (d.phase !== 'pause') roundLost(d, x, 'took a beast form'); }
+      if (!(RULES[d.rules] || {}).beasts && [d.a, d.b].some((x) => beast(x))) { const x = beast(d.a) ? d.a : d.b; if (d.phase !== 'pause') roundLost(d, x, 'took a beast form'); }
       if (d.phase === 'countdown' && now >= d.until) {
         d.phase = 'fight';
         for (const x of [d.a, d.b]) banner(x, 'Fight!', 2);
