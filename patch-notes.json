@@ -1,5 +1,20 @@
 [
   {
+    "title": "Duels: beast forms allowed",
+    "date": "2026-10-20",
+    "version": "Server update",
+    "tag": "Change",
+    "sections": [
+      {
+        "heading": "Duels",
+        "items": [
+          "A new duel rule, \"anything goes, beast forms too\": pick it in the challenge panel and either fighter may take a werewolf or vampire lord form mid-duel without losing the round. Both fighters still start in their own form.",
+          "Under every other rule, taking a beast form still loses the round, as before."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Dungeon traps are live",
     "date": "2026-10-20",
     "version": "Hotfix",
