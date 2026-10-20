@@ -1,5 +1,20 @@
 [
   {
+    "title": "Duels",
+    "date": "2026-10-20",
+    "version": "Server update",
+    "tag": "New",
+    "sections": [
+      {
+        "heading": "Settle it with steel",
+        "items": [
+          "Challenge another player to a duel from the X menu: one round, best of three or best of five, with your own rules and an optional wager of up to 5,000 gold, held until the duel is decided.",
+          "A beaten duellist kneels rather than dies, and both are healed when it ends. Stepping out of the circle, or logging out, forfeits. A wager left by a restart is returned."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Silver tests",
     "date": "2026-10-20",
     "version": "Server update",
