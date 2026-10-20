@@ -306,7 +306,8 @@ module.exports = (api) => {
 
   // ---- damage -------------------------------------------------------------------------------------------------------
   const resists = (src) => { try { return sourceResistsOf(src >>> 0) || new Set(); } catch (e) { return new Set(); } };
-  const isMagicSource = (src) => { const r = recordOf(src >>> 0); return !!r && ['SPEL', 'ENCH', 'SCRL'].includes(String(r.record.type)); };
+  // MGEF: one effect of a player-made enchantment (gearench.js)
+  const isMagicSource = (src) => { const r = recordOf(src >>> 0); return !!r && ['SPEL', 'ENCH', 'SCRL', 'MGEF'].includes(String(r.record.type)); };
   const hands = (src) => { try { return weaponHandsOf(src >>> 0) || ''; } catch (e) { return ''; } };
   // The attacker's gift: above 1 hits harder. dmg is the engine's damage, for nothing but a guard against 0.
   const attackMult = (agg, tgt, src, dmg) => {

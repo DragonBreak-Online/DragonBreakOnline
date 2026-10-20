@@ -6324,6 +6324,7 @@ const hitDamageHook = (aggressorId, targetId, sourceId, damage, ...rest) => {
   try { if (globalThis.__dboCompanionHitLanded) globalThis.__dboCompanionHitLanded(agg, tgt); } catch (e) { log('companion hit log failed', e.message); }
   try { if (globalThis.__dboNpcMoodHit) globalThis.__dboNpcMoodHit(agg, tgt, Number(sourceId) >>> 0); } catch (e) { log('npc mood hit failed', e.message); }
   try { if (globalThis.__dboSpellDotLanded) globalThis.__dboSpellDotLanded(agg, tgt, Number(sourceId) >>> 0); } catch (e) { log('spell dot failed', e.message); }
+  try { if (gearEnch) gearEnch.landed(agg, tgt, Number(sourceId) >>> 0, dealt); } catch (e) { log('gear enchantment landed failed', e.message); }
   const prev = globalThis.__dboPrevHitDamage;
   if (prev) { try { return prev(aggressorId, targetId, sourceId, dealt, ...rest); } catch (e) { log('hit damage chain failed', e.message); } }
   return undefined;
@@ -6888,6 +6889,9 @@ const sourceResistsOf = (sourceId) => {
   if (sourceResistCache.has(sourceId)) return sourceResistCache.get(sourceId);
   const out = new Set();
   const r = recordOf(sourceId);
+  // A magic effect is its own source for a player-made enchantment's effects (gearench.js)
+  const ownData = r && String(r.record.type) === 'MGEF' && (r.record.fields || []).find((x) => x && x.type === 'DATA' && x.data instanceof Uint8Array && x.data.byteLength >= 20);
+  if (ownData) out.add(new DataView(ownData.data.buffer, ownData.data.byteOffset, ownData.data.byteLength).getInt32(16, true));
   if (r && ['SPEL', 'ENCH', 'SCRL'].includes(String(r.record.type))) {
     for (const f of r.record.fields || []) {
       if (!f || f.type !== 'EFID' || !(f.data instanceof Uint8Array) || f.data.byteLength < 4) continue;
@@ -6998,6 +7002,8 @@ const arcaneDamageMult = (aggressorId, sourceId) => {
   const bonus = Number((ARCANE_DMG.byTier || [])[rank]) || 0;
   return bonus > 0 ? 1 + bonus : 1;
 };
+// gearench.js, loaded after racial.js below; the hit judge reads it at hit time
+let gearEnch = null;
 // Worn Fortify One-handed, Two-handed and Archery (Nate, 18 Oct: an enchanted hood that "never worked"; "tone down
 // enchantments so they're not too op"): vanilla raises OneHanded/TwoHanded/MarksmanModifier (AV 96/97/98) by a percent the
 // server never read. Each point adds perPoint (half of vanilla's 1%), all worn gear together at most cap, players only.
@@ -7238,6 +7244,13 @@ try {
   delete require.cache[RACIAL_JS];
   racial = require(RACIAL_JS)({ mp, log, personal, giveItem, profileOf, display, recordOf, every, onlineActors, weaponHandsOf, sourceResistsOf, gmstFloat, cfg, sendPacket, hasUiCap });
 } catch (e) { log('racial.js failed to load:', e.stack || e.message); racial = null; globalThis.__dboRaceGold = null; globalThis.__dboRaceOf = null; }
+// ---- enchantments the server judges: weapon hits, worn resistances and fortifies (server\gearench.js, config "gearEnchantments")
+try {
+  const GEARENCH_JS = path.resolve('gearench.js');
+  delete require.cache[GEARENCH_JS];
+  gearEnch = require(GEARENCH_JS)({ mp, log, recordOf, profileOf, display, personal, sendPacket, sourceResistsOf, weaponHandsOf, racial, cfg,
+    potionResistMult: (t, s) => potionResistMult(t, s), blessingTargetMult: (t, s) => blessingTargetMult(t, s), takenMult: (t, f) => potionTakenMult(t, f) });
+} catch (e) { log('gearench.js failed to load:', e.stack || e.message); gearEnch = null; globalThis.__dboGearBonus = null; globalThis.__dboGearRegen = null; }
 // ---- how tough a family of creatures is against players, by race (server\npctoughness.js, config "npcToughness") ----
 let toughness = null;
 try {
@@ -7649,6 +7662,8 @@ const potionPoisonHit = (agg, tgt, src, dmg, flags) => {
   const r = recordOf(src); if (!r || String(r.record.type) !== 'WEAP') return;
   try { globalThis.__dboPoisonHit(agg, tgt, src, flags); } catch (e) { log('poison hit failed', e.message); }
 };
+// An enchanted weapon's effects on a landed blow (gearench.js weaponAttempt); never fails the hit
+const gearWeaponHit = (agg, tgt, src, dmg, flags) => { try { if (gearEnch && dmg > 0) gearEnch.weaponAttempt(agg, tgt, src, dmg, flags); } catch (e) { log('gear enchantment failed', e.message); } };
 const hitDamageAttemptHook =(aggressorId, targetId, sourceId, damage, flags) => {
   const agg = Number(aggressorId) >>> 0;
   const tgt = Number(targetId) >>> 0;
@@ -7782,6 +7797,7 @@ const hitDamageAttemptHook =(aggressorId, targetId, sourceId, damage, flags) => 
     if (guard) {
       if (guard.rest < 1) globalThis.__dboMasteryPending = { agg, tgt, mult: guard.rest, health: guard.health };
       potionPoisonHit(agg, tgt, src, dmg, flags);
+      gearWeaponHit(agg, tgt, src, dmg, flags);
       return true;
     }
     // The health before anything below changes it: the give-back measures the hit from here
@@ -7799,6 +7815,7 @@ const hitDamageAttemptHook =(aggressorId, targetId, sourceId, damage, flags) => 
       if (before && before.health > 0) globalThis.__dboMasteryPending = { agg, tgt, mult, health: before.health };
     }
     potionPoisonHit(agg, tgt, src, dmg, flags);
+    gearWeaponHit(agg, tgt, src, dmg, flags);
   } catch (e) { /* not an actor */ }
   return true;
 };
