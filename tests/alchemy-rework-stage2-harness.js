@@ -318,7 +318,8 @@ const ticks = (n) => { for (let i = 0; i < n; i++) globalThis.__dboAlchemyRunTic
   check('a self-cast Restoration heal gets the Fortify Restoration share (castHook)', /potionRestorationCast\(Number\(casterId\) >>> 0, Number\(spellId\) >>> 0\)/.test(GM) && /spellSchoolOf\(spellId >>> 0\) !== 22/.test(GM));
   check('both landing paths of the hit judge hand weapon blows to the poison judge', (GM.match(/potionPoisonHit\(agg, tgt, src, dmg, flags\);/g) || []).length === 2);
   check('a failed alchemy.js load clears the new hooks', /alchemy\.js failed to load[^\n]*__dboPotionBonus = null; globalThis\.__dboPotionLockpickTiers = null; globalThis\.__dboPoisonHit = null;/.test(GM));
-  check('combat.js: Fortify Defence lets less through a block', /const through = raw \* share \* \(broken \? 1 : 1 - blockPotion\);/.test(fs.readFileSync('combat.js', 'utf8')));
+  // with worn Fortify Block beside it since 20 Oct (gearench.js), together at most all of the blow
+  check('combat.js: Fortify Defence lets less through a block', /const through = raw \* share \* \(broken \? 1 : 1 - Math\.min\(1, blockPotion \+ blockGear\)\);/.test(fs.readFileSync('combat.js', 'utf8')));
   check('lockpick.js: a Lockpicking potion counts as ranks, up to Master', /__dboPotionLockpickTiers[\s\S]{0,200}Math\.min\(4, own \+ extra\)/.test(fs.readFileSync('lockpick.js', 'utf8')));
 
   // ---- craft XP by value (skillrates.js) ----
