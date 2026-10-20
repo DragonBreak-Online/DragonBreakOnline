@@ -1442,7 +1442,7 @@ export class HousingSystem implements System {
     const out: Array<{ hold: string; rank: string }> = [];
     const profileId = this.profileOf(ctx, actorId);
     for (const z of this.zones.all) {
-      const rank = this.zones.rankOf(profileId, z.id);
+      const rank = this.zones.rankOf(profileId, z.id, actorId);
       if (rank) out.push({ hold: z.id, rank });
     }
     try {

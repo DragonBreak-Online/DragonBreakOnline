@@ -30,6 +30,7 @@ export interface Zone {
 
 const ZONES_FILE = "zones.json";
 const OFFICIALS_FILE = "officials.json";
+const SEATS_FILE = "officials-seats.json";
 const TAMRIEL_DESCS = ["3c:skyrim.esm"];
 // City worldspaces share Tamriel's coordinate frame, so a board in WhiterunWorld resolves like one outside the walls.
 const CITY_WORLD_DESCS = ["1a26f:skyrim.esm", "1691d:skyrim.esm", "16bb4:skyrim.esm", "16d71:skyrim.esm", "37edf:skyrim.esm"];
@@ -155,12 +156,33 @@ export class Zones {
     return this.officialsCache;
   }
 
-  // The rank a profile holds in a zone ("jarl", "steward", ...), or null.
-  rankOf(profileId: number, zoneId: string): string | null {
+  // officials-seats.json (the gamemode writes it): which character holds an account's seat, { zone: { rank: { profileId: actorId } } }.
+  // A seat with no character recorded is the account's, as before.
+  private seats(): Record<string, Record<string, Record<string, number>>> {
+    if (!this.officialsPath) return {};
+    const p = path.join(path.dirname(this.officialsPath), SEATS_FILE);
+    let mtime = 0;
+    try { mtime = fs.statSync(p).mtimeMs; } catch { this.seatsCache = {}; this.seatsMtime = -1; return this.seatsCache; }
+    if (mtime === this.seatsMtime) return this.seatsCache;
+    this.seatsMtime = mtime;
+    try { const raw = JSON.parse(fs.readFileSync(p, "utf8")); this.seatsCache = raw && typeof raw === "object" ? raw : {}; }
+    catch (e) { this.log(`[zones] ${SEATS_FILE} unreadable: ${e}`); this.seatsCache = {}; }
+    return this.seatsCache;
+  }
+
+  // The rank a profile holds in a zone ("jarl", "steward", ...), or null. With actorId, only a seat that character holds
+  // (Nate, 19 Oct: an account's other characters do not hold its office).
+  rankOf(profileId: number, zoneId: string, actorId?: number): string | null {
     const z = this.byId(zoneId);
     if (!z || !Number.isFinite(profileId) || profileId < 0) return null;
     const table = this.officials()[zoneId] || {};
-    for (const rank of z.officials) if ((table[rank] || []).indexOf(profileId) !== -1) return rank;
+    const bound = actorId ? (this.seats()[zoneId] || {}) : {};
+    for (const rank of z.officials) {
+      if ((table[rank] || []).indexOf(profileId) === -1) continue;
+      const held = Number((bound[rank] || {})[String(profileId)]) >>> 0;
+      if (actorId && held && held !== (actorId >>> 0)) continue;
+      return rank;
+    }
     return null;
   }
 
@@ -172,6 +194,8 @@ export class Zones {
   private officialsPath = "";
   private officialsMtime = -1;
   private officialsCache: Record<string, Record<string, number[]>> = {};
+  private seatsMtime = -1;
+  private seatsCache: Record<string, Record<string, Record<string, number>>> = {};
 }
 
 let shared: Zones | null = null;
