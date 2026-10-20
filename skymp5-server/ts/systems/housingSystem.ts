@@ -2147,12 +2147,13 @@ export class HousingSystem implements System {
 
   // Resolve any half of a pair (or a plain ref) to the id the record lives on.
   private primaryOf(ctx: SystemContext, refrId: number): number {
-    if (!refrId) return 0;
+    if (!refrId || this.gone.has(refrId)) return 0;
     const mp = ctx.svr as Mp;
     let raw: any = null;
     try {
       raw = mp.get(refrId, HOUSING_PROP);
     } catch (e) {
+      this.rememberGone(refrId, e);
       this.logUnclaimable(refrId, e);
       return 0;
     }
@@ -2180,10 +2181,12 @@ export class HousingSystem implements System {
   }
 
   private loadable(ctx: SystemContext, refrId: number): boolean {
+    if (this.gone.has(refrId)) return false;
     try {
       (ctx.svr as Mp).get(refrId, HOUSING_PROP);
       return true;
-    } catch {
+    } catch (e) {
+      this.rememberGone(refrId, e);
       return false;
     }
   }
@@ -2227,15 +2230,30 @@ export class HousingSystem implements System {
 
   // A reference a plugin update deleted throws "doesn't exist"; a record not yet loaded after boot reads as null instead
   private formGone(ctx: SystemContext, refrId: number): boolean {
+    if (this.gone.has(refrId)) return true;
     try {
       (ctx.svr as Mp).get(refrId, HOUSING_PROP);
       return false;
     } catch (e) {
-      return /doesn't exist/.test(String((e as Error)?.message ?? e));
+      return this.rememberGone(refrId, e);
     }
   }
 
+  // Every read of a claim on a deleted reference throws, and the C++ side logs the exception each time it is asked, not
+  // once per reference: a single stale claim (d9643:BSHeartland, a door DragonBreak Online Edits deletes) made about
+  // 43,000 error lines on 20 Oct, roughly four fifths of the day's. The first "doesn't exist" is remembered so the
+  // reference is never read again while the process lives. Only that message is remembered: a record not yet loaded
+  // after boot reads as null without throwing, and any other failure may pass, so neither is written off. The plugins
+  // cannot change under a running server, so there is nothing to invalidate.
+  private rememberGone(refrId: number, reason: unknown): boolean {
+    if (!/doesn't exist/.test(String((reason as Error)?.message ?? reason))) return false;
+    if (this.gone.size >= MAX_ESPM_CACHE) this.gone.clear();
+    this.gone.add(refrId);
+    return true;
+  }
+
   private read(ctx: SystemContext, primary: number): PropertyRecord | null {
+    if (this.gone.has(primary)) return null;
     try {
       const raw = (ctx.svr as Mp).get(primary, HOUSING_PROP);
       if (!raw || typeof raw !== "object" || Number((raw as any).primary)) return null;
@@ -2259,7 +2277,8 @@ export class HousingSystem implements System {
         ...(Number(r.keyBase) ? { keyBase: Number(r.keyBase) >>> 0 } : {}),
         ...(r.holders && typeof r.holders === "object" ? { holders: r.holders } : {}),
       };
-    } catch {
+    } catch (e) {
+      this.rememberGone(primary, e);
       return null;
     }
   }
@@ -2989,6 +3008,8 @@ export class HousingSystem implements System {
   private partnerCache = new Map<number, number>();
   private baseTypeCache = new Map<number, string>();
   private unclaimableLogged = new Set<number>();
+  // References the server cannot load at all (a plugin update deleted them), so they are never read twice
+  private gone = new Set<number>();
   private lastRequestMs = new Map<number, number>();
   private lastDenyMs = new Map<number, number>();
   private keyRing = false;
