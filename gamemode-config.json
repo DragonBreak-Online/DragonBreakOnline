@@ -1725,5 +1725,9 @@
  "staffEnchant": {
   "_comment": "Staff enchanting for events (staffenchant.js): /enchant and the F7 admin panel's Enchant tab put any weapon or apparel enchantment of the load order on one unworn piece, as a player-made enchantment (never disenchantable). minTier: the lowest staff tier allowed (gm, leadgm, developer, senior; Lead GM by default, as the panel's other item grants). maxScale: the strongest allowed, as a multiple of the enchantment's own main effect. weaponCharge: a weapon's full charge (3000 is a grand soul gem).",
   "enabled": true, "minTier": "leadgm", "maxScale": 3, "weaponCharge": 3000
+ },
+ "traps": {
+  "_comment": "Dungeon traps run by the server (traps.js, traps.json). only: all = anyone sets them off; staff = staff only (testing). Nate 20 Oct: on for everyone. ROLLBACK: only staff, hot reload.",
+  "only": "all"
  }
 }

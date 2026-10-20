@@ -1,5 +1,21 @@
 [
   {
+    "title": "Dungeon traps are live",
+    "date": "2026-10-20",
+    "version": "Hotfix",
+    "tag": "New",
+    "sections": [
+      {
+        "heading": "Dungeons",
+        "items": [
+          "Pressure plates and tripwires in dungeons now set off their traps: swinging walls, swinging blades, spears and battering rams, across more than 90 dungeons. Watch where you step.",
+          "Traps hurt by the dungeon's own numbers, more for higher-level characters, and can put you down. Everyone nearby sees them fire.",
+          "Dart traps and flame jets stay quiet for now."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Enchantments that work",
     "date": "2026-10-20",
     "version": "Server update",
