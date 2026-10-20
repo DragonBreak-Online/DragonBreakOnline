@@ -590,12 +590,13 @@ module.exports = (api) => {
 
   globalThis.__dboGearBonus = bonus;
   globalThis.__dboGearRegen = regenOf;
-  // A player's paralysis from gamemode.js's own paths (scrolls, runes, staves): capped and then immune, as above
-  const playerParalysis = (tgt, seconds) => {
+  // A player's paralysis from gamemode.js's own paths (scrolls, runes, staves), then immune as above
+  // capped: a weapon's or staff's (pvpParalysisMaxSeconds); a scroll or rune keeps its time but sets and obeys the window
+  const playerParalysis = (tgt, seconds, capped = true) => {
     if (!isPlayer(tgt) || !(seconds > 0)) return seconds;
     const now = Date.now();
     if (downed(tgt) || (IMMUNE.get(tgt) || 0) > now) return 0;
-    const sec = Math.min(seconds, Math.max(0, num(PVP.pvpParalysisMaxSeconds, 2)));
+    const sec = capped ? Math.min(seconds, Math.max(0, num(PVP.pvpParalysisMaxSeconds, 2))) : seconds;
     if (sec > 0) IMMUNE.set(tgt, now + (sec + Math.max(0, num(PVP.pvpParalysisImmuneSeconds, 15))) * 1000);
     return sec;
   };

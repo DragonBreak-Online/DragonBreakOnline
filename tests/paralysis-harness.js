@@ -41,6 +41,8 @@ add(HARM_SCROLL, 'SCRL', 'ScrollHarmParalyze', [...effect(MGEF_PARALYSIS, 6), ..
 add(PARALYZE, 'SPEL', 'Paralyze', effect(MGEF_PARALYSIS, 10));
 add(RUNE, 'SPEL', 'AshRune', effect(MGEF_RUNE, 0));
 add(FIREBOLT, 'SPEL', 'Firebolt', effect(MGEF_DAMAGE, 1));
+const STAFF = 0x205;
+add(STAFF, 'ENCH', 'StaffEnchParalyze', effect(MGEF_PARALYSIS, 10));
 
 const CASTER = 0x14, VICTIM = 0x15, OTHER = 0x16, NPC = 0xff000123;
 const props = new Map();
@@ -57,6 +59,7 @@ const stubs = {
   log: () => {}, display: (a) => `P${a.toString(16)}`,
   profileOf: (a) => (a === NPC ? -1 : 1),
   combat: { onSpellHit: (a, t, s) => staggers.push({ a, t, s }) },
+  cfg: {}, gearEnch: null,
 };
 const load = () => {
   mp.onSpellHit = undefined;
@@ -133,6 +136,21 @@ const cfg = JSON.parse(fs.readFileSync(path.join(SERVER, 'gamemode-config.json')
 const stagger = ((cfg.combat || {}).staggerSpells) || [];
 const push = ((cfg.combat || {}).pushSpells) || {};
 check('combat.pushSpells pushes with the Force Rune spell and its scroll alike, and staggerSpells holds neither', push.CYRForceRune === 10 && push.CYRForceRuneScroll === 10 && !stagger.includes('CYRForceRune') && !stagger.includes('CYRForceRuneScroll'), JSON.stringify({ stagger, push }));
+
+// A staff's paralysis (ENCH) on a player, through gearench.js's PvP cap (enchantment audit, 20 Oct)
+reset();
+const capped = [];
+stubs.gearEnch = { playerParalysis: (t, sec, cap) => { capped.push(cap); return cap ? Math.min(sec, 2) : sec; }, staffSpellHit: () => null };
+load();
+got = hit(STAFF);
+check('a Paralyze staff on a player holds pvpParalysisMaxSeconds 2 (it was never applied before)', got.length === 1 && got[0].seconds === 2 && capped[0] === true, JSON.stringify(got));
+reset(); capped.length = 0;
+got = hit(SCROLL);
+check('...a scroll passes the window uncapped (10 s)', got.length === 1 && got[0].seconds === 10 && capped[0] === false, JSON.stringify(got));
+reset();
+check('...an NPC target is the fork\'s: no packet, no server hold until staffRiders.npcServerHold', hit(STAFF, CASTER, NPC).length === 0 && !globalThis.__dboParalysedUntil.has(NPC));
+stubs.gearEnch = null;
+load();
 
 console.log(failures ? `${failures} failure(s)` : 'all passed');
 process.exit(failures ? 1 : 0);
