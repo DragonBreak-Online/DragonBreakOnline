@@ -74,6 +74,7 @@ const load = () => { for (const k of Object.keys(ui)) delete ui[k]; return requi
 const choose = (a, id) => (ui.salvageChoose || []).forEach((f) => f(a, [id]));
 // A list row opens the item's page; Break down one is the second click
 const breakOne = (a, baseId) => { choose(a, `b:${baseId}`); choose(a, `x1:${baseId}`); };
+const breakOneEnchanted = (a, baseId) => { choose(a, `be:${baseId}`); choose(a, `x1e:${baseId}`); };
 const lastWidget = (a) => { for (let i = widgets.length - 1; i >= 0; i--) if (widgets[i][0] === a) return widgets[i][1]; return undefined; };
 const act = (t, a) => globalThis.__dboSalvageActivate(t, a);
 
@@ -116,14 +117,30 @@ reset(); S = load();
 INV[PLAYER] = [{ baseId: SWORD, count: 1, health: 1.1 }, { baseId: DAEDRIC, count: 1, name: 'Oathkeeper' }, { baseId: SWORD, count: 2, poisonId: 0x73f34, poisonCount: 1 }, { baseId: SWORD, count: 1, health: 1 }];
 act(SMELTER, PLAYER); w = lastWidget(PLAYER);
 ok(!w.actions.some((x) => /Daedric/.test(x.label)) && w.actions.filter((x) => x.id.startsWith('b:')).length === 1, 'tempered, named and poisoned copies are never offered; health exactly 1 is plain');
-// A player-made enchantment stored only as its effects (armour has no charge or id): never offered or taken
+// A player-made enchantment stored only as its effects (armour has no charge or id) is the one piece of extra data the
+// station takes along with the item: its own row, the plain materials, and the enchantment lost (craigieg, #suggestions
+// 19 Oct). An item enchanted by its own record (EITM) and one carrying a charge are still never offered (above).
+const ENCH = { effectId: 0x3eb15, magnitude: 20, area: 0, duration: 0, cost: 30 };
 reset(); S = load();
-INV[PLAYER] = [{ baseId: SWORD, count: 1, enchantmentEffects: [{ effectId: 0x3eb15, magnitude: 20, area: 0, duration: 0, cost: 30 }] }];
-ok(act(SMELTER, PLAYER) === false, 'a copy enchanted only by its effects is not plain: nothing to break down, the smelter just works');
+INV[PLAYER] = [{ baseId: SWORD, count: 1, enchantmentEffects: [ENCH] }];
+ok(act(SMELTER, PLAYER) !== false, 'a copy enchanted only by its effects can be broken down');
+w = lastWidget(PLAYER);
+ok(w.actions.some((x) => x.id === `be:${SWORD}` && /\(enchanted\)/.test(x.label)), 'it is offered as its own enchanted row', w.actions.map((x) => x.id));
+choose(PLAYER, `be:${SWORD}`);
+ok(/enchantment is lost with it/.test(lastWidget(PLAYER).targetName), 'the page says the enchantment is lost', lastWidget(PLAYER).targetName);
+choose(PLAYER, `x1e:${SWORD}`);
+ok(!INV[PLAYER].some((e) => e.baseId === SWORD) && count(PLAYER, IRON) === 1, 'breaking it down gives the plain materials and takes the item', INV[PLAYER]);
 reset(); S = load();
-INV[PLAYER] = [{ baseId: SWORD, count: 1, enchantmentEffects: [{ effectId: 0x3eb15, magnitude: 20, area: 0, duration: 0, cost: 30 }] }, { baseId: SWORD, count: 1 }];
+INV[PLAYER] = [{ baseId: SWORD, count: 1, enchantmentEffects: [ENCH] }, { baseId: SWORD, count: 1 }];
 act(SMELTER, PLAYER); breakOne(PLAYER, SWORD);
-ok(INV[PLAYER].filter((e) => e.baseId === SWORD).length === 1 && INV[PLAYER].find((e) => e.baseId === SWORD).enchantmentEffects && count(PLAYER, IRON) === 1, '...beside a plain one, only the plain one is taken', INV[PLAYER]);
+ok(INV[PLAYER].filter((e) => e.baseId === SWORD).length === 1 && INV[PLAYER].find((e) => e.baseId === SWORD).enchantmentEffects && count(PLAYER, IRON) === 1, 'beside a plain one, the plain row takes only the plain one', INV[PLAYER]);
+breakOneEnchanted(PLAYER, SWORD);
+ok(!INV[PLAYER].some((e) => e.baseId === SWORD) && count(PLAYER, IRON) === 2, '...and the enchanted row then takes the enchanted one', INV[PLAYER]);
+reset(); S = load();
+INV[PLAYER] = [{ baseId: SWORD, count: 1, enchantmentEffects: [ENCH] }, { baseId: SWORD, count: 1, enchantmentEffects: [ENCH], health: 1.3 }];
+act(SMELTER, PLAYER);
+ok(lastWidget(PLAYER).actions.filter((x) => x.id.startsWith('be:')).length === 1
+  && !lastWidget(PLAYER).actions.some((x) => x.id === `b:${SWORD}`), 'an enchanted copy that is also tempered is left out, as a tempered one is', lastWidget(PLAYER).actions.map((x) => x.label));
 reset(); S = load();
 INV[PLAYER] = [{ baseId: SWORD, count: 1, health: 1.1 }];
 ok(act(SMELTER, PLAYER) === false, 'only a tempered sword: nothing to break down, the smelter just works');
