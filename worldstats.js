@@ -33,14 +33,18 @@ module.exports = (api) => {
     } catch (e) { return 0; }
   };
   // A record lookup copies every subrecord (a RACE has 1,300-4,000), and race editor ids never change while the process runs
-  const RACE_NAMES = globalThis.__dboRaceNames instanceof Map ? globalThis.__dboRaceNames : (globalThis.__dboRaceNames = new Map());
+  // v2 (20 Oct, names without DBO): a new key so a hot reload drops the names the old code cached, and the offline rows with them
+  const RACE_NAMES = globalThis.__dboRaceNamesV2 instanceof Map ? globalThis.__dboRaceNamesV2 : (globalThis.__dboRaceNamesV2 = new Map());
+  if (globalThis.__dboRaceNames instanceof Map) { delete globalThis.__dboRaceNames; ST.offline = new Map(); }
   const raceName = (raceId) => {
     const id = Number(raceId) >>> 0;
     if (RACE_NAMES.has(id)) return RACE_NAMES.get(id);
     let name = 'Unknown';
     try {
       const rec = mp.lookupEspmRecordById(id); const edid = rec && rec.record && rec.record.editorId;
-      if (edid) name = String(edid).replace(/Race(Vampire)?$/, '').replace(/([a-z])([A-Z])/g, '$1 $2');
+      // DragonBreak's own races drop their DBO prefix; the goblin colours count as one Goblin (Nate 20 Oct)
+      if (edid) name = String(edid).replace(/Race(Vampire)?$/, '').replace(/^DBO/, '').replace(/^Goblin\w+$/, 'Goblin')
+        .replace(/^HalfGiant$/, 'Half-Giant').replace(/([a-z])([A-Z])/g, '$1 $2');
     } catch (e) { /* unknown race */ }
     RACE_NAMES.set(id, name);
     return name;
@@ -144,7 +148,8 @@ module.exports = (api) => {
       gold: { total: carried + stored + banked + held, carried, stored: stored + banked + held, banked, held },
       ids: [...ST.chars], peak: ST.peak,
       clock: (() => { try { return globalThis.__dboClock ? globalThis.__dboClock.summary() : null; } catch (e) { return null; } })(),
-      races: [...races.entries()].map(([race, count]) => ({ race, count })).sort((x, y) => y.count - x.count || x.race.localeCompare(y.race)),
+      // A character never finished in the creator has no appearance and no race: counted above, not listed as a race
+      races: [...races.entries()].filter(([race]) => race !== 'Unknown').map(([race, count]) => ({ race, count })).sort((x, y) => y.count - x.count || x.race.localeCompare(y.race)),
     };
   };
 

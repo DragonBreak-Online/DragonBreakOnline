@@ -28,6 +28,22 @@ module.exports = (api) => {
       winterhold: [20, 25, 0, 55], dawnstar: [25, 25, 5, 45], windhelm: [30, 30, 10, 30],
       markarth: [45, 30, 20, 5], falkreath: [30, 35, 30, 5], riften: [40, 30, 25, 5],
     },
+    // The exact weathers of each kind, by family (Nate, 17 Oct: "we just need to sync everything"): the server picks one and
+    // every client applies that one, never one of its own from the region (the Whiterun region lists no rain by chance, so
+    // a rain weather could stay on there for good). Families follow each hold's Obsidian Weathers region (Skyrim.esm ids):
+    // [clear, cloudy, rain, snow]
+    families: {
+      base: [['81a', '10e1f2'], ['12f89', '10e1f1', 'c821e'], ['c821f', 'c8220'], ['4d7fb', 'c8221']],
+      tundra: [['10a240', '10e1ee'], ['10a243', '10e1ed'], ['10a242', '10a241'], ['4d7fb']],
+      forest: [['10a23b', '10e1ec'], ['10a23f', '10e1eb', '10a23e'], ['10a23d', '10a23c'], ['4d7fb']],
+      reach: [['10a237', '10e1ea'], ['10a23a', '10e1e9', '10a239'], ['10a238'], ['4d7fb']],
+      snow: [['10a244', '10e1f0'], ['10a245', '10e1ef'], ['c821f'], ['4d7fb', 'c8221']],
+      marsh: [['10a230', '10e1e6'], ['10a233', '10e1e5', '10a232'], ['10a231'], ['4d7fb']],
+    },
+    weatherPlugin: 'Skyrim.esm',
+    // Each zone's family; a zone listed here keeps its own weather (the rest share default's)
+    zoneFamily: { default: 'base', whiterun: 'tundra', riften: 'forest', falkreath: 'forest', markarth: 'reach', solitude: 'base',
+      morthal: 'marsh', windhelm: 'snow', winterhold: 'snow', dawnstar: 'snow', bruma: 'snow' },
   }, cfg.worldClock || {});
   const STATE_PATH = path.resolve('worldclock.json');
   const START_HOUR = 8;
@@ -67,18 +83,35 @@ module.exports = (api) => {
   // ---- weather -------------------------------------------------------------------------------------
   const KINDS = ['clear', 'cloudy', 'rain', 'snow'];
   const pick = (weights) => { const w = Array.isArray(weights) && weights.length === 4 ? weights : C.weather.default; const total = w.reduce((n, x) => n + x, 0) || 1; let r = Math.random() * total; for (let i = 0; i < 4; i++) { r -= w[i]; if (r < 0) return i; } return 0; };
-  const weatherOf = (zone) => {
-    const key = zone && C.weather[zone] ? zone : 'default';
+  const keyOf = (zone) => (zone && (C.weather[zone] || (C.zoneFamily || {})[zone]) ? zone : 'default');
+  // One exact weather of the kind from the zone's family ("hex:Plugin"), falling back as the client did (clear->cloudy,
+  // rain->snow->cloudy, snow->rain->cloudy); '' when the family has none
+  const FALLBACK = { 0: [0, 1], 1: [1, 0], 2: [2, 3, 1], 3: [3, 2, 1] };
+  const idFor = (key, kind) => {
+    const fam = (C.families || {})[(C.zoneFamily || {})[key] || (C.zoneFamily || {}).default];
+    if (!Array.isArray(fam)) return '';
+    for (const k of FALLBACK[kind] || [kind]) {
+      const list = fam[k];
+      if (Array.isArray(list) && list.length) return `${list[Math.floor(Math.random() * list.length)]}:${C.weatherPlugin || 'Skyrim.esm'}`;
+    }
+    return '';
+  };
+  const stateOf = (zone) => {
+    const key = keyOf(zone);
     const now = gameDays();
     let w = ST.weather[key];
     if (!w || now >= w.untilDays) {
       const [lo, hi] = C.weatherHours;
-      w = ST.weather[key] = { kind: pick(C.weather[key]), untilDays: now + (lo + Math.random() * (hi - lo)) / 24, forced: false };
+      const kind = pick(C.weather[key]);
+      w = ST.weather[key] = { kind, id: idFor(key, kind), untilDays: now + (lo + Math.random() * (hi - lo)) / 24, forced: false };
       save();
-    }
-    return w.kind;
+    } else if (!w.id) { w.id = idFor(key, w.kind); save(); }
+    return w;
   };
-  const weatherFor = (a) => { let z = null; try { z = zoneOfActor(a); } catch (e) { /* default */ } return weatherOf(z); };
+  const weatherOf = (zone) => stateOf(zone).kind;
+  const zoneOf = (a) => { try { return zoneOfActor(a); } catch (e) { return null; } };
+  const weatherFor = (a) => weatherOf(zoneOf(a));
+  const weatherIdFor = (a) => stateOf(zoneOf(a)).id || '';
 
   // A player in character creation is sent the noon nearest now, running at real time; only their packet changes, the
   // world clock and everything read from it server-side (night, the moons, sunlight) do not
@@ -90,7 +123,7 @@ module.exports = (api) => {
     return { gameDays: Math.round(d - h / 24) + h / 24, timeScale: 1 };
   };
   // startYear sets the engine's year (client calendar.ts); the engine derives the weekday and the moons from gameDays itself
-  const packetFor = (a) => Object.assign({ customPacketType: 'dboClock', serverNow: Date.now() }, clockFor(a), { weather: weatherFor(a), startYear: Math.floor(Number(C.startYear)) || 211 });
+  const packetFor = (a) => Object.assign({ customPacketType: 'dboClock', serverNow: Date.now() }, clockFor(a), { weather: weatherFor(a), weatherId: weatherIdFor(a), startYear: Math.floor(Number(C.startYear)) || 211 });
   const broadcast = () => { for (const a of onlineActors()) sendPacket(a, packetFor(a)); };
   every('worldClock', C.broadcastSeconds * 1000, broadcast);
 
@@ -118,8 +151,8 @@ module.exports = (api) => {
     const kind = KINDS.indexOf(String(kindName || '').toLowerCase());
     if (kind < 0) return personal(a, `Usage: /setweather <${KINDS.join('|')}> [game hours]`);
     let z = null; try { z = zoneOfActor(a); } catch (e) { /* default */ }
-    const key = z && C.weather[z] ? z : 'default';
-    ST.weather[key] = { kind, untilDays: gameDays() + (Number(hours) > 0 ? Number(hours) : 3) / 24, forced: true }; save(); broadcast();
+    const key = keyOf(z);
+    ST.weather[key] = { kind, id: idFor(key, kind), untilDays: gameDays() + (Number(hours) > 0 ? Number(hours) : 3) / 24, forced: true }; save(); broadcast();
     audit(`CLOCK ${who(a)} set the ${key} weather to ${KINDS[kind]}`); personal(a, `${KINDS[kind]} over ${key} for ${Number(hours) > 0 ? Number(hours) : 3} game hours.`);
   }, { admin: true, help: '<clear|cloudy|rain|snow> [game hours] weather where you stand' });
 

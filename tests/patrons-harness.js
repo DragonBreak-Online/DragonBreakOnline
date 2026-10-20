@@ -107,5 +107,10 @@ check('...every value is a string', group(14).rows.every((r) => typeof r.label =
 const words = JSON.stringify([group(14), group(7), group(8)]);
 check('...no tier name, price or offer in the text', /patreon|tier|traveler|adventurer|pathfinder|champion|\$|support|subscribe|buy|unlock/i.test(words), false);
 
+// /rerollrefund (19 Oct): a spent reroll given back, online by actor or offline by profile
+commands.get('rerollrefund')(9, 'profile 10');
+check('a refund by profile gives the adventurer theirs back', left(1), 1);
+commands.get('rerollrefund')(9, 'profile 10');
+check('...and a second refund finds nothing spent', /no spent reroll/.test(said[said.length - 1]), true);
 console.log(failures ? `\n${failures} check(s) FAILED` : '\nall checks passed');
 process.exit(failures ? 1 : 0);

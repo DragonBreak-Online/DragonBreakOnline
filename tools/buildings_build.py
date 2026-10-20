@@ -38,6 +38,9 @@ import core
 
 DISABLED, DELETED = 0x800, 0x20
 LARGE = 8
+# Interior load doors the walk does not cross: a secret way between two places that are owned apart (Nate, 19 Oct:
+# Mercer Frey's House came with the Ratway, the Flagon and the Cistern through its passage to Ratway Warrens)
+CUT = {'Skyrim.esm:052A96', 'Skyrim.esm:052A8C'}
 BRUMA = 'BSHeartland.esm:0A764B'
 lo = core.LoadOrder(args.data, args.order)
 if lo.missing_plugins: print("missing plugins:", lo.missing_plugins)
@@ -100,7 +103,7 @@ for c, r in loads.items():
         no_target.append(c); continue
     if t.get("target") != c: one_way.append(c)
     if r["cell"]: find(r["cell"])
-    if r["disabled"] or t["disabled"]: continue
+    if r["disabled"] or t["disabled"] or c in CUT or r["target"] in CUT: continue
     if r["cell"] and t["cell"]: union(r["cell"], t["cell"])
 
 # --- buildings: the components with a way in ---

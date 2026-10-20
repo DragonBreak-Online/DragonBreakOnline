@@ -57,6 +57,10 @@ ui.downedGiveUp(P, ['wrong-nonce']);
 check('a stale Give up does nothing', get(P, 'isDead') === true && !closed.length);
 ui.downedGiveUp(P, [w[1].nonce]);
 check('Give up wakes them at the temple', get(P, 'isDead') === false && JSON.stringify(get(P, 'locationalData')) === JSON.stringify(get(P, 'spawnPoint')));
+// The engine's bleed-out ended after the wake, so nobody stays frozen at the temple (SkaldsChosen, 20 Oct)
+anims.length = 0; pending.splice(0).forEach((f) => f());
+check('after waking, BleedOutStop is sent (the frozen temple wake)', anims.filter(([a, e]) => a === P && e === 'BleedOutStop').length >= 1, anims);
+check('/unstuck can end it too', typeof globalThis.__dboBleedOutStop === 'function');
 check('and closes the panel', closed.some((c) => c[0] === P && c[1] === 62));
 check('and clears the timer near them', JSON.stringify(lastTimers(NEAR)) === '[]');
 

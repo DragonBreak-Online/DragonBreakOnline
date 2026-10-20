@@ -343,6 +343,22 @@ module.exports = (api) => {
   };
   const sectionOf = (id) => { const s = SECTIONS[id]; return s && typeof s === 'object' && typeof s.view === 'function' ? s : null; };
   const call = (f, ...args) => { try { return f(...args); } catch (e) { log('journal: a section failed', e.message); return undefined; } };
+  // Whether one tab shows (falsy, true or { badge }), asking only that tab and the sections it hosts: a check of one tab
+  // never builds the others (17 Oct: the X menu's "does Settings show?" built every tab, the Magic one read a 331-spell
+  // list three times, and each press held the server about 14 s)
+  const tabShows = (a, id, m, who) => {
+    const s = sectionOf(id);
+    if (!s || s.tab || !canDraw(a, id)) return false;
+    // Another's journal shows their character, never their Settings (those belong to their PC, and carry who is near them)
+    if (id === 'settings' && (who >>> 0) !== (a >>> 0)) return false;
+    let vis = typeof s.visible === 'function' ? call(s.visible, who, m) : true;
+    // A section hosted in this tab can show it (a staff view of an empty Faction tab)
+    for (const [xid, x] of Object.entries(SECTIONS)) {
+      if (vis || !x || x.tab !== id || typeof x.visible !== 'function' || !canDraw(a, xid)) continue;
+      vis = call(x.visible, who, m);
+    }
+    return vis;
+  };
   // The tabs this player sees, in ORDER (unknown registered ids before Settings), each with its badge. subject: whose
   // journal it is (a staff member reading another's: the viewer's front decides what can be drawn, the subject what shows)
   const tabsFor = (a, m, subject) => {
@@ -351,17 +367,9 @@ module.exports = (api) => {
     const ids = ORDER.filter((id) => id !== 'settings').concat(Object.keys(SECTIONS).filter((id) => !ORDER.includes(id))).concat(['settings']);
     const out = [];
     for (const id of ids) {
-      const s = sectionOf(id);
-      if (!s || s.tab || !canDraw(a, id)) continue;
-      // Another's journal shows their character, never their Settings (those belong to their PC, and carry who is near them)
-      if (id === 'settings' && (who >>> 0) !== (a >>> 0)) continue;
-      let vis = typeof s.visible === 'function' ? call(s.visible, who, m) : true;
-      // A section hosted in this tab can show it (a staff view of an empty Faction tab)
-      for (const [xid, x] of Object.entries(SECTIONS)) {
-        if (vis || !x || x.tab !== id || typeof x.visible !== 'function' || !canDraw(a, xid)) continue;
-        vis = call(x.visible, who, m);
-      }
+      const vis = tabShows(a, id, m, who);
       if (!vis) continue;
+      const s = sectionOf(id);
       const t = { id, label: String((typeof s.label === 'function' ? call(s.label, who, m) : s.label) || LABELS[id] || id) };
       const badge = vis && typeof vis === 'object' ? Number(vis.badge) || 0 : 0;
       if (badge > 0) t.badge = String(badge);
@@ -437,11 +445,8 @@ module.exports = (api) => {
   // A hub front opens any tab it can draw and the player may see; asked for one it cannot (a tab from a newer package,
   // or Magic without Arcane Arts or Priest), this is false and the caller opens its own panel. An older journal front
   // opens Profile or Faction as before.
-  const tabOk = (a, tab, subject) => {
-    const s = sectionOf(tab);
-    if (!s || s.tab || !canDraw(a, tab)) return false;
-    return tabsFor(a, {}, subject).some((t) => t.id === tab);
-  };
+  // The same answer as finding it in tabsFor, from that one tab (tabShows)
+  const tabOk = (a, tab, subject) => !!tabShows(a, tab, { viewer: a }, subject === undefined ? a : subject);
   // focus (a hub front): handed to the tab's view, as a journalTab focus is (X's Voice settings names the player)
   globalThis.__dboJournalOpenTab = (a, tab, focus) => {
     if (!C.enabled || !(typeof hasCap === 'function' && hasCap(a, 'journal'))) return false;
@@ -651,7 +656,8 @@ module.exports = (api) => {
     'level:magicka': (a) => run(a, 'level', 'magicka 1'),
     'level:stamina': (a) => run(a, 'level', 'stamina 1'),
     // The race's power (racial.js usePower: once a real day, kept on the character)
-    racialPower: (a) => (typeof globalThis.__dboRacialPowerUse === 'function' ? globalThis.__dboRacialPowerUse(a) : null),
+    // text: the power's key from the box's button (front: one button per power); none from an older front, the first ready
+    racialPower: (a, text) => (typeof globalThis.__dboRacialPowerUse === 'function' ? globalThis.__dboRacialPowerUse(a, Date.now(), text || undefined) : null),
   };
   const run = (a, name, args) => {
     const lines = typeof globalThis.__dboRunCommand === 'function' ? globalThis.__dboRunCommand(a, name, args) : null;

@@ -107,6 +107,8 @@ module.exports = (api) => {
 
   const me = (a) => ({ profile: Number(profileOf(a)), char: a >>> 0, tag: tagOf(a), name: ownDisplay(a) });
   // A claim is one character's once property is per character (housingSystem.ts ownsRecord), else the account's
+  // mines.js: a clan's mine or a lair is never listed, sold or bought ('' when it may be)
+  const mineRefusal = (door) => { try { return typeof globalThis.__dboMineSaleRefusal === 'function' ? String(globalThis.__dboMineSaleRefusal(door) || '') : ''; } catch (e) { return ''; } };
   const owns = (a, rec) => { try { const H = housing(); if (H && typeof H.ownsRecord === 'function') return H.ownsRecord(rec, a) === true; } catch (e) { /* the account's */ } return Number(rec.owner) === Number(profileOf(a)); };
   const perChar = () => { try { const H = housing(); return !!H && typeof H.perCharacter === 'function' && H.perCharacter() === true; } catch (e) { return false; } };
   const actorOfTag = (tag) => onlineActors().find((x) => tagOf(x) === tag) || 0;
@@ -154,6 +156,7 @@ module.exports = (api) => {
   const list = (a, deposit, weekly) => {
     const h = here(a); if (h.err) return h.err;
     if (!h.manager(a)) return 'Only the officials who manage property here can rent it out.';
+    { const why = mineRefusal(h.door); if (why) return why; }
     if (h.L && h.L.tenant) return `It is let to ${h.L.tenant.name}.`;
     if (h.rec.owner) return `${h.rec.ownerName || 'Someone'} owns it. Take it back from the property menu first.`;
     deposit = Math.floor(Number(deposit)); weekly = Math.floor(Number(weekly));
@@ -247,7 +250,7 @@ module.exports = (api) => {
     if (!takeGold(a, cost)) return `Moving in takes the ${L.deposit} gold deposit and the first week's ${L.weekly}. You do not have ${cost} gold.`;
     const err = housing().grant(h.door, a);
     if (err) { giveGold(a, cost); return err; }
-    depositToTreasury(L.zone, L.weekly);
+    depositToTreasury(L.zone, L.weekly, { income: 'rent' });
     L.tenant = p;
     L.depositHeld = L.deposit;
     L.paidUntil = Date.now() + WEEK;
@@ -263,6 +266,7 @@ module.exports = (api) => {
   const sell = (a, price) => {
     const h = here(a); if (h.err) return h.err;
     if (!h.manager(a)) return 'Only the officials who manage property here can sell it.';
+    { const why = mineRefusal(h.door); if (why) return why; }
     if (h.L && h.L.tenant) return `It is let to ${h.L.tenant.name}.`;
     if (h.rec.owner) return `${h.rec.ownerName || 'Someone'} owns it. Only an empty house can be sold.`;
     price = Math.floor(Number(price));
@@ -282,6 +286,7 @@ module.exports = (api) => {
     const h = here(a); if (h.err) return h.err;
     const L = h.L;
     if (!L || !L.sale) return 'This property is not for sale.';
+    { const why = mineRefusal(h.door); if (why) return why; }
     if (L.resale) return buyFrom(a, h, seen, viaChat);
     // An owner since it was listed (a grant from the property menu): the sale no longer stands
     if (h.rec && h.rec.owner) { delete data().listings[h.key]; save(); return 'This property has an owner now, so it is no longer for sale.'; }
@@ -296,7 +301,7 @@ module.exports = (api) => {
     if (!takeGold(a, price)) return `It costs ${price} gold, and you do not have it.`;
     const err = housing().grant(h.door, a);
     if (err) { giveGold(a, price); return err; }
-    const paidIn = depositToTreasury(L.zone, price);
+    const paidIn = depositToTreasury(L.zone, price, { income: 'house sales' });
     if (paidIn !== price) { log(`tenancy: the treasury of ${L.zone} took ${paidIn} of a ${price} gold sale (${h.key})`); audit(`PROPERTY the treasury of ${L.zone} took ${paidIn} of the ${price} gold paid for ${h.key}`); }
     const p = me(a);
     try { if (globalThis.__dboEconomySaleValue) globalThis.__dboEconomySaleValue(h.door, price, p.name); } catch (e) { log('tenancy: setting the sale value failed', e.message); }
@@ -312,6 +317,7 @@ module.exports = (api) => {
   const resell = (a, price) => {
     const h = here(a); if (h.err) return h.err;
     if (!h.rec.owner || !owns(a, h.rec)) return 'Only its owner can put a property up for sale.';
+    { const why = mineRefusal(h.door); if (why) return why; }
     if (h.L && h.L.tenant) return 'A rented property stays the hold\'s: it cannot be sold.';
     if (h.L && !h.L.resale) return 'This property is listed by the hold. Ask its officials.';
     price = Math.floor(Number(price));
@@ -359,7 +365,7 @@ module.exports = (api) => {
     weeks = Math.max(1, Math.min(8, Math.floor(Number(weeks) || 1)));
     const cost = weeks * L.weekly;
     if (!takeGold(a, cost)) return `${weeks} week(s) of rent is ${cost} gold, and you do not have it.`;
-    depositToTreasury(L.zone, cost);
+    depositToTreasury(L.zone, cost, { income: 'rent' });
     L.paidUntil = Math.max(Date.now(), L.paidUntil) + weeks * WEEK;
     delete L.overdueSince;
     save();
@@ -389,7 +395,7 @@ module.exports = (api) => {
     else { returnDeposit = false; audit(`PROPERTY ${L.tenant.name} no longer holds rented ${hex(L.door)} (owner profile ${owner}); left with its owner, deposit kept by ${L.zone}`); }
     const dep = L.depositHeld || 0;
     if (returnDeposit) pay(L.tenant, dep, `your deposit back (${why})`);
-    else depositToTreasury(L.zone, dep);
+    else depositToTreasury(L.zone, dep, { income: 'rent' });
     const was = L.tenant;
     delete L.tenant; delete L.depositHeld; delete L.paidUntil; delete L.overdueSince;
     L.interest = [];
@@ -498,8 +504,11 @@ module.exports = (api) => {
   onUi('propertyMarket', (a) => {
     const h = here(a);
     if (h.err) return personal(a, h.err);
+    // A mine's door opens the mine's own panel first (mines.js), which comes back here for buying and selling
+    try { if (typeof globalThis.__dboMineAtDoor === 'function' && globalThis.__dboMineAtDoor(a, h.door)) return; } catch (e) { log('tenancy: the mine panel failed', e.message); }
     sendPanel(a, h);
   });
+  globalThis.__dboTenancyPanel = (a) => { const h = here(a); if (h.err) return personal(a, h.err); sendPanel(a, h); };
   const ACTIONS = {
     buy: (a) => buy(a, (panels.get(a >>> 0) || {}).shown), sell: (a, x) => sell(a, x), list: (a, d, w) => list(a, d, w), unlist: (a) => unlist(a),
     interest: (a) => interest(a), offer: (a, tag) => offer(a, tag), accept: (a) => accept(a), pay: (a, w) => payRent(a, w),

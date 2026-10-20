@@ -96,5 +96,7 @@ const purse = GM.slice(GM.indexOf('globalThis.__dboCoinPurse = '), GM.indexOf('/
 ok(/__dboLeaseStartedAt\(casterId\)/.test(purse) && /until - PURSE\.restMinutes \* 60000 < leaseAt/.test(purse) && /until > Date\.now\(\) && !emptiedBeforeClaim/.test(purse),
   'gamemode.js: a purse emptied before the claim began is full again for the new party');
 
+ok(/if \(giveItem\(casterId, 0xf, gold\)\) \{[\s\S]*?globalThis\.__dboRaceGold\(casterId, gold, 'a coin purse'\)[\s\S]*?\n  \}/.test(purse),
+  'gamemode.js: a purse that paid pays Imperial Luck on its gold (racial.js goldBonus), only once it was handed over');
 console.log(fails ? `\n${fails} failed` : '\nall passed');
 process.exit(fails ? 1 : 0);

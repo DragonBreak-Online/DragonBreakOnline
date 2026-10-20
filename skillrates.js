@@ -146,6 +146,10 @@ module.exports = (api) => {
     if (typeof globalThis.__dboRaceSkillRate === 'function') {
       try { const r = Number(globalThis.__dboRaceSkillRate(actorId >>> 0, skillId, kind)); if (Number.isFinite(r) && r > 0) rate *= r; } catch (e) { /* no race boost */ }
     }
+    // A god's skill boon (prayer.js skillBoon), never for a staff award
+    if (kind !== 'award' && typeof globalThis.__dboBlessingSkillRate === 'function') {
+      try { const r = Number(globalThis.__dboBlessingSkillRate(actorId >>> 0, skillId)); if (Number.isFinite(r) && r > 0) rate *= r; } catch (e) { /* no blessing boost */ }
+    }
     if (as === 'craft' && rate > 0) rate *= valueFactor(actorId, skillId, kind, detail);
     if (as === 'craft' && rate > 0) rate *= firstCraftRate(actorId, skillId, detail, kind);
     return rate;
@@ -156,7 +160,11 @@ module.exports = (api) => {
   const rateFor = (actorId, skillId, kind, detail) => {
     // Priest held at an Apprentice or Adept pick until that spell is chosen (schools.js, Arcane Mastery)
     try { if (typeof globalThis.__dboSchoolsSkillHeld === 'function' && globalThis.__dboSchoolsSkillHeld(actorId >>> 0, skillId)) return 0; } catch (e) { /* never blocks on error */ }
-    const rate = baseRate(actorId, skillId, kind, detail);
+    let rate = baseRate(actorId, skillId, kind, detail);
+    // A referral or welcome boost (referrals.js) runs through here, never through private.xpBoost; normal play only, never an award (staff, alchemy)
+    if (rate > 0 && kind !== 'award' && typeof globalThis.__dboReferralSkillRate === 'function') {
+      try { const r = Number(globalThis.__dboReferralSkillRate(actorId >>> 0)); if (Number.isFinite(r) && r >= 1 && r <= 3) rate *= r; } catch (e) { /* no referral boost */ }
+    }
     if (kind !== 'award' || typeof globalThis.__dboSchoolsAwardRate !== 'function') return rate;
     let k = 1;
     try { k = Number(globalThis.__dboSchoolsAwardRate(actorId >>> 0, skillId, kind, detail)); } catch (e) { k = 1; }

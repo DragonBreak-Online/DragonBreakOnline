@@ -34,7 +34,7 @@
 //     Studying a school closes once a spell of it is in the spellbook (learned through Arcane Arts); before the first
 //     school, any spell of the four closes it. A mage who changes school studies the new one (Z63J, 4 Oct);
 //   classes at a Class Lectern (base editor id `classes.edid`): a qualified teacher (the leader or an officer of a college,
-//     `teacherRoles` in `teacherGuilds`, Nate 13 Oct) picks one spell they know, which sets
+//     `teacherRoles` in `teacherGuilds` or any college, Nate 13 Oct, Swag 17 Oct) picks one spell they know, which sets
 //     the class's school and rank only (nobody learns it); students sign up at the same lectern. It runs `minutes` (30),
 //     teacher and students in the classroom (the lectern's interior cell, or `radiusMeters` outdoors); after it the
 //     teacher ends it at the lectern and every student still there is paid by `scale[student rank][class rank]`.
@@ -114,11 +114,13 @@ module.exports = (api) => {
     // Restoration) takes another player as apprentice from the X menu and picks a spell they know; the apprentice accepts.
     // Inside radiusMeters of the teacher the apprentice holds the spell (learned server-side for the while, as beastform.js
     // does); each cast of it there is xpPerCast, at most dailyXp a day (UTC), and dailyXp x daysByRank[spell rank] learns it
-    // for good. One apprentice at a time (max), seniorMax for the leader or an officer of a seniorGuilds faction. The
+    // for good. One apprentice at a time (max), seniorMax for the leader or an officer of a seniorGuilds faction, or of any
+    // faction guild-defs.json marks "college": true (Swag, 17 Oct: "any future magical colleges and current"). The
     // apprentice's school rank (Priest's for Restoration) must be at least the spell's.
     apprenticeship: {
       enabled: true, teacherArcaneLevel: 75, teacherPriestLevel: 75, radiusMeters: 60, xpPerCast: 1, castGapSeconds: 2, dailyXp: 20,
-      daysByRank: [1, 2, 3, 5, 15], max: 1, seniorMax: 3, seniorGuilds: ['synod', 'college-of-winterhold', 'college-of-whispers', 'house-telvanni'],
+      daysByRank: [1, 2, 3, 5, 15], max: 1, seniorMax: 3, seniorGuilds: ['synod', 'college-of-winterhold', 'college-of-whispers'],
+      collegeGuilds: true,
       seniorRoles: ['leader', 'officer'], offerMinutes: 5, tickSeconds: 3,
     },
     swap: { enabled: true, cooldownDays: 7, startShare: 0.5 },
@@ -154,6 +156,8 @@ module.exports = (api) => {
     classes: {
       enabled: true, edid: 'ClassLectern', lecterns: [], sameLecternUnits: 300, minutes: 30, joinMinutes: 10, graceMinutes: 5, radiusMeters: 15,
       teacherCooldownMinutes: 60, studentCooldownHours: 12, teacherMinRank: 3, requireList: false, teacherGuilds: ['synod', 'college-of-winterhold', 'college-of-whispers'], teacherRoles: ['leader', 'officer'],
+      // Any college (guild-defs.json "college": true) as well as the teacherGuilds named (Swag, 17 Oct)
+      collegeGuilds: true,
       units: 25, wheelEvents: 8, wheelValue: 150, maxStudents: 12,
       // Elion and Aldemar's proposal (Nate, 11 Oct): Arcane Arts at teacherArcaneLevel also qualifies a teacher, as Expert
       // study (teacherMinRank) in a school does. Students short of their first spell (Arcane Arts below firstSchoolAt, no
@@ -394,10 +398,15 @@ module.exports = (api) => {
   const rankMade = (s, school, rank) => !!(s.rankPicks && s.rankPicks[school] && s.rankPicks[school][rank]);
   // Held at a pick's level: a school by credit() (xp at the top of the level), Priest from priestHoldXp of it; past it counts
   const PRIEST_HOLD_XP = Math.max(0, Math.min(99.99, Number(C.rankPicks.priestHoldXp) || 90));
+  // A pick above the first spell's level opens on reaching it (Esmyr #EB56, 16-20 Oct: "Adept spells not prompting at 50"):
+  // it waited for the last xp of the level (a school's 99.99, Priest's priestHoldXp), so a Priest at 50 set to hold, or
+  // anyone not yet through the level, was never offered it. The hold at the pick's level still stops anyone going past it.
+  // A pick that shares its level with the first spell (Apprentice at 25) still waits for the end of that level, so the two
+  // come one after the other as designed
   const atThreshold = (a, s, school, p) => {
-    if (school === RESTORATION) { const pr = priestOf(a); return pr.level > p.at || (pr.level === p.at && pr.xp >= PRIEST_HOLD_XP); }
+    if (school === RESTORATION) { const pr = priestOf(a); return pr.level > p.at || (pr.level === p.at && (p.at > PICK_AT || pr.xp >= PRIEST_HOLD_XP)); }
     const lv = levelOf(s, school);
-    return lv > p.at || (lv === p.at && (Number((s.levels[school] || {}).xp) || 0) >= 99.99);
+    return lv > p.at || (lv === p.at && (p.at > PICK_AT || (Number((s.levels[school] || {}).xp) || 0) >= 99.99));
   };
   // The pick waiting in a school: 'first', a rank of RANK_PICKS, or '' (the first spell always comes first). The doc's
   // "at 25 Apprentice, and at the threshold for 26 it locks": a rank's pick opens once the school is held there.
@@ -544,7 +553,11 @@ module.exports = (api) => {
   // player sitting in a menu can outlast starterSettleSeconds. Two checks, so the client cannot run the add before the
   // remove: taken back, then given again (a relog, or putting it away and preparing it, does the same by hand). Only a
   // spell still prepared is sent; s.resend { desc: { due, taken, say } } holds the ones waiting.
-  const papyrusSpell = (a, fn, id, extra) => { try { return mp.callPapyrusFunction('method', 'Actor', fn, { type: 'form', desc: descOf(a) }, [{ type: 'espm', desc: descOf(id) }].concat(extra || [])) === true; } catch (e) { log(`schools: ${fn} ${descOf(id)} failed`, e.message); return false; } };
+  // A change forgets spells.js's kept read of the list (__dboSpellsLearnedChanged: one read serves a tick, 17 Oct)
+  const papyrusSpell = (a, fn, id, extra) => {
+    try { return mp.callPapyrusFunction('method', 'Actor', fn, { type: 'form', desc: descOf(a) }, [{ type: 'espm', desc: descOf(id) }].concat(extra || [])) === true; } catch (e) { log(`schools: ${fn} ${descOf(id)} failed`, e.message); return false; }
+    finally { try { if (typeof globalThis.__dboSpellsLearnedChanged === 'function') globalThis.__dboSpellsLearnedChanged(a); } catch (e) { /* spells.js not loaded */ } }
+  };
   const queueResend = (s, desc, afterMs, say) => { s.resend = Object.assign({}, s.resend || {}, { [descOf(idOf(desc)) || desc]: { due: Date.now() + afterMs, taken: false, say: say || '' } }); };
   // The line to tell, or ''; saves the record when it changed anything
   const runResends = (a, s) => {
@@ -1506,6 +1519,18 @@ module.exports = (api) => {
   // ---- lecterns: the Class Lectern and the Preach pulpit share one engine ----------------------------------------------
   const guildsOf = (a) => { const g = get(a, 'private.dboGuilds', []); return Array.isArray(g) ? g.map((m) => String(m && m.id)) : []; };
   const guildRolesOf = (a) => { const g = get(a, 'private.dboGuilds', []); return Array.isArray(g) ? g.filter(Boolean).map((m) => ({ id: String(m.id), role: String(m.role || '') })) : []; };
+  // A magic college: a faction guild-defs.json marks "college": true (the Synod, the College of Winterhold, the College of
+  // Whispers, and any added later; Swag, 17 Oct). guilds.js answers for every faction it holds, player charters too; without
+  // it the defs file is read once per load.
+  let collegeDefs = null;
+  const isCollege = (id) => {
+    try { if (typeof globalThis.__dboGuildIsCollege === 'function') return !!globalThis.__dboGuildIsCollege(String(id)); } catch (e) { /* the file below */ }
+    if (!collegeDefs) {
+      collegeDefs = new Set();
+      try { for (const f of JSON.parse(require('fs').readFileSync(require('path').resolve('guild-defs.json'), 'utf8')).factions || []) if (f && f.college === true) collegeDefs.add(String(f.id)); } catch (e) { log('schools: guild-defs.json unreadable for the colleges', e.message); }
+    }
+    return collegeDefs.has(String(id));
+  };
   const knownSpells = (a) => { try { return typeof globalThis.__dboSpellsKnown === 'function' ? (globalThis.__dboSpellsKnown(a) || []) : []; } catch (e) { return []; } };
   // Spells on loan to an apprentice (the lesson's spell, and any still to be taken back), unless they own it in their book:
   // never theirs to teach, to set a class by or to count as known in a spell line. Read from the record as it is, so an
@@ -1523,6 +1548,11 @@ module.exports = (api) => {
   globalThis.__dboSchoolsOnLoan = (a, id) => { try { return loansOf(a >>> 0).includes(Number(id) >>> 0); } catch (e) { return false; } };
   const faithOf = (a) => { const f = get(a, 'private.dboDeity', null); return f && typeof f === 'object' && f.id ? f : null; };
   const priestRank = (a) => { const p = priestOf(a); return p.held && p.level >= 1 ? p.rank : -1; };
+  // A character's rank 0-4 in a school, Priest's for Restoration (the rule an apprentice's rank follows), else -1. Read
+  // only. scribing.js asks it for a Master tome's co-writer (Nate and Swag, 17 Oct).
+  globalThis.__dboSchoolRankOf = (a, school) => {
+    try { return String(school) === RESTORATION ? priestRank(a >>> 0) : (typeof globalThis.__dboSchoolRank === 'function' ? Number(globalThis.__dboSchoolRank(a >>> 0, String(school))) : -1); } catch (e) { return -1; }
+  };
   // K: one kind of lectern. conf, refs, the state maps' keys, the record keys for its cooldowns and named list, the
   // teacher's own rule, the spells it is set by, the listener's rank, the pay, and its words (W)
   const makeLectern = (K) => {
@@ -1806,11 +1836,14 @@ module.exports = (api) => {
   // The lectern's own rule for a teacher (beyond the staff's list): a member of a teacherGuilds faction with Expert study
   // in a school or Arcane Arts at teacherArcaneLevel. The X menu's "Name class teacher" asks it too.
   const classQualified = (a) => {
-    const guilds = Array.isArray(C.classes.teacherGuilds) ? C.classes.teacherGuilds : [];
-    if (guilds.length && !guildsOf(a).some((g) => guilds.includes(g))) return `A class here is held by a member of ${schoolHouse(a)}, or of another college.`;
+    const named = Array.isArray(C.classes.teacherGuilds) ? C.classes.teacherGuilds : [];
+    const colleges = C.classes.collegeGuilds !== false;
+    const inList = (g) => named.includes(g) || (colleges && isCollege(g));
+    const gated = named.length > 0 || colleges;
+    if (gated && !guildsOf(a).some(inList)) return `A class here is held by a member of ${schoolHouse(a)}, or of another college.`;
     // Their college's leader and officers teach; staff name nobody (Nate, 13 Oct)
     const roles = Array.isArray(C.classes.teacherRoles) ? C.classes.teacherRoles : [];
-    if (roles.length && !guildRolesOf(a).some((m) => (!guilds.length || guilds.includes(m.id)) && roles.includes(m.role))) return `A class is held by the leader or an officer of ${schoolHouse(a)}, or of another college.`;
+    if (roles.length && !guildRolesOf(a).some((m) => (!gated || inList(m.id)) && roles.includes(m.role))) return `A class is held by the leader or an officer of ${schoolHouse(a)}, or of another college.`;
     const s = stateOf(a);
     if (!byArcane(a) && !SCHOOLS.some((n) => schoolRank(s, n) >= C.classes.teacherMinRank)) return `Teaching a class takes Arcane Arts at ${C.classes.teacherArcaneLevel} or ${RANKS[C.classes.teacherMinRank]} study in one of your schools.`;
     return '';
@@ -2049,6 +2082,8 @@ module.exports = (api) => {
   };
   const magicView = (a) => { try { return magicTabOf(a); } catch (e) { log(`schools: magic view for ${display(a)} failed: ${e.message}`); return null; } };
   globalThis.__dboMagicView = magicView;
+  // journal.js asks this first, so a tab check never builds the Magic view (which reads the whole spell list)
+  globalThis.__dboMagicOpen = (a) => { try { return !!(ready(a) && isPlayer(a) && (arcaneOf(a).held || priestOf(a).held)); } catch (e) { return false; } };
   globalThis.__dboMagicTab = magicView;
   // { ok, text } of one Magic tab action
   globalThis.__dboMagicAction = (a, op, args) => {
@@ -2103,7 +2138,7 @@ module.exports = (api) => {
   const knowsSpell = (a, id) => knownSpells(a).some((sp) => sp.id >>> 0 === id >>> 0) || bookOf(a).some((sp) => sp.id >>> 0 === id >>> 0);
   const inBookOf = (a, id) => bookOf(a).some((sp) => sp.id >>> 0 === id >>> 0);
   const engineHas = (a, id) => knownSpells(a).some((sp) => sp.id >>> 0 === id >>> 0);
-  const isSenior = (a) => guildRolesOf(a).some((m) => (AP.seniorGuilds || []).includes(m.id) && (AP.seniorRoles || []).includes(m.role));
+  const isSenior = (a) => guildRolesOf(a).some((m) => ((AP.seniorGuilds || []).includes(m.id) || (AP.collegeGuilds !== false && isCollege(m.id))) && (AP.seniorRoles || []).includes(m.role));
   const apMax = (a) => Math.max(0, Number(isSenior(a) ? AP.seniorMax : AP.max) || 0);
   const apList = (s) => (Array.isArray(s.apprentices) ? s.apprentices : []);
   const canTeachAny = (a) => arcaneOf(a).level >= AP.teacherArcaneLevel || (priestOf(a).held && priestOf(a).level >= AP.teacherPriestLevel);

@@ -158,6 +158,8 @@ module.exports = (api) => {
     const box = lettersOf(a);
     const m = box.find((x) => x.id === String(letterId));
     if (!m || !m.parcel) return { ok: false, text: 'That letter carries nothing.' };
+    // Silver a vampire or werewolf cannot keep would only be mailed back again: burn the letter instead (gamemode.js)
+    try { if (typeof globalThis.__dboParcelUnbearable === 'function' && globalThis.__dboParcelUnbearable(a, m)) return { ok: false, text: 'The silver would only burn you again. Burn the letter to be rid of it.' }; } catch (e) { /* collect as usual */ }
     const parcel = m.parcel;
     delete m.parcel;
     m.collected = true;
@@ -172,14 +174,29 @@ module.exports = (api) => {
   };
 
   // A letter from the board itself (supply goods, a refund), to a character online or not
-  const boardLetter = (to, zoneName, text, parcel, supplyOrder) => {
+  const boardLetter = (to, zoneName, text, parcel, supplyOrder, fromName) => {
     const box = lettersOf(to);
     const at = Date.now();
-    box.push({ id: `${at.toString(36)}${Math.floor(Math.random() * 1296).toString(36)}`, from: `The ${zoneName} notice board`, fromProfile: -1, text, at, read: false, parcel, supplyOrder });
+    box.push({ id: `${at.toString(36)}${Math.floor(Math.random() * 1296).toString(36)}`, from: fromName || `The ${zoneName} notice board`, fromProfile: -1, text, at, read: false, parcel, supplyOrder });
     saveLetters(to, box);
     if (onlineActors().includes(to)) { personal(to, `A letter waits for you at the notice boards: ${text}`); try { sendMailState(to); } catch (e) { /* marker */ } }
   };
 
+  // Goods the board holds for a reader gather in one letter of theirs (match: a letter it wrote, still carrying a parcel), so
+  // a stream of small parcels cannot fill a coop (a werewolf's silver, 19 Oct: 12 letters). false when there is none yet
+  const addToBoardLetter = (to, match, items, text) => {
+    const box = lettersOf(to);
+    const m = box.slice().reverse().find((x) => x && x.parcel && x.fromProfile === -1 && typeof match === 'function' && match(x));
+    if (!m) return false;
+    const merged = (m.parcel.items || []).map((e) => Object.assign({}, e));
+    for (const it of items) { const same = merged.find((e) => (Number(e.baseId) >>> 0) === (Number(it.baseId) >>> 0) && Object.keys(e).length === 2 && Object.keys(it).length === 2); if (same) same.count = Number(same.count) + Number(it.count); else merged.push(Object.assign({}, it)); }
+    m.parcel.items = merged;
+    if (text) m.text = text(merged);
+    m.read = false; m.at = Date.now();
+    saveLetters(to, box);
+    if (onlineActors().includes(to)) { try { sendMailState(to); } catch (e) { /* marker */ } }
+    return true;
+  };
   // An order's goods gather in one letter while it waits uncollected, so deliveries one at a time cannot flood a mailbox
   const supplyLetter = (o, by, n, items) => {
     const box = lettersOf(o.poster);
@@ -258,7 +275,7 @@ module.exports = (api) => {
       giveItem(a, GOLD_BASE, reward + fee);
       return { ok: false, text: 'The board could not take the order just now. Your gold is returned.' };
     }
-    const paid = depositToTreasury(zone.id, fee);
+    const paid = depositToTreasury(zone.id, fee, { income: 'board fees' });
     audit(`SUPPLY ${who(a)} posted #${o.id} at ${zone.name}: ${count}x ${o.name} for ${reward} gold (fee ${fee}, ${paid ? 'to the treasury' : 'no treasury'})`);
     return { ok: true, text: `Posted: ${count} ${o.name} for ${reward} gold. ${fee} gold went to ${zone.name} for the notice. The goods come to your mailbox.` };
   };
@@ -376,7 +393,7 @@ module.exports = (api) => {
   act('supplyDeliver', (a, z, [id, count]) => deliver(a, z, id, count), 'supply');
   act('supplyCancel', (a, z, [id]) => cancel(a, id), 'supply');
 
-  // couriers.js packs goods with takeParcel, hands them over with giveEntries and posts them with boardLetter
-  globalThis.__dboPostApi = { prepare, takeParcel, giveEntries, collect, view, itemsText, boardLetter, sendableBase, looseCount, nameOfItem, enabled: () => !!C.enabled };
+  // couriers.js packs goods with takeParcel, hands them over with giveEntries and posts them with boardLetter; bank.js vaults use takeItems
+  globalThis.__dboPostApi = { prepare, takeParcel, takeItems, giveEntries, collect, view, itemsText, boardLetter, addToBoardLetter, sendableBase, looseCount, nameOfItem, enabled: () => !!C.enabled };
   log(`post: parcels ${C.enabled ? `on (tax ${Math.round(C.taxRate * 100)}% of gold, ${C.itemFee} gold a stack, ${C.maxStacks} stacks)` : 'off'}, supply orders ${data().orders.filter(open).length} open`);
 };

@@ -48,7 +48,11 @@ function writeMarkdown(dir, run) {
   lines.push('Mode: ' + run.mode + ', movement every ' + run.cfg.movementMs + ' ms, run speed ' +
     run.cfg.runSpeed + ' u/s, chat every ' + Math.round(run.cfg.chatEveryMs[0] / 1000) + '-' +
     Math.round(run.cfg.chatEveryMs[1] / 1000) + ' s per bot' +
-    (run.cfg.hostNpcs ? ', NPC hosting emulated' : ', no NPC hosting') + '.');
+    (run.cfg.hostNpcs ? ', NPC hosting emulated' : ', no NPC hosting') +
+    (run.cfg.scatter
+      ? ', SCATTERED across ' + run.cfg.scatter.anchors + ' groups at least ' + run.cfg.scatter.separation +
+        ' units apart (cluster radius ' + run.cfg.scatter.clusterRadius + ')'
+      : ', crowded into one place') + '.');
   lines.push('');
   lines.push('| bots | length | connected | move Hz/bot | msg/s to server | msg/s to bots | KiB/s to bots (JSON) | UDP dgram/s | server CPU | RSS MB | tick p50 ms | tick p99 ms | loop lag p99 ms | log errors |');
   lines.push('|---|---|---|---|---|---|---|---|---|---|---|---|---|---|');
@@ -62,10 +66,18 @@ function writeMarkdown(dir, run) {
       (s.gateActivations ? ', ' + s.gateActivations + ' hub gate activations' : ''));
     lines.push('- connected ' + s.bots_connected + ', spawned ' + s.bots_spawned +
       ', disconnects ' + s.bots_disconnects + ', login failures ' + s.bots_loginFailures +
-      ', snap-backs (refused movement) ' + s.traffic.snapBacks);
+      ', Teleport2 corrections ' + s.traffic.snapBacks);
     lines.push('- sent: ' + s.traffic.movesSent + ' movement, ' + s.traffic.chatSent + ' chat, ' +
       s.traffic.avSent + ' actor-value, ' + s.traffic.activateSent + ' activate' +
       (s.traffic.warpSteps ? ', ' + s.traffic.warpSteps + ' warp steps' : ''));
+    // With the heartbeat rule on, what the bots sampled and what they sent are different numbers
+    if (s.traffic.movesSkipped) {
+      lines.push('- unchanged movement held back: ' + s.traffic.movesSkipped + ' of ' +
+        (s.traffic.movesSent + s.traffic.movesSkipped) + ' samples (' +
+        r1(100 * s.traffic.movesSkipped / Math.max(1, s.traffic.movesSent + s.traffic.movesSkipped)) +
+        '%), so each bot sampled ' + r1(s.traffic.movementSampledHzPerBot) + '/s and sent ' +
+        r1(s.traffic.movementHzPerBot) + '/s');
+    }
     lines.push('- received: ' + s.traffic.rxMessages + ' messages, ' + r1(s.traffic.rxKiB) + ' KiB of JSON, ' +
       s.traffic.chatReceived + ' chat lines, ' + s.traffic.createActorSeen + ' createActor, ' +
       s.traffic.teleports + ' teleports');
@@ -83,6 +95,38 @@ function writeMarkdown(dir, run) {
     if (s.traffic.topTypes.length) {
       lines.push('- busiest message types in: ' + s.traffic.topTypes
         .map((x) => x.name + ' ' + x.count + ' (' + r1(x.perSec) + '/s)').join(', '));
+    }
+    // The interest check: what one bot is told about, by how far away the mover is. With no interest
+    // management every band runs at the sender's rate (7.7/s each), which is what makes the traffic
+    // quadratic; a ladder shows itself here as the mid and far bands dropping while full stays put.
+    const it = s.traffic.interest;
+    if (it && it.perBot && it.perBot.full !== null) {
+      const band = (k) => r1(it.perBot[k]) + '/s from ' + r1(it.emitters[k]) + ' mover(s)' +
+        (it.perBotNew && it.perBotNew[k] !== null && it.perBotNew[k] !== undefined
+          ? ' (' + r1(it.perBotNew[k]) + '/s new)' : '');
+      lines.push('- interest per bot: near (<=' + it.fullUnits + 'u) ' + band('full') +
+        ', mid (<=' + it.midUnits + 'u) ' + band('mid') +
+        ', far ' + band('far') + (it.emitters.unknown > 0.05 ? ', unplaced ' + band('unknown') : '') +
+        ', own echo ' + r1(it.selfEchoPerSec / Math.max(1, s.bots_connected)) + '/s');
+      // A repeat of a position the bot was already told is wire cost that taught it nothing
+      if (it.newPosPerBot !== null && it.newPosPerBot !== undefined) {
+        lines.push('- of that, new positions ' + r1(it.newPosPerBot) + '/s per bot, repeats ' +
+          r1(it.dupPerBot) + '/s, createActor for a mover ' + r1(it.createsPerBot) + '/s' +
+          '; own echo new ' + r1(it.selfEchoNewPerSec / Math.max(1, s.bots_connected)) + '/s, repeat ' +
+          r1(it.selfEchoDupPerSec / Math.max(1, s.bots_connected)) + '/s');
+      }
+      if (it.top && it.top.length) {
+        // Rates, not counts: the counts are this step's, and dividing a run-long count by a step's
+        // length is what once made these emitters look faster than the clients that sent them
+        const secs = Math.max(1, s.durationMs / 1000);
+        const movers = it.top[0].top.split(',').slice(0, 12).map((f) => {
+          const c = f.split(':');
+          return c[0] + ':' + r1(Number(c[1]) / secs) + '/s:' + c[2] + 'u:' + r1(Number(c[3]) / secs) +
+            '/s new' + (Number(c[4]) ? ':' + c[4] + ' created' : '');
+        });
+        lines.push('- busiest movers for bot ' + it.top[0].bot + ' this step (idx:rate:distance:new): ' +
+          movers.join('  '));
+      }
     }
     if (s.server.tickP50ms !== null) {
       lines.push('- server tick: p50 ' + r2(s.server.tickP50ms) + ' ms, p90 ' + r2(s.server.tickP90ms) +

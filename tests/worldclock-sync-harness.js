@@ -16,6 +16,7 @@ let fails = 0;
 const ok = (c, what, got) => { console.log(`${c ? 'ok  ' : 'FAIL'}  ${what}${c || got === undefined ? '' : '   ' + JSON.stringify(got)}`); if (!c) fails++; };
 const realNow = Date.now;
 let now = 1790000000000;
+let zoneNow = null;
 Date.now = () => now;
 
 const load = (gameDays, worldClock) => {
@@ -26,10 +27,10 @@ const load = (gameDays, worldClock) => {
   require(MODULE)({
     mp: { get: () => null, set: () => {} }, log: () => {}, personal: (a, t) => said.push(t), system: () => {},
     registerChatCommand: (n, f) => { cmds[n] = f; }, sendPacket: (a, p) => packets.push(p), onlineActors: () => [0xff000014],
-    every: () => {}, zoneOfActor: () => null, audit: () => {}, who: String, cfg: worldClock ? { worldClock } : {},
+    every: () => {}, zoneOfActor: () => zoneNow, audit: () => {}, who: String, cfg: worldClock ? { worldClock } : {},
   });
   const time = () => { said.length = 0; cmds.time(0xff000014, ''); return said[0] || ''; };
-  return { time, packets, clock: globalThis.__dboClock };
+  return { time, packets, cmds, clock: globalThis.__dboClock };
 };
 const WEEKDAYS = ['Sundas', 'Morndas', 'Tirdas', 'Middas', 'Turdas', 'Fredas', 'Loredas'];
 
@@ -59,6 +60,33 @@ w = load(5.5);
 w.clock.sendTo(0xff000014);
 const p = w.packets.find((x) => x && x.customPacketType === 'dboClock');
 ok(!!p && p.gameDays === 5.5 && p.startYear === 211 && p.timeScale === 6, 'the dboClock packet still carries gameDays, timeScale and startYear', p);
+
+// Weather sync (Nate, 17 Oct: "we just need to sync everything"): the server picks the exact weather of a zone and every
+// client applies it; Whiterun has its own tundra weathers, not a share of the default
+{
+  const P = (wl, a) => { wl.packets.length = 0; wl.clock.sendTo(a); return wl.packets.find((x) => x && x.customPacketType === 'dboClock'); };
+  const TU = ['10a240', '10e1ee', '10a243', '10e1ed', '10a242', '10a241', '4d7fb'];
+  w = load(5.5);
+  zoneNow = 'whiterun';
+  const a1 = P(w, 0xff000014), a2 = P(w, 0xff000015);
+  ok(/^[0-9a-f]+:Skyrim\.esm$/.test(a1.weatherId) && TU.includes(a1.weatherId.split(':')[0]), 'weather: Whiterun is sent an exact tundra weather', a1.weatherId);
+  ok(a1.weatherId === a2.weatherId && a1.weather === a2.weather, 'weather: every player in Whiterun gets the same one', [a1.weatherId, a2.weatherId]);
+  w.cmds.setweather(0xff000014, 'rain');
+  const r = P(w, 0xff000014);
+  ok(r.weather === 2 && ['10a242', '10a241'].includes(r.weatherId.split(':')[0]), 'weather: /setweather rain in Whiterun sends a tundra rain', r);
+  zoneNow = 'solitude';
+  const s1 = P(w, 0xff000014);
+  ok(s1.weather !== undefined && !TU.slice(0, 6).includes(s1.weatherId.split(':')[0]), 'weather: Solitude keeps its own weather, not Whiterun\'s', s1);
+  zoneNow = 'windhelm';
+  w.cmds.setweather(0xff000014, 'rain');
+  ok(P(w, 0xff000014).weatherId === 'c821f:Skyrim.esm', 'weather: rain over Windhelm is the snow family\'s overcast rain');
+  zoneNow = null;
+  ok(!!P(w, 0xff000014).weatherId, 'weather: a place with no zone gets the default family');
+  w = load(5.5);
+  globalThis.__dboWorldClock.weather.default = { kind: 1, untilDays: 99, forced: false };
+  zoneNow = null;
+  ok(['12f89', '10e1f1', 'c821e'].includes(P(w, 0xff000014).weatherId.split(':')[0]), 'weather: a saved weather from before (no id) gets a cloudy one of its family');
+}
 
 Date.now = realNow;
 console.log(fails ? `${fails} failed` : 'all passed');

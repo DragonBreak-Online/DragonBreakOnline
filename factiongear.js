@@ -64,7 +64,7 @@ module.exports = (api) => {
 
   // "Imperial Helmet is made only by the Imperial Legion's smiths." and, for a member of the wrong rank, the rank it needs
   const makers = (e) => {
-    if (e.set === 'Orcish') return "the strongholds'";
+    if (e.set === 'Orcish' || e.set === 'Orcish Clan') return "the strongholds'";
     const names = [...new Set((e.factions || []).map(factionName))];
     if (names.length > 3) return "the vampire clans'";
     return `the ${listNames(names)}'s`.replace(/s's$/, "s'");

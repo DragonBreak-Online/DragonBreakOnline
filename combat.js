@@ -152,7 +152,9 @@ module.exports = (api) => {
         : Math.max(0, (shield ? C.shieldChip : C.weaponChip) - C.chipPerDefenseTier * Math.max(0, rankIn(tgt, 'defense')));
       // A Fortify Defence potion ("Blocking absorbs <mag>% more damage"; alchemy.js __dboPotionBonus block): less gets through
       let blockPotion = 0; try { const f = globalThis.__dboPotionBonus; blockPotion = typeof f === 'function' ? Math.max(0, Math.min(1, Number(f(tgt, 'block')) || 0)) : 0; } catch (e) { blockPotion = 0; }
-      const through = raw * share * (broken ? 1 : 1 - blockPotion);
+      // Worn Fortify Block: blocking holds back a capped share more (gearench.js bonus); with the potion at most all of it
+      let blockGear = 0; try { const g = globalThis.__dboGearBonus; blockGear = typeof g === 'function' ? Math.max(0, Number(g(tgt, 'block')) || 0) : 0; } catch (e) { blockGear = 0; }
+      const through = raw * share * (broken ? 1 : 1 - Math.min(1, blockPotion + blockGear));
       if (through > 0 && drain(tgt, 'health', through, Number(flags.targetMaxHealth)) !== null) events.push(`chip ${through.toFixed(1)}${broken ? ' (guard broken)' : ''}`);
       let breakGuard = !broken && !!flags.bash;
       if (!broken) {
@@ -244,7 +246,7 @@ module.exports = (api) => {
     if (allowedWords) return allowedWords;
     allowedWords = new Set();
     let list = [];
-    try { list = JSON.parse(fs.readFileSync(path.resolve('admin-powers.json'), 'utf8')).shouts || []; } catch (e) { log('combat: admin-powers.json unreadable, no shout is allowed', e.message); }
+    try { list = (() => { const d = JSON.parse(fs.readFileSync(path.resolve('admin-powers.json'), 'utf8')); return d.shoutsGate || d.shouts || []; })(); } catch (e) { log('combat: admin-powers.json unreadable, no shout is allowed', e.message); }
     // Only a shout on player-shouts.json counts, so a regenerated admin-powers.json (every SHOU: dragon breaths, Miraak's,
     // Greybeard copies) cannot open the gate again (Nate, 16 Oct). No allow-list file: no shout is allowed.
     let allow = new Set();

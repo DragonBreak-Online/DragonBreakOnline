@@ -110,11 +110,18 @@ module.exports = (api) => {
   const BY_BOOK = new Map(READY.map((m) => [m.bookId, m]));
 
   // ---- the engine's spell list ----------------------------------------------------------------------------------
+  // A change forgets spells.js's kept read of the list (one read serves a tick: about 4.5 s a read at 331 spells, 17 Oct)
+  const changed = (a) => { try { if (typeof globalThis.__dboSpellsLearnedChanged === 'function') globalThis.__dboSpellsLearnedChanged(a); } catch (e) { /* spells.js not loaded */ } };
   const papyrus = (a, fn, spellId, extra) => {
     try { return mp.callPapyrusFunction('method', 'Actor', fn, { type: 'form', desc: descOf(a) }, [{ type: 'espm', desc: descOf(spellId) }].concat(extra || [])) === true; }
     catch (e) { log(`manuals: ${fn} ${descOf(spellId)} failed`, e.message); return false; }
+    finally { changed(a); }
   };
+  // spells.js's read when it is loaded (gamemode.js loads it first), which the rest of the tick shares; else the engine's
   const learnedIds = (a) => {
+    if (typeof globalThis.__dboSpellsLearned === 'function') {
+      try { const l = globalThis.__dboSpellsLearned(a); return Array.isArray(l) ? new Set(l) : null; } catch (e) { return null; }
+    }
     try {
       const self = { type: 'form', desc: descOf(a) };
       const n = Number(mp.callPapyrusFunction('method', 'Actor', 'GetSpellCount', self, [])) || 0;
@@ -356,7 +363,7 @@ module.exports = (api) => {
     const price = priceOf(m);
     if (!takeGold(a, price)) return { ok: false, text: `${m.title} costs ${price} gold, and you do not have it.` };
     if (!giveItem(a, m.bookId, 1)) { giveItem(a, 0xf, price); return { ok: false, text: 'The book could not be handed over. Your gold is returned.' }; }
-    let paid = 0; try { paid = depositToTreasury(C.shop.treasury, price); } catch (e) { paid = 0; }
+    let paid = 0; try { paid = depositToTreasury(C.shop.treasury, price, { income: 'sales' }); } catch (e) { paid = 0; }
     audit(`MANUAL ${who(a)} bought ${m.name} (T${m.tier}) from the Synod for ${price} gold (${paid} to ${C.shop.treasury})`);
     try { if (typeof notify === 'function') notify(a, `${m.title} added`); } catch (e) { /* offline */ }
     return { ok: true, text: `You buy ${m.title} for ${price} gold. Read it to learn it; the book is used up as you learn.` };

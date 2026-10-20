@@ -4,8 +4,8 @@
 //
 // A case (restitution-cases.json, tracked) names a character by #TAG, the items taken as { "<hex base id>": count } exactly as
 // ITEMGUARD logged them, and optionally the containers the thief stashed them in, each capped at what the thief put there so
-// nobody else's goods are touched. Up to each count, the module removes the items from the character's pack (at login and
-// every sweepSeconds while online), from the listed containers (on the timer and as they are opened), and the gold still
+// nobody else's goods are touched. Up to each count, the module removes the items from the character's pack and bank vaults
+// (at login and every sweepSeconds while online), from the listed containers (on the timer and as they are opened), and the gold still
 // owed from the character's bank balance. Take only, never give: the victim is paid by tools/gift.js.
 // State (restitution-state.json beside world/, never in git): { cases: { <id>: { recovered, fromContainer, log } } }. It is
 // written before an inventory changes, and put back if the change throws, so a reload never counts an item twice.
@@ -104,6 +104,19 @@ module.exports = (api) => {
     })) {
       got += total(p.taken);
       audit(`RESTITUTION ${c.id} took ${describe(p.taken)} from the pack of ${who(a)}`);
+    }
+    // Goods parked in a vault (bank.js), up to what is still owed, one item at a time (bank review R10)
+    const vHas = globalThis.__dboVaultHas, vTake = globalThis.__dboVaultTake;
+    if (typeof vHas === 'function' && typeof vTake === 'function') {
+      for (const [h, n] of Object.entries(owed(c.items, caseState(c).recovered))) {
+        if (h === GOLD) continue;
+        const k = Math.min(n, Number(vHas(a, parseInt(h, 16))) || 0);
+        if (!(k > 0)) continue;
+        if (commit(c, `vaults of ${who(a)}`, { [h]: k }, () => { if (vTake(a, parseInt(h, 16), k, `restitution ${c.id}`) !== k) throw new Error('the vault take fell short'); })) {
+          got += k;
+          audit(`RESTITUTION ${c.id} took ${k} x ${h} from the bank vaults of ${who(a)}`);
+        }
+      }
     }
     const gold = owed(c.items, caseState(c).recovered)[GOLD] || 0;
     let bank = 0; try { bank = Number(mp.get(a, 'private.bankGold')) || 0; } catch (e) { /* no account */ }

@@ -112,5 +112,28 @@ store.set(`${WOLF}|inventory`, { entries: [{ baseId: RING, count: 1, worn: true 
 papyrusCalls.length = 0; timers.superSilver();
 ok(papyrusCalls.some((c) => /UnequipItem/.test(JSON.stringify(c))), 'a worn real silver ring is still taken off', papyrusCalls);
 
+// The loop (karta.gina, 19 Oct): a parcel of silver its vampire can never keep is burned unopened; a human keeps theirs
+ok(globalThis.__dboCannotCarry(VAMP, INGOT) && globalThis.__dboCannotCarry(WOLF, RING) && !globalThis.__dboCannotCarry(HUMAN, INGOT) && !globalThis.__dboCannotCarry(VAMP, IRON),
+  'the post asks whether a reader can never keep an item: silver for a vampire or werewolf only');
+// The Beast Form power without the beast (mod-0284, 20 Oct): the power held, not a werewolf here
+{
+  const POWER = 0x1234;   // every desc resolves to this here, the Beast Form power among them
+  globalThis.__dboSpellsLearned = (x) => (x === HUMAN || x === VAMP ? [0x99, POWER] : []);
+  audits.length = 0; papyrusCalls.length = 0;
+  globalThis.__dboSuperBeastPowerCheck(HUMAN, 'test');
+  ok(store.get(`${HUMAN}|private.supernatural`).kind === 'werewolf' && audits.some((t) => /held the Beast Form power without being a werewolf; made a werewolf/.test(t)), 'a human holding the Beast Form power becomes a werewolf, as the rite would have made them', audits);
+  papyrusCalls.length = 0;
+  globalThis.__dboSuperBeastPowerCheck(VAMP, 'test');
+  ok(store.get(`${VAMP}|private.supernatural`).kind === 'vampire' && papyrusCalls.some((c) => /RemoveSpell/.test(JSON.stringify(c))), 'a vampire holding it only loses it');
+  store.set(`${HUMAN}|private.supernatural`, { kind: null, disease: null });
+  globalThis.__dboIsStaff = (x) => x === HUMAN;
+  globalThis.__dboSuperBeastPowerCheck(HUMAN, 'test');
+  ok(store.get(`${HUMAN}|private.supernatural`).kind === null, 'staff are left alone (GM tests)');
+  globalThis.__dboIsStaff = () => false;
+  globalThis.__dboSpellsLearned = () => [0x99];
+  globalThis.__dboSuperBeastPowerCheck(HUMAN, 'test');
+  ok(store.get(`${HUMAN}|private.supernatural`).kind === null, 'without the power nothing changes');
+  ok(typeof timers.superBeastPower === 'function', 'a sweep runs over everyone online');
+}
 console.log(fail ? `${fail} FAILED` : 'all passed');
 process.exit(fail ? 1 : 0);

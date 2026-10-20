@@ -34,11 +34,12 @@ for (const a of [COUNT, GUARD, HUNTER, COUNT_ALT]) { inv(a, 0); set(a, 'worldOrC
 inv(CHEST, 100000);
 
 // A wolf, a chicken and a bear roam Bruma, so all three are known quarry there
-fs.writeFileSync('NPC-Spawns.json', JSON.stringify([
+const SPAWNS_FIRST = JSON.stringify([
   { Name: 'wild:wolf:1', ID: 'BSHeartland.esm:BSHeartland', POS: [0, 0, 0] },
   { Name: 'wild:chicken:1', ID: 'BSHeartland.esm:BSHeartland', POS: [0, 0, 0] },
   { Name: 'wild:bear:1', ID: 'BSHeartland.esm:BSHeartland', POS: [0, 0, 0] },
-]));
+]);
+fs.writeFileSync('NPC-Spawns.json', SPAWNS_FIRST);
 
 const out = { personal: [], audits: [] };
 const commands = new Map();
@@ -437,5 +438,40 @@ const leadOnly = (gamemode.match(/const LEAD_ONLY = new Set\(\[([\s\S]*?)\]\);/)
 check('appoint is Lead GM and above', /'appoint'/.test(leadOnly));
 check('dismiss is Lead GM and above', /'dismiss'/.test(leadOnly));
 
-console.log(failures ? `${failures} failure(s)` : 'all passed');
-process.exit(failures ? 1 : 0);
+// ---- bounties pay back (Nate, 18 Oct): the hold claims a contract kill's pelts and gets 75% of their value back --------------
+(async () => {
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+  const claimed = [];
+  let stash = { value: 40, count: 1 };
+  globalThis.__dboClaimPelts = (id) => { claimed.push(id); return stash; };
+  fs.writeFileSync('NPC-Spawns.json', SPAWNS_FIRST);
+  for (const a of [COUNT, HUNTER]) set(a, 'worldOrCellDesc', 'BSHeartland.esm:BSHeartland');
+  zoneOfActorMock = null;
+  clear(); inv(CHEST, 100); load(NOFLOOR);
+  run(COUNT, 'post wolf 2 24');
+  run(HUNTER, 'take 1');
+  beast(0x960, 'wolf');
+  const t0 = goldOf(CHEST);
+  globalThis.__dboContractKill(0x960, HUNTER);
+  await wait(500);
+  check('payback: a counted contract kill has its pelts claimed for the hold', claimed.length === 1, JSON.stringify(claimed));
+  check('payback: 75% of the pelts\' value (40 -> 30) goes back into the treasury', goldOf(CHEST) === t0 + 30, `${goldOf(CHEST) - t0}`);
+  check('payback: the hunter is told the hold took the pelt as proof', out.personal.some((p) => p.a === HUNTER && /takes the pelt as proof of the kill/.test(p.t)), JSON.stringify(out.personal.slice(-2)));
+  check('payback: audited', out.audits.some((t) => /CONTRACT PELTS .*worth 40 claimed by Bruma, 30 gold/.test(t)), JSON.stringify(out.audits.slice(-2)));
+  // A creature with no pelt (a skeever, a mudcrab): nothing comes back, the contract pays as before
+  stash = { value: 0, count: 0 };
+  const t1 = goldOf(CHEST); const h1 = goldOf(HUNTER);
+  killOf(0x960, HUNTER);
+  await wait(500);
+  check('payback: no pelt, nothing claimed, and the contract still pays the hunter in full (24)', goldOf(CHEST) === t1 && goldOf(HUNTER) === h1 + 24, `${goldOf(CHEST) - t1} ${goldOf(HUNTER) - h1}`);
+  // holdShare 0 turns it off: nothing is claimed
+  claimed.length = 0; stash = { value: 40, count: 1 };
+  clear(); inv(CHEST, 100); load(Object.assign({}, NOFLOOR, { holdShare: 0 }));
+  run(COUNT, 'post wolf 2 24'); run(HUNTER, 'take 1');
+  killOf(0x960, HUNTER);
+  await wait(500);
+  check('payback: holdShare 0 claims nothing', claimed.length === 0, JSON.stringify(claimed));
+  delete globalThis.__dboClaimPelts;
+  console.log(failures ? `${failures} failure(s)` : 'all passed');
+  process.exit(failures ? 1 : 0);
+})();

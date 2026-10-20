@@ -49,9 +49,10 @@ let defense = { heavy: 1, light: 1 };
 const defensePieceMult = () => defense;
 const gmstFloat = (id, fb) => fb;
 const g = {};
-const fn = new Function('recordOf', 'fieldsOf', 'u32At', 'globalAt', 'wornWithHealth', 'armorPieceOf', 'temperBonus', 'defensePieceMult', 'gmstFloat', 'cfg', 'Date', 'globalThis',
+// gearArmorMult: worn Fortify Heavy/Light Armor (gearench.js), none here
+const fn = new Function('recordOf', 'fieldsOf', 'u32At', 'globalAt', 'wornWithHealth', 'armorPieceOf', 'temperBonus', 'defensePieceMult', 'gmstFloat', 'cfg', 'Date', 'globalThis', 'gearArmorMult',
   src.slice(a, b) + '\nreturn { fleshOfSpell, fleshCast, fleshArmorOf, fleshDamageMult };');
-const F = fn(recordOf, fieldsOf, u32At, globalAt, wornWithHealth, armorPieceOf, temperBonus, defensePieceMult, gmstFloat, {}, Date2, g);
+const F = fn(recordOf, fieldsOf, u32At, globalAt, wornWithHealth, armorPieceOf, temperBonus, defensePieceMult, gmstFloat, {}, Date2, g, () => ({ heavy: 1, light: 1 }));
 
 let fails = 0, n = 0;
 const ok = (c, what, detail) => { n++; if (!c) fails++; console.log(`${c ? 'ok  ' : 'FAIL'}  ${what}${!c && detail !== undefined ? ': ' + JSON.stringify(detail) : ''}`); };

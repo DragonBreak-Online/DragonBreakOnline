@@ -76,7 +76,7 @@ function resolveTarget(args) {
       note: 'the live dev server, shared with whoever is testing in game',
     };
   }
-  const sandbox = new Sandbox({ root: path.join(ROOT, 'sandbox'), serverDir: SERVER_DIR, log });
+  const sandbox = new Sandbox({ root: path.join(ROOT, 'sandbox'), serverDir: SERVER_DIR, log, env: serverEnv(args) });
   const settings = sandbox.settings();
   return {
     kind, host: '127.0.0.1', port: settings.port, settings, sandbox,
@@ -229,6 +229,11 @@ class Runner {
     this.slots = slots;
     this.cfg = {
       movementMs: Number(args.movementMs || CFG.movementMs),
+      // --heartbeat makes the bots behave like the client from fork 2e12c0d1: sample every movementMs, but
+      // only send when something changed, or when heartbeatMs has passed. Absent means send every sample,
+      // which is the control for measuring that change.
+      heartbeatMs: args.heartbeat === undefined ? 0
+        : (args.heartbeat === true ? 700 : (Number(args.heartbeat) || 700)),
       runSpeed: Number(args.runSpeed || CFG.runSpeed),
       pauseMs: CFG.pauseMs,
       avEveryMs: args.noAv ? 0 : Number(args.avEveryMs || CFG.avEveryMs),
@@ -251,6 +256,8 @@ class Runner {
     this.pool = new HostPool({
       exe: EXE, dll: DLL, workDir: WORK, cwd: ROOT,
       botsPerHost: Number(args.botsPerHost || CFG.botsPerHost),
+      fullUnits: Number(args.fullUnits || CFG.fullUnits || 2000),
+      midUnits: Number(args.midUnits || CFG.midUnits || 4096),
       forward: P.FORWARDED,
       handlers: {
         event: (id, name, err) => { const b = this.bots[id]; if (b) b.onEvent(name, err); },
@@ -260,6 +267,26 @@ class Runner {
       },
     });
     this.place = CFG.places[args.spread || CFG.spread] || CFG.places.city;
+    // --scatter [units]: groups spread across the world instead of one crowd (default 2 grid cells apart)
+    // --scatter alone arrives as true, and Number(true) is 1, which would thin nothing
+    this.scatterSep = args.scatter === undefined ? 0
+      : (args.scatter === true ? 8192 : (Number(args.scatter) || 8192));
+    this.clusterRadius = Number(args.clusterRadius || 600);
+    this.anchors = null;
+    if (this.scatterSep > 0) {
+      try {
+        this.anchors = scatterAnchors(this.place.world, this.scatterSep);
+        // --groups N uses only N of them, so each cluster has members: N groups of bots/N
+        const groups = Number(this.args.groups || 0);
+        if (groups > 0 && groups < this.anchors.length) this.anchors = this.anchors.slice(0, groups);
+        if (!this.anchors.length) { this.anchors = null; log('scatter: no anchors in ' + this.place.world + ', staying crowded'); }
+        else log('scatter: ' + this.anchors.length + ' anchor(s) at least ' + this.scatterSep + ' units apart, cluster radius ' + this.clusterRadius);
+      } catch (e) { log('scatter: cannot read NPC-Spawns.json (' + e.message + '), staying crowded'); }
+    }
+    // the report says which scenario produced its numbers
+    this.cfg.scatter = this.anchors
+      ? { anchors: this.anchors.length, separation: this.scatterSep, clusterRadius: this.clusterRadius }
+      : null;
     // Verified through the creation-kit MCP on 2026-09-19: 13746:Skyrim.esm is RACE NordRace
     this.raceId = Number(args.raceId || 0x00013746);
     this.jobs = [];
@@ -278,7 +305,7 @@ class Runner {
   }
 
   makeBot(i) {
-    const home = spreadPoint(this.place, i);
+    const home = this.anchors ? scatterPoint(this.anchors, i, this.clusterRadius) : spreadPoint(this.place, i);
     const bot = new Bot({
       id: i,
       profileId: Number(this.args.profileBase || CFG.profileIdBase) + i,
@@ -289,7 +316,7 @@ class Runner {
       seed: 1000 + i,
       raceId: this.raceId,
       home,
-      homeRadius: Math.min(1200, this.place.radius),
+      homeRadius: this.anchors ? this.clusterRadius : Math.min(1200, this.place.radius),
       useWarp: !this.args.noWarp,
       botActorIds: this.botActorIds,
       targetWorld: this.targetWorld,
@@ -348,15 +375,88 @@ class Runner {
         totals[k] = (totals[k] || 0) + bot.stats[k];
       }
     }
-    const host = { rx: 0, rxBytes: 0, tx: 0, txBytes: 0, byType: {} };
-    for (const stat of this.stats.values()) {
+    // interest: what each bot was told about, by distance band. The host counts it because UpdateMovement
+    // is not forwarded to this process at all (libhost.js FORWARDED): at 620 a second per bot it would cost
+    // more than the measurement is worth. 'unknown' is an emitter seen before the bot had sent a position.
+    const band = () => ({ e: 0, m: 0 });
+    const host = {
+      rx: 0, rxBytes: 0, tx: 0, txBytes: 0, byType: {},
+      selfEcho: 0, selfEchoNew: 0, selfEchoDup: 0, movers: 0,
+      moverNewPos: 0, moverDup: 0, moverCreates: 0,
+      tiers: { full: band(), mid: band(), far: band(), unknown: band() },
+      tiersNew: { full: 0, mid: 0, far: 0 },
+      top: [],
+    };
+    for (const [botId, stat] of this.stats) {
       host.rx += stat.rx; host.rxBytes += stat.rxBytes; host.tx += stat.tx; host.txBytes += stat.txBytes;
       for (const t of Object.keys(stat.rxByType || {})) host.byType[t] = (host.byType[t] || 0) + stat.rxByType[t];
+      host.selfEcho += Number(stat.selfEcho) || 0;
+      host.selfEchoNew += Number(stat.selfEchoNew) || 0;
+      host.selfEchoDup += Number(stat.selfEchoDup) || 0;
+      host.movers += Number(stat.movers) || 0;
+      host.moverNewPos += Number(stat.moverNewPos) || 0;
+      host.moverDup += Number(stat.moverDup) || 0;
+      host.moverCreates += Number(stat.moverCreates) || 0;
+      for (const k of Object.keys(host.tiersNew)) {
+        host.tiersNew[k] += Number((stat.tiersNew || {})[k]) || 0;
+      }
+      for (const k of Object.keys(host.tiers)) {
+        const t = (stat.tiers || {})[k];
+        if (!t) continue;
+        host.tiers[k].e += Number(t.e) || 0;
+        host.tiers[k].m += Number(t.m) || 0;
+      }
+      if (stat.top && host.top.length < 3) host.top.push({ bot: botId, top: String(stat.top) });
     }
     const states = {};
     for (const bot of this.bots) { if (bot) states[bot.state] = (states[bot.state] || 0) + 1; }
     return { totals, host, states };
   }
+}
+
+// The scatter scenario: small groups spread across the worldspace instead of one crowd, so the fan-out can be
+// measured when players are NOT all in one 3x3 grid block. Anchors come from the vanilla wildlife placements in
+// NPC-Spawns.json, which are known-good ground in the right world, thinned greedily so no two are inside each
+// other's block (>= 8192 units, two grid cells; the block only reaches one cell out).
+function scatterAnchors(world, separation) {
+  const file = path.join(SERVER_DIR, 'NPC-Spawns.json');
+  const parsed = JSON.parse(fs.readFileSync(file, 'utf8'));
+  const key = Array.isArray(parsed) ? null : Object.keys(parsed).find((k) => k.toLowerCase() === 'zones');
+  const list = Array.isArray(parsed) ? parsed : (key ? parsed[key] : []);
+  const want = String(world).toLowerCase();
+  const pts = (list || [])
+    .filter((z) => z && Array.isArray(z.POS) && String(z.ID || '').toLowerCase() === want)
+    .map((z) => [Number(z.POS[0]), Number(z.POS[1]), Number(z.POS[2])])
+    .filter((p) => p.every(Number.isFinite));
+  pts.sort((a, b) => (a[0] - b[0]) || (a[1] - b[1]));   // deterministic, so a run is repeatable
+  const out = [];
+  for (const p of pts) {
+    if (out.every((q) => Math.hypot(p[0] - q[0], p[1] - q[1]) >= separation)) out.push(p);
+  }
+  return out;
+}
+
+// One bot's standing place: a point in its cluster when scattering, otherwise the ring inside the place
+function scatterPoint(anchors, i, clusterRadius) {
+  const a = anchors[i % anchors.length];
+  const golden = 2.399963229728653;
+  const ang = i * golden;
+  const r = clusterRadius * Math.sqrt(((i / anchors.length | 0) % 16) / 16);
+  return [a[0] + Math.cos(ang) * r, a[1] + Math.sin(ang) * r, a[2]];
+}
+
+// --server-env NAME=1,OTHER=2 for the sandbox server process, so a build can be measured with an env-gated
+// feature on and off without rebuilding it
+function serverEnv(args) {
+  const out = {};
+  const raw = args && args.serverEnv;
+  if (!raw || raw === true) return out;
+  for (const pair of String(raw).split(',')) {
+    const at = pair.indexOf('=');
+    if (at <= 0) continue;
+    out[pair.slice(0, at).trim()] = pair.slice(at + 1).trim();
+  }
+  return out;
 }
 
 function spreadPoint(place, i) {
@@ -380,7 +480,7 @@ function cmdBuild() {
 }
 
 async function cmdSandbox(args) {
-  const sandbox = new Sandbox({ root: path.join(ROOT, 'sandbox'), serverDir: SERVER_DIR, log });
+  const sandbox = new Sandbox({ root: path.join(ROOT, 'sandbox'), serverDir: SERVER_DIR, log, env: serverEnv(args) });
   const sub = args._[1] || 'status';
   if (sub === 'init') { sandbox.init(); return; }
   if (sub === 'start') {
@@ -521,6 +621,9 @@ async function cmdRun(args) {
     await sleep(6000); // let logins and spawns settle before the measured window
     if (runner.jobs.length) runner.assignDungeons();
 
+    // The per-emitter counters cannot be subtracted the way the totals are, so the hosts are told to start
+    // a fresh window here. Everything else in this snapshot is a running total and is deltaed below.
+    runner.pool.mark();
     previous = runner.snapshot();
     previousProm = prom && prom.samples.length ? prom.samples[prom.samples.length - 1] : null;
     previousOs = os.samples.length ? os.samples[os.samples.length - 1] : null;
@@ -623,6 +726,10 @@ function buildStep(x) {
   const movesSent = d('movesSent');
   const traffic = {
     movesSent,
+    // What the heartbeat rule held back. movementHzPerBot below is what was actually sent, so the pair gives
+    // both the client-side saving and the rate the server really saw.
+    movesSkipped: d('movesSkipped'),
+    movementSampledHzPerBot: connected ? (movesSent + d('movesSkipped')) / connected / seconds : null,
     chatSent: d('chatSent'),
     avSent: d('avSent'),
     activateSent: d('activateSent'),
@@ -648,6 +755,27 @@ function buildStep(x) {
     rxMsgsPerSec: hostD('rx') / seconds,
     rxKiBPerSec: hostD('rxBytes') / 1024 / seconds,
     topTypes,
+    // The interest check (README): emitters and movement messages per bot by distance band, so a ladder can
+    // be judged per actor. Deltas, like everything else here. connected scales it to a per-bot figure.
+    interest: (() => {
+      const bands = ["full", "mid", "far", "unknown"];
+      const out = { perBot: {}, perBotNew: {}, emitters: {}, selfEchoPerSec: hostD("selfEcho") / seconds, top: x.now.host.top,
+        fullUnits: x.runner.pool.fullUnits, midUnits: x.runner.pool.midUnits };
+      for (const b of bands) {
+        const m = x.now.host.tiers[b].m - x.previous.host.tiers[b].m;
+        out.perBot[b] = connected ? m / connected / seconds : null;
+        out.emitters[b] = connected ? x.now.host.tiers[b].e / connected : null;
+        const n = b === "unknown" ? 0 : x.now.host.tiersNew[b] - x.previous.host.tiersNew[b];
+        out.perBotNew[b] = connected ? n / connected / seconds : null;
+      }
+      // A position the listener was already told is wire cost that taught it nothing: newPos is what it learned
+      out.newPosPerBot = connected ? hostD("moverNewPos") / connected / seconds : null;
+      out.dupPerBot = connected ? hostD("moverDup") / connected / seconds : null;
+      out.createsPerBot = connected ? hostD("moverCreates") / connected / seconds : null;
+      out.selfEchoNewPerSec = hostD("selfEchoNew") / seconds;
+      out.selfEchoDupPerSec = hostD("selfEchoDup") / seconds;
+      return out;
+    })(),
   };
 
   // Real wire bytes, when the run went through the counting relay

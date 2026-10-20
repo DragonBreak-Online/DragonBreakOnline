@@ -17,7 +17,7 @@ const start = src.indexOf('const APPOINT_RULES = ');
 const end = src.indexOf('// ---- Scholar');
 if (start < 0 || end < start || !/const appointCheck = /.test(src.slice(start, end))) { console.log('FAIL the shared officials functions are not in gamemode.js'); process.exit(1); }
 if (!fs.existsSync(path.join(ROOT, 'court.js'))) { console.log('FAIL court.js is missing'); process.exit(1); }
-const section = src.slice(start, end) + '\nreturn { APPOINT_RULES, appointCap, appointCheck, appointFrom, seatOfficial, unseatOfficial, officialTarget, officialName, accountActors };';
+const section = src.slice(start, end) + '\nreturn { APPOINT_RULES, appointCap, appointCheck, appointFrom, seatOfficial, unseatOfficial, unseatOfficialBy, officialTarget, officialName, accountActors };';
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'claude-nate-court-'));
 fs.copyFileSync(path.join(ROOT, 'guild-defs.json'), path.join(dir, 'guild-defs.json'));
@@ -343,6 +343,45 @@ const realNow = Date.now;
 Date.now = () => realNow() + 25 * 3600000;
 ok('offers expire after 24 hours', sec.view(COUNT).courts[0].outgoing.length === 0 && sec.view(ADMIN).courts[0].outgoing.length === 0);
 Date.now = realNow;
+
+// ---- stepping down (Nate, 17 Oct: "people need the ability to leave factions on their own") ----------------------------------
+{
+  ev('courtAppoint', ADMIN, 'N', 'bruma', 'Hilde', 'guard');
+  ok('resign: Hilde is a Bruma Guard, seated and in the household', seated('bruma', 'guard').includes(21) && hhTitle(TG1) !== null, [officials.bruma, hhTitle(TG1)]);
+  r = ev('courtResign', TG1, 'N', 'bruma');
+  ok('resign: she steps down from her own court', r && r.kind === 'ok' && /stepped down from the court of Bruma, and are no longer its Guard/.test(r.text), r);
+  ok('resign: the seat is empty and she is out of the household', !seated('bruma', 'guard').includes(21) && hhTitle(TG1) === null, [officials.bruma, hhTitle(TG1)]);
+  ok('resign: the audit names it', audits.some((t) => /Hilde #HLD1 \(profile 21\) \(stepped down\) unseated Hilde/.test(t)), audits.slice(-3));
+  r = ev('courtResign', TG1, 'N', 'bruma');
+  ok('resign: again, she no longer serves it', r && r.kind === 'refused', r);
+  const ruler = (Object.entries(officials.bruma || {}).find(([k]) => k === 'count') || [])[1] || [];
+  const rulerActor = [...chars.entries()].find(([, c]) => ruler.includes(c.pid));
+  if (rulerActor) {
+    r = ev('courtResign', rulerActor[0], 'N', 'bruma');
+    ok('resign: the ruler cannot step down by a click', r && r.kind === 'refused' && /through the staff/.test(r.text) && seated('bruma', 'count').includes(rulerActor[1].pid), r);
+  }
+  ev('courtAppoint', ADMIN, 'N', 'bruma', 'Hilde', 'guard');
+  said.length = 0; commands.get('court')(TG1, 'resign');
+  ok('/court resign without a hold names the courts and does nothing', /court resign Bruma/.test(said[said.length - 1] || '') && seated('bruma', 'guard').includes(21), said);
+  said.length = 0; commands.get('court')(TG1, 'resign Bruma');
+  ok('/court resign Bruma steps her down', !seated('bruma', 'guard').includes(21) && /stepped down/.test(said[said.length - 1] || ''), said);
+  ok('resign: someone who serves no court cannot', ev('courtResign', TG2, 'N', 'bruma').kind === 'refused');
+}
+
+// ---- staff hold no leadership (Nate, 18 Oct: "GMs of any kind cannot be in leadership in any faction etc") --------------
+{
+  globalThis.__dboIsStaff = (a) => a === TG2;
+  let r = ev('courtAppoint', ADMIN, 'N', 'bruma', 'Ivar', 'steward');
+  ok('staff rule: a staff member cannot be appointed Steward', r && r.kind === 'refused' && /on the staff\. Staff hold no leading office/.test(r.text) && !seated('bruma', 'steward').includes(22), r);
+  r = ev('courtAppoint', ADMIN, 'N', 'bruma', 'Ivar', 'guard');
+  ok('staff rule: ...but may serve as a plain guard', r && r.kind === 'ok' && seated('bruma', 'guard').includes(22), r);
+  r = ev('courtRank', ADMIN, 'N', 'bruma', TG2, 3);
+  ok('staff rule: a staff member in the household cannot be made Knight (an officer rank)', r && r.kind === 'refused' && /Staff hold no officer rank in a faction/.test(r.text) && hhTitle(TG2) === 'Guard', [r, hhTitle(TG2)]);
+  r = ev('courtRank', ADMIN, 'N', 'bruma', TG2, 6);
+  ok('staff rule: ...but can be its Armorer', r && r.kind === 'ok' && hhTitle(TG2) === 'Armorer', [r, hhTitle(TG2)]);
+  ev('courtDismiss', ADMIN, 'N', 'bruma', '22');
+  delete globalThis.__dboIsStaff;
+}
 
 for (const k of ['__dboJournalFresh', '__dboJournalLimited']) delete globalThis[k];
 try { fs.rmSync(dir, { recursive: true, force: true }); } catch (e) { /* temp */ }

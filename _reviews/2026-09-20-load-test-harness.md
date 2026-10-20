@@ -1,5 +1,9 @@
 # Load test: a headless bot harness, and the first numbers from it
 
+> **Superseded in part, 2026-10-17** (`2026-10-17-npc-live-budget-cost.md`): `npcLiveBudget` is now 600, not
+> the 150 measured here, and the 100-player traffic below was a nearly empty world - populated it is 2.7x
+> higher. The dungeon finding is qualified there too: the enemies arrive late, not never.
+
 Written 2026-09-20. Answers the review item *"Load test before any real 100-player night"*
 (`_reviews\2026-09-19-daily-review.md`), which asked for a headless bot client that walks N bots around
 Bruma, sends chat and claims dungeons, and measures event-loop lag, outbound traffic and tick durations at

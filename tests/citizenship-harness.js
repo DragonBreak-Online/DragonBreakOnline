@@ -76,12 +76,14 @@ const said = [], audits = [], widgets = [], closed = [], seats = [], unseats = [
 const ui = {};
 let timer = null;
 let nearBoard = new Map();
+// A lone complete court takes office unopposed by default (otome, 18 Oct); the checks below that run a one-court vote turn it off
+const ELECTION = { unopposedWins: false };
 const api = () => ({
   mp, log: () => {}, audit: (t) => audits.push(t), who: (a) => (chars.get(a >>> 0) || {}).name || `actor ${a}`,
   personal: (a, t) => said.push([a >>> 0, t]), nameOf: (a) => chars.get(a >>> 0).name, ownNameOf: (a) => chars.get(a >>> 0).name, tagOf: (a) => `T${(a >>> 0).toString(16)}`,
   onUi: (n, f) => { ui[n] = f; }, onlineActors: () => online.slice(), isAdmin: (a) => a === STAFF || a === GM || a === GMJARL, isLeadStaff: (a) => a === STAFF,
   profileOf: (a) => { const c = chars.get(a >>> 0); return c ? c.pid : -1; },
-  cfg: { citizenship: { discordRoles: { bruma: '1500000000000000001', whiterun: 'not-an-id' } } },
+  cfg: { citizenship: { discordRoles: { bruma: '1500000000000000001', whiterun: 'not-an-id' }, election: { voterRules: { enabled: false }, unopposedWins: ELECTION.unopposedWins } } },  // the voter rules: tests/election-antialt-harness.js
   every: (n, ms, f) => { timer = f; },
   zoneList: () => ZONES, zoneById: (id) => ZONES.find((z) => z.id === String(id)) || null, readOfficials: () => officials,
   rankTitle: (r) => ({ count: 'Count', jarl: 'Jarl', steward: 'Steward', commander: 'Lord Commander' })[r] || r,
@@ -341,11 +343,13 @@ ok(E.phase === 'registration' && E.courts.length === 0, 'the one court got no vo
 M.register(rif[0], 'riften', [nm(rif[1]), nm(rif[2]), nm(rif[4])]);
 const k3 = M.data().elections.riften.courts[0].id;
 for (const a of [rif[1], rif[2], rif[4]]) M.answerInvite(a, 'riften', k3, true);
-now += 24 * HOUR; timer();
-M.vote(rif[9], 'riften', k3);
+// From here a lone court is unopposed (the default): it takes office at the close of registration, with no vote
+ELECTION.unopposedWins = true; delete globalThis.__dboCitizen; M = load();
 now += 24 * HOUR; timer();
 E = M.data().elections.riften;
-ok(E.phase === 'seated' && E.result.winner === k3, 'a single court with one vote takes office', E.phase);
+ok(E.phase === 'seated' && E.result.winner === k3 && E.result.unopposed === true && !Object.keys(E.votes || {}).length, 'a single complete court at the close of registration takes office unopposed, no vote', E.phase);
+ok(audits.some((t) => /one complete court at the close of registration; it takes office unopposed/.test(t)), '...audited as unopposed');
+ELECTION.unopposedWins = false; delete globalThis.__dboCitizen; M = load();
 
 // ---- the Jarl candidate loses eligibility: struck off, votes void; and cancel below 15 ----------------------------------
 const FK = { id: 'falkreath', name: 'Falkreath', treasury: 'f', officials: ['jarl', 'steward', 'commander'] };
@@ -420,6 +424,30 @@ ok(nb.grants === false && /no citizenship/.test(nb.why), 'a stronghold board say
 ok(M.revoke(COUNT, 'bruma', BJORN).error, 'a ruler cannot revoke a citizenship');
 ok(!M.revoke(STAFF, 'bruma', BJORN).error && !M.citizenOf(BJORN, 'bruma'), 'a Lead GM can');
 
+// ---- staff lookup in the F3 Citizen tab (Nate, 17 Oct: a Revoke button for Lead GMs) ------------------------------------------
+{
+  const GUARD = add(0x60, 60, 'Dreams'); online.push(GUARD);
+  officials.bruma.guard = [60];
+  ok(!M.join(GUARD, 'whiterun').error && M.citizenOf(GUARD, 'whiterun') && M.citizenOf(GUARD, 'bruma'), 'lookup: Dreams is a Whiterun citizen and, as a Bruma Guard, a Bruma one');
+  ok(M.journalView(GM).lookup === undefined && /Lead GM/.test(R(M.lookup(GM, 'Dreams'))), 'lookup: a plain GM has no lookup and is refused');
+  journalAnswers.length = 0;
+  ui.citizenJ(STAFF, ['n', 'lookup', '', 'Dreams']);
+  let lv = M.journalView(STAFF).lookup;
+  ok(lv && lv.name === 'Dreams' && lv.holds.length === 2, 'lookup: through the F3 tab the Lead GM sees both citizenships', lv);
+  const auto = lv && lv.holds.find((h) => h.zone === 'bruma');
+  ok(auto && auto.auto && /guard seat/.test(auto.via), 'lookup: Bruma is marked auto, through its guard seat', auto);
+  r = M.revoke(STAFF, 'bruma', GUARD);
+  ok(r.error && /through its guard seat/.test(r.error) && M.citizenOf(GUARD, 'bruma'), 'revoke: an auto citizenship is refused with the reason', r);
+  ui.citizenJ(STAFF, ['n', 'revoke', 'whiterun', (0x60).toString(16)]);
+  lv = M.journalView(STAFF).lookup;
+  ok(!M.citizenOf(GUARD, 'whiterun') && lv.holds.length === 1 && /no longer a citizen of Whiterun/.test(journalAnswers[journalAnswers.length - 1].text), 'revoke: the Revoke button takes Whiterun, and the lookup shows Bruma only', [lv, journalAnswers]);
+  officials.bruma.guard = [];
+  ok(!M.citizenOf(GUARD, 'bruma') && M.journalView(STAFF).lookup.holds.length === 0, 'unseated from the guard, Dreams is no Bruma citizen');
+  ok(/no character/i.test(R(M.lookup(STAFF, 'Nobody Here'))), 'lookup: an unknown name is refused');
+  ui.citizenJ(STAFF, ['n', 'lookup', '', '']);
+  ok(M.journalView(STAFF).lookup === null, 'lookup: an empty search clears it');
+}
+
 // ---- Lord Commander (coordinator's decision, 14 Oct): the commander office reads Lord Commander to players ---------------------
 const GM_SRC = fs.readFileSync(path.resolve(__dirname, '..', 'gamemode.js'), 'utf8');
 const RT = GM_SRC.slice(GM_SRC.indexOf('const RANK_TITLES = '), GM_SRC.indexOf('\n', GM_SRC.indexOf('const RANK_TITLES = ')));
@@ -457,6 +485,18 @@ ok(M.votingView(V1, WR).seats.find((s) => s.id === 'commander').label === 'Lord 
   ok(M.journalView(GM).manage.length === 0, 'caps: a plain GM\'s journal manages nothing');
   ok(globalThis.__dboCitizenMenuEntries(GMJARL, asker2).some((e) => e.id === 'citizen:grant:riften'), 'caps: the GM Jarl gets Grant in the X menu');
   ok(!M.grant(GMJARL, 'riften', asker2).error && M.citizenOf(asker2, 'riften'), 'caps: and grants it');
+}
+
+// ---- staff hold no leadership (Nate, 18 Oct): a staff member is unfit for any seat of an election court -------------------
+{
+  const STAFFER = add(0x70, 70, 'Trial Tess'); online.push(STAFFER);
+  M.join(STAFFER, 'riften');
+  globalThis.__dboIsStaff = (a) => a === STAFFER;
+  const Z = { id: 'riften', name: 'The Rift' };
+  ok(typeof M.unfit === 'function' && /is on the staff: staff take no seat in a court/.test(M.unfit(STAFFER, Z, 'housecarl')), 'staff rule: a staff member is unfit for a court seat', typeof M.unfit === 'function' ? M.unfit(STAFFER, Z, 'housecarl') : 'no unfit');
+  globalThis.__dboIsStaff = () => false;
+  ok(!/on the staff/.test(M.unfit(STAFFER, Z, 'housecarl')), 'staff rule: ...and not unfit for that reason once off the staff');
+  delete globalThis.__dboIsStaff;
 }
 
 console.log(fails ? `\n${fails} FAILED` : '\nall passed');

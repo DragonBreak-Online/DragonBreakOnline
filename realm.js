@@ -83,12 +83,12 @@ module.exports = (api) => {
   const info = (fid) => (typeof globalThis.__dboGuildInfo === 'function' ? globalThis.__dboGuildInfo(fid) : null);
   const guildsOf = (a) => (typeof globalThis.__dboGuildsOf === 'function' ? globalThis.__dboGuildsOf(a) || [] : []);
   const holdFactionOf = (zoneId) => (typeof globalThis.__dboHoldFactionOf === 'function' ? globalThis.__dboHoldFactionOf(zoneId) : null);
-  const rulesZone = (a, zoneId) => { try { return (ranksOf(profileOf(a)) || []).some((m) => m.zone && m.zone.id === zoneId && C.rulerRanks.includes(m.rank)); } catch (e) { return false; } };
+  const rulesZone = (a, zoneId) => { try { return (ranksOf(profileOf(a), a) || []).some((m) => m.zone && m.zone.id === zoneId && C.rulerRanks.includes(m.rank)); } catch (e) { return false; } };
   // A member of a faction: on its roster, or (for a hold's faction) holding any rank in that hold
   const memberOf = (a, fid) => {
     if (guildsOf(a).some((g) => g.id === fid)) return true;
     const f = info(fid);
-    if (f && f.kind === 'hold' && f.zone) { try { return (ranksOf(profileOf(a)) || []).some((m) => m.zone && m.zone.id === f.zone); } catch (e) { return false; } }
+    if (f && f.kind === 'hold' && f.zone) { try { return (ranksOf(profileOf(a), a) || []).some((m) => m.zone && m.zone.id === f.zone); } catch (e) { return false; } }
     return false;
   };
   // A leader: the leader rank on its roster, or (for a hold's faction) the hold's ruler
@@ -106,7 +106,7 @@ module.exports = (api) => {
   };
   const factionsLedBy = (a) => {
     const out = new Set(guildsOf(a).filter((g) => g.role === 'leader').map((g) => g.id));
-    try { for (const m of ranksOf(profileOf(a)) || []) if (m.zone && C.rulerRanks.includes(m.rank)) { const f = holdFactionOf(m.zone.id); if (f) out.add(f); } } catch (e) { /* none */ }
+    try { for (const m of ranksOf(profileOf(a), a) || []) if (m.zone && C.rulerRanks.includes(m.rank)) { const f = holdFactionOf(m.zone.id); if (f) out.add(f); } } catch (e) { /* none */ }
     return [...out];
   };
   const onlineOf = (fid) => onlineActors().filter((a) => memberOf(a, fid));
@@ -596,6 +596,10 @@ module.exports = (api) => {
   };
   globalThis.__dboRealmMemberOf = (a, fid) => memberOf(a, fid);
   globalThis.__dboRealmTerritoryName = (tid) => (territory(tid) || { name: tid }).name;
+  // A hold's seat territory (its id is the zone's, or it holds the seat's cells): where a building with no door out in the open
+  // pays its tax (economy.js, Nate 17 Oct: "tax guild HQs too"; Fort Dawnguard's doors all stand in its interiors)
+  globalThis.__dboRealmTerritory = (tid) => territory(tid);
+  globalThis.__dboRealmSeatTerritoryOf = (zone) => { const ts = territories().filter((t) => t.zone === zone); return ts.find((t) => t.id === zone) || ts.find((t) => Array.isArray(t.seatCells) && t.seatCells.length) || null; };
   globalThis.__dboRealmFactionsLedBy = (a) => factionsLedBy(a);
   globalThis.__dboRealmTerritoriesOf = (fid) => territoriesOf(fid).map((t) => t.id);
   const reply = (a, r) => { if (!(typeof globalThis.__dboFactionRefresh === 'function' && globalThis.__dboFactionRefresh(a, r.text, r.ok))) personal(a, r.text); };

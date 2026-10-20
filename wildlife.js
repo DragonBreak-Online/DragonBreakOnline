@@ -9,7 +9,8 @@
 // loot straight into the pack (the container never opens), once per player per chest per hour.
 //
 // gamemode-config.json "wildlife": { enabled, radius, despawnSeconds, respawnSeconds, pick,
-//   maxZones, campLootMinutes, campGold: [min, max], safeZones: [{ world, pos, radius, pick }] }
+//   maxZones, campLootMinutes, campGold: [min, max], safeZones: [{ world, pos, radius, pick }],
+//   density: { worlds, rollEdids, rollLevel, dangerLevel, dangerSpacing, dangerRespawnSeconds } (see densityPlan) }
 // A spot inside a safe zone uses that zone's pick (e.g. "low" near where new players arrive).
 'use strict';
 const fs = require('fs');
@@ -111,9 +112,65 @@ module.exports = (api) => {
     return { id: again, left: !again };
   };
 
+  // ---- predator density (wildlife-density-1017) ---------------------------------------------------
+  // 'mid' takes the middle entry of a leveled list, not a roll: every LvlAnimalForestPredator spot (skeever, wolf, spider,
+  // bear, troll, cave bear) was a bear, 158 of them across Skyrim and 76 within 50,000 units of Riften, often two at
+  // one spot (players, 17 Oct: "2-3 bears every ten or so feet along the main road", "7 bears in 5 minutes").
+  // gamemode-config wildlife.density { worlds, rollEdids, rollLevel, dangerLevel, dangerSpacing, dangerRespawnSeconds }:
+  // in the listed worlds, a spot whose leveled list's editor id matches rollEdids rolls once among the options up to
+  // rollLevel (vanilla's "every level up to the player's" list), fixed by the spot's own id so the same spot keeps its
+  // creature. A pick at dangerLevel or above (sabre cats, bears, ice wraiths, trolls) is a dangerous predator: at most one
+  // stands within dangerSpacing of another, the rest take their list's weakest option, and it returns after
+  // dangerRespawnSeconds rather than respawnSeconds. A safe zone's own pick still wins. worlds [] turns it all off.
+  const DEN = Object.assign({ worlds: [], rollEdids: 'Predator', rollLevel: 12, dangerLevel: 6, dangerSpacing: 0, dangerRespawnSeconds: 0 }, C.density || {});
+  const DEN_WORLDS = new Set((Array.isArray(DEN.worlds) ? DEN.worlds : []).map(normWorld));
+  const DEN_RE = (() => { try { return new RegExp(String(DEN.rollEdids || '^$')); } catch (e) { log('wildlife.density.rollEdids is not a pattern', e.message); return /^$/; } })();
+  const hashFrac = (s) => parseInt(crypto.createHash('sha1').update(String(s)).digest('hex').slice(0, 8), 16) / 0x100000000;
+  const sortedOpts = (options) => (options || []).filter((o) => Array.isArray(o) && o[1]).slice().sort((x, y) => x[0] - y[0]);
+  // placement -> { opt: [level, desc], danger } for the spots the density rules decide; the others keep pickFor
+  const densityPlan = () => {
+    const plan = new Map();
+    if (!DEN_WORLDS.size) return plan;
+    const lvl = Number(DEN.rollLevel), dangerAt = Number(DEN.dangerLevel), spacing = Number(DEN.dangerSpacing) || 0;
+    const cands = [];
+    for (const pl of DATA.placements || []) {
+      if (!pl || !pl.ref || !Array.isArray(pl.pos) || pl.noNavmesh || pl.anchorGone || !DEN_WORLDS.has(normWorld(pl.world))) continue;
+      if (SAFE.some((z) => normWorld(z.world) === normWorld(pl.world) && Math.hypot(pl.pos[0] - z.pos[0], pl.pos[1] - z.pos[1]) <= Number(z.radius))) continue;
+      const sorted = sortedOpts(pl.options);
+      if (!sorted.length) continue;
+      let opt;
+      if (DEN_RE.test(String(pl.edid || ''))) {
+        const up = sorted.filter((o) => Number(o[0]) <= lvl);
+        const list = up.length ? up : [sorted[0]];
+        opt = list[Math.min(list.length - 1, Math.floor(hashFrac(`roll:${pl.src}`) * list.length))];
+      } else opt = sorted[Math.floor(sorted.length / 2)];   // what 'mid' takes, so a single-creature spot keeps its creature
+      const danger = Number(opt[0]) >= dangerAt;
+      plan.set(pl, { opt, danger, weakest: sorted[0] });
+      if (danger) cands.push({ pl, fixed: Number(sorted[0][0]) >= dangerAt, h: hashFrac(`space:${pl.src}`) });
+    }
+    if (spacing > 0) {
+      // Spots that cannot step down (a placed sabre cat, a troll) claim their ground first, then the rest by their own id,
+      // so the kept set never depends on the order of wildlife.json
+      cands.sort((a, b) => (b.fixed - a.fixed) || (a.h - b.h));
+      const grid = new Map();
+      const key = (w, x, y) => `${w}|${x}|${y}`;
+      for (const c of cands) {
+        const w = normWorld(c.pl.world), gx = Math.floor(c.pl.pos[0] / spacing), gy = Math.floor(c.pl.pos[1] / spacing);
+        let near = false;
+        for (let dx = -1; dx <= 1 && !near; dx++) for (let dy = -1; dy <= 1 && !near; dy++)
+          for (const p of grid.get(key(w, gx + dx, gy + dy)) || []) if (Math.hypot(p[0] - c.pl.pos[0], p[1] - c.pl.pos[1]) < spacing) { near = true; break; }
+        if (near && !c.fixed) { const e = plan.get(c.pl); e.opt = e.weakest; e.danger = Number(e.weakest[0]) >= dangerAt; e.thinned = true; continue; }
+        const k = key(w, gx, gy); if (!grid.has(k)) grid.set(k, []); grid.get(k).push(c.pl.pos);
+      }
+    }
+    return plan;
+  };
+
   // ---- zones --------------------------------------------------------------------------------
   const buildZones = () => {
     const out = [];
+    const plan = densityPlan();
+    const dangerRespawn = Math.max(C.respawnSeconds, Number(DEN.dangerRespawnSeconds) || 0);
     let n = 0;
     for (const pl of DATA.placements || []) {
       if (out.length >= C.maxZones) break;
@@ -122,10 +179,13 @@ module.exports = (api) => {
       // and sinks or slides. Skipped, but still counted, so every later wild:* zone keeps its name. anchorGone: the anchor ref
       // left the plugins (the Skyrim release DLE removed 5edb2 at Bilegulch); skipped and counted the same way.
       if (pl.noNavmesh || pl.anchorGone) { n++; continue; }
-      const { id, left } = safePick(pl.options, pickFor(pl));
+      // The density plan's creature unless the crash guard refuses it; then the usual pick from the options the guard keeps
+      const planned = plan.get(pl);
+      const fromPlan = planned && !(CRASHY && CRASHY.on && CRASHY.check(planned.opt[1])) ? planned : null;
+      const { id, left } = fromPlan ? { id: fromPlan.opt[1], left: false } : safePick(pl.options, pickFor(pl));
       // Left out by the guard: still counted, so every later wild:* zone keeps its name (as a no-navmesh one is)
       if (!id) { if (left) n++; continue; }
-      out.push({ Name: `${PREFIX}${pl.kind}:${n++}`, ID: pl.world, POS: pl.pos, Size: C.radius, Anchor: pl.ref, NPC: [{ id, count: 1 }], Despawn: C.despawnSeconds, Respawn: C.respawnSeconds });
+      out.push({ Name: `${PREFIX}${pl.kind}:${n++}`, ID: pl.world, POS: pl.pos, Size: C.radius, Anchor: pl.ref, NPC: [{ id, count: 1 }], Despawn: C.despawnSeconds, Respawn: fromPlan && fromPlan.danger ? dangerRespawn : C.respawnSeconds });
     }
     for (const raw of OWNED.spawns || []) {
       if (out.length >= C.maxZones) break;

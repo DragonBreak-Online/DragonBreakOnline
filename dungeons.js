@@ -91,9 +91,28 @@ module.exports = (api) => {
     log(`dungeons: ${skillBooks.length} skill book(s) for Hermaeus Mora's blessing`);
     return skillBooks;
   };
+  // Ebony from the hardest dungeons (Nate, 17 Oct: "just needs to be severely rare"; the ebony thread asked for it in
+  // Expert and Master only). Ebony is a mined metal, kept out of every loot pool and swapped out of opened chests
+  // (loottiers.js LOOT_ONLY_METALS, gearswap.js), so it is handed to whoever opens the chest first or loots the master,
+  // one ingot, by the lease's difficulty. About 1 in 1,000 Expert and 1 in 400 Master chests, 1 in 200 and 1 in 100
+  // masters. Config dungeons.ebonyDrop; chance 0 or enabled false: none.
+  const EBONY = Object.assign({ enabled: true, item: '5ad9d:Skyrim.esm', chest: { hard: 0.001, nightmare: 0.0025 }, master: { hard: 0.005, nightmare: 0.01 } }, C.ebonyDrop || {});
+  const ebonyGift = (a, lease, kind) => {
+    try {
+      if (!EBONY.enabled || !lease) return;
+      const chance = Number(((kind === 'master' ? EBONY.master : EBONY.chest) || {})[lease.difficulty]) || 0;
+      if (!(chance > 0) || Math.random() >= chance) return;
+      const id = idOf(String(EBONY.item)); if (!id) return;
+      if (giveItem(a, id, 1)) {
+        personal(a, kind === 'master' ? 'Among the master\'s things, wrapped in oilcloth: an Ebony Ingot.' : 'Under a false bottom in the chest: an Ebony Ingot.');
+        audit(`EBONY ${who(a)} found an Ebony Ingot ${kind === 'master' ? 'on a master' : 'in a chest'} in ${lease.name} (${lease.difficulty}, 1 in ${Math.round(1 / chance)})`);
+      }
+    } catch (e) { log('dungeons: ebony gift failed', e.message); }
+  };
   const scholarGift = (a, chance, where) => {
     try {
-      if (!globalThis.__dboBlessedWith || !globalThis.__dboBlessedWith(a, 'scholarBoon') || Math.random() >= chance) return;
+      const sb = globalThis.__dboBlessingValue ? Number(globalThis.__dboBlessingValue(a, 'scholarBoon')) : (globalThis.__dboBlessedWith && globalThis.__dboBlessedWith(a, 'scholarBoon') ? 1 : 0);
+      if (!(sb > 0) || Math.random() >= chance * sb) return; // Xarxes (0.5) at half Hermaeus Mora's chance
       const b = pickFrom(skillBooksOf());
       if (b && giveItem(a, b.id, 1)) { personal(a, `Tucked ${where}, a book: ${b.name}. Hermaeus Mora collects, and sometimes he gives.`); try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('itemflow', a, 'scholar_gift', b.id, 1); } catch (e) { /* the player log is optional */ } }
     } catch (e) { log('dungeons: scholar gift failed', e.message); }
@@ -864,16 +883,54 @@ module.exports = (api) => {
     const filled = fillChests(d, diff, lease);
     const moveIn = (placed) => {
       if (ST.leases.get(d.id) !== lease) return;
-      let moved = 0;
+      let moved = 0; const inside = [];
       // The claimer first; in a staggered ruin each other member is queued behind them
       for (const pid of [...members].sort((x, y) => (x === leaderPid ? -1 : y === leaderPid ? 1 : 0))) {
         const a = actorByProfile(pid); if (!a) continue;
         if (a !== leaderActor && !atEntrance(a, entrance)) { system(a, `${display(leaderActor)} has claimed ${d.name}. Use the entrance to join them.`); continue; }
         if (entryWait(lease, d, pid) > 0) { queueEntry(a, lease, d, diff, entrance, pid); continue; }
-        if (goIn(a, lease, d, diff, entrance)) moved++;
+        if (goIn(a, lease, d, diff, entrance)) { moved++; inside.push(a); }
       }
       audit(`DUNGEON ${who(leaderActor)} claimed ${d.name} on ${diff.label} with ${members.size} member(s), ${zones.length} enemies (${placed >= 0 ? placed + ' placed before entry' : 'placed on entry'}), ${filled} containers filled (${lease.rolledGold instanceof Map ? [...lease.rolledGold.values()].reduce((n, g) => n + g, 0) : 0} gold), ${lease.locked.size} locked`);
       log(`dungeon ${d.id} claimed by ${display(leaderActor)}: ${diff.id}, party level ${lease.partyLevel} x${lease.partySize}, ${moved} moved in, ${zones.length} enemies, ${placed} prespawned, ${filled} containers`);
+      // What a claim that pre-spawned little or nothing means. `placed` is three-valued: -1 is the designed
+      // 'placed on entry' path, a count is what the spawn pass placed, and 0 used to say nothing at all.
+      //
+      // Three things keep an enemy off its spot at claim time, and only the third is a fault:
+      //  - AMBUSH (zone.Ambush): it lay in a coffin or pod in vanilla, so npcSpawnSystem holds the zone until
+      //    somebody stands inside AMBUSH_REACH. A Nordic crypt is nearly all ambushers, so 0 placed is correct.
+      //  - REACH (zone.Reach && !zone.Prespawn, from applyReach): the group is not within REACH.reach of a
+      //    landing and holds no boss, so it wakes when a player comes near. Dustman's Cairn on 18 Oct was 18
+      //    enemies in 9 groups with none near the landing, which is why it placed 0 and why that was not a bug.
+      //  - A STARVED SPAWN: an enemy that should stand ready and does not. The server's own pre-spawn line names
+      //    the gate (budget, cooldown, givenUp, strayHeld, fallenNobodyNear, noAnchor, spawnFailed).
+      const waiting = zones.reduce((n, z) => n + (z && z.Ambush ? 1 : 0), 0);
+      const asleep = zones.reduce((n, z) => n + (z && !z.Ambush && z.Reach && !z.Prespawn ? 1 : 0), 0);
+      const ready = zones.length - waiting - asleep;
+      // What the report calls asleep: with a count from the spawn pass, whatever it did not place and does not lie in wait,
+      // so placed + waiting + asleep is the total. The pass also places a reach group when a player already stands near it
+      // at the landing (Niryastare, Bawn, Silorn 18 Oct: 2-3 counted twice from the flags alone). The shortfall below still
+      // judges by the flags.
+      const asleepNow = placed >= 0 ? Math.max(0, zones.length - waiting - placed) : asleep;
+      // Lead GM and up only (Nate, 18 Oct: "make them staff only ... meaning Lead GM and Owner"): out-of-character lines at a
+      // claim's start spoiled what lies ahead for players, and the shortfall one still guesses at a fault the server cannot
+      // name yet. A Lead GM, Developer or Senior in the party sees them; everyone else is told nothing. Always logged.
+      const LEAD = new Set(['senior', 'developer', 'leadgm']);
+      const tell = (msg) => {
+        log(`dungeon ${d.id} (Lead GM+ only): ${msg}`);
+        for (const a of inside) { let t = null; try { t = typeof globalThis.__dboStaffTier === 'function' ? globalThis.__dboStaffTier(a) : null; } catch (e) { t = null; } if (LEAD.has(t)) system(a, `[staff] ${msg}`); }
+      };
+      if (waiting) log(`dungeon ${d.id}: ${waiting} of ${zones.length} enemies lie in wait within ${AMBUSH_REACH} units of their spot`);
+      if (asleepNow) log(`dungeon ${d.id}: ${asleepNow} of ${zones.length} enemies wake when somebody comes within ${REACH.reach} units`);
+      if (zones.length && waiting + asleepNow === zones.length) {
+        tell(`None of the ${zones.length} enemies here stand in the open: they wait for you to come to them.`);
+      } else if (placed >= 0 && placed < ready) {
+        log(`dungeon ${d.id} pre-spawned ${placed} of the ${ready} enemies that should stand ready (${waiting} lie in`
+          + ` wait, ${asleep} wake when approached): the server's pre-spawn line names the gate that held the rest`);
+        tell('Part of the ruin is still filling: those enemies are taking their places.');
+      } else if (waiting || asleepNow) {
+        tell(`${waiting + asleepNow} of the ${zones.length} enemies here are waiting for you rather than standing in the open.`);
+      }
       // the player log (playerlog.js): the claim on every member's post (the audit names only the leader)
       try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('dungeon', 'claim', [...members].map((pid) => actorByProfile(pid)).filter(Boolean), d.name, diff.label); } catch (e) { /* the player log is optional */ }
     };
@@ -889,7 +946,7 @@ module.exports = (api) => {
   // ---- a crash inside a claim (crash-wave-1001 §2): logging back in put the player in the same fight, which crashed
   // 12 more times on 1 Oct. A member whose newest launcher note (downed.js) is a recent crash wakes at the entrance,
   // still a member; the empty claim waits keepClaimMinutes for them, and ending empty costs them no rest.
-  const CL = Object.assign({ enabled: true, withinMinutes: 15, lateSeconds: 30, keepClaimMinutes: 10 }, C.crashLoop || {});
+  const CL = Object.assign({ enabled: true, withinMinutes: 15, lateSeconds: 30, keepClaimMinutes: 10, earlyLeaveMinutes: 5 }, C.crashLoop || {});
   ST.crashMoved = ST.crashMoved instanceof Map ? ST.crashMoved : new Map(); // `${pid}:${note time}` -> when it was acted on
   const noteTime = (n) => Number(n.at) || Number(n.endedAt) || 0;
   const lastNote = (pid) => { try { return typeof globalThis.__dboLastSessionNote === 'function' ? globalThis.__dboLastSessionNote(pid) : null; } catch (e) { return null; } };
@@ -906,6 +963,7 @@ module.exports = (api) => {
     if (!CL.enabled) return false;
     if (lease.looted instanceof Set && lease.looted.size > 0) return false;
     if (lease.crashMoved instanceof Set && lease.crashMoved.has(pid)) return true;
+    if (lease.earlyLeft instanceof Set && lease.earlyLeft.has(pid)) return true;
     const n = lastNote(pid);
     return !!(n && n.outcome === 'crash' && Date.now() - noteTime(n) <= CL.withinMinutes * 60000);
   };
@@ -943,7 +1001,7 @@ module.exports = (api) => {
     if (isRaidRuin(byId.get(lease.id))) { const p = partyOf(lease.leader); if (p) pushParty(p); }
     for (const pid of lease.members) {
       const spared = why === 'left' && crashSpared(lease, pid);
-      if (spared) log(`dungeon ${lease.id}: no rest for profile ${pid}, who crashed inside it`);
+      if (spared) log(`dungeon ${lease.id}: no rest for profile ${pid}, who crashed inside it or left just after the claim`);
       else setAccountRest(pid, lease.id, Date.now() + C.cooldownMinutes * 60000);
       const a = actorByProfile(pid);
       if (!a) continue;
@@ -961,7 +1019,8 @@ module.exports = (api) => {
         try { if (globalThis.__dboStatsAdd) globalThis.__dboStatsAdd(a, 'dungeonsCleared'); } catch (e) { /* journal stats only */ }
         system(a, `${lease.name} is cleared. Take your time leaving; it rests ${C.cooldownMinutes} minutes for you afterwards.`);
       } else {
-        system(a, `Your claim on ${lease.name} has ended. It rests ${C.cooldownMinutes} minutes for you.`);
+        system(a, spared ? `Your claim on ${lease.name} lapsed while you were away. It does not rest for you: claim it again when you're ready.`
+          : `Your claim on ${lease.name} has ended. It rests ${C.cooldownMinutes} minutes for you.`);
       }
     }
     // Anyone else still inside (not in the party, or joined late) is walked out to the same door when time runs out
@@ -1096,7 +1155,7 @@ module.exports = (api) => {
   // like any humanoid's (#bugs 1555083068547797072, Purr 1 Oct: a lease's goblins dropped nothing; only a boss or a guard
   // kind matched here, and only wild:* bodies are searched otherwise)
   const HUMANOID = /goblin|bandit|highwayman|marauder|outlaw|thug|forsworn|draugr|falmer|orc|soldier|guard|thalmor|vampire|hunter|warlock|necromancer|conjurer|mage|cultist|silverhand|reaver|smuggler|pirate|warrior|dremora|boss/i;
-  const ANIMAL = /wolf|bear|skeever|spider|chaurus|troll|sabre|mudcrab|horker|slaughterfish|deer|elk|goat|fox|hare|dog|mammoth|giant|atronach|wisp|spriggan|hagraven|sphere|centurion|ballista|ghost|dragon|frostbite|netch|riekling|ashhopper|ogre|minotaur|dreugh|gargoyle|werewolf|werebear|ashspawn|lurker|seeker|scamp|clannfear|daedroth|dragonpriest|horse|cow|chicken/i;
+  const ANIMAL = /wolf|bear|skeever|spider|chaurus|troll|sabre|mudcrab|horker|slaughterfish|deer|elk|goat|fox|hare|dog|mammoth|giant|atronach|wisp|spriggan|hagraven|sphere|centurion|ballista|ghost|dragon(?! ?priest)|frostbite|netch|riekling|ashhopper|ogre|minotaur|dreugh|gargoyle|werewolf|werebear|ashspawn|lurker|seeker|scamp|clannfear|daedroth|horse|cow|chicken/i;
   const CASTER = /mage|wizard|sorcerer|warlock|necromancer|conjurer|witch|priest|cultist|shaman/i;
   const BAD_WEAPON = /dun|Favor|^FF|LD_|NPC$|Trap|^FX|Unarmed|POI|Freeform|DragonPriest|Giant|Lurker|Riekling|Nightingale|^MG|^T0|^C0|SSD|weapBasic|BYOH|Skyforge|Bound|Projectile|dlc2DB|Wrathman|Keeper|Ysgramor|Horksbane|Longhammer|Relic|Illusion|Pickaxe|Catapult|Ballista|Sphere|Knife|Fork|Scimitar|Executioner|Katana|Akaviri|Prelate|Aetherium|Dawnguard|^Axe01|Cross[Bb]ow|Stalhrim|Dragonbone|Daedric|Wooden|Follower|Imperial|Silver|NordHero|Honed|Supple|Enhanced|^MFD/;
   const weaponFor = (edid, diffId, lease) => {
@@ -1626,7 +1685,7 @@ module.exports = (api) => {
       if (!lease) { glowOff(casterId, [targetId]); return null; }
       // Only the party that holds the claim: a party that stayed inside after clearing looted the next claim's refill
       if (!lease.members.has(profileOf(casterId))) return deny(casterId, `This belongs to the party that claimed ${lease.name}.`, `${chest.d.id} chest, not in the claiming party`);
-      const opened = () => { if (!lease.looted.has(targetId)) { lease.looted.add(targetId); if (!lease.stocked) { for (const pid of lease.members) { const a = actorByProfile(pid); if (a) glow(a, [targetId], false); } } scholarGift(casterId, SCHOLAR_CHEST, 'among the chest\'s things'); } };
+      const opened = () => { if (!lease.looted.has(targetId)) { lease.looted.add(targetId); if (!lease.stocked) { for (const pid of lease.members) { const a = actorByProfile(pid); if (a) glow(a, [targetId], false); } } scholarGift(casterId, SCHOLAR_CHEST, 'among the chest\'s things'); ebonyGift(casterId, lease, 'chest'); } };
       if (!lease.locked.has(targetId) || lease.unlocked.has(targetId)) { opened(); return null; }
       const level = lease.locked.get(targetId);
       const tier = lockpickingTier(casterId);
@@ -1965,13 +2024,90 @@ module.exports = (api) => {
     } catch (e) { log('gold split failed', e.message); }
   };
 
+  // ---- boss trophies (Nate, 19 Oct: "make sure its reasonable and some stuff rare drops. Like dragon priest items") --------
+  // On top of a master's boss roll: tables matched on the boss's kind. always: by difficulty, given every time; rolls: each a
+  // chance by difficulty for one item by weight. These are their own pool (like the Ayleid table): the Dragon Priest Dagger is
+  // in BANNED_LOOT for every other pool, but a dragon priest may carry one. Artifacts (the masks, Valthume's staff) never.
+  // Config dungeons.bossTrophies { ordinaryBosses, tables: [{ id, match, always, rolls }] }
+  const SOUL = { common: '2e4f3:Skyrim.esm', greater: '2e4fb:Skyrim.esm', grand: '2e4ff:Skyrim.esm' };
+  const FLAWLESS = [['6851e:Skyrim.esm', 1], ['6851f:Skyrim.esm', 1], ['68520:Skyrim.esm', 1], ['68521:Skyrim.esm', 1], ['68523:Skyrim.esm', 1]];
+  const TROPHY = Object.assign({
+    ordinaryBosses: true,
+    tables: [
+      { id: 'dragonPriest', match: 'dragon ?priest',
+        always: { story: [[SOUL.common, 1]], normal: [[SOUL.greater, 1]], hard: [[SOUL.grand, 1]], nightmare: [[SOUL.grand, 1]] },
+        rolls: [
+          { chance: { story: 0.25, normal: 0.4, hard: 0.6, nightmare: 0.8 }, items: FLAWLESS },
+          { chance: { story: 0.02, normal: 0.05, hard: 0.08, nightmare: 0.12 }, rare: true,
+            items: [['1c1fe:Skyrim.esm', 3], ['7e5bb:Skyrim.esm', 1], ['4de5b:Skyrim.esm', 1]] },
+          // A dragon priest's mask (Nate, 19 Oct: "1% Master, 0.5% Expert, one each"): an artifact allowed from this roll only,
+          // each mask once in the world (boss-trophies.json dropped; staff remove a line to free one). Not Konahrik, not the Wooden Mask
+          { chance: { hard: 0.005, nightmare: 0.01 }, rare: true, artifact: true, unique: true,
+            items: [['61cc9:Skyrim.esm', 1], ['61cc2:Skyrim.esm', 1], ['61cc1:Skyrim.esm', 1], ['61cc0:Skyrim.esm', 1],
+              ['61cb9:Skyrim.esm', 1], ['61cab:Skyrim.esm', 1], ['61ca5:Skyrim.esm', 1], ['61c8b:Skyrim.esm', 1]] },
+        ] },
+      { id: 'anyBoss', match: '.', exceptMatch: 'dragon ?priest', rolls: [{ chance: { story: 0.1, normal: 0.2, hard: 0.3, nightmare: 0.4 }, items: FLAWLESS }] },
+    ],
+  }, C.bossTrophies || {});
+  const trophyRe = (src) => { try { return new RegExp(String(src), 'i'); } catch (e) { return /$^/; } };
+  const pickWeighted = (items) => {
+    const list = (items || []).filter((x) => Array.isArray(x) && x[0] && Number(x[1]) > 0);
+    let r = Math.random() * list.reduce((n, x) => n + Number(x[1]), 0);
+    for (const x of list) { r -= Number(x[1]); if (r < 0) return x[0]; }
+    return list.length ? list[list.length - 1][0] : null;
+  };
+  // Unique trophies already in the world: boss-trophies.json { dropped: { "<desc lower case>": { at, by, where } } }
+  const TROPHY_FILE = 'boss-trophies.json';
+  const droppedTrophies = () => { const j = readJson(TROPHY_FILE, { dropped: {} }); return (j && typeof j.dropped === 'object' && j.dropped) || {}; };
+  const markDropped = (desc, by, where) => {
+    const j = readJson(TROPHY_FILE, { dropped: {} }); if (!j.dropped || typeof j.dropped !== 'object') j.dropped = {};
+    j._comment = 'Unique boss trophies already handed out (dungeons.js bossTrophies, the dragon priest masks): each drops once. Remove a line to let that one drop again.';
+    j.dropped[String(desc).toLowerCase()] = { at: new Date().toISOString(), by, where };
+    try { fs.writeFileSync(TROPHY_FILE + '.tmp', JSON.stringify(j, null, 1)); fs.renameSync(TROPHY_FILE + '.tmp', TROPHY_FILE); return true; }
+    catch (e) { log(`${TROPHY_FILE} write failed`, e.message); return false; }
+  };
+  const unmarkDropped = (desc) => {
+    const j = readJson(TROPHY_FILE, { dropped: {} }); if (!j.dropped) return;
+    delete j.dropped[String(desc).toLowerCase()];
+    try { fs.writeFileSync(TROPHY_FILE + '.tmp', JSON.stringify(j, null, 1)); fs.renameSync(TROPHY_FILE + '.tmp', TROPHY_FILE); } catch (e) { log(`${TROPHY_FILE} write failed`, e.message); }
+  };
+  // [{ baseId, count, rare, unique, desc }] for a master of this kind at this difficulty
+  const bossTrophies = (kind, diffId) => {
+    const out = [];
+    const add = (desc, count, roll) => {
+      const id = idOf(desc); if (!id) return;
+      const r = recordOf(id); const edid = String((r && r.editorId) || '');
+      if ((ARTIFACT.test(edid) && !(roll && roll.artifact)) || DRAGON_LOOT.test(edid)) return;
+      out.push({ baseId: id, count: Math.max(1, Number(count) || 1), rare: !!(roll && roll.rare), unique: !!(roll && roll.unique), desc: String(desc) });
+    };
+    for (const t of TROPHY.tables || []) {
+      if (!trophyRe(t.match).test(kind) || (t.exceptMatch && trophyRe(t.exceptMatch).test(kind))) continue;
+      for (const [desc, n] of ((t.always || {})[diffId] || [])) add(desc, n, null);
+      for (const roll of t.rolls || []) {
+        if (!(Math.random() < (Number((roll.chance || {})[diffId]) || 0))) continue;
+        const gone = roll.unique ? droppedTrophies() : null;
+        const items = gone ? (roll.items || []).filter((x) => Array.isArray(x) && !gone[String(x[0]).toLowerCase()]) : roll.items;
+        if (items && items.length) add(pickWeighted(items), 1, roll);
+      }
+    }
+    return out;
+  };
+  globalThis.__dboBossTrophies = bossTrophies;
+
   // ---- humanoid bodies: E hands over a small roll, once per body -----------------------------------
   const leaseOfTag = (tag) => [...ST.leases.values()].find((x) => tag.startsWith(`${ZONE_PREFIX}${x.id}:`)) || null;
   // An expedition's master (a boss zone of the lease): its body carries the boss chest's roll, handed over with E
   // (Nate, 2026-09-28: "the lich needs good boss loot that drops from him when you loot him")
-  function isMasterTag(tag) { const l = leaseOfTag(tag); const d = l ? byId.get(l.id) : null; return !!(l && d && d.expedition && l.bossZones && l.bossZones.has(tag)); }
+  function isMasterTag(tag) {
+    const l = leaseOfTag(tag); const d = l ? byId.get(l.id) : null;
+    if (!l || !d) return false;
+    if (d.expedition && l.bossZones && l.bossZones.has(tag)) return true;
+    // An ordinary dungeon's boss (its kind says boss) or any dragon priest: the boss roll too (Nate, 19 Oct: "better loot pool for
+    // boss creatures"; Rahgot was skinned for Bone Meal, his kind matched neither humanoid nor undead)
+    return TROPHY.ordinaryBosses !== false && (/boss/i.test(String((l.kinds || {})[tag] || '')) || /dragon ?priest/i.test(String((l.kinds || {})[tag] || '')));
+  }
   // Skeletons and zombies carried nothing (Catticus, 7 Oct): their bodies give a small undead roll; draugr stay humanoid
-  const UNDEAD = /skeleton|zombie|undead|revenant|bonewalker|lich/i;
+  const UNDEAD = /skeleton|zombie|undead|revenant|bonewalker|lich|dragon ?priest/i;
   function isUndeadTag(tag) { const l = leaseOfTag(tag); const kind = l && l.kinds ? l.kinds[tag] || '' : ''; return UNDEAD.test(kind) && !HUMANOID.test(kind) && !ANIMAL.test(kind); }
   function isHumanoidTag(tag) { const l = leaseOfTag(tag); const kind = l && l.kinds ? l.kinds[tag] || '' : ''; return HUMANOID.test(kind) && !ANIMAL.test(kind); }
   const itemName = (baseId) => { const r = recordOf(baseId); return String((r && r.editorId) || 'something').replace(/^(Food|Potion)/, '').replace(/([a-z])([A-Z])/g, '$1 $2').replace(/\d+$/, '').trim() || 'something'; };
@@ -2053,6 +2189,16 @@ module.exports = (api) => {
     try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('loot', 'dungeon_body', casterId, targetId, gave, goldKept, shares); } catch (e) { /* the player log is optional */ }
     personal(casterId, got.length ? `You find ${got.join(', ')}.` : 'You find nothing of use.');
     scholarGift(casterId, SCHOLAR_BODY, 'in their pack');
+    if (master) {
+      ebonyGift(casterId, lease, 'master');
+      for (const t of bossTrophies(String(((lease && lease.kinds) || {})[tag] || ''), diff.id)) {
+        // a unique trophy is written down before it is given, so a second body can never hand out the same mask
+        if (t.unique && (droppedTrophies()[t.desc.toLowerCase()] || !markDropped(t.desc, who(casterId), lease ? lease.name : '?'))) continue;
+        if (!giveItem(casterId, t.baseId, t.count)) { if (t.unique) unmarkDropped(t.desc); continue; }
+        personal(casterId, t.rare ? `Among the master's remains, something rare: ${itemName(t.baseId)}.` : `You also find ${t.count > 1 ? t.count + ' ' : ''}${itemName(t.baseId)}.`);
+        if (t.rare) audit(`BOSS TROPHY ${who(casterId)} took ${descOfId(t.baseId)} (${itemName(t.baseId)}) from a master in ${lease ? lease.name : '?'} (${diff.id})`);
+      }
+    }
     return false;
   };
 
@@ -2201,6 +2347,18 @@ module.exports = (api) => {
   // Runs after the actor has left the online list, so the others' panels drop the member until they return
   globalThis.__dboPartyLogout = (a) => {
     const pid = profileOf(a);
+    // Left within earlyLeaveMinutes of the claim (a load that never finished: Marcus, 19 Oct, Rielle): the claim waits
+    // keepClaimMinutes for them as after a crash, and if it lapses it costs them no rest
+    try {
+      const early = CL.enabled ? Math.max(0, Number(CL.earlyLeaveMinutes ?? 5)) * 60000 : 0;
+      for (const lease of ST.leases.values()) {
+        if (!lease.members.has(pid) || !(Date.now() - lease.startedAt < early)) continue;
+        lease.crashKeepUntil = Math.max(Number(lease.crashKeepUntil) || 0, Date.now() + CL.keepClaimMinutes * 60000);
+        if (!(lease.earlyLeft instanceof Set)) lease.earlyLeft = new Set();
+        lease.earlyLeft.add(pid);
+        log(`dungeon ${lease.id}: profile ${pid} left ${Math.round((Date.now() - lease.startedAt) / 1000)} s after the claim; it waits ${CL.keepClaimMinutes} min, and a lapse costs them no rest`);
+      }
+    } catch (e) { log('dungeon early leave failed', e.message); }
     if (partyOf(pid)) setTimeout(() => { const p = partyOf(pid); if (p) pushParty(p); }, 2000);
   };
   registerChatCommand('dungeon', (a, args) => {

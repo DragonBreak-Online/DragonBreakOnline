@@ -196,18 +196,17 @@ curse(CARRIER, { kind: null, disease: { kind: 'werewolf', since: 0, played: 1.5,
 let f = globalThis.__dboSuperProgress(CARRIER);
 ok(f && f.kind === 'fever-werewolf' && f.label === 'Sanies Lupinus' && f.group === 'The Fever' && f.epithet === 'Incubating', 'a werewolf carrier gets the Sanies Lupinus tab', f);
 ok(row(f, 'The fever').value === '50% grown' && /only while you play: about 6 hours more\. Time away from the game does not count\./.test(row(f, 'The fever').hint), '...halfway grown, the play time left, and that time away does not count', row(f, 'The fever'));
-ok(row(f, 'When it peaks').value === "Hircine's Hunt" && /Strike true 3 times in 5/.test(row(f, 'When it peaks').hint), "...Hircine's Hunt and what it takes", row(f, 'When it peaks'));
-// What a loss does is what finishRite does for this client: no riteJudge (0.3.74) is judged by arrival and lives
-ok(/Fail, and the fever breaks: you live, free of it\.$/.test(row(f, 'When it peaks').hint), '...a client timed across the network is told a loss breaks the fever and it lives', row(f, 'When it peaks').hint);
+// No trial at the peak since 18 Oct (Nate): the row says what happens, the same for every client
+ok(row(f, 'When it peaks').value === 'You become a werewolf' && /There is no trial/.test(row(f, 'When it peaks').hint), '...turning, with no trial', row(f, 'When it peaks'));
 caps.add('riteJudge');
 f = globalThis.__dboSuperProgress(CARRIER);
-ok(/Fail, and the fever takes your life with it\.$/.test(row(f, 'When it peaks').hint), '...one that times its own strikes (riteJudge) is told a loss kills', row(f, 'When it peaks').hint);
+ok(row(f, 'When it peaks').value === 'You become a werewolf' && /There is no trial/.test(row(f, 'When it peaks').hint), '...the same on a riteJudge client', row(f, 'When it peaks').hint);
 caps.delete('riteJudge');
 ok(/shrine of the Divines.*Cure Disease potion.*first effect.*Daedric Princes or the older faiths, or away from a shrine, do not/.test(row(f, 'A cure').hint) && f.ladder === null && f.powers.length === 0, '...how it is cured; no ladder, no powers');
 curse(CARRIER2, { kind: null, disease: { kind: 'vampire', since: 0, played: 3.2, by: '' } });
 f = globalThis.__dboSuperProgress(CARRIER2);
 ok(f && f.kind === 'fever-vampire' && f.label === 'Sanguinare Vampiris' && f.epithet === 'At its peak' && row(f, 'The fever').value === '100% grown'
-  && row(f, 'When it peaks').value === 'The Blood Fever', 'a vampire carrier past the peak: Sanguinare Vampiris at its peak, The Blood Fever', f);
+  && row(f, 'When it peaks').value === 'You become a vampire', 'a vampire carrier past the peak: Sanguinare Vampiris at its peak, you become a vampire', f);
 globalThis.__dboSuperProgressSend(CARRIER);
 last = packets[packets.length - 1];
 ok(last && last.a === CARRIER && last.p.progress && last.p.progress.kind === 'fever-werewolf', 'the panel packet carries the fever tab', last);

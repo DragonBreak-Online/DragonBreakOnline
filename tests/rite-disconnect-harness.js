@@ -64,21 +64,9 @@ const dead = () => store.get(`${A}|isDead`) === true;
 const permaDead = () => store.get(`${A}|private.permaDead`) === true;
 const failedAt = () => Number(store.get(`${A}|private.riteFailedAt`)) || 0;
 
-// ---- the Blood Fever ----
+// ---- the Blood Fever: gone since 18 Oct (Nate), the carrier turns at the peak, so there is nothing to disconnect from ----
 let r = startFever();
-ok(!!r && r.type === 'fever_vampire', 'the Blood Fever opens');
-play(r, 0, 1, true); leave();
-ok(!rite() && dead() && !state().disease && !permaDead(), 'fever, behind: lost (dead, the disease burned out), no permadeath', state());
-ok(logs.some((l) => /disconnected from The Blood Fever at 0 hit\(s\), 1 miss\(es\).*behind: counted as lost/.test(l)), '...and logged', logs.filter((l) => /disconnected/.test(l)));
-r = startFever(); play(r, 1, 1, true); leave();
-ok(!rite() && !dead() && state().disease && state().disease.played >= 3 && !state().kind, 'fever, even: cancelled, alive, the disease still waiting', state());
-globalThis.__dboConnectedAt = new Map([[A, Date.now() - 600000]]); online = [A]; timers.superSlow(); online = [];
-ok(!!rite(), '...and the fever comes back on a later tick');
-r = startFever(); play(r, 2, 0, true); leave();
-ok(!rite() && !dead() && state().disease && !state().kind, 'fever, ahead: cancelled, alive, not turned for free', state());
-ok(logs.some((l) => /even or ahead: cancelled, the fever will come again/.test(l)), '...and logged');
-r = startFever(); play(r, 0, 2, false); leave();
-ok(!rite() && !dead() && state().disease, 'fever, never touched: abandoned, not counted', state());
+ok(!r && !dead() && state().kind === 'vampire' && !state().disease, 'a peaked fever opens no rite: the carrier turns', state());
 
 // ---- Molag Bal's Embrace (voluntary, deadly) ----
 r = startEmbrace();
@@ -93,6 +81,11 @@ ok(!rite() && !dead() && !permaDead() && failedAt() > 0 && !state().kind, 'embra
 ok(logs.some((l) => /even or ahead: cancelled, the shrine waits/.test(l)), '...and logged');
 r = startEmbrace(); play(r, 0, 0, false); leave();
 ok(!rite() && !dead() && !failedAt(), 'embrace, never touched: abandoned, no wait', failedAt());
+
+// ---- closing the window before any round is not a forfeit (ticket #0235) ----
+// (the fever case is gone: since 18 Oct a peaked fever opens no rite, it turns the carrier)
+r = startEmbrace(); ui.riteClose(A);
+ok(!rite() && !dead() && !permaDead() && !failedAt(), 'embrace closed untouched: abandoned, no death, no wait', { dead: dead(), failedAt: failedAt() });
 
 // ---- closing the rite window on purpose is still a forfeit ----
 r = startEmbrace(); play(r, 1, 0, true);

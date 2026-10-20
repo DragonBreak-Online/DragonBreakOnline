@@ -27,14 +27,15 @@
 // same student rules. The class costs its teacher one lesson credit (a tome of the spell, else the day's tome purchase),
 // spent when the first student accepts; the rest of that class learn it on the same credit (Nate, 11 Oct: "fix the hole").
 //
-// A Master Scholar writes a tome of a spell they know at a Scholars' Ledger (tomeWriting; Nate, 16 Oct), from scrolls of
-// that spell by its rank, a cooldown per rank, and for a Master tome a Master mage of the school beside them.
+// A Master Scholar writes spell tomes and scrolls at a Scholars' Ledger: scribing.js (Nate, 16 Oct; Swag's rules, 17 Oct). This
+// file only names the tome of each spell for it (__dboSpellsTomeOf).
 //
 // State, on the character:
 //   private.dboStudied       { arcane: [spell desc...], priest: [...] }  the spellbook: every spell learned through this system
 //   private.dboPrepared      [spell desc...]                           the prepared ones, at most `prepared`
 //   private.dboTomeBoughtAt  ms of the last shop purchase
-//   private.dboTomeWrites    { rank: ms } the last tome written of each rank
+//   private.dboTomeWrites    { rank: ms } the last tome written of each rank, before 17 Oct (scribing.js reads it once)
+//   private.dboSpellTrims    { id: { at, by, why, removed, ... } } the staff trims applied to the character (staffTrims below)
 
 const fs = require('fs');
 const path = require('path');
@@ -56,6 +57,7 @@ module.exports = (api) => {
     suspendedSpells: [],
     prepareCells: ['20ff:BSHeartland.esm', '6c152:BSHeartland.esm',                             // the Synod Conclave, Bruma
       '12cb:BSHeartland.esm', '5f78c:BSHeartland.esm', '5f78d:BSHeartland.esm',                 // the Cathedral of St Martin, Bruma
+      '16a02:Skyrim.esm',                                                                       // Solitude's Temple of the Divines
       '1380e:Skyrim.esm', '1380f:Skyrim.esm', 'cab91:Skyrim.esm', '13810:Skyrim.esm', 'cab92:Skyrim.esm'], // College of Winterhold halls
     teachMeters: 5,
     // Only a Master teaches, and only spells of Adept rank and above (Nate, 2026-10-06); the student must be able to learn
@@ -74,7 +76,8 @@ module.exports = (api) => {
     // and teaches (none: every school); exclusive: its factions buy only there, not at the Synod. A cell not listed in a
     // place is the Synod's: every shop faction no exclusive place holds, every school.
     shopPlaces: [
-      { name: 'The Great Faiths', cells: ['12cb:BSHeartland.esm', '5f78c:BSHeartland.esm', '5f78d:BSHeartland.esm'], factions: ['great-faiths'], schools: ['Restoration', 'Alteration'], exclusive: true },  // the Cathedral of St Martin, Bruma
+      // the Cathedral of St Martin, Bruma, and Solitude's Temple of the Divines (Nate, 19 Oct)
+      { name: 'The Great Faiths', cells: ['12cb:BSHeartland.esm', '5f78c:BSHeartland.esm', '5f78d:BSHeartland.esm', '16a02:Skyrim.esm'], factions: ['great-faiths'], schools: ['Restoration', 'Alteration'], exclusive: true },
       { name: 'The College of Whispers', cells: ['781ad:BSHeartland.esm', '6ff7d:BSHeartland.esm'], factions: ['college-of-whispers'] },  // Frostcrag Spire
     ],
     shopMinTier: 1,
@@ -301,26 +304,59 @@ module.exports = (api) => {
     return out;
   };
 
-  // Spells the server has learned for the actor (not race or base spells), or null when it cannot tell
+  // Spells the server has learned for the actor (not race or base spells), or null when it cannot tell.
+  // One read serves the rest of the server tick, and never more than LEARNED_KEEP_MS (17 Oct): the fork's GetNthSpell
+  // walks the whole list and re-reads the actor's base records for every index, so N spells cost about N x N record reads
+  // (331 spells: about 4.5 s a read), and one Magic tab draw read the list three times. A kept list is used only while
+  // GetSpellCount (one walk, about 1/N of a read) still gives the count it was read at, and an AddSpell or RemoveSpell
+  // through this file's papyrus(), manuals.js's or schools.js's forgets it at once (__dboSpellsLearnedChanged; only a
+  // RemoveSpell the engine confirms here takes just that spell off instead, see papyrus), so a swap that keeps the count is
+  // never missed. manuals.js reads through here (__dboSpellsLearned).
+  const LEARNED_KEEP_MS = 1000;
+  const learnedKept = new Map(); // actor -> { n, ids, at (performance.now) }
+  let learnedSweep = false;
+  const forgetLearned = (a) => { learnedKept.delete(Number(a) >>> 0); };
+  const keepLearned = (a, n, ids) => {
+    learnedKept.set(Number(a) >>> 0, { n, ids: ids.slice(), at: performance.now() });
+    if (learnedSweep) return;
+    learnedSweep = true;
+    // The end of this tick: the server's loop (and the timers due with it) gives way before an immediate runs
+    const later = typeof setImmediate === 'function' ? setImmediate : (f) => setTimeout(f, 0);
+    later(() => { learnedSweep = false; learnedKept.clear(); });
+  };
   const learnedIds = (a) => {
     try {
       const self = { type: 'form', desc: descOf(a) };
       const n = Number(mp.callPapyrusFunction('method', 'Actor', 'GetSpellCount', self, [])) || 0;
+      const kept = learnedKept.get(Number(a) >>> 0);
+      if (kept && kept.n === n && performance.now() - kept.at <= LEARNED_KEEP_MS) return kept.ids.slice();
       const out = [];
       for (let i = 0; i < n; i++) {
         const s = mp.callPapyrusFunction('method', 'Actor', 'GetNthSpell', self, [i]);
         if (s && s.desc) out.push(idOf(s.desc));
       }
+      keepLearned(a, n, out);
       return out;
     } catch (e) { log('spells: learned list failed', e.message); return null; }
   };
+  globalThis.__dboSpellsLearned = learnedIds;
+  globalThis.__dboSpellsLearnedChanged = forgetLearned;
   const knows = (a, spellId) => { const l = learnedIds(a); return !!l && l.includes(spellId >>> 0); };
   // A spell an apprentice holds on loan from their teacher (schools.js apprenticeship) is not theirs to pass on
   const onLoan = (a, spellId) => { try { return typeof globalThis.__dboSchoolsOnLoan === 'function' && !!globalThis.__dboSchoolsOnLoan(a, spellId >>> 0); } catch (e) { return false; } };
   const ownLearned = (a) => (learnedIds(a) || []).filter((id) => !onLoan(a, id));
+  // A RemoveSpell the engine confirms (true only when it held that spell, learned in play: PapyrusActor::RemoveSpell) leaves
+  // the kept list less that one spell, so a login that holds back a spell and then strips a removed one reads the list once.
+  // Anything else forgets it.
   const papyrus = (a, fn, spellId, extra) => {
-    try { return mp.callPapyrusFunction('method', 'Actor', fn, { type: 'form', desc: descOf(a) }, [{ type: 'espm', desc: descOf(spellId) }].concat(extra || [])) === true; }
+    let ok = false;
+    try { ok = mp.callPapyrusFunction('method', 'Actor', fn, { type: 'form', desc: descOf(a) }, [{ type: 'espm', desc: descOf(spellId) }].concat(extra || [])) === true; return ok; }
     catch (e) { log(`spells: ${fn} ${descOf(spellId)} failed`, e.message); return false; }
+    finally {
+      const kept = learnedKept.get(Number(a) >>> 0), id = Number(spellId) >>> 0;
+      if (ok && fn === 'RemoveSpell' && kept && kept.ids.filter((x) => x === id).length === 1) { kept.ids = kept.ids.filter((x) => x !== id); kept.n -= 1; }
+      else forgetLearned(a);
+    }
   };
 
   const REMOVED = new Set((CFG.removedSpells || []).map(idOf).filter(Boolean));
@@ -328,7 +364,10 @@ module.exports = (api) => {
   const SUSPENDED = new Set((CFG.suspendedSpells || []).map(idOf).filter(Boolean));
   const suspended = (spellId) => SUSPENDED.has(Number(spellId) >>> 0);
   const nameOf = (spellId) => { const sp = classifySpell(spellId); return sp ? sp.name : 'That spell'; };
-  const heldLine = (spellId) => `${nameOf(spellId)} is held back for a short while; it stays in your spellbook.`;
+  // suspendedReasons { desc: why } says why a spell is held, in the line its caster reads (Nate, 17 Oct: the mount summons)
+  const HELD_WHY = new Map(Object.entries(CFG.suspendedReasons && typeof CFG.suspendedReasons === 'object' ? CFG.suspendedReasons : {})
+    .filter(([k]) => !k.startsWith('_')).map(([k, v]) => [idOf(k), String(v || '').trim()]).filter(([k, v]) => k && v));
+  const heldLine = (spellId) => { const why = HELD_WHY.get(Number(spellId) >>> 0); return `${nameOf(spellId)} is held back for a short while${why ? ` (${why})` : ''}; it stays in your spellbook.`; };
   // A held spell the engine had but the spellbook does not (known before study began, or given outside it) is listed here,
   // so it goes back into the engine once it is no longer held
   const HELD = 'private.dboHeldSpells';
@@ -634,7 +673,9 @@ module.exports = (api) => {
   // school check: the giver has decided. { ok, name, line }, or null when the spell is unknown here.
   // At login (gamemode.js): a removed spell leaves the engine, the spellbook and the prepared list
   globalThis.__dboSpellsStripRemoved = (a) => {
-    try { holdSuspended(a); } catch (e) { log('spells: hold failed', e.message); }
+    // Held here, so spells.hold does not read the whole list again a few seconds after the login (it marks a character
+    // the same way once it has held them; 17 Oct: a read is about 4.5 s for a character with 331 spells)
+    try { holdSuspended(a); holdChecked.add(a >>> 0); } catch (e) { log('spells: hold failed', e.message); }
     if (!REMOVED.size) return 0;
     let n = 0;
     for (const id of REMOVED) {
@@ -994,7 +1035,7 @@ module.exports = (api) => {
       try { const r = globalThis.__dboLedgerSale({ buyer: a, place: shopLedger.get(a >>> 0) || a, price, what: t.title }); return `split: ${r.text}`; }
       catch (e) { log('spells: tome sale payout failed', e.message); return 'the payout failed'; }
     }
-    return `${depositToTreasury(CFG.shopTreasury, price)} to ${CFG.shopTreasury} treasury`;
+    return `${depositToTreasury(CFG.shopTreasury, price, { income: 'sales' })} to ${CFG.shopTreasury} treasury`;
   };
 
   // { ok, text } of a purchase
@@ -1232,127 +1273,21 @@ module.exports = (api) => {
     audit(`TEACH ${who(o.teacher)} taught ${descOf(sp.id)} ${sp.name} to ${who(student)} at a class (${paidWith}; book ${knownIds(student).length}, prepared ${preparedIds(student).length}/${MAXP()})`);
   };
 
-  // ---- writing spell tomes (Nate, 16 Oct) ------------------------------------------------------------------------------
-  // A Master Scholar writes a tome of a spell they know at a Scholars' Ledger (salvage.js "Write a spell tome"). By the
-  // spell's rank (tomeWriting.scrolls, .cooldownDays): Novice no scroll, a day; Apprentice 1 scroll of the spell, 2 days;
-  // Adept 2, 4 days; Expert 4, a week; Master 5 and a Master mage of the school who knows the spell, standing by and
-  // accepting, two weeks. Scrolls of the spell are matched by name (FireboltScroll for Firebolt). Each rank has its own
-  // cooldown on the writer (private.dboTomeWrites). The restricted arts only for a Senior rank, as the shop and reading.
-  const WRITE = Object.assign({ enabled: true, scholarTier: 4, scrolls: [0, 1, 2, 4, 5], cooldownDays: [1, 2, 4, 7, 14], helperMeters: 5, offerSeconds: 60 }, CFG.tomeWriting || {});
-  const WRITES = 'private.dboTomeWrites';
-  // spell id -> a tome that teaches it; spell id -> the scroll bases of the same spell
-  // The ordinary SpellTome* book wins over a quest reward copy (MGRDestructionFinal is also Fire Storm)
+  // ---- the tome that teaches a spell (scribing.js writes it; Nate, 16 Oct, moved there with Swag's rules on 17 Oct) ----------
+  // spell id -> a tome that teaches it. The ordinary SpellTome* book wins over a quest reward copy (MGRDestructionFinal is
+  // also Fire Storm)
   const TOME_OF_SPELL = new Map();
   for (const t of TOMES.values()) { const had = TOME_OF_SPELL.get(t.spellId >>> 0); if (!had || (!/^SpellTome/i.test(had.edid) && /^SpellTome/i.test(t.edid))) TOME_OF_SPELL.set(t.spellId >>> 0, t); }
-  const SCROLLS_OF_SPELL = new Map();
-  {
-    const byEdid = new Map();
-    for (const t of TOME_LIST) { const id = idOf(canonToDesc(t.spellId)); if (id && t.spell) byEdid.set(String(t.spell).toLowerCase(), id >>> 0); }
-    for (const s of ((readJson('readables.json') || {}).scrolls || [])) {
-      const base = String(s.name || '').replace(/scroll$/i, '').toLowerCase(); const spell = byEdid.get(base); const id = idOf(canonToDesc(s.id));
-      if (spell && id) SCROLLS_OF_SPELL.set(spell, (SCROLLS_OF_SPELL.get(spell) || []).concat([id]));
-    }
-  }
-  const scrollsHeld = (a, spellId) => { const ids = SCROLLS_OF_SPELL.get(spellId >>> 0) || []; return inventoryOf(a).filter((e) => e && !e.worn && ids.includes(Number(e.baseId) >>> 0)).reduce((n, e) => n + (Number(e.count) || 0), 0); };
-  const takeScrolls = (a, spellId, n) => {
-    const ids = SCROLLS_OF_SPELL.get(spellId >>> 0) || [];
-    const entries = inventoryOf(a).map((e) => Object.assign({}, e));
-    let left = n;
-    for (const e of entries) { if (!left) break; if (e.worn || !ids.includes(Number(e.baseId) >>> 0)) continue; const k = Math.min(left, Number(e.count) || 0); e.count -= k; left -= k; }
-    return !left && set(a, 'inventory', { entries: entries.filter((e) => Number(e.count) > 0) });
-  };
-  const writtenAt = (a, rank) => Number((get(a, WRITES, {}) || {})[rank]) || 0;
-  const writeWait = (a, rank) => Math.max(0, writtenAt(a, rank) + (Number(WRITE.cooldownDays[rank]) || 0) * DAY - Date.now());
-  // What `a` may write: the spells they know that have a tome, restricted arts only for a Senior rank
-  const writable = (a) => [...new Set([].concat(ownLearned(a), knownIds(a)))].map(classifySpell)
-    .filter((sp) => sp && TOME_OF_SPELL.has(sp.id) && !removed(sp.id) && (!restrictedTome(TOME_OF_SPELL.get(sp.id)) || isSenior(a)))
-    .sort((x, y) => x.school.localeCompare(y.school) || x.rank - y.rank || x.name.localeCompare(y.name));
-  const writeRefusal = (a, sp) => {
-    if (!WRITE.enabled) return 'Spell tomes are not written just now.';
-    if (tierOf(a, 'scholar') < Number(WRITE.scholarTier)) return 'Only a Master Scholar writes spell tomes.';
-    if (!writable(a).some((x) => x.id === sp.id)) return restrictedTome(TOME_OF_SPELL.get(sp.id)) && !isSenior(a) ? `${RESTRICTED_LINE}.` : `You can only write a tome of a spell you know.`;
-    const wait = writeWait(a, sp.rank);
-    if (wait > 0) return `You wrote ${/^[AEIOU]/.test(RANKS[sp.rank]) ? 'an' : 'a'} ${RANKS[sp.rank]} tome not long ago; the next is yours in ${waitText(wait)}.`;
-    const need = Number(WRITE.scrolls[sp.rank]) || 0;
-    if (need && scrollsHeld(a, sp.id) < need) return `${sp.name} needs ${plural(need, 'scroll')} of ${sp.name}; you carry ${scrollsHeld(a, sp.id)}.`;
-    return null;
-  };
-  // A Master mage of the spell's school who knows it, near the writer
-  const helpers = (a, sp) => onlineActors().filter((b) => b !== (a >>> 0) && distanceMeters(a, b) <= Number(WRITE.helperMeters)
-    && (inBook(b, sp.id) || knows(b, sp.id)) && !slotRefusal(b, Object.assign({}, sp, { rank: 4 }), display(b)));
-  const finishWrite = (a, sp, helper) => {
-    const why = writeRefusal(a, sp);
-    if (why) return why;
-    const need = Number(WRITE.scrolls[sp.rank]) || 0;
-    if (need && !takeScrolls(a, sp.id, need)) return 'Your scrolls could not be used. Try again.';
-    const t = TOME_OF_SPELL.get(sp.id);
-    if (!giveItem(a, t.bookId, 1)) { log(`spells: ${who(a)} wrote ${sp.name} but the tome could not be given; ${need} scroll(s) spent`); return 'The tome could not be handed to you. Ask a GM.'; }
-    set(a, WRITES, Object.assign({}, get(a, WRITES, {}) || {}, { [sp.rank]: Date.now() }));
-    audit(`TOMEWRITE ${who(a)} wrote ${descOf(t.bookId)} ${t.title} (${RANKS[sp.rank]}) from ${plural(need, 'scroll')}${helper ? ` with ${who(helper)}` : ''}`);
-    return `You write ${t.title}. ${need ? `${plural(need, 'scroll')} of ${sp.name} ${need === 1 ? 'is' : 'are'} spent. ` : ''}Your next ${RANKS[sp.rank]} tome in ${waitText((Number(WRITE.cooldownDays[sp.rank]) || 0) * DAY)}.`;
-  };
-  const writeRow = (a, sp) => {
-    const need = Number(WRITE.scrolls[sp.rank]) || 0; const wait = writeWait(a, sp.rank);
-    const cost = need ? `${need} scroll${need === 1 ? '' : 's'} (${scrollsHeld(a, sp.id)} carried)` : 'no scroll';
-    return { id: `write:${descOf(sp.id)}`, label: `${spellLabel(sp)}: ${wait > 0 ? `ready in ${waitText(wait)}` : cost}${sp.rank === 4 ? ', with a Master mage' : ''}` };
-  };
-  const openWrite = (a, place, note, page) => {
-    const all = writable(a);
-    const pg = Math.max(0, Number(page) || 0); const per = MAX_ROWS - 2;
-    const rows = all.slice(pg * per, pg * per + per).map((sp) => writeRow(a, sp));
-    if (all.length > (pg + 1) * per) rows.push({ id: `wpage:${pg + 1}`, label: 'More spells' });
-    rows.push({ id: 'cancel', label: 'Close' });
-    menu(a, MENU_ID, note || (all.length ? 'Write a tome of which spell?' : 'You know no spell that has a tome to write.'), rows, { kind: 'write', place: place >>> 0, page: pg });
-    return true;
-  };
-  const atPlace = (a, place) => { try { return distanceMeters(a, place) <= LEDGER_REACH_M; } catch (e) { return false; } };
-  const writeOffers = globalThis.__dboTomeWriteOffers instanceof Map ? globalThis.__dboTomeWriteOffers : (globalThis.__dboTomeWriteOffers = new Map()); // helper -> offer
-  const chooseWrite = (a, choice, p) => {
-    if (!atPlace(a, p.place)) { closeWidget(a, MENU_ID); return personal(a, 'You walked away from the ledger.'); }
-    if (choice.startsWith('wpage:')) return openWrite(a, p.place, null, Number(choice.slice(6)));
-    if (choice.startsWith('write:')) {
-      const sp = classifySpell(idOf(choice.slice(6)));
-      if (!sp) return openWrite(a, p.place, 'That spell cannot be written.', p.page);
-      const why = writeRefusal(a, sp);
-      if (why) return openWrite(a, p.place, why, p.page);
-      if (sp.rank < 4) return openWrite(a, p.place, finishWrite(a, sp, 0), p.page);
-      const list = helpers(a, sp);
-      if (!list.length) return openWrite(a, p.place, `A Master tome needs a Master of ${sp.school} who knows ${sp.name}, standing beside you.`, p.page);
-      return menu(a, MENU_ID, `Who helps you write ${sp.name}?`, list.slice(0, MAX_ROWS - 1).map((b) => ({ id: `whelp:${b.toString(16)}:${descOf(sp.id)}`, label: display(b) })).concat([{ id: 'wback', label: 'Back' }]), p);
-    }
-    if (choice === 'wback') return openWrite(a, p.place, null, p.page);
-    if (choice.startsWith('whelp:')) {
-      const [, h16, ...d] = choice.split(':'); const helper = parseInt(h16, 16) >>> 0; const sp = classifySpell(idOf(d.join(':')));
-      if (!sp || !helpers(a, sp).includes(helper)) return openWrite(a, p.place, 'They cannot help with that just now.', p.page);
-      writeOffers.set(helper, { writer: a >>> 0, spellId: sp.id, place: p.place, at: Date.now() });
-      openWidget(helper, { type: 'contextMenu', id: MENU_ID, mode: 'menu', targetName: `${display(a)} asks your help to write a tome of ${sp.name}`,
-        actions: [{ id: 'accept', label: 'Help write it' }, { id: 'decline', label: 'Decline' }], events: { action: 'dbo:spellsWriteHelp', close: 'dbo:spellsWriteHelpClose' } }, true);
-      return openWrite(a, p.place, `You ask ${display(helper)} to help you write ${sp.name}.`, p.page);
-    }
-    closeWidget(a, MENU_ID);
-  };
-  const answerWriteHelp = (helper, accept) => {
-    const o = writeOffers.get(helper >>> 0); writeOffers.delete(helper >>> 0); closeWidget(helper, MENU_ID);
-    if (!o) return;
-    if (Date.now() - o.at > Number(WRITE.offerSeconds) * 1000) return personal(helper, 'The request has lapsed.');
-    if (!accept) return personal(o.writer, `${display(helper)} declines to help.`);
-    const sp = classifySpell(o.spellId);
-    if (!sp || !helpers(o.writer, sp).includes(helper >>> 0)) { personal(helper, 'You cannot help with that just now.'); return personal(o.writer, `${display(helper)} could not help after all.`); }
-    if (!atPlace(o.writer, o.place)) { personal(helper, `${display(o.writer)} has left the ledger.`); return personal(o.writer, 'You walked away from the ledger.'); }
-    const text = finishWrite(o.writer, sp, helper);
-    personal(o.writer, text); personal(helper, /^You write/.test(text) ? `You help ${display(o.writer)} write a tome of ${sp.name}.` : text);
-  };
-  onUi('spellsWriteHelp', (a, args) => answerWriteHelp(a, String(args[0] || '') === 'accept'));
-  onUi('spellsWriteHelpClose', (a) => answerWriteHelp(a, false));
-  globalThis.__dboTomeWriteActions = (a) => (WRITE.enabled && tierOf(a, 'scholar') >= Number(WRITE.scholarTier) ? [{ id: 'write', label: 'Write a spell tome' }] : []);
-  globalThis.__dboTomeWriteOpen = (a, place) => openWrite(a, Number(place) >>> 0);
+  globalThis.__dboSpellsTomeOf = (spellId) => { const t = TOME_OF_SPELL.get(Number(spellId) >>> 0); return t ? { bookId: t.bookId, spellId: t.spellId, title: t.title, edid: t.edid, school: t.school, rank: t.rank, name: t.name } : null; };
+  // Every spell some tome teaches, for scribing.js's list of Master tomes (the writer of one need not know the spell)
+  globalThis.__dboSpellsTomeSpells = () => [...TOME_OF_SPELL.keys()];
 
   // ---- menu answers ----------------------------------------------------------------------------------
   onUi('spellsChoose', (a, args) => {
     const p = pending.get(a >>> 0); const choice = String(args[0] || '');
     // Picking a spell to forget or a student reopens this widget id as the next menu; closing it first in the same tick
     // loses the cursor (the inn prompt, 2026-09-25), so those paths reopen with no close in between.
-    const reopening = !!p && ((p.kind === 'teach' && choice.startsWith('student:')) || p.kind === 'college' || ((p.kind === 'lecternRoot' || p.kind === 'write') && choice !== 'cancel'));
+    const reopening = !!p && ((p.kind === 'teach' && choice.startsWith('student:')) || p.kind === 'college' || (p.kind === 'lecternRoot' && choice !== 'cancel'));
     if (reopening) pending.delete(a >>> 0); else closeMenu(a);
     if (!p || choice === 'cancel') return;
     // A Class Lectern's first question: the class panel opens before this menu closes (panel handoff), or teaching
@@ -1363,7 +1298,6 @@ module.exports = (api) => {
       if (!done) personal(a, 'The lectern cannot be used just now.');
       return;
     }
-    if (p.kind === 'write') return chooseWrite(a, choice, p);
     if (p.kind === 'college') {
       // The teacher must still be at the ledger or lectern to choose; a lesson is offered from there
       if (!inRoomOf(p.place, a)) { closeWidget(a, MENU_ID); return personal(a, 'You walked away from the ledger.'); }
@@ -1384,7 +1318,7 @@ module.exports = (api) => {
     }
   });
   onUi('spellsClose', (a) => closeMenu(a));
-  onUi('close', (a, args, widgetId) => { if (widgetId === MENU_ID) { pending.delete(a >>> 0); offers.delete(a >>> 0); writeOffers.delete(a >>> 0); } if (widgetId === SHOP_ID) { shopNonces.delete(a >>> 0); shopLedger.delete(a >>> 0); } if (widgetId === BOOK_ID) { bookNonces.delete(a >>> 0); bookLedger.delete(a >>> 0); } });
+  onUi('close', (a, args, widgetId) => { if (widgetId === MENU_ID) { pending.delete(a >>> 0); offers.delete(a >>> 0); } if (widgetId === SHOP_ID) { shopNonces.delete(a >>> 0); shopLedger.delete(a >>> 0); } if (widgetId === BOOK_ID) { bookNonces.delete(a >>> 0); bookLedger.delete(a >>> 0); } });
 
   // For the F3 Magic tab (schools.js __dboMagicTab): the book, the prepared spells and the spells held outside the book
   // (granted outright, never studied: they take no prepared place), and whether they may be changed where `a` stands
@@ -1479,6 +1413,178 @@ module.exports = (api) => {
       .map((t) => ({ spell: t.name, school: t.school, rank: t.rank, rankName: RANKS[t.rank],
         where: shop.has(t.bookId) && soldHere(R, t) ? 'Sold by the Synod in Bruma (members of the Synod or a College)' : soldIn(R, t) ? `Sold in ${soldIn(R, t)}` : 'Found, not sold' }));
   };
+
+  // ---- staff trims (Jake, 17 Oct 2026): a staff removal of learned spells written in config, applied once per id ----------
+  // Why: the admin panel's Give all spells (adminSystem.ts) adds every tome spell, and reading a learned list costs the fork
+  // N squared (PapyrusActor GetSpellCount and GetNthSpell run IsSpellLearnedFromBase on every spell, and MpActor reads the
+  // base spells again each time). A character with 331 spells froze the main loop about 4.5 s a read (17 Oct).
+  // spells.staffTrims = [{ id, actor: 'ff001473', profile, keepSpells: [desc...], removeSpells: [desc...], keepShouts?: [],
+  // by, why }]. At load, and so at every hot reload, each entry not yet applied to its character removes every spell of
+  // removeSpells (computed offline from the character's saved form and a backup from before the grant) that is not in
+  // keepSpells, the spellbook (private.dboStudied), the prepared list or on loan from a teacher. It uses Actor.RemoveSpell,
+  // the engine's own path, which also tells the client when the character is online, trimBatch (20) spells a run every
+  // trimEveryMs (1000), so the removal never holds the loop. The learned list is never read. A character who is offline is
+  // trimmed on the saved form (the engine keeps every saved character loaded and drops the client message while nobody
+  // plays it), so the next login reads the short list; offline: 'wait' waits instead until they have been online for
+  // trimSettleMs. The removed spells also leave private.dboHeldSpells, so the end of a suspension does not give them back.
+  // keepShouts [] takes off the all-shouts grant (private.dboAllShouts, the only shout state the server keeps: the client is
+  // taught them at login); the grant cannot be kept in part, so a non-empty list leaves it on; no keepShouts leaves shouts
+  // alone. One audit line per batch and a summary. The result is kept on the character (private.dboSpellTrims[id]), so the
+  // entry never applies again (a new trim needs a new id). A bad entry (no id, an actor that is not a player character, a
+  // profile that does not match it, a desc this load order cannot resolve or that is not a spell) is skipped with a log
+  // line and stays unapplied. Only the named character is touched.
+  const TRIMS = 'private.dboSpellTrims';
+  const ALL_SHOUTS = 'private.dboAllShouts';
+  const TRIM_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$/;
+  const TRIM_BATCH = Math.max(1, Math.min(50, Math.floor(Number(CFG.trimBatch) || 20)));
+  const TRIM_EVERY_MS = Math.max(250, Number(CFG.trimEveryMs) || 1000);
+  const TRIM_SETTLE_MS = Math.max(0, Number(CFG.trimSettleMs) || 20000);
+  const trimText = (s, n) => String(s == null ? '' : s).replace(/<[@#][!&]?\d+>/g, '').replace(/\d{15,22}/g, '').replace(/\s+/g, ' ').trim().slice(0, n || 80);
+  // id -> the run in progress; kept over a reload, so a reload mid-run goes on where it was. One timer for every run
+  const trimRuns = globalThis.__dboSpellTrimRuns instanceof Map ? globalThis.__dboSpellTrimRuns : (globalThis.__dboSpellTrimRuns = new Map());
+  const trimSeen = globalThis.__dboSpellTrimSeen instanceof Map ? globalThis.__dboSpellTrimSeen : (globalThis.__dboSpellTrimSeen = new Map()); // actor -> first seen online
+  if (globalThis.__dboSpellTrimTimer) { clearInterval(globalThis.__dboSpellTrimTimer); globalThis.__dboSpellTrimTimer = null; }
+  // A saved character: reading a form that does not exist throws
+  const trimExists = (a) => { try { mp.get(a, 'profileId'); return true; } catch (e) { return false; } };
+  const trimsOf = (a) => { const r = get(a, TRIMS, null); return r && typeof r === 'object' && !Array.isArray(r) ? r : {}; };
+  const isSpellRec = (id) => { const r = lookup(id); return !!r && String(r.record.type) === 'SPEL'; };
+  const trimCheck = (x) => {
+    if (!x || typeof x !== 'object' || Array.isArray(x)) return { error: 'not an object' };
+    const id = typeof x.id === 'string' ? x.id.trim() : '';
+    if (!TRIM_ID.test(id)) return { error: id ? 'a bad id (letters, digits and . _ : - only, at most 64)' : 'no id' };
+    const hexStr = String(x.actor == null ? '' : x.actor).trim().toLowerCase().replace(/^0x/, '');
+    const actor = /^[0-9a-f]{1,8}$/.test(hexStr) ? parseInt(hexStr, 16) >>> 0 : 0;
+    if (actor < 0xff000000) return { id, error: 'actor is not a player character id (ff......)' };
+    const profile = typeof x.profile === 'number' || (typeof x.profile === 'string' && /^\d+$/.test(x.profile)) ? Number(x.profile) : NaN;
+    if (!Number.isInteger(profile) || profile < 0) return { id, error: 'no profile' };
+    if (!Array.isArray(x.keepSpells)) return { id, error: 'keepSpells is not a list' };
+    if (!Array.isArray(x.removeSpells) || !x.removeSpells.length) return { id, error: 'removeSpells is not a list of spells' };
+    if (x.keepShouts !== undefined && !Array.isArray(x.keepShouts)) return { id, error: 'keepShouts is not a list' };
+    if (x.offline !== undefined && x.offline !== 'apply' && x.offline !== 'wait') return { id, error: "offline is neither 'apply' nor 'wait'" };
+    const keep = new Set();
+    for (const d of x.keepSpells) { const s = idOf(d); if (!s) return { id, error: `keep spell ${trimText(d, 60)} is not in this load order` }; keep.add(s); }
+    const remove = [];
+    for (const d of x.removeSpells) {
+      const s = idOf(d);
+      if (!s) return { id, error: `spell ${trimText(d, 60)} is not in this load order` };
+      if (!remove.includes(s)) remove.push(s);
+    }
+    return { id, actor, profile, keep, remove, keepShouts: x.keepShouts, wait: x.offline === 'wait', by: trimText(x.by), why: trimText(x.why, 160) };
+  };
+  // A run: the spells to take off, decided once from the config and the saved character, never from the learned list
+  const trimStart = (r) => {
+    const a = r.actor;
+    if (!trimExists(a)) return { error: `character ${a.toString(16)} not found` };
+    const pid = Number(get(a, 'profileId', NaN));
+    if (pid !== r.profile) return { error: `character ${a.toString(16)} is of profile ${Number.isFinite(pid) ? pid : 'unknown'}, not ${r.profile}` };
+    // Each listed form must be a spell in this load order (a record read each, only while the entry is unapplied)
+    const notSpell = r.remove.find((s) => !isSpellRec(s));
+    if (notSpell !== undefined) return { error: `${descOf(notSpell) || notSpell.toString(16)} is not a spell` };
+    const book = new Set([].concat(knownIds(a), preparedIds(a)).map((s) => s >>> 0));
+    const list = [], spared = [];
+    for (const s of r.remove) {
+      if (r.keep.has(s)) continue;
+      if (book.has(s) || onLoan(a, s)) { spared.push(s); continue; }
+      list.push(s);
+    }
+    const old = trimRuns.get(r.id);
+    const carry = old && old.actor === a ? old : null;
+    const run = { id: r.id, entry: r, actor: a, list, spared, i: 0, batch: 0, removed: carry ? carry.removed : [], absent: carry ? carry.absent : [],
+      failed: [], stuck: 0, startedAt: carry ? carry.startedAt : Date.now(), wait: r.wait };
+    if (carry) { const done = new Set([].concat(run.removed, run.absent)); run.list = list.filter((s) => !done.has(s)); }
+    trimRuns.set(r.id, run);
+    return { run };
+  };
+  const trimFinish = (run) => {
+    trimRuns.delete(run.id);
+    const a = run.actor, r = run.entry;
+    if (run.failed.length) {
+      log(`spells: staff trim ${run.id}: ${run.failed.length} spell(s) could not be removed (${run.lastError || 'no reason'}); it stays unapplied and runs again at the next load`);
+      audit(`SPELL TRIM ${run.id} ${who(a)} stopped: ${run.removed.length} removed, ${run.failed.length} failed; runs again at the next load`);
+      return;
+    }
+    // The held list: a removed spell is not given back when its suspension ends
+    const gone = new Set(r.remove.filter((s) => !r.keep.has(s) && !run.spared.includes(s)));
+    const held = heldOf(a);
+    const heldDropped = held.filter((s) => gone.has(s));
+    if (heldDropped.length) set(a, HELD, held.filter((s) => !gone.has(s)).map(descOf).filter(Boolean));
+    let shouts = 'untouched';
+    if (Array.isArray(r.keepShouts)) {
+      const granted = get(a, ALL_SHOUTS, null) === true;
+      if (!granted) shouts = 'none granted';
+      else if (r.keepShouts.length) { shouts = 'grant kept (it cannot be kept in part)'; log(`spells: staff trim ${run.id}: keepShouts lists shouts, so the all-shouts grant stays on`); }
+      else shouts = set(a, ALL_SHOUTS, null) ? 'grant taken off' : 'grant could not be taken off';
+    }
+    const rec = { at: Date.now(), by: r.by, why: r.why, removed: run.removed.map(descOf), notLearned: run.absent.length, spared: run.spared.map(descOf),
+      heldDropped: heldDropped.map(descOf), shouts, ms: Date.now() - run.startedAt };
+    set(a, TRIMS, Object.assign({}, trimsOf(a), { [run.id]: rec }));
+    audit(`SPELL TRIM ${run.id} ${who(a)} done: ${run.removed.length} spell(s) removed, ${run.absent.length} not learned, ${run.spared.length} kept as spellbook, prepared or on loan${heldDropped.length ? `, ${heldDropped.length} off the held list (${rec.heldDropped.join(', ')})` : ''}, shouts: ${shouts}; by ${r.by || 'staff'}${r.why ? `: ${r.why}` : ''}`);
+    log(`spells: staff trim ${run.id} applied to ${a.toString(16)}: ${run.removed.length} removed, ${run.absent.length} not learned, ${run.spared.length} spared, ${heldDropped.length} held dropped, shouts ${shouts}, ${run.batch} batch(es)`);
+    if (run.removed.length && onlineActors().map((x) => x >>> 0).includes(a)) {
+      personal(a, `The staff have taken ${plural(run.removed.length, 'spell')} given by the admin panel's Give all spells off this character: a spell list that long slowed the whole server. The spells you had before are kept.`);
+    }
+  };
+  // One batch a run, of the first run that can go: RemoveSpell costs one base-spell read, not a read of the list
+  const trimTick = () => {
+    const online = new Set(onlineActors().map((x) => x >>> 0));
+    for (const k of trimSeen.keys()) if (!online.has(k)) trimSeen.delete(k);
+    for (const k of online) if (!trimSeen.has(k)) trimSeen.set(k, Date.now());
+    for (const run of trimRuns.values()) {
+      if (run.wait && !(online.has(run.actor) && Date.now() - trimSeen.get(run.actor) >= TRIM_SETTLE_MS)) continue;
+      if (run.i >= run.list.length) { trimFinish(run); break; }
+      const ids = run.list.slice(run.i, run.i + TRIM_BATCH);
+      const t0 = Date.now();
+      const self = { type: 'form', desc: descOf(run.actor) };
+      const gone = [], absent = [], failed = [];
+      for (const s of ids) {
+        let ok;
+        try { ok = mp.callPapyrusFunction('method', 'Actor', 'RemoveSpell', self, [{ type: 'espm', desc: descOf(s) }]) === true; }
+        catch (e) { failed.push(s); run.lastError = e.message; continue; }
+        (ok ? gone : absent).push(s);
+      }
+      // Nothing went through: the character is not there right now. The same batch again next run, then give up for this load
+      if (failed.length === ids.length) {
+        if (++run.stuck >= 3) { run.failed = failed; trimFinish(run); }
+        break;
+      }
+      run.stuck = 0; run.i += ids.length; run.batch++;
+      run.removed.push(...gone); run.absent.push(...absent); run.failed.push(...failed);
+      const total = Math.ceil(run.list.length / TRIM_BATCH);
+      audit(`SPELL TRIM ${run.id} ${who(run.actor)} batch ${run.batch}/${total} (${Date.now() - t0} ms): ${gone.length} removed${gone.length ? ` (${gone.map(descOf).join(', ')})` : ''}${absent.length ? `, ${absent.length} not learned` : ''}${failed.length ? `, ${failed.length} failed` : ''}`);
+      if (run.i >= run.list.length) trimFinish(run);
+      break;
+    }
+    if (!trimRuns.size && globalThis.__dboSpellTrimTimer) { clearInterval(globalThis.__dboSpellTrimTimer); globalThis.__dboSpellTrimTimer = null; }
+  };
+  // Starts every new entry of the config. Never throws: a load must not fail over a staff entry
+  const staffTrims = () => {
+    const out = { started: [], before: 0, skipped: [] };
+    const list = CFG.staffTrims;
+    if (list === undefined || list === null) return out;
+    if (!Array.isArray(list)) { log('spells: config staffTrims is not a list; nothing trimmed'); return out; }
+    const seenIds = new Set();
+    list.forEach((x, i) => {
+      try {
+        const r = trimCheck(x);
+        if (r.error) { out.skipped.push({ at: i, id: r.id || '', error: r.error }); log(`spells: staff trim ${r.id ? `${r.id} ` : ''}(entry ${i + 1}) skipped: ${r.error}`); return; }
+        if (seenIds.has(r.id)) { out.skipped.push({ at: i, id: r.id, error: 'a second entry with this id' }); log(`spells: staff trim ${r.id} (entry ${i + 1}) skipped: a second entry with this id`); return; }
+        seenIds.add(r.id);
+        if (trimExists(r.actor) && trimsOf(r.actor)[r.id]) { trimRuns.delete(r.id); out.before++; return; }
+        const s = trimStart(r);
+        if (s.error) { trimRuns.delete(r.id); out.skipped.push({ at: i, id: r.id, error: s.error }); log(`spells: staff trim ${r.id} (entry ${i + 1}) skipped: ${s.error}`); return; }
+        out.started.push(s.run);
+      } catch (e) { out.skipped.push({ at: i, id: '', error: e.message }); log(`spells: staff trim (entry ${i + 1}) failed`, e.stack || e.message); }
+    });
+    // A run whose entry left the config stops
+    for (const id of [...trimRuns.keys()]) if (!seenIds.has(id)) trimRuns.delete(id);
+    if (trimRuns.size) globalThis.__dboSpellTrimTimer = setInterval(() => { try { trimTick(); } catch (e) { log('spells: staff trim tick failed', e.stack || e.message); } }, TRIM_EVERY_MS);
+    if (out.started.length || out.skipped.length) {
+      log(`spells: staff trims: ${out.started.length} started (${out.started.map((run) => `${run.id}: ${run.list.length} to remove from ${run.actor.toString(16)}, ${run.spared.length} spared${run.wait ? ', waits for login' : ''}`).join('; ') || 'none'}), ${out.before} applied before, ${out.skipped.length} skipped`);
+    }
+    return out;
+  };
+  globalThis.__dboSpellsStaffTrims = () => [...trimRuns.values()].map((run) => ({ id: run.id, actor: run.actor, left: run.list.length - run.i, removed: run.removed.length, wait: run.wait }));
+  try { staffTrims(); } catch (e) { log('spells: staff trims failed', e.stack || e.message); }
 
   const R0 = regions();
   log(`spells ${CFG.enabled ? 'on' : 'off'}: ${TOMES.size} tomes known, ${STUDY_POINTS.length} study point(s), ${SHOP.length} tomes in the Synod shop, ${MAXP()} prepared, changed in ${COLLEGE_CELLS.size} college cell(s)${R0 ? `, ${SHOP.filter((t) => soldHere(R0, t)).length} stocked for ${R0.provinceName(CFG.shopProvince)}` : ''}`);

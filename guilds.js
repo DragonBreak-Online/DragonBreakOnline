@@ -68,7 +68,7 @@ module.exports = (api) => {
   };
   for (const f of (readJson(PLAYER_PATH, { factions: [] }).factions || [])) addPlayerFaction(f);
 
-  // ---- rank overrides: titles renamed and ranks added, moved or removed in game (F3 Faction tab, staff view) ---------
+  // ---- rank overrides: titles renamed and ranks added, moved or removed in game (F3 Faction tab: the leader, or staff) ---
   // guild-overrides.json (runtime, gitignored): { factionId: { ranks: [{ title, role }], by, at } }. A faction's ranks are
   // replaced whole, never edited in place, since factions of one template share its rank array.
   const OVR_PATH = path.resolve('guild-overrides.json');
@@ -221,6 +221,7 @@ module.exports = (api) => {
   const setMember = (fid, a, rank, by) => {
     const f = FACTIONS.get(fid);
     const role = (f.ranks[rank] || {}).role;
+    if ((role === 'leader' || role === 'officer') && typeof globalThis.__dboIsStaff === 'function' && globalThis.__dboIsStaff(a)) return `${ownNameOf(a)} is on the staff. Staff hold no ${role === 'leader' ? 'leader' : 'officer'} rank in a faction.`;
     const cap = Number(CAPS[role]) || 0;
     const had = entryOf(fid, a);
     if (cap && (!had || (f.ranks[had.rank] || {}).role !== role) && roleCount(fid, role) >= cap) return `${f.name} already has ${cap} ${shownAt(f, rank)}${cap === 1 ? '' : 's'}.`;
@@ -340,6 +341,16 @@ module.exports = (api) => {
       if (m) return say(FACTIONS.get(m.fid), holds(m.fid));
     }
     if (had) return null;
+    // A church takes only a follower of one of its gods (factions.limits.requiresFaith; Nate, 19 Oct): checked when they
+    // join, from the god chosen at a shrine (prayer.js private.dboDeity)
+    const req = (LIM.requiresFaith || {})[fid];
+    if (req && Array.isArray(req.deities) && req.deities.length) {
+      let faith = null; try { faith = mp.get(t, 'private.dboDeity'); } catch (e) { faith = null; }
+      if (!(faith && req.deities.includes(String(faith.id)))) {
+        const gods = req.label || 'its gods';
+        return { text: self ? `${TheName(f.name)} takes only those who follow ${gods}. Choose one of them at their shrine first.` : `${name} does not follow ${gods}; ${TheName(f.name)} takes only those who do.`, hidden: false };
+      }
+    }
     for (const c of LIM.conflicts || []) {
       const A = (c.a || []).map(String), B = (c.b || []).map(String);
       const other = A.includes(fid) ? B : B.includes(fid) ? A : null;
@@ -455,7 +466,8 @@ module.exports = (api) => {
       // The journal's Faction tab: holds and strongholds are shown on the Court tab instead (Nate, 3 Oct, Q3); a leader
       // renames the titles, a Lead GM also adds, moves and removes ranks and adds members
       court: f.kind === 'hold' || f.kind === 'stronghold', count: Object.keys(rosterOf(fid)).length, player: !!f.player,
-      canRename: isLeadStaff(a) || (rankOf(fid, a) || {}).role === 'leader', canEditRanks: isLeadStaff(a), canAdd: isLeadStaff(a),
+      // A faction's leader runs its ranks too (Nate, 16 Oct): renames, adds, moves and removes them
+      canRename: isLeadStaff(a) || (rankOf(fid, a) || {}).role === 'leader', canEditRanks: isLeadStaff(a) || (rankOf(fid, a) || {}).role === 'leader', canAdd: isLeadStaff(a),
     };
   };
   // The panel's content, also the Character Journal's Faction tab (journal.js); keepNonce: a journal redraw keeps the
@@ -512,6 +524,9 @@ module.exports = (api) => {
   // title is the rank's own title (economy.js keys wages by it), shown what it is shown as (rolenames.js)
   globalThis.__dboGuildsOf = (a) => membershipsOf(a >>> 0).map((m) => { const f = FACTIONS.get(m.fid); const r = f.ranks[m.e.rank] || {}; return { id: m.fid, name: f.name, title: r.title || '', shown: shownAt(f, m.e.rank), role: r.role || '', kind: f.kind || '', zone: f.zone || '', secret: !!f.secret, player: !!f.player, hall: hallOf(f) }; });
   globalThis.__dboGuildExists = (id) => FACTIONS.has(String(id));
+  // A magic college (guild-defs.json "college": true; Swag, 17 Oct: "any future magical colleges and current"): schools.js lets its
+  // leader and officers hold classes and take more apprentices, as the colleges it names
+  globalThis.__dboGuildIsCollege = (id) => { const f = FACTIONS.get(String(id)); return !!(f && f.college === true); };
   // When a faction was founded, for realm.js's protectDays: its first member's joining; a hold or stronghold is as old as
   // the land (review m6: nothing defined this, so the rule never applied)
   globalThis.__dboGuildFoundedAt = (id) => {
@@ -583,10 +598,21 @@ module.exports = (api) => {
   const readMarks = () => { const m = readJson(MARKS_PATH, {}); return m && typeof m === 'object' && !Array.isArray(m) ? m : {}; };
   const HALL_DOORS = new Map();
   for (const f of FACTIONS.values()) for (const d of (hallOf(f) || { doors: [] }).doors) { const k = String(d).toLowerCase(); HALL_DOORS.set(k, (HALL_DOORS.get(k) || []).concat([f.id])); }
+  // An Orc stronghold's mine is its clan's as the longhouse is (Nate, 20 Oct; mines.js): its ways in from mines.json count as
+  // the clan's hall doors, so the Chief holds it, the clan works it, and it is granted to the Chief while unowned. A mine that
+  // is a lease dungeon (not in dungeons.exclude) is left out: a lair, not property. mines.enabled / clanMines false: none.
+  const MINE_DOORS = new Map(); // fid -> [door desc as mines.json spells it]
+  if (((cfg.mines || {}).enabled) !== false && ((cfg.mines || {}).clanMines) !== false) {
+    for (const m of (readJson(path.resolve('mines.json'), {}) || {}).mines || []) {
+      if (!m || !m.clan || !FACTIONS.has(m.clan) || ((m.lease || []).length && !m.leaseExcluded)) continue;
+      for (const e of m.entrances || []) if (e && e.door) MINE_DOORS.set(m.clan, (MINE_DOORS.get(m.clan) || []).concat([String(e.door)]));
+    }
+  }
+  for (const [fid, doors] of MINE_DOORS) for (const d of doors) { const k = d.toLowerCase(); if (!(HALL_DOORS.get(k) || []).includes(fid)) HALL_DOORS.set(k, (HALL_DOORS.get(k) || []).concat([fid])); }
   // The hall door keys are lower case and getIdFromDesc matches a plugin's name exactly, so a door is spelled as the
   // halls spell its plugin before it is looked up (until 16 Oct every hall lookup by door threw: no root, no grant)
   const DOOR_SPELLING = new Map();
-  for (const f of FACTIONS.values()) for (const d of (hallOf(f) || { doors: [] }).doors) { const t = String(d), i = t.indexOf(':'); if (i > 0) DOOR_SPELLING.set(t.slice(i + 1).toLowerCase(), t.slice(i + 1)); }
+  for (const f of FACTIONS.values()) for (const d of (hallOf(f) || { doors: [] }).doors.concat(MINE_DOORS.get(f.id) || [])) { const t = String(d), i = t.indexOf(':'); if (i > 0) DOOR_SPELLING.set(t.slice(i + 1).toLowerCase(), t.slice(i + 1)); }
   const spelledDoor = (desc) => { const t = String(desc), i = t.indexOf(':'); return i > 0 ? `${t.slice(0, i)}:${DOOR_SPELLING.get(t.slice(i + 1).toLowerCase()) || t.slice(i + 1)}` : t; };
   const hallFactionsAt = (desc) => {
     const marks = readMarks();
@@ -692,7 +718,7 @@ module.exports = (api) => {
       if (!h || h.shared || !leader) continue;
       const marked = ((readMarks()[f.id] || {}).doors) || [];
       const off = ((readMarks()[f.id] || {}).off) || [];
-      const descs = [...new Set(h.doors.map((d) => String(d).toLowerCase()).concat(marked))].filter((d) => !off.includes(d));
+      const descs = [...new Set(h.doors.concat(MINE_DOORS.get(f.id) || []).map((d) => String(d).toLowerCase()).concat(marked))].filter((d) => !off.includes(d));
       for (const d of descs) {
         let id = 0; try { id = Number(mp.getIdFromDesc(spelledDoor(d))) >>> 0; } catch (e) { id = 0; }
         if (!id) continue;
@@ -847,12 +873,18 @@ module.exports = (api) => {
   globalThis.__dboGuildKick = (a, fid, t) => kickMember(a >>> 0, String(fid), Number(t) >>> 0);
   globalThis.__dboGuildSetRank = (a, fid, t, rank, court) => setRankOf(a >>> 0, String(fid), Number(t) >>> 0, Math.floor(Number(rank)), !!court);
   globalThis.__dboGuildInvite = (a, t, fid) => { const text = invite(a >>> 0, Number(t) >>> 0, String(fid)); return /^You invited/.test(text) ? { text } : { error: text }; };
+  const leave = (a, fid) => {
+    const f = FACTIONS.get(fid);
+    if (!f || !entryOf(fid, a)) return false;
+    removeMember(fid, a);
+    audit(`FACTION ${who(a)} left ${f.name}`);
+    return true;
+  };
+  globalThis.__dboGuildLeave = (a, fid) => leave(a >>> 0, String(fid));
   onUi('factionLeave', (a, args) => {
     if (!fresh(a, args)) return;
     const fid = String(args[1] || ''); const f = FACTIONS.get(fid);
-    if (!f || !entryOf(fid, a)) return reply(a, 'You are not in that faction.', fid, true);
-    removeMember(fid, a);
-    audit(`FACTION ${who(a)} left ${f.name}`);
+    if (!leave(a, fid)) return reply(a, 'You are not in that faction.', fid, true);
     reply(a, `You have left ${f.name}.`, '', false);
   });
   // A Lead GM adds a character, online or offline, at the lowest rank (the Faction tab's staff view)
@@ -881,18 +913,18 @@ module.exports = (api) => {
     reply(a, r.error || r.text, fid, !!r.error);
   });
   // The whole rank list at once: [{ title, role, from }], from = the rank's index before the edit, or -1 for a new one.
-  // A leader may only rename; a Lead GM may also add, move and remove ranks. Members keep their rank through a move
+  // The leader or a Lead GM adds, moves, removes and renames ranks (Nate, 16 Oct); only a Lead GM gives a staff name. The
+  // leader's rank stays first and the only leader rank (ranksProblem). Members keep their rank through a move
   // (they are stored by index, so the roster is renumbered in the same write); a rank somebody holds cannot go.
   const editRanks = (a, fid, list) => {
     const f = FACTIONS.get(fid);
     if (!f) return { error: 'No such faction.' };
     const lead = isLeadStaff(a);
-    if (!lead && (rankOf(fid, a) || {}).role !== 'leader') return { error: 'Only the leader renames ranks, and only a Lead GM adds, moves or removes them.' };
+    if (!lead && (rankOf(fid, a) || {}).role !== 'leader') return { error: 'Only the leader of the faction changes its ranks.' };
     if (!Array.isArray(list)) return { error: 'That rank list is not possible.' };
     const next = list.slice(0, RANKS_MAX + 1).map((r) => ({ title: cleanTitle(r && r.title), role: String((r && r.role) || ''), from: Number.isInteger(r && r.from) ? r.from : -1 }));
     const froms = next.map((r) => r.from).filter((x) => x >= 0);
     if (froms.some((x) => x >= f.ranks.length) || new Set(froms).size !== froms.length) return { error: 'That rank list is not possible.' };
-    if (!lead && (next.length !== f.ranks.length || next.some((r, i) => r.from !== i || r.role !== f.ranks[i].role))) return { error: 'You may rename your ranks. A Lead GM adds, moves or removes them.' };
     // The editor shows each rank as it is shown (rolenames.js). A row left alone keeps the rank's own title. A Lead GM's
     // new title for a rank is a staff name: the rank keeps its own title, so court offices, wages and the roster stamps
     // never move (without rolenames.js it renames the rank, as before). A leader renames the rank's own title, but not

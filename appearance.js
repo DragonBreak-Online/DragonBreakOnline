@@ -148,6 +148,14 @@ module.exports = (api) => {
     const r = rec(M.race), v = rec(M.vampire);
     if (r && v && HEADS.own.has('BretonRace')) { HEADS.raceOf.set(r, 'BretonRace'); HEADS.raceOf.set(v, 'BretonRace'); }
   } catch (e) { log('appearance: the Reachman race could not be read', e.message); }
+  // The DLE's DBOHalfGiantRace and its vampire (config halfGiantRace) wear the Nord's heads (head parts FLST 0A8033, the Nord
+  // morph): guarded as the Nord, the same way
+  try {
+    const M = (cfg && cfg.halfGiantRace) || {};
+    const rec = (d) => { const id = d ? mp.getIdFromDesc(String(d)) >>> 0 : 0; const r = id ? mp.lookupEspmRecordById(id) : null; return r && r.record && String(r.record.type) === 'RACE' ? id : 0; };
+    const r = rec(M.race), v = rec(M.vampire);
+    if (r && v && HEADS.own.has('NordRace')) { HEADS.raceOf.set(r, 'NordRace'); HEADS.raceOf.set(v, 'NordRace'); }
+  } catch (e) { log('appearance: the Half-Giant race could not be read', e.message); }
 
   const get = (a, k) => { try { return mp.get(a, k); } catch (e) { return undefined; } };
   const userOf = (a) => {
@@ -238,8 +246,9 @@ module.exports = (api) => {
     const before = get(a, 'appearance');
     if (!before || typeof before !== 'object') return personal(a, 'Your appearance could not be read. Ask a GM for help.');
     try {
-      mp.set(a, EDIT, Object.assign({ at: Date.now(), before: copy(before) }, left ? { free: true } : {}));
+      mp.set(a, EDIT, Object.assign({ at: Date.now(), before: copy(before), realName: ownName(a, before) }, left ? { free: true } : {}));
       mp.setRaceMenuOpen(a, true);
+      try { if (typeof globalThis.__dboMarkEditorOpen === 'function') globalThis.__dboMarkEditorOpen(a); } catch (e) { /* the edit flag guards it too */ }
       noteEditorOpened(a);
     } catch (e) {
       try { mp.set(a, EDIT, null); } catch (e2) { /* nothing more to undo */ }
@@ -527,6 +536,10 @@ module.exports = (api) => {
   });
   const NOT_KEPT_NOTE = ' RaceMenu-only details (extra sliders, sculpt, overlays) are not saved yet and are gone when you log out.';
 
+  // The mask state from playermenu.js ({ masked, real, shown, isMaskName }), or null without it
+  const maskOf = (a) => { try { return typeof globalThis.__dboMaskOf === 'function' ? globalThis.__dboMaskOf(a) : null; } catch (e) { return null; } };
+  // The character's own name: the one kept behind a mask, else the look's
+  const ownName = (a, look) => { const m = maskOf(a); return String((m && m.masked && m.real) || (look && look.name) || ''); };
   // The editor closed with this appearance (gamemode.js appearanceHook, the engine has already applied it). True when it
   // was ours to handle.
   const finish = (a, appearance) => {
@@ -540,6 +553,15 @@ module.exports = (api) => {
     const after = appearance && typeof appearance === 'object' ? copy(appearance) : null;
     closeSaveWindow(a);
     if (!after) return true;
+    // The name kept is the character's own (e.realName from the open), or the mask's while a mask is on now; never a mask
+    // name saved behind a mask at the open, which an editor left open over a logout (it unmasks) put back for good (#VKRS)
+    const m = maskOf(a);
+    let keep = String((m && m.isMaskName(before.name) ? (e.realName || '') : before.name) || '');
+    if (!keep || (m && m.isMaskName(keep))) keep = m && !m.isMaskName(after.name) ? String(after.name || '') : '';
+    if (m && m.masked) keep = m.shown;
+    if (!keep) { keep = String(before.name || ''); log(`appearance: ${who(a)} has no own name to keep after the editor; staff can /rename`); }
+    // The look before carries it too: it is compared with the new one and put back when a change is refused
+    before.name = keep;
     // Opened as a free change and one is still left (the switch may have gone off, or a RaceMenu save used it, meanwhile)
     const free = e.free === true && freeLeft(a) > 0;
     // Opened free but none is left now: that editor skipped the gold and the daily wait, so nothing from it is charged
@@ -558,8 +580,8 @@ module.exports = (api) => {
     const look = guarded ? guarded.look : after;
     if (guarded) audit(`APPEARANCE ${who(a)} editor swapped in ${raceName(guarded.from)}'s default head; kept their own`);
     const headNote = guarded ? ` ${HEAD_NOTE}` : '';
-    const nameKept = String(look.name || '') !== String(before.name || '');
-    if (nameKept) look.name = before.name;
+    const nameKept = String(look.name || '') !== keep;
+    if (nameKept) look.name = keep;
     if (sameLook(look, before)) {
       if (nameKept || guarded) { mp.set(a, 'appearance', before); resendAfterSettle(a, appearance); }
       if (!raceMenuKept(a)) {
@@ -709,6 +731,28 @@ module.exports = (api) => {
       if (t !== a) system(t, 'A GM gave you a free appearance change. Type /appearance to use it.');
       audit(`APPEARANCE ${who(a)} granted ${who(t)} a free appearance change (${left} left)`);
     }, { admin: true, help: '<player|#TAG> give someone one more free /appearance change' });
+  }
+
+  // /appearancecancel <name|#TAG>: a GM closes an /appearance editor left open over a logout (The Plague Doctor #VKRS, 17 Oct:
+  // the open edit reopened RaceMenu at every login with the Nord default head and another race in it). Nothing from the
+  // editor is saved: the edit and the server's RaceMenu are closed, the stored look stays as it is (with anything written to
+  // it since, such as a vampire's tells), and a free change is not used. A close the player's client sends afterwards
+  // arrives with RaceMenu shut and is dropped (guard 2).
+  if (typeof api.findByName === 'function') {
+    registerChatCommand('appearancecancel', (a, args) => {
+      a = a >>> 0;
+      const q = String(args || '').trim();
+      if (!q) return personal(a, 'Use /appearancecancel <name|#TAG>.');
+      const t = Number(api.findByName(q)) >>> 0;
+      if (!t) return personal(a, 'No such player online. Use their name or #TAG.');
+      const name = typeof api.display === 'function' ? api.display(t) : who(t);
+      if (!pending(t)) return personal(a, `${name} has no appearance edit open.`);
+      const openedAt = Number((get(t, EDIT) || {}).at) || 0;
+      try { mp.set(t, EDIT, null); mp.setRaceMenuOpen(t, false); } catch (e) { log('appearance: cancel failed for', who(t), e.message); return personal(a, 'The edit could not be closed. Try again.'); }
+      personal(a, `${name}'s appearance edit is closed. Their look is unchanged and no free change was used.`);
+      if (t !== a) system(t, 'A GM closed your open appearance editor. Your look is as it was; close the editor if it is still showing. Nothing was spent.');
+      audit(`APPEARANCE ${who(a)} cancelled ${who(t)}'s open appearance edit (opened ${new Date(openedAt).toISOString()})`);
+    }, { admin: true, help: '<player|#TAG> close an /appearance editor left open, saving nothing' });
   }
 
   globalThis.__dboAppearanceEdit = { pending, finish, blocked, chargenOpened, chargenFinish, refused, raceMenuClosed, freeLeft, freeNotice };

@@ -190,8 +190,9 @@ check('data: the Great Faiths\' hall doors stand in Bruma\'s worldspace (doors-p
   ['7a815:BSHeartland.esm', '7a816:BSHeartland.esm'].every((d) => WORLDS.has(keyOf(DOORS_POS[d][3]))), ['7a815', '7a816'].map((d) => DOORS_POS[`${d}:BSHeartland.esm`]));
 check('data: the Synod\'s hall doors stand only in its basement (6c152), not the main hall (20ff) where its ledger and lecterns are',
   ['6ca59:BSHeartland.esm', '6ca75:BSHeartland.esm'].every((d) => keyOf(DOORS_POS[d][3]) === keyOf(BASEMENT)));
-check('data: guild-defs lists the Cathedral building\'s cells (buildings.json CYRBrumaCathedralofStMartin) as the Great Faiths\' hall',
-  !!cathedral && cathedral.name === 'CYRBrumaCathedralofStMartin' && sameSet(hallOfDefs('great-faiths').cells, cathedral.cells), [hallOfDefs('great-faiths').cells, cathedral && cathedral.cells]);
+// Solitude's Temple of the Divines (16a02:Skyrim.esm) is the Great Faiths' too since 19 Oct (Nate)
+check('data: guild-defs lists the Cathedral building\'s cells (buildings.json CYRBrumaCathedralofStMartin) and Solitude\'s Temple of the Divines as the Great Faiths\' hall',
+  !!cathedral && cathedral.name === 'CYRBrumaCathedralofStMartin' && sameSet(hallOfDefs('great-faiths').cells, cathedral.cells.concat(['16a02:Skyrim.esm'])), [hallOfDefs('great-faiths').cells, cathedral && cathedral.cells]);
 check('data: guild-defs lists the Conclave building\'s cells (buildings.json CYRBrumaSynodConclave) as the Synod\'s hall',
   !!conclave && conclave.name === 'CYRBrumaSynodConclave' && sameSet(hallOfDefs('synod').cells, conclave.cells), [hallOfDefs('synod').cells, conclave && conclave.cells]);
 check('data: gamemode-config ledgerSale.hallCells pays the Great Faiths for all three Cathedral cells, the Synod for its two',

@@ -100,7 +100,7 @@ const TIER = E('senior', 'developer', 'leadgm', 'gm', 'trialgm', 'none');
 const SIDE = O({ hits: 'int', dmg: 'num', by: A(NAME, 8) });
 const REFUSAL_REASONS = ['god', 'ethereal', 'offline_body', 'login_grace', 'bound', 'paralysed', 'armour_change', 'damage_cap',
   'spell_rate', 'dungeon_ally', 'warband', 'companion_pvp', 'silver', 'recovering', 'downed', 'shout_not_given',
-  'friendly_lethal', 'unknown'];
+  'friendly_lethal', 'duel_pause', 'duel_rules', 'duel_beaten', 'duel_scaled', 'duel_outsider', 'unknown'];
 
 // ---- the event types (DESIGN.md 1.5) ------------------------------------------------------------------------------------
 // p: priority (0 never dropped before the hard cap, 1, 2 first to go); place: 'pos' (cell and coordinates), 'cell' (cell
@@ -176,7 +176,9 @@ const EVENT_TYPES = {
   'item.sweep': T(0, '', { kind: E('gearstrip', 'sprstrip', 'gearswap', 'gearrestore', 'restitution'), removed: ITEMS, refunds: ITEMS, case: 'code', n: 'int', gold: 'int' }),
   'item.mail': T(1, '', { op: E('parcel_sent', 'parcel_collected', 'supply_posted', 'supply_delivered', 'supply_taken_down', 'supply_refunded'), gold: 'int', items: ITEMS, tax: 'int', fee: 'int', id: 'int' }),
   'item.courier': T(1, '', { op: E('posted', 'took', 'delivered', 'robbed', 'opened', 'insured', 'lost', 'cleared', 'returned', 'reached'), job: 'int', items: ITEMS, gold: 'int', pay: 'int' }),
-  'item.bank': T(0, '', { op: E('deposit', 'withdraw', 'treasury'), gold: 'int', balance: 'int', treasury: NAME }),
+  'item.bank': T(0, '', { op: E('deposit', 'withdraw', 'treasury', 'vault_rent', 'vault_fee', 'vault_arrears', 'vault_open', 'vault_owed', 'vault_warn', 'vault_end',
+    'vault_store', 'vault_take', 'vault_seize', 'vault_seize_item', 'vault_staff_take', 'vault_restore'), gold: 'int', balance: 'int', treasury: NAME,
+    zone: 'zid', tier: 'code', n: 'int', i: NAME64, b: 'hex' }),
   'item.bank_write': T(1, '', { reason: E('wage', 'tax', 'ledger_sale', 'restitution', 'credit', 'charge', 'other'), from: 'int', to: 'int' }),
   'item.buy': T(1, '', { what: NAME64, price: 'int', seller: E('synod', 'tome_shop', 'ledger', 'other') }),
   'item.fee': T(1, '', { what: E('bed', 'rent', 'deposit', 'purchase', 'chest_rent', 'appearance', 'charter', 'commission', 'board_post', 'offering', 'pigeon', 'ledger'), gold: 'int', to: NAME }),
@@ -536,7 +538,28 @@ parsed('BANK', {
     let m = text.match(/ (deposited|withdrew) (\d{1,9}) gold \(balance (\d{1,12})\)$/);
     if (m) return [ev('item.bank', 0, { op: m[1] === 'deposited' ? 'deposit' : 'withdraw', gold: Number(m[2]), balance: Number(m[3]) })];
     m = text.match(/ paid (\d{1,9}) gold into the /);
-    return m ? [ev('item.bank', 0, { op: 'treasury', gold: Number(m[1]) })] : [];
+    if (m) return [ev('item.bank', 0, { op: 'treasury', gold: Number(m[1]) })];
+    // Vaults (bank.js, pinned 16 Oct after the bank review): item names come from the game's records, never from players
+    const Z = '([a-z0-9_-]{1,32})';
+    if ((m = text.match(new RegExp(` paid (\\d{1,9}) gold \\(\\d{1,9} banked, \\d{1,9} carried\\) to ${Z} for (renting|vault arrears|a week)`))))
+      return [ev('item.bank', 0, { op: m[3] === 'renting' ? 'vault_rent' : m[3] === 'a week' ? 'vault_fee' : 'vault_arrears', gold: Number(m[1]), zone: m[2] })];
+    if ((m = text.match(new RegExp(` rents a ([a-z]{1,24}) vault \\(\\d{1,6} weight\\) in ${Z}(?:, was [a-z]{1,24})?, paid (\\d{1,9})$`))))
+      return [ev('item.bank', 0, { op: 'vault_open', tier: m[1], zone: m[2], gold: Number(m[3]) })];
+    if ((m = text.match(new RegExp(` owes (\\d{1,9}) gold for the ${Z} vault \\((\\d{1,4}) week`))))
+      return [ev('item.bank', 0, { op: 'vault_owed', gold: Number(m[1]), zone: m[2], n: Number(m[3]) })];
+    if ((m = text.match(new RegExp(` warned of the ${Z} seizure `)))) return [ev('item.bank', 0, { op: 'vault_warn', zone: m[1] })];
+    if ((m = text.match(new RegExp(` gave up the ([a-z]{1,24}) vault in ${Z}$`)))) return [ev('item.bank', 0, { op: 'vault_end', tier: m[1], zone: m[2] })];
+    if ((m = text.match(new RegExp(` stored (\\d{1,9})x (.{1,64}?) \\(([0-9a-f]{1,8})\\) in ${Z} \\(`))))
+      return [ev('item.bank', 0, { op: 'vault_store', n: Number(m[1]), i: m[2], b: m[3], zone: m[4] })];
+    if ((m = text.match(new RegExp(` took (\\d{1,9})x (.{1,64}?) \\(([0-9a-f]{1,8})\\) out of ${Z}$`))))
+      return [ev('item.bank', 0, { op: 'vault_take', n: Number(m[1]), i: m[2], b: m[3], zone: m[4] })];
+    if ((m = text.match(new RegExp(` ${Z}: (\\d{1,9})x (.{1,64}?) \\(([0-9a-f]{1,8})\\) at \\d{1,9} = (\\d{1,12})$`))) && / SEIZED /.test(text))
+      return [ev('item.bank', 0, { op: 'vault_seize_item', zone: m[1], n: Number(m[2]), i: m[3], b: m[4], gold: Number(m[5]) })];
+    if ((m = text.match(new RegExp(` ${Z}: ([a-z]{1,24}) vault, \\d{1,4} kind\\(s\\) of goods sold for \\d{1,12} gold, (\\d{1,12}) to `))) && / SEIZED /.test(text))
+      return [ev('item.bank', 0, { op: 'vault_seize', zone: m[1], tier: m[2], gold: Number(m[3]) })];
+    if ((m = text.match(/ STAFF took (\d{1,9})x ([0-9a-f]{1,8}) from the vaults of /))) return [ev('item.bank', 0, { op: 'vault_staff_take', n: Number(m[1]), b: m[2] })];
+    if ((m = text.match(new RegExp(` RESTORED .* ${Z}: seizure `)))) return [ev('item.bank', 0, { op: 'vault_restore', zone: m[1] })];
+    return [];
   },
 });
 parsed('TEACH', {
@@ -998,7 +1021,8 @@ const COMMAND_SCHEMA = {
   tp: { target: { from: 0, lookup: 'online' } },
   chargen: { target: { from: 0, lookup: 'online' } },
   grantappearance: { target: { from: 0, lookup: 'online' } },
-  rename: { target: { from: 0, to: 1, lookup: 'online' } },
+  rename: { target: { from: 0, to: 1, lookup: 'any' } },
+  chars: { target: { from: 0, lookup: 'any' }, info: true },
   fixloc: { target: { from: 0, lookup: 'online' } },
   sethunger: { target: { from: 0, to: 1, lookup: 'online' }, nums: [-1] },
   wipechars: { target: { from: 0, lookup: 'any' } },
@@ -1052,7 +1076,7 @@ const COMMAND_SCHEMA = {
   realnames: { subs: S_('on off status') },
   forget: {}, concordat: {}, dossier: { subs: S_('add strike view') },
   // staff world commands: a staff.world action, never their text
-  announce: { world: 'announce' }, schedule: { world: 'schedule' }, rolename: { world: 'rolename' },
+  announce: { world: 'announce' }, event: { world: 'announce' }, schedule: { world: 'schedule' }, rolename: { world: 'rolename' },
   settime: { world: 'clock', nums: [0] }, timescale: { world: 'timescale', nums: [0] }, setweather: { world: 'weather' },
   placeundo: { world: 'place' }, placeexport: { world: 'place' },
   driftspawn: { world: 'drift' }, driftrepair: { world: 'drift' }, driftset: { world: 'drift' },
@@ -1132,6 +1156,20 @@ bank.js BANK 49f63759 parsed
 bank.js BANK b3999936 parsed
 bank.js BANK e33b0e75 parsed
 bank.js BANK f4565b27 parsed
+bank.js BANK 76082ae7 parsed
+bank.js BANK 4c816f34 parsed
+bank.js BANK dd237d73 parsed
+bank.js BANK 92dd9b73 parsed
+bank.js BANK ddbac33b parsed
+bank.js BANK 3958b0d9 parsed
+bank.js BANK 8ff19655 parsed
+bank.js BANK d4d119df parsed
+bank.js BANK 167dae12 parsed
+bank.js BANK 1609b3b0 parsed
+bank.js BANK 858f3e4b parsed
+bank.js BANK 9a871c63 parsed
+bank.js BANK 9603dfa8 parsed
+bank.js BANK 385d28ea parsed
 blackreach.js BLACKREACH 3be01906 clean
 beastform.js BEAST d8772b8c clean
 beastform.js <expr> 403600c0 excluded
@@ -1190,14 +1228,17 @@ citizenship.js ELECTION 19644858 clean
 citizenship.js ELECTION 1284d29d clean
 citizenship.js ELECTION a2b8d084 clean
 citizenship.js ELECTION c4f1f300 clean
-citizenship.js ELECTION 361df79b clean
+citizenship.js ELECTION 267a2b7c clean
 citizenship.js ELECTION 96adbfc0 clean
-citizenship.js ELECTION 2d4975a2 clean
+citizenship.js ELECTION 5263eff4 clean
+citizenship.js ELECTION 6c4f61dc clean
 citizenship.js ELECTION ba56254e clean
 citizenship.js ELECTION 3130c4e5 clean
 citizenship.js ELECTION 8e12772e clean
 citizenship.js ELECTION e9335d9a clean
 citizenship.js ELECTION 51c738f7 clean
+citizenship.js ELECTION a78d4be7 clean
+citizenship.js ELECTION 8ca5a5d0 clean
 citizenship.js ELECTION 9607cadb clean
 commissions.js COMMISSION 49e86f26 parsed
 commissions.js COMMISSION 150fc5bd parsed
@@ -1310,6 +1351,7 @@ gameticket.js TICKET 77ab190c clean
 gearstrip.js GEARSTRIP b2f2fbe7 parsed
 gearstrip.js GEARSTRIP dbc0d2fc parsed
 gearstrip.js GEARSTRIP 65292d67 parsed
+gearstrip.js GEARSTRIP 49b64e3f parsed
 gearswap.js GEARSWAP 56c1784a parsed
 gearswap.js GEARSWAP b469a986 parsed
 gearswap.js GEARSWAP a9ee526a parsed
@@ -1447,6 +1489,7 @@ rest.js REST ba04dd69 clean
 restitution.js RESTITUTION 2fe920c8 parsed
 restitution.js RESTITUTION a3dc7345 parsed
 restitution.js RESTITUTION 9fe1a93b parsed
+restitution.js RESTITUTION 2c16ec14 parsed
 robbery.js ROBBERY 11430e82 parsed
 robbery.js ROBBERY 008a7770 parsed
 robbery.js ROBBERY e3b9189d parsed
@@ -1505,6 +1548,7 @@ spells.js TEACH d52977b9 parsed
 sprstrip.js SPRSTRIP ac1572f1 parsed
 sprstrip.js SPRSTRIP a7b3a299 parsed
 sprstrip.js SPRSTRIP d281443a parsed
+sprstrip.js SPRSTRIP 785ed462 parsed
 struggle.js STRUGGLE-MISMATCH c97bbac2 clean
 struggle.js STRUGGLE 4292b3ed clean
 struggle.js STRUGGLE 64f21bae clean

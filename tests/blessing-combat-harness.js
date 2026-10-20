@@ -45,6 +45,8 @@ bless(A, 'boethiah');
 check('Boethiah: one-handed +10%, two-handed unchanged', near(mult(A, T, SWORD), 1.1) && near(mult(A, T, GREATSWORD), 1));
 bless(A, 'auriel');
 check('Auri-El: bows and crossbows +10%', near(mult(A, T, BOW), 1.1) && near(mult(A, T, CROSSBOW), 1.1) && near(mult(A, T, SWORD), 1));
+bless(A, 'alkosh');
+check('Alkosh: a fist +10%, a sword and a spell unchanged', near(mult(A, T, FIST), 1.1) && near(mult(A, T, SWORD), 1) && near(mult(A, T, FIREBOLT), 1));
 bless(A, 'malacath');
 check('Malacath: every weapon +10%, not fists or spells', near(mult(A, T, SWORD), 1.1) && near(mult(A, T, BOW), 1.1) && near(mult(A, T, FIST), 1) && near(mult(A, T, FIREBOLT), 1));
 bless(A, 'mehrunes');

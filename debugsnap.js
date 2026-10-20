@@ -31,26 +31,49 @@ module.exports = (api) => {
   const hosterOf = (id) => { try { return typeof mp.getHoster === 'function' ? mp.getHoster(id) >>> 0 : null; } catch (e) { return null; } };
   const nameOrId = (id) => { if (!id) return id === 0 ? 'nobody' : 'unknown'; try { return display(id); } catch (e) { return hex(id); } };
 
-  const playerView = (p) => {
+  // One snapshot shares its reads across players (server/_reviews/2026-10-18-gamemode-at-500.md: per player it cost
+  // 216 ms every 5 s at 500 crowded players). Every player in one grid square (WorldState GetGridPos, truncated toward
+  // zero) has the same 3x3 block of neighbours, so actorNeighbors is read once per square; each actor's place is read
+  // once; the details (base, host, dead, terrain) only for the NPCs that make a player's nearest maxNpcs.
+  const newCache = () => ({ squares: new Map(), places: new Map(), details: new Map() });
+  const placeOf = (cache, id) => {
+    let pl = cache.places.get(id);
+    if (pl === undefined) {
+      try {
+        pl = profileOf(id) >= 0 ? null : { pos: mp.get(id, 'pos'), world: String(mp.get(id, 'worldOrCellDesc') || '') };
+        if (pl && !Array.isArray(pl.pos)) pl = null;
+      } catch (e) { pl = null; }
+      cache.places.set(id, pl);
+    }
+    return pl;
+  };
+  const detailsOf = (cache, id, pl) => {
+    let d = cache.details.get(id);
+    if (!d) {
+      const h = hosterOf(id);
+      d = { id: hex(id), base: String(mp.get(id, 'baseDesc') || '?'), pos: pl.pos.map(r), dead: mp.get(id, 'isDead') === true,
+        host: h === null ? null : (h ? nameOrId(h) : 'nobody'), terrainDz: terrainDz(pl.world, pl.pos) };
+      cache.details.set(id, d);
+    }
+    return d;
+  };
+  const playerView = (p, cache = newCache()) => {
     const world = String(mp.get(p, 'worldOrCellDesc') || '');
     const pos = mp.get(p, 'pos') || [0, 0, 0];
     const out = { id: hex(p), name: display(p), world, pos: pos.map(r), terrainDz: terrainDz(world, pos), npcs: [] };
-    let near = []; try { near = mp.get(p, 'actorNeighbors') || []; } catch (e) { near = []; }
+    const square = `${world}|${Math.trunc(pos[0] / 4096)}|${Math.trunc(pos[1] / 4096)}`;
+    let near = cache.squares.get(square);
+    if (!near) { try { near = mp.get(p, 'actorNeighbors') || []; } catch (e) { near = []; } cache.squares.set(square, near); }
+    const found = [];
     for (const id of near) {
-      try {
-        if (profileOf(id) >= 0) continue;
-        const npos = mp.get(id, 'pos'); const nworld = String(mp.get(id, 'worldOrCellDesc') || '');
-        const h = hosterOf(id);
-        out.npcs.push({
-          id: hex(id), base: String(mp.get(id, 'baseDesc') || '?'), pos: npos.map(r),
-          dist: nworld === world ? r(Math.hypot(npos[0] - pos[0], npos[1] - pos[1], npos[2] - pos[2])) : null,
-          dead: mp.get(id, 'isDead') === true, host: h === null ? null : (h ? nameOrId(h) : 'nobody'),
-          terrainDz: terrainDz(nworld, npos),
-        });
-      } catch (e) { /* gone */ }
+      const pl = placeOf(cache, id);
+      if (!pl) continue;
+      found.push({ id, pl, dist: pl.world === world ? r(Math.hypot(pl.pos[0] - pos[0], pl.pos[1] - pos[1], pl.pos[2] - pos[2])) : null });
     }
-    out.npcs.sort((a, b) => (a.dist ?? 1e9) - (b.dist ?? 1e9));
-    out.npcs = out.npcs.slice(0, C.maxNpcs);
+    found.sort((a, b) => (a.dist ?? 1e9) - (b.dist ?? 1e9));
+    for (const f of found.slice(0, C.maxNpcs)) {
+      try { out.npcs.push(Object.assign({}, detailsOf(cache, f.id, f.pl), { dist: f.dist })); } catch (e) { /* gone */ }
+    }
     out.hosting = out.npcs.filter((n) => n.host === out.name).length;
     return out;
   };
@@ -68,7 +91,8 @@ module.exports = (api) => {
     if (S.writing) return Promise.resolve(false);
     S.writing = true;
     const file = path.join(C.dir, 'live.json');
-    const data = JSON.stringify(obj, null, 1);
+    // Unindented: at 500 players the indented file was several MB of spaces (dbo-inspect parses either)
+    const data = JSON.stringify(obj);
     return fs.promises.mkdir(C.dir, { recursive: true })
       .then(() => fs.promises.writeFile(file + '.tmp', data))
       .then(() => fs.promises.rename(file + '.tmp', file))
@@ -78,10 +102,13 @@ module.exports = (api) => {
   };
   const snap = () => {
     const players = [];
-    for (const p of onlineActors()) { try { players.push(playerView(p)); } catch (e) { /* loading */ } }
+    const cache = newCache();
+    for (const p of onlineActors()) { try { players.push(playerView(p, cache)); } catch (e) { /* loading */ } }
     return writeLive({ at: new Date().toISOString(), players });
   };
-  every('debugSnap', C.snapMs, () => { snap(); });
+  // "live": false stops live.json (and its cost); /bug still works
+  if (C.live === false) { if (typeof api.stopTimer === 'function') api.stopTimer('debugSnap'); }
+  else every('debugSnap', C.snapMs, () => { snap(); });
 
   // The last minute of log lines that mention the player or one of the NPCs near them
   const recentLog = (needles) => {

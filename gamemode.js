@@ -56,6 +56,20 @@ const timed = (name, fn) => function (...args) {
     if (ms > SLOW_TICK_MS) { s.slow++; log(`slow tick ${name}: ${ms.toFixed(1)} ms`); }
   }
 };
+// A player's UI event (each onUi handler, and F3's journal) is timed the same way, per call: one slower than SLOW_UI_MS
+// logs the event, the actor and the time (17 Oct: an X press ran 14 s, 13 queued presses held the loop 3 minutes, and no
+// timer line showed it)
+const SLOW_UI_MS = Number((cfg.debug || {}).slowUiMs) || 250;
+const uiTimed = (event, a, fn) => {
+  const t0 = performance.now();
+  try { return fn(); } finally {
+    const ms = performance.now() - t0;
+    if (ms > SLOW_UI_MS) {
+      let name = ''; try { name = display(a); } catch (e) { name = ''; }
+      log(`slow ui ${String(event).slice(0, 60)} ${name ? `${name} ` : ''}(${(Number(a) >>> 0).toString(16)}): ${ms.toFixed(1)} ms`);
+    }
+  }
+};
 const stopTimer = (name) => { const t = TIMERS.get(name); if (!t) return; clearTimeout(t.start); clearInterval(t.interval); TIMERS.delete(name); };
 // Start offsets are spread over the first second so timers made in one load do not fire together
 let timerSlot = 0;
@@ -95,8 +109,8 @@ every('tickSummary', 60000, () => {
 const SAVES = globalThis.__dboSaves instanceof Map ? globalThis.__dboSaves : (globalThis.__dboSaves = new Map());
 const saveSoon = (file, snapshot) => { const s = SAVES.get(file) || { dirty: false, busy: false, seq: 0 }; s.snapshot = snapshot; s.dirty = true; SAVES.set(file, s); };
 const writeSaveSync = (file, s) => { const tmp = `${file}.${++s.seq}.tmp`; fs.writeFileSync(tmp, s.snapshot()); fs.renameSync(tmp, file); s.dirty = false; };
-// Money moves write at once: a crash inside the debounce would bring back a paid contract to be paid again
-const saveNow = (file, snapshot) => { saveSoon(file, snapshot); try { writeSaveSync(file, SAVES.get(file)); } catch (e) { log('save failed', path.basename(file), e.message); } };
+// Money moves write at once: a crash inside the debounce would bring back a paid contract to be paid again; the world save (saveIntervalMs) goes on the next tick too
+const saveNow = (file, snapshot) => { saveSoon(file, snapshot); try { writeSaveSync(file, SAVES.get(file)); } catch (e) { log('save failed', path.basename(file), e.message); } try { mp.requestSaveNow?.(); } catch (e) { log('requestSaveNow failed', e.message); } };
 const writeSave = (file, s) => {
   if (!s.dirty || s.busy) return;
   let text; try { text = s.snapshot(); } catch (e) { return log('save snapshot failed', path.basename(file), e.message); }
@@ -288,6 +302,12 @@ const staffCan = (actorId, what) => isAdmin(actorId) || (TRIAL_CAN.has(what) && 
 // The tier for logs and the role sync: an admin tier, 'trialgm', or null
 const staffTierFrom = (profile, roles) => tierFrom(profile, roles) || (trialFrom(profile, roles) ? 'trialgm' : null);
 const staffTierOf = (actorId) => staffTierFrom(profileOf(actorId), rolesOf(actorId));
+// Staff of any rank, Trial GMs too, hold no leadership (Nate, 18 Oct: "GMs of any kind cannot be in leadership in any faction
+// etc"): no seat in an election court (citizenship.js), no leading court office (appointCheck), no faction leader or officer
+// rank (guilds.js setMember). By the account's Discord roles, kept on the character, so it holds for an offline one too
+globalThis.__dboIsStaff = (actorId) => { try { return staffTierOf(Number(actorId) >>> 0) !== null; } catch (e) { return false; } };
+// The staff tier of a character ('senior', 'developer', 'leadgm', 'gm', 'trialgm' or null), for modules that show staff-only lines
+globalThis.__dboStaffTier = (actorId) => { try { return staffTierOf(Number(actorId) >>> 0); } catch (e) { return null; } };
 // Chat commands a Trial GM may run, and the right each needs (the command gate in handleChat)
 const TRIAL_COMMANDS = { rename: 'rename', chargen: 'chargen', tp: 'tp', charstats: 'playerinfo', bugs: 'bugs', realnames: 'realnames' };
 const staffRolesSeen = (a, roles) => {
@@ -305,7 +325,7 @@ const TIER_LABEL = { senior: 'Senior', developer: 'Developer', leadgm: 'Lead GM'
 // appoint and dismiss are here because an official's powers are real money: a rank lets its holder post work paid
 // out of the hold treasury, so a GM who could appoint himself could pay himself (claude-jake's review, A1-1).
 // /chargen is open to every GM (Nate, 12 Oct), and to a Trial GM through TRIAL_COMMANDS
-const LEAD_ONLY = new Set(['beastform', 'vlremote', 'wwremote', 'feedpair', 'sethunger', 'wipechars', 'driftspawn', 'driftrepair', 'driftset',
+const LEAD_ONLY = new Set(['rerollrefund', 'beastform', 'vlremote', 'wwremote', 'feedpair', 'sethunger', 'wipechars', 'driftspawn', 'driftrepair', 'driftset',
   'jail', 'placeexport', 'staffstats', 'war', 'curse', 'schedule', 'warband', 'raid', 'settime', 'timescale', 'setweather', 'npc remove', 'dungeon end',
   'appoint', 'dismiss',
   // Handing out a smithing manual is handing out an item (the T5 ones are given in roleplay, like artifacts)
@@ -336,20 +356,38 @@ const distanceMeters = (a, b) => {
 };
 // distanceMeters costs four engine reads per pair; a message to everyone in range reads the
 // speaker once and skips anyone in another world on a single read
+// Where each online player stands, read at most every PLACES_MS and shared by every caller in between: at 500 crowded
+// players those two reads per player were 71% of a chat line's cost (CPU profile 19 Oct, 595 of 838 ms under handleChat;
+// sendNear and bubbleNear each walked everyone). A range check against a position up to 250 ms old is fine for chat.
+// Only who is online is read each call, so a player who just logged in is read fresh and one who left is skipped
+const PLACES_MS = 250;
+let placesAt = 0;
+let places = new Map();
+const placeOf = (a, now) => {
+  if (now - placesAt >= PLACES_MS) { places = new Map(); placesAt = now; }
+  let pl = places.get(a);
+  if (pl === undefined) {
+    try { const p = mp.get(a, 'pos'); pl = Array.isArray(p) ? { world: mp.get(a, 'worldOrCellDesc'), pos: p } : null; } catch (e) { pl = null; }
+    places.set(a, pl);
+  }
+  return pl;
+};
 const actorsNear = (fromActor, rangeM, includeSelf) => {
   const out = [];
   let world = null; let from = null;
   try { world = mp.get(fromActor, 'worldOrCellDesc'); from = mp.get(fromActor, 'pos'); } catch (e) { return out; }
   if (!Array.isArray(from)) return out;
   const reach = rangeM * UNITS_PER_METER;
+  const now = Date.now();
   for (const a of onlineActors()) {
     if (a === fromActor && !includeSelf) continue;
-    try {
-      if (mp.get(a, 'worldOrCellDesc') !== world) continue;
-      const p = mp.get(a, 'pos');
+    if (a !== fromActor) {
+      const pl = placeOf(a, now);
+      if (!pl || pl.world !== world) continue;
+      const p = pl.pos;
       const dx = p[0] - from[0]; const dy = p[1] - from[1]; const dz = p[2] - from[2];
       if (dx * dx + dy * dy + dz * dz > reach * reach) continue;
-    } catch (e) { continue; }
+    }
     out.push(a);
   }
   return out;
@@ -594,7 +632,10 @@ globalThis.__dboDiscordBan = (info) => {
   const modName = banOneLine(mod.name, 40).replace(/[^A-Za-z0-9_. -]+/g, '').trim();
   const by = modChars && modChars.length ? banCharText(modChars[0]) : modName ? `Discord user ${modName}${mod.bot === true ? ' (a bot)' : ''}` : 'an unknown moderator';
   const reason = banOneLine(String(info.reason || '').replace(BAN_ID_RX, '[id]'), 200);
-  const targets = [...banAccountsOf(info.discordId, online).values()].map((list) => `${banCharText(list[0])}${list.length > 1 ? `, ${list.length - 1} more character${list.length > 2 ? 's' : ''}` : ''}`);
+  const accounts = banAccountsOf(info.discordId, online);
+  // A ban revokes the banned account's referrals as a referee (referrals.js)
+  if (op === 'ban' && typeof globalThis.__dboReferralBan === 'function') { try { globalThis.__dboReferralBan([...accounts.keys()]); } catch (e) { log('referral ban hook failed:', e.message); } }
+  const targets = [...accounts.values()].map((list) => `${banCharText(list[0])}${list.length > 1 ? `, ${list.length - 1} more character${list.length > 2 ? 's' : ''}` : ''}`);
   if (!targets.length) targets.push('a Discord account with no character');
   for (const target of targets) audit(`BAN Discord ${op} (${via}) on ${target} by ${by}${reason ? `: ${reason}` : ''}`);
   return targets.length;
@@ -876,21 +917,22 @@ const HELP_GROUPS = [
   { key: 'beast', title: 'The beast in you', names: ['beast', 'forms', 'hunt', 'blood', 'feed'], role: 'beast',
     hints: ['Your curse and its powers: F3, the Supernatural tab.',
       'Silver and fire hurt a vampire more; silver and poison spells hurt a werewolf more in beast form.'] },
-  { key: 'work', title: 'Work and the world', names: ['time', 'property', 'keys', 'courier'],
+  { key: 'work', title: 'Work and the world', names: ['time', 'property', 'mine', 'keys', 'courier'],
     hints: ['Hunting work: the Contracts tab of the expedition board (Synod Conclave, Fighters Guild, Frostcrag Spire).', 'Other work for pay: a notice board, then /commission.',
       'Mining and woodcutting: an ore vein or a chopping block. Richer ores need a higher Miner tier.',
       'The Bleak-Frost Mine, west of Bruma: iron, corundum and gold, and meteoric iron for Adept miners.',
       'Smelting ore into ingots: a smelter. Enchanting and disenchanting: an arcane enchanter.',
       'Breaking gear down, with its skill: the station of its trade (a smelter, a tanning rack, a loom; books at a writing desk).',
       'A house you own or rent: look at its door and press X.', 'Your money: a bank counter.',
-      'Your business: its ledger book.', 'Where you are: /whereami.'] },
+      'Your business: its ledger book. A shop\'s goods: its ledger book, or /shop inside it.', 'Where you are: /whereami.'] },
   { key: 'rule', title: 'Rule and property', names: ['officials', 'appoint', 'dismiss', 'tax', 'ledgerpoint'], role: 'official',
-    hints: ['Your court: F3, the Court tab. A post you appoint someone to is offered, and they accept it.'] },
+    hints: ['Your court: F3, the Court tab. A post you appoint someone to is offered, and they accept it.',
+      'An outlaw of your hold (ruler or Steward): /bounty set <name or #TAG> <gold, up to 1000> <reason>; the jailer collects it.'] },
   { key: 'groups', title: 'Groups and dungeons', names: ['party', 'court', 'charter', 'nobility'],
     hints: ['Your factions and your court: F3, the Faction and Court tabs. The nobles of your hold: F3, the Nobility tab.',
       'A dungeon: its door. The party leader picks Novice, Adept, Expert or Master; /dungeon says what is claimed.',
       'An expedition: the board in the Synod Conclave, the Fighters Guild or Frostcrag Spire.'] },
-  { key: 'trouble', title: 'Trouble and help', names: ['gm', 'unstuck', 'struggle', 'bug', 'ticket', 'name', 'help', 'syncenchant'],
+  { key: 'trouble', title: 'Trouble and help', names: ['gm', 'unstuck', 'struggle', 'bug', 'ticket', 'name', 'help', 'syncenchant', 'bounty'],
     hints: ['Where you stand, your ids and the effects on you: press F7.',
       'Your keys: F3, Settings. A new key works from the next time you start the game.'] },
 ];
@@ -903,12 +945,12 @@ const HELP_GROUPS = [
 const HELP_BY_OBJECT = new Set(['bank', 'board', 'business', 'faction', 'deity', 'rite', 'tomes', 'respawn', 'skills',
   'ledger', 'chill', 'sentence', 'hunger', 'rest', 'tokens', 'whoami', 'pigeonblock', 'sign', 'level', 'spells',
   'teach', 'reroll', 'offer', 'contract', 'commission', 'wildlife', 'champions', 'whereami', 'playtest', 'dungeon', 'ping',
-  'expedition', 'expeditions', 'blackreach']);
+  'expedition', 'expeditions', 'blackreach', 'shop']);
 const helpRoleOk = (a, role) => {
   if (!role) return true;
   try {
     if (isAdmin(a)) return true;   // staff see every topic, rank or no rank
-    if (role === 'official') return (ranksOf(profileOf(a)) || []).length > 0;
+    if (role === 'official') return (ranksOf(profileOf(a), a) || []).length > 0;
     if (role === 'beast') return typeof globalThis.__dboSuperKind === 'function' && !!globalThis.__dboSuperKind(a);
   } catch (e) { return false; }
   return true;
@@ -945,8 +987,9 @@ const STAFF_HELP = [
     ['dismiss', '<player|#TAG|profile id> <zone>: remove an official, online or offline (told if online). Officials may dismiss the ranks they may appoint'],
     ['officials', '[zone]: who holds which rank where'],
     ['property', 'at a door, as an official: sell <price> | list <deposit> <weekly> | unlist | offer <name> | remind | grace | evict']] },
+  { key: 'elections', title: 'Hold elections', items: ['electionreview', 'strikevote', 'unstrikevote'] },
   { key: 'beasts', title: 'Beasts and the supernatural', items: ['beastform', 'curse', 'makesuper', 'vlremote', 'wwremote', 'feedpair', 'raid', 'warband'] },
-  { key: 'magic', title: 'Magic and crafts', items: ['schools', 'shoutclean', 'classteacher', 'preacher', 'manual', 'smithing', 'tailoring'] },
+  { key: 'magic', title: 'Magic and crafts', items: ['schools', 'shoutclean', 'classteacher', 'preacher', 'manual', 'smithing', 'tailoring', 'enchant'] },
   { key: 'law', title: 'Law', items: ['jail', ['concordat', '[races]: Concordat arrests standing, or the Thalmor outside the race rule'],
     ['dossier', 'list | read <name|#TAG> | reports | add <name|#TAG> <text> | strike <name|#TAG> <n>: the Thalmor dossiers and informant reports (add and strike: Lead GM)']] },
   { key: 'world', title: 'World', items: ['settime', 'setweather', 'timescale', 'region', ['dungeon end', '<dungeon id|name>: end a dungeon claim now'],
@@ -1059,6 +1102,40 @@ registerChatCommand('shoutclean', (a, args) => {
   }
   personal(a, `Reconnecting ${targets.filter(granted).length} player(s); they are taught the player shouts again at login.`);
 }, { admin: true, help: '[player|all] who holds the old all-shouts list; reconnect them to clear it' });
+// /grantproperty <player|#TAG> <door id> (Lead GM and up; Nate, 19 Oct: the Mountainwatch mine refused every grant from the
+// property panel with "You cannot claim that"): the housing system's own grant, by a door's form id, no panel involved.
+// A door may be "d97a2:BSHeartland.esm" or the hex form id. Its refusal (a cap, not a property) is shown as it is.
+registerChatCommand('grantproperty', (a, args) => {
+  const tier = staffTierOf(a);
+  if (!['senior', 'developer', 'leadgm'].includes(tier)) return personal(a, 'Only a Lead GM or above grants a property this way.');
+  const words = String(args || '').trim().split(/\s+/).filter(Boolean);
+  if (words.length < 2) return personal(a, 'Use /grantproperty <name or #TAG> <door id>, e.g. /grantproperty #8YDB d97a2:BSHeartland.esm');
+  const door = words.pop(); const t = findByName(words.join(' '));
+  if (!t) return personal(a, 'No such player online. Use their name or #TAG.');
+  let id = 0;
+  try { id = /:/.test(door) ? (mp.getIdFromDesc(door) >>> 0) : (parseInt(door, 16) >>> 0); } catch (e) { id = 0; }
+  if (!id) return personal(a, `${door} is not a form id I can read.`);
+  const H = globalThis.__dboHousing;
+  if (!H || typeof H.grant !== 'function') return personal(a, 'The housing system is not loaded.');
+  // A door whose pair key is a reference the server no longer has (the Mountainwatch mine: the housing pairs the outside door
+  // 80d97a2 with the original inside door 80d9643 that DLE deleted and replaced, and the lower id is the key, so every
+  // write failed): an empty record on the given door first makes it its own key, and the deleted one is never written
+  let seeded = false;
+  try {
+    const key = typeof H.primaryOf === 'function' ? (Number(H.primaryOf(id)) >>> 0) : 0;
+    let keyGone = false; if (key && key !== id) { try { mp.get(key, 'type'); } catch (e) { keyGone = /doesn't exist/.test(String(e && e.message)); } }
+    let own = null; try { own = mp.get(id, 'private.housing'); } catch (e) { own = null; }
+    // ...or it holds only a pointer to that key ({ primary: <gone> }, what the place rules wrote: d97a2 -> 80d9643)
+    const pointsAtGone = keyGone && own && typeof own === 'object' && (Number(own.primary) >>> 0) === key;
+    if (keyGone && (!own || pointsAtGone)) { mp.set(id, 'private.housing', { owner: 0, ownerName: '', name: null, locked: false, serial: 1, partner: 0, containers: [], issued: [] }); seeded = true; }
+  } catch (e) { log(`grantproperty: could not prepare ${id.toString(16)}: ${e.message}`); }
+  let err = ''; try { err = String(H.grant(id, t) || ''); } catch (e) { err = e.message || 'failed'; }
+  if (err) { log(`grantproperty: ${who(a)} -> ${who(t)} at ${id.toString(16)} refused: ${err}${seeded ? ' (after seeding its own record)' : ''}`); return personal(a, `Not granted: ${err}`); }
+  if (seeded) log(`grantproperty: ${id.toString(16)} keyed on itself (its pair key no longer exists)`);
+  audit(`HOUSING ${who(a)} granted ${id.toString(16)} (${door}) to ${who(t)} with /grantproperty`);
+  personal(a, `${display(t)} now owns ${door}.`);
+  try { personal(t, 'A property has been granted to you by the staff.'); } catch (e) { /* offline */ }
+}, { admin: true, help: '<name or #TAG> <door id> grant a property to a player by its door (Lead GM+)' });
 // Players cannot reopen character creation themselves; an admin does it for them by tag.
 registerChatCommand('chargen', (a, args) => {
   // A Trial GM opens it for their own character only (Nate, 12 Oct); a GM and above for anyone. No name: oneself
@@ -1067,6 +1144,7 @@ registerChatCommand('chargen', (a, args) => {
   if (trialOnly && (t >>> 0) !== (a >>> 0)) return personal(a, 'As a Trial GM you can open character creation for your own character only: /chargen');
   try {
     mp.setRaceMenuOpen(t, true);
+    markEditorOpen(t);
     // An existing character's look as it stands, so the close can undo the editor's swapped-in head (appearance.js). Once
     // the menu is open (its close comes back from the client later), so a menu that failed to open leaves no snapshot
     try { if (globalThis.__dboAppearanceEdit && typeof globalThis.__dboAppearanceEdit.chargenOpened === 'function') globalThis.__dboAppearanceEdit.chargenOpened(t); } catch (e) { log('chargen look snapshot failed', e.message); }
@@ -1076,6 +1154,13 @@ registerChatCommand('chargen', (a, args) => {
   } catch (e) { personal(a, 'Failed: ' + e.message); }
 }, { admin: true, help: '[player|#TAG] reopen character creation for someone (a Trial GM: yourself only)' });
 const NAME_RE = /^[A-Za-z][A-Za-z' \-]{1,30}$/;
+// An offline character by its #TAG ("#ABCD" or "Name #ABCD"): only when exactly one live character carries it in the index
+const offlineByTag = (q) => {
+  const m = String(q || '').trim().match(/(?:^|\s)#([A-Za-z0-9]{4})$/); if (!m) return 0;
+  let ids = []; try { ids = mp.findFormsByPropertyValue('private.indexed.tagKey', m[1].toLowerCase()) || []; } catch (e) { return 0; }
+  const live = ids.map((x) => Number(x) >>> 0).filter((id) => id && !(typeof globalThis.__dboFormGone === 'function' && globalThis.__dboFormGone(id)));
+  return live.length === 1 ? live[0] : 0;
+};
 // A staff rename, for /rename and the F7 panel's Rename (fork adminSystem.ts calls __dboAdminRename): { ok, text }
 const renameCharacter = (a, t, rawName) => {
   const newName = String(rawName || '').trim().replace(/\s+/g, ' ');
@@ -1098,9 +1183,12 @@ globalThis.__dboAdminRename = (a, t, name) => (staffCan(Number(a) >>> 0, 'rename
 registerChatCommand('rename', (a, args) => {
   const m = args.trim().match(/^(\S+(?:\s+#[A-Za-z0-9]{4})?|#[A-Za-z0-9]{4})\s+(.+)$/);
   if (!m) return personal(a, 'Usage: /rename <player|#TAG> <new name>');
-  const t = findByName(m[1]); if (!t) return personal(a, 'No such player. Use their name or #TAG.');
+  // A typed #TAG binds: findByName falls back to a name prefix when the tag is not online, which may be someone else
+  const tagIn = (m[1].match(/#([A-Za-z0-9]{4})$/) || [])[1];
+  let t = findByName(m[1]); if (t && tagIn && tagOf(t).toLowerCase() !== tagIn.toLowerCase()) t = 0;
+  t = t || offlineByTag(m[1]); if (!t) return personal(a, 'No such player. Use their name or #TAG (an offline character: its #TAG).');
   personal(a, renameCharacter(a, t, m[2]).text);
-}, { admin: true, help: '<player|#TAG> <new name>' });
+}, { admin: true, help: '<player|#TAG> <new name> (offline: by #TAG; /chars #TAG lists the account\'s characters)' });
 // The staff teleport: /tp, and /gm goto (gmcall.js). '' when it went, else why not
 const staffTeleport = (a, place) => {
   try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('travel', a, 'staff_tp', a); } catch (e) { /* the player log is optional */ }
@@ -1182,6 +1270,14 @@ every('meet', MEET_TICK_MS, () => {
   }
   for (const a of changed) { try { mp.set(a, 'private.metActors', metCache.get(a).list.slice()); } catch (e) { metCache.delete(a); } }
 });
+// Who a pigeon can reach: those met in person, and those who introduced themselves (playermenu.js ff_knownIds, the
+// ids that introduced themselves to a). The coop read only the met list, so an introduction never made a contact, and a
+// player who is always masked could be met by no one (#7DJT's /bug, 19 Oct: "people try to send me pigeons")
+const introducedTo = (a) => { try { const v = mp.get(a, 'ff_knownIds'); return Array.isArray(v) ? v.map((x) => Number(x) >>> 0).filter(Boolean) : []; } catch (e) { return []; } };
+// Introduced both ways (each in the other's ff_knownIds) reaches anywhere, whatever world either is in (Nate, 19 Oct: "let
+// pigeons reach anyone by name and tag as long as the two players introduced each other")
+const introducedBoth = (a) => { a = Number(a) >>> 0; return introducedTo(a).filter((x) => introducedTo(x).includes(a)); };
+const pigeonContactsOf = (a) => [...new Set(metOf(a).map((x) => Number(x) >>> 0).concat(introducedBoth(a)))].filter((x) => x !== (Number(a) >>> 0));
 // The ledger's "forget": struck out of one side only, and written back in by the next meeting in person
 const forgetMet = (a, b) => {
   try { mp.set(a, 'private.metActors', metOf(a).filter((x) => x !== b)); } catch (e) { log('forget failed', e.message); }
@@ -1201,10 +1297,12 @@ const togglePresenceShare = (a, b) => {
   return i < 0;
 };
 // c shows as about to v only when online, met both ways and shared both ways (L2-2: anyone met once saw it); online: a Set
+// Both have met and both share their whereabouts with each other: only then may v learn c is online or away
+const presenceMutual = (v, c) => { v = Number(v) >>> 0; c = Number(c) >>> 0; return v !== c && presenceSharesOf(c).includes(v) && presenceSharesOf(v).includes(c) && metOf(c).includes(v) && metOf(v).includes(c); };
 const presenceShown = (v, c, online) => {
   v = Number(v) >>> 0; c = Number(c) >>> 0;
   if (v === c || !(online instanceof Set ? online : new Set(onlineActors())).has(c)) return false;
-  return presenceSharesOf(c).includes(v) && presenceSharesOf(v).includes(c) && metOf(c).includes(v) && metOf(v).includes(c);
+  return presenceMutual(v, c);
 };
 const takeGold = (a, amount) => {
   // A negative amount would add gold and NaN would empty the purse; every caller checks today, this is the backstop
@@ -1221,10 +1319,11 @@ const takeGold = (a, amount) => {
   } catch (e) { log('gold take failed', e.message); return false; }
 };
 // Returns what was deposited; a zone without a treasury keeps nothing
-const depositToTreasury = (zoneId, amount) => {
+// opts { income: '<kind>' } marks the hold's income, which the Imperial tithe counts (bank.js); without it, never tithed
+const depositToTreasury = (zoneId, amount, opts) => {
   // A hold's treasury is its balance in the bank (bank.js); the chest is only the fallback if bank.js is not loaded
   const T = globalThis.__dboTreasuryZone;
-  if (T && typeof T.deposit === 'function') return T.deposit(typeof zoneId === 'object' && zoneId ? zoneId.id : zoneId, Math.floor(Number(amount) || 0));
+  if (T && typeof T.deposit === 'function') return T.deposit(typeof zoneId === 'object' && zoneId ? zoneId.id : zoneId, Math.floor(Number(amount) || 0), opts);
   const zone = zoneId ? zoneById(zoneId) : null;
   if (!zone || !zone.treasury || amount <= 0) return 0;
   try {
@@ -1277,7 +1376,11 @@ const saveLetters = (a, list) => {
   const kept = spare > 0 ? sorted.reverse().filter((m) => !(spare > 0 && m.read && !m.parcel && spare--)).reverse() : sorted;
   mp.set(a, 'private.pigeons', kept);
 };
-const pigeonsWaiting = (a) => lettersOf(a).filter((m) => !m.read || m.parcel).length;
+// A parcel its reader can never keep (a vampire's own silver, supernatural.js): it can be burned with its letter and does not
+// hold the waiting-mail marker; collecting it only mailed it back again (karta.gina, 19 Oct)
+const parcelUnbearable = (a, m) => { const p = m && m.parcel; const f = globalThis.__dboCannotCarry; return !!(p && typeof f === 'function' && !(Number(p.gold) > 0) && Array.isArray(p.items) && p.items.length && p.items.every((e) => f(a, Number(e.baseId) >>> 0))); };
+globalThis.__dboParcelUnbearable = parcelUnbearable;
+const pigeonsWaiting = (a) => lettersOf(a).filter((m) => !m.read || (m.parcel && !parcelUnbearable(a, m))).length;
 // Board positions for the client's floating letter marker (notice-board-spots.json, the same list bountyBoardSystem reads)
 const BOARD_REFS = (() => {
   try {
@@ -1341,7 +1444,7 @@ const sendPigeon = (a, to, rawText, zoneId, goldRaw, itemsRaw) => {
   const p = profileOf(a); const left = PIGEON_COOLDOWN_MS - (Date.now() - (pigeonLastSent.get(p) || 0));
   if (left > 0 && !admin) return { ok: false, text: `Your pigeon is still out. Next one in ${Math.ceil(left / 60000)} min.` };
   if (!to || to === a) return { ok: false, text: 'Choose who the letter is for.' };
-  if (!admin && !metOf(a).includes(to)) return { ok: false, text: 'Your pigeon does not know the way to someone you have never met.' };
+  if (!admin && !pigeonContactsOf(a).includes(to >>> 0)) return { ok: false, text: 'Your pigeon does not know the way to someone you have never met.' };
   if (prep && typeof globalThis.__dboFormGone === 'function' && globalThis.__dboFormGone(to)) return { ok: false, text: 'Your pigeon finds no one there to take a parcel.' };
   try {
     // Every letter lands at the notice boards and waits there; nobody reads a pigeon in the field
@@ -1364,7 +1467,7 @@ const sendPigeon = (a, to, rawText, zoneId, goldRaw, itemsRaw) => {
     }
     const taxed = price + (prep ? prep.tax + prep.fee : 0);
     notePigeonSent(p);
-    if (isBlocked) { if (taxed > 0) depositToTreasury(zoneId, taxed); return { ok: true, text: 'Your pigeon flew off and never came back.' }; }
+    if (isBlocked) { if (taxed > 0) depositToTreasury(zoneId, taxed, { income: 'postage' }); return { ok: true, text: 'Your pigeon flew off and never came back.' }; }
     const at = Date.now();
     const sig = nextSignature.get(a);
     nextSignature.delete(a);
@@ -1381,7 +1484,7 @@ const sendPigeon = (a, to, rawText, zoneId, goldRaw, itemsRaw) => {
       if (items.length) P.giveEntries(a, items);
       throw e;
     }
-    const paid = taxed > 0 ? depositToTreasury(zoneId, taxed) : 0;
+    const paid = taxed > 0 ? depositToTreasury(zoneId, taxed, { income: 'postage' }) : 0;
     if (sig) audit(`PIGEON ${who(a)} sent ${nameOf(to)} a letter signed "${from}"`);
     if (prep) audit(`POST ${who(a)} sent ${who(to)} ${[prep.gold ? `${prep.gold} gold` : '', P.itemsText(items)].filter(Boolean).join(', ')} (tax ${prep.tax + prep.fee}, flight ${price})`);
     // the player log: that a letter went, its parcel and how it was signed; never the text or the signature
@@ -1399,10 +1502,10 @@ const openPigeonCoop = (a, result, resultKind, view) => {
   const online = new Set(onlineActors());
   const price = admin ? 0 : pigeonFee();
   const contacts = [];
-  for (const id of metOf(a)) {
+  for (const id of pigeonContactsOf(a)) {
     try { if (!mp.get(id, 'appearance')) continue; } catch (e) { continue; }
     // Who they met: a contact behind a mask or in a beast form keeps their own name here
-    contacts.push({ id, name: ownNameOf(id), tag: tagOf(id), online: presenceShown(a, id, online), price });
+    contacts.push({ id, name: ownNameOf(id), tag: tagOf(id), online: presenceShown(a, id, online), shared: presenceMutual(a, id), price });
   }
   contacts.sort((x, y) => x.name.localeCompare(y.name));
   const left = PIGEON_COOLDOWN_MS - (Date.now() - (pigeonLastSent.get(profileOf(a)) || 0));
@@ -1661,13 +1764,36 @@ const treasuryRefused = (caster, target) => {
 // Gold lying in the world from the plugins (banks, shops, homes) is set dressing, never loot (Nate, 16 Oct: 500 gold from
 // the Riften bank's coin piles). Gold a player dropped (a dynamic ref) can still be picked up. Config placedGold.pickup
 const placedGoldBase = new Map(); // baseId -> true for gold
+const modelOf = (rec) => {
+  const f = rec && rec.record && (rec.record.fields || []).find((x) => x && x.type === 'MODL' && x.data instanceof Uint8Array);
+  if (!f) return '';
+  let t = ''; for (const c of f.data) { if (!c) break; t += String.fromCharCode(c); }
+  return t;
+};
+// A coin purse (Nate, 18 Oct: "make the ability to harvest gold purses again. NO LOOTING GOLD PILES"): harvestable flora with a
+// coin bag model (CoinBagSmall/Med/Large.nif) or CoinPurse/CoinPouch in its name, in every plugin of the load order. It goes to
+// __dboCoinPurse below; every other coin model (piles, stacks, loose coins) is placed gold, refused.
+const purseBase = new Map(); // baseId -> true for a coin purse
+const isPurseBase = (baseId) => {
+  if (purseBase.has(baseId)) return purseBase.get(baseId);
+  const rec = recordOf(baseId);
+  const yes = !!(rec && String(rec.record.type) === 'FLOR' && (/^coinbag/i.test(modelOf(rec).split(/[\\/]/).pop()) || /coin_?(purse|pouch)/i.test(String(rec.record.editorId || ''))));
+  purseBase.set(baseId, yes);
+  return yes;
+};
 const isPlacedGold = (target) => {
   if (target >= 0xff000000 || ((cfg.placedGold || {}).pickup) === true) return false;
   let baseId = 0; try { baseId = mp.getIdFromDesc(String(mp.get(target, 'baseDesc'))) >>> 0; } catch (e) { return false; }
   if (!baseId) return false;
   if (placedGoldBase.has(baseId)) return placedGoldBase.get(baseId);
+  if (isPurseBase(baseId)) { placedGoldBase.set(baseId, false); return false; }
   let yes = baseId === 0xf;
   if (!yes) { const rec = recordOf(baseId); yes = !!(rec && String(rec.record.type) === 'MISC' && /^gold0\d\d$|coin_?pile|gold_?(pile|stack|coins)/i.test(String(rec.record.editorId || ''))); }
+  // Any base whose model is coins, whatever its type (Nate, 17 Oct: Dragonborn's DLC2GoldPile activators in the banks paid
+  // out by script). A 140-plugin model scan found them as ACTI (DLC2CoinPile01/02), FLOR (coin purses, Summerset's coin
+  // stacks, Druadach's harvest coin) and MISC (coins and pouches); every coin model's file name has "coin" in it, and no
+  // other model's does. Gold Kanet and the golden Thieves Guild treasures are not coins and stay as they are.
+  if (!yes) { const rec = recordOf(baseId); yes = /coin|goldpile/i.test(modelOf(rec).split(/[\\/]/).pop()); }
   placedGoldBase.set(baseId, yes);
   return yes;
 };
@@ -1746,6 +1872,8 @@ mp.onActivate = (targetId, casterId) => {
   if (globalThis.__dboJailActivate && globalThis.__dboJailActivate(targetId >>> 0, casterId >>> 0)) return false;
   if (globalThis.__dboRestActivate && globalThis.__dboRestActivate(targetId >>> 0, casterId >>> 0)) return false;
   if (globalThis.__dboSuperActivate && globalThis.__dboSuperActivate(targetId >>> 0, casterId >>> 0)) return false;
+  // The Green Pact (greenpact.js): a sworn wood elf partakes of the slain, and is refused a living plant
+  if (globalThis.__dboGreenPactActivate) { try { if (globalThis.__dboGreenPactActivate(targetId >>> 0, casterId >>> 0)) return false; } catch (e) { log('green pact activate failed', e.message); } }
   if (globalThis.__dboCoinPurse && globalThis.__dboCoinPurse(targetId >>> 0, casterId >>> 0)) return false;
   if (globalThis.__dboWispStalk && globalThis.__dboWispStalk(targetId >>> 0, casterId >>> 0)) return false;
   if (globalThis.__dboAyleidWell && globalThis.__dboAyleidWell(targetId >>> 0, casterId >>> 0)) return false;
@@ -1760,6 +1888,7 @@ mp.onActivate = (targetId, casterId) => {
     if (refused) return false;
   }
   if (globalThis.__dboSalvageActivate && globalThis.__dboSalvageActivate(targetId >>> 0, casterId >>> 0)) return false;
+  if (globalThis.__dboRepairActivate && globalThis.__dboRepairActivate(targetId >>> 0, casterId >>> 0)) return false;
   try { if (globalThis.__dboEnchanterTouched) globalThis.__dboEnchanterTouched(targetId >>> 0, casterId >>> 0); } catch (e) { log('enchanter resend failed', e.message); }
   // An alchemy lab also shows what the pack can brew (alchemy.js); the lab's own menu still opens
   if (globalThis.__dboAlchemyLab) { try { if (globalThis.__dboAlchemyLab(targetId >>> 0, casterId >>> 0) === true) return false; } catch (e) { log('alchemy lab panel failed', e.message); } }
@@ -1804,6 +1933,31 @@ mp.onActivate = (targetId, casterId) => {
   // "allowed" (housingSystem.ts); that policy is the fork's to change, so a throw out of it still allows, now logged.
   try { return prev.call(mp, targetId, casterId) !== false; } catch (e) { logActivateThrow('systems', e); return true; }
 };
+// A court's own levers (Countess Frigga, 17 Oct: anyone in town could work Castle Bruma's north gate and shut her out):
+// only the court of the lever's zone pulls it, a seat in its offices or its household, and staff. config courtLevers
+// { "<lever desc>": "<zone id>" } replaces the list
+{
+  const activateBeforeCourtLevers = mp.onActivate;
+  const LEVERS = (cfg.courtLevers && typeof cfg.courtLevers === 'object') ? cfg.courtLevers : { '1b5fc3:DragonBreak Online Edits.esp': 'bruma' };
+  const leverZone = new Map();
+  for (const [desc, zone] of Object.entries(LEVERS)) { try { leverZone.set(mp.getIdFromDesc(desc) >>> 0, String(zone)); } catch (e) { log(`court levers: ${desc} not found`); } }
+  const servesCourt = (a, zone) => {
+    const pid = Number(profileOf(a));
+    const seats = (readOfficials() || {})[zone] || {};
+    if (pid >= 0 && Object.entries(seats).some(([r, list]) => (list || []).map(Number).includes(pid) && (() => { const held = typeof seatHolder === 'function' ? seatHolder(zone, r, pid) : 0; return !held || held === (a >>> 0); })())) return true;
+    try { const fid = typeof globalThis.__dboHoldFactionOf === 'function' ? globalThis.__dboHoldFactionOf(zone) : null; if (fid && typeof globalThis.__dboGuildsOf === 'function' && (globalThis.__dboGuildsOf(a) || []).some((g) => g.id === fid)) return true; } catch (e) { /* no household */ }
+    return false;
+  };
+  mp.onActivate = (targetId, casterId) => {
+    const zone = leverZone.get(targetId >>> 0);
+    if (zone && userOf(casterId) >= 0 && !isAdmin(casterId) && !servesCourt(casterId >>> 0, zone)) {
+      const z = (ZONES.holds || []).concat(ZONES.regions || []).find((x) => x.id === zone);
+      personal(casterId, `Only the court of ${z ? z.name : zone} works this lever.`);
+      return false;
+    }
+    return activateBeforeCourtLevers(targetId, casterId);
+  };
+}
 // Any throw in the chain above is refused, not allowed (see activateThrew)
 {
   const activateChain = mp.onActivate;
@@ -1859,6 +2013,22 @@ mp.onActivate = (targetId, casterId) => {
       }
       system(c, `${label} is locked: your key lets you in. Anyone without a key is refused.`);
     } catch (e) { /* no hint, the activation stands */ }
+    return allowed;
+  };
+}
+// Gates held shut (gamemode-config heldClosedDoors). A load door stays open after its first use, and an open HelgenGate01
+// on the Pale Pass border shows a wide-open gateway that players run through, its two leaves folded back at the hinges,
+// where the only activation spot is (Nate, 17 Oct). Closed again at every reload and a moment after each use, which
+// still takes the player through.
+{
+  const heldClosed = () => { const ids = []; for (const d of (cfg.heldClosedDoors || [])) { try { const id = mp.getIdFromDesc(String(d)) >>> 0; if (id) ids.push(id); } catch (e) { /* not in this load order */ } } return ids; };
+  const shut = (id) => { try { if (mp.get(id, 'isOpen') === true) mp.set(id, 'isOpen', false); } catch (e) { log('held door: close failed', id.toString(16), e.message); } };
+  for (const id of heldClosed()) shut(id);
+  const activateBeforeHeldDoors = mp.onActivate;
+  mp.onActivate = (targetId, casterId) => {
+    const allowed = activateBeforeHeldDoors(targetId, casterId);
+    const t = targetId >>> 0;
+    if (heldClosed().includes(t)) setTimeout(() => shut(t), 1500);
     return allowed;
   };
 }
@@ -1962,6 +2132,27 @@ const activateAllowed = (caster) => {
   };
 }
 every('activatePrune', 60000, () => { const now = Date.now(); for (const [k, b] of activateBuckets) if (now - b.at > 120000) activateBuckets.delete(k); });
+// Doors that start open (2026-10-17). The server keeps every door's open state itself and never reads a reference's "open by
+// default" (ONAM), so a door it has not seen before starts closed. Each listed door is opened once and marked
+// private.dboStartedOpen; after that its state belongs to the players and the levers, and is kept over restarts.
+// Castle Bruma's north gate (its lever 1b5fc3 lowers it).
+{
+  const pendingStartOpen = new Set(['1b5fc4:DragonBreak Online Edits.esp']);
+  every('doorsStartOpen', 30000, () => {
+    for (const desc of [...pendingStartOpen]) {
+      try {
+        const id = mp.getIdFromDesc(desc) >>> 0;
+        if (mp.get(id, 'private.dboStartedOpen') !== true) {
+          mp.set(id, 'isOpen', true);
+          mp.set(id, 'private.dboStartedOpen', true);
+          log(`doors: ${desc} opened once (it starts open)`);
+        }
+        pendingStartOpen.delete(desc);
+      } catch (e) { logCapped(`startopen:${desc}`, 2, `doors: ${desc} not opened yet: ${e.message}`); }
+    }
+    if (!pendingStartOpen.size) stopTimer('doorsStartOpen');
+  });
+}
 
 // ---- bank treasuries -----------------------------------------------------------------------
 // Every zone with a "treasury" in zones.json starts with 10,000 gold, seeded once; board fees are paid into it.
@@ -2176,7 +2367,7 @@ globalThis.__dboHandlers.customPacket = (userId, rawContent) => {
     // Front widgets driven by this file talk back through the client's DboRelayService.
     if (content.customPacketType === 'dbo') {
       const a = actorOf(userId); const hs = (globalThis.__dboUiEvents && globalThis.__dboUiEvents.get(String(content.event))) || [];
-      for (const h of hs) { if (!a) break; try { h(a, Array.isArray(content.args) ? content.args : [], Number(content.widget) || 0); } catch (e) { logCapped(`uifail:${userId}`, 6, 'ui event failed', String(content.event).slice(0, 60), e.message); } }
+      for (const h of hs) { if (!a) break; try { uiTimed(content.event, a, () => h(a, Array.isArray(content.args) ? content.args : [], Number(content.widget) || 0)); } catch (e) { logCapped(`uifail:${userId}`, 6, 'ui event failed', String(content.event).slice(0, 60), e.message); } }
       return;
     }
     // The client saw a beast power cast (BeastFormService); the server decides and transforms.
@@ -2240,8 +2431,10 @@ globalThis.__dboHandlers.customPacket = (userId, rawContent) => {
       let journal = false;
       // A newer client may name the tab it wants (K hands over to Skills); the hub otherwise reopens the last one
       const tab = typeof content.tab === 'string' ? content.tab.slice(0, 32) : undefined;
-      try { journal = typeof globalThis.__dboJournalRequest === 'function' && globalThis.__dboJournalRequest(a, tab) === true; } catch (e) { log('journal open failed', e.message); }
-      if (!journal && typeof globalThis.__dboFactionMenu === 'function') globalThis.__dboFactionMenu(a);
+      uiTimed('F3', a, () => {
+        try { journal = typeof globalThis.__dboJournalRequest === 'function' && globalThis.__dboJournalRequest(a, tab) === true; } catch (e) { log('journal open failed', e.message); }
+        if (!journal && typeof globalThis.__dboFactionMenu === 'function') globalThis.__dboFactionMenu(a);
+      });
       return;
     }
     // Mirror admin panel actions (F7) into the audit log; AdminSystem enforces them.
@@ -2284,6 +2477,24 @@ const creationPending = (a) => {
   try { return mp.get(a, 'private.creationPending') === true || mp.get(a, 'appearance') == null; }
   catch (e) { return false; }
 };
+// A player in the character editor (RaceMenu) cannot be hit, and hits no one (karta.gina, 19 Oct: "I nearly died while
+// creating my character"): creation, a patron reroll, /appearance (private.dboAppearanceEdit, at most EDITOR_GUARD_MS from
+// its opening) and a staff /chargen (marked below until the look comes back from the client)
+const EDITOR_GUARD_MS = 30 * 60000;
+const editorOpenAt = globalThis.__dboEditorOpenAt instanceof Map ? globalThis.__dboEditorOpenAt : (globalThis.__dboEditorOpenAt = new Map());
+const markEditorOpen = (a) => { editorOpenAt.set(Number(a) >>> 0, Date.now()); };
+const inEditor = (a) => {
+  a = Number(a) >>> 0;
+  if (!(profileOf(a) >= 0)) return false;
+  if (Date.now() - (editorOpenAt.get(a) || 0) < EDITOR_GUARD_MS) return true;
+  try {
+    if (creationPending(a) || mp.get(a, 'private.rerollPending') === true) return true;
+    const e = mp.get(a, 'private.dboAppearanceEdit');
+    return !!(e && Date.now() - (Number(e.at) || 0) < EDITOR_GUARD_MS);
+  } catch (e) { return false; }
+};
+globalThis.__dboInEditor = inEditor;
+globalThis.__dboMarkEditorOpen = markEditorOpen;
 // actorId -> 'spawning' | 'landing' | 'hub' | 'open' while a new character is carried to the creator. The client reports
 // 'arrived' when its body is really in a world, so each step waits exactly as long as that machine needs;
 // the old fixed timers stay behind as fallbacks for a client that never reports.
@@ -2405,6 +2616,7 @@ const openCreator = (a) => {
     mp.setRaceMenuOpen(a, true);
     // appearance.js / racemenupresets.js: when the editor opened, against when a saved face was put back
     if (globalThis.__dboRaceMenuOpenedAt instanceof Map) globalThis.__dboRaceMenuOpenedAt.set(a >>> 0, Date.now());
+    markEditorOpen(a);
     log(`opened character creation for ${display(a)}`);
   } catch (e) { log('creator open failed', e.message); }
 };
@@ -2734,6 +2946,7 @@ const goblinLook = (a, appearance) => {
 const appearanceHook = (actorId, appearance, isAllowed) => {
   // the player log (playerlog.js): every RaceMenu close, allowed or not; it reads the race and sex, never the name
   try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('appearance', actorId, appearance, isAllowed); } catch (e) { /* the player log is optional */ }
+  if (isAllowed && globalThis.__dboEditorOpenAt instanceof Map) globalThis.__dboEditorOpenAt.delete(actorId >>> 0);
   if (isAllowed) { try { goblinLook(actorId >>> 0, appearance); } catch (e) { log('goblin look check failed', e.message); } }
   let result = true;
   // A player's own /appearance edit (appearance.js): settled there (charge, locks), and none of creation's steps below run
@@ -2930,6 +3143,10 @@ const onCharacterReady = (userId, a) => {
     try { if (globalThis.__dboSchoolsLogin) globalThis.__dboSchoolsLogin(a); } catch (e) { log('schools login failed', e.message); }
     // The election notice of the current phase for a citizen of a hold that is choosing its Jarl, once per character (citizenship.js)
     try { if (globalThis.__dboCitizenLogin) globalThis.__dboCitizenLogin(a); } catch (e) { log('citizen notice login failed', e.message); }
+    // Vault fees, and any word of a vault warned or seized while they were away (bank.js)
+    try { if (globalThis.__dboBankLogin) globalThis.__dboBankLogin(a); } catch (e) { log('bank login failed', e.message); }
+    // A duel's wager a restart or a failed payment left held goes back (duel.js)
+    try { if (globalThis.__dboDuelLogin) globalThis.__dboDuelLogin(a); } catch (e) { log('duel login failed', e.message); }
     // A free appearance change waiting, once per character, never while one is still being made (appearance.js)
     try { if (globalThis.__dboAppearanceFreeLogin && !creationPending(a) && !inCreatorRealm(a)) globalThis.__dboAppearanceFreeLogin(a); } catch (e) { log('free appearance notice failed', e.message); }
   }), 8000);
@@ -3005,6 +3222,8 @@ globalThis.__dboHandlers.disconnect = (userId) => {
   if (a && globalThis.__dboVlBreakerDrop) {
     try { globalThis.__dboVlBreakerDrop(a, globalThis.__dboJournalOpen.get(a >>> 0) === true); } catch (e) { log('vl breaker failed', e.message); }
   }
+  try { if (a && globalThis.__dboDurabilityLeave) globalThis.__dboDurabilityLeave(a); } catch (e) { log('durability leave failed', e.message); }
+  if (a && globalThis.__dboEditorOpenAt instanceof Map) globalThis.__dboEditorOpenAt.delete(a >>> 0);
   if (a) globalThis.__dboJournalOpen.delete(a >>> 0);
   // A beast race must never be saved as the character's own
   if (a && globalThis.__dboBeastRevert) { try { globalThis.__dboBeastRevert(a, 'logout'); } catch (e) { log('beast revert on logout failed', e.message); } }
@@ -3017,7 +3236,9 @@ globalThis.__dboHandlers.disconnect = (userId) => {
   if (a && globalThis.__dboDungeonLeave) { try { globalThis.__dboDungeonLeave(a); } catch (e) { log('dungeon logout move failed', e.message); } }
   if (a && globalThis.__dboPartyLogout) { try { globalThis.__dboPartyLogout(a); } catch (e) { log('party logout failed', e.message); } }
   // What a UI said it can draw, and a deity offer already made, belong to this session (review C6, PRAY-1)
-  for (const k of ['__dboItemLeave', '__dboBankLeave', '__dboRobLeave', '__dboDeityForget', '__dboPanelLeave', '__dboManualsLeave', '__dboLabourLeave', '__dboPrayerLeave', '__dboSkinLeave', '__dboSchoolsLeave', '__dboKeyRingLeave', '__dboRacialLeave', '__dboStartLeave']) { if (a && typeof globalThis[k] === 'function') { try { globalThis[k](a); } catch (e) { log(`${k} failed`, e.message); } } }
+  for (const k of ['__dboItemLeave', '__dboBankLeave', '__dboRobLeave', '__dboSilverTestLeave', '__dboDeityForget', '__dboPanelLeave', '__dboManualsLeave', '__dboLabourLeave', '__dboPrayerLeave', '__dboSkinLeave', '__dboSchoolsLeave', '__dboKeyRingLeave', '__dboRacialLeave', '__dboStartLeave']) { if (a && typeof globalThis[k] === 'function') { try { globalThis[k](a); } catch (e) { log(`${k} failed`, e.message); } } }
+  // A duel ends with its duellist's logout (duel.js)
+  if (a && typeof globalThis.__dboDuelLeave === 'function') { try { globalThis.__dboDuelLeave(a); } catch (e) { log('duel leave failed', e.message); } }
   connected.delete(userId);
   const wait = globalThis.__dboLoginWaits.get(userId);
   if (wait) { clearInterval(wait); globalThis.__dboLoginWaits.delete(userId); }
@@ -3153,7 +3374,8 @@ const needsTick = () => {
       // and 1 otherwise. A missing module leaves the rate exactly where it was.
       // Well Fed (rest.js) slows it the same way, and the two multiply.
       const appetite = (globalThis.__dboPrayerHungerMult ? Number(globalThis.__dboPrayerHungerMult(a)) || 1 : 1)
-        * (globalThis.__dboRestHungerMult ? Number(globalThis.__dboRestHungerMult(a)) || 1 : 1);
+        * (globalThis.__dboRestHungerMult ? Number(globalThis.__dboRestHungerMult(a)) || 1 : 1)
+        * (globalThis.__dboRaceHungerMult ? Number(globalThis.__dboRaceHungerMult(a)) || 1 : 1);
       n.hunger = Math.min(100, n.hunger + (Number(NEEDS.hungerPerHour) || 0) * dt * appetite);
       applyNeedsStage(a, n, true);
       const warnMs = (Number(NEEDS.warnEveryMinutes) || 0) * 60000;
@@ -3218,6 +3440,11 @@ const foodKindOf = (baseId) => {
   foodKindCache.set(baseId, kind);
   return kind;
 };
+// Meat by editor id (needs.meatWords): raw and cooked meat, fish and the stews made of them
+const MEAT_WORDS = (Array.isArray(NEEDS.meatWords) ? NEEDS.meatWords : ['meat', 'beef', 'chicken', 'goat', 'horker', 'horse', 'mammoth', 'mudcrab',
+  'pheasant', 'rabbit', 'salmon', 'venison', 'clam', 'steak', 'slaughterfish', 'mutton', 'sausage', 'bear', 'boar', 'trout', 'turkey', 'fish',
+  'skeever', 'elk', 'dog', 'wolf']).map((w) => String(w).toLowerCase());
+const isMeat = (baseId) => { const r = recordOf(baseId); const e = String((r && r.record.editorId) || '').toLowerCase(); return MEAT_WORDS.some((w) => e.indexOf(w) !== -1); };
 const vampireAteAt = new Map(); // actorId -> ms of the last "ash" line
 const onEat = (a, baseId) => {
   if (!NEEDS.enabled) return;
@@ -3231,6 +3458,8 @@ const onEat = (a, baseId) => {
     restore *= foodMult;
     if (Date.now() - (vampireAteAt.get(a) || 0) > 600000) { vampireAteAt.set(a, Date.now()); system(a, 'Food sits like ash on your tongue. It barely touches your hunger.'); }
   }
+  // Y'ffre's blessing (faiths.json meatBoon): meat restores twice the hunger
+  try { const m = globalThis.__dboBlessingValue ? Number(globalThis.__dboBlessingValue(a, 'meatBoon')) : 0; if (m > 1 && isMeat(baseId)) restore *= m; } catch (e) { /* no prayer */ }
   // Eating takes time: the hunger counts when the meal is finished (startMeal, under the ui events below)
   if (NEEDS.mealTime !== false && startMeal(a, baseId, kind, restore)) return;
   creditMeal(a, [{ baseId, kind, restore }]);
@@ -3253,6 +3482,8 @@ const eatHook = (actorId, baseId, ...rest) => {
   let verdict;
   const prev = globalThis.__dboPrevEat;
   if (prev) { try { verdict = prev(actorId, baseId, ...rest); } catch (e) { log('eat hook chain failed', e.message); } }
+  // A field repair kit (durability.js) is used, not eaten
+  if (verdict !== false) { try { if (globalThis.__dboDurabilityKit && globalThis.__dboDurabilityKit(Number(actorId) >>> 0, Number(baseId) >>> 0)) return verdict; } catch (e) { log('repair kit failed', e.message); } }
   if (verdict !== false) { try { onEat(Number(actorId) >>> 0, Number(baseId) >>> 0); } catch (e) { log('eat handling failed', e.message); } try { if (globalThis.__dboSuperEat) globalThis.__dboSuperEat(Number(actorId) >>> 0, Number(baseId) >>> 0); } catch (e) { log('supernatural eat failed', e.message); } }
   return verdict;
 };
@@ -3931,6 +4162,13 @@ const DRIFT_KEYS = {
   sinkReport: { def: 120, ok: driftRange(16, 1000) },
   rehostClock: { def: 'apply', ok: (v) => v === 'packet' || v === 'apply' },
   rehostAfterMs: { def: 2100, ok: driftRange(1000, 10000) },
+  // NPC copies retired by SkyrimPlatform's retireCopy (LIFECYCLE_PLAN.md phase 1): disable, wait for the engine's queued
+  // Disable, then tear down. Off unless gamemode-config.json drift.nativeRetire is true; /driftset nativeRetire true|false
+  // switches it live. A client without the platform natives keeps the Papyrus delete whatever this says
+  nativeRetire: { def: !!(cfg && cfg.drift && cfg.drift.nativeRetire === true), ok: (v) => typeof v === 'boolean' },
+  // NPC copies created by SkyrimPlatform's createCopy at their final spot (LIFECYCLE_PLAN.md phase 2b), instead of
+  // placeAtMe(initially disabled) and a move. Off unless gamemode-config.json drift.nativeCreate; /driftset nativeCreate
+  nativeCreate: { def: !!(cfg && cfg.drift && cfg.drift.nativeCreate === true), ok: (v) => typeof v === 'boolean' },
   // A remote copy's face-tint rebuild (client 0.3.96 view/onScreenRebuild.ts): "load" once per 3D load (the face-morph crash
   // SkyrimSE+04328E9), "entry" on every return to the screen as before 0.3.96, the quick undo (claude-jake's review of
   // 6b7a3c59). Its default is gamemode-config.json drift.faceRebuild when set; /driftset faceRebuild entry switches it live.
@@ -4000,10 +4238,12 @@ const updateLetter = (a, args, change) => {
   if (String(args[0]) !== pigeonNonces.get(a)) return;
   const id = String(args[1] || ''); const box = lettersOf(a); const i = box.findIndex((m) => m.id === id);
   if (i < 0) return;
-  if (change === 'delete' && box[i].parcel) return openPigeonCoop(a, 'Collect the parcel before you burn the letter.', 'refused', 'letters');
+  const burnsParcel = change === 'delete' && parcelUnbearable(a, box[i]);
+  if (change === 'delete' && box[i].parcel && !burnsParcel) return openPigeonCoop(a, 'Collect the parcel before you burn the letter.', 'refused', 'letters');
+  if (burnsParcel) audit(`POST ${who(a)} burned a letter with a parcel they cannot carry: ${JSON.stringify(box[i].parcel.items.map((e) => [Number(e.baseId).toString(16), e.count]))}`);
   if (change === 'delete') box.splice(i, 1); else if (box[i].read) return; else box[i].read = true;
   saveLetters(a, box); sendMailState(a);
-  openPigeonCoop(a, change === 'delete' ? 'The letter goes into the fire.' : undefined, change === 'delete' ? 'sent' : undefined, 'letters');
+  openPigeonCoop(a, burnsParcel ? 'The letter and the silver go into the fire.' : change === 'delete' ? 'The letter goes into the fire.' : undefined, change === 'delete' ? 'sent' : undefined, 'letters');
 };
 onUi('pigeonRead', (a, args) => updateLetter(a, args, 'read'));
 onUi('pigeonDelete', (a, args) => updateLetter(a, args, 'delete'));
@@ -4102,11 +4342,45 @@ const rankTitle = (r, zoneId) => {
   if (zoneId && typeof zoneId === 'string' && RN && typeof RN.officeName === 'function') { try { const n = RN.officeName(zoneId, r); if (n) return n; } catch (e) { /* the default */ } }
   return String(RANK_TITLES[r] || r);
 };
-const ranksOf = (profileId) => {
+// Which character holds an account's seat (Nate, 19 Oct: Misfit_Panda's every character was Whiterun's Steward). officials.json
+// stays per account (the fork reads it); officials-seats.json { zone: { office: { profileId: actorId } } } names the character.
+// A seat with no character recorded counts for the whole account, as before, until it is bound (seatOfficial binds it).
+const SEATS_PATH = path.resolve('officials-seats.json');
+let seatsText = null, seatsMtime = -1, seatsCheckedAt = 0;
+const readSeats = () => {
+  if (seatsText === null || Date.now() - seatsCheckedAt > 1000) {
+    seatsCheckedAt = Date.now();
+    try { const m = fs.statSync(SEATS_PATH).mtimeMs; if (m !== seatsMtime) { seatsText = fs.readFileSync(SEATS_PATH, 'utf8'); seatsMtime = m; } } catch (e) { if (seatsText === null) seatsText = '{}'; }
+  }
+  try { return JSON.parse(seatsText) || {}; } catch (e) { return {}; }
+};
+const writeSeats = (o) => {
+  const text = JSON.stringify(o, null, 1);
+  fs.writeFileSync(SEATS_PATH + '.tmp', text); fs.renameSync(SEATS_PATH + '.tmp', SEATS_PATH);
+  seatsText = text; seatsCheckedAt = Date.now();
+  try { seatsMtime = fs.statSync(SEATS_PATH).mtimeMs; } catch (e) { seatsMtime = -1; }
+};
+// The character seated for pid in zone z's office r: an actor id, or 0 when none is recorded
+const seatHolder = (zid, r, pid) => Number((((readSeats()[zid] || {})[r] || {})[pid])) >>> 0;
+const bindSeat = (zid, r, pid, actor) => {
+  const o = readSeats(); o[zid] = o[zid] || {};
+  for (const k of Object.keys(o[zid])) if (o[zid][k] && typeof o[zid][k] === 'object') delete o[zid][k][pid];
+  if (r && actor) { o[zid][r] = o[zid][r] || {}; o[zid][r][pid] = actor >>> 0; }
+  try { writeSeats(o); } catch (e) { log('officials-seats.json write failed', e.message); }
+};
+// ranksOf(profileId): every seat of the account (lists, staff views). ranksOf(profileId, actorId): only the seats that
+// character holds (every check of what someone may do passes the actor)
+const ranksOf = (profileId, actor) => {
+  const pid = Number(profileId); const me = Number(actor) >>> 0;
   const o = readOfficials(); const out = [];
-  for (const z of zoneList()) for (const r of (z.officials || [])) if (((o[z.id] || {})[r] || []).map(Number).includes(profileId)) out.push({ zone: z, rank: r });
+  for (const z of zoneList()) for (const r of (z.officials || [])) {
+    if (!((o[z.id] || {})[r] || []).map(Number).includes(pid)) continue;
+    if (me && typeof seatHolder === 'function') { const held = seatHolder(z.id, r, pid); if (held && held !== me) continue; }
+    out.push({ zone: z, rank: r });
+  }
   return out;
 };
+globalThis.__dboSeatHolder = seatHolder;
 // Seat holders appoint their own officers (config appointRules: holder rank -> { appointable rank: max per zone; null
 // in the config = no limit }). Bruma is ruled by a Count; count stands in for the Baron until a baron rank exists.
 // Guards have no limit (Nate, 5 Oct: a hold's guard was capped at 20)
@@ -4122,7 +4396,7 @@ for (const rules of Object.values(APPOINT_RULES)) for (const k of Object.keys(ru
 const appointCap = (a, z, rank) => {
   if (isLeadStaff(a)) return Infinity;
   let cap = 0;
-  for (const m of ranksOf(profileOf(a))) if (m.zone.id === z.id) cap = Math.max(cap, Number((APPOINT_RULES[m.rank] || {})[rank]) || 0);
+  for (const m of ranksOf(profileOf(a), a)) if (m.zone.id === z.id) cap = Math.max(cap, Number((APPOINT_RULES[m.rank] || {})[rank]) || 0);
   // The leader of a faction that took this hold's capital in war names its new ruler and whoever the ruler names (realm.js)
   try {
     if (typeof globalThis.__dboConquerorLeads === 'function' && globalThis.__dboConquerorLeads(a, z.id)) {
@@ -4148,7 +4422,9 @@ const officialTarget = (query) => {
     actor = t; pid = profileOf(t);
     if (!(pid >= 0)) return { error: 'That character has no profile id.' };
   }
-  return { pid, actor, online: onlineActors().find((x) => profileOf(x) === pid) || 0,
+  // the named character is told when online; an account named by profile id: whichever of its characters is online
+  const on = onlineActors();
+  return { pid, actor, online: (actor && on.includes(actor >>> 0) ? actor >>> 0 : 0) || (/^\d+$/.test(q) ? on.find((x) => profileOf(x) === pid) || 0 : 0),
     // The answer names a masked character as the mask shows them: the #TAG asked for may be the one drawn under the mask
     label: actor ? publicDisplay(actor) : `profile ${pid}`, who: actor ? who(actor) : `profile ${pid}` };
 };
@@ -4174,12 +4450,15 @@ const raceEdidOf = (actor) => {
 // "DarkElfRaceVampire" -> "a Dark Elf"
 const raceLabel = (edid) => { const n = String(edid).replace(/Race(Vampire)?$/, '').replace(/([a-z])([A-Z])/g, '$1 $2'); return n ? `${/^[AEIOU]/.test(n) ? 'an' : 'a'} ${n}` : 'of no known race'; };
 // The rules of /appoint, shared with the Court tab (court.js): { error } or { cap, overridden }. tg is officialTarget's.
+const STAFF_MAY_HOLD = new Set(['guard', 'strongholdguard', 'courtmage', 'shaman', 'wisewoman']);
 const appointCheck = (a, z, rank, tg, override) => {
   if (!(z.officials || []).includes(rank)) return { error: `${z.name} has the ranks: ${(z.officials || []).map((r) => rankTitle(r, z.id)).join(', ')}.` };
   if (!tg.actor) return { error: `Profile ${tg.pid} has no characters.` };
   const cap = appointCap(a, z, rank);
   if (!cap) return { error: `Only a Lead GM or above, or a seat that may name a ${rankTitle(rank, z.id)}, can appoint one in ${z.name}.` };
   if (override && tierOf(a) !== 'senior') return { error: 'Only the Owners can override the Jarl rule.' };
+  // Plain guards and the court's advisers are no leadership; every other office is
+  if (!STAFF_MAY_HOLD.has(rank) && typeof globalThis.__dboIsStaff === 'function' && globalThis.__dboIsStaff(tg.actor)) return { error: `${tg.label} is on the staff. Staff hold no leading office in a court.` };
   let overridden = '';
   if (rank === 'jarl') {
     const race = raceEdidOf(tg.actor);
@@ -4211,6 +4490,7 @@ const seatOfficial = (z, rank, tg, by) => {
   for (const r of Object.keys(o[z.id])) o[z.id][r] = (o[z.id][r] || []).filter((x) => Number(x) !== tg.pid);
   o[z.id][rank] = (o[z.id][rank] || []).concat([tg.pid]);
   try { writeOfficials(o); } catch (e) { return { error: 'Could not write officials.json: ' + e.message }; }
+  if (typeof bindSeat === 'function') bindSeat(z.id, rank, tg.pid, tg.actor);
   if (tg.online) system(tg.online, `You have been appointed ${rankTitle(rank, z.id)} of ${z.name}.`);
   audit(`${by.staff ? 'GM' : 'OFFICIAL'} ${by.who} appointed ${tg.who} ${rankTitle(rank, z.id)} of ${z.name}${tg.online ? '' : ' (offline)'}${by.via || ''}${by.overridden ? ` (Jarl rule overridden by an Owner: ${by.overridden})` : ''}`);
   if (had) courtOfficeSync(z, tg, had, false);
@@ -4224,6 +4504,7 @@ const unseatOfficial = (a, z, tg) => {
   if (!had) return { error: `${tg.label} holds no rank in ${z.name}.` };
   if (!appointCap(a, z, had)) return { error: `You cannot dismiss a ${rankTitle(had, z.id)} of ${z.name}.` };
   try { writeOfficials(o); } catch (e) { return { error: 'Could not write officials.json: ' + e.message }; }
+  if (typeof bindSeat === 'function') bindSeat(z.id, null, tg.pid, 0);
   if (tg.online) system(tg.online, `You are no longer ${rankTitle(had, z.id)} of ${z.name}.`);
   audit(`${isAdmin(a) ? 'GM' : 'OFFICIAL'} ${who(a)} dismissed ${tg.who} as ${rankTitle(had, z.id)} of ${z.name}${tg.online ? '' : ' (offline)'}`);
   courtOfficeSync(z, tg, had, false);
@@ -4236,6 +4517,7 @@ const unseatOfficialBy = (z, tg, byWho) => {
   for (const r of Object.keys(o[z.id] || {})) { if ((o[z.id][r] || []).map(Number).includes(tg.pid)) had = r; o[z.id][r] = (o[z.id][r] || []).filter((x) => Number(x) !== tg.pid); }
   if (!had) return { error: `${tg.label} holds no rank in ${z.name}.` };
   try { writeOfficials(o); } catch (e) { return { error: 'Could not write officials.json: ' + e.message }; }
+  if (typeof bindSeat === 'function') bindSeat(z.id, null, tg.pid, 0);
   if (tg.online) system(tg.online, `You are no longer ${rankTitle(had, z.id)} of ${z.name}.`);
   audit(`OFFICIAL ${byWho} unseated ${tg.who} as ${rankTitle(had, z.id)} of ${z.name}${tg.online ? '' : ' (offline)'}`);
   courtOfficeSync(z, tg, had, false);
@@ -4283,7 +4565,7 @@ registerChatCommand('officials', (a, args) => {
   if (!args.trim() && typeof globalThis.__dboCourtOpen === 'function' && globalThis.__dboCourtOpen(a)) return;
   const lines = officialsLines(a, args.trim());
   personal(a, lines.length ? lines.join('  |  ') : 'No officials appointed yet. Admins: /appoint <player> <zone> <rank>.');
-  const mine = ranksOf(profileOf(a)); if (mine.length) personal(a, 'You hold: ' + mine.map((m) => `${rankTitle(m.rank, m.zone.id)} of ${m.zone.name}`).join(', '));
+  const mine = ranksOf(profileOf(a), a); if (mine.length) personal(a, 'You hold: ' + mine.map((m) => `${rankTitle(m.rank, m.zone.id)} of ${m.zone.name}`).join(', '));
 }, { help: '[zone] who rules where' });
 
 // ---- Scholar: books are nodes, reading is a mini-game -----------------------------------------
@@ -4309,27 +4591,12 @@ const READ = Object.assign({
   // A round nobody answered is cleared, with the lost round's cooldown, this long after its candle
   roundTimeoutMinutes: 5,
   wordsByTier: [[5, 7], [6, 8], [7, 9], [8, 10], [9, 12]],
-  // A scroll pressed between the pages of a book read through, by Scholar tier (Nate, 2026-09-25: scrolls let a new
-  // mage cast, and so train Arcane Arts or Priest, before owning a spell). The tier also caps the scroll's value.
-  // The book cooldown is per book, not per reader (one player finished 136 readings in an hour across 99 books on
-  // 2026-09-25), so the chance stays low and a character finds at most scrollDailyCap scrolls a day.
-  scrollChanceByTier: [0.04, 0.05, 0.06, 0.07, 0.08],
-  scrollMaxValueByTier: [50, 100, 250, 500, 0],
-  scrollDailyCap: 6,
-  // No day's cap on tomes (Nate, 11 Oct: "a rare percentage, not a cap on two a day"); 0 = none. Each tome found today
-  // multiplies the next one's chance by tomeChanceAfterFind instead, so a long day of reading levels off (a Master at 5%:
-  // about 3 tomes in 190 readings, 5 in 800, the busiest reader's day in the log)
-  tomeDailyCap: 0,
-  tomeChanceAfterFind: 0.5,
-  // A guaranteed tome after this many won readings without one, on a day with none found yet (0 = off; Nate, 10 Oct)
-  tomePityReads: 100,
-  // The highest tome rank by Scholar tier, Novice to Master (Nate, 14 Oct: the rank follows the tier): Apprentice tomes from
-  // Scholar 25, Adept from 50, Expert from 75 (the college gate keeps Expert to Senior ranks)
-  tomeRankByTier: [0, 1, 2, 3, 3],
-  // A Master tome only at Scholar masterTomeLevel, as masterTomeShare of the tomes found there ("extremely super super
-  // rare": 1 in 50 tomes, about 1 in 1000 readings at the Master tier's 5%), for a Senior rank as an Expert tome is
-  masterTomeLevel: 100,
-  masterTomeShare: 0.02,
+  // Tomes and scrolls pressed between the pages of a book read through (Nate and Swag, 17 Oct): each rank has its own fixed
+  // chance per reading, open from Scholar dropMinLevel of that rank; one roll covers them all, so a reading gives at most one
+  // (Swag: "make it so it doesnt have chance to have multiple drops"). No day's cap, no halving after a find, no pity.
+  tomeChanceByRank: [1 / 143, 1 / 167, 0.003, 1 / 625, 1 / 2500],
+  scrollChanceByRank: [1 / 57, 1 / 67, 1 / 80, 1 / 250, 1 / 600],
+  dropMinLevel: [0, 25, 50, 75, 90],
   // Copies of the book read, a day. A spell tome, a skill book or a note that cannot be taken is never copied: reading
   // a placed tome every 30 minutes on each character got round the Synod's one a week (loot review, 2026-09-29)
   bookDailyCap: 6,
@@ -4340,11 +4607,20 @@ const READ = Object.assign({
 // wrongPenaltySeconds), at least minStubs; a wrong reading burns one, and the words already right still lock in. minutes
 // bounds the whole round so an idle one ends. Lines, cooldowns, finds and daily caps are the timed reading's.
 const READ_PICK = Object.assign({ enabled: true, minutes: 10, stubShare: 0.5, minStubs: 2 }, READ.pick || {});
-// A random scroll a reader of this Scholar tier may find: within the tier's value cap, quest and empty ones left out
-const scrollFor = (tier) => {
-  const max = Number((READ.scrollMaxValueByTier || [])[Math.min(tier, 4)]) || 0;
+// A random scroll of one rank (spell-scrolls.json: the rank of the spell each scroll casts); quest and empty ones left out
+const SCROLL_RANKS = (() => {
+  const out = new Map();
+  try {
+    for (const sp of JSON.parse(fs.readFileSync(path.resolve('spell-scrolls.json'), 'utf8')).spells || []) {
+      for (const id of [sp.scrollId].concat((sp.alsoScrolls || []).map((x) => (typeof x === 'string' ? x : x && x.scrollId)))) if (id) out.set(String(id).toLowerCase(), Number(sp.rank));
+    }
+  } catch (e) { /* no ranks: no scrolls */ }
+  return out;
+})();
+const scrollRankOf = (x) => { const m = String(x.id || '').match(/^([^:]+):0*([0-9a-fA-F]+)$/); return m ? SCROLL_RANKS.get(`${parseInt(m[2], 16).toString(16)}:${m[1]}`.toLowerCase()) : undefined; };
+const scrollFor = (rank) => {
   let skip = null; try { skip = READ.scrollExcludePattern ? new RegExp(READ.scrollExcludePattern) : null; } catch (e) { skip = null; }
-  const pool = (READABLES.scrolls || []).filter((x) => (!max || (Number(x.value) || 0) <= max) && !(skip && skip.test(String(x.name || ''))));
+  const pool = (READABLES.scrolls || []).filter((x) => scrollRankOf(x) === rank && !(skip && skip.test(String(x.name || ''))));
   return pool.length ? pool[Math.floor(Math.random() * pool.length)] : null;
 };
 const candleMs = (words) => Math.round((Number(READ.baseSeconds) + Number(READ.secondsPerWord) * words) * 1000);
@@ -4584,28 +4860,15 @@ const wheelRoom = (a, skill, now = Date.now()) => {
 };
 globalThis.__dboWheelRoom = wheelRoom;
 globalThis.__dboScholarNoRoom = scholarNoRoom;
-// The tome a reading presses between the pages (Nate, 10 Oct, #suggestions: "5 courage tomes", "10 lesser wards"):
-// - ranks by Scholar tier (READ.tomeRankByTier, Nate 14 Oct): Novice tomes below 25, Apprentice from 25, Adept from 50,
-//   Expert from 75; a Master tome only at Scholar 100, as READ.masterTomeShare of the finds;
-// - and by college rank (Nate, 11 Oct: "RP gate-keep the high tiers"; spells.js readGate, __dboSpellsReadRankCap): anyone
-//   reads up to Adept (floorRank, Nate 14 Oct), Senior ranks up to Expert, and a Master tome only for a Senior rank; a
-//   tome above the cap is simply not in the pool, so the chance of a tome is unchanged and the find comes from the ranks
-//   allowed; the restricted arts only for Senior ranks (__dboSpellsReadRestricted). Without spells.js: Apprentice;
+// The tome a reading presses between the pages, of the rank the reading's roll chose (Nate and Swag, 17 Oct):
+// - no college rank gate on the rank (Nate, 17 Oct: "remove the college gate for reading drops"); the restricted arts
+//   still only for Senior ranks (__dboSpellsReadRestricted);
 // - never a tome whose spell the reader already knows, nor one they are carrying;
 // - a tome of a school the reader's own magic skills cover (arcane: Destruction, Conjuration, Illusion; priest:
 //   Restoration, Alteration, from skills.json vanillaSkills) is READ.tomeSchoolWeight times as likely.
-// null when nothing is left to give (the day's tome count is then not spent).
-const scholarTomePick = (a, tier, noMaster) => {
-  const caps = Array.isArray(READ.tomeRankByTier) ? READ.tomeRankByTier : [0, 1, 2, 3, 3];
-  const tierRank = Number(caps[Math.max(0, Math.min(tier, caps.length - 1))]) || 0;
-  let collegeRank = 1;
-  try { if (typeof globalThis.__dboSpellsReadRankCap === 'function') collegeRank = Number(globalThis.__dboSpellsReadRankCap(a)); } catch (e) { collegeRank = 1; }
-  if (!Number.isFinite(collegeRank)) collegeRank = 1;
-  let level = 0; try { const m = masteryOf(a); level = Number(m && m.skills && m.skills.scholar && m.skills.scholar.level) || 0; } catch (e) { level = 0; }
-  // The Master roll: a Senior rank (college cap at Expert) at Scholar masterTomeLevel; with no Master tome left it falls back
-  const master = !noMaster && collegeRank >= 3 && level >= (Number(READ.masterTomeLevel) || 100) && Math.random() < (Number(READ.masterTomeShare) || 0);
-  const maxRank = master ? 4 : Math.min(tierRank, collegeRank);
-  const minRank = master ? 4 : 0;
+// null when nothing of that rank is left to give: the reading then gives nothing.
+const scholarTomePick = (a, rank) => {
+  const maxRank = rank; const minRank = rank;
   const restricted = typeof globalThis.__dboSpellsReadRestricted === 'function' ? globalThis.__dboSpellsReadRestricted : () => false;
   let carried = new Set();
   try { const inv = mp.get(a, 'inventory'); carried = new Set(((inv && inv.entries) || []).filter((e) => Number(e.count) > 0).map((e) => Number(e.baseId) >>> 0)); } catch (e) { /* none known */ }
@@ -4625,7 +4888,7 @@ const scholarTomePick = (a, tier, noMaster) => {
     try { if (restricted(a, id)) continue; } catch (e) { /* not restricted */ }
     pool.push({ t, w: schools.has(String(t.school)) ? weight : 1 });
   }
-  if (!pool.length) return master ? scholarTomePick(a, tier, true) : null;
+  if (!pool.length) return null;
   let roll = Math.random() * pool.reduce((n, x) => n + x.w, 0);
   for (const x of pool) { roll -= x.w; if (roll < 0) return x.t; }
   return pool[pool.length - 1].t;
@@ -4813,7 +5076,8 @@ onUi('reading', (a, args) => {
     // book. Same correction as the mining/chopping rounds in labour.js.
     try { if (typeof globalThis.__alduinakMasteryEvent === 'function') globalThis.__alduinakMasteryEvent('read', a, { refrId: ses.refId }); } catch (e) { /* no skill system */ }
     // Hermaeus Mora's blessing: what you read teaches you more, so the round counts twice (the skill's caps still hold)
-    try { if (globalThis.__dboBlessedWith && globalThis.__dboBlessedWith(a, 'scholarBoon') && typeof globalThis.__alduinakMasteryEvent === 'function') globalThis.__alduinakMasteryEvent('read', a, { refrId: ses.refId }); } catch (e) { /* no skill system */ }
+    // Xarxes' (faiths.json scholarBoon 0.5) counts twice half the time
+    try { const sb = globalThis.__dboBlessingValue ? Number(globalThis.__dboBlessingValue(a, 'scholarBoon')) : (globalThis.__dboBlessedWith && globalThis.__dboBlessedWith(a, 'scholarBoon') ? 1 : 0); if (sb > 0 && Math.random() < sb && typeof globalThis.__alduinakMasteryEvent === 'function') globalThis.__alduinakMasteryEvent('read', a, { refrId: ses.refId }); } catch (e) { /* no skill system */ }
     // A smithing skill book is Blacksmith work too, once a book; a manual on a shelf is learned (manuals.js)
     try { const line = globalThis.__dboManualsReadWon ? globalThis.__dboManualsReadWon(a, ses.baseId) : ''; if (line) results.push(line); } catch (e) { log('manuals read failed', e.message); }
     // A smithing schematic, now and then (manuals.js, config smithing.discovery; Nate, 11 Oct): the rarer, the rarer
@@ -4825,7 +5089,6 @@ onUi('reading', (a, args) => {
       }
     } catch (e) { log('schematic find failed', e.message); }
     const bookChance = Number((SCHOLAR.bookDropChanceByTier || [])[Math.min(tier, 4)]) || 0;
-    const tomeChance = Number((SCHOLAR.tomeDropChanceByTier || [])[Math.min(tier, 4)]) || 0;
     const today = new Date().toISOString().slice(0, 10);
     let copied = null; try { copied = mp.get(a, 'private.scholarCopies'); } catch (e) { copied = null; }
     const copiesToday = copied && copied.day === today ? Number(copied.n) || 0 : 0;
@@ -4833,48 +5096,34 @@ onUi('reading', (a, args) => {
       results.push(`you copy out ${ses.title} and keep it`); gained.push(ses.title);
       try { mp.set(a, 'private.scholarCopies', { day: today, n: copiesToday + 1 }); } catch (e) { /* uncounted */ }
     }
-    const scrollChance = Number((READ.scrollChanceByTier || [])[Math.min(tier, 4)]) || 0;
-    let found = null; try { found = mp.get(a, 'private.scholarScrolls'); } catch (e) { found = null; }
-    const foundToday = found && found.day === today ? Number(found.n) || 0 : 0;
-    if (scrollChance > 0 && foundToday < (Number(READ.scrollDailyCap) || 0) && Math.random() < scrollChance) {
-      const pick = scrollFor(tier);
-      if (pick) { try { const id = mp.getIdFromDesc(pick.id.replace(/^([^:]+):0*([0-9a-fA-F]+)$/, '$2:$1')); if (giveItem(a, id >>> 0, 1)) { results.push(`a scroll was tucked between the pages: ${humanize(pick.name)}`); gained.push(humanize(pick.name)); mp.set(a, 'private.scholarScrolls', { day: today, n: foundToday + 1 }); } } catch (e) { log('readable give failed', pick.id, e.message); } }
+    // One roll over every rank the reader's Scholar level opens, tomes and scrolls alike: each keeps its own chance and at
+    // most one is found (Nate and Swag, 17 Oct). A rank with nothing left to give (all known or carried, the college gate) gives nothing
+    let level = 0; try { const m = masteryOf(a); level = Number(m && m.skills && m.skills.scholar && m.skills.scholar.level) || 0; } catch (e) { level = 0; }
+    const odds = [];
+    for (let r = 0; r < 5; r++) {
+      if (level < (Number((READ.dropMinLevel || [])[r]) || 0)) continue;
+      odds.push({ kind: 'tome', rank: r, p: Number((READ.tomeChanceByRank || [])[r]) || 0 }, { kind: 'scroll', rank: r, p: Number((READ.scrollChanceByRank || [])[r]) || 0 });
     }
-    // A spell tome at every Scholar tier (Nate, 2026-09-25: you should not have to be a Master to find one; 2026-09-26: a
-    // rare chance at Novice too), by
-    // skills.json tomeDropChanceByTier, its rank held to the tier (Novice tomes until Expert, Apprentice at Expert, Adept
-    // at Master) and at most tomeDailyCap a day, as the book cooldown is per book, not per reader. Scrolls have their
-    // own roll above.
-    let tomesFound = null; try { tomesFound = mp.get(a, 'private.scholarTomes'); } catch (e) { tomesFound = null; }
-    const tomesToday = tomesFound && tomesFound.day === today ? Number(tomesFound.n) || 0 : 0;
-    // Pity (Nate, 10 Oct): after READ.tomePityReads won readings with no tome the next one brings a tome, still within the
-    // day's tomeDailyCap; the count is per character and resets with every tome found
-    let dry = 0; try { dry = Number(mp.get(a, 'private.scholarTomeDry')) || 0; } catch (e) { dry = 0; }
-    const tomeCap = Number(READ.tomeDailyCap) || 0;
-    const underCap = tomeCap <= 0 || tomesToday < tomeCap;
-    const pity = tomesToday === 0 && Number(READ.tomePityReads) > 0 && dry + 1 >= Number(READ.tomePityReads);
-    const after = Math.max(0, Math.min(1, READ.tomeChanceAfterFind === undefined ? 1 : Number(READ.tomeChanceAfterFind)));
-    let tomeGiven = false;
-    if (underCap && (pity || Math.random() < tomeChance * Math.pow(after, tomesToday))) {
-      const pick = scholarTomePick(a, tier);
-      if (pick) { try { const id = mp.getIdFromDesc(pick.id.replace(/^([^:]+):0*([0-9a-fA-F]+)$/, '$2:$1')); if (giveItem(a, id >>> 0, 1)) { results.push(`a spell tome was pressed between the pages: ${humanize(pick.name)}`); gained.push(humanize(pick.name)); tomeGiven = true; mp.set(a, 'private.scholarTomes', { day: today, n: tomesToday + 1 }); } } catch (e) { log('readable give failed', pick.id, e.message); } }
+    let x = Math.random(); let hit = null;
+    for (const d of odds) { if (x < d.p) { hit = d; break; } x -= d.p; }
+    if (hit) {
+      const pick = hit.kind === 'tome' ? scholarTomePick(a, hit.rank) : scrollFor(hit.rank);
+      if (pick) {
+        try {
+          const id = mp.getIdFromDesc(pick.id.replace(/^([^:]+):0*([0-9a-fA-F]+)$/, '$2:$1'));
+          if (giveItem(a, id >>> 0, 1)) { results.push(hit.kind === 'tome' ? `a spell tome was pressed between the pages: ${humanize(pick.name)}` : `a scroll was tucked between the pages: ${humanize(pick.name)}`); gained.push(humanize(pick.name)); }
+        } catch (e) { log('readable give failed', pick.id, e.message); }
+      }
     }
-    // Below the day's cap only: a reader at the cap is not owed a tome, so the count waits for the new day
-    if (underCap) { try { mp.set(a, 'private.scholarTomeDry', tomeGiven ? 0 : dry + 1); } catch (e) { /* uncounted */ } }
     // The day's caps are silent rolls, so a reader who reached one is told once that day (#bugs 1556458497909194802)
     const dayCount = (k) => { try { const v = mp.get(a, k); return v && v.day === today ? Number(v.n) || 0 : 0; } catch (e) { return 0; } };
     let told = null; try { told = mp.get(a, 'private.scholarCapTold'); } catch (e) { told = null; }
     const toldKinds = told && told.day === today && Array.isArray(told.kinds) ? told.kinds : [];
-    const reached = [['copies', 'private.scholarCopies', READ.bookDailyCap, 'books copied'], ['scrolls', 'private.scholarScrolls', READ.scrollDailyCap, 'scrolls'], ['tomes', 'private.scholarTomes', READ.tomeDailyCap, 'spell tomes']]
-      // A cap of 0 is no cap (tomes, from 11 Oct): never reached
+    const reached = [['copies', 'private.scholarCopies', READ.bookDailyCap, 'books copied']]
       .filter(([kind, k, cap]) => Number(cap) > 0 && !toldKinds.includes(kind) && dayCount(k) >= Number(cap));
     if (reached.length) {
       try { mp.set(a, 'private.scholarCapTold', { day: today, kinds: toldKinds.concat(reached.map(([kind]) => kind)) }); } catch (e) { /* told again next read */ }
-      // Players read the old line as "2 tomes a day" (Nate, 10 Oct): say it is a chance, and that the day's most is reached
-      const tomeCap = reached.some((x) => x[0] === 'tomes');
-      capNotes.push(tomeCap
-        ? `That is the most spell tomes one day allows (${Number(READ.tomeDailyCap) || 0}). Tomes are a chance on each reading, better at a higher Scholar tier, and they come back after midnight UTC. Reading still trains Scholar${reached.length > 1 ? `; the ${reached.filter((x) => x[0] !== 'tomes').map((x) => x[3]).join(' and ')} for today are found too` : ''}.`
-        : `You have found all the ${reached.map((x) => x[3]).join(' and ')} one day allows; they come back after midnight UTC. Reading still trains Scholar.`);
+      capNotes.push(`You have found all the ${reached.map((x) => x[3]).join(' and ')} one day allows; they come back after midnight UTC. Reading still trains Scholar.`);
     }
     reads[ses.refId.toString(16)] = Date.now() + READ.cooldownMinutes * 60000;
     say('win');
@@ -4940,9 +5189,43 @@ const isCoinPurse = (targetId) => {
 };
 const harvestingTier = (a) => { const r = masteryOf(a); if (!r || !Array.isArray(r.order) || !r.order.includes('harvesting')) return -1; return Math.max(0, Number((r.skills && r.skills.harvesting || {}).rank) || 0); };
 const purseDeny = new Map();
+// A gold pile or purse is flora whose produce is gold itself or a leveled list; isCoinPurse caught only the leveled ones and
+// the purse names, so a pile with Gold001 as its produce was harvested by the engine (Nate, GM Nate in the Riften bank,
+// 17 Oct). Read the same way, once per base.
+const goldFloraKind = new Map(); // baseId -> true when FLOR that yields gold
+const isGoldFlora = (targetId) => {
+  if (targetId >= 0xff000000) return false;
+  if (isCoinPurse(targetId)) return true;
+  let baseId = 0; try { baseId = mp.getIdFromDesc(String(mp.get(targetId, 'baseDesc'))) >>> 0; } catch (e) { return false; }
+  if (goldFloraKind.has(baseId)) return goldFloraKind.get(baseId);
+  let yes = false;
+  const rec = recordOf(baseId);
+  if (rec && String(rec.record.type) === 'FLOR') {
+    const pfig = (rec.record.fields || []).find((f) => f.type === 'PFIG');
+    if (pfig && pfig.data instanceof Uint8Array && pfig.data.byteLength >= 4) {
+      const local = new DataView(pfig.data.buffer, pfig.data.byteOffset, 4).getUint32(0, true);
+      let id = local; try { id = rec.toGlobalRecordId ? rec.toGlobalRecordId(local) >>> 0 : local; } catch (e) { id = local; }
+      yes = id === 0xf;
+    }
+    if (!yes) yes = /coin|gold(pile|stack|pouch|bag|purse)/i.test(String(rec.record.editorId || ''));
+  }
+  goldFloraKind.set(baseId, yes);
+  return yes;
+};
 globalThis.__dboCoinPurse = (targetId, casterId) => {
-  if (!PURSE.enabled || !isCoinPurse(targetId)) return false;
+  // coinPurses.enabled false: no gold pile or purse pays out, every one is refused (Nate, 17 Oct: "all gold piles cannot be picked up")
+  if (!PURSE.enabled) {
+    if (!isGoldFlora(targetId)) return false;
+    if (Date.now() - (purseDeny.get(casterId) || 0) > 1500) { purseDeny.set(casterId, Date.now()); personal(casterId, 'There is nothing here to take. Gold comes from work, trade and taxes.'); }
+    return true;
+  }
   const say = (t) => { if (Date.now() - (purseDeny.get(casterId) || 0) > 1500) { purseDeny.set(casterId, Date.now()); personal(casterId, t); } return true; };
+  // Only a coin purse pays; a gold pile that is flora (its produce gold, or a leveled list) is refused like placed gold
+  const purse = isCoinPurse(targetId) && isPurseBase(baseIdOf(targetId));
+  if (!purse) return isGoldFlora(targetId) ? say('There is nothing here to take. Gold comes from work, trade and taxes.') : false;
+  // A bank's purses are the bank's (Nate, 19 Oct): every cell with a TheBank teller (coinPurses.refuseCells, the bank audit)
+  let cell = ''; try { cell = normPlace(mp.get(targetId, 'worldOrCellDesc')); } catch (e) { cell = ''; }
+  if (cell && (PURSE.refuseCells || []).map(normPlace).includes(cell)) return say('That purse belongs to the bank.');
   const until = restUntil(purseRest, targetId);
   // In a claimed dungeon a purse emptied before the claim began is full again for the new party (dungeons.js); back to
   // back claims found every purse resting from the last one (G64E, 4 Oct)
@@ -4958,6 +5241,8 @@ globalThis.__dboCoinPurse = (targetId, casterId) => {
   if (giveItem(casterId, 0xf, gold)) {
     try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('loot', 'coin_purse', casterId, targetId, [], gold); } catch (e) { /* the player log is optional */ }
     personal(casterId, `You pocket ${gold} gold from the purse.`);
+    // Imperial Luck (racial.js goldBonus): a purse is loot, so it pays the Imperial's share like a chest (Nate, 18 Oct)
+    try { if (typeof globalThis.__dboRaceGold === 'function') globalThis.__dboRaceGold(casterId, gold, 'a coin purse'); } catch (e) { log('racial gold failed', e.message); }
     try { if (typeof globalThis.__alduinakMasteryEvent === 'function') globalThis.__alduinakMasteryEvent('activate', casterId, { refrId: targetId }); } catch (e) { /* no skill system */ }
   }
   return true;
@@ -5230,6 +5515,8 @@ const inLoginGrace = (a) => {
 const unstuckActor = (a, by) => {
   const admin = staffCan(by, 'unstuck');
   try { if (mp.get(a, 'isDead')) return personal(by, 'You cannot use /unstuck while dead.'); } catch (e) { /* alive */ }
+  // Frozen in the engine's bleed-out after a temple wake (camera locked, no movement): /unstuck ends it first, cooldown or not
+  try { if (typeof globalThis.__dboBleedOutStop === 'function') globalThis.__dboBleedOutStop(a); } catch (e) { /* the move still runs */ }
   try { const r = mp.get(a, 'private.restrained'); if (r && (r.boundHands || r.carried || r.captorActorId)) return personal(by, 'You cannot use /unstuck while restrained or carried.'); } catch (e) { /* free */ }
   // No walking out of a jail, or out of a sentence (jail.js)
   if (!admin && globalThis.__dboJailUnstuck) { const why = globalThis.__dboJailUnstuck(a); if (why) return personal(by, why); }
@@ -5320,7 +5607,7 @@ const SKIN_PARTS_DEFAULT = [
   { creature: 'Netch', take: ['NetchLeather$', 'NetchJelly$'] },
   { creature: 'Lurker', take: ['NetchLeather$'] },
 ];
-const SKIN_NOT_ANIMAL = /Goblin|Riekling|Falmer|Dwarven|Dwemer|Centurion|Sphere|Ballista|Burrower|Sentry|EncGiant|LvlGiant|GiantBoss|StoneGiant|HerderGiant|Ogre|Spriggan|Hagraven|Atronach|Draugr|Skeleton|Bandit|Forsworn|Vampire|Necromancer|Warlock/i;
+const SKIN_NOT_ANIMAL = /DragonPriest|Goblin|Riekling|Falmer|Dwarven|Dwemer|Centurion|Sphere|Ballista|Burrower|Sentry|EncGiant|LvlGiant|GiantBoss|StoneGiant|HerderGiant|Ogre|Spriggan|Hagraven|Atronach|Draugr|Skeleton|Bandit|Forsworn|Vampire|Necromancer|Warlock/i;
 const SKIN_PARTS = (Array.isArray(cfg.skinParts) ? cfg.skinParts : SKIN_PARTS_DEFAULT).map((rule) => {
   const rx = (x) => { try { return new RegExp(String(x)); } catch (e) { log(`skinParts: bad pattern ${x}`); return null; } };
   const creature = rule && rx(rule.creature);
@@ -5443,6 +5730,8 @@ const skinSpent = globalThis.__dboSkinSpent || (globalThis.__dboSkinSpent = new 
 // reliable but not ordered and a report sent before the Stop can land after it (DESIGN.md section 13). nonce -> { a, round, how }
 const skinClosing = globalThis.__dboSkinClosing instanceof Map ? globalThis.__dboSkinClosing : (globalThis.__dboSkinClosing = new Map());
 const skinDeny = new Map();
+const skinRefused = new Map(); // `${skinner}:${body}` -> when the hide was refused; a second E within SKIN_REFUSE_MS opens the body
+const SKIN_REFUSE_MS = 15000;
 const skinSay = (a, text) => { if (Date.now() - (skinDeny.get(a) || 0) > 1500) { skinDeny.set(a, Date.now()); personal(a, text); } return false; };
 // Anyone may skin a simple animal (Nat's call, 2026-09-20). Holding the trade is no longer the price
 // of entry: it widens the seam, slows the blade, raises the chance of a second pelt, and is what lets
@@ -5451,6 +5740,18 @@ const skinnerTier = (a) => { const r = masteryOf(a); if (!r || !Array.isArray(r.
 // A pelt's gold value is the honest rarity signal, and it is already in the record: MISC keeps it at
 // DATA offset 0 (measured over the whole load order by ck-mcp\itemvalues.py). The census that set the
 // bands is ck-mcp\pelts.py: 38 skinnable records running 0 (fox, goat) to 300 (a Windhelm cave bear).
+// The hold's share of a contract kill (contracts.js, Nate 18 Oct: "bounties pay back"): the body's pelts and hides, never a
+// small creature's part (chitin, tails) nor a dragon's, come off the stash so nobody skins them; { value } of what was taken
+globalThis.__dboClaimPelts = (actorId) => {
+  const id = Number(actorId) >>> 0;
+  let stash = null; try { stash = mp.get(id, 'private.dboPelts'); } catch (e) { return null; }
+  if (!Array.isArray(stash)) return null;
+  const isPelt = (p) => { const r = recordOf(Number(p.baseId) >>> 0); return !p.dragon && !!r && String(r.record.type) === 'MISC' && PELT.test(String(r.record.editorId || '')); };
+  const taken = stash.filter(isPelt);
+  if (!taken.length) return { value: 0, count: 0 };
+  try { mp.set(id, 'private.dboPelts', stash.filter((p) => !isPelt(p))); } catch (e) { return null; }
+  return { value: taken.reduce((n, p) => n + peltValue(Number(p.baseId) >>> 0) * (Number(p.count) || 1), 0), count: taken.reduce((n, p) => n + (Number(p.count) || 1), 0) };
+};
 const peltValueCache = new Map();
 const peltValue = (baseId) => {
   if (peltValueCache.has(baseId)) return peltValueCache.get(baseId);
@@ -5690,10 +5991,19 @@ globalThis.__dboSkin = (targetId, casterId) => {
   const worth = peltsWorth(pelts);
   if (worth > tierCap(tier)) {
     const need = rankForValue(worth);
-    skinSay(casterId, pelts.some((p) => p && p.dragon) ? 'Only a Master Skinner can take the bones and scales of a dragon.'
+    // The first E only refuses, so the line is not hidden behind the body's loot window; E again searches the body
+    // (SkaldsChosen, 18 Oct: "the warning doesnt always appear" on bears and sabre cats)
+    const key = `${casterId}:${targetId}`;
+    if (Date.now() - (skinRefused.get(key) || 0) < SKIN_REFUSE_MS) return null;
+    skinRefused.set(key, Date.now());
+    if (skinRefused.size > 512) for (const [k, at] of skinRefused) if (Date.now() - at > SKIN_REFUSE_MS) skinRefused.delete(k);
+    const why = pelts.some((p) => p && p.dragon) ? 'Only a Master Skinner can take the bones and scales of a dragon.'
       // "An Apprentice", never "A Apprentice" (the 16 Oct log: 103 of 105 refusals named Apprentice or Adept)
-      : `This hide is beyond your hand. ${((r) => `${/^[AEIOU]/.test(r) ? 'An' : 'A'} ${r}`)(RANK_NAMES[Math.min(need, RANK_NAMES.length - 1)])} Skinner could take it.`);
-    return null;
+      : `This hide is beyond your hand. ${((r) => `${/^[AEIOU]/.test(r) ? 'An' : 'A'} ${r}`)(RANK_NAMES[Math.min(need, RANK_NAMES.length - 1)])} Skinner could take it.`;
+    skinDeny.delete(casterId);
+    skinSay(casterId, `${why} Press E again to search the body.`);
+    try { sendPacket(casterId, { customPacketType: 'dboBanner', text: why, seconds: 4 }); } catch (e) { /* old client */ }
+    return false;
   }
   const round = skinRound(casterId, tier, targetId, creatureName(targetId));
   if (MG.clientJudged(SKIN)) {
@@ -5991,7 +6301,9 @@ const deathHook = (actorId, killerId, ...rest) => {
   try { if (globalThis.__dboBlackreachDeath) globalThis.__dboBlackreachDeath(Number(actorId) >>> 0, Number(killerId) >>> 0); } catch (e) { log('blackreach death failed', e.message); }
   try { if (globalThis.__dboTrimCorpse) globalThis.__dboTrimCorpse(Number(actorId) >>> 0); } catch (e) { log('corpse trim failed', e.message); }
   try { if (globalThis.__dboStatsDeath) globalThis.__dboStatsDeath(Number(actorId) >>> 0, Number(killerId) >>> 0); } catch (e) { log('journal stats death failed', e.message); }
+  try { if (globalThis.__dboDurabilityDeath) globalThis.__dboDurabilityDeath(Number(actorId) >>> 0); } catch (e) { log('durability death failed', e.message); }
   try { if (globalThis.__dboDogDayDeath) globalThis.__dboDogDayDeath(Number(actorId) >>> 0, Number(killerId) >>> 0); } catch (e) { log('dog day death failed', e.message); }
+  try { if (globalThis.__dboGreenPactDeath) globalThis.__dboGreenPactDeath(Number(actorId) >>> 0, Number(killerId) >>> 0); } catch (e) { log('green pact death failed', e.message); }
   const prev = globalThis.__dboPrevDeath;
   if (prev) { try { return prev(actorId, killerId, ...rest); } catch (e) { log('death chain failed', e.message); } }
   return undefined;
@@ -6013,6 +6325,16 @@ const hitDamageHook = (aggressorId, targetId, sourceId, damage, ...rest) => {
   try { if (globalThis.__dboAggroHit && dealt > 0) globalThis.__dboAggroHit(agg, tgt); } catch (e) { log('aggro hit failed', e.message); }
   try { if (globalThis.__dboCompanionHitLanded) globalThis.__dboCompanionHitLanded(agg, tgt); } catch (e) { log('companion hit log failed', e.message); }
   try { if (globalThis.__dboNpcMoodHit) globalThis.__dboNpcMoodHit(agg, tgt, Number(sourceId) >>> 0); } catch (e) { log('npc mood hit failed', e.message); }
+  try { if (globalThis.__dboSpellDotLanded) globalThis.__dboSpellDotLanded(agg, tgt, Number(sourceId) >>> 0); } catch (e) { log('spell dot failed', e.message); }
+  try {
+    const pend = npcHitPending.get(`${agg}|${tgt}`);
+    if (pend && Date.now() - pend.at < 1500) {
+      npcHitPending.delete(`${agg}|${tgt}`);
+      const after = Number((mp.get(tgt, 'percentages') || {}).health);
+      if (Number.isFinite(pend.hp) && Number.isFinite(after)) log(`npc hit landed ${agg.toString(16)}>${tgt.toString(16)}: health ${(pend.hp * 100).toFixed(1)}% -> ${(after * 100).toFixed(1)}% (scaled ${Number.isFinite(pend.pct) ? (pend.pct * 100).toFixed(1) : '?'}%, unscaled ${Number.isFinite(pend.raw) ? (pend.raw * 100).toFixed(1) : '?'}%)`);
+    }
+  } catch (e) { /* measurement only */ }
+  try { if (gearEnch) gearEnch.landed(agg, tgt, Number(sourceId) >>> 0, dealt); } catch (e) { log('gear enchantment landed failed', e.message); }
   const prev = globalThis.__dboPrevHitDamage;
   if (prev) { try { return prev(aggressorId, targetId, sourceId, dealt, ...rest); } catch (e) { log('hit damage chain failed', e.message); } }
   return undefined;
@@ -6260,6 +6582,8 @@ const explosionParalysisOf = (spellId) => {
   // A paralysis scroll holds its victim on the server (C++ OnSpellHit), but the C++ cannot replay it on the victim's own
   // client: DoCombatSpellApply takes a Spell, and a Scroll is another form type (review SCH3-3). Its own effect counts here.
   if (spell && spell.record.type === 'SCRL') seconds = paralysisIn(spell);
+  // A staff's (ENCH) paralysis, which nothing applied on a player's own client (gearench.js caps it for PvP)
+  else if (spell && spell.record.type === 'ENCH') seconds = paralysisIn(spell);
   else if (spell && spell.record.type === 'SPEL' && !paralysisIn(spell)) {
     for (const f of fieldsOf(spell, 'EFID')) {
       const mgef = recordOf(globalAt(spell, u32At(f, 0)));
@@ -6284,7 +6608,9 @@ const serverHoldOf = (spellId) => {
   if (serverHold.has(spellId)) return serverHold.get(spellId);
   const spell = recordOf(spellId);
   let seconds = 0;
-  if (spell && (spell.record.type === 'SPEL' || spell.record.type === 'SCRL')) {
+  // A staff's ENCH only once the fork holds it too (gearEnchantments.staffRiders.npcServerHold, off until that build)
+  const enchHeld = spell && spell.record.type === 'ENCH' && (((cfg.gearEnchantments || {}).staffRiders || {}).npcServerHold === true);
+  if (spell && (spell.record.type === 'SPEL' || spell.record.type === 'SCRL' || enchHeld)) {
     const harms = fieldsOf(spell, 'EFID').some((f) => {
       const data = fieldsOf(recordOf(globalAt(spell, u32At(f, 0))), 'DATA')[0];
       return !!(u32At(data, 0) & (HOSTILE | DETRIMENTAL)) && u32At(data, 0x44) === AV_HEALTH;
@@ -6311,7 +6637,17 @@ if (typeof globalThis.__dboPrevSpellHit === 'undefined') globalThis.__dboPrevSpe
 const spellHitHook = (aggressorId, targetId, spellId, ...rest) => {
   try {
     const tgt = Number(targetId) >>> 0, agg = Number(aggressorId) >>> 0, spell = Number(spellId) >>> 0;
-    const seconds = explosionParalysisOf(spell), held = serverHoldOf(spell), now = Date.now();
+    let seconds = explosionParalysisOf(spell); const held = serverHoldOf(spell), now = Date.now();
+    const isEnch = seconds > 0 && (() => { const r = recordOf(spell); return !!r && r.record.type === 'ENCH'; })();
+    // A player: a staff's hold at most pvpParalysisMaxSeconds, then immune to every paralysis a while (gearench.js)
+    if (seconds > 0 && gearEnch && profileOf(tgt) >= 0 && agg !== tgt && !paralysisRefused(agg, tgt, now)) seconds = gearEnch.playerParalysis(tgt, seconds, isEnch);
+    // An NPC: a staff holds it here only where the caster's own engine paralysed it (its host), until the fork holds staves
+    if (isEnch && profileOf(tgt) < 0 && !(((cfg.gearEnchantments || {}).staffRiders || {}).npcServerHold === true)) {
+      let host = 0; try { host = typeof mp.getHoster === 'function' ? mp.getHoster(tgt) >>> 0 : 0; } catch (e) { host = 0; }
+      if (host !== agg) seconds = 0;
+    }
+    // A staff's slow and its stamina or magicka damage on a player (gearench.js staffSpellHit)
+    try { if (gearEnch && agg !== tgt) gearEnch.staffSpellHit(agg, tgt, spell); } catch (e) { log('staff riders failed', e.message); }
     if (globalThis.__dboBeastSpellHit) globalThis.__dboBeastSpellHit(Number(aggressorId) >>> 0, tgt, Number(spellId) >>> 0);
     if (globalThis.__dboSuperSpellHit) globalThis.__dboSuperSpellHit(Number(aggressorId) >>> 0, tgt, Number(spellId) >>> 0);
     // Force Rune and the like stagger instead of pushing (combat.js staggerSpells)
@@ -6356,6 +6692,8 @@ const equipHook = (actorId, equipment, isAllowed, ...rest) => {
     // supernatural.js notes a vampire spell the client holds before the server strips an unlearned one
     if (typeof globalThis.__dboSuperEquipSeen === 'function') globalThis.__dboSuperEquipSeen(a, equipment);
     if (typeof globalThis.__dboBeastStaleSpells === 'function') globalThis.__dboBeastStaleSpells(a, equipment);
+    // durability.js: a piece taken off gets its wear in its name; a Broken one put on comes off
+    if (isAllowed && typeof globalThis.__dboDurabilityEquip === 'function') { try { globalThis.__dboDurabilityEquip(a, equipment); } catch (e) { log('durability equip failed', e.message); } }
     // spawnwatch.js: the game has loaded, so its arrival report is due; until it comes its outfit is not remembered
     const spawnWatch = globalThis.__dboSpawnWatch;
     if (spawnWatch) { try { spawnWatch.report(a); } catch (e) { log('spawn watch report failed', e.message); } }
@@ -6566,7 +6904,7 @@ const masteryDamageMult = (aggressorId, sourceId) => {
 // Block (Stendarr, Malacath) and poison (Peryite) are not here: the server does not know a hit was blocked or poisoned.
 const BLESS_COMBAT = Object.assign({ enabled: true,
   attacker: { talos: { hands: 'two', mult: 1.1 }, boethiah: { hands: 'one', mult: 1.1 }, auriel: { hands: 'bow', mult: 1.1 },
-    malacath: { hands: 'any', mult: 1.1 }, mehrunes: { spell: true, mult: 1.1 } },
+    malacath: { hands: 'any', mult: 1.1 }, mehrunes: { spell: true, mult: 1.1 }, alkosh: { hands: 'unarmed', mult: 1.1 } },
   target: { azura: { spell: true, mult: 0.9 }, trinimac: { spell: true, mult: 0.75 }, ancestors: { element: 'fire', mult: 0.75 } } }, cfg.blessingCombat || {});
 const ELEMENT_RESIST = { fire: 41, shock: 42, frost: 43 };
 const sourceResistCache = new Map();
@@ -6575,6 +6913,9 @@ const sourceResistsOf = (sourceId) => {
   if (sourceResistCache.has(sourceId)) return sourceResistCache.get(sourceId);
   const out = new Set();
   const r = recordOf(sourceId);
+  // A magic effect is its own source for a player-made enchantment's effects (gearench.js)
+  const ownData = r && String(r.record.type) === 'MGEF' && (r.record.fields || []).find((x) => x && x.type === 'DATA' && x.data instanceof Uint8Array && x.data.byteLength >= 20);
+  if (ownData) out.add(new DataView(ownData.data.buffer, ownData.data.byteOffset, ownData.data.byteLength).getInt32(16, true));
   if (r && ['SPEL', 'ENCH', 'SCRL'].includes(String(r.record.type))) {
     for (const f of r.record.fields || []) {
       if (!f || f.type !== 'EFID' || !(f.data instanceof Uint8Array) || f.data.byteLength < 4) continue;
@@ -6612,7 +6953,8 @@ const blessingAttackMult = (aggressorId, sourceId) => {
   const atk = (BLESS_COMBAT.attacker || {})[blessedDeityOf(aggressorId)];
   if (!atk) return 1;
   const hands = weaponHandsOf(sourceId);
-  const fits = atk.spell ? isSpellSource(sourceId) : atk.hands === 'any' ? !!hands : hands === atk.hands;
+  // 'unarmed' is the engine's fist source 0x1f4 (Alkosh, faiths.json); 'any' is any weapon
+  const fits = atk.spell ? isSpellSource(sourceId) : atk.hands === 'unarmed' ? (sourceId >>> 0) === 0x1f4 : atk.hands === 'any' ? !!hands : hands === atk.hands;
   return fits ? Number(atk.mult) || 1 : 1;
 };
 const blessingTargetMult = (targetId, sourceId) => {
@@ -6633,6 +6975,8 @@ const potionResistMult = (targetId, sourceId) => {
   }
   return share > 0 ? Math.max(0, 1 - Math.min(1, share)) : 1;
 };
+// Worn Resist Fire, Frost, Shock, Magic and Poison (gearench.js; the client's own copy never reached this judge)
+const gearResistMult = (targetId, sourceId) => { try { return gearEnch ? Number(gearEnch.resistMult(targetId >>> 0, sourceId >>> 0)) || 1 : 1; } catch (e) { return 1; } };
 const blessingDamageMult = (aggressorId, targetId, sourceId) => blessingAttackMult(aggressorId, sourceId) * blessingTargetMult(targetId, sourceId);
 // The server's hit formula counts only the bow's WEAP damage; vanilla adds the worn arrow's (AMMO DATA float at byte 8)
 const ARROWS = Object.assign({ enabled: true, scale: 1 }, cfg.arrows || {});
@@ -6684,6 +7028,65 @@ const arcaneDamageMult = (aggressorId, sourceId) => {
   const bonus = Number((ARCANE_DMG.byTier || [])[rank]) || 0;
   return bonus > 0 ? 1 + bonus : 1;
 };
+// gearench.js, loaded after racial.js below; the hit judge reads it at hit time
+let gearEnch = null;
+// Worn Fortify One-handed, Two-handed and Archery (Nate, 18 Oct: an enchanted hood that "never worked"; "tone down
+// enchantments so they're not too op"): vanilla raises OneHanded/TwoHanded/MarksmanModifier (AV 96/97/98) by a percent the
+// server never read. Each point adds perPoint (half of vanilla's 1%), all worn gear together at most cap, players only.
+// Config "gearFortify": { enabled, perPoint, cap }.
+const GEAR_FORT = Object.assign({ enabled: true, perPoint: 0.005, cap: 0.25 }, cfg.gearFortify || {});
+// Fortify Unarmed (AV 35) shares this cap, so fists and weapons stay even (gearEnchantments.unarmed.enabled)
+const GEAR_FORT_AV = { 96: 'one', 97: 'two', 98: 'archery', 35: 'unarmed' };
+const gearFortEffects = globalThis.__dboGearFortEffects instanceof Map ? globalThis.__dboGearFortEffects : (globalThis.__dboGearFortEffects = new Map()); // MGEF -> hook or ''
+const gearFortHookOf = (mgefId) => {
+  const id = mgefId >>> 0;
+  if (gearFortEffects.has(id)) return gearFortEffects.get(id);
+  const data = fieldsOf(recordOf(id), 'DATA')[0];
+  // MGEF DATA: archetype at 0x40 (0 value modifier, 34 peak value modifier), actor value at 0x44
+  const arch = u32At(data, 0x40), av = u32At(data, 0x44);
+  const hook = (arch === 0 || arch === 34) && GEAR_FORT_AV[av] ? GEAR_FORT_AV[av] : '';
+  gearFortEffects.set(id, hook);
+  return hook;
+};
+// [{ effect, magnitude }] of an ENCH record (EFID then its EFIT, magnitude a float at 0)
+const enchEffectsOf = (enchId) => {
+  const lr = recordOf(enchId); const out = [];
+  if (!lr || lr.record.type !== 'ENCH') return out;
+  let effect = 0;
+  for (const f of lr.record.fields || []) {
+    if (!(f.data instanceof Uint8Array)) continue;
+    if (f.type === 'EFID') effect = globalAt(lr, u32At(f, 0));
+    else if (f.type === 'EFIT' && effect && f.data.byteLength >= 4) { out.push({ effect, magnitude: new DataView(f.data.buffer, f.data.byteOffset, 4).getFloat32(0, true) }); effect = 0; }
+  }
+  return out;
+};
+const wornEnchEffectsOf = (e) => {
+  if (Array.isArray(e.enchantmentEffects) && e.enchantmentEffects.length) return e.enchantmentEffects.map((x) => ({ effect: Number(x.effectId) >>> 0, magnitude: Number(x.magnitude) || 0 }));
+  const own = Number(e.enchantmentId) >>> 0;
+  if (own) return enchEffectsOf(own);
+  const base = recordOf(Number(e.baseId) >>> 0);
+  if (!base || (base.record.type !== 'ARMO' && base.record.type !== 'WEAP')) return [];
+  return enchEffectsOf(globalAt(base, u32At(fieldsOf(base, 'EITM')[0], 0)));
+};
+// The share worn gear adds to a hook, capped
+const gearFortBonus = (a, hook) => {
+  if (GEAR_FORT.enabled === false || profileOf(a) < 0) return 0;
+  let entries = []; try { const inv = mp.get(a, 'inventory'); entries = inv && Array.isArray(inv.entries) ? inv.entries : []; } catch (e) { return 0; }
+  let points = 0;
+  for (const e of entries) {
+    if (!e || !(e.worn || e.wornLeft)) continue;
+    for (const x of wornEnchEffectsOf(e)) if (x.magnitude > 0 && gearFortHookOf(x.effect) === hook) points += x.magnitude;
+  }
+  return Math.min(Math.max(0, Number(GEAR_FORT.cap) || 0), points * (Number(GEAR_FORT.perPoint) || 0));
+};
+globalThis.__dboGearFortBonus = gearFortBonus;
+const gearAttackMult = (aggressorId, sourceId) => {
+  if (GEAR_FORT.enabled === false || isSpellSource(sourceId)) return 1;
+  const hands = weaponHandsOf(sourceId);
+  const unarmedOn = (sourceId >>> 0) === 0x1f4 && (((cfg.gearEnchantments || {}).unarmed || {}).enabled !== false);
+  const hook = unarmedOn ? 'unarmed' : weaponSkillOf(sourceId) === 'archery' ? 'archery' : hands === 'one' || hands === 'two' ? hands : '';
+  return hook ? 1 + gearFortBonus(aggressorId, hook) : 1;
+};
 // Fortify potions (alchemy rework, Nate 14 Oct: "only where the server can honour them"; alchemy.js __dboPotionBonus): a
 // weapon potion adds its share to that weapon's blows (Blade, Blunt, Archery by the DBO weapon skill; a vanilla One- or
 // Two-handed potion by the weapon's hands, as its text says), a Destruction or Restoration potion to that school's spell
@@ -6694,10 +7097,11 @@ const potionBonus = (a, hook) => { try { const f = globalThis.__dboPotionBonus; 
 // bar then holds base + extra points, which is what a larger maximum is; restores stay shares of the bar. Sleeping Tree
 // Sap (hook taken) takes its share off every hit. Both sit outside the racial cap, as a larger pool is not a resistance.
 const potionMaxSeen = globalThis.__dboPotionMaxSeen instanceof Map ? globalThis.__dboPotionMaxSeen : (globalThis.__dboPotionMaxSeen = new Map());
+// Worn Fortify Health counts the same way, a player's gear at most gearEnchantments.fortifyHealth.gearHealthCap (gearench.js)
+const gearHealthPoints = (targetId) => { try { return gearEnch && profileOf(targetId) >= 0 ? Math.max(0, Number(gearEnch.healthPoints(targetId >>> 0)) || 0) : 0; } catch (e) { return 0; } };
 const potionTakenMult = (targetId, flags) => {
-  if (typeof globalThis.__dboPotionBonus !== 'function') return 1;
   let m = 1;
-  const extra = potionBonus(targetId, 'health');
+  const extra = potionBonus(targetId, 'health') + gearHealthPoints(targetId);
   // A weapon hit names the maximum; a spell hit does not, so the last one seen for the target stands in (it changes only
   // with the character's level), else downed.js's measured one, else the smallest a character has (150)
   let base = flags && typeof flags === 'object' ? Number(flags.targetMaxHealth) : NaN;
@@ -6820,7 +7224,9 @@ const temperBonus = (health, chest) => { const q = Math.round((Number(health) - 
 const wornWithHealth = (a) => {
   let entries = [];
   try { const eq = mp.get(a, 'equipment'); entries = eq && eq.inv && Array.isArray(eq.inv.entries) ? eq.inv.entries : []; } catch (e) { return []; }
-  return entries.filter((e) => e && (e.worn || e.wornLeft)).map((e) => ({ baseId: Number(e.baseId) >>> 0, health: Number(e.health) || 1 }));
+  // cond: what wear leaves of the piece (durability.js; 1 when it is not loaded)
+  const cond = (e) => { try { const m = typeof globalThis.__dboDurabilityMult === 'function' ? Number(globalThis.__dboDurabilityMult(a, Number(e.baseId) >>> 0, !!e.wornLeft, e.name || '')) : 1; return Number.isFinite(m) && m > 0 ? m : 1; } catch (err) { return 1; } };
+  return entries.filter((e) => e && (e.worn || e.wornLeft)).map((e) => ({ baseId: Number(e.baseId) >>> 0, health: Number(e.health) || 1, cond: cond(e) }));
 };
 // A tempered weapon's blow: base damage plus the game's tempering bonus, over base damage
 const temperDamageMult = (aggressorId, sourceId) => {
@@ -6828,7 +7234,7 @@ const temperDamageMult = (aggressorId, sourceId) => {
   if (!(base > 0)) return 1;
   const w = wornWithHealth(aggressorId).find((e) => e.baseId === (sourceId >>> 0));
   const bonus = w ? temperBonus(w.health, false) : 0;
-  return bonus > 0 ? (base + bonus) / base : 1;
+  return (bonus > 0 ? (base + bonus) / base : 1) * ((w && w.cond) || 1);
 };
 const gmstFloat = (id, fallback) => {
   const key = `gmst:${id}`;
@@ -6867,6 +7273,20 @@ try {
   delete require.cache[RACIAL_JS];
   racial = require(RACIAL_JS)({ mp, log, personal, giveItem, profileOf, display, recordOf, every, onlineActors, weaponHandsOf, sourceResistsOf, gmstFloat, cfg, sendPacket, hasUiCap });
 } catch (e) { log('racial.js failed to load:', e.stack || e.message); racial = null; globalThis.__dboRaceGold = null; globalThis.__dboRaceOf = null; }
+// ---- enchantments the server judges: weapon hits, worn resistances and fortifies (server\gearench.js, config "gearEnchantments")
+try {
+  const GEARENCH_JS = path.resolve('gearench.js');
+  delete require.cache[GEARENCH_JS];
+  gearEnch = require(GEARENCH_JS)({ mp, log, recordOf, profileOf, display, personal, sendPacket, sourceResistsOf, weaponHandsOf, racial, cfg,
+    potionResistMult: (t, s) => potionResistMult(t, s), blessingTargetMult: (t, s) => blessingTargetMult(t, s), takenMult: (t, f) => potionTakenMult(t, f) });
+} catch (e) { log('gearench.js failed to load:', e.stack || e.message); gearEnch = null; globalThis.__dboGearBonus = null; globalThis.__dboGearRegen = null; }
+// ---- how tough a family of creatures is against players, by race (server\npctoughness.js, config "npcToughness") ----
+let toughness = null;
+try {
+  const TOUGHNESS_JS = path.resolve('npctoughness.js');
+  delete require.cache[TOUGHNESS_JS];
+  toughness = require(TOUGHNESS_JS)({ mp, cfg, log, profileOf, recordOf });
+} catch (e) { log('npctoughness.js failed to load:', e.stack || e.message); toughness = null; }
 // How much a Defense tier multiplies a piece's rating: heavy by the tier's factor, light by lightShare of the gain
 const defensePieceMult = (targetId) => {
   const none = { heavy: 1, light: 1 };
@@ -6880,14 +7300,16 @@ const defensePieceMult = (targetId) => {
 };
 // Below 1 when the target's armor counts for more than the engine allowed it: the Defense tier multiplies each piece's
 // rating, and tempering adds the game's bonus to it (the engine reads the bare rating only)
+// Worn Fortify Heavy and Light Armor: that weight's pieces count a capped share more (gearench.js bonus)
+const gearArmorMult = (targetId) => { const b = globalThis.__dboGearBonus; try { return typeof b === 'function' ? { heavy: 1 + (Number(b(targetId, 'heavy')) || 0), light: 1 + (Number(b(targetId, 'light')) || 0) } : { heavy: 1, light: 1 }; } catch (e) { return { heavy: 1, light: 1 }; } };
 const defenseDamageMult = (targetId) => {
-  const pm = defensePieceMult(targetId);
+  const pm = defensePieceMult(targetId), gm = gearArmorMult(targetId);
   let bare = 0, counted = 0;
   try {
     for (const w of wornWithHealth(targetId)) {
       const p = armorPieceOf(w.baseId); if (!p) continue;
       bare += p.rating;
-      counted += ((p.counted || p.rating) + temperBonus(w.health, p.chest)) * (p.heavy ? pm.heavy : pm.light);
+      counted += ((p.counted || p.rating) + temperBonus(w.health, p.chest)) * (p.heavy ? pm.heavy : pm.light) * (w.cond || 1) * (p.heavy ? gm.heavy : gm.light);
     }
   } catch (e) { return 1; }
   // A Fortify Armor potion (alchemy.js, hook armor): the worn armour counts for that much more while it lasts
@@ -6959,12 +7381,12 @@ const fleshDamageMult = (targetId, sourceId) => {
   if (!(extra > 0)) return 1;
   const physical = (sourceId >>> 0) === 0x1f4 || (() => { const r = recordOf(sourceId >>> 0); return !!r && String(r.record.type) === 'WEAP'; })();
   if (!physical) return 1;
-  const pm = defensePieceMult(targetId);
+  const pm = defensePieceMult(targetId), gm = gearArmorMult(targetId);
   let counted = 0;
   try {
     for (const w of wornWithHealth(targetId)) {
       const p = armorPieceOf(w.baseId); if (!p) continue;
-      counted += ((p.counted || p.rating) + temperBonus(w.health, p.chest)) * (p.heavy ? pm.heavy : pm.light);
+      counted += ((p.counted || p.rating) + temperBonus(w.health, p.chest)) * (p.heavy ? pm.heavy : pm.light) * (w.cond || 1) * (p.heavy ? gm.heavy : gm.light);
     }
   } catch (e) { counted = 0; }
   const scale = gmstFloat(0x21a72, 0.12), cap = gmstFloat(0x37deb, 80);
@@ -7068,14 +7490,31 @@ const npcKindOf = (id) => {
   let tag = ''; try { tag = String(mp.get(id, 'private.npcSpawner') || ''); } catch (e) { return ''; }
   return tag.startsWith('wild:') ? (tag.split(':')[1] || '') : '';
 };
+// npcDamage.byBase { <editor id of the attacker's base>: mult } does the same by the creature itself, wherever it was spawned:
+// a spawn tag names the placement's kind, not what its leveled list rolled, so the bears of the Rift stood in wild:skeever
+// zones (wildlife-density-1017). Both apply when both match. Editor ids are looked up once per base desc.
+const npcBaseEdidCache = new Map();
+const npcBaseEdidOf = (id) => {
+  let base = ''; try { base = String(mp.get(id, 'baseDesc') || ''); } catch (e) { return ''; }
+  if (!base) return '';
+  if (npcBaseEdidCache.has(base)) return npcBaseEdidCache.get(base);
+  let edid = ''; try { const r = recordOf(mp.getIdFromDesc(base) >>> 0); edid = r && r.record ? String(r.record.editorId || '') : ''; } catch (e) { /* not a record */ }
+  if (npcBaseEdidCache.size > 4096) npcBaseEdidCache.clear();
+  npcBaseEdidCache.set(base, edid);
+  return edid;
+};
 const npcKindDamageMult = (agg, tgt, dmg) => {
-  const by = (cfg.npcDamage || {}).byKind;
-  if (!by || typeof by !== 'object' || !(dmg > 0) || agg === tgt) return 1;
+  const nd = cfg.npcDamage || {};
+  const by = nd.byKind, byBase = nd.byBase;
+  const hasKind = by && typeof by === 'object', hasBase = byBase && typeof byBase === 'object' && Object.keys(byBase).some((k) => !k.startsWith('_'));
+  if ((!hasKind && !hasBase) || !(dmg > 0) || agg === tgt) return 1;
   if (profileOf(agg) >= 0 || profileOf(tgt) < 0) return 1;
-  const kind = npcKindOf(agg);
-  if (!kind || !Object.prototype.hasOwnProperty.call(by, kind)) return 1;
-  const m = Number(by[kind]);
-  return m > 0 ? m : 1;
+  let m = 1;
+  const kind = hasKind ? npcKindOf(agg) : '';
+  if (kind && Object.prototype.hasOwnProperty.call(by, kind)) { const v = Number(by[kind]); if (v > 0) m *= v; }
+  const edid = hasBase ? npcBaseEdidOf(agg) : '';
+  if (edid && Object.prototype.hasOwnProperty.call(byBase, edid)) { const v = Number(byBase[edid]); if (v > 0) m *= v; }
+  return m;
 };
 // ---- NPC damage by dungeon difficulty, and NPC spells ------------------------------------------------------------------
 // gamemode-config npcDamage.byDifficulty { story, normal, hard, nightmare: mult } scales every hit (weapon, fists, spells) an
@@ -7113,6 +7552,7 @@ const npcDifficultyDamageMult = (agg, tgt, dmg, flags) => {
 // npcDamage.log: one line for every creature's or NPC's hit on a player, x1 hits included (the mastery line is written only
 // when a factor changed the hit), so a player's whole fight can be read: attacker base and spawn tag, the lease difficulty,
 // source, raw damage, the final factor, the flags and the health before. Off unless set.
+const npcHitPending = new Map();
 const npcHitLog = (agg, tgt, src, dmg, mult, flags) => {
   if (!(cfg.npcDamage || {}).log || !(dmg > 0) || agg === tgt) return;
   if (profileOf(agg) >= 0 || profileOf(tgt) < 0) return;
@@ -7125,7 +7565,11 @@ const npcHitLog = (agg, tgt, src, dmg, mult, flags) => {
   const edid = r && r.record ? String(r.record.editorId || '') : '';
   const max = Number(f.targetMaxHealth);
   const kind = [f.spell ? 'spell' : '', f.power ? 'power' : '', f.blocked ? 'blocked' : '', f.bash ? 'bash' : '', f.sneak ? 'sneak' : ''].filter(Boolean).join(',');
-  log(`npc hit ${display(agg)} (${edid || base || '?'}${tag ? ' ' + tag : ''}${npcLeaseDifficultyOf(agg) ? ' ' + npcLeaseDifficultyOf(agg) : ''}) -> ${display(tgt)}: source ${src.toString(16)} ${dmg.toFixed(1)} x${mult.toFixed(2)} = ${(dmg * mult).toFixed(1)}${max > 0 ? ` of ${max.toFixed(0)} (${((dmg * mult) / max * 100).toFixed(1)}%)` : ''}${kind ? ' [' + kind + ']' : ''} health ${Number.isFinite(hp) ? (hp * 100).toFixed(1) + '%' : '?'}`);
+  // Measured, not acted on (main session, 20 Oct: a hit on the player who hosts the NPC may skip the scaling): ids for the
+  // hoster log ("Hoster of X changed"), and the health after the hit lands (hitDamageHook, "npc hit landed")
+  npcHitPending.set(`${agg}|${tgt}`, { at: Date.now(), hp, pct: max > 0 ? (dmg * mult) / max : NaN, raw: max > 0 ? dmg / max : NaN });
+  if (npcHitPending.size > 512) for (const [k, v] of npcHitPending) if (Date.now() - v.at > 5000) npcHitPending.delete(k);
+  log(`npc hit ${display(agg)} (${edid || base || '?'}${tag ? ' ' + tag : ''}${npcLeaseDifficultyOf(agg) ? ' ' + npcLeaseDifficultyOf(agg) : ''}) -> ${display(tgt)}: source ${src.toString(16)} ${dmg.toFixed(1)} x${mult.toFixed(2)} = ${(dmg * mult).toFixed(1)}${max > 0 ? ` of ${max.toFixed(0)} (${((dmg * mult) / max * 100).toFixed(1)}%)` : ''}${kind ? ' [' + kind + ']' : ''} health ${Number.isFinite(hp) ? (hp * 100).toFixed(1) + '%' : '?'} ids ${agg.toString(16)}>${tgt.toString(16)}`);
 };
 // A hit scaled below 1 is given back after the engine applied it (masteryBonusDamage), but only to a target that lived
 // through the engine's full hit: at 50 health a boar's 50-point bite downed a player although the scaled bite would not
@@ -7254,6 +7698,8 @@ const potionPoisonHit = (agg, tgt, src, dmg, flags) => {
   const r = recordOf(src); if (!r || String(r.record.type) !== 'WEAP') return;
   try { globalThis.__dboPoisonHit(agg, tgt, src, flags); } catch (e) { log('poison hit failed', e.message); }
 };
+// An enchanted weapon's effects on a landed blow (gearench.js weaponAttempt); never fails the hit
+const gearWeaponHit = (agg, tgt, src, dmg, flags) => { try { if (gearEnch && dmg > 0) gearEnch.weaponAttempt(agg, tgt, src, dmg, flags); } catch (e) { log('gear enchantment failed', e.message); } };
 const hitDamageAttemptHook =(aggressorId, targetId, sourceId, damage, flags) => {
   const agg = Number(aggressorId) >>> 0;
   const tgt = Number(targetId) >>> 0;
@@ -7273,6 +7719,10 @@ const hitDamageAttemptHook =(aggressorId, targetId, sourceId, damage, flags) => 
   // 0b. A logged-out player's body cannot be harmed, by players or creatures, unless they left mid-fight
   globalThis.__dboHitRefusal = 'offline_body';
   if (agg !== tgt && offlineBodyProtected(tgt)) { refuseOfflineBody(agg, tgt); return false; }
+
+  // 0b2. A player in the character editor is never hit, and hits no one from it (spell hits come through here too)
+  globalThis.__dboHitRefusal = 'in_editor';
+  if (agg !== tgt && (inEditor(tgt) || inEditor(agg))) return false;
 
   // 0c. Just logged in: no creature harms the player yet; their own attack ends the grace
   globalThis.__dboHitRefusal = 'login_grace';
@@ -7321,6 +7771,9 @@ const hitDamageAttemptHook =(aggressorId, targetId, sourceId, damage, flags) => 
   // friendly GMs never harm each other. Before companionSystem's hook, so a refused hit sets no band on anyone.
   globalThis.__dboHitRefusal = 'warband';
   try { if (agg !== tgt && typeof globalThis.__dboWarbandRefusesHit === 'function' && globalThis.__dboWarbandRefusesHit(agg, tgt)) return false; } catch (e) { log('warband hit check failed', e.message); }
+  // 2e. An accepted silver test's strike gives its result and lands no damage (silvertest.js)
+  globalThis.__dboHitRefusal = 'silver_test';
+  try { if (agg !== tgt && typeof globalThis.__dboSilverTestStrike === 'function' && globalThis.__dboSilverTestStrike(agg, tgt, src, dmg, flags)) return false; } catch (e) { log('silver test hit failed', e.message); }
   // past the gameplay's own gates: a refusal from here on is the fork chain's or the summon guard's, unnamed
   globalThis.__dboHitRefusal = null;
 
@@ -7338,6 +7791,8 @@ const hitDamageAttemptHook =(aggressorId, targetId, sourceId, damage, flags) => 
   if (dmg > 0 && agg !== tgt && globalThis.__dboHostCooldown) { if (profileOf(agg) < 0) globalThis.__dboHostCooldown.noteFight(agg); if (profileOf(tgt) < 0) globalThis.__dboHostCooldown.noteFight(tgt); }
   // Any landed blow, PvE included, puts the players in it in combat for the armour swap timer
   if (dmg > 0 && agg !== tgt && armourSwap) armourSwap.onHit(agg, tgt);
+  // Weapons wear with blows landed, armour with hits taken, a shield with blocks (durability.js)
+  if (dmg > 0 && agg !== tgt && globalThis.__dboDurabilityHit) { try { globalThis.__dboDurabilityHit(agg >>> 0, tgt >>> 0, src >>> 0, flags); } catch (e) { log('durability hit failed', e.message); } }
   // Fire or silver on a vampire, silver or poison on a werewolf in beast form: note the health now, the extra comes off in
   // onHitDamage, after the mastery give-back, so it multiplies the capped target side rather than joining it
   globalThis.__dboSuperPending = null;
@@ -7350,11 +7805,17 @@ const hitDamageAttemptHook =(aggressorId, targetId, sourceId, damage, flags) => 
     // so a werewolf also took the Master fist bonus, the fist's stamina drain and its disarm (combat review, 2026-09-29)
     let beastAgg = false; try { const b = mp.get(agg, 'private.beast'); beastAgg = !!(b && b.form); } catch (e) { /* not an actor */ }
     // The target's side (Defense, a blessing, the race's resistance) is capped together: racial.js reductionCap
-    let targetSide = defenseDamageMult(tgt) * fleshDamageMult(tgt, src) * blessingTargetMult(tgt, src) * potionResistMult(tgt, src);
+    // Worn resistances join the race's, a potion's and a blessing's under racial.js reductionCap (gearench.js resistMult)
+    let targetSide = defenseDamageMult(tgt) * fleshDamageMult(tgt, src) * blessingTargetMult(tgt, src) * potionResistMult(tgt, src) * gearResistMult(tgt, src);
+    // Spellbreaker's ward while its wearer blocks a spell from the front (gearench.js), under the same cap as a racial ward
+    try { if (gearEnch) targetSide *= gearEnch.spellbreakerMult(agg, tgt, src, dmg, flags); } catch (e) { log('spellbreaker failed', e.message); }
     if (racial) { try { targetSide = racial.capTargetSide(targetSide * racial.targetMult(agg, tgt, src, dmg)); } catch (e) { log('racial target failed', e.message); } }
     let raceAtk = 1;
     if (racial && !beastAgg) { try { raceAtk = racial.attackMult(agg, tgt, src, dmg); } catch (e) { log('racial attack failed', e.message); } }
     let mult = (beastAgg ? 1 : masteryDamageMult(agg, src) * potionAttackMult(agg, src)) * potionTakenMult(tgt, flags) * arcaneDamageMult(agg, src) * materialDamageMult(agg, src) * temperDamageMult(agg, src) * arrowDamageMult(agg, src) * targetSide * blessingAttackMult(agg, src) * raceAtk * huntDamageMult(agg, tgt) * pvp;
+    if (!beastAgg) mult *= gearAttackMult(agg, src);
+    // The Shrouded Gloves double a one-handed sneak attack (gearench.js backstabMult)
+    try { if (gearEnch && !beastAgg) mult *= gearEnch.backstabMult(agg, src, flags); } catch (e) { log('backstab failed', e.message); }
     // Tired blows, fists into armour, staves through it, the fist's stamina drain and disarm (martial.js)
     if (martial && !beastAgg) { try { mult *= martial.onAttempt(agg, tgt, src, dmg, flags); } catch (e) { log('martial failed', e.message); } }
     // Block chip and stamina, guard breaks, bash, stagger (combat.js); a bash's blow comes back scaled down
@@ -7365,6 +7826,8 @@ const hitDamageAttemptHook =(aggressorId, targetId, sourceId, damage, flags) => 
     mult *= npcKindDamageMult(agg, tgt, dmg);
     // An enemy of a claimed dungeon by the lease's difficulty, and any NPC's spell (npcDamage.byDifficulty, spellMult)
     mult *= npcDifficultyDamageMult(agg, tgt, dmg, flags);
+    // A family of creatures by race, on a player (npcToughness.kinds.<kind>.dealt; the draugr, 17 Oct)
+    if (toughness) { try { mult *= toughness.dealtMult(agg, tgt, dmg); } catch (e) { log('toughness dealt failed', e.message); } }
     // A player's summon takes less by its owner's Conjuration rank (summonBuff.takenByTier)
     mult *= summonTakenMult(agg, tgt, dmg);
     try { npcHitLog(agg, tgt, src, dmg, mult, flags); } catch (e) { log('npc hit log failed', e.message); }
@@ -7375,18 +7838,25 @@ const hitDamageAttemptHook =(aggressorId, targetId, sourceId, damage, flags) => 
     if (guard) {
       if (guard.rest < 1) globalThis.__dboMasteryPending = { agg, tgt, mult: guard.rest, health: guard.health };
       potionPoisonHit(agg, tgt, src, dmg, flags);
+      gearWeaponHit(agg, tgt, src, dmg, flags);
       return true;
     }
     // The health before anything below changes it: the give-back measures the hit from here
     const before = mp.get(tgt, 'percentages');
+    // A player's damage-over-time spell measures its ticks from here too (spelldot.js)
+    try { if (globalThis.__dboSpellDotAttempt && before) globalThis.__dboSpellDotAttempt(agg, tgt, src, Number(before.health)); } catch (e) { log('spell dot attempt failed', e.message); }
     // A player's hit on a kind of creature or NPC (npcDamage.takenByKind): more lands before the engine's hit when it can
     // (weapon hits), else it joins the give-back's mult like any other factor
-    const taken = npcTakenDamageMult(agg, tgt, dmg) * summonDealtMult(agg, tgt, dmg);
+    // and on a family of creatures whose health the server leaves far above their level's (npcToughness; the draugr, 17 Oct)
+    let toughTaken = 1;
+    if (toughness) { try { toughTaken = toughness.takenMult(agg, tgt, dmg, flags); } catch (e) { log('toughness taken failed', e.message); } }
+    const taken = npcTakenDamageMult(agg, tgt, dmg) * summonDealtMult(agg, tgt, dmg) * toughTaken;
     if (!(taken > 1 && npcTakenLowerFirst(tgt, dmg, taken, flags))) mult *= taken;
     if (mult !== 1 && dmg > 0) {
       if (before && before.health > 0) globalThis.__dboMasteryPending = { agg, tgt, mult, health: before.health };
     }
     potionPoisonHit(agg, tgt, src, dmg, flags);
+    gearWeaponHit(agg, tgt, src, dmg, flags);
   } catch (e) { /* not an actor */ }
   return true;
 };
@@ -7638,7 +8108,7 @@ try {
   delete require.cache[PRAYER_JS];
   require(PRAYER_JS)({ mp, log, personal, audit, display, who, cfg, openWidget, closeWidget, onUi, registerChatCommand, onlineActors, every, skills: SKILLS_DEF,
     isLeadStaff, findAnyByName, sendPacket, distanceMeters, hasUiCap,
-    takeGold, treasuryHere: (a, gold) => { const z = zoneOfActor(a); return depositToTreasury(z && typeof z === 'object' ? z.id : z, gold); } });
+    takeGold, treasuryHere: (a, gold) => { const z = zoneOfActor(a); return depositToTreasury(z && typeof z === 'object' ? z.id : z, gold, { income: 'temple offerings' }); } });
 } catch (e) { log('prayer.js failed to load:', e.stack || e.message); globalThis.__dboPrayerActivate = null; globalThis.__dboPrayerLogin = null; }
 
 // ---- beds, inn rooms, Well Rested and Well Fed (server\rest.js, config "rest", beds.json) ---------
@@ -7662,6 +8132,8 @@ function businessFailClosed(targetId, casterId) {
   // Every record that lists the chest counts: two door claims in one inn can both list it (the reviewer's finding 1)
   const recs = [];
   for (const b of Object.values((d && d.businesses) || {})) if (b && b.chests && b.chests[key]) recs.push(b.chests[key]);
+  // A business's shop chest (shops.js) holds goods for sale: shut to everyone, its staff too, until business.js is back
+  for (const b of Object.values((d && d.businesses) || {})) if (b && b.shop && b.shop.chest === key) { personal(casterId, 'This shop chest is closed for a moment. Try again shortly.'); return true; }
   if (!recs.length) return false;
   const g = Number((cfg.business || {}).chestGraceHours), grace = (Number.isFinite(g) ? g : 72) * 3600000;
   const held = recs.filter((c) => !!c.renter && Number(c.until) + grace > Date.now());
@@ -7699,6 +8171,16 @@ try {
   require(SALVAGE_JS)({ mp, log, personal, who, cfg, openWidget, closeWidget, onUi, masteryOf, recordOf, fieldsOf, giveItem, distanceMeters,
     itemName: (d) => adminItemName(d) });
 } catch (e) { log('salvage.js failed to load:', e.stack || e.message); globalThis.__dboSalvageActivate = null; }
+// ---- weapon and armour wear, repair at the wheel and the bench (server\durability.js, config "durability") -----------
+try {
+  const DURABILITY_JS = path.resolve('durability.js');
+  delete require.cache[DURABILITY_JS];
+  require(DURABILITY_JS)({ mp, log, personal, who, cfg, openWidget, closeWidget, onUi, recordOf, fieldsOf, giveItem, takeGold, goldOf, distanceMeters, sendPacket,
+    itemName: (d) => adminItemName(d) });
+} catch (e) {
+  log('durability.js failed to load:', e.stack || e.message);
+  for (const k of ['__dboDurabilityMult', '__dboDurabilityHit', '__dboDurabilityDeath', '__dboDurabilityEquip', '__dboDurabilityLeave', '__dboRepairActivate']) globalThis[k] = null;
+}
 
 // ---- the expedition ruins' buttons and levers (server\ruinbuttons.js, ruin-buttons.json, config "ruinButtons") ----
 try {
@@ -7748,6 +8230,17 @@ try {
     takeGold, giveGold: (a, n) => giveItem(a, GOLD_BASE, n) !== false, depositToTreasury, zoneById, openWidget, closeWidget, onUi });
 } catch (e) { log('tenancy.js failed to load:', e.stack || e.message); }
 
+// ---- mines owned like property: access and the owner's share at the vein (server\mines.js, mines.json, config "mines") ----
+try {
+  const MINES_JS = path.resolve('mines.js');
+  delete require.cache[MINES_JS];
+  require(MINES_JS)({ mp, log, personal, audit, who, display, cfg, onUi, openWidget, closeWidget, onlineActors, every, registerChatCommand,
+    giveItem, distanceMeters, profileOf, zoneById, isLeadStaff });
+} catch (e) {
+  log('mines.js failed to load:', e.stack || e.message);
+  for (const k of ['__dboMineGate', '__dboMineShareQuote', '__dboMineValueOf', '__dboHousingNotHome', '__dboMineSaleRefusal', '__dboMineAtDoor', '__dboMinePanel', '__dboMines', '__dboMinesFlush']) globalThis[k] = null;
+}
+
 // ---- the ledger of contacts, read at boards, homes and placed ledgers (server\ledger.js, config "ledger") ----------
 try {
   const LEDGER_JS = path.resolve('ledger.js');
@@ -7789,8 +8282,24 @@ try {
   const auth = serverSettings.discordAuth || {};
   require(GMCALL_JS)({ mp, log, personal, staffSay, audit, staffNote, who, display, profileOf, discordOf, rolesOf, onlineActors, registerChatCommand,
     isAdmin, staffCan, every, saveSoon, sendPacket, zoneOfActor, zoneById, recordOf, teleportTo: staffTeleport, creationPending, sendJson, cfg,
-    token: (cfg.discord || {}).botToken || auth.botToken });
-} catch (e) { log('gmcall.js failed to load:', e.stack || e.message); globalThis.__dboGmCallsOpen = null; }
+    openWidget, closeWidget, onUi, token: (cfg.discord || {}).botToken || auth.botToken });
+} catch (e) { log('gmcall.js failed to load:', e.stack || e.message); globalThis.__dboGmCallsOpen = null; globalThis.__dboGmCallsView = null; globalThis.__dboGmCallsAct = null; }
+
+// ---- /enchant and the F7 Enchant tab: staff enchant one piece for an event (server\staffenchant.js, config "staffEnchant") --
+try {
+  const STAFFENCHANT_JS = path.resolve('staffenchant.js');
+  delete require.cache[STAFFENCHANT_JS];
+  require(STAFFENCHANT_JS)({ mp, log, personal, audit, staffNote, who, display, onlineActors, registerChatCommand, staffTierOf, findByName,
+    onUi, openWidget, closeWidget, sendPacket, itemName: (id) => globalThis.__alduinakItemName(id), cfg });
+} catch (e) { log('staffenchant.js failed to load:', e.stack || e.message); }
+
+// ---- /event and /chars: quick staff tools (server\stafftools.js, config "events") ------------------------------------
+try {
+  const STAFFTOOLS_JS = path.resolve('stafftools.js');
+  delete require.cache[STAFFTOOLS_JS];
+  require(STAFFTOOLS_JS)({ mp, log, personal, system, audit, who, tagOf, profileOf, rolesOf, onlineActors, registerChatCommand, isAdmin, cfg,
+    staffTier: staffTierOf, realNameOf, userOf, findByName, offlineByTag, sendJson, token: (cfg.discord || {}).botToken || (serverSettings.discordAuth || {}).botToken });
+} catch (e) { log('stafftools.js failed to load:', e.stack || e.message); }
 
 // ---- update controls: version log, /update, /schedule restart|shutdown|update (server\updates.js, config "updates") -----
 try {
@@ -7939,6 +8448,13 @@ try {
   delete require.cache[ROBBERY_JS];
   require(ROBBERY_JS)({ mp, log, personal, audit, who, onlineActors, recordOf, adminItemName, openWidget, closeWidget, onUi, sendPacket, every, cfg });
 } catch (e) { log('robbery.js failed to load:', e.stack || e.message); globalThis.__dboRobEntries = null; globalThis.__dboRobAction = null; }
+
+// ---- Silver Test in the X menu: a hunter's silver on a consenting subject's blood (server\silvertest.js) ----------------
+try {
+  const SILVERTEST_JS = path.resolve('silvertest.js');
+  delete require.cache[SILVERTEST_JS];
+  require(SILVERTEST_JS)({ mp, log, personal, audit, who, onlineActors, openWidget, closeWidget, onUi, sendPacket, every, cfg });
+} catch (e) { log('silvertest.js failed to load:', e.stack || e.message); for (const k of ['__dboSilverTestEntries', '__dboSilverTestAction', '__dboSilverTestStrike', '__dboSilverTestLeave']) globalThis[k] = null; }
 
 // ---- the Key Ring panel: house keys as records on the character (server\keyring.js; housingSystem.ts housingKeyRing) ------
 try {
@@ -8093,12 +8609,26 @@ try {
   delete require.cache[JOURNALSKILLS_JS];
   require(JOURNALSKILLS_JS)({ log, onUi });
 } catch (e) { log('journalskills.js failed to load:', e.stack || e.message); if (globalThis.__dboJournalSections) delete globalThis.__dboJournalSections.skills; }
+// ---- outlaw bounties: a hold's ruler or Steward sets them, the outlaw pays them to the jailer (server\outlaws.js) --------
+try {
+  const OUTLAWS_JS = path.resolve('outlaws.js');
+  delete require.cache[OUTLAWS_JS];
+  require(OUTLAWS_JS)({ mp, log, personal, system, audit, who, display, cfg, registerChatCommand, zoneOfActor, zoneById, readOfficials,
+    profileOf, officialTarget, onlineActors, giveItem, isLeadStaff, onUi });
+} catch (e) { log('outlaws.js failed to load:', e.stack || e.message); globalThis.__dboOutlawJailed = null; }
+// ---- the Green Pact: the wood elves' taboo on plants and the Partaking of the slain (server\greenpact.js) ----------------
+try {
+  const GREENPACT_JS = path.resolve('greenpact.js');
+  delete require.cache[GREENPACT_JS];
+  require(GREENPACT_JS)({ mp, log, personal, audit, who, cfg, registerChatCommand, recordOf, nameOf, profileOf, onlineActors, distanceMeters,
+    sendPacket, isGoldFlora, sate: (a) => { if (!NEEDS.enabled) return; const n = needsOf(a); n.hunger = 0; applyNeedsStage(a, n, true); saveNeeds(a, n); } });
+} catch (e) { log('greenpact.js failed to load:', e.stack || e.message); for (const k of ['__dboGreenPactActivate', '__dboGreenPactDeath', '__dboGreenPactRefusal']) globalThis[k] = null; }
 // ---- the journal's Court tab: offices, offers and the household (server\court.js, config "court") ------------------------
 try {
   const COURT_JS = path.resolve('court.js');
   delete require.cache[COURT_JS];
   require(COURT_JS)({ mp, log, ownNameOf, ownDisplay, system, personal, registerChatCommand, audit, who, display, nameOf, tagOf, onUi, onlineActors, isAdmin, isLeadStaff, profileOf, cfg, findByName,
-    zoneList, zoneById, readOfficials, rankTitle, appointCap, appointCheck, appointFrom, seatOfficial, unseatOfficial, officialTarget,
+    zoneList, zoneById, readOfficials, rankTitle, appointCap, appointCheck, appointFrom, seatOfficial, unseatOfficial, unseatOfficialBy, officialTarget,
     officialName, accountActors, ranksOf, APPOINT_RULES });
 } catch (e) { log('court.js failed to load:', e.stack || e.message); globalThis.__dboCourtOffer = null; globalThis.__dboCourtOfficeSync = null; if (globalThis.__dboJournalSections) delete globalThis.__dboJournalSections.court; }
 // ---- the nobility: fiefs, titles granted by the hold's ruler, the fief's tax share (server\nobility.js, config "nobility") --
@@ -8116,7 +8646,7 @@ try {
   delete require.cache[CITIZENSHIP_JS];
   require(CITIZENSHIP_JS)({ mp, log, ownNameOf, ownDisplay, personal, system, audit, who, display, nameOf, tagOf, onUi, onlineActors, isAdmin, isLeadStaff, profileOf, cfg, every,
     zoneList, zoneById, readOfficials, rankTitle, officialTarget, accountActors, seatOfficial, unseatOfficialBy, takeGold, depositToTreasury, openWidget, closeWidget,
-    boardZoneNear, raceEdidOf });
+    boardZoneNear, raceEdidOf, discordOf, registerChatCommand });
 } catch (e) {
   log('citizenship.js failed to load:', e.stack || e.message);
   for (const k of ['__dboCitizenMenuEntries', '__dboCitizenMenuAction', '__dboCitizenLogin', '__dboCitizenOf', '__dboCitizenGates', '__dboCitizenHolds', '__dboCitizenRoleIds', '__dboCitizenManagedRoleIds']) globalThis[k] = null;
@@ -8181,6 +8711,13 @@ try {
   delete require.cache[PLAYTIME_JS];
   require(PLAYTIME_JS)({ mp, log, personal, system, registerChatCommand, audit, who, display, profileOf, isAdmin, findAnyByName, onlineActors, every, creationPending, cfg });
 } catch (e) { log('playtime.js failed to load:', e.stack || e.message); }
+// ---- referral links and their boosts (server\referrals.js, config "referrals"; the backend's routes/referrals.js binds new accounts) ----
+// After playtime.js: its records tell referrals.js which accounts were seen before referrals opened
+try {
+  const REFERRALS_JS = path.resolve('referrals.js');
+  delete require.cache[REFERRALS_JS];
+  require(REFERRALS_JS)({ mp, log, personal, system, registerChatCommand, audit, who, display, profileOf, discordOf, isAdmin, isLeadStaff, findAnyByName, onlineActors, every, creationPending, onUi, cfg });
+} catch (e) { log('referrals.js failed to load:', e.stack || e.message); globalThis.__dboReferralSkillRate = null; }
 
 // ---- vampirism and lycanthropy (server\supernatural.js) ------------------------------------------------
 try {
@@ -8189,7 +8726,7 @@ try {
   // Feeding counts as a meal for the hunger meter
   const needsFeed = (a) => { if (!NEEDS.enabled) return; const n = needsOf(a); n.hunger = Math.max(0, n.hunger - (Number((NEEDS.restore || {}).meal) || 0)); saveNeeds(a, n); applyNeedsStage(a, n, false); };
   require(SUPERNATURAL_JS)({ mp, log, personal, registerChatCommand, onUi, openWidget, closeWidget, sendPacket, display, who, audit, isAdmin, findByName, onlineActors, every, profileOf, nameOf, isWorldspace, needsFeed, hungerOf: (a) => needsOf(a).hunger, cfg, hasUiCap, sourceResistsOf });
-} catch (e) { log('supernatural.js failed to load:', e.stack || e.message); for (const k of ['__dboSuperDamageMult', '__dboSuperHit', '__dboSuperEat', '__dboSuperPrayed', '__dboSuperPrayWarning', '__dboSuperDeath', '__dboSuperActivate', '__dboSuperMenuEntries', '__dboSuperMenuAction', '__dboSuperAdminInfect', '__dboBeastAllow', '__dboBeastChanged', '__dboSuperKind', '__dboSuperLogin', '__dboSuperLeave', '__dboSuperProgress', '__dboSuperProgressSend', '__dboSuperRateMult', '__dboSuperFoodMult', '__dboTellsRetake', '__dboVampHealCast', '__dboVampHealRefusal', '__dboVampHealBlocks', '__dboSuperBloodPotion']) globalThis[k] = null; }
+} catch (e) { log('supernatural.js failed to load:', e.stack || e.message); for (const k of ['__dboSuperDamageMult', '__dboSuperHit', '__dboSuperEat', '__dboSuperPrayed', '__dboSuperPrayWarning', '__dboSuperDeath', '__dboSuperActivate', '__dboSuperMenuEntries', '__dboSuperMenuAction', '__dboSuperAdminInfect', '__dboBeastAllow', '__dboBeastChanged', '__dboSuperKind', '__dboSuperIsSilverWeapon', '__dboSuperLogin', '__dboSuperLeave', '__dboSuperProgress', '__dboSuperProgressSend', '__dboSuperRateMult', '__dboSuperFoodMult', '__dboTellsRetake', '__dboVampHealCast', '__dboVampHealRefusal', '__dboVampHealBlocks', '__dboSuperBloodPotion']) globalThis[k] = null; }
 
 // ---- friendly fire and the down state (server\downed.js): after supernatural.js, whose hooks it wraps -------
 try {
@@ -8197,6 +8734,12 @@ try {
   delete require.cache[DOWNED_JS];
   require(DOWNED_JS)({ mp, log, personal, sendPacket, audit, who, display, profileOf, nameOf, onlineActors, every, registerChatCommand, cfg, openWidget, closeWidget, onUi, redress });
 } catch (e) { log('downed.js failed to load:', e.stack || e.message); globalThis.__dboReviveWith = null; globalThis.__dboIsDowned = null; globalThis.__dboLabDraught = null; }
+// ---- duels between two players, the death duel too (server\duel.js, config "duel"): after downed.js, whose hit, death, cast and eat hooks it wraps ----
+try {
+  const DUEL_JS = path.resolve('duel.js');
+  delete require.cache[DUEL_JS];
+  require(DUEL_JS)({ mp, log, personal, audit, who, display, profileOf, onlineActors, every, registerChatCommand, cfg, openWidget, closeWidget, onUi, sendPacket, takeGold, giveItem, goldOf, recordOf, findByName, isAdmin, staffLog });
+} catch (e) { log('duel.js failed to load:', e.stack || e.message); for (const k of ['__dboDuelPair', '__dboInDuel', '__dboDuelEntries', '__dboDuelAction', '__dboDuelLogin', '__dboDuelLeave']) globalThis[k] = null; }
 // ---- province rules for crafting and the tome shop (server\regions.js, config "regions"): before spells.js, which asks it ----
 try {
   const REGIONS_JS = path.resolve('regions.js');
@@ -8214,7 +8757,7 @@ try {
   const SPELLS_JS = path.resolve('spells.js');
   delete require.cache[SPELLS_JS];
   require(SPELLS_JS)({ mp, log, personal, system, audit, display, who, cfg, openWidget, closeWidget, onUi, registerChatCommand, onlineActors, distanceMeters, takeGold, giveItem, depositToTreasury, every });
-} catch (e) { log('spells.js failed to load:', e.stack || e.message); for (const k of ['__dboOpenSpellbook', '__dboSpellsRankOptions', '__dboSpellsOpenTo', '__dboSpellsBook', '__dboSpellsKnown', '__dboSpellsClassify', '__dboGuildWorkshop', '__dboSpellsGrant', '__dboSpellsTab', '__dboSpellsRankCap', '__dboSpellsChangePrepared', '__dboSpellsTomesFor', '__dboTomeShopHere', '__dboTomeShopOpen', '__dboTeachHere', '__dboTeachLedgerActions', '__dboTeachOpen', '__dboTeachLecternMenu', '__dboSpellsClassOffer']) globalThis[k] = null; }
+} catch (e) { log('spells.js failed to load:', e.stack || e.message); for (const k of ['__dboOpenSpellbook', '__dboSpellsRankOptions', '__dboSpellsOpenTo', '__dboSpellsBook', '__dboSpellsKnown', '__dboSpellsClassify', '__dboGuildWorkshop', '__dboSpellsGrant', '__dboSpellsTab', '__dboSpellsRankCap', '__dboSpellsChangePrepared', '__dboSpellsTomesFor', '__dboTomeShopHere', '__dboTomeShopOpen', '__dboTeachHere', '__dboTeachLedgerActions', '__dboTeachOpen', '__dboTeachLecternMenu', '__dboSpellsClassOffer', '__dboSpellsLearned', '__dboSpellsLearnedChanged', '__dboSpellsTomeOf', '__dboSpellsTomeSpells']) globalThis[k] = null; }
 // ---- smithing manuals and smithing skill books (server\manuals.js, manuals.json, config "manuals"): spells.js's read hook,
 // the Scholar's reading, dungeons.js's boss chests and salvage.js's Scholars' Ledger ask it at runtime ----
 try {
@@ -8239,14 +8782,22 @@ try {
   const SCHOOLS_JS = path.resolve('schools.js');
   delete require.cache[SCHOOLS_JS];
   require(SCHOOLS_JS)({ mp, log, personal, audit, display, who, cfg, openWidget, closeWidget, onUi, registerChatCommand, onlineActors, distanceMeters, every, sendPacket, isAdmin, findByName, isWorldspace, profileOf });
-} catch (e) { log('schools.js failed to load:', e.stack || e.message); for (const k of ['__dboSchoolsRefusal', '__dboSchoolsCast', '__dboSchoolsProgress', '__dboSchoolsProgressSend', '__dboSchoolsActivate', '__dboSchoolsAlteration', '__dboCastSkill', '__dboSchoolsGrandfathered', '__dboSchoolsLogin', '__dboSchoolsLedgerActions', '__dboSchoolsLedgerChoose', '__dboMagicTab', '__dboMagicView', '__dboMagicAction', '__dboAdminSetSchool', '__dboSchoolsArrived', '__dboSchoolsLeave', '__dboSchoolRank', '__dboSchoolsOpenLectern', '__dboSchoolsAwardRate', '__dboSchoolsMenuEntries', '__dboSchoolsMenuAction', '__dboSchoolsSkillHeld', '__dboSchoolsApprenticeView', '__dboSchoolsOnLoan']) globalThis[k] = null; }
+} catch (e) { log('schools.js failed to load:', e.stack || e.message); for (const k of ['__dboSchoolsRefusal', '__dboSchoolsCast', '__dboSchoolsProgress', '__dboSchoolsProgressSend', '__dboSchoolsActivate', '__dboSchoolsAlteration', '__dboCastSkill', '__dboSchoolsGrandfathered', '__dboSchoolsLogin', '__dboSchoolsLedgerActions', '__dboSchoolsLedgerChoose', '__dboMagicTab', '__dboMagicView', '__dboMagicAction', '__dboAdminSetSchool', '__dboSchoolsArrived', '__dboSchoolsLeave', '__dboSchoolRank', '__dboSchoolsOpenLectern', '__dboSchoolsAwardRate', '__dboSchoolsMenuEntries', '__dboSchoolsMenuAction', '__dboSchoolsSkillHeld', '__dboSchoolsApprenticeView', '__dboSchoolsOnLoan', '__dboMagicOpen', '__dboSchoolRankOf']) globalThis[k] = null; }
+// ---- scribing: a Master Scholar writes spell tomes and scrolls at a Scholars' Ledger (server\scribing.js, spell-scrolls.json,
+// config "scribing"; Nate and Swag, 17 Oct): after spells.js and schools.js, whose spellbook and school ranks it reads ----
+try {
+  const SCRIBING_JS = path.resolve('scribing.js');
+  delete require.cache[SCRIBING_JS];
+  require(SCRIBING_JS)({ mp, log, personal, audit, display, who, cfg, openWidget, closeWidget, onUi, onlineActors, distanceMeters, giveItem });
+} catch (e) { log('scribing.js failed to load:', e.stack || e.message); for (const k of ['__dboScribingActions', '__dboScribingOpen', '__dboScribingBrief']) globalThis[k] = null; }
 
 // ---- the bank: one account per character in every town's bank, treasuries pay-in only (server\bank.js, WAR_DESIGN.md) ----
 try {
   const BANK_JS = path.resolve('bank.js');
   delete require.cache[BANK_JS];
   require(BANK_JS)({ mp, log, personal, audit, who, cfg, openWidget, closeWidget, onUi, registerChatCommand, takeGold, giveItem,
-    goldOf, depositToTreasury, zoneById, zoneList, zoneOfActor, ranksOf, profileOf, distanceMeters, every });
+    goldOf, depositToTreasury, zoneById, zoneList, zoneOfActor, ranksOf, profileOf, distanceMeters, every, onlineActors,
+    zoneOfCell, zoneAtPlace, isWorldspace, findByName, staffTierOf, TIER_RANK });
 } catch (e) { log('bank.js failed to load:', e.stack || e.message); globalThis.__dboBankActivate = null; }
 // ---- #gm-approval-requests: a forum post per request a GM decides, its events as replies (server\approvalforum.js) ----
 let approvalForum = () => {};
@@ -8262,6 +8813,18 @@ try {
   require(CHARTERS_JS)({ mp, log, ownNameOf, ownDisplay, displayFor, personal, audit, who, display, nameOf, cfg, registerChatCommand, onlineActors, isAdmin, isLeadStaff,
     findByName, profileOf, takeGold, giveItem, every, staffNote, approvalForum });
 } catch (e) { log('charters.js failed to load:', e.stack || e.message); }
+// ---- dungeon traps, run by the server: plates, tripwires and trigger boxes, their traps' swings and blows (server\traps.js)
+try {
+  const TRAPS_JS = path.resolve('traps.js');
+  delete require.cache[TRAPS_JS];
+  require(TRAPS_JS)({ mp, log, cfg, every, onlineActors, profileOf, display, audit, personal, registerChatCommand });
+} catch (e) { log('traps.js failed to load:', e.stack || e.message); globalThis.__dboTrapsHandles = null; }
+// ---- damage over time from a player's spell: the duration the spell formula never deals (server\spelldot.js) --------
+try {
+  const SPELLDOT_JS = path.resolve('spelldot.js');
+  delete require.cache[SPELLDOT_JS];
+  require(SPELLDOT_JS)({ mp, log, cfg, every, recordOf, profileOf, display });
+} catch (e) { log('spelldot.js failed to load:', e.stack || e.message); globalThis.__dboSpellDotAttempt = null; globalThis.__dboSpellDotLanded = null; }
 // ---- alchemy at the ordinary labs: the nearest vanilla potion for a client-side mix (server alchemy.js) ------------
 try {
   const ALCHEMY_JS = path.resolve('alchemy.js');

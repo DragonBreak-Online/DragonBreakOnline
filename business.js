@@ -9,6 +9,10 @@
 //   - the owner or staff can put a container inside the business up for rent as storage, at a price a day. A rented chest
 //     is its renter's alone; when the rent runs out the renter has chestGraceHours to empty it or pay again, then it
 //     falls back to the owner, who clears it before it can be rented again.
+// A business can keep a SHOP (shops.js, Nate 19 Oct): owner or staff make one container inside it the shop chest, which
+// opens for them alone; they price what is in it, and anyone buys at the ledger's public page (or /shop), taxed by the hold.
+// A faction can run a business (Nate, 18-19 Oct; /business faction, see payFaction): its takings go to the faction's
+// treasury instead of the owner, and the faction's leader and officers keep its ledger and name its staff.
 // The hold takes its tax from every rent. The rate is the hold's own (/tax), set by its Jarl, Count or Steward (taxRanks),
 // from minTax (10%) to maxTax (40%); until one is set, rest.holdShare (10 %) stands. Each change is logged with who made it.
 //
@@ -112,13 +116,38 @@ module.exports = (api) => {
   const bizAt = (cell) => { const c = claimAt(cell); return c ? { claim: c, biz: bizOf(c.primary) } : { claim: null, biz: null }; };
   const bizHere = (a) => bizAt(cellOf(a));
   const isOwner = (a, b) => !!b && (ownerCharOf(b) ? ownerCharOf(b) === (a >>> 0) : profileOf(a) === Number(b.owner));
-  const isStaff = (a, b) => !!b && (isOwner(a, b) || (b.staff || []).some((s) => Number(s.profile) === profileOf(a)));
+  const isStaff = (a, b) => !!b && (isOwner(a, b) || (b.staff || []).some((s) => Number(s.profile) === profileOf(a)) || runsBizFaction(a, b));
   const stamp = (ms) => new Date(ms).toISOString().slice(0, 16).replace('T', ' ') + ' UTC';
   const note = (b, text) => { b.log = (b.log || []).concat([{ at: Date.now(), text }]).slice(-C.logKeep); };
 
-  // Gold to any online character of the owner's profile, else held for /business collect or their next login
+  // ---- a faction's business (Nate, 18-19 Oct: factions earn their gold through roleplay; no new gold is printed) --------
+  // b.faction { id, name, by, byProfile, at }: the owner's takings (bed rent, rented chests, ledger sales through
+  // ledgersale.js) go to that faction's treasury (bank.js __dboTreasury) instead of the owner. One faction at a time. A
+  // faction's leader or officers (factionRoles) register it, from inside it: a business its owner offered to the faction
+  // (/business faction <faction>, the owner a member), one the leader owns, or one standing in the faction's own hall. They
+  // keep its ledger as staff do and name members as staff; they or the owner hand it back (/business faction off). Every
+  // step is written in the ledger and audited. bank.js marks the deposit as income only for a hold faction (the Imperial
+  // tithe sees it); a landless faction's treasury counts none.
+  const RUN_ROLES = Array.isArray(C.factionRoles) ? C.factionRoles.map(String) : ['leader', 'officer'];
+  const guildsOf = (a) => { try { return typeof globalThis.__dboGuildsOf === 'function' ? globalThis.__dboGuildsOf(a >>> 0) || [] : []; } catch (e) { return []; } };
+  const guildInfo = (fid) => { try { return typeof globalThis.__dboGuildInfo === 'function' ? globalThis.__dboGuildInfo(String(fid)) : null; } catch (e) { return null; } };
+  const runsFaction = (a, fid) => !!fid && guildsOf(a).some((g) => g.id === fid && RUN_ROLES.includes(String(g.role)));
+  // The faction a business keeps its books for, while that faction still exists; else null (the owner is paid again)
+  const factionOf = (b) => { const f = b && b.faction; if (!f || !f.id) return null; const g = guildInfo(f.id); return g ? { id: String(f.id), name: String(g.name || f.name || f.id) } : null; };
+  const runsBizFaction = (a, b) => { const f = factionOf(b); return !!f && runsFaction(a, f.id); };
+  // Takings into the faction's treasury: the log text, or '' when there is no faction or its treasury would not take it
+  const payFaction = (b, n, why) => {
+    const f = factionOf(b); if (!f || !(n > 0)) return '';
+    try { const T = globalThis.__dboTreasury; if (T && typeof T.deposit === 'function' && T.deposit(f.id, n, `${b.name}: ${why || 'takings'}`, { income: 'business' })) return `${n} to the treasury of ${f.name}`; } catch (e) { log('business: faction deposit failed', e.message); }
+    log(`business: the treasury of ${f.id} would not take ${n} gold from ${b.name}; the owner is paid`);
+    return '';
+  };
+
+  // Gold to any online character of the owner's profile, else held for /business collect or their next login. A faction's
+  // business pays its faction's treasury instead
   const payOwner = (b, n) => {
     if (!(n > 0)) return '';
+    const toFaction = payFaction(b, n, 'takings'); if (toFaction) return toFaction;
     let ids = ownerCharOf(b) ? [ownerCharOf(b)] : []; if (!ids.length) { try { ids = (mp.getActorsByProfileId(Number(b.owner)) || []).map((x) => Number(x) >>> 0); } catch (e) { /* none */ } }
     const online = new Set(onlineActors().map((x) => x >>> 0));
     const here = ids.find((x) => online.has(x));
@@ -135,7 +164,7 @@ module.exports = (api) => {
     if (t && Number.isFinite(Number(t.rate))) return clamp(Number(t.rate));
     return clamp(Number.isFinite(Number(dflt)) ? Number(dflt) : (Number.isFinite(DEFAULT_TAX) ? DEFAULT_TAX : 0.1));
   };
-  const canTax = (a, zone) => isAdmin(a) || ranksOf(profileOf(a)).some((r) => r.zone && r.zone.id === zone && C.taxRanks.includes(r.rank));
+  const canTax = (a, zone) => isAdmin(a) || ranksOf(profileOf(a), a).some((r) => r.zone && r.zone.id === zone && C.taxRanks.includes(r.rank));
   const zoneName = (zone) => { const z = zoneById(zone); return (z && (z.name || z.label)) || zone || 'no hold'; };
   // What the owner took, kept for 31 days so the ledger can show the week's and the month's takings
   const earned = (b, gold) => {
@@ -146,7 +175,7 @@ module.exports = (api) => {
   // Splits a rent between the hold and the owner; returns the log text
   const splitRent = (b, zone, price) => {
     const tax = Math.round(price * taxRate(zone));
-    const toHold = tax ? depositToTreasury(zone, tax) : 0;
+    const toHold = tax ? depositToTreasury(zone, tax, { income: 'business tax' }) : 0;
     const net = price - (toHold ? tax : 0);
     const toOwner = payOwner(b, net);
     earned(b, net);
@@ -157,9 +186,14 @@ module.exports = (api) => {
   // The rent of this inn's beds, or null when no business sets one
   globalThis.__dboBusinessRent = (cell) => { const { biz } = bizAt(cell); return biz && Number(biz.rentGold) > 0 ? Math.round(Number(biz.rentGold)) : null; };
   globalThis.__dboHoldTax = (zone, dflt) => taxRate(zone, dflt);
+  // rest.js (a bed's rent) and ledgersale.js (a ledger's sale): the faction a business here keeps its books for
+  globalThis.__dboBusinessFactionAt = (cell) => { try { const { biz } = bizAt(Number(cell) >>> 0); const f = factionOf(biz); return f ? { id: f.id, name: f.name, business: biz.name } : null; } catch (e) { return null; } };
+  // rest.js: pays the owner's share of a bed's rent to the faction; the log text, or '' when the owner is to be paid
+  globalThis.__dboBusinessPayFaction = (cell, n, why) => { try { const { biz } = bizAt(Number(cell) >>> 0); return biz ? payFaction(biz, Math.floor(Number(n) || 0), why || 'bed rent') : ''; } catch (e) { return ''; } };
   // rest.js writes each bed rental here, with the owner's share
   globalThis.__dboBusinessLog = (cell, text, ownerGold) => { const { biz } = bizAt(cell); if (biz) { note(biz, text); earned(biz, Number(ownerGold) || 0); save(); } };
   globalThis.__dboBusinessLogin = (a) => {
+    try { if (shops) shops.login(a); } catch (e) { log('shops: login refund failed', e.message); }
     for (const b of Object.values(data().businesses)) {
       if (!isOwner(a, b) || !(Number(b.owed) > 0)) continue;
       const n = Number(b.owed);
@@ -173,8 +207,22 @@ module.exports = (api) => {
     }
   };
 
+  // ---- player shops (shops.js, config "shops") ---------------------------------------------------------
+  // Loaded from beside this file, afresh on every reload. If it fails, the shop chests stay guarded by the hook below and
+  // nothing is sold or priced until it loads again.
+  let shops = null;
+  if (!(S.shopLists instanceof Map)) S.shopLists = new Map();
+  try {
+    const SHOPS_JS = path.join(__dirname, 'shops.js');
+    delete require.cache[SHOPS_JS];
+    shops = require(SHOPS_JS)({ mp, log, personal, audit, who, display, cfg, takeGold, giveGold, data, save, note, earned, hex, get, cellOf,
+      bizAt, isStaff, armSeconds: C.armSeconds, armed: S.armed, lists: S.shopLists, onlineActors, profileOf });
+  } catch (e) { log('shops.js failed to load:', e.stack || e.message); shops = null; }
+
   // ---- rented chests ----------------------------------------------------------------------------------
   // chest ref -> the business it belongs to
+  // Every business record naming this container its shop chest ([[claimHex, record]]), whether or not shops.js loaded
+  const shopRecordsOf = (ref) => { const k = hex(Number(ref) >>> 0), out = []; for (const [id, b] of Object.entries(data().businesses || {})) if (b && b.shop && b.shop.chest === k) out.push([id, b]); return out; };
   const chestIndex = () => { const m = new Map(); for (const [id, b] of Object.entries(data().businesses)) for (const r of Object.keys(b.chests || {})) m.set(r, id); return m; };
   const chestState = (c) => {
     if (!c || !c.renter) return c && c.lapsed ? 'lapsed' : 'free';
@@ -218,8 +266,16 @@ module.exports = (api) => {
     if (ledgerTag && ledgerTag.claim) { if (C.enabled) openLedger(a, ref, ledgerTag); else personal(a, 'Business ledgers are closed for now.'); return true; }
     // An owner or staff member who asked to put a chest up (or take it down) picks it by opening it
     const arm = C.enabled ? S.armed.get(a) : null;
-    if (arm && arm.until > Date.now() && isContainer(ref)) {
+    // ...or the shop chest (shops.js): the next container they open inside that business
+    if (arm && arm.kind === 'shop' && arm.until > Date.now() && isContainer(ref)) {
       S.armed.delete(a);
+      if (!shops) { personal(a, 'Shops are closed for now.'); return true; }
+      return shops.designate(a, ref, arm) !== false;
+    }
+    if (arm && arm.kind !== 'shop' && arm.until > Date.now() && isContainer(ref)) {
+      S.armed.delete(a);
+      // A shop chest is never storage for rent (shops.js)
+      if (shopRecordsOf(ref).length) { personal(a, 'That is a shop chest. Make it a plain chest first, or choose another.'); return true; }
       const { claim, biz } = bizAt(cellOf(ref));
       if (!biz || !isStaff(a, biz)) { personal(a, 'That container is not inside your business.'); return true; }
       biz.chests = biz.chests || {};
@@ -239,6 +295,23 @@ module.exports = (api) => {
       note(biz, `${display(a)} put a chest up for rent at ${arm.price} gold a day`); save();
       audit(`BUSINESS ${who(a)} ${biz.name}: chest ${hex(ref)} for rent at ${arm.price} gold a day (claim ${hex(claim.primary)})`);
       personal(a, `The chest is for rent at ${arm.price} gold a day. Anyone who opens it is offered it.`);
+      return true;
+    }
+    // A shop chest (shops.js) opens for its business's owner and staff alone. Every record that names it must agree, read
+    // whether or not the business is still valid (as the rented chests below); with no valid business its owner of record
+    // and whoever holds the claim now may still open it to empty it. Not shops.js's word: this holds with it unloaded.
+    const shopRecs = shopRecordsOf(ref);
+    if (shopRecs.length) {
+      const may = shopRecs.every(([claimHex, raw]) => {
+        const b = bizOf(Number.parseInt(claimHex, 16) >>> 0);
+        if (b) return isStaff(a, b);
+        if (isOwner(a, raw)) return true;
+        const c = claimOf(Number.parseInt(claimHex, 16) >>> 0);
+        return !!c && ownsClaim(a, c);
+      });
+      if (may) return false;
+      const b = bizOf(Number.parseInt(shopRecs[0][0], 16) >>> 0) || shopRecs[0][1];
+      personal(a, `This is ${b.name || 'a business'}'s shop chest, for its owner and staff. To buy its goods, use the ledger book on the counter.`);
       return true;
     }
     const bizId = chestIndex().get(hex(ref));
@@ -323,15 +396,15 @@ module.exports = (api) => {
   const summary = (a, claim, b) => {
     const chests = Object.values(b.chests || {});
     const rented = chests.filter((c) => chestState(c) === 'rented').length;
-    personal(a, `${b.name} (owner ${b.ownerName}). Staff: ${staffNames(b)}. Bed rent: ${Number(b.rentGold) > 0 ? b.rentGold + ' gold' : 'the hold\'s standard'}. Chests for rent: ${chests.length} (${rented} rented). Tax to ${zoneName(b.zone)}: ${Math.round(taxRate(b.zone) * 100)}%.${isOwner(a, b) && Number(b.owed) > 0 ? ` Takings held: ${b.owed} gold (/business collect).` : ''}`);
-    personal(a, 'Ledger: /business log, /business notes, /business note <text>, /business rent <gold>, /business chest <gold a day> (then open the chest) or /business chest off. Owner: /business staff add|remove <name>, /business ledger (place it here), /business rename <name>, /business close.');
+    personal(a, `${b.name} (owner ${b.ownerName}${factionOf(b) ? `, its takings go to ${factionOf(b).name}` : ''}). Staff: ${staffNames(b)}. Bed rent: ${Number(b.rentGold) > 0 ? b.rentGold + ' gold' : 'the hold\'s standard'}. Chests for rent: ${chests.length} (${rented} rented). Tax to ${zoneName(b.zone)}: ${Math.round(taxRate(b.zone) * 100)}%.${isOwner(a, b) && Number(b.owed) > 0 ? ` Takings held: ${b.owed} gold (/business collect).` : ''}`);
+    personal(a, 'Ledger: /business log, /business notes, /business note <text>, /business rent <gold>, /business chest <gold a day> (then open the chest) or /business chest off. Shop: /business shop (stock and prices), /business shop chest (then open it) or chest off, /business shop price <number> <gold each|off>. Owner: /business staff add|remove <name>, /business ledger (place it here), /business rename <name>, /business close. A faction: /business faction <faction> | off.');
   };
   // What anyone may read in the ledger's first pages
   const publicLine = (b) => {
     const free = Object.values(b.chests || {}).filter((c) => chestState(c) === 'free');
     const prices = free.map((c) => Number(c.price) || 0);
     const storage = free.length ? `${free.length} storage chest${free.length > 1 ? 's' : ''} for rent from ${Math.min(...prices)} gold a day` : 'no storage for rent';
-    return `${b.name}, kept by ${b.ownerName}. Beds: ${Number(b.rentGold) > 0 ? b.rentGold + ' gold' : 'the hold\'s standard rent'}; ${storage}. ${zoneName(b.zone)} takes ${Math.round(taxRate(b.zone) * 100)}% of every rent.`;
+    return `${b.name}, kept by ${b.ownerName}${factionOf(b) ? ` for ${factionOf(b).name}` : ''}. Beds: ${Number(b.rentGold) > 0 ? b.rentGold + ' gold' : 'the hold\'s standard rent'}; ${storage}. ${zoneName(b.zone)} takes ${Math.round(taxRate(b.zone) * 100)}% of every rent.`;
   };
 
   // ---- the ledger book ---------------------------------------------------------------------------------
@@ -441,16 +514,23 @@ module.exports = (api) => {
       b.staff = b.staff || [];
       if (t.profile === Number(b.owner) || b.staff.some((s) => Number(s.profile) === t.profile)) return R(false, `${t.name} already keeps this ledger.`);
       if (b.staff.length >= C.maxStaff) return R(false, `A business has at most ${C.maxStaff} staff.`);
-      b.staff.push({ profile: t.profile, name: t.name }); note(b, `${display(a)} took on ${t.name} as staff`); save();
+      // A faction's leader or officer (not the owner) names members of the faction, on the faction's behalf
+      const f = factionOf(b), forFaction = !isOwner(a, b) && !!f;
+      if (forFaction && !guildsOf(t.actor).some((g) => g.id === f.id)) return R(false, `${t.name} is not a member of ${f.name}.`);
+      b.staff.push(Object.assign({ profile: t.profile, name: t.name }, forFaction ? { faction: f.id } : {})); note(b, `${display(a)} took on ${t.name} as staff${forFaction ? ` for ${f.name}` : ''}`); save();
+      audit(`BUSINESS ${who(a)} took on ${t.name} (profile ${t.profile}) as staff at ${b.name}${forFaction ? ` for ${f.id}` : ''}`);
       personal(t.actor, `${display(a)} took you on at ${b.name}. Its ledger is inside.`);
       return R(true, `${t.name} is staff at ${b.name}.`);
     },
     staffRemove: (a, claim, b, q) => {
       const t = staffTarget(b, q);
       const before = (b.staff || []).length;
-      if (t) b.staff = (b.staff || []).filter((s) => Number(s.profile) !== t.profile);
-      if (!t || b.staff.length === before) return R(false, 'They are not staff here.');
+      // A faction's leader or officer lets go only the staff named for the faction; the owner anyone
+      const f = factionOf(b), forFaction = !isOwner(a, b) && !!f;
+      if (t) b.staff = (b.staff || []).filter((s) => Number(s.profile) !== t.profile || (forFaction && s.faction !== f.id));
+      if (!t || b.staff.length === before) return R(false, forFaction ? `They are not staff named for ${f.name} here.` : 'They are not staff here.');
       note(b, `${display(a)} let ${t.name} go`); save();
+      audit(`BUSINESS ${who(a)} let ${t.name} (profile ${t.profile}) go as staff at ${b.name}${forFaction ? ` for ${f.id}` : ''}`);
       return R(true, `${t.name} no longer keeps this ledger.`);
     },
     collect: (a, claim, b) => {
@@ -470,18 +550,28 @@ module.exports = (api) => {
       if (Object.values(b.chests || {}).some((c) => ['rented', 'grace'].includes(chestState(c)))) return R(false, 'Chests are still rented here. Close once their rent and grace have run out.');
       if (Number(b.owed) > 0 && !giveGold(a, Number(b.owed))) return R(false, 'Collect the takings first.');
       removeLedger(b);
+      const shopChest = b.shop && b.shop.chest;
       delete data().businesses[hex(claim.primary)]; save();
-      audit(`BUSINESS ${who(a)} closed ${b.name} (claim ${hex(claim.primary)})`);
-      return R(true, `${b.name} is closed. The property is a plain home again.`);
+      audit(`BUSINESS ${who(a)} closed ${b.name} (claim ${hex(claim.primary)})${shopChest ? `; its shop chest ${shopChest} is a plain chest again, its goods still in it` : ''}`);
+      return R(true, `${b.name} is closed. The property is a plain home again.${shopChest ? ' The shop chest is a plain chest again; its goods are still in it.' : ''}`);
     },
     place: (a, claim, b) => placeLedger(a, claim, b),
     nudge: (a, claim, b, dir, dist) => nudgeLedger(a, claim, b, dir, dist),
+    // The shop (shops.js): '' arms "Make a shop chest", 'off' makes it a plain chest again
+    shopChest: (a, claim, b, v) => {
+      if (!shops) return R(false, 'Shops are closed for now.');
+      return String(v || '').toLowerCase() === 'off' ? shops.unmarkChest(a, claim, b) : shops.armChest(a, claim, b);
+    },
+    // A price per single item of one kind in the shop chest (gold each), or 'off'
+    shopPrice: (a, claim, b, key, gold) => (shops ? shops.setPrice(a, claim, b, key, gold) : R(false, 'Shops are closed for now.')),
   };
   const OWNER_ONLY = new Set(['staffAdd', 'staffRemove', 'collect', 'rename', 'close', 'place', 'nudge']);
   const runAction = (a, name, claim, b, args) => {
     if (!Object.prototype.hasOwnProperty.call(ACTIONS, name)) return R(false, 'That is not something the ledger does.');
     if (!isStaff(a, b) && !isAdmin(a)) return R(false, `${b.name}'s ledger is kept for its owner and staff.`);
-    if (OWNER_ONLY.has(name) && !isOwner(a, b)) return R(false, 'Only the owner can do that.');
+    // A faction's leader and officers name and let go its staff as the owner does (staffAdd/staffRemove keep them to members)
+    const factionStaffing = (name === 'staffAdd' || name === 'staffRemove') && runsBizFaction(a, b);
+    if (OWNER_ONLY.has(name) && !isOwner(a, b) && !factionStaffing) return R(false, 'Only the owner can do that.');
     const res = ACTIONS[name](a, claim, b, ...(args || []));
     // the player log (playerlog.js): the action and its claim when it went through; never the name or a note
     if (res && res.ok) { try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('business', a, name, claim.primary, 0); } catch (e) { /* the player log is optional */ } }
@@ -492,6 +582,8 @@ module.exports = (api) => {
   const caps = S.caps instanceof Map ? S.caps : (S.caps = new Map());
   onUi('uiCaps', (a, args) => { caps.set(a >>> 0, new Set((args || []).map(String))); });
   const hasPanel = (a) => (caps.get(a >>> 0) || new Set()).has('businessLedger');
+  // A front whose ledger panel draws the shop's pages (front businessLedger with the Buy and Shop pages)
+  const hasShopPanel = (a) => (caps.get(a >>> 0) || new Set()).has('playerShop');
   const panels = S.panels instanceof Map ? S.panels : (S.panels = new Map()); // actor -> { claim, nonce }
   const takings = (b, days) => { const since = Date.now() - days * 24 * HOUR; return (b.income || []).filter((e) => e.at >= since).reduce((n, e) => n + (Number(e.gold) || 0), 0); };
   const sendPanel = (a, claim, b, res) => {
@@ -503,7 +595,7 @@ module.exports = (api) => {
     }));
     const w = {
       type: 'businessLedger', id: PANEL_ID, nonce: p.nonce, role: owner ? 'owner' : staff ? 'staff' : 'customer',
-      name: b.name, ownerName: b.ownerName, hold: zoneName(b.zone), taxPct: Math.round(taxRate(b.zone) * 100), rent: Number(b.rentGold) || 0,
+      name: b.name, ownerName: factionOf(b) ? `${b.ownerName}, for ${factionOf(b).name}` : b.ownerName, hold: zoneName(b.zone), taxPct: Math.round(taxRate(b.zone) * 100), rent: Number(b.rentGold) || 0,
       minRent: C.minRent, maxRent: C.maxRent, maxChestPrice: C.maxChestPrice, chests,
       result: res ? res.text : '', resultKind: res ? (res.ok ? 'ok' : 'refused') : '',
     };
@@ -515,7 +607,16 @@ module.exports = (api) => {
         ledgerPlaced: !!ledgerRef(b), armSeconds: C.armSeconds,
       });
     }
+    // The shop (shops.js): the Buy list for everyone, the stock and its prices for the owner and staff. A front without the
+    // shop pages (no 'playerShop' in its uiCaps) ignores these and is told about /shop in chat instead
+    if (shops) { try { Object.assign(w, shops.panelFields(a, b, staff)); } catch (e) { log('shops: panel fields failed', e.message); } }
     openWidget(a, w, true);
+    if (shops && !hasShopPanel(a)) {
+      try {
+        const line = staff ? (b.shop && b.shop.chest ? 'The shop: /business shop lists its chest and prices; /business shop price <number> <gold each>.' : '') : shops.publicShopLine(b);
+        if (line && !(res && res.text)) personal(a, line);
+      } catch (e) { /* chat is a nicety */ }
+    }
   };
   const closePanel = (a) => { panels.delete(a >>> 0); closeWidget(a, PANEL_ID); };
   const openLedger = (a, ref, tag) => {
@@ -531,7 +632,8 @@ module.exports = (api) => {
     }
     if (hasPanel(a)) return sendPanel(a, claim, b);
     if (isStaff(a, b) || isAdmin(a)) return summary(a, claim, b);
-    return personal(a, publicLine(b));
+    personal(a, publicLine(b));
+    try { const line = shops ? shops.publicShopLine(b) : ''; if (line) personal(a, line); } catch (e) { /* chat is a nicety */ }
   };
   onUi('bizLedger', (a, args) => {
     const p = panels.get(a >>> 0);
@@ -540,15 +642,77 @@ module.exports = (api) => {
     if (!b) { closePanel(a); return personal(a, 'This business is closed.'); }
     if (!inside(a, claim)) { closePanel(a); return personal(a, 'You have left the business.'); }
     const name = String(args[1] || '');
+    // Buying from the shop is open to anyone at the ledger: [key, count, the unit price shown]
+    if (name === 'buy') {
+      let res;
+      try { res = shops ? shops.buy(a, claim, b, String(args[2] || ''), Number(args[3]), Number(args[4])) : R(false, 'Shops are closed for now.'); } catch (e) { log('shops: buy failed', e.stack || e.message); res = R(false, 'Something went wrong there. Try again in a moment.'); }
+      return sendPanel(a, claim, b, res);
+    }
     const res = runAction(a, name, claim, b, args.slice(2));
     if (name === 'close' && res.ok) { closePanel(a); return personal(a, res.text); }
     sendPanel(a, claim, b, res);
   });
   onUi('bizLedgerClose', (a) => closePanel(a));
 
+  // ---- /business faction: a faction's business (see payFaction) ----------------------------------------
+  // Chat only: the ledger's panel (front businessLedger) has no row for it without a client change; the panel names the
+  // faction beside the owner.
+  const ownerActorsOf = (b) => { if (ownerCharOf(b)) return [ownerCharOf(b)]; try { return (mp.getActorsByProfileId(Number(b.owner)) || []).map((x) => Number(x) >>> 0); } catch (e) { return []; } };
+  const hallFactionsOf = (claim) => {
+    const rec = get(claim.primary, 'private.housing', null); const partner = rec ? Number(rec.partner) >>> 0 : 0;
+    try { return typeof globalThis.__dboHallOf === 'function' ? (globalThis.__dboHallOf([claim.primary, partner].filter(Boolean)) || []).map(String) : []; } catch (e) { return []; }
+  };
+  const tellRunners = (fid, text, but) => { for (const x of onlineActors()) if ((x >>> 0) !== (but >>> 0) && runsFaction(x, fid)) personal(x, text); };
+  const factionAction = (a, claim, b, arg) => {
+    const q = String(arg || '').trim();
+    const cur = factionOf(b);
+    if (!q) {
+      if (cur) return R(true, `${b.name} keeps its books for ${cur.name}: its takings go to the faction's treasury. Its leader, officers or the owner hand it back with /business faction off.`);
+      if (b.factionOffer) return R(true, `${b.name} is offered to ${b.factionOffer.name}; a leader or officer of it accepts with /business faction ${b.factionOffer.id} here.`);
+      return R(true, `${b.name} keeps its own books. The owner offers it to a faction they belong to with /business faction <faction>; its leader or an officer accepts the same way.`);
+    }
+    if (/^(off|none|return|back)$/i.test(q)) {
+      if (!cur && !b.factionOffer) return R(false, `${b.name} keeps its books for no faction.`);
+      if (!cur) { const was = b.factionOffer; if (!isOwner(a, b) && !runsFaction(a, was.id) && !isAdmin(a)) return R(false, 'Only the owner withdraws that offer.'); delete b.factionOffer; note(b, `${display(a)} withdrew the offer to ${was.name}`); save(); audit(`BUSINESS ${who(a)} withdrew ${b.name}'s offer to ${was.id} (claim ${hex(claim.primary)})`); return R(true, `The offer to ${was.name} is withdrawn.`); }
+      if (!isOwner(a, b) && !runsFaction(a, cur.id) && !isAdmin(a)) return R(false, `Only the owner or ${cur.name}'s leader or officers hand it back.`);
+      const dropped = (b.staff || []).filter((s) => s.faction === cur.id).map((s) => s.name);
+      b.staff = (b.staff || []).filter((s) => s.faction !== cur.id);
+      delete b.faction; delete b.factionOffer;
+      note(b, `${display(a)} handed ${b.name} back from ${cur.name} to its owner${dropped.length ? `; staff named for the faction let go: ${dropped.join(', ')}` : ''}`); save();
+      audit(`BUSINESS ${who(a)} unregistered ${b.name} (claim ${hex(claim.primary)}) from faction ${cur.id}; takings go to its owner ${b.ownerName} again${dropped.length ? `; faction staff let go: ${dropped.join(', ')}` : ''}`);
+      tellRunners(cur.id, `${b.name} no longer keeps its books for ${cur.name}.`, a);
+      return R(true, `${b.name} keeps its own books again: its takings go to ${b.ownerName}.`);
+    }
+    const ql = q.toLowerCase();
+    const g = guildsOf(a).find((x) => String(x.id).toLowerCase() === ql || String(x.name || '').toLowerCase() === ql);
+    if (!g) return R(false, `You are not a member of a faction called "${q}".`);
+    const f = { id: String(g.id), name: String(g.name || g.id) };
+    if (cur && cur.id === f.id) return R(false, `${b.name} already keeps its books for ${f.name}.`);
+    if (cur) return R(false, `${b.name} keeps its books for ${cur.name}. A business belongs to one faction at a time: /business faction off first.`);
+    const inHall = hallFactionsOf(claim).includes(f.id);
+    const ownerIn = ownerActorsOf(b).some((x) => guildsOf(x).some((m) => m.id === f.id));
+    if (!inHall && !ownerIn) return R(false, `Its owner is not a member of ${f.name}, and it is not ${f.name}'s hall.`);
+    if (runsFaction(a, f.id)) {
+      const offered = b.factionOffer && b.factionOffer.id === f.id;
+      if (!isOwner(a, b) && !inHall && !offered) return R(false, `${b.ownerName} has to offer it to ${f.name} first: the owner uses /business faction ${f.id} inside it.`);
+      b.faction = { id: f.id, name: f.name, by: display(a), byProfile: profileOf(a), at: Date.now() };
+      delete b.factionOffer;
+      note(b, `${display(a)} registered ${b.name} for ${f.name}: its takings go to the faction's treasury`); save();
+      audit(`BUSINESS ${who(a)} registered ${b.name} (claim ${hex(claim.primary)}, owner ${b.ownerName}) for faction ${f.id}${inHall ? ' (its hall)' : offered ? ' (offered by its owner)' : ' (the owner\'s own)'}`);
+      for (const x of ownerActorsOf(b)) if (x !== (a >>> 0) && onlineActors().map((y) => y >>> 0).includes(x)) personal(x, `${b.name} now keeps its books for ${f.name}: its takings go to the faction's treasury.`);
+      return R(true, `${b.name} keeps its books for ${f.name} now: bed rent, rented chests and ledger sales pay the faction's treasury, less the hold's tax. Name staff with /business staff add <name>.`);
+    }
+    if (!isOwner(a, b)) return R(false, `Only ${f.name}'s leader or officers register a business for it.`);
+    b.factionOffer = { id: f.id, name: f.name, by: display(a), at: Date.now() };
+    note(b, `${display(a)} offered ${b.name} to ${f.name}`); save();
+    audit(`BUSINESS ${who(a)} offered ${b.name} (claim ${hex(claim.primary)}) to faction ${f.id}`);
+    tellRunners(f.id, `${display(a)} offers ${b.name} to ${f.name}. Accept it inside the business with /business faction ${f.id}.`, a);
+    return R(true, `${b.name} is offered to ${f.name}. Its leader or an officer accepts inside it with /business faction ${f.id}; /business faction off withdraws the offer.`);
+  };
+
   // ---- /business: the chat side, for a client without the panel ---------------------------------------
   const say = (a, r) => personal(a, r.text);
-  registerChatCommand('business', (a, args) => {
+  const businessCommand = (a, args) => {
     if (!C.enabled) return personal(a, 'Business ledgers are closed for now.');
     const words = String(args || '').trim().split(/\s+/).filter(Boolean);
     const sub = (words.shift() || '').toLowerCase(), rest = words.join(' ').trim();
@@ -582,6 +746,8 @@ module.exports = (api) => {
       return personal(a, `${name} is open. ${placed.ok ? 'Its ledger is in front of you; activate it to run the business.' : placed.text + ' /business ledger places it.'}`);
     }
     if (!biz) return personal(a, claim && ownsClaim(a, claim) ? 'This property is not a business yet: /business open <name>' : 'There is no business ledger here. Stand inside a business.');
+    // A faction's leader may register a business they keep no ledger of (their hall, one offered to them)
+    if (sub === 'faction') { const r = factionAction(a, claim, biz, rest); if (r.ok) { try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('business', a, 'faction', claim.primary, 0); } catch (e) { /* optional */ } } return say(a, r); }
     if (!isStaff(a, biz) && !isAdmin(a)) return personal(a, publicLine(biz));
     switch (sub) {
       case '': return hasPanel(a) ? sendPanel(a, claim, biz) : summary(a, claim, biz);
@@ -592,6 +758,16 @@ module.exports = (api) => {
       case 'chest': return say(a, runAction(a, 'chest', claim, biz, [rest]));
       case 'collect': return say(a, runAction(a, 'collect', claim, biz, []));
       case 'ledger': return say(a, runAction(a, 'place', claim, biz, []));
+      case 'shop': {
+        if (!shops) return personal(a, 'Shops are closed for now.');
+        const w2 = rest.split(/\s+/).filter(Boolean);
+        const op = (w2[0] || '').toLowerCase();
+        // The changes go through the ledger's actions (staff, the player log); the stock list is read here
+        if (op === 'chest') return say(a, runAction(a, 'shopChest', claim, biz, [(w2[1] || '').toLowerCase() === 'off' ? 'off' : '']));
+        if (op === 'price') { if (w2.length < 3) return personal(a, 'Price an item from the stock list: /business shop price <number> <gold each> (or off)'); return say(a, runAction(a, 'shopPrice', claim, biz, [w2[1], w2[2]])); }
+        if (!isStaff(a, biz)) return personal(a, 'The shop\'s stock is for its owner and staff.');
+        return shops.chatBusinessShop(a, claim, biz, '');
+      }
       case 'staff': {
         const op = (words.shift() || '').toLowerCase(), q = words.join(' ');
         if (!['add', 'remove'].includes(op) || !q) return personal(a, 'Name someone who is online: /business staff add <name or #TAG>, /business staff remove <name or #TAG>');
@@ -601,7 +777,21 @@ module.exports = (api) => {
       case 'close': return say(a, runAction(a, 'close', claim, biz, []));
       default: return hasPanel(a) ? sendPanel(a, claim, biz) : summary(a, claim, biz);
     }
-  }, { help: 'the business ledger where you stand (its book opens the same panel): open, log, notes, note, rent, chest, staff, ledger, collect, rename, close' });
+  };
+  registerChatCommand('business', businessCommand, { help: 'the business ledger where you stand (its book opens the same panel): open, log, notes, note, rent, chest, shop, staff, ledger, collect, rename, close, faction' });
+
+  // ---- /shop: a business's goods, for a customer without the panel's Buy page ----------------------------------------
+  registerChatCommand('shop', (a, args) => {
+    if (!C.enabled || !shops) return personal(a, 'Shops are closed for now.');
+    const { claim, biz } = bizHere(a);
+    // "/shop open <name>" from an owner is /business open (Tolfdir Shadowstride, 20 Oct: a new shop, and "/shop open"
+    // answered only "stand inside a business" while he stood in it)
+    if (/^open(\s|$)/i.test(String(args || '').trim()) && claim && ownsClaim(a, claim)) return businessCommand(a, args);
+    if (!biz) return personal(a, claim && ownsClaim(a, claim)
+      ? 'This property is not a business yet. Open it with /business open <name> (or /shop open <name>), then stock it from its ledger.'
+      : 'Stand inside a business to see what it sells.');
+    try { return shops.chatShop(a, claim, biz, args); } catch (e) { log('shops: /shop failed', e.stack || e.message); return personal(a, 'Something went wrong there. Try again in a moment.'); }
+  }, { help: 'what the business where you stand sells: /shop, then /shop buy <number> [how many]' });
 
   // ---- /tax ------------------------------------------------------------------------------------------
   // One hold rate (Nate, 12 Oct: "everything in bruma that can be owned"): every rent here, and economy.js's weekly property

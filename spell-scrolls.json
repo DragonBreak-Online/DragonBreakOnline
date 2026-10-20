@@ -1,0 +1,1796 @@
+{
+ "_comment": "Scrolls by the spell they cast, from the live plugins (tools/scribing/spell_scrolls.py; scribing.js). spells: one entry per spell with a scroll (rank 0-4 Novice..Master, school). scrolls: every scroll in the full plugins, with its value. soulGems: every soul gem with the soul it holds (1 Petty .. 5 Grand; a black gem holds 5 as a Grand) and the base it fills into (NAM0). Rerun after a plugin that adds scrolls or spells.",
+ "spells": [
+  {
+   "spellId": "6b57b:BSHeartland.esm",
+   "spell": "CYRCandlelightOrange",
+   "name": "Firelight",
+   "scrollId": "b5526:BSHeartland.esm",
+   "scroll": "CYRFirelightScroll",
+   "rank": 0,
+   "school": "Alteration",
+   "tome": true,
+   "match": "tome",
+   "alsoScrolls": []
+  },
+  {
+   "spellId": "43324:Skyrim.esm",
+   "spell": "Candlelight",
+   "name": "Candlelight",
+   "scrollId": "9659b:Skyrim.esm",
+   "scroll": "CandlelightScroll",
+   "rank": 0,
+   "school": "Alteration",
+   "tome": true,
+   "match": "name",
+   "alsoScrolls": []
+  },
+  {
+   "spellId": "5ad5c:Skyrim.esm",
+   "spell": "Oakflesh",
+   "name": "Oakflesh",
+   "scrollId": "9659c:Skyrim.esm",
+   "scroll": "OakfleshScroll",
+   "rank": 0,
+   "school": "Alteration",
+   "tome": true,
+   "match": "name",
+   "alsoScrolls": []
+  },
+  {
+   "spellId": "6028cd:BSAssets.esm",
+   "spell": "BSKOpenSpell2",
+   "name": "Open Apprentice Lock",
+   "scrollId": "602926:BSAssets.esm",
+   "scroll": "BSKOpenMasterLockScroll",
+   "rank": 1,
+   "school": "Alteration",
+   "tome": true,
+   "match": "tome",
+   "alsoScrolls": [
+    "602928:BSAssets.esm",
+    "602929:BSAssets.esm"
+   ]
+  },
+  {
+   "spellId": "43323:Skyrim.esm",
+   "spell": "Magelight",
+   "name": "Magelight",
+   "scrollId": "965a2:Skyrim.esm",
+   "scroll": "MagelightScroll",
+   "rank": 1,
+   "school": "Alteration",
+   "tome": true,
+   "match": "name",
+   "alsoScrolls": []
+  },
+  {
+   "spellId": "5ad5d:Skyrim.esm",
+   "spell": "Stoneflesh",
+   "name": "Stoneflesh",
+   "scrollId": "965a3:Skyrim.esm",
+   "scroll": "StonefleshScroll",
+   "rank": 1,
+   "school": "Alteration",
+   "tome": true,
+   "match": "name",
+   "alsoScrolls": []
+  },
+  {
+   "spellId": "602511:BSAssets.esm",
+   "spell": "BSKWaterWalking",
+   "name": "Water Walking",
+   "scrollId": "602927:BSAssets.esm",
+   "scroll": "BSKWaterwalkingScroll",
+   "rank": 2,
+   "school": "Alteration",
+   "tome": true,
+   "match": "name-only",
+   "alsoScrolls": []
+  },
+  {
+   "spellId": "51b16:Skyrim.esm",
+   "spell": "Ironflesh",
+   "name": "Ironflesh",
+   "scrollId": "a449b:Skyrim.esm",
+   "scroll": "IronFleshScroll",
+   "rank": 2,
+   "school": "Alteration",
+   "tome": true,
+   "match": "name",
+   "alsoScrolls": []
+  },
+  {
+   "spellId": "1a4cc:Skyrim.esm",
+   "spell": "Telekinesis",
+   "name": "Telekinesis",
+   "scrollId": "14042:Dawnguard.esm",
+   "scroll": "DLC1dunRedwaterDenTelekinesisScroll",
+   "rank": 2,
+   "school": "Alteration",
+   "tome": true,
+   "match": "tome",
+   "alsoScrolls": []
+  },
+  {
+   "spellId": "5d175:Skyrim.esm",
+   "spell": "Waterbreathing",
+   "name": "Waterbreathing",
+   "scrollId": "a449c:Skyrim.esm",
+   "scroll": "WaterBreathingScroll",
+   "rank": 2,
+   "school": "Alteration",
+   "tome": true,
+   "match": "name",
+   "alsoScrolls": []
+  },
+  {
+   "spellId": "6fa2c:BSHeartland.esm",
+   "spell": "CYRForceRune",
+   "name": "Force Rune",
+   "scrollId": "b5529:BSHeartland.esm",
+   "scroll": "CYRForceRuneScroll",
+   "rank": 3,
+   "school": "Alteration",
+   "tome": true,
+   "match": "name",
+   "alsoScrolls": []
+  },
+  {
+   "spellId": "5ad5e:Skyrim.esm",
+   "spell": "Ebonyflesh",
+   "name": "Ebonyflesh",
+   "scrollId": "a449e:Skyrim.esm",
+   "scroll": "EbonyFleshScroll",
+   "rank": 3,
+   "school": "Alteration",
+   "tome": true,
+   "match": "name",
+   "alsoScrolls": []
+  },
+  {
+   "spellId": "5ad5f:Skyrim.esm",
+   "spell": "Paralyze",
+   "name": "Paralyze",
+   "scrollId": "a449d:Skyrim.esm",
+   "scroll": "ParalyzeScroll",
+   "rank": 3,
+   "school": "Alteration",
+   "tome": true,
+   "match": "name",
+   "alsoScrolls": []
+  },
+  {
+   "spellId": "cdb70:Skyrim.esm",
+   "spell": "Dragonhide",
+   "name": "Dragonhide",
+   "scrollId": "e0cd6:Skyrim.esm",
+   "scroll": "DragonhideScroll",
+   "rank": 4,
+   "school": "Alteration",
+   "tome": true,
+   "match": "name",
+   "alsoScrolls": []
+  },
+  {
+   "spellId": "b62e6:Skyrim.esm",
+   "spell": "MassParalysis",
+   "name": "Mass Paralysis",
+   "scrollId": "21876:Skyrim.esm",
+   "scroll": "MassParalysisScroll",
+   "rank": 4,
+   "school": "Alteration",
+   "tome": true,
+   "match": "name",
+   "alsoScrolls": []
+  },
+  {
+   "spellId": "640b6:Skyrim.esm",
+   "spell": "ConjureFamiliar",
+   "name": "Conjure Familiar",
+   "scrollId": "9659f:Skyrim.esm",
+   "scroll": "ConjureFamiliarScroll",
+   "rank": 0,
+   "school": "Conjuration",
+   "tome": true,
+   "match": "name",
+   "alsoScrolls": []
+  },
+  {
+   "spellId": "7e8e1:Skyrim.esm",
+   "spell": "RaiseZombie",
+   "name": "Raise Zombie",
+   "scrollId": "9659e:Skyrim.esm",
+   "scroll": "RaiseZombieScroll",
+   "rank": 0,
+   "school": "Conjuration",
+   "tome": true,
+   "match": "name",
+   "alsoScrolls": []
+  },
+  {
+   "spellId": "601fb4:BSAssets.esm",
+   "spell": "BSKConjureScamp",
+   "name": "Conjure Scamp",
+   "scrollId": "602925:BSAssets.esm",
+   "scroll": "BSKSummonScampScroll",
+   "rank": 1,
+   "school": "Conjuration",
+   "tome": true,
+   "match": "tome",
+   "alsoScrolls": []
+  },
+  {
+   "spellId": "7230a:BSHeartland.esm",
+   "spell": "CYRSummonZombieSpell",
+   "name": "Summon Zombie",
+   "scrollId": "b5528:BSHeartland.esm",
+   "scroll": "CYRSummonZombieScroll",
+   "rank": 1,
+   "school": "Conjuration",
+   "tome": true,
+   "match": "tome",
+   "alsoScrolls": []
+  },
+  {
+   "spellId": "204c3:Skyrim.esm",
+   "spell": "ConjureFlameAtronach",
+   "name": "Conjure Flame Atronach",
+   "scrollId": "965a5:Skyrim.esm",
+   "scroll": "ConjureFlameAtronachScroll",
+   "rank": 1,
+   "school": "Conjuration",
+   "tome": true,
+   "match": "name",
+   "alsoScrolls": []
+  },
+  {
+   "spellId": "65bd7:Skyrim.esm",
+   "spell": "ReanimateCorpse",
+   "name": "Reanimate Corpse",
+   "scrollId": "965a4:Skyrim.esm",
+   "scroll": "ReanimateCorpseScroll",
+   "rank": 1,
+   "school": "Conjuration",
+   "tome": true,
+   "match": "name",
+   "alsoScrolls": []
+  },
+  {
+   "spellId": "4dba4:Skyrim.esm",
+   "spell": "SoulTrap",
+   "name": "Soul Trap",
+   "scrollId": "965a7:Skyrim.esm",
+   "scroll": "SoulTrapScroll",
+   "rank": 1,
+   "school": "Conjuration",
+   "tome": true,
+   "match": "name",
+   "alsoScrolls": []
+  },
+  {
+   "spellId": "6d22c:Skyrim.esm",
+   "spell": "BanishDaedra",
+   "name": "Banish Daedra",
+   "scrollId": "a449f:Skyrim.esm",
+   "scroll": "BanishDaedraScroll",
+   "rank": 2,
+   "school": "Conjuration",
+   "tome": true,
+   "match": "name",
+   "alsoScrolls": []
+  },
+  {
+   "spellId": "782c5:BSHeartland.esm",
+   "spell": "CYRSummonWillotheWispSpell",
+   "name": "Summon Will-o-the-Wisp",
+   "scrollId": "b5527:BSHeartland.esm",
+   "scroll": "CYRSummonWillotheWispScroll",
+   "rank": 2,
+   "school": "Conjuration",
+   "tome": true,
+   "match": "tome",
+   "alsoScrolls": []
+  },
+  {
+   "spellId": "204c4:Skyrim.esm",
+   "spell": "ConjureFrostAtronach",
+   "name": "Conjure Frost Atronach",
+   "scrollId": "a44a0:Skyrim.esm",
+   "scroll": "ConjureFrostAtronachScroll",
+   "rank": 2,
+   "school": "Conjuration",
+   "tome": true,
+   "match": "name",
+   "alsoScrolls": []
+  },
+  {
+   "spellId": "96d94:Skyrim.esm",
+   "spell": "Revenant",
+   "name": "Revenant",
+   "scrollId": "a44a3:Skyrim.esm",
+   "scroll": "RevenantScroll",
+   "rank": 2,
+   "school": "Conjuration",
+   "tome": true,
+   "match": "name",
+   "alsoScrolls": []
+  },
+  {
+   "spellId": "870:ccBGSSSE025-AdvDSGS.esm",
+   "spell": "ccBGSSSE025_ConjureDarkSeducerArcher",
+   "name": "Conjure Dark Seducer Archer",
+   "scrollId": "a0d:ccBGSSSE025-AdvDSGS.esm",
+   "scroll": "ccBGSSSE025_ConjureDarkSeducerArcherScroll",
+   "rank": 2,
+   "school": "Conjuration",
+   "tome": true,
+   "match": "name",
+   "alsoScrolls": []
+  },
+  {
+   "spellId": "a0b:ccBGSSSE025-AdvDSGS.esm",
+   "spell": "ccBGSSSE025_ConjureDarkSeducerWarrior",
+   "name": "Conjure Dark Seducer Warrior",
+   "scrollId": "a0f:ccBGSSSE025-AdvDSGS.esm",
+   "scroll": "ccBGSSSE025_ConjureDarkSeducerWarriorScroll",
+   "rank": 2,
+   "school": "Conjuration",
+   "tome": true,
+   "match": "name",
+   "alsoScrolls": []
+  },
+  {
+   "spellId": "86f:ccBGSSSE025-AdvDSGS.esm",
+   "spell": "ccBGSSSE025_ConjureGoldenSaintArcher",
+   "name": "Conjure Golden Saint Archer",
+   "scrollId": "8cf:ccBGSSSE025-AdvDSGS.esm",
+   "scroll": "ccBGSSSE025_ConjureGoldenSaintArcherScroll",
+   "rank": 2,
+   "school": "Conjuration",
+   "tome": true,
+   "match": "name",
+   "alsoScrolls": []
+  },
+  {
+   "spellId": "8cb:ccBGSSSE025-AdvDSGS.esm",
+   "spell": "ccBGSSSE025_ConjureGoldenSaintWarrior",
+   "name": "Conjure Golden Saint Warrior",
+   "scrollId": "8de:ccBGSSSE025-AdvDSGS.esm",
+   "scroll": "ccBGSSSE025_ConjureGoldenSaintWarriorScroll",
+   "rank": 2,
+   "school": "Conjuration",
+   "tome": true,
+   "match": "name",
+   "alsoScrolls": []
+  },
+  {
+   "spellId": "6f953:Skyrim.esm",
+   "spell": "CommandDaedra",
+   "name": "Command Daedra",
+   "scrollId": "a44a4:Skyrim.esm",
+   "scroll": "CommandDaedraScroll",
+   "rank": 3,
+   "school": "Conjuration",
+   "tome": true,
+   "match": "name",
+   "alsoScrolls": []
+  },
+  {
+   "spellId": "204c5:Skyrim.esm",
+   "spell": "ConjureStormAtronach",
+   "name": "Conjure Storm Atronach",
+   "scrollId": "a44a1:Skyrim.esm",
+   "scroll": "ConjureStormAtronachScroll",
+   "rank": 3,
+   "school": "Conjuration",
+   "tome": true,
+   "match": "name",
+   "alsoScrolls": []
+  },
+  {
+   "spellId": "96d95:Skyrim.esm",
+   "spell": "DreadZombie",
+   "name": "Dread Zombie",
+   "scrollId": "a44a5:Skyrim.esm",
+   "scroll": "DreadZombieScroll",
+   "rank": 3,
+   "school": "Conjuration",
+   "tome": true,
+   "match": "name",
+   "alsoScrolls": []
+  },
+  {
+   "spellId": "6f952:Skyrim.esm",
+   "spell": "ExpelDaedra",
+   "name": "Expel Daedra",
+   "scrollId": "a44a6:Skyrim.esm",
+   "scroll": "ExpelDaedraScroll",
+   "rank": 3,
+   "school": "Conjuration",
+   "tome": true,
+   "match": "name",
+   "alsoScrolls": []
+  },
+  {
+   "spellId": "7e8df:Skyrim.esm",
+   "spell": "DeadThrall",
+   "name": "Dead Thrall",
+   "scrollId": "a44a7:Skyrim.esm",
+   "scroll": "DeadThrallScroll",
+   "rank": 4,
+   "school": "Conjuration",
+   "tome": true,
+   "match": "name",
+   "alsoScrolls": []
+  },
+  {
+   "spellId": "7e5d5:Skyrim.esm",
+   "spell": "FlameThrall",
+   "name": "Flame Thrall",
+   "scrollId": "a44a8:Skyrim.esm",
+   "scroll": "FlameThrallScroll",
+   "rank": 4,
+   "school": "Conjuration",
+   "tome": true,
+   "match": "name-only",
+   "alsoScrolls": []
+  },
+  {
+   "spellId": "7e5d6:Skyrim.esm",
+   "spell": "FrostThrall",
+   "name": "Frost Thrall",
+   "scrollId": "a44a9:Skyrim.esm",
+   "scroll": "FrostThrallScroll",
+   "rank": 4,
+   "school": "Conjuration",
+   "tome": true,
+   "match": "name-only",
+   "alsoScrolls": []
+  },
+  {
+   "spellId": "7e5d7:Skyrim.esm",
+   "spell": "StormThrall",
+   "name": "Storm Thrall",
+   "scrollId": "a44aa:Skyrim.esm",
+   "scroll": "StormThrallScroll",
+   "rank": 4,
+   "school": "Conjuration",
+   "tome": true,
+   "match": "name-only",
+   "alsoScrolls": []
+  },
+  {
+   "spellId": "19d3fa:ccBGSSSE025-AdvDSGS.esm",
+   "spell": "ccBGSSSE025_ConjureStaada",
+   "name": "Conjure Staada",
+   "scrollId": "1b180e:ccBGSSSE025-AdvDSGS.esm",
+   "scroll": "ccBGSSSE025_ConjureStaadaScroll",
+   "rank": 4,
+   "school": "Conjuration",
+   "tome": true,
+   "match": "name",
+   "alsoScrolls": []
+  },
+  {
+   "spellId": "5db90:Skyrim.esm",
+   "spell": "FireRune",
+   "name": "Fire Rune",
+   "scrollId": "965a8:Skyrim.esm",
+   "scroll": "FireRuneScroll",
+   "rank": 1,
+   "school": "Destruction",
+   "tome": true,
+   "match": "name",
+   "alsoScrolls": []
+  },
+  {
+   "spellId": "12fd0:Skyrim.esm",
+   "spell": "Firebolt",
+   "name": "Firebolt",
+   "scrollId": "96598:Skyrim.esm",
+   "scroll": "FireboltScroll",
+   "rank": 1,
+   "school": "Destruction",
+   "tome": true,
+   "match": "name",
+   "alsoScrolls": []
+  },
+  {
+   "spellId": "6796f:Skyrim.esm",
+   "spell": "FrostRune",
+   "name": "Frost Rune",
+   "scrollId": "965a9:Skyrim.esm",
+   "scroll": "FrostRuneScroll",
+   "rank": 1,
+   "school": "Destruction",
+   "tome": true,
+   "match": "name",
+   "alsoScrolls": []
+  },
+  {
+   "spellId": "2b96c:Skyrim.esm",
+   "spell": "IceSpike",
+   "name": "Ice Spike",
+   "scrollId": "96599:Skyrim.esm",
+   "scroll": "IceSpikeScroll",
+   "rank": 1,
+   "school": "Destruction",
+   "tome": true,
+   "match": "name",
+   "alsoScrolls": []
+  },
+  {
+   "spellId": "2dd29:Skyrim.esm",
+   "spell": "LightningBolt",
+   "name": "Lightning Bolt",
+   "scrollId": "9659a:Skyrim.esm",
+   "scroll": "LightningBoltScroll",
+   "rank": 1,
+   "school": "Destruction",
+   "tome": true,
+   "match": "name",
+   "alsoScrolls": []
+  },
+  {
+   "spellId": "67970:Skyrim.esm",
+   "spell": "ShockRune",
+   "name": "Lightning Rune",
+   "scrollId": "965aa:Skyrim.esm",
+   "scroll": "ShockRuneScroll",
+   "rank": 1,
+   "school": "Destruction",
+   "tome": true,
+   "match": "name",
+   "alsoScrolls": []
+  },
+  {
+   "spellId": "72311:BSHeartland.esm",
+   "spell": "CYRFrozenFireRune",
+   "name": "Frozen Fire Rune",
+   "scrollId": "b552a:BSHeartland.esm",
+   "scroll": "CYRFrozenFireRuneScroll",
+   "rank": 2,
+   "school": "Destruction",
+   "tome": true,
+   "match": "name",
+   "alsoScrolls": []
+  },
+  {
+   "spellId": "45f9d:Skyrim.esm",
+   "spell": "ChainLightning",
+   "name": "Chain Lightning",
+   "scrollId": "a44b0:Skyrim.esm",
+   "scroll": "ChainLightningScroll",
+   "rank": 2,
+   "school": "Destruction",
+   "tome": true,
+   "match": "name",
+   "alsoScrolls": []
+  },
+  {
+   "spellId": "1c789:Skyrim.esm",
+   "spell": "Fireball",
+   "name": "Fireball",
+   "scrollId": "a44ae:Skyrim.esm",
+   "scroll": "FireballScroll",
+   "rank": 2,
+   "school": "Destruction",
+   "tome": true,
+   "match": "name",
+   "alsoScrolls": []
+  },
+  {
+   "spellId": "3aea2:Skyrim.esm",
+   "spell": "FrostCloak",
+   "name": "Frost Cloak",
+   "scrollId": "a44ac:Skyrim.esm",
+   "scroll": "FrostCloakScroll",
+   "rank": 2,
+   "school": "Destruction",
+   "tome": true,
+   "match": "name",
+   "alsoScrolls": []
+  },
+  {
+   "spellId": "45f9c:Skyrim.esm",
+   "spell": "IceStorm",
+   "name": "",
+   "scrollId": "a44af:Skyrim.esm",
+   "scroll": "IceStormScroll",
+   "rank": 2,
+   "school": "Destruction",
+   "tome": false,
+   "match": "name",
+   "alsoScrolls": []
+  },
+  {
+   "spellId": "3aea3:Skyrim.esm",
+   "spell": "LightningCloak",
+   "name": "Lightning Cloak",
+   "scrollId": "a44ad:Skyrim.esm",
+   "scroll": "LightningCloakScroll",
+   "rank": 2,
+   "school": "Destruction",
+   "tome": true,
+   "match": "name",
+   "alsoScrolls": []
+  },
+  {
+   "spellId": "3ae9f:Skyrim.esm",
+   "spell": "flameCloak",
+   "name": "",
+   "scrollId": "a44ab:Skyrim.esm",
+   "scroll": "FlameCloakScroll",
+   "rank": 2,
+   "school": "Destruction",
+   "tome": false,
+   "match": "name",
+   "alsoScrolls": []
+  },
+  {
+   "spellId": "7e8e4:Skyrim.esm",
+   "spell": "Blizzard",
+   "name": "Blizzard",
+   "scrollId": "a44b2:Skyrim.esm",
+   "scroll": "BlizzardScroll",
+   "rank": 4,
+   "school": "Destruction",
+   "tome": true,
+   "match": "name",
+   "alsoScrolls": []
+  },
+  {
+   "spellId": "7a82b:Skyrim.esm",
+   "spell": "FireStorm",
+   "name": "Fire Storm",
+   "scrollId": "a44b1:Skyrim.esm",
+   "scroll": "FireStormScroll",
+   "rank": 4,
+   "school": "Destruction",
+   "tome": true,
+   "match": "name",
+   "alsoScrolls": []
+  },
+  {
+   "spellId": "4dee8:Skyrim.esm",
+   "spell": "Courage",
+   "name": "Courage",
+   "scrollId": "965a0:Skyrim.esm",
+   "scroll": "CourageScroll",
+   "rank": 0,
+   "school": "Illusion",
+   "tome": true,
+   "match": "name",
+   "alsoScrolls": []
+  },
+  {
+   "spellId": "4deeb:Skyrim.esm",
+   "spell": "Fury",
+   "name": "Fury",
+   "scrollId": "965a1:Skyrim.esm",
+   "scroll": "FuryScroll",
+   "rank": 0,
+   "school": "Illusion",
+   "tome": true,
+   "match": "name",
+   "alsoScrolls": []
+  },
+  {
+   "spellId": "4dee9:Skyrim.esm",
+   "spell": "Calm",
+   "name": "Calm",
+   "scrollId": "965ad:Skyrim.esm",
+   "scroll": "CalmScroll",
+   "rank": 1,
+   "school": "Illusion",
+   "tome": true,
+   "match": "name",
+   "alsoScrolls": []
+  },
+  {
+   "spellId": "4deea:Skyrim.esm",
+   "spell": "Fear",
+   "name": "Fear",
+   "scrollId": "965ae:Skyrim.esm",
+   "scroll": "FearScroll",
+   "rank": 1,
+   "school": "Illusion",
+   "tome": true,
+   "match": "name",
+   "alsoScrolls": []
+  },
+  {
+   "spellId": "8f3eb:Skyrim.esm",
+   "spell": "Muffle",
+   "name": "Muffle",
+   "scrollId": "965ab:Skyrim.esm",
+   "scroll": "MuffleScroll",
+   "rank": 1,
+   "school": "Illusion",
+   "tome": true,
+   "match": "name",
+   "alsoScrolls": []
+  },
+  {
+   "spellId": "4deee:Skyrim.esm",
+   "spell": "Frenzy",
+   "name": "Frenzy",
+   "scrollId": "a44b6:Skyrim.esm",
+   "scroll": "FrenzyScroll",
+   "rank": 2,
+   "school": "Illusion",
+   "tome": true,
+   "match": "name",
+   "alsoScrolls": []
+  },
+  {
+   "spellId": "4deec:Skyrim.esm",
+   "spell": "Rally",
+   "name": "Rally",
+   "scrollId": "a44b5:Skyrim.esm",
+   "scroll": "RallyScroll",
+   "rank": 2,
+   "school": "Illusion",
+   "tome": true,
+   "match": "name",
+   "alsoScrolls": []
+  },
+  {
+   "spellId": "27eb6:Skyrim.esm",
+   "spell": "Invisibility",
+   "name": "Invisibility",
+   "scrollId": "a44b7:Skyrim.esm",
+   "scroll": "InvisibilityScroll",
+   "rank": 3,
+   "school": "Illusion",
+   "tome": true,
+   "match": "name",
+   "alsoScrolls": []
+  },
+  {
+   "spellId": "4deed:Skyrim.esm",
+   "spell": "Pacify",
+   "name": "Pacify",
+   "scrollId": "a44b9:Skyrim.esm",
+   "scroll": "PacifyScroll",
+   "rank": 3,
+   "school": "Illusion",
+   "tome": true,
+   "match": "name",
+   "alsoScrolls": []
+  },
+  {
+   "spellId": "4deef:Skyrim.esm",
+   "spell": "Rout",
+   "name": "Rout",
+   "scrollId": "a44ba:Skyrim.esm",
+   "scroll": "RoutScroll",
+   "rank": 3,
+   "school": "Illusion",
+   "tome": true,
+   "match": "name",
+   "alsoScrolls": []
+  },
+  {
+   "spellId": "7e8dd:Skyrim.esm",
+   "spell": "CallToArms",
+   "name": "Call to Arms",
+   "scrollId": "a44be:Skyrim.esm",
+   "scroll": "CallToArmsScroll",
+   "rank": 4,
+   "school": "Illusion",
+   "tome": true,
+   "match": "name",
+   "alsoScrolls": []
+  },
+  {
+   "spellId": "7e8db:Skyrim.esm",
+   "spell": "Harmony",
+   "name": "Harmony",
+   "scrollId": "a44bc:Skyrim.esm",
+   "scroll": "HarmonyScroll",
+   "rank": 4,
+   "school": "Illusion",
+   "tome": true,
+   "match": "name",
+   "alsoScrolls": []
+  },
+  {
+   "spellId": "7e8de:Skyrim.esm",
+   "spell": "Hysteria",
+   "name": "Hysteria",
+   "scrollId": "a44bd:Skyrim.esm",
+   "scroll": "HysteriaScroll",
+   "rank": 4,
+   "school": "Illusion",
+   "tome": true,
+   "match": "name",
+   "alsoScrolls": []
+  },
+  {
+   "spellId": "7e8da:Skyrim.esm",
+   "spell": "Mayhem",
+   "name": "Mayhem",
+   "scrollId": "a44bb:Skyrim.esm",
+   "scroll": "MayhemScroll",
+   "rank": 4,
+   "school": "Illusion",
+   "tome": true,
+   "match": "name",
+   "alsoScrolls": []
+  },
+  {
+   "spellId": "2f3b8:Skyrim.esm",
+   "spell": "FastHealing",
+   "name": "Fast Healing",
+   "scrollId": "965af:Skyrim.esm",
+   "scroll": "FastHealingScroll",
+   "rank": 1,
+   "school": "Restoration",
+   "tome": true,
+   "match": "name",
+   "alsoScrolls": []
+  },
+  {
+   "spellId": "4b146:Skyrim.esm",
+   "spell": "TurnLesserUndead",
+   "name": "Turn Lesser Undead",
+   "scrollId": "a44bf:Skyrim.esm",
+   "scroll": "TurnLesserUndeadScroll",
+   "rank": 1,
+   "school": "Restoration",
+   "tome": true,
+   "match": "name",
+   "alsoScrolls": []
+  },
+  {
+   "spellId": "b62ef:Skyrim.esm",
+   "spell": "CloseWounds",
+   "name": "Close Wounds",
+   "scrollId": "b64b3:Skyrim.esm",
+   "scroll": "CureWoundsScroll",
+   "rank": 2,
+   "school": "Restoration",
+   "tome": true,
+   "match": "tome",
+   "alsoScrolls": []
+  },
+  {
+   "spellId": "12fd2:Skyrim.esm",
+   "spell": "HealOther",
+   "name": "Heal Other",
+   "scrollId": "a44c1:Skyrim.esm",
+   "scroll": "HealOtherScroll",
+   "rank": 2,
+   "school": "Restoration",
+   "tome": true,
+   "match": "name",
+   "alsoScrolls": []
+  },
+  {
+   "spellId": "4d3f8:Skyrim.esm",
+   "spell": "RepelLesserUndead",
+   "name": "Repel Lesser Undead",
+   "scrollId": "a44c2:Skyrim.esm",
+   "scroll": "RepelLesserUndeadScroll",
+   "rank": 2,
+   "school": "Restoration",
+   "tome": true,
+   "match": "name",
+   "alsoScrolls": []
+  },
+  {
+   "spellId": "5dd5d:Skyrim.esm",
+   "spell": "TurnUndead",
+   "name": "Turn Undead",
+   "scrollId": "965b0:Skyrim.esm",
+   "scroll": "TurnUndeadScroll",
+   "rank": 2,
+   "school": "Restoration",
+   "tome": true,
+   "match": "name",
+   "alsoScrolls": []
+  },
+  {
+   "spellId": "5312d:Skyrim.esm",
+   "spell": "CircleOfProtection",
+   "name": "Circle of Protection",
+   "scrollId": "a44c3:Skyrim.esm",
+   "scroll": "CircleOfProtectionScroll",
+   "rank": 3,
+   "school": "Restoration",
+   "tome": true,
+   "match": "name",
+   "alsoScrolls": []
+  },
+  {
+   "spellId": "b62ee:Skyrim.esm",
+   "spell": "GrandHealing",
+   "name": "Grand Healing",
+   "scrollId": "a44c4:Skyrim.esm",
+   "scroll": "GrandHealingScroll",
+   "rank": 3,
+   "school": "Restoration",
+   "tome": true,
+   "match": "name",
+   "alsoScrolls": []
+  },
+  {
+   "spellId": "5dd60:Skyrim.esm",
+   "spell": "RepelUndead",
+   "name": "Repel Undead",
+   "scrollId": "a44c5:Skyrim.esm",
+   "scroll": "RepelUndeadScroll",
+   "rank": 3,
+   "school": "Restoration",
+   "tome": true,
+   "match": "name",
+   "alsoScrolls": []
+  },
+  {
+   "spellId": "5dd5e:Skyrim.esm",
+   "spell": "TurnGreaterUndead",
+   "name": "Turn Greater Undead",
+   "scrollId": "a44c6:Skyrim.esm",
+   "scroll": "TurnGreaterUndeadScroll",
+   "rank": 3,
+   "school": "Restoration",
+   "tome": true,
+   "match": "name",
+   "alsoScrolls": []
+  },
+  {
+   "spellId": "8c1ab:Skyrim.esm",
+   "spell": "BaneoftheUndead",
+   "name": "Bane of the Undead",
+   "scrollId": "218f2:Skyrim.esm",
+   "scroll": "BaneOfTheUndeadScroll",
+   "rank": 4,
+   "school": "Restoration",
+   "tome": true,
+   "match": "name",
+   "alsoScrolls": []
+  },
+  {
+   "spellId": "e0ccf:Skyrim.esm",
+   "spell": "GuardianCircle",
+   "name": "Guardian Circle",
+   "scrollId": "e0cd5:Skyrim.esm",
+   "scroll": "GuardianCircleScroll",
+   "rank": 4,
+   "school": "Restoration",
+   "tome": true,
+   "match": "name",
+   "alsoScrolls": []
+  }
+ ],
+ "scrolls": [
+  {
+   "id": "21876:Skyrim.esm",
+   "edid": "MassParalysisScroll",
+   "value": 500
+  },
+  {
+   "id": "218f2:Skyrim.esm",
+   "edid": "BaneOfTheUndeadScroll",
+   "value": 500
+  },
+  {
+   "id": "96598:Skyrim.esm",
+   "edid": "FireboltScroll",
+   "value": 50
+  },
+  {
+   "id": "96599:Skyrim.esm",
+   "edid": "IceSpikeScroll",
+   "value": 50
+  },
+  {
+   "id": "9659a:Skyrim.esm",
+   "edid": "LightningBoltScroll",
+   "value": 50
+  },
+  {
+   "id": "9659b:Skyrim.esm",
+   "edid": "CandlelightScroll",
+   "value": 25
+  },
+  {
+   "id": "9659c:Skyrim.esm",
+   "edid": "OakfleshScroll",
+   "value": 25
+  },
+  {
+   "id": "9659e:Skyrim.esm",
+   "edid": "RaiseZombieScroll",
+   "value": 25
+  },
+  {
+   "id": "9659f:Skyrim.esm",
+   "edid": "ConjureFamiliarScroll",
+   "value": 25
+  },
+  {
+   "id": "965a0:Skyrim.esm",
+   "edid": "CourageScroll",
+   "value": 25
+  },
+  {
+   "id": "965a1:Skyrim.esm",
+   "edid": "FuryScroll",
+   "value": 25
+  },
+  {
+   "id": "965a2:Skyrim.esm",
+   "edid": "MagelightScroll",
+   "value": 50
+  },
+  {
+   "id": "965a3:Skyrim.esm",
+   "edid": "StonefleshScroll",
+   "value": 50
+  },
+  {
+   "id": "965a4:Skyrim.esm",
+   "edid": "ReanimateCorpseScroll",
+   "value": 50
+  },
+  {
+   "id": "965a5:Skyrim.esm",
+   "edid": "ConjureFlameAtronachScroll",
+   "value": 50
+  },
+  {
+   "id": "965a7:Skyrim.esm",
+   "edid": "SoulTrapScroll",
+   "value": 50
+  },
+  {
+   "id": "965a8:Skyrim.esm",
+   "edid": "FireRuneScroll",
+   "value": 50
+  },
+  {
+   "id": "965a9:Skyrim.esm",
+   "edid": "FrostRuneScroll",
+   "value": 50
+  },
+  {
+   "id": "965aa:Skyrim.esm",
+   "edid": "ShockRuneScroll",
+   "value": 50
+  },
+  {
+   "id": "965ab:Skyrim.esm",
+   "edid": "MuffleScroll",
+   "value": 50
+  },
+  {
+   "id": "965ad:Skyrim.esm",
+   "edid": "CalmScroll",
+   "value": 50
+  },
+  {
+   "id": "965ae:Skyrim.esm",
+   "edid": "FearScroll",
+   "value": 50
+  },
+  {
+   "id": "965af:Skyrim.esm",
+   "edid": "FastHealingScroll",
+   "value": 50
+  },
+  {
+   "id": "965b0:Skyrim.esm",
+   "edid": "TurnUndeadScroll",
+   "value": 100
+  },
+  {
+   "id": "967e3:Skyrim.esm",
+   "edid": "MGRJzargo1Scroll",
+   "value": 100
+  },
+  {
+   "id": "a449b:Skyrim.esm",
+   "edid": "IronFleshScroll",
+   "value": 100
+  },
+  {
+   "id": "a449c:Skyrim.esm",
+   "edid": "WaterBreathingScroll",
+   "value": 100
+  },
+  {
+   "id": "a449d:Skyrim.esm",
+   "edid": "ParalyzeScroll",
+   "value": 250
+  },
+  {
+   "id": "a449e:Skyrim.esm",
+   "edid": "EbonyFleshScroll",
+   "value": 250
+  },
+  {
+   "id": "a449f:Skyrim.esm",
+   "edid": "BanishDaedraScroll",
+   "value": 100
+  },
+  {
+   "id": "a44a0:Skyrim.esm",
+   "edid": "ConjureFrostAtronachScroll",
+   "value": 100
+  },
+  {
+   "id": "a44a1:Skyrim.esm",
+   "edid": "ConjureStormAtronachScroll",
+   "value": 250
+  },
+  {
+   "id": "a44a3:Skyrim.esm",
+   "edid": "RevenantScroll",
+   "value": 100
+  },
+  {
+   "id": "a44a4:Skyrim.esm",
+   "edid": "CommandDaedraScroll",
+   "value": 250
+  },
+  {
+   "id": "a44a5:Skyrim.esm",
+   "edid": "DreadZombieScroll",
+   "value": 250
+  },
+  {
+   "id": "a44a6:Skyrim.esm",
+   "edid": "ExpelDaedraScroll",
+   "value": 250
+  },
+  {
+   "id": "a44a7:Skyrim.esm",
+   "edid": "DeadThrallScroll",
+   "value": 500
+  },
+  {
+   "id": "a44a8:Skyrim.esm",
+   "edid": "FlameThrallScroll",
+   "value": 500
+  },
+  {
+   "id": "a44a9:Skyrim.esm",
+   "edid": "FrostThrallScroll",
+   "value": 500
+  },
+  {
+   "id": "a44aa:Skyrim.esm",
+   "edid": "StormThrallScroll",
+   "value": 500
+  },
+  {
+   "id": "a44ab:Skyrim.esm",
+   "edid": "FlameCloakScroll",
+   "value": 100
+  },
+  {
+   "id": "a44ac:Skyrim.esm",
+   "edid": "FrostCloakScroll",
+   "value": 100
+  },
+  {
+   "id": "a44ad:Skyrim.esm",
+   "edid": "LightningCloakScroll",
+   "value": 100
+  },
+  {
+   "id": "a44ae:Skyrim.esm",
+   "edid": "FireballScroll",
+   "value": 100
+  },
+  {
+   "id": "a44af:Skyrim.esm",
+   "edid": "IceStormScroll",
+   "value": 100
+  },
+  {
+   "id": "a44b0:Skyrim.esm",
+   "edid": "ChainLightningScroll",
+   "value": 100
+  },
+  {
+   "id": "a44b1:Skyrim.esm",
+   "edid": "FireStormScroll",
+   "value": 500
+  },
+  {
+   "id": "a44b2:Skyrim.esm",
+   "edid": "BlizzardScroll",
+   "value": 500
+  },
+  {
+   "id": "a44b5:Skyrim.esm",
+   "edid": "RallyScroll",
+   "value": 100
+  },
+  {
+   "id": "a44b6:Skyrim.esm",
+   "edid": "FrenzyScroll",
+   "value": 100
+  },
+  {
+   "id": "a44b7:Skyrim.esm",
+   "edid": "InvisibilityScroll",
+   "value": 250
+  },
+  {
+   "id": "a44b9:Skyrim.esm",
+   "edid": "PacifyScroll",
+   "value": 250
+  },
+  {
+   "id": "a44ba:Skyrim.esm",
+   "edid": "RoutScroll",
+   "value": 250
+  },
+  {
+   "id": "a44bb:Skyrim.esm",
+   "edid": "MayhemScroll",
+   "value": 500
+  },
+  {
+   "id": "a44bc:Skyrim.esm",
+   "edid": "HarmonyScroll",
+   "value": 500
+  },
+  {
+   "id": "a44bd:Skyrim.esm",
+   "edid": "HysteriaScroll",
+   "value": 500
+  },
+  {
+   "id": "a44be:Skyrim.esm",
+   "edid": "CallToArmsScroll",
+   "value": 500
+  },
+  {
+   "id": "a44bf:Skyrim.esm",
+   "edid": "TurnLesserUndeadScroll",
+   "value": 50
+  },
+  {
+   "id": "a44c1:Skyrim.esm",
+   "edid": "HealOtherScroll",
+   "value": 100
+  },
+  {
+   "id": "a44c2:Skyrim.esm",
+   "edid": "RepelLesserUndeadScroll",
+   "value": 100
+  },
+  {
+   "id": "a44c3:Skyrim.esm",
+   "edid": "CircleOfProtectionScroll",
+   "value": 250
+  },
+  {
+   "id": "a44c4:Skyrim.esm",
+   "edid": "GrandHealingScroll",
+   "value": 250
+  },
+  {
+   "id": "a44c5:Skyrim.esm",
+   "edid": "RepelUndeadScroll",
+   "value": 250
+  },
+  {
+   "id": "a44c6:Skyrim.esm",
+   "edid": "TurnGreaterUndeadScroll",
+   "value": 250
+  },
+  {
+   "id": "b64b3:Skyrim.esm",
+   "edid": "CureWoundsScroll",
+   "value": 250
+  },
+  {
+   "id": "e0cd5:Skyrim.esm",
+   "edid": "GuardianCircleScroll",
+   "value": 250
+  },
+  {
+   "id": "e0cd6:Skyrim.esm",
+   "edid": "DragonhideScroll",
+   "value": 250
+  },
+  {
+   "id": "1019ae:Skyrim.esm",
+   "edid": "TGDetectLifeScroll",
+   "value": 500
+  },
+  {
+   "id": "1076e7:Skyrim.esm",
+   "edid": "MGR21ScrollDestruction",
+   "value": 50
+  },
+  {
+   "id": "1076e8:Skyrim.esm",
+   "edid": "MGR21ScrollIllusion",
+   "value": 50
+  },
+  {
+   "id": "1076e9:Skyrim.esm",
+   "edid": "MGR21ScrollAlteration",
+   "value": 50
+  },
+  {
+   "id": "1076ea:Skyrim.esm",
+   "edid": "MGR21ScrollRestoration",
+   "value": 50
+  },
+  {
+   "id": "1076eb:Skyrim.esm",
+   "edid": "MGR21ScrollConjuration",
+   "value": 50
+  },
+  {
+   "id": "1076ec:Skyrim.esm",
+   "edid": "MGR21ScrollMagicka",
+   "value": 50
+  },
+  {
+   "id": "14042:Dawnguard.esm",
+   "edid": "DLC1dunRedwaterDenTelekinesisScroll",
+   "value": 100
+  },
+  {
+   "id": "1445e:Dragonborn.esm",
+   "edid": "DLC2ExpSpiderPoisonJumpingScroll",
+   "value": 100
+  },
+  {
+   "id": "14480:Dragonborn.esm",
+   "edid": "DLC2ExpSpiderFireJumpingScroll",
+   "value": 100
+  },
+  {
+   "id": "16e1c:Dragonborn.esm",
+   "edid": "DLC2ExpSpiderZombieScroll",
+   "value": 100
+  },
+  {
+   "id": "1707b:Dragonborn.esm",
+   "edid": "DLC2ExpSpiderPoisonBombScroll",
+   "value": 100
+  },
+  {
+   "id": "1952c:Dragonborn.esm",
+   "edid": "DLC2ExpSpiderFireCloakScroll",
+   "value": 100
+  },
+  {
+   "id": "19534:Dragonborn.esm",
+   "edid": "DLC2ExpSpiderFireBombScroll",
+   "value": 100
+  },
+  {
+   "id": "1cab0:Dragonborn.esm",
+   "edid": "DLC2ExpSpiderPoisonCloakScroll",
+   "value": 100
+  },
+  {
+   "id": "1da03:Dragonborn.esm",
+   "edid": "DLC2ExpSpiderEmptyScroll01",
+   "value": 100
+  },
+  {
+   "id": "206d3:Dragonborn.esm",
+   "edid": "DLC2ExpSpiderFrostBombScroll",
+   "value": 100
+  },
+  {
+   "id": "206d9:Dragonborn.esm",
+   "edid": "DLC2ExpSpiderFrostCloakScroll",
+   "value": 100
+  },
+  {
+   "id": "206db:Dragonborn.esm",
+   "edid": "DLC2ExpSpiderFrostJumpingScroll",
+   "value": 100
+  },
+  {
+   "id": "2095f:Dragonborn.esm",
+   "edid": "DLC2ExpSpiderShockBombScroll",
+   "value": 100
+  },
+  {
+   "id": "20960:Dragonborn.esm",
+   "edid": "DLC2ExpSpiderShockCloakScroll",
+   "value": 100
+  },
+  {
+   "id": "20961:Dragonborn.esm",
+   "edid": "DLC2ExpSpiderShockJumpingScroll",
+   "value": 100
+  },
+  {
+   "id": "27490:Dragonborn.esm",
+   "edid": "DLC2ExpSpiderGlowingScroll",
+   "value": 100
+  },
+  {
+   "id": "2749d:Dragonborn.esm",
+   "edid": "DLC2ExpSpiderOilScroll",
+   "value": 100
+  },
+  {
+   "id": "274a5:Dragonborn.esm",
+   "edid": "DLC2ExpSpiderPackmuleScroll",
+   "value": 100
+  },
+  {
+   "id": "285c8:Dragonborn.esm",
+   "edid": "DLC2ExpSpiderFireBombScrollENEMY",
+   "value": 100
+  },
+  {
+   "id": "285cf:Dragonborn.esm",
+   "edid": "DLC2ExpSpiderFireCloakScrollENEMY",
+   "value": 100
+  },
+  {
+   "id": "285d1:Dragonborn.esm",
+   "edid": "DLC2ExpSpiderFireJumpingScrollENEMY",
+   "value": 100
+  },
+  {
+   "id": "3319e:Dragonborn.esm",
+   "edid": "DLC2ExpSpiderEmptyScroll02",
+   "value": 100
+  },
+  {
+   "id": "3319f:Dragonborn.esm",
+   "edid": "DLC2ExpSpiderEmptyScroll03",
+   "value": 100
+  },
+  {
+   "id": "331a0:Dragonborn.esm",
+   "edid": "DLC2ExpSpiderEmptyScroll04",
+   "value": 100
+  },
+  {
+   "id": "331a1:Dragonborn.esm",
+   "edid": "DLC2ExpSpiderEmptyScroll05",
+   "value": 100
+  },
+  {
+   "id": "8cf:ccBGSSSE025-AdvDSGS.esm",
+   "edid": "ccBGSSSE025_ConjureGoldenSaintArcherScroll",
+   "value": 250
+  },
+  {
+   "id": "8de:ccBGSSSE025-AdvDSGS.esm",
+   "edid": "ccBGSSSE025_ConjureGoldenSaintWarriorScroll",
+   "value": 250
+  },
+  {
+   "id": "a0d:ccBGSSSE025-AdvDSGS.esm",
+   "edid": "ccBGSSSE025_ConjureDarkSeducerArcherScroll",
+   "value": 250
+  },
+  {
+   "id": "a0f:ccBGSSSE025-AdvDSGS.esm",
+   "edid": "ccBGSSSE025_ConjureDarkSeducerWarriorScroll",
+   "value": 250
+  },
+  {
+   "id": "1b180e:ccBGSSSE025-AdvDSGS.esm",
+   "edid": "ccBGSSSE025_ConjureStaadaScroll",
+   "value": 500
+  },
+  {
+   "id": "602925:BSAssets.esm",
+   "edid": "BSKSummonScampScroll",
+   "value": 100
+  },
+  {
+   "id": "602926:BSAssets.esm",
+   "edid": "BSKOpenMasterLockScroll",
+   "value": 1000
+  },
+  {
+   "id": "602927:BSAssets.esm",
+   "edid": "BSKWaterwalkingScroll",
+   "value": 150
+  },
+  {
+   "id": "602928:BSAssets.esm",
+   "edid": "BSKOpenApprenticeLockScroll",
+   "value": 175
+  },
+  {
+   "id": "602929:BSAssets.esm",
+   "edid": "BSKOpenExpertLockScroll",
+   "value": 600
+  },
+  {
+   "id": "b5526:BSHeartland.esm",
+   "edid": "CYRFirelightScroll",
+   "value": 70
+  },
+  {
+   "id": "b5527:BSHeartland.esm",
+   "edid": "CYRSummonWillotheWispScroll",
+   "value": 120
+  },
+  {
+   "id": "b5528:BSHeartland.esm",
+   "edid": "CYRSummonZombieScroll",
+   "value": 40
+  },
+  {
+   "id": "b5529:BSHeartland.esm",
+   "edid": "CYRForceRuneScroll",
+   "value": 60
+  },
+  {
+   "id": "b552a:BSHeartland.esm",
+   "edid": "CYRFrozenFireRuneScroll",
+   "value": 50
+  },
+  {
+   "id": "4f8f5:Journey to Baan Malur.esp",
+   "edid": "TornadoScroll",
+   "value": 100
+  },
+  {
+   "id": "4f8f6:Journey to Baan Malur.esp",
+   "edid": "WhirlwindScroll",
+   "value": 50
+  },
+  {
+   "id": "4f8f7:Journey to Baan Malur.esp",
+   "edid": "WindRuneScroll",
+   "value": 50
+  },
+  {
+   "id": "4f8fa:Journey to Baan Malur.esp",
+   "edid": "WhirlwindCloakScroll",
+   "value": 100
+  },
+  {
+   "id": "4f8fc:Journey to Baan Malur.esp",
+   "edid": "CyclonelScroll",
+   "value": 500
+  },
+  {
+   "id": "96d57:Druadach.esm",
+   "edid": "DRVC_WerewolfChange",
+   "value": 500
+  }
+ ],
+ "soulGems": [
+  {
+   "id": "2e4e2:Skyrim.esm",
+   "edid": "SoulGemPetty",
+   "soul": 0,
+   "capacity": 1,
+   "filledBase": "2e4e3:Skyrim.esm"
+  },
+  {
+   "id": "2e4e3:Skyrim.esm",
+   "edid": "SoulGemPettyFilled",
+   "soul": 1,
+   "capacity": 1,
+   "filledBase": ""
+  },
+  {
+   "id": "2e4e4:Skyrim.esm",
+   "edid": "SoulGemLesser",
+   "soul": 0,
+   "capacity": 2,
+   "filledBase": "2e4e5:Skyrim.esm"
+  },
+  {
+   "id": "2e4e5:Skyrim.esm",
+   "edid": "SoulGemLesserFilled",
+   "soul": 2,
+   "capacity": 2,
+   "filledBase": ""
+  },
+  {
+   "id": "2e4e6:Skyrim.esm",
+   "edid": "SoulGemCommon",
+   "soul": 0,
+   "capacity": 3,
+   "filledBase": "2e4f3:Skyrim.esm"
+  },
+  {
+   "id": "2e4f3:Skyrim.esm",
+   "edid": "SoulGemCommonFilled",
+   "soul": 3,
+   "capacity": 3,
+   "filledBase": ""
+  },
+  {
+   "id": "2e4f4:Skyrim.esm",
+   "edid": "SoulGemGreater",
+   "soul": 0,
+   "capacity": 4,
+   "filledBase": "2e4fb:Skyrim.esm"
+  },
+  {
+   "id": "2e4fb:Skyrim.esm",
+   "edid": "SoulGemGreaterFilled",
+   "soul": 4,
+   "capacity": 4,
+   "filledBase": ""
+  },
+  {
+   "id": "2e4fc:Skyrim.esm",
+   "edid": "SoulGemGrand",
+   "soul": 0,
+   "capacity": 5,
+   "filledBase": "2e4ff:Skyrim.esm"
+  },
+  {
+   "id": "2e4ff:Skyrim.esm",
+   "edid": "SoulGemGrandFilled",
+   "soul": 5,
+   "capacity": 5,
+   "filledBase": ""
+  },
+  {
+   "id": "2e500:Skyrim.esm",
+   "edid": "SoulGemBlack",
+   "soul": 0,
+   "capacity": 5,
+   "filledBase": "2e504:Skyrim.esm"
+  },
+  {
+   "id": "2e504:Skyrim.esm",
+   "edid": "SoulGemBlackFilled",
+   "soul": 5,
+   "capacity": 5,
+   "filledBase": ""
+  },
+  {
+   "id": "43e26:Skyrim.esm",
+   "edid": "FFRiften14SoulGem",
+   "soul": 0,
+   "capacity": 0,
+   "filledBase": ""
+  },
+  {
+   "id": "63b27:Skyrim.esm",
+   "edid": "DA01SoulGemAzurasStar",
+   "soul": 0,
+   "capacity": 5,
+   "filledBase": ""
+  },
+  {
+   "id": "63b29:Skyrim.esm",
+   "edid": "DA01SoulGemBlackStar",
+   "soul": 0,
+   "capacity": 5,
+   "filledBase": ""
+  },
+  {
+   "id": "6a0c2:Skyrim.esm",
+   "edid": "DummySoulGem",
+   "soul": 0,
+   "capacity": 0,
+   "filledBase": ""
+  },
+  {
+   "id": "94e40:Skyrim.esm",
+   "edid": "WhiterunSoulGem",
+   "soul": 0,
+   "capacity": 2,
+   "filledBase": ""
+  },
+  {
+   "id": "804:ccBGSSSE025-AdvDSGS.esm",
+   "edid": "ccBGSSSE025_SoulTomato",
+   "soul": 0,
+   "capacity": 5,
+   "filledBase": "137f40:ccBGSSSE025-AdvDSGS.esm"
+  },
+  {
+   "id": "137f40:ccBGSSSE025-AdvDSGS.esm",
+   "edid": "ccBGSSSE025_SoulTomatoFilled",
+   "soul": 5,
+   "capacity": 5,
+   "filledBase": ""
+  },
+  {
+   "id": "83a60:BSHeartland.esm",
+   "edid": "CYRFrostcragMS01AstorsSoulGem",
+   "soul": 5,
+   "capacity": 5,
+   "filledBase": ""
+  },
+  {
+   "id": "60f51:Druadach.esm",
+   "edid": "DRV_SoulGemGreaterFilledInvisible_Skyhaven",
+   "soul": 4,
+   "capacity": 4,
+   "filledBase": ""
+  },
+  {
+   "id": "60f52:Druadach.esm",
+   "edid": "DRV_SoulGemLesserFilledInvisible_Skyhaven",
+   "soul": 2,
+   "capacity": 2,
+   "filledBase": ""
+  },
+  {
+   "id": "60f53:Druadach.esm",
+   "edid": "DRV_SoulGemPettyFilledInvisible_Skyhaven",
+   "soul": 1,
+   "capacity": 1,
+   "filledBase": ""
+  },
+  {
+   "id": "60f55:Druadach.esm",
+   "edid": "DRV_SoulGemCommonFilledInvisible_Skyhaven",
+   "soul": 3,
+   "capacity": 3,
+   "filledBase": ""
+  },
+  {
+   "id": "60f58:Druadach.esm",
+   "edid": "DRV_SoulGemBlackFilledInvisible_Skyhaven",
+   "soul": 5,
+   "capacity": 5,
+   "filledBase": ""
+  },
+  {
+   "id": "60f59:Druadach.esm",
+   "edid": "DRV_SoulGemGrandFilledInvisible_Skyhaven",
+   "soul": 5,
+   "capacity": 5,
+   "filledBase": ""
+  },
+  {
+   "id": "39f2dd:summersetisles.esp",
+   "edid": "SoulGemAppleSSI",
+   "soul": 0,
+   "capacity": 5,
+   "filledBase": "39f2de:summersetisles.esp"
+  },
+  {
+   "id": "39f2de:summersetisles.esp",
+   "edid": "SoulGemAppleSSIFilled",
+   "soul": 5,
+   "capacity": 5,
+   "filledBase": ""
+  },
+  {
+   "id": "401dda:summersetisles.esp",
+   "edid": "SoulGemWelkyndStoneFilled",
+   "soul": 5,
+   "capacity": 5,
+   "filledBase": ""
+  },
+  {
+   "id": "60d0ec:summersetisles.esp",
+   "edid": "SSIMemSoulGemBlack01",
+   "soul": 5,
+   "capacity": 5,
+   "filledBase": ""
+  },
+  {
+   "id": "4ea8d7:King of the Murkmire.esp",
+   "edid": "VakkaStone",
+   "soul": 0,
+   "capacity": 3,
+   "filledBase": ""
+  },
+  {
+   "id": "4ea8d8:King of the Murkmire.esp",
+   "edid": "KajinJatCrystal",
+   "soul": 0,
+   "capacity": 4,
+   "filledBase": ""
+  }
+ ]
+}

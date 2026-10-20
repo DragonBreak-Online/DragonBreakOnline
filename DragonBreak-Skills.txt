@@ -108,8 +108,8 @@ Miner - The Deep Delver
     1. Novice: Iron, corundum
     2. Apprentice: Silver, quicksilver
     3. Journeyman: Orichalcum, moonstone
-    4. Expert: Ebony, malachite
-    5. Master: Double yield from every vein
+    4. Expert: Malachite, mithril, adamantium
+    5. Master: Ebony, amber, and double yield from every vein
 
 Tailor - The Fine Thread
   Only a Tailor may use the tailor's bench. All clothing and medium armor is made here; tiers decide what you can cut and sew.

@@ -33,7 +33,7 @@ check('Light is brewed from the Beyond Skyrim effect (60193e:BSAssets.esm) from 
 check('every PC editor id the effects name is listed in records', Object.values(E).every((v) => (v.byTier || []).every((x) => !x || !/^DBO_/.test(x) || x in RW.records)));
 check('...as are the percent and slow restore effects and the fortify effects', (RW.percentEffects || []).concat((RW.overTime || {}).slowEffects || [], Object.keys((RW.fortify || {}).effects || {}).filter((k) => /^DBO_/.test(k))).every((x) => x in RW.records));
 check('overTime: from 60% (Philter, Elixir) over 5 s', RW.overTime && RW.overTime.fromShare === 0.6 && RW.overTime.seconds === 5);
-check('poisons ship inert (judge false), as a share of a 200-point pool', RW.poisons && RW.poisons.judge === false && RW.poisons.anchorPool === 200);
+check('poisons ship judged (judge true, 18 Oct), as a share of a 200-point pool', RW.poisons && RW.poisons.judge === true && RW.poisons.anchorPool === 200);
 check('the 6 combinations ship for Expert and Master once the PC records are mapped (none left planned)', Array.isArray(RW.combos) && RW.combos.length === 6 && !RW._combosPlanned && RW.combos.every((c) => c.minTier === 4 && c.byTier[3] && c.byTier[4] && RW.records[c.byTier[3]] && RW.records[c.byTier[4]]));
 check('every PC record is mapped to an id of DragonBreak Online Edits.esp (alchemy-records-apply.js, 15 Oct)', Object.values(RW.records || {}).every((v) => /^[0-9a-f]{1,6}:DragonBreak Online Edits\.esp$/.test(v)));
 check('poison words: Level 1 and 25 "Poison" (Weak is the drop-only one)', JSON.stringify(RW.words.poison) === JSON.stringify(['Poison', 'Poison', 'Potent Poison', 'Virulent Poison', 'Deadly Poison']));
@@ -249,10 +249,32 @@ const ticks = (n) => { for (let i = 0; i < n; i++) globalThis.__dboAlchemyRunTic
   await drink(pid('FortifySkillLockpicking04'), { health: 1, magicka: 1, stamina: 1 });
   check('...50% as two', globalThis.__dboPotionLockpickTiers(A) === 2);
 
+  // ---- Fortify Alchemy on worn gear (Nate, 18 Oct): one strength up at most, capped per item and in all ----
+  {
+    load({ records: MAPPED });
+    const FA = idOf('08b65c:Skyrim.esm');
+    const ring = (mag) => ({ baseId: 0x9000, count: 1, worn: true, enchantmentEffects: [{ effectId: FA, magnitude: mag, duration: 0, area: 0 }] });
+    const realRandom = Math.random;
+    const brewWith = (worn, roll, tier = 3) => { tierOf(A, tier); stockAll(); const e = props.get(A + '|inventory').entries; props.set(A + '|inventory', { entries: e.concat(worn) }); Math.random = () => roll; const m = craft([ONE_A, ONE_B]); Math.random = realRandom; return m; };
+    let m = brewWith([], 0);
+    check('gear: none worn, an Adept brews the Solution as before', count(pid('FortifySkillOneHanded02')) === 1 && !/steadies/.test(m), m);
+    m = brewWith([ring(20)], 0.1);
+    check('gear: a 20% ring and a roll under it: one strength up, and told why', count(pid('FortifySkillOneHanded02')) === 0 && /steadies your hand/.test(m), m);
+    m = brewWith([ring(20)], 0.3);
+    check('gear: a roll over it brews as the rank does', count(pid('FortifySkillOneHanded02')) === 1 && !/steadies/.test(m), m);
+    props.set(A + '|inventory', { entries: [ring(500)] });
+    check('gear: a forged 500% ring counts as 25% (perItemCap)', globalThis.__dboGearFortifyAlchemy(A) === 25);
+    const bag = props.get(A + '|inventory').entries;
+    props.set(A + '|inventory', { entries: bag.concat([ring(25), ring(25), ring(25), ring(25), ring(25), Object.assign(ring(25), { worn: false })]) });
+    check('gear: all worn together count at most 100%, and an unworn copy not at all', globalThis.__dboGearFortifyAlchemy(A) === 100, globalThis.__dboGearFortifyAlchemy(A));
+    m = brewWith([ring(25), ring(25), ring(25), ring(25)], 0.99, 5);
+    check('gear: a Master gains nothing past Master strength', /steadies/.test(m) === false, m);
+  }
   // ---- poisons ----
   put(A, 'inventory', { entries: [{ baseId: WEAPON, count: 1, worn: true, poisonId: DBO('a30'), poisonCount: 1 }] });
   put(B, 'percentages', { health: 1, magicka: 1, stamina: 1 });
-  check('poisons are inert as shipped (judge false)', globalThis.__dboPoisonHit(A, B, WEAPON, {}) === null);
+  load({ records: MAPPED, poisons: Object.assign({}, RW.poisons, { judge: false }) });
+  check('poisons are inert with judge false', globalThis.__dboPoisonHit(A, B, WEAPON, {}) === null);
   load({ records: MAPPED, poisons: Object.assign({}, RW.poisons, { judge: true }) });
   out.sets.length = 0;
   const got = globalThis.__dboPoisonHit(A, B, WEAPON, {});
@@ -296,7 +318,8 @@ const ticks = (n) => { for (let i = 0; i < n; i++) globalThis.__dboAlchemyRunTic
   check('a self-cast Restoration heal gets the Fortify Restoration share (castHook)', /potionRestorationCast\(Number\(casterId\) >>> 0, Number\(spellId\) >>> 0\)/.test(GM) && /spellSchoolOf\(spellId >>> 0\) !== 22/.test(GM));
   check('both landing paths of the hit judge hand weapon blows to the poison judge', (GM.match(/potionPoisonHit\(agg, tgt, src, dmg, flags\);/g) || []).length === 2);
   check('a failed alchemy.js load clears the new hooks', /alchemy\.js failed to load[^\n]*__dboPotionBonus = null; globalThis\.__dboPotionLockpickTiers = null; globalThis\.__dboPoisonHit = null;/.test(GM));
-  check('combat.js: Fortify Defence lets less through a block', /const through = raw \* share \* \(broken \? 1 : 1 - blockPotion\);/.test(fs.readFileSync('combat.js', 'utf8')));
+  // with worn Fortify Block beside it since 20 Oct (gearench.js), together at most all of the blow
+  check('combat.js: Fortify Defence lets less through a block', /const through = raw \* share \* \(broken \? 1 : 1 - Math\.min\(1, blockPotion \+ blockGear\)\);/.test(fs.readFileSync('combat.js', 'utf8')));
   check('lockpick.js: a Lockpicking potion counts as ranks, up to Master', /__dboPotionLockpickTiers[\s\S]{0,200}Math\.min\(4, own \+ extra\)/.test(fs.readFileSync('lockpick.js', 'utf8')));
 
   // ---- craft XP by value (skillrates.js) ----

@@ -14,7 +14,7 @@
 //
 // State, on changeforms:
 //   door      private.dboCell      { prisoner, name, picked }
-//   prisoner  private.dboSentence  { door, cell, totalMs, servedMs, by, at, concordat? }
+//   prisoner  private.dboSentence  { door, cell, totalMs, servedMs, by, at, arrester (actor who brought them in), concordat? }
 //
 // The White-Gold Concordat (thalmor.js, Nate 11 Oct): a Thalmor who arrested a Talos worshipper in the Empire is offered
 // the Concordat's sentence at the cell door (globalThis.__dboConcordatWarrant). That sentence is lawful: it carries
@@ -210,6 +210,16 @@ module.exports = (api) => {
     return !tryPick(caster, target, occ);
   };
 
+  // Who brought the prisoner in: the one carrying them, else the one who bound them (captureSystem.ts mirrors both on
+  // private.restrained), else the guard locking the door. Kept on the sentence as arrester
+  const broughtInBy = (prisoner, guard) => {
+    const r = get(prisoner, 'private.restrained', null);
+    for (const k of ['carrierActorId', 'captorActorId']) {
+      const id = r && typeof r === 'object' ? Number(r[k]) >>> 0 : 0;
+      if (id && id !== (prisoner >>> 0)) return id;
+    }
+    return guard >>> 0;
+  };
   const imprison = (guard, prisoner, door, mins, concordat) => {
     if (!lawful(guard)) return;
     if (sentenceOf(prisoner)) return personal(guard, `${display(prisoner)} is already serving a sentence.`);
@@ -217,7 +227,11 @@ module.exports = (api) => {
     if (occupantOf(door)) return personal(guard, 'Someone is already locked in that cell.');
     const cell = cellOf(door);
     const now = Date.now();
-    set(prisoner, 'private.dboSentence', Object.assign({ door: door >>> 0, cell, totalMs: mins * MIN, servedMs: 0, by: display(guard), at: now },
+    // Who brought them in (outlaws.js bounty shares): read before the door uncuffs them
+    const brought = broughtInBy(prisoner, guard);
+    // An outlaw's bounty in this hold (outlaws.js): paid as far as they can, the rest served as extra minutes
+    if (!concordat) { try { if (typeof globalThis.__dboOutlawJailed === 'function') mins += Math.max(0, Number(globalThis.__dboOutlawJailed(guard >>> 0, prisoner >>> 0, brought)) || 0); } catch (e) { log(`jail: outlaw bounty failed: ${e.message}`); } }
+    set(prisoner, 'private.dboSentence', Object.assign({ door: door >>> 0, cell, totalMs: mins * MIN, servedMs: 0, by: display(guard), at: now, arrester: brought },
       concordat ? { concordat: { by: who(guard), at: now } } : {}));
     set(door, 'private.dboCell', { prisoner: prisoner >>> 0, name: display(prisoner), picked: false });
     set(door, 'isOpen', false);

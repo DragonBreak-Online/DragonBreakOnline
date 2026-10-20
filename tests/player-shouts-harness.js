@@ -19,7 +19,7 @@ const byPlugin = (p) => allow.filter((x) => x[1] === p).length;
 ok(byPlugin('Skyrim.esm') === 20 && byPlugin('Dawnguard.esm') === 3 && byPlugin('Dragonborn.esm') === 4, 'vanilla 20, Dawnguard 3, Dragonborn 4');
 
 const powers = JSON.parse(fs.readFileSync(path.join(ROOT, 'admin-powers.json'), 'utf8'));
-const shouts = powers.shouts || [];
+const shouts = powers.shoutsGate || powers.shouts || [];
 const pluginOf = (desc) => String(desc).slice(String(desc).indexOf(':') + 1);
 const given = new Set(shouts.map((s) => key(s.name, pluginOf(s.shout))));
 const extra = shouts.filter((s) => !allowSet.has(key(s.name, pluginOf(s.shout)))).map((s) => s.name);
@@ -27,6 +27,7 @@ ok(extra.length === 0, `Give all Shouts teaches nothing outside the allow-list (
 const missing = allow.filter(([n, p]) => !given.has(key(n, p))).map((x) => x[0]);
 ok(missing.length === 0, `and every player shout is in it (${missing.join(', ')})`);
 ok(shouts.length === 27, `27 shouts in admin-powers.json (${shouts.length})`);
+ok(Array.isArray(powers.shouts) && powers.shouts.length === 0, 'Give all shouts gives nothing: admin-powers.json shouts is empty (Nate 17 Oct), the gate reads shoutsGate');
 // Non-player shouts carry a dragon's words (252c3..5) or the empty placeholder (ff8d7); a player shout has its own three
 const PLACEHOLDER = new Set(['252c3:Skyrim.esm', '252c4:Skyrim.esm', '252c5:Skyrim.esm', 'ff8d7:Skyrim.esm']);
 const badWords = shouts.filter((s) => (s.words || []).length !== 3 || new Set(s.words).size !== 3 || s.words.some((w) => PLACEHOLDER.has(w))).map((s) => s.name);
@@ -35,7 +36,9 @@ const NPC_NAME = /^(Dragon(?!rend)|L_|LShout|MQ|dun|DA13|dlc2MK)|Miraak|Greybear
 const npcNamed = shouts.filter((s) => NPC_NAME.test(s.name)).map((s) => s.name);
 ok(npcNamed.length === 0, `no dragon, Miraak, Greybeard, quest, racial or howl copy (${npcNamed.join(', ')})`);
 ok(shouts.every((s) => ['Skyrim.esm', 'Dawnguard.esm', 'Dragonborn.esm'].includes(pluginOf(s.shout))), 'no mod creature shout');
-ok((powers.spells || []).length > 0 && !!powers.werewolf, 'the spells and the werewolf power are untouched');
+// Give all spells has nothing to give (Jake, 17 Oct: it froze the server); the list waits in spellsGiveAllOff
+ok(Array.isArray(powers.spells) && powers.spells.length === 0 && (powers.spellsGiveAllOff || []).length > 0, 'Give all spells has nothing to give, and the old list is kept aside');
+ok(!!powers.werewolf && !!powers.vampirelord, 'the werewolf and Vampire Lord powers are untouched');
 
 // ---- the combat gate reads the allow-list too -------------------------------------------------------------------
 {

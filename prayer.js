@@ -83,7 +83,21 @@ module.exports = (api) => {
   const pickFor = (a) => PICK.enabled !== false && typeof hasUiCap === 'function' && hasUiCap(a, MG.PICK_CAP);
 
   const PRAY = Object.assign({}, skills.praying || {});
-  const DEITIES = (skills.deities || {}).choices || [];
+  // Faiths (faiths.json, Nate 18 Oct): pantheons a character takes before a patron in it, and the gods skills.json does not
+  // hold. Read at every load, so a change is a hot reload; skills.json's own gods come first and are never replaced
+  // config prayer.faiths false turns them off: one flat list of gods, every god its own faith, the 7-day rule for all
+  const FAITH_DATA = CFG.faiths === false ? {} : (() => { try { return JSON.parse(require('fs').readFileSync(path.resolve('faiths.json'), 'utf8')); } catch (e) { return {}; } })();
+  const FAITHS = Array.isArray(FAITH_DATA.faiths) ? FAITH_DATA.faiths : [];
+  const DEITIES = ((skills.deities || {}).choices || []).slice();
+  for (const d of FAITH_DATA.deities || []) if (d && d.id && !DEITIES.some((x) => x.id === d.id)) DEITIES.push(d);
+  for (const [id, names] of Object.entries(FAITH_DATA.aliases || {})) {
+    const i = DEITIES.findIndex((x) => x.id === id); if (i < 0) continue;
+    const had = Array.isArray(DEITIES[i].alsoKnownAs) ? DEITIES[i].alsoKnownAs : [];
+    DEITIES[i] = Object.assign({}, DEITIES[i], { alsoKnownAs: had.concat((names || []).filter((n) => !had.includes(n))) });
+  }
+  const PATRON_CHANGE_DAYS = Math.max(0, Number(FAITH_DATA.patronChangeDays ?? 1));
+  const OTHER_SHRINE_MULT = Math.max(0, Math.min(1, Number(FAITH_DATA.otherShrineChanceMult ?? 0.5)));
+  const faithById = (id) => FAITHS.find((f) => f.id === String(id || '')) || null;
   const CONVERSION_DAYS = Math.max(0, Number((skills.deities || {}).conversionCooldownDays) || 7);
   const VERSES = Math.max(1, Math.round(Number(PRAY.verses) || 3));
   const VERSE_MS = Math.max(1000, Math.round((Number(PRAY.verseSeconds) || 6) * 1000));
@@ -182,6 +196,20 @@ module.exports = (api) => {
     return a.aspectOf === b.id || b.aspectOf === a.id || (!!a.aspectOf && a.aspectOf === b.aspectOf);
   };
 
+  // A character's race editor id ("WoodElfRace"), for a faith's peoples
+  const raceEdid = (a) => { try { const app = mp.get(a, 'appearance'); const r = app && mp.lookupEspmRecordById(Number(app.raceId) >>> 0); return String((r && r.record && r.record.editorId) || ''); } catch (e) { return ''; } };
+  const faithFits = (f, race) => (f.peoples || []).some((p) => race.includes(p));
+  // The faith a record stands in: its own, else (one taken before faiths) the first faith of its patron that fits the race,
+  // else the first that holds the patron at all
+  const faithIdOf = (a, rec) => {
+    if (!rec) return '';
+    if (rec.faith && faithById(rec.faith) && (faithById(rec.faith).patrons || []).includes(rec.id)) return rec.faith;
+    const holding = FAITHS.filter((f) => (f.patrons || []).includes(rec.id));
+    const race = raceEdid(a);
+    // Of the faiths that fit, the one naming the fewest peoples is the race's own (a Nord's Old Ways before the Imperial Cult)
+    const fit = holding.filter((f) => faithFits(f, race)).sort((x, y) => (x.peoples || []).length - (y.peoples || []).length);
+    return ((fit[0] || holding[0]) || {}).id || '';
+  };
   // ── what a character worships ───────────────────────────────────────────────────────────────
   const faithOf = (a) => { try { const r = mp.get(a, 'private.dboDeity'); return r && typeof r === 'object' && r.id ? r : null; } catch (e) { return null; } };
   const setFaith = (a, v) => { try { mp.set(a, 'private.dboDeity', v); } catch (e) { log('prayer: faith save failed', e.message); } };
@@ -285,7 +313,7 @@ module.exports = (api) => {
   // A boon the server keeps with no spell at all: Sanguine's appetite, Hermaeus Mora's reading, and since 2026-10-01 the
   // regeneration of the Hist and the Yokudan gods (blessingRegen, held by the regeneration tick below) and the Ancestors'
   // ward against fire (combatBoon: gamemode.js blessingCombat, target.ancestors)
-  const serverBoonOf = (d) => !!(d && (d.hungerHalf || d.scholarBoon || d.blessingRegen || d.combatBoon));
+  const serverBoonOf = (d) => !!(d && (d.hungerHalf || d.scholarBoon || d.blessingRegen || d.combatBoon || d.meatBoon || d.skillBoon));
   // Sheogorath has no blessing of his own and should not have one. The Madgod gives what he feels
   // like, so his worshipper is handed another god's blessing at random - a different one each time.
   // This is the only boon in the list that is more lore-accurate as code than as a record, and it is
@@ -478,6 +506,29 @@ module.exports = (api) => {
       return !!(d && d[flag]);
     } catch (e) { return false; }
   };
+  // The flag's own value (Xarxes' scholarBoon 0.5 is half of Hermaeus Mora's true; Y'ffre's meatBoon 2), 0 when not blessed
+  globalThis.__dboBlessingValue = (a, flag) => {
+    try {
+      const b = blessingOf(a);
+      if (!b || Number(b.until) <= Date.now()) return 0;
+      const d = deityById(b.deity);
+      const v = d ? d[flag] : 0;
+      return v === true ? 1 : Math.max(0, Number(v) || 0);
+    } catch (e) { return 0; }
+  };
+
+  // A skill's XP rate under the running blessing (faiths.json skillBoon { skill: mult, '*': mult for every skill }; Nate 20 Oct:
+  // the gods without a spell of their own, simple and unique boons), 1 when not blessed. skillrates.js multiplies it in
+  globalThis.__dboBlessingSkillRate = (a, skillId) => {
+    try {
+      const b = blessingOf(a);
+      if (!b || Number(b.until) <= Date.now()) return 1;
+      const d = deityById(b.deity); const sb = d && d.skillBoon;
+      if (!sb || typeof sb !== 'object') return 1;
+      const v = Number(sb[skillId] !== undefined ? sb[skillId] : sb['*']);
+      return Number.isFinite(v) && v >= 1 && v <= 2 ? v : 1;
+    } catch (e) { return 1; }
+  };
 
   // A blessing is worn, not held: nothing else expires it, so the module does. The same sweep keeps a cast blessing on
   // its worshipper: once more a sweep before the spell's own duration ends, while the blessing runs on past it.
@@ -636,6 +687,9 @@ module.exports = (api) => {
     try { if (typeof globalThis.__dboChillRateMult === 'function') { const f = Number(globalThis.__dboChillRateMult(a, CHILL_AV[stat])); return f >= 0 ? Math.min(1, f) : 1; } } catch (e) { /* no downed system */ }
     return 1;
   };
+  // Worn Heal, Magicka and Stamina Rate enchantments (gearench.js regenOf, marked gear), the same units as a blessing's
+  const gearRegenOf = (a) => { try { const f = globalThis.__dboGearRegen; const l = typeof f === 'function' ? f(a) : []; return Array.isArray(l) ? l.filter((e) => e && e.gear && REGEN_AV_BY_NAME[e.av] !== undefined && Number(e.mag) > 0) : []; } catch (e) { return []; } };
+  const gearRegenCapOf = () => { const g = (cfg || {}).gearEnchantments || {}; const v = Number((g.regen || {}).gearRegenCap); return Number.isFinite(v) && v >= 0 ? v : 0.5; };
   // Registered whatever the config says and off inside, so a reload that turns it off replaces the running timer (every()
   // replaces by name) rather than leaving the previous module's
   every('prayerBlessingRegen', REGEN_TICK_MS, () => {
@@ -645,7 +699,7 @@ module.exports = (api) => {
     for (const a of (api.onlineActors ? api.onlineActors() : [])) {
       here.add(a);
       const b = blessingOf(a);
-      const list = b && Number(b.until) > now ? regenOfBlessing(b) : [];
+      const list = (b && Number(b.until) > now ? regenOfBlessing(b) : []).concat(gearRegenOf(a));
       if (!list.length) { regenOwed.delete(a); continue; }
       let owed = regenOwed.get(a);
       if (!owed) { owed = { at: now - REGEN_TICK_MS, health: 0, magicka: 0, stamina: 0 }; regenOwed.set(a, owed); }
@@ -662,8 +716,10 @@ module.exports = (api) => {
       const next = { health: Number(pc.health), magicka: Number(pc.magicka), stamina: Number(pc.stamina) };
       let changed = false;
       for (const stat of ['health', 'magicka', 'stamina']) {
-        let add = 0;
-        for (const e of list) if (e.stat === stat) add += regenPerSecond(a, e) * secs;
+        let add = 0, gear = 0;
+        for (const e of list) if (e.stat === stat) { if (e.gear) gear += regenPerSecond(a, e); else add += regenPerSecond(a, e) * secs; }
+        // Worn gear adds to a blessing, its own share at most gearRegenCap of the bar's base rate
+        if (gear > 0) add += Math.min(gear, gearRegenCapOf() * raceRateOf(a, stat) / 100 * REGEN_MULT) * secs;
         add *= chillOf(a, stat);
         if (!(next[stat] < 1) || !(add > 0)) { owed[stat] = 0; continue; }
         owed[stat] += add;
@@ -898,7 +954,7 @@ module.exports = (api) => {
     const faith = faithOf(a);
     if (!faith) return `This is a shrine of ${d.name}. You hold no god yet - say "/deity ${d.name}" here to take ${d.name} as your own.`;
     const mine = deityById(faith.id);
-    if (PRAY.onlyOwnDeity !== false && !sameFaith(mine, d)) {
+    if (PRAY.onlyOwnDeity !== false && !sameFaith(mine, d) && !inMyFaith(a, faith, d)) {
       return `${d.name} has no ear for a follower of ${mine ? mine.name : 'another god'}. Find your own shrine, or say "/deity ${d.name}" here to turn.`;
     }
     const until = Number(restsOf(a)[targetId.toString(16)]) || 0;
@@ -1290,7 +1346,9 @@ module.exports = (api) => {
     // The faiths prayed to anywhere answer more rarely and more briefly (blessingChanceMult, blessingHoursMult)
     const chance = (tier >= 0 && byTier.length
       ? Number(byTier[Math.min(tier, byTier.length - 1)]) || 0
-      : Number(odds.everyone) || 0) * (d.blessingChanceMult !== undefined ? Number(d.blessingChanceMult) : 1);
+      : Number(odds.everyone) || 0) * (d.blessingChanceMult !== undefined ? Number(d.blessingChanceMult) : 1)
+      // Another god of one's faith answers too, but the patron's shrines more often (Nate, 18 Oct)
+      * (sameFaith(deityById((faithOf(a) || {}).id), d) ? 1 : OTHER_SHRINE_MULT);
     const hours = (() => {
       const list = PRAY.blessingDurationHoursByTier || [];
       const i = Math.min(Math.max(tier, 0), Math.max(0, list.length - 1));
@@ -1315,10 +1373,15 @@ module.exports = (api) => {
     try { if (globalThis.__dboSuperPrayed) globalThis.__dboSuperPrayed(a, d.id, { atShrine: round.refId !== ANYWHERE_REF }); } catch (e) { /* no curses */ }
   });
 
-  const daysLeft = (faith) => {
+  const daysLeft = (faith, days) => {
     const last = Number(faith && (faith.convertedAt || faith.at)) || 0;
-    const ms = last + CONVERSION_DAYS * 86400000 - Date.now();
+    const ms = last + (days === undefined ? CONVERSION_DAYS : days) * 86400000 - Date.now();
     return ms > 0 ? Math.ceil(ms / 86400000) : 0;
+  };
+  // A god of the worshipper's own faith (any patron of it, or an aspect of one): their shrines answer too (Nate, 18 Oct)
+  const inMyFaith = (a, rec, d) => {
+    const f = faithById(faithIdOf(a, rec)); if (!f || !d) return false;
+    return (f.patrons || []).some((id) => sameFaith(deityById(id), d));
   };
 
   // ── the picker ──────────────────────────────────────────────────────────────────────────────
@@ -1417,9 +1480,15 @@ module.exports = (api) => {
   // the menu, because the brief moved conversion onto a menu key rather than a pilgrimage.
   const takeDeity = (a, d, opts) => {
     const faith = faithOf(a);
-    if (faith && faith.id === d.id) return { ok: false, text: `You already follow ${d.name}.` };
+    // The faith asked for (the picker's), else the one this god is found in for this character; a god outside it is refused
+    const wantFaith = opts && opts.faith ? faithById(opts.faith) : null;
+    if (opts && opts.faith && (!wantFaith || !(wantFaith.patrons || []).includes(d.id))) return { ok: false, text: `${d.name} is no god of that faith.` };
+    const newFaithId = wantFaith ? wantFaith.id : (faith && inMyFaith(a, faith, d) ? faithIdOf(a, faith) : faithIdOf(a, { id: d.id }));
+    const oldFaithId = faith ? faithIdOf(a, faith) : '';
+    if (faith && faith.id === d.id && newFaithId === oldFaithId) return { ok: false, text: `You already follow ${d.name}.` };
     if (faith) {
-      const left = daysLeft(faith);
+      // A new patron within one's faith takes a day; a new faith, the week (Nate, 18 Oct)
+      const left = daysLeft(faith, oldFaithId && oldFaithId === newFaithId ? PATRON_CHANGE_DAYS : CONVERSION_DAYS);
       if (left) {
         const mine = deityById(faith.id);
         return { ok: false, text: `${mine ? mine.name : 'Your god'} is not so easily left. You may turn again in ${left} day${left === 1 ? '' : 's'}.` };
@@ -1433,22 +1502,23 @@ module.exports = (api) => {
     }
     if (faith) clearBlessing(a, null, 'turned');
     setFaith(a, {
-      id: d.id, name: d.name, kind: d.kind,
+      id: d.id, name: d.name, kind: d.kind, faith: newFaithId,
       at: faith ? Number(faith.at) || Date.now() : Date.now(),
       convertedAt: Date.now(),
     });
-    audit(`DEITY ${who(a)} ${faith ? 'turned to' : 'took'} ${d.name}`);
+    const fname = (faithById(newFaithId) || {}).name || '';
+    audit(`DEITY ${who(a)} ${faith ? 'turned to' : 'took'} ${d.name}${fname ? ` (${fname})` : ''}`);
     return {
       ok: true, converted: !!faith,
-      text: faith
-        ? `You turn to ${d.name}. The blessing you carried falls away.`
-        : `You take ${d.name} as your own.`,
+      text: (faith
+        ? `You turn to ${d.name}${fname ? `, in ${fname}` : ''}. The blessing you carried falls away.`
+        : `You take ${d.name} as your own${fname ? `, in ${fname}` : ''}.`) + (fname ? ` Every shrine of ${fname} hears you; ${d.name}'s own answer most often.` : ''),
     };
   };
 
   // The menu's choice (the picker 36 and the journal's Deity tab): the 7-day rule, the first choice free, then where to pray
-  const chooseFromMenu = (a, d) => {
-    const r = takeDeity(a, d);
+  const chooseFromMenu = (a, d, faithId) => {
+    const r = takeDeity(a, d, faithId ? { faith: String(faithId) } : undefined);
     if (r.ok) {
       endCreationStep(a);
       const where = d.prayAnywhere
@@ -1476,8 +1546,13 @@ module.exports = (api) => {
   const deityView = (a, staff) => {
     const faith = faithOf(a);
     const left = faith ? daysLeft(faith) : 0;
+    const myFaith = faith ? faithIdOf(a, faith) : '';
+    const race = raceEdid(a);
     return {
       current: faith ? faith.id : '', first: !faith, daysLeft: left, cooldownDays: CONVERSION_DAYS, canChoose: !faith || left === 0,
+      // Faiths (Nate, 18 Oct): the picker lists these first, each opening to its patrons; suggested = fits the race
+      faith: myFaith, patronDaysLeft: faith ? daysLeft(faith, PATRON_CHANGE_DAYS) : 0, patronChangeDays: PATRON_CHANGE_DAYS,
+      faiths: FAITHS.map((f) => ({ id: f.id, name: f.name, patrons: (f.patrons || []).filter((id) => deityById(id)), suggested: faithFits(f, race) })),
       choices: DEITIES.map((d) => Object.assign({
         id: d.id, name: d.name, kind: d.kind, sphere: d.sphere || '', boon: d.boon || '',
         reachable: Number(d.inBruma) > 0 || !!d.prayAnywhere, inBruma: Math.max(0, Number(d.inBruma) || 0), prayAnywhere: !!d.prayAnywhere,
@@ -1487,16 +1562,33 @@ module.exports = (api) => {
     };
   };
   globalThis.__dboDeityView = (a, staff) => deityView(a >>> 0, !!staff);
+  // The faith and patron a character holds ({ faith, patron } ids, or null): gamemode.js's Green Pact asks
+  // sworn: the faith stored on the character (every choice since the faiths, 18 Oct), '' for a god taken before them
+  globalThis.__dboFaithOf = (a) => { const f = faithOf(Number(a) >>> 0); return f ? { faith: faithIdOf(Number(a) >>> 0, f), patron: f.id, sworn: String(f.faith || '') } : null; };
+  // Swearing to the faith one's god already places one in (greenpact.js /greenpact swear): a god taken before the faiths
+  // carries none, and the Green Pact asks for the vow. No new god and no new faith, so no waiting days. '' when sworn.
+  globalThis.__dboSwearFaith = (a, faithId) => {
+    a = Number(a) >>> 0;
+    const f = faithOf(a), want = faithById(faithId);
+    if (!f) return 'You hold no god yet. Take one of the faith first.';
+    if (!want || !(want.patrons || []).includes(f.id) || !faithFits(want, raceEdid(a))) return `${f.name} does not place you in ${want ? want.name : 'that faith'}.`;
+    if (f.faith === want.id) return `You are already sworn to ${want.name}.`;
+    if (f.faith && f.faith !== want.id) return `You are sworn to ${(faithById(f.faith) || {}).name || 'another faith'}. Choose your faith again in the Deity tab to change it.`;
+    setFaith(a, Object.assign({}, f, { faith: want.id }));
+    audit(`DEITY ${who(a)} swore to ${want.name} (${f.name})`);
+    return '';
+  };
   const journalSections = globalThis.__dboJournalSections && typeof globalThis.__dboJournalSections === 'object'
     ? globalThis.__dboJournalSections : (globalThis.__dboJournalSections = {});
   journalSections.deity = { visible: () => !!CFG.enabled && DEITIES.length > 0, view: (a, o) => deityView(a >>> 0, !!(o && o.staff)) };
   onUi('journalDeity', (a, args) => {
     if (typeof globalThis.__dboJournalFresh !== 'function' || !globalThis.__dboJournalFresh(a, (args || [])[0])) return;
     const id = String((args || [])[1] || '');
+    const faithId = String((args || [])[2] || '');
     globalThis.__dboJournalLimited(a, () => {
       const d = deityById(id);
       if (!d) return { tab: 'deity', text: 'No god by that name.', kind: 'refused' };
-      const r = chooseFromMenu(a, d);
+      const r = chooseFromMenu(a, d, faithId);
       return { tab: 'deity', text: r.text, kind: r.ok ? 'ok' : 'refused' };
     });
   });
@@ -1653,9 +1745,11 @@ module.exports = (api) => {
   // How each resolved blessing will be given (see the blessings block): cast on the worshipper, or learned (an Ability, a
   // Power, or a record the server could not read, which keeps AddSpell)
   const blessingCheck = (() => {
-    const out = { ok: 0, server: 0, broken: [], cast: 0, learned: 0, unread: [] };
+    const out = { ok: 0, server: 0, broken: [], cast: 0, learned: 0, unread: [], pending: [] };
     for (const d of DEITIES) {
       if (d.blessingSource === 'server') { out.server++; continue; }
+      // A new god of faiths.json whose record the PC has not made yet: no boon, and no complaint
+      if (d.blessingSource === 'pending' && !blessingIdOf(d)) { out.pending.push(d.name); continue; }
       const id = blessingIdOf(d);
       if (!id) { out.broken.push(d.name); continue; }
       out.ok++;
@@ -1665,6 +1759,7 @@ module.exports = (api) => {
     return out;
   })();
   if (blessingCheck.broken.length) log(`prayer: ${blessingCheck.broken.length} blessing(s) do not resolve: ${blessingCheck.broken.join(', ')}`);
+  if (blessingCheck.pending.length) log(`prayer: ${blessingCheck.pending.length} new god(s) wait for their blessing: ${blessingCheck.pending.join(', ')}`);
   // The display abilities of the server's boons (a bad one is logged once by displayOf, here at boot)
   {
     const shown = DEITIES.filter((d) => displayOf(d)).map((d) => `${d.id} ${displayOf(d).toString(16)}`);

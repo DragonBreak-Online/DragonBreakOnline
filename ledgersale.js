@@ -9,7 +9,8 @@
 //   sink   sinkShare (0.1) of the price, taken out of the game;
 //   owner  the rest. Where the ledger stands in a faction's hall it goes to that faction's treasury (bank.js __dboTreasury;
 //          Nate, 10 Oct: "Frostcrag to the College of Whispers, and Synod to the Synod"): the hall by its cell (config
-//          hallCells first, then guilds.js __dboHallFactionAt), or a claimed hall owned by its leader (guilds.js __dboHallOf).
+//          hallCells first, then guilds.js __dboHallFactionAt), a business that keeps its books for a faction (business.js
+//          __dboBusinessFactionAt, /business faction), or a claimed hall owned by its leader (guilds.js __dboHallOf).
 //          In any other building it goes into the bank account (private.bankGold) of the first character of the account
 //          that holds the housing claim on it, so nobody has to be online. A building nobody owns (or an owner with no
 //          character left, or a faction treasury that would not take it) pays the hold's treasury.
@@ -102,6 +103,8 @@ module.exports = (api) => {
     const cellDesc = String(get(place, 'worldOrCellDesc', ''));
     const h = hallAt(cellDesc);
     if (h && h.id) return { kind: 'faction', fid: String(h.id), name: String(h.name || h.id) };
+    // A business that keeps its books for a faction (business.js /business faction)
+    try { const bf = typeof globalThis.__dboBusinessFactionAt === 'function' ? globalThis.__dboBusinessFactionAt(idOf(cellDesc)) : null; if (bf && bf.id) return { kind: 'faction', fid: String(bf.id), name: String(bf.name || bf.id) }; } catch (e) { /* business.js not loaded */ }
     const claim = claimAt(idOf(cellDesc));
     if (claim) {
       let halls = [];
@@ -121,13 +124,13 @@ module.exports = (api) => {
     let zone = ''; try { zone = zoneIdOf(zoneOfActor(place)) || zoneIdOf(zoneOfActor(buyer)); } catch (e) { zone = ''; }
     const rate = taxRateOf(zone);
     const s = split(o.price, rate, C.sinkShare);
-    const toHold = (n) => { if (!(n > 0) || !zone) return 0; try { return Number(depositToTreasury(zone, n)) || 0; } catch (e) { return 0; } };
+    const toHold = (n) => { if (!(n > 0) || !zone) return 0; try { return Number(depositToTreasury(zone, n, { income: 'sales' })) || 0; } catch (e) { return 0; } };
     const taxPaid = toHold(s.tax);
     const r = recipientOf(place);
     let ownerPaid = 0, ownerTo = '';
     if (s.owner > 0 && r.kind === 'bank') { if (credit(r.actor, s.owner)) { ownerPaid = s.owner; ownerTo = `${r.name}'s bank account`; } }
     if (s.owner > 0 && !ownerPaid && r.kind === 'faction') {
-      try { const T = globalThis.__dboTreasury; if (T && typeof T.deposit === 'function' && T.deposit(r.fid, s.owner, `ledger sale: ${o.what || 'goods'}`)) { ownerPaid = s.owner; ownerTo = `the treasury of ${r.name}`; } else r.why = `the treasury of ${r.name} would not take it`; } catch (e) { /* bank.js not loaded */ }
+      try { const T = globalThis.__dboTreasury; if (T && typeof T.deposit === 'function' && T.deposit(r.fid, s.owner, `ledger sale: ${o.what || 'goods'}`, { income: 'sales' })) { ownerPaid = s.owner; ownerTo = `the treasury of ${r.name}`; } else r.why = `the treasury of ${r.name} would not take it`; } catch (e) { /* bank.js not loaded */ }
     }
     if (s.owner > 0 && !ownerPaid) { ownerPaid = toHold(s.owner); ownerTo = `the ${zone || 'no'} treasury${r.why ? ` (${r.why})` : r.kind !== 'hold' ? ' (the owner could not be paid)' : ''}`; }
     const lost = (s.tax - taxPaid) + (s.owner - ownerPaid);

@@ -460,6 +460,8 @@ module.exports = (api) => {
     { const live = liveRound(casterId); if (live) return reshow(casterId, live); }
     if (ore !== 'geode' && !ITEMS[ore]) return deny(casterId, 'You do not know what to do with this seam.');
     if (oresUpTo(tier).indexOf(ore) === -1) return deny(casterId, beyondSkill(ore, own));
+    // An owned mine's access rules (mines.js): its owner may keep its seams to a faction, named people or themselves
+    { const gate = typeof globalThis.__dboMineGate === 'function' ? globalThis.__dboMineGate(targetId, casterId) : ''; if (gate) return deny(casterId, gate); }
     const rests = restsOf(casterId, 'private.minedVeins');
     const until = Math.max(Number(rests[restKey(targetId)]) || 0, sharedRest(targetId, ore));
     if (until > Date.now()) return deny(casterId, `This seam is worked out for now. Come back in ${Math.ceil((until - Date.now()) / 60000)} minutes.`);
@@ -503,7 +505,13 @@ module.exports = (api) => {
     const type = String(rec.record.type || '');
     const edid = String(rec.record.editorId || '');
     if (type === 'ACTI' && (VEIN.test(edid) || nodeOf(targetId, edid))) return mine(targetId, casterId, rec);
-    if (type === 'FURN' && /^(DLC2)?WoodChoppingBlock/i.test(edid)) { endGathering(targetId); return chop(targetId, casterId); }
+    if (type === 'FURN' && /^(DLC2)?WoodChoppingBlock/i.test(edid)) {
+      endGathering(targetId);
+      // A wood elf sworn to the Green Pact cuts no wood (greenpact.js)
+      const pact = typeof globalThis.__dboGreenPactRefusal === 'function' ? globalThis.__dboGreenPactRefusal(casterId, 'chop') : '';
+      if (pact) return deny(casterId, pact);
+      return chop(targetId, casterId);
+    }
     // A seam's pickaxe marker pays out through the vanilla mining script: no round, no skill, no rest (Nate on Falcius,
     // 2026-09-28: refused at a gold seam, then mined it from its PickaxeMiningFloorMarker). The round on the seam
     // replaces it, so a player never sits at one; NPCs keep them for their idles.
@@ -734,14 +742,22 @@ module.exports = (api) => {
       // A geode holds one soul gem; salt sometimes comes with a rarer salt
       const gem = round.ore === 'geode' ? weighted(CFG.geodeGems) : '';
       const bonus = round.ore === 'salt' && Math.random() < (Number(CFG.saltBonusChance) || 0) ? weighted(CFG.saltBonus) : '';
-      const ok = giveItem(a, idOf(gem || ITEMS[round.ore]), count);
+      // An owned mine's share (mines.js): cut of the yield goes into the mine's store for its owner, once the miner's part is in hand
+      const item = gem || ITEMS[round.ore];
+      let share = null;
+      try { if (typeof globalThis.__dboMineShareQuote === 'function') share = globalThis.__dboMineShareQuote(round.refId, a, item, count, gem ? itemName(gem) : round.ore === 'salt' ? 'Salt Pile' : (CFG.gemOre || {})[round.ore] ? titleCase(round.ore) : `${oreName(round.ore)} Ore`); } catch (e) { share = null; }
+      const cut = share && share.cut > 0 ? Math.min(count, share.cut) : 0;
+      const ok = count - cut > 0 ? giveItem(a, idOf(item), count - cut) : true;
+      if (ok && cut) { try { share.commit(); } catch (e) { log('labour: the mine share failed', e.message); } }
       if (ok && bonus) giveItem(a, idOf(bonus), 1);
+      const kept = count - cut;
       text = !ok ? 'The seam gives way, but you cannot carry any more.'
-        : round.ore === 'geode' ? `The geode cracks open: ${itemName(gem)}.`
-        : round.ore === 'salt' ? `You scrape out ${count} Salt Pile${count === 1 ? '' : 's'}${bonus ? ` and some ${itemName(bonus)}` : ''}.`
-        : (CFG.gemOre || {})[round.ore] ? `The geode cracks open: ${count} ${titleCase(round.ore)}${count === 1 ? '' : 's'}.`
-        : `The seam gives way: ${count} ${oreName(round.ore)} Ore.`;
-      if (ok) audit(`MINE ${who(a)} worked a ${round.ore} seam (tier ${round.tier + 1}) -> ${count} ${gem ? itemName(gem) : 'ore'}${bonus ? ` + ${itemName(bonus)}` : ''}`);
+        : round.ore === 'geode' ? (cut ? `The geode cracks open: ${itemName(gem)}, the mine's share for ${share.to}.` : `The geode cracks open: ${itemName(gem)}.`)
+        : round.ore === 'salt' ? `You scrape out ${kept} Salt Pile${kept === 1 ? '' : 's'}${bonus ? ` and some ${itemName(bonus)}` : ''}.`
+        : (CFG.gemOre || {})[round.ore] ? `The geode cracks open: ${kept} ${titleCase(round.ore)}${kept === 1 ? '' : 's'}.`
+        : `The seam gives way: ${kept} ${oreName(round.ore)} Ore.`;
+      if (ok && cut && round.ore !== 'geode') text += ` ${cut} more go${cut === 1 ? 'es' : ''} to ${share.to}, the mine's share.`;
+      if (ok) audit(`MINE ${who(a)} worked a ${round.ore} seam (tier ${round.tier + 1}) -> ${count} ${gem ? itemName(gem) : 'ore'}${bonus ? ` + ${itemName(bonus)}` : ''}${cut ? ` (${cut} to ${share.to}, the share of ${share.mine})` : ''}`);
     } else {
       const count = Math.max(1, Math.round(tierValue(CFG.firewoodByTier, round.tier, 3)));
       const ok = giveItem(a, idOf(ITEMS.firewood), count);

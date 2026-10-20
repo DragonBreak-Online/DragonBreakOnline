@@ -13,6 +13,8 @@ class HostPool {
     this.workDir = opts.workDir;
     this.cwd = opts.cwd;
     this.botsPerHost = opts.botsPerHost || 10;
+    this.fullUnits = opts.fullUnits || 2000;
+    this.midUnits = opts.midUnits || 4096;
     this.forward = opts.forward.join(',');
     this.handlers = opts.handlers || {};
     this.hosts = [];
@@ -38,6 +40,9 @@ class HostPool {
       '--forward', this.forward,
       '--tick-ms', '1',
       '--stats-ms', '1000',
+      // the interest check's bands, so the host can bucket each mover as it counts it
+      '--full-units', String(this.fullUnits),
+      '--mid-units', String(this.midUnits),
     ], { cwd: this.cwd, stdio: ['pipe', 'pipe', 'pipe'] });
 
     const host = { index, child, alive: true, pendingWrites: [] };
@@ -96,12 +101,25 @@ class HostPool {
     this.write(botId, 'connect ' + botId + ' ' + host + ' ' + port);
   }
 
+  // The host counts inbound movement per emitter, so it needs to know which idx is the bot itself:
+  // that one is its own echo, and the movement it sends for that idx carries the position distances
+  // are measured from
+  self(botId, idx) {
+    this.write(botId, 'self ' + botId + ' ' + (idx >>> 0));
+  }
+
   send(botId, message, reliable) {
     this.write(botId, 'send ' + botId + ' ' + (reliable ? '1' : '0') + ' ' + JSON.stringify(message));
   }
 
   close(botId) {
     this.write(botId, 'close ' + botId);
+  }
+
+  // Starts a new window for the per-emitter counters, which run from the bot's connect. Without it the
+  // busiest-mover list in a report covers the whole run and its rates read high for the step.
+  mark() {
+    for (const host of this.hosts) if (host.alive) host.child.stdin.write('mark\n');
   }
 
   requestStats() {

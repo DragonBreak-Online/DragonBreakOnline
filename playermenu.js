@@ -12,7 +12,9 @@
 //   whoever carries the target: Put down
 //   while sneaking:            Pickpocket (pickpocket.js)
 //   when the target can answer: Rob (robbery.js; the target answers in a panel)
+//   Challenge to a Duel, or Yield the duel on the opponent (duel.js; the target answers in a panel)
 //   a Thalmor of an arresting rank in the Empire: Arrest under the Concordat (thalmor.js)
+//   a Dawnguard, Silver Hand or Vigil member with a silver weapon: Silver Test (silvertest.js; the target answers in a panel)
 // Trade, Search, Restrain, Uncuff, Carry and Put down go from the client straight to the server systems,
 // which check private.dboLawful themselves; Introduce, Inspect and Invite come back here as dbo events.
 // Restrain is instant for an admin or anyone holding a lawful rank, wherever they stand
@@ -42,6 +44,8 @@ module.exports = (api) => {
     giveItem, makeProp, runCommand, cfg, every } = api;
   // A GM observes; the powers below are for a Lead GM and above (claude-jake's review A3). Fails closed with an old gamemode.
   const isLeadStaff = typeof api.isLeadStaff === 'function' ? api.isLeadStaff : () => false;
+  // Which zone (hold) a character stands in: a hold's officials and guards arrest only there (Nate, 19 Oct)
+  const zoneOfActor = typeof api.zoneOfActor === 'function' ? api.zoneOfActor : null;
   // Staff rights by name (gamemode.js staffCan: every admin tier, and a Trial GM for the rights on its allowlist). An old
   // gamemode without it lets admins only, never wider
   const staffCan = typeof api.staffCan === 'function' ? api.staffCan : (a) => isAdmin(a);
@@ -91,7 +95,10 @@ module.exports = (api) => {
   const UNLAWFUL_RANKS = new Set(['courtmage', 'shaman', 'wisewoman']);
   // Faction ranks that arrest too (Nate, 6 Oct; guilds.js __dboGuildsOf, the rank's own title and role): an allegiance's
   // leaders, officers and sergeants, and a hold's guards by title. A plain member or a Citizen is not lawful.
-  const LAWFUL_FACTIONS = new Set(C.lawfulFactions || ['imperial-legion', 'imperial-civil-commission', 'penitus-oculatus', 'stormcloaks', 'thalmor', 'blades',
+  // Cuffs are per hold (Nate, 19 Oct): a hold's officials and guards arrest only in their own hold. The Empire's factions and the
+  // Thalmor arrest anywhere; the Stormcloaks only in Skyrim and the Great Houses only on Solstheim (config
+  // playerMenu.lawfulFactionRegions). The Blades are not listed: no arrest powers.
+  const LAWFUL_FACTIONS = new Set(C.lawfulFactions || ['imperial-legion', 'imperial-civil-commission', 'penitus-oculatus', 'thalmor', 'stormcloaks',
     'house-hlaalu', 'house-redoran', 'house-telvanni', 'house-indoril', 'house-dres', 'house-sadras']);
   const LAWFUL_ROLES = new Set(C.lawfulRoles || ['leader', 'officer', 'sergeant']);
   const GUARD_FACTIONS = new Set(C.guardFactions || ['hold-whiterun', 'hold-riften', 'hold-solitude', 'hold-windhelm', 'hold-markarth',
@@ -104,12 +111,22 @@ module.exports = (api) => {
   const FACTION_REGIONS = C.lawfulFactionRegions && typeof C.lawfulFactionRegions === 'object' ? C.lawfulFactionRegions : { thalmor: ['cyrodiil'] };
   const provinceHere = (a) => { const R = globalThis.__dboRegions; try { return R && typeof R.provinceAt === 'function' ? String((R.provinceAt(a) || {}).province || '') : ''; } catch (e) { return ''; } };
   const inFactionLand = (fid, a) => { const list = FACTION_REGIONS[fid]; return !Array.isArray(list) || list.includes(provinceHere(a)); };
-  const lawfulByFaction = (a) => {
+  // The hold (zone) a character stands in, '' when unknown: a hold's officials and guards arrest only there
+  const zoneHere = (a) => { try { const z = typeof zoneOfActor === 'function' ? zoneOfActor(a) : null; return z ? String(z) : ''; } catch (e) { return ''; } };
+  // A hold guard faction's own zone: hold-whiterun -> whiterun, county-bruma -> bruma
+  const guardZone = (fid) => String(fid).replace(/^(hold|county|stronghold)-/, '');
+  const lawfulByFaction = (a, here = zoneHere(a)) => {
     if (typeof globalThis.__dboGuildsOf !== 'function') return false;
     return (globalThis.__dboGuildsOf(a) || []).some((g) => (LAWFUL_FACTIONS.has(g.id) && LAWFUL_ROLES.has(g.role) && inFactionLand(g.id, a))
-      || (GUARD_FACTIONS.has(g.id) && GUARD_TITLES.has(String(g.title || '').toLowerCase())));
+      || (GUARD_FACTIONS.has(g.id) && GUARD_TITLES.has(String(g.title || '').toLowerCase()) && !!here && guardZone(g.id) === here));
   };
-  const isLawful = (a) => { try { return isLeadStaff(a) || ranksOf(profileOf(a)).some((m) => !UNLAWFUL_RANKS.has(m.rank)) || lawfulByFaction(a); } catch (e) { return false; } };
+  const isLawful = (a) => {
+    try {
+      if (isLeadStaff(a)) return true;
+      const here = zoneHere(a);
+      return (!!here && ranksOf(profileOf(a), a).some((m) => !UNLAWFUL_RANKS.has(m.rank) && m.zone && String(m.zone.id || m.zone) === here)) || lawfulByFaction(a, here);
+    } catch (e) { return false; }
+  };
   // A player in a beast form is the beast to everyone (beastform.js __dboBeastName)
   const beastName = (a) => { try { return typeof globalThis.__dboBeastName === 'function' ? String(globalThis.__dboBeastName(a) || '') : ''; } catch (e) { return ''; } };
   // A staff member with real names on sees the own name, and "Aldric (masked)" behind a disguise (staffLabel below); the
@@ -180,7 +197,7 @@ module.exports = (api) => {
     try {
       if (isLeadStaff(captor)) return true;
       if (isAdmin(target)) return false;
-      return ranksOf(profileOf(captor)).some((m) => !UNLAWFUL_RANKS.has(m.rank)) || lawfulByFaction(captor);
+      return ranksOf(profileOf(captor), captor).some((m) => !UNLAWFUL_RANKS.has(m.rank)) || lawfulByFaction(captor);
     } catch (e) { log('instant restraint check failed', e.message); return false; }
   };
 
@@ -373,7 +390,7 @@ module.exports = (api) => {
     // A mask kept from before the change is not on the beast's face: it would tie the beast to the masked one
     if (isMasked(t) && !beast) lines.push('Face hidden behind a mask');
     if (!isMasked(t) && !beast && (revealing(viewer) || knownBy(viewer).includes(t >>> 0))) {
-      const ranks = ranksOf(profileOf(t));
+      const ranks = ranksOf(profileOf(t), t);
       for (const r of ranks.slice(0, 3)) lines.push(`${rankTitle(r)} of ${r.zone.name}`);
     }
     const r = get(t, RESTRAINED_PROP, null);
@@ -435,10 +452,12 @@ module.exports = (api) => {
     // Pickpocket, only while the viewer sneaks (pickpocket.js reads the server's sneak flag)
     try { if (typeof globalThis.__dboPickpocketEntries === 'function') entries.push(...globalThis.__dboPickpocketEntries(a, t)); } catch (e) { /* pickpocket not loaded */ }
     try { if (typeof globalThis.__dboRobEntries === 'function') entries.push(...globalThis.__dboRobEntries(a, t)); } catch (e) { /* robbery not loaded */ }
+    try { if (typeof globalThis.__dboDuelEntries === 'function') entries.push(...globalThis.__dboDuelEntries(a, t)); } catch (e) { /* duel.js not loaded */ }
     try { if (typeof globalThis.__dboKeyRingEntries === 'function') entries.push(...globalThis.__dboKeyRingEntries(a, t)); } catch (e) { /* key ring not loaded */ }
     try { if (typeof globalThis.__dboCourierEntries === 'function') entries.push(...globalThis.__dboCourierEntries(a, t)); } catch (e) { /* couriers not loaded */ }
     try { if (typeof globalThis.__dboConcordatEntries === 'function') entries.push(...globalThis.__dboConcordatEntries(a, t)); } catch (e) { /* thalmor.js not loaded */ }
     try { if (typeof globalThis.__dboSuperMenuEntries === 'function') entries.push(...globalThis.__dboSuperMenuEntries(a, t)); } catch (e) { /* no curses */ }
+    try { if (typeof globalThis.__dboSilverTestEntries === 'function') entries.push(...globalThis.__dboSilverTestEntries(a, t)); } catch (e) { /* silvertest.js not loaded */ }
     try { if (typeof globalThis.__dboFactionMenuEntries === 'function') entries.push(...globalThis.__dboFactionMenuEntries(a, t)); } catch (e) { /* factions not loaded */ }
     try { if (typeof globalThis.__dboSchoolsMenuEntries === 'function') entries.push(...globalThis.__dboSchoolsMenuEntries(a, t)); } catch (e) { /* schools not loaded */ }
     // A ruler or Steward answers a citizenship request face to face (citizenship.js)
@@ -466,19 +485,36 @@ module.exports = (api) => {
     entries: mode === 'inspect' ? [] : menuFor(a, t), lines: lines || [],
   });
 
+  // A press inside PRESS_GAP_MS of this player's last answer finishing is dropped when that answer was slow (PRESS_SLOW_MS
+  // or more): 17 Oct, presses made while a slow menu was being built queued up and ran back to back, and 13 in a row held
+  // the server 3 minutes. The usual answer takes a few ms and drops nothing. Timed on the monotonic clock.
+  const PRESS_GAP_MS = 1000, PRESS_SLOW_MS = 100;
+  const lastPress = new Map(); // actor -> { done, took } (performance.now() ms) of its last playerMenu answer
   onUi('playerMenu', (a, args) => {
     const t = Number(args[0]) >>> 0;
-    refreshLawful(a); ensureKnown(a);
-    // One line per X press on a player: whether a menu went out, or why not (#bugs 'X not worky', 2026-09-26)
-    if (!validTarget(a, t)) {
-      log(`playerMenu ${display(a)} -> ${t.toString(16)}: refused (${!t || t === a ? 'no target' : !isOnline(t) ? 'target offline' : `${Math.round(distance(a, t))} units away`})`);
-      // A player who logged out stays in the world through the logout grace (5 min): "get closer" sent three players
-      // pressing X on one five and six times in a row (log, 27-29 Sep)
-      if (t && t !== a && !isOnline(t)) return personal(a, 'They have stepped out of the world. Their body stays a short while before it fades.');
-      return personal(a, 'Get closer to them first.');
+    const t0 = performance.now();
+    const last = lastPress.get(a >>> 0);
+    if (last && last.took >= PRESS_SLOW_MS && t0 - last.done < PRESS_GAP_MS) {
+      log(`playerMenu ${display(a)} -> ${t.toString(16)}: dropped (${Math.round(t0 - last.done)} ms after an answer that took ${Math.round(last.took)} ms)`);
+      return;
     }
-    const sent = openMenu(a, t, 'menu');
-    log(`playerMenu ${display(a)} -> ${display(t)}: ${sent === false ? 'menu packet failed' : 'menu sent'}`);
+    try {
+      refreshLawful(a); ensureKnown(a);
+      // One line per X press on a player: whether a menu went out, or why not (#bugs 'X not worky', 2026-09-26)
+      if (!validTarget(a, t)) {
+        log(`playerMenu ${display(a)} -> ${t.toString(16)}: refused (${!t || t === a ? 'no target' : !isOnline(t) ? 'target offline' : `${Math.round(distance(a, t))} units away`})`);
+        // A player who logged out stays in the world through the logout grace (5 min): "get closer" sent three players
+        // pressing X on one five and six times in a row (log, 27-29 Sep)
+        if (t && t !== a && !isOnline(t)) return personal(a, 'They have stepped out of the world. Their body stays a short while before it fades.');
+        return personal(a, 'Get closer to them first.');
+      }
+      const sent = openMenu(a, t, 'menu');
+      log(`playerMenu ${display(a)} -> ${display(t)}: ${sent === false ? 'menu packet failed' : 'menu sent'}`);
+    } finally {
+      const done = performance.now();
+      lastPress.set(a >>> 0, { done, took: done - t0 });
+      if (lastPress.size > 256) for (const [k, p] of lastPress) if (done - p.done >= PRESS_GAP_MS) lastPress.delete(k);
+    }
   });
   onUi('playerAction', (a, args) => {
     const id = String(args[0] || ''); const t = Number(args[1]) >>> 0;
@@ -497,10 +533,12 @@ module.exports = (api) => {
     if (id.startsWith('voice:')) return sendPacket(a, { customPacketType: 'dboVoicePeer', identity: (t >>> 0).toString(16), op: id.slice(6), name: nameFor(a, t) });
     if (typeof globalThis.__dboPickpocketAction === 'function' && globalThis.__dboPickpocketAction(a, id, t, nameFor)) return;
     if (typeof globalThis.__dboRobAction === 'function' && globalThis.__dboRobAction(a, id, t, nameFor)) return;
+    if (typeof globalThis.__dboDuelAction === 'function' && globalThis.__dboDuelAction(a, id, t)) return;
     if (typeof globalThis.__dboKeyRingAction === 'function' && globalThis.__dboKeyRingAction(a, id, t, nameFor)) return;
     if (typeof globalThis.__dboCourierAction === 'function' && globalThis.__dboCourierAction(a, id, t, nameFor)) return;
     if (typeof globalThis.__dboConcordatAction === 'function' && globalThis.__dboConcordatAction(a, id, t, nameFor)) return;
     if (typeof globalThis.__dboSuperMenuAction === 'function' && globalThis.__dboSuperMenuAction(a, id, t, nameFor)) return;
+    if (typeof globalThis.__dboSilverTestAction === 'function' && globalThis.__dboSilverTestAction(a, id, t)) return;
     if (typeof globalThis.__dboFactionMenuAction === 'function' && globalThis.__dboFactionMenuAction(a, id, t)) return;
     if (typeof globalThis.__dboSchoolsMenuAction === 'function' && globalThis.__dboSchoolsMenuAction(a, id, t, nameFor)) return;
     if (typeof globalThis.__dboCitizenMenuAction === 'function' && globalThis.__dboCitizenMenuAction(a, id, t)) return;
@@ -639,6 +677,8 @@ module.exports = (api) => {
     try { unmask(a, true); } catch (e) { log('unmask on leave failed', e.message); }
     try { endReveal(a, 'logout', true); } catch (e) { log('real names on leave failed', e.message); }
   };
+  // appearance.js: the editor keeps the character's own name, never the mask's (#VKRS, 17 Oct)
+  globalThis.__dboMaskOf = (a) => ({ masked: isMasked(Number(a) >>> 0), real: realName(Number(a) >>> 0), shown: String(C.maskName || ''), isMaskName });
   globalThis.__dboPlayerMenuReady = (a) => { try { unmask(a, true); realNamesOn.delete(Number(a) >>> 0); ensureKnown(a); refreshLawful(a); } catch (e) { log('player menu login failed', e.message); } };
   // At arrival (gamemode.js onUserAssignActor with assigned, then onCharacterReady), not 8 s later; assigned leaves a mode still on alone (the same character picked again)
   globalThis.__dboRealNamesLogin = (a, assigned) => { try { a = Number(a) >>> 0; if (assigned && revealing(a)) return; realNamesOn.delete(a); restoreLeftover(a, get(a, KNOWN_PROP, null)); } catch (e) { log('realnames: login check failed', e.message); } };

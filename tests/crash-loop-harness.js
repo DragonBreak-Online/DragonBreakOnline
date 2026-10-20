@@ -125,6 +125,39 @@ now += 11 * 60000; tick();
 const rest2 = globalThis.__dboDungeonAccountRest;
 ok(!claim() && rest2.has(`${PID2}:${RUIN.id}`), 'after looting, the member who crashed inside pays the usual rest', [...rest2.keys()]);
 
+// A load that never finished (Marcus, 19 Oct): leaving within 5 minutes of the claim keeps it 10 minutes, and a lapse costs
+// that member no rest; the member who stayed and walked off pays it as before; looting first, and the quick quitter pays too
+load();
+reset();
+{
+  const L3 = claim(); L3.startedAt = now - 60000; L3.lastInsideAt = now;
+  globalThis.__dboPartyLogout(P1);
+  ok(L3.earlyLeft.has(PID1) && L3.crashKeepUntil >= now + 10 * 60000 - 1, 'leaving a minute after the claim marks them and keeps the claim 10 minutes');
+  where.set(P1, OUTSIDE_CELL); where.set(P2, OUTSIDE_CELL);
+  now += 5 * 60000; tick();
+  ok(claim() === L3, 'five minutes empty: still kept for them');
+  now += 6 * 60000; tick();
+  const r3 = globalThis.__dboDungeonAccountRest;
+  ok(!claim() && !r3.has(`${PID1}:${RUIN.id}`) && r3.has(`${PID2}:${RUIN.id}`), 'it lapses: no rest for the one whose load failed, the usual hour for the other', [...r3.keys()]);
+  ok(said.some(([a, t]) => a === P1 && /lapsed while you were away. It does not rest for you/.test(t)), 'and they are told so', said);
+}
+load();
+reset();
+{
+  const L4 = claim(); L4.startedAt = now - 60000; L4.lastInsideAt = now; L4.looted.add(0xabc);
+  globalThis.__dboPartyLogout(P1);
+  where.set(P1, OUTSIDE_CELL); where.set(P2, OUTSIDE_CELL);
+  now += 11 * 60000; tick();
+  ok(globalThis.__dboDungeonAccountRest.has(`${PID1}:${RUIN.id}`), 'looted first, then quit: the usual rest, so a quick quit never refills the chests');
+}
+load();
+reset();
+{
+  const L5 = claim(); L5.startedAt = now - 10 * 60000;
+  globalThis.__dboPartyLogout(P1);
+  ok(!(L5.earlyLeft instanceof Set), 'leaving ten minutes after the claim is an ordinary leave');
+}
+
 // The switch: crashLoop.enabled false leaves everything as it was
 load({ dungeons: { crashLoop: { enabled: false } } });
 reset();

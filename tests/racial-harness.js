@@ -219,8 +219,8 @@ delete globalThis.__dboCombatAt;
 
 // ---- 4. the wiring ----
 const hook = gm.slice(gm.indexOf('const hitDamageAttemptHook'), gm.indexOf('hitDamageAttemptHook.__dbo = true;'));
-check('gamemode: the target\'s side is Defense x a Flesh spell x the target\'s blessing x a resist potion x the race, capped together',
-  /let targetSide = defenseDamageMult\(tgt\) \* fleshDamageMult\(tgt, src\) \* blessingTargetMult\(tgt, src\) \* potionResistMult\(tgt, src\);/.test(hook) && /targetSide = racial\.capTargetSide\(targetSide \* racial\.targetMult\(agg, tgt, src, dmg\)\)/.test(hook));
+check('gamemode: the target\'s side is Defense x a Flesh spell x the target\'s blessing x a resist potion x worn resistances x the race, capped together',
+  /let targetSide = defenseDamageMult\(tgt\) \* fleshDamageMult\(tgt, src\) \* blessingTargetMult\(tgt, src\) \* potionResistMult\(tgt, src\) \* gearResistMult\(tgt, src\);/.test(hook) && /targetSide = racial\.capTargetSide\(targetSide \* racial\.targetMult\(agg, tgt, src, dmg\)\)/.test(hook));
 check('gamemode: the race\'s attack gift joins the product, never for a beast',
   /if \(racial && !beastAgg\) \{ try \{ raceAtk = racial\.attackMult\(agg, tgt, src, dmg\)/.test(hook) && /\* targetSide \* blessingAttackMult\(agg, src\) \* raceAtk \*/.test(hook) && !/blessingDamageMult\(/.test(hook));
 check('gamemode: the blessing split keeps the old product', /const blessingDamageMult = \(aggressorId, targetId, sourceId\) => blessingAttackMult\(aggressorId, sourceId\) \* blessingTargetMult\(targetId, sourceId\);/.test(gm));
@@ -237,7 +237,10 @@ check('dungeons: a body\'s coin, a share of it, and a chest\'s rolled coin only 
 check('wildlife: a camp chest\'s coin', /__dboRaceGold\(casterId, it\.count, 'a camp chest'\)/.test(wl));
 check('contracts: the pay, as new coin', /__dboRaceGold\(killerId, paid, 'contract pay'\)/.test(ct));
 const others = fs.readdirSync(SERVER).filter((f) => f.endsWith('.js') && !['racial.js', 'dungeons.js', 'wildlife.js', 'contracts.js'].includes(f));
-check('nothing else pays Imperial Luck (not the bank, trades, refunds or staff grants)', others.every((f) => !fs.readFileSync(path.join(SERVER, f), 'utf8').includes('__dboRaceGold(')), others.filter((f) => fs.readFileSync(path.join(SERVER, f), 'utf8').includes('__dboRaceGold(')));
+// A coin purse is loot coin too (purses-back, 18 Oct): gamemode.js pays it there and nowhere else
+const gmSrc = fs.readFileSync(path.join(SERVER, 'gamemode.js'), 'utf8');
+check('gamemode.js: a coin purse\'s gold, its one Imperial Luck call', (gmSrc.match(/__dboRaceGold\(/g) || []).length === 1 && /__dboRaceGold\(casterId, gold, 'a coin purse'\)/.test(gmSrc));
+check('nothing else pays Imperial Luck (not the bank, trades, refunds or staff grants)', others.filter((f) => f !== 'gamemode.js').every((f) => !fs.readFileSync(path.join(SERVER, f), 'utf8').includes('__dboRaceGold(')), others.filter((f) => fs.readFileSync(path.join(SERVER, f), 'utf8').includes('__dboRaceGold(')));
 const conf = JSON.parse(fs.readFileSync(path.join(SERVER, 'gamemode-config.json'), 'utf8')).racial || {};
 check('gamemode-config: racial on, the approved numbers', conf.enabled === true && conf.reductionCap === 0.75 && conf.combatSeconds === 10 && conf.argonian.inCombat === false && conf.altmer.magickaRegen === 1.25 && conf.argonian.lowHealthHealRegen === 1.5
   && conf.bosmer.bowDamage === 0.1 && conf.breton.resistMagic === 0.25 && conf.dunmer.resistFire === 0.5 && conf.imperial.goldBonus === 0.1 && conf.khajiit.unarmedDamage === 8

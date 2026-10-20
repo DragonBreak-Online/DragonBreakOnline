@@ -140,7 +140,9 @@ const run = (d, expedition, diffId, claims, modulePath = path.join(ROOT, 'dungeo
       lookupEspmRecordById: (id) => (id === idOf('6:DragonBreak.esp') ? { record: { editorId: 'ExpeditionBoard' } } : REC.has(id) ? { record: REC.get(id) } : { record: null }) },
     log: () => {}, personal: () => {}, system: () => {}, audit: () => {}, registerChatCommand: (n, fn) => cmds.set(n, fn), onUi: (n, fn) => { const l = ui.get(n) || []; l.push(fn); ui.set(n, l); },
     openWidget: () => true, closeWidget: () => true, sendPacket: () => true, findByName: () => 0, display: String, who: String, profileOf: (a) => (a === A ? 1 : -1), nameOf: () => 'P',
-    onlineActors: () => [A], isAdmin: () => true, giveItem: (a, base, n) => { given.push([base, n]); return true; }, cfg: { dungeons: Object.assign({}, cfg.dungeons || {}, dungeonsCfg) }, every: (n, ms, fn) => timers.set(n, fn),
+// The deliberate Ebony Ingot gift of the hardest leases (dungeons.js ebonyDrop, Nate 17 Oct) is off here: these checks are
+// about the loot pools and the gear swap, which still never hand out ebony
+    onlineActors: () => [A], isAdmin: () => true, giveItem: (a, base, n) => { given.push([base, n]); return true; }, cfg: { dungeons: Object.assign({ ebonyDrop: { enabled: false } }, cfg.dungeons || {}, dungeonsCfg) }, every: (n, ms, fn) => timers.set(n, fn),
   };
   require(modulePath)(api);
   const fire = (n, a, args) => (ui.get(n) || []).forEach((f) => f(a, args, 0));
@@ -164,7 +166,8 @@ const run = (d, expedition, diffId, claims, modulePath = path.join(ROOT, 'dungeo
     // The enemies, as the spawn system places them: humanoids are armed by the arm tick, then fall carrying the worst gear
     const spawned = [];
     for (const z of lease.zones) {
-      const master = lease.bossZones && lease.bossZones.has(z.Name);
+      // an expedition's boss zone, or (19 Oct, boss trophies) an ordinary dungeon's boss or a dragon priest: the master's roll
+      const master = (lease.bossZones && lease.bossZones.has(z.Name)) || /boss|dragon ?priest/i.test(z.Kind || '');
       const humanoid = HUMANOID.test(z.Kind || '') && !ANIMAL.test(z.Kind || '');
       const id = body++; props.set(`${id}|private.npcSpawner`, z.Name); props.set(`${id}|inventory`, { entries: [] });
       spawned.push({ id, master, humanoid, boss: master || /boss/i.test(z.Kind || '') });

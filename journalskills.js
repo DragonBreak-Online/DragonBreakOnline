@@ -28,7 +28,12 @@ module.exports = (api) => {
       const smith = smithOf(a);
       // Arcane Arts' page shows each school's state and today's casting (schools.js __dboSchoolsBrief)
       let magic = null; try { magic = typeof globalThis.__dboSchoolsBrief === 'function' ? globalThis.__dboSchoolsBrief(a >>> 0) : null; } catch (e) { magic = null; }
-      return out && (smith || magic) ? Object.assign({}, out, smith ? { smith } : {}, magic ? { magicSchools: magic } : {}) : out;
+      // A Master Scholar's two scribing timers (scribing.js; Nate and Swag, 17 Oct), added to the Scholar page's rules text: the
+      // page draws the skill's description as it comes, so this needs no client or front change
+      let scribe = null; try { scribe = typeof globalThis.__dboScribingBrief === 'function' ? globalThis.__dboScribingBrief(a >>> 0) : null; } catch (e) { scribe = null; }
+      const skills = out && scribe && scribe.text && Array.isArray(out.skills)
+        ? out.skills.map((k) => (k && k.id === 'scholar' ? Object.assign({}, k, { description: `${String(k.description || '').trim()} ${scribe.text}`.trim() }) : k)) : null;
+      return out && (smith || magic || skills) ? Object.assign({}, out, smith ? { smith } : {}, magic ? { magicSchools: magic } : {}, skills ? { skills } : {}) : out;
     },
   };
 

@@ -46,7 +46,7 @@ module.exports = (api) => {
   const actorOfTag = (tag) => onlineActors().find((x) => tagOf(x) === tag) || 0;
   const byId = (id) => data().list.find((c) => c.id === Number(String(id).replace(/^#/, '')));
   const live = (c) => c.state === 'open' || c.state === 'taken' || c.state === 'refused';
-  const isOfficialOf = (a, zoneId) => ranksOf(Number(profileOf(a))).some((r) => r.zone.id === zoneId);
+  const isOfficialOf = (a, zoneId) => ranksOf(profileOf(a), a).some((r) => r.zone.id === zoneId);
 
   // Pays now if that character is online, else keeps it for their next login
   const pay = (party, gold, why) => {
@@ -57,7 +57,7 @@ module.exports = (api) => {
   };
   const settle = (c, toTaker, why) => {
     const duty = toTaker ? Math.floor(c.reward * C.dutyShare) : 0;
-    if (duty) depositToTreasury(c.zone, duty);
+    if (duty) depositToTreasury(c.zone, duty, { income: 'commission duty' });
     if (toTaker) pay(c.taker, c.reward - duty, `commission #${c.id} (${why})`);
     else pay(c.poster, c.reward, `commission #${c.id} returned (${why})`);
   };
@@ -75,7 +75,7 @@ module.exports = (api) => {
     if (data().list.filter((c) => live(c) && c.poster.tag === who0.tag).length >= C.maxPosted) return `You already have ${C.maxPosted} commissions posted.`;
     const fee = Math.max(1, Math.ceil(reward * C.feeShare));
     if (!takeGold(a, reward + fee)) return `Posting this takes ${reward} gold held for the reward and a ${fee} gold fee, and you do not have it.`;
-    depositToTreasury(zone, fee);
+    depositToTreasury(zone, fee, { income: 'board fees' });
     const z = zoneById(zone);
     const c = { id: data().next++, zone, zoneName: z ? z.name : zone, text, reward, fee, poster: who0, state: 'open', postedAt: Date.now(), expiresAt: Date.now() + C.openDays * DAY };
     data().list.push(c);

@@ -1,5 +1,1129 @@
 [
   {
+    "title": "Dungeon traps are live",
+    "date": "2026-10-20",
+    "version": "Hotfix",
+    "tag": "New",
+    "sections": [
+      {
+        "heading": "Dungeons",
+        "items": [
+          "Pressure plates and tripwires in dungeons now set off their traps: swinging walls, swinging blades, spears and battering rams, across more than 90 dungeons. Watch where you step.",
+          "Traps hurt by the dungeon's own numbers, more for higher-level characters, and can put you down. Everyone nearby sees them fire.",
+          "Dart traps and flame jets stay quiet for now."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Enchantments that work",
+    "date": "2026-10-20",
+    "version": "Server update",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Enchanted weapons",
+        "items": [
+          "Fire, frost, shock and chaos damage, absorb health, magicka and stamina, stamina and magicka damage, paralysis and frost slow on enchanted weapons now land. Before, an enchanted sword hit like a plain one.",
+          "They use the weapon's charge: an empty weapon does nothing until you recharge it.",
+          "Mehrunes' Razor can kill a foe outright (about 2 hits in 100, never a player, a boss or an essential character). The Ebony Blade absorbs 10 health. When undead marked by Dawnbreaker die, they burst and burn the undead around them."
+        ]
+      },
+      {
+        "heading": "Enchanted gear",
+        "items": [
+          "Resist Fire, Frost, Shock, Magic and Poison now protect you against spells, staves and enchantments.",
+          "Fortify Health adds real health. Fortify Health, Magicka and Stamina regeneration speed up your bars.",
+          "Fortify Block, Heavy Armor, Light Armor and Unarmed now count in fights, and Fortify Pickpocket raises your pickpocket chance.",
+          "Spellbreaker wards off up to 50 points of spells from the front while you block. The Shrouded Gloves double a sneak attack with a one-handed weapon."
+        ]
+      },
+      {
+        "heading": "Staves",
+        "items": [
+          "A Paralyze staff now holds players, and frost staves slow them. Absorb staves heal their caster."
+        ]
+      },
+      {
+        "heading": "Balanced for PvP",
+        "items": [
+          "Against another player an enchantment does half its damage, absorb and drain. Paralysis holds a player for 2 seconds at most, then leaves them immune to paralysis for 15 seconds.",
+          "Gear resistances count up to 40% each, and all your resistances together never go past the usual limit. Gear adds at most 100 health and half again your regeneration.",
+          "Enchantments add to your skill. They never replace it."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Werewolves are werewolves",
+    "date": "2026-10-20",
+    "version": "Hotfix",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Supernatural",
+        "items": [
+          "A character who held the Beast Form power without being a werewolf to the server (a rite that went wrong and was patched up by hand) is now a full werewolf: silver burns, and the beast can take them unbidden like any other."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "No more frozen temple wakes",
+    "date": "2026-10-20",
+    "version": "Hotfix",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Death and respawn",
+        "items": [
+          "Waking at the temple sometimes left you frozen in place, unable to move or look around, until you relogged. Waking now ends the bleed-out properly.",
+          "If it still happens, /unstuck now frees you too."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Opening a shop you bought",
+    "date": "2026-10-20",
+    "version": "Hotfix",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Businesses",
+        "items": [
+          "A property you buy becomes a shop once you open it as a business. Stand inside it and say /business open <name>; /shop open <name> now does the same. Then stock it from its ledger.",
+          "/shop inside your own property now tells you how to open it, instead of telling you to stand inside a business."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Adept spell choices open at 50",
+    "date": "2026-10-20",
+    "version": "Hotfix",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Magic",
+        "items": [
+          "Your Adept spell choice now opens as soon as the school reaches 50 (Priest 50 for Restoration). Before, it waited until you'd worked through the whole of level 50, so a Priest who stopped at 50 never saw it. Choose it from the F3 Magic tab, a Study Magic shelf or a Scholars' Ledger.",
+          "The Adept choice follows each school's own level, not Arcane Arts. Conjuration 50 opens your Adept Conjuration spell, even if your Arcane Arts is already higher."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Every god of Tamriel",
+    "date": "2026-10-20",
+    "version": "Server update",
+    "tag": "New",
+    "sections": [
+      {
+        "heading": "New faiths",
+        "items": [
+          "The All-Maker: the god of the Skaal of Solstheim, also called the All-Father.",
+          "The Tribunal: Almalexia, Sotha Sil and Vivec, still kept by the old faithful of Morrowind.",
+          "The Gods of High Rock: the Divines with Sheor and Ebonarm.",
+          "The Spirits of Akavir: Tosh Raka, the tiger-dragon."
+        ]
+      },
+      {
+        "heading": "New gods in the old faiths",
+        "items": [
+          "Khajiit: Magrus, Jone and Jode, Mafala, Lorkhaj and Fadomai.",
+          "Redguard: Ruptga (Tall Papa), Diagna, Sep and Ebonarm.",
+          "Imperial: Shezarr and Morihaus. Nord: Orkey. Bosmer: Ius. Altmer: Sai. Daedric: Jyggalag, Prince of Order."
+        ]
+      },
+      {
+        "heading": "How they work",
+        "items": [
+          "Choose them in F3, the Deity tab, like any god. They have no shrines yet, so pray to them anywhere with /pray.",
+          "Each has a simple boon of its own while the blessing lasts. Most make one skill's work teach you 15% more (the All-Maker Harvesting, Vivec Blade, Diagna Blacksmith, Sep Skinner and so on). Jone and Jode quicken magicka, Morihaus stamina, and Jyggalag gives 5% more in every skill.",
+          "Jyggalag is a Daedric Prince: his worship is outlawed in the Empire's lands."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Own a mine",
+    "date": "2026-10-20",
+    "version": "Server update",
+    "tag": "New",
+    "sections": [
+      {
+        "heading": "Mines are property",
+        "items": [
+          "Every mine in Skyrim, Bruma's lands and Solstheim can be owned. The hold's officials sell a mine at its door, as they sell a house, and a citizen of the hold can buy it.",
+          "A mine pays the weekly property tax like any building. It does not count as your home, so you can own a house and a mine.",
+          "The owner sets who may work its seams: anyone, a faction and named people, named people only, or nobody else.",
+          "The owner can take a share of what others mine there, up to half. That ore waits in the mine's store for the owner to collect. You see the share leave your yield as you mine.",
+          "Open the mine's panel from its door's property menu, or type /mine while you are at the mine."
+        ]
+      },
+      {
+        "heading": "Orc strongholds",
+        "items": [
+          "Each stronghold's mine belongs to its clan, like the longhouse. It is never sold. Clan members mine it freely and the Chief and officers set its rules."
+        ]
+      },
+      {
+        "heading": "Not for sale",
+        "items": [
+          "A mine that is also a dungeon you can lease stays a lair, not property."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Enchantments rebalanced",
+    "date": "2026-10-20",
+    "version": "Server update",
+    "tag": "Change",
+    "sections": [
+      {
+        "heading": "Enchanted gear",
+        "items": [
+          "Enchantments on gear are about half as strong as before: Fortify skills, health, magicka, regeneration and the rest. Gear was making characters far stronger than intended.",
+          "Worn Fortify One-handed, Two-handed and Archery enchantments now really add to the damage of your blows with that weapon type, up to 25% from all your gear together."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Duel types",
+    "date": "2026-10-20",
+    "version": "Server update",
+    "tag": "New",
+    "sections": [
+      {
+        "heading": "Practice, Friendly, Wager or Death",
+        "items": [
+          "Choose a Practice fight, Friendly duel, Wager duel or Death duel when you challenge someone, and they see exactly what they are accepting.",
+          "A Death duel is to the death: the loser's character dies for good. Both fighters must confirm that warning twice before it begins. Logging out or leaving the duel area ends a Death duel with no winner, and nobody dies."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Duels",
+    "date": "2026-10-20",
+    "version": "Server update",
+    "tag": "New",
+    "sections": [
+      {
+        "heading": "Settle it with steel",
+        "items": [
+          "Challenge another player to a duel from the X menu: one round, best of three or best of five, with your own rules and an optional wager of up to 5,000 gold, held until the duel is decided.",
+          "A beaten duellist kneels rather than dies, and both are healed when it ends. Stepping out of the circle, or logging out, forfeits. A wager left by a restart is returned."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Silver tests",
+    "date": "2026-10-20",
+    "version": "Server update",
+    "tag": "New",
+    "sections": [
+      {
+        "heading": "Test their blood",
+        "items": [
+          "Members of the Dawnguard, the Silver Hand and the Vigil of Stendarr who carry a silver weapon can ask another player to take a silver test from the X menu. The subject can accept or choose to fight or flee.",
+          "If they accept, strike them once with your silver weapon, a swing or a bash: the blow does no harm, and only you and the subject see whether the blood reacts normally or bursts into flame."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Events and staff tools",
+    "date": "2026-10-20",
+    "version": "Server update",
+    "tag": "New",
+    "sections": [
+      {
+        "heading": "Events",
+        "items": [
+          "Staff and event hosts can now announce events to everyone online with /event, so keep an eye out for clues about where the next one takes place.",
+          "Staff can also fix a character's name while its player is offline."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Nordic ruin doorways repaired",
+    "date": "2026-10-20",
+    "version": "Server update",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Doorways in the draugr ruins",
+        "items": [
+          "Several Nordic ruins were missing the stonework that frames a doorway, which left a gap in the wall and made finished passages look half-built. Those frames are back. If you remember a ruin with a hole where a door should have been, it should look right now."
+        ]
+      },
+      {
+        "heading": "Claw doors",
+        "items": [
+          "The spinning-ring doors that need a dragon claw are gone from Druadach Redoubt and Arnima. Their rings cannot be turned on a server, so each one was a dead end rather than a puzzle, and the way past is now open."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Mouse free in chat and panels",
+    "date": "2026-10-20",
+    "version": "Client 0.3.105",
+    "tag": "Change",
+    "sections": [
+      {
+        "heading": "Client 0.3.105",
+        "items": [
+          "With chat or a DragonBreak panel open, your mouse can now leave the game window (no more alt-tab to a second monitor).",
+          "Fixed a crash some players hit right after loading in."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Pigeons reach anyone you have exchanged introductions with",
+    "date": "2026-10-19",
+    "version": "Hotfix",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Pigeons",
+        "items": [
+          "When you and another player have both introduced yourselves to each other, your pigeons reach them wherever they are, Cyrodiil or Skyrim, and theirs reach you. They show in the coop's list by name and #TAG. The people you have met in person stay in the list too. Introductions from before today count.",
+          "Silver a vampire or werewolf can't carry now gathers in one letter in their mailbox, instead of a new letter every time."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Arrests stay in their own hold",
+    "date": "2026-10-19",
+    "version": "Server update",
+    "tag": "Change",
+    "sections": [
+      {
+        "heading": "Cuffs per hold",
+        "items": [
+          "A hold's guards and officials can restrain, carry and jail only inside their own hold. Outside it they have no arrest powers.",
+          "The Empire's factions (the Legion, the Civil Commission, the Penitus Oculatus) and the Thalmor arrest anywhere. The Stormcloaks arrest only in Skyrim, and the Great Houses only on Solstheim. Only officers and sergeants carry that power, not plain members."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Offices belong to one character",
+    "date": "2026-10-19",
+    "version": "Server update",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Your seat is your character's",
+        "items": [
+          "A court office (Jarl, Steward, Guard and the rest) now belongs to the character who was elected or appointed, not to every character on the account. Your other characters no longer hold your office's powers."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Goblin racial gifts",
+    "date": "2026-10-19",
+    "version": "Server update",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Every goblin colour",
+        "items": [
+          "Goblins with swamp, ash or ochre skin now have the Goblin's racial gift and the Feeding Frenzy power, like green goblins already did."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Better boss loot",
+    "date": "2026-10-19",
+    "version": "Server update",
+    "tag": "Change",
+    "sections": [
+      {
+        "heading": "Bosses carry more",
+        "items": [
+          "The boss of every dungeon now carries a proper boss's loot when you search the body with E, not only the masters of the Cyrodiil expeditions.",
+          "Dragon priests are no longer skinned like animals. A dragon priest always carries a filled soul gem (Grand at Expert and Master), often a flawless gem, and now and then something rare: a Dragon Priest Dagger or a dragon priest's staff. The higher the difficulty, the better the odds.",
+          "Other bosses sometimes carry a flawless gem as well. And a dragon priest at Expert or Master may, very rarely, give up its mask. Each mask exists only once in the world: once found, it never drops again."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Bank coin purses",
+    "date": "2026-10-19",
+    "version": "Server update",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Banks keep their coin",
+        "items": [
+          "Coin purses inside the banks can no longer be taken. They belong to the bank."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Gear wear paused",
+    "date": "2026-10-19",
+    "version": "Server update",
+    "tag": "Change",
+    "sections": [
+      {
+        "heading": "Wear is off for now",
+        "items": [
+          "Weapon and armour wear is switched off until more players are online. Gear no longer wears down, Worn and Damaged gear works at full strength, and Broken gear can be worn again.",
+          "Item names keep their Worn, Damaged or Broken tag for now; it does nothing while wear is off."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "A stuck dungeon load no longer costs you the dungeon",
+    "date": "2026-10-19",
+    "version": "Hotfix",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Dungeons",
+        "items": [
+          "If you have to quit within 5 minutes of claiming a dungeon (for example, stuck on its loading screen), your claim is kept for 10 minutes so you can come straight back in.",
+          "If the claim runs out before you return, the dungeon no longer rests for you for an hour, unless something in it was already looted."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Coin purses, safe character editing and other fixes",
+    "date": "2026-10-19",
+    "version": "Hotfix",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Coin purses",
+        "items": [
+          "Coin purses can be harvested again, and the Harvesting skill's purse bonuses count once more. Loose gold piles still give nothing: gold comes from work, trade and taxes."
+        ]
+      },
+      {
+        "heading": "Repairs",
+        "items": [
+          "Repairs at a sharpening wheel or an armorer's bench are a Blacksmith's work: the smith must hold the rank the piece needs. Without it, bring your gear to a smith.",
+          "Taking gear off no longer forgets how worn it was inside its tier.",
+          "Field tools are on their way: a whetstone for weapons, a sewing kit for light armour and clothing, and a hammer for heavy armour. Each use mends part of a Worn piece's wear, more for a better Blacksmith, but never brings it back to whole: that is a smith's job. Tools can break, except in a Master's hands."
+        ]
+      },
+      {
+        "heading": "Woodcutting",
+        "items": [
+          "Each chopping block now rests for you alone after you split its logs. Others can still use it while you wait."
+        ]
+      },
+      {
+        "heading": "Character editing",
+        "items": [
+          "While you are making your character, rerolling, or changing your look with /appearance, nothing can hurt you, and you cannot attack anyone."
+        ]
+      },
+      {
+        "heading": "Vampires, werewolves and silver",
+        "items": [
+          "Silver you cannot carry still goes to your mailbox, but you can now burn that letter with the silver in it, and it no longer keeps your mail marker lit. Taking it out only sent it straight back before."
+        ]
+      },
+      {
+        "heading": "Dungeons",
+        "items": [
+          "Rannveig's Fast can't be claimed for now: a hole in its floor drops you out of the world. It comes back once the hole is closed."
+        ]
+      },
+      {
+        "heading": "Pigeon contacts",
+        "items": [
+          "A contact you have met can see whether you are in the land only when you have both shared your whereabouts with /ledger share. With the next client update, the coop will say \"Whereabouts not shared\" for such contacts instead of the misleading \"Away\"."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Gear wear is kept, and the bench shows what to repair",
+    "date": "2026-10-19",
+    "version": "Hotfix",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Repairs",
+        "items": [
+          "Repairs at a sharpening wheel or an armorer's bench are a Blacksmith's work: the smith must hold the rank the piece needs. Without it, bring your gear to a smith.",
+          "Taking gear off no longer forgets how worn it was inside its tier.",
+          "Field tools are on their way: a whetstone for weapons, a sewing kit for light armour and clothing, and a hammer for heavy armour. Each use mends part of a Worn piece's wear, more for a better Blacksmith, but never brings it back to whole: that is a smith's job. Tools can break, except in a Master's hands."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Fortify Alchemy gear counts again",
+    "date": "2026-10-19",
+    "version": "Hotfix",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Alchemy",
+        "items": [
+          "Fortify Alchemy on the gear you wear helps your brewing again. Each point is a 1% chance that a potion comes out one strength above your Alchemist rank. Four 25% pieces make it every brew.",
+          "It never lifts a potion more than one strength. It never opens an effect your rank has not reached, and it never adds strength to a combination potion.",
+          "Each piece counts for at most 25%, and all your gear together for at most 100%. Fortify Enchanting potions are still not brewed, so the old potion-and-enchanting loop cannot build on itself."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Poisons work",
+    "date": "2026-10-19",
+    "version": "Hotfix",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Weapon poisons",
+        "items": [
+          "A poison you put on a weapon now takes effect when the blow lands. It does its damage at once, and lingering poisons keep draining for their duration. Each coat is used up by one blow. A blocked blow carries no poison.",
+          "Poison damage is a share of the target's own health, so it hurts a large creature and a small one alike. A poison never lands the killing blow: it leaves the target on its last sliver of health, and your next strike finishes them."
+        ]
+      },
+      {
+        "heading": "Poison and burning spells",
+        "items": [
+          "Spells that do damage over time, such as Toxic Missile, Toxic Volley, Searing Poison and Ignite, now do their full damage. Before, only the first second landed, so a 10-second poison did a tenth of what it says.",
+          "Casting the spell again restarts the effect rather than stacking it. A held spell like Toxic Volley keeps its lingering damage until you let go. Like weapon poisons, this lingering damage never lands the killing blow."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Skinning tells you when a hide is beyond you",
+    "date": "2026-10-19",
+    "version": "Hotfix",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Skinning",
+        "items": [
+          "When a hide such as a bear's or a sabre cat's needs a higher Skinner rank than yours, the first E on the body now only tells you so, on screen and in chat, and names the rank it takes. Before, the body's loot window opened at once and hid the message.",
+          "Press E again to search the body for its meat and anything else on it."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Repairs take materials",
+    "date": "2026-10-19",
+    "version": "Server update",
+    "tag": "Change",
+    "sections": [
+      {
+        "heading": "Every repair uses some of what the item is made from",
+        "items": [
+          "Repairing Worn gear now takes a quarter of the materials the item is made from, Damaged gear half, and Broken gear all of them, along with the gold fee. Amounts round down, but always at least one of the main material."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Faction rules: allegiances and faiths",
+    "date": "2026-10-19",
+    "version": "Server update",
+    "tag": "Changed",
+    "sections": [
+      {
+        "heading": "Allegiances",
+        "items": [
+          "The Orc strongholds' clans, the Imperial Civil Commission and the Penitus Oculatus are now allegiances: a member of one cannot also serve the Legion, the Stormcloaks, the Thalmor, a Great House, a court, or another of them.",
+          "Nobody loses a membership they already hold."
+        ]
+      },
+      {
+        "heading": "Faiths",
+        "items": [
+          "The Imperial Cult and the Great Faiths are now a faith, not a guild: you can belong to one of them as well as to a guild.",
+          "Only followers of the Eight Divines may join them. Choose your god at their shrine first.",
+          "The Vigil of Stendarr stays a guild, as a militant order."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Cooked Dog Meat",
+    "date": "2026-10-19",
+    "version": "Server update",
+    "tag": "New",
+    "sections": [
+      {
+        "heading": "At any cooking pot",
+        "items": [
+          "Cook raw dog meat with a pinch of salt at any cooking pot."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Faiths of Tamriel and the Green Pact",
+    "date": "2026-10-18",
+    "version": "Hotfix",
+    "tag": "New",
+    "sections": [
+      {
+        "heading": "Faiths",
+        "items": [
+          "Every god now belongs to a faith: the Imperial Cult, the Old Ways of the Nords, the Aldmeri Pantheon, the Green Pact, the Reclamations of the Dunmer, the Riddle'Thar of the Khajiit, the Yokudan gods of the Redguards, the Hist and Sithis, the Orcish Faith, the Old Gods of the Reach, the Deep of the Maormer, Daedric worship and the cults. Your god places you in a faith, the one of your people first when it fits.",
+          "You can pray at the shrine of any god of your faith. Your own god answers more often.",
+          "Changing to another god of your faith takes one day. Changing your faith still takes the week.",
+          "Fifteen gods from the lore join the roster, among them Shor, Tsun, Magnus, Xarxes, Y'ffre, Jephre, Baan Dar, Alkosh, Rajhin, Leki, Onsi, Satakal and Sithis. Sithis is hunted and Rajhin is a criminal's god. Gods also go by their other names, such as Kyne and Khenarthi for Kynareth.",
+          "Every new god blesses those who pray at their shrine. Three give a boon of their own: Xarxes, what you read teaches you more, at half of Hermaeus Mora's gift; Y'ffre, meat fills your hunger twice as much; Alkosh, your unarmed blows land 10% harder.",
+          "The fifteen new gods have wayshrines in the world: most around Bruma and its county, a few in their homelands on Summerset, in the Alik'r and at Lilmoth. Choose your faith and then your god in the Deity tab of your journal (F3), and pray at their shrine."
+        ]
+      },
+      {
+        "heading": "The Green Pact",
+        "items": [
+          "A wood elf sworn to the Green Pact may not cut wood at a chopping block or pick plants. Y'ffre forbids it.",
+          "Under the Meat Mandate, a sworn wood elf can press E on a person they or their party killed in the last three game days to eat of the body. A short kneel fills their hunger. After that, E on the same body searches it as usual. /partake off makes E search instead of eat.",
+          "A player's body is never eaten without that player's consent. They are asked, and only /partake yes allows it.",
+          "Eating the dead is a crime in the Empire. Guards within 30 metres are told what they saw.",
+          "Wood elves who chose their god before today are not bound. They join with /greenpact swear. Wood elves who choose a god of the Pact from now on are sworn by that choice."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Weapon and armour wear",
+    "date": "2026-10-19",
+    "version": "Server update",
+    "tag": "New",
+    "sections": [
+      {
+        "heading": "Gear wears down",
+        "items": [
+          "Weapons and armour now wear down: Worn, Damaged, then Broken, shown in the item's name. Worn gear loses a little of its damage or armour, Damaged more, and Broken gear cannot be worn.",
+          "Repair them at a sharpening wheel (weapons) or an armorer's bench (armour): a smith of the item's tier, a small fee, and for broken gear the materials it is made from."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Faction ranks",
+    "date": "2026-10-16",
+    "version": "Server update",
+    "tag": "Change",
+    "sections": [
+      {
+        "heading": "Leaders run their ranks",
+        "items": [
+          "A faction's leader can now add, remove, reorder and rename its ranks, and set each rank's role, from the Faction tab of the F3 Journal. Before, only staff could add or remove ranks.",
+          "A rank someone holds cannot be removed until they are moved to another rank. The leader's own rank always stays at the top, and there is only one."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "The Great Faiths in Solitude",
+    "date": "2026-10-19",
+    "version": "Server update",
+    "tag": "Change",
+    "sections": [
+      {
+        "heading": "Solitude's Temple of the Divines",
+        "items": [
+          "Solitude's Temple of the Divines is now a house of the Great Faiths, as the Cathedral of St Martin in Bruma is. Its Scholars' Ledger sells the faith's Restoration and Alteration tomes to its members, and the faith's senior ranks can teach a spell there.",
+          "Prepared spells can be changed anywhere in the temple."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Player shops",
+    "date": "2026-10-19",
+    "version": "Gameplay",
+    "tag": "New",
+    "sections": [
+      {
+        "heading": "Opening a shop",
+        "items": [
+          "Any business can now sell its owner's own goods. If you do not have a business yet, stand inside a property you own and type /business open <name>, then set its ledger book on the counter.",
+          "Choose a shop chest: type /business shop chest, then within a minute open the chest inside your business that should hold your goods. A chest that is rented out as storage cannot be a shop chest.",
+          "Only you and your staff can open the shop chest. Put your goods in it, then give each kind of item a price per item: /business shop shows the stock with numbers, and /business shop price <number> <gold each> sets a price (or off to take it off sale). Anything without a price is not for sale.",
+          "Enchanted and improved items are priced separately from plain ones and keep their enchantment when sold. Artifacts and keys can never be sold.",
+          "To stop selling, make it a plain chest again with /business shop chest off. Closing the business does the same. Your goods stay in the chest either way."
+        ]
+      },
+      {
+        "heading": "Buying",
+        "items": [
+          "Inside a business, type /shop to see what it sells, how many are left and the price of each, then /shop buy <number> <how many>. The ledger book also tells you when a shop has goods for sale.",
+          "You pay with the gold in your pack. You always pay the price you were shown. If the price changed in the meantime, the sale is stopped and you are shown the new price.",
+          "The shop works when its owner is offline. If a sale cannot be finished, everything is put back and you get your gold back."
+        ]
+      },
+      {
+        "heading": "Where the gold goes",
+        "items": [
+          "Each sale pays the hold's tax at the rate its rulers set, and a tenth of the price leaves the game to keep gold from piling up. The rest goes into the owner's bank account, or into the faction's treasury if the business belongs to a faction.",
+          "Every sale is written in the business ledger."
+        ]
+      },
+      {
+        "heading": "Coming with the next game update",
+        "items": [
+          "With the next game update the ledger panel gets a Buy list for customers and a Shop page for owners and staff (choose the chest, set prices with a click). The commands above keep working."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Factions can earn gold from businesses and bounties",
+    "date": "2026-10-19",
+    "version": "Gameplay",
+    "tag": "New",
+    "sections": [
+      {
+        "heading": "Faction businesses",
+        "items": [
+          "A faction can now run a business. Its takings (bed rent, rented storage and sales at its ledger) go into the faction's treasury instead of the owner's pocket, after the hold's usual tax. No new gold is made: it is the same money customers already pay.",
+          "To set one up, the owner of a business who belongs to the faction stands inside it and types /business faction <faction name>. A leader or officer of the faction then accepts inside the business with the same command. A leader who owns the business, or a business in the faction's own hall, can be registered straight away.",
+          "The faction's leader and officers can keep the business ledger and name other members as staff (/business staff add <name>). A business belongs to one faction at a time. The leader, an officer or the owner can hand it back with /business faction off, and the takings go to the owner again."
+        ]
+      },
+      {
+        "heading": "Bounty hunting",
+        "items": [
+          "When an outlaw with a hold bounty is locked up in that hold's jail, a quarter of the bounty they pay goes to the treasury of the faction that brought the outlaw in (whoever was carrying or holding them, otherwise the guard who locks the door). The guard who jails them keeps the rest. Hunting factions such as the Imperial Legion and the Fighters Guild are chosen first.",
+          "No new gold is made: the share comes out of the bounty paid. If the outlaw cannot pay and serves extra time instead, there is no share. When the outlaw is brought in by staff, by the hold's own guards and officials, or by a player in no faction, the guard who jails them keeps it all. A faction never earns a share for bringing in one of its own members.",
+          "Faction leaders who are online are told when their faction earns a share. Paying your own bounty with /bounty pay works as before."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "The Imperial tithe is now a quarter of all hold income",
+    "date": "2026-10-18",
+    "version": "Gameplay",
+    "tag": "Change",
+    "sections": [
+      {
+        "heading": "Cyrodiil's holds and the Imperial Legion",
+        "items": [
+          "The Empire's share of a Cyrodiil hold's income is now 25% (it was 10%), and it is taken on all of the hold's income, not only its property tax: taxes, rent, house sales, shop and sales taxes, notice and postage fees, bounties paid and other payments into the hold's treasury.",
+          "It is paid each Sunday at the weekly reckoning to the Imperial Legion's treasury. No new gold is made: the Legion is funded only from this share. Money a treasury gets back from its own spending, such as returned contract rewards or refunds, is not counted.",
+          "Skyrim's Holds pay no tithe, and the Legion pays none on its own income. A hold's weekly report now shows the tithe split between property tax and its other income."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Founding a guild takes 10 members",
+    "date": "2026-10-18",
+    "version": "Gameplay",
+    "tag": "Update",
+    "sections": [
+      {
+        "heading": "Faction charters",
+        "items": [
+          "A new guild or faction now needs 10 founding members, each on a different account, before its charter can be submitted (it was 3). A charter can have up to 15 founders. The Founder, an Officer and a Sergeant are still required among them, and the founders have 7 days from the draft to gather (it was 48 hours)."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Vampire and werewolf turning",
+    "date": "2026-10-18",
+    "version": "Server update",
+    "tag": "Change",
+    "sections": [
+      {
+        "heading": "No trial at the end of the fever",
+        "items": [
+          "When Sanguinare Vampiris or Sanies Lupinus has run its course, you now become a vampire or a werewolf straight away. The Blood Fever and Hircine's Hunt trials at the peak of the fever are gone, and nobody dies at the end of the incubation any more.",
+          "The fever can still be cured before it peaks. Molag Bal's Embrace and Hircine's Great Hunt at the shrines are unchanged."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Hunting contracts in the Court tab",
+    "date": "2026-10-18",
+    "version": "Next client update",
+    "tag": "New",
+    "sections": [
+      {
+        "heading": "Court",
+        "items": [
+          "With the next client update, your journal's Court tab (F3) shows a hold's terms for its standing hunting contracts: the pay per kill for pests, dangerous beasts and deadly beasts, the weekly budget, how much of it is spent and left this week and when it renews, whether the contracts are for its citizens only, and who last changed them.",
+          "Those who set the hold's tax (its Jarl or Count, its Steward, and the staff) can change the pay for each kind, the weekly budget, and switch standing contracts on or off right there, with the same limits as /contract price, /contract budget and /contract standing, which keep working."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Staff hold no leadership",
+    "date": "2026-10-18",
+    "version": "Hotfix",
+    "tag": "Staff",
+    "sections": [
+      {
+        "heading": "Staff",
+        "items": [
+          "Staff of every rank, Trial GMs included, cannot stand in an election court, cannot be appointed to a leading office of a court (they can still serve as a guard or a court mage), and cannot hold a leader or officer rank in any faction."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Outlaw bounties",
+    "date": "2026-10-18",
+    "version": "Hotfix",
+    "tag": "New",
+    "sections": [
+      {
+        "heading": "Law",
+        "items": [
+          "A hold's ruler or Steward can put a bounty of up to 1,000 gold on a wrongdoer: /bounty set <name or #TAG> <gold> <reason>. /bounty shows who is wanted in the hold you stand in, and any bounty on you.",
+          "A bounty belongs to its hold. When an outlaw is jailed in that hold, they pay it as a fine, from the gold they carry and then from their bank account, and it goes to whoever locked them in. What they cannot pay, they serve as extra time in the cell: a minute for every 10 gold.",
+          "An outlaw can settle their own bounty first with /bounty pay, standing in the hold; the gold goes to its treasury."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Hunting contracts pay the hold back",
+    "date": "2026-10-18",
+    "version": "Hotfix",
+    "tag": "Change",
+    "sections": [
+      {
+        "heading": "Contracts",
+        "items": [
+          "When you kill a creature for a hunting contract, the hold takes its pelt or hide as proof of the kill and sells it on: three quarters of its value goes back into the hold's treasury. You are told when it happens, and you are paid as before.",
+          "That body cannot be skinned for its pelt, but its meat and anything else it carried stay with it.",
+          "Creatures without a pelt (skeevers, mudcrabs and the like) are paid exactly as before. The rule is the same for contracts an official posts by hand."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Castle Bruma's gate lever",
+    "date": "2026-10-17",
+    "version": "Hotfix",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Bruma",
+        "items": [
+          "Only the Countess's court (anyone holding a seat in Bruma's court, or in the County household) and the staff can work the lever of Castle Bruma's north gate. Anyone else is told it is not theirs to pull."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Hunting contracts: for citizens, at the hold's price",
+    "date": "2026-10-17",
+    "version": "Gameplay",
+    "tag": "Change",
+    "sections": [
+      {
+        "heading": "For hunters",
+        "items": [
+          "The hold's own standing hunting contracts on the expedition board are now for its citizens. If you are not a citizen of that hold you still see them, stamped \"Citizens only\", but cannot take them. A hold that grants no citizenship keeps them open to everyone.",
+          "Work an official posts by hand stays open to every hunter.",
+          "Each hold has a weekly budget for its standing contracts, 1,000 gold to start. Once a week's budget is taken up, no more standing contracts can be taken there until Monday 00:00 UTC. A contract you give up, or one that runs out, gives its share back to the week's budget.",
+          "Type /contract status to see a hold's pay per kill, how much of this week's budget is left, and who may take its standing work. Contracts you already hold keep their pay."
+        ]
+      },
+      {
+        "heading": "For hold officials",
+        "items": [
+          "Whoever may set a hold's tax (its Jarl or Count and its Steward) now sets the pay per kill for each kind of danger: /contract price 1, 2 or 3 and the gold, from 1 to 200. It starts at 12 for pests, 25 for dangerous beasts and 60 for deadly ones.",
+          "They also set the weekly budget with /contract budget and the gold (0 posts no standing work), and can stop or restart the hold's standing contracts with /contract standing off or on.",
+          "The treasury's safety floor still applies: no contract may take the treasury below it."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Guild halls pay property tax",
+    "date": "2026-10-17",
+    "version": "Gameplay",
+    "tag": "Update",
+    "sections": [
+      {
+        "heading": "Property tax",
+        "items": [
+          "A guild hall or other property whose doors are all indoors, such as Fort Dawnguard, now pays the weekly property tax like any house. It goes to the treasury of the hold it belongs to.",
+          "A property no Steward has assessed is now valued at 500 gold for tax (it was 2,000), so it pays 50 gold a week at the lowest rate. A hold can raise its rate or have a Steward assess a house."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Reading: new tome and scroll odds",
+    "date": "2026-10-17",
+    "version": "Hotfix",
+    "tag": "Change",
+    "sections": [
+      {
+        "heading": "Scholar",
+        "items": [
+          "Every book you read through has a fixed chance to hold a spell tome or a scroll, by rank. Tomes: Novice 1 in 143, Apprentice 1 in 167, Adept 1 in 333, Expert 1 in 625, Master 1 in 2,500. Scrolls: Novice 1 in 57, Apprentice 1 in 67, Adept 1 in 80, Expert 1 in 250, Master 1 in 600.",
+          "Each rank opens at a Scholar level: Novice for everyone, Apprentice at 25, Adept at 50, Expert at 75 and Master at 90. Higher Scholars still find the lower ranks.",
+          "A reading gives at most one tome or scroll. There is no daily limit, and finding one does not lower your chances afterwards.",
+          "Expert and Master spell tomes no longer need a rank in a college: your Scholar level is enough."
+        ]
+      },
+      {
+        "heading": "Fixes",
+        "items": [
+          "Saving a new look in the appearance editor no longer leaves your name as \"Masked Person\" when you opened the editor behind a mask and saved it after logging back in. If this happened to you, a GM can give your name back with /rename."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Ebony in the hardest dungeons",
+    "date": "2026-10-17",
+    "version": "Gameplay",
+    "tag": "Update",
+    "sections": [
+      {
+        "heading": "Ebony",
+        "items": [
+          "Expert and Master dungeons can very rarely hold an Ebony Ingot: about 1 in 1,000 Expert chests and 1 in 400 Master chests, and 1 in 200 Expert and 1 in 100 Master bosses. It goes to whoever opens the chest first or loots the boss."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Orcish smithing for every Orc",
+    "date": "2026-10-17",
+    "version": "Hotfix",
+    "tag": "Change",
+    "sections": [
+      {
+        "heading": "Smithing",
+        "items": [
+          "Any Orc can now forge Orcish armour and weapons, whether or not they belong to a stronghold. Only Orcs can make them. The Orcish Clan pieces stay with the strongholds' own smiths."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Stepping down from a court",
+    "date": "2026-10-17",
+    "version": "Hotfix",
+    "tag": "Change",
+    "sections": [
+      {
+        "heading": "Courts",
+        "items": [
+          "You can now leave a court you serve on your own: type /court resign followed by the hold's name (for example /court resign Bruma). You give up your post and leave its household, and a citizenship that came with the post ends with it. A ruler steps down through the staff.",
+          "A Step down button in your journal's Court tab (F3) follows with the next client update."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Scribing: spell tomes and scrolls",
+    "date": "2026-10-17",
+    "version": "Server update",
+    "tag": "New",
+    "sections": [
+      {
+        "heading": "Writing spell tomes",
+        "items": [
+          "Master Scholars write spell tomes at a Scholars' Ledger: choose Write a spell tome. You can write a tome of a spell you know, as long as a tome of it exists.",
+          "Novice tomes need no scrolls. Apprentice tomes need 1 scroll, Adept 2 and Expert 4. These can be any scrolls you carry, and the cheapest go first.",
+          "A Master tome needs 5 scrolls of that same spell, and a co-writer: a Master of the spell's school (a Master Priest for Restoration) who knows the spell, stands within 10 metres of you and agrees. You do not need to know a Master spell yourself.",
+          "After you write a tome, you wait before you can write another, whatever its rank: a day after a Novice tome, 2 days after Apprentice, 4 after Adept, a week after Expert and two weeks after Master. A co-writer waits the two weeks too.",
+          "Tomes of raising the dead and of calling or banishing Daedra are still written only by senior college ranks."
+        ]
+      },
+      {
+        "heading": "Writing scrolls",
+        "items": [
+          "Master Scholars also write scrolls of the spells they know, at the same ledger: choose Write a scroll. Master scrolls cannot be written.",
+          "Each scroll uses 1 Linen Wrap, 1 Charcoal (from woodcutting) and 1 filled soul gem of any size. The smallest gem is used first.",
+          "Scrolls have their own wait, apart from tomes: a day after a Novice scroll, 2 days after Apprentice, 3 after Adept and 4 after Expert.",
+          "Both waits are shown on the Scholar page of the Skills tab in your journal (F3), and at the top of both lists."
+        ]
+      },
+      {
+        "heading": "Colleges",
+        "items": [
+          "Any magic college now counts the same as the Synod, the College of Winterhold and the College of Whispers: its leader and officers can teach classes at a Class Lectern and take on more apprentices."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Client 0.3.103: field of view, referrals and the bank",
+    "date": "2026-10-17",
+    "version": "Client 0.3.103",
+    "tag": "Update",
+    "sections": [
+      {
+        "heading": "Client 0.3.103",
+        "items": [
+          "Field of view now sticks: the value you set in the launcher is put on the game camera when you spawn, after the character creator and after a load, instead of sometimes being lost.",
+          "New field of view slider in F3, Settings, Camera. Move it between 50 and 140 and the view changes as you drag. Your choice is kept for your next start, and Reset puts the launcher's value back.",
+          "New Referrals tab in the F3 journal: your invite link and code, how far each friend you invited has got, and your rewards. A new account can enter a friend's code there once, in its first 24 hours of play.",
+          "Item vaults are open: rent a Strongbox (100 weight), a Coffer (250 weight) or a Vault (500 weight) at one gold per weight a week at a hold's bank, from the bank panel. Each hold's bank keeps its own vault, and an unpaid vault is seized after 30 days.",
+          "Gold piles and coin purses lying around the world can no longer be taken: they give nothing now. Gold comes from work, trade and taxes. Gold another player drops can still be picked up.",
+          "The Pale Pass border gates between Skyrim and Cyrodiil stand closed again instead of looking wide open. Walk up to the gate and use it to cross."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "A hold's first election",
+    "date": "2026-10-17",
+    "version": "Hotfix",
+    "tag": "Change",
+    "sections": [
+      {
+        "heading": "Elections",
+        "items": [
+          "A hold's first election does not ask for seven days of citizenship, and that includes whether it starts: the 15 citizens a hold needs to begin its first election are counted without the seven days. No character has yet been a citizen of a hold for a week, so the rule was leaving every hold with nought voters - and because a hold's citizen count is the number who may vote, it read as nought citizens too. Nobody was removed from any roll.",
+          "Everything else still holds for a first vote: the Discord account's age and the hours and days of play are judged as always, and the hold's Voting tab still tells you which one you are missing and when you will meet it.",
+          "Once a hold has seated a court by election, every later election there asks for the seven days, including one that staff restart.",
+          "The Rift's election, which opened before these rules existed, keeps its courts and its closing time: the rules were applied to it where it stands, as its first election, rather than starting it again. From the vote's opening a Rift voter needs the Discord account's age and the hours and days of play above; the seven days are not asked. Nobody has to re-enter a court."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Falkreath, Dawnguard crossbows and Summon Skeleton",
+    "date": "2026-10-17",
+    "version": "Update",
+    "tag": "Update",
+    "sections": [
+      {
+        "heading": "The world",
+        "items": [
+          "Falkreath is fully back to its Cities of the North layout: the floating slabs and rocks, the hole by the wall and the white streak are gone."
+        ]
+      },
+      {
+        "heading": "Smithing",
+        "items": [
+          "Dawnguard smiths can forge the Dawnguard crossbows and bolts again, the enhanced and exploding ones included."
+        ]
+      },
+      {
+        "heading": "Magic",
+        "items": [
+          "Summon Skeleton works for every caster again: everyone gets the regular skeleton until the beast-race skeletons are added.",
+          "The admin panel's Give all spells and Give all shouts are gone for good."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "The Pale's treasury",
+    "date": "2026-10-16",
+    "version": "Server update",
+    "tag": "Change",
+    "sections": [
+      {
+        "heading": "Treasuries",
+        "items": [
+          "The Pale now has a treasury at the Dawnstar bank. It starts with 10,000 gold, the same starting treasury every other hold received.",
+          "Taxes and fees paid in The Pale now go into that treasury, so the Jarl of the Pale has tax income like the other holds."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "More spells held or removed",
+    "date": "2026-10-17",
+    "version": "Hotfix",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Spells",
+        "items": [
+          "Incite Hysteria, Split the Mind, Blinding Mist, Shroud of Endurance and Shroud of Fortitude are held back for now: their effect on other people and creatures only happened on the caster's own screen. They stay in your spellbook.",
+          "The unlocking spells (Unlock Container and Open) are held back for now: locks are kept by the server, and these spells only work on the caster's own screen.",
+          "Two more joke summons have left the realm's magic: Sir Roderic the slaughterfish and the jar bomb."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Draugr, summons and new spells",
+    "date": "2026-10-17",
+    "version": "Hotfix",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Draugr",
+        "items": [
+          "Draugr are no longer far tougher than other foes of their rank, and their blows and shouts land a quarter softer. Deathlords are still the hardest fight of their level."
+        ]
+      },
+      {
+        "heading": "Spells",
+        "items": [
+          "Summoned mounts (Summon Indrik, Ethereal Strider, Arvak) are held back for now: riding a summoned mount wasn't shown to other players and could crash the game. They stay in your spellbook.",
+          "Conjure Ent is held back for now: it could crash the game when it appeared.",
+          "Spells that only worked on the caster's own screen are held back until they work for everyone: the Arnima turrets, Earthen Barrier, Earthen Pillar, Protective Vortex, Dark Circle and Thousand Cuts.",
+          "Some joke summons from Summerset Isles have left the realm's magic (Summon Tolfdir, Hero of Sheo Charles, Baby Daedric Table, the mimics, Slug)."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Fewer bears on Skyrim's roads",
+    "date": "2026-10-17",
+    "version": "Hotfix",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Wildlife",
+        "items": [
+          "A bug made every forest predator spot in Skyrim a bear. Each spot now holds its own creature (skeever, wolf, spider or bear), and the Rift has about a seventh of the bears it had.",
+          "Dangerous predators (bears, sabre cats, ice wraiths, trolls) keep their distance from each other and take an hour to return once killed.",
+          "Bears still hit as hard as ever: the Rift is bear country, just not every few steps."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Who may vote in hold elections",
+    "date": "2026-10-17",
+    "version": "Hotfix",
+    "tag": "Change",
+    "sections": [
+      {
+        "heading": "Elections",
+        "items": [
+          "To vote for a Jarl, your Discord account must be at least 90 days old, you need 10 hours of play on at least 3 different days, and your character must have been a citizen of the hold for 7 days. All three are judged when the vote opens; the hold's Voting tab tells you which one you are missing and when you will meet it.",
+          "Only those who may vote count toward the 15 citizens a hold needs to start an election.",
+          "Staff can strike a vote, with a reason, when one person has voted from more than one account, and can undo it. If your vote is struck you are told, at once or the next time you log in.",
+          "An election already running keeps the old rules, and votes already cast stand.",
+          "Citizenship began on 16 October, so no hold can start an election before about 23 October."
+        ]
+      }
+    ]
+  },
+  {
     "title": "The Lore Master",
     "date": "2026-10-16",
     "version": "Hotfix",

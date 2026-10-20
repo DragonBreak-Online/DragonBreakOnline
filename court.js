@@ -25,6 +25,10 @@
 //   courtRename  [nonce, zoneId, 'office'|'rank', officeId|rankIndex, name]   a Lead GM's name for it ('' = the default)
 //   courtTax     [nonce, zoneId, percent]          the hold's one tax rate (business.js /tax), by Jarl, Count, Steward or staff
 //   courtWage    [nonce, zoneId, office, gold]     an office's weekly wage (economy.js), by the ruler or Steward
+//   courtContractPrice    [nonce, zoneId, tier, gold]   the hold's pay per kill for a danger tier (contracts.js /contract price)
+//   courtContractBudget   [nonce, zoneId, gold]         its weekly budget for standing contracts (/contract budget)
+//   courtContractStanding [nonce, zoneId, 'on'|'off']   standing contracts on or off (/contract standing); all three by
+//                                                       whoever sets its tax, with /contract's bounds and audit
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -32,7 +36,7 @@ const path = require('path');
 module.exports = (api) => {
   const { mp, log, system, audit, who, display, nameOf, tagOf, onUi, onlineActors, isAdmin, profileOf, cfg,
     zoneList, zoneById, readOfficials, rankTitle, appointCap, appointCheck, appointFrom, seatOfficial, unseatOfficial,
-    officialTarget, officialName, accountActors, ranksOf, APPOINT_RULES, findByName } = api;
+    officialTarget, officialName, accountActors, ranksOf, APPOINT_RULES, findByName, unseatOfficialBy } = api;
   const personal = typeof api.personal === 'function' ? api.personal : () => {};
   // The staff override on appointments (seat outright, offer anyone, withdraw anyone's offer) is a Lead GM's and above,
   // like /appoint (gamemode.js appointCap). Any staff tier still sees every court; a GM acts in one only as its office allows
@@ -155,7 +159,7 @@ module.exports = (api) => {
   // ---- the view -------------------------------------------------------------------------------------------------------
   const courtZoneIds = (a) => {
     const ids = new Set();
-    try { for (const m of ranksOf(profileOf(a)) || []) ids.add(m.zone.id); } catch (e) { /* no ranks */ }
+    try { for (const m of ranksOf(profileOf(a), a) || []) ids.add(m.zone.id); } catch (e) { /* no ranks */ }
     const guilds = typeof globalThis.__dboGuildsOf === 'function' ? (globalThis.__dboGuildsOf(a) || []) : [];
     for (const g of guilds) if ((g.kind === 'hold' || g.kind === 'stronghold') && g.zone) ids.add(g.zone);
     for (const o of live()) if (o.pid === profileOf(a)) ids.add(o.zone);
@@ -168,15 +172,18 @@ module.exports = (api) => {
     const n = Number(((APPOINT_RULES || {})[top] || {})[rank]);
     return n > 0 && Number.isFinite(n) ? n : null; // null: no limit (guards)
   };
-  const holderView = (pid) => {
-    const on = onlineOf(pid);
+  const holderView = (pid, zid, rank) => {
+    // The seated character (gamemode.js officials-seats.json) when one is recorded, else the account as before
+    let seated = 0; try { seated = zid && typeof globalThis.__dboSeatHolder === 'function' ? globalThis.__dboSeatHolder(zid, rank, Number(pid)) : 0; } catch (e) { seated = 0; }
+    const live = onlineOf(pid);
+    const on = seated ? (live === seated ? seated : 0) : live;
     const ids = accountActors(pid);
-    const actor = on || ids[0] || 0;
+    const actor = seated || on || ids[0] || 0;
     let tag = '';
     try { tag = actor ? String(tagOf(actor) || '') : ''; } catch (e) { tag = ''; }
     // The own name: the live one was "Werewolf" or "Vampire Lord" while the official was in a beast form, telling anyone who
     // read the roster who the beast was (tracker 1559074270959640676), and "Masked Person" behind a mask
-    return { pid: Number(pid), name: on ? ownNameOf(on) : officialName(pid), tag, online: !!on };
+    return { pid: Number(pid), name: on ? ownNameOf(on) : seated ? ownNameOf(seated) : officialName(pid), tag, online: !!on };
   };
   // The ruler's office (its household rank is the leader's) is never paid a wage (economy.js payroll)
   const isRulerOffice = (rank) => ((C.factionRanks || {})[rank] || []).includes('@leader');
@@ -194,7 +201,7 @@ module.exports = (api) => {
       const cap = appointCap(a, z, rank);
       // default, only on an office staff renamed (rolenames.js): what zones.json calls it
       const named = RN() && RN().officeName(z.id, rank) ? { named: true, default: RN().officeDefault(rank) } : {};
-      return Object.assign({ rank, title: rankTitle(rank, z.id), seats: seatsOf(z, rank), holders: (zo[rank] || []).map(holderView), canAppoint: cap > 0 }, named,
+      return Object.assign({ rank, title: rankTitle(rank, z.id), seats: seatsOf(z, rank), holders: (zo[rank] || []).map((pid) => holderView(pid, z.id, rank)), canAppoint: cap > 0 }, named,
         wages && !isRulerOffice(rank) ? { wage: Math.floor(Number(wages[rank]) || 0) } : {});
     });
     const pid = profileOf(a);
@@ -210,7 +217,10 @@ module.exports = (api) => {
       if (globalThis.__dboHoldTax) tax = { pct: Math.round(Number(globalThis.__dboHoldTax(z.id)) * 100), max: Math.round(Number(globalThis.__dboHoldTaxMax ? globalThis.__dboHoldTaxMax() : 0.3) * 100),
         canSet: !!(globalThis.__dboCanSetHoldTax && globalThis.__dboCanSetHoldTax(a, z.id)) };
     } catch (e) { tax = null; }
-    return { id: z.id, name: z.name, kind: z.center ? 'stronghold' : z.capital ? 'hold' : 'region', mine: !!mine, offices, outgoing, household, treasury, tax, keepsBooks,
+    // The hold's terms for its standing hunting contracts (contracts.js __dboContractTerms), only where a treasury pays them
+    let contracts = null;
+    try { if (z.treasury && globalThis.__dboContractTerms) contracts = globalThis.__dboContractTerms.view(a, z.id) || null; } catch (e) { contracts = null; }
+    return { id: z.id, name: z.name, kind: z.center ? 'stronghold' : z.capital ? 'hold' : 'region', mine: !!mine, offices, outgoing, household, treasury, tax, keepsBooks, contracts,
       appointable: offices.filter((o) => o.canAppoint).map((o) => ({ rank: o.rank, title: o.title })), canName };
   };
   const visible = (a) => {
@@ -277,6 +287,16 @@ module.exports = (api) => {
     return { text: `${z.name} now taxes ${Math.round(rate * 100)}% of every rent and, each week, of every property's value.` };
   };
   onUi('courtTax', (a, args) => { if (fresh(a, args)) answer(a, () => setTax(a, args)); });
+  // courtContractPrice/Budget/Standing: the hold's terms for standing hunting contracts, by the same people and rules as
+  // /contract price|budget|standing (contracts.js setTerms: who may, the bounds, the audit line)
+  const setContract = (a, args, what, rest) => {
+    const z = zoneFor(a, args[1]); if (!z) return NO_COURT;
+    if (!z.treasury || !globalThis.__dboContractTerms) return { error: `${z.name} posts no hunting contracts.` };
+    return globalThis.__dboContractTerms.set(a, z.id, what, rest) || { error: 'That cannot be done just now.' };
+  };
+  onUi('courtContractPrice', (a, args) => { if (fresh(a, args)) answer(a, () => setContract(a, args, 'price', [args[2], args[3]])); });
+  onUi('courtContractBudget', (a, args) => { if (fresh(a, args)) answer(a, () => setContract(a, args, 'budget', [args[2]])); });
+  onUi('courtContractStanding', (a, args) => { if (fresh(a, args)) answer(a, () => setContract(a, args, 'standing', [args[2] === true || args[2] === 'on' ? 'on' : args[2] === false || args[2] === 'off' ? 'off' : String(args[2])])); });
   // courtWage [nonce, zoneId, office, gold]: economy.js's rules (the ruler or Steward; nobody sets their own)
   onUi('courtWage', (a, args) => {
     if (!fresh(a, args)) return;
@@ -299,6 +319,25 @@ module.exports = (api) => {
       return unseatOfficial(a, z, tg);
     });
   });
+  // A member steps down from their own court (Nate, 17 Oct: "people need the ability to leave factions on their own"): the
+  // office, then the household. The ruler's seat stays with the staff, so one click never empties a hold
+  const resign = (a, zoneId) => {
+    const z = zoneFor(a, zoneId); if (!z || !courtZoneIds(a).has(z.id)) return NO_COURT;
+    const pid = Number(profileOf(a));
+    const zo = readOfficials()[z.id] || {};
+    const had = Object.keys(zo).find((r) => (zo[r] || []).map(Number).includes(pid));
+    if (had && isRulerOffice(had)) return { error: `The ${rankTitle(had, z.id)} of ${z.name} steps down through the staff. Ask a Lead GM.` };
+    if (had) {
+      if (typeof unseatOfficialBy !== 'function') return { error: 'You cannot step down just now.' };
+      const tg = target(String(pid)); if (tg.error) return tg;
+      const r = unseatOfficialBy(z, tg, `${who(a)} (stepped down)`); if (r.error) return r;
+    }
+    const fid = holdFactionOf(z.id);
+    const left = !!fid && typeof globalThis.__dboGuildLeave === 'function' && globalThis.__dboGuildLeave(a, fid) === true;
+    if (!had && !left) return { error: `You hold no post in ${z.name}.` };
+    return { text: `You have stepped down from the court of ${z.name}${had ? `, and are no longer its ${rankTitle(had, z.id)}` : ''}.` };
+  };
+  onUi('courtResign', (a, args) => { if (fresh(a, args)) answer(a, () => resign(a, args[1])); });
   onUi('courtMove', (a, args) => {
     if (!fresh(a, args)) return;
     answer(a, () => {
@@ -387,8 +426,16 @@ module.exports = (api) => {
         const r = answerOffer(a, o.id, s === 'accept');
         return personal(a, r.error || r.text);
       }
-      personal(a, 'Usage: /court (your journal\'s Court tab), /court offers, /court accept [number], /court decline [number]');
-    }, { help: '[offers|accept|decline] the posts a court offers you (F3 Court shows them too)' });
+      // Until the Court tab has its Step down button: the hold is named in full, so a slip of the keys resigns nothing
+      if (s === 'resign') {
+        const q = rest.join(' ').toLowerCase();
+        const z = zoneList().find((x) => courtZoneIds(a).has(x.id) && (x.id === q || String(x.name).toLowerCase() === q));
+        if (!z) { const names = zoneList().filter((x) => courtZoneIds(a).has(x.id)).map((x) => x.name); return personal(a, names.length ? `Name the court to step down from: /court resign ${names.join(' | ')}` : 'You serve no court.'); }
+        const r = resign(a, z.id);
+        return personal(a, r.error || r.text);
+      }
+      personal(a, 'Usage: /court (your journal\'s Court tab), /court offers, /court accept [number], /court decline [number], /court resign <hold>');
+    }, { help: '[offers|accept|decline|resign <hold>] the posts a court offers you, or step down from your own (F3 Court shows them too)' });
   }
 
   log(`court ${C.enabled ? 'on' : 'off'}: ${zoneList().length} courts, ${live().length} open offers`);

@@ -500,6 +500,7 @@
       "id": "college-of-winterhold",
       "name": "College of Winterhold",
       "kind": "guild",
+      "college": true,
       "ranks": [
         {
           "title": "Arch-Mage",
@@ -572,6 +573,7 @@
       "id": "synod",
       "name": "The Synod",
       "kind": "guild",
+      "college": true,
       "ranks": [
         {
           "title": "Chancellor of the Synod",
@@ -623,6 +625,7 @@
       "id": "college-of-whispers",
       "name": "College of Whispers",
       "kind": "guild",
+      "college": true,
       "ranks": [
         {
           "title": "Master of Whispers",
@@ -1014,10 +1017,11 @@
         "cells": [
           "12cb:BSHeartland.esm",
           "5f78c:BSHeartland.esm",
-          "5f78d:BSHeartland.esm"
+          "5f78d:BSHeartland.esm",
+          "16a02:Skyrim.esm"
         ]
       },
-      "note": "Nate 11 Oct 2026 (option A): the players' order of the Eight Divines that runs the Cathedral of St Martin in Bruma, led by Sylvia Dawnveil (its notice: 'Priests and Knights of all Eight Divines'). Neutral: not the Empire's Imperial Cult. At the Cathedral it sells Restoration and Alteration tomes to its own by rank as the colleges do, its Senior ranks (Priest and up) teach those schools, and its sermons offer their spell. The leader may rename the ranks. Staff seat the High Priest."
+      "note": "Nate 11 Oct 2026 (option A): the players' order of the Eight Divines that runs the Cathedral of St Martin in Bruma (and, since 19 Oct, Solitude's Temple of the Divines), led by Sylvia Dawnveil (its notice: 'Priests and Knights of all Eight Divines'). Neutral: not the Empire's Imperial Cult. At the Cathedral it sells Restoration and Alteration tomes to its own by rank as the colleges do, its Senior ranks (Priest and up) teach those schools, and its sermons offer their spell. The leader may rename the ranks. Staff seat the High Priest."
     },
     {
       "id": "stormcloaks",
