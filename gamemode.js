@@ -7073,10 +7073,11 @@ const potionBonus = (a, hook) => { try { const f = globalThis.__dboPotionBonus; 
 // bar then holds base + extra points, which is what a larger maximum is; restores stay shares of the bar. Sleeping Tree
 // Sap (hook taken) takes its share off every hit. Both sit outside the racial cap, as a larger pool is not a resistance.
 const potionMaxSeen = globalThis.__dboPotionMaxSeen instanceof Map ? globalThis.__dboPotionMaxSeen : (globalThis.__dboPotionMaxSeen = new Map());
+// Worn Fortify Health counts the same way, a player's gear at most gearEnchantments.fortifyHealth.gearHealthCap (gearench.js)
+const gearHealthPoints = (targetId) => { try { return gearEnch && profileOf(targetId) >= 0 ? Math.max(0, Number(gearEnch.healthPoints(targetId >>> 0)) || 0) : 0; } catch (e) { return 0; } };
 const potionTakenMult = (targetId, flags) => {
-  if (typeof globalThis.__dboPotionBonus !== 'function') return 1;
   let m = 1;
-  const extra = potionBonus(targetId, 'health');
+  const extra = potionBonus(targetId, 'health') + gearHealthPoints(targetId);
   // A weapon hit names the maximum; a spell hit does not, so the last one seen for the target stands in (it changes only
   // with the character's level), else downed.js's measured one, else the smallest a character has (150)
   let base = flags && typeof flags === 'object' ? Number(flags.targetMaxHealth) : NaN;

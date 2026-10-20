@@ -361,6 +361,15 @@ const hp = (a) => S.get(a).percentages.health;
   check('sourceResistsOf takes a magic effect as its own source', /ownData = r && String\(r\.record\.type\) === 'MGEF'/.test(gm));
   check('racial.js counts a magic effect as magic', /\['SPEL', 'ENCH', 'SCRL', 'MGEF'\]/.test(read('racial.js')));
   check('item 2: worn resistances join the target side, before racial.js caps it', /potionResistMult\(tgt, src\) \* gearResistMult\(tgt, src\);\n    if \(racial\) \{ try \{ targetSide = racial\.capTargetSide/.test(gm));
+  // item 3: potionTakenMult, lifted out of gamemode.js with a worn Fortify Health 50 and no potion
+  {
+    const from = gm.indexOf('// Worn Fortify Health counts the same way'), to = gm.indexOf('const potionAttackMult =');
+    const fn = new Function('gearEnch', 'profileOf', 'potionBonus', 'potionMaxSeen', `${gm.slice(from, to)}; return potionTakenMult;`)(
+      { healthPoints: (a) => (a === 1 ? 50 : 0) }, (a) => (a === 1 || a === 2 ? 7 : -1), () => 0, new Map());
+    check('item 3: a 150-health player with Fortify Health 50 worn takes a hit as on a 200 pool (x0.75)', near(fn(1, { targetMaxHealth: 150 }), 0.75), fn(1, { targetMaxHealth: 150 }));
+    check('...without it, x1', fn(2, { targetMaxHealth: 150 }) === 1);
+    check('...works with alchemy.js not loaded (no early return on __dboPotionBonus)', !/const potionTakenMult = \(targetId, flags\) => \{\n  if \(typeof globalThis\.__dboPotionBonus/.test(gm));
+  }
   console.log(failed ? `${failed} failed` : 'all checks passed');
   process.exit(failed ? 1 : 0);
 })().catch((e) => { console.log('FAIL harness threw', e.stack); process.exit(1); });
