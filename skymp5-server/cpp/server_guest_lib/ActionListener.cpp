@@ -776,17 +776,110 @@ bool CanCastSpell(const MpActor& actor, uint32_t spellId)
     (actor.IsSpellLearned(spellId) || IsSpellInTemplateTree(actor, spellId));
 }
 
-// Cloaks and hazards (Blizzard) hit with a spell they grant, not the spell that was cast
+// A record's fields of one type, as raw little-endian uint32 at an offset
+template <class Callback>
+void ForEachFieldUint32(WorldState* worldState, const espm::RecordHeader* rec,
+                        const char* fieldType, uint32_t offset,
+                        const Callback& callback)
+{
+  espm::RecordHeaderAccess::IterateFields(
+    rec,
+    [&](const char* type, uint32_t size, const char* data) {
+      if (!std::memcmp(type, fieldType, 4) && size >= offset + 4) {
+        callback(*reinterpret_cast<const uint32_t*>(data + offset));
+      }
+    },
+    worldState->GetEspmCache());
+}
+
+// The spells of the hazards an impact data set's impacts leave (IPDS PNAM: material, IPCT; IPCT NAM2: HAZD), global ids.
+// A wall's burning ground comes this way, not from a Spawn Hazard effect: Wall of Flames' MAGFlamesBarrierImpact. Cached
+const std::vector<uint32_t>& ImpactHazardSpells(WorldState* worldState,
+                                                uint32_t impactDataSetId)
+{
+  static std::unordered_map<
+    WorldState*, std::unordered_map<uint32_t, std::vector<uint32_t>>>
+    spellsByWorld;
+  auto& cache = spellsByWorld[worldState];
+  if (const auto it = cache.find(impactDataSetId); it != cache.end()) {
+    return it->second;
+  }
+  std::vector<uint32_t> spells;
+  auto& browser = worldState->GetEspm().GetBrowser();
+  const auto setLookup = browser.LookupById(impactDataSetId);
+  std::unordered_set<uint32_t> impacts;
+  if (setLookup.rec && setLookup.rec->GetType() == "IPDS") {
+    ForEachFieldUint32(worldState, setLookup.rec, "PNAM", 4,
+                       [&](uint32_t impact) {
+                         if (impact != 0) {
+                           impacts.insert(setLookup.ToGlobalId(impact));
+                         }
+                       });
+  }
+  for (uint32_t impactId : impacts) {
+    const auto impactLookup = browser.LookupById(impactId);
+    if (!impactLookup.rec || !(impactLookup.rec->GetType() == "IPCT")) {
+      continue;
+    }
+    uint32_t hazardId = 0;
+    ForEachFieldUint32(worldState, impactLookup.rec, "NAM2", 0,
+                       [&](uint32_t raw) {
+                         if (raw != 0) {
+                           hazardId = impactLookup.ToGlobalId(raw);
+                         }
+                       });
+    const auto hazardLookup = browser.LookupById(hazardId);
+    const auto hazard = espm::Convert<espm::HAZD>(hazardLookup.rec);
+    if (!hazardId || !hazard) {
+      continue;
+    }
+    const uint32_t spell = hazard->GetData(worldState->GetEspmCache()).spell;
+    const uint32_t spellId = spell ? hazardLookup.ToGlobalId(spell) : 0;
+    if (spellId &&
+        std::find(spells.begin(), spells.end(), spellId) == spells.end()) {
+      spells.push_back(spellId);
+    }
+  }
+  if (cache.size() > 4096) {
+    cache.clear();
+  }
+  return cache.emplace(impactDataSetId, std::move(spells)).first->second;
+}
+
+// Cloaks and hazards (Blizzard, and the burning ground of a wall) hit with a spell they grant, not the spell that was
+// cast. The parent is a SPEL, a SCRL or a staff's ENCH
 bool IsSpellGrantedBy(WorldState* worldState, uint32_t parentSpellId,
                       uint32_t sourceId)
 {
+  const auto parentLookup =
+    worldState->GetEspm().GetBrowser().LookupById(parentSpellId);
+  if (!espm::IsSpellItem(parentLookup.rec) &&
+      !espm::Convert<espm::ENCH>(parentLookup.rec)) {
+    return false;
+  }
   bool granted = false;
-  ForEachSpellEffect(
-    worldState, parentSpellId,
-    [&](espm::MGEF::EffectType type, uint32_t associatedItem, uint32_t) {
-      if (granted || associatedItem == 0) {
+  ForEachEffectData(
+    worldState, parentLookup,
+    [&](const espm::SPEL::EFIT*, const espm::MGEF::DATA& data,
+        const espm::LookupResult& mgefLookup) {
+      if (granted) {
         return;
       }
+      if (data.impactDataSet != 0) {
+        const auto& hazardSpells = ImpactHazardSpells(
+          worldState, mgefLookup.ToGlobalId(data.impactDataSet));
+        if (std::find(hazardSpells.begin(), hazardSpells.end(), sourceId) !=
+            hazardSpells.end()) {
+          granted = true;
+          return;
+        }
+      }
+      if (data.associatedItem == 0) {
+        return;
+      }
+      const auto type = data.effectType;
+      const uint32_t associatedItem =
+        mgefLookup.ToGlobalId(data.associatedItem);
       if (type == espm::MGEF::EffectType::Cloak) {
         granted = associatedItem == sourceId;
         return;
@@ -808,6 +901,8 @@ bool IsSpellGrantedBy(WorldState* worldState, uint32_t parentSpellId,
   return granted;
 }
 
+uint32_t StaffEnchantmentOf(WorldState* worldState, uint32_t weaponId);
+
 // Projectiles, cloaks and hazards may land after the spell left the hand
 bool CanHitWithSpell(const MpActor& actor, uint32_t spellId)
 {
@@ -825,6 +920,25 @@ bool CanHitWithSpell(const MpActor& actor, uint32_t spellId)
   for (uint32_t knownSpellId : GetKnownSpells(actor)) {
     if (IsSpellGrantedBy(actor.GetParent(), knownSpellId, spellId)) {
       return true;
+    }
+  }
+  // A staff's wall leaves burning ground too (Forelhost's Dragon Priest staff): a staff in hand, or one a hosted NPC carries
+  const auto grantedByStaff = [&](uint32_t weaponId) {
+    const uint32_t enchantmentId =
+      StaffEnchantmentOf(actor.GetParent(), weaponId);
+    return enchantmentId != 0 &&
+      IsSpellGrantedBy(actor.GetParent(), enchantmentId, spellId);
+  };
+  for (const auto& entry : actor.GetEquippedWeapon()) {
+    if (entry && grantedByStaff(entry->baseId)) {
+      return true;
+    }
+  }
+  if (actor.GetProfileId() == -1) {
+    for (const auto& entry : actor.GetInventory().entries) {
+      if (grantedByStaff(entry.baseId)) {
+        return true;
+      }
     }
   }
   return false;
