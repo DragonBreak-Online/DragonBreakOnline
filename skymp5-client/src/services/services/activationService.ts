@@ -4,7 +4,7 @@ import { MsgType } from "../../messages";
 import { getInventory } from "../../sync/inventory";
 
 // TODO: refactor this out
-import { getViewFromStorage, localIdToRemoteId } from "../../view/worldViewMisc";
+import { getViewFromStorage, isRemoteHostedByMe, localIdToRemoteId } from "../../view/worldViewMisc";
 
 import { LastInvService } from "./lastInvService";
 import { selfActivated } from "../../sync/selfActivation";
@@ -85,6 +85,12 @@ export class ActivationService extends ClientListener {
         caster = localIdToRemoteId(caster);
         if (!caster) {
             logError(this, 'localIdToRemoteId returned 0 (caster) in on(\'activate\')');
+            return;
+        }
+
+        // The server throws Bad hoster for a caster this client does not host, so never send one
+        if (!isPlayer && !isRemoteHostedByMe(caster)) {
+            logTrace(this, "Not relaying an activation by an actor this client does not host");
             return;
         }
 

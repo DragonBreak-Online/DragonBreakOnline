@@ -40,7 +40,7 @@ const STUBS = {
   remoteServer: 'class RemoteServer {} module.exports = { RemoteServer };',
   messages: 'module.exports = { MsgType: { Activate: 6 } };',
   inventory: 'module.exports = { getInventory: () => { if (globalThis.__invThrows) throw new TypeError("Cannot read properties of null (reading \'getFormID\')"); return { entries: [] }; } };',
-  worldViewMisc: 'module.exports = { localIdToRemoteId: (id) => (id >= 0xff000000 ? (id + 0x100000) >>> 0 : id), getViewFromStorage: () => globalThis.__wv };',
+  worldViewMisc: 'module.exports = { localIdToRemoteId: (id) => (id >= 0xff000000 ? (id + 0x100000) >>> 0 : id), getViewFromStorage: () => globalThis.__wv, isRemoteHostedByMe: (id) => (globalThis.__hosted || []).includes(id) };',
   lastInv: 'class LastInvService {} module.exports = { LastInvService };',
   selfActivation: 'module.exports = { selfActivated() {} };',
   customPacketUtil: 'module.exports = { parseCustomPacket: () => null };',
@@ -209,8 +209,16 @@ async function main() {
     check('a blocked door still animating from the server stays ignored, as before', activate(player, door({ state: 2, blocked: true })).length === 0);
     check('a blocked closed door is sent, as before', activate(player, door({ state: 3, blocked: true })).length === 1);
     check('the Bleak Falls secret door the client leaves unblocked keeps its old rule', activate(player, door({ state: 2, blocked: false, base: 0x6f703 })).length === 0);
-    check('an NPC copy walking through an unblocked door keeps the old rule', activate({ getFormID: () => 0xff000123 }, door({ state: 4, blocked: false })).length === 0);
-    check('...while its activation of a closed door is still sent', activate({ getFormID: () => 0xff000123 }, door({ state: 3, blocked: false })).length === 1);
+    // An NPC this client hosts: the server accepts its activation, so these keep testing the open-state rule
+    const npc = { getFormID: () => 0xff000123 };
+    const remoteOf = (local) => (local + 0x100000) >>> 0;
+    globalThis.__hosted = [remoteOf(0xff000123)];
+    check('an NPC copy walking through an unblocked door keeps the old rule', activate(npc, door({ state: 4, blocked: false })).length === 0);
+    check('...while its activation of a closed door is still sent', activate(npc, door({ state: 3, blocked: false })).length === 1);
+    // The 306 Bad hoster throws of 18-20 Oct: the client relayed activations by actors it does not host
+    globalThis.__hosted = [];
+    check('an activation by an actor this client does not host is dropped, so the server never throws Bad hoster', activate(npc, door({ state: 3, blocked: false })).length === 0);
+    check('...and the player is still sent, though the player is never in the hosted list', activate(player, door({ state: 3, blocked: true })).length === 1);
     const reported = [];
     globalThis.__dboReportError = (w) => reported.push(w);
     globalThis.__invThrows = true;
