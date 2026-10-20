@@ -1090,6 +1090,19 @@ void ActionListener::OnUpdateMovement(const RawMessageData& rawMsgData,
       actor->ResetBlockCount();
     }
 
+    // Movement has never moved an actor between cells, so a hosted NPC that
+    // walked into the next cell of its dungeon kept the old one for good and
+    // every hit on it was refused from then on. MovementValidation now accepts
+    // that change for a non-player; applying it here is what makes the server
+    // agree with the clients this packet was already relayed to. SetCellOrWorld
+    // re-subscribes the actor to the new grid, which SetPos alone does not do,
+    // and it only runs on the rare packet where the cell really changed.
+    const FormDesc newCellOrWorld =
+      FormDesc::FromFormId(msg.data.worldOrCell, espmFiles);
+    if (!(actor->GetCellOrWorld() == newCellOrWorld)) {
+      actor->SetCellOrWorld(newCellOrWorld);
+    }
+
     actor->SetPos(
       NiPoint3{ msg.data.pos[0], msg.data.pos[1], msg.data.pos[2] },
       SetPosMode::CalledByUpdateMovement);

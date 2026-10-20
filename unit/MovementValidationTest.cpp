@@ -4,6 +4,7 @@
 #include "MsgType.h"
 #include "NiPoint3.h"
 #include "TestUtils.hpp"
+#include <limits>
 #include <vector>
 
 extern PartOne& GetPartOne();
@@ -181,4 +182,88 @@ TEST_CASE(
                           { "rot", { 123, 111, 123 } },
                           { "worldOrCell", 0x3c } });
   REQUIRE(partOne.Messages()[0].userId == 0);
+}
+
+// The bug these three guard: a hosted actor has no correction path, so a
+// refusal latches. The server kept the old cell, every later packet reported
+// the new one and was refused in turn, and OnHit then rejected every hit on
+// the actor as too distant or in a different cell - frozen and unkillable.
+// Measured on the live server as two cells of one dungeon: CYRBawn02 against
+// CYRBawn03, CYRSilorn02 against CYRSilorn, Bthardamz02a against Bthardamz02.
+
+TEST_CASE("Accepts a hosted NPC walking into the next cell of its dungeon",
+          "[MovementValidation]")
+{
+  PartOne& partOne = GetPartOne();
+
+  DoConnect(partOne, 0);
+  partOne.CreateActor(0xff000000, { 0, 0, 0 }, 0, 0x3c);
+  partOne.SetUserActor(0, 0xff000000);
+  partOne.CreateActor(0xff000001, { 0, 0, 0 }, 0, 0x3c);
+
+  auto& npc = partOne.worldState.GetFormAt<MpActor>(0xff000001);
+  MovementValidation::Tracker tracker;
+
+  // Far enough to trip the distance guard as well: interior cells have their
+  // own coordinate spaces, so the jump across the boundary measures nothing
+  partOne.Messages().clear();
+  REQUIRE(MovementValidation::Validate(
+    partOne, { 0, 0, 0 }, { 0, 0, 0 }, FormDesc::Tamriel(), { 9000, 0, 0 },
+    FormDesc::FromString("ffffff:Skyrim.esm"), 0, &npc, { "Skyrim.esm" },
+    &tracker));
+  // Nothing is sent to the hosting client: it was right, the server was stale
+  REQUIRE(partOne.Messages().empty());
+}
+
+TEST_CASE("Still refuses a hosted NPC's jump inside one cell",
+          "[MovementValidation]")
+{
+  PartOne& partOne = GetPartOne();
+
+  DoConnect(partOne, 0);
+  partOne.CreateActor(0xff000000, { 0, 0, 0 }, 0, 0x3c);
+  partOne.SetUserActor(0, 0xff000000);
+  partOne.CreateActor(0xff000001, { 0, 0, 0 }, 0, 0x3c);
+
+  auto& npc = partOne.worldState.GetFormAt<MpActor>(0xff000001);
+  MovementValidation::Tracker tracker;
+
+  // Refusing this cannot latch: the cell still agrees, so the next honest
+  // packet is accepted
+  partOne.Messages().clear();
+  REQUIRE(!MovementValidation::Validate(
+    partOne, { 0, 0, 0 }, { 0, 0, 0 }, FormDesc::Tamriel(), { 5000, 0, 0 },
+    FormDesc::Tamriel(), 0, &npc, { "Skyrim.esm" }, &tracker));
+  REQUIRE(partOne.Messages().empty());
+
+  REQUIRE(MovementValidation::Validate(
+    partOne, { 0, 0, 0 }, { 0, 0, 0 }, FormDesc::Tamriel(), { 100, 0, 0 },
+    FormDesc::Tamriel(), 0, &npc, { "Skyrim.esm" }, &tracker));
+  REQUIRE(partOne.Messages().empty());
+}
+
+TEST_CASE("Drops a hosted NPC's in-flight packet after a server teleport",
+          "[MovementValidation]")
+{
+  PartOne& partOne = GetPartOne();
+
+  DoConnect(partOne, 0);
+  partOne.CreateActor(0xff000000, { 0, 0, 0 }, 0, 0x3c);
+  partOne.SetUserActor(0, 0xff000000);
+  partOne.CreateActor(0xff000001, { 0, 0, 0 }, 0, 0x3c);
+
+  auto& npc = partOne.worldState.GetFormAt<MpActor>(0xff000001);
+  MovementValidation::Tracker tracker;
+
+  // The caller passes an infinite position for a packet sent before the hoster
+  // saw a server teleport. Accepting a cell change must not let that through,
+  // or the stale packet would overwrite the destination just set.
+  const float inf = std::numeric_limits<float>::infinity();
+
+  partOne.Messages().clear();
+  REQUIRE(!MovementValidation::Validate(
+    partOne, { 0, 0, 0 }, { 0, 0, 0 }, FormDesc::Tamriel(), { inf, inf, inf },
+    FormDesc::FromString("ffffff:Skyrim.esm"), 0, &npc, { "Skyrim.esm" },
+    &tracker));
+  REQUIRE(partOne.Messages().empty());
 }
