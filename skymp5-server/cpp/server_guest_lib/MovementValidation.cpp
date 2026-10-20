@@ -85,34 +85,19 @@ bool Validate(PartOne& partOne, const NiPoint3& currentPos,
   const bool cellChanged = currentCellOrWorld != newCellOrWorld;
   const bool tooFar = (currentPos - newPos).SqrLength() >= kSqrMaxDistance;
 
-  // A server teleport passes an infinite position so that every packet already
-  // in flight is refused. That has to keep holding for a hosted actor, or a
-  // stale packet would overwrite the destination the server has just set.
+  // An infinite position marks a packet sent before a server teleport
   const bool afterServerTeleport = !std::isfinite(newPos.x);
 
   if (cellChanged || tooFar) {
-    // A player can be corrected: the snap back puts the client where the
-    // server holds it, and the next packet agrees again.
+    // A player is corrected by the snap back, so refusing it cannot latch
     if (isMe) {
       sendSnapBack();
       return false;
     }
 
-    // A hosted actor has no correction path, so refusing it LATCHES. The
-    // server keeps the old cell, every later packet reports the new one and is
-    // refused in its turn, and OnHit then rejects every hit on the actor as
-    // too distant or in a different cell: it is frozen where it was and can
-    // never be killed. Walking from one cell of a multi-cell dungeon into the
-    // next is an ordinary thing for a spawned NPC to do - measured in the live
-    // log on CYRBawn, Silorn, Bthardamz and Blackreach, every case two cells
-    // of the same dungeon - so accept it, and let the caller move the actor's
-    // cell to match.
-    //
-    // The distance guard is skipped on purpose when the cell changed: interior
-    // cells each have their own coordinate space, so the jump across a
-    // boundary measures nothing. A jump within one cell is still refused -
-    // that is what this check is for - and refusing it cannot latch, because
-    // the cell still agrees and the next honest packet is accepted.
+    // A hosted actor has no correction path, so a refusal latches forever
+    // NPCs walk between the cells of one dungeon, which is ordinary
+    // Interior cells each have their own coordinate space, so a cross cell distance measures nothing
     if (!cellChanged || afterServerTeleport) {
       return false;
     }

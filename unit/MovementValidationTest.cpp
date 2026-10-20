@@ -184,12 +184,7 @@ TEST_CASE(
   REQUIRE(partOne.Messages()[0].userId == 0);
 }
 
-// The bug these three guard: a hosted actor has no correction path, so a
-// refusal latches. The server kept the old cell, every later packet reported
-// the new one and was refused in turn, and OnHit then rejected every hit on
-// the actor as too distant or in a different cell - frozen and unkillable.
-// Measured on the live server as two cells of one dungeon: CYRBawn02 against
-// CYRBawn03, CYRSilorn02 against CYRSilorn, Bthardamz02a against Bthardamz02.
+// A refused packet latches for a hosted actor, which freezes it and makes it unkillable
 
 TEST_CASE("Accepts a hosted NPC walking into the next cell of its dungeon",
           "[MovementValidation]")
