@@ -1,5 +1,20 @@
 [
   {
+    "title": "Duel types",
+    "date": "2026-10-20",
+    "version": "Server update",
+    "tag": "New",
+    "sections": [
+      {
+        "heading": "Practice, Friendly, Wager or Death",
+        "items": [
+          "Choose a Practice fight, Friendly duel, Wager duel or Death duel when you challenge someone, and they see exactly what they are accepting.",
+          "A Death duel is to the death: the loser's character dies for good. Both fighters must confirm that warning twice before it begins. Logging out or leaving the duel area ends a Death duel with no winner, and nobody dies."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Duels",
     "date": "2026-10-20",
     "version": "Server update",
