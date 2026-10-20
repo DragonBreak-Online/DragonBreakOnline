@@ -7718,7 +7718,7 @@ const hitDamageAttemptHook =(aggressorId, targetId, sourceId, damage, flags) => 
     // (weapon hits), else it joins the give-back's mult like any other factor
     // and on a family of creatures whose health the server leaves far above their level's (npcToughness; the draugr, 17 Oct)
     let toughTaken = 1;
-    if (toughness) { try { toughTaken = toughness.takenMult(agg, tgt, dmg, flags); } catch (e) { log('toughness taken failed', e.message); } }
+    if (toughness) { try { toughTaken = toughness.takenMult(agg, tgt, dmg, flags, src); } catch (e) { log('toughness taken failed', e.message); } }
     const taken = npcTakenDamageMult(agg, tgt, dmg) * summonDealtMult(agg, tgt, dmg) * toughTaken;
     if (!(taken > 1 && npcTakenLowerFirst(tgt, dmg, taken, flags))) mult *= taken;
     if (mult !== 1 && dmg > 0) {

@@ -13,17 +13,23 @@ const ok = (c, what, got) => { console.log(`${c ? 'ok  ' : 'FAIL'}  ${what}${!c 
 
 // ---- stub records: a race, NPC_ with ACBS template flags and TPLT, a LVLN ------------------------------------------------
 const DRAUGR_RACE = 0x00000d53, NORD_RACE = 0x00013746;
-const ids = { 'd53:Skyrim.esm': DRAUGR_RACE, '13746:Skyrim.esm': NORD_RACE, 'f71dc:Skyrim.esm': 0xf71dc, '2a6fd:Dragonborn.esm': 0x0402a6fd };
+const ids = { 'd53:Skyrim.esm': DRAUGR_RACE, '13746:Skyrim.esm': NORD_RACE, 'f71dc:Skyrim.esm': 0xf71dc, '2a6fd:Dragonborn.esm': 0x0402a6fd, '10aa1a:Skyrim.esm': 0x0010aa1a };
 const u32 = (n) => { const b = new Uint8Array(4); new DataView(b.buffer).setUint32(0, n >>> 0, true); return b; };
 const acbs = (tflags) => { const b = new Uint8Array(24); new DataView(b.buffer).setUint16(18, tflags, true); return b; };
 const lvlo = (id) => { const b = new Uint8Array(12); new DataView(b.buffer).setUint32(4, id >>> 0, true); return b; };
 const npc = (edid, race, tplt, tflags) => ({ record: { type: 'NPC_', editorId: edid, fields: [{ type: 'ACBS', data: acbs(tflags || 0) }].concat(race ? [{ type: 'RNAM', data: u32(race) }] : []).concat(tplt ? [{ type: 'TPLT', data: u32(tplt) }] : []) }, toGlobalRecordId: (x) => x });
+const kwda = (...gs) => { const b = new Uint8Array(4 * gs.length); const v = new DataView(b.buffer); gs.forEach((g, i) => v.setUint32(i * 4, g >>> 0, true)); return b; };
+const weap = (edid, ...gs) => ({ record: { type: 'WEAP', editorId: edid, fields: [{ type: 'KWDA', data: kwda(...gs) }] }, toGlobalRecordId: (x) => x });
+const SILVER_KW = 0x0010aa1a;
 const RECORDS = {
   0x100: npc('DraugrTemplate', DRAUGR_RACE),
   0x101: npc('EncDraugr05Melee1HHeadM02', NORD_RACE, 0x100, 0x01),   // takes its race from the template (Use Traits)
   0x102: npc('EncDraugrWrongFlag', NORD_RACE, 0x100, 0x02),          // a template for stats only: its own race counts
   0x103: npc('EncBandit06Melee1HNordM', NORD_RACE),
   0x104: { record: { type: 'LVLN', editorId: 'LCharDraugr', fields: [{ type: 'LVLO', data: lvlo(0x103) }, { type: 'LVLO', data: lvlo(0x101) }] }, toGlobalRecordId: (x) => x },
+  0x200: weap('SilverSword', 0x01e715, SILVER_KW),
+  0x201: weap('IronSword', 0x01e715, 0x0010aa19),
+  0x202: { record: { type: 'SPEL', editorId: 'Firebolt', fields: [] }, toGlobalRecordId: (x) => x },
 };
 const PLAYER = 0xff000014, PLAYER2 = 0xff000015, DRAUGR = 0xff000100, BANDIT = 0xff000101, SUMMON = 0xff000102, STRAY = 0xff000103, FAKE = 0xff000104;
 const props = new Map(); const put = (id, k, v) => props.set(id + '|' + k, v);
@@ -55,6 +61,27 @@ ok(T.takenMult(PLAYER, DRAUGR, 10, {}) === 1 && T.takenMult(PLAYER, DRAUGR, 0, H
 ok(T.dealtMult(DRAUGR, PLAYER, 20) === 0.75, "a draugr's hit on a player takes dealt (0.75)");
 ok(T.dealtMult(DRAUGR, SUMMON, 20) === 1 && T.dealtMult(DRAUGR, BANDIT, 20) === 1, '...not its hit on a summon or an NPC');
 ok(T.dealtMult(BANDIT, PLAYER, 20) === 1 && T.dealtMult(PLAYER2, PLAYER, 20) === 1, "a bandit's hit and PvP are untouched");
+// ---- a weapon keyword the kind is weak to (silver on the undead) ---------------------------------------------------
+// Vanilla's silver bonus rides on an enchantment, and an enchantment-source hit never reaches this server's damage, so
+// silver did nothing to the undead here (otome and lorvanack, #suggestions 19 Oct). The keyword is read off the weapon.
+const SILVER = 0x200, IRON = 0x201, FIREBOLT = 0x202;
+const W = load({ npcToughness: { enabled: true, kinds: { draugr: Object.assign({}, KIND, { weakTo: { '10aa1a:Skyrim.esm': 1.5 } }) } } });
+ok(near(W.takenMult(PLAYER, DRAUGR, 10, H(150), SILVER), 1.5), 'a silver weapon hits a draugr under the knee half again as hard', W.takenMult(PLAYER, DRAUGR, 10, H(150), SILVER));
+ok(W.takenMult(PLAYER, DRAUGR, 10, H(150), IRON) === 1, '...an iron one as before');
+ok(near(W.takenMult(PLAYER, DRAUGR, 10, H(960), SILVER), (960 / 504) * 1.5), 'above the knee the weakness rides on top of knee and slope', W.takenMult(PLAYER, DRAUGR, 10, H(960), SILVER));
+ok(W.takenMult(PLAYER, BANDIT, 10, H(150), SILVER) === 1, 'silver does nothing to a bandit: the weakness is the kind\'s');
+ok(W.takenMult(PLAYER, DRAUGR, 10, H(150), FIREBOLT) === 1 && W.takenMult(PLAYER, DRAUGR, 10, H(150), 0) === 1,
+  'a spell and a fist carry no weapon keyword, so neither is silver');
+ok(near(W.takenMult(SUMMON, DRAUGR, 10, H(150), SILVER), 1.5), "a player's summon swinging silver counts too");
+ok(W.takenMult(STRAY, DRAUGR, 10, H(150), SILVER) === 1, 'an NPC swinging silver at a draugr does not');
+ok(near(W.takenMult(PLAYER, DRAUGR, 10, {}, SILVER), 1.5), 'the weakness stands without the max health the knee needs');
+const W2 = load({ npcToughness: { enabled: true, kinds: { draugr: Object.assign({}, KIND, { weakTo: { '10aa1a:Skyrim.esm': 1.5, '13746:Skyrim.esm': 3 } }) } } });
+ok(near(W2.takenMult(PLAYER, DRAUGR, 10, H(150), SILVER), 1.5), 'only a keyword the weapon carries counts');
+ok(T.takenMult(PLAYER, DRAUGR, 10, H(150), SILVER) === 1, 'a kind with no weakTo is unchanged by a silver weapon');
+const sc = JSON.parse(fs.readFileSync(path.join(SERVER, 'gamemode-config.json'), 'utf8'));
+ok(((((sc.npcToughness || {}).kinds || {}).draugr || {}).weakTo || {})['10aa1a:Skyrim.esm'] === 1.5,
+  'shipped: the draugr are weak to WeapMaterialSilver at 1.5', (((sc.npcToughness || {}).kinds || {}).draugr || {}).weakTo);
+
 const OFF = load({ npcToughness: { enabled: false, kinds: { draugr: KIND } } });
 ok(OFF.kindOf(DRAUGR) === '' && OFF.takenMult(PLAYER, DRAUGR, 10, H(960)) === 1 && OFF.dealtMult(DRAUGR, PLAYER, 20) === 1, 'enabled false: nothing changes');
 ok(load({}).takenMult(PLAYER, DRAUGR, 10, H(960)) === 1, 'no npcToughness block: nothing changes');
@@ -69,7 +96,7 @@ const gm = fs.readFileSync(path.join(SERVER, 'gamemode.js'), 'utf8');
 const hook = gm.slice(gm.indexOf('const hitDamageAttemptHook ='), gm.indexOf('// ---- companion hits, measured'));
 ok(/require\(TOUGHNESS_JS\)\(\{ mp, cfg, log, profileOf, recordOf \}\)/.test(gm), 'gamemode.js loads npctoughness.js with mp, cfg, log, profileOf, recordOf');
 ok(/mult \*= toughness\.dealtMult\(agg, tgt, dmg\)/.test(hook), "the hit hook scales a draugr's hit on a player by dealt");
-ok(/toughTaken = toughness\.takenMult\(agg, tgt, dmg, flags\)/.test(hook) && /summonDealtMult\(agg, tgt, dmg\) \* toughTaken/.test(hook), "...and a player's side's hit on one joins takenByKind (lowered first on a weapon hit)");
+ok(/toughTaken = toughness\.takenMult\(agg, tgt, dmg, flags, src\)/.test(hook) && /summonDealtMult\(agg, tgt, dmg\) \* toughTaken/.test(hook), "...and a player's side's hit on one joins takenByKind (lowered first on a weapon hit), with the hit's source for a weakness");
 
 // ---- before and after: health (records of the 140-plugin order) and blows ----------------------------------------------
 const S = load({ npcToughness: cfg.npcToughness });

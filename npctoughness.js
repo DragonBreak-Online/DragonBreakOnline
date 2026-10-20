@@ -12,6 +12,11 @@
 //          knee + (health - knee) * slope above the knee, as it is below: hits scale by health / that, so a 960-health
 //          Deathlord takes the blows of a 504-health one and a 150-health Restless Draugr is unchanged
 //   dealt  scales every hit one lands on a player (weapon, fists, spells and shouts), on top of npcDamage
+//   weakTo { <keyword desc>: mult }  a weapon carrying that keyword hits one of this kind that much harder, on top of
+//          knee/slope. Vanilla's silver bonus is an enchantment on the weapon, and an enchantment-source hit never
+//          reaches this server's damage (hitService drops it), so silver has done nothing to the undead here; the
+//          keyword is read off the weapon record instead (WeapMaterialSilver, 10aa1a:Skyrim.esm). The largest matching
+//          weakness counts, never the product of several
 // log    one line per scaled hit
 // enabled false turns it all off. Read at load; gamemode.js reloads this module with the config.
 'use strict';
@@ -29,7 +34,12 @@ module.exports = (deps) => {
   for (const [name, k] of Object.entries(C.kinds && typeof C.kinds === 'object' ? C.kinds : {})) {
     if (name.startsWith('_') || !k || typeof k !== 'object') continue;
     const knee = Number(k.knee), slope = Number(k.slope), dealt = Number(k.dealt);
-    KINDS[name] = { knee: knee > 0 ? knee : 0, slope: slope > 0 && slope <= 1 ? slope : 1, dealt: dealt > 0 ? dealt : 1 };
+    const weakTo = new Map();
+    for (const [kw, mult] of Object.entries(k.weakTo && typeof k.weakTo === 'object' ? k.weakTo : {})) {
+      const id = idOf(kw); const m = Number(mult);
+      if (id && m > 0) weakTo.set(id, m);
+    }
+    KINDS[name] = { knee: knee > 0 ? knee : 0, slope: slope > 0 && slope <= 1 ? slope : 1, dealt: dealt > 0 ? dealt : 1, weakTo };
     for (const r of Array.isArray(k.races) ? k.races : []) { const id = idOf(r); if (id) KIND_OF_RACE.set(id, name); }
   }
   // base id -> kind ('' for none); the plugins never change while the process runs
@@ -77,18 +87,48 @@ module.exports = (deps) => {
   };
   const note = (s) => { if (C.log === true) log(`toughness ${s}`); };
 
+  // The keywords of the record a hit came from, as load-order ids. A weapon's KWDA; a spell or a fist has none, so it
+  // never matches a weakness. Records never change while the process runs, so the list is cached per source.
+  const KWDA_OF = globalThis.__dboToughnessKwda instanceof Map ? globalThis.__dboToughnessKwda : (globalThis.__dboToughnessKwda = new Map());
+  const keywordsOf = (src) => {
+    const id = Number(src) >>> 0;
+    if (!id) return [];
+    let out = KWDA_OF.get(id);
+    if (out) return out;
+    out = [];
+    const res = recordOf(id);
+    if (res && String(res.record.type) === 'WEAP') {
+      for (const f of fieldsOf(res, 'KWDA')) {
+        const n = Math.floor(f.data.byteLength / 4);
+        for (let i = 0; i < n; i++) { const g = globalAt(res, f.data, i * 4); if (g && !out.includes(g)) out.push(g); }
+      }
+    }
+    KWDA_OF.set(id, out);
+    return out;
+  };
+  // The largest weakness of this kind the hit's weapon carries, else 1
+  const weaknessMult = (k, src) => {
+    if (!k.weakTo || !k.weakTo.size) return 1;
+    let m = 1;
+    for (const kw of keywordsOf(src)) { const w = k.weakTo.get(kw); if (w > m) m = w; }
+    return m;
+  };
+
   // The health a hit lands against: the health itself up to the knee, slope of the rest above it
   const effectiveHealth = (k, health) => (k.knee > 0 && health > k.knee ? k.knee + (health - k.knee) * k.slope : health);
   // A player's side hitting an NPC of a kind: the factor its hit scales by (>= 1)
-  const takenMult = (agg, tgt, dmg, flags) => {
+  const takenMult = (agg, tgt, dmg, flags, src) => {
     if (!(dmg > 0) || agg === tgt || !playerSide(agg)) return 1;
     const kind = kindOf(tgt);
     const k = kind ? KINDS[kind] : null;
     if (!k) return 1;
+    const weak = weaknessMult(k, src);
     const max = Number(flags && flags.targetMaxHealth);
-    if (!(max > 0)) return 1;
-    const m = max / effectiveHealth(k, max);
-    if (m > 1) note(`taken ${kind} ${tgt.toString(16)} health ${max.toFixed(0)} as ${effectiveHealth(k, max).toFixed(0)}: x${m.toFixed(2)}`);
+    // A weakness stands on its own: it counts even where the health is unknown, which the knee and slope need
+    if (!(max > 0)) return weak;
+    const m = (max / effectiveHealth(k, max)) * weak;
+    if (m > 1) note(`taken ${kind} ${tgt.toString(16)} health ${max.toFixed(0)} as ${effectiveHealth(k, max).toFixed(0)}`
+      + `${weak > 1 ? `, weak to ${(src >>> 0).toString(16)} x${weak}` : ''}: x${m.toFixed(2)}`);
     return m > 1 ? m : 1;
   };
   // An NPC of a kind hitting a player: the kind's dealt factor
