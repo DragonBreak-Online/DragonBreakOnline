@@ -343,8 +343,45 @@ HRESULT CoalescedMouseRead(IDirectInputDevice8A* device, DWORD dataSize,
   return DI_OK;
 }
 
+// While the mouse is free the game's menu cursor is placed under the Windows cursor every frame, so the X and Y
+// movement items are taken out of a buffered read; buttons and the wheel stay
+void DropMouseMovement(LPDIDEVICEOBJECTDATA out, DWORD dataSize, LPDWORD outLen)
+{
+  auto* bytes = reinterpret_cast<uint8_t*>(out);
+  DWORD kept = 0;
+  for (DWORD i = 0; i < *outLen; ++i) {
+    const auto* item = reinterpret_cast<const DIDEVICEOBJECTDATA*>(bytes + i * dataSize);
+    if (item->dwOfs == DIMOFS_X || item->dwOfs == DIMOFS_Y) {
+      continue;
+    }
+    if (kept != i) {
+      std::memmove(bytes + kept * dataSize, bytes + i * dataSize, dataSize);
+    }
+    ++kept;
+  }
+  *outLen = kept;
+}
+
+HRESULT ReadMouseDataInner(IDirectInputDevice8A* device, DWORD dataSize,
+                           LPDIDEVICEOBJECTDATA out, LPDWORD outLen,
+                           DWORD flags);
+
 HRESULT ReadMouseData(IDirectInputDevice8A* device, DWORD dataSize,
                       LPDIDEVICEOBJECTDATA out, LPDWORD outLen, DWORD flags)
+{
+  const HRESULT hr = ReadMouseDataInner(device, dataSize, out, outLen, flags);
+  // Only while the browser has focus: a free mouse with the browser closed must still turn the camera
+  if (CEFUtils::DInputHook::MouseFree() && CEFUtils::DInputHook::ChromeFocus() && out && outLen &&
+      !(flags & DIGDD_PEEK) && dataSize >= 4 * sizeof(DWORD) &&
+      (hr == DI_OK || hr == DI_BUFFEROVERFLOW)) {
+    DropMouseMovement(out, dataSize, outLen);
+  }
+  return hr;
+}
+
+HRESULT ReadMouseDataInner(IDirectInputDevice8A* device, DWORD dataSize,
+                           LPDIDEVICEOBJECTDATA out, LPDWORD outLen,
+                           DWORD flags)
 {
   using namespace CEFUtils::InputDiag;
   Tally(kDiMouseData);
@@ -766,6 +803,15 @@ HRESULT _stdcall FakeIDirectInputDevice8A::GetDeviceState(DWORD outDataLen,
   if (instanceInfo.guidInstance == GUID_SysMouse &&
       outDataLen >= sizeof(DIMOUSESTATE2)) {
     CheckDeafMouse(m_pDevice, mouseState);
+  }
+
+  // While the mouse is free the game's menu cursor follows the Windows cursor (MouseApi); the device's movement would
+  // move it a second time
+  if (DInputHook::MouseFree() && DInputHook::ChromeFocus() &&
+      instanceInfo.guidInstance == GUID_SysMouse &&
+      outDataLen >= sizeof(DIMOUSESTATE2)) {
+    mouseState->lX = 0;
+    mouseState->lY = 0;
   }
 
   ProcessMouseData(mouseState);

@@ -67,6 +67,8 @@ export declare function dboMenuIsOpen(): boolean
 export declare function dboMenuInvoke(target: string, arg?: string): void
 // What the movie passed to _global.dboNative(...) since the last poll, its arguments joined by 
 export declare function dboMenuPoll(): string[]
+export declare function setMouseFree(free: boolean): boolean
+export declare function isMouseFree(): boolean
 
 export type PacketType = 'message' | 'disconnect' | 'connectionAccepted' | 'connectionFailed' | 'connectionDenied'
 

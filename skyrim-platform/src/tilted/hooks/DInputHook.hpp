@@ -16,6 +16,14 @@ struct DInputHook
     return chromeFocus;
   }
 
+  // The mouse may leave the game window (MouseApi, setMouseFree): the game's menu cursor follows the Windows cursor
+  // instead, so the device's movement is not handed to the game as well. Main thread only
+  static bool& MouseFree()
+  {
+    static bool mouseFree;
+    return mouseFree;
+  }
+
   struct
   {
     std::mutex m;

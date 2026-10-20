@@ -2,6 +2,7 @@
 #include "BrowserApi.h"    // APIs for register in CommonExecutionListener
 #include "CallNativeApi.h" // CallNativeApi::NativeCallRequirements
 #include "CameraApi.h"
+#include "MouseApi.h"
 #include "ConsoleApi.h" // CommonExecutionListener
 #include "ConstEnumApi.h"
 #include "DboMenuApi.h"
@@ -279,6 +280,7 @@ private:
       LoadGameApi::Register(env, e);
       CameraApi::Register(env, e);
       DboMenuApi::Register(env, e);
+      MouseApi::Register(env, e);
       MpClientPluginApi::Register(env, e);
       ObjectReferenceApi::Register(env, e);
       HttpClientApi::Register(env, e);
