@@ -499,17 +499,9 @@ public:
         client.right <= 0 || client.bottom <= 0) {
       return;
     }
-    // Something clipped the cursor again (SSE Display Tweaks does on focus and window moves): a free mouse lifts it
-    RECT clip;
-    if (GetClipCursor(&clip) &&
-        (clip.left > GetSystemMetrics(SM_XVIRTUALSCREEN) ||
-         clip.top > GetSystemMetrics(SM_YVIRTUALSCREEN) ||
-         clip.right < GetSystemMetrics(SM_XVIRTUALSCREEN) +
-             GetSystemMetrics(SM_CXVIRTUALSCREEN) ||
-         clip.bottom < GetSystemMetrics(SM_YVIRTUALSCREEN) +
-             GetSystemMetrics(SM_CYVIRTUALSCREEN))) {
-      ClipCursor(nullptr);
-    }
+    // Something may have clipped the cursor again (SSE Display Tweaks does on focus and window moves): a free mouse
+    // lifts it. One cheap call per update while free; the PCH's windows.h leaves out GetSystemMetrics to compare first
+    ClipCursor(nullptr);
     // Outside the window the game's cursor stays where it left
     if (position.x < 0 || position.y < 0 || position.x >= client.right ||
         position.y >= client.bottom) {
