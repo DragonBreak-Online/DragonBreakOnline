@@ -1,6 +1,6 @@
 [
   {
-    "title": "Pigeons reach more of the people you know",
+    "title": "Pigeons reach anyone you have exchanged introductions with",
     "date": "2026-10-19",
     "version": "Hotfix",
     "tag": "Fix",
@@ -8,7 +8,7 @@
       {
         "heading": "Pigeons",
         "items": [
-          "Anyone who has introduced themselves to you is now in your pigeon coop's list, as well as the people you have met in person. That includes introductions from before today.",
+          "When you and another player have both introduced yourselves to each other, your pigeons reach them wherever they are, Cyrodiil or Skyrim, and theirs reach you. They show in the coop's list by name and #TAG. The people you have met in person stay in the list too. Introductions from before today count.",
           "Silver a vampire or werewolf can't carry now gathers in one letter in their mailbox, instead of a new letter every time."
         ]
       }

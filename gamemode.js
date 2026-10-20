@@ -1264,7 +1264,10 @@ every('meet', MEET_TICK_MS, () => {
 // ids that introduced themselves to a). The coop read only the met list, so an introduction never made a contact, and a
 // player who is always masked could be met by no one (#7DJT's /bug, 19 Oct: "people try to send me pigeons")
 const introducedTo = (a) => { try { const v = mp.get(a, 'ff_knownIds'); return Array.isArray(v) ? v.map((x) => Number(x) >>> 0).filter(Boolean) : []; } catch (e) { return []; } };
-const pigeonContactsOf = (a) => [...new Set(metOf(a).map((x) => Number(x) >>> 0).concat(introducedTo(a)))].filter((x) => x !== (Number(a) >>> 0));
+// Introduced both ways (each in the other's ff_knownIds) reaches anywhere, whatever world either is in (Nate, 19 Oct: "let
+// pigeons reach anyone by name and tag as long as the two players introduced each other")
+const introducedBoth = (a) => { a = Number(a) >>> 0; return introducedTo(a).filter((x) => introducedTo(x).includes(a)); };
+const pigeonContactsOf = (a) => [...new Set(metOf(a).map((x) => Number(x) >>> 0).concat(introducedBoth(a)))].filter((x) => x !== (Number(a) >>> 0));
 // The ledger's "forget": struck out of one side only, and written back in by the next meeting in person
 const forgetMet = (a, b) => {
   try { mp.set(a, 'private.metActors', metOf(a).filter((x) => x !== b)); } catch (e) { log('forget failed', e.message); }
