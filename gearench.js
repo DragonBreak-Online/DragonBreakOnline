@@ -65,6 +65,17 @@ module.exports = (api) => {
 
   // Parsed records live on globalThis so a reload keeps them; they are plain numbers, never native objects
   const C = globalThis.__dboGearEnchCache || (globalThis.__dboGearEnchCache = { mgef: new Map(), ench: new Map(), kw: new Map(), worn: new Map() });
+  C.weap = C.weap || new Map(); // hit source -> { weap, ench (its EITM's global id) }
+  // Whether a hit source is a WEAP and its record's enchantment, read once
+  const weapOf = (src) => {
+    if (C.weap.has(src)) return C.weap.get(src);
+    const r = recordOf(src);
+    const weap = !!r && String(r.record.type) === 'WEAP';
+    const eitm = weap ? fieldList(r).find((f) => f.type === 'EITM' && f.data.byteLength >= 4) : null;
+    const out = { weap, ench: eitm ? toGlobal(r, dv(eitm.data).getUint32(0, true)) : 0 };
+    C.weap.set(src, out);
+    return out;
+  };
 
   // A CTDA: op (top 3 bits of byte 0), flags (low 5), value f32 at 4, function u16 at 8, param 1 u32 at 12, run on u32 at 20
   const readCond = (lr, d) => {
@@ -285,9 +296,8 @@ module.exports = (api) => {
     }
     if (entries.length) return null;
     // An NPC's weapon from its base outfit may have no inventory entry: the record's own enchantment
-    const base = recordOf(src);
-    const eitm = base ? fieldList(base).find((f) => f.type === 'EITM' && f.data.byteLength >= 4) : null;
-    const x = eitm && !isPlayer(agg) ? enchOf(toGlobal(base, dv(eitm.data).getUint32(0, true))) : null;
+    const w = weapOf(src);
+    const x = w.ench && !isPlayer(agg) ? enchOf(w.ench) : null;
     return x ? { effects: x.effects, ench: x } : null;
   };
 
@@ -449,7 +459,7 @@ module.exports = (api) => {
       if (!isUndead(t)) continue;
       const pool = maxHealthOf(t);
       if (!(pool > 0)) continue;
-      const plan = planOf(agg, t, [fire], (src) => sideOf(agg, t, src, 1));
+      const plan = planOf(agg, t, [fire], (src) => sideOf(agg, t, src, 0));
       if (isPlayer(t)) { plan.health *= Math.max(0, num(PVP.pvpMult, 0.5)); watch(agg, t, 'Dawnbreaker burst'); }
       if (applyPlan(agg, t, plan, { maxHealth: pool, maxStamina: 0, taken: 1 }).length) n += 1;
     }
@@ -464,8 +474,7 @@ module.exports = (api) => {
     noteMax(tgt, f);
     if (W.enabled === false || agg === tgt) return null;
     if (f.spell || (f.blocked && W.onBlocked !== true)) return null;
-    const rec = recordOf(src);
-    if (!rec || String(rec.record.type) !== 'WEAP') return null;
+    if (!weapOf(src).weap) return null;
     // The host's own engine already applied an NPC's enchantment to the player hosting that NPC
     if (!isPlayer(agg) && isPlayer(tgt) && isNpcHostedBy(agg, tgt)) return { skipped: 'victim hosts the attacker' };
     const set = heldSet(agg, src);
@@ -487,7 +496,8 @@ module.exports = (api) => {
     }
     // On a player the enchantment's points count pvpMult (0.5); on an NPC in full
     const pvp = isPlayer(tgt) ? Math.max(0, num(PVP.pvpMult, 0.5)) : 1;
-    const plan = planOf(agg, tgt, list, (mgefId) => sideOf(agg, tgt, set.ench ? set.ench.id : mgefId, dmg));
+    // dmg 0: reading the resistance must not spend a racial ward (racial.js wardAbsorb needs a damage)
+    const plan = planOf(agg, tgt, list, (mgefId) => sideOf(agg, tgt, set.ench ? set.ench.id : mgefId, 0));
     for (const k of ['health', 'stamina', 'magicka', 'absorbStamina', 'absorbMagicka']) plan[k] *= Math.max(0, num(W.damageMult, 1)) * pvp;
     const ctx = { maxHealth: num(f.targetMaxHealth, 0), maxStamina: num(f.targetMaxStamina, 0), taken: typeof api.takenMult === 'function' ? api.takenMult(tgt, f) : 1 };
     result.plan = plan;
@@ -511,7 +521,7 @@ module.exports = (api) => {
     if (ST.enabled === false || agg === tgt || !isPlayer(tgt)) return null;
     const x = enchOf(spellId);
     if (!x || x.type !== 'ENCH' || !x.staff) return null;
-    const plan = planOf(agg, tgt, runnable(x.effects, tgt), () => sideOf(agg, tgt, x.id, 1));
+    const plan = planOf(agg, tgt, runnable(x.effects, tgt), () => sideOf(agg, tgt, x.id, 0));
     plan.stamina *= Math.max(0, num(PVP.pvpMult, 0.5)); plan.magicka *= Math.max(0, num(PVP.pvpMult, 0.5));
     const did = [];
     if (plan.slow > 0 && slow(tgt, plan.slow, plan.slowSeconds, ST.maxSlowSeconds)) did.push('slow');
