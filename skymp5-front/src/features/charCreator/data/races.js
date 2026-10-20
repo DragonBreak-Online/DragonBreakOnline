@@ -170,6 +170,15 @@ export const SPECIES = [
         lore: 'Sea Elves of Pyandonea: serpent-charming raiders with chameleon skin, ancient foes of the Altmer.'
       },
       {
+        id: 'snowelf',
+        name: 'Snow Elf',
+        raceId: HIGHELF,
+        raceEditorId: 'HighElfRace',
+        faceGen: true,
+        lockedNote: 'Unlocks after 150 hours played, like the extra character slot.',
+        lore: 'The Falmer of old, the elves of Skyrim before the Nords: all but a handful were lost to war and the Dwemer\'s deep places.'
+      },
+      {
         id: 'falmer',
         name: 'Falmer',
         raceId: FALMER,
