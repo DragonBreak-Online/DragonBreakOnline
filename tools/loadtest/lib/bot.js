@@ -188,7 +188,7 @@ class Bot {
           try {
             const line = String(JSON.parse(msg.dataDump));
             const text = line.slice(line.indexOf(String.fromCharCode(31)) + 1);
-            if (/npc|spawn|up [-+]?d/i.test(text)) this.log('bot ' + this.id + ' <- ' + text.slice(0, 300));
+            if (/npc|spawn|above its spot|u away|@ \[/i.test(text)) this.log('bot ' + this.id + ' <- ' + text.slice(0, 300));
           } catch (e) { /* not a string payload */ }
         }
       }
@@ -445,8 +445,11 @@ class Bot {
     if (seconds > (this.cfg.driftSeconds || 20)) return base;
     if (now - (this.lastDriftLog || 0) > 20000) {
       this.lastDriftLog = now;
-      this.log('bot ' + this.id + ' drifting hosted ' + refrId.toString(16) + ': z ' +
-        Math.round(base[2]) + ' -> ' + Math.round(base[2] + seconds * (this.cfg.driftUnitsPerSec || 4)) +
+      // Name the axis actually being driven, not z: --drift-axis x reads as a z drift otherwise
+      const axis = this.cfg.driftAxis === 'x' ? 0 : 2;
+      const from = base[axis];
+      this.log('bot ' + this.id + ' drifting hosted ' + refrId.toString(16) + ': ' + 'xyz'[axis] + ' ' +
+        Math.round(from) + ' -> ' + Math.round(from + seconds * (this.cfg.driftUnitsPerSec || 4)) +
         ' (+' + Math.round(seconds * (this.cfg.driftUnitsPerSec || 4)) + ' after ' + Math.round(seconds) + ' s)');
     }
     const moved = seconds * (this.cfg.driftUnitsPerSec || 4);
