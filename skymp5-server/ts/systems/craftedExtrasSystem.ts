@@ -2,7 +2,7 @@ import { System, Log, SystemContext, Content } from "./system";
 import { Settings } from "../settings";
 import { espmFieldFormIds, readFormIdField, toFormId } from "./formIdUtil";
 import {
-  EnchantmentEffect, Inventory, InventoryEntry, addEntries, copyValidExtras, describeExtras, healthStep,
+  EnchantmentEffect, Inventory, InventoryEntry, addEntries, copyValidExtras, describeExtras, hasIdentityExtras, healthStep,
   isEnchanted, isSet, readInventory, sameBase, sameEffects, sameFloat, sameItem, withCount,
 } from "./inventoryExtras";
 
@@ -100,7 +100,12 @@ const REFUSAL_TEXT: Record<RefusalReason, string> = {
   uncapped: "The server does not know that enchantment, so it cannot be put on an item",
   soul: "The server could not find the filled soul gem that enchantment used",
 };
-const HELD_TEXT = "Your enchantment was recorded at the strength your Enchanter rank allows";
+const HELD_TEXT = "Your enchantment was recorded at the strength your Enchanter rank and materials allow";
+// ARMO BOD2 (offset 4) or BODT (offset 8) armor type: 0 light, 1 heavy, 2 clothing (robes and jewelry)
+const ARMOR_TYPE_UNKNOWN = -1;
+// The gameplay's share of an effect never goes past this; the cap still bounds the result
+const MAX_GAMEPLAY_SCALE = 2;
+const MAX_GAMEPLAY_TAKES = 4;
 
 interface Cap {
   magnitude: number;
@@ -118,6 +123,7 @@ interface ItemInfo {
   baseEnchantment: number;
   baseCharge: number;
   enchantable: boolean;
+  armorType: number;
 }
 
 interface Station {
@@ -167,6 +173,17 @@ interface Plan {
   // What was paid for, for the skills' credit: the soul size of a new enchantment and the temper steps gained (0 none)
   enchantSoul: number;
   temperSteps: number;
+  // Inventory lines of materials the gameplay asked for on top of vanilla's (a gemstone), one unit each
+  take: number[];
+  gameplayNote?: string;
+}
+
+// What the gameplay (enchanting.js, globalThis.__dboEnchantScale) makes of a new enchantment: a share per effect, the
+// spare items it uses up and a line for the player
+interface GameplayScale {
+  mults: number[];
+  takes: number[];
+  note?: string;
 }
 
 const NO_STATION: Station = { enchanting: false, temperBenches: [], temperCap: 10, enchantMargin: 0 };
@@ -178,11 +195,10 @@ const chargeOf = (e: InventoryEntry): number => (typeof e.chargePercent === "num
 const formulaCost = (baseCost: number, e: EnchantmentEffect): number =>
   baseCost * Math.pow(Math.max(e.magnitude, 1), 1.1) * Math.pow(Math.max(e.duration / 10, 1), 1.1);
 
-// The same effects as claimed, none of them stronger: what the server stores for a claim it held to the rank
-const heldBelow = (held?: EnchantmentEffect[], claim?: EnchantmentEffect[]): boolean =>
-  !!held && !!claim && held.length > 0 && held.length === claim.length && held.every((e, i) =>
-    e.effectId === claim[i].effectId && (e.magnitude <= claim[i].magnitude || sameFloat(e.magnitude, claim[i].magnitude)) &&
-    e.area <= claim[i].area && e.duration <= claim[i].duration);
+// The same effects as claimed at another strength: what the server stores for a claim it held to the rank, or scaled by the
+// gameplay (enchanting.js: weaker on heavy armor, stronger than vanilla from a Greater soul)
+const heldAtOtherStrength = (held?: EnchantmentEffect[], claim?: EnchantmentEffect[]): boolean =>
+  !!held && !!claim && held.length > 0 && held.length === claim.length && held.every((e, i) => e.effectId === claim[i].effectId);
 
 // Leading load order entries that are base game files (ids from 0 up to it); all five when there is no load order
 const baseGameFileCount = (loadOrder: unknown): number => {
@@ -265,6 +281,12 @@ export class CraftedExtrasSystem implements System {
     const souls = this.soulSources(ctx, pool);
     const emptiedGems = this.pairEmptiedGems(ctx, gained, souls);
     const credits = this.creditsOf(actorId);
+    // Units of each line the report does not spend, which the gameplay may ask for (a gemstone vanilla never takes)
+    this.spare = inv.entries.map((e) => e.count);
+    for (const p of pool) this.spare[p.index] -= p.claimed;
+    this.spareOf = inv.entries;
+    const taken = inv.entries.map(() => 0);
+    let gameplayNote = "";
 
     const added: InventoryEntry[] = [];
     const refused = new Set<number>();
@@ -287,6 +309,11 @@ export class CraftedExtrasSystem implements System {
           break;
         }
         this.commit(plan, added);
+        for (const i of plan.take) {
+          taken[i] += 1;
+          this.spare[i] -= 1;
+        }
+        if (plan.gameplayNote) gameplayNote = plan.gameplayNote;
         this.log(`[crafted] ${hex(actorId)} ${hex(plan.entry.baseId)}: ${plan.notes.join(", ")} {${describeExtras(plan.entry).join(", ")}}`);
         this.creditWork(actorId, plan);
       }
@@ -296,6 +323,7 @@ export class CraftedExtrasSystem implements System {
     if (added.length) {
       const counts = inv.entries.map((e) => e.count);
       for (const p of pool) counts[p.index] -= p.claimed - p.left;
+      taken.forEach((n, j) => { counts[j] -= n; });
       const rest: Inventory = { entries: inv.entries.map((e, j) => ({ ...e, count: counts[j] })).filter((e) => e.count > 0) };
       mp.set(actorId, "inventory", addEntries(rest, added));
     }
@@ -308,9 +336,13 @@ export class CraftedExtrasSystem implements System {
       const reason = why ? REFUSAL_TEXT[why] : "";
       if (why) this.log(`[crafted] ${hex(actorId)}: refused (${why}) ${Array.from(refused, (id) => hex(id)).join(", ")}`);
       this.notify(ctx, userId, reason ? `${reason}. The item keeps its previous state.` : "The server did not accept that change to your item, so it keeps its previous state.");
+    } else if (gameplayNote) {
+      this.notify(ctx, userId, gameplayNote);
     } else if (held.size) {
       this.notify(ctx, userId, `${HELD_TEXT}.`);
     }
+    this.spare = [];
+    this.spareOf = [];
   }
 
   private normalize(raw: unknown, max: number): InventoryEntry[] {
@@ -406,6 +438,8 @@ export class CraftedExtrasSystem implements System {
     let soul: SoulSource | null = null;
     let credit: PoisonCredit | null = null;
     let enchantSoul = 0, temperSteps = 0;
+    let take: number[] = [];
+    let gameplayNote: string | undefined;
 
     // Souls only arrive through the soul trap system, and plugin enchantments never change
     if ((g.soul || 0) !== (s.soul || 0) || (g.enchantmentId || 0) !== (s.enchantmentId || 0)) return null;
@@ -421,7 +455,15 @@ export class CraftedExtrasSystem implements System {
       if (!effects) return null;
       soul = this.takeSoul(souls, weapon ? g.maxCharge || 0 : Infinity);
       if (!soul) return this.refuse("soul");
-      out.enchantmentEffects = effects;
+      const scale = this.gameplayScale(station.actorId, s.baseId, info, soul.size, effects);
+      if (scale) {
+        out.enchantmentEffects = this.scaleEnchantment(ctx, effects, weapon, station.enchantMargin, scale.mults);
+        take = scale.takes;
+        gameplayNote = scale.note;
+        notes.push(`scaled ${scale.mults.map((m) => Math.round(m * 100) + "%").join("/")}${take.length ? ` using ${take.map((i) => hex(this.spareOf[i].baseId)).join(", ")}` : ""}`);
+      } else {
+        out.enchantmentEffects = effects;
+      }
       if (weapon) {
         const cap = SOUL_CHARGE[soul.size];
         out.maxCharge = g.maxCharge && g.maxCharge > 0 ? Math.min(g.maxCharge, cap) : cap;
@@ -491,12 +533,12 @@ export class CraftedExtrasSystem implements System {
       }
     }
 
-    return notes.length ? { entry: out, reserve, soul, credit, notes, enchantSoul, temperSteps } : null;
+    return notes.length ? { entry: out, reserve, soul, credit, notes, enchantSoul, temperSteps, take, gameplayNote } : null;
   }
 
-  // A server copy holds this enchantment below the claimed strength, and nothing else of the item differs
+  // A server copy holds this enchantment at another strength than claimed, and nothing else of the item differs
   private isHeldCopy(g: InventoryEntry, pool: PoolEntry[]): boolean {
-    return pool.some((p) => sameBase(p.entry, g) && heldBelow(p.entry.enchantmentEffects, g.enchantmentEffects) &&
+    return pool.some((p) => sameBase(p.entry, g) && heldAtOtherStrength(p.entry.enchantmentEffects, g.enchantmentEffects) &&
       !sameEffects(p.entry.enchantmentEffects, g.enchantmentEffects) &&
       sameItem({ ...g, enchantmentEffects: p.entry.enchantmentEffects, maxCharge: p.entry.maxCharge }, p.entry));
   }
@@ -581,6 +623,60 @@ export class CraftedExtrasSystem implements System {
     return out;
   }
 
+  // Accepted effects times the gameplay's share each: the rank's cap applies before the share, and bounds a share above 1
+  private scaleEnchantment(ctx: SystemContext, effects: EnchantmentEffect[], weapon: boolean, margin: number, mults: number[]): EnchantmentEffect[] {
+    const caps = this.enchantmentCaps(ctx);
+    return effects.map((e, i) => {
+      const m = mults[i];
+      if (m === 1) return e;
+      const cap = caps.get((weapon ? "w" : "a") + (e.effectId >>> 0));
+      const top = cap ? cap.magnitude * margin : e.magnitude;
+      const out: EnchantmentEffect = { ...e, magnitude: Math.round(Math.min(e.magnitude * m, Math.max(top, e.magnitude)) * 100) / 100 };
+      // Paralysis and Soul Trap grow in duration, not magnitude
+      if ((this.mgefFlagsOf(ctx, e.effectId) & FLAG_POWER_AFFECTS_DURATION) !== 0 && e.duration > 0) {
+        const topDuration = cap ? Math.floor(cap.duration * margin) : e.duration;
+        out.duration = Math.max(1, Math.min(Math.round(e.duration * m), Math.max(topDuration, e.duration)));
+      }
+      const estimate = formulaCost(this.baseCostOf(ctx, out.effectId), out);
+      if (estimate > 0) out.cost = Math.min(Math.max(e.cost * Math.min(m, 1), estimate * COST_BAND[0]), estimate * COST_BAND[1]);
+      return out;
+    });
+  }
+
+  // The gameplay's verdict on a new enchantment (enchanting.js); null when it has none, so vanilla's strength stands
+  private gameplayScale(actorId: number | undefined, baseId: number, info: ItemInfo, soulSize: number, effects: EnchantmentEffect[]): GameplayScale | null {
+    const hook = (globalThis as any).__dboEnchantScale;
+    if (typeof hook !== "function" || !actorId) return null;
+    // Plain lines only: a gemstone is never a copy with extras
+    const spare = this.spareOf.map((e, index) => ({ baseId: e.baseId >>> 0, count: this.spare[index] || 0, index }))
+      .filter((e, i) => e.count > 0 && !hasIdentityExtras(this.spareOf[i]));
+    let r: any;
+    try {
+      r = hook(actorId >>> 0, {
+        baseId: baseId >>> 0, weapon: info.type === "WEAP", armorType: info.armorType, soul: soulSize,
+        effects: effects.map((e) => e.effectId >>> 0), spare: spare.map(({ baseId, count }) => ({ baseId, count })),
+      });
+    } catch (e) {
+      this.log(`[crafted] ${hex(actorId)}: enchanting scale failed: ${e}`);
+      return null;
+    }
+    if (!r || !Array.isArray(r.mults)) return null;
+    const mults = effects.map((_, i) => {
+      const m = Number(r.mults[i]);
+      return Number.isFinite(m) ? Math.max(0, Math.min(m, MAX_GAMEPLAY_SCALE)) : 1;
+    });
+    const takes: number[] = [];
+    const left = new Map(spare.map((e) => [e.index, e.count]));
+    for (const id of Array.isArray(r.take) ? r.take.slice(0, MAX_GAMEPLAY_TAKES) : []) {
+      const line = spare.find((e) => e.baseId === (Number(id) >>> 0) && (left.get(e.index) || 0) > 0);
+      if (!line) continue;
+      left.set(line.index, (left.get(line.index) || 0) - 1);
+      takes.push(line.index);
+    }
+    const note = typeof r.note === "string" && r.note ? r.note.slice(0, 300) : undefined;
+    return { mults, takes, note };
+  }
+
   // The crafting furniture, when the player is at it
   private stationOf(ctx: SystemContext, actorId: number, workbenchId: number): Station {
     if (!workbenchId) return NO_STATION;
@@ -631,12 +727,16 @@ export class CraftedExtrasSystem implements System {
     let baseEnchantment = 0;
     try { baseEnchantment = eitm ? res.toGlobalRecordId(eitm) >>> 0 : 0; } catch { baseEnchantment = eitm; }
     const eamt = type === "WEAP" ? this.fieldData(res, "EAMT") : null;
+    const bod2 = type === "ARMO" ? this.fieldData(res, "BOD2") : null;
+    const bodt = type === "ARMO" && !bod2 ? this.fieldData(res, "BODT") : null;
     const info: ItemInfo = {
       type,
       baseEnchantment,
       baseCharge: eamt && eamt.byteLength >= 2 ? viewOf(eamt).getUint16(0, true) : 0,
       enchantable: (type === "WEAP" || type === "ARMO") && !baseEnchantment &&
         !this.keywordsOf(ctx, baseId).includes(KEYWORD_DISALLOW_ENCHANTING),
+      armorType: bod2 && bod2.byteLength >= 8 ? viewOf(bod2).getUint32(4, true)
+        : bodt && bodt.byteLength >= 12 ? viewOf(bodt).getUint32(8, true) : ARMOR_TYPE_UNKNOWN,
     };
     this.itemCache.set(baseId >>> 0, info);
     return info;
@@ -862,4 +962,7 @@ export class CraftedExtrasSystem implements System {
   private baseFiles = BASE_GAME_FILES.size;
   private uncappedLogged = new Set<string>();
   private recipes: Map<number, TemperRecipe[]> | null = null;
+  // The report being read: its inventory lines and the units of each it does not spend
+  private spare: number[] = [];
+  private spareOf: InventoryEntry[] = [];
 }
