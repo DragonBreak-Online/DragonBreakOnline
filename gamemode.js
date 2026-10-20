@@ -6574,6 +6574,8 @@ const explosionParalysisOf = (spellId) => {
   // A paralysis scroll holds its victim on the server (C++ OnSpellHit), but the C++ cannot replay it on the victim's own
   // client: DoCombatSpellApply takes a Spell, and a Scroll is another form type (review SCH3-3). Its own effect counts here.
   if (spell && spell.record.type === 'SCRL') seconds = paralysisIn(spell);
+  // A staff's (ENCH) paralysis, which nothing applied on a player's own client (gearench.js caps it for PvP)
+  else if (spell && spell.record.type === 'ENCH') seconds = paralysisIn(spell);
   else if (spell && spell.record.type === 'SPEL' && !paralysisIn(spell)) {
     for (const f of fieldsOf(spell, 'EFID')) {
       const mgef = recordOf(globalAt(spell, u32At(f, 0)));
@@ -6598,7 +6600,9 @@ const serverHoldOf = (spellId) => {
   if (serverHold.has(spellId)) return serverHold.get(spellId);
   const spell = recordOf(spellId);
   let seconds = 0;
-  if (spell && (spell.record.type === 'SPEL' || spell.record.type === 'SCRL')) {
+  // A staff's ENCH only once the fork holds it too (gearEnchantments.staffRiders.npcServerHold, off until that build)
+  const enchHeld = spell && spell.record.type === 'ENCH' && (((cfg.gearEnchantments || {}).staffRiders || {}).npcServerHold === true);
+  if (spell && (spell.record.type === 'SPEL' || spell.record.type === 'SCRL' || enchHeld)) {
     const harms = fieldsOf(spell, 'EFID').some((f) => {
       const data = fieldsOf(recordOf(globalAt(spell, u32At(f, 0))), 'DATA')[0];
       return !!(u32At(data, 0) & (HOSTILE | DETRIMENTAL)) && u32At(data, 0x44) === AV_HEALTH;
@@ -6625,7 +6629,17 @@ if (typeof globalThis.__dboPrevSpellHit === 'undefined') globalThis.__dboPrevSpe
 const spellHitHook = (aggressorId, targetId, spellId, ...rest) => {
   try {
     const tgt = Number(targetId) >>> 0, agg = Number(aggressorId) >>> 0, spell = Number(spellId) >>> 0;
-    const seconds = explosionParalysisOf(spell), held = serverHoldOf(spell), now = Date.now();
+    let seconds = explosionParalysisOf(spell); const held = serverHoldOf(spell), now = Date.now();
+    const isEnch = seconds > 0 && (() => { const r = recordOf(spell); return !!r && r.record.type === 'ENCH'; })();
+    // A player: a staff's hold at most pvpParalysisMaxSeconds, then immune to every paralysis a while (gearench.js)
+    if (seconds > 0 && gearEnch && profileOf(tgt) >= 0 && agg !== tgt && !paralysisRefused(agg, tgt, now)) seconds = gearEnch.playerParalysis(tgt, seconds, isEnch);
+    // An NPC: a staff holds it here only where the caster's own engine paralysed it (its host), until the fork holds staves
+    if (isEnch && profileOf(tgt) < 0 && !(((cfg.gearEnchantments || {}).staffRiders || {}).npcServerHold === true)) {
+      let host = 0; try { host = typeof mp.getHoster === 'function' ? mp.getHoster(tgt) >>> 0 : 0; } catch (e) { host = 0; }
+      if (host !== agg) seconds = 0;
+    }
+    // A staff's slow and its stamina or magicka damage on a player (gearench.js staffSpellHit)
+    try { if (gearEnch && agg !== tgt) gearEnch.staffSpellHit(agg, tgt, spell); } catch (e) { log('staff riders failed', e.message); }
     if (globalThis.__dboBeastSpellHit) globalThis.__dboBeastSpellHit(Number(aggressorId) >>> 0, tgt, Number(spellId) >>> 0);
     if (globalThis.__dboSuperSpellHit) globalThis.__dboSuperSpellHit(Number(aggressorId) >>> 0, tgt, Number(spellId) >>> 0);
     // Force Rune and the like stagger instead of pushing (combat.js staggerSpells)

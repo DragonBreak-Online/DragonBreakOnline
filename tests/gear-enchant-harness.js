@@ -370,6 +370,8 @@ const hp = (a) => S.get(a).percentages.health;
     check('...without it, x1', fn(2, { targetMaxHealth: 150 }) === 1);
     check('...works with alchemy.js not loaded (no early return on __dboPotionBonus)', !/const potionTakenMult = \(targetId, flags\) => \{\n  if \(typeof globalThis\.__dboPotionBonus/.test(gm));
   }
+  check('item 5: a staff ENCH paralyses through explosionParalysisOf, capped for players by playerParalysis', /else if \(spell && spell\.record\.type === 'ENCH'\) seconds = paralysisIn\(spell\);/.test(gm) && /gearEnch\.playerParalysis\(tgt, seconds, isEnch\)/.test(gm));
+  check('...the spell hit hands a staff to staffSpellHit (slow, drains)', /gearEnch\.staffSpellHit\(agg, tgt, spell\)/.test(gm));
   console.log(failed ? `${failed} failed` : 'all checks passed');
   process.exit(failed ? 1 : 0);
 })().catch((e) => { console.log('FAIL harness threw', e.stack); process.exit(1); });
