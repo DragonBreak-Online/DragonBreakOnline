@@ -360,6 +360,7 @@ const hp = (a) => S.get(a).percentages.health;
   check('onHitDamage hands the landed hit to gearench', /gearEnch\.landed\(agg, tgt, Number\(sourceId\) >>> 0, dealt\)/.test(gm));
   check('sourceResistsOf takes a magic effect as its own source', /ownData = r && String\(r\.record\.type\) === 'MGEF'/.test(gm));
   check('racial.js counts a magic effect as magic', /\['SPEL', 'ENCH', 'SCRL', 'MGEF'\]/.test(read('racial.js')));
+  check('item 2: worn resistances join the target side, before racial.js caps it', /potionResistMult\(tgt, src\) \* gearResistMult\(tgt, src\);\n    if \(racial\) \{ try \{ targetSide = racial\.capTargetSide/.test(gm));
   console.log(failed ? `${failed} failed` : 'all checks passed');
   process.exit(failed ? 1 : 0);
 })().catch((e) => { console.log('FAIL harness threw', e.stack); process.exit(1); });
