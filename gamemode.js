@@ -7025,7 +7025,8 @@ let gearEnch = null;
 // server never read. Each point adds perPoint (half of vanilla's 1%), all worn gear together at most cap, players only.
 // Config "gearFortify": { enabled, perPoint, cap }.
 const GEAR_FORT = Object.assign({ enabled: true, perPoint: 0.005, cap: 0.25 }, cfg.gearFortify || {});
-const GEAR_FORT_AV = { 96: 'one', 97: 'two', 98: 'archery' };
+// Fortify Unarmed (AV 35) shares this cap, so fists and weapons stay even (gearEnchantments.unarmed.enabled)
+const GEAR_FORT_AV = { 96: 'one', 97: 'two', 98: 'archery', 35: 'unarmed' };
 const gearFortEffects = globalThis.__dboGearFortEffects instanceof Map ? globalThis.__dboGearFortEffects : (globalThis.__dboGearFortEffects = new Map()); // MGEF -> hook or ''
 const gearFortHookOf = (mgefId) => {
   const id = mgefId >>> 0;
@@ -7072,7 +7073,8 @@ globalThis.__dboGearFortBonus = gearFortBonus;
 const gearAttackMult = (aggressorId, sourceId) => {
   if (GEAR_FORT.enabled === false || isSpellSource(sourceId)) return 1;
   const hands = weaponHandsOf(sourceId);
-  const hook = weaponSkillOf(sourceId) === 'archery' ? 'archery' : hands === 'one' || hands === 'two' ? hands : '';
+  const unarmedOn = (sourceId >>> 0) === 0x1f4 && (((cfg.gearEnchantments || {}).unarmed || {}).enabled !== false);
+  const hook = unarmedOn ? 'unarmed' : weaponSkillOf(sourceId) === 'archery' ? 'archery' : hands === 'one' || hands === 'two' ? hands : '';
   return hook ? 1 + gearFortBonus(aggressorId, hook) : 1;
 };
 // Fortify potions (alchemy rework, Nate 14 Oct: "only where the server can honour them"; alchemy.js __dboPotionBonus): a
@@ -7288,14 +7290,16 @@ const defensePieceMult = (targetId) => {
 };
 // Below 1 when the target's armor counts for more than the engine allowed it: the Defense tier multiplies each piece's
 // rating, and tempering adds the game's bonus to it (the engine reads the bare rating only)
+// Worn Fortify Heavy and Light Armor: that weight's pieces count a capped share more (gearench.js bonus)
+const gearArmorMult = (targetId) => { const b = globalThis.__dboGearBonus; try { return typeof b === 'function' ? { heavy: 1 + (Number(b(targetId, 'heavy')) || 0), light: 1 + (Number(b(targetId, 'light')) || 0) } : { heavy: 1, light: 1 }; } catch (e) { return { heavy: 1, light: 1 }; } };
 const defenseDamageMult = (targetId) => {
-  const pm = defensePieceMult(targetId);
+  const pm = defensePieceMult(targetId), gm = gearArmorMult(targetId);
   let bare = 0, counted = 0;
   try {
     for (const w of wornWithHealth(targetId)) {
       const p = armorPieceOf(w.baseId); if (!p) continue;
       bare += p.rating;
-      counted += ((p.counted || p.rating) + temperBonus(w.health, p.chest)) * (p.heavy ? pm.heavy : pm.light) * (w.cond || 1);
+      counted += ((p.counted || p.rating) + temperBonus(w.health, p.chest)) * (p.heavy ? pm.heavy : pm.light) * (w.cond || 1) * (p.heavy ? gm.heavy : gm.light);
     }
   } catch (e) { return 1; }
   // A Fortify Armor potion (alchemy.js, hook armor): the worn armour counts for that much more while it lasts
@@ -7367,12 +7371,12 @@ const fleshDamageMult = (targetId, sourceId) => {
   if (!(extra > 0)) return 1;
   const physical = (sourceId >>> 0) === 0x1f4 || (() => { const r = recordOf(sourceId >>> 0); return !!r && String(r.record.type) === 'WEAP'; })();
   if (!physical) return 1;
-  const pm = defensePieceMult(targetId);
+  const pm = defensePieceMult(targetId), gm = gearArmorMult(targetId);
   let counted = 0;
   try {
     for (const w of wornWithHealth(targetId)) {
       const p = armorPieceOf(w.baseId); if (!p) continue;
-      counted += ((p.counted || p.rating) + temperBonus(w.health, p.chest)) * (p.heavy ? pm.heavy : pm.light) * (w.cond || 1);
+      counted += ((p.counted || p.rating) + temperBonus(w.health, p.chest)) * (p.heavy ? pm.heavy : pm.light) * (w.cond || 1) * (p.heavy ? gm.heavy : gm.light);
     }
   } catch (e) { counted = 0; }
   const scale = gmstFloat(0x21a72, 0.12), cap = gmstFloat(0x37deb, 80);

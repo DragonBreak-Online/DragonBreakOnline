@@ -78,8 +78,10 @@ module.exports = (api) => {
     const behind = flat > 0 && Math.sin(z) * dx + Math.cos(z) * dy < Math.cos(cone) * flat;
     return { dist: Math.hypot(flat, la.pos[2] - lt.pos[2]), height: Math.abs(la.pos[2] - lt.pos[2]), behind };
   };
-  const chanceFor = (tier, g, drawn) => {
+  // thief: worn Fortify Pickpocket adds a capped share (gearench.js bonus), still within min/maxChance
+  const chanceFor = (tier, g, drawn, thief) => {
     let c = tier < 0 ? Number(C.chanceUntrained) || 0 : at(C.chanceByTier, tier);
+    try { const b = globalThis.__dboGearBonus; if (thief !== undefined && typeof b === 'function') c += Math.max(0, Number(b(thief, 'pickpocket')) || 0); } catch (e) { /* no gear module */ }
     if (g.behind) c += Number(C.behindBonus) || 0;
     if (drawn) c -= Number(C.weaponDrawnPenalty) || 0;
     return Math.min(Number(C.maxChance), Math.max(Number(C.minChance), c));
@@ -229,7 +231,7 @@ module.exports = (api) => {
 
     const tier = tierOf(a);
     const drawn = weaponDrawn(t);
-    const chance = chanceFor(tier, g, drawn);
+    const chance = chanceFor(tier, g, drawn, a);
     const roll = Math.random();
     const odds = `${tier < 0 ? 'untrained' : `Lockpicking t${tier + 1}`}, ${g.behind ? 'from behind' : 'from the front'}${drawn ? ', weapon drawn' : ''}, ${Math.round(chance * 100)}% rolled ${Math.round(roll * 100)}`;
     if (roll >= chance) {
