@@ -71,6 +71,7 @@ begin
   for i := 0 to Pred(slList.Count) do begin
     line := Trim(slList[i]);
     if line = '' then Continue;
+    if Copy(line, 1, 1) = '#' then Continue;   { a commented-out target, not a plugin }
     p1 := Pos('|', line);
     plug := Copy(line, 1, p1 - 1);
     line := Copy(line, p1 + 1, Length(line));

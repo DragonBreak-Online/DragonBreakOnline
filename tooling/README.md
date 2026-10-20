@@ -15,6 +15,13 @@ public.
 | `ops/backup-git.cmd` | The pre-push backup of both repos (branch + bundle + working-tree patch) | root |
 | `CLIENT_BUILD.md` | How the player download is built and published | - |
 
+**Everything in this table is a copy, and the copy that runs is the one on the right.** A `.pas`
+edited here does nothing until it reaches its working location, and an edit made there is invisible
+to this repo - which holds for the data files the scripts read as well as the scripts themselves.
+`xedit-scripts/DBO_PuzzleGateList.txt` is the one to watch: a headless run loads the copy in
+`Skyrim Special Edition - dev\Edit Scripts\`, not this one, and the two having drifted is why
+several of its entries described a world that no longer existed. Edit both, or neither is true.
+
 ## Running them anywhere but Nat's PC
 
 The scripts hard-code the root `E:\DragonBreak Online Dev files` and expect this layout under it:
