@@ -338,7 +338,12 @@ TEST_CASE("A staff's AI riders replay on the NPC's host as a spell carrying "
   constexpr uint32_t kVampireCharm = 0x000c4de2;
   constexpr uint32_t kStaffOfTurnUndead = 0x00029b95;
   constexpr uint32_t kTurnUndeadEnchantment = 0x00029b96;
-  constexpr uint32_t kTurnUndead = 0x0005dd5d;
+  // StaffEnchTurnUndead: TurnUndeadFFAimed50 8; TurnUndead carries it at 13, RepelLesserUndead Turn Undead at 8
+  constexpr uint32_t kRepelLesserUndead = 0x0004d3f8;
+  // StaffEnchFrenzy: Frenzy 8; the Frenzy spell is 14, Fury 6
+  constexpr uint32_t kStaffOfFrenzy = 0x00029b8f;
+  constexpr uint32_t kFrenzyEnchantment = 0x00029b65;
+  constexpr uint32_t kFury = 0x0004deeb;
   SpellSyncScene scene(p);
 
   auto replayedAs = [&](uint32_t staff, uint32_t enchantment) -> uint32_t {
@@ -348,8 +353,10 @@ TEST_CASE("A staff's AI riders replay on the NPC's host as a spell carrying "
     return replay ? (*replay)["arguments"][0]["formId"].get<uint32_t>() : 0;
   };
   REQUIRE(replayedAs(kStaffOfCalm, kCalmEnchantment) == kVampireCharm);
+  // The closest at or below the staff's magnitude
   REQUIRE(replayedAs(kStaffOfTurnUndead, kTurnUndeadEnchantment) ==
-          kTurnUndead);
+          kRepelLesserUndead);
+  REQUIRE(replayedAs(kStaffOfFrenzy, kFrenzyEnchantment) == kFury);
 
   // A player's game would ignore it
   std::this_thread::sleep_for(ActionListener::kRiderHitInterval);

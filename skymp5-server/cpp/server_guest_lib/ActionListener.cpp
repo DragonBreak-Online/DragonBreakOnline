@@ -22,6 +22,7 @@
 #include "script_objects/EspmGameObject.h"
 #include "libespm/RecordHeaderAccess.h"
 #include <chrono>
+#include <optional>
 #include <cstring>
 #include <fmt/format.h>
 #include <fmt/ranges.h>
@@ -355,18 +356,31 @@ SpellRiders GetExplosionRiders(WorldState* worldState, uint32_t spellId)
   return riders;
 }
 
-// Global MGEF id -> magnitude of each effect of a SPEL, SCRL or ENCH; harmsHealth and commands as in SpellRiders
-struct EffectMagnitudes
+// The effects of a SPEL, SCRL or ENCH with global MGEF ids; harmsHealth and commands as in SpellRiders
+struct EffectList
 {
-  std::unordered_map<uint32_t, float> byEffect;
+  struct Entry
+  {
+    uint32_t effectId = 0;
+    espm::MGEF::EffectType type = espm::MGEF::EffectType::ValueMod;
+    float magnitude = 0.f;
+    uint32_t area = 0;
+  };
+  std::vector<Entry> entries;
   bool harmsHealth = false;
   bool commands = false;
+
+  bool Has(uint32_t effectId) const
+  {
+    return std::any_of(entries.begin(), entries.end(),
+                       [&](const Entry& e) { return e.effectId == effectId; });
+  }
 };
 
-EffectMagnitudes GetEffectMagnitudes(WorldState* worldState,
-                                     const espm::LookupResult& itemLookup)
+EffectList GetEffectList(WorldState* worldState,
+                         const espm::LookupResult& itemLookup)
 {
-  EffectMagnitudes result;
+  EffectList result;
   ForEachEffectData(
     worldState, itemLookup,
     [&](const espm::SPEL::EFIT* effectItem, const espm::MGEF::DATA& data,
@@ -377,21 +391,24 @@ EffectMagnitudes GetEffectMagnitudes(WorldState* worldState,
       }
       result.harmsHealth = result.harmsHealth || riders.damagesHealth;
       result.commands = result.commands || riders.commands;
-      result.byEffect[mgefLookup.ToGlobalId(mgefLookup.rec->GetId())] =
-        effectItem ? effectItem->magnitude : 0.f;
+      result.entries.push_back(
+        { mgefLookup.ToGlobalId(mgefLookup.rec->GetId()), data.effectType,
+          effectItem ? effectItem->magnitude : 0.f,
+          effectItem ? effectItem->areaOfEffect : 0 });
     });
   return result;
 }
 
-// A spell carrying an enchantment's AI riders, which DoCombatSpellApply can replay (Staff of Calm: Calm). It has every
-// AI effect of the enchantment and harms no Health; the nearest in magnitude and effect list wins, 0 when none does
+// A spell carrying an enchantment's AI riders, which DoCombatSpellApply can replay (Staff of Calm: VampireCharm). For
+// each AI effect of the enchantment it has one of the same type, no wider; it harms no Health and commands nothing.
+// The closest at or below the enchantment's magnitudes wins (Nate: balance everything), then the same magic effect,
+// then the fewest unshared effects, then the lower form id; the weakest above only when none is at or below
 uint32_t StandInSpellOf(WorldState* worldState, uint32_t enchantmentId)
 {
+  using Type = espm::MGEF::EffectType;
   struct Index
   {
-    // Global MGEF id of an AI effect -> the spells that carry it
-    std::unordered_map<uint32_t, std::vector<espm::LookupResult>>
-      spellsByEffect;
+    std::unordered_map<Type, std::vector<espm::LookupResult>> spellsByType;
     std::unordered_map<uint32_t, uint32_t> answers;
   };
   static std::unordered_map<const WorldState*, Index> indexByWorld;
@@ -403,89 +420,105 @@ uint32_t StandInSpellOf(WorldState* worldState, uint32_t enchantmentId)
       ForEachEffectData(
         worldState, spell,
         [&](const espm::SPEL::EFIT*, const espm::MGEF::DATA& data,
-            const espm::LookupResult& mgefLookup) {
+            const espm::LookupResult&) {
           if (IsAiRiderEffect(data.effectType)) {
-            auto& spells = index.spellsByEffect[mgefLookup.ToGlobalId(
-              mgefLookup.rec->GetId())];
+            auto& spells = index.spellsByType[data.effectType];
             if (spells.empty() || spells.back().rec != spell.rec) {
               spells.push_back(spell);
             }
           }
         });
     }
-    spdlog::info("ActionListener: {} AI magic effects carried by spells",
-                 index.spellsByEffect.size());
+    spdlog::info("ActionListener: {} AI effect types carried by spells",
+                 index.spellsByType.size());
   }
   if (const auto it = index.answers.find(enchantmentId);
       it != index.answers.end()) {
     return it->second;
   }
 
-  const auto enchantmentLookup = browser.LookupById(enchantmentId);
-  const auto enchantment = GetEffectMagnitudes(worldState, enchantmentLookup);
-  std::vector<uint32_t> aiEffects;
-  ForEachEffectData(
-    worldState, enchantmentLookup,
-    [&](const espm::SPEL::EFIT*, const espm::MGEF::DATA& data,
-        const espm::LookupResult& mgefLookup) {
-      if (IsAiRiderEffect(data.effectType)) {
-        aiEffects.push_back(mgefLookup.ToGlobalId(mgefLookup.rec->GetId()));
-      }
-    });
+  const auto enchantment =
+    GetEffectList(worldState, browser.LookupById(enchantmentId));
+  std::vector<EffectList::Entry> aiEffects;
+  for (const auto& entry : enchantment.entries) {
+    if (IsAiRiderEffect(entry.type)) {
+      aiEffects.push_back(entry);
+    }
+  }
 
-  constexpr float kUnsharedEffectCost = 0.5f;
-  uint32_t best = 0;
-  float bestScore = 0.f;
+  // stronger, magnitude distance, other magic effects, unshared effects, form id
+  using Rank = std::tuple<bool, float, int, int, uint32_t>;
+  std::optional<Rank> best;
   const auto candidatesIt = aiEffects.empty()
-    ? index.spellsByEffect.end()
-    : index.spellsByEffect.find(aiEffects.front());
-  if (candidatesIt != index.spellsByEffect.end()) {
+    ? index.spellsByType.end()
+    : index.spellsByType.find(aiEffects.front().type);
+  if (candidatesIt != index.spellsByType.end()) {
     for (const auto& spell : candidatesIt->second) {
-      const auto candidate = GetEffectMagnitudes(worldState, spell);
+      const auto candidate = GetEffectList(worldState, spell);
       if (candidate.harmsHealth || candidate.commands) {
         continue;
       }
-      float score = 0.f;
-      bool hasAll = true;
-      for (uint32_t effect : aiEffects) {
-        const auto it = candidate.byEffect.find(effect);
-        if (it == candidate.byEffect.end()) {
+      bool stronger = false, hasAll = true;
+      float distance = 0.f;
+      int otherEffects = 0;
+      for (const auto& wanted : aiEffects) {
+        // The strongest of the type, of the same magic effect when it has one
+        const EffectList::Entry* match = nullptr;
+        for (const auto& entry : candidate.entries) {
+          if (entry.type != wanted.type ||
+              (entry.area > 0 && wanted.area == 0)) {
+            continue;
+          }
+          const bool same = entry.effectId == wanted.effectId;
+          const bool matchSame = match && match->effectId == wanted.effectId;
+          if (!match || (same && !matchSame) ||
+              (same == matchSame && entry.magnitude > match->magnitude)) {
+            match = &entry;
+          }
+        }
+        if (!match) {
           hasAll = false;
           break;
         }
-        score += std::abs(it->second - enchantment.byEffect.at(effect));
+        stronger = stronger || match->magnitude > wanted.magnitude;
+        distance += std::abs(match->magnitude - wanted.magnitude);
+        otherEffects += match->effectId == wanted.effectId ? 0 : 1;
       }
       if (!hasAll) {
         continue;
       }
-      for (const auto& [effect, magnitude] : candidate.byEffect) {
-        score +=
-          enchantment.byEffect.count(effect) ? 0.f : kUnsharedEffectCost;
+      int unshared = 0;
+      for (const auto& entry : candidate.entries) {
+        unshared += enchantment.Has(entry.effectId) ? 0 : 1;
       }
-      for (const auto& [effect, magnitude] : enchantment.byEffect) {
-        score += candidate.byEffect.count(effect) ? 0.f : kUnsharedEffectCost;
+      for (const auto& entry : enchantment.entries) {
+        unshared += candidate.Has(entry.effectId) ? 0 : 1;
       }
-      const uint32_t spellId = spell.ToGlobalId(spell.rec->GetId());
-      if (!best || score < bestScore ||
-          (score == bestScore && spellId < best)) {
-        best = spellId;
-        bestScore = score;
+      const Rank rank{ stronger, distance, otherEffects, unshared,
+                       spell.ToGlobalId(spell.rec->GetId()) };
+      if (!best || rank < *best) {
+        best = rank;
       }
     }
   }
-  if (best) {
-    spdlog::info("ActionListener: enchantment {:x} replays as spell {:x}",
-                 enchantmentId, best);
-  } else {
+  const uint32_t spellId = best ? std::get<4>(*best) : 0;
+  if (!best) {
     spdlog::warn("ActionListener: no spell carries the AI riders of "
                  "enchantment {:x}, they are not replayed",
                  enchantmentId);
+  } else if (std::get<0>(*best)) {
+    spdlog::warn("ActionListener: enchantment {:x} replays as spell {:x}, "
+                 "which is stronger (none is at or below it)",
+                 enchantmentId, spellId);
+  } else {
+    spdlog::info("ActionListener: enchantment {:x} replays as spell {:x}",
+                 enchantmentId, spellId);
   }
   if (index.answers.size() > 4096) {
     index.answers.clear();
   }
-  index.answers.emplace(enchantmentId, best);
-  return best;
+  index.answers.emplace(enchantmentId, spellId);
+  return spellId;
 }
 
 // Absorb Health's part of a spell's damage on target, counted like the damage formula counts it (visible effects
