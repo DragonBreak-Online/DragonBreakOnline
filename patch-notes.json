@@ -1,5 +1,20 @@
 [
   {
+    "title": "Enchantments rebalanced",
+    "date": "2026-10-20",
+    "version": "Server update",
+    "tag": "Change",
+    "sections": [
+      {
+        "heading": "Enchanted gear",
+        "items": [
+          "Enchantments on gear are about half as strong as before: Fortify skills, health, magicka, regeneration and the rest. Gear was making characters far stronger than intended.",
+          "Worn Fortify One-handed, Two-handed and Archery enchantments now really add to the damage of your blows with that weapon type, up to 25% from all your gear together."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Duel types",
     "date": "2026-10-20",
     "version": "Server update",
