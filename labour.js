@@ -88,6 +88,39 @@ module.exports = (api) => {
       '736eb:BSHeartland.esm': 'adamantium',                      // MineOreSilver03, the far north gallery
       '7b94e:BSHeartland.esm': 'adamantium',                      // MineOreSilver03, the west end
       '7ba53:BSHeartland.esm': 'adamantium',                      // MineOreSilver01, the east end
+      // Mountainwatch's Frostiron mine is THE adamantium mine (Nate, 17 Oct: "make the mountainwatch mine adimantium").
+      // Bruma needed a draw of its own over Skyrim, and ebony is Skyrim's by lore; adamantium is Cyrodiil's answer, a heavy
+      // set a notch under ebony (114 armour to its 128) that no Nord can forge. Its 25 unclaimed veins - 16 iron, 7 gold,
+      // 6 corundum by their bases, in CYRFrostironmine01 and 02 - all give Adamantium Ore from Miner tier 4 (Expert, with
+      // malachite). The mine's four quicksilver veins below are LEFT ALONE: they are the only quicksilver inside the Bruma
+      // lock (199 seams worked), and taking them would kill a trade to feed another.
+      // NOTE: every vein here now needs Expert. A Novice who walks in finds nothing they can work, where the mine used to
+      // give iron and corundum. If that is too harsh, the iron veins below can go back by deleting their lines.
+      '177faa:DragonBreak Online Edits.esp': 'adamantium',       // MineOreCorundum01, CYRFrostironmine01
+      '177fac:DragonBreak Online Edits.esp': 'adamantium',       // MineOreCorundum01, CYRFrostironmine01
+      '177fae:DragonBreak Online Edits.esp': 'adamantium',       // MineOreCorundum01, CYRFrostironmine01
+      '177fb0:DragonBreak Online Edits.esp': 'adamantium',       // MineOreCorundum01, CYRFrostironmine01
+      '177fb2:DragonBreak Online Edits.esp': 'adamantium',       // MineOreCorundum01, CYRFrostironmine01
+      '177fb4:DragonBreak Online Edits.esp': 'adamantium',       // MineOreCorundum01, CYRFrostironmine01
+      'e59fb:BSHeartland.esm': 'adamantium',                     // MineOreGold03, CYRFrostironmine01
+      'e59fc:BSHeartland.esm': 'adamantium',                     // MineOreGold03, CYRFrostironmine01
+      'e59fa:BSHeartland.esm': 'adamantium',                     // MineOreGold04, CYRFrostironmine01
+      'e59f9:BSHeartland.esm': 'adamantium',                     // MineOreIron01, CYRFrostironmine01
+      'e59fe:BSHeartland.esm': 'adamantium',                     // MineOreIron03, CYRFrostironmine01
+      '177f9e:DragonBreak Online Edits.esp': 'adamantium',       // MineOreIron04, CYRFrostironmine01
+      '177fa0:DragonBreak Online Edits.esp': 'adamantium',       // MineOreIron04, CYRFrostironmine01
+      '177fa2:DragonBreak Online Edits.esp': 'adamantium',       // MineOreIron04, CYRFrostironmine01
+      '177fa6:DragonBreak Online Edits.esp': 'adamantium',       // MineOreIron04, CYRFrostironmine01
+      'd9845:BSHeartland.esm': 'adamantium',                     // MineOreIron04, CYRFrostironmine01
+      'd9847:BSHeartland.esm': 'adamantium',                     // MineOreIron04, CYRFrostironmine01
+      'e59e4:BSHeartland.esm': 'adamantium',                     // MineOreGold02, CYRFrostironmine02
+      'e59d9:BSHeartland.esm': 'adamantium',                     // MineOreGold03, CYRFrostironmine02
+      'e59e3:BSHeartland.esm': 'adamantium',                     // MineOreGold03, CYRFrostironmine02
+      'e59e0:BSHeartland.esm': 'adamantium',                     // MineOreGold04, CYRFrostironmine02
+      'e59e5:BSHeartland.esm': 'adamantium',                     // MineOreIron02, CYRFrostironmine02
+      'd9a1c:BSHeartland.esm': 'adamantium',                     // MineOreIron03, CYRFrostironmine02
+      'd9a16:BSHeartland.esm': 'adamantium',                     // MineOreIron04, CYRFrostironmine02
+      'd9a19:BSHeartland.esm': 'adamantium',                     // MineOreIron04, CYRFrostironmine02
       // No soul-gem geode stands inside the Bruma lock (only Whistling Mine and Blackreach have them), and an enchanter needs
       // empty soul gems (economy scan, 11 Oct: 14 of 63 Enchanters active): three silver veins of the Bleak Mine
       // (CYRBleakMine01, door inside the border, 11 silver veins), 3,758 units apart at the closest, are Geode Veins that

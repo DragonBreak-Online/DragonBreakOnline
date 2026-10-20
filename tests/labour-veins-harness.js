@@ -17,6 +17,23 @@ for (const [edid, want] of [
   ['BSBMMineOreSilver01', ''], ['CYRMineGemRuby01', ''], ['12SeaSaltDeposit', ''],
 ]) ok(ore(edid) === want, `${edid} -> ${want || 'not a vein'} (got ${ore(edid) || 'nothing'})`);
 ok(/extraOreTier: \{ salt: 0, tin: 0,/.test(src), 'tin is minable from tier 0, with copper');
+
+// The remapped veins (oreByRef): a ref may be claimed once and once only, or the later line silently wins and a trade
+// loses its only seams. Mountainwatch's Frostiron mine is the adamantium mine (Nate, 17 Oct); its four quicksilver veins
+// are deliberately left out of it, being the only quicksilver inside the Bruma lock.
+const REMAPS = [...src.matchAll(/'([0-9a-f]+:[^']+)': '([a-z]+)',/g)].map((r) => [r[1], r[2]]);
+const seen = new Map();
+const twice = REMAPS.filter(([ref]) => (seen.has(ref) ? true : (seen.set(ref, 1), false)));
+ok(!twice.length, `no ref is remapped twice (${twice.map(([r]) => r).join(', ') || 'none'})`);
+const byOre = REMAPS.reduce((m2, [, o]) => Object.assign(m2, { [o]: (m2[o] || 0) + 1 }), {});
+ok(byOre.adamantium >= 25, `adamantium has its mine: ${byOre.adamantium || 0} veins`);
+ok(byOre.quicksilver === 4, `the four quicksilver veins survive it: ${byOre.quicksilver || 0}`);
+ok(byOre.meteoriciron === 3 && byOre.geode === 3, 'meteoric iron and the soul-gem geodes are untouched');
+for (const ref of ['177faa:DragonBreak Online Edits.esp', 'd9a16:BSHeartland.esm', 'e59e0:BSHeartland.esm'])
+  ok(seen.has(ref) && REMAPS.find(([r]) => r === ref)[1] === 'adamantium', `${ref} gives adamantium`);
+for (const ref of ['e59f8:BSHeartland.esm', '177fa4:DragonBreak Online Edits.esp'])
+  ok(REMAPS.find(([r]) => r === ref)[1] === 'quicksilver', `${ref} is still quicksilver`);
+ok(/adamantium: 3,/.test(src) || /adamantium: [0-9]/.test(src), 'adamantium still opens at its Miner tier (extraOreTier)');
 ok(/if \(type === 'ACTI' && \(VEIN\.test\(edid\)/.test(src), 'the activation test uses the same VEIN');
 console.log(fails ? `${fails} failed` : 'all passed');
 process.exit(fails ? 1 : 0);
