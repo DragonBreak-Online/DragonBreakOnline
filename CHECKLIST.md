@@ -1,5 +1,107 @@
 # DragonBreak Online checklist (2026-09-14)
 
+## 19 Oct, late - the missing doorways, and the gate list stops being a script input (Worker A, PC)
+
+Nat: "theres missing doorways etc, i feel like in the draugr ruins its from when we removed the blade
+traps or something" - then "or blockers". He was right about the cause and right about which pass.
+
+**The doorways were never doors.** `NorHallExSmRotatingDoor01` is floor-level Nordic corridor
+architecture (`Dungeons\Nordic\BgHalls\`) - the *housing* a rotating door sits in, part of the room
+shell. The blocker passes of 12-19 Sep read it as a door by its name and sank it, taking the
+doorway's frame with it. The ACTI panel that actually turns is `NorRotatingDoor`, a separate record
+480 units above. Four housings restored: `Skyrim.esm` `042ED6` / `042EDB` / `042EDE` and
+`Dragonborn.esm:01A18E`.
+
+**Claw doors gone, per Nat's call** ("we shouldnt have the claw doors tbh ... change them to
+something else or remove them"): 4 references disabled + sunk - `Druadach.esm` `05FF57` / `05FF5F`,
+`arnima.esm` `085E99` / `085EA1`. The puzzle rings they need can't be turned server-side at all, so
+they were dead ends wearing a door.
+
+**`DBO_PuzzleGateList.txt` is no longer safe to run whole, and now says so in a header.** It records
+what the Sep passes *targeted*; it is not a description of the world as it should be. A full run on
+19 Oct reported DONE for **56** references when **4** were wanted. The output was rejected, not
+saved (`REJECTED-dle-would-reseal-blackreach.esp`). It would have:
+- **re-sealed Blackreach** - its 7 entrances were deliberately reopened on 14 Oct but nobody dropped
+  them from the list;
+- **removed 45 portcullises that have never been removed** (skyrim 37, dawnguard 5, dragonborn 3) -
+  absent from the current DLE and from both the 19 Oct and 9 Oct backups, so standing since at least
+  9 Oct. Whether they go is Nat's curation call, not the script's;
+- **undone the four housings and the Silverdrift gate** restored the same day.
+All of those lines are now commented out. 431 active entries remain. **If an area is ever reopened,
+drop its lines at the same time.**
+
+### The 155 lever gates are a DATA problem, not a code problem
+
+First read of this was wrong and is corrected here. The gates' base script is `norportcullisscript`,
+not `default2StateActivator`, and the conclusion drawn from that - "so `ruinbuttons.js` cannot drive
+them" - does not follow. **The base script only decides what the ENGINE's default activate-children
+chain does.** `ruinbuttons.js` does not use that chain; its `play()` sends
+`callPapyrusFunction('method', 'ObjectReference', 'PlayAnimation', ...)`, which works on any
+reference whatever script its base carries, reaches every client in the cell, and is kept as the
+reference's `lastAnimation` so a player arriving later sees it open too.
+
+Two things settle it without an in-game test:
+
+- **`norportcullisscript`'s own string table holds the literal animation names `open` and `close`,
+  played through `playAnimation`** - the same names `default2StateActivator` uses. Read straight out
+  of `Skyrim - Misc.bsa`; a `.pex` carries its string table in the clear, so this needed no
+  decompiler.
+- **`ruin-buttons.json` already drives a gate this way in production**: Silorn's second button opens
+  `BSKAyleidPortGatePole04` with plain `"open"`/`"close"` and no `"call": "gamebryo"`.
+
+So the 155 restore needs a `ruin-buttons.json` entry per lever and no new server module, no C++ and
+no client rebuild. `tooling/ruin_buttons.py` is the generator to extend. The gates must be
+**enabled** first, though - the server never loads a disabled reference - so the restore is still a
+plugin pass.
+
+**The one genuine unknown is the mesh, not the script.** Beyond Skyrim's retractable stair did not
+move for `PlayAnimation` (Nate, 2026-09-28) because its NIF has no behaviour graph, only a
+`NiControllerManager`, and needed `PlayGamebryoAnimation`. Whether the Nordic door's own mesh
+(`Dungeons\Nordic\SecretPass\Animated\RmSmDoor01\NorSecRmSmDoorSm01.nif` - note "Animated") behaves
+the same way is what the single-gate test answers. If it does not move, add `"call": "gamebryo"` to
+the target before concluding anything.
+
+**The proving case, ready to run.** Gate `Skyrim.esm:0B77E7` is restored and enabled; its lever is
+`Skyrim.esm:0B780A` (`NorPullBar01`) at (776.72, 5512.33, -1103.75); both are in `SilverdriftLair01`
+= cell `15210:Skyrim.esm`. In game as admin (profile 1 - the playtest lock exempts admins,
+`playtest.js:150`, and Silverdrift is in Skyrim, outside the Bruma region):
+
+    /tpos 640 5376 -1056 15210:Skyrim.esm
+
+Pulling the bar by hand only proves the vanilla client-side Papyrus still runs, which says nothing
+about what other players see. The test that matters is the **server-driven** one: register the lever
+in `ruin-buttons.json` and confirm the gate opens for a second client. `SilverdriftLairLocation` is a
+real dungeon in `dungeons.json`, so the lease-end close path wires up on its own.
+
+### Worth keeping
+
+- **Sink depth is the passes' fingerprint.** `z <= -29000` isolates exactly what the blocker passes
+  did, with no upstream comparison needed: the 2026-09-08 duplicate-disable incident only set the
+  Initially Disabled flag, the AbandonedPrison template likewise, and vanilla never sinks anything.
+- **Filter by model path, not by words in the editor id.** The first hole sweep keyed on names and
+  returned 4,752 false positives - every `CandleHornWall01` and `CaveLamp02`. A piece is structural
+  only if its mesh lives in a build kit.
+- **Form-id adjacency is not a cell.** "Silverdrift lost only its housings" was inferred from ids
+  sitting next to each other and was wrong; the panels were sunk too. Read the cell.
+- **Never key a record index by local id alone.** Two DLE records share local `085EA1` under
+  different masters (arnima `0E085EA1`, BSAssets `06085EA1`); a dict keyed on `fid & 0xFFFFFF` keeps
+  only the last and reported a real claw-door removal as missing. Key on the full raw id.
+- **ck-mcp notes:** `resolve` is case-sensitive on the plugin name; `set_flags` and `move_ref` only
+  edit records already present in the target plugin; `cell_contents`' `base_filter` and `refs_near`
+  are unreliable - derive from the plugin instead.
+
+All nine references re-verified against the **current** DLE `0aabc04b7c877c34` (Worker C's
+half-giant build, which preserved them): five restored to their masters, four disabled and sunk.
+Nothing deployed.
+
+**Still open:** the Silverdrift pull-bar test above (Nat, in game); the execution blocks from
+`execution-blocks-pc.md` - disable Solitude `Skyrim.esm:0A6CE5` and Falkreath
+`The Great Cities - Minor Cities and Towns.esp:001C1A`, place `DBO_ExecutionBlock` (DLE `1AC980`) at
+both transforms plus one each in Whiterun, Windhelm, Markarth, Riften, Morthal, Dawnstar,
+Winterhold; and Helgen Reborn's orphan keyhole `Helgen Reborn.esp:13E2AA` at (4814, -2421, 53),
+which has no door base near it. All three need the Creation Kit - ck-mcp cannot create references.
+The 13 sunk world-building items stay as they are, per Nat.
+
 ## Added 2026-10-18: dungeon anchors never resolve, and a pre-spawn that cannot say why - PC session (load test)
 
 Lead 1 (the Dustman's Cairn claim that pre-spawned 0 of its 18 standing enemies). Full work in
