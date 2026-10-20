@@ -5,7 +5,7 @@
 "buildings":1689,
 "bruma":86,
 "flagged":{
-"dungeon":232,
+"dungeon":218,
 "rooms":103,
 "oneWay":7,
 "large":12,
@@ -704,9 +704,6 @@
 "5b94f:BSHeartland.esm",
 "d3785:BSHeartland.esm",
 "d3786:BSHeartland.esm"
-],
-"flags":[
-"dungeon"
 ]
 },
 {
@@ -3424,9 +3421,6 @@
 "b0863:BSHeartland.esm",
 "b0864:BSHeartland.esm",
 "b0865:BSHeartland.esm"
-],
-"flags":[
-"dungeon"
 ]
 },
 {
@@ -3682,9 +3676,6 @@
 "doors":[],
 "containers":[
 "8720d:BSHeartland.esm"
-],
-"flags":[
-"dungeon"
 ]
 },
 {
@@ -3854,9 +3845,6 @@
 "e59de:BSHeartland.esm",
 "e5a0d:BSHeartland.esm",
 "e5a0e:BSHeartland.esm"
-],
-"flags":[
-"dungeon"
 ]
 },
 {
@@ -9499,9 +9487,6 @@
 "6220f:Skyrim.esm",
 "62210:Skyrim.esm",
 "ef02e:Skyrim.esm"
-],
-"flags":[
-"dungeon"
 ]
 },
 {
@@ -15365,9 +15350,6 @@
 "aa65c:Skyrim.esm",
 "aa65d:Skyrim.esm",
 "acd70:Skyrim.esm"
-],
-"flags":[
-"dungeon"
 ]
 },
 {
@@ -40011,10 +39993,7 @@
 "315aa7:SurWR.esp"
 ],
 "doors":[],
-"containers":[],
-"flags":[
-"dungeon"
-]
+"containers":[]
 },
 {
 "id":"31098:Druadach.esm",
@@ -42470,9 +42449,6 @@
 "containers":[
 "35a82:Dragonborn.esm",
 "35b94:Dragonborn.esm"
-],
-"flags":[
-"dungeon"
 ]
 },
 {
@@ -56074,9 +56050,6 @@
 "17d05:Dawnguard.esm",
 "1a867:Dawnguard.esm",
 "9e31:Dawnguard.esm"
-],
-"flags":[
-"dungeon"
 ]
 },
 {
@@ -56787,9 +56760,6 @@
 "e8af1:Skyrim.esm",
 "e8af2:Skyrim.esm",
 "e8af3:Skyrim.esm"
-],
-"flags":[
-"dungeon"
 ]
 },
 {
@@ -58768,9 +58738,6 @@
 "containers":[
 "b0d6f:Skyrim.esm",
 "bb9ce:Skyrim.esm"
-],
-"flags":[
-"dungeon"
 ]
 },
 {
@@ -67195,9 +67162,6 @@
 "ee360:Skyrim.esm",
 "ee361:Skyrim.esm",
 "ee362:Skyrim.esm"
-],
-"flags":[
-"dungeon"
 ]
 },
 {
@@ -83551,9 +83515,6 @@
 "ddfcb:Skyrim.esm",
 "ddfcc:Skyrim.esm",
 "ddff0:Skyrim.esm"
-],
-"flags":[
-"dungeon"
 ]
 },
 {
@@ -84291,9 +84252,6 @@
 "febb5:Skyrim.esm",
 "febe0:Skyrim.esm",
 "febe2:Skyrim.esm"
-],
-"flags":[
-"dungeon"
 ]
 },
 {

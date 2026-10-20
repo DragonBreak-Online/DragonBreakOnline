@@ -298,7 +298,9 @@ require(GUILDS)({ mp, log: noop, personal: noop, system: noop, audit: noop, regi
 const hallOf = (m) => globalThis.__dboHallOf([door(m)]);
 check('guilds.js: Gloombound Mine\'s door is Clan Narzulbur\'s hall door', JSON.stringify(hallOf(GLOOM)) === '["clan-narzulbur"]', hallOf(GLOOM));
 check('...its Chief holds it as a hall\'s leader (no home cap) and a clan member shares it', globalThis.__dboHallLeader([door(GLOOM)], CHIEF) === true && globalThis.__dboHallMember([door(GLOOM)], 0, ORC) === true && globalThis.__dboHallMember([door(GLOOM)], 0, STRANGER) === false);
-check('...Bilegulch Mine, a lease dungeon, is no hall of Cracked Tusk', hallOf(M.get('BilegulchMine')).length === 0);
+// Bilegulch left the leases with Cracked Tusk Keep (Nate, 20 Oct: the clan's stronghold, not a dungeon): its mine is the clan's
+check('...Bilegulch Mine, off the leases (dungeons.exclude, leaseExcluded), is Clan Cracked Tusk\'s hall door', JSON.stringify(hallOf(M.get('BilegulchMine'))) === '["clan-cracked-tusk"]', hallOf(M.get('BilegulchMine')));
+check('...and mines.json marks it so, as the config lists both sites', M.get('BilegulchMine').leaseExcluded === true && ['CrackedTuskKeepLocation', 'BilegulchMineLocation'].every((x) => (JSON.parse(fs.readFileSync(path.join(SERVER, 'gamemode-config.json'), 'utf8')).dungeons.exclude || []).includes(x)));
 check('...an ordinary mine is nobody\'s hall', hallOf(KOL).length === 0);
 globalThis.__dboGuildInfo = saved.info; globalThis.__dboGuildsOf = saved.of;
 
