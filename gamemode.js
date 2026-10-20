@@ -5639,6 +5639,19 @@ const skinPartsFor = (creatureEdid, entries) => {
 // 2026-09-29). __dboSkin refuses the body until the stash has run, for 2 s at most.
 const peltPending = globalThis.__dboPeltPending instanceof Map ? globalThis.__dboPeltPending : (globalThis.__dboPeltPending = new Map());
 const PELT_PENDING_MS = 2000;
+// People, the undead, giants and constructs are never skinned, whatever they carry (18 Oct: a Thalmor and a Kilkreath
+// ghost were skinned for what was in their packs, and a giant gave up the Deer Hide it held). The body's race decides,
+// from its base NPC_ RNAM; trolls, wraiths, wisps and the beasts keep their parts
+const NO_SKIN_RACE = /(Nord|Imperial|Breton|Redguard|HighElf|WoodElf|DarkElf|Dunmer|Orc|SnowElf|SeaElf|WildElf|Maormer|Reachman|Elder|Child)Race|Argonian|Khajiit|Goblin|HighElfComp|VampireBeast|Corprus|Husk|Falmer|Dremora|Riekling|Draugr|Skele|Zomb|DragonPriest|Lich|Atronach|Dwarven|Spriggan|Hagraven|Ogre|GiantRace|GiantOutside|StoneGiant|FrostGiant/i;
+const skinRaceEdid = (id) => {
+  try {
+    const base = recordOf(mp.getIdFromDesc(String(mp.get(id, 'baseDesc') || '')));
+    const f = base && (base.record.fields || []).find((x) => x && x.type === 'RNAM' && x.data && x.data.byteLength >= 4);
+    if (!f) return '';
+    const race = recordOf(base.toGlobalRecordId(new DataView(f.data.buffer, f.data.byteOffset, 4).getUint32(0, true)) >>> 0);
+    return String((race && race.record.editorId) || '');
+  } catch (e) { return ''; }
+};
 // A dragon's bones and scales (dragon-materials.json) are skinned too, and only a Master Skinner can (Nate, 11 Oct: "the
 // ability to skin dragons for the last tier in skinning"). They come off the body into the stash whatever spawned the
 // dragon (a staff spawn carries no spawn tag), and the pelt-value bands put DragonBone (500) past Expert (100); its gold
@@ -5658,6 +5671,7 @@ const stashPelts = (actorId) => {
   }
   let tag = ''; try { tag = String(mp.get(actorId, 'private.npcSpawner') || ''); } catch (e) { return; }
   if (!tag) return;
+  if (NO_SKIN_RACE.test(skinRaceEdid(actorId))) return;
   // A creature whose skin is not what it carries: its own trophy goes to the stash, the hides it hunted stay loot
   const trophy = trophyFor(actorId);
   if (trophy) { try { mp.set(actorId, 'private.dboPelts', trophy); } catch (e) { log('trophy stash failed', e.message); } return; }
