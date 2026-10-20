@@ -295,7 +295,15 @@ load(Object.assign(baseCfg(), { spells: Object.assign({}, baseCfg().spells, { sh
   const SKILLS_DEF = JSON.parse(fs.readFileSync(F('skills.json'), 'utf8'));
   const rmp = { get: (a, k) => (k === 'inventory' ? { entries: [] } : null), getIdFromDesc: (d) => { try { return idOf(d); } catch (e) { return 0; } } };
   const pickOf = new Function('mp', 'READABLES', 'READ', 'SKILLS_DEF', 'masteryOf', `${gsrc.slice(gs, ge)}; return scholarTomePick;`)(rmp, READABLES, { tomeSchoolWeight: 3 }, SKILLS_DEF, () => ({ order: ['scholar'] }));
-  const RESTRICTED_EDIDS = new Set((CONFIG.spells.seniorOnlyTomes || []).map((e) => e.toLowerCase()));
+  // The effective restricted list, not gamemode-config.json's: seniorOnlyTomes is a spells.js module DEFAULT (raising the
+  // dead, the Daedra lords, banishing them) and the live config does not set the key, so reading the config alone says
+  // "none" and every "0 restricted draws" assertion below would pass for the wrong reason. The gate cannot be asked
+  // here either: it resolves a book ID in this harness's fixture world, while the drop table is the real readables.json.
+  const SPELLS_SRC = fs.readFileSync(F('spells.js'), 'utf8');
+  const defBlock = SPELLS_SRC.slice(SPELLS_SRC.indexOf('seniorOnlyTomes: ['), SPELLS_SRC.indexOf(']', SPELLS_SRC.indexOf('seniorOnlyTomes: [')));
+  const DEFAULT_SENIOR_ONLY = (defBlock.match(/'[^']+'/g) || []).map((q) => q.slice(1, -1));
+  const RESTRICTED_EDIDS = new Set((CONFIG.spells.seniorOnlyTomes || DEFAULT_SENIOR_ONLY).map((e) => e.toLowerCase()));
+  const RESTRICTED_IN_TABLE = (READABLES.tomes || []).map((t) => String(t.name)).filter((n) => RESTRICTED_EDIDS.has(n.toLowerCase()));
   // scholarTomePick(a, rank) draws tomes of EXACTLY that rank since ffdbb117 (17 Oct, "fixed tome and scroll odds per
   // rank ... no cap, halving or pity"): the reading roll picks the rank from the Scholar level (READ.dropMinLevel) and
   // the picker fills it. It was a ceiling before, and these three checks still asked it for a range of ranks, which is
@@ -305,21 +313,14 @@ load(Object.assign(baseCfg(), { spells: Object.assign({}, baseCfg().spells, { sh
   const dn = perRank(NOBODY), da = perRank(ASSOC), ds = perRank(SENIOR);
   check('gate end to end: the picker gives the rank it is asked for and no other', [dn, da, ds].every((rows) => rows.every((d, r) => d.ranks === '' || d.ranks === String(r))), [dn.map((d) => d.ranks), ds.map((d) => d.ranks)]);
   check('gate end to end: a Master Scholar with no college still finds Novice, Apprentice and Adept tomes', dn.slice(0, 3).every((d) => d.ranks !== '' && d.none === 0), dn.slice(0, 3));
-  // The restricted list is the LIVE one (CONFIG is gamemode-config.json), and it is empty today, so no tome is
-  // Senior-only in the drop table however many are drawn. Said out loud rather than asserted as 0 restricted draws,
-  // which any empty list would satisfy; fill spells.seniorOnlyTomes and this check starts proving the gate instead.
-  // The mechanism itself is covered above, against the harness's own config (__dboSpellsReadRestricted).
-  if (!RESTRICTED_EDIDS.size) {
-    check('gate end to end: spells.seniorOnlyTomes is empty on live, so no tome is restricted for anyone (the gate is built but holds nothing back)',
-      dn.every((d) => d.restricted === 0) && da.every((d) => d.restricted === 0) && ds.every((d) => d.restricted === 0),
-      { configured: 0, drawn: [dn, da, ds].map((rows) => rows.reduce((n, d) => n + d.restricted, 0)) });
-  } else {
-    const inTable = [...RESTRICTED_EDIDS].filter((e) => (READABLES.tomes || []).some((t) => String(t.name).toLowerCase() === e));
-    check('gate end to end: a restricted tome never reaches a reader below Senior, at any rank',
-      dn.every((d) => d.restricted === 0) && da.every((d) => d.restricted === 0), [dn.map((d) => d.restricted), da.map((d) => d.restricted)]);
-    check('gate end to end: a Senior Magister does find them (when any are in the drop table at all)',
-      !inTable.length || ds.some((d) => d.restricted > 0), { inTable: inTable.length, senior: ds.map((d) => d.restricted) });
-  }
+  check('gate end to end: the drop table does hold restricted tomes, so the checks below are not vacuous',
+    RESTRICTED_IN_TABLE.length > 0, RESTRICTED_IN_TABLE.length);
+  check('gate end to end: Dread Zombie and Dead Thrall are among them (Nate, 20 Oct: behind Senior)',
+    ['SpellTomeDreadZombie', 'SpellTomeDeadThrall'].every((n) => RESTRICTED_IN_TABLE.includes(n)), RESTRICTED_IN_TABLE);
+  check('gate end to end: the default list is read, not the config, which does not set the key', DEFAULT_SENIOR_ONLY.length > 10 && CONFIG.spells.seniorOnlyTomes === undefined, DEFAULT_SENIOR_ONLY.length);
+  check('gate end to end: a restricted tome never reaches a reader below Senior, at any rank',
+    dn.every((d) => d.restricted === 0) && da.every((d) => d.restricted === 0), [dn.map((d) => d.restricted), da.map((d) => d.restricted)]);
+  check('gate end to end: a Senior Magister does find them', ds.some((d) => d.restricted > 0), ds.map((d) => d.restricted));
   // Pinning what is true today, and it is deliberate: 40762c38 "reading: no college rank gate on tome drops, the Scholar
   // level alone opens Expert and Master (Nate 17 Oct)" took the cap out of gamemode.js. __dboSpellsReadRankCap is still
   // exported by spells.js and still gates the restricted list and the shop, but nothing consults it for what a reading
