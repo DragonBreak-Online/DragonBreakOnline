@@ -1246,6 +1246,22 @@ module.exports = (api) => {
     audit(`SCHOOLS ${who(a)} changed ${from} (${fromLevel}, now resting) for ${to} (${levelOf(s, to)}) as their ${s.primary === to ? 'primary' : 'secondary'} school`);
     return { ok: true, text: `${to} takes the place of ${from} at ${levelOf(s, to)}. ${from} rests at ${fromLevel}; change back to take it up where you left it. Your next change is ${plural(Math.round(SWAP_MS / (24 * HOUR)), 'day')} away.` };
   };
+  // { ok, text }: the primary and the secondary trade places, levels as they are (#bugs 19 Oct, rocco0001: a change could
+  // only bring in a new school). The same wait as any change of school
+  const tradeSchools = (a) => {
+    const s = stateOf(a);
+    const why = swapRefusal(a, s);
+    if (why) return { ok: false, text: why };
+    if (!s.primary || !s.secondary) return { ok: false, text: 'You need a primary and a secondary school to trade their places.' };
+    const was = s.primary;
+    s.primary = s.secondary; s.secondary = was;
+    const now = Date.now();
+    s.swapAt = now;
+    s.swaps = (Array.isArray(s.swaps) ? s.swaps : []).concat([{ from: was, to: s.primary, fromLevel: levelOf(s, was), toLevel: levelOf(s, s.primary), at: now, trade: true }]).slice(-10);
+    save(a, s);
+    audit(`SCHOOLS ${who(a)} made ${s.primary} their primary and ${was} their secondary school`);
+    return { ok: true, text: `${s.primary} is now your primary school and ${was} your secondary, each at its level. Your next change is ${plural(Math.round(SWAP_MS / (24 * HOUR)), 'day')} away.` };
+  };
   const SCHOOL_MENU_ID = 77;
   const menuOpen = S.schoolMenu instanceof Map ? S.schoolMenu : (S.schoolMenu = new Map()); // actor -> { ref, where, nonce }
   const showMenu = (a, ref, where, title, actions) => {
@@ -1271,6 +1287,7 @@ module.exports = (api) => {
     const why = swapRefusal(a, s);
     if (why) return openSchoolMenu(a, ref, where, why);
     const rows = [];
+    if (s.primary && s.secondary) rows.push({ id: 'trade', label: `Make ${s.secondary} your primary and ${s.primary} your secondary` });
     for (const from of [s.primary, s.secondary].filter(Boolean)) {
       for (const to of SCHOOLS) if (!active(s, to)) rows.push({ id: `swap:${from}:${to}`, label: `${from} for ${to} (${to} at ${startFor(s, from, to)})` });
     }
@@ -1312,6 +1329,12 @@ module.exports = (api) => {
     if (m.ref && !atBooks(a, m.ref)) { closeMenu(a); return personal(a, `You walked away from the ${m.where === 'ledger' ? "Scholars' Ledger" : 'books'}.`); }
     if (id === 'menu') return openSchoolMenu(a, m.ref, m.where);
     if (id === 'swap') return openSwapList(a, m.ref, m.where);
+    if (id === 'trade') {
+      const r = tradeSchools(a);
+      personal(a, r.text);
+      try { globalThis.__dboSchoolsProgressSend(a); } catch (e) { /* no K menu */ }
+      return openSchoolMenu(a, m.ref, m.where, r.text);
+    }
     if (id === 'secondary') return openSecondaryList(a, m.ref, m.where);
     if (id === 'study') {
       if (m.where !== 'shelf' || !isStudy(m.ref)) return openSchoolMenu(a, m.ref, m.where);
