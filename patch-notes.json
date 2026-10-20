@@ -1,5 +1,44 @@
 [
   {
+    "title": "Enchantments that work",
+    "date": "2026-10-20",
+    "version": "Server update",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Enchanted weapons",
+        "items": [
+          "Fire, frost, shock and chaos damage, absorb health, magicka and stamina, stamina and magicka damage, paralysis and frost slow on enchanted weapons now land. Before, an enchanted sword hit like a plain one.",
+          "They use the weapon's charge: an empty weapon does nothing until you recharge it.",
+          "Mehrunes' Razor can kill a foe outright (about 2 hits in 100, never a player, a boss or an essential character). The Ebony Blade absorbs 10 health. When undead marked by Dawnbreaker die, they burst and burn the undead around them."
+        ]
+      },
+      {
+        "heading": "Enchanted gear",
+        "items": [
+          "Resist Fire, Frost, Shock, Magic and Poison now protect you against spells, staves and enchantments.",
+          "Fortify Health adds real health. Fortify Health, Magicka and Stamina regeneration speed up your bars.",
+          "Fortify Block, Heavy Armor, Light Armor and Unarmed now count in fights, and Fortify Pickpocket raises your pickpocket chance.",
+          "Spellbreaker wards off up to 50 points of spells from the front while you block. The Shrouded Gloves double a sneak attack with a one-handed weapon."
+        ]
+      },
+      {
+        "heading": "Staves",
+        "items": [
+          "A Paralyze staff now holds players, and frost staves slow them. Absorb staves heal their caster."
+        ]
+      },
+      {
+        "heading": "Balanced for PvP",
+        "items": [
+          "Against another player an enchantment does half its damage, absorb and drain. Paralysis holds a player for 2 seconds at most, then leaves them immune to paralysis for 15 seconds.",
+          "Gear resistances count up to 40% each, and all your resistances together never go past the usual limit. Gear adds at most 100 health and half again your regeneration.",
+          "Enchantments add to your skill. They never replace it."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Every god of Tamriel",
     "date": "2026-10-20",
     "version": "Server update",
