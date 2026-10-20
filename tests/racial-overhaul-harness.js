@@ -239,7 +239,7 @@ check('...merged: the Maormer keep shock 50%, Blade +15% and the ward', RL.confi
 
 // ---- 6. the wiring ----
 const jr = fs.readFileSync(path.join(SERVER, 'journal.js'), 'utf8');
-check('journal.js: the Profile tab\'s action racialPower and its view', /racialPower: \(a\) => \(typeof globalThis\.__dboRacialPowerUse === 'function'/.test(jr) && /racialPower: own === false \? null : racialPowerView\(a\)/.test(jr) && /racialPower: 'Racial Power'/.test(jr));
+check('journal.js: the Profile tab\'s action racialPower and its view', /racialPower: \(a, text\) => \(typeof globalThis\.__dboRacialPowerUse === 'function' \? globalThis\.__dboRacialPowerUse\(a, Date\.now\(\), text \|\| undefined\)/.test(jr) && /racialPower: own === false \? null : racialPowerView\(a\)/.test(jr) && /racialPower: 'Racial Power'/.test(jr));
 const gmSrc = fs.readFileSync(path.join(SERVER, 'gamemode.js'), 'utf8');
 check('gamemode.js: the hit hands the ward its damage; racial gets sendPacket', /racial\.targetMult\(agg, tgt, src, dmg\)/.test(gmSrc) && /gmstFloat, cfg, sendPacket(, hasUiCap)? \}\);/.test(gmSrc));
 check('gamemode.js: the HUD carries the countdown and can be sent on demand', /globalThis\.__dboRacialPowerHud\(a\) : null; if \(rp\) v\.racialPower = rp;/.test(gmSrc) && /globalThis\.__dboHudRefresh = \(a\) =>/.test(gmSrc));
