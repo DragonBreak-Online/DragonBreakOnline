@@ -1192,6 +1192,17 @@ module.exports = (api) => {
     const mat = String(bowName || '').replace(/^(?:CYR|BSK)/, '').match(/^(Draugr|Falmer|Forsworn|Orcish|Dwarven|Elven|Glass|Ebony|Ayleid|AncientImperial)/);
     return (mat && arrows.find((a) => a.name.replace(/^(?:CYR|BSK)/, '').startsWith(mat[1]))) || arrows.find((a) => a.name === 'IronArrow') || arrows[0] || null;
   };
+  // An artifact a spawn's base carries leaves its inventory before the first host grant, where MpActor::EquipBestWeapon puts
+  // the most damaging weapon in hand: Immersive Weapons' Chrysamere left Orchendor, a caster, holding a two-hander he never
+  // swung, so he cast nothing (Bthardamz, 20 Oct). Returns how many entries went
+  const dropArtifacts = (id) => {
+    let entries = null; try { const inv = mp.get(id, 'inventory'); entries = inv && Array.isArray(inv.entries) ? inv.entries : null; } catch (e) { return 0; }
+    if (!entries) return 0;
+    const kept = entries.filter((en) => { const r = recordOf(Number(en.baseId) >>> 0); return !(r && ARTIFACT.test(String(r.editorId || ''))); });
+    if (kept.length === entries.length) return 0;
+    try { mp.set(id, 'inventory', { entries: kept }); } catch (e) { return 0; }
+    return entries.length - kept.length;
+  };
   const armLease = (lease, snap = spawnSnapshot()) => {
     if (!lease.armed) lease.armed = new Set();
     if (!snap) return;
@@ -1201,6 +1212,8 @@ module.exports = (api) => {
       const tag = String(snap.tags.get(id) || '');
       if (!tag.startsWith(prefix)) continue;
       lease.armed.add(id);
+      const dropped = dropArtifacts(id);
+      if (dropped) log(`dungeon ${lease.id}: ${tag} ${id.toString(16)} lost ${dropped} artifact(s) its base carries`);
       const edid = (lease.kinds || {})[tag] || '';
       if (!HUMANOID.test(edid) || ANIMAL.test(edid)) continue;
       let recEdid = '';
