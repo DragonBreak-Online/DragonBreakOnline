@@ -70,8 +70,10 @@ ok(gold() === 800 && /^Your standard look is unchanged\. RaceMenu-only changes \
 // 4. Race and sex are kept: the old look goes back, nothing charged
 m = reset(800); run(); finish(Object.assign(look(), { raceId: 0x13745, hairColor: 9 }));
 ok(gold() === 800 && props.get(`${A}|appearance`).raceId === 0x13746 && props.get(`${A}|appearance`).hairColor === 2 && /Race can't be changed/.test(sys.at(-1)), 'a race change puts the previous look back and charges nothing', sys.at(-1));
+ok(/log out and back in/.test(sys.at(-1)) && /identity reroll/.test(sys.at(-1)), 'the race refusal says the own game keeps the new race until a relog, and how a race changes', sys.at(-1));
 m = reset(800); run(); finish(Object.assign(look(), { isFemale: true }));
 ok(gold() === 800 && props.get(`${A}|appearance`).isFemale === false && /Sex can't be changed/.test(sys.at(-1)), 'so does a sex change');
+ok(!/log out and back in/.test(sys.at(-1)), 'a sex refusal has no race note', sys.at(-1));
 
 // 5. The name is kept, the rest of the new look stays and is paid for
 m = reset(800); run(); finish(Object.assign(look(), { name: 'Brandy', hairColor: 9 }));
