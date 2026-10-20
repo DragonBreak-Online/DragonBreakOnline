@@ -844,13 +844,21 @@ module.exports = (api) => {
   // as the second character slot (Nate 20 Oct: "unlock at 150 hours like the second character slot"; playtime.js hours,
   // per account, kept for good once earned). config halfGiantRace.unlockHours, else playtimeSlot.hours, else 150
   globalThis.__dboLockedRacesFor = (profileId) => {
-    const hours = Number(HR.unlockHours) > 0 ? Number(HR.unlockHours) : (Number(((cfg && cfg.playtimeSlot) || {}).hours) > 0 ? Number(cfg.playtimeSlot.hours) : 150);
+    const slot = Number(((cfg && cfg.playtimeSlot) || {}).hours) > 0 ? Number(cfg.playtimeSlot.hours) : 150;
+    let earned = false, ms = -1;
     try {
-      if (typeof globalThis.__dboEarnedSlots === 'function' && Number(globalThis.__dboEarnedSlots(profileId)) > 0 && !(Number(HR.unlockHours) > 0)) return [];
+      earned = typeof globalThis.__dboEarnedSlots === 'function' && Number(globalThis.__dboEarnedSlots(profileId)) > 0;
       const p = typeof globalThis.__dboPlaytimeOf === 'function' ? globalThis.__dboPlaytimeOf(profileId) : undefined;
-      if (p && Number(p.ms) >= hours * 3600000) return [];
+      if (p) ms = Number(p.ms) || 0;
     } catch (e) { /* locked */ }
-    return ['halfgiant'];
+    // The rare races (Nate 20 Oct): the Half-Giant and the Snow Elf, each at its config unlockHours, else the slot's hours
+    const out = [];
+    for (const [slug, M] of [['halfgiant', HR], ['snowelf', SR]]) {
+      const own = Number((M || {}).unlockHours) > 0 ? Number(M.unlockHours) : 0;
+      const open = (!own && earned) || ms >= (own || slot) * 3600000;
+      if (!open) out.push(slug);
+    }
+    return out;
   };
   // gamemode.js needs tick: the race's appetite (the Half-Giant's 1.5), 1 for everyone else
   globalThis.__dboRaceHungerMult = (a) => { const r = raceOf(a >>> 0); return r ? Math.max(0, num((C[r] || {}).hunger, 1)) : 1; };

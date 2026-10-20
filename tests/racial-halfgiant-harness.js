@@ -65,12 +65,12 @@ check('overhaul off: a Half-Giant has the Nord gift', R0.raceOf(1) === 'nord', R
 // The creator lock: 150 hours played (playtime.js), like the second character slot
 globalThis.__dboEarnedSlots = (pid) => (pid === 7 ? 1 : 0);
 globalThis.__dboPlaytimeOf = (pid) => ({ ms: pid === 8 ? 150 * 3600000 : pid === 9 ? 149 * 3600000 : 0, days: 1 });
-check('a new account: the Half-Giant is locked', JSON.stringify(globalThis.__dboLockedRacesFor(5)) === '["halfgiant"]');
-check('149 hours: still locked', globalThis.__dboLockedRacesFor(9).length === 1);
+check('a new account: the Half-Giant and the Snow Elf are locked', JSON.stringify(globalThis.__dboLockedRacesFor(5)) === '["halfgiant","snowelf"]', globalThis.__dboLockedRacesFor(5));
+check('149 hours: still locked', globalThis.__dboLockedRacesFor(9).length === 2);
 check('150 hours: open', globalThis.__dboLockedRacesFor(8).length === 0);
 check('the playtime slot earned: open', globalThis.__dboLockedRacesFor(7).length === 0);
 delete globalThis.__dboPlaytimeOf; delete globalThis.__dboEarnedSlots;
-check('playtime off: locked, never open to everyone', globalThis.__dboLockedRacesFor(8).length === 1);
+check('playtime off: locked, never open to everyone', globalThis.__dboLockedRacesFor(8).length === 2);
 
 const read = (f) => fs.readFileSync(path.join(SERVER, f), 'utf8');
 check('gamemode.js multiplies the appetite by the race', /__dboRaceHungerMult\(a\)/.test(read('gamemode.js')));
