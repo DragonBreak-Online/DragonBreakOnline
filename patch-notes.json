@@ -1,5 +1,20 @@
 [
   {
+    "title": "Silver tests",
+    "date": "2026-10-20",
+    "version": "Server update",
+    "tag": "New",
+    "sections": [
+      {
+        "heading": "Test their blood",
+        "items": [
+          "Members of the Dawnguard, the Silver Hand and the Vigil of Stendarr who carry a silver weapon can ask another player to take a silver test from the X menu. The subject can accept or choose to fight or flee.",
+          "If they accept, strike them once with your silver weapon, a swing or a bash: the blow does no harm, and only you and the subject see whether the blood reacts normally or bursts into flame."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Events and staff tools",
     "date": "2026-10-20",
     "version": "Server update",
