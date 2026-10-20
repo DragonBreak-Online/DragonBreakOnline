@@ -358,8 +358,21 @@ module.exports = (api) => {
   // ---- regeneration ---------------------------------------------------------------------------------------------------
   const STAT_AV = { health: 'HealRateMult', magicka: 'MagickaRateMult', stamina: 'StaminaRateMult' };
   const capOf = (f, conditional) => Math.max(1, Math.min(num(f, 1), num(conditional ? C.conditionalRegenCap : C.alwaysRegenCap, 1)));
+  // Whether a world or cell is an exterior never changes, so the record is read once per desc: read every tick for every
+  // Nord (inCold, stamina), recordOf was 1.4-2 s a minute of the event loop at 500 crowded bots (CPU profiles, 19 Oct)
+  const OUTDOORS_BY_DESC = new Map();
   const outdoors = (a) => {
-    try { const d = String(mp.get(a >>> 0, 'worldOrCellDesc') || ''); const r = d ? recordOf(mp.getIdFromDesc(d) >>> 0) : null; return !!r && String(r.record.type) === 'WRLD'; } catch (e) { return false; }
+    try {
+      const d = String(mp.get(a >>> 0, 'worldOrCellDesc') || '');
+      if (!d) return false;
+      let yes = OUTDOORS_BY_DESC.get(d);
+      if (yes === undefined) {
+        const r = recordOf(mp.getIdFromDesc(d) >>> 0);
+        yes = !!r && String(r.record.type) === 'WRLD';
+        OUTDOORS_BY_DESC.set(d, yes);
+      }
+      return yes;
+    } catch (e) { return false; }
   };
   const normDesc = (d) => { const s = String(d || ''); const i = s.indexOf(':'); if (i < 0) return s.toLowerCase(); const n = parseInt(s.slice(0, i), 16); return (Number.isFinite(n) ? n.toString(16) : s.slice(0, i).toLowerCase()) + ':' + s.slice(i + 1).toLowerCase(); };
   const inCold = (a) => {
