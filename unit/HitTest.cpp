@@ -862,6 +862,62 @@ TEST_CASE("A staff's enchantment hits only from a staff the aggressor holds or "
 }
 
 
+TEST_CASE("A creature's melee lands its race's attack spell, a player's "
+          "never does",
+          "[Hit]")
+{
+  PartOne& p = GetPartOne();
+  constexpr uint32_t kPlayer = 0xff000000;
+  constexpr uint32_t kAtronach = 0xff000001;
+  // SummonAtronachFlame, AtronachFlameRace through its template: ATKD spells crAtronachFlameMeleeAttack and the power attack's
+  constexpr uint32_t kFlameAtronach = 0x000204c0;
+  constexpr uint32_t kFlameMelee = 0x00050cf7;
+  constexpr uint32_t kFlameMeleePower = 0x00050cf8;
+  // ChaurusRace's bite, another race's attack spell
+  constexpr uint32_t kChaurusBite = 0x00053474;
+
+  DoConnect(p, 0);
+  p.CreateActor(kPlayer, { 0, 0, 0 }, 0, 0x3c, 1);
+  p.SetUserActor(0, kPlayer);
+  auto& player = p.worldState.GetFormAt<MpActor>(kPlayer);
+  player.SetEquipment(Equipment());
+  p.worldState.AddForm(
+    std::unique_ptr<MpActor>(new MpActor(
+      { { 0, 100, 0 },
+        { 0, 0, 0 },
+        FormDesc::FromFormId(0x3c, p.worldState.espmFiles) },
+      FormCallbacks::DoNothing(), kFlameAtronach)),
+    kAtronach);
+  p.worldState.GetFormAt<MpActor>(kAtronach).SetEquipment(Equipment());
+  p.worldState.hosters[kAtronach] = kPlayer;
+
+  // Health one hit takes (the unit PartOne's fake formula), 0 when refused
+  auto hit = [&](uint32_t aggressor, uint32_t target, uint32_t source) {
+    auto& actor =
+      p.worldState.GetFormAt<MpActor>(target == 0x14 ? kPlayer : target);
+    actor.SetPercentages({ 1.f, 1.f, 1.f });
+    RawMessageData rawMsgData;
+    rawMsgData.userId = 0;
+    HitMessage hitMsg;
+    hitMsg.data.aggressor = aggressor;
+    hitMsg.data.target = target;
+    hitMsg.data.source = source;
+    p.GetActionListener().OnHit(rawMsgData, hitMsg);
+    return 1.f - actor.GetChangeForm().actorValues.healthPercentage;
+  };
+
+  REQUIRE(hit(kAtronach, 0x14, kFlameMelee) > 0.f);
+  REQUIRE(hit(kAtronach, 0x14, kFlameMeleePower) > 0.f);
+  REQUIRE(hit(kAtronach, 0x14, kChaurusBite) == Catch::Approx(0.f));
+  // A player's own hit naming a creature's attack spell stays refused
+  REQUIRE(hit(0x14, kAtronach, kFlameMelee) == Catch::Approx(0.f));
+
+  p.worldState.hosters.erase(kAtronach);
+  p.DestroyActor(kAtronach);
+  p.DestroyActor(kPlayer);
+  DoDisconnect(p, 0);
+}
+
 TEST_CASE("A scroll hit with no read takes the scroll at its first hit, once "
           "per read, from the caster who holds it",
           "[Hit]")

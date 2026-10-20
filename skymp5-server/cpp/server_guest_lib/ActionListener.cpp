@@ -627,6 +627,36 @@ bool IsSpellGrantedBy(WorldState* worldState, uint32_t parentSpellId,
   return granted;
 }
 
+// A creature's melee carries its race's attack spell (RACE ATKD at 8: a Flame Atronach's fire, a spider's poison)
+bool IsRaceAttackSpell(const MpActor& actor, uint32_t spellId)
+{
+  WorldState* worldState = actor.GetParent();
+  if (!worldState || !worldState->HasEspm()) {
+    return false;
+  }
+  uint32_t raceId = 0;
+  try {
+    raceId = actor.GetRaceId();
+  } catch (const std::exception&) {
+    return false;
+  }
+  const auto raceLookup = worldState->GetEspm().GetBrowser().LookupById(raceId);
+  if (!raceLookup.rec || !(raceLookup.rec->GetType() == "RACE")) {
+    return false;
+  }
+  bool found = false;
+  espm::RecordHeaderAccess::IterateFields(
+    raceLookup.rec,
+    [&](const char* type, uint32_t size, const char* data) {
+      if (!found && !std::memcmp(type, "ATKD", 4) && size >= 12) {
+        const uint32_t raw = *reinterpret_cast<const uint32_t*>(data + 8);
+        found = raw != 0 && raceLookup.ToGlobalId(raw) == spellId;
+      }
+    },
+    worldState->GetEspmCache());
+  return found;
+}
+
 // Projectiles, cloaks and hazards may land after the spell left the hand
 bool CanHitWithSpell(const MpActor& actor, uint32_t spellId)
 {
@@ -634,7 +664,9 @@ bool CanHitWithSpell(const MpActor& actor, uint32_t spellId)
       actor.IsSpellLearned(spellId)) {
     return true;
   }
-  if (actor.GetProfileId() == -1 && IsSpellInTemplateTree(actor, spellId)) {
+  if (actor.GetProfileId() == -1 &&
+      (IsSpellInTemplateTree(actor, spellId) ||
+       IsRaceAttackSpell(actor, spellId))) {
     return true;
   }
   if (actor.GetProfileId() != -1 &&
