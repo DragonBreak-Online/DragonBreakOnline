@@ -572,7 +572,9 @@ module.exports = (api) => {
     if (raceChanged || sexChanged) {
       mp.set(a, 'appearance', before);
       resendAfterSettle(a, appearance);
-      system(a, `${raceChanged ? 'Race' : 'Sex'} can't be changed here, so your previous look was kept. No gold was taken.${freeKept}`);
+      // The player's own game keeps the race the editor gave it until the next login (the client resets the look, not the
+      // live race), so they stand as the new race on their own screen and as the old one on everyone else's (#29KY, 20 Oct)
+      system(a, `${raceChanged ? 'Race' : 'Sex'} can't be changed here, so your previous look was kept. No gold was taken.${raceChanged ? ' Your game may show the new race until you log out and back in; everyone else sees your previous one. A race change needs an identity reroll.' : ''}${freeKept}`);
       audit(`APPEARANCE ${who(a)} tried to change ${raceChanged ? 'race' : 'sex'}: previous look kept, nothing charged`);
       return true;
     }

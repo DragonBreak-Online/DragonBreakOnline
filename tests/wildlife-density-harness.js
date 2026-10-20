@@ -78,6 +78,14 @@ try {
   const riftBears = after.filter((z) => inRift(z) && BEAR.test(nameOf(z.NPC[0].id))).length;
   ok(riftBears >= 5, 'the Rift still has bears (lore)', riftBears);
 
+  // 7. Pelagia Farm (Moss-Pocket #8G8Z, 20 Oct): the one plains predator spot west of the farm that rolled a sabre cat takes
+  // its weakest creature; no other zone changes
+  const noFarm = Object.assign({}, CFG.wildlife, { safeZones: (CFG.wildlife.safeZones || []).filter((z) => !/Pelagia/.test(z._comment || '')) });
+  const withoutFarm = loadWild(noFarm);
+  const farmDiff = after.filter((z, i) => z.NPC[0].id !== withoutFarm[i].NPC[0].id);
+  ok(withoutFarm.find((z) => z.Name === 'wild:skeever:697')?.NPC[0].id === '23ab5:Skyrim.esm', 'without the farm safe zone the spot by Pelagia Farm is a sabre cat (the report)');
+  ok(farmDiff.length === 1 && farmDiff[0].Name === 'wild:skeever:697' && farmDiff[0].NPC[0].id === '23ab7:Skyrim.esm', 'with it that one spot is a skeever and no other zone changes', farmDiff.map((z) => [z.Name, z.NPC[0].id]));
+
   // 6. numbers
   const stats = (zs, f) => {
     const s = zs.filter(f), c = {}; for (const z of s) { const n = nameOf(z.NPC[0].id); c[n] = (c[n] || 0) + 1; }
