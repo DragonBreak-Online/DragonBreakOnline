@@ -96,7 +96,7 @@ ok('every patron of every faith is a god in the roster', FAITHS.faiths.every((f)
   ok('the 21 new gods are there, prayed to anywhere, each with a boon', gods.every((g) => g && g.prayAnywhere && g.boon && (g.skillBoon || g.blessingRegen)));
   const sig = gods.map((g) => JSON.stringify(g.skillBoon || g.blessingRegen));
   ok('...and no two of them share a boon', new Set(sig).size === sig.length, sig);
-  ok('the All-Maker is the Skaal\'s, also called the All-Father', FAITHS.faiths.find((f) => f.id === 'skaal').patrons.join() === 'allmaker' && gods[0].alsoKnownAs.includes('All-Father'));
+  ok('the All-Maker is the Skaal\'s, with no name lore does not give him', FAITHS.faiths.find((f) => f.id === 'skaal').patrons.join() === 'allmaker' && !gods[0].alsoKnownAs.includes('All-Father'));
   const A = 0x31; props.set(A + '|appearance', { raceId: 0x102 });
   blessWith(A, 'allmaker');
   ok('the All-Maker\'s blessing: Harvesting XP x1.15, Blade untouched', globalThis.__dboBlessingSkillRate(A, 'harvesting') === 1.15 && globalThis.__dboBlessingSkillRate(A, 'blade') === 1);

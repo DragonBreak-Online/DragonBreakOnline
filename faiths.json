@@ -380,7 +380,7 @@
       "id": "syrabane",
       "name": "Syrabane",
       "kind": "aedra",
-      "sphere": "The Aldmeri god of magic and warlocks, patron of apprentices and young mages.",
+      "sphere": "The Aldmeri god-ancestor of magic, the Apprentices' God, who aided Y'ffre in the time of the Thrassian Plague and saved many with his ring.",
       "boon": "Enchanting +10",
       "blessing": "1d1fad:DragonBreak Online Edits.esp",
       "blessingSource": "vanilla",
@@ -487,7 +487,7 @@
       "id": "alkosh",
       "name": "Alkosh",
       "kind": "aedra",
-      "sphere": "The Dragon King of Cats, the Khajiit's first cat, their Akatosh.",
+      "sphere": "The Dragon King of Cats: Akatosh as the Khajiit know him, one of the oldest of their gods.",
       "boon": "unarmed blows land 10% harder",
       "blessing": null,
       "blessingSource": "server",
@@ -562,7 +562,7 @@
       "id": "satakal",
       "name": "Satakal",
       "kind": "aedra",
-      "sphere": "The Worldskin, the Yokudan god of everything, who sheds and eats himself and is renewed. Tall Papa taught the spirits the Walkabout to survive him.",
+      "sphere": "The Worldskin, the god of everything, who sheds his skin and eats himself to be born again.",
       "boon": "Health regenerates 25% faster",
       "blessing": "1d1fb4:DragonBreak Online Edits.esp",
       "blessingSource": "vanilla",
@@ -601,9 +601,7 @@
       "name": "The All-Maker",
       "kind": "faith",
       "sphere": "The god of the Skaal of Solstheim, who made all things and gives the Greater Powers: Earth, Water, Wind, Sun, Tree and Beast. His foe is the Adversary, Herma-Mora.",
-      "alsoKnownAs": [
-        "All-Father"
-      ],
+      "alsoKnownAs": [],
       "skillBoon": {
         "harvesting": 1.15
       },
@@ -677,7 +675,7 @@
       "id": "vivec",
       "name": "Vivec",
       "kind": "faith",
-      "sphere": "The Warrior-Poet of the Tribunal, guardian of Morrowind, who was gone before the Red Year. His sermons are still read by those who keep the old Temple.",
+      "sphere": "The Warrior-Poet of the Tribunal, guardian of Morrowind, who lost his godhood after 3E 427 and vanished before the Red Year. His sermons are still read by those who keep the old Temple.",
       "alsoKnownAs": [
         "Vehk",
         "The Warrior-Poet"
@@ -971,7 +969,7 @@
       "id": "orkey",
       "name": "Orkey",
       "kind": "faith",
-      "sphere": "An old god of the Nords, remembered in their legends for cutting short the lives of men. Some say he is Malacath by another name.",
+      "sphere": "An old god of the Nords, who tricked them into a bargain that cut their lives to six winters, until Shor won them back. Some say he is Malacath by another name.",
       "alsoKnownAs": [],
       "skillBoon": {
         "woodcutter": 1.15
@@ -1044,7 +1042,7 @@
       "id": "ius",
       "name": "Ius",
       "kind": "faith",
-      "sphere": "An animal god of the Bosmer, honoured among the spirits of Valenwood.",
+      "sphere": "The Bosmer animal god of compromise.",
       "alsoKnownAs": [],
       "skillBoon": {
         "alchemist": 1.15
