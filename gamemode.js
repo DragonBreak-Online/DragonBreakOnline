@@ -8139,6 +8139,7 @@ try {
   const auth = serverSettings.discordAuth || {};
   require(GMCALL_JS)({ mp, log, personal, staffSay, audit, staffNote, who, display, profileOf, discordOf, rolesOf, onlineActors, registerChatCommand,
     isAdmin, staffCan, every, saveSoon, sendPacket, zoneOfActor, zoneById, recordOf, teleportTo: staffTeleport, creationPending, sendJson, cfg,
+    openWidget, closeWidget, onUi,
     token: (cfg.discord || {}).botToken || auth.botToken });
 } catch (e) { log('gmcall.js failed to load:', e.stack || e.message); globalThis.__dboGmCallsOpen = null; }
 

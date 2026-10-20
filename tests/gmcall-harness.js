@@ -46,7 +46,12 @@ const sayOf = (a, tab) => said.filter((x) => x[0] === a && (!tab || x[1] === tab
 const messagesOf = (a, tab) => said.filter((x) => x[0] === a && (!tab || x[1] === tab)).map((x) => x[2]);
 const bannersOf = (a) => packets.filter((x) => x[0] === a && x[1].customPacketType === 'dboBanner').map((x) => x[1].text);
 const noticesOf = (a) => packets.filter((x) => x[0] === a && x[1].customPacketType === 'dboNotice').map((x) => x[1].text);
-const reset = () => { said.length = 0; packets.length = 0; audits.length = 0; notes.length = 0; teleports.length = 0; discord.length = 0; };
+const widgets = [], closedWidgets = [], queueUi = {};
+const reset = () => { said.length = 0; packets.length = 0; audits.length = 0; notes.length = 0; teleports.length = 0; discord.length = 0; widgets.length = 0; closedWidgets.length = 0; };
+const lastPanel = (a) => { for (let i = widgets.length - 1; i >= 0; i--) if (widgets[i][0] === a) return widgets[i][1]; return undefined; };
+const panelIds = (a) => (lastPanel(a) ? lastPanel(a).actions.map((x) => x.id) : []);
+const panelLabels = (a) => (lastPanel(a) ? lastPanel(a).actions.map((x) => x.label) : []);
+const choose = (a, id) => { for (const f of queueUi.gmQueueChoose || []) f(a, [id]); };
 
 const api = (gmCalls, extra) => Object.assign({
   mp: {
@@ -77,6 +82,9 @@ const api = (gmCalls, extra) => Object.assign({
   zoneById: (id) => ({ bruma: { id: 'bruma', name: 'Bruma' }, whiterun: { id: 'whiterun', name: 'Whiterun Hold' } })[id] || null,
   recordOf: (id) => (id === 0x3c ? { record: { editorId: 'Tamriel', type: 'WRLD' } } : id === 0x08000abc ? { record: { editorId: 'BrumaCastleKeep', type: 'CELL' } } : null),
   teleportTo: (a, place) => { teleports.push([a, place]); return ''; },
+  openWidget: (a, payload) => { widgets.push([a, payload]); },
+  closeWidget: (a, id) => { closedWidgets.push([a, id]); },
+  onUi: (ev, fn) => { (queueUi[ev] = queueUi[ev] || []).push(fn); },
   creationPending: () => false,
   sendJson: (method, url, body) => {
     discord.push({ method, url, body });
@@ -137,7 +145,7 @@ const flush = () => new Promise((r) => setImmediate(r));
   check('/gm list is one message, its lines joined (Drakstas, 16 Oct: nine calls showed as one)', messagesOf(ADMIN, 'admin').some((t) => /^\d+ open GM calls?:\n {2}#1 /.test(t)), messagesOf(ADMIN, 'admin'));
   check('/gm list shows the open call to staff', sayOf(ADMIN, 'admin').some((t) => /^ {2}#1 Argosh gro-Shatul #ARGO at Whiterun Hold, Tamriel, 3 min ago, waiting: "I am stuck .* \/ also my horse is gone"$/.test(t)), sayOf(ADMIN).join(' | '));
   reset(); gm(ADMIN, 'please help');
-  check('staff words that are no subcommand give the usage, not a call', /\/gm list \[all\] \| take <n>/.test(sayOf(ADMIN, 'admin').join(' ')) && globalThis.__dboGmCalls.open.length === 1);
+  check('staff words that are no subcommand give the usage, not a call', /\| list \[all\] \| take <n>/.test(sayOf(ADMIN, 'admin').join(' ')) && globalThis.__dboGmCalls.open.length === 1);
   reset(); gm(ADMIN, 'take 7');
   check('a wrong number says so', /No open GM call #7/.test(sayOf(ADMIN, 'admin').join(' ')));
   reset(); gm(ADMIN, 'take 1');
@@ -324,7 +332,89 @@ const flush = () => new Promise((r) => setImmediate(r));
   const pn = JSON.parse(fs.readFileSync(path.join(ROOT, 'patch-notes.json'), 'utf8'));
   check('the patch notes say how to call a GM', pn.some((e) => JSON.stringify(e).includes('/gm') && /Contact a GM/.test(JSON.stringify(e))));
 
+  // ---- the staff queue panel (Nate, 20 Oct) ---------------------------------------------------------------------------
+  // A fresh load: the handlers of the one before would fire again (a reload stacks listeners), and the calls above stay
+  // in the state file, so the queue is emptied by hand and the new call's own number is used
+  const freshPanel = () => {
+    for (const k of Object.keys(queueUi)) delete queueUi[k];
+    delete globalThis.__dboGmPanel;
+    load();
+    globalThis.__dboGmCalls.open.length = 0;
+    reset();
+  };
+  freshPanel();
+  gm(CALLER, 'I am stuck in a rock');
+  const N = globalThis.__dboGmCalls.open[0].n;
+  reset(); gm(ADMIN, '');
+  let pan = lastPanel(ADMIN);
+  check('/gm alone opens the staff queue panel for staff', !!pan && pan.id === 78 && pan.type === 'contextMenu' && pan.mode === 'menu', pan && [pan.id, pan.mode]);
+  check('its title counts the calls and the tickets', /Staff queue: 1 GM call \(1 waiting\), 0 tickets/.test(pan.targetName), pan && pan.targetName);
+  check('the open call is a row, waiting, with who, where and how long', panelIds(ADMIN).includes(`c:${N}`)
+    && new RegExp(`^#${N} Argosh gro-Shatul #ARGO - Whiterun Hold, Tamriel - .* - WAITING$`).test(panelLabels(ADMIN)[0]), panelLabels(ADMIN));
+  check('a player never gets the panel', (reset(), gm(CALLER, ''), lastPanel(CALLER) === undefined));
+  reset(); choose(ADMIN, `c:${N}`);
+  check("the row opens the call with the player's own words and the buttons", new RegExp(`#${N} Argosh gro-Shatul #ARGO at Whiterun Hold, Tamriel, .*: "I am stuck in a rock"`).test(lastPanel(ADMIN).targetName)
+    && panelIds(ADMIN).join(',') === `goto:${N},take:${N},close:${N},list`, [lastPanel(ADMIN).targetName, panelIds(ADMIN)]);
+  reset(); choose(ADMIN, `take:${N}`);
+  check('Take it takes the call, as /gm take does', globalThis.__dboGmCalls.open[0].takenBy && globalThis.__dboGmCalls.open[0].takenBy.profile === 21
+    && audits.some((t) => new RegExp(`GMCALL #${N} taken by Iced Sky`).test(t)), audits);
+  check('...and the page comes back showing it taken, now offering to put it back', new RegExp(`Taken\\. #${N} .*taken by Iced Sky`).test(lastPanel(ADMIN).targetName)
+    && panelIds(ADMIN).join(',') === `goto:${N},rel:${N},close:${N},list`, [lastPanel(ADMIN).targetName, panelIds(ADMIN)]);
+  reset(); choose(ADMIN, `rel:${N}`);
+  check('Put it back releases it', !globalThis.__dboGmCalls.open[0].takenBy && /Back in the queue/.test(lastPanel(ADMIN).targetName), lastPanel(ADMIN).targetName);
+  reset(); choose(ADMIN, `goto:${N}`);
+  check('Go to teleports the GM to the caller and closes the panel', teleports.length === 1
+    && teleports[0][1].cellOrWorldDesc === '3c:Skyrim.esm' && closedWidgets.some((x) => x[0] === ADMIN && x[1] === 78), [teleports, closedWidgets]);
+  reset(); choose(ROLESTAFF, `goto:${N}`);
+  check('a role-only helper cannot go to a caller, as with /gm goto', teleports.length === 0
+    && /for staff with a GM tier/.test(sayOf(ROLESTAFF).join(' ')), sayOf(ROLESTAFF).join(' | '));
+  reset(); choose(CALLER, `c:${N}`);
+  check('a player who gets hold of the panel is refused and it closes', lastPanel(CALLER) === undefined && closedWidgets.some((x) => x[0] === CALLER));
+  reset(); choose(ADMIN, `close:${N}`);
+  check('Close it closes the call and goes back to the queue', globalThis.__dboGmCalls.open.length === 0
+    && new RegExp(`#${N} closed`).test(lastPanel(ADMIN).targetName) && audits.some((t) => new RegExp(`GMCALL #${N} closed by Iced Sky`).test(t)), lastPanel(ADMIN).targetName);
+  reset(); choose(ADMIN, `c:${N}`);
+  check('a row for a call that has gone says so instead of throwing', new RegExp(`GM call #${N} is no longer open`).test(lastPanel(ADMIN).targetName), lastPanel(ADMIN).targetName);
+
+  // ---- tickets opened with /ticket sit in the same queue --------------------------------------------------------------
+  let forgotten = [];
+  const TICKET = { n: 'G0007', kind: 'mod', label: 'Moderation Help', profile: 11, name: 'Argosh gro-Shatul #ARGO',
+    where: 'Whiterun Hold, 3c:Skyrim.esm at 1000, 2000, 30', place: { desc: '3c:Skyrim.esm', pos: [1000, 2000, 30] }, channel: 'mod-g0007-argosh', at: Date.now() - 60000 };
+  globalThis.__dboGameTicketQueue = { open: () => [TICKET], forget: (n) => { forgotten.push(n); return TICKET; } };
+  reset(); gm(ADMIN, 'panel');
+  check('/gm panel opens it too, and a ticket is a row beside the calls', panelIds(ADMIN).includes('t:G0007')
+    && /0 GM calls, 1 ticket/.test(lastPanel(ADMIN).targetName), [panelIds(ADMIN), lastPanel(ADMIN).targetName]);
+  check('the ticket row names its kind and who opened it', /^G0007 Moderation Help: Argosh gro-Shatul #ARGO - .* - on Discord$/.test(panelLabels(ADMIN)[0]), panelLabels(ADMIN));
+  reset(); choose(ADMIN, 't:G0007');
+  check("the ticket page never shows the ticket's words, only kind, who and where", /Moderation Help from Argosh gro-Shatul/.test(lastPanel(ADMIN).targetName)
+    && /Staff answer it in its Discord channel/.test(lastPanel(ADMIN).targetName) && panelIds(ADMIN).join(',') === 'tgoto:G0007,tforget:G0007,list', [lastPanel(ADMIN).targetName, panelIds(ADMIN)]);
+  reset(); choose(ADMIN, 'tgoto:G0007');
+  check('Go to takes the GM to the player who opened it', teleports.length === 1 && teleports[0][1].cellOrWorldDesc === '3c:Skyrim.esm'
+    && audits.some((t) => /TICKET G0007 .* went to/.test(t)), [teleports, audits]);
+  reset(); choose(ADMIN, 'tforget:G0007');
+  check('taking it off the list forgets it and is audited; the ticket itself is untouched', forgotten.join() === 'G0007'
+    && audits.some((t) => /TICKET G0007 taken off the staff queue by Iced Sky/.test(t)), [forgotten, audits]);
+
+  // ---- paging, and the same rows and actions for the F7 tab -----------------------------------------------------------
+  globalThis.__dboGameTicketQueue = { open: () => [], forget: () => null };
+  freshPanel();
+  for (let i = 0; i < 8; i++) { P[CALLER].profile = 100 + i; gm(CALLER, `call number ${i}`); }
+  P[CALLER].profile = 11;
+  const FIRST = globalThis.__dboGmCalls.open[0].n;
+  reset(); gm(ADMIN, 'queue');
+  check('eight calls page in sixes', panelIds(ADMIN).filter((x) => x.startsWith('c:')).length === 6 && panelIds(ADMIN).includes('p:1'), panelIds(ADMIN));
+  reset(); choose(ADMIN, 'p:1');
+  check('the next page holds the rest', panelIds(ADMIN).filter((x) => x.startsWith('c:')).length === 2 && /page 2 of 2/.test(panelLabels(ADMIN).join(' ')), panelLabels(ADMIN));
+  const Q = globalThis.__dboStaffQueue;
+  check('__dboStaffQueue gives staff the same rows for the F7 tab, and nothing to a player',
+    !!Q && Q.rows(ADMIN).length === 8 && Q.rows(ADMIN)[0].kind === 'call' && Q.rows(ADMIN)[0].waiting === true && Q.rows(CALLER).length === 0,
+    Q && [Q.rows(ADMIN).length, Q.rows(CALLER).length]);
+  reset();
+  check('its act() runs the same actions, and refuses a player', Q.act(ADMIN, 'call.take', String(FIRST)) === '' && Q.act(CALLER, 'call.take', String(FIRST)) === 'Staff only.'
+    && Q.act(ADMIN, 'call.take', '9999') === 'No such open GM call.' && Q.act(ADMIN, 'nonsense', String(FIRST)) === 'Unknown action.');
+
   Date.now = realNow;
+
   try { fs.rmSync(dir, { recursive: true, force: true }); } catch (e) { /* tmp */ }
   console.log(fails ? `\n${fails} check(s) failed` : '\nall checks passed');
   process.exit(fails ? 1 : 0);

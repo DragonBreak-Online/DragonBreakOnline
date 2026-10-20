@@ -43,6 +43,9 @@ module.exports = (api) => {
   const teleportTo = fn(api.teleportTo, null);
   const creationPending = fn(api.creationPending, () => false);
   const sendJson = fn(api.sendJson, null);
+  const openWidget = fn(api.openWidget, null);
+  const closeWidget = fn(api.closeWidget, () => {});
+  const onUi = fn(api.onUi, () => {});
   const C = Object.assign({
     enabled: true, cooldownSeconds: 120, minText: 5, maxText: 300, maxLines: 5, remindMinutes: 5, expireHours: 24,
     filter: true, staffRoleIds: [], openTicket: false, discord: false, discordChannelId: '', discordPingRoleId: '',
@@ -224,7 +227,7 @@ module.exports = (api) => {
   };
 
   // ---- the staff side ----------------------------------------------------------------------------------------------
-  const STAFF_USAGE = '/gm list [all] | take <n> | goto <n> | release <n> | close <n> [note] | quiet [on|off]';
+  const STAFF_USAGE = '/gm (the queue panel) | list [all] | take <n> | goto <n> | release <n> | close <n> [note] | quiet [on|off]';
   const numberOf = (a, s) => {
     const n = Number(String(s || '').replace(/^#/, ''));
     const c = Number.isInteger(n) ? findOpen(n) : null;
@@ -304,9 +307,10 @@ module.exports = (api) => {
     save();
     say(a, want ? 'GM calls: no banners for you; calls still come to this tab. /gm quiet off brings them back.' : 'GM calls: banners on.');
   };
-  const STAFF_SUBS = new Set(['list', 'take', 'goto', 'release', 'close', 'quiet']);
+  const STAFF_SUBS = new Set(['list', 'take', 'goto', 'release', 'close', 'quiet', 'panel', 'queue']);
   const staffCommand = (a, sub, rest) => {
     const [first, ...more] = rest.split(/\s+/);
+    if (sub === 'panel' || sub === 'queue') return void openList(a, 0);
     if (sub === 'list') return list(a, first === 'all');
     if (sub === 'quiet') return setQuiet(a, (first || '').toLowerCase());
     const c = numberOf(a, first); if (!c) return;
@@ -322,7 +326,8 @@ module.exports = (api) => {
     const sub = (sp < 0 ? text : text.slice(0, sp)).toLowerCase();
     const rest = sp < 0 ? '' : text.slice(sp + 1).trim();
     if (!text) {
-      if (isStaff(a)) { say(a, `GM calls: ${STAFF_USAGE}`); return list(a, false); }
+      // Staff get the queue panel (Nate, 20 Oct); /gm list is still the chat version, and stands in when widgets are off
+      if (isStaff(a)) { if (openWidget) return void openList(a, 0); say(a, `GM calls: ${STAFF_USAGE}`); return list(a, false); }
       return playerStatus(a);
     }
     if (isStaff(a) && STAFF_SUBS.has(sub)) return staffCommand(a, sub, rest);
@@ -334,6 +339,152 @@ module.exports = (api) => {
   };
   registerChatCommand('gm', command, { help: '<what you need>: call a GM to you; staff in the game are told at once' });
   registerChatCommand('callgm', command, { hidden: true, help: 'the same as /gm <what you need>' });
+
+  // ---- the staff queue panel (Nate, 20 Oct: "revamp the GM ticketing list ... buttons to go to the ticket area") -----
+  // One list of everything waiting on staff in the game: the open GM calls, and the tickets opened with /ticket
+  // (gameticket.js keeps those; the ones opened from the Discord panel are the backend's and are not here). A row opens
+  // the thing itself, with its words and a button for each action that already existed as a command, so nothing new is
+  // enforced here: take, go to, release and close are the same calls /gm take|goto|release|close make.
+  // The F7 admin panel is a front widget, so it cannot gain a tab without a client package; __dboStaffQueue is the same
+  // data and the same actions for that tab to use when it is built.
+  const PANEL_ID = 78;
+  const PANEL_ROWS = 6;
+  const PANEL = globalThis.__dboGmPanel instanceof Map ? globalThis.__dboGmPanel : (globalThis.__dboGmPanel = new Map());
+  const ticketQueue = () => (globalThis.__dboGameTicketQueue && typeof globalThis.__dboGameTicketQueue.open === 'function'
+    ? globalThis.__dboGameTicketQueue.open() : []);
+  // Waiting calls first, then taken ones, then the tickets; oldest first inside each group
+  const rows = () => {
+    const calls = S.open.slice().sort((x, y) => (x.takenBy ? 1 : 0) - (y.takenBy ? 1 : 0) || x.at - y.at)
+      .map((c) => ({ kind: 'call', id: String(c.n), call: c }));
+    const tickets = ticketQueue().sort((x, y) => (Number(x.at) || 0) - (Number(y.at) || 0))
+      .map((t) => ({ kind: 'ticket', id: String(t.n), ticket: t }));
+    return calls.concat(tickets);
+  };
+  const rowLabel = (r) => {
+    if (r.kind === 'call') {
+      const c = r.call;
+      const on = callerOnline(c);
+      return `#${c.n} ${c.name}${on ? '' : ' (offline)'} - ${placeText(c.place)} - ${ago(c.at)} - ${c.takenBy ? `taken by ${c.takenBy.name}` : 'WAITING'}`;
+    }
+    const t = r.ticket;
+    const on = onlineActors().find((x) => Number(profileOf(x)) === Number(t.profile));
+    return `${t.n} ${t.label}: ${t.name}${on ? '' : ' (offline)'} - ${ago(Number(t.at) || Date.now())} - on Discord`;
+  };
+  const panelPage = (a) => { const p = PANEL.get(a >>> 0); return p && Number.isInteger(p.page) ? p.page : 0; };
+  const closePanel = (a) => { PANEL.delete(a >>> 0); try { closeWidget(a, PANEL_ID); } catch (e) { /* gone */ } };
+  const openList = (a, page, note) => {
+    if (!openWidget) { say(a, 'The panel is not available right now.'); return list(a, false); }
+    const all = rows();
+    const pages = Math.max(1, Math.ceil(all.length / PANEL_ROWS));
+    const p = ((Number(page) || 0) % pages + pages) % pages;
+    const waiting = S.open.filter((c) => !c.takenBy).length;
+    const actions = all.slice(p * PANEL_ROWS, p * PANEL_ROWS + PANEL_ROWS).map((r) => ({ id: `${r.kind === 'call' ? 'c' : 't'}:${r.id}`, label: rowLabel(r) }));
+    if (!all.length) actions.push({ id: 'refresh', label: 'Nothing waiting. Look again' });
+    if (pages > 1) actions.push({ id: `p:${p + 1}`, label: `More (page ${p + 1} of ${pages})` });
+    PANEL.set(a >>> 0, { page: p });
+    openWidget(a, {
+      type: 'contextMenu', id: PANEL_ID, mode: 'menu',
+      targetName: `${note ? `${note}. ` : ''}Staff queue: ${S.open.length} GM call${S.open.length === 1 ? '' : 's'}`
+        + `${waiting ? ` (${waiting} waiting)` : ''}, ${ticketQueue().length} ticket${ticketQueue().length === 1 ? '' : 's'}`,
+      actions, events: { action: 'dbo:gmQueueChoose', close: 'dbo:gmQueueClose' },
+    }, true);
+    return all.length;
+  };
+  const openCall = (a, c, note) => {
+    if (!openWidget) return;
+    const on = callerOnline(c);
+    const said = c.lines.map((l) => l.text).join(' / ').slice(0, 300);
+    const actions = [{ id: `goto:${c.n}`, label: on ? `Go to ${c.name}` : `Go to where ${c.name} called from` }];
+    if (!c.takenBy || c.takenBy.profile !== Number(profileOf(a))) actions.push({ id: `take:${c.n}`, label: c.takenBy ? `Take it from ${c.takenBy.name}` : 'Take it' });
+    if (c.takenBy) actions.push({ id: `rel:${c.n}`, label: 'Put it back in the queue' });
+    actions.push({ id: `close:${c.n}`, label: 'Close it' });
+    actions.push({ id: 'list', label: 'Back to the queue' });
+    PANEL.set(a >>> 0, { page: panelPage(a), call: c.n });
+    openWidget(a, {
+      type: 'contextMenu', id: PANEL_ID, mode: 'menu',
+      targetName: `${note ? `${note}. ` : ''}#${c.n} ${c.name}${on ? '' : ' (offline)'} at ${placeText(c.place)}, ${ago(c.at)}`
+        + `${c.takenBy ? `, taken by ${c.takenBy.name}` : ''}: "${said}"`,
+      actions, events: { action: 'dbo:gmQueueChoose', close: 'dbo:gmQueueClose' },
+    }, true);
+  };
+  const openTicketRow = (a, t, note) => {
+    if (!openWidget) return;
+    const on = onlineActors().find((x) => Number(profileOf(x)) === Number(t.profile));
+    const actions = [{ id: `tgoto:${t.n}`, label: on ? `Go to ${t.name}` : `Go to where ${t.name} opened it` }];
+    actions.push({ id: `tforget:${t.n}`, label: 'Take it off this list (it stays on Discord)' });
+    actions.push({ id: 'list', label: 'Back to the queue' });
+    PANEL.set(a >>> 0, { page: panelPage(a), ticket: t.n });
+    openWidget(a, {
+      type: 'contextMenu', id: PANEL_ID, mode: 'menu',
+      // The ticket's words live in its Discord channel, which only the player and staff there can read: the panel names
+      // the kind and where it was opened, never the text
+      targetName: `${note ? `${note}. ` : ''}${t.n} ${t.label} from ${t.name}${on ? '' : ' (offline)'}, ${ago(Number(t.at) || Date.now())}`
+        + `, at ${String(t.where || '?').slice(0, 120)}. Staff answer it in its Discord channel`,
+      actions, events: { action: 'dbo:gmQueueChoose', close: 'dbo:gmQueueClose' },
+    }, true);
+  };
+  // Going to where a ticket was opened: the player if they are in the game, else the spot they stood on
+  const gotoTicket = (a, t) => {
+    if (!isAdmin(a) && !canAnswer(a)) return say(a, 'Going to a player is for staff with a GM tier.');
+    if (!teleportTo) return say(a, 'Teleport is not available right now. Use /tp <name>.');
+    if (creationPending(a)) return say(a, 'Finish your own character first.');
+    const p = onlineActors().find((x) => Number(profileOf(x)) === Number(t.profile));
+    let place = null;
+    if (p) { try { place = { cellOrWorldDesc: mp.get(p, 'worldOrCellDesc'), pos: mp.get(p, 'pos'), rot: mp.get(p, 'angle') || [0, 0, 0] }; } catch (e) { place = null; } }
+    else if (t.place && t.place.desc && Array.isArray(t.place.pos)) place = { cellOrWorldDesc: t.place.desc, pos: t.place.pos, rot: [0, 0, 0] };
+    if (!place || !place.cellOrWorldDesc) return say(a, `Where ${t.n} was opened is not known. Use /tp <name>.`);
+    const err = teleportTo(a, place);
+    if (err) return say(a, `Teleport failed: ${err}`);
+    audit(`TICKET ${t.n} ${who(a)} went to ${p ? who(p) : `where ${t.name} opened it (offline)`}`);
+    staffNote(a, 'ticket goto', `went to ${t.n} (${t.name}${p ? '' : ', offline: to where they opened it'})`);
+    say(a, p ? `Taken to ${t.name} (ticket ${t.n}).` : `${t.name} is offline: taken to where they opened ticket ${t.n}.`);
+  };
+  onUi('gmQueueClose', (a) => { PANEL.delete(a >>> 0); });
+  onUi('gmQueueChoose', (a, args) => {
+    if (!isStaff(a)) return closePanel(a);
+    const id = String((args && args[0]) || '');
+    if (id === 'list' || id === 'refresh') return void openList(a, panelPage(a));
+    let m = /^p:(\d+)$/.exec(id);
+    if (m) return void openList(a, Number(m[1]));
+    m = /^(c|take|goto|rel|close):(\d+)$/.exec(id);
+    if (m) {
+      const c = findOpen(Number(m[2]));
+      if (!c) return void openList(a, panelPage(a), `GM call #${m[2]} is no longer open`);
+      if (m[1] === 'c') return openCall(a, c);
+      if (m[1] === 'take') { take(a, c); return openCall(a, c, 'Taken'); }
+      if (m[1] === 'goto') { goto(a, c); return closePanel(a); }
+      if (m[1] === 'rel') { release(a, c); return openCall(a, c, 'Back in the queue'); }
+      closeBy(a, c, '');
+      return void openList(a, panelPage(a), `#${c.n} closed`);
+    }
+    m = /^(t|tgoto|tforget):(G?\d+)$/i.exec(id);
+    if (m) {
+      const t = ticketQueue().find((x) => String(x.n).toLowerCase() === m[2].toLowerCase());
+      if (!t) return void openList(a, panelPage(a), `Ticket ${m[2]} is no longer listed`);
+      if (m[1] === 't') return openTicketRow(a, t);
+      if (m[1] === 'tgoto') { gotoTicket(a, t); return closePanel(a); }
+      try { if (globalThis.__dboGameTicketQueue) globalThis.__dboGameTicketQueue.forget(t.n); } catch (e) { /* gone */ }
+      audit(`TICKET ${t.n} taken off the staff queue by ${who(a)}`);
+      return void openList(a, panelPage(a), `${t.n} off the list`);
+    }
+  });
+  // For the F7 admin panel when it is built: the same rows and the same actions, rank checked here as in the panel
+  globalThis.__dboStaffQueue = {
+    rows: (a) => (isStaff(a >>> 0) ? rows().map((r) => ({ kind: r.kind, id: r.id, label: rowLabel(r), waiting: r.kind === 'call' ? !r.call.takenBy : false })) : []),
+    act: (a, kind, id, note) => {
+      const s = a >>> 0;
+      if (!isStaff(s)) return 'Staff only.';
+      if (kind === 'ticket.goto') { const t = ticketQueue().find((x) => String(x.n).toLowerCase() === String(id).toLowerCase()); if (!t) return 'No such ticket.'; gotoTicket(s, t); return ''; }
+      if (kind === 'ticket.forget') { try { return globalThis.__dboGameTicketQueue && globalThis.__dboGameTicketQueue.forget(id) ? '' : 'No such ticket.'; } catch (e) { return 'No such ticket.'; } }
+      const c = findOpen(Number(String(id).replace(/^#/, '')));
+      if (!c) return 'No such open GM call.';
+      if (kind === 'call.take') { take(s, c); return ''; }
+      if (kind === 'call.goto') { goto(s, c); return ''; }
+      if (kind === 'call.release') { release(s, c); return ''; }
+      if (kind === 'call.close') { closeBy(s, c, note || ''); return ''; }
+      return 'Unknown action.';
+    },
+  };
 
   // ---- reminders, staff coming online, and calls nobody touched ------------------------------------------------------
   every('gmcalls', 10000, () => {
