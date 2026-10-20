@@ -3374,7 +3374,8 @@ const needsTick = () => {
       // and 1 otherwise. A missing module leaves the rate exactly where it was.
       // Well Fed (rest.js) slows it the same way, and the two multiply.
       const appetite = (globalThis.__dboPrayerHungerMult ? Number(globalThis.__dboPrayerHungerMult(a)) || 1 : 1)
-        * (globalThis.__dboRestHungerMult ? Number(globalThis.__dboRestHungerMult(a)) || 1 : 1);
+        * (globalThis.__dboRestHungerMult ? Number(globalThis.__dboRestHungerMult(a)) || 1 : 1)
+        * (globalThis.__dboRaceHungerMult ? Number(globalThis.__dboRaceHungerMult(a)) || 1 : 1);
       n.hunger = Math.min(100, n.hunger + (Number(NEEDS.hungerPerHour) || 0) * dt * appetite);
       applyNeedsStage(a, n, true);
       const warnMs = (Number(NEEDS.warnEveryMinutes) || 0) * 60000;

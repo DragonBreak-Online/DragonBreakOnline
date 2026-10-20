@@ -229,6 +229,14 @@ module.exports = (api) => {
     return r && v ? [r, v] : null;
   })();
   if (reachmanRace) { VAMPIRE_RACES.set(reachmanRace[0], reachmanRace[1]); MORTAL_RACES.set(reachmanRace[1], reachmanRace[0]); }
+  // The DLE's DBOHalfGiantRace and its vampire (config halfGiantRace, PC Worker C 20 Oct) the same way
+  const halfGiantRace = (() => {
+    const M = cfg.halfGiantRace || {};
+    const rec = (d) => { const id = d ? (() => { try { return mp.getIdFromDesc(String(d)) >>> 0; } catch (e) { return 0; } })() : 0; let r = null; try { r = id ? recordOf(id) : null; } catch (e) { r = null; } const t = r && (r.record ? r.record.type : r.type); return t && String(t) === 'RACE' ? id : 0; };
+    const r = rec(M.race), v = rec(M.vampire);
+    return r && v ? [r, v] : null;
+  })();
+  if (halfGiantRace) { VAMPIRE_RACES.set(halfGiantRace[0], halfGiantRace[1]); MORTAL_RACES.set(halfGiantRace[1], halfGiantRace[0]); }
   const keywordsOf = (id) => fieldIds(recordOf(id), 'KWDA').map((k) => globalOf(id, k));
   const hasKeyword = (id, kw) => !!kw && keywordsOf(id).includes(kw);
   const effectsOf = (id) => fieldIds(recordOf(id), 'EFID').map((e) => globalOf(id, e));
@@ -310,6 +318,7 @@ module.exports = (api) => {
   if (snowElfRace) FAMILY.set(snowElfRace[0], 'highelf');
   // A Reachman is a man of Breton stock on the Breton morph, with vanilla human heads: the human tells
   if (reachmanRace) FAMILY.set(reachmanRace[0], 'human');
+  if (halfGiantRace) FAMILY.set(halfGiantRace[0], 'human');
   // A Goblin has no eyes to choose (no head parts at all): its tells are the skin tone alone (Nat, 15 Oct: "skin tone works").
   // A goblin werewolf shows nothing
   if (goblinRace) FAMILY.set(goblinRace[0], 'goblin');
