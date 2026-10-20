@@ -4,6 +4,8 @@
 #include "NiPoint3.h"
 #include "PartOne.h"
 #include "TeleportMessage2.h"
+#include "WorldState.h"
+#include <libespm/espm.h>
 #include <algorithm>
 #include <cmath>
 #include <nlohmann/json.hpp>
@@ -11,6 +13,31 @@
 #include <string>
 
 namespace {
+
+// Location a cell belongs to (CELL XLCN), 0 when it has none or is not a cell
+uint32_t LocationOf(WorldState& worldState, const FormDesc& cellOrWorld,
+                    const EspmFileTable& files)
+{
+  if (!worldState.HasEspm()) {
+    return 0;
+  }
+  uint32_t cellId = 0;
+  try {
+    cellId = cellOrWorld.ToFormId(files);
+  } catch (const std::exception&) {
+    return 0;
+  }
+  if (!cellId) {
+    return 0;
+  }
+  const auto lookup = worldState.GetEspm().GetBrowser().LookupById(cellId);
+  const auto* cell = espm::Convert<espm::CELL>(lookup.rec);
+  if (!cell) {
+    return 0;
+  }
+  const uint32_t local = cell->GetData(worldState.GetEspmCache()).locationId;
+  return local ? lookup.ToGlobalId(local) : 0;
+}
 
 float HorizontalDistance(const NiPoint3& a, const NiPoint3& b)
 {
@@ -99,6 +126,14 @@ bool Validate(PartOne& partOne, const NiPoint3& currentPos,
     // NPCs walk between the cells of one dungeon, which is ordinary
     // Interior cells each have their own coordinate space, so a cross cell distance measures nothing
     if (!cellChanged || afterServerTeleport) {
+      return false;
+    }
+
+    // Only between cells of one location, which is what the parts of a dungeon share
+    const uint32_t fromLocation =
+      LocationOf(partOne.worldState, currentCellOrWorld, espmFiles);
+    if (fromLocation == 0 ||
+        fromLocation != LocationOf(partOne.worldState, newCellOrWorld, espmFiles)) {
       return false;
     }
   }

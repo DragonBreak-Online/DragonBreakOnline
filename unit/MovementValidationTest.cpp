@@ -199,14 +199,58 @@ TEST_CASE("Accepts a hosted NPC walking into the next cell of its dungeon",
   auto& npc = partOne.worldState.GetFormAt<MpActor>(0xff000001);
   MovementValidation::Tracker tracker;
 
-  // Far enough to trip the distance guard as well: interior cells have their
-  // own coordinate spaces, so the jump across the boundary measures nothing
+  // Bthardamz02a and Bthardamz02, both in location 00019152
+  // Far past the guard on purpose: interior cells have their own coordinate spaces
   partOne.Messages().clear();
   REQUIRE(MovementValidation::Validate(
-    partOne, { 0, 0, 0 }, { 0, 0, 0 }, FormDesc::Tamriel(), { 9000, 0, 0 },
-    FormDesc::FromString("ffffff:Skyrim.esm"), 0, &npc, { "Skyrim.esm" },
-    &tracker));
+    partOne, { 0, 0, 0 }, { 0, 0, 0 }, FormDesc::FromString("5912d:Skyrim.esm"),
+    { 9000, 0, 0 }, FormDesc::FromString("361f9:Skyrim.esm"), 0, &npc,
+    { "Skyrim.esm" }, &tracker));
   // Nothing is sent to the hosting client: it was right, the server was stale
+  REQUIRE(partOne.Messages().empty());
+}
+
+TEST_CASE("Refuses a hosted NPC's move between cells of different locations",
+          "[MovementValidation]")
+{
+  PartOne& partOne = GetPartOne();
+
+  DoConnect(partOne, 0);
+  partOne.CreateActor(0xff000000, { 0, 0, 0 }, 0, 0x3c);
+  partOne.SetUserActor(0, 0xff000000);
+  partOne.CreateActor(0xff000001, { 0, 0, 0 }, 0, 0x3c);
+
+  auto& npc = partOne.worldState.GetFormAt<MpActor>(0xff000001);
+  MovementValidation::Tracker tracker;
+
+  // Bthardamz02a (location 00019152) to WhiterunBanneredMare (location 0001F86D)
+  partOne.Messages().clear();
+  REQUIRE(!MovementValidation::Validate(
+    partOne, { 0, 0, 0 }, { 0, 0, 0 }, FormDesc::FromString("5912d:Skyrim.esm"),
+    { 10, 0, 0 }, FormDesc::FromString("1605e:Skyrim.esm"), 0, &npc,
+    { "Skyrim.esm" }, &tracker));
+  REQUIRE(partOne.Messages().empty());
+}
+
+TEST_CASE("Refuses a hosted NPC's move when a cell carries no location",
+          "[MovementValidation]")
+{
+  PartOne& partOne = GetPartOne();
+
+  DoConnect(partOne, 0);
+  partOne.CreateActor(0xff000000, { 0, 0, 0 }, 0, 0x3c);
+  partOne.SetUserActor(0, 0xff000000);
+  partOne.CreateActor(0xff000001, { 0, 0, 0 }, 0, 0x3c);
+
+  auto& npc = partOne.worldState.GetFormAt<MpActor>(0xff000001);
+  MovementValidation::Tracker tracker;
+
+  // QASmoke carries no XLCN, so it never qualifies
+  partOne.Messages().clear();
+  REQUIRE(!MovementValidation::Validate(
+    partOne, { 0, 0, 0 }, { 0, 0, 0 }, FormDesc::FromString("32ae7:Skyrim.esm"),
+    { 10, 0, 0 }, FormDesc::FromString("5912d:Skyrim.esm"), 0, &npc,
+    { "Skyrim.esm" }, &tracker));
   REQUIRE(partOne.Messages().empty());
 }
 
