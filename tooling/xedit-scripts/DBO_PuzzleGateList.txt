@@ -1,0 +1,539 @@
+# THIS COPY IS THE ONE xEDIT READS. A tracked copy lives in the `server` repo at
+# tooling/xedit-scripts/DBO_PuzzleGateList.txt, beside the script that reads this file,
+# tooling/xedit-scripts/DBO_RemovePuzzleGates.pas (first tracked 20 Oct 2026, branch
+# puzzlegatelist-floors-1020). EDIT BOTH OR THEY DRIFT - the list and its script having drifted is
+# why several entries below describe a world that no longer exists. No commit hash is named here on
+# purpose: a file cannot cite the commit that contains it, and the hash changes on every amend.
+# ============================================================================================================
+# DO NOT RUN DBO_RemovePuzzleGates.pas AGAINST THIS WHOLE FILE. Run it only against a reviewed subset.
+#
+# This list records what the removal passes of 12-19 Sep 2026 targeted. It is NOT a description of the world as
+# it should be now, because several of its entries have since been reversed on purpose, and the script has no
+# way to know that. Re-running it whole re-applies every reversal silently. Found the hard way on 19 Oct 2026:
+# a full run reported "DONE" for 56 references when only 4 were wanted, and the output was rejected, not saved.
+#
+# What a full run would wrongly do today:
+#   * RE-SEAL BLACKREACH. Its 7 entrances (skyrim.esm 06998D, 058E22, 07829A, 0A0338, 0EF933, 0EF7AA, 0EF79B)
+#     were disable+sunk when Blackreach was shut, then deliberately RESTORED on 14 Oct to open it as an
+#     open-world dungeon - but nobody dropped them from here. They are commented out below. If Blackreach is
+#     ever shut again, uncomment them; if any other area is reopened, DROP ITS LINES AT THE SAME TIME.
+#   * REMOVE 45 PORTCULLISES THAT HAVE NEVER BEEN REMOVED. Of the 120 NorHallExSmPortcullis01 entries, 75 are
+#     disabled and sunk in the current DLE, in the 19 Oct pre-restore backup and in the 9 Oct backup; the other
+#     45 (skyrim.esm 37, dawnguard.esm 5, dragonborn.esm 3) have an override in none of the three. They have
+#     stood since at least 9 Oct. Whether they should go is Nat's curation call, not the script's.
+#   * UNDO DELIBERATE RESTORES. The four NorHallExSmRotatingDoor01 housings (042ED6, 042EDB, 042EDE,
+#     dragonborn 01A18E) were restored on 19 Oct because that base is Nordic corridor architecture, not a
+#     blocker - sinking it is what caused "missing doorways" in the draugr ruins. Silverdrift's gate
+#     skyrim.esm:0B77E7 was restored the same day as the lever-gate proving case. All are commented out below.
+#
+# How to use it safely:
+#   1. Copy the lines you actually intend to apply into the file, run, then restore this full file.
+#   2. Check the result log: "DONE" count must equal what you asked for. Anything more is a reversal being
+#      undone - reject the output.
+#   3. xEdit writes "DragonBreak Online Edits.esp.save.<timestamp>" and leaves the plugin alone - note the
+#      timestamp suffix, a "*.save" glob misses it. Diff that save against the live plugin at RECORD level
+#      before installing it, with:
+#          py -I "<root>\server\tooling\plugdiff.py" "<live .esp>" "<the .save.<timestamp> file>"
+#      A byte compare proves nothing after a re-save, and an xEdit save has previously rewritten 93 unrelated
+#      records in this plugin. Do not use comparesave.py for this on its own: it compares references only as
+#      counts per base object, so a reference that was moved or disabled without changing any count - which is
+#      exactly what this script does - does not appear in its output at all.
+#
+# Note: the script counts every non-blank line as a target, comments included, so comment lines appear in the
+# result log as "FAIL plugin not loaded :". That is harmless.
+# ============================================================================================================
+skyrim.esm|0AD649|NorSecRmSmDoorSm01
+dawnguard.esm|018062|CasPortcullis
+dragonborn.esm|020B85|NorPortcullis
+dragonborn.esm|020B82|NorPortcullis
+dragonborn.esm|017FA5|NorPortcullis
+dragonborn.esm|025037|DLC2SV01HalfClawKeyHoleRight
+dragonborn.esm|025033|DLC2SV01HalfClawKeyHoleLeft
+dragonborn.esm|01CACB|DLC2SV01FullClawKeyHole
+dragonborn.esm|01CACA|PuzzleDoorSmallWheel04
+dragonborn.esm|01CAC9|PuzzleDoorMediumWheel04
+dragonborn.esm|01CAC8|PuzzleDoorLargeWheel04
+dragonborn.esm|01CAC7|PuzzleDoorBase01
+dragonborn.esm|01AC8A|PortGatePole01
+dragonborn.esm|01AC89|PortGatePole01
+dragonborn.esm|01AC88|PortGatePole01
+dragonborn.esm|01AC87|PortGatePole01
+dragonborn.esm|01AC86|PortGatePole01
+dragonborn.esm|01AC85|PortGatePole01
+dragonborn.esm|01AC84|PortGatePole01
+dragonborn.esm|01AC83|PortGatePole01
+dragonborn.esm|01AC82|PortGatePole01
+dragonborn.esm|01AC81|PortGatePole01
+dragonborn.esm|01AC80|PortGatePole01
+dragonborn.esm|01AC7F|PortGatePole01
+dragonborn.esm|01AC7E|PortGatePole01
+dragonborn.esm|01AC7D|PortGatePole01
+dragonborn.esm|01AC7C|PortGatePole01
+dragonborn.esm|01B80A|DLC2PuzzleDoorLargeWheel06Static
+dragonborn.esm|01B809|PuzzleDoorBase01
+dragonborn.esm|01B807|DLC2PuzzleDoorSmallWheel03Static
+dragonborn.esm|01B805|DLC2PuzzleDoorMediumWheel06Static
+dragonborn.esm|024E9B|NorPortcullisLarge01
+daedric landscape.esp|0318BF|NorPortcullis
+skyrim.esm|039AE2|NorSecRmSmDoorSm01
+skyrim.esm|08CAB6|NorSecRmSmDoorSm01
+skyrim.esm|01F103|NorSecRmSmDoorSm01
+skyrim.esm|0D794E|NorSecRmSmDoorSm01
+skyrim.esm|0D7913|NorSecRmSmDoorSm01
+skyrim.esm|0C024E|NorSecRmSmDoorSm01
+skyrim.esm|09E54E|NorSecRmSmDoorSm01
+skyrim.esm|019F66|NorSecRmSmDoorSm01
+skyrim.esm|07B7D8|NorSecRmSmDoorSm01
+# RESTORED 19 Oct as the lever-gate proving case, do not re-remove: skyrim.esm|0B77E7|NorSecRmSmDoorSm01
+skyrim.esm|0485A5|NorSecRmSmDoorSm01
+skyrim.esm|09D75E|NorSecRmSmDoorSm01
+skyrim.esm|07B84B|NorSecRmSmDoorSm01
+skyrim.esm|07B84A|NorSecRmSmDoorSm01
+skyrim.esm|05EBC0|soljundsPortcullis
+skyrim.esm|0270BA|NorSecRmSmDoorSm01
+skyrim.esm|029E04|NorSecRmSmDoorSm01
+skyrim.esm|0D7356|NorSecRmSmDoorSm01
+skyrim.esm|061CE9|NorSecRmSmDoorSm01
+skyrim.esm|0578B3|NorSecRmSmDoorSm01
+skyrim.esm|05D416|NorSecRmSmDoorSm01
+skyrim.esm|082EAB|NorSecRmSmDoorSm01
+skyrim.esm|0DB045|NorSecRmSmDoorSm01
+skyrim.esm|05BD20|NorSecRmSmDoorSm01
+skyrim.esm|031744|NorSecRmSmDoorSm01
+skyrim.esm|0E419C|NorSecRmSmDoorSm01
+skyrim.esm|02A051|NorSecRmSmDoorSm01
+skyrim.esm|05B236|NorSecRmSmDoorSm01
+skyrim.esm|086D9E|NorPortcullisLarge01
+dawnguard.esm|018F61|CasPortcullis
+dawnguard.esm|018E70|CasPortcullis
+dawnguard.esm|018A00|CasPortcullis
+dawnguard.esm|019A7E|CasPortcullis
+dawnguard.esm|00B2A3|NorPortcullis
+dawnguard.esm|00B254|NorPortcullisLarge01
+dawnguard.esm|00B23B|NorPortcullis
+dawnguard.esm|0135BE|NorPortcullis
+dawnguard.esm|00996E|NorPortcullis
+dawnguard.esm|00619F|NorPortcullis
+dawnguard.esm|00618D|NorPortcullis
+dawnguard.esm|012F61|NorSecRmSmDoorSm01
+dawnguard.esm|00F602|NorSecRmSmDoorSm01
+dawnguard.esm|00A67E|NorSecRmSmDoorSm01
+dawnguard.esm|00A5B5|NorSecRmSmDoorSm01
+dawnguard.esm|0097F2|NorPortcullisLarge01
+dawnguard.esm|009742|NorPortcullisLarge01
+dawnguard.esm|018414|NorPortcullis
+dawnguard.esm|018413|NorPortcullis
+dawnguard.esm|018412|NorPortcullis
+dawnguard.esm|018411|NorPortcullis
+dawnguard.esm|002F8D|NorPortcullisLarge01
+dawnguard.esm|0010AC|CasPortcullis
+dawnguard.esm|000F7D|NorPortcullisLarge01
+dragonborn.esm|02C541|NorSecRmSmDoorSm01
+dragonborn.esm|02C530|NorSecRmSmDoorSm01
+dragonborn.esm|027A72|NorPortcullis
+dragonborn.esm|027A71|NorPortcullis
+dragonborn.esm|020D4B|NorPortcullis
+dragonborn.esm|020CAB|NorPortcullis
+dragonborn.esm|018169|NorPortcullis
+dragonborn.esm|01814D|NorPortcullis
+dragonborn.esm|03464B|PortGatePole05
+dragonborn.esm|03464A|PortGatePole05
+dragonborn.esm|034649|PortGatePole05
+dragonborn.esm|034648|PortGatePole05
+dragonborn.esm|034647|PortGatePole05
+dragonborn.esm|034646|PortGatePole05
+dragonborn.esm|034645|PortGatePole05
+dragonborn.esm|034644|PortGatePole05
+dragonborn.esm|034643|PortGatePole05
+dragonborn.esm|034642|PortGatePole05
+dragonborn.esm|034641|PortGatePole05
+dragonborn.esm|034640|PortGatePole05
+dragonborn.esm|03463F|PortGatePole05
+dragonborn.esm|03463E|PortGatePole05
+dragonborn.esm|03463D|PortGatePole05
+dragonborn.esm|03463C|PortGatePole05
+dragonborn.esm|03463B|PortGatePole05
+dragonborn.esm|03463A|PortGatePole05
+dragonborn.esm|034638|PortGatePole05
+dragonborn.esm|0345C4|PortGatePole05
+dragonborn.esm|0345C3|PortGatePole05
+dragonborn.esm|0345C2|PortGatePole05
+dragonborn.esm|0345C1|PortGatePole05
+dragonborn.esm|0345C0|PortGatePole05
+dragonborn.esm|0345BF|PortGatePole05
+dragonborn.esm|0345BE|PortGatePole05
+dragonborn.esm|0345BD|PortGatePole05
+dragonborn.esm|0345BC|PortGatePole05
+dragonborn.esm|0345BB|PortGatePole05
+dragonborn.esm|0345BA|PortGatePole05
+dragonborn.esm|0345B9|PortGatePole05
+dragonborn.esm|0345B8|PortGatePole05
+dragonborn.esm|0345B7|PortGatePole05
+dragonborn.esm|0345B6|PortGatePole05
+dragonborn.esm|0345B5|PortGatePole05
+dragonborn.esm|0345B4|PortGatePole05
+dragonborn.esm|0345B3|PortGatePole05
+dragonborn.esm|0345B2|PortGatePole05
+dragonborn.esm|0345B1|PortGatePole05
+dragonborn.esm|034581|PortGatePole05
+dragonborn.esm|034580|PortGatePole05
+dragonborn.esm|03457F|PortGatePole05
+dragonborn.esm|03457E|PortGatePole05
+dragonborn.esm|03457D|PortGatePole05
+dragonborn.esm|03457C|PortGatePole05
+dragonborn.esm|03457B|PortGatePole05
+dragonborn.esm|03457A|PortGatePole05
+dragonborn.esm|034579|PortGatePole05
+dragonborn.esm|034578|PortGatePole05
+dragonborn.esm|034577|PortGatePole05
+dragonborn.esm|034576|PortGatePole05
+dragonborn.esm|034575|PortGatePole05
+dragonborn.esm|034574|PortGatePole05
+dragonborn.esm|034573|PortGatePole05
+dragonborn.esm|034572|PortGatePole05
+dragonborn.esm|034571|PortGatePole05
+dragonborn.esm|034570|PortGatePole05
+dragonborn.esm|03456F|PortGatePole05
+dragonborn.esm|03456E|PortGatePole05
+dragonborn.esm|0263F5|NorPortcullis
+dragonborn.esm|01ABAC|NorPortcullis
+dragonborn.esm|0321C7|NorPortcullis
+dragonborn.esm|0321B4|NorPortcullis
+dragonborn.esm|01ACF5|NorPortcullisLarge01
+dragonborn.esm|01E8F7|NorSecRmSmDoorSm01
+dragonborn.esm|0287B6|NorSecRmSmDoorSm01
+dragonborn.esm|02878D|PortGatePole01
+dragonborn.esm|02878C|PortGatePole01
+dragonborn.esm|02878B|PortGatePole01
+dragonborn.esm|02878A|PortGatePole01
+dragonborn.esm|028789|PortGatePole01
+dragonborn.esm|028788|PortGatePole01
+dragonborn.esm|028787|PortGatePole01
+dragonborn.esm|028786|PortGatePole01
+dragonborn.esm|018A5E|NorPortcullis
+dragonborn.esm|01899E|NorPortcullisLarge01
+dragonborn.esm|017B3A|NorPortcullisLarge01
+dragonborn.esm|01FABA|NorPortcullisLarge01
+dragonborn.esm|01FAB9|NorPortcullisLarge01
+dragonborn.esm|03C455|NorSecRmSmDoorSm01
+dragonborn.esm|026838|NorPortcullis
+dragonborn.esm|01B7C3|NorSecRmSmDoorSm01
+dragonborn.esm|01AA11|NorSecRmSmDoorSm01
+dragonborn.esm|02626D|PortGatePole03
+dragonborn.esm|02626C|PortGatePole03
+dragonborn.esm|02626B|PortGatePole03
+dragonborn.esm|02626A|PortGatePole03
+dragonborn.esm|026269|PortGatePole03
+dragonborn.esm|026268|PortGatePole03
+dragonborn.esm|026267|PortGatePole03
+dragonborn.esm|026266|PortGatePole03
+dragonborn.esm|0192A3|NorPortcullisLarge01
+jk's castle volkihar.esp|000F06|CasPortcullis
+daedric landscape.esp|01D5C1|NorPortcullis
+daedric landscape.esp|02D383|NorPortcullis
+daedric landscape.esp|03D6D8|NorPortcullis
+daedric landscape.esp|03D6CE|NorPortcullis
+skyrim.esm|0B64A5|NorHallExSmPortcullis01
+skyrim.esm|0B7465|NorSecRmSmDoorSm02
+skyrim.esm|10A192|NorPortcullisStatic
+skyrim.esm|050E6A|NorHallExSmPortcullis01
+skyrim.esm|0DE077|NorHallExSmPortcullis01
+skyrim.esm|0DE088|NorHallExSmPortcullis01
+skyrim.esm|0E730C|NorHallExSmPortcullis01
+# left in place by Nat's choice, 19 Oct (never removed; a full run would sink it for the first time): skyrim.esm|036413|NorHallExSmPortcullis01
+# left in place by Nat's choice, 19 Oct (never removed; a full run would sink it for the first time): skyrim.esm|036411|NorHallExSmPortcullis01
+# left in place by Nat's choice, 19 Oct (never removed; a full run would sink it for the first time): skyrim.esm|03640E|NorHallExSmPortcullis01
+skyrim.esm|039B21|NorHallExSmPortcullis01
+skyrim.esm|039B20|NorHallExSmPortcullis01
+skyrim.esm|09A678|NorHallExSmPortcullis01
+skyrim.esm|09A67C|NorHallExSmPortcullis01
+skyrim.esm|02C400|NorHallExSmPortcullis01
+skyrim.esm|0637A9|NorPortcullis
+# skyrim.esm|063758|NorHallExSmPortcullis01   <- 20 Oct: floor restored; players fell through; Nat via the server session; DLE child DragonBreak Dungeon Floors.esp
+# skyrim.esm|063756|NorHallExSmPortcullis01   <- 20 Oct: floor restored; players fell through; Nat via the server session; DLE child DragonBreak Dungeon Floors.esp
+skyrim.esm|032B32|NorHallExSmPortcullis01ice
+skyrim.esm|032B31|NorHallExSmPortcullis01ice
+skyrim.esm|072B56|NorHallExSmPortcullis01ice
+skyrim.esm|072B38|NorHallExSmPortcullis01ice
+skyrim.esm|0AB10B|NorSecRmSmDoorSm01
+# skyrim.esm|072D02|NorHallExSmPortcullis01   <- 20 Oct: floor restored; players fell through; Nat via the server session; DLE child DragonBreak Dungeon Floors.esp
+# skyrim.esm|072D03|NorHallExSmPortcullis01   <- 20 Oct: floor restored; players fell through; Nat via the server session; DLE child DragonBreak Dungeon Floors.esp
+# skyrim.esm|072D92|NorHallExSmPortcullis01   <- 20 Oct: floor restored; players fell through; Nat via the server session; DLE child DragonBreak Dungeon Floors.esp
+# skyrim.esm|072D91|NorHallExSmPortcullis01   <- 20 Oct: floor restored; players fell through; Nat via the server session; DLE child DragonBreak Dungeon Floors.esp
+# left in place by Nat's choice, 19 Oct (never removed; a full run would sink it for the first time): skyrim.esm|03D939|NorHallExSmPortcullis01
+# left in place by Nat's choice, 19 Oct (never removed; a full run would sink it for the first time): skyrim.esm|03D937|NorHallExSmPortcullis01
+# left in place by Nat's choice, 19 Oct (never removed; a full run would sink it for the first time): skyrim.esm|03D936|NorHallExSmPortcullis01
+# left in place by Nat's choice, 19 Oct (never removed; a full run would sink it for the first time): skyrim.esm|03D917|NorHallExSmPortcullis01
+# left in place by Nat's choice, 19 Oct (never removed; a full run would sink it for the first time): skyrim.esm|03D916|NorHallExSmPortcullis01
+skyrim.esm|03D915|NorHallExSmPortcullis01
+skyrim.esm|0285C1|NorHallExSmPortcullis01
+skyrim.esm|04634C|NorHallExSmPortcullis01
+skyrim.esm|04660C|NorHallExSmPortcullis01
+skyrim.esm|09A5E7|NorHallExSmPortcullis01
+skyrim.esm|09A5E6|NorHallExSmPortcullis01
+# skyrim.esm|0A1EDB|NorHallExSmPortcullis01   <- 20 Oct: floor restored; players fell through; Nat via the server session; DLE child DragonBreak Dungeon Floors.esp
+# skyrim.esm|0A23FB|NorHallExSmPortcullis01   <- 20 Oct: floor restored; players fell through; Nat via the server session; DLE child DragonBreak Dungeon Floors.esp
+# skyrim.esm|0A23FA|NorHallExSmPortcullis01   <- 20 Oct: floor restored; players fell through; Nat via the server session; DLE child DragonBreak Dungeon Floors.esp
+skyrim.esm|0A5E6A|NorSecRmSmDoorSm01
+# left in place by Nat's choice, 19 Oct (never removed; a full run would sink it for the first time): skyrim.esm|0A5F76|NorHallExSmPortcullis01
+# left in place by Nat's choice, 19 Oct (never removed; a full run would sink it for the first time): skyrim.esm|0A5F67|NorHallExSmPortcullis01
+# left in place by Nat's choice, 19 Oct (never removed; a full run would sink it for the first time): skyrim.esm|0A5F66|NorHallExSmPortcullis01
+# left in place by Nat's choice, 19 Oct (never removed; a full run would sink it for the first time): skyrim.esm|0A5F65|NorHallExSmPortcullis01
+skyrim.esm|03E6AE|NorHallExSmPortcullis01
+# left in place by Nat's choice, 19 Oct (never removed; a full run would sink it for the first time): skyrim.esm|044E4D|NorHallExSmPortcullis01
+# left in place by Nat's choice, 19 Oct (never removed; a full run would sink it for the first time): skyrim.esm|02D0C5|NorHallExSmPortcullis01
+# left in place by Nat's choice, 19 Oct (never removed; a full run would sink it for the first time): skyrim.esm|02D0B6|NorHallExSmPortcullis01
+# left in place by Nat's choice, 19 Oct (never removed; a full run would sink it for the first time): skyrim.esm|02D096|NorHallExSmPortcullis01
+skyrim.esm|08DB07|NorSecRmSmDoorSm01
+skyrim.esm|048596|NorPortcullisStatic
+skyrim.esm|05AF5D|NorHallExSmPortcullis01
+skyrim.esm|09E547|NorSecRmSmDoorSm01
+skyrim.esm|0A4785|NorHallExSmPortcullis01
+# left in place by Nat's choice, 19 Oct (never removed; a full run would sink it for the first time): skyrim.esm|0A4784|NorHallExSmPortcullis01
+# left in place by Nat's choice, 19 Oct (never removed; a full run would sink it for the first time): skyrim.esm|0A4783|NorHallExSmPortcullis01
+# skyrim.esm|035AB9|NorHallExSmPortcullis01   <- 20 Oct: floor restored; players fell through; Nat via the server session; DLE child DragonBreak Dungeon Floors.esp
+skyrim.esm|06FCCF|NorPortcullisStatic
+skyrim.esm|02FE39|NorHallExSmPortcullis01
+skyrim.esm|09D750|NorSecRmSmDoorSm01
+# left in place by Nat's choice, 19 Oct (never removed; a full run would sink it for the first time): skyrim.esm|01B6AC|NorHallExSmPortcullis01
+skyrim.esm|0278A2|NorHallExSmPortcullis01
+skyrim.esm|098530|NorHallExSmPortcullis01
+# left in place by Nat's choice, 19 Oct (never removed; a full run would sink it for the first time): skyrim.esm|09852F|NorHallExSmPortcullis01
+skyrim.esm|05EBBF|NorHallExSmPortcullis01
+# skyrim.esm|0230D6|NorHallExSmPortcullis01   <- 20 Oct: floor restored; players fell through; Nat via the server session; DLE child DragonBreak Dungeon Floors.esp
+# skyrim.esm|0230CA|NorHallExSmPortcullis01   <- 20 Oct: floor restored; players fell through; Nat via the server session; DLE child DragonBreak Dungeon Floors.esp
+# skyrim.esm|03A4C9|NorHallExSmPortcullis01   <- 20 Oct: floor restored; players fell through; Nat via the server session; DLE child DragonBreak Dungeon Floors.esp
+# skyrim.esm|07A2C0|NorHallExSmPortcullis01   <- 20 Oct: floor restored; players fell through; Nat via the server session; DLE child DragonBreak Dungeon Floors.esp
+# left in place by Nat's choice, 19 Oct (never removed; a full run would sink it for the first time): skyrim.esm|086266|NorHallExSmPortcullis01
+# left in place by Nat's choice, 19 Oct (never removed; a full run would sink it for the first time): skyrim.esm|086267|NorHallExSmPortcullis01
+skyrim.esm|072415|NorHallExSmPortcullis01
+skyrim.esm|0578B4|NorSecRmSmDoorSm01
+skyrim.esm|08CE75|NorSecRmSmDoorSm01
+# skyrim.esm|040C72|NorHallExSmPortcullis01   <- 20 Oct: floor restored; players fell through; Nat via the server session; DLE child DragonBreak Dungeon Floors.esp
+# skyrim.esm|040C71|NorHallExSmPortcullis01   <- 20 Oct: floor restored; players fell through; Nat via the server session; DLE child DragonBreak Dungeon Floors.esp
+# skyrim.esm|040C77|NorHallExSmPortcullis01   <- 20 Oct: floor restored; players fell through; Nat via the server session; DLE child DragonBreak Dungeon Floors.esp
+skyrim.esm|0557BB|NorPortcullisStatic
+skyrim.esm|08615B|NorSecRmSmDoorSm01
+skyrim.esm|0ED3C4|NorSecRmSmDoorSm01
+skyrim.esm|0ED7DA|NorHallExSmPortcullis01
+# skyrim.esm|03A30A|NorHallExSmPortcullis01   <- 20 Oct: floor restored; players fell through; Nat via the server session; DLE child DragonBreak Dungeon Floors.esp
+skyrim.esm|02E1FD|NorHallExSmPortcullis01
+skyrim.esm|0B63F8|NorHallExSmPortcullis01
+# left in place by Nat's choice, 19 Oct (never removed; a full run would sink it for the first time): skyrim.esm|0236E6|NorHallExSmPortcullis01
+# left in place by Nat's choice, 19 Oct (never removed; a full run would sink it for the first time): skyrim.esm|0236E5|NorHallExSmPortcullis01
+# left in place by Nat's choice, 19 Oct (never removed; a full run would sink it for the first time): skyrim.esm|0236E4|NorHallExSmPortcullis01
+skyrim.esm|023314|NorHallExSmPortcullis01
+skyrim.esm|0DB044|NorSecRmSmDoorSm01
+skyrim.esm|07F720|NorSecRmSmDoorSm01
+# left in place by Nat's choice, 19 Oct (never removed; a full run would sink it for the first time): skyrim.esm|081A12|NorHallExSmPortcullis01
+# left in place by Nat's choice, 19 Oct (never removed; a full run would sink it for the first time): skyrim.esm|081A11|NorHallExSmPortcullis01
+skyrim.esm|081A0F|NorHallExSmPortcullis01
+skyrim.esm|081A0D|NorHallExSmPortcullis01
+skyrim.esm|03275B|NorHallExSmPortcullis01
+# left in place by Nat's choice, 19 Oct (never removed; a full run would sink it for the first time): skyrim.esm|022F89|NorHallExSmPortcullis01
+# left in place by Nat's choice, 19 Oct (never removed; a full run would sink it for the first time): skyrim.esm|022F88|NorHallExSmPortcullis01
+# left in place by Nat's choice, 19 Oct (never removed; a full run would sink it for the first time): skyrim.esm|082C77|NorHallExSmPortcullis01
+# skyrim.esm|082C84|NorHallExSmPortcullis01   <- 20 Oct: floor restored; players fell through; Nat via the server session; DLE child DragonBreak Dungeon Floors.esp
+skyrim.esm|02A868|NorHallExSmPortcullis01
+skyrim.esm|035641|NorHallExSmPortcullis01
+skyrim.esm|03F3AF|NorHallExSmPortcullis01
+skyrim.esm|01D3DE|NorHallExSmPortcullis01
+# left in place by Nat's choice, 19 Oct (never removed; a full run would sink it for the first time): skyrim.esm|01D3E1|NorHallExSmPortcullis01
+# left in place by Nat's choice, 19 Oct (never removed; a full run would sink it for the first time): skyrim.esm|01D3E3|NorHallExSmPortcullis01
+skyrim.esm|0375D6|NorHallExSmPortcullis01
+# left in place by Nat's choice, 19 Oct (never removed; a full run would sink it for the first time): skyrim.esm|0375D5|NorHallExSmPortcullis01
+# left in place by Nat's choice, 19 Oct (never removed; a full run would sink it for the first time): skyrim.esm|0375D2|NorHallExSmPortcullis01
+# left in place by Nat's choice, 19 Oct (never removed; a full run would sink it for the first time): skyrim.esm|03AC36|NorHallExSmPortcullis01
+# left in place by Nat's choice, 19 Oct (never removed; a full run would sink it for the first time): skyrim.esm|03AC34|NorHallExSmPortcullis01
+# left in place by Nat's choice, 19 Oct (never removed; a full run would sink it for the first time): skyrim.esm|03AC32|NorHallExSmPortcullis01
+skyrim.esm|02AD1F|NorHallExSmPortcullis01
+skyrim.esm|026564|NorHallExSmPortcullis01
+skyrim.esm|026568|NorHallExSmPortcullis01
+skyrim.esm|02656A|NorHallExSmPortcullis01
+skyrim.esm|026AF1|NorHallExSmPortcullis01
+skyrim.esm|0347D9|NorHallExSmPortcullis01
+skyrim.esm|0347D8|NorHallExSmPortcullis01
+skyrim.esm|034746|NorHallExSmPortcullis01
+skyrim.esm|0AA71E|NorPortcullisStatic
+skyrim.esm|02B3DA|NorHallExSmPortcullis01
+skyrim.esm|02B3CA|NorHallExSmPortcullis01
+skyrim.esm|080A99|PortGatePole06
+skyrim.esm|080A98|PortGatePole06
+skyrim.esm|080A97|PortGatePole06
+skyrim.esm|022731|NorHallExSmPortcullis01
+skyrim.esm|0222A4|NorHallExSmPortcullis01
+skyrim.esm|10436C|PortGatePole01
+skyrim.esm|10436D|PortGatePole01
+skyrim.esm|10436E|PortGatePole01
+skyrim.esm|104374|PortGatePole01
+skyrim.esm|104375|PortGatePole01
+dawnguard.esm|00D11A|NorPortcullis
+dawnguard.esm|00D106|NorPortcullis
+dawnguard.esm|00D105|NorPortcullis
+dawnguard.esm|00CC11|NorPortcullis
+dawnguard.esm|00DF28|CasPortcullis
+dawnguard.esm|00DF27|CasPortcullis
+dawnguard.esm|00B248|NorPortcullis
+dawnguard.esm|009A2D|NorHallExSmPortcullis01
+# left in place by Nat's choice, 19 Oct (never removed; a full run would sink it for the first time): dawnguard.esm|0099C1|NorHallExSmPortcullis01
+# left in place by Nat's choice, 19 Oct (never removed; a full run would sink it for the first time): dawnguard.esm|0099C0|NorHallExSmPortcullis01
+# left in place by Nat's choice, 19 Oct (never removed; a full run would sink it for the first time): dawnguard.esm|0099BF|NorHallExSmPortcullis01
+# left in place by Nat's choice, 19 Oct (never removed; a full run would sink it for the first time): dawnguard.esm|0099BE|NorHallExSmPortcullis01
+# left in place by Nat's choice, 19 Oct (never removed; a full run would sink it for the first time): dawnguard.esm|0099BD|NorHallExSmPortcullis01
+dawnguard.esm|00996D|NorHallExSmPortcullis01
+dawnguard.esm|00619D|NorHallExSmPortcullis01
+dawnguard.esm|006184|NorHallExSmPortcullis01
+dawnguard.esm|00A5BC|NorSecRmSmDoorSm01
+dawnguard.esm|000FC9|NorPortcullis
+dawnguard.esm|000FC8|NorPortcullis
+dawnguard.esm|004C67|PortGatePole06
+dawnguard.esm|004C66|PortGatePole06
+dawnguard.esm|004C65|PortGatePole06
+dawnguard.esm|004C64|PortGatePole06
+dawnguard.esm|004C63|PortGatePole06
+dawnguard.esm|004C62|PortGatePole06
+dawnguard.esm|004C5A|PortGatePole06
+dawnguard.esm|003938|PortGatePole06
+dawnguard.esm|003937|PortGatePole06
+dawnguard.esm|003936|PortGatePole06
+dawnguard.esm|003935|PortGatePole06
+dawnguard.esm|003929|PortGatePole06
+dawnguard.esm|003928|PortGatePole06
+dawnguard.esm|003927|PortGatePole06
+dawnguard.esm|004110|PortGatePole06
+dawnguard.esm|00410F|PortGatePole06
+dawnguard.esm|00410E|PortGatePole06
+dawnguard.esm|00410D|PortGatePole06
+dawnguard.esm|00410C|PortGatePole06
+dawnguard.esm|00410B|PortGatePole06
+dawnguard.esm|00410A|PortGatePole06
+dragonborn.esm|0179CB|NorPortcullis
+# left in place by Nat's choice, 19 Oct (never removed; a full run would sink it for the first time): dragonborn.esm|020CB3|NorHallExSmPortcullis01
+# left in place by Nat's choice, 19 Oct (never removed; a full run would sink it for the first time): dragonborn.esm|020CB1|NorHallExSmPortcullis01
+dragonborn.esm|020C7D|NorPortcullis
+dragonborn.esm|018142|NorPortcullis
+# left in place by Nat's choice, 19 Oct (never removed; a full run would sink it for the first time): dragonborn.esm|0180BE|NorHallExSmPortcullis01
+dragonborn.esm|01AD2E|NorPortcullisLarge01
+dragonborn.esm|01AD2D|NorPortcullisLarge01
+dragonborn.esm|017382|NorPortcullis
+dragonborn.esm|024C21|NorPortcullisLarge01
+dragonborn.esm|01AD3D|NorHallExSmPortcullis01
+dragonborn.esm|01ABAB|NorHallExSmPortcullis01
+dragonborn.esm|01ABAA|NorHallExSmPortcullis01
+dragonborn.esm|02683A|NorHallExSmPortcullis01
+dragonborn.esm|0292E7|PortGatePoleDwemer
+dragonborn.esm|0292E6|PortGatePoleDwemer
+dragonborn.esm|0292E5|PortGatePoleDwemer
+dragonborn.esm|0292E4|PortGatePoleDwemer
+dragonborn.esm|0292E3|PortGatePoleDwemer
+dragonborn.esm|0292E2|PortGatePoleDwemer
+dragonborn.esm|0292E1|PortGatePoleDwemer
+dragonborn.esm|0292E0|PortGatePoleDwemer
+dragonborn.esm|0292DF|PortGatePoleDwemer
+dragonborn.esm|0292DE|PortGatePoleDwemer
+dragonborn.esm|024E81|PortGatePole06
+dragonborn.esm|024E7F|PortGatePole06
+dragonborn.esm|024E7D|PortGatePole06
+dragonborn.esm|024E7B|PortGatePole06
+dragonborn.esm|024E79|PortGatePole06
+dragonborn.esm|01A96D|PortGatePole06
+dragonborn.esm|01A96B|PortGatePole06
+dragonborn.esm|01A969|PortGatePole06
+dragonborn.esm|01A967|PortGatePole06
+dragonborn.esm|01A965|PortGatePole06
+dragonborn.esm|03782D|NorPortcullisLarge01
+# BLACKREACH - DO NOT RE-REMOVE: skyrim.esm|06998D|DweDoorLarge01Load
+# BLACKREACH - DO NOT RE-REMOVE: skyrim.esm|058E22|DweDoorLarge01Load
+# BLACKREACH - DO NOT RE-REMOVE: skyrim.esm|07829A|DweDoorLarge01Load
+daedric landscape.esp|043A82|DweDoorLarge01Load
+# BLACKREACH - DO NOT RE-REMOVE: skyrim.esm|0A0338|DweFacadeLiftLeverLoadDown01
+# BLACKREACH - DO NOT RE-REMOVE: skyrim.esm|0EF933|DweFacadeLiftLeverLoadDown01_MinUse
+# BLACKREACH - DO NOT RE-REMOVE: skyrim.esm|0EF7AA|DweFacadeLiftLeverLoadDown01_MinUse
+# BLACKREACH - DO NOT RE-REMOVE: skyrim.esm|0EF79B|DweFacadeLiftLeverLoadDown01_MinUse
+skyrim.esm|03A07F|NorRotatingDoor
+skyrim.esm|02623F|NorRotatingDoor
+skyrim.esm|026241|NorRotatingDoor
+# skyrim.esm|072DAC|NorRotatingDoor   <- 20 Oct: replaced by a NorRotatingDoor01NOPORT ref, gate stays out; players fell through; Nat via the server session; DLE child DragonBreak Dungeon Floors.esp
+# skyrim.esm|072DAD|NorRotatingDoor   <- 20 Oct: replaced by a NorRotatingDoor01NOPORT ref, gate stays out; players fell through; Nat via the server session; DLE child DragonBreak Dungeon Floors.esp
+skyrim.esm|069228|NorRotatingDoor
+# skyrim.esm|0B7F1B|NorRotatingDoor   <- 20 Oct: replaced by a NorRotatingDoor01NOPORT ref, gate stays out; players fell through; Nat via the server session; DLE child DragonBreak Dungeon Floors.esp
+# skyrim.esm|0B7F1C|NorRotatingDoor   <- 20 Oct: replaced by a NorRotatingDoor01NOPORT ref, gate stays out; players fell through; Nat via the server session; DLE child DragonBreak Dungeon Floors.esp
+# skyrim.esm|0B7F1A|NorRotatingDoor   <- 20 Oct: replaced by a NorRotatingDoor01NOPORT ref, gate stays out; players fell through; Nat via the server session; DLE child DragonBreak Dungeon Floors.esp
+skyrim.esm|05D82D|NorRotatingDoor
+skyrim.esm|05D835|NorRotatingDoor
+skyrim.esm|05D834|NorRotatingDoor
+skyrim.esm|05D833|NorRotatingDoor
+skyrim.esm|05D832|NorRotatingDoor
+skyrim.esm|05D831|NorRotatingDoor
+skyrim.esm|05D82F|NorRotatingDoor
+skyrim.esm|05D82E|NorRotatingDoor
+skyrim.esm|085D9D|NorRotatingDoor
+skyrim.esm|085D9E|NorRotatingDoor
+skyrim.esm|06EF83|NorRotatingDoor01NOPORT
+skyrim.esm|06EF99|NorRotatingDoor01NOPORT
+skyrim.esm|06EF9A|NorRotatingDoor01NOPORT
+skyrim.esm|06EF9B|NorRotatingDoor01NOPORT
+skyrim.esm|0B1D0A|NorRotatingDoor
+dragonborn.esm|020D66|NorRotatingDoor
+dragonborn.esm|020D40|NorRotatingDoor
+dragonborn.esm|020D39|NorRotatingDoor
+dragonborn.esm|020B63|NorRotatingDoor01NOPORT
+dragonborn.esm|020B61|NorRotatingDoor01NOPORT
+dragonborn.esm|018146|NorRotatingDoor
+dragonborn.esm|018145|NorRotatingDoor
+dragonborn.esm|018144|NorRotatingDoor
+dragonborn.esm|01A187|NorRotatingDoor
+dragonborn.esm|018DE2|NorRotatingDoor
+skyrim.esm|05AEDF|NorShaftTrapDoorSmaller
+skyrim.esm|01B38E|NorShaftTrapDoorSmaller
+skyrim.esm|0457B2|NorShaftTrapDoorSmallerTriggered
+skyrim.esm|0F2DCF|NorShaftTrapDoor01
+skyrim.esm|05C66E|NorShaftTrapDoorSmallerTriggered
+skyrim.esm|018E75|NorShaftTrapDoorTriggered
+skyrim.esm|085DDC|NorShaftTrapDoorTriggered
+skyrim.esm|0AB687|NorShaftTrapDoorSmallerTriggered
+skyrim.esm|10C68A|NorShaftTrapDoorSmallerTriggered
+skyrim.esm|03F348|NorShaftTrapDoorSmallerTriggered
+# skyrim.esm|034738|NorShaftTrapDoor01   <- 20 Oct: trap door restored, closed; players fell through; Nat via the server session; DLE child DragonBreak Dungeon Floors.esp
+# skyrim.esm|051607|NorShaftTrapDoor01   <- 20 Oct: trap door restored, closed; players fell through; Nat via the server session; DLE child DragonBreak Dungeon Floors.esp
+# skyrim.esm|051606|dunRannveigsFastTrapDoor   <- 20 Oct: trap door restored, closed; players fell through; Nat via the server session; DLE child DragonBreak Dungeon Floors.esp
+# skyrim.esm|051604|dunRannveigsFastTrapDoor   <- 20 Oct: trap door restored, closed; players fell through; Nat via the server session; DLE child DragonBreak Dungeon Floors.esp
+dawnguard.esm|005A63|NorShaftTrapDoorSmaller
+dragonborn.esm|018102|NorShaftTrapDoorTriggered
+dragonborn.esm|01AD2B|NorShaftTrapDoorSmallerTriggered
+dragonborn.esm|025241|NorShaftTrapDoorSmallerTriggered
+dragonborn.esm|01D04F|NorShaftTrapDoorTriggered
+skyrim.esm|0F4986|dunLabyrinthianFireDoor
+skyrim.esm|0471DE|DunFrostflowCellarDoor
+skyrim.esm|061C09|dunDeadMensRespiteHoSDoor
+skyrim.esm|10DE05|TG08BLastDoor
+skyrim.esm|024E04|DA16VaerminaStatueDoor
+skyrim.esm|0F4973|dunLabyrinthianFrostDoor
+dragonborn.esm|027618|DLC2dunNchardakDoorSeal
+dragonborn.esm|026AD8|DLC2dunNchardakDweDoorLarge01NoName
+dragonborn.esm|02BF58|DLC2dunNchardakDoorSeal
+dragonborn.esm|01D4C1|DLC2dunNchardakDoorSeal
+dragonborn.esm|01D4C0|DLC2dunNchardakDoorSeal
+dragonborn.esm|02A716|DLC2dunNchardakDoorSeal
+dragonborn.esm|01C6FA|DLC2dunNchardakDweDoorLarge01NoName
+dragonborn.esm|01C685|DLC2dunNchardakDweDoorLarge01NoName
+dragonborn.esm|0177E2|DLC2dunNchardakDweDoorLarge01NoName
+dragonborn.esm|01D4C8|DLC2dunNchardakDoorSeal
+dragonborn.esm|0178D3|DLC2dunNchardakDoorSeal
+dragonborn.esm|0178D2|DLC2dunNchardakDoorSeal
+dragonborn.esm|026AD6|DLC2dunNchardakDoorSeal
+# 2026-10-19: the four NorHallExSmRotatingDoor01 refs were REMOVED FROM THIS LIST and restored in DLE.
+# They are not blockers: that base is a STAT in Dungeons\Nordic\BgHalls\, the floor-level housing of a
+# rotating door, and the pivoting panel is the separate ACTI NorRotatingDoor. Helgen Reborn's untouched
+# pair shows them 480 units apart at one x,y. Sinking the housing deleted a piece of Nordic corridor and
+# is what Nat reported as "missing doorways" in the draugr ruins. The 38 NorRotatingDoor / NOPORT panels
+# stay removed, so the way is still open. Dropped: skyrim.esm 042ED6, 042EDB, 042EDE (SilverdriftLair01),
+# dragonborn.esm 01A18E. Do not add them back.
+druadach.esm|05FF57|DRV_PuzzleDoorBase01_Skyhaven
+druadach.esm|05FF5F|DRV_PuzzleDoorKeyHole_Skyhaven
+arnima.esm|085E99|PuzzleDoorBase01
+arnima.esm|085EA1|PuzzleDoorKeyHole01Ruby
+# 2026-10-19: the 7 Blackreach entrance lines above are commented out. They were disable+sunk when Nat
+# wanted Blackreach shut, then deliberately RESTORED on 14 Oct to open it as an open-world dungeon - but
+# nobody dropped them from this list, so a re-run of this script silently re-sealed all seven (caught
+# 19 Oct, the save was rejected and not installed). Any future reopening must drop the lines too.
