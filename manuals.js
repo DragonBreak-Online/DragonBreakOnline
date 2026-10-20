@@ -343,6 +343,33 @@ module.exports = (api) => {
     return null;
   };
 
+  // ---- schematics found at a site (Nat, 20 Oct: Adamantium's own rare schematic, found at Sancre Tor) ----------------
+  // A site is a few placed chests outside the leases (its chests are emptied world containers, gamemode.js). Opening one
+  // rolls `chance` for a player who has not tried the site within cooldownHours; a hit hands one of its families' books
+  // over, as a reading's find does. Config smithing.sites: [{ id, name, chests: [desc], chance, cooldownHours, families }]
+  const SITES = (Array.isArray(SMC.sites) ? SMC.sites : [{ id: 'sancreTor', name: 'Sancre Tor', chance: 0.03, cooldownHours: 24, families: ['adamantium'],
+    // CYRTreasRuinsChestBossSnow, the two boss chests the DLE places in CYRSancreTorExterior cells
+    chests: ['1833aa:DragonBreak Online Edits.esp', '1833a9:DragonBreak Online Edits.esp'] }]).filter((x) => x && x.id && Array.isArray(x.chests));
+  const siteChests = new Map(); // chest id -> site
+  for (const site of SITES) for (const c of site.chests) { const id = idOf(c); if (id) siteChests.set(id >>> 0, site); }
+  globalThis.__dboSchematicSiteFind = (a, chestId) => {
+    const site = siteChests.get(Number(chestId) >>> 0);
+    if (!site || !C.enabled || !SMITH || !isPlayer(a)) return null;
+    const tried = get(a, 'private.dboSiteFinds', {}) || {};
+    const now = Date.now();
+    if (now - (Number(tried[site.id]) || 0) < (Number(site.cooldownHours) || 24) * 3600000) return null;
+    set(a, 'private.dboSiteFinds', Object.assign({}, tried, { [site.id]: now }));
+    if (!(Math.random() < (Number(site.chance) || 0))) return null;
+    const allowed = new Set((site.families || []).map(String));
+    const pool = READY.filter((m) => allowed.has(m.key) && !m.staffOnly && !m.withheld);
+    if (!pool.length) return null;
+    const pick = pool[Math.floor(Math.random() * pool.length)];
+    if (!giveItem(a, pick.bookId, 1)) { log(`manuals: ${who(a)} found ${pick.title} at ${site.name} but it could not be handed over`); return null; }
+    personal(a, `Wedged under the chest's lining you find ${pick.title}.`);
+    audit(`SCHEMATIC ${who(a)} found ${pick.title} in a chest at ${site.name} (1 in ${Math.round(1 / Number(site.chance))})`);
+    return { id: pick.book, name: pick.title, site: site.id };
+  };
+
   // ---- the Scholars' Ledger (salvage.js): the Synod's manuals, and a Scholar's copies ----------------------------
   const inShop = (a) => (C.shop.cells || []).map(norm).includes(norm(get(a, 'worldOrCellDesc', '')));
   const shopMax = () => Number(SMITH ? (C.shop.smithingMaxTier || 3) : C.shop.maxTier);
