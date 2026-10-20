@@ -2370,6 +2370,7 @@ module.exports = (api) => {
     globalThis.__dboSuperLoginAt instanceof Map && globalThis.__dboSuperLoginAt.set(a >>> 0, Date.now());
     try { const bs = stateOf(a); if (bs && bs.blood) sendPacket(a, { customPacketType: 'dboBloody', on: true }); } catch (e) { /* old client */ }
     setTimeout(() => { try { if (onlineActors().includes(a)) flushStageSpells(a, stateOf(a), 'login'); } catch (e) { log('supernatural: login spell flush failed', e.message); } }, 15000);
+    setTimeout(() => { try { if (globalThis.__dboSuperBeastPowerCheck) globalThis.__dboSuperBeastPowerCheck(a, 'login'); } catch (e) { /* the sweep tries again */ } }, 25000);
     const i = G.revoke.indexOf(a >>> 0);
     if (i >= 0) { removeSpell(a, VAMPIRE_LORD_POWER); G.revoke.splice(i, 1); saveG(); }
     for (const o of onlineActors()) { if (o !== a && beastForm(o) === 'werewolf' && globalThis.__dboGuildIsPackLeader && globalThis.__dboGuildIsPackLeader(o)) sendPacket(a, { customPacketType: 'dboPale', actor: o >>> 0, shader: PALE_SHADER, on: true }); }
@@ -2381,6 +2382,27 @@ module.exports = (api) => {
     for (const p of [...ASK.pending.values()]) if (p.t === (a >>> 0) || p.a === (a >>> 0)) answerFeed(p, 'resist', 'gone');
   };
   globalThis.__dboSuperForfeitIfDead = forfeit;
+
+  // ---- the Beast Form power without the beast (mod-0284, Kahu #LLX8, 20 Oct) ----------------------------------------------
+  // A staff hand once gave a player whose rite had failed the Beast Form power itself: they turned at will but the server
+  // never knew them for a werewolf, so they carried silver and never turned unbidden. Whoever holds the power (spells.js's
+  // learned list) and is not a werewolf here becomes one as the rite would have made them; a vampire only loses it.
+  // Staff are left alone (GM tests), as is anyone mid-rite or in beast form.
+  const beastPowerCheck = (a, why) => {
+    try {
+      a >>>= 0;
+      if (!isPlayer(a) || !onlineActors().includes(a) || beastForm(a)) return;
+      if (typeof globalThis.__dboIsStaff === 'function' && globalThis.__dboIsStaff(a)) return;
+      const s = stateOf(a); if (!s || s.kind === 'werewolf') return;
+      const learned = typeof globalThis.__dboSpellsLearned === 'function' ? globalThis.__dboSpellsLearned(a) : null;
+      if (!Array.isArray(learned) || !learned.includes(BEAST_POWER >>> 0)) return;
+      if (s.kind === 'vampire') { removeSpell(a, BEAST_POWER); audit(`SUPERNATURAL ${who(a)} held the Beast Form power as a vampire; it was taken (${why})`); return; }
+      becomeWerewolf(a, false, false);
+      audit(`SUPERNATURAL ${who(a)} held the Beast Form power without being a werewolf; made a werewolf as the rite would (${why})`);
+    } catch (e) { log('supernatural: beast power check failed', e.message); }
+  };
+  globalThis.__dboSuperBeastPowerCheck = beastPowerCheck;
+  every('superBeastPower', 300000, () => { for (const a of onlineActors()) beastPowerCheck(a, 'sweep'); });
 
   // A vampire's rank (bloodranks.js) slows thirst and softens the sun; 1 when it is not loaded
   const bloodRate = (a, hook) => { try { const m = typeof globalThis[hook] === 'function' ? Number(globalThis[hook](a)) : 1; return Number.isFinite(m) && m >= 0 ? m : 1; } catch (e) { return 1; } };

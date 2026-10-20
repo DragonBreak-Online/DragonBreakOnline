@@ -1,5 +1,19 @@
 [
   {
+    "title": "Werewolves are werewolves",
+    "date": "2026-10-20",
+    "version": "Hotfix",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Supernatural",
+        "items": [
+          "A character who held the Beast Form power without being a werewolf to the server (a rite that went wrong and was patched up by hand) is now a full werewolf: silver burns, and the beast can take them unbidden like any other."
+        ]
+      }
+    ]
+  },
+  {
     "title": "No more frozen temple wakes",
     "date": "2026-10-20",
     "version": "Hotfix",
