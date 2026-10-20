@@ -88,6 +88,11 @@ module.exports = (api) => {
     if (!slow) return;
     if (tooSoon(tgt, now, Math.max(0, Number(C.minGapMs) || 0))) return;
     if (player) {
+      // One frost slow at a time, shared with gearench.js's enchanted-weapon slow (PvP: never stacked)
+      const F = globalThis.__dboFrostSlowUntil instanceof Map ? globalThis.__dboFrostSlowUntil : (globalThis.__dboFrostSlowUntil = new Map());
+      { const f = F.get(tgt >>> 0); if (f && f.until > now && f.kind !== 'chill') return; }
+      F.set(tgt >>> 0, { kind: 'chill', until: now + (Number(slow.seconds) || 0) * 1000 });
+      if (F.size > 512) for (const [k, f] of F) if (!f || f.until < now) F.delete(k);
       const text = String((E.player || {}).text || '');
       try { sendPacket(tgt >>> 0, { customPacketType: 'dboStatus', kind: 'chill', seconds: slow.seconds, speedMult: slow.speedMult, text }); }
       catch (e) { /* offline */ }

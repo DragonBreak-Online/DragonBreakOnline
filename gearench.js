@@ -362,6 +362,10 @@ module.exports = (api) => {
     if (!isPlayer(tgt) || !(speed > 0) || !(seconds > 0)) return false;
     const now = Date.now();
     if (now - (slowSent.get(tgt) || 0) < 1000) return false;
+    // One frost slow at a time on a player, shared with elements.js's chill (PvP: weapon and spell frost never stack)
+    const F = globalThis.__dboFrostSlowUntil instanceof Map ? globalThis.__dboFrostSlowUntil : (globalThis.__dboFrostSlowUntil = new Map());
+    { const f = F.get(tgt); if (f && f.until > now && f.kind !== 'slow') return false; }
+    F.set(tgt, { kind: 'slow', until: now + Math.min(num(max, 10), seconds) * 1000 });
     slowSent.set(tgt, now);
     if (slowSent.size > 512) for (const [k, t] of slowSent) if (now - t > 5000) slowSent.delete(k);
     try { sendPacket(tgt, { customPacketType: 'dboStatus', kind: 'slow', seconds: Math.min(num(max, 10), seconds), speedMult: -Math.min(90, Math.round(speed)) }); } catch (e) { return false; }
