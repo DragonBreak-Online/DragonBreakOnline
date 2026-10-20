@@ -184,6 +184,19 @@ void ForEachSpellEffectData(WorldState* worldState, uint32_t spellId,
   }
 }
 
+// ForEachEffectData for a SPEL, SCRL or ENCH (a staff's hit names its enchantment)
+template <class Callback>
+void ForEachHitEffectData(WorldState* worldState, uint32_t sourceId,
+                          const Callback& callback)
+{
+  const auto sourceLookup =
+    worldState->GetEspm().GetBrowser().LookupById(sourceId);
+  if (espm::IsSpellItem(sourceLookup.rec) ||
+      espm::Convert<espm::ENCH>(sourceLookup.rec)) {
+    ForEachEffectData(worldState, sourceLookup, callback);
+  }
+}
+
 // Calls callback(effectType, associatedItem, projectile) with global ids for each effect of a SPEL
 template <class Callback>
 void ForEachSpellEffect(WorldState* worldState, uint32_t spellId,
@@ -280,7 +293,7 @@ void AddSpellRider(SpellRiders& riders, const espm::SPEL::EFIT& effectItem,
 SpellRiders GetSpellRiders(WorldState* worldState, uint32_t spellId)
 {
   SpellRiders riders;
-  ForEachSpellEffectData(
+  ForEachHitEffectData(
     worldState, spellId,
     [&](const espm::SPEL::EFIT* effectItem, const espm::MGEF::DATA& data,
         const espm::LookupResult&) {
@@ -348,7 +361,7 @@ float AbsorbHealthShare(WorldState* worldState, uint32_t spellId,
   const bool wholeDamageOverTime = CountsWholeDamageOverTime(
     worldState, espm::GetSpellItemData(spellId, worldState).spellItem, target);
   float absorbVisible = 0.f, absorbTotal = 0.f, visible = 0.f, total = 0.f;
-  ForEachSpellEffectData(
+  ForEachHitEffectData(
     worldState, spellId,
     [&](const espm::SPEL::EFIT* effectItem, const espm::MGEF::DATA& data,
         const espm::LookupResult&) {
