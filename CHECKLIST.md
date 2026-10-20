@@ -1,5 +1,110 @@
 # DragonBreak Online checklist (2026-09-14)
 
+## 20 Oct, night - spawned NPCs freeze when they walk between the cells of a dungeon (Worker 2, PC)
+
+Nat picked this off the open list: "an NPC's cell is never updated by movement, and an update that
+disagrees is dropped, after which every hit on it is refused". Root cause found in the fork's own
+C++, fixed, tightened on Nat's ruling, both builds green, the tightened one installed on the PC's
+local server. **Not in game yet and not live.**
+
+### The bug, exactly
+
+1. A hosted NPC crosses into the next cell. `MovementValidation::Validate`
+   (`MovementValidation.cpp:85`) drops the packet because the cell disagrees.
+2. The correction is gated behind `isMe`, which is `ActorByUser(userId) == actor` - true for a
+   player, **never for a hosted NPC**, because that user is the hosting *player*. So the packet is
+   dropped and **the hosting client is never told**.
+3. `OnUpdateMovement` returns before `SetPos`/`SetAngle`, so the server keeps the old position **and
+   the old cell**. Every later packet reports the same new cell and is refused in its turn. The
+   refusal **latches**: nothing retries, backs off or corrects.
+4. `OnHit` then refuses every hit on that actor, at `ActionListener.cpp:1497` (different cells) or
+   `:1511` (too distant). The actor is frozen where it was and can never be killed.
+
+Hosted actors are relayed to other clients **before** validation, which is why the NPC is seen
+walking around normally while the server believes it never left the boundary. That is three player
+reports - the motionless ogre, the briefly invulnerable enemies, the no-clipping wolves - as one bug.
+
+`MovementValidation.cpp:95` already carried the insight, applied only to the rate limiter: *"Refusing
+an NPC's move with no correction path freezes the server's copy of it."* The hard check four lines
+above never got the same treatment.
+
+### The trigger was already in the log
+
+No instrument and no playtest were needed. `npcSpawnSystem.ts:821` has been printing both descs for
+days whenever it re-places a desynced actor. 16 lines in `/var/log/skymp-server.log`, and resolved
+against the load order **every pair is two cells of the same dungeon**: CYRBawn02/CYRBawn03,
+CYRSilorn02/CYRSilorn, Bthardamz02a/Bthardamz02, Blackreach/BlackreachZcell04.
+
+**Correcting a wrong turn taken on the way:** `cellOrWorld` is the worldspace in exteriors, so
+crossing an exterior boundary cannot trip the rule - true, and wrong as a generalisation. In an
+interior it falls through to `getParentCell()`, and a large dungeon is several CELL records, so
+walking between them changes the id legitimately and routinely. Dungeons are interiors; spawned
+dungeon NPCs are exactly who this hits. Two plausible candidates (a `worldOrCell` of 0, a
+client/server form-id mismatch) were both wrong, and the answer was in the log the whole time.
+
+### The fix, and Nat's tightening
+
+Players keep the strict path. For a non-player a cell change is accepted and `ActionListener` applies
+it with `SetCellOrWorld`, which moves the grid subscription - `SetPos` alone does not, and movement
+had never moved an actor between cells at all. An in-flight packet from before a server teleport is
+still dropped, so a stale position cannot overwrite a destination just set.
+
+Nat's ruling narrowed it: **skip the 4096 u guard only when both cells share a location (CELL
+XLCN)**. `libespm` parsed only `DATA` and could not read a cell's location at all, so `CELL::Data`
+gained `locationId`, read the way `WRLD` already reads its own.
+
+**Measured against all 218 dungeons before writing it:** 215 have every cell in one location, **0
+span more than one**, and 3 have a cell with no location. Of those 3, Outlaw Endre Cave and Moranda
+are single-cell so no crossing is possible; only **Fort Coldcorn 01** (2 cells, neither with an
+XLCN) keeps the old freeze, and that is better fixed by adding the XLCN in the DLE than in code.
+The zero is the reassuring figure: no dungeon legitimately changes location when an NPC walks.
+
+Branch `npc-cell-fix-1020`. Two CI flatrim builds, both green: `39503998977` (`298a0010`, loose) and
+**`39508912385` (`4bfdedbf`, tightened, the only version that may go toward main or live)**. The
+tightened one is installed on the local server; backups in `server\_backup-pre-cellfix-tight-20261020-180907`
+with the pre-fix originals kept in `_backup-pre-cellfix-20261020-173439`.
+
+**Still to do:** walk a spawned NPC across the boundary in Bthardamz (`/tpos 0 0 0 5912d:Skyrim.esm`,
+neighbour `361f9`) or CYRBawn (`b9c01`/`b9c00` in `BSHeartland.esm`) and confirm the hit lands and the
+"is in X, not Y" line stops. Live waits on that test **and** `online:0`.
+
+### Still open, and it is the larger half
+
+This fixes the **86** "different cells" refusals. It does not touch the **376** "too distant" ones,
+which are a separate latch. Proposal written up in `E:\DragonBreak RE\findings\too-distant-latch.md`:
+
+**The 4096 guard refuses a hosted actor with no correction path and no timeout, so being wrong once
+is permanent.** `ActionListener::RefuseNpcJump` (`:879`) already solves this on the same code path,
+in Nat's own comment: refuse, correct the hoster, and *"if the hoster insists for 3 s its position
+wins, so an NPC that really moved is never frozen"*. Giving the 4096 guard the same give-in is a
+small change to one function, and **it does not depend on knowing what causes the first bad packet** -
+which matters, because we still do not for most cases.
+
+Evidence with its limits: 162 of the 376 follow a hosting handover of that actor (median 39 s, 75%
+within 5 min), **214 have no handover at all**. A refused hit only happens when a player swings, so
+that gap measures time-to-next-attack, not time-to-latch; correlating handovers against the *first*
+refusal per actor would be the sounder test and has not been run.
+
+### Worth keeping
+
+- **Read the log before building an instrument.** The answer to "what triggers it" had been printing
+  for three days in a diagnostic somebody had already written.
+- **Never index plugin records by `fid & 0xFFFFFF`.** Two records in one plugin can share a local id
+  under different masters (the DLE holds arnima `0E085EA1` and BSAssets `06085EA1`); masking keeps
+  only one and reported a real change as missing. The raw master index is the **0-based** position in
+  the master list, and an off-by-one there mimics the master-renumbering bug.
+- **The PC's `server` checkout is a different line from `origin/server`**, not an older copy of it:
+  269 patch notes against 346. Never run `deploy-news` from the PC, and write new notes onto the
+  `origin/server` base in a worktree.
+- A worktree in a scratchpad **silently disables the pre-commit hook** (`verify_formids` is looked
+  for relative to the repo root), so it prints "form ids NOT checked" and commits anyway.
+- From Worker 4, measured not assumed: the server **does** store a hosted actor's reported position
+  (`SetPos` writes it unconditionally; `CalledByUpdateMovement` only skips the *database* write), a
+  hosted actor's stored position **resets toward the spawn point when hosting changes hands**,
+  hosting churn is **normal breadth, not thrash** (215,727 changes across 57,301 actors over 70 h),
+  and the 306 `Bad hoster` refusals are a client bug - `activationService.ts` has no host check
+  before relaying an activation, and `isHostedByMe` exists unused in `worldViewMisc.ts`.
+
 ## 19 Oct, late - the missing doorways, and the gate list stops being a script input (Worker A, PC)
 
 Nat: "theres missing doorways etc, i feel like in the draugr ruins its from when we removed the blade
