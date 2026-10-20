@@ -903,6 +903,47 @@ bool IsSpellGrantedBy(WorldState* worldState, uint32_t parentSpellId,
 
 uint32_t StaffEnchantmentOf(WorldState* worldState, uint32_t weaponId);
 
+// A creature's melee carries an attack spell from its attack data (ATKD at 8): the race's (a Flame Atronach's fire, a
+// spider's poison) or the NPC_'s own, which replaces it (a vampire's AAAFrostTouch)
+bool IsAttackDataSpell(const MpActor& actor, uint32_t spellId)
+{
+  WorldState* worldState = actor.GetParent();
+  if (!worldState || !worldState->HasEspm()) {
+    return false;
+  }
+  std::vector<uint32_t> owners = { actor.GetBaseId() };
+  for (const auto& desc : actor.GetTemplateChain()) {
+    owners.push_back(desc.ToFormId(worldState->espmFiles));
+  }
+  try {
+    owners.push_back(actor.GetRaceId());
+  } catch (const std::exception&) {
+  }
+  auto& browser = worldState->GetEspm().GetBrowser();
+  bool found = false;
+  for (uint32_t ownerId : owners) {
+    const auto lookup = browser.LookupById(ownerId);
+    const bool isOwner = lookup.rec &&
+      (lookup.rec->GetType() == "RACE" || lookup.rec->GetType() == "NPC_");
+    if (!isOwner) {
+      continue;
+    }
+    espm::RecordHeaderAccess::IterateFields(
+      lookup.rec,
+      [&](const char* type, uint32_t size, const char* data) {
+        if (!found && !std::memcmp(type, "ATKD", 4) && size >= 12) {
+          const uint32_t raw = *reinterpret_cast<const uint32_t*>(data + 8);
+          found = raw != 0 && lookup.ToGlobalId(raw) == spellId;
+        }
+      },
+      worldState->GetEspmCache());
+    if (found) {
+      return true;
+    }
+  }
+  return false;
+}
+
 // Projectiles, cloaks and hazards may land after the spell left the hand
 bool CanHitWithSpell(const MpActor& actor, uint32_t spellId)
 {
@@ -910,7 +951,9 @@ bool CanHitWithSpell(const MpActor& actor, uint32_t spellId)
       actor.IsSpellLearned(spellId)) {
     return true;
   }
-  if (actor.GetProfileId() == -1 && IsSpellInTemplateTree(actor, spellId)) {
+  if (actor.GetProfileId() == -1 &&
+      (IsSpellInTemplateTree(actor, spellId) ||
+       IsAttackDataSpell(actor, spellId))) {
     return true;
   }
   if (actor.GetProfileId() != -1 &&
