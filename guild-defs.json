@@ -8,7 +8,8 @@
     },
     "officer": {
       "invite": true,
-      "kick": true
+      "kick": true,
+      "setRank": true
     },
     "sergeant": {
       "invite": true
