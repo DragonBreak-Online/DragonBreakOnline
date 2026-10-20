@@ -460,7 +460,7 @@ module.exports = (api) => {
       id: fid, name: f.name, kind: f.kind, secret: !!f.secret, prince: f.prince || '',
       myRank: e ? e.rank : -1, myTitle: e ? shownAt(f, e.rank) : '',
       // The staff override is a Lead GM's, as the handlers check (a GM observes)
-      canInvite: isLeadStaff(a) || can(fid, a, 'invite'), canKick: isLeadStaff(a) || can(fid, a, 'kick'), canSetRank: isLeadStaff(a) || can(fid, a, 'setRank'),
+      canInvite: isLeadStaff(a) || can(fid, a, 'invite'), canKick: isLeadStaff(a) || can(fid, a, 'kick'), canSetRank: isLeadStaff(a) || (can(fid, a, 'setRank') && (!courtKind(fid) || (rankOf(fid, a) || {}).role === 'leader')),
       // title is what the rank is shown as; canon, only on a rank staff renamed, is its own title (the default)
       ranks: f.ranks.map((r, i) => { const t = shownAt(f, i); return t !== r.title ? { title: t, role: r.role, canon: r.title } : { title: r.title, role: r.role }; }), members,
       // The journal's Faction tab: holds and strongholds are shown on the Court tab instead (Nate, 3 Oct, Q3); a leader
@@ -846,8 +846,18 @@ module.exports = (api) => {
     const leaderRank = f.ranks.findIndex((r) => r.role === 'leader');
     if (court && (rank === leaderRank || entryOf(fid, t).rank === leaderRank)) return { error: `The ${shownAt(f, leaderRank)} of ${f.name} follows the court's office: appoint or dismiss the office instead.` };
     if (!isLeadStaff(a)) {
-      if (!can(fid, a, 'setRank')) return { error: 'Only the leader sets ranks.' };
+      if (!can(fid, a, 'setRank')) return { error: 'Your rank does not set ranks.' };
       if (t === (a >>> 0)) return { error: 'Pass leadership by naming someone else leader.' };
+      // A rank below the leader that sets ranks (the officer role, so a faction is not frozen while its leader is away,
+      // fabled_is_me #suggestions 19 Oct) promotes only beneath itself: never to the leader's rank, never someone of its
+      // own rank or above, and never above itself. The leader is bound by none of it.
+      const mine = entryOf(fid, a);
+      if (mine && mine.rank !== leaderRank) {
+        if (courtKind(fid)) return { error: `The ranks of ${f.name} follow the court's offices: the ${shownAt(f, leaderRank)} appoints them.` };
+        if (rank === leaderRank) return { error: `Only the ${shownAt(f, leaderRank)} names a new ${shownAt(f, leaderRank)}.` };
+        if (!outranks(fid, a, t)) return { error: 'You cannot set the rank of someone of equal or higher rank.' };
+        if (rank <= mine.rank) return { error: `You can promote only below your own rank of ${shownAt(f, mine.rank)}.` };
+      }
     }
     const lim = limitRefusal(t, fid, rank, a);
     if (lim) return { error: lim.hidden ? `${nameOf(t)} cannot take that rank.` : lim.text };
