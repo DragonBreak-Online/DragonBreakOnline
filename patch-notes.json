@@ -1,5 +1,21 @@
 [
   {
+    "title": "Castle gates and their levers",
+    "date": "2026-10-17",
+    "version": "Hotfix",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Property",
+        "items": [
+          "A castle gate now moves on everyone's screen, not only on its owner's. The server was keeping the gate open or shut without anything playing it, so whoever pulled the lever saw nothing happen while it closed for someone standing further off.",
+          "A gate's lock now governs its lever. A lever could never be locked - the game counts it as scenery, not property - so a locked gate could still be raised and dropped by anyone who walked up to it. While a gate is claimed and locked, only those its key opens may work the lever.",
+          "Castle Bruma's north gate is the first of these. Tell us of any other gate that should answer to its owner."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Dungeon traps are live",
     "date": "2026-10-20",
     "version": "Hotfix",
