@@ -376,7 +376,7 @@ check('the lectern\'s other box shows the same class', lastWidget(NOVICE, 'class
 arcane(ADEPT, 60); p = progress(ADEPT); ui('schoolChoose', ADEPT, [p.nonce, 'Destruction', 'primary']);
 activate(LECTERN, ADEPT);
 w = lastWidget(ADEPT, 'classLectern');
-check('an Adept of Destruction may sign up and is told 70% of the lesson', w.role === 'visitor' && w.canJoin === true && /you would take 70% of the lesson/.test(w.gain), w);
+check('an Adept of Destruction may sign up and is told 50% of the lesson (one rank away, either way; Nate 18 Oct)', w.role === 'visitor' && w.canJoin === true && /you would take 50% of the lesson/.test(w.gain), w);
 ui('lecternJoin', ADEPT, [w.nonce]);
 check('...and signs up', globalThis.__dboSchoolsState.classes.get(LECTERN).students.has(ADEPT) && lastWidget(ADEPT, 'classLectern').role === 'student' && saidAny(TEACHER, /Adept #TAG6 has signed up/));
 check('...the student\'s own click keeps focus; the teacher\'s panel is redrawn without taking it', lastSent(ADEPT, 'classLectern').focus === true && lastSent(TEACHER, 'classLectern').focus === false && lastSent(TEACHER, 'classLectern').w.students.length === 1);
@@ -405,11 +405,11 @@ const lvx = (a, school) => { const l = rec(a).levels[school]; return l ? l.level
 const adeptBefore = lvx(ADEPT, 'Destruction');
 const wheelBefore = wheelEvents.length;
 ui('lecternEnd', TEACHER, [w.nonce]);
-check('End Class pays the Adept 70% of 25 units in Destruction (17.5 units, 43.75 xp at Adept)', Math.abs(lvx(ADEPT, 'Destruction') - adeptBefore - 43.75) < 1e-6 && saidAny(ADEPT, /You took 70% of the lesson: your study of Destruction stands at \d+/), [adeptBefore, lvx(ADEPT, 'Destruction'), said(ADEPT)]);
+check('End Class pays the Adept half of an Adept class: 2.5 levels of Destruction from 60 (Nate 18 Oct, fixed levels not units)', lvx(ADEPT, 'Destruction') >= 62000 && lvx(ADEPT, 'Destruction') <= 62100, [adeptBefore, lvx(ADEPT, 'Destruction')]);   // level 62 + half a level of xp
 const paidWheel = wheelEvents.slice(wheelBefore);
-check('...and credits Arcane Arts with 6 casts of Incinerate (8 x 0.7) through the Wheel', paidWheel.length === 6 && paidWheel.every((e) => e.a === ADEPT && e.kind === 'cast' && e.detail.spellId === idOf(T.incinerate[1])), paidWheel);
+check('...and credits Arcane Arts through the Wheel, where its caps apply (half the events)', paidWheel.length === 4 && paidWheel.every((e) => e.a === ADEPT && e.kind === 'cast' && e.detail.spellId === idOf(T.incinerate[1])), paidWheel);
 check('the class is gone and the crosshair name is handed back', !globalThis.__dboSchoolsState.classes.has(LECTERN) && lastPacket(ADEPT, 'refDecor').refs[0].name === null);
-check('...audited with who was paid', out.audits.some((l) => /SCHOOLS class by P15 on Incinerate \(Destruction Expert\) .* ended: P16 x0\.7/.test(l)), out.audits.slice(-2));
+check('...audited with who was paid', out.audits.some((l) => /SCHOOLS class by P15 on Incinerate \(Destruction Expert\) .* ended: P16 x0\.5/.test(l)), out.audits.slice(-2));
 activate(LECTERN, TEACHER);
 check('the teacher waits an hour for the next class', /You taught a class not long ago. You may hold the next in \d+ minutes/.test(lastWidget(TEACHER, 'classLectern').whyNot), lastWidget(TEACHER, 'classLectern').whyNot);
 advance(61 * MIN);

@@ -125,6 +125,17 @@ module.exports = (api) => {
     // within radiusMeters of it. The student learns as a lesson does; a member is taught up to the rank they may buy, and
     // never below studentMinCap (Apprentice), so an Initiate or a smith can still be taught their first spells.
     collegeTeach: { enabled: true, radiusMeters: 15, studentMinCap: 1 },
+    // Teaching a spell from a tome at a class (Nate, 18 Oct, from Swag's lectern spec). The rules the spell half of a
+    // class answers to, kept apart from the class's own progression and from the tome shop:
+    //   tomeOnly      the teacher must HOLD a tome of the spell; the day's tome purchase no longer stands in for one
+    //   maxRank       the highest spell rank that may be taught at all (2 = Adept; Expert and Master never)
+    //   teacherRank   the teacher's rank needed IN THE SPELL'S OWN SCHOOL, by the spell's rank: a Novice spell wants an
+    //                 Adept, an Apprentice spell an Expert, an Adept spell a Master. A high rank in another school is
+    //                 nothing here.
+    //   teacherHours / studentHours   cooldowns of this system alone, kept in their own records
+    //                 (private.dboTomeClassTaught, private.dboTomeClassLearned), so using this never delays a regular
+    //                 class and a regular class never delays this.
+    tomeClass: { enabled: true, tomeOnly: true, maxRank: 2, teacherRank: [2, 3, 4], teacherHours: 6, studentHours: 20 },
     // Tomes the Synod sells to Senior ranks although the province does not stock them (Elion and Aldemar: Banish Daedra
     // is a Skyrim tome, so the conjuration teacher could never buy it). Tome editor ids.
     shopSeniorTomes: ['SpellTomeBanishDaedra'],
@@ -1104,6 +1115,11 @@ module.exports = (api) => {
     }
     return 0;
   };
+  // This system's own waits, in records nothing else reads (Nate, 18 Oct: completely independent of the regular class)
+  const TOME_CLASS_PROP = { taught: 'private.dboTomeClassTaught', learned: 'private.dboTomeClassLearned' };
+  const tomeClassAt = (a, which) => Number(get(a, TOME_CLASS_PROP[which], 0)) || 0;
+  const tomeClassWait = (a, which, hours) => Math.max(0, tomeClassAt(a, which) + (Number(hours) || 0) * 3600000 - Date.now());
+  const markTomeClass = (a, which) => { try { set(a, TOME_CLASS_PROP[which], Date.now()); } catch (e) { /* offline */ } };
   const takeOneItem = (a, baseId) => {
     const entries = inventoryOf(a).map((e) => Object.assign({}, e));
     const i = entries.findIndex((e) => (Number(e.baseId) >>> 0) === (baseId >>> 0) && !e.worn && Number(e.count) > 0);
@@ -1219,11 +1235,35 @@ module.exports = (api) => {
     const mine = collegesOf(student) || [];
     return Math.min(Number(CFG.shopMaxRank), Math.max(Number(TEACH.studentMinCap) || 0, ...mine.map(rankCapIn)));
   };
-  const classRefusal = (teacher, student, sp) => {
+  const classRefusal = (teacher, student, sp, classKey) => {
     if (suspended(sp.id)) return `${sp.name} is held back for a short while and is not taught.`;
     if (!onlineActors().includes(student >>> 0)) return `${display(student)} is not here.`;
     if (!((knows(teacher, sp.id) && !onLoan(teacher, sp.id)) || inBook(teacher, sp.id))) return `${display(teacher)} can no longer teach ${sp.name}.`;
     if (restrictedSpell(sp.id) && !isSenior(student)) return `${RESTRICTED_LINE}.`;
+    const TC = Object.assign({ enabled: true, tomeOnly: true, maxRank: 2, teacherRank: [2, 3, 4], teacherHours: 6, studentHours: 20 }, CFG.tomeClass || {});
+    if (TC.enabled !== false) {
+      // Only Novice to Adept spells are ever taught this way
+      if (Number(sp.rank) > Number(TC.maxRank)) return `${RANKS[sp.rank]} spells are not taught from a tome; ${sp.name} must be studied.`;
+      // The teacher's rank in THE SPELL'S OWN school, never another's. schools.js owns school ranks and already answers
+      // this question with a sentence of its own (__dboSchoolsRefusal), so it is asked rather than guessed at from the
+      // Wheel's path skill, which is Arcane Arts and would have let a Master of one school teach any of them.
+      const want = Number((TC.teacherRank || [])[Number(sp.rank)]);
+      if (Number.isFinite(want) && typeof globalThis.__dboSchoolsRefusal === 'function') {
+        const whyRank = globalThis.__dboSchoolsRefusal(teacher, sp.school, want, display(teacher));
+        if (whyRank) return whyRank;
+      }
+      // Both the tome and the teacher's wait are asked only of a NEW class: once a class's tome has been spent, everyone
+      // else in that same class still learns on it, which is the whole point of one tome for the class. The caller
+      // passes the class's key; without one, every offer is its own class.
+      if (!classKey || !classPaid(classKey)) {
+        // The tome has to be in the teacher's hands, not bought from the day's allowance
+        if (TC.tomeOnly && !heldTomeOf(teacher, sp.id)) return `${display(teacher)} carries no tome of ${sp.name}.`;
+        const tWait = tomeClassWait(teacher, 'taught', TC.teacherHours);
+        if (tWait > 0) return `${display(teacher)} taught from a tome not long ago; the next is theirs in ${waitText(tWait)}.`;
+      }
+      const sWait = tomeClassWait(student, 'learned', TC.studentHours);
+      if (sWait > 0) return `${display(student)} learned from a tome not long ago; the next is theirs in ${waitText(sWait)}.`;
+    }
     const cap = classStudentCap(student);
     if (Number(sp.rank) > cap) return `At your rank you may be taught spells up to ${RANKS[cap]}; ${sp.name} is ${/^[AEIOU]/.test(rankWord(sp.rank)) ? 'an' : 'a'} ${rankWord(sp.rank)} spell.`;
     if (knows(student, sp.id) || inBook(student, sp.id)) return 'known';
@@ -1234,7 +1274,7 @@ module.exports = (api) => {
       if (!CFG.enabled) return false;
       const sp = classifySpell(Number(spellId) >>> 0);
       if (!sp) return false;
-      const why = classRefusal(teacher >>> 0, student >>> 0, sp);
+      const why = classRefusal(teacher >>> 0, student >>> 0, sp, String(classKey || ''));
       if (why === 'known') return false;
       if (why) { personal(student, `${display(teacher)} would teach you ${sp.name}, but: ${why}`); return false; }
       const key = String(classKey || `${teacher >>> 0}:${sp.id}:${Math.floor(Date.now() / 60000)}`);
@@ -1251,7 +1291,7 @@ module.exports = (api) => {
   };
   const answerClass = (student, o) => {
     const sp = classifySpell(o.spellId);
-    const why = sp ? classRefusal(o.teacher, student, sp) : 'That spell cannot be taught.';
+    const why = sp ? classRefusal(o.teacher, student, sp, o.classKey) : 'That spell cannot be taught.';
     if (why) { personal(student, why === 'known' ? `You already know ${sp.name}.` : why); return; }
     // The class's one credit: the first student to accept spends it, the rest learn on it
     let paidWith = 'the class\'s tome';
@@ -1267,6 +1307,8 @@ module.exports = (api) => {
     const skill = bookSkillFor(student, sp);
     migrate(student);
     writeStudied(student, skill.id, studiedIds(student, skill.id).concat([sp.id]));
+    // This system's own waits start only now, when the spell has actually been handed over (Nate, 18 Oct)
+    if ((CFG.tomeClass || {}).enabled !== false) { markTomeClass(o.teacher, 'taught'); markTomeClass(student, 'learned'); }
     const line = settleNew(student, sp, false);
     personal(student, `${display(o.teacher)} teaches you ${spellLabel(sp)}. ${line}`);
     if (onlineActors().includes(o.teacher)) personal(o.teacher, `${display(student)} learned ${sp.name} from your class.`);

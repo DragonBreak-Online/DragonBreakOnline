@@ -525,6 +525,20 @@ ui('lecternCancel', TEACHER, [lastWidget(TEACHER, 'classLectern').nonce]);
   known(TEACHER).add(idOf(SPARKS.spell));
   wallClock += 2 * HOUR;
   put(TEACHER, 'private.dboSchools', Object.assign(getp(TEACHER, 'private.dboSchools'), { classAt: 0 }));
+  // The spell half of a class answers to spells.js tomeClass from 18 Oct: a Novice spell wants an ADEPT of that school
+  // and a tome of it IN HAND (the day's purchase no longer stands in), and the teacher and student each wait afterwards.
+  // So the teacher is made an Adept of Destruction and handed a tome of Sparks; the offer flow below is unchanged.
+  // Each scenario below is its own situation, so the tomeClass waits (6 h teacher, 20 h student) start clear; that they
+  // BITE is checked on its own further down rather than by accident here.
+  const clearTomeWaits = (...who) => { for (const a of who) { put(a, 'private.dboTomeClassTaught', 0); put(a, 'private.dboTomeClassLearned', 0); } };
+  const teachReady = () => {
+    const rec = getp(TEACHER, 'private.dboSchools');
+    rec.levels = Object.assign({}, rec.levels, { Destruction: { level: 60, xp: 0 } });
+    put(TEACHER, 'private.dboSchools', rec);
+    api.giveItem(TEACHER, idOf(SPARKS.book), 1);
+    put(TEACHER, 'private.dboTomeClassTaught', 0);
+  };
+  teachReady();
   const boughtBefore = getp(TEACHER, 'private.dboTomeBoughtAt');
   openLectern(TEACHER);
   ui('lecternStart', TEACHER, [lastWidget(TEACHER, 'classLectern').nonce, SPARKS.spell]);
@@ -537,10 +551,15 @@ ui('lecternCancel', TEACHER, [lastWidget(TEACHER, 'classLectern').nonce]);
   check('...one who already knows it is not asked', !(lastWidget(STU2, 'contextMenu') || {}).targetName || !/the spell of the class/.test(lastWidget(STU2, 'contextMenu').targetName));
   ui('spellsOffer', STU, ['accept'], 45);
   check('...accepting learns it, audited as TEACH at a class', studiedAll(STU).includes(SPARKS.spell) && /^TEACH P19 taught 2dd2a:Skyrim.esm Sparks to P22 at a class/.test(lastAudit(/^TEACH/)), [studiedAll(STU), lastAudit(/^TEACH/)]);
-  check('...and costs the teacher one tome purchase for the class (Nate, 11 Oct: no spell for nothing)', getp(TEACHER, 'private.dboTomeBoughtAt') === wallClock && getp(TEACHER, 'private.dboTomeBoughtAt') !== boughtBefore && /tome purchase/.test(lastAudit(/^TEACH/)), [boughtBefore, getp(TEACHER, 'private.dboTomeBoughtAt'), lastAudit(/^TEACH/)]);
+  check('...and spends the teacher\'s TOME, never the day\'s purchase (Nate 18 Oct: tomeOnly)', count(TEACHER, idOf(SPARKS.book)) === 0 && getp(TEACHER, 'private.dboTomeBoughtAt') === boughtBefore, [count(TEACHER, idOf(SPARKS.book)), boughtBefore, getp(TEACHER, 'private.dboTomeBoughtAt')]);
+  check('...and starts both waits: the teacher\'s 6 h and the student\'s 20 h', getp(TEACHER, 'private.dboTomeClassTaught') > 0 && getp(STU, 'private.dboTomeClassLearned') > 0);
+  api.giveItem(TEACHER, idOf(SPARKS.book), 1);   // a tome in hand, so it is the WAIT that speaks and not the tome gate
+  check('...which bite: the same teacher is refused a NEW class at once, and says how long', globalThis.__dboSpellsClassOffer(TEACHER, STU2, idOf(SPARKS.spell), 'harness-wait') === false && /taught from a tome not long ago/.test(said(STU2)), said(STU2));
+  clearTomeWaits(TEACHER, STU, STU2);
   // One credit per class: two students of one class, one tome carried
   api.giveItem(TEACHER, idOf(FLAMES.book), 1);
   for (const a of [STU, STU2]) { known(a).delete(idOf(FLAMES.spell)); }
+  clearTomeWaits(TEACHER, STU, STU2);
   const key = 'harness-class-1';
   const o1 = globalThis.__dboSpellsClassOffer(TEACHER, STU, idOf(FLAMES.spell), key);
   const o2 = globalThis.__dboSpellsClassOffer(TEACHER, STU2, idOf(FLAMES.spell), key);
@@ -550,12 +569,17 @@ ui('lecternCancel', TEACHER, [lastWidget(TEACHER, 'classLectern').nonce]);
   ui('spellsOffer', STU2, ['accept'], 45);
   check('...the second of the same class learns it on the same tome', studiedAll(STU2).includes(FLAMES.spell) && /the class's tome/.test(lastAudit(/^TEACH/)), [studiedAll(STU2), lastAudit(/^TEACH/)]);
   for (const a of [STU2]) { known(a).delete(idOf(FLAMES.spell)); put(a, 'private.dboStudied', {}); }
-  check('a new class with no tome and no purchase left offers nothing, and says why', globalThis.__dboSpellsClassOffer(TEACHER, STU2, idOf(FLAMES.spell), 'harness-class-2') === false && /no tome purchase left today/.test(said(STU2)), said(STU2));
+  clearTomeWaits(TEACHER, STU, STU2);
+  check('a new class with no tome offers nothing, and says so (a purchase can no longer stand in)', globalThis.__dboSpellsClassOffer(TEACHER, STU2, idOf(FLAMES.spell), 'harness-class-2') === false && /carries no tome of Flames/.test(said(STU2)), said(STU2));
   api.giveItem(TEACHER, idOf(FLAMES.book), 1);
   // The offer keeps the college rules: rank cap and restricted arts, and it lapses after 180 s
+  clearTomeWaits(TEACHER, STU, STU2);
   known(TEACHER).add(idOf(FIREBALL.spell)); known(TEACHER).add(idOf(REANIMATE.spell));
-  check('an Adept class spell is not offered to an Associate (rank cap), who is told why', globalThis.__dboSpellsClassOffer(TEACHER, STU, idOf(FIREBALL.spell)) === false && /would teach you Fireball, but: At your rank you may be taught spells up to Apprentice/.test(said(STU)), said(STU));
+  { const rec = getp(TEACHER, 'private.dboSchools'); rec.levels = Object.assign({}, rec.levels, { Destruction: { level: 95, xp: 0 } }); put(TEACHER, 'private.dboSchools', rec); }
+  api.giveItem(TEACHER, idOf(FIREBALL.book), 1);   // a Master of Destruction with the tome: now it is the STUDENT's cap that refuses
+  check('an Adept class spell is not offered to an Associate (rank cap), who is told why', globalThis.__dboSpellsClassOffer(TEACHER, STU, idOf(FIREBALL.spell), 'harness-cap') === false && /may be taught spells up to/.test(said(STU)), said(STU));
   check('a restricted art is not offered to an Associate', globalThis.__dboSpellsClassOffer(TEACHER, STU, idOf(REANIMATE.spell)) === false && /restricted arts/.test(said(STU)), said(STU));
+  clearTomeWaits(TEACHER, STU, STU2);
   globalThis.__dboSpellsClassOffer(TEACHER, STU2, idOf(FLAMES.spell));
   wallClock += 181 * 1000;
   ui('spellsOffer', STU2, ['accept'], 45);
