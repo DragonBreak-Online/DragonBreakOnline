@@ -62,6 +62,10 @@ export interface JournalRacialPower {
   // A power with no buffs says what it does (racial.js power.effect: Night Eye), and how long its wait is when not a day
   effect?: string;
   cooldownHours?: number;
+  // Which of the race's powers this is (racial.js keyOf), sent back with the button; absent from an older server
+  key?: string;
+  // The race's other powers, each on its own wait (racial.js powerView: the Khajiit's Cat-like Reflexes beside Night Eye)
+  others?: JournalRacialPower[];
 }
 
 export interface JournalStatGroup {
@@ -238,6 +242,7 @@ export const describePower = (p: JournalRacialPower): string => {
     if (Number(b[k]) > 1) out.push(`${word} regenerates x${Number(b[k])}`);
   }
   if (Number(b.wardPoints) > 0) out.push(`a ward absorbs ${Number(b.wardPoints)} spell damage`);
+  share('moveSpeed', '+', 'speed'); share('jumpHeight', '+', 'jump height');
   const text = out.join(', ') || String(p.effect || '');
   return text ? text.charAt(0).toUpperCase() + text.slice(1) : '';
 };
@@ -251,8 +256,9 @@ const often = (p: JournalRacialPower): string => {
   return h > 0 && h < 24 ? `Again ${clock(h * 3600000)} after each use.` : 'Once a day.';
 };
 
-// The Profile tab's racial power: what it does, and the button while it is ready (journal.js journalAction racialPower)
-export const RacialPowerBox = ({ power, busy, act }: { power: JournalRacialPower; busy: boolean; act: (key: string, ...args: unknown[]) => void }) => {
+// The Profile tab's racial powers: what each does, and its button while it is ready (journal.js journalAction racialPower,
+// with the power's key, so the server calls that one rather than the first that is ready)
+const RacialPowerRow = ({ power, busy, act }: { power: JournalRacialPower; busy: boolean; act: (key: string, ...args: unknown[]) => void }) => {
   const got = useRef(Date.now());
   const sent = useRef(power);
   if (sent.current !== power) { sent.current = power; got.current = Date.now(); }
@@ -267,19 +273,26 @@ export const RacialPowerBox = ({ power, busy, act }: { power: JournalRacialPower
   });
   const what = describePower(power);
   return (
-    <section className="journal__actions journal__power">
-      <h2 className="journal__heading">Racial Power</h2>
-      <div className="journal__action">
-        <h3 className="journal__action-head">{power.name}</h3>
-        <p className="journal__hint">{what ? `${what}, for ${power.seconds} seconds.` : `For ${power.seconds} seconds.`} {often(power)}</p>
-        <div className="journal__editor-actions">
-          {power.clientOnly ? <span className="journal__hint">Comes with a later update of the game.</span>
-            : left > 0 ? <span className="journal__hint journal__power-on">Upon you: {Math.ceil(left / 1000)} s</span>
-              : wait > 0 ? <span className="journal__hint">Returns in {clock(wait)}</span>
-                : <button type="button" className="journal__button journal__button--primary" disabled={busy}
-                  onClick={() => act('journalAction', 'racialPower')}>Call on {power.name}</button>}
-        </div>
+    <div className="journal__action">
+      <h3 className="journal__action-head">{power.name}</h3>
+      <p className="journal__hint">{what ? `${what}, for ${power.seconds} seconds.` : `For ${power.seconds} seconds.`} {often(power)}</p>
+      <div className="journal__editor-actions">
+        {power.clientOnly ? <span className="journal__hint">Comes with a later update of the game.</span>
+          : left > 0 ? <span className="journal__hint journal__power-on">Upon you: {Math.ceil(left / 1000)} s</span>
+            : wait > 0 ? <span className="journal__hint">Returns in {clock(wait)}</span>
+              : <button type="button" className="journal__button journal__button--primary" disabled={busy}
+                onClick={() => (power.key ? act('journalAction', 'racialPower', power.key) : act('journalAction', 'racialPower'))}>Call on {power.name}</button>}
       </div>
+    </div>
+  );
+};
+
+export const RacialPowerBox = ({ power, busy, act }: { power: JournalRacialPower; busy: boolean; act: (key: string, ...args: unknown[]) => void }) => {
+  const all = [power, ...(Array.isArray(power.others) ? power.others : [])];
+  return (
+    <section className="journal__actions journal__power">
+      <h2 className="journal__heading">{all.length > 1 ? 'Racial Powers' : 'Racial Power'}</h2>
+      {all.map((p, i) => <RacialPowerRow key={p.key || `${i}:${p.name}`} power={p} busy={busy} act={act} />)}
     </section>
   );
 };
