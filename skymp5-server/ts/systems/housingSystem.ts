@@ -1411,6 +1411,7 @@ export class HousingSystem implements System {
   private fiefExempt(ctx: SystemContext, primary: number, profileId: number, actorId: number): boolean {
     if (!primary) return false;
     if (this.hallExempt(ctx, primary, actorId)) return true;
+    if (this.notHome(ctx, primary)) return true;
     const h = this.fiefHolderOf(ctx, primary);
     return !!h && h.profile === profileId && (!actorId || h.actor === (actorId >>> 0));
   }
@@ -1421,6 +1422,14 @@ export class HousingSystem implements System {
     const leader = (globalThis as any).__dboHallLeader;
     if (typeof leader !== "function") return false;
     try { return leader([primary, this.partnerOf(ctx, primary)].filter(Boolean), actorId >>> 0) === true; } catch { return false; }
+  }
+
+  // A building the gameplay says is no home (mines.js __dboHousingNotHome: a mine, Nate 20 Oct) is owned and taxed as
+  // property but is outside the one-building cap
+  private notHome(ctx: SystemContext, primary: number): boolean {
+    const f = (globalThis as any).__dboHousingNotHome;
+    if (typeof f !== "function") return false;
+    try { return f([primary, this.partnerOf(ctx, primary)].filter(Boolean)) === true; } catch { return false; }
   }
 
   // A jarl, steward or other manager rank of the hold the property stands in
