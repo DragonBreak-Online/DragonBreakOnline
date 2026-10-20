@@ -1,5 +1,20 @@
 [
   {
+    "title": "Adept spell choices open at 50",
+    "date": "2026-10-20",
+    "version": "Hotfix",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Magic",
+        "items": [
+          "Your Adept spell choice now opens as soon as the school reaches 50 (Priest 50 for Restoration). Before, it waited until you'd worked through the whole of level 50, so a Priest who stopped at 50 never saw it. Choose it from the F3 Magic tab, a Study Magic shelf or a Scholars' Ledger.",
+          "The Adept choice follows each school's own level, not Arcane Arts. Conjuration 50 opens your Adept Conjuration spell, even if your Arcane Arts is already higher."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Every god of Tamriel",
     "date": "2026-10-20",
     "version": "Server update",

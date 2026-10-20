@@ -398,10 +398,15 @@ module.exports = (api) => {
   const rankMade = (s, school, rank) => !!(s.rankPicks && s.rankPicks[school] && s.rankPicks[school][rank]);
   // Held at a pick's level: a school by credit() (xp at the top of the level), Priest from priestHoldXp of it; past it counts
   const PRIEST_HOLD_XP = Math.max(0, Math.min(99.99, Number(C.rankPicks.priestHoldXp) || 90));
+  // A pick above the first spell's level opens on reaching it (Esmyr #EB56, 16-20 Oct: "Adept spells not prompting at 50"):
+  // it waited for the last xp of the level (a school's 99.99, Priest's priestHoldXp), so a Priest at 50 set to hold, or
+  // anyone not yet through the level, was never offered it. The hold at the pick's level still stops anyone going past it.
+  // A pick that shares its level with the first spell (Apprentice at 25) still waits for the end of that level, so the two
+  // come one after the other as designed
   const atThreshold = (a, s, school, p) => {
-    if (school === RESTORATION) { const pr = priestOf(a); return pr.level > p.at || (pr.level === p.at && pr.xp >= PRIEST_HOLD_XP); }
+    if (school === RESTORATION) { const pr = priestOf(a); return pr.level > p.at || (pr.level === p.at && (p.at > PICK_AT || pr.xp >= PRIEST_HOLD_XP)); }
     const lv = levelOf(s, school);
-    return lv > p.at || (lv === p.at && (Number((s.levels[school] || {}).xp) || 0) >= 99.99);
+    return lv > p.at || (lv === p.at && (p.at > PICK_AT || (Number((s.levels[school] || {}).xp) || 0) >= 99.99));
   };
   // The pick waiting in a school: 'first', a rank of RANK_PICKS, or '' (the first spell always comes first). The doc's
   // "at 25 Apprentice, and at the threshold for 26 it locks": a rank's pick opens once the school is held there.
