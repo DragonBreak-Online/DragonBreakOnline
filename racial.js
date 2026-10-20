@@ -547,7 +547,8 @@ module.exports = (api) => {
     const m = new Map();
     const src = Object.assign({ '1d2010:DragonBreak Online Edits.esp': 'Feeding Frenzy', '1d200f:DragonBreak Online Edits.esp': 'Glacier Fall',
       '1d2011:DragonBreak Online Edits.esp': 'Roaring Tempest',
-      '1d2018:DragonBreak Online Edits.esp': 'Fury of the Reach' }, C.powerSpells || {});
+      '1d2018:DragonBreak Online Edits.esp': 'Fury of the Reach',
+    '1d201a:DragonBreak Online Edits.esp': 'Titanborn Fury' }, C.powerSpells || {});
     for (const [desc, name] of Object.entries(src)) { try { const id = mp.getIdFromDesc(desc) >>> 0; if (id) m.set(id, String(name)); } catch (e) { /* not in this load order */ } }
     return m;
   })();
