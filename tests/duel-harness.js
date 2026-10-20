@@ -68,7 +68,10 @@ const installBase = () => {
   mp.onActivate = () => true;
   mp.onReadBook = () => undefined;
 };
-const out = { banners: [], audits: [], personal: [], widgets: [], closed: [] };
+const out = { banners: [], audits: [], personal: [], widgets: [], closed: [], staff: [] };
+// supernatural.js's permaKill, as far as a duel can see it: the character is marked dead for good
+const killed = [];
+globalThis.__dboPermaKill = (a, why) => { killed.push([a >>> 0, why]); set(a >>> 0, 'private.permaDead', true); set(a >>> 0, 'isDead', true); };
 const timers = {};
 const commands = {};
 const ui = new Map();
@@ -90,7 +93,7 @@ const loadAll = (duelCfg) => {
     takeGold: (a, n) => { const g = goldOfA(a); if (g < n) return false; setGold(a, g - n); return true; },
     giveItem: (a, id, n) => { if (id !== GOLD) return false; setGold(a, goldOfA(a) + n); return true; },
     goldOf: (a) => goldOfA(a), recordOf, findByName: (q) => [A, B, O].find((x) => 'p' + x.toString(16) === String(q).toLowerCase()) || 0,
-    isAdmin: (a) => a === O,
+    isAdmin: (a) => a === O, staffLog: (...x) => out.staff.push(x),
   };
   require(path.resolve(__dirname, '..', 'downed.js'))(api);
   delete require.cache[path.resolve(__dirname, '..', 'duel.js')];
@@ -118,19 +121,34 @@ const hit = (agg, tgt, dmg, src = SWORD, max = 200) => {
 const totalGold = () => goldOfA(A) + goldOfA(B) + goldOfA(O) + [A, B, O].reduce((s, x) => s + ((get(x, 'private.dboDuelEscrow') || {}).gold || 0), 0);
 const GOLD_TOTAL = totalGold();
 const entries = (a, t) => globalThis.__dboDuelEntries(a, t).map((e) => e.id);
-const draft = (a, t, { format = 0, rules = 0, wager = 0 } = {}) => {
+// The challenger's panel: clicks the type and the wager until they read as asked (a wager means a Wager duel by default)
+const draft = (a, t, { type, format = 0, rules = 0, wager = 0 } = {}) => {
+  type = type || (wager > 0 ? 'wager' : 'friendly');
   globalThis.__dboDuelAction(a, 'duel:challenge', t);
   const w = lastWidget(a, 121);
   const nonce = w ? w[1].actions[0].id.split('|')[0] : '';
+  const dr = () => globalThis.__dboDuels.drafts.get(a) || {};
+  for (let i = 0; i < 8 && dr().type !== type; i++) fire('duelDraft', a, `${nonce}|type`);
   for (let i = 0; i < format; i++) fire('duelDraft', a, `${nonce}|format`);
   for (let i = 0; i < rules; i++) fire('duelDraft', a, `${nonce}|rules`);
-  for (let i = 0; i < wager; i++) fire('duelDraft', a, `${nonce}|wager`);
+  for (let i = 0; i < 12 && dr().wager !== wager; i++) fire('duelDraft', a, `${nonce}|wager`);
   return nonce;
 };
-const challenge = (a, t, opts) => { const n = draft(a, t, opts); fire('duelDraft', a, `${n}|send`); const w = lastWidget(t, 122); return w ? w[1].actions[0].id.split('|')[0] : ''; };
+// Sends it (confirming a death duel's warning) and returns the challenged player's nonce
+const challenge = (a, t, opts) => {
+  const n = draft(a, t, opts);
+  fire('duelDraft', a, `${n}|send`);
+  if (opts && opts.type === 'death') fire('duelDraft', a, `${n}|confirm`);
+  const w = lastWidget(t, 122); return w ? w[1].actions[0].id.split('|')[0] : '';
+};
 const duel = () => globalThis.__dboDuels.duels.values().next().value || null;
 const full = () => { for (const x of [A, B, O]) set(x, 'percentages', { health: 1, stamina: 1, magicka: 1 }); };
-const startFight = (opts) => { const n = challenge(A, B, opts); fire('duelOffer', B, `${n}|accept`); tick(3100); return duel(); };
+const startFight = (opts) => {
+  const n = challenge(A, B, opts);
+  fire('duelOffer', B, `${n}|accept`);
+  if (opts && opts.type === 'death') fire('duelOffer', B, `${n}|confirm`);
+  tick(3100); return duel();
+};
 
 // ---- the menu and refusals ------------------------------------------------------------------------------------------
 check('X on a player offers Challenge to a Duel', entries(A, B).includes('duel:challenge'));
@@ -145,15 +163,14 @@ check('too far apart a challenge is refused', !lastWidget(A, 121) && out.persona
 set(B, 'pos', [140, 0, 0]);
 
 // ---- the panels: draft, refuse, time out ------------------------------------------------------------------------------
-let n = draft(A, B, { format: 1, rules: 1, wager: 4 });
+let n = draft(A, B, { format: 1, rules: 1, wager: 100 });
 const w = lastWidget(A, 121)[1];
-check('the draft panel cycles format, rules and wager', /best of three/.test(w.actions[0].label) && /no magic/.test(w.actions[1].label) && /100 gold each/.test(w.actions[2].label), w.actions.map((x) => x.label).join(' / '));
-check('to the death is never offered', !out.widgets.some(([, x]) => (x.actions || []).some((y) => /death/i.test(y.label))));
+check('the draft panel cycles type, format, rules and wager', /Wager duel/.test(w.actions[0].label) && /best of three/.test(w.actions[1].label) && /no magic/.test(w.actions[2].label) && /100 gold each/.test(w.actions[3].label), w.actions.map((x) => x.label).join(' / '));
 fire('duelDraft', A, `${n}|send`);
 let offer = lastWidget(B, 122);
 check('the challenged player gets an Accept / Refuse panel', !!offer && /best of three, no magic, 100 gold each/.test(offer[1].targetName), offer && offer[1].targetName);
 fire('duelOffer', B, `${offer[1].actions[1].id}`);
-check('refusing tells the challenger and starts nothing', !duel() && out.personal.some(([a, t]) => a === A && /refuses your duel/.test(t)));
+check('refusing tells the challenger and starts nothing', !duel() && out.personal.some(([a, t]) => a === A && /refuses your wager duel/.test(t)));
 check('refusing takes no gold', goldOfA(A) === 500 && goldOfA(B) === 300);
 n = challenge(A, B);
 tick(31000);
@@ -165,7 +182,7 @@ fire('duelOfferClose', B);
 check('closing the panel refuses', !duel() && !globalThis.__dboDuels.offers.size);
 
 // ---- a best of three with a wager -------------------------------------------------------------------------------------
-n = challenge(A, B, { format: 1, wager: 4 });
+n = challenge(A, B, { format: 1, wager: 100 });
 fire('duelOffer', B, `${n}|accept`);
 let d = duel();
 check('accepting begins the duel', !!d && d.format === 'bo3' && d.wager === 100);
@@ -201,7 +218,7 @@ check('the payout and every round are audited', out.audits.some((t) => /^DUEL .*
 
 // ---- disconnects -------------------------------------------------------------------------------------------------------
 full();
-d = startFight({ wager: 3 });
+d = startFight({ wager: 50 });
 check('a 50 gold duel begins', d && d.wager === 50 && goldOfA(A) === 550 && goldOfA(B) === 150);
 online.delete(B);
 globalThis.__dboDuelLeave(B);
@@ -209,7 +226,7 @@ check('a disconnect ends the duel with no winner', d.closed && !d.winner && !glo
 check('and each wager goes back', goldOfA(A) === 600 && goldOfA(B) === 200 && totalGold() === GOLD_TOTAL);
 online.add(B);
 full();
-d = startFight({ wager: 3 });
+d = startFight({ wager: 50 });
 online.delete(A);
 tick(500);
 check('a dropped connection the watch finds ends it too', d.closed && goldOfA(A) === 600 && goldOfA(B) === 200);
@@ -259,7 +276,7 @@ check('yielding gives the duel away', d.closed && d.winner === B && d.wins[1] ==
 
 // ---- leaving the ground -------------------------------------------------------------------------------------------------
 full();
-d = startFight({ wager: 3 });
+d = startFight({ wager: 50 });
 set(B, 'pos', [3000, 0, 0]);
 tick(500); tick(1000); tick(1000); tick(1000);
 check('stepping off the ground forfeits the duel', d.closed && d.wins[0] >= 1 && goldOfA(A) === 650 && goldOfA(B) === 150 && totalGold() === GOLD_TOTAL, `${goldOfA(A)} ${goldOfA(B)}`);
@@ -291,7 +308,7 @@ tick(6100);
 
 // ---- a killing blow past the guard ----------------------------------------------------------------------------------------
 full();
-d = startFight({ wager: 3 });
+d = startFight({ wager: 50 });
 set(B, 'isDead', true);
 mp.onDeath(B, A);
 tick(600);
@@ -311,14 +328,143 @@ check('the guard still holds after the reload', get(B, 'isDead') === false && d.
 commands.duel(O, `stop pff000001`);
 check('staff can stop a duel (no winner)', d.closed && !d.winner);
 
+
+// ---- the four types -----------------------------------------------------------------------------------------------------
+const types = () => { globalThis.__dboDuelAction(A, 'duel:challenge', B); const d0 = globalThis.__dboDuels.drafts.get(A); const nn = d0.nonce; const seen = []; for (let i = 0; i < 4; i++) { seen.push(globalThis.__dboDuels.drafts.get(A).type); fire('duelDraft', A, `${nn}|type`); } fire('duelDraft', A, `${nn}|cancel`); return seen; };
+full();
+check('the challenger chooses among four types', types().sort().join() === 'death,friendly,practice,wager');
+n = draft(A, B, { type: 'practice' });
+check('a practice fight offers no wager line', !lastWidget(A, 121)[1].actions.some((x) => /Wager/.test(x.label)));
+fire('duelDraft', A, `${n}|cancel`);
+n = draft(A, B, { type: 'friendly' });
+check('a friendly duel offers no wager line', !lastWidget(A, 121)[1].actions.some((x) => /Wager/.test(x.label)));
+fire('duelDraft', A, `${n}|cancel`);
+n = draft(A, B, { type: 'wager' });
+check('a wager duel starts at the smallest wager, never none', globalThis.__dboDuels.drafts.get(A).wager === 10);
+fire('duelDraft', A, `${n}|cancel`);
+// practice: rounds as chosen, no winner kept
+full();
+d = startFight({ type: 'practice', format: 1 });
+check('the challenged player sees PRACTICE FIGHT first', /^PRACTICE FIGHT:/.test(out.widgets.filter(([a, x]) => a === B && x.id === 122).pop()[1].targetName));
+check('a practice fight begins, best of three', d && d.type === 'practice' && d.format === 'bo3' && d.wager === 0);
+hit(A, B, 199); tick(6100); tick(3100); hit(A, B, 199); tick(6100);
+check('a practice fight records no winner', d.closed && !d.winner && out.audits.some((t) => /^DUEL practice fight of .* over, 2-0/.test(t)));
+check('and both stand at full health', hp(A) === 1 && hp(B) === 1);
+// friendly: a winner, nobody pays
+full();
+const g0 = [goldOfA(A), goldOfA(B)];
+d = startFight({ type: 'friendly' });
+hit(B, A, 199); tick(6100);
+check('a friendly duel has a winner and moves no gold', d.closed && d.winner === B && goldOfA(A) === g0[0] && goldOfA(B) === g0[1]);
+// wager: none is refused
+n = draft(A, B, { type: 'wager' });
+check('a wager duel is a Wager duel with gold', globalThis.__dboDuels.drafts.get(A).type === 'wager');
+fire('duelDraft', A, `${n}|cancel`);
+
+// ---- the death duel: two agreements each side ----------------------------------------------------------------------------
+full();
+killed.length = 0;
+n = draft(A, B, { type: 'death', wager: 0 });
+check('a death duel offers one round only (no format line) and warns in the panel', !lastWidget(A, 121)[1].actions.some((x) => /Format/.test(x.label)) && /dies for good/.test(lastWidget(A, 121)[1].targetName));
+fire('duelDraft', A, `${n}|confirm`);
+check('confirm before the warning does nothing', !globalThis.__dboDuels.offers.size);
+fire('duelDraft', A, `${n}|send`);
+check('Send on a death duel shows the challenger the warning first', /dies for good.*Are you sure/.test(lastWidget(A, 121)[1].targetName) && !globalThis.__dboDuels.offers.size);
+fire('duelDraft', A, `${n}|back`);
+check('No, go back returns to the settings without a challenge', /Type: Death duel/.test(lastWidget(A, 121)[1].actions[0].label) && !globalThis.__dboDuels.offers.size);
+fire('duelDraft', A, `${n}|send`);
+fire('duelDraftClose', A);
+check('closing the challenger warning sends nothing', !globalThis.__dboDuels.offers.size && !globalThis.__dboDuels.drafts.size);
+n = challenge(A, B, { type: 'death' });
+const deathOffer = lastWidget(B, 122)[1];
+check('the challenged player sees DEATH DUEL and the same warning', /^DEATH DUEL:/.test(deathOffer.targetName) && /dies for good/.test(deathOffer.targetName), deathOffer.targetName);
+check("the challenger's confirmation is audited with a time", out.audits.some((t) => /^DUEL DEATH .* confirmed a death duel challenge to .* at \d{4}-\d\d-\d\dT/.test(t)));
+fire('duelOffer', B, `${n}|refuse`);
+check('refusing at the first step starts nothing', !duel() && !globalThis.__dboDuels.offers.size && out.audits.some((t) => /did not take the death duel .*refused\)/.test(t)));
+n = challenge(A, B, { type: 'death' });
+fire('duelOffer', B, `${n}|confirm`);
+check('a confirm without the accept does nothing', !duel() && globalThis.__dboDuels.offers.size === 1);
+fire('duelOffer', B, `${n}|accept`);
+check('accepting shows the challenged player the warning again, nothing begins yet', !duel() && /Are you sure/.test(lastWidget(B, 122)[1].targetName));
+fire('duelOffer', B, `${n}|refuse`);
+check('refusing at the second warning starts nothing', !duel() && out.audits.some((t) => /did not take the death duel .*at the second warning/.test(t)));
+n = challenge(A, B, { type: 'death' });
+fire('duelOffer', B, `${n}|accept`);
+fire('duelOfferClose', B);
+check('closing the second warning refuses', !duel() && !globalThis.__dboDuels.offers.size);
+check('nobody died of any refusal', killed.length === 0);
+
+// a death duel to its end, with a wager
+full();
+d = startFight({ type: 'death', wager: 50 });
+check('both agreements given, the death duel begins (one round)', d && d.type === 'death' && d.format === 'single' && d.wager === 50 && d.agreed.every((x) => /^\d{4}-/.test(x)));
+check('the agreement is audited with both names and times', out.audits.some((t) => /^DUEL DEATH agreed: Pff000001 at \d{4}-.* and Pff000002 at \d{4}-/.test(t)));
+hit(A, B, 60);
+hit(A, B, 199);
+check('the beaten loser, and only the loser, is permakilled', killed.length === 1 && killed[0][0] === B && /death duel/.test(killed[0][1]) && get(A, 'private.permaDead') !== true);
+check('the winner takes the wager and stands at full health', goldOfA(A) === 650 && goldOfA(B) === 150 && hp(A) === 1 && totalGold() === GOLD_TOTAL);
+check('the outcome is audited and noted to staff', out.audits.some((t) => /^DUEL DEATH Pff000001 killed Pff000002 in a death duel/.test(t)) && out.staff.some((x) => x[2] === 'death duel' && /killed Pff000002 in a death duel \(PK/.test(x[3])));
+set(B, 'private.permaDead', false); set(B, 'isDead', false); setGold(A, 600); setGold(B, 200); killed.length = 0;
+
+// never on a disconnect, never off the ground, never for a broken rule, never at a yield
+full();
+d = startFight({ type: 'death', wager: 50 });
+online.delete(B); globalThis.__dboDuelLeave(B); online.add(B);
+check('a disconnect in a death duel: no winner, stakes back, nobody dies', d.closed && !d.winner && killed.length === 0 && goldOfA(A) === 600 && goldOfA(B) === 200);
+full();
+d = startFight({ type: 'death' });
+mp.onHitDamageAttempt(A, B, SWORD, 199, { targetMaxHealth: 200 });
+online.delete(B);
+flush();
+check('the loser gone before the blow falls: nobody dies', d.closed && !d.winner && killed.length === 0);
+online.add(B);
+full();
+d = startFight({ type: 'death' });
+set(B, 'pos', [3000, 0, 0]);
+tick(500); tick(1000); tick(1000); tick(1000);
+check('leaving the ground in a death duel: no winner, nobody dies', d.closed && !d.winner && killed.length === 0);
+set(B, 'pos', [140, 0, 0]);
+full();
+d = startFight({ type: 'death', rules: 1 });
+mp.onSpellCast(B, OAKFLESH);
+flush();
+check('a broken rule forfeits a death duel without death', d.closed && d.winner === A && killed.length === 0);
+full();
+d = startFight({ type: 'death' });
+check('the X menu calls a death duel off rather than yield a life', globalThis.__dboDuelEntries(B, A)[0].label === 'End the death duel (no winner)');
+globalThis.__dboDuelAction(B, 'duel:yield', A);
+check('calling it off: no winner, nobody dies', d.closed && !d.winner && killed.length === 0);
+// the engine's blow past the guard: the same end on the fallen body
+full();
+d = startFight({ type: 'death' });
+set(B, 'isDead', true); mp.onDeath(B, A); flush();
+check("a killing blow past the guard ends only the loser's life, and takes them out of the down state", killed.length === 1 && killed[0][0] === B && !globalThis.__dboDownedState.downed.has(B));
+set(B, 'private.permaDead', false); set(B, 'isDead', false); killed.length = 0;
+// switched off
+loadAll({ deathDuels: false });
+full();
+check('deathDuels false takes the type away', !types().includes('death'));
+globalThis.__dboDuels.drafts.clear();
+loadAll({ deathDuels: true });
+full();
+d = startFight({ type: 'death' });
+loadAll({ deathDuels: false });
+tick(500);
+check('switched off during a death duel: it ends with no winner, nobody dies', d.closed && !d.winner && killed.length === 0);
+
 // ---- disconnect: 'forfeit' ------------------------------------------------------------------------------------------------
 loadAll({ disconnect: 'forfeit' });
 full();
-d = startFight({ wager: 3 });
+d = startFight({ wager: 50 });
 online.delete(B);
 globalThis.__dboDuelLeave(B);
 check("with disconnect 'forfeit' the one who stayed wins the wagers", d.closed && goldOfA(A) === 650 && goldOfA(B) === 150 && totalGold() === GOLD_TOTAL);
 online.add(B);
+setGold(A, 600); setGold(B, 200);
+full();
+d = startFight({ type: 'death', wager: 50 });
+online.delete(B); globalThis.__dboDuelLeave(B); online.add(B);
+check("even with 'forfeit', a death duel's disconnect has no winner and nobody dies", d.closed && !d.winner && killed.length === 0 && goldOfA(A) === 600 && goldOfA(B) === 200);
 
 // ---- switched off -----------------------------------------------------------------------------------------------------------
 loadAll({ enabled: false });
