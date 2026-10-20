@@ -320,10 +320,10 @@ load(Object.assign(baseCfg(), { spells: Object.assign({}, baseCfg().spells, { sh
     check('gate end to end: a Senior Magister does find them (when any are in the drop table at all)',
       !inTable.length || ds.some((d) => d.restricted > 0), { inTable: inTable.length, senior: ds.map((d) => d.restricted) });
   }
-  // Pinning what is true today, not what was: the college rank cap (__dboSpellsReadRankCap, still exported by spells.js)
-  // is consulted by nothing in gamemode.js since ffdbb117, so a reader's college no longer limits the RANK a reading can
-  // find - only the Scholar level does, and only the restricted list is gated by college rank. If the cap is ever meant
-  // to bind drops again, this check is the one that should fail.
+  // Pinning what is true today, and it is deliberate: 40762c38 "reading: no college rank gate on tome drops, the Scholar
+  // level alone opens Expert and Master (Nate 17 Oct)" took the cap out of gamemode.js. __dboSpellsReadRankCap is still
+  // exported by spells.js and still gates the restricted list and the shop, but nothing consults it for what a reading
+  // finds. So this check guards Nate's decision: it fails if a college cap is ever put back on drops.
   check('gate end to end: a college rank cap does not limit the rank a reading finds (only the restricted list is gated)',
     cap(ASSOC) < 3 && da[3].ranks === '3' && da[3].none === 0, { capAssoc: cap(ASSOC), expertDraw: da[3] });
   // A spell taken out of the game (removedSpells: Transmute) is never pressed between the pages, gate or not (#bugs 15 Oct)
