@@ -120,8 +120,8 @@ const yieldOf = (ore, rank) => Math.max(1, Math.round(({ iron: 5, quicksilver: 2
 
 // ---- 1. the data ----
 // 38 since 4358dbea put Mountainwatch's Frostiron mine on adamantium (Nate, 17 Oct): the 13 before it (3 meteoric,
-// 4 quicksilver, 3 adamantium, 3 Bleak Mine geodes) plus that mine's 25. The quicksilver four are untouched.
-check('the boot line counts every vein named by reference (13 before the Frostiron remap, 25 added by it)', /38 veins by reference/.test(boot), boot);
+// 4 quicksilver, 3 adamantium, 3 Bleak Mine geodes) plus that mine's 13. Its 12 iron veins went back on 20 Oct, and the quicksilver four were never taken.
+check('the boot line counts every vein named by reference (13 before the Frostiron remap, 13 added by it after the iron veins went back)', /26 veins by reference/.test(boot), boot);
 check('skills.json: quicksilver is a Miner tier 2 (Apprentice) ore', bandOf('quicksilver') === 1, MINER.oreByTier);
 check('the four quicksilver refs are iron veins of the mine by their base', QUICK.every((r) => /^MineOreIron/.test(VEINS[r])));
 
@@ -146,22 +146,20 @@ for (const [i, ref] of QUICK.entries()) {
   check('a real quicksilver vein: a Novice is told only that quicksilver is beyond them', !low.opened && low.said.length === 1 && low.said[0] === 'Quicksilver is beyond your skill. Work the seams you know first.', low.said);
 }
 
-// ---- 3. the mine's other veins since the Frostiron remap ----
-// They gave iron to a Novice until 4358dbea put the whole mine on adamantium (Nate, 17 Oct); only the four quicksilver
-// seams were spared, so nothing in CYRFrostironmine01/02 is workable below Expert now. That is the trade the remap made
-// and it is asserted here rather than left as a surprise. A fresh player per vein: deny() says a refusal at most once
-// in 1.5 s per player, which is why the old loop could not read the text.
-let adam = 0, opened = 0;
+// ---- 3. the other iron veins are as they were ----
+// 4358dbea put the whole mine on adamantium (Nate, 17 Oct) and these eight stopped giving iron; Nate softened it on
+// 20 Oct ("put the iron veins back"), so an iron-looking vein in CYRFrostironmine01/02 is iron again and a Novice who
+// walks in has seams to work. Only the mine's gold- and corundum-looking veins hold adamantium now.
+// A fresh player per vein: deny() says a refusal at most once in 1.5 s per player, so one shared player hid the text.
+let others = 0;
 let probe = 0x400;
 for (const [ref, edid] of Object.entries(VEINS)) {
   if (QUICK.includes(ref)) continue;
   const r = work(ref, 0, (probe += 1));
-  if (r.opened) { opened++; check(`${ref} ${edid} opens for a Novice, and should not`, false, r); continue; }
-  if (r.said.some((t) => /^Adamantium is beyond your skill\. This vein looks like iron but holds adamantium, which takes an Expert Miner/.test(t))) adam++;
-  else check(`${ref} ${edid}: a Novice is told the iron-looking vein holds adamantium`, false, r);
+  if (r.opened && r.title === 'Iron Seam' && r.items.length === 1 && r.items[0][0] === ORE_ITEM.iron && r.items[0][1] === yieldOf('iron', 0)) others++;
+  else check(`${ref} ${edid} gives iron`, false, r);
 }
-check("the mine's other 8 veins hold adamantium and open for no Novice", adam === 8 && opened === 0, { adam, opened });
-check('the four quicksilver seams are not among them (they are the only quicksilver inside the Bruma lock)', QUICK.length === 4);
+check('the other 8 iron veins give iron to a Novice, the softening put back', others === 8, others);
 
 // ---- 4. gearswap never touches mined quicksilver ----
 const readJson = (f) => JSON.parse(fs.readFileSync(path.join(SERVER, f), 'utf8'));

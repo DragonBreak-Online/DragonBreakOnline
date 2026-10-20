@@ -26,11 +26,17 @@ const seen = new Map();
 const twice = REMAPS.filter(([ref]) => (seen.has(ref) ? true : (seen.set(ref, 1), false)));
 ok(!twice.length, `no ref is remapped twice (${twice.map(([r]) => r).join(', ') || 'none'})`);
 const byOre = REMAPS.reduce((m2, [, o]) => Object.assign(m2, { [o]: (m2[o] || 0) + 1 }), {});
-ok(byOre.adamantium >= 25, `adamantium has its mine: ${byOre.adamantium || 0} veins`);
+// 16 = the 3 that were adamantium before the mine (the Bleak Mine silver-looking seams) plus the mine's 13. Softened on
+// 20 Oct ("put the iron veins back"): the mine's 12 iron veins give iron again, so only its gold- and corundum-looking
+// ones hold adamantium and a Novice still has seams to work down there.
+ok(byOre.adamantium === 16, `adamantium has its mine, the iron veins left to the newcomers: ${byOre.adamantium || 0} veins`);
 ok(byOre.quicksilver === 4, `the four quicksilver veins survive it: ${byOre.quicksilver || 0}`);
 ok(byOre.meteoriciron === 3 && byOre.geode === 3, 'meteoric iron and the soul-gem geodes are untouched');
-for (const ref of ['177faa:DragonBreak Online Edits.esp', 'd9a16:BSHeartland.esm', 'e59e0:BSHeartland.esm'])
-  ok(seen.has(ref) && REMAPS.find(([r]) => r === ref)[1] === 'adamantium', `${ref} gives adamantium`);
+for (const ref of ['177faa:DragonBreak Online Edits.esp', 'e59e0:BSHeartland.esm', 'e59fb:BSHeartland.esm'])
+  ok(seen.has(ref) && REMAPS.find(([r]) => r === ref)[1] === 'adamantium', `${ref} (corundum- and gold-looking) gives adamantium`);
+// The iron ones are named here so putting them back is not quietly undone by a later remap
+for (const ref of ['d9a16:BSHeartland.esm', 'd9845:BSHeartland.esm', 'e59f9:BSHeartland.esm'])
+  ok(!seen.has(ref), `${ref} (iron-looking) is left alone, so it still gives iron`);
 for (const ref of ['e59f8:BSHeartland.esm', '177fa4:DragonBreak Online Edits.esp'])
   ok(REMAPS.find(([r]) => r === ref)[1] === 'quicksilver', `${ref} is still quicksilver`);
 ok(/adamantium: 3,/.test(src) || /adamantium: [0-9]/.test(src), 'adamantium still opens at its Miner tier (extraOreTier)');
