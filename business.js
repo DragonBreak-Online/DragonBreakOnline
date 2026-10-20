@@ -712,7 +712,7 @@ module.exports = (api) => {
 
   // ---- /business: the chat side, for a client without the panel ---------------------------------------
   const say = (a, r) => personal(a, r.text);
-  registerChatCommand('business', (a, args) => {
+  const businessCommand = (a, args) => {
     if (!C.enabled) return personal(a, 'Business ledgers are closed for now.');
     const words = String(args || '').trim().split(/\s+/).filter(Boolean);
     const sub = (words.shift() || '').toLowerCase(), rest = words.join(' ').trim();
@@ -777,13 +777,19 @@ module.exports = (api) => {
       case 'close': return say(a, runAction(a, 'close', claim, biz, []));
       default: return hasPanel(a) ? sendPanel(a, claim, biz) : summary(a, claim, biz);
     }
-  }, { help: 'the business ledger where you stand (its book opens the same panel): open, log, notes, note, rent, chest, shop, staff, ledger, collect, rename, close, faction' });
+  };
+  registerChatCommand('business', businessCommand, { help: 'the business ledger where you stand (its book opens the same panel): open, log, notes, note, rent, chest, shop, staff, ledger, collect, rename, close, faction' });
 
   // ---- /shop: a business's goods, for a customer without the panel's Buy page ----------------------------------------
   registerChatCommand('shop', (a, args) => {
     if (!C.enabled || !shops) return personal(a, 'Shops are closed for now.');
     const { claim, biz } = bizHere(a);
-    if (!biz) return personal(a, 'Stand inside a business to see what it sells.');
+    // "/shop open <name>" from an owner is /business open (Tolfdir Shadowstride, 20 Oct: a new shop, and "/shop open"
+    // answered only "stand inside a business" while he stood in it)
+    if (/^open(\s|$)/i.test(String(args || '').trim()) && claim && ownsClaim(a, claim)) return businessCommand(a, args);
+    if (!biz) return personal(a, claim && ownsClaim(a, claim)
+      ? 'This property is not a business yet. Open it with /business open <name> (or /shop open <name>), then stock it from its ledger.'
+      : 'Stand inside a business to see what it sells.');
     try { return shops.chatShop(a, claim, biz, args); } catch (e) { log('shops: /shop failed', e.stack || e.message); return personal(a, 'Something went wrong there. Try again in a moment.'); }
   }, { help: 'what the business where you stand sells: /shop, then /shop buy <number> [how many]' });
 

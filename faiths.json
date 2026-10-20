@@ -21,7 +21,19 @@
         "mara",
         "stendarr",
         "talos",
-        "zenithar"
+        "zenithar",
+        "shezarr",
+        "morihaus"
+      ]
+    },
+    {
+      "id": "skaal",
+      "name": "The All-Maker",
+      "peoples": [
+        "Nord"
+      ],
+      "patrons": [
+        "allmaker"
       ]
     },
     {
@@ -38,7 +50,8 @@
         "mara",
         "dibella",
         "talos",
-        "dragoncult"
+        "dragoncult",
+        "orkey"
       ]
     },
     {
@@ -56,7 +69,8 @@
         "xarxes",
         "phynaster",
         "mara",
-        "stendarr"
+        "stendarr",
+        "sai"
       ]
     },
     {
@@ -71,7 +85,8 @@
         "baandar",
         "zenithar",
         "hircine",
-        "auriel"
+        "auriel",
+        "ius"
       ]
     },
     {
@@ -101,7 +116,12 @@
         "rajhin",
         "stendarr",
         "mara",
-        "baandar"
+        "baandar",
+        "magrus",
+        "jonejode",
+        "mafala",
+        "lorkhaj",
+        "fadomai"
       ]
     },
     {
@@ -117,7 +137,11 @@
         "satakal",
         "arkay",
         "talos",
-        "mara"
+        "mara",
+        "ruptga",
+        "diagna",
+        "sep",
+        "ebonarm"
       ]
     },
     {
@@ -188,7 +212,8 @@
         "sanguine",
         "sheogorath",
         "vaermina",
-        "ithelia"
+        "ithelia",
+        "jyggalag"
       ]
     },
     {
@@ -198,6 +223,47 @@
       "patrons": [
         "dragoncult",
         "wormcult"
+      ]
+    },
+    {
+      "id": "tribunal",
+      "name": "The Tribunal",
+      "peoples": [
+        "DarkElf"
+      ],
+      "patrons": [
+        "almalexia",
+        "sothasil",
+        "vivec"
+      ]
+    },
+    {
+      "id": "highrock",
+      "name": "The Gods of High Rock",
+      "peoples": [
+        "Breton"
+      ],
+      "patrons": [
+        "akatosh",
+        "julianos",
+        "dibella",
+        "stendarr",
+        "mara",
+        "kynareth",
+        "zenithar",
+        "arkay",
+        "sheor",
+        "ebonarm"
+      ]
+    },
+    {
+      "id": "akaviri",
+      "name": "The Spirits of Akavir",
+      "peoples": [
+        "Imperial"
+      ],
+      "patrons": [
+        "toshraka"
       ]
     }
   ],
@@ -232,10 +298,23 @@
       "Azurah"
     ],
     "hermaeusmora": [
-      "Herma-Mora"
+      "Herma-Mora",
+      "Hermorah"
     ],
     "malacath": [
       "Mauloch"
+    ],
+    "mehrunes": [
+      "Merrunz"
+    ],
+    "namira": [
+      "Namiira"
+    ],
+    "sheogorath": [
+      "Sheggorath"
+    ],
+    "boethiah": [
+      "Boethra"
     ]
   },
   "deities": [
@@ -301,7 +380,7 @@
       "id": "syrabane",
       "name": "Syrabane",
       "kind": "aedra",
-      "sphere": "The warden-god of magic and apprentices, who saved Firsthold with his ring; patron of the Psijics.",
+      "sphere": "The Aldmeri god-ancestor of magic, the Apprentices' God, who aided Y'ffre in the time of the Thrassian Plague and saved many with his ring.",
       "boon": "Enchanting +10",
       "blessing": "1d1fad:DragonBreak Online Edits.esp",
       "blessingSource": "vanilla",
@@ -408,7 +487,7 @@
       "id": "alkosh",
       "name": "Alkosh",
       "kind": "aedra",
-      "sphere": "The Dragon King of Cats, Akatosh to the Khajiit, who drove off Pelinal and the Dwarf-Bards.",
+      "sphere": "The Dragon King of Cats: Akatosh as the Khajiit know him, one of the oldest of their gods.",
       "boon": "unarmed blows land 10% harder",
       "blessing": null,
       "blessingSource": "server",
@@ -483,7 +562,7 @@
       "id": "satakal",
       "name": "Satakal",
       "kind": "aedra",
-      "sphere": "The Worldskin, the god who sheds and eats himself and is renewed; the Walkabout is his.",
+      "sphere": "The Worldskin, the god of everything, who sheds his skin and eats himself to be born again.",
       "boon": "Health regenerates 25% faster",
       "blessing": "1d1fb4:DragonBreak Online Edits.esp",
       "blessingSource": "vanilla",
@@ -516,6 +595,519 @@
       "shrines": [
         "1d1fc4:DragonBreak Online Edits.esp"
       ]
+    },
+    {
+      "id": "allmaker",
+      "name": "The All-Maker",
+      "kind": "faith",
+      "sphere": "The god of the Skaal of Solstheim, who made all things and gives the Greater Powers: Earth, Water, Wind, Sun, Tree and Beast. His foe is the Adversary, Herma-Mora.",
+      "alsoKnownAs": [],
+      "skillBoon": {
+        "harvesting": 1.15
+      },
+      "boon": "Harvesting work teaches you 15% more while the blessing lasts",
+      "blessing": "",
+      "blessingSource": "server",
+      "blessingImplemented": true,
+      "lawful": true,
+      "prayAnywhere": true,
+      "blessingChanceMult": 0.5,
+      "blessingHoursMult": 0.5,
+      "shrines": [],
+      "placements": 0,
+      "inPlaytest": 0,
+      "inBruma": 0,
+      "note": "Nate 20 Oct: every Elder Scrolls deity, simple unique boons, no shrine yet (prayed to anywhere with /pray); a shrine object comes later. The boon is the server's (no spell); a display ability for Active Effects is for the PC to add."
+    },
+    {
+      "id": "almalexia",
+      "name": "Almalexia",
+      "kind": "faith",
+      "sphere": "Mother Morrowind, the Tribunal's goddess of mercy and healing. She died in 3E 427, and the New Temple no longer names her a god, but the old faithful still keep her.",
+      "alsoKnownAs": [
+        "Mother Morrowind",
+        "Ayem"
+      ],
+      "skillBoon": {
+        "priest": 1.15
+      },
+      "boon": "Priest work teaches you 15% more while the blessing lasts",
+      "blessing": "",
+      "blessingSource": "server",
+      "blessingImplemented": true,
+      "lawful": true,
+      "prayAnywhere": true,
+      "blessingChanceMult": 0.5,
+      "blessingHoursMult": 0.5,
+      "shrines": [],
+      "placements": 0,
+      "inPlaytest": 0,
+      "inBruma": 0,
+      "note": "Nate 20 Oct: every Elder Scrolls deity, simple unique boons, no shrine yet (prayed to anywhere with /pray); a shrine object comes later. The boon is the server's (no spell); a display ability for Active Effects is for the PC to add."
+    },
+    {
+      "id": "sothasil",
+      "name": "Sotha Sil",
+      "kind": "faith",
+      "sphere": "The Clockwork God, the Tribunal's sorcerer and tinker, lost in 3E 427. His followers still keep the mysteries of the Clockwork City.",
+      "alsoKnownAs": [
+        "The Clockwork God",
+        "Seht"
+      ],
+      "skillBoon": {
+        "enchanter": 1.15
+      },
+      "boon": "Enchanter work teaches you 15% more while the blessing lasts",
+      "blessing": "",
+      "blessingSource": "server",
+      "blessingImplemented": true,
+      "lawful": true,
+      "prayAnywhere": true,
+      "blessingChanceMult": 0.5,
+      "blessingHoursMult": 0.5,
+      "shrines": [],
+      "placements": 0,
+      "inPlaytest": 0,
+      "inBruma": 0,
+      "note": "Nate 20 Oct: every Elder Scrolls deity, simple unique boons, no shrine yet (prayed to anywhere with /pray); a shrine object comes later. The boon is the server's (no spell); a display ability for Active Effects is for the PC to add."
+    },
+    {
+      "id": "vivec",
+      "name": "Vivec",
+      "kind": "faith",
+      "sphere": "The Warrior-Poet of the Tribunal, guardian of Morrowind, who lost his godhood after 3E 427 and vanished before the Red Year. His sermons are still read by those who keep the old Temple.",
+      "alsoKnownAs": [
+        "Vehk",
+        "The Warrior-Poet"
+      ],
+      "skillBoon": {
+        "blade": 1.15
+      },
+      "boon": "Blade work teaches you 15% more while the blessing lasts",
+      "blessing": "",
+      "blessingSource": "server",
+      "blessingImplemented": true,
+      "lawful": true,
+      "prayAnywhere": true,
+      "blessingChanceMult": 0.5,
+      "blessingHoursMult": 0.5,
+      "shrines": [],
+      "placements": 0,
+      "inPlaytest": 0,
+      "inBruma": 0,
+      "note": "Nate 20 Oct: every Elder Scrolls deity, simple unique boons, no shrine yet (prayed to anywhere with /pray); a shrine object comes later. The boon is the server's (no spell); a display ability for Active Effects is for the PC to add."
+    },
+    {
+      "id": "magrus",
+      "name": "Magrus",
+      "kind": "faith",
+      "sphere": "The Khajiit god of the sun, the cat whose eye is the sun itself.",
+      "alsoKnownAs": [
+        "Magnus (to the Altmer)"
+      ],
+      "skillBoon": {
+        "archery": 1.15
+      },
+      "boon": "Archery work teaches you 15% more while the blessing lasts",
+      "blessing": "",
+      "blessingSource": "server",
+      "blessingImplemented": true,
+      "lawful": true,
+      "prayAnywhere": true,
+      "blessingChanceMult": 0.5,
+      "blessingHoursMult": 0.5,
+      "shrines": [],
+      "placements": 0,
+      "inPlaytest": 0,
+      "inBruma": 0,
+      "note": "Nate 20 Oct: every Elder Scrolls deity, simple unique boons, no shrine yet (prayed to anywhere with /pray); a shrine object comes later. The boon is the server's (no spell); a display ability for Active Effects is for the PC to add."
+    },
+    {
+      "id": "jonejode",
+      "name": "Jone and Jode",
+      "kind": "faith",
+      "sphere": "The two moons, Masser and Secunda, whose dance shapes every Khajiit at birth: the Lunar Lattice, the Ja-Kha'jay.",
+      "alsoKnownAs": [
+        "Masser and Secunda"
+      ],
+      "blessingRegen": {
+        "MagickaRateMult": 25
+      },
+      "boon": "Magicka returns 25% faster while the blessing lasts - the moons light the way",
+      "blessing": "",
+      "blessingSource": "server",
+      "blessingImplemented": true,
+      "lawful": true,
+      "prayAnywhere": true,
+      "blessingChanceMult": 0.5,
+      "blessingHoursMult": 0.5,
+      "shrines": [],
+      "placements": 0,
+      "inPlaytest": 0,
+      "inBruma": 0,
+      "note": "Nate 20 Oct: every Elder Scrolls deity, simple unique boons, no shrine yet (prayed to anywhere with /pray); a shrine object comes later. The boon is the server's (no spell); a display ability for Active Effects is for the PC to add."
+    },
+    {
+      "id": "mafala",
+      "name": "Mafala",
+      "kind": "faith",
+      "sphere": "The Clan Mother of the Khajiit, who keeps the secrets of the clans and teaches them to the worthy.",
+      "alsoKnownAs": [
+        "Mephala (to others)"
+      ],
+      "skillBoon": {
+        "lockpicking": 1.15
+      },
+      "boon": "Lockpicking work teaches you 15% more while the blessing lasts",
+      "blessing": "",
+      "blessingSource": "server",
+      "blessingImplemented": true,
+      "lawful": true,
+      "prayAnywhere": true,
+      "blessingChanceMult": 0.5,
+      "blessingHoursMult": 0.5,
+      "shrines": [],
+      "placements": 0,
+      "inPlaytest": 0,
+      "inBruma": 0,
+      "note": "Nate 20 Oct: every Elder Scrolls deity, simple unique boons, no shrine yet (prayed to anywhere with /pray); a shrine object comes later. The boon is the server's (no spell); a display ability for Active Effects is for the PC to add."
+    },
+    {
+      "id": "lorkhaj",
+      "name": "Lorkhaj",
+      "kind": "faith",
+      "sphere": "The Moon Beast, the Khajiit name for the Missing God, whose dark heart is hidden in the moons.",
+      "alsoKnownAs": [
+        "Lorkhan (to others)"
+      ],
+      "skillBoon": {
+        "unarmed": 1.15
+      },
+      "boon": "Unarmed work teaches you 15% more while the blessing lasts",
+      "blessing": "",
+      "blessingSource": "server",
+      "blessingImplemented": true,
+      "lawful": true,
+      "prayAnywhere": true,
+      "blessingChanceMult": 0.5,
+      "blessingHoursMult": 0.5,
+      "shrines": [],
+      "placements": 0,
+      "inPlaytest": 0,
+      "inBruma": 0,
+      "note": "Nate 20 Oct: every Elder Scrolls deity, simple unique boons, no shrine yet (prayed to anywhere with /pray); a shrine object comes later. The boon is the server's (no spell); a display ability for Active Effects is for the PC to add."
+    },
+    {
+      "id": "fadomai",
+      "name": "Fadomai",
+      "kind": "faith",
+      "sphere": "The Great Mother of the cats, who bore the Khajiit gods and gave each of her children a gift before she died.",
+      "alsoKnownAs": [],
+      "skillBoon": {
+        "cook": 1.15
+      },
+      "boon": "Cook work teaches you 15% more while the blessing lasts",
+      "blessing": "",
+      "blessingSource": "server",
+      "blessingImplemented": true,
+      "lawful": true,
+      "prayAnywhere": true,
+      "blessingChanceMult": 0.5,
+      "blessingHoursMult": 0.5,
+      "shrines": [],
+      "placements": 0,
+      "inPlaytest": 0,
+      "inBruma": 0,
+      "note": "Nate 20 Oct: every Elder Scrolls deity, simple unique boons, no shrine yet (prayed to anywhere with /pray); a shrine object comes later. The boon is the server's (no spell); a display ability for Active Effects is for the PC to add."
+    },
+    {
+      "id": "ruptga",
+      "name": "Ruptga",
+      "kind": "faith",
+      "sphere": "Tall Papa, chief of the Yokudan gods, who placed the stars and taught the spirits how to live past death.",
+      "alsoKnownAs": [
+        "Tall Papa"
+      ],
+      "skillBoon": {
+        "arcane": 1.15
+      },
+      "boon": "Arcane Arts work teaches you 15% more while the blessing lasts",
+      "blessing": "",
+      "blessingSource": "server",
+      "blessingImplemented": true,
+      "lawful": true,
+      "prayAnywhere": true,
+      "blessingChanceMult": 0.5,
+      "blessingHoursMult": 0.5,
+      "shrines": [],
+      "placements": 0,
+      "inPlaytest": 0,
+      "inBruma": 0,
+      "note": "Nate 20 Oct: every Elder Scrolls deity, simple unique boons, no shrine yet (prayed to anywhere with /pray); a shrine object comes later. The boon is the server's (no spell); a display ability for Active Effects is for the PC to add."
+    },
+    {
+      "id": "diagna",
+      "name": "Diagna",
+      "kind": "faith",
+      "sphere": "The Orichalc God of the Sideways Blade, who led the Yokudans against the Lefthanded Elves.",
+      "alsoKnownAs": [],
+      "skillBoon": {
+        "blacksmith": 1.15
+      },
+      "boon": "Blacksmith work teaches you 15% more while the blessing lasts",
+      "blessing": "",
+      "blessingSource": "server",
+      "blessingImplemented": true,
+      "lawful": true,
+      "prayAnywhere": true,
+      "blessingChanceMult": 0.5,
+      "blessingHoursMult": 0.5,
+      "shrines": [],
+      "placements": 0,
+      "inPlaytest": 0,
+      "inBruma": 0,
+      "note": "Nate 20 Oct: every Elder Scrolls deity, simple unique boons, no shrine yet (prayed to anywhere with /pray); a shrine object comes later. The boon is the server's (no spell); a display ability for Active Effects is for the PC to add."
+    },
+    {
+      "id": "sep",
+      "name": "Sep",
+      "kind": "faith",
+      "sphere": "The Snake, made by Tall Papa, whose hunger made the world; the Redguards' Missing God, and their warning.",
+      "alsoKnownAs": [
+        "The Snake"
+      ],
+      "skillBoon": {
+        "skinner": 1.15
+      },
+      "boon": "Skinner work teaches you 15% more while the blessing lasts",
+      "blessing": "",
+      "blessingSource": "server",
+      "blessingImplemented": true,
+      "lawful": true,
+      "prayAnywhere": true,
+      "blessingChanceMult": 0.5,
+      "blessingHoursMult": 0.5,
+      "shrines": [],
+      "placements": 0,
+      "inPlaytest": 0,
+      "inBruma": 0,
+      "note": "Nate 20 Oct: every Elder Scrolls deity, simple unique boons, no shrine yet (prayed to anywhere with /pray); a shrine object comes later. The boon is the server's (no spell); a display ability for Active Effects is for the PC to add."
+    },
+    {
+      "id": "ebonarm",
+      "name": "Ebonarm",
+      "kind": "faith",
+      "sphere": "The Black Knight, god of war of the Redguards and Bretons, whose ebony blade is fused to his arm. He rides the horse Rayzhal and favours the honourable fighter.",
+      "alsoKnownAs": [
+        "The Black Knight"
+      ],
+      "skillBoon": {
+        "defense": 1.15
+      },
+      "boon": "Defense work teaches you 15% more while the blessing lasts",
+      "blessing": "",
+      "blessingSource": "server",
+      "blessingImplemented": true,
+      "lawful": true,
+      "prayAnywhere": true,
+      "blessingChanceMult": 0.5,
+      "blessingHoursMult": 0.5,
+      "shrines": [],
+      "placements": 0,
+      "inPlaytest": 0,
+      "inBruma": 0,
+      "note": "Nate 20 Oct: every Elder Scrolls deity, simple unique boons, no shrine yet (prayed to anywhere with /pray); a shrine object comes later. The boon is the server's (no spell); a display ability for Active Effects is for the PC to add."
+    },
+    {
+      "id": "toshraka",
+      "name": "Tosh Raka",
+      "kind": "faith",
+      "sphere": "The tiger-dragon of the Ka Po' Tun of Akavir, who would become a dragon and rule all.",
+      "alsoKnownAs": [],
+      "skillBoon": {
+        "blunt": 1.15
+      },
+      "boon": "Blunt Weapons work teaches you 15% more while the blessing lasts",
+      "blessing": "",
+      "blessingSource": "server",
+      "blessingImplemented": true,
+      "lawful": true,
+      "prayAnywhere": true,
+      "blessingChanceMult": 0.5,
+      "blessingHoursMult": 0.5,
+      "shrines": [],
+      "placements": 0,
+      "inPlaytest": 0,
+      "inBruma": 0,
+      "note": "Nate 20 Oct: every Elder Scrolls deity, simple unique boons, no shrine yet (prayed to anywhere with /pray); a shrine object comes later. The boon is the server's (no spell); a display ability for Active Effects is for the PC to add."
+    },
+    {
+      "id": "jyggalag",
+      "name": "Jyggalag",
+      "kind": "faith",
+      "sphere": "The Prince of Order, freed in 3E 433 from the curse that made him the Madgod. He wants a world without chance.",
+      "alsoKnownAs": [],
+      "blessing": "",
+      "blessingSource": "server",
+      "blessingImplemented": true,
+      "lawful": false,
+      "prayAnywhere": true,
+      "blessingChanceMult": 0.5,
+      "blessingHoursMult": 0.5,
+      "shrines": [],
+      "placements": 0,
+      "inPlaytest": 0,
+      "inBruma": 0,
+      "note": "Nate 20 Oct: every Elder Scrolls deity, simple unique boons, no shrine yet (prayed to anywhere with /pray); a shrine object comes later. The boon is the server's (no spell); a display ability for Active Effects is for the PC to add.",
+      "unlawfulWhere": "Daedric worship is outlawed in the Empire's lands.",
+      "skillBoon": {
+        "*": 1.05
+      },
+      "boon": "Every skill's work teaches you 5% more while the blessing lasts - order in all things"
+    },
+    {
+      "id": "orkey",
+      "name": "Orkey",
+      "kind": "faith",
+      "sphere": "An old god of the Nords, who tricked them into a bargain that cut their lives to six winters, until Shor won them back. Some say he is Malacath by another name.",
+      "alsoKnownAs": [],
+      "skillBoon": {
+        "woodcutter": 1.15
+      },
+      "boon": "Woodcutter work teaches you 15% more while the blessing lasts",
+      "blessing": "",
+      "blessingSource": "server",
+      "blessingImplemented": true,
+      "lawful": true,
+      "prayAnywhere": true,
+      "blessingChanceMult": 0.5,
+      "blessingHoursMult": 0.5,
+      "shrines": [],
+      "placements": 0,
+      "inPlaytest": 0,
+      "inBruma": 0,
+      "note": "Nate 20 Oct: every Elder Scrolls deity, simple unique boons, no shrine yet (prayed to anywhere with /pray); a shrine object comes later. The boon is the server's (no spell); a display ability for Active Effects is for the PC to add."
+    },
+    {
+      "id": "sheor",
+      "name": "Sheor",
+      "kind": "faith",
+      "sphere": "The Bad Man of High Rock, blamed for strife and failed crops; the Bretons' name for the Missing God.",
+      "alsoKnownAs": [
+        "The Bad Man"
+      ],
+      "skillBoon": {
+        "miner": 1.15
+      },
+      "boon": "Miner work teaches you 15% more while the blessing lasts",
+      "blessing": "",
+      "blessingSource": "server",
+      "blessingImplemented": true,
+      "lawful": true,
+      "prayAnywhere": true,
+      "blessingChanceMult": 0.5,
+      "blessingHoursMult": 0.5,
+      "shrines": [],
+      "placements": 0,
+      "inPlaytest": 0,
+      "inBruma": 0,
+      "note": "Nate 20 Oct: every Elder Scrolls deity, simple unique boons, no shrine yet (prayed to anywhere with /pray); a shrine object comes later. The boon is the server's (no spell); a display ability for Active Effects is for the PC to add."
+    },
+    {
+      "id": "shezarr",
+      "name": "Shezarr",
+      "kind": "faith",
+      "sphere": "The Imperial name for the Missing God, the spirit behind every human undertaking.",
+      "alsoKnownAs": [
+        "Lorkhan (to the elves)"
+      ],
+      "skillBoon": {
+        "tailor": 1.15
+      },
+      "boon": "Tailor work teaches you 15% more while the blessing lasts",
+      "blessing": "",
+      "blessingSource": "server",
+      "blessingImplemented": true,
+      "lawful": true,
+      "prayAnywhere": true,
+      "blessingChanceMult": 0.5,
+      "blessingHoursMult": 0.5,
+      "shrines": [],
+      "placements": 0,
+      "inPlaytest": 0,
+      "inBruma": 0,
+      "note": "Nate 20 Oct: every Elder Scrolls deity, simple unique boons, no shrine yet (prayed to anywhere with /pray); a shrine object comes later. The boon is the server's (no spell); a display ability for Active Effects is for the PC to add."
+    },
+    {
+      "id": "ius",
+      "name": "Ius",
+      "kind": "faith",
+      "sphere": "The Bosmer animal god of compromise.",
+      "alsoKnownAs": [],
+      "skillBoon": {
+        "alchemist": 1.15
+      },
+      "boon": "Alchemist work teaches you 15% more while the blessing lasts",
+      "blessing": "",
+      "blessingSource": "server",
+      "blessingImplemented": true,
+      "lawful": true,
+      "prayAnywhere": true,
+      "blessingChanceMult": 0.5,
+      "blessingHoursMult": 0.5,
+      "shrines": [],
+      "placements": 0,
+      "inPlaytest": 0,
+      "inBruma": 0,
+      "note": "Nate 20 Oct: every Elder Scrolls deity, simple unique boons, no shrine yet (prayed to anywhere with /pray); a shrine object comes later. The boon is the server's (no spell); a display ability for Active Effects is for the PC to add."
+    },
+    {
+      "id": "sai",
+      "name": "Sai",
+      "kind": "faith",
+      "sphere": "The god of luck of the Altmer and the Bosmer.",
+      "alsoKnownAs": [],
+      "skillBoon": {
+        "scholar": 1.15
+      },
+      "boon": "Scholar work teaches you 15% more while the blessing lasts",
+      "blessing": "",
+      "blessingSource": "server",
+      "blessingImplemented": true,
+      "lawful": true,
+      "prayAnywhere": true,
+      "blessingChanceMult": 0.5,
+      "blessingHoursMult": 0.5,
+      "shrines": [],
+      "placements": 0,
+      "inPlaytest": 0,
+      "inBruma": 0,
+      "note": "Nate 20 Oct: every Elder Scrolls deity, simple unique boons, no shrine yet (prayed to anywhere with /pray); a shrine object comes later. The boon is the server's (no spell); a display ability for Active Effects is for the PC to add."
+    },
+    {
+      "id": "morihaus",
+      "name": "Morihaus",
+      "kind": "faith",
+      "sphere": "The First Breath of Man, the winged bull and consort of Saint Alessia, whose horns broke the Ayleid towers.",
+      "alsoKnownAs": [
+        "The Bull"
+      ],
+      "blessingRegen": {
+        "StaminaRateMult": 25
+      },
+      "boon": "Stamina returns 25% faster while the blessing lasts - the bull does not tire",
+      "blessing": "",
+      "blessingSource": "server",
+      "blessingImplemented": true,
+      "lawful": true,
+      "prayAnywhere": true,
+      "blessingChanceMult": 0.5,
+      "blessingHoursMult": 0.5,
+      "shrines": [],
+      "placements": 0,
+      "inPlaytest": 0,
+      "inBruma": 0,
+      "note": "Nate 20 Oct: every Elder Scrolls deity, simple unique boons, no shrine yet (prayed to anywhere with /pray); a shrine object comes later. The boon is the server's (no spell); a display ability for Active Effects is for the PC to add."
     }
   ]
 }

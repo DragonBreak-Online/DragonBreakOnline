@@ -72,12 +72,14 @@ ok(piece(ID.BlackBearAncientNordCuirass).counted > piece(ID.ArmorOrcishCuirass).
 {
   const a = gm.indexOf('const defenseDamageMult = '), b = gm.indexOf('\n};', a);
   const dsrc = gm.slice(a, b + 3);
-  const mult = (worn) => new Function('defensePieceMult', 'wornWithHealth', 'armorPieceOf', 'temperBonus', 'potionBonus', 'gmstFloat', `${dsrc}\nreturn defenseDamageMult;`)(
-    () => ({ heavy: 1, light: 1 }), () => worn.map((e) => ({ baseId: ID[e], health: 1 })), piece, () => 0, () => 0, (id, d) => d)(0x14);
+  // gearArmorMult: worn Fortify Heavy/Light Armor (gearench.js), none here
+  const mult = (worn, gear = { heavy: 1, light: 1 }) => new Function('defensePieceMult', 'wornWithHealth', 'armorPieceOf', 'temperBonus', 'potionBonus', 'gmstFloat', 'gearArmorMult', `${dsrc}\nreturn defenseDamageMult;`)(
+    () => ({ heavy: 1, light: 1 }), () => worn.map((e) => ({ baseId: ID[e], health: 1 })), piece, () => 0, () => 0, (id, d) => d, () => gear)(0x14);
   const m = mult(['BlackBearAncientNordCuirassLight', 'BlackBearAncientNordGauntletsLight', 'BlackBearAncientNordBootsLight', 'BlackBearAncientNordHelmetBerserker']);
   // the engine took 75 x 0.12 = 9% off; the server counts 64 (7.68%): 0.9232 / 0.91 = 1.0145 of the engine's hit
   ok(Math.abs(m - (1 - 64 * 0.12 / 100) / (1 - 75 * 0.12 / 100)) < 1e-9 && m > 1, `a hit on a full light set lands ${m.toFixed(4)}x the engine's (64 counted, not 75)`, m);
   ok(mult(['ArmorScaledCuirass', 'ArmorScaledHelmet']) === 1, '...and a Scaled set is untouched (1)');
+  ok(mult(['ArmorScaledCuirass', 'ArmorScaledHelmet'], { heavy: 1.13, light: 1.13 }) < 1, '...worn Fortify Light Armor 13 makes the same set count more (below 1)');
 }
 
 // ---- hot reload: the cache follows the config -----------------------------------------------------------------------

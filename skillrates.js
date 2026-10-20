@@ -146,6 +146,10 @@ module.exports = (api) => {
     if (typeof globalThis.__dboRaceSkillRate === 'function') {
       try { const r = Number(globalThis.__dboRaceSkillRate(actorId >>> 0, skillId, kind)); if (Number.isFinite(r) && r > 0) rate *= r; } catch (e) { /* no race boost */ }
     }
+    // A god's skill boon (prayer.js skillBoon), never for a staff award
+    if (kind !== 'award' && typeof globalThis.__dboBlessingSkillRate === 'function') {
+      try { const r = Number(globalThis.__dboBlessingSkillRate(actorId >>> 0, skillId)); if (Number.isFinite(r) && r > 0) rate *= r; } catch (e) { /* no blessing boost */ }
+    }
     if (as === 'craft' && rate > 0) rate *= valueFactor(actorId, skillId, kind, detail);
     if (as === 'craft' && rate > 0) rate *= firstCraftRate(actorId, skillId, detail, kind);
     return rate;

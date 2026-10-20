@@ -130,6 +130,8 @@ module.exports = (api) => {
     const sa = sideOf(agg), st = sideOf(tgt);
     if (!isPlayer(sa) || !isPlayer(st)) return false;
     if (sa === st) return true;
+    // Two party members fighting a duel strike at full strength (duel.js keeps the duel non-lethal)
+    try { if (typeof globalThis.__dboDuelPair === 'function' && globalThis.__dboDuelPair(sa, st)) return false; } catch (e) { /* duel.js not loaded */ }
     const pa = partyOf(sa);
     return pa !== null && pa !== undefined && pa === partyOf(st);
   };
@@ -475,6 +477,7 @@ module.exports = (api) => {
   // Papyrus Debug.SendAnimationEvent (as gatheringSystem.ts does for its exit idle). That is only a pose, so the rest is
   // held here: the client holds the controls (dboParalyse, quiet), and the hit hook above refuses hits both ways.
   S.recovering = S.recovering instanceof Map ? S.recovering : new Map(); // actor -> { at, until }
+  globalThis.__dboBleedOutStop = (a) => anim(Number(a) >>> 0, 'BleedOutStop');
   const anim = (a, ev) => { try { mp.callPapyrusFunction('global', 'Debug', 'SendAnimationEvent', null, [{ type: 'form', desc: mp.getDescFromId(a) }, ev]); } catch (e) { log(`downed: ${ev} failed for ${display(a)}: ${e.message}`); } };
   const startRecovery = (t) => {
     const now = Date.now();
@@ -684,6 +687,9 @@ module.exports = (api) => {
     mp.set(t, 'isDead', false);
     wakeAfter(t, d);
     dressAfterWake(t);
+    // The client only plays the get-up and never ends the engine's bleed-out, which sometimes holds the player frozen at the
+    // temple, camera locked, until a relog (27 of 407 wakes on 18-20 Oct; SkaldsChosen, Whiterun): end it twice after waking
+    for (const ms of [3000, 10000]) setTimeout(() => { try { if (isPlayer(t) && !S.downed.has(t) && !isDead(t)) anim(t, 'BleedOutStop'); } catch (e) { /* gone */ } }, ms);
   };
   const finish = (t, by) => {
     // Journal stats: the finishing blow is the kill (Nate, 2026-09-30), in a war to the death too

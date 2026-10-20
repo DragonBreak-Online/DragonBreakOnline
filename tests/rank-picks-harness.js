@@ -244,6 +244,14 @@ check('...another skill is never held', globalThis.__dboSchoolsSkillHeld(PRI, 'a
 const rest = view(PRI).schools.find((x) => x.name === 'Restoration').firstSpell.choices[0];
 r = globalThis.__dboMagicAction(PRI, 'firstSpell', ['Restoration', rest.id]);
 check('...chosen: no longer held', r.ok && globalThis.__dboSchoolsSkillHeld(PRI, 'priest') === false, r);
+// The Adept pick at Priest 50 opens on reaching 50, however little of the level is done (Esmyr #EB56, 20 Oct: Priest 50 at
+// 6%, the skill set to hold, never offered it)
+{ const m = props.get(PRI + '|private.mastery'); m.skills.priest.level = 50; m.skills.priest.rank = 2; m.skills.priest.xp = 6; put(PRI, 'private.mastery', m); }
+{ const f = view(PRI).schools.find((x) => x.name === 'Restoration').firstSpell;
+  check('Priest 50 at 6%: its Adept pick is open at once', f && f.stage === 'Adept', f); }
+{ const m = props.get(PRI + '|private.mastery'); m.skills.priest.level = 49; m.skills.priest.xp = 99; put(PRI, 'private.mastery', m); }
+{ const f = view(PRI).schools.find((x) => x.name === 'Restoration').firstSpell;
+  check('...and not at 49', !f || f.stage !== 'Adept', f); }
 const rates = fs.readFileSync(path.join(SERVER, 'skillrates.js'), 'utf8');
 check('skillrates.js rates a held skill 0 before anything else', /const rateFor = [^\n]*\n[^\n]*\n\s*try \{ if \(typeof globalThis\.__dboSchoolsSkillHeld === 'function' && globalThis\.__dboSchoolsSkillHeld\(actorId >>> 0, skillId\)\) return 0;/.test(rates));
 

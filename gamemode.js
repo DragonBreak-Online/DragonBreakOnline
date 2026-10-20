@@ -917,7 +917,7 @@ const HELP_GROUPS = [
   { key: 'beast', title: 'The beast in you', names: ['beast', 'forms', 'hunt', 'blood', 'feed'], role: 'beast',
     hints: ['Your curse and its powers: F3, the Supernatural tab.',
       'Silver and fire hurt a vampire more; silver and poison spells hurt a werewolf more in beast form.'] },
-  { key: 'work', title: 'Work and the world', names: ['time', 'property', 'keys', 'courier'],
+  { key: 'work', title: 'Work and the world', names: ['time', 'property', 'mine', 'keys', 'courier'],
     hints: ['Hunting work: the Contracts tab of the expedition board (Synod Conclave, Fighters Guild, Frostcrag Spire).', 'Other work for pay: a notice board, then /commission.',
       'Mining and woodcutting: an ore vein or a chopping block. Richer ores need a higher Miner tier.',
       'The Bleak-Frost Mine, west of Bruma: iron, corundum and gold, and meteoric iron for Adept miners.',
@@ -989,7 +989,7 @@ const STAFF_HELP = [
     ['property', 'at a door, as an official: sell <price> | list <deposit> <weekly> | unlist | offer <name> | remind | grace | evict']] },
   { key: 'elections', title: 'Hold elections', items: ['electionreview', 'strikevote', 'unstrikevote'] },
   { key: 'beasts', title: 'Beasts and the supernatural', items: ['beastform', 'curse', 'makesuper', 'vlremote', 'wwremote', 'feedpair', 'raid', 'warband'] },
-  { key: 'magic', title: 'Magic and crafts', items: ['schools', 'shoutclean', 'classteacher', 'preacher', 'manual', 'smithing', 'tailoring'] },
+  { key: 'magic', title: 'Magic and crafts', items: ['schools', 'shoutclean', 'classteacher', 'preacher', 'manual', 'smithing', 'tailoring', 'enchant'] },
   { key: 'law', title: 'Law', items: ['jail', ['concordat', '[races]: Concordat arrests standing, or the Thalmor outside the race rule'],
     ['dossier', 'list | read <name|#TAG> | reports | add <name|#TAG> <text> | strike <name|#TAG> <n>: the Thalmor dossiers and informant reports (add and strike: Lead GM)']] },
   { key: 'world', title: 'World', items: ['settime', 'setweather', 'timescale', 'region', ['dungeon end', '<dungeon id|name>: end a dungeon claim now'],
@@ -1154,6 +1154,13 @@ registerChatCommand('chargen', (a, args) => {
   } catch (e) { personal(a, 'Failed: ' + e.message); }
 }, { admin: true, help: '[player|#TAG] reopen character creation for someone (a Trial GM: yourself only)' });
 const NAME_RE = /^[A-Za-z][A-Za-z' \-]{1,30}$/;
+// An offline character by its #TAG ("#ABCD" or "Name #ABCD"): only when exactly one live character carries it in the index
+const offlineByTag = (q) => {
+  const m = String(q || '').trim().match(/(?:^|\s)#([A-Za-z0-9]{4})$/); if (!m) return 0;
+  let ids = []; try { ids = mp.findFormsByPropertyValue('private.indexed.tagKey', m[1].toLowerCase()) || []; } catch (e) { return 0; }
+  const live = ids.map((x) => Number(x) >>> 0).filter((id) => id && !(typeof globalThis.__dboFormGone === 'function' && globalThis.__dboFormGone(id)));
+  return live.length === 1 ? live[0] : 0;
+};
 // A staff rename, for /rename and the F7 panel's Rename (fork adminSystem.ts calls __dboAdminRename): { ok, text }
 const renameCharacter = (a, t, rawName) => {
   const newName = String(rawName || '').trim().replace(/\s+/g, ' ');
@@ -1176,9 +1183,12 @@ globalThis.__dboAdminRename = (a, t, name) => (staffCan(Number(a) >>> 0, 'rename
 registerChatCommand('rename', (a, args) => {
   const m = args.trim().match(/^(\S+(?:\s+#[A-Za-z0-9]{4})?|#[A-Za-z0-9]{4})\s+(.+)$/);
   if (!m) return personal(a, 'Usage: /rename <player|#TAG> <new name>');
-  const t = findByName(m[1]); if (!t) return personal(a, 'No such player. Use their name or #TAG.');
+  // A typed #TAG binds: findByName falls back to a name prefix when the tag is not online, which may be someone else
+  const tagIn = (m[1].match(/#([A-Za-z0-9]{4})$/) || [])[1];
+  let t = findByName(m[1]); if (t && tagIn && tagOf(t).toLowerCase() !== tagIn.toLowerCase()) t = 0;
+  t = t || offlineByTag(m[1]); if (!t) return personal(a, 'No such player. Use their name or #TAG (an offline character: its #TAG).');
   personal(a, renameCharacter(a, t, m[2]).text);
-}, { admin: true, help: '<player|#TAG> <new name>' });
+}, { admin: true, help: '<player|#TAG> <new name> (offline: by #TAG; /chars #TAG lists the account\'s characters)' });
 // The staff teleport: /tp, and /gm goto (gmcall.js). '' when it went, else why not
 const staffTeleport = (a, place) => {
   try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('travel', a, 'staff_tp', a); } catch (e) { /* the player log is optional */ }
@@ -3135,6 +3145,8 @@ const onCharacterReady = (userId, a) => {
     try { if (globalThis.__dboCitizenLogin) globalThis.__dboCitizenLogin(a); } catch (e) { log('citizen notice login failed', e.message); }
     // Vault fees, and any word of a vault warned or seized while they were away (bank.js)
     try { if (globalThis.__dboBankLogin) globalThis.__dboBankLogin(a); } catch (e) { log('bank login failed', e.message); }
+    // A duel's wager a restart or a failed payment left held goes back (duel.js)
+    try { if (globalThis.__dboDuelLogin) globalThis.__dboDuelLogin(a); } catch (e) { log('duel login failed', e.message); }
     // A free appearance change waiting, once per character, never while one is still being made (appearance.js)
     try { if (globalThis.__dboAppearanceFreeLogin && !creationPending(a) && !inCreatorRealm(a)) globalThis.__dboAppearanceFreeLogin(a); } catch (e) { log('free appearance notice failed', e.message); }
   }), 8000);
@@ -3224,7 +3236,9 @@ globalThis.__dboHandlers.disconnect = (userId) => {
   if (a && globalThis.__dboDungeonLeave) { try { globalThis.__dboDungeonLeave(a); } catch (e) { log('dungeon logout move failed', e.message); } }
   if (a && globalThis.__dboPartyLogout) { try { globalThis.__dboPartyLogout(a); } catch (e) { log('party logout failed', e.message); } }
   // What a UI said it can draw, and a deity offer already made, belong to this session (review C6, PRAY-1)
-  for (const k of ['__dboItemLeave', '__dboBankLeave', '__dboRobLeave', '__dboDeityForget', '__dboPanelLeave', '__dboManualsLeave', '__dboLabourLeave', '__dboPrayerLeave', '__dboSkinLeave', '__dboSchoolsLeave', '__dboKeyRingLeave', '__dboRacialLeave', '__dboStartLeave']) { if (a && typeof globalThis[k] === 'function') { try { globalThis[k](a); } catch (e) { log(`${k} failed`, e.message); } } }
+  for (const k of ['__dboItemLeave', '__dboBankLeave', '__dboRobLeave', '__dboSilverTestLeave', '__dboDeityForget', '__dboPanelLeave', '__dboManualsLeave', '__dboLabourLeave', '__dboPrayerLeave', '__dboSkinLeave', '__dboSchoolsLeave', '__dboKeyRingLeave', '__dboRacialLeave', '__dboStartLeave']) { if (a && typeof globalThis[k] === 'function') { try { globalThis[k](a); } catch (e) { log(`${k} failed`, e.message); } } }
+  // A duel ends with its duellist's logout (duel.js)
+  if (a && typeof globalThis.__dboDuelLeave === 'function') { try { globalThis.__dboDuelLeave(a); } catch (e) { log('duel leave failed', e.message); } }
   connected.delete(userId);
   const wait = globalThis.__dboLoginWaits.get(userId);
   if (wait) { clearInterval(wait); globalThis.__dboLoginWaits.delete(userId); }
@@ -3360,7 +3374,8 @@ const needsTick = () => {
       // and 1 otherwise. A missing module leaves the rate exactly where it was.
       // Well Fed (rest.js) slows it the same way, and the two multiply.
       const appetite = (globalThis.__dboPrayerHungerMult ? Number(globalThis.__dboPrayerHungerMult(a)) || 1 : 1)
-        * (globalThis.__dboRestHungerMult ? Number(globalThis.__dboRestHungerMult(a)) || 1 : 1);
+        * (globalThis.__dboRestHungerMult ? Number(globalThis.__dboRestHungerMult(a)) || 1 : 1)
+        * (globalThis.__dboRaceHungerMult ? Number(globalThis.__dboRaceHungerMult(a)) || 1 : 1);
       n.hunger = Math.min(100, n.hunger + (Number(NEEDS.hungerPerHour) || 0) * dt * appetite);
       applyNeedsStage(a, n, true);
       const warnMs = (Number(NEEDS.warnEveryMinutes) || 0) * 60000;
@@ -5500,6 +5515,8 @@ const inLoginGrace = (a) => {
 const unstuckActor = (a, by) => {
   const admin = staffCan(by, 'unstuck');
   try { if (mp.get(a, 'isDead')) return personal(by, 'You cannot use /unstuck while dead.'); } catch (e) { /* alive */ }
+  // Frozen in the engine's bleed-out after a temple wake (camera locked, no movement): /unstuck ends it first, cooldown or not
+  try { if (typeof globalThis.__dboBleedOutStop === 'function') globalThis.__dboBleedOutStop(a); } catch (e) { /* the move still runs */ }
   try { const r = mp.get(a, 'private.restrained'); if (r && (r.boundHands || r.carried || r.captorActorId)) return personal(by, 'You cannot use /unstuck while restrained or carried.'); } catch (e) { /* free */ }
   // No walking out of a jail, or out of a sentence (jail.js)
   if (!admin && globalThis.__dboJailUnstuck) { const why = globalThis.__dboJailUnstuck(a); if (why) return personal(by, why); }
@@ -6309,6 +6326,15 @@ const hitDamageHook = (aggressorId, targetId, sourceId, damage, ...rest) => {
   try { if (globalThis.__dboCompanionHitLanded) globalThis.__dboCompanionHitLanded(agg, tgt); } catch (e) { log('companion hit log failed', e.message); }
   try { if (globalThis.__dboNpcMoodHit) globalThis.__dboNpcMoodHit(agg, tgt, Number(sourceId) >>> 0); } catch (e) { log('npc mood hit failed', e.message); }
   try { if (globalThis.__dboSpellDotLanded) globalThis.__dboSpellDotLanded(agg, tgt, Number(sourceId) >>> 0); } catch (e) { log('spell dot failed', e.message); }
+  try {
+    const pend = npcHitPending.get(`${agg}|${tgt}`);
+    if (pend && Date.now() - pend.at < 1500) {
+      npcHitPending.delete(`${agg}|${tgt}`);
+      const after = Number((mp.get(tgt, 'percentages') || {}).health);
+      if (Number.isFinite(pend.hp) && Number.isFinite(after)) log(`npc hit landed ${agg.toString(16)}>${tgt.toString(16)}: health ${(pend.hp * 100).toFixed(1)}% -> ${(after * 100).toFixed(1)}% (scaled ${Number.isFinite(pend.pct) ? (pend.pct * 100).toFixed(1) : '?'}%, unscaled ${Number.isFinite(pend.raw) ? (pend.raw * 100).toFixed(1) : '?'}%)`);
+    }
+  } catch (e) { /* measurement only */ }
+  try { if (gearEnch) gearEnch.landed(agg, tgt, Number(sourceId) >>> 0, dealt); } catch (e) { log('gear enchantment landed failed', e.message); }
   const prev = globalThis.__dboPrevHitDamage;
   if (prev) { try { return prev(aggressorId, targetId, sourceId, dealt, ...rest); } catch (e) { log('hit damage chain failed', e.message); } }
   return undefined;
@@ -6556,6 +6582,8 @@ const explosionParalysisOf = (spellId) => {
   // A paralysis scroll holds its victim on the server (C++ OnSpellHit), but the C++ cannot replay it on the victim's own
   // client: DoCombatSpellApply takes a Spell, and a Scroll is another form type (review SCH3-3). Its own effect counts here.
   if (spell && spell.record.type === 'SCRL') seconds = paralysisIn(spell);
+  // A staff's (ENCH) paralysis, which nothing applied on a player's own client (gearench.js caps it for PvP)
+  else if (spell && spell.record.type === 'ENCH') seconds = paralysisIn(spell);
   else if (spell && spell.record.type === 'SPEL' && !paralysisIn(spell)) {
     for (const f of fieldsOf(spell, 'EFID')) {
       const mgef = recordOf(globalAt(spell, u32At(f, 0)));
@@ -6580,7 +6608,9 @@ const serverHoldOf = (spellId) => {
   if (serverHold.has(spellId)) return serverHold.get(spellId);
   const spell = recordOf(spellId);
   let seconds = 0;
-  if (spell && (spell.record.type === 'SPEL' || spell.record.type === 'SCRL')) {
+  // A staff's ENCH only once the fork holds it too (gearEnchantments.staffRiders.npcServerHold, off until that build)
+  const enchHeld = spell && spell.record.type === 'ENCH' && (((cfg.gearEnchantments || {}).staffRiders || {}).npcServerHold === true);
+  if (spell && (spell.record.type === 'SPEL' || spell.record.type === 'SCRL' || enchHeld)) {
     const harms = fieldsOf(spell, 'EFID').some((f) => {
       const data = fieldsOf(recordOf(globalAt(spell, u32At(f, 0))), 'DATA')[0];
       return !!(u32At(data, 0) & (HOSTILE | DETRIMENTAL)) && u32At(data, 0x44) === AV_HEALTH;
@@ -6607,7 +6637,17 @@ if (typeof globalThis.__dboPrevSpellHit === 'undefined') globalThis.__dboPrevSpe
 const spellHitHook = (aggressorId, targetId, spellId, ...rest) => {
   try {
     const tgt = Number(targetId) >>> 0, agg = Number(aggressorId) >>> 0, spell = Number(spellId) >>> 0;
-    const seconds = explosionParalysisOf(spell), held = serverHoldOf(spell), now = Date.now();
+    let seconds = explosionParalysisOf(spell); const held = serverHoldOf(spell), now = Date.now();
+    const isEnch = seconds > 0 && (() => { const r = recordOf(spell); return !!r && r.record.type === 'ENCH'; })();
+    // A player: a staff's hold at most pvpParalysisMaxSeconds, then immune to every paralysis a while (gearench.js)
+    if (seconds > 0 && gearEnch && profileOf(tgt) >= 0 && agg !== tgt && !paralysisRefused(agg, tgt, now)) seconds = gearEnch.playerParalysis(tgt, seconds, isEnch);
+    // An NPC: a staff holds it here only where the caster's own engine paralysed it (its host), until the fork holds staves
+    if (isEnch && profileOf(tgt) < 0 && !(((cfg.gearEnchantments || {}).staffRiders || {}).npcServerHold === true)) {
+      let host = 0; try { host = typeof mp.getHoster === 'function' ? mp.getHoster(tgt) >>> 0 : 0; } catch (e) { host = 0; }
+      if (host !== agg) seconds = 0;
+    }
+    // A staff's slow and its stamina or magicka damage on a player (gearench.js staffSpellHit)
+    try { if (gearEnch && agg !== tgt) gearEnch.staffSpellHit(agg, tgt, spell); } catch (e) { log('staff riders failed', e.message); }
     if (globalThis.__dboBeastSpellHit) globalThis.__dboBeastSpellHit(Number(aggressorId) >>> 0, tgt, Number(spellId) >>> 0);
     if (globalThis.__dboSuperSpellHit) globalThis.__dboSuperSpellHit(Number(aggressorId) >>> 0, tgt, Number(spellId) >>> 0);
     // Force Rune and the like stagger instead of pushing (combat.js staggerSpells)
@@ -6873,6 +6913,9 @@ const sourceResistsOf = (sourceId) => {
   if (sourceResistCache.has(sourceId)) return sourceResistCache.get(sourceId);
   const out = new Set();
   const r = recordOf(sourceId);
+  // A magic effect is its own source for a player-made enchantment's effects (gearench.js)
+  const ownData = r && String(r.record.type) === 'MGEF' && (r.record.fields || []).find((x) => x && x.type === 'DATA' && x.data instanceof Uint8Array && x.data.byteLength >= 20);
+  if (ownData) out.add(new DataView(ownData.data.buffer, ownData.data.byteOffset, ownData.data.byteLength).getInt32(16, true));
   if (r && ['SPEL', 'ENCH', 'SCRL'].includes(String(r.record.type))) {
     for (const f of r.record.fields || []) {
       if (!f || f.type !== 'EFID' || !(f.data instanceof Uint8Array) || f.data.byteLength < 4) continue;
@@ -6932,6 +6975,8 @@ const potionResistMult = (targetId, sourceId) => {
   }
   return share > 0 ? Math.max(0, 1 - Math.min(1, share)) : 1;
 };
+// Worn Resist Fire, Frost, Shock, Magic and Poison (gearench.js; the client's own copy never reached this judge)
+const gearResistMult = (targetId, sourceId) => { try { return gearEnch ? Number(gearEnch.resistMult(targetId >>> 0, sourceId >>> 0)) || 1 : 1; } catch (e) { return 1; } };
 const blessingDamageMult = (aggressorId, targetId, sourceId) => blessingAttackMult(aggressorId, sourceId) * blessingTargetMult(targetId, sourceId);
 // The server's hit formula counts only the bow's WEAP damage; vanilla adds the worn arrow's (AMMO DATA float at byte 8)
 const ARROWS = Object.assign({ enabled: true, scale: 1 }, cfg.arrows || {});
@@ -6983,6 +7028,65 @@ const arcaneDamageMult = (aggressorId, sourceId) => {
   const bonus = Number((ARCANE_DMG.byTier || [])[rank]) || 0;
   return bonus > 0 ? 1 + bonus : 1;
 };
+// gearench.js, loaded after racial.js below; the hit judge reads it at hit time
+let gearEnch = null;
+// Worn Fortify One-handed, Two-handed and Archery (Nate, 18 Oct: an enchanted hood that "never worked"; "tone down
+// enchantments so they're not too op"): vanilla raises OneHanded/TwoHanded/MarksmanModifier (AV 96/97/98) by a percent the
+// server never read. Each point adds perPoint (half of vanilla's 1%), all worn gear together at most cap, players only.
+// Config "gearFortify": { enabled, perPoint, cap }.
+const GEAR_FORT = Object.assign({ enabled: true, perPoint: 0.005, cap: 0.25 }, cfg.gearFortify || {});
+// Fortify Unarmed (AV 35) shares this cap, so fists and weapons stay even (gearEnchantments.unarmed.enabled)
+const GEAR_FORT_AV = { 96: 'one', 97: 'two', 98: 'archery', 35: 'unarmed' };
+const gearFortEffects = globalThis.__dboGearFortEffects instanceof Map ? globalThis.__dboGearFortEffects : (globalThis.__dboGearFortEffects = new Map()); // MGEF -> hook or ''
+const gearFortHookOf = (mgefId) => {
+  const id = mgefId >>> 0;
+  if (gearFortEffects.has(id)) return gearFortEffects.get(id);
+  const data = fieldsOf(recordOf(id), 'DATA')[0];
+  // MGEF DATA: archetype at 0x40 (0 value modifier, 34 peak value modifier), actor value at 0x44
+  const arch = u32At(data, 0x40), av = u32At(data, 0x44);
+  const hook = (arch === 0 || arch === 34) && GEAR_FORT_AV[av] ? GEAR_FORT_AV[av] : '';
+  gearFortEffects.set(id, hook);
+  return hook;
+};
+// [{ effect, magnitude }] of an ENCH record (EFID then its EFIT, magnitude a float at 0)
+const enchEffectsOf = (enchId) => {
+  const lr = recordOf(enchId); const out = [];
+  if (!lr || lr.record.type !== 'ENCH') return out;
+  let effect = 0;
+  for (const f of lr.record.fields || []) {
+    if (!(f.data instanceof Uint8Array)) continue;
+    if (f.type === 'EFID') effect = globalAt(lr, u32At(f, 0));
+    else if (f.type === 'EFIT' && effect && f.data.byteLength >= 4) { out.push({ effect, magnitude: new DataView(f.data.buffer, f.data.byteOffset, 4).getFloat32(0, true) }); effect = 0; }
+  }
+  return out;
+};
+const wornEnchEffectsOf = (e) => {
+  if (Array.isArray(e.enchantmentEffects) && e.enchantmentEffects.length) return e.enchantmentEffects.map((x) => ({ effect: Number(x.effectId) >>> 0, magnitude: Number(x.magnitude) || 0 }));
+  const own = Number(e.enchantmentId) >>> 0;
+  if (own) return enchEffectsOf(own);
+  const base = recordOf(Number(e.baseId) >>> 0);
+  if (!base || (base.record.type !== 'ARMO' && base.record.type !== 'WEAP')) return [];
+  return enchEffectsOf(globalAt(base, u32At(fieldsOf(base, 'EITM')[0], 0)));
+};
+// The share worn gear adds to a hook, capped
+const gearFortBonus = (a, hook) => {
+  if (GEAR_FORT.enabled === false || profileOf(a) < 0) return 0;
+  let entries = []; try { const inv = mp.get(a, 'inventory'); entries = inv && Array.isArray(inv.entries) ? inv.entries : []; } catch (e) { return 0; }
+  let points = 0;
+  for (const e of entries) {
+    if (!e || !(e.worn || e.wornLeft)) continue;
+    for (const x of wornEnchEffectsOf(e)) if (x.magnitude > 0 && gearFortHookOf(x.effect) === hook) points += x.magnitude;
+  }
+  return Math.min(Math.max(0, Number(GEAR_FORT.cap) || 0), points * (Number(GEAR_FORT.perPoint) || 0));
+};
+globalThis.__dboGearFortBonus = gearFortBonus;
+const gearAttackMult = (aggressorId, sourceId) => {
+  if (GEAR_FORT.enabled === false || isSpellSource(sourceId)) return 1;
+  const hands = weaponHandsOf(sourceId);
+  const unarmedOn = (sourceId >>> 0) === 0x1f4 && (((cfg.gearEnchantments || {}).unarmed || {}).enabled !== false);
+  const hook = unarmedOn ? 'unarmed' : weaponSkillOf(sourceId) === 'archery' ? 'archery' : hands === 'one' || hands === 'two' ? hands : '';
+  return hook ? 1 + gearFortBonus(aggressorId, hook) : 1;
+};
 // Fortify potions (alchemy rework, Nate 14 Oct: "only where the server can honour them"; alchemy.js __dboPotionBonus): a
 // weapon potion adds its share to that weapon's blows (Blade, Blunt, Archery by the DBO weapon skill; a vanilla One- or
 // Two-handed potion by the weapon's hands, as its text says), a Destruction or Restoration potion to that school's spell
@@ -6993,10 +7097,11 @@ const potionBonus = (a, hook) => { try { const f = globalThis.__dboPotionBonus; 
 // bar then holds base + extra points, which is what a larger maximum is; restores stay shares of the bar. Sleeping Tree
 // Sap (hook taken) takes its share off every hit. Both sit outside the racial cap, as a larger pool is not a resistance.
 const potionMaxSeen = globalThis.__dboPotionMaxSeen instanceof Map ? globalThis.__dboPotionMaxSeen : (globalThis.__dboPotionMaxSeen = new Map());
+// Worn Fortify Health counts the same way, a player's gear at most gearEnchantments.fortifyHealth.gearHealthCap (gearench.js)
+const gearHealthPoints = (targetId) => { try { return gearEnch && profileOf(targetId) >= 0 ? Math.max(0, Number(gearEnch.healthPoints(targetId >>> 0)) || 0) : 0; } catch (e) { return 0; } };
 const potionTakenMult = (targetId, flags) => {
-  if (typeof globalThis.__dboPotionBonus !== 'function') return 1;
   let m = 1;
-  const extra = potionBonus(targetId, 'health');
+  const extra = potionBonus(targetId, 'health') + gearHealthPoints(targetId);
   // A weapon hit names the maximum; a spell hit does not, so the last one seen for the target stands in (it changes only
   // with the character's level), else downed.js's measured one, else the smallest a character has (150)
   let base = flags && typeof flags === 'object' ? Number(flags.targetMaxHealth) : NaN;
@@ -7168,6 +7273,13 @@ try {
   delete require.cache[RACIAL_JS];
   racial = require(RACIAL_JS)({ mp, log, personal, giveItem, profileOf, display, recordOf, every, onlineActors, weaponHandsOf, sourceResistsOf, gmstFloat, cfg, sendPacket, hasUiCap });
 } catch (e) { log('racial.js failed to load:', e.stack || e.message); racial = null; globalThis.__dboRaceGold = null; globalThis.__dboRaceOf = null; }
+// ---- enchantments the server judges: weapon hits, worn resistances and fortifies (server\gearench.js, config "gearEnchantments")
+try {
+  const GEARENCH_JS = path.resolve('gearench.js');
+  delete require.cache[GEARENCH_JS];
+  gearEnch = require(GEARENCH_JS)({ mp, log, recordOf, profileOf, display, personal, sendPacket, sourceResistsOf, weaponHandsOf, racial, cfg,
+    potionResistMult: (t, s) => potionResistMult(t, s), blessingTargetMult: (t, s) => blessingTargetMult(t, s), takenMult: (t, f) => potionTakenMult(t, f) });
+} catch (e) { log('gearench.js failed to load:', e.stack || e.message); gearEnch = null; globalThis.__dboGearBonus = null; globalThis.__dboGearRegen = null; }
 // ---- how tough a family of creatures is against players, by race (server\npctoughness.js, config "npcToughness") ----
 let toughness = null;
 try {
@@ -7188,14 +7300,16 @@ const defensePieceMult = (targetId) => {
 };
 // Below 1 when the target's armor counts for more than the engine allowed it: the Defense tier multiplies each piece's
 // rating, and tempering adds the game's bonus to it (the engine reads the bare rating only)
+// Worn Fortify Heavy and Light Armor: that weight's pieces count a capped share more (gearench.js bonus)
+const gearArmorMult = (targetId) => { const b = globalThis.__dboGearBonus; try { return typeof b === 'function' ? { heavy: 1 + (Number(b(targetId, 'heavy')) || 0), light: 1 + (Number(b(targetId, 'light')) || 0) } : { heavy: 1, light: 1 }; } catch (e) { return { heavy: 1, light: 1 }; } };
 const defenseDamageMult = (targetId) => {
-  const pm = defensePieceMult(targetId);
+  const pm = defensePieceMult(targetId), gm = gearArmorMult(targetId);
   let bare = 0, counted = 0;
   try {
     for (const w of wornWithHealth(targetId)) {
       const p = armorPieceOf(w.baseId); if (!p) continue;
       bare += p.rating;
-      counted += ((p.counted || p.rating) + temperBonus(w.health, p.chest)) * (p.heavy ? pm.heavy : pm.light) * (w.cond || 1);
+      counted += ((p.counted || p.rating) + temperBonus(w.health, p.chest)) * (p.heavy ? pm.heavy : pm.light) * (w.cond || 1) * (p.heavy ? gm.heavy : gm.light);
     }
   } catch (e) { return 1; }
   // A Fortify Armor potion (alchemy.js, hook armor): the worn armour counts for that much more while it lasts
@@ -7267,12 +7381,12 @@ const fleshDamageMult = (targetId, sourceId) => {
   if (!(extra > 0)) return 1;
   const physical = (sourceId >>> 0) === 0x1f4 || (() => { const r = recordOf(sourceId >>> 0); return !!r && String(r.record.type) === 'WEAP'; })();
   if (!physical) return 1;
-  const pm = defensePieceMult(targetId);
+  const pm = defensePieceMult(targetId), gm = gearArmorMult(targetId);
   let counted = 0;
   try {
     for (const w of wornWithHealth(targetId)) {
       const p = armorPieceOf(w.baseId); if (!p) continue;
-      counted += ((p.counted || p.rating) + temperBonus(w.health, p.chest)) * (p.heavy ? pm.heavy : pm.light) * (w.cond || 1);
+      counted += ((p.counted || p.rating) + temperBonus(w.health, p.chest)) * (p.heavy ? pm.heavy : pm.light) * (w.cond || 1) * (p.heavy ? gm.heavy : gm.light);
     }
   } catch (e) { counted = 0; }
   const scale = gmstFloat(0x21a72, 0.12), cap = gmstFloat(0x37deb, 80);
@@ -7438,6 +7552,7 @@ const npcDifficultyDamageMult = (agg, tgt, dmg, flags) => {
 // npcDamage.log: one line for every creature's or NPC's hit on a player, x1 hits included (the mastery line is written only
 // when a factor changed the hit), so a player's whole fight can be read: attacker base and spawn tag, the lease difficulty,
 // source, raw damage, the final factor, the flags and the health before. Off unless set.
+const npcHitPending = new Map();
 const npcHitLog = (agg, tgt, src, dmg, mult, flags) => {
   if (!(cfg.npcDamage || {}).log || !(dmg > 0) || agg === tgt) return;
   if (profileOf(agg) >= 0 || profileOf(tgt) < 0) return;
@@ -7450,7 +7565,11 @@ const npcHitLog = (agg, tgt, src, dmg, mult, flags) => {
   const edid = r && r.record ? String(r.record.editorId || '') : '';
   const max = Number(f.targetMaxHealth);
   const kind = [f.spell ? 'spell' : '', f.power ? 'power' : '', f.blocked ? 'blocked' : '', f.bash ? 'bash' : '', f.sneak ? 'sneak' : ''].filter(Boolean).join(',');
-  log(`npc hit ${display(agg)} (${edid || base || '?'}${tag ? ' ' + tag : ''}${npcLeaseDifficultyOf(agg) ? ' ' + npcLeaseDifficultyOf(agg) : ''}) -> ${display(tgt)}: source ${src.toString(16)} ${dmg.toFixed(1)} x${mult.toFixed(2)} = ${(dmg * mult).toFixed(1)}${max > 0 ? ` of ${max.toFixed(0)} (${((dmg * mult) / max * 100).toFixed(1)}%)` : ''}${kind ? ' [' + kind + ']' : ''} health ${Number.isFinite(hp) ? (hp * 100).toFixed(1) + '%' : '?'}`);
+  // Measured, not acted on (main session, 20 Oct: a hit on the player who hosts the NPC may skip the scaling): ids for the
+  // hoster log ("Hoster of X changed"), and the health after the hit lands (hitDamageHook, "npc hit landed")
+  npcHitPending.set(`${agg}|${tgt}`, { at: Date.now(), hp, pct: max > 0 ? (dmg * mult) / max : NaN, raw: max > 0 ? dmg / max : NaN });
+  if (npcHitPending.size > 512) for (const [k, v] of npcHitPending) if (Date.now() - v.at > 5000) npcHitPending.delete(k);
+  log(`npc hit ${display(agg)} (${edid || base || '?'}${tag ? ' ' + tag : ''}${npcLeaseDifficultyOf(agg) ? ' ' + npcLeaseDifficultyOf(agg) : ''}) -> ${display(tgt)}: source ${src.toString(16)} ${dmg.toFixed(1)} x${mult.toFixed(2)} = ${(dmg * mult).toFixed(1)}${max > 0 ? ` of ${max.toFixed(0)} (${((dmg * mult) / max * 100).toFixed(1)}%)` : ''}${kind ? ' [' + kind + ']' : ''} health ${Number.isFinite(hp) ? (hp * 100).toFixed(1) + '%' : '?'} ids ${agg.toString(16)}>${tgt.toString(16)}`);
 };
 // A hit scaled below 1 is given back after the engine applied it (masteryBonusDamage), but only to a target that lived
 // through the engine's full hit: at 50 health a boar's 50-point bite downed a player although the scaled bite would not
@@ -7579,6 +7698,8 @@ const potionPoisonHit = (agg, tgt, src, dmg, flags) => {
   const r = recordOf(src); if (!r || String(r.record.type) !== 'WEAP') return;
   try { globalThis.__dboPoisonHit(agg, tgt, src, flags); } catch (e) { log('poison hit failed', e.message); }
 };
+// An enchanted weapon's effects on a landed blow (gearench.js weaponAttempt); never fails the hit
+const gearWeaponHit = (agg, tgt, src, dmg, flags) => { try { if (gearEnch && dmg > 0) gearEnch.weaponAttempt(agg, tgt, src, dmg, flags); } catch (e) { log('gear enchantment failed', e.message); } };
 const hitDamageAttemptHook =(aggressorId, targetId, sourceId, damage, flags) => {
   const agg = Number(aggressorId) >>> 0;
   const tgt = Number(targetId) >>> 0;
@@ -7650,6 +7771,9 @@ const hitDamageAttemptHook =(aggressorId, targetId, sourceId, damage, flags) => 
   // friendly GMs never harm each other. Before companionSystem's hook, so a refused hit sets no band on anyone.
   globalThis.__dboHitRefusal = 'warband';
   try { if (agg !== tgt && typeof globalThis.__dboWarbandRefusesHit === 'function' && globalThis.__dboWarbandRefusesHit(agg, tgt)) return false; } catch (e) { log('warband hit check failed', e.message); }
+  // 2e. An accepted silver test's strike gives its result and lands no damage (silvertest.js)
+  globalThis.__dboHitRefusal = 'silver_test';
+  try { if (agg !== tgt && typeof globalThis.__dboSilverTestStrike === 'function' && globalThis.__dboSilverTestStrike(agg, tgt, src, dmg, flags)) return false; } catch (e) { log('silver test hit failed', e.message); }
   // past the gameplay's own gates: a refusal from here on is the fork chain's or the summon guard's, unnamed
   globalThis.__dboHitRefusal = null;
 
@@ -7681,11 +7805,17 @@ const hitDamageAttemptHook =(aggressorId, targetId, sourceId, damage, flags) => 
     // so a werewolf also took the Master fist bonus, the fist's stamina drain and its disarm (combat review, 2026-09-29)
     let beastAgg = false; try { const b = mp.get(agg, 'private.beast'); beastAgg = !!(b && b.form); } catch (e) { /* not an actor */ }
     // The target's side (Defense, a blessing, the race's resistance) is capped together: racial.js reductionCap
-    let targetSide = defenseDamageMult(tgt) * fleshDamageMult(tgt, src) * blessingTargetMult(tgt, src) * potionResistMult(tgt, src);
+    // Worn resistances join the race's, a potion's and a blessing's under racial.js reductionCap (gearench.js resistMult)
+    let targetSide = defenseDamageMult(tgt) * fleshDamageMult(tgt, src) * blessingTargetMult(tgt, src) * potionResistMult(tgt, src) * gearResistMult(tgt, src);
+    // Spellbreaker's ward while its wearer blocks a spell from the front (gearench.js), under the same cap as a racial ward
+    try { if (gearEnch) targetSide *= gearEnch.spellbreakerMult(agg, tgt, src, dmg, flags); } catch (e) { log('spellbreaker failed', e.message); }
     if (racial) { try { targetSide = racial.capTargetSide(targetSide * racial.targetMult(agg, tgt, src, dmg)); } catch (e) { log('racial target failed', e.message); } }
     let raceAtk = 1;
     if (racial && !beastAgg) { try { raceAtk = racial.attackMult(agg, tgt, src, dmg); } catch (e) { log('racial attack failed', e.message); } }
     let mult = (beastAgg ? 1 : masteryDamageMult(agg, src) * potionAttackMult(agg, src)) * potionTakenMult(tgt, flags) * arcaneDamageMult(agg, src) * materialDamageMult(agg, src) * temperDamageMult(agg, src) * arrowDamageMult(agg, src) * targetSide * blessingAttackMult(agg, src) * raceAtk * huntDamageMult(agg, tgt) * pvp;
+    if (!beastAgg) mult *= gearAttackMult(agg, src);
+    // The Shrouded Gloves double a one-handed sneak attack (gearench.js backstabMult)
+    try { if (gearEnch && !beastAgg) mult *= gearEnch.backstabMult(agg, src, flags); } catch (e) { log('backstab failed', e.message); }
     // Tired blows, fists into armour, staves through it, the fist's stamina drain and disarm (martial.js)
     if (martial && !beastAgg) { try { mult *= martial.onAttempt(agg, tgt, src, dmg, flags); } catch (e) { log('martial failed', e.message); } }
     // Block chip and stamina, guard breaks, bash, stagger (combat.js); a bash's blow comes back scaled down
@@ -7708,6 +7838,7 @@ const hitDamageAttemptHook =(aggressorId, targetId, sourceId, damage, flags) => 
     if (guard) {
       if (guard.rest < 1) globalThis.__dboMasteryPending = { agg, tgt, mult: guard.rest, health: guard.health };
       potionPoisonHit(agg, tgt, src, dmg, flags);
+      gearWeaponHit(agg, tgt, src, dmg, flags);
       return true;
     }
     // The health before anything below changes it: the give-back measures the hit from here
@@ -7725,6 +7856,7 @@ const hitDamageAttemptHook =(aggressorId, targetId, sourceId, damage, flags) => 
       if (before && before.health > 0) globalThis.__dboMasteryPending = { agg, tgt, mult, health: before.health };
     }
     potionPoisonHit(agg, tgt, src, dmg, flags);
+    gearWeaponHit(agg, tgt, src, dmg, flags);
   } catch (e) { /* not an actor */ }
   return true;
 };
@@ -8098,6 +8230,17 @@ try {
     takeGold, giveGold: (a, n) => giveItem(a, GOLD_BASE, n) !== false, depositToTreasury, zoneById, openWidget, closeWidget, onUi });
 } catch (e) { log('tenancy.js failed to load:', e.stack || e.message); }
 
+// ---- mines owned like property: access and the owner's share at the vein (server\mines.js, mines.json, config "mines") ----
+try {
+  const MINES_JS = path.resolve('mines.js');
+  delete require.cache[MINES_JS];
+  require(MINES_JS)({ mp, log, personal, audit, who, display, cfg, onUi, openWidget, closeWidget, onlineActors, every, registerChatCommand,
+    giveItem, distanceMeters, profileOf, zoneById, isLeadStaff });
+} catch (e) {
+  log('mines.js failed to load:', e.stack || e.message);
+  for (const k of ['__dboMineGate', '__dboMineShareQuote', '__dboMineValueOf', '__dboHousingNotHome', '__dboMineSaleRefusal', '__dboMineAtDoor', '__dboMinePanel', '__dboMines', '__dboMinesFlush']) globalThis[k] = null;
+}
+
 // ---- the ledger of contacts, read at boards, homes and placed ledgers (server\ledger.js, config "ledger") ----------
 try {
   const LEDGER_JS = path.resolve('ledger.js');
@@ -8139,8 +8282,24 @@ try {
   const auth = serverSettings.discordAuth || {};
   require(GMCALL_JS)({ mp, log, personal, staffSay, audit, staffNote, who, display, profileOf, discordOf, rolesOf, onlineActors, registerChatCommand,
     isAdmin, staffCan, every, saveSoon, sendPacket, zoneOfActor, zoneById, recordOf, teleportTo: staffTeleport, creationPending, sendJson, cfg,
-    token: (cfg.discord || {}).botToken || auth.botToken });
-} catch (e) { log('gmcall.js failed to load:', e.stack || e.message); globalThis.__dboGmCallsOpen = null; }
+    openWidget, closeWidget, onUi, token: (cfg.discord || {}).botToken || auth.botToken });
+} catch (e) { log('gmcall.js failed to load:', e.stack || e.message); globalThis.__dboGmCallsOpen = null; globalThis.__dboGmCallsView = null; globalThis.__dboGmCallsAct = null; }
+
+// ---- /enchant and the F7 Enchant tab: staff enchant one piece for an event (server\staffenchant.js, config "staffEnchant") --
+try {
+  const STAFFENCHANT_JS = path.resolve('staffenchant.js');
+  delete require.cache[STAFFENCHANT_JS];
+  require(STAFFENCHANT_JS)({ mp, log, personal, audit, staffNote, who, display, onlineActors, registerChatCommand, staffTierOf, findByName,
+    onUi, openWidget, closeWidget, sendPacket, itemName: (id) => globalThis.__alduinakItemName(id), cfg });
+} catch (e) { log('staffenchant.js failed to load:', e.stack || e.message); }
+
+// ---- /event and /chars: quick staff tools (server\stafftools.js, config "events") ------------------------------------
+try {
+  const STAFFTOOLS_JS = path.resolve('stafftools.js');
+  delete require.cache[STAFFTOOLS_JS];
+  require(STAFFTOOLS_JS)({ mp, log, personal, system, audit, who, tagOf, profileOf, rolesOf, onlineActors, registerChatCommand, isAdmin, cfg,
+    staffTier: staffTierOf, realNameOf, userOf, findByName, offlineByTag, sendJson, token: (cfg.discord || {}).botToken || (serverSettings.discordAuth || {}).botToken });
+} catch (e) { log('stafftools.js failed to load:', e.stack || e.message); }
 
 // ---- update controls: version log, /update, /schedule restart|shutdown|update (server\updates.js, config "updates") -----
 try {
@@ -8289,6 +8448,13 @@ try {
   delete require.cache[ROBBERY_JS];
   require(ROBBERY_JS)({ mp, log, personal, audit, who, onlineActors, recordOf, adminItemName, openWidget, closeWidget, onUi, sendPacket, every, cfg });
 } catch (e) { log('robbery.js failed to load:', e.stack || e.message); globalThis.__dboRobEntries = null; globalThis.__dboRobAction = null; }
+
+// ---- Silver Test in the X menu: a hunter's silver on a consenting subject's blood (server\silvertest.js) ----------------
+try {
+  const SILVERTEST_JS = path.resolve('silvertest.js');
+  delete require.cache[SILVERTEST_JS];
+  require(SILVERTEST_JS)({ mp, log, personal, audit, who, onlineActors, openWidget, closeWidget, onUi, sendPacket, every, cfg });
+} catch (e) { log('silvertest.js failed to load:', e.stack || e.message); for (const k of ['__dboSilverTestEntries', '__dboSilverTestAction', '__dboSilverTestStrike', '__dboSilverTestLeave']) globalThis[k] = null; }
 
 // ---- the Key Ring panel: house keys as records on the character (server\keyring.js; housingSystem.ts housingKeyRing) ------
 try {
@@ -8560,7 +8726,7 @@ try {
   // Feeding counts as a meal for the hunger meter
   const needsFeed = (a) => { if (!NEEDS.enabled) return; const n = needsOf(a); n.hunger = Math.max(0, n.hunger - (Number((NEEDS.restore || {}).meal) || 0)); saveNeeds(a, n); applyNeedsStage(a, n, false); };
   require(SUPERNATURAL_JS)({ mp, log, personal, registerChatCommand, onUi, openWidget, closeWidget, sendPacket, display, who, audit, isAdmin, findByName, onlineActors, every, profileOf, nameOf, isWorldspace, needsFeed, hungerOf: (a) => needsOf(a).hunger, cfg, hasUiCap, sourceResistsOf });
-} catch (e) { log('supernatural.js failed to load:', e.stack || e.message); for (const k of ['__dboSuperDamageMult', '__dboSuperHit', '__dboSuperEat', '__dboSuperPrayed', '__dboSuperPrayWarning', '__dboSuperDeath', '__dboSuperActivate', '__dboSuperMenuEntries', '__dboSuperMenuAction', '__dboSuperAdminInfect', '__dboBeastAllow', '__dboBeastChanged', '__dboSuperKind', '__dboSuperLogin', '__dboSuperLeave', '__dboSuperProgress', '__dboSuperProgressSend', '__dboSuperRateMult', '__dboSuperFoodMult', '__dboTellsRetake', '__dboVampHealCast', '__dboVampHealRefusal', '__dboVampHealBlocks', '__dboSuperBloodPotion']) globalThis[k] = null; }
+} catch (e) { log('supernatural.js failed to load:', e.stack || e.message); for (const k of ['__dboSuperDamageMult', '__dboSuperHit', '__dboSuperEat', '__dboSuperPrayed', '__dboSuperPrayWarning', '__dboSuperDeath', '__dboSuperActivate', '__dboSuperMenuEntries', '__dboSuperMenuAction', '__dboSuperAdminInfect', '__dboBeastAllow', '__dboBeastChanged', '__dboSuperKind', '__dboSuperIsSilverWeapon', '__dboSuperLogin', '__dboSuperLeave', '__dboSuperProgress', '__dboSuperProgressSend', '__dboSuperRateMult', '__dboSuperFoodMult', '__dboTellsRetake', '__dboVampHealCast', '__dboVampHealRefusal', '__dboVampHealBlocks', '__dboSuperBloodPotion']) globalThis[k] = null; }
 
 // ---- friendly fire and the down state (server\downed.js): after supernatural.js, whose hooks it wraps -------
 try {
@@ -8568,6 +8734,12 @@ try {
   delete require.cache[DOWNED_JS];
   require(DOWNED_JS)({ mp, log, personal, sendPacket, audit, who, display, profileOf, nameOf, onlineActors, every, registerChatCommand, cfg, openWidget, closeWidget, onUi, redress });
 } catch (e) { log('downed.js failed to load:', e.stack || e.message); globalThis.__dboReviveWith = null; globalThis.__dboIsDowned = null; globalThis.__dboLabDraught = null; }
+// ---- duels between two players, the death duel too (server\duel.js, config "duel"): after downed.js, whose hit, death, cast and eat hooks it wraps ----
+try {
+  const DUEL_JS = path.resolve('duel.js');
+  delete require.cache[DUEL_JS];
+  require(DUEL_JS)({ mp, log, personal, audit, who, display, profileOf, onlineActors, every, registerChatCommand, cfg, openWidget, closeWidget, onUi, sendPacket, takeGold, giveItem, goldOf, recordOf, findByName, isAdmin, staffLog });
+} catch (e) { log('duel.js failed to load:', e.stack || e.message); for (const k of ['__dboDuelPair', '__dboInDuel', '__dboDuelEntries', '__dboDuelAction', '__dboDuelLogin', '__dboDuelLeave']) globalThis[k] = null; }
 // ---- province rules for crafting and the tome shop (server\regions.js, config "regions"): before spells.js, which asks it ----
 try {
   const REGIONS_JS = path.resolve('regions.js');
@@ -8641,6 +8813,12 @@ try {
   require(CHARTERS_JS)({ mp, log, ownNameOf, ownDisplay, displayFor, personal, audit, who, display, nameOf, cfg, registerChatCommand, onlineActors, isAdmin, isLeadStaff,
     findByName, profileOf, takeGold, giveItem, every, staffNote, approvalForum });
 } catch (e) { log('charters.js failed to load:', e.stack || e.message); }
+// ---- dungeon traps, run by the server: plates, tripwires and trigger boxes, their traps' swings and blows (server\traps.js)
+try {
+  const TRAPS_JS = path.resolve('traps.js');
+  delete require.cache[TRAPS_JS];
+  require(TRAPS_JS)({ mp, log, cfg, every, onlineActors, profileOf, display, audit, personal, registerChatCommand });
+} catch (e) { log('traps.js failed to load:', e.stack || e.message); globalThis.__dboTrapsHandles = null; }
 // ---- damage over time from a player's spell: the duration the spell formula never deals (server\spelldot.js) --------
 try {
   const SPELLDOT_JS = path.resolve('spelldot.js');

@@ -210,6 +210,21 @@ check('no blessing write for castHoldSeconds after the worshipper\'s cast (racia
 check('...and the blessing runs again once the hold is over', (() => { run(2); return out.sets.length > 0 && pc().stamina > 0.5; })());
 delete globalThis.__dboCastHeld;
 
+// Worn regeneration gear (gearench.js regenOf, enchantment audit 20 Oct): the same units, its own share capped at
+// gearEnchantments.regen.gearRegenCap (0.5) of the race's rate, added to a blessing
+props.delete(ACTOR + '|private.dboBlessing'); globalThis.__dboBlessingRegenOwed.delete(ACTOR);
+let gearList = [];
+globalThis.__dboGearRegen = () => gearList;
+gearList = [{ av: 'HealRateMult', stat: 'health', kind: 'mult', mag: 25, gear: true }];
+check('gear Heal Rate 25 (no blessing) adds a quarter of the Nord\'s 0.7%/s: +0.007 in 4 s', (() => { setPc(0.5, 0.5, 0.5); run(4); return near(pc().health, 0.507, 1e-6); })(), JSON.stringify(pc()));
+gearList = [{ av: 'MagickaRateMult', stat: 'magicka', kind: 'mult', mag: 200, gear: true }];
+check('...gear Magicka Rate 200 is held to gearRegenCap 0.5 of 3%/s: +0.03 in 2 s, not 0.12', (() => { globalThis.__dboBlessingRegenOwed.delete(ACTOR); setPc(0.5, 0.5, 0.5); run(2); return near(pc().magicka, 0.53, 1e-6); })(), JSON.stringify(pc()));
+gearList = [{ av: 'MagickaRateMult', stat: 'magicka', kind: 'mult', mag: 75, gear: true }];
+check('...with Akatosh\'s Magicka Rate 10 (0.003/s) they add: 0.003 + 0.015 a second', (() => { bless('akatosh'); setPc(0.5, 0.2, 0.5); run(2); return near(pc().magicka, 0.236, 1e-6); })(), JSON.stringify(pc()));
+gearList = [{ av: 'HealRateMult', stat: 'health', kind: 'mult', mag: 25 }];
+check('...an entry not marked gear is never taken from the gear hook', (() => { props.delete(ACTOR + '|private.dboBlessing'); globalThis.__dboBlessingRegenOwed.delete(ACTOR); setPc(0.5, 0.5, 0.5); out.sets.length = 0; run(3); return out.sets.length === 0; })());
+delete globalThis.__dboGearRegen;
+
 console.log('');
 console.log('deity      bar      server rate/s   during the blessing   after it ends');
 for (const [deity, stat, perSec, secs, got] of table) console.log(`${deity.padEnd(10)} ${stat.padEnd(8)} ${String(perSec).padEnd(15)} +${got.toFixed(4)} in ${String(secs).padEnd(2)} s    +0`);

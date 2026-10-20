@@ -100,7 +100,7 @@ const TIER = E('senior', 'developer', 'leadgm', 'gm', 'trialgm', 'none');
 const SIDE = O({ hits: 'int', dmg: 'num', by: A(NAME, 8) });
 const REFUSAL_REASONS = ['god', 'ethereal', 'offline_body', 'login_grace', 'bound', 'paralysed', 'armour_change', 'damage_cap',
   'spell_rate', 'dungeon_ally', 'warband', 'companion_pvp', 'silver', 'recovering', 'downed', 'shout_not_given',
-  'friendly_lethal', 'unknown'];
+  'friendly_lethal', 'duel_pause', 'duel_rules', 'duel_beaten', 'duel_scaled', 'duel_outsider', 'unknown'];
 
 // ---- the event types (DESIGN.md 1.5) ------------------------------------------------------------------------------------
 // p: priority (0 never dropped before the hard cap, 1, 2 first to go); place: 'pos' (cell and coordinates), 'cell' (cell
@@ -1021,7 +1021,8 @@ const COMMAND_SCHEMA = {
   tp: { target: { from: 0, lookup: 'online' } },
   chargen: { target: { from: 0, lookup: 'online' } },
   grantappearance: { target: { from: 0, lookup: 'online' } },
-  rename: { target: { from: 0, to: 1, lookup: 'online' } },
+  rename: { target: { from: 0, to: 1, lookup: 'any' } },
+  chars: { target: { from: 0, lookup: 'any' }, info: true },
   fixloc: { target: { from: 0, lookup: 'online' } },
   sethunger: { target: { from: 0, to: 1, lookup: 'online' }, nums: [-1] },
   wipechars: { target: { from: 0, lookup: 'any' } },
@@ -1075,7 +1076,7 @@ const COMMAND_SCHEMA = {
   realnames: { subs: S_('on off status') },
   forget: {}, concordat: {}, dossier: { subs: S_('add strike view') },
   // staff world commands: a staff.world action, never their text
-  announce: { world: 'announce' }, schedule: { world: 'schedule' }, rolename: { world: 'rolename' },
+  announce: { world: 'announce' }, event: { world: 'announce' }, schedule: { world: 'schedule' }, rolename: { world: 'rolename' },
   settime: { world: 'clock', nums: [0] }, timescale: { world: 'timescale', nums: [0] }, setweather: { world: 'weather' },
   placeundo: { world: 'place' }, placeexport: { world: 'place' },
   driftspawn: { world: 'drift' }, driftrepair: { world: 'drift' }, driftset: { world: 'drift' },

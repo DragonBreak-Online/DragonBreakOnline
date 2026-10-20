@@ -107,6 +107,11 @@ module.exports = (api) => {
     // Nate, 5 Oct (ticket #0064): a fed vampire passes for mortal, as Cyrodiil's vampires do. The eyes and the pallor
     // show from this stage of thirst; a vampire the fever turned shows them until the first meal. 1 = always
     vampireTellsStage: 3,
+    // A goblin vampire's eyes (Nate, 20 Oct: "goblin vampire eyes need to glow when they are hungry"). Goblins have no eye
+    // head parts: the eyes are in headparts.dds on the head mesh's shape mesh001:1:2:3:3 (every Goblin Head.nif variant).
+    // While the tells show, that shape takes txst (a TXST of a glowing headparts texture), and txstMortal when they go.
+    // Both are DLE records the PC makes; empty, nothing is swapped and the pallor alone shows, as before
+    goblinEyes: { node: 'mesh001:1:2:3:3', txst: '', txstMortal: '' },
     // Nat: covering up shields a vampire from the sun. Share of the burn each covered part takes away (sums to 1),
     // and how much of the burn full cover removes
     sunCover: { head: 0.35, body: 0.35, hands: 0.15, feet: 0.15 }, sunCoverMax: 0.8,
@@ -224,6 +229,14 @@ module.exports = (api) => {
     return r && v ? [r, v] : null;
   })();
   if (reachmanRace) { VAMPIRE_RACES.set(reachmanRace[0], reachmanRace[1]); MORTAL_RACES.set(reachmanRace[1], reachmanRace[0]); }
+  // The DLE's DBOHalfGiantRace and its vampire (config halfGiantRace, PC Worker C 20 Oct) the same way
+  const halfGiantRace = (() => {
+    const M = cfg.halfGiantRace || {};
+    const rec = (d) => { const id = d ? (() => { try { return mp.getIdFromDesc(String(d)) >>> 0; } catch (e) { return 0; } })() : 0; let r = null; try { r = id ? recordOf(id) : null; } catch (e) { r = null; } const t = r && (r.record ? r.record.type : r.type); return t && String(t) === 'RACE' ? id : 0; };
+    const r = rec(M.race), v = rec(M.vampire);
+    return r && v ? [r, v] : null;
+  })();
+  if (halfGiantRace) { VAMPIRE_RACES.set(halfGiantRace[0], halfGiantRace[1]); MORTAL_RACES.set(halfGiantRace[1], halfGiantRace[0]); }
   const keywordsOf = (id) => fieldIds(recordOf(id), 'KWDA').map((k) => globalOf(id, k));
   const hasKeyword = (id, kw) => !!kw && keywordsOf(id).includes(kw);
   const effectsOf = (id) => fieldIds(recordOf(id), 'EFID').map((e) => globalOf(id, e));
@@ -305,6 +318,7 @@ module.exports = (api) => {
   if (snowElfRace) FAMILY.set(snowElfRace[0], 'highelf');
   // A Reachman is a man of Breton stock on the Breton morph, with vanilla human heads: the human tells
   if (reachmanRace) FAMILY.set(reachmanRace[0], 'human');
+  if (halfGiantRace) FAMILY.set(halfGiantRace[0], 'human');
   // A Goblin has no eyes to choose (no head parts at all): its tells are the skin tone alone (Nat, 15 Oct: "skin tone works").
   // A goblin werewolf shows nothing
   if (goblinRace) FAMILY.set(goblinRace[0], 'goblin');
@@ -358,6 +372,17 @@ module.exports = (api) => {
     }
     return { next, look };
   };
+  // The goblin's eye shape retextured for every watcher (NetImmerse.SetNodeTextureSet, kept in the change form, so new
+  // watchers and relogs get it too): the glowing set when on, the mortal set when off. true when it was sent
+  const goblinEyes = (a, on) => {
+    const G = C.goblinEyes || {}; const desc = String((on ? G.txst : G.txstMortal) || '');
+    if (!desc || !G.node) return false;
+    try {
+      mp.callPapyrusFunction('global', 'NetImmerse', 'SetNodeTextureSet', null, [{ type: 'form', desc: mp.getDescFromId(a >>> 0) }, String(G.node), { type: 'form', desc }, false]);
+      log(`supernatural: ${display(a)}'s goblin eyes ${on ? 'glow' : 'are their own again'}`);
+      return true;
+    } catch (e) { log(`supernatural: goblin eyes for ${display(a)} failed: ${e.message}`); return false; }
+  };
   // Idempotent: run on every slow tick, so a reroll, a relog or a beast revert gets the tells back
   const ensureTells = (a, s) => {
     if (!s || !s.kind || beastForm(a)) return;
@@ -365,7 +390,11 @@ module.exports = (api) => {
     if (!app || !Array.isArray(app.headpartIds)) return;
     const { fam, want } = tellEyeFor(app, s);
     if (!want && !skinOnly(fam, s)) return;
-    if (!want && s.look) return; // a goblin's pallor is laid once, as eyes are
+    if (!want && s.look) {
+      // a goblin's pallor is laid once, as eyes are; the glow joins one laid before it was configured
+      if (s.look.skinOnly && !s.look.eyeGlow && s.kind === 'vampire' && goblinEyes(a, true)) { s.look.eyeGlow = true; saveState(a, s); }
+      return;
+    }
     if (want && app.headpartIds.includes(want)) {
       // Shown before the eyes' extras went with them (2026-09-29): take the stray overlay off once, keeping it for the cure
       const look = s.look;
@@ -381,6 +410,7 @@ module.exports = (api) => {
     }
     const laid = layTells(app, s, fam, want);
     if (!laid) return;
+    if (laid.look.skinOnly && s.kind === 'vampire' && goblinEyes(a, true)) laid.look.eyeGlow = true;
     s.look = laid.look; saveState(a, s);
     mp.set(a, 'appearance', laid.next);
     log(`supernatural: ${display(a)} shows the ${s.kind}'s tells`);
@@ -406,6 +436,7 @@ module.exports = (api) => {
   const clearTells = (a, s) => {
     const look = s && s.look; if (!look) return;
     s.look = null;
+    if (look.eyeGlow) goblinEyes(a, false);
     let app = null; try { app = mp.get(a, 'appearance'); } catch (e) { return; }
     if (!app || !Array.isArray(app.headpartIds)) return;
     const extras = (Array.isArray(look.prevExtras) ? look.prevExtras : []).filter((x) => !app.headpartIds.some((h) => (Number(h) >>> 0) === x));
@@ -460,6 +491,8 @@ module.exports = (api) => {
       const laid = want ? (!mortal.headpartIds.includes(want) ? layTells(mortal, s, fam, want) : null) : (skinOnly(fam, s) ? layTells(mortal, s, fam, 0) : null);
       if (laid) { s.look = laid.look; next = laid.next; }
     }
+    // A goblin's glowing eyes are on the mesh, not in the look: they stay with the new look, or go when it shows none
+    if (look && look.eyeGlow) { if (s.look && s.look.skinOnly) s.look.eyeGlow = true; else goblinEyes(a, false); }
     if (!look && !s.look && !bloodTaken) return false;
     saveState(a, s);
     if (JSON.stringify(next) !== JSON.stringify(app)) mp.set(a, 'appearance', next);
@@ -2145,6 +2178,8 @@ module.exports = (api) => {
     for (const o of onlineActors()) sendPacket(o, { customPacketType: 'dboPale', actor: a >>> 0, shader: PALE_SHADER, on: !!on });
   };
   globalThis.__dboSuperKind = (a) => kindOf(a);
+  // The silver weapon test the weaknesses use (keyword or silverWeapons), for silvertest.js
+  globalThis.__dboSuperIsSilverWeapon = (id) => isSilverSource(Number(id) >>> 0);
   // After an identity reroll a vampire wears the vampire variant of the race just chosen
   globalThis.__dboSuperReapplyLook = (a) => { if (kindOf(a) === 'vampire') setLookRace(a, true); };
   globalThis.__dboSuperCrownHolder = () => crownHolder();
@@ -2335,6 +2370,7 @@ module.exports = (api) => {
     globalThis.__dboSuperLoginAt instanceof Map && globalThis.__dboSuperLoginAt.set(a >>> 0, Date.now());
     try { const bs = stateOf(a); if (bs && bs.blood) sendPacket(a, { customPacketType: 'dboBloody', on: true }); } catch (e) { /* old client */ }
     setTimeout(() => { try { if (onlineActors().includes(a)) flushStageSpells(a, stateOf(a), 'login'); } catch (e) { log('supernatural: login spell flush failed', e.message); } }, 15000);
+    setTimeout(() => { try { if (globalThis.__dboSuperBeastPowerCheck) globalThis.__dboSuperBeastPowerCheck(a, 'login'); } catch (e) { /* the sweep tries again */ } }, 25000);
     const i = G.revoke.indexOf(a >>> 0);
     if (i >= 0) { removeSpell(a, VAMPIRE_LORD_POWER); G.revoke.splice(i, 1); saveG(); }
     for (const o of onlineActors()) { if (o !== a && beastForm(o) === 'werewolf' && globalThis.__dboGuildIsPackLeader && globalThis.__dboGuildIsPackLeader(o)) sendPacket(a, { customPacketType: 'dboPale', actor: o >>> 0, shader: PALE_SHADER, on: true }); }
@@ -2346,6 +2382,27 @@ module.exports = (api) => {
     for (const p of [...ASK.pending.values()]) if (p.t === (a >>> 0) || p.a === (a >>> 0)) answerFeed(p, 'resist', 'gone');
   };
   globalThis.__dboSuperForfeitIfDead = forfeit;
+
+  // ---- the Beast Form power without the beast (mod-0284, Kahu #LLX8, 20 Oct) ----------------------------------------------
+  // A staff hand once gave a player whose rite had failed the Beast Form power itself: they turned at will but the server
+  // never knew them for a werewolf, so they carried silver and never turned unbidden. Whoever holds the power (spells.js's
+  // learned list) and is not a werewolf here becomes one as the rite would have made them; a vampire only loses it.
+  // Staff are left alone (GM tests), as is anyone mid-rite or in beast form.
+  const beastPowerCheck = (a, why) => {
+    try {
+      a >>>= 0;
+      if (!isPlayer(a) || !onlineActors().includes(a) || beastForm(a)) return;
+      if (typeof globalThis.__dboIsStaff === 'function' && globalThis.__dboIsStaff(a)) return;
+      const s = stateOf(a); if (!s || s.kind === 'werewolf') return;
+      const learned = typeof globalThis.__dboSpellsLearned === 'function' ? globalThis.__dboSpellsLearned(a) : null;
+      if (!Array.isArray(learned) || !learned.includes(BEAST_POWER >>> 0)) return;
+      if (s.kind === 'vampire') { removeSpell(a, BEAST_POWER); audit(`SUPERNATURAL ${who(a)} held the Beast Form power as a vampire; it was taken (${why})`); return; }
+      becomeWerewolf(a, false, false);
+      audit(`SUPERNATURAL ${who(a)} held the Beast Form power without being a werewolf; made a werewolf as the rite would (${why})`);
+    } catch (e) { log('supernatural: beast power check failed', e.message); }
+  };
+  globalThis.__dboSuperBeastPowerCheck = beastPowerCheck;
+  every('superBeastPower', 300000, () => { for (const a of onlineActors()) beastPowerCheck(a, 'sweep'); });
 
   // A vampire's rank (bloodranks.js) slows thirst and softens the sun; 1 when it is not loaded
   const bloodRate = (a, hook) => { try { const m = typeof globalThis[hook] === 'function' ? Number(globalThis[hook](a)) : 1; return Number.isFinite(m) && m >= 0 ? m : 1; } catch (e) { return 1; } };

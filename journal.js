@@ -656,7 +656,8 @@ module.exports = (api) => {
     'level:magicka': (a) => run(a, 'level', 'magicka 1'),
     'level:stamina': (a) => run(a, 'level', 'stamina 1'),
     // The race's power (racial.js usePower: once a real day, kept on the character)
-    racialPower: (a) => (typeof globalThis.__dboRacialPowerUse === 'function' ? globalThis.__dboRacialPowerUse(a) : null),
+    // text: the power's key from the box's button (front: one button per power); none from an older front, the first ready
+    racialPower: (a, text) => (typeof globalThis.__dboRacialPowerUse === 'function' ? globalThis.__dboRacialPowerUse(a, Date.now(), text || undefined) : null),
   };
   const run = (a, name, args) => {
     const lines = typeof globalThis.__dboRunCommand === 'function' ? globalThis.__dboRunCommand(a, name, args) : null;

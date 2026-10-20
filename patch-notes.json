@@ -1,5 +1,292 @@
 [
   {
+    "title": "Dungeon traps are live",
+    "date": "2026-10-20",
+    "version": "Hotfix",
+    "tag": "New",
+    "sections": [
+      {
+        "heading": "Dungeons",
+        "items": [
+          "Pressure plates and tripwires in dungeons now set off their traps: swinging walls, swinging blades, spears and battering rams, across more than 90 dungeons. Watch where you step.",
+          "Traps hurt by the dungeon's own numbers, more for higher-level characters, and can put you down. Everyone nearby sees them fire.",
+          "Dart traps and flame jets stay quiet for now."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Enchantments that work",
+    "date": "2026-10-20",
+    "version": "Server update",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Enchanted weapons",
+        "items": [
+          "Fire, frost, shock and chaos damage, absorb health, magicka and stamina, stamina and magicka damage, paralysis and frost slow on enchanted weapons now land. Before, an enchanted sword hit like a plain one.",
+          "They use the weapon's charge: an empty weapon does nothing until you recharge it.",
+          "Mehrunes' Razor can kill a foe outright (about 2 hits in 100, never a player, a boss or an essential character). The Ebony Blade absorbs 10 health. When undead marked by Dawnbreaker die, they burst and burn the undead around them."
+        ]
+      },
+      {
+        "heading": "Enchanted gear",
+        "items": [
+          "Resist Fire, Frost, Shock, Magic and Poison now protect you against spells, staves and enchantments.",
+          "Fortify Health adds real health. Fortify Health, Magicka and Stamina regeneration speed up your bars.",
+          "Fortify Block, Heavy Armor, Light Armor and Unarmed now count in fights, and Fortify Pickpocket raises your pickpocket chance.",
+          "Spellbreaker wards off up to 50 points of spells from the front while you block. The Shrouded Gloves double a sneak attack with a one-handed weapon."
+        ]
+      },
+      {
+        "heading": "Staves",
+        "items": [
+          "A Paralyze staff now holds players, and frost staves slow them. Absorb staves heal their caster."
+        ]
+      },
+      {
+        "heading": "Balanced for PvP",
+        "items": [
+          "Against another player an enchantment does half its damage, absorb and drain. Paralysis holds a player for 2 seconds at most, then leaves them immune to paralysis for 15 seconds.",
+          "Gear resistances count up to 40% each, and all your resistances together never go past the usual limit. Gear adds at most 100 health and half again your regeneration.",
+          "Enchantments add to your skill. They never replace it."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Werewolves are werewolves",
+    "date": "2026-10-20",
+    "version": "Hotfix",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Supernatural",
+        "items": [
+          "A character who held the Beast Form power without being a werewolf to the server (a rite that went wrong and was patched up by hand) is now a full werewolf: silver burns, and the beast can take them unbidden like any other."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "No more frozen temple wakes",
+    "date": "2026-10-20",
+    "version": "Hotfix",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Death and respawn",
+        "items": [
+          "Waking at the temple sometimes left you frozen in place, unable to move or look around, until you relogged. Waking now ends the bleed-out properly.",
+          "If it still happens, /unstuck now frees you too."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Opening a shop you bought",
+    "date": "2026-10-20",
+    "version": "Hotfix",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Businesses",
+        "items": [
+          "A property you buy becomes a shop once you open it as a business. Stand inside it and say /business open <name>; /shop open <name> now does the same. Then stock it from its ledger.",
+          "/shop inside your own property now tells you how to open it, instead of telling you to stand inside a business."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Adept spell choices open at 50",
+    "date": "2026-10-20",
+    "version": "Hotfix",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Magic",
+        "items": [
+          "Your Adept spell choice now opens as soon as the school reaches 50 (Priest 50 for Restoration). Before, it waited until you'd worked through the whole of level 50, so a Priest who stopped at 50 never saw it. Choose it from the F3 Magic tab, a Study Magic shelf or a Scholars' Ledger.",
+          "The Adept choice follows each school's own level, not Arcane Arts. Conjuration 50 opens your Adept Conjuration spell, even if your Arcane Arts is already higher."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Every god of Tamriel",
+    "date": "2026-10-20",
+    "version": "Server update",
+    "tag": "New",
+    "sections": [
+      {
+        "heading": "New faiths",
+        "items": [
+          "The All-Maker: the god of the Skaal of Solstheim.",
+          "The Tribunal: Almalexia, Sotha Sil and Vivec, still kept by the old faithful of Morrowind.",
+          "The Gods of High Rock: the Divines with Sheor and Ebonarm.",
+          "The Spirits of Akavir: Tosh Raka, the tiger-dragon."
+        ]
+      },
+      {
+        "heading": "New gods in the old faiths",
+        "items": [
+          "Khajiit: Magrus, Jone and Jode, Mafala, Lorkhaj and Fadomai.",
+          "Redguard: Ruptga (Tall Papa), Diagna, Sep and Ebonarm.",
+          "Imperial: Shezarr and Morihaus. Nord: Orkey. Bosmer: Ius. Altmer: Sai. Daedric: Jyggalag, Prince of Order."
+        ]
+      },
+      {
+        "heading": "How they work",
+        "items": [
+          "Choose them in F3, the Deity tab, like any god. They have no shrines yet, so pray to them anywhere with /pray.",
+          "Each has a simple boon of its own while the blessing lasts. Most make one skill's work teach you 15% more (the All-Maker Harvesting, Vivec Blade, Diagna Blacksmith, Sep Skinner and so on). Jone and Jode quicken magicka, Morihaus stamina, and Jyggalag gives 5% more in every skill.",
+          "Jyggalag is a Daedric Prince: his worship is outlawed in the Empire's lands."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Own a mine",
+    "date": "2026-10-20",
+    "version": "Server update",
+    "tag": "New",
+    "sections": [
+      {
+        "heading": "Mines are property",
+        "items": [
+          "Every mine in Skyrim, Bruma's lands and Solstheim can be owned. The hold's officials sell a mine at its door, as they sell a house, and a citizen of the hold can buy it.",
+          "A mine pays the weekly property tax like any building. It does not count as your home, so you can own a house and a mine.",
+          "The owner sets who may work its seams: anyone, a faction and named people, named people only, or nobody else.",
+          "The owner can take a share of what others mine there, up to half. That ore waits in the mine's store for the owner to collect. You see the share leave your yield as you mine.",
+          "Open the mine's panel from its door's property menu, or type /mine while you are at the mine."
+        ]
+      },
+      {
+        "heading": "Orc strongholds",
+        "items": [
+          "Each stronghold's mine belongs to its clan, like the longhouse. It is never sold. Clan members mine it freely and the Chief and officers set its rules."
+        ]
+      },
+      {
+        "heading": "Not for sale",
+        "items": [
+          "A mine that is also a dungeon you can lease stays a lair, not property."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Enchantments rebalanced",
+    "date": "2026-10-20",
+    "version": "Server update",
+    "tag": "Change",
+    "sections": [
+      {
+        "heading": "Enchanted gear",
+        "items": [
+          "Enchantments on gear are about half as strong as before: Fortify skills, health, magicka, regeneration and the rest. Gear was making characters far stronger than intended.",
+          "Worn Fortify One-handed, Two-handed and Archery enchantments now really add to the damage of your blows with that weapon type, up to 25% from all your gear together."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Duel types",
+    "date": "2026-10-20",
+    "version": "Server update",
+    "tag": "New",
+    "sections": [
+      {
+        "heading": "Practice, Friendly, Wager or Death",
+        "items": [
+          "Choose a Practice fight, Friendly duel, Wager duel or Death duel when you challenge someone, and they see exactly what they are accepting.",
+          "A Death duel is to the death: the loser's character dies for good. Both fighters must confirm that warning twice before it begins. Logging out or leaving the duel area ends a Death duel with no winner, and nobody dies."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Duels",
+    "date": "2026-10-20",
+    "version": "Server update",
+    "tag": "New",
+    "sections": [
+      {
+        "heading": "Settle it with steel",
+        "items": [
+          "Challenge another player to a duel from the X menu: one round, best of three or best of five, with your own rules and an optional wager of up to 5,000 gold, held until the duel is decided.",
+          "A beaten duellist kneels rather than dies, and both are healed when it ends. Stepping out of the circle, or logging out, forfeits. A wager left by a restart is returned."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Silver tests",
+    "date": "2026-10-20",
+    "version": "Server update",
+    "tag": "New",
+    "sections": [
+      {
+        "heading": "Test their blood",
+        "items": [
+          "Members of the Dawnguard, the Silver Hand and the Vigil of Stendarr who carry a silver weapon can ask another player to take a silver test from the X menu. The subject can accept or choose to fight or flee.",
+          "If they accept, strike them once with your silver weapon, a swing or a bash: the blow does no harm, and only you and the subject see whether the blood reacts normally or bursts into flame."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Events and staff tools",
+    "date": "2026-10-20",
+    "version": "Server update",
+    "tag": "New",
+    "sections": [
+      {
+        "heading": "Events",
+        "items": [
+          "Staff and event hosts can now announce events to everyone online with /event, so keep an eye out for clues about where the next one takes place.",
+          "Staff can also fix a character's name while its player is offline."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Nordic ruin doorways repaired",
+    "date": "2026-10-20",
+    "version": "Server update",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Doorways in the draugr ruins",
+        "items": [
+          "Several Nordic ruins were missing the stonework that frames a doorway, which left a gap in the wall and made finished passages look half-built. Those frames are back. If you remember a ruin with a hole where a door should have been, it should look right now."
+        ]
+      },
+      {
+        "heading": "Claw doors",
+        "items": [
+          "The spinning-ring doors that need a dragon claw are gone from Druadach Redoubt and Arnima. Their rings cannot be turned on a server, so each one was a dead end rather than a puzzle, and the way past is now open."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Mouse free in chat and panels",
+    "date": "2026-10-20",
+    "version": "Client 0.3.105",
+    "tag": "Change",
+    "sections": [
+      {
+        "heading": "Client 0.3.105",
+        "items": [
+          "With chat or a DragonBreak panel open, your mouse can now leave the game window (no more alt-tab to a second monitor).",
+          "Fixed a crash some players hit right after loading in."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Pigeons reach anyone you have exchanged introductions with",
     "date": "2026-10-19",
     "version": "Hotfix",

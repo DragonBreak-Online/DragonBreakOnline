@@ -301,7 +301,13 @@
    "_comment": "Spells refused before the server systems see the cast (gamemode.js castHook), with what the caster is told. For spells that crash the game.",
    "782c5:BSHeartland.esm": "Summon Will-o-the-Wisp is disabled for now: the wisp crashes the game when it appears. It will come back once that is fixed."
  },
+ "silverTest": {
+   "_comment": "silvertest.js: Silver Test in the X menu for Dawnguard, Silver Hand and Vigil of Stendarr members carrying a silver weapon (mestreugway 16 Oct, Nate 19 Oct). The target accepts or chooses Fight or Flee; an accepted test's silver strike within strikeSeconds gives the result to the two of them and, with harmless true, deals no damage. enabled false takes it off the menu. Other keys and defaults in the file header.",
+   "enabled": true
+ },
  "supernatural": {
+  "_goblinEyes": "Goblin vampires' eyes glow while the tells show (supernatural.js goblinEyes, Nate 20 Oct): the DLE's DBO_GoblinVampireEyes and DBO_GoblinEyesMortal (PC Worker C, DLE 115b2e5c) on the green Goblin head's eye shape. Needs that DLE.",
+  "goblinEyes": { "node": "mesh001:1:2:3:3", "txst": "1d2013:DragonBreak Online Edits.esp", "txstMortal": "1d2014:DragonBreak Online Edits.esp" },
    "_comment": "Overrides for supernatural.js defaults. huntMarkChance: the chance that surviving Hircine's Great Hunt (/rite) gives Sanies Lupinus; an unmarked survivor waits riteFailCooldownHours to run it again. infectWerewolf: a werewolf's bite's chance to pass it on. Nate, 2026-09-27: werewolf harder to come by than vampirism, 0.5 -> 0.25 and 0.05 -> 0.02. Nate, 2026-10-03: both rarer, lycanthropy rarest: 0.25 -> 0.1 and 0.02 -> 0.005 (infectVampire 0.03 and infectFeed 0.05 are the supernatural.js defaults).",
    "huntMarkChance": 0.1,
    "_infectWerewolf": "Nate, 13 Oct: 0.005 -> 0.01 a bite. The world held 20 vampires to 2 werewolves, six to one, which is exactly the ratio of the two infection chances (a vampire's hit 0.03). This doubles the werewolf side and leaves the vampire side alone. Rollback: 0.005, hot reload.",
@@ -361,6 +367,13 @@
   "byKind": { "boar": 0.4, "minotaur": 18, "undead": 4 },
   "byBase": {}, "_byBase": "byBase { <attacker base editor id>: mult }, like byKind but by the creature itself (gamemode.js npcBaseEdidOf), since a leveled spot's tag names the placement's kind (the Rift's bears stood in wild:skeever zones). Empty since 17 Oct 04:4x (Nate: players like the danger; bears back to full once the bear-every-spot bug was fixed). Was: bears 0.75 (wildlife-density-1017, players 17 Oct: two-shot in steel plate): a bear's hit on a 200-285 health player measured 14-32% (median 21%, 603 hits 16-17 Oct), 0.75 makes it 10-24%. Delete a key to undo. Hot reload.",
   "takenByKind": { "boar": 5, "minotaur": 0.4, "undead": 0.35, "brfalmer": 0.75, "brdwemer": 0.75, "brchaurus": 0.75, "brspider": 0.75, "brtroll": 0.75, "brgiant": 0.75, "brwisp": 0.75 }, "_takenByKindBlackreach": "br*: Blackreach's spawns (blackreach.json, wildlife.js; Nate 14 Oct: super hard). Players deal three quarters to them, on top of the Master pick and count; their own hits stay x1, a Master lease's byDifficulty. Proposal of check 5 (15 Oct), Nate to confirm; delete the br* keys to undo.", "byDifficulty": { "story": 0.5, "normal": 0.65, "hard": 0.8, "nightmare": 1 }, "_byDifficultyComment": "byDifficulty { story, normal, hard, nightmare: mult } scales every hit an enemy of a claimed dungeon or expedition lands on a player, by the lease's difficulty (gamemode.js npcDifficultyDamageMult); spellMult scales every creature's or NPC's spell hit on a player (their copies never run out of magicka); log writes an 'npc hit' line for every creature or NPC hit on a player, x1 hits included. byDifficulty set by Nate, 4 Oct (Novice 0.5, Adept 0.65, Expert 0.8, Master 1); spellMult unset; log on since 13 Oct (Jake: turn on the npc damage log; to measure NPC hits that pass through players, thread 1555436044474650685). Hot reload.", "log": true
+ },
+ "duel": {
+  "_comment": "Duels (duel.js; mestreugway's suggestion, 11 Oct). X on a player > Challenge to a Duel: format (formats: single, bo3, bo5), rules (no magic, no potions, both), a wager of wagerSteps gold each up to maxWager, held at the start and paid to the winner (no winner: each gets their own back; a restart returns it at the next login). Both within challengeMeters, at fullHealth or more, out of PvP for combatSeconds; the challenged answers within answerSeconds. A blow that would bring health to loseAt loses the round: refused, the loser kneels pauseSeconds, both stand at full health, countdownSeconds to the next round. Leaving arenaMeters of the start for leaveSeconds forfeits; maxMinutes ends with no winner. disconnect: 'refund' (no winner) or 'forfeit' (the one who stayed wins). Types (Nate, 19 Oct; both must agree): Practice fight (no wager, no winner kept), Friendly duel (a winner, no wager), Wager duel (a winner and a wager), Death duel (one round, a wager optional; each side confirms a second warning, both agreements and every result are audited; a logout, leaving the ground, a yield or a death to anything else ends it with no winner and nobody dies). deathDuelPermadeath true (Nate, 20 Oct): the loser's character ends for good through supernatural.js permaKill, posted to staff, never while offline; false: the losing blow lands and the loser falls as in any fight (downed.js), the winner takes the wager. deathDuels false takes the Death duel away and ends a running one without death. enabled false takes the X menu entry away. Hot reload.",
+  "enabled": true, "challengeMeters": 8, "arenaMeters": 25, "leaveSeconds": 3, "answerSeconds": 30, "countdownSeconds": 3,
+  "pauseSeconds": 6, "loseAt": 0.05, "fullHealth": 0.99, "combatSeconds": 30, "maxMinutes": 15, "maxWager": 5000,
+  "wagerSteps": [0, 10, 25, 50, 100, 250, 500, 1000], "formats": ["single", "bo3", "bo5"], "disconnect": "refund",
+  "deathDuels": true, "deathDuelPermadeath": true
  },
  "pvp": {
   "_comment": "damageMult scales every player-on-player hit after skills and armor (1 = unchanged). 1.25 from 2026-09-25 (Nat: PvP damage buffed a bit).",
@@ -472,6 +485,23 @@
   "staminaDamage": { "enabled": true, "minMult": 0.5, "fullAt": 0.5 },
   "fists": { "armorExtra": 0.5, "drainByTier": [6, 8, 10, 13, 16], "untrainedDrain": 4, "powerDrainMult": 2, "powerDisarm": true, "powerDisarmMinRank": 0 },
   "staves": { "armorPierce": 0.25 }
+ },
+ "gearFortify": {"_comment": "Worn Fortify One-handed, Two-handed and Archery enchantments (gamemode.js gearAttackMult; Nate 18 Oct, toned down): each point adds perPoint to that weapon's blows (vanilla gives 0.01), all worn gear together at most cap. Players only.", "enabled": true, "perPoint": 0.01, "cap": 0.25},
+ "gearEnchantments": {
+  "_comment": "Enchantments the server judges (gearench.js; enchantment audit, Nate 20 Oct). The client engine applies enchantments only to its own copy of the world and the server judges every hit, so each part re-implements one kind; the 20 Oct plugin nerf already halved most magnitudes. Every part has its own enabled.",
+  "weaponHits": {"_comment": "An enchanted weapon (not a staff) on a landed, unblocked blow: elemental and chaos damage resisted like a spell, absorb, stamina and magicka damage, paralysis, frost slow, Mehrunes Razor, the Ebony Blade (its lowest tier: the kill count is not readable), Dawnbreaker. A player copy needs a hit worth of charge (the client drains it, craftedExtras keeps it). Skipped for an NPC hitting the player who hosts it: that engine applied it already. damageMult scales the points; minHealth: an enchantment never lands the killing blow; assumedMaxMagicka: the pool magicka points come off (the server cannot read maximum magicka). Conditions: GetRandomPercent, HasKeyword and GetIsID run here, a tier the server cannot tell counts as its lowest, anything else leaves the effect out.", "enabled": true, "damageMult": 1, "onBlocked": false, "minHealth": 0.01, "assumedMaxMagicka": 150, "maxParalysisSeconds": 10, "maxSlowSeconds": 10, "log": false},
+  "pvp": {"_comment": "PvP balance (Nate 20 Oct: balance everything with PvP in mind; enchantments are a garnish on skill: mastery tiers +35/+65/+100%, Defense x1.25..x3.5, a naked player 150 health). On a PLAYER target an enchantment deals, absorbs and drains pvpMult of its points (NPCs in full). A player is paralysed at most pvpParalysisMaxSeconds by a weapon or staff, then immune to every paralysis for pvpParalysisImmuneSeconds; never while downed or held. One log line per attacker each logEverySeconds for an enchanted hit on a player. Fear, calm and frenzy never touch players (the engine and the C++ apply them to NPCs only).", "pvpMult": 0.5, "pvpParalysisMaxSeconds": 2, "pvpParalysisImmuneSeconds": 15, "logEverySeconds": 60},
+  "resist": {"_comment": "Worn Resist Fire, Frost, Shock, Magic and Poison on the target side of every hit they resist (Resist Magic: any spell, staff or enchantment). The gear share is at most gearResistCap a resistance; race, potion, gear and blessing together never take more than racial.reductionCap off a hit.", "enabled": true, "gearResistCap": 0.4},
+  "fortifyHealth": {"_comment": "Worn Fortify Health on a player counts as health (a stat, not a resistance): a hit lands as on a pool that much larger, like a Fortify Health potion (gamemode.js potionTakenMult), outside the reduction cap. The gear extra is at most gearHealthCap points.", "enabled": true, "gearHealthCap": 100},
+  "regen": {"_comment": "Worn Heal, Magicka and Stamina Rate enchantments on a player (the server crops a client report to its own rates, CropRegeneration.cpp, so they did nothing). prayer.js prayerBlessingRegen adds them in the units it adds a blessing (a Rate effect its magnitude to the rate, a RateMult effect its magnitude % of the race rate), the gear share at most gearRegenCap of the bar base rate; they add to a blessing, and racial.js regeneration is its own factor beside both.", "enabled": true, "gearRegenCap": 0.5},
+  "staffRiders": {"_comment": "A staff (ENCH) on a PLAYER: its paralysis (gamemode.js spellHitHook, dboParalyse, at most pvp.pvpParalysisMaxSeconds then the immunity window), frost slow (dboStatus), stamina and magicka damage at pvp.pvpMult, and while server-settings spellSync.absorb is false the caster gets back what an absorb staff took. Fear, calm, frenzy, rally and turn undead never touch players. NPC targets are the fork (ActionListener riders); npcServerHold: true makes the gameplay hold a paralysed NPC too, for when the fork holds staves (until then only where the caster hosts the NPC).", "enabled": true, "maxSlowSeconds": 10, "npcServerHold": false},
+  "block": {"_comment": "Worn Fortify Block on a player: a blocked blow lets perPoint a point less through (combat.js chip, with a Fortify Block potion at most all of it), at most cap.", "enabled": true, "perPoint": 0.01, "cap": 0.25},
+  "heavyArmor": {"_comment": "Worn Fortify Heavy Armor on a player: worn heavy pieces count perPoint a point more armour in the Defense path (gamemode.js defenseDamageMult, the Flesh spells too), at most cap.", "enabled": true, "perPoint": 0.01, "cap": 0.25},
+  "lightArmor": {"_comment": "Worn Fortify Light Armor: the same for light pieces.", "enabled": true, "perPoint": 0.01, "cap": 0.25},
+  "unarmed": {"_comment": "Worn Fortify Unarmed: fists land harder through gearAttackMult, on gearFortify perPoint and cap, so fists and weapons stay even.", "enabled": true},
+  "pickpocket": {"_comment": "Worn Fortify Pickpocket: perPoint a point more chance in pickpocket.js (still within its minChance and maxChance), at most cap.", "enabled": true, "perPoint": 0.005, "cap": 0.1},
+  "spellbreaker": {"_comment": "Spellbreaker (DA13SpellBreakerEnch: WardPower 50 while IsBlocking; UESP: protects against spells for up to 50 points): while its wearer blocks, a spell from within frontDegrees of the front loses up to the ward points left; spent, the ward breaks; raised again after a lowered shield or rearmSeconds without a spell, it holds a fresh 50. Inside the reduction cap like a racial ward. The server cannot tell an area spell, so a Fireball from the front is warded too.", "enabled": true, "rearmSeconds": 3, "frontDegrees": 90},
+  "uniques": {"_comment": "Scripted uniques the engine runs by script, on the server: Mehrunes Razor (DA07MehrunesRazorMagicEffectScript: RandomInt(0, 100) <= 1, so 2 in 101) kills an NPC outright, never a player, companion, boss, essential, protected or unique NPC; Dawnbreaker (GetRandomPercent <= 25 on undead) marks for markSeconds and the marked undead dying bursts DA09DawnbreakerBaneOfUndeadSpell fire 25 on the undead within 80 ft (feetToUnits), vampire players at pvp.pvpMult (its turn undead and stagger need the fork); the Shrouded Gloves (Backstab, UESP: double sneak attack damage with one-handed weapons) multiply a one-handed sneak attack by mult. The Ebony Blade absorb counts its lowest tier (10), as its kill count is not readable server-side.", "enabled": true, "dawnbreaker": {"enabled": true, "effects": ["DA09EncDawnbreakeScriptEffect"], "markSeconds": 10, "burstSpell": "fee36:Skyrim.esm", "feetToUnits": 21.33}, "razor": {"enabled": true, "effects": ["DA07MehrunesRazorMagicEffect"], "chance": 0.0198}, "backstab": {"enabled": true, "effects": ["DBEnchBackstab"], "mult": 2}}
  },
  "weaponMaterials": {
   "_comment": "Extra damage by the weapon's material keyword (editor id), on top of its base damage, for hits by players (playersOnly) in every fight. Vanilla puts Daedric (sword 14) and Dragonbone (15) one point apart; with this Dragonbone hits about 16% harder than Daedric and a Daedric sword about 2.4x an Iron one. Keywords from Skyrim.esm, Dawnguard (DLC1) and Dragonborn (DLC2), and Saints & Seducers' Madness (as Daedric), and ArmorMaterialDragonplate, which Immersive Weapons puts on its Dragonsteel weapons (as Dragonbone; only weapons read this list), so tier 5 always out-hits tier 4 (Nate, 2026-09-30; tools/recipes/t4_below_t5.py). Amber (as Glass, 0.13) is held until the PC ladder run's plugin lowers its stats: with the bonus on today's records an Amber sword (16.95) out-hits a Daedric one (16.80) (Worker D's review); a weapon without one of these gets nothing.",
@@ -1272,6 +1302,11 @@
   "_variants": "The creator's goblin skin colours (private.rp.race slug -> race), each its own RACE in the DLE. Without them a swamp, ash or ochre goblin had no racial gift or power (Nate, 19 Oct).",
   "variants": { "goblinswamp": "1aca09:DragonBreak Online Edits.esp", "goblinash": "1aca11:DragonBreak Online Edits.esp", "goblinochre": "1aca19:DragonBreak Online Edits.esp" }
  },
+ "halfGiantRace": {
+  "_comment": "The DLE's DBOHalfGiantRace and its vampire (PC Worker C, 20 Oct; on the Nord). racial.js gives the creator's halfgiant slug this race (__dboRaceOverrides) and the Half-Giant's gifts (racial.halfgiant). Resolves to nothing until the DLE carrying 1D201B/1D201C is live.",
+  "race": "1d201b:DragonBreak Online Edits.esp",
+  "vampire": "1d201c:DragonBreak Online Edits.esp"
+ },
  "reachmanRace": {
   "_comment": "The DLE's DBOReachmanRace and its vampire (Nat, 14 Oct; from Reachman Race.esp v2, Nexus 39844, Breton morph, vanilla heads). racial.js gives the creator's reachfolk slug this race (__dboRaceOverrides) and the Reachman's gifts (racial.reachman); supernatural.js turns it into its vampire and back.",
   "race": "1c8981:DragonBreak Online Edits.esp",
@@ -1317,6 +1352,7 @@
   "enabled": true,
   "max": 256
  },
+ "mines": {"_comment": "Mines owned like property (mines.js, mines.json from tools/mines_build.py; Nate, 20 Oct: \"allow all mines to be claimable. orc mines belong to the strongholds\"). A mine is held by the housing claim on its way in: the hold's officials sell it at its door to a citizen (tenancy.js), it pays the weekly property tax in every hold, the Legion's tithe only on Cyrodiil's mines (economy.js titheProvinces), and it is no home (outside the one-building cap once the fork's housingSystem notHome ships). An Orc stronghold's mine is its clan's hall (guilds.js): never sold, the clan works it, its Chief and officers set its rules. The owner sets, from the panel at its door (property menu, Buy or rent) or /mine: who may mine (open, a faction and named people, named people only, closed) and a share of 0 to maxShare percent of what others mine, kept in ore in the mine's store for the owner to collect there. value + perVein for each vein is a mine's tax value until a Steward assesses it or the hold sells it (valueByMine { mine id: gold } overrides). A mine that is a lease dungeon and not in dungeons.exclude is a lair: not sold, and no clan holds it (leaseMinesForSale true sells them). Share payments are audited once per auditEveryMinutes per mine. ROLLBACK: enabled false, hot reload: every mine opens to all with no share and counts toward the cap again; clan mines stop being halls at the next reload; claims and mines-state.json stay.", "enabled": true, "value": 1000, "perVein": 50, "valueByMine": {}, "maxShare": 50, "shareSteps": [0, 5, 10, 15, 20, 25, 30, 40, 50], "maxStockPerItem": 1000, "maxNamed": 24, "clanMines": true, "leaseMinesForSale": false, "auditEveryMinutes": 60},
  "housingPlaces": {
   "_comment": "Places (N3, fork housingSystem.ts): staff profiles whose claims the place migration leaves exactly as they are and the one-place cap never counts (Nate, 3 Oct: storage lent to players). Read when the migration plan runs; no restart needed.",
   "staffProfiles": [4],
@@ -1672,5 +1708,26 @@
     { "id": "vault", "name": "Vault", "weight": 500, "weekly": 500 }
    ]
   }
+ },
+ "events": {
+  "_comment": "/event <message> (server\\stafftools.js; aussiepie's #staff-suggestions, 8 Oct): staff of any rank (Trial GMs included) and holders of a Discord role in hostRoleIds announce an event to every online player, on screen and in chat, with an audit line. cooldownSeconds is per host, globalCooldownSeconds across all hosts. showHost names the host's character. discord true also posts it to discordChannelId (proposed: #events in Server Entrance), pinging discordPingRoleId if set; off until Nate approves the channel and the bot can post there.",
+  "enabled": true,
+  "cooldownSeconds": 300,
+  "globalCooldownSeconds": 60,
+  "minText": 5,
+  "maxText": 300,
+  "hostRoleIds": [],
+  "showHost": true,
+  "discord": false,
+  "discordChannelId": "1549181668516954174",
+  "discordPingRoleId": ""
+ },
+ "staffEnchant": {
+  "_comment": "Staff enchanting for events (staffenchant.js): /enchant and the F7 admin panel's Enchant tab put any weapon or apparel enchantment of the load order on one unworn piece, as a player-made enchantment (never disenchantable). minTier: the lowest staff tier allowed (gm, leadgm, developer, senior; Lead GM by default, as the panel's other item grants). maxScale: the strongest allowed, as a multiple of the enchantment's own main effect. weaponCharge: a weapon's full charge (3000 is a grand soul gem).",
+  "enabled": true, "minTier": "leadgm", "maxScale": 3, "weaponCharge": 3000
+ },
+ "traps": {
+  "_comment": "Dungeon traps run by the server (traps.js, traps.json). only: all = anyone sets them off; staff = staff only (testing). Nate 20 Oct: on for everyone. ROLLBACK: only staff, hot reload.",
+  "only": "all"
  }
 }

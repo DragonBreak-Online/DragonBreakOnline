@@ -313,7 +313,7 @@ module.exports = (api) => {
   // A boon the server keeps with no spell at all: Sanguine's appetite, Hermaeus Mora's reading, and since 2026-10-01 the
   // regeneration of the Hist and the Yokudan gods (blessingRegen, held by the regeneration tick below) and the Ancestors'
   // ward against fire (combatBoon: gamemode.js blessingCombat, target.ancestors)
-  const serverBoonOf = (d) => !!(d && (d.hungerHalf || d.scholarBoon || d.blessingRegen || d.combatBoon || d.meatBoon));
+  const serverBoonOf = (d) => !!(d && (d.hungerHalf || d.scholarBoon || d.blessingRegen || d.combatBoon || d.meatBoon || d.skillBoon));
   // Sheogorath has no blessing of his own and should not have one. The Madgod gives what he feels
   // like, so his worshipper is handed another god's blessing at random - a different one each time.
   // This is the only boon in the list that is more lore-accurate as code than as a record, and it is
@@ -517,6 +517,19 @@ module.exports = (api) => {
     } catch (e) { return 0; }
   };
 
+  // A skill's XP rate under the running blessing (faiths.json skillBoon { skill: mult, '*': mult for every skill }; Nate 20 Oct:
+  // the gods without a spell of their own, simple and unique boons), 1 when not blessed. skillrates.js multiplies it in
+  globalThis.__dboBlessingSkillRate = (a, skillId) => {
+    try {
+      const b = blessingOf(a);
+      if (!b || Number(b.until) <= Date.now()) return 1;
+      const d = deityById(b.deity); const sb = d && d.skillBoon;
+      if (!sb || typeof sb !== 'object') return 1;
+      const v = Number(sb[skillId] !== undefined ? sb[skillId] : sb['*']);
+      return Number.isFinite(v) && v >= 1 && v <= 2 ? v : 1;
+    } catch (e) { return 1; }
+  };
+
   // A blessing is worn, not held: nothing else expires it, so the module does. The same sweep keeps a cast blessing on
   // its worshipper: once more a sweep before the spell's own duration ends, while the blessing runs on past it.
   every('prayerBlessings', SWEEP_MS, () => {
@@ -674,6 +687,9 @@ module.exports = (api) => {
     try { if (typeof globalThis.__dboChillRateMult === 'function') { const f = Number(globalThis.__dboChillRateMult(a, CHILL_AV[stat])); return f >= 0 ? Math.min(1, f) : 1; } } catch (e) { /* no downed system */ }
     return 1;
   };
+  // Worn Heal, Magicka and Stamina Rate enchantments (gearench.js regenOf, marked gear), the same units as a blessing's
+  const gearRegenOf = (a) => { try { const f = globalThis.__dboGearRegen; const l = typeof f === 'function' ? f(a) : []; return Array.isArray(l) ? l.filter((e) => e && e.gear && REGEN_AV_BY_NAME[e.av] !== undefined && Number(e.mag) > 0) : []; } catch (e) { return []; } };
+  const gearRegenCapOf = () => { const g = (cfg || {}).gearEnchantments || {}; const v = Number((g.regen || {}).gearRegenCap); return Number.isFinite(v) && v >= 0 ? v : 0.5; };
   // Registered whatever the config says and off inside, so a reload that turns it off replaces the running timer (every()
   // replaces by name) rather than leaving the previous module's
   every('prayerBlessingRegen', REGEN_TICK_MS, () => {
@@ -683,7 +699,7 @@ module.exports = (api) => {
     for (const a of (api.onlineActors ? api.onlineActors() : [])) {
       here.add(a);
       const b = blessingOf(a);
-      const list = b && Number(b.until) > now ? regenOfBlessing(b) : [];
+      const list = (b && Number(b.until) > now ? regenOfBlessing(b) : []).concat(gearRegenOf(a));
       if (!list.length) { regenOwed.delete(a); continue; }
       let owed = regenOwed.get(a);
       if (!owed) { owed = { at: now - REGEN_TICK_MS, health: 0, magicka: 0, stamina: 0 }; regenOwed.set(a, owed); }
@@ -700,8 +716,10 @@ module.exports = (api) => {
       const next = { health: Number(pc.health), magicka: Number(pc.magicka), stamina: Number(pc.stamina) };
       let changed = false;
       for (const stat of ['health', 'magicka', 'stamina']) {
-        let add = 0;
-        for (const e of list) if (e.stat === stat) add += regenPerSecond(a, e) * secs;
+        let add = 0, gear = 0;
+        for (const e of list) if (e.stat === stat) { if (e.gear) gear += regenPerSecond(a, e); else add += regenPerSecond(a, e) * secs; }
+        // Worn gear adds to a blessing, its own share at most gearRegenCap of the bar's base rate
+        if (gear > 0) add += Math.min(gear, gearRegenCapOf() * raceRateOf(a, stat) / 100 * REGEN_MULT) * secs;
         add *= chillOf(a, stat);
         if (!(next[stat] < 1) || !(add > 0)) { owed[stat] = 0; continue; }
         owed[stat] += add;
