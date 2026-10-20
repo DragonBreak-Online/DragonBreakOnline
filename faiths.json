@@ -617,7 +617,8 @@
       "placements": 0,
       "inPlaytest": 0,
       "inBruma": 0,
-      "note": "Nate 20 Oct: every Elder Scrolls deity, simple unique boons, no shrine yet (prayed to anywhere with /pray); a shrine object comes later. The boon is the server's (no spell); a display ability for Active Effects is for the PC to add."
+      "note": "Nate 20 Oct: every Elder Scrolls deity, simple unique boons, no shrine yet (prayed to anywhere with /pray); a shrine object comes later. The boon is the server's (no spell); a display ability for Active Effects is for the PC to add.",
+      "blessingDisplay": "1d2038:DragonBreak Online Edits.esp"
     },
     {
       "id": "almalexia",
@@ -643,7 +644,8 @@
       "placements": 0,
       "inPlaytest": 0,
       "inBruma": 0,
-      "note": "Nate 20 Oct: every Elder Scrolls deity, simple unique boons, no shrine yet (prayed to anywhere with /pray); a shrine object comes later. The boon is the server's (no spell); a display ability for Active Effects is for the PC to add."
+      "note": "Nate 20 Oct: every Elder Scrolls deity, simple unique boons, no shrine yet (prayed to anywhere with /pray); a shrine object comes later. The boon is the server's (no spell); a display ability for Active Effects is for the PC to add.",
+      "blessingDisplay": "1d2039:DragonBreak Online Edits.esp"
     },
     {
       "id": "sothasil",
@@ -669,7 +671,8 @@
       "placements": 0,
       "inPlaytest": 0,
       "inBruma": 0,
-      "note": "Nate 20 Oct: every Elder Scrolls deity, simple unique boons, no shrine yet (prayed to anywhere with /pray); a shrine object comes later. The boon is the server's (no spell); a display ability for Active Effects is for the PC to add."
+      "note": "Nate 20 Oct: every Elder Scrolls deity, simple unique boons, no shrine yet (prayed to anywhere with /pray); a shrine object comes later. The boon is the server's (no spell); a display ability for Active Effects is for the PC to add.",
+      "blessingDisplay": "1d203a:DragonBreak Online Edits.esp"
     },
     {
       "id": "vivec",
@@ -695,7 +698,8 @@
       "placements": 0,
       "inPlaytest": 0,
       "inBruma": 0,
-      "note": "Nate 20 Oct: every Elder Scrolls deity, simple unique boons, no shrine yet (prayed to anywhere with /pray); a shrine object comes later. The boon is the server's (no spell); a display ability for Active Effects is for the PC to add."
+      "note": "Nate 20 Oct: every Elder Scrolls deity, simple unique boons, no shrine yet (prayed to anywhere with /pray); a shrine object comes later. The boon is the server's (no spell); a display ability for Active Effects is for the PC to add.",
+      "blessingDisplay": "1d203b:DragonBreak Online Edits.esp"
     },
     {
       "id": "magrus",
@@ -720,7 +724,8 @@
       "placements": 0,
       "inPlaytest": 0,
       "inBruma": 0,
-      "note": "Nate 20 Oct: every Elder Scrolls deity, simple unique boons, no shrine yet (prayed to anywhere with /pray); a shrine object comes later. The boon is the server's (no spell); a display ability for Active Effects is for the PC to add."
+      "note": "Nate 20 Oct: every Elder Scrolls deity, simple unique boons, no shrine yet (prayed to anywhere with /pray); a shrine object comes later. The boon is the server's (no spell); a display ability for Active Effects is for the PC to add.",
+      "blessingDisplay": "1d203c:DragonBreak Online Edits.esp"
     },
     {
       "id": "jonejode",
@@ -745,7 +750,8 @@
       "placements": 0,
       "inPlaytest": 0,
       "inBruma": 0,
-      "note": "Nate 20 Oct: every Elder Scrolls deity, simple unique boons, no shrine yet (prayed to anywhere with /pray); a shrine object comes later. The boon is the server's (no spell); a display ability for Active Effects is for the PC to add."
+      "note": "Nate 20 Oct: every Elder Scrolls deity, simple unique boons, no shrine yet (prayed to anywhere with /pray); a shrine object comes later. The boon is the server's (no spell); a display ability for Active Effects is for the PC to add.",
+      "blessingDisplay": "1d203d:DragonBreak Online Edits.esp"
     },
     {
       "id": "mafala",
@@ -770,7 +776,8 @@
       "placements": 0,
       "inPlaytest": 0,
       "inBruma": 0,
-      "note": "Nate 20 Oct: every Elder Scrolls deity, simple unique boons, no shrine yet (prayed to anywhere with /pray); a shrine object comes later. The boon is the server's (no spell); a display ability for Active Effects is for the PC to add."
+      "note": "Nate 20 Oct: every Elder Scrolls deity, simple unique boons, no shrine yet (prayed to anywhere with /pray); a shrine object comes later. The boon is the server's (no spell); a display ability for Active Effects is for the PC to add.",
+      "blessingDisplay": "1d203e:DragonBreak Online Edits.esp"
     },
     {
       "id": "lorkhaj",
@@ -795,7 +802,8 @@
       "placements": 0,
       "inPlaytest": 0,
       "inBruma": 0,
-      "note": "Nate 20 Oct: every Elder Scrolls deity, simple unique boons, no shrine yet (prayed to anywhere with /pray); a shrine object comes later. The boon is the server's (no spell); a display ability for Active Effects is for the PC to add."
+      "note": "Nate 20 Oct: every Elder Scrolls deity, simple unique boons, no shrine yet (prayed to anywhere with /pray); a shrine object comes later. The boon is the server's (no spell); a display ability for Active Effects is for the PC to add.",
+      "blessingDisplay": "1d203f:DragonBreak Online Edits.esp"
     },
     {
       "id": "fadomai",
@@ -818,7 +826,8 @@
       "placements": 0,
       "inPlaytest": 0,
       "inBruma": 0,
-      "note": "Nate 20 Oct: every Elder Scrolls deity, simple unique boons, no shrine yet (prayed to anywhere with /pray); a shrine object comes later. The boon is the server's (no spell); a display ability for Active Effects is for the PC to add."
+      "note": "Nate 20 Oct: every Elder Scrolls deity, simple unique boons, no shrine yet (prayed to anywhere with /pray); a shrine object comes later. The boon is the server's (no spell); a display ability for Active Effects is for the PC to add.",
+      "blessingDisplay": "1d2040:DragonBreak Online Edits.esp"
     },
     {
       "id": "ruptga",
@@ -843,7 +852,8 @@
       "placements": 0,
       "inPlaytest": 0,
       "inBruma": 0,
-      "note": "Nate 20 Oct: every Elder Scrolls deity, simple unique boons, no shrine yet (prayed to anywhere with /pray); a shrine object comes later. The boon is the server's (no spell); a display ability for Active Effects is for the PC to add."
+      "note": "Nate 20 Oct: every Elder Scrolls deity, simple unique boons, no shrine yet (prayed to anywhere with /pray); a shrine object comes later. The boon is the server's (no spell); a display ability for Active Effects is for the PC to add.",
+      "blessingDisplay": "1d2041:DragonBreak Online Edits.esp"
     },
     {
       "id": "diagna",
@@ -866,7 +876,8 @@
       "placements": 0,
       "inPlaytest": 0,
       "inBruma": 0,
-      "note": "Nate 20 Oct: every Elder Scrolls deity, simple unique boons, no shrine yet (prayed to anywhere with /pray); a shrine object comes later. The boon is the server's (no spell); a display ability for Active Effects is for the PC to add."
+      "note": "Nate 20 Oct: every Elder Scrolls deity, simple unique boons, no shrine yet (prayed to anywhere with /pray); a shrine object comes later. The boon is the server's (no spell); a display ability for Active Effects is for the PC to add.",
+      "blessingDisplay": "1d2042:DragonBreak Online Edits.esp"
     },
     {
       "id": "sep",
@@ -891,7 +902,8 @@
       "placements": 0,
       "inPlaytest": 0,
       "inBruma": 0,
-      "note": "Nate 20 Oct: every Elder Scrolls deity, simple unique boons, no shrine yet (prayed to anywhere with /pray); a shrine object comes later. The boon is the server's (no spell); a display ability for Active Effects is for the PC to add."
+      "note": "Nate 20 Oct: every Elder Scrolls deity, simple unique boons, no shrine yet (prayed to anywhere with /pray); a shrine object comes later. The boon is the server's (no spell); a display ability for Active Effects is for the PC to add.",
+      "blessingDisplay": "1d2043:DragonBreak Online Edits.esp"
     },
     {
       "id": "ebonarm",
@@ -916,7 +928,8 @@
       "placements": 0,
       "inPlaytest": 0,
       "inBruma": 0,
-      "note": "Nate 20 Oct: every Elder Scrolls deity, simple unique boons, no shrine yet (prayed to anywhere with /pray); a shrine object comes later. The boon is the server's (no spell); a display ability for Active Effects is for the PC to add."
+      "note": "Nate 20 Oct: every Elder Scrolls deity, simple unique boons, no shrine yet (prayed to anywhere with /pray); a shrine object comes later. The boon is the server's (no spell); a display ability for Active Effects is for the PC to add.",
+      "blessingDisplay": "1d2044:DragonBreak Online Edits.esp"
     },
     {
       "id": "toshraka",
@@ -939,7 +952,8 @@
       "placements": 0,
       "inPlaytest": 0,
       "inBruma": 0,
-      "note": "Nate 20 Oct: every Elder Scrolls deity, simple unique boons, no shrine yet (prayed to anywhere with /pray); a shrine object comes later. The boon is the server's (no spell); a display ability for Active Effects is for the PC to add."
+      "note": "Nate 20 Oct: every Elder Scrolls deity, simple unique boons, no shrine yet (prayed to anywhere with /pray); a shrine object comes later. The boon is the server's (no spell); a display ability for Active Effects is for the PC to add.",
+      "blessingDisplay": "1d2045:DragonBreak Online Edits.esp"
     },
     {
       "id": "jyggalag",
@@ -963,7 +977,8 @@
       "skillBoon": {
         "*": 1.05
       },
-      "boon": "Every skill's work teaches you 5% more while the blessing lasts - order in all things"
+      "boon": "Every skill's work teaches you 5% more while the blessing lasts - order in all things",
+      "blessingDisplay": "1d2046:DragonBreak Online Edits.esp"
     },
     {
       "id": "orkey",
@@ -986,7 +1001,8 @@
       "placements": 0,
       "inPlaytest": 0,
       "inBruma": 0,
-      "note": "Nate 20 Oct: every Elder Scrolls deity, simple unique boons, no shrine yet (prayed to anywhere with /pray); a shrine object comes later. The boon is the server's (no spell); a display ability for Active Effects is for the PC to add."
+      "note": "Nate 20 Oct: every Elder Scrolls deity, simple unique boons, no shrine yet (prayed to anywhere with /pray); a shrine object comes later. The boon is the server's (no spell); a display ability for Active Effects is for the PC to add.",
+      "blessingDisplay": "1d2047:DragonBreak Online Edits.esp"
     },
     {
       "id": "sheor",
@@ -1011,7 +1027,8 @@
       "placements": 0,
       "inPlaytest": 0,
       "inBruma": 0,
-      "note": "Nate 20 Oct: every Elder Scrolls deity, simple unique boons, no shrine yet (prayed to anywhere with /pray); a shrine object comes later. The boon is the server's (no spell); a display ability for Active Effects is for the PC to add."
+      "note": "Nate 20 Oct: every Elder Scrolls deity, simple unique boons, no shrine yet (prayed to anywhere with /pray); a shrine object comes later. The boon is the server's (no spell); a display ability for Active Effects is for the PC to add.",
+      "blessingDisplay": "1d2048:DragonBreak Online Edits.esp"
     },
     {
       "id": "shezarr",
@@ -1036,7 +1053,8 @@
       "placements": 0,
       "inPlaytest": 0,
       "inBruma": 0,
-      "note": "Nate 20 Oct: every Elder Scrolls deity, simple unique boons, no shrine yet (prayed to anywhere with /pray); a shrine object comes later. The boon is the server's (no spell); a display ability for Active Effects is for the PC to add."
+      "note": "Nate 20 Oct: every Elder Scrolls deity, simple unique boons, no shrine yet (prayed to anywhere with /pray); a shrine object comes later. The boon is the server's (no spell); a display ability for Active Effects is for the PC to add.",
+      "blessingDisplay": "1d2049:DragonBreak Online Edits.esp"
     },
     {
       "id": "ius",
@@ -1059,7 +1077,8 @@
       "placements": 0,
       "inPlaytest": 0,
       "inBruma": 0,
-      "note": "Nate 20 Oct: every Elder Scrolls deity, simple unique boons, no shrine yet (prayed to anywhere with /pray); a shrine object comes later. The boon is the server's (no spell); a display ability for Active Effects is for the PC to add."
+      "note": "Nate 20 Oct: every Elder Scrolls deity, simple unique boons, no shrine yet (prayed to anywhere with /pray); a shrine object comes later. The boon is the server's (no spell); a display ability for Active Effects is for the PC to add.",
+      "blessingDisplay": "1d204a:DragonBreak Online Edits.esp"
     },
     {
       "id": "sai",
@@ -1082,7 +1101,8 @@
       "placements": 0,
       "inPlaytest": 0,
       "inBruma": 0,
-      "note": "Nate 20 Oct: every Elder Scrolls deity, simple unique boons, no shrine yet (prayed to anywhere with /pray); a shrine object comes later. The boon is the server's (no spell); a display ability for Active Effects is for the PC to add."
+      "note": "Nate 20 Oct: every Elder Scrolls deity, simple unique boons, no shrine yet (prayed to anywhere with /pray); a shrine object comes later. The boon is the server's (no spell); a display ability for Active Effects is for the PC to add.",
+      "blessingDisplay": "1d204b:DragonBreak Online Edits.esp"
     },
     {
       "id": "morihaus",
@@ -1107,7 +1127,8 @@
       "placements": 0,
       "inPlaytest": 0,
       "inBruma": 0,
-      "note": "Nate 20 Oct: every Elder Scrolls deity, simple unique boons, no shrine yet (prayed to anywhere with /pray); a shrine object comes later. The boon is the server's (no spell); a display ability for Active Effects is for the PC to add."
+      "note": "Nate 20 Oct: every Elder Scrolls deity, simple unique boons, no shrine yet (prayed to anywhere with /pray); a shrine object comes later. The boon is the server's (no spell); a display ability for Active Effects is for the PC to add.",
+      "blessingDisplay": "1d204c:DragonBreak Online Edits.esp"
     }
   ]
 }

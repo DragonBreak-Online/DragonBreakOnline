@@ -1374,7 +1374,7 @@
     "id": "malacath",
     "name": "Malacath",
     "kind": "daedra",
-    "shrines": [
+    "shrines": ["8e5f5:Druadach.esm", "1568a4:arnima.esm", 
      "5db6:DragonBreak.esp",
      "23bb:DragonBreak.esp"
     ],
@@ -1393,7 +1393,7 @@
     "id": "azura",
     "name": "Azura",
     "kind": "daedra",
-    "shrines": [
+    "shrines": ["2125e9:Journey to Baan Malur.esp", "77f35d:summersetisles.esp", 
      "92492:Skyrim.esm",
      "3a484:Dragonborn.esm",
      "125bfc:DragonBreak Online Edits.esp"
@@ -1412,7 +1412,7 @@
     "id": "boethiah",
     "name": "Boethiah",
     "kind": "daedra",
-    "shrines": [
+    "shrines": ["22f0d:Skyrim.esm", "291aa1:Journey to Baan Malur.esp", 
      "39e34:Dragonborn.esm",
      "125bfd:DragonBreak Online Edits.esp"
     ],
@@ -1432,7 +1432,7 @@
     "id": "mephala",
     "name": "Mephala",
     "kind": "daedra",
-    "shrines": [
+    "shrines": ["291aa2:Journey to Baan Malur.esp", 
      "3a481:Dragonborn.esm",
      "125bff:DragonBreak Online Edits.esp"
     ],
@@ -1473,7 +1473,7 @@
     "id": "molagbal",
     "name": "Molag Bal",
     "kind": "daedra",
-    "shrines": [
+    "shrines": ["ec970:Skyrim.esm", "dee7e:Skyrim.esm", 
      "c7b72:Skyrim.esm",
      "125c01:DragonBreak Online Edits.esp"
     ],
@@ -1493,7 +1493,7 @@
     "id": "nocturnal",
     "name": "Nocturnal",
     "kind": "daedra",
-    "shrines": [
+    "shrines": ["190350:arnima.esm", "5a98:man_DaedricShrines.esp", 
      "10e8b0:Skyrim.esm",
      "125c03:DragonBreak Online Edits.esp"
     ],
@@ -1581,7 +1581,7 @@
     "id": "sheogorath",
     "name": "Sheogorath",
     "kind": "daedra",
-    "shrines": [
+    "shrines": ["147871:summersetisles.esp", 
      "1112cb:DragonBreak Online Edits.esp"
     ],
     "blessing": "<author: Boon of Sheogorath>",
@@ -1602,7 +1602,7 @@
     "id": "clavicusvile",
     "name": "Clavicus Vile",
     "kind": "daedra",
-    "shrines": [
+    "shrines": ["20951:Skyrim.esm", "fe530:Skyrim.esm", 
      "1c4e8:Skyrim.esm"
     ],
     "blessing": "",
@@ -1643,7 +1643,7 @@
     "id": "namira",
     "name": "Namira",
     "kind": "daedra",
-    "shrines": [
+    "shrines": ["ac9ab:Skyrim.esm", 
      "125c02:DragonBreak Online Edits.esp"
     ],
     "blessing": "1209c9:DragonBreak Online Edits.esp",
