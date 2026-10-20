@@ -372,6 +372,10 @@ const hp = (a) => S.get(a).percentages.health;
   }
   check('item 5: a staff ENCH paralyses through explosionParalysisOf, capped for players by playerParalysis', /else if \(spell && spell\.record\.type === 'ENCH'\) seconds = paralysisIn\(spell\);/.test(gm) && /gearEnch\.playerParalysis\(tgt, seconds, isEnch\)/.test(gm));
   check('...the spell hit hands a staff to staffSpellHit (slow, drains)', /gearEnch\.staffSpellHit\(agg, tgt, spell\)/.test(gm));
+  check('item 7: worn Heavy and Light Armor scale their own pieces in Defense and the Flesh spells', (gm.match(/\* \(w\.cond \|\| 1\) \* \(p\.heavy \? gm\.heavy : gm\.light\)/g) || []).length === 2);
+  check('...Fortify Block adds to the block potion in combat.js', /1 - Math\.min\(1, blockPotion \+ blockGear\)/.test(read('combat.js')));
+  check('...Fortify Pickpocket adds to the thief\'s chance in pickpocket.js', /chanceFor\(tier, g, drawn, a\)/.test(read('pickpocket.js')) && /b\(thief, 'pickpocket'\)/.test(read('pickpocket.js')));
+  check('...Fortify Unarmed shares gearFortify (AV 35)', /35: 'unarmed'/.test(gm));
   console.log(failed ? `${failed} failed` : 'all checks passed');
   process.exit(failed ? 1 : 0);
 })().catch((e) => { console.log('FAIL harness threw', e.stack); process.exit(1); });

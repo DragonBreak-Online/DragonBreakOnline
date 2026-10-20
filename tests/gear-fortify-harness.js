@@ -15,7 +15,7 @@ const check = (name, ok, got) => { console.log(`${ok ? 'ok  ' : 'FAIL'}  ${name}
 const u32 = (...v) => { const b = new DataView(new ArrayBuffer(v.length * 4)); v.forEach((x, i) => b.setUint32(i * 4, x, true)); return new Uint8Array(b.buffer); };
 const f32 = (x) => { const b = new DataView(new ArrayBuffer(12)); b.setFloat32(0, x, true); return new Uint8Array(b.buffer); };
 const mgefData = (arch, av) => { const b = new DataView(new ArrayBuffer(0x98)); b.setUint32(0x40, arch, true); b.setUint32(0x44, av, true); return new Uint8Array(b.buffer); };
-const HOOD = 0x0e00ae01, ARCHERY_ENCH = 0xbe00e, ARCHERY_FX = 0x7a0fe, ONE_ENCH = 0x111, ONE_FX = 0x222, HEALTH_ENCH = 0x333, HEALTH_FX = 0x444;
+const HOOD = 0x0e00ae01, ARCHERY_ENCH = 0xbe00e, ARCHERY_FX = 0x7a0fe, ONE_ENCH = 0x111, ONE_FX = 0x222, HEALTH_ENCH = 0x333, HEALTH_FX = 0x444, FIST_ENCH = 0x888, FIST_FX = 0x999, GLOVES = 0xaaa;
 const RING = 0x555, AMULET = 0x666, PLAIN = 0x777, BOW = 0x139a5, SWORD = 0x12eb7, GREATSWORD = 0x1359d, SPELL = 0x12fcd;
 const ench = (fx, mag) => ({ type: 'ENCH', fields: [{ type: 'EFID', data: u32(fx) }, { type: 'EFIT', data: f32(mag) }] });
 const armo = (e) => ({ type: 'ARMO', fields: e ? [{ type: 'EITM', data: u32(e) }] : [] });
@@ -25,6 +25,7 @@ const records = {
   [ARCHERY_FX]: { type: 'MGEF', fields: [{ type: 'DATA', data: mgefData(34, 98) }] },
   [ONE_FX]: { type: 'MGEF', fields: [{ type: 'DATA', data: mgefData(34, 96) }] },
   [HEALTH_FX]: { type: 'MGEF', fields: [{ type: 'DATA', data: mgefData(34, 24) }] },
+  [FIST_FX]: { type: 'MGEF', fields: [{ type: 'DATA', data: mgefData(34, 35) }] }, [FIST_ENCH]: ench(FIST_FX, 10), [GLOVES]: armo(FIST_ENCH),
   [SPELL]: { type: 'SPEL', fields: [] },
 };
 const recordOf = (id) => (records[id >>> 0] ? { record: records[id >>> 0], toGlobalRecordId: (x) => x } : null);
@@ -61,6 +62,15 @@ mult = load({ gearFortify: { enabled: false } });
 check('enabled false: nothing', mult(1, BOW) === 1);
 mult = load({ gearFortify: { perPoint: 0.01, cap: 1 } });
 check('config: vanilla strength when asked', near(mult(1, BOW), 1.4), mult(1, BOW));
+mult = load({ gearFortify: { perPoint: 0.01, cap: 0.25 } });
+inv.set(1, [{ baseId: GLOVES, count: 1, worn: true }]);
+check('Fortify Unarmed 10 (EnchArmorFortifyUnarmed01): fists 10% harder, on gearFortify\'s per point', near(mult(1, 0x1f4), 1.1), mult(1, 0x1f4));
+check('...not a sword', mult(1, SWORD) === 1);
+inv.set(1, [{ baseId: GLOVES, count: 1, worn: true }, { baseId: PLAIN, count: 1, worn: true, enchantmentEffects: [{ effectId: FIST_FX, magnitude: 30 }] }]);
+check('...40 points stop at gearFortify\'s cap 0.25', near(mult(1, 0x1f4), 1.25), mult(1, 0x1f4));
+mult = load({ gearFortify: { perPoint: 0.01, cap: 0.25 }, gearEnchantments: { unarmed: { enabled: false } } });
+check('...gearEnchantments.unarmed.enabled false: nothing', mult(1, 0x1f4) === 1);
+mult = load({});
 check('the hit judge multiplies it in, never for a beast', /if \(!beastAgg\) mult \*= gearAttackMult\(agg, src\);/.test(src));
 console.log(failed ? `${failed} failed` : 'all checks passed');
 process.exit(failed ? 1 : 0);
