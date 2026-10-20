@@ -575,9 +575,18 @@ export class Spawn implements System {
   // Paywalled races this profile has not been granted
   private lockedRacesFor(profileId: number | undefined): string[] {
     const granted = profileId !== undefined ? this.charCreator.grants[String(profileId)] ?? [] : [];
-    return Object.entries(this.charCreator.paywalledRaces)
+    const locked = Object.entries(this.charCreator.paywalledRaces)
       .filter(([, entitlement]) => !granted.includes(entitlement))
       .map(([race]) => race);
+    // Races the gameplay layer locks per account (racial.js: the Half-Giant until 150 hours played, Nate 20 Oct)
+    const hook = (globalThis as Record<string, unknown>).__dboLockedRacesFor;
+    if (profileId !== undefined && typeof hook === "function") {
+      try {
+        const more = (hook as (p: number) => unknown)(profileId);
+        if (Array.isArray(more)) for (const r of more) if (typeof r === "string" && !locked.includes(r)) locked.push(r);
+      } catch { /* the gameplay layer is optional */ }
+    }
+    return locked;
   }
 
   private isCharCreatorPending(mp: Mp, actorId: number): boolean {

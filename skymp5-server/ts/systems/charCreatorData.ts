@@ -36,6 +36,8 @@ export const RACES: Record<string, RaceEntry> = {
   redguard: { speciesId: "human", raceId: REDGUARD, childRaceId: REDGUARD_CHILD, faceGen: true },
   breton: { speciesId: "human", raceId: BRETON, childRaceId: BRETON_CHILD, faceGen: true },
   reachfolk: { speciesId: "human", raceId: BRETON, childRaceId: BRETON_CHILD, faceGen: true },
+  // The Half-Giant (Nate 20 Oct): made on the Nord, then on DBOHalfGiantRace through __dboRaceOverrides.halfgiant; no child
+  halfgiant: { speciesId: "human", raceId: NORD, faceGen: true },
   akaviri: { speciesId: "human", raceId: IMPERIAL, childRaceId: IMPERIAL_CHILD, faceGen: true },
   giant: { speciesId: "human", raceId: GIANT, faceGen: false },
   altmer: { speciesId: "mer", raceId: HIGHELF, faceGen: true },
@@ -185,6 +187,7 @@ export function validateResult(data: unknown, config: CharCreatorConfig): Valida
   const age = typeof d.age === "string" ? d.age : "";
   if (!AGE_IDS.includes(age)) return fail("Invalid age");
   if (age === "child" && !config.allowChildren) return fail("Child characters are not allowed on this server");
+  if (age === "child" && race === "halfgiant") return fail("A Half-Giant cannot be made as a child");
 
   const sex = d.sex;
   if (sex !== "male" && sex !== "female") return fail("Invalid sex");

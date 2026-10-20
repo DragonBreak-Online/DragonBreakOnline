@@ -44,6 +44,14 @@ const ok = (c, what, got) => { console.log(`${c ? 'ok  ' : 'FAIL'} ${what}${c ||
   ok(CC.raceOverrideFor('maormer', 'child') === 0, 'no child override (the Maormer have no child race)');
   globalThis.__dboRaceOverrides = { maormer: 'x' };
   ok(CC.raceOverrideFor('maormer', 'adult') === 0, 'a bad id is ignored');
+  // The Half-Giant (Nate 20 Oct): the front sends the Nord id, the character is made on DBOHalfGiantRace, never as a child
+  const NORD = 0x13746, HGRACE = 0x491d201b;
+  globalThis.__dboRaceOverrides = { halfgiant: HGRACE };
+  r = CC.validateResult(result('halfgiant', NORD), config);
+  ok(r.ok && r.clean.appearance.raceId === HGRACE && r.clean.race === 'halfgiant', 'a Half-Giant is made on DBOHalfGiantRace', r.ok ? r.clean.appearance.raceId : r);
+  ok(!CC.validateResult(result('halfgiant', NORD, 'child'), Object.assign({}, config, { allowChildren: true })).ok, '...never as a child');
+  r = CC.validateResult(result('nord', NORD), config);
+  ok(r.ok && r.clean.appearance.raceId === NORD, 'a Nord stays a Nord');
   console.log(fails ? `${fails} failed` : 'all passed');
   process.exit(fails ? 1 : 0);
 })().catch((e) => { console.log('FAIL', e.stack); process.exit(1); });
