@@ -115,8 +115,9 @@ public:
   static constexpr std::chrono::milliseconds kStaffVolleySpread{ 150 };
   static constexpr size_t kStaffTargetsPerVolley = 12;
 
-  // Spell riders (ApplySpellRiders) need a cast of the spell, or of a cloak or hazard granting it, this recent, and
-  // land once per (caster, spell, target) each kRiderHitInterval; a rune's hold re-arms after kExplosionHoldCooldown
+  // Spell riders (ApplySpellRiders) need a cast of the spell, or of a cloak or hazard granting it, this recent (a staff
+  // hit needs the staff held), and land once per (caster, spell, target) each kRiderHitInterval; a rune's or staff's
+  // hold on an NPC re-arms after kExplosionHoldCooldown
   static constexpr std::chrono::seconds kRiderCastWindow{ 90 };
   static constexpr std::chrono::milliseconds kRiderHitInterval{ 1000 };
   static constexpr std::chrono::seconds kExplosionHoldCooldown{ 10 };

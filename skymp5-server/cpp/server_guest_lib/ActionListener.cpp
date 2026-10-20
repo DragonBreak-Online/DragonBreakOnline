@@ -3301,38 +3301,59 @@ void ActionListener::ApplySpellRiders(MpActor& aggressor, MpActor& target,
   const SpellRiders riders = GetSpellRiders(worldState, spellId);
   const bool ridersOn = worldState->spellSync.riders;
   const bool isPlayer = target.GetUserId() != Networking::InvalidUserId;
-  // A rune's paralysis sits on its explosion's enchantment (Ash Rune), which DoCombatSpellApply cannot apply: an NPC
-  // is held on the server and kept still on its host. Players get dboParalyse from the gamemode
-  const uint64_t explosionKey =
+  // A staff hit names its enchantment, which DoCombatSpellApply cannot take
+  const bool isEnchantment = static_cast<bool>(espm::Convert<espm::ENCH>(
+    partOne.GetEspm().GetBrowser().LookupById(spellId).rec));
+  // A rune's paralysis sits on its explosion's enchantment (Ash Rune), a staff's on its own: an NPC is held on the
+  // server and kept still on its host. Players get dboParalyse from the gamemode
+  const uint64_t holdKey =
     (static_cast<uint64_t>(aggressor.GetFormId()) << 32) | target.GetFormId();
   const auto now = std::chrono::steady_clock::now();
-  const auto readyIt = explosionHoldReady.find(explosionKey);
-  const bool explosionReady =
+  const auto readyIt = explosionHoldReady.find(holdKey);
+  const bool hostHoldReady =
     readyIt == explosionHoldReady.end() || now >= readyIt->second;
-  const uint32_t explosionHoldSeconds =
-    worldState->spellSync.explosionRiders && !isPlayer && explosionReady
-    ? GetExplosionRiders(worldState, spellId).paralysisSeconds
-    : 0;
+  uint32_t hostHoldSeconds = 0;
+  if (!isPlayer && hostHoldReady) {
+    if (isEnchantment) {
+      hostHoldSeconds = ridersOn ? riders.paralysisSeconds : 0;
+    } else if (worldState->spellSync.explosionRiders) {
+      hostHoldSeconds =
+        GetExplosionRiders(worldState, spellId).paralysisSeconds;
+    }
+  }
   const uint32_t spellHoldSeconds =
-    riders.damagesHealth ? 0 : riders.paralysisSeconds;
-  const uint32_t holdSeconds = std::max(spellHoldSeconds, explosionHoldSeconds);
+    riders.damagesHealth || isEnchantment ? 0 : riders.paralysisSeconds;
+  const uint32_t holdSeconds = std::max(spellHoldSeconds, hostHoldSeconds);
+  // An enchantment's AI riders replay as a spell that carries them
+  uint32_t replayId = spellId;
+  if (isEnchantment) {
+    const bool replayAi = ridersOn && !isPlayer && riders.ai &&
+      !riders.damagesHealth && !riders.commands;
+    replayId = replayAi ? StandInSpellOf(worldState, spellId) : 0;
+  }
   // Replaying a spell that also damages Health on the target's game would damage it twice. A player's own client
   // takes the stagger and slow from the clone replay already, and the base game applies AI effects to NPCs only
-  const bool replaySpell = !riders.damagesHealth && !riders.commands &&
-    (spellHoldSeconds > 0 ||
-     (ridersOn && !isPlayer &&
-      (riders.staggerAny || riders.slowAny || riders.ai)));
-  // Such a spell's unconditional stagger and slow go to an NPC's host on their own
-  const bool applyApart = ridersOn && riders.damagesHealth && !isPlayer &&
+  const bool replaySpell = isEnchantment
+    ? replayId != 0
+    : !riders.damagesHealth && !riders.commands &&
+      (spellHoldSeconds > 0 ||
+       (ridersOn && !isPlayer &&
+        (riders.staggerAny || riders.slowAny || riders.ai)));
+  // Such a spell's unconditional stagger and slow go to an NPC's host on their own, as do an enchantment's not replayed
+  const bool applyApart = ridersOn && !isPlayer &&
+    (riders.damagesHealth || (isEnchantment && !replaySpell)) &&
     (riders.stagger || riders.slow > 0.f);
-  if (!replaySpell && !applyApart && explosionHoldSeconds == 0) {
+  if (!replaySpell && !applyApart && hostHoldSeconds == 0) {
     return;
   }
   if (holdSeconds > 0 && IsParalyzed(target)) {
     return;
   }
-  // Only a hit of a spell the caster cast lately, at most once a kRiderHitInterval per target
-  if (!CastRecently(aggressor.GetFormId(), spellId) ||
+  // Only a hit of a spell the caster cast lately or of a staff it holds, at most once a kRiderHitInterval per target
+  const bool sourceUsed = isEnchantment
+    ? CanHitWithStaffEnchantment(aggressor, spellId)
+    : CastRecently(aggressor.GetFormId(), spellId);
+  if (!sourceUsed ||
       !TakeRiderHit(aggressor.GetFormId(), spellId, target.GetFormId())) {
     spdlog::info("OnSpellHit - riders of spell {:x} of {:x} on {:x} refused "
                  "(no recent cast, or too soon)",
@@ -3358,13 +3379,13 @@ void ActionListener::ApplySpellRiders(MpActor& aggressor, MpActor& target,
                  spellId, aggressor.GetFormId(), target.GetFormId(),
                  holdSeconds);
   }
-  if (explosionHoldSeconds > 0) {
+  if (hostHoldSeconds > 0) {
     if (explosionHoldReady.size() > 1024) {
       std::erase_if(explosionHoldReady,
                     [&](const auto& entry) { return entry.second <= now; });
     }
-    explosionHoldReady[explosionKey] = now +
-      std::chrono::seconds(explosionHoldSeconds) + kExplosionHoldCooldown;
+    explosionHoldReady[holdKey] =
+      now + std::chrono::seconds(hostHoldSeconds) + kExplosionHoldCooldown;
   }
 
   // A player's own client, or the host of an NPC
@@ -3374,9 +3395,8 @@ void ActionListener::ApplySpellRiders(MpActor& aggressor, MpActor& target,
     return;
   }
 
-  if (explosionHoldSeconds > 0) {
-    StartHostEffect(HostEffect::Hold, executor, target, 0.f,
-                    explosionHoldSeconds);
+  if (hostHoldSeconds > 0) {
+    StartHostEffect(HostEffect::Hold, executor, target, 0.f, hostHoldSeconds);
   }
   if (applyApart) {
     if (riders.stagger) {
@@ -3404,24 +3424,25 @@ void ActionListener::ApplySpellRiders(MpActor& aggressor, MpActor& target,
 
   // DoCombatSpellApply takes a Spell; a Scroll is another form type in Papyrus, so a scroll's riders are kept on the
   // server only (review SCH1-R4)
-  const auto sourceLookup = partOne.GetEspm().GetBrowser().LookupById(spellId);
-  if (!espm::Convert<espm::SPEL>(sourceLookup.rec)) {
+  const auto replayLookup = partOne.GetEspm().GetBrowser().LookupById(replayId);
+  if (!espm::Convert<espm::SPEL>(replayLookup.rec)) {
     spdlog::info("OnSpellHit - riders of {:x} on {:x} are not replayed on "
                  "{:x}'s client (not a SPEL)",
                  spellId, target.GetFormId(), executor.GetFormId());
     return;
   }
   SpSnippetObjectArgument spellArg;
-  spellArg.formId = spellId;
+  spellArg.formId = replayId;
   spellArg.type = "Spell";
   SnippetArgs args;
   args.push_back(spellArg);
   args.push_back(SnippetActorArgument(worldState, executor, target, "Actor"));
   SpSnippet("Actor", "DoCombatSpellApply", args, aggressor.GetFormId())
     .Execute(&executor, SpSnippetMode::kNoReturnResult);
-  spdlog::info("OnSpellHit - spell {:x} of {:x} replayed on {:x} for {:x}",
+  spdlog::info("OnSpellHit - spell {:x} of {:x} replayed on {:x} for {:x} "
+               "(as {:x})",
                spellId, aggressor.GetFormId(), executor.GetFormId(),
-               target.GetFormId());
+               target.GetFormId(), replayId);
 }
 
 void ActionListener::StartHostEffect(HostEffect effect, MpActor& executor,
