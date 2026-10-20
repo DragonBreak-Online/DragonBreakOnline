@@ -16,3 +16,4 @@ import './tabs/KeysTab';
 import './tabs/CitizenTab';
 import './tabs/ReferralsTab';
 import './tabs/WantedTab';
+import './tabs/NotesTab';
