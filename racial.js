@@ -526,7 +526,19 @@ module.exports = (api) => {
   // ---- Highborn -------------------------------------------------------------------------------------------------------
   // gamemode.js castHook: a Highborn cast that reaches the server (an old or modified client; 0.3.74 dispels it and
   // never relays it) runs the C++ rate boost for its minute, and the Altmer's gift waits that minute
+  // The racial power spells on the DLE's race records (Nate, 19 Oct: "they just need the racial spells for the Power and
+  // passive"): cast from the magic menu, one calls the server's power as the Journal does. config racial.powerSpells
+  // { "<spell desc>": "<power name>" }
+  const POWER_SPELLS = (() => {
+    const m = new Map();
+    const src = Object.assign({ '1d2010:DragonBreak Online Edits.esp': 'Feeding Frenzy', '1d200f:DragonBreak Online Edits.esp': 'Glacier Fall',
+      '1d2011:DragonBreak Online Edits.esp': 'Roaring Tempest' }, C.powerSpells || {});
+    for (const [desc, name] of Object.entries(src)) { try { const id = mp.getIdFromDesc(desc) >>> 0; if (id) m.set(id, String(name)); } catch (e) { /* not in this load order */ } }
+    return m;
+  })();
   const onCast = (a, spellId, at = Date.now()) => {
+    const power = POWER_SPELLS.get(spellId >>> 0);
+    if (power) { try { const r = usePower(a >>> 0, at, power); if (r && r.text) personal(a >>> 0, r.text); } catch (e) { log('racial: power spell failed', e.message); } return; }
     S.castAt.set(a >>> 0, at);
     if (S.castAt.size > 500) for (const [k, t] of S.castAt) if (at - t > 60000) S.castAt.delete(k);
     // Stamped with the server's magicka from before the channel; a fire-and-forget cast in the other hand keeps it

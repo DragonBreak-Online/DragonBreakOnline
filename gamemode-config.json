@@ -306,6 +306,8 @@
    "enabled": true
  },
  "supernatural": {
+  "_goblinEyes": "Goblin vampires' eyes glow while the tells show (supernatural.js goblinEyes, Nate 20 Oct): the DLE's DBO_GoblinVampireEyes and DBO_GoblinEyesMortal (PC Worker C, DLE 115b2e5c) on the green Goblin head's eye shape. Needs that DLE.",
+  "goblinEyes": { "node": "mesh001:1:2:3:3", "txst": "1d2013:DragonBreak Online Edits.esp", "txstMortal": "1d2014:DragonBreak Online Edits.esp" },
    "_comment": "Overrides for supernatural.js defaults. huntMarkChance: the chance that surviving Hircine's Great Hunt (/rite) gives Sanies Lupinus; an unmarked survivor waits riteFailCooldownHours to run it again. infectWerewolf: a werewolf's bite's chance to pass it on. Nate, 2026-09-27: werewolf harder to come by than vampirism, 0.5 -> 0.25 and 0.05 -> 0.02. Nate, 2026-10-03: both rarer, lycanthropy rarest: 0.25 -> 0.1 and 0.02 -> 0.005 (infectVampire 0.03 and infectFeed 0.05 are the supernatural.js defaults).",
    "huntMarkChance": 0.1,
    "_infectWerewolf": "Nate, 13 Oct: 0.005 -> 0.01 a bite. The world held 20 vampires to 2 werewolves, six to one, which is exactly the ratio of the two infection chances (a vampire's hit 0.03). This doubles the werewolf side and leaves the vampire side alone. Rollback: 0.005, hot reload.",
