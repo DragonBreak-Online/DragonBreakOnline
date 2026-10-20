@@ -1,5 +1,5 @@
 // The server's look for the player's own character arrives in tick context, so it waits here and goes on from an update
-import { Game, Ui } from "skyrimPlatform";
+import { Game, Race, Ui } from "skyrimPlatform";
 import { Appearance, applyAppearanceToPlayer, applyNameToPlayer, ownLookOnBase, sameLookButName } from "./appearance";
 import { isBeastRaceId, isGuardedActor } from "./beastRaces";
 import { driftConfig } from "./driftConfig";
@@ -150,6 +150,21 @@ export class OwnLookQueue {
       this.log("Skipped own appearance: ownLook puts only a name on");
       trace("own drop=nameonly");
       return;
+    }
+    // A refused /appearance race change leaves the live race on this screen only: put the look's race back first, then the look
+    let live = 0;
+    try { live = (player?.getRace()?.getFormID() ?? 0) >>> 0; } catch { live = 0; }
+    if (player && live && live !== raceId) {
+      const race = Race.from(Game.getFormEx(raceId));
+      if (race) {
+        g.__dboRaceSwitchAt = Date.now();
+        player.setRace(race);
+        trace(`own race=${live.toString(16)}->${raceId.toString(16)}`);
+        this.look = look;
+        this.seenAt = 0;
+        this.queue();
+        return;
+      }
     }
     applyAppearanceToPlayer(look, true, "update");
     this.log("Applied appearance to the player");
