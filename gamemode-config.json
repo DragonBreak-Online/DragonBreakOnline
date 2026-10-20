@@ -1023,8 +1023,8 @@
    "9a87dc:King of the Murkmire.esp",
    "182af:Dragonborn.esm",
    "376f8:Dragonborn.esm",
-   "376f7:Dragonborn.esm"
-  ],
+   "376f7:Dragonborn.esm", "5eb06:Skyrim.esm"
+  ], "doorMessages": {"_comment": "A blocked door's own refusal line (playtest.js). 5eb06: the escape cave's outside door into HelgenKeep01 hung every load (#bugs 1561460052320059422, 18 Oct); Helgen is rebuilt and the tunnel fell in with Alduin's attack.", "5eb06:Skyrim.esm": "The tunnel has collapsed. Rubble fills it from wall to wall."},
   "_blockedDoors": "Nate 15 Oct: only Skyrim opens; every route from Windhelm to Solstheim and Baan Malur is closed. The 13 load doors from open places into closed lands (re-derived from the release package's 140-plugin order, Gray Cowl REDUX included): the Solstheim ship's hatch at the Windhelm docks 16fe0, the two Creation Club placeholder doors 3111/3117, Baan Malur's Dwemer door east of Windhelm 1c8d60 and the Dunmeth Pass gate 800 (Journey to Baan Malur), Gray Cowl 1a4d/1a88/15fbc, Druadach 30d90/3754/374e, arnima d7b3c, Murkmire 9a87dc. Plus the Northern Maiden's crew at the Windhelm docks, whose dialogue sails to Raven Rock: Gjalund Salt-Sage 182af, Sogrlaf 376f8, Lygrleid 376f7 (Dragonborn.esm; talking to them is refused; the PC actor pass disables them too). No other Solstheim or Baan Malur route lands in an open place: no boat, silt strider or ferry activator of a closed plugin stands in Skyrim (tools/skyrim_release_scan.py, 15 Oct). Anyone carried into a closed land anyway is put back where they last stood.",
   "graceSeconds": 60,
   "checkSeconds": 5,
