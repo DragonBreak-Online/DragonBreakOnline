@@ -45,6 +45,8 @@ export const RACES: Record<string, RaceEntry> = {
   bosmer: { speciesId: "mer", raceId: WOODELF, faceGen: true },
   orsimer: { speciesId: "mer", raceId: ORC, faceGen: true },
   maormer: { speciesId: "mer", raceId: HIGHELF, faceGen: true },
+  // The Snow Elf (Nate 20 Oct): made on the High Elf, then on DBOSnowElfRace through __dboRaceOverrides.snowelf; locked until 150 h
+  snowelf: { speciesId: "mer", raceId: HIGHELF, faceGen: true },
   falmer: { speciesId: "mer", raceId: FALMER, faceGen: false },
   dremora: { speciesId: "daedra", raceId: DREMORA, faceGen: true },
   aureal: { speciesId: "daedra", raceId: DREMORA, faceGen: true },
