@@ -759,6 +759,16 @@
     ],
     "radius": 25000,
     "pick": "low"
+   },
+   {
+    "_comment": "Pelagia Farm's west edge outside Whiterun (Moss-Pocket #8G8Z, 20 Oct: a sabre cat spawn by the farm): one plains predator spot (wildlife.json dc551, wild:skeever:697) rolled a sabre cat for good under density. Its weakest creature here; the radius takes this spot only (its twin dc550 is 270 units off).",
+    "world": "3c:Skyrim.esm",
+    "pos": [
+     13898,
+     -19863
+    ],
+    "radius": 100,
+    "pick": "low"
    }
   ]
  },
