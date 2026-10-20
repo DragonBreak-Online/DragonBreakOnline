@@ -7792,11 +7792,15 @@ const hitDamageAttemptHook =(aggressorId, targetId, sourceId, damage, flags) => 
     // The target's side (Defense, a blessing, the race's resistance) is capped together: racial.js reductionCap
     // Worn resistances join the race's, a potion's and a blessing's under racial.js reductionCap (gearench.js resistMult)
     let targetSide = defenseDamageMult(tgt) * fleshDamageMult(tgt, src) * blessingTargetMult(tgt, src) * potionResistMult(tgt, src) * gearResistMult(tgt, src);
+    // Spellbreaker's ward while its wearer blocks a spell from the front (gearench.js), under the same cap as a racial ward
+    try { if (gearEnch) targetSide *= gearEnch.spellbreakerMult(agg, tgt, src, dmg, flags); } catch (e) { log('spellbreaker failed', e.message); }
     if (racial) { try { targetSide = racial.capTargetSide(targetSide * racial.targetMult(agg, tgt, src, dmg)); } catch (e) { log('racial target failed', e.message); } }
     let raceAtk = 1;
     if (racial && !beastAgg) { try { raceAtk = racial.attackMult(agg, tgt, src, dmg); } catch (e) { log('racial attack failed', e.message); } }
     let mult = (beastAgg ? 1 : masteryDamageMult(agg, src) * potionAttackMult(agg, src)) * potionTakenMult(tgt, flags) * arcaneDamageMult(agg, src) * materialDamageMult(agg, src) * temperDamageMult(agg, src) * arrowDamageMult(agg, src) * targetSide * blessingAttackMult(agg, src) * raceAtk * huntDamageMult(agg, tgt) * pvp;
     if (!beastAgg) mult *= gearAttackMult(agg, src);
+    // The Shrouded Gloves double a one-handed sneak attack (gearench.js backstabMult)
+    try { if (gearEnch && !beastAgg) mult *= gearEnch.backstabMult(agg, src, flags); } catch (e) { log('backstab failed', e.message); }
     // Tired blows, fists into armour, staves through it, the fist's stamina drain and disarm (martial.js)
     if (martial && !beastAgg) { try { mult *= martial.onAttempt(agg, tgt, src, dmg, flags); } catch (e) { log('martial failed', e.message); } }
     // Block chip and stamina, guard breaks, bash, stagger (combat.js); a bash's blow comes back scaled down
