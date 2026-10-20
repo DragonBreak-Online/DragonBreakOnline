@@ -36,6 +36,7 @@
 #include <napi.h>
 #include <prometheus/core.h>
 #include <save_storages/SaveStorageFactory.h>
+#include <spdlog/async.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <sstream>
 
@@ -49,9 +50,25 @@ namespace {
 
 constexpr size_t kMockServerIdx = 1;
 
+// Both loggers, the gamemode's "console" and spdlog's default one that the C++ systems use, write on a background
+// thread. Writing on the server's own thread blocked it whenever stdout was slow to take a line: at 500 crowded bots one
+// MovementValidation peak line held an UpdateMovement call for 534 ms (TickProfile "slow UpdateMovement", 19 Oct),
+// the 0.5-1 s stall seen about every 40 minutes. A full queue drops the oldest lines rather than wait. The last lines
+// before a hard crash can be lost; the crash logger keeps the call stack.
 std::shared_ptr<spdlog::logger>& GetLogger()
 {
-  static auto g_logger = spdlog::stdout_color_mt("console");
+  static auto g_logger = [] {
+    spdlog::init_thread_pool(65536, 1);
+    auto sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
+    auto console = std::make_shared<spdlog::async_logger>(
+      "console", sink, spdlog::thread_pool(),
+      spdlog::async_overflow_policy::overrun_oldest);
+    spdlog::register_logger(console);
+    spdlog::set_default_logger(std::make_shared<spdlog::async_logger>(
+      "", sink, spdlog::thread_pool(),
+      spdlog::async_overflow_policy::overrun_oldest));
+    return std::static_pointer_cast<spdlog::logger>(console);
+  }();
   return g_logger;
 }
 
