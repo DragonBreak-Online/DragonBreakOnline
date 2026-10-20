@@ -1,5 +1,20 @@
 [
   {
+    "title": "Events and staff tools",
+    "date": "2026-10-20",
+    "version": "Server update",
+    "tag": "New",
+    "sections": [
+      {
+        "heading": "Events",
+        "items": [
+          "Staff and event hosts can now announce events to everyone online with /event, so keep an eye out for clues about where the next one takes place.",
+          "Staff can also fix a character's name while its player is offline."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Pigeons reach anyone you have exchanged introductions with",
     "date": "2026-10-19",
     "version": "Hotfix",
