@@ -4851,6 +4851,776 @@
    "recipes": [
     "d83:DragonBreak Nexus Patches.esp"
    ]
+  },
+  "800:Sentinel - City Guards.esp": {
+   "name": "Whiterun Guard's Armor",
+   "set": "Whiterun Guard",
+   "factions": [
+    "hold-whiterun"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "d84:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "801:Sentinel - City Guards.esp": {
+   "name": "Whiterun Guard's Heavy Armor",
+   "set": "Whiterun Guard",
+   "factions": [
+    "hold-whiterun"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "d85:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "802:Sentinel - City Guards.esp": {
+   "name": "Whiterun Guard's Heavy Boots",
+   "set": "Whiterun Guard",
+   "factions": [
+    "hold-whiterun"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "d86:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "803:Sentinel - City Guards.esp": {
+   "name": "Whiterun Guard's Cloak",
+   "set": "Whiterun Guard",
+   "factions": [
+    "hold-whiterun"
+   ],
+   "role": "tailor",
+   "recipes": [
+    "d87:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "804:Sentinel - City Guards.esp": {
+   "name": "Whiterun Guard's Ceremonial Cloak",
+   "set": "Whiterun Guard",
+   "factions": [
+    "hold-whiterun"
+   ],
+   "role": "tailor",
+   "recipes": [
+    "d88:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "805:Sentinel - City Guards.esp": {
+   "name": "Whiterun Guard's Heavy Gauntlets",
+   "set": "Whiterun Guard",
+   "factions": [
+    "hold-whiterun"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "d89:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "806:Sentinel - City Guards.esp": {
+   "name": "Whiterun Guard's Helmet",
+   "set": "Whiterun Guard",
+   "factions": [
+    "hold-whiterun"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "d8a:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "807:Sentinel - City Guards.esp": {
+   "name": "Whiterun Guard's Ceremonial Helmet",
+   "set": "Whiterun Guard",
+   "factions": [
+    "hold-whiterun"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "d8b:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "808:Sentinel - City Guards.esp": {
+   "name": "Whiterun Guard's Heavy Helmet",
+   "set": "Whiterun Guard",
+   "factions": [
+    "hold-whiterun"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "d8c:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "809:Sentinel - City Guards.esp": {
+   "name": "Whiterun Guard's Shield",
+   "set": "Whiterun Guard",
+   "factions": [
+    "hold-whiterun"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "d8d:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "80a:Sentinel - City Guards.esp": {
+   "name": "Whiterun Guard's Heavy Shield",
+   "set": "Whiterun Guard",
+   "factions": [
+    "hold-whiterun"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "d8e:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "80b:Sentinel - City Guards.esp": {
+   "name": "Haafingar Guard's Armor",
+   "set": "Solitude Guard",
+   "factions": [
+    "hold-solitude"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "d8f:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "80c:Sentinel - City Guards.esp": {
+   "name": "Haafingar Guard's Heavy Armor",
+   "set": "Solitude Guard",
+   "factions": [
+    "hold-solitude"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "d90:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "80d:Sentinel - City Guards.esp": {
+   "name": "Haafingar Guard's Boots",
+   "set": "Solitude Guard",
+   "factions": [
+    "hold-solitude"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "d91:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "80e:Sentinel - City Guards.esp": {
+   "name": "Haafingar Guard's Heavy Boots",
+   "set": "Solitude Guard",
+   "factions": [
+    "hold-solitude"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "d92:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "80f:Sentinel - City Guards.esp": {
+   "name": "Haafingar Guard's Cloak",
+   "set": "Solitude Guard",
+   "factions": [
+    "hold-solitude"
+   ],
+   "role": "tailor",
+   "recipes": [
+    "d93:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "810:Sentinel - City Guards.esp": {
+   "name": "Haafingar Guard's Gauntlets",
+   "set": "Solitude Guard",
+   "factions": [
+    "hold-solitude"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "d94:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "811:Sentinel - City Guards.esp": {
+   "name": "Haafingar Guard's Heavy Gauntlets",
+   "set": "Solitude Guard",
+   "factions": [
+    "hold-solitude"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "d95:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "812:Sentinel - City Guards.esp": {
+   "name": "Haafingar Guard's Helmet",
+   "set": "Solitude Guard",
+   "factions": [
+    "hold-solitude"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "d96:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "813:Sentinel - City Guards.esp": {
+   "name": "Haafingar Guard's Heavy Helmet",
+   "set": "Solitude Guard",
+   "factions": [
+    "hold-solitude"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "d97:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "814:Sentinel - City Guards.esp": {
+   "name": "Haafingar Guard's Shield",
+   "set": "Solitude Guard",
+   "factions": [
+    "hold-solitude"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "d98:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "817:Sentinel - City Guards.esp": {
+   "name": "Eastmarch Guard's Cloak",
+   "set": "Windhelm Guard",
+   "factions": [
+    "hold-windhelm"
+   ],
+   "role": "tailor",
+   "recipes": [
+    "d99:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "818:Sentinel - City Guards.esp": {
+   "name": "Eastmarch Guard's Heavy Cloak",
+   "set": "Windhelm Guard",
+   "factions": [
+    "hold-windhelm"
+   ],
+   "role": "tailor",
+   "recipes": [
+    "d9a:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "81c:Sentinel - City Guards.esp": {
+   "name": "Eastmarch Guard's Shield",
+   "set": "Windhelm Guard",
+   "factions": [
+    "hold-windhelm"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "d9b:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "81d:Sentinel - City Guards.esp": {
+   "name": "Eastmarch Guard's Tower Shield",
+   "set": "Windhelm Guard",
+   "factions": [
+    "hold-windhelm"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "d9c:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "81e:Sentinel - City Guards.esp": {
+   "name": "Reach Guard's Armor",
+   "set": "Markarth Guard",
+   "factions": [
+    "hold-markarth"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "d9d:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "81f:Sentinel - City Guards.esp": {
+   "name": "Reach Guard's Heavy Armor",
+   "set": "Markarth Guard",
+   "factions": [
+    "hold-markarth"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "d9e:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "820:Sentinel - City Guards.esp": {
+   "name": "Reach Guard's Boots",
+   "set": "Markarth Guard",
+   "factions": [
+    "hold-markarth"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "d9f:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "821:Sentinel - City Guards.esp": {
+   "name": "Reach Guard's Heavy Boots",
+   "set": "Markarth Guard",
+   "factions": [
+    "hold-markarth"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "da0:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "822:Sentinel - City Guards.esp": {
+   "name": "Reach Guard's Cloak",
+   "set": "Markarth Guard",
+   "factions": [
+    "hold-markarth"
+   ],
+   "role": "tailor",
+   "recipes": [
+    "da1:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "823:Sentinel - City Guards.esp": {
+   "name": "Reach Guard's Gauntlets",
+   "set": "Markarth Guard",
+   "factions": [
+    "hold-markarth"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "da2:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "824:Sentinel - City Guards.esp": {
+   "name": "Reach Guard's Heavy Gauntlets",
+   "set": "Markarth Guard",
+   "factions": [
+    "hold-markarth"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "da3:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "825:Sentinel - City Guards.esp": {
+   "name": "Reach Guard's Helmet",
+   "set": "Markarth Guard",
+   "factions": [
+    "hold-markarth"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "da4:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "826:Sentinel - City Guards.esp": {
+   "name": "Reach Guard's Heavy Helmet",
+   "set": "Markarth Guard",
+   "factions": [
+    "hold-markarth"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "da5:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "827:Sentinel - City Guards.esp": {
+   "name": "Reach Guard's Shield",
+   "set": "Markarth Guard",
+   "factions": [
+    "hold-markarth"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "da6:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "828:Sentinel - City Guards.esp": {
+   "name": "Rift Guard's Armor",
+   "set": "Riften Guard",
+   "factions": [
+    "hold-riften"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "da7:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "829:Sentinel - City Guards.esp": {
+   "name": "Rift Guard's Heavy Armor",
+   "set": "Riften Guard",
+   "factions": [
+    "hold-riften"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "da8:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "82a:Sentinel - City Guards.esp": {
+   "name": "Rift Guard's Boots",
+   "set": "Riften Guard",
+   "factions": [
+    "hold-riften"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "da9:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "82b:Sentinel - City Guards.esp": {
+   "name": "Rift Guard's Cloak",
+   "set": "Riften Guard",
+   "factions": [
+    "hold-riften"
+   ],
+   "role": "tailor",
+   "recipes": [
+    "daa:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "82c:Sentinel - City Guards.esp": {
+   "name": "Rift Guard's Gauntlets",
+   "set": "Riften Guard",
+   "factions": [
+    "hold-riften"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "dab:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "82d:Sentinel - City Guards.esp": {
+   "name": "Rift Guard's Helmet",
+   "set": "Riften Guard",
+   "factions": [
+    "hold-riften"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "dac:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "82e:Sentinel - City Guards.esp": {
+   "name": "Rift Guard's Heavy Helmet",
+   "set": "Riften Guard",
+   "factions": [
+    "hold-riften"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "dad:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "82f:Sentinel - City Guards.esp": {
+   "name": "Rift Guard's Shield",
+   "set": "Riften Guard",
+   "factions": [
+    "hold-riften"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "dae:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "830:Sentinel - City Guards.esp": {
+   "name": "Pale Guard's Armor",
+   "set": "Dawnstar Guard",
+   "factions": [
+    "hold-dawnstar"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "daf:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "831:Sentinel - City Guards.esp": {
+   "name": "Pale Guard's Heavy Armor",
+   "set": "Dawnstar Guard",
+   "factions": [
+    "hold-dawnstar"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "db0:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "832:Sentinel - City Guards.esp": {
+   "name": "Pale Guard's Boots",
+   "set": "Dawnstar Guard",
+   "factions": [
+    "hold-dawnstar"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "db1:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "833:Sentinel - City Guards.esp": {
+   "name": "Pale Guard's Heavy Boots",
+   "set": "Dawnstar Guard",
+   "factions": [
+    "hold-dawnstar"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "db2:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "834:Sentinel - City Guards.esp": {
+   "name": "Pale Guard's Cloak",
+   "set": "Dawnstar Guard",
+   "factions": [
+    "hold-dawnstar"
+   ],
+   "role": "tailor",
+   "recipes": [
+    "db3:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "835:Sentinel - City Guards.esp": {
+   "name": "Pale Guard's Gauntlets",
+   "set": "Dawnstar Guard",
+   "factions": [
+    "hold-dawnstar"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "db4:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "836:Sentinel - City Guards.esp": {
+   "name": "Pale Guard's Heavy Gauntlets",
+   "set": "Dawnstar Guard",
+   "factions": [
+    "hold-dawnstar"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "db5:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "837:Sentinel - City Guards.esp": {
+   "name": "Pale Guard's Helmet",
+   "set": "Dawnstar Guard",
+   "factions": [
+    "hold-dawnstar"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "db6:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "838:Sentinel - City Guards.esp": {
+   "name": "Pale Guard's Heavy Helmet",
+   "set": "Dawnstar Guard",
+   "factions": [
+    "hold-dawnstar"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "db7:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "839:Sentinel - City Guards.esp": {
+   "name": "Pale Guard's Shield",
+   "set": "Dawnstar Guard",
+   "factions": [
+    "hold-dawnstar"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "db8:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "83a:Sentinel - City Guards.esp": {
+   "name": "Falkreath Guard's Armor",
+   "set": "Falkreath Guard",
+   "factions": [
+    "hold-falkreath"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "db9:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "83b:Sentinel - City Guards.esp": {
+   "name": "Falkreath Guard's Heavy Armor",
+   "set": "Falkreath Guard",
+   "factions": [
+    "hold-falkreath"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "dba:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "83c:Sentinel - City Guards.esp": {
+   "name": "Falkreath Guard's Boots",
+   "set": "Falkreath Guard",
+   "factions": [
+    "hold-falkreath"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "dbb:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "83d:Sentinel - City Guards.esp": {
+   "name": "Falkreath Guard's Cloak",
+   "set": "Falkreath Guard",
+   "factions": [
+    "hold-falkreath"
+   ],
+   "role": "tailor",
+   "recipes": [
+    "dbc:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "83e:Sentinel - City Guards.esp": {
+   "name": "Falkreath Guard's Gauntlets",
+   "set": "Falkreath Guard",
+   "factions": [
+    "hold-falkreath"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "dbd:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "83f:Sentinel - City Guards.esp": {
+   "name": "Falkreath Guard's Helmet",
+   "set": "Falkreath Guard",
+   "factions": [
+    "hold-falkreath"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "dbe:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "840:Sentinel - City Guards.esp": {
+   "name": "Falkreath Guard's Heavy Helmet",
+   "set": "Falkreath Guard",
+   "factions": [
+    "hold-falkreath"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "dbf:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "841:Sentinel - City Guards.esp": {
+   "name": "Falkreath Guard's Shield",
+   "set": "Falkreath Guard",
+   "factions": [
+    "hold-falkreath"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "dc0:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "842:Sentinel - City Guards.esp": {
+   "name": "Falkreath Guard's Heavy Shield",
+   "set": "Falkreath Guard",
+   "factions": [
+    "hold-falkreath"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "dc1:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "843:Sentinel - City Guards.esp": {
+   "name": "Hjaalmarch Guard's Armor",
+   "set": "Morthal Guard",
+   "factions": [
+    "hold-morthal"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "dc2:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "844:Sentinel - City Guards.esp": {
+   "name": "Hjaalmarch Guard's Heavy Armor",
+   "set": "Morthal Guard",
+   "factions": [
+    "hold-morthal"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "dc3:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "845:Sentinel - City Guards.esp": {
+   "name": "Hjaalmarch Guard's Boots",
+   "set": "Morthal Guard",
+   "factions": [
+    "hold-morthal"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "dc4:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "846:Sentinel - City Guards.esp": {
+   "name": "Hjaalmarch Guard's Cloak",
+   "set": "Morthal Guard",
+   "factions": [
+    "hold-morthal"
+   ],
+   "role": "tailor",
+   "recipes": [
+    "dc5:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "847:Sentinel - City Guards.esp": {
+   "name": "Hjaalmarch Guard's Gauntlets",
+   "set": "Morthal Guard",
+   "factions": [
+    "hold-morthal"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "dc6:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "848:Sentinel - City Guards.esp": {
+   "name": "Hjaalmarch Guard's Helmet",
+   "set": "Morthal Guard",
+   "factions": [
+    "hold-morthal"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "dc7:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "849:Sentinel - City Guards.esp": {
+   "name": "Hjaalmarch Guard's Heavy Helmet",
+   "set": "Morthal Guard",
+   "factions": [
+    "hold-morthal"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "dc8:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "84a:Sentinel - City Guards.esp": {
+   "name": "Hjaalmarch Guard's Shield",
+   "set": "Morthal Guard",
+   "factions": [
+    "hold-morthal"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "dc9:DragonBreak Nexus Patches.esp"
+   ]
   }
  },
  "_uniformsComment": "War uniforms (realm.js, config war.uniforms): in a battle only fighters wearing a body piece of their faction's uniform count at a standard. A faction's uniform is its items above plus these worn-only extras; a faction with neither (the Fighters Guild today) is not held to it.",
