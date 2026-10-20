@@ -245,6 +245,14 @@ struct SpellRiders
   bool commands = false;
 };
 
+// Calm, Demoralize, Frenzy, Turn Undead, Rally: only the game hosting an NPC applies them
+bool IsAiRiderEffect(espm::MGEF::EffectType type)
+{
+  using Type = espm::MGEF::EffectType;
+  return type == Type::Calm || type == Type::Demoralize ||
+    type == Type::Frenzy || type == Type::TurnUndead || type == Type::Rally;
+}
+
 void AddSpellRider(SpellRiders& riders, const espm::SPEL::EFIT& effectItem,
                    const espm::MGEF::DATA& data)
 {
@@ -253,19 +261,13 @@ void AddSpellRider(SpellRiders& riders, const espm::SPEL::EFIT& effectItem,
     ((data.IsFlagSet(espm::MGEF::Flags::Hostile) ||
       data.IsFlagSet(espm::MGEF::Flags::Detrimental)) &&
      data.primaryAV == espm::ActorValue::Health);
+  riders.ai = riders.ai || IsAiRiderEffect(data.effectType);
   switch (data.effectType) {
     case Type::Paralysis:
       if (!data.IsFlagSet(espm::MGEF::Flags::HideInUI)) {
         riders.paralysisSeconds =
           std::max(riders.paralysisSeconds, effectItem.duration);
       }
-      break;
-    case Type::Calm:
-    case Type::Demoralize:
-    case Type::Frenzy:
-    case Type::TurnUndead:
-    case Type::Rally:
-      riders.ai = true;
       break;
     case Type::Stagger:
       riders.staggerAny = true;
@@ -351,6 +353,139 @@ SpellRiders GetExplosionRiders(WorldState* worldState, uint32_t spellId)
       }
     });
   return riders;
+}
+
+// Global MGEF id -> magnitude of each effect of a SPEL, SCRL or ENCH; harmsHealth and commands as in SpellRiders
+struct EffectMagnitudes
+{
+  std::unordered_map<uint32_t, float> byEffect;
+  bool harmsHealth = false;
+  bool commands = false;
+};
+
+EffectMagnitudes GetEffectMagnitudes(WorldState* worldState,
+                                     const espm::LookupResult& itemLookup)
+{
+  EffectMagnitudes result;
+  ForEachEffectData(
+    worldState, itemLookup,
+    [&](const espm::SPEL::EFIT* effectItem, const espm::MGEF::DATA& data,
+        const espm::LookupResult& mgefLookup) {
+      SpellRiders riders;
+      if (effectItem) {
+        AddSpellRider(riders, *effectItem, data);
+      }
+      result.harmsHealth = result.harmsHealth || riders.damagesHealth;
+      result.commands = result.commands || riders.commands;
+      result.byEffect[mgefLookup.ToGlobalId(mgefLookup.rec->GetId())] =
+        effectItem ? effectItem->magnitude : 0.f;
+    });
+  return result;
+}
+
+// A spell carrying an enchantment's AI riders, which DoCombatSpellApply can replay (Staff of Calm: Calm). It has every
+// AI effect of the enchantment and harms no Health; the nearest in magnitude and effect list wins, 0 when none does
+uint32_t StandInSpellOf(WorldState* worldState, uint32_t enchantmentId)
+{
+  struct Index
+  {
+    // Global MGEF id of an AI effect -> the spells that carry it
+    std::unordered_map<uint32_t, std::vector<espm::LookupResult>>
+      spellsByEffect;
+    std::unordered_map<uint32_t, uint32_t> answers;
+  };
+  static std::unordered_map<const WorldState*, Index> indexByWorld;
+  auto [indexIt, built] = indexByWorld.try_emplace(worldState);
+  Index& index = indexIt->second;
+  auto& browser = worldState->GetEspm().GetBrowser();
+  if (built) {
+    for (const auto& spell : browser.GetDistinctRecordsByType("SPEL")) {
+      ForEachEffectData(
+        worldState, spell,
+        [&](const espm::SPEL::EFIT*, const espm::MGEF::DATA& data,
+            const espm::LookupResult& mgefLookup) {
+          if (IsAiRiderEffect(data.effectType)) {
+            auto& spells = index.spellsByEffect[mgefLookup.ToGlobalId(
+              mgefLookup.rec->GetId())];
+            if (spells.empty() || spells.back().rec != spell.rec) {
+              spells.push_back(spell);
+            }
+          }
+        });
+    }
+    spdlog::info("ActionListener: {} AI magic effects carried by spells",
+                 index.spellsByEffect.size());
+  }
+  if (const auto it = index.answers.find(enchantmentId);
+      it != index.answers.end()) {
+    return it->second;
+  }
+
+  const auto enchantmentLookup = browser.LookupById(enchantmentId);
+  const auto enchantment = GetEffectMagnitudes(worldState, enchantmentLookup);
+  std::vector<uint32_t> aiEffects;
+  ForEachEffectData(
+    worldState, enchantmentLookup,
+    [&](const espm::SPEL::EFIT*, const espm::MGEF::DATA& data,
+        const espm::LookupResult& mgefLookup) {
+      if (IsAiRiderEffect(data.effectType)) {
+        aiEffects.push_back(mgefLookup.ToGlobalId(mgefLookup.rec->GetId()));
+      }
+    });
+
+  constexpr float kUnsharedEffectCost = 0.5f;
+  uint32_t best = 0;
+  float bestScore = 0.f;
+  const auto candidatesIt = aiEffects.empty()
+    ? index.spellsByEffect.end()
+    : index.spellsByEffect.find(aiEffects.front());
+  if (candidatesIt != index.spellsByEffect.end()) {
+    for (const auto& spell : candidatesIt->second) {
+      const auto candidate = GetEffectMagnitudes(worldState, spell);
+      if (candidate.harmsHealth || candidate.commands) {
+        continue;
+      }
+      float score = 0.f;
+      bool hasAll = true;
+      for (uint32_t effect : aiEffects) {
+        const auto it = candidate.byEffect.find(effect);
+        if (it == candidate.byEffect.end()) {
+          hasAll = false;
+          break;
+        }
+        score += std::abs(it->second - enchantment.byEffect.at(effect));
+      }
+      if (!hasAll) {
+        continue;
+      }
+      for (const auto& [effect, magnitude] : candidate.byEffect) {
+        score +=
+          enchantment.byEffect.count(effect) ? 0.f : kUnsharedEffectCost;
+      }
+      for (const auto& [effect, magnitude] : enchantment.byEffect) {
+        score += candidate.byEffect.count(effect) ? 0.f : kUnsharedEffectCost;
+      }
+      const uint32_t spellId = spell.ToGlobalId(spell.rec->GetId());
+      if (!best || score < bestScore ||
+          (score == bestScore && spellId < best)) {
+        best = spellId;
+        bestScore = score;
+      }
+    }
+  }
+  if (best) {
+    spdlog::info("ActionListener: enchantment {:x} replays as spell {:x}",
+                 enchantmentId, best);
+  } else {
+    spdlog::warn("ActionListener: no spell carries the AI riders of "
+                 "enchantment {:x}, they are not replayed",
+                 enchantmentId);
+  }
+  if (index.answers.size() > 4096) {
+    index.answers.clear();
+  }
+  index.answers.emplace(enchantmentId, best);
+  return best;
 }
 
 // Absorb Health's part of a spell's damage on target, counted like the damage formula counts it (visible effects
