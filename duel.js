@@ -2,9 +2,20 @@
 // gamemode.js after downed.js, whose hit, death, cast and eat hooks it wraps from outside.
 //
 // X on another player offers Challenge to a Duel (playermenu.js asks __dboDuelEntries, __dboDuelAction answers). The
-// challenger sets the duel in a panel (DUEL_MENU_ID): the format (one round, best of three, best of five), the rules (no
-// magic, no potions, both) and a wager in gold each. The challenged player accepts or refuses in a panel of their own
-// (OFFER_MENU_ID; closing it or answerSeconds passing refuses).
+// challenger sets the duel in a panel (DUEL_MENU_ID): the type, the format (one round, best of three, best of five), the
+// rules (no magic, no potions, both) and a wager in gold each. The challenged player is shown the type first and accepts
+// or refuses that duel as set, in a panel of their own (OFFER_MENU_ID; closing it or answerSeconds passing refuses).
+// Both must agree to the type (Nate, 19 Oct: "players can choose what they do ... both must agree to the duel type"):
+//   Practice fight  rounds as chosen, no wager, no winner recorded
+//   Friendly duel   a winner, no wager
+//   Wager duel      a winner, and a wager each that the winner takes
+//   Death duel      one round; the loser's character ends for good (supernatural.js __dboPermaKill), a wager optional.
+//                   Each side confirms a second warning before it begins, both agreements are audited. The killing
+//                   blow is refused like any duel's and the loser is ended standing, as the chopping block does
+//                   (execution.js): no down state, so no revive, crash forgiveness or temple can race it. Only a
+//                   beaten loser dies: a broken rule forfeits without death; a yield, a logout, leaving the ground or
+//                   anything but the other's blow ends it with no winner, and nobody offline is ever ended.
+//                   Config deathDuels: false takes the type away and ends a running one without death.
 // To begin, both stand within challengeMeters, at full health, up, unbound, in their own form, free of Death's Chill and
 // out of any PvP fight for combatSeconds, and each carries the wager. The wagers are taken at the start and held on each
 // character (private.dboDuelEscrow), so a restart or a crash returns them at the next login: the winner gets both, a duel
@@ -18,19 +29,18 @@
 // and creatures still can; falling to one, or to anything but the other duelist, ends the duel with no winner.
 // The duel also ends with no winner after maxMinutes, or when one logs out (disconnect 'forfeit' gives it to the one who
 // stayed); stepping arenaMeters from where it began for leaveSeconds forfeits it (both out: no winner).
-// "To the death" (the loser's character ends) is not built and is never offered: it waits on Nate (config toTheDeath).
 //
 // gamemode-config.json "duel" (every key optional); enabled: false takes the menu entry away and ends no running duel.
 'use strict';
 
 module.exports = (api) => {
   const { mp, log, personal, audit, who, display, profileOf, onlineActors, every, registerChatCommand, cfg, openWidget,
-    closeWidget, onUi, sendPacket, takeGold, giveItem, goldOf, recordOf, findByName, isAdmin } = api;
+    closeWidget, onUi, sendPacket, takeGold, giveItem, goldOf, recordOf, findByName, isAdmin, staffLog } = api;
   const C = Object.assign({
     enabled: true, challengeMeters: 8, arenaMeters: 25, leaveSeconds: 3, answerSeconds: 30, countdownSeconds: 3,
     pauseSeconds: 6, loseAt: 0.05, fullHealth: 0.99, combatSeconds: 30, maxMinutes: 15, maxWager: 5000,
     wagerSteps: [0, 10, 25, 50, 100, 250, 500, 1000], formats: ['single', 'bo3', 'bo5'], disconnect: 'refund',
-    toTheDeath: false, minMaxHealth: 150, outsiderNoticeSeconds: 5,
+    deathDuels: true, minMaxHealth: 150, outsiderNoticeSeconds: 5,
   }, cfg.duel || {});
   const DUEL_MENU_ID = 121;
   const OFFER_MENU_ID = 122;
@@ -49,6 +59,16 @@ module.exports = (api) => {
     { id: 'nopotions', label: 'no potions', magic: true, potions: false },
     { id: 'both', label: 'no magic, no potions', magic: false, potions: false },
   ];
+  const TYPES = {
+    practice: { label: 'Practice fight', winner: false, wager: false },
+    friendly: { label: 'Friendly duel', winner: true, wager: false },
+    wager: { label: 'Wager duel', winner: true, wager: true },
+    death: { label: 'Death duel', winner: true, wager: 'optional', death: true },
+  };
+  const DEATH_WARNING = "The loser's character dies for good: no revive, no temple, no way back.";
+  const deathOn = () => C.deathDuels !== false && typeof globalThis.__dboPermaKill === 'function';
+  const typeList = () => Object.keys(TYPES).filter((t) => !TYPES[t].death || deathOn());
+  const isDeath = (d) => !!(d && TYPES[d.type] && TYPES[d.type].death);
   const formatList = () => (Array.isArray(C.formats) ? C.formats : []).filter((f) => FORMATS[f]);
 
   // Kept across hot reloads: running duels by id and by duelist, the challengers' drafts, open offers by the challenged
@@ -110,7 +130,8 @@ module.exports = (api) => {
   const other = (d, a) => ((a >>> 0) === d.a ? d.b : d.a);
   const idx = (d, a) => ((a >>> 0) === d.a ? 0 : 1);
   const score = (d) => `${d.wins[0]}-${d.wins[1]}`;
-  const describe = (f, r, w) => `${FORMATS[f] ? FORMATS[f].label : f}, ${RULES[r] ? RULES[r].label : r}, ${w > 0 ? `${w} gold each` : 'no wager'}`;
+  const describe = (o) => `${TYPES[o.type].label}: ${TYPES[o.type].death ? 'one round' : FORMATS[o.format] ? FORMATS[o.format].label : o.format}, ${RULES[o.rules] ? RULES[o.rules].label : o.rules}, ${o.wager > 0 ? `${o.wager} gold each` : 'no wager'}`;
+  const inArea = (d, x) => gap(placeOf(x), d.anchor) <= C.arenaMeters * UNITS;
   // True for the two duelists of one running duel (downed.js: no friendly-fire cut between party members who duel)
   globalThis.__dboDuelPair = (x, y) => { const d = duelOf(Number(x) >>> 0); return !!d && other(d, Number(x) >>> 0) === (Number(y) >>> 0); };
   globalThis.__dboInDuel = (a) => !!duelOf(Number(a) >>> 0);
@@ -196,6 +217,11 @@ module.exports = (api) => {
     if (d.phase === 'over') return;
     if (d.phase === 'pause') { if (!d.owed && d.kneeling !== loser) d.owed = loser; return; }
     const winner = other(d, loser);
+    if (isDeath(d)) {
+      // Only the other's blow ends a life; a broken rule forfeits the duel without death
+      if (why === 'beaten') return deathBlow(d, winner, loser);
+      return award(d, winner, `${display(loser)} ${why}, a forfeit without death`);
+    }
     d.wins[idx(d, winner)]++;
     d.phase = 'pause';
     d.until = Date.now() + C.pauseSeconds * 1000;
@@ -211,6 +237,8 @@ module.exports = (api) => {
   // The end of every duel, with a winner (0 for none). Pays the wagers, heals both, and stands the loser up.
   const finish = (d, winner, why) => {
     if (d.closed) return;
+    // A practice fight records no winner and has no wager: its score is all it leaves
+    if (winner && !TYPES[d.type].winner) { practiceOver(d, why); winner = 0; why = 'practice over'; }
     d.closed = true;
     d.phase = 'over';
     d.winner = winner || 0;
@@ -229,16 +257,42 @@ module.exports = (api) => {
         for (const x of [d.a, d.b]) { hold(x, `refund:${d.id}`, d.wager); settle(x, `duel ${d.id} without a winner`); }
       }
     }
-    for (const x of [d.a, d.b]) restore(d, x);
+    for (const x of [d.a, d.b]) if (!(isDeath(d) && winner && x !== winner)) restore(d, x);
+    if (why === 'practice over') { audit(`DUEL practice fight of ${who(d.a)} and ${who(d.b)} over, ${score(d)}, ${describe(d)}`); return; }
     const purse = d.wager > 0 ? (winner ? ` and the ${d.wager * 2} gold wagered` : '. Each wager goes back') : '';
     for (const x of [d.a, d.b]) {
       if (!online(x)) continue;
       const y = other(d, x);
       if (!winner) banner(x, `The duel with ${nameTo(x, y)} ends with no winner (${why})${purse}.`, 5);
       else if (x === winner) banner(x, `You win the duel against ${nameTo(x, y)}, ${score(d)}${purse}.`, 5);
-      else banner(x, `${nameTo(x, y)} wins the duel, ${score(d)}.`, 5);
+      else if (!isDeath(d)) banner(x, `${nameTo(x, y)} wins the duel, ${score(d)}.`, 5);
     }
-    audit(`DUEL ${winner ? `${who(winner)} beat ${who(other(d, winner))}` : `${who(d.a)} and ${who(d.b)}: no winner`} (${why}), ${score(d)}, ${describe(d.format, d.rules, d.wager)}`);
+    audit(`DUEL ${winner ? `${who(winner)} beat ${who(other(d, winner))}` : `${who(d.a)} and ${who(d.b)}: no winner`} (${why}), ${score(d)}, ${describe(d)}`);
+  };
+  const practiceOver = (d, why) => {
+    for (const x of [d.a, d.b]) if (online(x)) banner(x, `The practice fight with ${nameTo(x, other(d, x))} is over, ${d.wins[idx(d, x)]}-${d.wins[idx(d, other(d, x))]}${/yield|left/.test(why) ? ` (${why})` : ''}.`, 5);
+  };
+  // A death duel decided by the other's blow. The loser is ended standing (permaKill), never offline, never off the ground,
+  // never with death duels switched off; else the duel ends with no winner. The wager is paid before the death.
+  const deathBlow = (d, winner, loser) => {
+    d.phase = 'deathblow';
+    d.wins[idx(d, winner)] = 1;
+    setTimeout(() => {
+      if (d.closed) return;
+      const why = !deathOn() ? 'death duels are switched off' : !online(loser) || !online(winner) ? 'one of them is gone'
+        : dead(loser) ? `${display(loser)} fell already` : !inArea(d, loser) || !inArea(d, winner) ? 'one of them left the ground' : '';
+      if (why) return finish(d, 0, why);
+      finish(d, winner, 'the death blow');
+      endLife(d, winner, loser, 'the death blow');
+    }, 0);
+  };
+  const endLife = (d, winner, loser, how) => {
+    banner(loser, `${nameTo(loser, winner)} wins the death duel.`, 6);
+    try { globalThis.__dboPermaKill(loser, `killed by ${display(winner)} in a death duel they both agreed to`); } catch (e) { log(`duel: permaKill failed: ${e.message}`); }
+    const gone = get(loser, 'private.permaDead', false) === true;
+    const line = `${display(winner)} killed ${display(loser)} in a death duel (PK, ${how}), agreed by ${display(d.a)} at ${d.agreed[0]} and ${display(d.b)} at ${d.agreed[1]}`;
+    audit(`DUEL DEATH ${who(winner)} killed ${who(loser)} in a death duel (${how}); agreed ${d.agreed[0]} and ${d.agreed[1]}${gone ? '' : '; the permadeath DID NOT take'}`);
+    try { if (typeof staffLog === 'function') staffLog(display(winner), '', 'death duel', gone ? line : `${line}; the permadeath did not take`, false); } catch (e) { /* the audit line stands */ }
   };
   // The duel goes to y outright: a yield, a forfeit, a killing blow
   const award = (d, y, why) => { d.wins[idx(d, y)] = Math.max(d.wins[idx(d, y)], FORMATS[d.format].wins); finish(d, y, why); };
@@ -252,13 +306,13 @@ module.exports = (api) => {
     }
     const pa = placeOf(a), pb = placeOf(b);
     const d = {
-      id, a, b, format: o.format, rules: o.rules, wager: o.wager, wins: [0, 0], round: 0, phase: 'countdown', until: 0,
+      id, a, b, type: o.type, agreed: [o.agreedA || '', o.agreedB || ''], format: TYPES[o.type].death ? 'single' : o.format, rules: o.rules, wager: o.wager, wins: [0, 0], round: 0, phase: 'countdown', until: 0,
       anchor: { cell: pa.cell, pos: pa.pos.map((v, i) => (v + pb.pos[i]) / 2) }, startedAt: Date.now(), out: [0, 0],
       snap: [pct(a), pct(b)], kneeling: 0, winner: 0, owed: 0, closed: false,
     };
     S.duels.set(id, d);
     S.by.set(a, id); S.by.set(b, id);
-    audit(`DUEL ${who(a)} and ${who(b)} began a duel: ${describe(o.format, o.rules, o.wager)}${o.wager > 0 ? ` (${o.wager * 2} gold held)` : ''}`);
+    audit(`DUEL ${who(a)} and ${who(b)} began a duel: ${describe(o)}${o.wager > 0 ? ` (${o.wager * 2} gold held)` : ''}`);
     startRound(d);
     return '';
   };
@@ -340,7 +394,15 @@ module.exports = (api) => {
           const x = Number(actorId) >>> 0, d = duelOf(x);
           if (d) {
             const y = other(d, x), by = sideOf(Number(killerId) >>> 0);
-            if (by === y) {
+            if (by === y && isDeath(d)) {
+              // The engine's blow got past the guard in a death duel: the same end, on the fallen body, while both are here
+              if (deathOn() && online(x) && online(y) && inArea(d, x) && inArea(d, y)) {
+                d.wins[idx(d, y)] = 1;
+                finish(d, y, 'a killing blow');
+                try { const ds = globalThis.__dboDownedState; if (ds && ds.downed instanceof Map) ds.downed.delete(x); closeWidget(x, 62); } catch (e) { /* no down state */ }
+                endLife(d, y, x, 'a killing blow');
+              } else finish(d, 0, `${display(x)} fell, but the death could not be given`);
+            } else if (by === y) {
               // A blow that got past the guard: the duel is lost, and the winner raises the fallen at once
               award(d, y, 'a killing blow');
               setTimeout(() => {
@@ -390,48 +452,82 @@ module.exports = (api) => {
 
   // ---- the panels --------------------------------------------------------------------------------------------------------
   const nonceFor = (a) => `${(a >>> 0).toString(16)}-${Date.now().toString(36)}`;
+  const iso = () => new Date(Date.now()).toISOString();
   const wagerSteps = () => (Array.isArray(C.wagerSteps) ? C.wagerSteps : [0]).map((n) => Math.max(0, Math.round(Number(n) || 0))).filter((n) => n <= C.maxWager);
+  // The steps this challenger can afford for this type: a Wager duel has no "none", the others without a wager only "none"
+  const stepsFor = (a, type) => {
+    const w = TYPES[type].wager;
+    if (!w) return [0];
+    const l = wagerSteps().filter((n) => n === 0 || n <= goldOf(a));
+    return w === true ? l.filter((n) => n > 0) : l;
+  };
   const draftPanel = (a) => {
     const d = S.drafts.get(a);
     if (!d) return;
+    const T = TYPES[d.type];
+    if (d.step === 'confirm') {
+      return openWidget(a, {
+        type: 'contextMenu', id: DUEL_MENU_ID, mode: 'menu',
+        targetName: `DEATH DUEL with ${nameTo(a, d.target)}. ${DEATH_WARNING} That may be you. Are you sure?`,
+        actions: [{ id: `${d.nonce}|confirm`, label: 'Yes: to the death. Send the challenge' }, { id: `${d.nonce}|back`, label: 'No, go back' }],
+        events: { action: 'dbo:duelDraft', close: 'dbo:duelDraftClose' },
+      }, true);
+    }
+    const actions = [{ id: `${d.nonce}|type`, label: `Type: ${T.label}` }];
+    if (!T.death) actions.push({ id: `${d.nonce}|format`, label: `Format: ${FORMATS[d.format].label}` });
+    actions.push({ id: `${d.nonce}|rules`, label: `Rules: ${RULES[d.rules].label}` });
+    if (T.wager) actions.push({ id: `${d.nonce}|wager`, label: d.wager > 0 ? `Wager: ${d.wager} gold each, the winner takes both` : 'Wager: none' });
+    actions.push({ id: `${d.nonce}|send`, label: 'Send the challenge' }, { id: `${d.nonce}|cancel`, label: 'Cancel' });
+    const note = T.death ? DEATH_WARNING : T.winner ? 'Nobody dies: a beaten duellist kneels.' : 'Nobody dies, and no winner is kept.';
     openWidget(a, {
       type: 'contextMenu', id: DUEL_MENU_ID, mode: 'menu',
-      targetName: `Challenge ${nameTo(a, d.target)} to a duel. Choose a line to change it. Nobody dies: a beaten duellist kneels.`,
-      actions: [
-        { id: `${d.nonce}|format`, label: `Format: ${FORMATS[d.format].label}` },
-        { id: `${d.nonce}|rules`, label: `Rules: ${RULES[d.rules].label}` },
-        { id: `${d.nonce}|wager`, label: d.wager > 0 ? `Wager: ${d.wager} gold each, the winner takes both` : 'Wager: none' },
-        { id: `${d.nonce}|send`, label: 'Send the challenge' },
-        { id: `${d.nonce}|cancel`, label: 'Cancel' },
-      ],
-      events: { action: 'dbo:duelDraft', close: 'dbo:duelDraftClose' },
+      targetName: `Challenge ${nameTo(a, d.target)}: ${T.label.toUpperCase()}. Choose a line to change it. ${note}`,
+      actions, events: { action: 'dbo:duelDraft', close: 'dbo:duelDraftClose' },
     }, true);
   };
   const openDraft = (a, t) => {
     const why = refusal(a, t, 0);
     if (why) return personal(a, why);
     if (!formatList().length) return personal(a, 'Duels are not allowed right now.');
-    S.drafts.set(a, { target: t, format: formatList()[0], rules: 0, wager: 0, nonce: nonceFor(a) });
+    S.drafts.set(a, { target: t, type: 'friendly', format: formatList()[0], rules: 0, wager: 0, nonce: nonceFor(a), step: 'settings', agreedAt: '' });
     draftPanel(a);
   };
   const closeDraft = (a) => { S.drafts.delete(a); closeWidget(a, DUEL_MENU_ID); };
   const offerFor = (a) => { for (const [t, o] of S.offers) if (o.from === (a >>> 0)) return { t, o }; return null; };
+  const offerPanel = (t, o) => {
+    const a = o.from, T = TYPES[o.type];
+    if (o.step === 'confirm') {
+      return openWidget(t, {
+        type: 'contextMenu', id: OFFER_MENU_ID, mode: 'menu',
+        targetName: `DEATH DUEL with ${nameTo(t, a)}. ${DEATH_WARNING} That may be you. Are you sure?`,
+        actions: [{ id: `${o.nonce}|confirm`, label: 'Yes: to the death' }, { id: `${o.nonce}|refuse`, label: 'No, refuse' }],
+        events: { action: 'dbo:duelOffer', close: 'dbo:duelOfferClose' },
+      }, true);
+    }
+    const note = T.death ? DEATH_WARNING : T.winner ? 'Nobody dies: a beaten duellist kneels.' : 'Nobody dies, and no winner is kept.';
+    openWidget(t, {
+      type: 'contextMenu', id: OFFER_MENU_ID, mode: 'menu',
+      targetName: `${T.label.toUpperCase()}: ${nameTo(t, a)} challenges you. ${describe(o)}${o.wager > 0 ? ', the winner takes both' : ''}. ${note} You must be at full health.`,
+      actions: [{ id: `${o.nonce}|accept`, label: `Accept the ${T.label.toLowerCase()}` }, { id: `${o.nonce}|refuse`, label: 'Refuse' }],
+      events: { action: 'dbo:duelOffer', close: 'dbo:duelOfferClose' },
+    }, true);
+  };
   const sendOffer = (a, d) => {
-    const t = d.target;
+    const t = d.target, T = TYPES[d.type];
+    if (!T || (T.death && !deathOn())) return personal(a, 'Death duels are not allowed right now.');
+    if (T.death && !d.agreedAt) return personal(a, 'A death duel must be confirmed first.');
+    if (T.wager === true && !(d.wager > 0)) return personal(a, 'A wager duel needs a wager: choose one, or make it a friendly duel.');
     const why = refusal(a, t, d.wager);
     if (why) return personal(a, why);
     if (S.offers.has(t)) return personal(a, `${nameTo(a, t)} is answering another challenge.`);
     const mine = offerFor(a); if (mine) withdraw(mine.t, 'replaced');
-    const o = { from: a, format: d.format, rules: d.rules, wager: d.wager, nonce: nonceFor(t), until: Date.now() + C.answerSeconds * 1000 };
+    const o = { from: a, type: d.type, format: T.death ? 'single' : d.format, rules: d.rules, wager: T.wager ? d.wager : 0, nonce: nonceFor(t),
+      until: Date.now() + C.answerSeconds * 1000, step: 'offer', agreedA: d.agreedAt, agreedB: '' };
     S.offers.set(t, o);
-    openWidget(t, {
-      type: 'contextMenu', id: OFFER_MENU_ID, mode: 'menu',
-      targetName: `${nameTo(t, a)} challenges you to a duel: ${describe(o.format, o.rules, o.wager)}${o.wager > 0 ? ', the winner takes both' : ''}. Nobody dies: a beaten duellist kneels. You must be at full health.`,
-      actions: [{ id: `${o.nonce}|accept`, label: 'Accept the duel' }, { id: `${o.nonce}|refuse`, label: 'Refuse' }],
-      events: { action: 'dbo:duelOffer', close: 'dbo:duelOfferClose' },
-    }, true);
-    personal(a, `You challenge ${nameTo(a, t)} to a duel (${describe(o.format, o.rules, o.wager)}). They have ${C.answerSeconds} seconds to answer.`);
-    log(`duel: ${display(a)} challenged ${display(t)} (${describe(o.format, o.rules, o.wager)})`);
+    offerPanel(t, o);
+    personal(a, `You challenge ${nameTo(a, t)} (${describe(o)}). They have ${C.answerSeconds} seconds to answer.`);
+    log(`duel: ${display(a)} challenged ${display(t)} (${describe(o)})`);
+    if (T.death) audit(`DUEL DEATH ${who(a)} confirmed a death duel challenge to ${who(t)} at ${d.agreedAt} (${describe(o)})`);
   };
   // An open challenge goes away: refused, timed out, replaced or one of them gone
   const withdraw = (t, why) => {
@@ -439,8 +535,9 @@ module.exports = (api) => {
     if (!o) return;
     S.offers.delete(t);
     closeWidget(t, OFFER_MENU_ID);
-    if (why === 'refused') { if (online(o.from)) personal(o.from, `${nameTo(o.from, t)} refuses your duel.`); }
+    if (why === 'refused') { if (online(o.from)) personal(o.from, `${nameTo(o.from, t)} refuses your ${TYPES[o.type].label.toLowerCase()}.`); }
     else if (why === 'timeout') { if (online(o.from)) personal(o.from, `${nameTo(o.from, t)} did not answer your challenge.`); personal(t, 'The challenge lapses.'); }
+    if (TYPES[o.type].death) audit(`DUEL DEATH ${who(t)} did not take the death duel from ${who(o.from)} (${why}${o.step === 'confirm' ? ', at the second warning' : ''})`);
     log(`duel: challenge ${display(o.from)} -> ${display(t)} ended (${why})`);
   };
   const answer = (t, accept) => {
@@ -450,12 +547,14 @@ module.exports = (api) => {
     S.offers.delete(t);
     closeWidget(t, OFFER_MENU_ID);
     const a = o.from;
+    if (TYPES[o.type].death && !deathOn()) { personal(a, 'Death duels are not allowed right now.'); personal(t, 'Death duels are not allowed right now.'); return; }
     const why = refusal(a, t, o.wager);
     if (why) {
       personal(a, why);
       personal(t, `The duel cannot begin: ${why.charAt(0).toLowerCase() + why.slice(1)}`);
       return;
     }
+    if (TYPES[o.type].death) audit(`DUEL DEATH agreed: ${who(a)} at ${o.agreedA} and ${who(t)} at ${o.agreedB} (${describe(o)})`);
     const failed = begin(a, t, o);
     if (failed) { personal(a, `The duel cannot begin: ${failed}`); personal(t, `The duel cannot begin: ${failed}`); }
   };
@@ -466,14 +565,31 @@ module.exports = (api) => {
       const raw = String((args || [])[0] || ''), cut = raw.indexOf('|');
       if (!d || cut < 0 || raw.slice(0, cut) !== d.nonce) return;
       const what = raw.slice(cut + 1);
+      if (d.step === 'confirm') {
+        if (what === 'back') { d.step = 'settings'; return draftPanel(a); }
+        if (what !== 'confirm') return;
+        d.agreedAt = iso();
+        closeDraft(a);
+        return sendOffer(a, d);
+      }
+      if (what === 'type') {
+        const l = typeList();
+        d.type = l[(l.indexOf(d.type) + 1) % l.length];
+        const steps = stepsFor(a, d.type);
+        if (!steps.includes(d.wager)) d.wager = steps.length ? steps[0] : 0;
+        return draftPanel(a);
+      }
       if (what === 'format') { const l = formatList(); d.format = l[(l.indexOf(d.format) + 1) % l.length]; return draftPanel(a); }
       if (what === 'rules') { d.rules = (d.rules + 1) % RULES.length; return draftPanel(a); }
       if (what === 'wager') {
-        const steps = wagerSteps().filter((n) => n === 0 || n <= goldOf(a));
+        const steps = stepsFor(a, d.type);
         const next = steps.find((n) => n > d.wager);
-        d.wager = next === undefined ? 0 : next;
+        d.wager = next === undefined ? (steps[0] || 0) : next;
         return draftPanel(a);
       }
+      // The first agreement to a death duel: the challenger reads the warning and confirms it
+      if (what === 'send' && TYPES[d.type].death) { d.step = 'confirm'; return draftPanel(a); }
+      if (what !== 'send' && what !== 'cancel') return;
       closeDraft(a);
       if (what === 'send') sendOffer(a, d);
     });
@@ -482,7 +598,16 @@ module.exports = (api) => {
       const o = S.offers.get(t >>> 0);
       const raw = String((args || [])[0] || ''), cut = raw.indexOf('|');
       if (!o || cut < 0 || raw.slice(0, cut) !== o.nonce) return;
-      answer(t >>> 0, raw.slice(cut + 1) === 'accept');
+      const what = raw.slice(cut + 1);
+      if (what === 'refuse') return answer(t >>> 0, false);
+      // A death duel's accept shows the warning again; only its confirm agrees
+      if (TYPES[o.type].death) {
+        if (what === 'accept' && o.step === 'offer') { o.step = 'confirm'; return offerPanel(t >>> 0, o); }
+        if (what !== 'confirm' || o.step !== 'confirm') return;
+        o.agreedB = iso();
+        return answer(t >>> 0, true);
+      }
+      if (what === 'accept') answer(t >>> 0, true);
     });
     onUi('duelOfferClose', (t) => { if (S.offers.has(t >>> 0)) answer(t >>> 0, false); });
   }
@@ -491,14 +616,16 @@ module.exports = (api) => {
   globalThis.__dboDuelEntries = (a, t) => {
     if (!isPlayer(t)) return [];
     const d = duelOf(a);
-    if (d) return other(d, a) === (t >>> 0) ? [{ id: 'duel:yield', label: 'Yield the duel' }] : [];
+    if (d) return other(d, a) === (t >>> 0) ? [{ id: 'duel:yield', label: isDeath(d) ? 'End the death duel (no winner)' : 'Yield the duel' }] : [];
     if (!C.enabled || duelOf(t)) return [];
     return [{ id: 'duel:challenge', label: 'Challenge to a Duel' }];
   };
   const yieldDuel = (a) => {
     const d = duelOf(a);
     if (!d) return personal(a, 'You are not in a duel.');
-    if (d.phase === 'pause' && d.winner) return; // already decided, ending in a moment
+    if ((d.phase === 'pause' && d.winner) || d.phase === 'deathblow') return; // already decided, ending in a moment
+    // Nobody yields their life: a death duel given up ends with no winner
+    if (isDeath(d)) return finish(d, 0, `${display(a)} called it off`);
     award(d, other(d, a), `${display(a)} yielded`);
   };
   globalThis.__dboDuelAction = (a, id, t) => {
@@ -516,7 +643,7 @@ module.exports = (api) => {
     const d = duelOf(a);
     if (!d) return;
     const y = other(d, a);
-    if (C.disconnect === 'forfeit') award(d, y, `${display(a)} left`);
+    if (C.disconnect === 'forfeit' && !isDeath(d)) award(d, y, `${display(a)} left`);
     else finish(d, 0, `${display(a)} left`);
   };
   const watch = () => {
@@ -534,6 +661,7 @@ module.exports = (api) => {
       const bound = [d.a, d.b].find((x) => restrained(x));
       if (bound) { finish(d, 0, `${display(bound)} was bound`); continue; }
       if (now - d.startedAt > C.maxMinutes * 60000) { finish(d, 0, 'time ran out'); continue; }
+      if (isDeath(d) && !deathOn()) { finish(d, 0, 'death duels are switched off'); continue; }
       // Out of the ground for leaveSeconds forfeits; both out, no winner
       const outs = [d.a, d.b].map((x, i) => {
         if (gap(placeOf(x), d.anchor) <= C.arenaMeters * UNITS) { d.out[i] = 0; return false; }
@@ -541,11 +669,13 @@ module.exports = (api) => {
         return now - d.out[i] >= C.leaveSeconds * 1000;
       });
       if (outs[0] && outs[1]) { finish(d, 0, 'both left the ground'); continue; }
+      if ((outs[0] || outs[1]) && isDeath(d)) { finish(d, 0, `${display(outs[0] ? d.a : d.b)} left the ground`); continue; }
       if (outs[0] || outs[1]) {
         const x = outs[0] ? d.a : d.b;
         award(d, other(d, x), `${display(x)} left the ground`);
         continue;
       }
+      if (d.phase === 'deathblow') continue;
       if ([d.a, d.b].some((x) => beast(x))) { const x = beast(d.a) ? d.a : d.b; if (d.phase !== 'pause') roundLost(d, x, 'took a beast form'); }
       if (d.phase === 'countdown' && now >= d.until) {
         d.phase = 'fight';
@@ -578,7 +708,7 @@ module.exports = (api) => {
     }
     const d = duelOf(a);
     if (!d) return personal(a, 'You are not in a duel. Press X on another player and choose Challenge to a Duel.');
-    personal(a, `Duel with ${nameTo(a, other(d, a))}: round ${d.round}, ${describe(d.format, d.rules, d.wager)}, you ${d.wins[idx(d, a)]} - ${d.wins[idx(d, other(d, a))]}. /duel yield to concede.`);
+    personal(a, `Duel with ${nameTo(a, other(d, a))}: round ${d.round}, ${describe(d)}, you ${d.wins[idx(d, a)]} - ${d.wins[idx(d, other(d, a))]}. /duel yield to concede.`);
   }, { help: '[yield] your duel; challenge someone with X > Challenge to a Duel. Staff: /duel stop <name>' });
 
   // Wagers left by a restart, for whoever is online as this loads

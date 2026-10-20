@@ -8608,11 +8608,11 @@ try {
   delete require.cache[DOWNED_JS];
   require(DOWNED_JS)({ mp, log, personal, sendPacket, audit, who, display, profileOf, nameOf, onlineActors, every, registerChatCommand, cfg, openWidget, closeWidget, onUi, redress });
 } catch (e) { log('downed.js failed to load:', e.stack || e.message); globalThis.__dboReviveWith = null; globalThis.__dboIsDowned = null; globalThis.__dboLabDraught = null; }
-// ---- duels between two players (server\duel.js, config "duel"): after downed.js, whose hit, death, cast and eat hooks it wraps ----
+// ---- duels between two players, the death duel too (server\duel.js, config "duel"): after downed.js, whose hit, death, cast and eat hooks it wraps ----
 try {
   const DUEL_JS = path.resolve('duel.js');
   delete require.cache[DUEL_JS];
-  require(DUEL_JS)({ mp, log, personal, audit, who, display, profileOf, onlineActors, every, registerChatCommand, cfg, openWidget, closeWidget, onUi, sendPacket, takeGold, giveItem, goldOf, recordOf, findByName, isAdmin });
+  require(DUEL_JS)({ mp, log, personal, audit, who, display, profileOf, onlineActors, every, registerChatCommand, cfg, openWidget, closeWidget, onUi, sendPacket, takeGold, giveItem, goldOf, recordOf, findByName, isAdmin, staffLog });
 } catch (e) { log('duel.js failed to load:', e.stack || e.message); for (const k of ['__dboDuelPair', '__dboInDuel', '__dboDuelEntries', '__dboDuelAction', '__dboDuelLogin', '__dboDuelLeave']) globalThis[k] = null; }
 // ---- province rules for crafting and the tome shop (server\regions.js, config "regions"): before spells.js, which asks it ----
 try {
