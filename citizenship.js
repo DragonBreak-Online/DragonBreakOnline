@@ -232,6 +232,8 @@ module.exports = (api) => {
     d.requests = d.requests.filter((r) => !((r.actor >>> 0) === (a >>> 0) && r.zone === z.id));
     save();
   };
+  // Said when a citizenship is taken or asked for (Moderation Help #0218, 17 Oct: the seven days came as a surprise)
+  const COOLDOWN_LINE = () => ` Renouncing a citizenship bars a new one for ${C.cooldownDays} days.`;
   const join = (a, zid) => {
     const z = holdOf(zid); if (!z) return { error: 'This land grants no citizenship.' };
     const chk = joinCheck(a, z); if (chk.error) return chk;
@@ -241,7 +243,7 @@ module.exports = (api) => {
       save();
       for (const m of onlineActors()) if (m !== (a >>> 0) && !isLeadStaff(m) && (rules(m, z) || isSteward(m, z))) personal(m, `${nameNow(a)} asks to become a citizen of ${ofPlace(z.name)}. Grant or decline it at a notice board (Citizenship) or in your journal (F3, Citizen).`);
       audit(`CITIZEN ${who(a)} asked for the citizenship of ${z.name}`);
-      return { text: `You have asked for the citizenship of ${ofPlace(z.name)}. Go before the ${rulerWord(z)} or the Steward: they grant it.` };
+      return { text: `You have asked for the citizenship of ${ofPlace(z.name)}. Go before the ${rulerWord(z)} or the Steward: they grant it.${COOLDOWN_LINE()}` };
     }
     if (chk.how === 'paid') {
       if (!takeGold(a, chk.fee)) return { error: `The citizenship of ${ofPlace(z.name)} costs ${chk.fee} gold, and you do not carry it.` };
@@ -250,7 +252,7 @@ module.exports = (api) => {
     }
     addHold(a, z, chk.noRuler ? 'free (no ruler)' : chk.how === 'paid' ? `paid ${chk.fee}` : 'free');
     audit(`CITIZEN ${who(a)} became a citizen of ${z.name} (${chk.noRuler ? 'free, no ruler seated' : chk.how}${chk.fee ? `, ${chk.fee} gold to the treasury` : ''})`);
-    return { text: `You are a citizen of ${ofPlace(z.name)}${chk.fee ? `, for ${chk.fee} gold paid into its treasury` : ''}.${holdsOf(a).length > 1 ? ' It is your Secondary citizenship.' : ''}` };
+    return { text: `You are a citizen of ${ofPlace(z.name)}${chk.fee ? `, for ${chk.fee} gold paid into its treasury` : ''}.${holdsOf(a).length > 1 ? ' It is your Secondary citizenship.' : ''}${COOLDOWN_LINE()}` };
   };
   const grant = (by, zid, actor) => {
     const z = holdOf(zid); if (!z) return { error: 'This land grants no citizenship.' };
@@ -261,7 +263,7 @@ module.exports = (api) => {
     if (chk.error) return { error: `${r.name} cannot take it now: ${chk.error.replace(/^You are/, 'they are').replace(/^You /, 'they ')}` };
     addHold(actor, z, `granted by ${who(by)}`);
     audit(`CITIZEN ${who(by)} granted ${r.name} (character ${hex(actor)}) the citizenship of ${z.name}`);
-    tell(actor, `You are now a citizen of ${ofPlace(z.name)}, granted by ${nameNow(by)}.`);
+    tell(actor, `You are now a citizen of ${ofPlace(z.name)}, granted by ${nameNow(by)}.${COOLDOWN_LINE()}`);
     return { text: `${r.name} is now a citizen of ${ofPlace(z.name)}.` };
   };
   const decline = (by, zid, actor) => {
