@@ -5751,7 +5751,9 @@ const skinClosing = globalThis.__dboSkinClosing instanceof Map ? globalThis.__db
 const skinDeny = new Map();
 const skinRefused = new Map(); // `${skinner}:${body}` -> when the hide was refused; a second E within SKIN_REFUSE_MS opens the body
 const SKIN_REFUSE_MS = 15000;
-const skinSay = (a, text) => { if (Date.now() - (skinDeny.get(a) || 0) > 1500) { skinDeny.set(a, Date.now()); personal(a, text); } return false; };
+// On screen as well as in chat (Moderation Help #0207, 18 Oct: a bear beyond the skinner's rank opened as a body and the
+// chat line went unseen behind the container), as smithing.js tells a refused craft
+const skinSay = (a, text) => { if (Date.now() - (skinDeny.get(a) || 0) > 1500) { skinDeny.set(a, Date.now()); personal(a, text); try { sendPacket(a, { customPacketType: 'dboNotice', text }); } catch (e) { /* chat said it */ } } return false; };
 // Anyone may skin a simple animal (Nat's call, 2026-09-20). Holding the trade is no longer the price
 // of entry: it widens the seam, slows the blade, raises the chance of a second pelt, and is what lets
 // you take the rarer beasts at all.
