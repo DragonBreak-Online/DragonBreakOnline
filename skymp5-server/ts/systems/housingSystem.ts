@@ -1945,17 +1945,35 @@ export class HousingSystem implements System {
     return { kept, moved, dead };
   }
 
-  // At login: key items in the pack move onto the ring, and ring keys that no longer open their lock are dropped
+  // Named key items on the vanilla Werewolf Cage Key that no claimed lock accepts, only while every claimed record reads (a
+  // record not loaded yet proves nothing). Two of them with different names stack as one in the game, so the client's
+  // inventory apply takes them off and gives them back every 5 s and they cannot be dropped (#8BR9, 20 Oct)
+  private deadLegacyKeys(ctx: SystemContext, dead: any[]): any[] {
+    const legacy = dead.filter((e) => (Number(e?.baseId) >>> 0) === KEY_BASE_ID && typeof e?.name === "string" && e.name);
+    if (!legacy.length || !this.claimed.length) return [];
+    for (const primary of this.claimed) if (!this.read(ctx, primary)) return [];
+    return legacy;
+  }
+
+  // At login: key items in the pack move onto the ring, old keys that open nothing are thrown away, and ring keys that no
+  // longer open their lock are dropped
   private ringAtLogin(ctx: SystemContext, actorId: number): void {
     const mp = ctx.svr as Mp;
     const userId = this.userOf(ctx, actorId);
     const inv = mp.get(actorId, "inventory");
     const entries: any[] = inv && Array.isArray(inv.entries) ? inv.entries : [];
-    const { kept, moved } = this.ringFromItems(ctx, entries, actorId);
+    const { kept, moved, dead: deadItems } = this.ringFromItems(ctx, entries, actorId);
+    const junk = this.deadLegacyKeys(ctx, deadItems);
+    if (moved.length || junk.length) {
+      mp.set(actorId, "inventory", { entries: kept.filter((e) => !junk.includes(e)) });
+    }
     if (moved.length) {
-      mp.set(actorId, "inventory", { entries: kept });
       this.log(`[housing] moved ${moved.length} key item(s) of ${actorId.toString(16)} onto the key ring`);
       this.notice(ctx, userId, `Your keys are on your key ring now: ${moved.join(", ")}.`);
+    }
+    if (junk.length) {
+      this.log(`[housing] threw away ${junk.length} old key(s) of ${actorId.toString(16)} that open nothing: ${junk.map((e) => `"${e.name}" x${Number(e.count) || 1}`).join(", ")}`);
+      this.notice(ctx, userId, `Old keys that no longer open anything were thrown away: ${junk.map((e) => e.name).join(", ")}.`);
     }
     const stale = new Set(this.ringOf(ctx, actorId).filter((k) => {
       const rec = this.read(ctx, k.p);
@@ -1974,17 +1992,22 @@ export class HousingSystem implements System {
     this.keyPoolReady(ctx);
     if (!entries.some((e) => isPropertyKeyBase(Number(e?.baseId)))) return;
     const { kept, moved, dead } = this.ringFromItems(ctx, entries, casterId);
-    // Keys that open nothing stayed in the container and could not be taken out (GM ticket 152, 17 Oct): they go to the opener's
-    // pack as items, never destroyed, in case the locks only read as missing for a moment
+    // Keys that open nothing stayed in the container and could not be taken out (GM ticket 152, 17 Oct): they leave it. Old
+    // Werewolf Cage Keys are thrown away once every lock reads (deadLegacyKeys); others go to the opener's pack as items
+    const junk = this.deadLegacyKeys(ctx, dead);
+    const given = dead.filter((e) => !junk.includes(e));
     const left = dead.length ? kept.filter((e) => !dead.includes(e)) : kept;
     if (!moved.length && !dead.length) return;
     mp.set(targetId, "inventory", { entries: left });
-    if (dead.length) {
+    if (junk.length) {
+      this.log(`[housing] threw away ${junk.length} old key(s) that open nothing from container ${targetId.toString(16)}, opened by ${casterId.toString(16)}: ${junk.map((e) => `"${e.name}" x${Number(e.count) || 1}`).join(", ")}`);
+    }
+    if (given.length) {
       const pack = mp.get(casterId, "inventory");
       const packEntries: any[] = pack && Array.isArray(pack.entries) ? pack.entries.slice() : [];
-      mp.set(casterId, "inventory", { entries: packEntries.concat(dead) });
-      this.log(`[housing] ${casterId.toString(16)} took ${dead.length} key(s) that open nothing from container ${targetId.toString(16)}`);
-      this.notice(ctx, this.userOf(ctx, casterId), `You take ${dead.map((e) => e.name).join(", ")}. Their locks have been changed: they open nothing now.`);
+      mp.set(casterId, "inventory", { entries: packEntries.concat(given) });
+      this.log(`[housing] ${casterId.toString(16)} took ${given.length} key(s) that open nothing from container ${targetId.toString(16)}`);
+      this.notice(ctx, this.userOf(ctx, casterId), `You take ${given.map((e) => e.name).join(", ")}. Their locks have been changed: they open nothing now.`);
     }
     if (!moved.length) return;
     this.log(`[housing] ${casterId.toString(16)} took ${moved.length} key(s) from container ${targetId.toString(16)} onto the key ring`);
