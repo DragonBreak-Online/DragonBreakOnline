@@ -21,6 +21,10 @@ MGEF::Data MGEF::GetData(
           *reinterpret_cast<const uint32_t*>(data + 0x48);
         result.data.explosion =
           *reinterpret_cast<const uint32_t*>(data + 0x4c);
+        if (size >= 0x68) {
+          result.data.impactDataSet =
+            *reinterpret_cast<const uint32_t*>(data + 0x64);
+        }
         result.data.effectType = EffectType{
           *reinterpret_cast<const std::underlying_type_t<EffectType>*>(data +
                                                                        0x40)

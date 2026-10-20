@@ -861,6 +861,62 @@ TEST_CASE("A staff's enchantment hits only from a staff the aggressor holds or "
   DoDisconnect(p, 0);
 }
 
+TEST_CASE("A wall's burning ground hits with its hazard's spell, from a caster "
+          "who knows the wall or holds its staff",
+          "[Hit]")
+{
+  PartOne& p = GetPartOne();
+  constexpr uint32_t kCaster = 0xff000000;
+  constexpr uint32_t kFirst = 0xff000001;
+  // WallOfFlames: BarrierFireConcAimed, impact set MAGFlamesBarrierImpactSet -> FireBarrierHazard -> HazardWallofFireSpell
+  constexpr uint32_t kWallOfFlames = 0x00035d7f;
+  constexpr uint32_t kHazardWallOfFire = 0x0008f3f1;
+  constexpr uint32_t kHazardWallOfFrost = 0x0008f3f5;
+  // StaffWallofFlames (StaffEnchWallOfFlames), the enchantment Forelhost's Dragon Priest staff carries
+  constexpr uint32_t kStaffOfWallOfFlames = 0x00029b85;
+
+  DoConnect(p, 0);
+  p.CreateActor(kCaster, { 0, 0, 0 }, 0, 0x3c, 1);
+  p.SetUserActor(0, kCaster);
+  p.CreateActor(kFirst, { 0, 100, 0 }, 0, 0x3c);
+  auto& caster = p.worldState.GetFormAt<MpActor>(kCaster);
+  caster.SetEquipment(Equipment());
+
+  // Health one hit takes (the unit PartOne's fake formula), 0 when refused
+  auto hit = [&](uint32_t source) {
+    auto& actor = p.worldState.GetFormAt<MpActor>(kFirst);
+    actor.SetPercentages({ 1.f, 1.f, 1.f });
+    RawMessageData rawMsgData;
+    rawMsgData.userId = 0;
+    HitMessage hitMsg;
+    hitMsg.data.aggressor = 0x14;
+    hitMsg.data.target = kFirst;
+    hitMsg.data.source = source;
+    p.GetActionListener().OnHit(rawMsgData, hitMsg);
+    return 1.f - actor.GetChangeForm().actorValues.healthPercentage;
+  };
+
+  REQUIRE(hit(kHazardWallOfFire) == Catch::Approx(0.f));
+  caster.AddItem(kStaffOfWallOfFlames, 1);
+  Equipment eq;
+  eq.inv.entries.push_back(
+    Inventory::Entry(kStaffOfWallOfFlames, 1, kExtraWornTrue));
+  caster.SetEquipment(eq);
+  REQUIRE(hit(kHazardWallOfFire) > 0.f);
+  // A player's staff counts only in hand
+  caster.SetEquipment(Equipment());
+  REQUIRE(hit(kHazardWallOfFire) == Catch::Approx(0.f));
+
+  caster.AddSpell(kWallOfFlames);
+  REQUIRE(hit(kHazardWallOfFire) > 0.f);
+  // Another wall's ground is not this wall's
+  REQUIRE(hit(kHazardWallOfFrost) == Catch::Approx(0.f));
+
+  p.DestroyActor(kCaster);
+  p.DestroyActor(kFirst);
+  DoDisconnect(p, 0);
+}
+
 
 TEST_CASE("A scroll hit with no read takes the scroll at its first hit, once "
           "per read, from the caster who holds it",

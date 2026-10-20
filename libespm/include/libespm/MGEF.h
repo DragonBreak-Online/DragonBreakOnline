@@ -95,6 +95,8 @@ public:
     uint32_t projectile = 0;
     // Raw (file-local) EXPL id
     uint32_t explosion = 0;
+    // Raw (file-local) IPDS id: its impacts may leave a hazard (a wall spell's burning ground)
+    uint32_t impactDataSet = 0;
     // CTDA on the effect (Turn Undead's IsUndead, perk riders' HasPerk), which only the engine evaluates
     bool hasConditions = false;
 
