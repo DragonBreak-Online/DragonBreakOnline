@@ -42,6 +42,12 @@ bool ApplyMouseFree(bool free)
   auto vtable = *reinterpret_cast<std::uintptr_t* const*>(mouse);
   reinterpret_cast<Reinitialize>(vtable[kReinitializeSlot])(mouse, free);
   CEFUtils::DInputHook::MouseFree() = free;
+  // SSE Display Tweaks' LockCursor clips the cursor to the window on focus, activation and window moves (DWindow,
+  // ClipCursor); a free mouse lifts it. The game's exclusive mouse holds the cursor again when it is not free, and
+  // Display Tweaks clips again on the next focus
+  if (free) {
+    ClipCursor(nullptr);
+  }
   spdlog::info("MouseApi: mouse {}", free ? "free to leave the window" : "held by the game");
   return true;
 }
