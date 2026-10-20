@@ -1529,6 +1529,8 @@ registerChatCommand('pigeonblock', (a, args) => {
   const t = findAnyByName(args.trim()); if (!t || t < 0) return personal(a, 'No such character (use their #TAG).');
   try {
     const list = Array.isArray(mp.get(a, 'private.pigeonBlock')) ? mp.get(a, 'private.pigeonBlock') : []; const tp = profileOf(t);
+    // A character with no account (an NPC, a name not loaded) blocks nobody: it once wrote -1 into the list
+    if (!(tp >= 0)) return personal(a, 'That is not a player whose pigeons you can block.');
     const i = list.indexOf(tp); if (i >= 0) { list.splice(i, 1); personal(a, `Pigeons from ${nameOf(t)} allowed again.`); } else { list.push(tp); personal(a, `Pigeons from ${nameOf(t)} will be ignored.`); }
     mp.set(a, 'private.pigeonBlock', list);
   } catch (e) { personal(a, 'Failed: ' + e.message); }
