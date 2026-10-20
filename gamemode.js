@@ -8641,6 +8641,12 @@ try {
   require(CHARTERS_JS)({ mp, log, ownNameOf, ownDisplay, displayFor, personal, audit, who, display, nameOf, cfg, registerChatCommand, onlineActors, isAdmin, isLeadStaff,
     findByName, profileOf, takeGold, giveItem, every, staffNote, approvalForum });
 } catch (e) { log('charters.js failed to load:', e.stack || e.message); }
+// ---- dungeon traps, run by the server: plates, tripwires and trigger boxes, their traps' swings and blows (server\traps.js)
+try {
+  const TRAPS_JS = path.resolve('traps.js');
+  delete require.cache[TRAPS_JS];
+  require(TRAPS_JS)({ mp, log, cfg, every, onlineActors, profileOf, display, audit, personal, registerChatCommand });
+} catch (e) { log('traps.js failed to load:', e.stack || e.message); globalThis.__dboTrapsHandles = null; }
 // ---- damage over time from a player's spell: the duration the spell formula never deals (server\spelldot.js) --------
 try {
   const SPELLDOT_JS = path.resolve('spelldot.js');
