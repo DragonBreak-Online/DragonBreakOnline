@@ -598,10 +598,21 @@ module.exports = (api) => {
   const readMarks = () => { const m = readJson(MARKS_PATH, {}); return m && typeof m === 'object' && !Array.isArray(m) ? m : {}; };
   const HALL_DOORS = new Map();
   for (const f of FACTIONS.values()) for (const d of (hallOf(f) || { doors: [] }).doors) { const k = String(d).toLowerCase(); HALL_DOORS.set(k, (HALL_DOORS.get(k) || []).concat([f.id])); }
+  // An Orc stronghold's mine is its clan's as the longhouse is (Nate, 20 Oct; mines.js): its ways in from mines.json count as
+  // the clan's hall doors, so the Chief holds it, the clan works it, and it is granted to the Chief while unowned. A mine that
+  // is a lease dungeon (not in dungeons.exclude) is left out: a lair, not property. mines.enabled / clanMines false: none.
+  const MINE_DOORS = new Map(); // fid -> [door desc as mines.json spells it]
+  if (((cfg.mines || {}).enabled) !== false && ((cfg.mines || {}).clanMines) !== false) {
+    for (const m of (readJson(path.resolve('mines.json'), {}) || {}).mines || []) {
+      if (!m || !m.clan || !FACTIONS.has(m.clan) || ((m.lease || []).length && !m.leaseExcluded)) continue;
+      for (const e of m.entrances || []) if (e && e.door) MINE_DOORS.set(m.clan, (MINE_DOORS.get(m.clan) || []).concat([String(e.door)]));
+    }
+  }
+  for (const [fid, doors] of MINE_DOORS) for (const d of doors) { const k = d.toLowerCase(); if (!(HALL_DOORS.get(k) || []).includes(fid)) HALL_DOORS.set(k, (HALL_DOORS.get(k) || []).concat([fid])); }
   // The hall door keys are lower case and getIdFromDesc matches a plugin's name exactly, so a door is spelled as the
   // halls spell its plugin before it is looked up (until 16 Oct every hall lookup by door threw: no root, no grant)
   const DOOR_SPELLING = new Map();
-  for (const f of FACTIONS.values()) for (const d of (hallOf(f) || { doors: [] }).doors) { const t = String(d), i = t.indexOf(':'); if (i > 0) DOOR_SPELLING.set(t.slice(i + 1).toLowerCase(), t.slice(i + 1)); }
+  for (const f of FACTIONS.values()) for (const d of (hallOf(f) || { doors: [] }).doors.concat(MINE_DOORS.get(f.id) || [])) { const t = String(d), i = t.indexOf(':'); if (i > 0) DOOR_SPELLING.set(t.slice(i + 1).toLowerCase(), t.slice(i + 1)); }
   const spelledDoor = (desc) => { const t = String(desc), i = t.indexOf(':'); return i > 0 ? `${t.slice(0, i)}:${DOOR_SPELLING.get(t.slice(i + 1).toLowerCase()) || t.slice(i + 1)}` : t; };
   const hallFactionsAt = (desc) => {
     const marks = readMarks();
@@ -707,7 +718,7 @@ module.exports = (api) => {
       if (!h || h.shared || !leader) continue;
       const marked = ((readMarks()[f.id] || {}).doors) || [];
       const off = ((readMarks()[f.id] || {}).off) || [];
-      const descs = [...new Set(h.doors.map((d) => String(d).toLowerCase()).concat(marked))].filter((d) => !off.includes(d));
+      const descs = [...new Set(h.doors.concat(MINE_DOORS.get(f.id) || []).map((d) => String(d).toLowerCase()).concat(marked))].filter((d) => !off.includes(d));
       for (const d of descs) {
         let id = 0; try { id = Number(mp.getIdFromDesc(spelledDoor(d))) >>> 0; } catch (e) { id = 0; }
         if (!id) continue;

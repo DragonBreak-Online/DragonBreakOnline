@@ -917,7 +917,7 @@ const HELP_GROUPS = [
   { key: 'beast', title: 'The beast in you', names: ['beast', 'forms', 'hunt', 'blood', 'feed'], role: 'beast',
     hints: ['Your curse and its powers: F3, the Supernatural tab.',
       'Silver and fire hurt a vampire more; silver and poison spells hurt a werewolf more in beast form.'] },
-  { key: 'work', title: 'Work and the world', names: ['time', 'property', 'keys', 'courier'],
+  { key: 'work', title: 'Work and the world', names: ['time', 'property', 'mine', 'keys', 'courier'],
     hints: ['Hunting work: the Contracts tab of the expedition board (Synod Conclave, Fighters Guild, Frostcrag Spire).', 'Other work for pay: a notice board, then /commission.',
       'Mining and woodcutting: an ore vein or a chopping block. Richer ores need a higher Miner tier.',
       'The Bleak-Frost Mine, west of Bruma: iron, corundum and gold, and meteoric iron for Adept miners.',
@@ -8171,6 +8171,17 @@ try {
   require(TENANCY_JS)({ mp, log, ownNameOf, ownDisplay, personal, audit, who, display, tagOf, profileOf, onlineActors, every, registerChatCommand, cfg,
     takeGold, giveGold: (a, n) => giveItem(a, GOLD_BASE, n) !== false, depositToTreasury, zoneById, openWidget, closeWidget, onUi });
 } catch (e) { log('tenancy.js failed to load:', e.stack || e.message); }
+
+// ---- mines owned like property: access and the owner's share at the vein (server\mines.js, mines.json, config "mines") ----
+try {
+  const MINES_JS = path.resolve('mines.js');
+  delete require.cache[MINES_JS];
+  require(MINES_JS)({ mp, log, personal, audit, who, display, cfg, onUi, openWidget, closeWidget, onlineActors, every, registerChatCommand,
+    giveItem, distanceMeters, profileOf, zoneById, isLeadStaff });
+} catch (e) {
+  log('mines.js failed to load:', e.stack || e.message);
+  for (const k of ['__dboMineGate', '__dboMineShareQuote', '__dboMineValueOf', '__dboHousingNotHome', '__dboMineSaleRefusal', '__dboMineAtDoor', '__dboMinePanel', '__dboMines', '__dboMinesFlush']) globalThis[k] = null;
+}
 
 // ---- the ledger of contacts, read at boards, homes and placed ledgers (server\ledger.js, config "ledger") ----------
 try {
