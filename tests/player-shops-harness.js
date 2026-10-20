@@ -317,6 +317,12 @@ const stockKept = JSON.stringify(inv(SHOP));
 ok(/shop chest is a plain chest again; its goods are still in it/.test(run(OWNER, 'close')) && !all()[DOOR.toString(16)], 'closing the business unmarks the shop chest');
 ok(JSON.stringify(inv(SHOP)) === stockKept && act(SHOP, STRAY) === false, '...its goods stay in it, and it is a plain chest');
 ok(/Stand inside a business|sells nothing/.test(shop(BUYER, '')), '/shop finds no shop there');
+// The owner of a property that is not a business yet (Tolfdir Shadowstride, 20 Oct: "/shop open" told him to stand inside one)
+ok(/not a business yet\. Open it with \/business open <name> \(or \/shop open <name>\)/.test(shop(OWNER, '')), '/shop in your own property that is no business yet: says how to open it');
+ok(/Stand inside a business/.test(shop(BUYER, 'open Mine')) && !all()[DOOR.toString(16)], 'a stranger\'s /shop open opens nothing');
+shop(OWNER, 'open The Iron Fist');
+ok(!!all()[DOOR.toString(16)] && all()[DOOR.toString(16)].name === 'The Iron Fist', '...and /shop open <name> opens it, as /business open does');
+run(OWNER, 'close');
 
 // ---- config: shops off -----------------------------------------------------------------------------------------------------
 run(OWNER, 'open The Iron Fist');

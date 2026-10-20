@@ -1,5 +1,20 @@
 [
   {
+    "title": "Opening a shop you bought",
+    "date": "2026-10-20",
+    "version": "Hotfix",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Businesses",
+        "items": [
+          "A property you buy becomes a shop once you open it as a business. Stand inside it and say /business open <name>; /shop open <name> now does the same. Then stock it from its ledger.",
+          "/shop inside your own property now tells you how to open it, instead of telling you to stand inside a business."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Adept spell choices open at 50",
     "date": "2026-10-20",
     "version": "Hotfix",
