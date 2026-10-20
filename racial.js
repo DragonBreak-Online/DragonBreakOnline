@@ -35,7 +35,7 @@
 //     activeUntil } is the character's, so a relog neither resets the wait nor ends the buff.
 'use strict';
 
-const RACES = ['altmer', 'argonian', 'bosmer', 'breton', 'dunmer', 'imperial', 'khajiit', 'nord', 'orc', 'redguard', 'maormer', 'snowelf', 'goblin', 'reachman'];
+const RACES = ['altmer', 'argonian', 'bosmer', 'breton', 'dunmer', 'imperial', 'khajiit', 'nord', 'orc', 'redguard', 'maormer', 'snowelf', 'goblin', 'reachman', 'halfgiant'];
 // Each race by its own RACE record and its vampire variant (Skyrim.esm, index 0: the same pairs regions.js and
 // supernatural.js use)
 const RACE_IDS = {
@@ -122,6 +122,12 @@ const DEFAULTS = {
   // regeneration, +20% attack speed): attack speed is the player's own game, so both regenerations at the timed cap instead
   reachman: { resistMagic: 0.15, resistPoison: 0.25, xp: { alchemist: 1.15 },
     power: { name: 'Fury of the Reach', seconds: 60, buffs: { staminaRegen: 1.5, magickaRegen: 1.5 } } },
+  // The Half-Giant (the DLE's DBOHalfGiantRace on the Nord, config halfGiantRace; Nate 20 Oct, PC Worker C's design): half
+  // the Nord's frost share, +50 health (charlevel.js adds healthBonus to private.dboAvBonus), and two costs for the size:
+  // bulk (a share of extra damage taken, always: a bigger target) and hunger (appetite, gamemode.js needs tick). Titanborn
+  // Fury the Orc's way. The race record's spells are tooltip mirrors: these are the only numbers
+  halfgiant: { resistFrost: 0.25, healthBonus: 50, bulk: 0.15, hunger: 1.5, xp: { blunt: 1.15 },
+    power: { name: 'Titanborn Fury', seconds: 60, buffs: { meleeDamage: 0.25, damageTaken: 0.25 } } },
 };
 const merge = (cfg) => {
   const c = Object.assign({}, DEFAULTS, cfg || {});
@@ -169,13 +175,17 @@ module.exports = (api) => {
   // races.js: a placeholder on the Breton record until now), so the override is filed under it
   const RR = (cfg && cfg.reachmanRace) || {};
   const REACHMAN_IDS = [raceRec(RR.race), raceRec(RR.vampire)].filter((x) => x);
+  // The Half-Giant and its vampire (config halfGiantRace), the same way; the creator's slug is 'halfgiant'
+  const HR = (cfg && cfg.halfGiantRace) || {};
+  const HALFGIANT_IDS = [raceRec(HR.race), raceRec(HR.vampire)].filter((x) => x);
   // The goblin vampire (goblinRace.vampire, DBOGoblinRaceVampire, PC 15 Oct) keeps the Goblin's gift, as the Snow Elf's does.
   // It stays out of __dboGoblinRaces: gamemode.js goblinLook would set it back to the mortal race on a RaceMenu close
   const GOBLIN_VAMPIRE = raceRec(GR.vampire);
   globalThis.__dboGoblinRaces = GOBLIN_IDS;
   globalThis.__dboGoblinVampires = GOBLIN_VAMPIRE && raceRec(GR.race) ? { [raceRec(GR.race)]: GOBLIN_VAMPIRE } : {};
   globalThis.__dboRaceOverrides = Object.assign(MAORMER_IDS.length ? { maormer: MAORMER_IDS[0] } : {},
-    raceRec(SR.race) ? { snowelf: raceRec(SR.race) } : {}, Object.fromEntries(GOBLIN_SLUGS), raceRec(RR.race) ? { reachfolk: raceRec(RR.race) } : {});
+    raceRec(SR.race) ? { snowelf: raceRec(SR.race) } : {}, Object.fromEntries(GOBLIN_SLUGS), raceRec(RR.race) ? { reachfolk: raceRec(RR.race) } : {},
+    raceRec(HR.race) ? { halfgiant: raceRec(HR.race) } : {});
   log(`racial: DLE races maormer ${MAORMER_IDS.map((x) => x.toString(16))} snowelf ${SNOWELF_IDS.map((x) => x.toString(16))} goblin ${GOBLIN_IDS.map((x) => x.toString(16))} reachman ${REACHMAN_IDS.map((x) => x.toString(16))}, overhaul ${C.overhaul === true}`);
   const rpRace = (a) => { try { const rp = mp.get(a >>> 0, 'private.rp'); return rp && rp.race ? String(rp.race).toLowerCase() : ''; } catch (e) { return ''; } };
   // The race whose gift this player has now, or '' (not a player, a beast form, an unknown race, switched off)
@@ -189,6 +199,8 @@ module.exports = (api) => {
     if (GOBLIN_IDS.includes(id) || (GOBLIN_VAMPIRE && id === GOBLIN_VAMPIRE)) return C.overhaul === true ? 'goblin' : '';
     // Without the overhaul a Reachman has the Breton's gift (their morph race and their forebears)
     if (REACHMAN_IDS.includes(id)) return C.overhaul === true ? 'reachman' : 'breton';
+    // Without the overhaul a Half-Giant has the Nord's gift (its source race)
+    if (HALFGIANT_IDS.includes(id)) return C.overhaul === true ? 'halfgiant' : 'nord';
     const r = RACE_OF_ID.get(id) || '';
     // A Maormer made before the DLE's race stands on the High Elf record (charCreatorData.ts): without this every Maormer
     // counts as an Altmer
@@ -335,7 +347,7 @@ module.exports = (api) => {
     const resist = (share) => { m *= 1 - clamp01(num(share, 0)); };
     if (rs.has(AV.poison) && (race === 'argonian' || race === 'bosmer' || race === 'redguard' || race === 'goblin' || race === 'reachman')) resist(R.resistPoison);
     if (race === 'dunmer' && rs.has(AV.fire)) resist(R.resistFire);
-    if ((race === 'nord' || race === 'snowelf') && rs.has(AV.frost)) resist(R.resistFrost);
+    if ((race === 'nord' || race === 'snowelf' || race === 'halfgiant') && rs.has(AV.frost)) resist(R.resistFrost);
     if (race === 'maormer' && rs.has(AV.shock)) resist(R.resistShock);
     // Magic resistance: the race's own share and the power's add up (Dragonskin: 25% + 25% = 50%), under the cap
     const magic = (race === 'breton' || race === 'maormer' || race === 'reachman' ? Math.max(0, num(R.resistMagic, 0)) : 0) + buff(tgt, 'resistMagic');
@@ -345,6 +357,8 @@ module.exports = (api) => {
     if (b && num(b.wardPoints, 0) > 0 && isMagicSource(src) && dmg > 0) m *= wardAbsorb(tgt, dmg * m);
     if (race === 'altmer' && (rs.has(AV.fire) || rs.has(AV.frost) || rs.has(AV.shock))) m *= 1 + Math.max(0, num(R.elementalWeakness, 0));
     if (race === 'orc' && healthOf(tgt) < num(R.lowHealth, 0)) resist(R.damageTaken);
+    // bulk: a share of extra damage taken, always (a bigger target), at most bulkCap
+    if (num(R.bulk, 0) > 0) m *= 1 + Math.min(num(C.bulkCap, 0.5), num(R.bulk, 0));
     return m;
   };
   // Every reduction on the target's side together (Defense x a blessing x the race) never takes more than reductionCap
@@ -737,7 +751,7 @@ module.exports = (api) => {
   // The Journal's Profile and /status: the race's passive gifts in words (Nat, 13 Oct: "show the passives in the profile tab"),
   // read from the same numbers the hooks use, so a config change shows here too. XP boosts only with the overhaul on
   const RACE_NAME = { altmer: 'High Elf', argonian: 'Argonian', bosmer: 'Wood Elf', breton: 'Breton', dunmer: 'Dark Elf', imperial: 'Imperial',
-    khajiit: 'Khajiit', nord: 'Nord', orc: 'Orc', redguard: 'Redguard', maormer: 'Maormer', snowelf: 'Snow Elf', goblin: 'Goblin', reachman: 'Reachman' };
+    khajiit: 'Khajiit', nord: 'Nord', orc: 'Orc', redguard: 'Redguard', maormer: 'Maormer', snowelf: 'Snow Elf', goblin: 'Goblin', reachman: 'Reachman', halfgiant: 'Half-Giant' };
   const SKILL_NAME = { arcane: 'Arcane', defense: 'Defence', harvesting: 'Gatherer', archery: 'Archery', blade: 'Blade', blunt: 'Blunt',
     priest: 'Priest', unarmed: 'Martial Arts', blacksmith: 'Blacksmithing', alchemist: 'Alchemy' };
   const pct = (v) => Math.round(num(v, 0) * 100);
@@ -757,6 +771,9 @@ module.exports = (api) => {
     if (race === 'orc' && num(R.lowHealth, 0) > 0) out.push(`below ${pct(R.lowHealth)}% health: +${pct(R.meleeDamage)}% melee damage, ${pct(R.damageTaken)}% less damage taken`);
     if ((race === 'imperial' || race === 'goblin') && num(R.goldBonus, 0) > 0) out.push(`+${pct(R.goldBonus)}% gold from loot and contracts`);
     if (race === 'altmer' && num(R.elementalWeakness, 0) > 0) out.push(`+${pct(R.elementalWeakness)}% damage from fire, frost and shock`);
+    if (num(R.healthBonus, 0) > 0) out.push(`+${num(R.healthBonus, 0)} health`);
+    if (num(R.bulk, 0) > 0) out.push(`${pct(Math.min(num(C.bulkCap, 0.5), num(R.bulk, 0)))}% more damage taken (a bigger target)`);
+    if (num(R.hunger, 1) > 1) out.push(`hungers ${pct(num(R.hunger, 1) - 1)}% faster`);
     if (overhaul() && R.xp && typeof R.xp === 'object') {
       for (const [sk, rate] of Object.entries(R.xp)) if (num(rate, 1) > 1) out.push(`+${pct(rate - 1)}% ${SKILL_NAME[sk] || sk} XP`);
     }
@@ -808,6 +825,10 @@ module.exports = (api) => {
   if (typeof every === 'function') every('racialAbility', 15000, () => { try { abilityTick(); } catch (e) { log('racial ability failed', e.message); } });
 
   globalThis.__dboRaceGold = goldBonus;
+  // gamemode.js needs tick: the race's appetite (the Half-Giant's 1.5), 1 for everyone else
+  globalThis.__dboRaceHungerMult = (a) => { const r = raceOf(a >>> 0); return r ? Math.max(0, num((C[r] || {}).hunger, 1)) : 1; };
+  // charlevel.js: a race's flat vital bonus, added to the spent level points in private.dboAvBonus
+  globalThis.__dboRaceVitalBonus = (a) => { const r = raceOf(a >>> 0); return { health: r ? Math.max(0, num((C[r] || {}).healthBonus, 0)) : 0 }; };
   globalThis.__dboRaceOf = raceOf;
   globalThis.__dboRaceSkillRate = skillRate;
   globalThis.__dboRaceDiseaseResist = diseaseResist;

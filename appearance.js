@@ -148,6 +148,14 @@ module.exports = (api) => {
     const r = rec(M.race), v = rec(M.vampire);
     if (r && v && HEADS.own.has('BretonRace')) { HEADS.raceOf.set(r, 'BretonRace'); HEADS.raceOf.set(v, 'BretonRace'); }
   } catch (e) { log('appearance: the Reachman race could not be read', e.message); }
+  // The DLE's DBOHalfGiantRace and its vampire (config halfGiantRace) wear the Nord's heads (head parts FLST 0A8033, the Nord
+  // morph): guarded as the Nord, the same way
+  try {
+    const M = (cfg && cfg.halfGiantRace) || {};
+    const rec = (d) => { const id = d ? mp.getIdFromDesc(String(d)) >>> 0 : 0; const r = id ? mp.lookupEspmRecordById(id) : null; return r && r.record && String(r.record.type) === 'RACE' ? id : 0; };
+    const r = rec(M.race), v = rec(M.vampire);
+    if (r && v && HEADS.own.has('NordRace')) { HEADS.raceOf.set(r, 'NordRace'); HEADS.raceOf.set(v, 'NordRace'); }
+  } catch (e) { log('appearance: the Half-Giant race could not be read', e.message); }
 
   const get = (a, k) => { try { return mp.get(a, k); } catch (e) { return undefined; } };
   const userOf = (a) => {

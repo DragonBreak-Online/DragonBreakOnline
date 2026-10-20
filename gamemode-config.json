@@ -1272,6 +1272,11 @@
   "_variants": "The creator's goblin skin colours (private.rp.race slug -> race), each its own RACE in the DLE. Without them a swamp, ash or ochre goblin had no racial gift or power (Nate, 19 Oct).",
   "variants": { "goblinswamp": "1aca09:DragonBreak Online Edits.esp", "goblinash": "1aca11:DragonBreak Online Edits.esp", "goblinochre": "1aca19:DragonBreak Online Edits.esp" }
  },
+ "halfGiantRace": {
+  "_comment": "The DLE's DBOHalfGiantRace and its vampire (PC Worker C, 20 Oct; on the Nord). racial.js gives the creator's halfgiant slug this race (__dboRaceOverrides) and the Half-Giant's gifts (racial.halfgiant). Resolves to nothing until the DLE carrying 1D201B/1D201C is live.",
+  "race": "1d201b:DragonBreak Online Edits.esp",
+  "vampire": "1d201c:DragonBreak Online Edits.esp"
+ },
  "reachmanRace": {
   "_comment": "The DLE's DBOReachmanRace and its vampire (Nat, 14 Oct; from Reachman Race.esp v2, Nexus 39844, Breton morph, vanilla heads). racial.js gives the creator's reachfolk slug this race (__dboRaceOverrides) and the Reachman's gifts (racial.reachman); supernatural.js turns it into its vampire and back.",
   "race": "1c8981:DragonBreak Online Edits.esp",
