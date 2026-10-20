@@ -313,7 +313,7 @@ module.exports = (api) => {
   // A boon the server keeps with no spell at all: Sanguine's appetite, Hermaeus Mora's reading, and since 2026-10-01 the
   // regeneration of the Hist and the Yokudan gods (blessingRegen, held by the regeneration tick below) and the Ancestors'
   // ward against fire (combatBoon: gamemode.js blessingCombat, target.ancestors)
-  const serverBoonOf = (d) => !!(d && (d.hungerHalf || d.scholarBoon || d.blessingRegen || d.combatBoon || d.meatBoon));
+  const serverBoonOf = (d) => !!(d && (d.hungerHalf || d.scholarBoon || d.blessingRegen || d.combatBoon || d.meatBoon || d.skillBoon));
   // Sheogorath has no blessing of his own and should not have one. The Madgod gives what he feels
   // like, so his worshipper is handed another god's blessing at random - a different one each time.
   // This is the only boon in the list that is more lore-accurate as code than as a record, and it is
@@ -515,6 +515,19 @@ module.exports = (api) => {
       const v = d ? d[flag] : 0;
       return v === true ? 1 : Math.max(0, Number(v) || 0);
     } catch (e) { return 0; }
+  };
+
+  // A skill's XP rate under the running blessing (faiths.json skillBoon { skill: mult, '*': mult for every skill }; Nate 20 Oct:
+  // the gods without a spell of their own, simple and unique boons), 1 when not blessed. skillrates.js multiplies it in
+  globalThis.__dboBlessingSkillRate = (a, skillId) => {
+    try {
+      const b = blessingOf(a);
+      if (!b || Number(b.until) <= Date.now()) return 1;
+      const d = deityById(b.deity); const sb = d && d.skillBoon;
+      if (!sb || typeof sb !== 'object') return 1;
+      const v = Number(sb[skillId] !== undefined ? sb[skillId] : sb['*']);
+      return Number.isFinite(v) && v >= 1 && v <= 2 ? v : 1;
+    } catch (e) { return 1; }
   };
 
   // A blessing is worn, not held: nothing else expires it, so the module does. The same sweep keeps a cast blessing on

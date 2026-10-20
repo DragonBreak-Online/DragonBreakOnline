@@ -1,5 +1,38 @@
 [
   {
+    "title": "Every god of Tamriel",
+    "date": "2026-10-20",
+    "version": "Server update",
+    "tag": "New",
+    "sections": [
+      {
+        "heading": "New faiths",
+        "items": [
+          "The All-Maker: the god of the Skaal of Solstheim, also called the All-Father.",
+          "The Tribunal: Almalexia, Sotha Sil and Vivec, still kept by the old faithful of Morrowind.",
+          "The Gods of High Rock: the Divines with Sheor and Ebonarm.",
+          "The Spirits of Akavir: Tosh Raka, the tiger-dragon."
+        ]
+      },
+      {
+        "heading": "New gods in the old faiths",
+        "items": [
+          "Khajiit: Magrus, Jone and Jode, Mafala, Lorkhaj and Fadomai.",
+          "Redguard: Ruptga (Tall Papa), Diagna, Sep and Ebonarm.",
+          "Imperial: Shezarr and Morihaus. Nord: Orkey. Bosmer: Ius. Altmer: Sai. Daedric: Jyggalag, Prince of Order."
+        ]
+      },
+      {
+        "heading": "How they work",
+        "items": [
+          "Choose them in F3, the Deity tab, like any god. They have no shrines yet, so pray to them anywhere with /pray.",
+          "Each has a simple boon of its own while the blessing lasts. Most make one skill's work teach you 15% more (the All-Maker Harvesting, Vivec Blade, Diagna Blacksmith, Sep Skinner and so on). Jone and Jode quicken magicka, Morihaus stamina, and Jyggalag gives 5% more in every skill.",
+          "Jyggalag is a Daedric Prince: his worship is outlawed in the Empire's lands."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Own a mine",
     "date": "2026-10-20",
     "version": "Server update",

@@ -39,8 +39,8 @@ const choose = (a, id, faith) => { answers.length = 0; (handlers.get('journalDei
 const rec = (a) => props.get(a + '|private.dboDeity') || {};
 
 let v = globalThis.__dboDeityView(ACTOR);
-ok('the roster is skills.json\'s gods then the 15 new ones', v.choices.length === SKILLS.deities.choices.length + 15 && v.choices.slice(0, SKILLS.deities.choices.length).map((c) => c.id).join() === SKILLS.deities.choices.map((c) => c.id).join());
-ok('13 faiths, the Green Pact among them with Y\'ffre', v.faiths.length === 13 && v.faiths.find((f) => f.id === 'greenpact').patrons.includes('yffre'));
+ok('the roster is skills.json\'s gods then faiths.json\'s', v.choices.length === SKILLS.deities.choices.length + FAITHS.deities.length && v.choices.slice(0, SKILLS.deities.choices.length).map((c) => c.id).join() === SKILLS.deities.choices.map((c) => c.id).join());
+ok('every faith listed, the Green Pact among them with Y\'ffre', v.faiths.length === FAITHS.faiths.length && v.faiths.find((f) => f.id === 'greenpact').patrons.includes('yffre'));
 ok('other names: Kynareth is also Kyne and Khenarthi', ['Kyne', 'Khenarthi'].every((n) => v.choices.find((c) => c.id === 'kynareth').alsoKnownAs.includes(n)));
 ok('the suggested faith follows the race (a Bosmer: the Green Pact)', globalThis.__dboDeityView(BOSMER).faiths.find((f) => f.id === 'greenpact').suggested && !globalThis.__dboDeityView(BOSMER).faiths.find((f) => f.id === 'imperial').suggested);
 ok('Sithis is hunted', v.choices.find((c) => c.id === 'sithis').lawful === false && /Hunted/.test(v.choices.find((c) => c.id === 'sithis').unlawfulWhere));
@@ -86,4 +86,23 @@ props.set(ACTOR + '|private.dboBlessing', { deity: 'yffre', until: wallClock - 1
 ok('an expired blessing is worth nothing', globalThis.__dboBlessingValue(ACTOR, 'meatBoon') === 0);
 ok('the three boons are the server\'s now', ['xarxes', 'yffre', 'alkosh'].every((id) => FAITHS.deities.find((d) => d.id === id).blessingSource === 'server'));
 ok('every patron of every faith is a god in the roster', FAITHS.faiths.every((f) => f.patrons.every((id) => v.choices.some((c) => c.id === id))));
+// Every Elder Scrolls deity (Nate 20 Oct): each patron is a god, the new gods pray anywhere and have a boon of their own
+{
+  const all = SKILLS.deities.choices.concat(FAITHS.deities); const ids = new Set(all.map((x) => x.id));
+  const missing = FAITHS.faiths.flatMap((f) => f.patrons.filter((p) => !ids.has(p)).map((p) => `${f.id}:${p}`));
+  ok('every faith\'s patrons are gods', missing.length === 0, missing);
+  const NEW = ['allmaker', 'almalexia', 'sothasil', 'vivec', 'magrus', 'jonejode', 'mafala', 'lorkhaj', 'fadomai', 'ruptga', 'diagna', 'sep', 'ebonarm', 'toshraka', 'jyggalag', 'orkey', 'sheor', 'shezarr', 'ius', 'sai', 'morihaus'];
+  const gods = NEW.map((id) => all.find((x) => x.id === id));
+  ok('the 21 new gods are there, prayed to anywhere, each with a boon', gods.every((g) => g && g.prayAnywhere && g.boon && (g.skillBoon || g.blessingRegen)));
+  const sig = gods.map((g) => JSON.stringify(g.skillBoon || g.blessingRegen));
+  ok('...and no two of them share a boon', new Set(sig).size === sig.length, sig);
+  ok('the All-Maker is the Skaal\'s, also called the All-Father', FAITHS.faiths.find((f) => f.id === 'skaal').patrons.join() === 'allmaker' && gods[0].alsoKnownAs.includes('All-Father'));
+  const A = 0x31; props.set(A + '|appearance', { raceId: 0x102 });
+  blessWith(A, 'allmaker');
+  ok('the All-Maker\'s blessing: Harvesting XP x1.15, Blade untouched', globalThis.__dboBlessingSkillRate(A, 'harvesting') === 1.15 && globalThis.__dboBlessingSkillRate(A, 'blade') === 1);
+  blessWith(A, 'jyggalag');
+  ok('Jyggalag\'s: every skill x1.05', globalThis.__dboBlessingSkillRate(A, 'miner') === 1.05 && globalThis.__dboBlessingSkillRate(A, 'scholar') === 1.05);
+  props.set(A + '|private.dboBlessing', { deity: 'allmaker', until: 1 });
+  ok('an expired blessing gives nothing', globalThis.__dboBlessingSkillRate(A, 'harvesting') === 1);
+}
 console.log(fails ? `${fails} FAILED` : 'all checks passed'); process.exit(fails ? 1 : 0);
