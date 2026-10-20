@@ -1460,7 +1460,7 @@ void ActionListener::OnActivate(const RawMessageData& rawMsgData,
       std::stringstream ss;
       ss << std::hex << "Bad hoster is attached to caster 0x"
          << msg.data.caster << ", expected 0x" << ac->GetFormId()
-         << ", but found 0x" << hosterId;
+         << ", but found 0x" << hosterId << ", target 0x" << msg.data.target;
       throw std::runtime_error(ss.str());
     }
   }
