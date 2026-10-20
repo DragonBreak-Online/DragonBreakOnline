@@ -192,7 +192,12 @@ module.exports = (api) => {
     try { if (zone && fn('__dboHoldTax')) r = Number(fn('__dboHoldTax')(zone, own)); } catch (e) { r = own; }
     return Math.min(C.maxTaxRate, Math.max(C.minTaxRate, Number.isFinite(r) ? r : 0));
   };
-  const valueOf = (ref) => { const v = Number(data().values[String(ref)]); return Number.isFinite(v) && v >= 0 ? v : C.defaultPropertyValue; };
+  // Unassessed: a mine's own value (mines.js, by its veins), else every property's default
+  const valueOf = (ref) => {
+    const v = Number(data().values[String(ref)]); if (Number.isFinite(v) && v >= 0) return v;
+    let mine = NaN; try { mine = fn('__dboMineValueOf') ? Number(fn('__dboMineValueOf')(ref)) : NaN; } catch (e) { mine = NaN; }
+    return Number.isFinite(mine) && mine > 0 ? mine : C.defaultPropertyValue;
+  };
 
   // ---- the Imperial tithe ------------------------------------------------------------------------------------------------
   const titheRate = () => { const r = Number(C.titheRate); return Number.isFinite(r) ? Math.min(0.5, Math.max(0, r)) : 0; };

@@ -150,3 +150,6 @@ discipline.json
 /citizenship.json
 /citizenship.json.tmp
 officials-seats.json
+
+# mines.js: mine rules and the owners' stores of ore
+mines-state.json
