@@ -452,6 +452,44 @@ loadAll({ deathDuels: false });
 tick(500);
 check('switched off during a death duel: it ends with no winner, nobody dies', d.closed && !d.winner && killed.length === 0);
 
+// ---- deathDuelPermadeath false: the losing blow lands and downed.js takes the fall ---------------------------------------
+loadAll({ deathDuelPermadeath: false });
+full();
+killed.length = 0;
+setGold(A, 600); setGold(B, 200);
+n = challenge(A, B, { type: 'death', wager: 50 });
+check('without permadeath the warning speaks of a fall, not the end of the character', /falls as in any fight/.test(lastWidget(B, 122)[1].targetName) && !/dies for good/.test(lastWidget(B, 122)[1].targetName));
+fire('duelOffer', B, `${n}|accept`);
+check('the second warning still comes, in the same words', /falls as in any fight.*Are you sure/.test(lastWidget(B, 122)[1].targetName) && !duel());
+fire('duelOffer', B, `${n}|confirm`);
+tick(3100);
+d = duel();
+check('the death duel begins after both agreements', d && d.type === 'death' && out.audits.some((t) => /^DUEL DEATH agreed:/.test(t)));
+hit(A, B, 60);
+check('no guard: a heavy blow lands', Math.abs(hp(B) - 0.7) < 1e-9, hp(B));
+hit(A, B, 199);
+check('the losing blow lands: the loser is dead and down by downed.js rules', get(B, 'isDead') === true && globalThis.__dboIsDowned(B) && globalThis.__dboDownedState.downed.has(B));
+check('no permadeath, no kneel, no mercy heal', killed.length === 0 && get(B, 'private.permaDead') !== true && !out.audits.slice(-6).some((t) => /REVIVE .*mercy/.test(t)));
+check('the winner takes the wager', d.closed && d.winner === A && goldOfA(A) === 650 && goldOfA(B) === 150 && totalGold() === GOLD_TOTAL);
+check('the result is audited as a death duel', out.audits.some((t) => /^DUEL DEATH result \(a normal death\): Pff000001 beat Pff000002/.test(t)));
+tick(500);
+check('the down state goes on as for any death (still down after the watch)', globalThis.__dboIsDowned(B));
+set(B, 'isDead', false); globalThis.__dboDownedState.downed.delete(B); setGold(A, 600); setGold(B, 200);
+full();
+d = startFight({ type: 'death', wager: 50 });
+online.delete(B); globalThis.__dboDuelLeave(B); online.add(B);
+check('a disconnect without permadeath: no winner, stakes back', d.closed && !d.winner && goldOfA(A) === 600 && goldOfA(B) === 200);
+full();
+d = startFight({ type: 'death' });
+hit(N, B, 400);
+check('a death to a creature: no winner, nobody gets the duel', d.closed && !d.winner);
+set(B, 'isDead', false); globalThis.__dboDownedState.downed.delete(B);
+loadAll();
+full();
+n = challenge(A, B, { type: 'death' });
+check('permadeath is the default, and its warning says so', /dies for good/.test(lastWidget(B, 122)[1].targetName));
+fire('duelOffer', B, `${n}|refuse`);
+
 // ---- disconnect: 'forfeit' ------------------------------------------------------------------------------------------------
 loadAll({ disconnect: 'forfeit' });
 full();

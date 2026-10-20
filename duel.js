@@ -9,12 +9,18 @@
 //   Practice fight  rounds as chosen, no wager, no winner recorded
 //   Friendly duel   a winner, no wager
 //   Wager duel      a winner, and a wager each that the winner takes
-//   Death duel      one round; the loser's character ends for good (supernatural.js __dboPermaKill), a wager optional.
-//                   Each side confirms a second warning before it begins, both agreements are audited. The killing
-//                   blow is refused like any duel's and the loser is ended standing, as the chopping block does
-//                   (execution.js): no down state, so no revive, crash forgiveness or temple can race it. Only a
-//                   beaten loser dies: a broken rule forfeits without death; a yield, a logout, leaving the ground or
-//                   anything but the other's blow ends it with no winner, and nobody offline is ever ended.
+//   Death duel      one round, a wager optional, no guard. Each side confirms a second warning before it begins; both
+//                   agreements and every result are audited. Two readings, by config deathDuelPermadeath:
+//                   false  the losing blow lands: the loser dies as in any fight, under downed.js's rules
+//                                    (the down state, a revive, the temple and Death's Chill, the body searched),
+//                                    with no kneel and no heal. The wager goes to the winner.
+//                   true (default)   the loser's character ends for good (supernatural.js __dboPermaKill). The losing
+//                                    blow is refused like any duel's and the loser is ended standing, as the chopping
+//                                    block does (execution.js), so no revive, crash forgiveness or temple can race it;
+//                                    a blow that got past the guard ends the fallen body the same way. Nobody offline
+//                                    is ever ended.
+//                   Only the other's blow decides it: a broken rule forfeits without death; a yield, a logout, leaving
+//                   the ground or anything but the other's blow ends it with no winner and the stakes back.
 //                   Config deathDuels: false takes the type away and ends a running one without death.
 // To begin, both stand within challengeMeters, at full health, up, unbound, in their own form, free of Death's Chill and
 // out of any PvP fight for combatSeconds, and each carries the wager. The wagers are taken at the start and held on each
@@ -40,7 +46,7 @@ module.exports = (api) => {
     enabled: true, challengeMeters: 8, arenaMeters: 25, leaveSeconds: 3, answerSeconds: 30, countdownSeconds: 3,
     pauseSeconds: 6, loseAt: 0.05, fullHealth: 0.99, combatSeconds: 30, maxMinutes: 15, maxWager: 5000,
     wagerSteps: [0, 10, 25, 50, 100, 250, 500, 1000], formats: ['single', 'bo3', 'bo5'], disconnect: 'refund',
-    deathDuels: true, minMaxHealth: 150, outsiderNoticeSeconds: 5,
+    deathDuels: true, deathDuelPermadeath: true, minMaxHealth: 150, outsiderNoticeSeconds: 5,
   }, cfg.duel || {});
   const DUEL_MENU_ID = 121;
   const OFFER_MENU_ID = 122;
@@ -65,8 +71,10 @@ module.exports = (api) => {
     wager: { label: 'Wager duel', winner: true, wager: true },
     death: { label: 'Death duel', winner: true, wager: 'optional', death: true },
   };
-  const DEATH_WARNING = "The loser's character dies for good: no revive, no temple, no way back.";
-  const deathOn = () => C.deathDuels !== false && typeof globalThis.__dboPermaKill === 'function';
+  const permadeath = () => C.deathDuelPermadeath !== false;
+  const deathWarning = () => (permadeath() ? "The loser's character dies for good: no revive, no temple, no way back."
+    : 'Nothing holds the last blow back: the loser falls as in any fight, to be finished, raised or sent to the temple with the chill of the grave.');
+  const deathOn = () => C.deathDuels !== false && (!permadeath() || typeof globalThis.__dboPermaKill === 'function');
   const typeList = () => Object.keys(TYPES).filter((t) => !TYPES[t].death || deathOn());
   const isDeath = (d) => !!(d && TYPES[d.type] && TYPES[d.type].death);
   const formatList = () => (Array.isArray(C.formats) ? C.formats : []).filter((f) => FORMATS[f]);
@@ -247,7 +255,7 @@ module.exports = (api) => {
     if (d.kneeling) stand(d.kneeling);
     clearDots(d);
     // They fought as duellists, not as enemies: each may raise the other afterwards (downed.js hostile)
-    try { const ds = globalThis.__dboDownedState; if (ds && ds.fought instanceof Map) ds.fought.delete(d.a < d.b ? `${d.a}:${d.b}` : `${d.b}:${d.a}`); } catch (e) { /* no down state */ }
+    if (!isDeath(d)) try { const ds = globalThis.__dboDownedState; if (ds && ds.fought instanceof Map) ds.fought.delete(d.a < d.b ? `${d.a}:${d.b}` : `${d.b}:${d.a}`); } catch (e) { /* no down state */ }
     if (d.wager > 0) {
       if (winner) {
         const loser = other(d, winner);
@@ -257,7 +265,8 @@ module.exports = (api) => {
         for (const x of [d.a, d.b]) { hold(x, `refund:${d.id}`, d.wager); settle(x, `duel ${d.id} without a winner`); }
       }
     }
-    for (const x of [d.a, d.b]) if (!(isDeath(d) && winner && x !== winner)) restore(d, x);
+    // A death duel is a real fight: nobody is healed at its end
+    if (!isDeath(d)) for (const x of [d.a, d.b]) restore(d, x);
     if (why === 'practice over') { audit(`DUEL practice fight of ${who(d.a)} and ${who(d.b)} over, ${score(d)}, ${describe(d)}`); return; }
     const purse = d.wager > 0 ? (winner ? ` and the ${d.wager * 2} gold wagered` : '. Each wager goes back') : '';
     for (const x of [d.a, d.b]) {
@@ -265,9 +274,9 @@ module.exports = (api) => {
       const y = other(d, x);
       if (!winner) banner(x, `The duel with ${nameTo(x, y)} ends with no winner (${why})${purse}.`, 5);
       else if (x === winner) banner(x, `You win the duel against ${nameTo(x, y)}, ${score(d)}${purse}.`, 5);
-      else if (!isDeath(d)) banner(x, `${nameTo(x, y)} wins the duel, ${score(d)}.`, 5);
+      else if (!isDeath(d) || !permadeath()) banner(x, `${nameTo(x, y)} wins the ${isDeath(d) ? 'death duel' : 'duel'}, ${score(d)}.`, 5);
     }
-    audit(`DUEL ${winner ? `${who(winner)} beat ${who(other(d, winner))}` : `${who(d.a)} and ${who(d.b)}: no winner`} (${why}), ${score(d)}, ${describe(d)}`);
+    audit(`DUEL ${isDeath(d) ? `DEATH result (${permadeath() ? 'permadeath' : 'a normal death'}): ` : ''}${winner ? `${who(winner)} beat ${who(other(d, winner))}` : `${who(d.a)} and ${who(d.b)}: no winner`} (${why}), ${score(d)}, ${describe(d)}`);
   };
   const practiceOver = (d, why) => {
     for (const x of [d.a, d.b]) if (online(x)) banner(x, `The practice fight with ${nameTo(x, other(d, x))} is over, ${d.wins[idx(d, x)]}-${d.wins[idx(d, other(d, x))]}${/yield|left/.test(why) ? ` (${why})` : ''}.`, 5);
@@ -348,6 +357,8 @@ module.exports = (api) => {
             return false;
           }
           if (inner.call(this, aggressorId, targetId, sourceId, damage, ...rest) === false) return false;
+          // A death duel without permadeath has no guard: the losing blow lands and downed.js takes the fall
+          if (isDeath(dt) && !permadeath()) return true;
           if (!(dmg > 0)) return true;
           const p = pct(tgt);
           if (!p || !(p.health > 0)) return true;
@@ -394,7 +405,11 @@ module.exports = (api) => {
           const x = Number(actorId) >>> 0, d = duelOf(x);
           if (d) {
             const y = other(d, x), by = sideOf(Number(killerId) >>> 0);
-            if (by === y && isDeath(d)) {
+            if (by === y && isDeath(d) && !permadeath()) {
+              // The losing blow of a death duel: the loser is down like anyone killed (downed.js), the winner paid
+              d.wins[idx(d, y)] = 1;
+              finish(d, y, 'the killing blow');
+            } else if (by === y && isDeath(d)) {
               // The engine's blow got past the guard in a death duel: the same end, on the fallen body, while both are here
               if (deathOn() && online(x) && online(y) && inArea(d, x) && inArea(d, y)) {
                 d.wins[idx(d, y)] = 1;
@@ -468,7 +483,7 @@ module.exports = (api) => {
     if (d.step === 'confirm') {
       return openWidget(a, {
         type: 'contextMenu', id: DUEL_MENU_ID, mode: 'menu',
-        targetName: `DEATH DUEL with ${nameTo(a, d.target)}. ${DEATH_WARNING} That may be you. Are you sure?`,
+        targetName: `DEATH DUEL with ${nameTo(a, d.target)}. ${deathWarning()} That may be you. Are you sure?`,
         actions: [{ id: `${d.nonce}|confirm`, label: 'Yes: to the death. Send the challenge' }, { id: `${d.nonce}|back`, label: 'No, go back' }],
         events: { action: 'dbo:duelDraft', close: 'dbo:duelDraftClose' },
       }, true);
@@ -478,7 +493,7 @@ module.exports = (api) => {
     actions.push({ id: `${d.nonce}|rules`, label: `Rules: ${RULES[d.rules].label}` });
     if (T.wager) actions.push({ id: `${d.nonce}|wager`, label: d.wager > 0 ? `Wager: ${d.wager} gold each, the winner takes both` : 'Wager: none' });
     actions.push({ id: `${d.nonce}|send`, label: 'Send the challenge' }, { id: `${d.nonce}|cancel`, label: 'Cancel' });
-    const note = T.death ? DEATH_WARNING : T.winner ? 'Nobody dies: a beaten duellist kneels.' : 'Nobody dies, and no winner is kept.';
+    const note = T.death ? deathWarning() : T.winner ? 'Nobody dies: a beaten duellist kneels.' : 'Nobody dies, and no winner is kept.';
     openWidget(a, {
       type: 'contextMenu', id: DUEL_MENU_ID, mode: 'menu',
       targetName: `Challenge ${nameTo(a, d.target)}: ${T.label.toUpperCase()}. Choose a line to change it. ${note}`,
@@ -499,12 +514,12 @@ module.exports = (api) => {
     if (o.step === 'confirm') {
       return openWidget(t, {
         type: 'contextMenu', id: OFFER_MENU_ID, mode: 'menu',
-        targetName: `DEATH DUEL with ${nameTo(t, a)}. ${DEATH_WARNING} That may be you. Are you sure?`,
+        targetName: `DEATH DUEL with ${nameTo(t, a)}. ${deathWarning()} That may be you. Are you sure?`,
         actions: [{ id: `${o.nonce}|confirm`, label: 'Yes: to the death' }, { id: `${o.nonce}|refuse`, label: 'No, refuse' }],
         events: { action: 'dbo:duelOffer', close: 'dbo:duelOfferClose' },
       }, true);
     }
-    const note = T.death ? DEATH_WARNING : T.winner ? 'Nobody dies: a beaten duellist kneels.' : 'Nobody dies, and no winner is kept.';
+    const note = T.death ? deathWarning() : T.winner ? 'Nobody dies: a beaten duellist kneels.' : 'Nobody dies, and no winner is kept.';
     openWidget(t, {
       type: 'contextMenu', id: OFFER_MENU_ID, mode: 'menu',
       targetName: `${T.label.toUpperCase()}: ${nameTo(t, a)} challenges you. ${describe(o)}${o.wager > 0 ? ', the winner takes both' : ''}. ${note} You must be at full health.`,
