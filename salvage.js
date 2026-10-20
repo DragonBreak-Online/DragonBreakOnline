@@ -29,6 +29,9 @@ module.exports = (api) => {
   const { mp, log, personal, who, cfg, openWidget, closeWidget, onUi, masteryOf, recordOf, fieldsOf, giveItem, itemName, distanceMeters } = api;
   const CFG = Object.assign({
     enabled: true,
+    // A stack a player enchanted themselves can be broken down too, losing the enchantment (craigieg, #suggestions
+    // 19 Oct: iron daggers of frost that no smith would take); false leaves them out, as before
+    playerEnchanted: true,
     shareByTier: [0.25, 0.35, 0.5, 0.6, 0.75],
     pageSize: 7, useWindowSeconds: 20, reachMeters: 6.5,
     bookBreakdownBases: ['BookBreakdown'],
@@ -194,33 +197,42 @@ module.exports = (api) => {
   // A plain, unworn stack. An entry carrying extra data (an enchantment, a name, tempering, poison, a soul, a charge) is
   // a different item on the same base, never counted or taken, so breaking down the plain sword cannot eat the enchanted one.
   const EXTRA = ['enchantmentId', 'name', 'poisonId', 'soul', 'chargePercent', 'maxCharge', 'removeEnchantmentOnUnequip'];
-  const plain = (e) => !!e && !e.worn && !e.wornLeft && Number(e.count) > 0
+  // Everything but the enchantment: unworn, whole, unnamed, unpoisoned, soulless, untempered
+  const plainish = (e) => !!e && !e.worn && !e.wornLeft && Number(e.count) > 0
     && EXTRA.every((k) => e[k] === undefined || e[k] === null || e[k] === 0 || e[k] === '' || e[k] === false)
-    && !(Number(e.poisonCount) > 0) && (e.health === undefined || e.health === null || Number(e.health) === 1)
-    // A player-made enchantment travels as its effects; on armour it carries no charge or id at all
-    && !(Array.isArray(e.enchantmentEffects) && e.enchantmentEffects.length > 0);
+    && !(Number(e.poisonCount) > 0) && (e.health === undefined || e.health === null || Number(e.health) === 1);
+  // A player-made enchantment travels as its effects (a magic effect, a magnitude, an area and a duration), and carries
+  // no id and no charge of its own: every such entry in the live log is enchantmentEffects alone. So it is the one piece
+  // of extra data the station can take along with the item, and a stack carrying it is offered as its own row.
+  const madeEnchanted = (e) => plainish(e) && Array.isArray(e.enchantmentEffects) && e.enchantmentEffects.length > 0;
+  const plain = (e) => plainish(e) && !(Array.isArray(e.enchantmentEffects) && e.enchantmentEffects.length > 0);
 
   // The stacks the player carries that this station can take apart: [{ baseId, count, gives }]
   const breakable = (a, station, rank) => {
     let entries = [];
     try { const inv = mp.get(a, 'inventory'); entries = inv && Array.isArray(inv.entries) ? inv.entries : []; } catch (e) { entries = []; }
     const counts = new Map();
+    const ench = new Map();
     for (const e of entries) {
-      if (!plain(e)) continue;
       const id = Number(e.baseId) >>> 0;
-      counts.set(id, (counts.get(id) || 0) + Number(e.count));
+      if (plain(e)) counts.set(id, (counts.get(id) || 0) + Number(e.count));
+      else if (CFG.playerEnchanted && madeEnchanted(e)) ench.set(id, (ench.get(id) || 0) + Number(e.count));
     }
     const out = [];
-    for (const [baseId, count] of counts) { const gives = yieldOf(baseId, station, rank); if (gives) out.push({ baseId, count, gives }); }
-    return out.sort((x, y) => nameOf(descOf(x.baseId)).localeCompare(nameOf(descOf(y.baseId))));
+    for (const [baseId, count] of counts) { const gives = yieldOf(baseId, station, rank); if (gives) out.push({ baseId, count, gives, ench: false }); }
+    // The same materials: the enchantment itself gives nothing back, and the row says so
+    for (const [baseId, count] of ench) { const gives = yieldOf(baseId, station, rank); if (gives) out.push({ baseId, count, gives, ench: true }); }
+    return out.sort((x, y) => nameOf(descOf(x.baseId)).localeCompare(nameOf(descOf(y.baseId))) || (x.ench ? 1 : 0) - (y.ench ? 1 : 0));
   };
 
   // Takes one from a stack the player is not wearing
-  const takeOne = (a, baseId) => {
+  const takeOne = (a, baseId, ench) => {
     try {
       const inv = mp.get(a, 'inventory') || { entries: [] };
       const entries = Array.isArray(inv.entries) ? inv.entries.map((e) => Object.assign({}, e)) : [];
-      const i = entries.findIndex((e) => plain(e) && (Number(e.baseId) >>> 0) === (baseId >>> 0));
+      // The enchanted stack and the plain one share a base: take from the one the row named, never the other
+      const want = ench ? madeEnchanted : plain;
+      const i = entries.findIndex((e) => want(e) && (Number(e.baseId) >>> 0) === (baseId >>> 0));
       if (i < 0) return false;
       entries[i].count = Number(entries[i].count) - 1;
       if (entries[i].count <= 0) entries.splice(i, 1);
@@ -240,7 +252,7 @@ module.exports = (api) => {
     const p = ((page % pages) + pages) % pages;
     const actions = station.dedicated ? [] : [{ id: 'use', label: station.id === 'desk' ? 'Sit at the desk (use it again)' : `Work the ${station.label} (use it again)` }];
     for (const it of list.slice(p * size, p * size + size)) {
-      actions.push({ id: `b:${it.baseId}`, label: `${nameOf(descOf(it.baseId))}${it.count > 1 ? ` (${it.count})` : ''}: ${givesText(it.gives)}` });
+      actions.push({ id: `b${it.ench ? 'e' : ''}:${it.baseId}`, label: `${nameOf(descOf(it.baseId))}${it.ench ? ' (enchanted)' : ''}${it.count > 1 ? ` (${it.count})` : ''}: ${givesText(it.gives)}` });
     }
     if (pages > 1) actions.push({ id: 'more', label: `More (page ${p + 1} of ${pages})` });
     S.pending.set(a >>> 0, { target: target >>> 0, station: station.id, page: p });
@@ -335,19 +347,21 @@ module.exports = (api) => {
   // and the list closes up (Barush broke three schematics in 1.5 s at the Scholars' Ledger, 13 Oct). Break one keeps
   // this page while any are left; Break down all takes the stack in one go; the item's worth is shown first.
   const worthOf = (baseId) => { try { return typeof globalThis.__dboBaseValue === 'function' ? Number(globalThis.__dboBaseValue(baseId >>> 0)) || 0 : 0; } catch (e) { return 0; } };
-  const openItem = (a, target, station, page, baseId, note) => {
+  const openItem = (a, target, station, page, baseId, note, ench) => {
     const rank = rankIn(a, station.skill);
-    const it = breakable(a, station, rank).find((x) => x.baseId === (baseId >>> 0));
+    const it = breakable(a, station, rank).find((x) => x.baseId === (baseId >>> 0) && !!x.ench === !!ench);
     if (!it) return openPanel(a, target, station, page, note);
     const name = nameOf(descOf(it.baseId));
     const worth = worthOf(it.baseId);
-    const actions = [{ id: `x1:${it.baseId}`, label: `Break down one: ${givesText(it.gives)}` }];
-    if (it.count > 1) actions.push({ id: `xa:${it.baseId}`, label: `Break down all ${it.count}` });
+    const e = it.ench ? 'e' : '';
+    const actions = [{ id: `x1${e}:${it.baseId}`, label: `Break down one: ${givesText(it.gives)}` }];
+    if (it.count > 1) actions.push({ id: `xa${e}:${it.baseId}`, label: `Break down all ${it.count}` });
     actions.push({ id: 'list', label: 'Back to the list' });
-    S.pending.set(a >>> 0, { target: target >>> 0, station: station.id, page, item: it.baseId });
+    S.pending.set(a >>> 0, { target: target >>> 0, station: station.id, page, item: it.baseId, ench: !!it.ench });
     openWidget(a, {
       type: 'contextMenu', id: WIDGET_ID, mode: 'menu',
-      targetName: `${note ? `${note}. ` : ''}${name}${it.count > 1 ? ` (${it.count})` : ''}${worth > 0 ? `, worth ${worth} gold${it.count > 1 ? ' each' : ''}` : ''}`,
+      // The enchantment is gone with the item: the materials are the plain ones, so the panel says it before the break
+      targetName: `${note ? `${note}. ` : ''}${name}${it.count > 1 ? ` (${it.count})` : ''}${worth > 0 ? `, worth ${worth} gold${it.count > 1 ? ' each' : ''}` : ''}${it.ench ? '. Your enchantment is lost with it' : ''}`,
       actions, events: { action: 'dbo:salvageChoose', close: 'dbo:salvageClose' },
     }, true);
     return it.count;
@@ -439,22 +453,23 @@ module.exports = (api) => {
       return;
     }
     if (id === 'list') { openPanel(a, p.target, station, p.page); return; }
-    const m = /^(b|x1|xa):(\d+)$/.exec(id);
+    const m = /^(b|x1|xa)(e?):(\d+)$/.exec(id);
     if (!m) return;
     // The panel stays open while the player walks; the station must still be in reach
     try { if (distanceMeters(a, p.target) > CFG.reachMeters) { closePanel(a); personal(a, `You walked away from the ${station.label}.`); return; } } catch (e) { /* no position */ }
-    const baseId = Number(m[2]) >>> 0;
-    if (m[1] === 'b') { openItem(a, p.target, station, p.page, baseId); return; }
-    // A break is only for the item whose page is open
-    if (p.item !== baseId) { openPanel(a, p.target, station, p.page); return; }
+    const baseId = Number(m[3]) >>> 0;
+    const ench = m[2] === 'e';
+    if (m[1] === 'b') { openItem(a, p.target, station, p.page, baseId, undefined, ench); return; }
+    // A break is only for the stack whose page is open, the plain one or the enchanted one
+    if (p.item !== baseId || !!p.ench !== ench) { openPanel(a, p.target, station, p.page); return; }
     const rank = rankIn(a, station.skill);
     const gives = rank < 0 ? null : yieldOf(baseId, station, rank);
-    const name = nameOf(descOf(baseId));
-    const want = m[1] === 'xa' ? Math.min(MAX_ALL, (breakable(a, station, rank).find((x) => x.baseId === baseId) || { count: 0 }).count) : 1;
+    const name = `${nameOf(descOf(baseId))}${ench ? ' (enchanted)' : ''}`;
+    const want = m[1] === 'xa' ? Math.min(MAX_ALL, (breakable(a, station, rank).find((x) => x.baseId === baseId && !!x.ench === ench) || { count: 0 }).count) : 1;
     let done = 0;
     const total = new Map();
     for (; gives && done < want; done++) {
-      if (!takeOne(a, baseId)) break;
+      if (!takeOne(a, baseId, ench)) break;
       const got = rollGives(gives);
       for (const [d, n] of got) { const mid = idOf(d); if (mid) giveItem(a, mid, n); total.set(d, (total.get(d) || 0) + n); }
       try { if (typeof globalThis.__dboSkillRateBrokeDown === 'function') globalThis.__dboSkillRateBrokeDown(a, baseId); } catch (e) { /* no skill rates */ }
@@ -464,7 +479,7 @@ module.exports = (api) => {
     const gotText = total.size ? givesText([...total]) : 'nothing came back';
     const what = done > 1 ? `${done} ${name}` : name;
     log(`salvage: ${who(a)} broke down ${what} (${descOf(baseId)}) at the ${station.label}, ${TIER_NAMES[rank]}: ${gotText}`);
-    const left = openItem(a, p.target, station, p.page, baseId, `${what} broken down: ${gotText}`);
+    const left = openItem(a, p.target, station, p.page, baseId, `${what} broken down: ${gotText}`, ench);
     if (!left && !breakable(a, station, rank).length) { closePanel(a); personal(a, `${what} broken down: ${gotText}. Nothing else here to break down.`); }
   });
   onUi('salvageClose', (a) => closePanel(a));
