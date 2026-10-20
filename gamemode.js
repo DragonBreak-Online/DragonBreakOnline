@@ -6683,6 +6683,26 @@ const firstEquipOf = globalThis.__dboFirstEquip instanceof Map ? globalThis.__db
 // session's first one are the login's too, so the naked one re-dresses
 const LOGIN_BURST_MS = 10000;
 const firstEquipAt = globalThis.__dboFirstEquipAt instanceof Map ? globalThis.__dboFirstEquipAt : (globalThis.__dboFirstEquipAt = new Map());
+// A people's own armour, worn by them alone (Nat, 20 Oct: goblin armour "only goblin-race players can use them, craft AND
+// equip"; the craft side is regions.js raceCraft goblinArmour). A worn piece whose editor id matches a rule comes off a
+// character of a known other race (racial.js __dboRaceOf; an unknown race, a beast form, is left alone). Config
+// raceEquip: [{ edid: regex, race: racial.js race, line }]
+const RACE_EQUIP = (Array.isArray(cfg.raceEquip) ? cfg.raceEquip : [{ edid: '^DBOArm_Goblin', race: 'goblin', line: 'Goblin-made gear fits only a goblin.' }])
+  .map((r) => { try { return { rx: new RegExp(String(r.edid)), race: String(r.race), line: String(r.line || 'That is not made for your people.') }; } catch (e) { log(`raceEquip: bad pattern ${r && r.edid}`); return null; } }).filter(Boolean);
+const raceEquipRule = (baseId) => { const r = recordOf(baseId); if (!r || String(r.record.type) !== 'ARMO') return null; const e = String(r.record.editorId || ''); return RACE_EQUIP.find((x) => x.rx.test(e)) || null; };
+const raceEquipSaid = new Map();
+const raceEquipCheck = (a, equipment) => {
+  if (!RACE_EQUIP.length || typeof globalThis.__dboRaceOf !== 'function') return;
+  const race = String(globalThis.__dboRaceOf(a) || '');
+  if (!race) return;
+  for (const w of wornOf(equipment)) {
+    const rule = raceEquipRule(Number(w.baseId) >>> 0);
+    if (!rule || rule.race === race) continue;
+    setTimeout(() => { try { mp.callPapyrusFunction('method', 'Actor', 'UnequipItem', { type: 'form', desc: mp.getDescFromId(a) }, [{ type: 'espm', desc: mp.getDescFromId(Number(w.baseId) >>> 0) }, false, true]); } catch (e) { log('raceEquip: UnequipItem failed', e.message); } }, 200);
+    if (Date.now() - (raceEquipSaid.get(a) || 0) > 3000) { raceEquipSaid.set(a, Date.now()); personal(a, rule.line); try { sendPacket(a, { customPacketType: 'dboNotice', text: rule.line }); } catch (e) { /* chat is enough */ } }
+    log(`raceEquip: ${display(a)} (${race}) cannot wear ${(Number(w.baseId) >>> 0).toString(16)}; taken off`);
+  }
+};
 const equipHook = (actorId, equipment, isAllowed, ...rest) => {
   // The client reports its equipment while it is still dressing after login (an empty or naked
   // report), and the engine has already stored that. Keep our own copy of the last outfit that
@@ -6694,6 +6714,7 @@ const equipHook = (actorId, equipment, isAllowed, ...rest) => {
     if (typeof globalThis.__dboBeastStaleSpells === 'function') globalThis.__dboBeastStaleSpells(a, equipment);
     // durability.js: a piece taken off gets its wear in its name; a Broken one put on comes off
     if (isAllowed && typeof globalThis.__dboDurabilityEquip === 'function') { try { globalThis.__dboDurabilityEquip(a, equipment); } catch (e) { log('durability equip failed', e.message); } }
+    if (isAllowed) { try { raceEquipCheck(a, equipment); } catch (e) { log('race equip failed', e.message); } }
     // spawnwatch.js: the game has loaded, so its arrival report is due; until it comes its outfit is not remembered
     const spawnWatch = globalThis.__dboSpawnWatch;
     if (spawnWatch) { try { spawnWatch.report(a); } catch (e) { log('spawn watch report failed', e.message); } }
