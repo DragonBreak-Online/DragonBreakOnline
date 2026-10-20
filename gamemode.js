@@ -7272,6 +7272,12 @@ try {
   gearEnch = require(GEARENCH_JS)({ mp, log, recordOf, profileOf, display, personal, sendPacket, sourceResistsOf, weaponHandsOf, racial, cfg,
     potionResistMult: (t, s) => potionResistMult(t, s), blessingTargetMult: (t, s) => blessingTargetMult(t, s), takenMult: (t, f) => potionTakenMult(t, f) });
 } catch (e) { log('gearench.js failed to load:', e.stack || e.message); gearEnch = null; globalThis.__dboGearBonus = null; globalThis.__dboGearRegen = null; }
+// ---- a new player enchantment's strength by item and materials (server\enchanting.js, config "enchanting"; craftedExtrasSystem asks it) ----
+try {
+  const ENCHANTING_JS = path.resolve('enchanting.js');
+  delete require.cache[ENCHANTING_JS];
+  require(ENCHANTING_JS)({ mp, log, cfg });
+} catch (e) { log('enchanting.js failed to load:', e.stack || e.message); globalThis.__dboEnchantScale = null; }
 // ---- how tough a family of creatures is against players, by race (server\npctoughness.js, config "npcToughness") ----
 let toughness = null;
 try {

@@ -1726,6 +1726,24 @@
   "_comment": "Staff enchanting for events (staffenchant.js): /enchant and the F7 admin panel's Enchant tab put any weapon or apparel enchantment of the load order on one unworn piece, as a player-made enchantment (never disenchantable). minTier: the lowest staff tier allowed (gm, leadgm, developer, senior; Lead GM by default, as the panel's other item grants). maxScale: the strongest allowed, as a multiple of the enchantment's own main effect. weaponCharge: a weapon's full charge (3000 is a grand soul gem).",
   "enabled": true, "minTier": "leadgm", "maxScale": 3, "weaponCharge": 3000
  },
+ "enchanting": {
+  "_comment": "A new player enchantment's strength by the item and the materials (enchanting.js; fork craftedExtrasSystem asks it and stores each effect at that share, after the Enchanter rank's cap; staff suggestion 20 Oct). Off until Nate switches it on in session. Items made before keep their strength. ROLLBACK: enabled false, hot reload.",
+  "enabled": false,
+  "notify": true,
+  "itemShare": {"_comment": "Share kept by the item's ARMO armor type: clothing covers robes, hoods, jewelry. unknown: an item whose record names no type.", "clothing": 1, "light": 0.66, "heavy": 0.33, "unknown": 1},
+  "weaponShare": 1,
+  "soulShare": {"_comment": "Share of a Grand soul's strength by soul size, petty..grand (black counts as grand). apparel replaces vanilla's 1/12, 1/6, 1/3, 2/3, 1 (Greater raised to full). weapon multiplies vanilla, where the soul sets the charge, not the strength.", "apparel": [0.0833, 0.1667, 0.3333, 1, 1], "weapon": [1, 1, 1, 1, 1]},
+  "gems": {"_comment": "Effects in a gem family use one gemstone of it from the inventory (one per family per enchantment, taken with the craft). Share by what was there: flawless, regular, none (never refused). flawlessFirst: spend a flawless gem before a regular one. weapons: weapon effects in a family need a gem too.", "flawless": 1, "regular": 0.8, "none": 0.6, "flawlessFirst": true, "weapons": true},
+  "gemFamilies": {
+   "_comment": "Gem families by MGEF editor id; gem ids as form descs. Effects in no family need no gem (the Fortify skill effects, Carry Weight, Muffle, Waterbreathing). A proposal for Nate: Skyrim gives gems no magic of their own.",
+   "ruby": {"label": "ruby", "regular": ["63b42:Skyrim.esm"], "flawless": ["68522:Skyrim.esm"], "effects": ["EnchResistFireConstantSelf", "EnchFireDamageFFContact", "DLC2EnchFireDamageFFContact50", "EnchFortifyDestructionConstantSelf", "EnchRobesFortifyDestructionConstantSelf"]},
+   "sapphire": {"label": "sapphire", "regular": ["63b44:Skyrim.esm"], "flawless": ["68523:Skyrim.esm"], "effects": ["EnchResistFrostConstantSelf", "EnchFrostDamageFFContact", "FrostSlowFFContact", "DLC2EnchFrostDamageFFContact50", "EnchFortifyMagickaConstantSelf", "EnchFortifyMagickaRateConstantSelf", "EnchRobesFortifyMagickaRateConstantSelf"]},
+   "garnet": {"label": "garnet", "regular": ["63b45:Skyrim.esm"], "flawless": ["68521:Skyrim.esm"], "effects": ["EnchResistShocktConstantSelf", "EnchShockDamageFFContact", "DLC2EnchShockDamageFFContact50", "EnchMagickaDamageFFContact"]},
+   "emerald": {"label": "emerald", "regular": ["63b43:Skyrim.esm"], "flawless": ["68520:Skyrim.esm"], "effects": ["EnchFortifyHealthConstantSelf", "EnchFortifyHealRateConstantSelf", "EnchFortifyRestorationConstantSelf", "EnchRobesFortifyRestorationConstantSelf", "EnchResistPoisonConstantSelf", "EnchResistDiseaseConstantSelf", "EnchAbsorbHealthFFContact"]},
+   "amethyst": {"label": "amethyst", "regular": ["63b46:Skyrim.esm"], "flawless": ["6851e:Skyrim.esm"], "effects": ["EnchFortifyConjurationConstantSelf", "EnchRobesFortifyConjurationConstantSelf", "EnchFortifyIllusionConstantSelf", "EnchRobesFortifyIllusionConstantSelf", "EnchParalysisFFContact", "EnchSoulTrapFFContact", "EnchBanishFFContact", "EnchTurnUndeadFFContact", "EnchInfluenceConfDownFFContactLow", "EnchAbsorbMagickaFFContact"]},
+   "diamond": {"label": "diamond", "regular": ["63b47:Skyrim.esm"], "flawless": ["6851f:Skyrim.esm"], "effects": ["EnchFortifyAlterationConstantSelf", "EnchRobesFortifyAlterationConstantSelf", "EnchResistMagicConstantSelf", "EnchFortifyStaminaConstantSelf", "EnchFortifyStaminaRateConstantSelf", "EnchAbsorbStaminaFFContact", "EnchStaminaDamageFFContact"]}
+  }
+ },
  "traps": {
   "_comment": "Dungeon traps run by the server (traps.js, traps.json). only: all = anyone sets them off; staff = staff only (testing). Nate 20 Oct: on for everyone. ROLLBACK: only staff, hot reload.",
   "only": "all"
