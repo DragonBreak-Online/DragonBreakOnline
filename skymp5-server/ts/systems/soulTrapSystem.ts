@@ -19,6 +19,8 @@ const DEATH_POLL_MS = 100;
 // MGEF archetype Soul Trap; the Soul Trap spell (SoulTrapFFActor) and weapon enchantments (EnchSoulTrapFFContact) use Script-archetype effects.
 const ARCHETYPE_SOUL_TRAP = 23;
 const SCRIPT_SOUL_TRAP_EFFECTS = new Set([0x0004dba3, 0x0005b452]);
+// Script-archetype soul traps of other plugins, resolved by desc at init: Umbra's (Gray Fox Cowl)
+const SCRIPT_SOUL_TRAP_DESCS = ["1807d:Gray Fox Cowl.esm"];
 // libespm NPC_::TemplateFlags
 const USE_TRAITS = 0x01;
 const USE_STATS = 0x02;
@@ -93,6 +95,14 @@ export class SoulTrapSystem implements System {
 
   async initAsync(ctx: SystemContext): Promise<void> {
     const mp = ctx.svr as Mp;
+    for (const desc of SCRIPT_SOUL_TRAP_DESCS) {
+      try {
+        const id = mp.getIdFromDesc(desc) >>> 0;
+        if (id) SCRIPT_SOUL_TRAP_EFFECTS.add(id);
+      } catch {
+        this.log(`[soultrap] ${desc} is not in the load order`);
+      }
+    }
     const previousHit = typeof mp[HIT_EVENT] === "function" ? mp[HIT_EVENT] : null;
     mp[HIT_EVENT] = (...args: unknown[]) => {
       try {
