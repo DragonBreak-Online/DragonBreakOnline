@@ -193,8 +193,7 @@ ok(globalThis.__dboManualsShop(A).some((x) => /^Schematics: Ancient Imperial \(T
 const REAL = JSON.parse(fs.readFileSync(path.join(SERVER, 'smithing.json'), 'utf8')).families;
 const noBook = REAL.filter((f) => f.tier > 1 && !f.bookId && !f.free && !f.technique && f.book !== 'staff' && f.book !== 'race').map((f) => f.id);
 // A people's own armoury (book 'race': Yokudan, Black Bear, Apex Khajiit; Skyrim release 15 Oct) has no book by design
-// Dragon Priest (18 Oct) waits on its DLE book from the PC: gated, never found until then
-ok(noBook.join() === 'orcish,dragon_priest' && REAL.filter((f) => f.bookId).every((f) => /^[0-9a-f]+:DragonBreak Online Edits\.esp$/.test(f.bookId)), 'every family above T1 has a DLE book except Orcish (apprentice only), Dragon Priest (book pending) and the peoples\' own armouries', noBook);
+ok(noBook.join() === 'orcish' && REAL.filter((f) => f.bookId).every((f) => /^[0-9a-f]+:DragonBreak Online Edits\.esp$/.test(f.bookId)), 'every family above T1 has a DLE book except Orcish (apprentice only) and the peoples\' own armouries', noBook);
 const steelBook = mp.getIdFromDesc(REAL.find((f) => f.id === 'steel').bookId);
 rec(steelBook, 'BOOK', 'DBO_Schematics_steel', [{ type: 'DATA', data: bookData() }]);
 load({ enabled: true, drops: {} });
@@ -351,7 +350,7 @@ ok(!globalThis.__dboManualsShop(A).some((x) => /Brass|Adamantium/.test(x.label))
   r1 = roll(5, 'nordRuin', [0.999, 0.999, 0.999, 0.999, 0.999, 0, 0]);
   ok(r1 && r1.row === 'ancientNord' && /Ancient Nord/.test(r1.name), '...where it does', r1);
   give(); r1 = roll(5, 'nordRuin|priestLair', [0.999, 0.999, 0.999, 0.999, 0.999, 0.999, 0, 0]);
-  ok(r1 && r1.row === 'ancientNord', 'a Dragon Priest lair is a barrow too: Ancient Nord still comes there (no priest book yet, so its row passes)', r1);
+  ok(r1 && r1.row === 'ancientNord', 'a Dragon Priest lair is a barrow too: Ancient Nord still comes there when the priest row misses', r1);
   ok(row('dragonPriest') && row('dragonPriest').where === 'priestLair' && row('dragonPriest').families.join() === 'dragon_priest', 'live: Dragon Priest Armor is read only in a priest lair (18 Oct)');
   give(); r1 = roll(1, '', [0.999, 0.999, 0.999, 0, 0]);
   ok(r1 && r1.row === 'rare' && !/Chitin/.test(r1.name), 'a Rare find (never Chitin while it is withheld)', r1);

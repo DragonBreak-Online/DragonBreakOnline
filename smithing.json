@@ -40,7 +40,7 @@
   { "id": "glacial_crystal", "name": "Glacial Crystal", "tier": 5, "held": true, "noLoot": true, "where": "an exceptionally rare find when reading", "bookId": "192e56:DragonBreak Online Edits.esp" },
   { "id": "amber", "name": "Amber", "tier": 5, "where": "a Valenwood craft: apprentice under a Blacksmith who knows it", "bookId": "192e57:DragonBreak Online Edits.esp" },
   { "id": "EBONY", "name": "Ebony", "tier": 6, "held": true, "noLoot": true, "where": "an extremely rare find, and only for a Master Scholar's reading", "bookId": "192e5b:DragonBreak Online Edits.esp" },
-  { "id": "dragon_priest", "name": "Dragon Priest", "tier": 6, "held": true, "noLoot": true, "where": "learned by reading inside a Dragon Priest's lair, and nowhere else" },
+  { "id": "dragon_priest", "name": "Dragon Priest", "tier": 6, "held": true, "noLoot": true, "where": "learned by reading inside a Dragon Priest's lair, and nowhere else", "bookId": "1d2012:DragonBreak Online Edits.esp" },
   { "id": "stalhrim", "name": "Stalhrim", "tier": 6, "held": true, "noLoot": true, "where": "an extremely rare find, and only for a Master Scholar's reading: the Skaal keep it close", "bookId": "192e5c:DragonBreak Online Edits.esp" },
   { "id": "DAEDRIC", "name": "Daedric", "tier": 7, "held": true, "noLoot": true, "where": "the rarest find of all when reading", "bookId": "192e5e:DragonBreak Online Edits.esp" },
   { "id": "madness", "name": "Madness", "tier": 7, "held": true, "noLoot": true, "where": "the rarest find of all when reading", "bookId": "192e5d:DragonBreak Online Edits.esp" },
