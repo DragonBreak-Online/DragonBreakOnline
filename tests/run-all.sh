@@ -145,6 +145,7 @@ declare -A NEEDS=(
   [maormer-race-front]=front:skymp5-front/src/features/charCreator/appearanceBuilder.js
   [reachman-race-front]=front:skymp5-front/src/features/charCreator/appearanceBuilder.js
   [thalmor-tab-front]=front:skymp5-front/src/features/journal/index.tsx
+  [journalnotes-front]=front:skymp5-front/src/features/journal/index.tsx
   [courier-tab-front]=front:skymp5-front/src/features/pigeon/index.tsx
   [courier-handover-front]=front:skymp5-front/src/features/courierHandover/index.tsx
 )

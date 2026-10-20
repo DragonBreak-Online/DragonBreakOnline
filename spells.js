@@ -531,6 +531,8 @@ module.exports = (api) => {
   const readHook = function (actorId, baseId, ...rest) {
     // Smithing manuals and skill books (manuals.js) are asked first: a manual beyond the reader's tier is refused and kept
     try { if (typeof globalThis.__dboManualsRead === 'function' && globalThis.__dboManualsRead(Number(actorId) >>> 0, Number(baseId) >>> 0) === false) return false; } catch (e) { log('spells: manuals check failed', e.message); }
+    // A player's written work (journalnotes.js) opens in their journal; it teaches nothing, so nothing else is asked
+    try { if (typeof globalThis.__dboWrittenRead === 'function' && globalThis.__dboWrittenRead(Number(actorId) >>> 0, Number(baseId) >>> 0)) return prevRead ? prevRead.call(this, actorId, baseId, ...rest) : undefined; } catch (e) { log('spells: written work check failed', e.message); }
     let verdict = null;
     try { verdict = judgeRead(Number(actorId) >>> 0, Number(baseId) >>> 0); } catch (e) { log('spells: read check failed', e.stack || e.message); }
     if (verdict && verdict.refuse) return false;

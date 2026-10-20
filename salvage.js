@@ -331,6 +331,8 @@ module.exports = (api) => {
     if (!CFG.enabled) return false;
     const station = stationOf(target);
     if (!station) return false;
+    // Where a player last sat to write (journalnotes.js writes entries out at a desk or ledger)
+    if (station.books) try { if (typeof globalThis.__dboWritingDeskSeen === 'function') globalThis.__dboWritingDeskSeen(caster, target); } catch (e) { /* no journal notes */ }
     const pass = S.pass.get(caster >>> 0);
     if (pass) {
       S.pass.delete(caster >>> 0);

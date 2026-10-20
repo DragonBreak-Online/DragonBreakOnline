@@ -462,6 +462,15 @@
   "bookStrips": 1,
   "notePaper": 1
  },
+ "journalNotes": {
+  "_comment": "The F3 journal's Personal Journal tab (journalnotes.js; staff suggestion from mestreugway, 6 Oct): private entries in folders, a Received part, and writing an entry out as a note, letter, book or journal. Only the player sees the tab (never staff reading another's journal). Limits: entryMax characters per entry, titleMax per title, entriesMax entries, foldersMax folders, receivedMax received writings. write: requireDesk = the player last used a writing desk or Scholars' Ledger within deskMeters; kinds = paper (paperId) each costs; each work takes one blank BOOK record of its kind from basesFile (filled from the plugin, empty until then: writing out says no blanks); the registry is runtime state. nameItems puts the title on the item. ROLLBACK: enabled false (the tab goes) or write.enabled false (no writing out), hot reload.",
+  "enabled": true, "entryMax": 4000, "titleMax": 60, "entriesMax": 200, "foldersMax": 20, "folderNameMax": 30, "receivedMax": 100,
+  "write": {
+   "enabled": true, "requireDesk": true, "deskMeters": 3, "paperId": "7cba1:BSHeartland.esm", "nameItems": true,
+   "basesFile": "written-bases.json", "registry": "journal/written.json",
+   "kinds": { "note": { "label": "Note", "paper": 1 }, "letter": { "label": "Letter", "paper": 3 }, "book": { "label": "Book", "paper": 10 }, "journal": { "label": "Journal", "paper": 20 } }
+  }
+ },
  "scribing": {
   "_comment": "Scribing (scribing.js; Nate and Swag, 17 Oct): a Master Scholar (Scholar tier scholarTier, 4 = Master) writes at a Scholars' Ledger. Tomes of spells they know that a tome teaches, by rank Novice..Master: tome.scrolls scrolls (any scrolls carried, the cheapest first; Master: that spell's own scrolls), one tome timer of tome.cooldownHours[rank]. A Master tome needs a co-writer within tome.coWriterMeters who is a Master (coWriterRank) of the school (Priest for Restoration), knows the spell, has their own tome writing ready and accepts within tome.offerSeconds; both take the wait; the writer of a Master tome need not know the spell. Scrolls of spells they know below Master that have a scroll (spell-scrolls.json, tools/scribing/spell_scrolls.py): scroll.materials plus scroll.soulGems filled soul gems (filledGems, or emptyGems holding a soul; the smallest first), one scroll timer of scroll.cooldownHours[rank] (Novice..Expert). Hot reload.",
   "enabled": true,

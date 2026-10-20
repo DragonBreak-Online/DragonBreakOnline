@@ -8646,6 +8646,12 @@ try {
   delete require.cache[JOURNALSKILLS_JS];
   require(JOURNALSKILLS_JS)({ log, onUi });
 } catch (e) { log('journalskills.js failed to load:', e.stack || e.message); if (globalThis.__dboJournalSections) delete globalThis.__dboJournalSections.skills; }
+// ---- the journal's Personal Journal tab: private entries, folders, written works (server\journalnotes.js, config "journalNotes") ----
+try {
+  const JOURNALNOTES_JS = path.resolve('journalnotes.js');
+  delete require.cache[JOURNALNOTES_JS];
+  require(JOURNALNOTES_JS)({ mp, log, audit, who, nameOf, personal, onUi, cfg, distanceMeters });
+} catch (e) { log('journalnotes.js failed to load:', e.stack || e.message); if (globalThis.__dboJournalSections) delete globalThis.__dboJournalSections.notes; globalThis.__dboWrittenRead = null; globalThis.__dboWritingDeskSeen = null; }
 // ---- outlaw bounties: a hold's ruler or Steward sets them, the outlaw pays them to the jailer (server\outlaws.js) --------
 try {
   const OUTLAWS_JS = path.resolve('outlaws.js');

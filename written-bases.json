@@ -1,0 +1,7 @@
+{
+ "_comment": "Blank BOOK records for player-written works (journalnotes.js), one record per work, never reused: the game stacks items of one record whatever their name. Filled from DragonBreak Online Edits.esp once the PC adds them (~/claude-nate-release/journal-pc.md); re-read when this file changes. Entries are \"<hex>:<plugin>\".",
+ "note": [],
+ "letter": [],
+ "book": [],
+ "journal": []
+}
