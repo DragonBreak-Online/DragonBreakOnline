@@ -482,6 +482,43 @@ public:
       diag.gamepadConnected.load());
   }
 
+  // While the mouse is free (MouseApi) and the browser has focus, the game's menu cursor, which the browser's moves and
+  // clicks are sent at, is put under the Windows cursor, scaled from the window's client area to the game's screen
+  void FollowWindowsCursor()
+  {
+    if (!CEFUtils::DInputHook::MouseFree() || !IsBrowserFocused() ||
+        !pCursorX || !pCursorY || !screen) {
+      return;
+    }
+    auto main = RE::Main::GetSingleton();
+    const HWND window = main ? reinterpret_cast<HWND>(main->wnd) : nullptr;
+    POINT position;
+    RECT client;
+    if (!window || !GetCursorPos(&position) ||
+        !ScreenToClient(window, &position) || !GetClientRect(window, &client) ||
+        client.right <= 0 || client.bottom <= 0) {
+      return;
+    }
+    // Outside the window the game's cursor stays where it left
+    if (position.x < 0 || position.y < 0 || position.x >= client.right ||
+        position.y >= client.bottom) {
+      return;
+    }
+    const float x = static_cast<float>(position.x) * screen->screenWidth /
+      static_cast<float>(client.right);
+    const float y = static_cast<float>(position.y) * screen->screenHeight /
+      static_cast<float>(client.bottom);
+    if (x == *pCursorX && y == *pCursorY) {
+      return;
+    }
+    *pCursorX = x;
+    *pCursorY = y;
+    ReleaseOwnCursor("the mouse is free and the menu cursor follows Windows");
+    if (auto app = service->GetMyChromiumApp()) {
+      app->InjectMouseMove(x, y, GetCefModifiers_(0), true);
+    }
+  }
+
   void OnMouseMove(float deltaX, float deltaY) noexcept override
   {
     auto ui = RE::UI::GetSingleton();
@@ -537,6 +574,8 @@ public:
     auto ui = RE::UI::GetSingleton();
     if (!ui)
       return;
+
+    FollowWindowsCursor();
 
     // What input depends on, for the diagnostics summary on another thread
     auto& diag = CEFUtils::InputDiag::Get();
