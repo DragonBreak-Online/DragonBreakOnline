@@ -1,5 +1,37 @@
 # DragonBreak Online checklist (2026-09-14)
 
+## 2026-10-20 - the dungeon anchor bug measured and CLOSED, not fixed (Worker 4, PC)
+
+**It never costs a spawn.** Measured against `/var/log/skymp-server.log`, 18-20 Oct, 3.9M lines, **887 dungeon
+claims**: `failed to spawn` **0**, `placed in X, expected Y` **2** (both self-corrected by `assertPlacedIn`'s
+retry), `stayed N units from its spot` **0**. `noAnchor` appears in **0 of the 317** pre-spawn reports.
+
+**The misses are real but harmless.** 4,672 `dungeon anchor ... is not in the server's world` lines, **2,311
+unique refs of the 3,562** placement refs in the deployed `dungeons.json` (218 dungeons, 3,608 placements), so
+**65% of placements have no anchor**. That is `anchorExists` correctly discovering what `DragonBreak Online
+Edits` disabled on purpose, so the server owns spawning. It is a report, not a failure.
+
+**A resolvable anchor is already preferred, including during play.** `spawnOne` does
+`attempt(zone.anchorId || anchorId)`, so the zone's own anchor wins over the player `fillSlots` picked. An
+earlier reading of the `const anchor =` line in `fillSlots` suggested a player beat the anchor once the party
+was inside; that is wrong, and the one-line reorder it implied would have been a no-op.
+
+**So two proposals were dropped rather than built**: reordering `fillSlots` (no effect), and re-running
+`ck-mcp\dungeons_anchor.py` to give the other 65% a loadable anchor. The second would regenerate
+`dungeons.json`, which every dungeon worker shares, for a measured benefit of about **two placements per three
+days**. Not worth the disruption; revisit only if the placement failure counts rise.
+
+**What the same window says is actually wrong with spawned NPCs**, in volume order: `strayed` **516**,
+`too distant` **376**, `Bad hoster` **306**, `hung` **194**, `riding a translation` **163**, `different cells`
+**86**, `has dropped` **20**. `strayed` and `hung` are `checkMisplaced` destroying and replacing an actor, so
+**710 destructions in three days**: either real misplacement or a net tight enough to kill healthy enemies
+mid-fight. Being measured next (Worker 4). `too distant`, `different cells` and `Bad hoster` belong to the
+NPC-cell and hosting work (Worker 2), and the counts were handed over.
+
+**The diagnostic half of this item was already shipped**: `d55f539a` is in `origin/main` via `991bcc82`, live,
+and producing the 317 reports the numbers above come from. The 18 Oct worktree on `npcspawn-skip-report-1018`
+is stale; nothing is pending there.
+
 ## 19 Oct, late - the missing doorways, and the gate list stops being a script input (Worker A, PC)
 
 Nat: "theres missing doorways etc, i feel like in the draugr ruins its from when we removed the blade
