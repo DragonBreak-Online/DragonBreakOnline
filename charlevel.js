@@ -7,7 +7,7 @@
 
 module.exports = (api) => {
   const { mp, log, personal, system, audit, display, cfg, openWidget, closeWidget, onUi, registerChatCommand,
-    onlineActors, every, sendPacket } = api;
+    onlineActors, every, sendPacket, isAdmin, findByName } = api;
 
   const CFG = Object.assign({
     enabled: true,
@@ -16,6 +16,8 @@ module.exports = (api) => {
     // Nate 15 Oct: +25 a level (was +10). Characters who spent points at the old rate are topped up (rescale)
     perLevel: 25,
     checkSeconds: 30,
+    // A reroll (patrons.js) hands every spent point back to spend again: a new race may want other vitals
+    refundOnReroll: true,
   }, cfg.charLevel || {});
   const WIDGET_ID = 43;
   const MAX_LEVEL = CFG.thresholds.length;
@@ -132,6 +134,26 @@ module.exports = (api) => {
     return true;
   };
 
+  // Every spent point back to spend again (Moderation Help #0240, 18 Oct: a reroll to a goblin left three Magicka points
+  // the new race had no use for). The server's maximum drops at once (private.dboAvBonus); the client only ever adds a
+  // gain (levelBonusService), so its bars follow at the next login, which builds them from the bonus
+  const refund = (a, why) => {
+    if (!CFG.enabled || (why === 'reroll' && CFG.refundOnReroll === false)) return 0;
+    const st = stateOf(a);
+    rescale(a, st);
+    const back = Object.keys(VITALS).reduce((n, av) => n + Math.round(st.spent[av] / CFG.perLevel), 0);
+    if (!back) return 0;
+    const was = JSON.stringify(st.spent);
+    st.pending += back;
+    st.spent = { health: 0, magicka: 0, stamina: 0 };
+    save(a, st);
+    audit(`LEVEL ${display(a)} level points refunded (${why}): ${back} to spend again, was ${was}`);
+    personal(a, `Your ${back} level point${back === 1 ? ' is' : 's are'} yours to spend again: /level. Your bars show the change after your next login.`);
+    openChoice(a);
+    return back;
+  };
+  globalThis.__dboCharLevelRefund = refund;
+
   onUi('levelChoose', (a, args) => {
     const av = String(args[0] || '');
     // Closing first lost both the click and the panel whenever the choice did not take
@@ -151,6 +173,14 @@ module.exports = (api) => {
     const words = String(args || '').trim().split(/\s+/);
     const arg = words[0].toLowerCase();
     // The panel is not always reachable, so points can always be spent from chat: /level health, /level health 3
+    // Staff: /level reset <player|#TAG> hands every spent point back
+    if (arg === 'reset') {
+      if (typeof isAdmin !== 'function' || !isAdmin(a)) return personal(a, 'Staff only.');
+      const t = words[1] ? (typeof findByName === 'function' ? findByName(words.slice(1).join(' ')) : 0) : a;
+      if (!t) return personal(a, 'Usage: /level reset <player|#TAG> (online)');
+      const n = refund(t, `staff ${display(a)}`);
+      return personal(a, n ? `${display(t)}: ${n} point${n === 1 ? '' : 's'} to spend again.` : `${display(t)} has no spent points.`);
+    }
     if (arg) { spend(a, arg, words[1] === undefined ? 1 : words[1]); return; }
     const st = stateOf(a);
     const units = unitsOf(a);
@@ -160,7 +190,7 @@ module.exports = (api) => {
       personal(a, `${st.pending} unspent point${st.pending === 1 ? '' : 's'}. Choose in the panel, or type /level health, /level magicka or /level stamina, with a number to spend several (/level health 3).`);
       openChoice(a, true);
     }
-  }, { help: 'your character level and progress; /level <health|magicka|stamina> [n] spends points' });
+  }, { help: 'your character level and progress; /level <health|magicka|stamina> [n] spends points; staff: /level reset <player>' });
 
   globalThis.__dboCharLevel = (a) => stateOf(a).level;
   globalThis.__dboCharLevelPending = (a) => Number(stateOf(a).pending) || 0;
