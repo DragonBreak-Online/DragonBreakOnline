@@ -6518,6 +6518,36 @@ const potionRestorationCast = (casterId, spellId) => {
     } catch (e) { /* gone */ }
   });
 };
+// Arcane Asylum (Beyond Skyrim's BSKArcaneAsylum; its effect BSKAsylumFFSelf reads "Caster becomes invulnerable and heals
+// ... for <dur> seconds"): the invulnerability is BSKAsylumDispelScript in the caster's own game, which no server number
+// follows (#bugs 19 Oct: 0 protection). The server keeps it for the spell's duration; the caster's own blow ends it, as a
+// dispel script does. Config "arcaneAsylum": { enabled, spell }
+const ASYLUM = Object.assign({ enabled: true, spell: 'd64:BSAssets.esm' }, cfg.arcaneAsylum || {});
+const asylumUntil = globalThis.__dboAsylumUntil instanceof Map ? globalThis.__dboAsylumUntil : (globalThis.__dboAsylumUntil = new Map());
+// The spell's id and its first effect's duration in seconds (SPEL EFIT: magnitude, area, duration), once
+let asylumSpell = null;
+const asylumOf = () => {
+  if (asylumSpell) return asylumSpell;
+  let id = 0; try { id = mp.getIdFromDesc(String(ASYLUM.spell)) >>> 0; } catch (e) { id = 0; }
+  const efit = id ? fieldsOf(recordOf(id), 'EFIT')[0] : null;
+  return (asylumSpell = { id, seconds: efit ? u32At(efit, 8) : 0 });
+};
+const asylumCast = (caster, spellId) => {
+  if (!ASYLUM.enabled) return;
+  const sp = asylumOf();
+  if (!sp.id || (spellId >>> 0) !== sp.id || !(sp.seconds > 0)) return;
+  asylumUntil.set(caster >>> 0, Date.now() + sp.seconds * 1000);
+  log(`asylum: ${display(caster)} invulnerable for ${sp.seconds} s`);
+};
+// true when this blow lands on a caster under the Asylum; a blow the caster deals ends it
+const asylumHit = (agg, tgt) => {
+  if (!ASYLUM.enabled || !asylumUntil.size) return false;
+  if (agg !== tgt && asylumUntil.has(agg)) { asylumUntil.delete(agg); log(`asylum: ${display(agg)} struck a blow, the Asylum ends`); }
+  const until = asylumUntil.get(tgt);
+  if (!until) return false;
+  if (until <= Date.now()) { asylumUntil.delete(tgt); return false; }
+  return agg !== tgt;
+};
 const castHook = (casterId, spellId, ...rest) => {
   try { if (racial) racial.onCast(Number(casterId) >>> 0, Number(spellId) >>> 0); } catch (e) { log('racial cast failed', e.message); }
   try { if (globalThis.__dboBeastCast) globalThis.__dboBeastCast(casterId, spellId); } catch (e) { log('beast cast failed', e.message); }
@@ -6561,6 +6591,7 @@ const castHook = (casterId, spellId, ...rest) => {
   // A Flesh spell's armour counts on the server while it lasts (fleshCast, below; called at the cast, defined by then)
   if (verdict !== false && typeof globalThis.__dboFleshCast === 'function') { try { globalThis.__dboFleshCast(Number(casterId) >>> 0, Number(spellId) >>> 0); } catch (e) { log('flesh cast failed', e.message); } }
   if (verdict !== false) { try { potionRestorationCast(Number(casterId) >>> 0, Number(spellId) >>> 0); } catch (e) { log('restoration potion failed', e.message); } }
+  if (verdict !== false) { try { asylumCast(Number(casterId) >>> 0, Number(spellId) >>> 0); } catch (e) { log('asylum cast failed', e.message); } }
   return verdict;
 };
 castHook.__dbo = true;
@@ -7716,6 +7747,9 @@ const hitDamageAttemptHook =(aggressorId, targetId, sourceId, damage, flags) => 
   // attacker's claws and Drain landed while nothing could land on them (combat review, 2026-09-29)
   globalThis.__dboHitRefusal = 'ethereal';
   try { if (globalThis.__dboBeastEthereal && (globalThis.__dboBeastEthereal(tgt) || (agg !== tgt && globalThis.__dboBeastEthereal(agg)))) return false; } catch (e) { /* not loaded */ }
+  // 0b. A caster under Arcane Asylum takes nothing, until their own blow ends it (asylumHit, above)
+  globalThis.__dboHitRefusal = 'asylum';
+  if (asylumHit(agg, tgt)) return false;
 
   // 0b. A logged-out player's body cannot be harmed, by players or creatures, unless they left mid-fight
   globalThis.__dboHitRefusal = 'offline_body';
