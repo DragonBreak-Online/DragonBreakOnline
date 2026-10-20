@@ -6326,6 +6326,14 @@ const hitDamageHook = (aggressorId, targetId, sourceId, damage, ...rest) => {
   try { if (globalThis.__dboCompanionHitLanded) globalThis.__dboCompanionHitLanded(agg, tgt); } catch (e) { log('companion hit log failed', e.message); }
   try { if (globalThis.__dboNpcMoodHit) globalThis.__dboNpcMoodHit(agg, tgt, Number(sourceId) >>> 0); } catch (e) { log('npc mood hit failed', e.message); }
   try { if (globalThis.__dboSpellDotLanded) globalThis.__dboSpellDotLanded(agg, tgt, Number(sourceId) >>> 0); } catch (e) { log('spell dot failed', e.message); }
+  try {
+    const pend = npcHitPending.get(`${agg}|${tgt}`);
+    if (pend && Date.now() - pend.at < 1500) {
+      npcHitPending.delete(`${agg}|${tgt}`);
+      const after = Number((mp.get(tgt, 'percentages') || {}).health);
+      if (Number.isFinite(pend.hp) && Number.isFinite(after)) log(`npc hit landed ${agg.toString(16)}>${tgt.toString(16)}: health ${(pend.hp * 100).toFixed(1)}% -> ${(after * 100).toFixed(1)}% (scaled ${Number.isFinite(pend.pct) ? (pend.pct * 100).toFixed(1) : '?'}%, unscaled ${Number.isFinite(pend.raw) ? (pend.raw * 100).toFixed(1) : '?'}%)`);
+    }
+  } catch (e) { /* measurement only */ }
   try { if (gearEnch) gearEnch.landed(agg, tgt, Number(sourceId) >>> 0, dealt); } catch (e) { log('gear enchantment landed failed', e.message); }
   const prev = globalThis.__dboPrevHitDamage;
   if (prev) { try { return prev(aggressorId, targetId, sourceId, dealt, ...rest); } catch (e) { log('hit damage chain failed', e.message); } }
@@ -7544,6 +7552,7 @@ const npcDifficultyDamageMult = (agg, tgt, dmg, flags) => {
 // npcDamage.log: one line for every creature's or NPC's hit on a player, x1 hits included (the mastery line is written only
 // when a factor changed the hit), so a player's whole fight can be read: attacker base and spawn tag, the lease difficulty,
 // source, raw damage, the final factor, the flags and the health before. Off unless set.
+const npcHitPending = new Map();
 const npcHitLog = (agg, tgt, src, dmg, mult, flags) => {
   if (!(cfg.npcDamage || {}).log || !(dmg > 0) || agg === tgt) return;
   if (profileOf(agg) >= 0 || profileOf(tgt) < 0) return;
@@ -7556,7 +7565,11 @@ const npcHitLog = (agg, tgt, src, dmg, mult, flags) => {
   const edid = r && r.record ? String(r.record.editorId || '') : '';
   const max = Number(f.targetMaxHealth);
   const kind = [f.spell ? 'spell' : '', f.power ? 'power' : '', f.blocked ? 'blocked' : '', f.bash ? 'bash' : '', f.sneak ? 'sneak' : ''].filter(Boolean).join(',');
-  log(`npc hit ${display(agg)} (${edid || base || '?'}${tag ? ' ' + tag : ''}${npcLeaseDifficultyOf(agg) ? ' ' + npcLeaseDifficultyOf(agg) : ''}) -> ${display(tgt)}: source ${src.toString(16)} ${dmg.toFixed(1)} x${mult.toFixed(2)} = ${(dmg * mult).toFixed(1)}${max > 0 ? ` of ${max.toFixed(0)} (${((dmg * mult) / max * 100).toFixed(1)}%)` : ''}${kind ? ' [' + kind + ']' : ''} health ${Number.isFinite(hp) ? (hp * 100).toFixed(1) + '%' : '?'}`);
+  // Measured, not acted on (main session, 20 Oct: a hit on the player who hosts the NPC may skip the scaling): ids for the
+  // hoster log ("Hoster of X changed"), and the health after the hit lands (hitDamageHook, "npc hit landed")
+  npcHitPending.set(`${agg}|${tgt}`, { at: Date.now(), hp, pct: max > 0 ? (dmg * mult) / max : NaN, raw: max > 0 ? dmg / max : NaN });
+  if (npcHitPending.size > 512) for (const [k, v] of npcHitPending) if (Date.now() - v.at > 5000) npcHitPending.delete(k);
+  log(`npc hit ${display(agg)} (${edid || base || '?'}${tag ? ' ' + tag : ''}${npcLeaseDifficultyOf(agg) ? ' ' + npcLeaseDifficultyOf(agg) : ''}) -> ${display(tgt)}: source ${src.toString(16)} ${dmg.toFixed(1)} x${mult.toFixed(2)} = ${(dmg * mult).toFixed(1)}${max > 0 ? ` of ${max.toFixed(0)} (${((dmg * mult) / max * 100).toFixed(1)}%)` : ''}${kind ? ' [' + kind + ']' : ''} health ${Number.isFinite(hp) ? (hp * 100).toFixed(1) + '%' : '?'} ids ${agg.toString(16)}>${tgt.toString(16)}`);
 };
 // A hit scaled below 1 is given back after the engine applied it (masteryBonusDamage), but only to a target that lived
 // through the engine's full hit: at 50 health a boar's 50-point bite downed a player although the scaled bite would not
