@@ -9,7 +9,7 @@
 // No imports, so a harness loads it on its own (tests/client-diag-harness.js). Nothing here ever throws.
 
 // The client build these lines come from (the launcher package version)
-export const DBO_CLIENT_VERSION = "0.3.106";
+export const DBO_CLIENT_VERSION = "0.3.107";
 // gamemode.js keeps the first 500 characters of a line
 export const DIAG_LINE_MAX = 480;
 export const ERROR_LINES_PER_MINUTE = 10;
