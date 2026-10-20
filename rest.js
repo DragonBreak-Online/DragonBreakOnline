@@ -280,15 +280,25 @@ module.exports = (api) => {
   const closePrompt = (a) => { pending.delete(a >>> 0); quoted.delete(a >>> 0); reopenedAt.delete(a >>> 0); closeWidget(a, WIDGET_ID); };
 
   // Called from the gamemode's activate chain; true means handled (the activation is refused).
+  // Why a bed gives no rest, said once in a while (#bugs 18 Oct, Kahu #LLX8: a child's bed in a friend's house did
+  // nothing and said nothing). The bed still works as the game's own furniture; only the rest is refused
+  const bedSaid = new Map();
+  const sayBed = (a, text) => { const now = Date.now(); if (now - (bedSaid.get(a >>> 0) || 0) < 5000) return; bedSaid.set(a >>> 0, now); personal(a, text); };
+  const CHILD_BED = /Bed.*Child|Child.*Bed/i;
+  const isChildBed = (ref) => { try { const r = mp.lookupEspmRecordById(baseOf(ref)); return !!(r && r.record && String(r.record.type) === 'FURN' && CHILD_BED.test(String(r.record.editorId || ''))); } catch (e) { return false; } };
   globalThis.__dboRestActivate = (target, caster) => {
-    if (!CFG.enabled || !(RENT_BEDS.has(target >>> 0) || BEDS.has(baseOf(target)))) return false;
+    if (!CFG.enabled) return false;
+    if (!(RENT_BEDS.has(target >>> 0) || BEDS.has(baseOf(target)))) {
+      if (isChildBed(target)) sayBed(caster, "That is a child's bed, too small to rest in properly.");
+      return false;
+    }
     const l = lying.get(caster >>> 0);
     if (l) {
       lying.delete(caster >>> 0);
       if (l.bed === (target >>> 0) && l.until > Date.now()) { const k = standing(caster, target); if (k === 'own' || k === 'rented') return false; }
     }
     const kind = standing(caster, target);
-    if (!kind) return false;
+    if (!kind) { sayBed(caster, 'This bed is not yours. You rest well in a bed of your own home, or one you rent at an inn.'); return false; }
     if (kind === 'taken') {
       const r = rentOf(target);
       personal(caster, `This bed is rented${r && r.renter ? ` by ${nameTo(caster, r.renter)}` : ''} until ${r ? clock(r.until) : 'later'}.`);
