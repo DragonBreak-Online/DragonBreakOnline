@@ -839,6 +839,18 @@ module.exports = (api) => {
   if (typeof every === 'function') every('racialAbility', 15000, () => { try { abilityTick(); } catch (e) { log('racial ability failed', e.message); } });
 
   globalThis.__dboRaceGold = goldBonus;
+  // The creator's locked races (fork spawn.ts lockedRacesFor asks this per profile): the Half-Giant opens at the same play time
+  // as the second character slot (Nate 20 Oct: "unlock at 150 hours like the second character slot"; playtime.js hours,
+  // per account, kept for good once earned). config halfGiantRace.unlockHours, else playtimeSlot.hours, else 150
+  globalThis.__dboLockedRacesFor = (profileId) => {
+    const hours = Number(HR.unlockHours) > 0 ? Number(HR.unlockHours) : (Number(((cfg && cfg.playtimeSlot) || {}).hours) > 0 ? Number(cfg.playtimeSlot.hours) : 150);
+    try {
+      if (typeof globalThis.__dboEarnedSlots === 'function' && Number(globalThis.__dboEarnedSlots(profileId)) > 0 && !(Number(HR.unlockHours) > 0)) return [];
+      const p = typeof globalThis.__dboPlaytimeOf === 'function' ? globalThis.__dboPlaytimeOf(profileId) : undefined;
+      if (p && Number(p.ms) >= hours * 3600000) return [];
+    } catch (e) { /* locked */ }
+    return ['halfgiant'];
+  };
   // gamemode.js needs tick: the race's appetite (the Half-Giant's 1.5), 1 for everyone else
   globalThis.__dboRaceHungerMult = (a) => { const r = raceOf(a >>> 0); return r ? Math.max(0, num((C[r] || {}).hunger, 1)) : 1; };
   // charlevel.js: a race's flat vital bonus, added to the spent level points in private.dboAvBonus
