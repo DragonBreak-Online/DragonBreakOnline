@@ -349,6 +349,9 @@ ok(!globalThis.__dboManualsShop(A).some((x) => /Brass|Adamantium/.test(x.label))
   ok(r1 === null, 'Ancient Nord comes only to a reader in a Nordic barrow', r1);
   r1 = roll(5, 'nordRuin', [0.999, 0.999, 0.999, 0.999, 0.999, 0, 0]);
   ok(r1 && r1.row === 'ancientNord' && /Ancient Nord/.test(r1.name), '...where it does', r1);
+  give(); r1 = roll(5, 'nordRuin|priestLair', [0.999, 0.999, 0.999, 0.999, 0.999, 0.999, 0, 0]);
+  ok(r1 && r1.row === 'ancientNord', 'a Dragon Priest lair is a barrow too: Ancient Nord still comes there when the priest row misses', r1);
+  ok(row('dragonPriest') && row('dragonPriest').where === 'priestLair' && row('dragonPriest').families.join() === 'dragon_priest', 'live: Dragon Priest Armor is read only in a priest lair (18 Oct)');
   give(); r1 = roll(1, '', [0.999, 0.999, 0.999, 0, 0]);
   ok(r1 && r1.row === 'rare' && !/Chitin/.test(r1.name), 'a Rare find (never Chitin while it is withheld)', r1);
   give(); r1 = roll(5, '', []);
@@ -369,7 +372,7 @@ ok(/verdict !== false && typeof globalThis\.__dboSmithCrafted === 'function'/.te
 const dsrc = fs.readFileSync(path.join(SERVER, 'dungeons.js'), 'utf8'), wsrc = fs.readFileSync(path.join(SERVER, 'wildlife.js'), 'utf8');
 ok(/'ayleidRuin'/.test(dsrc) && /'dwemerRuin'/.test(dsrc) && /'falmerRuin'/.test(dsrc) && /isCyrodiilFort\(d\) \? 'fort'/.test(dsrc) && /__dboTechniqueDrop\(techniqueRuin\(d\), diff\.id\)/.test(dsrc) && /__dboTechniqueDrop\('goblinCamp'\)/.test(wsrc), 'ruin chests (Ayleid, Dwemer, Falmer, Cyrodiil forts) and goblin camps ask for a technique drop');
 const gsrc = fs.readFileSync(path.join(SERVER, 'gamemode.js'), 'utf8');
-ok(/__dboSchematicFind\(a, tier \+ 1, where\)/.test(gsrc) && /globalThis\.__dboTechniqueRuinAt = \(a\) => techniqueRuin\(dungeonAround\(a\)\)/.test(dsrc), 'a won reading rolls for a schematic with the Scholar tier (1-5) and the ruin it is read in');
+ok(/__dboSchematicFind\(a, tier \+ 1, where\)/.test(gsrc) && /globalThis\.__dboTechniqueRuinAt = \(a\) => \{\n    const d = dungeonAround\(a\), kind = techniqueRuin\(d\);/.test(dsrc) && /LocTypeDragonPriestLair'\) \? \[kind, 'priestLair'\]/.test(dsrc), 'a won reading rolls for a schematic with the Scholar tier (1-5) and the ruin it is read in');
 ok(/__dboSmithCraft\(actorId, itemId, recipeId\) === false\) return false;\n(?:[^\n]*\n){0,2}    \/\/ Faction gear first/.test(src), 'regions.js asks the smithing gate (then the tailor gate) before faction gear');
 console.log(fails ? `${fails} failed` : 'all passed');
 process.exit(fails ? 1 : 0);

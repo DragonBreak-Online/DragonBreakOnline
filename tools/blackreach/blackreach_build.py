@@ -49,7 +49,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--placements', required=True)
     ap.add_argument('--data', default='/opt/skyrim-data')
-    ap.add_argument('--order', default=os.path.expanduser('~nate/dragonbreak/fork/deploy/skyrim-data/loadorder.txt'))
+    ap.add_argument('--order', default='/opt/alduinak/deploy/skyrim-data/loadorder.txt')
     ap.add_argument('--plugins', default='', help='a folder of plugins read instead of their --data copies (the package)')
     ap.add_argument('--out', default=os.path.join(HERE, '..', '..', 'blackreach.json'))
     ap.add_argument('--report', default='')

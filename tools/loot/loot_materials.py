@@ -17,7 +17,7 @@ import argparse, json, os, re, struct, sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 SERVER = os.path.abspath(os.path.join(HERE, '..', '..'))
 DATA = os.environ.get('DBO_DATA', '/opt/skyrim-data')
-ORDER = os.environ.get('DBO_LOADORDER', os.path.expanduser('~nate/dragonbreak/fork/deploy/skyrim-data/loadorder.txt'))
+ORDER = os.environ.get('DBO_LOADORDER', '/opt/alduinak/deploy/skyrim-data/loadorder.txt')
 ESPLIB = os.environ.get('DBO_ESPLIB', os.path.expanduser('~nate/dragonbreak/ck-mcp'))
 
 # keyword editor id -> family (first match wins, except that a banned family anywhere in the list wins)
@@ -62,6 +62,13 @@ METAL = [(r'^IngotSteel$|^IngotCorundum$', 'steel'), (r'^IngotIron$', 'iron'), (
          (r'^IngotMalachite$', 'glass'), (r'^IngotDwarven$', 'dwarven'), (r'^BSKIngotBronze$', 'ancient_nord'),
          (r'^DLC2OreStalhrim$', 'stalhrim'), (r'^DragonBone$|^DragonScales$', 'DRAGON'), (r'^DaedraHeart$', 'DAEDRIC'),
          (r'ChitinPlate$|^ChaurusChitin$', 'chitin'), (r'^BSKIngotMeteoricIron$', 'ayleid'), (r'^Leather01$', 'leather')]
+# Editor ids whose family is set by hand where the rules below find only clothing (Nate, 18 Oct: a schematic for every armour):
+# Dragon Priest Armor's robes, boots and gloves are their own technique; Immersive Armors' Dwarven Mage pieces are Dwarven
+# work, its Shaman pieces Hide; the Boethiah ritual set, the Seadog's earrings and eyepatch and Conan's amulet are artifacts
+FIXED = [
+    (r'^DPA_DragonPriest(Robes|Boots|Gloves)', 'dragon_priest'), (r'^IADwarvenMageU', 'dwarven'), (r'^IAShamanU', 'hide'),
+    (r'^IA(RitualBoethiah|Seadog|ConanAmulet)', 'artifact'),
+]
 BANNED = ('DRAGON', 'DAEDRIC', 'madness', 'EBONY', 'stalhrim', 'orcish')
 # Sets whose editor id names them although their keywords borrow another material's (BS Heartland's Ancient Imperial
 # weapons carry WeapMaterialSteel, Immersive Armors' Glacial Crystal IAKMaterialGlass/Ebony): the smithing families
@@ -167,6 +174,15 @@ def classifier(scan_data):
         return None
 
     def classify(key, depth=0):
+        f = classify_rules(key, depth)
+        if f in ('clothing', 'unclassified'):
+            e = (I.get(key) or {}).get('edid') or ''
+            for pat, fixed in FIXED:
+                if re.search(pat, e):
+                    return fixed
+        return f
+
+    def classify_rules(key, depth=0):
         r = I.get(key)
         if not r:
             return None
@@ -184,7 +200,7 @@ def classifier(scan_data):
                     return b
             return fams[0]
         if r.get('tmpl') and depth < 5:
-            f = classify(canon(r['tmpl']), depth + 1)
+            f = classify_rules(canon(r['tmpl']), depth + 1)
             if f:
                 return f
         if any(n in ('ArmorClothing', 'ArmorJewelry', 'VendorItemJewelry', 'VendorItemClothing') or n.startswith('Clothing') for n in names):

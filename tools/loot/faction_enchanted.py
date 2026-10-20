@@ -15,7 +15,7 @@ sys.path.insert(0, os.environ.get('ESPLIB_DIR', os.path.expanduser('~nate/dragon
 import esplib  # noqa: E402
 
 DATA = os.environ.get('SKYRIM_DATA', '/opt/skyrim-data')
-ORDER = os.environ.get('LOAD_ORDER', os.path.expanduser('~nate/dragonbreak/fork/deploy/skyrim-data/loadorder.txt'))
+ORDER = os.environ.get('LOAD_ORDER', '/opt/alduinak/deploy/skyrim-data/loadorder.txt')
 TAG = 'faction gear, enchanted'
 
 

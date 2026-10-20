@@ -2,7 +2,7 @@
 ck-mcp's own with their E:\\ paths routed through here; nothing else in them changed).
 
     DBO_DATA     the plugin folder, read only (default /opt/skyrim-data)
-    DBO_ORDER    the load order (default ~nate/dragonbreak/fork/deploy/skyrim-data/loadorder.txt)
+    DBO_ORDER    the load order (default /opt/alduinak/deploy/skyrim-data/loadorder.txt, the live server's)
     DBO_SERVER   the server folder the generators read hand data from (default: this worktree)
     DBO_REPLACE  "Load order name=path", several joined by '|': reads a plugin not yet in DBO_DATA under
                  its load-order name, e.g. DBO_REPLACE="DragonBreak Online Edits.esp=/path/graft-v13.esp"
@@ -19,7 +19,7 @@ sys.path.insert(1, os.path.join(HERE, '..', '..', 'tooling', 'ck-mcp'))   # core
 import core, esplib  # noqa: E402
 
 DATA = os.environ.get('DBO_DATA') or '/opt/skyrim-data'
-ORDER = os.environ.get('DBO_ORDER') or os.path.expanduser('~nate/dragonbreak/fork/deploy/skyrim-data/loadorder.txt')
+ORDER = os.environ.get('DBO_ORDER') or '/opt/alduinak/deploy/skyrim-data/loadorder.txt'
 SERVER = os.path.abspath(os.environ.get('DBO_SERVER') or os.path.join(HERE, '..', '..'))
 REPLACE = {k.strip().lower(): v.strip() for k, v in
            (r.split('=', 1) for r in (os.environ.get('DBO_REPLACE') or '').split('|') if r.strip())}

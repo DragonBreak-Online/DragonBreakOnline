@@ -5621,6 +5621,974 @@
    "recipes": [
     "dc9:DragonBreak Nexus Patches.esp"
    ]
+  },
+  "23146:Hothtrooper44_ArmorCompilation.esp": {
+   "name": "Tribunal Heavy Boots Black",
+   "set": "Tribunal Temple",
+   "factions": [
+    "house-indoril"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "23190:Hothtrooper44_ArmorCompilation.esp"
+   ]
+  },
+  "23147:Hothtrooper44_ArmorCompilation.esp": {
+   "name": "Tribunal Heavy Boots Blue",
+   "set": "Tribunal Temple",
+   "factions": [
+    "house-indoril"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "23191:Hothtrooper44_ArmorCompilation.esp"
+   ]
+  },
+  "23148:Hothtrooper44_ArmorCompilation.esp": {
+   "name": "Tribunal Heavy Boots Green",
+   "set": "Tribunal Temple",
+   "factions": [
+    "house-indoril"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "23192:Hothtrooper44_ArmorCompilation.esp"
+   ]
+  },
+  "23149:Hothtrooper44_ArmorCompilation.esp": {
+   "name": "Tribunal Heavy Boots Red",
+   "set": "Tribunal Temple",
+   "factions": [
+    "house-indoril"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "23193:Hothtrooper44_ArmorCompilation.esp"
+   ]
+  },
+  "2314a:Hothtrooper44_ArmorCompilation.esp": {
+   "name": "Tribunal Heavy Boots White",
+   "set": "Tribunal Temple",
+   "factions": [
+    "house-indoril"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "23194:Hothtrooper44_ArmorCompilation.esp"
+   ]
+  },
+  "2314b:Hothtrooper44_ArmorCompilation.esp": {
+   "name": "Tribunal Heavy Gloves Black",
+   "set": "Tribunal Temple",
+   "factions": [
+    "house-indoril"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "23195:Hothtrooper44_ArmorCompilation.esp"
+   ]
+  },
+  "2314c:Hothtrooper44_ArmorCompilation.esp": {
+   "name": "Tribunal Heavy Gloves Blue",
+   "set": "Tribunal Temple",
+   "factions": [
+    "house-indoril"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "23196:Hothtrooper44_ArmorCompilation.esp"
+   ]
+  },
+  "2314d:Hothtrooper44_ArmorCompilation.esp": {
+   "name": "Tribunal Heavy Gloves Green",
+   "set": "Tribunal Temple",
+   "factions": [
+    "house-indoril"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "23197:Hothtrooper44_ArmorCompilation.esp"
+   ]
+  },
+  "2314e:Hothtrooper44_ArmorCompilation.esp": {
+   "name": "Tribunal Heavy Gloves Red",
+   "set": "Tribunal Temple",
+   "factions": [
+    "house-indoril"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "23198:Hothtrooper44_ArmorCompilation.esp"
+   ]
+  },
+  "2314f:Hothtrooper44_ArmorCompilation.esp": {
+   "name": "Tribunal Heavy Gloves White",
+   "set": "Tribunal Temple",
+   "factions": [
+    "house-indoril"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "23199:Hothtrooper44_ArmorCompilation.esp"
+   ]
+  },
+  "23150:Hothtrooper44_ArmorCompilation.esp": {
+   "name": "Tribunal Heavy Hood Black",
+   "set": "Tribunal Temple",
+   "factions": [
+    "house-indoril"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "2319a:Hothtrooper44_ArmorCompilation.esp"
+   ]
+  },
+  "23151:Hothtrooper44_ArmorCompilation.esp": {
+   "name": "Tribunal Heavy Hood Blue",
+   "set": "Tribunal Temple",
+   "factions": [
+    "house-indoril"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "2319b:Hothtrooper44_ArmorCompilation.esp"
+   ]
+  },
+  "23152:Hothtrooper44_ArmorCompilation.esp": {
+   "name": "Tribunal Heavy Hood Green",
+   "set": "Tribunal Temple",
+   "factions": [
+    "house-indoril"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "2319c:Hothtrooper44_ArmorCompilation.esp"
+   ]
+  },
+  "23153:Hothtrooper44_ArmorCompilation.esp": {
+   "name": "Tribunal Heavy Hood Red",
+   "set": "Tribunal Temple",
+   "factions": [
+    "house-indoril"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "2319d:Hothtrooper44_ArmorCompilation.esp"
+   ]
+  },
+  "23154:Hothtrooper44_ArmorCompilation.esp": {
+   "name": "Tribunal Heavy Hood White",
+   "set": "Tribunal Temple",
+   "factions": [
+    "house-indoril"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "2319e:Hothtrooper44_ArmorCompilation.esp"
+   ]
+  },
+  "2315a:Hothtrooper44_ArmorCompilation.esp": {
+   "name": "Tribunal Heavy Mantle Black",
+   "set": "Tribunal Temple",
+   "factions": [
+    "house-indoril"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "231a4:Hothtrooper44_ArmorCompilation.esp"
+   ]
+  },
+  "2315b:Hothtrooper44_ArmorCompilation.esp": {
+   "name": "Tribunal Heavy Mantle Blue",
+   "set": "Tribunal Temple",
+   "factions": [
+    "house-indoril"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "231a5:Hothtrooper44_ArmorCompilation.esp"
+   ]
+  },
+  "2315c:Hothtrooper44_ArmorCompilation.esp": {
+   "name": "Tribunal Heavy Mantle Green",
+   "set": "Tribunal Temple",
+   "factions": [
+    "house-indoril"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "231a6:Hothtrooper44_ArmorCompilation.esp"
+   ]
+  },
+  "2315d:Hothtrooper44_ArmorCompilation.esp": {
+   "name": "Tribunal Heavy Mantle Red",
+   "set": "Tribunal Temple",
+   "factions": [
+    "house-indoril"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "231a7:Hothtrooper44_ArmorCompilation.esp"
+   ]
+  },
+  "2315e:Hothtrooper44_ArmorCompilation.esp": {
+   "name": "Tribunal Heavy Mantle White",
+   "set": "Tribunal Temple",
+   "factions": [
+    "house-indoril"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "231a8:Hothtrooper44_ArmorCompilation.esp"
+   ]
+  },
+  "23155:Hothtrooper44_ArmorCompilation.esp": {
+   "name": "Tribunal Heavy Robe Black",
+   "set": "Tribunal Temple",
+   "factions": [
+    "house-indoril"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "2319f:Hothtrooper44_ArmorCompilation.esp"
+   ]
+  },
+  "23156:Hothtrooper44_ArmorCompilation.esp": {
+   "name": "Tribunal Heavy Robe Blue",
+   "set": "Tribunal Temple",
+   "factions": [
+    "house-indoril"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "231a0:Hothtrooper44_ArmorCompilation.esp"
+   ]
+  },
+  "23157:Hothtrooper44_ArmorCompilation.esp": {
+   "name": "Tribunal Heavy Robe Green",
+   "set": "Tribunal Temple",
+   "factions": [
+    "house-indoril"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "231a1:Hothtrooper44_ArmorCompilation.esp"
+   ]
+  },
+  "23158:Hothtrooper44_ArmorCompilation.esp": {
+   "name": "Tribunal Heavy Robe Red",
+   "set": "Tribunal Temple",
+   "factions": [
+    "house-indoril"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "231a2:Hothtrooper44_ArmorCompilation.esp"
+   ]
+  },
+  "23159:Hothtrooper44_ArmorCompilation.esp": {
+   "name": "Tribunal Heavy Robe White",
+   "set": "Tribunal Temple",
+   "factions": [
+    "house-indoril"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "231a3:Hothtrooper44_ArmorCompilation.esp"
+   ]
+  },
+  "2315f:Hothtrooper44_ArmorCompilation.esp": {
+   "name": "Tribunal Light Boots Black",
+   "set": "Tribunal Temple",
+   "factions": [
+    "house-indoril"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "231a9:Hothtrooper44_ArmorCompilation.esp"
+   ]
+  },
+  "23160:Hothtrooper44_ArmorCompilation.esp": {
+   "name": "Tribunal Light Boots Blue",
+   "set": "Tribunal Temple",
+   "factions": [
+    "house-indoril"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "231aa:Hothtrooper44_ArmorCompilation.esp"
+   ]
+  },
+  "23161:Hothtrooper44_ArmorCompilation.esp": {
+   "name": "Tribunal Light Boots Green",
+   "set": "Tribunal Temple",
+   "factions": [
+    "house-indoril"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "231ab:Hothtrooper44_ArmorCompilation.esp"
+   ]
+  },
+  "23162:Hothtrooper44_ArmorCompilation.esp": {
+   "name": "Tribunal Light Boots Red",
+   "set": "Tribunal Temple",
+   "factions": [
+    "house-indoril"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "231ac:Hothtrooper44_ArmorCompilation.esp"
+   ]
+  },
+  "23163:Hothtrooper44_ArmorCompilation.esp": {
+   "name": "Tribunal Light Boots White",
+   "set": "Tribunal Temple",
+   "factions": [
+    "house-indoril"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "231ad:Hothtrooper44_ArmorCompilation.esp"
+   ]
+  },
+  "23164:Hothtrooper44_ArmorCompilation.esp": {
+   "name": "Tribunal Light Gloves Black",
+   "set": "Tribunal Temple",
+   "factions": [
+    "house-indoril"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "231ae:Hothtrooper44_ArmorCompilation.esp"
+   ]
+  },
+  "23165:Hothtrooper44_ArmorCompilation.esp": {
+   "name": "Tribunal Light Gloves Blue",
+   "set": "Tribunal Temple",
+   "factions": [
+    "house-indoril"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "231af:Hothtrooper44_ArmorCompilation.esp"
+   ]
+  },
+  "23166:Hothtrooper44_ArmorCompilation.esp": {
+   "name": "Tribunal Light Gloves Green",
+   "set": "Tribunal Temple",
+   "factions": [
+    "house-indoril"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "231b0:Hothtrooper44_ArmorCompilation.esp"
+   ]
+  },
+  "23167:Hothtrooper44_ArmorCompilation.esp": {
+   "name": "Tribunal Light Gloves Red",
+   "set": "Tribunal Temple",
+   "factions": [
+    "house-indoril"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "231b1:Hothtrooper44_ArmorCompilation.esp"
+   ]
+  },
+  "23168:Hothtrooper44_ArmorCompilation.esp": {
+   "name": "Tribunal Light Gloves White",
+   "set": "Tribunal Temple",
+   "factions": [
+    "house-indoril"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "231b2:Hothtrooper44_ArmorCompilation.esp"
+   ]
+  },
+  "23169:Hothtrooper44_ArmorCompilation.esp": {
+   "name": "Tribunal Light Hood Black",
+   "set": "Tribunal Temple",
+   "factions": [
+    "house-indoril"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "231b3:Hothtrooper44_ArmorCompilation.esp"
+   ]
+  },
+  "2316a:Hothtrooper44_ArmorCompilation.esp": {
+   "name": "Tribunal Light Hood Blue",
+   "set": "Tribunal Temple",
+   "factions": [
+    "house-indoril"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "231b4:Hothtrooper44_ArmorCompilation.esp"
+   ]
+  },
+  "2316b:Hothtrooper44_ArmorCompilation.esp": {
+   "name": "Tribunal Light Hood Green",
+   "set": "Tribunal Temple",
+   "factions": [
+    "house-indoril"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "231b5:Hothtrooper44_ArmorCompilation.esp"
+   ]
+  },
+  "2316c:Hothtrooper44_ArmorCompilation.esp": {
+   "name": "Tribunal Light Hood Red",
+   "set": "Tribunal Temple",
+   "factions": [
+    "house-indoril"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "231b6:Hothtrooper44_ArmorCompilation.esp"
+   ]
+  },
+  "2316d:Hothtrooper44_ArmorCompilation.esp": {
+   "name": "Tribunal Light Hood White",
+   "set": "Tribunal Temple",
+   "factions": [
+    "house-indoril"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "231b7:Hothtrooper44_ArmorCompilation.esp"
+   ]
+  },
+  "23173:Hothtrooper44_ArmorCompilation.esp": {
+   "name": "Tribunal Light Mantle Black",
+   "set": "Tribunal Temple",
+   "factions": [
+    "house-indoril"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "231bd:Hothtrooper44_ArmorCompilation.esp"
+   ]
+  },
+  "23174:Hothtrooper44_ArmorCompilation.esp": {
+   "name": "Tribunal Light Mantle Blue",
+   "set": "Tribunal Temple",
+   "factions": [
+    "house-indoril"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "231be:Hothtrooper44_ArmorCompilation.esp"
+   ]
+  },
+  "23175:Hothtrooper44_ArmorCompilation.esp": {
+   "name": "Tribunal Light Mantle Green",
+   "set": "Tribunal Temple",
+   "factions": [
+    "house-indoril"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "231bf:Hothtrooper44_ArmorCompilation.esp"
+   ]
+  },
+  "23176:Hothtrooper44_ArmorCompilation.esp": {
+   "name": "Tribunal Light Mantle Red",
+   "set": "Tribunal Temple",
+   "factions": [
+    "house-indoril"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "231c0:Hothtrooper44_ArmorCompilation.esp"
+   ]
+  },
+  "23177:Hothtrooper44_ArmorCompilation.esp": {
+   "name": "Tribunal Light Mantle White",
+   "set": "Tribunal Temple",
+   "factions": [
+    "house-indoril"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "231c1:Hothtrooper44_ArmorCompilation.esp"
+   ]
+  },
+  "2316e:Hothtrooper44_ArmorCompilation.esp": {
+   "name": "Tribunal Light Robe Black",
+   "set": "Tribunal Temple",
+   "factions": [
+    "house-indoril"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "231b8:Hothtrooper44_ArmorCompilation.esp"
+   ]
+  },
+  "2316f:Hothtrooper44_ArmorCompilation.esp": {
+   "name": "Tribunal Light Robe Blue",
+   "set": "Tribunal Temple",
+   "factions": [
+    "house-indoril"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "231b9:Hothtrooper44_ArmorCompilation.esp"
+   ]
+  },
+  "23170:Hothtrooper44_ArmorCompilation.esp": {
+   "name": "Tribunal Light Robe Green",
+   "set": "Tribunal Temple",
+   "factions": [
+    "house-indoril"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "231ba:Hothtrooper44_ArmorCompilation.esp"
+   ]
+  },
+  "23171:Hothtrooper44_ArmorCompilation.esp": {
+   "name": "Tribunal Light Robe Red",
+   "set": "Tribunal Temple",
+   "factions": [
+    "house-indoril"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "231bb:Hothtrooper44_ArmorCompilation.esp"
+   ]
+  },
+  "23172:Hothtrooper44_ArmorCompilation.esp": {
+   "name": "Tribunal Light Robe White",
+   "set": "Tribunal Temple",
+   "factions": [
+    "house-indoril"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "231bc:Hothtrooper44_ArmorCompilation.esp"
+   ]
+  },
+  "23178:Hothtrooper44_ArmorCompilation.esp": {
+   "name": "Tribunal Mask Bronze",
+   "set": "Tribunal Temple",
+   "factions": [
+    "house-indoril"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "231c2:Hothtrooper44_ArmorCompilation.esp"
+   ]
+  },
+  "23179:Hothtrooper44_ArmorCompilation.esp": {
+   "name": "Tribunal Mask Ebony",
+   "set": "Tribunal Temple",
+   "factions": [
+    "house-indoril"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "231c3:Hothtrooper44_ArmorCompilation.esp"
+   ]
+  },
+  "2317a:Hothtrooper44_ArmorCompilation.esp": {
+   "name": "Tribunal Mask Gold",
+   "set": "Tribunal Temple",
+   "factions": [
+    "house-indoril"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "231c4:Hothtrooper44_ArmorCompilation.esp"
+   ]
+  },
+  "2317b:Hothtrooper44_ArmorCompilation.esp": {
+   "name": "Tribunal Mask Silver",
+   "set": "Tribunal Temple",
+   "factions": [
+    "house-indoril"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "231c5:Hothtrooper44_ArmorCompilation.esp"
+   ]
+  },
+  "2317c:Hothtrooper44_ArmorCompilation.esp": {
+   "name": "Tribunal Unarmored Boots Black",
+   "set": "Tribunal Temple",
+   "factions": [
+    "house-indoril"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "231c6:Hothtrooper44_ArmorCompilation.esp"
+   ]
+  },
+  "2317d:Hothtrooper44_ArmorCompilation.esp": {
+   "name": "Tribunal Unarmored Boots Blue",
+   "set": "Tribunal Temple",
+   "factions": [
+    "house-indoril"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "231c7:Hothtrooper44_ArmorCompilation.esp"
+   ]
+  },
+  "2317e:Hothtrooper44_ArmorCompilation.esp": {
+   "name": "Tribunal Unarmored Boots Green",
+   "set": "Tribunal Temple",
+   "factions": [
+    "house-indoril"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "231c8:Hothtrooper44_ArmorCompilation.esp"
+   ]
+  },
+  "2317f:Hothtrooper44_ArmorCompilation.esp": {
+   "name": "Tribunal Unarmored Boots Red",
+   "set": "Tribunal Temple",
+   "factions": [
+    "house-indoril"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "231c9:Hothtrooper44_ArmorCompilation.esp"
+   ]
+  },
+  "23180:Hothtrooper44_ArmorCompilation.esp": {
+   "name": "Tribunal Unarmored Boots White",
+   "set": "Tribunal Temple",
+   "factions": [
+    "house-indoril"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "231ca:Hothtrooper44_ArmorCompilation.esp"
+   ]
+  },
+  "23181:Hothtrooper44_ArmorCompilation.esp": {
+   "name": "Tribunal Unarmored Gloves Black",
+   "set": "Tribunal Temple",
+   "factions": [
+    "house-indoril"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "231cb:Hothtrooper44_ArmorCompilation.esp"
+   ]
+  },
+  "23182:Hothtrooper44_ArmorCompilation.esp": {
+   "name": "Tribunal Unarmored Gloves Blue",
+   "set": "Tribunal Temple",
+   "factions": [
+    "house-indoril"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "231cc:Hothtrooper44_ArmorCompilation.esp"
+   ]
+  },
+  "23183:Hothtrooper44_ArmorCompilation.esp": {
+   "name": "Tribunal Unarmored Gloves Green",
+   "set": "Tribunal Temple",
+   "factions": [
+    "house-indoril"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "231cd:Hothtrooper44_ArmorCompilation.esp"
+   ]
+  },
+  "23184:Hothtrooper44_ArmorCompilation.esp": {
+   "name": "Tribunal Unarmored Gloves Red",
+   "set": "Tribunal Temple",
+   "factions": [
+    "house-indoril"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "231ce:Hothtrooper44_ArmorCompilation.esp"
+   ]
+  },
+  "23185:Hothtrooper44_ArmorCompilation.esp": {
+   "name": "Tribunal Unarmored Gloves White",
+   "set": "Tribunal Temple",
+   "factions": [
+    "house-indoril"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "231cf:Hothtrooper44_ArmorCompilation.esp"
+   ]
+  },
+  "23186:Hothtrooper44_ArmorCompilation.esp": {
+   "name": "Tribunal Unarmored Hood Black",
+   "set": "Tribunal Temple",
+   "factions": [
+    "house-indoril"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "231d0:Hothtrooper44_ArmorCompilation.esp"
+   ]
+  },
+  "23187:Hothtrooper44_ArmorCompilation.esp": {
+   "name": "Tribunal Unarmored Hood Blue",
+   "set": "Tribunal Temple",
+   "factions": [
+    "house-indoril"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "231d1:Hothtrooper44_ArmorCompilation.esp"
+   ]
+  },
+  "23188:Hothtrooper44_ArmorCompilation.esp": {
+   "name": "Tribunal Unarmored Hood Green",
+   "set": "Tribunal Temple",
+   "factions": [
+    "house-indoril"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "231d2:Hothtrooper44_ArmorCompilation.esp"
+   ]
+  },
+  "23189:Hothtrooper44_ArmorCompilation.esp": {
+   "name": "Tribunal Unarmored Hood Red",
+   "set": "Tribunal Temple",
+   "factions": [
+    "house-indoril"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "231d3:Hothtrooper44_ArmorCompilation.esp"
+   ]
+  },
+  "2318a:Hothtrooper44_ArmorCompilation.esp": {
+   "name": "Tribunal Unarmored Hood White",
+   "set": "Tribunal Temple",
+   "factions": [
+    "house-indoril"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "231d4:Hothtrooper44_ArmorCompilation.esp"
+   ]
+  },
+  "2318b:Hothtrooper44_ArmorCompilation.esp": {
+   "name": "Tribunal Unarmored Robe Black",
+   "set": "Tribunal Temple",
+   "factions": [
+    "house-indoril"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "231d5:Hothtrooper44_ArmorCompilation.esp"
+   ]
+  },
+  "2318c:Hothtrooper44_ArmorCompilation.esp": {
+   "name": "Tribunal Unarmored Robe Blue",
+   "set": "Tribunal Temple",
+   "factions": [
+    "house-indoril"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "231d6:Hothtrooper44_ArmorCompilation.esp"
+   ]
+  },
+  "2318d:Hothtrooper44_ArmorCompilation.esp": {
+   "name": "Tribunal Unarmored Robe Green",
+   "set": "Tribunal Temple",
+   "factions": [
+    "house-indoril"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "231d7:Hothtrooper44_ArmorCompilation.esp"
+   ]
+  },
+  "2318e:Hothtrooper44_ArmorCompilation.esp": {
+   "name": "Tribunal Unarmored Robe Red",
+   "set": "Tribunal Temple",
+   "factions": [
+    "house-indoril"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "231d8:Hothtrooper44_ArmorCompilation.esp"
+   ]
+  },
+  "2318f:Hothtrooper44_ArmorCompilation.esp": {
+   "name": "Tribunal Unarmored Robe White",
+   "set": "Tribunal Temple",
+   "factions": [
+    "house-indoril"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "231d9:Hothtrooper44_ArmorCompilation.esp"
+   ]
+  },
+  "84136:BSHeartland.esm": {
+   "name": "College of Whispers Hood",
+   "set": "College of Whispers",
+   "factions": [
+    "college-of-whispers"
+   ],
+   "role": "tailor",
+   "recipes": [
+    "864:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "8e2:Sentinel.esp": {
+   "name": "Wolf Armor",
+   "set": "Companions",
+   "factions": [
+    "companions"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "aa6:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "8e1:Sentinel.esp": {
+   "name": "Wolf Boots",
+   "set": "Companions",
+   "factions": [
+    "companions"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "aa5:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "8e3:Sentinel.esp": {
+   "name": "Wolf Gauntlets",
+   "set": "Companions",
+   "factions": [
+    "companions"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "aa7:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "8da:Sentinel.esp": {
+   "name": "Wolf Shield",
+   "set": "Companions",
+   "factions": [
+    "companions"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "a9e:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "50c6:Dawnguard.esm": {
+   "name": "Dawnguard Armor",
+   "set": "Dawnguard",
+   "factions": [
+    "dawnguard"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "948:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "50c5:Dawnguard.esm": {
+   "name": "Dawnguard Boots",
+   "set": "Dawnguard",
+   "factions": [
+    "dawnguard"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "949:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "50c7:Dawnguard.esm": {
+   "name": "Dawnguard Gauntlets",
+   "set": "Dawnguard",
+   "factions": [
+    "dawnguard"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "947:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "f0d:JK's Fort Dawnguard.esp": {
+   "name": "Dawnguard War Axe SPR",
+   "set": "Dawnguard",
+   "factions": [
+    "dawnguard"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "afe:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "b31:Sentinel.esp": {
+   "name": "Stormcloak Battleaxe",
+   "set": "Stormcloaks",
+   "factions": [
+    "stormcloaks"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "ad2:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "b30:Sentinel.esp": {
+   "name": "Stormcloak Bearded Axe",
+   "set": "Stormcloaks",
+   "factions": [
+    "stormcloaks"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "ad1:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "b2f:Sentinel.esp": {
+   "name": "Stormcloak Greatsword",
+   "set": "Stormcloaks",
+   "factions": [
+    "stormcloaks"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "ad0:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "b2e:Sentinel.esp": {
+   "name": "Stormcloak Sword",
+   "set": "Stormcloaks",
+   "factions": [
+    "stormcloaks"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "acf:DragonBreak Nexus Patches.esp"
+   ]
+  },
+  "b40:Sentinel.esp": {
+   "name": "Stormcloak War Axe",
+   "set": "Stormcloaks",
+   "factions": [
+    "stormcloaks"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "ad7:DragonBreak Nexus Patches.esp"
+   ]
   }
  },
  "_uniformsComment": "War uniforms (realm.js, config war.uniforms): in a battle only fighters wearing a body piece of their faction's uniform count at a standard. A faction's uniform is its items above plus these worn-only extras; a faction with neither (the Fighters Guild today) is not held to it.",

@@ -24,7 +24,7 @@ sys.path.insert(0, os.path.expanduser('~/dragonbreak/ck-mcp'))
 from esplib import Plugin, subrecords, edid_of
 
 DATA = '/opt/skyrim-data'
-LOADORDER = os.path.expanduser('~/dragonbreak/fork/deploy/skyrim-data/loadorder.txt')
+LOADORDER = '/opt/alduinak/deploy/skyrim-data/loadorder.txt'
 MARKER = (48236.2, 260600.4, 20405.1)
 WORLD_LOCAL = 0x0A764B          # BSHeartland's Cyrodiil world
 BORDER_LOCAL = 0x0CBCDD         # CYRBrumaReleaseBorderRegion
