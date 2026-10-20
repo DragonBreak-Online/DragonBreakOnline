@@ -15,6 +15,7 @@
 #include "libespm/REFR.h"
 #include "libespm/RecordHeader.h"
 #include "libespm/RefrKey.h"
+#include "libespm/SPEL.h"
 #include "libespm/WRLD.h"
 #include <cstring>
 #include <optional>
@@ -49,6 +50,7 @@ struct Browser::Impl
   std::vector<const RecordHeader*> factions;
   std::vector<const RecordHeader*> quests;
   std::vector<const RecordHeader*> shouts;
+  std::vector<const RecordHeader*> spells;
   std::vector<const RecordHeader*> worlds;
   std::vector<const RecordHeader*> cells;
   std::vector<const RecordHeader*> activationChildren;
@@ -144,9 +146,12 @@ const std::vector<const RecordHeader*>& Browser::GetRecordsByType(
   if (!std::strcmp(type, "SHOU")) {
     return pImpl->shouts;
   }
+  if (!std::strcmp(type, espm::SPEL::kType)) {
+    return pImpl->spells;
+  }
   throw std::runtime_error("GetRecordsByType currently supports only REFR, "
-                           "COBJ, ENCH, KYWD, FACT, QUST, WRLD, CELL and SHOU "
-                           "records");
+                           "COBJ, ENCH, KYWD, FACT, QUST, WRLD, CELL, SHOU "
+                           "and SPEL records");
 }
 
 const std::vector<const RecordHeader*>& Browser::GetActivationChildren()
@@ -296,6 +301,10 @@ bool Browser::ReadAny(const GroupStack* parentGrStack)
     // spells, ActionListener's IsShoutWordSpell)
     if (t == "SHOU") {
       pImpl->shouts.push_back(recHeader);
+    }
+
+    if (utils::Is<espm::SPEL>(t)) {
+      pImpl->spells.push_back(recHeader);
     }
 
     if (utils::Is<espm::WRLD>(t)) {
