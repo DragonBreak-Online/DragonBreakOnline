@@ -9029,6 +9029,13 @@ try {
   delete require.cache[TRAPS_JS];
   require(TRAPS_JS)({ mp, log, cfg, every, onlineActors, profileOf, display, audit, personal, registerChatCommand });
 } catch (e) { log('traps.js failed to load:', e.stack || e.message); globalThis.__dboTrapsHandles = null; }
+// ---- Papyrus OnUpdate guard: two vanilla scripts that loop every second on the server, and a report naming the next one
+// (server\papyrusguard.js, config "papyrusGuard"). A failed load lets every OnUpdate through again.
+try {
+  const PAPYRUSGUARD_JS = path.resolve('papyrusguard.js');
+  delete require.cache[PAPYRUSGUARD_JS];
+  require(PAPYRUSGUARD_JS)({ mp, log, cfg });
+} catch (e) { log('papyrusguard.js failed to load:', e.stack || e.message); globalThis.__dboPapyrusOnUpdate = null; }
 // ---- damage over time from a player's spell: the duration the spell formula never deals (server\spelldot.js) --------
 try {
   const SPELLDOT_JS = path.resolve('spelldot.js');
