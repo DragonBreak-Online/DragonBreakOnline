@@ -564,8 +564,11 @@
         <button class="modal-close" id="legal-close" title="Close">&#10005;</button>
       </div>
       <div class="legal-changes" id="legal-changes" hidden>
-        <span class="setting-label">What changed</span>
-        <ul id="legal-changes-list"></ul>
+        <div class="legal-changes-head">
+          <span class="setting-label legal-changes-title" id="legal-changes-title">What changed</span>
+          <button type="button" class="legal-changes-toggle" id="legal-changes-toggle" aria-controls="legal-changes-list" aria-expanded="true">Hide changes</button>
+        </div>
+        <ul class="legal-changes-list" id="legal-changes-list"></ul>
       </div>
       <div class="modal-tabs">
         <button type="button" class="modal-tab active" data-legal-tab="terms">Terms of Service<span class="legal-read" id="legal-read-terms"></span></button>

@@ -18,7 +18,11 @@ window.dboLegal = (() => {
   const footer = $('legal-footer')
   const changesBox = $('legal-changes')
   const changesList = $('legal-changes-list')
+  const changesTitle = $('legal-changes-title')
+  const changesToggle = $('legal-changes-toggle')
   const NAMES = { terms: 'the Terms of Service', privacy: 'the Privacy Policy' }
+  // In a window shorter than this the change list opens folded, so the documents keep the room
+  const FOLD_BELOW = 700
 
   const MSG_PENDING = 'Accept the Terms of Service and the Privacy Policy to play: press Terms & Privacy below.'
   const MSG_DECLINED = 'You declined the Terms of Service and the Privacy Policy, so Play is off. Press Terms & Privacy below to read them again.'
@@ -29,6 +33,7 @@ window.dboLegal = (() => {
   let busy = false
   let problem = ''
   let active = 'terms'
+  let changesOpen = true
   const read = { terms: false, privacy: false }
   const scrollPos = { terms: 0, privacy: 0 }
   let onChange = () => {}
@@ -127,13 +132,25 @@ window.dboLegal = (() => {
     markRead()
   }
 
+  function showChanges(open) {
+    changesOpen = open
+    changesList.hidden = !open
+    changesToggle.textContent = open ? 'Hide changes' : 'Show all changes'
+    changesToggle.ariaExpanded = String(open)
+  }
+
   function render() {
     for (const k of Object.keys(docs)) { docs[k].textContent = ''; if (doc && doc[k]) blocks(docs[k], doc[k]) }
     const reprompt = accepting() && doc && doc.changes && doc.changes.length > 0 &&
       status.lastAcceptedVersion && status.lastAcceptedVersion !== status.version
     changesList.textContent = ''
-    if (reprompt) for (const c of doc.changes) { const li = document.createElement('li'); li.textContent = c; changesList.appendChild(li) }
+    if (reprompt) {
+      for (const c of doc.changes) { const li = document.createElement('li'); li.textContent = c; changesList.appendChild(li) }
+      const n = doc.changes.length
+      changesTitle.textContent = `What changed in version ${doc.version} (${n} ${n === 1 ? 'change' : 'changes'})`
+    }
     changesBox.hidden = !reprompt
+    showChanges(changesOpen)
     const note = !doc || doc.source === 'none'
       ? `The texts could not be loaded${doc && doc.error ? ` (${doc.error})` : ''}. Check your connection and press Retry.`
       : doc.source === 'bundled' ? 'The server could not be reached, so this is the copy that came with the launcher.' : ''
@@ -159,6 +176,7 @@ window.dboLegal = (() => {
     if (!overlay.hidden) return
     overlay.hidden = false
     resetReading()
+    changesOpen = !(window.innerHeight < FOLD_BELOW)
     agree.checked = false
     problem = ''
     acceptBtn.textContent = 'Accept'
@@ -238,6 +256,8 @@ window.dboLegal = (() => {
 
   body.addEventListener('scroll', markRead, { passive: true })
   for (const t of tabs) t.addEventListener('click', () => showTab(t.dataset.legalTab))
+  // Folding the list gives the document more room, which can bring its end into view
+  changesToggle.addEventListener('click', () => { showChanges(!changesOpen); markRead() })
   agree.addEventListener('change', () => { problem = ''; update() })
   acceptBtn.addEventListener('click', accept)
   retryBtn.addEventListener('click', retry)
