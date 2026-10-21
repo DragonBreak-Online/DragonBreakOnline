@@ -1,5 +1,5 @@
 {
- "_comment": "A stronghold's own people and beasts, spawned by wildlife.js as wild:<site>:<name> zones, never hostile (Nat, 20 Oct: Cracked Tusk is the clan's stronghold, not a lair; Worker 1's brief ~/inbox/NOTE-for-server-claude-2026-10-20-C10-cracked-tusk-residents.md). A spawn is written only when its anchor resolves (its plugin is in the server's load order), it has a base, and approved is not false. INERT until CrackedTuskKeepExpanded.esp ships: every anchor is a CTK ref (check the ids against the shipped plugin). Livestock is Nat's decision 1 (CTK's 11 animals off in the Strongholds Fix; EncGoatDomestic, never DA14Goat). The residents are the brief's starting roster: approved false and no base until Nat approves the roster and an orc NPC_ without bandit factions is chosen for each role.",
+ "_comment": "A stronghold's own people and beasts, spawned by wildlife.js as wild:<site>:<name> zones, never hostile (Nat, 20 Oct: Cracked Tusk is the clan's stronghold, not a lair; Worker 1's briefs ~/inbox/NOTE-for-server-claude-2026-10-20-C10-cracked-tusk-residents.md and staged-20261021-strongholds/CRACKED_TUSK_RESIDENTS_BRIEF.md). A spawn is written only when its anchor resolves (its plugin is in the server's load order), it has a base, and approved is not false. Every anchor is a CrackedTuskKeepExpanded.esp ref (checked against the shipped file 21 Oct), so nothing spawns before CTK and its master AIO load. Livestock is Nat's decision 1 (CTK's 11 animals off in the Strongholds Fix; EncGoatDomestic, never DA14Goat). The residents are the brief's roster, which Nat approved as written on 21 Oct, on AIO's non-unique stronghold orcs (section 6: no bandit or hostile faction, no script, no template). Each base carries one fixed name, so spawns of one base share it.",
  "sites": [
   {
    "id": "cracked-tusk",
@@ -154,8 +154,8 @@
      "name": "chief",
      "role": "chief",
      "count": 1,
-     "base": null,
-     "approved": false,
+     "base": "579:Orc Strongholds - All In One.esp",
+     "approved": true,
      "world": "1526a:Skyrim.esm",
      "pos": [
       -1562,
@@ -164,14 +164,14 @@
      ],
      "heading": 320,
      "anchor": "1ce60:CrackedTuskKeepExpanded.esp",
-     "note": "the longhouse upper hall, by the double bed 06b239"
+     "note": "the longhouse upper hall, by the double bed 06b239; base AIO 00_OrcGuard01 \"Tarzag\""
     },
     {
      "name": "household",
      "role": "household",
      "count": 2,
-     "base": null,
-     "approved": false,
+     "base": "22c:Orc Strongholds - All In One.esp",
+     "approved": true,
      "world": "1526a:Skyrim.esm",
      "pos": [
       -2170,
@@ -180,14 +180,14 @@
      ],
      "heading": 0,
      "anchor": "1ce61:CrackedTuskKeepExpanded.esp",
-     "note": "upper hall beds 1ce60-63"
+     "note": "upper hall beds 1ce60-63; base AIO 00_OrcCold \"Krogzah\""
     },
     {
      "name": "blacksmith",
      "role": "blacksmith",
      "count": 1,
-     "base": null,
-     "approved": false,
+     "base": "22a:Orc Strongholds - All In One.esp",
+     "approved": true,
      "world": "3c:Skyrim.esm",
      "pos": [
       -54646,
@@ -196,14 +196,14 @@
      ],
      "heading": 195,
      "anchor": "4065c:CrackedTuskKeepExpanded.esp",
-     "note": "the forge yard: forge 4065c, wheel 4065d, workbench 4065e; bed 40683"
+     "note": "the forge yard: forge 4065c, wheel 4065d, workbench 4065e; bed 40683; base AIO 00_OrcDrummer \"Horzug\""
     },
     {
      "name": "wisewoman",
      "role": "wisewoman",
      "count": 1,
-     "base": null,
-     "approved": false,
+     "base": "22c:Orc Strongholds - All In One.esp",
+     "approved": true,
      "world": "3c:Skyrim.esm",
      "pos": [
       -56068,
@@ -212,14 +212,14 @@
      ],
      "heading": 80,
      "anchor": "5edfa:CrackedTuskKeepExpanded.esp",
-     "note": "the alchemy table outside, near the shrine 23be:DragonBreak.esp"
+     "note": "the alchemy table outside, near the shrine 23be:DragonBreak.esp; base AIO 00_OrcCold \"Krogzah\""
     },
     {
      "name": "guards",
      "role": "guards",
-     "count": 3,
-     "base": null,
-     "approved": false,
+     "count": 2,
+     "base": "57b:Orc Strongholds - All In One.esp",
+     "approved": true,
      "world": "3c:Skyrim.esm",
      "pos": [
       -56692,
@@ -228,14 +228,30 @@
      ],
      "heading": 280,
      "anchor": "4fa07:CrackedTuskKeepExpanded.esp",
-     "note": "the training ground: combat dummies 4fa07/08, the gates"
+     "note": "the training ground: combat dummies 4fa07/08, the gates; base AIO 00_OrcGuard02 \"Fazog\""
+    },
+    {
+     "name": "guards2",
+     "role": "guards",
+     "count": 1,
+     "base": "57d:Orc Strongholds - All In One.esp",
+     "approved": true,
+     "world": "3c:Skyrim.esm",
+     "pos": [
+      -56692,
+      -85890,
+      -2073
+     ],
+     "heading": 280,
+     "anchor": "4fa07:CrackedTuskKeepExpanded.esp",
+     "note": "the training ground: combat dummies 4fa07/08, the gates; base AIO 00_OrcGuard03 \"Bargat\""
     },
     {
      "name": "miners",
      "role": "miners",
      "count": 2,
-     "base": null,
-     "approved": false,
+     "base": "22a:Orc Strongholds - All In One.esp",
+     "approved": true,
      "world": "3c:Skyrim.esm",
      "pos": [
       -53044,
@@ -244,14 +260,14 @@
      ],
      "heading": 0,
      "anchor": "e6d:CrackedTuskKeepExpanded.esp",
-     "note": "CrackedTuskMine1 (cell ea8), its door e6d; markers inside"
+     "note": "CrackedTuskMine1 (cell ea8), its door e6d; markers inside; base AIO 00_OrcDrummer \"Horzug\""
     },
     {
      "name": "workers",
      "role": "workers",
      "count": 2,
-     "base": null,
-     "approved": false,
+     "base": "22a:Orc Strongholds - All In One.esp",
+     "approved": true,
      "world": "3c:Skyrim.esm",
      "pos": [
       -57450,
@@ -260,14 +276,14 @@
      ],
      "heading": 277,
      "anchor": "4fa54:CrackedTuskKeepExpanded.esp",
-     "note": "the quarry stones 4fa54/56/6c, the sawmill 4fa38, planters 312bc-bf"
+     "note": "the quarry stones 4fa54/56/6c, the sawmill 4fa38, planters 312bc-bf; base AIO 00_OrcDrummer \"Horzug\""
     },
     {
      "name": "hunters",
      "role": "hunters",
      "count": 2,
-     "base": null,
-     "approved": false,
+     "base": "21f:Orc Strongholds - All In One.esp",
+     "approved": true,
      "world": "3c:Skyrim.esm",
      "pos": [
       -54195,
@@ -276,7 +292,7 @@
      ],
      "heading": 143,
      "anchor": "3203:CrackedTuskKeepExpanded.esp",
-     "note": "the east fire 3203, bedrolls 2709/270a"
+     "note": "the east fire 3203, bedrolls 2709/270a; base AIO 00_orcArcher \"Gorab\""
     }
    ]
   }
