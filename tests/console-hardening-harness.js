@@ -229,6 +229,10 @@ reset();
   rep = send('/discipline #LLX8 warn The account cannot be read', AS_LEAD);
   mp.getActorsByProfileId = real;
   check("H1. an account whose characters cannot be read is refused (rankUnknown), it fails closed", refused(rep, 'rankUnknown') && /could not read the staff rank/.test(header(rep)), brief(rep));
+  mp.getActorsByProfileId = (pid) => (pid === 2 ? [] : real(pid));
+  rep = send('/discipline #NNAT warn The profile index misses the target', AS_LEAD);
+  mp.getActorsByProfileId = real;
+  check("H1. the target character's own stamp counts even when the engine's profile index misses it: Nate (Developer) is refused for a Lead GM", refused(rep, 'rank'), brief(rep));
   // In game the typed command is unchanged (out of scope): the gap stays there, said in the hand-off
   setOnline(A.lead, true); reset();
   const n2 = n(2);
