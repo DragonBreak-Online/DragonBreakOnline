@@ -187,6 +187,7 @@ test('an Owner sees everything running, ending soonest first, and the strikes co
   assert.equal(susp.target.discordName, 'Bobby')
   const ip = r.json.rows.find(x => x.id === 'abn:ip1')
   assert.equal(ip.target.name, 'Ivan')
+  assert.equal(ip.by, 'Jake (profile 1)', 'the panel\'s "profile N" is named')
   const dash = r.json.rows.find(x => x.id === 'ban:i1')
   assert.equal(dash.by, 'Old Admin', 'a raw Discord id in bannedBy becomes the Discord name')
   assert.equal(dash.target.profileId, 40)

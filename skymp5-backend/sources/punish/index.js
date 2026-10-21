@@ -118,6 +118,10 @@ function createPunishments({ config, readStore, dynamicFields, characterName, lo
       if (first) { t.name = first.name; t.tag = t.tag || first.tag }
     }
     if (r._byDiscordId) { r.by = discordNameOf(id, r._byDiscordId) || 'a dashboard user'; r._byDiscordId = null }
+    // The admin panel and the in-game ban name staff as "profile N" or "profile N (tier)"
+    const staff = typeof r.by === 'string' && /^profile (\d{1,9})(?: \(([a-z]{1,12})\))?$/.exec(r.by)
+    const staffName = staff && discordNameOf(id, id.discordOf.get(Number(staff[1])))
+    if (staffName) r.by = `${staffName} (profile ${staff[1]}${staff[2] ? `, ${staff[2]}` : ''})`
   }
 
   function collect() {
