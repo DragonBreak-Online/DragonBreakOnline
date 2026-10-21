@@ -107,6 +107,10 @@ module.exports = (api) => {
     // Nate, 5 Oct (ticket #0064): a fed vampire passes for mortal, as Cyrodiil's vampires do. The eyes and the pallor
     // show from this stage of thirst; a vampire the fever turned shows them until the first meal. 1 = always
     vampireTellsStage: 3,
+    // Eyes that are a vampire's and never a character's own (vampire-eyes fix, 21 Oct), beside the tell eyes below: the
+    // Dawnguard vampire races' default eyes (HDPT valid only on HeadPartsHumanoidVampire, read from Dawnguard.esm) and the
+    // child's. An editor opened on a vampire race offers only these, so it saved them as the character's own
+    vampireEyeParts: ['6f88:Dawnguard.esm', '6f90:Dawnguard.esm', '29e0:Dawnguard.esm', '1094c4:Skyrim.esm'],
     // A goblin vampire's eyes (Nate, 20 Oct: "goblin vampire eyes need to glow when they are hungry"). Goblins have no eye
     // head parts: the eyes are in headparts.dds on the head mesh's shape mesh001:1:2:3:3 (every Goblin Head.nif variant).
     // While the tells show, that shape takes txst (a TXST of a glowing headparts texture), and txstMortal when they go.
@@ -411,7 +415,9 @@ module.exports = (api) => {
     const laid = layTells(app, s, fam, want);
     if (!laid) return;
     if (laid.look.skinOnly && s.kind === 'vampire' && goblinEyes(a, true)) laid.look.eyeGlow = true;
-    s.look = laid.look; saveState(a, s);
+    s.look = laid.look;
+    if (laid.look.eye && laid.look.prevEye && !isVampEye(laid.look.prevEye)) s.ownEye = Number(laid.look.prevEye) >>> 0;
+    saveState(a, s);
     mp.set(a, 'appearance', laid.next);
     log(`supernatural: ${display(a)} shows the ${s.kind}'s tells`);
   };
@@ -436,6 +442,8 @@ module.exports = (api) => {
   const clearTells = (a, s) => {
     const look = s && s.look; if (!look) return;
     s.look = null;
+    // The eyes given back are the character's own: kept for a look that loses them later (vampire-eyes fix, 21 Oct)
+    if (look.eye && look.prevEye && !isVampEye(look.prevEye)) s.ownEye = Number(look.prevEye) >>> 0;
     if (look.eyeGlow) goblinEyes(a, false);
     let app = null; try { app = mp.get(a, 'appearance'); } catch (e) { return; }
     if (!app || !Array.isArray(app.headpartIds)) return;
@@ -445,6 +453,106 @@ module.exports = (api) => {
     if (look.prevTone !== undefined) next.tints = (next.tints || []).map((x) => (isToneTint(x) ? Object.assign({}, x, { argb: look.prevTone }) : x));
     mp.set(a, 'appearance', next);
   };
+  // ---- vampire eyes kept as a character's own (Nate, 21 Oct: "check and fix all vampire eyes issue") ----------------
+  // Mike Morethi #5D8L: a GM's /chargen on 18 Oct saved the vampire eyes as his own while his tells were not due. s.look was
+  // null, so ensureTells saw the tell eyes already in and stopped, and nothing ever gave his eyes back. Lady Suna #EHVB the
+  // same way with Dawnguard's vampire eyes. An editor opened on a vampire race offers only vampire eyes (the mortal eyes'
+  // valid-race lists, HeadPartsHuman and the rest, hold no vampire race), so any edit on a vampire can do it.
+  // A vampire eye in the look while the tells are not due (or with no curse at all) is put back to the character's own:
+  // the eyes the tells hide (s.look.prevEye), the eyes the editor opened on, a repair from vampire-eye-repairs.json (taken
+  // from the hourly world backups, keyed "<profile>:<TAG>"), or the mortal race's default eyes read from its RACE record.
+  const VAMP_EYES = new Set([...Object.values(TELL_EYES.vampire).flat(), ...(Array.isArray(C.vampireEyeParts) ? C.vampireEyeParts : []).map(idOf)].filter(Boolean));
+  const isVampEye = (id) => VAMP_EYES.has(Number(id) >>> 0);
+  const REPAIRS_JSON = path.join(__dirname, 'vampire-eye-repairs.json');
+  // Read once per load: a hot reload reads it again
+  const EYE_REPAIRS = (() => { try { const j = JSON.parse(fs.readFileSync(REPAIRS_JSON, 'utf8')); return j && typeof j.repairs === 'object' ? j.repairs : {}; } catch (e) { return {}; } })();
+  const tagOfChar = (a) => { try { const t = mp.get(a, 'private.charTag'); return typeof t === 'string' ? t : ''; } catch (e) { return ''; } };
+  const repairEyeOf = (a) => {
+    const r = EYE_REPAIRS[`${profileOf(a)}:${tagOfChar(a)}`];
+    const eye = r && r.eye ? idOf(String(r.eye)) : 0;
+    return eye && !isVampEye(eye) && isEyePart(eye) ? eye : 0;
+  };
+  // A RACE's head data: NAM0 then MNAM (male) or FNAM (female), then INDX/HEAD pairs; the body data before the first NAM0
+  // carries MNAM/FNAM markers too, so only a marker right after NAM0 opens a sex's head parts
+  const raceEyeCache = new Map();
+  const raceDefaultEye = (race, female) => {
+    const key = `${race >>> 0}:${female ? 1 : 0}`;
+    if (raceEyeCache.has(key)) return raceEyeCache.get(key);
+    let eye = 0;
+    let sex = null, afterNam0 = false;
+    for (const f of (recordOf(race >>> 0) || {}).fields || []) {
+      if (f.type === 'NAM0') { afterNam0 = true; sex = null; continue; }
+      if (afterNam0 && (f.type === 'MNAM' || f.type === 'FNAM')) { sex = f.type === 'FNAM'; afterNam0 = false; continue; }
+      afterNam0 = false;
+      if (f.type === 'HEAD' && sex === !!female) {
+        const id = globalOf(race >>> 0, u32s(f)[0] >>> 0);
+        if (id && isEyePart(id) && !isVampEye(id)) { eye = id; break; }
+      }
+    }
+    raceEyeCache.set(key, eye);
+    return eye;
+  };
+  const eyeIn = (x) => { const ids = (x && Array.isArray(x.headpartIds)) ? x.headpartIds.map((h) => Number(h) >>> 0) : []; return ids.find((h) => isEyePart(h)) || 0; };
+  // The character's own eyes for a look that holds vampire eyes: { eye, from } or null
+  const ownEyeFor = (a, app, s, before) => {
+    const kept = s && s.look ? Number(s.look.prevEye) >>> 0 : 0;
+    if (kept && !isVampEye(kept) && isEyePart(kept)) return { eye: kept, from: 'the eyes the tells hid' };
+    const was = eyeIn(before);
+    if (was && !isVampEye(was)) return { eye: was, from: 'the eyes before the edit' };
+    const last = s && s.ownEye ? Number(s.ownEye) >>> 0 : 0;
+    if (last && !isVampEye(last) && isEyePart(last)) return { eye: last, from: 'the own eyes last given back' };
+    const fix = repairEyeOf(a);
+    if (fix) return { eye: fix, from: 'vampire-eye-repairs.json' };
+    const race = Number(app.raceId) >>> 0;
+    const def = raceDefaultEye(MORTAL_RACES.get(race) || race, !!app.isFemale);
+    if (def) return { eye: def, from: 'the race\'s default eyes' };
+    return null;
+  };
+  const eyeWarned = new Set();
+  // A look that should not show vampire eyes, put right. why names the caller in the log. Returns { from, to, via } when a
+  // change was made, or a string saying why not
+  const fixStuckEyes = (a, why, force) => {
+    a = Number(a) >>> 0;
+    const s = stateOf(a);
+    if (!s || beastForm(a)) return 'in beast form or unreadable';
+    let app = null; try { app = mp.get(a, 'appearance'); } catch (e) { return 'no appearance'; }
+    if (!app || !Array.isArray(app.headpartIds)) return 'no appearance';
+    const ids = app.headpartIds.map((h) => Number(h) >>> 0);
+    const showing = s.kind === 'vampire' && tellsShown(s);
+    // The tells are due: the eyes are right, but the eyes they hide must be the character's own for the next feed
+    if (showing) {
+      if (s.look && s.look.eye && isVampEye(s.look.prevEye)) {
+        const r = ownEyeFor(a, app, Object.assign({}, s, { look: null }), null);
+        if (!r) return 'the tells hide vampire eyes and no own eyes were found';
+        const from = Number(s.look.prevEye) >>> 0;
+        s.look.prevEye = r.eye; saveState(a, s);
+        log(`supernatural: ${display(a)}'s tells hid vampire eyes ${from.toString(16)}; they now hide ${r.eye.toString(16)} (${r.from}; ${why})`);
+        audit(`SUPERNATURAL ${who(a)} vampire eyes under the tells ${from.toString(16)} -> ${r.eye.toString(16)} (${r.from}; ${why})`);
+        return { from, to: r.eye, via: r.from };
+      }
+      return 'the tells are due';
+    }
+    const at = ids.findIndex((h) => isVampEye(h));
+    if (at < 0) return 'no vampire eyes';
+    const vEye = ids[at];
+    // Tells laid with the own eyes kept: showTells (a fed vampire) or endCurse (a cure) gives them back
+    if (!force && s.kind && s.look && s.look.eye === vEye && !isVampEye(s.look.prevEye)) return 'the tells are being cleared';
+    const r = ownEyeFor(a, app, s, null);
+    if (!r) {
+      const k = `${a}:${vEye}`;
+      if (!eyeWarned.has(k)) { eyeWarned.add(k); log(`supernatural: ${display(a)} wears vampire eyes ${vEye.toString(16)} with no tells due, and no own eyes were found (${why})`); }
+      return 'no own eyes found';
+    }
+    const next = Object.assign({}, app, { headpartIds: app.headpartIds.map((h, i) => (i === at ? r.eye : h)) });
+    if (s.look && s.look.eye === vEye) { s.look = null; saveState(a, s); }
+    mp.set(a, 'appearance', next);
+    log(`supernatural: ${display(a)} wore vampire eyes ${vEye.toString(16)} with no tells due (${s.kind || 'mortal'}, stage ${s.stage || 0}); own eyes ${r.eye.toString(16)} put back from ${r.from} (${why})`);
+    audit(`SUPERNATURAL ${who(a)} vampire eyes ${vEye.toString(16)} -> ${r.eye.toString(16)} (${r.from}; ${why})`);
+    return { from: vEye, to: r.eye, via: r.from };
+  };
+  // Mortals and cured characters are looked at once a session; a curse's tick looks every time
+  const eyesCheckedFor = new Set();
+
   // A saved appearance edit (appearance.js: /appearance, a GM's /chargen on an existing character, or a patron's /reroll)
   // on a character with a curse. s.look keeps the eyes, skin colour and skin tone the tells hide, and a feed gives them
   // back, so an edit saved while the tells showed was undone at the next feed (Selena #PXVM, 5 Oct), and one that changed
@@ -456,10 +564,28 @@ module.exports = (api) => {
   const retakeTells = (a, before) => {
     a = Number(a) >>> 0;
     const s = stateOf(a);
-    if (!s || !s.kind || beastForm(a)) return false;
+    if (!s || !s.kind || beastForm(a)) { if (s && !s.kind && !beastForm(a)) fixStuckEyes(a, 'saved edit, no curse'); return false; }
     let app = null; try { app = mp.get(a, 'appearance'); } catch (e) { return false; }
     if (!app || !Array.isArray(app.headpartIds)) return false;
     const b = before && typeof before === 'object' ? before : null;
+    // The editor guard (vampire-eyes fix, 21 Oct): vampire eyes are never saved as the character's own. The tell eyes the
+    // player kept are mapped back below; any other vampire eyes (what an editor on a vampire race offers) are swapped for
+    // the own eyes here, and the tells go back over those when they are due
+    let eyeGuarded = null;
+    {
+      const ids = app.headpartIds.map((h) => Number(h) >>> 0);
+      const at = ids.findIndex((h) => isVampEye(h) && !(s.look && s.look.eye === h));
+      if (at >= 0) {
+        const r = ownEyeFor(a, app, s, b);
+        if (r) {
+          eyeGuarded = { from: ids[at], to: r.eye, via: r.from };
+          app = Object.assign({}, app, { headpartIds: app.headpartIds.map((h, i) => (i === at ? r.eye : h)) });
+          log(`supernatural: ${display(a)}'s edit saved vampire eyes ${ids[at].toString(16)} as their own; kept ${r.eye.toString(16)} (${r.from})`);
+          audit(`SUPERNATURAL ${who(a)} editor saved vampire eyes ${ids[at].toString(16)}; own eyes ${r.eye.toString(16)} kept (${r.from})`);
+          personal(a, 'A vampire\'s eyes are not yours to choose: they show with your thirst. Your own eyes were kept.');
+        } else log(`supernatural: ${display(a)}'s edit saved vampire eyes ${ids[at].toString(16)} and no own eyes were found; left as saved`);
+      }
+    }
     const bloodTaken = s.kind === 'vampire' && retakeBlood(a, s, app, b);
     const mortal = Object.assign({}, app);
     const look = s.look;
@@ -485,6 +611,7 @@ module.exports = (api) => {
       }
       s.look = null;
     }
+    { const own = eyeIn(mortal); if (own && !isVampEye(own)) s.ownEye = own; }
     let next = mortal;
     if (tellsShown(s)) {
       const { fam, want } = tellEyeFor(mortal, s);
@@ -493,9 +620,9 @@ module.exports = (api) => {
     }
     // A goblin's glowing eyes are on the mesh, not in the look: they stay with the new look, or go when it shows none
     if (look && look.eyeGlow) { if (s.look && s.look.skinOnly) s.look.eyeGlow = true; else goblinEyes(a, false); }
-    if (!look && !s.look && !bloodTaken) return false;
+    if (!look && !s.look && !bloodTaken && !eyeGuarded) return false;
     saveState(a, s);
-    if (JSON.stringify(next) !== JSON.stringify(app)) mp.set(a, 'appearance', next);
+    if (eyeGuarded || JSON.stringify(next) !== JSON.stringify(app)) mp.set(a, 'appearance', next);
     if (look || s.look) log(`supernatural: ${display(a)} saved a new look; the ${s.kind}'s tells now hide it${s.look ? '' : ' (not showing)'}`);
     return true;
   };
@@ -2367,6 +2494,7 @@ module.exports = (api) => {
   globalThis.__dboSuperLogin = (a) => {
     // After the client's own login spell sync (remoteServer.ts enforceSpells on CreateActor), not before it
     flushedFor.delete(a >>> 0);
+    eyesCheckedFor.delete(a >>> 0);
     globalThis.__dboSuperLoginAt instanceof Map && globalThis.__dboSuperLoginAt.set(a >>> 0, Date.now());
     try { const bs = stateOf(a); if (bs && bs.blood) sendPacket(a, { customPacketType: 'dboBloody', on: true }); } catch (e) { /* old client */ }
     setTimeout(() => { try { if (onlineActors().includes(a)) flushStageSpells(a, stateOf(a), 'login'); } catch (e) { log('supernatural: login spell flush failed', e.message); } }, 15000);
@@ -2501,6 +2629,11 @@ module.exports = (api) => {
         else if (!sameSpells(s.spells, wantSpells(s))) syncVampSpells(a, s);
       }
       if (s.kind) showTells(a, s);
+      // Vampire eyes with no tells due (vampire-eyes fix, 21 Oct): a curse's look every tick, anyone else's once a session
+      if (s.kind || !eyesCheckedFor.has(a >>> 0)) {
+        eyesCheckedFor.add(a >>> 0);
+        try { fixStuckEyes(a, 'slow tick'); } catch (e) { log(`supernatural: eye check for ${display(a)} failed: ${e.message}`); }
+      }
     }
   });
   every('superSun', 10000, () => {
@@ -2621,6 +2754,47 @@ module.exports = (api) => {
     audit(`SUPERNATURAL GM ${who(a)} /curse ${display(t)} ${w}`);
     personal(a, `Done: ${display(t)} ${w}.`);
   }, { admin: true, help: '<player|me|#TAG> <vampire|purevampire|werewolf|blessedwerewolf|infectvampire|infectwerewolf|fever|cure|crown|bloody|wash|riteclear|status|restore|stage 1-4>' });
+
+  // Staff repair for vampire eyes kept as a character's own (vampire-eyes fix, 21 Oct). audit: everyone online and every
+  // character in vampire-eye-repairs.json; fix: one character, online by name or #TAG, offline by #TAG
+  const eyeLine = (t) => {
+    const s = stateOf(t) || {};
+    let app = null; try { app = mp.get(t, 'appearance'); } catch (e) { /* unreadable */ }
+    const ids = app && Array.isArray(app.headpartIds) ? app.headpartIds.map((h) => Number(h) >>> 0) : [];
+    const v = ids.find((h) => isVampEye(h));
+    const showing = s.kind === 'vampire' && tellsShown(s);
+    const kept = s.look ? Number(s.look.prevEye) >>> 0 : 0;
+    const verdict = !v ? (kept && isVampEye(kept) ? 'tells hide vampire eyes' : 'ok')
+      : showing ? (kept && isVampEye(kept) ? 'tells hide vampire eyes' : 'ok (tells due)')
+      : s.kind && s.look && s.look.eye === v ? 'clears at the next tick' : s.kind ? 'STUCK' : 'CURED, still wears them';
+    return { verdict, text: `${display(t)} #${tagOfChar(t) || '????'}: ${s.kind ? `${s.kind} stage ${s.stage || 0}${s.unfed ? ', unfed' : ''}` : 'mortal'}, eyes ${v ? v.toString(16) + ' (vampire)' : 'own'}${kept ? `, tells hide ${kept.toString(16)}` : ''}: ${verdict}` };
+  };
+  registerChatCommand('vampeyes', (a, args) => {
+    const [what, ...rest] = String(args || '').trim().split(/\s+/);
+    const w = String(what || '').toLowerCase();
+    if (w === 'audit') {
+      const seen = new Set();
+      const lines = [];
+      for (const t of onlineActors()) { seen.add(t >>> 0); const l = eyeLine(t); if (l.verdict !== 'ok') lines.push(l.text); }
+      for (const k of Object.keys(EYE_REPAIRS)) {
+        const tag = k.split(':')[1];
+        const t = tag ? findCharacter(`#${tag}`) : 0;
+        if (!t || seen.has(t >>> 0)) continue;
+        lines.push(`${eyeLine(t).text} [repair ${EYE_REPAIRS[k].eye}]`);
+      }
+      return personal(a, lines.length ? `Vampire eyes:\n${lines.join('\n')}` : 'Vampire eyes: nobody online (or in vampire-eye-repairs.json) wears them out of turn.');
+    }
+    if (w === 'fix') {
+      const q = rest.join(' ');
+      const t = q === 'me' ? a : findCharacter(q);
+      if (!t) return personal(a, 'No such character: use their name if online, or #TAG.');
+      const r = fixStuckEyes(t, `GM ${nameOf(a)}`, true);
+      if (typeof r === 'string') return personal(a, `${display(t)}: nothing changed (${r}).`);
+      audit(`SUPERNATURAL GM ${who(a)} /vampeyes fix ${display(t)}`);
+      return personal(a, `${display(t)}: vampire eyes ${r.from.toString(16)} -> ${r.to.toString(16)} (${r.via}). They see it after a relog.`);
+    }
+    return personal(a, 'Usage: /vampeyes audit | /vampeyes fix <player|#TAG|me>');
+  }, { admin: true, help: 'audit | fix <player|#TAG|me>: vampire eyes kept as a character\'s own' });
 
   log(`supernatural on: sanguinare ${SANGUINARE.toString(16)}, ${VAMPIRE_RACES.size} vampire races, crown ${G.crown ? G.crown.name : 'unclaimed'}, cure effects ${CURE_EFFECTS.size}, pale shader ${PALE_SHADER.toString(16)}`);
 };

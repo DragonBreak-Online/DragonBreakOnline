@@ -1,0 +1,7 @@
+{
+  "_doc": "Own eyes for characters whose look kept a vampire's eyes (supernatural.js fixStuckEyes, vampire-eyes fix 21 Oct). Keyed '<profileId>:<TAG>'; eye is a form desc (load-order safe). Taken from the hourly world backups in /opt/skymp-backups/world: the last eye before the vampire eyes appeared. Used only when the character wears vampire eyes with no tells due and no kept eyes (s.look.prevEye) or eyes before an edit are known.",
+  "repairs": {
+    "171:5D8L": { "name": "Mike Morethi", "eye": "cd45:Improved Eyes Skyrim.esp", "edid": "MJBMaleEyesDarkElfRed01", "was": "e7aeb (MaleEyesHumanVampire)", "source": "world-20261018T000030Z: 0x2700cd45; a GM /chargen on 18 Oct 18:27 saved the vampire eyes" },
+    "31:EHVB": { "name": "Lady Suna Vauclaire", "eye": "53997:Skyrim.esm", "was": "2006f90 (Dawnguard FemaleEyesHumanVampire01)", "source": "s.look.prevEye 0x53997 in world-20261012T000116Z..20261017T000026Z; vampire eyes saved by 20261018T000030Z" }
+  }
+}
