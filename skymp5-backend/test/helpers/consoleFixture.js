@@ -81,6 +81,7 @@ function createConsoleFixture(label = 'dbo-console-') {
     F.api = createStaffConsole({
       config: { ...F.config, ...configOverride }, discordBot: F.discordBot, siteSessions: F.siteSessions,
       profileIdOf: id => (F.profiles.has(id) ? F.profiles.get(id) : null), spool: F.spool, audit: F.audit,
+      discordIdsOfProfile: pid => [...F.profiles].filter(([, p]) => p === pid).map(([d]) => d),
       jobsFile: path.join(root, 'data', 'console-jobs.json'), switchFile, now: F.now, log: (...a) => F.logs.push(a.join(' ')),
       waitMs: 1500, lateWaitMs: 1500, ...extra,
     })
