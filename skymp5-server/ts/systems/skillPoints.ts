@@ -193,6 +193,16 @@ export const structuralCap = (
   return cap;
 };
 
+/** The limit a staff tool would break by putting `id` straight at `level`, or null when it fits. A set that does not raise the skill never breaks one. */
+export type SetLimit = "cap" | "pool" | "seat" | "expert";
+export const limitBrokenBySet = (levels: SkillLevels, id: string, level: number, cfg: PointConfig): SetLimit | null => {
+  if (level <= (levels[id] || 0)) return null;
+  if (level > cfg.capPerSkill) return "cap";
+  if (Object.entries(levels).reduce((n, [k, v]) => n + (k === id ? 0 : v), 0) + level > cfg.pool) return "pool";
+  const cap = structuralCap(levels, id, cfg);
+  return level <= cap ? null : cap === cfg.expertAbove ? "expert" : "seat";
+};
+
 // ── the pool, and who gives way ────────────────────────────────────────────────────────────────────
 
 export type Lock = "raise" | "hold" | "lower";

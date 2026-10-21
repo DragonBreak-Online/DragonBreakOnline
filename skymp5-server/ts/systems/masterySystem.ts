@@ -169,6 +169,13 @@ export interface MasterySummary {
   hours: number;
 }
 
+// An admin skill change: whether it was made, the staff reply, and the level (hours in the old model) the skill now has
+export interface AdminSkillResult {
+  ok: boolean;
+  text: string;
+  level?: number;
+}
+
 interface ResolvedRules {
   craftKeywords: Set<number>;
   craftStations: Set<number>;
@@ -888,6 +895,9 @@ export class MasterySystem implements System {
 
   // ── Admin API (shape kept for AdminSystem) ──────────────────────────────────
 
+  // True under the point system, where a skill's number is its level 0..100 rather than worked hours
+  usesLevels(): boolean { return !!this.points; }
+
   summaryOf(ctx: SystemContext, actorId: number): MasterySummary {
     const rec = this.read(ctx, actorId) || emptyRecord();
     const ranks = rec.order.map((id) => rec.skills[id] ? rec.skills[id].rank : 0);
@@ -900,19 +910,33 @@ export class MasterySystem implements System {
     };
   }
 
-  grantPoints(ctx: SystemContext, actorId: number, amount: number, skillId?: string): MasterySummary | null {
-    if (!Number.isInteger(amount) || amount === 0 || Math.abs(amount) > MAX_GRANT) return null;
+  // Admin: adds hours, or levels within the cap and limits under the point system, to the named or first held skill
+  grantPoints(ctx: SystemContext, actorId: number, amount: number, skillId?: string): AdminSkillResult {
+    const cfg = this.points;
+    if (!Number.isInteger(amount) || amount === 0 || Math.abs(amount) > MAX_GRANT) return { ok: false, text: `${cfg ? "Levels" : "Hours"} must be a whole number between -${MAX_GRANT} and ${MAX_GRANT}` };
     const rec = this.read(ctx, actorId) || emptyRecord();
     const id = skillId && rec.order.indexOf(skillId) !== -1 ? skillId : rec.order[0];
-    if (!id) return null;
+    if (!id) return { ok: false, text: "No skill taken up to grant to" };
     const prog = rec.skills[id];
-    prog.level = Math.max(0, prog.level + amount);
-    this.write(ctx, actorId, rec);
+    const label = this.labelOf(id);
     const userId = this.userOf(ctx, actorId);
-    this.notice(ctx, userId, `Your hours as a ${this.labelOf(id)} now stand at ${prog.level}.`);
-    this.syncRank(ctx, actorId, rec, id, userId);
-    this.write(ctx, actorId, rec);
-    return this.summaryOf(ctx, actorId);
+    if (!cfg) {
+      prog.level = Math.max(0, prog.level + amount);
+      this.write(ctx, actorId, rec);
+      this.notice(ctx, userId, `Your hours as a ${label} now stand at ${prog.level}.`);
+      this.syncRank(ctx, actorId, rec, id, userId);
+      this.write(ctx, actorId, rec);
+      const s = this.summaryOf(ctx, actorId);
+      return { ok: true, text: `${s.hours}h, ${s.label ? `${s.rankName} ${s.label}` : "no craft chosen"}`, level: prog.level };
+    }
+    const top = Math.min(cfg.capPerSkill, P.MAX_LEVEL);
+    const level = Math.max(0, Math.min(top, prog.level + amount));
+    const refused = this.limitRefusal(rec, id, level, `${label} to level ${level}`);
+    if (refused) return { ok: false, text: refused };
+    this.notice(ctx, userId, level < 1 ? `${label} has been set aside.` : `Your ${label} now stands at level ${level}.`);
+    this.putLevel(ctx, actorId, rec, id, level, level < 1 || level >= top ? 0 : prog.xp || 0);
+    const used = Object.values(rec.skills).reduce((n, pr) => n + pr.level, 0);
+    return { ok: true, text: `${label} level ${level}${level >= 1 ? ` (${this.tierNames[prog.rank] || ""})` : ", set aside"}, ${used} of ${cfg.pool} points on the Wheel`, level };
   }
 
   resetCharacter(ctx: SystemContext, actorId: number): boolean {
@@ -936,22 +960,52 @@ export class MasterySystem implements System {
     };
   }
 
-  // Admin: puts the character at the start of a tier in a skill, taking the skill up first if needed (the chosen-skill limit does not apply)
-  adminSetTier(ctx: SystemContext, actorId: number, skillId: string, tier: number): boolean {
-    if (!this.def(skillId) || !Number.isInteger(tier) || tier < 0 || tier >= this.tierHours.length) return false;
+  // Admin: puts a skill at its tier's first hour (past the chosen limit) or, under the point system, first level within the limits
+  adminSetTier(ctx: SystemContext, actorId: number, skillId: string, tier: number): AdminSkillResult {
+    if (!this.def(skillId)) return { ok: false, text: "No such skill" };
+    const level = this.points ? P.levelFloorOfTier(tier) : this.tierHours[tier];
+    if (!Number.isInteger(tier) || tier < 0 || tier >= this.tierHours.length || (this.points && P.tierOfLevel(level) !== tier)) return { ok: false, text: "No such tier" };
     const rec = this.read(ctx, actorId) || emptyRecord();
+    const label = this.labelOf(skillId), name = this.tierNames[tier] || `tier ${tier + 1}`;
+    const refused = this.limitRefusal(rec, skillId, level, `${label} to ${name} (level ${level})`);
+    if (refused) return { ok: false, text: refused };
+    this.putLevel(ctx, actorId, rec, skillId, level, 0);
+    return { ok: true, text: `${label} set to ${name} (${this.points ? `level ${level}` : `${level} h`})`, level };
+  }
+
+  // Sets one skill's level and settles its rank, marker spells, actor values and the menu; a skill not held is taken up
+  private putLevel(ctx: SystemContext, actorId: number, rec: MasteryRecord, skillId: string, level: number, xp: number): void {
     const userId = this.userOf(ctx, actorId);
-    if (rec.order.indexOf(skillId) === -1) {
-      rec.order.push(skillId);
-      rec.skills[skillId] = rec.skills[skillId] || emptyProgress();
-      rec.skills[skillId].rank = -1;
+    const held = this.points ? (rec.skills[skillId]?.level ?? 0) >= 1 : rec.order.indexOf(skillId) !== -1;
+    const prog = rec.skills[skillId] = rec.skills[skillId] || emptyProgress();
+    if (!held) {
+      if (rec.order.indexOf(skillId) === -1) rec.order.push(skillId);
+      prog.rank = -1;
+      // As a first touch and a take-up leave it: rising, with no banked offer left to credit again
+      if (this.points) { prog.lock = "raise"; delete prog.shadow; delete prog.offered; }
     }
-    rec.skills[skillId].level = this.tierHours[tier];
+    prog.level = level;
+    if (this.points) prog.xp = xp;
     this.syncRank(ctx, actorId, rec, skillId, userId);
-    this.applyActorValues(ctx, actorId, skillId, rec.skills[skillId].rank, rec);
+    this.applyActorValues(ctx, actorId, skillId, prog.rank, rec);
     this.write(ctx, actorId, rec);
     this.sendMenu(ctx, userId);
-    return true;
+  }
+
+  // Staff words for the limit a level set would break (P.limitBrokenBySet); null when it fits or the point system is off
+  private limitRefusal(rec: MasteryRecord, skillId: string, level: number, what: string): string | null {
+    const cfg = this.points; if (!cfg) return null;
+    const levels: P.SkillLevels = {};
+    for (const [id, prog] of Object.entries(rec.skills)) levels[id] = prog.level;
+    const holders = (above: number) => Object.entries(levels).filter(([id, v]) => id !== skillId && v > above).map(([id, v]) => `${this.labelOf(id)} ${v}`).join(", ");
+    const used = Object.entries(levels).reduce((n, [id, v]) => n + (id === skillId ? 0 : v), level);
+    switch (P.limitBrokenBySet(levels, skillId, level, cfg)) {
+      case "cap": return `${what} is past the cap of ${cfg.capPerSkill}`;
+      case "pool": return `${what} would use ${used} of the ${cfg.pool} points on the Wheel. Lower or set aside another skill first`;
+      case "seat": return `${what} breaks the limit of ${cfg.seatCount} skill over ${cfg.seatAbove} (${holders(cfg.seatAbove)}). Lower that first`;
+      case "expert": return `${what} breaks the limit of ${cfg.expertCount} skills over ${cfg.expertAbove} (${holders(cfg.expertAbove)}). Lower one of them first`;
+      default: return null;
+    }
   }
 
   // Admin: sets one skill aside with no standing stone, no gold and no respec counted

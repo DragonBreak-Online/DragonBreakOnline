@@ -2,7 +2,7 @@ import { Settings } from "../settings";
 import { System, Log, SystemContext, Content } from "./system";
 import { AdminTier, AdminRoleConfig, TIER_CAPS, readAdminRoleConfig, adminTierOf, isTrialGm, TRIAL_GM_ACTIONS, TRIAL_GM_MODES, TRIAL_GM_TABS, TRIAL_GM_REQUESTS } from "./adminRoles";
 import { NpcSpawnSystem } from "./npcSpawnSystem";
-import { MasterySystem, MAX_GRANT } from "./masterySystem";
+import { MasterySystem } from "./masterySystem";
 import { kickWithReason } from "./kickUtil";
 import { AdminBans } from "./adminBans";
 import { guidOf } from "./actorUtil";
@@ -41,7 +41,7 @@ type Mp = any;
 //                     { customPacketType: "adminAction", action: "toggleMode", mode }
 //                     { customPacketType: "adminAction", action: "npcZoneAdd", zone }  zone: JSON string of one NPC-Spawns.json entry
 //                     { customPacketType: "adminAction", action: "npcZoneTp" | "npcZoneReset" | "npcZoneDelete", target }  target: zone name
-//                     { customPacketType: "adminAction", action: "masteryGrant", target, amount }  worked hours to add (negative removes), any tier, self allowed
+//                     { customPacketType: "adminAction", action: "masteryGrant", target, amount }  hours to add, levels under the point system (negative removes), self allowed
 //                     { customPacketType: "adminAction", action: "masteryReset", target }  clears the character's chosen craft and its hours
 //                     (F7 panel, 2026-09-16)
 //                     { customPacketType: "adminAction", action: "kill" | "deleteCharacter" | "ipBan", target }  target: online actor id hex
@@ -637,14 +637,9 @@ export class AdminSystem implements System {
         this.reply(mp, userId, true, action === "ipBan" ? `IP-banned ${target.name}` : `Banned ${target.name} for ${hours} hour(s)`);
       } else if (action === "masteryGrant") {
         const amount = Number(content["amount"]);
-        const summary = this.mastery.grantPoints(ctx, target.actorId, amount);
-        if (!summary) {
-          this.reply(mp, userId, false, `Hours must be a whole number between -${MAX_GRANT} and ${MAX_GRANT}`);
-        } else {
-          const standing = summary.label ? `${summary.rankName} ${summary.label}` : "no craft chosen";
-          this.adminLog(`profile ${adminProfile} granted ${amount} mastery hour(s) to ${target.name} (profile ${target.profileId}), now ${summary.hours}h, ${standing}`);
-          this.reply(mp, userId, true, `${target.name}: ${summary.hours}h, ${standing}`);
-        }
+        const r = this.mastery.grantPoints(ctx, target.actorId, amount);
+        if (r.ok) this.adminLog(`profile ${adminProfile} granted ${amount} mastery ${this.mastery.usesLevels() ? "level" : "hour"}(s) to ${target.name} (profile ${target.profileId}), now ${r.text}`);
+        this.reply(mp, userId, r.ok, r.ok ? `${target.name}: ${r.text}` : r.text);
       } else if (action === "masteryReset") {
         const ok = this.mastery.resetCharacter(ctx, target.actorId);
         if (ok) this.adminLog(`profile ${adminProfile} reset the craft and hours of ${target.name} (profile ${target.profileId})`);
@@ -733,12 +728,21 @@ export class AdminSystem implements System {
     action: string, who: { userId: number; actorId: number; profileId: number; name: string }, content: Content): void {
     const whom = who.actorId === myActorId ? "themself" : `${who.name} (profile ${who.profileId})`;
     try {
-      if (action === "masterySetTier" || action === "masteryDrop") {
+      // The player log reads "set <skill> to tier <n> for" from the admin log line (playerlog-rules.js), so the level goes after it
+      if (action === "masterySetTier") {
         const skill = String(content["skill"] ?? "");
         const tier = Number(content["tier"]);
-        const ok = action === "masterySetTier" ? this.mastery.adminSetTier(ctx, who.actorId, skill, tier) : this.mastery.adminDropSkill(ctx, who.actorId, skill);
-        if (ok) this.adminLog(`profile ${adminProfile} ${action === "masterySetTier" ? `set ${skill} to tier ${tier} for` : `dropped ${skill} for`} ${whom}`);
-        this.reply(mp, userId, ok, ok ? (action === "masterySetTier" ? `${who.name}: ${skill} set` : `${who.name}: ${skill} set aside`) : "That did not work");
+        const r = this.mastery.adminSetTier(ctx, who.actorId, skill, tier);
+        if (r.ok) this.adminLog(`profile ${adminProfile} set ${skill} to tier ${tier} for ${whom}, ${this.mastery.usesLevels() ? `level ${r.level}` : `${r.level} h`}`);
+        this.reply(mp, userId, r.ok, `${who.name}: ${r.text}`);
+        if (r.ok) this.sendMasteryDetail(ctx, mp, userId, who);
+        return;
+      }
+      if (action === "masteryDrop") {
+        const skill = String(content["skill"] ?? "");
+        const ok = this.mastery.adminDropSkill(ctx, who.actorId, skill);
+        if (ok) this.adminLog(`profile ${adminProfile} dropped ${skill} for ${whom}`);
+        this.reply(mp, userId, ok, ok ? `${who.name}: ${skill} set aside` : "That did not work");
         if (ok) this.sendMasteryDetail(ctx, mp, userId, who);
         return;
       }
