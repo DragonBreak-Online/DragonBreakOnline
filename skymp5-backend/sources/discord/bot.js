@@ -7,6 +7,7 @@ const bans = require('../bans')
 const players = require('../players')
 const tickets = require('./tickets')
 const banAudit = require('./banAudit')
+const moderationJournal = require('./moderationJournal')
 const serverStatus = require('./serverStatus')
 
 const client = new Client({
@@ -59,7 +60,8 @@ client.on('guildBanAdd', ban => {
     listNote = 'the game ban list could not be written'
     console.error('[discord-bot] failed to record guild ban:', err.message)
   }
-  banAudit.record('ban', ban, listNote).catch(err => console.error('[discord-bot] ban audit failed:', err.message))
+  banAudit.record('ban', ban, listNote).then(mod => moderationJournal.append('discord_ban', ban.user, mod))
+    .catch(err => console.error('[discord-bot] ban audit failed:', err.message))
 })
 
 // A Discord unban lifts the snapshot too, or the player would stay banned forever
@@ -77,7 +79,8 @@ client.on('guildBanRemove', ban => {
     listNote = 'the game ban list could not be updated'
     console.error('[discord-bot] failed to lift guild ban:', err.message)
   }
-  banAudit.record('unban', ban, listNote).catch(err => console.error('[discord-bot] unban audit failed:', err.message))
+  banAudit.record('unban', ban, listNote).then(mod => moderationJournal.append('discord_unban', ban.user, mod))
+    .catch(err => console.error('[discord-bot] unban audit failed:', err.message))
 })
 
 // Role and nickname changes go to the audit channel the moment they happen
@@ -94,6 +97,12 @@ client.on('guildMemberUpdate', (before, after) => {
     if (removed.length) audit.log(`PERM ${tag} lost role(s): ${removed.join(', ')}`)
     if (before.nickname !== after.nickname) audit.log(`NAME ${tag} nickname "${before.nickname || ''}" -> "${after.nickname || ''}"`)
     if (added.length || removed.length) roleCache.delete(after.id)
+    // A timeout given or taken off, for the moderation journal (the staff dashboard's Punishments panel)
+    const wasUntil = before.communicationDisabledUntilTimestamp || 0
+    const until = after.communicationDisabledUntilTimestamp || 0
+    if (wasUntil !== until) {
+      moderationJournal.timeoutChanged(after, wasUntil, until).catch(err => console.error('[discord-bot] timeout journal failed:', err.message))
+    }
   } catch (err) {
     console.error('[discord-bot] member update audit failed:', err.message)
   }

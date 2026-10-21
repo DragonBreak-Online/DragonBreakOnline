@@ -15,8 +15,8 @@ const oneLine = (text, max) => String(text || '').replace(/[\u0000-\u001f\u007f]
 // A Discord id or mention a moderator typed into the reason
 const ID_RX = /<[@#][!&]?\d{5,22}>|\b\d{17,20}\b/g
 
-// { found, denied, name, bot, reason } from the newest entry of this type on this member; denied: no View Audit Log
-async function moderatorOf(guild, type, targetId) {
+// { found, denied, name, bot, reason } from the newest entry of this type on this member that match accepts; denied: no View Audit Log
+async function moderatorOf(guild, type, targetId, match = () => true) {
   for (const wait of WAITS_MS) {
     if (wait > 0) await sleep(wait)
     let entries
@@ -25,7 +25,7 @@ async function moderatorOf(guild, type, targetId) {
     } catch (err) {
       return { found: false, denied: !!err && (err.code === 50013 || err.status === 403) }
     }
-    const hit = entries.find(e => e && e.targetId === targetId && Date.now() - Number(e.createdTimestamp) < ENTRY_MAX_AGE_MS)
+    const hit = entries.find(e => e && e.targetId === targetId && Date.now() - Number(e.createdTimestamp) < ENTRY_MAX_AGE_MS && match(e))
     if (hit) return { found: true, name: oneLine(hit.executor && hit.executor.username, 40) || 'unknown', bot: !!(hit.executor && hit.executor.bot), reason: oneLine(String(hit.reason || '').replace(ID_RX, '[id]'), 300) }
   }
   return { found: false, denied: false }
@@ -65,6 +65,7 @@ async function record(op, ban, listNote) {
   const user = oneLine(ban.user.username, 40) || 'unknown user'
   const [verb, done] = op === 'ban' ? ['BAN', 'banned'] : ['UNBAN', 'unbanned']
   audit.log(`${verb} ${user} (${accountText(discordId)}) ${done} on Discord by ${who}; ${listNote}; ${mod.reason ? `reason: ${mod.reason}` : 'no reason given'}`)
+  return mod
 }
 
-module.exports = { record, moderatorOf, WAITS_MS }
+module.exports = { record, moderatorOf, tagsOf, WAITS_MS }
