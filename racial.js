@@ -851,9 +851,9 @@ module.exports = (api) => {
       const p = typeof globalThis.__dboPlaytimeOf === 'function' ? globalThis.__dboPlaytimeOf(profileId) : undefined;
       if (p) ms = Number(p.ms) || 0;
     } catch (e) { /* locked */ }
-    // The rare races (Nate 20 Oct): the Half-Giant and the Snow Elf, each at its config unlockHours, else the slot's hours
+    // The Half-Giant alone (Nate 21 Oct: "only the half-giant is locked"; the Snow Elf is open), at its config unlockHours, else the slot's hours
     const out = [];
-    for (const [slug, M] of [['halfgiant', HR], ['snowelf', SR]]) {
+    for (const [slug, M] of [['halfgiant', HR]]) {
       const own = Number((M || {}).unlockHours) > 0 ? Number(M.unlockHours) : 0;
       const open = (!own && earned) || ms >= (own || slot) * 3600000;
       if (!open) out.push(slug);
