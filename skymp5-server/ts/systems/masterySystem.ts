@@ -910,8 +910,7 @@ export class MasterySystem implements System {
     };
   }
 
-  // Admin: adds hours (levels under the point system, up to the cap and inside the limits) to one held skill, the first in
-  // the order when none is named; a negative amount takes them back
+  // Admin: adds hours, or levels within the cap and limits under the point system, to the named or first held skill
   grantPoints(ctx: SystemContext, actorId: number, amount: number, skillId?: string): AdminSkillResult {
     const cfg = this.points;
     if (!Number.isInteger(amount) || amount === 0 || Math.abs(amount) > MAX_GRANT) return { ok: false, text: `${cfg ? "Levels" : "Hours"} must be a whole number between -${MAX_GRANT} and ${MAX_GRANT}` };
@@ -960,8 +959,7 @@ export class MasterySystem implements System {
     };
   }
 
-  // Admin: puts the character at the start of a tier in a skill, taking the skill up first if needed. Hours model: the
-  // tier's first hour, past the chosen-skill limit too. Point system: the tier's first level with no xp, inside the limits
+  // Admin: puts a skill at its tier's first hour (past the chosen limit) or, under the point system, first level within the limits
   adminSetTier(ctx: SystemContext, actorId: number, skillId: string, tier: number): AdminSkillResult {
     if (!this.def(skillId)) return { ok: false, text: "No such skill" };
     const level = this.points ? P.levelFloorOfTier(tier) : this.tierHours[tier];
