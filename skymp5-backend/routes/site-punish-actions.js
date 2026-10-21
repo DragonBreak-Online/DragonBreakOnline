@@ -107,7 +107,8 @@ function authorize(req, res, next) {
   }).catch(next)
 }
 
-router.post('/:action', actionRequest, authorize, express.json({ limit: '2kb', inflate: false }), answer(async (req, res) => {
+// rank (the cached panel rank) only refuses: a caller with none never reaches the tries, the pin or the audit channel
+router.post('/:action', actionRequest, rank, authorize, express.json({ limit: '2kb', inflate: false }), answer(async (req, res) => {
   const { status, body } = await actions().perform(req.punishCtx, req.params.action, req.body)
   res.status(status).json(body)
 }))

@@ -89,6 +89,14 @@ test('POST: each check refuses in order, and the body is read only after the cal
   assert.equal(ok.job.state, 'done')
 })
 
+test('POST: a signed-in player with no panel rank is refused before the actions module, and the audit channel never hears of it', async () => {
+  const lookups = H.F.lookups
+  for (let i = 0; i < 3; i++) await want(post(session('bob'), { raw: '{not json' }), 403, 'notStaff', 'a player')
+  await want(post(session('none'), { raw: '{not json' }), 403, 'notStaff', 'a pinned account with no rank')
+  assert.deepEqual(H.audits, [])
+  assert.equal(H.F.lookups, lookups, 'Discord was never asked for fresh roles')
+})
+
 test('the mount: actions answer before the read-only panel, which refuses any other write; the panel off is 404 everywhere', async () => {
   await want(post(session('owner'), { url: `${P}/player/10` }), 405, 'readOnly', 'the read-only panel')
   await want(post(session('owner'), { url: `${P}/actions/jobs/${uuid()}` }), 404, 'notFound', 'not a write the panel route ever sees')

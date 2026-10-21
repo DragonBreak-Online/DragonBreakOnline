@@ -103,7 +103,7 @@ Errors, as `{ v, error, … }`:
 |---|---|---|
 | 400 | `badRequest`, `badProfile`, `badConfirm`, `badReason{why}`, `badMinutes`, `badCommand` | the body |
 | 401 | `signedOut`, `signInAgain{signInUrl}` | no session, or a sign-in older than 4 h |
-| 403 | `badOrigin`, `badHeader`, `notAllowed`, `ownAccount`, `staffTarget` | sender checks, rank or pin, target |
+| 403 | `badOrigin`, `badHeader`, `notStaff`, `notAllowed`, `ownAccount`, `staffTarget` | sender checks, no panel rank, rank or pin, target |
 | 404 | `notFound`, `noDiscordAccount` | no such account, or it has no Discord account |
 | 409 | `conflict` | the requestId was used by another account or with other fields |
 | 409 | `alreadyBanned{ref, kind}` (`kind` is `ban` or `discord_ban`), or `alreadyBanned{kind:'discord'}` | `ban`, or `discord-ban` |
