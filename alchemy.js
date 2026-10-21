@@ -408,7 +408,9 @@ module.exports = (api) => {
   // 2/3/5/5 a second for 10 s), so a larger pool loses more points, a smaller one fewer. Poison never lands the killing
   // blow (minHealth, as the mastery give-back: percentages carry no killer); the next blow does. A drain replaces a running
   // one on the same pool. Charges are counted here, since the client's "used up" report comes up to 10 s later.
-  const POISON = Object.assign({ judge: false, anchorPool: 200, minHealth: 0.01, ledgerMinutes: 5,
+  // A spent coat stays spent until the weapon is seen clean or the player applies a poison again (the eat hook below),
+  // not by time: a coated spare in the pack never strikes on the client, so it is never reported used up
+  const POISON = Object.assign({ judge: false, anchorPool: 200, minHealth: 0.01, ledgerMinutes: 360,
     damage: { '03eb42': 'health', '03a2b6': 'magicka', '03a2c6': 'stamina' },
     linger: { '10aa4a': 'health', '10de5f': 'magicka', '10de5e': 'stamina' } }, RW.poisons || {});
   const POISON_DAMAGE = new Map(), POISON_LINGER = new Map();
@@ -440,6 +442,13 @@ module.exports = (api) => {
     return out;
   };
   const LEDGER = globalThis.__dboPoisonLedger instanceof Map ? globalThis.__dboPoisonLedger : (globalThis.__dboPoisonLedger = new Map()); // agg|weapon|poison -> { left, at }
+  // A poison applied (its OnEquip reaches onEatItem before the craft report) starts that poison's charges again
+  const poisonApplied = (actor, poison) => {
+    if (!LEDGER.size) return;
+    const head = `${actor >>> 0}|`, tail = `|${poison >>> 0}`;
+    for (const k of [...LEDGER.keys()]) if (k.startsWith(head) && k.endsWith(tail)) LEDGER.delete(k);
+  };
+  let poisonSwept = 0;
   // From gamemode.js's hit judge for a landed, unblocked weapon hit. Returns what it did (for the log and the harness)
   globalThis.__dboPoisonHit = (aggressor, target, source, flags) => {
     if (POISON.judge !== true) return null;
@@ -447,21 +456,25 @@ module.exports = (api) => {
     if (agg === tgt || (flags && (flags.blocked || flags.spell))) return null;
     let entries = [];
     try { const inv = mp.get(agg, 'inventory'); entries = inv && Array.isArray(inv.entries) ? inv.entries : []; } catch (e) { return null; }
-    // The fork writes a freshly coated copy back without its worn flag (inventoryExtras withCount), so with no worn copy of
-    // this weapon left, the blow came from the coated one
+    // A player's inventory carries no worn flags (the fork keeps them in the equipment property; withCount also drops them
+    // from a freshly coated copy), so with no worn copy of this weapon the blow takes a coated one
     const ofSrc = entries.filter((e) => e && (Number(e.baseId) >>> 0) === src);
     const isWorn = (e) => !!(e.worn || e.wornLeft), coated = (e) => (Number(e.poisonId) >>> 0) !== 0;
-    const copy = ofSrc.find((e) => isWorn(e) && coated(e)) || (ofSrc.some(isWorn) ? undefined : ofSrc.find(coated));
+    const copies = ofSrc.some(isWorn) ? ofSrc.filter((e) => isWorn(e) && coated(e)) : ofSrc.filter(coated);
     const now = Date.now();
-    for (const [k, v] of LEDGER) if (now - v.at > Math.max(1, Number(POISON.ledgerMinutes) || 5) * 60000) LEDGER.delete(k);
-    if (!copy) { for (const k of [...LEDGER.keys()]) if (k.startsWith(`${agg}|${src}|`)) LEDGER.delete(k); return null; }
-    const poisonId = Number(copy.poisonId) >>> 0;
-    const p = poisonOf(poisonId);
+    if (now - poisonSwept > 60000) { poisonSwept = now; for (const [k, v] of LEDGER) if (now - v.at > Math.max(1, Number(POISON.ledgerMinutes) || 360) * 60000) LEDGER.delete(k); }
+    if (!copies.length) { for (const k of [...LEDGER.keys()]) if (k.startsWith(`${agg}|${src}|`)) LEDGER.delete(k); return null; }
+    // The first judged coat with a charge left; the count never goes above what the copy holds ("poison down to" reports)
+    let poisonId = 0, p = null, key = '', left = 0;
+    for (const c of copies) {
+      const id = Number(c.poisonId) >>> 0, judged = poisonOf(id);
+      if (!judged) continue;
+      const k = `${agg}|${src}|${id}`, have = LEDGER.get(k), most = Math.max(1, Math.floor(Number(c.poisonCount) || 1));
+      const n = have ? Math.min(have.left, most) : most;
+      if (n > 0) { poisonId = id; p = judged; key = k; left = n; break; }
+    }
     if (!p) return null;
-    const key = `${agg}|${src}|${poisonId}`;
-    const l = LEDGER.get(key) || { left: Math.max(1, Math.floor(Number(copy.poisonCount) || 1)), at: now };
-    if (l.left <= 0) return null;
-    l.left -= 1; l.at = now; LEDGER.set(key, l);
+    LEDGER.set(key, { left: left - 1, at: now });
     later(() => {
       try {
         const q = pctOf(tgt);
@@ -526,6 +539,7 @@ module.exports = (api) => {
     if (inner && inner.__dboAlchemyEat) inner = inner.__inner;
     const hook = function (actorId, baseId, ...rest) {
       const a = Number(actorId) >>> 0, id = Number(baseId) >>> 0;
+      try { poisonApplied(a, id); } catch (e) { /* the next clean blow clears it */ }
       let before = null;
       try { if (drinkOf(id)) before = pctOf(a); } catch (e) { before = null; }
       const out = typeof inner === 'function' ? inner.call(this, actorId, baseId, ...rest) : undefined;

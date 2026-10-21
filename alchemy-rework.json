@@ -112,7 +112,7 @@
   "judge": true,
   "anchorPool": 200,
   "minHealth": 0.01,
-  "ledgerMinutes": 5,
+  "ledgerMinutes": 360,
   "_comment": "Weapon poisons as a share of the TARGET's pool: the record's points / anchorPool (a 200-point pool takes the design's 30/35/40/50/65 and 2/3/5/5 a second; 150 takes three quarters of that). judge true from 18 Oct (players found poisons did nothing on live; false makes them inert again).",
   "damage": {
    "03eb42": "health",
