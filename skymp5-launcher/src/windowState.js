@@ -38,12 +38,16 @@ function grabbableArea(rect, areas) {
 }
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v))
+// A work area smaller than this is a bad report, not a real screen (Electron's headless display says 1 x 1); sized to it the window could not be used
+const SANE_AREA = { width: 320, height: 240 }
+const usable = a => !!a && num(a.x, -100000, 100000) && num(a.y, -100000, 100000) && num(a.width, SANE_AREA.width, 100000) && num(a.height, SANE_AREA.height, 100000)
 
 // BrowserWindow size options from the saved state and the screens' work areas ({ x, y, width, height } each)
 function windowOptions({ saved, workAreas = [], primary }) {
   const s = sanitize(saved)
-  const areas = workAreas.filter(a => a && a.width > 0 && a.height > 0)
-  const home = primary && primary.width > 0 && primary.height > 0 ? primary : areas[0] || { x: 0, y: 0, ...DEFAULT_SIZE }
+  const areas = workAreas.filter(usable)
+  // With no usable screen at all the window opens as 2.1.50 did: 1280 x 720 with the 800 x 540 minimum
+  const home = usable(primary) ? primary : areas[0] || { x: 0, y: 0, ...DEFAULT_SIZE }
   const placed = s && 'x' in s ? grabbableArea({ x: s.x, y: s.y, width: s.width, height: s.height }, areas) : null
   const area = placed || home
   const minWidth = Math.min(MIN_SIZE.width, area.width)

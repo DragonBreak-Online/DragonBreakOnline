@@ -27,6 +27,17 @@ test('a small screen gets a window that fits it, and the minimum is never larger
   assert.strictEqual(tiny.bounds.minHeight, 500)
 })
 
+test('a screen that reports a nonsense work area (1 x 1, 0 x 0) never gives a 1 px window', () => {
+  // Seen with Electron 41's real screen module on CT 115 (headless display): getAllDisplays() and getPrimaryDisplay() gave a 1 x 1 work area
+  for (const bad of [{ x: 0, y: 0, width: 1, height: 1 }, { x: 0, y: 0, width: 0, height: 0 }, { x: 0, y: 0, width: 300, height: 200 }, { x: NaN, y: 0, width: 1920, height: 1040 }, null]) {
+    const o = windowOptions({ saved: { x: 0, y: 0, width: 1, height: 1 }, workAreas: [bad], primary: bad })
+    assert.deepStrictEqual(o.bounds, { x: 0, y: 0, width: 1280, height: 720, minWidth: 800, minHeight: 540, resizable: true, maximizable: true }, JSON.stringify(bad))
+  }
+  // A good screen next to a bad report is used
+  const good = windowOptions({ saved: undefined, workAreas: [{ x: 0, y: 0, width: 1, height: 1 }, FHD], primary: { x: 0, y: 0, width: 1, height: 1 } })
+  assert.deepStrictEqual([good.bounds.x, good.bounds.y, good.bounds.width, good.bounds.height, good.bounds.minWidth], [320, 160, 1280, 720, 800])
+})
+
 test('the saved size and position come back while the window can still be grabbed on a screen', () => {
   const o = one({ x: 100, y: 50, width: 1000, height: 650, maximized: false })
   assert.deepStrictEqual([o.bounds.x, o.bounds.y, o.bounds.width, o.bounds.height], [100, 50, 1000, 650])
