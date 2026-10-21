@@ -1,8 +1,9 @@
 // Scripted test for plugin doors in gamemode.js's activate chain (#bugs 17 Oct, Whiterun Bakery and Hearth-Healer's
 // Hall: "the ladder doesn't work, can't reach the upper floor"). SurWR's ladders up are load doors on a Hearthfire
-// trapdoor base (BYOHBYOHWRtowerLTrapDoor01, OBND -730,-57,254 .. -609,57,764): the ref sits 338 units under the floor
-// and the ladder itself stands 609-730 units along the door's X axis, so the chain's 6.5 m reach from the ref point
-// refused every climb. It cuts doorBoundsInReach out of the gamemode and runs it on the plugins' own positions.
+// trapdoor base (BYOHBYOHWRtowerLTrapDoor01, OBND -730,-57,254 .. -609,57,764, each ref scaled 0.77): the ref sits 338
+// units under the floor and the ladder itself stands 469-562 units along the door's X axis, so the chain's 6.5 m reach
+// from the ref point refused every climb. It cuts doorBoundsInReach out of the gamemode and runs it on the plugins' own
+// positions and scales.
 //
 //   node tests/door-bounds-reach-harness.js   (from server/)
 'use strict';
@@ -25,6 +26,8 @@ const helperSrc = a >= 0 && b > a ? src.slice(a, b) : 'const doorBoundsInReach =
 
 // Records as mp.lookupEspmRecordById gives them: OBND is six little-endian int16
 const obnd = (v) => { const d = new Uint8Array(12); const dv = new DataView(d.buffer); v.forEach((x, i) => dv.setInt16(i * 2, x, true)); return { type: 'OBND', data: d }; };
+// A ref's XSCL is one little-endian float32
+const xscl = (k) => { const d = new Uint8Array(4); new DataView(d.buffer).setFloat32(0, k, true); return { type: 'XSCL', data: d }; };
 const LADDER_UP = 0x3b6d, TRAPDOOR = 0x3b6c, CHEST = 0x1234, PLAIN_DOOR = 0x29cb0;
 const RECORDS = {
   [LADDER_UP]: { type: 'DOOR', editorId: 'BYOHBYOHWRtowerLTrapDoor01', fields: [obnd([-730, -57, 254, -609, 57, 764])] },
@@ -56,6 +59,8 @@ const dist = (door) => { const p = mp.get(P, 'pos'), q = mp.get(door, 'pos'); re
 // The Bakery's two ladder doors (SurWR.esp 76f9b up, 76fa4 down), as the plugin places them; the Hearth-Healer's Hall's
 // pair (c8566/c8543) stand at the same spots in its copy of the room
 const UP = 0x1b076f9b, DOWN = 0x1b076fa4;
+RECORDS[UP] = { type: 'REFR', fields: [xscl(0.77)] };
+RECORDS[DOWN] = { type: 'REFR', fields: [xscl(0.9)] };
 put(UP, LADDER_UP, BAKERY, [97.2, -981.3, -338.4], [0, 0, 270]);
 put(DOWN, TRAPDOOR, BAKERY, [97.6, -1456.7, 254.1], [0, 0, 0]);
 
@@ -72,8 +77,10 @@ at([97, -1600, 0]);
 check('standing against the ladder is in reach', reach(UP) === true);
 at([97, -1650, 120]);
 check('halfway up the ladder is in reach', reach(UP) === true);
+at([97, -1500, 0]);
+check('right under the trapdoor down, where the scaled ladder stands, is in reach', reach(UP) === true);
 at([97, -300, 0]);
-check('across the room, 18 m from the ladder, is refused', reach(UP) === false);
+check('across the room, 16 m from the ladder, is refused', reach(UP) === false);
 at([650, -1650, 0]);
 check('7.1 m to the side of the ladder is refused', reach(UP) === false);
 at([97, -1600, 0], '3c:Skyrim.esm');
@@ -93,6 +100,25 @@ check('not turned: the box is along -X', reach(0x1b000002) === true);
 put(0x1b000003, LADDER_UP, BAKERY, [0, 0, 0], [30, 0, 270]);
 at([0, -669, 300]);
 check('a tilted door keeps the plain reach', reach(0x1b000003) === false);
+put(0x1b00000a, LADDER_UP, BAKERY, [0, 0, 0], [360, -0.5, 0]);
+at([-669, 0, 300]);
+check('an X angle of 360 (or -0.5) is level, not tilted', reach(0x1b00000a) === true);
+
+// Scale: the bounds grow and shrink with the ref's XSCL, as the mesh does
+RECORDS[0x1b000008] = { type: 'REFR', fields: [xscl(0.5)] };
+put(0x1b000008, LADDER_UP, BAKERY, [0, 0, 0], [0, 0, 0]);
+at([-1180, 0, 300]);
+check('a door scaled 0.5: 11.6 m from its scaled bounds is refused (6.4 m from the unscaled ones)', reach(0x1b000008) === false);
+at([-500, 0, 250]);
+check('a door scaled 0.5: next to its scaled bounds is in reach', reach(0x1b000008) === true);
+RECORDS[0x1b000009] = { type: 'REFR', fields: [xscl(2)] };
+put(0x1b000009, LADDER_UP, BAKERY, [0, 0, 0], [0, 0, 0]);
+at([-1860, 0, 600]);
+check('a door scaled 2: 5.7 m from its scaled bounds is in reach (16 m from the unscaled ones)', reach(0x1b000009) === true);
+RECORDS[0x1b00000b] = { type: 'REFR', fields: [xscl(0)] };
+put(0x1b00000b, LADDER_UP, BAKERY, [0, 0, 0], [0, 0, 0]);
+at([-669, 0, 300]);
+check('a broken scale of 0 counts as 1', reach(0x1b00000b) === true);
 
 // Only plugin doors
 put(0x1b000004, CHEST, BAKERY, [97.2, -981.3, -338.4], [0, 0, 270]);
@@ -112,7 +138,7 @@ check('a base the load order does not have is not let through', reach(0x1b000007
 
 const before = lookups;
 for (let i = 0; i < 50; i++) reach(UP);
-check('the record is looked up once per base, not per activation', lookups === before, lookups - before);
+check('the records are looked up once per base and ref, not per activation', lookups === before, lookups - before);
 
 console.log(failures ? `${failures} failure(s)` : 'all passed');
 process.exit(failures ? 1 : 0);

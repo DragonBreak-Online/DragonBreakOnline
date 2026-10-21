@@ -1749,10 +1749,13 @@ const hawkBodyInReach = (caster, target, q) => {
   } catch (e) { return false; }
 };
 // A plugin door whose reference point is far from its own mesh (#bugs 17 Oct: the ladders up in the Whiterun Bakery and
-// Hearth-Healer's Hall, SurWR load doors on Hearthfire's BYOHBYOHWRtowerLTrapDoor01, OBND -730..-609 along X): the ref
-// sits 338 units under the floor and the ladder 609-730 units from it, so the 6.5 m reach from the ref point refused
-// every climb. A plugin DOOR is in reach within 6.5 m of its bounds (OBND, turned by the ref's Z angle as traps.js does).
+// Hearth-Healer's Hall, SurWR load doors on Hearthfire's BYOHBYOHWRtowerLTrapDoor01, OBND -730..-609 along X, ref scale
+// 0.77): the ref sits 338 units under the floor and the ladder 469-562 units from it, so the 6.5 m reach from the ref point
+// refused every climb. A plugin DOOR is in reach within 6.5 m of its bounds (OBND times the ref's XSCL scale, turned by
+// the ref's Z angle, as traps.js does).
 const doorBoundsBox = new Map();   // base id -> OBND [x1, y1, z1, x2, y2, z2], or null when not a DOOR with bounds
+const doorRefScale = new Map();    // plugin ref id -> its XSCL scale (1 when it has none), read once per ref
+const doorAngleOff = (v) => Math.abs((((Number(v) || 0) % 360) + 540) % 360 - 180);   // degrees from level, 360 = 0
 const doorBoundsInReach = (caster, target, q) => {
   if ((target >>> 0) >= 0xff000000) return false;
   let base = 0; try { base = mp.getIdFromDesc(String(mp.get(target, 'baseDesc') || '')) >>> 0; } catch (e) { return false; }
@@ -1770,18 +1773,29 @@ const doorBoundsInReach = (caster, target, q) => {
   }
   const box = doorBoundsBox.get(base);
   if (!box) return false;
+  const ref = target >>> 0;
+  if (!doorRefScale.has(ref)) {
+    let sc = 1;
+    try {
+      const own = mp.lookupEspmRecordById(ref);
+      const f = own && own.record ? (own.record.fields || []).find((x) => x && x.type === 'XSCL') : null;
+      if (f && f.data instanceof Uint8Array && f.data.byteLength >= 4) { const v = new DataView(f.data.buffer, f.data.byteOffset, 4).getFloat32(0, true); if (v > 0 && v <= 10) sc = v; }
+    } catch (e) { sc = 1; }
+    doorRefScale.set(ref, sc);
+  }
+  const k = doorRefScale.get(ref);
   try {
     if (mp.get(caster, 'worldOrCellDesc') !== mp.get(target, 'worldOrCellDesc')) return false;
     const p = mp.get(caster, 'pos');
     const ang = mp.get(target, 'angle') || [0, 0, 0];
     if (!Array.isArray(p) || !Array.isArray(q)) return false;
     // A tilted door keeps the plain reach; doors turn about Z only in practice
-    if (Math.abs(Number(ang[0]) || 0) > 1 || Math.abs(Number(ang[1]) || 0) > 1) return false;
+    if (doorAngleOff(ang[0]) > 1 || doorAngleOff(ang[1]) > 1) return false;
     const t = (Number(ang[2]) || 0) * Math.PI / 180, c = Math.cos(t), s = Math.sin(t);
     const dx = p[0] - q[0], dy = p[1] - q[1], dz = p[2] - q[2];
     const lx = dx * c - dy * s, ly = dx * s + dy * c;
     const out = (v, lo, hi) => (v < lo ? lo - v : v > hi ? v - hi : 0);
-    return Math.hypot(out(lx, box[0], box[3]), out(ly, box[1], box[4]), out(dz, box[2], box[5])) / UNITS_PER_METER <= 6.5;
+    return Math.hypot(out(lx, box[0] * k, box[3] * k), out(ly, box[1] * k, box[4] * k), out(dz, box[2] * k, box[5] * k)) / UNITS_PER_METER <= 6.5;
   } catch (e) { return false; }
 };
 // A hold's treasury chest is paid into at a bank and spent by the realm; nobody but staff opens it (review B1: any rank
