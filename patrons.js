@@ -74,6 +74,9 @@ module.exports = (api) => {
       const b = mp.get(a, 'private.beast'); if (b && b.form) return 'Return to your own shape first.';
       if (beastComing(a)) return 'Not while the beast is coming.';
       const r = mp.get(a, 'private.restrained'); if (r && r.boundHands) return 'Not while your hands are bound.';
+      // The mask keeps the old name and puts it back when it comes off, over the reroll's new one (#bugs 1561047265534025878)
+      const m = typeof globalThis.__dboMaskOf === 'function' ? globalThis.__dboMaskOf(a) : null;
+      if (m && m.masked) return 'Take your mask off first (H): a mask keeps your old name.';
     } catch (e) { return 'Try again in a moment.'; }
     return null;
   };
