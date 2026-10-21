@@ -1,5 +1,6 @@
 import { System, Log, Content, SystemContext } from "./system";
 import { Settings } from "../settings";
+import type { DiscordGuildConfig } from "../settings";
 import * as fetchRetry from "fetch-retry";
 import { loginsCounter, loginErrorsCounter } from "./metricsSystem";
 import { hasDiscordBanRole } from "./discordBanSystem";
@@ -45,11 +46,41 @@ type Mp = any; // TODO
 interface UserProfile {
   id: number;
   discordId: string | null;
+  // The backend's own guild lookup for this session: true member, false not, null or missing unknown
+  discordMember?: boolean | null;
+  roles?: string[];
 }
 
-namespace DiscordErrors {
-  export const unknownMember = 10007;
-}
+// A 429 on the guild member lookup is retried inside this budget, and never past 10 s into the login (the client waits 15 s)
+const discordMemberBudgetMs = 6000;
+const discordLoginDeadlineMs = 10000;
+const discordMemberMaxTries = 4;
+const discordRetryJitterMs = 250;
+const discordRetryCapMs = 60000;
+
+type DiscordMemberAnswer =
+  | { kind: "member"; status: number; roles: string[] }
+  | { kind: "notMember"; status: number }
+  | { kind: "unanswered"; status: number };
+
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+const headerOf = (response: Response, name: string): string | null => {
+  try { return response.headers?.get(name) ?? null; } catch { return null; }
+};
+const secondsToMs = (v: unknown): number => {
+  if (v === null || v === undefined || v === "") return NaN;
+  const s = Number(v);
+  return Number.isFinite(s) && s >= 0 ? Math.min(s * 1000, discordRetryCapMs) : NaN;
+};
+// How long Discord asked us to wait: body retry_after, else the Retry-After or X-RateLimit-Reset-After header, else 1 s
+const discordRetryAfterMs = async (response: Response): Promise<number> => {
+  const body = await response.json().catch((): null => null);
+  for (const v of [body?.retry_after, headerOf(response, "retry-after"), headerOf(response, "x-ratelimit-reset-after")]) {
+    const ms = secondsToMs(v);
+    if (!Number.isNaN(ms)) return ms;
+  }
+  return 1000;
+};
 
 // See NetworkingCombined.h: it implements a hack to prevent the soul-transmission bug
 // TODO: reimplement Login system. Preferably, in C++ with clear data flow.
@@ -60,6 +91,56 @@ export class Login implements System {
   private loginAttempted = new Set<number>();
   private repeatLoggedAt = 0;
   private repeatCount = 0;
+
+  // Shared by every login: after a 429 the next member lookups wait it out instead of all hitting Discord again
+  private discordRetryAt = 0;
+  private discordGaps = { reportedAt: 0, limited: 0, passedOnBackend: 0, refused: 0, lastStatus: 0 };
+
+  private reportDiscordGaps(): void {
+    const now = Date.now();
+    const g = this.discordGaps;
+    if (now - g.reportedAt < 60000) return;
+    this.log(`Login: Discord rate limited ${g.limited} guild member lookup(s) (HTTP 429); logins Discord left unanswered: ${g.passedOnBackend} let in on the backend's membership answer, ${g.refused} refused (last status ${g.lastStatus}), since the last report`);
+    this.discordGaps = { reportedAt: now, limited: 0, passedOnBackend: 0, refused: 0, lastStatus: g.lastStatus };
+  }
+
+  private async fetchDiscordMember(guildId: string, discordId: string, botToken: string, deadline: number): Promise<DiscordMemberAnswer> {
+    for (let attempt = 1; ; attempt++) {
+      const waitMs = this.discordRetryAt - Date.now();
+      if (waitMs > 0) {
+        if (Date.now() + waitMs > deadline) return { kind: "unanswered", status: 429 };
+        await sleep(waitMs + Math.random() * discordRetryJitterMs);
+      }
+      // v10 pinned: the unversioned route is Discord's old default API, where retry_after was in milliseconds, not seconds
+      const response = await this.fetchRetry(
+        `https://discord.com/api/v10/guilds/${guildId}/members/${discordId}`,
+        {
+          method: 'GET',
+          headers: { 'Authorization': `Bot ${botToken}` },
+          ...this.getFetchOptions('discordAuth_multi'),
+        },
+      );
+      if (response.ok) {
+        // The bucket is empty: later lookups wait for its reset rather than draw a 429
+        if (headerOf(response, "x-ratelimit-remaining") === "0") {
+          const resetMs = secondsToMs(headerOf(response, "x-ratelimit-reset-after"));
+          if (!Number.isNaN(resetMs)) this.discordRetryAt = Math.max(this.discordRetryAt, Date.now() + resetMs);
+        }
+        const responseData = await response.json();
+        return { kind: "member", status: response.status, roles: (responseData && responseData.roles) || [] };
+      }
+      if (response.status === 404) return { kind: "notMember", status: 404 };
+      if (response.status !== 429) return { kind: "unanswered", status: response.status };
+
+      const retryAfterMs = await discordRetryAfterMs(response);
+      this.discordRetryAt = Math.max(this.discordRetryAt, Date.now() + retryAfterMs);
+      this.discordGaps.limited++;
+      this.reportDiscordGaps();
+      if (attempt >= discordMemberMaxTries || this.discordRetryAt + discordRetryJitterMs > deadline) {
+        return { kind: "unanswered", status: 429 };
+      }
+    }
+  }
 
   connect(userId: number): void {
     this.loginAttempted.delete(userId);
@@ -205,6 +286,7 @@ export class Login implements System {
       this.log("The server is in offline mode, the client is NOT");
     } else if (this.offlineMode === false && gameData && gameData.session) {
       (async () => {
+        const loginStartedAt = Date.now();
         this.emit(ctx, "userAssignSession", userId, gameData.session);
 
         // A dropped connection's userId goes to the next one and every client shares the relay ip, so only the guid tells them apart
@@ -279,38 +361,54 @@ export class Login implements System {
             roles = currentRoles;
           }
 
-          for (const guildConfig of discordAuth.guilds) {
-            const response = await this.fetchRetry(
-              `https://discord.com/api/guilds/${guildConfig.guildId}/members/${profile.discordId}`,
-              {
-                method: 'GET',
-                headers: { 'Authorization': `Bot ${discordAuth.botToken}` },
-                ...this.getFetchOptions('discordAuth_multi'),
-              },
-            );
+          const takeGuildRoles = (guildConfig: DiscordGuildConfig, guildRoles: string[]) => {
+            fetchedRoles = [...fetchedRoles, ...guildRoles];
+            if (hasDiscordBanRole(guildConfig, guildRoles)) {
+              isBanned = true;
+            }
+            if (guildConfig.hideIpRoleId && guildRoles.indexOf(guildConfig.hideIpRoleId) !== -1) {
+              shouldHideIp = true;
+            }
+          };
 
-            if (response.status === 401 || response.status === 403) {
-              console.error(`discordAuth: Discord API returned ${response.status} for guild ${guildConfig.guildId} - ` +
+          const unanswered: DiscordGuildConfig[] = [];
+          let unansweredStatus = 0;
+          const discordDeadline = Math.min(Date.now() + discordMemberBudgetMs, loginStartedAt + discordLoginDeadlineMs);
+          for (const guildConfig of discordAuth.guilds) {
+            const answer = await this.fetchDiscordMember(guildConfig.guildId, profile.discordId, discordAuth.botToken, discordDeadline);
+
+            if (answer.status === 401 || answer.status === 403) {
+              console.error(`discordAuth: Discord API returned ${answer.status} for guild ${guildConfig.guildId} - ` +
                 `check that the bot token is valid and Server Members Intent is enabled`);
             }
 
-            if (response.ok) {
-              const responseData = await response.json();
+            if (answer.kind === "member") {
               isMemberOfAny = true;
-
-              const guildRoles: string[] = responseData.roles || [];
-              fetchedRoles = [...fetchedRoles, ...guildRoles];
-
-              if (hasDiscordBanRole(guildConfig, guildRoles)) {
-                isBanned = true;
-              }
-              if (guildConfig.hideIpRoleId && guildRoles.indexOf(guildConfig.hideIpRoleId) !== -1) {
-                shouldHideIp = true;
-              }
+              takeGuildRoles(guildConfig, answer.roles);
+            } else if (answer.kind === "unanswered") {
+              unanswered.push(guildConfig);
+              unansweredStatus = answer.status;
             }
             assertSameConnection("discordAuth guild member fetch");
           }
 
+          // Only a 404 is "not a member"; when Discord gave no answer, the backend's own lookup for this session decides
+          if (!isMemberOfAny && unanswered.length > 0) {
+            if (profile.discordMember === true) {
+              isMemberOfAny = true;
+              const backendRoles = Array.isArray(profile.roles) ? profile.roles.map(String) : [];
+              // The backend's discord.js list carries @everyone (id = guild id), which Discord's REST answer never does
+              for (const guildConfig of unanswered) takeGuildRoles(guildConfig, backendRoles.filter((r) => r !== guildConfig.guildId));
+              this.discordGaps.passedOnBackend++;
+              this.reportDiscordGaps();
+            } else {
+              this.discordGaps.refused++;
+              this.discordGaps.lastStatus = unansweredStatus;
+              this.reportDiscordGaps();
+              ctx.svr.sendCustomPacket(userId, loginFailedNotInTheDiscordServer);
+              throw new Error(`Discord did not answer the membership check (HTTP ${unansweredStatus})`);
+            }
+          }
 
           if (!isMemberOfAny) {
             ctx.svr.sendCustomPacket(userId, loginFailedNotInTheDiscordServer);
