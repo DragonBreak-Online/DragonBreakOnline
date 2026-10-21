@@ -76,6 +76,10 @@ check('away from any door you are told to go to it', /Stand at the door/.test(ru
 chars[OTHER].pos = [50, 0, 0];
 check('an empty house is not for rent', /stands empty and is not for rent/.test(run(OTHER, '')));
 check('a player cannot list it', /Only the officials/.test(run(RENTER, 'list 100 20')));
+// A faction's hall is not the hold's to rent (Nate, 21 Oct: Castle Volkihar is the vampire faction's, not Solitude's)
+globalThis.__dboForeignHall = (refs) => (refs.map(Number).includes(DOOR) ? 'Clan Volkihar' : '');
+{ const t = run(STEWARD, 'list 100 20'); check("the hold's steward cannot list a faction's hall", /hall of Clan Volkihar\. The hold does not rent or sell it/.test(t), t); }
+delete globalThis.__dboForeignHall;
 let r = run(STEWARD, 'list 100 20');
 check('the steward lists it', /Listed for rent: 100 gold deposit and 20/.test(r), r);
 check('players see the terms', /100 gold deposit and 20 gold a week/.test(run(RENTER, '')));

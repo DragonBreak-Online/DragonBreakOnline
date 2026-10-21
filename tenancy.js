@@ -135,6 +135,9 @@ module.exports = (api) => {
     if (!d) return { err: 'Stand at the door of the property.' };
     const primary = H.primaryOf(d);
     if (!primary) return { err: 'That door is no property.' };
+    // A faction's hall is not the hold's to rent or sell (guilds.js __dboForeignHall; Nate, 21 Oct, Castle Volkihar)
+    let hallOf = ''; try { hallOf = typeof globalThis.__dboForeignHall === 'function' ? globalThis.__dboForeignHall([primary, d]) : ''; } catch (e) { hallOf = ''; }
+    if (hallOf) return { err: `This is the hall of ${hallOf}. The hold does not rent or sell it.` };
     return { door: primary, key: hex(primary), L: data().listings[hex(primary)], rec: H.recordOf(primary) || { owner: 0 }, manager: (x) => {
       if (H.isManager(x, primary)) return true;
       if (!fiefHolderAt(x, primary)) return false;

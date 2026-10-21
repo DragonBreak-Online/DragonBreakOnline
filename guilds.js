@@ -770,6 +770,16 @@ module.exports = (api) => {
     }
     return [...out];
   };
+  // A faction's hall is the faction's, never the hold's to rent or sell (Nate, 21 Oct: "make sure the castle isn't
+  // controlled by Solitude": Castle Volkihar is the vampire faction's). The name of the first non-court faction whose hall
+  // one of these refs is, led or not, else ''. A hold's or stronghold's own hall is its court's, which the hold does manage.
+  globalThis.__dboForeignHall = (refs) => {
+    for (const r of Array.isArray(refs) ? refs : []) {
+      let desc = ''; try { desc = String(mp.getDescFromId(Number(r) >>> 0) || '').toLowerCase(); } catch (e) { continue; }
+      for (const fid of hallFactionsAt(desc)) { const f = FACTIONS.get(fid); if (f && f.kind !== 'hold' && f.kind !== 'stronghold') return f.name; }
+    }
+    return '';
+  };
   // A hall's leader (Nate, 16 Oct: "make sure the guild leaders own their HQ"). A building's record sits on whichever door
   // was claimed first, and that need not be a door guild-defs lists: Castle Bruma's root is 6c473, its listed doors b46a8 and
   // 726f2 are members of it, so the Count and the Legion's leader never matched it. For a leader, a building is also the hall
