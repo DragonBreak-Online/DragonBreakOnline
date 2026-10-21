@@ -1465,7 +1465,7 @@
   "on": true,
   "races": ["12e82:Skyrim.esm", "e7713:Skyrim.esm", "1052a3:Skyrim.esm", "117de:Dawnguard.esm", "2c88b:Dragonborn.esm", "2c88c:Dragonborn.esm"],
   "bases": ["a0f31:Druadach.esm"],
-  "_basesComment": "a0f31:Druadach.esm DrV_DwemerBurrower (Blackreach spot wild:brdwemer:b1d1f69): 19 of 27 quit-and-rejoin events inside Blackreach since 18 Oct fell while it was spitting, whole groups at once (19 Oct 03:12, 20 Oct 14:02, 21 Oct 06:05-06:30; #bugs 1562349200203841596). Kept out until the client crash is traced; remove it from bases to bring it back (hot reload).",
+  "_basesComment": "a0f31:Druadach.esm DrV_DwemerBurrower (Blackreach spot wild:brdwemer:b1d1f69): 19 of 27 quit-and-rejoin events inside Blackreach since 18 Oct fell while it was spitting, whole groups at once (19 Oct 03:12, 20 Oct 14:02, 21 Oct 06:05-06:30; #bugs 1562349200203841596). Kept out until the client crash is traced; remove it from bases to bring it back (hot reload). on false (the dragons' switch) brings it back too.",
   "testProfiles": [],
   "testGuard": 0,
   "message": "Dragons are switched off for now: a dragon near players crashes their games (4 Oct). They come back with the client fix."
