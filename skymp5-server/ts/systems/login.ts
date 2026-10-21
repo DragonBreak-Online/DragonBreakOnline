@@ -396,7 +396,8 @@ export class Login implements System {
             if (profile.discordMember === true) {
               isMemberOfAny = true;
               const backendRoles = Array.isArray(profile.roles) ? profile.roles.map(String) : [];
-              for (const guildConfig of unanswered) takeGuildRoles(guildConfig, backendRoles);
+              // The backend's discord.js list carries @everyone (id = guild id), which Discord's REST answer never does
+              for (const guildConfig of unanswered) takeGuildRoles(guildConfig, backendRoles.filter((r) => r !== guildConfig.guildId));
               this.discordGaps.passedOnBackend++;
               this.reportDiscordGaps();
             } else {

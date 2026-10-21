@@ -151,6 +151,11 @@ const user = (i, extra) => ({ id: 100 + i, discordId: String(5550 + i), ...extra
   check('...well inside the client\'s 15 s login wait', took5 < 8000, took5);
   check('...and the log says Discord rate limited the check', logs.some((l) => /rate limit/i.test(l) && /429/.test(l)), logs.filter((l) => /discord/i.test(l)).slice(0, 5));
 
+  reset({ sessions: { [sessionFor(15)]: user(15, { discordMember: true, roles: ['R', 'G', 'R2'] }) }, discord: async () => limited(0.02) });
+  mute(); login = await newLogin(G); await loginOnce(login, 15, sessionFor(15)); unmute();
+  const ev15 = emitted.find((e) => e[0] === 'spawnAllowed' && e[1] === 15);
+  check('...without the @everyone role (the guild id) the backend\'s discord.js list carries, as Discord\'s own answer would be', !!ev15 && JSON.stringify(ev15[3]) === JSON.stringify(['R', 'R2']), ev15 && ev15[3]);
+
   for (const [label, extra] of [['no backend answer (older backend)', {}], ['the backend could not reach Discord either', { discordMember: null }], ['the backend said not a member', { discordMember: false }]]) {
     reset({ sessions: { [sessionFor(6)]: user(6, extra) }, discord: async () => limited(0.02) });
     mute(); login = await newLogin(G); await loginOnce(login, 6, sessionFor(6)); unmute();
