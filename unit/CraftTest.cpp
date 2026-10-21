@@ -469,6 +469,24 @@ TEST_CASE("GetInCurrentLoc tells a recipe where the crafter is",
   p.DestroyActor(0xff000001);
 }
 
+TEST_CASE("A recipe's own GetInCurrentLoc condition reaches GetInCurrentLoc",
+          "[Craft][espm]")
+{
+  // BYOHHouseExteriorRecipe009FishHatchery (030008cf) holds function index 359
+  PartOne& p = GetPartOne();
+  espm::CompressedFieldsCache cache;
+  auto recipe = p.GetEspm().GetBrowser().LookupById(0x030008cf);
+  REQUIRE(recipe.rec);
+  REQUIRE(recipe.rec->GetType() == "COBJ");
+  const auto data =
+    reinterpret_cast<const espm::COBJ*>(recipe.rec)->GetData(cache);
+  const auto it = std::find_if(
+    data.conditions.begin(), data.conditions.end(),
+    [](const espm::CTDA& ctda) { return ctda.functionIndex == 359; });
+  REQUIRE(it != data.conditions.end());
+  REQUIRE(Condition::FromCtda(*it).function == "GetInCurrentLoc");
+}
+
 TEST_CASE("A recipe that needs a vanilla perk is refused", "[Craft][espm]")
 {
   // RecipeWeaponEbonyDagger (db8b9) needs HasPerk(EbonySmithing cb412)
