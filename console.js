@@ -52,6 +52,13 @@ const NAME_RE = /^[A-Za-z][A-Za-z' -]{1,30}$/;
 const UNSAFE_RE = /[\u0000-\u001f\u007f\u00ad\u200b-\u200f\u2028-\u202e\u2066-\u2069\ufeff\u0080-\u009f\u061c]/g;
 const SETTINGS = ['off', 'dry-run', 'on'];
 const REQ_KEYS = ['v', 'id', 'src', 'discordId', 'user', 'profileId', 'roles', 'text', 'mode', 'issuedAt', 'expiresAt', 'sig'];
+// Optional, after them (hardening, 21 Oct): the account the dashboard showed (targetProfileId; the #TAG must be a character of
+// it), and that account's Discord roles as the backend just fetched them (targetRoles, only with targetProfileId). Discord
+// /console sends neither. A backend sends them only for a command whose allow.json entry says targetProfile
+const TARGET_KEYS = ['targetProfileId', 'targetRoles'];
+// Console suspensions of one account: at most 3 an hour from the console, every caller and both sources together (in game
+// there is no such cap). A dry run is checked, not counted
+const SUSPEND_CAP = Object.freeze({ perTarget: 3, windowMs: 60 * 60 * 1000 });
 // Chat markup the client reads: the PM sender, the system and admin tabs, the bubble tag and colour codes
 const MARKUP_RE = /\[\[(?:PM\]\][^|\]]{0,64}\||S\]\]|A\]\]|B[0-9a-fA-F]{1,8}\]\])|#\{[0-9a-fA-F]{6}\}/g;
 // A console reason (rule tagKindReason), after cleanCommand's folding (NFC; control, zero-width and bidi characters to
@@ -82,11 +89,13 @@ const MAX_SUSPEND_DAYS = 30; // discipline.js DEFAULTS.maxSuspendDays
 // Free text: /rename's new name, held to NAME_RE, and /discipline's reason (Jake, 21 Oct: "allow /discipline in the web
 // console too"), held to REASON_RE above, so the only words that reach #staff-commands and the audit channel are plain ones.
 // Review SEC-2 took the 'any' rule away (/players took any words, and they reached #staff-commands); there is still none.
-// gamemode-config remoteConsole.deny takes a command ('discipline') or one kind of it ('discipline suspend')
+// gamemode-config remoteConsole.deny takes a command ('discipline') or one kind of it ('discipline suspend').
+// rank: the target's account must be below the caller's tier (its highest tier over all its characters, and its fresh roles
+// when the backend sent them); never the caller's own account. Console only: the same command typed in game is unchanged
 const ALLOW = Object.freeze({
   wwremote: { usage: '/wwremote [on|off|clear #TAG]', rule: 'switch' },
   vlremote: { usage: '/vlremote [on|off|clear #TAG]', rule: 'switch' },
-  kick: { usage: '/kick #TAG', rule: 'tag', noArg: 'needTag',
+  kick: { usage: '/kick #TAG', rule: 'tag', noArg: 'needTag', rank: true,
     help: 'Kicks one online character, named by #TAG. It takes no reason, and they can log straight back in.' },
   fixloc: { usage: '/fixloc #TAG', rule: 'tag', noArg: 'self' },
   rename: { usage: '/rename #TAG <new name>', rule: 'tagName', offline: true },
@@ -99,7 +108,7 @@ const ALLOW = Object.freeze({
   // checks (suspend, lift and overturn need a Lead GM, so do staff targets; never one's own account; a lift needs a running
   // suspension, an overturn a record of the account). The record view and /discipline list stay in game
   // (its usage is written out from the kinds left after the config's deny, usageOf below)
-  discipline: { usage: '/discipline #TAG <kind> <reason>', rule: 'tagKindReason', kinds: Object.freeze(Object.keys(KIND_ARGS)), offline: true,
+  discipline: { usage: '/discipline #TAG <kind> <reason>', rule: 'tagKindReason', kinds: Object.freeze(Object.keys(KIND_ARGS)), offline: true, rank: true,
     help: "A warning, strike, suspension, lift or overturn on the player's account record, as in game; the player is told. The record view and list stay in game." },
 });
 // Why the rest are refused, by class (DESIGN 8.2). Built-ins that are not registry commands are notChat; any other
@@ -114,6 +123,16 @@ const TEXT = {
   needTag: () => 'Name the player by #TAG from the console.',
   target: (x) => `${x} is not online (or no such tag).`,
   targetAny: (x) => `No character carries ${x} (or more than one does).`,
+  // A #TAG must name one character: more than one live form carrying it is refused, even with one of them online
+  tagShared: (x) => `More than one character carries ${x}, so the console will not guess which one you mean. Run it in game on the player you mean.`,
+  tagIndex: (x) => `The game could not check whether another character carries ${x}, so it did not act. Try again, or run it in game.`,
+  // The dashboard's account check (targetProfileId) and the rank check (rule flag rank)
+  targetProfile: (x) => `${x} is not a character of the account you opened, so nothing was done. Open the player again and pick the character from their list.`,
+  profileNoTag: () => 'The page named an account, but this command names no #TAG to check it against, so it was not run.',
+  ownAccount: (x) => `${x} is on your own account. The console does not act on your own account.`,
+  rank: (x) => `${x} is on a staff account of your rank or higher, so the console will not act on it. Take it to someone above that rank, or to the Owners.`,
+  rankUnknown: (x) => `The game could not read the staff rank of ${x}'s account, so it did not act. Run it in game.`,
+  suspendCap: (x) => `${x}'s account has had ${SUSPEND_CAP.perTarget} suspensions from the console in the last hour, the most the console takes. Wait, or do it in game.`,
   beast: (x) => `${x} is in a beast form. /chargen waits until they change back.`,
   inWorld: (cmd) => `/${cmd} needs you standing in the world. Run it in game.`,
   self: (cmd) => `/${cmd} acts on your own character. Run it in game.`,
@@ -217,7 +236,10 @@ const usageOf = (cmd, kinds, maxDays) => {
   }
   return `/${cmd} #TAG ${parts.join('; ')}`;
 };
-const reqPayload = (r) => `dbo-console-req-v1\n${JSON.stringify([r.v, r.id, r.src, r.discordId, r.user, r.profileId, r.roles, r.text, r.mode, r.issuedAt, r.expiresAt])}`;
+// The target fields are signed when present: [.., expiresAt, targetProfileId, targetRoles or null]; a request without them
+// signs the same 11 fields as before, so either side may be older for the requests that carry none
+const reqPayload = (r) => `dbo-console-req-v1\n${JSON.stringify([r.v, r.id, r.src, r.discordId, r.user, r.profileId, r.roles, r.text, r.mode, r.issuedAt, r.expiresAt]
+  .concat(r.targetProfileId !== undefined ? [r.targetProfileId, r.targetRoles !== undefined ? r.targetRoles : null] : []))}`;
 const canonLines = (lines) => lines.map((l) => ({ to: String(l.to), text: String(l.text) }));
 const repPayload = (r) => `dbo-console-rep-v1\n${JSON.stringify([r.v, r.id, r.state, r.gate, r.ranAs, r.online, r.tier, r.target, canonLines(r.lines), r.why, r.at])}`;
 const hmac = (key, text) => crypto.createHmac('sha256', key).update(text, 'utf8').digest();
@@ -279,7 +301,9 @@ const checkLine = (text, has, deny, opts) => {
 const checkShape = (r, fileId) => {
   if (!r || typeof r !== 'object' || Array.isArray(r)) return 'not an object';
   const keys = Object.keys(r);
-  if (keys.length !== REQ_KEYS.length || !REQ_KEYS.every((k) => keys.includes(k))) return 'keys';
+  if (!REQ_KEYS.every((k) => keys.includes(k)) || !keys.every((k) => REQ_KEYS.includes(k) || TARGET_KEYS.includes(k))) return 'keys';
+  const own = (k) => Object.prototype.hasOwnProperty.call(r, k);
+  if (own('targetRoles') && !own('targetProfileId')) return 'keys';
   if (r.v !== 1) return 'version';
   if (typeof r.id !== 'string' || !ID_RE.test(r.id) || r.id !== fileId) return 'id';
   if (!((r.src === 'web' && r.id.startsWith('w-')) || (r.src === 'discord' && r.id.startsWith('d-')))) return 'src';
@@ -287,6 +311,8 @@ const checkShape = (r, fileId) => {
   if (typeof r.user !== 'string' || !(USER_RE.test(r.user) || r.user === 'unknown')) return 'user';
   if (!Number.isSafeInteger(r.profileId) || r.profileId < 0) return 'profileId';
   if (!Array.isArray(r.roles) || r.roles.length > 100 || !r.roles.every((x) => typeof x === 'string' && SNOWFLAKE.test(x))) return 'roles';
+  if (own('targetProfileId') && !(Number.isSafeInteger(r.targetProfileId) && r.targetProfileId >= 0)) return 'targetProfileId';
+  if (own('targetRoles') && !(Array.isArray(r.targetRoles) && r.targetRoles.length <= 100 && r.targetRoles.every((x) => typeof x === 'string' && SNOWFLAKE.test(x)))) return 'targetRoles';
   if (typeof r.text !== 'string' || r.text.length > 500 || cleanCommand(r.text) !== r.text) return 'text';
   if (r.mode !== 'on' && r.mode !== 'dry-run') return 'mode';
   if (!Number.isSafeInteger(r.issuedAt) || !Number.isSafeInteger(r.expiresAt) || r.expiresAt <= r.issuedAt || r.expiresAt - r.issuedAt > TTL_MAX_MS) return 'time';
@@ -397,13 +423,45 @@ module.exports = (api) => {
     audit(`REMOTE ${r.src} req ${id8(r.id)} ${r.user} <@${r.discordId}> refused (${why}): ${r.text}`);
   };
 
+  // Live characters carrying a tag in the index, offline ones included (a deleted one stays there until a restart); null when
+  // the index could not be read (the lookup threw), so nobody can say the tag is unique. An engine without the index has none
+  const offlineByTag = (want) => {
+    if (typeof mp.findFormsByPropertyValue !== 'function') return [];
+    let ids = []; try { ids = mp.findFormsByPropertyValue('private.indexed.tagKey', want) || []; } catch (e) { return null; }
+    try { return ids.map((x) => Number(x) >>> 0).filter((id) => id && !(typeof globalThis.__dboFormGone === 'function' && globalThis.__dboFormGone(id))); } catch (e) { return null; }
+  };
+  // Every live character carrying the tag, online (by tagOf) and in the index, each once; null when the index threw
+  const liveByTag = (want) => {
+    const on = onlineActors().map((o) => Number(o) >>> 0).filter((o) => { try { return String(tagOf(o)).toLowerCase() === want; } catch (e) { return false; } });
+    const ix = offlineByTag(want);
+    if (ix === null) return null;
+    return { all: [...new Set([...on, ...ix])], online: on };
+  };
+  // The account's highest staff tier as a rank: every character it has (the roles stamped at each one's last login, online or
+  // not), the profile itself (the code's admin profiles), and the Discord roles the backend just fetched for it when it sent
+  // them. -1 when it cannot be read. Each source can only raise it, so a stale stamp or a Discord demotion still counts
+  const accountRank = (pid, freshRoles) => {
+    if (!Number.isSafeInteger(pid) || pid < 0) return -1;
+    try {
+      let best = rank(staffTierFrom(pid, []));
+      for (const c of (mp.getActorsByProfileId(pid) || []).map((x) => Number(x) >>> 0)) if (c && profileOf(c) === pid) best = Math.max(best, rank(staffTierOf(c)));
+      if (Array.isArray(freshRoles)) best = Math.max(best, rank(staffTierFrom(pid, freshRoles)));
+      return best;
+    } catch (e) { logOnce('accountRank', `staff rank of profile ${pid} unreadable: ${e.message}`); return -1; }
+  };
+  // true when the account already had SUSPEND_CAP.perTarget console suspensions within the window; count: this one counts
+  const suspendCapped = (pid, count) => {
+    const m = S.suspends instanceof Map ? S.suspends : (S.suspends = new Map());
+    const t = now(); const cut = t - SUSPEND_CAP.windowMs;
+    if (m.size > 1000) for (const [k, v] of m) if (!v.some((x) => x > cut)) m.delete(k);
+    const list = (m.get(pid) || []).filter((x) => x > cut);
+    if (list.length >= SUSPEND_CAP.perTarget) { m.set(pid, list); return true; }
+    if (count) list.push(t);
+    m.set(pid, list);
+    return false;
+  };
   // The admin's own character (DESIGN 7.5): online first; else the one whose stamped tier matches the fresh one; else the
   // lowest form id. Only actors of the profile that carry the requester's Discord id
-  // Live characters carrying a tag in the index, offline ones included (a deleted one stays there until a restart)
-  const offlineByTag = (want) => {
-    let ids = []; try { ids = mp.findFormsByPropertyValue('private.indexed.tagKey', want) || []; } catch (e) { return []; }
-    return ids.map((x) => Number(x) >>> 0).filter((id) => id && !(typeof globalThis.__dboFormGone === 'function' && globalThis.__dboFormGone(id)));
-  };
   const callerOf = (profileId, discordId, fresh) => {
     let ids = [];
     try { ids = (mp.getActorsByProfileId(profileId) || []).map((x) => Number(x) >>> 0); } catch (e) { ids = []; }
@@ -431,6 +489,10 @@ module.exports = (api) => {
       const c = commands.get(name);
       if (!c) { logOnce(`allow:${name}`, `/${name} is on the allowlist but not registered; left out`); continue; }
       const entry = { name, usage: a.usage, rule: a.rule, help: String(a.help || c.help || '').slice(0, 200) };
+      // targetProfile: the reader checks a request's targetProfileId for it (a command that names one #TAG), so the backend may
+      // send one; rank: the rank check runs, so the backend sends the target account's fresh roles with it
+      if (a.rule === 'tag' || a.rule === 'tagName' || a.rule === 'tagKindReason') entry.targetProfile = true;
+      if (a.rank) entry.rank = true;
       // A tagKindReason command lists the kinds the console takes here, and the longest suspension, so the backend's
       // pre-check and the page know them; with every kind denied it is left out
       if (a.rule === 'tagKindReason') {
@@ -510,21 +572,40 @@ module.exports = (api) => {
 
     const line = checkLine(r.text, (n) => commands.has(n), deny, { maxSuspendDays: MAX_DAYS });
     if (line.why) return refuse(key, r, line.why, { subject: line.subject !== undefined ? line.subject : line.cmd, fields: as });
+    const rule = ALLOW[line.cmd];
+    const pagePid = r.targetProfileId;
+    if (pagePid !== undefined && !line.tag) return refuse(key, r, 'profileNoTag', { fields: as });
     let target = 0;
     if (line.tag) {
       const want = line.tag.slice(1).toLowerCase();
-      let hits = onlineActors().filter((o) => { try { return String(tagOf(o)).toLowerCase() === want; } catch (e) { return false; } });
-      if (!hits.length && ALLOW[line.cmd].offline) hits = offlineByTag(want);
-      if (hits.length !== 1) return refuse(key, r, ALLOW[line.cmd].offline ? 'targetAny' : 'target', { subject: line.tag, fields: as });
-      target = hits[0];
-      if (ALLOW[line.cmd].noBeast) {
+      const at = (why) => refuse(key, r, why, { subject: line.tag, fields: as });
+      // One character, counting every live form that carries the tag, online or not (review, 21 Oct: one online and one
+      // offline used to pass and take the online one)
+      const hits = liveByTag(want);
+      if (hits === null) return at('tagIndex');
+      if (hits.all.length > 1) return at('tagShared');
+      if (rule.offline ? hits.all.length !== 1 : hits.online.length !== 1) return at(rule.offline ? 'targetAny' : 'target');
+      target = hits.all[0];
+      if (rule.noBeast) {
         let beast = false;
         try { beast = typeof globalThis.__dboBeastOriginalRace === 'function' && !!globalThis.__dboBeastOriginalRace(target); } catch (e) { beast = true; }
-        if (beast) return refuse(key, r, 'beast', { subject: line.tag, fields: as });
+        if (beast) return at('beast');
       }
+      let pid = -1; try { pid = profileOf(target); } catch (e) { pid = -1; }
+      // The dashboard's check: the #TAG resolves to a character of the account the page showed, else nothing runs
+      if (pagePid !== undefined && pid !== pagePid) return at('targetProfile');
+      if (rule.rank) {
+        if (!Number.isSafeInteger(pid) || pid < 0) return at('rankUnknown');
+        if (pid === r.profileId) return at('ownAccount');
+        // The caller's effective tier is the lower of the fresh and stamped ones (as the floor check above)
+        const theirs = accountRank(pid, pagePid !== undefined && Array.isArray(r.targetRoles) ? r.targetRoles : null);
+        if (theirs < 0) return at('rankUnknown');
+        if (theirs >= Math.min(rank(fresh), rank(stamped))) return at('rank');
+      }
+      if (line.kind === 'suspend' && suspendCapped(pid, !dry)) return at('suspendCap');
     }
     const targetName = target ? display(target) : '';
-    audit(`REMOTE ${r.src} req ${id8(r.id)} ${r.user} <@${r.discordId}> as ${who(a)}${targetName ? ` on ${targetName}` : ''}${dry ? ' (dry run)' : ''}: ${r.text}`);
+    audit(`REMOTE ${r.src} req ${id8(r.id)} ${r.user} <@${r.discordId}> as ${who(a)}${targetName ? ` on ${targetName}` : ''}${pagePid !== undefined ? ` (page profile ${pagePid})` : ''}${dry ? ' (dry run)' : ''}: ${r.text}`);
     let gate = 'failed', lines = [];
     try {
       // The player log (playerlog.js) names a command's route from __dboPlogRoute before it guesses from the capture
@@ -539,7 +620,7 @@ module.exports = (api) => {
     const shown = replyLines(lines);
     if (state === 'refused' && !shown.length) shown.push({ to: 'console', text: (TEXT[whyCode] || TEXT.gate)(line.cmd) });
     // A dry run stops in handleLine before the command, so discipline.js's own checks never ran: say so
-    if (state === 'dry-run' && ALLOW[line.cmd].rule === 'tagKindReason') shown.unshift({ to: 'console', text: TEXT.dryRecord() });
+    if (state === 'dry-run' && rule.rule === 'tagKindReason') shown.unshift({ to: 'console', text: TEXT.dryRecord() });
     writeReply(key, Object.assign({ id: r.id, state, gate, target: targetName, lines: shown, why: whyCode }, as));
     audit(`REMOTE req ${id8(r.id)} -> ${state}/${gate}`);
   };
@@ -599,4 +680,4 @@ module.exports = (api) => {
 
 // Shared pure helpers, for the harness and the backend's copy of the same rules
 module.exports.rules = { cleanCommand, parseSwitch, checkLine, checkShape, reqPayload, repPayload, replyLines, plainLine, id8, ALLOW, TEXT,
-  KIND_ARGS, REASON_RE, maxDaysOf, lengthHours, reasonWhy, kindsOf, usageOf };
+  KIND_ARGS, REASON_RE, maxDaysOf, lengthHours, reasonWhy, kindsOf, usageOf, TARGET_KEYS, SUSPEND_CAP };

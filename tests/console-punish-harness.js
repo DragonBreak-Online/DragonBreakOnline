@@ -326,7 +326,8 @@ reset();
 {
   const before = JSON.stringify(recordOf(1));
   let rep = send('/discipline #JALT warn Testing my own account');
-  check("E3. never one's own account: Jake on Jake Alt (profile 1) is refused by discipline.js, nothing recorded", rep && rep.state === 'ran' && header(rep) === 'You cannot discipline your own account.' && JSON.stringify(recordOf(1)) === before, rep);
+  // (the hardening's rank check refuses one's own account in the console first, ownAccount; discipline.js refuses it in game)
+  check("E3. never one's own account: Jake on Jake Alt (profile 1) is refused (ownAccount), nothing recorded", rep && rep.state === 'refused' && rep.why === 'ownAccount' && JSON.stringify(recordOf(1)) === before, rep);
   rep = send('/discipline #LLX8 lift appeal accepted');
   check('E3. a lift with no running suspension: "Lydia #LLX8 is not suspended."', rep && header(rep) === 'Lydia #LLX8 is not suspended.' && recordOf(6).length === 1, rep);
   rep = send('/discipline #LLX8 overturn 9 no such record');
@@ -335,12 +336,13 @@ reset();
   check('E3. an overturn of an overturn is refused by discipline.js', rep && /That entry is itself an overturn/.test(header(rep)), rep);
   rep = send('/discipline #8KWH overturn 2 again please');
   check('E3. a record already overturned: "#2 was already overturned by Jake #ABCD."', rep && header(rep) === '#2 was already overturned by Jake #ABCD.', rep);
-  // A Lead GM passes the console's floor and discipline.js's Lead-GM kinds; she may discipline staff (Nate, Developer), as in game
+  // A Lead GM passes the console's floor and discipline.js's Lead-GM kinds; she may discipline staff below her (Gemma, GM), as
+  // in game. A Developer (Nate) is at or above her rank: the hardening refuses that from the console (console-hardening-harness H1)
   reset();
-  rep = send('/discipline #NNAT suspend 12h tested a dupe on the live server', AS_LEAD);
-  check('E3. a pinned Lead GM suspends from the console (suspend is Lead GM and above in discipline.js)', rep && rep.state === 'ran' && /^Recorded: suspend #1 on Nate #NNAT until /.test(header(rep)) && rep.tier === 'leadgm', rep);
-  rep = send('/discipline #NNAT lift it was a test server', AS_LEAD);
-  check('E3. ...and lifts it', rep && rep.state === 'ran' && /^Recorded: lift #2 on Nate #NNAT\./.test(header(rep)), rep);
+  rep = send('/discipline #GMGM suspend 12h tested a dupe on the live server', AS_LEAD);
+  check('E3. a pinned Lead GM suspends from the console (suspend is Lead GM and above in discipline.js)', rep && rep.state === 'ran' && /^Recorded: suspend #1 on Gemma #GMGM until /.test(header(rep)) && rep.tier === 'leadgm', rep);
+  rep = send('/discipline #GMGM lift it was a test server', AS_LEAD);
+  check('E3. ...and lifts it', rep && rep.state === 'ran' && /^Recorded: lift #2 on Gemma #GMGM\./.test(header(rep)), rep);
   // A GM never reaches discipline.js from the console: the floor in code is Lead GM
   reset();
   rep = send('/discipline #8KWH warn Gemma tries the console', { discordId: ID.gm, profileId: 3, roles: [ROLE.gm], user: 'gemma' });
@@ -367,7 +369,7 @@ reset();
   check('E4. a request whose text the backend did not clean (a raw colour code, a newline) is refused as bad, nothing runs', raw && raw.state === 'bad' && nl && nl.state === 'bad' && !kicked.length && recordOf(5).length === n5, [raw, nl]);
   store.get(A.lydia)['private.charTag'] = 'BOB2'; setOnline(A.lydia, false);
   const dup = send('/discipline #BOB2 warn two characters carry it');
-  check('E4. a tag two characters carry (none online) is refused as targetAny, nothing recorded', dup && dup.why === 'targetAny' && recordOf(5).length === n5, dup);
+  check('E4. a tag two characters carry (none online) is refused as tagShared, nothing recorded', dup && dup.why === 'tagShared' && recordOf(5).length === n5, dup);
   store.get(A.lydia)['private.charTag'] = 'LLX8'; setOnline(A.lydia, true);
   globalThis.__dboFormGone = (id) => (id >>> 0) === A.bobAlt;
   const gone = send('/discipline #BOB2 warn a deleted character');
@@ -382,8 +384,8 @@ reset();
   const rep = send('/discipline #8KWH suspend 3d stole from a barrel', { mode: 'dry-run' });
   check('E5. a dry run passes the console and the gate, records nothing, kicks nobody, writes no staff line', rep && rep.state === 'dry-run' && rep.target === 'Bob #8KWH' && recordOf(5).length === n5 && !kicked.length && !staffLines.length, rep);
   check('E5. ...and says that the record\'s own checks did not run', rep && /^Dry run: it passed the console and the command gate only\. Nothing was recorded, and the record's own checks .* did not run\.$/.test(header(rep)), rep && rep.lines);
-  const own = send('/discipline #JALT warn Testing my own account', { mode: 'dry-run' });
-  check('E5. ...so a dry run of a line discipline.js would refuse (own account) still reads dry-run, with that warning', own && own.state === 'dry-run' && /Dry run/.test(header(own)), own);
+  const own = send('/discipline #LLX8 lift Lydia is not suspended', { mode: 'dry-run' });
+  check('E5. ...so a dry run of a line discipline.js would refuse (a lift with nothing to lift) still reads dry-run, with that warning', own && own.state === 'dry-run' && /Dry run/.test(header(own)), own);
   setSwitch('dry-run\n');
   const sw = send('/discipline #8KWH warn the switch is at dry run');
   check('E5. the switch at dry-run forces it for /discipline too', sw && sw.state === 'dry-run' && recordOf(5).length === n5, sw);
