@@ -50,9 +50,9 @@
   --glass-border-bright: rgba(var(--accent-rgb), 0.55);
   --glow:         0 0 18px rgba(var(--accent-rgb), 0.25);
 
-  --topbar-h:     52px;
-  --bottombar-h:  66px;
-  --text-scale:  1.12;
+  --topbar-h:     44px;
+  --bottombar-h:  56px;
+  --text-scale:  1.06;
 }
 
 /* Base */
@@ -115,7 +115,7 @@ html, body {
   border-bottom: 1px solid var(--glass-border);
   display: flex;
   align-items: center;
-  padding: 0 14px 0 20px;
+  padding: 0 10px 0 14px;
   gap: 0;
   flex-shrink: 0;
   -webkit-app-region: drag;
@@ -125,15 +125,15 @@ html, body {
 .topbar-logo {
   display: flex;
   align-items: center;
-  gap: 11px;
+  gap: 9px;
   -webkit-app-region: no-drag;
   flex-shrink: 0;
 }
 
 /* The hourglass mark itself, which is where the whole palette comes from */
 .logo-emblem {
-  width: 36px;
-  height: 36px;
+  width: 30px;
+  height: 30px;
   border: 1px solid var(--glass-border-bright);
   border-radius: 7px;
   object-fit: cover;
@@ -153,7 +153,7 @@ html, body {
   font-family: 'Cinzel', serif;
   font-size: calc(16px * var(--text-scale));
   font-weight: 700;
-  letter-spacing: 4px;
+  letter-spacing: 3px;
   color: var(--silver);
   text-shadow: 0 0 14px rgba(var(--accent-rgb), 0.5), 0 2px 6px rgba(0, 0, 0, 0.8);
 }
@@ -172,11 +172,13 @@ html, body {
   align-items: center;
   gap: 4px;
   margin: 0 auto;
+  min-width: 0;
+  overflow: hidden;
   -webkit-app-region: no-drag;
 }
 
 .topnav-link {
-  padding: 5px 16px;
+  padding: 4px 12px;
   font-family: 'Barlow Condensed', sans-serif;
   font-size: calc(11px * var(--text-scale));
   font-weight: 500;
@@ -207,8 +209,8 @@ html, body {
 }
 
 .btn-gear {
-  width: 32px;
-  height: 32px;
+  width: 30px;
+  height: 30px;
   background: transparent;
   border: 1px solid transparent;
   color: rgba(var(--accent-rgb), 0.45);
@@ -219,7 +221,7 @@ html, body {
   align-items: center;
   justify-content: center;
   transition: all 0.2s;
-  margin-right: 8px;
+  margin-right: 6px;
 }
 
 .btn-gear:hover {
@@ -258,7 +260,7 @@ html, body {
 .main {
   flex: 1;
   overflow-y: auto;
-  padding: 22px 36px 24px;
+  padding: 12px 18px;
   display: flex;
   flex-direction: column;
   gap: 0;
@@ -269,7 +271,7 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 18px;
+  margin-bottom: 8px;
 }
 
 .status-badges {
@@ -340,7 +342,7 @@ html, body {
 
 /* Section heading */
 .section-header {
-  margin-bottom: 20px;
+  margin-bottom: 8px;
   display: flex;
   align-items: baseline;
   gap: 10px;
@@ -398,7 +400,7 @@ html, body {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 7px 12px;
+  padding: 4px 10px;
   border-bottom: 1px solid rgba(var(--accent-rgb), 0.07);
   transition: background 0.15s;
 }
@@ -488,7 +490,7 @@ html, body {
 /* Two-column content layout */
 .content-layout {
   display: flex;
-  gap: 16px;
+  gap: 12px;
   flex: 1;
   min-height: 0;
 }
@@ -502,7 +504,7 @@ html, body {
 }
 
 .modlist-section {
-  width: 268px;
+  width: clamp(210px, 24vw, 300px);
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
@@ -512,7 +514,7 @@ html, body {
 .news-grid {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
   flex: 1;
   min-height: 0;
   overflow-y: auto;
@@ -541,8 +543,8 @@ html, body {
   position: relative;
   display: flex;
   align-items: flex-end;
-  min-height: 64px;
-  padding: 14px 16px 12px;
+  min-height: 44px;
+  padding: 9px 14px 8px;
   background:
     radial-gradient(ellipse at 85% 0%, rgba(232, 214, 160, 0.16), transparent 55%),
     radial-gradient(ellipse at 0% 100%, rgba(var(--accent-rgb), 0.18), transparent 60%),
@@ -562,12 +564,12 @@ html, body {
 }
 
 .news-card--featured .news-card-banner {
-  min-height: 118px;
-  padding: 18px 20px 16px;
+  min-height: 76px;
+  padding: 12px 16px 10px;
 }
 
 .news-card-banner--image {
-  min-height: 150px;
+  min-height: 110px;
 }
 
 .news-card-banner img {
@@ -634,7 +636,7 @@ html, body {
 }
 
 .news-card--featured .news-card-title {
-  font-size: calc(20px * var(--text-scale));
+  font-size: calc(18px * var(--text-scale));
 }
 
 .news-card-date {
@@ -645,14 +647,14 @@ html, body {
 }
 
 .news-card-body {
-  padding: 12px 16px 14px;
+  padding: 8px 14px 10px;
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
 
 .news-card--featured .news-card-body {
-  padding: 14px 20px 16px;
+  padding: 10px 16px 12px;
 }
 
 .news-card-desc {
@@ -743,20 +745,24 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 0 0 28px;
+  gap: 12px;
+  padding: 0 0 0 16px;
   flex-shrink: 0;
 }
 
 .bottombar-info {
   display: flex;
   align-items: center;
-  gap: 20px;
+  gap: 14px;
+  flex: 1;
+  min-width: 0;
 }
 
 .info-item {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  flex-shrink: 0;
 }
 
 .info-label {
@@ -798,8 +804,9 @@ html, body {
 .bottombar-right {
   display: flex;
   align-items: center;
-  gap: 18px;
+  gap: 14px;
   height: 100%;
+  flex-shrink: 0;
 }
 
 .connect-warning {
@@ -827,7 +834,7 @@ html, body {
 /* The PLAY button - solid red, prominent */
 .btn-play {
   height: 100%;
-  padding: 0 48px;
+  padding: 0 36px;
   background: linear-gradient(to bottom, #e8d6a0 0%, #c9ad72 100%);
   border: none;
   border-left: 1px solid rgba(255,255,255,0.1);
@@ -879,8 +886,8 @@ html, body {
   -webkit-backdrop-filter: blur(32px) saturate(1.4);
   border: 1px solid var(--glass-border-bright);
   width: 580px;
-  max-width: 92vw;
-  max-height: 88vh;
+  max-width: calc(100vw - 24px);
+  max-height: calc(100vh - 24px);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -890,7 +897,7 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 18px 24px;
+  padding: 10px 16px;
   border-bottom: 1px solid var(--glass-border);
   flex-shrink: 0;
 }
@@ -918,7 +925,7 @@ html, body {
 .modal-close:hover { background: rgba(201, 70, 58,0.65); color: #fff; }
 
 .modal-body {
-  padding: 22px 24px;
+  padding: 14px 18px;
   overflow-y: auto;
   flex: 1;
 }
@@ -926,8 +933,8 @@ html, body {
 .settings-group {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  margin-bottom: 18px;
+  gap: 5px;
+  margin-bottom: 12px;
 }
 
 .settings-group[hidden] { display: none; }
@@ -954,8 +961,8 @@ html, body {
   border: 1px solid var(--glass-border);
   color: var(--parchment);
   font-family: 'Barlow Condensed', sans-serif;
-  font-size: calc(15px * var(--text-scale));
-  padding: 9px 12px;
+  font-size: calc(14px * var(--text-scale));
+  padding: 6px 10px;
   outline: none;
   width: 100%;
   transition: border-color 0.2s;
@@ -983,13 +990,13 @@ html, body {
 .btn-browse:hover { border-color: var(--glass-border-bright); color: var(--parchment); }
 
 .modal-actions {
-  margin-top: 24px;
+  margin-top: 12px;
   display: flex;
   align-items: center;
   justify-content: flex-end;
   gap: 12px;
   flex-wrap: wrap;
-  padding-top: 18px;
+  padding-top: 10px;
   border-top: 1px solid var(--glass-border);
 }
 
@@ -1022,7 +1029,7 @@ html, body {
   word-break: break-word;
 }
 
-#tab-install .install-progress { height: 200px; }
+#tab-install .install-progress { height: clamp(100px, 24vh, 200px); }
 
 .btn-install {
   padding: 9px 18px;
@@ -1062,8 +1069,8 @@ html, body {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-bottom: 16px;
-  padding: 6px 12px;
+  margin-bottom: 8px;
+  padding: 4px 10px;
   background: rgba(8, 25, 28, 0.45);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
@@ -1121,7 +1128,7 @@ html, body {
 .metric-card {
   background: rgba(8, 25, 28, 0.5);
   border: 1px solid var(--glass-border);
-  padding: 14px 16px;
+  padding: 10px 12px;
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -1167,7 +1174,7 @@ html, body {
   gap: 18px;
   background: rgba(8, 25, 28, 0.5);
   border: 1px solid var(--glass-border);
-  padding: 14px 16px;
+  padding: 10px 12px;
 }
 
 .metric-clock-moon {
@@ -1202,7 +1209,7 @@ html, body {
   grid-column: 1 / -1;
   background: rgba(8, 25, 28, 0.5);
   border: 1px solid var(--glass-border);
-  padding: 14px 16px;
+  padding: 10px 12px;
   display: flex;
   flex-direction: column;
   gap: 7px;
@@ -1397,7 +1404,7 @@ html, body {
 }
 
 .modal-tab {
-  padding: 10px 22px;
+  padding: 8px 16px;
   background: transparent;
   border: none;
   border-bottom: 2px solid transparent;
@@ -1569,11 +1576,17 @@ html, body {
 
 /* The status/progress text now lives on the left side of the bottom bar */
 .bottombar-info .connect-warning {
-  max-width: 520px;
+  flex: 1;
+  min-width: 0;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.2;
   padding-right: 0;
+}
+/* Up to two lines, so a long notice such as the Terms one reads in full instead of being cut off */
+.bottombar-info .connect-warning.visible {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 /* Nexus topbar button - darker yellow */
@@ -1625,13 +1638,13 @@ html, body {
 .settings-collapse {
   border: 1px solid var(--glass-border);
   border-radius: 6px;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
   background: rgba(0, 0, 0, 0.18);
   overflow: hidden;
 }
 .settings-collapse > summary {
   cursor: pointer;
-  padding: 10px 14px;
+  padding: 8px 12px;
   font-family: 'Cinzel', serif;
   font-weight: 600;
   letter-spacing: 0.04em;
@@ -1847,8 +1860,8 @@ button.hotkey-btn--capturing {
 
 /* Install progress: the panel on the main screen and the bar above the Repair tab's log */
 .install-panel {
-  margin-top: 12px;
-  padding: 12px 16px;
+  margin-top: 8px;
+  padding: 8px 12px;
   background: var(--glass-bg);
   border: 1px solid var(--glass-border-bright);
   display: flex;
@@ -1889,6 +1902,29 @@ button.hotkey-btn--capturing {
 .install-progress--panel { height: 90px; }
 button:disabled[title] { cursor: not-allowed; }
 
+/* Resizable window: the layout tightens as the window gets narrower or shorter, down to the 800 x 540 minimum */
+@media (max-width: 1100px), (max-height: 680px) {
+  :root { --text-scale: 1; --topbar-h: 42px; --bottombar-h: 52px; }
+}
+@media (max-width: 1100px) {
+  .logo-tagline { display: none; }
+  .logo-name { letter-spacing: 2px; }
+  .topnav-link { padding: 4px 9px; letter-spacing: 1.5px; }
+  .discord-topbar-name { max-width: 84px; }
+  .bottombar-info { gap: 10px; }
+  .btn-play { padding: 0 26px; letter-spacing: 3px; }
+  .btn-play:hover { letter-spacing: 4px; }
+  .footer-server-select { max-width: 120px; }
+}
+@media (max-width: 920px) {
+  .logo-text-block { display: none; }
+  .info-divider { display: none; }
+}
+@media (max-height: 680px) {
+  .main { padding-top: 8px; padding-bottom: 8px; }
+  .news-card--featured .news-card-banner { min-height: 60px; }
+  .news-card-banner--image { min-height: 84px; }
+}
 @media (max-height: 640px) {
   .legal-changes-list { max-height: clamp(48px, 20vh, 160px); }
 }
