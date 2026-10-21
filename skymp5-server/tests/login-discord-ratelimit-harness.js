@@ -179,6 +179,21 @@ const user = (i, extra) => ({ id: 100 + i, discordId: String(5550 + i), ...extra
   check('a 60 s global rate limit gives up at once and the backend\'s answer decides', spawned(10) && took10 < 1500, { took10, calls: discordCalls.length });
   check('...with one Discord call', discordCalls.length === 1, discordCalls.length);
 
+  section('a slow session check leaves less time for Discord retries (the client gives up at 15 s)');
+  {
+    const slow = { sessions: { [sessionFor(14)]: user(14, { discordMember: true, roles: ['R'] }) }, discord: async () => limited(1) };
+    reset(slow);
+    const fast = rl.fetch;
+    rl.fetch = async (url, opts) => {
+      if (/\/sessions\/[^/]+$/.test(new URL(url).pathname)) await new Promise((r) => setTimeout(r, 9500));
+      return fast(url, opts);
+    };
+    mute(); login = await newLogin(G); const took14 = await loginOnce(login, 14, sessionFor(14)); unmute();
+    rl.fetch = fast;
+    check('a 9.5 s session check: no 1 s Discord wait past 10 s into the login, the backend\'s answer decides', spawned(14) && took14 < 10300, { took14, calls: discordCalls.length });
+    check('...with one Discord call', discordCalls.length === 1, discordCalls.length);
+  }
+
   section('two guilds: a member of one is in, as before');
   reset({ sessions: { [sessionFor(11)]: user(11) }, discord: async (g) => (g === 'A' ? notMember() : member(['RB'])) });
   mute(); login = await newLogin([{ guildId: 'A' }, { guildId: 'B' }]); await loginOnce(login, 11, sessionFor(11)); unmute();

@@ -51,8 +51,9 @@ interface UserProfile {
   roles?: string[];
 }
 
-// A 429 on the guild member lookup is retried inside this budget so the login still answers within the client's 15 s wait
+// A 429 on the guild member lookup is retried inside this budget, and never past 10 s into the login (the client waits 15 s)
 const discordMemberBudgetMs = 6000;
+const discordLoginDeadlineMs = 10000;
 const discordMemberMaxTries = 4;
 const discordRetryJitterMs = 250;
 const discordRetryCapMs = 60000;
@@ -103,8 +104,7 @@ export class Login implements System {
     this.discordGaps = { reportedAt: now, limited: 0, passedOnBackend: 0, refused: 0, lastStatus: g.lastStatus };
   }
 
-  private async fetchDiscordMember(guildId: string, discordId: string, botToken: string): Promise<DiscordMemberAnswer> {
-    const deadline = Date.now() + discordMemberBudgetMs;
+  private async fetchDiscordMember(guildId: string, discordId: string, botToken: string, deadline: number): Promise<DiscordMemberAnswer> {
     for (let attempt = 1; ; attempt++) {
       const waitMs = this.discordRetryAt - Date.now();
       if (waitMs > 0) {
@@ -285,6 +285,7 @@ export class Login implements System {
       this.log("The server is in offline mode, the client is NOT");
     } else if (this.offlineMode === false && gameData && gameData.session) {
       (async () => {
+        const loginStartedAt = Date.now();
         this.emit(ctx, "userAssignSession", userId, gameData.session);
 
         // A dropped connection's userId goes to the next one and every client shares the relay ip, so only the guid tells them apart
@@ -371,8 +372,9 @@ export class Login implements System {
 
           const unanswered: DiscordGuildConfig[] = [];
           let unansweredStatus = 0;
+          const discordDeadline = Math.min(Date.now() + discordMemberBudgetMs, loginStartedAt + discordLoginDeadlineMs);
           for (const guildConfig of discordAuth.guilds) {
-            const answer = await this.fetchDiscordMember(guildConfig.guildId, profile.discordId, discordAuth.botToken);
+            const answer = await this.fetchDiscordMember(guildConfig.guildId, profile.discordId, discordAuth.botToken, discordDeadline);
 
             if (answer.status === 401 || answer.status === 403) {
               console.error(`discordAuth: Discord API returned ${answer.status} for guild ${guildConfig.guildId} - ` +
