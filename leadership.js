@@ -34,6 +34,10 @@ module.exports = (api) => {
   const RULER = new Set((C.rulerRanks || []).map((r) => String(r).toLowerCase()));
   // guilds.js kinds whose leader rank IS a court's ruler seat, counted once as the seat and never as a faction
   const COURT_KINDS = new Set(['hold', 'stronghold']);
+  // A player guild's Guildmaster is NOT a leadership seat (Nate, 21 Oct). guilds.js already keeps bands out of
+  // __dboGuildsOf and __dboGuildLeaders, so neither the check nor the audit sees one; named here so a later change to
+  // either does not quietly make a Guildmaster a leader.
+  const BAND_KINDS = new Set(['band']);
 
   const guildsOf = (a) => { try { return typeof globalThis.__dboGuildsOf === 'function' ? (globalThis.__dboGuildsOf(a >>> 0) || []) : []; } catch (e) { return []; } };
   const seatsOf = (a) => { try { return typeof api.ranksOf === 'function' ? (api.ranksOf(profileOf(a >>> 0), a >>> 0) || []) : []; } catch (e) { return []; } };
@@ -48,7 +52,7 @@ module.exports = (api) => {
       // A hold's or stronghold's own faction is NOT a second seat: court.js keeps its leader rank in step with the
       // office, so a Jarl leads "Whiterun Hold" because they are Jarl of Whiterun. Counting both would refuse every
       // ruler their own seat. The ruler seat below is the one that speaks for a court.
-      if (COURT_KINDS.has(String(m.kind || ''))) continue;
+      if (COURT_KINDS.has(String(m.kind || '')) || BAND_KINDS.has(String(m.kind || ''))) continue;
       out.push({ kind: 'faction', id: String(m.id), name: `${m.shown || m.title || 'Leader'} of ${m.name}` });
     }
     for (const s of seatsOf(a)) {
@@ -92,6 +96,7 @@ module.exports = (api) => {
     };
     for (const l of guildLeaders()) {
       if (COURT_KINDS.has(String(l.kind || ''))) continue;   // the same seat as the ruler row below
+      if (BAND_KINDS.has(String(l.kind || ''))) continue;    // a player guild is no leadership seat
       add(l.actor, l.pid, { kind: 'faction', id: String(l.id), name: `${l.title || 'Leader'} of ${l.name}` });
     }
     for (const s of rulerSeats()) if (RULER.has(String(s.rank).toLowerCase())) add(s.actor, s.pid, { kind: 'hold', id: String(s.zone), name: `${titleOf(s.rank, s.zone)} of ${s.zoneName || s.zone}` });

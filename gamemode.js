@@ -8998,6 +8998,14 @@ try {
   require(CHARTERS_JS)({ mp, log, ownNameOf, ownDisplay, displayFor, personal, audit, who, display, nameOf, cfg, registerChatCommand, onlineActors, isAdmin, isLeadStaff,
     findByName, profileOf, takeGold, giveItem, every, staffNote, approvalForum });
 } catch (e) { log('charters.js failed to load:', e.stack || e.message); }
+// ---- player guilds: informal groups with none of the faction powers (server\playerguilds.js, config "playerGuilds") ----
+try {
+  const PLAYERGUILDS_JS = path.resolve('playerguilds.js');
+  delete require.cache[PLAYERGUILDS_JS];
+  require(PLAYERGUILDS_JS)({ mp, log, personal, system, audit, staffNote, who, display, nameOf, cfg, registerChatCommand,
+    findByName, onlineActors, isAdmin });
+} catch (e) { log('playerguilds.js failed to load:', e.stack || e.message); }
+
 // ---- one leadership seat per character (server\leadership.js, config "leadership"; Nate, 21 Oct) ------------------------
 // Every seating of a faction leader or a hold's ruler asks it first: appointCheck and seatOfficial above, and guilds.js
 // for the faction side. rulerSeats reads the live officials with their per-character binding, for /leadership audit.

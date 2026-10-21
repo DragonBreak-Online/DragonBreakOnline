@@ -68,6 +68,42 @@ module.exports = (api) => {
   };
   for (const f of (readJson(PLAYER_PATH, { factions: [] }).factions || [])) addPlayerFaction(f);
 
+  // ---- player guilds, kind 'band' (Nate, 21 Oct: a third tier under the lore factions and the chartered ones) --------
+  // An informal group any player makes on the spot, at most maxMembers including its Guildmaster. It lives in FACTIONS so
+  // the F3 Faction tab and the rosters show it with no client release, and NOTHING else treats it as a faction: the kind is
+  // 'band', not the lore kind 'guild' (the Fighters Guild is a guild), and __dboGuildsOf - which every power reads - leaves
+  // bands out unless asked for them. Its own file, never player-factions.json, so charters.js's disband and dissolve flows
+  // and its leadsPlayerFaction check never see one.
+  const BAND_KIND = 'band';
+  const BAND_PATH = path.resolve('player-guilds.json');
+  // compatibleKinds / compatibleIds / colleges: what a guild member MAY also belong to (Nate, 21 Oct: "a leader or member
+  // of any faction cannot create or join a guild", except religious factions and the magic colleges). The defs carry no
+  // "religious" flag: kind 'cult' is the 15 Daedric cults, while the Imperial Cult, the Great Faiths and the Vigil of
+  // Stendarr are kind 'guild', so they are named by id. A college is the college flag (Winterhold, the Synod, Whispers,
+  // and any later one), not a kind.
+  const BAND = Object.assign({
+    enabled: true, maxMembers: 10,
+    compatibleKinds: ['cult'],
+    compatibleIds: ['imperial-cult', 'great-faiths', 'vigil-of-stendarr'],
+    collegesCompatible: true,
+  }, (cfg.playerGuilds || {}));
+  const BAND_RANKS = [{ title: 'Guildmaster', role: 'leader' }, { title: 'Officer', role: 'officer' }, { title: 'Member', role: 'member' }];
+  const bandDefs = () => { const d = readJson(BAND_PATH, { guilds: [] }); return Array.isArray(d.guilds) ? d.guilds : []; };
+  const isBand = (fid) => { const f = FACTIONS.get(String(fid)); return !!f && f.kind === BAND_KIND; };
+  const addBand = (g) => {
+    if (!g || !g.id || FACTIONS.has(String(g.id))) return false;
+    FACTIONS.set(String(g.id), { id: String(g.id), name: String(g.name), kind: BAND_KIND, band: true, player: true,
+      ranks: BAND_RANKS.map((r) => ({ title: r.title, role: r.role })), founded: Number(g.founded) || Date.now(), by: String(g.by || '') });
+    return true;
+  };
+  const saveBands = () => {
+    const out = [...FACTIONS.values()].filter((f) => f.kind === BAND_KIND)
+      .map((f) => ({ id: f.id, name: f.name, founded: f.founded, by: f.by }));
+    try { fs.writeFileSync(BAND_PATH + '.tmp', JSON.stringify({ guilds: out }, null, 1)); fs.renameSync(BAND_PATH + '.tmp', BAND_PATH); return true; }
+    catch (e) { log(`player guilds: ${BAND_PATH} could not be written: ${e.message}`); return false; }
+  };
+  if (BAND.enabled !== false) for (const g of bandDefs()) addBand(g);
+
   // ---- rank overrides: titles renamed and ranks added, moved or removed in game (F3 Faction tab: the leader, or staff) ---
   // guild-overrides.json (runtime, gitignored): { factionId: { ranks: [{ title, role }], by, at } }. A faction's ranks are
   // replaced whole, never edited in place, since factions of one template share its rank array.
@@ -218,8 +254,36 @@ module.exports = (api) => {
   const isOnline = (a) => onlineActors().includes(a >>> 0);
 
   // by: the character who makes the change (null for the court's own office sync), for the wording of a limit refusal
+  // A band's own rules: at most maxMembers including the Guildmaster, and one band per CHARACTER on top of any factions
+  const bandFull = (fid) => isBand(fid) && Object.keys(rosterOf(fid)).length >= Math.max(1, Number(BAND.maxMembers) || 10);
+  const bandOf = (a) => membershipsOf(a >>> 0).find((m) => isBand(m.fid)) || null;
+  // A faction a guild member may also belong to: a religious one or a magic college
+  const bandCompatible = (fid) => {
+    const f = FACTIONS.get(String(fid));
+    if (!f || f.kind === BAND_KIND) return true;
+    if (BAND.collegesCompatible !== false && f.college === true) return true;
+    if ((BAND.compatibleKinds || []).map(String).includes(String(f.kind || ''))) return true;
+    return (BAND.compatibleIds || []).map(String).includes(String(f.id));
+  };
+  // The factions this character holds that a guild cannot sit beside
+  const bandBlockers = (a) => membershipsOf(a >>> 0).filter((m) => !isBand(m.fid) && !bandCompatible(m.fid))
+    .map((m) => ({ fid: m.fid, name: FACTIONS.get(m.fid).name }));
   const setMember = (fid, a, rank, by) => {
     const f = FACTIONS.get(fid);
+    if (f && f.kind === BAND_KIND && !entryOf(fid, a)) {
+      if (bandFull(fid)) return `${f.name} is full: a guild holds ${Math.max(1, Number(BAND.maxMembers) || 10)}, its Guildmaster included.`;
+      const had = bandOf(a);
+      if (had) return `${nameOf(a)} is already in ${FACTIONS.get(had.fid).name}. A character belongs to one guild at a time.`;
+      const no = bandBlockers(a);
+      if (no.length) return `${nameOf(a)} belongs to ${no.map((x) => x.name).join(' and ')}. A guild is for players in no faction: leave it first. A faith or a magic college may stand beside a guild.`;
+    }
+    // The other way about: a faction rank is refused to someone in a guild, unless the faction is a faith or a college.
+    // setMember is the one write every join and promotion goes through - the panel, the Court tab's household, /faction,
+    // an approved charter and its co-founders - so the rule holds at all of them from here.
+    if (f && f.kind !== BAND_KIND && !entryOf(fid, a) && !bandCompatible(fid)) {
+      const band = bandOf(a);
+      if (band) return `${nameOf(a)} is in ${FACTIONS.get(band.fid).name}. Leave your guild first: a faction is not for guild members.`;
+    }
     const role = (f.ranks[rank] || {}).role;
     if ((role === 'leader' || role === 'officer') && typeof globalThis.__dboIsStaff === 'function' && globalThis.__dboIsStaff(a)) return `${ownNameOf(a)} is on the staff. Staff hold no ${role === 'leader' ? 'leader' : 'officer'} rank in a faction.`;
     const cap = Number(CAPS[role]) || 0;
@@ -533,8 +597,71 @@ module.exports = (api) => {
     return { name: String(h.name), zone: h.zone || '', doors: Array.isArray(h.doors) ? h.doors.slice() : [], shared: !!h.shared, note: h.note || '' };
   };
   // title is the rank's own title (economy.js keys wages by it), shown what it is shown as (rolenames.js)
-  globalThis.__dboGuildsOf = (a) => membershipsOf(a >>> 0).map((m) => { const f = FACTIONS.get(m.fid); const r = f.ranks[m.e.rank] || {}; return { id: m.fid, name: f.name, title: r.title || '', shown: shownAt(f, m.e.rank), role: r.role || '', kind: f.kind || '', zone: f.zone || '', secret: !!f.secret, player: !!f.player, hall: hallOf(f) }; });
+  // Every power reads this (factiongear, bank, business, economy, realm, raids, leadership, the colleges...), so a band is
+  // left out of it: that is how "guilds get none of the faction powers" is kept in ONE place instead of 25. opts.bands
+  // true asks for them, for the few views that should show a band (the Faction tab's own payload uses membershipsOf).
+  globalThis.__dboGuildsOf = (a, opts) => membershipsOf(a >>> 0).filter((m) => (opts && opts.bands) || !isBand(m.fid)).map((m) => { const f = FACTIONS.get(m.fid); const r = f.ranks[m.e.rank] || {}; return { id: m.fid, name: f.name, title: r.title || '', shown: shownAt(f, m.e.rank), role: r.role || '', kind: f.kind || '', zone: f.zone || '', secret: !!f.secret, player: !!f.player, hall: hallOf(f) }; });
   globalThis.__dboGuildExists = (id) => FACTIONS.has(String(id));
+
+  // ---- the player guild API (playerguilds.js drives it; the F3 Faction tab shows the result) --------------------------
+  const bandId = (name) => {
+    const base = String(name).toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'guild';
+    let id = `guild-${base}`;
+    for (let n = 2; FACTIONS.has(id); n++) id = `guild-${base}-${n}`;
+    return id;
+  };
+  globalThis.__dboBandNames = () => [...FACTIONS.values()].filter((f) => f.kind === BAND_KIND).map((f) => f.name);
+  globalThis.__dboBands = () => [...FACTIONS.values()].filter((f) => f.kind === BAND_KIND)
+    .map((f) => ({ id: f.id, name: f.name, founded: f.founded, by: f.by, members: Object.keys(rosterOf(f.id)).length,
+      master: Object.entries(rosterOf(f.id)).find(([, e]) => e.rank === 0) ? Object.entries(rosterOf(f.id)).find(([, e]) => e.rank === 0)[1].name : '' }));
+  globalThis.__dboBandOf = (a) => { const m = bandOf(a >>> 0); if (!m) return null; const f = FACTIONS.get(m.fid); return { id: f.id, name: f.name, rank: m.e.rank, title: f.ranks[m.e.rank].title }; };
+  globalThis.__dboBandMaxMembers = () => Math.max(1, Number(BAND.maxMembers) || 10);
+  // Why this character may not be in a guild at all, or ''
+  globalThis.__dboBandBlocked = (a) => {
+    if (BAND.enabled === false) return 'Guilds are closed right now.';
+    const no = bandBlockers(a >>> 0);
+    return no.length ? `You belong to ${no.map((x) => x.name).join(' and ')}. A guild is for players in no faction: leave it first. A faith or a magic college may stand beside a guild.` : '';
+  };
+  // Creates the guild with `a` as its Guildmaster. { error } or { id, name }
+  globalThis.__dboBandCreate = (a, name) => {
+    if (BAND.enabled === false) return { error: 'Guilds are closed right now.' };
+    const who2 = a >>> 0;
+    const blocked = globalThis.__dboBandBlocked(who2);
+    if (blocked) return { error: blocked };
+    if (bandOf(who2)) return { error: `You are already in ${FACTIONS.get(bandOf(who2).fid).name}. A character belongs to one guild at a time.` };
+    const id = bandId(name);
+    if (!addBand({ id, name: String(name), founded: Date.now(), by: nameOf(who2) })) return { error: 'That guild could not be made.' };
+    const err = setMember(id, who2, 0, null);
+    if (err) { FACTIONS.delete(id); delete ST.members[id]; save(); return { error: err } ; }
+    if (!saveBands()) { FACTIONS.delete(id); delete ST.members[id]; save(); return { error: 'The guild could not be written to disk; nothing was made.' }; }
+    save();
+    return { id, name: String(name) };
+  };
+  // Joining an invited guild at the Member rank: setMember holds the cap, the one-guild rule and the faction rule
+  globalThis.__dboBandJoin = (a, id) => {
+    const f = FACTIONS.get(String(id));
+    if (!f || f.kind !== BAND_KIND) return { error: 'That guild is gone.' };
+    const err = setMember(f.id, a >>> 0, f.ranks.length - 1, null);
+    if (err) return { error: err };
+    save();
+    return { id: f.id, name: f.name };
+  };
+  globalThis.__dboBandRename = (id, name) => {
+    const f = FACTIONS.get(String(id));
+    if (!f || f.kind !== BAND_KIND) return { error: 'No such guild.' };
+    const was = f.name; f.name = String(name);
+    if (!saveBands()) { f.name = was; return { error: 'The new name could not be written; nothing changed.' }; }
+    return { was, name: f.name };
+  };
+  globalThis.__dboBandDissolve = (id) => {
+    const f = FACTIONS.get(String(id));
+    if (!f || f.kind !== BAND_KIND) return { error: 'No such guild.' };
+    const members = Object.keys(rosterOf(f.id)).map((x) => Number(x) >>> 0);
+    FACTIONS.delete(f.id); delete ST.members[f.id];
+    saveBands(); save();
+    for (const m of members) { try { mirror(m); } catch (e) { /* offline */ } }
+    return { name: f.name, members };
+  };
   // A magic college (guild-defs.json "college": true; Swag, 17 Oct: "any future magical colleges and current"): schools.js lets its
   // leader and officers hold classes and take more apprentices, as the colleges it names
   globalThis.__dboGuildIsCollege = (id) => { const f = FACTIONS.get(String(id)); return !!(f && f.college === true); };
@@ -547,7 +674,7 @@ module.exports = (api) => {
     return since.length ? Math.min(...since) : 0;
   };
   // Every faction that is not secret, for the war section's lists (realm.js)
-  globalThis.__dboFactionList = () => [...FACTIONS.values()].filter((f) => !f.secret).map((f) => f.id);
+  globalThis.__dboFactionList = () => [...FACTIONS.values()].filter((f) => !f.secret && f.kind !== BAND_KIND).map((f) => f.id);   // realm.js's war targets: never a band
   // For the war system (realm.js): a faction's name and kind, and the characters on its roster (actor ids)
   globalThis.__dboGuildInfo = (id) => { const f = FACTIONS.get(String(id)); return f ? { id: f.id, name: f.name, kind: f.kind || '', zone: f.zone || '', secret: !!f.secret, circle: circleOf(f.id), hall: hallOf(f) } : null; };
   // Where a faction is seated (guild-defs.json "hall"). A home address for now: the name players are told and
@@ -1242,6 +1369,7 @@ module.exports = (api) => {
   globalThis.__dboGuildLeaders = () => {
     const out = [];
     for (const f of FACTIONS.values()) {
+      if (f.kind === BAND_KIND) continue;   // a Guildmaster is not a leadership seat (Nate, 21 Oct)
       const lead = f.ranks.findIndex((r) => r.role === 'leader');
       if (lead < 0) continue;
       for (const [id, m] of Object.entries(rosterOf(f.id))) {

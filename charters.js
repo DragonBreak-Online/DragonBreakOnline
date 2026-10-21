@@ -137,7 +137,7 @@ module.exports = (api) => {
     for (const f of defs.factions || []) if (f.prince) princes.add(f.prince);
     const deities = (((skills.deities || {}).choices) || []).map((d) => d && d.name).filter((n) => n && !princes.has(n));
     return {
-      factions: (defs.factions || []).flatMap((f) => [f.name, String(f.id || '').replace(/-/g, ' ')]).filter(Boolean).concat(playerFactions().map((f) => f.name)),
+      factions: (defs.factions || []).flatMap((f) => [f.name, String(f.id || '').replace(/-/g, ' ')]).filter(Boolean).concat(playerFactions().map((f) => f.name), (typeof globalThis.__dboBandNames === 'function' ? globalThis.__dboBandNames() : [])),
       places: names(zones.holds).concat(names(zones.strongholds), names(zones.regions)),
       princes: [...princes], deities,
     };
@@ -612,6 +612,9 @@ module.exports = (api) => {
     }
     if (dirty) save();
   };
+  // playerguilds.js reuses this for /guild create: the blocked words, the reserved names, the lore factions and places,
+  // the Daedric Princes and the deities, and now the player guilds' own names (lore() above)
+  globalThis.__dboCharterNameCheck = (raw, kind) => checkName(raw, 0, String(kind || 'company'));
   globalThis.__dboChartersSweep = sweep;
   if (typeof every === 'function') every('charters', 30000, () => { try { sweep(); } catch (e) { log('charters: sweep failed', e.stack || e.message); } });
 
