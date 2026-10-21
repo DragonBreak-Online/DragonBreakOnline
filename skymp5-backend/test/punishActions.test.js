@@ -496,3 +496,43 @@ test('what the viewer may do: each tier, the pin, the switch and the bot; a GM m
   assert.deepEqual(Object.values(info('owner', 'owner').can), [false, false, false, false, false])
   H.clean(o)
 })
+
+test('the same request id after a failure gets the same status and error, after a restart too; a new id may try again', async () => {
+  const jobsFile = path.join(H.PF.root, 'replay', 'punish-actions.json')
+  H.make({ jobsFile })
+  H.bot.fail = Object.assign(new Error('Missing Permissions'), { code: 50013 })
+  const body = H.body('discord-timeout', { minutes: 30 })
+  const first = want(await H.call('discord-timeout', 'owner', body), 502, 'discordRefused')
+  H.bot.fail = null
+  const calls = H.calls.length
+  for (const make of [() => {}, () => H.make({ jobsFile })]) {
+    make()
+    const again = want(await H.call('discord-timeout', 'owner', body), 502, 'discordRefused')
+    assert.deepEqual([again.code, again.job], [first.code, first.job])
+  }
+  assert.equal(H.calls.length, calls, 'Discord was not asked again')
+  want(await H.call('discord-timeout', 'owner', { ...body, requestId: uuid() }), 200)
+})
+
+test('the longest timeout ends short of Discord\'s 28 days, in whole seconds; shorter ones get at least their minutes', async () => {
+  H.F.clock.offset += 456
+  const t0 = H.F.now()
+  const r = want(await H.call('discord-timeout', 'owner', H.body('discord-timeout', { minutes: 40320 })), 200)
+  const t1 = H.F.now()
+  const until = Date.parse(r.job.until)
+  assert.equal(until % 1000, 0)
+  assert.ok(until <= t1 + 40320 * 60000 - 60000 && until > t0 + 40320 * 60000 - 62000, String(until - t0))
+  assert.equal(H.calls.at(-1)[2], until)
+  const s = want(await H.call('discord-timeout', 'owner', H.body('discord-timeout', { minutes: 10 })), 200)
+  assert.ok(Date.parse(s.job.until) >= t0 + 10 * 60000)
+})
+
+test('unban: once the entry is gone the job is done, even when the ban role cannot be read', async () => {
+  want(await H.call('ban', 'owner', H.body('ban')), 200)
+  H.make({ extra: { bannedRoleId: () => { throw new Error('server-access.json unreadable') } } })
+  const rows = journalOf('unban', bobId).length
+  const r = want(await H.call('unban', 'owner', H.body('unban', { reason: 'Appeal accepted by staff' })), 200)
+  assert.deepEqual([r.job.state, r.job.banRoleHeld], ['done', null])
+  assert.equal(entryOf(bobId), undefined)
+  assert.equal(journalOf('unban', bobId).length, rows + 1)
+})

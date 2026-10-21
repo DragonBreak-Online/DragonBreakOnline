@@ -28,8 +28,9 @@ const TIER_LABEL = Object.freeze({ owner: 'Owner', dev: 'Dragon Break Dev', lead
 const PUNISH_COMMANDS = Object.freeze(['discipline', 'kick'])
 // The console's #TAG (allowlist.js TAG_RE), the first word after /discipline and /kick
 const TAG_RE = /^#[A-Za-z0-9]{4}$/
-// Discord's longest timeout, 28 days
+// Discord's longest timeout, 28 days; an end past it from Discord's own clock is refused, so the longest ends a minute short
 const MAX_MINUTES = 40320
+const CAP_MARGIN_MS = 60 * 1000
 const PRESETS = Object.freeze([10, 60, 360, 1440, 4320, 10080, 40320])
 const LIMITS = Object.freeze({ triesPer10Min: 20, perMinute: 5, perHour: 30, sitePerHour: Object.freeze({ bans: 10, discordBans: 10, timeouts: 30 }) })
 const JOBS_KEPT = 200
@@ -51,6 +52,8 @@ const iso = t => (Number.isFinite(t) && t > 0 ? new Date(t).toISOString() : null
 const utc = t => `${new Date(t).toISOString().slice(0, 16).replace('T', ' ')} UTC`
 const duration = m => (m % 1440 === 0 ? `${m / 1440} d` : m % 60 === 0 ? `${m / 60} h` : `${m} min`)
 const narrower = (a, b) => rules.SETTINGS[Math.min(rules.SETTINGS.indexOf(a), rules.SETTINGS.indexOf(b))]
+// A timeout's end in whole seconds: at least the minutes asked for, never past the cap less the margin
+const endOf = (at, minutes) => Math.min(Math.ceil((at + minutes * MINUTE) / 1000) * 1000, Math.floor((at + MAX_MINUTES * MINUTE - CAP_MARGIN_MS) / 1000) * 1000)
 
 // 'off | dry-run | on' then bans=, discord= and send= that only narrow it, in at most 64 bytes; anything else is off
 function parseActionsSwitch(text) {
@@ -212,6 +215,7 @@ function createPunishActions({
         target: { profileId: Number(t.profileId) || 0, name: str(t.name, 48) || null, tag: str(t.tag, 4) || null, discordName: str(t.discordName, 40) || null },
         reason: str(j.reason, REASON_MAX), minutes: Number.isSafeInteger(j.minutes) ? j.minutes : null, untilMs: Number(j.untilMs) || null,
         ref: rules.foldText(j.ref, 8) || null, banRoleHeld: typeof j.banRoleHeld === 'boolean' ? j.banRoleHeld : null, at: Number(j.at) || 0, mode: str(j.mode, 8),
+        status: Number.isInteger(j.status) && j.status >= 400 && j.status <= 599 ? j.status : null, detail: str(j.detail, 32) || null,
       })
     }
   }
@@ -246,6 +250,13 @@ function createPunishActions({
     say(`PUNISH req ${rules.id8(`w-${j.uuid}`)} -> ${j.state}${j.error ? ` (${j.error})` : ''}${j.ref ? `: ref ${j.ref}` : ''}`)
     if (j.state === 'done' || j.state === 'unknown') staffLine(j)
   }
+  // The answer's status is kept with the job, so the same request id again gets the same answer
+  function failed(j, status, code, detail) {
+    Object.assign(j, { state: 'failed', error: code, status, detail: detail || null })
+    finish(j)
+    return [status, code, detail]
+  }
+  const failedAnswer = j => answer(j.status, { v: 1, error: j.error, ...(j.detail ? { code: j.detail } : {}), job: view(j) })
 
   // ---- who is asking --------------------------------------------------------------------------------------------
   // Before the body is read: the switch, the console's config, the session, tries, a fresh sign-in, the pin, the roles now
@@ -311,7 +322,7 @@ function createPunishActions({
     if (known) {
       const same = known.discordId === ctx.discordId && known.action === action && known.profileId === b.profileId && known.reason === b.reason && known.minutes === b.minutes
       if (!same) return refuse(409, 'conflict')
-      return answer(200, { v: 1, job: view(known) })
+      return known.state === 'failed' && known.status ? failedAnswer(known) : answer(200, { v: 1, job: view(known) })
     }
 
     const found = await targetChecks(ctx, b.profileId, refuse)
@@ -337,7 +348,7 @@ function createPunishActions({
     const job = {
       uuid: b.uuid, action, state: 'running', error: '', discordId: ctx.discordId, handle: ctx.handle, tier: ctx.tier, targetDiscordId: t.discordId,
       profileId: b.profileId, target: { profileId: t.profileId, name: t.name || null, tag: t.tag || null, discordName: t.discordName || null },
-      reason: b.reason, minutes: b.minutes, untilMs: b.minutes ? Math.ceil((at + b.minutes * MINUTE) / 1000) * 1000 : null,
+      reason: b.reason, minutes: b.minutes, untilMs: b.minutes ? endOf(at, b.minutes) : null,
       ref: null, banRoleHeld: null, at, mode: ctx.mode, wasUntil: member.timedOutUntil || 0, tags: t.tags || [],
     }
     remember(job)
@@ -345,12 +356,8 @@ function createPunishActions({
     say(`PUNISH ${ctx.handle} (<@${ctx.discordId}>) via web req ${rules.id8(`w-${b.uuid}`)}: ${what(job)}${ctx.mode === 'dry-run' ? ' (dry run)' : ''}: ${b.reason}`)
     if (ctx.mode === 'dry-run') { job.state = 'dry-run'; finish(job); return answer(200, { v: 1, job: view(job) }) }
 
-    const outcome = await act(job, member)
-    if (job.state === 'failed') {
-      const [status, code, detail] = outcome || [503, job.error]
-      return answer(status, { v: 1, error: code, ...(detail ? { code: detail } : {}), job: view(job) })
-    }
-    return answer(200, { v: 1, job: view(job) })
+    await act(job, member)
+    return job.state === 'failed' && job.status ? failedAnswer(job) : answer(200, { v: 1, job: view(job) })
   }
 
   // The account's state for each action: a refusal, or null to go ahead
@@ -412,21 +419,23 @@ function createPunishActions({
       try {
         if (j.action === 'ban') {
           const r = bans.addNew({ discordId: j.targetDiscordId, reason: j.reason, bannedBy: `${j.handle} (dashboard)` })
-          if (r.existing) { j.state = 'failed'; j.error = 'alreadyBanned'; j.ref = r.existing.ref || null; finish(j); return [409, 'alreadyBanned'] }
+          if (r.existing) { j.ref = r.existing.ref || null; return failed(j, 409, 'alreadyBanned') }
           j.ref = r.entry.ref
         } else {
           const r = bans.removeEntry(j.targetDiscordId)
-          if (!r.removed) { j.state = 'failed'; j.error = 'notBanned'; finish(j); return [409, 'notBanned'] }
+          if (!r.removed) return failed(j, 409, 'notBanned')
           j.ref = r.removed.ref || null
-          const role = bannedRoleId()
-          j.banRoleHeld = !!role && member.state === 'member' && (member.roles || []).includes(String(role))
         }
       } catch (err) {
         log('ban list not written:', err.message)
-        j.state = 'failed'
-        j.error = 'storeUnreadable'
-        finish(j)
-        return [503, 'storeUnreadable']
+        return failed(j, 503, 'storeUnreadable')
+      }
+      // After the write, so nothing here can report a lifted ban as not done
+      if (j.action === 'unban') {
+        try {
+          const role = bannedRoleId()
+          j.banRoleHeld = !!role && member.state === 'member' && (member.roles || []).includes(String(role))
+        } catch (err) { log('ban role not read:', err.message) }
       }
       j.state = 'done'
       journalRow(j, j.action, { ref: j.ref })
@@ -463,10 +472,7 @@ function createPunishActions({
       const [status, code, detail] = r.err && r.err.code === 'botNotReady' ? [503, 'botNotReady'] : DISCORD_ERRORS[r.err && r.err.code] || [502, 'discordRefused', r.err && Number.isInteger(r.err.code) ? String(r.err.code) : 'other']
       if (r.err && r.err.code === 50013) log(`Discord refused ${j.action}: the bot lacks a permission`)
       else log(`Discord refused ${j.action}:`, (r.err && (r.err.code || r.err.message)) || 'unknown')
-      j.state = 'failed'
-      j.error = code
-      finish(j)
-      return [status, code, detail]
+      return failed(j, status, code, detail)
     }
     const first = await withDeadline(settled, discordDeadlineMs)
     if (first) return apply(first)
