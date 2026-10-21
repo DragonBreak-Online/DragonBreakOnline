@@ -1748,6 +1748,42 @@ const hawkBodyInReach = (caster, target, q) => {
     return Math.hypot(p[0] - q[0], p[1] - q[1]) / UNITS_PER_METER <= HAWK_BODY_REACH_M && p[2] - q[2] <= 6.5 * UNITS_PER_METER;
   } catch (e) { return false; }
 };
+// A plugin door whose reference point is far from its own mesh (#bugs 17 Oct: the ladders up in the Whiterun Bakery and
+// Hearth-Healer's Hall, SurWR load doors on Hearthfire's BYOHBYOHWRtowerLTrapDoor01, OBND -730..-609 along X): the ref
+// sits 338 units under the floor and the ladder 609-730 units from it, so the 6.5 m reach from the ref point refused
+// every climb. A plugin DOOR is in reach within 6.5 m of its bounds (OBND, turned by the ref's Z angle as traps.js does).
+const doorBoundsBox = new Map();   // base id -> OBND [x1, y1, z1, x2, y2, z2], or null when not a DOOR with bounds
+const doorBoundsInReach = (caster, target, q) => {
+  if ((target >>> 0) >= 0xff000000) return false;
+  let base = 0; try { base = mp.getIdFromDesc(String(mp.get(target, 'baseDesc') || '')) >>> 0; } catch (e) { return false; }
+  if (!base) return false;
+  if (!doorBoundsBox.has(base)) {
+    let box = null;
+    try {
+      const r = mp.lookupEspmRecordById(base);
+      const rec = r && r.record;
+      const f = rec && String(rec.type) === 'DOOR' ? (rec.fields || []).find((x) => x.type === 'OBND') : null;
+      const d = f && f.data;
+      if (d instanceof Uint8Array && d.byteLength >= 12) { const v = new DataView(d.buffer, d.byteOffset, d.byteLength); box = [0, 2, 4, 6, 8, 10].map((o) => v.getInt16(o, true)); }
+    } catch (e) { box = null; }
+    doorBoundsBox.set(base, box);
+  }
+  const box = doorBoundsBox.get(base);
+  if (!box) return false;
+  try {
+    if (mp.get(caster, 'worldOrCellDesc') !== mp.get(target, 'worldOrCellDesc')) return false;
+    const p = mp.get(caster, 'pos');
+    const ang = mp.get(target, 'angle') || [0, 0, 0];
+    if (!Array.isArray(p) || !Array.isArray(q)) return false;
+    // A tilted door keeps the plain reach; doors turn about Z only in practice
+    if (Math.abs(Number(ang[0]) || 0) > 1 || Math.abs(Number(ang[1]) || 0) > 1) return false;
+    const t = (Number(ang[2]) || 0) * Math.PI / 180, c = Math.cos(t), s = Math.sin(t);
+    const dx = p[0] - q[0], dy = p[1] - q[1], dz = p[2] - q[2];
+    const lx = dx * c - dy * s, ly = dx * s + dy * c;
+    const out = (v, lo, hi) => (v < lo ? lo - v : v > hi ? v - hi : 0);
+    return Math.hypot(out(lx, box[0], box[3]), out(ly, box[1], box[4]), out(dz, box[2], box[5])) / UNITS_PER_METER <= 6.5;
+  } catch (e) { return false; }
+};
 // A hold's treasury chest is paid into at a bank and spent by the realm; nobody but staff opens it (review B1: any rank
 // or key holder, or a lockpick on an unclaimed one, could empty it)
 const treasuryChests = () => {
@@ -1856,7 +1892,7 @@ mp.onActivate = (targetId, casterId) => {
   // Reach applies to actors only; a lever or trap linker activates its gate from any distance
   try {
     const q = mp.get(target, 'pos');
-    if (Array.isArray(q) && mp.get(caster, 'type') === 'MpActor' && distanceMeters(caster, target) > 6.5 && !(typeof hawkBodyInReach === 'function' && hawkBodyInReach(caster, target, q))) return false;
+    if (Array.isArray(q) && mp.get(caster, 'type') === 'MpActor' && distanceMeters(caster, target) > 6.5 && !(typeof hawkBodyInReach === 'function' && hawkBodyInReach(caster, target, q)) && !(typeof doorBoundsInReach === 'function' && doorBoundsInReach(caster, target, q))) return false;
   } catch (e) { }
   // A home's weapon rack (weaponracks.js): owner and key holders rack and take; anyone else, raiders too, is refused. Before
   // the raid hook, and before blockPlacedPickup, which would hand a racked display copy to whoever touched it

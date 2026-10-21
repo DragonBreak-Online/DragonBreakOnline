@@ -18,7 +18,7 @@ let failures = 0;
 const check = (name, ok, got) => { console.log(`${ok ? 'ok  ' : 'FAIL'} ${name}${got !== undefined && !ok ? '   ' + JSON.stringify(got) : ''}`); if (!ok) failures++; };
 
 check('the reach check in the chain lets a hawk body within its reach through',
-  /distanceMeters\(caster, target\) > 6\.5 && !\(typeof hawkBodyInReach === 'function' && hawkBodyInReach\(caster, target, q\)\)\) return false;/.test(src));
+  /distanceMeters\(caster, target\) > 6\.5 && !\(typeof hawkBodyInReach === 'function' && hawkBodyInReach\(caster, target, q\)\)( && !\(typeof doorBoundsInReach === 'function' && doorBoundsInReach\(caster, target, q\)\))?\) return false;/.test(src));
 
 const BRUMA = 'a764b:BSHeartland.esm';
 const HAWK_GO = 0x105821, BONE_HAWK_GO = 0x2002992, CHEST = 0x1234, PLANT = 0x6018f3;
