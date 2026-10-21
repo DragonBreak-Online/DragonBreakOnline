@@ -268,6 +268,12 @@ function createStaffConsole({
     if (pagePid !== undefined && !(entry && entry.targetProfile)) {
       return refuse(422, 'notRemote', handle, { why: 'noProfileCheck', reason: rules.whyText('noProfileCheck', cmd) })
     }
+    // The page account's fresh roles for the rank check, asked before step 9 so nothing waits between it and the record
+    const target = pagePid === undefined ? {} : { targetProfileId: pagePid }
+    if (pagePid !== undefined && entry.rank && !jobs.has(reqId)) {
+      const roles = await targetRolesOf(pagePid)
+      if (roles) target.targetRoles = roles
+    }
     // 9. One run per request id
     const known = jobs.get(reqId)
     if (known) {
@@ -278,12 +284,6 @@ function createStaffConsole({
     // 10. Accepted commands: per account and site-wide
     if (over(`min:${discordId}`, LIMITS.perMinute, MINUTE) || over(`hour:${discordId}`, LIMITS.perHour, 60 * MINUTE) || over('site', LIMITS.siteWidePerMinute, MINUTE)) {
       return refuse(429, 'tooMany', handle)
-    }
-    // 10b. The page account's fresh Discord roles for the game's rank check, left out when Discord gave none
-    const target = pagePid === undefined ? {} : { targetProfileId: pagePid }
-    if (pagePid !== undefined && entry.rank) {
-      const roles = await targetRolesOf(pagePid)
-      if (roles) target.targetRoles = roles
     }
     // 11. The record and the audit line, before anything is sent
     const job = { id: reqId, at: now(), source, discordId, handle, profileId, text: line, setting: mode, state: 'sent', ranAs: '', online: false, tier: '', target: '', why: '', lines: [] }
