@@ -447,7 +447,11 @@ module.exports = (api) => {
     if (agg === tgt || (flags && (flags.blocked || flags.spell))) return null;
     let entries = [];
     try { const inv = mp.get(agg, 'inventory'); entries = inv && Array.isArray(inv.entries) ? inv.entries : []; } catch (e) { return null; }
-    const copy = entries.find((e) => e && (Number(e.baseId) >>> 0) === src && (e.worn || e.wornLeft) && (Number(e.poisonId) >>> 0));
+    // The fork writes a freshly coated copy back without its worn flag (inventoryExtras withCount), so with no worn copy of
+    // this weapon left, the blow came from the coated one
+    const ofSrc = entries.filter((e) => e && (Number(e.baseId) >>> 0) === src);
+    const isWorn = (e) => !!(e.worn || e.wornLeft), coated = (e) => (Number(e.poisonId) >>> 0) !== 0;
+    const copy = ofSrc.find((e) => isWorn(e) && coated(e)) || (ofSrc.some(isWorn) ? undefined : ofSrc.find(coated));
     const now = Date.now();
     for (const [k, v] of LEDGER) if (now - v.at > Math.max(1, Number(POISON.ledgerMinutes) || 5) * 60000) LEDGER.delete(k);
     if (!copy) { for (const k of [...LEDGER.keys()]) if (k.startsWith(`${agg}|${src}|`)) LEDGER.delete(k); return null; }
