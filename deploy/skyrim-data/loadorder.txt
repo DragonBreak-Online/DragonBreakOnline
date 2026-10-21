@@ -135,6 +135,9 @@ Apex_Khajiit.esp
 GVLT_Gryphonknight.esp
 SteelheartArmors.esp
 GildForgottenArmoryCrude.esp
+Orc Strongholds - All In One.esp
+CrackedTuskKeepExpanded.esp
 DragonBreak Online Edits.esp
 DragonBreak Nexus Patches.esp
 DragonBreak Armory.esp
+DragonBreak Strongholds Fix.esp
