@@ -411,6 +411,33 @@ reset();
   check('E7. the reader counts eleven commands', logs.some((l) => /console: reader on .*, 11 commands, floor leadgm, game pin 4$/.test(l)), logs);
 }
 
+// ---- E8. review (21 Oct): a suspended account cannot act from the console; a reason of blank letters is no reason -------------
+reset();
+{
+  let rep = send('/discipline #LEAD suspend 3d a suspended caller is refused');
+  check('E8. Jake suspends Leda (Lead GM)', rep && rep.state === 'ran' && /^Recorded: suspend #\d+ on Leda #LEAD until /.test(header(rep)), rep);
+  reset();
+  const n5 = recordOf(5).length, n1 = recordOf(1).length;
+  const web = send('/discipline #8KWH strike acting while suspended', AS_LEAD);
+  const disc = send('/discipline #ABCD suspend 30d acting while suspended', Object.assign({ src: 'discord' }, AS_LEAD));
+  const kick = send('/kick #LLX8', Object.assign({ src: 'discord' }, AS_LEAD));
+  check('E8. ...then Leda, suspended, is refused (suspended) from the web and from Discord, for /discipline and /kick alike', [web, disc, kick].every((x) => x && x.state === 'refused' && x.why === 'suspended')
+    && header(web) === 'Your account is suspended, so the console cannot act as you: a suspended account cannot act in game either.', [web, disc, kick]);
+  check('E8. ...and nothing reached the gate: no record, no staff line, nobody kicked', recordOf(5).length === n5 && recordOf(1).length === n1 && !staffLines.length && !kicked.length, { staffLines, kicked });
+  const hook = globalThis.__dboVoiceRefused;
+  globalThis.__dboVoiceRefused = () => { throw new Error('record unreadable'); };
+  const thrown = send('/discipline #LLX8 warn the check throws here', { mode: 'dry-run' });
+  globalThis.__dboVoiceRefused = null;
+  const off = send('/discipline #LLX8 warn discipline is switched off', Object.assign({ mode: 'dry-run' }, AS_LEAD));
+  globalThis.__dboVoiceRefused = hook;
+  check('E8. a suspension check that throws refuses (as suspended); with discipline.js off (no check) the console does not refuse for it', thrown && thrown.why === 'suspended' && off && off.state === 'dry-run', [thrown, off]);
+  rep = send('/discipline #LEAD lift review over, she may act again');
+  const back = send('/discipline #LLX8 warn back on duty after the lift', AS_LEAD);
+  check('E8. once Jake lifts it, Leda acts again', rep && rep.state === 'ran' && back && back.state === 'ran' && /^Recorded: warn #\d+ on Lydia #LLX8\.$/.test(header(back)), [rep, back]);
+  const blanks = [ch(0x3164).repeat(5), ch(0x115f).repeat(5), ch(0x1160).repeat(5), ch(0xffa0).repeat(5), `ok ${ch(0x3164)} reason`].map((x) => decide(`/discipline #8KWH warn ${x}`).why);
+  check('E8. a reason holding a Hangul filler (a letter that draws nothing) is refused as reasonChars', blanks.every((w) => w === 'reasonChars'), blanks);
+}
+
 global.setTimeout = realTimeout;
 fs.rmSync(SCRATCH, { recursive: true, force: true });
 console.log('');

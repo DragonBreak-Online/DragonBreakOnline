@@ -62,6 +62,8 @@ const MARKUP_RE = /\[\[(?:PM\]\][^|\]]{0,64}\||S\]\]|A\]\]|B[0-9a-fA-F]{1,8}\]\]
 // cuts or refuses for length a reason the console let through
 const REASON_RE = /^[\p{L}\p{N} .,;:!?'"()\/&+%-]+$/u;
 const ASTRAL_RE = /[\ud800-\udfff]/;
+// The four letters that draw nothing (the Hangul fillers, default-ignorable): five of them made a reason that reads as empty
+const BLANK_RE = /[\u115f\u1160\u3164\uffa0]/;
 const REASON_MIN = 5, REASON_MAX = 300;
 // The record kinds the console takes for /discipline (Jake, 21 Oct: "We need all options to be available under punishment"),
 // and the one word each takes before its reason, as discipline.js reads them: none; a length, whole hours or days
@@ -133,6 +135,7 @@ const TEXT = {
   reasonChars: () => 'A reason from the console takes letters, numbers, spaces and . , ; : ! ? \' " ( ) - / & + % only: no colour codes, markup, mentions, symbols or line breaks.',
   dryRecord: () => "Dry run: it passed the console and the command gate only. Nothing was recorded, and the record's own checks (own account, staff target, record number, is suspended) did not run.",
   noChar: () => 'The console acts as your own character. Make one in game first.',
+  suspended: () => 'Your account is suspended, so the console cannot act as you: a suspended account cannot act in game either.',
   tier: (floor) => `The console is for ${floor || 'Lead GM'} and above in game.`,
   rolesChanged: () => 'Your Discord roles changed since you last logged in (or your character has not been stamped with them yet). Log in once.',
   notPinned: () => "This Discord account is not on the game's console list.",
@@ -193,7 +196,7 @@ const lengthHours = (word, maxDays) => {
 // What is wrong with a console reason, or '' when it may run (REASON_RE above)
 const reasonWhy = (reason) => {
   if (!reason) return 'reasonShort';
-  if (ASTRAL_RE.test(reason) || !REASON_RE.test(reason)) return 'reasonChars';
+  if (ASTRAL_RE.test(reason) || BLANK_RE.test(reason) || !REASON_RE.test(reason)) return 'reasonChars';
   if (reason.length < REASON_MIN) return 'reasonShort';
   return reason.length > REASON_MAX ? 'reasonLong' : '';
 };
@@ -410,6 +413,13 @@ module.exports = (api) => {
     if (online) return online;
     return keep.find((c) => staffTierOf(c) === fresh) || keep[0];
   };
+  // discipline.js's own test (the account's running suspension, or one that holds out this Discord account), as it publishes
+  // it for the voice gate; none without discipline.js; a test that throws counts as suspended
+  const heldOut = (a) => {
+    const f = globalThis.__dboVoiceRefused;
+    if (typeof f !== 'function') return false;
+    try { return f(a) === 'suspended'; } catch (e) { logOnce('heldOut', `suspension check failed: ${e.message}`); return true; }
+  };
 
   // Writes allow.json for the backend's page and its pre-check: the commands this generation allows, after the config's deny
   let published = false, publishTriedAt = 0;
@@ -494,6 +504,9 @@ module.exports = (api) => {
     // promotion only after a login stamps it, and so every remote caller passes isAdmin in the gate (and gets its staff line)
     if (rank(fresh) < rank(FLOOR)) return refuse(key, r, 'tier', { subject: FLOOR_LABEL[FLOOR] || FLOOR, fields: as });
     if (rank(stamped) > rank(fresh) || rank(stamped) < rank(FLOOR)) return refuse(key, r, 'rolesChanged', { fields: as });
+    // A suspended account is refused at login, so it cannot act in game, nor from here (review, 21 Oct: a suspended Lead GM
+    // still struck, suspended and kicked from the console)
+    if (heldOut(a)) return refuse(key, r, 'suspended', { fields: as });
 
     const line = checkLine(r.text, (n) => commands.has(n), deny, { maxSuspendDays: MAX_DAYS });
     if (line.why) return refuse(key, r, line.why, { subject: line.subject !== undefined ? line.subject : line.cmd, fields: as });
