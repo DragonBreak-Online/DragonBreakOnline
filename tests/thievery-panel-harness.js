@@ -147,10 +147,10 @@ const flush = () => new Promise((r) => setImmediate(r));
   now += 5 * 3600000;
 
   // ---- live breaches and break-ins
-  T.data().breaches['500:65'] = { thief: THIEF, name: 'P101', at: now, until: now + 600000, faction: 'thieves-guild' };
+  T.data().breaches['500:65'] = { thief: THIEF, name: 'P101', home: 'Lydia\'s house', at: now, until: now + 600000, faction: 'thieves-guild' };
   T.data().breaches['501:65'] = { thief: THIEF, name: 'P101', at: now - 3600000, until: now - 3000000, faction: 'thieves-guild' };
   op(GM, 'watch');
-  check('only live breaches are listed', last(GM).breaches.length === 1 && last(GM).breaches[0].faction === 'Thieves Guild');
+  check('only live breaches are listed', last(GM).breaches.length === 1 && last(GM).breaches[0].faction === 'Thieves Guild' && last(GM).breaches[0].home === 'Lydia\'s house');
 
   // ---- revoke and unwatch
   op(LEAD, 'unmark', 'thieves-guild');

@@ -317,7 +317,7 @@ const factory = (api) => {
         if (hitSince(a, ch.at)) { personal(a, 'The lock gives, but you were seen to: the moment is lost.'); return; }
         const now = Date.now();
         const d = data();
-        d.breaches[breachKey(a, ch.p)] = { thief: a, name: display(a), at: now, until: now + C.breachMinutes * 60000, faction: thiefFaction(a),
+        d.breaches[breachKey(a, ch.p)] = { thief: a, name: display(a), home: homeLabel(ch.rec), at: now, until: now + C.breachMinutes * 60000, faction: thiefFaction(a),
           [ch.kind === 'door' ? 'outsideCell' : 'innerCell']: ch.cell };
         d.homes[hex(ch.p)] = now;
         save();
@@ -848,7 +848,7 @@ const factory = (api) => {
         canSendBack: s.state === 'fenced' || (s.state === 'carried' && online(s.thief)) })),
       stolenTotal: d.stolen.length,
       permits: Object.entries(d.permits).filter(([, p]) => now < Number(p.until)).map(([home, p]) => ({ home, homeName: p.home || home, thief: p.name, until: p.until, by: p.by || '' })),
-      breaches: Object.values(d.breaches).filter((b) => now < Number(b.until)).map((b) => ({ thief: b.name, faction: factionName(b.faction || ''), until: b.until, at: b.at })),
+      breaches: Object.values(d.breaches).filter((b) => now < Number(b.until)).map((b) => ({ thief: b.name, home: b.home || '', faction: factionName(b.faction || ''), until: b.until, at: b.at })),
       working: [...S.channels.values()].map((ch) => ({ thief: display(ch.a), home: homeLabel(ch.rec), kind: ch.kind, until: ch.until })),
       result: (S.panelResult && S.panelResult.get(a >>> 0)) || null,
     };
