@@ -71,6 +71,16 @@ test('reasons: folded to one line; markup, mentions, colour codes, emoji, ids an
   assert.equal(r('x'.repeat(301)).why, 'reasonLong')
   assert.equal(r('alt of 123456789012345678 found').why, 'reasonPrivate')
   assert.equal(r('connected from 81.2.69.160 again').why, 'reasonPrivate')
+  // The console's own rule (allowlist.js reasonWhy): a Hangul filler draws nothing, so it is refused; an astral letter too
+  for (const filler of ['\u115f', '\u1160', '\u3164', '\uffa0']) {
+    assert.equal(r(filler.repeat(6)).why, 'reasonChars', escape(filler))
+    assert.equal(r(`Griefing${filler}at the bank`).why, 'reasonChars', escape(filler))
+  }
+  assert.equal(r('Griefing \u{1D400} bank').why, 'reasonChars')
+  const rules = require('../sources/console/allowlist')
+  for (const t of ['Griefing at the bank', 'abc', 'x'.repeat(301), 'cheats \u{1F600}', '\u3164\u3164\u3164\u3164\u3164', 'a<b>c d e']) {
+    assert.equal(r(t).why || '', rules.reasonWhy(t), t)
+  }
 })
 
 test('ban: an Owner bans a player on the game ban list; the journal, the audit lines, #staff-commands and the panel show it', async () => {
