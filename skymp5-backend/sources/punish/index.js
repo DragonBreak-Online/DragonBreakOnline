@@ -20,6 +20,8 @@ const PERMANENT = Number.MAX_SAFE_INTEGER
 const SEARCH_MAX = 20
 const COLLECT_MS = 2000
 const LOOKUPS_AT_ONCE = 5
+// One GM request waits on Discord this long at most, however many accounts it covers; what is not answered is hidden
+const LOOKUPS_MS = 10000
 
 const ROW_FIELDS = ['id', 'kind', 'source', 'by', 'state', 'active', 'reason', 'ref', 'ticket', 'told', 'outside', 'undid', 'lifts',
   'hours', 'count', 'how', 'leftMs', 'totalMs', 'concordat', 'alsoHolds']
@@ -168,8 +170,12 @@ function createPunishments({ config, readStore, dynamicFields, characterName, lo
   // For a GM, records on staff members are left out, and so is any whose account Discord could not be asked about
   async function staffFree(discordIds) {
     const list = [...new Set(discordIds.map(d => d || ''))]
-    const status = await mapLimit(list, LOOKUPS_AT_ONCE, d => (d ? staffStatusOf(d) : 'unknown'))
-    return new Set(list.filter((d, i) => status[i] === 'player'))
+    let timer
+    const giveUp = new Promise(resolve => { timer = setTimeout(resolve, LOOKUPS_MS, 'unknown') })
+    try {
+      const status = await mapLimit(list, LOOKUPS_AT_ONCE, d => (d ? Promise.race([staffStatusOf(d), giveUp]) : 'unknown'))
+      return new Set(list.filter((d, i) => status[i] === 'player'))
+    } finally { clearTimeout(timer) }
   }
 
   async function visible(viewer, rows) {

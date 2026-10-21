@@ -148,7 +148,7 @@ module.exports = {
   // Days of player log read, at most 90 (the Privacy Policy keeps server activity logs 90 days)
   punishPlayerLogDays: clampedInt(process.env.PUNISH_PLAYERLOG_DAYS, 1, 90, 90),
   // The moderation journal (Discord timeouts, bans and unbans, one JSON per line) and the backend's ban list, both read only
-  punishJournalFile: process.env.PUNISH_JOURNAL_FILE || path.join(__dirname, 'data', 'moderation.jsonl'),
+  punishJournalFile: process.env.PUNISH_JOURNAL_FILE ?? path.join(__dirname, 'data', 'moderation.jsonl'),
   punishBansFile: process.env.PUNISH_BANS_FILE || path.join(__dirname, 'data', 'bans.json'),
   // Optional channel lock for /console, comma separated; empty allows any channel of the guild
   consoleDiscordChannelIds: process.env.CONSOLE_DISCORD_CHANNEL_IDS || '',

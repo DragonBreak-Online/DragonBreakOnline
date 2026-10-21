@@ -15,6 +15,8 @@ const ARCHIVE_FILE = /^(\d{4}-\d{2}-\d{2})(?:\.\d{1,3})?\.jsonl\.gz$/
 const WANTED = ['"session.kick"', '"session.ban"']
 const KICKS = new Set(['command', 'panel', 'suspension', 'discord_ban', 'ban_enforce'])
 const BANS = new Set(['ban', 'tempban', 'unban'])
+// A line longer than this is no event of ours: it is dropped rather than held
+const MAX_LINE = 1024 * 1024
 
 const read = new Set()
 const tails = new Map()
@@ -49,6 +51,7 @@ async function readArchive(file, out) {
   for await (const chunk of stream) {
     const parts = (rest + chunk).split('\n')
     rest = parts.pop()
+    if (rest.length > MAX_LINE) rest = ''
     for (const line of parts) { const e = pick(line); if (e) out.push(e) }
   }
 }
@@ -65,7 +68,11 @@ async function readOn(file, out) {
   for await (const chunk of fs.createReadStream(file, { start: t.offset, end: st.size - 1 })) {
     const buf = rest.length ? Buffer.concat([rest, chunk]) : chunk
     const end = buf.lastIndexOf(10)
-    if (end < 0) { rest = buf; continue }
+    if (end < 0) {
+      // Held for the next chunk unless it is too long to be an event; then skipped, and the read goes on after it
+      if (buf.length > MAX_LINE) { used += buf.length; rest = Buffer.alloc(0) } else rest = buf
+      continue
+    }
     for (const line of buf.subarray(0, end).toString('utf8').split('\n')) { const e = pick(line); if (e) out.push(e) }
     used += end + 1
     rest = buf.subarray(end + 1)
