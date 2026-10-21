@@ -152,7 +152,7 @@ const read = async (a, tome) => {
 (async () => {
 
 // ---- boot ----
-check('boot line counts the tomes and both study points', out.logs.some((l) => /spells on: \d+ tomes known, 2 study point\(s\), \d+ tomes in the Synod shop, 3 prepared, changed in 10 college cell\(s\)/.test(l)), out.logs);
+check('boot line counts the tomes and both study points', out.logs.some((l) => /spells on: \d+ tomes known, 2 study point\(s\), \d+ tomes in the Synod shop, 3 prepared, changed in 11 college cell\(s\)/.test(l)), out.logs);
 check('the read hook wraps the handler that was there', mp.onReadBook.__dboSpellsInner === original);
 load();
 check('a reload unwraps its own wrapper instead of stacking', mp.onReadBook.__dboSpellsInner === original);
@@ -183,7 +183,7 @@ at(MAGE, HALL, [100, 0, 0]);
 check('...and works beside it', (await read(MAGE, T.sparks)) !== false && studied(MAGE, 'arcane').length === 3);
 at(MAGE, SYNOD, [0, 0, 0]);
 check('no limit on the spellbook: a fourth spell is learned', (await read(MAGE, T.boundSword)) !== false && studied(MAGE, 'arcane').length === 4, studied(MAGE, 'arcane'));
-check('...but with 3 prepared it waits in the book: the engine gives it back', !known(MAGE).has(idOf(T.boundSword[1])) && prepared(MAGE).length === 3 && papyrus.some((p) => p[0] === 'RemoveSpell' && p[2] === T.boundSword[1]) && /Your 3 prepared spells are full, so it waits in your spellbook\. Prepared spells are changed at a magic college/.test(said(MAGE)), said(MAGE));
+check('...but with 3 prepared it waits in the book: the engine gives it back', !known(MAGE).has(idOf(T.boundSword[1])) && prepared(MAGE).length === 3 && papyrus.some((p) => p[0] === 'RemoveSpell' && p[2] === T.boundSword[1]) && /Your 3 prepared spells are full, so Bound Sword waits in your spellbook and is not among the spells you can cast yet\. To cast it, open \/spells at a magic college \(the Synod Conclave in Bruma or the College of Winterhold\), a temple of the Great Faiths \(the Cathedral of St Martin in Bruma or Solitude's Temple of the Divines\) or a Scholars' Ledger, put one prepared spell away and prepare Bound Sword\.$/.test(said(MAGE)), said(MAGE));
 check('its tome read again is refused and kept: it is in the book', (await read(MAGE, T.boundSword)) === false && /Bound Sword is already in your spellbook\. You keep the tome/.test(said(MAGE)) && studied(MAGE, 'arcane').length === 4, said(MAGE));
 known(MAGE).add(idOf(HEALING));
 check('spells known before study began are not in the book and take no prepared place', prepared(MAGE).length === 3 && !studied(MAGE, 'priest').length);
@@ -221,7 +221,14 @@ check('a stale panel changes nothing', known(MAGE).has(idOf(T.flames[1])) && pre
 at(MAGE, BRUMA, [0, 0, 0]);
 cmd('spells', MAGE);
 book = lastWidget(MAGE);
-check('outside a college the book opens to read, with the hint', book.atCollege === false && /changed at a magic college \(the Synod Conclave in Bruma, or the College of Winterhold\) or at a Scholars' Ledger/.test(book.hint));
+check('outside a college the book opens to read, with the hint', book.atCollege === false && /^Prepared spells are changed at a magic college \(the Synod Conclave in Bruma or the College of Winterhold\), a temple of the Great Faiths \(the Cathedral of St Martin in Bruma or Solitude's Temple of the Divines\) or a Scholars' Ledger\.$/.test(book.hint), book.hint);
+// The hint names the temples because they are prepare places (f69b64a9, 11 Oct; c6c5de89, 19 Oct): each one it names opens the book
+// to change spells, and a cell it does not name (Bruma's streets) does not (Jorik Hamrikson #TW2F, 17 Oct)
+for (const [name, cell] of [['the Cathedral of St Martin', '12cb:BSHeartland.esm'], ['Solitude\'s Temple of the Divines', '16a02:Skyrim.esm'], ['the College of Winterhold', HALL], ['the Synod Conclave', SYNOD]]) {
+  at(MAGE, cell, [0, 0, 0]); cmd('spells', MAGE);
+  check(`...${name}, which the hint names, is a place to change them`, lastWidget(MAGE).atCollege === true && lastWidget(MAGE).hint === '', lastWidget(MAGE).hint);
+}
+at(MAGE, BRUMA, [0, 0, 0]); cmd('spells', MAGE); book = lastWidget(MAGE);
 ui('spellbookUnprepare', MAGE, [book.nonce, T.flames[1]], 58);
 check('...and nothing can be changed there', lastWidget(MAGE).resultKind === 'refused' && known(MAGE).has(idOf(T.flames[1])) && prepared(MAGE).length === 3);
 // The Scholars' Ledger (salvage.js opens the book from it) is a place to change them too, checked on every change

@@ -9,7 +9,8 @@
 // unlearning/forgetting a spell"): every spell studied or taught stays in the character's spellbook, with no limit, and
 // at most `prepared` (3) of them, whatever their school, are on the character at a time (Actor.AddSpell / RemoveSpell).
 // The spellbook panel (/spells, front widget "spellbook") shows them all; the prepared ones are changed only at a magic
-// college (prepareCells: the Synod Conclave, the College of Winterhold) or beside a Scholars' Ledger. The College of
+// college or a temple of the Great Faiths (prepareCells: the Synod Conclave, the College of Winterhold, the Cathedral of
+// St Martin, Solitude's Temple of the Divines) or beside a Scholars' Ledger. The College of
 // Whispers' hall, Frostcrag Spire, is not a prepareCells college: its mages change them at its ledger (Nate, 4 Oct).
 // Spells the engine holds outside the book (granted outright, never studied) take no place. /forget is retired.
 // /teach passes a spell to a nearby player. The college tome shop inside the Synod enclave opens from a button on the
@@ -409,9 +410,15 @@ module.exports = (api) => {
     try { return distanceMeters(a, ref) <= LEDGER_REACH_M; } catch (e) { return false; }
   };
   const atCollege = (a) => COLLEGE_CELLS.has(norm(get(a, 'worldOrCellDesc', ''))) || atLedger(a);
-  const COLLEGE_HINT = "Prepared spells are changed at a magic college (the Synod Conclave in Bruma, or the College of Winterhold) or at a Scholars' Ledger.";
+  // Where prepared spells change: the places of prepareCells' default list, and the ledger. The temples have been prepare
+  // cells since 11 Oct (the Cathedral of St Martin) and 19 Oct (Solitude's Temple of the Divines), but the line still
+  // named the two colleges alone, so a Priest was sent to a college (Jorik Hamrikson #TW2F, 17 Oct: Fast Healing chosen at
+  // Priest 25 with 3 spells prepared, "didnt learn Fast Healing when it says Known Spells")
+  const PREPARE_PLACES = "a magic college (the Synod Conclave in Bruma or the College of Winterhold), a temple of the Great Faiths (the Cathedral of St Martin in Bruma or Solitude's Temple of the Divines) or a Scholars' Ledger";
+  const COLLEGE_HINT = `Prepared spells are changed at ${PREPARE_PLACES}.`;
   // A spell newly in the book: prepared at once while there is room (the engine already holds it after a read; a lesson
-  // adds it), else it waits in the book and the engine's copy is taken back. Returns the line to tell the player.
+  // adds it), else it waits in the book and the engine's copy is taken back. Returns the line to tell the player: when it
+  // waits, that it cannot be cast yet and how to change that (the book lists it as known, the Magic menu does not)
   const settleNew = (a, sp, engineHasIt) => {
     const id = (sp.spellId || sp.id) >>> 0;   // a tome carries its spell as spellId, a classified spell as id
     const prep = preparedIds(a);
@@ -421,7 +428,7 @@ module.exports = (api) => {
       return `It is prepared. ${preparedLine(a)}.`;
     }
     if (engineHasIt) papyrus(a, 'RemoveSpell', id);
-    return `Your ${MAXP()} prepared spells are full, so it waits in your spellbook. ${COLLEGE_HINT}`;
+    return `Your ${MAXP()} prepared spells are full, so ${sp.name} waits in your spellbook and is not among the spells you can cast yet. To cast it, open /spells at ${PREPARE_PLACES}, put one prepared spell away and prepare ${sp.name}.`;
   };
 
   // The skills whose path may take a spell of this school for this character, skills.json's owner first. Alteration is
@@ -569,7 +576,7 @@ module.exports = (api) => {
     }, true);
   };
   // Nothing is forgotten now (Nate, 2026-09-28): /spells forget and the hidden /forget (Worker B's aliases) open the book
-  const RETIRED = 'Spells are no longer forgotten: put one away in your spellbook instead, at a magic college.';
+  const RETIRED = 'Spells are no longer forgotten: put one away in your spellbook instead, at a magic college, a temple of the Great Faiths or a Scholars\' Ledger.';
   // The panel opens only for a client whose UI said it draws it (dbo:uiCaps 'spellbook' from the HUD): an unknown
   // widget opened with focus would leave an invisible panel holding the keys. An older client gets the book in chat.
   const caps = globalThis.__dboSpellbookCaps instanceof Map ? globalThis.__dboSpellbookCaps : (globalThis.__dboSpellbookCaps = new Map());
@@ -591,7 +598,7 @@ module.exports = (api) => {
     bookLedger.delete(a >>> 0);
     const first = String(Array.isArray(args) ? args[0] : args || '').trim();
     openFromCommand(a, /^forget\b/i.test(first) ? RETIRED : '');
-  }, { help: 'your spellbook: every spell you have studied, and the prepared ones (changed at a Scholars\' Ledger or a magic college)' });
+  }, { help: 'your spellbook: every spell you have studied, and the prepared ones (changed at a Scholars\' Ledger, a magic college or a temple of the Great Faiths)' });
   registerChatCommand('forget', (a) => openFromCommand(a, RETIRED), { hidden: true, help: 'retired; /spells opens your spellbook' });
 
   // { ok, text } of preparing or putting away one spell

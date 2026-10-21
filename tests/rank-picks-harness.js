@@ -326,6 +326,30 @@ book(RL, ['13018:Skyrim.esm'], 'priest'); // Lesser Ward
 { const m = props.get(RL + '|private.mastery'); m.skills.priest.xp = 95; put(RL, 'private.mastery', m); }
 f = view(RL).schools.find((x) => x.name === 'Restoration').firstSpell;
 check('Restoration\'s lines follow Priest: Fast Healing (from Healing) and Steadfast Ward (from Lesser Ward) first', r.ok && f.stage === 'Apprentice' && f.choices.slice(0, 2).every((c) => c.line) && f.choices.some((c) => c.id === '2f3b8:Skyrim.esm' && c.line === 'Healing') && f.choices.some((c) => c.id === '211f1:Skyrim.esm' && c.line === 'Lesser Ward'), [r, f.choices.slice(0, 3)]);
+// Jorik Hamrikson #TW2F (17 Oct 17:40Z, "Priest Lvl 25, didnt learn Fast Healing when it says Known Spells"): Healing,
+// Oakflesh and Lesser Ward prepared, Fast Healing chosen as the Apprentice spell went into the book only (prepared 3/3), and
+// the line sent him to "a magic college" though the temples change prepared spells too. Told now that it cannot be cast
+// yet, how to change that and where, the temples named; and the Cathedral of St Martin does it.
+{
+  const JH = 0x39, FAST = '2f3b8:Skyrim.esm', LESSER_WARD = '13018:Skyrim.esm', CATHEDRAL = '12cb:BSHeartland.esm';
+  put(JH, 'profileId', JH); at(JH, SYNOD, [0, 0, 0]); online.push(JH); ui('uiCaps', JH, ['bank', 'spellbook', 'schools']);
+  priestOf(JH, 25);
+  tick('schools.first'); advance(91000);
+  r = globalThis.__dboMagicAction(JH, 'firstSpell', ['Restoration', HEALING]);
+  book(JH, [T.oakflesh[1], LESSER_WARD], 'priest');
+  put(JH, 'private.dboPrepared', [HEALING, T.oakflesh[1], LESSER_WARD]);
+  known(JH).add(idOf(T.oakflesh[1])); known(JH).add(idOf(LESSER_WARD));
+  { const m = props.get(JH + '|private.mastery'); m.skills.priest.xp = 95; put(JH, 'private.mastery', m); }
+  at(JH, BRUMA, [0, 0, 0]);
+  const prep = () => props.get(JH + '|private.dboPrepared') || [];
+  r = globalThis.__dboMagicAction(JH, 'firstSpell', ['Restoration', FAST]);
+  check('Priest 25 with 3 prepared picks Fast Healing out in Bruma: in the book, not prepared, not on the character', r.ok && priestBook(JH).includes(FAST) && !prep().includes(FAST) && prep().length === 3 && !known(JH).has(idOf(FAST)), [r, prep()]);
+  check('...and told it cannot be cast yet, what to do, and every place that does it, the temples too', /Fast Healing waits in your spellbook and is not among the spells you can cast yet\. To cast it, open \/spells at a magic college \(the Synod Conclave in Bruma or the College of Winterhold\), a temple of the Great Faiths \(the Cathedral of St Martin in Bruma or Solitude's Temple of the Divines\) or a Scholars' Ledger, put one prepared spell away and prepare Fast Healing\./.test(r.text) && /can rise again/.test(r.text), r.text);
+  at(JH, CATHEDRAL, [0, 0, 0]);
+  const away = globalThis.__dboMagicAction(JH, 'unprepare', [HEALING]);
+  const on = globalThis.__dboMagicAction(JH, 'prepare', [FAST]);
+  check('...at the Cathedral of St Martin, as told: Healing put away and Fast Healing prepared, on the character', away.ok && on.ok && prep().includes(FAST) && !prep().includes(HEALING) && known(JH).has(idOf(FAST)), [away, on, prep()]);
+}
 // A school with no first spells listed still reaches its rank picks (no hold strands it)
 load({ firstSpells: Object.assign({}, schoolsCfg.firstSpells || {}, { Illusion: [] }) });
 const IL = 0x38; put(IL, 'profileId', IL); at(IL, SYNOD, [0, 0, 0]); online.push(IL); ui('uiCaps', IL, ['bank', 'spellbook', 'schools']); arcane(IL, 25);
