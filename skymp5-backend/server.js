@@ -121,6 +121,7 @@ app.use('/api/launch-check',       launchCheckRoute)
 const siteServerRoute = require('./routes/site-server')
 app.use('/api/site/staff/server', siteServerRoute)
 app.use('/api/site/staff/console', require('./routes/site-console'))
+app.use('/api/site/staff/punishments', require('./routes/site-punish'))
 app.use('/api/site/staff', require('./routes/site-staff'))
 app.use('/api/site',               siteAuthRoute)
 // Body-parser failures on any route answer in JSON; NODE_ENV is unset here, so the default handler would send a stack trace

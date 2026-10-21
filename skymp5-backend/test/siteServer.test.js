@@ -117,9 +117,9 @@ test('Dev staff get owner:false and an Owner gets owner:true, in the status and 
   assert.deepEqual(owner.json.schedules, [])
   assert.equal(owner.json.service.state, 'reachable')
   assert.deepEqual(owner.json.players, { online: 2, max: 50, heartbeatAt: owner.json.players.heartbeatAt })
-  assert.deepEqual((await get('/api/site/staff/me', 'dev')).json, { signedIn: true, staff: true, owner: false, name: 'dev' })
-  assert.deepEqual((await get('/api/site/staff/me', 'owner')).json, { signedIn: true, staff: true, owner: true, name: 'owner' })
-  assert.deepEqual((await get('/api/site/staff/me', 'none')).json, { signedIn: true, staff: false, owner: false, name: 'none' })
+  assert.deepEqual((await get('/api/site/staff/me', 'dev')).json, { signedIn: true, staff: true, owner: false, punish: 'dev', name: 'dev' })
+  assert.deepEqual((await get('/api/site/staff/me', 'owner')).json, { signedIn: true, staff: true, owner: true, punish: 'owner', name: 'owner' })
+  assert.deepEqual((await get('/api/site/staff/me', 'none')).json, { signedIn: true, staff: false, owner: false, punish: null, name: 'none' })
   for (const call of systemctl) assert.deepEqual(call, ['systemctl', ...serverStatus.SYSTEMCTL_ARGS])
 })
 

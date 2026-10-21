@@ -4,7 +4,7 @@
 // Roles: config.siteStaffRoleIds (Owners and Dragon Break Dev) and config.siteOwnerRoleIds (Owners). The bot's
 // role lookup fails closed: if Discord cannot be asked, the answer is no.
 //
-//   GET /api/site/staff/me        whether the signed-in visitor is staff, and for staff whether an Owner
+//   GET /api/site/staff/me        whether the signed-in visitor is staff, for staff whether an Owner, and their Punishments panel rank (routes/site-punish.js)
 //   GET /api/site/staff/overview  server state and account totals
 //   GET /api/site/staff/players   every account: Discord name, characters, last launcher sign-in, last game join, factions
 
@@ -16,6 +16,7 @@ const nameTable = require('../sources/nameTable')
 const { getHeartbeat } = require('./servers')
 const { internals } = require('./site-auth')
 const { currentSession, readStore, toSiteCharacter, profileIdOf, dynamicFields } = internals
+const { tierOf } = require('../sources/punish/tier')
 
 router.use((_req, res, next) => {
   res.set('Cache-Control', 'no-store, private')
@@ -53,7 +54,8 @@ router.get('/me', async (req, res) => {
   const session = currentSession(req)
   if (!session) return res.json({ signedIn: false, staff: false, owner: false })
   const staff = await isStaff(session.discordId)
-  res.json({ signedIn: true, staff, owner: staff && await isOwner(session.discordId), name: String(session.username || '') })
+  const owner = staff && await isOwner(session.discordId)
+  res.json({ signedIn: true, staff, owner, punish: await tierOf(session.discordId), name: String(session.username || '') })
 })
 
 // Characters grouped by the account that owns them; a character stamped with another Discord id is skipped

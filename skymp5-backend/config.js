@@ -24,6 +24,10 @@ const DEVICE_MATCH = String(process.env.DEVICE_MATCH || '').trim().toLowerCase()
 const AUTO_REPORTS = String(process.env.AUTO_REPORTS || '').trim().toLowerCase()
 // Old launcher login switch: off and revoke are the only other values, so a typo keeps the old flow working
 const LAUNCHER_LOGIN_LEGACY = String(process.env.LAUNCHER_LOGIN_LEGACY || '').trim().toLowerCase()
+// The Lead GM Discord role (a role, not a person): the third of the console's default roles, after Owners and Dragon Break Dev
+const LEAD_GM_ROLE_ID = '1494126618065506425'
+// A comma-separated list of ids from the env; unset gives the fallback, set but empty gives none
+const idList = (value, fallback) => String(value ?? fallback).split(',').map(s => s.trim()).filter(Boolean)
 
 module.exports = {
   // Client files bucket
@@ -134,6 +138,18 @@ module.exports = {
   consoleRoleIds: process.env.CONSOLE_ROLE_IDS || '1494126527489507369,1494491999305338981,1494126618065506425',
   // The dashboard's console needs a Discord sign-in this many hours old at most
   consoleFreshSigninHours: positiveInt(process.env.CONSOLE_FRESH_SIGNIN_HOURS, 4),
+  // Punishments panel on the staff dashboard (routes/site-punish.js), read only; off answers 404 and the page hides it
+  punishPanel: String(process.env.PUNISH_PANEL || '').trim().toLowerCase() !== 'off',
+  // Owners and the dashboard's staff roles need no setting; Lead GM by default; GM only once listed; a Trial GM never
+  punishLeadGmRoleIds: idList(process.env.PUNISH_LEADGM_ROLE_IDS, LEAD_GM_ROLE_ID),
+  punishGmRoleIds: idList(process.env.PUNISH_GM_ROLE_IDS, ''),
+  // The player log folder (events/ and archive/), the only history of kicks and pruned panel bans; empty turns it off
+  punishPlayerLogDir: process.env.PUNISH_PLAYERLOG_DIR ?? '/var/lib/playerlog',
+  // Days of player log read, at most 90 (the Privacy Policy keeps server activity logs 90 days)
+  punishPlayerLogDays: clampedInt(process.env.PUNISH_PLAYERLOG_DAYS, 1, 90, 90),
+  // The moderation journal (Discord timeouts, bans and unbans, one JSON per line) and the backend's ban list, both read only
+  punishJournalFile: process.env.PUNISH_JOURNAL_FILE || path.join(__dirname, 'data', 'moderation.jsonl'),
+  punishBansFile: process.env.PUNISH_BANS_FILE || path.join(__dirname, 'data', 'bans.json'),
   // Optional channel lock for /console, comma separated; empty allows any channel of the guild
   consoleDiscordChannelIds: process.env.CONSOLE_DISCORD_CHANNEL_IDS || '',
   consoleSwitchFile: process.env.CONSOLE_SWITCH_FILE || '/etc/dragonbreak/console',
