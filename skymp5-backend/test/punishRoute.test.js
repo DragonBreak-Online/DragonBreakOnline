@@ -279,6 +279,24 @@ test('when Discord cannot say who is staff, a GM sees nothing rather than a staf
   } finally { discordDown = false; staffStatusOf.clear() }
 })
 
+test('staffStatusOf.known answers from the cache only and never asks Discord', async () => {
+  staffStatusOf.clear()
+  discordDown = true
+  try {
+    assert.equal(staffStatusOf.known(PEOPLE.bob.discordId), null, 'nothing cached yet')
+    assert.equal(staffStatusOf.known(''), null)
+  } finally { discordDown = false }
+  assert.equal(await staffStatusOf(PEOPLE.bob.discordId), 'player')
+  assert.equal(await staffStatusOf(PEOPLE.gina.discordId), 'staff')
+  discordDown = true
+  try {
+    assert.equal(staffStatusOf.known(PEOPLE.bob.discordId), 'player')
+    assert.equal(staffStatusOf.known(PEOPLE.gina.discordId), 'staff')
+    assert.equal(staffStatusOf.known(PEOPLE.ivan.discordId), null, 'an account never looked up stays unknown')
+  } finally { discordDown = false; staffStatusOf.clear() }
+  assert.equal(staffStatusOf.known(PEOPLE.bob.discordId), null, 'cleared with the cache')
+})
+
 test('search finds an account by character name, #TAG, TAG, profile and Discord name', async () => {
   const find = async q => (await get(`${P}/search?q=${encodeURIComponent(q)}`, 'owner')).json.accounts.map(a => a.profileId)
   assert.deepEqual(await find('bo'), [10])

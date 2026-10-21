@@ -61,5 +61,10 @@ async function staffStatusOf(discordId) {
   return status
 }
 staffStatusOf.clear = () => staffCache.clear()
+// The cached answer for an account without asking Discord; null when there is none
+staffStatusOf.known = discordId => {
+  const hit = discordId ? staffCache.get(discordId) : null
+  return hit && hit.until > Date.now() ? hit.status : null
+}
 
 module.exports = { tierOf, staffStatusOf }

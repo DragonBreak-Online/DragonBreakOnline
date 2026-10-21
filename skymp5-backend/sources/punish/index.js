@@ -173,8 +173,9 @@ function createPunishments({ config, readStore, dynamicFields, characterName, lo
     let timer, gaveUp = false
     const giveUp = new Promise(resolve => { timer = setTimeout(() => { gaveUp = true; resolve('unknown') }, LOOKUPS_MS) })
     try {
-      // Once given up, the accounts not yet asked about are not asked at all
-      const status = await mapLimit(list, LOOKUPS_AT_ONCE, d => (d && !gaveUp ? Promise.race([staffStatusOf(d), giveUp]) : 'unknown'))
+      // Once given up, the accounts not yet asked about get only an answer already cached, and Discord is not asked
+      const known = d => (typeof staffStatusOf.known === 'function' && staffStatusOf.known(d)) || 'unknown'
+      const status = await mapLimit(list, LOOKUPS_AT_ONCE, d => (!d ? 'unknown' : gaveUp ? known(d) : Promise.race([staffStatusOf(d), giveUp])))
       return new Set(list.filter((d, i) => status[i] === 'player'))
     } finally { clearTimeout(timer) }
   }

@@ -36,6 +36,29 @@ test('a GM request that gives up on Discord after 10 s starts no more lookups', 
   assert.equal(asked.length, 5, 'no lookup is started once the request has given up')
 })
 
+test('after the give-up, an account Discord answered about in the last minutes still shows, without a new lookup', async t => {
+  // The GM's accounts in the order they are asked about: the first five hang, the rest are in tier.js's cache
+  const order = []
+  await service({ staffStatusOf: async d => { if (!order.includes(d)) order.push(d); return 'player' } }).recent(GM, { from: '2000-01-01', limit: '100' })
+  const known = new Set(order.slice(5))
+  assert.ok(known.size > 0)
+  const want = (await service({ staffStatusOf: async d => (known.has(d) ? 'player' : 'unknown') }).recent(GM, { from: '2000-01-01', limit: '100' })).rows
+  assert.ok(want.length > 0)
+
+  t.mock.timers.enable({ apis: ['setTimeout'] })
+  const asked = []
+  // As tier.js answers: from its cache at once (also through .known, which never asks Discord), anything else through Discord, which hangs
+  const staffStatusOf = async d => { asked.push(d); return known.has(d) ? 'player' : new Promise(() => {}) }
+  staffStatusOf.known = d => (known.has(d) ? 'player' : null)
+  const pending = service({ staffStatusOf }).recent(GM, { from: '2000-01-01', limit: '100' })
+  await flush()
+  const before = asked.length
+  t.mock.timers.tick(10000)
+  const r = await pending
+  assert.deepEqual(r.rows, want, 'an account already answered about shows as it did before the give-up was added')
+  assert.equal(asked.length, before, 'no lookup is started once the request has given up')
+})
+
 // Every Active page asked one after another, the snapshot taken again before each (2 s)
 async function activePages(svc, viewer) {
   const seen = []
