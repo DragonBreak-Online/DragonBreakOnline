@@ -747,7 +747,11 @@ module.exports = (api) => {
     }
     if (!biz) return personal(a, claim && ownsClaim(a, claim) ? 'This property is not a business yet: /business open <name>' : 'There is no business ledger here. Stand inside a business.');
     // A faction's leader may register a business they keep no ledger of (their hall, one offered to them)
-    if (sub === 'faction') { const r = factionAction(a, claim, biz, rest); if (r.ok) { try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('business', a, 'faction', claim.primary, 0); } catch (e) { /* optional */ } } return say(a, r); }
+    if (sub === 'faction') {
+      const r = factionAction(a, claim, biz, rest);
+      if (r.ok) try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('business', a, 'faction', claim.primary, 0); } catch (e) { /* the player log is optional */ }
+      return say(a, r);
+    }
     if (!isStaff(a, biz) && !isAdmin(a)) return personal(a, publicLine(biz));
     switch (sub) {
       case '': return hasPanel(a) ? sendPanel(a, claim, biz) : summary(a, claim, biz);

@@ -89,11 +89,11 @@ ok(reasons.length >= 14 && reasons.every(([, r]) => R.REFUSAL_REASONS.includes(r
 // other harnesses read), in order, and clears it before the fork chain and the summon guard, whose refusals stay unnamed
 const hook = gm.slice(gm.indexOf('const hitDamageAttemptHook ='), gm.indexOf('const hitDamageAttemptLogged ='));
 const marks = [...hook.matchAll(/globalThis\.__dboHitRefusal = (?:'([a-z_]+)'|null);/g)].map((m) => [m[1] || null, m.index]);
-const order = ['shout_not_given', 'ethereal', 'offline_body', 'login_grace', 'bound', 'paralysed', 'armour_change', 'damage_cap', 'spell_rate', 'dungeon_ally', 'warband', null];
+const order = ['shout_not_given', 'ethereal', 'asylum', 'offline_body', 'in_editor', 'login_grace', 'bound', 'paralysed', 'armour_change', 'damage_cap', 'spell_rate', 'dungeon_ally', 'warband', 'silver_test', null];
 ok(JSON.stringify(marks.map(([r]) => r)) === JSON.stringify(order), 'gamemode\'s hit hook: a reason for each gate, in order, then cleared', marks.map(([r]) => r));
 const firstGate = hook.indexOf('return false');
 const prevAt = hook.indexOf('const prev = globalThis.__dboPrevHitDamageAttempt');
-ok(marks.length && marks[0][1] < firstGate && marks[marks.length - 1][1] < prevAt && hook.slice(marks[marks.length - 2][1], prevAt).includes('__dboWarbandRefusesHit'), '...the first reason before the first gate, the clearing after the last gate and before the fork chain');
+ok(marks.length && marks[0][1] < firstGate && marks[marks.length - 1][1] < prevAt && hook.slice(marks[marks.length - 3][1], prevAt).includes('__dboWarbandRefusesHit') && hook.slice(marks[marks.length - 2][1], prevAt).includes('__dboSilverTestStrike'), '...the first reason before the first gate, the clearing after the last gate and before the fork chain');
 // the accessors: read-only, no names
 const biz = fs.readFileSync(path.join(ROOT, 'business.js'), 'utf8');
 const bizAcc = biz.slice(biz.indexOf('globalThis.__dboBusinessChestOf = '), biz.indexOf('globalThis.__dboBusinessActivate = '));
