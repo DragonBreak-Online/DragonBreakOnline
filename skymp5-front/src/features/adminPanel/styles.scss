@@ -581,3 +581,13 @@ $admin-row-gutter: 16px;
 .admin-panel__gmcall-note { flex: 1; min-width: 160px; }
 .admin-panel__enchant-pieces { width: 240px; .admin-panel__category:disabled { opacity: 0.45; cursor: default; } }
 .admin-panel__enchant-preview { display: flex; flex-direction: column; gap: 1px; padding: 2px 6px; }
+
+// Thievery (thieveryTab.tsx)
+.admin-panel__thievery { display: flex; flex-direction: column; gap: 6px; }
+.admin-panel__thievery-list { display: flex; flex-direction: column; gap: 6px; max-height: 440px; }
+.admin-panel__thievery-row { align-items: center; .admin-panel__actions { margin-left: auto; gap: 6px; } }
+.admin-panel__thievery-result { border: 1px solid $admin-gold; color: #fff; padding: 4px 8px; font-size: 14px; &--refused { border-color: #c98a3a; color: #f0c890; } }
+.admin-panel__thievery-armed { display: flex; gap: 10px; align-items: center; color: $admin-gold; font-size: 14px; padding: 2px 8px; border: 1px dashed $admin-gold; }
+.admin-panel__thievery-state { flex: 0 0 90px; text-align: right; color: $dbo-text-dim; font-size: 13px; &--carried, &--fenced { color: $admin-gold; } }
+.admin-panel__thievery-spacer { flex: 0 0 110px; }
+.admin-panel__thievery-hours { flex: 0 0 64px; width: 64px; }
