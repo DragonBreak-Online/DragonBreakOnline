@@ -9,10 +9,11 @@
 //    (335f3) and its four statues are not in the server's world, so the properties are None: bossMob.IsDead() never says
 //    yes, its health over its base health is None / None (the operator/ line), and OnCellDetach, the script's only other
 //    way out, is never sent by the server.
-//  - BYOHHouseTrophyBaseScript, on the trophy bases BYOHHouseTrophyBase1 and 2 (a31a, a31e:HearthFires.esm; a mod puts one
-//    in Fort Greymoor). Activating one starts it. In an OnUpdate the server has no player for Game.GetPlayer() (only an
-//    actor's own OnUpdate has one), so GetItemCount on None is None (the operator> line), and GetDistance(None) is 0.0, so
-//    "the player is within 250 units" is true forever.
+//  - BYOHHouseTrophyBaseScript, on the trophy bases BYOHHouseTrophyBase1 and 2 (a31a, a31e:HearthFires.esm; DragonBreak
+//    Online Edits.esp puts two in Fort Greymoor, bf794 and bf86c, and players sit on them). Activating one starts it; on
+//    21 Oct both looped at once from 02:42 to the 03:25 restart. In an OnUpdate the server has no player for
+//    Game.GetPlayer() (only an actor's own OnUpdate has one), so GetItemCount on None is None (the operator> line), and
+//    GetDistance(None) is 0.0, so "the player is within 250 units" is true forever.
 // Neither OnUpdate can do anything on the server but log and ask for the next one, so this module refuses that one event
 // for those forms. The first refused OnUpdate ends the loop (nothing asks for the next), a loop already running ends
 // within a second of a reload, and nothing else about them changes: the trigger, activating, sitting.
@@ -21,6 +22,8 @@
 // reportMinutes, and only when something was refused or a form got reportMin or more in that window, one line names the
 // busiest forms with their base, so the next loop like these is named by its reference, not by a "Wrong type" line.
 // config "papyrusGuard": { enabled, refs: [desc], bases: [desc], report, reportMinutes, reportMin }
+// Undo on a hot reload: "enabled": false. Taking this module or its loader out (a revert) does not: the wrapper and the
+// last hook live on mp and globalThis until a restart, so set enabled false first (or revert and restart).
 'use strict';
 
 module.exports = (api) => {

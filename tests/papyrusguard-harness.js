@@ -21,10 +21,11 @@ Date.now = () => now;
 const later = (ms, fn) => queue.push({ at: now + ms, fn });
 const run = (ms) => { const end = now + ms; for (;;) { queue.sort((a, b) => a.at - b.at); const h = queue[0]; if (!h || h.at > end) break; queue.shift(); now = h.at; h.fn(); } now = end; };
 
-// Forms: the Soljund's Sinkhole trigger, a trophy base placed by a mod (plugin 0x49), an ordinary scripted form, a runtime form
-const SOLJUND = 0x0006aebe, TROPHY = 0x490bf794, OTHER = 0x00012345, RUNTIME = 0xff00abcd;
-const DESC = { [SOLJUND]: '0006AEBE:Skyrim.esm', [TROPHY]: '0bf794:The Great Cities - Minor Cities and Towns.esp', [OTHER]: '12345:Skyrim.esm', [RUNTIME]: 'ff00abcd' };
-const BASE = { [SOLJUND]: '6aebd:Skyrim.esm', [TROPHY]: '0000A31E:HearthFires.esm', [OTHER]: '777:Skyrim.esm', [RUNTIME]: 'a31a:HearthFires.esm' };
+// Forms: the Soljund's Sinkhole trigger, the two trophy bases DragonBreak Online Edits.esp puts in Fort Greymoor (plugin
+// 0x49 since the 21 Oct 03:25 restart, 0x48 before), an ordinary scripted form, a runtime form
+const SOLJUND = 0x0006aebe, TROPHY = 0x490bf794, TROPHY2 = 0x490bf86c, OTHER = 0x00012345, RUNTIME = 0xff00abcd;
+const DESC = { [SOLJUND]: '0006AEBE:Skyrim.esm', [TROPHY]: '0bf794:DragonBreak Online Edits.esp', [TROPHY2]: 'bf86c:DragonBreak Online Edits.esp', [OTHER]: '12345:Skyrim.esm', [RUNTIME]: 'ff00abcd' };
+const BASE = { [SOLJUND]: '6aebd:Skyrim.esm', [TROPHY]: '0000A31E:HearthFires.esm', [TROPHY2]: 'a31e:HearthFires.esm', [OTHER]: '777:Skyrim.esm', [RUNTIME]: 'a31a:HearthFires.esm' };
 const asked = { desc: 0, base: 0 };
 const mp = {
   getDescFromId: (id) => { asked.desc++; const d = DESC[id >>> 0]; if (d === undefined) throw new Error('no such form'); return d; },
@@ -79,6 +80,11 @@ ok(innerCalls.length === 0, 'a refused OnUpdate does not reach the previous hand
 registerForSingleUpdate(SOLJUND, 1.0); registerForSingleUpdate(TROPHY, 1.0);
 run(5000);
 ok(serverLog.length === before && queue.length === 0, 'a new start of either script ends at its first OnUpdate, without a line');
+// Both Fort Greymoor seats sat on (21 Oct 02:42:30 and 02:42:40, both looping until the 03:25 restart): both end, no line
+SCRIPTS[TROPHY2] = SCRIPTS[TROPHY];
+registerForSingleUpdate(TROPHY, 1.0); later(10000, () => registerForSingleUpdate(TROPHY2, 1.0));
+run(60000);
+ok(serverLog.length === before && queue.length === 0 && !ran.has(TROPHY2), 'two trophy bases started 10 s apart both end at their first OnUpdate, without a line', serverLog.length - before);
 
 // ---- nothing else is refused ----------------------------------------------------------------------------------------
 registerForSingleUpdate(OTHER, 1.0);
