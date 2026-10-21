@@ -1,6 +1,6 @@
 # DragonBreak Online Terms of Service
 
-**Effective date: October 1, 2026**
+**Effective date: October 21, 2026**
 
 ## 1. Acceptance
 
@@ -24,13 +24,17 @@ DragonBreak Online is a free, unofficial, fan-made multiplayer roleplay server f
 
 DragonBreak Online is not affiliated with, endorsed by, or sponsored by Bethesda Softworks, ZeniMax Media, Microsoft, or the SkyMP project.
 
-Playing DragonBreak Online is free. Optional supporter perks, where offered, are covered by their own terms.
+Playing DragonBreak Online is free. Optional supporter perks, where offered, are described where they are offered, and may change as the project develops.
 
 ## 4. Accounts and Characters
 
 * Your DragonBreak Online account is tied to your Discord account. Keep your Discord account secure; you are responsible for activity conducted through it.
+* **One Discord account per person.** Each person may link only one Discord account to DragonBreak Online, and must use only that account in our Discord and in the game. Except to open a support ticket as described below, or for testing that the Owners have approved, you may not create or use another Discord account to play or to join our Discord, for any reason, including to get extra characters, votes, referral rewards or supporter perks. Additional characters are available only through the character slots on your one account.
+* People who share a computer or an internet connection, such as members of one household, may each play with their own Discord account.
+* If you lose access to your Discord account or need to move to a new one, you may join our Discord with the new account to open a support ticket. Do this before you play with the new account. We do not move accounts while a ban or suspension is in effect.
+* If we find that one person uses more than one Discord account, we may remove access for the additional accounts. Removing an additional account is not a ban of you or of the account you keep. We may also take further action under section 10.
 * You may not sell, trade, share, rent, or lend your account or characters.
-* A ban applies to all accounts you use. Creating or using another account to evade a ban or restriction is prohibited and may result in further enforcement.
+* A ban applies to you and to all accounts you use. Creating or using another account to evade a ban or restriction is prohibited and may result in further enforcement.
 * Character names must follow the naming requirements in the current Server Rules. We may rename or remove characters that violate those requirements.
 
 ## 5. The Launcher
@@ -43,7 +47,7 @@ Before using the launcher, back up any files in your Skyrim installation that yo
 
 ## 6. Conduct and Roleplay
 
-You must follow the current **DragonBreak Online Server Rules** and roleplay standards published on our website and Discord. Those rules form part of these Terms.
+You must follow the current **DragonBreak Online Server Rules** and roleplay standards. Their official text is published, with its version date, on our website and in the rules channel of our Discord. If two copies differ, the one with the latest version date applies. Those rules form part of these Terms.
 
 At a minimum:
 
@@ -55,7 +59,7 @@ At a minimum:
 
 ## 7. Cheating and Exploits
 
-You may not use cheats, trainers, memory editors, unauthorized software, the game console, or modifications that provide an unfair gameplay advantage.
+You may not use cheats, trainers, memory editors, unauthorized software, macros, auto-clickers or scripts that play for you, the game console, or modifications that provide an unfair gameplay advantage.
 
 You may not:
 
@@ -177,4 +181,4 @@ We may suspend or terminate your access if you violate these Terms or the Server
 
 **Legal and privacy requests:** [dragonbreakonline@gmail.com](mailto:dragonbreakonline@gmail.com)
 
-**Last updated:** October 1, 2026
+**Last updated:** October 21, 2026
