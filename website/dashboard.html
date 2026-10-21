@@ -70,11 +70,21 @@
  .con-entry{border-top:1px solid rgba(143,211,208,.13);padding:.45rem 0}
  .con-entry pre{margin:.3rem 0 0;padding:.4rem .6rem;background:var(--panel-soft);border:1px solid var(--border);border-radius:6px;font-size:.8rem;white-space:pre-wrap;overflow-wrap:anywhere}
  .con-help{font-size:.8rem;margin:.2rem 0 .4rem}
+ #punish td{font-size:.86rem}
+ #punish .pill{font-size:.68rem}
+ #punish .bar{margin:.15rem 0 .35rem}
+ #punish button.chip{cursor:pointer;font:inherit;font-size:.76rem;line-height:1.45;padding:.02rem .55rem;margin:.1rem .25rem .1rem 0;background:transparent;color:var(--text-dim);border:1px solid var(--border);border-radius:999px}
+ #punish button.chip.on{border-color:var(--gold-border);background:var(--gold-fill);color:var(--gold)}
+ #punish button.linkish{background:none;border:0;padding:0;margin:0;color:var(--aqua);font:inherit;text-align:left;cursor:pointer;text-decoration:underline;text-underline-offset:2px}
+ #punish input[type=date]{background:var(--panel-soft);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:.15rem .4rem;font:inherit;font-size:.8rem;margin-right:.5rem}
+ .pu-acct{display:flex;flex-wrap:wrap;gap:.15rem .7rem;align-items:baseline;padding:.35rem 0;border-bottom:1px solid rgba(143,211,208,.08)}
+ .pu-note{font-size:.8rem;margin:.15rem 0}
+ #punish .con-form input{font-family:inherit}
 </style></head><body>
 <img class="wm" src="dbo-watermark.png" alt="">
 <div class="wrap">
 
-<div class="hero"><h1>Staff dashboard</h1><div class="tag">Owners and Dragon Break Dev</div></div>
+<div class="hero"><h1>Staff dashboard</h1><div class="tag" id="heroTag">Owners and Dragon Break Dev</div></div>
 
 <div id="checking" class="gate dim">Checking your sign-in&hellip;</div>
 <div id="signedOut" class="panel gate" hidden>
@@ -113,6 +123,20 @@
     </div></div>
   </section>
 
+  <section id="punish" class="srv" hidden>
+    <div class="blk"><span class="lbl">Punishments</span><div id="puHead"></div></div>
+    <div class="blk"><span class="lbl">Active now</span><div id="puActive"></div></div>
+    <div class="blk"><span class="lbl">Find a player</span><div>
+      <form id="puFind" class="con-form">
+        <input id="puQ" class="search" maxlength="40" autocomplete="off" spellcheck="false" placeholder="Character name, #TAG, profile 12 or Discord name" aria-label="Find a player">
+        <button type="submit" id="puGo">Find</button>
+      </form>
+      <div id="puFound"></div>
+    </div></div>
+    <div class="blk" id="puHistBlk" hidden><span class="lbl">History</span><div id="puHist"></div></div>
+    <div class="blk"><span class="lbl">Recent</span><div id="puRecent"></div></div>
+  </section>
+
   <dialog id="ctl" class="ctl" aria-labelledby="ctlTitle">
     <form id="ctlForm">
       <h3 id="ctlTitle"></h3>
@@ -128,6 +152,7 @@
     </form>
   </dialog>
 
+  <div id="staffOnly">
   <div class="cards" id="cards"></div>
 
   <div class="two">
@@ -151,6 +176,7 @@
 
   <div class="two">
     <div><h2>Races of the realm</h2><table id="races"></table></div>
+  </div>
   </div>
 </div>
 
@@ -896,15 +922,341 @@ async function refreshConsole() {
 
 $('conForm').addEventListener('submit', runConsole);
 
+// Punishments panel: read only, every row already filtered for the viewer's rank by the backend (routes/site-punish.js).
+// Times are UTC as the game prints them. Everything is written with textContent, and nothing is kept in the browser
+const PU = '/api/site/staff/punishments';
+const puList = () => ({ kinds: new Set(), from: '', to: '', rows: [], next: null, pages: 0, busy: false, error: '' });
+const pu = { only: false, info: null, failed: false, act: puList(), rec: puList(), hist: null, found: null, findBusy: false, findError: '' };
+const PU_TIER = { owner: 'Owner', dev: 'Dragon Break Dev', leadgm: 'Lead GM', gm: 'GM' };
+const PU_KIND = { warn: 'Warning', strike: 'Strike', suspend: 'Suspension', lift: 'Lifted', overturn: 'Overturned', tempban: 'Temp ban', ban: 'Ban',
+  ipban: 'IP ban', unban: 'Unban', discord_ban: 'Discord ban', discord_unban: 'Discord unban', discord_timeout: 'Discord timeout',
+  discord_timeout_end: 'Timeout ended', kick: 'Kick', jail: 'Jail', restitution: 'Restitution' };
+const PU_TONE = { suspend: 'bad', tempban: 'bad', ban: 'bad', ipban: 'bad', discord_ban: 'bad', strike: 'warn', warn: 'warn', discord_timeout: 'warn',
+  kick: 'warn', jail: 'warn', restitution: 'warn' };
+const PU_CAN_RUN = ['suspend', 'tempban', 'ban', 'ipban', 'discord_ban', 'discord_timeout', 'jail', 'restitution'];
+const PU_SOURCE = { discipline: 'in game (/discipline)', panelBans: 'admin panel', bans: 'game ban list', jail: 'jail', restitution: 'restitution case',
+  journal: 'Discord', playerLog: 'player log' };
+const PU_SOURCE_NAME = { discipline: 'Discipline', panelBans: 'Panel bans', bans: 'Ban list', jail: 'Jail', restitution: 'Restitution',
+  journal: 'Discord journal', playerLog: 'Player log' };
+const PU_KICK = { command: '/kick', panel: 'admin panel', suspension: 'enforcing a suspension', discord_ban: 'Discord ban', ban_enforce: 'enforcing a ban' };
+const PU_STATE = { running: 'running', scheduled: 'starts later', ended: 'ended', counting: 'counts now', expired: 'no longer counts', open: 'open', closed: 'closed' };
+const PU_ERR = { tooMany: 'Too many requests. Wait a minute and try again.', ownAccount: 'Records about your own account are shown to Owners only.',
+  notFound: 'Nothing to show for this account.', badQuery: 'Type 2 to 40 characters of a name, a #TAG or a profile number.',
+  badDate: 'Check the dates: from must not be after to.', badKind: RELOAD, badCursor: RELOAD, badLimit: RELOAD, badProfile: RELOAD,
+  unavailable: 'The records cannot be read right now.', notStaff: 'Your rank does not show punishments.' };
+
+const puWhen = iso => (iso ? `${utc(iso)} UTC` : '?');
+const puDay = day => { const t = Date.parse(`${day}T00:00:00Z`); return Number.isFinite(t) ? `${new Date(t).getUTCDate()} ${MONTHS[new Date(t).getUTCMonth()]}` : '?'; };
+function puLeft(ms) {
+  const m = Math.max(0, Math.round((ms || 0) / 60000)), h = Math.floor(m / 60);
+  return h >= 48 ? `${Math.floor(h / 24)} d ${h % 24} h` : h ? `${h} h ${m % 60} min` : `${m} min`;
+}
+const puError = r => PU_ERR[r.body && r.body.error] || (r.status ? `The server answered ${r.status}.` : 'Cannot reach the server right now.');
+
+async function puGet(path) {
+  let r;
+  try { r = await fetch(path, { cache: 'no-store', credentials: 'same-origin' }); } catch { return { status: 0, ok: false, body: {} }; }
+  const body = await r.json().catch(() => ({}));
+  if (r.status === 401) show('signedOut');
+  return { status: r.status, ok: r.ok, body };
+}
+
+function puQuery(st, extra) {
+  const q = [];
+  if (st.kinds.size) q.push('kind=' + encodeURIComponent([...st.kinds].join(',')));
+  if (st.from) q.push('from=' + encodeURIComponent(st.from));
+  if (st.to) q.push('to=' + encodeURIComponent(st.to));
+  for (const [k, v] of Object.entries(extra || {})) if (v) q.push(`${k}=${encodeURIComponent(v)}`);
+  return q.length ? '?' + q.join('&') : '';
+}
+
+function puWhat(r) {
+  const until = r.until ? `until ${puWhen(r.until)}` : '';
+  const i = r.items || {};
+  switch (r.kind) {
+    case 'suspend': return [`Suspended${r.hours ? ` ${r.hours} h` : ''}`, r.from ? `from ${puWhen(r.from)}` : '', until].filter(Boolean).join(', ')
+      + (r.alsoHolds ? `; also holds out ${plural(r.alsoHolds, 'Discord account')}` : '');
+    case 'lift': return r.lifts ? `Lifted suspension #${r.lifts}` : 'Lifted a suspension';
+    case 'overturn': return r.undid ? `Overturned #${r.undid}` : 'Overturned a record';
+    case 'tempban': return [`Banned${r.hours ? ` ${r.hours} h` : ''}`, until].filter(Boolean).join(', ');
+    case 'ban': return 'Banned, permanent';
+    case 'ipban': return 'IP ban, permanent (the address is never shown)';
+    case 'unban': return 'Ban lifted';
+    case 'discord_ban': return r.source === 'bans' ? 'Banned on Discord, so banned from the game' : 'Banned on Discord';
+    case 'discord_unban': return 'Unbanned on Discord';
+    case 'discord_timeout': return ['Timed out on Discord', until].filter(Boolean).join(', ');
+    case 'discord_timeout_end': return 'Discord timeout ended';
+    case 'kick': return `Kicked (${PU_KICK[r.how] || r.how || '?'})${r.count > 1 ? `, ${r.count} times within the hour` : ''}`;
+    case 'jail': return `Jailed for ${Math.round((r.totalMs || 0) / 60000)} min${r.concordat ? ' under the White-Gold Concordat' : ''}`;
+    case 'restitution': return `Goods taken back: ${i.itemsBack || 0} of ${i.items || 0} items${i.gold ? `, ${i.goldBack || 0} of ${i.gold} gold` : ''}`;
+    case 'strike': return 'Strike';
+    case 'warn': return 'Warning';
+  }
+  return PU_KIND[r.kind] || r.kind;
+}
+
+function puEnds(r) {
+  if (r.kind === 'jail') return `${puLeft(r.leftMs)} left to serve; counts only while they are online in the jail`;
+  if (r.state === 'scheduled') return `starts ${puWhen(r.from)}, ends ${puWhen(r.until)}`;
+  if (r.endsInMs === null || r.endsInMs === undefined) return r.kind === 'restitution' ? 'until all is taken back' : 'permanent';
+  return `${puLeft(r.endsInMs)} left (${puWhen(r.until)})`;
+}
+
+function puState(r) {
+  const bits = [];
+  const undo = (word, u) => `${word}${u.by ? ' by ' + u.by : ''}${u.at ? ' on ' + puWhen(u.at) : ''}${u.reason ? ': ' + u.reason : ''}`;
+  if (r.state === 'lifted') bits.push(undo('lifted', r.lifted || {}));
+  else if (r.state === 'overturned') bits.push(undo('overturned', r.overturned || {}));
+  else if (PU_STATE[r.state]) bits.push(PU_STATE[r.state]);
+  if (r.told === true) bits.push('player told');
+  else if (r.told === false) bits.push('player told at their next login');
+  if (r.outside) bits.push(typeof r.outside === 'string' ? `decided outside the game (${r.outside})` : 'decided outside the game');
+  return bits.join(' · ');
+}
+
+const puPill = r => el('span', 'pill ' + (PU_TONE[r.kind] || 'ok'), PU_KIND[r.kind] || r.kind);
+const puRef = r => [r.ref, r.ticket && r.ticket !== r.outside ? 'ticket ' + r.ticket : null].filter(Boolean).join(' · ');
+
+function puWho(r) {
+  const t = r.target || {}, d = el('div');
+  const label = [t.name, t.tag ? '#' + t.tag : null].filter(Boolean).join(' ') || t.discordName || 'unknown';
+  if (Number.isInteger(t.profileId)) {
+    const b = el('button', 'linkish', label);
+    b.type = 'button';
+    b.addEventListener('click', () => openHistory(t.profileId));
+    d.append(b);
+  } else d.append(el('span', '', label));
+  d.append(el('div', 'dim', [Number.isInteger(t.profileId) ? 'profile ' + t.profileId : 'no game account', t.name || t.tag ? t.discordName : null].filter(Boolean).join(' · ')));
+  return d;
+}
+
+function puTable(head, rows, cells) {
+  const t = el('table'), hr = el('tr');
+  head.forEach(h => hr.append(el('th', '', h)));
+  t.append(hr);
+  for (const r of rows) {
+    const tr = el('tr');
+    for (const c of cells(r)) { const td = el('td'); if (c && typeof c === 'object') td.append(c); else td.textContent = c == null ? '' : String(c); tr.append(td); }
+    t.append(tr);
+  }
+  if (!rows.length) { const tr = el('tr'), td = el('td', 'dim', 'No punishments on record.'); td.colSpan = head.length; tr.append(td); t.append(tr); }
+  const box = el('div', 'scroll');
+  box.append(t);
+  return box;
+}
+
+function puChips(st, kinds, reload) {
+  const bar = el('div', 'bar');
+  for (const k of kinds) {
+    const b = el('button', 'chip' + (st.kinds.has(k) ? ' on' : ''), PU_KIND[k] || k);
+    b.type = 'button';
+    b.setAttribute('aria-pressed', String(st.kinds.has(k)));
+    b.addEventListener('click', () => { if (st.kinds.has(k)) st.kinds.delete(k); else st.kinds.add(k); reload(); });
+    bar.append(b);
+  }
+  return bar;
+}
+
+function puDates(st, reload) {
+  const bar = el('div', 'bar');
+  for (const [key, label] of [['from', 'From'], ['to', 'To']]) {
+    const i = el('input');
+    i.type = 'date';
+    i.value = st[key] || '';
+    i.setAttribute('aria-label', label);
+    i.addEventListener('change', () => { st[key] = i.value; reload(); });
+    bar.append(el('span', 'dim', label), i);
+  }
+  return bar;
+}
+
+function puMore(st, load) {
+  if (!st.next) return null;
+  const b = el('button', 'ghost', st.busy ? 'Loading…' : 'Load older');
+  b.type = 'button';
+  b.disabled = st.busy;
+  b.addEventListener('click', () => load(true).then(renderPunish));
+  return b;
+}
+
+async function puLoad(st, url, more) {
+  if (st.busy) return false;
+  st.busy = true;
+  const r = await puGet(url + (more && st.next ? `${url.includes('?') ? '&' : '?'}cursor=${encodeURIComponent(st.next)}` : ''));
+  st.busy = false;
+  if (!r.ok) { st.error = puError(r); return false; }
+  st.error = '';
+  st.rows = more ? st.rows.concat(r.body.rows || r.body.history || []) : (r.body.rows || r.body.history || []);
+  st.next = r.body.next || null;
+  st.pages = more ? st.pages + 1 : 1;
+  return r.body;
+}
+
+const loadActive = more => puLoad(pu.act, `${PU}/active${puQuery(pu.act, { limit: '100' })}`, more).then(b => { if (b && !more) pu.act.strikes = b.strikes || []; });
+const loadRecent = more => puLoad(pu.rec, `${PU}/recent${puQuery(pu.rec, { limit: '50' })}`, more);
+async function loadHistory(more) {
+  const h = pu.hist;
+  if (!h) return;
+  const b = await puLoad(h, `${PU}/player/${h.profileId}${puQuery(h, { limit: '50' })}`, more);
+  if (b && !more && pu.hist === h) Object.assign(h, { player: b.player, strikes: b.strikes, active: b.active || [] });
+}
+
+function openHistory(profileId) {
+  pu.hist = Object.assign(puList(), { profileId, player: null, strikes: null, active: [] });
+  renderPunish();
+  loadHistory(false).then(renderPunish);
+  if (typeof $('puHistBlk').scrollIntoView === 'function') $('puHistBlk').scrollIntoView();
+}
+
+async function findPlayer(ev) {
+  ev.preventDefault();
+  const q = String($('puQ').value || '').trim();
+  if (!q || pu.findBusy) return;
+  pu.findBusy = true;
+  renderFind();
+  const r = await puGet(`${PU}/search?q=${encodeURIComponent(q)}`);
+  pu.findBusy = false;
+  pu.found = r.ok ? r.body.accounts || [] : null;
+  pu.findError = r.ok ? '' : puError(r);
+  renderFind();
+}
+
+function renderFind() {
+  $('puGo').disabled = pu.findBusy;
+  const box = $('puFound'); box.textContent = '';
+  if (pu.findError) return box.append(line(pu.findError, 'warn'));
+  if (!pu.found) return box.append(line('Dead and deleted characters are found too. Up to 20 accounts.', 'dim pu-note'));
+  if (!pu.found.length) return box.append(line('No account matches.', 'dim'));
+  for (const a of pu.found) {
+    const row = el('div', 'pu-acct');
+    const first = a.characters[0];
+    const b = el('button', 'linkish', first ? `${first.name}${first.tag ? ' #' + first.tag : ''}` : `profile ${a.profileId}`);
+    b.type = 'button';
+    b.addEventListener('click', () => openHistory(a.profileId));
+    row.append(b, el('span', 'dim', [`profile ${a.profileId}`, a.discordName].filter(Boolean).join(' · ')));
+    for (const c of a.characters.slice(1)) row.append(el('span', 'chip', `${c.name}${c.tag ? ' #' + c.tag : ''}${c.status !== 'alive' ? ' (' + c.status + ')' : ''}`));
+    if (first && first.status !== 'alive') row.append(el('span', 'dim', `first listed is ${first.status}`));
+    row.append(el('span', a.active ? 'warn' : 'dim', `${plural(a.records, 'record')}${a.active ? `, ${a.active} running` : ''}`));
+    box.append(row);
+  }
+}
+
+function renderPuHead(s) {
+  const box = $('puHead'); box.textContent = '';
+  const bar = el('div', 'bar');
+  bar.append(el('span', 'pill ok', s.label || PU_TIER[s.tier] || s.tier));
+  for (const [key, v] of Object.entries(s.sources || {})) {
+    const name = PU_SOURCE_NAME[key] || key;
+    if (v.status === 'ok') bar.append(el('span', 'flag', key === 'playerLog' && v.from ? `${name} from ${puDay(v.from)}` : name));
+    else if (v.status === 'missing') bar.append(el('span', 'flag', `${name}: none on file`));
+    else if (v.status === 'loading' || v.status === 'idle') bar.append(el('span', 'flag', `${name}: loading`));
+    else if (v.status === 'off') bar.append(el('span', 'flag', `${name}: off`));
+    else bar.append(el('span', 'flag warn', `${name}: could not be read${v.asOf ? ', showing the copy from ' + puWhen(v.asOf) : ''}`));
+  }
+  box.append(bar);
+  box.append(line(`Read only. Strikes count for ${s.strikeDays} days; staff are told at ${s.strikesForReview}. Kicks and Discord bans come from the player log, which keeps ${s.sources?.playerLog?.days || 90} days.`, 'dim pu-note'));
+  if (s.tier === 'gm') box.append(line('As a GM you see warnings, strikes, suspensions, kicks and jail, and bans while they run. Records on staff members and on your own account are not shown.', 'dim pu-note'));
+  else if (s.tier !== 'owner') box.append(line('Records on your own account are shown to Owners only.', 'dim pu-note'));
+  if (pu.failed) box.append(line('! Could not refresh; this is the last copy.', 'warn'));
+}
+
+function renderPuActive(s) {
+  const box = $('puActive'), st = pu.act; box.textContent = '';
+  box.append(puChips(st, PU_CAN_RUN.filter(k => (s.kinds || []).includes(k)), () => loadActive(false).then(renderPunish)));
+  if (st.error) box.append(line(st.error, 'warn'));
+  box.append(puTable(['Kind', 'Player', 'Ends', 'Given by', 'Reason', 'Ref'], st.rows,
+    r => [puPill(r), puWho(r), puEnds(r), r.by || '', r.reason || '', puRef(r)]));
+  const more = puMore(st, loadActive);
+  if (more) box.append(more);
+  for (const k of st.strikes || []) {
+    const t = k.target || {};
+    box.append(line(`Strikes counting: ${[t.name, t.tag ? '#' + t.tag : null].filter(Boolean).join(' ') || 'profile ' + t.profileId} (profile ${t.profileId}): ${k.count} of ${k.review} in ${k.days} days`, k.count >= k.review ? 'warn' : 'dim'));
+  }
+}
+
+const puHistoryCells = withPlayer => r => [utc(r.at), puPill(r), ...(withPlayer ? [puWho(r)] : []), puWhat(r), r.by || '', r.reason || '', puState(r), [PU_SOURCE[r.source] || r.source, puRef(r)].filter(Boolean).join(' · ')];
+
+function renderPuHist(s) {
+  const h = pu.hist;
+  $('puHistBlk').hidden = !h;
+  const box = $('puHist'); box.textContent = '';
+  if (!h) return;
+  const head = el('div', 'bar');
+  const p = h.player;
+  const chars = p && p.characters.length ? p.characters.map(c => `${c.name}${c.tag ? ' #' + c.tag : ''}${c.status !== 'alive' ? ' (' + c.status + ')' : ''}`).join(', ') : `profile ${h.profileId}`;
+  head.append(el('span', '', chars), el('span', 'dim', [`profile ${h.profileId}`, p && p.discordName].filter(Boolean).join(' · ')));
+  if (h.strikes) head.append(el('span', h.strikes.count >= h.strikes.review ? 'warn' : 'dim', `${h.strikes.count} of ${h.strikes.review} strikes in ${h.strikes.days} days`));
+  const close = el('button', 'ghost', 'Close');
+  close.type = 'button';
+  close.addEventListener('click', () => { pu.hist = null; renderPunish(); });
+  head.append(close);
+  box.append(head);
+  if (h.error) box.append(line(h.error, 'warn'));
+  if (h.active && h.active.length) box.append(line('Running now: ' + h.active.map(r => `${PU_KIND[r.kind] || r.kind} (${puEnds(r)})`).join('; '), 'warn'));
+  const reload = () => loadHistory(false).then(renderPunish);
+  box.append(puChips(h, s.kinds || [], reload), puDates(h, reload));
+  box.append(puTable(['Date', 'Kind', 'What', 'By', 'Reason', 'State', 'Source'], h.rows, puHistoryCells(false)));
+  const more = puMore(h, loadHistory);
+  if (more) box.append(more);
+}
+
+function renderPuRecent(s) {
+  const box = $('puRecent'), st = pu.rec; box.textContent = '';
+  const reload = () => loadRecent(false).then(renderPunish);
+  box.append(puChips(st, s.kinds || [], reload), puDates(st, reload));
+  if (!st.from && !st.to) box.append(line('The last 30 days. Pick dates for older records.', 'dim pu-note'));
+  if (st.error) box.append(line(st.error, 'warn'));
+  box.append(puTable(['Date', 'Kind', 'Player', 'What', 'By', 'Reason', 'State', 'Source'], st.rows, puHistoryCells(true)));
+  const more = puMore(st, loadRecent);
+  if (more) box.append(more);
+}
+
+function renderPunish() {
+  const s = pu.info;
+  $('punish').hidden = !s;
+  if (!s) return;
+  renderPuHead(s); renderPuActive(s); renderFind(); renderPuHist(s); renderPuRecent(s);
+}
+
+// Every 60 s; a list paged past its first page is left as it is until the viewer changes a filter
+async function refreshPunish() {
+  const r = await puGet(PU);
+  if (r.status === 401) return;
+  if (!r.ok) {
+    if (r.status === 403 && pu.only) return show('notStaff');
+    // Switched off or an older backend (404), no rank right now (403), or nothing read yet: the section stays hidden
+    if (r.status === 404 || r.status === 403 || !pu.info) pu.info = null; else pu.failed = true;
+    return renderPunish();
+  }
+  pu.info = r.body;
+  pu.failed = false;
+  await Promise.all([pu.act.pages > 1 ? null : loadActive(false), pu.rec.pages > 1 ? null : loadRecent(false), pu.hist && pu.hist.pages <= 1 ? loadHistory(false) : null]);
+  renderPunish();
+}
+
+$('puFind').addEventListener('submit', findPlayer);
+
 async function main() {
   let me;
   try { me = await (await fetch('/api/site/staff/me', { cache: 'no-store', credentials: 'same-origin' })).json(); }
   catch { $('checking').textContent = 'Cannot reach the server right now.'; return; }
   if (!me.signedIn) return show('signedOut');
-  if (!me.staff) return show('notStaff');
+  if (!me.staff && !me.punish) return show('notStaff');
   show('board');
+  // A Lead GM or GM has the Punishments panel only: no other panel is loaded, and the backend refuses them anyway
+  if (!me.staff) {
+    pu.only = true;
+    $('staffOnly').hidden = true;
+    $('live').hidden = true;
+    $('heroTag').textContent = 'Punishments';
+    $('status').textContent = `Signed in as ${me.name || 'staff'}, ${PU_TIER[me.punish] || me.punish}`;
+    await refreshPunish();
+    setInterval(refreshPunish, 60000);
+    return;
+  }
   $('search').addEventListener('input', renderPlayers);
-  await Promise.all([refreshLive(), refreshPlayers(), refreshServer(), refreshConsole()]);
+  await Promise.all([refreshLive(), refreshPlayers(), refreshServer(), refreshConsole(), refreshPunish()]);
+  setInterval(refreshPunish, 60000);
   setInterval(refreshConsole, 60000);
   setInterval(refreshLive, 10000);
   setInterval(refreshPlayers, 60000);
