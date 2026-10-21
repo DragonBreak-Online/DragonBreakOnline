@@ -175,7 +175,6 @@ export const SPECIES = [
         raceId: HIGHELF,
         raceEditorId: 'HighElfRace',
         faceGen: true,
-        lockedNote: 'Unlocks after 150 hours played, like the extra character slot.',
         lore: 'The Falmer of old, the elves of Skyrim before the Nords: all but a handful were lost to war and the Dwemer\'s deep places.'
       },
       {
