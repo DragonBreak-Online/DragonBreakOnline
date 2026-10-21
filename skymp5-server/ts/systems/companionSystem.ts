@@ -193,7 +193,13 @@ export class CompanionSystem implements System {
     try { ownerId = ctx.svr.getUserActor(userId) >>> 0; } catch { return; }
     if (!ownerId) return;
     this.twinSouls.delete(ownerId);
-    for (const c of this.ownedBy(ownerId)) this.release(c);
+    // The server maps the owner to its closed connection until this event returns, so a destroy now can throw part way
+    // ("User with id N doesn't exist") and leave the summon behind; release once the user is gone
+    setImmediate(() => {
+      for (const c of this.ownedBy(ownerId)) {
+        try { this.release(c); } catch (e) { this.log(`CompanionSystem: release of ${hex(c.id)} after logout failed: ${e}`); }
+      }
+    });
   }
 
   customPacket(userId: number, type: string, content: Content, ctx: SystemContext): void {
