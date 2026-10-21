@@ -39,22 +39,40 @@ function readText(file) {
 }
 
 const stamp = file => { const s = fs.statSync(file); return `${s.size}:${s.mtimeMs}:${s.ino}` }
+// A deploy rewrites the files in place: for this long after reads start failing, the last good copy is answered instead
+const MID_WRITE_MS = 10000
 let cache = null
+let failingSince = null
 
-// The current rules, re-read only when the manifest or the text changes on disk; throws when either is missing or malformed
-function currentRules(dir = RULES_DIR) {
-  const manifest = readManifest(dir)
+function load(dir) {
+  const manifestStamp = stamp(path.join(dir, 'manifest.json'))
+  const same = cache && cache.dir === dir
+  const manifest = same && cache.manifestStamp === manifestStamp ? cache.manifest : readManifest(dir)
   const file = path.join(dir, manifest.file)
-  const key = [dir, stamp(path.join(dir, 'manifest.json')), stamp(file)].join('|')
-  if (cache && cache.key === key) return cache.doc
+  const key = `${manifestStamp}|${stamp(file)}`
+  if (same && cache.key === key) return cache.doc
   const doc = Object.freeze({
     version: manifest.version,
     effective: manifest.effective,
     changes: Object.freeze(manifest.changes),
     rules: readText(file),
   })
-  cache = { key, doc }
+  cache = { dir, manifestStamp, manifest, key, doc }
   return doc
 }
 
-module.exports = { currentRules, validateManifest, normalizeText, RULES_DIR, VERSION_RE, resetCache: () => { cache = null } }
+// The current rules, re-read only when the manifest or the text changes on disk; throws when either is missing or malformed
+function currentRules(dir = RULES_DIR) {
+  try {
+    const doc = load(dir)
+    failingSince = null
+    return doc
+  } catch (err) {
+    if (!cache || cache.dir !== dir) throw err
+    failingSince ??= Date.now()
+    if (Date.now() - failingSince > MID_WRITE_MS) throw err
+    return cache.doc
+  }
+}
+
+module.exports = { currentRules, validateManifest, normalizeText, RULES_DIR, VERSION_RE, resetCache: () => { cache = null; failingSince = null } }

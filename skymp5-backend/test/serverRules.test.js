@@ -114,6 +114,34 @@ test('a missing or malformed manifest or text answers 503, never a stack trace o
   assert.equal((await get('/api/files/rules')).status, 200)
 })
 
+test('an unchanged manifest is not read again on each request', () => {
+  reset()
+  serverRules.currentRules(DIR)
+  const real = fs.readFileSync
+  let reads = 0
+  fs.readFileSync = function (file, ...rest) { if (String(file).endsWith('manifest.json')) reads++; return real.call(this, file, ...rest) }
+  try { for (let k = 0; k < 3; k++) assert.equal(serverRules.currentRules(DIR).version, 'v1') } finally { fs.readFileSync = real }
+  assert.equal(reads, 0)
+})
+
+test('a manifest caught mid-write answers the last good rules for a moment, then fails as before', t => {
+  t.mock.timers.enable({ apis: ['Date'], now: Date.now() })
+  reset()
+  assert.equal(serverRules.currentRules(DIR).version, 'v1')
+  try {
+    fs.writeFileSync(path.join(DIR, 'manifest.json'), '{ "version": "v2", "effe')
+    assert.equal(serverRules.currentRules(DIR).version, 'v1', 'the last good copy while the deploy writes')
+    fs.rmSync(path.join(DIR, 'manifest.json'))
+    assert.equal(serverRules.currentRules(DIR).version, 'v1', 'and while the file is replaced')
+    t.mock.timers.tick(10001)
+    assert.throws(() => serverRules.currentRules(DIR), 'a manifest still broken after that is an error, never old rules for good')
+  } finally {
+    fs.writeFileSync(path.join(DIR, 'manifest.json'), manifest('v1'))
+    reset()
+  }
+  assert.equal(serverRules.currentRules(DIR).version, 'v1')
+})
+
 test('a visitor is limited to 120 requests in 10 minutes', async () => {
   let last
   for (let k = 0; k < 125; k++) last = await get('/api/files/rules/server-rules.md')
