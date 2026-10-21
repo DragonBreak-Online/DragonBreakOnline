@@ -733,12 +733,21 @@ export class AdminSystem implements System {
     action: string, who: { userId: number; actorId: number; profileId: number; name: string }, content: Content): void {
     const whom = who.actorId === myActorId ? "themself" : `${who.name} (profile ${who.profileId})`;
     try {
-      if (action === "masterySetTier" || action === "masteryDrop") {
+      // The player log reads "set <skill> to tier <n> for" from the admin log line (playerlog-rules.js), so the level goes after it
+      if (action === "masterySetTier") {
         const skill = String(content["skill"] ?? "");
         const tier = Number(content["tier"]);
-        const ok = action === "masterySetTier" ? this.mastery.adminSetTier(ctx, who.actorId, skill, tier) : this.mastery.adminDropSkill(ctx, who.actorId, skill);
-        if (ok) this.adminLog(`profile ${adminProfile} ${action === "masterySetTier" ? `set ${skill} to tier ${tier} for` : `dropped ${skill} for`} ${whom}`);
-        this.reply(mp, userId, ok, ok ? (action === "masterySetTier" ? `${who.name}: ${skill} set` : `${who.name}: ${skill} set aside`) : "That did not work");
+        const r = this.mastery.adminSetTier(ctx, who.actorId, skill, tier);
+        if (r.ok) this.adminLog(`profile ${adminProfile} set ${skill} to tier ${tier} for ${whom}, ${this.mastery.usesLevels() ? `level ${r.level}` : `${r.level} h`}`);
+        this.reply(mp, userId, r.ok, `${who.name}: ${r.text}`);
+        if (r.ok) this.sendMasteryDetail(ctx, mp, userId, who);
+        return;
+      }
+      if (action === "masteryDrop") {
+        const skill = String(content["skill"] ?? "");
+        const ok = this.mastery.adminDropSkill(ctx, who.actorId, skill);
+        if (ok) this.adminLog(`profile ${adminProfile} dropped ${skill} for ${whom}`);
+        this.reply(mp, userId, ok, ok ? `${who.name}: ${skill} set aside` : "That did not work");
         if (ok) this.sendMasteryDetail(ctx, mp, userId, who);
         return;
       }
