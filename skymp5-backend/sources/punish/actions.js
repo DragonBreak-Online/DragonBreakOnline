@@ -504,7 +504,12 @@ function createPunishActions({
       if (found.refused) return found.refused
       if (!(found.t.tags || []).includes(words[1].slice(1).toUpperCase())) return refuse(409, 'wrongTarget')
     }
-    const { status, body } = await api.runStaffCommand(ctx.caller, { uuid: b.uuid, text: b.command, only: PUNISH_COMMANDS, cap: ctx.mode, via: 'punish' })
+    // The account the dialog showed goes with the line as targetProfileId, as the Console panel's /run sends it
+    // (page_contract): the console sends it only to a game that checks it for this command (else 422 noProfileCheck,
+    // nothing sent), with that account's fresh roles for the game's rank check
+    const { status, body } = await api.runStaffCommand(ctx.caller, {
+      uuid: b.uuid, text: b.command, targetProfileId: b.profileId, only: PUNISH_COMMANDS, cap: ctx.mode, via: 'punish',
+    })
     return answer(status, body)
   }
 
@@ -514,16 +519,17 @@ function createPunishActions({
     const caller = api.webCaller(token)
     const sw = settings()
     const st = api.state('web')
-    const names = (st.commands || []).map(c => c.name)
+    // Only a command the game checks against the page's account (targetProfile) can be sent; the rest stay Copy
+    const sendable = PUNISH_COMMANDS.filter(n => (st.commands || []).some(c => c.name === n && c.targetProfile === true))
     const m = bot.botModeration()
     const pinned = !!caller && !api.config.problem && api.config.pins.has(caller.discordId)
     const may = a => ACTIONS[a].tiers.includes(tier) && pinned && sw[ACTIONS[a].area] !== 'off'
     return {
       v: 1, tier, fresh: api.isFresh(caller), signInUrl: SIGN_IN_URL, pinned, switch: sw,
-      send: { setting: st.setting, ready: st.ready, commands: PUNISH_COMMANDS.filter(n => names.includes(n)) },
+      send: { setting: st.setting, ready: st.ready, commands: sendable },
       bot: { ready: m.ready, banMembers: m.banMembers, moderateMembers: m.moderateMembers, viewAuditLog: m.viewAuditLog },
       can: {
-        send: may('send') && st.setting !== 'off' && st.ready, ban: may('ban'), unban: may('unban'),
+        send: may('send') && st.setting !== 'off' && st.ready && sendable.length > 0, ban: may('ban'), unban: may('unban'),
         discordTimeout: may('discord-timeout') && m.ready && m.moderateMembers, discordBan: may('discord-ban') && m.ready && m.banMembers,
       },
       reason: { min: REASON_MIN, max: REASON_MAX }, timeout: { maxMinutes: MAX_MINUTES, presets: [...PRESETS] },

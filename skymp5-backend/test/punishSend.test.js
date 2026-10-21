@@ -1,12 +1,13 @@
 'use strict'
 // POST /api/site/staff/punishments/actions/send over HTTP: /discipline and /kick only, through the console's one function,
-// for Owners, Dev and Lead GMs; the #TAG must be the named account's; the general console stays Owners and Dev only
+// for Owners, Dev and Lead GMs; the #TAG must be the named account's; the general console stays Owners and Dev only.
+// The account goes to the game as targetProfileId, with its fresh roles, exactly as the Console panel's /run sends it
 
 const { test, before, after, beforeEach } = require('node:test')
 const assert = require('node:assert/strict')
 const fs = require('fs')
 const http = require('http')
-const { createActionsFixture, ORIGIN, uuid } = require('./helpers/punishActionsFixture')
+const { createActionsFixture, ORIGIN, uuid, ALLOW, HARDENED_ALLOW, GUILD, ROLE } = require('./helpers/punishActionsFixture')
 
 const H = createActionsFixture()
 const { PEOPLE, F } = H
@@ -30,6 +31,9 @@ beforeEach(() => {
   H.reset()
   F.audits.length = 0
   fs.writeFileSync(F.switchFile, 'on\n')
+  H.allow(HARDENED_ALLOW)
+  // A fresh console each test, so its per-account limits start empty
+  F.make()
   route.internals.setService(H.make())
 })
 
@@ -60,7 +64,9 @@ test('a Lead GM sends /kick #TAG for the account it names; it runs in game as th
   assert.equal(r.job.command, '/kick #BOB1')
   const sent = F.requests.at(-1)
   assert.deepEqual([sent.src, sent.discordId, sent.text, sent.mode, sent.sigOk], ['web', PEOPLE.lead.discordId, '/kick #BOB1', 'on', true])
-  assert.ok(F.audits.some(l => l === `CONSOLE lena_lead (<@${PEOPLE.lead.discordId}>) via web punish req ${body.requestId.slice(0, 8)}: /kick #BOB1`), F.audits.join('\n'))
+  // The page's account and its fresh roles, signed, for the game's account and rank checks
+  assert.deepEqual([sent.targetProfileId, sent.targetRoles], [PEOPLE.bob.profileId, [GUILD]])
+  assert.ok(F.audits.some(l => l === `CONSOLE lena_lead (<@${PEOPLE.lead.discordId}>) via web punish req ${body.requestId.slice(0, 8)} (page profile ${PEOPLE.bob.profileId}): /kick #BOB1`), F.audits.join('\n'))
   // The job is read back here, own only (a Lead GM cannot read /console/jobs)
   const job = await request('GET', `/api/site/staff/punishments/actions/jobs/${body.requestId}`, { 'x-test-session': token })
   assert.equal(want(job, 200).job.id, `w-${body.requestId}`)
@@ -68,17 +74,59 @@ test('a Lead GM sends /kick #TAG for the account it names; it runs in game as th
   want(await request('GET', `/api/site/staff/console/jobs/${body.requestId}`, { 'x-test-session': token }), 403, 'notStaff')
 })
 
-test('only /discipline and /kick: /fixloc is notPunish and never reaches the game; /discipline waits for the game\'s rule', async () => {
+test('only /discipline and /kick: /fixloc is notPunish and never reaches the game, though the game checks its account', async () => {
   const n = F.requests.length
   want(await send('owner', kick('/fixloc #BOB1')), 422, 'notPunish')
+  want(await send('owner', kick('/rename #BOB1 Robert')), 422, 'notPunish')
   want(await send('owner', kick('/say hello')), 422, 'notPunish')
   want(await send('owner', kick('/kick #BOB1 now')), 422, 'notRemote')
-  const d = want(await send('owner', kick('/discipline #BOB1 warn Spamming the trade chat')), 422, 'notRemote')
-  assert.equal(d.why, 'notYet', 'allow.json has no /discipline rule until the game publishes it')
   const t = want(await send('owner', kick('/kick')), 422, 'notRemote')
   assert.equal(t.why, 'needTag')
   want(await send('owner', kick('not a command at all!')), 422, 'notPunish')
   assert.equal(F.requests.length, n)
+  // /discipline with the game's rule: every kind goes with the account
+  for (const line of ['/discipline #BOB1 warn Spamming the trade chat', '/discipline #BOB1 strike Spamming the trade chat', '/discipline #BOB1 suspend 3d Spamming the trade chat']) {
+    const r = want(await send('lead', kick(line)), 200)
+    assert.equal(r.job.state, 'ran', line)
+    assert.deepEqual([F.requests.at(-1).text, F.requests.at(-1).targetProfileId, F.requests.at(-1).targetRoles], [line, PEOPLE.bob.profileId, [GUILD]])
+  }
+  const bad = want(await send('lead', kick('/discipline #BOB1 warn <@1>')), 422, 'notRemote')
+  assert.equal(bad.why, 'reasonChars')
+  assert.equal(F.requests.length, n + 3)
+})
+
+test('today\'s game (no account check in allow.json): /kick and /discipline are refused before anything is sent, as /console/run refuses them', async () => {
+  H.allow(ALLOW)
+  const n = F.requests.length
+  const k = want(await send('owner', kick()), 422, 'notRemote')
+  assert.equal(k.why, 'noProfileCheck')
+  assert.match(k.reason, /does not check \/kick against the account you opened yet/)
+  const run = want(await send('owner', { requestId: uuid(), command: '/kick #BOB1', targetProfileId: PEOPLE.bob.profileId }, { url: '/api/site/staff/console/run' }), 422, 'notRemote')
+  assert.deepEqual([run.why, run.reason], [k.why, k.reason], 'the same answer as the Console panel')
+  const d = want(await send('owner', kick('/discipline #BOB1 warn Spamming the trade chat')), 422, 'notRemote')
+  assert.equal(d.why, 'notYet', 'allow.json has no /discipline rule until the game publishes it')
+  assert.equal(F.requests.length, n)
+  // The page offers Copy only
+  const info = H.actions.info(session('owner'), 'owner')
+  assert.deepEqual([info.send.commands, info.can.send], [[], false])
+  H.allow(HARDENED_ALLOW)
+  const after = H.actions.info(session('owner'), 'owner')
+  assert.deepEqual([after.send.commands, after.can.send], [['discipline', 'kick'], true])
+})
+
+test('the request the game gets from /actions/send is the one /console/run sends for the same line and account', async () => {
+  const pick = r => Object.fromEntries(['v', 'src', 'discordId', 'user', 'profileId', 'roles', 'text', 'mode', 'targetProfileId', 'targetRoles', 'sigOk'].map(k => [k, r[k]]))
+  for (const [line, pid] of [['/kick #BOB1', PEOPLE.bob.profileId], ['/discipline #BOB1 strike Spamming the trade chat', PEOPLE.bob.profileId], ['/kick #GIN1', PEOPLE.gina.profileId]]) {
+    want(await send('owner', { requestId: uuid(), command: line, targetProfileId: pid }, { url: '/api/site/staff/console/run' }), 200)
+    const viaRun = pick(F.requests.at(-1))
+    want(await send('owner', kick(line, { profileId: pid })), 200)
+    const viaSend = pick(F.requests.at(-1))
+    assert.deepEqual(viaSend, viaRun, line)
+    assert.equal(viaSend.targetProfileId, pid)
+    assert.ok(Array.isArray(viaSend.targetRoles) && viaSend.sigOk, line)
+  }
+  // A GM target's fresh roles go along, so the game's rank check sees them
+  assert.deepEqual(F.requests.at(-1).targetRoles, [GUILD, ROLE.gm])
 })
 
 test('the #TAG must be the named account\'s; never your own account; never staff of your rank or higher', async () => {
@@ -112,6 +160,8 @@ test('one run per request id: the same line answers the first job, another line 
   want(await send('owner', { ...body, command: '/kick #BOB1 ' }), 200, null)
   want(await send('owner', { ...body, command: '/kick #GIN1' }), 409, 'conflict')
   want(await send('dev', body), 409, 'conflict')
+  // A known id answers its first job and sends nothing, whatever account the body names
+  assert.deepEqual(want(await send('owner', { ...body, profileId: PEOPLE.gina.profileId }), 200).job, first.job)
   assert.equal(F.requests.length, n)
 })
 

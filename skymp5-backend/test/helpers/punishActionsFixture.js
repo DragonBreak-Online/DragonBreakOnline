@@ -6,7 +6,7 @@
 require.cache[require.resolve('dotenv')] = { exports: { config: () => ({}) } }
 const fs = require('fs')
 const path = require('path')
-const { createConsoleFixture, ROLE, GUILD, DEPLOY_ROLE_IDS, uuid } = require('./consoleFixture')
+const { createConsoleFixture, ROLE, GUILD, DEPLOY_ROLE_IDS, ALLOW, uuid } = require('./consoleFixture')
 const { createPunishFixture, PEOPLE, SECRET_STRINGS } = require('./punishFixture')
 
 const ROOT = path.join(__dirname, '..', '..')
@@ -17,6 +17,14 @@ const stub = (rel, exports) => {
 const ORIGIN = 'https://site.example'
 const BAN_ROLE = '1555000000000000999'
 const HANDLES = { owner: 'jake', dev: 'nate.pierce', lead: 'lena_lead', gm: 'gus_gm', trial: 'tia', none: 'pat', actor: 'old_lead', rep: 'vex' }
+// allow.json as the hardened game (punish-hardening-1021-review 45e90896c) writes it: /discipline's rule, and the page's
+// account (targetProfile) checked on the #TAG commands, the rank check on /discipline and /kick. ALLOW is today's game
+const DISCIPLINE = {
+  name: 'discipline', usage: '/discipline #TAG warn|strike|lift <reason>; suspend <1-720h|1-30d> <reason>; overturn <n> <reason>', rule: 'tagKindReason',
+  help: 'x', kinds: ['warn', 'strike', 'suspend', 'lift', 'overturn'], maxSuspendDays: 30, targetProfile: true, rank: true,
+}
+const TAGGED = new Set(['kick', 'fixloc', 'rename', 'chargen', 'chars'])
+const HARDENED_ALLOW = [...ALLOW.map(a => (TAGGED.has(a.name) ? { ...a, targetProfile: true, ...(a.name === 'kick' ? { rank: true } : {}) } : a)), DISCIPLINE]
 
 function createActionsFixture() {
   const PF = createPunishFixture()
@@ -67,6 +75,9 @@ function createActionsFixture() {
   F.profiles = new Map(Object.entries(PF.profiles.map))
   F.config.consoleDiscordIds = ['owner', 'dev', 'lead', 'gm', 'trial', 'none'].map(k => PEOPLE[k].discordId).join(',')
   F.make()
+  // The game's allow.json; the hardened game's unless a test writes today's (H.allow(ALLOW))
+  H.allow = list => fs.writeFileSync(path.join(F.dir, 'allow.json'), JSON.stringify(list), { mode: 0o600 })
+  H.allow(HARDENED_ALLOW)
 
   // The ban list: bans.js copied beside the fixture's data folder, so its FILE is the fixture's bans.json
   fs.mkdirSync(path.join(PF.root, 'sources'), { recursive: true })
@@ -160,4 +171,4 @@ function createActionsFixture() {
   return H
 }
 
-module.exports = { createActionsFixture, ORIGIN, BAN_ROLE, HANDLES, uuid, ROLE, GUILD }
+module.exports = { createActionsFixture, ORIGIN, BAN_ROLE, HANDLES, uuid, ROLE, GUILD, ALLOW, HARDENED_ALLOW }
