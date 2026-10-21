@@ -158,6 +158,8 @@ function disciplineRows(entries, { now, strikeDays = 90, held = new Map() }) {
       } else if (e.kind === 'overturn') {
         r.undid = e.undid
       }
+      // A lift can be overturned too; the page shows who and why only on an overturned state
+      if (e.overturned && r.state === 'recorded') r.state = 'overturned'
       rows.push(r)
     }
     if (counting) strikes.set(p, counting)
@@ -349,8 +351,28 @@ function playerLogRows(events) {
   return rows
 }
 
+// One row per ban (filled rows): the player log's copy goes when another source has it, and the ban list takes the journal's who and why
+const SAME_BAN_MS = 10 * 60000
+const PLOG_COPY_OF = { ban: ['tempban', 'ban'], discord_ban: ['discord_ban'], discord_unban: ['discord_unban'] }
+function oneRowPerBan(rows) {
+  const near = (a, b) => Number.isFinite(a.atMs) && Number.isFinite(b.atMs) && Math.abs(a.atMs - b.atMs) <= SAME_BAN_MS
+  const others = rows.filter(r => r.source !== 'playerLog' && ['tempban', 'ban', 'discord_ban', 'discord_unban'].includes(r.kind))
+  if (!others.length) return rows
+  const drop = new Set()
+  for (const b of others) {
+    if (b.source !== 'bans' || b.kind !== 'discord_ban' || !b._discordId) continue
+    const j = others.find(x => x.source === 'journal' && x.kind === 'discord_ban' && x._discordId === b._discordId && near(x, b) && !drop.has(x))
+    if (j) { b.by = j.by || b.by; b.reason = j.reason || b.reason; b.ticket = b.ticket || j.ticket; drop.add(j) }
+  }
+  for (const r of rows) {
+    const kinds = r.source === 'playerLog' ? PLOG_COPY_OF[r.kind] : null
+    if (kinds && r.target.profileId !== null && others.some(o => kinds.includes(o.kind) && o.target.profileId === r.target.profileId && near(o, r))) drop.add(r)
+  }
+  return drop.size ? rows.filter(r => !drop.has(r)) : rows
+}
+
 module.exports = {
   KINDS, DEFAULT_CONFIG, DAY_MS, ticketOf, nameTag,
   parseGameConfig, parseDiscipline, parseHeld, disciplineRows, parseAdminBans, adminBanRows, parseBans, banRows, jailRows,
-  parseCases, parseRestitutionState, restitutionRows, parseJournalLine, journalRows, playerLogRows,
+  parseCases, parseRestitutionState, restitutionRows, parseJournalLine, journalRows, playerLogRows, oneRowPerBan,
 }

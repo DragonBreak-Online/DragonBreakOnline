@@ -315,6 +315,17 @@ test('one account\'s page: what runs now, the history newest first, filters by k
   }
 })
 
+test('recent with only a "to" date reads back from that day instead of refusing it', async () => {
+  const day = d => new Date(F.now - d * 86400000).toISOString().slice(0, 10)
+  const old = await get(`${P}/recent?to=${day(40)}`, 'owner')
+  assert.deepEqual([old.status, old.json.from, old.json.rows.length], [200, null, 0])
+  const r = await get(`${P}/recent?to=${day(15)}&limit=100`, 'owner')
+  assert.equal(r.status, 200)
+  assert.ok(r.json.rows.some(x => x.id === 'dsc:10:1'), 'the warning of 20 days ago')
+  assert.ok(r.json.rows.every(x => Date.parse(x.at) < F.now - 14 * 86400000))
+  assert.equal((await get(`${P}/recent?from=${day(5)}&to=${day(15)}`, 'owner')).status, 400)
+})
+
 test('pagination: every row once, in order, by an opaque cursor that is checked', async () => {
   const all = await rowsOf('owner')
   const seen = []

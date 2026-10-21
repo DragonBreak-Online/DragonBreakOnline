@@ -77,6 +77,10 @@ test('discipline: lifts found, strikes counted in their window, suspensions by s
   assert.equal(by['dsc:7:4'].alsoHolds, 2)
   assert.deepEqual(by['dsc:7:4'].target, { profileId: 7, name: null, tag: null, discordName: null })
   assert.throws(() => R.parseDiscipline({ nope: 1 }))
+  const undone = R.disciplineRows(R.parseDiscipline({ profiles: { 8: [
+    { n: 1, kind: 'lift', reason: 'too early', by: 'B #BBBB', at: at(2), char: 'Q #QQQQ', overturned: { by: 'C #CCCC', at: at(1), reason: 'not agreed' } },
+  ] } }), { now }).rows[0]
+  assert.deepEqual([undone.state, undone.overturned.by, undone.overturned.reason], ['overturned', 'C #CCCC', 'not agreed'])
 })
 
 test('parsers keep no address, hwid or Concordat "by", and bans.json is parsed without sources/bans.js', () => {
@@ -138,4 +142,31 @@ test('jsonlTail: reads on from where it stopped, never a half line, starts again
     fs.writeFileSync(file, '{"a":9}\n')
     assert.deepEqual(t.read().rows, [9])
   } finally { fs.rmSync(dir, { recursive: true, force: true }) }
+})
+
+test('one row per ban: the player log\'s copy goes, the ban list takes the journal\'s who and why, other bans stay', () => {
+  const t = Date.parse('2026-10-21T12:00:00Z')
+  const dA = '100000000000000101', dB = '100000000000000102'
+  const filled = (rows, p) => rows.map(r => Object.assign(r, { target: { ...r.target, profileId: r.target.profileId ?? p } }))
+  const bans = filled(R.banRows(R.parseBans([{ discordId: dA, ref: 'B-WG6QYG', reason: 'discord ban', bannedBy: 'discord', bannedAt: new Date(t).toISOString() }])), 10)
+  const journal = filled(R.journalRows([
+    R.parseJournalLine({ v: 1, id: 'M-AAAAAA', kind: 'discord_ban', at: new Date(t + 7000).toISOString(), discordId: dA, profileId: 10, reason: 'threats (ticket rep-0305)', by: { discordName: 'rowan_staff' } }),
+    R.parseJournalLine({ v: 1, id: 'M-BBBBBB', kind: 'discord_unban', at: new Date(t + 3600000).toISOString(), discordId: dB, profileId: 20, reason: 'appeal', by: { discordName: 'rowan_staff' } }),
+  ], { now: t }), null)
+  const panel = filled(R.adminBanRows(R.parseAdminBans({ bans: [{ id: 'tb1', profileId: 30, name: 'Lena', ip: '', until: t + 5 * 3600000, reason: 'Griefing', by: 'profile 1', at: t }] }), { now: t }), null)
+  const ev = (s, at, p, ev, kind, src) => ({ g: 'gen1', s, t: at, ev, kind, src, p, c: null, n: null, by: null })
+  const plog = R.playerLogRows([
+    ev(1, t + 1000, 10, 'session.ban', 'ban', 'audit:BAN'),
+    ev(2, t + 3600500, 20, 'session.ban', 'unban', 'audit:BAN'),
+    ev(3, t + 200, 30, 'session.ban', 'ban', 'audit:GM'),
+    ev(4, t + 30 * 60000, 30, 'session.ban', 'ban', 'audit:GM'),
+    ev(5, t + 900, 40, 'session.ban', 'ban', 'audit:BAN'),
+    ev(6, t + 1000, 10, 'session.kick', 'discord_ban', 'hook:leave'),
+  ])
+  const out = R.oneRowPerBan([...bans, ...journal, ...panel, ...plog])
+  assert.deepEqual(out.map(r => r.id).sort(), ['abn:tb1', 'ban:B-WG6QYG', 'mod:M-BBBBBB', 'plog:gen1:4', 'plog:gen1:5', 'plog:gen1:6'])
+  const b = out.find(r => r.id === 'ban:B-WG6QYG')
+  assert.deepEqual([b.by, b.reason, b.ticket, b.active], ['rowan_staff', 'threats (ticket rep-0305)', 'rep-0305', true])
+  const alone = R.banRows(R.parseBans([{ discordId: dA, reason: 'discord ban', bannedBy: 'discord', bannedAt: new Date(t).toISOString() }]))
+  assert.equal(R.oneRowPerBan(alone), alone)
 })
