@@ -5,6 +5,7 @@ import './styles.scss';
 import { PlayerPunish, DeityReset, SkillsTab, ItemsTab, PowersTab, TeleportTab, PlaceTab, PlayerCare, TargetPicker, PanelBan, MasteryTarget, TargetOption, BeastState, PanelPlacements, PlaceMeta, PlaceResults, PlaceSet } from './extraTabs';
 import { SearchBar, fuzzyFilter } from '../../components/SearchBar/SearchBar';
 import { GmCallsTab, EnchantTab } from './staffTabs';
+import { ThieveryTab } from './thieveryTab';
 
 // One roster row as merged by the server (online actor data + backend record).
 interface PanelPlayer {
@@ -116,7 +117,7 @@ const send = (key: string, ...args: unknown[]): void => {
   }
 };
 
-type Tab = 'debug' | 'players' | 'gmcalls' | 'skills' | 'items' | 'enchant' | 'powers' | 'teleport' | 'place' | 'modes' | 'npcs';
+type Tab = 'debug' | 'players' | 'gmcalls' | 'thievery' | 'skills' | 'items' | 'enchant' | 'powers' | 'teleport' | 'place' | 'modes' | 'npcs';
 
 // Debug is open to every player; the rest render only while data.admin is true. The rail lists them top to bottom
 // (F3 design 3.10); the tabs that act on somebody act on the one named in the status strip.
@@ -127,6 +128,8 @@ const TABS: Array<{ id: Tab; label: string }> = [
   { id: 'debug', label: 'Debug' },
   { id: 'players', label: 'Players' },
   { id: 'gmcalls', label: 'GM Calls' },
+  // GMs and above (a Trial GM's tab list leaves it out); the gamemode checks each button's tier
+  { id: 'thievery', label: 'Thievery' },
   { id: 'skills', label: 'Skills' },
   { id: 'items', label: 'Items' },
   { id: 'enchant', label: 'Enchant' },
@@ -582,6 +585,7 @@ const AdminPanel = ({ data }: { data: AdminPanelData }) => {
 
         {tab === 'skills' ? <SkillsTab events={ev} masteryTarget={data.masteryTarget || null} who={actingOn} canSpawn={canSpawn} /> : null}
         {tab === 'gmcalls' ? <GmCallsTab /> : null}
+        {tab === 'thievery' ? <ThieveryTab /> : null}
         {tab === 'enchant' ? <EnchantTab who={actingOn} /> : null}
         {tab === 'items' ? <ItemsTab events={ev} itemsVersion={data.itemsVersion || 0} who={actingOn} canSpawn={canSpawn} /> : null}
         {tab === 'powers' ? <PowersTab events={ev} who={actingOn} beast={acting ? acting.beast : undefined} canSpawn={canSpawn} /> : null}
