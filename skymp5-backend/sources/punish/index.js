@@ -141,7 +141,7 @@ function createPunishments({ config, readStore, dynamicFields, characterName, lo
       ...dsc.rows,
       ...R.adminBanRows(read.panelBans.value || [], { now: t }),
       ...R.banRows(read.bans.value || []),
-      ...R.jailRows(id.sentences, { now: t }),
+      ...R.jailRows(id.sentences),
       ...R.restitutionRows(read.cases.value || [], read.restitution.value || new Map(), cfg.restitution),
       ...R.journalRows(j.rows, { now: t }),
       ...plogRows().map(r => ({ ...r, target: { ...r.target } })),

@@ -97,6 +97,14 @@ test('parsers keep no address, hwid or Concordat "by", and bans.json is parsed w
   assert.deepEqual(R.jailRows([{ key: 'ff02', sentence: { totalMs: 600000, servedMs: 600000 } }], { now: 0 }), [], 'a served sentence is over')
 })
 
+test('jail: a sentence ends at a fixed whole-ms time, however long its player stays offline', () => {
+  const s = [{ key: 'ff03', profileId: 1, name: 'N', tag: 'TTTT', sentence: { totalMs: 600000, servedMs: 1234.25, by: 'G #GGGG', at: 5000 } }]
+  const early = R.jailRows(s, { now: 10000 })[0], late = R.jailRows(s, { now: 99999999 })[0]
+  assert.equal(early.endsAtMs, late.endsAtMs, 'the Active list key does not move while nothing is served')
+  assert.ok(Number.isSafeInteger(early.endsAtMs))
+  assert.equal(early.leftMs, 598766)
+})
+
 test('journal: a later timeout or a timeout_end ends a running timeout', () => {
   const now = Date.parse('2026-10-21T15:00:00Z')
   const line = (id, kind, at, until) => R.parseJournalLine({ v: 1, id, kind, at, until, discordId: '123456789012345678', reason: 'r' })

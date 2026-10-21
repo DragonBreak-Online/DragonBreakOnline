@@ -221,7 +221,8 @@ function banRows(list) {
 
 // ---- jail sentences on the changeforms (gameplay jail.js): the Concordat's "by" carries a Discord mention, so only
 // whether it is a Concordat sentence is kept ----
-function jailRows(sentences, { now }) {
+// Time counts only while the prisoner is in the jail, so the Active list orders a sentence by its earliest end (at + total), which stays put
+function jailRows(sentences) {
   const out = []
   for (const { key, profileId, name, tag, sentence: s } of sentences) {
     if (!isObj(s) || !/^[0-9a-f]{1,8}$/i.test(key)) continue
@@ -229,10 +230,11 @@ function jailRows(sentences, { now }) {
     if (!(Number.isFinite(total) && total > 0)) continue
     const left = Math.max(0, total - (Number(s.servedMs) || 0))
     if (!left) continue
+    const atMs = epoch(s.at)
     out.push(row({
       id: `jail:${key.toLowerCase()}`, kind: 'jail', source: 'jail', target: { profileId, name, tag, discordName: null },
-      by: scrub(s.by, 80), atMs: epoch(s.at), state: 'running', active: true, leftMs: Math.round(left), totalMs: Math.round(total),
-      endsAtMs: now + left, concordat: isObj(s.concordat),
+      by: scrub(s.by, 80), atMs, state: 'running', active: true, leftMs: Math.round(left), totalMs: Math.round(total),
+      endsAtMs: atMs ? Math.round(atMs + total) : null, concordat: isObj(s.concordat),
     }))
   }
   return out
