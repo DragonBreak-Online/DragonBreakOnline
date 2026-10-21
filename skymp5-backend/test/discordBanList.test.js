@@ -1,7 +1,8 @@
 'use strict'
-// The bot's Discord ban snapshot on the game ban list (a private copy of bans.js on a temp list): a Discord ban never
-// overwrites a game ban, a Discord unban never lifts one, an unreadable list is never replaced, and a ban the dashboard
-// claimed gets no second journal row. Also the list's fail-closed writes the Punishments panel uses.
+// The bot's Discord ban snapshot on the game ban list (a private copy of bans.js on a temp list). With the Punishments
+// panel's game bans on (PUNISH_ACTIONS bans area 'on'): a Discord ban never overwrites a game ban, a Discord unban never
+// lifts one, an unreadable list is never replaced. With them off (the default) the bot does as it did before. A ban the
+// dashboard claimed gets no second journal row. Also the list's fail-closed writes the Punishments panel uses.
 
 const { test, beforeEach, after } = require('node:test')
 const assert = require('node:assert/strict')
@@ -25,7 +26,9 @@ const JOURNAL = path.join(DIR, 'moderation.jsonl')
 const handlers = {}
 class FakeClient { on(ev, fn) { handlers[ev] = fn; return this } once() { return this } }
 stub('discord.js', { Client: FakeClient, GatewayIntentBits: { Guilds: 1, GuildMembers: 2, GuildModeration: 4 }, AuditLogEvent: { MemberBanAdd: 22, MemberBanRemove: 23, MemberUpdate: 24 }, PermissionFlagsBits: {} })
-stub(path.join(ROOT, 'config.js'), { discordGuildId: GUILD, discordBotToken: '', discordLogChannelId: '', punishJournalFile: JOURNAL })
+const SWITCH = path.join(DIR, 'punish-actions')
+const config = { discordGuildId: GUILD, discordBotToken: '', discordLogChannelId: '', punishJournalFile: JOURNAL, punishActions: 'on', punishActionsSwitchFile: SWITCH }
+stub(path.join(ROOT, 'config.js'), config)
 stub(path.join(ROOT, 'sources/bans.js'), bans)
 stub(path.join(ROOT, 'sources/players.js'), { load: () => ({ [ZED]: { lastIp: '81.2.69.160' } }) })
 stub(path.join(ROOT, 'sources/profiles.js'), { load: () => ({ nextId: 300, map: { [ZED]: 209 } }) })
@@ -47,7 +50,7 @@ const list = () => JSON.parse(fs.readFileSync(BANS, 'utf8'))
 const rows = () => (fs.existsSync(JOURNAL) ? fs.readFileSync(JOURNAL, 'utf8').trim().split('\n').filter(Boolean).map(l => JSON.parse(l)) : [])
 const gameBan = { discordId: ZED, ref: 'B-GAME01', hwid: null, ip: null, reason: 'Duping gold at the bank', bannedAt: '2026-10-21T10:00:00.000Z', bannedBy: 'jake (dashboard)' }
 
-beforeEach(() => { fs.rmSync(BANS, { force: true }); fs.rmSync(JOURNAL, { force: true }); lines.length = 0 })
+beforeEach(() => { fs.rmSync(BANS, { force: true }); fs.rmSync(JOURNAL, { force: true }); fs.rmSync(SWITCH, { force: true }); lines.length = 0; config.punishActions = 'on' })
 after(() => fs.rmSync(DIR, { recursive: true, force: true }))
 
 test('a Discord ban adds its copy to the game ban list; a game ban already there is kept, reason, ref and all', async () => {
@@ -117,4 +120,60 @@ test('the panel\'s writes fail closed: a new ban only, never an address, and a l
     assert.throws(call, e => e.code === 'ESTOREUNREADABLE')
   }
   assert.equal(fs.readFileSync(BANS, 'utf8'), '{"not": "a list"}')
+})
+
+// The guard follows the panel's game bans: PUNISH_ACTIONS (unset is off) narrowed by the switch file
+const banLog = () => { try { return fs.readFileSync(path.join(DIR, 'logs', 'ban.log'), 'utf8') } catch { return '' } }
+const offs = [
+  ['PUNISH_ACTIONS unset', () => { config.punishActions = undefined }],
+  ['PUNISH_ACTIONS off', () => { config.punishActions = 'off' }],
+  ['PUNISH_ACTIONS dry-run', () => { config.punishActions = 'dry-run' }],
+  ['PUNISH_ACTIONS on bans=dry-run', () => { config.punishActions = 'on bans=dry-run' }],
+  ['PUNISH_ACTIONS on bans=off', () => { config.punishActions = 'on bans=off' }],
+  ['the switch file says off', () => { fs.writeFileSync(SWITCH, 'off\n') }],
+  ['the switch file is malformed', () => { fs.writeFileSync(SWITCH, 'yes please\n') }],
+]
+for (const [name, set] of offs) {
+  test(`switch off (${name}): a Discord ban replaces a game ban and a Discord unban lifts it, as before the guard`, async () => {
+    set()
+    fs.writeFileSync(BANS, JSON.stringify([gameBan]))
+    const logBefore = banLog()
+    handlers.guildBanAdd(ban())
+    await settle()
+    const copy = list()
+    assert.equal(copy.length, 1)
+    assert.deepEqual([copy[0].discordId, copy[0].ref, copy[0].reason, copy[0].bannedBy, copy[0].ip], [ZED, 'B-GAME01', 'discord ban', 'discord', '81.2.69.160'])
+    assert.match(lines.at(-1), /added to the game ban list as B-GAME01/)
+    assert.match(banLog().slice(logBefore.length), /discord ban: discordId=209000000000000209 username=zed_user hwid=none ip=81\.2\.69\.160/)
+    fs.writeFileSync(BANS, JSON.stringify([gameBan]))
+    handlers.guildBanRemove(ban())
+    await settle()
+    assert.deepEqual(list(), [])
+    assert.match(lines.at(-1), /lifted from the game ban list/)
+    assert.deepEqual(rows().map(r => [r.kind, r.via]), [['discord_ban', 'discord'], ['discord_unban', 'discord']])
+  })
+}
+
+test('switch off: an unreadable list is read as bans.load reads it (no fail-closed refusal), as before the guard', async () => {
+  config.punishActions = undefined
+  fs.writeFileSync(BANS, '[{"discordId": "1"')
+  handlers.guildBanAdd(ban())
+  await settle()
+  assert.doesNotMatch(lines.at(-1), /could not be written/)
+  assert.deepEqual(list().map(e => e.discordId), [ZED], 'bans.load() reads an unreadable list as empty, the hazard the guard closes once bans are on')
+})
+
+test('the guard is on only for bans=on: PUNISH_ACTIONS on, or on with discord or send narrowed, and a switch file that leaves bans on', async () => {
+  for (const [env, file] of [['on', null], ['on discord=off send=off', null], ['on', 'on\n'], ['on', 'on send=dry-run\n']]) {
+    config.punishActions = env
+    fs.rmSync(SWITCH, { force: true })
+    if (file) fs.writeFileSync(SWITCH, file)
+    fs.writeFileSync(BANS, JSON.stringify([gameBan]))
+    handlers.guildBanAdd(ban())
+    await settle()
+    assert.deepEqual(list(), [gameBan], `${env} / ${file}`)
+    handlers.guildBanRemove(ban())
+    await settle()
+    assert.deepEqual(list(), [gameBan], `${env} / ${file}`)
+  }
 })

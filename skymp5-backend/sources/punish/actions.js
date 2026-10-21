@@ -101,6 +101,32 @@ function parseBody(action, b) {
   return out
 }
 
+// ---- the switch: PUNISH_ACTIONS, narrowed by the switch file when there is one --------------------------------
+// The file's setting, or null when there is none
+function fileSetting(config, fs) {
+  const file = config.punishActionsSwitchFile
+  if (!file) return null
+  let text = null
+  try {
+    const fd = fs.openSync(file, SWITCH_OPEN)
+    try {
+      const st = fs.fstatSync(fd)
+      text = st.isFile() && st.size <= SWITCH_MAX_BYTES ? fs.readFileSync(fd, 'utf8') : ''
+    } finally { fs.closeSync(fd) }
+  } catch (err) {
+    if (err.code === 'ENOENT') return null
+    text = ''
+  }
+  return parseActionsSwitch(text)
+}
+// Each area's setting now: { bans, discord, send }. Also read by the bot (discord/bot.js), whose guard of the game ban
+// list is on only while the bans area is on
+function actionsSettings(config, fs = nodeFs) {
+  const env = parseActionsSwitch(config.punishActions)
+  const file = fileSetting(config, fs)
+  return Object.fromEntries(AREAS.map(a => [a, file ? narrower(env[a], file[a]) : env[a]]))
+}
+
 function createPunishActions({
   config, consoleApi, bot, bans, journal, audit, targetOf, profileIdOf, tierFromRoles, rankOfRoles, bannedRoleId = () => '',
   jobsFile, auditFile, fs = nodeFs, now = Date.now, log = (...a) => console.log('[punish-actions]', ...a),
@@ -111,28 +137,7 @@ function createPunishActions({
   const windows = new Map()
   const seenAt = new Map()
 
-  // ---- the switch: PUNISH_ACTIONS, narrowed by the switch file when there is one --------------------------------
-  function fileSetting() {
-    const file = config.punishActionsSwitchFile
-    if (!file) return null
-    let text = null
-    try {
-      const fd = fs.openSync(file, SWITCH_OPEN)
-      try {
-        const st = fs.fstatSync(fd)
-        text = st.isFile() && st.size <= SWITCH_MAX_BYTES ? fs.readFileSync(fd, 'utf8') : ''
-      } finally { fs.closeSync(fd) }
-    } catch (err) {
-      if (err.code === 'ENOENT') return null
-      text = ''
-    }
-    return parseActionsSwitch(text)
-  }
-  function settings() {
-    const env = parseActionsSwitch(config.punishActions)
-    const file = fileSetting()
-    return Object.fromEntries(AREAS.map(a => [a, file ? narrower(env[a], file[a]) : env[a]]))
-  }
+  const settings = () => actionsSettings(config, fs)
 
   // ---- limits and refusal lines ------------------------------------------------------------------------------------
   // A sliding window per key; true when this call is over the limit (it is not counted then)
@@ -561,4 +566,4 @@ function createPunishActions({
   return { authorize, perform, info, job, recover, settings }
 }
 
-module.exports = { createPunishActions, parseActionsSwitch, parseBody, ACTIONS, PUNISH_COMMANDS, LIMITS, MAX_MINUTES }
+module.exports = { createPunishActions, parseActionsSwitch, actionsSettings, parseBody, ACTIONS, PUNISH_COMMANDS, LIMITS, MAX_MINUTES }

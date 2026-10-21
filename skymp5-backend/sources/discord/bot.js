@@ -43,8 +43,18 @@ client.on('error', err => {
   console.error('[discord-bot] error:', err.message)
 })
 
-// A real Discord guild ban snapshots the player into bans.json under a ban ref, unless a game ban is already there (it is
-// kept, reason and all); the staff audit channel gets who and why either way. The dashboard writes its own journal row
+// The guard of the game ban list (a Discord ban never replaces a game ban, a Discord unban never lifts one, the list read
+// fail closed) is on only while the Punishments panel's own game ban and unban are on (PUNISH_ACTIONS bans area 'on', the
+// switch file read now), so staff can lift a game ban there. Otherwise, the default, the bot does exactly as before
+function guardsGameBans() {
+  try { return require('../punish/actions').actionsSettings(config).bans === 'on' } catch (err) {
+    console.error('[discord-bot] the actions switch could not be read, so the ban list has no guard:', err.message)
+    return false
+  }
+}
+
+// A real Discord guild ban snapshots the player into bans.json under a ban ref; with the guard on, a game ban already there
+// is kept, reason and all. The staff audit channel gets who and why either way. The dashboard writes its own journal row
 client.on('guildBanAdd', ban => {
   let listNote = 'added to the game ban list'
   try {
@@ -56,7 +66,7 @@ client.on('guildBanAdd', ban => {
       ip: record.lastIp || null,
       reason: 'discord ban',
       bannedBy: 'discord',
-    }, { keepOther: true })
+    }, { keepOther: guardsGameBans() })
     if (entry.kept) listNote = `already on the game ban list${entry.ref ? ` as ${entry.ref}` : ''}; kept`
     else {
       if (entry.ref) listNote = `added to the game ban list as ${entry.ref}`
@@ -71,14 +81,14 @@ client.on('guildBanAdd', ban => {
     .catch(err => console.error('[discord-bot] ban audit failed:', err.message))
 })
 
-// A Discord unban lifts the snapshot too, or the player would stay banned forever; a game ban given in game or on a
-// dashboard stays until it is lifted there
+// A Discord unban lifts the snapshot too, or the player would stay banned forever; with the guard on, a game ban given in
+// game or on a dashboard stays until it is lifted there
 client.on('guildBanRemove', ban => {
   let listNote = 'it was not on the game ban list'
   try {
     if (config.discordGuildId && ban.guild.id !== config.discordGuildId) return
     const discordId = ban.user.id
-    const lifted = bans.removeByDiscordId(discordId, { onlyDiscordCopy: true })
+    const lifted = bans.removeByDiscordId(discordId, { onlyDiscordCopy: guardsGameBans() })
     if (lifted === true) {
       listNote = 'lifted from the game ban list'
       bans.logBan(`discord unban: discordId=${discordId} username=${ban.user.username || 'unknown'}`)
