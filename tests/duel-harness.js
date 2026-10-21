@@ -509,19 +509,20 @@ loadAll({ enabled: false });
 check('enabled false takes the entry away', entries(A, B).length === 0);
 
 {
-// Beast forms (Purr, 20 Oct): under the default rules a transformation loses the round; 'beast forms too' allows it
+// Beast forms (Purr, 20-21 Oct): anything goes allows them; the fifth rule set forbids them, and there a turn loses the round
 loadAll(); full();
 for (const x of [A, B]) set(x, 'private.beast', null);
 tick(6100);
 const dd = startFight({ rules: 0 });
 set(A, 'private.beast', { form: 'werewolf' }); tick(1000);
-check('anything goes: taking a beast form mid-fight loses the round', dd.wins.join() === '0,1', dd.wins);
-set(A, 'private.beast', null); tick(6100); tick(6100);
+check('anything goes: a werewolf keeps fighting, no round lost', dd.wins.join() === '0,0' && dd.phase === 'fight', { wins: dd.wins, phase: dd.phase });
+set(A, 'private.beast', null);
+globalThis.__dboDuelAction(A, 'duel:yield', B); tick(6100); tick(6100);
 full();
 const de = startFight({ rules: 4 });
-check('the fifth rule is beast forms too', de && de.rules === 4);
+check('the fifth rule is no beast forms', de && de.rules === 4);
 set(A, 'private.beast', { form: 'werewolf' }); tick(1000);
-check('beast forms too: a werewolf keeps fighting, no round lost', de.wins.join() === '0,0' && de.phase === 'fight', { wins: de.wins, phase: de.phase });
+check('no beast forms: taking one mid-fight loses the round', de.wins.join() === '0,1', de.wins);
 set(A, 'private.beast', null);
 }
 console.log(failures ? `${failures} failure(s)` : 'all checks passed');

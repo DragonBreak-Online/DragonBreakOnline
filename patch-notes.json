@@ -1,5 +1,20 @@
 [
   {
+    "title": "Werewolves can duel as werewolves",
+    "date": "2026-10-21",
+    "version": "Hotfix",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Duels",
+        "items": [
+          "Under the \"anything goes\" rules you can now take your beast form mid-duel. Before, turning lost you the round at once.",
+          "If you'd rather fight without it, choose \"anything goes, no beast forms\". Both of you still start the duel in your own form."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Duels: beast forms allowed",
     "date": "2026-10-20",
     "version": "Server update",
