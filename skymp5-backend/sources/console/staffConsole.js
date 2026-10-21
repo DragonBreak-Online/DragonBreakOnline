@@ -243,10 +243,10 @@ function createStaffConsole({
     if (!line) return refuse(400, 'badCommand', handle)
     // 8. The allowlist the game published; without it the game decides alone
     const allow = spool.allow()
-    const pre = allow ? rules.precheck(line, allow) : null
+    const pre = allow ? rules.precheck(line, allow, text) : null
     if (pre) {
       const usage = (allow.find(a => a.name === pre.cmd) || {}).usage
-      return refuse(422, 'notRemote', handle, { why: pre.why, reason: rules.whyText(pre.why, pre.cmd, usage) })
+      return refuse(422, 'notRemote', handle, { why: pre.why, reason: rules.whyText(pre.why, pre.cmd, usage, pre.subject) })
     }
     // 9. One run per request id
     const known = jobs.get(reqId)
@@ -285,7 +285,9 @@ function createStaffConsole({
   // ---- what the page reads ----------------------------------------------------------------------------------------
   function state(source) {
     const allow = spool.allow()
-    return { setting: setting(source), ready: !C.problem && !spool.problem(), commands: (allow || []).map(a => ({ name: a.name, usage: a.usage, help: a.help })) }
+    // /discipline also carries the kinds the game takes now and its longest suspension, so the page offers only those
+    const listed = a => ({ name: a.name, usage: a.usage, help: a.help, ...(a.kinds ? { kinds: [...a.kinds] } : {}), ...(a.maxSuspendDays ? { maxSuspendDays: a.maxSuspendDays } : {}) })
+    return { setting: setting(source), ready: !C.problem && !spool.problem(), commands: (allow || []).map(listed) }
   }
   const isFresh = caller => callers.has(caller) && caller.source === 'web' && caller.signedInAt > 0 && now() - caller.signedInAt <= C.freshMs
   function job(id, caller) {
