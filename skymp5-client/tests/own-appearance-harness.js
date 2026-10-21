@@ -44,7 +44,7 @@ const STUBS = {
       setRace: native('Actor.setRace', (r) => { G.liveRace = r.getFormID() >>> 0; ev('setRace'); }),
       is3DLoaded: native('ObjectReference.is3DLoaded', () => G.loaded3D),
       regenerateHead: native('Actor.regenerateHead', () => ev('regenerateHead')),
-      changeHeadPart: native('Actor.changeHeadPart', () => ev('changeHeadPart')),
+      changeHeadPart: native('Actor.changeHeadPart', (p) => { ev('changeHeadPart'); (G.headPuts = G.headPuts || []).push({ id: p.getFormID() >>> 0, live: G.liveRace, t: Date.now() }); }),
       unequipAll: native('Actor.unequipAll', () => {}) };
     module.exports = {
       Game: { getPlayer: () => player, getFormEx: native('Game.getFormEx', (id) => race(id)), getFormFromFile: native('Game.getFormFromFile', () => null),
@@ -53,7 +53,7 @@ const STUBS = {
       ActorBase: { from: (b) => b }, Actor: { from: (a) => a }, ObjectReference: {},
       TESModPlatform: { setNpcSex() {}, setNpcRace: native('TESModPlatform.setNpcRace', () => ev('setNpcRace')), setNpcSkinColor() {},
         setNpcHairColor() {}, resizeHeadpartsArray() {}, clearTintMasks() {}, pushTintMask() {}, setFormIdUnsafe() {}, createNpc: () => null },
-      Race: { from: (r) => r }, HeadPart: { from: () => null }, TextureSet: { from: () => null }, VoiceType: { from: () => null },
+      Race: { from: (r) => r }, HeadPart: { from: (f) => { const t = f && G.headParts && G.headParts[f.getFormID() >>> 0]; return t === undefined ? null : { getFormID: () => f.getFormID(), getType: () => t, isExtraPart: () => false }; } }, TextureSet: { from: () => null }, VoiceType: { from: () => null },
       printConsole() {}, once() {}, on() {}, writeLogs() {}, Utility: { wait: () => ({ then() {} }) },
     };`,
   // The player's NiNode update: recorded with the live race it went out on
@@ -71,6 +71,7 @@ const frame = () => {
   const fns = pending.splice(0);
   if (order === 'lifo') fns.reverse();
   for (const fn of fns) { try { fn(); } catch (e) { G.updateErrors.push(e.message); } }
+  if (G.everyUpdate) { try { G.everyUpdate(); } catch (e) { G.updateErrors.push(e.message); } }
   G.inUpdate = false;
   NOW += 16;
 };
@@ -117,8 +118,10 @@ async function main() {
   const rsJs = (await esbuild.transform(`${settleMs}\n${settling}\nclass Rs {\n${handler.replace('private ', '')}\n}\nreturn Rs;`, { loader: 'ts' })).code;
   const Rs = new Function('Ui', 'Game', 'applyAppearanceToPlayer', 'logTrace', 'logError', rsJs)(sp.Ui, sp.Game, APP.applyAppearanceToPlayer, logTrace, logError);
   const bfJs = (await esbuild.transform(`class Bfs {\n${onBeast.replace('private ', '')}\n}\nreturn Bfs;`, { loader: 'ts' })).code;
-  const Bfs = new Function('parseCustomPacket', 'parseBeastBodies', 'setBeastBodies', 'Race', 'Armor', 'wantRace', 'parseAbilities', 'logTrace', 'logError', bfJs)(
-    (e) => JSON.parse(e.message.contentJsonDump), () => null, () => {}, { from: (r) => r }, { from: () => null }, () => null, () => null, logTrace, logError);
+  const Bfs = new Function('parseCustomPacket', 'parseBeastBodies', 'setBeastBodies', 'Race', 'Armor', 'wantRace', 'parseAbilities', 'logTrace', 'logError',
+    'dropLiveHeadParts', 'isVampireRaceId', 'requestLiveHeadParts', bfJs)(
+    (e) => JSON.parse(e.message.contentJsonDump), () => null, () => {}, { from: (r) => r }, { from: () => null }, () => null, () => null, logTrace, logError,
+    APP.dropLiveHeadParts || (() => {}), APP.isVampireRaceId || (() => false), APP.requestLiveHeadParts || (() => {}));
 
   // World model: idx 0 is this client's character, idx 1 another player
   const ME = 0, OTHER = 1;
@@ -468,6 +471,38 @@ async function main() {
   deliver(ME, look({ skinColor: 74 }));
   runFor(1500);
   check('..."apply" again: the next look goes on in full', fullApplies() === 1, writes());
+
+  // 15. The vampire turn (vampire-eyes fix, 21 Oct): setLookRace writes the look on the vampire race, then dboBeast with
+  // beast false. A vampire race puts its own fanged face and eyes on the live head, so the look's face and eyes go back on
+  // with changeHeadPart, on the vampire body, after the race window; and once more after a load on a vampire race
+  if (OWN && OWN.tickLiveHeadParts) {
+    const NORD_V = 0x88794, FACE = 0x1a2b3, EYES = 0x1a2b5;
+    G.headParts = { [FACE]: 1, [EYES]: 2 };
+    G.everyUpdate = () => OWN.tickLiveHeadParts();
+    for (const o of ['fifo', 'lifo']) {
+      spawn(); order = o; G.headPuts = [];
+      deliver(ME, look({ raceId: NORD_V }));
+      dboBeast(NORD_V, false);
+      runFor(8000);
+      const turned = G.events.find((e) => e.what === 'setRace');
+      const puts = G.headPuts.map((x) => x.id);
+      check(`[${o}] vampire turn: the look's face and eyes go on the live head`, puts.includes(FACE) && puts.includes(EYES), G.headPuts);
+      check(`[${o}] ...on the vampire body, 3 s after the race change, once`, !!turned && G.headPuts.every((x) => x.live === NORD_V && x.t >= turned.t + 3000) && G.headPuts.length === 2, G.headPuts);
+      check(`[${o}] ...and no native ran in tick context`, G.tickErrors.length === 0 && G.updateErrors.length === 0, { t: G.tickErrors, u: G.updateErrors });
+      // No new look after the turn (the look did not change): tickLiveHeadParts puts the look on the base on again
+      spawn(); order = o; G.headPuts = [];
+      G.liveRace = NORD_V; tick(() => {});
+      loadApply(look({ raceId: NORD_V })); clear(); G.headPuts = [];
+      runFor(8000);
+      check(`[${o}] load on a vampire race, no look after it: face and eyes go on from the update, after the load`, G.headPuts.length === 2, G.headPuts);
+      // A werewolf revert (a mortal race) asks for nothing
+      spawn(); order = o; G.headPuts = [];
+      deliver(ME, look({ name: 'Werewolf' })); dboBeast(WEREWOLF, true); runFor(5000);
+      deliver(ME, look()); dboBeast(NORD, false); runFor(8000);
+      check(`[${o}] a werewolf revert to a mortal race: no head part swap`, G.headPuts.length === 0, G.headPuts);
+    }
+    G.everyUpdate = null; G.headParts = null;
+  }
 
   console.log(failures ? `${failures} FAILED` : 'all passed');
   process.exit(failures ? 1 : 0);

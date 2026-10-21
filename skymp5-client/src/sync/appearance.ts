@@ -192,6 +192,7 @@ export const applyAppearance = (appearance: Appearance): ActorBase => {
 
 // BGSHeadPart type of eyes (0 misc, 1 face, 2 eyes, 3 hair)
 const HEADPART_EYES = 2;
+const HEADPART_FACE = 1;
 
 // The eyes in a look (BGSHeadPart type 2, not an extra part), or null
 export const eyesOf = (appearance: Appearance): HeadPart | null => {
@@ -205,6 +206,75 @@ export const eyesOf = (appearance: Appearance): HeadPart | null => {
 // The eyes the player's head was last built or swapped with
 let lastEyesId = 0;
 
+// ---- The live head after a race change (vampire-eyes fix, 21 Oct) ----
+// Elsilda #FJL5, turned pure-blood on 21 Oct: her saved look kept her own eyes and face, every watcher saw them, but her
+// own screen showed vampire eyes and fangs, through a relog too. A vampire race (Dawnguard's, as the DLE carries them)
+// lists its own head parts (MaleHeadNordVampire with the fangs, MaleEyesHumanVampire01), and setRace puts those on the
+// player's live head; the base keeps the look's parts, so the "eyes differ from the last applied" test below never fired.
+// After a race change to a vampire race that is not a beast form (BeastFormService: the turn, a Vampire Lord's return), and
+// after a spawn or load on a vampire race, the look's face and eyes are put on the live head once with changeHeadPart,
+// outside the load. The base's overlay head parts (SKSE ActorBase.getNthOverlayHeadPart) are traced beside, so an
+// in-game test shows whether they are what holds the vampire's parts.
+// The humanoid vampire races (Skyrim.esm; the server's supernatural.js VAMPIRE_RACES): the races that do this
+export const VAMPIRE_RACE_IDS = new Set<number>([0x88794, 0x88844, 0x8883c, 0x88846, 0x88840, 0x8883d, 0x88884, 0xa82b9, 0x8883a, 0x88845]);
+export const isVampireRaceId = (raceId: number): boolean => VAMPIRE_RACE_IDS.has(raceId >>> 0);
+let liveHeadWanted: { why: string; at: number } | null = null;
+export const requestLiveHeadParts = (why: string): void => { liveHeadWanted = { why, at: Date.now() }; };
+export const liveHeadPartsWanted = (): { why: string; at: number } | null => liveHeadWanted;
+export const dropLiveHeadParts = (): void => { liveHeadWanted = null; };
+
+// The look's own (not extra) part of a type, or null
+const partOfType = (appearance: Appearance, type: number): HeadPart | null => {
+  for (const id of appearance.headpartIds) {
+    const part = HeadPart.from(Game.getFormEx(id));
+    if (part && !part.isExtraPart() && part.getType() === type) return part;
+  }
+  return null;
+};
+
+// The part of a type the base shows: its overlay list when it has one (what a race change put on), else its own list
+const basePartOfType = (base: ActorBase, type: number): { part: HeadPart | null; overlay: boolean } => {
+  try {
+    if (base.getNumOverlayHeadParts() > 0) {
+      const i = base.getIndexOfOverlayHeadPartByType(type);
+      return { part: i >= 0 ? base.getNthOverlayHeadPart(i) : null, overlay: true };
+    }
+    const i = base.getIndexOfHeadPartByType(type);
+    return { part: i >= 0 ? base.getNthHeadPart(i) : null, overlay: false };
+  } catch {
+    return { part: null, overlay: false };
+  }
+};
+
+// Puts the look's face and eyes on the player's live head (changeHeadPart: the eyes swap the 9 Oct code already makes in
+// session, and the face, which carries a vampire race's fangs). Returns how many parts went on. Never during a load:
+// callers run it from an update, and the full apply after it rebuilds the head.
+export const putLiveHeadParts = (appearance: Appearance, why: string): number => {
+  liveHeadWanted = null;
+  const player = Game.getPlayer() as Actor | null;
+  if (!player) return 0;
+  const base = ActorBase.from(player.getBaseObject());
+  if (!base) return 0;
+  let put = 0;
+  const notes: string[] = [];
+  for (const type of [HEADPART_FACE, HEADPART_EYES]) {
+    const want = partOfType(appearance, type);
+    if (!want) continue;
+    const shown = basePartOfType(base, type);
+    const shownId = shown.part ? shown.part.getFormID() >>> 0 : 0;
+    const wantId = want.getFormID() >>> 0;
+    try {
+      player.changeHeadPart(want);
+      put++;
+      notes.push(`${type === HEADPART_EYES ? "eyes" : "face"} ${shownId.toString(16)}${shown.overlay ? "(overlay)" : ""}->${wantId.toString(16)}`);
+      if (type === HEADPART_EYES) lastEyesId = wantId;
+    } catch { /* not on this platform build */ }
+  }
+  trace(`own head why=${why} put=${put}${notes.length ? " " + notes.join(" ") : ""}`);
+  try { writeLogs("dbo-diag", `live head after ${why}: ${put} part(s) put on${notes.length ? ": " + notes.join(", ") : ""}`); } catch { /* no writeLogs */ }
+  return put;
+};
+
 // The live head keeps its eyes when only the base's head part list changes, so a vampire's tells came and went at relog only.
 // Swapped only on a look change in session (liveEyes) and only when the eyes differ: rebuilding the head during a load is
 // the same risk as the torch put-out that crashed logins (9 Oct)
@@ -216,10 +286,17 @@ export const applyAppearanceToPlayer = (appearance: Appearance, liveEyes = false
   );
   const eyes = eyesOf(appearance);
   const eyesId = eyes ? eyes.getFormID() : 0;
-  if (liveEyes && eyes && lastEyesId && eyesId !== lastEyesId) {
+  // A race change asked for the face and eyes to go on the live head (requestLiveHeadParts): done here, in session, in
+  // place of the eyes-only swap. A spawn or load leaves it for OwnLookQueue's update (tickLiveHeadParts), never mid-load
+  const wanted = liveHeadWanted;
+  if (liveEyes && wanted) {
+    putLiveHeadParts(appearance, wanted.why);
+  } else if (liveEyes && eyes && lastEyesId && eyesId !== lastEyesId) {
     try { (Game.getPlayer() as Actor).changeHeadPart(eyes); } catch { /* not on this platform build */ }
   }
   if (eyesId) lastEyesId = eyesId;
+  // A spawn or a load on a vampire race: the face and eyes go on once the load is over (ownLook tickLiveHeadParts)
+  if (!liveEyes && (event === "spawn" || event === "load") && isVampireRaceId(appearance.raceId)) requestLiveHeadParts(event);
   applyTints(null, appearance);
   regeneratePlayerHead(appearance);
   traceOwnLook(event, appearance);

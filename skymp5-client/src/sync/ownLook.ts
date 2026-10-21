@@ -1,6 +1,6 @@
 // The server's look for the player's own character arrives in tick context, so it waits here and goes on from an update
 import { Game, Race, Ui } from "skyrimPlatform";
-import { Appearance, applyAppearanceToPlayer, applyNameToPlayer, ownLookOnBase, sameLookButName } from "./appearance";
+import { Appearance, applyAppearanceToPlayer, applyNameToPlayer, dropLiveHeadParts, liveHeadPartsWanted, ownLookOnBase, sameLookButName } from "./appearance";
 import { isBeastRaceId, isGuardedActor } from "./beastRaces";
 import { driftConfig } from "./driftConfig";
 import { trace } from "../lib/clientDiag";
@@ -170,3 +170,33 @@ export class OwnLookQueue {
     this.log("Applied appearance to the player");
   }
 }
+
+// ---- The live head after a race change or a load (appearance.ts requestLiveHeadParts; vampire-eyes fix, 21 Oct) ----
+// Usually the look the server sends after the change carries it (applyAppearanceToPlayer, "update"). When none comes (a
+// look that did not change, a load), the look last put on the base goes on again from an update, once this long has
+// passed, the race switch has settled, the editor is shut, the 3D is loaded and the live race is the look's race. A beast
+// body drops it; a look on another race waits, and is dropped after LIVE_HEAD_GIVE_UP_MS.
+export const LIVE_HEAD_AFTER_MS = 6000;
+export const LIVE_HEAD_GIVE_UP_MS = 60000;
+export const tickLiveHeadParts = (): void => {
+  const wanted = liveHeadPartsWanted();
+  if (!wanted) return;
+  const now = Date.now();
+  if (now - wanted.at < LIVE_HEAD_AFTER_MS) return;
+  if (now - wanted.at > LIVE_HEAD_GIVE_UP_MS) { dropLiveHeadParts(); trace(`own head drop=late why=${wanted.why}`); return; }
+  const g = globalThis as any;
+  if ((Number(g.__dboRaceSwitches) || 0) > 0 || now - (Number(g.__dboRaceSwitchAt) || 0) < OWN_LOOK_AFTER_RACE_MS) return;
+  if (Ui.isMenuOpen("RaceSex Menu")) return;
+  const player = Game.getPlayer();
+  let loaded3D = false;
+  try { loaded3D = !!player && player.is3DLoaded(); } catch { loaded3D = false; }
+  if (!player || !loaded3D) return;
+  if (isGuardedActor(player)) { dropLiveHeadParts(); trace(`own head drop=beast why=${wanted.why}`); return; }
+  const onBase = ownLookOnBase();
+  if (!onBase) { dropLiveHeadParts(); return; }
+  let live = 0;
+  try { live = (player.getRace()?.getFormID() ?? 0) >>> 0; } catch { live = 0; }
+  if (live !== (Number(onBase.look.raceId) >>> 0)) return;
+  // The full own-look apply, as an update: it puts the face and eyes on (the request is still set) and rebuilds the head
+  applyAppearanceToPlayer(onBase.look, true, "head");
+};

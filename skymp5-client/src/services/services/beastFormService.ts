@@ -11,6 +11,8 @@ import { howlShoutIds, mayHoldHowl, stripDue } from "./beastHowl";
 import { parseBeastBodies, setBeastBodies } from "../../sync/beastBody";
 import { resolveBeastRaces, vanillaBeastRaceOf } from "../../sync/beastRaces";
 import { RaceWanted, raceCheckStep, wantRace } from "./beastRaceCheck";
+import { dropLiveHeadParts, isVampireRaceId, requestLiveHeadParts } from "../../sync/appearance";
+import { tickLiveHeadParts } from "../../sync/ownLook";
 
 // WerewolfChange 92c48, DLC1VampireChange 0200283b, DLC1RevertForm 0200cd5c (load order: Dawnguard is index 02)
 const BEAST_POWERS = new Set([0x00092c48, 0x0200283b, 0x0200cd5c]);
@@ -93,6 +95,8 @@ export class BeastFormService extends ClientListener {
     this.controller.on("update", () => this.onHowlCheck());
     // The plugin beast races resolve in the first update, before a dboBeastBody list (read where natives cannot run) needs them
     this.controller.on("update", () => resolveBeastRaces());
+    // The look's face and eyes back on the live head after a race change or a load, when no new look carried them
+    this.controller.on("update", () => { try { tickLiveHeadParts(); } catch (e) { logError(this, "live head check failed", e); } });
     this.controller.emitter.on("connectionAccepted", () => { this.howlForced = true; setBeastBodies([]); this.gearGuard = false; });
   }
 
@@ -264,6 +268,9 @@ export class BeastFormService extends ClientListener {
         if (!player || !race) { logError(this, "race not found", raceId.toString(16)); return; }
         if (beast) player.unequipAll();
         player.setRace(race);
+        // A vampire race puts its own head parts (fanged face, vampire eyes) on the live head: the look's face and eyes go
+        // back on with the next own look, or from tickLiveHeadParts (vampire-eyes fix, 21 Oct). A beast form keeps its own
+        if (beast) dropLiveHeadParts(); else if (isVampireRaceId(raceId)) requestLiveHeadParts("race");
         // A revert that lands while the character lies in bleed-out or dead does not hold (GroundedPasta, 10 Oct: downed as
         // a werewolf, woke at the temple still a wolf on his own screen): watched until it is seen to stick. Only a revert:
         // a beast race watched the same way would force the form back on someone whose own race returned without a
