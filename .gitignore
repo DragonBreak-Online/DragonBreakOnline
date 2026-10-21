@@ -145,6 +145,8 @@ sprstrip-state.json
 gearstrip-state.json
 restitution-state.json
 discipline.json
+# Discord accounts held out by a suspension (discipline.js discordFile): ids, never in git
+discipline-discord.json
 
 # Citizenship rolls, requests, policies and elections (citizenship.js)
 /citizenship.json

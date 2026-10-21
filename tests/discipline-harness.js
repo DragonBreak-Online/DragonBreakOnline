@@ -14,7 +14,8 @@ const CFG = JSON.parse(fs.readFileSync(path.join(SERVER, 'gamemode-config.json')
 const gm = fs.readFileSync(path.join(SERVER, 'gamemode.js'), 'utf8');
 ok(CFG.discipline && CFG.discipline.enabled === true && CFG.discipline.strikesForReview === 3, 'gamemode-config discipline on, review at 3 strikes');
 ok(/__dboRestitutionLogin\(a\);[^\n]*\n\s*try \{ if \(globalThis\.__dboDisciplineLogin\)/.test(gm), 'gamemode.js: login hook, after restitution');
-ok(/require\(DISCIPLINE_JS\)/.test(gm) && gm.includes("items: ['kick', 'discipline',"), 'gamemode.js loads it; /adminhelp lists it');
+// /players went in front of kick on 16 Oct (90bb6a905), which this check missed: it looks for kick, discipline anywhere in the list
+ok(/require\(DISCIPLINE_JS\)/.test(gm) && /items: \[[^\]]*'kick', 'discipline',/.test(gm), 'gamemode.js loads it; /adminhelp lists it');
 ok(fs.readFileSync(path.join(SERVER, '.gitignore'), 'utf8').includes('discipline.json'), 'records are gitignored');
 ok(lengthMs('12h', 30) === 43200000 && lengthMs('3d', 30) === 259200000 && lengthMs('31d', 30) === 0 && lengthMs('x', 30) === 0, 'lengths: 12h, 3d; over the cap or nonsense refused');
 
@@ -33,7 +34,8 @@ const load = () => {
     who: (a) => `w${a}`, display: (a) => `c${a}`, profileOf: (a) => prof[a], onlineActors: () => online.slice(),
     registerChatCommand: (n, fn) => { if (n === 'discipline') cmd = fn; }, isAdmin: (a) => !!tier[a], isLeadStaff: (a) => !!tier[a] && tier[a] !== 'gm',
     findAnyByName: (q) => tags[q] || 0, sendPacket: (a, p) => packets.push([a, p]), userOf: (a) => a + 100, every: (n, ms, fn) => { tick = fn; },
-    cfg: { discipline: Object.assign({}, CFG.discipline, { file: FILE }) }
+    // record: [] so the records shipped in gamemode-config.json (rep-0305, 21 Oct) do not land in this account set
+    cfg: { discipline: Object.assign({}, CFG.discipline, { file: FILE, record: [] }) }
   });
 };
 load();
