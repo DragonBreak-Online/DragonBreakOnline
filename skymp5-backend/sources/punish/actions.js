@@ -28,8 +28,9 @@ const TIER_LABEL = Object.freeze({ owner: 'Owner', dev: 'Dragon Break Dev', lead
 const PUNISH_COMMANDS = Object.freeze(['discipline', 'kick'])
 // The console's #TAG (allowlist.js TAG_RE), the first word after /discipline and /kick
 const TAG_RE = /^#[A-Za-z0-9]{4}$/
-// Discord's longest timeout, 28 days
+// Discord's longest timeout, 28 days; an end past it from Discord's own clock is refused, so the longest ends a minute short
 const MAX_MINUTES = 40320
+const CAP_MARGIN_MS = 60 * 1000
 const PRESETS = Object.freeze([10, 60, 360, 1440, 4320, 10080, 40320])
 const LIMITS = Object.freeze({ triesPer10Min: 20, perMinute: 5, perHour: 30, sitePerHour: Object.freeze({ bans: 10, discordBans: 10, timeouts: 30 }) })
 const JOBS_KEPT = 200
@@ -51,6 +52,8 @@ const iso = t => (Number.isFinite(t) && t > 0 ? new Date(t).toISOString() : null
 const utc = t => `${new Date(t).toISOString().slice(0, 16).replace('T', ' ')} UTC`
 const duration = m => (m % 1440 === 0 ? `${m / 1440} d` : m % 60 === 0 ? `${m / 60} h` : `${m} min`)
 const narrower = (a, b) => rules.SETTINGS[Math.min(rules.SETTINGS.indexOf(a), rules.SETTINGS.indexOf(b))]
+// A timeout's end in whole seconds: at least the minutes asked for, never past the cap less the margin
+const endOf = (at, minutes) => Math.min(Math.ceil((at + minutes * MINUTE) / 1000) * 1000, Math.floor((at + MAX_MINUTES * MINUTE - CAP_MARGIN_MS) / 1000) * 1000)
 
 // 'off | dry-run | on' then bans=, discord= and send= that only narrow it, in at most 64 bytes; anything else is off
 function parseActionsSwitch(text) {
@@ -345,7 +348,7 @@ function createPunishActions({
     const job = {
       uuid: b.uuid, action, state: 'running', error: '', discordId: ctx.discordId, handle: ctx.handle, tier: ctx.tier, targetDiscordId: t.discordId,
       profileId: b.profileId, target: { profileId: t.profileId, name: t.name || null, tag: t.tag || null, discordName: t.discordName || null },
-      reason: b.reason, minutes: b.minutes, untilMs: b.minutes ? Math.ceil((at + b.minutes * MINUTE) / 1000) * 1000 : null,
+      reason: b.reason, minutes: b.minutes, untilMs: b.minutes ? endOf(at, b.minutes) : null,
       ref: null, banRoleHeld: null, at, mode: ctx.mode, wasUntil: member.timedOutUntil || 0, tags: t.tags || [],
     }
     remember(job)

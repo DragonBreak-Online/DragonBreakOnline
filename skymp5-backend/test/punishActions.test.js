@@ -514,6 +514,19 @@ test('the same request id after a failure gets the same status and error, after 
   want(await H.call('discord-timeout', 'owner', { ...body, requestId: uuid() }), 200)
 })
 
+test('the longest timeout ends short of Discord\'s 28 days, in whole seconds; shorter ones get at least their minutes', async () => {
+  H.F.clock.offset += 456
+  const t0 = H.F.now()
+  const r = want(await H.call('discord-timeout', 'owner', H.body('discord-timeout', { minutes: 40320 })), 200)
+  const t1 = H.F.now()
+  const until = Date.parse(r.job.until)
+  assert.equal(until % 1000, 0)
+  assert.ok(until <= t1 + 40320 * 60000 - 60000 && until > t0 + 40320 * 60000 - 62000, String(until - t0))
+  assert.equal(H.calls.at(-1)[2], until)
+  const s = want(await H.call('discord-timeout', 'owner', H.body('discord-timeout', { minutes: 10 })), 200)
+  assert.ok(Date.parse(s.job.until) >= t0 + 10 * 60000)
+})
+
 test('unban: once the entry is gone the job is done, even when the ban role cannot be read', async () => {
   want(await H.call('ban', 'owner', H.body('ban')), 200)
   H.make({ extra: { bannedRoleId: () => { throw new Error('server-access.json unreadable') } } })

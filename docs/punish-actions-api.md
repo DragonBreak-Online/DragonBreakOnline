@@ -93,7 +93,7 @@ its first error status. To try again after `failed`, the dialog takes a new `req
     again"). A late answer still updates the job, so poll the jobs route.
   - `failed`: comes with an error status, below.
 - `ref`: the game ban list's `B-XXXXXX`, for `ban` and `unban`.
-- `until`: the timeout's end, ISO UTC, whole seconds.
+- `until`: the timeout's end, ISO UTC, whole seconds. The 28-day one ends a minute short of 28 days (Discord's cap).
 - `banRoleHeld` (unban): true when the account still holds the Discord ban role. Say "remove the ban role in Discord".
 - After `done`, reload History and Running now after 2.5 s. The panel reads the ban list within 2 s and the journal
   within 30 s.
