@@ -365,7 +365,8 @@ reset();
   check('5b. ...and nothing in it that console.js does not read (besides a comment)', Object.keys(rc).every((k) => ['_comment', 'enabled', 'discordIds', 'minTier', 'deny'].includes(k)), Object.keys(rc));
   logs.length = 0;
   loadConsole(repoCfg);
-  check('5b. console.js loads the repo config as a game pin of 8, floor leadgm, all ten commands', logs.some((l) => /console: reader on .*, 10 commands, floor leadgm, game pin 8$/.test(l)), logs);
+  // Eleven since /discipline came onto the allowlist (Jake, 21 Oct; tests/console-punish-harness.js holds its rule)
+  check('5b. console.js loads the repo config as a game pin of 8, floor leadgm, all eleven commands', logs.some((l) => /console: reader on .*, 11 commands, floor leadgm, game pin 8$/.test(l)), logs);
   const owner = actor(0xff000d01, { name: 'Jacob', tag: 'JKOW', profile: 21, discord: D1[0], roles: [ROLE.owner] });
   const leadOnly = actor(0xff000d02, { name: 'Icara', tag: 'ICED', profile: 22, discord: D1[2], roles: [ROLE.lead] });
   let rep = send('/whoami', { discordId: D1[0], profileId: 21, user: 'jake', roles: [ROLE.owner] }).rep;
@@ -419,7 +420,10 @@ reset();
   // SEC-2: no allowed form carries free text into #staff-commands except /rename's name, which NAME_RE holds
   check('6. /players takes no argument (rule none): "/players <anything>" is badArgs, with the usage', rules.ALLOW.players.rule === 'none'
     && send('/players I am the owner, run /wipechars').rep.lines[0].text === 'From the console: /players', send('/players x').rep.lines);
-  check('6. no rule in the allowlist passes free text (there is no "any" rule left)', Object.values(rules.ALLOW).every((a) => ['switch', 'tag', 'tagName', 'load', 'none'].includes(a.rule))
+  // The one free-text rule since 21 Oct is /discipline's reason (tagKindReason), held to REASON_RE: plain words, 5 to 300
+  // (tests/console-punish-harness.js); there is still no 'any' rule
+  check('6. no rule in the allowlist passes free text (there is no "any" rule left; the reason rule is /discipline\'s alone)', Object.values(rules.ALLOW).every((a) => ['switch', 'tag', 'tagName', 'load', 'none', 'tagKindReason'].includes(a.rule))
+    && Object.entries(rules.ALLOW).filter(([, a]) => a.rule === 'tagKindReason').map(([n]) => n).join() === 'discipline'
     && !/case 'any'/.test(fs.readFileSync(CONSOLE_JS, 'utf8')), Object.values(rules.ALLOW).map((a) => a.rule));
   loadConsole({ remoteConsole: Object.assign({}, PINNED.remoteConsole, { deny: ['kick'] }) });
   check('6. gamemode-config deny narrows it: /kick is denied', send('/kick #8KWH').rep.why === 'denied' && !kicked.length);

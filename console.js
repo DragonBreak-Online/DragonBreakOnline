@@ -54,16 +54,38 @@ const SETTINGS = ['off', 'dry-run', 'on'];
 const REQ_KEYS = ['v', 'id', 'src', 'discordId', 'user', 'profileId', 'roles', 'text', 'mode', 'issuedAt', 'expiresAt', 'sig'];
 // Chat markup the client reads: the PM sender, the system and admin tabs, the bubble tag and colour codes
 const MARKUP_RE = /\[\[(?:PM\]\][^|\]]{0,64}\||S\]\]|A\]\]|B[0-9a-fA-F]{1,8}\]\])|#\{[0-9a-fA-F]{6}\}/g;
+// A console reason (rule tagKindReason), after cleanCommand's folding (NFC; control, zero-width and bidi characters to
+// spaces; whitespace collapsed): plain words only. Letters, digits, the space and . , ; : ! ? ' " ( ) - / & + %; so no '#{'
+// colour code, no '[[' ']]' chat markup, no '<' '>' '@' mention, no '|' (the PM sender's end), no backtick, '\' '*' '_' '~'
+// (Discord markdown in the audit channel) and no symbol or emoji. Nothing outside the Basic Multilingual Plane either, so its
+// code points are the UTF-16 units discipline.js counts when it cuts a reason at 300: 5 to 300 of them, so the game never
+// cuts or refuses for length a reason the console let through
+const REASON_RE = /^[\p{L}\p{N} .,;:!?'"()\/&+%-]+$/u;
+const ASTRAL_RE = /[\ud800-\udfff]/;
+const REASON_MIN = 5, REASON_MAX = 300;
+// The record kinds the console takes for /discipline (Jake, 21 Oct: "We need all options to be available under punishment"),
+// and the one word each takes before its reason, as discipline.js reads them: none; a length, whole hours or days
+// (discipline.js also takes '1.5d' and '0.01h', the console does not), at most the config's maxSuspendDays; a record
+// number, digits only (discipline.js also takes '#3', the console does not). Not the record view (/discipline #TAG) or list
+const KIND_ARGS = Object.freeze({ warn: 'none', strike: 'none', suspend: 'length', lift: 'none', overturn: 'record' });
+const LENGTH_RE = /^(?:([1-9][0-9]{0,2})h|([1-9][0-9]?)d)$/;
+const RECORD_RE = /^[1-9][0-9]{0,4}$/;
+const MAX_SUSPEND_DAYS = 30; // discipline.js DEFAULTS.maxSuspendDays
 
 // ---- the v1 allowlist (DESIGN section 8.1). Widening it is a code change and a review; gamemode-config can only narrow it.
 // rule: switch = none | on | off | clear #TAG; tag = #TAG (noArg: what the empty form would do); tagName = #TAG <new name>;
-// load = none | reset; none = no argument. offline: the #TAG may name an offline character (one live form in the tag index).
-// There is no free-text rule: the only free text any allowed form carries is
-// /rename's new name, held to NAME_RE (review SEC-2: /players took 'any', and its words reached #staff-commands)
+// load = none | reset; none = no argument; tagKindReason = #TAG <kind> [<length>|<n>] <reason>, kind one of `kinds` (each
+// with its KIND_ARGS word), reason held to REASON_RE. offline: the #TAG may name an offline character (one live form in the
+// tag index). help: what the page lists instead of the registry's help (which names forms the console refuses).
+// Free text: /rename's new name, held to NAME_RE, and /discipline's reason (Jake, 21 Oct: "allow /discipline in the web
+// console too"), held to REASON_RE above, so the only words that reach #staff-commands and the audit channel are plain ones.
+// Review SEC-2 took the 'any' rule away (/players took any words, and they reached #staff-commands); there is still none.
+// gamemode-config remoteConsole.deny takes a command ('discipline') or one kind of it ('discipline suspend')
 const ALLOW = Object.freeze({
   wwremote: { usage: '/wwremote [on|off|clear #TAG]', rule: 'switch' },
   vlremote: { usage: '/vlremote [on|off|clear #TAG]', rule: 'switch' },
-  kick: { usage: '/kick #TAG', rule: 'tag', noArg: 'needTag' },
+  kick: { usage: '/kick #TAG', rule: 'tag', noArg: 'needTag',
+    help: 'Kicks one online character, named by #TAG. It takes no reason, and they can log straight back in.' },
   fixloc: { usage: '/fixloc #TAG', rule: 'tag', noArg: 'self' },
   rename: { usage: '/rename #TAG <new name>', rule: 'tagName', offline: true },
   chars: { usage: '/chars #TAG', rule: 'tag', noArg: 'needTag', offline: true },
@@ -71,6 +93,12 @@ const ALLOW = Object.freeze({
   players: { usage: '/players', rule: 'none' },
   load: { usage: '/load [reset]', rule: 'load' },
   whoami: { usage: '/whoami', rule: 'none' },
+  // A warning, strike, suspension, lift or overturn on the account's record, as typed in game; discipline.js keeps its own
+  // checks (suspend, lift and overturn need a Lead GM, so do staff targets; never one's own account; a lift needs a running
+  // suspension, an overturn a record of the account). The record view and /discipline list stay in game
+  // (its usage is written out from the kinds left after the config's deny, usageOf below)
+  discipline: { usage: '/discipline #TAG <kind> <reason>', rule: 'tagKindReason', kinds: Object.freeze(Object.keys(KIND_ARGS)), offline: true,
+    help: "A warning, strike, suspension, lift or overturn on the player's account record, as in game; the player is told. The record view and list stay in game." },
 });
 // Why the rest are refused, by class (DESIGN 8.2). Built-ins that are not registry commands are notChat; any other
 // registry command is notYet
@@ -94,6 +122,16 @@ const TEXT = {
   denied: (cmd) => `/${cmd} is switched off for the console in the game's config.`,
   badArgs: (cmd) => `From the console: ${ALLOW[cmd] ? ALLOW[cmd].usage : `/${cmd}`}`,
   badName: () => 'Names: 2-31 letters, spaces, apostrophes or hyphens, starting with a letter.',
+  // The tagKindReason refusals: the subject is the usage (badKind), the config's maxSuspendDays (badLength)
+  badKind: (usage) => `From the console: ${usage || '/discipline'}. A player's record and /discipline list stay in game.`,
+  badLength: (max) => `Give a length in whole hours or days, ${lengthWords(Number(max) || MAX_SUSPEND_DAYS)}, like 12h or 3d.`,
+  badRecord: () => 'Give the record number in digits, like overturn 3 <reason>. /discipline #TAG in game shows the record.',
+  // The backend's alone (allowlist.js, the same words): a reason line typed with a line break in it
+  oneLine: () => 'From the console: one line of at most 500 characters.',
+  reasonShort: () => `Give a reason of at least ${REASON_MIN} characters. The player is shown it.`,
+  reasonLong: () => `The reason can be at most ${REASON_MAX} characters.`,
+  reasonChars: () => 'A reason from the console takes letters, numbers, spaces and . , ; : ! ? \' " ( ) - / & + % only: no colour codes, markup, mentions, symbols or line breaks.',
+  dryRecord: () => "Dry run: it passed the console and the command gate only. Nothing was recorded, and the record's own checks (own account, staff target, record number, is suspended) did not run.",
   noChar: () => 'The console acts as your own character. Make one in game first.',
   tier: (floor) => `The console is for ${floor || 'Lead GM'} and above in game.`,
   rolesChanged: () => 'Your Discord roles changed since you last logged in (or your character has not been stamped with them yet). Log in once.',
@@ -136,14 +174,55 @@ const parseSwitch = (text) => {
   }
   return out;
 };
+// discipline.js's maxSuspendDays as it reads it (its default, else the config's value), or 0 when it allows no length
+const maxDaysOf = (cfg) => {
+  const d = cfg && typeof cfg.discipline === 'object' && cfg.discipline ? cfg.discipline : {};
+  const n = d.maxSuspendDays === undefined ? MAX_SUSPEND_DAYS : Number(d.maxSuspendDays);
+  return Number.isFinite(n) && n * 24 >= 1 ? n : 0;
+};
+const lengthWords = (maxDays) => { const h = Math.floor(maxDays * 24), d = Math.floor(maxDays); return d >= 1 ? `1h to ${h}h or 1d to ${d}d` : `1h to ${h}h`; };
+const lengthShort = (maxDays) => { const h = Math.floor(maxDays * 24), d = Math.floor(maxDays); return d >= 1 ? `1-${h}h|1-${d}d` : `1-${h}h`; };
+// A suspension's length word -> whole hours, else 0: '12h' or '3d', no decimals, no leading zero, within maxDays as
+// discipline.js lengthMs counts it (n x 1 h or n x 1 d against maxDays x 1 d), so the game takes every length the console does
+const lengthHours = (word, maxDays) => {
+  const m = LENGTH_RE.exec(String(word || '').toLowerCase());
+  if (!m) return 0;
+  const h = m[1] ? Number(m[1]) : Number(m[2]) * 24;
+  return h * 3600000 <= maxDays * 86400000 ? h : 0;
+};
+// What is wrong with a console reason, or '' when it may run (REASON_RE above)
+const reasonWhy = (reason) => {
+  if (!reason) return 'reasonShort';
+  if (ASTRAL_RE.test(reason) || !REASON_RE.test(reason)) return 'reasonChars';
+  if (reason.length < REASON_MIN) return 'reasonShort';
+  return reason.length > REASON_MAX ? 'reasonLong' : '';
+};
+// The kinds a tagKindReason command takes here: its own, less those the config denies ('discipline suspend'), and suspend
+// only while the config allows a length at all
+const kindsOf = (cmd, deny, maxDays) => {
+  const a = Object.prototype.hasOwnProperty.call(ALLOW, cmd) ? ALLOW[cmd] : null;
+  if (!a || a.rule !== 'tagKindReason' || deny.has(cmd)) return [];
+  return a.kinds.filter((k) => !deny.has(`${cmd} ${k}`) && !(KIND_ARGS[k] === 'length' && !(maxDays > 0)));
+};
+// The usage the page, Discord and the refusals show, for the kinds that are left
+const usageOf = (cmd, kinds, maxDays) => {
+  const plain = kinds.filter((k) => KIND_ARGS[k] === 'none');
+  const parts = plain.length ? [`${plain.join('|')} <reason>`] : [];
+  for (const k of kinds) {
+    if (KIND_ARGS[k] === 'length') parts.push(`${k} <${lengthShort(maxDays)}> <reason>`);
+    if (KIND_ARGS[k] === 'record') parts.push(`${k} <n> <reason>`);
+  }
+  return `/${cmd} #TAG ${parts.join('; ')}`;
+};
 const reqPayload = (r) => `dbo-console-req-v1\n${JSON.stringify([r.v, r.id, r.src, r.discordId, r.user, r.profileId, r.roles, r.text, r.mode, r.issuedAt, r.expiresAt])}`;
 const canonLines = (lines) => lines.map((l) => ({ to: String(l.to), text: String(l.text) }));
 const repPayload = (r) => `dbo-console-rep-v1\n${JSON.stringify([r.v, r.id, r.state, r.gate, r.ranAs, r.online, r.tier, r.target, canonLines(r.lines), r.why, r.at])}`;
 const hmac = (key, text) => crypto.createHmac('sha256', key).update(text, 'utf8').digest();
 const id8 = (id) => (String(id).startsWith('w-') ? String(id).slice(2, 10) : String(id).slice(-8));
 
-// What the argument rule says about one cleaned line: { cmd, body, tag } to run, or { cmd, why } refused
-const checkLine = (text, has, deny) => {
+// What the argument rule says about one cleaned line: { cmd, body, tag } to run, or { cmd, why, subject? } refused (subject:
+// what the refusal's text names, else the command). opts.maxSuspendDays: discipline's, from maxDaysOf (its default without)
+const checkLine = (text, has, deny, opts) => {
   const m = /^\/([a-z]{2,24})(?: (.*))?$/.exec(text || '');
   if (!m) return { cmd: '', why: 'notChat' };
   const cmd = m[1]; const body = m[2] === undefined ? '' : m[2];
@@ -172,6 +251,23 @@ const checkLine = (text, has, deny) => {
     }
     case 'load': return !words.length || (words.length === 1 && words[0].toLowerCase() === 'reset') ? { cmd, body } : { cmd, why: 'badArgs' };
     case 'none': return words.length ? { cmd, why: 'badArgs' } : { cmd, body };
+    // #TAG <kind> [<length>|<n>] <reason>: one target by tag, never a name; a fixed kind word; the kind's own word; a reason
+    case 'tagKindReason': {
+      const maxDays = opts && opts.maxSuspendDays !== undefined ? opts.maxSuspendDays : MAX_SUSPEND_DAYS;
+      const kinds = kindsOf(cmd, deny, maxDays);
+      if (!kinds.length) return { cmd, why: 'denied' };
+      const usage = usageOf(cmd, kinds, maxDays);
+      // No #TAG first: the bare command and 'list' are the record views (they stay in game); anything else is a name
+      if (!words.length || !TAG_RE.test(words[0])) return words.length && words[0].toLowerCase() !== 'list' ? { cmd, why: 'needTag' } : { cmd, why: 'badKind', subject: usage };
+      const kind = (words[1] || '').toLowerCase();
+      if (!Object.prototype.hasOwnProperty.call(KIND_ARGS, kind) || !rule.kinds.includes(kind)) return { cmd, why: 'badKind', subject: usage };
+      if (!kinds.includes(kind)) return { cmd, why: 'denied', subject: `${cmd} ${kind}` };
+      const arg = KIND_ARGS[kind];
+      if (arg === 'length' && !lengthHours(words[2], maxDays)) return { cmd, why: 'badLength', subject: maxDays };
+      if (arg === 'record' && !RECORD_RE.test(words[2] || '')) return { cmd, why: 'badRecord' };
+      const why = reasonWhy(words.slice(arg === 'none' ? 2 : 3).join(' '));
+      return why ? { cmd, why } : { cmd, body, tag: words[0], kind };
+    }
     default: return { cmd, why: 'notYet' };
   }
 };
@@ -220,6 +316,8 @@ module.exports = (api) => {
   const now = typeof api.now === 'function' ? api.now : Date.now;
   const C = (cfg && typeof cfg.remoteConsole === 'object' && cfg.remoteConsole) || {};
   const deny = new Set(Array.isArray(C.deny) ? C.deny.map((x) => String(x).toLowerCase()) : []);
+  // The longest suspension discipline.js takes (its config, read the same way), for the tagKindReason length word
+  const MAX_DAYS = maxDaysOf(cfg);
   const rank = (t) => (t && Object.prototype.hasOwnProperty.call(TIER_RANK, t) ? TIER_RANK[t] : 0);
   // The config can raise the floor (to developer or senior), never lower it below CODE_FLOOR
   const FLOOR = rank(C.minTier) > rank(CODE_FLOOR) ? String(C.minTier) : CODE_FLOOR;
@@ -322,7 +420,15 @@ module.exports = (api) => {
       if (deny.has(name)) continue;
       const c = commands.get(name);
       if (!c) { logOnce(`allow:${name}`, `/${name} is on the allowlist but not registered; left out`); continue; }
-      list.push({ name, usage: a.usage, rule: a.rule, help: String(c.help || '').slice(0, 200) });
+      const entry = { name, usage: a.usage, rule: a.rule, help: String(a.help || c.help || '').slice(0, 200) };
+      // A tagKindReason command lists the kinds the console takes here, and the longest suspension, so the backend's
+      // pre-check and the page know them; with every kind denied it is left out
+      if (a.rule === 'tagKindReason') {
+        const kinds = kindsOf(name, deny, MAX_DAYS);
+        if (!kinds.length) continue;
+        Object.assign(entry, { usage: usageOf(name, kinds, MAX_DAYS), kinds }, kinds.some((k) => KIND_ARGS[k] === 'length') ? { maxSuspendDays: MAX_DAYS } : {});
+      }
+      list.push(entry);
     }
     const file = path.join(P.spool, 'allow.json'); const tmp = `${file}.tmp`;
     // As writeReply: whatever sits at the tmp name (a FIFO would block the open for write) is removed, then 'wx' creates a
@@ -389,8 +495,8 @@ module.exports = (api) => {
     if (rank(fresh) < rank(FLOOR)) return refuse(key, r, 'tier', { subject: FLOOR_LABEL[FLOOR] || FLOOR, fields: as });
     if (rank(stamped) > rank(fresh) || rank(stamped) < rank(FLOOR)) return refuse(key, r, 'rolesChanged', { fields: as });
 
-    const line = checkLine(r.text, (n) => commands.has(n), deny);
-    if (line.why) return refuse(key, r, line.why, { subject: line.cmd, fields: as });
+    const line = checkLine(r.text, (n) => commands.has(n), deny, { maxSuspendDays: MAX_DAYS });
+    if (line.why) return refuse(key, r, line.why, { subject: line.subject !== undefined ? line.subject : line.cmd, fields: as });
     let target = 0;
     if (line.tag) {
       const want = line.tag.slice(1).toLowerCase();
@@ -419,6 +525,8 @@ module.exports = (api) => {
     const whyCode = gate === 'refused' ? 'gate' : gate === 'unknown' ? 'unknown' : '';
     const shown = replyLines(lines);
     if (state === 'refused' && !shown.length) shown.push({ to: 'console', text: (TEXT[whyCode] || TEXT.gate)(line.cmd) });
+    // A dry run stops in handleLine before the command, so discipline.js's own checks never ran: say so
+    if (state === 'dry-run' && ALLOW[line.cmd].rule === 'tagKindReason') shown.unshift({ to: 'console', text: TEXT.dryRecord() });
     writeReply(key, Object.assign({ id: r.id, state, gate, target: targetName, lines: shown, why: whyCode }, as));
     audit(`REMOTE req ${id8(r.id)} -> ${state}/${gate}`);
   };
@@ -477,4 +585,5 @@ module.exports = (api) => {
 };
 
 // Shared pure helpers, for the harness and the backend's copy of the same rules
-module.exports.rules = { cleanCommand, parseSwitch, checkLine, checkShape, reqPayload, repPayload, replyLines, plainLine, id8, ALLOW, TEXT };
+module.exports.rules = { cleanCommand, parseSwitch, checkLine, checkShape, reqPayload, repPayload, replyLines, plainLine, id8, ALLOW, TEXT,
+  KIND_ARGS, REASON_RE, maxDaysOf, lengthHours, reasonWhy, kindsOf, usageOf };
