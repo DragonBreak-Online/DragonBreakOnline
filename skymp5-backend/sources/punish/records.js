@@ -325,9 +325,12 @@ function journalRows(entries, { now }) {
 function playerLogRows(events) {
   const rows = []
   const lastKick = new Map()
-  const byText = b => (!b ? null : b.n ? `${b.n}${b.c ? ` #${b.c}` : ''}` : Number.isSafeInteger(b.p) && b.p >= 0 ? `profile ${b.p}` : null)
+  const byText = b => {
+    const n = b && scrub(b.n, 48)
+    return !b ? null : n ? `${n}${b.c ? ` #${b.c}` : ''}` : Number.isSafeInteger(b.p) && b.p >= 0 ? `profile ${b.p}` : null
+  }
   for (const e of [...events].sort((a, b) => a.t - b.t || a.s - b.s)) {
-    const target = { profileId: Number.isSafeInteger(e.p) && e.p >= 0 ? e.p : null, name: e.n || null, tag: e.c || null, discordName: null }
+    const target = { profileId: Number.isSafeInteger(e.p) && e.p >= 0 ? e.p : null, name: scrub(e.n, 48), tag: e.c || null, discordName: null }
     const by = byText(e.by)
     const id = `plog:${e.g}:${e.s}`
     if (e.ev === 'session.kick') {

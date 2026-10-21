@@ -139,3 +139,13 @@ test('jsonlTail: reads on from where it stopped, never a half line, starts again
     assert.deepEqual(t.read().rows, [9])
   } finally { fs.rmSync(dir, { recursive: true, force: true }) }
 })
+
+test('player log: the names of a kick\'s player and staff member are scrubbed like every other name', () => {
+  const id = '1'.repeat(18)
+  const rows = R.playerLogRows([{ g: 'g1', s: 1, t: 1000, ev: 'session.kick', kind: 'command', p: 10, c: 'BOB1', n: `Bo‮b ${id}`,
+    by: { p: 20, c: 'GIN1', n: `Gi​na <@${id}>` } }])
+  assert.equal(rows.length, 1)
+  assert.equal(rows[0].target.name, 'Bo b [id]')
+  assert.equal(rows[0].by, 'Gi na [id] #GIN1')
+  assert.doesNotMatch(JSON.stringify(rows), /\d{15,}|<@|[​‮]/)
+})
