@@ -1574,6 +1574,48 @@
       ]
     },
     {
+      "id": "house-ravenwatch",
+      "name": "House Ravenwatch",
+      "kind": "guild",
+      "secret": true,
+      "requires": "vampire",
+      "note": "Nate, 21 Oct (UESP Lore:House_Ravenwatch): a noble house of Rivenspire, High Rock, secretly vampires, founded by Count Verandis Ravenwatch, who forsook killing: they feed only on willing servants or outlaws and never to excess, try to redeem other vampires and kill only grave threats. No hall yet",
+      "ranks": [
+        {
+          "title": "Count",
+          "role": "leader"
+        },
+        {
+          "title": "Elder of the House",
+          "role": "officer"
+        },
+        {
+          "title": "Warden of the Watch",
+          "role": "sergeant"
+        },
+        {
+          "title": "Blood-Scholar",
+          "role": "mage"
+        },
+        {
+          "title": "Armourer",
+          "role": "blacksmith"
+        },
+        {
+          "title": "Clothier",
+          "role": "tailor"
+        },
+        {
+          "title": "Kin of Ravenwatch",
+          "role": "member"
+        },
+        {
+          "title": "Ward",
+          "role": "member"
+        }
+      ]
+    },
+    {
       "id": "bloodmist-clan",
       "name": "Bloodmist Clan",
       "kind": "guild",
