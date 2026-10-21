@@ -4,6 +4,7 @@
 #include "GetEquipped.h"
 #include "GetEquippedItemType.h"
 #include "GetGlobalValue.h"
+#include "GetInCurrentLoc.h"
 #include "GetIsPlayableRace.h"
 #include "GetIsRace.h"
 #include "GetItemCount.h"
@@ -57,6 +58,8 @@ ConditionFunctionMap ConditionFunctionFactory::CreateConditionFunctions()
     std::make_shared<ConditionFunctions::GetGlobalValue>());
   res.RegisterConditionFunction(
     std::make_shared<ConditionFunctions::GetPCIsRace>());
+  res.RegisterConditionFunction(
+    std::make_shared<ConditionFunctions::GetInCurrentLoc>());
 
   res.RegisterConditionFunction(
     std::make_shared<ConditionFunctions::SkympGetDamageSourceHasKeyword>());

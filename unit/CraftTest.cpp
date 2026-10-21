@@ -434,6 +434,41 @@ TEST_CASE("A craft report with no product at a forge takes nothing and goes "
   DoDisconnect(p, 0);
 }
 
+TEST_CASE("GetInCurrentLoc tells a recipe where the crafter is",
+          "[Craft][espm]")
+{
+  // Radiant Raiment's location sits in Solitude Wells, in Solitude: the Solitude guard cape was refused there (18 Oct)
+  const uint32_t RadiantRaiment = 0x16a0f, RadiantRaimentLocation = 0x2009e,
+                 SolitudeLocation = 0x18a5a, WhiterunLocation = 0x18a56;
+  PartOne& p = GetPartOne();
+  p.CreateActor(0xff000000, { 0, 0, 0 }, 0, RadiantRaiment);
+  p.CreateActor(0xff000001, { 0, 0, 0 }, 0, 0x3c);
+  auto& inShop = p.worldState.GetFormAt<MpActor>(0xff000000);
+  auto& outdoors = p.worldState.GetFormAt<MpActor>(0xff000001);
+
+  const auto at = [](uint32_t location) {
+    return std::vector<Condition>{ MakeCondition("GetInCurrentLoc",
+                                                 location) };
+  };
+  REQUIRE(EvaluateAs(ConditionsEvaluatorCaller::kCraft, at(SolitudeLocation),
+                     inShop) == true);
+  REQUIRE(EvaluateAs(ConditionsEvaluatorCaller::kCraft,
+                     at(RadiantRaimentLocation), inShop) == true);
+  REQUIRE(EvaluateAs(ConditionsEvaluatorCaller::kCraft, at(WhiterunLocation),
+                     inShop) == false);
+
+  // A worldspace names no location, so the recipe stays locked there
+  REQUIRE(EvaluateAs(ConditionsEvaluatorCaller::kCraft, at(SolitudeLocation),
+                     outdoors) == false);
+
+  MpActor detached(LocationalData(), FormCallbacks::DoNothing());
+  REQUIRE(EvaluateAs(ConditionsEvaluatorCaller::kCraft, at(SolitudeLocation),
+                     detached) == false);
+
+  p.DestroyActor(0xff000000);
+  p.DestroyActor(0xff000001);
+}
+
 TEST_CASE("A recipe that needs a vanilla perk is refused", "[Craft][espm]")
 {
   // RecipeWeaponEbonyDagger (db8b9) needs HasPerk(EbonySmithing cb412)
