@@ -44,4 +44,37 @@ function* fileChangeForms(dir, match = /\.json$/) {
   }
 }
 
-module.exports = { charFromCf, fileChangeForms }
+// A full scan's [{ cf, char, mtime }] in directory order, re-reading only files whose mtime, size or inode changed; throws when the folder is unreadable
+function createCharacterIndex(match = /\.json$/) {
+  // file name -> { mtimeMs, size, ino, form }; form null when not a character or not JSON when read
+  let known = new Map()
+  let knownDir = null
+  return function scan(dir) {
+    fs.accessSync(dir, fs.constants.R_OK)
+    if (dir !== knownDir) { known = new Map(); knownDir = dir }
+    const next = new Map()
+    const forms = []
+    for (const entry of fs.readdirSync(dir)) {
+      if (!match.test(entry)) continue
+      const file = path.join(dir, entry)
+      let st
+      try { st = fs.statSync(file) } catch { continue }
+      let hit = known.get(entry)
+      if (!hit || hit.mtimeMs !== st.mtimeMs || hit.size !== st.size || hit.ino !== st.ino) {
+        let form = null
+        try {
+          const cf = JSON.parse(fs.readFileSync(file, 'utf8'))
+          const char = charFromCf(cf)
+          if (char) form = { cf, char, mtime: st.mtime }
+        } catch { /* gone or half-written: read again once the file changes */ }
+        hit = { mtimeMs: st.mtimeMs, size: st.size, ino: st.ino, form }
+      }
+      next.set(entry, hit)
+      if (hit.form) forms.push(hit.form)
+    }
+    known = next
+    return forms
+  }
+}
+
+module.exports = { charFromCf, fileChangeForms, createCharacterIndex }

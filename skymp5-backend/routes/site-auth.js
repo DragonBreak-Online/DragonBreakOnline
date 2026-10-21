@@ -3,7 +3,6 @@
 
 const router        = require('express').Router()
 const crypto        = require('crypto')
-const fs            = require('fs')
 const rateLimit     = require('express-rate-limit')
 const config        = require('../config')
 const oauth         = require('../sources/discord/oauth')
@@ -15,7 +14,7 @@ const bans          = require('../sources/bans')
 const nameTable     = require('../sources/nameTable')
 const officials     = require('../sources/officials')
 const factions      = require('../sources/factionWhitelist')
-const { charFromCf, fileChangeForms } = require('../sources/characters')
+const { createCharacterIndex } = require('../sources/characters')
 const { progressOf } = require('../sources/progress')
 const problemReport = require('../sources/problemReport')
 const { visitorIp } = require('../sources/visitorIp')
@@ -128,18 +127,11 @@ function profileIdOf(discordId) {
 }
 
 // Characters in the changeForms store with their file's mtime; throws when the directory is unreadable
+const characterIndex = createCharacterIndex(PLAYER_FORM_FILE)
 let storeCache = { at: 0, forms: [] }
 function readStore() {
   if (Date.now() - storeCache.at < STORE_CACHE_MS) return storeCache.forms
-  fs.accessSync(config.changeFormsDir, fs.constants.R_OK)
-  const forms = []
-  for (const [file, cf] of fileChangeForms(config.changeFormsDir, PLAYER_FORM_FILE)) {
-    const char = charFromCf(cf)
-    if (!char) continue
-    let mtime
-    try { mtime = fs.statSync(file).mtime } catch { continue }
-    forms.push({ cf, char, mtime })
-  }
+  const forms = characterIndex(config.changeFormsDir)
   storeCache = { at: Date.now(), forms }
   return forms
 }
