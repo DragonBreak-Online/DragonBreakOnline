@@ -38,20 +38,13 @@ try {
   ok(site.spawns.every((s) => /crackedtuskkeepexpanded\.esp$/i.test(s.anchor)), 'every spawn is anchored on a CrackedTuskKeepExpanded.esp ref');
   ok(!site.spawns.some((s) => /^1cb2c:/i.test(s.base || '')), 'no spawn is DA14Goat (1cb2c), the unique quest goat');
   ok(load(false).length === 0, 'INERT while the plugin is not loaded: no wild:cracked-tusk zone');
+  // Nate, 21 Oct: no AI at Cracked Tusk, a player-run stronghold like the others: even with the plugin loaded, nothing spawns
   const z = load(true);
-  const kinds = (b) => z.filter((x) => x.NPC[0].id === b).length;
-  const beasts = z.filter((x) => /:(goat|cow|chicken)\d$/.test(x.Name));
-  ok(beasts.length === 11 && kinds('4359c:Skyrim.esm') === 6 && kinds('23a90:Skyrim.esm') === 3 && kinds('a91a0:Skyrim.esm') === 2, 'with the plugin: the livestock spawns, 6 EncGoatDomestic, 3 EncCow, 2 EncChicken', z.map((x) => x.Name));
-  ok(z.every((x) => x.hostile === false), '...never hostile');
-  // The roster Nat approved as written (21 Oct), on AIO's non-unique stronghold orcs (the PC's brief, section 6)
-  const AIO = ':Orc Strongholds - All In One.esp';
-  const want = { chief: ['579', 1], household: ['22c', 2], blacksmith: ['22a', 1], wisewoman: ['22c', 1], guards: ['57b', 2], guards2: ['57d', 1], miners: ['22a', 2], workers: ['22a', 2], hunters: ['21f', 2] };
-  const people = z.filter((x) => !beasts.includes(x));
-  ok(people.length === Object.keys(want).length && Object.entries(want).every(([n, [b, c]]) => people.some((x) => x.Name === `wild:cracked-tusk:${n}` && x.NPC[0].id === b + AIO && x.NPC[0].count === c)),
-    '...and the approved roster: 14 orcs over 9 spawns, every base an AIO stronghold orc', people.map((x) => [x.Name, x.NPC[0].id, x.NPC[0].count]));
-  ok(people.reduce((n, x) => n + x.NPC[0].count, 0) === 14, '...14 residents in all (chief 1, household 2, smith 1, wisewoman 1, guards 3, miners 2, workers 2, hunters 2)');
-  ok(z.some((x) => x.Name === 'wild:cracked-tusk:chief' && x.ID === '1526a:Skyrim.esm'), '...the chief in the longhouse cell, not the exterior');
-  const held = JSON.parse(JSON.stringify(S)); held.sites[0].spawns.find((s) => s.role === 'chief').approved = false;
+  ok(z.length === 0, 'with the plugin loaded: no wild:cracked-tusk zone at all (every row approved:false)', z.map((x) => x.Name));
+  // The mechanism still works if a row is ever approved again: one row approved spawns, the rest stay held
+  const one = JSON.parse(JSON.stringify(S)); one.sites[0].spawns[0].approved = true;
+  ok(load(true, one).length === 1, 'a single row set approved spawns alone');
+  const held = JSON.parse(JSON.stringify(S));
   ok(!load(true, held).some((x) => x.Name === 'wild:cracked-tusk:chief'), 'a spawn set approved:false is held back');
 } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 console.log(fails ? `${fails} failed` : 'all passed'); process.exit(fails ? 1 : 0);

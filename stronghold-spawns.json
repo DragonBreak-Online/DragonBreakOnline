@@ -1,5 +1,5 @@
 {
- "_comment": "A stronghold's own people and beasts, spawned by wildlife.js as wild:<site>:<name> zones, never hostile (Nat, 20 Oct: Cracked Tusk is the clan's stronghold, not a lair; Worker 1's briefs ~/inbox/NOTE-for-server-claude-2026-10-20-C10-cracked-tusk-residents.md and staged-20261021-strongholds/CRACKED_TUSK_RESIDENTS_BRIEF.md). A spawn is written only when its anchor resolves (its plugin is in the server's load order), it has a base, and approved is not false. Every anchor is a CrackedTuskKeepExpanded.esp ref (checked against the shipped file 21 Oct), so nothing spawns before CTK and its master AIO load. Livestock is Nat's decision 1 (CTK's 11 animals off in the Strongholds Fix; EncGoatDomestic, never DA14Goat). The residents are the brief's roster, which Nat approved as written on 21 Oct, on AIO's non-unique stronghold orcs (section 6: no bandit or hostile faction, no script, no template). Each base carries one fixed name, so spawns of one base share it.",
+ "_comment": "NOTHING SPAWNS (Nate, 21 Oct: \"there isn't supposed to be AI in Cracked Tusk Keep, it's a player-run orc stronghold like the others\"): every row is approved:false, residents and livestock alike. A stronghold's own people and beasts, spawned by wildlife.js as wild:<site>:<name> zones, never hostile (Nat, 20 Oct: Cracked Tusk is the clan's stronghold, not a lair; Worker 1's briefs ~/inbox/NOTE-for-server-claude-2026-10-20-C10-cracked-tusk-residents.md and staged-20261021-strongholds/CRACKED_TUSK_RESIDENTS_BRIEF.md). A spawn is written only when its anchor resolves (its plugin is in the server's load order), it has a base, and approved is not false. Every anchor is a CrackedTuskKeepExpanded.esp ref (checked against the shipped file 21 Oct), so nothing spawns before CTK and its master AIO load. Livestock is Nat's decision 1 (CTK's 11 animals off in the Strongholds Fix; EncGoatDomestic, never DA14Goat). The residents are the brief's roster, which Nat approved as written on 21 Oct, on AIO's non-unique stronghold orcs (section 6: no bandit or hostile faction, no script, no template). Each base carries one fixed name, so spawns of one base share it.",
  "sites": [
   {
    "id": "cracked-tusk",
@@ -18,7 +18,8 @@
      ],
      "heading": 0,
      "anchor": "2c19f:CrackedTuskKeepExpanded.esp",
-     "note": "a Gleda spot (CTK d68-d6c); EncGoatDomestic, never DA14Goat"
+     "note": "a Gleda spot (CTK d68-d6c); EncGoatDomestic, never DA14Goat",
+     "approved": false
     },
     {
      "name": "goat2",
@@ -31,7 +32,8 @@
      ],
      "heading": 0,
      "anchor": "2c19f:CrackedTuskKeepExpanded.esp",
-     "note": "a Gleda spot (CTK d68-d6c); EncGoatDomestic, never DA14Goat"
+     "note": "a Gleda spot (CTK d68-d6c); EncGoatDomestic, never DA14Goat",
+     "approved": false
     },
     {
      "name": "goat3",
@@ -44,7 +46,8 @@
      ],
      "heading": 0,
      "anchor": "2c19f:CrackedTuskKeepExpanded.esp",
-     "note": "a Gleda spot (CTK d68-d6c); EncGoatDomestic, never DA14Goat"
+     "note": "a Gleda spot (CTK d68-d6c); EncGoatDomestic, never DA14Goat",
+     "approved": false
     },
     {
      "name": "goat4",
@@ -57,7 +60,8 @@
      ],
      "heading": 0,
      "anchor": "2c19f:CrackedTuskKeepExpanded.esp",
-     "note": "a Gleda spot (CTK d68-d6c); EncGoatDomestic, never DA14Goat"
+     "note": "a Gleda spot (CTK d68-d6c); EncGoatDomestic, never DA14Goat",
+     "approved": false
     },
     {
      "name": "goat5",
@@ -70,7 +74,8 @@
      ],
      "heading": 349,
      "anchor": "2c19f:CrackedTuskKeepExpanded.esp",
-     "note": "a Gleda spot (CTK d68-d6c); EncGoatDomestic, never DA14Goat"
+     "note": "a Gleda spot (CTK d68-d6c); EncGoatDomestic, never DA14Goat",
+     "approved": false
     },
     {
      "name": "goat6",
@@ -83,7 +88,8 @@
      ],
      "heading": 130,
      "anchor": "8b05:CrackedTuskKeepExpanded.esp",
-     "note": "CTK 8b06's spot, by the goat pen"
+     "note": "CTK 8b06's spot, by the goat pen",
+     "approved": false
     },
     {
      "name": "cow1",
@@ -96,7 +102,8 @@
      ],
      "heading": 0,
      "anchor": "4fa6e:CrackedTuskKeepExpanded.esp",
-     "note": "CTK 4fa64-66"
+     "note": "CTK 4fa64-66",
+     "approved": false
     },
     {
      "name": "cow2",
@@ -109,7 +116,8 @@
      ],
      "heading": 178,
      "anchor": "4fa6e:CrackedTuskKeepExpanded.esp",
-     "note": "CTK 4fa64-66"
+     "note": "CTK 4fa64-66",
+     "approved": false
     },
     {
      "name": "cow3",
@@ -122,7 +130,8 @@
      ],
      "heading": 0,
      "anchor": "4fa6e:CrackedTuskKeepExpanded.esp",
-     "note": "CTK 4fa64-66"
+     "note": "CTK 4fa64-66",
+     "approved": false
     },
     {
      "name": "chicken1",
@@ -135,7 +144,8 @@
      ],
      "heading": 0,
      "anchor": "4fa6e:CrackedTuskKeepExpanded.esp",
-     "note": "CTK 4fa68-69"
+     "note": "CTK 4fa68-69",
+     "approved": false
     },
     {
      "name": "chicken2",
@@ -148,14 +158,15 @@
      ],
      "heading": 103,
      "anchor": "4fa6e:CrackedTuskKeepExpanded.esp",
-     "note": "CTK 4fa68-69"
+     "note": "CTK 4fa68-69",
+     "approved": false
     },
     {
      "name": "chief",
      "role": "chief",
      "count": 1,
      "base": "579:Orc Strongholds - All In One.esp",
-     "approved": true,
+     "approved": false,
      "world": "1526a:Skyrim.esm",
      "pos": [
       -1562,
@@ -171,7 +182,7 @@
      "role": "household",
      "count": 2,
      "base": "22c:Orc Strongholds - All In One.esp",
-     "approved": true,
+     "approved": false,
      "world": "1526a:Skyrim.esm",
      "pos": [
       -2170,
@@ -187,7 +198,7 @@
      "role": "blacksmith",
      "count": 1,
      "base": "22a:Orc Strongholds - All In One.esp",
-     "approved": true,
+     "approved": false,
      "world": "3c:Skyrim.esm",
      "pos": [
       -54646,
@@ -203,7 +214,7 @@
      "role": "wisewoman",
      "count": 1,
      "base": "22c:Orc Strongholds - All In One.esp",
-     "approved": true,
+     "approved": false,
      "world": "3c:Skyrim.esm",
      "pos": [
       -56068,
@@ -219,7 +230,7 @@
      "role": "guards",
      "count": 2,
      "base": "57b:Orc Strongholds - All In One.esp",
-     "approved": true,
+     "approved": false,
      "world": "3c:Skyrim.esm",
      "pos": [
       -56692,
@@ -235,7 +246,7 @@
      "role": "guards",
      "count": 1,
      "base": "57d:Orc Strongholds - All In One.esp",
-     "approved": true,
+     "approved": false,
      "world": "3c:Skyrim.esm",
      "pos": [
       -56692,
@@ -251,7 +262,7 @@
      "role": "miners",
      "count": 2,
      "base": "22a:Orc Strongholds - All In One.esp",
-     "approved": true,
+     "approved": false,
      "world": "3c:Skyrim.esm",
      "pos": [
       -53044,
@@ -267,7 +278,7 @@
      "role": "workers",
      "count": 2,
      "base": "22a:Orc Strongholds - All In One.esp",
-     "approved": true,
+     "approved": false,
      "world": "3c:Skyrim.esm",
      "pos": [
       -57450,
@@ -283,7 +294,7 @@
      "role": "hunters",
      "count": 2,
      "base": "21f:Orc Strongholds - All In One.esp",
-     "approved": true,
+     "approved": false,
      "world": "3c:Skyrim.esm",
      "pos": [
       -54195,
