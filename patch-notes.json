@@ -1,5 +1,53 @@
 [
   {
+    "title": "The 21 October update",
+    "date": "2026-10-21",
+    "version": "Server update",
+    "tag": "New",
+    "sections": [
+      {
+        "heading": "Before you play",
+        "items": [
+          "Update the Nexus collection and reopen this launcher: it downloads the new files, Orc Strongholds - All In One included."
+        ]
+      },
+      {
+        "heading": "World",
+        "items": [
+          "Dungeon floors restored: no more falling through Shriekwind Bastion, Forsaken Cave, Redwater Den and others.",
+          "Orc Strongholds All In One and Cracked Tusk Keep Expanded. Cracked Tusk is now a player-run clan stronghold like the others, with its own mine.",
+          "The pantheon shrines can be seen, the Honorblade of Whiterun no longer blinds, and adamantium armour has its looks."
+        ]
+      },
+      {
+        "heading": "Combat",
+        "items": [
+          "Creatures hit at full strength again: atronach fire, spider and chaurus poison, wisp drain, Death Hound chill, Chaurus Hunter spit.",
+          "Staves of fear, calm, frenzy, turn undead and paralysis work on creatures; Wall of Flames, Frost and Storms hurt whoever stands in them.",
+          "Frost slows players (never twice at once), the sun burns the undead and silver hurts them again. Umbra traps souls."
+        ]
+      },
+      {
+        "heading": "Crafting and items",
+        "items": [
+          "Every hold's smiths and tailors make their hold's Sentinel guard uniform (79 pieces).",
+          "Backpacks and every carry-weight item are back to full strength.",
+          "Adamantium has its own schematic from Sancre Tor; Dragon Priest, Tribunal and Dwarven schematics too. Mountainwatch gives adamantium and still iron for beginners.",
+          "Khajiit and Argonians can wear more armour; goblin armour is for goblins."
+        ]
+      },
+      {
+        "heading": "Gods, thieves and more",
+        "items": [
+          "The 21 new gods show their blessing under Active Effects, and 15 more Daedric shrines count for worship.",
+          "Thievery is open for staff-approved thieves' guilds: break into homes, fence the goods, and guards can raid a fence.",
+          "Smaller fixes: beds, citizenship, the Helgen cave, Falkreath's dogs, Orchendor, and level points come back on a reroll.",
+          "GMs: everyone from GM up has an extra staff character slot."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Werewolves can duel as werewolves",
     "date": "2026-10-21",
     "version": "Hotfix",
