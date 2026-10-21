@@ -100,3 +100,20 @@ test('readStore throws when the folder cannot be read, as before', t => {
   config.changeFormsDir = path.join(ROOT, 'missing')
   try { assert.throws(() => scan(t)) } finally { config.changeFormsDir = was }
 })
+
+test('a file that could not be read is read again on the next scan, as a full scan would', t => {
+  t.mock.timers.enable({ apis: ['Date'], now: Date.now() + 120000 })
+  save('ff000008.json', character('ff000008', 8, 'Farengar'))
+  const real = fs.readFileSync
+  fs.readFileSync = function (file, ...rest) {
+    if (path.basename(String(file)) === 'ff000008.json') throw Object.assign(new Error('EMFILE: too many open files'), { code: 'EMFILE' })
+    return real.call(this, file, ...rest)
+  }
+  let first
+  try { first = scan(t) } finally { fs.readFileSync = real }
+  assert.ok(!first.forms.some(f => f.char.name === 'Farengar'), 'left out while it cannot be read, as before')
+  const next = scan(t)
+  assert.deepEqual(next.read, ['ff000008.json'], 'only the file that failed is read again')
+  assert.ok(next.forms.some(f => f.char.name === 'Farengar'), 'not left out until the game next saves it')
+  assert.deepEqual(next.forms, fullScan())
+})

@@ -61,12 +61,15 @@ function createCharacterIndex(match = /\.json$/) {
       try { st = fs.statSync(file) } catch { continue }
       let hit = known.get(entry)
       if (!hit || hit.mtimeMs !== st.mtimeMs || hit.size !== st.size || hit.ino !== st.ino) {
+        let text
+        // Not kept when the read fails (gone, or an I/O error), so the next scan reads it again
+        try { text = fs.readFileSync(file, 'utf8') } catch { continue }
         let form = null
         try {
-          const cf = JSON.parse(fs.readFileSync(file, 'utf8'))
+          const cf = JSON.parse(text)
           const char = charFromCf(cf)
           if (char) form = { cf, char, mtime: st.mtime }
-        } catch { /* gone or half-written: read again once the file changes */ }
+        } catch { /* half-written: read again once the file changes */ }
         hit = { mtimeMs: st.mtimeMs, size: st.size, ino: st.ino, form }
       }
       next.set(entry, hit)
