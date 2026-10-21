@@ -79,6 +79,7 @@ export function isTrialGm(mp: any, actorId: number, cfg: AdminRoleConfig): boole
 // request and action is refused (AdminSystem.customPacket)
 export const TRIAL_GM_ACTIONS = new Set(["teleportTo", "teleportLoc", "rename"]);
 export const TRIAL_GM_MODES = new Set(["invis", "ghost"]);
-export const TRIAL_GM_TABS = ["debug", "players", "teleport", "modes"];
+// GM Calls too: a Trial GM answers calls like a GM tier (Nate 21 Oct: the F7 GM Calls tab for every GM tier)
+export const TRIAL_GM_TABS = ["debug", "players", "gmcalls", "teleport", "modes"];
 // Data requests a Trial GM may make besides the menu: the Teleport tab's list of locations
 export const TRIAL_GM_REQUESTS = new Set(["adminLocationsRequest"]);
