@@ -54,7 +54,7 @@ const withDeadline = (promise, ms) => {
 }
 
 function createStaffConsole({
-  config, discordBot, siteSessions, profileIdOf, spool, audit, jobsFile, switchFile, fs = nodeFs, now = Date.now,
+  config, discordBot, siteSessions, profileIdOf, spool, audit, jobsFile, switchFile, fs = nodeFs, now = Date.now, discordIdsOfProfile = () => [],
   log = (...a) => console.log('[console]', ...a), waitMs = WAIT_MS, lateWaitMs = LATE_WAIT_MS,
 }) {
   const C = readConfig(config)
@@ -207,6 +207,17 @@ function createStaffConsole({
     catch (err) { log('audit failed:', err.message) }
   }
 
+  // The fresh roles of the profile's Discord accounts (at most 3); null when none is known or none answered
+  async function targetRolesOf(pid) {
+    let dids = []
+    try { dids = (discordIdsOfProfile(pid) || []).map(String).filter(d => rules.SNOWFLAKE.test(d)).slice(0, 3) } catch (err) { log('profile store unreadable:', err.message); return null }
+    if (!dids.length) return null
+    const members = await Promise.all(dids.map(d => withDeadline(discordBot.getMemberFresh(d), MEMBER_DEADLINE_MS)))
+    const found = members.filter(m => m && Array.isArray(m.roles))
+    if (!found.length) return null
+    return [...new Set(found.flatMap(m => m.roles.map(String)).filter(r => rules.SNOWFLAKE.test(r)))].slice(0, 100)
+  }
+
   // ---- the one function -------------------------------------------------------------------------------------------
   const answer = (status, body) => ({ status, body })
   const error = (status, code, extra = {}) => answer(status, { v: 1, error: code, ...extra })
@@ -224,6 +235,9 @@ function createStaffConsole({
     const reqId = source === 'web' ? (typeof request.uuid === 'string' && rules.UUID_RE.test(request.uuid) ? `w-${request.uuid.toLowerCase()}` : '') : `d-${caller.interactionId}`
     const refuse = (status, code, handle, extra) => { refusal(source, discordId, handle, reqId, code, text); return error(status, code, extra) }
     if (!reqId) return refuse(400, 'badRequest', '-')
+    // The account the dashboard showed; the game refuses a #TAG that is not one of its characters
+    const pagePid = source === 'web' && request.targetProfileId !== undefined ? request.targetProfileId : undefined
+    if (pagePid !== undefined && !(Number.isSafeInteger(pagePid) && pagePid >= 0)) return refuse(400, 'badRequest', '-')
     // 3. A dashboard caller signed in on Discord's page within the last few hours
     if (source === 'web' && !(caller.signedInAt > 0 && now() - caller.signedInAt <= C.freshMs)) return refuse(401, 'signInAgain', '-', { signInUrl: SIGN_IN_URL })
     // 4. Every attempt counts before any Discord lookup
@@ -248,6 +262,12 @@ function createStaffConsole({
       const usage = (allow.find(a => a.name === pre.cmd) || {}).usage
       return refuse(422, 'notRemote', handle, { why: pre.why, reason: rules.whyText(pre.why, pre.cmd, usage, pre.subject) })
     }
+    // A page account goes only to a game that says it checks it for this command, else nothing is sent
+    const cmd = (/^\/([a-z]{2,24})/.exec(line) || [])[1] || ''
+    const entry = allow ? allow.find(a => a.name === cmd) : null
+    if (pagePid !== undefined && !(entry && entry.targetProfile)) {
+      return refuse(422, 'notRemote', handle, { why: 'noProfileCheck', reason: rules.whyText('noProfileCheck', cmd) })
+    }
     // 9. One run per request id
     const known = jobs.get(reqId)
     if (known) {
@@ -259,13 +279,19 @@ function createStaffConsole({
     if (over(`min:${discordId}`, LIMITS.perMinute, MINUTE) || over(`hour:${discordId}`, LIMITS.perHour, 60 * MINUTE) || over('site', LIMITS.siteWidePerMinute, MINUTE)) {
       return refuse(429, 'tooMany', handle)
     }
+    // 10b. The page account's fresh Discord roles for the game's rank check, left out when Discord gave none
+    const target = pagePid === undefined ? {} : { targetProfileId: pagePid }
+    if (pagePid !== undefined && entry.rank) {
+      const roles = await targetRolesOf(pagePid)
+      if (roles) target.targetRoles = roles
+    }
     // 11. The record and the audit line, before anything is sent
     const job = { id: reqId, at: now(), source, discordId, handle, profileId, text: line, setting: mode, state: 'sent', ranAs: '', online: false, tier: '', target: '', why: '', lines: [] }
     remember(job)
-    try { audit.log(`CONSOLE ${handle} (<@${discordId}>) via ${source} req ${rules.id8(reqId)}${mode === 'dry-run' ? ' (dry run)' : ''}: ${line}`) } catch (err) { log('audit failed:', err.message) }
+    try { audit.log(`CONSOLE ${handle} (<@${discordId}>) via ${source} req ${rules.id8(reqId)}${mode === 'dry-run' ? ' (dry run)' : ''}${pagePid !== undefined ? ` (page profile ${pagePid})` : ''}: ${line}`) } catch (err) { log('audit failed:', err.message) }
     // 12. and 13. Send, then wait for the game
     const work = (async () => {
-      try { spool.send({ id: reqId, src: source, discordId, user: handle, profileId, roles, text: line, mode }) }
+      try { spool.send({ id: reqId, src: source, discordId, user: handle, profileId, roles, text: line, mode, ...target }) }
       catch (err) { log('send failed:', err.message); job.state = 'notRun'; remember(job); sayResult(job); return }
       const rep = await spool.waitReply(reqId, waitMs)
       if (rep) { fill(job, rep); remember(job); sayResult(job); return }
@@ -286,7 +312,9 @@ function createStaffConsole({
   function state(source) {
     const allow = spool.allow()
     // /discipline also carries the kinds the game takes now and its longest suspension, so the page offers only those
-    const listed = a => ({ name: a.name, usage: a.usage, help: a.help, ...(a.kinds ? { kinds: [...a.kinds] } : {}), ...(a.maxSuspendDays ? { maxSuspendDays: a.maxSuspendDays } : {}) })
+    // targetProfile: the page may send its account with the command; rank: the game refuses a target at the caller's rank or above
+    const listed = a => ({ name: a.name, usage: a.usage, help: a.help, ...(a.kinds ? { kinds: [...a.kinds] } : {}), ...(a.maxSuspendDays ? { maxSuspendDays: a.maxSuspendDays } : {}),
+      ...(a.targetProfile ? { targetProfile: true } : {}), ...(a.rank ? { rank: true } : {}) })
     return { setting: setting(source), ready: !C.problem && !spool.problem(), commands: (allow || []).map(listed) }
   }
   const isFresh = caller => callers.has(caller) && caller.source === 'web' && caller.signedInAt > 0 && now() - caller.signedInAt <= C.freshMs

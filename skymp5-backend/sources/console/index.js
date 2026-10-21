@@ -16,6 +16,7 @@ function consoleApi() {
     discordBot: require('../discordBot'),
     siteSessions: require('../siteSessions'),
     profileIdOf: discordId => { const id = profiles.load().map[discordId]; return Number.isInteger(id) ? id : null },
+    discordIdsOfProfile: profileId => Object.entries(profiles.load().map || {}).filter(([, id]) => id === profileId).map(([d]) => d),
     spool: createSpool({ dir: config.consoleSpoolDir, keyFile: config.consoleKeyFile }),
     audit: require('../discord/audit'),
     jobsFile: path.join(__dirname, '..', '..', 'data', 'console-jobs.json'),
