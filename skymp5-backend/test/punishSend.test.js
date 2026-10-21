@@ -94,7 +94,8 @@ test('the #TAG must be the named account\'s; never your own account; never staff
 
 test('a GM is refused; the general console stays Owners and Dev, so a Lead GM is refused /console/run', async () => {
   want(await send('gm', kick()), 403, 'notAllowed')
-  want(await send('trial', kick()), 403, 'notAllowed')
+  // A Trial GM has no panel rank, so the route refuses them before the actions module
+  want(await send('trial', kick()), 403, 'notStaff')
   want(await send('actor', kick()), 403, 'notAllowed')
   const n = F.requests.length
   want(await send('lead', { requestId: uuid(), command: '/kick #BOB1' }, { url: '/api/site/staff/console/run' }), 403, 'notStaff')
