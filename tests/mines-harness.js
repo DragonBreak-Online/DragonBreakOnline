@@ -22,7 +22,13 @@ const LIST = JSON.parse(fs.readFileSync('mines.json', 'utf8'));
 const M = new Map(LIST.mines.map((m) => [m.id, m]));
 const defs = JSON.parse(fs.readFileSync('guild-defs.json', 'utf8'));
 const clans = new Set(defs.factions.filter((f) => f.kind === 'stronghold').map((f) => f.id));
-check('28 mines in Skyrim and Bruma\'s land', LIST.mines.length === 28, LIST.counts);
+check('43 mines in Skyrim and Bruma\'s land (28 mines, 15 bandit camps with ore veins: Nate, 21 Oct)', LIST.mines.length === 43, LIST.counts);
+{
+  // Ticket #0308: Halted Stream Camp is a mine (outside the one-building cap), out of the dungeon leases, so its hold rents it
+  const hs = LIST.mines.find((m) => m.id === 'HaltedStreamCamp01');
+  check('Halted Stream Camp is a mine with its rented door, and leaves the leases', !!hs && hs.leaseExcluded === true
+    && hs.entrances.some((e) => /^0*460a8:Skyrim\.esm$/i.test(e.inside) || /^0*460a8:Skyrim\.esm$/i.test(e.door)), hs && { lease: hs.lease, ex: hs.leaseExcluded, e: hs.entrances });
+}
 check('every id is unique', new Set(LIST.mines.map((m) => m.id)).size === LIST.mines.length);
 check('every mine has a way in, a hold, a name and its cells', LIST.mines.every((m) => m.entrances.length && m.hold && m.name && m.cells.length), LIST.mines.filter((m) => !(m.entrances.length && m.hold && m.name)).map((m) => m.id));
 check('only the open lands: Skyrim and Bruma', LIST.mines.every((m) => m.world === 'skyrim' || m.world === 'bruma'));

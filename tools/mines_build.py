@@ -4,7 +4,7 @@ orc mines belong to the strongholds").
 A mine is a building of buildings.json (the interior cells behind a door from a worldspace) any of whose cells is a mine:
   - its location (CELL XLCN) carries the keyword LocTypeMine, or a parent of it does not but the location does, or
   - it holds an ore vein (the bases labour.js mines: MineOre*, CYRMineOre*, DLC2MineOre*, BSKMineOre*) and its editor id
-    or its location's says Mine.
+    or its location's says Mine, or its location is a bandit camp (LocTypeBanditCamp; Nate, 21 Oct).
 Only buildings whose way in stands in Tamriel (Skyrim) or BSHeartland (Bruma's land) are kept: the open lands.
 
 Each mine lists its name (the location's FULL through the Strings tables, else the cell's, else the editor id), its hold (the
@@ -124,6 +124,8 @@ def chain(l):
         seen.add(l); out.append(l); l = loc[l]['parent']
     return out
 def is_mine_loc(l): return bool(l) and 'LocTypeMine' in loc.get(l, {}).get('kw', [])
+# A bandit camp with ore veins in it (Halted Stream Camp) is a mine too (Nate, 21 Oct, ticket #0308)
+def is_camp_loc(l): return bool(l) and 'LocTypeBanditCamp' in loc.get(l, {}).get('kw', [])
 
 # --- dungeons, zones, factions ---
 lease_cells, lease_of = set(), {}
@@ -151,7 +153,8 @@ for b in B:
     if not world: continue
     cs = [canon_of_desc(x) for x in b['cells']]
     mine_cells = [c for c in cs if is_mine_loc((cells.get(c) or {}).get('loc'))
-                  or (vein_by_cell.get(c) and re.search(r'mine', (cells.get(c) or {}).get('edid', '') + ' ' + loc.get((cells.get(c) or {}).get('loc'), {}).get('edid', ''), re.I))]
+                  or (vein_by_cell.get(c) and re.search(r'mine', (cells.get(c) or {}).get('edid', '') + ' ' + loc.get((cells.get(c) or {}).get('loc'), {}).get('edid', ''), re.I))
+                  or (vein_by_cell.get(c) and is_camp_loc((cells.get(c) or {}).get('loc')))]
     if not mine_cells: continue
     l = next((cells[c]['loc'] for c in mine_cells if is_mine_loc(cells[c].get('loc'))), None) or (cells.get(mine_cells[0]) or {}).get('loc')
     ch = chain(l)
