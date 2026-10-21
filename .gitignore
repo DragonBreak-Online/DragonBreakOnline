@@ -56,6 +56,9 @@ pigeon-cooldowns.json
 _launch-*.txt
 server-stats.json
 server-stats.json.tmp
+# worldstats.js: the staff dashboard's supernatural counts (counts only, staff-only route; never commit a live copy)
+staff-stats.json
+staff-stats.json.tmp
 worldclock.json
 worldclock.json.tmp
 supernatural.json

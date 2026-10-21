@@ -256,7 +256,8 @@ module.exports = (api) => {
         row = { at: now, profileId, race: realRace ? raceName(realRace) : 'Unknown', name: (app && app.name) || 'Stranger', carried: goldIn(a), banked: bankedOf(a), stored: null };
         if (!onlineSet.has(a)) ST.offline.set(a, row); else ST.offline.delete(a);
       }
-      if (ready && row.sup === undefined) row.sup = digestOf(a, onlineSet.has(a));
+      // The staff counts must never cost the public Server Stats its write: a digest that throws counts as nothing
+      if (ready && row.sup === undefined) { try { row.sup = digestOf(a, onlineSet.has(a)); } catch (e) { row.sup = null; } }
       counted.set(a, { profileId: row.profileId, online: onlineSet.has(a), sup: row.sup || null });
       ST.counted.push(`${row.name} (${row.race})`);
       races.set(row.race, (races.get(row.race) || 0) + 1);

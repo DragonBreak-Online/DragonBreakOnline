@@ -187,6 +187,16 @@ const supReads = (key) => reads.get(`${ID[key]}|${S}`) || 0;
   check('...the houses count 0 members; the vampires read this minute have no rank, the cached one keeps its', st.houses.every((h) => h.members === 0) && st.vampire.ranks.reduce((n, r) => n + r.count, 0) === 1, JSON.stringify(st.vampire.ranks));
   install();
 
+  // ---- a curse state the digest cannot read (an engine value whose field throws): only its own figure is lost --------
+  const goodV1 = props.get(`${ID.V1}|${S}`);
+  props.set(`${ID.V1}|${S}`, Object.defineProperty({}, 'kind', { get() { throw new Error('boom'); }, enumerable: true }));
+  pub = await minute();
+  st = JSON.parse(readFile('staff-stats.json'));
+  check('a digest that throws: server-stats.json is still written with every character', pub && pub.characters === 11 && JSON.parse(readFile('server-stats.json')).characters === 11, pub && pub.characters);
+  check('...and the staff file too, without that vampire', tot(st.vampire) === '3/1/3', tot(st.vampire));
+  props.set(`${ID.V1}|${S}`, goodV1);
+  await minute();
+
   // ---- without supernatural.js nothing is written, and an older staff file is left as it was ---------------------------
   uninstall();
   const last = readFile('staff-stats.json');
