@@ -1,9 +1,10 @@
 #include "MpActor.h"
+#include "SpellCastRules.h"
 #include "TestUtils.hpp"
 #include <catch2/catch_all.hpp>
 
 PartOne& GetPartOne();
-bool CanCastSpell(const MpActor& actor, uint32_t spellId);
+using SpellCastRules::CanCastSpell;
 
 namespace {
 constexpr uint32_t kActor = 0xff000000;

@@ -35,6 +35,7 @@
 #include "HostStartMessage.h"
 #include "HostStopMessage.h"
 #include "SpSnippet.h"
+#include "SpellCastRules.h"
 #include "UpdateAnimVariablesMessage.h"
 #include "UpdateEquipmentMessage.h"
 #include <algorithm>
@@ -753,6 +754,10 @@ bool IsHeldScroll(const MpActor& actor, uint32_t spellId)
   return false;
 }
 
+}  // namespace
+
+namespace SpellCastRules {
+
 bool CanCastSpell(const MpActor& actor, uint32_t spellId)
 {
   if (actor.GetEquipment().IsSpellEquipped(spellId)) {
@@ -775,6 +780,10 @@ bool CanCastSpell(const MpActor& actor, uint32_t spellId)
   return actor.GetProfileId() == -1 &&
     (actor.IsSpellLearned(spellId) || IsSpellInTemplateTree(actor, spellId));
 }
+
+}  // namespace SpellCastRules
+
+namespace {
 
 // A record's fields of one type, as raw little-endian uint32 at an offset
 template <class Callback>
@@ -2756,7 +2765,7 @@ void ActionListener::OnSpellCast(const RawMessageData& rawMsgData,
     return;
   }
 
-  if (!CanCastSpell(*caster, spellCastData.spell)) {
+  if (!SpellCastRules::CanCastSpell(*caster, spellCastData.spell)) {
     spdlog::info("ActionListener::OnSpellCast - spell {0:x} not "
                  "found in equipment of {1:x}",
                  spellCastData.spell, caster->GetFormId());
