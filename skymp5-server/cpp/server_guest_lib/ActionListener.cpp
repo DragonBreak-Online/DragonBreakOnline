@@ -408,14 +408,14 @@ uint32_t StandInSpellOf(WorldState* worldState, uint32_t enchantmentId)
   using Type = espm::MGEF::EffectType;
   struct Index
   {
+    bool built = false;
     std::unordered_map<Type, std::vector<espm::LookupResult>> spellsByType;
     std::unordered_map<uint32_t, uint32_t> answers;
   };
-  static std::unordered_map<const WorldState*, Index> indexByWorld;
-  auto [indexIt, built] = indexByWorld.try_emplace(worldState);
-  Index& index = indexIt->second;
+  Index& index = worldState->GetEspmDerived<Index>();
   auto& browser = worldState->GetEspm().GetBrowser();
-  if (built) {
+  if (!index.built) {
+    index.built = true;
     for (const auto& spell : browser.GetDistinctRecordsByType("SPEL")) {
       ForEachEffectData(
         worldState, spell,
@@ -654,13 +654,16 @@ std::vector<uint32_t> ShoutWordSpells(const espm::LookupResult& lookup,
 // shout's words (Nate, 2026-09-28: shouts did nothing to anyone).
 bool IsShoutWordSpell(WorldState* worldState, uint32_t spellId)
 {
-  static std::unordered_map<const WorldState*, std::unordered_set<uint32_t>>
-    wordsByWorld;
+  struct ShoutWords
+  {
+    bool built = false;
+    std::unordered_set<uint32_t> spells;
+  };
   if (!worldState || !worldState->HasEspm()) {
     return false;
   }
-  auto it = wordsByWorld.find(worldState);
-  if (it == wordsByWorld.end()) {
+  auto& shoutWords = worldState->GetEspmDerived<ShoutWords>();
+  if (!shoutWords.built) {
     std::unordered_set<uint32_t> words;
     auto& browser = worldState->GetEspm().GetBrowser();
     const auto perFile = browser.GetRecordsByType("SHOU");
@@ -679,9 +682,10 @@ bool IsShoutWordSpell(WorldState* worldState, uint32_t spellId)
     }
     spdlog::info("ActionListener: {} shout word spells in the load order",
                  words.size());
-    it = wordsByWorld.emplace(worldState, std::move(words)).first;
+    shoutWords.spells = std::move(words);
+    shoutWords.built = true;
   }
-  return it->second.count(spellId) > 0;
+  return shoutWords.spells.count(spellId) > 0;
 }
 
 // The host's engine rolls leveled templates on its own, so any spell in the base's template tree is valid
@@ -797,10 +801,11 @@ void ForEachFieldUint32(WorldState* worldState, const espm::RecordHeader* rec,
 const std::vector<uint32_t>& ImpactHazardSpells(WorldState* worldState,
                                                 uint32_t impactDataSetId)
 {
-  static std::unordered_map<
-    WorldState*, std::unordered_map<uint32_t, std::vector<uint32_t>>>
-    spellsByWorld;
-  auto& cache = spellsByWorld[worldState];
+  struct HazardSpells
+  {
+    std::unordered_map<uint32_t, std::vector<uint32_t>> bySet;
+  };
+  auto& cache = worldState->GetEspmDerived<HazardSpells>().bySet;
   if (const auto it = cache.find(impactDataSetId); it != cache.end()) {
     return it->second;
   }
@@ -1047,10 +1052,13 @@ std::optional<float> DroppedCharge(WorldState* worldState,
 // Breadth-first so its own inventory comes before a template's leveled actors (review S1); cached per base and enchantment
 bool IsStaffInTemplateTree(const MpActor& actor, uint32_t enchantmentId)
 {
+  struct StaffAnswers
+  {
+    std::unordered_map<uint64_t, bool> byBaseAndEnchantment;
+  };
   WorldState* worldState = actor.GetParent();
-  static std::unordered_map<WorldState*, std::unordered_map<uint64_t, bool>>
-    answersByWorld;
-  auto& answers = answersByWorld[worldState];
+  auto& answers =
+    worldState->GetEspmDerived<StaffAnswers>().byBaseAndEnchantment;
   const uint64_t key =
     (static_cast<uint64_t>(actor.GetBaseId()) << 32) | enchantmentId;
   if (const auto it = answers.find(key); it != answers.end()) {

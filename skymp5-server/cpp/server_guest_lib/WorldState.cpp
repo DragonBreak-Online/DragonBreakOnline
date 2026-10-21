@@ -73,6 +73,7 @@ struct WorldState::Impl
   std::optional<std::unordered_map<
     uint32_t, std::vector<std::pair<uint32_t, uint32_t>>>>
     unloadedActivationChilds;
+  std::unordered_map<const void*, std::shared_ptr<void>> espmDerived;
 };
 
 WorldState::WorldState()
@@ -106,6 +107,7 @@ void WorldState::AttachEspm(espm::Loader* espm_,
   espm = espm_;
   formCallbacksFactory = formCallbacksFactory_;
   espmCache.reset(new espm::CompressedFieldsCache);
+  pImpl->espmDerived.clear();
   espmFiles = espm->GetFileNames();
 
   // Reuse the combiner's slot assignment so FormDesc encodes the same form ids the game runtime does
@@ -1210,6 +1212,11 @@ espm::CompressedFieldsCache& WorldState::GetEspmCache()
     throw std::runtime_error("No espm cache found");
   }
   return *espmCache;
+}
+
+std::shared_ptr<void>& WorldState::EspmDerivedSlot(const void* key)
+{
+  return pImpl->espmDerived[key];
 }
 
 IScriptStorage* WorldState::GetScriptStorage() const
