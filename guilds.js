@@ -238,7 +238,11 @@ module.exports = (api) => {
   // it is untouched; what it catches is a leader of something else, or a hold's ruler.
   const leadershipNo = (t, fid, by) => {
     if (typeof globalThis.__dboLeadershipRefusal !== 'function') return '';
-    try { return globalThis.__dboLeadershipRefusal(t >>> 0, { kind: 'faction', id: String(fid) }, by) || ''; } catch (e) { return ''; }
+    // A hold's or stronghold's own faction is its ruler seat (court.js keeps the two in step, and seatOfficial writes the
+    // seat before it syncs the rank), so the seat skipped is the hold's, or a newly seated Jarl is refused their own rank
+    const f = FACTIONS.get(String(fid));
+    const skip = f && (f.kind === 'hold' || f.kind === 'stronghold') && f.zone ? { kind: 'hold', id: String(f.zone) } : { kind: 'faction', id: String(fid) };
+    try { return globalThis.__dboLeadershipRefusal(t >>> 0, skip, by) || ''; } catch (e) { return ''; }
   };
   const outranks = (fid, a, b) => { const ea = entryOf(fid, a), eb = entryOf(fid, b); return !!ea && (!eb || ea.rank < eb.rank); };
 

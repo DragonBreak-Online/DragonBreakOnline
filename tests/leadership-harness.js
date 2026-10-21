@@ -135,6 +135,20 @@ refusalFor = 0;
 r = globalThis.__dboGuildFoundPlayer(def, G_BOUND, []);
 ok('...and founds it once they hold nothing', !r || typeof r !== 'string' ? true : !/already holds/.test(r), r);
 
+// A newly seated ruler takes their own hold faction's leader rank: seatOfficial writes the seat before court.js syncs
+// the rank, so the seat skipped must be the hold's (a faction skip refused every new Jarl their rank)
+{
+  const court = [...Object.values(DEFS.factions || {})].find((f) => f && (f.kind === 'hold' || f.kind === 'stronghold') && f.zone)
+    || (Array.isArray(DEFS.factions) ? DEFS.factions.find((f) => f && (f.kind === 'hold' || f.kind === 'stronghold') && f.zone) : null);
+  const seen = [];
+  const keep = globalThis.__dboLeadershipRefusal;
+  globalThis.__dboLeadershipRefusal = (t, skip) => { seen.push(skip); return skip && skip.kind === 'hold' && skip.id === String(court.zone) ? '' : 'Freeone already holds Jarl of somewhere.'; };
+  const out = court ? globalThis.__dboCourtSync(court.zone, G_FREE, ['@leader'], true) : 'no court faction in guild-defs.json';
+  const got = court ? (globalThis.__dboGuildsOf(G_FREE) || []).find((m) => m.id === court.id) : undefined;
+  ok("a new ruler's court sync skips their own hold seat and gives them the leader rank", !!court && !!got && got.role === 'leader' && seen.some((k) => k && k.kind === 'hold' && k.id === String(court.zone)), [court && court.id, out, got, seen]);
+  globalThis.__dboLeadershipRefusal = keep;
+}
+
 // ---- part 3: the two gamemode.js chokepoints -------------------------------------------------------------------------
 process.chdir(ROOT);
 const GM = fs.readFileSync(path.join(ROOT, 'gamemode.js'), 'utf8');
