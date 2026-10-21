@@ -150,7 +150,7 @@ function createPunishments({ config, readStore, dynamicFields, characterName, lo
     const flag = v => ({ status: v.status, asOf: v.asOf })
     const restStatus = read.cases.status === 'ok' && read.restitution.status === 'unreadable' ? read.restitution : read.cases
     snapshot = {
-      at: t, rows, strikes: dsc.strikes, cfg, id,
+      at: t, rows: R.oneRowPerBan(rows), strikes: dsc.strikes, cfg, id,
       sources: {
         discipline: flag(read.discipline), panelBans: flag(read.panelBans), bans: flag(read.bans),
         jail: { status: id.status.store === 'ok' ? 'ok' : 'unreadable', asOf: iso(t) },
@@ -265,7 +265,8 @@ function createPunishments({ config, readStore, dynamicFields, characterName, lo
     },
 
     async recent(viewer, q) {
-      const o = listOptions(viewer, q, now() - 30 * R.DAY_MS)
+      // The last 30 days unless a date is picked; a "to" alone has no lower bound
+      const o = listOptions(viewer, q, q.to !== undefined && q.to !== '' ? null : now() - 30 * R.DAY_MS)
       const s = collect()
       const rows = await visible(viewer, s.rows)
       const page = paginate(rows.filter(r => matches(o, r)), atKey, -1, o.cursor, o.limit)

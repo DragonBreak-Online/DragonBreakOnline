@@ -70,7 +70,8 @@
  .con-entry{border-top:1px solid rgba(143,211,208,.13);padding:.45rem 0}
  .con-entry pre{margin:.3rem 0 0;padding:.4rem .6rem;background:var(--panel-soft);border:1px solid var(--border);border-radius:6px;font-size:.8rem;white-space:pre-wrap;overflow-wrap:anywhere}
  .con-help{font-size:.8rem;margin:.2rem 0 .4rem}
- #punish td{font-size:.86rem}
+ #punish td{font-size:.86rem;overflow-wrap:break-word}
+ #punish th{cursor:default}
  #punish .pill{font-size:.68rem}
  #punish .bar{margin:.15rem 0 .35rem}
  #punish button.chip{cursor:pointer;font:inherit;font-size:.76rem;line-height:1.45;padding:.02rem .55rem;margin:.1rem .25rem .1rem 0;background:transparent;color:var(--text-dim);border:1px solid var(--border);border-radius:999px}
@@ -80,6 +81,7 @@
  .pu-acct{display:flex;flex-wrap:wrap;gap:.15rem .7rem;align-items:baseline;padding:.35rem 0;border-bottom:1px solid rgba(143,211,208,.08)}
  .pu-note{font-size:.8rem;margin:.15rem 0}
  #punish .con-form input{font-family:inherit}
+ #punish .flag{white-space:normal}
 </style></head><body>
 <img class="wm" src="dbo-watermark.png" alt="">
 <div class="wrap">
@@ -979,8 +981,8 @@ function puWhat(r) {
     case 'lift': return r.lifts ? `Lifted suspension #${r.lifts}` : 'Lifted a suspension';
     case 'overturn': return r.undid ? `Overturned #${r.undid}` : 'Overturned a record';
     case 'tempban': return [`Banned${r.hours ? ` ${r.hours} h` : ''}`, until].filter(Boolean).join(', ');
-    case 'ban': return 'Banned, permanent';
-    case 'ipban': return 'IP ban, permanent (the address is never shown)';
+    case 'ban': return r.source === 'playerLog' ? 'Banned in the admin panel (the log does not say for how long)' : 'Banned, permanent';
+    case 'ipban': return `IP ban, ${r.until ? `until ${puWhen(r.until)}` : 'permanent'} (the address is never shown)`;
     case 'unban': return 'Ban lifted';
     case 'discord_ban': return r.source === 'bans' ? 'Banned on Discord, so banned from the game' : 'Banned on Discord';
     case 'discord_unban': return 'Unbanned on Discord';
@@ -1079,10 +1081,13 @@ function puMore(st, load) {
   return b;
 }
 
+// A filter changed while a list loads asks again; only the newest answer is kept
 async function puLoad(st, url, more) {
-  if (st.busy) return false;
+  if (more && st.busy) return false;
+  const seq = st.seq = (st.seq || 0) + 1;
   st.busy = true;
   const r = await puGet(url + (more && st.next ? `${url.includes('?') ? '&' : '?'}cursor=${encodeURIComponent(st.next)}` : ''));
+  if (seq !== st.seq) return false;
   st.busy = false;
   if (!r.ok) { st.error = puError(r); return false; }
   st.error = '';

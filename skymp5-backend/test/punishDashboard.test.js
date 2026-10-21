@@ -195,3 +195,36 @@ test('Find a player sends the query and lists accounts that open their history',
   await settle()
   assert.ok(p.asked.includes(`${PU}/player/10?limit=50`))
 })
+
+test('a chip pressed while a list is loading is not lost: the newest answer is the one shown', async () => {
+  let slow = null
+  const p = load(url => (url === `${PU}/recent?kind=strike%2Cwarn&limit=50`
+    ? [200, { ...RECENT, rows: [ROW('dsc:10:1', 'warn', { state: 'recorded', active: false, reason: 'Spamming the trade chat' })] }]
+    : panel(url)))
+  await settle()
+  const fetch0 = p.ctx.fetch
+  p.ctx.fetch = url => (url === `${PU}/recent?kind=strike&limit=50` ? new Promise(done => { slow = done }) : fetch0(url))
+  button(p.$('puRecent'), 'Strike').listeners.click()
+  await settle()
+  assert.ok(slow, 'the Strike load is still in flight')
+  button(p.$('puRecent'), 'Warning').listeners.click()
+  await settle()
+  assert.ok(p.asked.includes(`${PU}/recent?kind=strike%2Cwarn&limit=50`), p.asked.join(' '))
+  slow({ ok: true, status: 200, json: async () => RECENT })
+  await settle()
+  const text = p.$('puRecent').textContent
+  assert.match(text, /Spamming the trade chat/)
+  assert.doesNotMatch(text, /Kicked/)
+})
+
+test('a ban only the player log has is not called permanent; a timed IP ban shows its end', async () => {
+  const p = load(url => (url.startsWith(`${PU}/recent`)
+    ? [200, { ...RECENT, rows: [ROW('plog:gen1:9', 'ban', { source: 'playerLog', state: 'recorded', active: false, until: null, endsInMs: null, hours: null }),
+      ROW('abn:ip2', 'ipban', { source: 'panelBans', until: '2026-10-22T05:00:00.000Z' })] }]
+    : panel(url)))
+  await settle()
+  const text = p.$('puRecent').textContent
+  assert.match(text, /Banned in the admin panel \(the log does not say for how long\)/)
+  assert.doesNotMatch(text, /Banned, permanent/)
+  assert.match(text, /IP ban, until 22 Oct 05:00 UTC/)
+})
