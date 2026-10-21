@@ -170,10 +170,11 @@ function createPunishments({ config, readStore, dynamicFields, characterName, lo
   // For a GM, records on staff members are left out, and so is any whose account Discord could not be asked about
   async function staffFree(discordIds) {
     const list = [...new Set(discordIds.map(d => d || ''))]
-    let timer
-    const giveUp = new Promise(resolve => { timer = setTimeout(resolve, LOOKUPS_MS, 'unknown') })
+    let timer, gaveUp = false
+    const giveUp = new Promise(resolve => { timer = setTimeout(() => { gaveUp = true; resolve('unknown') }, LOOKUPS_MS) })
     try {
-      const status = await mapLimit(list, LOOKUPS_AT_ONCE, d => (d ? Promise.race([staffStatusOf(d), giveUp]) : 'unknown'))
+      // Once given up, the accounts not yet asked about are not asked at all
+      const status = await mapLimit(list, LOOKUPS_AT_ONCE, d => (d && !gaveUp ? Promise.race([staffStatusOf(d), giveUp]) : 'unknown'))
       return new Set(list.filter((d, i) => status[i] === 'player'))
     } finally { clearTimeout(timer) }
   }
