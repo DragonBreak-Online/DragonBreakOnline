@@ -8982,7 +8982,7 @@ try {
   const THIEVERY_JS = path.resolve('thievery.js');
   delete require.cache[THIEVERY_JS];
   require(THIEVERY_JS)({ mp, log, personal, system, staffSay, audit, who, display, displayFor, cfg, onUi, openWidget, closeWidget, onlineActors, every,
-    recordOf, adminItemName, registerChatCommand, isAdmin, isLeadStaff, findByName, profileOf, sendPacket, distanceMeters, approvalForum, saveSoon, saveNow });
+    recordOf, adminItemName, registerChatCommand, isAdmin, isLeadStaff, findByName, profileOf, sendPacket, distanceMeters, approvalForum, saveSoon, saveNow, staffNote });
 } catch (e) { log('thievery.js failed to load:', e.stack || e.message); globalThis.__dboBurglaryActivate = null; }
 // ---- dungeon traps, run by the server: plates, tripwires and trigger boxes, their traps' swings and blows (server\traps.js)
 try {

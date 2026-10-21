@@ -21,6 +21,8 @@
 // <n> lifts the freeze. A freeze nobody rules lifts after freezeMaxHours. Guards also seize stolen things from a bound,
 // downed or jailed thief (/stolen <name>, /stolen seize <name>), which go back to their owners.
 // A faction hall, or a ref in protectedRefs, needs a GM's permit for that thief (/burglary permit <name>, then use the door).
+// Staff: the F7 admin panel's Thievery tab (staffData widget 162, dbo:staffThievery) shows the factions, fences, raids, the
+// stolen ledger, permits and live breaches, and its buttons run the same actions as /burglary, /fence and /stolen return.
 //
 // State: thievery.json beside the server (runtime, gitignored). Item moves save at once; the rest through saveSoon.
 'use strict';
@@ -98,12 +100,20 @@ const factory = (api) => {
   const displayFor = fn(api.displayFor, (viewer, t) => display(t));
   const distanceMeters = fn(api.distanceMeters, () => Infinity);
   const approvalForum = fn(api.approvalForum, () => {});
+  const staffNote = fn(api.staffNote, null);
   const saveSoon = fn(api.saveSoon, null), saveNow = fn(api.saveNow, null);
   const C = Object.assign({}, DEFAULTS, cfg.thievery || {});
   const FILE = path.resolve(C.file || 'thievery.json');
   const WIDGET_ID = 161;
   // Kept across hot reloads: break-ins under way (thief -> channel), open panels, armed staff, the loaded state
   const S = globalThis.__dboThievery || (globalThis.__dboThievery = { channels: new Map(), pending: new Map(), arm: new Map(), data: null });
+  // Staff with the F7 Thievery tab open (actor -> the last state sent) and the last answer each was shown
+  if (!(S.watch instanceof Map)) S.watch = new Map();
+  if (!(S.panelResult instanceof Map)) S.panelResult = new Map();
+  // A data-only widget the F7 Thievery tab reads (front staffData); never drawn on its own
+  const THIEVERY_DATA_WIDGET_ID = 162;
+  let pushWatchers = () => {};
+  let armedDone = (a, r) => personal(a, r.text);
 
   // ---- state ----------------------------------------------------------------------------------------------------------
   const data = () => {
@@ -116,9 +126,11 @@ const factory = (api) => {
   };
   const snapshot = () => JSON.stringify(data(), null, 1);
   const writeSync = () => { try { const tmp = `${FILE}.tmp`; fs.writeFileSync(tmp, snapshot()); fs.renameSync(tmp, FILE); } catch (e) { log('thievery: saving failed', e.message); } };
-  const save = () => (saveSoon ? saveSoon(FILE, snapshot) : writeSync());
+  // Every change is saved, so the open F7 tabs hear of it here
+  const changed = () => setImmediate(() => { try { pushWatchers(); } catch (e) { log('thievery: panel update failed', e.message); } });
+  const save = () => { changed(); return saveSoon ? saveSoon(FILE, snapshot) : writeSync(); };
   // Item moves: the ledger is written with the inventories
-  const saveMove = () => (saveNow ? saveNow(FILE, snapshot) : writeSync());
+  const saveMove = () => { changed(); return saveNow ? saveNow(FILE, snapshot) : writeSync(); };
 
   // ---- small readers --------------------------------------------------------------------------------------------------
   const get = (a, prop, fallback) => { try { const v = mp.get(a, prop); return v === undefined || v === null ? fallback : v; } catch (e) { return fallback; } };
@@ -247,7 +259,7 @@ const factory = (api) => {
   // The visible work at the lock: an interaction idle (idles.js) held while it lasts, which other players see through the
   // animation sync; idleKey '' plays none
   const holdIdle = (a) => { try { return C.idleKey && typeof globalThis.__dboHoldIdle === 'function' ? globalThis.__dboHoldIdle(a, C.idleKey) : null; } catch (e) { return null; } };
-  const endChannel = (ch) => { S.channels.delete(ch.a); try { if (ch.idle && typeof globalThis.__dboStopIdle === 'function') globalThis.__dboStopIdle(ch.a, ch.idle); } catch (e) { /* offline */ } };
+  const endChannel = (ch) => { S.channels.delete(ch.a); changed(); try { if (ch.idle && typeof globalThis.__dboStopIdle === 'function') globalThis.__dboStopIdle(ch.a, ch.idle); } catch (e) { /* offline */ } };
   const interrupt = (a, why) => {
     const ch = S.channels.get(a >>> 0); if (!ch) return;
     endChannel(ch);
@@ -285,6 +297,7 @@ const factory = (api) => {
     const now = Date.now();
     const ch = { a: a >>> 0, ref: ref >>> 0, p: home.p, rec: home.rec, kind: home.kind, at: now, until: now + C.forceSeconds * 1000, pos: posOf(a), cell: cellOf(a) };
     S.channels.set(a >>> 0, ch);
+    changed();
     ch.idle = holdIdle(a);
     const label = homeLabel(home.rec);
     personal(a, `You set to work on the lock of ${label}. Hold still for ${C.forceSeconds} seconds; anyone near can see you, and a blow or a step away stops you.`);
@@ -304,7 +317,7 @@ const factory = (api) => {
         if (hitSince(a, ch.at)) { personal(a, 'The lock gives, but you were seen to: the moment is lost.'); return; }
         const now = Date.now();
         const d = data();
-        d.breaches[breachKey(a, ch.p)] = { thief: a, name: display(a), at: now, until: now + C.breachMinutes * 60000, faction: thiefFaction(a),
+        d.breaches[breachKey(a, ch.p)] = { thief: a, name: display(a), home: homeLabel(ch.rec), at: now, until: now + C.breachMinutes * 60000, faction: thiefFaction(a),
           [ch.kind === 'door' ? 'outsideCell' : 'innerCell']: ch.cell };
         d.homes[hex(ch.p)] = now;
         save();
@@ -513,7 +526,7 @@ const factory = (api) => {
     }
     if (changed) save();
   };
-  every('thieveryTick', 30000, () => { deliverReturns(); tellRaid(); mature(); return 0; });
+  every('thieveryTick', 30000, () => { deliverReturns(); tellRaid(); mature(); pushWatchers(); return 0; });
 
   // ---- the activation hook ------------------------------------------------------------------------------------------
   // gamemode.js asks this before housing's locks; true ends the activation here (nothing opens). Anyone not handled here
@@ -524,7 +537,7 @@ const factory = (api) => {
     const armed = S.arm.get(caster);
     if (armed && Date.now() < armed.until) {
       S.arm.delete(caster);
-      if (armed.kind === 'fence') markFence(caster, target, armed.fid); else permitAt(caster, target, armed);
+      armedDone(caster, armed.kind === 'fence' ? markFence(caster, target, armed.fid) : permitAt(caster, target, armed));
       return true;
     }
     const fence = fenceAt(target);
@@ -568,62 +581,186 @@ const factory = (api) => {
   });
   onUi('thiefClose', (a) => { S.pending.delete(a >>> 0); closeWidget(a, WIDGET_ID); });
 
-  // ---- staff: approving factions, fences, permits ----------------------------------------------------------------------
+  // ---- staff actions: one path for the commands and the F7 Thievery tab ---------------------------------------------------
+  // Each returns { ok, text }; the commands say the text, the tab shows it. Tiers: Lead GM for factions and fences, any GM for
+  // raids, permits and sending stolen goods back (a raid ruled before its notice is out: Lead GM).
+  const res = (ok, text) => ({ ok: !!ok, text: String(text) });
+  const setFaction = (a, fid, on) => {
+    if (!isLeadStaff(a)) return res(false, 'Lead GMs and above approve thief factions.');
+    if (!factionExists(fid)) return res(false, `No faction "${fid}". Use its id, as /burglary factions lists them.`);
+    const d = data();
+    d.approved = d.approved.filter((x) => x !== fid);
+    if (on) d.approved.push(fid);
+    save();
+    audit(`BURGLARY ${who(a)} ${on ? 'approved' : 'revoked'} ${fid} as a thief faction`);
+    return res(true, `${factionName(fid)} is ${on ? 'now' : 'no longer'} a thief faction${!on && (C.factions || []).includes(fid) ? ' here, but the config still lists it' : ''}.`);
+  };
+  const armFence = (a, fid) => {
+    if (!isLeadStaff(a)) return res(false, 'Lead GMs and above place a Fence Chest.');
+    if (!approvedFactions().has(fid)) return res(false, `${fid || 'That'} is no approved thief faction (/burglary factions).`);
+    S.arm.set(a >>> 0, { kind: 'fence', fid, until: Date.now() + C.armSeconds * 1000 });
+    return res(true, `Now open the container in ${factionName(fid)}'s hall that is to be its Fence Chest (within ${C.armSeconds} s).`);
+  };
+  const unmarkFence = (a, fid) => {
+    if (!isLeadStaff(a)) return res(false, 'Lead GMs and above place a Fence Chest.');
+    const d = data();
+    if (!d.fences[fid]) return res(false, 'It has no fence.');
+    if (lotsOf(fid).length || d.fences[fid].frozen) return res(false, 'Its fence still holds lots or is frozen; mark another chest instead, and the lots move with it.');
+    delete d.fences[fid]; save(); audit(`FENCE ${who(a)} removed the Fence Chest of ${factionName(fid)}`);
+    return res(true, `The Fence Chest of ${factionName(fid)} is a plain container again.`);
+  };
+  // The armed staff member's next activation (the hook above)
   const markFence = (a, ref, fid) => {
-    if (baseType(ref) !== 'CONT') return personal(a, 'That is no container. /fence mark again.');
+    if (!isLeadStaff(a)) return res(false, 'Lead GMs and above place a Fence Chest.');
+    if (baseType(ref) !== 'CONT') return res(false, 'That is no container. Mark again.');
     const hall = (() => { try { return typeof globalThis.__dboGuildHall === 'function' ? globalThis.__dboGuildHall(fid) : null; } catch (e) { return null; } })();
     const cells = hall && Array.isArray(hall.cells) ? hall.cells.map((c) => String(c).toLowerCase()) : [];
-    if (cells.length && !cells.includes(String(get(ref, 'worldOrCellDesc', '') || '').toLowerCase())) return personal(a, `That container is not in ${factionName(fid)}'s hall (${hall.name}).`);
+    if (cells.length && !cells.includes(String(get(ref, 'worldOrCellDesc', '') || '').toLowerCase())) return res(false, `That container is not in ${factionName(fid)}'s hall (${hall.name}).`);
     const d = data();
-    if (fenceAt(ref)) return personal(a, 'That container is a fence already.');
+    if (fenceAt(ref)) return res(false, 'That container is a fence already.');
     // Its own contents could never be reached again: an empty one only
     const inv = get(ref, 'inventory', null);
-    if (inv && (inv.entries || []).some((e) => Number(e && e.count) > 0)) return personal(a, 'Empty that container first: a Fence Chest never opens as a container again.');
-    if (homeOf(ref)) return personal(a, 'That is a player\'s storage, not a hall\'s chest.');
+    if (inv && (inv.entries || []).some((e) => Number(e && e.count) > 0)) return res(false, 'Empty that container first: a Fence Chest never opens as a container again.');
+    if (homeOf(ref)) return res(false, 'That is a player\'s storage, not a hall\'s chest.');
     const old = d.fences[fid];
     d.fences[fid] = Object.assign({}, old || {}, { chest: hex(ref), by: display(a), at: Date.now() });
     save();
     audit(`FENCE ${who(a)} made ${hex(ref)} the Fence Chest of ${factionName(fid)}${old ? ` (was ${old.chest}; its lots stay)` : ''}`);
-    personal(a, `That chest is now the Fence Chest of ${factionName(fid)}. It no longer opens as a container.`);
+    return res(true, `That chest is now the Fence Chest of ${factionName(fid)}. It no longer opens as a container.`);
+  };
+  const armPermit = (a, name, hoursRaw) => {
+    if (!isAdmin(a)) return res(false, 'GMs grant permits.');
+    const t = name ? findByName(name) : null;
+    if (!t) return res(false, 'Name a thief who is online: /burglary permit <name> [hours], then use the home\'s door or chest.');
+    const hours = Math.max(1, Math.min(168, Number(hoursRaw) || C.permitHours));
+    S.arm.set(a >>> 0, { kind: 'permit', thief: t >>> 0, name: display(t), hours, until: Date.now() + C.armSeconds * 1000 });
+    return res(true, `Now use the door or chest of the home ${display(t)} may break into (within ${C.armSeconds} s).`);
   };
   const permitAt = (a, ref, armed) => {
+    if (!isAdmin(a)) return res(false, 'GMs grant permits.');
     const home = homeOf(ref);
-    if (!home) return personal(a, 'That is no player\'s home. /burglary permit again.');
-    data().permits[hex(home.p)] = { thief: armed.thief, name: armed.name, until: Date.now() + armed.hours * HOUR, by: display(a) };
+    if (!home) return res(false, 'That is no player\'s home. Grant the permit again.');
+    data().permits[hex(home.p)] = { thief: armed.thief, name: armed.name, until: Date.now() + armed.hours * HOUR, by: display(a), home: homeLabel(home.rec) };
     save();
     audit(`BURGLARY ${who(a)} permits ${armed.name} to break into ${homeLabel(home.rec)} (${hex(home.p)}) for ${armed.hours} h`);
-    personal(a, `${armed.name} may break into ${homeLabel(home.rec)} for ${armed.hours} hours.`);
     if (online(armed.thief)) personal(armed.thief, `A GM has approved your break-in at ${homeLabel(home.rec)} for the next ${armed.hours} hours.`);
+    return res(true, `${armed.name} may break into ${homeLabel(home.rec)} for ${armed.hours} hours.`);
+  };
+  const revokePermit = (a, homeHex) => {
+    if (!isAdmin(a)) return res(false, 'GMs grant permits.');
+    const k = String(homeHex || '').toLowerCase(); const p = data().permits[k];
+    if (!p) return res(false, 'There is no permit for that home.');
+    delete data().permits[k]; save();
+    audit(`BURGLARY ${who(a)} revoked ${p.name}'s permit for ${p.home || k}`);
+    return res(true, `${p.name} may no longer break into ${p.home || k}.`);
+  };
+  const decideRaid = (a, n, verb, reason) => {
+    if (!isAdmin(a)) return res(false, 'GMs decide raids.');
+    const d = data();
+    const r = d.raids.find((x) => x.n === Number(n));
+    if (!r) return res(false, 'No such raid. /fence raids');
+    if (verb === 'approve' || verb === 'deny') {
+      if (r.state !== 'pending') return res(false, `Raid #${r.n} is ${r.state}.`);
+      if (verb === 'deny') {
+        if (!reason) return res(false, 'Give a reason: /fence deny <n> <reason>');
+        r.state = 'denied'; r.decidedBy = display(a); r.reason = reason; save();
+        audit(`FENCE raid #${r.n} denied by ${who(a)}: ${reason}`);
+        forum({ kind: 'close', key: raidKey(r), by: a, text: `denied it: ${reason}` });
+        if (online(r.by)) personal(r.by, `Your raid request #${r.n} was denied: ${reason}`);
+        return res(true, `Raid #${r.n} denied.`);
+      }
+      const now = Date.now();
+      Object.assign(r, { state: 'approved', decidedBy: display(a), approvedAt: now, raidAt: now + C.noticeHours * HOUR, told: [] });
+      const f = d.fences[r.fid]; if (f) f.frozen = r.n;
+      save();
+      audit(`FENCE raid #${r.n} on ${factionName(r.fid)} approved by ${who(a)}; the fence is frozen, the raid from ${new Date(r.raidAt).toISOString()}`);
+      forum({ kind: 'reply', key: raidKey(r), by: a, text: `approved it. The fence is frozen; the raid may be ruled from ${new Date(r.raidAt).toISOString().slice(0, 16)}Z.` });
+      if (online(r.by)) personal(r.by, `Your raid on the fence of ${factionName(r.fid)} is approved. The thieves are warned; the raid is on from ${new Date(r.raidAt).toUTCString().slice(5, 22)} UTC.`);
+      tellRaid();
+      return res(true, `Raid #${r.n} approved; the fence is frozen.`);
+    }
+    if (verb !== 'won' && verb !== 'lost') return res(false, 'Approve, deny, won or lost.');
+    if (r.state !== 'approved') return res(false, `Raid #${r.n} is ${r.state}.`);
+    if (Date.now() < Number(r.raidAt) && !isLeadStaff(a)) return res(false, `The thieves have until ${new Date(r.raidAt).toISOString().slice(0, 16)}Z.`);
+    r.state = verb; r.ruledBy = display(a); r.ruledAt = Date.now();
+    let k = 0;
+    if (verb === 'won') {
+      for (const l of lotsOf(r.fid)) {
+        l.state = 'recovered';
+        const st = d.stolen.find((x) => x.n === l.stolen); if (st) st.state = 'recovered';
+        returnToOwner(l, 'The guard recovered it from a fence'); k++;
+      }
+    }
+    unfreeze(r); saveMove();
+    audit(`FENCE raid #${r.n} on ${factionName(r.fid)} ruled ${verb} by ${who(a)}${verb === 'won' ? `: ${k} lot(s) go back to their owners` : ''}`);
+    forum({ kind: 'close', key: raidKey(r), by: a, text: verb === 'won' ? `ruled the raid won by the guard: ${k} lot(s) go back to their owners.` : 'ruled the raid lost by the guard: the fence is free again.' });
+    for (const o of onlineActors()) if (memberOf(o, r.fid) || o === (r.by >>> 0)) personal(o, verb === 'won' ? `The guard raided the fence of ${factionName(r.fid)} and recovered what it held.` : `The raid on the fence of ${factionName(r.fid)} failed; the fence is free again.`);
+    deliverReturns();
+    return res(true, `Raid #${r.n} ruled ${verb}.`);
+  };
+  // Out of a thief's pack into the owner's returns: true when it moved (what was not there stays on the ledger as lost)
+  const takeOff = (t, s, why) => {
+    const d = data();
+    const inv = get(t, 'inventory', { entries: [] });
+    const out = takeKind(inv.entries, kindKey(s.entry), Number(s.entry.count));
+    if (!out.taken) return false;
+    try { mp.set(t, 'inventory', { entries: out.left }); } catch (e) { log('thievery: a seizure failed', e.message); return false; }
+    const rest = Number(s.entry.count) - Number(out.taken.count);
+    if (rest > 0) d.stolen.push(Object.assign({}, s, { n: d.nextStolen++, entry: Object.assign({}, s.entry, { count: rest }), state: 'lost' }));
+    s.entry = out.taken; s.state = 'recovered';
+    returnToOwner(s, why);
+    return true;
+  };
+  const seize = (a, t) => {
+    if (!lawful(a) && !isAdmin(a)) return res(false, 'Only the guard searches for stolen goods.');
+    if (!isAdmin(a) && (distanceMeters(a, t) > C.seizeMeters || !(restrained(t) || downed(t) || jailed(t)))) return res(false, 'Search only someone bound, downed or jailed, within reach.');
+    let n = 0;
+    for (const s of carriedBy(t)) if (takeOff(t, s, 'The guard recovered it from the thief')) n++;
+    saveMove();
+    audit(`BURGLARY ${who(a)} seized ${n} stolen lot(s) from ${who(t)}`);
+    personal(t, `The guard takes back what you stole (${n}).`);
+    deliverReturns();
+    return res(true, `${n} stolen lot(s) taken; they go back to their owners.`);
+  };
+  // One ledger entry back to its owner: off the fence, or out of the thief's pack while they are online
+  const sendBack = (a, n) => {
+    if (!isAdmin(a)) return res(false, 'GMs send stolen goods back.');
+    const d = data();
+    const s = d.stolen.find((x) => x.n === Number(n));
+    if (!s) return res(false, 'No such entry in the stolen ledger.');
+    if (s.state === 'fenced') {
+      const l = d.lots.find((x) => x.n === s.lot && x.state === 'held');
+      if (!l) return res(false, `Entry #${s.n} is not on the fence any more.`);
+      const f = d.fences[l.fid];
+      if (f && f.frozen) return res(false, 'That fence is frozen for a raid: rule the raid instead.');
+      l.state = 'recovered'; s.state = 'recovered';
+      returnToOwner(l, 'Staff recovered it from a fence');
+    } else if (s.state === 'carried') {
+      const t = Number(s.thief) >>> 0;
+      if (!online(t)) return res(false, `${s.thiefName} is offline; send it back while they are in the game.`);
+      if (!takeOff(t, s, 'Staff recovered it from the thief')) return res(false, `${s.thiefName} no longer carries it.`);
+      personal(t, `Staff take back ${countText(s.entry)}, stolen from ${s.homeName}.`);
+    } else return res(false, `Entry #${s.n} is ${s.state}.`);
+    saveMove();
+    audit(`BURGLARY ${who(a)} sent stolen #${s.n} (${countText(s.entry)} [${hex(s.entry.baseId)}]) back to ${s.ownerName || s.owner}`);
+    deliverReturns();
+    return res(true, `${countText(s.entry)} goes back to ${s.ownerName || 'its owner'}.`);
   };
   const say = (a, lines) => (Array.isArray(lines) ? lines : [lines]).forEach((l) => personal(a, l));
+  const tell = (a, r) => personal(a, r.text);
 
   registerChatCommand('burglary', (a, args) => {
     const [sub, ...rest] = String(args || '').trim().split(/\s+/);
     const arg = rest.join(' ').trim();
     const s = String(sub || '').toLowerCase();
-    if (s === 'approve' || s === 'revoke') {
-      if (!isLeadStaff(a)) return personal(a, 'Lead GMs and above approve thief factions.');
-      if (!factionExists(arg)) return personal(a, `No faction "${arg}". Use its id, as /burglary factions lists them.`);
-      const d = data();
-      d.approved = d.approved.filter((x) => x !== arg);
-      if (s === 'approve') d.approved.push(arg);
-      save();
-      audit(`BURGLARY ${who(a)} ${s}d ${arg} as a thief faction`);
-      return personal(a, `${factionName(arg)} is ${s === 'approve' ? 'now' : 'no longer'} a thief faction${s === 'revoke' && (C.factions || []).includes(arg) ? ' here, but the config still lists it' : ''}.`);
-    }
+    if (s === 'approve' || s === 'revoke') return tell(a, setFaction(a, arg, s === 'approve'));
     if (s === 'factions') {
       if (!isAdmin(a)) return personal(a, 'For staff.');
       return say(a, [`Thievery is ${C.enabled ? 'on' : 'off'}. Thief factions: ${[...approvedFactions()].map(factionName).join(', ') || 'none'}.`,
         ...Object.entries(data().fences).map(([fid, f]) => `Fence of ${factionName(fid)}: chest ${f.chest}${f.frozen ? `, frozen by raid #${f.frozen}` : ''}, ${lotsOf(fid).length} lot(s)`)]);
     }
-    if (s === 'permit') {
-      if (!isAdmin(a)) return personal(a, 'GMs grant permits.');
-      const m = /^(.*?)(?:\s+(\d+))?$/.exec(arg); const t = m && m[1] ? findByName(m[1]) : null;
-      if (!t) return personal(a, 'Usage: /burglary permit <name> [hours], then use the home\'s door or chest.');
-      const hours = Math.max(1, Math.min(168, Number(m[2]) || C.permitHours));
-      S.arm.set(a >>> 0, { kind: 'permit', thief: t >>> 0, name: display(t), hours, until: Date.now() + C.armSeconds * 1000 });
-      return personal(a, `Now use the door or chest of the home ${display(t)} may break into (within ${C.armSeconds} s).`);
-    }
+    if (s === 'permit') { const m = /^(.*?)(?:\s+(\d+))?$/.exec(arg); return tell(a, armPermit(a, m && m[1], m && m[2])); }
+    if (s === 'unpermit') return tell(a, revokePermit(a, arg));
     if (s === 'log') {
       if (!isAdmin(a)) return personal(a, 'For staff.');
       const rows = data().stolen.slice(-15).map((x) => `#${x.n} ${new Date(x.at).toISOString().slice(5, 16)} ${x.thiefName} took ${countText(x.entry)} from ${x.homeName} (${x.ownerName}): ${x.state}`);
@@ -636,25 +773,14 @@ const factory = (api) => {
     say(a, [`You steal for ${factionName(f)}. Crouch and use a locked door of a player's home, or one of its chests, to break in: ${C.forceSeconds} s at the lock, seen by anyone near, then the lock itself.`,
       `You may carry off ${left} more kind${left === 1 ? '' : 's'} of thing in this ${C.takeWindowHours}-hour window (a stack is one). Fence it at your faction's Fence Chest: it turns to gold after ${C.fenceDays} days.`]);
     return undefined;
-  }, { help: 'how burglary works for you; staff: approve|revoke <faction> | factions | permit <name> [hours] | log' });
+  }, { help: 'how burglary works for you; staff: approve|revoke <faction> | factions | permit <name> [hours] | unpermit <home> | log' });
 
   registerChatCommand('fence', (a, args) => {
     const [sub, nRaw, ...rest] = String(args || '').trim().split(/\s+/);
     const s = String(sub || '').toLowerCase();
     const d = data();
-    if (s === 'mark' || s === 'unmark') {
-      if (!isLeadStaff(a)) return personal(a, 'Lead GMs and above place a Fence Chest.');
-      const fid = String(nRaw || '');
-      if (!approvedFactions().has(fid)) return personal(a, `${fid || 'That'} is no approved thief faction (/burglary factions).`);
-      if (s === 'unmark') {
-        if (!d.fences[fid]) return personal(a, 'It has no fence.');
-        if (lotsOf(fid).length || d.fences[fid].frozen) return personal(a, 'Its fence still holds lots or is frozen; mark another chest instead, and the lots move with it.');
-        delete d.fences[fid]; save(); audit(`FENCE ${who(a)} removed the Fence Chest of ${factionName(fid)}`);
-        return personal(a, 'Done.');
-      }
-      S.arm.set(a >>> 0, { kind: 'fence', fid, until: Date.now() + C.armSeconds * 1000 });
-      return personal(a, `Now open the container in ${factionName(fid)}'s hall that is to be its Fence Chest (within ${C.armSeconds} s).`);
-    }
+    if (s === 'mark') return tell(a, armFence(a, String(nRaw || '')));
+    if (s === 'unmark') return tell(a, unmarkFence(a, String(nRaw || '')));
     if (s === 'report') {
       if (!lawful(a) && !isAdmin(a)) return personal(a, 'Only the guard asks leave to raid a fence.');
       const fid = String(nRaw || ''); const evidence = rest.join(' ').trim().slice(0, C.maxEvidence);
@@ -665,8 +791,8 @@ const factory = (api) => {
       d.raids.push(r); save();
       audit(`FENCE raid #${r.n} asked by ${who(a)} on ${factionName(fid)}: ${evidence}`);
       forum({ kind: 'open', key: raidKey(r), title: `Fence raid #${r.n}: ${factionName(fid)}`, by: a,
-        text: `**Guard raid on the fence of ${factionName(fid)}**\nEvidence: ${evidence}\nDecide in game: /fence approve ${r.n}, or /fence deny ${r.n} <reason>. Approval freezes the Fence Chest at once and warns the faction; the raid can be ruled ${C.noticeHours} hours later with /fence won ${r.n} or /fence lost ${r.n}.` });
-      for (const o of onlineActors()) if (isAdmin(o)) staffSay(o, `Fence raid #${r.n} asked by ${display(a)} on ${factionName(fid)}. /fence raids`);
+        text: `**Guard raid on the fence of ${factionName(fid)}**\nEvidence: ${evidence}\nDecide in game (F7, Thievery tab): /fence approve ${r.n}, or /fence deny ${r.n} <reason>. Approval freezes the Fence Chest at once and warns the faction; the raid can be ruled ${C.noticeHours} hours later with /fence won ${r.n} or /fence lost ${r.n}.` });
+      for (const o of onlineActors()) if (isAdmin(o)) staffSay(o, `Fence raid #${r.n} asked by ${display(a)} on ${factionName(fid)}. F7 Thievery, or /fence raids`);
       return personal(a, `Your request (#${r.n}) is with the GMs.`);
     }
     if (s === 'raids') {
@@ -674,80 +800,94 @@ const factory = (api) => {
       const rows = d.raids.filter((r) => r.state === 'pending' || r.state === 'approved' || nRaw === 'all').slice(-10).map(raidLine);
       return say(a, rows.length ? rows : ['No raids are open.']);
     }
-    if (['approve', 'deny', 'won', 'lost'].includes(s)) {
-      if (!isAdmin(a)) return personal(a, 'GMs decide raids.');
-      const r = d.raids.find((x) => x.n === Number(nRaw));
-      if (!r) return personal(a, 'No such raid. /fence raids');
-      const reason = rest.join(' ').trim();
-      if (s === 'approve' || s === 'deny') {
-        if (r.state !== 'pending') return personal(a, `Raid #${r.n} is ${r.state}.`);
-        if (s === 'deny') {
-          if (!reason) return personal(a, 'Give a reason: /fence deny <n> <reason>');
-          r.state = 'denied'; r.decidedBy = display(a); r.reason = reason; save();
-          audit(`FENCE raid #${r.n} denied by ${who(a)}: ${reason}`);
-          forum({ kind: 'close', key: raidKey(r), by: a, text: `denied it: ${reason}` });
-          if (online(r.by)) personal(r.by, `Your raid request #${r.n} was denied: ${reason}`);
-          return personal(a, 'Denied.');
-        }
-        const now = Date.now();
-        Object.assign(r, { state: 'approved', decidedBy: display(a), approvedAt: now, raidAt: now + C.noticeHours * HOUR, told: [] });
-        const f = d.fences[r.fid]; if (f) f.frozen = r.n;
-        save();
-        audit(`FENCE raid #${r.n} on ${factionName(r.fid)} approved by ${who(a)}; the fence is frozen, the raid from ${new Date(r.raidAt).toISOString()}`);
-        forum({ kind: 'reply', key: raidKey(r), by: a, text: `approved it. The fence is frozen; the raid may be ruled from ${new Date(r.raidAt).toISOString().slice(0, 16)}Z.` });
-        if (online(r.by)) personal(r.by, `Your raid on the fence of ${factionName(r.fid)} is approved. The thieves are warned; the raid is on from ${new Date(r.raidAt).toUTCString().slice(5, 22)} UTC.`);
-        tellRaid();
-        return personal(a, 'Approved; the fence is frozen.');
-      }
-      if (r.state !== 'approved') return personal(a, `Raid #${r.n} is ${r.state}.`);
-      if (Date.now() < Number(r.raidAt) && !isLeadStaff(a)) return personal(a, `The thieves have until ${new Date(r.raidAt).toISOString().slice(0, 16)}Z.`);
-      r.state = s; r.ruledBy = display(a); r.ruledAt = Date.now();
-      let n = 0;
-      if (s === 'won') {
-        for (const l of lotsOf(r.fid)) {
-          l.state = 'recovered';
-          const st = d.stolen.find((x) => x.n === l.stolen); if (st) st.state = 'recovered';
-          returnToOwner(l, 'The guard recovered it from a fence'); n++;
-        }
-      }
-      unfreeze(r); saveMove();
-      audit(`FENCE raid #${r.n} on ${factionName(r.fid)} ruled ${s} by ${who(a)}${s === 'won' ? `: ${n} lot(s) go back to their owners` : ''}`);
-      forum({ kind: 'close', key: raidKey(r), by: a, text: s === 'won' ? `ruled the raid won by the guard: ${n} lot(s) go back to their owners.` : 'ruled the raid lost by the guard: the fence is free again.' });
-      for (const o of onlineActors()) if (memberOf(o, r.fid) || o === (r.by >>> 0)) personal(o, s === 'won' ? `The guard raided the fence of ${factionName(r.fid)} and recovered what it held.` : `The raid on the fence of ${factionName(r.fid)} failed; the fence is free again.`);
-      deliverReturns();
-      return personal(a, `Raid #${r.n} ruled ${s}.`);
-    }
+    if (['approve', 'deny', 'won', 'lost'].includes(s)) return tell(a, decideRaid(a, nRaw, s, rest.join(' ').trim()));
     return personal(a, 'Usage: /fence report <faction id> <evidence> (guards); staff: raids [all] | approve <n> | deny <n> <reason> | won <n> | lost <n> | mark|unmark <faction id>');
   }, { help: 'guards: report <faction> <evidence>; staff: raids, approve/deny/won/lost <n>, mark <faction>' });
 
   // ---- guards: stolen goods on a captured thief -------------------------------------------------------------------------
   registerChatCommand('stolen', (a, args) => {
-    if (!lawful(a) && !isAdmin(a)) return personal(a, 'Only the guard searches for stolen goods.');
     const raw = String(args || '').trim();
-    const seize = /^seize\s+/i.test(raw);
+    const ret = /^return\s+#?(\d+)$/i.exec(raw);
+    if (ret) return tell(a, sendBack(a, ret[1]));
+    if (!lawful(a) && !isAdmin(a)) return personal(a, 'Only the guard searches for stolen goods.');
+    const isSeize = /^seize\s+/i.test(raw);
     const t = findByName(raw.replace(/^seize\s+/i, ''));
-    if (!t) return personal(a, 'Usage: /stolen <name> to search, /stolen seize <name> to take it back.');
+    if (!t) return personal(a, 'Usage: /stolen <name> to search, /stolen seize <name> to take it back; staff: /stolen return <n>.');
     if (!isAdmin(a) && (distanceMeters(a, t) > C.seizeMeters || !(restrained(t) || downed(t) || jailed(t)))) return personal(a, 'Search only someone bound, downed or jailed, within reach.');
     const found = carriedBy(t);
-    if (!seize) return say(a, found.length ? [`${display(t)} carries stolen goods:`, ...found.map((s) => `${countText(s.entry)}, from ${s.homeName}`)] : [`${display(t)} carries nothing known to be stolen.`]);
-    const d = data(); let n = 0;
-    for (const s of found) {
-      const inv = get(t, 'inventory', { entries: [] });
-      const out = takeKind(inv.entries, kindKey(s.entry), Number(s.entry.count));
-      if (!out.taken) continue;
-      try { mp.set(t, 'inventory', { entries: out.left }); } catch (e) { log('thievery: a seizure failed', e.message); continue; }
-      const rest = Number(s.entry.count) - Number(out.taken.count);
-      if (rest > 0) d.stolen.push(Object.assign({}, s, { n: d.nextStolen++, entry: Object.assign({}, s.entry, { count: rest }), state: 'lost' }));
-      s.entry = out.taken; s.state = 'recovered';
-      returnToOwner(s, 'The guard recovered it from the thief'); n++;
+    if (!isSeize) return say(a, found.length ? [`${display(t)} carries stolen goods:`, ...found.map((s) => `${countText(s.entry)}, from ${s.homeName}`)] : [`${display(t)} carries nothing known to be stolen.`]);
+    return tell(a, seize(a, t));
+  }, { help: '<name> | seize <name>: stolen goods on a bound, downed or jailed thief (guards); return <n>: staff' });
+
+  // ---- the F7 Thievery tab ------------------------------------------------------------------------------------------
+  // The tab asks with dbo:staffThievery watch|unwatch|approve|revoke|mark|unmark|raid|permit|unpermit|sendback ...; while it is
+  // open the state comes as a staffData widget each time it changes. GMs and above see it; the buttons run the actions above,
+  // which check the tier themselves.
+  const FACTION_FILES = ['guild-defs.json', 'player-factions.json'];
+  const knownFactions = () => {
+    const out = new Map();
+    for (const f of FACTION_FILES) {
+      try { for (const x of (JSON.parse(fs.readFileSync(path.resolve(f), 'utf8')).factions || [])) if (x && x.id && !out.has(String(x.id))) out.set(String(x.id), String(x.name || x.id)); } catch (e) { /* not there */ }
     }
-    saveMove();
-    audit(`BURGLARY ${who(a)} seized ${n} stolen lot(s) from ${who(t)}`);
-    personal(t, `The guard takes back what you stole (${n}).`);
-    personal(a, `${n} stolen lot(s) taken; they go back to their owners.`);
-    deliverReturns();
-    return undefined;
-  }, { help: '<name> | seize <name>: stolen goods on a bound, downed or jailed thief (guards)' });
+    for (const id of approvedFactions()) if (!out.has(id)) out.set(id, factionName(id));
+    return [...out].map(([id, name]) => ({ id, name }));
+  };
+  const STOLEN_SHOWN = 300;
+  const view = (a) => {
+    const d = data(); const now = Date.now();
+    const approved = approvedFactions(); const fromConfig = new Set((C.factions || []).map(String));
+    const fenceRow = (fid) => { const f = d.fences[fid]; return f ? { chest: f.chest, by: f.by || '', at: Number(f.at) || 0, frozen: Number(f.frozen) || 0, lots: lotsOf(fid).length } : null; };
+    return {
+      enabled: !!C.enabled, lead: !!isLeadStaff(a), gm: !!isAdmin(a),
+      armed: (() => { const x = S.arm.get(a >>> 0); return x && now < x.until ? { kind: x.kind, fid: x.fid || '', name: x.name || '', until: x.until } : null; })(),
+      factions: [...approved].map((id) => ({ id, name: factionName(id), config: fromConfig.has(id), fence: fenceRow(id) })),
+      candidates: knownFactions().filter((f) => !approved.has(f.id)),
+      raids: d.raids.filter((r) => r.state === 'pending' || r.state === 'approved').concat(d.raids.filter((r) => r.state !== 'pending' && r.state !== 'approved').slice(-8).reverse())
+        .map((r) => ({ n: r.n, fid: r.fid, faction: factionName(r.fid), state: r.state, by: r.byName, evidence: r.evidence, at: r.at, raidAt: Number(r.raidAt) || 0, decidedBy: r.decidedBy || r.ruledBy || '', reason: r.reason || '' })),
+      stolen: d.stolen.slice(-STOLEN_SHOWN).reverse().map((s) => ({ n: s.n, at: s.at, item: countText(s.entry), owner: s.ownerName || String(s.owner), thief: s.thiefName, home: s.homeName, state: s.state,
+        canSendBack: s.state === 'fenced' || (s.state === 'carried' && online(s.thief)) })),
+      stolenTotal: d.stolen.length,
+      permits: Object.entries(d.permits).filter(([, p]) => now < Number(p.until)).map(([home, p]) => ({ home, homeName: p.home || home, thief: p.name, until: p.until, by: p.by || '' })),
+      breaches: Object.values(d.breaches).filter((b) => now < Number(b.until)).map((b) => ({ thief: b.name, home: b.home || '', faction: factionName(b.faction || ''), until: b.until, at: b.at })),
+      working: [...S.channels.values()].map((ch) => ({ thief: display(ch.a), home: homeLabel(ch.rec), kind: ch.kind, until: ch.until })),
+      result: (S.panelResult && S.panelResult.get(a >>> 0)) || null,
+    };
+  };
+  const pushTo = (a, force) => {
+    const v = view(a);
+    const key = JSON.stringify(v);
+    if (!force && S.watch.get(a >>> 0) === key) return;
+    S.watch.set(a >>> 0, key);
+    openWidget(a, Object.assign({ type: 'staffData', id: THIEVERY_DATA_WIDGET_ID, kind: 'thievery', now: Date.now() }, v), false);
+  };
+  pushWatchers = () => {
+    if (!S.watch.size) return;
+    const on = new Set(onlineActors().map((x) => x >>> 0));
+    for (const k of [...S.watch.keys()]) { if (!on.has(k) || !isAdmin(k)) { S.watch.delete(k); continue; } pushTo(k, false); }
+  };
+  const shown = (a, r) => { S.panelResult.set(a >>> 0, Object.assign({ at: Date.now() }, r)); if (S.watch.has(a >>> 0)) pushTo(a, false); return r; };
+  armedDone = (a, r) => { personal(a, r.text); shown(a, r); };
+  const panelOp = (a, op, x, y, z) => {
+    if (!isAdmin(a)) return null;
+    const arg = String(x == null ? '' : x).trim();
+    if (op === 'watch') { S.watch.set(a >>> 0, ''); return pushTo(a, true); }
+    if (op === 'unwatch') { S.watch.delete(a >>> 0); S.panelResult.delete(a >>> 0); return closeWidget(a, THIEVERY_DATA_WIDGET_ID); }
+    let r = null;
+    if (op === 'approve' || op === 'revoke') r = setFaction(a, arg, op === 'approve');
+    else if (op === 'mark') r = armFence(a, arg);
+    else if (op === 'unmark') r = unmarkFence(a, arg);
+    else if (op === 'raid') r = decideRaid(a, arg, String(y || ''), String(z || '').trim().slice(0, 300));
+    else if (op === 'permit') r = armPermit(a, arg, y);
+    else if (op === 'unpermit') r = revokePermit(a, arg);
+    else if (op === 'sendback') r = sendBack(a, arg);
+    else if (op === 'cancel') { S.arm.delete(a >>> 0); r = res(true, 'Nothing is armed.'); }
+    if (!r) return null;
+    try { if (typeof staffNote === 'function' && r.ok) staffNote(a, 'F7 Thievery', `${op} ${arg} ${y || ''}: ${r.text}`); } catch (e) { /* the note is optional */ }
+    return shown(a, r);
+  };
+  onUi('staffThievery', (a, args) => panelOp(a, String((args || [])[0] || ''), (args || [])[1], (args || [])[2], (args || [])[3]));
+  globalThis.__dboThieveryView = (a) => (isAdmin(a) ? view(a) : null);
+  globalThis.__dboThieveryAct = panelOp;
 
   log(`thievery ${C.enabled ? 'on' : 'off'}: ${approvedFactions().size} thief faction(s), ${Object.keys(data().fences).length} fence(s), ${data().lots.filter((l) => l.state === 'held').length} lot(s) held, ${S.channels.size} break-in(s) under way`);
   return { data, homeOf, hasAccess, steal, mature, deliverReturns };
