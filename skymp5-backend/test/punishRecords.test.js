@@ -214,3 +214,20 @@ test('journal: a dashboard game ban is history, lifted by its unban; the ban lis
   const one = R.oneRowPerBan([...list2, ...j2])
   assert.deepEqual(one.map(r => [r.id, r.by, r.reason, r.active]), [['ban:B-WG6QYG', 'jake', 'Duping gold', true]])
 })
+
+test('bans.json reasons: a dashboard ban (bannedBy "<handle> (dashboard)") shows 300; every other ban is cut at 200 as before', () => {
+  const long = 'Griefing at the bank '.repeat(14).trim()
+  assert.ok(long.length > 280 && long.length <= 300)
+  const at = '2026-10-21T12:00:00Z'
+  const parsed = R.parseBans([
+    { discordId: '100000000000000101', ref: 'B-WG6QYG', reason: long, bannedAt: at, bannedBy: 'jake (dashboard)' },
+    { discordId: '100000000000000102', ref: 'B-WG6QYH', reason: long, bannedAt: at, bannedBy: 'in-game admin' },
+    { discordId: '100000000000000103', ref: 'B-WG6QYJ', reason: long, bannedAt: at, bannedBy: 'jake' },
+    { discordId: '100000000000000104', ref: 'B-WG6QYK', reason: long, bannedAt: at, bannedBy: 'dashboard' },
+    { discordId: '100000000000000105', ref: 'B-WG6QYM', reason: long, bannedAt: at, bannedBy: '100000000000000999' },
+    { discordId: '100000000000000106', ref: 'B-WG6QYN', reason: long, bannedAt: at },
+  ])
+  assert.equal(parsed[0].reason, long)
+  for (const b of parsed.slice(1)) assert.equal(b.reason, scrub(long, 200), b.ref)
+  assert.equal([...parsed[1].reason].length, 200)
+})

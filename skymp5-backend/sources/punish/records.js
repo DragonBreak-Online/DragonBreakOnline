@@ -197,6 +197,9 @@ function adminBanRows(list, { now }) {
 
 // ---- data/bans.json (the backend's game ban list): read here directly, never through sources/bans.js, whose lookups
 // can save the file. hwid and ip are never read ----
+// A ban the Punishments panel gave (bans.addNew, bannedBy '<handle> (dashboard)') shows its whole reason, up to 300; every
+// other ban is cut at 200 as before. A Discord handle holds no space or bracket, so no older entry reads as one
+const DASHBOARD_BY_RE = / \(dashboard\)$/
 function parseBans(data) {
   if (!Array.isArray(data)) throw new Error('not a ban list')
   return data.map((b, i) => {
@@ -204,7 +207,7 @@ function parseBans(data) {
     const byRaw = String(b.bannedBy ?? '').trim()
     return {
       i, _discordId: discordIdOf(b.discordId), ref: BAN_REF_RE.test(String(b.ref ?? '')) ? b.ref : null,
-      reason: scrub(b.reason, 300), atMs: isoMs(b.bannedAt),
+      reason: scrub(b.reason, DASHBOARD_BY_RE.test(byRaw) ? 300 : 200), atMs: isoMs(b.bannedAt),
       by: discordIdOf(byRaw) ? null : scrub(byRaw, 80), _byDiscordId: discordIdOf(byRaw),
     }
   }).filter(Boolean)
