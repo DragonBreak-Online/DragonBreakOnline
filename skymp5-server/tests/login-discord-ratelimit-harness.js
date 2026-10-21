@@ -66,11 +66,11 @@ rl.fetch = async (url) => {
     const user = world.sessions[decodeURIComponent(m[1])];
     return user ? answer(200, { user }) : answer(404, {});
   }
-  m = u.pathname.match(/^\/api\/guilds\/([^/]+)\/members\/([^/]+)$/);
+  m = u.pathname.match(/^\/api(?:\/v(\d+))?\/guilds\/([^/]+)\/members\/([^/]+)$/);
   if (u.hostname === 'discord.com' && m) {
-    const n = discordCalls.filter((c) => c.discordId === m[2]).length;
-    const r = await world.discord(m[1], m[2], n);
-    discordCalls.push({ at: Date.now(), guildId: m[1], discordId: m[2], status: r.status });
+    const n = discordCalls.filter((c) => c.discordId === m[3]).length;
+    const r = await world.discord(m[2], m[3], n);
+    discordCalls.push({ at: Date.now(), guildId: m[2], discordId: m[3], status: r.status, version: m[1] ? Number(m[1]) : null });
     return r;
   }
   if (u.hostname === 'discord.com') return answer(200, {});   // the event log channel post
@@ -126,6 +126,7 @@ const user = (i, extra) => ({ id: 100 + i, discordId: String(5550 + i), ...extra
   check('a member rate limited once logs in', spawned(1), { packets, calls: discordCalls.map((c) => c.status) });
   check('...after asking Discord again once the 429 passed', discordCalls.length === 2 && discordCalls[1].at - discordCalls[0].at >= 45, discordCalls.map((c) => c.status));
   check('...and is never told to join the Discord', !refusedNotInDiscord(1), packets);
+  check('...asking API v10, where retry_after is in seconds (the unversioned route is the old default, in milliseconds)', discordCalls.length > 0 && discordCalls.every((c) => c.version === 10), discordCalls.map((c) => c.version));
 
   section('the wait comes from the Retry-After header when the body has none');
   reset({ sessions: { [sessionFor(2)]: user(2) }, discord: async (g, d, n) => (n === 0 ? answer(429, {}, { 'retry-after': '0.06' }) : member()) });

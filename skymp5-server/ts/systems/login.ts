@@ -111,8 +111,9 @@ export class Login implements System {
         if (Date.now() + waitMs > deadline) return { kind: "unanswered", status: 429 };
         await sleep(waitMs + Math.random() * discordRetryJitterMs);
       }
+      // v10 pinned: the unversioned route is Discord's old default API, where retry_after was in milliseconds, not seconds
       const response = await this.fetchRetry(
-        `https://discord.com/api/guilds/${guildId}/members/${discordId}`,
+        `https://discord.com/api/v10/guilds/${guildId}/members/${discordId}`,
         {
           method: 'GET',
           headers: { 'Authorization': `Bot ${botToken}` },
