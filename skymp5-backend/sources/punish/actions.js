@@ -212,6 +212,7 @@ function createPunishActions({
         target: { profileId: Number(t.profileId) || 0, name: str(t.name, 48) || null, tag: str(t.tag, 4) || null, discordName: str(t.discordName, 40) || null },
         reason: str(j.reason, REASON_MAX), minutes: Number.isSafeInteger(j.minutes) ? j.minutes : null, untilMs: Number(j.untilMs) || null,
         ref: rules.foldText(j.ref, 8) || null, banRoleHeld: typeof j.banRoleHeld === 'boolean' ? j.banRoleHeld : null, at: Number(j.at) || 0, mode: str(j.mode, 8),
+        status: Number.isInteger(j.status) && j.status >= 400 && j.status <= 599 ? j.status : null, detail: str(j.detail, 32) || null,
       })
     }
   }
@@ -246,6 +247,13 @@ function createPunishActions({
     say(`PUNISH req ${rules.id8(`w-${j.uuid}`)} -> ${j.state}${j.error ? ` (${j.error})` : ''}${j.ref ? `: ref ${j.ref}` : ''}`)
     if (j.state === 'done' || j.state === 'unknown') staffLine(j)
   }
+  // The answer's status is kept with the job, so the same request id again gets the same answer
+  function failed(j, status, code, detail) {
+    Object.assign(j, { state: 'failed', error: code, status, detail: detail || null })
+    finish(j)
+    return [status, code, detail]
+  }
+  const failedAnswer = j => answer(j.status, { v: 1, error: j.error, ...(j.detail ? { code: j.detail } : {}), job: view(j) })
 
   // ---- who is asking --------------------------------------------------------------------------------------------
   // Before the body is read: the switch, the console's config, the session, tries, a fresh sign-in, the pin, the roles now
@@ -311,7 +319,7 @@ function createPunishActions({
     if (known) {
       const same = known.discordId === ctx.discordId && known.action === action && known.profileId === b.profileId && known.reason === b.reason && known.minutes === b.minutes
       if (!same) return refuse(409, 'conflict')
-      return answer(200, { v: 1, job: view(known) })
+      return known.state === 'failed' && known.status ? failedAnswer(known) : answer(200, { v: 1, job: view(known) })
     }
 
     const found = await targetChecks(ctx, b.profileId, refuse)
@@ -345,12 +353,8 @@ function createPunishActions({
     say(`PUNISH ${ctx.handle} (<@${ctx.discordId}>) via web req ${rules.id8(`w-${b.uuid}`)}: ${what(job)}${ctx.mode === 'dry-run' ? ' (dry run)' : ''}: ${b.reason}`)
     if (ctx.mode === 'dry-run') { job.state = 'dry-run'; finish(job); return answer(200, { v: 1, job: view(job) }) }
 
-    const outcome = await act(job, member)
-    if (job.state === 'failed') {
-      const [status, code, detail] = outcome || [503, job.error]
-      return answer(status, { v: 1, error: code, ...(detail ? { code: detail } : {}), job: view(job) })
-    }
-    return answer(200, { v: 1, job: view(job) })
+    await act(job, member)
+    return job.state === 'failed' && job.status ? failedAnswer(job) : answer(200, { v: 1, job: view(job) })
   }
 
   // The account's state for each action: a refusal, or null to go ahead
@@ -412,19 +416,16 @@ function createPunishActions({
       try {
         if (j.action === 'ban') {
           const r = bans.addNew({ discordId: j.targetDiscordId, reason: j.reason, bannedBy: `${j.handle} (dashboard)` })
-          if (r.existing) { j.state = 'failed'; j.error = 'alreadyBanned'; j.ref = r.existing.ref || null; finish(j); return [409, 'alreadyBanned'] }
+          if (r.existing) { j.ref = r.existing.ref || null; return failed(j, 409, 'alreadyBanned') }
           j.ref = r.entry.ref
         } else {
           const r = bans.removeEntry(j.targetDiscordId)
-          if (!r.removed) { j.state = 'failed'; j.error = 'notBanned'; finish(j); return [409, 'notBanned'] }
+          if (!r.removed) return failed(j, 409, 'notBanned')
           j.ref = r.removed.ref || null
         }
       } catch (err) {
         log('ban list not written:', err.message)
-        j.state = 'failed'
-        j.error = 'storeUnreadable'
-        finish(j)
-        return [503, 'storeUnreadable']
+        return failed(j, 503, 'storeUnreadable')
       }
       // After the write, so nothing here can report a lifted ban as not done
       if (j.action === 'unban') {
@@ -468,10 +469,7 @@ function createPunishActions({
       const [status, code, detail] = r.err && r.err.code === 'botNotReady' ? [503, 'botNotReady'] : DISCORD_ERRORS[r.err && r.err.code] || [502, 'discordRefused', r.err && Number.isInteger(r.err.code) ? String(r.err.code) : 'other']
       if (r.err && r.err.code === 50013) log(`Discord refused ${j.action}: the bot lacks a permission`)
       else log(`Discord refused ${j.action}:`, (r.err && (r.err.code || r.err.message)) || 'unknown')
-      j.state = 'failed'
-      j.error = code
-      finish(j)
-      return [status, code, detail]
+      return failed(j, status, code, detail)
     }
     const first = await withDeadline(settled, discordDeadlineMs)
     if (first) return apply(first)

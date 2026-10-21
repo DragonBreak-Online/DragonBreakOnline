@@ -76,7 +76,8 @@ The body has exactly the listed keys, at most 2 kB. Common fields:
 
 ### Answers for `ban`, `unban` and the four Discord actions
 
-200 `{ v, job }`. The same `requestId` again returns the same job and never acts twice.
+200 `{ v, job }`. The same `requestId` again returns the same job and never acts twice; a `failed` one comes back with
+its first error status. To try again after `failed`, the dialog takes a new `requestId`.
 
 ```json
 { "id": "<requestId>", "action": "ban", "state": "done", "error": "",

@@ -497,6 +497,23 @@ test('what the viewer may do: each tier, the pin, the switch and the bot; a GM m
   H.clean(o)
 })
 
+test('the same request id after a failure gets the same status and error, after a restart too; a new id may try again', async () => {
+  const jobsFile = path.join(H.PF.root, 'replay', 'punish-actions.json')
+  H.make({ jobsFile })
+  H.bot.fail = Object.assign(new Error('Missing Permissions'), { code: 50013 })
+  const body = H.body('discord-timeout', { minutes: 30 })
+  const first = want(await H.call('discord-timeout', 'owner', body), 502, 'discordRefused')
+  H.bot.fail = null
+  const calls = H.calls.length
+  for (const make of [() => {}, () => H.make({ jobsFile })]) {
+    make()
+    const again = want(await H.call('discord-timeout', 'owner', body), 502, 'discordRefused')
+    assert.deepEqual([again.code, again.job], [first.code, first.job])
+  }
+  assert.equal(H.calls.length, calls, 'Discord was not asked again')
+  want(await H.call('discord-timeout', 'owner', { ...body, requestId: uuid() }), 200)
+})
+
 test('unban: once the entry is gone the job is done, even when the ban role cannot be read', async () => {
   want(await H.call('ban', 'owner', H.body('ban')), 200)
   H.make({ extra: { bannedRoleId: () => { throw new Error('server-access.json unreadable') } } })
