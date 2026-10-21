@@ -4480,6 +4480,16 @@ const appointCheck = (a, z, rank, tg, override) => {
       overridden = raceLabel(race);
     }
   }
+  // One leadership seat per character (leadership.js; Nate, 21 Oct): a ruler seat is refused to whoever already leads a
+  // faction or another hold. The seat being replaced in THIS zone is skipped, so a re-seat or a move inside a court is
+  // untouched. It binds staff appointments too unless leadership.staffOverride is on.
+  if (typeof globalThis.__dboLeadershipRefusal === 'function') {
+    const rulers = ((cfg.leadership || {}).rulerRanks) || ['jarl', 'count', 'chieftain'];
+    if (rulers.map(String).includes(String(rank))) {
+      const no = globalThis.__dboLeadershipRefusal(tg.actor, { kind: 'hold', id: z.id }, a);
+      if (no) return { error: no };
+    }
+  }
   if (!isLeadStaff(a)) {
     const zo = readOfficials()[z.id] || {};
     const held = Object.keys(zo).find((r) => (zo[r] || []).map(Number).includes(tg.pid));
@@ -4497,6 +4507,15 @@ const appointCheck = (a, z, rank, tg, override) => {
 const courtOfficeSync = (z, tg, rank, seated) => { try { if (typeof globalThis.__dboCourtOfficeSync === 'function') globalThis.__dboCourtOfficeSync(z, tg, rank, seated); } catch (e) { log('court sync failed', e.message); } };
 // Seats tg as rank of z, one rank per zone. by: { who, staff, overridden?, via? } for the audit. { error } or { text }
 const seatOfficial = (z, rank, tg, by) => {
+  // The backstop for every caller that does not come through appointCheck: court.js's accepted offer and its move inside
+  // a court, and citizenship.js's election. The same rule, skipping this zone's own seat (leadership.js)
+  if (typeof globalThis.__dboLeadershipRefusal === 'function') {
+    const rulers = ((cfg.leadership || {}).rulerRanks) || ['jarl', 'count', 'chieftain'];
+    if (rulers.map(String).includes(String(rank))) {
+      const no = globalThis.__dboLeadershipRefusal(tg.actor, { kind: 'hold', id: z.id });
+      if (no) return { error: no };
+    }
+  }
   const o = readOfficials(); o[z.id] = o[z.id] || {};
   // One rank per zone: the office being left (a re-seat or a move) gives up its household rank too
   const had = Object.keys(o[z.id]).find((r) => r !== rank && (o[z.id][r] || []).map(Number).includes(tg.pid)) || null;
@@ -8979,6 +8998,24 @@ try {
   require(CHARTERS_JS)({ mp, log, ownNameOf, ownDisplay, displayFor, personal, audit, who, display, nameOf, cfg, registerChatCommand, onlineActors, isAdmin, isLeadStaff,
     findByName, profileOf, takeGold, giveItem, every, staffNote, approvalForum });
 } catch (e) { log('charters.js failed to load:', e.stack || e.message); }
+// ---- one leadership seat per character (server\leadership.js, config "leadership"; Nate, 21 Oct) ------------------------
+// Every seating of a faction leader or a hold's ruler asks it first: appointCheck and seatOfficial above, and guilds.js
+// for the faction side. rulerSeats reads the live officials with their per-character binding, for /leadership audit.
+try {
+  const LEADERSHIP_JS = path.resolve('leadership.js');
+  delete require.cache[LEADERSHIP_JS];
+  const rulerSeats = () => {
+    const out = []; const o = readOfficials(); const seats = readSeats();
+    for (const z of zoneList()) for (const r of (z.officials || [])) for (const pid of ((o[z.id] || {})[r] || []).map(Number)) {
+      const actor = Number(((seats[z.id] || {})[r] || {})[pid]) >>> 0;
+      out.push({ zone: z.id, zoneName: z.name, rank: r, pid, actor });
+    }
+    return out;
+  };
+  require(LEADERSHIP_JS)({ mp, log, personal, audit, who, display, nameOf, profileOf, onlineActors, accountActors,
+    registerChatCommand, isAdmin, isLeadStaff, ranksOf, rankTitle, rulerSeats, cfg });
+} catch (e) { log('leadership.js failed to load:', e.stack || e.message); globalThis.__dboLeadershipRefusal = null; }
+
 // ---- thievery and burglary: thief factions, break-ins, the Fence Chest, guard raids (server\thievery.js, config "thievery") ----
 try {
   const THIEVERY_JS = path.resolve('thievery.js');
