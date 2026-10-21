@@ -2,15 +2,9 @@
   "version": "2026-10-21",
   "effective": "2026-10-21",
   "changes": [
-    "Terms section 4: one Discord account per person. Use only one Discord account in our Discord and in the game. Extra characters come from the character slots on your one account, never from a second account. A test account needs the Owners' approval.",
-    "People who share a PC or an internet connection, such as one household, may each play with their own Discord account. Sharing either is never, on its own, a reason for a ban.",
-    "Lost your Discord account, or moving to a new one? You may join our Discord with the new account to open a ticket. Do this before you play on it. Accounts are never moved during a ban or suspension.",
-    "If one person is found using more than one Discord account, the extra accounts may lose access. That is not a ban of you or of the account you keep. Staff may also act under section 10. Using another account during a ban is ban evasion.",
-    "If you already use more than one Discord account, open a ticket by November 4, 2026 and choose the one to keep. Nobody is punished for coming forward by then.",
-    "Terms section 6: the official Server Rules are published with their version date on our website and in our Discord's rules channel. If two copies differ, the one with the latest version date applies.",
-    "Terms section 7 now names macros, auto-clickers and scripts that play for you as not allowed.",
-    "Terms section 3: optional supporter perks are described where they are offered, and may change as the project develops.",
-    "The Privacy Policy has not changed since 17 October 2026. The one-way PC code may still be used only for the ban check, referrals and hold elections, as the policy describes. It is not used to look for second accounts in any other way."
+    "One Discord account per person (Terms section 4). If you use more than one, open a ticket by November 4, 2026 to choose the one you keep.",
+    "Section 6: the official Server Rules are on our website and in our Discord. Section 7: macros, auto-clickers and scripts that play for you are not allowed.",
+    "Section 3: supporter perks may change. The Privacy Policy has not changed since 17 October 2026."
   ],
   "files": {
     "terms": "terms.md",
