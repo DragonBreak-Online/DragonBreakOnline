@@ -35,3 +35,11 @@ test('the ban role still wins', async () => {
   membership.set('banned', true)
   assert.equal((await access.getDiscordAccess('banned')).error, 'banned')
 })
+
+test('the membership answer goes out with the result, for the game server', async () => {
+  membership.set('m', true)
+  membership.set('out', false)
+  assert.equal((await access.getDiscordAccess('m')).member, true)
+  assert.equal((await access.getDiscordAccess('out')).member, false)
+  assert.equal((await access.getDiscordAccess('unknown')).member, null)
+})
