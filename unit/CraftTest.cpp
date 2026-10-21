@@ -165,14 +165,20 @@ TEST_CASE("A HearthFires oven makes its recipes (the bench keyword is global)",
   // milk and wheat at BYOHCraftingOven. The oven (CraftingOvenMarker) keeps that
   // keyword as 0x020117F7 in HearthFires.esm, the recipe resolves it to
   // 0x030117F7: read raw, no oven recipe matched (Purr, 17 Oct)
-  const uint32_t kOven = 0x03011ce2, kBread = 0x65c97;
+  const uint32_t kOven = 0xff00f0e1, kOvenBase = 0x0300283f, kBread = 0x65c97;
   const Inventory inputs = Inventory()
                              .AddItem(0x34cdf, 1)
                              .AddItem(0x03003534, 1)
                              .AddItem(0x03003538, 1)
                              .AddItem(0x23d77, 1);
 
+  // HearthFires' own ovens start disabled (house kitchens), so the server never loads them: one is placed
   PartOne& p = GetPartOne();
+  p.worldState.AddForm(
+    std::make_unique<MpObjectReference>(
+      LocationalData{ { 1000, 2000, 300 }, { 0, 0, 0 }, FormDesc::Tamriel() },
+      FormCallbacks::DoNothing(), kOvenBase, "FURN"),
+    kOven);
   auto& oven = p.worldState.GetFormAt<MpObjectReference>(kOven);
 
   DoConnect(p, 0);
