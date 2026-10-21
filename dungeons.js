@@ -393,6 +393,9 @@ module.exports = (api) => {
     for (const z of d.zones || []) {
       for (const npc of z.npcs || []) {
         const edid = String(npc.edid || '');
+        // A quest ally placed in the dungeon (Anska in High Gate Ruins, Valdar's ghost in Valthume) is no enemy: it never
+        // joins a lease, so nobody fights a friend or has to kill one for the clear (#bugs 1560726192754270389)
+        if (isAllyPlacement(npc.ref)) continue;
         let opts = npc.options || [];
         // Novice: a boss may name its own leveled line (expeditions.json storyOptions). pickScaled falls back to a
         // placement's lowest option when nothing is in band, so a boss with one fixed high-level option (Silorn's
@@ -1312,6 +1315,22 @@ module.exports = (api) => {
     return res;
   };
   const placedBase = (refDesc) => { const res = espmOf(idOf(refDesc)); const name = res && String(res.record.type) === 'ACHR' ? fieldsOf(res, 'NAME')[0] : null; return name ? globalIdAt(res, name.data) : 0; };
+  // ---- allies ------------------------------------------------------------------------------------
+  // A placement whose own template is in DunPlayerAllyFaction is the player's friend in vanilla (Anska, Valdar's ghost, the
+  // Harmugstahl adventurer). As a lease enemy it fought the party, or stood by and still had to die for the clear (High
+  // Gate Ruins, 16 and 18 Oct; Valthume, 18 Oct). Config dungeons.allyFactions (faction editor ids) overrides; [] turns it off.
+  const ALLY_FACTIONS = new Set((Array.isArray(C.allyFactions) ? C.allyFactions : ['DunPlayerAllyFaction']).map((s) => String(s).toLowerCase()));
+  const allyCache = new Map();
+  const isAllyPlacement = (refDesc) => {
+    if (!ALLY_FACTIONS.size || !refDesc) return false;
+    const base = placedBase(refDesc);
+    if (!base) return false;
+    if (allyCache.has(base)) return allyCache.get(base);
+    const src = factionSource(base);
+    const ally = !!(src && src.factions.some((f) => ALLY_FACTIONS.has(String(edidOf(f.id)).toLowerCase())));
+    allyCache.set(base, ally);
+    return ally;
+  };
   const factionKey = (src) => src ? src.factions.map((f) => `${f.id}:${f.rank}`).sort().join(',') + `|${src.crime}` : '';
   const factionNames = (src) => src ? src.factions.map((f) => edidOf(f.id)).sort().concat(src.crime ? [`crime ${edidOf(src.crime)}`] : []).join(', ') || 'none' : 'from leveled pick';
   // Factions the placement's own template gives that the spawned base does not, or null when they agree
