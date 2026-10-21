@@ -150,6 +150,12 @@ module.exports = {
   // The moderation journal (Discord timeouts, bans and unbans, one JSON per line) and the backend's ban list, both read only
   punishJournalFile: process.env.PUNISH_JOURNAL_FILE ?? path.join(__dirname, 'data', 'moderation.jsonl'),
   punishBansFile: process.env.PUNISH_BANS_FILE || path.join(__dirname, 'data', 'bans.json'),
+  // Punishments panel actions (routes/site-punish-actions.js): 'off | dry-run | on', then bans=, discord= and send= that only narrow it; unset is off
+  punishActions: String(process.env.PUNISH_ACTIONS || 'off'),
+  // A switch file read on every action that can only narrow PUNISH_ACTIONS (same format); missing narrows nothing, malformed is off
+  punishActionsSwitchFile: process.env.PUNISH_ACTIONS_SWITCH_FILE || '/etc/dragonbreak/punish-actions',
+  // The game's #staff-commands channel (gamemode-config discord.staffChannelId); the dashboard's bans and Discord actions are posted there too
+  staffCommandsChannelId: process.env.STAFF_COMMANDS_CHANNEL_ID || '',
   // Optional channel lock for /console, comma separated; empty allows any channel of the guild
   consoleDiscordChannelIds: process.env.CONSOLE_DISCORD_CHANNEL_IDS || '',
   consoleSwitchFile: process.env.CONSOLE_SWITCH_FILE || '/etc/dragonbreak/console',
