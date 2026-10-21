@@ -167,8 +167,11 @@ bool Validate(PartOne& partOne, const NiPoint3& currentPos,
   const bool finite = std::isfinite(newPos.x) && std::isfinite(newPos.y) &&
     std::isfinite(newPos.z);
 
-  // A hosted actor's position must be finite on every axis: a NaN distance passes every guard below
-  if (!isMe && !finite) {
+  // A position must be finite on every axis: a NaN distance passes every guard below, a NaN height the rate check too
+  if (!finite) {
+    if (isMe) {
+      sendSnapBack();
+    }
     return false;
   }
 
