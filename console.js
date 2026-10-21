@@ -440,10 +440,11 @@ module.exports = (api) => {
   // The account's highest staff tier as a rank: every character it has (the roles stamped at each one's last login, online or
   // not), the profile itself (the code's admin profiles), and the Discord roles the backend just fetched for it when it sent
   // them. -1 when it cannot be read. Each source can only raise it, so a stale stamp or a Discord demotion still counts
-  const accountRank = (pid, freshRoles) => {
+  const accountRank = (pid, freshRoles, target) => {
     if (!Number.isSafeInteger(pid) || pid < 0) return -1;
     try {
-      let best = rank(staffTierFrom(pid, []));
+      // The target character's own stamp too, should the engine's profile index ever miss it
+      let best = Math.max(rank(staffTierFrom(pid, [])), target ? rank(staffTierOf(target)) : 0);
       for (const c of (mp.getActorsByProfileId(pid) || []).map((x) => Number(x) >>> 0)) if (c && profileOf(c) === pid) best = Math.max(best, rank(staffTierOf(c)));
       if (Array.isArray(freshRoles)) best = Math.max(best, rank(staffTierFrom(pid, freshRoles)));
       return best;
@@ -598,7 +599,7 @@ module.exports = (api) => {
         if (!Number.isSafeInteger(pid) || pid < 0) return at('rankUnknown');
         if (pid === r.profileId) return at('ownAccount');
         // The caller's effective tier is the lower of the fresh and stamped ones (as the floor check above)
-        const theirs = accountRank(pid, pagePid !== undefined && Array.isArray(r.targetRoles) ? r.targetRoles : null);
+        const theirs = accountRank(pid, pagePid !== undefined && Array.isArray(r.targetRoles) ? r.targetRoles : null, target);
         if (theirs < 0) return at('rankUnknown');
         if (theirs >= Math.min(rank(fresh), rank(stamped))) return at('rank');
       }
