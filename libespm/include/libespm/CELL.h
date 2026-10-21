@@ -25,6 +25,9 @@ public:
   struct Data
   {
     uint16_t flags = 0;
+
+    // Location reference (LCTN), file local: convert with LookupResult::ToGlobalId
+    formId locationId = 0;
   };
 
   Data GetData(CompressedFieldsCache& cache) const noexcept;

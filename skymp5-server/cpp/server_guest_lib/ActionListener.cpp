@@ -1428,6 +1428,13 @@ void ActionListener::OnUpdateMovement(const RawMessageData& rawMsgData,
       actor->ResetBlockCount();
     }
 
+    // SetPos does not move an actor between cells, and SetCellOrWorld moves its grid subscription
+    const FormDesc newCellOrWorld =
+      FormDesc::FromFormId(msg.data.worldOrCell, espmFiles);
+    if (!(actor->GetCellOrWorld() == newCellOrWorld)) {
+      actor->SetCellOrWorld(newCellOrWorld);
+    }
+
     actor->SetPos(
       NiPoint3{ msg.data.pos[0], msg.data.pos[1], msg.data.pos[2] },
       SetPosMode::CalledByUpdateMovement);
