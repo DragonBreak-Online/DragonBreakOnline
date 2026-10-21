@@ -36,6 +36,8 @@ module.exports = (api) => {
   // living actors should be used as spawns for their respective npc", creatures only). Each becomes a wild zone of its
   // own base at its own spot and heading; groups with a chest of ours are camps like the giants'.
   const OWNED = readJson('owned-spawns.json', { spawns: [], camps: [] });
+  // A stronghold's own people and beasts (Cracked Tusk, Nat 20 Oct): never hostile, each only once its anchor's plugin is loaded
+  const STRONG = readJson('stronghold-spawns.json', { sites: [] });
   // Named after the placing reference, not a running number, so a regenerated list never renames another zone
   // Another creature in a plugin's spot (Nate, 9 Oct: Sancre Tor's minotaurs only stared, their war axe never stayed in
   // hand, so skeletons stand there instead). gamemode-config.json ownedSpawns.replace: { "<kind>": { "kind": "<new kind>",
@@ -199,6 +201,17 @@ module.exports = (api) => {
       const { id } = safePick(sp.options, pickFor(sp));
       if (!id) continue;
       out.push(Object.assign({ Name: ownedZoneName(sp), ID: sp.world, POS: sp.pos, Size: C.radius, Anchor: sp.ref, Heading: Number(sp.heading) || 0, NPC: [{ id, count: sp.count || 1 }], Despawn: C.despawnSeconds, Respawn: C.respawnSeconds }, HOSTILE_KINDS.has(sp.kind) ? { Hostile: true } : {}));
+    }
+    // A stronghold's spawns (stronghold-spawns.json): skipped while the anchor does not resolve (its plugin not in the load
+    // order yet), the spawn has no base, or it is not approved; never hostile
+    for (const site of STRONG.sites || []) {
+      if (!site || !site.id || site.enabled === false) continue;
+      for (const sp of site.spawns || []) {
+        if (out.length >= C.maxZones) break;
+        if (!sp || !sp.name || !sp.base || sp.approved === false || !sp.anchor || !Array.isArray(sp.pos) || !idOf(String(sp.anchor))) continue;
+        out.push({ Name: `${PREFIX}${site.id}:${sp.name}`, ID: sp.world, POS: sp.pos, Size: Number(sp.radius) || C.radius, Anchor: sp.anchor, Heading: Number(sp.heading) || 0,
+          NPC: [{ id: sp.base, count: Math.max(1, Number(sp.count) || 1) }], Despawn: C.despawnSeconds, Respawn: C.respawnSeconds, hostile: false });
+      }
     }
     // Blackreach: every spot hostile (its Falmer, automatons, chaurus, giants and wisps attack on sight), none without its anchor
     if (BRC.enabled) for (const sp of BR.spots || []) {

@@ -83,8 +83,15 @@ refs = {c: r for c, r in refs.items() if not r["deleted"]}
 loads = {c: r for c, r in refs.items() if r["kind"] == 'DOOR' and r["target"]}
 
 dungeon_cells = set()
+# A site kept out of the leases (gamemode-config dungeons.exclude: Cracked Tusk Keep, the clan's own, Nate 20 Oct) is a
+# building like any other, as mines_build.py already reads it
+try:
+    excluded = set(((json.load(open(os.path.join(SERVER, 'gamemode-config.json'))).get('dungeons') or {}).get('exclude')) or [])
+except Exception:
+    excluded = set()
 try:
     for d in json.load(open(os.path.join(SERVER, 'dungeons.json')))['dungeons']:
+        if d.get('id') in excluded: continue
         for cl in d['cells']: dungeon_cells.add(canon_of_desc(cl['desc']))
 except Exception as e:
     print("dungeons.json unreadable, no dungeon flags:", e)

@@ -1,0 +1,284 @@
+{
+ "_comment": "A stronghold's own people and beasts, spawned by wildlife.js as wild:<site>:<name> zones, never hostile (Nat, 20 Oct: Cracked Tusk is the clan's stronghold, not a lair; Worker 1's brief ~/inbox/NOTE-for-server-claude-2026-10-20-C10-cracked-tusk-residents.md). A spawn is written only when its anchor resolves (its plugin is in the server's load order), it has a base, and approved is not false. INERT until CrackedTuskKeepExpanded.esp ships: every anchor is a CTK ref (check the ids against the shipped plugin). Livestock is Nat's decision 1 (CTK's 11 animals off in the Strongholds Fix; EncGoatDomestic, never DA14Goat). The residents are the brief's starting roster: approved false and no base until Nat approves the roster and an orc NPC_ without bandit factions is chosen for each role.",
+ "sites": [
+  {
+   "id": "cracked-tusk",
+   "name": "Cracked Tusk Keep",
+   "clan": "clan-cracked-tusk",
+   "zone": "cracked-tusk",
+   "spawns": [
+    {
+     "name": "goat1",
+     "base": "4359c:Skyrim.esm",
+     "world": "3c:Skyrim.esm",
+     "pos": [
+      -56156,
+      -88774,
+      -1993
+     ],
+     "heading": 0,
+     "anchor": "2c19f:CrackedTuskKeepExpanded.esp",
+     "note": "a Gleda spot (CTK d68-d6c); EncGoatDomestic, never DA14Goat"
+    },
+    {
+     "name": "goat2",
+     "base": "4359c:Skyrim.esm",
+     "world": "3c:Skyrim.esm",
+     "pos": [
+      -56313,
+      -88823,
+      -1971
+     ],
+     "heading": 0,
+     "anchor": "2c19f:CrackedTuskKeepExpanded.esp",
+     "note": "a Gleda spot (CTK d68-d6c); EncGoatDomestic, never DA14Goat"
+    },
+    {
+     "name": "goat3",
+     "base": "4359c:Skyrim.esm",
+     "world": "3c:Skyrim.esm",
+     "pos": [
+      -56063,
+      -88780,
+      -2007
+     ],
+     "heading": 0,
+     "anchor": "2c19f:CrackedTuskKeepExpanded.esp",
+     "note": "a Gleda spot (CTK d68-d6c); EncGoatDomestic, never DA14Goat"
+    },
+    {
+     "name": "goat4",
+     "base": "4359c:Skyrim.esm",
+     "world": "3c:Skyrim.esm",
+     "pos": [
+      -55946,
+      -88903,
+      -2033
+     ],
+     "heading": 0,
+     "anchor": "2c19f:CrackedTuskKeepExpanded.esp",
+     "note": "a Gleda spot (CTK d68-d6c); EncGoatDomestic, never DA14Goat"
+    },
+    {
+     "name": "goat5",
+     "base": "4359c:Skyrim.esm",
+     "world": "3c:Skyrim.esm",
+     "pos": [
+      -56041,
+      -88916,
+      -2001
+     ],
+     "heading": 349,
+     "anchor": "2c19f:CrackedTuskKeepExpanded.esp",
+     "note": "a Gleda spot (CTK d68-d6c); EncGoatDomestic, never DA14Goat"
+    },
+    {
+     "name": "goat6",
+     "base": "4359c:Skyrim.esm",
+     "world": "3c:Skyrim.esm",
+     "pos": [
+      -52244,
+      -88477,
+      -2292
+     ],
+     "heading": 130,
+     "anchor": "8b05:CrackedTuskKeepExpanded.esp",
+     "note": "CTK 8b06's spot, by the goat pen"
+    },
+    {
+     "name": "cow1",
+     "base": "23a90:Skyrim.esm",
+     "world": "3c:Skyrim.esm",
+     "pos": [
+      -56987,
+      -86232,
+      -2195
+     ],
+     "heading": 0,
+     "anchor": "4fa6e:CrackedTuskKeepExpanded.esp",
+     "note": "CTK 4fa64-66"
+    },
+    {
+     "name": "cow2",
+     "base": "23a90:Skyrim.esm",
+     "world": "3c:Skyrim.esm",
+     "pos": [
+      -57169,
+      -86101,
+      -2175
+     ],
+     "heading": 178,
+     "anchor": "4fa6e:CrackedTuskKeepExpanded.esp",
+     "note": "CTK 4fa64-66"
+    },
+    {
+     "name": "cow3",
+     "base": "23a90:Skyrim.esm",
+     "world": "3c:Skyrim.esm",
+     "pos": [
+      -57068,
+      -86083,
+      -2201
+     ],
+     "heading": 0,
+     "anchor": "4fa6e:CrackedTuskKeepExpanded.esp",
+     "note": "CTK 4fa64-66"
+    },
+    {
+     "name": "chicken1",
+     "base": "a91a0:Skyrim.esm",
+     "world": "3c:Skyrim.esm",
+     "pos": [
+      -56921,
+      -86005,
+      -2212
+     ],
+     "heading": 0,
+     "anchor": "4fa6e:CrackedTuskKeepExpanded.esp",
+     "note": "CTK 4fa68-69"
+    },
+    {
+     "name": "chicken2",
+     "base": "a91a0:Skyrim.esm",
+     "world": "3c:Skyrim.esm",
+     "pos": [
+      -56962,
+      -85936,
+      -2206
+     ],
+     "heading": 103,
+     "anchor": "4fa6e:CrackedTuskKeepExpanded.esp",
+     "note": "CTK 4fa68-69"
+    },
+    {
+     "name": "chief",
+     "role": "chief",
+     "count": 1,
+     "base": null,
+     "approved": false,
+     "world": "1526a:Skyrim.esm",
+     "pos": [
+      -1562,
+      148,
+      208
+     ],
+     "heading": 320,
+     "anchor": "1ce60:CrackedTuskKeepExpanded.esp",
+     "note": "the longhouse upper hall, by the double bed 06b239"
+    },
+    {
+     "name": "household",
+     "role": "household",
+     "count": 2,
+     "base": null,
+     "approved": false,
+     "world": "1526a:Skyrim.esm",
+     "pos": [
+      -2170,
+      270,
+      210
+     ],
+     "heading": 0,
+     "anchor": "1ce61:CrackedTuskKeepExpanded.esp",
+     "note": "upper hall beds 1ce60-63"
+    },
+    {
+     "name": "blacksmith",
+     "role": "blacksmith",
+     "count": 1,
+     "base": null,
+     "approved": false,
+     "world": "3c:Skyrim.esm",
+     "pos": [
+      -54646,
+      -89286,
+      -1892
+     ],
+     "heading": 195,
+     "anchor": "4065c:CrackedTuskKeepExpanded.esp",
+     "note": "the forge yard: forge 4065c, wheel 4065d, workbench 4065e; bed 40683"
+    },
+    {
+     "name": "wisewoman",
+     "role": "wisewoman",
+     "count": 1,
+     "base": null,
+     "approved": false,
+     "world": "3c:Skyrim.esm",
+     "pos": [
+      -56068,
+      -85881,
+      -2075
+     ],
+     "heading": 80,
+     "anchor": "5edfa:CrackedTuskKeepExpanded.esp",
+     "note": "the alchemy table outside, near the shrine 23be:DragonBreak.esp"
+    },
+    {
+     "name": "guards",
+     "role": "guards",
+     "count": 3,
+     "base": null,
+     "approved": false,
+     "world": "3c:Skyrim.esm",
+     "pos": [
+      -56692,
+      -85890,
+      -2073
+     ],
+     "heading": 280,
+     "anchor": "4fa07:CrackedTuskKeepExpanded.esp",
+     "note": "the training ground: combat dummies 4fa07/08, the gates"
+    },
+    {
+     "name": "miners",
+     "role": "miners",
+     "count": 2,
+     "base": null,
+     "approved": false,
+     "world": "3c:Skyrim.esm",
+     "pos": [
+      -53044,
+      -90495,
+      -2016
+     ],
+     "heading": 0,
+     "anchor": "e6d:CrackedTuskKeepExpanded.esp",
+     "note": "CrackedTuskMine1 (cell ea8), its door e6d; markers inside"
+    },
+    {
+     "name": "workers",
+     "role": "workers",
+     "count": 2,
+     "base": null,
+     "approved": false,
+     "world": "3c:Skyrim.esm",
+     "pos": [
+      -57450,
+      -87100,
+      -2155
+     ],
+     "heading": 277,
+     "anchor": "4fa54:CrackedTuskKeepExpanded.esp",
+     "note": "the quarry stones 4fa54/56/6c, the sawmill 4fa38, planters 312bc-bf"
+    },
+    {
+     "name": "hunters",
+     "role": "hunters",
+     "count": 2,
+     "base": null,
+     "approved": false,
+     "world": "3c:Skyrim.esm",
+     "pos": [
+      -54195,
+      -88503,
+      -2295
+     ],
+     "heading": 143,
+     "anchor": "3203:CrackedTuskKeepExpanded.esp",
+     "note": "the east fire 3203, bedrolls 2709/270a"
+    }
+   ]
+  }
+ ]
+}
