@@ -43,9 +43,7 @@ client.on('error', err => {
   console.error('[discord-bot] error:', err.message)
 })
 
-// The guard of the game ban list (a Discord ban never replaces a game ban, a Discord unban never lifts one, the list read
-// fail closed) is on only while the Punishments panel's own game ban and unban are on (PUNISH_ACTIONS bans area 'on', the
-// switch file read now), so staff can lift a game ban there. Otherwise, the default, the bot does exactly as before
+// The game ban list's guard is on only while the panel's own game bans are (PUNISH_ACTIONS bans=on); off, the bot does as before
 function guardsGameBans() {
   try { return require('../punish/actions').actionsSettings(config).bans === 'on' } catch (err) {
     console.error('[discord-bot] the actions switch could not be read, so the ban list has no guard:', err.message)
@@ -53,8 +51,7 @@ function guardsGameBans() {
   }
 }
 
-// A real Discord guild ban snapshots the player into bans.json under a ban ref; with the guard on, a game ban already there
-// is kept, reason and all. The staff audit channel gets who and why either way. The dashboard writes its own journal row
+// A real Discord guild ban snapshots the player into bans.json under a ban ref (guarded: a game ban already there is kept)
 client.on('guildBanAdd', ban => {
   let listNote = 'added to the game ban list'
   try {
@@ -81,8 +78,7 @@ client.on('guildBanAdd', ban => {
     .catch(err => console.error('[discord-bot] ban audit failed:', err.message))
 })
 
-// A Discord unban lifts the snapshot too, or the player would stay banned forever; with the guard on, a game ban given in
-// game or on a dashboard stays until it is lifted there
+// A Discord unban lifts the snapshot too, or the player would stay banned forever (guarded: only the snapshot)
 client.on('guildBanRemove', ban => {
   let listNote = 'it was not on the game ban list'
   try {

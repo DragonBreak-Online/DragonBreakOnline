@@ -1,7 +1,6 @@
 'use strict'
 // POST /api/site/staff/punishments/actions/send over HTTP: /discipline and /kick only, through the console's one function,
-// for Owners, Dev and Lead GMs; the #TAG must be the named account's; the general console stays Owners and Dev only.
-// The account goes to the game as targetProfileId, with its fresh roles, exactly as the Console panel's /run sends it
+// for Owners, Dev and Lead GMs; the #TAG must be the named account's, sent as targetProfileId as /run sends it
 
 const { test, before, after, beforeEach } = require('node:test')
 const assert = require('node:assert/strict')

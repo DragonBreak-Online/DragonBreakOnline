@@ -17,8 +17,7 @@ const stub = (rel, exports) => {
 const ORIGIN = 'https://site.example'
 const BAN_ROLE = '1555000000000000999'
 const HANDLES = { owner: 'jake', dev: 'nate.pierce', lead: 'lena_lead', gm: 'gus_gm', trial: 'tia', none: 'pat', actor: 'old_lead', rep: 'vex' }
-// allow.json as the hardened game (punish-hardening-1021-review 45e90896c) writes it: /discipline's rule, and the page's
-// account (targetProfile) checked on the #TAG commands, the rank check on /discipline and /kick. ALLOW is today's game
+// allow.json as the hardened game (45e90896c) writes it, with /discipline and the targetProfile and rank flags; ALLOW is today's
 const DISCIPLINE = {
   name: 'discipline', usage: '/discipline #TAG warn|strike|lift <reason>; suspend <1-720h|1-30d> <reason>; overturn <n> <reason>', rule: 'tagKindReason',
   help: 'x', kinds: ['warn', 'strike', 'suspend', 'lift', 'overturn'], maxSuspendDays: 30, targetProfile: true, rank: true,

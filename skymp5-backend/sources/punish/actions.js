@@ -119,8 +119,7 @@ function fileSetting(config, fs) {
   }
   return parseActionsSwitch(text)
 }
-// Each area's setting now: { bans, discord, send }. Also read by the bot (discord/bot.js), whose guard of the game ban
-// list is on only while the bans area is on
+// Each area's setting now, { bans, discord, send }; the bot reads it too (discord/bot.js guardsGameBans)
 function actionsSettings(config, fs = nodeFs) {
   const env = parseActionsSwitch(config.punishActions)
   const file = fileSetting(config, fs)
@@ -504,9 +503,7 @@ function createPunishActions({
       if (found.refused) return found.refused
       if (!(found.t.tags || []).includes(words[1].slice(1).toUpperCase())) return refuse(409, 'wrongTarget')
     }
-    // The account the dialog showed goes with the line as targetProfileId, as the Console panel's /run sends it
-    // (page_contract): the console sends it only to a game that checks it for this command (else 422 noProfileCheck,
-    // nothing sent), with that account's fresh roles for the game's rank check
+    // The dialog's account goes as targetProfileId, as the Console panel's /run sends it
     const { status, body } = await api.runStaffCommand(ctx.caller, {
       uuid: b.uuid, text: b.command, targetProfileId: b.profileId, only: PUNISH_COMMANDS, cap: ctx.mode, via: 'punish',
     })
@@ -519,7 +516,7 @@ function createPunishActions({
     const caller = api.webCaller(token)
     const sw = settings()
     const st = api.state('web')
-    // Only a command the game checks against the page's account (targetProfile) can be sent; the rest stay Copy
+    // Only a command the game checks against the page's account (targetProfile) can be sent
     const sendable = PUNISH_COMMANDS.filter(n => (st.commands || []).some(c => c.name === n && c.targetProfile === true))
     const m = bot.botModeration()
     const pinned = !!caller && !api.config.problem && api.config.pins.has(caller.discordId)

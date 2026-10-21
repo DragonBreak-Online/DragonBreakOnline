@@ -1,8 +1,5 @@
 'use strict'
-// The reason staff give for a punishment, the same rule as the console's /discipline reason (allowlist.js reasonWhy, which
-// is console.js's): after NFC, unsafe characters to spaces and whitespace folded, letters, digits, space and
-// . , ; : ! ? ' " ( ) - / & + % only, no Hangul filler (a letter that draws nothing), nothing outside the BMP, 5 to 300 by
-// String.length. So no colour code, markup, mention or blank-looking reason reaches Discord or a record.
+// A punishment reason: one line after NFC and folding, then the console's own /discipline rule (allowlist.js reasonWhy)
 
 const { UNSAFE_RE, REASON_RE, reasonWhy } = require('../console/allowlist')
 const { scrub } = require('./scrub')
@@ -10,8 +7,7 @@ const { scrub } = require('./scrub')
 const REASON_MIN = 5
 const REASON_MAX = 300
 
-// { reason } when it passes, else { why }: reasonShort, reasonChars and reasonLong from the console's own reasonWhy, and
-// reasonPrivate for a Discord id, address, email or secret, which the panel would hide (punish/scrub.js)
+// { reason }, else { why }: reasonWhy's codes, or reasonPrivate for an id, address, email or secret (punish/scrub.js)
 function cleanReason(value) {
   if (typeof value !== 'string') return { why: 'reasonShort' }
   const reason = value.normalize('NFC').replace(UNSAFE_RE, ' ').replace(/\s+/g, ' ').trim()

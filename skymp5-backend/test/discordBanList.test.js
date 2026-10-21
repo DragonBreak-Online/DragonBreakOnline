@@ -1,8 +1,7 @@
 'use strict'
-// The bot's Discord ban snapshot on the game ban list (a private copy of bans.js on a temp list). With the Punishments
-// panel's game bans on (PUNISH_ACTIONS bans area 'on'): a Discord ban never overwrites a game ban, a Discord unban never
-// lifts one, an unreadable list is never replaced. With them off (the default) the bot does as it did before. A ban the
-// dashboard claimed gets no second journal row. Also the list's fail-closed writes the Punishments panel uses.
+// The bot's Discord ban snapshot on the game ban list (a private copy of bans.js on a temp list): with PUNISH_ACTIONS bans
+// on, a Discord ban never overwrites a game ban, a Discord unban never lifts one, an unreadable list is never replaced;
+// off (the default), as before. A ban the dashboard claimed gets no second journal row. Also the panel's fail-closed writes.
 
 const { test, beforeEach, after } = require('node:test')
 const assert = require('node:assert/strict')
