@@ -8,7 +8,7 @@ import { filterAccessForSlot } from "../backendFactionApi";
 import { validateResult, CharCreatorConfig } from "./charCreatorData";
 import { scanModHair, ModHairCatalog } from "./hairCatalog";
 import { guidOf } from "./actorUtil";
-import { AdminRoleConfig, readAdminRoleConfig, isTrialGmFrom } from "./adminRoles";
+import { AdminRoleConfig, readAdminRoleConfig, isTrialGmFrom, adminTierFrom } from "./adminRoles";
 
 const NAME_INDEX_PROP = "private.indexed.charName";
 
@@ -354,11 +354,12 @@ export class Spawn implements System {
     return Math.min(10, this.maxCharacters + (auth ? extraSlotsFor(auth.roles) : 0));
   }
 
-  // A Trial GM (adminRoles.trialgm, Nate 11 Oct) has one slot more than their roles give, for staff work alone: the slot
-  // after the player slots, -1 for anyone else. A character created there is marked private.dboStaffChar. GMs and above
-  // keep their slots from patron-tiers.json as before. Losing the role hides the slot like a lapsed tier's.
+  // Staff (a Trial GM, Nate 11 Oct; a GM or above, Nate 21 Oct: promoted Trial GMs lost their staff character) have one slot
+  // more than their roles give, for staff work alone: the slot after the player slots, -1 for anyone else. A character
+  // created there is marked private.dboStaffChar. Losing every staff role hides the slot like a lapsed tier's.
   private staffSlotOf(auth: { profileId: number; roles: string[] }): number {
-    if (!isTrialGmFrom(auth.profileId, auth.roles || [], this.roleCfg)) return -1;
+    const roles = auth.roles || [];
+    if (!isTrialGmFrom(auth.profileId, roles, this.roleCfg) && !adminTierFrom(auth.profileId, roles, this.roleCfg)) return -1;
     const n = Math.min(10, this.maxCharacters + extraSlotsFor(auth.roles));
     return n < 10 ? n : -1;
   }
