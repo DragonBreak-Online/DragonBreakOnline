@@ -40,11 +40,18 @@ try {
   ok(load(false).length === 0, 'INERT while the plugin is not loaded: no wild:cracked-tusk zone');
   const z = load(true);
   const kinds = (b) => z.filter((x) => x.NPC[0].id === b).length;
-  ok(z.length === 11 && kinds('4359c:Skyrim.esm') === 6 && kinds('23a90:Skyrim.esm') === 3 && kinds('a91a0:Skyrim.esm') === 2, 'with the plugin: the livestock spawns, 6 EncGoatDomestic, 3 EncCow, 2 EncChicken', z.map((x) => x.Name));
+  const beasts = z.filter((x) => /:(goat|cow|chicken)\d$/.test(x.Name));
+  ok(beasts.length === 11 && kinds('4359c:Skyrim.esm') === 6 && kinds('23a90:Skyrim.esm') === 3 && kinds('a91a0:Skyrim.esm') === 2, 'with the plugin: the livestock spawns, 6 EncGoatDomestic, 3 EncCow, 2 EncChicken', z.map((x) => x.Name));
   ok(z.every((x) => x.hostile === false), '...never hostile');
-  ok(!z.some((x) => /chief|blacksmith|guards|miners/.test(x.Name)), '...and no resident yet: the roster waits on Nat (approved false, no base)');
-  const approved = JSON.parse(JSON.stringify(S)); const chief = approved.sites[0].spawns.find((s) => s.role === 'chief'); chief.approved = true; chief.base = '13b97:Skyrim.esm';
-  const z2 = load(true, approved);
-  ok(z2.some((x) => x.Name === 'wild:cracked-tusk:chief' && x.ID === '1526a:Skyrim.esm' && x.hostile === false), 'an approved role with a base spawns in its cell, not hostile', z2.map((x) => x.Name));
+  // The roster Nat approved as written (21 Oct), on AIO's non-unique stronghold orcs (the PC's brief, section 6)
+  const AIO = ':Orc Strongholds - All In One.esp';
+  const want = { chief: ['579', 1], household: ['22c', 2], blacksmith: ['22a', 1], wisewoman: ['22c', 1], guards: ['57b', 2], guards2: ['57d', 1], miners: ['22a', 2], workers: ['22a', 2], hunters: ['21f', 2] };
+  const people = z.filter((x) => !beasts.includes(x));
+  ok(people.length === Object.keys(want).length && Object.entries(want).every(([n, [b, c]]) => people.some((x) => x.Name === `wild:cracked-tusk:${n}` && x.NPC[0].id === b + AIO && x.NPC[0].count === c)),
+    '...and the approved roster: 14 orcs over 9 spawns, every base an AIO stronghold orc', people.map((x) => [x.Name, x.NPC[0].id, x.NPC[0].count]));
+  ok(people.reduce((n, x) => n + x.NPC[0].count, 0) === 14, '...14 residents in all (chief 1, household 2, smith 1, wisewoman 1, guards 3, miners 2, workers 2, hunters 2)');
+  ok(z.some((x) => x.Name === 'wild:cracked-tusk:chief' && x.ID === '1526a:Skyrim.esm'), '...the chief in the longhouse cell, not the exterior');
+  const held = JSON.parse(JSON.stringify(S)); held.sites[0].spawns.find((s) => s.role === 'chief').approved = false;
+  ok(!load(true, held).some((x) => x.Name === 'wild:cracked-tusk:chief'), 'a spawn set approved:false is held back');
 } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 console.log(fails ? `${fails} failed` : 'all passed'); process.exit(fails ? 1 : 0);
