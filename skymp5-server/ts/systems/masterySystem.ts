@@ -910,19 +910,33 @@ export class MasterySystem implements System {
     };
   }
 
-  grantPoints(ctx: SystemContext, actorId: number, amount: number, skillId?: string): MasterySummary | null {
-    if (!Number.isInteger(amount) || amount === 0 || Math.abs(amount) > MAX_GRANT) return null;
+  // Admin: adds hours (levels under the point system, up to the cap and inside the limits) to one held skill, the first in
+  // the order when none is named; a negative amount takes them back
+  grantPoints(ctx: SystemContext, actorId: number, amount: number, skillId?: string): AdminSkillResult {
+    const cfg = this.points;
+    if (!Number.isInteger(amount) || amount === 0 || Math.abs(amount) > MAX_GRANT) return { ok: false, text: `${cfg ? "Levels" : "Hours"} must be a whole number between -${MAX_GRANT} and ${MAX_GRANT}` };
     const rec = this.read(ctx, actorId) || emptyRecord();
     const id = skillId && rec.order.indexOf(skillId) !== -1 ? skillId : rec.order[0];
-    if (!id) return null;
+    if (!id) return { ok: false, text: "No skill taken up to grant to" };
     const prog = rec.skills[id];
-    prog.level = Math.max(0, prog.level + amount);
-    this.write(ctx, actorId, rec);
+    const label = this.labelOf(id);
     const userId = this.userOf(ctx, actorId);
-    this.notice(ctx, userId, `Your hours as a ${this.labelOf(id)} now stand at ${prog.level}.`);
-    this.syncRank(ctx, actorId, rec, id, userId);
-    this.write(ctx, actorId, rec);
-    return this.summaryOf(ctx, actorId);
+    if (!cfg) {
+      prog.level = Math.max(0, prog.level + amount);
+      this.write(ctx, actorId, rec);
+      this.notice(ctx, userId, `Your hours as a ${label} now stand at ${prog.level}.`);
+      this.syncRank(ctx, actorId, rec, id, userId);
+      this.write(ctx, actorId, rec);
+      const s = this.summaryOf(ctx, actorId);
+      return { ok: true, text: `${s.hours}h, ${s.label ? `${s.rankName} ${s.label}` : "no craft chosen"}`, level: prog.level };
+    }
+    const level = Math.max(0, Math.min(cfg.capPerSkill, prog.level + amount));
+    const refused = this.limitRefusal(rec, id, level, `${label} to level ${level}`);
+    if (refused) return { ok: false, text: refused };
+    this.notice(ctx, userId, level < 1 ? `${label} has been set aside.` : `Your ${label} now stands at level ${level}.`);
+    this.putLevel(ctx, actorId, rec, id, level, level < 1 || level >= P.MAX_LEVEL ? 0 : prog.xp || 0);
+    const used = Object.values(rec.skills).reduce((n, pr) => n + pr.level, 0);
+    return { ok: true, text: `${label} level ${level}${level >= 1 ? ` (${this.tierNames[prog.rank] || ""})` : ", set aside"}, ${used} of ${cfg.pool} points on the Wheel`, level };
   }
 
   resetCharacter(ctx: SystemContext, actorId: number): boolean {

@@ -2,7 +2,7 @@ import { Settings } from "../settings";
 import { System, Log, SystemContext, Content } from "./system";
 import { AdminTier, AdminRoleConfig, TIER_CAPS, readAdminRoleConfig, adminTierOf, isTrialGm, TRIAL_GM_ACTIONS, TRIAL_GM_MODES, TRIAL_GM_TABS, TRIAL_GM_REQUESTS } from "./adminRoles";
 import { NpcSpawnSystem } from "./npcSpawnSystem";
-import { MasterySystem, MAX_GRANT } from "./masterySystem";
+import { MasterySystem } from "./masterySystem";
 import { kickWithReason } from "./kickUtil";
 import { AdminBans } from "./adminBans";
 import { guidOf } from "./actorUtil";
@@ -637,14 +637,9 @@ export class AdminSystem implements System {
         this.reply(mp, userId, true, action === "ipBan" ? `IP-banned ${target.name}` : `Banned ${target.name} for ${hours} hour(s)`);
       } else if (action === "masteryGrant") {
         const amount = Number(content["amount"]);
-        const summary = this.mastery.grantPoints(ctx, target.actorId, amount);
-        if (!summary) {
-          this.reply(mp, userId, false, `Hours must be a whole number between -${MAX_GRANT} and ${MAX_GRANT}`);
-        } else {
-          const standing = summary.label ? `${summary.rankName} ${summary.label}` : "no craft chosen";
-          this.adminLog(`profile ${adminProfile} granted ${amount} mastery hour(s) to ${target.name} (profile ${target.profileId}), now ${summary.hours}h, ${standing}`);
-          this.reply(mp, userId, true, `${target.name}: ${summary.hours}h, ${standing}`);
-        }
+        const r = this.mastery.grantPoints(ctx, target.actorId, amount);
+        if (r.ok) this.adminLog(`profile ${adminProfile} granted ${amount} mastery ${this.mastery.usesLevels() ? "level" : "hour"}(s) to ${target.name} (profile ${target.profileId}), now ${r.text}`);
+        this.reply(mp, userId, r.ok, r.ok ? `${target.name}: ${r.text}` : r.text);
       } else if (action === "masteryReset") {
         const ok = this.mastery.resetCharacter(ctx, target.actorId);
         if (ok) this.adminLog(`profile ${adminProfile} reset the craft and hours of ${target.name} (profile ${target.profileId})`);
