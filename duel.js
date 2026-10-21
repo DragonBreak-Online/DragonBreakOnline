@@ -60,12 +60,14 @@ module.exports = (api) => {
     bo5: { wins: 3, label: 'best of five' },
   };
   const RULES = [
-    { id: 'none', label: 'anything goes', magic: true, potions: true },
+    // Anything goes means beast forms too (Purr, 20-21 Oct: a werewolf lost every "anything goes" duel on the turn, the
+    // separate beast rule being one nobody chose); both still start in their own form
+    { id: 'none', label: 'anything goes, beast forms too', magic: true, potions: true, beasts: true },
     { id: 'nomagic', label: 'no magic', magic: false, potions: true },
     { id: 'nopotions', label: 'no potions', magic: true, potions: false },
     { id: 'both', label: 'no magic, no potions', magic: false, potions: false },
-    // Beast forms may be taken mid-fight (Purr, 20 Oct: a werewolf duel lost the round on the turn); both still start in their own form
-    { id: 'beasts', label: 'anything goes, beast forms too', magic: true, potions: true, beasts: true },
+    // Kept in its place (a duel stores its rules by position): the old "beast forms too" is now the one that forbids them
+    { id: 'nobeasts', label: 'anything goes, no beast forms', magic: true, potions: true, beasts: false },
   ];
   const TYPES = {
     practice: { label: 'Practice fight', winner: false, wager: false },
