@@ -81,7 +81,7 @@ test('after a failed launcher update, Play starts the game instead of retrying t
   assert.strictEqual(calls.loadSettings, 1, 'the second press runs the game flow')
 })
 
-test('the 10 s launcher update check does not lock Play again after a failure', async () => {
+test('the regular launcher update check does not lock Play again after a failure', async () => {
   const { t, el, play, calls } = load()
   await t.checkLauncherUpdate()
   await play()

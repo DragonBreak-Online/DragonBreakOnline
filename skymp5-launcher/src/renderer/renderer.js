@@ -1065,6 +1065,8 @@ function setInstallLock(on) {
     for (const b of REPAIR_BUTTONS) if (!(b === btnRepairModlist && mo2InstallRunning)) b.disabled = repairRunning
     updatePlayButton()
     refreshIsolatedStatus()
+    // A Settings install or repair may have brought the files up to date; Play's own sequence checks when it ends
+    if (!playBusy) refreshPlayState()
   }
 }
 
@@ -1180,8 +1182,8 @@ async function repairModlist() {
   const { success, error, warning, modsTotal } = await runInstall('modlist', { force: true })
   mo2InstallRunning = false
   btnRepairModlist.textContent = 'Repair Modlist'
-  // Keep the Play button honest right away instead of waiting for the 10s
-  // poll - otherwise a stale UPDATE label eats the player's next click.
+  // Keep the Play button honest right away instead of waiting for the next
+  // check - otherwise a stale UPDATE label eats the player's next click.
   refreshPlayState()
   if (!success) {
     installLog(`Error: ${error}`)
@@ -1374,28 +1376,32 @@ function updatePlayButton() {
   updateLockState()
 }
 
-// Re-evaluate the install/update state (called at startup, after installs,
-// after the game copy is created, and on a slow poll).
-async function refreshPlayState() {
+// Re-evaluate the install/update state (startup, installs, the game copy, and every 5 min while shown: playPoll)
+// A failed check keeps the last answer, so a network blip never turns UPDATE back into PLAY
+async function checkPlayState() {
   const iso = await window.electronAPI.isolatedStatus()
   isoReady = !iso.enabled || iso.ready
 
   const uc = await window.electronAPI.filesUpdateCheck()
-  updateAvailable = !!uc.updateAvailable
-  // Mirror the launcher notice so players can see which one is updating
-  if (updateAvailable) {
-    clientVersionEl.textContent = '⬆ UPDATE AVAILABLE'
-    clientVersionEl.classList.add('update-available')
-    clientVersionEl.title = uc.serverVersion ? `v${uc.serverVersion} is available` : ''
-  } else {
-    if (uc.serverVersion) clientVersionEl.textContent = `v${uc.serverVersion}`
-    clientVersionEl.classList.remove('update-available')
-    clientVersionEl.title = ''
+  if (uc && uc.ok) {
+    updateAvailable = !!uc.updateAvailable
+    // Mirror the launcher notice so players can see which one is updating
+    if (updateAvailable) {
+      clientVersionEl.textContent = '⬆ UPDATE AVAILABLE'
+      clientVersionEl.classList.add('update-available')
+      clientVersionEl.title = uc.serverVersion ? `v${uc.serverVersion} is available` : ''
+    } else {
+      if (uc.serverVersion) clientVersionEl.textContent = `v${uc.serverVersion}`
+      clientVersionEl.classList.remove('update-available')
+      clientVersionEl.title = ''
+    }
   }
 
   updatePlayButton()
+  return !!(uc && uc.ok)
 }
-setInterval(refreshPlayState, 10_000)
+// Every caller goes through the scheduler: a check in flight is shared and the next one is planned from it
+function refreshPlayState() { return playPoll.runNow() }
 
 async function pollGameRunning() {
   if (gamePollInFlight) return
@@ -1407,15 +1413,15 @@ async function pollGameRunning() {
     if (timedOut) showWarning(LAUNCH_TIMEOUT_WARNING)
     if (running && connectWarning.textContent === LAUNCH_TIMEOUT_WARNING) clearWarning()
     if (running !== gameRunning || timedOut) {
+      const ended = gameRunning && !running
       gameRunning = running
       updatePlayButton()
+      if (ended || timedOut) resumeAfterGame()
     }
   } finally {
     gamePollInFlight = false
   }
 }
-setInterval(pollGameRunning, 10_000)
-pollGameRunning()
 
 // Keeps Play locked and polls fast until the launched game process appears
 function startLaunchWatch() {
@@ -1458,6 +1464,12 @@ function runInstallForPlay() {
 btnConnect.addEventListener('click', async () => {
   if (gameRunning || launchStartedAt || playBusy) return
   if (repairRunning) { showWarning('A repair is running, wait for it to finish.'); return }
+
+  // The launcher version is asked again first, so the press acts on the server's answer of now
+  playBusy            = true
+  btnConnect.disabled = true
+  await checkLauncherUpdateBeforePlay()
+  playBusy            = false
 
   // Launcher update takes priority over everything: it replaces this process. Once it has failed, Play plays.
   if (launcherUpdateFirst()) {
@@ -1579,8 +1591,14 @@ const badgePlayers = document.getElementById('badge-players')
 
 // track reachability so we can resync the one-shot panels when the backend returns
 let backendWasReachable = null
+// The check waits while the window is hidden or the game runs, so an outage then goes unseen: after a gap this long the panels resync too
+const RESYNC_AFTER_GAP_MS = 15 * 60_000
+let statusCheckedAt = 0
 
+// Resolves false when the backend could not be reached (the check then backs off); a game server that is down is an answer
 async function checkServerStatus() {
+  const gap = statusCheckedAt > 0 && Date.now() - statusCheckedAt >= RESYNC_AFTER_GAP_MS
+  statusCheckedAt = Date.now()
   const data = await window.electronAPI.fetchStatus()
   const backendUp = !!(data && data.ok)   // drives the reconnect resync below
   if (!data || !data.ok || data.status !== 'online') {
@@ -1601,11 +1619,12 @@ async function checkServerStatus() {
     }
   }
 
-  // resync only when the backend goes offline then back online; skip the first poll
-  if (backendUp && backendWasReachable === false) {
+  // resync when the backend goes offline then back online, or after a long gap; skip the first poll
+  if (backendUp && (backendWasReachable === false || gap)) {
     refreshServerData()
   }
   backendWasReachable = backendUp
+  return backendUp
 }
 
 // re-pull panels that only load at startup; player count already polls itself
@@ -1613,7 +1632,7 @@ function refreshServerData() {
   loadNews()
   loadModlist()
   loadServerInfo()
-  refreshPlayState()   // client version + update availability
+  playPoll.nudge()   // client version + update availability, unless it was just checked
 }
 
 // Server info strip
@@ -1675,7 +1694,8 @@ async function loadServerInfo() {
 const launcherVersionEl = document.getElementById('launcher-version')
 const clientVersionEl   = document.getElementById('client-version')
 
-// The check runs every 10s (see the polling block at the bottom), so the
+// The check runs every 15 minutes while the window shows, when it is shown or
+// focused (see the background checks at the bottom) and before Play acts, so the
 // UPDATE AVAILABLE state appears while the launcher is open - no restart
 // needed. Progress handlers are registered exactly once here; the periodic
 // check only flips the label state.
@@ -1723,10 +1743,13 @@ async function runLauncherUpdate() {
   // On success the installer restarts the launcher, so leave the UI as is.
 }
 
+// Resolves false when the server could not be asked; that keeps the last answer, so a blip never turns UPDATE LAUNCHER back into PLAY
 async function checkLauncherUpdate() {
   const result = await window.electronAPI.checkUpdate()
-  if (!result) return
-  if (launcherVersionEl.dataset.updating) return  // don't clobber install progress UI
+  if (!result) return false
+  if (launcherVersionEl.dataset.updating) return true  // don't clobber install progress UI
+  const failed = result.latest == null
+  if (failed && launcherUpdateReady) return false
 
   const was = launcherUpdateReady
   if (result.hasUpdate) {
@@ -1741,6 +1764,13 @@ async function checkLauncherUpdate() {
     launcherVersionEl.title = ''
   }
   if (was !== launcherUpdateReady) updatePlayButton()
+  return !failed
+}
+
+// Before Play acts; a slow or failed answer never holds the game up
+const PLAY_UPDATE_CHECK_MS = 3000
+function checkLauncherUpdateBeforePlay() {
+  return Promise.race([checkLauncherUpdate().catch(() => false), new Promise(resolve => setTimeout(resolve, PLAY_UPDATE_CHECK_MS))])
 }
 
 // News
@@ -2115,18 +2145,36 @@ window.dboLegal.init({
   },
 })
 loadSettings().then(s => { if (s && s.discordUser) window.dboLegal.check() })
-checkServerStatus()
-checkLauncherUpdate()
+
+// Background checks (pollPlan.js): the network ones wait while the window is hidden or minimized and while the game
+// runs or starts, and every check runs at once when the window shows or gets focus
+const PP = window.dboPollPlan
+const gameBusy = () => gameRunning || launchStartedAt > 0
+const statusPoll   = PP.createCheck({ run: checkServerStatus,   everyMs: 60_000,  minGapMs: 15_000, paused: () => document.hidden || gameBusy() })
+const playPoll     = PP.createCheck({ run: checkPlayState,      everyMs: 300_000, minGapMs: 60_000, paused: () => document.hidden || gameBusy() || installActive || playBusy })
+const launcherPoll = PP.createCheck({ run: checkLauncherUpdate, everyMs: 900_000, minGapMs: 60_000, paused: () => document.hidden || gameBusy() })
+// Local only (tasklist); while the game starts the 2 s launch watch runs as well, hidden or not
+const gamePoll     = PP.createCheck({ run: pollGameRunning,     everyMs: 30_000,  paused: () => document.hidden })
+const networkPolls = [statusPoll, playPoll, launcherPoll]
+
+function nudgePolls() {
+  gamePoll.nudge()
+  for (const p of networkPolls) p.nudge()
+}
+// The game or a launch ended: what waited catches up, spread over 5 s because a server restart sends everyone back at once
+function resumeAfterGame() {
+  setTimeout(() => { for (const p of networkPolls) p.nudge() }, Math.random() * 5000)
+}
+document.addEventListener('visibilitychange', () => { if (!document.hidden) nudgePolls() })
+window.addEventListener('focus', nudgePolls)
+
+gamePoll.start()
+statusPoll.start()
+launcherPoll.start()
 loadNews()
 loadServerInfo()
 loadModlist()
-// Live 10s heartbeat: game-server status + players (topbar badge), client
-// files update (Play button flips to UPDATE), launcher self-update (footer
-// label flips to UPDATE AVAILABLE) - all without restarting the launcher.
-// refreshPlayState and pollGameRunning poll on their own 10s timers above.
-setInterval(checkServerStatus, 10_000)
-setInterval(checkLauncherUpdate, 10_000)
-refreshPlayState()
+playPoll.start()
 
 // Skyrim Version panel (docs/DOWNGRADE_1_6_1170.md). It opens by itself when Skyrim is not 1.6.1170, and from
 // Settings > Repair. While it is open it asks main every 2 s how the three depot downloads stand.
@@ -2262,7 +2310,8 @@ function renderAfter(s) {
 }
 
 async function refreshDowngrade() {
-  if (downgradeAsking || modalDowngrade.hidden) return
+  // Minimized it waits; the 2 s timer picks up again as the window shows
+  if (downgradeAsking || modalDowngrade.hidden || document.hidden) return
   downgradeAsking = true
   let s
   try { s = await window.electronAPI.downgradeStatus() } catch (err) { s = { ok: false, error: err.message } } finally { downgradeAsking = false }
