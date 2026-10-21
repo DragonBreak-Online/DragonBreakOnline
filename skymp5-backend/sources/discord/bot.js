@@ -9,16 +9,19 @@ const tickets = require('./tickets')
 const banAudit = require('./banAudit')
 const moderationJournal = require('./moderationJournal')
 const serverStatus = require('./serverStatus')
+const { createModeration } = require('./moderation')
 
 const client = new Client({
   intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers, GatewayIntentBits.GuildModeration],
 })
 
 let ready = false
+const moderation = createModeration({ client, isReady: () => ready, guildId: () => config.discordGuildId })
 
 client.once('ready', () => {
   ready = true
   console.log(`[discord-bot] ready as ${client.user.tag}`)
+  console.log(`[discord-bot] ${moderation.readyLine()}`)
   tickets.ensurePanel(client).catch(err => console.error('[discord-bot] ticket panel failed:', err.message))
   serverStatus.start(client)
 })
@@ -40,7 +43,8 @@ client.on('error', err => {
   console.error('[discord-bot] error:', err.message)
 })
 
-// A real Discord guild ban snapshots the player into bans.json under a ban ref; the staff audit channel gets who and why either way
+// A real Discord guild ban snapshots the player into bans.json under a ban ref, unless a game ban is already there (it is
+// kept, reason and all); the staff audit channel gets who and why either way. The dashboard writes its own journal row
 client.on('guildBanAdd', ban => {
   let listNote = 'added to the game ban list'
   try {
@@ -52,34 +56,41 @@ client.on('guildBanAdd', ban => {
       ip: record.lastIp || null,
       reason: 'discord ban',
       bannedBy: 'discord',
-    })
-    if (entry.ref) listNote = `added to the game ban list as ${entry.ref}`
-    bans.logBan(`discord ban: discordId=${discordId} username=${ban.user.username || 'unknown'} hwid=${entry.hwid || 'none'} ip=${entry.ip || 'none'}`)
-    console.log(`[discord-bot] recorded guild ban for ${discordId}`)
+    }, { keepOther: true })
+    if (entry.kept) listNote = `already on the game ban list${entry.ref ? ` as ${entry.ref}` : ''}; kept`
+    else {
+      if (entry.ref) listNote = `added to the game ban list as ${entry.ref}`
+      bans.logBan(`discord ban: discordId=${discordId} username=${ban.user.username || 'unknown'} hwid=${entry.hwid || 'none'} ip=${entry.ip || 'none'}`)
+      console.log(`[discord-bot] recorded guild ban for ${discordId}`)
+    }
   } catch (err) {
     listNote = 'the game ban list could not be written'
     console.error('[discord-bot] failed to record guild ban:', err.message)
   }
-  banAudit.record('ban', ban, listNote).then(mod => moderationJournal.append('discord_ban', ban.user, mod))
+  banAudit.record('ban', ban, listNote).then(mod => (moderationJournal.claimedBan(ban.user.id, 'discord_ban') ? null : moderationJournal.append('discord_ban', ban.user, mod)))
     .catch(err => console.error('[discord-bot] ban audit failed:', err.message))
 })
 
-// A Discord unban lifts the snapshot too, or the player would stay banned forever
+// A Discord unban lifts the snapshot too, or the player would stay banned forever; a game ban given in game or on a
+// dashboard stays until it is lifted there
 client.on('guildBanRemove', ban => {
   let listNote = 'it was not on the game ban list'
   try {
     if (config.discordGuildId && ban.guild.id !== config.discordGuildId) return
     const discordId = ban.user.id
-    if (bans.removeByDiscordId(discordId)) {
+    const lifted = bans.removeByDiscordId(discordId, { onlyDiscordCopy: true })
+    if (lifted === true) {
       listNote = 'lifted from the game ban list'
       bans.logBan(`discord unban: discordId=${discordId} username=${ban.user.username || 'unknown'}`)
       console.log(`[discord-bot] lifted guild ban for ${discordId}`)
+    } else if (lifted && lifted.kept) {
+      listNote = `the game ban${lifted.kept.ref ? ` ${lifted.kept.ref}` : ''} stays; lift it on the dashboard`
     }
   } catch (err) {
     listNote = 'the game ban list could not be updated'
     console.error('[discord-bot] failed to lift guild ban:', err.message)
   }
-  banAudit.record('unban', ban, listNote).then(mod => moderationJournal.append('discord_unban', ban.user, mod))
+  banAudit.record('unban', ban, listNote).then(mod => (moderationJournal.claimedBan(ban.user.id, 'discord_unban') ? null : moderationJournal.append('discord_unban', ban.user, mod)))
     .catch(err => console.error('[discord-bot] unban audit failed:', err.message))
 })
 
@@ -316,6 +327,12 @@ function start() {
 module.exports = {
   start,
   audit: require('./audit'),
+  botModeration: moderation.botModeration,
+  memberState: moderation.memberState,
+  timeoutMember: moderation.timeoutMember,
+  banUser: moderation.banUser,
+  unbanUser: moderation.unbanUser,
+  banState: moderation.banState,
   getMemberRoles,
   getMemberFresh,
   isOwnClient,

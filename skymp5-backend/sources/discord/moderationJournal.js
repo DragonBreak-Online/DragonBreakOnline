@@ -58,13 +58,55 @@ function timeoutKind(wasUntil, until) {
 
 // One row per timeout change, whichever Discord event comes first: the audit log entry or the member update
 const claimed = new Map()
+const claimKey = (discordId, kind, wasUntil, until) => `${discordId}:${kind}:${Math.round((kind === 'discord_timeout' ? until : wasUntil) / 1000)}`
 function claim(discordId, kind, wasUntil, until) {
   const now = Date.now()
   for (const [k, t] of claimed) if (t <= now) claimed.delete(k)
-  const key = `${discordId}:${kind}:${Math.round((kind === 'discord_timeout' ? until : wasUntil) / 1000)}`
+  const key = claimKey(discordId, kind, wasUntil, until)
   if (claimed.has(key)) return false
   claimed.set(key, now + TIMING.claimMs)
   return true
+}
+
+// The dashboard's claim on a timeout it gives or takes off, taken before it asks Discord, so the bot's copy is skipped; its key, or null
+const claimTimeout = (discordId, kind, wasUntil, until) => (claim(String(discordId), kind, wasUntil, until) ? claimKey(String(discordId), kind, wasUntil, until) : null)
+// The same for a Discord ban or unban, which the bot's guildBanAdd and guildBanRemove see within a moment
+const BAN_CLAIM_MS = 2 * 60000
+function claimBan(discordId, kind) {
+  const key = `${discordId}:${kind}:dashboard`
+  claimed.set(key, Date.now() + BAN_CLAIM_MS)
+  return key
+}
+// true once, when the dashboard claimed this ban or unban in the last 2 minutes
+function claimedBan(discordId, kind) {
+  const key = `${discordId}:${kind}:dashboard`
+  const until = claimed.get(key)
+  if (!until || until <= Date.now()) return false
+  claimed.delete(key)
+  return true
+}
+const release = key => { if (key) claimed.delete(key) }
+
+// A row for an action the dashboard took (sources/punish/actions.js), named by the staff member's Discord username
+const DASHBOARD_KINDS = new Set(['discord_timeout', 'discord_timeout_end', 'discord_ban', 'discord_unban', 'ban', 'unban'])
+function dashboard(kind, d) {
+  const file = config.punishJournalFile
+  if (!file || !DASHBOARD_KINDS.has(kind) || !d || !d.discordId) return null
+  try {
+    const reason = scrub(d.reason)
+    const entry = {
+      v: 1, id: newId(), at: new Date().toISOString(), kind, discordId: String(d.discordId), profileId: Number.isSafeInteger(d.profileId) ? d.profileId : null,
+      tags: (Array.isArray(d.tags) ? d.tags : []).slice(0, 10), name: null, discordName: scrub(d.discordName, 40),
+      until: d.untilMs ? new Date(d.untilMs).toISOString() : null, reason,
+      by: { name: null, profileId: null, discordName: scrub(d.by && d.by.handle, 40) }, ticket: ticketOf(reason), via: 'dashboard',
+      req: typeof d.req === 'string' ? d.req.slice(0, 8) : null, ...(d.ref ? { ref: String(d.ref) } : {}),
+    }
+    fs.appendFileSync(file, `${JSON.stringify(entry)}\n`, { mode: 0o600 })
+    return entry
+  } catch (err) {
+    console.error('[moderation-journal] not written:', err.code || err.message)
+    return null
+  }
 }
 
 // The guild audit log entry of a timeout: it names who and why, and comes for every member, cached by the bot or not
@@ -94,4 +136,4 @@ async function timeoutChanged(member, wasUntil, until) {
   return append(kind, member.user, mod, kind === 'discord_timeout' ? until : null)
 }
 
-module.exports = { append, auditEntry, timeoutChanged, TIMING }
+module.exports = { append, auditEntry, timeoutChanged, dashboard, claimTimeout, claimBan, claimedBan, release, TIMING }

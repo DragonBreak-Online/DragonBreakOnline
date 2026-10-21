@@ -348,6 +348,21 @@ function createPunishments({ config, readStore, dynamicFields, characterName, lo
       }
     },
 
+    // The account an action names, for sources/punish/actions.js only: its Discord id never leaves the server.
+    // Throws when the profile store cannot be read, so an action is refused rather than aimed at no one
+    targetOf(profileId) {
+      const id = identity.get()
+      if (id.status.profiles !== 'ok') throw new Error('the profile store cannot be read')
+      if (!id.chars.has(profileId) && !id.discordOf.has(profileId)) return null
+      const discordId = id.discordOf.get(profileId) || null
+      const chars = (id.chars.get(profileId) || []).filter(c => c.status !== 'deleted')
+      const first = chars.find(c => c.tag) || null
+      return {
+        profileId, discordId, discordName: discordNameOf(id, discordId), name: first ? first.name : null, tag: first ? first.tag : null,
+        tags: chars.map(c => c.tag).filter(Boolean),
+      }
+    },
+
     stop: () => plog.stop(),
   }
 }

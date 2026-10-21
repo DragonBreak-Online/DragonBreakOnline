@@ -10,7 +10,8 @@ const HOUR_MS = 3600000
 const KINDS = ['warn', 'strike', 'suspend', 'lift', 'overturn', 'tempban', 'ban', 'ipban', 'unban', 'discord_ban', 'discord_unban',
   'discord_timeout', 'discord_timeout_end', 'kick', 'jail', 'restitution']
 const DISCIPLINE_KINDS = new Set(['warn', 'strike', 'suspend', 'lift', 'overturn'])
-const JOURNAL_KINDS = new Set(['discord_timeout', 'discord_timeout_end', 'discord_ban', 'discord_unban'])
+// ban and unban: the game ban list's, from the dashboard's actions, so a lifted ban keeps its history
+const JOURNAL_KINDS = new Set(['discord_timeout', 'discord_timeout_end', 'discord_ban', 'discord_unban', 'ban', 'unban'])
 const KICK_KINDS = new Set(['command', 'panel', 'suspension', 'discord_ban', 'ban_enforce'])
 // Kicks that enforce a ban or suspension at each login try: one row with a count
 const ENFORCING_KICKS = new Set(['suspension', 'discord_ban', 'ban_enforce'])
@@ -203,7 +204,7 @@ function parseBans(data) {
     const byRaw = String(b.bannedBy ?? '').trim()
     return {
       i, _discordId: discordIdOf(b.discordId), ref: BAN_REF_RE.test(String(b.ref ?? '')) ? b.ref : null,
-      reason: scrub(b.reason, 200), atMs: isoMs(b.bannedAt),
+      reason: scrub(b.reason, 300), atMs: isoMs(b.bannedAt),
       by: discordIdOf(byRaw) ? null : scrub(byRaw, 80), _byDiscordId: discordIdOf(byRaw),
     }
   }).filter(Boolean)
@@ -296,13 +297,16 @@ function parseJournalLine(o) {
     name: scrub(o.name, 48), discordName: scrub(o.discordName, 40), untilMs: isoMs(o.until), reason: scrub(o.reason),
     by: scrub(by.name, 48) || scrub(by.discordName, 40) || (posInt(by.profileId) ? `profile ${by.profileId}` : null),
     ticket: /^(?:rep-\d{3,5}|#\d{3,5})$/i.test(String(o.ticket ?? '')) ? String(o.ticket).toLowerCase() : ticketOf(o.reason),
+    banRef: BAN_REF_RE.test(String(o.ref ?? '')) ? o.ref : null,
   }
 }
 
-// A timeout runs until its end, a later timeout of the same account or a timeout_end, whichever comes first
+// A timeout runs until its end, a later timeout of the same account or a timeout_end, whichever comes first. A game ban's
+// row is history (the ban list's row is the running one) and an unban marks the one it lifted
 function journalRows(entries, { now }) {
   const rows = []
   const lastTimeout = new Map()
+  const bansOf = new Map()
   for (const e of [...entries].sort((a, b) => a.atMs - b.atMs || (a.id < b.id ? -1 : 1))) {
     const who = e._discordId || (e.profileId ? `p${e.profileId}` : null)
     const r = row({
@@ -319,6 +323,13 @@ function journalRows(entries, { now }) {
       r.state = e.untilMs && e.untilMs > now ? 'running' : 'ended'
       r.active = r.state === 'running'
       if (who) lastTimeout.set(who, r)
+    }
+    if (e.kind === 'ban' || e.kind === 'unban') r.ref = e.banRef || e.id
+    if (who && e.kind === 'ban') bansOf.set(who, [...(bansOf.get(who) || []), r])
+    if (who && e.kind === 'unban') {
+      const list = bansOf.get(who) || []
+      const b = e.banRef ? list.find(x => x.ref === e.banRef && x.state !== 'lifted') : list.filter(x => x.state !== 'lifted').pop()
+      if (b) { b.state = 'lifted'; b.lifted = { by: e.by, atMs: e.atMs, reason: e.reason } }
     }
     rows.push(r)
   }
@@ -365,8 +376,10 @@ function oneRowPerBan(rows) {
   if (!others.length) return rows
   const drop = new Set()
   for (const b of others) {
-    if (b.source !== 'bans' || b.kind !== 'discord_ban' || !b._discordId) continue
-    const j = others.find(x => x.source === 'journal' && x.kind === 'discord_ban' && x._discordId === b._discordId && near(x, b) && !drop.has(x))
+    if (b.source !== 'bans' || !b._discordId) continue
+    // A dashboard ban's journal row is the same ban by its ref; a Discord ban's is the one near it in time
+    const same = x => (b.kind === 'ban' ? !!b.ref && x.ref === b.ref : near(x, b))
+    const j = others.find(x => x.source === 'journal' && x.kind === b.kind && x.state !== 'lifted' && x._discordId === b._discordId && same(x) && !drop.has(x))
     if (j) { b.by = j.by || b.by; b.reason = j.reason || b.reason; b.ticket = b.ticket || j.ticket; drop.add(j) }
   }
   for (const r of rows) {
