@@ -169,3 +169,18 @@ test('the page follows the window from the minimum up: bars keep their controls,
   assert.ok(points.length >= 4)
   for (const [dim, px] of points) assert.ok(px > MIN_SIZE[dim], `@media max-${dim}: ${px}px is above the ${MIN_SIZE[dim]} px minimum`)
 })
+
+test('in a narrow window the footer keeps Terms & Privacy and the notice clear, and the modlist header wraps inside its panel', () => {
+  const css = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'styles.css'), 'utf8')
+  const narrow = css.match(/\n@media \(max-width: 1100px\) \{([\s\S]*?)\n\}/)
+  assert.ok(narrow, 'styles.css has the max-width: 1100px block')
+  // With a launcher update pending, Play (UPDATE LAUNCHER), the version value and the pill all said it, and below
+  // about 880 px the pill covered Terms & Privacy and squeezed the notice to nothing (seen in an 800 x 540 render)
+  assert.match(narrow[1], /\n\s*\.update-pill\s*\{\s*display:\s*none;?\s*\}/)
+  const renderer = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'renderer.js'), 'utf8')
+  assert.match(renderer, /btnConnect\.textContent = '\\u2913 UPDATE LAUNCHER'/, 'Play still says the launcher update')
+  assert.match(renderer, /btnConnect\.textContent = '\\u2913 UPDATE'/, 'and the client update')
+  const header = css.match(/\n\.section-header--modlist\s*\{([^}]*)\}/)
+  assert.ok(header, 'a top-level rule for the modlist header')
+  assert.match(header[1], /flex-wrap:\s*wrap/, 'the Nexus Collection link wraps instead of running past the panel')
+})

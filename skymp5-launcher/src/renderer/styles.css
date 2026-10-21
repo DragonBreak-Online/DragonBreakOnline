@@ -358,6 +358,12 @@ html, body {
   text-shadow: 0 1px 8px rgba(0,0,0,0.8);
 }
 
+/* In a narrow window the Nexus Collection link goes onto its own line instead of past the panel's edge */
+.section-header--modlist {
+  flex-wrap: wrap;
+  row-gap: 2px;
+}
+
 .modlist-count {
   font-family: 'Barlow Condensed', sans-serif;
   font-size: calc(10px * var(--text-scale));
@@ -1915,6 +1921,9 @@ button:disabled[title] { cursor: not-allowed; }
   .btn-play { padding: 0 26px; letter-spacing: 3px; }
   .btn-play:hover { letter-spacing: 4px; }
   .footer-server-select { max-width: 120px; }
+  /* The pill repeats what the Play button (UPDATE LAUNCHER / UPDATE) and the version values already say; with it the
+     footer ran under it below about 880 px, covering Terms & Privacy and leaving the notice no room */
+  .update-pill { display: none; }
 }
 @media (max-width: 920px) {
   .logo-text-block { display: none; }
