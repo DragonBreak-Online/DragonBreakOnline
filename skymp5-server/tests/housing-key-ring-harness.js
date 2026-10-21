@@ -104,7 +104,7 @@ const check = (name, ok, got) => { console.log(`${ok ? 'ok  ' : 'FAIL'} ${name}$
   mp.set(D, 'inventory', { entries: [{ baseId: KEY_BASE_ID, count: 2, name: 'Key to the Elions Shed' }, { baseId: 0xf, count: 50 }, { baseId: KEY_BASE_ID, count: 1, name: 'Key to Nowhere (ABC)' }] });
   sys.ringAtLogin(ctx, D);
   check('a pack key moves onto the ring at login', ring(D)[0] === 'Key to the Elions Shed' && walksIn(SHED, D) === true, ring(D));
-  check('the pack keeps everything else, and a key that opens nothing known', inv(D).length === 2 && inv(D).some((e) => e.baseId === 0xf), inv(D));
+  check('the pack keeps everything else; a named cage key no lock accepts is thrown away (#8BR9)', inv(D).length === 1 && inv(D)[0].baseId === 0xf, inv(D));
 
   // A key left in a chest goes onto the ring of whoever opens it
   mp.set(CHEST, 'inventory', { entries: [{ baseId: KEY_BASE_ID, count: 1, name: 'Property Key No. 4 (100)' }] });

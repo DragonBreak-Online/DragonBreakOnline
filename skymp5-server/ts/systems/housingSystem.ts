@@ -1946,12 +1946,13 @@ export class HousingSystem implements System {
   }
 
   // Named key items on the vanilla Werewolf Cage Key that no claimed lock accepts, only while every claimed record reads (a
-  // record not loaded yet proves nothing). Two of them with different names stack as one in the game, so the client's
+  // record not loaded yet proves nothing; a claim on a reference the load order no longer has opens nothing and is skipped,
+  // as in the place and owner plans). Two of them with different names stack as one in the game, so the client's
   // inventory apply takes them off and gives them back every 5 s and they cannot be dropped (#8BR9, 20 Oct)
   private deadLegacyKeys(ctx: SystemContext, dead: any[]): any[] {
     const legacy = dead.filter((e) => (Number(e?.baseId) >>> 0) === KEY_BASE_ID && typeof e?.name === "string" && e.name);
     if (!legacy.length || !this.claimed.length) return [];
-    for (const primary of this.claimed) if (!this.read(ctx, primary)) return [];
+    for (const primary of this.claimed) if (!this.read(ctx, primary) && !this.formGone(ctx, primary)) return [];
     return legacy;
   }
 
