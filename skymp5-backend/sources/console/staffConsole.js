@@ -47,6 +47,8 @@ function readConfig(config) {
   return { pins: new Set(pins), roles: rank.roles, guild: rank.guild, channels: new Set(channels), freshMs: (hours > 0 && hours <= 24 ? hours : 4) * 3600 * 1000, problem }
 }
 
+const narrower = (a, b) => rules.SETTINGS[Math.min(rules.SETTINGS.indexOf(a), Math.max(0, rules.SETTINGS.indexOf(b)))]
+
 const withDeadline = (promise, ms) => {
   let timer
   const deadline = new Promise(resolve => { timer = setTimeout(resolve, ms, null) })
@@ -215,8 +217,8 @@ function createStaffConsole({
     // 0. A caller from one of the two factories, or a code bug
     if (!callers.has(caller)) { log('refused a caller that no factory made (code bug)'); return error(500, 'badCaller') }
     const { source, discordId } = caller
-    // 1. The kill switch, read on every call
-    const mode = setting(source)
+    // 1. The kill switch, read on every call; a caller's cap (the Punishments panel's own switch) can only narrow it
+    const mode = request.cap ? narrower(setting(source), request.cap) : setting(source)
     if (mode !== 'on' && mode !== 'dry-run') { quiet(source, discordId, 'consoleOff'); return error(503, 'consoleOff') }
     // 2. The config, the spool and the key
     if (C.problem || spool.problem()) { quiet(source, discordId, 'unavailable'); return error(503, 'unavailable') }
@@ -241,6 +243,8 @@ function createStaffConsole({
     // 7. One clean line
     const line = rules.cleanCommand(text)
     if (!line) return refuse(400, 'badCommand', handle)
+    // 7b. A caller held to some commands (the Punishments panel: /discipline and /kick) is refused the rest before any record
+    if (request.only && !request.only.includes(line.slice(1).split(' ')[0])) return refuse(422, 'notPunish', handle)
     // 8. The allowlist the game published; without it the game decides alone
     const allow = spool.allow()
     const pre = allow ? rules.precheck(line, allow) : null
@@ -252,6 +256,7 @@ function createStaffConsole({
     const known = jobs.get(reqId)
     if (known) {
       if (known.discordId !== discordId) return refuse(409, 'conflict', handle)
+      if (request.only && known.text !== line) return refuse(409, 'conflict', handle)
       if (running.has(reqId)) return answer(202, { v: 1, job: view(known) })
       return answer(200, { v: 1, job: view(known) })
     }
@@ -262,7 +267,8 @@ function createStaffConsole({
     // 11. The record and the audit line, before anything is sent
     const job = { id: reqId, at: now(), source, discordId, handle, profileId, text: line, setting: mode, state: 'sent', ranAs: '', online: false, tier: '', target: '', why: '', lines: [] }
     remember(job)
-    try { audit.log(`CONSOLE ${handle} (<@${discordId}>) via ${source} req ${rules.id8(reqId)}${mode === 'dry-run' ? ' (dry run)' : ''}: ${line}`) } catch (err) { log('audit failed:', err.message) }
+    const via = request.via === 'punish' ? `${source} punish` : source
+    try { audit.log(`CONSOLE ${handle} (<@${discordId}>) via ${via} req ${rules.id8(reqId)}${mode === 'dry-run' ? ' (dry run)' : ''}: ${line}`) } catch (err) { log('audit failed:', err.message) }
     // 12. and 13. Send, then wait for the game
     const work = (async () => {
       try { spool.send({ id: reqId, src: source, discordId, user: handle, profileId, roles, text: line, mode }) }
@@ -313,4 +319,4 @@ function createStaffConsole({
   return { webCaller, discordCaller, runStaffCommand, state, job, isFresh, recover, setting, config: C }
 }
 
-module.exports = { createStaffConsole, readConfig, readRankRule, LIMITS, SIGN_IN_URL, TIER_LABEL }
+module.exports = { createStaffConsole, readConfig, readRankRule, withDeadline, LIMITS, SIGN_IN_URL, TIER_LABEL }
