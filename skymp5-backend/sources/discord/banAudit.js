@@ -15,6 +15,9 @@ const oneLine = (text, max) => String(text || '').replace(/[\u0000-\u001f\u007f]
 // A Discord id or mention a moderator typed into the reason
 const ID_RX = /<[@#][!&]?\d{5,22}>|\b\d{17,20}\b/g
 
+// The moderator's answer from one audit log entry's executor and reason
+const fromEntry = (executor, reason) => ({ found: true, name: oneLine(executor && executor.username, 40) || 'unknown', bot: !!(executor && executor.bot), reason: oneLine(String(reason || '').replace(ID_RX, '[id]'), 300) })
+
 // { found, denied, name, bot, reason } from the newest entry of this type on this member that match accepts; denied: no View Audit Log
 async function moderatorOf(guild, type, targetId, match = () => true) {
   for (const wait of WAITS_MS) {
@@ -26,7 +29,7 @@ async function moderatorOf(guild, type, targetId, match = () => true) {
       return { found: false, denied: !!err && (err.code === 50013 || err.status === 403) }
     }
     const hit = entries.find(e => e && e.targetId === targetId && Date.now() - Number(e.createdTimestamp) < ENTRY_MAX_AGE_MS && match(e))
-    if (hit) return { found: true, name: oneLine(hit.executor && hit.executor.username, 40) || 'unknown', bot: !!(hit.executor && hit.executor.bot), reason: oneLine(String(hit.reason || '').replace(ID_RX, '[id]'), 300) }
+    if (hit) return fromEntry(hit.executor, hit.reason)
   }
   return { found: false, denied: false }
 }
@@ -68,4 +71,4 @@ async function record(op, ban, listNote) {
   return mod
 }
 
-module.exports = { record, moderatorOf, tagsOf, WAITS_MS }
+module.exports = { record, moderatorOf, fromEntry, tagsOf, WAITS_MS }

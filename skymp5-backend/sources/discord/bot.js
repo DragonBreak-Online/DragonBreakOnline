@@ -83,6 +83,12 @@ client.on('guildBanRemove', ban => {
     .catch(err => console.error('[discord-bot] unban audit failed:', err.message))
 })
 
+// A timeout given or taken off in Discord, from the guild audit log, for the moderation journal; it also comes for members the bot has not cached
+client.on('guildAuditLogEntryCreate', (entry, guild) => {
+  if (config.discordGuildId && (!guild || guild.id !== config.discordGuildId)) return
+  moderationJournal.auditEntry(entry, guild).catch(err => console.error('[discord-bot] timeout journal failed:', err.message))
+})
+
 // Role and nickname changes go to the audit channel the moment they happen
 client.on('guildMemberUpdate', (before, after) => {
   try {
@@ -97,7 +103,7 @@ client.on('guildMemberUpdate', (before, after) => {
     if (removed.length) audit.log(`PERM ${tag} lost role(s): ${removed.join(', ')}`)
     if (before.nickname !== after.nickname) audit.log(`NAME ${tag} nickname "${before.nickname || ''}" -> "${after.nickname || ''}"`)
     if (added.length || removed.length) roleCache.delete(after.id)
-    // A timeout given or taken off, for the moderation journal (the staff dashboard's Punishments panel)
+    // A timeout given or taken off on a cached member; journalled only if its audit log entry does not come
     const wasUntil = before.communicationDisabledUntilTimestamp || 0
     const until = after.communicationDisabledUntilTimestamp || 0
     if (wasUntil !== until) {

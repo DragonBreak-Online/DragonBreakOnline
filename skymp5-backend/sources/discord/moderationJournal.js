@@ -8,7 +8,7 @@ const fs = require('fs')
 const { AuditLogEvent } = require('discord.js')
 const config = require('../../config')
 const profiles = require('../profiles')
-const { moderatorOf, tagsOf } = require('./banAudit')
+const { moderatorOf, fromEntry, tagsOf } = require('./banAudit')
 const { scrub } = require('../punish/scrub')
 const { ticketOf } = require('../punish/records')
 
@@ -43,14 +43,55 @@ function append(kind, user, mod, until = null) {
   }
 }
 
-const isTimeoutEntry = e => (e.changes || []).some(c => c && c.key === 'communication_disabled_until')
+const TIMEOUT_KEY = 'communication_disabled_until'
+const isTimeoutEntry = e => (e.changes || []).some(c => c && c.key === TIMEOUT_KEY)
 
-// A timeout given (or changed) or taken off early; one that runs out by itself fires no member update
-async function timeoutChanged(member, wasUntil, until) {
-  const on = until > Date.now()
-  if (!config.punishJournalFile || (!on && !(wasUntil > Date.now()))) return null
-  const mod = await moderatorOf(member.guild, AuditLogEvent.MemberUpdate, String(member.id), isTimeoutEntry)
-  return append(on ? 'discord_timeout' : 'discord_timeout_end', member.user, mod, on ? until : null)
+// auditGraceMs: how long a member update waits for the audit log entry of the same timeout; claimMs: how long one is remembered
+const TIMING = { auditGraceMs: 10000, claimMs: 15 * 60000 }
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
+
+// A timeout given (or changed) or taken off early; one that runs out by itself is neither
+function timeoutKind(wasUntil, until) {
+  if (until > Date.now()) return 'discord_timeout'
+  return wasUntil > Date.now() ? 'discord_timeout_end' : null
 }
 
-module.exports = { append, timeoutChanged }
+// One row per timeout change, whichever Discord event comes first: the audit log entry or the member update
+const claimed = new Map()
+function claim(discordId, kind, wasUntil, until) {
+  const now = Date.now()
+  for (const [k, t] of claimed) if (t <= now) claimed.delete(k)
+  const key = `${discordId}:${kind}:${Math.round((kind === 'discord_timeout' ? until : wasUntil) / 1000)}`
+  if (claimed.has(key)) return false
+  claimed.set(key, now + TIMING.claimMs)
+  return true
+}
+
+// The guild audit log entry of a timeout: it names who and why, and comes for every member, cached by the bot or not
+async function auditEntry(entry, guild) {
+  if (!config.punishJournalFile || !entry || entry.action !== AuditLogEvent.MemberUpdate || !entry.targetId) return null
+  const change = (entry.changes || []).find(c => c && c.key === TIMEOUT_KEY)
+  if (!change) return null
+  const wasUntil = Date.parse(change.old) || 0
+  const until = Date.parse(change.new) || 0
+  const discordId = String(entry.targetId)
+  const kind = timeoutKind(wasUntil, until)
+  if (!kind || !claim(discordId, kind, wasUntil, until)) return null
+  const users = guild && guild.client && guild.client.users
+  const fetchUser = async id => { try { return users ? await users.fetch(String(id)) : null } catch { return null } }
+  const executor = entry.executor || (entry.executorId ? await fetchUser(entry.executorId) : null)
+  const user = (entry.target && entry.target.id ? entry.target : await fetchUser(discordId)) || { id: discordId }
+  return append(kind, user, fromEntry(executor, entry.reason), kind === 'discord_timeout' ? until : null)
+}
+
+// A member update on a member the bot has cached: journalled only when no audit log entry came for it (no View Audit Log)
+async function timeoutChanged(member, wasUntil, until) {
+  const kind = timeoutKind(wasUntil, until)
+  if (!config.punishJournalFile || !kind) return null
+  await sleep(TIMING.auditGraceMs)
+  if (!claim(String(member.id), kind, wasUntil, until)) return null
+  const mod = await moderatorOf(member.guild, AuditLogEvent.MemberUpdate, String(member.id), isTimeoutEntry)
+  return append(kind, member.user, mod, kind === 'discord_timeout' ? until : null)
+}
+
+module.exports = { append, auditEntry, timeoutChanged, TIMING }
