@@ -1,6 +1,6 @@
 'use strict'
 // selfUpdate.js: install.log lines for the launcher's own update (claude-jake, 11 Oct): the check (first answer and each
-// change only, it runs every 10 s), and on the next start whether the version that was installing is the one running.
+// change only, it repeats), and on the next start whether the version that was installing is the one running.
 const test = require('node:test')
 const assert = require('node:assert')
 const fs = require('fs')

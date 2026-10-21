@@ -37,7 +37,7 @@ const PENDING_KEY = 'pendingSelfUpdate'
 // failed and nothing restarted the launcher); it is still reported once, as not applied
 const STALE_MS = 24 * 60 * 60 * 1000
 
-// The update check runs every 10 s; log the first answer and then only a change
+// The update check repeats (every 15 min, on show and before Play); log the first answer and then only a change
 function createCheckLogger(log) {
   let last = null
   return (result, err) => {

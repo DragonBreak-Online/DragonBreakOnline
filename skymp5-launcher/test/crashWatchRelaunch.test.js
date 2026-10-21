@@ -62,7 +62,7 @@ function setup({ promptMs = 0 } = {}) {
     process: { platform: 'win32' },
     store: { get: k => kv[k], set: (k, v) => { kv[k] = v } },
     bugLogPoller: { poll() {} },
-    bugLogs: { POLL_MS: 30_000 },
+    bugLogs: { POLL_MS: 60_000 },
     documentsDirOrNull: () => docs,
     MYGAMES_VARIANTS: ['Skyrim Special Edition'],
     path,

@@ -35,6 +35,7 @@ const debloat = require('./debloat')
 const selfRepair = require('./selfRepair')
 const downloadLib = require('./download')
 const { createInstallManifest } = require('./installManifest')
+const { createPollCache } = require('./pollCache')
 const selfUpdate = require('./selfUpdate')
 const nxmLinks = require('./nxm')
 const legalLib = require('./legal')
@@ -958,7 +959,8 @@ ipcMain.handle('api:status', async () => {
     const data = await fetchJSON(`${config.apiUrl}/api/status`)
     // The public /api/status is answered by a status probe that carries no player count (2026-09-27: Leerod asked for
     // one; the badge only showed ONLINE). /api/servers always has it, so the count comes from there when missing.
-    if (data && data.players == null) {
+    // The badge shows a count only while the server is online, so it is not asked for otherwise
+    if (data && data.status === 'online' && data.players == null) {
       try {
         const list = await fetchJSON(`${config.apiUrl}/api/servers`)
         // The selected server, picked the way activeServer() picks it from the cached list
@@ -1780,7 +1782,7 @@ function stepAsideForGame() {
   setTimeout(tick, 1500)
 }
 
-// In-game /bug reports get this session's logs (src/bugLogs.js): asked for every 30 s while the game runs and once at exit
+// In-game /bug reports get this session's logs (src/bugLogs.js): asked for every minute while the game runs and once at exit
 const bugLogPoller = bugLogs.createBugLogPoller({
   fetchPending: async () => {
     const session = store.get('gameSession')
@@ -1888,18 +1890,22 @@ function pruneCrashPromptKeys() {
   }
 }
 
+// The GETs the window polls (Play state, launcher version) ask with the last ETag, so an unchanged answer costs no body
+const polledJSON = createPollCache(fetchJSON)
+
 // Lightweight update probe for the Play/Update button: compares the server's
 // published client-files version with what was last installed.
+// ok: false (the version or the DragonBreak file list could not be read) leaves the button as it was.
 ipcMain.handle('files:updateCheck', async () => {
   try {
-    const vd = await fetchJSON(`${config.apiUrl}/api/files/version`)
+    const vd = await polledJSON(`${config.apiUrl}/api/files/version`)
     const gamePath   = effectiveGamePath()
     const allPresent = clientFilesPresent(gamePath)
     // A failed modpack install also flips the Play button to UPDATE so one
     // click re-runs the install and self-heals the incomplete state.
     const modpackFailed = store.get('mo2Enabled') && store.get('modpackState') === 'failed'
     let extrasCurrent = true
-    if (!store.get('dboFilesDisabled')) { try { extrasCurrent = extrasUpToDate(await fetchExtraManifest(), gamePath) } catch { /* backend hiccup: keep Play */ } }
+    if (!store.get('dboFilesDisabled')) extrasCurrent = extrasUpToDate(await fetchExtraManifest(polledJSON), gamePath)
     return {
       ok: true,
       updateAvailable: vd.version !== store.get('filesVersion') || !allPresent || modpackFailed || !extrasCurrent,
@@ -2082,12 +2088,12 @@ async function sendReportAttachment(reportId, save, session) {
 
 ipcMain.handle('report:send', (_e, args) => submitReport(args))
 
-// Launcher update check (the window asks every 10 s; install.log hears the first answer and each change)
+// Launcher update check (the window asks every 15 min, on show and before Play; install.log hears the first answer and each change)
 const logUpdateCheck = selfUpdate.createCheckLogger(log)
 ipcMain.handle('app:checkUpdate', async () => {
   const current = app.getVersion()
   try {
-    const data = await fetchJSON(`${config.apiUrl}/api/version`)
+    const data = await polledJSON(`${config.apiUrl}/api/version`)
     const latest    = data.version
     const hasUpdate = compareVersions(latest, current) > 0
     logUpdateCheck({ current, latest, hasUpdate })
@@ -3559,8 +3565,8 @@ async function extractClientZip(zipPath, destDir, onProgress) {
 
 const extraFileUrl = rel => `${config.apiUrl}/api/files/extra/${rel.split('/').map(encodeURIComponent).join('/')}`
 
-async function fetchExtraManifest() {
-  try { return await fetchJSON(`${config.apiUrl}/api/files/extra`) }
+async function fetchExtraManifest(get = fetchJSON) {
+  try { return await get(`${config.apiUrl}/api/files/extra`) }
   catch (err) { if (err.statusCode === 404) return null; throw err }
 }
 
@@ -4497,7 +4503,8 @@ function installManifest() {
   return installManifestSource
 }
 
-function fetchJSON(url, headers = {}, redirectsLeft = 3) {
+// meta (pollCache.js) gets the reply's status and ETag, and a 304 then resolves with nothing
+function fetchJSON(url, headers = {}, redirectsLeft = 3, meta = null) {
   return new Promise((resolve, reject) => {
     const mod    = url.startsWith('https') ? https : http
     const urlObj = new URL(url)
@@ -4509,6 +4516,8 @@ function fetchJSON(url, headers = {}, redirectsLeft = 3) {
       headers,
     }
     const req = mod.request(opts, res => {
+      if (meta) { meta.status = res.statusCode; meta.etag = res.headers.etag || '' }
+      if (meta && res.statusCode === 304) { res.resume(); return resolve(undefined) }
       // Follow same-host redirects (e.g. the reverse proxy upgrading http to
       // https). Cross-host hops and https->http downgrades stay errors so the
       // session header can never leak to another origin.
@@ -4519,7 +4528,7 @@ function fetchJSON(url, headers = {}, redirectsLeft = 3) {
         const sameHost  = next && next.hostname === urlObj.hostname
         const downgrade = next && urlObj.protocol === 'https:' && next.protocol !== 'https:'
         if (next && sameHost && !downgrade && redirectsLeft > 0) {
-          return resolve(fetchJSON(next.href, headers, redirectsLeft - 1))
+          return resolve(fetchJSON(next.href, headers, redirectsLeft - 1, meta))
         }
         const e = new Error(`HTTP ${res.statusCode} from ${url} (redirect to ${res.headers.location})`)
         e.statusCode = res.statusCode

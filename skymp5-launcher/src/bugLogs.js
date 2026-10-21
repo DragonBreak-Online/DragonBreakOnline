@@ -3,7 +3,7 @@
 
 const SENT_KEY = 'bugLogsSent'
 const SENT_KEEP = 50
-const POLL_MS = 30_000
+const POLL_MS = 60_000   // the backend keeps a /bug waiting for 2 h, and the poll at game exit catches one made just before quitting
 
 // fetchPending(): [{ id }]; send(id): { ok, error, notPending? }; store: get/set; log(text)
 function createBugLogPoller({ fetchPending, send, store, log = () => {} }) {
