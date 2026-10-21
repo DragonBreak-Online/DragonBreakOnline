@@ -1,0 +1,14 @@
+{
+  "version": "2026-10-21",
+  "effective": "2026-10-21",
+  "changes": [
+    "First official version of the DragonBreak Online Server Rules, kept on the DragonBreak server and published on our website and in our Discord's #server-rules channel.",
+    "It replaces Blood and Law on the website, the Discord Rules in #welcome and the six #rp-rules threads, and adds the rules announced since.",
+    "New in section 3: one Discord account per person. Anyone who already has more than one opens a ticket by 4 November 2026 to choose the one to keep.",
+    "First official Staff Handbook for every rank. It replaces the Trial GM Handbook and the GM Handbook."
+  ],
+  "files": {
+    "rules": "server-rules.md",
+    "staff": "staff-handbook.md"
+  }
+}
