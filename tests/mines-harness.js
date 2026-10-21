@@ -27,7 +27,7 @@ check('every id is unique', new Set(LIST.mines.map((m) => m.id)).size === LIST.m
 check('every mine has a way in, a hold, a name and its cells', LIST.mines.every((m) => m.entrances.length && m.hold && m.name && m.cells.length), LIST.mines.filter((m) => !(m.entrances.length && m.hold && m.name)).map((m) => m.id));
 check('only the open lands: Skyrim and Bruma', LIST.mines.every((m) => m.world === 'skyrim' || m.world === 'bruma'));
 check('Bruma\'s four: Bleak-Frost, Frost-Iron, Gutted, Plundered', ['CYRBleakFrostMine01', 'CYRFrostironmine01', 'CYRGuttedMine', 'CYRPlunderedMine'].every((i) => M.has(i) && M.get(i).hold === 'bruma'));
-const want = { GloomboundMine: 'clan-narzulbur', DushnikhYalMine: 'clan-dushnikh-yal', MorKhazgurMine: 'clan-mor-khazgur', DuskgourdMine: 'clan-largashbur', GolKharzumMine1: 'clan-gol-kharzum', BilegulchMine: 'clan-cracked-tusk' };
+const want = { GloomboundMine: 'clan-narzulbur', DushnikhYalMine: 'clan-dushnikh-yal', MorKhazgurMine: 'clan-mor-khazgur', DuskgourdMine: 'clan-largashbur', GolKharzumMine1: 'clan-gol-kharzum', CrackedTuskMine1: 'clan-cracked-tusk' };
 for (const [id, clan] of Object.entries(want)) check(`${M.has(id) ? M.get(id).name : id} belongs to ${clan}`, M.has(id) && M.get(id).clan === clan, M.get(id));
 check('six clan mines, every clan a stronghold faction of guild-defs', LIST.mines.filter((m) => m.clan).length === 6 && LIST.mines.filter((m) => m.clan).every((m) => clans.has(m.clan)));
 check('Frost-Iron Mine is a lease dungeon kept out of the leases', M.get('CYRFrostironmine01').leaseExcluded === true);
@@ -298,10 +298,10 @@ require(GUILDS)({ mp, log: noop, personal: noop, system: noop, audit: noop, regi
 const hallOf = (m) => globalThis.__dboHallOf([door(m)]);
 check('guilds.js: Gloombound Mine\'s door is Clan Narzulbur\'s hall door', JSON.stringify(hallOf(GLOOM)) === '["clan-narzulbur"]', hallOf(GLOOM));
 check('...its Chief holds it as a hall\'s leader (no home cap) and a clan member shares it', globalThis.__dboHallLeader([door(GLOOM)], CHIEF) === true && globalThis.__dboHallMember([door(GLOOM)], 0, ORC) === true && globalThis.__dboHallMember([door(GLOOM)], 0, STRANGER) === false);
-// Bilegulch left the leases with Cracked Tusk Keep (Nate, 20 Oct: the clan's stronghold, not a dungeon): its mine is the clan's
-check('...Bilegulch Mine, off the leases (dungeons.exclude, leaseExcluded), is Clan Cracked Tusk\'s hall door', JSON.stringify(hallOf(M.get('BilegulchMine'))) === '["clan-cracked-tusk"]', hallOf(M.get('BilegulchMine')));
-check('...and mines.json marks it so, as the config lists both sites', M.get('BilegulchMine').leaseExcluded === true && ['CrackedTuskKeepLocation', 'BilegulchMineLocation'].every((x) => (JSON.parse(fs.readFileSync(path.join(SERVER, 'gamemode-config.json'), 'utf8')).dungeons.exclude || []).includes(x)));
-check('...an ordinary mine is nobody\'s hall', hallOf(KOL).length === 0);
+// The strongholds release (21 Oct: AIO + CrackedTuskKeepExpanded + the Strongholds Fix): CTK's own mine is the clan's, and
+// the Fix switches off Bilegulch's old door, so Bilegulch is no mine any more
+check('...CrackedTuskMine1 (CTK) is Clan Cracked Tusk\'s hall door', JSON.stringify(hallOf(M.get('CrackedTuskMine1'))) === '["clan-cracked-tusk"]', hallOf(M.get('CrackedTuskMine1')));
+check('...and Bilegulch is gone from mines.json', !M.has('BilegulchMine'));
 globalThis.__dboGuildInfo = saved.info; globalThis.__dboGuildsOf = saved.of;
 
 // ---- switched off ------------------------------------------------------------------------------------------------------
