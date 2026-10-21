@@ -87,6 +87,13 @@ test('the pre-check refuses names, wrong words, bad durations, record numbers, s
   assert.equal(pre(`/discipline #8KWH warn ${'a'.repeat(478)}`).why, 'clean', 'over 500 characters is no command at all (badCommand)')
 })
 
+test('a reason holding a Hangul filler, a letter that draws nothing, is refused as reasonChars (review, 21 Oct; console.js BLANK_RE)', () => {
+  for (const r of [ch(0x3164).repeat(5), ch(0x115f).repeat(5), ch(0x1160).repeat(5), ch(0xffa0).repeat(5), `ok ${ch(0x3164)} reason`]) {
+    assert.equal(pre(`/discipline #8KWH warn ${r}`).why, 'reasonChars', JSON.stringify(r))
+  }
+  assert.equal(pre('/discipline #8KWH warn Hangul \uD55C\uAE00 letters stay fine'), null, 'real Hangul letters still pass')
+})
+
 test('a reason line typed with a line break is refused (oneLine); the folded line alone is not refused for it', () => {
   for (const t of ['/discipline #8KWH warn spamming the chat\n/kick #LLX8', '/discipline #8KWH warn first line\nsecond line', `/discipline #8KWH warn one${ch(0x2028)}two lines`,
     '/discipline #8KWH warn one\r\ntwo lines', `/discipline #8KWH warn one${ch(0x85)}two lines`]) assert.equal((pre(t) || {}).why, 'oneLine', JSON.stringify(t))

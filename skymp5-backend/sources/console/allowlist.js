@@ -17,6 +17,8 @@ const REQUEST_ID_RE = /^(w-[0-9a-f-]{36}|d-\d{17,20})$/
 // A /discipline reason after cleanCommand: plain letters, digits and . , ; : ! ? ' " ( ) - / & + %, BMP only, 5 to 300 (console.js REASON_RE)
 const REASON_RE = /^[\p{L}\p{N} .,;:!?'"()\/&+%-]+$/u
 const ASTRAL_RE = /[\ud800-\udfff]/
+// The four letters that draw nothing, the Hangul fillers (console.js BLANK_RE)
+const BLANK_RE = /[\u115f\u1160\u3164\uffa0]/
 const REASON_MIN = 5
 const REASON_MAX = 300
 // The record kinds and the word each takes before its reason (console.js KIND_ARGS); allow.json can only narrow them
@@ -124,7 +126,7 @@ function lengthHours(word, maxDays) {
 // What is wrong with a reason, or '' (console.js reasonWhy)
 function reasonWhy(reason) {
   if (!reason) return 'reasonShort'
-  if (ASTRAL_RE.test(reason) || !REASON_RE.test(reason)) return 'reasonChars'
+  if (ASTRAL_RE.test(reason) || BLANK_RE.test(reason) || !REASON_RE.test(reason)) return 'reasonChars'
   if (reason.length < REASON_MIN) return 'reasonShort'
   return reason.length > REASON_MAX ? 'reasonLong' : ''
 }
