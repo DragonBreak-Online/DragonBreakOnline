@@ -4,7 +4,7 @@ if (!require('electron').app.isPackaged) {
   require('dotenv').config()
 }
 
-const { app, BrowserWindow, ipcMain, dialog, shell, clipboard } = require('electron')
+const { app, BrowserWindow, ipcMain, dialog, shell, clipboard, screen } = require('electron')
 
 // Basic/Remote display adapters (RDP, VMs, servers) bugcheck the video
 // scheduler when Chromium drives them; the launcher UI does not need the GPU.
@@ -38,6 +38,7 @@ const { createInstallManifest } = require('./installManifest')
 const selfUpdate = require('./selfUpdate')
 const nxmLinks = require('./nxm')
 const legalLib = require('./legal')
+const windowState = require('./windowState')
 const discordLogin = require('./discordLogin')
 const installProgress = require('./renderer/installProgress')
 const installGate  = installProgress.createGate()
@@ -110,6 +111,7 @@ const store = new Store({
     baseDirPath:       '',     // DragonBreak base dir: MO2 root, with the game at <base>\skyrim
     forcedDefaultsApplied: false, // server-required graphics defaults seeded once at first install
     archiveDir:        '',     // a folder of mod archives already downloaded (Vortex's), used before asking Nexus
+    windowState:       null,   // the launcher window's last size, position and maximized state (windowState.js)
   }
 })
 
@@ -283,11 +285,13 @@ ipcMain.handle('game:detectPath', () => {
 
 // Window
 function createWindow() {
+  const size = windowState.windowOptions({
+    saved:     store.get(windowState.STORE_KEY),
+    workAreas: screen.getAllDisplays().map(d => d.workArea),
+    primary:   screen.getPrimaryDisplay().workArea,
+  })
   win = new BrowserWindow({
-    width:     1280,
-    height:    720,
-    minWidth:  1024,
-    minHeight: 600,
+    ...size.bounds,
     frame:     false,
     resizable: true,
     webPreferences: {
@@ -299,6 +303,7 @@ function createWindow() {
     show: false,
   })
 
+  windowState.track(win, store)
   win.loadFile(path.join(__dirname, 'renderer', 'index.html'))
   // Closing mid-install asks first; a re-run keeps finished downloads and installed mods
   win.on('close', (e) => {
@@ -311,6 +316,7 @@ function createWindow() {
     if (choice !== 1) e.preventDefault()
   })
   win.once('ready-to-show', () => {
+    if (size.maximized) win.maximize()
     win.show()
     // Chained so the two startup modals never stack
     maybeWarnNeverLaunched().then(() => {
