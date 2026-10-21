@@ -414,8 +414,13 @@ module.exports = (api) => {
   // cells since 11 Oct (the Cathedral of St Martin) and 19 Oct (Solitude's Temple of the Divines), but the line still
   // named the two colleges alone, so a Priest was sent to a college (Jorik Hamrikson #TW2F, 17 Oct: Fast Healing chosen at
   // Priest 25 with 3 spells prepared, "didnt learn Fast Healing when it says Known Spells")
-  const PREPARE_PLACES = "a magic college (the Synod Conclave in Bruma or the College of Winterhold), a temple of the Great Faiths (the Cathedral of St Martin in Bruma or Solitude's Temple of the Divines) or a Scholars' Ledger";
+  const COLLEGES_TEXT = 'a magic college (the Synod Conclave in Bruma or the College of Winterhold)';
+  const TEMPLES_TEXT = "a temple of the Great Faiths (the Cathedral of St Martin in Bruma or Solitude's Temple of the Divines)";
+  const PREPARE_PLACES = `${COLLEGES_TEXT}, ${TEMPLES_TEXT} or a Scholars' Ledger`;
   const COLLEGE_HINT = `Prepared spells are changed at ${PREPARE_PLACES}.`;
+  // How to get there for a spell that waits: /spells in a prepare cell, but beside a ledger its own Open your Spell Book,
+  // since /spells forgets the ledger (Frostcrag Spire's ledger is outside every prepare cell)
+  const HOW_TO_PREPARE = `open your spellbook with /spells at ${COLLEGES_TEXT} or ${TEMPLES_TEXT}, or with Open your Spell Book at a Scholars' Ledger`;
   // A spell newly in the book: prepared at once while there is room (the engine already holds it after a read; a lesson
   // adds it), else it waits in the book and the engine's copy is taken back. Returns the line to tell the player: when it
   // waits, that it cannot be cast yet and how to change that (the book lists it as known, the Magic menu does not)
@@ -428,7 +433,7 @@ module.exports = (api) => {
       return `It is prepared. ${preparedLine(a)}.`;
     }
     if (engineHasIt) papyrus(a, 'RemoveSpell', id);
-    return `Your ${MAXP()} prepared spells are full, so ${sp.name} waits in your spellbook and is not among the spells you can cast yet. To cast it, open /spells at ${PREPARE_PLACES}, put one prepared spell away and prepare ${sp.name}.`;
+    return `Your ${MAXP()} prepared spells are full, so ${sp.name} waits in your spellbook and is not among the spells you can cast yet. To cast it, ${HOW_TO_PREPARE}; then put one prepared spell away and prepare ${sp.name}.`;
   };
 
   // The skills whose path may take a spell of this school for this character, skills.json's owner first. Alteration is

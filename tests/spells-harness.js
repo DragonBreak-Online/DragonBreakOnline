@@ -183,7 +183,7 @@ at(MAGE, HALL, [100, 0, 0]);
 check('...and works beside it', (await read(MAGE, T.sparks)) !== false && studied(MAGE, 'arcane').length === 3);
 at(MAGE, SYNOD, [0, 0, 0]);
 check('no limit on the spellbook: a fourth spell is learned', (await read(MAGE, T.boundSword)) !== false && studied(MAGE, 'arcane').length === 4, studied(MAGE, 'arcane'));
-check('...but with 3 prepared it waits in the book: the engine gives it back', !known(MAGE).has(idOf(T.boundSword[1])) && prepared(MAGE).length === 3 && papyrus.some((p) => p[0] === 'RemoveSpell' && p[2] === T.boundSword[1]) && /Your 3 prepared spells are full, so Bound Sword waits in your spellbook and is not among the spells you can cast yet\. To cast it, open \/spells at a magic college \(the Synod Conclave in Bruma or the College of Winterhold\), a temple of the Great Faiths \(the Cathedral of St Martin in Bruma or Solitude's Temple of the Divines\) or a Scholars' Ledger, put one prepared spell away and prepare Bound Sword\.$/.test(said(MAGE)), said(MAGE));
+check('...but with 3 prepared it waits in the book: the engine gives it back', !known(MAGE).has(idOf(T.boundSword[1])) && prepared(MAGE).length === 3 && papyrus.some((p) => p[0] === 'RemoveSpell' && p[2] === T.boundSword[1]) && /Your 3 prepared spells are full, so Bound Sword waits in your spellbook and is not among the spells you can cast yet\. To cast it, open your spellbook with \/spells at a magic college \(the Synod Conclave in Bruma or the College of Winterhold\) or a temple of the Great Faiths \(the Cathedral of St Martin in Bruma or Solitude's Temple of the Divines\), or with Open your Spell Book at a Scholars' Ledger; then put one prepared spell away and prepare Bound Sword\.$/.test(said(MAGE)), said(MAGE));
 check('its tome read again is refused and kept: it is in the book', (await read(MAGE, T.boundSword)) === false && /Bound Sword is already in your spellbook\. You keep the tome/.test(said(MAGE)) && studied(MAGE, 'arcane').length === 4, said(MAGE));
 known(MAGE).add(idOf(HEALING));
 check('spells known before study began are not in the book and take no prepared place', prepared(MAGE).length === 3 && !studied(MAGE, 'priest').length);
@@ -249,6 +249,11 @@ ui('spellbookPrepare', MAGE, [book.nonce, T.flames[1]], 58);
 check('back beside it, the spell is prepared again', lastWidget(MAGE).resultKind === 'ok' && prepared(MAGE).length === 3 && known(MAGE).has(idOf(T.flames[1])), lastWidget(MAGE).result);
 cmd('spells', MAGE);
 check('/spells opened away from the ledger forgets it', lastWidget(MAGE).atCollege === false);
+// ...even typed 1 m from it: at a Scholars' Ledger outside the prepare cells (Frostcrag Spire's, one staff place) /spells
+// only reads, and the ledger's own Open your Spell Book changes them, so the line for a spell that waits names that, not
+// /spells (review of d44a40a0b: it said "open /spells at ... or a Scholars' Ledger")
+check('...so beside a ledger, /spells reads and the ledger\'s Open your Spell Book changes them', mkApi().distanceMeters(MAGE, LEDGER) <= 1.01 && lastWidget(MAGE).atCollege === false && globalThis.__dboOpenSpellbook(MAGE, { ledger: LEDGER }) === true && lastWidget(MAGE).atCollege === true);
+cmd('spells', MAGE);
 check('an old client gets the book in chat from the ledger, and the hook says no panel opened', (() => { ui('uiCaps', STUDENT, ['bank']); const r = globalThis.__dboOpenSpellbook(STUDENT, { ledger: LEDGER }); ui('uiCaps', STUDENT, ['bank', 'spellbook']); return r === false && /Prepared \(/.test(said(STUDENT)); })());
 at(MAGE, SYNOD, [0, 0, 0]);
 

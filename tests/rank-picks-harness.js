@@ -344,7 +344,7 @@ check('Restoration\'s lines follow Priest: Fast Healing (from Healing) and Stead
   const prep = () => props.get(JH + '|private.dboPrepared') || [];
   r = globalThis.__dboMagicAction(JH, 'firstSpell', ['Restoration', FAST]);
   check('Priest 25 with 3 prepared picks Fast Healing out in Bruma: in the book, not prepared, not on the character', r.ok && priestBook(JH).includes(FAST) && !prep().includes(FAST) && prep().length === 3 && !known(JH).has(idOf(FAST)), [r, prep()]);
-  check('...and told it cannot be cast yet, what to do, and every place that does it, the temples too', /Fast Healing waits in your spellbook and is not among the spells you can cast yet\. To cast it, open \/spells at a magic college \(the Synod Conclave in Bruma or the College of Winterhold\), a temple of the Great Faiths \(the Cathedral of St Martin in Bruma or Solitude's Temple of the Divines\) or a Scholars' Ledger, put one prepared spell away and prepare Fast Healing\./.test(r.text) && /can rise again/.test(r.text), r.text);
+  check('...and told it cannot be cast yet, what to do, and every place that does it, the temples too', /Fast Healing waits in your spellbook and is not among the spells you can cast yet\. To cast it, open your spellbook with \/spells at a magic college \(the Synod Conclave in Bruma or the College of Winterhold\) or a temple of the Great Faiths \(the Cathedral of St Martin in Bruma or Solitude's Temple of the Divines\), or with Open your Spell Book at a Scholars' Ledger; then put one prepared spell away and prepare Fast Healing\./.test(r.text) && /can rise again/.test(r.text), r.text);
   at(JH, CATHEDRAL, [0, 0, 0]);
   const away = globalThis.__dboMagicAction(JH, 'unprepare', [HEALING]);
   const on = globalThis.__dboMagicAction(JH, 'prepare', [FAST]);
