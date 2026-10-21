@@ -496,3 +496,13 @@ test('what the viewer may do: each tier, the pin, the switch and the bot; a GM m
   assert.deepEqual(Object.values(info('owner', 'owner').can), [false, false, false, false, false])
   H.clean(o)
 })
+
+test('unban: once the entry is gone the job is done, even when the ban role cannot be read', async () => {
+  want(await H.call('ban', 'owner', H.body('ban')), 200)
+  H.make({ extra: { bannedRoleId: () => { throw new Error('server-access.json unreadable') } } })
+  const rows = journalOf('unban', bobId).length
+  const r = want(await H.call('unban', 'owner', H.body('unban', { reason: 'Appeal accepted by staff' })), 200)
+  assert.deepEqual([r.job.state, r.job.banRoleHeld], ['done', null])
+  assert.equal(entryOf(bobId), undefined)
+  assert.equal(journalOf('unban', bobId).length, rows + 1)
+})

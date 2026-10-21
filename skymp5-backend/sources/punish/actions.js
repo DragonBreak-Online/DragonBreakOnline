@@ -418,8 +418,6 @@ function createPunishActions({
           const r = bans.removeEntry(j.targetDiscordId)
           if (!r.removed) { j.state = 'failed'; j.error = 'notBanned'; finish(j); return [409, 'notBanned'] }
           j.ref = r.removed.ref || null
-          const role = bannedRoleId()
-          j.banRoleHeld = !!role && member.state === 'member' && (member.roles || []).includes(String(role))
         }
       } catch (err) {
         log('ban list not written:', err.message)
@@ -427,6 +425,13 @@ function createPunishActions({
         j.error = 'storeUnreadable'
         finish(j)
         return [503, 'storeUnreadable']
+      }
+      // After the write, so nothing here can report a lifted ban as not done
+      if (j.action === 'unban') {
+        try {
+          const role = bannedRoleId()
+          j.banRoleHeld = !!role && member.state === 'member' && (member.roles || []).includes(String(role))
+        } catch (err) { log('ban role not read:', err.message) }
       }
       j.state = 'done'
       journalRow(j, j.action, { ref: j.ref })
