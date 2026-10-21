@@ -118,6 +118,20 @@ test('a minimized or destroyed window saves nothing, so the last good size is ke
   assert.strictEqual(store.writes.length, 0)
 })
 
+test('a store that cannot be written never stops the window closing: the other close handlers still run', async () => {
+  const win = fakeWin({ x: 10, y: 20, width: 1100, height: 700 })
+  const store = { set() { throw new Error('EPERM: operation not permitted, rename config.json') } }
+  track(win, store, 5)
+  let asked = 0
+  win.on('close', () => { asked++ })  // main.js's mid-install question comes after it
+  assert.doesNotThrow(() => win.fire('close'))
+  assert.strictEqual(asked, 1)
+  win.fire('resize')
+  await wait(20)  // the delayed save throws nothing either (the test would fail on an uncaught error)
+  win.getNormalBounds = () => { throw new Error('Object has been destroyed') }
+  assert.doesNotThrow(() => win.fire('close'))
+})
+
 test('what is saved reads back as the same window', () => {
   const win = fakeWin({ x: 200, y: 120, width: 1024, height: 700 })
   const store = fakeStore()

@@ -65,9 +65,11 @@ function track(win, store, delay = SAVE_DELAY_MS) {
   const save = () => {
     clearTimeout(timer)
     timer = null
-    if (win.isDestroyed() || win.isMinimized() || win.isFullScreen()) return
-    const b = win.getNormalBounds()
-    store.set(STORE_KEY, { x: b.x, y: b.y, width: b.width, height: b.height, maximized: win.isMaximized() })
+    try {
+      if (win.isDestroyed() || win.isMinimized() || win.isFullScreen()) return
+      const b = win.getNormalBounds()
+      store.set(STORE_KEY, { x: b.x, y: b.y, width: b.width, height: b.height, maximized: win.isMaximized() })
+    } catch { /* an unwritable store only loses the size; a throw here would skip the other close handlers (the mid-install question) */ }
   }
   const later = () => { clearTimeout(timer); timer = setTimeout(save, delay) }
   for (const ev of ['resize', 'move', 'maximize', 'unmaximize']) win.on(ev, later)
