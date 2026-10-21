@@ -194,7 +194,8 @@ function createPunishments({ config, readStore, dynamicFields, characterName, lo
     o.at = iso(r.atMs)
     o.until = iso(r.untilMs)
     o.from = iso(r.fromMs)
-    o.endsInMs = r.active && r.endsAtMs ? Math.max(0, r.endsAtMs - t) : null
+    // A jail sentence counts down only while it is served, so what is left of it is its leftMs
+    o.endsInMs = r.kind === 'jail' ? r.leftMs : r.active && r.endsAtMs ? Math.max(0, r.endsAtMs - t) : null
     o.lifted = r.lifted ? { by: r.lifted.by, at: iso(r.lifted.atMs), reason: r.lifted.reason } : null
     o.overturned = r.overturned ? { by: r.overturned.by, at: iso(r.overturned.atMs), reason: r.overturned.reason } : null
     o.items = r.items ? { ...r.items } : null

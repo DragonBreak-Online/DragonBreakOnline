@@ -83,6 +83,12 @@ test('Active pages a jail sentence once, though its player is offline and the sn
   assert.deepEqual([...seen].sort(), [...all].sort())
 })
 
+test('a jail row still answers what is left to serve as endsInMs, though it is ordered by its earliest end', async () => {
+  const rows = (await service({ staffStatusOf: async () => 'player' }).active(OWNER, { limit: '100' })).rows.filter(x => x.kind === 'jail')
+  assert.deepEqual(rows.map(x => [x.id, x.endsInMs]).sort(), [['jail:ff000010', 20 * 60000], ['jail:ff000020', 20 * 60000]])
+  for (const x of rows) assert.equal(x.endsInMs, x.leftMs)
+})
+
 test('a jail sentence with a fractional servedMs pages with a cursor the panel accepts', async () => {
   const odd = {
     cf: { recType: 1, profileId: 40, formDesc: 'ff000041', displayName: 'Ivan Two', dynamicFields: { 'private.charTag': 'IVN2', 'private.dboSentence': { totalMs: 600000, servedMs: 1234.25, by: 'Lena #LED1', at: F.now - 1000 } } },
