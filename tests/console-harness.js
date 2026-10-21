@@ -97,11 +97,13 @@ const body = [
 ].join('\n');
 const world = { online };
 const G = new Function('mp', 'log', 'cfg', 'fs', 'path', 'world', 'CHAT_PROP', 'US', 'noteTold', 'ADMIN_PROFILES', 'TIERS', 'tierRoles', 'legacyAdminRoles',
-  'trialRoles', 'FLOOD', 'R', 'sendNear', 'bubbleNear', 'hasPlayerMenu', 'openPlayerMenu', 'staffLog', 'indexName', 'discordTarget', 'postJson', 'setTimeout', body)(
+  'trialRoles', 'FLOOD', 'R', 'sendNear', 'bubbleNear', 'hasPlayerMenu', 'openPlayerMenu', 'staffLog', 'indexName', 'discordTarget', 'postJson', 'setTimeout',
+  // /chargen marks the editor open (the editor guard, origin/server 355afd2cd, 19 Oct); its bookkeeping is not what this harness tests
+  'markEditorOpen', body)(
   mp, log, {}, fs, path, world, 'ff_chatMsg', String.fromCharCode(31), () => {}, new Set(), ['senior', 'developer', 'leadgm', 'gm'],
   { senior: [ROLE.owner], developer: [ROLE.dev], leadgm: [ROLE.lead], gm: [ROLE.gm] }, [], [ROLE.trial],
   { chatMaxChars: 2000, stripColourCodes: true }, { say: 20, low: 8, whisper: 3, wide: 35, shout: 80, emote: 20, emoteLow: 8, emoteLong: 35, looc: 20, loocLow: 8, loocLong: 35 },
-  () => {}, () => {}, () => false, () => {}, (who, tier, what, detail) => staffLines.push({ who, tier, what, detail }), () => {}, null, async () => {}, () => 0);
+  () => {}, () => {}, () => false, () => {}, (who, tier, what, detail) => staffLines.push({ who, tier, what, detail }), () => {}, null, async () => {}, () => 0, () => {});
 
 // beastform.js's /wwremote and /vlremote, with its BODY table and breaker flag, cut as written
 // beastform.js's bodyTripped as written, with what it reads. One line until origin/server d4be291be (Nate's hotfix-1014b,
@@ -491,8 +493,10 @@ reset();
   check('9. a dry run writes none', !staffLines.length, staffLines);
   reset(); const d = send('/whoami', { src: 'discord' }).r;
   check('9. a Discord one is tagged discord with the last 8 digits of the interaction id', staffLines.length === 1 && staffLines[0].detail.endsWith(`[remote discord ${d.id.slice(-8)}]`), staffLines);
-  reset(); G.handleChat(store.get(A.jake).__user, '/players');
-  check('9. typed /players still writes no staff line (unchanged)', !staffLines.length);
+  // Typed, a command registered without admin writes none; /players is admin since Nate's 16 Oct change (players learn who is
+  // about by meeting them), so typed it writes one as every staff command does: /whoami is the one without admin now
+  reset(); G.handleChat(store.get(A.jake).__user, '/whoami');
+  check('9. typed /whoami (registered without admin) still writes no staff line (unchanged)', !staffLines.length, staffLines);
 }
 
 // ---- 10. the capture ------------------------------------------------------------------------------------------------------------
