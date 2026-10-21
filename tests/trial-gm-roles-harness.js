@@ -31,7 +31,7 @@ const none = R.readAdminRoleConfig({ adminRoles: { gm: ['g1'] } });
 ok('without the key nobody is a Trial GM', none.trialRoles.length === 0 && !R.isTrialGm(mp, 1, none) && R.adminTierOf(mp, 1, none) === null);
 ok('a null settings object still reads', R.readAdminRoleConfig(null).trialRoles.length === 0);
 ok('the panel allowlist is TP to a player or a location (Nate 12 Oct) and Rename, the Invisible and Ghost modes (Nate 12 Oct), and the Debug, Players, Teleport and Modes tabs',
-  [...R.TRIAL_GM_ACTIONS].sort().join() === 'rename,teleportLoc,teleportTo' && [...R.TRIAL_GM_MODES].join() === 'invis,ghost' && R.TRIAL_GM_TABS.join() === 'debug,players,teleport,modes',
+  [...R.TRIAL_GM_ACTIONS].sort().join() === 'rename,teleportLoc,teleportTo' && [...R.TRIAL_GM_MODES].join() === 'invis,ghost' && R.TRIAL_GM_TABS.join() === 'debug,players,gmcalls,teleport,modes',
   [[...R.TRIAL_GM_ACTIONS], [...R.TRIAL_GM_MODES], R.TRIAL_GM_TABS]);
 ok('...and the one data request besides the menu is the Teleport tab\'s list of locations',
   R.TRIAL_GM_REQUESTS instanceof Set && [...R.TRIAL_GM_REQUESTS].join() === 'adminLocationsRequest', R.TRIAL_GM_REQUESTS && [...R.TRIAL_GM_REQUESTS]);

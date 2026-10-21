@@ -61,7 +61,7 @@ const result = (out) => (out.find((x) => x.p.customPacketType === 'adminActionRe
   const menu = (sent.find((x) => x.u === 1 && x.p.customPacketType === 'adminMenu') || {}).p;
   ok('a Trial GM gets the menu, as trialgm', menu && menu.tier === 'trialgm', menu && menu.tier);
   ok('...with the trial caps: no ban, no spawn, the tabs and actions they may use', menu && menu.caps.trial === true && menu.caps.ban === false && menu.caps.spawn === false
-    && menu.caps.tabs.join() === 'debug,players,teleport,modes' && menu.caps.actions.slice().sort().join() === 'rename,teleportLoc,teleportTo', menu && menu.caps);
+    && menu.caps.tabs.join() === 'debug,players,gmcalls,teleport,modes' && menu.caps.actions.slice().sort().join() === 'rename,teleportLoc,teleportTo', menu && menu.caps);
   const rows = (menu && menu.players) || [];
   ok('...the player list, everyone online but them', rows.length === 3 && rows.every((r) => r.online && r.n), rows.map((r) => r.n));
   ok('...without addresses, hardware ids, mastery or beast rows', rows.every((r) => r.ip === '' && r.hwid === '' && r.m === undefined && r.b === undefined), rows[0]);
