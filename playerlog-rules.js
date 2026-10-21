@@ -1287,10 +1287,11 @@ couriers.js COURIER 4806f214 parsed
 court.js <expr> 9d97c8d1 parsed
 court.js OFFICIAL 86dad6bd parsed
 court.js <expr> a74e62f0 parsed
-discipline.js DISCIPLINE 63fea0ae parsed
+discipline.js DISCIPLINE d74e7242 parsed
 discipline.js DISCIPLINE e5c533ad parsed
 discipline.js DISCIPLINE e8c0f96e parsed
-discipline.js DISCIPLINE dc327337 parsed
+discipline.js DISCIPLINE eaf7762e parsed
+discipline.js DISCIPLINE 95d68f5f parsed
 discordroles.js DISCORD 22bc34df excluded
 discordroles.js DISCORD b04ccd84 excluded
 discordroles.js DISCORD 053e6b2c excluded
