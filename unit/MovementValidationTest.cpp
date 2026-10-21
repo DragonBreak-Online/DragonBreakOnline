@@ -200,13 +200,134 @@ TEST_CASE("Accepts a hosted NPC walking into the next cell of its dungeon",
   MovementValidation::Tracker tracker;
 
   // Bthardamz02a and Bthardamz02, both in location 00019152
-  // Far past the guard on purpose: interior cells have their own coordinate spaces
+  // Its load door 00059266 puts an actor at 8892 4799 -3143 in Bthardamz02, far past the guard from where it stood
   partOne.Messages().clear();
   REQUIRE(MovementValidation::Validate(
-    partOne, { 0, 0, 0 }, { 0, 0, 0 }, FormDesc::FromString("5912d:Skyrim.esm"),
-    { 9000, 0, 0 }, FormDesc::FromString("361f9:Skyrim.esm"), 0, &npc,
-    { "Skyrim.esm" }, &tracker));
+    partOne, { 704, 576, 768 }, { 0, 0, 0 },
+    FormDesc::FromString("5912d:Skyrim.esm"), { 8950, 4700, -3143 },
+    FormDesc::FromString("361f9:Skyrim.esm"), 0, &npc, { "Skyrim.esm" },
+    &tracker));
   // Nothing is sent to the hosting client: it was right, the server was stale
+  REQUIRE(partOne.Messages().empty());
+}
+
+TEST_CASE("Refuses a hosted NPC's move into the next cell far from its load "
+          "doors",
+          "[MovementValidation]")
+{
+  PartOne& partOne = GetPartOne();
+
+  DoConnect(partOne, 0);
+  partOne.CreateActor(0xff000000, { 0, 0, 0 }, 0, 0x3c);
+  partOne.SetUserActor(0, 0xff000000);
+  partOne.CreateActor(0xff000001, { 0, 0, 0 }, 0, 0x3c);
+
+  auto& npc = partOne.worldState.GetFormAt<MpActor>(0xff000001);
+  MovementValidation::Tracker tracker;
+
+  // Bthardamz02a's doors into Bthardamz02 put an actor at 8892 4799 -3143 and 7368 5326 -4167
+  for (const NiPoint3& to :
+       { NiPoint3{ 9000, 0, 0 }, NiPoint3{ 1e9f, 1e9f, 1e9f },
+         NiPoint3{ 8892 + 4200, 4799, -3143 } }) {
+    partOne.Messages().clear();
+    REQUIRE(!MovementValidation::Validate(
+      partOne, { 704, 576, 768 }, { 0, 0, 0 },
+      FormDesc::FromString("5912d:Skyrim.esm"), to,
+      FormDesc::FromString("361f9:Skyrim.esm"), 0, &npc, { "Skyrim.esm" },
+      &tracker));
+    REQUIRE(partOne.Messages().empty());
+  }
+}
+
+TEST_CASE("Refuses a hosted NPC's position that is not finite on every axis",
+          "[MovementValidation]")
+{
+  PartOne& partOne = GetPartOne();
+
+  DoConnect(partOne, 0);
+  partOne.CreateActor(0xff000000, { 0, 0, 0 }, 0, 0x3c);
+  partOne.SetUserActor(0, 0xff000000);
+  partOne.CreateActor(0xff000001, { 0, 0, 0 }, 0, 0x3c);
+
+  auto& npc = partOne.worldState.GetFormAt<MpActor>(0xff000001);
+  MovementValidation::Tracker tracker;
+  const float nan = std::numeric_limits<float>::quiet_NaN();
+
+  // Into the next cell at its load door's arrival, with a NaN height
+  partOne.Messages().clear();
+  REQUIRE(!MovementValidation::Validate(
+    partOne, { 704, 576, 768 }, { 0, 0, 0 },
+    FormDesc::FromString("5912d:Skyrim.esm"), { 8892, nan, nan },
+    FormDesc::FromString("361f9:Skyrim.esm"), 0, &npc, { "Skyrim.esm" },
+    &tracker));
+  // Inside one cell, where a NaN distance never trips the guard
+  REQUIRE(!MovementValidation::Validate(
+    partOne, { 0, 0, 0 }, { 0, 0, 0 }, FormDesc::Tamriel(), { 10, nan, 0 },
+    FormDesc::Tamriel(), 0, &npc, { "Skyrim.esm" }, &tracker));
+  REQUIRE(partOne.Messages().empty());
+
+  REQUIRE(MovementValidation::Validate(
+    partOne, { 0, 0, 0 }, { 0, 0, 0 }, FormDesc::Tamriel(), { 10, 10, 0 },
+    FormDesc::Tamriel(), 0, &npc, { "Skyrim.esm" }, &tracker));
+}
+
+TEST_CASE("Accepts a hosted NPC walking back through the other cell's door",
+          "[MovementValidation]")
+{
+  PartOne& partOne = GetPartOne();
+
+  DoConnect(partOne, 0);
+  partOne.CreateActor(0xff000000, { 0, 0, 0 }, 0, 0x3c);
+  partOne.SetUserActor(0, 0xff000000);
+  partOne.CreateActor(0xff000001, { 0, 0, 0 }, 0, 0x3c);
+
+  auto& npc = partOne.worldState.GetFormAt<MpActor>(0xff000001);
+  MovementValidation::Tracker tracker;
+
+  // Bthardamz02's door 0003e40a puts an actor at -611 1856 0 in Bthardamz02a
+  partOne.Messages().clear();
+  REQUIRE(MovementValidation::Validate(
+    partOne, { 7468, 5321, -4169 }, { 0, 0, 0 },
+    FormDesc::FromString("361f9:Skyrim.esm"), { -560, 1900, 0 },
+    FormDesc::FromString("5912d:Skyrim.esm"), 0, &npc, { "Skyrim.esm" },
+    &tracker));
+  REQUIRE(partOne.Messages().empty());
+}
+
+TEST_CASE("Refuses a player's position that is not finite on every axis",
+          "[MovementValidation]")
+{
+  PartOne& partOne = GetPartOne();
+
+  DoConnect(partOne, 0);
+  partOne.CreateActor(0xff000000, { 0, 0, 0 }, 0, 0x3c);
+  partOne.SetUserActor(0, 0xff000000);
+
+  auto& actor = partOne.worldState.GetFormAt<MpActor>(0xff000000);
+  MovementValidation::Tracker tracker;
+  const float nan = std::numeric_limits<float>::quiet_NaN();
+
+  // A NaN height adds nothing to the up or down budget
+  partOne.Messages().clear();
+  REQUIRE(!MovementValidation::Validate(
+    partOne, { 0, 0, 0 }, { 0, 0, 0 }, FormDesc::Tamriel(), { 10, 10, nan },
+    FormDesc::Tamriel(), 0, &actor, { "Skyrim.esm" }, &tracker));
+  REQUIRE(partOne.Messages().size() == 1);
+  REQUIRE(partOne.Messages()[0].j["t"] ==
+          static_cast<int>(MsgType::Teleport2));
+
+  // With the rate check off nothing else looks at the position
+  partOne.worldState.movementLimits.enabled = false;
+  partOne.Messages().clear();
+  REQUIRE(!MovementValidation::Validate(
+    partOne, { 0, 0, 0 }, { 0, 0, 0 }, FormDesc::Tamriel(), { 10, nan, 0 },
+    FormDesc::Tamriel(), 0, &actor, { "Skyrim.esm" }, &tracker));
+  REQUIRE(partOne.Messages().size() == 1);
+
+  partOne.Messages().clear();
+  REQUIRE(MovementValidation::Validate(
+    partOne, { 0, 0, 0 }, { 0, 0, 0 }, FormDesc::Tamriel(), { 10, 10, 0 },
+    FormDesc::Tamriel(), 0, &actor, { "Skyrim.esm" }, &tracker));
   REQUIRE(partOne.Messages().empty());
 }
 

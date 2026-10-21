@@ -6,9 +6,13 @@
 
 #include "ActionListener.h"
 #include "HitMessage.h"
+#include "formulas/TES5DamageFormula.h"
 #include "libespm/Loader.h"
+#include "script_storages/DirectoryScriptStorage.h"
+#include <optional>
 
 PartOne& GetPartOne();
+espm::Loader& GetEspmLoader();
 using namespace std::chrono_literals;
 
 namespace {
@@ -402,4 +406,49 @@ TEST_CASE("A damaging staff's slow reaches the NPC's host on its own",
   REQUIRE(scene.Actor(SpellSyncScene::kNpc)
             .GetChangeForm()
             .actorValues.healthPercentage < 1.f);
+}
+
+// A static keyed by WorldState* gave the next WorldState at that address the first one's index, into a freed espm
+TEST_CASE("A WorldState at a reused address builds its own staff stand-in "
+          "index",
+          "[SpellSync][espm]")
+{
+  constexpr uint32_t kStaffOfCalm = 0x00029b8b;
+  constexpr uint32_t kCalmEnchantment = 0x000b62e1;
+  constexpr uint32_t kVampireCharm = 0x000c4de2;
+  constexpr uint32_t kStaffOfFrenzy = 0x00029b8f;
+  constexpr uint32_t kFrenzyEnchantment = 0x00029b65;
+  constexpr uint32_t kFury = 0x0004deeb;
+
+  auto replayedAs = [](PartOne& p, uint32_t staff,
+                       uint32_t enchantment) -> uint32_t {
+    SpellSyncScene scene(p);
+    const auto snippets =
+      scene.StaffHit(staff, enchantment, SpellSyncScene::kNpc);
+    const auto* replay = Find(snippets, "DoCombatSpellApply");
+    return replay ? (*replay)["arguments"][0]["formId"].get<uint32_t>() : 0;
+  };
+  auto attach = [](PartOne& p, espm::Loader& loader) {
+    p.SetDamageFormula(std::make_unique<TES5DamageFormula>());
+    p.worldState.AttachScriptStorage(
+      std::make_shared<DirectoryScriptStorage>(TEST_PEX_DIR));
+    p.AttachEspm(&loader);
+    p.worldState.bannedEspmCharacterRaceIds.clear();
+  };
+
+  // One storage, so both WorldStates live at the same address
+  std::optional<PartOne> partOne;
+  {
+    espm::Loader skyrimOnly(GetDataDir(), { "Skyrim.esm" });
+    partOne.emplace();
+    attach(*partOne, skyrimOnly);
+    REQUIRE(replayedAs(*partOne, kStaffOfCalm, kCalmEnchantment) ==
+            kVampireCharm);
+    partOne.reset();
+  }
+
+  partOne.emplace();
+  attach(*partOne, GetEspmLoader());
+  REQUIRE(replayedAs(*partOne, kStaffOfFrenzy, kFrenzyEnchantment) == kFury);
+  partOne.reset();
 }

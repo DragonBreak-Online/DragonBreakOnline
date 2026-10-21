@@ -5,14 +5,27 @@
 #include "PartOne.h"
 #include "TeleportMessage2.h"
 #include "WorldState.h"
+#include <libespm/GroupUtils.h>
 #include <libespm/espm.h>
 #include <algorithm>
 #include <cmath>
 #include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
 #include <string>
+#include <unordered_map>
+#include <utility>
+#include <vector>
 
 namespace {
+
+uint32_t FormIdOrZero(const FormDesc& cellOrWorld, const EspmFileTable& files)
+{
+  try {
+    return cellOrWorld.ToFormId(files);
+  } catch (const std::exception&) {
+    return 0;
+  }
+}
 
 // Location a cell belongs to (CELL XLCN), 0 when it has none or is not a cell
 uint32_t LocationOf(WorldState& worldState, const FormDesc& cellOrWorld,
@@ -21,12 +34,7 @@ uint32_t LocationOf(WorldState& worldState, const FormDesc& cellOrWorld,
   if (!worldState.HasEspm()) {
     return 0;
   }
-  uint32_t cellId = 0;
-  try {
-    cellId = cellOrWorld.ToFormId(files);
-  } catch (const std::exception&) {
-    return 0;
-  }
+  const uint32_t cellId = FormIdOrZero(cellOrWorld, files);
   if (!cellId) {
     return 0;
   }
@@ -37,6 +45,49 @@ uint32_t LocationOf(WorldState& worldState, const FormDesc& cellOrWorld,
   }
   const uint32_t local = cell->GetData(worldState.GetEspmCache()).locationId;
   return local ? lookup.ToGlobalId(local) : 0;
+}
+
+// Where each load door of a cell puts an actor, with the cell it leads to
+using LoadDoorArrivals = std::vector<std::pair<uint32_t, NiPoint3>>;
+
+struct LoadDoorArrivalsByCell
+{
+  std::unordered_map<uint32_t, LoadDoorArrivals> byCell;
+};
+
+// Read once per interior cell, whose references all sit on grid square 0,0
+const LoadDoorArrivals& ArrivalsFrom(WorldState& worldState, uint32_t cellId)
+{
+  auto& byCell = worldState.GetEspmDerived<LoadDoorArrivalsByCell>().byCell;
+  if (const auto it = byCell.find(cellId); it != byCell.end()) {
+    return it->second;
+  }
+  LoadDoorArrivals arrivals;
+  auto& browser = worldState.GetEspm().GetBrowser();
+  auto& cache = worldState.GetEspmCache();
+  for (MpObjectReference* refr :
+       worldState.GetNeighborsByPosition(cellId, 0, 0)) {
+    if (refr->GetBaseType() != espm::DOOR::kType) {
+      continue;
+    }
+    const auto door = browser.LookupById(refr->GetFormId());
+    const auto* doorRecord = espm::Convert<espm::REFR>(door.rec);
+    const auto* teleport =
+      doorRecord ? doorRecord->GetData(cache).teleport : nullptr;
+    if (!teleport) {
+      continue;
+    }
+    const auto destination =
+      browser.LookupById(door.ToGlobalId(teleport->destinationDoor));
+    const auto* destinationRecord = espm::Convert<espm::REFR>(destination.rec);
+    if (!destinationRecord) {
+      continue;
+    }
+    arrivals.emplace_back(
+      destination.ToGlobalId(espm::GetWorldOrCell(browser, destinationRecord)),
+      NiPoint3{ teleport->pos[0], teleport->pos[1], teleport->pos[2] });
+  }
+  return byCell.emplace(cellId, std::move(arrivals)).first->second;
 }
 
 float HorizontalDistance(const NiPoint3& a, const NiPoint3& b)
@@ -113,7 +164,16 @@ bool Validate(PartOne& partOne, const NiPoint3& currentPos,
   const bool tooFar = (currentPos - newPos).SqrLength() >= kSqrMaxDistance;
 
   // An infinite position marks a packet sent before a server teleport
-  const bool afterServerTeleport = !std::isfinite(newPos.x);
+  const bool finite = std::isfinite(newPos.x) && std::isfinite(newPos.y) &&
+    std::isfinite(newPos.z);
+
+  // A position must be finite on every axis: a NaN distance passes every guard below, a NaN height the rate check too
+  if (!finite) {
+    if (isMe) {
+      sendSnapBack();
+    }
+    return false;
+  }
 
   if (cellChanged || tooFar) {
     // A player is corrected by the snap back, so refusing it cannot latch
@@ -125,7 +185,7 @@ bool Validate(PartOne& partOne, const NiPoint3& currentPos,
     // A hosted actor has no correction path, so a refusal latches forever
     // NPCs walk between the cells of one dungeon, which is ordinary
     // Interior cells each have their own coordinate space, so a cross cell distance measures nothing
-    if (!cellChanged || afterServerTeleport) {
+    if (!cellChanged) {
       return false;
     }
 
@@ -134,6 +194,18 @@ bool Validate(PartOne& partOne, const NiPoint3& currentPos,
       LocationOf(partOne.worldState, currentCellOrWorld, espmFiles);
     if (fromLocation == 0 ||
         fromLocation != LocationOf(partOne.worldState, newCellOrWorld, espmFiles)) {
+      return false;
+    }
+
+    // Through a load door of the old cell into the new one, within the guard of where that door puts an actor
+    const uint32_t toCell = FormIdOrZero(newCellOrWorld, espmFiles);
+    const auto& arrivals = ArrivalsFrom(
+      partOne.worldState, FormIdOrZero(currentCellOrWorld, espmFiles));
+    if (std::none_of(
+          arrivals.begin(), arrivals.end(), [&](const auto& arrival) {
+            return arrival.first == toCell &&
+              (arrival.second - newPos).SqrLength() < kSqrMaxDistance;
+          })) {
       return false;
     }
   }

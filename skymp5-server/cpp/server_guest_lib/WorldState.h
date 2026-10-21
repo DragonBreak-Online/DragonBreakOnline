@@ -242,6 +242,20 @@ public:
   espm::Loader& GetEspm() const;
   bool HasEspm() const;
   espm::CompressedFieldsCache& GetEspmCache();
+
+  // One T per WorldState, dropped with it and by AttachEspm: a static keyed by WorldState* outlives it
+  template <class T>
+  T& GetEspmDerived()
+  {
+    static char key;
+    auto& slot = EspmDerivedSlot(&key);
+    if (!slot) {
+      slot = std::make_shared<T>();
+    }
+    return *static_cast<T*>(slot.get());
+  }
+  std::shared_ptr<void>& EspmDerivedSlot(const void* key);
+
   IScriptStorage* GetScriptStorage() const;
   VirtualMachine& GetPapyrusVm();
   const std::set<uint32_t>& GetActorsByProfileId(int32_t profileId) const;
