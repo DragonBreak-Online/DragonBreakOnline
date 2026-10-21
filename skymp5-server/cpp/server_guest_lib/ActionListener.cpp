@@ -3543,7 +3543,9 @@ void ActionListener::ApplySpellRiders(MpActor& aggressor, MpActor& target,
   if (!replaySpell && !applyApart && hostHoldSeconds == 0) {
     return;
   }
-  if (holdSeconds > 0 && IsParalyzed(target)) {
+  // A paralysis staff on an NPC already held sends nothing, its push included (the re-hold gap leaves holdSeconds at 0)
+  if ((holdSeconds > 0 || (isEnchantment && riders.paralysisSeconds > 0)) &&
+      IsParalyzed(target)) {
     return;
   }
   // Only a hit of a spell the caster cast lately or of a staff it holds, at most once a kRiderHitInterval per target
