@@ -91,30 +91,31 @@ async function getDiscordAccess(discordId) {
   }
 
   // Nate, 9 Oct 2026: only members of the DragonBreak Online Discord may play. Unknown (Discord unreachable) lets them in.
-  if (settings.requireGuildMember && await discordBot.isGuildMember(discordId) === false) {
-    return { allowed: false, error: 'notWhitelisted', reason: 'notInDiscord', roles, settings }
+  const member = settings.requireGuildMember ? await discordBot.isGuildMember(discordId) : null
+  if (member === false) {
+    return { allowed: false, error: 'notWhitelisted', reason: 'notInDiscord', roles, settings, member }
   }
 
   if (settings.serverLocked) {
     if (settings.lockedDiscordIds.includes(discordId) || hasAnyRole(roles, settings.lockedRoleIds)) {
-      return { allowed: true, roles, settings }
+      return { allowed: true, roles, settings, member }
     }
-    return { allowed: false, error: 'serverLocked', roles, settings }
+    return { allowed: false, error: 'serverLocked', roles, settings, member }
   }
 
   if (settings.whitelistRoleId) {
     if (!roles.includes(settings.whitelistRoleId)) {
-      return { allowed: false, error: 'notWhitelisted', roles, settings }
+      return { allowed: false, error: 'notWhitelisted', roles, settings, member }
     }
-    return { allowed: true, roles, settings }
+    return { allowed: true, roles, settings, member }
   }
 
   const fileWhitelist = loadFileWhitelist()
   if (fileWhitelist.length > 0 && !fileWhitelist.includes(discordId)) {
-    return { allowed: false, error: 'notWhitelisted', roles, settings }
+    return { allowed: false, error: 'notWhitelisted', roles, settings, member }
   }
 
-  return { allowed: true, roles, settings }
+  return { allowed: true, roles, settings, member }
 }
 
 function publicState() {

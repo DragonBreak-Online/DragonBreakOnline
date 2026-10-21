@@ -360,6 +360,8 @@ router.get('/:key/sessions/:session', async (req, res) => {
       discordId: entry.discordId,
       username:  entry.username,
       roles:     access.roles,
+      // The game server lets a member in on this answer when its own Discord lookup is rate limited
+      discordMember: typeof access.member === 'boolean' ? access.member : null,
       ...getProfileFactionPayload(entry.discordId),
     },
   })
