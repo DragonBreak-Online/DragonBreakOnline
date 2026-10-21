@@ -1,4 +1,5 @@
 #include "TestUtils.hpp"
+#include <algorithm>
 #include <catch2/catch_all.hpp>
 #include <cstdio>
 
@@ -165,14 +166,20 @@ TEST_CASE("A HearthFires oven makes its recipes (the bench keyword is global)",
   // milk and wheat at BYOHCraftingOven. The oven (CraftingOvenMarker) keeps that
   // keyword as 0x020117F7 in HearthFires.esm, the recipe resolves it to
   // 0x030117F7: read raw, no oven recipe matched (Purr, 17 Oct)
-  const uint32_t kOven = 0x03011ce2, kBread = 0x65c97;
+  const uint32_t kOven = 0xff00f0e1, kOvenBase = 0x0300283f, kBread = 0x65c97;
   const Inventory inputs = Inventory()
                              .AddItem(0x34cdf, 1)
                              .AddItem(0x03003534, 1)
                              .AddItem(0x03003538, 1)
                              .AddItem(0x23d77, 1);
 
+  // HearthFires' own ovens start disabled (house kitchens), so the server never loads them: one is placed
   PartOne& p = GetPartOne();
+  p.worldState.AddForm(
+    std::make_unique<MpObjectReference>(
+      LocationalData{ { 1000, 2000, 300 }, { 0, 0, 0 }, FormDesc::Tamriel() },
+      FormCallbacks::DoNothing(), kOvenBase, "FURN"),
+    kOven);
   auto& oven = p.worldState.GetFormAt<MpObjectReference>(kOven);
 
   DoConnect(p, 0);
@@ -337,6 +344,147 @@ TEST_CASE("A tempering recipe never makes an item", "[Craft][espm]")
     Inventory().AddItem(IronIngot, 1).AddItem(LeatherStrips, 1), IronDagger);
   REQUIRE(forge.size() == 1);
   REQUIRE(forge[0].rec->GetId() == 0xda76a);
+}
+
+TEST_CASE("A recipe that makes nothing is never matched", "[Craft][espm]")
+{
+  // RecipeArmorSteelPlateShield (dd982) has no CNAM in Skyrim.esm, like the deleted placeholders mods ship
+  PartOne& p = GetPartOne();
+  auto craftService = p.GetActionListener().GetCraftService();
+  const Inventory inputs = Inventory()
+                             .AddItem(0x5ad93, 1)
+                             .AddItem(0x5ace5, 3)
+                             .AddItem(0x800e4, 1)
+                             .AddItem(0x5ace4, 1);
+
+  auto recipe = p.GetEspm().GetBrowser().LookupById(0xdd982);
+  REQUIRE(recipe.rec);
+  REQUIRE(craftService->RecipeItemsMatch(recipe, inputs, 0) == false);
+  REQUIRE(craftService
+            ->FindRecipe(std::nullopt, std::vector<uint32_t>{ 0x88105 },
+                         p.GetEspm().GetBrowser(), inputs, 0)
+            .empty());
+}
+
+namespace {
+class CraftEventsListener : public PartOneListener
+{
+public:
+  void OnConnect(Networking::UserId) override {}
+  void OnDisconnect(Networking::UserId) override {}
+  void OnCustomPacket(Networking::UserId,
+                      const simdjson::dom::element&) override
+  {
+  }
+  bool OnMpApiEvent(const GameModeEvent& event) override
+  {
+    names.push_back(event.GetName());
+    // Every perk is waived, so only the recipe's own data can refuse
+    return names.back() != "onCraftPerkRequired";
+  }
+
+  std::vector<std::string> names;
+};
+}
+
+TEST_CASE("A craft report with no product at a forge takes nothing and goes "
+          "to the gamemode",
+          "[Craft][espm]")
+{
+  // 19 Oct: such a report used an empty recipe and wrote item 0 into the crafter's inventory
+  const Inventory inputs = Inventory()
+                             .AddItem(0x5ad93, 1)
+                             .AddItem(0x5ace5, 3)
+                             .AddItem(0x800e4, 1)
+                             .AddItem(0x5ace4, 1);
+
+  PartOne& p = GetPartOne();
+  auto listener = std::make_shared<CraftEventsListener>();
+  p.AddListener(listener);
+  const auto workbenchId = 0x1ad6e;
+  auto& refr = p.worldState.GetFormAt<MpObjectReference>(workbenchId);
+
+  DoConnect(p, 0);
+  p.CreateActor(0xff000000, refr.GetPos(), 0,
+                refr.GetCellOrWorld().ToFormId(p.worldState.espmFiles));
+  p.SetUserActor(0, 0xff000000);
+  auto& ac = p.worldState.GetFormAt<MpActor>(0xff000000);
+  for (auto entry : inputs.entries)
+    ac.AddItem(entry.baseId, entry.count);
+  const Inventory before = ac.GetInventory();
+
+  RawMessageData msgData;
+  msgData.userId = 0;
+  CraftItemMessage msg;
+  msg.data.craftInputObjects = inputs;
+  msg.data.workbench = workbenchId;
+  msg.data.resultObjectId = 0;
+  p.GetActionListener().OnCraftItem(msgData, msg);
+
+  REQUIRE(ac.GetInventory() == before);
+  REQUIRE(std::none_of(ac.GetInventory().entries.begin(),
+                       ac.GetInventory().entries.end(),
+                       [](const Inventory::Entry& e) { return !e.baseId; }));
+  REQUIRE(std::count(listener->names.begin(), listener->names.end(),
+                     "onCraftUnmatched") == 1);
+  REQUIRE(std::count(listener->names.begin(), listener->names.end(),
+                     "onCraft") == 0);
+
+  p.DestroyActor(0xff000000);
+  DoDisconnect(p, 0);
+}
+
+TEST_CASE("GetInCurrentLoc tells a recipe where the crafter is",
+          "[Craft][espm]")
+{
+  // Radiant Raiment's location sits in Solitude Wells, in Solitude: the Solitude guard cape was refused there (18 Oct)
+  const uint32_t RadiantRaiment = 0x16a0f, RadiantRaimentLocation = 0x2009e,
+                 SolitudeLocation = 0x18a5a, WhiterunLocation = 0x18a56;
+  PartOne& p = GetPartOne();
+  p.CreateActor(0xff000000, { 0, 0, 0 }, 0, RadiantRaiment);
+  p.CreateActor(0xff000001, { 0, 0, 0 }, 0, 0x3c);
+  auto& inShop = p.worldState.GetFormAt<MpActor>(0xff000000);
+  auto& outdoors = p.worldState.GetFormAt<MpActor>(0xff000001);
+
+  const auto at = [](uint32_t location) {
+    return std::vector<Condition>{ MakeCondition("GetInCurrentLoc",
+                                                 location) };
+  };
+  REQUIRE(EvaluateAs(ConditionsEvaluatorCaller::kCraft, at(SolitudeLocation),
+                     inShop) == true);
+  REQUIRE(EvaluateAs(ConditionsEvaluatorCaller::kCraft,
+                     at(RadiantRaimentLocation), inShop) == true);
+  REQUIRE(EvaluateAs(ConditionsEvaluatorCaller::kCraft, at(WhiterunLocation),
+                     inShop) == false);
+
+  // A worldspace names no location, so the recipe stays locked there
+  REQUIRE(EvaluateAs(ConditionsEvaluatorCaller::kCraft, at(SolitudeLocation),
+                     outdoors) == false);
+
+  MpActor detached(LocationalData(), FormCallbacks::DoNothing());
+  REQUIRE(EvaluateAs(ConditionsEvaluatorCaller::kCraft, at(SolitudeLocation),
+                     detached) == false);
+
+  p.DestroyActor(0xff000000);
+  p.DestroyActor(0xff000001);
+}
+
+TEST_CASE("A recipe's own GetInCurrentLoc condition reaches GetInCurrentLoc",
+          "[Craft][espm]")
+{
+  // BYOHHouseExteriorRecipe009FishHatchery (030008cf) holds function index 359
+  PartOne& p = GetPartOne();
+  espm::CompressedFieldsCache cache;
+  auto recipe = p.GetEspm().GetBrowser().LookupById(0x030008cf);
+  REQUIRE(recipe.rec);
+  REQUIRE(recipe.rec->GetType() == "COBJ");
+  const auto data =
+    reinterpret_cast<const espm::COBJ*>(recipe.rec)->GetData(cache);
+  const auto it = std::find_if(
+    data.conditions.begin(), data.conditions.end(),
+    [](const espm::CTDA& ctda) { return ctda.functionIndex == 359; });
+  REQUIRE(it != data.conditions.end());
+  REQUIRE(Condition::FromCtda(*it).function == "GetInCurrentLoc");
 }
 
 TEST_CASE("A recipe that needs a vanilla perk is refused", "[Craft][espm]")

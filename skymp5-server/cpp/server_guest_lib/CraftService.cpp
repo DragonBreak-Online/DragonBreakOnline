@@ -106,6 +106,11 @@ bool CraftService::RecipeItemsMatch(const espm::LookupResult& lookupRes,
     return false;
   }
 
+  // A recipe with no product (RecipeArmorSteelPlateShield, deleted mod placeholders) matched a report of nothing made
+  if (recipeData.outputObjectFormId == 0) {
+    return false;
+  }
+
   auto thisInputObjects = recipeData.inputObjects;
   for (auto& entry : thisInputObjects) {
     auto formId = lookupRes.ToGlobalId(entry.formId);
@@ -263,7 +268,8 @@ bool CraftService::EvaluateCraftRecipeConditions(
     "HasSpell",       "SpellHasKeyword",   "WornHasKeyword",
     "WornApparelHasKeywordCount",          "SkympWornHasKeywordCount",
     "SkympGetDamageSourceHasKeyword",      "SkympGetIsDamageSource",
-    "GetGlobalValue", "GetPCIsRace",      "#448"
+    "GetGlobalValue", "GetPCIsRace",      "GetInCurrentLoc",
+    "#448"
   };
   std::vector<Condition> conditions;
   std::transform(
