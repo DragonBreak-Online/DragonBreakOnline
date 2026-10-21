@@ -1045,6 +1045,7 @@ module.exports = (api) => {
     writeSpawnZones();
     // A ruin's opened gates and stairs close again for the next party (ruinbuttons.js)
     try { if (globalThis.__dboRuinLeaseEnded) globalThis.__dboRuinLeaseEnded(lease.id); } catch (e) { log('ruin buttons reset failed', e.message); }
+    try { if (globalThis.__dboLeverPuzzleLeaseEnded) globalThis.__dboLeverPuzzleLeaseEnded(lease.id); } catch (e) { log('lever puzzle reset failed', e.message); }
     audit(`DUNGEON ${lease.name} released (${why})`);
     try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('dungeon', 'end', [...lease.members].map((pid) => actorByProfile(pid)).filter(Boolean), lease.name, lease.difficulty, why); } catch (e) { /* the player log is optional */ }
   };

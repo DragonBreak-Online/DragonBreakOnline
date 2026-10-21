@@ -1935,6 +1935,8 @@ mp.onActivate = (targetId, casterId) => {
   if (globalThis.__dboAyleidWell && globalThis.__dboAyleidWell(targetId >>> 0, casterId >>> 0)) return false;
   // An expedition ruin's button or lever (ruinbuttons.js): it opens its gate or stair for everyone, once per lease
   if (globalThis.__dboRuinButton && globalThis.__dboRuinButton(targetId >>> 0, casterId >>> 0)) return false;
+  // A dungeon's lever puzzle (leverpuzzles.js): High Gate Ruins' four levers, whose vanilla script cannot be solved here
+  if (globalThis.__dboLeverPuzzle && globalThis.__dboLeverPuzzle(targetId >>> 0, casterId >>> 0)) return false;
   if (globalThis.__dboBankActivate && globalThis.__dboBankActivate(targetId >>> 0, casterId >>> 0)) return false;
   // A rented chest is kept for its renter by business.js alone. The engine takes a thrown activate handler as "allowed",
   // so a hook that throws falls back to the stand-in below instead of opening the chest (review A2-1, fail closed)
@@ -8404,6 +8406,12 @@ try {
   delete require.cache[RUINBUTTONS_JS];
   require(RUINBUTTONS_JS)({ mp, log, personal, audit, who, cfg, sendPacket });
 } catch (e) { log('ruinbuttons.js failed to load:', e.stack || e.message); globalThis.__dboRuinButton = null; globalThis.__dboRuinLeaseEnded = null; globalThis.__dboRuinDoorUsed = null; }
+// ---- Nordic lever puzzles the vanilla scripts cannot solve on the server (server\leverpuzzles.js, config "leverPuzzles") ----
+try {
+  const LEVERPUZZLES_JS = path.resolve('leverpuzzles.js');
+  delete require.cache[LEVERPUZZLES_JS];
+  require(LEVERPUZZLES_JS)({ mp, log, cfg, personal, audit, who, registerChatCommand });
+} catch (e) { log('leverpuzzles.js failed to load:', e.stack || e.message); globalThis.__dboLeverPuzzle = null; globalThis.__dboLeverPuzzleLeaseEnded = null; }
 
 // ---- jails, cell doors and sentences (server\jail.js, config "jail", jails.json) ------------------
 try {
