@@ -81,7 +81,9 @@ function parseSwitch(text) {
   return out
 }
 
-const reqPayload = r => `dbo-console-req-v1\n${JSON.stringify([r.v, r.id, r.src, r.discordId, r.user, r.profileId, r.roles, r.text, r.mode, r.issuedAt, r.expiresAt])}`
+// The optional target fields are signed after expiresAt (targetProfileId, then targetRoles or null), as console.js signs them
+const reqPayload = r => `dbo-console-req-v1\n${JSON.stringify([r.v, r.id, r.src, r.discordId, r.user, r.profileId, r.roles, r.text, r.mode, r.issuedAt, r.expiresAt]
+  .concat(r.targetProfileId !== undefined ? [r.targetProfileId, r.targetRoles !== undefined ? r.targetRoles : null] : []))}`
 const canonLines = lines => lines.map(l => ({ to: String(l.to), text: String(l.text) }))
 const repPayload = r => `dbo-console-rep-v1\n${JSON.stringify([r.v, r.id, r.state, r.gate, r.ranAs, r.online, r.tier, r.target, canonLines(r.lines), r.why, r.at])}`
 // The 8 characters every audit line carries, so the backend and game records join up: a UUID's first 8, an interaction's last 8
@@ -106,6 +108,9 @@ function parseAllow(text) {
   for (const x of list) {
     if (!x || typeof x !== 'object' || typeof x.name !== 'string' || !/^[a-z]{2,24}$/.test(x.name) || !RULES.has(x.rule)) return null
     const entry = { name: x.name, rule: x.rule, usage: foldText(x.usage, 160), help: foldText(x.help, 200) }
+    // targetProfile: the game checks the page's account for this command; rank: the game runs its rank check on it
+    if (x.targetProfile === true) entry.targetProfile = true
+    if (x.rank === true) entry.rank = true
     if (x.rule === 'tagKindReason') {
       const k = kindsEntry(x)
       if (!k) return null
@@ -203,6 +208,7 @@ function whyText(why, cmd, usage, subject) {
     case 'reasonLong': return `The reason can be at most ${REASON_MAX} characters.`
     case 'reasonChars': return 'A reason from the console takes letters, numbers, spaces and . , ; : ! ? \' " ( ) - / & + % only: no colour codes, markup, mentions, symbols or line breaks.'
     case 'denied': return `/${subject || cmd} is switched off for the console in the game's config.`
+    case 'noProfileCheck': return `The game does not check /${cmd} against the account you opened yet, so it was not sent. Copy the command and run it in game.`
     default: return 'That cannot be run from the console.'
   }
 }
