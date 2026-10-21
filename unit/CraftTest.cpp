@@ -1,4 +1,5 @@
 #include "TestUtils.hpp"
+#include <algorithm>
 #include <catch2/catch_all.hpp>
 #include <cstdio>
 
@@ -343,6 +344,94 @@ TEST_CASE("A tempering recipe never makes an item", "[Craft][espm]")
     Inventory().AddItem(IronIngot, 1).AddItem(LeatherStrips, 1), IronDagger);
   REQUIRE(forge.size() == 1);
   REQUIRE(forge[0].rec->GetId() == 0xda76a);
+}
+
+TEST_CASE("A recipe that makes nothing is never matched", "[Craft][espm]")
+{
+  // RecipeArmorSteelPlateShield (dd982) has no CNAM in Skyrim.esm, like the deleted placeholders mods ship
+  PartOne& p = GetPartOne();
+  auto craftService = p.GetActionListener().GetCraftService();
+  const Inventory inputs = Inventory()
+                             .AddItem(0x5ad93, 1)
+                             .AddItem(0x5ace5, 3)
+                             .AddItem(0x800e4, 1)
+                             .AddItem(0x5ace4, 1);
+
+  auto recipe = p.GetEspm().GetBrowser().LookupById(0xdd982);
+  REQUIRE(recipe.rec);
+  REQUIRE(craftService->RecipeItemsMatch(recipe, inputs, 0) == false);
+  REQUIRE(craftService
+            ->FindRecipe(std::nullopt, std::vector<uint32_t>{ 0x88105 },
+                         p.GetEspm().GetBrowser(), inputs, 0)
+            .empty());
+}
+
+namespace {
+class CraftEventsListener : public PartOneListener
+{
+public:
+  void OnConnect(Networking::UserId) override {}
+  void OnDisconnect(Networking::UserId) override {}
+  void OnCustomPacket(Networking::UserId,
+                      const simdjson::dom::element&) override
+  {
+  }
+  bool OnMpApiEvent(const GameModeEvent& event) override
+  {
+    names.push_back(event.GetName());
+    // Every perk is waived, so only the recipe's own data can refuse
+    return names.back() != "onCraftPerkRequired";
+  }
+
+  std::vector<std::string> names;
+};
+}
+
+TEST_CASE("A craft report with no product at a forge takes nothing and goes "
+          "to the gamemode",
+          "[Craft][espm]")
+{
+  // 19 Oct: such a report used an empty recipe and wrote item 0 into the crafter's inventory
+  const Inventory inputs = Inventory()
+                             .AddItem(0x5ad93, 1)
+                             .AddItem(0x5ace5, 3)
+                             .AddItem(0x800e4, 1)
+                             .AddItem(0x5ace4, 1);
+
+  PartOne& p = GetPartOne();
+  auto listener = std::make_shared<CraftEventsListener>();
+  p.AddListener(listener);
+  const auto workbenchId = 0x1ad6e;
+  auto& refr = p.worldState.GetFormAt<MpObjectReference>(workbenchId);
+
+  DoConnect(p, 0);
+  p.CreateActor(0xff000000, refr.GetPos(), 0,
+                refr.GetCellOrWorld().ToFormId(p.worldState.espmFiles));
+  p.SetUserActor(0, 0xff000000);
+  auto& ac = p.worldState.GetFormAt<MpActor>(0xff000000);
+  for (auto entry : inputs.entries)
+    ac.AddItem(entry.baseId, entry.count);
+  const Inventory before = ac.GetInventory();
+
+  RawMessageData msgData;
+  msgData.userId = 0;
+  CraftItemMessage msg;
+  msg.data.craftInputObjects = inputs;
+  msg.data.workbench = workbenchId;
+  msg.data.resultObjectId = 0;
+  p.GetActionListener().OnCraftItem(msgData, msg);
+
+  REQUIRE(ac.GetInventory() == before);
+  REQUIRE(std::none_of(ac.GetInventory().entries.begin(),
+                       ac.GetInventory().entries.end(),
+                       [](const Inventory::Entry& e) { return !e.baseId; }));
+  REQUIRE(std::count(listener->names.begin(), listener->names.end(),
+                     "onCraftUnmatched") == 1);
+  REQUIRE(std::count(listener->names.begin(), listener->names.end(),
+                     "onCraft") == 0);
+
+  p.DestroyActor(0xff000000);
+  DoDisconnect(p, 0);
 }
 
 TEST_CASE("A recipe that needs a vanilla perk is refused", "[Craft][espm]")

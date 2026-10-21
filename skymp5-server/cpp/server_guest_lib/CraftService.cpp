@@ -106,6 +106,11 @@ bool CraftService::RecipeItemsMatch(const espm::LookupResult& lookupRes,
     return false;
   }
 
+  // A recipe with no product (RecipeArmorSteelPlateShield, deleted mod placeholders) matched a report of nothing made
+  if (recipeData.outputObjectFormId == 0) {
+    return false;
+  }
+
   auto thisInputObjects = recipeData.inputObjects;
   for (auto& entry : thisInputObjects) {
     auto formId = lookupRes.ToGlobalId(entry.formId);
