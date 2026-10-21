@@ -186,3 +186,21 @@ test('POST /run takes {requestId, command, targetProfileId} and passes the accou
     }
   } finally { server.close() }
 })
+
+test('one request id sent twice while the target account\'s roles are fetched reaches the game once', async () => {
+  const real = F.discordBot.getMemberFresh
+  F.discordBot.getMemberFresh = async id => { if (id === ID.gm) await new Promise(r => setTimeout(r, 300)); return real(id) }
+  try {
+    const caller = F.api.webCaller(F.session(ID.jake))
+    const body = { uuid: uuid(), text: '/discipline #GMGM strike The page sent this one twice', targetProfileId: 3 }
+    const first = F.api.runStaffCommand(caller, body)
+    await new Promise(r => setTimeout(r, 50))
+    const [a, b] = await Promise.all([first, F.api.runStaffCommand(caller, body)])
+    assert.equal(F.requests.filter(q => q.id === `w-${body.uuid}`).length, 1, 'sent once')
+    assert.equal(F.audits.filter(l => l.includes(`req ${body.uuid.slice(0, 8)} (page profile 3)`)).length, 1, 'one audit line')
+    assert.equal(a.status, 200)
+    assert.equal(a.body.job.state, 'ran')
+    assert.ok([200, 202].includes(b.status), String(b.status))
+    assert.equal(b.body.job.id, a.body.job.id)
+  } finally { F.discordBot.getMemberFresh = real }
+})
