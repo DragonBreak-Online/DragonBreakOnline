@@ -180,6 +180,25 @@ test('a game server coming back is shown within about a minute; a backend back a
   assert.strictEqual(w.calls.news, news + 1, 'news, modlist and server info reload once when the backend is back')
 })
 
+test('the network coming back (after a sleep, a Wi-Fi drop) asks again at once instead of waiting out the backoff', async () => {
+  const w = load()
+  await flush()
+  assert.strictEqual(w.badge(), 'ONLINE')
+  // The PC sleeps for 8 h with the window shown; on wake every overdue check runs before Wi-Fi is back
+  w.answers.status = { ok: false }
+  w.answers.files = { ok: false, updateAvailable: false }
+  w.answers.version = { current: '2.1.52', latest: null, hasUpdate: false }
+  mock.timers.tick(8 * 60 * MIN); await flush()
+  assert.strictEqual(w.badge(), 'OFFLINE', 'the first check after the wake found no network')
+  await advance(10_000)
+  // Windows reports the network back a few seconds later
+  w.answers.status = { ok: true, status: 'online', players: 4 }
+  w.answers.files = { ok: true, updateAvailable: false, serverVersion: '0.3.106' }
+  w.answers.version = { current: '2.1.52', latest: '2.1.52', hasUpdate: false }
+  w.online(); await flush()
+  assert.strictEqual(w.badge(), 'ONLINE', 'not OFFLINE for the 2 min backoff')
+})
+
 test('a storm of minimize/restore, focus and game starts and ends never doubles a check or leaks timers', async () => {
   const w = load()
   await flush()

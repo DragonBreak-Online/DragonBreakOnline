@@ -2167,6 +2167,8 @@ function resumeAfterGame() {
 }
 document.addEventListener('visibilitychange', () => { if (!document.hidden) nudgePolls() })
 window.addEventListener('focus', nudgePolls)
+// The network is back (Wi-Fi after a sleep or a drop): a check that failed meanwhile asks again now, not after its backoff
+window.addEventListener('online', nudgePolls)
 
 gamePoll.start()
 statusPoll.start()
