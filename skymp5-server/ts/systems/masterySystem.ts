@@ -929,11 +929,12 @@ export class MasterySystem implements System {
       const s = this.summaryOf(ctx, actorId);
       return { ok: true, text: `${s.hours}h, ${s.label ? `${s.rankName} ${s.label}` : "no craft chosen"}`, level: prog.level };
     }
-    const level = Math.max(0, Math.min(cfg.capPerSkill, prog.level + amount));
+    const top = Math.min(cfg.capPerSkill, P.MAX_LEVEL);
+    const level = Math.max(0, Math.min(top, prog.level + amount));
     const refused = this.limitRefusal(rec, id, level, `${label} to level ${level}`);
     if (refused) return { ok: false, text: refused };
     this.notice(ctx, userId, level < 1 ? `${label} has been set aside.` : `Your ${label} now stands at level ${level}.`);
-    this.putLevel(ctx, actorId, rec, id, level, level < 1 || level >= P.MAX_LEVEL ? 0 : prog.xp || 0);
+    this.putLevel(ctx, actorId, rec, id, level, level < 1 || level >= top ? 0 : prog.xp || 0);
     const used = Object.values(rec.skills).reduce((n, pr) => n + pr.level, 0);
     return { ok: true, text: `${label} level ${level}${level >= 1 ? ` (${this.tierNames[prog.rank] || ""})` : ", set aside"}, ${used} of ${cfg.pool} points on the Wheel`, level };
   }

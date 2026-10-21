@@ -247,6 +247,12 @@ const skillsJson = (pointSystem) => JSON.stringify({
   const row = detail && detail.skills.find((s) => s.id === 'blacksmith');
   check('point system: the Skills tab row shows Adept, level 50 in its hours field', !!row && row.chosen === true && row.rank === 2 && row.hours === 50, row);
 
+  // ---- a per-skill cap below 100: the grant stops there with no xp left, as a counted gain does (addUnits) ----
+  admin = await boot({ enabled: true, pool: 300, capPerSkill: 95, seatAbove: 90, seatCount: 1, expertAbove: 75, expertCount: 3, transferFloor: 25 });
+  put({ blacksmith: { level: 90, xp: 50 } });
+  r = grant(10);
+  check('point system grant: +10 at 90 with a cap of 95 stops at 95 with no xp', r[0].ok === true && skill('blacksmith').level === 95 && skill('blacksmith').xp === 0, skill('blacksmith'));
+
   // ════ the point system OFF: the hours model ════
   admin = await boot(undefined);
   const HOURS = [0, 10, 30, 70, 150];

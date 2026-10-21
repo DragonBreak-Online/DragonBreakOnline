@@ -41,7 +41,7 @@ type Mp = any;
 //                     { customPacketType: "adminAction", action: "toggleMode", mode }
 //                     { customPacketType: "adminAction", action: "npcZoneAdd", zone }  zone: JSON string of one NPC-Spawns.json entry
 //                     { customPacketType: "adminAction", action: "npcZoneTp" | "npcZoneReset" | "npcZoneDelete", target }  target: zone name
-//                     { customPacketType: "adminAction", action: "masteryGrant", target, amount }  worked hours to add (negative removes), any tier, self allowed
+//                     { customPacketType: "adminAction", action: "masteryGrant", target, amount }  hours to add, levels under the point system (negative removes), self allowed
 //                     { customPacketType: "adminAction", action: "masteryReset", target }  clears the character's chosen craft and its hours
 //                     (F7 panel, 2026-09-16)
 //                     { customPacketType: "adminAction", action: "kill" | "deleteCharacter" | "ipBan", target }  target: online actor id hex
