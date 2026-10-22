@@ -2,7 +2,7 @@
 // Based on the vanilla Skyrim AE (1.6.1130+) PC controlmap.txt, which adds the Creations Menu
 // input context. The only change from vanilla is the "Wait" action: its keyboard (T / 0x14) and
 // gamepad (Back / 0x0020) bindings are set to 0xff (unbound), because waiting is disabled on the
-// server. All other bindings are vanilla.
+// server; Inventory "ChargeItem", which borrows Wait's keys in vanilla, gets T (0x14) itself. Rest vanilla.
 // Written automatically by the launcher on install; do not edit by hand.
 // 1st field: User event name.  DO NOT ALTER!  This field is used to ID events in the code							
 // 2nd: Keyboard key ID that will proc this event.  A value of 0xff means the event is unmapped for this device.							
@@ -94,7 +94,7 @@ YButton		!0,Toggle POV			!0,Toggle POV				0x8000						0	0	0	0x8
 Cursor		0xff					0xa							0xff						0	0	0	0x8
 
 // Inventory
-ChargeItem	!0,Wait	!0,Wait	!0,Shout		0	0	0	0x8
+ChargeItem	0x14	0xff	!0,Shout		0	0	0	0x8
 
 // Debug Text
 PrevPage	0xc8	0xff	0xff	0	0	0	0x10

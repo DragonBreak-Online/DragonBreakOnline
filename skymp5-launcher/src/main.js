@@ -703,11 +703,13 @@ function readControlmapText() {
   return { path: p, text: controlmapCheck.toCrlf(fs.readFileSync(CONTROLMAP_SEED, 'utf8')), exists: false }
 }
 
-// Stale launcher copies lack the AE Creations Menu context or still bind Wait on the gamepad
+// Stale launcher copies lack the AE Creations Menu context, still bind Wait on the gamepad, or leave ChargeItem on Wait's key
 function isStaleLauncherControlmap(text) {
   if (!/launcher controlmap override/.test(text)) return false
   const wait = text.match(/^Wait[ \t]+\S+[ \t]+\S+[ \t]+(\S+)/m)
-  return !/^PurchaseCredits[ \t]/m.test(text) || (!!wait && wait[1].toLowerCase() !== '0xff')
+  // ChargeItem borrowed Wait's unbound key, so no enchanted weapon could be recharged (Thievyn Morethi, 21 Oct)
+  const charge = text.match(/^ChargeItem[ \t]+(\S+)/m)
+  return !/^PurchaseCredits[ \t]/m.test(text) || (!!wait && wait[1].toLowerCase() !== '0xff') || (!!charge && /Wait/i.test(charge[1]))
 }
 
 // Rebuilds a stale launcher copy from the seed, keeping the key and mouse rebinds the Settings tab manages
