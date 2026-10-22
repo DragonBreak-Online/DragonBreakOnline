@@ -9,6 +9,7 @@ import { CustomPacketMessage } from "../messages/customPacketMessage";
 import { Actor, BrowserMessageEvent, ButtonEvent, DxScanCode, InputDeviceType, Menu, storage } from "skyrimPlatform";
 import { COMPANION_HUD_KEY } from "./companionService";
 import { remoteIdToLocalId } from "../../view/worldViewMisc";
+import { withClientUiCaps } from "../../lib/clientUiCaps";
 
 const HUD_WIDGET_ID = 29;
 const PARTY_WIDGET_ID = 32;
@@ -280,8 +281,9 @@ export class DboRelayService extends ClientListener {
     const key = e.arguments[0];
     if (key === "menu:escape") { if (this.focusedId) this.closeFocused("escape"); return; }
     if (typeof key !== "string" || !key.startsWith("dbo:")) return;
-    const args = Array.prototype.slice.call(e.arguments, 1);
-    sendCustomPacket(this.controller, { customPacketType: "dbo", event: key.slice(4), args, widget: this.focusedId });
+    const event = key.slice(4);
+    const args = withClientUiCaps(event, Array.prototype.slice.call(e.arguments, 1));
+    sendCustomPacket(this.controller, { customPacketType: "dbo", event, args, widget: this.focusedId });
   }
 
   private closeFocused(why: string): void {
