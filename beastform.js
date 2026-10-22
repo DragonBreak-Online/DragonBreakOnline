@@ -262,6 +262,16 @@ module.exports = (api) => {
     log(`beastform: ${display(a)} ${what}, ${n} of ${near} near saw it`);
   };
 
+  // Beast Form is a Greater Power (Skyrim.esm 92c48, SPIT type 2): the player's own game lets it be cast once a game day,
+  // so a werewolf allowed more changes (Great Hunt ranks, a carried rest, a blessing) could change again only after a relog
+  // (Purr #7DJT, 17 Oct). /beast is judged by the same daily limit, so a werewolf with changes left is told to use it.
+  const tellChangeAgain = (a) => {
+    let n = null;
+    try { n = typeof globalThis.__dboBeastChangesLeft === 'function' ? globalThis.__dboBeastChangesLeft(a) : null; } catch (e) { n = null; }
+    if (!(n > 0)) return;
+    personal(a, `${n === Infinity ? 'The beast will come again whenever you call it.' : `The beast can take you ${n} more time${n === 1 ? '' : 's'} today.`} If your Beast Form power will not work yet, type /beast.`);
+  };
+
   const revert = (a, why) => {
     // The form's spells may stay in the client's hands once more: take them back again after this revert
     if (globalThis.__dboBeastStaleTaken instanceof Map) globalThis.__dboBeastStaleTaken.delete(Number(a) >>> 0);
@@ -283,6 +293,7 @@ module.exports = (api) => {
     // Skipped if another form was taken in the meantime: a revert straight into werewolf dressed the wolf in armour
     setTimeout(() => { try { if (!stateOf(a)) redress(a); } catch (e) { log('beastform re-dress failed', e.message); } }, 1500);
     log(`${display(a)} left ${FORMS[s.form] ? FORMS[s.form].name : s.form} (${why})`);
+    if (s.form === 'werewolf' && (why === 'asked to revert' || why === 'time up')) tellChangeAgain(a);
     witness(a, s.form === 'werewolf' ? 'shed the beast and stand as a mortal again' : 'sink back into mortal form');
     sendBeastBodies();
     try { if (globalThis.__dboBeastChanged) globalThis.__dboBeastChanged(a, s.form, false); } catch (e) { log('beast change hook failed', e.message); }

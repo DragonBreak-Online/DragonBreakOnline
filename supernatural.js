@@ -2298,6 +2298,20 @@ module.exports = (api) => {
     }
     return null;
   };
+  // The changes the daily limit still allows today, read only (Infinity when spared, null for no werewolf): beastform.js tells
+  // a werewolf after a revert, since the game's own Beast Form power rests a day in their game (Purr #7DJT, 17 Oct)
+  globalThis.__dboBeastChangesLeft = (a) => {
+    const s = stateOf(a);
+    if (!s || s.kind !== 'werewolf') return null;
+    if (spared(a, s)) return Infinity;
+    const clock = globalThis.__dboClock;
+    const now = clock && typeof clock.gameDays === 'function' ? clock.gameDays() : null;
+    if (now === null) return null;
+    const day = Math.floor(now);
+    const used = s.beastDay === day ? (Number(s.beastDayUses) || 0) : 0;
+    const perDay = typeof globalThis.__dboHuntChangesPerDay === 'function' ? Number(globalThis.__dboHuntChangesPerDay(a)) || C.beastChangesPerDay : C.beastChangesPerDay;
+    return Math.max(0, perDay - used);
+  };
   // Pack leaders run with the pale spirit coat; every client in the world is told
   globalThis.__dboBeastChanged = (a, key, on) => {
     if (key === 'werewolf' && on && typeof globalThis.__dboHuntChanged === 'function') { try { globalThis.__dboHuntChanged(a); } catch (e) { log('supernatural: hunt change failed', e.message); } }
