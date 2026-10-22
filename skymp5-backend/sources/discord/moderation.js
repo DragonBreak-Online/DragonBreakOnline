@@ -13,10 +13,14 @@ function outranksIn(g, byId, byRoles, targetId, targetRoles) {
   if (!everyone) return null
   if (String(targetId) === String(g.ownerId)) return false
   if (String(byId) === String(g.ownerId)) return true
+  // A role the cache does not hold cannot be placed, so the answer is unknown (skipped, it would put a target lower)
+  const by = (byRoles || []).map(id => g.roles.cache.get(String(id)))
+  const target = (targetRoles || []).map(id => g.roles.cache.get(String(id)))
+  if (by.includes(undefined) || target.includes(undefined)) return null
   // RoleManager.comparePositions: the higher position, and at the same position the older role (the lower id)
   const above = (a, b) => (a.position !== b.position ? a.position > b.position : BigInt(a.id) < BigInt(b.id))
-  const top = list => (list || []).map(id => g.roles.cache.get(String(id))).filter(Boolean).reduce((t, r) => (above(r, t) ? r : t), everyone)
-  return above(top(byRoles), top(targetRoles))
+  const top = list => list.reduce((t, r) => (above(r, t) ? r : t), everyone)
+  return above(top(by), top(target))
 }
 
 function createModeration({ client, isReady, guildId }) {

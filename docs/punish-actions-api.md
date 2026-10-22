@@ -215,7 +215,8 @@ The checks run in this order. The first refusal answers.
    in Discord's own order (the higher position; at the same position the older role). It holds for Owners and Dev too,
    because the bot does the action and Discord checks only the bot's place. As in Discord, the server's owner may act on
    anyone, and nobody acts on the server's owner. An account that is not in the server has no roles, so a ban by id or an
-   unban passes it. Roles not in the bot's cache are 503 `discordUnavailable`. A dry run checks all of this too.
+   unban passes it. A role of the caller or the target that the bot's role cache does not hold (or no `@everyone` there)
+   is 503 `discordUnavailable`, never skipped. A dry run checks all of this too.
 
 ### `send`: `/discipline` and `/kick` from the dialog
 
