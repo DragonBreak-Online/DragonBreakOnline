@@ -7,9 +7,9 @@
 // work/, so a request runs at most once, and checks everything again itself: the signature and a 10 s window, the ids
 // already seen, the switch file, the game's own pin of Discord ids, its own limits, the caller (the admin's own
 // character, stamped with the same Discord id), the tier (the lower of the roles the backend just fetched and the roles
-// stamped at login, Lead GM or above), the allowlist and its argument rule, and that a #TAG target is exactly one
-// online player. Then the line goes through gamemode.js handleLine, the gate typed chat uses (admin flag, LEAD_ONLY, the
-// #staff-commands line), inside captureFor, and a signed reply goes into out/.
+// stamped at login, Lead GM or above; a Lead GM runs only /discipline and /kick), the allowlist and its argument rule, and
+// that a #TAG target is exactly one online player. Then the line goes through gamemode.js handleLine, the gate typed chat
+// uses (admin flag, LEAD_ONLY, the #staff-commands line), inside captureFor, and a signed reply goes into out/.
 //
 // No listener, no shell, no network: a file in, a file out. The tick never throws (a missing or bad spool counts as off),
 // and a reader left behind by a gamemode generation that did not load this module stops itself (the generation guard).
@@ -39,6 +39,9 @@ const LOG_EVERY_MS = 60 * 1000;
 // remoteConsole.minTier can raise it (developer, senior), never lower it, so a GM or a Trial GM is refused whatever the
 // config says. Above the floor every command keeps its own in-game checks (the admin flag, LEAD_ONLY, the handler's own)
 const CODE_FLOOR = 'leadgm';
+// Below this tier (the lower of fresh and stamped) the console runs only PUNISH_ONLY (Jake, 22 Oct: "Punishments only")
+const FULL_TIER = 'developer';
+const PUNISH_ONLY = Object.freeze(['discipline', 'kick']);
 const FLOOR_LABEL = Object.freeze({ leadgm: 'Lead GM', developer: 'Developer', senior: 'Senior' });
 
 const ID_RE = /^(w-[0-9a-f-]{36}|d-\d{17,20})$/;
@@ -156,6 +159,7 @@ const TEXT = {
   noChar: () => 'The console acts as your own character. Make one in game first.',
   suspended: () => 'Your account is suspended, so the console cannot act as you: a suspended account cannot act in game either.',
   tier: (floor) => `The console is for ${floor || 'Lead GM'} and above in game.`,
+  punishOnly: () => 'A Lead GM can run only /discipline and /kick from the console. Run anything else in game.',
   rolesChanged: () => 'Your Discord roles changed since you last logged in (or your character has not been stamped with them yet). Log in once.',
   notPinned: () => "This Discord account is not on the game's console list.",
   tooMany: () => 'Too many console commands. Wait a minute.',
@@ -572,6 +576,7 @@ module.exports = (api) => {
     if (heldOut(a)) return refuse(key, r, 'suspended', { fields: as });
 
     const line = checkLine(r.text, (n) => commands.has(n), deny, { maxSuspendDays: MAX_DAYS });
+    if (Math.min(rank(fresh), rank(stamped)) < rank(FULL_TIER) && !PUNISH_ONLY.includes(line.cmd)) return refuse(key, r, 'punishOnly', { fields: as });
     if (line.why) return refuse(key, r, line.why, { subject: line.subject !== undefined ? line.subject : line.cmd, fields: as });
     const rule = ALLOW[line.cmd];
     const pagePid = r.targetProfileId;
@@ -681,4 +686,4 @@ module.exports = (api) => {
 
 // Shared pure helpers, for the harness and the backend's copy of the same rules
 module.exports.rules = { cleanCommand, parseSwitch, checkLine, checkShape, reqPayload, repPayload, replyLines, plainLine, id8, ALLOW, TEXT,
-  KIND_ARGS, REASON_RE, maxDaysOf, lengthHours, reasonWhy, kindsOf, usageOf, TARGET_KEYS, SUSPEND_CAP };
+  KIND_ARGS, REASON_RE, maxDaysOf, lengthHours, reasonWhy, kindsOf, usageOf, TARGET_KEYS, SUSPEND_CAP, FULL_TIER, PUNISH_ONLY };
