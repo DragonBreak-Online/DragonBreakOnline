@@ -259,12 +259,14 @@ module.exports = (K) => {
     if (nested) top.inner = true;
     S.cmdStack.push(ctx);
     if (S.cmdStack.length > 8) S.cmdStack.splice(0, S.cmdStack.length - 8);
-    if (nm === 'kick' && ctx.targets && ctx.targets[0] && ctx.targets[0].a) put('pendingLeave', parseInt(ctx.targets[0].a, 16) >>> 0, { reason: 'command', t: now(), by: actor });
+    if (nm === 'kick' && ctx.targets && ctx.targets[0] && ctx.targets[0].a) { ctx.leaveMark = parseInt(ctx.targets[0].a, 16) >>> 0; put('pendingLeave', ctx.leaveMark, { reason: 'command', t: now(), by: actor }); }
     return ctx;
   };
   const cmdEnd = (ctx, result) => {
     const i = S.cmdStack.lastIndexOf(ctx);
     if (i >= 0) S.cmdStack.splice(i, 1);
+    // A refused /kick removed nobody (the rank rule, own account): its leave mark goes, or a logout within 60 s read as this kick
+    if (ctx.leaveMark && !ctx.outcome && ctx.refused) { const p = S.pendingLeave.get(ctx.leaveMark); if (p && p.reason === 'command' && p.by === ctx.a) S.pendingLeave.delete(ctx.leaveMark); }
     // An alias or a command that ran another records nothing itself: the inner run did, with via
     if (ctx.skip || ctx.inner) return;
     const schema = ctx.schema;
@@ -549,6 +551,8 @@ module.exports = (K) => {
       if (list && list.length) {
         const pend = list.shift();
         if (pend && pend.params && !f.params) f.params = pend.params;
+        // A refused panel kick or ban (rank, the rank's caps) removed nobody: the leave mark the packet set goes
+        if (pend && pend.target && f.outcome === 'refused') { const p = S.pendingLeave.get(pend.target); if (p && p.reason === 'panel' && p.by === actor.id) S.pendingLeave.delete(pend.target); }
         if (pend && pend.target) {
           const i = o.findIndex((x) => x.r === 'target');
           if (i < 0 || !o[i].a) { const tp = partyOf(pend.target, 'target'); if (tp) { if (i < 0) o.push(tp); else o[i] = tp; } }

@@ -173,5 +173,20 @@ for (const f of fs.readdirSync(ROOT).filter((x) => x.endsWith('.js'))) for (cons
 const noSchema = [...registered].filter((n) => !Object.prototype.hasOwnProperty.call(R.COMMAND_SCHEMA, n)).sort();
 console.log(`     warning: ${noSchema.length} registered command(s) with no COMMAND_SCHEMA entry (recorded by name only): ${noSchema.join(' ')}`);
 ok(Object.keys(R.COMMAND_SCHEMA).every((n) => !R.CHAT_VERBS.has(n)), 'no chat verb has a schema entry');
+// ---- a refused /kick takes back its leave mark (review of 22 Oct): else the target's logout within 60 s read as this kick -----
+{
+  registerChatCommand('kick', (a, args) => { ran.push(['kick', args]); return personal(a, 'Selene #K2QX is on a staff account of your rank or higher, so you cannot kick them. Take it to someone above that rank, or to the Owners.'); }, { admin: true });
+  K.S.pendingLeave.delete(B);
+  out = chat(6, '/kick Selene');
+  ok(out.length === 1 && out[0].f.outcome === 'refused' && !K.S.pendingLeave.has(B), 'a /kick refused by the rank rule: outcome refused, and the target carries no leave mark', { out: out.map((r) => r.f), mark: K.S.pendingLeave.get(B) });
+  registerChatCommand('kick', (a, args) => { K.S.pendingLeave.set(B, { reason: 'suspended', t: CL.t, by: 0 }); return personal(a, 'You cannot kick them.'); }, { admin: true });
+  chat(6, '/kick Selene');
+  ok((K.S.pendingLeave.get(B) || {}).reason === 'suspended', '...a leave mark something else set meanwhile (a suspension) is left alone', K.S.pendingLeave.get(B));
+  K.S.pendingLeave.delete(B);
+  registerChatCommand('kick', (a, args) => { ran.push(['kick', args]); }, { admin: true });
+  out = chat(6, '/kick Selene');
+  const m = K.S.pendingLeave.get(B) || {};
+  ok(out.length === 1 && out[0].f.outcome === 'ok' && m.reason === 'command' && m.by === D, '...a /kick that went through keeps it, as before', { out: out.map((r) => r.f), m });
+}
 console.log(failures ? `\n${failures} FAILED` : '\nall passed');
 process.exit(failures ? 1 : 0);

@@ -683,6 +683,13 @@ const housing = (W) => {
   const sa2 = W.last('staff.action');
   ok(sk && sk.c === '5D8L' && sk.n === 'Mike', 'C-R8: a panel kick line parsed after the target left names the character, not "someone"', sk);
   ok(sa2 && sa2.f.action === 'kick' && sa2.o.some((x) => x.r === 'target' && x.c === '5D8L' && x.a), '...the staff action\'s target is the character the packet named', sa2 && sa2.o);
+  // A panel kick the server refused (adminSystem.ts's rank rule, 22 Oct) removed nobody: the leave mark its packet set goes
+  W.h('packet', 6, { customPacketType: 'adminAction', action: 'kick', target: B.toString(16) });
+  const markSet = !!W.K.S.pendingLeave.get(B);
+  W.h('audit', 'GM profile 4 (gm) was refused kick on Selene (profile 2) (staff rank)');
+  W.QU.run(); W.K.flushTick(true);
+  const sr = W.last('staff.action') || NONE;
+  ok(markSet && !W.K.S.pendingLeave.has(B) && sr.f.outcome === 'refused' && sr.o.some((x) => x.r === 'target' && x.c === 'K2QX'), 'a refused panel kick: outcome refused, and its target carries no leave mark (a logout soon after is no kick)', { markSet, mark: W.K.S.pendingLeave.get(B), f: sr.f });
   W.h('packet', 6, { customPacketType: 'adminAction', action: 'tempBan', target: B.toString(16), hours: 2 });
   W.CL.t += 11000; W.tick('playerlogFast');
   ok((W.last('staff.action') || NONE).f.action === 'tempBan' && (W.last('staff.action') || NONE).f.params.hours === 2 && (W.last('staff.action') || NONE).o[0].c === 'K2QX', '...tempBan is named (adminSystem.ts\'s own action names), its target from the hex', W.last('staff.action'));
