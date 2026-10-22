@@ -3,7 +3,8 @@
 // all its characters, so an alt with no roles stamped counts as its owner), and an account whose rank cannot be read. The
 // remote console keeps the same rule from the same code (gamemode.js accountRankOf). The real gate (gamemode.js handleLine,
 // cut as written), /kick, discipline.js and console.js run against a fake world.
-// K /kick typed, D /discipline typed, P the same decisions typed and from the console, S the code holds one rule.
+// K /kick typed, D /discipline typed, P the same decisions typed and from the console, A the record-author rule for lift and
+// overturn (a lower rank does not undo a higher rank's record; a config record is the Owners'), S the code holds one rule.
 //   node tests/staff-rank-harness.js    (as root: the console's spool and key checks want root-owned files)
 'use strict';
 const fs = require('fs');
@@ -62,9 +63,10 @@ const A = {
   gm: actor(0xff000a20, { name: 'Gemma', tag: 'GMGM', profile: 3, discord: ID.gm, roles: [ROLE.gm] }),
   gary: actor(0xff000a30, { name: 'Gary', tag: 'GARY', profile: 4, discord: '200000000000000004', roles: [ROLE.gm] }),
   tina: actor(0xff000a90, { name: 'Tina', tag: 'TRIA', profile: 13, discord: '200000000000000013', roles: [ROLE.trial] }),
-  // Players: Bob (5) and his alt
+  // Players: Bob (5) and his alt; Pia (16), suspended by a config record in A
   bob: actor(0xff000b01, { name: 'Bob', tag: '8KWH', profile: 5, discord: '200000000000000005', online: true }),
   bobAlt: actor(0xff000b02, { name: 'Bobette', tag: 'BOB2', profile: 5, discord: '200000000000000005' }),
+  pia: actor(0xff000b10, { name: 'Pia', tag: 'PIAA', profile: 16, discord: '200000000000000016' }),
 };
 const online = () => [...store].filter(([, o]) => o.__user >= 0).map(([id]) => id);
 const setOnline = (id, on) => { const o = store.get(id); if (on && o.__user >= 0) return; o.__user = on ? nextUser++ : -1; };
@@ -101,7 +103,8 @@ const body = [
   cut('// Online first, then any character (offline included) by tag or exact name.', '// ---- letters:', 'findAnyByName'),
   `return { deliver, system, personal, captureFor, userOf, nameOf, profileOf, discordOf, tagOf, display, who, isAdmin, isLeadStaff, staffTierFrom, staffTierOf,
     TIER_RANK, TIER_LABEL, broadcast, findByName, findAnyByName, audit, commands, registerChatCommand, handleLine,
-    accountRankOf: typeof accountRankOf === 'function' ? accountRankOf : undefined, rankRefusalOf: typeof rankRefusalOf === 'function' ? rankRefusalOf : undefined };`,
+    accountRankOf: typeof accountRankOf === 'function' ? accountRankOf : undefined, rankRefusalOf: typeof rankRefusalOf === 'function' ? rankRefusalOf : undefined,
+    authorRefusalOf: typeof authorRefusalOf === 'function' ? authorRefusalOf : undefined };`,
 ].join('\n');
 const world = { online };
 const G = new Function('mp', 'log', 'cfg', 'fs', 'path', 'world', 'CHAT_PROP', 'US', 'noteTold', 'ADMIN_PROFILES', 'TIERS', 'tierRoles', 'legacyAdminRoles',
@@ -114,12 +117,12 @@ const G = new Function('mp', 'log', 'cfg', 'fs', 'path', 'world', 'CHAT_PROP', '
 // The real discipline.js on a scratch record file; its kick waits 1.5 s with setTimeout, run at once here
 const realTimeout = global.setTimeout;
 global.setTimeout = (fn) => { fn(); return 0; };
-const loadDiscipline = () => {
+const loadDiscipline = (record = []) => {
   delete require.cache[DISCIPLINE_JS];
   require(DISCIPLINE_JS)({ mp, log, personal: G.personal, audit: G.audit, who: G.who, display: G.display, profileOf: G.profileOf, onlineActors: online,
-    registerChatCommand: G.registerChatCommand, isAdmin: G.isAdmin, isLeadStaff: G.isLeadStaff, findAnyByName: G.findAnyByName, rankRefusal: G.rankRefusalOf,
+    registerChatCommand: G.registerChatCommand, isAdmin: G.isAdmin, isLeadStaff: G.isLeadStaff, findAnyByName: G.findAnyByName, rankRefusal: G.rankRefusalOf, authorRefusal: G.authorRefusalOf,
     sendPacket: (a, p) => packets.push([a >>> 0, p]), userOf: G.userOf, every: () => {},
-    cfg: { discipline: Object.assign({}, REPO_CFG.discipline, { file: RECORDS, discordFile: path.join(SCRATCH, 'none.json'), record: [] }) } });
+    cfg: { discipline: Object.assign({}, REPO_CFG.discipline, { file: RECORDS, discordFile: path.join(SCRATCH, 'none.json'), record }) } });
 };
 loadDiscipline();
 const recordOf = (p) => { try { return JSON.parse(fs.readFileSync(RECORDS, 'utf8')).profiles[p] || []; } catch (e) { return []; } };
@@ -315,12 +318,67 @@ reset();
   check('P2. /kick: typed in game and from the console decide alike, and as the rule says', !kwrong.length, kwrong);
 }
 
+// ==== A. the record-author rule: lift and overturn ==========================================================================
+reset();
+{
+  const num = (told, kind) => { const m = told.join(' ').match(new RegExp(`Recorded: ${kind} #(\\d+)`)); return m ? Number(m[1]) : 0; };
+  const entry = (p, k) => recordOf(p).find((e) => e.n === k) || {};
+  const sus = num(typed(A.jake, '/discipline #8KWH suspend 3d an Owner suspends a player'), 'suspend');
+  let told = typed(A.lead, '/discipline #8KWH lift a Lead GM lifts the Owner suspension');
+  const told2 = typed(A.nate, '/discipline #8KWH lift a Developer lifts the Owner suspension');
+  check("A1. a Lead GM and a Developer cannot lift an Owner's suspension of a player (review finding 3)", sus > 0
+    && told.includes(`Suspension #${sus} was given by Jake #ABCD, of a rank above yours, so you cannot lift it. Ask someone of that rank, or the Owners.`)
+    && told2.some((l) => l.startsWith(`Suspension #${sus} was given by Jake #ABCD, of a rank above yours`)) && !entry(5, sus).lifted, { sus, told, told2 });
+  told = typed(A.olaf, '/discipline #8KWH lift another Owner lifts it');
+  check('A1. ...another Owner can (the same rank)', told.some((l) => /^Recorded: lift #\d+ on Bob #8KWH/.test(l)) && entry(5, sus).lifted === true, told);
+  setOnline(A.olaf, false);
+  const lst = num(typed(A.lead, '/discipline #8KWH strike a Lead GM strikes a player'), 'strike');
+  told = typed(A.lars, '/discipline #8KWH overturn ' + lst + ' another Lead GM overturns it');
+  check("A2. a Lead GM overturns another Lead GM's strike (the same rank)", lst > 0 && told.some((l) => /^Recorded: overturn #\d+ on Bob #8KWH/.test(l)) && !!entry(5, lst).overturned, told);
+  setOnline(A.lars, false);
+  const dst = num(typed(A.nate, '/discipline #8KWH strike a Developer strikes a player'), 'strike');
+  told = typed(A.lead, '/discipline #8KWH overturn ' + dst + ' a Lead GM overturns the Developer strike');
+  check("A2. ...but not a Developer's", told.includes(`Record #${dst} was given by Nate #NNAT, of a rank above yours, so you cannot overturn it. Ask someone of that rank, or the Owners.`) && !entry(5, dst).overturned, told);
+  told = typed(A.jake, '/discipline #8KWH overturn ' + dst + ' an Owner overturns the Developer strike');
+  check("A2. ...and an Owner overturns the Developer's", told.some((l) => /^Recorded: overturn #\d+ on Bob #8KWH/.test(l)) && !!entry(5, dst).overturned, told);
+  const gst = num(typed(A.gm, '/discipline #8KWH strike a GM strikes a player'), 'strike');
+  told = typed(A.lead, '/discipline #8KWH overturn ' + gst + ' a Lead GM overturns a GM strike');
+  check("A3. a Lead GM overturns a GM's strike (a higher rank undoes a lower one's, as before)", told.some((l) => /^Recorded: overturn #\d+ on Bob #8KWH/.test(l)) && !!entry(5, gst).overturned, told);
+  // A suspension decided outside the game (gamemode-config.json's discipline records, byProfile 0) is the Owners'
+  loadDiscipline([{ key: 'owners-test', tag: 'PIAA', kind: 'suspend', from: new Date(Date.now() - 60000).toISOString(), length: '3d', reason: 'decided by the Owners for the test', by: 'Jake' }]);
+  const cfgN = (recordOf(16)[0] || {}).n;
+  told = typed(A.lead, '/discipline #PIAA lift a Lead GM lifts a config suspension');
+  const told3 = typed(A.nate, '/discipline #PIAA lift a Developer lifts a config suspension');
+  check('A4. a Lead GM and a Developer cannot lift a suspension decided outside the game (a config record)', cfgN === 1 && (recordOf(16)[0] || {}).byProfile === 0
+    && told.includes('Suspension #1 was decided outside the game by the Owners, so only an Owner can lift it.') && told3.includes('Suspension #1 was decided outside the game by the Owners, so only an Owner can lift it.')
+    && !recordOf(16)[0].lifted, { told, told3, rec: recordOf(16) });
+  told = typed(A.jake, '/discipline #PIAA lift an Owner lifts the config suspension');
+  check('A4. ...an Owner can', told.some((l) => /^Recorded: lift #2 on Pia #PIAA/.test(l)) && recordOf(16)[0].lifted === true, told);
+  // Fails closed: the author's account cannot be read, or an entry carries no author
+  const ost = num(typed(A.lead, '/discipline #8KWH strike a strike to test the unreadable author'), 'strike');
+  const realIdx = mp.getActorsByProfileId;
+  mp.getActorsByProfileId = (pid) => { if (pid === 9) throw new Error('index gone'); return realIdx(pid); };
+  told = typed(A.jake, '/discipline #8KWH overturn ' + ost + ' the author cannot be read');
+  mp.getActorsByProfileId = realIdx;
+  check("A5. a record whose author's account cannot be read is not overturned, even by an Owner (fails closed)", told.includes(`Who gave Record #${ost} cannot be read, so it was not overturned. Ask an Owner.`) && !entry(5, ost).overturned, told);
+  const file = JSON.parse(fs.readFileSync(RECORDS, 'utf8')); delete file.profiles[5].find((e) => e.n === ost).byProfile; fs.writeFileSync(RECORDS, JSON.stringify(file));
+  loadDiscipline();
+  told = typed(A.jake, '/discipline #8KWH overturn ' + ost + ' the entry has no author');
+  check('A5. ...nor an entry that carries no author', told.includes(`Who gave Record #${ost} cannot be read, so it was not overturned. Ask an Owner.`) && !entry(5, ost).overturned, told);
+  // From the console the same rule holds: discipline.js runs behind the console's own checks
+  const sus2 = num(typed(A.jake, '/discipline #8KWH suspend 1d an Owner suspends again'), 'suspend');
+  setOnline(A.lead, false); setOnline(A.jake, true);
+  const rep = send('/discipline #8KWH lift a Lead GM lifts it from the console', AS.lead);
+  check("A6. from the console a Lead GM cannot lift an Owner's suspension either (X9), and the reply says why", sus2 > 0 && !entry(5, sus2).lifted
+    && !!rep && rep.lines.some((l) => l.text === `Suspension #${sus2} was given by Jake #ABCD, of a rank above yours, so you cannot lift it. Ask someone of that rank, or the Owners.`), rep && rep.lines);
+}
+
 // ==== S. one rule in the code ===============================================================================================
 {
   const consoleSrc = fs.readFileSync(CONSOLE_JS, 'utf8');
   check('S1. gamemode.js holds the one accountRankOf, and console.js computes no rank of its own (it calls api.accountRank)',
     (src.match(/^const accountRankOf = /gm) || []).length === 1 && !/getActorsByProfileId\(pid\)/.test(consoleSrc) && /api\.accountRank\(pid, freshRoles, target/.test(consoleSrc));
-  check('S1. gamemode.js hands the rule to console.js and to discipline.js', /accountRank: accountRankOf \}\);/.test(src) && /rankRefusal: rankRefusalOf \}\);/.test(src));
+  check('S1. gamemode.js hands the rule to console.js and to discipline.js', /accountRank: accountRankOf \}\);/.test(src) && /rankRefusal: rankRefusalOf, authorRefusal: authorRefusalOf \}\);/.test(src));
   // console.js without gamemode.js's rule refuses the rank commands (fails closed); other commands are not touched
   loadConsole(undefined); reset();
   setOnline(A.jake, true);

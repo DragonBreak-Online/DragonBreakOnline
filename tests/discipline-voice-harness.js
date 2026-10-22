@@ -27,7 +27,7 @@ const load = (extra) => {
     registerChatCommand: (n, fn) => { if (n === 'discipline') cmd = fn; }, isAdmin: (a) => !!tier[a], isLeadStaff: (a) => !!tier[a] && tier[a] !== 'gm',
     findAnyByName: (q) => tags[q] || 0, sendPacket: () => {}, userOf: (a) => a + 100, every: () => {},
     // gamemode.js's rank rule: every target here is a player's account (tests/staff-rank-harness.js runs the real rule)
-    rankRefusal: () => null,
+    rankRefusal: () => null, authorRefusal: () => null,
     cfg: { discipline: Object.assign({}, CFG.discipline, { file: FILE, record: [] }, extra) }
   });
 };

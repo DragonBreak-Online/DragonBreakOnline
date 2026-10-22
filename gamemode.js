@@ -331,6 +331,15 @@ const rankRefusalOf = (a, t) => {
   if (theirs < 0) return 'unknown';
   return theirs >= rankOfTier(staffTierOf(a)) ? 'rank' : null;
 };
+// The record-author rule (discipline.js lift and overturn; the console review's finding 3, 21 Oct: a Lead GM lifted and then
+// overturned an Owner's suspension of a player): a lower rank does not undo what a higher rank decided, the same rank may.
+// byProfile is the account that gave the record; 0 is a record decided outside the game (gamemode-config.json's discipline
+// records), which the Owners decide. 'rank' when that outranks actor a, 'unknown' when it cannot be read, else null
+const authorRefusalOf = (a, byProfile) => {
+  const theirs = byProfile === 0 ? rankOfTier('senior') : accountRankOf(byProfile, null, 0, (e) => log(`rank rule: staff rank of profile ${byProfile} unreadable: ${e.message}`));
+  if (theirs < 0) return 'unknown';
+  return theirs > rankOfTier(staffTierOf(a)) ? 'rank' : null;
+};
 // Staff of any rank, Trial GMs too, hold no leadership (Nate, 18 Oct: "GMs of any kind cannot be in leadership in any faction
 // etc"): no seat in an election court (citizenship.js), no leading court office (appointCheck), no faction leader or officer
 // rank (guilds.js setMember). By the account's Discord roles, kept on the character, so it holds for an offline one too
@@ -8815,7 +8824,7 @@ try {
   const DISCIPLINE_JS = path.resolve('discipline.js');
   delete require.cache[DISCIPLINE_JS];
   require(DISCIPLINE_JS)({ mp, log, personal, audit, who, display, profileOf, onlineActors, registerChatCommand, isAdmin, isLeadStaff,
-    findAnyByName, sendPacket, userOf, every, cfg, rankRefusal: rankRefusalOf });
+    findAnyByName, sendPacket, userOf, every, cfg, rankRefusal: rankRefusalOf, authorRefusal: authorRefusalOf });
 } catch (e) { log('discipline.js failed to load:', e.stack || e.message); globalThis.__dboDisciplineLogin = null; }
 // ---- raids and pillage (server\raids.js, WAR_DESIGN.md section 5) -----------------------------------------------------------
 try {

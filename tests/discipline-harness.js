@@ -32,6 +32,9 @@ const RANKS = { leadgm: 2, gm: 1 };
 const accountRank = (p) => Math.max(0, ...Object.keys(prof).filter((x) => prof[x] === p).map((x) => RANKS[tier[x]] || 0));
 const rankRefusal = (a, t) => (prof[t] === undefined ? 'unknown' : prof[t] === prof[a] ? 'own' : accountRank(prof[t]) >= (RANKS[tier[a]] || 0) ? 'rank' : null);
 let rankApi = rankRefusal;
+// and its record-author rule: the account that gave the record (0: the config's, the Owners', rank 4) must not outrank the caller
+const authorRefusal = (a, by) => { const theirs = by === 0 ? 4 : Number.isSafeInteger(by) && by > 0 ? accountRank(by) : -1; return theirs < 0 ? 'unknown' : theirs > (RANKS[tier[a]] || 0) ? 'rank' : null; };
+let authorApi = authorRefusal;
 const said = [], audits = [], packets = [], kicked = [];
 let cmd = null, tick = null;
 const realTimeout = global.setTimeout; global.setTimeout = (fn) => fn();
@@ -41,7 +44,7 @@ const load = () => {
     mp: { kick: (u) => kicked.push(u) }, log: () => {}, personal: (a, t) => said.push([a, t]), audit: (t) => audits.push(t),
     who: (a) => `w${a}`, display: (a) => `c${a}`, profileOf: (a) => prof[a], onlineActors: () => online.slice(),
     registerChatCommand: (n, fn) => { if (n === 'discipline') cmd = fn; }, isAdmin: (a) => !!tier[a], isLeadStaff: (a) => !!tier[a] && tier[a] !== 'gm',
-    findAnyByName: (q) => tags[q] || 0, sendPacket: (a, p) => packets.push([a, p]), userOf: (a) => a + 100, every: (n, ms, fn) => { tick = fn; }, rankRefusal: rankApi,
+    findAnyByName: (q) => tags[q] || 0, sendPacket: (a, p) => packets.push([a, p]), userOf: (a) => a + 100, every: (n, ms, fn) => { tick = fn; }, rankRefusal: rankApi, authorRefusal: authorApi,
     // record: [] so the records shipped in gamemode-config.json (rep-0305, 21 Oct) do not land in this account set
     cfg: { discipline: Object.assign({}, CFG.discipline, { file: FILE, record: [] }) }
   });
@@ -128,6 +131,14 @@ for (const [label, fn] of [['without gamemode.js rankRefusal', undefined], ['a r
   ok(/^The staff rank of c3's account could not be read, so nothing was recorded\./.test(last(2)) && recs(20) === before20, `${label}: every kind is refused, nothing recorded (fails closed)`, last(2));
 }
 rankApi = rankRefusal; load();
+// ---- the record-author rule (lift, overturn): without gamemode.js's rule neither runs; a warn or strike still does --------
+authorApi = undefined; load(); said.length = 0;
+cmd(2, '#AAAA strike for the record-author check');
+const sk = Number((said.map(([, t]) => t).join(' ').match(/Recorded: strike #(\d+)/) || [])[1]);
+cmd(2, `#AAAA overturn ${sk} without the record-author rule`);
+ok(sk > 0 && last(2) === `Who gave Record #${sk} cannot be read, so it was not overturned. Ask an Owner.` && !JSON.parse(fs.readFileSync(FILE, 'utf8')).profiles[20].find((e) => e.n === sk).overturned,
+  'without gamemode.js authorRefusal an overturn is refused (fails closed); the strike itself ran', last(2));
+authorApi = authorRefusal; load();
 global.setTimeout = realTimeout;
 fs.rmSync(tmp, { recursive: true, force: true });
 console.log(fails ? `\n${fails} FAILED` : '\nall passed');

@@ -10,8 +10,9 @@
 //   /discipline list                          every suspension still running
 // The record is the account's (profile), so it follows every character on it. Every kind is refused on an account of the
 // caller's own rank or higher (gamemode.js rankRefusalOf: the account's highest staff tier over all its characters, so an alt
-// with no roles stamped counts as its owner), and when that rank cannot be read. Every action goes to the audit log with who
-// did it and why. A player offline is told at their next login.
+// with no roles stamped counts as its owner), and when that rank cannot be read. Lift and overturn also need the caller's rank
+// to be at least that of the account that gave the record (gamemode.js authorRefusalOf; a config record is the Owners').
+// Every action goes to the audit log with who did it and why. A player offline is told at their next login.
 // Records (discipline.json beside world/, never in git): { profiles: { <profile>: [{ n, kind, reason, by, at, char, until?, seen, lifted? }] } }
 // Config "discipline" in gamemode-config.json: { enabled, strikeDays, strikesForReview, maxSuspendDays, record, discordFile }.
 // record lists actions decided outside the game, each added once, matched by key:
@@ -65,6 +66,16 @@ module.exports = (api) => {
     sendPacket, userOf, every } = api;
   // gamemode.js's rank rule; without it every record kind is refused (fails closed)
   const rankRefusal = typeof api.rankRefusal === 'function' ? api.rankRefusal : () => 'unknown';
+  // and its record-author rule for lift and overturn (a lower rank does not undo a higher rank's record); without it neither runs
+  const authorRefusal = typeof api.authorRefusal === 'function' ? api.authorRefusal : () => 'unknown';
+  // Why staff member a may not undo record e (what: its name in the answer, verb: lift or overturn), or '' when they may
+  const authorNo = (a, e, what, verb) => {
+    let no = 'unknown'; try { no = authorRefusal(a, e.byProfile); } catch (err) { log('discipline: record-author rule failed', err.message); }
+    if (!no) return '';
+    if (no === 'rank') return e.byProfile === 0 ? `${what} was decided outside the game by the Owners, so only an Owner can ${verb} it.`
+      : `${what} was given by ${e.by}, of a rank above yours, so you cannot ${verb} it. Ask someone of that rank, or the Owners.`;
+    return `Who gave ${what} cannot be read, so it was not ${verb === 'lift' ? 'lifted' : 'overturned'}. Ask an Owner.`;
+  };
   const C = Object.assign({}, DEFAULTS, (api.cfg || {}).discipline || {});
   if (C.enabled === false) { globalThis.__dboDisciplineLogin = null; globalThis.__dboVoiceRefused = null; log('discipline: off'); return; }
   const stateDir = () => { try { return path.dirname(fs.realpathSync(path.resolve('world'))); } catch (e) { return path.resolve('.'); } };
@@ -205,6 +216,8 @@ module.exports = (api) => {
     if (kind === 'lift') {
       const s = activeSuspension(recordOf(profileOf(target)), Date.now());
       if (!s) return personal(a, `${display(target)} is not suspended.`);
+      const notYours = authorNo(a, s, `Suspension #${s.n}`, 'lift');
+      if (notYours) return personal(a, notYours);
       s.lifted = true;
     }
     // The record is marked, never deleted: staff keep the history of what was decided and of its being undone.
@@ -215,6 +228,8 @@ module.exports = (api) => {
       if (!undone) return personal(a, `${display(target)} has no record #${nth}. /discipline ${parts[0]} shows them.`);
       if (undone.kind === 'overturn') return personal(a, 'That entry is itself an overturn; overturn the record it undid.');
       if (undone.overturned) return personal(a, `#${nth} was already overturned by ${undone.overturned.by}.`);
+      const notYours = authorNo(a, undone, `Record #${nth}`, 'overturn');
+      if (notYours) return personal(a, notYours);
       undone.overturned = { by: display(a), byProfile: profileOf(a), at: new Date().toISOString(), reason };
       if (!save()) { delete undone.overturned; return personal(a, 'The record could not be saved; nothing was done.'); }
     }
