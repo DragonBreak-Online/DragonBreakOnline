@@ -662,7 +662,9 @@ module.exports = (api) => {
   // or on any revert, only the staff audit line (who, which animal, why it ended).
   // Other clients build the animal only from dboBeastBody, and only when their UI says 'creatureBody' (the next client
   // package); an older one would show a stripped human named Chicken. So the change is refused, and ended at the next tick,
-  // while any other player within guardUnits (6000, about 86 m) in the same cell or worldspace lacks that capability.
+  // while any other player the fork could stream the staff member to lacks that capability: one in the same cell or
+  // worldspace within two grid squares (the fork streams the 3x3 block of 4096-unit squares; see unseeingNear) or within
+  // guardUnits (6000), or any player the fork already lists as a neighbour (actorNeighbors).
   // Refused too when dead or down, bound or carried, jailed, in a duel or a fight, on a horse, seated or at a station, in
   // water (most cannot swim) or indoors (none can open a door); indoors and water also end it at the tick. The server sees no
   // seat, saddle or water directly: those three are read from the anticheat's horse and the client's last relayed animation.
@@ -684,7 +686,6 @@ module.exports = (api) => {
   const isLeadStaff = typeof api.isLeadStaff === 'function' ? api.isLeadStaff : () => false;
   const isOwner = (a) => { try { return typeof api.tierOf === 'function' && api.tierOf(a) === 'senior'; } catch (e) { return false; } };
   const GUARD_UNITS = Number(PCFG.guardUnits) > 0 ? Number(PCFG.guardUnits) : 6000;
-  const GUARD_M = Math.round(GUARD_UNITS * 0.01428);
   const getp = (a, k) => { try { return mp.get(a, k); } catch (e) { return undefined; } };
   const isOnline = (a) => api.onlineActors().some((o) => (o >>> 0) === (a >>> 0));
   // An interior is a CELL record; a worldspace (outdoors) is a WRLD (jail.js reads it the same way). A cache only
@@ -719,24 +720,43 @@ module.exports = (api) => {
     } catch (e) { /* no anticheat */ }
     return animShape(a) === 'mounted';
   };
-  // How many other players near enough to see a lack 'creatureBody' (their game would show a stripped human); null when a's
-  // own place cannot be read
+  // Whom the fork streams an actor to (review R1, 22 Oct): every player in the 3x3 block of grid squares around it, a square
+  // being int16(pos / 4096) on x and y (MpObjectReference GetGridPos: truncated toward zero, so square 0 is 8191 units wide;
+  // height ignored; Grid.h MoveImpl i, j in -1..1), in the same cell or worldspace. That reaches a player 8191 units off on
+  // one axis (11.6k on the diagonal; 12.3k on an axis, 17k on the diagonal across a worldspace's x = 0 and y = 0 lines) and
+  // at any height above or below, far past a 6000-unit radius. So the guard counts the fork's own test with one square more (GUARD_SQUARES 2: a 5x5 block), so the
+  // tick's revert lands before a player walking in becomes a listener; the guardUnits radius as well (it only matters when
+  // raised past 8192); and every online player in actorNeighbors, the fork's own lists (ActorNeighborsBinding: the actors
+  // this one is streamed to and those streamed to it), whatever their place. a itself is in that list and is skipped
+  const GUARD_SQUARES = 2;
+  const squareOf = (p) => [Math.trunc(Number(p[0]) / 4096), Math.trunc(Number(p[1]) / 4096)];
+  // How many other players the staff member could be streamed to lack 'creatureBody' (their game would show a stripped human);
+  // null when a's own place cannot be read. A place that is not a number counts as near (fails closed)
   const unseeingNear = (a) => {
     const here = getp(a, 'worldOrCellDesc'), pos = getp(a, 'pos');
     if (!here || !Array.isArray(pos)) return null;
+    const sq = squareOf(pos);
+    let listed = null;
+    try { const l = mp.get(a, 'actorNeighbors'); if (Array.isArray(l)) listed = new Set(l.map((x) => Number(x) >>> 0)); } catch (e) { listed = null; }
     let n = 0;
     for (const o of api.onlineActors()) {
       if ((o >>> 0) === (a >>> 0)) continue;
       try {
-        if (mp.get(o, 'worldOrCellDesc') !== here) continue;
-        const p = mp.get(o, 'pos');
-        if (!Array.isArray(p) || Math.hypot(p[0] - pos[0], p[1] - pos[1], p[2] - pos[2]) > GUARD_UNITS) continue;
-        if (!hasUiCap(o, 'creatureBody')) n++;
+        if (hasUiCap(o, 'creatureBody')) continue;
+        if (!(listed && listed.has(o >>> 0))) {
+          if (mp.get(o, 'worldOrCellDesc') !== here) continue;
+          const p = mp.get(o, 'pos');
+          if (!Array.isArray(p)) continue;
+          const q = squareOf(p);
+          const squaresOff = Math.abs(q[0] - sq[0]) > GUARD_SQUARES || Math.abs(q[1] - sq[1]) > GUARD_SQUARES;
+          if (squaresOff && Math.hypot(p[0] - pos[0], p[1] - pos[1], p[2] - pos[2]) > GUARD_UNITS) continue;
+        }
+        n++;
       } catch (e) { /* gone */ }
     }
     return n;
   };
-  const unseeingText = (n) => `${n} ${n === 1 ? 'player' : 'players'} within about ${GUARD_M} m would see a stripped human instead of the animal: their game cannot show it yet. Polymorph with nobody that near.`;
+  const unseeingText = (n) => `${n} ${n === 1 ? 'player' : 'players'} nearby would see a stripped human instead of the animal: their game cannot show it yet. Polymorph with nobody else within about 250 m.`;
   // Why a cannot take an animal shape now, or ''
   const polymorphRefusal = (a) => {
     if (globalThis.__dboPolymorphOn !== true) return 'Polymorph is switched off for now.';
@@ -785,7 +805,7 @@ module.exports = (api) => {
   const POLY_END = { 'asked to revert': 'asked', death: 'died', logout: 'logged out', login: 'logged in', 'time up': 'time up',
     'polymorph off': 'switched off', 'polymorph guard': 'a player who cannot see it came near', 'polymorph indoors': 'went indoors',
     'polymorph water': 'went into water', 'reverted from the admin panel': 'staff panel', 'revert power': 'revert power' };
-  const POLY_TELL = { 'polymorph off': 'polymorph was switched off', 'polymorph guard': `a player came within about ${GUARD_M} m whose game cannot show the animal yet`,
+  const POLY_TELL = { 'polymorph off': 'polymorph was switched off', 'polymorph guard': 'a player came near whose game cannot show the animal yet',
     'polymorph indoors': 'these animals cannot open doors, so it ends indoors', 'polymorph water': 'most of these animals cannot swim, so it ends in water',
     death: 'the animal died', login: 'you were still an animal when you left' };
   const polymorphEnded = (a, s, why) => {
@@ -958,5 +978,5 @@ module.exports = (api) => {
   }, { help: '[werewolf|vampirelord|revert] take or leave your beast form (or cast the power)' });
 
   log(`beastform on: ${Object.entries(FORMS).map(([k, f]) => `${k} race ${f.race.toString(16)} power ${f.power.toString(16)}${f.seconds ? ` ${f.seconds}s` : ''}`).join(', ')}, revert ${REVERT_POWER.toString(16)}, Behemoth for the ${BEHEMOTH.rank} ${BEHEMOTH.enabled === true ? `ON (${behemothRace() ? behemothRace().toString(16) : 'race not in the load order'})` : 'off'}, Vampire Lord remote body ${globalThis.__dboVampireLordRemote === true ? 'ON' : 'off'}, werewolf remote body ${globalThis.__dboWerewolfRemote !== false ? 'ON' : 'off'}${globalThis.__dboWwRemoteSetBy ? ` (${globalThis.__dboWwRemoteSetBy})` : ''}`);
-  log(`beastform polymorph ${polymorphOn() ? 'ON' : 'off'}${globalThis.__dboPolymorphSetBy ? ` (${globalThis.__dboPolymorphSetBy})` : ''}: ${Object.entries(CREATURES).map(([k, c]) => `${k} ${c.race ? c.race.toString(16) : 'not in the load order'}`).join(', ')}; refused near a player without creatureBody within ${GUARD_UNITS} units`);
+  log(`beastform polymorph ${polymorphOn() ? 'ON' : 'off'}${globalThis.__dboPolymorphSetBy ? ` (${globalThis.__dboPolymorphSetBy})` : ''}: ${Object.entries(CREATURES).map(([k, c]) => `${k} ${c.race ? c.race.toString(16) : 'not in the load order'}`).join(', ')}; refused near a player without creatureBody (within ${GUARD_SQUARES} grid squares, ${GUARD_UNITS} units or listed by the fork)`);
 };
