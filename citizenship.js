@@ -152,11 +152,17 @@ module.exports = (api) => {
   const holds = () => zoneList().filter(grants);
   const rulerOffice = (z) => (z.officials || [])[0];
   const seated = (z, office) => (((readOfficials() || {})[z.id] || {})[office] || []).map(Number);
+  // A bound seat (officials-seats.json, Nate 19 Oct) is its character's alone; an unbound one is the account's
+  const holdsSeat = (a, z, office) => {
+    const pid = Number(profileOf(a)); if (!(pid >= 0) || !seated(z, office).includes(pid)) return false;
+    let held = 0; try { held = typeof globalThis.__dboSeatHolder === 'function' ? Number(globalThis.__dboSeatHolder(z.id, office, pid)) >>> 0 : 0; } catch (e) { held = 0; }
+    return !held || held === (Number(a) >>> 0);
+  };
   const courtFaction = (zid) => (typeof globalThis.__dboCourtFaction === 'function' ? globalThis.__dboCourtFaction(zid) : null);
   const guildsOf = (a) => { try { return typeof globalThis.__dboGuildsOf === 'function' ? (globalThis.__dboGuildsOf(a >>> 0) || []) : []; } catch (e) { return []; } };
   // The hold's ruler: the account in its first office, or its household's leader
   const rules = (a, z) => {
-    if (seated(z, rulerOffice(z)).includes(Number(profileOf(a)))) return true;
+    if (holdsSeat(a, z, rulerOffice(z))) return true;
     const fid = courtFaction(z.id);
     return !!fid && guildsOf(a).some((g) => g.id === fid && g.role === 'leader');
   };
@@ -165,7 +171,7 @@ module.exports = (api) => {
     const fid = courtFaction(z.id);
     try { return !!fid && typeof globalThis.__dboGuildHolders === 'function' && globalThis.__dboGuildHolders(fid, 0).some(exists); } catch (e) { return false; }
   };
-  const isSteward = (a, z) => (C.stewardOffices || []).some((o) => seated(z, o).includes(Number(profileOf(a))));
+  const isSteward = (a, z) => (C.stewardOffices || []).some((o) => holdsSeat(a, z, o));
   // Who runs the hold's citizenship: the ruler, a Steward, or a Lead GM and above (Nate, 15 Oct: any GM could grant,
   // decline and set the policy and fee). A GM or Trial GM who holds the ruler's or Steward's office keeps that office's rights
   const manages = (a, z) => isLeadStaff(a) || rules(a, z) || isSteward(a, z);
@@ -182,8 +188,7 @@ module.exports = (api) => {
     for (const zid of C.auto || []) {
       const z = holdOf(zid); if (!z) continue;
       const viaFaction = guildsOf(a).some((g) => factionZone(g) === z.id);
-      const pid = Number(profileOf(a));
-      const viaOffice = pid >= 0 && (z.officials || []).some((o) => seated(z, o).includes(pid));
+      const viaOffice = (z.officials || []).some((o) => holdsSeat(a, z, o));
       if (viaFaction || viaOffice) out.push(z.id);
     }
     return out;
@@ -191,8 +196,7 @@ module.exports = (api) => {
   // Why an auto hold counts this character: the factions based there and the offices held, for staff
   const autoWhy = (a, z) => {
     const out = guildsOf(a).filter((g) => factionZone(g) === z.id).map((g) => String(g.name || g.id));
-    const pid = Number(profileOf(a));
-    if (pid >= 0) for (const o of z.officials || []) if (seated(z, o).includes(pid)) out.push(`its ${o} seat`);
+    for (const o of z.officials || []) if (holdsSeat(a, z, o)) out.push(`its ${o} seat`);
     return out.join(', ');
   };
   // Every hold of the character, Primary first: { zone, since, how, auto }

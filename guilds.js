@@ -857,7 +857,9 @@ module.exports = (api) => {
     const fromCfg = (((cfg.housingPlaces || {}).shares || {})[desc] || []).map((k) => String(k).toLowerCase());
     return [...new Set(fromCfg.concat((marks['@offices'] || {})[desc] || []))].filter((k) => !off.includes(k));
   };
-  const holdsOffice = (a, key) => { const [zone, office] = String(key).split(':'); const pid = Number(profileOf(a)); return pid >= 0 && ((officials()[zone] || {})[office] || []).map(Number).includes(pid); };
+  // A seat bound to a character (gamemode.js officials-seats.json, Nate 19 Oct) is that character's alone
+  const seatIsOf = (zone, office, pid, a) => { let held = 0; try { held = typeof globalThis.__dboSeatHolder === 'function' ? Number(globalThis.__dboSeatHolder(zone, office, pid)) >>> 0 : 0; } catch (e) { held = 0; } return !held || held === (Number(a) >>> 0); };
+  const holdsOffice = (a, key) => { const [zone, office] = String(key).split(':'); const pid = Number(profileOf(a)); return pid >= 0 && ((officials()[zone] || {})[office] || []).map(Number).includes(pid) && seatIsOf(zone, office, pid, a); };
   const descsOf = (refs) => (Array.isArray(refs) ? refs : []).map((r) => { try { return String(mp.getDescFromId(Number(r) >>> 0) || '').toLowerCase(); } catch (e) { return ''; } }).filter(Boolean);
   const officeShare = (refs, a) => descsOf(refs).some((d) => officesAt(d).some((k) => holdsOffice(a, k)));
   globalThis.__dboHallOffice = (refs, owner, actor) => { const a = Number(actor) >>> 0; return !!a && officeShare(refs, a); };

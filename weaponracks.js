@@ -281,7 +281,9 @@ module.exports = (api) => {
     if (!hold) return '';
     const p = profileOf(a); if (p < 0) return '';
     const table = officials()[hold] || {};
-    for (const rank of MANAGER_RANKS) if ((table[rank] || []).map(Number).includes(p)) return rank;
+    // A seat bound to a character (gamemode.js officials-seats.json, Nate 19 Oct) manages for that character alone
+    const seatIsMine = (rank) => { let held = 0; try { held = typeof globalThis.__dboSeatHolder === 'function' ? Number(globalThis.__dboSeatHolder(hold, rank, p)) >>> 0 : 0; } catch (e) { held = 0; } return !held || held === (Number(a) >>> 0); };
+    for (const rank of MANAGER_RANKS) if ((table[rank] || []).map(Number).includes(p) && seatIsMine(rank)) return rank;
     try {
       const access = mp.get(a, 'private.skympAccess');
       for (const row of (access && Array.isArray(access.factions) ? access.factions : [])) {
