@@ -27,6 +27,7 @@ type Mp = any;
 // Admins resolve to a tier (senior | developer | gm) via adminRoles.ts from "adminRoles", the legacy "adminRoleIds" and "adminProfileIds".
 // Every tier gets the server console (consoleCommandsAllowed per assign; keep enableConsoleCommandsForAll OFF) and the tabbed admin panel (client AdminMenuService, Insert key).
 // Only tiers with TIER_CAPS.ban may ban; the refusal is enforced here, never in the client.
+// Kick, the bans, kill and delete act only on an account below the admin's own rank, never their own (RANKED_ACTIONS).
 // A Trial GM (adminRoles.trialgm, no admin tier) gets the menu (who is online, without Discord ids, addresses or hardware
 // ids), TP to a player or a location, Rename and the Invisible and Ghost modes (TRIAL_GM_ACTIONS / TRIAL_GM_MODES; Ghost
 // from 12 Oct, Nate: "trial gms need to use the ghost form button in the admin panel"); anything else is refused here and logged.
@@ -112,6 +113,8 @@ const MIRRORED_MODES = ["god", "smite", "healhit", "invis", "ghost"];
 // higher; each staff member's own mirror carries their rank, which their client compares (formView adminViewOf)
 const STAFF_RANK: Record<AdminTier, number> = { senior: 5, developer: 4, leadgm: 3, gm: 2 };
 const TRIAL_RANK = 1;
+// Panel actions on another player's account: the rank rule of typed /kick and /discipline (gamemode.js rankRefusalOf, 22 Oct)
+const RANKED_ACTIONS = new Set(["kick", "ban", "tempBan", "ipBan", "kill", "deleteCharacter"]);
 
 interface TeleportLocation {
   name: string;
@@ -219,6 +222,29 @@ export class AdminSystem implements System {
     const tier = this.tierOf(mp, actorId);
     if (tier) return STAFF_RANK[tier] || 0;
     return isTrialGm(mp, actorId, this.roleCfg) ? TRIAL_RANK : 0;
+  }
+
+  // The account's highest staff rank over all its characters and the admin profiles, -1 when unreadable (gamemode.js accountRankOf)
+  private accountRank(mp: Mp, profileId: number, actorId: number): number {
+    try {
+      let best = Math.max(this.roleCfg.adminProfileIds.includes(profileId) ? STAFF_RANK.senior : 0, this.staffRank(mp, actorId));
+      for (const c of Array.from((mp.getActorsByProfileId(profileId) || []) as ArrayLike<number>, (x) => Number(x) >>> 0)) {
+        if (c && this.profileOf(mp, c) === profileId) best = Math.max(best, this.staffRank(mp, c));
+      }
+      return best;
+    } catch (e) {
+      this.log(`AdminSystem: staff rank of profile ${profileId} unreadable: ${e}`);
+      return -1;
+    }
+  }
+
+  // Why the admin may not act on the target's account: own, rank (a staff account of the admin's rank or higher) or unknown
+  private rankRefusal(mp: Mp, adminActorId: number, adminProfile: number, target: { actorId: number; profileId: number }): "own" | "rank" | "unknown" | null {
+    if (!(target.profileId > 0)) return "unknown";
+    if (target.profileId === adminProfile) return "own";
+    const theirs = this.accountRank(mp, target.profileId, target.actorId);
+    if (theirs < 0) return "unknown";
+    return theirs >= this.staffRank(mp, adminActorId) ? "rank" : null;
   }
 
   private isAdminActor(mp: Mp, actorId: number): boolean {
@@ -591,6 +617,16 @@ export class AdminSystem implements System {
       this.reply(mp, userId, false, "Target is no longer online");
       return;
     }
+    if (RANKED_ACTIONS.has(action)) {
+      const no = this.rankRefusal(mp, myActorId, adminProfile, target);
+      if (no) {
+        this.adminLog(`profile ${adminProfile} (${tier}) was refused ${action} on ${target.name} (profile ${target.profileId}) (${no === "own" ? "own account" : no === "rank" ? "staff rank" : "rank unreadable"})`);
+        this.reply(mp, userId, false, no === "own" ? "Not on your own account"
+          : no === "rank" ? `${target.name} is on a staff account of your rank or higher. Take it to someone above that rank, or to the Owners.`
+            : `The staff rank of ${target.name}'s account could not be read, so nothing was done. Try again, or ask an Owner.`);
+        return;
+      }
+    }
 
     try {
       if (action === "teleportTo") {
@@ -622,7 +658,6 @@ export class AdminSystem implements System {
         this.reply(mp, userId, true, `Killed ${target.name}`);
       } else if (action === "deleteCharacter") {
         if (!caps.ban) { this.reply(mp, userId, false, "Your rank cannot delete characters"); return; }
-        if (target.actorId === myActorId) { this.reply(mp, userId, false, "Delete your own character from character select"); return; }
         try { kickWithReason(mp, target.userId, "Your character was deleted by an admin."); } catch { }
         const doomed = target.actorId;
         setTimeout(() => { try { mp.destroyActor(doomed); } catch (e) { this.log(`AdminSystem: destroyActor ${doomed.toString(16)} failed: ${e}`); } }, 1500);
@@ -631,7 +666,6 @@ export class AdminSystem implements System {
         this.reply(mp, userId, true, `Deleted ${target.name}`);
       } else if (action === "ipBan" || action === "tempBan") {
         if (!caps.ban) { this.reply(mp, userId, false, "Your rank cannot ban players"); return; }
-        if (target.actorId === myActorId) { this.reply(mp, userId, false, "You cannot ban yourself"); return; }
         const hours = action === "tempBan" ? Number(content["hours"]) : 0;
         if (action === "tempBan" && (!Number.isFinite(hours) || hours <= 0 || hours > 24 * 365)) { this.reply(mp, userId, false, "Pick a ban length between 1 hour and a year"); return; }
         let ip = "";
