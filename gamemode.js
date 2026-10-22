@@ -357,7 +357,8 @@ const TRIAL_COMMANDS = { rename: 'rename', chargen: 'chargen', tp: 'tp', charsta
 // A demotion reaches every character of the account, offline ones too: the rank rule (accountRankOf) counts each one's stamp,
 // and the old stamp of a character not played since kept a demoted account out of everyone's reach (review of 22 Oct: an
 // ex-Owner could be disciplined or kicked by nobody). The staff part of such a stamp becomes the fresh read's, so the stamp
-// gives the account's tier now, never less; its other roles wait for that character's next login, which writes it afresh
+// gives the account's tier now, never less; its other roles wait for that character's next login, which writes it afresh.
+// Only from a whole read (whole: the caller says so): a part of the answer could lower a stamp below the account's tier
 const dropStaleStaffStamps = (a, fresh, now) => {
   const pid = profileOf(a);
   if (!Number.isSafeInteger(pid) || pid < 0) return;
@@ -374,7 +375,7 @@ const dropStaleStaffStamps = (a, fresh, now) => {
   }
   if (done.length) audit(`STAFF ${who(a)}: Discord roles now give ${now || 'no staff tier'}; the higher staff stamp of ${done.length} character(s) of profile ${pid} now gives that too: ${done.map((c) => c.toString(16)).join(', ')}`);
 };
-const staffRolesSeen = (a, roles) => {
+const staffRolesSeen = (a, roles, whole) => {
   const before = staffTierOf(a);
   const fresh = idList(roles);
   const now = staffTierFrom(profileOf(a), fresh);
@@ -384,7 +385,7 @@ const staffRolesSeen = (a, roles) => {
     try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('leave_reason', a, 'demotion'); } catch (e) { /* the player log is optional */ }
     setTimeout(() => { try { const u = userOf(a); if (u >= 0) mp.kick(u); } catch (e) { log('staff role change: kick failed', e.message); } }, 1500);
   }
-  dropStaleStaffStamps(a, fresh, now);
+  if (whole === true) dropStaleStaffStamps(a, fresh, now);
 };
 const TIER_LABEL = { senior: 'Senior', developer: 'Developer', leadgm: 'Lead GM', gm: 'GM', trialgm: 'Trial GM' };
 // Staff commands a GM may not use (command name, or 'name sub' for one subcommand)
@@ -3674,7 +3675,7 @@ registerChatCommand('wipechars', (a, args) => {
   if (no === 'own') return personal(a, `You cannot wipe your own account (profile ${pid}).`);
   if (no === 'rank') return personal(a, `Profile ${pid} is a staff account of your rank or higher, so you cannot wipe it. Take it to someone above that rank, or to the Owners.`);
   if (no) return personal(a, `The staff rank of profile ${pid} could not be read, so nothing was wiped. Try again, or ask an Owner.`);
-  let ids = []; try { ids = (mp.getActorsByProfileId(pid) || []).map((x) => Number(x) >>> 0); } catch (e) { return personal(a, 'Lookup failed: ' + e.message); }
+  let ids = []; try { ids = (mp.getActorsByProfileId(pid) || []).map((x) => Number(x) >>> 0).filter((id) => profileOf(id) === pid); } catch (e) { return personal(a, 'Lookup failed: ' + e.message); }
   if (!ids.length) return personal(a, `Profile ${pid} has no characters.`);
   const names = ids.map((id) => `${nameOf(id)} (${id.toString(16)})`);
   let n = 0;
@@ -8565,8 +8566,11 @@ try {
   require(DISCORDROLES_JS)({ mp, log, audit, who, onlineActors, every, discordOf, profileOf, zoneById, cfg,
     skills: SKILLS_DEF.skills || [], token: (cfg.discord || {}).botToken || auth.botToken, guildId: ((auth.guilds || [])[0] || {}).guildId,
     // Read every sync while any character of the account carries a staff stamp (or the account cannot be read), so a demotion
-    // is seen from whichever character is played and staffRolesSeen takes the old stamps off the rest
-    isStaff: (a) => staffTierOf(a) !== null || accountRankOf(profileOf(a), null, a) !== 0, staffRolesSeen });
+    // is seen from whichever character is played and staffRolesSeen takes the old stamps off the rest. A read is whole (it may
+    // lower the other characters' stamps) with one guild, as the sync reads the first and the login all of them, and from a
+    // member read: "not in the guild" (10007) only logs out, as before
+    isStaff: (a) => staffTierOf(a) !== null || accountRankOf(profileOf(a), null, a) !== 0,
+    staffRolesSeen: (a, roles, how) => staffRolesSeen(a, roles, how !== 'left' && (auth.guilds || []).length <= 1) });
 } catch (e) { log('discordroles.js failed to load:', e.stack || e.message); globalThis.__dboDiscordPost = null; }
 
 // ---- /ticket: a private Discord ticket with staff, opened from the game (server\gameticket.js, config "tickets") -------

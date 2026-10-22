@@ -106,7 +106,7 @@ check('the legacy admin role still counts (as Senior)', kicked.length === 0);
   const rank = (pid) => T.accountRankOf(pid, null, 0);
   kicked.length = 0; audits.length = 0; logs.length = 0;
   check('R0. before the role sync sees it, the old stamps count: Olga is an Owner\'s account, Dev a Developer\'s (raise-only)', rank(40) === 4 && rank(50) === 3, [rank(40), rank(50)]);
-  T.staffRolesSeen(0x40, [ROLE.player]); run();
+  T.staffRolesSeen(0x40, [ROLE.player], true); run();
   check('R1. an Owner demoted while online is logged out as before', kicked.includes(40) && audits.some((l) => /now give no staff tier \(was senior\); logged out/.test(l)), audits);
   check("R1. ...and the staff role comes off every character of her account, the ones not played since too; their other roles stay",
     JSON.stringify(actors[0x41].roles) === JSON.stringify([ROLE.player, 'patron']) && JSON.stringify(actors[0x40].roles) === JSON.stringify([ROLE.player])
@@ -114,20 +114,28 @@ check('the legacy admin role still counts (as Senior)', kicked.length === 0);
   check('R1. ...so her account is no staff account any more (the rank rule reads 0), and the audit names the characters', rank(40) === 0
     && audits.some((l) => /profile 40 now gives that too: 40, 41$/.test(l)), { rank: rank(40), audits });
   kicked.length = 0; audits.length = 0;
-  T.staffRolesSeen(0x50, [ROLE.gm, ROLE.player]); run();
+  T.staffRolesSeen(0x50, [ROLE.gm, ROLE.player], true); run();
   check('R2. a Developer demoted to GM while offline, who logs in on another character: nobody is logged out (that character is a GM by its login stamp)', kicked.length === 0, kicked);
   check("R2. ...but the role sync still brings his other characters' stamps down to GM: Dev Old [GM], Dev Lead [GM], never below what Discord gives now",
     JSON.stringify(actors[0x51].roles) === JSON.stringify([ROLE.gm]) && JSON.stringify(actors[0x52].roles) === JSON.stringify([ROLE.gm]) && rank(50) === 1, { roles: [actors[0x51].roles, actors[0x52].roles], rank: rank(50) });
   kicked.length = 0; audits.length = 0;
-  T.staffRolesSeen(0x60, []); run();
+  T.staffRolesSeen(0x60, [], true); run();
   check('R3. a Trial GM whose role is gone: logged out, and the old character\'s Trial GM stamp goes too', kicked.includes(60) && JSON.stringify(actors[0x61].roles) === JSON.stringify([ROLE.player]) && rank(60) === 0, actors[0x61].roles);
   kicked.length = 0; audits.length = 0;
-  T.staffRolesSeen(0x70, [ROLE.senior]); run();
+  T.staffRolesSeen(0x70, [ROLE.senior], true); run();
   check('R4. a promotion changes no stamp (the next login writes it; a lower stamp never decides the rank)', kicked.length === 0 && audits.length === 0 && JSON.stringify(actors[0x71].roles) === JSON.stringify(['t1']) && JSON.stringify(actors[0x70].roles) === JSON.stringify([ROLE.gm]));
-  T.staffRolesSeen(0x50, [ROLE.gm]); run();
+  T.staffRolesSeen(0x50, [ROLE.gm], true); run();
   check('R4. ...nor does the same tier again: nothing to change, no audit line', audits.length === 0 && JSON.stringify(actors[0x51].roles) === JSON.stringify([ROLE.gm]), audits);
-  T.staffRolesSeen(0x13, []); run();
+  T.staffRolesSeen(0x13, [], true); run();
   check("R4. ...nor a Senior by profile id: Ada's character stamped Developer keeps it", audits.length === 0 && JSON.stringify(actors[0x13a].roles) === JSON.stringify([ROLE.developer]), actors[0x13a].roles);
+  // Only a whole read lowers other characters' stamps (review of 22 Oct, L3): with more than one guild the sync reads only the
+  // first, and "not in the guild" (10007) is no roles read at all; then the online character is logged out as before, nothing else
+  actors[0xa0] = { profile: 90, roles: [ROLE.senior], user: 91 };
+  actors[0xa1] = { profile: 90, roles: [ROLE.senior] };
+  kicked.length = 0; audits.length = 0;
+  T.staffRolesSeen(0xa0, []); run();
+  check('R7. a read that is not whole (more guilds, or not in the guild): the online character is logged out, the other character keeps its stamp',
+    kicked.includes(91) && JSON.stringify(actors[0xa1].roles) === JSON.stringify([ROLE.senior]) && JSON.stringify(actors[0xa0].roles) === JSON.stringify([ROLE.senior]) && audits.length === 1, { kicked, roles: actors[0xa1].roles, audits });
 }
 {
   // The same, with the engine's profile index misbehaving: a stale entry from another profile, then an index that throws
@@ -141,17 +149,19 @@ check('the legacy admin role still counts (as Senior)', kicked.length === 0);
     new Set(), ['senior', 'developer', 'leadgm', 'gm'], { senior: [ROLE.senior], developer: [ROLE.developer], leadgm: [ROLE.leadgm], gm: [ROLE.gm] }, [], [],
     (x) => tab[x].profile, (x) => tab[x].roles, (v) => (Array.isArray(v) ? v.map(String) : []), (t) => a3.push(t), (x) => `#${x.toString(16)}`, () => {}, (x) => tab[x].user,
     mp3, (...a) => l3.push(a.join(' ')), (fn) => tm3.push(fn));
-  T3.staffRolesSeen(0x90, []); while (tm3.length) tm3.shift()();
+  T3.staffRolesSeen(0x90, [], true); while (tm3.length) tm3.shift()();
   check("R5. a character of another profile in the index (a stale entry) keeps its stamp", JSON.stringify(tab[0x91].roles) === JSON.stringify([ROLE.leadgm]) && JSON.stringify(tab[0x90].roles) === JSON.stringify([]) && k3.includes(90), [tab[0x90].roles, tab[0x91].roles, k3]);
   tab[0x90].roles = [ROLE.leadgm]; k3.length = 0;
   mp3.getActorsByProfileId = () => { throw new Error('index gone'); };
-  T3.staffRolesSeen(0x90, []); while (tm3.length) tm3.shift()();
+  T3.staffRolesSeen(0x90, [], true); while (tm3.length) tm3.shift()();
   check('R5. an index that cannot be read: the demoted character is still logged out, and the log says why', k3.includes(90) && l3.some((l) => /characters of profile 80 unreadable: index gone/.test(l)), { k3, l3 });
 }
 
-check('discordroles.js is given isStaff and staffRolesSeen', /require\(DISCORDROLES_JS\)\(\{[\s\S]*?isStaff: \(a\) => staffTierOf\(a\) !== null[^\n]*, staffRolesSeen \}\)/.test(src));
-check("R6. ...and isStaff holds while any character of the account carries a staff stamp, so the role sync reads a demoted account's roles from whichever character is played",
-  /isStaff: \(a\) => staffTierOf\(a\) !== null \|\| accountRankOf\(profileOf\(a\), null, a\) !== 0, staffRolesSeen \}\)/.test(src));
+check('discordroles.js is given isStaff and staffRolesSeen', /require\(DISCORDROLES_JS\)\(\{[\s\S]*?isStaff: \(a\) => staffTierOf\(a\) !== null[\s\S]*?staffRolesSeen: \(a, roles, how\) => staffRolesSeen\(/.test(src));
+check("R6. ...isStaff holds while any character of the account carries a staff stamp, so the role sync reads a demoted account's roles from whichever character is played",
+  /isStaff: \(a\) => staffTierOf\(a\) !== null \|\| accountRankOf\(profileOf\(a\), null, a\) !== 0,\n/.test(src));
+check("R7. ...and a read is whole only from a member read with one guild configured (the sync reads the first guild, the login all of them)",
+  /staffRolesSeen: \(a, roles, how\) => staffRolesSeen\(a, roles, how !== 'left' && \(auth\.guilds \|\| \[\]\)\.length <= 1\) \}\);/.test(src));
 
 console.log(failures ? `\n${failures} FAILED` : '\nall passed');
 process.exit(failures ? 1 : 0);

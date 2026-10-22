@@ -206,7 +206,7 @@ const pos = (n) => byName(n).position;
       log: (...x) => logs.push(x.join(' ')), audit: () => {}, who: (a) => `#${a}`, onlineActors: () => [PLAYER], every: () => {},
       discordOf: (a) => props[a].discord, profileOf: (a) => props[a].profile, zoneById: () => null, cfg: {},
       skills: [{ id: 'blade', label: 'Blade' }, { id: 'miner', label: 'Miner' }, { id: 'unarmed', label: 'Unarmed' }, { id: 'blacksmith', label: 'Blacksmith' }],
-      token: 'T', guildId: 'G', isStaff: () => staff, staffRolesSeen: (a, r) => seen.push([a, r.slice()]),
+      token: 'T', guildId: 'G', isStaff: () => staff, staffRolesSeen: (a, r, how) => seen.push([a, r.slice(), how]),
     });
     await mod2.setup();
     await mod2.sync(PLAYER);
@@ -224,6 +224,8 @@ const pos = (n) => byName(n).position;
     delete members['111111111111111111'];
     await mod2.sync(PLAYER);
     check('a staff member who left the guild (404, Unknown Member) is shown no roles at all', seen.length === 4 && seen[3][1].length === 0, JSON.stringify(seen[3]));
+    check("...marked 'left' (no roles were read), while a member read is marked 'member': only a member read may lower another character's stamp (review of 22 Oct)",
+      seen[3][2] === 'left' && seen.slice(0, 3).every((x) => x[2] === 'member'), JSON.stringify(seen.map((x) => x[2])));
     // Worker E's review: only an unknown member means gone; nothing else may read as "no roles"
     const cases = [
       ['a 404 for an unknown guild (10004: the bot removed, a wrong id)', { status: 404, body: { message: 'Unknown Guild', code: 10004 } }],

@@ -158,7 +158,8 @@ module.exports = (api) => {
     return { skillNames, skillLevels, homes, citizen };
   };
 
-  const staffRoles = (a, roles) => { try { if (typeof api.staffRolesSeen === 'function') api.staffRolesSeen(a, roles); } catch (e) { log('discord roles: staff check failed for', who(a), e.message); } };
+  // how: 'left' when Discord says they are not in the guild (no roles read), else a member read
+  const staffRoles = (a, roles, how) => { try { if (typeof api.staffRolesSeen === 'function') api.staffRolesSeen(a, roles, how); } catch (e) { log('discord roles: staff check failed for', who(a), e.message); } };
   const sync = (a) => serial(async () => {
     const discordId = discordOf(a);
     if (!discordId || !/^\d{15,22}$/.test(discordId)) return;
@@ -183,10 +184,10 @@ module.exports = (api) => {
     try { member = await request('GET', `/guilds/${guildId}/members/${discordId}`); }
     catch (e) {
       // Only an unknown member has left; a wrong or lost guild (10004) says nothing about their roles
-      if (e.status === 404) { if (e.code === 10007) staffRoles(a, []); S.synced.set(discordId, { key, at: Date.now(), actor: a }); return; }
+      if (e.status === 404) { if (e.code === 10007) staffRoles(a, [], 'left'); S.synced.set(discordId, { key, at: Date.now(), actor: a }); return; }
       throw e;
     }
-    if (member && Array.isArray(member.roles)) staffRoles(a, member.roles);
+    if (member && Array.isArray(member.roles)) staffRoles(a, member.roles, 'member');
     const have = new Set(member.roles || []);
     // Ties are settled by what is already worn, so the skill roles are only known once the member has been read
     const heldSkills = new Set(skillLabels().filter((l) => { const r = roles.get(l); return r && have.has(r.id); }));

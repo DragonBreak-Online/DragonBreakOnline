@@ -226,7 +226,7 @@ reset();
   check('H1. ...and can never lower it: Lars, stamped Lead GM, with no fresh roles, is still refused (a stamp counts until it is gone)', refused(rep, 'rank'), brief(rep));
   // The role sync takes it away (review of 22 Oct: old stamps protected demoted staff): Lars plays, his roles are read, every
   // character of his account then carries what Discord gives now
-  setOnline(A.lars, true); G.staffRolesSeen(A.lars, []); setOnline(A.lars, false);
+  setOnline(A.lars, true); G.staffRolesSeen(A.lars, [], true); setOnline(A.lars, false);
   rep = send('/discipline #LARS warn Lars after the role sync saw his demotion', Object.assign({ targetProfileId: 11, targetRoles: [] }, AS_LEAD));
   check('H1. ...until the role sync has seen the demotion (staffRolesSeen): then the old stamp is gone and the console runs on his account', ran(rep, /^Recorded: warn #\d+ on Lars #LARS\./), brief(rep));
   rep = send('/discipline #8KWH warn Bob is a player in Discord too', Object.assign({ targetProfileId: 5, targetRoles: [] }, AS_LEAD));

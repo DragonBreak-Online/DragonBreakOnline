@@ -745,6 +745,27 @@ const housing = (W) => {
   ok(W.evs('item.unexplained').length === 1, '...a change an event explains is not');
   mark(W);
 
+  // ================================================================================================================ refused panel actions
+  // The leave mark a refused panel kick or ban clears is the one on the account the server's line names, not the oldest
+  // pending packet's: a backend ban's line comes after the POST, so a kick refused meanwhile must not clear the ban's mark
+  // (review of 22 Oct, probe-panel-fifo)
+  reset();
+  W = world();
+  for (const [u, a] of [[3, A], [4, B], [5, Cm], [6, D]]) W.h('login', u, a);
+  W.h('packet', 6, { customPacketType: 'adminAction', action: 'ban', target: B.toString(16) });
+  W.h('packet', 6, { customPacketType: 'adminAction', action: 'kick', target: Cm.toString(16) });
+  W.h('audit', 'GM profile 4 (developer) was refused kick on Mike (profile 3) (staff rank)');
+  W.QU.run(); W.K.flushTick(true);
+  const fr = W.last('staff.action') || NONE;
+  ok(!W.K.S.pendingLeave.has(Cm) && (W.K.S.pendingLeave.get(B) || {}).reason === 'panel' && fr.f.outcome === 'refused' && fr.o.some((x) => x.r === 'target' && x.c === '5D8L'),
+    'a panel kick refused while a ban is still at the backend: the refused target\'s mark goes, the banned one\'s stays', { B: W.K.S.pendingLeave.get(B), Cm: W.K.S.pendingLeave.get(Cm), f: fr.f });
+  W.h('audit', 'GM profile 4 (developer) banned Selene (profile 2)');
+  W.QU.run(); W.K.flushTick(true);
+  W.h('logout', 4, B); W.h('logout', 5, Cm); W.QU.run();
+  const lo = (p) => (W.evs('session.logout').filter((r) => r.p === p).pop() || NONE).f.reason;
+  ok(lo(2) === 'kicked' && lo(3) !== 'kicked', '...so the banned player leaves as kicked, the one the server refused to kick does not', { selene: lo(2), mike: lo(3) });
+  mark(W);
+
   // ================================================================================================================ wrapper invariants
   reset();
   W = world();

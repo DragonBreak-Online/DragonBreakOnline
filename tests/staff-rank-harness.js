@@ -396,7 +396,7 @@ reset();
   setOnline(A.dina, true); setOnline(A.lead, true);
   let told = typed(A.lead, '/kick #DINA');
   check("R1. before the role sync has seen it, Dina Old's Developer stamp still protects her account (raise-only, as K4)", told.includes(RANK_KICK('Dina #DINA')) && !kicked.length, { told, kicked });
-  G.staffRolesSeen(A.dina, []);
+  G.staffRolesSeen(A.dina, [], true);
   check("R1. the role sync reads her roles from the character she plays: Dina Old's Developer stamp comes off, Dina is not logged out (no staff stamp of her own)",
     JSON.stringify(store.get(A.dinaOld)['private.discordRoles']) === '[]' && !kicked.length, store.get(A.dinaOld)['private.discordRoles']);
   told = typed(A.lead, '/kick #DINA');
@@ -414,7 +414,7 @@ reset();
   const before = ['jake', 'nate', 'lead', 'gm'].map((k) => typed(A[k], '/kick #OLF2'));
   check('R2. before the role sync has seen it, the ex-Owner can be kicked by nobody, not even an Owner (the finding as proven)',
     before.every((t) => t.includes(RANK_KICK('Olaf Two #OLF2'))) && !kicked.length, { before, kicked });
-  G.staffRolesSeen(olaf2, []);
+  G.staffRolesSeen(olaf2, [], true);
   check('R2. the role sync on the character he plays brings the old Owner stamp down', JSON.stringify(store.get(A.olaf)['private.discordRoles']) === '[]', store.get(A.olaf)['private.discordRoles']);
   told = typed(A.gm, '/kick #OLF2');
   const n12 = n(12);
@@ -426,7 +426,7 @@ reset();
   reset();
   const ledaAlt = actor(0xff000a41, { name: 'Leda Alt', tag: 'LED2', profile: 9, discord: ID.lead, roles: [ROLE.lead, 'patron'] });
   setOnline(A.lead, true);
-  G.staffRolesSeen(A.lead, [ROLE.gm]);
+  G.staffRolesSeen(A.lead, [ROLE.gm], true);
   check('R3. a Lead GM demoted to GM while online is logged out, and her other character now carries GM, its other roles kept (the account is a GM\'s, not a player\'s)',
     audits().some((l) => /^STAFF Leda #LEAD .*: Discord roles now give gm \(was leadgm\); logged out so it takes effect$/.test(l)) && JSON.stringify(store.get(ledaAlt)['private.discordRoles']) === JSON.stringify(['patron', ROLE.gm]) && G.accountRankOf(9, null, 0) === 1,
     { audits: audits(), alt: store.get(ledaAlt)['private.discordRoles'], rank: G.accountRankOf(9, null, 0) });

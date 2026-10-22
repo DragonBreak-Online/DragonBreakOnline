@@ -182,6 +182,12 @@ ok(Object.keys(R.COMMAND_SCHEMA).every((n) => !R.CHAT_VERBS.has(n)), 'no chat ve
   registerChatCommand('kick', (a, args) => { K.S.pendingLeave.set(B, { reason: 'suspended', t: CL.t, by: 0 }); return personal(a, 'You cannot kick them.'); }, { admin: true });
   chat(6, '/kick Selene');
   ok((K.S.pendingLeave.get(B) || {}).reason === 'suspended', '...a leave mark something else set meanwhile (a suspension) is left alone', K.S.pendingLeave.get(B));
+  // a mark that was there before the refused /kick (a demotion's, a suspension's) comes back (review of 22 Oct, I1)
+  registerChatCommand('kick', (a) => personal(a, 'You cannot kick them.'), { admin: true });
+  const prior = { reason: 'demotion', t: CL.t, by: 0 };
+  K.S.pendingLeave.set(B, prior);
+  chat(6, '/kick Selene');
+  ok(K.S.pendingLeave.get(B) === prior, '...a mark that was there before a refused /kick comes back unchanged', K.S.pendingLeave.get(B));
   K.S.pendingLeave.delete(B);
   registerChatCommand('kick', (a, args) => { ran.push(['kick', args]); }, { admin: true });
   out = chat(6, '/kick Selene');

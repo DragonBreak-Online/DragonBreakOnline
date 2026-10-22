@@ -124,6 +124,8 @@ module.exports = (K) => {
   const LEAVE_REASON = { kick: 'kicked', kicked: 'kicked', command: 'kicked', panel: 'kicked', demotion: 'kicked', suspension: 'suspended', suspended: 'suspended',
     sleep: 'slept', slept: 'slept', permadeath: 'permadeath', afk: 'kicked', discord_ban: 'kicked', ban_enforce: 'kicked', server_stop: 'server_stop' };
   const KICK_KIND = new Set(['command', 'panel', 'demotion', 'suspension', 'sleep', 'permadeath', 'afk', 'discord_ban', 'ban_enforce']);
+  // The F7 panel actions that remove their target (adminSystem.ts): the packet marks the target as leaving
+  const PANEL_LEAVE = new Set(['kick', 'ban', 'tempBan', 'ipBan']);
   // The end of a character's session: logout reason, gold and bank, open aggregates flushed, the inventory snapshot
   const leave = (a, forced, src) => {
     a = u32(a);
@@ -259,14 +261,22 @@ module.exports = (K) => {
     if (nested) top.inner = true;
     S.cmdStack.push(ctx);
     if (S.cmdStack.length > 8) S.cmdStack.splice(0, S.cmdStack.length - 8);
-    if (nm === 'kick' && ctx.targets && ctx.targets[0] && ctx.targets[0].a) { ctx.leaveMark = parseInt(ctx.targets[0].a, 16) >>> 0; put('pendingLeave', ctx.leaveMark, { reason: 'command', t: now(), by: actor }); }
+    if (nm === 'kick' && ctx.targets && ctx.targets[0] && ctx.targets[0].a) {
+      ctx.leaveMark = parseInt(ctx.targets[0].a, 16) >>> 0;
+      ctx.leavePrev = S.pendingLeave.get(ctx.leaveMark);
+      put('pendingLeave', ctx.leaveMark, { reason: 'command', t: now(), by: actor });
+    }
     return ctx;
   };
   const cmdEnd = (ctx, result) => {
     const i = S.cmdStack.lastIndexOf(ctx);
     if (i >= 0) S.cmdStack.splice(i, 1);
-    // A refused /kick removed nobody (the rank rule, own account): its leave mark goes, or a logout within 60 s read as this kick
-    if (ctx.leaveMark && !ctx.outcome && ctx.refused) { const p = S.pendingLeave.get(ctx.leaveMark); if (p && p.reason === 'command' && p.by === ctx.a) S.pendingLeave.delete(ctx.leaveMark); }
+    // A refused /kick removed nobody (the rank rule, own account): its leave mark goes, or a logout within 60 s read as this kick;
+    // a mark that was there before it (a suspension's, a demotion's) comes back
+    if (ctx.leaveMark && !ctx.outcome && ctx.refused) {
+      const p = S.pendingLeave.get(ctx.leaveMark);
+      if (p && p.reason === 'command' && p.by === ctx.a) { if (ctx.leavePrev) put('pendingLeave', ctx.leaveMark, ctx.leavePrev); else S.pendingLeave.delete(ctx.leaveMark); }
+    }
     // An alias or a command that ran another records nothing itself: the inner run did, with via
     if (ctx.skip || ctx.inner) return;
     const schema = ctx.schema;
@@ -421,7 +431,7 @@ module.exports = (K) => {
       list.push({ action, target: t, params: panelParams(c), t: now() });
       if (list.length > 8) list.shift();
       put('panelPending', a, Object.assign(list, { t: now() }));
-      if (t && (action === 'kick' || action === 'ban' || action === 'tempBan' || action === 'ipBan')) put('pendingLeave', t, { reason: 'panel', t: now(), by: a });
+      if (t && PANEL_LEAVE.has(action)) put('pendingLeave', t, { reason: 'panel', t: now(), by: a });
       if (t && action === 'summon') put('travel', t, { reason: 'summon', by: a, t: now() });
       if (t && action === 'teleportTo') put('travel', a, { reason: 'panel_tp', by: a, t: now() });
       if (t && action === 'kill') put('deaths', t, { cause: 'staff_kill', by: a, t: now() });
@@ -549,10 +559,13 @@ module.exports = (K) => {
     if (e.ev === 'staff.action' && f.via === 'panel' && actor.id) {
       const list = S.panelPending.get(actor.id);
       if (list && list.length) {
-        const pend = list.shift();
+        // A refused panel kick or ban removed nobody: the leave mark goes, from the pending packet on the account the line names
+        // (not the oldest packet: a backend ban's line comes later, and some packets get no line; review of 22 Oct)
+        const tp = f.outcome === 'refused' ? o.find((x) => x.r === 'target') : null;
+        const hit = tp && tp.p >= 0 ? list.find((x) => x.target && PANEL_LEAVE.has(x.action) && profileOf(x.target) === tp.p) : null;
+        if (hit) { const p = S.pendingLeave.get(hit.target); if (p && p.reason === 'panel' && p.by === actor.id) S.pendingLeave.delete(hit.target); }
+        const pend = hit ? list.splice(list.indexOf(hit), 1)[0] : list.shift();
         if (pend && pend.params && !f.params) f.params = pend.params;
-        // A refused panel kick or ban (rank, the rank's caps) removed nobody: the leave mark the packet set goes
-        if (pend && pend.target && f.outcome === 'refused') { const p = S.pendingLeave.get(pend.target); if (p && p.reason === 'panel' && p.by === actor.id) S.pendingLeave.delete(pend.target); }
         if (pend && pend.target) {
           const i = o.findIndex((x) => x.r === 'target');
           if (i < 0 || !o[i].a) { const tp = partyOf(pend.target, 'target'); if (tp) { if (i < 0) o.push(tp); else o[i] = tp; } }
