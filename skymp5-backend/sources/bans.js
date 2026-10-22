@@ -7,7 +7,7 @@ const crypto = require('crypto')
 const fs     = require('fs')
 const net    = require('net')
 const path   = require('path')
-const { replaceFile } = require('./storeFile')
+const { replaceFile, readStore } = require('./storeFile')
 
 const FILE    = path.join(__dirname, '..', 'data', 'bans.json')
 // The player store beside this one; path.dirname so a test that moves bans.json moves this too
@@ -59,6 +59,15 @@ function load() {
   try { data = JSON.parse(fs.readFileSync(FILE, 'utf8')) } catch { return [] }
   return Array.isArray(data) ? giveRefs(data) : []
 }
+
+// Fail closed: a list that exists but cannot be read or is not a list throws, never read as empty (a save would wipe it)
+function loadStrict() {
+  const data = readStore(FILE, v => (Array.isArray(v) ? null : 'is not a ban list'), 'Repair data/bans.json by hand (a JSON list)')
+  return data ? giveRefs(data) : []
+}
+
+// The Discord ban's snapshot the bot writes (guildBanAdd), as against a ban staff gave in game or on a dashboard
+const isDiscordCopy = e => !!e && e.reason === 'discord ban' && e.bannedBy === 'discord'
 
 // Atomic and on disk when it returns (storeFile.replaceFile): a full disk or a crash leaves the old list, never a cut one
 function save(data) {
@@ -168,12 +177,18 @@ function isBanned({ discordId, ip } = {}) {
   ) || null
 }
 
-// Adds a ban entry; an existing entry for the same discordId is replaced and keeps its ref
-function add(input) {
+// Adds a ban entry; an existing entry for the same discordId is replaced and keeps its ref. keepOther (the bot's Discord
+// snapshot): an existing ban that is not a Discord copy is kept, read fail closed, gains the address if it has none, kept: true
+function add(input, { keepOther = false } = {}) {
   const discordId = String((input && input.discordId) || '').trim()
   if (!discordId) throw new Error('discordId is required')
-  const all = load()
+  const all = keepOther ? loadStrict() : load()
   const old = all.find(e => String(e.discordId) === discordId)
+  if (keepOther && old && !isDiscordCopy(old)) {
+    const ip = old.ip ? '' : publicIp(input.ip)
+    if (ip) { old.ip = ip; save(all) }
+    return { ...old, kept: true }
+  }
   const data = all.filter(e => String(e.discordId) !== discordId)
   const entry = {
     discordId,
@@ -189,13 +204,47 @@ function add(input) {
   return entry
 }
 
-function removeByDiscordId(discordId) {
+// true when lifted, false when not on the list; onlyDiscordCopy (a Discord unban): read fail closed, and any other ban is
+// kept and returned as { kept: entry }, so a Discord unban never lifts a game ban
+function removeByDiscordId(discordId, { onlyDiscordCopy = false } = {}) {
   const id = String(discordId || '').trim()
-  const data = load()
-  const next = data.filter(e => String(e.discordId) !== id)
-  if (next.length === data.length) return false
-  save(next)
+  const data = onlyDiscordCopy ? loadStrict() : load()
+  const old = data.find(e => String(e.discordId) === id)
+  if (!old) return false
+  if (onlyDiscordCopy && !isDiscordCopy(old)) return { kept: old }
+  save(data.filter(e => String(e.discordId) !== id))
   return true
+}
+
+// The Punishments panel's writes, all fail closed. The entry for an account, or null
+function findEntry(discordId) {
+  const id = String(discordId || '').trim()
+  return (id && loadStrict().find(e => String(e.discordId) === id)) || null
+}
+
+// A new ban only: { entry }, or { existing } and nothing written. The address as the in-game /ban keeps it (publicIp)
+function addNew(input) {
+  const discordId = String((input && input.discordId) || '').trim()
+  if (!discordId) throw new Error('discordId is required')
+  const all = loadStrict()
+  const existing = all.find(e => String(e.discordId) === discordId)
+  if (existing) return { existing }
+  const entry = {
+    discordId, ref: newRef(new Set(all.map(e => e && e.ref))), hwid: null, ip: publicIp(input.ip) || null, reason: String(input.reason || ''),
+    bannedAt: input.bannedAt || new Date().toISOString(), bannedBy: input.bannedBy || null,
+  }
+  save([...all, entry])
+  return { entry }
+}
+
+// { removed: entry } or { none: true }
+function removeEntry(discordId) {
+  const id = String(discordId || '').trim()
+  const all = loadStrict()
+  const removed = all.find(e => String(e.discordId) === id)
+  if (!id || !removed) return { none: true }
+  save(all.filter(e => String(e.discordId) !== id))
+  return { removed }
 }
 
 // Appends a timestamped line to ban.log; logging failures must never break the ban flow
@@ -216,5 +265,9 @@ module.exports = {
   isBanned,
   add,
   removeByDiscordId,
+  findEntry,
+  addNew,
+  removeEntry,
+  isDiscordCopy,
   logBan,
 }

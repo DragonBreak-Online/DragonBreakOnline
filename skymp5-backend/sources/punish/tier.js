@@ -33,6 +33,22 @@ async function tierOf(discordId) {
   return withDeadline(lookup, null)
 }
 
+// The same order from roles already fetched (the actions ask Discord themselves); null for none
+function tierFromRoles(roles) {
+  const held = new Set((roles || []).map(String))
+  for (const [tier, list] of ORDER) if ((list() || []).some(r => held.has(String(r)))) return tier
+  return null
+}
+
+const RANK = Object.freeze({ owner: 4, dev: 3, leadgm: 2, gm: 1 })
+// A member's rank for the actions' staff-target rule: their tier's, 1 for any other staff role (a Trial GM), 0 for a player
+function rankOfRoles(roles) {
+  const tier = tierFromRoles(roles)
+  if (tier) return RANK[tier]
+  const staff = staffRoleIds()
+  return (roles || []).some(r => staff.has(String(r))) ? 1 : 0
+}
+
 // Every role that makes a member staff, for hiding staff members' records from a GM
 function staffRoleIds() {
   const console_ = String(config.consoleRoleIds || '').split(',').map(s => s.trim()).filter(Boolean)
@@ -67,4 +83,4 @@ staffStatusOf.known = discordId => {
   return hit && hit.until > Date.now() ? hit.status : null
 }
 
-module.exports = { tierOf, staffStatusOf }
+module.exports = { tierOf, staffStatusOf, tierFromRoles, rankOfRoles, staffRoleIds, RANK }

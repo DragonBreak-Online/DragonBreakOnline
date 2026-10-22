@@ -71,8 +71,9 @@ const globalJson = express.json({
   verify: (req, _res, buf) => { req.rawBody = buf },
 })
 // Problem reports and the server controls are parsed by their own routes, only after the sender checks and rate limits
+const punishActionsRoute = require('./routes/site-punish-actions')
 const OWN_PARSER_PATHS = [...filesRoute.OWN_PARSER_PATHS, '/api/site/report', '/api/site/staff/console/run',
-  ...require('./sources/serverControl').ACTIONS.map(a => `/api/site/staff/server/actions/${a}`)]
+  ...require('./sources/serverControl').ACTIONS.map(a => `/api/site/staff/server/actions/${a}`), ...punishActionsRoute.OWN_PARSER_PATHS]
 app.use(require('./sources/problemReport').parserExcept(OWN_PARSER_PATHS, globalJson))
 
 // Static file serving: root/ is installed into Skyrim/ (Data/ sub-dir)
@@ -123,6 +124,8 @@ app.use('/api/launch-check',       launchCheckRoute)
 const siteServerRoute = require('./routes/site-server')
 app.use('/api/site/staff/server', siteServerRoute)
 app.use('/api/site/staff/console', require('./routes/site-console'))
+// The panel's actions before the read-only panel, which answers 405 to anything but a GET (PUNISH_ACTIONS, off unless set)
+app.use('/api/site/staff/punishments/actions', punishActionsRoute)
 app.use('/api/site/staff/punishments', require('./routes/site-punish'))
 app.use('/api/site/staff', require('./routes/site-staff'))
 app.use('/api/site',               siteAuthRoute)
@@ -133,6 +136,7 @@ app.listen(PORT, () => {
   console.log(`DragonBreak backend running on http://localhost:${PORT}`)
   siteServerRoute.recover()
   try { require('./sources/console').consoleApi().recover() } catch (err) { console.error('[console] recover failed:', err.message) }
+  punishActionsRoute.recover()
   require('./sources/autoReport').start()
   try { require('./sources/deviceChecks').start() } catch (err) { console.error('[device-check] start failed:', err.message) }
 })

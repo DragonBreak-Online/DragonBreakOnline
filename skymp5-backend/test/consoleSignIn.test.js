@@ -260,3 +260,34 @@ test('internals hand out the raw session token for the console', () => {
   const { internals } = require('../routes/site-auth')
   assert.equal(internals.sessionToken({ headers: { cookie: 'a=1; db_site=abc; db_site_next=x' } }), 'abc')
 })
+
+test('V1: an encoded ../ under /api/site, and the relative site-config.json it would lead to, are 404s from the backend', async () => {
+  const { port } = server.address()
+  // The raw path goes out as written: a URL string would have Node normalise it first
+  const raw = p => new Promise((resolve, reject) => http.get({ host: '127.0.0.1', port, path: p, agent: false }, res => {
+    let text = ''
+    res.setEncoding('utf8')
+    res.on('data', c => { text += c })
+    res.on('end', () => resolve({ status: res.statusCode, type: res.headers['content-type'] || '', text }))
+  }).on('error', reject))
+  for (const p of ['/api/site/x/..%2F..%2F..%2Findex.html', '/api/site/x/..%2f..%2f..%2fwhoami', '/api/site/x/..%5C..%5Cindex.html',
+    '/api/site/x/site-config.json', '/api/site/site-config.json']) {
+    const r = await raw(p)
+    assert.equal(r.status, 404, p)
+    assert.doesNotMatch(r.text, /discordInvite|<script/, p)
+  }
+})
+
+test('V1: a rate-limited sign-in answers plain text, not an HTML page on the website origin', async () => {
+  const visitor = { 'cf-connecting-ip': '192.0.2.77' }
+  for (let i = 0; i < 10; i++) assert.equal((await get('/api/site/login', '', visitor)).status, 302)
+  const r = await new Promise((resolve, reject) => http.get(`${base}/api/site/login`, { agent: false, headers: visitor }, res => {
+    let text = ''
+    res.setEncoding('utf8')
+    res.on('data', c => { text += c })
+    res.on('end', () => resolve({ status: res.statusCode, type: res.headers['content-type'] || '', text }))
+  }).on('error', reject))
+  assert.equal(r.status, 429)
+  assert.equal(r.type, 'text/plain; charset=utf-8')
+  assert.equal(r.text, 'Too many sign-ins right now. Please try again in a minute.')
+})

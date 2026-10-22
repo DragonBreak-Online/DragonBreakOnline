@@ -62,10 +62,11 @@ because that is the prefix the public proxy forwards.
      `curl -s -o /dev/null -D - "https://dragonbreakonline.com/api/users/login-discord?state=$(openssl rand -hex 32)"`
      (a throwaway login that expires on its own). The answer is a 302, and nginx `add_header` covers a 302 even
      without `always`. After the restart it must show exactly one `Content-Security-Policy`, the backend's own
-     (`frame-ancestors 'none'; form-action 'self'; base-uri 'none'`); before it, today's backend sends none, so any
-     policy seen then comes from nginx or Cloudflare. A second policy with `script-src` or `default-src` blocks the
-     Continue page's script: Continue then works as a plain button and its guard is silently off. Then check again
-     that an old launcher still logs in.
+     (`frame-ancestors 'none'; form-action 'self'; base-uri 'none'; script-src 'sha256-fZ0t…' 'sha256-Lp1J…'`, the
+     hashes of the autoClose and Continue scripts, pinned in `test/launcherLoginRoutes.test.js`); before it, the live
+     backend sends the same policy without `script-src`, so any other policy seen comes from nginx or Cloudflare. A
+     second policy with `script-src` or `default-src` blocks the Continue page's script: Continue then works as a
+     plain button and its guard is silently off. Then check again that an old launcher still logs in.
    - Tokens taken before the fix stay valid until their owner logs in again or `revoke` is set. Staff accounts can be
      cleared at once after the deploy with `DELETE /api/servers/:key/sessions-by-discord/:discordId`
      (`X-Auth-Token`); each of them then presses Discord Login once.

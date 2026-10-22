@@ -64,6 +64,8 @@ const limitOptions = {
   standardHeaders: true,
   legacyHeaders: false,
   message: 'Too many sign-ins right now. Please try again in a minute.',
+  // Plain text, not HTML: a browser opens these on the website origin, so the answer is never a page script could be added to
+  handler: (_req, res, _next, options) => res.status(options.statusCode).type('text/plain').send(options.message),
 }
 
 // Per visitor, so one client cannot use up the site-wide budget; requests without the header meet only the site-wide limit

@@ -188,3 +188,46 @@ test('one row per ban: the player log\'s copy goes, the ban list takes the journ
   const alone = R.banRows(R.parseBans([{ discordId: dA, reason: 'discord ban', bannedBy: 'discord', bannedAt: new Date(t).toISOString() }]))
   assert.equal(R.oneRowPerBan(alone), alone)
 })
+
+test('journal: a dashboard game ban is history, lifted by its unban; the ban list row takes its who and why by ref; reasons keep 300', () => {
+  const t = Date.parse('2026-10-21T12:00:00Z')
+  const d = '100000000000000101'
+  const line = (id, kind, at, extra) => R.parseJournalLine({ v: 1, id, kind, at: new Date(at).toISOString(), discordId: d, profileId: 10, via: 'dashboard', ...extra })
+  const filled = rows => rows.map(r => Object.assign(r, { target: { ...r.target, profileId: r.target.profileId ?? 10 } }))
+  const long = 'x'.repeat(300)
+  const journal = R.journalRows([
+    line('M-AAAAAA', 'ban', t, { ref: 'B-WG6QYG', reason: 'Duping gold', by: { discordName: 'jake' } }),
+    line('M-BBBBBB', 'unban', t + 3600000, { ref: 'B-WG6QYG', reason: 'Appeal accepted', by: { discordName: 'nate.pierce' } }),
+    line('M-CCCCCC', 'ban', t + 7200000, { ref: 'B-IIIIII', reason: long, by: { discordName: 'jake' } }),
+  ], { now: t + 8000000 })
+  assert.deepEqual(journal.map(r => [r.id, r.kind, r.ref, r.state, r.active]), [
+    ['mod:M-AAAAAA', 'ban', 'B-WG6QYG', 'lifted', false], ['mod:M-BBBBBB', 'unban', 'B-WG6QYG', 'recorded', false], ['mod:M-CCCCCC', 'ban', 'M-CCCCCC', 'recorded', false],
+  ])
+  assert.deepEqual(journal[0].lifted, { by: 'nate.pierce', atMs: t + 3600000, reason: 'Appeal accepted' })
+  // A journal ban without a good ban ref keeps its own id, and merges with no ban list row
+  const list = filled(R.banRows(R.parseBans([{ discordId: d, ref: 'B-WG6QYH', reason: long, bannedBy: 'jake (dashboard)', bannedAt: new Date(t + 7200000).toISOString() }])))
+  assert.equal(list[0].reason, long, 'a dashboard reason of 300 is kept whole')
+  const merged = R.oneRowPerBan([...list, ...filled(journal)])
+  assert.ok(merged.some(r => r.id === 'mod:M-CCCCCC'), 'a journal row merges only by its ban ref')
+  const list2 = filled(R.banRows(R.parseBans([{ discordId: d, ref: 'B-WG6QYG', reason: 'Duping gold', bannedBy: 'jake (dashboard)', bannedAt: new Date(t).toISOString() }])))
+  const j2 = filled(R.journalRows([line('M-DDDDDD', 'ban', t, { ref: 'B-WG6QYG', reason: 'Duping gold', by: { discordName: 'jake' } })], { now: t }))
+  const one = R.oneRowPerBan([...list2, ...j2])
+  assert.deepEqual(one.map(r => [r.id, r.by, r.reason, r.active]), [['ban:B-WG6QYG', 'jake', 'Duping gold', true]])
+})
+
+test('bans.json reasons: a dashboard ban (bannedBy "<handle> (dashboard)") shows 300; every other ban is cut at 200 as before', () => {
+  const long = 'Griefing at the bank '.repeat(14).trim()
+  assert.ok(long.length > 280 && long.length <= 300)
+  const at = '2026-10-21T12:00:00Z'
+  const parsed = R.parseBans([
+    { discordId: '100000000000000101', ref: 'B-WG6QYG', reason: long, bannedAt: at, bannedBy: 'jake (dashboard)' },
+    { discordId: '100000000000000102', ref: 'B-WG6QYH', reason: long, bannedAt: at, bannedBy: 'in-game admin' },
+    { discordId: '100000000000000103', ref: 'B-WG6QYJ', reason: long, bannedAt: at, bannedBy: 'jake' },
+    { discordId: '100000000000000104', ref: 'B-WG6QYK', reason: long, bannedAt: at, bannedBy: 'dashboard' },
+    { discordId: '100000000000000105', ref: 'B-WG6QYM', reason: long, bannedAt: at, bannedBy: '100000000000000999' },
+    { discordId: '100000000000000106', ref: 'B-WG6QYN', reason: long, bannedAt: at },
+  ])
+  assert.equal(parsed[0].reason, long)
+  for (const b of parsed.slice(1)) assert.equal(b.reason, scrub(long, 200), b.ref)
+  assert.equal([...parsed[1].reason].length, 200)
+})

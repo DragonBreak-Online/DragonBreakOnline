@@ -91,6 +91,7 @@ const get  = (url, opts) => request('GET', url, opts)
 const post = (url, json, opts = {}) => request('POST', url, { ...opts, json })
 const b64url = buf => buf.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
 const pkce = () => { const verifier = b64url(crypto.randomBytes(32)); return { verifier, challenge: b64url(crypto.createHash('sha256').update(verifier).digest()) } }
+const scriptHash = text => `'sha256-${crypto.createHash('sha256').update(text, 'utf8').digest('base64')}'`
 const hiddenValue = (html, name) => (new RegExp(`name="${name}" value="([^"]*)"`).exec(html) || [])[1]
 const sessionCheck = (token, headers = { 'x-auth-token': 'server-secret' }) => get(`/api/servers/test-key/sessions/${token}`, { headers })
 const withConfig = async (patch, fn) => {
@@ -157,7 +158,8 @@ test('F1: the old flow\'s Continue button starts asleep and wakes only on a focu
   assert.match(form, /<script>\(function \(\) \{\n  var b = document\.getElementById\('continue'\)[^\n]*\n  b\.disabled = true\n/, 'the script puts it to sleep first')
   assert.match(form, /<p class="meta" id="continue-hint" hidden>/, 'the hint shows only when the script runs')
   assert.match(page.text, /\.panel button:disabled \{ opacity: \.55; cursor: default; \}/, 'a sleeping button looks asleep')
-  assert.doesNotMatch(page.headers['content-security-policy'], /script-src|default-src|sandbox/, 'the page lets its inline script run')
+  assert.ok(page.headers['content-security-policy'].split(' ').includes(scriptHash(/<script>([\s\S]*?)<\/script>/.exec(form)[1])), 'the page lets its own inline script run')
+  assert.doesNotMatch(page.headers['content-security-policy'], /default-src|sandbox|unsafe-inline/)
   assert.match(form, /document\.hasFocus\(\)/)
   assert.match(form, /visibilitychange/)
   assert.match(form, /addEventListener\('blur', sleep\)/)
@@ -511,6 +513,42 @@ test('F1: login pages are never cached, framed, sent as a referrer or left in re
   assert.match(page.headers['content-security-policy'], /frame-ancestors 'none'/)
   assert.match(page.headers['cache-control'], /no-store/)
   assert.equal(page.headers['referrer-policy'], 'no-referrer')
+})
+
+// The reviewed set: the autoClose and Continue scripts; a change to either changes these and needs a new review
+const AUTO_CLOSE_HASH = "'sha256-fZ0tV7TXMJab7A0vH8JWL37p4stmG1VivMiWDm/mz1w='"
+const CONTINUE_HASH   = "'sha256-Lp1Jt9z7UrEw/e2XL5Ocly6JFclUcumdAzdP9K4+6pM='"
+const LOGIN_CSP = `frame-ancestors 'none'; form-action 'self'; base-uri 'none'; script-src ${AUTO_CLOSE_HASH} ${CONTINUE_HASH}`
+
+test('V1: every login page and answer sends the exact hash-pinned CSP, and every script a page serves is one it pins', async () => {
+  const seen = {}
+  const check = (name, r, scripts) => {
+    assert.equal(r.headers['content-security-policy'], LOGIN_CSP, name)
+    const served = [...r.text.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m => scriptHash(m[1]))
+    assert.deepEqual(served, scripts, `${name}: the scripts it serves`)
+    assert.equal((r.text.match(/<script/g) || []).length, served.length, `${name}: no other script element`)
+    assert.doesNotMatch(r.text, /\son[a-z]+=|javascript:/i, `${name}: no inline handler the CSP would block`)
+    seen[name] = r.status
+  }
+  check('incomplete link', await get('/api/users/login-discord?state=a'), [])
+  check('cancelled', await get('/api/users/login-discord/callback?error=access_denied&state=x'), [])
+  check('expired', await get('/api/users/login-discord/callback?code=c&state=x'), [])
+  const { state, page } = await legacyToConfirmPage()
+  check('Continue page', page, [CONTINUE_HASH])
+  const nonce = hiddenValue(page.text, 'nonce')
+  check('Continue with a bad nonce', await request('POST', '/api/users/login-discord/confirm', { form: { state, nonce: 'f'.repeat(64) } }), [])
+  check('logged in', await request('POST', '/api/users/login-discord/confirm', { form: { state, nonce } }), [AUTO_CLOSE_HASH])
+  const game = (await post('/api/users/login-discord/start', { client: 'game' })).json
+  await get(`/api/users/login-discord?state=${game.state}`)
+  const codePage = await get(`/api/users/login-discord/callback?code=c&state=${game.state}`)
+  check('game code page', codePage, [])
+  const gameNonce = hiddenValue(codePage.text, 'nonce')
+  check('wrong game code', await request('POST', '/api/users/login-discord/confirm', { form: { state: game.state, nonce: gameNonce, user_code: 'ZZZZ-ZZZZ' } }), [])
+  check('game logged in', await request('POST', '/api/users/login-discord/confirm', { form: { state: game.state, nonce: gameNonce, user_code: game.userCode } }), [AUTO_CLOSE_HASH])
+  const start = await post('/api/users/login-discord/start', { client: 'launcher' })
+  assert.equal(start.headers['content-security-policy'], LOGIN_CSP, 'JSON answers carry it too')
+  assert.deepEqual(seen, { 'incomplete link': 400, cancelled: 400, expired: 400, 'Continue page': 200, 'Continue with a bad nonce': 400,
+    'logged in': 200, 'game code page': 200, 'wrong game code': 400, 'game logged in': 200 })
 })
 
 test('F1: logins are counted by flow per day, with no names in the file', async () => {

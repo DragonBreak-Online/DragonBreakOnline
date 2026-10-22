@@ -164,3 +164,37 @@ for (const [status, body, wait] of [
     assert.equal(dropped().length, 0)
   })
 }
+
+test('#staff-commands lines go to their own channel in their own batches; without the channel they stay in the backend log', async t => {
+  const { audit } = load(t)
+  const config = require('../config')
+  const paths = []
+  t.mock.method(https, 'request', (opts, onRes) => {
+    const req = new EventEmitter()
+    req.end = data => {
+      paths.push([opts.path, JSON.parse(data).content, JSON.parse(data).allowed_mentions])
+      const res = new EventEmitter()
+      res.statusCode = 200
+      onRes(res)
+      process.nextTick(() => { res.emit('data', '{"id":"1"}'); res.emit('end') })
+    }
+    return req
+  })
+  const warn = t.mock.method(console, 'warn', () => {})
+  audit.staff('[12:00:00] jake <@1554000000000000001> (Owner): game ban (permanent) on Bob #BOB1 (profile 10): Griefing [dashboard 7a1c2a3b]')
+  assert.equal(warn.mock.callCount(), 1, 'one warning, no channel set')
+  audit.staff('[12:00:01] second line')
+  assert.equal(warn.mock.callCount(), 1, 'only once')
+  await run(t, 2)
+  assert.deepEqual(paths, [])
+  config.staffCommandsChannelId = '1554000000000000888'
+  try {
+    audit.staff('[12:00:02] jake <@1554000000000000001> (Owner): Discord ban on Bob #BOB1 (profile 10): Threats [dashboard 7a1c2a3b]')
+    audit.log('PUNISH req 7a1c2a3b -> done')
+    await run(t, 2)
+    assert.deepEqual(paths.map(p => p[0]).sort(), ['/api/v10/channels/1554000000000000777/messages', '/api/v10/channels/1554000000000000888/messages'])
+    const staff = paths.find(p => p[0].includes('888'))
+    assert.equal(staff[1], '[12:00:02] jake <@1554000000000000001> (Owner): Discord ban on Bob #BOB1 (profile 10): Threats [dashboard 7a1c2a3b]', 'the line as given, no second stamp')
+    assert.deepEqual(staff[2], { parse: [] }, 'no one is pinged')
+  } finally { delete config.staffCommandsChannelId }
+})

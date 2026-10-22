@@ -1,5 +1,5 @@
 'use strict'
-// Staff dashboard Console panel: GET / (setting, commands, freshness), POST /run {requestId, command}, GET /jobs/<id> (own only)
+// Staff dashboard Console panel: GET / (setting, commands, freshness), POST /run {requestId, command[, targetProfileId]}, GET /jobs/<id> (own only)
 
 const express = require('express')
 const router = express.Router()
@@ -13,6 +13,8 @@ const rules = require('../sources/console/allowlist')
 const { SIGN_IN_URL } = require('../sources/console/staffConsole')
 
 const BODY_KEYS = ['requestId', 'command']
+// The account the Punishments page showed; the game refuses a #TAG that is not one of its characters
+const OPTIONAL_KEYS = ['targetProfileId']
 const MAX_COMMAND = 600
 
 router.use((_req, res, next) => {
@@ -55,8 +57,9 @@ function consoleRequest(req, res, next) {
 function consoleBody(req, res, next) {
   const b = req.body
   const keys = b && typeof b === 'object' && !Array.isArray(b) ? Object.keys(b) : null
-  if (!keys || keys.length !== BODY_KEYS.length || !BODY_KEYS.every(k => keys.includes(k))) return res.status(400).json({ error: 'badRequest' })
+  if (!keys || !BODY_KEYS.every(k => keys.includes(k)) || !keys.every(k => BODY_KEYS.includes(k) || OPTIONAL_KEYS.includes(k))) return res.status(400).json({ error: 'badRequest' })
   if (typeof b.requestId !== 'string' || !rules.UUID_RE.test(b.requestId)) return res.status(400).json({ error: 'badRequest' })
+  if (keys.includes('targetProfileId') && !(Number.isSafeInteger(b.targetProfileId) && b.targetProfileId >= 0)) return res.status(400).json({ error: 'badRequest' })
   if (typeof b.command !== 'string' || b.command.length > MAX_COMMAND) return res.status(400).json({ error: 'badCommand' })
   next()
 }
@@ -66,7 +69,7 @@ router.post('/run', consoleRequest, requireStaff, express.json({ limit: '2kb', i
   const api = consoleApi()
   const caller = api.webCaller(sessionToken(req))
   if (!caller) return res.status(401).json({ error: 'signedOut' })
-  const { status, body } = await api.runStaffCommand(caller, { uuid: req.body.requestId, text: req.body.command })
+  const { status, body } = await api.runStaffCommand(caller, { uuid: req.body.requestId, text: req.body.command, ...(req.body.targetProfileId !== undefined ? { targetProfileId: req.body.targetProfileId } : {}) })
   res.status(status).json(body)
 }))
 router.use('/run', bodyErrors)

@@ -42,6 +42,19 @@ test('a /console command is deferred privately first, then run, and answered wit
   assert.equal(F.requests[0].src, 'discord')
 })
 
+test('a pinned Lead GM on Discord /console: /kick runs; anything else is answered in words, and nothing is sent (Jake, 22 Oct)', async () => {
+  const lead = text => interaction({ text, fields: { user: { id: ID.lead, bot: false } } })
+  const ww = lead('/wwremote clear #8KWH')
+  assert.equal(await consoleCommand.handleInteraction(ww.it, F.api), true)
+  assert.deepEqual(ww.calls.map(c => c[0]), ['defer', 'edit'])
+  assert.equal(ww.calls[1][1].content, 'A Lead GM can run only /discipline and /kick from the console. Run anything else in game.\nNothing was run.')
+  assert.equal(F.requests.length, 0)
+  const kick = lead('/kick #8KWH')
+  assert.equal(await consoleCommand.handleInteraction(kick.it, F.api), true)
+  assert.match(kick.calls[1][1].content, /^\/kick #8KWH: ran - /)
+  assert.deepEqual(F.requests.map(r => [r.src, r.discordId, r.text]), [['discord', ID.lead, '/kick #8KWH']])
+})
+
 test('a defer that throws runs nothing and writes no spool file', async () => {
   F.stopGame()
   const { it, calls } = interaction({ deferThrows: true })
