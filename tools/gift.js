@@ -4,6 +4,7 @@
 //
 //   sudo node tools/gift.js --tag KKVT --gold 50 --reason "Sorry, the update ended your dungeon run" --by Nate
 //   sudo node tools/gift.js --profile 71 --item 0x1397e:1 --reason "..."
+//   sudo node tools/gift.js --tag 8YDB --school Destruction:21 --reason "..."   levels added to a school (repeatable)
 //   sudo node tools/gift.js --list            what waits in the inbox, and the last deliveries
 //
 // GIFTS_DIR is the live server folder (default /opt/alduinak/build/dist/server).
@@ -28,7 +29,7 @@ if (args.includes('--list')) {
   try { l = JSON.parse(fs.readFileSync(path.join(DIR, 'gift-ledger.json'), 'utf8')).delivered || {}; } catch (e) { /* none yet */ }
   const done = Object.entries(l).slice(-10);
   console.log(`delivered (last ${done.length} of ${Object.keys(l).length}):`);
-  for (const [id, d] of done) console.log(`  ${id}  ${d.at}  ${d.to}  ${d.gold ? d.gold + ' gold ' : ''}${(d.items || []).length ? JSON.stringify(d.items) : ''} ${d.reason}`);
+  for (const [id, d] of done) console.log(`  ${id}  ${d.at}  ${d.to}  ${d.gold ? d.gold + ' gold ' : ''}${(d.items || []).length ? JSON.stringify(d.items) : ''}${d.schools ? `schools ${JSON.stringify(d.schools)} ` : ''} ${d.reason}`);
   process.exit(0);
 }
 
@@ -44,11 +45,22 @@ const items = all('item').map((s) => {
   if (!m) die(`--item is baseId:count, like 0x1397e:1 (got ${s})`);
   return { baseId: Number(m[1]), count: Number(m[2]) };
 });
-if (!gold && !items.length) die('nothing to give: --gold N and/or --item baseId:count');
+// Restoration is not one: it follows Priest on the Wheel
+const SCHOOLS = ['Alteration', 'Conjuration', 'Destruction', 'Illusion'];
+const schools = {};
+for (const s of all('school')) {
+  const m = /^([a-z]+):(\d+)$/i.exec(s);
+  const name = m && SCHOOLS.find((n) => n.toLowerCase() === m[1].toLowerCase());
+  if (!name) die(`--school is School:levels, one of ${SCHOOLS.join(', ')}, like Destruction:21 (got ${s})`);
+  if (!(Number(m[2]) >= 1 && Number(m[2]) <= 100)) die(`--school levels are 1-100 (got ${s})`);
+  if (schools[name]) die(`--school ${name} is given twice`);
+  schools[name] = Number(m[2]);
+}
+if (!gold && !items.length && !Object.keys(schools).length) die('nothing to give: --gold N, --item baseId:count and/or --school School:levels');
 const reason = String(opt('reason') || '').slice(0, 200);
 if (!reason) die('--reason is required: the player is told it');
 
-const gift = { ...(tag ? { tag } : { profile }), ...(gold ? { gold } : {}), ...(items.length ? { items } : {}), reason, by: String(opt('by') || 'staff').slice(0, 40), at: new Date().toISOString() };
+const gift = { ...(tag ? { tag } : { profile }), ...(gold ? { gold } : {}), ...(items.length ? { items } : {}), ...(Object.keys(schools).length ? { schools } : {}), reason, by: String(opt('by') || 'staff').slice(0, 40), at: new Date().toISOString() };
 const id = `${new Date().toISOString().replace(/[-:]/g, '').slice(0, 15)}-${tag || 'p' + profile}-${crypto.randomBytes(3).toString('hex')}`;
 fs.mkdirSync(INBOX, { recursive: true });
 const tmp = path.join(INBOX, `.${id}.tmp`);
