@@ -27,6 +27,22 @@ Every answer is JSON with `Cache-Control: no-store, private`. No answer carries 
   - GET shows every `can.*` as false;
   - every POST answers 503 `actionsOff`, after the rank check.
 
+## Ship order: backend, then the website, then the game
+
+1. This backend, one restart.
+2. The website's `dashboard.html` from `dashboard-actions-1021`.
+3. The game's hot reload of `punish-hardening-1021-review`.
+
+The `dashboard-1021-final` page (74e20c94e) offers Send on Add strike and Add warning as soon as GET `/console` lists
+`/discipline`. It sends the two-key `/run` body, without the account. With the new game, that Send works for Owners and
+Dev whatever `PUNISH_ACTIONS` says. So that page must never be live with the new game:
+- install the new page before the game reload;
+- to undo the page while the new game runs, put back 779feb8b4's `dashboard.html`, never 74e20c94e's;
+- to stop it with no deploy, write `on web=off` to `/etc/dragonbreak/console` (the Console panel stops too); or set
+  `remoteConsole.deny ["discipline"]` in the game and hot reload.
+
+Every other mix of old and new pages, backends and games is Copy only, and the new three send only once `PUNISH_ACTIONS` is on.
+
 ## The Console panel's command list: GET `/api/site/staff/console`
 
 `{ v, setting, ready, fresh, signInUrl, commands, maxLength }`.
