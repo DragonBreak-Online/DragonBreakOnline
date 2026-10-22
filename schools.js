@@ -2224,7 +2224,8 @@ module.exports = (api) => {
     if (added <= 0) return { ok: false, text: heldFor ? `${display(t)}'s ${name} is held at ${was} until its ${heldFor} spell is chosen.` : `${display(t)}'s ${name} is already ${was}.`, school: name, from: was, to: was, added: 0, heldFor };
     if (dry) return { ok: true, text: '', school: name, from: was, to: level, added, heldFor };
     s.levels[name] = { level, xp };
-    save(t, s);
+    // A record the engine would not take is no grant: nothing audited, and gifts.js records 0 given (review A, mod-0311)
+    if (!save(t, s)) return { ok: false, text: `${display(t)}'s ${name} could not be saved, so nothing was given.`, school: name, from: was, to: was, added: 0, heldFor: '' };
     const giver = typeof by === 'number' && by ? who(by) : String(by || 'staff').slice(0, 40);
     const short = heldFor ? `; held at ${level} for the ${heldFor} spell, ${add - added} not given` : added < add ? `; capped at 100, ${add - added} not given` : '';
     audit(`SCHOOLS ${giver} granted ${who(t)} ${added} ${name} level${added === 1 ? '' : 's'}: ${was} to ${level} (${roleOf(s, name)}${short}); ${String(reason || '').slice(0, 200)}`);

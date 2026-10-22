@@ -79,7 +79,9 @@ const anims = [];
 const mp = {
   getIdFromDesc: idOf,
   getDescFromId: descOf,
-  get: (id, p) => props.get(id + '|' + p),
+  // A copy, as the engine gives: a grant that never saved must not show in the record (review A: by reference, a grant
+  // with no save() passed every check)
+  get: (id, p) => { const v = props.get(id + '|' + p); return v === undefined ? v : JSON.parse(JSON.stringify(v)); },
   set: (id, p, v) => props.set(id + '|' + p, JSON.parse(JSON.stringify(v))),
   lookupEspmRecordById: (id) => (RECORDS[id] ? { record: RECORDS[id], toGlobalRecordId: (local) => local } : null),
   callPapyrusFunction: (kind, cls, fn, self, args) => {
@@ -226,6 +228,17 @@ check('...and none of them changes a level or writes an audit line', typeof glob
   check('...a dry run at 100 or of Restoration is refused as the real one is', d4.ok === false && d4.added === 0 && d4.school === 'Destruction' && /already 100/.test(d4.text) && d5.ok === false && !d5.school && /Priest skill/.test(d5.text), [d4, d5]);
 }
 check('a staff actor as the giver is named as one', grant(EXPERT, 'Destruction', 1, TEACHER, 'by actor').ok && audits(/^SCHOOLS P15 granted P44 1 Destruction level: 80 to 81 \(primary\); by actor$/).length === 1, out.audits.slice(-1));
+
+// ---- a record the engine will not take: no grant, nothing audited (review A: it was audited as granted and the gift spent)
+{
+  const NOSAVE = 0x49; mage(NOSAVE, 30, 0, BOTH);
+  const realSet = mp.set, nAud = out.audits.length, nPk = out.packets.length;
+  mp.set = (id, p, v) => { if (id === NOSAVE && p === 'private.dboSchools') throw new Error('engine refused'); return realSet(id, p, v); };
+  const rr = grant(NOSAVE, 'Destruction', 5, 'Jake', 'no save');
+  mp.set = realSet;
+  check('a grant the engine will not save is refused: 30 kept, 0 added, no SCHOOLS line, no K menu', rr.ok === false && rr.added === 0 && rr.school === 'Destruction' && !rr.heldFor && /could not be saved/.test(rr.text) && level(NOSAVE, 'Destruction') === 30 && out.audits.length === nAud && out.packets.length === nPk, [rr, out.audits.slice(nAud)]);
+  online = online.filter((x) => x !== NOSAVE);
+}
 
 // ---- a staff gift of school levels through the real gifts.js ----
 {
