@@ -37,11 +37,12 @@ check('...as it already did __dboSpellsKnown and __dboSpellsTab', globalThis.__d
 
 // ---- schools.js ----
 const SCHOOLS = block('// ---- the schools of magic, Study Magic and the Class Lectern', 'schools.js');
-for (const k of ['__dboMagicOpen', '__dboMagicView', '__dboMagicTab']) globalThis[k] = stale();
+for (const k of ['__dboMagicOpen', '__dboMagicView', '__dboMagicTab', '__dboSchoolsGrant']) globalThis[k] = stale();
 const schoolsLog = loads(SCHOOLS);
 check('schools.js failing to load is logged', schoolsLog.some((l) => /schools\.js failed to load/.test(l)), schoolsLog);
 check('...and leaves no __dboMagicOpen answering for the Magic tab', globalThis.__dboMagicOpen === null, typeof globalThis.__dboMagicOpen);
 check('...as it already did __dboMagicView and __dboMagicTab', globalThis.__dboMagicView === null && globalThis.__dboMagicTab === null);
+check('...nor __dboSchoolsGrant, so a staff gift of school levels waits instead of reaching a dead load (mod-0311)', globalThis.__dboSchoolsGrant === null, typeof globalThis.__dboSchoolsGrant);
 
 console.log(`${checks - failures}/${checks} checks passed`);
 process.exit(failures ? 1 : 0);
