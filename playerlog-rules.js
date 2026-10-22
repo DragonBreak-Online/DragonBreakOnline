@@ -476,6 +476,25 @@ AUDIT_VERBS.CONTRACT.cut = (text, raw) => {
   const said = at > h[0].length ? text.slice(at + 2 + hold.length) : '';
   return !endLost(raw) && CONTRACT_SAID[term].test(said) ? `${head}: ${hold}${said}` : head;
 };
+// STAFF ENCHANT <staff> enchanted <their own|<owner>'s> <piece>[ (named "<new>")]: <ench> [<hex> <edid>] <effects>
+// (staffenchant.js apply): <piece> is the inventory entry's custom name first (nameOfEntry), a name a player or an earlier
+// /enchant wrote, and it is not quoted (review F3, 22 Oct). It goes, as everywhere (the design keeps only that a piece is
+// named; BODY is excluded for this): "piece" stands for it, and "(named "…")" still says a new name was given. The
+// enchantment's name, form id, editor id and effects stay: the end of the line after its last ": " (record names and
+// numbers, never a colon or a bracket), and only when the end of the line is not lost, so a name with a colon, a bracket, a
+// fake end or a quote in it never passes. With no such end only who enchanted whose piece is kept; a line the cut cannot
+// read keeps nothing. Other STAFF lines are not cut
+const ENCHANT_HEAD = new RegExp(`^(STAFF ENCHANT ${WHO_RX} enchanted (?:their own|${WHO_RX}'s)) `);
+const ENCHANT_END = /: ([A-Za-z0-9 ]{1,80} \[[0-9a-f]{1,8} [A-Za-z0-9_]{1,100}\](?: [A-Za-z0-9 .,-]{0,300})?)$/;
+AUDIT_VERBS.STAFF.cut = (text, raw) => {
+  if (!text.startsWith('STAFF ENCHANT ')) return text;
+  const h = text.match(ENCHANT_HEAD);
+  if (!h) return 'STAFF ENCHANT';
+  const rest = text.slice(h[0].length);
+  const e = endLost(raw) ? null : rest.match(ENCHANT_END);
+  if (!e) return `${h[1]} piece`;
+  return `${h[1]} piece${/ \(named "…"\)$/.test(rest.slice(0, e.index)) ? ' (named "…")' : ''}: ${e[1]}`;
+};
 // Duels: display() names in the reasons ("Rowan #PGDB yielded"); the one beaten, killed or challenged is the target
 clean_('DUEL', { display: true, roles: R_BY([[/ (?:against|beat|killed|challenge to) $/, 'target']]) });
 // Record, config and dungeon names, hex refs and numbers only

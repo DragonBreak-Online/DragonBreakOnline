@@ -203,6 +203,32 @@ got = contractText(`CONTRACT ${ROWAN} set Bruma standing off: ${OFF}`);
 ok(got === `set Bruma standing: ${OFF}`, '...a line with nothing typed after the value', got);
 out = run(`CONTRACT A B C D E F G #PGDB (profile 1, <@337337773973569537>) set Bruma price 1 50 ${CANARY}: ${PAYS(50, 1, 12)}`);
 ok(!JSON.stringify(out).includes(CANARY), '...a set line the cut cannot read (a name of seven words) keeps nothing', out);
+// STAFF ENCHANT <staff> enchanted <their own|<owner>'s> <piece>[ (named "<new>")]: <ench> [<hex> <edid>] <effects>
+// (staffenchant.js apply): <piece> is the entry's custom name first (nameOfEntry), written by a player or by an earlier
+// /enchant, and not quoted, so it goes (review F3, 22 Oct); the enchantment's names and numbers at the end stay
+const SELENE = 'Selene #K2QX (profile 2, <@22>)';
+const FIRE = 'Fire Damage 02 [4605a EnchWeaponFireDamage02] Fire Damage 10';
+const enchantOf = (line, n) => { const o = run(line); return o.length === 1 && o[0].ev === 'act.STAFF' && o[0].c === 'PGDB' && (o[0].o || []).length === n && !JSON.stringify(o).includes(CANARY) ? o[0].f.text : JSON.stringify(o); };
+got = enchantOf(`STAFF ENCHANT ${ROWAN} enchanted ${SELENE}'s ${CANARY} My Named Blade: ${FIRE}`, 1);
+ok(got === `ENCHANT Rowan #PGDB enchanted Selene #K2QX's piece: ${FIRE}`, 'STAFF ENCHANT: the piece\'s custom name (a player\'s or an earlier /enchant\'s, unquoted) is cut, who, whose and the enchantment stay', got);
+got = enchantOf(`STAFF ENCHANT ${ROWAN} enchanted ${SELENE}'s ${CANARY} Blade (named "${CANARY} New"): ${FIRE}`, 1);
+ok(got === `ENCHANT Rowan #PGDB enchanted Selene #K2QX's piece (named "…"): ${FIRE}`, '...with a new name given: that a name was given stays, neither name', got);
+got = enchantOf(`STAFF ENCHANT ${ROWAN} enchanted their own ${CANARY} Mine: Fire Damage 02 [4605a EnchWeaponFireDamage02] Fire Damage 10.000000000000002 for 5s, Frost 2`, 0);
+ok(got === "ENCHANT Rowan #PGDB enchanted their own piece: Fire Damage 02 [4605a EnchWeaponFireDamage02] Fire Damage 10.000000000000002 for 5s, Frost 2", '...their own piece, the effects with a duration and a second effect', got);
+got = enchantOf(`STAFF ENCHANT ${ROWAN} enchanted ${SELENE}'s My ${CANARY}"q Blade (named "${CANARY} New"): ${FIRE}`, 1);
+ok(got === "ENCHANT Rowan #PGDB enchanted Selene #K2QX's piece", '...a name with one quote (it pairs with the new name\'s and loses the end of the line): who and whose only', got);
+got = enchantOf(`STAFF ENCHANT ${ROWAN} enchanted ${SELENE}'s x: ${CANARY} Words [1 Fake] More ${CANARY}": ${FIRE}`, 1);
+ok(got === "ENCHANT Rowan #PGDB enchanted Selene #K2QX's piece", '...a name with a fake end and a quote: never kept as the enchantment', got);
+got = enchantOf(`STAFF ENCHANT ${ROWAN} enchanted ${SELENE}'s ${CANARY}: ${FIRE}: ${FIRE}`, 1);
+ok(got === `ENCHANT Rowan #PGDB enchanted Selene #K2QX's piece: ${FIRE}`, '...a name with a colon and a fake end, no quote: the real end is the last', got);
+got = enchantOf(`STAFF ENCHANT ${ROWAN} enchanted ${SELENE}'s Dar #U6T6 (profile 4, <@44>) ${CANARY}: ${FIRE}`, 1);
+ok(got === `ENCHANT Rowan #PGDB enchanted Selene #K2QX's piece: ${FIRE}`, '...a name shaped like a character is never a party', got);
+got = enchantOf(`STAFF ENCHANT ${ROWAN} enchanted ${SELENE}'s ${CANARY} ${'x'.repeat(560)}: ${FIRE}`, 1);
+ok(got === "ENCHANT Rowan #PGDB enchanted Selene #K2QX's piece", '...a line past the 600 cap: who and whose only', got);
+out = run(`STAFF ENCHANT A B C D E F G #PGDB (profile 1, <@337337773973569537>) enchanted ${SELENE}'s ${CANARY}: ${FIRE}`);
+ok(!JSON.stringify(out).includes(CANARY), '...a line the cut cannot read (a name of seven words) keeps nothing', out);
+out = run(`STAFF ${ROWAN}: Discord roles now give gm (was helper); logged out so it takes effect`);
+ok(out.length === 1 && out[0].f.text === 'Rowan #PGDB: Discord roles now give gm (was helper); logged out so it takes effect', '...other STAFF lines are not cut', out);
 // every sentence setTerms can write (read from contracts.js, numbers filled in) passes the cut whole: a reworded sentence
 // fails here instead of quietly leaving the player log with "set <hold> <term>" only
 {
