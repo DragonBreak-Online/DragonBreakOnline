@@ -1,6 +1,6 @@
 import { Actor, Game, on, printConsole } from "skyrimPlatform";
 import { NiNodeQueuePlan } from "./niNodeQueuePlan";
-import { isBeastRaceId } from "../sync/beastRaceIds";
+import { isBeastOrPolymorphRaceId } from "../sync/beastRaceIds";
 import * as faceSync from "./faceSyncDiag";
 import { trace } from "../lib/clientDiag";
 
@@ -13,13 +13,13 @@ const actorOf = (formId: number): Actor | null => {
   try { return Actor.from(Game.getFormEx(formId)); } catch { return null; }
 };
 
-// Loaded this frame; a copy gone, or now a beast (its graph crashed on a queued 3D reset), is dropped
+// Loaded this frame; a copy gone, or now a beast or polymorph creature (a beast graph crashed on a queued 3D reset), is dropped
 const loadedNow = (formId: number): boolean | null => {
   const actor = actorOf(formId);
   if (!actor) return null;
   try {
     const race = actor.getRace();
-    if (race && isBeastRaceId(race.getFormID())) return null;
+    if (race && isBeastOrPolymorphRaceId(race.getFormID())) return null;
     return actor.is3DLoaded();
   } catch {
     return null;
@@ -57,11 +57,11 @@ const flush = (): void => {
   faceSync.sent(id, Date.now());
 };
 
-// The copies' beast rule for the player's own 3D reset; queued work still runs, it refuses a beast itself
+// The copies' beast rule for the player's own 3D reset, polymorph creatures included; queued work still runs, it refuses a beast itself
 const isBeastPlayer = (player: Actor): boolean => {
   try {
     const race = player.getRace();
-    return !!race && isBeastRaceId(race.getFormID());
+    return !!race && isBeastOrPolymorphRaceId(race.getFormID());
   } catch {
     return false;
   }

@@ -1,6 +1,6 @@
 import { Actor, ActorBase, createText, destroyText, EffectShader, Faction, Form, FormType, Game, Keyword, NetImmerse, ObjectReference, once, printConsole, setTextColor, setTextPos, setTextSize, setTextString, Spell, storage, TESModPlatform, Utility, worldPointToScreenPoint } from "skyrimPlatform";
 import { isSpeaking } from "../services/services/voiceSpeaking";
-import { isBeastRaceId } from "../sync/beastRaceIds";
+import { isBeastOrPolymorphRaceId } from "../sync/beastRaceIds";
 import { revealLabelFor, revealMarkerOf, revealTagText } from "./realNamesMarker";
 import { beastBodyAppearance, beastBodyOf } from "../sync/beastBody";
 import { TAKEOVER_RECHECK_SECONDS, isHostileTakeover, takeoverLine } from "./takeoverDiag";
@@ -47,8 +47,8 @@ export interface ScreenResolution {
 
 // A copy nobody drives this far from where the server holds it is re-seated, not left standing there
 const STRANDED_UNITS = 512;
-// Werewolf and Vampire Lord (sync/beastRaceIds.ts). A watcher crashed updating a remote werewolf's behaviour graph one
-// second after the race swap respawned it; the new copy's first moments are left alone
+// Werewolf, Vampire Lord and polymorph creatures (sync/beastRaceIds.ts). A watcher crashed updating a remote werewolf's
+// behaviour graph one second after the race swap respawned it; the new copy's first moments are left alone
 const BEAST_SPAWN_SETTLE_MS = 1500;
 // A hosted copy this far from the server position has its updates refused, so it is snapped back
 const RESYNC_UNITS = 3000;
@@ -1269,8 +1269,9 @@ export class FormView {
     }
   }
 
+  // A player's copy in a beast or polymorph body; a world NPC copy has no appearance, so its race never counts here
   private isBeastCopy(model: FormModel): boolean {
-    return !!model.appearance && isBeastRaceId(model.appearance.raceId);
+    return !!model.appearance && isBeastOrPolymorphRaceId(model.appearance.raceId);
   }
 
   // Logging only; never changes what the view does. Says what became of the local copy at the moment it changed hands.
