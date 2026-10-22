@@ -76,8 +76,8 @@ check('a change of listing counts as an appearance change (it respawns the copy 
   /model\.numAppearanceChanges !== this\.appearanceState\.lastNumChanges \|\|\s*beastRace !== this\.appearanceState\.beastRace/.test(fv) &&
   /this\.appearanceState\.beastRace = beastRace;/.test(fv));
 check('one beast look per server appearance, not one a frame', /cache\.from !== model\.appearance \|\| cache\.race !== race/.test(fv));
-check('the beast copy still settles for 1.5 s and hides its name tag (isBeastCopy reads the model\'s race)',
-  /private isBeastCopy\(model: FormModel\): boolean \{\s*return !!model\.appearance && isBeastRaceId\(model\.appearance\.raceId\);/.test(fv));
+check('the beast copy still settles for 1.5 s and hides its name tag (isBeastCopy reads the model\'s race; polymorph-body-harness.js has the animals)',
+  /private isBeastCopy\(model: FormModel\): boolean \{\s*return !!model\.appearance && isBeastOrPolymorphRaceId\(model\.appearance\.raceId\);/.test(fv));
 
 check('a beast copy\'s relayed animations (a Lord\'s LevitateStart/LandStart) wait for the settle and are not marked applied meanwhile',
   /if \(refr\.is3DLoaded\(\) && !this\.isSettlingCopy\(model\) && !holdsRelayedRagdoll\(/.test(fv) && /private isSettlingBeast\(model: FormModel\): boolean \{\s*return this\.isBeastCopy\(model\)/.test(fv));
