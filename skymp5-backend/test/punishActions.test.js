@@ -23,6 +23,7 @@ beforeEach(() => {
   H.bot.banStateAnswer = null
   fs.rmSync(H.switchFile, { force: true })
   for (const k of ['bob', 'gina', 'dev', 'rep']) H.roles.set(PEOPLE[k].discordId, k === 'gina' ? [GUILD, ROLE.gm] : k === 'dev' ? [GUILD, ROLE.dev] : [GUILD])
+  H.lastIp.clear()
   try { H.bans.removeEntry(PEOPLE.bob.discordId) } catch { /* a test broke the list and restores it */ }
   H.make()
 })
@@ -568,4 +569,55 @@ test('unban: once the entry is gone the job is done, even when the ban role cann
   assert.deepEqual([r.job.state, r.job.banRoleHeld], ['done', null])
   assert.equal(entryOf(bobId), undefined)
   assert.equal(journalOf('unban', bobId).length, rows + 1)
+})
+
+// Jake, 22 Oct: "Yes, like in-game /ban". Documentation addresses only (RFC 5737)
+const ROOMY = { extra: { limits: { triesPer10Min: 999, perMinute: 999, perHour: 999, sitePerHour: { bans: 999, discordBans: 999, timeouts: 999 } } } }
+test('ban: the account\'s last address goes on the ban list as the in-game /ban keeps it (publicIp), and is shown nowhere', async () => {
+  H.make(ROOMY)
+  H.lastIp.set(10, '203.0.113.50')
+  const body = H.body('ban')
+  const r = want(await H.call('ban', 'owner', body), 200)
+  assert.equal(r.job.state, 'done')
+  const e = entryOf(bobId)
+  assert.deepEqual([e.ip, e.hwid, e.ref, e.bannedBy], ['203.0.113.50', null, r.job.ref, 'jake (dashboard)'])
+  assert.equal(H.bans.isBanned({ discordId: '800000000000000999', ip: '203.0.113.50' }).ref, r.job.ref, 'another account on that address is refused at login, as after an in-game /ban')
+  // Nowhere else: the answer, the job replay and GET, the audit and staff lines, the backend log, the audit file, the jobs file, the journal, ban.log, the panel
+  const replay = want(await H.call('ban', 'owner', body), 200)
+  const read = f => { try { return fs.readFileSync(f, 'utf8') } catch { return '' } }
+  const panel = await H.rows(10)
+  const files = [path.join(H.PF.root, 'punish-actions.jsonl'), H.PF.journalFile, path.join(H.PF.root, 'logs', 'ban.log'), ...fs.readdirSync(H.PF.root).filter(d => d.startsWith('jobs-')).map(d => path.join(H.PF.root, d, 'punish-actions.json'))]
+  const seen = [JSON.stringify([r, replay, H.actions.job(H.F.session(PEOPLE.owner.discordId), body.requestId), H.audits, H.staff, H.logs, panel]), ...files.map(read)]
+  assert.ok(files.some(f => read(f).includes(body.requestId.slice(0, 8))), 'the files were written')
+  assert.ok(seen.every(t => !t.includes('203.0.113')), 'the address is in bans.json only')
+  H.clean(panel)
+  // unban takes the entry, address and all
+  want(await H.call('unban', 'owner', H.body('unban')), 200)
+  assert.equal(entryOf(bobId), undefined)
+  assert.equal(H.bans.isBanned({ discordId: '800000000000000999', ip: '203.0.113.50' }), null)
+})
+
+test('ban: an internal, shared or unknown address is never kept; a player store that cannot be read still bans, by Discord id only', async () => {
+  H.make(ROOMY)
+  for (const ip of ['10.0.0.7', '172.20.1.1', '100.64.3.4', '127.0.0.1', 'fe80::1', '', 'nonsense']) {
+    H.lastIp.set(10, ip)
+    want(await H.call('ban', 'owner', H.body('ban')), 200)
+    assert.equal(entryOf(bobId).ip, null, ip)
+    H.bans.removeEntry(bobId)
+  }
+  H.lastIp.set(10, '::ffff:203.0.113.51')
+  want(await H.call('ban', 'owner', H.body('ban')), 200)
+  assert.equal(entryOf(bobId).ip, '203.0.113.51', 'an IPv4-mapped address in its plain form, as bans.js matches it')
+  H.bans.removeEntry(bobId)
+  H.make({ ...ROOMY, extra: { ...ROOMY.extra, lastIpOf: () => { throw Object.assign(new Error('players.json unreadable'), { code: 'ESTOREUNREADABLE' }) } } })
+  const r = want(await H.call('ban', 'owner', H.body('ban')), 200)
+  assert.equal(r.job.state, 'done')
+  assert.equal(entryOf(bobId).ip, null)
+  assert.ok(H.logs.some(l => /player store unreadable, the ban holds no address/.test(l)), H.logs.join('\n'))
+  // A dry run writes no ban and asks for no address
+  H.bans.removeEntry(bobId)
+  let asked = 0
+  H.make({ config: { punishActions: 'dry-run' }, extra: { ...ROOMY.extra, lastIpOf: () => { asked++; return '203.0.113.52' } } })
+  assert.equal(want(await H.call('ban', 'owner', H.body('ban')), 200).job.state, 'dry-run')
+  assert.deepEqual([entryOf(bobId), asked], [undefined, 0])
 })

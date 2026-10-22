@@ -178,13 +178,17 @@ function isBanned({ discordId, ip } = {}) {
 }
 
 // Adds a ban entry; an existing entry for the same discordId is replaced and keeps its ref. keepOther (the bot's Discord
-// snapshot): an existing ban that is not a Discord copy is kept as it is, read fail closed, and returned with kept: true
+// snapshot): an existing ban that is not a Discord copy is kept, read fail closed, gains the address if it has none, kept: true
 function add(input, { keepOther = false } = {}) {
   const discordId = String((input && input.discordId) || '').trim()
   if (!discordId) throw new Error('discordId is required')
   const all = keepOther ? loadStrict() : load()
   const old = all.find(e => String(e.discordId) === discordId)
-  if (keepOther && old && !isDiscordCopy(old)) return { ...old, kept: true }
+  if (keepOther && old && !isDiscordCopy(old)) {
+    const ip = old.ip ? '' : publicIp(input.ip)
+    if (ip) { old.ip = ip; save(all) }
+    return { ...old, kept: true }
+  }
   const data = all.filter(e => String(e.discordId) !== discordId)
   const entry = {
     discordId,
@@ -218,7 +222,7 @@ function findEntry(discordId) {
   return (id && loadStrict().find(e => String(e.discordId) === id)) || null
 }
 
-// A new ban only: { entry }, or { existing } and nothing written. Never an address: the Discord id is what refuses them
+// A new ban only: { entry }, or { existing } and nothing written. The address as the in-game /ban keeps it (publicIp)
 function addNew(input) {
   const discordId = String((input && input.discordId) || '').trim()
   if (!discordId) throw new Error('discordId is required')
@@ -226,7 +230,7 @@ function addNew(input) {
   const existing = all.find(e => String(e.discordId) === discordId)
   if (existing) return { existing }
   const entry = {
-    discordId, ref: newRef(new Set(all.map(e => e && e.ref))), hwid: null, ip: null, reason: String(input.reason || ''),
+    discordId, ref: newRef(new Set(all.map(e => e && e.ref))), hwid: null, ip: publicIp(input.ip) || null, reason: String(input.reason || ''),
     bannedAt: input.bannedAt || new Date().toISOString(), bannedBy: input.bannedBy || null,
   }
   save([...all, entry])

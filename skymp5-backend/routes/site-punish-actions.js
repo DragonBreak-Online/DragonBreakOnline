@@ -23,6 +23,12 @@ const BASE = '/api/site/staff/punishments/actions'
 // For server.js: the global JSON parser stays off these, so a body is read only after this route's checks
 const OWN_PARSER_PATHS = Object.keys(ACTIONS).map(a => `${BASE}/${a}`)
 
+// The player record's lastIp, as the in-game /ban (routes/master-api.js) and the bot's Discord ban snapshot read it
+function lastIpOf(profileId, discordId) {
+  const p = require('../sources/players').load()[discordId]
+  return p && Number(p.profileId) === profileId ? p.lastIp || null : null
+}
+
 let service = null
 function actions() {
   if (service) return service
@@ -40,6 +46,7 @@ function actions() {
     tierFromRoles: tier.tierFromRoles,
     rankOfRoles: tier.rankOfRoles,
     bannedRoleId: () => require('../sources/serverAccess').load().bannedRoleId,
+    lastIpOf,
     jobsFile: path.join(__dirname, '..', 'data', 'punish-actions.json'),
     auditFile: path.join(__dirname, '..', 'data', 'punish-actions.jsonl'),
   })
@@ -126,4 +133,4 @@ router.recover = () => { try { actions().recover() } catch (err) { console.error
 
 module.exports = router
 module.exports.OWN_PARSER_PATHS = OWN_PARSER_PATHS
-module.exports.internals = { actions, setService: s => { service = s } }
+module.exports.internals = { actions, lastIpOf, setService: s => { service = s } }

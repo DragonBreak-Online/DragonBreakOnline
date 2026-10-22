@@ -29,7 +29,8 @@ const SWITCH = path.join(DIR, 'punish-actions')
 const config = { discordGuildId: GUILD, discordBotToken: '', discordLogChannelId: '', punishJournalFile: JOURNAL, punishActions: 'on', punishActionsSwitchFile: SWITCH }
 stub(path.join(ROOT, 'config.js'), config)
 stub(path.join(ROOT, 'sources/bans.js'), bans)
-stub(path.join(ROOT, 'sources/players.js'), { load: () => ({ [ZED]: { lastIp: '81.2.69.160' } }) })
+let zedIp = '81.2.69.160'
+stub(path.join(ROOT, 'sources/players.js'), { load: () => ({ [ZED]: { lastIp: zedIp } }) })
 stub(path.join(ROOT, 'sources/profiles.js'), { load: () => ({ nextId: 300, map: { [ZED]: 209 } }) })
 stub(path.join(ROOT, 'sources/discord/tickets.js'), { ensurePanel: async () => {}, handleInteraction: async () => false })
 stub(path.join(ROOT, 'sources/discord/serverStatus.js'), { start: () => {} })
@@ -49,10 +50,11 @@ const list = () => JSON.parse(fs.readFileSync(BANS, 'utf8'))
 const rows = () => (fs.existsSync(JOURNAL) ? fs.readFileSync(JOURNAL, 'utf8').trim().split('\n').filter(Boolean).map(l => JSON.parse(l)) : [])
 const gameBan = { discordId: ZED, ref: 'B-GAME01', hwid: null, ip: null, reason: 'Duping gold at the bank', bannedAt: '2026-10-21T10:00:00.000Z', bannedBy: 'jake (dashboard)' }
 
-beforeEach(() => { fs.rmSync(BANS, { force: true }); fs.rmSync(JOURNAL, { force: true }); fs.rmSync(SWITCH, { force: true }); lines.length = 0; config.punishActions = 'on' })
+const PLAYERS = path.join(DIR, 'data', 'players.json')
+beforeEach(() => { fs.rmSync(BANS, { force: true }); fs.rmSync(JOURNAL, { force: true }); fs.rmSync(SWITCH, { force: true }); fs.rmSync(PLAYERS, { force: true }); lines.length = 0; config.punishActions = 'on'; zedIp = '81.2.69.160' })
 after(() => fs.rmSync(DIR, { recursive: true, force: true }))
 
-test('a Discord ban adds its copy to the game ban list; a game ban already there is kept, reason, ref and all', async () => {
+test('a Discord ban adds its copy to the game ban list; a game ban already there is kept, reason, ref and all, and gains the address', async () => {
   handlers.guildBanAdd(ban())
   await settle()
   const copy = list()[0]
@@ -61,8 +63,40 @@ test('a Discord ban adds its copy to the game ban list; a game ban already there
   fs.writeFileSync(BANS, JSON.stringify([gameBan]))
   handlers.guildBanAdd(ban())
   await settle()
-  assert.deepEqual(list(), [gameBan])
+  assert.deepEqual(list(), [{ ...gameBan, ip: '81.2.69.160' }], 'the kept game ban had no address, so it takes the snapshot\'s (Jake, 22 Oct)')
   assert.match(lines.at(-1), /already on the game ban list as B-GAME01; kept/)
+  assert.doesNotMatch(lines.join('\n'), /81\.2\.69/, 'the audit lines never show it')
+})
+
+test('a kept game ban keeps its own address; an internal, shared or missing one is never added; the list is rewritten only for a new address', async () => {
+  const own = { ...gameBan, ip: '203.0.113.20' }
+  fs.writeFileSync(BANS, JSON.stringify([own]))
+  zedIp = '203.0.113.21'
+  handlers.guildBanAdd(ban())
+  await settle()
+  assert.deepEqual(list(), [own], 'its own address stays')
+  for (const ip of ['10.1.2.3', '192.168.1.9', '::1', '', null, 'not an address']) {
+    zedIp = ip
+    fs.writeFileSync(BANS, JSON.stringify([gameBan]))
+    const before = fs.statSync(BANS).mtimeMs
+    handlers.guildBanAdd(ban())
+    await settle()
+    assert.deepEqual(list(), [gameBan], String(ip))
+    assert.equal(fs.statSync(BANS).mtimeMs, before, `${ip}: nothing written`)
+  }
+  // An address on three player records is a shared connection (bans.js SHARED_MIN), never one player's
+  fs.writeFileSync(PLAYERS, JSON.stringify({ a: { lastIp: '198.51.100.4' }, b: { lastIp: '198.51.100.4' }, c: { lastIp: '198.51.100.4' } }))
+  zedIp = '198.51.100.4'
+  fs.writeFileSync(BANS, JSON.stringify([gameBan]))
+  handlers.guildBanAdd(ban())
+  await settle()
+  assert.deepEqual(list(), [gameBan], 'a shared address')
+  // A Discord copy that is no game ban is replaced as before, address and all
+  zedIp = '203.0.113.22'
+  fs.writeFileSync(BANS, JSON.stringify([{ discordId: ZED, ref: 'B-C0PY02', hwid: null, ip: null, reason: 'discord ban', bannedAt: '2026-10-21T10:00:00.000Z', bannedBy: 'discord' }]))
+  handlers.guildBanAdd(ban())
+  await settle()
+  assert.deepEqual([list()[0].ref, list()[0].ip], ['B-C0PY02', '203.0.113.22'])
 })
 
 test('a Discord unban lifts only the Discord copy; a game ban stays, and the audit line says where to lift it', async () => {
@@ -102,7 +136,17 @@ test('a ban or unban the dashboard claimed gets no second journal row from the b
   assert.equal(rows().length, 1)
 })
 
-test('the panel\'s writes fail closed: a new ban only, never an address, and a list that cannot be read is an error', () => {
+test('the panel\'s writes fail closed: a new ban only, an address only as publicIp keeps it, and a list that cannot be read is an error', () => {
+  for (const [given, kept] of [['203.0.113.7', '203.0.113.7'], ['::ffff:203.0.113.8', '203.0.113.8'], ['10.0.0.5', null], ['100.64.0.9', null], ['', null], [undefined, null]]) {
+    const r = bans.addNew({ discordId: AMY, ip: given, reason: 'Griefing at the bank', bannedBy: 'jake (dashboard)' })
+    assert.equal(r.entry.ip, kept, String(given))
+    assert.equal(r.entry.hwid, null)
+    if (kept) assert.equal(bans.isBanned({ discordId: '209000000000000299', ip: given }).ref, r.entry.ref, `another account on ${given} is refused, as after an in-game /ban`)
+    bans.removeEntry(AMY)
+  }
+  fs.writeFileSync(PLAYERS, JSON.stringify({ a: { lastIp: '198.51.100.4' }, b: { lastIp: '198.51.100.4' }, c: { lastIp: '198.51.100.4' } }))
+  assert.equal(bans.addNew({ discordId: AMY, ip: '198.51.100.4', reason: 'x' }).entry.ip, null, 'a shared address')
+  bans.removeEntry(AMY)
   const made = bans.addNew({ discordId: ZED, reason: 'Griefing at the bank', bannedBy: 'jake (dashboard)' })
   assert.match(made.entry.ref, /^B-[0-9A-HJKMNP-TV-Z]{6}$/)
   assert.deepEqual([made.entry.ip, made.entry.hwid], [null, null])
@@ -170,9 +214,9 @@ test('the guard is on only for bans=on: PUNISH_ACTIONS on, or on with discord or
     fs.writeFileSync(BANS, JSON.stringify([gameBan]))
     handlers.guildBanAdd(ban())
     await settle()
-    assert.deepEqual(list(), [gameBan], `${env} / ${file}`)
+    assert.deepEqual(list(), [{ ...gameBan, ip: '81.2.69.160' }], `${env} / ${file}`)
     handlers.guildBanRemove(ban())
     await settle()
-    assert.deepEqual(list(), [gameBan], `${env} / ${file}`)
+    assert.deepEqual(list(), [{ ...gameBan, ip: '81.2.69.160' }], `${env} / ${file}`)
   }
 })

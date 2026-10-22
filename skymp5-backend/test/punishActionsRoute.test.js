@@ -144,3 +144,18 @@ test('a failure inside answers 503 in JSON, never a stack trace', async () => {
   await want(post(session('owner')), 503, 'unavailable', 'POST')
   await want(request('GET', `${P}/actions`, { 'x-test-session': session('owner') }), 503, 'unavailable', 'GET')
 })
+
+// Jake, 22 Oct: "Yes, like in-game /ban". The route reads the account's last address from the player record, for that account only
+test('the address a dashboard ban keeps: the player record\'s lastIp of that Discord account and profile, else none', () => {
+  const players = H.PF.players
+  const bob = PEOPLE.bob
+  const was = players[bob.discordId].lastIp
+  try {
+    players[bob.discordId].lastIp = '203.0.113.60'
+    assert.equal(route.internals.lastIpOf(bob.profileId, bob.discordId), '203.0.113.60')
+    assert.equal(route.internals.lastIpOf(bob.profileId + 1, bob.discordId), null, 'another profile on that record')
+    assert.equal(route.internals.lastIpOf(bob.profileId, '800000000000000998'), null, 'no record')
+    players[bob.discordId].lastIp = ''
+    assert.equal(route.internals.lastIpOf(bob.profileId, bob.discordId), null)
+  } finally { players[bob.discordId].lastIp = was }
+})

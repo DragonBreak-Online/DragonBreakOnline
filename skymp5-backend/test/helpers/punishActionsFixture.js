@@ -112,6 +112,8 @@ function createActionsFixture() {
     unbanUser: (d, reason) => write('unbanUser', d, reason),
     banState: async d => H.bot.banStateAnswer || (H.bot.banned.has(d) ? 'banned' : 'notBanned'),
   }
+  // The account's last address as the route reads it (players.json lastIp); none unless a test sets one
+  H.lastIp = new Map()
 
   const { createPunishments } = require('../../sources/punish')
   const tier = require('../../sources/punish/tier')
@@ -138,7 +140,7 @@ function createActionsFixture() {
       consoleApi: () => F.api, bot: H.fakeBot, bans: H.bans, journal: require('../../sources/discord/moderationJournal'),
       audit: { log: l => H.audits.push(l), staff: l => H.staff.push(l) },
       targetOf: p => H.panel.targetOf(p), profileIdOf: d => PF.profiles.map[d] ?? null,
-      tierFromRoles: tier.tierFromRoles, rankOfRoles: tier.rankOfRoles, bannedRoleId: () => BAN_ROLE,
+      tierFromRoles: tier.tierFromRoles, rankOfRoles: tier.rankOfRoles, bannedRoleId: () => BAN_ROLE, lastIpOf: p => H.lastIp.get(p) ?? null,
       jobsFile: opts.jobsFile || path.join(PF.root, `jobs-${n}`, 'punish-actions.json'), auditFile: path.join(PF.root, 'punish-actions.jsonl'),
       now: F.now, log: (...a) => H.logs.push(a.join(' ')), discordDeadlineMs: 150, memberDeadlineMs: 150, ...(opts.extra || {}),
     })

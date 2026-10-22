@@ -127,7 +127,7 @@ function actionsSettings(config, fs = nodeFs) {
 }
 
 function createPunishActions({
-  config, consoleApi, bot, bans, journal, audit, targetOf, profileIdOf, tierFromRoles, rankOfRoles, bannedRoleId = () => '',
+  config, consoleApi, bot, bans, journal, audit, targetOf, profileIdOf, tierFromRoles, rankOfRoles, bannedRoleId = () => '', lastIpOf = () => null,
   jobsFile, auditFile, fs = nodeFs, now = Date.now, log = (...a) => console.log('[punish-actions]', ...a),
   discordDeadlineMs = DISCORD_DEADLINE_MS, memberDeadlineMs = MEMBER_DEADLINE_MS, limits = LIMITS,
 }) {
@@ -419,13 +419,17 @@ function createPunishActions({
     } catch (err) { log('journal not written:', err.message); return null }
   }
   const logBan = line => { try { bans.logBan(line) } catch { /* logBan never throws; a stub may */ } }
+  // The account's last address, as the in-game /ban takes it; bans.addNew keeps it only through publicIp, and nothing shows it
+  const addressOf = j => {
+    try { return lastIpOf(j.target.profileId, j.targetDiscordId) || null } catch (err) { log('player store unreadable, the ban holds no address:', err.message); return null }
+  }
 
   // Runs the action; resolves to [status, code, detail] when it failed, else undefined
   async function act(j, member) {
     if (j.action === 'ban' || j.action === 'unban') {
       try {
         if (j.action === 'ban') {
-          const r = bans.addNew({ discordId: j.targetDiscordId, reason: j.reason, bannedBy: `${j.handle} (dashboard)` })
+          const r = bans.addNew({ discordId: j.targetDiscordId, ip: addressOf(j), reason: j.reason, bannedBy: `${j.handle} (dashboard)` })
           if (r.existing) { j.ref = r.existing.ref || null; return failed(j, 409, 'alreadyBanned') }
           j.ref = r.entry.ref
         } else {
