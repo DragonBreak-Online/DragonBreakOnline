@@ -446,6 +446,13 @@ AUDIT_VERBS.BEAST.roles = R_BY([[/ (?:to|from) $/, 'target']]);
 AUDIT_VERBS.FEED.roles = R_BY([[/ asked $/, 'target'], [/ let $/, 'target'], [/ refused $/, 'target']]);
 AUDIT_VERBS.ROPE.roles = R_BY([[/ cut $/, 'target'], [/ of $/, 'captor']]);
 AUDIT_VERBS.STRUGGLE.roles = R_BY([[/ of $/, 'captor']]);
+// SCHOOLS <giver> granted <target> N <school> level(s): a to b (<role>); <reason> (schools.js grant): the giver is a gift's "by"
+// and the reason its reason, both staff-written (GIFT is excluded for them), so both go; the target and the levels stay
+const WHO_RX = '(?:[^\\s#]+ ){0,5}[^\\s#]+ #[A-Z0-9?]{4} \\(profile -?\\d{1,9}(?:, <@\\d{1,22}>)?\\)';
+const SCHOOLS_GRANT = new RegExp(`^SCHOOLS [\\s\\S]{1,200}? granted (${WHO_RX} \\d+ [^:]{1,60} levels?: \\d+ to \\d+ \\([^()]*\\));[\\s\\S]*$`);
+AUDIT_VERBS.SCHOOLS.cut = (text) => text.replace(SCHOOLS_GRANT, 'SCHOOLS staff granted $1');
+// SPELL TRIM ... shouts: <state>; by <by>: <why> (spells.js staff trim): by and why are written by staff in config, so they go
+AUDIT_VERBS.SPELL.cut = (text) => text.replace(/^(SPELL TRIM [\s\S]*?, shouts: (?:untouched|none granted|grant kept \(it cannot be kept in part\)|grant taken off|grant could not be taken off)); by [\s\S]*$/, '$1');
 
 // X: excluded (no event from the audit tap; a direct hook covers the action, without the text)
 excluded('JOIN LEAVE', 'the session hooks');
@@ -701,6 +708,8 @@ parsed('POST', {
   cut: / from .*$/,
   parse: (text, P) => {
     if (!P.length) return [];
+    // a letter burned with a parcel its reader cannot carry (gamemode.js updateLetter) is no parcel collected
+    if (/ burned a letter /.test(text)) return [];
     const sent = / sent /.test(text);
     const items = itemsFromText((text.match(/ (?:sent|collected) (?:.*? )?(?:\d+ gold, )?(\d+x .*?)(?: \(tax |$)/) || [])[1]);
     return [ev('item.mail', 0, { op: sent ? 'parcel_sent' : 'parcel_collected', gold: gold(text, /(\d{1,9}) gold/), items, tax: gold(text, /\(tax (\d{1,9})/) }, sent ? rest(P, 0, 'recipient') : [], { mirror: sent })];
@@ -861,7 +870,8 @@ parsed('DEITY', {
     if (/ was refused a deity reset/.test(text)) return [ev('char.deity', 0, { op: 'reset_refused' })];
     if (/ reset of .* FAILED/.test(text)) return [ev('char.deity', P.length > 1 ? 1 : 0, { op: 'reset_failed' })];
     if (/ reset /.test(text)) return [ev('char.deity', P.length > 1 ? 1 : 0, { op: 'reset' })];
-    const m = text.match(/ (turned to|took) ([A-Za-z' -]{1,48})$/);
+    // " (<faith>)" after the god since the faiths (prayer.js, 19 Oct): a config name, not kept
+    const m = text.match(/ (turned to|took) ([A-Za-z' -]{1,48})(?: \([A-Za-z' -]{1,48}\))?$/);
     return m ? [ev('char.deity', 0, { op: m[1] === 'took' ? 'chose' : 'turned', deity: m[2] })] : [];
   },
 });

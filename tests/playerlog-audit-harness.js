@@ -173,6 +173,11 @@ let out = run('CONTRACT Rowan #PGDB (profile 1, <@337337773973569537>) completed
 ok(out.length === 1 && out[0].ev === 'act.CONTRACT' && out[0].f.text === 'completed 7 wolves for Bruma (84 gold)' && out[0].p === 1 && out[0].c === 'PGDB', 'a clean verb: act.<VERB>, the actor from the game; the verb and the actor\'s own "Name #TAG" leave the text, which the forwarder prints after them (review C-R4)', out);
 out = run('LEVEL Rowan #PGDB reached character level 12');
 ok(out.length === 1 && out[0].p === 1, 'a Name #TAG party with no profile: resolved by name and tag', out);
+// staff-written text in a clean verb's line is cut: a gift's "by" and reason (schools.js grant, gifts.js mod-0311), a trim's by and why
+out = run(`SCHOOLS ${CANARY} Staff granted Rowan #PGDB (profile 1, <@337337773973569537>) 5 Alteration levels: 10 to 15 (primary; held at 15 for the Adept spell, 2 not given); ${CANARY} for the event`);
+ok(out.length === 1 && out[0].ev === 'act.SCHOOLS' && out[0].c === 'PGDB' && /granted Rowan #PGDB 5 Alteration levels: 10 to 15 \(primary; held at 15/.test(out[0].f.text) && !JSON.stringify(out).includes(CANARY), 'SCHOOLS grant: the giver and the reason (a gift\'s staff-written by and reason) are cut, the target and the levels stay', out);
+out = run(`SPELL TRIM t1 Rowan #PGDB (profile 1, <@337337773973569537>) done: 3 spell(s) removed, 0 not learned, 1 kept as spellbook, prepared or on loan, shouts: grant kept (it cannot be kept in part); by ${CANARY}: ${CANARY} had 331 spells`);
+ok(out.length === 1 && out[0].c === 'PGDB' && /3 spell\(s\) removed, .*shouts: grant kept \(it cannot be kept in part\)$/.test(out[0].f.text) && !JSON.stringify(out).includes(CANARY), 'SPELL TRIM: the staff-written by and why are cut, the counts stay', out);
 out = run('LABOUR-MISMATCH Rowan #PGDB (profile 1) chop widget=win/3 replay=1/5 seed=ab');
 ok(out.some((r) => r.ev === 'sec.signal' && r.f.kind === 'mismatch' && r.f.game === 'labour'), 'a *-MISMATCH line is also a security signal', out.map((r) => r.ev));
 // ---- roles --------------------------------------------------------------------------------------------------------------------
@@ -230,6 +235,12 @@ out = run(`NAME Rowan #PGDB (profile 1) reroll name "${CANARY}" refused (Names a
 ok(out.length === 0, 'a refused name (raw typed text) gives nothing', out);
 out = run('NAME profile 1 renamed "Rowan" -> "Rowena"');
 ok(out[0].ev === 'char.rename' && out[0].f.from === 'Rowan' && out[0].f.to === 'Rowena' && out[0].p === 1, 'NAME renamed: char.rename (names are identity)', out[0]);
+out = run('DEITY Rowan #PGDB (profile 1, <@337337773973569537>) took Mara (Eight Divines)');
+ok(out.length === 1 && out[0].ev === 'char.deity' && out[0].f.op === 'chose' && out[0].f.deity === 'Mara', 'DEITY took <god> (<faith>): the choice and the god, with the faith the line names since the faiths (19 Oct)', out);
+out = run('DEITY Rowan #PGDB (profile 1, <@337337773973569537>) turned to Kynareth');
+ok(out.length === 1 && out[0].f.op === 'turned' && out[0].f.deity === 'Kynareth', '...and a line with no faith', out);
+out = run('POST Rowan #PGDB (profile 1, <@337337773973569537>) burned a letter with a parcel they cannot carry: [["12eb7",1]]');
+ok(!out.some((r) => r.ev === 'item.mail'), 'POST burned a letter with its parcel: never read as a parcel collected', out);
 out = run(`BOARD [profile 1] posted in bruma (Notices) for 10 gold: "${CANARY}"`);
 ok(!JSON.stringify(out).includes(CANARY), 'BOARD: the note never', out);
 out = run(`PIGEON Rowan #PGDB (profile 1) sent Selene a letter signed "${CANARY}"`);
