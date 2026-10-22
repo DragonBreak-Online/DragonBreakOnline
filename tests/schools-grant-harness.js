@@ -215,6 +215,16 @@ const refusals = [
 const bad = refusals.map(([s, l, re]) => [s, l, grant(EXPERT, s, l, 'Nate', 'bad')]).filter(([s, l, x], i) => x.ok !== false || !refusals[i][2].test(x.text));
 check('Restoration, an unknown school and a level outside whole 1-100 are refused with the reason', bad.length === 0, bad);
 check('...and none of them changes a level or writes an audit line', typeof globalThis.__dboSchoolsGrant === 'function' && level(EXPERT, 'Destruction') === lv0 && out.audits.length === n, [level(EXPERT, 'Destruction'), out.audits.slice(n)]);
+// ---- a dry run (gifts.js asks before it spends a gift) answers and changes nothing ----
+{
+  const DRY = 0x47; mage(DRY, 40, 20, { Apprentice: picked });
+  const nAud = out.audits.length, nPk = out.packets.length;
+  const d1 = grant(DRY, 'Destruction', 20, 'Jake', 'dry', true), d2 = grant(DRY, 'Destruction', 5, 'Jake', 'dry', true), d3 = grant(DRY, 'Alteration', 5, 'Jake', 'dry', true);
+  check('a dry run answers what a grant would give: held at 50 (10), or all 5, from 40', d1.ok && d1.added === 10 && d1.to === 50 && d1.heldFor === 'Adept' && d2.ok && d2.added === 5 && d2.to === 45 && !d2.heldFor && d3.ok && d3.school === 'Alteration' && d3.added === 5, [d1, d2, d3]);
+  check('...and changes no level or xp, writes no audit line and sends no K menu', typeof globalThis.__dboSchoolsGrant === 'function' && level(DRY, 'Destruction') === 40 && xpOf(DRY, 'Destruction') === 20 && level(DRY, 'Alteration') === 0 && out.audits.length === nAud && out.packets.length === nPk, [rec(DRY).levels, out.audits.slice(nAud)]);
+  const d4 = grant(ELION, 'Destruction', 1, 'Jake', 'dry', true), d5 = grant(EXPERT, 'Restoration', 1, 'Jake', 'dry', true);
+  check('...a dry run at 100 or of Restoration is refused as the real one is', d4.ok === false && d4.added === 0 && d4.school === 'Destruction' && /already 100/.test(d4.text) && d5.ok === false && !d5.school && /Priest skill/.test(d5.text), [d4, d5]);
+}
 check('a staff actor as the giver is named as one', grant(EXPERT, 'Destruction', 1, TEACHER, 'by actor').ok && audits(/^SCHOOLS P15 granted P44 1 Destruction level: 80 to 81 \(primary\); by actor$/).length === 1, out.audits.slice(-1));
 
 // ---- a staff gift of school levels through the real gifts.js ----
@@ -240,6 +250,38 @@ check('a staff actor as the giver is named as one', grant(EXPERT, 'Destruction',
   check('gift: the SCHOOLS and GIFT audit lines both name it', audits(/^SCHOOLS Jake granted P46 10 Destruction levels: 76 to 86 \(primary\); Your classes/).length === 1 && audits(/^GIFT g-aldemar by Jake to P46: 10 Destruction levels \(76 to 86\); Your classes/).length === 1, out.audits.slice(-2));
   giftTimers.get('gifts')(); loadGifts(); giftTimers.get('gifts')();
   check('gift: a second pass and a reload pay nothing more', level(ALDEMAR, 'Destruction') === 86 && audits(/^SCHOOLS Jake granted P46/).length === 1, rec(ALDEMAR).levels.Destruction);
+  // The ledger as the only guard: the file back in the inbox (a crash between the ledger and the unlink), before and after a reload
+  const real = globalThis.__dboSchoolsGrant;
+  let calls = 0;
+  globalThis.__dboSchoolsGrant = (...a) => { calls++; return real(...a); };
+  const nAud = out.audits.length, nSaid = out.said.length;
+  for (const reload of [false, true]) {
+    fs.writeFileSync(path.join('gifts-inbox', 'g-aldemar.json'), JSON.stringify({ tag: '8HSY', schools: { Destruction: 10 }, reason: 'Your classes were underpaid under the old rule.', by: 'Jake', at: '2026-10-22T00:00:00Z' }));
+    if (reload) loadGifts();
+    giftTimers.get('gifts')();
+  }
+  check('gift: its file back in the inbox, before and after a reload: removed, the hook never called, 86 kept, nothing said or audited', typeof real === 'function' && calls === 0 && level(ALDEMAR, 'Destruction') === 86 && !fs.existsSync(path.join('gifts-inbox', 'g-aldemar.json')) && out.audits.length === nAud && out.said.length === nSaid, [calls, out.audits.slice(nAud)]);
+  globalThis.__dboSchoolsGrant = real;
+
+  // Held at the Adept pick through the real hook: 10 given, the other 10 queued again and paid once the spell is chosen
+  const HELD2 = 0x48; mage(HELD2, 40, 20, { Apprentice: picked }); put(HELD2, 'private.charTag', 'H2LD');
+  fs.writeFileSync(path.join('gifts-inbox', 'g-held.json'), JSON.stringify({ tag: 'H2LD', schools: { Destruction: 20 }, reason: 'held gift', by: 'Jake' }));
+  giftTimers.get('gifts')();
+  const restFile = path.join('gifts-inbox', 'g-held-rest1.json');
+  const restGift = fs.existsSync(restFile) ? JSON.parse(fs.readFileSync(restFile, 'utf8')) : null;
+  check('gift held at a pick: 40 to 50, the other 10 waiting as g-held-rest1, the player told they follow', level(HELD2, 'Destruction') === 50 && restGift && JSON.stringify(restGift.schools) === '{"Destruction":10}' && restGift.tag === 'H2LD' && out.said.filter((x) => x[0] === HELD2).map((x) => x[1]).join('|') === 'A gift from the staff: 10 levels of Destruction (it stops at 50 until you choose its Adept spell; the other 10 levels follow then). held gift', [level(HELD2, 'Destruction'), restGift, out.said.filter((x) => x[0] === HELD2)]);
+  const ledgerNow = () => { try { return JSON.parse(fs.readFileSync('gift-ledger.json', 'utf8')).delivered; } catch (e) { return {}; } };
+  check('...the ledger says 10 of the 20 were given and names the rest', JSON.stringify((ledgerNow()['g-held'] || {}).schoolsGiven) === '{"Destruction":10}' && (ledgerNow()['g-held'] || {}).rest === 'g-held-rest1', ledgerNow()['g-held']);
+  giftTimers.get('gifts')(); loadGifts(); giftTimers.get('gifts')();
+  check('...while the Adept spell is unchosen the rest waits (no grant, not in the ledger), logged once', level(HELD2, 'Destruction') === 50 && fs.existsSync(restFile) && !ledgerNow()['g-held-rest1'] && out.logs.filter((l) => /g-held-rest1\.json waits: nothing can be given yet/.test(l)).length === 1, out.logs.slice(-2));
+  const h = rec(HELD2); if (h) { h.rankPicks.Destruction.Adept = picked; put(HELD2, 'private.dboSchools', h); }
+  giftTimers.get('gifts')();
+  check('...once it is chosen the other 10 are granted: 50 to 60, and the rest is in the ledger', level(HELD2, 'Destruction') === 60 && !fs.existsSync(restFile) && JSON.stringify((ledgerNow()['g-held-rest1'] || {}).schoolsGiven) === '{"Destruction":10}' && audits(/^SCHOOLS Jake granted P48 10 Destruction levels: 50 to 60 \(primary\); held gift$/).length === 1, [level(HELD2, 'Destruction'), out.audits.slice(-2)]);
+
+  // A schools gift at 100 is not spent: it waits
+  fs.writeFileSync(path.join('gifts-inbox', 'g-full.json'), JSON.stringify({ tag: '8YDB', schools: { Destruction: 5 }, reason: 'full', by: 'Jake' }));
+  giftTimers.get('gifts')();
+  check('gift to a school already at 100: kept in the inbox, not in the ledger, logged', level(ELION, 'Destruction') === 100 && fs.existsSync(path.join('gifts-inbox', 'g-full.json')) && !ledgerNow()['g-full'] && out.logs.some((l) => /g-full\.json waits: nothing can be given yet \(Destruction: .*already 100/.test(l)), out.logs.slice(-1));
 }
 
 console.log(`\n${checks - failures}/${checks} passed`);
