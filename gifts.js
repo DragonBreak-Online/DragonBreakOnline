@@ -7,7 +7,7 @@
 // A gift for someone offline waits in the inbox until they are back, across restarts.
 //
 //   gifts-inbox/<id>.json  { tag: "KKVT" | profile: 71, gold: 50, items: [{ baseId: 0x1397e, count: 1 }], schools: { Destruction: 21 }, reason, by, at }
-//   gift-ledger.json       { delivered: { <id>: { at, to, gold, items, schools?, schoolsGiven?, rest?, reason, by } } }, written only here
+//   gift-ledger.json       { delivered: { <id>: { at, to, gold, items, schools?, schoolsGiven?, rest? | restNotQueued?, reason, by } } }, written only here
 //
 // `schools` (mod-0311, Jake 22 Oct) adds whole levels 1-100 to a school of magic through schools.js __dboSchoolsGrant,
 // which caps at 100 and holds at an unmade Apprentice or Adept pick as class pay does; a gift may be schools only, and
@@ -74,7 +74,7 @@ module.exports = (api) => {
     const given = [];
     if (g.gold && giveItem(a, GOLD, g.gold)) given.push(`${g.gold} gold`);
     for (const i of g.items) if (giveItem(a, i.baseId >>> 0, i.count)) given.push(`${i.count}x 0x${(i.baseId >>> 0).toString(16)}`);
-    const goods = given.length, told = [], refused = [], got = {}, rest = {};
+    const goods = given.length, told = [], refused = [], got = {}, rest = {}, res = [];
     const nextId = g.schools ? restId(g.id) : '';
     for (const [school, n] of Object.entries(g.schools || {})) {
       const hook = grantHook();
@@ -83,17 +83,25 @@ module.exports = (api) => {
       got[school] = added;
       // Held at a pick: the rest is queued again; capped at 100 or refused: it is not given
       if (r.heldFor && r.school) rest[school] = n - added;
-      if (!added) { refused.push(`${school}: ${r.text}${rest[school] ? ` ${n} queued again as ${nextId}` : ''}`); if (rest[school]) told.push(`${levelsWord(n)} of ${school} once you choose its ${r.heldFor} spell`); continue; }
+      res.push([school, n, r, added]);
+    }
+    // The rest is queued before anything is said or recorded, so the ledger, the audit and the player name a rest only
+    // when its file is really in the inbox (review A: a failed write was still told "the other levels follow then")
+    let queued = false;
+    if (Object.keys(rest).length) { try { queueRest(nextId, g, rest); queued = true; } catch (e) { log(`gifts: ${g.id}: the rest ${JSON.stringify(rest)} could not be queued again (${e.message}); queue it by hand`); } }
+    for (const [school, n, r, added] of res) {
+      const held = rest[school];
+      if (!added) { refused.push(`${school}: ${r.text}${held ? (queued ? ` ${n} queued again as ${nextId}` : ` ${n} NOT queued again (see the log)`) : ''}`); if (held && queued) told.push(`${levelsWord(n)} of ${school} once you choose its ${r.heldFor} spell`); continue; }
       const short = n - added;
-      given.push(`${added} ${r.school} level${added === 1 ? '' : 's'} (${r.from} to ${r.to}${short ? (rest[school] ? `, ${short} more queued as ${nextId}` : `, ${short} not given`) : ''})`);
-      told.push(`${levelsWord(added)} of ${r.school}${!short ? '' : rest[school] ? ` (it stops at ${r.to} until you choose its ${r.heldFor} spell; the other ${levelsWord(short)} follow${short === 1 ? 's' : ''} then)` : ' (it is now 100, the most there is)'}`);
+      given.push(`${added} ${r.school} level${added === 1 ? '' : 's'} (${r.from} to ${r.to}${short ? (held ? (queued ? `, ${short} more queued as ${nextId}` : `, ${short} more NOT queued (see the log)`) : `, ${short} not given`) : ''})`);
+      told.push(`${levelsWord(added)} of ${r.school}${!short ? '' : held ? ` (it stops at ${r.to} until you choose its ${r.heldFor} spell${queued ? `; the other ${levelsWord(short)} follow${short === 1 ? 's' : ''} then` : ''})` : ' (it is now 100, the most there is)'}`);
     }
     if (g.schools) {
-      // What each school really got, and the rest queued again; written after the grants, so it never risks paying twice
-      if (Object.keys(rest).length) { try { queueRest(nextId, g, rest); } catch (e) { log(`gifts: ${g.id}: the rest ${JSON.stringify(rest)} could not be queued again (${e.message}); queue it by hand`); } }
-      Object.assign(l.delivered[g.id], { schoolsGiven: got }, Object.keys(rest).length ? { rest: nextId } : {});
+      // What each school really got, and the rest queued again (or, if its file could not be written, what was not); written
+      // after the grants, so it never risks paying twice
+      Object.assign(l.delivered[g.id], { schoolsGiven: got }, queued ? { rest: nextId } : Object.keys(rest).length ? { restNotQueued: rest } : {});
       try { saveLedger(l); } catch (e) { log(`gifts: ${g.id}: ledger not updated with what was given (${e.message})`); }
-      const short = Object.entries(g.schools).filter(([k, n]) => got[k] < n && !rest[k]);
+      const short = Object.entries(g.schools).filter(([k, n]) => got[k] < n && !(queued && rest[k]));
       if (short.length) log(`gifts: ${g.id}: ${short.map(([k, n]) => `${k} gave ${got[k]} of ${n}`).join(', ')}; see its GIFT audit line`);
     }
     try { fs.unlinkSync(path.join(INBOX, g.file)); } catch (e) { /* the ledger keeps it from paying twice */ }

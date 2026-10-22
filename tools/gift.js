@@ -34,7 +34,7 @@ if (args.includes('--list')) {
   try { l = JSON.parse(fs.readFileSync(path.join(DIR, 'gift-ledger.json'), 'utf8')).delivered || {}; } catch (e) { /* none yet */ }
   const done = Object.entries(l).slice(-10);
   console.log(`delivered (last ${done.length} of ${Object.keys(l).length}):`);
-  for (const [id, d] of done) console.log(`  ${id}  ${d.at}  ${d.to}  ${d.gold ? d.gold + ' gold ' : ''}${(d.items || []).length ? JSON.stringify(d.items) : ''}${d.schools ? `${(d.items || []).length ? ' ' : ''}schools ${JSON.stringify(d.schools)} ${d.schoolsGiven ? `given ${JSON.stringify(d.schoolsGiven)} ` : ''}${d.rest ? `rest queued as ${d.rest} ` : ''}` : ''} ${d.reason}`);
+  for (const [id, d] of done) console.log(`  ${id}  ${d.at}  ${d.to}  ${d.gold ? d.gold + ' gold ' : ''}${(d.items || []).length ? JSON.stringify(d.items) : ''}${d.schools ? `${(d.items || []).length ? ' ' : ''}schools ${JSON.stringify(d.schools)} ${d.schoolsGiven ? `given ${JSON.stringify(d.schoolsGiven)} ` : ''}${d.rest ? `rest queued as ${d.rest} ` : ''}${d.restNotQueued ? `rest NOT queued ${JSON.stringify(d.restNotQueued)} ` : ''}` : ''} ${d.reason}`);
   process.exit(0);
 }
 

@@ -154,6 +154,18 @@ check('the rest while the spell is still unchosen: not spent, nothing granted, s
 grantAnswer = (a, school, n) => ({ ok: true, text: '', school, from: 51, to: 51 + n, added: n, heldFor: '' });
 tick();
 check('...once chosen, the other 10 are granted and the rest is in the ledger', grants.length === g0 + 1 && grants[g0][2] === 10 && inbox().length === 0 && ledger()[`${hid}-rest1`] && JSON.stringify(ledger()[`${hid}-rest1`].schoolsGiven) === '{"Destruction":10}' && said(A).slice(-1)[0] === 'A gift from the staff: 10 levels of Destruction. held', [said(A).slice(-1), ledger()[`${hid}-rest1`]]);
+// The rest's file cannot be written (review A; a directory in its place stands in for a full disk): the levels given stay
+// given, but the ledger, the audit and the player name no rest that is not in the inbox, and staff are told in the log
+grantAnswer = () => ({ ok: true, text: '', school: 'Destruction', from: 40, to: 50, added: 10, heldFor: 'Adept' });
+fs.mkdirSync(path.join(dir, 'gifts-inbox', 'nofile-rest1.json'));
+fs.writeFileSync(path.join(dir, 'gifts-inbox', 'nofile.json'), JSON.stringify({ tag: 'KKVT', schools: { Destruction: 20 }, reason: 'nofile' }));
+g0 = grants.length; nA = out.logs.length; let nAu = out.audits.length; tick();
+const nf = ledger().nofile || {};
+check('a rest that cannot be queued: given 10, the ledger keeps the 10 as restNotQueued and names no rest', grants.length === g0 + 1 && JSON.stringify(nf.schoolsGiven) === '{"Destruction":10}' && !nf.rest && JSON.stringify(nf.restNotQueued) === '{"Destruction":10}', nf);
+check('...the audit says it was NOT queued, and the player is not told the rest follows', out.audits.slice(nAu).some((t) => t === 'GIFT nofile by staff to Pff000014: 10 Destruction levels (40 to 50, 10 more NOT queued (see the log)); nofile') && said(A).slice(-1)[0] === 'A gift from the staff: 10 levels of Destruction (it stops at 50 until you choose its Adept spell). nofile', [out.audits.slice(nAu), said(A).slice(-1)]);
+check('...and staff are told in the log what to queue by hand and what was short', out.logs.slice(nA).some((t) => /^gifts: nofile: the rest \{"Destruction":10\} could not be queued again .*queue it by hand$/.test(t)) && out.logs.slice(nA).some((t) => t === 'gifts: nofile: Destruction gave 10 of 20; see its GIFT audit line'), out.logs.slice(nA));
+fs.rmdirSync(path.join(dir, 'gifts-inbox', 'nofile-rest1.json'));
+for (const f of fs.readdirSync(path.join(dir, 'gifts-inbox'))) if (/^\.nofile/.test(f)) fs.unlinkSync(path.join(dir, 'gifts-inbox', f));
 // Nothing at all to give (already 100): it waits, it is not spent
 grantAnswer = fullAnswer;
 tryGift('--tag', 'KKVT', '--school', 'Illusion:3', '--reason', 'full', '--force');
@@ -183,7 +195,7 @@ for (const bad of [['Restoration:5'], ['Destruction:0'], ['Destruction:101'], ['
 check('the tool refuses Restoration, 0, 101, an unknown school, a bad number and a school twice, naming --school', refusedSchools === 6 && inbox().length === 0, refusedSchools);
 tryGift('--tag', 'KKVT', '--school', 'Alteration:4', '--reason', 'list me', '--force');
 const listed = tryGift('--list') || '';
-check('--list shows the schools waiting, and delivered with what was given and the rest\'s id', /"schools": \{ "Alteration": 4 \}/.test(listed) && /schools \{"Destruction":21\} given \{"Destruction":21\}/.test(listed) && new RegExp(`given \\{"Destruction":10,"Illusion":0,"Conjuration":5\\} rest queued as ${hid}-rest1`).test(listed), listed);
+check('--list shows the schools waiting, and delivered with what was given and the rest\'s id', /"schools": \{ "Alteration": 4 \}/.test(listed) && /schools \{"Destruction":21\} given \{"Destruction":21\}/.test(listed) && new RegExp(`given \\{"Destruction":10,"Illusion":0,"Conjuration":5\\} rest queued as ${hid}-rest1`).test(listed) && /schools \{"Destruction":20\} given \{"Destruction":10\} rest NOT queued \{"Destruction":10\} +nofile/.test(listed), listed);
 
 process.chdir(cwd);
 fs.rmSync(dir, { recursive: true, force: true });
