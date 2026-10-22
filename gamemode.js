@@ -1843,7 +1843,11 @@ const hawkBodyInReach = (caster, target, q) => {
 // 0.77): the ref sits 338 units under the floor and the ladder 469-562 units from it, so the 6.5 m reach from the ref point
 // refused every climb. A plugin DOOR is in reach within 6.5 m of its bounds (OBND times the ref's XSCL scale, turned by
 // the ref's Z angle, as traps.js does).
-const doorBoundsBox = new Map();   // base id -> OBND [x1, y1, z1, x2, y2, z2], or null when not a DOOR with bounds
+// A shrine activator (an ACTI whose editor id names a shrine) is held to its bounds the same way (/bug 16 Oct, the Shrine of
+// Hircine near Falkreath: DBO_ShrineOfHircine's ref point sits on the statue's plinth 400 units above the ground in front,
+// its OBND reaching 399 below it, so a worshipper at the statue's foot stood 6.7 m from the ref point and was refused unseen).
+const doorBoundsBox = new Map();   // base id -> OBND [x1, y1, z1, x2, y2, z2], or null when not a DOOR or shrine with bounds
+const boundsReachBase = (rec) => !!rec && (String(rec.type) === 'DOOR' || (String(rec.type) === 'ACTI' && /shrine/i.test(String(rec.editorId || ''))));
 const doorRefScale = new Map();    // plugin ref id -> its XSCL scale (1 when it has none), read once per ref
 const doorAngleOff = (v) => Math.abs((((Number(v) || 0) % 360) + 540) % 360 - 180);   // degrees from level, 360 = 0
 const doorBoundsInReach = (caster, target, q) => {
@@ -1855,7 +1859,7 @@ const doorBoundsInReach = (caster, target, q) => {
     try {
       const r = mp.lookupEspmRecordById(base);
       const rec = r && r.record;
-      const f = rec && String(rec.type) === 'DOOR' ? (rec.fields || []).find((x) => x.type === 'OBND') : null;
+      const f = boundsReachBase(rec) ? (rec.fields || []).find((x) => x.type === 'OBND') : null;
       const d = f && f.data;
       if (d instanceof Uint8Array && d.byteLength >= 12) { const v = new DataView(d.buffer, d.byteOffset, d.byteLength); box = [0, 2, 4, 6, 8, 10].map((o) => v.getInt16(o, true)); }
     } catch (e) { box = null; }
