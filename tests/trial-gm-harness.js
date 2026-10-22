@@ -111,7 +111,7 @@ check('/charstats lives behind the gate only (journalstats.js asks no isAdmin in
 
 // ---- the wiring ------------------------------------------------------------------------------------------------------------
 check('gmcall.js and debugsnap.js are given staffCan', /require\(GMCALL_JS\)\(\{[\s\S]*?isAdmin, staffCan, every,/.test(src) && /require\(DEBUGSNAP_JS\)\(\{[^}]*isAdmin, staffCan, cfg \}\)/.test(src));
-check('the role sync sees a Trial GM as staff (a lost role logs them out)', /isStaff: \(a\) => staffTierOf\(a\) !== null, staffRolesSeen/.test(src));
+check('the role sync sees a Trial GM as staff (a lost role logs them out)', /isStaff: \(a\) => staffTierOf\(a\) !== null(?: \|\| accountRankOf\(profileOf\(a\), null, a\) !== 0)?, staffRolesSeen/.test(src));
 check('/whoami says trialgm', /tier \$\{staffTierOf\(a\) \|\| 'player'\}/.test(src));
 check('/help admin gives a Trial GM their own list, as private lines', /if \(staffAsk && isTrialStaff\(a\)\) return trialHelp\(a\);/.test(src) && /const trialHelp = \(a\) => \{[\s\S]*?personal\(a,/.test(src));
 const trialHelpNames = (src.match(/const TRIAL_HELP = \[([\s\S]*?)\n\];/) || ['', ''])[1].match(/\['(\w+)'/g).map((x) => x.slice(2, -1));

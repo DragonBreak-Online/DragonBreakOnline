@@ -4,7 +4,8 @@
 // remote console keeps the same rule from the same code (gamemode.js accountRankOf). The real gate (gamemode.js handleLine,
 // cut as written), /kick, discipline.js and console.js run against a fake world.
 // K /kick typed, D /discipline typed, P the same decisions typed and from the console, A the record-author rule for lift and
-// overturn (a lower rank does not undo a higher rank's record; a config record is the Owners'), S the code holds one rule.
+// overturn (a lower rank does not undo a higher rank's record; a config record is the Owners'), R a Discord demotion reaches
+// every character of the account once the role sync sees it (staffRolesSeen), S the code holds one rule.
 //   node tests/staff-rank-harness.js    (as root: the console's spool and key checks want root-owned files)
 'use strict';
 const fs = require('fs');
@@ -102,7 +103,7 @@ const body = [
   cut("registerChatCommand('players'", '// The staff teleport:', '/players to /rename'),
   cut('// Online first, then any character (offline included) by tag or exact name.', '// ---- letters:', 'findAnyByName'),
   `return { deliver, system, personal, captureFor, userOf, nameOf, profileOf, discordOf, tagOf, display, who, isAdmin, isLeadStaff, staffTierFrom, staffTierOf,
-    TIER_RANK, TIER_LABEL, broadcast, findByName, findAnyByName, audit, commands, registerChatCommand, handleLine,
+    TIER_RANK, TIER_LABEL, broadcast, findByName, findAnyByName, audit, commands, registerChatCommand, handleLine, staffRolesSeen,
     accountRankOf: typeof accountRankOf === 'function' ? accountRankOf : undefined, rankRefusalOf: typeof rankRefusalOf === 'function' ? rankRefusalOf : undefined,
     authorRefusalOf: typeof authorRefusalOf === 'function' ? authorRefusalOf : undefined };`,
 ].join('\n');
@@ -383,6 +384,54 @@ reset();
   const rep = send('/discipline #8KWH lift a Lead GM lifts it from the console', AS.lead);
   check("A6. from the console a Lead GM cannot lift an Owner's suspension either (X9), and the reply says why", sus2 > 0 && !entry(5, sus2).lifted
     && !!rep && rep.lines.some((l) => l.text === `Suspension #${sus2} was given by Jake #ABCD, of a rank above yours, so you cannot lift it. Ask someone of that rank, or the Owners.`), rep && rep.lines);
+}
+
+// ==== R. a Discord demotion reaches every character of the account (review of 22 Oct, PROVEN: old stamps protected) ========
+reset();
+{
+  // Dina (14), a Developer demoted on Discord: her online character has no roles, Dina Old still has Developer stamped (K4, D2)
+  setOnline(A.dina, true); setOnline(A.lead, true);
+  let told = typed(A.lead, '/kick #DINA');
+  check("R1. before the role sync has seen it, Dina Old's Developer stamp still protects her account (raise-only, as K4)", told.includes(RANK_KICK('Dina #DINA')) && !kicked.length, { told, kicked });
+  G.staffRolesSeen(A.dina, []);
+  check("R1. the role sync reads her roles from the character she plays: Dina Old's Developer stamp comes off, Dina is not logged out (no staff stamp of her own)",
+    JSON.stringify(store.get(A.dinaOld)['private.discordRoles']) === '[]' && !kicked.length, store.get(A.dinaOld)['private.discordRoles']);
+  told = typed(A.lead, '/kick #DINA');
+  check('R1. ...and a Lead GM can kick her now', kicked.includes(userOf(A.dina)) && !told.some((l) => /staff account|could not be read/.test(l)), { told, kicked });
+  const n14 = n(14);
+  told = typed(A.lead, '/discipline #DOLD warn the old character of a demoted Developer');
+  check('R1. ...and discipline her account typed in game (on the old character, offline)', told.some((l) => /^Recorded: warn #\d+ on Dina Old #DOLD/.test(l)) && n(14) === n14 + 1, told);
+  setOnline(A.lead, false); setOnline(A.jake, true);
+  const rep = send('/discipline #DINA warn from the console after the demotion', AS.lead);
+  check('R1. ...and from the console (the same accountRankOf)', !!rep && rep.state === 'ran' && n(14) === n14 + 2, rep && { state: rep.state, why: rep.why });
+  setOnline(A.dina, false);
+  // Olaf (12), an Owner demoted on Discord while offline, logs in on a new character (stamped at that login with his roles now)
+  reset();
+  const olaf2 = actor(0xff000a61, { name: 'Olaf Two', tag: 'OLF2', profile: 12, discord: '200000000000000012', roles: [], online: true });
+  const before = ['jake', 'nate', 'lead', 'gm'].map((k) => typed(A[k], '/kick #OLF2'));
+  check('R2. before the role sync has seen it, the ex-Owner can be kicked by nobody, not even an Owner (the finding as proven)',
+    before.every((t) => t.includes(RANK_KICK('Olaf Two #OLF2'))) && !kicked.length, { before, kicked });
+  G.staffRolesSeen(olaf2, []);
+  check('R2. the role sync on the character he plays brings the old Owner stamp down', JSON.stringify(store.get(A.olaf)['private.discordRoles']) === '[]', store.get(A.olaf)['private.discordRoles']);
+  told = typed(A.gm, '/kick #OLF2');
+  const n12 = n(12);
+  const dis = typed(A.lead, '/discipline #OLAF strike the old character of an ex-Owner');
+  check('R2. ...so a GM kicks him, and a Lead GM disciplines his old character', kicked.includes(userOf(olaf2)) && dis.some((l) => /^Recorded: strike #\d+ on Olaf #OLAF/.test(l)) && n(12) === n12 + 1, { told, dis, kicked });
+  setOnline(olaf2, false);
+  for (const k of ['nate', 'lead', 'gm']) setOnline(A[k], false);
+  // Leda (9) demoted from Lead GM to GM while online: logged out, and every stamp of her account says GM, never less
+  reset();
+  const ledaAlt = actor(0xff000a41, { name: 'Leda Alt', tag: 'LED2', profile: 9, discord: ID.lead, roles: [ROLE.lead, 'patron'] });
+  setOnline(A.lead, true);
+  G.staffRolesSeen(A.lead, [ROLE.gm]);
+  check('R3. a Lead GM demoted to GM while online is logged out, and her other character now carries GM, its other roles kept (the account is a GM\'s, not a player\'s)',
+    audits().some((l) => /^STAFF Leda #LEAD .*: Discord roles now give gm \(was leadgm\); logged out so it takes effect$/.test(l)) && JSON.stringify(store.get(ledaAlt)['private.discordRoles']) === JSON.stringify(['patron', ROLE.gm]) && G.accountRankOf(9, null, 0) === 1,
+    { audits: audits(), alt: store.get(ledaAlt)['private.discordRoles'], rank: G.accountRankOf(9, null, 0) });
+  told = typed(A.gary, '/kick #LEAD');
+  check('R3. ...so a GM still cannot kick her (same rank): the demotion never lets anyone below her new rank through', told.includes(RANK_KICK('Leda #LEAD')), told);
+  // restore Leda for the sections below
+  store.get(A.lead)['private.discordRoles'] = [ROLE.lead]; store.get(ledaAlt)['private.discordRoles'] = [ROLE.lead, 'patron'];
+  setOnline(A.lead, false); setOnline(A.gary, false);
 }
 
 // ==== S. one rule in the code ===============================================================================================

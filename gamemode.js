@@ -308,8 +308,9 @@ const staffTierOf = (actorId) => staffTierFrom(profileOf(actorId), rolesOf(actor
 // Developer's account.
 // An account's rank is its highest staff tier: the code's admin profiles, the roles stamped at the last login of every
 // character it has (online or not) and of the named character itself, and Discord roles just fetched for it when there are
-// any (the console's dashboard sends). Each source can only raise it, so a stale stamp or a Discord demotion minutes ago still
-// counts: a false refusal, never a pass. -1 when it cannot be read; onError(e) hears why
+// any (the console's dashboard sends). Each source can only raise it, so a Discord demotion counts once the role sync has seen
+// it: staffRolesSeen then takes the lost staff roles off every character of the account (until then a false refusal, never a
+// pass). -1 when it cannot be read; onError(e) hears why
 const rankOfTier = (t) => (t && Object.prototype.hasOwnProperty.call(TIER_RANK, t) ? TIER_RANK[t] : 0);
 const accountRankOf = (pid, freshRoles, target, onError) => {
   if (!Number.isSafeInteger(pid) || pid < 0) return -1;
@@ -352,15 +353,37 @@ globalThis.__dboIsStaff = (actorId) => { try { return staffTierOf(Number(actorId
 globalThis.__dboStaffTier = (actorId) => { try { return staffTierOf(Number(actorId) >>> 0); } catch (e) { return null; } };
 // Chat commands a Trial GM may run, and the right each needs (the command gate in handleChat)
 const TRIAL_COMMANDS = { rename: 'rename', chargen: 'chargen', tp: 'tp', charstats: 'playerinfo', bugs: 'bugs', realnames: 'realnames' };
+// A demotion reaches every character of the account, offline ones too: the rank rule (accountRankOf) counts each one's stamp,
+// and the old stamp of a character not played since kept a demoted account out of everyone's reach (review of 22 Oct: an
+// ex-Owner could be disciplined or kicked by nobody). The staff part of such a stamp becomes the fresh read's, so the stamp
+// gives the account's tier now, never less; its other roles wait for that character's next login, which writes it afresh
+const dropStaleStaffStamps = (a, fresh, now) => {
+  const pid = profileOf(a);
+  if (!Number.isSafeInteger(pid) || pid < 0) return;
+  const floor = rankOfTier(now);
+  let ids;
+  try { ids = (mp.getActorsByProfileId(pid) || []).map((x) => Number(x) >>> 0); } catch (e) { log(`staff role change: characters of profile ${pid} unreadable: ${e.message}`); return; }
+  if (!ids.includes(a >>> 0)) ids.push(a >>> 0);
+  const staffIds = new Set([...TIERS.flatMap((t) => tierRoles[t] || []), ...legacyAdminRoles, ...trialRoles]);
+  const freshStaff = fresh.filter((r) => staffIds.has(r));
+  const done = [];
+  for (const c of ids) {
+    if (!c || profileOf(c) !== pid || rankOfTier(staffTierOf(c)) <= floor) continue;
+    try { mp.set(c, 'private.discordRoles', rolesOf(c).filter((r) => !staffIds.has(r)).concat(freshStaff)); done.push(c); } catch (e) { log(`staff role change: re-stamp of ${c.toString(16)} failed: ${e.message}`); }
+  }
+  if (done.length) audit(`STAFF ${who(a)}: Discord roles now give ${now || 'no staff tier'}; the higher staff stamp of ${done.length} character(s) of profile ${pid} now gives that too: ${done.map((c) => c.toString(16)).join(', ')}`);
+};
 const staffRolesSeen = (a, roles) => {
   const before = staffTierOf(a);
-  if (!before) return;
-  const now = staffTierFrom(profileOf(a), idList(roles));
-  if ((TIER_RANK[now] || 0) >= TIER_RANK[before]) return;
-  audit(`STAFF ${who(a)}: Discord roles now give ${now || 'no staff tier'} (was ${before}); logged out so it takes effect`);
-  personal(a, 'Your staff roles have changed. Log in again.');
-  try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('leave_reason', a, 'demotion'); } catch (e) { /* the player log is optional */ }
-  setTimeout(() => { try { const u = userOf(a); if (u >= 0) mp.kick(u); } catch (e) { log('staff role change: kick failed', e.message); } }, 1500);
+  const fresh = idList(roles);
+  const now = staffTierFrom(profileOf(a), fresh);
+  if (before && (TIER_RANK[now] || 0) < TIER_RANK[before]) {
+    audit(`STAFF ${who(a)}: Discord roles now give ${now || 'no staff tier'} (was ${before}); logged out so it takes effect`);
+    personal(a, 'Your staff roles have changed. Log in again.');
+    try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('leave_reason', a, 'demotion'); } catch (e) { /* the player log is optional */ }
+    setTimeout(() => { try { const u = userOf(a); if (u >= 0) mp.kick(u); } catch (e) { log('staff role change: kick failed', e.message); } }, 1500);
+  }
+  dropStaleStaffStamps(a, fresh, now);
 };
 const TIER_LABEL = { senior: 'Senior', developer: 'Developer', leadgm: 'Lead GM', gm: 'GM', trialgm: 'Trial GM' };
 // Staff commands a GM may not use (command name, or 'name sub' for one subcommand)
@@ -8535,7 +8558,9 @@ try {
   const auth = serverSettings.discordAuth || {};
   require(DISCORDROLES_JS)({ mp, log, audit, who, onlineActors, every, discordOf, profileOf, zoneById, cfg,
     skills: SKILLS_DEF.skills || [], token: (cfg.discord || {}).botToken || auth.botToken, guildId: ((auth.guilds || [])[0] || {}).guildId,
-    isStaff: (a) => staffTierOf(a) !== null, staffRolesSeen });
+    // Read every sync while any character of the account carries a staff stamp (or the account cannot be read), so a demotion
+    // is seen from whichever character is played and staffRolesSeen takes the old stamps off the rest
+    isStaff: (a) => staffTierOf(a) !== null || accountRankOf(profileOf(a), null, a) !== 0, staffRolesSeen });
 } catch (e) { log('discordroles.js failed to load:', e.stack || e.message); globalThis.__dboDiscordPost = null; }
 
 // ---- /ticket: a private Discord ticket with staff, opened from the game (server\gameticket.js, config "tickets") -------
