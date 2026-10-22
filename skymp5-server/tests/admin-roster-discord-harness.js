@@ -153,7 +153,8 @@ const settle = async () => { for (let i = 0; i < 30; i++) await turn(); };
     const mira = rowOf(rows, MIRA.profileId);
     check('Trial GM: online players keep the actor id, name and #TAG', !!mira && mira.a === MIRA.actorId.toString(16) && mira.n === MIRA.name && mira.t === MIRA.tag, mira);
     check('Trial GM: the player with no profile yet is listed too', rows.some((r) => r.n === NOPROFILE.name), rows.map((r) => r.n));
-    check('Trial GM: the trial caps are unchanged', menu.caps && menu.caps.trial === true && menu.caps.tabs.join() === 'debug,players,teleport,modes', menu.caps);
+    // GM Calls is a Trial GM tab since a12e09f38 (Nate 21 Oct: GM Calls in F7 for every GM tier)
+    check('Trial GM: the trial caps are unchanged', menu.caps && menu.caps.trial === true && menu.caps.tabs.join() === 'debug,players,gmcalls,teleport,modes', menu.caps);
     props[trial.actorId].locationalData = undefined;
     packets.length = 0;
     sys.customPacket(trial.userId, 'adminAction', { customPacketType: 'adminAction', action: 'teleportTo', target: mira ? mira.a : '' }, ctx);
