@@ -42,6 +42,25 @@ export const vanillaBeastRaceOf = (raceId: number | undefined | null): number =>
 
 export const isBeastRaceId = (raceId: number | undefined | null): boolean => vanillaBeastRaceOf(raceId) !== 0;
 
+// Staff polymorph creatures (server beastform.js): kept apart from BEAST_RACE_IDS so world NPC copies of these races are unchanged
+// All Skyrim.esm (runtime id = local id), no FaceGen head, all in NON_HUMANOID_RACES; wolf and horse are left out
+export const POLYMORPH_RACES: ReadonlyMap<number, string> = new Map([
+  [0x000a919d, "ChickenRace"],
+  [0x0006dc99, "HareRace"],
+  [0x0006fc4a, "GoatDomesticsRace"],
+  [0x00109c7c, "FoxRace"],
+  [0x000131ee, "DogRace"],
+  [0x00013201, "SkeeverRace"],
+  [0x000ba545, "MudcrabRace"],
+  [0x000cf89b, "DeerRace"],
+]);
+
+export const isPolymorphRaceId = (raceId: number | undefined | null): boolean => POLYMORPH_RACES.has(Number(raceId) >>> 0);
+
+// A body the server may list a player in (dboBeastBody): no queued 3D reset, a settle and no name tag on its copy
+export const isBeastOrPolymorphRaceId = (raceId: number | undefined | null): boolean =>
+  isBeastRaceId(raceId) || isPolymorphRaceId(raceId);
+
 // Every other race whose behaviour graph is not the humanoid master graph (sync/nonHumanoidRaceList.ts), resolved at
 // runtime by beastRaces.ts. An Ayleid Pelinaga's copy (draugr graph) crashed a watcher 2 s after its relayed stop (1 Oct).
 const nonHumanoidRaceIds = new Set<number>();
@@ -51,9 +70,9 @@ export const setNonHumanoidRaceIds = (ids: number[]): void => {
   for (const id of ids) nonHumanoidRaceIds.add(Number(id) >>> 0);
 };
 
-// A copy of this race takes no caster or animation variables
+// A copy of this race takes no caster or animation variables; polymorph races count before the non-humanoid list resolves
 export const isGuardedRaceId = (raceId: number | undefined | null): boolean =>
-  isBeastRaceId(raceId) || nonHumanoidRaceIds.has(Number(raceId) >>> 0);
+  isBeastRaceId(raceId) || isPolymorphRaceId(raceId) || nonHumanoidRaceIds.has(Number(raceId) >>> 0);
 
 export interface CasterVariables {
   booleans: Uint8Array;
