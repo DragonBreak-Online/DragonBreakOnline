@@ -1,6 +1,7 @@
 const router = require('express').Router()
 const fs     = require('fs')
 const path   = require('path')
+const { inlineHash } = require('../sources/securityHeaders')
 
 const MANIFEST_PATH = path.join(__dirname, '..', 'data', 'install-manifest.json')
 const GAME = 'skyrimspecialedition'
@@ -15,13 +16,7 @@ const esc = s => String(s).replace(/[&<>"']/g, c =>
 const linkFor = (modId, fileId) =>
   `https://www.nexusmods.com/${GAME}/mods/${modId}?tab=files${fileId ? `&file_id=${fileId}` : ''}&nmm=1`
 
-const page = body => `<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>DragonBreak mod downloads</title>
-<style>
+const PAGE_STYLE = `
   body { font-family: system-ui, sans-serif; background:#1b1b1f; color:#e9e9ee; margin:0; padding:2rem; line-height:1.5; }
   .wrap { max-width: 760px; margin: 0 auto; }
   h1 { font-size: 1.4rem; }
@@ -40,10 +35,60 @@ const page = body => `<!doctype html>
   .open-all:disabled { opacity:.55; cursor:default; }
   .open-all:disabled:hover { background:#31437a; }
   .open-all-hint { display:block; margin-top:.5rem; font-size:.85rem; color:#9a9aa5; }
-</style>
+`
+
+// Opens the links a few at a time from the button; the page's only script
+const BATCH_SCRIPT = `
+    var batchBtn = document.getElementById('open-batch')
+    if (batchBtn) {
+      var BATCH = 5
+      var links = document.querySelectorAll('ol a')
+      var next  = 0
+      batchBtn.addEventListener('click', function () {
+        // Synchronous loop on purpose: pop-up blockers only honour window.open calls
+        // made directly inside the click gesture, so each click opens one small batch.
+        var stop = Math.min(next + BATCH, links.length)
+        var blocked = false
+        while (next < stop) {
+          // No 'noopener' feature: it makes window.open return null even on success,
+          // which would hide blocked pop-ups. Sever the opener by hand instead.
+          var win = window.open(links[next].href, '_blank')
+          if (!win) { blocked = true; break }
+          win.opener = null
+          next++
+        }
+        if (blocked) {
+          batchBtn.textContent = 'Pop-ups blocked - allow them for this site, then click again (' +
+            next + ' of ' + links.length + ' opened)'
+        } else if (next >= links.length) {
+          batchBtn.disabled    = true
+          batchBtn.textContent = 'All ' + links.length + ' links opened'
+        } else {
+          batchBtn.textContent = 'Open the next ' + Math.min(BATCH, links.length - next) +
+            ' links (' + next + ' of ' + links.length + ' opened)'
+        }
+      })
+    }
+  `
+
+// Only this page's own style and script run: nothing injected or added on the way can, and the page cannot be framed or post anywhere
+const CSP = `default-src 'none'; script-src ${inlineHash(BATCH_SCRIPT)}; style-src ${inlineHash(PAGE_STYLE)}; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`
+
+const page = body => `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DragonBreak mod downloads</title>
+<style>${PAGE_STYLE}</style>
 </head>
 <body><div class="wrap">${body}</div></body>
 </html>`
+
+router.use((_req, res, next) => {
+  res.set('Content-Security-Policy', CSP)
+  next()
+})
 
 // HTML page of every Nexus archive's download link; free accounts can't use the API, so players Ctrl+click links (about 5 at a time) to start Mod Manager Downloads
 // ?need=<modId>-<fileId>,... narrows the list to what the launcher is still missing.
@@ -103,38 +148,7 @@ router.get('/', (req, res) => {
   ${shown.length
     ? `<ol>\n${rows}\n</ol>`
     : `<p class="empty">${hiddenCount > 0 ? 'Every mod is already downloaded. Go back to the launcher and continue the install.' : 'No Nexus mods in the current manifest.'}</p>`}
-  <script>
-    var batchBtn = document.getElementById('open-batch')
-    if (batchBtn) {
-      var BATCH = 5
-      var links = document.querySelectorAll('ol a')
-      var next  = 0
-      batchBtn.addEventListener('click', function () {
-        // Synchronous loop on purpose: pop-up blockers only honour window.open calls
-        // made directly inside the click gesture, so each click opens one small batch.
-        var stop = Math.min(next + BATCH, links.length)
-        var blocked = false
-        while (next < stop) {
-          // No 'noopener' feature: it makes window.open return null even on success,
-          // which would hide blocked pop-ups. Sever the opener by hand instead.
-          var win = window.open(links[next].href, '_blank')
-          if (!win) { blocked = true; break }
-          win.opener = null
-          next++
-        }
-        if (blocked) {
-          batchBtn.textContent = 'Pop-ups blocked - allow them for this site, then click again (' +
-            next + ' of ' + links.length + ' opened)'
-        } else if (next >= links.length) {
-          batchBtn.disabled    = true
-          batchBtn.textContent = 'All ' + links.length + ' links opened'
-        } else {
-          batchBtn.textContent = 'Open the next ' + Math.min(BATCH, links.length - next) +
-            ' links (' + next + ' of ' + links.length + ' opened)'
-        }
-      })
-    }
-  </script>`))
+  <script>${BATCH_SCRIPT}</script>`))
 })
 
 module.exports = router
