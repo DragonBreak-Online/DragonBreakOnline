@@ -48,7 +48,9 @@ module.exports = (api) => {
     const seats = (readOfficials() || {})[zid] || {};
     const pid = pidOf(a);
     const ruler = (z.officials || [])[0];
-    return [ruler, 'steward'].some((o) => o && (seats[o] || []).map(Number).includes(pid));
+    // a bound seat is its character's alone (gamemode.js officials-seats.json); an unbound one is the account's
+    const sh = typeof globalThis.__dboSeatHolder === 'function' ? globalThis.__dboSeatHolder : null;
+    return pid >= 0 && [ruler, 'steward'].some((o) => o && (seats[o] || []).map(Number).includes(pid) && (() => { let held = 0; try { held = sh ? Number(sh(zid, o, pid)) >>> 0 : 0; } catch (e) { held = 0; } return !held || held === (a >>> 0); })());
   };
 
   // ---- gold: carried first, then the bank (bank.js keeps the balance on the character) ----------------------------

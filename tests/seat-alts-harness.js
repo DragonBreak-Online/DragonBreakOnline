@@ -1,10 +1,11 @@
 'use strict';
 // Court seats per character (Nate, 19 Oct: "an account's other characters do not hold its office"; 3419354a4 binds a seat to
-// the character seated in officials-seats.json). Three readers still asked officials.json by account, so another character
+// the character seated in officials-seats.json). Four readers still asked officials.json by account, so another character
 // of an official's account kept the office's powers there:
 //   citizenship.js  the ruler's and the Steward's citizenship powers (policy, grant, decline) and Bruma's citizenship by office
 //   guilds.js       a building shared with an office (Castle Bruma and Bruma's Steward, housingPlaces.shares)
 //   weaponracks.js  a hold manager taking racked weapons down
+//   outlaws.js      the ruler's and the Steward's bounties (/bounty set and clear, the F3 Wanted tab's Set and Clear)
 // Loads the real modules (weaponracks' managerRank is cut out of the file) against stubs, in a scratch folder.
 //   node tests/seat-alts-harness.js [server folder]   (from server/)
 const fs = require('fs');
@@ -93,6 +94,51 @@ const managerRank = new Function('fs', 'path', 'S', 'log', 'profileOf', 'mp', `$
   fs, path, {}, noop, profileOf, { get: () => undefined });
 ok(managerRank(MISTA, 'whiterun') === 'steward', "weaponracks: Whiterun's seated Steward manages its racks", managerRank(MISTA, 'whiterun'));
 ok(managerRank(PIPPIN, 'whiterun') === '', "weaponracks: the Steward's other character does not", managerRank(PIPPIN, 'whiterun'));
+
+// ---- outlaws.js: the ruler's and the Steward's bounties ---------------------------------------------------------------------
+// Bruma's Countess (account 35) is seated as Frigga; her account's other character is Frigga Alt. Carloft Fhang is the Steward.
+const FRIGGA = 0xff002301, FRIGGA_ALT = 0xff002302;
+PID.set(FRIGGA, 35); PID.set(FRIGGA_ALT, 35); NAME.set(FRIGGA, 'Frigga'); NAME.set(FRIGGA_ALT, 'Frigga Alt');
+seats.bruma.count = { 35: FRIGGA };
+const said = [];
+let bountyCmd = null, outlawJ = null, tabReply = null;
+globalThis.__dboJournalFresh = () => true;
+globalThis.__dboJournalLimited = (a, act) => { tabReply = act(); };
+const O = require(path.join(SRV, 'outlaws.js'))({
+  mp: { get: () => undefined, set: noop }, log: noop, personal: (a, t) => said.push(String(t)), system: noop, audit: noop,
+  who: (a) => NAME.get(a >>> 0) || 'someone', display: (a) => NAME.get(a >>> 0) || 'someone', cfg: {},
+  registerChatCommand: (n, f) => { if (n === 'bounty') bountyCmd = f; }, zoneOfActor: () => 'bruma',
+  zoneById: (id) => ZONES.find((z) => z.id === String(id)) || null, readOfficials: () => officials, profileOf,
+  officialTarget: (q) => { const e = [...NAME.entries()].find(([, n]) => n.toLowerCase() === String(q).trim().toLowerCase()); return e ? { pid: PID.get(e[0]), actor: e[0], online: 0, label: e[1], who: e[1] } : { error: 'Nobody by that name.' }; },
+  onlineActors: () => [...PID.keys()], giveItem: noop, isLeadStaff: () => false, onUi: (n, f) => { if (n === 'outlawJ') outlawJ = f; },
+});
+const bounty = (a, args) => { said.length = 0; bountyCmd(a, args); return said[said.length - 1] || ''; };
+const f3 = (a, ...args) => { tabReply = null; outlawJ(a, ['fresh', ...args]); return tabReply || {}; };
+const wantedAt = () => ((O.tabView(FRIGGA).wanted || []).find((w) => w.pid === 7) || {}).amount || 0;
+ok(typeof bountyCmd === 'function' && typeof outlawJ === 'function', 'outlaws: /bounty and the F3 Wanted tab are registered');
+let t = bounty(CARLOFT, 'set Outsider 50 brawling');
+ok(/is wanted in Bruma/.test(t) && wantedAt() === 50, "outlaws: Bruma's seated Steward sets a bounty with /bounty set", t);
+t = bounty(CARLOFT_ALT, 'clear Outsider');
+ok(/^Only the ruler or the Steward/.test(t) && wantedAt() === 50, "outlaws: the Steward's other character may not clear it with /bounty clear", t);
+t = bounty(FRIGGA_ALT, 'set Outsider 60 again');
+ok(/^Only the ruler or the Steward/.test(t) && wantedAt() === 50, "outlaws: the Countess's other character may not set one with /bounty set", t);
+t = bounty(OUTSIDER, 'set Carloft Fhang 10 spite');
+ok(/^Only the ruler or the Steward/.test(t), 'outlaws: nor may anyone else', t);
+ok(O.tabView(CARLOFT).canDeclare === true && O.tabView(FRIGGA).canDeclare === true, 'outlaws: the F3 Wanted tab offers the seated Steward and Countess its Set and Clear');
+ok(O.tabView(CARLOFT_ALT).canDeclare === false && O.tabView(FRIGGA_ALT).canDeclare === false, "outlaws: ...and not their accounts' other characters",
+  [O.tabView(CARLOFT_ALT).canDeclare, O.tabView(FRIGGA_ALT).canDeclare]);
+let j = f3(FRIGGA_ALT, 'set', 'Outsider', 70, 'again');
+ok(j.kind === 'refused' && wantedAt() === 50, "outlaws: the Countess's other character may not Set from the F3 Wanted tab", j);
+j = f3(CARLOFT_ALT, 'clear', 7);
+ok(j.kind === 'refused' && wantedAt() === 50, "outlaws: the Steward's other character may not Clear from the F3 Wanted tab", j);
+if (!wantedAt()) bounty(CARLOFT, 'set Outsider 50 brawling'); // a check above let it go: put it back for the next one
+j = f3(FRIGGA, 'clear', 7);
+ok(j.kind === 'ok' && wantedAt() === 0, 'outlaws: the seated Countess Clears it from the F3 Wanted tab', j);
+// An unbound seat still counts for the whole account (as gamemode.js ranksOf does)
+delete seats.bruma.steward[150];
+t = bounty(CARLOFT_ALT, 'set Outsider 40 brawling');
+ok(/is wanted in Bruma/.test(t) && wantedAt() === 40, 'outlaws: an unbound Steward seat still counts for the account', t);
+seats.bruma.steward[150] = CARLOFT;
 
 console.log(fail ? `${fail} failed` : 'all checks passed');
 process.exit(fail ? 1 : 0);
