@@ -995,7 +995,7 @@ const HELP_GROUPS = [
   { key: 'rule', title: 'Rule and property', names: ['officials', 'appoint', 'dismiss', 'tax', 'ledgerpoint'], role: 'official',
     hints: ['Your court: F3, the Court tab. A post you appoint someone to is offered, and they accept it.',
       'An outlaw of your hold (ruler or Steward): /bounty set <name or #TAG> <gold, up to 1000> <reason>; the jailer collects it.'] },
-  { key: 'groups', title: 'Groups and dungeons', names: ['party', 'guild', 'court', 'charter', 'nobility', 'burglary', 'fence', 'stolen'],
+  { key: 'groups', title: 'Groups and dungeons', names: ['party', 'guild', 'rebellion', 'court', 'charter', 'nobility', 'burglary', 'fence', 'stolen'],
     hints: ['Your factions and your court: F3, the Faction and Court tabs. The nobles of your hold: F3, the Nobility tab.',
       'Thieves of a guild the staff approved: crouch at the locked door of a player\'s home to break in, and fence what you take at your guild\'s Fence Chest (/fence). Guards: /fence report a fence, /stolen to search a captured thief.',
       'A dungeon: its door. The party leader picks Novice, Adept, Expert or Master; /dungeon says what is claimed.',
@@ -1013,7 +1013,7 @@ const HELP_GROUPS = [
 const HELP_BY_OBJECT = new Set(['bank', 'board', 'business', 'faction', 'deity', 'rite', 'tomes', 'respawn', 'skills',
   'ledger', 'chill', 'sentence', 'hunger', 'rest', 'tokens', 'whoami', 'pigeonblock', 'sign', 'level', 'spells',
   'teach', 'reroll', 'offer', 'contract', 'commission', 'wildlife', 'champions', 'whereami', 'playtest', 'dungeon', 'ping',
-  'expedition', 'expeditions', 'blackreach', 'shop', 'rebellion']);
+  'expedition', 'expeditions', 'blackreach', 'shop']);
 const helpRoleOk = (a, role) => {
   if (!role) return true;
   try {
@@ -1025,7 +1025,8 @@ const helpRoleOk = (a, role) => {
 };
 const helpGroupsFor = (a) => {
   const staff = isAdmin(a);
-  const usable = (n) => { const c = commands.get(n); return !!c && !c.hidden && (!c.admin || staff) && (n !== 'ledgerpoint' || staff); };
+  const usable = (n) => { const c = commands.get(n); return !!c && !c.hidden && (!c.admin || staff) && (n !== 'ledgerpoint' || staff)
+    && (n !== 'rebellion' || (typeof globalThis.__dboRebellionOpen === 'function' && !!globalThis.__dboRebellionOpen())); };
   const placed = new Set(HELP_GROUPS.flatMap((g) => g.names));
   const groups = HELP_GROUPS.filter((g) => helpRoleOk(a, g.role))
     .map((g) => ({ key: g.key, title: g.title, names: g.names.filter(usable), hints: (g.hints || []).slice() }));

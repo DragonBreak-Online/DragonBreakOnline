@@ -10,7 +10,9 @@
 //   - every player command has a menu entry, is named in a hint, or is in EXCLUDED with the reason; nothing falls
 //     through to the Other tab, and every staff command has a /help admin topic;
 //   - staff entries reach staff alone, and the panel keeps to what its front draws: a numeric widget id, unique entry
-//     names and hint lines, boxes with no drop-downs, plain ASCII text.
+//     names and hint lines, boxes with no drop-downs, plain ASCII text;
+//   - /rebellion is under Groups while risings are on (rebellion.js __dboRebellionOpen) and in no topic, tab or search
+//     while they are off.
 // Run it from this folder's parent with
 //   node tests/menu-coverage-harness.js            (FORK=<fork> for the key check; run-all.sh passes it)
 'use strict';
@@ -52,7 +54,6 @@ const EXCLUDED = {
   wildlife: 'rare: what roams the wilds',
   champions: 'rare: named beasts abroad',
   playtest: 'rare: what part of the world is open',
-  rebellion: 'off until config rebellion.enabled (switched on with Nate); give it a topic when risings open',
 };
 // Words the chat handler takes before it looks for a command (gamemode.js handleChat)
 const CHAT_WORDS = new Set(['say', 'low', 'whisper', 'wide', 'shout', 'me', 'melow', 'melong', 'my', 'mylow', 'mylong', 'do', 'dolow',
@@ -243,6 +244,40 @@ for (const [label, w] of [['player', P], ['staff', S]]) {
 }
 const unexpanded = entriesOf(S).filter((e) => /\$\{/.test(e.desc) && !/^unstuck$/.test(e.name)).map((e) => e.name);
 check('no help text shows an unfilled ${...} (the scan keeps templates as written; only /unstuck has one, filled at load)', unexpanded.length === 0, unexpanded.join(', '));
+
+// ---- /rebellion follows the risings flag (rebellion.js __dboRebellionOpen, config rebellion.enabled) --------------
+// While risings are off, /rebellion is in no topic, no tab and not the panel's search (typed, it says risings are not in
+// force). Once the flag is on it is under Groups for everyone, read when the menu is built (no reload); off again, it goes.
+// The flag is null when rebellion.js failed to load, and absent in a line without it.
+const rb = registered.get('rebellion');
+check('/rebellion is a player command (not staff, not hidden): typed, it runs whatever the flag', !!rb && !rb.admin && !rb.hidden, JSON.stringify(rb));
+const hadFlag = Object.prototype.hasOwnProperty.call(globalThis, '__dboRebellionOpen'), flagWas = globalThis.__dboRebellionOpen;
+const setFlag = (v) => { if (v === undefined) delete globalThis.__dboRebellionOpen; else globalThis.__dboRebellionOpen = v; };
+const rebellionIn = (a) => {
+  const w = panelOf(a);
+  const run = () => { chatted.length = 0; ui.get('menuRun').forEach((fn) => fn(a, [w.nonce, 'rebellion', 'status'])); return chatted.map((c) => c.text); };
+  return { topics: api.helpGroupsFor(a).filter((g) => g.names.includes('rebellion')).map((g) => g.key),
+    tabs: w.tabs.filter((t) => t.entries.some((e) => e.name.split(' ')[0] === 'rebellion')).map((t) => t.key),
+    search: (w.searchOnly || []).some((e) => e.name.split(' ')[0] === 'rebellion'),
+    entry: w.tabs.flatMap((t) => t.entries).find((e) => e.name === 'rebellion') || null, ran: run() };
+};
+const nowhere = (x) => !x.topics.length && !x.tabs.length && !x.search && !x.ran.length;
+for (const [label, flag] of [['risings off', () => false], ['rebellion.js failed to load (null)', null], ['no rebellion.js (no flag)', undefined]]) {
+  setFlag(flag);
+  const seen = [PLAYER, STAFF].map(rebellionIn);
+  check(`/rebellion, ${label}: in no topic, no tab, not the search, and a panel button for it runs nothing (player and staff)`, seen.every(nowhere),
+    JSON.stringify(seen.map(({ entry, ...x }) => x)));
+}
+setFlag(() => true);
+const onSeen = [PLAYER, STAFF, RANKED, BEAST].map(rebellionIn);
+check('/rebellion, risings on: under Groups in /help and in the panel\'s Groups tab, for players and staff', onSeen.every((x) => x.topics.join() === 'groups' && x.tabs.join() === 'groups'),
+  JSON.stringify(onSeen.map(({ entry, ...x }) => x)));
+check('...and its panel button runs "/rebellion status"', onSeen.every((x) => x.ran.length === 1 && x.ran[0] === '/rebellion status'), JSON.stringify(onSeen.map((x) => x.ran)));
+check('...and the button says what it does, in plain ASCII', onSeen.every((x) => x.entry && x.entry.desc && [x.entry.label, x.entry.desc].every((t) => /^[\x20-\x7e]+$/.test(t))),
+  JSON.stringify(onSeen[0].entry));
+setFlag(() => false);
+check('/rebellion, risings switched off again: gone from every topic and tab', [PLAYER, STAFF].map(rebellionIn).every(nowhere));
+if (hadFlag) globalThis.__dboRebellionOpen = flagWas; else delete globalThis.__dboRebellionOpen;
 
 delete globalThis.__dboSuperKind;
 console.log(failures ? `${failures} failure(s)` : 'all passed');
