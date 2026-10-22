@@ -702,6 +702,6 @@
     "e7eb:Dawnguard.esm": "DLC1nVampireBloodMagicRingDrainingClaws (Ring of Draining Claws): cut Vampire Lord jewellery the base game never places, with no enchantment, so it does nothing but sell for 1000; came out of a Master chest (#8HSY, 17 Oct); never loot",
     "e803:Dawnguard.esm": "DLC1nVampireNightPowerNecklaceBloodyGrip (Amulet of Draining Grip): cut Vampire Lord jewellery the base game never places, with no enchantment, so it does nothing but sell for 1000; came out of a Master chest (#8HSY, 17 Oct); never loot",
     "f4d7:Dawnguard.esm": "DLC1nVampireNightPowerNecklaceDrain (Amulet of Drain Magicka): cut Vampire Lord jewellery the base game never places, with no enchantment, so it does nothing but sell for 1000; came out of a Master chest (#8HSY, 17 Oct); never loot",
-    "f4d5:Dawnguard.esm": "DLC1nVampireNightPowerNecklaceGargoyle (Amulet of the Gargoyle): cut Vampire Lord jewellery the base game never places, with no enchantment, so it does nothing but sell for 1000; came out of a Master chest (#8HSY, 17 Oct); never loot"
+    "f4d5:Dawnguard.esm": "DLC1nVampireNightPowerNecklaceGargoyle (Amulet of the Gargoyle): a vanilla Volkihar quest reward (DLC1RV09, Amulets of Night Power), not cut; its Vampire Lord bonus is a vanilla script (DLC1PlayerVampireQuest) our server-driven form does not run, so here it does nothing but sell for 1000; taken out with the 11 cut pieces (#8HSY, 17 Oct); never loot"
   }
 }
