@@ -648,6 +648,7 @@ module.exports = (api) => {
   const VAMP_DRAIN = [0, sk('8d5bf'), sk('8d5c0'), sk('8d5c1'), sk('8d5c2')];
   const VAMP_THRALL = [0, sk('ed0a4'), sk('ed0a5'), sk('ed0a6'), sk('ed0a7')];
   const VAMP_SIGHT = sk('c4de1'), VAMP_SEDUCTION = sk('c4de2'), VAMP_EMBRACE = sk('88821');
+  const SEDUCED_MS = 30000; // Vampiric Seduction's calm, vanilla 30 s: a feed on the seduced needs no asking until then
   const vampSpellsFor = (stage) => {
     const n = Math.max(1, Math.min(4, stage || 1));
     return [VAMP_DRAIN[n], VAMP_THRALL[n], VAMP_SIGHT, n >= 2 ? VAMP_SEDUCTION : 0, n >= 4 ? VAMP_EMBRACE : 0].filter(Boolean);
@@ -849,6 +850,12 @@ module.exports = (api) => {
   };
   globalThis.__dboSuperSpellHit = (agg, tgt, spellId) => {
     try { vampHealHit(Number(agg) >>> 0, Number(tgt) >>> 0, Number(spellId) >>> 0); } catch (e) { log('supernatural: healing check failed', e.message); }
+    // Vampiric Seduction calms a player for the vampire who cast it: the next feed on them needs no asking (Onny, 22 Oct:
+    // "bite people over and over again, but it doesn't actually count as feeding"; the bite was vanilla's, in the caster's game only)
+    if (VAMP_SEDUCTION && (Number(spellId) >>> 0) === VAMP_SEDUCTION && agg !== tgt && isPlayer(tgt) && kindOf(agg) === 'vampire') {
+      seduced.set(Number(tgt) >>> 0, { a: Number(agg) >>> 0, until: Date.now() + SEDUCED_MS });
+      return;
+    }
     if (WW_FEED_HOLD && (Number(spellId) >>> 0) === WW_FEED_HOLD) { wolfFeedHold(Number(agg) >>> 0, Number(tgt) >>> 0); return; }
     if (agg === tgt || !VAMP_DRAIN_SET.has(Number(spellId) >>> 0)) return;
     const p = health(agg); if (p && p.health > 0) setHealth(agg, p.health + 0.03);
@@ -2050,6 +2057,8 @@ module.exports = (api) => {
   });
   globalThis.__dboSuperActivate = (t, a) => {
     if (!isPlayer(a)) return false;
+    // E on a player the vampire has Seduced feeds on them, as vanilla's bite does
+    if (seducedBy(t, a)) return feedSeduced(a, t);
     const s = stateOf(a); if (!s || (!s.kind && beastForm(a) !== 'werewolf')) return false;
     // E again on the body being fed on keeps the feed going rather than opening it
     const mine = feeds.get(a >>> 0); if (mine && mine.t === (t >>> 0)) return true;
@@ -2101,6 +2110,18 @@ module.exports = (api) => {
   // X menu: Feed (and Feed Deeply, from the rank bloodranks.js names) on another player, each victim once per
   // feedLivingEveryDays. A bound captive is fed on at once; anyone else is asked, and answers in a panel.
   const livingFedAt = globalThis.__dboSuperLivingFed || (globalThis.__dboSuperLivingFed = new Map()); // victim actorId -> gameDays
+  // victim actorId -> { a: the vampire who Seduced them, until } (Vampiric Seduction lasts 30 s in vanilla)
+  const seduced = globalThis.__dboSuperSeduced || (globalThis.__dboSuperSeduced = new Map());
+  const seducedBy = (t, a) => { const sd = seduced.get(t >>> 0); if (!sd) return false; if (Date.now() >= sd.until) { seduced.delete(t >>> 0); return false; } return sd.a === (a >>> 0); };
+  const feedSeduced = (a, t) => {
+    let dead = true; try { dead = !!mp.get(t, 'isDead'); } catch (e) { /* not an actor */ }
+    if (dead || kindOf(a) !== 'vampire') return false;
+    const last = livingFedAt.get(t >>> 0);
+    if (last !== undefined && gameDays() - last < Number(C.feedLivingEveryDays)) { personal(a, 'They have no blood left to give. Let them recover.'); return true; }
+    seduced.delete(t >>> 0);
+    startFeed(a, t, { onCorpse: false, willing: true });
+    return true;
+  };
   const FEED_PROMPT_ID = 51;
   // Kept across hot reloads: requests by victim, each vampire's last ask, refusals by vampire:victim, each UI's panels
   const ASK = globalThis.__dboSuperAsk || (globalThis.__dboSuperAsk = { pending: new Map(), askedAt: new Map(), refused: new Map(), caps: new Map() });
@@ -2226,6 +2247,7 @@ module.exports = (api) => {
     const last = livingFedAt.get(t >>> 0);
     if (last !== undefined && gameDays() - last < Number(C.feedLivingEveryDays)) { personal(a, `${name(a, t)} has no blood left to give. Let them recover.`); return true; }
     if (boundCaptive(t)) { startFeed(a, t, { onCorpse: false, long }); return true; }
+    if (seducedBy(t, a)) { seduced.delete(t >>> 0); startFeed(a, t, { onCorpse: false, long, willing: true }); return true; }
     if (!askable(a, t)) { personal(a, `${name(a, t)} cannot be asked now.`); return true; }
     askFeed(a, t, long, name);
     return true;
