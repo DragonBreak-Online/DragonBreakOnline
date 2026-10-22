@@ -77,10 +77,23 @@ const files = fs.readdirSync(ROOT).filter((f) => f.endsWith('.js'));
 for (const f of files) {
   const src = fs.readFileSync(path.join(ROOT, f), 'utf8');
   const calls = [...src.matchAll(/registerChatCommand\s*\(/g)].map((m) => m.index);
+  // A local helper whose first parameter is the name (placement.js worldCommand): its calls are read instead, each with
+  // the helper's flags and its last quoted argument as the help
+  const helpers = [...src.matchAll(/const\s+(\w+)\s*=\s*\(\s*(\w+)\s*,[^)]*\)\s*=>\s*(registerChatCommand\s*\(\s*\2\s*,)/g)]
+    .map((m) => ({ name: m[1], at: m.index + m[0].length - m[3].length }));
+  for (const h of helpers) {
+    const k = calls.indexOf(h.at);
+    const o = (src.slice(h.at, k + 1 < calls.length ? calls[k + 1] : h.at + 30000).match(/,\s*(\{\s*(?:admin|hidden|help)\s*:[^\n]*?\})\s*\)/) || [])[1] || '';
+    for (const m of src.matchAll(new RegExp(`\\b${h.name}\\(\\s*'([^']+)'[^\\n]*`, 'g'))) {
+      const help = (m[0].match(/,\s*('(?:[^'\\]|\\.)*')\s*\);?\s*$/) || [])[1];
+      registered.set(m[1].toLowerCase(), { file: f, admin: /\badmin\s*:\s*true\b/.test(o), dynamicAdmin: false, hidden: /\bhidden\s*:\s*true\b/.test(o), help: help ? unquote(help) : '' });
+    }
+  }
   for (let k = 0; k < calls.length; k++) {
     const at = calls[k];
     const before = src.slice(Math.max(0, at - 6), at);
     const head = src.slice(at, at + 200);
+    if (helpers.some((h) => h.at === at)) continue;
     if (/const\s+$/.test(src.slice(Math.max(0, at - 6), at)) || /^registerChatCommand\s*\(\s*oldName\b/.test(head)) continue; // the definitions
     void before;
     const m = head.match(/^registerChatCommand\s*\(\s*(['"])([^'"]+)\1\s*,/);
