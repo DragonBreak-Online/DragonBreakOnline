@@ -52,6 +52,7 @@ const EXCLUDED = {
   wildlife: 'rare: what roams the wilds',
   champions: 'rare: named beasts abroad',
   playtest: 'rare: what part of the world is open',
+  rebellion: 'off until config rebellion.enabled (switched on with Nate); give it a topic when risings open',
 };
 // Words the chat handler takes before it looks for a command (gamemode.js handleChat)
 const CHAT_WORDS = new Set(['say', 'low', 'whisper', 'wide', 'shout', 'me', 'melow', 'melong', 'my', 'mylow', 'mylong', 'do', 'dolow',

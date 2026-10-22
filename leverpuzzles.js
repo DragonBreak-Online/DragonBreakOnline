@@ -91,7 +91,7 @@ module.exports = (api) => {
     if (!p || !['open', 'reset'].includes(what)) return personal(a, `Usage: /leverpuzzle open|reset <${PUZZLES.map((x) => x.id).join('|')}>`);
     if (what === 'open') { for (const l of p.levers) litOf(p).add(l.sign); const ok = setDoor(p, true); audit(`LEVERPUZZLE GM ${who(a)} opened ${p.name}`); return personal(a, ok ? `${p.name}: the door is open.` : `${p.name}: the door could not be opened (see the log).`); }
     reset(p); audit(`LEVERPUZZLE GM ${who(a)} reset ${p.name}`); return personal(a, `${p.name}: levers up, door shut.`);
-  }, { admin: true, hidden: true });
+  }, { admin: true, hidden: true, help: 'open|reset <puzzle id>: open a lever puzzle\'s door, or reset it, should it not move' });
 
   log(`leverpuzzles ${C.enabled ? 'on' : 'off'}: ${byLever.size} levers in ${PUZZLES.length} puzzles`);
 };

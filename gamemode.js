@@ -962,12 +962,12 @@ const TEACH_TIER_NAME = (() => {
 })();
 
 const HELP_GROUPS = [
-  { key: 'people', title: 'Chat and people', names: ['players'],
+  { key: 'people', title: 'Chat and people', names: ['players', 'duel'],
     hints: ['Talking: type in chat (T). /low /whisper /wide /shout set how far you carry; /me /my /do emote; /looc is out of character.',
-      'Introducing yourself, trading or inspecting someone: look at them and press X.', 'Emotes: press B.', 'Hiding your face: press H.',
+      'Introducing yourself, trading, inspecting or challenging someone to a duel: look at them and press X.', 'Emotes: press B.', 'Hiding your face: press H.',
       'Letters by pigeon, and yours to read: a notice board. A bird flies only to someone you have met.',
       'Everyone you have met: the ledger at a notice board or in your home (/ledger).'] },
-  { key: 'character', title: 'Your character', names: ['status', 'boost', 'appearance', 'playtime'],
+  { key: 'character', title: 'Your character', names: ['status', 'boost', 'referral', 'appearance', 'playtime'],
     hints: ['Your journal: press F3. Profile, stats, skills, magic, your god, and settings such as your keys.',
       'A new look: /appearance reopens the appearance editor (gold, once a day; race, sex and name stay).',
       'Your skills: press K (the Skills tab of your journal).', 'Spending a level: /status tells you when you have a point.',
@@ -977,7 +977,7 @@ const HELP_GROUPS = [
       'Changing a school of magic: a Scholars\' Ledger or a Study Magic shelf, once every 7 days.',
       'Spell tomes: bought in the Synod Conclave, read at a study spot there or in Frost Crag Spire.',
       `Classes: a Class Lectern. At ${TEACH_TIER_NAME} in Arcane Arts or Priest you can /teach a spell to someone beside you.`] },
-  { key: 'faith', title: 'Faith and the unseen', names: ['pray'],
+  { key: 'faith', title: 'Faith and the unseen', names: ['pray', 'greenpact', 'partake'],
     hints: ['Your god, and turning to another: F3, the Deity tab, or /deity.',
       'Offerings and rites: a shrine. Molag Bal gives the Embrace, Hircine the Great Hunt; Arkay or Stendarr lift a curse for a filled black soul gem.',
       'A fever caught from a vampire or a werewolf: a Cure Disease potion, or prayer at a shrine of the Divines.'] },
@@ -995,7 +995,7 @@ const HELP_GROUPS = [
   { key: 'rule', title: 'Rule and property', names: ['officials', 'appoint', 'dismiss', 'tax', 'ledgerpoint'], role: 'official',
     hints: ['Your court: F3, the Court tab. A post you appoint someone to is offered, and they accept it.',
       'An outlaw of your hold (ruler or Steward): /bounty set <name or #TAG> <gold, up to 1000> <reason>; the jailer collects it.'] },
-  { key: 'groups', title: 'Groups and dungeons', names: ['party', 'court', 'charter', 'nobility', 'burglary', 'fence', 'stolen'],
+  { key: 'groups', title: 'Groups and dungeons', names: ['party', 'guild', 'court', 'charter', 'nobility', 'burglary', 'fence', 'stolen'],
     hints: ['Your factions and your court: F3, the Faction and Court tabs. The nobles of your hold: F3, the Nobility tab.',
       'Thieves of a guild the staff approved: crouch at the locked door of a player\'s home to break in, and fence what you take at your guild\'s Fence Chest (/fence). Guards: /fence report a fence, /stolen to search a captured thief.',
       'A dungeon: its door. The party leader picks Novice, Adept, Expert or Master; /dungeon says what is claimed.',
@@ -1013,7 +1013,7 @@ const HELP_GROUPS = [
 const HELP_BY_OBJECT = new Set(['bank', 'board', 'business', 'faction', 'deity', 'rite', 'tomes', 'respawn', 'skills',
   'ledger', 'chill', 'sentence', 'hunger', 'rest', 'tokens', 'whoami', 'pigeonblock', 'sign', 'level', 'spells',
   'teach', 'reroll', 'offer', 'contract', 'commission', 'wildlife', 'champions', 'whereami', 'playtest', 'dungeon', 'ping',
-  'expedition', 'expeditions', 'blackreach', 'shop']);
+  'expedition', 'expeditions', 'blackreach', 'shop', 'rebellion']);
 const helpRoleOk = (a, role) => {
   if (!role) return true;
   try {
@@ -1040,7 +1040,8 @@ const helpLine = (n) => { const c = commands.get(n); return `/${n}${c && c.help 
 // listed under Other staff tools.
 const STAFF_HELP = [
   { key: 'players', title: 'Players', items: ['players', 'kick', 'discipline', 'tp', 'fixloc', 'chargen', 'grantappearance', 'rename', 'sethunger', 'wipechars',
-    ['tokens', '<player|#TAG>: someone\'s Patreon tier and identity rerolls left'], 'stats', 'charstats', 'bugs', 'realnames'] },
+    ['tokens', '<player|#TAG>: someone\'s Patreon tier and identity rerolls left'], 'rerollrefund', 'stats', 'charstats', 'bugs', 'realnames', 'chars',
+    'appearancecancel', 'vaults', 'acstate', 'anticheat'] },
   { key: 'calls', title: 'GM calls from players', items: [['gm list', '[all]: the open calls (all: and the last ten closed)'],
     ['gm take', '<n>: the call is yours; the player is told you are on the way, other staff who took it'],
     ['gm goto', '<n>: go to the caller (to where they called from, if they are offline); takes the call if nobody has'],
@@ -1054,14 +1055,15 @@ const STAFF_HELP = [
     ['appoint', '<player|#TAG|profile id> <zone> <rank> [override]: make someone an official, online or offline. A Jarl must be a Breton, a Nord or an Imperial; only the Owners may add override. /appoint alone lists the zone ids; a wrong rank lists that zone\'s ranks. Rulers name 5 Stewards, 2 Court Mages, a Guard Captain and any number of Guards; Chieftains 5 Banes, a Shaman, a Wise-Woman, a Guard Commander and any number of Guards; captains name Guards'],
     ['dismiss', '<player|#TAG|profile id> <zone>: remove an official, online or offline (told if online). Officials may dismiss the ranks they may appoint'],
     ['officials', '[zone]: who holds which rank where'],
-    ['property', 'at a door, as an official: sell <price> | list <deposit> <weekly> | unlist | offer <name> | remind | grace | evict']] },
+    ['property', 'at a door, as an official: sell <price> | list <deposit> <weekly> | unlist | offer <name> | remind | grace | evict'],
+    'grantproperty', 'leadership'] },
   { key: 'elections', title: 'Hold elections', items: ['electionreview', 'strikevote', 'unstrikevote'] },
-  { key: 'beasts', title: 'Beasts and the supernatural', items: ['beastform', 'curse', 'makesuper', 'vlremote', 'wwremote', 'feedpair', 'raid', 'warband'] },
+  { key: 'beasts', title: 'Beasts and the supernatural', items: ['beastform', 'curse', 'makesuper', 'vlremote', 'wwremote', 'feedpair', 'raid', 'warband', 'vampeyes'] },
   { key: 'magic', title: 'Magic and crafts', items: ['schools', 'shoutclean', 'classteacher', 'preacher', 'manual', 'smithing', 'tailoring', 'enchant'] },
   { key: 'law', title: 'Law', items: ['jail', ['concordat', '[races]: Concordat arrests standing, or the Thalmor outside the race rule'],
     ['dossier', 'list | read <name|#TAG> | reports | add <name|#TAG> <text> | strike <name|#TAG> <n>: the Thalmor dossiers and informant reports (add and strike: Lead GM)']] },
   { key: 'world', title: 'World', items: ['settime', 'setweather', 'timescale', 'region', ['dungeon end', '<dungeon id|name>: end a dungeon claim now'],
-    'placed', 'placeundo', 'placeexport', 'masktest', 'couriers'] },
+    'placed', 'placeundo', 'placeexport', 'worldedits', 'worldhide', 'worldshow', 'masktest', 'couriers', 'traps', 'leverpuzzle'] },
   { key: 'debug', title: 'Server and debugging', items: ['monitor', 'load', 'selftest', 'npc', 'mv', 'driftset', 'driftspawn', 'driftrepair',
     'staffdiag', 'voicediag', 'staffstats', 'gearswap', 'factiongear'] },
 ];
