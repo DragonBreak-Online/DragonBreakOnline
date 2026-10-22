@@ -453,6 +453,29 @@ const SCHOOLS_GRANT = new RegExp(`^SCHOOLS [\\s\\S]{1,200}? granted (${WHO_RX} \
 AUDIT_VERBS.SCHOOLS.cut = (text) => text.replace(SCHOOLS_GRANT, 'SCHOOLS staff granted $1');
 // SPELL TRIM ... shouts: <state>; by <by>: <why> (spells.js staff trim): by and why are written by staff in config, so they go
 AUDIT_VERBS.SPELL.cut = (text) => text.replace(/^(SPELL TRIM [\s\S]*?, shouts: (?:untouched|none granted|grant kept \(it cannot be kept in part\)|grant taken off|grant could not be taken off)); by [\s\S]*$/, '$1');
+// true when unquote(raw) lost the end of the line (a quote left unmatched takes the rest with it), or parseAudit's cap did:
+// the line then ends in someone's words, so a cut that keeps the server's own end of the line has none to keep
+const endLost = (raw) => { const s = String(raw || ''); return s.length >= 600 || s.replace(/"[^"\n]{0,600}"/g, '').includes('"'); };
+// CONTRACT <official> set <hold> <price|budget|standing> <typed>: <sentence> (contracts.js setTerms): the chat passes every
+// word typed after the term and setTerms reads only the first one or two, so the rest is an official's own words (review
+// F2/PLA-2, 22 Oct): they go. The server's sentence stays (it says the tier, the gold or on/off): the one after the last
+// ": <hold>", kept only when it is word for word one setTerms writes and the end of the line is not lost, so typed words with
+// a colon, a fake sentence or a quote in them never pass. With no such sentence nothing after the term is kept, and a set
+// line of any other shape keeps nothing at all
+const CONTRACT_SET = new RegExp(`^(CONTRACT ${WHO_RX} set (.{1,60}?) (price|budget|standing))(?= )`);
+const CONTRACT_SAID = {
+  price: /^ now pays \d{1,12} gold a kill for (?:pests|dangerous beasts|deadly beasts) \(tier [123]; was \d{1,12}\)\. Contracts already taken keep their pay\.$/,
+  budget: /^'s standing contracts may now commit \d{1,12} gold a week \(was \d{1,12}\); -?\d{1,12} is left this week\.$/,
+  standing: /^ posts (?:standing contracts again|no standing contracts; those up now come down and their gold goes back to the treasury\. Contracts already taken run on)\.$/,
+};
+AUDIT_VERBS.CONTRACT.cut = (text, raw) => {
+  const h = text.match(CONTRACT_SET);
+  if (!h) return /^CONTRACT [\s\S]*?\) set /.test(text) ? 'CONTRACT' : text;
+  const [, head, hold, term] = h;
+  const at = text.lastIndexOf(`: ${hold}`);
+  const said = at > h[0].length ? text.slice(at + 2 + hold.length) : '';
+  return !endLost(raw) && CONTRACT_SAID[term].test(said) ? `${head}: ${hold}${said}` : head;
+};
 // Duels: display() names in the reasons ("Rowan #PGDB yielded"); the one beaten, killed or challenged is the target
 clean_('DUEL', { display: true, roles: R_BY([[/ (?:against|beat|killed|challenge to) $/, 'target']]) });
 // Record, config and dungeon names, hex refs and numbers only
@@ -972,7 +995,8 @@ const parseAudit = (body) => {
   if (!def) return { verb: null, unknown: unknownVerbKey(raw), events: [] };
   if (def.cls === 'excluded') return { verb, cls: 'excluded', events: [] };
   let text = unquote(raw);
-  if (typeof def.cut === 'function') text = def.cut(text);
+  // a cut function also gets the raw line, to tell whether unquote lost its end (endLost)
+  if (typeof def.cut === 'function') text = def.cut(text, raw);
   else if (def.cut) { const m = text.match(def.cut); if (m) text = text.slice(0, m.index); }
   text = text.replace(/\s+$/, '');
   const P = partiesOf(text, !!def.display || def.cls === 'parsed');

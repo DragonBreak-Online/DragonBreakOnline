@@ -178,6 +178,44 @@ out = run(`SCHOOLS ${CANARY} Staff granted Rowan #PGDB (profile 1, <@33733777397
 ok(out.length === 1 && out[0].ev === 'act.SCHOOLS' && out[0].c === 'PGDB' && /granted Rowan #PGDB 5 Alteration levels: 10 to 15 \(primary; held at 15/.test(out[0].f.text) && !JSON.stringify(out).includes(CANARY), 'SCHOOLS grant: the giver and the reason (a gift\'s staff-written by and reason) are cut, the target and the levels stay', out);
 out = run(`SPELL TRIM t1 Rowan #PGDB (profile 1, <@337337773973569537>) done: 3 spell(s) removed, 0 not learned, 1 kept as spellbook, prepared or on loan, shouts: grant kept (it cannot be kept in part); by ${CANARY}: ${CANARY} had 331 spells`);
 ok(out.length === 1 && out[0].c === 'PGDB' && /3 spell\(s\) removed, .*shouts: grant kept \(it cannot be kept in part\)$/.test(out[0].f.text) && !JSON.stringify(out).includes(CANARY), 'SPELL TRIM: the staff-written by and why are cut, the counts stay', out);
+// CONTRACT <official> set <hold> <term> <typed>: <the server's sentence> (contracts.js setTerms): /contract price|budget|standing
+// passes every word typed after the term and reads only the first one or two, so the rest is an official's own words
+// (review F2/PLA-2, 22 Oct). They go; the server's sentence, which says the tier, the gold or on/off, stays
+const ROWAN = 'Rowan #PGDB (profile 1, <@337337773973569537>)';
+const PAYS = (g, t, w) => `Bruma now pays ${g} gold a kill for pests (tier ${t}; was ${w}). Contracts already taken keep their pay.`;
+const OFF = 'Bruma posts no standing contracts; those up now come down and their gold goes back to the treasury. Contracts already taken run on.';
+const contractText = (line) => { const o = run(line); return o.length === 1 && o[0].ev === 'act.CONTRACT' && o[0].c === 'PGDB' && !(o[0].o || []).length && !JSON.stringify(o).includes(CANARY) ? o[0].f.text : JSON.stringify(o); };
+let got = contractText(`CONTRACT ${ROWAN} set Bruma price 1 50 ${CANARY} typed words: ${PAYS(50, 1, 12)}`);
+ok(got === `set Bruma price: ${PAYS(50, 1, 12)}`, 'CONTRACT set: the words typed after the term are cut, the hold, the term and the server\'s sentence stay', got);
+got = contractText(`CONTRACT ${ROWAN} set Bruma price 3 70 ${CANARY}: with a colon: Bruma now pays 999 gold a kill for ${CANARY} fake: ${PAYS(70, 1, 60)}`);
+ok(got === `set Bruma price: ${PAYS(70, 1, 60)}`, '...also when the typed words hold a colon and a fake sentence (the last one is the server\'s)', got);
+got = contractText(`CONTRACT ${ROWAN} set Bruma price 1 57 Selene #K2QX (profile 2, <@22>) ${CANARY}: ${PAYS(57, 1, 56)}`);
+ok(got === `set Bruma price: ${PAYS(57, 1, 56)}`, '...and when they name another character (never a party of the line)', got);
+got = contractText(`CONTRACT ${ROWAN} set Bruma budget 400 ${CANARY}: Bruma's standing contracts may now commit ${CANARY}: Bruma's standing contracts may now commit 400 gold a week (was 500); 400 is left this week.`);
+ok(got === 'set Bruma budget: Bruma\'s standing contracts may now commit 400 gold a week (was 500); 400 is left this week.', '...budget', got);
+got = contractText(`CONTRACT ${ROWAN} set Bruma standing on ${CANARY} typed: Bruma posts standing contracts again.`);
+ok(got === 'set Bruma standing: Bruma posts standing contracts again.', '...standing', got);
+got = contractText(`CONTRACT ${ROWAN} set Bruma price 1 55 x: Bruma now pays ${CANARY} words "unmatched: ${PAYS(55, 1, 50)}`);
+ok(got === 'set Bruma price', '...a quote typed takes the server\'s sentence with it: nothing after the term is kept, not a sentence the words fake', got);
+got = contractText(`CONTRACT ${ROWAN} set Bruma price 1 56 x: ${PAYS(999, 1, 1)} "unmatched: ${PAYS(56, 1, 55)}`);
+ok(got === 'set Bruma price', '...not even a word-for-word fake of the server\'s sentence (its numbers would be wrong)', got);
+got = contractText(`CONTRACT ${ROWAN} set Bruma standing off: ${OFF}`);
+ok(got === `set Bruma standing: ${OFF}`, '...a line with nothing typed after the value', got);
+out = run(`CONTRACT A B C D E F G #PGDB (profile 1, <@337337773973569537>) set Bruma price 1 50 ${CANARY}: ${PAYS(50, 1, 12)}`);
+ok(!JSON.stringify(out).includes(CANARY), '...a set line the cut cannot read (a name of seven words) keeps nothing', out);
+// every sentence setTerms can write (read from contracts.js, numbers filled in) passes the cut whole: a reworded sentence
+// fails here instead of quietly leaving the player log with "set <hold> <term>" only
+{
+  const csrc = fs.readFileSync(path.join(ROOT, 'contracts.js'), 'utf8');
+  const st = csrc.slice(csrc.indexOf('const setTerms = '), csrc.indexOf('audit(`CONTRACT ${who(a)} set '));
+  const said = [...st.matchAll(/`([^`]*)`/g)].map((m) => m[1]).filter((t) => t.startsWith('${zone.name}'))
+    .map((t) => t.replace(/\$\{zone\.name\}/g, 'Bruma').replace(/\$\{TIER_WORD\[tier\]\}/g, 'pests').replace(/\$\{tier\}/g, '1').replace(/\$\{[^}]*\}/g, '12'));
+  const bad = said.filter((s) => {
+    const term = / now pays /.test(s) ? 'price 1 12' : /'s standing contracts may now commit /.test(s) ? 'budget 12' : / again\.$/.test(s) ? 'standing on' : 'standing off';
+    return contractText(`CONTRACT ${ROWAN} set Bruma ${term} ${CANARY}: ${s}`) !== `set Bruma ${term.split(' ')[0]}: ${s}`;
+  });
+  ok(said.length === 4 && bad.length === 0, `...each of setTerms' ${said.length} sentences (of 4) is kept word for word`, bad);
+}
 out = run('LABOUR-MISMATCH Rowan #PGDB (profile 1) chop widget=win/3 replay=1/5 seed=ab');
 ok(out.some((r) => r.ev === 'sec.signal' && r.f.kind === 'mismatch' && r.f.game === 'labour'), 'a *-MISMATCH line is also a security signal', out.map((r) => r.ev));
 // ---- roles --------------------------------------------------------------------------------------------------------------------
