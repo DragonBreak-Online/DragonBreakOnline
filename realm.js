@@ -31,6 +31,12 @@
 //   end       when every territory named is taken, after the last window, or by peace (a tribute from one treasury to
 //             the other, accepted by the other leader) or surrender (the defender's hands the named land over).
 //
+// A rising (rebellion.js, Nate 22 Oct) is a war of kind 'rebellion': the hold's citizens' rebel faction against the hold's own
+// faction, for its capital. rebellion.js starts it through __dboRealmStartWar (no fee, no muster, its own notice and windows),
+// and its battles run while rebellion.enabled is on even with war.enabled off. Taking the capital asks rebellion.js first
+// (__dboRebellionCapitalFalling: the court is unseated and the rebels' claimant seated); every end of such a war is told to
+// rebellion.js (__dboRebellionWarEnded), which settles victory, defeat or peace.
+//
 // The leaders' controls are the war section of the faction panel (F3, next client package): dbo:war* events here.
 // Staff see and manage wars with /war (admins only).
 'use strict';
@@ -110,6 +116,10 @@ module.exports = (api) => {
     return [...out];
   };
   const onlineOf = (fid) => onlineActors().filter((a) => memberOf(a, fid));
+  // Who fights for a side of war w: in a rising the hold's own faction counts every household rank, the Citizen too, so a
+  // rebel who keeps a household rank fights for the rising only (Nate, 22 Oct)
+  const fightsFor = (w, a, fid) => memberOf(a, fid) && !(w.kind === 'rebellion' && fid === w.defender && memberOf(a, w.attacker));
+  const onlineFor = (w, fid) => onlineActors().filter((a) => fightsFor(w, a, fid));
   const nameOfFaction = (fid) => (info(fid) || {}).name || fid;
 
   // ---- ownership -----------------------------------------------------------------------------------------------------
@@ -124,7 +134,9 @@ module.exports = (api) => {
   // Until someone takes it, a territory belongs to the faction it names (territories.json owner, e.g. the Legion's forts),
   // else to its zone's hold faction
   const ownerOf = (tid) => { const o = owners().owners[tid]; if (o && o.faction) return o.faction; const t = territory(tid); return t ? (t.owner && info(t.owner) ? t.owner : holdFactionOf(t.zone)) : null; };
-  const setOwner = (tid, fid, why) => {
+  // quiet: no capital-taken consequences (rebellion.js hands a won capital back to the hold's own faction, whose court it has
+  // just seated)
+  const setOwner = (tid, fid, why, quiet) => {
     const prev = ownerOf(tid);
     owners().owners[tid] = { faction: fid, since: Date.now() };
     owners().history.push({ at: Date.now(), territory: tid, from: prev, to: fid, why });
@@ -132,7 +144,13 @@ module.exports = (api) => {
     writeJson(OWNERS, owners());
     audit(`REALM ${territory(tid) ? territory(tid).name : tid} passes from ${nameOfFaction(prev)} to ${nameOfFaction(fid)} (${why})`);
     const t = territory(tid);
-    if (t && prev !== fid && (holdCapital(t.zone) || {}).id === t.id) onCapitalTaken(t, prev, fid);
+    if (quiet || !t || prev === fid || (holdCapital(t.zone) || {}).id !== t.id) return;
+    // A rising that takes the capital: rebellion.js unseats the court through the court's own path first, so the household
+    // ranks follow the offices; the clearing below then finds nothing left
+    const rising = live().find((w) => w.kind === 'rebellion' && w.attacker === fid && w.defender === prev && w.goal.includes(t.id));
+    if (rising && typeof globalThis.__dboRebellionCapitalFalling === 'function') { try { globalThis.__dboRebellionCapitalFalling(rising, t); } catch (e) { log('realm: rebellion capital hook failed', e.message); } }
+    onCapitalTaken(t, prev, fid);
+    if (rising && typeof globalThis.__dboRebellionCapitalTaken === 'function') { try { globalThis.__dboRebellionCapitalTaken(rising, t); } catch (e) { log('realm: rebellion victory hook failed', e.message); } }
   };
   const territoriesOf = (fid) => territories().filter((t) => ownerOf(t.id) === fid);
   const worldOf = (a) => { try { return String(mp.get(a, 'worldOrCellDesc') || ''); } catch (e) { return ''; } };
@@ -224,7 +242,7 @@ module.exports = (api) => {
     }
     return [...new Set(out)].sort((x, y) => x - y);
   };
-  const windowChoices = (declaredAt) => slotsFrom(declaredAt + C.noticeDays * DAY).slice(0, 7);
+  const windowChoices = (declaredAt, noticeDays) => slotsFrom(declaredAt + (noticeDays === undefined ? C.noticeDays : noticeDays) * DAY).slice(0, 7);
 
   // ---- mustering at the capital ----------------------------------------------------------------------------------------
   // A faction's capital: the one its leader (or staff) chose, else staff's config seat, else a hold's capital territory,
@@ -359,6 +377,37 @@ module.exports = (api) => {
   const announce = (text) => { for (const a of onlineActors()) { system(a, text); try { sendPacket(a, { customPacketType: 'dboBanner', text, seconds: 6 }); } catch (e) { /* old client */ } } };
   const whenText = (ms) => new Date(ms).toISOString().replace('T', ' ').slice(0, 16) + ' UTC';
 
+ // The war record, saved. starts: the battle windows' start times
+  const makeWar = (o) => {
+    const w = {
+      id: wars().nextId++, attacker: o.attacker, defender: o.defender, goal: o.goal, declaredBy: o.by, declaredAt: o.now, startsAt: o.starts[0],
+      windows: o.starts.map((start) => ({ start, end: start + o.windowHours * 3600000 })),
+      death: o.death ? 'proposed' : null, status: 'notice', captures: [], endedAt: 0, outcome: '',
+    };
+    if (o.kind) w.kind = o.kind;
+    if (o.rebellion) w.rebellion = o.rebellion;
+    wars().wars.push(w);
+    saveWars();
+    return w;
+  };
+  // rebellion.js: a rising's war, past every rule of a declaration (rebellion.js holds its own: the petition, the hold's
+  // citizens, one rising per hold). o { attacker, defender, goal, by (profile), noticeDays, windowsPerWar, windowHours, death,
+  // rebellion (its id) }. { ok, text, war }
+  const startWar = (o) => {
+    const goal = [...new Set((o.goal || []).map(String))];
+    if (!info(o.attacker) || !info(o.defender) || o.attacker === o.defender) return { ok: false, text: 'There is no such faction.' };
+    const bad = goal.filter((g) => !territory(g));
+    if (!goal.length || bad.length) return { ok: false, text: 'There is no such land.' };
+    const now = Date.now();
+    const per = Math.max(1, Math.floor(Number(o.windowsPerWar) || C.windowsPerWar));
+    const starts = windowChoices(now, Number.isFinite(Number(o.noticeDays)) ? Number(o.noticeDays) : C.noticeDays).slice(0, per);
+    if (starts.length < per) return { ok: false, text: 'There are not enough battle windows after the notice; staff must set more evening slots.' };
+    const w = makeWar({ attacker: o.attacker, defender: o.defender, goal, by: o.by, now, starts, windowHours: Number(o.windowHours) || C.windowHours,
+      death: !!o.death && C.deathWar, kind: o.kind || 'rebellion', rebellion: o.rebellion });
+    audit(`WAR ${w.id} (${w.kind}) begun: ${nameOfFaction(w.attacker)} against ${nameOfFaction(w.defender)} for ${goal.map((g) => territory(g).name).join(', ')}; windows ${w.windows.map((x) => whenText(x.start)).join(', ')}${w.death ? '; proposed to the death' : ''}`);
+    return { ok: true, text: `The first battle window opens ${whenText(w.startsAt)}.`, war: w };
+  };
+
   // Returns { ok, text, war }
   const declare = (a, attacker, defender, goal, picks, toDeath) => {
     goal = [...new Set((goal || []).map(String))];
@@ -371,13 +420,7 @@ module.exports = (api) => {
     chosen.sort((x, y) => x - y);
     if (chosen.length < C.windowsPerWar) return { ok: false, text: 'There are not enough battle windows after the notice; staff must set more evening slots.' };
     if (!globalThis.__dboTreasury.spend(attacker, C.declareFee, `war declared on ${defender}`)) return { ok: false, text: 'The treasury could not pay the declaration.' };
-    const w = {
-      id: wars().nextId++, attacker, defender, goal, declaredBy: profileOf(a), declaredAt: now, startsAt: chosen[0],
-      windows: chosen.map((start) => ({ start, end: start + C.windowHours * 3600000 })),
-      death: toDeath && C.deathWar ? 'proposed' : null, status: 'notice', captures: [], endedAt: 0, outcome: '',
-    };
-    wars().wars.push(w);
-    saveWars();
+    const w = makeWar({ attacker, defender, goal, by: profileOf(a), now, starts: chosen, windowHours: C.windowHours, death: toDeath && C.deathWar });
     const land = goal.map((g) => territory(g).name).join(', ');
     audit(`WAR ${w.id} declared by ${who(a)}: ${nameOfFaction(attacker)} on ${nameOfFaction(defender)} for ${land}; windows ${w.windows.map((x) => whenText(x.start)).join(', ')}${w.death ? '; proposed to the death' : ''}`);
     announce(`${nameOfFaction(attacker)} declares war on ${nameOfFaction(defender)} for ${land}. The first battle is ${whenText(w.startsAt)}.`);
@@ -397,12 +440,16 @@ module.exports = (api) => {
     return { ok: true, text: accept ? 'You accept a war to the death.' : 'You refuse a war to the death.' };
   };
 
-  const endWar = (w, outcome) => {
-    w.status = 'ended'; w.endedAt = Date.now(); w.outcome = outcome;
+  // how (a rising's): 'won' (the attacker took what it named), 'lost' (the windows closed, or the attacker withdrew),
+  // 'peace', 'staff'; rebellion.js settles the rising by it
+  const endWar = (w, outcome, how) => {
+    if (w.status === 'ended') return;
+    w.status = 'ended'; w.endedAt = Date.now(); w.outcome = outcome; if (how) w.how = how;
     for (const k of [...S.capture.keys()]) if (k.startsWith(`${w.id}:`)) S.capture.delete(k);
     saveWars();
     audit(`WAR ${w.id} ended: ${outcome}`);
     announce(`The war between ${nameOfFaction(w.attacker)} and ${nameOfFaction(w.defender)} is over: ${outcome}.`);
+    if (w.kind === 'rebellion' && typeof globalThis.__dboRebellionWarEnded === 'function') { try { globalThis.__dboRebellionWarEnded(w, how || 'lost'); } catch (e) { log('realm: rebellion end hook failed', e.message); } }
   };
 
   // Peace: a tribute from the proposer's treasury (or the other's, when they ask for one), accepted by the other leader
@@ -441,7 +488,7 @@ module.exports = (api) => {
       }
     }
     const tributeText = w.peace.tribute;
-    endWar(w, `peace${tributeText ? `, ${nameOfFaction(from)} paying ${tributeText} gold` : ''}`);
+    endWar(w, `peace${tributeText ? `, ${nameOfFaction(from)} paying ${tributeText} gold` : ''}`, 'peace');
     return { ok: true, text: 'Peace is made.' };
   };
   const surrender = (a, id) => {
@@ -449,10 +496,10 @@ module.exports = (api) => {
     if (!w) return { ok: false, text: 'There is no such war.' };
     if (leads(a, w.defender)) {
       for (const g of w.goal) if (ownerOf(g) !== w.attacker) setOwner(g, w.attacker, `surrender in war ${w.id}`);
-      endWar(w, `${nameOfFaction(w.defender)} surrendered and gave up ${w.goal.map((g) => territory(g).name).join(', ')}`);
+      if (w.status !== 'ended') endWar(w, `${nameOfFaction(w.defender)} surrendered and gave up ${w.goal.map((g) => territory(g).name).join(', ')}`, 'won');
       return { ok: true, text: 'You surrender.' };
     }
-    if (leads(a, w.attacker)) { endWar(w, `${nameOfFaction(w.attacker)} withdrew`); return { ok: true, text: 'You withdraw from the war.' }; }
+    if (leads(a, w.attacker)) { endWar(w, `${nameOfFaction(w.attacker)} withdrew`, 'lost'); return { ok: true, text: 'You withdraw from the war.' }; }
     return { ok: false, text: 'Only the leaders of the two sides can surrender.' };
   };
 
@@ -473,20 +520,24 @@ module.exports = (api) => {
     }
     return false;
   };
+  // A rising's battles run while rebellion.enabled is on, whatever war.enabled says (Nate, 22 Oct)
+  const risingsOpen = () => typeof globalThis.__dboRebellionOpen === 'function' && !!globalThis.__dboRebellionOpen();
   const tick = () => {
-    if (!C.enabled) return;
+    const risings = risingsOpen();
+    if (!C.enabled && !risings) return;
     const now = Date.now();
     for (const w of live()) {
+      if (w.kind === 'rebellion' ? !risings : !C.enabled) continue;
       if (w.status === 'notice' && now >= w.startsAt) { w.status = 'active'; saveWars(); announce(`War: ${nameOfFaction(w.attacker)} against ${nameOfFaction(w.defender)}. The first battle window is open.${C.uniforms ? " Only fighters in their faction's uniform count at a standard." : ''}`); }
       if (w.status !== 'active') continue;
-      if (w.goal.every((g) => ownerOf(g) === w.attacker)) { endWar(w, `${nameOfFaction(w.attacker)} took everything it fought for`); continue; }
-      if (now >= lastEnd(w)) { endWar(w, `the last battle window closed with ${w.captures.length} capture(s)`); continue; }
+      if (w.goal.every((g) => ownerOf(g) === w.attacker)) { endWar(w, `${nameOfFaction(w.attacker)} took everything it fought for`, 'won'); continue; }
+      if (now >= lastEnd(w)) { endWar(w, `the last battle window closed with ${w.captures.length} capture(s)`, 'lost'); continue; }
       if (!inWindow(w, now)) continue;
       for (const tid of w.goal) {
         const t = territory(tid); if (!t) continue;
         const holder = ownerOf(tid);
-        const attackers = onlineOf(w.attacker).filter((x) => atMarker(x, t) && !isDownedOrDead(x) && uniformed(x, w.attacker, w, t));
-        const defenders = onlineOf(w.defender).filter((x) => atMarker(x, t) && !isDownedOrDead(x) && uniformed(x, w.defender, w, t));
+        const attackers = onlineFor(w, w.attacker).filter((x) => atMarker(x, t) && !isDownedOrDead(x) && uniformed(x, w.attacker, w, t));
+        const defenders = onlineFor(w, w.defender).filter((x) => atMarker(x, t) && !isDownedOrDead(x) && uniformed(x, w.defender, w, t));
         const taker = holder === w.defender ? w.attacker : holder === w.attacker ? w.defender : null;
         const takers = taker === w.attacker ? attackers : defenders;
         const holders = taker === w.attacker ? defenders : attackers;
@@ -501,6 +552,7 @@ module.exports = (api) => {
             w.captures.push({ territory: tid, by: taker, at: now });
             saveWars();
             setOwner(tid, taker, `captured in war ${w.id}`);
+            if (w.status === 'ended') break;   // a rising settled by its capital (rebellion.js ended it)
             announce(`${nameOfFaction(taker)} has taken ${t.name}.`);
             continue;
           }
@@ -522,7 +574,7 @@ module.exports = (api) => {
     for (const w of live()) {
       if (w.death !== 'accepted' || w.status !== 'active' || !inWindow(w, now)) continue;
       const sides = [[w.attacker, w.defender], [w.defender, w.attacker]];
-      const hit = sides.find(([v, k]) => memberOf(victim, v) && memberOf(killer, k));
+      const hit = sides.find(([v, k]) => fightsFor(w, victim, v) && fightsFor(w, killer, k));
       if (!hit) continue;
       const here = territoryAt(worldOf(victim), posOf(victim));
       if (!here || !w.goal.includes(here.id)) continue;
@@ -601,6 +653,16 @@ module.exports = (api) => {
   globalThis.__dboRealmTerritory = (tid) => territory(tid);
   globalThis.__dboRealmSeatTerritoryOf = (zone) => { const ts = territories().filter((t) => t.zone === zone); return ts.find((t) => t.id === zone) || ts.find((t) => Array.isArray(t.seatCells) && t.seatCells.length) || null; };
   globalThis.__dboRealmFactionsLedBy = (a) => factionsLedBy(a);
+  // rebellion.js: start, read and end a rising's war, answer its to-the-death proposal and surrender, a hold's capital, and
+  // hand a won capital back to the hold's faction without the capital-taken consequences
+  globalThis.__dboRealmStartWar = (o) => startWar(o || {});
+  globalThis.__dboRealmWar = (id) => wars().wars.find((w) => w.id === Number(id)) || null;
+  globalThis.__dboRealmEndWar = (id, outcome, how) => { const w = live().find((x) => x.id === Number(id)); if (!w) return false; endWar(w, String(outcome || 'ended'), how); return true; };
+  globalThis.__dboRealmAnswerDeath = (a, id, accept) => answerDeath(a, id, !!accept);
+  globalThis.__dboRealmSurrender = (a, id) => surrender(a, id);
+  globalThis.__dboRealmHoldCapital = (zoneId) => { const t = holdCapital(zoneId); return t ? { id: t.id, name: t.name, zone: t.zone } : null; };
+  globalThis.__dboRealmRestoreOwner = (tid, fid, why) => { if (!territory(tid) || !info(fid)) return false; setOwner(tid, fid, why, true); return true; };
+  globalThis.__dboRealmTerritoriesIn = (zoneId) => territories().filter((t) => t.zone === zoneId).map((t) => ({ id: t.id, name: t.name, owner: ownerOf(t.id) }));
   globalThis.__dboRealmTerritoriesOf = (fid) => territoriesOf(fid).map((t) => t.id);
   const reply = (a, r) => { if (!(typeof globalThis.__dboFactionRefresh === 'function' && globalThis.__dboFactionRefresh(a, r.text, r.ok))) personal(a, r.text); };
   // Every war action comes from the faction panel with its nonce first, so a stale window cannot act
@@ -633,7 +695,7 @@ module.exports = (api) => {
       saveWars(); audit(`WAR capital of ${x} set by ${who(a)}: ${d.capitals[x].name}`);
       return personal(a, `${nameOfFaction(x)}'s capital is ${d.capitals[x].name} now.`);
     }
-    if (sub === 'end' && x) { const w = live().find((q) => q.id === Number(x)); if (!w) return personal(a, 'No such war.'); endWar(w, `ended by staff (${display(a)})`); return personal(a, 'Ended.'); }
+    if (sub === 'end' && x) { const w = live().find((q) => q.id === Number(x)); if (!w) return personal(a, 'No such war.'); endWar(w, `ended by staff (${display(a)})`, 'staff'); return personal(a, 'Ended.'); }
     personal(a, `Territories: ${territories().map((t) => `${t.name} (${nameOfFaction(ownerOf(t.id))})`).join(', ') || 'none'}`);
     const ws = live();
     personal(a, ws.length ? ws.map((w) => `#${w.id} ${nameOfFaction(w.attacker)} vs ${nameOfFaction(w.defender)} [${w.status}] for ${w.goal.join(', ')}; windows ${w.windows.map((q) => whenText(q.start)).join(', ')}${w.death ? `; death ${w.death}` : ''}`).join(' | ') : 'No wars.');
@@ -644,5 +706,5 @@ module.exports = (api) => {
 
   every('realm', C.tickMs, () => { try { tick(); } catch (e) { log('realm: tick failed', e.message); } });
   log(`realm loaded: ${territories().length} territories, ${live().length} war(s) under way, war ${C.enabled ? 'OPEN' : 'closed (war.enabled false)'}`);
-  return { declare, answerDeath, proposePeace, answerPeace, surrender, tick, ownerOf, territoryAt, realmView, declareRefusal, windowChoices, setOwner, offerTreaty, answerTreaty, seatOf, musterRefusal, setCapital, holdCapital };
+  return { declare, startWar, endWar, answerDeath, proposePeace, answerPeace, surrender, tick, ownerOf, territoryAt, realmView, declareRefusal, windowChoices, setOwner, offerTreaty, answerTreaty, seatOf, musterRefusal, setCapital, holdCapital };
 };

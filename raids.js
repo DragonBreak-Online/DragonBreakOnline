@@ -11,6 +11,14 @@
 // A home's take is 3 things across its containers plus 15% of their gold; a container's is 3 things and 15% of its gold.
 // Never worn things (a container has none), never keys (keys go only to robbery's rare roll). The owner is told if online;
 // every break-in and the raid itself are in the audit log for the hold's officials and staff.
+//
+// A rising (rebellion.js, Nate 22 Oct): while a hold's rebellion is under way (its notice or its battles), and while
+// rebellion.enabled is on, its two sides may raid each other under these same rules even with raids.enabled off. The rebel
+// leader raids the land of the hold (any of its territories), breaking only into the homes of loyalists (members of the
+// hold's own faction: its court and household); the hold's ruler raids the same land for the declared rebels' homes. The
+// raided side is the one counted for minDefendersOnline. Such a raid ends with the rebellion. rebellion.js answers which
+// two sides a rising has (__dboRebellionRaidSides). The hold's stores and treasury are no raid target: gold in the bank and
+// the treasury is safe, as for every raid.
 'use strict';
 
 module.exports = (api) => {
@@ -31,6 +39,8 @@ module.exports = (api) => {
   // A member of a faction, as realm.js counts one (its roster, or any rank in a hold for a hold's faction)
   const memberOf = (a, fid) => (fn('__dboRealmMemberOf') ? !!fn('__dboRealmMemberOf')(a, fid) : guildsOf(a).some((g) => g.id === fid));
   const onlineOf = (fid) => onlineActors().filter((a) => memberOf(a, fid));
+  // A side of a rising: the hold's faction counts its Citizen rank too, so a declared rebel is never a loyalist here
+  const sideOf = (x, fid, rebels) => memberOf(x, fid) && !(rebels && fid !== rebels && memberOf(x, rebels));
   const placeName = (tid) => (fn('__dboRealmTerritoryName') ? fn('__dboRealmTerritoryName')(tid) : tid);
   const get = (a, prop, fallback) => { try { const v = mp.get(a, prop); return v === undefined || v === null ? fallback : v; } catch (e) { return fallback; } };
   const typeOf = (id) => { try { const r = recordOf(id >>> 0); return r && r.record ? String(r.record.type) : ''; } catch (e) { return ''; } };
@@ -39,23 +49,33 @@ module.exports = (api) => {
     const r = recordOf(id >>> 0);
     return String((r && r.record && r.record.editorId) || '').replace(/([a-z])([A-Z])/g, '$1 $2').replace(/\d+$/, '').trim() || 'something';
   };
-  const active = () => { const now = Date.now(); S.raids = S.raids.filter((r) => now < r.until); return S.raids; };
+  // A rising's raid lasts only while its rebellion does
+  const risingOn = (r) => !r.rebellion || (fn('__dboRebellionLive') ? !!fn('__dboRebellionLive')(r.rebellion) : false);
+  const active = () => { const now = Date.now(); S.raids = S.raids.filter((r) => now < r.until && risingOn(r)); return S.raids; };
+  // The rising whose sides these are, when raider raids target on land tid: { id, raided } or null
+  const risingFor = (raider, target, tid) => { try { return fn('__dboRebellionRaidSides') ? fn('__dboRebellionRaidSides')(raider, target, tid) || null : null; } catch (e) { return null; } };
 
   // ---- starting a raid -----------------------------------------------------------------------------------------------
-  const start = (a, raider, tid) => {
-    if (!C.enabled) return { ok: false, text: 'Raids are closed during the alpha, with war.' };
+  // target: the side raided, for a rising (the rebels' faction, raided on the hold's own land); else the land's owner
+  const start = (a, raider, tid, target) => {
+    const owner0 = ownerOf(tid);
+    const rising = owner0 ? risingFor(raider, target || owner0, tid) : null;
+    if (!C.enabled && !rising) return { ok: false, text: 'Raids are closed during the alpha, with war.' };
     if (!leads(a, raider)) return { ok: false, text: 'Only a faction\'s leader, or a hold\'s ruler, sends a raid.' };
-    const owner = ownerOf(tid);
-    if (!owner) return { ok: false, text: 'There is no such land.' };
+    if (!owner0) return { ok: false, text: 'There is no such land.' };
+    // The side raided: for a rising, the other side (the rebels on the hold's own land); else whoever owns the land
+    const owner = rising ? rising.raided : owner0;
     if (owner === raider) return { ok: false, text: 'That land is your own.' };
     if (active().some((r) => r.raider === raider)) return { ok: false, text: `${nameOfFaction(raider)} is already raiding.` };
     if (active().some((r) => r.territory === tid)) return { ok: false, text: 'That land is already being raided.' };
-    const last = Number(S.lastRaided[tid]) || 0;
+    const lastKey = rising ? `${tid}@${raider}` : tid;
+    const last = Number(S.lastRaided[lastKey]) || 0;
     if (Date.now() - last < C.cooldownDays * 86400000) return { ok: false, text: `That land was raided too recently; it can be raided again in ${Math.ceil((last + C.cooldownDays * 86400000 - Date.now()) / 3600000)} hours.` };
-    const defenders = onlineOf(owner).length;
+    const defenders = onlineActors().filter((x) => sideOf(x, owner, rising && rising.rebels)).length;
     if (defenders < C.minDefendersOnline) return { ok: false, text: `A raid needs ${C.minDefendersOnline} of ${nameOfFaction(owner)} online to defend (${defenders} are).` };
     const r = { raider, owner, territory: tid, by: a >>> 0, at: Date.now(), until: Date.now() + C.raidMinutes * 60000, broken: [] };
-    S.raids.push(r); S.lastRaided[tid] = r.at;
+    if (rising) { r.rebellion = rising.id; r.rebels = rising.rebels; }
+    S.raids.push(r); S.lastRaided[lastKey] = r.at;
     audit(`RAID ${who(a)}: ${nameOfFaction(raider)} raids ${placeName(tid)} (${nameOfFaction(owner)}) for ${C.raidMinutes} min`);
     for (const x of onlineOf(owner)) { personal(x, `Raiders of ${nameOfFaction(raider)} are loose in ${placeName(tid)}! Homes there can be broken into for the next ${C.raidMinutes} minutes.`); try { sendPacket(x, { customPacketType: 'dboBanner', text: `Raid! ${nameOfFaction(raider)} is raiding your land`, seconds: 6 }); } catch (e) { /* old client */ } }
     for (const x of onlineOf(raider)) personal(x, `The raid is on: break into homes and containers in ${placeName(tid)} for the next ${C.raidMinutes} minutes.`);
@@ -119,7 +139,10 @@ module.exports = (api) => {
     let where = null;
     for (const r of [home.ref, home.rec.partner].filter(Boolean)) { try { where = territoryAt(String(mp.get(r, 'worldOrCellDesc') || ''), mp.get(r, 'pos')); } catch (e) { /* unloaded */ } if (where) break; }
     if (!where) return false;
-    const raid = raids.find((r) => r.territory === where.id && memberOf(caster, r.raider));
+    // The home's character once property is per character (housingSystem.ts ownerActorsOf), else every character of the account
+    const ownerChars = (() => { try { return (typeof H.ownerActorsOf === 'function' ? H.ownerActorsOf(home.rec) : mp.getActorsByProfileId(home.rec.owner) || []).map((x) => Number(x) >>> 0); } catch (e) { return []; } })();
+    // A rising's raid breaks only into the raided side's homes: loyalists' for the rebels, declared rebels' for the hold
+    const raid = raids.find((r) => r.territory === where.id && sideOf(caster, r.raider, r.rebels) && (!r.rebellion || ownerChars.some((o) => sideOf(o, r.owner, r.rebels))));
     if (!raid) return false;
     // A home's break-in takes from its containers not yet broken into, and counts them all as broken: no second take
     const key = container ? `c${container}` : `h${home.ref}`;
@@ -131,8 +154,6 @@ module.exports = (api) => {
     const parts = []; if (r.gold) parts.push(`${r.gold} gold`); parts.push(...r.items);
     const what = parts.length > 1 ? `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}` : parts[0];
     personal(caster, what ? `You break in and take ${what}.` : 'You break in, but there is nothing worth taking.');
-    // The home's character once property is per character (housingSystem.ts ownerActorsOf), else every character of the account
-    const ownerChars = (() => { try { return (typeof H.ownerActorsOf === 'function' ? H.ownerActorsOf(home.rec) : mp.getActorsByProfileId(home.rec.owner) || []).map((x) => Number(x) >>> 0); } catch (e) { return []; } })();
     for (const o of ownerChars) if (onlineActors().includes(o)) system(o, `Raiders have broken into ${home.rec.name || 'your home'}${what ? ` and taken ${what}` : ''}.`);
     audit(`RAID break-in by ${who(caster)} (${nameOfFaction(raid.raider)}) at ${container ? `container ${container.toString(16)} of ` : ''}home ${home.ref.toString(16)} (${home.rec.ownerName || home.rec.owner}): ${what || 'nothing'}`);
     return true;
@@ -140,7 +161,7 @@ module.exports = (api) => {
 
   every('raids', 10000, () => {
     const before = S.raids.length;
-    const ended = S.raids.filter((r) => Date.now() >= r.until);
+    const ended = S.raids.filter((r) => Date.now() >= r.until || !risingOn(r));
     active();
     for (const r of ended) { audit(`RAID on ${placeName(r.territory)} by ${nameOfFaction(r.raider)} ended: ${r.broken.filter((k) => k.startsWith('h')).length} home(s) broken into`); for (const x of onlineOf(r.owner).concat(onlineOf(r.raider))) personal(x, `The raid on ${placeName(r.territory)} is over.`); }
     return before;
@@ -148,7 +169,9 @@ module.exports = (api) => {
 
   const fromPanel = (a, args) => fn('__dboFactionNonceOk') ? fn('__dboFactionNonceOk')(a, (args || [])[0]) : false;
   const reply = (a, r) => { if (!(fn('__dboFactionRefresh') && fn('__dboFactionRefresh')(a, r.text, r.ok))) personal(a, r.text); };
-  onUi('raidStart', (a, args) => { if (fromPanel(a, args)) reply(a, start(a, String(args[1] || ''), String(args[2] || ''))); });
+  onUi('raidStart', (a, args) => { if (fromPanel(a, args)) reply(a, start(a, String(args[1] || ''), String(args[2] || ''), args[3] ? String(args[3]) : undefined)); });
+  // rebellion.js's /rebellion raid
+  globalThis.__dboRaidStart = (a, raider, tid, target) => start(a >>> 0, String(raider || ''), String(tid || ''), target ? String(target) : undefined);
   globalThis.__dboRaidView = () => ({ rules: { enabled: !!C.enabled, minDefendersOnline: C.minDefendersOnline, cooldownDays: C.cooldownDays, raidMinutes: C.raidMinutes },
     raids: active().map((r) => ({ raider: r.raider, raiderName: nameOfFaction(r.raider), owner: r.owner, territory: r.territory, territoryName: placeName(r.territory), until: r.until, breakIns: r.broken.filter((k) => k.startsWith('h')).length })),
     lastRaided: Object.assign({}, S.lastRaided) });

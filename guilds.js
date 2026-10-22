@@ -67,6 +67,26 @@ module.exports = (api) => {
     return true;
   };
   for (const f of (readJson(PLAYER_PATH, { factions: [] }).factions || [])) addPlayerFaction(f);
+  // ---- rebel factions, kind 'rebellion' (rebellion.js; Nate, 22 Oct) ------------------------------------------------------
+  // The temporary faction a hold's rising becomes once its leader declares: founded at the declaration, dissolved when the
+  // rebellion ends (victory, defeat, peace or staff). Its own runtime file, never player-factions.json, so charters.js's
+  // disband and dissolve flows never see one. A rising is not an allegiance: a guild member or a faction member who is a
+  // citizen of the hold may rise with it (bandCompatible below), and its leader rank IS a leadership seat (leadership.js).
+  const REBEL_KIND = 'rebellion';
+  const REBEL_PATH = path.resolve('rebel-factions.json');
+  const REBEL_RANKS = [{ title: 'Rebel Leader', role: 'leader' }, { title: 'Rebel Captain', role: 'officer' }, { title: 'Rebel', role: 'member' }];
+  const addRebel = (r) => {
+    if (!r || !r.id || FACTIONS.has(String(r.id))) return false;
+    FACTIONS.set(String(r.id), { id: String(r.id), name: String(r.name), kind: REBEL_KIND, rebellion: Number(r.rebellion) || 0, zone: '', against: String(r.zone || ''),
+      player: true, ranks: REBEL_RANKS.map((x) => ({ title: x.title, role: x.role })), founded: Number(r.founded) || Date.now() });
+    return true;
+  };
+  const saveRebels = () => {
+    const out = [...FACTIONS.values()].filter((f) => f.kind === REBEL_KIND).map((f) => ({ id: f.id, name: f.name, rebellion: f.rebellion, zone: f.against, founded: f.founded }));
+    try { fs.writeFileSync(REBEL_PATH + '.tmp', JSON.stringify({ factions: out }, null, 1)); fs.renameSync(REBEL_PATH + '.tmp', REBEL_PATH); return true; }
+    catch (e) { log(`rebel factions: ${REBEL_PATH} could not be written: ${e.message}`); return false; }
+  };
+  for (const r of (readJson(REBEL_PATH, { factions: [] }).factions || [])) addRebel(r);
 
   // ---- player guilds, kind 'band' (Nate, 21 Oct: a third tier under the lore factions and the chartered ones) --------
   // An informal group any player makes on the spot, at most maxMembers including its Guildmaster. It lives in FACTIONS so
@@ -260,7 +280,7 @@ module.exports = (api) => {
   // A faction a guild member may also belong to: a religious one or a magic college
   const bandCompatible = (fid) => {
     const f = FACTIONS.get(String(fid));
-    if (!f || f.kind === BAND_KIND) return true;
+    if (!f || f.kind === BAND_KIND || f.kind === REBEL_KIND) return true;
     if (BAND.collegesCompatible !== false && f.college === true) return true;
     if ((BAND.compatibleKinds || []).map(String).includes(String(f.kind || ''))) return true;
     return (BAND.compatibleIds || []).map(String).includes(String(f.id));
@@ -924,6 +944,42 @@ module.exports = (api) => {
     delete ST.members[f.id]; FACTIONS.delete(f.id); save();
     for (const m of ids) mirror(m);
     return true;
+  };
+  // rebellion.js: the rising becomes a faction at its declaration. def { id, name, rebellion, zone }; leader an actor; members
+  // actors at the Rebel rank. setMember holds every rule (staff hold no leader rank, the faction limits, the guild rule);
+  // the leader's one-seat rule is asked first. { error } or { id, name, joined: [actor], refused: [{ actor, why }] }
+  globalThis.__dboRebelFactionFound = (def, leader, members) => {
+    if (!def || !def.id || FACTIONS.has(String(def.id))) return { error: `A faction with the id ${def && def.id} already exists.` };
+    addRebel(Object.assign({ founded: Date.now() }, def));
+    const fid = String(def.id);
+    const undo = (why) => { FACTIONS.delete(fid); delete ST.members[fid]; save(); saveRebels(); return { error: why }; };
+    const no = leadershipNo(leader, fid, null);
+    if (no) return undo(no);
+    const err = setMember(fid, leader >>> 0, 0, null);
+    if (err) return undo(err);
+    const joined = [leader >>> 0]; const refused = [];
+    for (const m of members || []) {
+      const t = Number(m) >>> 0; if (!t || t === (leader >>> 0)) continue;
+      const e = setMember(fid, t, lowestRank(fid), null);
+      if (e) refused.push({ actor: t, why: e }); else joined.push(t);
+    }
+    if (!saveRebels()) return undo('The rebel faction could not be written to disk; nothing was made.');
+    return { id: fid, name: String(def.name), joined, refused };
+  };
+  // A citizen joining a declared rising, at the Rebel rank. An error string, or null
+  globalThis.__dboRebelFactionJoin = (id, a) => {
+    const f = FACTIONS.get(String(id)); if (!f || f.kind !== REBEL_KIND) return 'That rising is over.';
+    if (entryOf(f.id, a >>> 0)) return null;
+    return setMember(f.id, a >>> 0, lowestRank(f.id), null);
+  };
+  // Dissolved when the rebellion ends: the roster goes with it. The members it had, or null for no such rebel faction
+  globalThis.__dboRebelFactionDissolve = (id) => {
+    const f = FACTIONS.get(String(id)); if (!f || f.kind !== REBEL_KIND) return null;
+    const members = Object.keys(rosterOf(f.id)).map((x) => Number(x) >>> 0);
+    FACTIONS.delete(f.id); delete ST.members[f.id];
+    save(); saveRebels();
+    for (const m of members) { try { mirror(m); } catch (e) { /* offline */ } }
+    return members;
   };
   globalThis.__dboGuildMembers = (id) => Object.keys(ST.members[String(id)] || {}).map((x) => Number(x) >>> 0);
   // Characters deleted at character select, by /wipechars or from the admin panel stay on the rosters (nothing tells

@@ -146,6 +146,18 @@ module.exports = (api) => {
     return extra;
   };
 
+  // rebellion.js: a failed rising's rebels are wanted in the hold they rose against, as if its ruler had set the bounty (the
+  // larger of any bounty they already have there and amount, which is held to max). True when it was set
+  globalThis.__dboOutlawDeclare = (zid, pid, amount, reason, name, by) => {
+    if (!C.enabled || !zoneById(zid) || !(Number(pid) >= 0)) return false;
+    const n = Math.min(Number(C.max) || 1000, Math.max(1, Math.floor(Number(amount) || 0)));
+    const list = wantedIn(zid); const had = list[String(Number(pid))];
+    list[String(Number(pid))] = { amount: Math.max(n, had ? Math.floor(Number(had.amount) || 0) : 0), reason: String(reason || 'rebellion').slice(0, 120), name: String(name || `profile ${pid}`), by: String(by || 'the hold'), at: Date.now() };
+    save();
+    audit(`BOUNTY set: ${by || 'the hold'} put ${list[String(Number(pid))].amount} gold on ${name || `profile ${pid}`} in ${holdName(zid)}: ${reason}`);
+    return true;
+  };
+
   // ---- /bounty --------------------------------------------------------------------------------------------------------
   const listText = (a, zid) => {
     const lines = [];

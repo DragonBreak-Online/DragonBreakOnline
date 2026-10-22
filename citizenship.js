@@ -205,6 +205,8 @@ module.exports = (api) => {
   // "In no faction": no membership but a hold household's Citizen rank
   const factionsOf = (a) => guildsOf(a).filter((g) => !(g.kind === 'hold' && String(g.title).toLowerCase() === 'citizen'));
   const factionFree = (a) => factionsOf(a).length === 0;
+  // A failed rising's outlaws (rebellion.js): banished from the hold's citizenship until the date
+  const barredUntil = (a, zid) => { const e = entryOf(a); const t = e && e.barred && typeof e.barred === 'object' ? Number(e.barred[zid]) || 0 : 0; return t > Date.now() ? t : 0; };
   const cooldownLeft = (a) => { const e = entryOf(a); return e && Number(e.cooldownUntil) > Date.now() ? Number(e.cooldownUntil) - Date.now() : 0; };
   const requestOf = (a, zid) => data().requests.find((r) => (r.actor >>> 0) === (a >>> 0) && r.zone === zid) || null;
   const liveRequests = () => { const cut = Date.now() - C.requestDays * DAY; data().requests = data().requests.filter((r) => Number(r.at) > cut && exists(r.actor)); return data().requests; };
@@ -215,6 +217,8 @@ module.exports = (api) => {
   // How this character could join z now: { how: 'free'|'paid'|'manual'|'nofee', fee } or { error }
   const joinCheck = (a, z) => {
     if (citizenOf(a, z.id)) return { error: `You are already a citizen of ${ofPlace(z.name)}.` };
+    const outlawed = barredUntil(a, z.id);
+    if (outlawed) return { error: `You are an outlaw of ${ofPlace(z.name)}, banished after a failed rising. You may ask for its citizenship again from ${dateText(outlawed)}.` };
     const left = cooldownLeft(a);
     if (left) return { error: `You renounced a citizenship lately. You may take another from ${dateText(Date.now() + left)}.` };
     if (holdsOf(a).length >= C.maxHolds) return { error: `You are a citizen of ${C.maxHolds} holds already, the most anyone may be. Renounce one first (F3, Citizen).` };
@@ -1275,6 +1279,25 @@ module.exports = (api) => {
   };
   // gamemode.js's login: the election notice of the current phase, once per character
   globalThis.__dboCitizenLogin = (a) => { if (C.enabled) noticeLogin(Number(a) >>> 0); };
+  // rebellion.js: how many accounts are citizens of a hold (the petition's share), and a failed rising's outlaw: the
+  // citizenship on the rolls is taken (as a staff revoke: no renounce cooldown), the character barred from asking for it
+  // again until `until`, and any request there withdrawn. A citizenship through a faction or court based in the hold (auto)
+  // is no entry on the rolls and lasts while that membership does. { removed, auto }
+  globalThis.__dboCitizenAccountCount = (zid) => { if (!C.enabled) return 0; const z = holdOf(zid); return z ? citizenPids(z).size : 0; };
+  globalThis.__dboCitizenOutlaw = (actor, zid, until, why) => {
+    const a = Number(actor) >>> 0; const z = holdOf(zid);
+    if (!C.enabled || !z || !a) return { removed: false, auto: false };
+    const d = data(); const k = hex(a);
+    const e = d.chars[k] || (d.chars[k] = { pid: Number(profileOf(a)), name: nameNow(a), holds: [], renounced: [] });
+    const had = Array.isArray(e.holds) && e.holds.some((h) => h.zone === z.id);
+    e.holds = (Array.isArray(e.holds) ? e.holds : []).filter((h) => h.zone !== z.id);
+    e.barred = Object.assign({}, e.barred && typeof e.barred === 'object' ? e.barred : {}, { [z.id]: Number(until) || 0 });
+    d.requests = d.requests.filter((r) => !((r.actor >>> 0) === a && r.zone === z.id));
+    save();
+    const auto = autoHolds(a).includes(z.id);
+    audit(`CITIZEN ${e.name || k} (character ${k}) is an outlaw of ${z.name}${had ? ': citizenship taken' : ''}, barred until ${dateText(until)} (${why || 'a failed rising'})${auto ? '; still a citizen through a faction or court based there' : ''}`);
+    return { removed: had, auto };
+  };
   globalThis.__dboCitizenHolds = (a) => (C.enabled ? holdsOf(Number(a) >>> 0).map((h) => h.zone) : []);
   // discordroles.js: the citizen roles this character should wear, and every role this module manages
   globalThis.__dboCitizenRoleIds = (a) => { const ids = roleIds(); return C.enabled ? holdsOf(Number(a) >>> 0).map((h) => ids[h.zone]).filter(Boolean) : []; };
