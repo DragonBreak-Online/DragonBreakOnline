@@ -99,7 +99,7 @@ test('the role check fails closed: an error, a hang, not in the guild, a wrong r
 // Jake, 14 Oct: "Jake, Nate and Lead GMs". The backend's half: the Lead GM role passes the live role check for a pinned
 // account; a GM or Trial GM role alone does not, pinned or not; the Lead GM role does not get round the pin
 test('a pinned Lead GM passes the role check; a GM or Trial GM role does not; the pin still applies', async () => {
-  const lead = await run(web(ID.lead), '/wwremote clear #8KWH')
+  const lead = await run(web(ID.lead), '/kick #8KWH')
   assert.equal(lead.status, 200, JSON.stringify(lead.body))
   assert.equal(lead.body.job.state, 'ran')
   const r = F.requests.find(x => x.discordId === ID.lead)
@@ -117,6 +117,55 @@ test('a pinned Lead GM passes the role check; a GM or Trial GM role does not; th
   // The role set before 14 Oct (Owners + Dev) refuses the same Lead GM: the role list is what lets them in
   F.make({ consoleRoleIds: `${ROLE.owner},${ROLE.dev}` })
   assert.equal((await run(web(ID.lead), '/whoami')).body.error, 'notAllowed')
+})
+
+// Jake, 22 Oct: "Punishments only". Owners and Dev (SITE_OWNER_ROLE_IDS, SITE_STAFF_ROLE_IDS, as Discord answers now) keep the whole console
+test('a Lead GM sends only /discipline and /kick, from the web and from Discord; the rest is 422 notRemote punishOnly and nothing is sent', async () => {
+  F.allowed = JSON.parse(fs.readFileSync(path.join(F.dir, 'allow.json'), 'utf8'))
+  fs.writeFileSync(path.join(F.dir, 'allow.json'), JSON.stringify([...F.allowed, { name: 'discipline', usage: '/discipline #TAG warn <reason>', rule: 'tagKindReason', help: 'x', kinds: ['warn'] }]), { mode: 0o600 })
+  try {
+    const word = 'A Lead GM can run only /discipline and /kick from the console. Run anything else in game.'
+    const discord = id => F.api.discordCaller(Object.assign(Object.create(ChatInputCommandInteraction.prototype), {
+      id: String(1400000000000000000n + BigInt(Math.floor(Math.random() * 1e9))), client: F.client, commandName: 'console', guildId: GUILD, channelId: '1', user: { id, bot: false },
+    }))
+    for (const [label, caller] of [['web', () => web(ID.lead)], ['Discord', () => discord(ID.lead)]]) {
+      for (const text of ['/wwremote clear #8KWH', '/whoami', '/players', '/fixloc #8KWH', '/load reset', '/tp #8KWH', '/nosuch thing']) {
+        const res = await F.api.runStaffCommand(caller(), { uuid: uuid(), text })
+        assert.equal(res.status, 422, `${label} ${text}: ${JSON.stringify(res.body)}`)
+        assert.deepEqual(res.body, { v: 1, error: 'notRemote', why: 'punishOnly', reason: word }, `${label} ${text}`)
+      }
+    }
+    assert.equal(F.requests.length, 0, 'nothing reached the game')
+    assert.ok(refusals().some(l => /CONSOLE refused web icedsky .* notRemote: \/wwremote clear #8KWH/.test(l)), refusals().join('\n'))
+    // A dry run is held the same way
+    fs.writeFileSync(F.switchFile, 'dry-run\n')
+    assert.equal((await run(web(ID.lead), '/whoami')).body.why, 'punishOnly')
+    fs.writeFileSync(F.switchFile, 'on\n')
+    // /kick and /discipline go out for her, from both front ends
+    for (const [caller, text] of [[web(ID.lead), '/kick #8KWH'], [discord(ID.lead), '/discipline #8KWH warn Spam in the trade chat'], [web(ID.lead), '/discipline #8KWH warn Spam in the trade chat']]) {
+      const res = await F.api.runStaffCommand(caller, { uuid: uuid(), text })
+      assert.equal(res.status, 200, `${text}: ${JSON.stringify(res.body)}`)
+      assert.equal(res.body.job.state, 'ran')
+    }
+    assert.deepEqual(F.requests.map(r => [r.src, r.text.split(' ')[0]]), [['web', '/kick'], ['discord', '/discipline'], ['web', '/discipline']])
+    // Owners and Dev run every command; a Lead GM who also holds the Dev role is Dev
+    F.requests.length = 0
+    F.members.set(ID.lead, { roles: [GUILD, ROLE.lead, ROLE.dev], handle: 'icedsky' })
+    for (const id of [ID.jake, ID.nate, ID.lead]) assert.equal((await run(web(id), '/wwremote clear #8KWH')).body.job.state, 'ran', id)
+    assert.equal((await F.api.runStaffCommand(discord(ID.jake), { text: '/players' })).body.job.state, 'ran')
+    assert.equal(F.requests.length, 4)
+    // Dev's role taken away in Discord a moment ago: the roles asked now count
+    F.members.set(ID.lead, { roles: [GUILD, ROLE.lead], handle: 'icedsky' })
+    assert.equal((await run(web(ID.lead), '/players')).body.why, 'punishOnly')
+    // The dashboard's roles decide who is Dev, whatever CONSOLE_ROLE_IDS holds: none set is punishments only for everyone
+    F.make({ siteStaffRoleIds: [], siteOwnerRoleIds: [] })
+    assert.equal((await run(web(ID.jake), '/players')).body.why, 'punishOnly')
+    F.make({ siteStaffRoleIds: `${ROLE.owner}, ${ROLE.dev}`, siteOwnerRoleIds: '' })
+    assert.equal((await run(web(ID.nate), '/players')).body.job.state, 'ran', 'a comma list as the env gives it')
+  } finally {
+    fs.writeFileSync(path.join(F.dir, 'allow.json'), JSON.stringify(F.allowed), { mode: 0o600 })
+    F.members.set(ID.lead, { roles: [GUILD, ROLE.lead], handle: 'icedsky' })
+  }
 })
 
 test('the config: the console has its own role list (Owners, Dev, Lead GM), not the dashboard staff roles; one count line at start', () => {

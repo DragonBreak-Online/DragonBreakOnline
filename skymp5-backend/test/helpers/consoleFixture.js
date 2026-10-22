@@ -73,7 +73,7 @@ function createConsoleFixture(label = 'dbo-console-') {
   F.now = () => Date.now() + F.clock.offset
   F.config = {
     consoleDiscordIds: `${ID.jake},${ID.nate},${ID.gm},${ID.stranger},${ID.lead},${ID.trial}`, consoleRoleIds: DEPLOY_ROLE_IDS, discordGuildId: GUILD,
-    consoleFreshSigninHours: 4, consoleDiscordChannelIds: '',
+    consoleFreshSigninHours: 4, consoleDiscordChannelIds: '', siteOwnerRoleIds: [ROLE.owner], siteStaffRoleIds: [ROLE.owner, ROLE.dev],
   }
   F.audit = { log: line => F.audits.push(line) }
   F.make = (configOverride = {}, extra = {}) => {

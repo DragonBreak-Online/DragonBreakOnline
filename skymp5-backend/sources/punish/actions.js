@@ -25,7 +25,7 @@ const ACTIONS = Object.freeze({
   'discord-unban': { area: 'discord', tiers: SENIOR, keys: ['reason'], confirm: 'DISCORD UNBAN', family: 'discordBans', perm: 'banMembers', permission: 'BanMembers' },
 })
 const TIER_LABEL = Object.freeze({ owner: 'Owner', dev: 'Dragon Break Dev', leadgm: 'Lead GM', gm: 'GM' })
-const PUNISH_COMMANDS = Object.freeze(['discipline', 'kick'])
+const PUNISH_COMMANDS = rules.PUNISH_ONLY
 // The console's #TAG (allowlist.js TAG_RE), the first word after /discipline and /kick
 const TAG_RE = /^#[A-Za-z0-9]{4}$/
 // Discord's longest timeout, 28 days; an end past it from Discord's own clock is refused, so the longest ends a minute short

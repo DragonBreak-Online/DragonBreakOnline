@@ -38,6 +38,8 @@ const BUILTIN = new Set(['say', 'low', 'whisper', 'wide', 'shout', 'me', 'melow'
 const RULES = new Set(['switch', 'tag', 'tagName', 'load', 'none', 'tagKindReason'])
 // The empty form of a #TAG command: /kick needs a target, /fixloc and /chargen alone act on the caller
 const NO_ARG = Object.freeze({ kick: 'needTag', fixloc: 'self', chargen: 'self' })
+// All a Lead GM may run from the console (console.js PUNISH_ONLY; Jake, 22 Oct: "Punishments only")
+const PUNISH_ONLY = Object.freeze(['discipline', 'kick'])
 
 // One clean '/word rest' line of at most 500 characters with '#{' broken, or null when it is not a command
 function cleanCommand(value) {
@@ -209,6 +211,7 @@ function whyText(why, cmd, usage, subject) {
     case 'reasonChars': return 'A reason from the console takes letters, numbers, spaces and . , ; : ! ? \' " ( ) - / & + % only: no colour codes, markup, mentions, symbols or line breaks.'
     case 'denied': return `/${subject || cmd} is switched off for the console in the game's config.`
     case 'noProfileCheck': return `The game does not check /${cmd} against the account you opened yet, so it was not sent. Copy the command and run it in game.`
+    case 'punishOnly': return 'A Lead GM can run only /discipline and /kick from the console. Run anything else in game.'
     default: return 'That cannot be run from the console.'
   }
 }
@@ -216,5 +219,5 @@ function whyText(why, cmd, usage, subject) {
 module.exports = {
   cleanCommand, foldText, cleanHandle, parseSwitch, reqPayload, repPayload, canonLines, id8, parseAllow, precheck, whyText,
   lengthHours, reasonWhy,
-  UNSAFE_RE, MAX_TEXT, SETTINGS, SOURCES, SNOWFLAKE, HANDLE_RE, UUID_RE, REQUEST_ID_RE, KIND_ARGS, REASON_RE,
+  UNSAFE_RE, MAX_TEXT, SETTINGS, SOURCES, SNOWFLAKE, HANDLE_RE, UUID_RE, REQUEST_ID_RE, KIND_ARGS, REASON_RE, PUNISH_ONLY,
 }

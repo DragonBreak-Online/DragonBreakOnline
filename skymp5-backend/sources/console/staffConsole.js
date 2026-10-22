@@ -20,6 +20,7 @@ const SWITCH_OPEN = nodeFs.constants.O_RDONLY | (nodeFs.constants.O_NOFOLLOW || 
 const SWITCH_MAX_BYTES = 64
 
 const ids = value => String(value ?? '').split(',').map(s => s.trim()).filter(Boolean)
+const roleList = value => (Array.isArray(value) ? value.map(String) : ids(value))
 const snowflakes = (list, max) => list.length >= 1 && list.length <= max && list.every(x => rules.SNOWFLAKE.test(x))
 
 // The rank rule, Lead GM and above (Owners, Dragon Break Dev, Lead GM in CONSOLE_ROLE_IDS), shared with /say; problem is '' when usable
@@ -44,7 +45,9 @@ function readConfig(config) {
   if (!snowflakes(pins, 10)) problem = 'CONSOLE_DISCORD_IDS must be 1 to 10 Discord ids (empty is off)'
   else if (rank.problem) problem = rank.problem
   else if (channels.length && !snowflakes(channels, 25)) problem = 'CONSOLE_DISCORD_CHANNEL_IDS must be channel ids'
-  return { pins: new Set(pins), roles: rank.roles, guild: rank.guild, channels: new Set(channels), freshMs: (hours > 0 && hours <= 24 ? hours : 4) * 3600 * 1000, problem }
+  // Owners and Dragon Break Dev (the dashboard's roles) run every command; any other console role only PUNISH_ONLY
+  const full = new Set([...roleList(config.siteOwnerRoleIds), ...roleList(config.siteStaffRoleIds)])
+  return { pins: new Set(pins), roles: rank.roles, guild: rank.guild, channels: new Set(channels), full, freshMs: (hours > 0 && hours <= 24 ? hours : 4) * 3600 * 1000, problem }
 }
 
 const narrower = (a, b) => rules.SETTINGS[Math.min(rules.SETTINGS.indexOf(a), Math.max(0, rules.SETTINGS.indexOf(b)))]
@@ -258,7 +261,12 @@ function createStaffConsole({
     const line = rules.cleanCommand(text)
     if (!line) return refuse(400, 'badCommand', handle)
     // 7b. A caller held to some commands (the Punishments panel: /discipline and /kick) is refused the rest before any record
-    if (request.only && !request.only.includes(line.slice(1).split(' ')[0])) return refuse(422, 'notPunish', handle)
+    const word = line.slice(1).split(' ')[0]
+    if (request.only && !request.only.includes(word)) return refuse(422, 'notPunish', handle)
+    // 7c. A Lead GM (no Owners or Dragon Break Dev role now) gets /discipline and /kick only, as the game holds them
+    if (!roles.some(r => C.full.has(r)) && !rules.PUNISH_ONLY.includes(word)) {
+      return refuse(422, 'notRemote', handle, { why: 'punishOnly', reason: rules.whyText('punishOnly', word) })
+    }
     // 8. The allowlist the game published; without it the game decides alone
     const allow = spool.allow()
     const pre = allow ? rules.precheck(line, allow, text) : null
