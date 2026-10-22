@@ -166,11 +166,14 @@ const AS = {
 
 // A line typed in game by an online staff member: what they were told
 const US = String.fromCharCode(31);
+const toldAll = [];
 const typed = (who, line) => {
   setOnline(who, true);
   const from = chatWrites.length;
   G.handleLine(who, line, G.userOf(who));
-  return chatWrites.slice(from).filter(([a]) => a === who).map(([, l]) => String(l).split(US).pop().replace(/^\[\[PM\]\]System\|/, ''));
+  const told = chatWrites.slice(from).filter(([a]) => a === who).map(([, l]) => String(l).split(US).pop().replace(/^\[\[PM\]\]System\|/, ''));
+  toldAll.push(...told);
+  return told;
 };
 const reset = () => { kicked.length = 0; staffLines.length = 0; chatWrites.length = 0; logs.length = 0; packets.length = 0; };
 const userOf = (id) => store.get(id).__user;
@@ -215,7 +218,7 @@ reset();
   reset();
   told = typed(A.jake, '/kick #JALT');
   const told4 = typed(A.jake, '/kick #ABCD');
-  check('K6. nobody kicks their own account, another character on it or themself', told.includes('Jake Alt #JALT is on your own account. Log out instead.') && told4.includes('Jake #ABCD is on your own account. Log out instead.') && !kicked.length, { told, told4, kicked });
+  check('K6. nobody kicks their own account, another character on it or themself', told.includes('You cannot kick your own account: Jake Alt #JALT is on it. Log out instead.') && told4.includes('You cannot kick your own account: Jake #ABCD is on it. Log out instead.') && !kicked.length, { told, told4, kicked });
   // fails closed: the profile, or the account's characters, cannot be read
   const realGet = mp.get;
   mp.get = (id, k) => { if ((id >>> 0) === A.bob && k === 'profileId') throw new Error('store gone'); return realGet(id, k); };
@@ -281,7 +284,7 @@ reset();
   // console request is refused as tier whatever the target; typed, the GM gets the rank rule
   const CALLERS = { gm: [A.gm, 3, 1], lead: [A.lead, 9, 2], nate: [A.nate, 2, 3], jake: [A.jake, 1, 4] };
   const TARGETS = { '8KWH': [5, 0], TRIA: [13, 0.5], GARY: [4, 1], LARS: [11, 2], NNAT: [2, 3], DINA: [14, 3], OLAF: [12, 4], JALT: [1, 4], ADMN: [ADMIN_PROFILE, 4] };
-  const wrong = []; let pairs = 0;
+  const wrong = []; let pairs = 0, floor = 0;
   for (const [cn, [who, cpid, crank]] of Object.entries(CALLERS)) {
     for (const [tag, [tpid, trank]] of Object.entries(TARGETS)) {
       const expect = tpid !== cpid && trank < crank;
@@ -291,12 +294,15 @@ reset();
       setOnline(who, false); setOnline(A.jake, true);
       before = n(tpid);
       const rep = send(`/discipline #${tag} warn parity check from the console`, AS[cn]);
-      const remote = cn === 'gm' ? (!!rep && rep.why === 'tier' && n(tpid) === before ? expect : !expect) : !!rep && rep.state === 'ran' && n(tpid) === before + 1;
       pairs++;
-      if (inGame !== expect || remote !== expect) wrong.push({ caller: cn, tag, expect, inGame, remote, why: rep && rep.why });
+      // A GM never reaches the rank rule from the console: its floor refuses them as tier first, whatever the target
+      if (cn === 'gm') { floor++; if (inGame !== expect || !rep || rep.why !== 'tier' || n(tpid) !== before) wrong.push({ caller: cn, tag, expect, inGame, why: rep && rep.why }); continue; }
+      const remote = !!rep && rep.state === 'ran' && n(tpid) === before + 1;
+      if (inGame !== expect || remote !== expect || (!expect && !(rep && ['rank', 'ownAccount'].includes(rep.why)))) wrong.push({ caller: cn, tag, expect, inGame, remote, why: rep && rep.why });
     }
   }
-  check(`P1. /discipline warn: typed in game and from the console decide alike, and as the rule says, for ${pairs} caller and account pairs`, !wrong.length && pairs === 36, wrong);
+  check(`P1. /discipline warn: typed in game as the rule says for ${pairs} caller and account pairs; from the console alike for the ${pairs - floor} of Lead GMs and above (refused as rank or own account), and a GM's ${floor} as tier (the console's floor)`,
+    !wrong.length && pairs === 36 && floor === 9, wrong);
   // /kick from the console on online targets, against the same rule typed
   const kwrong = [];
   for (const [cn, [who, cpid, crank]] of Object.entries(CALLERS)) {
@@ -309,13 +315,16 @@ reset();
       reset();
       const rep = send(`/kick #${tag}`, AS[cn]);
       const expect = tpid !== cpid && trank < crank;
-      const remote = cn === 'gm' ? (!!rep && rep.why === 'tier' && !kicked.length ? expect : !expect) : !!rep && rep.state === 'ran' && kicked.includes(userOf(t));
-      if (inGame !== expect || remote !== expect) kwrong.push({ caller: cn, tag, expect, inGame, remote, why: rep && rep.why });
+      if (cn === 'gm') { if (inGame !== expect || !rep || rep.why !== 'tier' || kicked.length) kwrong.push({ caller: cn, tag, expect, inGame, why: rep && rep.why }); }
+      else {
+        const remote = !!rep && rep.state === 'ran' && kicked.includes(userOf(t));
+        if (inGame !== expect || remote !== expect || (!expect && !(rep && ['rank', 'ownAccount'].includes(rep.why)))) kwrong.push({ caller: cn, tag, expect, inGame, remote, why: rep && rep.why });
+      }
       if (t !== A.bob && t !== A.jake) setOnline(t, false);
     }
     if (who !== A.jake) setOnline(who, false);
   }
-  check('P2. /kick: typed in game and from the console decide alike, and as the rule says', !kwrong.length, kwrong);
+  check("P2. /kick: typed in game and from the console decide alike, and as the rule says (a GM's console request: tier)", !kwrong.length, kwrong);
 }
 
 // ==== A. the record-author rule: lift and overturn ==========================================================================
@@ -358,13 +367,16 @@ reset();
   const ost = num(typed(A.lead, '/discipline #8KWH strike a strike to test the unreadable author'), 'strike');
   const realIdx = mp.getActorsByProfileId;
   mp.getActorsByProfileId = (pid) => { if (pid === 9) throw new Error('index gone'); return realIdx(pid); };
-  told = typed(A.jake, '/discipline #8KWH overturn ' + ost + ' the author cannot be read');
+  told = typed(A.nate, '/discipline #8KWH overturn ' + ost + ' the author cannot be read');
   mp.getActorsByProfileId = realIdx;
-  check("A5. a record whose author's account cannot be read is not overturned, even by an Owner (fails closed)", told.includes(`Who gave Record #${ost} cannot be read, so it was not overturned. Ask an Owner.`) && !entry(5, ost).overturned, told);
+  check("A5. a record whose author's account cannot be read is not overturned by a Developer (fails closed)", told.includes(`Who gave Record #${ost} cannot be read, so it was not overturned. Ask an Owner.`) && !entry(5, ost).overturned, told);
   const file = JSON.parse(fs.readFileSync(RECORDS, 'utf8')); delete file.profiles[5].find((e) => e.n === ost).byProfile; fs.writeFileSync(RECORDS, JSON.stringify(file));
   loadDiscipline();
-  told = typed(A.jake, '/discipline #8KWH overturn ' + ost + ' the entry has no author');
+  told = typed(A.nate, '/discipline #8KWH overturn ' + ost + ' the entry has no author');
   check('A5. ...nor an entry that carries no author', told.includes(`Who gave Record #${ost} cannot be read, so it was not overturned. Ask an Owner.`) && !entry(5, ost).overturned, told);
+  setOnline(A.nate, false);
+  told = typed(A.jake, '/discipline #8KWH overturn ' + ost + ' an Owner overturns the entry with no author');
+  check('A5. ...but an Owner does: no author outranks an Owner, so the record is never left undoable by anyone in game (review, 22 Oct)', told.some((l) => /^Recorded: overturn #\d+ on Bob #8KWH/.test(l)) && !!entry(5, ost).overturned, told);
   // From the console the same rule holds: discipline.js runs behind the console's own checks
   const sus2 = num(typed(A.jake, '/discipline #8KWH suspend 1d an Owner suspends again'), 'suspend');
   setOnline(A.lead, false); setOnline(A.jake, true);
@@ -389,6 +401,15 @@ reset();
   const rep2 = send('/discipline #NNAT warn console asks the shared rule', AS.lead);
   check("S2. with it, the console asks gamemode.js's rule for the target's account (and refuses a Lead GM on a Developer)", !!rep2 && rep2.why === 'rank' && calls.some(([pid, fresh, t]) => pid === 2 && fresh === null && t === A.nate), { calls, rep: rep2 && rep2.why });
   loadConsole(G.accountRankOf);
+}
+
+// The player log records a command's outcome from what it told (playerlog-rules.js REFUSAL_RX): every refusal of the rank
+// rule and the record-author rule told above must read as one, or a refused /kick is logged as a kick that ran (review, 22 Oct)
+{
+  const { REFUSAL_RX } = require(path.join(ROOT, 'playerlog-rules.js'));
+  const said = [...new Set(toldAll.filter((l) => /staff account of your rank|your own account|could not be read|cannot be read|of a rank above yours|decided outside the game/.test(l))
+    .map((l) => l.replace(/[A-Z][a-z]+(?: [A-Z][a-z]+)? #[A-Z0-9]{4}/g, 'X').replace(/#\d+/g, '#n')))];
+  check(`S3. each of the ${said.length} refusal texts of the rank and record-author rules reads as a refusal to the player log`, said.length >= 9 && said.every((l) => REFUSAL_RX.test(l)), said.filter((l) => !REFUSAL_RX.test(l)).concat([`kinds: ${said.length}`]));
 }
 
 global.setTimeout = realTimeout;

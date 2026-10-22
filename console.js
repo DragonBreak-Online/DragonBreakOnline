@@ -108,8 +108,9 @@ const ALLOW = Object.freeze({
   load: { usage: '/load [reset]', rule: 'load' },
   whoami: { usage: '/whoami', rule: 'none' },
   // A warning, strike, suspension, lift or overturn on the account's record, as typed in game; discipline.js keeps its own
-  // checks (suspend, lift and overturn need a Lead GM, so do staff targets; never one's own account; a lift needs a running
-  // suspension, an overturn a record of the account). The record view and /discipline list stay in game
+  // checks (suspend, lift and overturn need a Lead GM; never one's own account nor a staff account of one's rank or higher; a
+  // lift needs a running suspension, an overturn a record of the account, and both a rank at least that of who gave it). The
+  // record view and /discipline list stay in game
   // (its usage is written out from the kinds left after the config's deny, usageOf below)
   discipline: { usage: '/discipline #TAG <kind> <reason>', rule: 'tagKindReason', kinds: Object.freeze(Object.keys(KIND_ARGS)), offline: true, rank: true,
     help: "A warning, strike, suspension, lift or overturn on the player's account record, as in game; the player is told. The record view and list stay in game." },
@@ -155,7 +156,7 @@ const TEXT = {
   reasonShort: () => `Give a reason of at least ${REASON_MIN} characters. The player is shown it.`,
   reasonLong: () => `The reason can be at most ${REASON_MAX} characters.`,
   reasonChars: () => 'A reason from the console takes letters, numbers, spaces and . , ; : ! ? \' " ( ) - / & + % only: no colour codes, markup, mentions, symbols or line breaks.',
-  dryRecord: () => "Dry run: it passed the console and the command gate only. Nothing was recorded, and the record's own checks (own account, staff target, record number, is suspended) did not run.",
+  dryRecord: () => "Dry run: it passed the console and the command gate only. Nothing was recorded, and the record's own checks (own account, staff target, record number, is suspended, who gave the record) did not run.",
   noChar: () => 'The console acts as your own character. Make one in game first.',
   suspended: () => 'Your account is suspended, so the console cannot act as you: a suspended account cannot act in game either.',
   tier: (floor) => `The console is for ${floor || 'Lead GM'} and above in game.`,

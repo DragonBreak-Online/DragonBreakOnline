@@ -334,11 +334,15 @@ const rankRefusalOf = (a, t) => {
 // The record-author rule (discipline.js lift and overturn; the console review's finding 3, 21 Oct: a Lead GM lifted and then
 // overturned an Owner's suspension of a player): a lower rank does not undo what a higher rank decided, the same rank may.
 // byProfile is the account that gave the record; 0 is a record decided outside the game (gamemode-config.json's discipline
-// records), which the Owners decide. 'rank' when that outranks actor a, 'unknown' when it cannot be read, else null
+// records), which the Owners decide. 'rank' when that outranks actor a, 'unknown' when it cannot be read, else null.
+// No author outranks an Owner, so an Owner is never refused, not even when the author cannot be read (review of 22 Oct: a
+// record with no readable author was then undoable by nobody in game, and the config's lift reaches only a config suspension)
 const authorRefusalOf = (a, byProfile) => {
+  const mine = rankOfTier(staffTierOf(a));
+  if (mine >= rankOfTier('senior')) return null;
   const theirs = byProfile === 0 ? rankOfTier('senior') : accountRankOf(byProfile, null, 0, (e) => log(`rank rule: staff rank of profile ${byProfile} unreadable: ${e.message}`));
   if (theirs < 0) return 'unknown';
-  return theirs > rankOfTier(staffTierOf(a)) ? 'rank' : null;
+  return theirs > mine ? 'rank' : null;
 };
 // Staff of any rank, Trial GMs too, hold no leadership (Nate, 18 Oct: "GMs of any kind cannot be in leadership in any faction
 // etc"): no seat in an election court (citizenship.js), no leading court office (appointCheck), no faction leader or officer
@@ -1119,7 +1123,8 @@ registerChatCommand('kick', (a, args) => {
   const t = findByName(args.trim()); if (!t) return personal(a, 'No such player.');
   // The rank rule (rankRefusalOf): not one's own account, nor a staff account of one's rank or higher
   const no = rankRefusalOf(a, t);
-  if (no === 'own') return personal(a, `${display(t)} is on your own account. Log out instead.`);
+  // Every refusal says "cannot" or "try again", so the player log (playerlog-rules.js REFUSAL_RX) records it as refused
+  if (no === 'own') return personal(a, `You cannot kick your own account: ${display(t)} is on it. Log out instead.`);
   if (no === 'rank') return personal(a, `${display(t)} is on a staff account of your rank or higher, so you cannot kick them. Take it to someone above that rank, or to the Owners.`);
   if (no) return personal(a, `The staff rank of ${display(t)}'s account could not be read, so nobody was kicked. Try again, or ask an Owner.`);
   try { mp.kick(userOf(t)); broadcast(`[[S]]#{${C.SYS}}${nameOf(t)} was kicked by ${nameOf(a)}.`); audit(`GM ${who(a)} kicked ${who(t)} via /kick`); }
