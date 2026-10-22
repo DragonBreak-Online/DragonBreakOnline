@@ -313,7 +313,8 @@ module.exports = (api) => {
       const i = factionTabInfo(a); if (!i) return true;
       const court = canDraw(m && m.viewer !== undefined ? m.viewer : a, 'court');
       const member = (i.member || 0) + (court ? 0 : i.courtMember || 0), invites = (i.invites || 0) + (court ? 0 : i.courtInvites || 0);
-      if (!(member || invites || i.staff)) return false;
+      // A hold court member always gets it: the realm map lives here, and the Court tab has none (22 Oct, Court of Riften)
+      if (!(member || invites || i.staff || i.courtMember)) return false;
       return invites ? { badge: invites } : true;
     },
     view: (a, o) => factionView(a, !!(o && o.keep), !!(o && o.readOnly)),
