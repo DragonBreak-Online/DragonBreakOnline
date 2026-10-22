@@ -93,7 +93,7 @@ ok(/else startLogin\(a\); return; \}/.test(src), 'the client\'s arrival report i
 ok(/'__dboRacialLeave', '__dboStartLeave'\]/.test(src), 'every logout runs __dboStartLeave');
 ok(src.indexOf("onUi('startChoose'") > src.indexOf('const onUi = '), 'the answers are registered below onUi (a top-level call above it fails the whole load)');
 const gate = src.slice(src.indexOf('const g = gateOf(targetId >>> 0);'), src.indexOf('const prev = globalThis.__dboPrevActivate;'));
-ok(/if \(g && creationPending\(casterId >>> 0\)\) return false;/.test(gate), 'a gate refuses a character still being made');
+ok(/if \(g && creationPending\(casterId >>> 0\)\) \{ gateCreationTold\(casterId >>> 0\); return false; \}/.test(gate), 'a gate refuses a character still being made, and tells them why');
 ok(gate.indexOf('gateAnswersStart') > 0 && /pos: gateSpotFor\(g, casterId >>> 0\)/.test(gate), 'a gate answers the question and lands on one of its spread spots');
 ok(/Cyrodiil or Skyrim\?/.test(block) && /Pale Pass/.test(block) && /gate of a hold/.test(block), 'the question names both lands and where each answer leads');
 console.log(fails ? `${fails} failure(s)` : 'all checks passed'); process.exit(fails ? 1 : 0);

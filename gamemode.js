@@ -1731,6 +1731,18 @@ const gateOf = (targetId) => {
     return m ? GATES[m[1]] || null : null;
   } catch (e) { return null; }
 };
+// A gate refuses a character still in creation; it was refused without a word (/bug 20 Oct "stuck in the starting room,
+// relog didnt fix": the race menu's close threw in the client, no look reached the server, and 8 gate tries in 9 s went
+// unanswered). Told at most every GATE_CREATION_TELL_MS, with the way out.
+const GATE_CREATION_TELL_MS = 10000;
+const gateCreationToldAt = globalThis.__dboGateCreationToldAt instanceof Map ? globalThis.__dboGateCreationToldAt : (globalThis.__dboGateCreationToldAt = new Map());
+const gateCreationTold = (a) => {
+  const id = a >>> 0, now = Date.now();
+  if (now - (gateCreationToldAt.get(id) || 0) < GATE_CREATION_TELL_MS) return;
+  gateCreationToldAt.set(id, now);
+  if (gateCreationToldAt.size > 500) for (const [k, t] of gateCreationToldAt) if (now - t > GATE_CREATION_TELL_MS) gateCreationToldAt.delete(k);
+  personal(id, 'Your character is not finished yet, so the gates cannot take you. If the race menu already closed and you are still here, your game did not send your new look: quit Skyrim completely, start it again and log in, and the race menu opens again.');
+};
 // One spot picker per gate; holds live on globalThis so a reload keeps the promises already made
 const gateSpotHolds = globalThis.__dboGateSpotHolds instanceof Map ? globalThis.__dboGateSpotHolds : (globalThis.__dboGateSpotHolds = new Map());
 const gatePickers = new Map();
@@ -2049,8 +2061,9 @@ mp.onActivate = (targetId, casterId) => {
   // The last container gate: crouch over the chest, and it opens a moment later (idles.js chestHold, off by default)
   if (globalThis.__dboChestHold) { try { if (globalThis.__dboChestHold(targetId >>> 0, casterId >>> 0) === true) return false; } catch (e) { log('chest hold failed', e.message); } }
   const g = gateOf(targetId >>> 0);
-  // A character still being made goes nowhere (the race menu and the god come first; never a move with RaceMenu open)
-  if (g && creationPending(casterId >>> 0)) return false;
+  // A character still being made goes nowhere (the race menu and the god come first; never a move with RaceMenu open),
+  // and is told why
+  if (g && creationPending(casterId >>> 0)) { gateCreationTold(casterId >>> 0); return false; }
   if (g && globalThis.__dboPlaytestGate && globalThis.__dboPlaytestGate(casterId >>> 0)) return false;
   if (g) {
     try {
