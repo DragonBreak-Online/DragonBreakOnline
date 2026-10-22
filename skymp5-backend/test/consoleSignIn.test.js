@@ -277,3 +277,17 @@ test('V1: an encoded ../ under /api/site, and the relative site-config.json it w
     assert.doesNotMatch(r.text, /discordInvite|<script/, p)
   }
 })
+
+test('V1: a rate-limited sign-in answers plain text, not an HTML page on the website origin', async () => {
+  const visitor = { 'cf-connecting-ip': '192.0.2.77' }
+  for (let i = 0; i < 10; i++) assert.equal((await get('/api/site/login', '', visitor)).status, 302)
+  const r = await new Promise((resolve, reject) => http.get(`${base}/api/site/login`, { agent: false, headers: visitor }, res => {
+    let text = ''
+    res.setEncoding('utf8')
+    res.on('data', c => { text += c })
+    res.on('end', () => resolve({ status: res.statusCode, type: res.headers['content-type'] || '', text }))
+  }).on('error', reject))
+  assert.equal(r.status, 429)
+  assert.equal(r.type, 'text/plain; charset=utf-8')
+  assert.equal(r.text, 'Too many sign-ins right now. Please try again in a minute.')
+})
