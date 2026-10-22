@@ -3,6 +3,10 @@
 Branch `punish-backend-final`. It is backend A, the console allowlist and its hardening (898340e2f), merged with
 backend B, the ban, unban and Discord routes and the punish-only send (b472e8501 plus the authz and correctness reviews).
 On top of those, it gates the bot's ban-list guard and sends the page's account on `/actions/send` as `/console/run` does.
+Branch `punish-decisions-1022-backend` adds Jake's three decisions of 22 Oct:
+- "Punishments only": a Lead GM sends only `/discipline` and `/kick` through any console path (below);
+- "Yes, like in-game /ban": a dashboard game ban keeps the account's last address, as the in-game `/ban` does;
+- "Yes, follow role order": the Discord actions follow Discord's role order, and nobody Discord-bans an Administrator.
 
 The page has two ways to send. Both reach the same console function (`runStaffCommand`) and the same game checks.
 
@@ -14,6 +18,12 @@ The page has two ways to send. Both reach the same console function (`runStaffCo
 
 GMs get Copy only, everywhere.
 
+A Lead GM is a console caller with no Owners or Dragon Break Dev role (`SITE_OWNER_ROLE_IDS`, `SITE_STAFF_ROLE_IDS`, as
+Discord answers at that moment). On `/console/run`, `/actions/send` and Discord `/console` alike, a Lead GM gets only
+`/discipline` and `/kick`. Anything else is 422 `notRemote{why:'punishOnly'}` and nothing is sent. The game holds the same
+rule on its own (its effective tier, the lower of the fresh and stamped ones, must be Developer or above for anything
+else) and refuses with a `refused` job, `why: 'punishOnly'`.
+
 Every answer is JSON with `Cache-Control: no-store, private`. No answer carries a Discord id, an address or a hwid.
 
 ## What deploying changes, with every switch at its default
@@ -23,6 +33,9 @@ Every answer is JSON with `Cache-Control: no-store, private`. No answer carries 
 - Unchanged: the bot's Discord ban and unban handling, the panel's records, audit posting and the Console panel's
   two-key body. The only visible change is backend A's allowlist pre-check. The tests and differential checks behind
   this are listed in the hand-off.
+- On at once, whatever the switches: a pinned Lead GM's Discord `/console` takes only `/discipline` and `/kick`. Every
+  other line is answered "A Lead GM can run only /discipline and /kick from the console. Run anything else in game." and
+  nothing is sent. Owners and Dev keep the whole console.
 - New routes under `/api/site/staff/punishments/actions` answer, but no page calls them yet:
   - GET shows every `can.*` as false;
   - every POST answers 503 `actionsOff`, after the rank check.
@@ -30,8 +43,8 @@ Every answer is JSON with `Cache-Control: no-store, private`. No answer carries 
 ## Ship order: backend, then the website, then the game
 
 1. This backend, one restart.
-2. The website's `dashboard.html` from `dashboard-actions-1021`.
-3. The game's hot reload of `punish-hardening-1021-review`.
+2. The website's `dashboard.html` from `dashboard-decisions-1022`.
+3. The game's hot reload of `punish-decisions-1022`.
 
 The `dashboard-1021-final` page (74e20c94e) offers Send on Add strike and Add warning as soon as GET `/console` lists
 `/discipline`. It sends the two-key `/run` body, without the account. With the new game, that Send works for Owners and
@@ -103,9 +116,8 @@ Base `/api/site/staff/punishments/actions`. It is mounted before the read-only p
 Every POST also needs:
 - a panel rank (otherwise 403 `notStaff` before anything else);
 - the caller's Discord id in the console pin (`CONSOLE_DISCORD_IDS`). The pin is the console's own: a Lead GM pinned here
-  (and in the game's pin, which `send` also needs) can also use Discord `/console` with every command the game allows,
-  since the console's rank rule (`CONSOLE_ROLE_IDS`) takes Lead GMs. `send`'s `/discipline` and `/kick` limit holds on
-  this panel only;
+  (and in the game's pin, which `send` also needs) can also use Discord `/console`, for `/discipline` and `/kick` only
+  (Jake, 22 Oct: "Punishments only"). The backend and the game both hold that limit, on every console path;
 - a Discord sign-in at most 4 hours old;
 - the tier above, from roles asked of Discord at that moment.
 
@@ -192,6 +204,18 @@ The checks run in this order. The first refusal answers.
 3. The body: 400 `badRequest`, `badProfile`, `badMinutes`, `badReason{why}`, `badCommand`, `badConfirm`.
 4. The target: 404 `notFound`, 403 `ownAccount`, 503 `discordUnavailable` (the target's roles are unknown), 403
    `staffTarget`.
+5. For the Discord actions, the bot and the member, before Discord is written to:
+   - 503 `botNotReady`, `botLacksPermission{permission}`;
+   - timeouts: 409 `notInGuild`, 409 `targetIsAdmin`, 403 `roleOrder`, 409 `botBelowTarget`, 409 `notTimedOut` (end);
+   - `discord-ban`: a member who is an Administrator is 409 `targetIsAdmin` for every tier; then 403 `roleOrder`, 409
+     `botBelowTarget`, and Discord's own ban list (409 `alreadyBanned{kind:'discord'}`, 503 `discordUnavailable`);
+   - `discord-unban`: 403 `roleOrder` for a member, then Discord's ban list (409 `notBanned`).
+
+   `roleOrder` (Jake, 22 Oct: "Yes, follow role order"): the target's highest Discord role is at or above the caller's,
+   in Discord's own order (the higher position; at the same position the older role). It holds for Owners and Dev too,
+   because the bot does the action and Discord checks only the bot's place. As in Discord, the server's owner may act on
+   anyone, and nobody acts on the server's owner. An account that is not in the server has no roles, so a ban by id or an
+   unban passes it. Roles not in the bot's cache are 503 `discordUnavailable`. A dry run checks all of this too.
 
 ### `send`: `/discipline` and `/kick` from the dialog
 
@@ -246,6 +270,12 @@ its first error status, `{ v, error, code?, job }`.
   - `failed`: comes with its error status;
   - `notRun`: a backend restart came before the job ran.
 - `ref`: the game ban list's `B-XXXXXX` (`ban`, `unban`).
+- A game ban keeps the account's last address on the server, as the in-game `/ban` does (Jake, 22 Oct: "Yes, like
+  in-game /ban"): the player record's `lastIp`, through `bans.js` `publicIp`. An internal, relay or carrier-grade NAT
+  address, one shared by 3 or more player records, or none is not kept; a player store that cannot be read bans by
+  Discord id only. Another account that connects from a kept address is refused at login. The address is never in an
+  answer, a job, the audit file, an audit or #staff-commands line, the journal, ban.log or the panel. `unban` takes it
+  off with the entry.
 - `until`: the timeout's end, ISO UTC, in whole seconds. The 28-day timeout ends a minute short of 28 days.
 - `banRoleHeld` (`unban`): the account still holds the Discord ban role. Say "remove the ban role in Discord".
 - A game ban stops the next login only. Offer "Kick now" as a second `send` with `/kick #TAG` and a new `requestId`.
@@ -257,13 +287,13 @@ its first error status, `{ v, error, code?, job }`.
 |---|---|---|
 | 400 | `badRequest`, `badProfile`, `badConfirm`, `badReason{why}`, `badMinutes`, `badCommand` | the body (`badMinutes` also comes from Discord's 50035) |
 | 401 | `signedOut`, `signInAgain{signInUrl}` | no session, or a sign-in older than 4 h |
-| 403 | `badOrigin`, `badHeader`, `notStaff`, `notAllowed`, `ownAccount`, `staffTarget` | sender checks, no panel rank, tier or pin, the target |
+| 403 | `badOrigin`, `badHeader`, `notStaff`, `notAllowed`, `ownAccount`, `staffTarget`, `roleOrder` | sender checks, no panel rank, tier or pin, the target (`roleOrder`: the Discord actions) |
 | 404 | `notFound`, `noDiscordAccount` | an unknown action or account, or an account with no Discord id (Discord's 10013 is `notFound` too) |
 | 409 | `conflict` | the `requestId` was used by another account or with other fields (for `send`, another line) |
 | 409 | `alreadyBanned{ref, kind}` (`kind` is `ban` or `discord_ban`), or `alreadyBanned{kind:'discord'}` | `ban`, or `discord-ban` |
 | 409 | `notBanned` | `unban`, `discord-unban` (also Discord's 10026) |
 | 409 | `discordBan` | `unban` of a Discord ban's copy while Discord still bans them: use Discord unban |
-| 409 | `notInGuild`, `targetIsAdmin`, `botBelowTarget`, `notTimedOut` | the Discord actions (`notInGuild` also from Discord's 10007) |
+| 409 | `notInGuild`, `targetIsAdmin`, `botBelowTarget`, `notTimedOut` | the Discord actions (`notInGuild` also from Discord's 10007; `targetIsAdmin` for timeouts and Discord bans) |
 | 409 | `wrongTarget`, `noProfile` | `send`: the `#TAG` is not on that account; the caller has no character |
 | 413, 415 | (a sentence), `badContentType` | too large, not JSON |
 | 422 | `notPunish`, `notRemote{why, reason}` | `send` only |
@@ -304,6 +334,7 @@ Show `reason`. The backend writes it, in the game's own words.
 | `oneLine` | a line break in the typed text |
 | `reasonShort`, `reasonLong`, `reasonChars` | the reason |
 | `noProfileCheck` | the game does not check this command against the opened account yet; copy it and run it in game |
+| `punishOnly` | a Lead GM, any command but `/discipline` and `/kick` (also on `/console/run` and Discord `/console`) |
 
 ### A `refused` job (200, `job.state: 'refused'`, `job.why`): the game did not run it, and a resend is safe
 
@@ -318,6 +349,7 @@ Show `reason`. The backend writes it, in the game's own words.
 | `rankUnknown` | the game could not read the account's rank |
 | `suspendCap` | "#TAG's account has had 3 suspensions from the console in the last hour, the most the console takes. Wait, or do it in game." |
 | `suspended` | the caller's own account is suspended |
+| `punishOnly` | "A Lead GM can run only /discipline and /kick from the console. Run anything else in game." |
 | `target`, `targetAny` | the tag is not online, or there is no such tag |
 | `tier`, `rolesChanged`, `notPinned`, `noChar` | the caller, as the game sees them (a new Lead GM logs in once) |
 | `tooMany`, `gate`, `unknown` | the game's own limit, or its command gate |
@@ -329,8 +361,9 @@ The game's switch, a late request, a full queue and an unreadable request are no
 ## Confirmation wording (the page)
 
 - Send: show the exact line and the account ("<Name #TAG> (profile N)"). Every Yes button sends the action's confirm word.
-- Ban: "Ban <Name #TAG> (profile N) from the game for good? They cannot log in again until unbanned." Optionally "Kick
-  them now", sent after `done`.
+- Ban: "Ban <Name #TAG> (profile N) from the game for good? They cannot log in again until unbanned." Say that, as with
+  an in-game `/ban`, their last address is kept (never shown) and refuses other accounts from it. Optionally "Kick them
+  now", sent after `done`.
 - Discord ban: "Ban <Discord name> from the Discord? The game ban list gets a copy until they are unbanned on Discord."
 - Timeout: "Time out <Discord name> on Discord until <UTC>? Discord only; no effect in game."
 
@@ -347,7 +380,8 @@ The game's switch, a late request, a full queue and an unreadable request are no
     makes it a dry run). An action already recorded runs to its end.
 - The bot's guard of the game ban list is on only while the bans area is `on` (env narrowed by the file, read at each
   Discord event). The guard means:
-  - a Discord ban never replaces an existing game ban;
+  - a Discord ban never replaces an existing game ban; a kept one that has no address takes the Discord ban's (the
+    player record's `lastIp` through `publicIp`), so a Discord ban still catches the same connection;
   - a Discord unban lifts only the bot's own `discord ban` copy;
   - the list is read fail-closed.
 
