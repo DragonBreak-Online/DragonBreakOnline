@@ -3,8 +3,9 @@
 // skeever, mudcrab, deer) through the werewolf's race swap. Jake's rules: staff themselves only; killable (not ethereal; a
 // death reverts it and the player is seen); silent (no witness line on the change or on any revert; the werewolf's and the
 // Vampire Lord's lines unchanged); refused while dead or down, mounted, seated, bound, jailed, in a duel or a fight, already a
-// beast, indoors or in water; refused, and ended at the tick, while a player whose client lacks 'creatureBody' is within
-// 6000 units; an Owners' kill switch kept through reloads and restarts. The creature keys stay out of FORMS, so /beastform
+// beast, indoors or in water; refused, and ended at the tick, while a player whose client lacks 'creatureBody' could be
+// streamed the staff member (two grid squares out, 6000 units, or in the fork's actorNeighbors: review R1); an Owners' kill
+// switch kept through reloads and restarts. The creature keys stay out of FORMS, so /beastform
 // and the admin panel's grant and revoke never take one, and watchers are sent a creature body only when their client says
 // 'creatureBody' (the werewolf and Vampire Lord bodies are unchanged for 'beastBody' clients).
 //   node tests/polymorph-harness.js   (from server/; BEAST_ROOT=<dir> loads beastform.js from another tree)
@@ -158,14 +159,14 @@ revertToOwn(); delete globalThis.__dboCombatAt; props.set(`${LEAD}|lastAnimEvent
 // ---- 4. the visibility guard -------------------------------------------------------------------------------------------------
 place(PLAYER, 3000);
 r = run(LEAD, 'chicken');
-ok(/1 player within about 86 m would see a stripped human/.test(r) && !beast(LEAD), '4. a player on a client with only beastBody 3000 units away: refused', r);
+ok(/^1 player nearby would see a stripped human/.test(r) && !beast(LEAD), '4. a player on a client with only beastBody 3000 units away: refused', r);
 caps.set(PLAYER, new Set());
 place(FARP, 5900);
 r = run(LEAD, 'chicken');
-ok(/2 players within about 86 m/.test(r) && !beast(LEAD), '4. two such players (one with no capability at all, at 5900): refused, counted, never named', r);
-place(PLAYER, 3000, OTHER_WORLD); place(FARP, 6100);
+ok(/^2 players nearby would see/.test(r) && !beast(LEAD), '4. two such players (one with no capability at all, at 5900): refused, counted, never named', r);
+place(PLAYER, 3000, OTHER_WORLD); place(FARP, 13000);
 r = run(LEAD, 'chicken');
-ok(beast(LEAD) && beast(LEAD).form === 'chicken', '4. the same spot in another worldspace, and 6100 units: allowed', r);
+ok(beast(LEAD) && beast(LEAD).form === 'chicken', '4. the same spot in another worldspace, and 13000 units (three grid squares off): allowed', r);
 revertToOwn();
 place(NEWP, 1500); place(OWNER, 2500);
 r = run(LEAD, 'chicken');
@@ -178,7 +179,7 @@ place(PLAYER, 4000);
 n0 = said.length;
 tick();
 ok(!beast(LEAD) && look(LEAD).raceId === HUMAN && look(LEAD).name === `Name${LEAD.toString(16)}`, '4. tick: a player without creatureBody walks within 6000: reverted at once', look(LEAD));
-ok(told(n0, LEAD).some((t) => /You are yourself again: a player came within about 86 m whose game cannot show the animal yet/.test(t)), '4. ...the staff member is told why', told(n0, LEAD));
+ok(told(n0, LEAD).some((t) => /You are yourself again: a player came near whose game cannot show the animal yet/.test(t)), '4. ...the staff member is told why', told(n0, LEAD));
 ok(witnessLines(n0).length === 0, '4. ...and nobody near is told anything', witnessLines(n0));
 ok(audits.some((t) => /^BEAST P14 \(profile 20\) left the Chicken shape \(polymorph\): a player who cannot see it came near$/.test(t)), '4. ...the staff audit says why it ended', audits.slice(-2));
 place(PLAYER, 3000, OTHER_WORLD);
@@ -195,6 +196,69 @@ tick();
 ok(!beast(LEAD) && told(n0, LEAD).some((t) => /cannot swim, so it ends in water/.test(t)) && witnessLines(n0).length === 0, '4. tick: an animal that swims is reverted, told, silently', told(n0, LEAD));
 props.set(`${LEAD}|lastAnimEvent`, null);
 place(NEWP, 100000, OTHER_WORLD); place(OWNER, 110000, OTHER_WORLD);
+
+// ---- 4b. the fork's streaming block, not a radius (review R1, 22 Oct) --------------------------------------------------------
+// The fork streams an actor to every player in the 3x3 block of grid squares around it (MpObjectReference GetGridPos
+// int16(pos / 4096), truncated toward zero, height ignored; Grid.h MoveImpl i, j in -1..1). The guard counts two squares out,
+// and the fork's own listener list (actorNeighbors). Every refusal and revert below is one the 6000-unit radius let through.
+const at = (a, p, cell) => { props.set(`${a}|worldOrCellDesc`, cell || WORLD); props.set(`${a}|pos`, p.slice()); };
+const kept4b = [LEAD, PLAYER, FARP, NEWP].map((a) => [a, props.get(`${a}|worldOrCellDesc`), props.get(`${a}|pos`)]);
+const capsPlayer4b = caps.get(PLAYER);
+caps.set(PLAYER, new Set(['beastBody']));   // a live 0.3.106 client
+at(FARP, [100000, 0, 0], OTHER_WORLD); at(NEWP, [110000, 0, 0], OTHER_WORLD);
+const streamed = [
+  ['in the next square on one axis, 7000 units off (LEAD at x 100)', [100, 0, 0], [7100, 0, 0]],
+  ['in the next square, 8000 units off (LEAD at x 4200)', [4200, 0, 0], [12200, 0, 0]],
+  ['in the next square on the diagonal, 11000 units off', [4200, 4200, 0], [4200 + 7778, 4200 + 7778, 0]],
+  ['across the x = 0 line (square 0 is 8191 units wide), 12000 units off', [-3900, 0, 0], [8100, 0, 0]],
+  ['10000 units straight above (height is ignored)', [100, 0, 0], [100, 0, 10000]],
+  ['two squares off, 8100 units (not streamed yet: the one-square margin)', [4200, 0, 0], [12300, 0, 0]],
+];
+for (const [label, lp, pp] of streamed) {
+  at(LEAD, lp); at(PLAYER, pp);
+  const r4 = run(LEAD, 'chicken');
+  ok(/^1 player nearby would see a stripped human/.test(r4) && !beast(LEAD), `4b. a 0.3.106 player ${label}: refused`, r4);
+  revertToOwn();
+}
+at(LEAD, [4200, 0, 0]); at(PLAYER, [16400, 0, 0]);
+r = run(LEAD, 'chicken');
+ok(beast(LEAD) && beast(LEAD).form === 'chicken', '4b. a 0.3.106 player three squares off (12200 units): allowed', r);
+n0 = said.length;
+tick();
+ok(beast(LEAD), '4b. tick: still three squares off: kept');
+at(PLAYER, [12300, 0, 0]);
+tick();
+ok(!beast(LEAD) && told(n0, LEAD).some((t) => /a player came near whose game cannot show the animal yet/.test(t)) && witnessLines(n0).length === 0,
+  '4b. tick: the player walks to two squares off (8100 units): reverted, told, silently', told(n0, LEAD));
+revertToOwn();
+at(LEAD, [100, 0, 0]); at(PLAYER, [7100, 0, 0], OTHER_WORLD);
+r = run(LEAD, 'chicken');
+ok(beast(LEAD) && beast(LEAD).form === 'chicken', '4b. the next square\'s spot in another worldspace: allowed', r);
+revertToOwn();
+at(PLAYER, [100000, 0, 0], OTHER_WORLD); at(NEWP, [7100, 0, 0]);
+r = run(LEAD, 'chicken');
+ok(beast(LEAD) && beast(LEAD).form === 'chicken', '4b. a creatureBody player in the next square: allowed', r);
+// the fork's own listener list counts whatever the place says; LEAD itself, an NPC and a creatureBody client in it do not
+const NPC4B = 0xff000abc;
+props.set(`${LEAD}|actorNeighbors`, [LEAD, NPC4B, NEWP]);
+n0 = said.length;
+tick();
+ok(beast(LEAD), '4b. tick: actorNeighbors holding LEAD itself, an NPC and a creatureBody client: kept');
+props.set(`${LEAD}|actorNeighbors`, [LEAD, NPC4B, NEWP, PLAYER]);
+tick();
+ok(!beast(LEAD) && told(n0, LEAD).some((t) => /a player came near whose game cannot show the animal yet/.test(t)) && witnessLines(n0).length === 0,
+  '4b. tick: the fork lists a 0.3.106 player as a neighbour (their place says another worldspace): reverted, told, silently', told(n0, LEAD));
+revertToOwn();
+r = run(LEAD, 'chicken');
+ok(/^1 player nearby would see a stripped human/.test(r) && !beast(LEAD), '4b. ...and refused while the fork lists them', r);
+revertToOwn();
+props.delete(`${LEAD}|actorNeighbors`);
+at(PLAYER, [NaN, 0, 0]);
+r = run(LEAD, 'chicken');
+ok(/^1 player nearby would see a stripped human/.test(r) && !beast(LEAD), '4b. a player in the same worldspace whose place is not a number counts as near (fails closed)', r);
+revertToOwn();
+for (const [a, c, p] of kept4b) { props.set(`${a}|worldOrCellDesc`, c); props.set(`${a}|pos`, p); }
+caps.set(PLAYER, capsPlayer4b);
 
 // ---- 5. the change: the race swap, silent, the mortal race kept ---------------------------------------------------------------
 place(NEWP, 1000);   // a creatureBody client watching
