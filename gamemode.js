@@ -8570,7 +8570,7 @@ try {
     // lower the other characters' stamps) with one guild, as the sync reads the first and the login all of them, and from a
     // member read: "not in the guild" (10007) only logs out, as before
     isStaff: (a) => staffTierOf(a) !== null || accountRankOf(profileOf(a), null, a) !== 0,
-    staffRolesSeen: (a, roles, how) => staffRolesSeen(a, roles, how !== 'left' && (auth.guilds || []).length <= 1) });
+    staffRolesSeen: (a, roles, how) => staffRolesSeen(a, roles, how === 'member' && (auth.guilds || []).length <= 1) });
 } catch (e) { log('discordroles.js failed to load:', e.stack || e.message); globalThis.__dboDiscordPost = null; }
 
 // ---- /ticket: a private Discord ticket with staff, opened from the game (server\gameticket.js, config "tickets") -------

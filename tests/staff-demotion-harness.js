@@ -160,8 +160,8 @@ check('the legacy admin role still counts (as Senior)', kicked.length === 0);
 check('discordroles.js is given isStaff and staffRolesSeen', /require\(DISCORDROLES_JS\)\(\{[\s\S]*?isStaff: \(a\) => staffTierOf\(a\) !== null[\s\S]*?staffRolesSeen: \(a, roles, how\) => staffRolesSeen\(/.test(src));
 check("R6. ...isStaff holds while any character of the account carries a staff stamp, so the role sync reads a demoted account's roles from whichever character is played",
   /isStaff: \(a\) => staffTierOf\(a\) !== null \|\| accountRankOf\(profileOf\(a\), null, a\) !== 0,\n/.test(src));
-check("R7. ...and a read is whole only from a member read with one guild configured (the sync reads the first guild, the login all of them)",
-  /staffRolesSeen: \(a, roles, how\) => staffRolesSeen\(a, roles, how !== 'left' && \(auth\.guilds \|\| \[\]\)\.length <= 1\) \}\);/.test(src));
+check("R7. ...and a read is whole only when discordroles.js says it is a member read, with one guild configured (the sync reads the first guild, the login all of them; anything else, an old discordroles.js too, re-stamps nothing)",
+  /staffRolesSeen: \(a, roles, how\) => staffRolesSeen\(a, roles, how === 'member' && \(auth\.guilds \|\| \[\]\)\.length <= 1\) \}\);/.test(src));
 
 console.log(failures ? `\n${failures} FAILED` : '\nall passed');
 process.exit(failures ? 1 : 0);
