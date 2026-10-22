@@ -2209,8 +2209,9 @@ module.exports = (api) => {
   // (or a staff actor). { ok, text, school, from, to, added, heldFor }. Whole levels 1-100, capped at 100; the xp into the
   // current level is kept. Like credit(), it stops at an Apprentice or Adept pick's level until that spell is chosen
   // (heldFor names the rank; the rest is not given), so a grant never carries anyone past a choice they owe, and a school
-  // already past a pick is never pulled back. The caller tells the player; the K menu is refreshed here.
-  const grant = (t, school, add, by, reason) => {
+  // already past a pick is never pulled back. The caller tells the player; the K menu is refreshed here. With `dry` it
+  // only answers what it would give (gifts.js asks before it spends a gift), changing, auditing and sending nothing.
+  const grant = (t, school, add, by, reason, dry) => {
     const name = SCHOOLS.find((n) => n.toLowerCase() === String(school || '').toLowerCase());
     if (String(school || '').toLowerCase() === 'restoration') return { ok: false, text: 'Restoration follows the Priest skill: grant Priest on the Wheel instead.' };
     if (!name) return { ok: false, text: `${school || 'That'} is not a school of magic. Schools: ${SCHOOLS.join(', ')}.` };
@@ -2221,6 +2222,7 @@ module.exports = (api) => {
     for (const p of RANK_PICKS) if (was <= p.at && level > p.at && !rankMade(s, name, p.rank)) { level = p.at; xp = 99.99; heldFor = p.rank; break; }
     const added = level - was;
     if (added <= 0) return { ok: false, text: heldFor ? `${display(t)}'s ${name} is held at ${was} until its ${heldFor} spell is chosen.` : `${display(t)}'s ${name} is already ${was}.`, school: name, from: was, to: was, added: 0, heldFor };
+    if (dry) return { ok: true, text: '', school: name, from: was, to: level, added, heldFor };
     s.levels[name] = { level, xp };
     save(t, s);
     const giver = typeof by === 'number' && by ? who(by) : String(by || 'staff').slice(0, 40);
@@ -2229,7 +2231,7 @@ module.exports = (api) => {
     try { globalThis.__dboSchoolsProgressSend(t); } catch (e) { /* no K menu */ }
     return { ok: true, text: `${display(t)}'s ${name} is now ${level} (was ${was}${short}).`, school: name, from: was, to: level, added, heldFor };
   };
-  globalThis.__dboSchoolsGrant = (t, school, levels, by, reason) => { try { return grant(t >>> 0, school, levels, by, reason); } catch (e) { return { ok: false, text: e.message }; } };
+  globalThis.__dboSchoolsGrant = (t, school, levels, by, reason, dry) => { try { return grant(t >>> 0, school, levels, by, reason, !!dry); } catch (e) { return { ok: false, text: e.message }; } };
 
   // ---- apprenticeship (Arcane Mastery stage 2, Nate 14 Oct) --------------------------------------------------------------
   // The apprentice's record: s.apprentice { teacher, teacherName, spell (desc), school, rank, xp, need, day, dayXp, at, held,
