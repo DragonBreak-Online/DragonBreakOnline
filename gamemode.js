@@ -5153,6 +5153,9 @@ globalThis.__dboReadBook = (targetId, casterId) => {
   let rec = null; try { rec = mp.lookupEspmRecordById(mp.getIdFromDesc(String(mp.get(targetId, 'baseDesc')))); } catch (e) { return false; }
   if (!rec || !rec.record || String(rec.record.type) !== 'BOOK') return false;
   const baseId = (() => { try { return mp.getIdFromDesc(String(mp.get(targetId, 'baseDesc'))) >>> 0; } catch (e) { return 0; } })();
+  // Bethesda's placeholder books (Skyrim.esm d7866 "Dummy Book": no name, no model) are no reading: copied, they were an
+  // invisible item shown as Unknown at the ledgers (22 Oct, #bugs "Dummy Books?")
+  if (/dummy|placeholder/i.test(String(rec.record.editorId || ''))) return false;
   const title = humanize(rec.record.editorId);
   // BOOK DATA flags (byte 0): 0x01 teaches a skill, 0x02 cannot be taken, 0x04 teaches a spell
   const bookData = (rec.record.fields || []).find((f) => f && f.type === 'DATA' && f.data instanceof Uint8Array && f.data.byteLength);

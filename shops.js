@@ -51,7 +51,7 @@ module.exports = (ctx) => {
   const { mp, log, personal, audit, who, display, cfg, takeGold, giveGold, data, save, note, earned, hex, get, cellOf, bizAt,
     isStaff, armSeconds, onlineActors, profileOf } = ctx;
   const C = Object.assign({
-    enabled: true, minPrice: 1, maxPrice: 100000, maxPerBuy: 1000, listMax: 60, maxPrices: 200,
+    enabled: true, minPrice: 1, maxPrice: 100000, maxPerBuy: 1000, listMax: 200, maxPrices: 200,
     // Never listed, by record type and by editor id (on top of artifacts.json)
     bannedTypes: ['KEYM'], bannedPattern: '',
     armSeconds: 0,

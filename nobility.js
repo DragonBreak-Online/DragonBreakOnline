@@ -292,6 +292,8 @@ module.exports = (api) => {
     const ids = new Set(Object.keys(C.realms || {}));
     for (const f of FIEFS) ids.add(f.hold);
     for (const n of living()) ids.add(n.hold);
+    // A ruler's own hold, though it has no fiefs or nobles yet (Jarl of Falkreath, 22 Oct: only Haafingar and Bruma showed)
+    try { for (const m of ranksOf(profileOf(a), a) || []) if (m && m.zone && m.zone.id) ids.add(m.zone.id); } catch (e) { /* no ranks */ }
     return [...ids].filter((id) => zoneById(id)).filter((id) => FIEFS.some((f) => f.hold === id) || living().some((n) => n.hold === id) || rules(a, id));
   };
   const holdView = (a, zid) => {

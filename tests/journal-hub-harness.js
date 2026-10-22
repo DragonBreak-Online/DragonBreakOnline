@@ -278,7 +278,8 @@ caps.get(HOLD).add('journalTab:court');
 const courtVis = globalThis.__dboJournalSections.court.visible;
 globalThis.__dboJournalSections.court.visible = (a) => a === HOLD || courtVis(a);
 globalThis.__dboJournalRequest(HOLD);
-check('...on a front with Court: no Faction tab, Court covers it', !ids(last(HOLD)).includes('faction') && ids(last(HOLD)).includes('court'), ids(last(HOLD)));
+// The realm map lives in the Faction tab and the Court tab has none, so a court member keeps both (22 Oct, Court of Riften)
+check('...on a front with Court: the Faction tab stays beside Court, for the realm map', ids(last(HOLD)).includes('faction') && ids(last(HOLD)).includes('court'), ids(last(HOLD)));
 globalThis.__dboJournalSections.court.visible = courtVis;
 
 // ---- read-only extras: no Settings of another, the staff flag is the viewer's, the faction panel read only ----

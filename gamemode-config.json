@@ -461,7 +461,7 @@
   "minPrice": 1,
   "maxPrice": 100000,
   "maxPerBuy": 1000,
-  "listMax": 60,
+  "listMax": 200,
   "maxPrices": 200,
   "bannedTypes": ["KEYM"],
   "bannedPattern": "",
