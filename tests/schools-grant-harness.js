@@ -174,10 +174,10 @@ const BOTH = { Apprentice: picked, Adept: picked };
 const ELION = 0x41; mage(ELION, 64, 40, BOTH);
 let r = grant(ELION, 'destruction', 21, 'Jake', 'mod-0311: classes underpaid');
 check('+21 Destruction from 64 is 85: levels are added, not set', r.ok === true && r.added === 21 && r.from === 64 && r.to === 85 && level(ELION, 'Destruction') === 85, r);
-check('...the xp into the level is kept (40)', xpOf(ELION, 'Destruction') === 40, rec(ELION).levels.Destruction);
+check('...the xp into the level is kept (40)', level(ELION, 'Destruction') === 85 && xpOf(ELION, 'Destruction') === 40, rec(ELION).levels.Destruction);
 check('...it is audited in the SCHOOLS style with the giver and the reason', audits(/^SCHOOLS Jake granted P41 21 Destruction levels: 64 to 85 \(primary\); mod-0311: classes underpaid$/).length === 1, out.audits.slice(-2));
 check('...and the K menu is sent again', !!lastPacket(ELION, 'dboSchoolProgress') && lastPacket(ELION, 'dboSchoolProgress').progress !== undefined && out.packets.filter((x) => x.a === ELION).length === 1, out.packets.filter((x) => x.a === ELION).length);
-check('...the hook tells no one itself (the caller does)', !out.said.some((x) => x[0] === ELION));
+check('...the hook tells no one itself (the caller does)', r.ok === true && !out.said.some((x) => x[0] === ELION));
 
 // ---- the cap at 100 ----
 r = grant(ELION, 'Destruction', 30, 'Jake', 'cap');
@@ -214,7 +214,7 @@ const refusals = [
 ];
 const bad = refusals.map(([s, l, re]) => [s, l, grant(EXPERT, s, l, 'Nate', 'bad')]).filter(([s, l, x], i) => x.ok !== false || !refusals[i][2].test(x.text));
 check('Restoration, an unknown school and a level outside whole 1-100 are refused with the reason', bad.length === 0, bad);
-check('...and none of them changes a level or writes an audit line', level(EXPERT, 'Destruction') === lv0 && out.audits.length === n, [level(EXPERT, 'Destruction'), out.audits.slice(n)]);
+check('...and none of them changes a level or writes an audit line', typeof globalThis.__dboSchoolsGrant === 'function' && level(EXPERT, 'Destruction') === lv0 && out.audits.length === n, [level(EXPERT, 'Destruction'), out.audits.slice(n)]);
 check('a staff actor as the giver is named as one', grant(EXPERT, 'Destruction', 1, TEACHER, 'by actor').ok && audits(/^SCHOOLS P15 granted P44 1 Destruction level: 80 to 81 \(primary\); by actor$/).length === 1, out.audits.slice(-1));
 
 // ---- a staff gift of school levels through the real gifts.js ----
@@ -232,7 +232,7 @@ check('a staff actor as the giver is named as one', grant(EXPERT, 'Destruction',
   fs.writeFileSync(path.join('gifts-inbox', 'g-aldemar.json'), JSON.stringify({ tag: '8HSY', schools: { Destruction: 10 }, reason: 'Your classes were underpaid under the old rule.', by: 'Jake', at: '2026-10-22T00:00:00Z' }));
   online = online.filter((a) => a !== ALDEMAR);
   giftTimers.get('gifts')();
-  check('gift: Aldemar offline, the schools gift waits', level(ALDEMAR, 'Destruction') === 76 && fs.existsSync(path.join('gifts-inbox', 'g-aldemar.json')));
+  check('gift: Aldemar offline, the schools gift waits (and is no bad file)', level(ALDEMAR, 'Destruction') === 76 && fs.existsSync(path.join('gifts-inbox', 'g-aldemar.json')) && !out.logs.some((l) => /g-aldemar\.json refused/.test(l)), out.logs.slice(-1));
   online.push(ALDEMAR);
   giftTimers.get('gifts')();
   check('gift: in the world, +10 Destruction through the real hook: 76 to 86, xp kept', level(ALDEMAR, 'Destruction') === 86 && xpOf(ALDEMAR, 'Destruction') === 10, rec(ALDEMAR).levels.Destruction);
