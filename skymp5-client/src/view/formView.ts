@@ -1171,10 +1171,14 @@ export class FormView {
     if (hostile === false || isOwnCompanion(remoteId) || isAnyCompanion(remoteId) || companionOf) {
       return false;
     }
+    // A player's copy before the race test: one shown in a polymorph body must never turn hostile by its race
+    if (model.appearance) {
+      return false;
+    }
     if (FormView.ambushRaces.includes(actor.getRace()?.getFormID() ?? 0)) {
       return true;
     }
-    if (model.appearance || actor.getActorValue("Aggression") >= 2) {
+    if (actor.getActorValue("Aggression") >= 2) {
       return false;
     }
     // Allies and friends of the player (followers, housecarls) never turn on anyone
