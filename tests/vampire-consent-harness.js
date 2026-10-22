@@ -271,6 +271,21 @@ ok(packets.filter(([a, p]) => a === V && p.customPacketType === 'dboBloody' && p
 cmds.curse(V, 'me cure');
 ok(!state(V).blood && store.get(`${V}|appearance`).tints[0].argb === 0, 'the cure washes the blood with the curse');
 
+// ---- Vampiric Seduction (Onny, 22 Oct: a seduced bite never counted as feeding) ----------------------------------------
+// Every Skyrim.esm id resolves to 0x1234 in this stub, so 0x1234 is Seduction's id here
+store.set(`${V}|private.supernatural`, { kind: 'vampire', stage: 3, lastFed: -1, pure: false });
+now += 3 * GAME_DAY_MS; feedTick(30000); said.length = 0; widgets.length = 0;
+ok(globalThis.__dboSuperActivate(T, V) === false, 'E on a living player nobody seduced is not a feed');
+globalThis.__dboSuperSpellHit(V, T, 0x1234);
+const sres = globalThis.__dboSuperActivate(T, V);
+ok(sres === true && heard(T, /drinks from your neck/) && !widgets.some(([a]) => a === T), 'Seduced, E on them feeds at once, as the willing, with no asking');
+feedTick(30000);
+said.length = 0;
+globalThis.__dboSuperSpellHit(V, B, 0x1234);
+ok(globalThis.__dboSuperActivate(B, W2) === false, 'another vampire cannot feed on the one V seduced');
+now += 31000;
+ok(globalThis.__dboSuperActivate(B, V) === false, 'and the calm wears off after 30 s');
+
 Math.random = realRandom;
 console.log(fail ? `${fail} failed` : 'all checks passed');
 process.exit(fail ? 1 : 0);
