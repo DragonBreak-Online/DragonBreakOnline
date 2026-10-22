@@ -8,6 +8,7 @@ const fs = require('fs')
 const path = require('path')
 const { createConsoleFixture, ROLE, GUILD, DEPLOY_ROLE_IDS, ALLOW, uuid } = require('./consoleFixture')
 const { createPunishFixture, PEOPLE, SECRET_STRINGS } = require('./punishFixture')
+const { outranksIn } = require('../../sources/discord/moderation')
 
 const ROOT = path.join(__dirname, '..', '..')
 const stub = (rel, exports) => {
@@ -16,6 +17,8 @@ const stub = (rel, exports) => {
 }
 const ORIGIN = 'https://site.example'
 const BAN_ROLE = '1555000000000000999'
+// A Discord-only role that is no panel tier (a Discord moderator role), for the role order checks
+const MOD_ROLE = '1555000000000000777'
 const HANDLES = { owner: 'jake', dev: 'nate.pierce', lead: 'lena_lead', gm: 'gus_gm', trial: 'tia', none: 'pat', actor: 'old_lead', rep: 'vex' }
 // allow.json as the hardened game (45e90896c) writes it, with /discipline and the targetProfile and rank flags; ALLOW is today's
 const DISCIPLINE = {
@@ -91,6 +94,11 @@ function createActionsFixture() {
     moderation: { ready: true, banMembers: true, moderateMembers: true, viewAuditLog: true },
     member: new Map(), banned: new Set(), fail: null, hang: false, banStateAnswer: null,
   }
+  // The guild's roles as the gateway caches them, for the real role order rule (moderation.js outranksIn)
+  H.positions = () => new Map([[GUILD, 0], [ROLE.trial, 10], [ROLE.gm, 20], [MOD_ROLE, 25], [ROLE.lead, 30], [ROLE.dev, 40], [ROLE.owner, 50], [BAN_ROLE, 5]])
+  H.guild = { id: GUILD, ownerId: '900000000000000001', roles: { cache: new Map() } }
+  H.setRoles = (positions = H.positions()) => { H.guild.roles.cache = new Map([...positions].map(([id, position]) => [id, { id, position }])) }
+  H.setRoles()
   const write = (name, ...args) => {
     H.calls.push([name, ...args])
     if (H.bot.hang) return H.bot.hang === true ? new Promise(() => {}) : H.bot.hang
@@ -111,6 +119,7 @@ function createActionsFixture() {
     banUser: (d, reason) => write('banUser', d, reason),
     unbanUser: (d, reason) => write('unbanUser', d, reason),
     banState: async d => H.bot.banStateAnswer || (H.bot.banned.has(d) ? 'banned' : 'notBanned'),
+    outranks: (...a) => outranksIn(H.guild, ...a),
   }
   // The account's last address as the route reads it (players.json lastIp); none unless a test sets one
   H.lastIp = new Map()
@@ -172,4 +181,4 @@ function createActionsFixture() {
   return H
 }
 
-module.exports = { createActionsFixture, ORIGIN, BAN_ROLE, HANDLES, uuid, ROLE, GUILD, ALLOW, HARDENED_ALLOW }
+module.exports = { createActionsFixture, ORIGIN, BAN_ROLE, MOD_ROLE, HANDLES, uuid, ROLE, GUILD, ALLOW, HARDENED_ALLOW }

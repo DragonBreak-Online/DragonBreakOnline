@@ -7,7 +7,7 @@ const { test, after, beforeEach } = require('node:test')
 const assert = require('node:assert/strict')
 const fs = require('fs')
 const path = require('path')
-const { createActionsFixture, uuid, BAN_ROLE, ROLE, GUILD, ALLOW, HARDENED_ALLOW } = require('./helpers/punishActionsFixture')
+const { createActionsFixture, uuid, BAN_ROLE, MOD_ROLE, ROLE, GUILD, ALLOW, HARDENED_ALLOW } = require('./helpers/punishActionsFixture')
 const { parseActionsSwitch, parseBody, ACTIONS } = require('../sources/punish/actions')
 
 const H = createActionsFixture()
@@ -23,7 +23,10 @@ beforeEach(() => {
   H.bot.banStateAnswer = null
   fs.rmSync(H.switchFile, { force: true })
   for (const k of ['bob', 'gina', 'dev', 'rep']) H.roles.set(PEOPLE[k].discordId, k === 'gina' ? [GUILD, ROLE.gm] : k === 'dev' ? [GUILD, ROLE.dev] : [GUILD])
+  H.roles.set(PEOPLE.lead.discordId, [GUILD, ROLE.lead])
   H.lastIp.clear()
+  H.setRoles()
+  H.guild.ownerId = '900000000000000001'
   try { H.bans.removeEntry(PEOPLE.bob.discordId) } catch { /* a test broke the list and restores it */ }
   H.make()
 })
@@ -620,4 +623,77 @@ test('ban: an internal, shared or unknown address is never kept; a player store 
   H.make({ config: { punishActions: 'dry-run' }, extra: { ...ROOMY.extra, lastIpOf: () => { asked++; return '203.0.113.52' } } })
   assert.equal(want(await H.call('ban', 'owner', H.body('ban')), 200).job.state, 'dry-run')
   assert.deepEqual([entryOf(bobId), asked], [undefined, 0])
+})
+
+// Jake, 22 Oct: "Yes, follow role order". Positions: Owners 50, Dev 40, Lead GM 30, a Discord moderator role 25, GM 20
+test('Discord role order: a timeout, ban or unban is refused when the target\'s highest role is at or above the caller\'s, for every tier', async () => {
+  H.make(ROOMY)
+  const leadId = PEOPLE.lead.discordId
+  H.roles.set(bobId, [GUILD, MOD_ROLE])
+  want(await H.call('discord-timeout', 'lead', H.body('discord-timeout')), 200)
+  H.calls.length = 0
+  // The moderator role above Lead GM: a Lead GM may not, a Dev may
+  H.setRoles(new Map([...H.positions(), [MOD_ROLE, 35]]))
+  for (const action of ['discord-timeout', 'discord-timeout-end']) want(await H.call(action, 'lead', H.body(action)), 403, 'roleOrder')
+  assert.match(H.audits.join('\n'), /PUNISH refused lena_lead .* discord-timeout roleOrder/)
+  want(await H.call('discord-timeout', 'dev', H.body('discord-timeout')), 200)
+  // At the caller's own place: the same role, or the same position with the older role
+  H.setRoles()
+  H.roles.set(leadId, [GUILD, ROLE.lead, MOD_ROLE])
+  H.setRoles(new Map([...H.positions(), [MOD_ROLE, 33]]))
+  want(await H.call('discord-timeout', 'lead', H.body('discord-timeout')), 403, 'roleOrder')
+  H.roles.set(leadId, [GUILD, ROLE.lead])
+  const OLDER = '1400000000000000555'
+  H.setRoles(new Map([...H.positions(), [OLDER, 30]]))
+  H.roles.set(bobId, [GUILD, OLDER])
+  want(await H.call('discord-timeout', 'lead', H.body('discord-timeout')), 403, 'roleOrder')
+  H.setRoles(new Map([...H.positions(), [MOD_ROLE, 30]]))
+  H.roles.set(bobId, [GUILD, MOD_ROLE])
+  want(await H.call('discord-timeout', 'lead', H.body('discord-timeout')), 200, null, 'the same position with a newer role is below')
+  // Owners and Dev too: a role at 45 is above Dev, below Owners
+  H.setRoles(new Map([...H.positions(), [MOD_ROLE, 45]]))
+  H.calls.length = 0
+  for (const action of ['discord-timeout', 'discord-ban']) want(await H.call(action, 'dev', H.body(action)), 403, 'roleOrder')
+  assert.deepEqual(H.calls, [], 'Discord is never written to')
+  want(await H.call('discord-ban', 'owner', H.body('discord-ban')), 200)
+  // An unban of a member who is still in the server with a higher role (Discord keeps no roles for a banned account)
+  H.bot.member.set(bobId, { state: 'member', roles: [GUILD, MOD_ROLE], handle: 'bobby', bannable: true, moderatable: true, admin: false, timedOutUntil: 0 })
+  want(await H.call('discord-unban', 'dev', H.body('discord-unban')), 403, 'roleOrder')
+  H.bot.member.set(bobId, { state: 'absent' })
+  want(await H.call('discord-unban', 'dev', H.body('discord-unban')), 200)
+  // A dry run checks it too
+  H.bot.member.clear()
+  H.make({ ...ROOMY, config: { punishActions: 'dry-run' } })
+  want(await H.call('discord-timeout', 'dev', H.body('discord-timeout')), 403, 'roleOrder')
+  // The game ban list and the send are not Discord actions: no role order there
+  H.make(ROOMY)
+  assert.equal(want(await H.call('ban', 'owner', H.body('ban')), 200).job.state, 'done')
+})
+
+test('Discord role order: the server\'s owner is above everyone and nobody acts on them; roles not cached fail closed; never an Administrator', async () => {
+  H.make(ROOMY)
+  H.guild.ownerId = bobId
+  for (const [who, action] of [['owner', 'discord-ban'], ['owner', 'discord-timeout'], ['lead', 'discord-timeout']]) want(await H.call(action, who, H.body(action)), 403, 'roleOrder')
+  H.guild.ownerId = PEOPLE.owner.discordId
+  H.roles.set(bobId, [GUILD, MOD_ROLE])
+  H.setRoles(new Map([...H.positions(), [MOD_ROLE, 60]]))
+  want(await H.call('discord-timeout', 'owner', H.body('discord-timeout')), 200, null, 'the server owner, as in Discord itself')
+  want(await H.call('discord-timeout', 'dev', H.body('discord-timeout')), 403, 'roleOrder')
+  H.guild.ownerId = '900000000000000001'
+  H.setRoles(new Map([...H.positions()].filter(([id]) => id !== GUILD)))
+  H.calls.length = 0
+  want(await H.call('discord-timeout', 'owner', H.body('discord-timeout')), 503, 'discordUnavailable')
+  want(await H.call('discord-ban', 'owner', H.body('discord-ban')), 503, 'discordUnavailable')
+  H.setRoles()
+  H.make({ ...ROOMY, extra: { ...ROOMY.extra, bot: { ...H.fakeBot, outranks: undefined } } })
+  want(await H.call('discord-timeout', 'owner', H.body('discord-timeout')), 503, 'discordUnavailable')
+  H.make(ROOMY)
+  // An Administrator: no Discord ban, as no timeout, from any tier; checked before the role order
+  H.bot.member.set(bobId, { state: 'member', roles: [GUILD], handle: 'bobby', bannable: true, moderatable: false, admin: true, timedOutUntil: 0 })
+  for (const who of ['owner', 'dev']) want(await H.call('discord-ban', who, H.body('discord-ban')), 409, 'targetIsAdmin')
+  want(await H.call('discord-timeout', 'owner', H.body('discord-timeout')), 409, 'targetIsAdmin')
+  assert.deepEqual(H.calls, [], 'Discord is never written to')
+  // Not in the server: banned by id, as before
+  H.bot.member.set(bobId, { state: 'absent' })
+  assert.equal(want(await H.call('discord-ban', 'owner', H.body('discord-ban')), 200).job.state, 'done')
 })

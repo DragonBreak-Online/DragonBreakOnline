@@ -7,6 +7,18 @@ const { PermissionFlagsBits } = require('discord.js')
 
 const NOT_READY = Object.freeze({ ready: false, banMembers: false, moderateMembers: false, viewAuditLog: false })
 
+// Discord's role order for one member acting on another, as GuildMember.manageable has it for the bot; null when not cached
+function outranksIn(g, byId, byRoles, targetId, targetRoles) {
+  const everyone = g?.roles?.cache?.get(String(g.id))
+  if (!everyone) return null
+  if (String(targetId) === String(g.ownerId)) return false
+  if (String(byId) === String(g.ownerId)) return true
+  // RoleManager.comparePositions: the higher position, and at the same position the older role (the lower id)
+  const above = (a, b) => (a.position !== b.position ? a.position > b.position : BigInt(a.id) < BigInt(b.id))
+  const top = list => (list || []).map(id => g.roles.cache.get(String(id))).filter(Boolean).reduce((t, r) => (above(r, t) ? r : t), everyone)
+  return above(top(byRoles), top(targetRoles))
+}
+
 function createModeration({ client, isReady, guildId }) {
   const guild = () => (isReady() ? client.guilds.cache.get(guildId()) || null : null)
   const has = (subject, flag) => { try { return !!subject.permissions.has(flag) } catch { return false } }
@@ -57,6 +69,9 @@ function createModeration({ client, isReady, guildId }) {
     try { await g.bans.fetch({ user: discordId, force: true }); return 'banned' } catch (err) { return err && err.code === 10026 ? 'notBanned' : 'unknown' }
   }
 
+  // From the gateway's role cache, as botModeration; any error is null
+  const outranks = (byId, byRoles, targetId, targetRoles) => { try { return outranksIn(guild(), byId, byRoles, targetId, targetRoles) } catch { return null } }
+
   // One line at gateway ready, so a restart shows whether the actions can work
   function readyLine() {
     const m = botModeration()
@@ -65,7 +80,7 @@ function createModeration({ client, isReady, guildId }) {
       : 'moderation: the guild is not in the cache'
   }
 
-  return { botModeration, memberState, timeoutMember, banUser, unbanUser, banState, readyLine }
+  return { botModeration, memberState, timeoutMember, banUser, unbanUser, banState, outranks, readyLine }
 }
 
-module.exports = { createModeration }
+module.exports = { createModeration, outranksIn }

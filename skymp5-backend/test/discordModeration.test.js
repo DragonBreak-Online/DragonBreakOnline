@@ -5,7 +5,7 @@
 const { test } = require('node:test')
 const assert = require('node:assert/strict')
 const { PermissionsBitField, PermissionFlagsBits } = require('discord.js')
-const { createModeration } = require('../sources/discord/moderation')
+const { createModeration, outranksIn } = require('../sources/discord/moderation')
 
 const GUILD = '500000000000000005', ZED = '209000000000000209'
 const err = code => Object.assign(new Error(`Discord ${code}`), { code })
@@ -93,4 +93,28 @@ test('a Discord ban is asked of Discord now: banned, notBanned (10026) or unknow
   assert.equal(await D.m.banState(ZED), 'unknown')
   D.ready = false
   assert.equal(await D.m.banState(ZED), 'unknown')
+})
+
+// Discord's role order (Jake, 22 Oct: "Yes, follow role order"), on a guild-like object as the gateway caches it
+test('role order: the highest role wins, the older role at the same position, the server owner above all and never a target', () => {
+  const role = (id, position) => [id, { id, position }]
+  const A = '1494126618065506425', B = '1555000000000000777', C = '1400000000000000555', OWNER = '900000000000000001', X = '209000000000000301', Y = '209000000000000302'
+  const g = { id: GUILD, ownerId: OWNER, roles: { cache: new Map([role(GUILD, 0), role(A, 30), role(B, 25), role(C, 30)]) } }
+  assert.equal(outranksIn(g, X, [GUILD, A], Y, [GUILD, B]), true, '30 over 25')
+  assert.equal(outranksIn(g, X, [GUILD, B], Y, [GUILD, A]), false, '25 under 30')
+  assert.equal(outranksIn(g, X, [A], Y, [A]), false, 'the same role is not above')
+  assert.equal(outranksIn(g, X, [A], Y, [C]), false, 'same position: the older role (lower id) is above')
+  assert.equal(outranksIn(g, X, [C], Y, [A]), true)
+  assert.equal(outranksIn(g, X, [A, B], Y, [B]), true, 'the highest of several roles counts')
+  assert.equal(outranksIn(g, X, [A], Y, []), true, 'no roles is @everyone')
+  assert.equal(outranksIn(g, X, [], Y, []), false, '@everyone on @everyone')
+  assert.equal(outranksIn(g, X, ['1999999999999999999'], Y, [B]), false, 'a role not in the cache counts for nothing')
+  assert.equal(outranksIn(g, OWNER, [], Y, [A]), true, 'the server owner acts on anyone')
+  assert.equal(outranksIn(g, X, [A], OWNER, []), false, 'and nobody acts on the server owner')
+  assert.equal(outranksIn({ ...g, roles: { cache: new Map([role(A, 30)]) } }, X, [A], Y, []), null, 'no @everyone in the cache: unknown')
+  assert.equal(outranksIn(null, X, [A], Y, []), null)
+  const D = fake()
+  assert.equal(D.m.outranks(X, [A], Y, []), null, 'the fake guild has no role cache')
+  D.ready = false
+  assert.equal(D.m.outranks(X, [A], Y, []), null, 'not ready')
 })

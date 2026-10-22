@@ -339,6 +339,7 @@ module.exports = {
   banUser: moderation.banUser,
   unbanUser: moderation.unbanUser,
   banState: moderation.banState,
+  outranks: moderation.outranks,
   getMemberRoles,
   getMemberFresh,
   isOwnClient,

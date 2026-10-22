@@ -286,7 +286,7 @@ function createPunishActions({
     if (!tier || !spec.tiers.includes(tier)) return loud(403, 'notAllowed', handle)
     let profileId
     try { profileId = profileIdOf(discordId) } catch (err) { log('profile store unreadable:', err.message); return loud(503, 'unavailable', handle) }
-    return { ctx: { caller, discordId, handle, tier, rank: rankOfRoles(roles), profileId: Number.isSafeInteger(profileId) ? profileId : null, mode } }
+    return { ctx: { caller, discordId, handle, tier, roles, rank: rankOfRoles(roles), profileId: Number.isSafeInteger(profileId) ? profileId : null, mode } }
   }
 
   // The account, never the caller's own, and not staff of the caller's rank or higher; { t, member } or { refused }
@@ -340,7 +340,7 @@ function createPunishActions({
       if (!m.ready) return refuse(503, 'botNotReady')
       if (!m[spec.perm]) return refuse(503, 'botLacksPermission', { permission: spec.permission })
     }
-    const pre = await precheck(action, t, member, refuse)
+    const pre = await precheck(ctx, action, t, member, refuse)
     if (pre) return pre
     // The switch again just before the record, so a file written off or dry-run after authorize holds for this request too
     const mode = narrower(ctx.mode, settings()[spec.area])
@@ -368,7 +368,13 @@ function createPunishActions({
   }
 
   // The account's state for each action: a refusal, or null to go ahead
-  async function precheck(action, t, member, refuse) {
+  async function precheck(ctx, action, t, member, refuse) {
+    // Discord's role order between the caller and the target, for every caller (Jake, 22 Oct: "Yes, follow role order")
+    const order = () => {
+      if (member.state !== 'member') return null
+      const ok = typeof bot.outranks === 'function' ? bot.outranks(ctx.discordId, ctx.roles, t.discordId, member.roles || []) : null
+      return ok === true ? null : ok === false ? refuse(403, 'roleOrder') : refuse(503, 'discordUnavailable')
+    }
     const banOf = () => { try { return { entry: bans.findEntry(t.discordId) } } catch (err) { log('ban list unreadable:', err.message); return { broken: true } } }
     const discordBan = async () => (await withDeadline(bot.banState(t.discordId), memberDeadlineMs)) || 'unknown'
     switch (action) {
@@ -389,19 +395,28 @@ function createPunishActions({
         return state === 'notBanned' ? null : refuse(503, 'discordUnavailable')
       }
       case 'discord-timeout':
-      case 'discord-timeout-end':
+      case 'discord-timeout-end': {
         if (member.state !== 'member') return refuse(409, 'notInGuild')
         if (member.admin) return refuse(409, 'targetIsAdmin')
+        const below = order()
+        if (below) return below
         if (!member.moderatable) return refuse(409, 'botBelowTarget')
         if (action === 'discord-timeout-end' && !(member.timedOutUntil > now())) return refuse(409, 'notTimedOut')
         return null
+      }
       case 'discord-ban': {
+        // Nobody bans an Administrator from the dashboard (Jake, 22 Oct), as for timeouts
+        if (member.state === 'member' && member.admin) return refuse(409, 'targetIsAdmin')
+        const below = order()
+        if (below) return below
         if (member.state === 'member' && !member.bannable) return refuse(409, 'botBelowTarget')
         const state = await discordBan()
         if (state === 'banned') return refuse(409, 'alreadyBanned', { kind: 'discord' })
         return state === 'notBanned' ? null : refuse(503, 'discordUnavailable')
       }
       case 'discord-unban': {
+        const below = order()
+        if (below) return below
         const state = await discordBan()
         if (state === 'notBanned') return refuse(409, 'notBanned')
         return state === 'banned' ? null : refuse(503, 'discordUnavailable')
