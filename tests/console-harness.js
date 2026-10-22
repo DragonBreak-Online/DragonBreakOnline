@@ -295,24 +295,35 @@ reset();
   check('4. a pinned Trial GM is refused (tier), with the floor named', rep.why === 'tier' && /^The console is for Lead GM and above in game\.$/.test(header(rep)) && !staffLines.length, rep);
   rep = send('/whoami', { discordId: ID.gm, profileId: 3, roles: [ROLE.gm] }).rep;
   check('4. a pinned GM is refused (tier): GM is below the floor in code', rep.state === 'refused' && rep.why === 'tier' && rep.tier === 'gm' && !staffLines.length, rep);
+  // Jake, 22 Oct: "Punishments only". A pinned Lead GM passes the floor, then runs /discipline and /kick only
   rep = send('/whoami', { discordId: ID.lead, profileId: 9, roles: [ROLE.lead] }).rep;
-  check('4. a pinned Lead GM passes (Leda, offline), and the handler sees her own tier, leadgm', rep.state === 'ran' && rep.tier === 'leadgm' && rep.online === false && /tier leadgm$/.test(header(rep)), rep);
-  check('4. ...with a #staff-commands line naming her Lead GM tier and the remote tag', staffLines.some((l) => /^Leda #LEAD <@200000000000000008> \(Lead GM\): \/whoami +\[remote web [0-9a-f]{8}\]$/.test(l.detail)), staffLines);
-  // A Lead-GM command (LEAD_ONLY in game, which a Lead GM passes), run on an online player
+  check('4. a pinned Lead GM passes the floor (Leda, offline, tier leadgm), but /whoami is refused (punishOnly), with no #staff-commands line', rep.state === 'refused' && rep.why === 'punishOnly'
+    && rep.tier === 'leadgm' && rep.online === false && header(rep) === 'A Lead GM can run only /discipline and /kick from the console. Run anything else in game.' && !staffLines.length, rep);
+  rep = send('/kick #8KWH', { discordId: ID.lead, profileId: 9, roles: [ROLE.lead] }).rep;
+  check('4. ...and /kick #8KWH runs for her, with a #staff-commands line naming her Lead GM tier and the remote tag', rep.state === 'ran' && kicked.includes(store.get(A.bob).__user)
+    && staffLines.some((l) => /^Leda #LEAD <@200000000000000008> \(Lead GM\): \/kick #8KWH +\[remote web [0-9a-f]{8}\]$/.test(l.detail)), [rep, staffLines]);
+  // A Lead-GM command in game (LEAD_ONLY): refused for a Lead GM from the console, from the web and from Discord, and in a dry run
   staffLines.length = 0; store.get(A.bob)['private.wwBodyOff'] = { at: 1 };
-  rep = send('/wwremote clear #8KWH', { discordId: ID.lead, profileId: 9, roles: [ROLE.lead], src: 'discord' }).rep;
-  check('4. a pinned Lead GM runs a Lead-GM command: /wwremote clear #8KWH ran, the breaker is cleared', rep.state === 'ran' && rep.target === 'Bob #8KWH' && store.get(A.bob)['private.wwBodyOff'] === null
+  const leadWw = ['web', 'discord'].map((src) => send('/wwremote clear #8KWH', { discordId: ID.lead, profileId: 9, roles: [ROLE.lead], src }).rep)
+    .concat([send('/wwremote clear #8KWH', { discordId: ID.lead, profileId: 9, roles: [ROLE.lead], mode: 'dry-run' }).rep]);
+  check('4. a pinned Lead GM is refused the Lead-GM command /wwremote clear #8KWH (punishOnly) from the web, Discord and a dry run; the breaker stays, no staff line',
+    leadWw.every((x) => x.state === 'refused' && x.why === 'punishOnly') && store.get(A.bob)['private.wwBodyOff'] !== null && !staffLines.length, leadWw);
+  rep = send('/wwremote clear #8KWH', { discordId: ID.nate, profileId: 2, roles: [ROLE.dev], src: 'discord' }).rep;
+  check('4. a Developer runs it: /wwremote clear #8KWH ran, the breaker is cleared', rep.state === 'ran' && rep.target === 'Bob #8KWH' && store.get(A.bob)['private.wwBodyOff'] === null
     && /werewolf body may be shown again/.test(header(rep)), rep);
-  check('4. ...and it went through LEAD_ONLY as a Lead GM, not around it (staff line, no refusal)', staffLines.some((l) => /\(Lead GM\): \/wwremote clear #8KWH \[remote discord /.test(l.detail)) && !staffLines.some((l) => /REFUSED/.test(l.detail)), staffLines);
+  check('4. ...and it went through LEAD_ONLY as a Developer, not around it (staff line, no refusal)', staffLines.some((l) => /\(Developer\): \/wwremote clear #8KWH \[remote discord /.test(l.detail)) && !staffLines.some((l) => /REFUSED/.test(l.detail)), staffLines);
   // A Developer/Senior-only command in game (/schedule: updates.js may(), senior and developer only) is never run for a Lead GM
   neverRan.length = 0;
   rep = send('/schedule restart 30m test', { discordId: ID.lead, profileId: 9, roles: [ROLE.lead] }).rep;
-  check('4. a pinned Lead GM is refused a Developer/Senior-only command (/schedule), and it never runs', rep.state === 'refused' && rep.why === 'later' && !neverRan.length, rep);
+  check('4. a pinned Lead GM is refused a Developer/Senior-only command (/schedule, punishOnly), and it never runs', rep.state === 'refused' && rep.why === 'punishOnly' && !neverRan.length, rep);
+  // Promoted in Discord but stamped Lead GM: the lower tier counts until a login, so still punishments only
+  rep = send('/whoami', { discordId: ID.lead, profileId: 9, roles: [ROLE.dev] }).rep;
+  check('4. a Lead GM promoted to Developer in Discord, not yet stamped, is still refused /whoami (punishOnly)', rep.state === 'refused' && rep.why === 'punishOnly', rep);
   // A handler's own tier check (as updates.js and placement.js keep them) sees the Lead GM's real tier through the console
   const realLoad = G.commands.get('load'); const loadRan = [];
   G.commands.set('load', Object.assign({}, realLoad, { fn: (a) => { if ((G.TIER_RANK[G.tierOf(a)] || 0) < G.TIER_RANK.developer) return G.personal(a, 'That is for a Developer and above.'); loadRan.push(a); } }));
   rep = send('/load', { discordId: ID.lead, profileId: 9, roles: [ROLE.lead] }).rep;
-  check('4. a handler that checks for Developer and above refuses the pinned Lead GM through the console (nothing lifts her tier)', /That is for a Developer and above\./.test(header(rep)) && !loadRan.length, rep);
+  check('4. the console refuses the pinned Lead GM /load before its handler (punishOnly; nothing lifts her tier)', rep.why === 'punishOnly' && !loadRan.length, rep);
   rep = send('/load', { discordId: ID.nate, profileId: 2, roles: [ROLE.dev] }).rep;
   check('4. ...and lets a Developer through', loadRan.length === 1 && loadRan[0] === A.nate, rep);
   G.commands.set('load', realLoad);
@@ -322,7 +333,7 @@ reset();
     loadConsole({ remoteConsole: Object.assign({}, PINNED.remoteConsole, { minTier: low }) });
     rep = send('/whoami', { discordId: ID.gm, profileId: 3, roles: [ROLE.gm] }).rep;
     const lead = send('/whoami', { discordId: ID.lead, profileId: 9, roles: [ROLE.lead] }).rep;
-    check(`4. minTier "${low}" in config cannot lower the floor: a GM is still refused, a Lead GM still passes`, rep.why === 'tier' && lead.state === 'ran', [rep, lead]);
+    check(`4. minTier "${low}" in config cannot lower the floor: a GM is still refused, a Lead GM still passes it (to the punishOnly rule)`, rep.why === 'tier' && lead.why === 'punishOnly', [rep, lead]);
   }
   rep = send('/whoami', { discordId: ID.trial, profileId: 4, roles: [ROLE.trial] }).rep;
   check('4. ...and a Trial GM is still refused', rep.why === 'tier', rep);
@@ -377,11 +388,13 @@ reset();
   check('5b. ...and a form that would act on that character is refused with a clear message', rep.state === 'refused' && rep.why === 'self' && /acts on your own character\. Run it in game\./.test(header(rep)), rep);
   staffLines.length = 0;
   rep = send('/whoami', { discordId: D1[2], profileId: 22, user: 'icedsky', roles: [ROLE.lead] }).rep;
-  check('5b. a pinned Lead GM runs on the repo config (Jake, 14 Oct: "Jake, Nate and Lead GMs"), as her own character, tier leadgm',
-    rep.state === 'ran' && rep.ranAs === 'Icara #ICED' && rep.tier === 'leadgm' && staffLines.some((l) => /\(Lead GM\): \/whoami +\[remote /.test(l.detail)), rep);
+  check('5b. a pinned Lead GM passes on the repo config (Jake, 14 Oct: "Jake, Nate and Lead GMs"), as her own character, tier leadgm, but /whoami is punishOnly (22 Oct)',
+    rep.state === 'refused' && rep.why === 'punishOnly' && rep.ranAs === 'Icara #ICED' && rep.tier === 'leadgm' && !staffLines.length, rep);
   store.get(A.lydia)['private.wwBodyOff'] = { at: 1 };
   rep = send('/wwremote clear #LLX8', { discordId: D1[2], profileId: 22, user: 'icedsky', roles: [ROLE.lead], src: 'discord' }).rep;
-  check('5b. ...and the Lead-GM command /wwremote clear #LLX8 runs for her', rep.state === 'ran' && store.get(A.lydia)['private.wwBodyOff'] === null, rep);
+  check('5b. ...and so is the Lead-GM command /wwremote clear #LLX8: the breaker stays', rep.state === 'refused' && rep.why === 'punishOnly' && store.get(A.lydia)['private.wwBodyOff'] !== null, rep);
+  rep = send('/kick #LLX8', { discordId: D1[2], profileId: 22, user: 'icedsky', roles: [ROLE.lead], src: 'discord' }).rep;
+  check('5b. ...while /kick #LLX8 runs for her', rep.state === 'ran' && kicked.includes(store.get(A.lydia).__user) && staffLines.some((l) => /\(Lead GM\): \/kick #LLX8 +\[remote discord /.test(l.detail)), [rep, staffLines]);
   // One of the eight demoted to GM in Discord (and stamped GM at the next login): the pin is not a right
   const demoted = actor(0xff000d03, { name: 'Dunn', tag: 'DUNN', profile: 23, discord: D1[6], roles: [ROLE.gm] });
   staffLines.length = 0;

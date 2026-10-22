@@ -3,9 +3,10 @@
 // ACCOUNT's highest tier over all its characters (and its fresh Discord roles when the backend sends them); H2 the page's
 // account check (targetProfileId) and the request shape that carries it; H3 a #TAG two live characters carry is refused,
 // even with one of them online; H4 the reason rule, pinned (the backend's consoleHardening test holds the same table); H5 at
-// most 3 console suspensions of one account an hour. Signed requests run through the reader, the real gate (gamemode.js
-// handleLine, cut as written) and the real discipline.js. On the review head (punish-actions-1021-review aeb501748) the H1,
-// H2, H3 and H5 checks fail; H4 and the "unchanged" checks pass there too.
+// most 3 console suspensions of one account an hour; H6 a Lead GM runs only /discipline and /kick from the console (Jake,
+// 22 Oct: "Punishments only"), Developers and Owners every command. Signed requests run through the reader, the real gate
+// (gamemode.js handleLine, cut as written) and the real discipline.js. On the review head (punish-actions-1021-review
+// aeb501748) the H1, H2, H3 and H5 checks fail; H4 and the "unchanged" checks pass there too. On 45e90896c the H6 checks fail.
 //   node tests/console-hardening-harness.js    (as root: the spool checks want root-owned files; keep TMPDIR off the HDD)
 'use strict';
 const fs = require('fs');
@@ -355,6 +356,56 @@ reset();
   const dries = [1, 2, 3, 4].map((i) => send(`/discipline #LLX8 suspend 1h dry run number ${i}`, { mode: 'dry-run' }));
   const after = [send('/discipline #LLX8 suspend 1h real one after dry runs'), send('/discipline #LLX8 suspend 1h real two after dry runs')];
   check('H5. dry runs are not counted: four dry runs, then two real suspensions of Lydia still run', dries.every((x) => x && x.state === 'dry-run') && after.every((x) => ran(x)), [...dries, ...after].map(brief));
+}
+
+// ---- H6. a Lead GM runs only /discipline and /kick from the console; Developers and Owners every command -------------------
+reset();
+{
+  const PUNISH_ONLY = 'A Lead GM can run only /discipline and /kick from the console. Run anything else in game.';
+  const before = recordOf(5).length;
+  store.get(A.bob)['private.wwBodyOff'] = { at: 1 };
+  // Allowlisted ones (registered here or not), refused classes (/tp, /say) and an unknown word: punishOnly before the line's own rule
+  const others = ['/players', '/whoami', '/ping', '/fixloc #8KWH', '/rename #8KWH Bobby Two', '/chars #8KWH', '/chargen #8KWH', '/wwremote clear #8KWH', '/vlremote on', '/load',
+    '/tp #8KWH', '/say hello there', '/nosuchcommand', '/disciplinex #8KWH warn spelled wrong'];
+  const got = others.flatMap((t) => ['web', 'discord'].map((src) => [t, src, send(t, Object.assign({ src }, AS_LEAD))]));
+  const wrong = got.filter(([, , rep]) => !refused(rep, 'punishOnly') || header(rep) !== PUNISH_ONLY || rep.tier !== 'leadgm' || rep.ranAs !== 'Leda #LEAD');
+  check('H6. a Lead GM is refused every other command from the web and Discord (punishOnly), with her own tier and character in the reply', !wrong.length, wrong.map(([t, src, rep]) => [t, src, brief(rep)]));
+  check('H6. ...and none of them ran: no staff line, nobody kicked, the breaker stays, no record, no player told', !staffLines.length && !kicked.length && store.get(A.bob)['private.wwBodyOff'] !== null
+    && recordOf(5).length === before && !packets.length && !said(A.bob).length, { staffLines, kicked });
+  check('H6. ...each refusal has its REMOTE audit line naming punishOnly', got.every(([t]) => audits().some((l) => l.includes('refused (punishOnly): ') && l.endsWith(rules.cleanCommand(t)))), audits().slice(-3));
+  let rep = send('/players', Object.assign({ mode: 'dry-run' }, AS_LEAD));
+  check('H6. a dry run is refused the same way', refused(rep, 'punishOnly'), brief(rep));
+  rep = send('/players', { discordId: ID.lead, profileId: 9, roles: [ROLE.dev], user: 'icedsky' });
+  check('H6. a Lead GM promoted to Developer in Discord but stamped Lead GM: the lower tier counts, still punishOnly until a login', refused(rep, 'punishOnly'), brief(rep));
+  reset();
+  rep = send('/discipline #8KWH warn A Lead GM warns a player', Object.assign({ src: 'discord' }, AS_LEAD));
+  check('H6. /discipline runs for her, from Discord as from the web (H1)', ran(rep, /^Recorded: warn #\d+ on Bob #8KWH\./) && recordOf(5).length === before + 1, brief(rep));
+  rep = send('/discipline #8KWH strike A dry run of a strike', Object.assign({ mode: 'dry-run' }, AS_LEAD));
+  check('H6. ...a dry run of /discipline passes the console', rep && rep.state === 'dry-run' && recordOf(5).length === before + 1, brief(rep));
+  rep = send('/kick #8KWH', Object.assign({ src: 'discord' }, AS_LEAD));
+  check('H6. ...and /kick runs for her', ran(rep) && kicked.includes(store.get(A.bob).__user), brief(rep));
+  rep = send('/discipline #8KWH list', AS_LEAD);
+  check("H6. /discipline's own rule still applies to her (the record view stays in game: badKind)", refused(rep, 'badKind'), brief(rep));
+  rep = send('/kick', AS_LEAD);
+  check("H6. ...and /kick's (needTag)", refused(rep, 'needTag'), brief(rep));
+  reset();
+  rep = send('/players', AS_NATE);
+  check('H6. a Developer runs every command: /players for Nate', ran(rep), brief(rep));
+  rep = send('/whoami', Object.assign({ src: 'discord' }, AS_NATE));
+  check('H6. ...and /whoami from Discord', ran(rep), brief(rep));
+  rep = send('/players');
+  check('H6. an Owner runs every command: /players for Jake', ran(rep), brief(rep));
+  rep = send('/players', { discordId: ID.gm, profileId: 3, roles: [ROLE.gm], user: 'gemma' });
+  check('H6. a GM is still refused by the floor first (tier), not punishOnly', refused(rep, 'tier'), brief(rep));
+  loadConsole(CFG({ deny: ['kick'] }));
+  rep = send('/kick #8KWH', AS_LEAD);
+  check("H6. the config's deny still narrows her two: /kick denied for a Lead GM", refused(rep, 'denied') && !kicked.length, brief(rep));
+  loadConsole(CFG({ minTier: 'developer' }));
+  rep = send('/discipline #8KWH warn The raised floor wins', AS_LEAD);
+  check('H6. a raised floor (minTier developer) still refuses a Lead GM everything (tier)', refused(rep, 'tier'), brief(rep));
+  loadConsole(CFG());
+  check('H6. the rule is in code, for the backend\'s copy: PUNISH_ONLY discipline and kick, the full console from developer', JSON.stringify(rules.PUNISH_ONLY) === '["discipline","kick"]' && rules.FULL_TIER === 'developer'
+    && Object.isFrozen(rules.PUNISH_ONLY), [rules.PUNISH_ONLY, rules.FULL_TIER]);
 }
 
 global.setTimeout = realTimeout;
