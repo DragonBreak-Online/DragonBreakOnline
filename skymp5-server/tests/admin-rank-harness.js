@@ -150,7 +150,8 @@ const READ_AS_REFUSED = /^profile \d+(?: \([a-z]+\))? was refused /;
             || line !== `profile ${s.profileId} (${tier}) was refused ${action} on ${t.name} (profile ${t.profileId}) (staff rank)` || !READ_AS_REFUSED.test(line)) wrong.push({ tier, action, key, want: 'rank refusal', r, logs });
         } else {
           capped++;
-          if (r.happened || !r.results.some((x) => x.ok === false)) wrong.push({ tier, action, key, want: 'refused by caps', r });
+          // one admin log line read as refused, so the player log takes back the packet's leave mark (review of 22 Oct, L2)
+          if (r.happened || !r.results.some((x) => x.ok === false) || logs.filter((l) => READ_AS_REFUSED.test(l)).length !== 1) wrong.push({ tier, action, key, want: 'refused by caps, one refused line', r, logs });
         }
       }
     }
@@ -211,6 +212,32 @@ const READ_AS_REFUSED = /^profile \d+(?: \([a-z]+\))? was refused /;
     delete props[TARGETS.mira.actorId].profileId;
     const r2 = await act(STAFF.senior, 'ban', TARGETS.mira);
     check('...nor one whose profile cannot be read (no ban posted)', !r2.happened && posts.length === 0 && r2.results[0] && /could not be read/.test(r2.results[0].text), r2);
+  }
+
+  // ---- every other refusal of a kick or a ban writes its refused line too (the player log clears the packet's mark by it) ----
+  {
+    const lines = [];
+    const refusedLine = async (s, action, t, extra, why) => {
+      setup();
+      const r = await act(s, action, t, extra);
+      await new Promise((res) => realSetImmediate(res));
+      const l = logs.filter((x) => READ_AS_REFUSED.test(x));
+      lines.push({ action, why, ok: !r.happened && l.length === 1 && l[0] === `profile ${s.profileId} (${Object.keys(STAFF).find((k) => STAFF[k] === s)}) was refused ${action} on ${t.name} (profile ${t.profileId}) (${why})`, l });
+    };
+    await refusedLine(STAFF.developer, 'tempBan', TARGETS.mira, { hours: 0 }, 'ban length');
+    const realIp = mp.getUserIp;
+    mp.getUserIp = (u) => (u === TARGETS.mira.userId ? '10.10.10.1:50000' : realIp(u));
+    await refusedLine(STAFF.developer, 'ipBan', TARGETS.mira, {}, 'ip bans off');
+    mp.getUserIp = (u) => (u === TARGETS.mira.userId ? '' : realIp(u));
+    await refusedLine(STAFF.developer, 'ipBan', TARGETS.mira, {}, 'ip unknown');
+    mp.getUserIp = realIp;
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = async (url, o) => (o && o.method === 'POST' ? { ok: false, status: 503, json: async () => ({}) } : realFetch(url, o));
+    await refusedLine(STAFF.developer, 'ban', TARGETS.mira, {}, 'backend 503');
+    globalThis.fetch = async (url, o) => { if (o && o.method === 'POST') throw new Error('down'); return realFetch(url, o); };
+    await refusedLine(STAFF.developer, 'ban', TARGETS.mira, {}, 'backend unreachable');
+    globalThis.fetch = realFetch;
+    check('a ban length out of range, ip bans off, an unknown ip and a failed or unreachable backend each write one refused line naming the target, and nothing happens', lines.every((x) => x.ok), lines.filter((x) => !x.ok));
   }
 
   // ---- what the rule does not touch: teleport and summon still reach a higher rank ----

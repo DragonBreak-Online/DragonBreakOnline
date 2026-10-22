@@ -388,6 +388,12 @@ export class AdminSystem implements System {
     return ADMIN_MODES.map(m => ({ id: m.id, label: m.label, active: !!state[m.id] }));
   }
 
+  // A refused action on a player: the panel's answer, and one admin log line the player log reads as refused
+  private refuse(mp: Mp, userId: number, adminProfile: number, tier: string, action: string, target: { name: string; profileId: number }, why: string, text: string): void {
+    this.adminLog(`profile ${adminProfile} (${tier}) was refused ${action} on ${target.name} (profile ${target.profileId}) (${why})`);
+    this.reply(mp, userId, false, text);
+  }
+
   private reply(mp: Mp, userId: number, ok: boolean, text: string): void {
     try {
       mp.sendCustomPacket(userId, JSON.stringify({ customPacketType: "adminActionResult", ok, text }));
@@ -620,10 +626,10 @@ export class AdminSystem implements System {
     if (RANKED_ACTIONS.has(action)) {
       const no = this.rankRefusal(mp, myActorId, adminProfile, target);
       if (no) {
-        this.adminLog(`profile ${adminProfile} (${tier}) was refused ${action} on ${target.name} (profile ${target.profileId}) (${no === "own" ? "own account" : no === "rank" ? "staff rank" : "rank unreadable"})`);
-        this.reply(mp, userId, false, no === "own" ? "Not on your own account"
-          : no === "rank" ? `${target.name} is on a staff account of your rank or higher. Take it to someone above that rank, or to the Owners.`
-            : `The staff rank of ${target.name}'s account could not be read, so nothing was done. Try again, or ask an Owner.`);
+        this.refuse(mp, userId, adminProfile, tier, action, target, no === "own" ? "own account" : no === "rank" ? "staff rank" : "rank unreadable",
+          no === "own" ? "Not on your own account"
+            : no === "rank" ? `${target.name} is on a staff account of your rank or higher. Take it to someone above that rank, or to the Owners.`
+              : `The staff rank of ${target.name}'s account could not be read, so nothing was done. Try again, or ask an Owner.`);
         return;
       }
     }
@@ -657,7 +663,7 @@ export class AdminSystem implements System {
         this.adminLog(`profile ${adminProfile} killed ${target.name} (profile ${target.profileId})`);
         this.reply(mp, userId, true, `Killed ${target.name}`);
       } else if (action === "deleteCharacter") {
-        if (!caps.ban) { this.reply(mp, userId, false, "Your rank cannot delete characters"); return; }
+        if (!caps.ban) { this.refuse(mp, userId, adminProfile, tier, action, target, "rank caps", "Your rank cannot delete characters"); return; }
         try { kickWithReason(mp, target.userId, "Your character was deleted by an admin."); } catch { }
         const doomed = target.actorId;
         setTimeout(() => { try { mp.destroyActor(doomed); } catch (e) { this.log(`AdminSystem: destroyActor ${doomed.toString(16)} failed: ${e}`); } }, 1500);
@@ -665,17 +671,17 @@ export class AdminSystem implements System {
         this.adminLog(`profile ${adminProfile} deleted the character ${target.name} (profile ${target.profileId}, actor ${doomed.toString(16)})`);
         this.reply(mp, userId, true, `Deleted ${target.name}`);
       } else if (action === "ipBan" || action === "tempBan") {
-        if (!caps.ban) { this.reply(mp, userId, false, "Your rank cannot ban players"); return; }
+        if (!caps.ban) { this.refuse(mp, userId, adminProfile, tier, action, target, "rank caps", "Your rank cannot ban players"); return; }
         const hours = action === "tempBan" ? Number(content["hours"]) : 0;
-        if (action === "tempBan" && (!Number.isFinite(hours) || hours <= 0 || hours > 24 * 365)) { this.reply(mp, userId, false, "Pick a ban length between 1 hour and a year"); return; }
+        if (action === "tempBan" && (!Number.isFinite(hours) || hours <= 0 || hours > 24 * 365)) { this.refuse(mp, userId, adminProfile, tier, action, target, "ban length", "Pick a ban length between 1 hour and a year"); return; }
         let ip = "";
         try { ip = String(mp.getUserIp(target.userId) || "").split(":")[0]; } catch { }
-        if (action === "ipBan" && !ip) { this.reply(mp, userId, false, "Their ip is unknown"); return; }
+        if (action === "ipBan" && !ip) { this.refuse(mp, userId, adminProfile, tier, action, target, "ip unknown", "Their ip is unknown"); return; }
         // The host's port forward shows every player as one internal address (10.10.10.1 on 6 Oct): an IP ban on it bans
         // the whole server. Refused until the server sees real addresses; a Discord ban and a temp ban still work
         if (action === "ipBan" && isPrivateAddress(ip)) {
           this.log(`AdminSystem: profile ${adminProfile} IP ban on ${target.name} refused: ${ip} is an internal address every player shares`);
-          this.reply(mp, userId, false, "IP bans are off: the server sees every player at the same internal address, so this would ban everyone. Use a ban or a temp ban.");
+          this.refuse(mp, userId, adminProfile, tier, action, target, "ip bans off", "IP bans are off: the server sees every player at the same internal address, so this would ban everyone. Use a ban or a temp ban.");
           return;
         }
         const ban = this.bans.add({
@@ -1143,11 +1149,11 @@ export class AdminSystem implements System {
     tier: AdminTier
   ): void {
     if (!this.masterUrl || !this.masterKey || !this.authToken) {
-      this.reply(mp, userId, false, "Ban unavailable: master api not configured");
+      this.refuse(mp, userId, adminProfile, tier, "ban", target, "no master api", "Ban unavailable: master api not configured");
       return;
     }
     if (!target.profileId) {
-      this.reply(mp, userId, false, "Ban unavailable: target has no profile id");
+      this.refuse(mp, userId, adminProfile, tier, "ban", target, "no profile id", "Ban unavailable: target has no profile id");
       return;
     }
     const targetGuid = guidOf(mp, target.userId);
@@ -1172,10 +1178,12 @@ export class AdminSystem implements System {
         this.replyIfSameAdmin(mp, userId, adminActorId, true, `Banned ${target.name}`);
       } else {
         this.log(`AdminSystem: backend ban failed with status ${res.status}`);
+        this.adminLog(`profile ${adminProfile} (${tier}) was refused ban on ${target.name} (profile ${target.profileId}) (backend ${res.status})`);
         this.replyIfSameAdmin(mp, userId, adminActorId, false, `Ban failed (backend ${res.status})`);
       }
     }).catch(e => {
       this.log(`AdminSystem: backend ban request failed: ${e}`);
+      this.adminLog(`profile ${adminProfile} (${tier}) was refused ban on ${target.name} (profile ${target.profileId}) (backend unreachable)`);
       this.replyIfSameAdmin(mp, userId, adminActorId, false, "Ban failed: backend unreachable");
     });
   }
