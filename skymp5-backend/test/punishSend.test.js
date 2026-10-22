@@ -180,6 +180,23 @@ test('the switch: PUNISH_ACTIONS send=dry-run caps the console to a dry run; sen
   assert.equal(F.requests.at(-1).mode, 'dry-run')
 })
 
+test('the switch file written off or dry-run after authorize holds for that send: nothing reaches the game, or only a dry run', async () => {
+  const past = async file => {
+    const a = await H.actions.authorize(session('owner'), 'send')
+    assert.ok(a.ctx, JSON.stringify(a.refused))
+    fs.writeFileSync(H.switchFile, file)
+    try { return await H.actions.perform(a.ctx, 'send', kick()) } finally { fs.rmSync(H.switchFile, { force: true }) }
+  }
+  const n = F.requests.length
+  const r = await past('on send=off')
+  assert.equal(r.status, 503, JSON.stringify(r.body))
+  assert.equal(r.body.error, 'actionsOff')
+  assert.equal(F.requests.length, n, 'nothing reached the game')
+  assert.ok(!F.audits.some(l => /^CONSOLE .* via web punish /.test(l)), 'no console record')
+  assert.equal((await past('dry-run')).status, 200)
+  assert.equal(F.requests.at(-1).mode, 'dry-run')
+})
+
 test('a sign-in older than 4 hours is signInAgain, before Discord is asked', async () => {
   const lookups = F.lookups
   const r = want(await send('lead', kick(), { token: session('lead', 5 * 3600 * 1000) }), 401, 'signInAgain')

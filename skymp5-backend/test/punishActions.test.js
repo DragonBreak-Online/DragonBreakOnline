@@ -443,6 +443,23 @@ test('dry run: every check runs and nothing is written; it narrows per area and 
   assert.equal(entryOf(bobId), undefined)
 })
 
+test('the switch file written off or dry-run after authorize holds for that request: nothing is recorded or done', async () => {
+  const past = async (action, file) => {
+    const a = await H.actions.authorize(H.F.session(PEOPLE.owner.discordId, 60 * 1000), action)
+    assert.ok(a.ctx, JSON.stringify(a.refused))
+    fs.writeFileSync(H.switchFile, file)
+    try { return await H.actions.perform(a.ctx, action, H.body(action)) } finally { fs.rmSync(H.switchFile, { force: true }) }
+  }
+  want(await past('ban', 'off\n'), 503, 'actionsOff')
+  want(await past('discord-timeout', 'on discord=off'), 503, 'actionsOff')
+  assert.equal(entryOf(bobId), undefined)
+  assert.deepEqual(H.calls, [], 'Discord is never written to')
+  assert.ok(!H.audits.some(l => / via web req /.test(l)), 'no accepted line')
+  assert.equal(want(await past('ban', 'dry-run'), 200).job.state, 'dry-run')
+  assert.equal(entryOf(bobId), undefined)
+  assert.equal(want(await past('ban', 'on'), 200).job.state, 'done')
+})
+
 test('limits: tries count refusals; accepted actions per account a minute; site-wide an hour; a repeated request id is not counted', async () => {
   const L = (o) => ({ extra: { limits: { triesPer10Min: 99, perMinute: 99, perHour: 99, sitePerHour: { bans: 99, discordBans: 99, timeouts: 99 }, ...o } } })
   H.make(L({ triesPer10Min: 3 }))

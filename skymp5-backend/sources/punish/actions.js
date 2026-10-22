@@ -342,6 +342,9 @@ function createPunishActions({
     }
     const pre = await precheck(action, t, member, refuse)
     if (pre) return pre
+    // The switch again just before the record, so a file written off or dry-run after authorize holds for this request too
+    const mode = narrower(ctx.mode, settings()[spec.area])
+    if (mode === 'off') return refuse(503, 'actionsOff')
 
     // Accepted actions only: per account and site-wide per hour
     if (over(`min:${ctx.discordId}`, limits.perMinute, MINUTE) || over(`hour:${ctx.discordId}`, limits.perHour, 60 * MINUTE)
@@ -353,12 +356,12 @@ function createPunishActions({
       uuid: b.uuid, action, state: 'running', error: '', discordId: ctx.discordId, handle: ctx.handle, tier: ctx.tier, targetDiscordId: t.discordId,
       profileId: b.profileId, target: { profileId: t.profileId, name: t.name || null, tag: t.tag || null, discordName: t.discordName || null },
       reason: b.reason, minutes: b.minutes, untilMs: b.minutes ? endOf(at, b.minutes) : null,
-      ref: null, banRoleHeld: null, at, mode: ctx.mode, wasUntil: member.timedOutUntil || 0, tags: t.tags || [],
+      ref: null, banRoleHeld: null, at, mode, wasUntil: member.timedOutUntil || 0, tags: t.tags || [],
     }
     remember(job)
     record(job)
-    say(`PUNISH ${ctx.handle} (<@${ctx.discordId}>) via web req ${rules.id8(`w-${b.uuid}`)}: ${what(job)}${ctx.mode === 'dry-run' ? ' (dry run)' : ''}: ${b.reason}`)
-    if (ctx.mode === 'dry-run') { job.state = 'dry-run'; finish(job); return answer(200, { v: 1, job: view(job) }) }
+    say(`PUNISH ${ctx.handle} (<@${ctx.discordId}>) via web req ${rules.id8(`w-${b.uuid}`)}: ${what(job)}${mode === 'dry-run' ? ' (dry run)' : ''}: ${b.reason}`)
+    if (mode === 'dry-run') { job.state = 'dry-run'; finish(job); return answer(200, { v: 1, job: view(job) }) }
 
     await act(job, member)
     return job.state === 'failed' && job.status ? failedAnswer(job) : answer(200, { v: 1, job: view(job) })
@@ -503,9 +506,12 @@ function createPunishActions({
       if (found.refused) return found.refused
       if (!(found.t.tags || []).includes(words[1].slice(1).toUpperCase())) return refuse(409, 'wrongTarget')
     }
+    // The switch again just before the console's record, as for the other actions
+    const mode = narrower(ctx.mode, settings().send)
+    if (mode === 'off') return refuse(503, 'actionsOff')
     // The dialog's account goes as targetProfileId, as the Console panel's /run sends it
     const { status, body } = await api.runStaffCommand(ctx.caller, {
-      uuid: b.uuid, text: b.command, targetProfileId: b.profileId, only: PUNISH_COMMANDS, cap: ctx.mode, via: 'punish',
+      uuid: b.uuid, text: b.command, targetProfileId: b.profileId, only: PUNISH_COMMANDS, cap: mode, via: 'punish',
     })
     return answer(status, body)
   }

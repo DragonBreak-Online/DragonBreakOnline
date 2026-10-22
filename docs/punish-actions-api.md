@@ -86,7 +86,10 @@ Base `/api/site/staff/punishments/actions`. It is mounted before the read-only p
 
 Every POST also needs:
 - a panel rank (otherwise 403 `notStaff` before anything else);
-- the caller's Discord id in the console pin (`CONSOLE_DISCORD_IDS`);
+- the caller's Discord id in the console pin (`CONSOLE_DISCORD_IDS`). The pin is the console's own: a Lead GM pinned here
+  (and in the game's pin, which `send` also needs) can also use Discord `/console` with every command the game allows,
+  since the console's rank rule (`CONSOLE_ROLE_IDS`) takes Lead GMs. `send`'s `/discipline` and `/kick` limit holds on
+  this panel only;
 - a Discord sign-in at most 4 hours old;
 - the tier above, from roles asked of Discord at that moment.
 
@@ -323,7 +326,9 @@ The game's switch, a late request, a full queue and an unreadable request are no
   only narrow the env key.
   - Missing narrows nothing.
   - Malformed, a symlink, or more than 64 bytes reads as `off`.
-  - Writing `off` to it stops every action at once, and turns the bot's guard off, with no restart.
+  - Writing `off` to it stops every action at once, and turns the bot's guard off, with no restart. It is read again just
+    before an action is recorded, so it also stops a request already past its sign-in and rank checks (`dry-run` there
+    makes it a dry run). An action already recorded runs to its end.
 - The bot's guard of the game ban list is on only while the bans area is `on` (env narrowed by the file, read at each
   Discord event). The guard means:
   - a Discord ban never replaces an existing game ban;
