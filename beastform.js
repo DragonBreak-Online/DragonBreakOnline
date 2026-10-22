@@ -65,6 +65,30 @@ module.exports = (api) => {
     vampirelord: { name: 'Vampire Lord', race: idOf('283a:Dawnguard.esm'), power: idOf('283b:Dawnguard.esm'), seconds: 0 },
   };
   const REVERT_POWER = idOf('cd5c:Dawnguard.esm');
+  // Staff polymorph (Jake, 22 Oct: "a way how I can polymorph into animals"): a Lead GM or above turns themselves, and only
+  // themselves, into one of these animals with /polymorph (below). A table of its own, never merged into FORMS, so no creature
+  // key reaches the beast powers: /beastform grant|remove, the admin panel's grant and revoke, holdsPower, byPower and the daily
+  // limit all look in FORMS alone. Each race is its Skyrim.esm RACE record, read from /opt/skyrim-data/Skyrim.esm (22 Oct):
+  // ChickenRace a919d, HareRace 6dc99, GoatDomesticsRace 6fc4a, FoxRace 109c7c, DogRace 131ee, SkeeverRace 13201, MudcrabRace
+  // ba545, DeerRace cf89b. None is timed. Wolf and horse are left out: today's clients make a player wolf's copy hostile
+  // (formView ambushRaces), and a horse's copy can be ridden. Entries are never taken out while someone may be in one.
+  const CREATURES = {
+    chicken: { name: 'Chicken', race: idOf('a919d:Skyrim.esm') },
+    hare: { name: 'Hare', race: idOf('6dc99:Skyrim.esm') },
+    goat: { name: 'Goat', race: idOf('6fc4a:Skyrim.esm') },
+    fox: { name: 'Fox', race: idOf('109c7c:Skyrim.esm') },
+    dog: { name: 'Dog', race: idOf('131ee:Skyrim.esm') },
+    skeever: { name: 'Skeever', race: idOf('13201:Skyrim.esm') },
+    mudcrab: { name: 'Mudcrab', race: idOf('ba545:Skyrim.esm') },
+    deer: { name: 'Deer', race: idOf('cf89b:Skyrim.esm') },
+  };
+  const CREATURE_WORDS = { rabbit: 'hare' };
+  const own = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
+  const isCreature = (key) => own(CREATURES, String(key));
+  // A form's name for any key, a creature's or one no longer in either table included: never throws
+  const formName = (key) => (own(FORMS, String(key)) ? FORMS[key].name : isCreature(key) ? CREATURES[key].name : String(key || ''));
+  // A creature shape is marked so at the change (private.beast.creature), or known by its key
+  const isCreatureState = (s) => !!s && (s.creature === true || isCreature(s.form));
   // The Werewolf Behemoth (DLE DBO race 1d1f9e, a werewolf copy at 1.3x; Nat tested it on the PC's local server, 15 Oct) is the
   // form of an Elder of the Great Hunt only (Nate, 15 Oct); every other werewolf keeps the vanilla body. Config
   // beastform.behemoth { enabled, race, rank }: OFF until client 0.3.100 (its watcher guard for the bigger body) is out and a
@@ -161,7 +185,8 @@ module.exports = (api) => {
   // While in a beast form a player goes by the beast's name, never their own (Nate, 5 Oct): the appearance name is what
   // chat, the X menu and other clients read, and the revert puts the kept appearance (and name) back. beastform.names
   const NAMES = Object.assign({ werewolf: 'Werewolf', vampirelord: 'Vampire Lord' }, CFG.names || {});
-  globalThis.__dboBeastName = (a) => { const s = stateOf(Number(a) >>> 0); return s ? String(NAMES[s.form] || FORMS[s.form].name) : ''; };
+  // Any key a character may be in, a creature's or one gone from both tables (a rollback) included, gives a name
+  globalThis.__dboBeastName = (a) => { const s = stateOf(Number(a) >>> 0); return s ? String((own(NAMES, String(s.form)) && NAMES[s.form]) || formName(s.form) || 'Beast') : ''; };
   const byPower = new Map(Object.entries(FORMS).filter(([, f]) => f.power && f.race).map(([k, f]) => [f.power, k]));
 
   const self = (a) => ({ type: 'form', desc: mp.getDescFromId(a) });
@@ -199,7 +224,7 @@ module.exports = (api) => {
     if (!f) return `there is no form called '${key}'`;
     if (!f.race || !f.power) return `${key} is not in this load order (race ${f.race.toString(16)}, power ${f.power.toString(16)})`;
     const s = stateOf(a);
-    if (s) return `already in ${FORMS[s.form] ? FORMS[s.form].name : s.form}; revert first`;
+    if (s) return `already in ${formName(s.form)}; revert first`;
     try { if (mp.get(a, 'isDead')) return 'the dead do not change shape'; } catch (e) { return `no actor to change (${e.message})`; }
     // Read the look first: __dboBeastAllow spends one of the day's changes, and a transform that fails after it
     // for want of an appearance would spend it for nothing
@@ -292,9 +317,11 @@ module.exports = (api) => {
     learn(a, s.form, false);
     // Skipped if another form was taken in the meantime: a revert straight into werewolf dressed the wolf in armour
     setTimeout(() => { try { if (!stateOf(a)) redress(a); } catch (e) { log('beastform re-dress failed', e.message); } }, 1500);
-    log(`${display(a)} left ${FORMS[s.form] ? FORMS[s.form].name : s.form} (${why})`);
+    log(`${display(a)} left ${formName(s.form)} (${why})`);
     if (s.form === 'werewolf' && (why === 'asked to revert' || why === 'time up')) tellChangeAgain(a);
-    witness(a, s.form === 'werewolf' ? 'shed the beast and stand as a mortal again' : 'sink back into mortal form');
+    // A staff polymorph ends in silence, whatever ended it (Jake, 22 Oct): no line to anyone near, only the staff audit
+    if (isCreatureState(s)) polymorphEnded(a, s, why);
+    else witness(a, s.form === 'werewolf' ? 'shed the beast and stand as a mortal again' : 'sink back into mortal form');
     sendBeastBodies();
     try { if (globalThis.__dboBeastChanged) globalThis.__dboBeastChanged(a, s.form, false); } catch (e) { log('beast change hook failed', e.message); }
     return true;
@@ -413,6 +440,7 @@ module.exports = (api) => {
 
   every('beastForms', 1000, () => {
     const online = new Set(api.onlineActors().map((x) => x >>> 0));
+    try { polymorphTick(online); } catch (e) { log('beastform: polymorph tick failed', e.message); }
     for (const a of online) {
       const s = stateOf(a);
       if (s && s.until && Date.now() >= s.until) revert(a, 'time up');
@@ -462,11 +490,15 @@ module.exports = (api) => {
     const now = Date.now();
     const all = api.onlineActors();
     const bodies = all.filter(bodyShown).map((a) => { const s = stateOf(a); return { id: a >>> 0, race: (s && Number(s.race) >>> 0) || FORMS[formOf(a)].race }; });
+    // Staff polymorph (phase 2): a creature goes only to a client that builds its copy safely ('creatureBody', a later client);
+    // formOf never names one, so it is never in bodies above, and its race is never read through FORMS
+    const creatures = polymorphOn() ? all.map(creatureBodyOf).filter(Boolean) : [];
     const resend = now - WB.sentAt >= RESEND_MS;
     if (resend) WB.sentAt = now;
     for (const o of all) {
-      if (!hasUiCap(o, 'beastBody')) { WB.sent.delete(o >>> 0); continue; }
-      const mine = bodies.filter((b) => b.id !== (o >>> 0));
+      const beastCap = hasUiCap(o, 'beastBody'), creatureCap = hasUiCap(o, 'creatureBody');
+      if (!beastCap && !creatureCap) { WB.sent.delete(o >>> 0); continue; }
+      const mine = (beastCap ? bodies : []).concat(creatureCap ? creatures : []).filter((b) => b.id !== (o >>> 0));
       const key = JSON.stringify(mine);
       if (!(resend && mine.length) && WB.sent.get(o >>> 0) === key) continue;
       WB.sent.set(o >>> 0, key);
@@ -616,8 +648,230 @@ module.exports = (api) => {
   registerChatCommand('forms', (a) => {
     const s = stateOf(a);
     if (!s) return personal(a, 'You are in your own shape. In a beast form this lists its abilities and keys.');
+    if (isCreatureState(s)) return personal(a, `You are a ${formName(s.form)}. /polymorph revert turns you back.`);
     for (const line of legend(s.form)) personal(a, line);
   }, { help: 'the abilities and keys of the beast form you are in' });
+
+  // ── staff polymorph (Jake, 22 Oct) ──────────────────────────────────────────────────────────────────────────────────────
+  // /polymorph <animal> | revert | list: a Lead GM and above (gamemode.js LEAD_ONLY and isLeadStaff, the gate /beastform has)
+  // turns themselves into an animal of CREATURES. There is no target argument, so nobody can polymorph another player. It is
+  // the werewolf's race swap: the look kept in private.beast (with the animal's race and creature: true), the appearance
+  // keeping the mortal race under the animal's name, the own client swapping race on dboBeast (no loadout, no spells). Death,
+  // logout and login revert it as they do any form, so an animal race is never saved as the character's own. It can be hit
+  // and killed (it is not ethereal); a death reverts it and the player is seen again. Silent: no witness line on the change
+  // or on any revert, only the staff audit line (who, which animal, why it ended).
+  // Other clients build the animal only from dboBeastBody, and only when their UI says 'creatureBody' (the next client
+  // package); an older one would show a stripped human named Chicken. So the change is refused, and ended at the next tick,
+  // while any other player within guardUnits (6000, about 86 m) in the same cell or worldspace lacks that capability.
+  // Refused too when dead or down, bound or carried, jailed, in a duel or a fight, on a horse, seated or at a station, in
+  // water (most cannot swim) or indoors (none can open a door); indoors and water also end it at the tick. The server sees no
+  // seat, saddle or water directly: those three are read from the anticheat's horse and the client's last relayed animation.
+  // /polymorph on|off (Owners): the kill switch, kept in beastform-state.json like /wwremote through reloads and restarts;
+  // off ends every polymorph at once. Config beastform.polymorph { enabled (the default while no switch is saved: true),
+  // guardUnits, combatSeconds, forms (a list narrowing which animals may be taken; a shape already taken still ends as usual) }
+  const PCFG = Object.assign({ enabled: true, guardUnits: 6000, combatSeconds: 30, forms: null },
+    CFG.polymorph && typeof CFG.polymorph === 'object' ? CFG.polymorph : {});
+  if (globalThis.__dboPolymorphSetBy === undefined) {
+    const saved = readState();
+    if (saved && typeof saved.polymorphOn === 'boolean') {
+      globalThis.__dboPolymorphOn = saved.polymorphOn;
+      globalThis.__dboPolymorphSetBy = String(saved.polymorphSetBy || 'file');
+    } else globalThis.__dboPolymorphOn = PCFG.enabled !== false;
+  }
+  const savePolymorph = (on, by) => writeState({ polymorphOn: on === true, polymorphSetBy: by, polymorphAt: new Date().toISOString() });
+  // The rank helpers gamemode.js hands over: isLeadStaff (the Lead GM gate of LEAD_ONLY), tierOf 'senior' (an Owner). An older
+  // gamemode.js without them: both closed
+  const isLeadStaff = typeof api.isLeadStaff === 'function' ? api.isLeadStaff : () => false;
+  const isOwner = (a) => { try { return typeof api.tierOf === 'function' && api.tierOf(a) === 'senior'; } catch (e) { return false; } };
+  const GUARD_UNITS = Number(PCFG.guardUnits) > 0 ? Number(PCFG.guardUnits) : 6000;
+  const GUARD_M = Math.round(GUARD_UNITS * 0.01428);
+  const getp = (a, k) => { try { return mp.get(a, k); } catch (e) { return undefined; } };
+  const isOnline = (a) => api.onlineActors().some((o) => (o >>> 0) === (a >>> 0));
+  // An interior is a CELL record; a worldspace (outdoors) is a WRLD (jail.js reads it the same way). A cache only
+  const interiors = new Map();
+  const isIndoors = (a) => {
+    const desc = String(getp(a, 'worldOrCellDesc') || '');
+    if (!desc) return false;
+    if (!interiors.has(desc)) {
+      let yes = false;
+      try { const r = mp.lookupEspmRecordById(mp.getIdFromDesc(desc) >>> 0); yes = !!(r && r.record && String(r.record.type) === 'CELL'); } catch (e) { yes = false; }
+      if (interiors.size > 4000) interiors.clear();
+      interiors.set(desc, yes);
+    }
+    return interiors.get(desc);
+  };
+  // The animation the player's own client last relayed, which the fork keeps while they stand still (MpActor lastAnimEvent:
+  // a movement update that is not 'Standing' clears it): the server's only sight of a seat, a saddle or water
+  const animShape = (a) => {
+    const e = String(getp(a, 'lastAnimEvent') || '').toLowerCase();
+    if (!e || /exit|stop|forcedefault|dismount/.test(e)) return '';
+    if (/swim/.test(e)) return 'water';
+    if (/horse|mount/.test(e)) return 'mounted';
+    if (/chair|stool|bench|throne|bedroll|furniture|sitting|kneel|enter(instant|start|tosit)?$/.test(e)) return 'seated';
+    return '';
+  };
+  // A horse the player activated and still has under them (anticheat.js, its movement class), or a horse's relayed animation
+  const onHorse = (a) => {
+    try {
+      const ac = globalThis.__dboAnticheat;
+      const st = ac && ac.players instanceof Map ? ac.players.get(a >>> 0) : null;
+      if (st && st.mounted === true && st.horse) return true;
+    } catch (e) { /* no anticheat */ }
+    return animShape(a) === 'mounted';
+  };
+  // How many other players near enough to see a lack 'creatureBody' (their game would show a stripped human); null when a's
+  // own place cannot be read
+  const unseeingNear = (a) => {
+    const here = getp(a, 'worldOrCellDesc'), pos = getp(a, 'pos');
+    if (!here || !Array.isArray(pos)) return null;
+    let n = 0;
+    for (const o of api.onlineActors()) {
+      if ((o >>> 0) === (a >>> 0)) continue;
+      try {
+        if (mp.get(o, 'worldOrCellDesc') !== here) continue;
+        const p = mp.get(o, 'pos');
+        if (!Array.isArray(p) || Math.hypot(p[0] - pos[0], p[1] - pos[1], p[2] - pos[2]) > GUARD_UNITS) continue;
+        if (!hasUiCap(o, 'creatureBody')) n++;
+      } catch (e) { /* gone */ }
+    }
+    return n;
+  };
+  const unseeingText = (n) => `${n} ${n === 1 ? 'player' : 'players'} within about ${GUARD_M} m would see a stripped human instead of the animal: their game cannot show it yet. Polymorph with nobody that near.`;
+  // Why a cannot take an animal shape now, or ''
+  const polymorphRefusal = (a) => {
+    if (globalThis.__dboPolymorphOn !== true) return 'Polymorph is switched off for now.';
+    if (!isOnline(a)) return 'You are not in the world.';
+    let downed = false; try { downed = typeof globalThis.__dboIsDowned === 'function' && !!globalThis.__dboIsDowned(a); } catch (e) { downed = false; }
+    if (downed) return 'Not while you are down.';
+    if (getp(a, 'isDead') === true) return 'Not while you are dead.';
+    const s = stateOf(a);
+    if (s) return isCreatureState(s) ? `You are already a ${formName(s.form)}: /polymorph revert first.` : `Leave your ${formName(s.form)} shape first (/beast revert).`;
+    const r = getp(a, 'private.restrained');
+    if (r && (r.boundHands || r.carried || r.captorActorId)) return 'Not while you are bound, carried or held.';
+    const jail = getp(a, 'private.dboSentence');
+    if (jail && Number(jail.totalMs) > (Number(jail.servedMs) || 0)) return 'Not while you are in jail.';
+    let duel = false; try { duel = typeof globalThis.__dboInDuel === 'function' && !!globalThis.__dboInDuel(a); } catch (e) { duel = false; }
+    if (duel) return 'Not in a duel.';
+    const fought = globalThis.__dboCombatAt instanceof Map ? Number(globalThis.__dboCombatAt.get(a >>> 0)) || 0 : 0;
+    if (Date.now() - fought < (Number(PCFG.combatSeconds) || 0) * 1000) return 'Not in the middle of a fight.';
+    if (onHorse(a)) return 'Not on a horse, or right beside the one you rode: get off and step away first.';
+    const shape = animShape(a);
+    if (shape === 'seated') return 'Not while you are sitting or using something: stand up first.';
+    if (shape === 'water') return 'Not in water: most of these animals cannot swim.';
+    if (getp(a, 'private.dboAppearanceEdit')) return 'Close the appearance editor first.';
+    if (isIndoors(a)) return 'Not indoors: these animals cannot open doors. Go outside first.';
+    const n = unseeingNear(a);
+    if (n === null) return 'The server cannot read where you are.';
+    if (n > 0) return unseeingText(n);
+    return '';
+  };
+  // What ends a shape already taken, checked every tick: the switch, indoors, water, a player near who cannot see it
+  const polymorphBreak = (a) => {
+    if (globalThis.__dboPolymorphOn !== true) return 'polymorph off';
+    if (isIndoors(a)) return 'polymorph indoors';
+    if (animShape(a) === 'water') return 'polymorph water';
+    if (unseeingNear(a) > 0) return 'polymorph guard';
+    return '';
+  };
+  const polymorphTick = (online) => {
+    for (const a of online) {
+      const s = stateOf(a);
+      if (!s || !isCreatureState(s)) continue;
+      const why = polymorphBreak(a);
+      if (why) revert(a, why);
+    }
+  };
+  // The staff audit line (who, which animal, why it ended: a fixed word, never typed text) and the staff member's own line
+  const POLY_END = { 'asked to revert': 'asked', death: 'died', logout: 'logged out', login: 'logged in', 'time up': 'time up',
+    'polymorph off': 'switched off', 'polymorph guard': 'a player who cannot see it came near', 'polymorph indoors': 'went indoors',
+    'polymorph water': 'went into water', 'reverted from the admin panel': 'staff panel', 'revert power': 'revert power' };
+  const POLY_TELL = { 'polymorph off': 'polymorph was switched off', 'polymorph guard': `a player came within about ${GUARD_M} m whose game cannot show the animal yet`,
+    'polymorph indoors': 'these animals cannot open doors, so it ends indoors', 'polymorph water': 'most of these animals cannot swim, so it ends in water',
+    death: 'the animal died', login: 'you were still an animal when you left' };
+  const polymorphEnded = (a, s, why) => {
+    const w = String(why || '');
+    const end = own(POLY_END, w) ? POLY_END[w] : /^reverted by /.test(w) ? 'staff command' : 'other';
+    const name = isCreature(s.form) ? CREATURES[s.form].name : 'animal';
+    audit(`BEAST ${who(a)} left the ${name} shape (polymorph): ${end}`);
+    if (own(POLY_TELL, w)) personal(a, `You are yourself again: ${POLY_TELL[w]}.`);
+  };
+  // A creature's body for a 'creatureBody' viewer: the race kept in private.beast at the change, else the creature table's
+  const creatureBodyOf = (a) => {
+    const s = stateOf(a);
+    if (!s || !isCreatureState(s)) return null;
+    const race = (Number(s.race) >>> 0) || (isCreature(s.form) ? CREATURES[s.form].race >>> 0 : 0);
+    return race ? { id: a >>> 0, race } : null;
+  };
+  const polymorphOn = () => globalThis.__dboPolymorphOn === true;
+  // Returns '' when the change happened, else the sentence that says why not
+  const polymorphTo = (a, key) => {
+    const c = isCreature(key) ? CREATURES[key] : null;
+    if (!c) return 'There is no such animal.';
+    if (!c.race) return `The ${c.name} is not in this load order.`;
+    if (Array.isArray(PCFG.forms) && !PCFG.forms.map(String).includes(key)) return `The ${c.name} is not open for polymorph now.`;
+    const why = polymorphRefusal(a);
+    if (why) return why;
+    let original = null; try { original = mp.get(a, 'appearance'); } catch (e) { /* none */ }
+    if (!original || !original.raceId) return 'This character has no appearance yet.';
+    const race = c.race >>> 0;
+    try {
+      mp.set(a, 'private.beast', { form: key, original, at: Date.now(), until: 0, race, creature: true });
+      // The mortal race stays in the appearance for every client, as a beast's does; only the name changes
+      mp.set(a, 'appearance', Object.assign({}, original, { name: String((own(NAMES, key) && NAMES[key]) || c.name) }));
+    } catch (e) {
+      log(`beastform: polymorph of ${display(a)} failed: ${e.message}`);
+      try { mp.set(a, 'appearance', original); mp.set(a, 'private.beast', null); } catch (e2) { /* as it was */ }
+      return 'That failed; see the server log.';
+    }
+    sendPacket(a, { customPacketType: 'dboBeast', race, beast: true, form: key, wear: [], abilities: null });
+    audit(`BEAST ${who(a)} took the ${c.name} shape (polymorph, staff, own character)`);
+    log(`beastform: ${display(a)} polymorphed into ${c.name} (race ${race.toString(16)})`);
+    sendBeastBodies();
+    try { if (globalThis.__dboBeastChanged) globalThis.__dboBeastChanged(a, key, true); } catch (e) { log('beast change hook failed', e.message); }
+    return '';
+  };
+  const animals = () => Object.keys(CREATURES).filter((k) => CREATURES[k].race && !(Array.isArray(PCFG.forms) && !PCFG.forms.map(String).includes(k)));
+  registerChatCommand('polymorph', (a, args) => {
+    a = a >>> 0;
+    if (!isLeadStaff(a)) return personal(a, 'That is for a Lead GM and above.');
+    const words = String(args || '').trim().toLowerCase().split(/\s+/).filter(Boolean);
+    const w = words[0] || '';
+    const usage = `Usage: /polymorph <${animals().join('|')}> | revert | list${isOwner(a) ? ' | on | off' : ''}. It works on yourself alone.`;
+    if (w === 'on' || w === 'off') {
+      if (!isOwner(a)) return personal(a, 'Only an Owner switches polymorph on or off.');
+      if (words.length > 1) return personal(a, usage);
+      const on = w === 'on';
+      globalThis.__dboPolymorphOn = on; globalThis.__dboPolymorphSetBy = 'admin'; savePolymorph(on, 'admin');
+      let n = 0;
+      if (!on) for (const o of api.onlineActors()) { if (isCreatureState(stateOf(o >>> 0)) && revert(o >>> 0, 'polymorph off')) n++; }
+      audit(`BEAST ${who(a)} switched polymorph ${on ? 'on' : 'off'} for all staff (${n} turned back)`);
+      sendBeastBodies();
+      return personal(a, on ? 'Polymorph is on: a Lead GM and above may take an animal shape.' : `Polymorph is off${n ? ` and ${n} turned back` : ''}. It stays off through reloads and restarts until /polymorph on.`);
+    }
+    if (!w) {
+      return personal(a, `Polymorph is ${polymorphOn() ? 'on' : 'off'}. /polymorph <animal> turns you, and only you, into one: ${animals().join(', ')}. ` +
+        `/polymorph revert turns you back; /polymorph list shows who is one.${isOwner(a) ? ' /polymorph on|off switches it for everyone.' : ''}`);
+    }
+    if (w === 'list') {
+      if (words.length > 1) return personal(a, usage);
+      const now = Date.now();
+      const list = api.onlineActors().map((o) => [o >>> 0, stateOf(o >>> 0)]).filter(([, s]) => isCreatureState(s))
+        .map(([o, s]) => `${display(o)}: ${formName(s.form)} for ${Math.max(0, Math.round((now - (Number(s.at) || now)) / 60000))} min`);
+      return personal(a, `Polymorph is ${polymorphOn() ? 'on' : 'off'}. ${list.length ? `In an animal shape now: ${list.join('; ')}.` : 'Nobody is in an animal shape.'}`);
+    }
+    // Only ever on oneself: any word after the first (a name, a #TAG) is refused, never looked up
+    if (words.length > 1) return personal(a, `Polymorph works on yourself alone: /polymorph ${w}, with nothing after it.`);
+    if (w === 'revert') {
+      const s = stateOf(a);
+      if (!isCreatureState(s)) return personal(a, s ? `You are in ${formName(s.form)}, not an animal shape: /beast revert.` : 'You are in your own shape.');
+      return personal(a, revert(a, 'asked to revert') ? 'You are yourself again.' : 'That failed; see the server log.');
+    }
+    const key = own(CREATURE_WORDS, w) ? CREATURE_WORDS[w] : w;
+    if (!isCreature(key)) return personal(a, usage);
+    const why = polymorphTo(a, key);
+    if (why) { log(`beastform: ${display(a)} could not polymorph into ${key}: ${why}`); return personal(a, why); }
+    personal(a, `You are a ${CREATURES[key].name}. Nobody near you is told. /polymorph revert turns you back; so do a death, a logout, going indoors or into water, and a player coming near whose game cannot show the animal.`);
+  }, { admin: true, help: 'chicken|hare|goat|fox|dog|skeever|mudcrab|deer|revert|list|on|off: take an animal shape yourself (never anyone else) or end it; on and off: the Owners\' switch for everyone' });
 
   // Admins: grant or take the power, or force a form for testing
   registerChatCommand('beastform', (a, args) => {
@@ -678,7 +932,9 @@ module.exports = (api) => {
   // The admin panel and /beastform drive the change directly, so an admin never depends on the cast relay
   globalThis.__dboBeastAdmin = (a, key, op) => {
     const k = key === 'vampire' ? 'vampirelord' : String(key || 'werewolf').toLowerCase();
-    if (!FORMS[k]) return `Unknown form '${key}'`;
+    // A creature key may only end the shape it names (the panel's revert); grant, revoke and a change stay FORMS' alone
+    const creatureRevert = op === 'revert' && isCreature(k);
+    if (!own(FORMS, k) && !creatureRevert) return `Unknown form '${key}'`;
     if (op === 'revert') return revert(a, 'reverted from the admin panel') ? `${display(a)} is back in their own shape.` : `${display(a)} is not transformed.`;
     if (op === 'revoke') {
       papyrus(a, 'RemoveSpell', [spellArg(FORMS[k].power)]);
@@ -702,4 +958,5 @@ module.exports = (api) => {
   }, { help: '[werewolf|vampirelord|revert] take or leave your beast form (or cast the power)' });
 
   log(`beastform on: ${Object.entries(FORMS).map(([k, f]) => `${k} race ${f.race.toString(16)} power ${f.power.toString(16)}${f.seconds ? ` ${f.seconds}s` : ''}`).join(', ')}, revert ${REVERT_POWER.toString(16)}, Behemoth for the ${BEHEMOTH.rank} ${BEHEMOTH.enabled === true ? `ON (${behemothRace() ? behemothRace().toString(16) : 'race not in the load order'})` : 'off'}, Vampire Lord remote body ${globalThis.__dboVampireLordRemote === true ? 'ON' : 'off'}, werewolf remote body ${globalThis.__dboWerewolfRemote !== false ? 'ON' : 'off'}${globalThis.__dboWwRemoteSetBy ? ` (${globalThis.__dboWwRemoteSetBy})` : ''}`);
+  log(`beastform polymorph ${polymorphOn() ? 'ON' : 'off'}${globalThis.__dboPolymorphSetBy ? ` (${globalThis.__dboPolymorphSetBy})` : ''}: ${Object.entries(CREATURES).map(([k, c]) => `${k} ${c.race ? c.race.toString(16) : 'not in the load order'}`).join(', ')}; refused near a player without creatureBody within ${GUARD_UNITS} units`);
 };

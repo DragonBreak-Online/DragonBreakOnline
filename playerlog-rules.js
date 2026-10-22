@@ -1133,6 +1133,8 @@ const COMMAND_SCHEMA = {
   leave: {}, makesuper: { subs: S_('vampire werewolf') },
   vlremote: { subs: S_('on off clear') }, wwremote: { subs: S_('on off clear') },
   beast: { subs: S_('werewolf vampirelord revert') },
+  // staff polymorph (beastform.js): the animal or the word, never a name (it takes none)
+  polymorph: { subs: S_('chicken hare rabbit goat fox dog skeever mudcrab deer revert list on off') },
   manual: { subs: S_('grant list buy copy') },
   schools: { subs: S_('set reset view') },
   classteacher: {}, preacher: {},
@@ -1263,6 +1265,9 @@ beastform.js <expr> 403600c0 excluded
 beastform.js GM 20c30028 parsed
 beastform.js GM 47bd1cd1 parsed
 beastform.js BEAST eadfbd8f clean
+beastform.js BEAST 168eca78 clean
+beastform.js BEAST d2c5f579 clean
+beastform.js BEAST 4b982cb7 clean
 bloodranks.js BLOOD 2e7d8b09 clean
 business.js BUSINESS b0f9df0b parsed
 business.js BUSINESS 7485beff parsed

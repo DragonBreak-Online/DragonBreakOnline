@@ -392,7 +392,7 @@ const TIER_LABEL = { senior: 'Senior', developer: 'Developer', leadgm: 'Lead GM'
 // appoint and dismiss are here because an official's powers are real money: a rank lets its holder post work paid
 // out of the hold treasury, so a GM who could appoint himself could pay himself (claude-jake's review, A1-1).
 // /chargen is open to every GM (Nate, 12 Oct), and to a Trial GM through TRIAL_COMMANDS
-const LEAD_ONLY = new Set(['rerollrefund', 'beastform', 'vlremote', 'wwremote', 'feedpair', 'sethunger', 'wipechars', 'driftspawn', 'driftrepair', 'driftset',
+const LEAD_ONLY = new Set(['rerollrefund', 'beastform', 'polymorph', 'vlremote', 'wwremote', 'feedpair', 'sethunger', 'wipechars', 'driftspawn', 'driftrepair', 'driftset',
   'jail', 'placeexport', 'staffstats', 'war', 'curse', 'schedule', 'warband', 'raid', 'settime', 'timescale', 'setweather', 'npc remove', 'dungeon end',
   'appoint', 'dismiss',
   // Handing out a smithing manual is handing out an item (the T5 ones are given in roleplay, like artifacts)
@@ -1059,7 +1059,7 @@ const STAFF_HELP = [
     ['property', 'at a door, as an official: sell <price> | list <deposit> <weekly> | unlist | offer <name> | remind | grace | evict'],
     'grantproperty', 'leadership'] },
   { key: 'elections', title: 'Hold elections', items: ['electionreview', 'strikevote', 'unstrikevote'] },
-  { key: 'beasts', title: 'Beasts and the supernatural', items: ['beastform', 'curse', 'makesuper', 'vlremote', 'wwremote', 'feedpair', 'raid', 'warband', 'vampeyes'] },
+  { key: 'beasts', title: 'Beasts and the supernatural', items: ['beastform', 'polymorph', 'curse', 'makesuper', 'vlremote', 'wwremote', 'feedpair', 'raid', 'warband', 'vampeyes'] },
   { key: 'magic', title: 'Magic and crafts', items: ['schools', 'shoutclean', 'classteacher', 'preacher', 'manual', 'smithing', 'tailoring', 'enchant'] },
   { key: 'law', title: 'Law', items: ['jail', ['concordat', '[races]: Concordat arrests standing, or the Thalmor outside the race rule'],
     ['dossier', 'list | read <name|#TAG> | reports | add <name|#TAG> <text> | strike <name|#TAG> <n>: the Thalmor dossiers and informant reports (add and strike: Lead GM)']] },
@@ -9036,7 +9036,7 @@ try {
 try {
   const BEASTFORM_JS = path.resolve('beastform.js');
   delete require.cache[BEASTFORM_JS];
-  require(BEASTFORM_JS)({ mp, log, personal, registerChatCommand, sendPacket, display, who, audit, findByName, every, redress, onlineActors, cfg, isAdmin, hasUiCap });
+  require(BEASTFORM_JS)({ mp, log, personal, registerChatCommand, sendPacket, display, who, audit, findByName, every, redress, onlineActors, cfg, isAdmin, isLeadStaff, tierOf, hasUiCap });
 } catch (e) { log('beastform.js failed to load:', e.stack || e.message); for (const k of ['__dboBeastCast', '__dboBeastRevert', '__dboBeastOriginalRace', '__dboBeastTransform', '__dboBeastRequest', '__dboBeastAdmin', '__dboBeastHolds']) globalThis[k] = null; }
 
 // ---- the Great Hunt: werewolf ranks from feeding, hunting and changing (server\greathunt.js) ----------------------
