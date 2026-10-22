@@ -6,8 +6,12 @@
 // is handed over, the player is told why, the staff audit log gets a line, and the gift moves into gift-ledger.json.
 // A gift for someone offline waits in the inbox until they are back, across restarts.
 //
-//   gifts-inbox/<id>.json  { tag: "KKVT" | profile: 71, gold: 50, items: [{ baseId: 0x1397e, count: 1 }], reason, by, at }
-//   gift-ledger.json       { delivered: { <id>: { at, to, gold, items, reason, by } } }, written only here
+//   gifts-inbox/<id>.json  { tag: "KKVT" | profile: 71, gold: 50, items: [{ baseId: 0x1397e, count: 1 }], schools: { Destruction: 21 }, reason, by, at }
+//   gift-ledger.json       { delivered: { <id>: { at, to, gold, items, schools?, reason, by } } }, written only here
+//
+// `schools` (mod-0311, Jake 22 Oct) adds whole levels 1-100 to a school of magic through schools.js __dboSchoolsGrant,
+// which caps at 100 and holds at an unmade Apprentice or Adept pick as class pay does; a gift may be schools only. One
+// waits in the inbox while schools.js is not loaded, so it is never spent on nothing.
 //
 // A gift is handed over at most once: the ledger is written before the gold is given, so a crash in between loses one
 // gift rather than paying it twice. A gift already in the ledger is only cleared from the inbox.
@@ -21,6 +25,11 @@ module.exports = (api) => {
   const LEDGER = path.resolve('gift-ledger.json');
   const GOLD = 0x0000000f;
   const MAX_GOLD = 100000, MAX_COUNT = 1000, MAX_FILES = 200;
+  // Restoration is not one: it follows Priest on the Wheel
+  const SCHOOLS = ['Alteration', 'Conjuration', 'Destruction', 'Illusion'];
+  const schoolsOk = (s) => !!s && typeof s === 'object' && !Array.isArray(s) && Object.keys(s).length > 0
+    && Object.entries(s).every(([k, n]) => SCHOOLS.includes(k) && Number.isInteger(n) && n >= 1 && n <= 100);
+  const grantHook = () => (typeof globalThis.__dboSchoolsGrant === 'function' ? globalThis.__dboSchoolsGrant : null);
 
   const readJson = (p, fallback) => { try { return JSON.parse(fs.readFileSync(p, 'utf8')); } catch (e) { return fallback; } };
   const ledger = () => { const l = readJson(LEDGER, null); return l && typeof l.delivered === 'object' && l.delivered ? l : { delivered: {} }; };
@@ -35,24 +44,36 @@ module.exports = (api) => {
       : !(typeof g.tag === 'string' && /^[A-Z0-9]{4}$/.test(g.tag)) && !(Number.isInteger(g.profile) && g.profile > 0) ? 'no #TAG or profile'
       : g.gold !== undefined && !(Number.isInteger(g.gold) && g.gold > 0 && g.gold <= MAX_GOLD) ? `gold must be 1-${MAX_GOLD}`
       : g.items !== undefined && !(Array.isArray(g.items) && g.items.length <= 20 && g.items.every((i) => i && Number.isInteger(i.baseId) && i.baseId > 0 && Number.isInteger(i.count) && i.count > 0 && i.count <= MAX_COUNT)) ? 'bad items'
-      : !g.gold && !(g.items && g.items.length) ? 'nothing to give'
+      : g.schools !== undefined && !schoolsOk(g.schools) ? `bad schools (${SCHOOLS.join(', ')}: whole levels 1-100)`
+      : !g.gold && !(g.items && g.items.length) && !g.schools ? 'nothing to give'
       : '';
     if (why) { if (!badOnce.has(file)) { badOnce.add(file); log(`gifts: ${file} refused (${why}); fix or delete it`); } return null; }
-    return { id, file, tag: g.tag || '', profile: Number.isInteger(g.profile) ? g.profile : 0, gold: g.gold || 0, items: g.items || [],
+    return { id, file, tag: g.tag || '', profile: Number.isInteger(g.profile) ? g.profile : 0, gold: g.gold || 0, items: g.items || [], schools: g.schools || null,
       reason: String(g.reason || '').slice(0, 200), by: String(g.by || 'staff').slice(0, 40) };
   };
 
-  const describe = (g) => [g.gold ? `${g.gold} gold` : '', ...g.items.map((i) => `${i.count}x 0x${(i.baseId >>> 0).toString(16)}`)].filter(Boolean).join(', ');
+  const levelsWord = (n) => `${n} level${n === 1 ? '' : 's'}`;
+  const describe = (g) => [g.gold ? `${g.gold} gold` : '', ...g.items.map((i) => `${i.count}x 0x${(i.baseId >>> 0).toString(16)}`),
+    ...Object.entries(g.schools || {}).map(([k, n]) => `${n} ${k} level${n === 1 ? '' : 's'}`)].filter(Boolean).join(', ');
 
   const deliver = (a, g, l) => {
-    l.delivered[g.id] = { at: new Date().toISOString(), to: who(a), gold: g.gold, items: g.items, reason: g.reason, by: g.by };
+    l.delivered[g.id] = { at: new Date().toISOString(), to: who(a), gold: g.gold, items: g.items, ...(g.schools ? { schools: g.schools } : {}), reason: g.reason, by: g.by };
     saveLedger(l);
     const given = [];
     if (g.gold && giveItem(a, GOLD, g.gold)) given.push(`${g.gold} gold`);
     for (const i of g.items) if (giveItem(a, i.baseId >>> 0, i.count)) given.push(`${i.count}x 0x${(i.baseId >>> 0).toString(16)}`);
+    const goods = given.length, told = [], refused = [];
+    for (const [school, n] of Object.entries(g.schools || {})) {
+      const hook = grantHook();
+      const r = (hook && hook(a, school, n, g.by, g.reason)) || { ok: false, text: 'schools.js is not loaded' };
+      if (!(r.ok && r.added > 0)) { refused.push(`${school}: ${r.text}`); continue; }
+      given.push(`${r.added} ${r.school} level${r.added === 1 ? '' : 's'} (${r.from} to ${r.to}${r.added < n ? `, ${n - r.added} not given` : ''})`);
+      told.push(`${levelsWord(r.added)} of ${r.school}${r.heldFor ? ` (held at ${r.to} until you choose its ${r.heldFor} spell)` : ''}`);
+    }
     try { fs.unlinkSync(path.join(INBOX, g.file)); } catch (e) { /* the ledger keeps it from paying twice */ }
-    if (given.length) personal(a, `A gift from the staff: ${g.gold ? `${g.gold} gold` : 'items'}${g.reason ? `. ${g.reason}` : '.'}`);
-    audit(`GIFT ${g.id} by ${g.by} to ${who(a)}: ${given.join(', ') || 'NOTHING (give failed)'}${given.length < (g.gold ? 1 : 0) + g.items.length ? ` of ${describe(g)}` : ''}; ${g.reason}`);
+    const what = [goods ? (g.gold ? `${g.gold} gold` : 'items') : '', ...told].filter(Boolean).join(', ');
+    if (what) personal(a, `A gift from the staff: ${what}${g.reason ? `. ${g.reason}` : '.'}`);
+    audit(`GIFT ${g.id} by ${g.by} to ${who(a)}: ${given.join(', ') || 'NOTHING (give failed)'}${given.length < (g.gold ? 1 : 0) + g.items.length + Object.keys(g.schools || {}).length ? ` of ${describe(g)}` : ''}${refused.length ? ` (${refused.join('; ')})` : ''}; ${g.reason}`);
   };
 
   const tick = () => {
@@ -65,6 +86,7 @@ module.exports = (api) => {
     const online = onlineActors();
     for (const g of gifts) {
       if (l.delivered[g.id]) { try { fs.unlinkSync(path.join(INBOX, g.file)); } catch (e) { /* gone */ } continue; }
+      if (g.schools && !grantHook()) { if (!badOnce.has(`${g.file}:schools`)) { badOnce.add(`${g.file}:schools`); log(`gifts: ${g.file} waits: schools.js is not loaded to grant its levels`); } continue; }
       const a = online.find((x) => {
         if (g.tag) { try { return mp.get(x, 'private.charTag') === g.tag; } catch (e) { return false; } }
         return profileOf(x) === g.profile;
