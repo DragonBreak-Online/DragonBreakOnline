@@ -1,6 +1,5 @@
 #include "ActionListener.h"
 #include "ActiveMagicEffectsMap.h"
-#include "SpellCastMessage.h"
 #include "TestUtils.hpp"
 #include <catch2/catch_all.hpp>
 
@@ -18,13 +17,24 @@ void CastOwn(PartOne& p, uint32_t spellId)
   eq.voiceSpell = spellId;
   ac.SetEquipment(eq);
 
-  RawMessageData rawMsgData;
-  rawMsgData.userId = 0;
-  SpellCastMessage msg;
-  msg.data.caster = 0x14;
-  msg.data.target = 0x14;
-  msg.data.spell = spellId;
-  p.GetActionListener().OnSpellCast(rawMsgData, msg);
+  // A real packet: the cast is relayed with its raw bytes
+  DoMessage(p, 0,
+            nlohmann::json{
+              { "t", MsgType::SpellCast },
+              { "data",
+                { { "caster", 0x14 },
+                  { "target", 0x14 },
+                  { "spell", spellId },
+                  { "isDualCasting", false },
+                  { "interruptCast", false },
+                  { "castingSource", 0 },
+                  { "aimAngle", 0.f },
+                  { "aimHeading", 0.f },
+                  { "actorAnimationVariables",
+                    { { "booleans", nlohmann::json::array() },
+                      { "floats", nlohmann::json::array() },
+                      { "integers", nlohmann::json::array() } } },
+                  { "keepAlive", false } } } });
 }
 
 MpActor& Connect(PartOne& p)
