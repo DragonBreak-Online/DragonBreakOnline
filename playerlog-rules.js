@@ -453,6 +453,13 @@ const SCHOOLS_GRANT = new RegExp(`^SCHOOLS [\\s\\S]{1,200}? granted (${WHO_RX} \
 AUDIT_VERBS.SCHOOLS.cut = (text) => text.replace(SCHOOLS_GRANT, 'SCHOOLS staff granted $1');
 // SPELL TRIM ... shouts: <state>; by <by>: <why> (spells.js staff trim): by and why are written by staff in config, so they go
 AUDIT_VERBS.SPELL.cut = (text) => text.replace(/^(SPELL TRIM [\s\S]*?, shouts: (?:untouched|none granted|grant kept \(it cannot be kept in part\)|grant taken off|grant could not be taken off)); by [\s\S]*$/, '$1');
+// Duels: display() names in the reasons ("Rowan #PGDB yielded"); the one beaten, killed or challenged is the target
+clean_('DUEL', { display: true, roles: R_BY([[/ (?:against|beat|killed|challenge to) $/, 'target']]) });
+// Record, config and dungeon names, hex refs and numbers only
+clean_('EBONY BOSS GOLD LEVERPUZZLE SCRIBE WORLDEDIT');
+AUDIT_VERBS.HOUSING = { cls: 'clean', roles: R_BY([[/ to $/, 'target']]) };
+AUDIT_VERBS.PARTAKE = { cls: 'clean', roles: R_BY([[/ (?:ate of|asked|allowed) $/, 'target']]) };
+clean_('TRAPS', { display: true });
 
 // X: excluded (no event from the audit tap; a direct hook covers the action, without the text)
 excluded('JOIN LEAVE', 'the session hooks');
@@ -473,6 +480,16 @@ clean_('ANTICHEAT', { display: true });
 excluded('ANTICHEAT-DAILY', 'counts per kind only, no player');
 excluded('WWBREAKER VLBREAKER', 'the beastform breaker names who dropped');
 excluded('REMOTE', 'the remote staff console (console.js): staff command text and a Discord handle; the command wrapper records the run (route console)');
+// Lines that carry words a player or staff member wrote, with no parser yet: nothing from the audit tap, as before they were
+// classified (a parser can bring their parties in later)
+excluded('WRITTEN', 'a written work\'s title, quoted');
+excluded('EVENT', 'the event announcement\'s text');
+excluded('GUILD', 'player guild names, a GM\'s reason');
+excluded('BOUNTY', 'the reason a ruler gave for a bounty');
+excluded('REBELLION', 'player-named risings and a secret petition\'s code');
+excluded('REFERRAL', 'staff only: profiles by number, staff reasons, PC sharing');
+excluded('SHOP', 'business names and the failure reasons');
+excluded('BURGLARY FENCE', 'home labels, raid evidence and reasons');
 
 // S: parsed. Only anchored groups survive: parties (resolved in the game), ops from fixed tables, numbers, hex refs.
 // The court, said by staff or an official: office titles are never kept (rolenames can make them staff-written), nor
@@ -1170,9 +1187,11 @@ appearance.js APPEARANCE cc2a3d88 clean
 appearance.js APPEARANCE 8dda1487 clean
 appearance.js APPEARANCE c08fc0d2 clean
 appearance.js APPEARANCE 8a7cc30f clean
+appearance.js APPEARANCE fa5ed0fc clean
 appearance.js APPEARANCE b80ac1f1 clean
 appearance.js APPEARANCE b0525394 clean
 bank.js BANK 462e889d parsed
+bank.js BANK f4890f79 parsed
 bank.js BANK 5efd151e parsed
 bank.js BANK 8324fa85 parsed
 bank.js BANK 8bc0ab15 parsed
@@ -1206,12 +1225,19 @@ business.js BUSINESS b0f9df0b parsed
 business.js BUSINESS 7485beff parsed
 business.js BUSINESS 2719609b parsed
 business.js BUSINESS 69e987c3 parsed
-business.js BUSINESS 7d8cd031 parsed
+business.js BUSINESS c048e7c9 parsed
+business.js BUSINESS 8664bec6 parsed
+business.js BUSINESS 9392aa64 parsed
+business.js BUSINESS c982a506 parsed
+business.js BUSINESS 45cf5839 parsed
+business.js BUSINESS 9adabccc parsed
+business.js BUSINESS 8aadb66a parsed
 business.js BUSINESS 1cb283fe parsed
 business.js BUSINESS a7c97b52 parsed
 business.js TAX 4f9fe86e clean
 champions.js CHAMPION c06a6bd9 clean
 charlevel.js LEVEL e66d9173 clean
+charlevel.js LEVEL 34ff7176 clean
 charters.js CHARTER bbc7a352 parsed
 charters.js CHARTER 12a5d3b9 parsed
 charters.js CHARTER 334c3708 parsed
@@ -1249,6 +1275,7 @@ citizenship.js CITIZEN 22100e82 clean
 citizenship.js ELECTION f6fe19bb clean
 citizenship.js ELECTION aedc91eb clean
 citizenship.js ELECTION d4c72052 clean
+citizenship.js ELECTION 4a9329f4 clean
 citizenship.js ELECTION 19644858 clean
 citizenship.js ELECTION 1284d29d clean
 citizenship.js ELECTION a2b8d084 clean
@@ -1264,6 +1291,7 @@ citizenship.js ELECTION e9335d9a clean
 citizenship.js ELECTION 51c738f7 clean
 citizenship.js ELECTION a78d4be7 clean
 citizenship.js ELECTION 8ca5a5d0 clean
+citizenship.js CITIZEN e6f03eeb clean
 citizenship.js ELECTION 9607cadb clean
 commissions.js COMMISSION 49e86f26 parsed
 commissions.js COMMISSION 150fc5bd parsed
@@ -1280,7 +1308,9 @@ console.js REMOTE 1ef926f8 excluded
 console.js REMOTE 04d3b66a excluded
 contracts.js CONTRACT 5686a09a clean
 contracts.js CONTRACT b6341078 clean
+contracts.js CONTRACT 1c58c02d clean
 contracts.js CONTRACT aaccf4b3 clean
+contracts.js CONTRACT bdffe91c clean
 couriers.js COURIER 23513b81 parsed
 couriers.js COURIER 2b9f065b parsed
 couriers.js COURIER d0598bda parsed
@@ -1315,20 +1345,31 @@ downed.js CRASH-DOWN 3000ad8e clean
 downed.js FINISHED 4794f063 parsed
 downed.js RECIPE 83b08366 clean
 downed.js BREW 53c051c5 clean
+duel.js DUEL dd8f1e8f clean
+duel.js DUEL 7039f20e clean
+duel.js DUEL 5e8dc518 clean
+duel.js DUEL 38a2bc86 clean
+duel.js DUEL b0854696 clean
+duel.js DUEL 1eafe7ef clean
+duel.js DUEL 12f9ee7c clean
+duel.js DUEL 78cccf60 clean
+duel.js DUEL afa42cac clean
 dungeons.js DUNGEON 612925dd clean
 dungeons.js CRASHLOOP 9635f3d7 clean
 dungeons.js DUNGEON f795c1c6 clean
 dungeons.js DUNGEON 7179acec clean
 dungeons.js CHESTGOLD 4c0c6909 clean
+dungeons.js BOSS 437f03cb clean
 dungeons.js GM 8c3bf53e parsed
-economy.js ECONOMY 7b08166c parsed
-economy.js ECONOMY fde8bcf2 parsed
+dungeons.js EBONY db7845e7 clean
 economy.js ECONOMY e15fb1e7 parsed
 economy.js ECONOMY 24f6b1a2 parsed
 economy.js ECONOMY b0eba156 parsed
 economy.js ECONOMY 4f84a430 parsed
 economy.js ECONOMY e93056cd parsed
 economy.js ECONOMY c11d4c54 parsed
+economy.js ECONOMY 2cdbb30f parsed
+economy.js ECONOMY 8e9b5f21 parsed
 execution.js EXECUTION e5653509 clean
 execution.js EXECUTION 4c691b64 clean
 execution.js EXECUTION 151542a7 clean
@@ -1342,6 +1383,8 @@ gamemode.js NAME 1dc3182f parsed
 gamemode.js PERM cf246214 parsed
 gamemode.js PERM c10e460a parsed
 gamemode.js GM 82a0a368 parsed
+gamemode.js GM 9386ec05 parsed
+gamemode.js HOUSING 77d29769 clean
 gamemode.js GM 6fbbe634 parsed
 gamemode.js GM c3aa528e parsed
 gamemode.js GM 806c63e4 parsed
@@ -1349,6 +1392,7 @@ gamemode.js PIGEON 08c63dcc excluded
 gamemode.js POST 2a604861 parsed
 gamemode.js GM 90ebebeb parsed
 gamemode.js TREASURY 0cdffe5e clean
+gamemode.js GOLD bc09604d clean
 gamemode.js BANK c8ca81b1 parsed
 gamemode.js GM 6146f51c parsed
 gamemode.js JOIN 825709f7 excluded
@@ -1360,6 +1404,7 @@ gamemode.js STAFF e30a10a1 clean
 gamemode.js GM 2188c029 parsed
 gamemode.js GM fc0d417f parsed
 gamemode.js GM 15dd58a2 parsed
+gamemode.js POST 50314046 parsed
 gamemode.js BOARD b942ed32 parsed
 gamemode.js <expr> 06af3bb2 parsed
 gamemode.js <expr> 81ff2a3c parsed
@@ -1384,7 +1429,7 @@ gearswap.js GEARSWAP a9ee526a parsed
 gearswap.js GEARRESTORE 7b6eb5c9 parsed
 gearswap.js GEARRESTORE 059c5afd parsed
 gearswap.js GEARRESTORE 3f5caeb1 parsed
-gifts.js GIFT 3509ea43 excluded
+gifts.js GIFT f3d9a000 excluded
 gmcall.js GMCALL 6825a400 parsed
 gmcall.js GMCALL 208745b4 parsed
 gmcall.js GMCALL d9bbbeb8 parsed
@@ -1396,10 +1441,14 @@ gmcall.js GMCALL a9eaaca2 parsed
 gmcall.js GMCALL 4d962b08 parsed
 greathunt.js HUNT 08c91559 clean
 greathunt.js HUNT 4610cddc clean
+greenpact.js PARTAKE 4cd5c56f clean
+greenpact.js PARTAKE 934342b4 clean
+greenpact.js PARTAKE 6dd41892 clean
 guilds.js FACTION-LIMIT 80aca6c8 parsed
 guilds.js FACTION-LIMIT ae8015bc parsed
 guilds.js FACTION f8d4e175 parsed
 guilds.js FACTION 6c77ee5e parsed
+guilds.js FACTION 9196331b parsed
 guilds.js FACTION 4b9dc721 parsed
 guilds.js FACTION 733dfbb1 parsed
 guilds.js FACTION c877bfe7 parsed
@@ -1418,16 +1467,20 @@ jail.js JAIL 1b911941 clean
 jail.js JAIL ab248e05 clean
 jail.js JAIL cca6b801 clean
 jail.js JAIL 93c7d6d9 clean
+journalnotes.js WRITTEN baf0dce7 excluded
 keyring.js KEYRING b2ad5fc1 parsed
 keyring.js KEYRING 0b8be016 parsed
 keyring.js KEYRING 0b8be016 parsed
 keyring.js KEYRING f333bd5d parsed
 labour.js LABOUR-MISMATCH d7791950 clean
-labour.js MINE 720c6edd clean
+labour.js MINE 915776d9 clean
 labour.js CHOP 6d22c150 clean
 ledger.js LEDGER ba4ac58e excluded
 ledger.js LEDGER 77274c80 excluded
 ledgersale.js LEDGERSALE 57e2baf4 parsed
+leverpuzzles.js LEVERPUZZLE 44a72fc8 clean
+leverpuzzles.js LEVERPUZZLE 02bcc12b clean
+leverpuzzles.js LEVERPUZZLE eb03d283 clean
 lockpick.js LOCK 24f728b1 clean
 lockpick.js LOCKPICK-MISMATCH 280b5b3c clean
 lockpick.js LOCK 24f728b1 clean
@@ -1437,17 +1490,29 @@ manuals.js MANUAL 53f416fb clean
 manuals.js MANUAL d753d3eb clean
 manuals.js SKILLBOOK a5403e71 clean
 manuals.js SCHEMATIC 121a751a clean
+manuals.js SCHEMATIC 3ecb4848 clean
 manuals.js MANUAL 9ff5ff92 clean
 manuals.js MANUAL b71b7e27 clean
 manuals.js MANUAL 2f06b826 clean
 manuals.js MANUAL 8df0187e clean
+mines.js MINE c3af4e8a clean
+mines.js MINE 1b10e15b clean
+mines.js MINE 9cd1fd91 clean
 naming.js NAME 1cf7ac2d parsed
 naming.js NAME c75b6e10 parsed
 naming.js NAME d8ef2ef4 parsed
 nobility.js NOBILITY 97cfe241 parsed
 nobility.js NOBILITY 2022e40c parsed
 orphans.js ORPHAN 79ab9d5e excluded
+outlaws.js BOUNTY 30a8bfe5 excluded
+outlaws.js BOUNTY 16cb8c4f excluded
+outlaws.js BOUNTY 2eaae5ee excluded
+outlaws.js BOUNTY 2784331c excluded
+outlaws.js BOUNTY 322b41f3 excluded
+outlaws.js BOUNTY d5aa49c4 excluded
+outlaws.js BOUNTY 12814a1a excluded
 patrons.js REROLL 0fd5f13c clean
+patrons.js REROLL 5adb2276 clean
 pickpocket.js THEFT 6f851464 parsed
 pickpocket.js THEFT ecb55f36 parsed
 pickpocket.js THEFT cfffaf2c parsed
@@ -1465,9 +1530,20 @@ placement.js PLACE 958b8dce excluded
 placement.js PLACE 58d5c714 excluded
 placement.js PLACE b7914e97 excluded
 placement.js PLACE 15bbb51c excluded
+playerguilds.js GUILD bbed1c36 excluded
+playerguilds.js GUILD 83f1a43c excluded
+playerguilds.js GUILD 185bff53 excluded
+playerguilds.js GUILD 2d1d0446 excluded
+playerguilds.js GUILD c606be52 excluded
+playerguilds.js GUILD f47eaa3c excluded
+playerguilds.js GUILD 6fb1ce5c excluded
+playerguilds.js GUILD de66f55a excluded
+playerguilds.js GUILD c8ffe61b excluded
+playerguilds.js GUILD 7365e4e9 excluded
 playtest.js PLAYTEST 006bc8da clean
 playtest.js PLAYTEST 37ce7390 clean
 playtest.js PLAYTEST 6d1c5991 clean
+playtest.js PLAYTEST 689db7a8 clean
 playtesterboost.js BOOST 86d7eb6d clean
 playtesterboost.js BOOST 7a3a00b0 clean
 playtesterboost.js BOOST d1a90aa3 clean
@@ -1480,7 +1556,8 @@ post.js SUPPLY bedaa858 clean
 prayer.js OFFERING dc4d1de1 clean
 prayer.js PRAYER-MISMATCH 81a877ce clean
 prayer.js PRAYER bcadb75c clean
-prayer.js DEITY 3bf3ca10 parsed
+prayer.js DEITY 94c053c8 parsed
+prayer.js DEITY 359ee636 parsed
 prayer.js DEITY 6fc5b703 parsed
 prayer.js DEITY 4d3cb547 parsed
 prayer.js DEITY 0e4ababa parsed
@@ -1492,6 +1569,7 @@ realm.js REALM b3cdee6b parsed
 realm.js REALM 97d74408 parsed
 realm.js WAR 02e57730 parsed
 realm.js WAR 1d954b17 parsed
+realm.js WAR db0da18a parsed
 realm.js WAR 89eaa67a parsed
 realm.js WAR ba7a8fea parsed
 realm.js WAR b49e348d parsed
@@ -1499,6 +1577,39 @@ realm.js WAR 6baba944 parsed
 realm.js WAR cf8cca6d parsed
 realm.js WAR 6bad01ad parsed
 realm.js WAR e33513bf parsed
+rebellion.js REBELLION 2b0b3600 excluded
+rebellion.js REBELLION 9696db09 excluded
+rebellion.js REBELLION aeaa5259 excluded
+rebellion.js REBELLION 9a3856fe excluded
+rebellion.js REBELLION c59236c3 excluded
+rebellion.js REBELLION 3fabdf32 excluded
+rebellion.js REBELLION 10cf4ab3 excluded
+rebellion.js REBELLION 58c222d2 excluded
+rebellion.js REBELLION 28283c16 excluded
+rebellion.js REBELLION c01ebfbb excluded
+rebellion.js REBELLION 82c5bd37 excluded
+rebellion.js REBELLION 7c1ca8ce excluded
+rebellion.js REBELLION c2048083 excluded
+rebellion.js REBELLION f79a46be excluded
+rebellion.js REBELLION ff6cd85d excluded
+rebellion.js REBELLION bd96e993 excluded
+rebellion.js REBELLION 08f0a3e7 excluded
+referrals.js REFERRAL 404c381c excluded
+referrals.js REFERRAL e9e7820d excluded
+referrals.js <expr> e559b0fa excluded
+referrals.js <expr> 7c3b1074 excluded
+referrals.js <expr> fba4d520 excluded
+referrals.js <expr> d9616e46 excluded
+referrals.js <expr> b0ebeb7c excluded
+referrals.js REFERRAL 5d0a72fb excluded
+referrals.js REFERRAL cf59389e excluded
+referrals.js REFERRAL a21d92e8 excluded
+referrals.js REFERRAL ec31533d excluded
+referrals.js REFERRAL e3cd0b73 excluded
+referrals.js REFERRAL 129b516e excluded
+referrals.js REFERRAL 8f11972e excluded
+referrals.js REFERRAL ad1239aa excluded
+referrals.js REFERRAL 0a67f28f excluded
 regions.js REGION a0b2cc46 clean
 regions.js FORGENEVER d25fc68f clean
 regions.js ARTIFACT e31183e3 clean
@@ -1535,6 +1646,7 @@ schools.js SCHOOLS 38f0ba62 clean
 schools.js SCHOOLS 9fb3fbbc clean
 schools.js SCHOOLS e38e3945 clean
 schools.js SCHOOLS f2391232 clean
+schools.js SCHOOLS c0be7fec clean
 schools.js SCHOOLS 11eda490 clean
 schools.js SCHOOLS f4efbaa1 clean
 schools.js SCHOOLS a1eb1100 clean
@@ -1543,6 +1655,7 @@ schools.js SCHOOLS 73d40512 clean
 schools.js SCHOOLS a020aca7 clean
 schools.js SCHOOLS 97bc4f22 clean
 schools.js SCHOOLS 25df858f clean
+schools.js SCHOOLS a6e41f2b clean
 schools.js SCHOOLS 626fbf9d clean
 schools.js SCHOOLS 5feb23d3 clean
 schools.js SCHOOLS 549393c1 clean
@@ -1556,6 +1669,23 @@ schools.js SCHOOLS 49620ca2 clean
 schools.js SCHOOLS 4bf99e52 clean
 schools.js SCHOOLS c9a90965 clean
 schools.js SCHOOLS a8bfbc1d clean
+scribing.js SCRIBE a910395c clean
+scribing.js SCRIBE 7444798d clean
+scribing.js SCRIBE aca01dfb clean
+shops.js SHOP 78180277 excluded
+shops.js SHOP b05fe7cd excluded
+shops.js SHOP a9746335 excluded
+shops.js SHOP e7913e19 excluded
+shops.js SHOP a1b4c2e6 excluded
+shops.js SHOP a196555e excluded
+shops.js SHOP 88671fca excluded
+silvertest.js SILVER 479492a5 clean
+silvertest.js SILVER bb21bfdb clean
+silvertest.js SILVER 2cefd1be clean
+silvertest.js SILVER 102f3d42 clean
+silvertest.js SILVER 7adf5989 clean
+silvertest.js SILVER 92dd568b clean
+silvertest.js SILVER 6b1d4eab clean
 smithing.js SMITH 92d9d0d1 clean
 smithing.js SMITH f0ad3f6e clean
 smithing.js SMITH 642eeccc clean
@@ -1564,6 +1694,8 @@ spells.js SPELL c975df88 clean
 spells.js SPELL 7dd908fc clean
 spells.js SPELL aaa9fe7a clean
 spells.js SPELL 56699862 clean
+spells.js SPELL e88fdb82 clean
+spells.js SPELL b365d699 clean
 spells.js SPELL 9dba290f clean
 spells.js SPELL 8633406d clean
 spells.js SPELL d923f500 clean
@@ -1571,10 +1703,15 @@ spells.js SPELL 3f46006a clean
 spells.js SPELL 6eca2fef clean
 spells.js TEACH acada6bd parsed
 spells.js TEACH d52977b9 parsed
+spells.js SPELL f950cf7a clean
+spells.js SPELL 6eaecec5 clean
+spells.js SPELL 970641d9 clean
 sprstrip.js SPRSTRIP ac1572f1 parsed
 sprstrip.js SPRSTRIP a7b3a299 parsed
 sprstrip.js SPRSTRIP d281443a parsed
 sprstrip.js SPRSTRIP 785ed462 parsed
+staffenchant.js STAFF 9a94a0c4 clean
+stafftools.js EVENT 90e88695 excluded
 struggle.js STRUGGLE-MISMATCH c97bbac2 clean
 struggle.js STRUGGLE 4292b3ed clean
 struggle.js STRUGGLE 64f21bae clean
@@ -1596,13 +1733,21 @@ supernatural.js RITE 660b5a7f clean
 supernatural.js SUPERNATURAL 85d18a28 parsed
 supernatural.js SUPERNATURAL 1b9b1278 parsed
 supernatural.js SUPERNATURAL b66c9b3b parsed
+supernatural.js SUPERNATURAL 43a4cd72 parsed
+supernatural.js SUPERNATURAL 54a19c8c parsed
 supernatural.js GM 3c8e58ad parsed
 supernatural.js GM 4eae7552 parsed
 supernatural.js FEED c6171020 clean
 supernatural.js FEED 70f09eb9 clean
 supernatural.js FEED 9de7df49 clean
+supernatural.js SUPERNATURAL bae7ad8d parsed
+supernatural.js SUPERNATURAL 8ac6ad0d parsed
 supernatural.js SUPERNATURAL 2462dde7 parsed
 supernatural.js SUPERNATURAL ded670f2 parsed
+supernatural.js SUPERNATURAL 644712c6 parsed
+supernatural.js SUPERNATURAL 34ab901a parsed
+supernatural.js SUPERNATURAL b84ebdba parsed
+supernatural.js SUPERNATURAL 6a6a6673 parsed
 tailoring.js TAILOR 4ccf2f80 clean
 tenancy.js PROPERTY 8dbca314 parsed
 tenancy.js PROPERTY e3463099 parsed
@@ -1629,6 +1774,28 @@ thalmor.js CONCORDAT f62ed9cc clean
 thalmor.js THALMOR 3d505ba6 excluded
 thalmor.js THALMOR 999d1114 excluded
 thalmor.js THALMOR 07585056 excluded
+thievery.js BURGLARY fe62ff8e excluded
+thievery.js BURGLARY 49dc2b56 excluded
+thievery.js BURGLARY 67de5545 excluded
+thievery.js BURGLARY 4c2c0ebf excluded
+thievery.js BURGLARY 22d39bbf excluded
+thievery.js FENCE df1462fe excluded
+thievery.js FENCE d03976b3 excluded
+thievery.js FENCE 7b2563f4 excluded
+thievery.js FENCE a7180fcc excluded
+thievery.js FENCE 25f09718 excluded
+thievery.js BURGLARY 9dfe8eb8 excluded
+thievery.js FENCE 1e58a761 excluded
+thievery.js FENCE 5d16d209 excluded
+thievery.js BURGLARY cb247761 excluded
+thievery.js BURGLARY d9137570 excluded
+thievery.js FENCE 2382cb91 excluded
+thievery.js FENCE e8887037 excluded
+thievery.js FENCE cd3cdaca excluded
+thievery.js BURGLARY 19e10e3e excluded
+thievery.js BURGLARY fb5b3c67 excluded
+thievery.js FENCE 2c29dac3 excluded
+traps.js TRAPS e78eabea clean
 updates.js SCHEDULE d379ec24 excluded
 updates.js SCHEDULE 2e638d4c excluded
 updates.js SCHEDULE 316703ad excluded
@@ -1653,6 +1820,7 @@ wildlife.js CAMP 23958ca3 clean
 worldclock.js CLOCK 976f9d7b clean
 worldclock.js CLOCK 91485c97 clean
 worldclock.js CLOCK ccc4cdd1 clean
+worldedit.js WORLDEDIT 197a6260 clean
 `.trim().split('\n').filter(Boolean).map((l) => { const [file, verb, hash, cls] = l.trim().split(/\s+/); return { file, verb, hash, cls }; });
 
 module.exports = {
