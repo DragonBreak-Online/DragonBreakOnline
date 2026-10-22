@@ -5,7 +5,8 @@
 // cut as written), /kick, discipline.js and console.js run against a fake world.
 // K /kick typed, D /discipline typed, P the same decisions typed and from the console, A the record-author rule for lift and
 // overturn (a lower rank does not undo a higher rank's record; a config record is the Owners'), R a Discord demotion reaches
-// every character of the account once the role sync sees it (staffRolesSeen), S the code holds one rule.
+// every character of the account once the role sync sees it (staffRolesSeen), W /wipechars takes the same rule, S the code
+// holds one rule.
 //   node tests/staff-rank-harness.js    (as root: the console's spool and key checks want root-owned files)
 'use strict';
 const fs = require('fs');
@@ -45,7 +46,7 @@ fs.writeFileSync(SWITCH_FILE, 'on\n');
 const ROLE = { owner: '1494126527489507369', dev: '1494491999305338981', lead: '1494126618065506425', gm: '1553844072878178384', trial: '1558248795932860507' };
 const ID = { jake: '200000000000000001', nate: '200000000000000002', gm: '200000000000000003', lead: '200000000000000008' };
 const ADMIN_PROFILE = 15;
-const store = new Map(); const chatWrites = []; const kicked = []; const logs = []; const staffLines = []; const packets = [];
+const store = new Map(); const chatWrites = []; const kicked = []; const destroyed = []; const logs = []; const staffLines = []; const packets = [];
 let nextUser = 10;
 const actor = (id, o) => { store.set(id >>> 0, { __user: o.online ? nextUser++ : -1, profileId: o.profile, appearance: { name: o.name }, 'private.charTag': o.tag, 'private.skympDiscordId': o.discord || '', 'private.discordRoles': o.roles || [] }); return id >>> 0; };
 const A = {
@@ -79,6 +80,7 @@ const mp = {
   getActorsByProfileId: (pid) => [...store].filter(([, o]) => o.profileId === pid).map(([id]) => id),
   findFormsByPropertyValue: (k, v) => (k === 'private.indexed.tagKey' ? [...store].filter(([, o]) => String(o['private.charTag'] || '').toLowerCase() === v).map(([id]) => id) : []),
   kick: (u) => kicked.push(u),
+  destroyActor: (id) => { destroyed.push(id >>> 0); store.delete(id >>> 0); },
   getServerSettings: () => ({}),
 };
 const log = (...a) => logs.push(a.join(' '));
@@ -102,6 +104,7 @@ const body = [
   cut('const quoteSay = ', '// ---- Realm of Lorkhan hold gates', 'handleChat and handleLine'),
   cut("registerChatCommand('players'", '// The staff teleport:', '/players to /rename'),
   cut('// Online first, then any character (offline included) by tag or exact name.', '// ---- letters:', 'findAnyByName'),
+  cut("registerChatCommand('wipechars'", "registerChatCommand('fixloc'", '/wipechars'),
   `return { deliver, system, personal, captureFor, userOf, nameOf, profileOf, discordOf, tagOf, display, who, isAdmin, isLeadStaff, staffTierFrom, staffTierOf,
     TIER_RANK, TIER_LABEL, broadcast, findByName, findAnyByName, audit, commands, registerChatCommand, handleLine, staffRolesSeen,
     accountRankOf: typeof accountRankOf === 'function' ? accountRankOf : undefined, rankRefusalOf: typeof rankRefusalOf === 'function' ? rankRefusalOf : undefined,
@@ -432,6 +435,41 @@ reset();
   // restore Leda for the sections below
   store.get(A.lead)['private.discordRoles'] = [ROLE.lead]; store.get(ledaAlt)['private.discordRoles'] = [ROLE.lead, 'patron'];
   setOnline(A.lead, false); setOnline(A.gary, false);
+}
+
+// ==== W. /wipechars (Lead GM and above) takes the same rule ================================================================
+reset();
+{
+  const wade = actor(0xff000c01, { name: 'Wade', tag: 'WADE', profile: 17, discord: '200000000000000017', online: true });
+  const wadeAlt = actor(0xff000c02, { name: 'Wade Alt', tag: 'WAD2', profile: 17, discord: '200000000000000017' });
+  const gwen = actor(0xff000c10, { name: 'Gwen', tag: 'GWEN', profile: 18, discord: '200000000000000018', roles: [ROLE.gm] });
+  const zed = actor(0xff000c20, { name: 'Zed', tag: 'ZEDD', profile: 19, discord: '200000000000000019' });
+  const RANK_WIPE = (p) => `Profile ${p} is a staff account of your rank or higher, so you cannot wipe it. Take it to someone above that rank, or to the Owners.`;
+  const OWN_WIPE = (p) => `You cannot wipe your own account (profile ${p}).`;
+  const lines = (who, args) => args.map((x) => typed(who, `/wipechars ${x}`));
+  const left = () => [A.jake, A.jakeAlt, A.admn, A.nate, A.lars, A.lead].every((x) => store.has(x));
+  let r = lines(A.lead, ['#ABCD', '#JALT', 'Jake', '1', '15']);
+  check("W1. a Lead GM cannot wipe an Owner's account: by #TAG, by the alt with no roles stamped, by name, by profile id, nor the code's admin profile",
+    r.slice(0, 4).every((t) => t.includes(RANK_WIPE(1))) && r[4].includes(RANK_WIPE(ADMIN_PROFILE)) && !destroyed.length && left(), { r, destroyed });
+  r = lines(A.lead, ['#NNAT', '11']);
+  check('W1. ...nor a Developer\'s, nor another Lead GM\'s', r[0].includes(RANK_WIPE(2)) && r[1].includes(RANK_WIPE(11)) && !destroyed.length && left(), { r, destroyed });
+  r = lines(A.nate, ['#ABCD', '2']);
+  const r2 = lines(A.jake, ['15']);
+  check("W2. a Developer cannot wipe an Owner's account, an Owner not the admin profile's (the same rank)", r[0].includes(RANK_WIPE(1)) && r2[0].includes(RANK_WIPE(ADMIN_PROFILE)) && !destroyed.length && left(), { r, r2 });
+  check('W3. nobody wipes their own account: a Developer by profile id, an Owner by the alt\'s #TAG', r[1].includes(OWN_WIPE(2)) && typed(A.jake, '/wipechars #JALT').includes(OWN_WIPE(1)) && !destroyed.length && left(), r);
+  const realIdx = mp.getActorsByProfileId;
+  mp.getActorsByProfileId = (pid) => { if (pid === 19) throw new Error('index gone'); return realIdx(pid); };
+  const z = typed(A.lead, '/wipechars #ZEDD');
+  mp.getActorsByProfileId = realIdx;
+  check('W4. an account whose rank cannot be read is not wiped (fails closed)', z.includes('The staff rank of profile 19 could not be read, so nothing was wiped. Try again, or ask an Owner.') && store.has(zed) && !destroyed.length, z);
+  r = typed(A.lead, '/wipechars #GWEN');
+  check("W5. a Lead GM wipes a GM's account, as before, with the audit line", destroyed.includes(gwen) && r.some((l) => /^Wiped 1 of 1 character\(s\) of profile 18/.test(l))
+    && audits().some((l) => /^GM Leda #LEAD .* wiped 1 character\(s\) of profile 18: Gwen/.test(l)), { r, destroyed, audits: audits() });
+  r = typed(A.nate, '/wipechars 17');
+  check("W5. ...and a Developer a player's account by profile id, every character of it", destroyed.includes(wade) && destroyed.includes(wadeAlt) && r.some((l) => /^Wiped 2 of 2 character\(s\) of profile 17/.test(l)), { r, destroyed });
+  const g = typed(A.gm, '/wipechars 19');
+  check('W6. a GM is still stopped by the Lead GM gate first, nothing wiped', store.has(zed) && destroyed.length === 3 && !g.some((l) => /^Wiped/.test(l)), g);
+  for (const k of ['nate', 'lead', 'gm']) setOnline(A[k], false);
 }
 
 // ==== S. one rule in the code ===============================================================================================

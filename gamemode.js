@@ -323,15 +323,16 @@ const accountRankOf = (pid, freshRoles, target, onError) => {
 };
 // Why actor a may not act on t's account in game, or null: 'own' (a's own account), 'rank' (an account of a's rank or
 // higher, by a's own tier as stamped at login: the role sync logs out a demoted one), 'unknown' (the account or its rank
-// cannot be read, so the command is refused, never guessed)
-const rankRefusalOf = (a, t) => {
-  const pid = profileOf(t);
+// cannot be read, so the command is refused, never guessed). accountRefusalOf is the same for a profile id (t, when there is
+// one, is a character of it whose stamp counts too): /wipechars
+const accountRefusalOf = (a, pid, t) => {
   if (!Number.isSafeInteger(pid) || pid < 0) return 'unknown';
   if (pid === profileOf(a)) return 'own';
-  const theirs = accountRankOf(pid, null, t, (e) => log(`rank rule: staff rank of profile ${pid} unreadable: ${e.message}`));
+  const theirs = accountRankOf(pid, null, t || 0, (e) => log(`rank rule: staff rank of profile ${pid} unreadable: ${e.message}`));
   if (theirs < 0) return 'unknown';
   return theirs >= rankOfTier(staffTierOf(a)) ? 'rank' : null;
 };
+const rankRefusalOf = (a, t) => accountRefusalOf(a, profileOf(t), t);
 // The record-author rule (discipline.js lift and overturn; the console review's finding 3, 21 Oct: a Lead GM lifted and then
 // overturned an Owner's suspension of a player): a lower rank does not undo what a higher rank decided, the same rank may.
 // byProfile is the account that gave the record; 0 is a record decided outside the game (gamemode-config.json's discipline
@@ -3665,9 +3666,14 @@ try { log(`onlinePlayers raw = ${JSON.stringify(mp.get(0, 'onlinePlayers'))}`); 
 // Every character of a profile, online or not: the actors are destroyed and the slots free up (character select refreshes on relog)
 registerChatCommand('wipechars', (a, args) => {
   const q = args.trim();
-  let pid = /^\d+$/.test(q) ? Number(q) : -1;
-  if (pid < 0) { const t = findAnyByName(q); if (t > 0) pid = profileOf(t); }
+  let pid = /^\d+$/.test(q) ? Number(q) : -1, t = 0;
+  if (pid < 0) { t = findAnyByName(q); if (t > 0) pid = profileOf(t); }
   if (!(pid >= 0)) return personal(a, 'Usage: /wipechars <profile id|name|#TAG>');
+  // The rank rule (accountRefusalOf), as /kick and /discipline: not one's own account, nor a staff account of one's rank or higher
+  const no = accountRefusalOf(a, pid, t > 0 ? t : 0);
+  if (no === 'own') return personal(a, `You cannot wipe your own account (profile ${pid}).`);
+  if (no === 'rank') return personal(a, `Profile ${pid} is a staff account of your rank or higher, so you cannot wipe it. Take it to someone above that rank, or to the Owners.`);
+  if (no) return personal(a, `The staff rank of profile ${pid} could not be read, so nothing was wiped. Try again, or ask an Owner.`);
   let ids = []; try { ids = (mp.getActorsByProfileId(pid) || []).map((x) => Number(x) >>> 0); } catch (e) { return personal(a, 'Lookup failed: ' + e.message); }
   if (!ids.length) return personal(a, `Profile ${pid} has no characters.`);
   const names = ids.map((id) => `${nameOf(id)} (${id.toString(16)})`);
