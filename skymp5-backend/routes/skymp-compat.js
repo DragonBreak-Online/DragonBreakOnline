@@ -47,6 +47,7 @@ const { visitorIp } = require('../sources/visitorIp')
 const { createLoginStore, TTL } = require('../sources/launcherLogins')
 const loginFlowCounts = require('../sources/loginFlowCounts')
 const referrals = require('../sources/referrals')
+const { inlineHash } = require('../sources/securityHeaders')
 
 // Launcher-supplied hardware id: printable chars only, capped length; returns '' when unusable
 function sanitizeHwid(value) {
@@ -84,14 +85,14 @@ const pollLimiter     = perVisitor(60)
 
 const OUTDATED = 'This DragonBreak launcher is out of date, so it cannot log in any more. Close it and open it again: it updates itself. Then press Discord Login in the new launcher.'
 
-// Every login page and answer: never cached, never framed, no referrer, forms post only to this site, and the page that opened it loses its handle
+// Every login page and answer: never cached, never framed, no referrer, forms post only to this site, only its own scripts run, and the page that opened it loses its handle
 function loginHeaders(_req, res, next) {
   res.set({
     'Cache-Control': 'no-store, private',
     'Referrer-Policy': 'no-referrer',
     'X-Frame-Options': 'DENY',
     'Cross-Origin-Opener-Policy': 'same-origin',
-    'Content-Security-Policy': "frame-ancestors 'none'; form-action 'self'; base-uri 'none'",
+    'Content-Security-Policy': LOGIN_CSP,
   })
   next()
 }
@@ -372,6 +373,14 @@ function escapeHtml(s) {
     ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
 }
 
+const AUTO_CLOSE_SCRIPT = `
+  window.close()
+  setTimeout(function () {
+    var n = document.getElementById('note')
+    if (n) n.textContent = 'You can close this tab now and return to the launcher.'
+  }, 600)
+`
+
 // End-of-OAuth page; autoClose tries window.close(), which browsers only honour for some external-app-opened tabs, so the message stays as a fallback
 // Styled by the website's own stylesheet (same origin through the public proxy), so it always matches the site
 function authPage({ ok, title, message, autoClose = false, tag = 'Launcher sign-in', form = '', mark: markHtml = null }) {
@@ -424,13 +433,7 @@ function authPage({ ok, title, message, autoClose = false, tag = 'Launcher sign-
   </div>
   <footer>Dragon Break &middot; time runs differently here</footer>
 </div>
-${autoClose ? `<script>
-  window.close()
-  setTimeout(function () {
-    var n = document.getElementById('note')
-    if (n) n.textContent = 'You can close this tab now and return to the launcher.'
-  }, 600)
-</script>` : ''}
+${autoClose ? `<script>${AUTO_CLOSE_SCRIPT}</script>` : ''}
 </body>
 </html>`
 }
@@ -461,9 +464,7 @@ function confirmPage({ flow, state, nonce, username, error = '' }) {
 // Continue wakes after this tab has been in front for a second with no presses on it, and for a pointer once it has been on the page for half a second; a held key or button never counts
 // The button is live in the markup and the script puts it to sleep, so if the script cannot run (scripts off, or a CSP from a proxy or an extension) it works as before
 // While Continue sleeps a Tab stays on the page, so a quick Tab and Enter cannot reach the address bar and load the callback again
-const CONTINUE_BUTTON = `<button type="submit" id="continue">Continue</button>
-<p class="meta" id="continue-hint" hidden>If Continue does not respond, wait a second, move the mouse or press Tab, then press it again.</p>
-<script>(function () {
+const CONTINUE_SCRIPT = `(function () {
   var b = document.getElementById('continue'), since = -1, entered = -1
   b.disabled = true
   function now() { return performance.now() }
@@ -490,6 +491,12 @@ const CONTINUE_BUTTON = `<button type="submit" id="continue">Continue</button>
   arm()
   document.addEventListener('keydown', function (e) { if (e.key === 'Tab' && !e.ctrlKey && !e.altKey && !e.metaKey && b.disabled) e.preventDefault() }, true)
   document.getElementById('continue-hint').hidden = false
-})()</script>`
+})()`
+const CONTINUE_BUTTON = `<button type="submit" id="continue">Continue</button>
+<p class="meta" id="continue-hint" hidden>If Continue does not respond, wait a second, move the mouse or press Tab, then press it again.</p>
+<script>${CONTINUE_SCRIPT}</script>`
+
+// The login pages run these two scripts and nothing else, so nothing injected or added on the way runs on the website origin
+const LOGIN_CSP = `frame-ancestors 'none'; form-action 'self'; base-uri 'none'; script-src ${inlineHash(AUTO_CLOSE_SCRIPT)} ${inlineHash(CONTINUE_SCRIPT)}`
 
 module.exports = router
