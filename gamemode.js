@@ -1735,13 +1735,15 @@ const gateOf = (targetId) => {
 // relog didnt fix": the race menu's close threw in the client, no look reached the server, and 8 gate tries in 9 s went
 // unanswered). Told at most every GATE_CREATION_TELL_MS, with the way out.
 const GATE_CREATION_TELL_MS = 10000;
+// /unstuck refuses an unfinished character with the same line (review GC-2: it sent Stranger #MSFB from the Realm to Bruma)
+const GATE_CREATION_LINE = 'Your character is not finished yet, so the gates cannot take you. If the race menu already closed and you are still here, your game did not send your new look: quit Skyrim completely, start it again and log in, and the race menu opens again.';
 const gateCreationToldAt = globalThis.__dboGateCreationToldAt instanceof Map ? globalThis.__dboGateCreationToldAt : (globalThis.__dboGateCreationToldAt = new Map());
 const gateCreationTold = (a) => {
   const id = a >>> 0, now = Date.now();
   if (now - (gateCreationToldAt.get(id) || 0) < GATE_CREATION_TELL_MS) return;
   gateCreationToldAt.set(id, now);
   if (gateCreationToldAt.size > 500) for (const [k, t] of gateCreationToldAt) if (now - t > GATE_CREATION_TELL_MS) gateCreationToldAt.delete(k);
-  personal(id, 'Your character is not finished yet, so the gates cannot take you. If the race menu already closed and you are still here, your game did not send your new look: quit Skyrim completely, start it again and log in, and the race menu opens again.');
+  personal(id, GATE_CREATION_LINE);
 };
 // One spot picker per gate; holds live on globalThis so a reload keeps the promises already made
 const gateSpotHolds = globalThis.__dboGateSpotHolds instanceof Map ? globalThis.__dboGateSpotHolds : (globalThis.__dboGateSpotHolds = new Map());
@@ -5693,6 +5695,9 @@ const inLoginGrace = (a) => {
 const unstuckActor = (a, by) => {
   const admin = staffCan(by, 'unstuck');
   try { if (mp.get(a, 'isDead')) return personal(by, 'You cannot use /unstuck while dead.'); } catch (e) { /* alive */ }
+  // A character still in creation stays in the Realm (20 Oct: the Realm has no zone, so it went to the Bruma temple with no
+  // look and no name); a full restart brings the race menu back, which frees one caught in the Realm too. Staff may move one.
+  if (!admin && creationPending(a)) return personal(by, GATE_CREATION_LINE);
   // Frozen in the engine's bleed-out after a temple wake (camera locked, no movement): /unstuck ends it first, cooldown or not
   try { if (typeof globalThis.__dboBleedOutStop === 'function') globalThis.__dboBleedOutStop(a); } catch (e) { /* the move still runs */ }
   try { const r = mp.get(a, 'private.restrained'); if (r && (r.boundHands || r.carried || r.captorActorId)) return personal(by, 'You cannot use /unstuck while restrained or carried.'); } catch (e) { /* free */ }
