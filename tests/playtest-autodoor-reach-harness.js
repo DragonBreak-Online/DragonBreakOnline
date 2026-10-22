@@ -68,8 +68,11 @@ require(path.join(SERVER, 'playtest.js'))({
 });
 const distanceMeters = new Function('mp', 'UNITS_PER_METER', `${distSrc}\nreturn distanceMeters;`)(mp, Number(upm[1]));
 const stub = () => false;
+// placedGoldRefused (16 Oct) and the court lever block's cfg, ZONES and seat lookups (17 Oct) joined the chain since
 const chain = new Function('mp', 'lastPickupDeny', 'personal', 'treasuryRefused', 'distanceMeters', 'log', 'businessFailClosed', 'gateOf', 'TAMRIEL', 'system', 'logActivateThrow', 'blockPlacedPickup',
-  `${chainSrc}\nreturn mp.onActivate;`)(mp, new Map(), (a, t) => told.push(t), stub, distanceMeters, () => {}, stub, () => null, '3c:Skyrim.esm', () => {}, () => {}, stub);
+  'placedGoldRefused', 'cfg', 'ZONES', 'profileOf', 'readOfficials', 'userOf', 'isAdmin',
+  `${chainSrc}\nreturn mp.onActivate;`)(mp, new Map(), (a, t) => told.push(t), stub, distanceMeters, () => {}, stub, () => null, '3c:Skyrim.esm', () => {}, () => {}, stub,
+  stub, cfg, { holds: [], regions: [] }, () => -1, () => ({}), (a) => (online.includes(a >>> 0) ? 1 : -1), stub);
 
 const arrival = cfg.playtest.arrival;
 const at = (dx) => ({ cell: TRAIL, pos: [-8004 + dx, -3519, 9868] });
