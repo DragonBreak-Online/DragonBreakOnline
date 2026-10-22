@@ -906,6 +906,7 @@
       "id": "penitus-oculatus",
       "name": "Penitus Oculatus",
       "kind": "guild",
+      "secret": true,
       "ranks": [
         {
           "title": "Commander",
