@@ -8780,7 +8780,23 @@ try {
   const RAIDS_JS = path.resolve('raids.js');
   delete require.cache[RAIDS_JS];
   require(RAIDS_JS)({ mp, log, personal, system, audit, who, display, cfg, onUi, onlineActors, every, recordOf, adminItemName, sendPacket });
-} catch (e) { log('raids.js failed to load:', e.stack || e.message); globalThis.__dboRaidActivate = null; globalThis.__dboRaidView = null; }// ---- announcements: `bash dev-server.sh announce '<text>'` writes announce.json; every online player sees it once ----
+} catch (e) { log('raids.js failed to load:', e.stack || e.message); globalThis.__dboRaidActivate = null; globalThis.__dboRaidView = null; globalThis.__dboRaidStart = null; }
+// ---- risings against a hold's ruler: secret petitions, the rebel faction, its war for the capital (server\rebellion.js, config "rebellion", off by default) ----
+try {
+  const REBELLION_JS = path.resolve('rebellion.js');
+  delete require.cache[REBELLION_JS];
+  require(REBELLION_JS)({ mp, log, personal, system, audit, who, display, cfg, registerChatCommand, isAdmin, isLeadStaff, onlineActors, every, sendPacket,
+    profileOf, zoneById, zoneOfActor, readOfficials, rankTitle, officialTarget, seatOfficial, unseatOfficialBy, accountActors, ownNameOf, staffNote,
+    // Who may take a won throne: the same rules as an appointment (appointCheck): no staff in a leading office, the Jarl's race
+    rulerFit: (actor, z, office) => {
+      const label = ownNameOf(actor);
+      if (typeof globalThis.__dboIsStaff === 'function' && globalThis.__dboIsStaff(actor)) return `${label} is on the staff. Staff hold no leading office in a court.`;
+      if (office === 'jarl' && !JARL_RACE.test(raceEdidOf(actor))) return `${label} is ${raceLabel(raceEdidOf(actor))}. By Skyrim's law only a Breton, a Nord or an Imperial may sit as Jarl.`;
+      try { const no = typeof globalThis.__dboCitizenSeatCheck === 'function' ? globalThis.__dboCitizenSeatCheck(z.id, office, '', actor, label) : ''; if (no) return no; } catch (e) { /* no citizenship */ }
+      return '';
+    } });
+} catch (e) { log('rebellion.js failed to load:', e.stack || e.message); for (const k of ['__dboRebellionOpen', '__dboRebellionLive', '__dboRebellionRaidSides', '__dboRebellionCapitalFalling', '__dboRebellionCapitalTaken', '__dboRebellionWarEnded']) globalThis[k] = null; }
+// ---- announcements: `bash dev-server.sh announce '<text>'` writes announce.json; every online player sees it once ----
 const ANNOUNCE_PATH = path.resolve('announce.json');
 const announceSeen = globalThis.__dboAnnounceSeen || (globalThis.__dboAnnounceSeen = { at: 0 });
 every('announce', 5000, () => {
