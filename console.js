@@ -441,18 +441,14 @@ module.exports = (api) => {
     if (ix === null) return null;
     return { all: [...new Set([...on, ...ix])], online: on };
   };
-  // The account's highest staff tier as a rank: every character it has (the roles stamped at each one's last login, online or
-  // not), the profile itself (the code's admin profiles), and the Discord roles the backend just fetched for it when it sent
-  // them. -1 when it cannot be read. Each source can only raise it, so a stale stamp or a Discord demotion still counts
+  // The account's highest staff tier as a rank: gamemode.js accountRankOf, the one rule typed /discipline and /kick use too
+  // (every character's stamped roles, online or not, and the target's own; the code's admin profiles; the Discord roles the
+  // backend just fetched for it when it sent them; each source can only raise it). -1 when it cannot be read, and without
+  // gamemode.js's rule every rank command is refused
   const accountRank = (pid, freshRoles, target) => {
-    if (!Number.isSafeInteger(pid) || pid < 0) return -1;
-    try {
-      // The target character's own stamp too, should the engine's profile index ever miss it
-      let best = Math.max(rank(staffTierFrom(pid, [])), target ? rank(staffTierOf(target)) : 0);
-      for (const c of (mp.getActorsByProfileId(pid) || []).map((x) => Number(x) >>> 0)) if (c && profileOf(c) === pid) best = Math.max(best, rank(staffTierOf(c)));
-      if (Array.isArray(freshRoles)) best = Math.max(best, rank(staffTierFrom(pid, freshRoles)));
-      return best;
-    } catch (e) { logOnce('accountRank', `staff rank of profile ${pid} unreadable: ${e.message}`); return -1; }
+    if (typeof api.accountRank !== 'function') { logOnce('accountRank', 'no accountRank from gamemode.js: /discipline and /kick are refused'); return -1; }
+    const r = api.accountRank(pid, freshRoles, target, (e) => logOnce('accountRank', `staff rank of profile ${pid} unreadable: ${e.message}`));
+    return typeof r === 'number' && r >= 0 ? r : -1;
   };
   // true when the account already had SUSPEND_CAP.perTarget console suspensions within the window; count: this one counts
   const suspendCapped = (pid, count) => {

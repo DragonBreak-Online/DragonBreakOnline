@@ -196,7 +196,7 @@ const body = [
   cut("registerChatCommand('players'", '// The staff teleport:', '/players to /rename'),
   cut('// Online first, then any character (offline included) by tag or exact name.', '// ---- letters:', 'findAnyByName'),
   `return { deliver, system, personal, captureFor, userOf, nameOf, profileOf, discordOf, tagOf, display, who, isAdmin, isLeadStaff, staffTierFrom, staffTierOf,
-    TIER_RANK, TIER_LABEL, broadcast, findByName, findAnyByName, audit, commands, registerChatCommand, handleLine };`,
+    TIER_RANK, TIER_LABEL, broadcast, findByName, findAnyByName, audit, commands, registerChatCommand, handleLine, accountRankOf, rankRefusalOf };`,
 ].join('\n');
 const world = { online };
 const G = new Function('mp', 'log', 'cfg', 'fs', 'path', 'world', 'CHAT_PROP', 'US', 'noteTold', 'ADMIN_PROFILES', 'TIERS', 'tierRoles', 'legacyAdminRoles',
@@ -212,7 +212,7 @@ global.setTimeout = (fn) => { fn(); return 0; };
 const loadDiscipline = () => {
   delete require.cache[DISCIPLINE_JS];
   require(DISCIPLINE_JS)({ mp, log, personal: G.personal, audit: G.audit, who: G.who, display: G.display, profileOf: G.profileOf, onlineActors: online,
-    registerChatCommand: G.registerChatCommand, isAdmin: G.isAdmin, isLeadStaff: G.isLeadStaff, findAnyByName: G.findAnyByName,
+    registerChatCommand: G.registerChatCommand, isAdmin: G.isAdmin, isLeadStaff: G.isLeadStaff, findAnyByName: G.findAnyByName, rankRefusal: G.rankRefusalOf,
     sendPacket: (a, p) => packets.push([a >>> 0, p]), userOf: G.userOf, every: () => {},
     cfg: { discipline: Object.assign({}, REPO_CFG.discipline, { file: RECORDS, discordFile: path.join(SCRATCH, 'none.json'), record: [] }) } });
 };
@@ -240,6 +240,7 @@ const loadConsole = (cfg) => {
   const mod = require(CONSOLE_JS)({ mp, log, audit: G.audit, every: (n, ms, fn) => { ticker = fn; }, stopTimer: () => {}, cfg, commands: G.commands, handleLine: G.handleLine,
     findByName: G.findByName, tagOf: G.tagOf, profileOf: G.profileOf, discordOf: G.discordOf, userOf: G.userOf, display: G.display, who: G.who, staffTierFrom: G.staffTierFrom,
     staffTierOf: G.staffTierOf, TIER_LABEL: G.TIER_LABEL, TIER_RANK: G.TIER_RANK, captureFor: G.captureFor, onlineActors: online, gen: globalThis.__dboRunCommand,
+    accountRank: G.accountRankOf,
     paths: { spool: SPOOL, key: KEY_FILE, switch: SWITCH_FILE }, now: () => clock });
   ticker();
   return mod;

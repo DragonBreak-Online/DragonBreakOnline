@@ -302,6 +302,35 @@ const staffCan = (actorId, what) => isAdmin(actorId) || (TRIAL_CAN.has(what) && 
 // The tier for logs and the role sync: an admin tier, 'trialgm', or null
 const staffTierFrom = (profile, roles) => tierFrom(profile, roles) || (trialFrom(profile, roles) ? 'trialgm' : null);
 const staffTierOf = (actorId) => staffTierFrom(profileOf(actorId), rolesOf(actorId));
+// The rank rule for punishments, one rule for /discipline (every kind) and /kick typed in game and for the remote console
+// (console.js): staff act only on an account below their own rank. The console review of 21 Oct proved a GM striking an
+// Owner in game through an alt with no roles stamped, and a Lead GM suspending, lifting or overturning on an Owner's or a
+// Developer's account.
+// An account's rank is its highest staff tier: the code's admin profiles, the roles stamped at the last login of every
+// character it has (online or not) and of the named character itself, and Discord roles just fetched for it when there are
+// any (the console's dashboard sends). Each source can only raise it, so a stale stamp or a Discord demotion minutes ago still
+// counts: a false refusal, never a pass. -1 when it cannot be read; onError(e) hears why
+const rankOfTier = (t) => (t && Object.prototype.hasOwnProperty.call(TIER_RANK, t) ? TIER_RANK[t] : 0);
+const accountRankOf = (pid, freshRoles, target, onError) => {
+  if (!Number.isSafeInteger(pid) || pid < 0) return -1;
+  try {
+    let best = Math.max(rankOfTier(staffTierFrom(pid, [])), target ? rankOfTier(staffTierOf(target)) : 0);
+    for (const c of (mp.getActorsByProfileId(pid) || []).map((x) => Number(x) >>> 0)) if (c && profileOf(c) === pid) best = Math.max(best, rankOfTier(staffTierOf(c)));
+    if (Array.isArray(freshRoles)) best = Math.max(best, rankOfTier(staffTierFrom(pid, freshRoles)));
+    return best;
+  } catch (e) { try { if (typeof onError === 'function') onError(e); } catch (e2) { /* only the answer matters */ } return -1; }
+};
+// Why actor a may not act on t's account in game, or null: 'own' (a's own account), 'rank' (an account of a's rank or
+// higher, by a's own tier as stamped at login: the role sync logs out a demoted one), 'unknown' (the account or its rank
+// cannot be read, so the command is refused, never guessed)
+const rankRefusalOf = (a, t) => {
+  const pid = profileOf(t);
+  if (!Number.isSafeInteger(pid) || pid < 0) return 'unknown';
+  if (pid === profileOf(a)) return 'own';
+  const theirs = accountRankOf(pid, null, t, (e) => log(`rank rule: staff rank of profile ${pid} unreadable: ${e.message}`));
+  if (theirs < 0) return 'unknown';
+  return theirs >= rankOfTier(staffTierOf(a)) ? 'rank' : null;
+};
 // Staff of any rank, Trial GMs too, hold no leadership (Nate, 18 Oct: "GMs of any kind cannot be in leadership in any faction
 // etc"): no seat in an election court (citizenship.js), no leading court office (appointCheck), no faction leader or officer
 // rank (guilds.js setMember). By the account's Discord roles, kept on the character, so it holds for an offline one too
@@ -1079,6 +1108,11 @@ registerChatCommand('whoami', (a) => personal(a, `${display(a)}  actor ff${a.toS
 registerChatCommand('ping', (a) => personal(a, 'Pong!'), { help: 'connection test' });
 registerChatCommand('kick', (a, args) => {
   const t = findByName(args.trim()); if (!t) return personal(a, 'No such player.');
+  // The rank rule (rankRefusalOf): not one's own account, nor a staff account of one's rank or higher
+  const no = rankRefusalOf(a, t);
+  if (no === 'own') return personal(a, `${display(t)} is on your own account. Log out instead.`);
+  if (no === 'rank') return personal(a, `${display(t)} is on a staff account of your rank or higher, so you cannot kick them. Take it to someone above that rank, or to the Owners.`);
+  if (no) return personal(a, `The staff rank of ${display(t)}'s account could not be read, so nobody was kicked. Try again, or ask an Owner.`);
   try { mp.kick(userOf(t)); broadcast(`[[S]]#{${C.SYS}}${nameOf(t)} was kicked by ${nameOf(a)}.`); audit(`GM ${who(a)} kicked ${who(t)} via /kick`); }
   catch (e) { personal(a, 'Kick failed: ' + e.message); }
 }, { admin: true, help: '<player>' });
@@ -8781,7 +8815,7 @@ try {
   const DISCIPLINE_JS = path.resolve('discipline.js');
   delete require.cache[DISCIPLINE_JS];
   require(DISCIPLINE_JS)({ mp, log, personal, audit, who, display, profileOf, onlineActors, registerChatCommand, isAdmin, isLeadStaff,
-    findAnyByName, sendPacket, userOf, every, cfg });
+    findAnyByName, sendPacket, userOf, every, cfg, rankRefusal: rankRefusalOf });
 } catch (e) { log('discipline.js failed to load:', e.stack || e.message); globalThis.__dboDisciplineLogin = null; }
 // ---- raids and pillage (server\raids.js, WAR_DESIGN.md section 5) -----------------------------------------------------------
 try {
@@ -9169,7 +9203,7 @@ try {
   const CONSOLE_JS = path.resolve('console.js');
   delete require.cache[CONSOLE_JS];
   require(CONSOLE_JS)({ mp, log, audit, every, stopTimer, cfg, commands, handleLine, findByName, tagOf, profileOf, discordOf, userOf,
-    display, who, staffTierFrom, staffTierOf, TIER_LABEL, TIER_RANK, captureFor, onlineActors, gen: globalThis.__dboRunCommand });
+    display, who, staffTierFrom, staffTierOf, TIER_LABEL, TIER_RANK, captureFor, onlineActors, gen: globalThis.__dboRunCommand, accountRank: accountRankOf });
 } catch (e) { stopTimer('remoteConsole'); log('console.js failed to load:', e.stack || e.message); }
 
 // ---- per-player activity log, never chat (server\playerlog.js, config "playerLog"): LAST, its hooks wrap every other ----

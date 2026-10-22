@@ -93,7 +93,7 @@ const body = [
   cut("registerChatCommand('load'", '// The spawned npcs near you', '/load'),
   `return { deliver, system, personal, captureFor, actorOf, userOf, nameOf, profileOf, discordOf, tagOf, display, who, tierFrom, tierOf, isAdmin,
     isLeadStaff, staffTierFrom, staffTierOf, TIER_RANK, TIER_LABEL, LEAD_ONLY, broadcast, findByName, audit, commands, registerChatCommand, staffSay,
-    handleChat, handleLine, NAME_RE, offlineByTag };`,
+    handleChat, handleLine, NAME_RE, offlineByTag, accountRankOf, rankRefusalOf };`,
 ].join('\n');
 const world = { online };
 const G = new Function('mp', 'log', 'cfg', 'fs', 'path', 'world', 'CHAT_PROP', 'US', 'noteTold', 'ADMIN_PROFILES', 'TIERS', 'tierRoles', 'legacyAdminRoles',
@@ -172,7 +172,7 @@ const loadConsole = (cfg) => {
   return require(CONSOLE_JS)({ mp, log, audit: G.audit, every: fakeEvery, stopTimer: () => {}, cfg, commands: G.commands, handleLine: G.handleLine, findByName: G.findByName,
     tagOf: G.tagOf, profileOf: G.profileOf, discordOf: G.discordOf, userOf: G.userOf, display: G.display, who: G.who, staffTierFrom: G.staffTierFrom,
     staffTierOf: G.staffTierOf, TIER_LABEL: G.TIER_LABEL, TIER_RANK: G.TIER_RANK, captureFor: G.captureFor, onlineActors: online, gen: globalThis.__dboRunCommand,
-    paths: { spool: SPOOL, key: KEY_FILE, switch: SWITCH_FILE }, now: () => clock });
+    accountRank: G.accountRankOf, paths: { spool: SPOOL, key: KEY_FILE, switch: SWITCH_FILE }, now: () => clock });
 };
 const PINNED = { remoteConsole: { discordIds: [ID.jake, ID.nate, ID.gm, ID.trial, ID.lead] } };
 const RC = loadConsole(PINNED);
@@ -781,9 +781,9 @@ process.stdout.write(JSON.stringify({ state: rep && rep.state, why: rep && rep.w
   const thrower = path.join(SCRATCH, 'console-throws.js');
   fs.writeFileSync(thrower, "throw new Error('broken console.js');\n");
   const runLoader = (file) => new Function('mp', 'log', 'audit', 'every', 'stopTimer', 'cfg', 'commands', 'handleLine', 'findByName', 'tagOf', 'profileOf', 'discordOf', 'userOf',
-    'display', 'who', 'staffTierFrom', 'staffTierOf', 'TIER_LABEL', 'TIER_RANK', 'captureFor', 'onlineActors', 'path', 'require', loaderSrc)(
+    'display', 'who', 'staffTierFrom', 'staffTierOf', 'TIER_LABEL', 'TIER_RANK', 'captureFor', 'onlineActors', 'accountRankOf', 'path', 'require', loaderSrc)(
     mp, log, G.audit, T.every, T.stopTimer, PINNED, G.commands, G.handleLine, G.findByName, G.tagOf, G.profileOf, G.discordOf, G.userOf, G.display, G.who,
-    G.staffTierFrom, G.staffTierOf, G.TIER_LABEL, G.TIER_RANK, G.captureFor, online, { resolve: () => file }, require);
+    G.staffTierFrom, G.staffTierOf, G.TIER_LABEL, G.TIER_RANK, G.captureFor, online, G.accountRankOf, { resolve: () => file }, require);
   const newGeneration = () => { globalThis.__dboRunCommand = () => null; };
   const readers = () => [...T.TIMERS.keys()].filter((k) => k === 'remoteConsole').length;
   check('15. the loader in gamemode.js stops the old reader before it loads, and again in its catch', /^stopTimer\('remoteConsole'\);\ntry \{/m.test(loaderSrc) && /\} catch \(e\) \{ stopTimer\('remoteConsole'\); log\('console\.js failed to load:'/.test(loaderSrc));

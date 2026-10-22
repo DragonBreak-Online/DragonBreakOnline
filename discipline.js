@@ -8,8 +8,10 @@
 //   /discipline #TAG suspend <n>h|<n>d <reason>   Lead GM and above: logged out now and refused at login until it ends
 //   /discipline #TAG lift <reason>            Lead GM and above: ends a suspension early
 //   /discipline list                          every suspension still running
-// The record is the account's (profile), so it follows every character on it. A GM cannot discipline staff; Lead GM and above
-// can. Every action goes to the audit log with who did it and why. A player offline is told at their next login.
+// The record is the account's (profile), so it follows every character on it. Every kind is refused on an account of the
+// caller's own rank or higher (gamemode.js rankRefusalOf: the account's highest staff tier over all its characters, so an alt
+// with no roles stamped counts as its owner), and when that rank cannot be read. Every action goes to the audit log with who
+// did it and why. A player offline is told at their next login.
 // Records (discipline.json beside world/, never in git): { profiles: { <profile>: [{ n, kind, reason, by, at, char, until?, seen, lifted? }] } }
 // Config "discipline" in gamemode-config.json: { enabled, strikeDays, strikesForReview, maxSuspendDays, record, discordFile }.
 // record lists actions decided outside the game, each added once, matched by key:
@@ -61,6 +63,8 @@ const stamp = (ms) => new Date(ms).toISOString().replace('T', ' ').slice(0, 16) 
 module.exports = (api) => {
   const { mp, log, personal, audit, who, display, profileOf, onlineActors, registerChatCommand, isAdmin, isLeadStaff, findAnyByName,
     sendPacket, userOf, every } = api;
+  // gamemode.js's rank rule; without it every record kind is refused (fails closed)
+  const rankRefusal = typeof api.rankRefusal === 'function' ? api.rankRefusal : () => 'unknown';
   const C = Object.assign({}, DEFAULTS, (api.cfg || {}).discipline || {});
   if (C.enabled === false) { globalThis.__dboDisciplineLogin = null; globalThis.__dboVoiceRefused = null; log('discipline: off'); return; }
   const stateDir = () => { try { return path.dirname(fs.realpathSync(path.resolve('world'))); } catch (e) { return path.resolve('.'); } };
@@ -183,7 +187,12 @@ module.exports = (api) => {
     const kind = (parts[1] || '').toLowerCase();
     if (!kind) return show(a, target);
     if (!KINDS.includes(kind)) return personal(a, `Unknown action "${kind}": warn, strike, suspend, lift or overturn.`);
-    if (isAdmin(target) && !isLeadStaff(a)) return personal(a, 'Only a Lead GM or above can discipline staff. Owners take reports about GMs through the Report a GM ticket.');
+    // The rank rule replaces "a Lead GM or above can discipline staff", which went by the named character alone (21 Oct review:
+    // a GM struck an Owner through an alt with no roles stamped) and let a Lead GM act on an Owner's or a Developer's account
+    let no = 'unknown'; try { no = rankRefusal(a, target); } catch (e) { log('discipline: rank rule failed', e.message); }
+    if (no === 'own') return personal(a, 'You cannot discipline your own account.');
+    if (no === 'rank') return personal(a, `${display(target)} is on a staff account of your rank or higher, so you cannot discipline it. Take it to someone above that rank, or to the Owners: reports about staff go through the Report a GM ticket.`);
+    if (no) return personal(a, `The staff rank of ${display(target)}'s account could not be read, so nothing was recorded. Try again, or ask an Owner.`);
     if ((kind === 'suspend' || kind === 'lift') && !isLeadStaff(a)) return personal(a, 'Suspensions are for Lead GMs and above. Give a strike and tell a Lead GM.');
     // Overturning undoes another staff member's decision, so it sits with suspensions rather than with warnings
     if (kind === 'overturn' && !isLeadStaff(a)) return personal(a, 'Only a Lead GM or above can overturn a record. Ask one, with what you found.');

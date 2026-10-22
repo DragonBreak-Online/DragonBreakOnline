@@ -21,9 +21,17 @@ ok(lengthMs('12h', 30) === 43200000 && lengthMs('3d', 30) === 259200000 && lengt
 
 const tmp = fs.mkdtempSync(path.join(fs.existsSync('/dev/shm') ? '/dev/shm' : os.tmpdir(), 'claude-nate-discipline-'));
 const FILE = path.join(tmp, 'discipline.json');
-// actors: 1 GM (profile 10), 2 Lead GM (11), 3 player (20), 4 the player's alt (20), 5 another GM (12), 6 offline player (21)
-const prof = { 1: 10, 2: 11, 3: 20, 4: 20, 5: 12, 6: 21 }, tier = { 1: 'gm', 2: 'leadgm', 5: 'gm' }, tags = { '#AAAA': 3, '#BBBB': 4, '#GMGM': 5, '#OFFL': 6, '#LEAD': 2 };
+// actors: 1 GM (profile 10), 2 Lead GM (11), 3 player (20), 4 the player's alt (20), 5 another GM (12), 6 offline player (21),
+// 8 another Lead GM (13, offline) and 9 that Lead GM's alt with no roles stamped (13)
+const prof = { 1: 10, 2: 11, 3: 20, 4: 20, 5: 12, 6: 21, 8: 13, 9: 13 }, tier = { 1: 'gm', 2: 'leadgm', 5: 'gm', 8: 'leadgm' };
+const tags = { '#AAAA': 3, '#BBBB': 4, '#GMGM': 5, '#OFFL': 6, '#LEAD': 2, '#LALT': 9 };
 let online = [1, 2, 3, 5];
+// gamemode.js rankRefusalOf over this world (tests/staff-rank-harness.js runs the real one): an account's rank is the highest
+// tier of any character on it; refused on one's own account, on the same rank or higher, and when it cannot be read
+const RANKS = { leadgm: 2, gm: 1 };
+const accountRank = (p) => Math.max(0, ...Object.keys(prof).filter((x) => prof[x] === p).map((x) => RANKS[tier[x]] || 0));
+const rankRefusal = (a, t) => (prof[t] === undefined ? 'unknown' : prof[t] === prof[a] ? 'own' : accountRank(prof[t]) >= (RANKS[tier[a]] || 0) ? 'rank' : null);
+let rankApi = rankRefusal;
 const said = [], audits = [], packets = [], kicked = [];
 let cmd = null, tick = null;
 const realTimeout = global.setTimeout; global.setTimeout = (fn) => fn();
@@ -33,7 +41,7 @@ const load = () => {
     mp: { kick: (u) => kicked.push(u) }, log: () => {}, personal: (a, t) => said.push([a, t]), audit: (t) => audits.push(t),
     who: (a) => `w${a}`, display: (a) => `c${a}`, profileOf: (a) => prof[a], onlineActors: () => online.slice(),
     registerChatCommand: (n, fn) => { if (n === 'discipline') cmd = fn; }, isAdmin: (a) => !!tier[a], isLeadStaff: (a) => !!tier[a] && tier[a] !== 'gm',
-    findAnyByName: (q) => tags[q] || 0, sendPacket: (a, p) => packets.push([a, p]), userOf: (a) => a + 100, every: (n, ms, fn) => { tick = fn; },
+    findAnyByName: (q) => tags[q] || 0, sendPacket: (a, p) => packets.push([a, p]), userOf: (a) => a + 100, every: (n, ms, fn) => { tick = fn; }, rankRefusal: rankApi,
     // record: [] so the records shipped in gamemode-config.json (rep-0305, 21 Oct) do not land in this account set
     cfg: { discipline: Object.assign({}, CFG.discipline, { file: FILE, record: [] }) }
   });
@@ -43,7 +51,7 @@ const last = (a) => (said.filter((s) => s[0] === a).pop() || [])[1] || '';
 cmd(3, '#AAAA warn spamming'); ok(/Only staff/.test(last(3)), 'a player cannot use it');
 cmd(1, '#AAAA warn hi'); ok(/Give a reason/.test(last(1)), 'a reason is required');
 cmd(1, '#AAAA warn spamming the market chat'); ok(/Recorded: warn #1/.test(last(1)) && /A warning from staff: spamming/.test(last(3)), 'a GM warns; the player is told at once');
-cmd(1, '#GMGM strike abuse'); ok(/Only a Lead GM/.test(last(1)), 'a GM cannot discipline another GM');
+cmd(1, '#GMGM strike abuse'); ok(/^c5 is on a staff account of your rank or higher, so you cannot discipline it\./.test(last(1)), 'a GM cannot discipline another GM (the rank rule)', last(1));
 cmd(1, '#AAAA suspend 3d theft'); ok(/Suspensions are for Lead GMs/.test(last(1)), 'a GM cannot suspend');
 cmd(1, '#AAAA strike griefing one'); cmd(1, '#AAAA strike griefing two'); cmd(1, '#AAAA strike griefing three');
 ok(/3 strikes in 90 days/.test(last(1)) && audits.some((l) => /a Lead GM should review/.test(l)), 'the third strike asks for a Lead GM review');
@@ -102,6 +110,24 @@ cmd(2, `#BBBB overturn ${sus.n} the evidence did not hold up`);
 const after = JSON.parse(fs.readFileSync(FILE, 'utf8')).profiles[20];
 ok(!require(MOD).activeSuspension(after, Date.now()), 'an overturned suspension no longer holds the account out');
 kicked.length = 0; ok(globalThis.__dboDisciplineLogin(4) !== true && !kicked.length, 'and that account can log in again');
+// ---- the rank rule (22 Oct): by the account, for every kind, and refused when the rank cannot be read ----------------------
+said.length = 0; audits.length = 0;
+const recs = (p) => (JSON.parse(fs.readFileSync(FILE, 'utf8')).profiles[p] || []).length;
+cmd(1, '#LALT strike a GM strikes a Lead GM through an alt');
+ok(/^c9 is on a staff account of your rank or higher, so you cannot discipline it\. Take it to someone above that rank, or to the Owners/.test(last(1)) && recs(13) === 0,
+  'a GM cannot strike a Lead GM through an alt with no roles stamped: the account counts, not the character', last(1));
+for (const k of ['warn spamming the chat', 'strike griefing at the gate', 'suspend 3d stole from a barrel', 'lift appeal accepted', 'overturn 1 it was the wrong person']) cmd(2, `#LALT ${k}`);
+ok(said.filter(([a, t]) => a === 2 && /^c9 is on a staff account of your rank or higher/.test(t)).length === 5 && recs(13) === 0 && !audits.length,
+  'a Lead GM cannot warn, strike, suspend, lift or overturn on another Lead GM account', said.filter(([a]) => a === 2));
+cmd(2, '#GMGM warn a Lead GM warns a GM'); ok(/^Recorded: warn #1 on c5\./.test(last(2)) && recs(12) === 1, 'a Lead GM still disciplines a GM account', last(2));
+said.length = 0; cmd(1, '#LALT'); ok(said.some(([a, t]) => a === 1 && /^c9 \(profile 13\): no record/.test(t)), 'reading a record is no punishment: it stays open', said);
+const before20 = recs(20);
+for (const [label, fn] of [['without gamemode.js rankRefusal', undefined], ['a rank rule that throws', () => { throw new Error('index gone'); }], ["'unknown'", () => 'unknown']]) {
+  rankApi = fn; load(); said.length = 0;
+  cmd(2, '#AAAA warn the rank cannot be read here');
+  ok(/^The staff rank of c3's account could not be read, so nothing was recorded\./.test(last(2)) && recs(20) === before20, `${label}: every kind is refused, nothing recorded (fails closed)`, last(2));
+}
+rankApi = rankRefusal; load();
 global.setTimeout = realTimeout;
 fs.rmSync(tmp, { recursive: true, force: true });
 console.log(fails ? `\n${fails} FAILED` : '\nall passed');
