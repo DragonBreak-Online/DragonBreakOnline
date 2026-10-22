@@ -486,6 +486,18 @@ const BEASTS: Array<{ key: 'werewolf' | 'vampirelord'; label: string; give: stri
   { key: 'vampirelord', label: 'Vampire Lord', give: 'giveVampireLord' },
 ];
 
+// Staff polymorph animals (server beastform.js, /polymorph): shown and reverted here, never given from this panel
+export const CREATURE_FORMS: Record<string, string> = {
+  chicken: 'Chicken', rabbit: 'Rabbit', hare: 'Hare', goat: 'Goat', fox: 'Fox', dog: 'Dog', skeever: 'Skeever', mudcrab: 'Mudcrab', deer: 'Deer',
+};
+
+export const creatureLabel = (form: string): string => CREATURE_FORMS[form] || humanize(form);
+
+export const currentShape = (form: string): string => {
+  const name = form === 'vampirelord' ? 'Vampire Lord' : form === 'werewolf' ? 'werewolf' : creatureLabel(form).toLowerCase();
+  return 'Currently ' + (/^[aeiou]/i.test(name) ? 'an ' : 'a ') + name;
+};
+
 export const PowersTab = ({ events, who, beast, canSpawn }: { events: Record<string, string>; who: string; beast?: BeastState; canSpawn: boolean }) => {
   const fields = (extra?: Record<string, unknown>): Record<string, unknown> => Object.assign({}, targetFields(who), extra || {});
   const state = (key: 'werewolf' | 'vampirelord'): string => {
@@ -497,10 +509,20 @@ export const PowersTab = ({ events, who, beast, canSpawn }: { events: Record<str
     <div className="admin-panel__body">
       <div className="admin-panel__filters">
         <span className="admin-panel__hint">
-          {beast ? (beast.form ? 'Currently a ' + (beast.form === 'vampirelord' ? 'Vampire Lord' : 'werewolf') : 'In their own shape') : 'Refresh to read their state'}
+          {beast ? (beast.form ? currentShape(beast.form) : 'In their own shape') : 'Refresh to read their state'}
         </span>
       </div>
       <div className="admin-panel__powers">
+        {beast && beast.form && !BEASTS.some((b) => b.key === beast.form) ? (
+          <div className="admin-panel__power">
+            <span className="admin-panel__label">{creatureLabel(beast.form)} <span className="admin-panel__hint">transformed now</span></span>
+            {canSpawn ? (
+              <div className="admin-panel__actions">
+                <Button text="Revert" width={96} height={32} onClick={() => adminAction(events, 'beastForm', fields({ form: beast.form, op: 'revert' }))} />
+              </div>
+            ) : null}
+          </div>
+        ) : null}
         {BEASTS.map((b) => (
           <div key={b.key} className="admin-panel__power">
             <span className="admin-panel__label">{b.label} <span className="admin-panel__hint">{state(b.key)}</span></span>
@@ -516,7 +538,7 @@ export const PowersTab = ({ events, who, beast, canSpawn }: { events: Record<str
         ))}
         <span className="admin-panel__hint">
           {canSpawn
-            ? 'To make a player a vampire or a werewolf in play, give the disease on the Players tab. Grant gives the vanilla power so it can be cast in game; Transform now changes shape from here, which does not need the cast to reach the server. Revoke takes the power back and reverts the shape.'
+            ? 'To make a player a vampire or a werewolf in play, give the disease on the Players tab. Grant gives the vanilla power so it can be cast in game; Transform now changes shape from here, which does not need the cast to reach the server. Revoke takes the power back and reverts the shape. An animal shape from /polymorph shows at the top with its own Revert.'
             : 'Powers are for a Lead GM and above. You can see who holds what.'}
         </span>
       </div>
