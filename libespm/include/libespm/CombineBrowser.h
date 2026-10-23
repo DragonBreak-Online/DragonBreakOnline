@@ -36,6 +36,11 @@ public:
   std::vector<const std::vector<const RecordHeader*>*> GetRecordsAtPos(
     uint32_t cellOrWorld, int16_t cellX, int16_t cellY) const;
 
+  // One file's records at a grid square, cellOrWorld in that file's own ids; empty for a bad index
+  const std::vector<const RecordHeader*>& GetRecordsAtPos(
+    size_t fileIndex, uint32_t cellOrWorld, int16_t cellX,
+    int16_t cellY) const;
+
   // Returns nullptr on failure
   const IdMapping* GetCombMapping(size_t fileIndex) const noexcept;
   const IdMapping* GetRawMapping(size_t fileIndex) const noexcept;

@@ -161,6 +161,17 @@ CombineBrowser::GetRecordsAtPos(uint32_t cellOrWorld, int16_t cellX,
   return res;
 }
 
+const std::vector<const RecordHeader*>& CombineBrowser::GetRecordsAtPos(
+  size_t fileIndex, uint32_t cellOrWorld, int16_t cellX, int16_t cellY) const
+{
+  if (fileIndex >= pImpl->numSources) {
+    static const std::vector<const RecordHeader*> g_empty;
+    return g_empty;
+  }
+  return pImpl->sources[fileIndex].br->GetRecordsAtPos(cellOrWorld, cellX,
+                                                       cellY);
+}
+
 const IdMapping* CombineBrowser::GetCombMapping(
   size_t fileIndex) const noexcept
 {
