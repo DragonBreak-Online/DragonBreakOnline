@@ -486,7 +486,7 @@ module.exports = (api) => {
     // A fever carrier sleeps badly (supernatural.js feverDebuffs): Well Fed, never Well Rested
     if (restless(a)) {
       system(a, `Your sleep is restless and full of fever dreams. You wake Well Fed, but not rested: hunger comes slower for ${CFG.wellFedHours} hours.`);
-      audit(`REST ${who(a)} woke after ${Math.round(slept / 60000)} minutes, restless with fever`);
+      log(`rest: ${who(a)} woke after ${Math.round(slept / 60000)} minutes, restless with fever`);
       return;
     }
     set(a, 'private.dboRested', { until: now + CFG.restedHours * HOUR });
