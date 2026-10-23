@@ -375,6 +375,12 @@
   "wagerSteps": [0, 10, 25, 50, 100, 250, 500, 1000], "formats": ["single", "bo3", "bo5"], "disconnect": "refund",
   "deathDuels": true, "deathDuelPermadeath": true
  },
+ "werewolfFrenzy": {
+  "_comment": "frenzy.js (Nate, 23 Oct): a forced werewolf change (feral or the full moon) tips into a frenzy with this chance: for minSeconds..maxSeconds the werewolf's client is AI-driven (client FrenzyService, from the client package that carries it) and fights the nearest valid target within rangeMeters, then the next. NPCs always; players only with hitsPlayers, downed and never finished, and never staff, players in the character editor, being made or just logged in, duellists, those inside a safeZones circle ({ world, pos, radius } in units) or, with sparePartyMembers, the werewolf's party. Ends on the time, no target, the werewolf down/dead/reverted, logout, staff /frenzy <who> end, or the client's failsafe; then exhaustedMinutes of stamina recovery x exhaustedStaminaMult and cooldownMinutes before the next. A player downed by it: exposure.js decides the bounty when loaded, else bountyGold in the hold (bountyFallback). disable: the DisablePlayerControls flags while frenzied (movement, fighting, camSwitch, looking, sneaking, menu, activate, journalTabs). OFF until the in-game test passes; lead staff test with /frenzy me start while in beast form. ROLLBACK: enabled false (hot reload).",
+  "enabled": false, "chance": 0.3, "minSeconds": 20, "maxSeconds": 30, "rangeMeters": 40, "hitsPlayers": true, "sparePartyMembers": true,
+  "cooldownMinutes": 30, "exhaustedMinutes": 5, "exhaustedStaminaMult": 0.3, "bountyGold": 100, "bountyFallback": true,
+  "disable": [true, false, false, false, true, true, true, true], "safeZones": []
+ },
  "pvp": {
   "_comment": "damageMult scales every player-on-player hit after skills and armor (1 = unchanged). 1.25 from 2026-09-25 (Nat: PvP damage buffed a bit).",
   "damageMult": 1.25

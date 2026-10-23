@@ -392,7 +392,7 @@ const TIER_LABEL = { senior: 'Senior', developer: 'Developer', leadgm: 'Lead GM'
 // appoint and dismiss are here because an official's powers are real money: a rank lets its holder post work paid
 // out of the hold treasury, so a GM who could appoint himself could pay himself (claude-jake's review, A1-1).
 // /chargen is open to every GM (Nate, 12 Oct), and to a Trial GM through TRIAL_COMMANDS
-const LEAD_ONLY = new Set(['rerollrefund', 'beastform', 'polymorph', 'vlremote', 'wwremote', 'feedpair', 'sethunger', 'wipechars', 'driftspawn', 'driftrepair', 'driftset',
+const LEAD_ONLY = new Set(['rerollrefund', 'beastform', 'frenzy', 'polymorph', 'vlremote', 'wwremote', 'feedpair', 'sethunger', 'wipechars', 'driftspawn', 'driftrepair', 'driftset',
   'jail', 'placeexport', 'staffstats', 'war', 'curse', 'schedule', 'warband', 'raid', 'settime', 'timescale', 'setweather', 'npc remove', 'dungeon end',
   'appoint', 'dismiss',
   // Handing out a smithing manual is handing out an item (the T5 ones are given in roleplay, like artifacts)
@@ -1059,7 +1059,7 @@ const STAFF_HELP = [
     ['property', 'at a door, as an official: sell <price> | list <deposit> <weekly> | unlist | offer <name> | remind | grace | evict'],
     'grantproperty', 'leadership'] },
   { key: 'elections', title: 'Hold elections', items: ['electionreview', 'strikevote', 'unstrikevote'] },
-  { key: 'beasts', title: 'Beasts and the supernatural', items: ['beastform', 'polymorph', 'curse', 'makesuper', 'vlremote', 'wwremote', 'feedpair', 'raid', 'warband', 'vampeyes'] },
+  { key: 'beasts', title: 'Beasts and the supernatural', items: ['beastform', 'frenzy', 'polymorph', 'curse', 'makesuper', 'vlremote', 'wwremote', 'feedpair', 'raid', 'warband', 'vampeyes'] },
   { key: 'magic', title: 'Magic and crafts', items: ['schools', 'shoutclean', 'classteacher', 'preacher', 'manual', 'smithing', 'tailoring', 'enchant'] },
   { key: 'law', title: 'Law', items: ['jail', ['concordat', '[races]: Concordat arrests standing, or the Thalmor outside the race rule'],
     ['dossier', 'list | read <name|#TAG> | reports | add <name|#TAG> <text> | strike <name|#TAG> <n>: the Thalmor dossiers and informant reports (add and strike: Lead GM)']] },
@@ -2545,6 +2545,12 @@ globalThis.__dboHandlers.customPacket = (userId, rawContent) => {
       if (a && typeof globalThis.__dboMapSync === 'function') { try { globalThis.__dboMapSync(a, content); } catch (e) { log('map sync failed', e.message); } }
       return;
     }
+    // The frenzied werewolf's client answers (FrenzyService): took control, could not find the target, gave control back
+    if (content.customPacketType === 'dboFrenzyReport') {
+      const a = actorOf(userId);
+      if (a && typeof globalThis.__dboFrenzyReport === 'function') { try { globalThis.__dboFrenzyReport(a, content); } catch (e) { log('frenzy report failed', e.message); } }
+      return;
+    }
     if (content.customPacketType === 'dboBeastDiag') {
       const a = actorOf(userId);
       if (a) logCapped(`beastdiag:${userId}`, 40, `beastdiag ${display(a)} speedSampled=${Number(content.speedSampled).toFixed(1)} running=${!!content.running} sprinting=${!!content.sprinting}`);
@@ -3397,6 +3403,7 @@ globalThis.__dboHandlers.disconnect = (userId) => {
   for (const k of ['__dboItemLeave', '__dboBankLeave', '__dboRobLeave', '__dboSilverTestLeave', '__dboDeityForget', '__dboPanelLeave', '__dboManualsLeave', '__dboLabourLeave', '__dboPrayerLeave', '__dboSkinLeave', '__dboSchoolsLeave', '__dboKeyRingLeave', '__dboRacialLeave', '__dboStartLeave']) { if (a && typeof globalThis[k] === 'function') { try { globalThis[k](a); } catch (e) { log(`${k} failed`, e.message); } } }
   // A duel ends with its duellist's logout (duel.js)
   if (a && typeof globalThis.__dboDuelLeave === 'function') { try { globalThis.__dboDuelLeave(a); } catch (e) { log('duel leave failed', e.message); } }
+  if (a && typeof globalThis.__dboFrenzyLeave === 'function') { try { globalThis.__dboFrenzyLeave(a); } catch (e) { log('frenzy leave failed', e.message); } }
   connected.delete(userId);
   const wait = globalThis.__dboLoginWaits.get(userId);
   if (wait) { clearInterval(wait); globalThis.__dboLoginWaits.delete(userId); }
@@ -3491,6 +3498,8 @@ const applyNeedsStage = (a, n, announce, force) => {
     let blood = 1;
     try { if (typeof globalThis.__dboSuperRateMult === 'function') blood = Number(globalThis.__dboSuperRateMult(a, NEEDS_AV[key])); } catch (e) { blood = 1; }
     if (!(blood >= 0)) blood = 1;
+    // And the exhaustion after a werewolf frenzy (frenzy.js)
+    try { if (typeof globalThis.__dboFrenzyRateMult === 'function') { const f = Number(globalThis.__dboFrenzyRateMult(a, NEEDS_AV[key])); if (f >= 0) blood *= f; } } catch (e) { /* not loaded */ }
     const value = Math.max(0, Math.round((NEEDS_RATE_BASE + want) * mult * blood));
     const fresh = Date.now() - (Number(n.appliedAt[key]) || 0) < NEEDS_REAPPLY_MS;
     if (want === have && value === n.appliedValue[key] && fresh && !force) continue;
@@ -9107,6 +9116,13 @@ try {
   delete require.cache[DUEL_JS];
   require(DUEL_JS)({ mp, log, personal, audit, who, display, profileOf, onlineActors, every, registerChatCommand, cfg, openWidget, closeWidget, onUi, sendPacket, takeGold, giveItem, goldOf, recordOf, findByName, isAdmin, staffLog });
 } catch (e) { log('duel.js failed to load:', e.stack || e.message); for (const k of ['__dboDuelPair', '__dboInDuel', '__dboDuelEntries', '__dboDuelAction', '__dboDuelLogin', '__dboDuelLeave']) globalThis[k] = null; }
+// ---- the werewolf frenzy (server\frenzy.js, config "werewolfFrenzy", off by default): after duel.js, whose hit and death hooks it wraps ----
+try {
+  const FRENZY_JS = path.resolve('frenzy.js');
+  delete require.cache[FRENZY_JS];
+  require(FRENZY_JS)({ mp, log, personal, sendPacket, audit, who, display, profileOf, onlineActors, every, registerChatCommand, cfg,
+    isAdmin, isLeadStaff, findByName, zoneOfActor, ownNameOf, inEditor, creationPending, inLoginGrace });
+} catch (e) { log('frenzy.js failed to load:', e.stack || e.message); for (const k of ['__dboFrenzyForced', '__dboFrenzyActive', '__dboFrenzyEnd', '__dboFrenzyLeave', '__dboFrenzyRateMult', '__dboFrenzyReport']) globalThis[k] = null; }
 // ---- province rules for crafting and the tome shop (server\regions.js, config "regions"): before spells.js, which asks it ----
 try {
   const REGIONS_JS = path.resolve('regions.js');
