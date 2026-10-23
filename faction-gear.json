@@ -68,7 +68,7 @@
    ]
   },
   "8b5:sentinel.esp": {
-   "name": "TH_SonsBootsSoldier",
+   "name": "Stormcloak Hide Boots",
    "set": "Stormcloaks",
    "factions": [
     "stormcloaks"
@@ -79,7 +79,7 @@
    ]
   },
   "8b6:sentinel.esp": {
-   "name": "TH_SonsBootsSoldierA",
+   "name": "Stormcloak Soldier Boots",
    "set": "Stormcloaks",
    "factions": [
     "stormcloaks"
@@ -90,7 +90,7 @@
    ]
   },
   "8b7:sentinel.esp": {
-   "name": "TH_SonsBootsSoldierB",
+   "name": "Stormcloak Heavy Soldier Boots",
    "set": "Stormcloaks",
    "factions": [
     "stormcloaks"
@@ -101,7 +101,7 @@
    ]
   },
   "8b8:sentinel.esp": {
-   "name": "TH_SonsBootsSoldierC",
+   "name": "Stormcloak Lamellar Boots",
    "set": "Stormcloaks",
    "factions": [
     "stormcloaks"
@@ -112,7 +112,7 @@
    ]
   },
   "8b9:sentinel.esp": {
-   "name": "TH_SonsBootsSoldierD",
+   "name": "Stormcloak Heavy Lamellar Boots",
    "set": "Stormcloaks",
    "factions": [
     "stormcloaks"
@@ -123,7 +123,7 @@
    ]
   },
   "8ba:sentinel.esp": {
-   "name": "TH_SonsCuirassSoldier",
+   "name": "Stormcloak Hide Armor",
    "set": "Stormcloaks",
    "factions": [
     "stormcloaks"
@@ -134,7 +134,7 @@
    ]
   },
   "8bc:sentinel.esp": {
-   "name": "TH_SonsCuirassSoldierB",
+   "name": "Stormcloak Braided Armor",
    "set": "Stormcloaks",
    "factions": [
     "stormcloaks"
@@ -145,7 +145,7 @@
    ]
   },
   "8bd:sentinel.esp": {
-   "name": "TH_SonsCuirassSoldierC",
+   "name": "Stormcloak Chainmail Armor",
    "set": "Stormcloaks",
    "factions": [
     "stormcloaks"
@@ -156,7 +156,7 @@
    ]
   },
   "8be:sentinel.esp": {
-   "name": "TH_SonsCuirassSoldierD",
+   "name": "Stormcloak Lamellar Armor",
    "set": "Stormcloaks",
    "factions": [
     "stormcloaks"
@@ -167,7 +167,7 @@
    ]
   },
   "8bf:sentinel.esp": {
-   "name": "TH_SonsCuirassSoldierE",
+   "name": "Stormcloak Heavy Lamellar Armor",
    "set": "Stormcloaks",
    "factions": [
     "stormcloaks"
@@ -178,7 +178,7 @@
    ]
   },
   "8c0:sentinel.esp": {
-   "name": "TH_SonsGauntletsSoldier",
+   "name": "Stormcloak Hide Gauntlets",
    "set": "Stormcloaks",
    "factions": [
     "stormcloaks"
@@ -189,7 +189,7 @@
    ]
   },
   "8c1:sentinel.esp": {
-   "name": "TH_SonsGauntletsSoldierA",
+   "name": "Stormcloak Soldier Gauntlets",
    "set": "Stormcloaks",
    "factions": [
     "stormcloaks"
@@ -200,7 +200,7 @@
    ]
   },
   "8c2:sentinel.esp": {
-   "name": "TH_SonsGauntletsSoldierB",
+   "name": "Stormcloak Heavy Soldier Gauntlets",
    "set": "Stormcloaks",
    "factions": [
     "stormcloaks"
@@ -211,7 +211,7 @@
    ]
   },
   "8c3:sentinel.esp": {
-   "name": "TH_SonsGauntletsSoldierC",
+   "name": "Stormcloak Lamellar Gauntlets",
    "set": "Stormcloaks",
    "factions": [
     "stormcloaks"
@@ -222,7 +222,7 @@
    ]
   },
   "8c4:sentinel.esp": {
-   "name": "TH_SonsGauntletsSoldierD",
+   "name": "Stormcloak Heavy Lamellar Gauntlets",
    "set": "Stormcloaks",
    "factions": [
     "stormcloaks"
@@ -233,7 +233,7 @@
    ]
   },
   "8c5:sentinel.esp": {
-   "name": "TH_SonsHelmetSoldier",
+   "name": "Stormcloak Hide Helmet",
    "set": "Stormcloaks",
    "factions": [
     "stormcloaks"
@@ -244,7 +244,7 @@
    ]
   },
   "8c6:sentinel.esp": {
-   "name": "TH_SonsHelmetSoldierA",
+   "name": "Stormcloak Leather Helmet",
    "set": "Stormcloaks",
    "factions": [
     "stormcloaks"
@@ -255,7 +255,7 @@
    ]
   },
   "8c7:sentinel.esp": {
-   "name": "TH_SonsHelmetSoldierB",
+   "name": "Stormcloak Conical Helmet",
    "set": "Stormcloaks",
    "factions": [
     "stormcloaks"
@@ -266,7 +266,7 @@
    ]
   },
   "8c8:sentinel.esp": {
-   "name": "TH_SonsHelmetSoldierC",
+   "name": "Stormcloak Soldier Helmet",
    "set": "Stormcloaks",
    "factions": [
     "stormcloaks"
@@ -277,7 +277,7 @@
    ]
   },
   "8c9:sentinel.esp": {
-   "name": "TH_SonsHelmetSoldierD",
+   "name": "Stormcloak Heavy Soldier Helmet",
    "set": "Stormcloaks",
    "factions": [
     "stormcloaks"
@@ -288,7 +288,7 @@
    ]
   },
   "8ca:sentinel.esp": {
-   "name": "TH_SonsHelmetSoldierE",
+   "name": "Stormcloak Iron Helmet",
    "set": "Stormcloaks",
    "factions": [
     "stormcloaks"
@@ -299,7 +299,7 @@
    ]
   },
   "8cb:sentinel.esp": {
-   "name": "TH_SonsHelmetSoldierF",
+   "name": "Stormcloak Heavy Iron Helmet",
    "set": "Stormcloaks",
    "factions": [
     "stormcloaks"
@@ -310,7 +310,7 @@
    ]
   },
   "8cc:sentinel.esp": {
-   "name": "TH_SonsShield",
+   "name": "Stormcloak Shield",
    "set": "Stormcloaks",
    "factions": [
     "stormcloaks"
@@ -321,7 +321,7 @@
    ]
   },
   "8cd:sentinel.esp": {
-   "name": "TH_SonsShieldA",
+   "name": "Stormcloak Light Shield",
    "set": "Stormcloaks",
    "factions": [
     "stormcloaks"
