@@ -69,7 +69,10 @@ module.exports = (api) => {
       (Array.isArray(list) ? list : []).forEach((npc, i) => { if (posts[i]) patrolOf.set(`${hold}:${posts[i].n}`, npc); });
     }
     const npcOf = (p) => patrolOf.get(`${p.hold}:${p.n}`) || npcOrDefault(p);
-    const mine = C.enabled ? readPosts().filter((p) => npcOf(p)).map((p) => ({ Name: `${PREFIX}${p.hold}:${p.n}`, ID: p.world, POS: p.pos, Size: C.radius, Heading: Number(p.heading) || 0,
+    // onlyHolds: when set, only those holds' posts spawn; the rest stay saved (23 Oct: Skyrim's guards crashed a client
+    // fighting a Stormcloak NPC; Bruma's Cyrodiil guards stay on)
+    const active = (p) => !Array.isArray(C.onlyHolds) || C.onlyHolds.includes(p.hold);
+    const mine = C.enabled ? readPosts().filter((p) => active(p) && npcOf(p)).map((p) => ({ Name: `${PREFIX}${p.hold}:${p.n}`, ID: p.world, POS: p.pos, Size: C.radius, Heading: Number(p.heading) || 0,
       NPC: [{ id: npcOf(p), count: 1 }], Despawn: C.despawnSeconds, Respawn: C.respawnSeconds, Hostile: false })) : [];
     const kept = list.filter((z) => !String((z && (z.Name || z.name)) || '').startsWith(PREFIX));
     const sig = JSON.stringify(mine);
