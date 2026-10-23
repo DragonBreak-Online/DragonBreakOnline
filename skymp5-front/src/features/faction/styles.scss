@@ -356,3 +356,23 @@
   .dbo-picker--open { display: block; }
   .dbo-picker--open .dbo-picker__list { position: static; margin-top: 4px; max-height: none; }
 }
+
+// ---- the Guild and Rebellion tabs (guild.tsx, rebellion.tsx) ----------------------------------------------------------
+.guild-tab__rules { margin: 0; padding-left: 18px; font-size: 13px; color: $dbo-text; li { margin: 2px 0; } }
+.guild-tab__confirm { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.guild-tab__ask { font-size: 13px; color: $dbo-gold; }
+.rebellion__code { letter-spacing: 0.18em; color: $dbo-gold; }
+.rebellion__meter { height: 6px; border-radius: 3px; background: rgba(255, 255, 255, 0.1); overflow: hidden; }
+.rebellion__fill { height: 100%; background: #c9534f; }
+.rebellion__signers { display: flex; flex-direction: column; gap: 3px; }
+.rebellion__signer { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; gap: 8px; align-items: center; font-size: 13px; min-height: 26px; }
+.rebellion__signer-actions { display: inline-flex; gap: 6px; justify-content: flex-end; }
+.rebellion__timeline { margin: 2px 0; padding-left: 18px; font-size: 13px; color: $dbo-text-dim; }
+.rebellion__step { margin: 2px 0;
+  &--past { opacity: 0.6; }
+  &--now { color: #f0b4b4; }
+  &--next { color: $dbo-text; }
+  &--capture { color: $dbo-gold; } }
+.rebellion__rules { font-size: 12px; }
+// A card's heading is otherwise the page's dark default (the War tab's cards still are: worth the same line there)
+.guild-tab .war__head, .rebellion .war__head { color: $dbo-text; }

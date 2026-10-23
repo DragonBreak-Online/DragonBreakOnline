@@ -7,6 +7,8 @@ import { EconomyData, RealmData, RealmMapDef, RealmTab, TreasuryTab, WarTab } fr
 import realmBruma from '../../img/realm-bruma.png';
 import { Picker } from '../../components/Picker/Picker';
 import { FactionStaffView, RankEditor } from './staff';
+import { BandView, GuildTab } from './guild';
+import { RebellionTab, RebellionView } from './rebellion';
 // Skyrim's (render.py --world 3c:Skyrim.esm --name skyrim): cells -57,-43 to 61,50 at 512 game units a pixel, 952 x 752
 import realmSkyrim from '../../img/realm-skyrim.png';
 // One map per worldspace (a territory's mapWorld, server realm.js): Bruma's and Skyrim's coordinates overlap, so each map
@@ -69,6 +71,9 @@ export interface FactionData {
   roles?: string[];
   rankTitleMax?: number;
   ranksMax?: number;
+  // The Guild tab (playerguilds.js) and the Rebellion tab (rebellion.js; null while risings are off, and the tab hidden)
+  band?: BandView | null;
+  rebellion?: RebellionView | null;
 }
 
 const send = (key: string, ...args: unknown[]): void => {
@@ -94,7 +99,9 @@ export const FactionContent = ({ data, embedded, readOnly }: { data: FactionData
   const [inviteName, setInviteName] = useState('');
   const [busyState, setBusy] = useState(false);
   const busy = busyState || !!readOnly;
-  const [tab, setTab] = useState<'members' | 'realm' | 'war' | 'treasury'>('members');
+  const [tab, setTab] = useState<'members' | 'realm' | 'war' | 'treasury' | 'guild' | 'rebellion'>('members');
+  // A text field clears only after its action was done (a refusal leaves it to be corrected)
+  const okNonce = data.resultKind === 'ok' ? data.nonce : null;
 
   useEffect(() => {
     setBusy(false);
@@ -132,10 +139,22 @@ export const FactionContent = ({ data, embedded, readOnly }: { data: FactionData
           {data.economy && data.economy.factions.length > 0 && (
             <button className={'faction__tab' + (tab === 'treasury' ? ' faction__tab--on' : '')} onClick={() => setTab('treasury')}>Treasury</button>
           )}
+          {data.band && !staffView && (
+            <button className={'faction__tab' + (tab === 'guild' ? ' faction__tab--on' : '')} onClick={() => setTab('guild')}>
+              Guild{data.band.invites.length ? ` (${data.band.invites.length})` : ''}
+            </button>
+          )}
+          {data.rebellion && !staffView && (
+            <button className={'faction__tab' + (tab === 'rebellion' ? ' faction__tab--on' : '')} onClick={() => setTab('rebellion')}>Rebellion</button>
+          )}
         </div>
 
         {tab === 'realm' && <div className="faction__body faction__body--wide"><RealmTab realm={data.realm || null} maps={REALM_MAPS} act={act} busy={busy} /></div>}
         {tab === 'war' && <div className="faction__body faction__body--wide"><WarTab realm={data.realm || null} act={act} busy={busy} /></div>}
+        {tab === 'guild' && <div className="faction__body faction__body--wide"><GuildTab band={data.band || null} act={act} busy={busy} nonce={okNonce} /></div>}
+        {tab === 'rebellion' && (data.rebellion
+          ? <div className="faction__body faction__body--wide"><RebellionTab reb={data.rebellion} act={act} busy={busy} okNonce={okNonce} /></div>
+          : <div className="faction__body faction__body--wide"><p className="faction__empty">Risings are not in force.</p></div>)}
         {tab === 'treasury' && <div className="faction__body faction__body--wide"><TreasuryTab economy={data.economy || null} act={act} busy={busy} /></div>}
 
         {tab === 'members' && staffView && <div className="faction__body faction__body--wide faction__body--staff"><FactionStaffView data={data} busy={busy} act={act} /></div>}
