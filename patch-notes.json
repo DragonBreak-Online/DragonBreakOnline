@@ -42,7 +42,8 @@
           "Old house and room keys cut before a property changed hands no longer open it. Keys on your key ring are unaffected.",
           "Invisibility can't be brewed or cast for now: others kept seeing you invisible long after it ended for you. With client 0.3.108b everyone sees you reappear when it ends.",
           "Bandit camps with ore, like Halted Stream Camp, count as mines and can be rented without using your one home.",
-          "Business owners can move their ledger like the Place tool (/business ledger move, or the Book tab's button with 0.3.108b)."
+          "Business owners can move their ledger like the Place tool (/business ledger move, or the Book tab's button with 0.3.108b).",
+          "A Priest's Healing Hands or Heal Other now raises a fallen player within 3 metres, wherever you aim."
         ]
       }
     ]
