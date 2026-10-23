@@ -1812,7 +1812,8 @@
   "_exemptProfiles": "Choom (51, Lead GM) and Neem (97): Nate, 23 Oct: \"leave them be\" - their staff powers stay as they were",
   "seedTags": ["D3EP", "S4PZ", "38XK"],
   "seedMissing": [{"profile": 51, "name": "Choom"}, {"profile": 97, "name": "Neem"}],
-  "staffCharOnly": { "enabled": true, "clearModes": true },
+  "_staffCharOnly": "Off (Nate, 23 Oct: \"we shouldnt limit gm stuff per character\"): staff powers work on every character of a staff account again. The other three rules stay on. ROLLBACK: enabled true, hot reload.",
+  "staffCharOnly": { "enabled": false, "clearModes": true },
   "selfTarget": { "enabled": true, "staffNeedsLead": true },
   "callRef": { "enabled": true, "bindMinutes": 60 },
   "trialLimits": { "enabled": true }

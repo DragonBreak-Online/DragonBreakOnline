@@ -157,7 +157,7 @@ check('gamemode.js: the journal\'s command route asks the rules too', /if \(r &&
 const gm = fs.readFileSync(path.join(ROOT, 'gmcall.js'), 'utf8');
 check('gmcall.js: /gm goto asks gotoRefusal before it moves anyone', /const goto = \(a, c\) => \{[\s\S]{0,400}g\.gotoRefusal\(a, c\)[\s\S]{0,200}if \(no\) return say\(a, no\);/.test(gm));
 const conf = JSON.parse(fs.readFileSync(path.join(ROOT, 'gamemode-config.json'), 'utf8')).staffPowers;
-check('gamemode-config.json: staffPowers with each part\'s switch, on, the Owners exempt', !!conf && conf.enabled === true && conf.staffCharOnly.enabled === true && conf.selfTarget.enabled === true && conf.callRef.enabled === true && conf.trialLimits.enabled === true && conf.exemptTiers.join() === 'senior' && /ROLLBACK/.test(conf._comment), conf);
+check('gamemode-config.json: staffPowers with each part\'s switch; staff characters off (Nate, 23 Oct), the rest on, the Owners exempt', !!conf && conf.enabled === true && conf.staffCharOnly.enabled === false && conf.selfTarget.enabled === true && conf.callRef.enabled === true && conf.trialLimits.enabled === true && conf.exemptTiers.join() === 'senior' && /ROLLBACK/.test(conf._comment), conf);
 check('...seeding #D3EP, #S4PZ and #38XK', conf.seedTags.join() === 'D3EP,S4PZ,38XK');
 void [LEAD2, GM2, BOB, OWNER];
 done();
