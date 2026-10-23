@@ -496,23 +496,26 @@ export class EmoteService extends ClientListener {
     const start = this.emoteStartPos;
     this.emoteStartPos = null;
     let noted = false;
-    for (const delay of [0.3, 1, 2.5]) {
-      this.sp.Utility.wait(delay).then(() => {
-        this.controller.once("update", () => {
-          if (this.activeEmote) return;
-          const player = this.sp.Game.getPlayer();
-          if (!player || player.getFurnitureReference() || player.isOnMount()) return;
-          // The platform's setCollision (what sync/animation uses for copies), reached through sp: it is not in Sp's typings
-          const setCollision = (this.sp as unknown as { setCollision?: (refrFormId: number, collision: boolean) => void }).setCollision;
-          if (typeof setCollision !== "function") return;
-          try { setCollision(player.getFormID(), true); } catch (e) { return; }
-          if (noted || !start) return;
-          noted = true;
-          const moved = Math.round(Math.hypot(player.getPositionX() - start[0], player.getPositionY() - start[1], player.getPositionZ() - start[2]));
-          emoteNote(`collision restored after ${anim} (${why}), body moved ${moved} u since it began`);
+    // Also reached from tick context (the wheel's Stop, a dboIdleStop), where Utility.wait throws: the waits start on an update
+    this.controller.once("update", () => {
+      for (const delay of [0.3, 1, 2.5]) {
+        this.sp.Utility.wait(delay).then(() => {
+          this.controller.once("update", () => {
+            if (this.activeEmote) return;
+            const player = this.sp.Game.getPlayer();
+            if (!player || player.getFurnitureReference() || player.isOnMount()) return;
+            // The platform's setCollision (what sync/animation uses for copies), reached through sp: it is not in Sp's typings
+            const setCollision = (this.sp as unknown as { setCollision?: (refrFormId: number, collision: boolean) => void }).setCollision;
+            if (typeof setCollision !== "function") return;
+            try { setCollision(player.getFormID(), true); } catch (e) { return; }
+            if (noted || !start) return;
+            noted = true;
+            const moved = Math.round(Math.hypot(player.getPositionX() - start[0], player.getPositionY() - start[1], player.getPositionZ() - start[2]));
+            emoteNote(`collision restored after ${anim} (${why}), body moved ${moved} u since it began`);
+          });
         });
-      });
-    }
+      }
+    });
   }
 
   // An emote never walks: a body that travels while one runs (a gamepad stick, which no cancel key covers, or a slide)
