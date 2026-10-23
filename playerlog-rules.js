@@ -506,8 +506,22 @@ const CIT_RELEASE = [
     ' could not release $2 from the citizenship of $3 (character $4): it comes from a faction or court based there and lasts while that membership does (a staff release)'],
   [`: ${CIT_TAG} found no citizenship of profile (\\d{1,9}) to release`, ': a staff release found no citizenship of profile $2 to release'],
 ].map(([s, to]) => [new RegExp(`^CITIZEN STAFF ([\\s\\S]{1,200}?)${s}$`), new RegExp(`^CITIZEN STAFF ([\\s\\S]{1,200})${s}$`), `CITIZEN STAFF staff${to}`]);
+// CITIZEN <name> (character <hex>) is an outlaw of <hold>[: citizenship taken], barred until <date> (<why>)[; still a citizen
+// through a faction or court based there] (citizenship.js __dboCitizenOutlaw): its one caller, rebellion.js's failed rising,
+// gives "the failed rising <name>", a name a player chose (charters.js checkName; REBELLION is excluded for it), so "a failed
+// rising" stands for it, as the ELECTION void line's faction names go. The line names no party today, so it gives no event;
+// the character, the hold, the date and both flags stay for the day it names the character with who(). Any other end, or a
+// lost one, keeps the head only, and an outlaw line the cut cannot read keeps nothing
+const CIT_OUTLAW = new RegExp(`^(CITIZEN ${CIT_NAME} \\(character [0-9a-f]{1,8}\\) is an outlaw of ${CIT_HOLD}(?:: citizenship taken)?, barred until \\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2} UTC)(?: ([\\s\\S]*))?$`);
+const CIT_OUTLAW_WHY = /^\((?:the failed rising [^#():;"…]{1,80}|a failed rising)\)((?:; still a citizen through a faction or court based there)?)$/;
 AUDIT_VERBS.CITIZEN.cut = (text, raw) => {
-  if (!text.startsWith('CITIZEN STAFF ')) return text;
+  if (!text.startsWith('CITIZEN STAFF ')) {
+    if (!/ is an outlaw of /.test(text)) return text;
+    const o = text.match(CIT_OUTLAW);
+    if (!o) return 'CITIZEN';
+    const w = o[2] !== undefined && !endLost(raw) ? o[2].match(CIT_OUTLAW_WHY) : null;
+    return w ? `${o[1]} (a failed rising)${w[1]}` : o[1];
+  }
   if (endLost(raw)) return 'CITIZEN STAFF';
   if (CIT_REVOKE.test(text)) return text;
   const fit = CIT_RELEASE.filter(([first]) => first.test(text));
