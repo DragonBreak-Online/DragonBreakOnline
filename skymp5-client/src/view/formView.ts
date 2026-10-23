@@ -30,8 +30,9 @@ import { PlayerCharacterDataHolder } from "./playerCharacterDataHolder";
 import { dropCopyNiNodeWork, queueCopyNiNodeUpdate } from "./niNodeQueue";
 import { onScreenRebuildDue, OnScreenRebuildState } from "./onScreenRebuild";
 import { lastTryHost, tryHost } from "./hostAttempts";
-import { GHOST_ALPHA, GHOST_SHADER_ID, INVIS_ABILITY_IDS, INVIS_ABILITY_SHADER_IDS } from "../lib/ghostLook";
+import { GHOST_ALPHA, GHOST_SHADER_ID, INVIS_ABILITY_IDS, INVIS_ABILITY_SHADER_IDS, INVIS_SHIMMER_SHADER_ID } from "../lib/ghostLook";
 import { AdminView, keepNoCopy, nextHiddenAt, seesInvisible, viewerRankOf } from "./adminCopyPolicy";
+import { ConfirmState, nextConfirm, ownerInvisOf, spellHidden } from "./spellInvisPolicy";
 import { ModelApplyUtils } from "./modelApplyUtils";
 import { SpApiInteractor } from "../services/spApiInteractor";
 import { WorldCleanerService } from "../services/services/worldCleanerService";
@@ -887,7 +888,7 @@ export class FormView {
         && (revealing || !this.isSweetHidePerson(refr))
         && FormView.adminViewOf(model) !== "hidden"
         // Nor over someone under an Invisibility spell or potion (#bugs 1 Oct: "you can see invisible people's names")
-        && !this.spellInvisible(refr)
+        && !this.spellInvisible(refr, model)
         // A werewolf or Vampire Lord is not recognisable: no name and no #TAG over a beast, even to those who know the
         // player (#bugs 'werewolf shows nametag of player', 2026-09-26)
         && (!this.isBeastCopy(model) || (revealing && revealLabelFor(known, this.getRemoteRefrId()) !== ""));
@@ -1169,8 +1170,9 @@ export class FormView {
   // Admin Invisible and Ghost ride the neighbor-visible ff_adminModes prop; 3D reloads reset alpha and shaders, so both are reapplied
   private applyAdminInvisibility(refr: ObjectReference, model: FormModel): void {
     let view = FormView.adminViewOf(model);
-    if (view === "visible" && this.spellInvisible(refr)) view = "hidden";
+    if (view === "visible" && this.spellInvisible(refr, model)) view = "hidden";
     if (view === "visible" && this.adminView === "visible") {
+      this.clearStaleInvisLook(refr);
       return;
     }
     const actor = Actor.from(refr);
@@ -1245,13 +1247,34 @@ export class FormView {
     return viewerRankOf(storage["ownerModelSet"], storage["ownerModel"]);
   }
 
-  // A replayed Invisibility spell would otherwise draw the caster as vanilla's shimmer instead of hiding them
-  private spellInvisible(refr: ObjectReference): boolean {
+  // A replayed Invisibility spell would otherwise draw the caster as vanilla's shimmer instead of hiding them. A player
+  // copy is hidden only while its owner's own client still reports the effect (ff_spellInvis, spellInvisPolicy.ts): an
+  // attack or an activation ends it on the owner's screen alone, and the copy kept it for the rest of its 30-50 s
+  private spellInvisible(refr: ObjectReference, model: FormModel): boolean {
     const now = Date.now();
+    const owner = ownerInvisOf((model as Record<string, unknown>)["ff_spellInvis"]);
+    this.invisConfirm = nextConfirm(this.invisConfirm, owner, now);
     if (now - this.lastSpellInvisCheck < FormView.spellInvisCheckMs) return this.spellInvisibleSeen;
     this.lastSpellInvisCheck = now;
-    try { this.spellInvisibleSeen = (Actor.from(refr)?.getActorValue("Invisibility") ?? 0) > 0; } catch { this.spellInvisibleSeen = false; }
+    let av = 0;
+    try { av = Actor.from(refr)?.getActorValue("Invisibility") ?? 0; } catch { av = 0; }
+    this.copyInvisAv = av;
+    this.spellInvisibleSeen = spellHidden(!!model.appearance, av, owner, this.invisConfirm, now);
     return this.spellInvisibleSeen;
+  }
+
+  // A player copy shown although its own Invisibility effect still runs (the owner's ended): the effect's hit shader
+  // (Skyrim.esm InvisFXShader, ghostLook.ts) would still draw it as a shimmer, so it is stopped, once a second while the
+  // copy's actor value stays up (a 3D reload starts it again). The effect itself runs out on its own.
+  private clearStaleInvisLook(refr: ObjectReference): void {
+    if (!(this.copyInvisAv > 0)) return;
+    const now = Date.now();
+    if (now - this.lastStaleInvisClear < FormView.adminHideReapplyMs) return;
+    this.lastStaleInvisClear = now;
+    const actor = Actor.from(refr);
+    if (!actor || !actor.is3DLoaded()) return;
+    EffectShader.from(Game.getFormEx(INVIS_SHIMMER_SHADER_ID))?.stop(actor);
+    actor.setAlpha(1, false);
   }
 
   private removeNickname() {
@@ -1512,6 +1535,9 @@ export class FormView {
   private adminShaderReplayAt = 0;
   private lastSpellInvisCheck = 0;
   private spellInvisibleSeen = false;
+  private invisConfirm: ConfirmState | null = null;
+  private copyInvisAv = 0;
+  private lastStaleInvisClear = 0;
   private lastAdminHideApply = 0;
   private textNameId: number | undefined = undefined;
   private textActorIdId: number | undefined = undefined;

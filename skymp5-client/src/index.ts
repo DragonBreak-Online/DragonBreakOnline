@@ -88,6 +88,7 @@ import { AdminMenuService } from "./services/services/adminMenuService";
 import { PlacementService } from "./services/services/placementService";
 import { WorldEditService } from "./services/services/worldEditService";
 import { AdminModeService } from "./services/services/adminModeService";
+import { SpellInvisReportService } from "./services/services/spellInvisReportService";
 import { ExecutionService } from "./services/services/executionService";
 // U: the player menu, the server's help topics as a panel (Nate, 2026-09-28)
 import { PersonalMenuService } from "./services/services/personalMenuService";
@@ -248,6 +249,7 @@ const main = () => {
       new PlacementService(sp, controller),
       new WorldEditService(sp, controller),
       new AdminModeService(sp, controller),
+      new SpellInvisReportService(sp, controller),
       new FactionService(sp, controller),
       new TradeService(sp, controller),
       new NetInfoService(sp, controller),
