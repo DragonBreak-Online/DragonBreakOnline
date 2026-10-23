@@ -5,8 +5,9 @@
 // Craft tier: the Blacksmith's Wheel points (private.mastery skills.blacksmith.level, 0-100) against smithing.tierPoints
 // [0,15,30,45,60,76,91]. A family (loot-materials.json, smithing.json) above T1 needs its technique: a manual in
 // manuals.js's record (private.dboManuals[family]), learned from a book (manuals.js), an apprenticeship (here) or staff.
-// Forging an item (a COBJ at a forge, Skyforge, Dawnguard or Aetherium bench) of a family the smith may not work is
-// refused through regions.js's craft hook (globalThis.__dboSmithCraft), materials kept. Admins pass unless /smithing test.
+// Forging an item (a COBJ at a forge, Skyforge, Dawnguard or Aetherium bench, or with no bench keyword) of a family the
+// smith may not work is refused through regions.js's craft hook (globalThis.__dboSmithCraft), materials kept. Admins pass
+// unless /smithing test.
 // Apprenticeship: a smith who lacks a technique forges under a supervising Blacksmith who knows it, is online, within
 // apprenticeRange, has the craft tier, and (Orcish) the supervisorRace; apprenticeCrafts such crafts teach it for good.
 // Upgrade cap (craftedExtrasSystem.ts asks __dboTemperCap): an item of family tier T improves to at most
@@ -72,13 +73,21 @@ module.exports = (api) => {
   const bypass = (a) => { try { return isAdmin(a) && !S.test.has(a >>> 0); } catch (e) { return false; } };
 
   // ---- forge recipes ------------------------------------------------------------------------------------------------
+  // A creation recipe with no workbench keyword (no BNAM, or BNAM 0) is forge work too: the fork offers it only at a
+  // smithing forge (CraftService.cpp counts bench keyword 0 as CraftingSmithingForge, since 25 Sep, for Sentinel.esp's 238
+  // benchless recipes). Judged only by a forge BNAM, those skipped the tier and technique: Noble and Gilded Ebony were
+  // forged without the Ebony schematic (#bugs 1562992015346499634, 23 Oct). Benchless recipes of unclassified items pass
   const FORGE = /Forge|Dawnguard/i;
   const benchCache = new Map();
   const isForgeRecipe = (recipeId) => {
     recipeId >>>= 0;
     if (benchCache.has(recipeId)) return benchCache.get(recipeId);
     const res = lookup(recipeId); let yes = false;
-    if (res && String(res.record.type) === 'COBJ') { const b = lookup(fieldId(res, 'BNAM')); yes = !!b && FORGE.test(String(b.record.editorId || '')); }
+    if (res && String(res.record.type) === 'COBJ') {
+      const benchless = !u32((res.record.fields || []).find((x) => x && x.type === 'BNAM'));
+      const b = benchless ? null : lookup(fieldId(res, 'BNAM'));
+      yes = benchless || (!!b && FORGE.test(String(b.record.editorId || '')));
+    }
     benchCache.set(recipeId, yes);
     return yes;
   };
