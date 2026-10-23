@@ -100,7 +100,7 @@ const TIER = E('senior', 'developer', 'leadgm', 'gm', 'trialgm', 'none');
 const SIDE = O({ hits: 'int', dmg: 'num', by: A(NAME, 8) });
 const REFUSAL_REASONS = ['god', 'ethereal', 'offline_body', 'login_grace', 'bound', 'paralysed', 'armour_change', 'damage_cap',
   'spell_rate', 'dungeon_ally', 'warband', 'companion_pvp', 'silver', 'recovering', 'downed', 'shout_not_given',
-  'friendly_lethal', 'duel_pause', 'duel_rules', 'duel_beaten', 'duel_scaled', 'duel_outsider', 'anticheat', 'asylum', 'in_editor', 'silver_test', 'unknown'];
+  'friendly_lethal', 'duel_pause', 'duel_rules', 'duel_beaten', 'duel_scaled', 'duel_outsider', 'anticheat', 'asylum', 'in_editor', 'silver_test', 'frenzy_downed', 'frenzy_spared', 'unknown'];
 
 // The anticheat kinds a sec.signal may carry (anticheat.js acFlag and the fork's onAnticheat through it; ANTI-CHEAT DESIGN
 // 17 Oct). playerlog-taps.js's anticheat hook writes these and no other kind.
