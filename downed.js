@@ -693,6 +693,20 @@ module.exports = (api) => {
     // temple, camera locked, until a relog (27 of 407 wakes on 18-20 Oct; SkaldsChosen, Whiterun): end it twice after waking
     for (const ms of [3000, 10000]) setTimeout(() => { try { if (isPlayer(t) && !S.downed.has(t) && !isDead(t)) anim(t, 'BleedOutStop'); } catch (e) { /* gone */ } }, ms);
   };
+  // Ends a down by waking the player at loc (a locationalData) instead of the temple: the watch's jail (guards.js)
+  globalThis.__dboDownedWakeIn = (t, loc, text) => {
+    t = Number(t) >>> 0;
+    const d = S.downed.get(t);
+    if (!d || !isDead(t) || mp.get(t, 'private.permaDead') === true) return false;
+    endDown(t);
+    try { mp.set(t, 'locationalData', loc); } catch (e) { log(`downed: wake move failed for ${display(t)}: ${e.message}`); }
+    mp.set(t, 'isDead', false);
+    wakeAfter(t, d);
+    dressAfterWake(t);
+    for (const ms of [3000, 10000]) setTimeout(() => { try { if (isPlayer(t) && !S.downed.has(t) && !isDead(t)) anim(t, 'BleedOutStop'); } catch (e) { /* gone */ } }, ms);
+    if (text) banner(t, text, 6);
+    return true;
+  };
   const finish = (t, by) => {
     // Journal stats: the finishing blow is the kill (Nate, 2026-09-30), in a war to the death too
     try { if (globalThis.__dboStatsAdd && by && by !== t && isPlayer(by)) { globalThis.__dboStatsAdd(t, 'killedByPlayers'); globalThis.__dboStatsAdd(by, 'playerKills'); } } catch (e) { /* stats only */ }

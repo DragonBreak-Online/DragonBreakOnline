@@ -1,5 +1,21 @@
 [
   {
+    "title": "The Watch: city guards in Bruma",
+    "date": "2026-10-23",
+    "version": "Server update",
+    "tag": "New",
+    "sections": [
+      {
+        "heading": "The Watch",
+        "items": [
+          "Bruma's guards are back at their posts. More cities will follow.",
+          "Fighting the watch gains you nothing: a guard's body can't be searched, and hitting or killing a guard (or being hit by one) trains no skill.",
+          "A guard who brings you down drags you to the hold's jail for 30 minutes instead of the temple. When the city jail is full, you go to the hold's prison."
+        ]
+      }
+    ]
+  },
+  {
     "title": "The 23 October update",
     "date": "2026-10-23",
     "version": "Server update",

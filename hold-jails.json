@@ -1,0 +1,1101 @@
+{
+ "_comment": "Each hold's jail cells for the watch's NPC guards (guards.js, jail.js __dboJailByWatch), city jail first, then its prison as overflow (Nate, 23 Oct). Generated 23 Oct from the load order: every non-load door in the hold's jail and prison cells with a bed within 450 units, spot = 60% of the way from the door to that bed. Windhelm, Markarth and Winterhold's town jail have none yet.",
+ "holds": {
+  "whiterun": [
+   {
+    "kind": "jail",
+    "cellEdid": "WhiterunJail02",
+    "cell": "580a2:Skyrim.esm",
+    "door": "d471d:Skyrim.esm",
+    "spot": [
+     1832,
+     1157,
+     7225
+    ]
+   },
+   {
+    "kind": "jail",
+    "cellEdid": "WhiterunDragonsreachBasement",
+    "cell": "4a376:Skyrim.esm",
+    "door": "dcc9c:Skyrim.esm",
+    "spot": [
+     -1008,
+     -412,
+     -206
+    ]
+   },
+   {
+    "kind": "prison",
+    "cellEdid": "WhiterunPrison",
+    "cell": "4deb9:DragonBreak.esp",
+    "door": "4dfe4:DragonBreak.esp",
+    "spot": [
+     4286,
+     892,
+     394
+    ]
+   },
+   {
+    "kind": "prison",
+    "cellEdid": "WhiterunPrison",
+    "cell": "4deb9:DragonBreak.esp",
+    "door": "4e001:DragonBreak.esp",
+    "spot": [
+     4354,
+     1896,
+     397
+    ]
+   },
+   {
+    "kind": "prison",
+    "cellEdid": "WhiterunPrison",
+    "cell": "4deb9:DragonBreak.esp",
+    "door": "4dee7:DragonBreak.esp",
+    "spot": [
+     4791,
+     923,
+     401
+    ]
+   },
+   {
+    "kind": "prison",
+    "cellEdid": "WhiterunPrison",
+    "cell": "4deb9:DragonBreak.esp",
+    "door": "4e247:DragonBreak.esp",
+    "spot": [
+     3983,
+     1870,
+     397
+    ]
+   },
+   {
+    "kind": "prison",
+    "cellEdid": "WhiterunPrison",
+    "cell": "4deb9:DragonBreak.esp",
+    "door": "4e279:DragonBreak.esp",
+    "spot": [
+     4316,
+     2705,
+     403
+    ]
+   },
+   {
+    "kind": "prison",
+    "cellEdid": "WhiterunPrison",
+    "cell": "4deb9:DragonBreak.esp",
+    "door": "4dfd0:DragonBreak.esp",
+    "spot": [
+     3796,
+     894,
+     400
+    ]
+   },
+   {
+    "kind": "prison",
+    "cellEdid": "WhiterunPrison",
+    "cell": "4deb9:DragonBreak.esp",
+    "door": "4e24e:DragonBreak.esp",
+    "spot": [
+     3704,
+     1915,
+     396
+    ]
+   },
+   {
+    "kind": "prison",
+    "cellEdid": "WhiterunPrison",
+    "cell": "4deb9:DragonBreak.esp",
+    "door": "4e206:DragonBreak.esp",
+    "spot": [
+     3824,
+     2706,
+     400
+    ]
+   },
+   {
+    "kind": "prison",
+    "cellEdid": "WhiterunPrison",
+    "cell": "4deb9:DragonBreak.esp",
+    "door": "4df5d:DragonBreak.esp",
+    "spot": [
+     4869,
+     789,
+     403
+    ]
+   },
+   {
+    "kind": "prison",
+    "cellEdid": "WhiterunPrison",
+    "cell": "4deb9:DragonBreak.esp",
+    "door": "4df03:DragonBreak.esp",
+    "spot": [
+     4469,
+     2705,
+     403
+    ]
+   }
+  ],
+  "solitude": [
+   {
+    "kind": "jail",
+    "cellEdid": "SolitudeJail01",
+    "cell": "56e88:Skyrim.esm",
+    "door": "5e924:Skyrim.esm",
+    "spot": [
+     1646,
+     1347,
+     -566
+    ]
+   },
+   {
+    "kind": "jail",
+    "cellEdid": "SolitudeJail01",
+    "cell": "56e88:Skyrim.esm",
+    "door": "5e923:Skyrim.esm",
+    "spot": [
+     1890,
+     1795,
+     -566
+    ]
+   },
+   {
+    "kind": "jail",
+    "cellEdid": "SolitudeJail01",
+    "cell": "56e88:Skyrim.esm",
+    "door": "5e91e:Skyrim.esm",
+    "spot": [
+     1741,
+     2261,
+     -566
+    ]
+   },
+   {
+    "kind": "jail",
+    "cellEdid": "SolitudeJail01",
+    "cell": "56e88:Skyrim.esm",
+    "door": "5e922:Skyrim.esm",
+    "spot": [
+     885,
+     1337,
+     -566
+    ]
+   },
+   {
+    "kind": "jail",
+    "cellEdid": "SolitudeJail01",
+    "cell": "56e88:Skyrim.esm",
+    "door": "5e921:Skyrim.esm",
+    "spot": [
+     608,
+     1977,
+     -566
+    ]
+   },
+   {
+    "kind": "jail",
+    "cellEdid": "SolitudeJail01",
+    "cell": "56e88:Skyrim.esm",
+    "door": "5e920:Skyrim.esm",
+    "spot": [
+     751,
+     2265,
+     -566
+    ]
+   },
+   {
+    "kind": "jail",
+    "cellEdid": "SolitudeJail01",
+    "cell": "56e88:Skyrim.esm",
+    "door": "5e91f:Skyrim.esm",
+    "spot": [
+     1148,
+     2542,
+     -566
+    ]
+   },
+   {
+    "kind": "jail",
+    "cellEdid": "SolitudeJail01",
+    "cell": "56e88:Skyrim.esm",
+    "door": "c845b:Skyrim.esm",
+    "spot": [
+     1879,
+     2308,
+     -566
+    ]
+   },
+   {
+    "kind": "jail",
+    "cellEdid": "SolitudeJail01",
+    "cell": "56e88:Skyrim.esm",
+    "door": "ef4ab:Skyrim.esm",
+    "spot": [
+     1666,
+     2532,
+     -566
+    ]
+   },
+   {
+    "kind": "prison",
+    "cellEdid": "SolitudePrison01",
+    "cell": "47972:DragonBreak.esp",
+    "door": "47d1b:DragonBreak.esp",
+    "spot": [
+     3704,
+     1915,
+     396
+    ]
+   },
+   {
+    "kind": "prison",
+    "cellEdid": "SolitudePrison01",
+    "cell": "47972:DragonBreak.esp",
+    "door": "47b1f:DragonBreak.esp",
+    "spot": [
+     4286,
+     892,
+     394
+    ]
+   },
+   {
+    "kind": "prison",
+    "cellEdid": "SolitudePrison01",
+    "cell": "47972:DragonBreak.esp",
+    "door": "47c9d:DragonBreak.esp",
+    "spot": [
+     4869,
+     789,
+     403
+    ]
+   },
+   {
+    "kind": "prison",
+    "cellEdid": "SolitudePrison01",
+    "cell": "47972:DragonBreak.esp",
+    "door": "47d92:DragonBreak.esp",
+    "spot": [
+     3796,
+     894,
+     400
+    ]
+   },
+   {
+    "kind": "prison",
+    "cellEdid": "SolitudePrison01",
+    "cell": "47972:DragonBreak.esp",
+    "door": "479be:DragonBreak.esp",
+    "spot": [
+     4316,
+     2705,
+     403
+    ]
+   },
+   {
+    "kind": "prison",
+    "cellEdid": "SolitudePrison01",
+    "cell": "47972:DragonBreak.esp",
+    "door": "47a16:DragonBreak.esp",
+    "spot": [
+     3983,
+     1870,
+     397
+    ]
+   },
+   {
+    "kind": "prison",
+    "cellEdid": "SolitudePrison01",
+    "cell": "47972:DragonBreak.esp",
+    "door": "47abe:DragonBreak.esp",
+    "spot": [
+     4354,
+     1896,
+     397
+    ]
+   },
+   {
+    "kind": "prison",
+    "cellEdid": "SolitudePrison01",
+    "cell": "47972:DragonBreak.esp",
+    "door": "47983:DragonBreak.esp",
+    "spot": [
+     4469,
+     2705,
+     403
+    ]
+   },
+   {
+    "kind": "prison",
+    "cellEdid": "SolitudePrison01",
+    "cell": "47972:DragonBreak.esp",
+    "door": "47bfa:DragonBreak.esp",
+    "spot": [
+     3824,
+     2706,
+     400
+    ]
+   },
+   {
+    "kind": "prison",
+    "cellEdid": "SolitudePrison01",
+    "cell": "47972:DragonBreak.esp",
+    "door": "47ace:DragonBreak.esp",
+    "spot": [
+     4791,
+     923,
+     401
+    ]
+   }
+  ],
+  "riften": [
+   {
+    "kind": "jail",
+    "cellEdid": "RiftenJail01",
+    "cell": "a8b23:Skyrim.esm",
+    "door": "a8f38:Skyrim.esm",
+    "spot": [
+     1697,
+     602,
+     266
+    ]
+   },
+   {
+    "kind": "jail",
+    "cellEdid": "RiftenJail01",
+    "cell": "a8b23:Skyrim.esm",
+    "door": "a8e59:Skyrim.esm",
+    "spot": [
+     717,
+     478,
+     10
+    ]
+   },
+   {
+    "kind": "jail",
+    "cellEdid": "RiftenJail01",
+    "cell": "a8b23:Skyrim.esm",
+    "door": "a8e58:Skyrim.esm",
+    "spot": [
+     708,
+     172,
+     10
+    ]
+   },
+   {
+    "kind": "jail",
+    "cellEdid": "RiftenJail01",
+    "cell": "a8b23:Skyrim.esm",
+    "door": "a8e56:Skyrim.esm",
+    "spot": [
+     1218,
+     376,
+     10
+    ]
+   },
+   {
+    "kind": "jail",
+    "cellEdid": "RiftenJail01",
+    "cell": "a8b23:Skyrim.esm",
+    "door": "a8e52:Skyrim.esm",
+    "spot": [
+     1218,
+     581,
+     10
+    ]
+   },
+   {
+    "kind": "jail",
+    "cellEdid": "RiftenJail01",
+    "cell": "a8b23:Skyrim.esm",
+    "door": "a8e4e:Skyrim.esm",
+    "spot": [
+     582,
+     391,
+     266
+    ]
+   },
+   {
+    "kind": "jail",
+    "cellEdid": "RiftenJail01",
+    "cell": "a8b23:Skyrim.esm",
+    "door": "a8e4a:Skyrim.esm",
+    "spot": [
+     462,
+     -39,
+     266
+    ]
+   },
+   {
+    "kind": "jail",
+    "cellEdid": "RiftenJail01",
+    "cell": "a8b23:Skyrim.esm",
+    "door": "a8e46:Skyrim.esm",
+    "spot": [
+     1595,
+     602,
+     266
+    ]
+   },
+   {
+    "kind": "jail",
+    "cellEdid": "RiftenJail01",
+    "cell": "a8b23:Skyrim.esm",
+    "door": "a8e43:Skyrim.esm",
+    "spot": [
+     1566,
+     290,
+     266
+    ]
+   },
+   {
+    "kind": "jail",
+    "cellEdid": "RiftenJail01",
+    "cell": "a8b23:Skyrim.esm",
+    "door": "ab46a:Skyrim.esm",
+    "spot": [
+     1682,
+     -112,
+     266
+    ]
+   },
+   {
+    "kind": "jail",
+    "cellEdid": "RiftenJail01",
+    "cell": "a8b23:Skyrim.esm",
+    "door": "e8217:Skyrim.esm",
+    "spot": [
+     1682,
+     -112,
+     266
+    ]
+   },
+   {
+    "kind": "prison",
+    "cellEdid": "RiftenPrison",
+    "cell": "15ee0:DragonBreak Online Edits.esp",
+    "door": "15f5d:DragonBreak Online Edits.esp",
+    "spot": [
+     3704,
+     1915,
+     396
+    ]
+   },
+   {
+    "kind": "prison",
+    "cellEdid": "RiftenPrison",
+    "cell": "15ee0:DragonBreak Online Edits.esp",
+    "door": "1615c:DragonBreak Online Edits.esp",
+    "spot": [
+     3983,
+     1870,
+     397
+    ]
+   },
+   {
+    "kind": "prison",
+    "cellEdid": "RiftenPrison",
+    "cell": "15ee0:DragonBreak Online Edits.esp",
+    "door": "1600f:DragonBreak Online Edits.esp",
+    "spot": [
+     3824,
+     2706,
+     400
+    ]
+   },
+   {
+    "kind": "prison",
+    "cellEdid": "RiftenPrison",
+    "cell": "15ee0:DragonBreak Online Edits.esp",
+    "door": "162eb:DragonBreak Online Edits.esp",
+    "spot": [
+     4354,
+     1896,
+     397
+    ]
+   },
+   {
+    "kind": "prison",
+    "cellEdid": "RiftenPrison",
+    "cell": "15ee0:DragonBreak Online Edits.esp",
+    "door": "1606b:DragonBreak Online Edits.esp",
+    "spot": [
+     3796,
+     894,
+     400
+    ]
+   },
+   {
+    "kind": "prison",
+    "cellEdid": "RiftenPrison",
+    "cell": "15ee0:DragonBreak Online Edits.esp",
+    "door": "16188:DragonBreak Online Edits.esp",
+    "spot": [
+     4791,
+     923,
+     401
+    ]
+   },
+   {
+    "kind": "prison",
+    "cellEdid": "RiftenPrison",
+    "cell": "15ee0:DragonBreak Online Edits.esp",
+    "door": "1611e:DragonBreak Online Edits.esp",
+    "spot": [
+     4469,
+     2705,
+     403
+    ]
+   },
+   {
+    "kind": "prison",
+    "cellEdid": "RiftenPrison",
+    "cell": "15ee0:DragonBreak Online Edits.esp",
+    "door": "1609a:DragonBreak Online Edits.esp",
+    "spot": [
+     4286,
+     892,
+     394
+    ]
+   },
+   {
+    "kind": "prison",
+    "cellEdid": "RiftenPrison",
+    "cell": "15ee0:DragonBreak Online Edits.esp",
+    "door": "16025:DragonBreak Online Edits.esp",
+    "spot": [
+     4316,
+     2705,
+     403
+    ]
+   },
+   {
+    "kind": "prison",
+    "cellEdid": "RiftenPrison",
+    "cell": "15ee0:DragonBreak Online Edits.esp",
+    "door": "162aa:DragonBreak Online Edits.esp",
+    "spot": [
+     4869,
+     789,
+     403
+    ]
+   }
+  ],
+  "dawnstar": [
+   {
+    "kind": "jail",
+    "cellEdid": "DawnstarBarracksJail",
+    "cell": "eb440:Skyrim.esm",
+    "door": "ec564:Skyrim.esm",
+    "spot": [
+     1575,
+     384,
+     10
+    ]
+   },
+   {
+    "kind": "prison",
+    "cellEdid": "DawnstarPrison",
+    "cell": "153ee:DragonBreak Online Edits.esp",
+    "door": "15819:DragonBreak Online Edits.esp",
+    "spot": [
+     4286,
+     892,
+     394
+    ]
+   },
+   {
+    "kind": "prison",
+    "cellEdid": "DawnstarPrison",
+    "cell": "153ee:DragonBreak Online Edits.esp",
+    "door": "15697:DragonBreak Online Edits.esp",
+    "spot": [
+     3796,
+     894,
+     400
+    ]
+   },
+   {
+    "kind": "prison",
+    "cellEdid": "DawnstarPrison",
+    "cell": "153ee:DragonBreak Online Edits.esp",
+    "door": "1543b:DragonBreak Online Edits.esp",
+    "spot": [
+     3824,
+     2706,
+     400
+    ]
+   },
+   {
+    "kind": "prison",
+    "cellEdid": "DawnstarPrison",
+    "cell": "153ee:DragonBreak Online Edits.esp",
+    "door": "154b9:DragonBreak Online Edits.esp",
+    "spot": [
+     4469,
+     2705,
+     403
+    ]
+   },
+   {
+    "kind": "prison",
+    "cellEdid": "DawnstarPrison",
+    "cell": "153ee:DragonBreak Online Edits.esp",
+    "door": "155e0:DragonBreak Online Edits.esp",
+    "spot": [
+     4869,
+     789,
+     403
+    ]
+   },
+   {
+    "kind": "prison",
+    "cellEdid": "DawnstarPrison",
+    "cell": "153ee:DragonBreak Online Edits.esp",
+    "door": "156d9:DragonBreak Online Edits.esp",
+    "spot": [
+     4791,
+     923,
+     401
+    ]
+   },
+   {
+    "kind": "prison",
+    "cellEdid": "DawnstarPrison",
+    "cell": "153ee:DragonBreak Online Edits.esp",
+    "door": "1570f:DragonBreak Online Edits.esp",
+    "spot": [
+     4354,
+     1896,
+     397
+    ]
+   },
+   {
+    "kind": "prison",
+    "cellEdid": "DawnstarPrison",
+    "cell": "153ee:DragonBreak Online Edits.esp",
+    "door": "15581:DragonBreak Online Edits.esp",
+    "spot": [
+     4316,
+     2705,
+     403
+    ]
+   },
+   {
+    "kind": "prison",
+    "cellEdid": "DawnstarPrison",
+    "cell": "153ee:DragonBreak Online Edits.esp",
+    "door": "157df:DragonBreak Online Edits.esp",
+    "spot": [
+     3704,
+     1915,
+     396
+    ]
+   },
+   {
+    "kind": "prison",
+    "cellEdid": "DawnstarPrison",
+    "cell": "153ee:DragonBreak Online Edits.esp",
+    "door": "155fa:DragonBreak Online Edits.esp",
+    "spot": [
+     3983,
+     1870,
+     397
+    ]
+   }
+  ],
+  "falkreath": [
+   {
+    "kind": "jail",
+    "cellEdid": "FalkreathBarracksJail",
+    "cell": "ef324:Skyrim.esm",
+    "door": "ef434:Skyrim.esm",
+    "spot": [
+     1690,
+     352,
+     10
+    ]
+   },
+   {
+    "kind": "prison",
+    "cellEdid": "FalkreathPrison",
+    "cell": "14e67:DragonBreak Online Edits.esp",
+    "door": "15258:DragonBreak Online Edits.esp",
+    "spot": [
+     3704,
+     1915,
+     396
+    ]
+   },
+   {
+    "kind": "prison",
+    "cellEdid": "FalkreathPrison",
+    "cell": "14e67:DragonBreak Online Edits.esp",
+    "door": "15059:DragonBreak Online Edits.esp",
+    "spot": [
+     4869,
+     789,
+     403
+    ]
+   },
+   {
+    "kind": "prison",
+    "cellEdid": "FalkreathPrison",
+    "cell": "14e67:DragonBreak Online Edits.esp",
+    "door": "14ffa:DragonBreak Online Edits.esp",
+    "spot": [
+     4316,
+     2705,
+     403
+    ]
+   },
+   {
+    "kind": "prison",
+    "cellEdid": "FalkreathPrison",
+    "cell": "14e67:DragonBreak Online Edits.esp",
+    "door": "15292:DragonBreak Online Edits.esp",
+    "spot": [
+     4286,
+     892,
+     394
+    ]
+   },
+   {
+    "kind": "prison",
+    "cellEdid": "FalkreathPrison",
+    "cell": "14e67:DragonBreak Online Edits.esp",
+    "door": "15152:DragonBreak Online Edits.esp",
+    "spot": [
+     4791,
+     923,
+     401
+    ]
+   },
+   {
+    "kind": "prison",
+    "cellEdid": "FalkreathPrison",
+    "cell": "14e67:DragonBreak Online Edits.esp",
+    "door": "15073:DragonBreak Online Edits.esp",
+    "spot": [
+     3983,
+     1870,
+     397
+    ]
+   },
+   {
+    "kind": "prison",
+    "cellEdid": "FalkreathPrison",
+    "cell": "14e67:DragonBreak Online Edits.esp",
+    "door": "14eb4:DragonBreak Online Edits.esp",
+    "spot": [
+     3824,
+     2706,
+     400
+    ]
+   },
+   {
+    "kind": "prison",
+    "cellEdid": "FalkreathPrison",
+    "cell": "14e67:DragonBreak Online Edits.esp",
+    "door": "15188:DragonBreak Online Edits.esp",
+    "spot": [
+     4354,
+     1896,
+     397
+    ]
+   },
+   {
+    "kind": "prison",
+    "cellEdid": "FalkreathPrison",
+    "cell": "14e67:DragonBreak Online Edits.esp",
+    "door": "15110:DragonBreak Online Edits.esp",
+    "spot": [
+     3796,
+     894,
+     400
+    ]
+   },
+   {
+    "kind": "prison",
+    "cellEdid": "FalkreathPrison",
+    "cell": "14e67:DragonBreak Online Edits.esp",
+    "door": "14f32:DragonBreak Online Edits.esp",
+    "spot": [
+     4469,
+     2705,
+     403
+    ]
+   }
+  ],
+  "morthal": [
+   {
+    "kind": "jail",
+    "cellEdid": "MorthalGuardhouseJail",
+    "cell": "5d010:Skyrim.esm",
+    "door": "ec565:Skyrim.esm",
+    "spot": [
+     1434,
+     286,
+     10
+    ]
+   },
+   {
+    "kind": "prison",
+    "cellEdid": "MorthalPrison",
+    "cell": "1597d:DragonBreak Online Edits.esp",
+    "door": "15bbb:DragonBreak Online Edits.esp",
+    "spot": [
+     4469,
+     2705,
+     403
+    ]
+   },
+   {
+    "kind": "prison",
+    "cellEdid": "MorthalPrison",
+    "cell": "1597d:DragonBreak Online Edits.esp",
+    "door": "15b08:DragonBreak Online Edits.esp",
+    "spot": [
+     3796,
+     894,
+     400
+    ]
+   },
+   {
+    "kind": "prison",
+    "cellEdid": "MorthalPrison",
+    "cell": "1597d:DragonBreak Online Edits.esp",
+    "door": "15d88:DragonBreak Online Edits.esp",
+    "spot": [
+     4354,
+     1896,
+     397
+    ]
+   },
+   {
+    "kind": "prison",
+    "cellEdid": "MorthalPrison",
+    "cell": "1597d:DragonBreak Online Edits.esp",
+    "door": "15bf9:DragonBreak Online Edits.esp",
+    "spot": [
+     3983,
+     1870,
+     397
+    ]
+   },
+   {
+    "kind": "prison",
+    "cellEdid": "MorthalPrison",
+    "cell": "1597d:DragonBreak Online Edits.esp",
+    "door": "15d47:DragonBreak Online Edits.esp",
+    "spot": [
+     4869,
+     789,
+     403
+    ]
+   },
+   {
+    "kind": "prison",
+    "cellEdid": "MorthalPrison",
+    "cell": "1597d:DragonBreak Online Edits.esp",
+    "door": "15aac:DragonBreak Online Edits.esp",
+    "spot": [
+     3824,
+     2706,
+     400
+    ]
+   },
+   {
+    "kind": "prison",
+    "cellEdid": "MorthalPrison",
+    "cell": "1597d:DragonBreak Online Edits.esp",
+    "door": "15ac2:DragonBreak Online Edits.esp",
+    "spot": [
+     4316,
+     2705,
+     403
+    ]
+   },
+   {
+    "kind": "prison",
+    "cellEdid": "MorthalPrison",
+    "cell": "1597d:DragonBreak Online Edits.esp",
+    "door": "159fa:DragonBreak Online Edits.esp",
+    "spot": [
+     3704,
+     1915,
+     396
+    ]
+   },
+   {
+    "kind": "prison",
+    "cellEdid": "MorthalPrison",
+    "cell": "1597d:DragonBreak Online Edits.esp",
+    "door": "15c25:DragonBreak Online Edits.esp",
+    "spot": [
+     4791,
+     923,
+     401
+    ]
+   },
+   {
+    "kind": "prison",
+    "cellEdid": "MorthalPrison",
+    "cell": "1597d:DragonBreak Online Edits.esp",
+    "door": "15b37:DragonBreak Online Edits.esp",
+    "spot": [
+     4286,
+     892,
+     394
+    ]
+   }
+  ],
+  "winterhold": [
+   {
+    "kind": "prison",
+    "cellEdid": "WinterholdPrison01",
+    "cell": "4e4b4:DragonBreak.esp",
+    "door": "4e81b:DragonBreak.esp",
+    "spot": [
+     3704,
+     1915,
+     396
+    ]
+   },
+   {
+    "kind": "prison",
+    "cellEdid": "WinterholdPrison01",
+    "cell": "4e4b4:DragonBreak.esp",
+    "door": "4e5df:DragonBreak.esp",
+    "spot": [
+     4286,
+     892,
+     394
+    ]
+   },
+   {
+    "kind": "prison",
+    "cellEdid": "WinterholdPrison01",
+    "cell": "4e4b4:DragonBreak.esp",
+    "door": "4e4fe:DragonBreak.esp",
+    "spot": [
+     4469,
+     2705,
+     403
+    ]
+   },
+   {
+    "kind": "prison",
+    "cellEdid": "WinterholdPrison01",
+    "cell": "4e4b4:DragonBreak.esp",
+    "door": "4e846:DragonBreak.esp",
+    "spot": [
+     4316,
+     2705,
+     403
+    ]
+   },
+   {
+    "kind": "prison",
+    "cellEdid": "WinterholdPrison01",
+    "cell": "4e4b4:DragonBreak.esp",
+    "door": "4e5fc:DragonBreak.esp",
+    "spot": [
+     4354,
+     1896,
+     397
+    ]
+   },
+   {
+    "kind": "prison",
+    "cellEdid": "WinterholdPrison01",
+    "cell": "4e4b4:DragonBreak.esp",
+    "door": "4e4e2:DragonBreak.esp",
+    "spot": [
+     4791,
+     923,
+     401
+    ]
+   },
+   {
+    "kind": "prison",
+    "cellEdid": "WinterholdPrison01",
+    "cell": "4e4b4:DragonBreak.esp",
+    "door": "4e814:DragonBreak.esp",
+    "spot": [
+     3983,
+     1870,
+     397
+    ]
+   },
+   {
+    "kind": "prison",
+    "cellEdid": "WinterholdPrison01",
+    "cell": "4e4b4:DragonBreak.esp",
+    "door": "4e558:DragonBreak.esp",
+    "spot": [
+     4869,
+     789,
+     403
+    ]
+   },
+   {
+    "kind": "prison",
+    "cellEdid": "WinterholdPrison01",
+    "cell": "4e4b4:DragonBreak.esp",
+    "door": "4e5cb:DragonBreak.esp",
+    "spot": [
+     3796,
+     894,
+     400
+    ]
+   },
+   {
+    "kind": "prison",
+    "cellEdid": "WinterholdPrison01",
+    "cell": "4e4b4:DragonBreak.esp",
+    "door": "4e7d3:DragonBreak.esp",
+    "spot": [
+     3824,
+     2706,
+     400
+    ]
+   }
+  ],
+  "windhelm": [],
+  "markarth": [],
+  "bruma": [
+   {
+    "kind": "jail",
+    "cellEdid": "CYRBrumaCastleDungeon",
+    "cell": "6c410:BSHeartland.esm",
+    "door": "6c43c:BSHeartland.esm",
+    "spot": [
+     323,
+     -978,
+     13
+    ]
+   },
+   {
+    "kind": "jail",
+    "cellEdid": "CYRBrumaCastleDungeon",
+    "cell": "6c410:BSHeartland.esm",
+    "door": "6c438:BSHeartland.esm",
+    "spot": [
+     -231,
+     -435,
+     13
+    ]
+   },
+   {
+    "kind": "jail",
+    "cellEdid": "CYRBrumaCastleDungeon",
+    "cell": "6c410:BSHeartland.esm",
+    "door": "6c437:BSHeartland.esm",
+    "spot": [
+     -231,
+     -537,
+     13
+    ]
+   }
+  ]
+ }
+}

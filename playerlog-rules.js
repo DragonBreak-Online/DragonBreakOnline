@@ -446,6 +446,8 @@ AUDIT_VERBS.BEAST.roles = R_BY([[/ (?:to|from) $/, 'target']]);
 // FRENZY <werewolf> for N s, first on <target> (frenzy.js): ids, numbers and fixed reasons only
 clean_('FRENZY');
 AUDIT_VERBS.FRENZY.roles = R_BY([[/ killed by $/, 'by'], [/ first on $/, 'target'], [/ for bringing down $/, 'target'], [/ \(GM $/, 'staff'], [/: staff $/, 'staff']]);
+// GUARDS <who> placed|removed guard post <hold> #n, ran a jail test, brought down by the watch of <hold> (guards.js): ids, holds, numbers
+clean_('GUARDS');
 AUDIT_VERBS.FEED.roles = R_BY([[/ asked $/, 'target'], [/ let $/, 'target'], [/ refused $/, 'target'], [/ feed on $/, 'target']]);
 AUDIT_VERBS.ROPE.roles = R_BY([[/ cut $/, 'target'], [/ of $/, 'captor']]);
 AUDIT_VERBS.STRUGGLE.roles = R_BY([[/ of $/, 'captor']]);
@@ -1429,6 +1431,10 @@ execution.js EXECUTION 151542a7 clean
 execution.js EXECUTION 10d27374 clean
 execution.js EXECUTION 76ea358d clean
 factiongear.js FACTIONGEAR 79b8dc7c clean
+guards.js GUARDS f67e7ce9 clean
+guards.js GUARDS 64f64081 clean
+guards.js GUARDS 89ac5f53 clean
+guards.js GUARDS c54052ef clean
 frenzy.js FRENZY 317ea9b7 clean
 frenzy.js FRENZY b5c35900 clean
 frenzy.js FRENZY d855ce67 clean
@@ -1522,6 +1528,7 @@ guilds.js FACTION bdc6897e parsed
 jail.js JAIL 9a6540c2 clean
 jail.js JAIL 9a6540c2 clean
 jail.js JAIL 0e8664e2 clean
+jail.js JAIL 5fc441ab clean
 jail.js JAIL 1b911941 clean
 jail.js JAIL ab248e05 clean
 jail.js JAIL cca6b801 clean

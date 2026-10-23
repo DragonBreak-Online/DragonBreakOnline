@@ -245,6 +245,25 @@ module.exports = (api) => {
     if (concordat) { try { if (typeof globalThis.__dboConcordatJailed === 'function') globalThis.__dboConcordatJailed(guard >>> 0, prisoner >>> 0, mins, jailName(cell)); } catch (e) { log('jail: concordat record failed', e.message); } }
   };
 
+  // The hold's watch (guards.js) jails a player its NPC guards brought down: the first free cell of hold-jails.json, the
+  // city jail before its prison (Nate, 23 Oct: "use the prisons as overflow"). Returns where to put the prisoner, or null
+  const HOLD_JAILS = (() => { try { return JSON.parse(fs.readFileSync(path.resolve('hold-jails.json'), 'utf8')).holds || {}; } catch (e) { log('jail: hold-jails.json unreadable, the watch jails nobody', e.message); return {}; } })();
+  globalThis.__dboJailByWatch = (prisoner, hold, mins, byLabel) => {
+    prisoner = prisoner >>> 0;
+    if (sentenceOf(prisoner)) return null;
+    for (const c of HOLD_JAILS[String(hold)] || []) {
+      const door = idOf(c.door); if (!door || occupantOf(door)) continue;
+      const cell = norm(c.cell);
+      set(prisoner, 'private.dboSentence', { door, cell, totalMs: mins * MIN, servedMs: 0, by: String(byLabel || 'the watch'), at: Date.now(), arrester: 0, watch: String(hold) });
+      set(door, 'private.dboCell', { prisoner, name: display(prisoner), picked: false });
+      set(door, 'isOpen', false);
+      lastSeen.delete(prisoner);
+      audit(`JAIL ${who(prisoner)} jailed by the watch of ${hold} for ${mins} min in ${jailName(cell)} (${c.kind})`);
+      return { cellDesc: String(c.cell), pos: c.spot, kind: c.kind, name: jailName(cell) };
+    }
+    return null;
+  };
+
   // Ends a sentence, served or released; the door's record goes with it
   const finish = (prisoner, how) => {
     const s = sentenceOf(prisoner); if (!s) return;
