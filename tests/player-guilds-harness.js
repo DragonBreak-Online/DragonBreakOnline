@@ -196,6 +196,23 @@ load();
 ok('a reload reads the guilds back, with their members', bands().some((b) => b.id === LID) && !!globalThis.__dboBandOf(MASTER), [bands().map((b) => b.id), globalThis.__dboBandOf(MASTER)]);
 ok('player-guilds.json is gitignored (runtime)', fs.readFileSync(path.join(ROOT, '.gitignore'), 'utf8').split('\n').includes('player-guilds.json'));
 
+// ---- werewolf packs hold at most packs.maxMembers (Nate, 23 Oct: 5) --------------------------------------------------
+{
+  const PACK = 'pack-of-the-jerall';
+  const st = globalThis.__dboGuildState;
+  globalThis.__dboSuperKind = () => 'werewolf';
+  const add = (q) => { told.length = 0; st.nonces.set(GM, 'pk'); (handlers.factionAdd || []).forEach((f) => f(GM, ['pk', PACK, q])); return st.members[PACK] || {}; };
+  st.members[PACK] = {};
+  for (let i = 0; i < 4; i++) st.members[PACK][String(0x900 + i)] = { rank: 1, name: `Wolf${i}` };
+  ok('a pack of four takes a fifth', !!add('Third')[String(THIRD)], Object.keys(st.members[PACK] || {}).length);
+  ok('a pack of five refuses a sixth, and says so plainly', !add('Mage')[String(MAGE)] && /is full: a pack runs 5 strong/.test(JSON.stringify(drawn.slice(-1))), drawn.slice(-1));
+  CFG.packs = { maxMembers: 6 }; load();
+  globalThis.__dboGuildState.members[PACK] = Object.assign({}, st.members[PACK]);
+  const st2 = globalThis.__dboGuildState; told.length = 0; st2.nonces.set(GM, 'pk2'); (handlers.factionAdd || []).forEach((f) => f(GM, ['pk2', PACK, 'Mage']));
+  ok('packs.maxMembers sets the size', !!(st2.members[PACK] || {})[String(MAGE)], Object.keys(st2.members[PACK] || {}).length);
+  delete globalThis.__dboSuperKind;
+}
+
 process.chdir(ROOT);
 try { fs.rmSync(dir, { recursive: true, force: true }); } catch (e) { /* tmp */ }
 console.log(fails ? `\n${fails} FAILED` : '\nall passed');

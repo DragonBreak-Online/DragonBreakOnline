@@ -109,6 +109,9 @@ module.exports = (api) => {
     compatibleIds: ['imperial-cult', 'great-faiths', 'vigil-of-stendarr'],
     collegesCompatible: true,
   }, (cfg.playerGuilds || {}));
+  // A werewolf pack holds at most packs.maxMembers, its Alpha included (Nate, 23 Oct: "5 werewolves per pack")
+  const PACKS = Object.assign({ maxMembers: 5 }, (cfg.packs || {}));
+  const packFull = (fid) => { const f = FACTIONS.get(fid); return !!f && f.kind === 'pack' && Object.keys(rosterOf(fid)).length >= Math.max(1, Number(PACKS.maxMembers) || 5); };
   const BAND_RANKS = [{ title: 'Guildmaster', role: 'leader' }, { title: 'Officer', role: 'officer' }, { title: 'Member', role: 'member' }];
   const bandDefs = () => { const d = readJson(BAND_PATH, { guilds: [] }); return Array.isArray(d.guilds) ? d.guilds : []; };
   const isBand = (fid) => { const f = FACTIONS.get(String(fid)); return !!f && f.kind === BAND_KIND; };
@@ -293,6 +296,7 @@ module.exports = (api) => {
   // opts.alpha: a pack challenge, which seats the Alpha as it always has (Nate, 23 Oct: "Keep pack alphas the same")
   const setMember = (fid, a, rank, by, opts) => {
     const f = FACTIONS.get(fid);
+    if (f && f.kind === 'pack' && !entryOf(fid, a) && packFull(fid)) return `${f.name} is full: a pack runs ${Math.max(1, Number(PACKS.maxMembers) || 5)} strong, its Alpha included.`;
     if (f && f.kind === BAND_KIND && !entryOf(fid, a)) {
       if (bandFull(fid)) return `${f.name} is full: a guild holds ${Math.max(1, Number(BAND.maxMembers) || 10)}, its Guildmaster included.`;
       const had = bandOf(a);
