@@ -1489,10 +1489,14 @@ export class HousingSystem implements System {
   }
 
   // Staff who override housing claims: Lead GM and above (TIER_CAPS.spawn). A GM observes; opening, transferring, revoking
-  // or cutting keys for someone else's property is not theirs (claude-jake's review A3-1, 2026-09-28)
+  // or cutting keys for someone else's property is not theirs (claude-jake's review A3-1, 2026-09-28). Only on a staff
+  // character: the gameplay's staff rules (staffguard.js __dboAdminGate 'housing') refuse the override on any other one
   private isAdmin(ctx: SystemContext, actorId: number): boolean {
     const tier = adminTierOf(ctx.svr as Mp, actorId, this.roleCfg);
-    return tier !== null && TIER_CAPS[tier].spawn;
+    if (tier === null || !TIER_CAPS[tier].spawn) return false;
+    const gate = (globalThis as any).__dboAdminGate;
+    if (typeof gate !== "function") return true;
+    try { return !gate(actorId, "housing", {}); } catch { return true; }
   }
 
   // officials.json (via zones) first, then the backend faction rows "hold:<slug>:<rank>".
