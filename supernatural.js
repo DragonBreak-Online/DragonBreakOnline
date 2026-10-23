@@ -1043,6 +1043,7 @@ module.exports = (api) => {
     const s = stateOf(a); if (!s || !s.disease) return false;
     const kind = s.disease.kind; s.disease = null; saveState(a, s);
     if (kind === 'vampire') removeSpell(a, SANGUINARE);
+    if (typeof globalThis.__dboFeverEnded === 'function') globalThis.__dboFeverEnded(a);
     personal(a, told || 'The fever breaks.'); log(`supernatural: ${display(a)} cured of the ${kind} disease (${how})`);
     return true;
   };
@@ -2508,6 +2509,7 @@ module.exports = (api) => {
           label: 'When it peaks', value: wolf ? 'You become a werewolf' : 'You become a vampire',
           hint: 'There is no trial: when the fever has run its course, the curse takes you wherever you are (unless it is cured first).',
         },
+        ...feverRows(s),
         { label: 'A cure', value: 'Still possible', hint: 'A held prayer at a shrine of the Divines, a Cure Disease potion, or food or a potion that cures disease breaks the fever (an ingredient only when curing disease is its first effect). Prayers to the Daedric Princes or the older faiths, or away from a shrine, do not.' },
       ],
       powers: [],
@@ -2645,6 +2647,7 @@ module.exports = (api) => {
         // The incubation done, the carrier turns: no trial (Nate, 18 Oct)
         log(`supernatural: ${display(a)} fever peaked; they turn`);
         if (s.disease.kind === 'vampire') becomeVampire(a, false, true); else becomeWerewolf(a, false, true);
+        feverEnded(a);
         continue;
       }
       if (s.kind === 'vampire' && s.unfed) tickUnfed(a, s, day);
@@ -2668,6 +2671,150 @@ module.exports = (api) => {
       }
     }
   });
+  // ---- the fever's debuffs (Nate, 23 Oct: "fevers need debuffs") ----------------------------------------------------------
+  // Three stages by the share of the incubation played: early, worsening, near the peak. Every effect is made where the
+  // server really decides: health and stamina recovery through the needs system's client rates (__dboSuperRateMult, as the
+  // withering), magicka recovery through MagickaRateMult (re-sent, since Death's Chill writes it too), food through
+  // __dboSuperFoodMult, fire through __dboSuperDamageMult, daylight's toll as a stamina write like the sun's health one, and
+  // rest.js asks __dboFeverRestless before Well Rested. A cure or the turning ends them at once (feverEnded).
+  const FEVER_DEFAULTS = {
+    enabled: true, worseningAt: 1 / 3, peakAt: 2 / 3, noWellRested: true, reapplySeconds: 60,
+    vampire: [
+      { staminaRegen: 0.75 },
+      { staminaRegen: 0.75, healthRegen: 0.5, sunStaminaPerMinute: 0.06, sunStaminaFloor: 0.3 },
+      { staminaRegen: 0.75, healthRegen: 0.25, sunStaminaPerMinute: 0.06, sunStaminaFloor: 0.3, food: 0.5, fireTaken: 0.15 },
+    ],
+    werewolf: [
+      {},
+      { magickaRegen: 0.5, cookedFood: 0.5 },
+      { magickaRegen: 0.5, cookedFood: 0.5, healthRegenDay: 0.5, nightShake: { everyMinutes: 3, chance: 0.5, strength: 0.2, seconds: 1.5 } },
+    ],
+  };
+  const FD = (() => {
+    const o = C.feverDebuffs && typeof C.feverDebuffs === 'object' ? C.feverDebuffs : {};
+    const stages = (kind) => FEVER_DEFAULTS[kind].map((d, i) => Object.assign({}, d, (Array.isArray(o[kind]) && o[kind][i]) || {}));
+    return Object.assign({}, FEVER_DEFAULTS, o, { vampire: stages('vampire'), werewolf: stages('werewolf') });
+  })();
+  const FEVER_STAGE_NAMES = ['early', 'worsening', 'near its peak'];
+  // 1..3 for a carrier while the debuffs are on, else 0
+  const feverStage = (s) => {
+    if (FD.enabled === false || !s || !s.disease || (s.disease.kind !== 'vampire' && s.disease.kind !== 'werewolf')) return 0;
+    const p = playedOf(s.disease) / Math.max(1e-9, Number(C.incubationDays) || 3);
+    return p >= Number(FD.peakAt) ? 3 : p >= Number(FD.worseningAt) ? 2 : 1;
+  };
+  const feverOf = (a) => { const s = stateOf(a); const st = feverStage(s); return st ? { kind: s.disease.kind, stage: st, fx: FD[s.disease.kind][st - 1] || {}, s } : null; };
+  const isDay = () => { const c = clock(); return !!c && typeof c.isNight === 'function' && !c.isNight(); };
+  const share = (v, d) => { const n = Number(v); return Number.isFinite(n) && n >= 0 ? n : d; };
+  const feverRate = (a, av) => {
+    const f = feverOf(a); if (!f) return 1;
+    if (av === 'StaminaRateMult') return share(f.fx.staminaRegen, 1);
+    if (av !== 'HealRateMult') return 1;
+    return share(f.fx.healthRegen, 1) * (isDay() ? share(f.fx.healthRegenDay, 1) : 1);
+  };
+  globalThis.__dboFeverRateMult = feverRate;
+  const vampireRateMult = globalThis.__dboSuperRateMult;
+  globalThis.__dboSuperRateMult = (a, av) => +(vampireRateMult(a, av) * feverRate(a, av)).toFixed(3);
+  // Cooked food by editor id: the needs system's meal words (stews, roasts, anything "cooked")
+  const COOKED_WORDS = (Array.isArray(FD.cookedWords) ? FD.cookedWords : Array.isArray((cfg.needs || {}).mealWords) ? cfg.needs.mealWords : ['cooked', 'stew', 'roast', 'grilled', 'steak', 'soup', 'pie'])
+    .map((w) => String(w).toLowerCase()).filter(Boolean);
+  const isCooked = (baseId) => { const r = baseId ? recordOf(Number(baseId) >>> 0) : null; const e = String((r && r.editorId) || '').toLowerCase(); return !!e && COOKED_WORDS.some((w) => e.includes(w)); };
+  const feverFood = (a, baseId) => {
+    const f = feverOf(a); if (!f) return 1;
+    return share(f.fx.food, 1) * (f.fx.cookedFood !== undefined && isCooked(baseId) ? share(f.fx.cookedFood, 1) : 1);
+  };
+  const vampireFoodMult = globalThis.__dboSuperFoodMult;
+  globalThis.__dboSuperFoodMult = (a, baseId) => +(vampireFoodMult(a, baseId) * feverFood(a, baseId)).toFixed(3);
+  // gamemode.js says this when food fills less, instead of the vampire's "ash" line
+  globalThis.__dboSuperFoodLine = (a, baseId) => {
+    const s = stateOf(a);
+    if (s && s.kind === 'vampire') return '';
+    const f = feverOf(a); if (!f || !(feverFood(a, baseId) < 1)) return '';
+    return f.kind === 'werewolf' ? 'Cooked food turns your stomach. You crave raw meat.' : 'The fever turns your stomach. Food barely touches your hunger.';
+  };
+  const vampireDamageMult = globalThis.__dboSuperDamageMult;
+  globalThis.__dboSuperDamageMult = (agg, tgt, src) => {
+    const m = vampireDamageMult(agg, tgt, src);
+    if (!isPlayer(tgt)) return m;
+    const f = feverOf(tgt);
+    return f && share(f.fx.fireTaken, 0) > 0 && isFireSource(src) ? m * (1 + share(f.fx.fireTaken, 0)) : m;
+  };
+  // rest.js: no Well Rested while feverish
+  globalThis.__dboFeverRestless = (a) => FD.noWellRested !== false && !!feverOf(a);
+
+  const FEVER = globalThis.__dboFeverApplied instanceof Map ? globalThis.__dboFeverApplied : (globalThis.__dboFeverApplied = new Map()); // actor -> { key, magicka, at, shakeAt }
+  const chillMult = (a, av) => { try { const m = typeof globalThis.__dboChillRateMult === 'function' ? Number(globalThis.__dboChillRateMult(a, av)) : 1; return m >= 0 ? m : 1; } catch (e) { return 1; } };
+  const setMagickaRate = (a, mult) => { try { if (typeof globalThis.__dboSetActorValue === 'function') globalThis.__dboSetActorValue(a, 'MagickaRateMult', Math.round(100 * chillMult(a, 'MagickaRateMult') * mult)); } catch (e) { /* offline */ } };
+  // Takes every fever effect off at once: a cure, the turning, the switch off
+  const feverEnded = (a) => {
+    const had = FEVER.get(a >>> 0); FEVER.delete(a >>> 0);
+    if (!had) return;
+    if (had.magicka !== 1) setMagickaRate(a, 1);
+    refreshRates(a);
+  };
+  globalThis.__dboFeverEnded = feverEnded;
+  const FEVER_LINES = {
+    vampire: [null, 'The fever worsens. Daylight stings your eyes and saps your strength, and your wounds are slow to close.',
+      'The fever burns cold in your veins. Food turns your stomach, your wounds barely mend, and you shrink from fire.'],
+    werewolf: [null, 'The fever worsens. Magic slips through your fingers, and cooked food turns your stomach.',
+      'The fever rages. By day your wounds are slow to close; by night your blood runs hot and will not settle.'],
+  };
+  const feverTick = () => {
+    const day = isDay();
+    for (const a of onlineActors()) {
+      try {
+        const f = feverOf(a);
+        if (!f) { feverEnded(a); continue; }
+        const prev = FEVER.get(a >>> 0) || { key: '', magicka: 1, at: 0, shakeAt: 0 };
+        // Each new stage once, in a short line; the first is the infection's own line
+        const told = Number(f.s.disease.feverStage) || 0;
+        if (f.stage !== told) {
+          f.s.disease.feverStage = f.stage; saveState(a, f.s);
+          const line = f.stage > told ? FEVER_LINES[f.kind][f.stage - 1] : null;
+          if (line) personal(a, line);
+          log(`supernatural: ${display(a)} ${f.kind} fever ${FEVER_STAGE_NAMES[f.stage - 1]}`);
+        }
+        const key = `${f.kind}:${f.stage}:${day ? 'd' : 'n'}`;
+        if (key !== prev.key) refreshRates(a);
+        const magicka = share(f.fx.magickaRegen, 1);
+        const stale = Date.now() - prev.at >= Math.max(5, Number(FD.reapplySeconds) || 60) * 1000;
+        if (magicka !== prev.magicka || (magicka !== 1 && stale)) setMagickaRate(a, magicka);
+        const next = { key, magicka, at: magicka !== prev.magicka || stale ? Date.now() : prev.at, shakeAt: prev.shakeAt };
+        let dead = false; try { dead = !!mp.get(a, 'isDead'); } catch (e) { dead = true; }
+        // Daylight saps a vampire carrier's stamina outdoors, down to a floor
+        const drain = share(f.fx.sunStaminaPerMinute, 0) * 15 / 60;
+        if (drain > 0 && day && !dead && isOutdoors(a)) {
+          const p = health(a); const floor = share(f.fx.sunStaminaFloor, 0.3);
+          if (p && Number(p.health) > 0 && Number(p.stamina) > floor) {
+            try { mp.set(a, 'percentages', { health: p.health, magicka: p.magicka, stamina: Math.max(floor, Number(p.stamina) - drain) }); } catch (e) { /* offline */ }
+          }
+        }
+        // The werewolf carrier's night jitters near the peak (dboShake, client 0.3.77+)
+        const sh = f.fx.nightShake;
+        if (sh && !day && !dead && Date.now() - next.shakeAt >= share(sh.everyMinutes, 3) * 60000) {
+          next.shakeAt = Date.now();
+          if (Math.random() < share(sh.chance, 0.5)) { try { sendPacket(a, { customPacketType: 'dboShake', strength: Math.min(1, share(sh.strength, 0.2)), seconds: share(sh.seconds, 1.5) }); } catch (e) { /* offline */ } }
+        }
+        FEVER.set(a >>> 0, next);
+      } catch (e) { log(`supernatural: fever tick for ${display(a)} failed: ${e.message}`); }
+    }
+    for (const a of [...FEVER.keys()]) if (!onlineActors().includes(a)) FEVER.delete(a);
+  };
+  every('superFever', 15000, feverTick);
+  // The stage in plain words: the F3 fever tab (feverView) and /status
+  const FEVER_FEEL = {
+    vampire: ['A chill in the blood. You tire easily and your breath is slow to return.',
+      'Your wounds are slow to close, and daylight stings your eyes and saps your strength.',
+      'Food turns your stomach, your wounds barely mend, and fire burns you deeper.'],
+    werewolf: ['Restless sleep. The hunt calls to you in your dreams, and you never wake rested.',
+      'Magic slips through your fingers, and cooked food turns your stomach.',
+      'By day your wounds are slow to close; by night your blood runs hot and will not settle.'],
+  };
+  const feverRows = (s) => {
+    const st = feverStage(s); if (!st) return [];
+    const restless = FD.noWellRested !== false ? ' You cannot wake Well Rested.' : '';
+    return [{ label: 'How it takes you', value: FEVER_STAGE_NAMES[st - 1].replace(/^./, (c) => c.toUpperCase()), hint: FEVER_FEEL[s.disease.kind][st - 1] + restless }];
+  };
+  try { if (typeof globalThis.__dboRegisterStatus === 'function') globalThis.__dboRegisterStatus('fever', 26, (a) => { const s = stateOf(a); const st = feverStage(s); return st ? `Feverish (${FEVER_STAGE_NAMES[st - 1]})` : null; }); } catch (e) { /* gamemode older than /status */ }
   every('superSun', 10000, () => {
     const c = clock(); if (!c || c.isNight()) return;
     for (const a of onlineActors()) {

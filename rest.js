@@ -461,6 +461,7 @@ module.exports = (api) => {
 
   // ---- waking ---------------------------------------------------------------------------------------
   const active = (a, prop) => { const v = get(a, prop, null); return !!v && Number(v.until) > Date.now(); };
+  const restless = (a) => { try { return typeof globalThis.__dboFeverRestless === 'function' && !!globalThis.__dboFeverRestless(a >>> 0); } catch (e) { return false; } };
 
   // Called on login, before the gamemode applies the hunger stage.
   globalThis.__dboRestLogin = (a) => {
@@ -481,8 +482,14 @@ module.exports = (api) => {
       return;
     }
     const now = Date.now();
-    set(a, 'private.dboRested', { until: now + CFG.restedHours * HOUR });
     set(a, 'private.dboWellFed', { until: now + CFG.wellFedHours * HOUR });
+    // A fever carrier sleeps badly (supernatural.js feverDebuffs): Well Fed, never Well Rested
+    if (restless(a)) {
+      system(a, `Your sleep is restless and full of fever dreams. You wake Well Fed, but not rested: hunger comes slower for ${CFG.wellFedHours} hours.`);
+      log(`rest: ${who(a)} woke after ${Math.round(slept / 60000)} minutes, restless with fever`);
+      return;
+    }
+    set(a, 'private.dboRested', { until: now + CFG.restedHours * HOUR });
     system(a, `You wake Well Rested and Well Fed. Your wounds heal faster for ${CFG.restedHours} hours, and hunger comes slower for ${CFG.wellFedHours}.`);
     audit(`REST ${who(a)} woke rested after ${Math.round(slept / 60000)} minutes`);
   };
@@ -508,6 +515,7 @@ module.exports = (api) => {
           if (v && Number(v.until) <= Date.now()) { set(a, prop, null); if (seen.has(a >>> 0)) personal(a, `You are no longer ${name}.`); }
         }
         if (!active(a, 'private.dboRested') || get(a, 'isDead', false)) continue;
+        if (restless(a)) { set(a, 'private.dboRested', null); personal(a, 'The fever leaves you no rest. You are no longer Well Rested.'); continue; }
         const pvp = globalThis.__dboPvpAt instanceof Map ? globalThis.__dboPvpAt.get(a >>> 0) || 0 : 0;
         if (Date.now() - pvp < CFG.pvpPauseSeconds * 1000) continue;
         const pct = get(a, 'percentages', null);
