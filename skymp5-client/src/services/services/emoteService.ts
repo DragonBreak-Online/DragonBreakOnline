@@ -477,6 +477,7 @@ export class EmoteService extends ClientListener {
       emoteNote(`sent ${anim}`);
       this.sp.Debug.sendAnimationEvent(player, anim);
       this.emoteStartPos = [player.getPositionX(), player.getPositionY(), player.getPositionZ()];
+      this.emoteMoved = 0;
       logTrace(this, `Playing emote`, anim);
     });
   }
@@ -495,7 +496,9 @@ export class EmoteService extends ClientListener {
   // An emote holds the body in place, so the player's own collision is switched back on (setCollision is a set, not a
   // toggle) as the exit plays out and twice after it; the note says how far the body went while the emote ran
   private restoreCollisionAfter(anim: string, why: string): void {
-    const start = this.emoteStartPos;
+    // Taken while it ran (watchEmoteDrift): read after the stop it would count the walk away from it
+    const sent = this.emoteStartPos !== null;
+    const moved = this.emoteMoved;
     this.emoteStartPos = null;
     let noted = false;
     // Also reached from tick context (the wheel's Stop, a dboIdleStop), where Utility.wait throws: the waits start on an update
@@ -510,10 +513,9 @@ export class EmoteService extends ClientListener {
             const setCollision = (this.sp as unknown as { setCollision?: (refrFormId: number, collision: boolean) => void }).setCollision;
             if (typeof setCollision !== "function") return;
             try { setCollision(player.getFormID(), true); } catch (e) { return; }
-            if (noted || !start) return;
+            if (noted || !sent) return;
             noted = true;
-            const moved = Math.round(Math.hypot(player.getPositionX() - start[0], player.getPositionY() - start[1], player.getPositionZ() - start[2]));
-            emoteNote(`collision restored after ${anim} (${why}), body moved ${moved} u since it began`);
+            emoteNote(`collision restored after ${anim} (${why}), body moved ${moved} u while it ran`);
           });
         });
       }
@@ -527,7 +529,9 @@ export class EmoteService extends ClientListener {
     const player = this.sp.Game.getPlayer();
     if (!player) return;
     const s = this.emoteStartPos;
-    if (Math.hypot(player.getPositionX() - s[0], player.getPositionY() - s[1]) > EMOTE_DRIFT_UNITS) this.stopActiveEmote(false, "the body moved");
+    const dx = player.getPositionX() - s[0], dy = player.getPositionY() - s[1];
+    this.emoteMoved = Math.round(Math.hypot(dx, dy, player.getPositionZ() - s[2]));
+    if (Math.hypot(dx, dy) > EMOTE_DRIFT_UNITS) this.stopActiveEmote(false, "the body moved");
   }
 
   // IdleForceDefaultState breaks most idles; state idles that reject it get
@@ -666,6 +670,8 @@ export class EmoteService extends ClientListener {
   private serverIdle = "";
   private activeEmote = "";
   private emoteStartPos: [number, number, number] | null = null;
+  // How far the body had gone from that spot at the last update while the emote ran
+  private emoteMoved = 0;
   private allowedAnims: Set<string>;
   private propAnims: Set<string>;
   private exitEvents = new Map<string, string>();

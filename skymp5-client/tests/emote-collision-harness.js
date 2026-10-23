@@ -279,6 +279,32 @@ const scenario = (name, fn) => {
     return [kept && G.anims.includes('IdleForceDefaultState') && G.notes.some((n) => /by the body moved/.test(n)), { kept, anims: G.anims }];
   });
 
+  // ---- the note's distance: what the body did while the emote ran, not after the stop ----------------------------------------
+  const movedInNote = () => { const m = restoredNote().match(/body moved (\d+) u/); return m ? Number(m[1]) : null; };
+  scenario('W then running on (370 u/s): the note says 0 u for an emote that never moved', () => {
+    wheelPlay('IdleWave'); run(1);
+    key(DxScanCode.W); player.speed = 370; run(3);
+    return [movedInNote() === 0, restoredNote()];
+  });
+  scenario('40 u of drift during the emote, then W and running on: the note says 40 u', () => {
+    wheelPlay('IdleWave'); run(1);
+    player.x += 40; run(0.1);
+    key(DxScanCode.W); player.speed = 370; run(3);
+    return [movedInNote() === 40, restoredNote()];
+  });
+  scenario("40 u of drift, then the wheel's Stop (tick context): the note says 40 u", () => {
+    wheelPlay('IdleWave'); run(1);
+    player.x += 40; run(0.1);
+    wheelStop(); player.speed = 85; run(3);
+    return [movedInNote() === 40 && G.errors.length === 0, { note: restoredNote(), errors: G.errors }];
+  });
+  scenario('a walk-off stop names the distance at the stop (just over 96 u), not the run after it', () => {
+    wheelPlay('IdleWave'); run(1);
+    player.speed = 370; run(3);
+    const moved = movedInNote();
+    return [moved !== null && moved > 96 && moved <= 96 + 370 * FRAME_S + 1, restoredNote()];
+  });
+
   console.log(failures ? `${failures} FAIL` : 'all ok');
   process.exit(failures ? 1 : 0);
 })().catch((e) => { console.error(e); process.exit(2); });
