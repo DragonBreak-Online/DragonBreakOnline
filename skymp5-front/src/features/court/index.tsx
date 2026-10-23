@@ -29,6 +29,13 @@ export interface CourtView {
   tax?: { pct: number; max: number; canSet: boolean } | null; keepsBooks?: boolean;
   // The hold's terms for its standing hunting contracts (contracts.js; null or missing where no treasury pays them)
   contracts?: CourtContracts | null;
+  // Beasts seen changing in the hold (server exposure.js); staff also get the witness count and the hunters among them
+  exposed?: CourtExposed[] | null;
+}
+export interface CourtExposed {
+  // name: '' unless the viewer is staff, or of the same court as the beast (the court-powers rule)
+  name: string; what: string; place: string; at: number; until: number; bounty: number; hurt: boolean; wanted: boolean;
+  seen?: number; hunters?: string[];
 }
 export interface CourtContractTier { tier: number; name: string; price: number; kinds?: string[] }
 export interface CourtContracts {
@@ -286,6 +293,18 @@ export const CourtTab = ({ section, busy, act }: JournalTabProps<CourtSection>) 
               </div>
             ) : null}
             {court.contracts ? <ContractTerms court={court} terms={court.contracts} busy={busy} act={act} /> : null}
+            {court.exposed && court.exposed.length ? (
+              <div className="court__outgoing">
+                <h3 className="court__heading">Seen as beasts</h3>
+                {court.exposed.map((x, i) => (
+                  <div key={i} className="court__holder">
+                    <span className="court__holder-name">{x.name ? `${x.name}: ${x.what}` : x.what.charAt(0).toUpperCase() + x.what.slice(1)}, seen near {x.place}
+                      <span className="court__muted"> ({x.wanted ? `wanted for ${x.bounty} gold` : 'bounty settled'}{x.hurt ? ', hurt people' : ''}, known until {new Date(x.until).toISOString().slice(0, 10)}{x.seen ? `; ${x.seen} witnesses` : ''}{x.hunters && x.hunters.length ? `; hunters: ${x.hunters.join(', ')}` : ''})</span>
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : null}
             {court.keepsBooks ? <p className="court__note">Wages are paid every Sunday from the treasury into each holder's bank account; the ruler is never paid, and nobody sets their own.</p> : null}
             <div className="court__offices">
               {court.offices.map((o) => <OfficeRow key={o.rank} court={court} office={o} outright={s.outright} busy={busy} act={act} />)}
