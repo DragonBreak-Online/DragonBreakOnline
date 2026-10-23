@@ -313,9 +313,12 @@ module.exports = (api) => {
     if (lim && !useOverride(a, fid, lim)) return lim.text;
     rosterOf(fid)[String(a >>> 0)] = { rank, name: ownNameOf(a), tag: tagOf(a), since: had ? had.since : Date.now() };
     save(); mirror(a);
+    if (!had) factionMoved('join', fid, a);
     return null;
   };
-  const removeMember = (fid, a) => { delete rosterOf(fid)[String(a >>> 0)]; save(); if (isOnline(a)) mirror(a); };
+  // citizenship.js watches faction moves around an election vote
+  const factionMoved = (kind, fid, a) => { try { if (typeof globalThis.__dboCitizenFactionMove === 'function') globalThis.__dboCitizenFactionMove(kind, fid, a >>> 0); } catch (e) { /* elections are optional */ } };
+  const removeMember = (fid, a) => { if (entryOf(fid, a)) factionMoved('leave', fid, a); delete rosterOf(fid)[String(a >>> 0)]; save(); if (isOnline(a)) mirror(a); };
   const lowestRank = (fid) => FACTIONS.get(fid).ranks.length - 1;
   // One leadership seat per character (leadership.js; Nate, 21 Oct: "no leadership can have leadership in any other
   // faction or hold"). '' to go ahead, else the line to show. The faction being joined is skipped, so a transfer inside

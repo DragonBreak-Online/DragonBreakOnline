@@ -107,6 +107,13 @@ module.exports = (api) => {
   const VR0 = { enabled: true, discordAgeDays: 90, playHours: 10, playDays: 3, citizenDays: 7, citizenDaysFirstElection: 0, oneVotePerDevice: false,
     playersFile: '/opt/alduinak/skymp5-backend/data/players.json', deviceFile: '/opt/alduinak/skymp5-backend/data/device-ids.json', cacheMinutes: 10 };
   C.election.voterRules = Object.assign({}, VR0, C.election.voterRules || {});
+  // Faction membership for the vote (Nate, 23 Oct; Mike Morethi left House Telvanni 6 s before voting and rejoined 2 min
+  // later): judged when registration opens (snapshotAtRegistration), and a vote whose character left a faction within
+  // leftHours before it and joins one within rejoinHours after it is voided, audited and told to the hold's court
+  C.election.factionGuard = Object.assign({ enabled: true, snapshotAtRegistration: true, leftHours: 24, rejoinHours: 24 }, C.election.factionGuard || {});
+  // Staff characters (private.dboStaffChar) do not count toward the threshold nor the citizen count rebellion.js reads
+  // (Nate, 23 Oct). staffProfiles: also leave out every account with a staff tier on any of its characters
+  C.election.staffNotCounted = Object.assign({ enabled: true, staffProfiles: false }, C.election.staffNotCounted || {});
   const PANEL_ID = 84;
   const FILE = path.resolve('citizenship.json');
   const DAY = 86400000, HOUR = 3600000;
@@ -117,7 +124,7 @@ module.exports = (api) => {
   const S = globalThis.__dboCitizen || (globalThis.__dboCitizen = { data: null });
   if (!(S.panels instanceof Map)) S.panels = new Map(); // actor -> { zone, nonce, tab }
   const fill = (d) => {
-    for (const k of ['chars', 'policies', 'elections', 'voterHold', 'elected']) if (!d[k] || typeof d[k] !== 'object' || Array.isArray(d[k])) d[k] = {};
+    for (const k of ['chars', 'policies', 'elections', 'voterHold', 'elected', 'factionMoves', 'courtNotices']) if (!d[k] || typeof d[k] !== 'object' || Array.isArray(d[k])) d[k] = {};
     if (!Array.isArray(d.requests)) d.requests = [];
     if (!Array.isArray(d.staffApplied)) d.staffApplied = [];
     return d;
@@ -485,6 +492,28 @@ module.exports = (api) => {
     return pids;
   };
 
+  // The citizen accounts that count (threshold, citizen count, rebellion.js's share): citizenPids without staff characters,
+  // and with staffProfiles without any account that has a staff tier
+  const staffChar = (a) => {
+    if (!a) return false;
+    try { if (typeof globalThis.__dboIsStaffCharacter === 'function') return globalThis.__dboIsStaffCharacter(a >>> 0) === true; } catch (e) { return false; }
+    try { return mp.get(a >>> 0, 'private.dboStaffChar') === true; } catch (e) { return false; }
+  };
+  const staffAccount = (pid) => {
+    try { return typeof globalThis.__dboIsStaff === 'function' && (accountActors(pid) || []).some((x) => !!globalThis.__dboIsStaff(Number(x) >>> 0)); } catch (e) { return false; }
+  };
+  const countedPids = (z) => {
+    const all = citizenPids(z); const SN = EL.staffNotCounted;
+    if (!SN || SN.enabled !== true) return all;
+    const out = new Map();
+    for (const [pid, list] of all) {
+      const keep = list.filter((c) => !staffChar(c.actor));
+      if (!keep.length || (SN.staffProfiles === true && staffAccount(pid))) continue;
+      out.set(pid, keep);
+    }
+    return out;
+  };
+
   // A hold that has seated a court by election: data().elected (written when a court is seated, kept apart from the
   // record, which staff restart and resume delete), or a record that still carries its result
   const electedOnce = (zid) => !!data().elected[zid] || !!(data().elections[zid] && data().elections[zid].result);
@@ -616,7 +645,7 @@ module.exports = (api) => {
   // one PC count once
   const eligiblePids = (z, E) => {
     const out = [];
-    for (const [pid, list] of citizenPids(z)) if (list.some((c) => !voterWhy(pid, c.actor, c.since, E, z))) out.push(pid);
+    for (const [pid, list] of countedPids(z)) if (list.some((c) => !voterWhy(pid, c.actor, c.since, E, z))) out.push(pid);
     if (!deviceRule() || out.length < 2) return out;
     const find = deviceGroups(out); const seen = new Set();
     return out.filter((p) => { const g = find(p); if (seen.has(g)) return false; seen.add(g); return true; });
@@ -630,6 +659,68 @@ module.exports = (api) => {
   const voterLabel = (E, pid) => { const v = E.voters && E.voters[String(pid)]; return v ? `${v.name}${v.tag ? ` #${v.tag}` : ''}` : `profile ${pid}`; };
   // A round's voter names (E.voters) live only while it is open; the play-time snapshot (E.voterPlay) until the election ends
   const forgetVoters = (E, all) => { delete E.voters; delete E.salt; if (all) delete E.voterPlay; };
+  // ---- faction moves around the vote (config election.factionGuard) ----------------------------------------------------------
+  const FG = EL.factionGuard;
+  // At each opening of registration: the hold's citizen characters who serve a faction then (hex -> faction names)
+  const snapFactions = (z, E) => {
+    if (FG.enabled !== true || FG.snapshotAtRegistration === false) return;
+    E.factioned = {};
+    for (const list of citizenPids(z).values()) for (const c of list) {
+      if (!c.actor || factionFree(c.actor)) continue;
+      E.factioned[hex(c.actor)] = factionsOf(c.actor).map((g) => String(g.name || g.id)).slice(0, 3);
+    }
+  };
+  // guilds.js tells every join (after it) and leave (before it); only a faction that bars a voter is kept
+  const barring = (a, fid) => factionsOf(a).some((g) => g.id === String(fid));
+  const pruneMoves = () => {
+    const cut = Date.now() - Math.max(Number(FG.leftHours) || 0, Number(FG.rejoinHours) || 0) * HOUR - DAY;
+    const d = data();
+    for (const [k, m] of Object.entries(d.factionMoves)) if (!m || !(Number(m.at) > cut)) delete d.factionMoves[k];
+    for (const E of Object.values(d.elections)) {
+      if (!E || !E.watch || typeof E.watch !== 'object') continue;
+      for (const [pid, w] of Object.entries(E.watch)) if (!w || !(Number(w.at) + (Number(FG.rejoinHours) || 0) * HOUR > Date.now())) delete E.watch[pid];
+    }
+  };
+  const factionMove = (kind, fid, actor) => {
+    if (!C.enabled || FG.enabled !== true || !EL.noFactionVoters) return;
+    const a = Number(actor) >>> 0; if (!a || !barring(a, fid)) return;
+    let name = String(fid); try { const info = typeof globalThis.__dboGuildInfo === 'function' ? globalThis.__dboGuildInfo(fid) : null; if (info && info.name) name = String(info.name); } catch (e) { /* the id will do */ }
+    if (kind === 'leave') { data().factionMoves[hex(a)] = { at: Date.now(), fid: String(fid), name }; save(); return; }
+    if (kind !== 'join') return;
+    for (const z of holds()) {
+      const E = elOf(z.id); if (!E || !E.watch) continue;
+      for (const [pid, w] of Object.entries(E.watch)) {
+        if (w.actor !== hex(a) || !(Date.now() - Number(w.at) <= (Number(FG.rejoinHours) || 0) * HOUR)) continue;
+        delete E.watch[pid];
+        voidRejoin(z, E, pid, w, name);
+      }
+    }
+  };
+  // The vote of an account whose character left a faction, voted and joined one again: voided while its round is open (and the
+  // account kept from voting again, as a strike), else flagged for the staff; audited and told to the voter and the hold's court
+  const voidRejoin = (z, E, pid, w, joined) => {
+    if (E.struckVotes && E.struckVotes[pid]) return;
+    const open = E.phase === 'voting' && Number(E.round) === Number(w.round) && E.votes && E.votes[pid] !== undefined;
+    const why = `left ${w.leftName} ${hm(Number(w.at) - Number(w.leftAt))} before voting and joined ${joined} ${hm(Date.now() - Number(w.at))} after`;
+    if (open) {
+      delete E.votes[pid];
+      if (!E.struckVotes || typeof E.struckVotes !== 'object') E.struckVotes = {};
+      E.struckVotes[pid] = { by: 'the election (automatic)', at: Date.now(), round: E.round, name: w.name, reason: why };
+      tellAccount(Number(pid), `Your vote in the election of ${ofPlace(z.name)} is void: ${w.name} left a faction just before voting and joined one again soon after. Those who serve a faction do not vote in this election. If you think this is wrong, ask the staff on Discord.`);
+    }
+    save();
+    audit(`ELECTION ${z.name}: the vote of ${w.name} (profile ${pid}, round ${w.round}) ${open ? 'is void' : 'was already counted; staff review it'}: ${why}`);
+    courtNotice(z, open ? `The vote of ${w.name} in the election of ${ofPlace(z.name)} is void: they left ${w.leftName} just before voting and joined ${joined} again soon after.`
+      : `${w.name} left ${w.leftName} just before voting in the election of ${ofPlace(z.name)} and joined ${joined} soon after. The round was already counted; the staff have been told.`);
+  };
+  // To the hold's ruler and Stewards online now, else kept for the next of them to log in (seven days, the newest twenty)
+  const courtNotice = (z, text) => {
+    const on = onlineActors().filter((m) => rules(m, z) || isSteward(m, z));
+    for (const m of on) personal(m, text);
+    if (on.length) return;
+    const d = data(); const list = (Array.isArray(d.courtNotices[z.id]) ? d.courtNotices[z.id] : []).filter((n) => Number(n.at) > Date.now() - 7 * DAY);
+    list.push({ at: Date.now(), text }); d.courtNotices[z.id] = list.slice(-20); save();
+  };
   const struckCount = (E) => Object.keys((E && E.struckVotes) || {}).length;
   const isJarlRace = (a) => { const r = String(raceEdidOf(a) || ''); return (EL.jarlRaces || []).some((p) => new RegExp(`^${p}(Vampire)?$`).test(r)); };
   // Why a character cannot stand for a seat of z's ballot, or ''
@@ -667,6 +758,8 @@ module.exports = (api) => {
     if (home && home !== z.id) { const h = holdOf(home); return `Your account votes in ${h ? ofPlace(h.name) : 'another hold'}. One hold per player, whichever of your characters you play.`; }
     if (E && E.struckVotes && E.struckVotes[pidV]) return 'Your vote in this election was struck by the staff after a review. If you think this is wrong, ask the staff on Discord.';
     if (EL.noFactionVoters && !factionFree(a)) return 'Those who serve a faction or a court cannot vote in this first election.';
+    const was = EL.noFactionVoters && FG.enabled === true && FG.snapshotAtRegistration !== false && E && E.factioned && E.factioned[hex(a)];
+    if (was) return `This character served ${andList(Array.isArray(was) && was.length ? was : ['a faction'])} when the call for courts went out. Who serves a faction is judged then, so this character cannot vote in this election.`;
     const cab = cabinetOf(E, a);
     if (cab) {
       const jarl = cab.court.members.jarl ? cab.court.members.jarl.name : 'a candidate';
@@ -748,6 +841,12 @@ module.exports = (api) => {
     const vn = data().voteNotices; const vk = String(Number(profileOf(a)));
     if (vn && typeof vn === 'object' && vn[vk]) { personal(a, vn[vk]); delete vn[vk]; told = true; }
     for (const z of holds()) {
+      const list = data().courtNotices[z.id];
+      if (!Array.isArray(list) || !list.length || !(rules(a, z) || isSteward(a, z))) continue;
+      for (const n of list) if (Number(n.at) > Date.now() - 7 * DAY) personal(a, n.text);
+      delete data().courtNotices[z.id]; told = true;
+    }
+    for (const z of holds()) {
       const E = elOf(z.id); const n = E && E.notice;
       if (!n || !electing(z) || !(Date.now() < Number(n.until)) || !citizenOf(a, z.id)) continue;
       if (n.kind !== 'result' && !(E.phase === 'registration' || E.phase === 'voting')) continue;
@@ -764,7 +863,10 @@ module.exports = (api) => {
     announce(z, E, E.phase === 'voting' ? (E.revote ? 'revote' : 'voting') : (Number(E.reopened) ? 'reopened' : 'registration'));
     log(`citizenship: the running election of ${z.id} had no notice; announced its ${E.phase} now`);
   };
-  const startPhase = (E, phase, hours) => { E.phase = phase; E.phaseStartedAt = Date.now(); E.phaseEndsAt = Date.now() + hours * HOUR; };
+  const startPhase = (E, phase, hours, z) => {
+    E.phase = phase; E.phaseStartedAt = Date.now(); E.phaseEndsAt = Date.now() + hours * HOUR;
+    if (phase === 'registration' && z) snapFactions(z, E);
+  };
   const startElection = (z, why) => {
     // Its first ever unless the hold has seated a court by election (electedOnce: kept apart from the record, which staff
     // restart and resume delete). Stamped once, at the start, so the answer cannot change under a running election.
@@ -772,7 +874,7 @@ module.exports = (api) => {
     if (!electedOnce(z.id)) E.firstEver = 1;
     // The voter rules apply to an election stamped at its start (one already running at the deploy keeps the old rules)
     if (VR.enabled === true) E.rules = 1;
-    startPhase(E, 'registration', EL.registrationHours);
+    startPhase(E, 'registration', EL.registrationHours, z);
     data().elections[z.id] = E; save();
     audit(`ELECTION ${z.name}: registration opened (${why}); closes ${dateText(E.phaseEndsAt)}`);
     announce(z, E, 'registration');
@@ -835,7 +937,7 @@ module.exports = (api) => {
         return true;
       }
       if (citizenAccounts(z) >= EL.threshold) {
-        startPhase(E, 'registration', EL.registrationHours); E.reopened = (Number(E.reopened) || 0) + 1; forgetVoters(E, true); save();
+        startPhase(E, 'registration', EL.registrationHours, z); E.reopened = (Number(E.reopened) || 0) + 1; forgetVoters(E, true); save();
         audit(`ELECTION ${z.name}: no complete court; registration reopened until ${dateText(E.phaseEndsAt)}`);
         announce(z, E, 'reopened');
         return true;
@@ -854,7 +956,7 @@ module.exports = (api) => {
       log(`citizenship: ${z.id} round ${E.round} closed: ${JSON.stringify(counts)}`);
       if (!E.ballot.length) {
         E.courts = []; E.ballot = []; E.votes = {}; forgetVoters(E, true);
-        if (citizenAccounts(z) >= EL.threshold) { startPhase(E, 'registration', EL.registrationHours); E.revote = false; save(); audit(`ELECTION ${z.name}: no court left on the ballot; registration reopened`); announce(z, E, 'reopened'); }
+        if (citizenAccounts(z) >= EL.threshold) { startPhase(E, 'registration', EL.registrationHours, z); E.revote = false; save(); audit(`ELECTION ${z.name}: no court left on the ballot; registration reopened`); announce(z, E, 'reopened'); }
         else cancel(z, 'no court left on the ballot');
         return true;
       }
@@ -863,7 +965,7 @@ module.exports = (api) => {
       // Nobody voted (one court, or several tied at 0): never a revote, as nobody can become able to vote in one
       if (top < 1) {
         E.courts = []; E.ballot = []; E.votes = {}; forgetVoters(E, true);
-        if (citizenAccounts(z) >= EL.threshold) { startPhase(E, 'registration', EL.registrationHours); E.revote = false; save(); audit(`ELECTION ${z.name}: no vote was cast; registration reopened`); announce(z, E, 'reopened'); }
+        if (citizenAccounts(z) >= EL.threshold) { startPhase(E, 'registration', EL.registrationHours, z); E.revote = false; save(); audit(`ELECTION ${z.name}: no vote was cast; registration reopened`); announce(z, E, 'reopened'); }
         else cancel(z, 'no vote was cast');
         return true;
       }
@@ -893,6 +995,7 @@ module.exports = (api) => {
   };
   const tick = () => {
     if (!C.enabled) return;
+    try { pruneMoves(); } catch (e) { log('citizenship: pruning faction moves failed', e.message); }
     for (const z of holds()) {
       if (!electing(z)) continue;
       const E = elOf(z.id);
@@ -992,6 +1095,12 @@ module.exports = (api) => {
     // For a strike's label: who voted in this round (forgotten when the round closes)
     if (!E.voters || typeof E.voters !== 'object') E.voters = {};
     E.voters[pid] = { name: nameNow(a), tag: tagSafe(a), at: Date.now() };
+    // Left a faction lately: watched until rejoinHours after the vote (factionMove)
+    const mv = FG.enabled === true && data().factionMoves[hex(a)];
+    if (mv && Date.now() - Number(mv.at) <= (Number(FG.leftHours) || 0) * HOUR) {
+      if (!E.watch || typeof E.watch !== 'object') E.watch = {};
+      E.watch[pid] = { actor: hex(a), name: nameNow(a), at: Date.now(), round: E.round, leftAt: Number(mv.at), leftName: mv.name || mv.fid };
+    }
     save();
     // The ballot is secret: the audit says that a vote was cast, never for whom
     audit(`ELECTION ${z.name}: ${who(a)} voted (round ${E.round})`);
@@ -1283,11 +1392,11 @@ module.exports = (api) => {
   };
   // gamemode.js's login: the election notice of the current phase, once per character
   globalThis.__dboCitizenLogin = (a) => { if (C.enabled) noticeLogin(Number(a) >>> 0); };
-  // rebellion.js: how many accounts are citizens of a hold (the petition's share), and a failed rising's outlaw: the
+  // rebellion.js: how many accounts are citizens of a hold (the petition's share; counted as for the election, staff left out), and a failed rising's outlaw: the
   // citizenship on the rolls is taken (as a staff revoke: no renounce cooldown), the character barred from asking for it
   // again until `until`, and any request there withdrawn. A citizenship through a faction or court based in the hold (auto)
   // is no entry on the rolls and lasts while that membership does. { removed, auto }
-  globalThis.__dboCitizenAccountCount = (zid) => { if (!C.enabled) return 0; const z = holdOf(zid); return z ? citizenPids(z).size : 0; };
+  globalThis.__dboCitizenAccountCount = (zid) => { if (!C.enabled) return 0; const z = holdOf(zid); return z ? countedPids(z).size : 0; };
   globalThis.__dboCitizenOutlaw = (actor, zid, until, why) => {
     const a = Number(actor) >>> 0; const z = holdOf(zid);
     if (!C.enabled || !z || !a) return { removed: false, auto: false };
@@ -1302,6 +1411,8 @@ module.exports = (api) => {
     audit(`CITIZEN ${e.name || k} (character ${k}) is an outlaw of ${z.name}${had ? ': citizenship taken' : ''}, barred until ${dateText(until)} (${why || 'a failed rising'})${auto ? '; still a citizen through a faction or court based there' : ''}`);
     return { removed: had, auto };
   };
+  // guilds.js: a character joins (after the write) or leaves (before it) a faction
+  globalThis.__dboCitizenFactionMove = (kind, fid, actor) => { try { factionMove(String(kind), String(fid), actor); } catch (e) { log('citizenship: faction move failed', e.message); } };
   globalThis.__dboCitizenHolds = (a) => (C.enabled ? holdsOf(Number(a) >>> 0).map((h) => h.zone) : []);
   // discordroles.js: the citizen roles this character should wear, and every role this module manages
   globalThis.__dboCitizenRoleIds = (a) => { const ids = roleIds(); return C.enabled ? holdsOf(Number(a) >>> 0).map((h) => ids[h.zone]).filter(Boolean) : []; };
@@ -1333,5 +1444,5 @@ module.exports = (api) => {
   try { stampRunning(); } catch (e) { log('citizenship: stampRunning failed', e.message); }
 
   return { join, grant, decline, renounce, makePrimary, revoke, lookup, unfit, staffReleases, setPolicy, register, replace, withdraw, answerInvite, vote, staffAct, strikeVote, unstrikeVote, reviewText, voterWhy, tick, advance,
-    holdsOf, citizenOf, factionFree, citizenAccounts, canVote, noticeLogin, boardPayload, journalView, votingView, citizenshipView, data, PANEL_ID };
+    holdsOf, citizenOf, factionFree, citizenAccounts, countedPids, factionMove, canVote, noticeLogin, boardPayload, journalView, votingView, citizenshipView, data, PANEL_ID };
 };
