@@ -53,7 +53,7 @@ Math.random = () => 0;   // every roll goes feral
 reset();
 timers.superFeral();
 ok(changes.length === 0, 'a feral roll does not change the werewolf at once');
-ok(said.some(([a, t]) => a === A && /The beast is coming\./.test(t)) && packets.some(([a, p]) => a === A && p.customPacketType === 'dboBanner' && /The beast is coming/.test(p.text)), 'the player is told the beast is coming (chat and banner)', said);
+ok(said.some(([a, t]) => a === A && /The beast is coming/.test(t)) && packets.some(([a, p]) => a === A && p.customPacketType === 'dboBanner' && /The beast is coming/.test(p.text)), 'the player is told the beast is coming (chat and banner)', said);
 ok(shakes().length === 1 && shakes()[0].strength === 0.25 && shakes()[0].seconds === 2, 'the first shake comes with the warning, softly', shakes());
 advance(6000);
 ok(shakes().length === 2 && shakes()[1].strength === 0.45, 'a harder shake halfway (6 s before)', shakes());
@@ -142,7 +142,7 @@ const W45 = { supernatural: { feralLoginGraceMinutes: 0, feralWarn: { seconds: 4
 const loadBoth = () => { load(W45); delete require.cache[APPEARANCE]; api.cfg = Object.assign({}, W45, { appearance: { cost: 500, cooldownHours: 24 } }); return require(APPEARANCE)(Object.assign({}, api, { userOf: () => 3, later: (fn, ms) => setTimeout(fn, ms) })); };
 const LOOK = { raceId: 0x13746, isFemale: false, name: 'Ulfgar', weight: 50, skinColor: 1, hairColor: 2, headpartIds: [0x5162f, 0x51631], headTextureSetId: 3, options: [0], presets: [0], tints: [] };
 const gold = () => (store.get(`${A}|inventory`).entries.find((e) => e.baseId === 0xf) || { count: 0 }).count;
-const warned = () => said.some(([a, t]) => a === A && /The beast is coming\./.test(t));
+const warned = () => said.some(([a, t]) => a === A && /The beast is coming/.test(t));
 const realBoth = () => {
   reset(); loadBoth();
   store.set(`${A}|inventory`, { entries: [{ baseId: 0xf, count: 800 }] });
@@ -204,8 +204,24 @@ advance(5000);
 ok(changes.length === 1 && gold() === 800, 'the change lands at 45 s as warned', changes);
 globalThis.__dboAppearanceEdit = undefined;
 
+// ---- the shipped defaults, driven rather than read out of the source (Nate, 23 Oct: more warning, more time) ----
+reset();
+globalThis.__dboSuperLoginAt && globalThis.__dboSuperLoginAt.clear();
+load({});
+timers.superFeral();
+const lead = Math.round((globalThis.__dboFeralDue.get(A) - now) / 1000);
+ok(lead >= 120, `the default warning gives at least two minutes (${lead} s)`);
+const lines = () => said.filter(([a]) => a === A).map(([, t]) => t);
+const first = lines().length;
+ok(first >= 1 && shakes().length === 1, 'the default warning opens with a line and a soft shake', [lines(), shakes()]);
+advance((lead - 20) * 1000);
+ok(new Set(lines()).size >= 4 && changes.length === 0, 'more lines come as the change nears, each saying something new, and nothing has changed yet', lines());
+ok(shakes().length >= 4 && shakes()[shakes().length - 1].strength > shakes()[0].strength, 'the shakes come with them, harder each time', shakes());
+advance(20000);
+ok(changes.length === 1 && changes[0][2] === true, 'the change lands when the warning said it would', changes);
+ok(!/feralPerMinute: \{ sated: 0\.[1-9]/.test(require('fs').readFileSync(MODULE, 'utf8')), 'and a sated werewolf still does not go feral (Jake, 6 Oct)');
+
 Math.random = realRandom;
 globalThis.setTimeout = realSetTimeout;
-ok(/feralWarn: \{ seconds: 45,/.test(require('fs').readFileSync(MODULE, 'utf8')) && /feralPerMinute: \{ sated: 0,/.test(require('fs').readFileSync(MODULE, 'utf8')), 'defaults (Jake, 6 Oct): a 45 s warning, and no feral change while sated');
 console.log(fail ? `${fail} FAILED` : 'all passed');
 process.exit(fail ? 1 : 0);
