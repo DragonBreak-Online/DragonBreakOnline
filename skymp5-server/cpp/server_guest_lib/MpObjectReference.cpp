@@ -593,7 +593,8 @@ void MpObjectReference::SetPos(const NiPoint3& newPos, SetPosMode setPosMode)
           wst->SetTimer(std::chrono::seconds(0))
             .Then([wst, id, inside, me, myId, this](Viet::Void) {
               if (wst->LookupFormById(myId).get() != this) {
-                wst->logger->error("Refr pointer expired", id);
+                wst->logger->error(
+                  "Refr pointer expired (ref {:x}, trigger {:x})", myId, id);
                 return;
               }
               auto& emitter = wst->LookupFormById(id);
@@ -2300,6 +2301,11 @@ void MpObjectReference::BeforeDestroy()
   if (this->occupant && this->occupantDestroySink) {
     this->occupant->RemoveEventSink(this->occupantDestroySink);
   }
+
+  // A trigger leave queued by the move below runs on a 0 s timer after this ref is gone, so it was never delivered
+  // and logged "Refr pointer expired" (NpcSpawnSystem despawns, 23 Oct); forget the trigger state instead
+  emittersWithPrimitives.reset();
+  primitivesWeAreInside.reset();
 
   // Move far far away calling OnTriggerExit, unsubscribing, etc
   SetPos({ -1'000'000'000, 0, 0 });
