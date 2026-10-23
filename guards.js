@@ -48,6 +48,8 @@ module.exports = (api) => {
     if (!hold) { try { const z = zoneOfActor(a); hold = (z && z.id) || ''; } catch (e) { hold = ''; } }
     return hold;
   };
+  // gamemode.js wakes the dead and sends /unstuck to this hold's temple (templeZoneOf)
+  globalThis.__dboHoldHere = holdHere;
 
   const readPosts = () => { try { const v = JSON.parse(fs.readFileSync(POSTS_FILE, 'utf8')); return Array.isArray(v.posts) ? v.posts : []; } catch (e) { return []; } };
   const savePosts = (posts) => { try { let autoDone = []; try { const v = JSON.parse(fs.readFileSync(POSTS_FILE, 'utf8')); autoDone = Array.isArray(v.autoDone) ? v.autoDone : []; } catch (e) { /* none yet */ } fs.writeFileSync(POSTS_FILE + '.tmp', JSON.stringify({ posts, autoDone }, null, 1)); fs.renameSync(POSTS_FILE + '.tmp', POSTS_FILE); return true; } catch (e) { log('guards: guard-posts.json write failed', e.message); return false; } };

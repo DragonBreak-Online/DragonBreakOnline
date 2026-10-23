@@ -27,9 +27,9 @@ const audits = [], told = [];
 let handler = null;
 const UNSTUCK = eval('(' + /const UNSTUCK = Object\.assign\((\{[^}]*\})/.exec(src)[1] + ')');
 const pvpAt = new Map(), combatAt = new Map();
-new Function('registerChatCommand', 'staffCan', 'mp', 'globalThis', 'pvpAt', 'combatAt', 'UNSTUCK', 'findByName', 'display', 'personal', 'zoneOfActor', 'templeFor', 'log', 'audit', 'who', 'creationPending', 'GATE_CREATION_LINE', cmdSrc)(
+new Function('registerChatCommand', 'staffCan', 'mp', 'globalThis', 'pvpAt', 'combatAt', 'UNSTUCK', 'findByName', 'display', 'personal', 'zoneOfActor', 'templeZoneOf', 'templeFor', 'log', 'audit', 'who', 'creationPending', 'GATE_CREATION_LINE', cmdSrc)(
   (name, fn) => { if (name === 'unstuck') handler = fn; }, () => false, mp, {}, pvpAt, combatAt, UNSTUCK, () => 0, () => 'Masked Person',
-  (a, t) => told.push(t), () => 'bruma', () => ({ world: 'a764b:BSHeartland.esm', pos: [59151, 201645, 7559], rotZ: 0 }), () => {}, (t) => audits.push(t), () => 'Masked Person #EWLC (profile 60)',
+  (a, t) => told.push(t), () => 'bruma', () => 'bruma', () => ({ world: 'a764b:BSHeartland.esm', pos: [59151, 201645, 7559], rotZ: 0 }), () => {}, (t) => audits.push(t), () => 'Masked Person #EWLC (profile 60)',
   () => false, 'unfinished'); // a finished character (tests/unstuck-creation-harness.js covers one in creation)
 ok(typeof handler === 'function', '/unstuck registers');
 ok(UNSTUCK.cooldownMinutes === 30 && UNSTUCK.combatSeconds === 60, 'the defaults are 30 minutes and a minute after a fight', UNSTUCK);

@@ -5706,6 +5706,18 @@ const zoneOfActor = (a) => {
   if (!zone) { let last = null; try { last = mp.get(a, 'private.lastOutside'); } catch (e) { /* none */ } if (last && last.world) zone = zoneAtPlace(last.world, last.pos); }
   return zone;
 };
+// The zone whose temple a player wakes at or /unstuck walks to: in Skyrim, the hold the watch reads there (guards.js
+// __dboHoldHere: a hold-jails.json cell, else the realm.js territory of the place or of the last place outside), when it
+// is a hold with a temple. Ivarstead is nearer Whiterun's capital but is the Rift's (#bugs, 23 Oct). Cyrodiil, Solstheim
+// and an interior claimed by its plugin keep zoneOfActor, as does everything without guards.js or realm.js.
+const isHoldZone = (z) => (ZONES.holds || []).some((h) => h.id === z);
+const templeZoneOf = (a) => {
+  const zone = zoneOfActor(a);
+  if (zone && !isHoldZone(zone)) return zone;
+  let hold = '';
+  try { hold = typeof globalThis.__dboHoldHere === 'function' ? String(globalThis.__dboHoldHere(a) || '') : ''; } catch (e) { hold = ''; }
+  return hold && isHoldZone(hold) && templeFor(hold) ? hold : zone;
+};
 // ---- /unstuck: walk out to the respawn temple of the area you are in ------------------------------
 // Anyone, every 30 minutes and never in a fight, PvE included (Nate, 13 Oct)
 const UNSTUCK = Object.assign({ cooldownMinutes: 30, combatSeconds: 60 }, cfg.unstuck || {});
@@ -5774,7 +5786,7 @@ const unstuckActor = (a, by) => {
   const last = Number(mp.get(a, 'private.unstuckAt')) || 0;
   const wait = last + UNSTUCK.cooldownMinutes * 60000 - Date.now();
   if (!admin && wait > 0) return personal(by, `/unstuck is ready again in ${Math.ceil(wait / 60000)} minute${Math.ceil(wait / 60000) === 1 ? '' : 's'}.`);
-  const zone = zoneOfActor(a) || 'bruma';
+  const zone = templeZoneOf(a) || 'bruma';
   const t = templeFor(zone) || templeFor('bruma');
   if (!t) return personal(by, 'There is no respawn point for this area. Ask a GM for help.');
   // Read before the move: read after it, every line named the respawn's world (the Bleak-Frost Mine report, 4 Oct)
@@ -5798,7 +5810,7 @@ registerChatCommand('unstuck', (a, args) => {
 }, { help: `move to the respawn point of your area (every ${UNSTUCK.cooldownMinutes} min, not in combat); staff: [player]` });
 const setDeathTemple = (a) => {
   try { if (!(Number(mp.get(a, 'profileId')) >= 0)) return; } catch (e) { return; }
-  const zone = zoneOfActor(a);
+  const zone = templeZoneOf(a);
   const t = zone ? templeFor(zone) : null;
   if (!t) { log(`${display(a)} fell in ${zone || 'a place with no zone'} at ${(() => { try { return String(mp.get(a, 'worldOrCellDesc') || '?'); } catch (e) { return '?'; } })()}; the spawn point stays as it was`); return; }
   try { mp.set(a, 'spawnPoint', { cellOrWorldDesc: t.world, pos: t.pos, rot: [0, 0, Number(t.rotZ) || 0] }); log(`${display(a)} fell in ${zone}; wakes at its temple`); } catch (e) { log('respawn temple failed', e.message); }
@@ -8944,7 +8956,7 @@ try {
   require(EXECUTION_JS)({ mp, log, personal, audit, who, display, cfg, isAdmin, isPlayer: (a) => profileOf(a) >= 0, sendPacket, openWidget, closeWidget,
     onUi, onlineActors, distanceMeters, every, staffLog,
     // The /unstuck move without its checks: a player the chopping block will not let up (13 Oct)
-    toTemple: (a) => { const t = templeFor(zoneOfActor(a) || 'bruma') || templeFor('bruma'); if (!t) return false; mp.set(a, 'locationalData', { cellOrWorldDesc: t.world, pos: t.pos, rot: [0, 0, Number(t.rotZ) || 0] }); return true; } });
+    toTemple: (a) => { const t = templeFor(templeZoneOf(a) || 'bruma') || templeFor('bruma'); if (!t) return false; mp.set(a, 'locationalData', { cellOrWorldDesc: t.world, pos: t.pos, rot: [0, 0, Number(t.rotZ) || 0] }); return true; } });
 } catch (e) { log('execution.js failed to load:', e.stack || e.message); globalThis.__dboExecutionActivate = null; }
 // ---- the Dawnguard War Axe SPR taken back, its smith refunded (server\sprstrip.js, config "sprStrip"; Nate, 11 Oct) ----------
 try {
@@ -9193,7 +9205,7 @@ try {
   const GUARDS_JS = path.resolve('guards.js');
   delete require.cache[GUARDS_JS];
   require(GUARDS_JS)({ mp, log, personal, audit, who, display, cfg, registerChatCommand, zoneOfActor, zoneById });
-} catch (e) { log('guards.js failed to load:', e.stack || e.message); globalThis.__dboWatchActivate = null; globalThis.__dboWatchNoSkill = null; globalThis.__dboGuardsOnDeath = null; }
+} catch (e) { log('guards.js failed to load:', e.stack || e.message); globalThis.__dboWatchActivate = null; globalThis.__dboWatchNoSkill = null; globalThis.__dboGuardsOnDeath = null; globalThis.__dboHoldHere = null; }
 // ---- apiaries and beehives: honey on a timer (server\apiaries.js, config "apiaries") ----
 try {
   const APIARIES_JS = path.resolve('apiaries.js');

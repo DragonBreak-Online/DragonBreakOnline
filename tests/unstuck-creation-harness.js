@@ -49,6 +49,7 @@ const sandbox = {
   display: (a) => `#${(a >>> 0).toString(16)}`,
   personal: (a, t) => told.push([a >>> 0, t]),
   zoneOfActor: () => null, // the Realm has no zone
+  templeZoneOf: () => null, // nor a hold (tests/death-temple-hold-harness.js runs the real one)
   templeFor: (z) => (z === 'bruma' ? { world: HEARTLAND, pos: [59151, 201645, 7559], rotZ: 0 } : null),
   log: () => {},
   audit: (t) => audits.push(t),
