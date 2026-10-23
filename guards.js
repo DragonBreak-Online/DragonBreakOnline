@@ -59,8 +59,10 @@ module.exports = (api) => {
       const parsed = JSON.parse(fs.readFileSync(SPAWNS_FILE, 'utf8'));
       if (Array.isArray(parsed)) list = parsed; else if (parsed && typeof parsed === 'object') { root = parsed; key = Object.keys(parsed).find((k) => k.toLowerCase() === 'zones') || 'zones'; list = Array.isArray(parsed[key]) ? parsed[key] : []; }
     } catch (e) { /* no file yet */ }
-    const mine = C.enabled ? readPosts().map((p) => ({ Name: `${PREFIX}${p.hold}:${p.n}`, ID: p.world, POS: p.pos, Size: C.radius, Heading: Number(p.heading) || 0,
-      NPC: [{ id: p.npc, count: 1 }], Despawn: C.despawnSeconds, Respawn: C.respawnSeconds, Hostile: false })) : [];
+    // A post saved with something that is no NPC desc ("/guardpost add 3", 23 Oct) gets its hold's guard
+    const npcOf = (p) => (/^[0-9a-f]+:.+\.es[mpl]$/i.test(String(p.npc || '')) ? p.npc : C.npcByHold[p.hold]);
+    const mine = C.enabled ? readPosts().filter((p) => npcOf(p)).map((p) => ({ Name: `${PREFIX}${p.hold}:${p.n}`, ID: p.world, POS: p.pos, Size: C.radius, Heading: Number(p.heading) || 0,
+      NPC: [{ id: npcOf(p), count: 1 }], Despawn: C.despawnSeconds, Respawn: C.respawnSeconds, Hostile: false })) : [];
     const kept = list.filter((z) => !String((z && (z.Name || z.name)) || '').startsWith(PREFIX));
     const sig = JSON.stringify(mine);
     if (globalThis.__dboGuardsSig === sig && list.length - kept.length === mine.length) return mine.length;
@@ -138,6 +140,7 @@ module.exports = (api) => {
     }
     if (what === 'add') {
       const hold = holdHere(a); if (!hold) return personal(a, 'No hold claims this place. Stand on a hold\'s land, or inside one of its buildings.');
+      if (rest[0] && !/^[0-9a-f]+:.+\.es[mpl]$/i.test(rest[0])) return personal(a, 'Usage: /guardpost add places one guard where you stand (an optional NPC id like abe18:Skyrim.esm picks another guard). Nothing was placed.');
       const npc = rest[0] || C.npcByHold[hold];
       if (!npc) return personal(a, `There is no guard set for ${hold}: /guardpost add <npc desc>, or add it to guards.npcByHold.`);
       let world = '', pos = null, rot = null;

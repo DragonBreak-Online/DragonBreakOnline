@@ -95,6 +95,8 @@ ok(audits.some((t) => /^JAIL .* jailed by the watch of bruma for 10 min/.test(t)
 // Cidhna Mine: one shared yard, any number of prisoners, its gate never locked
 for (const pid of [11, 12]) { const a = 0xff000100 + pid; put(a, 'profileId', pid); ok(globalThis.__dboJailByWatch(a, 'markarth', 10, 'the watch of Markarth') !== null, `Markarth: prisoner ${pid - 10} goes to Cidhna Mine`); }
 ok(mp.get(idOf('bf4d4:Skyrim.esm'), 'private.dboCell') === undefined && mp.get(idOf('bf4d4:Skyrim.esm'), 'isOpen') === undefined, '...whose gate is neither locked nor claimed');
+said.length = 0; cmds.guardpost.f(STAFF, 'add 3');
+ok(/Nothing was placed/.test(said.at(-1)[1]) && !JSON.parse(fs.readFileSync('guard-posts.json', 'utf8')).posts.some((p) => p.npc === '3'), '/guardpost add 3 is refused: 3 is no NPC id');
 cmds.guardpost.f(STAFF, 'auto bruma');
 let posts = JSON.parse(fs.readFileSync('guard-posts.json', 'utf8'));
 ok(posts.posts.filter((p) => p.hold === 'bruma' && p.auto).length === 2 && posts.autoDone.includes('bruma') && JSON.parse(fs.readFileSync('NPC-Spawns.json', 'utf8')).zones.some((x) => x.Name === 'guard:bruma:3' && x.POS[0] === 40),
