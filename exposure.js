@@ -30,12 +30,16 @@ const path = require('path');
 module.exports = (api) => {
   const { mp, log, personal, system, audit, who, display, cfg, registerChatCommand, zoneOfActor, zoneById, readOfficials,
     profileOf, officialTarget, onlineActors, isAdmin, isLeadStaff, every } = api;
+  // gamemode.js's unseat for a process (household ranks and leadership.js follow through courtOfficeSync)
+  const unseatOfficialBy = typeof api.unseatOfficialBy === 'function' ? api.unseatOfficialBy : null;
   const C = Object.assign({
     enabled: true, witnesses: 3, days: 7, cityBounty: 500, wildsBounty: 200, hurtMultiplier: 2,
     // A capital territory's marker within cityRadius, or one of the walled cities' own worldspaces (Whiterun 1a26f, Windhelm
     // 1691d, Riften 16bb4, Markarth 16d71, Solitude 37edf: gamemode.js TAMRIEL_FRAME)
     cityRadius: 5000, cityWorlds: ['1a26f:Skyrim.esm', '1691d:Skyrim.esm', '16bb4:Skyrim.esm', '16d71:Skyrim.esm', '37edf:Skyrim.esm'],
     guardsHostile: true, courtPowers: true, notices: true,
+    // An exposed ruler (the hold's first office) is unseated; /confess lets a cursed character confess openly
+    deposeRulers: true, confess: true, confessConfirmSeconds: 60,
     guardTitles: ['Guard', 'Guard Sergeant', 'Guard Captain'],
     // guild-defs.json ids (verified 23 Oct): vigil-of-stendarr, silver-hand, dawnguard
     hunters: { werewolf: ['vigil-of-stendarr', 'silver-hand'], vampireLord: ['dawnguard', 'vigil-of-stendarr'] },
@@ -67,7 +71,10 @@ module.exports = (api) => {
   const beastForm = (a) => { const b = get(a, 'private.beast'); return b && typeof b === 'object' ? b : null; };
   // The beast forms watched: beastform.js keys, the supernatural.js kind each belongs to, and the words for it
   const FORMS = { werewolf: { kind: 'werewolf', hunters: 'werewolf', noun: 'a werewolf', crime: 'seen changing into a werewolf' },
-    vampirelord: { kind: 'vampire', hunters: 'vampireLord', noun: 'a Vampire Lord', crime: 'seen rising as a Vampire Lord' } };
+    vampirelord: { kind: 'vampire', hunters: 'vampireLord', noun: 'a Vampire Lord', crime: 'seen rising as a Vampire Lord' },
+    // A confession (/confess, /exposure confess) names the curse, not a shape: a confessed vampire is a vampire
+    vampire: { kind: 'vampire', hunters: 'vampireLord', noun: 'a vampire', crime: 'confessed to being a vampire' } };
+  const formForKind = (kind) => (kind === 'werewolf' ? 'werewolf' : kind === 'vampire' ? 'vampire' : null);
   const formOf = (h) => FORMS[(h && h.form) || 'werewolf'] || FORMS.werewolf;
   const stillOfKind = (a, form) => { const s = get(a, 'private.supernatural'); return !!(s && s.kind === (FORMS[form] || FORMS.werewolf).kind); };
   const ordersFor = (form) => { const l = (C.hunters || {})[(FORMS[form] || FORMS.werewolf).hunters]; return Array.isArray(l) ? l.map(String) : []; };
@@ -119,11 +126,28 @@ module.exports = (api) => {
     return ok;
   };
 
-  const expose = (a, zid, place, seen, hurt, form, hunters) => {
+  // An exposed ruler is deposed (Nate, 23 Oct), through gamemode.js's unseat; lesser officials keep their seats, suspended
+  // (__dboExposureBarred) until cleared, so the court still stands for whoever rules next. Only the seat this character holds:
+  // an account's seat bound to another of its characters stays.
+  const depose = (a, zid, h) => {
+    if (!C.deposeRulers || !unseatOfficialBy) return false;
+    const z = zoneById(zid); const ruler = z && (z.officials || [])[0];
+    if (!ruler || !seatedAs(a, zid, ruler)) return false;
+    const label = h.name || display(a);
+    const r = safe(() => unseatOfficialBy(z, { pid: Number(profileOf(a)), label, who: who(a), online: onlineActors().map(id).includes(id(a)) ? id(a) : 0 }, `exposure (${FORMS[h.form] ? FORMS[h.form].noun : 'a beast'} in ${z.name})`), { error: 'unseat failed' });
+    if (r.error) { log(`exposure: could not depose ${display(a)} in ${zid}: ${r.error}`); return false; }
+    h.deposed = r.had;
+    audit(`EXPOSURE ${who(a)} deposed as ${r.had} of ${z.name}`);
+    return true;
+  };
+
+  // how: 'seen' (witnesses), 'confessed' (the character's own /confess) or 'staff' (/exposure confess); the same consequences
+  const expose = (a, zid, place, seen, hurt, form, hunters, how = 'seen', why = '') => {
     const f = FORMS[form] || FORMS.werewolf;
+    const crime = how === 'seen' ? f.crime : `confessed to being ${f.noun}`;
     if (form === 'werewolf' && exemptIn(a, zid)) {
       log(`exposure: ${display(a)} seen changing in ${holdName(zid)} by ${seen}, spared as of the Companions' Circle`);
-      audit(`EXPOSURE ${who(a)} ${f.crime} by ${seen} in ${holdName(zid)}: exempt (Circle of the Companions)`);
+      audit(`EXPOSURE ${who(a)} ${crime}${how === 'seen' ? ` by ${seen}` : ''} in ${holdName(zid)}: exempt (Circle of the Companions)`);
       return false;
     }
     const cases = data().cases; const key = String(id(a));
@@ -133,12 +157,14 @@ module.exports = (api) => {
     const h = was || { at: Date.now(), told: [], hunters: [] };
     const known = new Set((h.hunters || []).map((x) => x.who));
     Object.assign(h, { form, until: Date.now() + Number(C.days) * DAY, place: place.place, city: !!(h.city || place.city), seen: Math.max(Number(h.seen) || 0, seen),
-      hunters: (h.hunters || []).concat((hunters || []).filter((x) => !known.has(x.who))).slice(-20), hurt: !!(h.hurt || hurt), name: c.name });
+      hunters: (h.hunters || []).concat((hunters || []).filter((x) => !known.has(x.who))).slice(-20), hurt: !!(h.hurt || hurt), name: c.name }, how !== 'seen' ? { confessed: true } : {});
     c.holds[zid] = h;
     declare(a, zid, h);
+    depose(a, zid, h);
     save();
-    audit(`EXPOSURE ${who(a)} ${f.crime} by ${seen} at ${place.place} (${holdName(zid)}, ${place.city ? 'city' : 'wilds'}${hurt ? ', hurt people' : ''}): known for ${C.days} days, bounty ${h.bounty || 0}${h.hunters.length ? `; hunters among the witnesses: ${h.hunters.map((x) => `${x.who} (${x.order})`).join(', ')}` : ''}`);
-    system(a, was ? `You were seen in the beast's shape again in ${holdName(zid)}. The word against you there will not die down soon.`
+    audit(`EXPOSURE ${who(a)} ${crime}${how === 'seen' ? ` by ${seen}` : how === 'staff' ? ` (marked by staff: ${why})` : ' openly'} at ${place.place} (${holdName(zid)}, ${place.city ? 'city' : 'wilds'}${hurt ? ', hurt people' : ''}): known for ${C.days} days, bounty ${h.bounty || 0}${h.hunters.length ? `; hunters among the witnesses: ${h.hunters.map((x) => `${x.who} (${x.order})`).join(', ')}` : ''}`);
+    if (how !== 'seen') system(a, `You have confessed before ${holdName(zid)} what you are. ${h.bounty ? `The hold has put a bounty of ${h.bounty} gold on you, and ` : ''}its guards will know you on sight.`);
+    else system(a, was ? `You were seen in the beast's shape again in ${holdName(zid)}. The word against you there will not die down soon.`
       : `You were seen ${form === 'werewolf' ? 'changing into a beast' : 'rising as a Vampire Lord'} near ${place.place}. Word will spread through ${holdName(zid)}: ${h.bounty ? `the hold has put a bounty of ${h.bounty} gold on you, and ` : ''}its guards will know you on sight.`);
     tick();
     return true;
@@ -211,6 +237,13 @@ module.exports = (api) => {
     const sh = g('__dboSeatHolder');
     return Object.entries(seats).some(([r, l]) => Array.isArray(l) && l.map(Number).includes(pid) && (() => { const held = sh ? Number(safe(() => sh(zid, r, pid), 0)) >>> 0 : 0; return !held || held === id(x); })());
   };
+  const seatedAs = (x, zid, rank) => {
+    const pid = Number(profileOf(x)); if (!(pid >= 0)) return false;
+    const l = ((readOfficials() || {})[zid] || {})[rank];
+    if (!Array.isArray(l) || !l.map(Number).includes(pid)) return false;
+    const sh = g('__dboSeatHolder'); const held = sh ? Number(safe(() => sh(zid, rank, pid), 0)) >>> 0 : 0;
+    return !held || held === id(x);
+  };
   const servesHold = (x, zid) => {
     if (seatedIn(x, zid)) return true;
     const fid = safe(() => (g('__dboHoldFactionOf') ? g('__dboHoldFactionOf')(zid) : null), null);
@@ -221,11 +254,12 @@ module.exports = (api) => {
   const timeOfDay = (at) => { const hr = new Date(at).getUTCHours(); return hr < 5 ? 'in the night' : hr < 12 ? 'in the morning' : hr < 18 ? 'in the afternoon' : 'in the evening'; };
   const notify = (c, zid, h, online) => {
     const a = c.actor;
-    const ofCourt = seatedIn(a, zid);
+    const ofCourt = seatedIn(a, zid) || !!h.deposed;
     // Named as the reader's own character knows them, never by a beast's name: wait for the mortal shape
     if (ofCourt && online.includes(a) && beastForm(a)) return false;
     const f = formOf(h);
-    const what = `${f.noun.charAt(0).toUpperCase()}${f.noun.slice(1)} was seen near ${h.place}, in ${holdName(zid)}, ${timeOfDay(h.at)}`;
+    const what = h.confessed ? `${f.noun.charAt(0).toUpperCase()}${f.noun.slice(1)} openly confessed what they are, in ${holdName(zid)}, ${timeOfDay(h.at)}`
+      : `${f.noun.charAt(0).toUpperCase()}${f.noun.slice(1)} was seen near ${h.place}, in ${holdName(zid)}, ${timeOfDay(h.at)}`;
     let changed = false;
     for (const x of online) {
       if (x === a || h.told.includes(x)) continue;
@@ -237,7 +271,8 @@ module.exports = (api) => {
         if (ofCourt && seatedIn(x, zid)) {
           const n = nameTo(x, a);
           const named = /^(stranger|someone|masked person)$/i.test(n) ? 'one of this court' : `${n}, of this court,`;
-          line += ` It was ${named} and they hold no court powers in ${holdName(zid)} until cleared.`;
+          const deposedAs = h.deposed ? String(h.deposed).charAt(0).toUpperCase() + String(h.deposed).slice(1) : '';
+          line += deposedAs ? ` It was ${named.replace(/, of this court,$/, '')}, the ${deposedAs} of ${holdName(zid)}, who is deposed.` : ` It was ${named} and they hold no court powers in ${holdName(zid)} until cleared.`;
         }
         system(x, `${line} See the Court tab of your journal (F3).`);
       }
@@ -318,6 +353,41 @@ module.exports = (api) => {
     audit(`EXPOSURE GM ${who(a)} cleared ${tg.who}${zid ? ` in ${holdName(zid)}` : ` in ${n} hold(s)`}: ${text}`);
     return `${tg.label} is no longer known as a beast${zid ? ` in ${holdName(zid)}` : ''}. Any bounty stands until paid or lifted (/bounty clear).`;
   };
+  // ---- confession: /confess (the character, where they stand, after a confirm) and /exposure confess (staff) ----------------
+  const confessAsks = S.confessAsks || (S.confessAsks = new Map());
+  const confess = (a, args) => {
+    if (!C.enabled || !C.confess) return 'Nobody here would take such a confession.';
+    const form = formForKind((get(a, 'private.supernatural') || {}).kind);
+    if (!form) return 'You have nothing of that kind to confess.';
+    const place = placeOf(a);
+    if (!place.zid) return 'There is nobody here to hear it. Confess in a hold.';
+    if (exposedIn(a, place.zid)) return `${holdName(place.zid)} already knows what you are.`;
+    const asked = confessAsks.get(id(a));
+    if (String(args || '').trim().toLowerCase() !== 'yes' || !asked || Date.now() - asked > Number(C.confessConfirmSeconds) * 1000) {
+      confessAsks.set(id(a), Date.now());
+      return `To confess openly in ${holdName(place.zid)} that you are ${FORMS[form].noun} cannot be taken back: the hold will know you for ${C.days} days, put a bounty on you, set its guards on you${C.deposeRulers ? ', and depose you if you rule it' : ''}. Type /confess yes within ${C.confessConfirmSeconds} seconds to confess.`;
+    }
+    confessAsks.delete(id(a));
+    return expose(a, place.zid, place, 0, false, form, [], 'confessed') ? '' : 'Your confession goes unheeded here.';
+  };
+  const staffConfess = (a, rest) => {
+    const parts = String(rest || '').trim().split(/\s+/).filter(Boolean);
+    // /exposure confess <who> <hold> <reason>: the hold is the first word after the name that is a zone id
+    const zi = parts.findIndex((p, i) => i > 0 && zoneById(p));
+    if (zi < 1 || zi === parts.length - 1) return 'Usage: /exposure confess <name|#TAG|profile id> <hold> <reason>';
+    const tg = officialTarget(parts.slice(0, zi).join(' ')); if (tg.error) return tg.error;
+    if (!tg.actor) return `${tg.label} has no character.`;
+    const z = zoneById(parts[zi]); const why = parts.slice(zi + 1).join(' ').slice(0, 160);
+    const form = formForKind((get(tg.actor, 'private.supernatural') || {}).kind);
+    if (!form) return `${tg.label} is neither a werewolf nor a vampire.`;
+    const ok = expose(id(tg.actor), z.id, { zid: z.id, city: true, place: z.name }, 0, false, form, [], 'staff', `${who(a)}: ${why}`);
+    return ok ? `${tg.label} is known as ${FORMS[form].noun} in ${z.name}.` : `${tg.label} is spared in ${z.name} (the Circle of the Companions).`;
+  };
+  if (typeof registerChatCommand === 'function') {
+    registerChatCommand('confess', (a, args) => { const t = confess(a, args); if (t) personal(a, t); },
+      { help: 'confess openly, in the hold you stand in, that you are a werewolf or a vampire (asks first; it cannot be undone)' });
+  }
+
   const listText = () => {
     const lines = [];
     for (const c of Object.values(data().cases)) for (const [z, h] of Object.entries(c.holds)) if (live(h)) lines.push(`${c.name} (${who(c.actor)}), ${formOf(h).noun}, in ${holdName(z)} near ${h.place}, seen by ${h.seen}${(h.hunters || []).length ? ` (hunters: ${h.hunters.map((x) => `${x.who} of ${orderName(x.order)}`).join(', ')})` : ''}, ${h.hurt ? 'hurt people, ' : ''}bounty ${h.bounty || 0}, until ${new Date(h.until).toISOString().slice(0, 16)}Z`);
@@ -330,8 +400,9 @@ module.exports = (api) => {
       const s = String(sub || '').toLowerCase();
       if (!s || s === 'list') return personal(a, `Werewolf exposure is ${C.enabled ? 'on' : 'off'}. ${listText()}`);
       if (s === 'clear') return personal(a, clearCase(a, rest.join(' ')));
-      personal(a, 'Usage: /exposure [list] | clear <name|#TAG|profile id> [hold] <reason>');
-    }, { admin: true, help: '[list|clear <who> [hold] <reason>] werewolves and Vampire Lords known in a hold after being seen changing (Lead GM)' });
+      if (s === 'confess') return personal(a, staffConfess(a, rest.join(' ')));
+      personal(a, 'Usage: /exposure [list] | clear <name|#TAG|profile id> [hold] <reason> | confess <name|#TAG|profile id> <hold> <reason>');
+    }, { admin: true, help: '[list|clear <who> [hold] <reason>|confess <who> <hold> <reason>] werewolves and Vampire Lords known in a hold after being seen changing (Lead GM)' });
   }
 
   log(`exposure ${C.enabled ? 'on' : 'off'}: ${Object.keys(data().cases).length} known beasts, ${C.witnesses} witnesses, ${C.days} days, ${C.cityBounty}/${C.wildsBounty} gold x${C.hurtMultiplier} when hurt`);

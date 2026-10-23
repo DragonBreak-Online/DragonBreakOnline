@@ -86,6 +86,8 @@ module.exports = (api) => {
     // without it, and it is left out until someone confirms the bow is silver
     silverWeapons: [],
     forcedChangeChance: 0.10, beastChangesPerDay: 1,
+    // Every cursed werewolf online changes once each full moon (Nate, 23 Oct); false leaves only forcedChangeChance
+    fullMoonGuaranteed: true,
     // Nate, 23 Oct ("people cant auto transform"): false refuses a cursed werewolf's own call of the beast (the power, /beast);
     // only a forced change (feral, the full moon) or staff turns them. voluntaryWhenSpared keeps the call for those never
     // forced (a pack's Alpha, Hircine's blessing), who would otherwise never change. A GM's grant to a mortal and admins keep it
@@ -2901,6 +2903,7 @@ module.exports = (api) => {
       if (!stillChanges(a)) return log(`supernatural: ${display(a)}'s forced change passed (no longer able to change)`);
       change();
       log(logLine);
+      markMoonTaken(a);
       if (typeof globalThis.__dboBeastTransform === 'function') globalThis.__dboBeastTransform(a, 'werewolf', true);
       // A forced change may tip into a frenzy (frenzy.js, config werewolfFrenzy)
       try { if (typeof globalThis.__dboFrenzyForced === 'function') globalThis.__dboFrenzyForced(a); } catch (e) { log(`supernatural: frenzy check failed: ${e.message}`); }
@@ -2926,13 +2929,27 @@ module.exports = (api) => {
     }
     setTimeout(go, lead * 1000);
   };
+  // The full moon takes every cursed werewolf once (Nate, 23 Oct: "yes do it"), indoors or out, on top of the hourly chance
+  // outdoors: the first night hour of a full moon they are online, past the login grace, with the usual warning first. A
+  // forced change of any kind under that moon counts. Spared as before: a pack's Alpha and Hircine's blessed.
+  // private.fullMoonTaken holds the moon's number (engine moons: eight phases of three days, worldclock.js)
+  const MOON_TAKEN = 'private.fullMoonTaken';
+  const moonNumber = (c) => Math.floor(Number(c.gameDays()) / 24);
+  function markMoonTaken(a) { try { const c = clock(); if (c && c.isNight() && c.isFullMoon()) mp.set(a, MOON_TAKEN, moonNumber(c)); } catch (e) { /* offline */ } }
+  const moonTaken = (a, c) => { try { return Number(mp.get(a, MOON_TAKEN)) === moonNumber(c); } catch (e) { return true; } };
   let lastHour = -1;
   every('superMoon', 5000, () => {
     const c = clock(); if (!c) return;
     const h = Math.floor(c.gameDays() * 24); if (h === lastHour) return; lastHour = h;
     if (!c.isNight() || !c.isFullMoon()) return;
     for (const a of onlineActors()) {
-      const s = stateOf(a); if (!s || s.kind !== 'werewolf' || spared(a, s) || beastForm(a) || !isOutdoors(a)) continue;
+      const s = stateOf(a); if (!s || s.kind !== 'werewolf' || spared(a, s) || beastForm(a)) continue;
+      if (C.fullMoonGuaranteed !== false && !moonTaken(a, c) && !FERAL_DUE.has(a) && !inLoginGrace(a) && !rites.has(a)) {
+        forcedChange(a, 'The full moon pulls at your blood, and tonight it will not be denied. The beast is coming - you have a couple of minutes, no more.',
+          () => personal(a, 'The full moon calls, and the beast answers without you.'), `supernatural: ${display(a)} changed under the full moon (once each full moon)`);
+        continue;
+      }
+      if (!isOutdoors(a)) continue;
       if (FERAL_DUE.has(a) || inLoginGrace(a) || Math.random() >= C.forcedChangeChance * forcedMult(a)) continue;
       forcedChange(a, 'The full moon pulls at your blood. The beast is coming - you have a couple of minutes, no more.', () => personal(a, 'The full moon calls, and the beast answers without you.'),
         `supernatural: ${display(a)} changed under the full moon`);

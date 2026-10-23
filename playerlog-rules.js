@@ -1563,11 +1563,12 @@ naming.js NAME d8ef2ef4 parsed
 nobility.js NOBILITY 97cfe241 parsed
 nobility.js NOBILITY 2022e40c parsed
 orphans.js ORPHAN 79ab9d5e excluded
-exposure.js EXPOSURE 14e39400 excluded
 exposure.js EXPOSURE 5f33fd21 excluded
+exposure.js EXPOSURE 1588aa8a excluded
+exposure.js EXPOSURE 4f7323f3 excluded
+exposure.js EXPOSURE 502fbe8b excluded
 exposure.js EXPOSURE 7d6e979d excluded
 exposure.js EXPOSURE 9d89712e excluded
-exposure.js EXPOSURE a498daa8 excluded
 outlaws.js BOUNTY 30a8bfe5 excluded
 outlaws.js BOUNTY 16cb8c4f excluded
 outlaws.js BOUNTY 2eaae5ee excluded

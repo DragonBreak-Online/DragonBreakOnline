@@ -42,15 +42,17 @@ props.set(`${JARL}|private.supernatural`, { kind: 'werewolf' });
 props.set(`${HARB}|private.supernatural`, { kind: 'werewolf' });
 props.set(`${VAMP}|private.supernatural`, { kind: 'vampire' });
 
-const api = (cfg) => ({
+let OFF = { bruma: { count: [11], steward: [22], guard: [] }, whiterun: { jarl: [] } };
+const unseats = [];
+const api = (cfg, extra) => Object.assign({
   mp, log: () => {}, personal: (a, t) => said.push([a, t]), system: (a, t) => sys.push([a, t]), audit: (t) => audits.push(t),
   who: (a) => (chars[a] ? `${chars[a][1]} #${a.toString(16)}` : String(a)), display: (a) => (chars[a] ? chars[a][1] : String(a)), cfg,
   registerChatCommand: (n, f) => { cmds[n] = f; }, zoneOfActor: () => territory.zone, zoneById: (id) => ZONES[String(id).toLowerCase()] || null,
-  readOfficials: () => ({ bruma: { count: [11], steward: [22], guard: [] }, whiterun: { jarl: [] } }), profileOf: (a) => (chars[a] ? chars[a][0] : -1),
+  readOfficials: () => OFF, profileOf: (a) => (chars[a] ? chars[a][0] : -1),
   officialTarget: (q) => { const e = Object.entries(chars).find(([, c]) => c[1].toLowerCase() === String(q).toLowerCase()); return e ? { pid: e[1][0], actor: Number(e[0]), online: Number(e[0]), label: e[1][1], who: e[1][1] } : { error: `No character called ${q}.` }; },
   onlineActors: () => online.slice(), isAdmin: (a) => a === GM || a === LEAD, isLeadStaff: (a) => a === LEAD, every: () => {}, giveItem: () => {}, onUi: () => {},
-});
-const load = (file, cfg) => { const p = path.join(ROOT, file); delete require.cache[p]; return require(p)(api(cfg || {})); };
+}, extra || {});
+const load = (file, cfg, extra) => { const p = path.join(ROOT, file); delete require.cache[p]; return require(p)(api(cfg || {}, extra)); };
 load('outlaws.js');
 let X = load('exposure.js');
 const bounty = (zid, a) => { const l = ((globalThis.__dboOutlaws.data || {}).zones || {})[zid] || {}; const b = l[String(chars[a][0])]; return b ? b.amount : 0; };
@@ -181,6 +183,48 @@ said.length = 0; cmds.exposure(LEAD, 'list');
 ok('.../exposure list shows it', /Serana .*a Vampire Lord.*hunters: Dane .* of the Dawnguard/.test(said.at(-1)[1]), said.at(-1));
 props.set(`${VAMP}|private.supernatural`, { kind: null }); X.tick();
 ok('...and a cure of vampirism clears it', !globalThis.__dboExposedIn(VAMP, 'bruma'));
+
+// ---- 2 (23 Oct): an exposed ruler is deposed through gamemode's unseat; a lesser official stays seated, suspended ----------
+const unseat = (z, tg, byWho) => { unseats.push({ z: z.id, tg, byWho }); let had = null; for (const k of Object.keys(OFF[z.id] || {})) { if (OFF[z.id][k].includes(tg.pid)) had = k; OFF[z.id][k] = OFF[z.id][k].filter((x) => x !== tg.pid); } return had ? { had, text: '' } : { error: 'no rank' }; };
+const reload2 = (cfg) => { try { fs.unlinkSync('exposure.json'); } catch (e) { /* none */ } globalThis.__dboExposure = null; X = load('exposure.js', cfg, { unseatOfficialBy: unseat }); clearBounties(); sys.length = 0; audits.length = 0; };
+reload2();
+online = Object.keys(chars).map(Number);
+territory = { id: 'bruma', name: 'Bruma', zone: 'bruma', kind: 'capital', marker: { world: 'w', pos: [0, 0, 0] } };
+props.set(`${JARL}|private.supernatural`, { kind: 'werewolf' });
+see(JARL, 'werewolf', [W1, W2, W3], 'in'); beast(JARL, null); X.tick();
+ok('an exposed Count is deposed through unseatOfficialBy', unseats.length === 1 && unseats[0].z === 'bruma' && unseats[0].tg.pid === 11 && /exposure/.test(unseats[0].byWho) && !OFF.bruma.count.includes(11), unseats);
+ok('...audited', audits.some((t) => /EXPOSURE Frigga .* deposed as count of Bruma/.test(t)));
+ok('...the court (Steward) is told who, and that he is deposed', sys.some(([a, t]) => a === STEW && /It was Frigga, the Count of Bruma, who is deposed/.test(t)), sys.filter(([a]) => a === STEW));
+ok('...nobody outside the court is told who', !sys.some(([a, t]) => a !== JARL && a !== STEW && NAMES.test(t)));
+props.set(`${STEW}|private.supernatural`, { kind: 'werewolf' });
+see(STEW, 'werewolf', [W1, W2, W3], 'in'); beast(STEW, null);
+ok('an exposed Steward keeps the seat (no second unseat) but is suspended', unseats.length === 1 && OFF.bruma.steward.includes(22) && /will not take your word/.test(globalThis.__dboExposureBarred(STEW, 'bruma')));
+reload2({ exposure: { deposeRulers: false } });
+OFF = { bruma: { count: [11], steward: [22], guard: [] }, whiterun: { jarl: [] } };
+see(JARL, 'werewolf', [W1, W2, W3], 'in'); beast(JARL, null);
+ok('deposeRulers false: the Count keeps the seat, suspended', unseats.length === 1 && OFF.bruma.count.includes(11) && globalThis.__dboExposureBarred(JARL, 'bruma') !== '');
+
+// ---- 1 (23 Oct): confession, the character's own (/confess, confirmed) or marked by staff (/exposure confess) ----------
+reload2(); OFF = { bruma: { count: [11], steward: [22], guard: [] }, whiterun: { jarl: [] } }; unseats.length = 0;
+const run = (cmd, a, args) => { said.length = 0; cmds[cmd](a, args); return (said.at(-1) || [])[1] || ''; };
+ok('a mortal has nothing to confess', /nothing of that kind/.test(run('confess', W1, '')));
+ok('/confess asks first, naming what it costs', /cannot be taken back.*\/confess yes/.test(run('confess', WOLF, '')) && !globalThis.__dboExposedIn(WOLF, 'bruma'));
+ok('/confess yes without asking first only asks', (globalThis.__dboExposure.confessAsks.clear(), /cannot be taken back/.test(run('confess', WOLF, 'yes'))) && !globalThis.__dboExposedIn(WOLF, 'bruma'));
+run('confess', WOLF, 'yes');
+ok('/confess yes after the ask: known in the hold, 500 bounty', globalThis.__dboExposedIn(WOLF, 'bruma') && bounty('bruma', WOLF) === 500 && sys.some(([a, t]) => a === WOLF && /You have confessed before Bruma/.test(t)));
+X.tick();
+ok('...the court hears of a confession, nameless', sys.some(([a, t]) => a === PGUARD && /a werewolf openly confessed what they are, in Bruma/.test(t)) && !sys.some(([a, t]) => a !== WOLF && NAMES.test(t)));
+ok('...audited as a confession', audits.some((t) => /EXPOSURE Ulf .* confessed to being a werewolf openly/.test(t)));
+ok('a second confession: already known', /already knows/.test(run('confess', WOLF, '')));
+ok('staff confess: a GM below Lead may not', /Lead GM/.test(run('exposure', GM, 'confess Serana bruma she told the Jarls')));
+ok('staff confess needs a hold and a reason', /Usage/.test(run('exposure', LEAD, 'confess Serana bruma')));
+ok('staff confess of a mortal is refused', /neither a werewolf nor a vampire/.test(run('exposure', LEAD, 'confess Ann bruma no')));
+props.set(`${VAMP}|private.supernatural`, { kind: 'vampire' });
+ok('a Lead GM marks a confessed vampire in a hold', /Serana is known as a vampire in Bruma/.test(run('exposure', LEAD, 'confess Serana bruma she told all the Jarls')) && globalThis.__dboExposedIn(VAMP, 'bruma') && bounty('bruma', VAMP) === 500);
+ok('...audited with the staff member and the reason', audits.some((t) => /EXPOSURE Serana .* confessed to being a vampire \(marked by staff: Nate #2c: she told all the Jarls\)/.test(t)), audits.filter((t) => /Serana/.test(t)));
+props.set(`${JARL}|private.supernatural`, { kind: 'werewolf' });
+run('exposure', LEAD, 'confess Frigga bruma confessed at court');
+ok('a confessing ruler is deposed too', unseats.some((u) => u.tg.pid === 11));
 
 // ---- enabled false --------------------------------------------------------------------------------------------------------
 reset();

@@ -989,7 +989,7 @@ const HELP_GROUPS = [
     hints: ['Your god, and turning to another: F3, the Deity tab, or /deity.',
       'Offerings and rites: a shrine. Molag Bal gives the Embrace, Hircine the Great Hunt; Arkay or Stendarr lift a curse for a filled black soul gem.',
       'A fever caught from a vampire or a werewolf: a Cure Disease potion, or prayer at a shrine of the Divines.'] },
-  { key: 'beast', title: 'The beast in you', names: ['beast', 'forms', 'hunt', 'blood', 'feed'], role: 'beast',
+  { key: 'beast', title: 'The beast in you', names: ['beast', 'forms', 'hunt', 'blood', 'feed', 'confess'], role: 'beast',
     hints: ['Your curse and its powers: F3, the Supernatural tab.',
       'Silver and fire hurt a vampire more; silver and poison spells hurt a werewolf more in beast form.'] },
   { key: 'work', title: 'Work and the world', names: ['time', 'property', 'mine', 'keys', 'courier'],
@@ -1062,7 +1062,7 @@ const STAFF_HELP = [
   { key: 'factions', title: 'Factions', items: [['faction leader', '<player|#TAG> <faction id>: name the first leader of a faction'],
     ['faction remove', '<name|#TAG> <faction id>: take someone out of a faction'], ['faction hallmark', "<faction id>, at a building's door: its faction's hall (hallunmark undoes it)"], ['faction list', 'every faction id, secret ones included'], 'ledgerpoint',
     ['rolename', 'list <court|faction> | <court> <office> <new title> | <faction> <rank number> <new title> | reset <court> <office> | reset <faction> <rank number>: rename an office or rank for everyone who holds it, at once (Lead GM; F3 Court and the Faction tab\'s rank editor do it too)'], 'war',
-    ['exposure', '[list] | clear <name|#TAG|profile id> [hold] <reason>: werewolves and Vampire Lords seen changing, by hold, with the hunters who saw it; clear one (audited)']] },
+    ['exposure', '[list] | clear <name|#TAG|profile id> [hold] <reason> | confess <name|#TAG|profile id> <hold> <reason>: werewolves and Vampire Lords seen changing, by hold, with the hunters who saw it; clear one, or mark a new confession (audited)']] },
   { key: 'appoint', title: 'Appointments and property', items: [
     ['appoint', '<player|#TAG|profile id> <zone> <rank> [override]: make someone an official, online or offline. A Jarl must be a Breton, a Nord or an Imperial; only the Owners may add override. /appoint alone lists the zone ids; a wrong rank lists that zone\'s ranks. Rulers name 5 Stewards, 2 Court Mages, a Guard Captain and any number of Guards; Chieftains 5 Banes, a Shaman, a Wise-Woman, a Guard Commander and any number of Guards; captains name Guards'],
     ['dismiss', '<player|#TAG|profile id> <zone>: remove an official, online or offline (told if online). Officials may dismiss the ranks they may appoint'],
@@ -9064,7 +9064,7 @@ try {
   const EXPOSURE_JS = path.resolve('exposure.js');
   delete require.cache[EXPOSURE_JS];
   require(EXPOSURE_JS)({ mp, log, personal, system, audit, who, display, cfg, registerChatCommand, zoneOfActor, zoneById, readOfficials,
-    profileOf, officialTarget, onlineActors, isAdmin, isLeadStaff, every });
+    profileOf, officialTarget, onlineActors, isAdmin, isLeadStaff, every, unseatOfficialBy });
 } catch (e) { log('exposure.js failed to load:', e.stack || e.message); for (const k of ['__dboBeastWitnessed', '__dboExposureHit', '__dboExposureBounty', '__dboExposureBarred', '__dboExposedIn', '__dboExposureCourtView']) globalThis[k] = null; }
 // ---- the Green Pact: the wood elves' taboo on plants and the Partaking of the slain (server\greenpact.js) ----------------
 try {
