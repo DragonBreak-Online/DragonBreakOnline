@@ -5085,6 +5085,14 @@ const wheelRoom = (a, skill, now = Date.now()) => {
   return null;
 };
 globalThis.__dboWheelRoom = wheelRoom;
+// Scholar at the Wheel's per-skill cap (Master, 100): the hourly and daily limits only guard gains it can no longer make
+const scholarAtPeak = (a) => {
+  try {
+    const r = mp.get(a, 'private.mastery'); const s = r && r.skills && r.skills.scholar; if (!s) return false;
+    const ps = (SKILLS_DEF && SKILLS_DEF.pointSystem) || {};
+    return (Number(s.level != null ? s.level : s.points) || 0) >= (Number(ps.capPerSkill) || 100);
+  } catch (e) { return false; }
+};
 globalThis.__dboScholarNoRoom = scholarNoRoom;
 // The tome a reading presses between the pages, of the rank the reading's roll chose (Nate and Swag, 17 Oct):
 // - no college rank gate on the rank (Nate, 17 Oct: "remove the college gate for reading drops"); the restricted arts
@@ -5180,7 +5188,11 @@ globalThis.__dboReadBook = (targetId, casterId) => {
   const until = Number(reads[key]) || 0;
   if (until > Date.now()) return deny(`You read this not long ago. Come back in ${Math.ceil((until - Date.now()) / 60000)} minutes.`);
   // A smithing schematic is read to learn its technique (manuals.js), not for Scholar points, so the cap never stops it
-  if (!(globalThis.__dboManualsIsManual && globalThis.__dboManualsIsManual(baseId))) { const noRoom = scholarNoRoom(casterId); if (noRoom) return deny(noRoom); }
+  // A Master Scholar (the skill at its peak) still reads for the tomes and scrolls between the pages, though it earns no more
+  // Scholar (Nate, 23 Oct: "when players hit master scholar people cant read more books for tomes"); every other limit holds
+  if (!(globalThis.__dboManualsIsManual && globalThis.__dboManualsIsManual(baseId))) {
+    if (!scholarAtPeak(casterId)) { const noRoom = scholarNoRoom(casterId); if (noRoom) return deny(noRoom); }
+  }
   const cyrodiil = CYRODIIL_PLUGINS.has(String(mp.get(targetId, 'baseDesc')).split(':')[1].toLowerCase());
   const line = readLine(tier, cyrodiil); const original = line.split(' ');
   let shuffled = shuffleIdx(original.length);

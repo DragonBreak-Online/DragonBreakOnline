@@ -517,6 +517,10 @@ console.log('client-judged:');
   let n = 0; for (let i = 0; i < 3; i++) n += readAt(bandStart(0, 'tome', 0) + eps).tomes.length;
   check('no halving, no cap: the same roll gives a tome every reading', n === 3, n);
   check('no pity count is kept', props.get(READER + '|private.scholarTomeDry') === undefined, props.get(READER + '|private.scholarTomeDry'));
+  // Nate, 23 Oct: "when players hit master scholar people cant read more books for tomes" (the peak refused every book)
+  at(100);
+  g = readAt(bandStart(100, 'tome', 4) + eps);
+  check('Scholar 100 (Master, the peak): still reads, and the Master tome band gives a Master tome', g.tomes.join() === '4' && !g.scrolls.length, g);
   at(90);
   globalThis.__dboSpellsReadRankCap = () => 2;
   g = readAt(bandStart(90, 'tome', 3) + eps);
