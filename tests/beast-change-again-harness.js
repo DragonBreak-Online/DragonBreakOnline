@@ -35,12 +35,13 @@ globalThis.__dboClock = { gameDays: () => day, summary: () => ({ timeScale: 6 })
 // The Great Hunt: an Elder changes three times a game day
 globalThis.__dboHuntChangesPerDay = () => 3;
 globalThis.__dboBeastPowers = undefined;
+// Changes by choice, as under the voluntaryWerewolf rollback (werewolf-form-rules-harness.js covers it off)
 const cfg = JSON.parse(fs.readFileSync(path.join(CFG_ROOT, 'gamemode-config.json'), 'utf8'));
 delete globalThis.__dboSuperState;
 require(path.join(ROOT, 'supernatural.js'))({
   mp, log: noop, audit: noop, personal: noop, registerChatCommand: noop, onUi: noop, openWidget: noop, closeWidget: noop,
   sendPacket: noop, display: String, who: String, isAdmin: () => false, findByName: () => null, onlineActors: () => [], every: noop,
-  profileOf: (a) => a, nameOf: String, isWorldspace: () => true, needsFeed: noop, hungerOf: () => 0, cfg: { supernatural: cfg.supernatural || {} },
+  profileOf: (a) => a, nameOf: String, isWorldspace: () => true, needsFeed: noop, hungerOf: () => 0, cfg: { supernatural: Object.assign({}, cfg.supernatural || {}, { voluntaryWerewolf: true }) },
 });
 require(path.join(ROOT, 'beastform.js'))({
   mp, log: noop, personal: (a, t) => said.push({ a, t }), registerChatCommand: noop, sendPacket: noop,

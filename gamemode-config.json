@@ -310,6 +310,9 @@
   "goblinEyes": { "node": "mesh001:1:2:3:3", "txst": "1d2013:DragonBreak Online Edits.esp", "txstMortal": "1d2014:DragonBreak Online Edits.esp" },
    "_comment": "Overrides for supernatural.js defaults. huntMarkChance: the chance that surviving Hircine's Great Hunt (/rite) gives Sanies Lupinus; an unmarked survivor waits riteFailCooldownHours to run it again. infectWerewolf: a werewolf's bite's chance to pass it on. Nate, 2026-09-27: werewolf harder to come by than vampirism, 0.5 -> 0.25 and 0.05 -> 0.02. Nate, 2026-10-03: both rarer, lycanthropy rarest: 0.25 -> 0.1 and 0.02 -> 0.005 (infectVampire 0.03 and infectFeed 0.05 are the supernatural.js defaults).",
    "huntMarkChance": 0.1,
+   "_voluntaryWerewolf": "Nate, 23 Oct ('people cant auto transform'): false refuses a cursed werewolf's own Beast Form (the power, /beast) with a line saying the beast comes when it will; only the feral and full-moon changes and staff (/beastform <who> werewolf now, the admin panel) turn them. The rest of a change a logout or crash cut short may still be taken back. voluntaryWhenSpared true keeps the call for those the beast never forces (a pack's Alpha, Hircine's blessing), who would otherwise never change; a GM's grant to a mortal and admins keep it too. ROLLBACK: voluntaryWerewolf true (hot reload).",
+   "voluntaryWerewolf": false,
+   "voluntaryWhenSpared": true,
    "_infectWerewolf": "Nate, 13 Oct: 0.005 -> 0.01 a bite. The world held 20 vampires to 2 werewolves, six to one, which is exactly the ratio of the two infection chances (a vampire's hit 0.03). This doubles the werewolf side and leaves the vampire side alone. Rollback: 0.005, hot reload.",
    "infectWerewolf": 0.01,
    "vampireRestoration": { "_comment": "Nate, 11 Oct (a house rule): a vampire cannot cast Restoration's healing spells (restoration-healing.json) nor read, buy or be taught one, and healing magic does nothing for a vampire. Potions still heal; the anti-undead spells still burn. false turns it all off.", "enabled": true },
@@ -1295,7 +1298,12 @@
   "breakerDrops": 2,
   "breakerWindowSeconds": 600,
   "_breaker": "wwwatch: / vlwatch: every drop near a beast is logged with distance and timing. Drops by watchers shown its body, within breakerUnits of it in the last breakerSeconds, count; breakerDrops of them inside breakerWindowSeconds turn that character's body off (private.wwBodyOff / private.vlBodyOff, kept through restarts) until /wwremote or /vlremote clear <player>.",
-  "_names": "While in a beast form a player is named after it (beastform.js NAMES: Werewolf, Vampire Lord), in chat, menus and on other clients; the revert, death, login and logout put the real name back."
+  "_names": "While in a beast form a player is named after it (beastform.js NAMES: Werewolf, Vampire Lord), in chat, menus and on other clients; the revert, death, login and logout put the real name back.",
+  "werewolf": { "_comment": "Nate, 23 Oct (a Jarl changed in a crowd and reverted 6 s later): minSeconds: a werewolf cannot revert by choice (Revert Form, /beast) this long into a change, never past its end, and is told how long is left; death, logout, login, staff (/beastform <who> werewolf revert, the admin panel) and the time running out still end it at once. Vampire Lords are not held. seconds: the change's length only when greathunt.js is not loaded (greatHunt.beastSeconds rules otherwise; was 150). ROLLBACK: minSeconds 0 (hot reload).", "seconds": 300, "minSeconds": 240 }
+ },
+ "greatHunt": {
+  "_comment": "Overrides for greathunt.js defaults. beastSeconds: how long a werewolf's change lasts by Great Hunt rank (Fledgling, Prowler, Hunter, Blood-Howler, Elder). Nate, 23 Oct: about double, from 150/180/210/240/300. Feeding still adds feedSeconds (30..60). ROLLBACK: delete beastSeconds (the code defaults are the old values; hot reload).",
+  "beastSeconds": [300, 360, 420, 480, 600]
  },
  "offlineBody": {
   "_comment": "A logged-out player's body cannot be harmed (Nate, 2026-09-30), unless a blow landed on or by them in the last combatLogSeconds before the logout (combat logging). 0 = every logged-out body is safe.",

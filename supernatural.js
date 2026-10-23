@@ -14,7 +14,8 @@
 //              stage 1; it takes seconds by blood rank, and ranked vampires can feed deeply. A vampire the fever
 //              turned has no gifts until the first meal and withers without one (firstMealHours). Food does little.
 //              The Blood Crown: one pure-blood holds the Vampire Lord power; a vampire who slays the holder takes it.
-//   Werewolves beast form once per game day (beastform.js runs it); under a full moon at night, outdoors, each game hour
+//   Werewolves beast form only when the beast takes them (voluntaryWerewolf; a pack's Alpha and Hircine's blessed call it once
+//              per game day; beastform.js runs it); under a full moon at night, outdoors, each game hour
 //              has a 1 in 10 chance of a forced change unless Hircine blessed them; feeding in beast form adds 30 s;
 //              silver hurts. The leader of a pack (guild-defs kind "pack") runs with the pale spirit coat. The Great
 //              Hunt (greathunt.js) sets these numbers by rank when it is loaded, and a werewolf in beast form feeds on
@@ -85,6 +86,10 @@ module.exports = (api) => {
     // without it, and it is left out until someone confirms the bow is silver
     silverWeapons: [],
     forcedChangeChance: 0.10, beastChangesPerDay: 1,
+    // Nate, 23 Oct ("people cant auto transform"): false refuses a cursed werewolf's own call of the beast (the power, /beast);
+    // only a forced change (feral, the full moon) or staff turns them. voluntaryWhenSpared keeps the call for those never
+    // forced (a pack's Alpha, Hircine's blessing), who would otherwise never change. A GM's grant to a mortal and admins keep it
+    voluntaryWerewolf: false, voluntaryWhenSpared: true,
     beastFeedSeconds: 30, corpseFreshMinutes: 10,
     // A restrained living player gives blood this often, in game days
     feedLivingEveryDays: 1,
@@ -858,6 +863,8 @@ module.exports = (api) => {
   const isAlpha = (a) => { try { return typeof globalThis.__dboGuildIsPackLeader === 'function' && !!globalThis.__dboGuildIsPackLeader(a); } catch (e) { return false; } };
   // The old Hircine blessing belongs to a pack's Alpha now; an admin can still set it (/curse ... blessedwerewolf)
   const spared = (a, s) => isAlpha(a) || !!(s && s.blessed);
+  // Whether this werewolf may call the beast themselves (voluntaryWerewolf)
+  const callsBeast = (a, s) => C.voluntaryWerewolf === true || (C.voluntaryWhenSpared !== false && spared(a, s));
 
   // ---- silver: a werewolf or vampire can neither wear it nor strike with it (Nat) --------------------------
   // Silver is the silver weapon keyword or "silver" in the editor id, which also catches rings, amulets and circlets.
@@ -1078,8 +1085,10 @@ module.exports = (api) => {
     endCurse(a, 'became a werewolf');
     const s = stateOf(a); Object.assign(s, { kind: 'werewolf', disease: null, stage: 0, blessed: !!blessed, beastDay: -1 });
     saveState(a, s); addSpell(a, BEAST_POWER); ensureTells(a, stateOf(a));
-    if (fromFever) { onScreen(a, FEVER_TURNED.werewolf, 8); personal(a, 'Beast Form is yours once a day, and the hungrier you are, the more often the beast takes you whether you will it or not.'); }
-    else personal(a, blessed ? 'Hircine marks you as his own. The beast answers when you call, and only then.' : 'The fever breaks into a howl. You are a werewolf. Beast Form is yours once a day, and the hungrier you are, the more often the beast takes you whether you will it or not.');
+    const how = callsBeast(a, s) ? 'Beast Form is yours once a day, and the hungrier you are, the more often the beast takes you whether you will it or not.'
+      : 'The beast cannot be called: it takes you when it will, at night, under the full moon, and more often the hungrier you are.';
+    if (fromFever) { onScreen(a, FEVER_TURNED.werewolf, 8); personal(a, how); }
+    else personal(a, blessed ? 'Hircine marks you as his own. The beast answers when you call, and only then.' : `The fever breaks into a howl. You are a werewolf. ${how}`);
     audit(`SUPERNATURAL ${who(a)} became a ${blessed ? 'Hircine-blessed ' : ''}werewolf`);
   };
   // Across the middle of the screen (dboBanner, client 0.3.26+), Skyrim's notification for older clients, and chat
@@ -2277,6 +2286,13 @@ module.exports = (api) => {
     if (key === 'werewolf' && (!s || s.kind !== 'werewolf') && mp.get(a, 'private.werewolfGrant') !== true) {
       return s && s.disease && s.disease.kind === 'werewolf' ? 'The beast is not yours yet. Wait for the fever to peak.' : 'You are no werewolf.';
     }
+    // Only the beast decides when (voluntaryWerewolf); the rest of a change a session cut short still comes back
+    if (key === 'werewolf' && s && s.kind === 'werewolf' && !callsBeast(a, s) && !(opts && opts.carry === true)) {
+      const no = 'The beast cannot be called. It comes when it will: when you hunger, at night, and under the full moon.';
+      sendPacket(a, { customPacketType: 'dboBanner', text: no, seconds: 4 });
+      sendPacket(a, { customPacketType: 'dboStatus', kind: 'notice', seconds: 1, speedMult: 0, text: no });
+      return no;
+    }
     // Once per in-game day, which is the design and not a real day: the world clock owns the calendar
     if (key === 'werewolf' && s && s.kind === 'werewolf' && !spared(a, s) && !(opts && opts.carry === true)) {
       const clock = globalThis.__dboClock;
@@ -2302,7 +2318,7 @@ module.exports = (api) => {
   // a werewolf after a revert, since the game's own Beast Form power rests a day in their game (Purr #7DJT, 17 Oct)
   globalThis.__dboBeastChangesLeft = (a) => {
     const s = stateOf(a);
-    if (!s || s.kind !== 'werewolf') return null;
+    if (!s || s.kind !== 'werewolf' || !callsBeast(a, s)) return null;
     if (spared(a, s)) return Infinity;
     const clock = globalThis.__dboClock;
     const now = clock && typeof clock.gameDays === 'function' ? clock.gameDays() : null;
@@ -2360,7 +2376,8 @@ module.exports = (api) => {
       hint: alpha ? 'You lead your pack. You run with the pale coat, and the beast answers to you.'
         : packs.length ? 'A packmate who brings the Pack Leader down, both in beast form, takes the pack.' : 'You belong to no pack and hunt alone. A pack takes you in only by invitation.',
     }];
-    if (spared(a, s)) rows.push({ label: 'Beast form', value: 'At will', hint: alpha ? 'A Pack Leader is not held to a daily change.' : "Hircine's blessing frees you from the daily change." });
+    if (!callsBeast(a, s)) rows.push({ label: 'Beast form', value: 'When it takes you', hint: 'You cannot call the beast. It comes when you hunger, at night, and under the full moon.' });
+    else if (spared(a, s)) rows.push({ label: 'Beast form', value: 'At will', hint: alpha ? 'A Pack Leader is not held to a daily change.' : "Hircine's blessing frees you from the daily change." });
     else {
       const now = gameDays(); const day = Math.floor(now);
       const perDay = typeof globalThis.__dboHuntChangesPerDay === 'function' ? Number(globalThis.__dboHuntChangesPerDay(a)) || C.beastChangesPerDay : C.beastChangesPerDay;
@@ -2370,7 +2387,8 @@ module.exports = (api) => {
     if (beastForm(a) === 'werewolf') {
       let b = null; try { b = mp.get(a, 'private.beast'); } catch (e) { /* offline */ }
       const left = b && b.until ? Math.max(0, Math.ceil((Number(b.until) - Date.now()) / 1000)) : 0;
-      rows.push({ label: 'In the beast', value: left ? `${left} s left` : 'Now', hint: 'Feed on a fresh body to stay longer.' });
+      let hold = 0; try { hold = typeof globalThis.__dboBeastRevertLockLeft === 'function' ? Number(globalThis.__dboBeastRevertLockLeft(a)) || 0 : 0; } catch (e) { hold = 0; }
+      rows.push({ label: 'In the beast', value: left ? `${left} s left` : 'Now', hint: `${hold > 0 ? `You cannot turn back for another ${hold} s. ` : ''}Feed on a fresh body to stay longer.` });
     }
     if (spared(a, s)) rows.push({ label: 'The beast within', value: 'Held', hint: 'It never takes you unprepared, and the full moon does not force it out.' });
     else {
@@ -2393,7 +2411,7 @@ module.exports = (api) => {
       creed: "Hircine's blood runs in you. The Great Hunt honours those who live as the beast.",
       ladder: hunt, rows,
       powers: [
-        { name: 'Beast Form', have: true, note: 'Become the werewolf' },
+        { name: 'Beast Form', have: true, note: callsBeast(a, s) ? 'Become the werewolf' : 'The beast comes when it will, not when you call' },
         { name: 'Feeding', have: true, note: `In the beast, activate a fresh body: ${feedSecs} s longer, and your hunger eases` },
         { name: 'Howl of Terror', have: true, note: 'In the beast: those near you flee in fear' },
         { name: 'Totem of the Hunt', have: true, note: 'In the beast: sense the living around you' },

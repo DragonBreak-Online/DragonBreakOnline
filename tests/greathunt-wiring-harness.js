@@ -23,7 +23,7 @@ const api = {
   mp, log: noop, audit: noop, personal: (a, t) => said.push({ a, t }), registerChatCommand: noop,
   onUi: noop, openWidget: noop, closeWidget: noop, sendPacket: noop, display: String, who: String,
   isAdmin: () => false, findByName: () => null, onlineActors: () => [WOLF, VAMP], every: (n, ms, f) => timers.set(n, f), profileOf: (a) => (a < 100 ? a : -1),
-  nameOf: String, isWorldspace: () => true, needsFeed: (a) => fedMeals.push(a), hungerOf: () => 0, cfg: {},
+  nameOf: String, isWorldspace: () => true, needsFeed: (a) => fedMeals.push(a), hungerOf: () => 0, cfg: { supernatural: { voluntaryWerewolf: true } },  // changes by choice: the rollback (werewolf-form-rules-harness.js has it off)
   zoneOfActor: () => null, zoneById: () => null,
 };
 for (const f of ['supernatural.js', 'greathunt.js', 'bloodranks.js']) { const p = path.resolve(__dirname, '..', f); delete require.cache[p]; }

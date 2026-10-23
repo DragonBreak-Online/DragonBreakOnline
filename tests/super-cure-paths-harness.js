@@ -46,7 +46,7 @@ const api = {
   mp, log: (...a) => logs.push(a.join(' ')), audit: () => {}, personal: (a, t) => said.push(t), registerChatCommand: () => {},
   onUi: (n, fn) => { (ui[n] = ui[n] || []).push(fn); }, openWidget: (a, w) => widgets.push(w), closeWidget: () => {}, sendPacket: () => {}, display: (a) => `P${a.toString(16)}`, who: String,
   isAdmin: () => admin, findByName: () => null, onlineActors: () => [P], every: () => {}, profileOf: () => 1, nameOf: String,
-  isWorldspace: () => true, needsFeed: () => {}, hungerOf: () => 0, cfg: {},
+  isWorldspace: () => true, needsFeed: () => {}, hungerOf: () => 0, cfg: { supernatural: { voluntaryWerewolf: true } },  // changes by choice: the rollback (werewolf-form-rules-harness.js has it off)
 };
 fs.writeFileSync('supernatural.json', JSON.stringify({ crown: null, revoke: [] }));
 delete globalThis.__dboSuperState;

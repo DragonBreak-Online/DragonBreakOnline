@@ -32,9 +32,10 @@ globalThis.__dboBeastAllow = (a, key, forced, opts) => {
   usedToday++;
   return null;
 };
+// The fixture's arithmetic is the old 150 s change (beastform.werewolf.seconds, the length without greathunt.js)
 require(path.resolve(__dirname, '..', 'beastform.js'))({
   mp, log: (...x) => logs.push(x.join(' ')), personal: (a, t) => said.push(t), registerChatCommand: noop, sendPacket: noop,
-  display: String, who: String, audit: noop, findByName: () => null, every: noop, redress: noop, cfg: {}, isAdmin: () => false,
+  display: String, who: String, audit: noop, findByName: () => null, every: noop, redress: noop, cfg: { beastform: { werewolf: { seconds: 150 } } }, isAdmin: () => false,
   onlineActors: () => [WOLF],
 });
 let pass = 0, fail = 0;

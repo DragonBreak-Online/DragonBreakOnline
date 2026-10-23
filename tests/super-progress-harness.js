@@ -27,7 +27,7 @@ const api = {
   mp, log: noop, audit: noop, personal: noop, system: noop, registerChatCommand: (n, f) => { cmds[n] = f; },
   onUi: noop, openWidget: noop, closeWidget: noop, sendPacket: (a, p) => packets.push({ a, p }), display: String, who: String,
   isAdmin: () => false, findByName: () => null, onlineActors: () => online, every: (n, ms, f) => { timers[n] = f; }, profileOf: (a) => a,
-  nameOf: String, isWorldspace: () => true, needsFeed: noop, hungerOf: () => hunger, zoneOfActor: () => null, zoneById: () => null, cfg: {},
+  nameOf: String, isWorldspace: () => true, needsFeed: noop, hungerOf: () => hunger, zoneOfActor: () => null, zoneById: () => null, cfg: { supernatural: { voluntaryWerewolf: true } },  // changes by choice: the rollback (werewolf-form-rules-harness.js has it off)
   hasUiCap: (a, c) => caps.has(c),
 };
 for (const f of ['greathunt.js', 'bloodranks.js', 'supernatural.js']) require(path.resolve(__dirname, '..', f))(api);

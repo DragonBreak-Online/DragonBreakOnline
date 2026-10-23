@@ -5,7 +5,9 @@
 // gamemode castHook): the real appearance is kept in private.beast, appearance.raceId becomes the beast race (other
 // clients rebuild the actor from it), the player's own client swaps race on a dboBeast packet, gear comes off.
 // Reverting restores the kept appearance and re-dresses. Death, logout and login always revert, so a beast race is
-// never saved as the character's own. Who may transform: whoever holds the power (admin panel or /beastform grant).
+// never saved as the character's own. Who may transform: whoever holds the power (admin panel or /beastform grant); a cursed
+// werewolf only when the beast takes them (supernatural.js voluntaryWerewolf), and none reverts by choice before
+// beastform.werewolf.minSeconds.
 'use strict';
 
 const fs = require('fs');
@@ -58,10 +60,15 @@ module.exports = (api) => {
     return 'Someone';
   };
 
+  // Config beastform.werewolf (Nate, 23 Oct: Jarl Uhtred changed in a crowd and was himself again 6 s later). seconds: the
+  // change's length when greathunt.js is not loaded (its rank table greatHunt.beastSeconds rules otherwise; was 150).
+  // minSeconds: no revert by choice (the Revert Form power, /beast) this long into a werewolf's change, never past its
+  // end; a death, a logout, a login, a staff revert and the time running out still end it at once. 0 = no hold.
+  const WW = Object.assign({ seconds: 300, minSeconds: 240 }, CFG.werewolf || {});
   const idOf = (desc) => { try { return mp.getIdFromDesc(desc) >>> 0; } catch (e) { log(`beastform: ${desc} not in the load order`); return 0; } };
   // Form ids verified against the load order (ck-mcp lookup, 2026-09-22)
   const FORMS = {
-    werewolf: { name: 'Beast Form', race: idOf('cdd84:Skyrim.esm'), power: idOf('92c48:Skyrim.esm'), seconds: 150 },
+    werewolf: { name: 'Beast Form', race: idOf('cdd84:Skyrim.esm'), power: idOf('92c48:Skyrim.esm'), seconds: Math.max(0, Number(WW.seconds) || 0) || 150 },
     vampirelord: { name: 'Vampire Lord', race: idOf('283a:Dawnguard.esm'), power: idOf('283b:Dawnguard.esm'), seconds: 0 },
   };
   const REVERT_POWER = idOf('cd5c:Dawnguard.esm');
@@ -253,7 +260,8 @@ module.exports = (api) => {
     learn(a, key, true);
     sendPacket(a, { customPacketType: 'dboBeast', race, beast: true, form: key, wear, abilities: packetAbilities(key) });
     if (race !== f.race) log(`beastform: ${display(a)} is an Elder and takes the Behemoth (${race.toString(16)})`);
-    personal(a, key === 'werewolf' ? `The beast takes you for ${seconds} seconds.` : 'You take the form of a Vampire Lord. Press 9, then your Shout key, to revert.');
+    const hold = key === 'werewolf' ? revertLockLeft(a) : 0;
+    personal(a, key === 'werewolf' ? `The beast takes you for ${seconds} seconds.${hold ? ` You cannot turn back for the first ${hold}.` : ''}` : 'You take the form of a Vampire Lord. Press 9, then your Shout key, to revert.');
     for (const line of legend(key)) personal(a, line);
     audit(`BEAST ${who(a)} took ${f.name}`);
     witness(a, key === 'werewolf' ? 'twist into a beast' : 'rise into a Vampire Lord');
@@ -297,6 +305,28 @@ module.exports = (api) => {
     personal(a, `${n === Infinity ? 'The beast will come again whenever you call it.' : `The beast can take you ${n} more time${n === 1 ? '' : 's'} today.`} If your Beast Form power will not work yet, type /beast.`);
   };
 
+  // Seconds before a werewolf may revert by choice (WW.minSeconds from the change, never past its end); 0 for every other form
+  const revertLockLeft = (a, s = stateOf(a)) => {
+    if (!s || s.form !== 'werewolf' || isCreatureState(s)) return 0;
+    const min = Math.max(0, Number(WW.minSeconds) || 0);
+    if (!min || !Number(s.at)) return 0;
+    let end = Number(s.at) + min * 1000;
+    if (Number(s.until) > 0) end = Math.min(end, Number(s.until));
+    return Math.max(0, Math.ceil((end - Date.now()) / 1000));
+  };
+  globalThis.__dboBeastRevertLockLeft = (a) => revertLockLeft(Number(a) >>> 0);
+  // A revert by choice (the Revert Form power, /beast) asked too early: true when refused, and the player is told how long is left
+  const refuseEarlyRevert = (a) => {
+    const left = revertLockLeft(a);
+    if (!left) return false;
+    const text = `The beast will not let you go yet. You can turn back in ${left} second${left === 1 ? '' : 's'}.`;
+    sendPacket(a, { customPacketType: 'dboBanner', text, seconds: 3 });
+    sendPacket(a, { customPacketType: 'dboStatus', kind: 'notice', seconds: 1, speedMult: 0, text });
+    personal(a, isAdmin && isAdmin(a) ? `${text} Staff: /beastform me werewolf revert ends it now.` : text);
+    log(`beastform: ${display(a)} asked to revert ${left} s too early: refused`);
+    return true;
+  };
+
   const revert = (a, why) => {
     // The form's spells may stay in the client's hands once more: take them back again after this revert
     if (globalThis.__dboBeastStaleTaken instanceof Map) globalThis.__dboBeastStaleTaken.delete(Number(a) >>> 0);
@@ -331,7 +361,7 @@ module.exports = (api) => {
   globalThis.__dboBeastCast = (casterId, spellId) => {
     const a = Number(casterId) >>> 0, id = Number(spellId) >>> 0;
     noteBeastCast(a, id);
-    if (id === REVERT_POWER && stateOf(a)) { revert(a, 'revert power'); return true; }
+    if (id === REVERT_POWER && stateOf(a)) { if (!refuseEarlyRevert(a)) revert(a, 'revert power'); return true; }
     const key = byPower.get(id);
     if (!key) return false;
     log(`beastform: ${display(a)} cast ${FORMS[key].name} (${id.toString(16)})`);
@@ -384,7 +414,7 @@ module.exports = (api) => {
   globalThis.__dboBeastPower = (a, spellId) => {
     a = Number(a) >>> 0; spellId = Number(spellId) >>> 0;
     // Revert Form chosen on the Shout key arrives here like any power; it ends the form (Exsenus, 2026-10-01: stuck)
-    if (spellId === REVERT_POWER) { if (stateOf(a)) revert(a, 'revert power'); return; }
+    if (spellId === REVERT_POWER) { if (stateOf(a) && !refuseEarlyRevert(a)) revert(a, 'revert power'); return; }
     const pw = POWERS.get(spellId), s = stateOf(a);
     noteBeastCast(a, spellId);
     if (!pw || !s || s.form !== pw.form) return;
@@ -923,7 +953,10 @@ module.exports = (api) => {
     return false;
   };
   const takeForm = (a, key) => {
-    if (stateOf(a)) return revert(a, 'asked to revert') ? 'You return to your own shape.' : 'You are not transformed.';
+    if (stateOf(a)) {
+      if (refuseEarlyRevert(a)) return '';
+      return revert(a, 'asked to revert') ? 'You return to your own shape.' : 'You are not transformed.';
+    }
     if (!holdsPower(a, key)) return key === 'werewolf' ? 'The beast blood is not in you.' : 'Only a Vampire Lord can take that form.';
     transform(a, key);   // says why itself when it refuses
     return '';
@@ -977,6 +1010,6 @@ module.exports = (api) => {
     const r = takeForm(a, key); if (r) personal(a, r);
   }, { help: '[werewolf|vampirelord|revert] take or leave your beast form (or cast the power)' });
 
-  log(`beastform on: ${Object.entries(FORMS).map(([k, f]) => `${k} race ${f.race.toString(16)} power ${f.power.toString(16)}${f.seconds ? ` ${f.seconds}s` : ''}`).join(', ')}, revert ${REVERT_POWER.toString(16)}, Behemoth for the ${BEHEMOTH.rank} ${BEHEMOTH.enabled === true ? `ON (${behemothRace() ? behemothRace().toString(16) : 'race not in the load order'})` : 'off'}, Vampire Lord remote body ${globalThis.__dboVampireLordRemote === true ? 'ON' : 'off'}, werewolf remote body ${globalThis.__dboWerewolfRemote !== false ? 'ON' : 'off'}${globalThis.__dboWwRemoteSetBy ? ` (${globalThis.__dboWwRemoteSetBy})` : ''}`);
+  log(`beastform on: ${Object.entries(FORMS).map(([k, f]) => `${k} race ${f.race.toString(16)} power ${f.power.toString(16)}${f.seconds ? ` ${f.seconds}s` : ''}`).join(', ')}, revert ${REVERT_POWER.toString(16)} (not by choice in a werewolf's first ${Math.max(0, Number(WW.minSeconds) || 0)} s), Behemoth for the ${BEHEMOTH.rank} ${BEHEMOTH.enabled === true ? `ON (${behemothRace() ? behemothRace().toString(16) : 'race not in the load order'})` : 'off'}, Vampire Lord remote body ${globalThis.__dboVampireLordRemote === true ? 'ON' : 'off'}, werewolf remote body ${globalThis.__dboWerewolfRemote !== false ? 'ON' : 'off'}${globalThis.__dboWwRemoteSetBy ? ` (${globalThis.__dboWwRemoteSetBy})` : ''}`);
   log(`beastform polymorph ${polymorphOn() ? 'ON' : 'off'}${globalThis.__dboPolymorphSetBy ? ` (${globalThis.__dboPolymorphSetBy})` : ''}: ${Object.entries(CREATURES).map(([k, c]) => `${k} ${c.race ? c.race.toString(16) : 'not in the load order'}`).join(', ')}; refused near a player without creatureBody (within ${GUARD_SQUARES} grid squares, ${GUARD_UNITS} units or listed by the fork)`);
 };
