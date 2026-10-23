@@ -1,5 +1,5 @@
 {
- "_comment": "Guard post spots per hold, from where the base game's own guards stood outdoors in each city (23 Oct; guardspots.py over Skyrim.esm): the walled city's worldspace, or within 5000 units of a town's centre; gates and posts first, then spread out, at most 6. guards.js places them once per hold listed in guards.autoHolds, or on /guardpost auto <hold>. Bruma has none (its guards start inside the castle).",
+ "_comment": "Guard post spots per hold, from where the base game's own guards stood outdoors in each city (23 Oct; guardspots.py over Skyrim.esm): the walled city's worldspace, or within 5000 units of a town's centre; gates and posts first, then spread out, at most 6. guards.js places them once per hold listed in guards.autoHolds, or on /guardpost auto <hold>. Bruma: its own guards (Nate, 23 Oct: 'just have the bruma guards follow the scripts of the vanilla'), each spawned at the outdoor marker its AI package walks to, with its own NPC (npc), so the vanilla packages run.",
  "holds": {
   "riften": [
    {
@@ -547,6 +547,107 @@
     ],
     "heading": 136,
     "from": "GuardMarkarthSonsNightShift03"
+   }
+  ],
+  "bruma": [
+   {
+    "world": "a764b:BSHeartland.esm",
+    "pos": [
+     62060,
+     202816,
+     7217
+    ],
+    "heading": 0,
+    "from": "CYRGuardBrumaEastGate1",
+    "npc": "790de:BSHeartland.esm"
+   },
+   {
+    "world": "a764b:BSHeartland.esm",
+    "pos": [
+     55508,
+     207238,
+     8096
+    ],
+    "heading": 0,
+    "from": "CYRGuardBrumaNorthGate1",
+    "npc": "790df:BSHeartland.esm"
+   },
+   {
+    "world": "a764b:BSHeartland.esm",
+    "pos": [
+     60502,
+     202779,
+     7144
+    ],
+    "heading": 0,
+    "from": "CYRGuardBrumaPatrolDay1MainPatrol",
+    "npc": "790f4:BSHeartland.esm"
+   },
+   {
+    "world": "a764b:BSHeartland.esm",
+    "pos": [
+     59876,
+     203507,
+     7174
+    ],
+    "heading": 0,
+    "from": "CYRGuardBrumaPatrolDay2UpperClass",
+    "npc": "79055:BSHeartland.esm"
+   },
+   {
+    "world": "a764b:BSHeartland.esm",
+    "pos": [
+     57933,
+     200322,
+     7396
+    ],
+    "heading": 0,
+    "from": "CYRGuardBrumaPatrolDay3LowerClass",
+    "npc": "7905e:BSHeartland.esm"
+   },
+   {
+    "world": "a764b:BSHeartland.esm",
+    "pos": [
+     54913,
+     208256,
+     8049
+    ],
+    "heading": 0,
+    "from": "CYRGuardBrumaPatrolOutsideWalls1",
+    "npc": "790e0:BSHeartland.esm"
+   },
+   {
+    "world": "a764b:BSHeartland.esm",
+    "pos": [
+     63356,
+     203526,
+     7248
+    ],
+    "heading": 0,
+    "from": "CYRGuardBrumaPatrolOutsideWalls2",
+    "npc": "7913b:BSHeartland.esm"
+   },
+   {
+    "world": "a764b:BSHeartland.esm",
+    "pos": [
+     53911,
+     204101,
+     8452
+    ],
+    "heading": 0,
+    "from": "CYRGuardBrumaCastleCourtyardDay",
+    "npc": "8b3ff:BSHeartland.esm"
+   },
+   {
+    "world": "a764b:BSHeartland.esm",
+    "pos": [
+     53779,
+     207656,
+     8489
+    ],
+    "heading": 0,
+    "from": "CYRGuardBrumaSlumsPatrol1",
+    "npc": "79073:BSHeartland.esm"
    }
   ]
  }

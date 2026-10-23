@@ -198,9 +198,10 @@ module.exports = (api) => {
   const readDone = () => { try { const v = JSON.parse(fs.readFileSync(POSTS_FILE, 'utf8')); return Array.isArray(v.autoDone) ? v.autoDone : []; } catch (e) { return []; } };
   const placeSpots = (hold, by) => {
     const npc = C.npcByHold[hold]; const spots = SPOTS[hold] || [];
-    if (!npc || !spots.length) return 0;
+    if (!spots.length || (!npc && spots.some((sp) => !sp.npc))) return 0;
     const posts = readPosts(); let n = posts.reduce((m, p) => (p.hold === hold ? Math.max(m, Number(p.n) || 0) : m), 0);
-    for (const sp of spots) posts.push({ hold, n: ++n, world: sp.world, pos: sp.pos, heading: sp.heading, npc, by, at: Date.now(), auto: true });
+    // A spot may name its own guard (Bruma's: each original guard, so its own vanilla AI package runs)
+    for (const sp of spots) posts.push({ hold, n: ++n, world: sp.world, pos: sp.pos, heading: sp.heading, npc: sp.npc || npc, by, at: Date.now(), auto: true });
     const done = [...new Set(readDone().concat(hold))];
     try { fs.writeFileSync(POSTS_FILE + '.tmp', JSON.stringify({ posts, autoDone: done }, null, 1)); fs.renameSync(POSTS_FILE + '.tmp', POSTS_FILE); } catch (e) { log('guards: guard-posts.json write failed', e.message); return 0; }
     return spots.length;
