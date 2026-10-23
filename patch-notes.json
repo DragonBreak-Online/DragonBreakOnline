@@ -1,5 +1,20 @@
 [
   {
+    "title": "Priests raise the fallen at their feet",
+    "date": "2026-10-23",
+    "version": "Server update",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Reviving with healing magic",
+        "items": [
+          "A Priest of Expert rank or higher who casts Healing Hands or Heal Other at a fallen player standing right beside them now raises them, wherever the spell lands. Before, the spell often missed the body and nobody rose.",
+          "Farther away, aim at the fallen as before."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Bug fixes: books, shops, nobility, faction map, Vampiric Seduction",
     "date": "2026-10-23",
     "version": "Hotfix",
