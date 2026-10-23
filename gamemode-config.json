@@ -1566,8 +1566,7 @@
        "clan-largashbur",
        "clan-narzulbur",
        "clan-cracked-tusk",
-       "imperial-civil-commission",
-       "penitus-oculatus"
+       "imperial-civil-commission"
       ],
       "officialsOnly": [
        "hold-whiterun",
@@ -1603,6 +1602,7 @@
      },
      "secret": {
       "ids": [
+       "penitus-oculatus",
        "blades",
        "thieves-guild",
        "dark-brotherhood",
