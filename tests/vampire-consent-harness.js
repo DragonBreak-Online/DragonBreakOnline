@@ -282,9 +282,47 @@ ok(sres === true && heard(T, /drinks from your neck/) && !widgets.some(([a]) => 
 feedTick(30000);
 said.length = 0;
 globalThis.__dboSuperSpellHit(V, B, 0x1234);
+// W2 was last a bound mortal (the captive check above): a vampire again, free, so the check means what it says
+store.set(`${W2}|private.restrained`, null); store.set(`${W2}|private.supernatural`, { kind: 'vampire', stage: 2, lastFed: 0 });
 ok(globalThis.__dboSuperActivate(B, W2) === false, 'another vampire cannot feed on the one V seduced');
 now += 31000;
 ok(globalThis.__dboSuperActivate(B, V) === false, 'and the calm wears off after 30 s');
+
+// ---- review R1/F1 (23 Oct): Seduction skips the asking, never who may be fed on (askable) --------------------------------
+// Not a vampire (their blood is dead), not a beast, not a player in a rite; and a feeder in beast form does not feed.
+// Each case casts its own Seduction and clears any feed it started, so one case's result never decides the next
+now += 3 * GAME_DAY_MS; feedTick(30000); said.length = 0; widgets.length = 0;
+const FEEDS = globalThis.__dboSuperFeeds;
+const fedOn = (t) => { const f = FEEDS.get(V); const r = !!f && f.t === t; FEEDS.delete(V); return r; };
+const seduce = (t) => globalThis.__dboSuperSpellHit(V, t, 0x1234);
+// E on t: true when E was taken as a feed or a feed on t began (either is the bypass)
+const eFeeds = (t) => { const r = globalThis.__dboSuperActivate(t, V); return fedOn(t) || r !== false; };
+seduce(W2);
+ok(!eFeeds(W2), 'Seduced, another vampire is not fed on with E (dead blood)');
+seduce(W2); said.length = 0;
+globalThis.__dboSuperMenuAction(V, 'super:feed', W2, nameFor);
+ok(!fedOn(W2) && heard(V, /cannot be asked now/), '...nor with a Feed sent for them (the menu offers none)');
+store.set(`${B}|private.beast`, { form: 'werewolf', until: now + 600000 });
+seduce(B);
+ok(!eFeeds(B), 'Seduced, a werewolf in beast form is not fed on with E');
+seduce(B); said.length = 0;
+globalThis.__dboSuperMenuAction(V, 'super:feed', B, nameFor);
+ok(!fedOn(B) && heard(V, /cannot be asked now/), '...nor with a Feed sent for them');
+store.set(`${B}|private.beast`, null);
+globalThis.__dboRites.set(T, { kind: 'test' });
+seduce(T);
+ok(!eFeeds(T), 'Seduced, a player in a rite is not fed on with E');
+seduce(T); said.length = 0;
+globalThis.__dboSuperMenuAction(V, 'super:feed', T, nameFor);
+ok(!fedOn(T) && heard(V, /cannot be asked now/), '...nor with a Feed sent for them');
+globalThis.__dboRites.delete(T);
+store.set(`${V}|private.beast`, { form: 'vampirelord', until: now + 600000 });
+seduce(T);
+ok(!eFeeds(T), 'a vampire who took the Vampire Lord form after the Seduction does not feed with E (the menu hides Feed in beast form)');
+store.set(`${V}|private.beast`, null);
+seduce(T); said.length = 0;
+ok(globalThis.__dboSuperActivate(T, V) === true && FEEDS.has(V) && FEEDS.get(V).t === T && heard(T, /your neck/), 'the control: in their own form, a seduced mortal free of any rite is still fed on with E');
+feedTick(30000);
 
 Math.random = realRandom;
 console.log(fail ? `${fail} failed` : 'all checks passed');

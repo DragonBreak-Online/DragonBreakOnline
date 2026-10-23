@@ -2116,6 +2116,9 @@ module.exports = (api) => {
   const feedSeduced = (a, t) => {
     let dead = true; try { dead = !!mp.get(t, 'isDead'); } catch (e) { /* not an actor */ }
     if (dead || kindOf(a) !== 'vampire') return false;
+    // Seduction skips the asking, not who may be fed on (review R1, 23 Oct): never a vampire, a beast or a player in a rite
+    // (askable), and never by a feeder in beast form, whom the menu offers no Feed either
+    if (beastForm(a) || !askable(a, t)) return false;
     const last = livingFedAt.get(t >>> 0);
     if (last !== undefined && gameDays() - last < Number(C.feedLivingEveryDays)) { personal(a, 'They have no blood left to give. Let them recover.'); return true; }
     seduced.delete(t >>> 0);
@@ -2247,7 +2250,7 @@ module.exports = (api) => {
     const last = livingFedAt.get(t >>> 0);
     if (last !== undefined && gameDays() - last < Number(C.feedLivingEveryDays)) { personal(a, `${name(a, t)} has no blood left to give. Let them recover.`); return true; }
     if (boundCaptive(t)) { startFeed(a, t, { onCorpse: false, long }); return true; }
-    if (seducedBy(t, a)) { seduced.delete(t >>> 0); startFeed(a, t, { onCorpse: false, long, willing: true }); return true; }
+    if (seducedBy(t, a) && askable(a, t)) { seduced.delete(t >>> 0); startFeed(a, t, { onCorpse: false, long, willing: true }); return true; }
     if (!askable(a, t)) { personal(a, `${name(a, t)} cannot be asked now.`); return true; }
     askFeed(a, t, long, name);
     return true;
