@@ -76,9 +76,12 @@ module.exports = (api) => {
     // same/similar abilities as the Colleges"; the College of Whispers at its own Frostcrag Spire). schools: what it stocks
     // and teaches (none: every school); exclusive: its factions buy only there, not at the Synod. A cell not listed in a
     // place is the Synod's: every shop faction no exclusive place holds, every school.
+    // open: the place asks no faction and no rank of anyone who stands in it (Nate, 23 Oct: "make sure you dont need to be
+    // in a specific faith to use the faith ledgers"). The chapels are open: a priest of any god, or of none, reads there,
+    // while the Synod's own ledger still sells to the Synod and the colleges alone.
     shopPlaces: [
       // the Cathedral of St Martin, Bruma, and Solitude's Temple of the Divines (Nate, 19 Oct)
-      { name: 'The Great Faiths', cells: ['12cb:BSHeartland.esm', '5f78c:BSHeartland.esm', '5f78d:BSHeartland.esm', '16a02:Skyrim.esm'], factions: ['great-faiths'], schools: ['Restoration', 'Alteration'], exclusive: true },
+      { name: 'The Great Faiths', open: true, cells: ['12cb:BSHeartland.esm', '5f78c:BSHeartland.esm', '5f78d:BSHeartland.esm', '16a02:Skyrim.esm'], factions: ['great-faiths'], schools: ['Restoration', 'Alteration'], exclusive: true },
       { name: 'The College of Whispers', cells: ['781ad:BSHeartland.esm', '6ff7d:BSHeartland.esm'], factions: ['college-of-whispers'] },  // Frostcrag Spire
     ],
     shopMinTier: 1,
@@ -837,7 +840,7 @@ module.exports = (api) => {
   const regions = () => { const R = globalThis.__dboRegions; return R && R.tomesOn() ? R : null; };
   const soldHere = (R, t) => !R || R.tomeOk(t.bookId, CFG.shopProvince);
   const soldIn = (R, t) => { const w = R ? R.tomeWhere(t.bookId) : null; return w && w.length ? R.listNames(w) : ''; };
-  const PLACES = (CFG.shopPlaces || []).map((p) => ({ name: String(p.name || ''), cells: new Set((p.cells || []).map(norm)), factions: (p.factions || []).map(String), schools: Array.isArray(p.schools) && p.schools.length ? p.schools.map(String) : null, exclusive: p.exclusive === true }));
+  const PLACES = (CFG.shopPlaces || []).map((p) => ({ name: String(p.name || ''), open: p.open === true, cells: new Set((p.cells || []).map(norm)), factions: (p.factions || []).map(String), schools: Array.isArray(p.schools) && p.schools.length ? p.schools.map(String) : null, exclusive: p.exclusive === true }));
   const PLACE_FACTIONS = new Set([].concat(...PLACES.filter((p) => p.exclusive).map((p) => p.factions)));
   // The shop the buyer stands in: a listed place (a temple), else the Synod's for every faction no place claims
   const placeOf = (a) => {
@@ -994,8 +997,12 @@ module.exports = (api) => {
   const shopRefusal = (a) => {
     if (!CFG.enabled) return 'The tome shop is closed.';
     if (!inShop(a)) return 'Tomes are sold inside the Synod Conclave in Bruma.';
-    if (!isMember(a)) return placeOf(a) && placeOf(a).name ? `${placeOf(a).name} sells its tomes only to its own.` : 'The court mage sells tomes only to members of the Synod or a College.';
-    if (CFG.shopAboveInitiate !== false && !aboveInitiate(a)) return 'The court mage sells tomes to mages of the Synod or a College above Initiate, and not to its smiths or robe-makers. Ask your college\'s leaders about promotion.';
+    // An open place (config shopPlaces[].open: a chapel, Nate 23 Oct "you dont need to be in a specific faith to use the
+    // faith ledgers") asks no faction and no rank of anyone: the faithful of any god, and of none, read there. The deity
+    // itself was never asked anywhere in this module; what refused them was belonging to no shop faction at all.
+    const openPlace = placeOf(a) && placeOf(a).open === true;
+    if (!openPlace && !isMember(a)) return placeOf(a) && placeOf(a).name ? `${placeOf(a).name} sells its tomes only to its own.` : 'The court mage sells tomes only to members of the Synod or a College.';
+    if (!openPlace && CFG.shopAboveInitiate !== false && !aboveInitiate(a)) return 'The court mage sells tomes to mages of the Synod or a College above Initiate, and not to its smiths or robe-makers. Ask your college\'s leaders about promotion.';
     if (!SPELL_SKILLS.some((s) => tierOf(a, s.id) >= CFG.shopMinTier)) return `Tomes are sold to those with ${SPELL_SKILLS.map((s) => s.label).join(' or ')} at ${TIER_NAMES[CFG.shopMinTier]} or higher.`;
     const next = nextBuyAt(a);
     if (next) return `${usedLine(a)} The next is yours in ${waitText(next - Date.now())}.`;
