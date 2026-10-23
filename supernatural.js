@@ -98,7 +98,15 @@ module.exports = (api) => {
     feralPerMinute: { sated: 0, starving: 0.06 }, feralNightMult: 1.5, feralFullMoonMult: 3,
     // Nate, 5 Oct: a forced change is felt coming. feralWarn.seconds before it the screen shakes (client dboShake,
     // Game.ShakeCamera; 0.3.77+, older clients only get the line), harder at each shake; 0 changes at once as before
-    feralWarn: { seconds: 45, shakes: [{ at: 45, strength: 0.25, seconds: 2.5 }, { at: 30, strength: 0.35, seconds: 2.5 }, { at: 15, strength: 0.5, seconds: 2.5 }, { at: 2, strength: 0.8, seconds: 2 }] },
+    feralWarn: { seconds: 150,
+      // What it says on the way, each at its own seconds before the change (the opening line is passed in by the caller)
+      lines: [
+        { at: 120, text: 'Your skin itches and your teeth ache. The beast is close.', seconds: 5 },
+        { at: 90, text: 'The hunger turns in you. Two minutes of your own, at most - find somewhere away from people.', seconds: 6 },
+        { at: 45, text: 'Your hands are shaking. Not long now.', seconds: 5 },
+        { at: 20, text: 'The beast is at the door of you. Seconds.', seconds: 5 },
+      ],
+      shakes: [{ at: 150, strength: 0.12, seconds: 2 }, { at: 120, strength: 0.15, seconds: 2.5 }, { at: 90, strength: 0.25, seconds: 2.5 }, { at: 45, strength: 0.35, seconds: 3 }, { at: 20, strength: 0.5, seconds: 3 }, { at: 5, strength: 0.75, seconds: 3 }] },
     // #bugs 1556845702422990888 (6 Oct): no forced change (feral or full moon) in the first minutes after a login, so a
     // werewolf is not changed before they have even looked around; 0 = none
     feralLoginGraceMinutes: 5,
@@ -2694,6 +2702,16 @@ module.exports = (api) => {
     if (FERAL_DUE.has(a)) return;
     FERAL_DUE.set(a, Date.now() + lead * 1000);
     onScreen(a, warning, 4);
+    // More than one word of warning, and time to act on it (Nate, 23 Oct: "we need more of a warning and time for the
+    // werewolf random change"). The lines count the change down so a werewolf can get out of a town or off a road before
+    // it takes them; they matter most on a client older than 0.3.77, which feels no shake and would otherwise read one
+    // line 45 seconds before turning. Each line fires at its own `at` seconds before the change.
+    for (const x of Array.isArray(W.lines) ? W.lines : []) {
+      const at = Math.max(0, Math.min(lead, Number(x.at) || 0));
+      const say = () => { if (FERAL_DUE.has(a) && stillChanges(a)) onScreen(a, String(x.text || ''), Math.max(2, Number(x.seconds) || 4)); };
+      if (at >= lead) continue;                       // the opening line above has already said it
+      setTimeout(say, (lead - at) * 1000);
+    }
     for (const x of Array.isArray(W.shakes) ? W.shakes : []) {
       const at = Math.max(0, Math.min(lead, Number(x.at) || 0));
       const fire = () => { if (FERAL_DUE.has(a)) shake(a, Math.max(0, Math.min(1, Number(x.strength) || 0)), Math.max(0, Number(x.seconds) || 0)); };
@@ -2709,7 +2727,7 @@ module.exports = (api) => {
     for (const a of onlineActors()) {
       const s = stateOf(a); if (!s || s.kind !== 'werewolf' || spared(a, s) || beastForm(a) || !isOutdoors(a)) continue;
       if (FERAL_DUE.has(a) || inLoginGrace(a) || Math.random() >= C.forcedChangeChance * forcedMult(a)) continue;
-      forcedChange(a, 'The full moon pulls at your blood. The beast is coming.', () => personal(a, 'The full moon calls, and the beast answers without you.'),
+      forcedChange(a, 'The full moon pulls at your blood. The beast is coming - you have a couple of minutes, no more.', () => personal(a, 'The full moon calls, and the beast answers without you.'),
         `supernatural: ${display(a)} changed under the full moon`);
     }
   });
@@ -2725,7 +2743,7 @@ module.exports = (api) => {
       if (c && c.isNight()) p *= c.isFullMoon() ? C.feralFullMoonMult : C.feralNightMult;
       p *= forcedMult(a);
       if (Math.random() >= p) continue;
-      forcedChange(a, hunger >= 60 ? 'Your hunger turns to a fever. The beast is coming.' : 'Your blood runs hot and your bones ache. The beast is coming.', () => {
+      forcedChange(a, hunger >= 60 ? 'Your hunger turns to a fever. The beast is coming - you have a couple of minutes, no more.' : 'Your blood runs hot and your bones ache. The beast is coming - you have a couple of minutes, no more.', () => {
         personal(a, hunger >= 60 ? 'Hunger claws its way up your throat, and the beast tears free.' : 'Something wakes in your blood, and the beast takes you without asking.');
         quietNear(a, (v) => `${nameTo(v, a)} doubles over, and something tears its way out of them.`, 3000);
       }, `supernatural: ${display(a)} went feral (hunger ${Math.round(hunger)}, chance ${(p * 100).toFixed(1)}%/min)`);
