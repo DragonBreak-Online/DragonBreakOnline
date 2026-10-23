@@ -242,7 +242,7 @@ const ok = (c, name, got) => { if (!c) fails++; console.log(`${c ? 'ok  ' : 'FAI
   act(BLOCK, V); act(BLOCK, X); choose(GM, lastPanel(GM).actions[1].id);
   pos.set(V, 1); pos.set(X, 1.5); onlineSet.delete(V); tick(); onlineSet.add(V);
   ok(templed.join() === String(X), 'a player who logged off meanwhile is left alone, the one online still seated is sent', templed);
-  ok(/toTemple: \(a\) => \{ const t = templeFor\(zoneOfActor\(a\) \|\| 'bruma'\) \|\| templeFor\('bruma'\);[^\n]*mp\.set\(a, 'locationalData', \{ cellOrWorldDesc: t\.world, pos: t\.pos/.test(fs.readFileSync(path.join(SERVER, 'gamemode.js'), 'utf8')),
+  ok(/toTemple: \(a\) => \{ const t = templeFor\(templeZoneOf\(a\) \|\| 'bruma'\) \|\| templeFor\('bruma'\);[^\n]*mp\.set\(a, 'locationalData', \{ cellOrWorldDesc: t\.world, pos: t\.pos/.test(fs.readFileSync(path.join(SERVER, 'gamemode.js'), 'utf8')),
     'gamemode.js gives it toTemple: the /unstuck move to the area\'s respawn temple');
   load({ execution: { enabled: false } });
   ok(act(BLOCK, V) === undefined && !globalThis.__dboExecutionState().length, 'enabled false: the block is plain furniture');
