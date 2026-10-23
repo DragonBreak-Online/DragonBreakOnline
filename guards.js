@@ -60,7 +60,15 @@ module.exports = (api) => {
       if (Array.isArray(parsed)) list = parsed; else if (parsed && typeof parsed === 'object') { root = parsed; key = Object.keys(parsed).find((k) => k.toLowerCase() === 'zones') || 'zones'; list = Array.isArray(parsed[key]) ? parsed[key] : []; }
     } catch (e) { /* no file yet */ }
     // A post saved with something that is no NPC desc ("/guardpost add 3", 23 Oct) gets its hold's guard
-    const npcOf = (p) => (/^[0-9a-f]+:.+\.es[mpl]$/i.test(String(p.npc || '')) ? p.npc : C.npcByHold[p.hold]);
+    const npcOrDefault = (p) => (/^[0-9a-f]+:.+\.es[mpl]$/i.test(String(p.npc || '')) ? p.npc : C.npcByHold[p.hold]);
+    // Patrols (Nate, 23 Oct: "yes patrols would be good"): a hold's first posts take its patrolsByHold guards in order, whose
+    // own AI walks the base game's patrol routes; the server cannot move an NPC itself
+    const patrolOf = new Map();
+    for (const [hold, list] of Object.entries(C.patrolsByHold || {})) {
+      const posts = readPosts().filter((p) => p.hold === hold).sort((x, y) => Number(x.n) - Number(y.n));
+      (Array.isArray(list) ? list : []).forEach((npc, i) => { if (posts[i]) patrolOf.set(`${hold}:${posts[i].n}`, npc); });
+    }
+    const npcOf = (p) => patrolOf.get(`${p.hold}:${p.n}`) || npcOrDefault(p);
     const mine = C.enabled ? readPosts().filter((p) => npcOf(p)).map((p) => ({ Name: `${PREFIX}${p.hold}:${p.n}`, ID: p.world, POS: p.pos, Size: C.radius, Heading: Number(p.heading) || 0,
       NPC: [{ id: npcOf(p), count: 1 }], Despawn: C.despawnSeconds, Respawn: C.respawnSeconds, Hostile: false })) : [];
     const kept = list.filter((z) => !String((z && (z.Name || z.name)) || '').startsWith(PREFIX));

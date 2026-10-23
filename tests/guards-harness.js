@@ -107,5 +107,11 @@ ok(!posts.posts.some((p) => p.n === 3) && posts.autoDone.includes('bruma'), 'rem
 cmds.guardpost.f(STAFF, 'remove bruma 2');
 cmds.guardpost.f(STAFF, 'remove bruma 1');
 ok(!JSON.parse(fs.readFileSync('NPC-Spawns.json', 'utf8')).zones.some((x) => x.Name.startsWith('guard:')), '/guardpost remove takes its zone out');
+// Patrols: a hold's first posts take its patrol guards, in order; the rest keep the hold's guard
+cmds.guardpost.f(STAFF, 'add'); cmds.guardpost.f(STAFF, 'add');
+delete require.cache[path.join(SERVER, 'guards.js')]; globalThis.__dboGuardsSig = null;
+require(path.join(SERVER, 'guards.js'))(Object.assign({}, api, { cfg: { guards: { patrolsByHold: { bruma: ['d314c:Skyrim.esm'] } } } }));
+const gz = JSON.parse(fs.readFileSync('NPC-Spawns.json', 'utf8')).zones.filter((x) => x.Name.startsWith('guard:bruma:')).sort((x, y) => x.Name.localeCompare(y.Name));
+ok(gz.length === 2 && gz[0].NPC[0].id === 'd314c:Skyrim.esm' && gz[1].NPC[0].id === '6daba:BSHeartland.esm', 'the first post takes the patrol guard, the next keeps the hold\'s guard', gz.map((x) => [x.Name, x.NPC[0].id]));
 console.log(fails ? `${fails} FAILED` : 'all passed');
 process.exit(fails ? 1 : 0);
