@@ -71,7 +71,15 @@ module.exports = (api) => {
   // ---- places -----------------------------------------------------------------------------------------
   const idOf = (desc) => { try { return mp.getIdFromDesc(String(desc)) >>> 0; } catch (e) { return 0; } };
   const hex = (id) => (id >>> 0).toString(16);
-  const get = (id, prop, dflt) => { try { const v = mp.get(id, prop); return v === undefined || v === null ? dflt : v; } catch (e) { return dflt; } };
+  // A reference the load order no longer has throws on every read, each one logged: asked once, as housingSystem.ts's gone memo
+  const GONE = globalThis.__dboGoneRefs instanceof Set ? globalThis.__dboGoneRefs : (globalThis.__dboGoneRefs = new Set());
+  const get = (id, prop, dflt) => {
+    const r = Number(id) >>> 0; if (GONE.has(r)) return dflt;
+    try { const v = mp.get(id, prop); return v === undefined || v === null ? dflt : v; } catch (e) {
+      if (r < 0xff000000 && /doesn't exist/.test(String(e && e.message))) { if (GONE.size >= 4096) GONE.clear(); GONE.add(r); }
+      return dflt;
+    }
+  };
   const cellOf = (ref) => idOf(get(ref, 'worldOrCellDesc', ''));
   const baseOf = (ref) => idOf(get(ref, 'baseDesc', ''));
   const interiors = new Map();

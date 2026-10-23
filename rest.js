@@ -104,7 +104,15 @@ module.exports = (api) => {
 
   const baseOf = (ref) => { try { return idOf(mp.get(ref, 'baseDesc')); } catch (e) { return 0; } };
   const cellOf = (ref) => { try { return idOf(mp.get(ref, 'worldOrCellDesc')); } catch (e) { return 0; } };
-  const get = (id, prop, dflt) => { try { const v = mp.get(id, prop); return v === undefined || v === null ? dflt : v; } catch (e) { return dflt; } };
+  // A reference the load order no longer has throws on every read, each one logged: asked once, as housingSystem.ts's gone memo
+  const GONE = globalThis.__dboGoneRefs instanceof Set ? globalThis.__dboGoneRefs : (globalThis.__dboGoneRefs = new Set());
+  const get = (id, prop, dflt) => {
+    const r = Number(id) >>> 0; if (GONE.has(r)) return dflt;
+    try { const v = mp.get(id, prop); return v === undefined || v === null ? dflt : v; } catch (e) {
+      if (r < 0xff000000 && /doesn't exist/.test(String(e && e.message))) { if (GONE.size >= 4096) GONE.clear(); GONE.add(r); }
+      return dflt;
+    }
+  };
   const set = (id, prop, v) => { try { mp.set(id, prop, v); return true; } catch (e) { log(`rest: set ${prop} failed`, e.message); return false; } };
 
   // ---- players ----------------------------------------------------------------------------------------

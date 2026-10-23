@@ -58,16 +58,26 @@ module.exports = (api) => {
   // Every container of every property the profile owns, counted once per profile
   // bank.js keeps each character's balance on the character (private.bankGold)
   const bankedOf = (a) => { try { const v = Number(mp.get(a, 'private.bankGold')); return Number.isFinite(v) && v > 0 ? Math.floor(v) : 0; } catch (e) { return 0; } };
+  // A claim the load order no longer has is skipped, not the rest of the profile's, and asked once (rest.js, housingSystem.ts gone memo)
+  const GONE = globalThis.__dboGoneRefs instanceof Set ? globalThis.__dboGoneRefs : (globalThis.__dboGoneRefs = new Set());
+  const claimOf = (p) => {
+    if (GONE.has(p)) return null;
+    try { return mp.get(p, 'private.housing') || {}; } catch (e) {
+      if (p < 0xff000000 && /doesn't exist/.test(String(e && e.message))) { if (GONE.size >= 4096) GONE.clear(); GONE.add(p); }
+      return null;
+    }
+  };
   const storedGold = (profileId) => {
     let total = 0;
-    try {
-      for (const p of mp.findFormsByPropertyValue(HOUSING_OWNER_PROP, String(profileId)) || []) {
-        const rec = mp.get(Number(p) >>> 0, 'private.housing') || {};
-        const ids = new Set((Array.isArray(rec.containers) ? rec.containers : []).map((c) => Number(c) >>> 0));
-        ids.add(Number(p) >>> 0);
-        for (const c of ids) total += goldIn(c);
-      }
-    } catch (e) { /* no properties */ }
+    let props = [];
+    try { props = mp.findFormsByPropertyValue(HOUSING_OWNER_PROP, String(profileId)) || []; } catch (e) { /* no properties */ }
+    for (const raw of Array.isArray(props) ? props : []) {
+      const p = Number(raw) >>> 0;
+      const rec = claimOf(p); if (!rec) continue;
+      const ids = new Set((Array.isArray(rec.containers) ? rec.containers : []).map((c) => Number(c) >>> 0));
+      ids.add(p);
+      for (const c of ids) total += goldIn(c);
+    }
     return total;
   };
 
