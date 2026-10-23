@@ -490,7 +490,8 @@ AUDIT_VERBS.CONTRACT.cut = (text, raw) => {
 // reached their post (PRIV-2, 23 Oct). The by becomes "staff" (the line's own word for an entry with none) and "a staff
 // release" stands for the id and the why, as "a ticket" does in STAFFREF; the character's name, the hold, the character id
 // and the profile stay. The by and the why are free text on both sides of those, so a line is kept only when it reads one
-// way: its end is not lost, one shape fits, and its by can end at one place only (a by or a why that copies the line's own
+// way: its end is not lost (an unmatched quote or the 600 cap; audit() itself cuts a body at 500 and adds "...", which no
+// shape below reads either), one shape fits, and its by can end at one place only (a by or a why that copies the line's own
 // words keeps nothing). Any other CITIZEN STAFF line keeps nothing, but a Lead GM's revoke (CITIZEN STAFF <who()> revoked
 // ...) names them as every staff line does and is not cut; its names hold no quote, so a by and a why quoted together never
 // pass as one. Other CITIZEN lines are not cut, and the templates are unchanged, so their AUDIT_SITES pins stay

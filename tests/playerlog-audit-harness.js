@@ -277,6 +277,24 @@ out = run(`CITIZEN STAFF ${CANARY} " released Selene from the citizenship of the
 ok(out.length === 0, '...a by and a why quoted together never pass as a Lead GM\'s revoke (a fake party)', out);
 out = run(`CITIZEN STAFF ${ROWAN} revoked the citizenship of Bruma from Selene (character ff000015)`);
 ok(out.length === 1 && out[0].ev === 'act.CITIZEN' && out[0].c === 'PGDB' && out[0].f.text === 'STAFF Rowan #PGDB revoked the citizenship of Bruma from Selene (character ff000015)', '...a Lead GM\'s revoke (who() names them, as on every staff line) is not cut: it stays in their post', out);
+// the revoke as citizenship.js writes it (its template read from the file), so a reworded revoke the cut no longer reads
+// fails here, not only at its pin
+{
+  const rv = sites.filter((s) => s.file === 'citizenship.js' && s.t.startsWith('CITIZEN STAFF ${who(by)} revoked'));
+  const line = rv.length === 1 ? rv[0].t.split('${who(by)}').join(ROWAN).split('${z.name}').join('Bruma').split('${e.name}').join('Selene')
+    .split('${hex(actor)}').join('ff000015') : '';
+  out = run(line);
+  ok(rv.length === 1 && !line.includes('${') && citizenCut(line) === R.unquote(line) && out.length === 1 && out[0].ev === 'act.CITIZEN' && out[0].c === 'PGDB',
+    '...the revoke citizenship.js writes (template read from the file) is read as a Lead GM\'s revoke and not cut', [line, out]);
+}
+// audit() cuts a body at 500 characters and adds "..." (gamemode.js AUDIT_LINE_MAX): a release line that long keeps nothing
+{
+  const long = `CITIZEN STAFF ${DAR} ${'x'.repeat(150)} could not release Selene from the citizenship of the Rift (character ff000015): it comes from a faction or court based there and lasts while that membership does (staff release r1: ${CANARY} ${'y'.repeat(200)})`;
+  const body = long.length > 500 ? `${long.slice(0, 500)}...` : long;
+  got = citizenCut(body);
+  out = run(body);
+  ok(long.length > 500 && got === 'CITIZEN STAFF' && out.length === 0, '...a release line audit() cut at 500 characters keeps nothing and reaches nobody\'s post', [got, out]);
+}
 out = run(`CITIZEN ${ROWAN} granted Selene (character ff000015) the citizenship of Bruma`);
 ok(out.length === 1 && out[0].c === 'PGDB' && out[0].f.text === 'granted Selene (character ff000015) the citizenship of Bruma', '...nor are the other CITIZEN lines', out);
 // CITIZEN <name> (character <hex>) is an outlaw of <hold>[: citizenship taken], barred until <date> (<why>)[; still a citizen
