@@ -69,6 +69,8 @@ reset();
 ok('three player witnesses expose them in the hold', see(WOLF, 'werewolf', [W1, W2, W3], 'in') === true && globalThis.__dboExposedIn(WOLF, 'bruma'));
 ok('...in a city: 500 gold bounty in Bruma', bounty('bruma', WOLF) === 500, bounty('bruma', WOLF));
 ok('...the werewolf is told', sys.some(([a, t]) => a === WOLF && /bounty of 500 gold/.test(t)));
+{ const b = (((globalThis.__dboOutlaws.data || {}).zones || {}).bruma || {})[String(chars[WOLF][0])] || {};
+  ok("the public bounty never names the beast (Nate, 23 Oct)", !/wolf|beast|vampire|lord|seen as/i.test(`${b.reason} ${b.by}`) && /hold/.test(String(b.reason)), b); }
 ok('...and it is audited', audits.some((t) => /EXPOSURE Ulf .* seen changing into a werewolf by 3/.test(t)));
 ok('...known for 7 days', (() => { const h = JSON.parse(fs.readFileSync('exposure.json', 'utf8')).cases[String(WOLF)].holds.bruma; return Math.round((h.until - h.at) / 86400000) === 7; })());
 

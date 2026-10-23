@@ -109,8 +109,11 @@ module.exports = (api) => {
   const declare = (a, zid, h) => {
     const amount = amountFor(h);
     const f = formOf(h);
-    const reason = h.hurt ? `${f.crime}, and hurt people in that shape` : f.crime;
-    const ok = safe(() => (g('__dboOutlawDeclare') ? g('__dboOutlawDeclare')(zid, Number(profileOf(a)), amount, reason, h.name || display(a), `${holdName(zid)} (seen as ${f.noun})`) === true : false), false);
+    // The public Wanted list and /bounty show only a plain reason, never the beast (Nate, 23 Oct: the bounty must not give the
+    // beast away); what was seen goes to the staff log and /exposure, and to the hold's court through its own notices
+    const reason = h.hurt ? String(C.publicReasonHurt || 'wanted by order of the hold, for violence') : String(C.publicReason || 'wanted by order of the hold');
+    const ok = safe(() => (g('__dboOutlawDeclare') ? g('__dboOutlawDeclare')(zid, Number(profileOf(a)), amount, reason, h.name || display(a), holdName(zid)) === true : false), false);
+    if (ok) log(`exposure: bounty ${amount} on ${display(a)} in ${zid} for ${h.hurt ? `${f.crime}, and hurt people in that shape` : f.crime} (seen as ${f.noun}; public reason "${reason}")`);
     if (ok) h.bounty = Math.max(Number(h.bounty) || 0, amount);
     else log(`exposure: no bounty set on ${display(a)} in ${zid} (outlaws off or not loaded)`);
     return ok;
