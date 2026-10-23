@@ -246,9 +246,17 @@ export class RestraintService extends ClientListener {
   private stopLeashWalk(): void {
     if (!this.leashWalking) return;
     this.leashWalking = false;
+    // Also reached from the packet handler, where natives throw: the stop goes on an update unless the walk began again
+    this.controller.once("update", () => { if (!this.leashWalking) this.releaseTranslation(); });
+  }
+
+  // stopTranslation alone does not reliably hand the body back to havok (movementApply.ts giveBackCollision)
+  private releaseTranslation(): void {
     try {
       const player = this.sp.Game.getPlayer();
-      if (player) player.stopTranslation();
+      if (!player) return;
+      player.stopTranslation();
+      if (!player.getFurnitureReference()) setRefrCollision(player.getFormID(), true);
     } catch { /* not in game */ }
   }
 
@@ -363,6 +371,8 @@ export class RestraintService extends ClientListener {
     if (this.carriedControlsApplied) {
       this.carriedControlsApplied = false;
       this.sp.Game.enablePlayerControls(true, false, true, false, false, false, false, false, 0);
+      // The carry moved the body with translateTo, like the leash
+      this.releaseTranslation();
     }
     if (this.boundHands) {
       // Can still walk / be marched, but can't fight, sneak or use hands.
