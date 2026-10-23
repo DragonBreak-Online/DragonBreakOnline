@@ -483,6 +483,38 @@ AUDIT_VERBS.CONTRACT.cut = (text, raw) => {
   const said = at > h[0].length ? text.slice(at + 2 + hold.length) : '';
   return !endLost(raw) && CONTRACT_SAID[term].test(said) ? `${head}: ${hold}${said}` : head;
 };
+// CITIZEN STAFF <by> released|withdrew|could not release <name> ... (character <hex>...(staff release <id>[: <why>])) and
+// CITIZEN STAFF <by>: staff release <id>[: <why>] found no citizenship of profile N to release (citizenship.js releaseTell):
+// the by, the id and the why are what staff wrote in a config entry (citizenship.staffReleases), not an identity from who();
+// releaseCheck only takes Discord mentions and ids out, so a by or a why shaped like a character made it a party and the line
+// reached their post (PRIV-2, 23 Oct). The by becomes "staff" (the line's own word for an entry with none) and "a staff
+// release" stands for the id and the why, as "a ticket" does in STAFFREF; the character's name, the hold, the character id
+// and the profile stay. The by and the why are free text on both sides of those, so a line is kept only when it reads one
+// way: its end is not lost, one shape fits, and its by can end at one place only (a by or a why that copies the line's own
+// words keeps nothing). Any other CITIZEN STAFF line keeps nothing, but a Lead GM's revoke (CITIZEN STAFF <who()> revoked
+// ...) names them as every staff line does and is not cut; its names hold no quote, so a by and a why quoted together never
+// pass as one. Other CITIZEN lines are not cut, and the templates are unchanged, so their AUDIT_SITES pins stay
+const CIT_NAME = '[^#():;"…]{1,64}';
+const CIT_HOLD = '[^#():;"…]{1,60}';
+const CIT_W = '[^\\s#():;"…]+';
+const CIT_REVOKE = new RegExp(`^CITIZEN STAFF (?:${CIT_W} ){0,5}${CIT_W} #[A-Z0-9?]{4} \\(profile -?\\d{1,9}(?:, <@\\d{1,22}>)?\\) revoked the citizenship of ${CIT_HOLD} from ${CIT_NAME} \\(character [0-9a-f]{1,8}\\)$`);
+const CIT_TAG = 'staff release [A-Za-z0-9._:-]{1,64}(?:: [\\s\\S]*)?';
+const CIT_RELEASE = [
+  [` released (${CIT_NAME}) from the citizenship of (${CIT_HOLD}) \\(character ([0-9a-f]{1,8}); ${CIT_TAG}\\)`, ' released $2 from the citizenship of $3 (character $4; a staff release)'],
+  [` withdrew (${CIT_NAME})'s request for the citizenship of (${CIT_HOLD}) \\(character ([0-9a-f]{1,8}); ${CIT_TAG}\\)`, " withdrew $2's request for the citizenship of $3 (character $4; a staff release)"],
+  [` could not release (${CIT_NAME}) from the citizenship of (${CIT_HOLD}) \\(character ([0-9a-f]{1,8})\\): it comes from a faction or court based there and lasts while that membership does \\(${CIT_TAG}\\)`,
+    ' could not release $2 from the citizenship of $3 (character $4): it comes from a faction or court based there and lasts while that membership does (a staff release)'],
+  [`: ${CIT_TAG} found no citizenship of profile (\\d{1,9}) to release`, ': a staff release found no citizenship of profile $2 to release'],
+].map(([s, to]) => [new RegExp(`^CITIZEN STAFF ([\\s\\S]{1,200}?)${s}$`), new RegExp(`^CITIZEN STAFF ([\\s\\S]{1,200})${s}$`), `CITIZEN STAFF staff${to}`]);
+AUDIT_VERBS.CITIZEN.cut = (text, raw) => {
+  if (!text.startsWith('CITIZEN STAFF ')) return text;
+  if (endLost(raw)) return 'CITIZEN STAFF';
+  if (CIT_REVOKE.test(text)) return text;
+  const fit = CIT_RELEASE.filter(([first]) => first.test(text));
+  if (fit.length !== 1) return 'CITIZEN STAFF';
+  const [first, last, to] = fit[0];
+  return text.match(first)[1].length === text.match(last)[1].length ? text.replace(first, to) : 'CITIZEN STAFF';
+};
 // STAFF ENCHANT <staff> enchanted <their own|<owner>'s> <piece>[ (named "<new>")]: <ench> [<hex> <edid>] <effects>
 // (staffenchant.js apply): <piece> is the inventory entry's custom name first (nameOfEntry), a name a player or an earlier
 // /enchant wrote, and it is not quoted (review F3, 22 Oct). It goes, as everywhere (the design keeps only that a piece is
