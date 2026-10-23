@@ -33,6 +33,8 @@ const path = require('path');
 module.exports = (api) => {
   const { mp, log, personal, audit, who, display, cfg, openWidget, closeWidget, onUi, registerChatCommand, onlineActors,
     profileOf, findByName, takeGold, giveGold, depositToTreasury, zoneOfActor, zoneById, ranksOf, distanceMeters, isAdmin } = api;
+  // Starts the client's Place-tool edit mode on the ledger (placeEdit); without it the arrows are the only way
+  const sendPacket = typeof api.sendPacket === 'function' ? api.sendPacket : null;
   // The owner, a chest's renter and who set the tax are kept as the rosters name them, never by a beast's name (gamemode.js
   // ownDisplay; tracker 1559074270959640676): "kept by Werewolf #TAG" told every visitor who the beast was
   const ownDisplay = typeof api.ownDisplay === 'function' ? api.ownDisplay : display;
@@ -48,6 +50,9 @@ module.exports = (api) => {
     chestRentPaused: true,
     // The ledger book (TGDummyLedger, the Thieves Guild's business ledger) and how the owner sets it on a counter
     ledgerBase: '106a68:Skyrim.esm', ledgerForward: 70, ledgerHeight: 95, nudgeStep: 5, nudgeTurn: 15, ledgerReach: 700,
+    // Moving it like the F7 Place tool (placeMode): how long one start stays good, how far above or below the owner's feet
+    // it may go (units), and how far it may tilt (degrees); placeMode false leaves only the arrows
+    placeMode: true, placeSeconds: 600, placeRise: 250, placeTilt: 45,
     panelKeep: 40,
   }, cfg.business || {});
   const DEFAULT_TAX = Number((cfg.rest || {}).holdShare);
@@ -397,7 +402,7 @@ module.exports = (api) => {
     const chests = Object.values(b.chests || {});
     const rented = chests.filter((c) => chestState(c) === 'rented').length;
     personal(a, `${b.name} (owner ${b.ownerName}${factionOf(b) ? `, its takings go to ${factionOf(b).name}` : ''}). Staff: ${staffNames(b)}. Bed rent: ${Number(b.rentGold) > 0 ? b.rentGold + ' gold' : 'the hold\'s standard'}. Chests for rent: ${chests.length} (${rented} rented). Tax to ${zoneName(b.zone)}: ${Math.round(taxRate(b.zone) * 100)}%.${isOwner(a, b) && Number(b.owed) > 0 ? ` Takings held: ${b.owed} gold (/business collect).` : ''}`);
-    personal(a, 'Ledger: /business log, /business notes, /business note <text>, /business rent <gold>, /business chest <gold a day> (then open the chest) or /business chest off. Shop: /business shop (stock and prices), /business shop chest (then open it) or chest off, /business shop price <number> <gold each|off>. Owner: /business staff add|remove <name>, /business ledger (place it here), /business rename <name>, /business close. A faction: /business faction <faction> | off.');
+    personal(a, 'Ledger: /business log, /business notes, /business note <text>, /business rent <gold>, /business chest <gold a day> (then open the chest) or /business chest off. Shop: /business shop (stock and prices), /business shop chest (then open it) or chest off, /business shop price <number> <gold each|off>. Owner: /business staff add|remove <name>, /business ledger (place it here), /business ledger move (move it like the Place tool), /business rename <name>, /business close. A faction: /business faction <faction> | off.');
   };
   // What anyone may read in the ledger's first pages
   const publicLine = (b) => {
@@ -474,6 +479,85 @@ module.exports = (api) => {
     b.ledger.pos = pos.map(r1); b.ledger.rot = rot; save();
     return R(true, '');
   };
+
+  // ---- moving it like the F7 Place tool (Nate, 23 Oct) -----------------------------------------------------
+  // The client's PlacementService already has an edit mode the server starts with a placeEdit packet (placement.js sends
+  // the same one for a GM's placement): a faint copy of the ledger follows the owner's aim, the arrows turn it and set
+  // its distance, PgUp/PgDn raise it, Shift+arrows tilt it, Enter confirms, Backspace stops. Enter sends back
+  // dbo placeMove [id, pos, rot] with the id it was given, so the id carries a one-time nonce: 'bizledger:<nonce>'. This
+  // side, never placement.js's GM path (placement.js skips these ids), checks it: the session is this actor's and still
+  // fresh, they still own the business and stand inside it, in the ledger's own cell, and the spot is within ledgerReach
+  // and placeRise of them. A used nonce is gone, so a replayed or forged packet moves nothing. After Enter the client is
+  // in its select tool; Enter on the ledger there (placeSelect) starts another move, Backspace leaves.
+  const PLACE_PREFIX = 'bizledger:';
+  const placing = S.placing instanceof Map ? S.placing : (S.placing = new Map()); // actor -> { nonce, claim, ref, until }
+  const newNonce = () => require('crypto').randomBytes(8).toString('hex');
+  const finite = (v, n) => Array.isArray(v) && v.length >= n && v.slice(0, n).every((x) => typeof x === 'number' && Number.isFinite(x));
+  const norm = (d) => ((d % 360) + 360) % 360;
+  const signedDeg = (d) => { const x = norm(d); return x > 180 ? x - 360 : x; };
+  const startPlace = (a, claim, b) => {
+    if (C.placeMode === false || !sendPacket) return R(false, 'Moving the ledger that way is not available; use the arrows.');
+    const id = ledgerRef(b);
+    if (!id) return R(false, 'Place the ledger first.');
+    if (!inside(a, claim)) return R(false, 'Stand inside the business to move its ledger.');
+    if (cellOf(id) !== cellOf(a)) return R(false, 'Stand in the same room as the ledger to move it.');
+    const pos = get(id, 'pos', null) || (b.ledger && b.ledger.pos);
+    if (!finite(pos, 3)) return R(false, 'The ledger\'s position is not known yet.');
+    const nonce = newNonce();
+    placing.set(a >>> 0, { nonce, claim: claim.primary >>> 0, ref: id, until: Date.now() + C.placeSeconds * 1000 });
+    const rot = finite(b.ledger && b.ledger.rot, 3) ? b.ledger.rot : (get(id, 'angle', null) || [0, 0, 0]);
+    sendPacket(a, { customPacketType: 'placeEdit', id: PLACE_PREFIX + nonce, base: LEDGER_BASE, name: `${b.name}'s ledger`, kind: 'object', hostile: false, pos: pos.slice(0, 3), rot: rot.slice(0, 3) });
+    return R(true, 'The ledger follows your aim. Arrows turn it and set how far, PgUp/PgDn raise it, Shift+arrows tilt it, Enter sets it down, Backspace stops.');
+  };
+  // dbo placeMove from the client's edit mode; true when it was a ledger's (handled here, refused or not)
+  const confirmPlace = (a, idRaw, posIn, rotIn) => {
+    const idStr = String(idRaw || '');
+    if (!idStr.startsWith(PLACE_PREFIX)) return false;
+    const s = placing.get(a >>> 0);
+    const refuse = (text, why) => { log(`business: ledger move from ${who(a)} refused: ${why}`); personal(a, text); return true; };
+    if (!s || s.nonce !== idStr.slice(PLACE_PREFIX.length)) return refuse('That move is out of date. Open the ledger and start again.', 'unknown or stale nonce');
+    placing.delete(a >>> 0);
+    if (Date.now() > s.until) return refuse('That took too long. Open the ledger and start again.', 'expired');
+    const claim = claimOf(s.claim), b = claim ? bizOf(claim.primary) : null;
+    if (!b) return refuse('This business is closed.', 'no business');
+    if (!isOwner(a, b)) return refuse('Only the owner can do that.', 'not the owner');
+    if (ledgerRef(b) !== s.ref) return refuse('The ledger has changed since. Open it and start again.', 'another ledger');
+    if (!inside(a, claim)) return refuse('Stand inside the business to move its ledger.', 'outside the business');
+    if (cellOf(s.ref) !== cellOf(a)) return refuse('Stand in the same room as the ledger to move it.', 'another cell');
+    // A spot it may not go: the owner keeps moving it (a fresh start from where it stands), told why
+    const retry = (text, why) => { refuse(text, why); startPlace(a, claim, b); return true; };
+    if (!finite(posIn, 3) || !finite(rotIn, 3)) return refuse('Move refused: a bad position.', 'bad numbers');
+    const pos = posIn.slice(0, 3), me = get(a, 'pos', null);
+    if (!finite(me, 3)) return refuse('Your position is not known yet.', 'no actor position');
+    if (Math.hypot(pos[0] - me[0], pos[1] - me[1]) > C.ledgerReach) return retry('That is too far from you. Set it down closer.', 'out of reach');
+    if (Math.abs(pos[2] - me[2]) > C.placeRise) return retry('That is too high or too low. Set it down nearer your own height.', 'out of height');
+    const tilt = Math.max(0, Number(C.placeTilt) || 0);
+    if (Math.abs(signedDeg(rotIn[0])) > tilt || Math.abs(signedDeg(rotIn[1])) > tilt) return retry(`Tilt it no more than ${tilt} degrees.`, 'too tilted');
+    const rot = [norm(rotIn[0]), norm(rotIn[1]), norm(rotIn[2])].map(r1);
+    setLedger(s.ref, pos, rot);
+    b.ledger.pos = pos.map(r1); b.ledger.rot = rot; save();
+    log(`business: ${who(a)} moved ${b.name}'s ledger to ${pos.map(Math.round).join(',')}`);
+    personal(a, 'The ledger is set down. Enter on it moves it again; Backspace finishes.');
+    return true;
+  };
+  // The client's select tool aimed at a ledger: start another move when this actor may (true when it was a ledger)
+  const selectPlace = (a, refHex) => {
+    const t = String(refHex || '').toLowerCase();
+    if (!/^[0-9a-f]{1,8}$/.test(t)) return false;
+    const ref = parseInt(t, 16) >>> 0;
+    const tag = get(ref, LEDGER_TAG, null);
+    if (!tag || !tag.claim) return false;
+    const claim = claimOf(parseInt(String(tag.claim), 16) >>> 0), b = claim ? bizOf(claim.primary) : null;
+    if (!b || ledgerRef(b) !== ref) return true;
+    if (!isOwner(a, b)) { personal(a, 'Only the owner can move this ledger.'); return true; }
+    personal(a, startPlace(a, claim, b).text);
+    return true;
+  };
+  // placement.js asks before its GM path: ids this file answers
+  globalThis.__dboBizLedgerPlaceId = (id) => String(id || '').startsWith(PLACE_PREFIX);
+  globalThis.__dboBizLedgerRef = (refHex) => { const t = String(refHex || '').toLowerCase(); if (!/^[0-9a-f]{1,8}$/.test(t)) return false; const g = get(parseInt(t, 16) >>> 0, LEDGER_TAG, null); return !!(g && g.claim); };
+  onUi('placeMove', (a, args) => { try { confirmPlace(a, (args || [])[0], (args || [])[1], (args || [])[2]); } catch (e) { log('business: ledger move failed', e.stack || e.message); } });
+  onUi('placeSelect', (a, args) => { try { if (C.enabled) selectPlace(a, (args || [])[0]); } catch (e) { log('business: ledger select failed', e.stack || e.message); } });
 
   // ---- the ledger's actions, shared by its panel and /business ----------------------------------------
   // Each returns { ok, text }; a refused one changes nothing.
@@ -557,6 +641,7 @@ module.exports = (api) => {
     },
     place: (a, claim, b) => placeLedger(a, claim, b),
     nudge: (a, claim, b, dir, dist) => nudgeLedger(a, claim, b, dir, dist),
+    placeMode: (a, claim, b) => startPlace(a, claim, b),
     // The shop (shops.js): '' arms "Make a shop chest", 'off' makes it a plain chest again
     shopChest: (a, claim, b, v) => {
       if (!shops) return R(false, 'Shops are closed for now.');
@@ -565,7 +650,7 @@ module.exports = (api) => {
     // A price per single item of one kind in the shop chest (gold each), or 'off'
     shopPrice: (a, claim, b, key, gold) => (shops ? shops.setPrice(a, claim, b, key, gold) : R(false, 'Shops are closed for now.')),
   };
-  const OWNER_ONLY = new Set(['staffAdd', 'staffRemove', 'collect', 'rename', 'close', 'place', 'nudge']);
+  const OWNER_ONLY = new Set(['staffAdd', 'staffRemove', 'collect', 'rename', 'close', 'place', 'nudge', 'placeMode']);
   const runAction = (a, name, claim, b, args) => {
     if (!Object.prototype.hasOwnProperty.call(ACTIONS, name)) return R(false, 'That is not something the ledger does.');
     if (!isStaff(a, b) && !isAdmin(a)) return R(false, `${b.name}'s ledger is kept for its owner and staff.`);
@@ -604,7 +689,7 @@ module.exports = (api) => {
         staff: (b.staff || []).map((s) => ({ profile: Number(s.profile), name: String(s.name) })), maxStaff: C.maxStaff, maxNote: C.maxNote,
         owed: owner ? Number(b.owed) || 0 : 0, week: takings(b, 7), month: takings(b, 30),
         log: (b.log || []).slice(-C.panelKeep).reverse(), notes: (b.notes || []).slice(-C.panelKeep).reverse(),
-        ledgerPlaced: !!ledgerRef(b), armSeconds: C.armSeconds,
+        ledgerPlaced: !!ledgerRef(b), armSeconds: C.armSeconds, placeMode: C.placeMode !== false && !!sendPacket,
       });
     }
     // The shop (shops.js): the Buy list for everyone, the stock and its prices for the owner and staff. A front without the
@@ -650,6 +735,8 @@ module.exports = (api) => {
     }
     const res = runAction(a, name, claim, b, args.slice(2));
     if (name === 'close' && res.ok) { closePanel(a); return personal(a, res.text); }
+    // The edit mode needs the game's keyboard: the panel closes first, the keys are on screen and in chat
+    if (name === 'placeMode' && res.ok) { closePanel(a); return personal(a, res.text); }
     sendPanel(a, claim, b, res);
   });
   onUi('bizLedgerClose', (a) => closePanel(a));
@@ -761,7 +848,7 @@ module.exports = (api) => {
       case 'rent': return say(a, runAction(a, 'rent', claim, biz, [rest]));
       case 'chest': return say(a, runAction(a, 'chest', claim, biz, [rest]));
       case 'collect': return say(a, runAction(a, 'collect', claim, biz, []));
-      case 'ledger': return say(a, runAction(a, 'place', claim, biz, []));
+      case 'ledger': return say(a, runAction(a, rest.toLowerCase() === 'move' ? 'placeMode' : 'place', claim, biz, []));
       case 'shop': {
         if (!shops) return personal(a, 'Shops are closed for now.');
         const w2 = rest.split(/\s+/).filter(Boolean);

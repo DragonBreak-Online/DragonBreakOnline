@@ -8468,7 +8468,7 @@ try {
   delete require.cache[BUSINESS_JS];
   require(BUSINESS_JS)({ mp, log, ownNameOf, ownDisplay, publicDisplay, personal, audit, who, display, cfg, openWidget, closeWidget, onUi, registerChatCommand, onlineActors,
     profileOf, findByName, takeGold, giveGold: (a, n) => giveItem(a, GOLD_BASE, n) !== false, depositToTreasury, zoneOfActor, zoneById,
-    ranksOf, distanceMeters, isAdmin });
+    ranksOf, distanceMeters, isAdmin, sendPacket });
 } catch (e) { log('business.js failed to load:', e.stack || e.message); globalThis.__dboBusinessActivate = businessFailClosed; globalThis.__dboBusinessLogin = null; globalThis.__dboBusinessRent = null; globalThis.__dboHoldTax = null; globalThis.__dboBusinessLog = null; }
 // ---- where a ledger sale's gold goes: the building's owner, the hold's tax, a sink (server\ledgersale.js, config "ledgerSale");
 // manuals.js's blacksmith's ledger and spells.js's tome shop call it at runtime ----

@@ -622,8 +622,11 @@ module.exports = (api) => {
     sendPacket(a, packet);
   });
 
+  // A business ledger moved with this same edit mode (business.js startPlace) answers to business.js alone
+  const bizLedger = (id, ref) => { try { return ref ? globalThis.__dboBizLedgerRef && globalThis.__dboBizLedgerRef(id) === true : globalThis.__dboBizLedgerPlaceId && globalThis.__dboBizLedgerPlaceId(id) === true; } catch (e) { return false; } };
   onUi('placeMove', (a, args) => {
     const idHex = String(args[0] || '');
+    if (bizLedger(idHex, false)) return;
     if (!isAdmin(a)) { log(`placement: placeMove ${idHex} from ${who(a)} refused: not an admin`); return; }
     const pos = Array.isArray(args[1]) ? args[1].slice(0, 3).map(num) : [];
     const rot = Array.isArray(args[2]) ? args[2].slice(0, 3).map(num) : [];
@@ -642,7 +645,7 @@ module.exports = (api) => {
 
   // The select tool aimed at something: if it was placed with the tab and this GM may change it, the client edits it
   onUi('placeSelect', (a, args) => {
-    if (!isAdmin(a)) return;
+    if (!isAdmin(a) || bizLedger(args[0], true)) return;
     // Something a plugin placed: what it is and what Delete does; with client 0.3.102 also the edit mode to move it
     if (worldTarget(args[0])) {
       let d;
