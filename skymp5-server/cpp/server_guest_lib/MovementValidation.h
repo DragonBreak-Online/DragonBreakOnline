@@ -32,8 +32,8 @@ struct ActorState
   uint32_t serverMovesSinceLog = 0;
   bool seeded = false;
   // A hosted actor the hoster keeps reporting too far away, and since when
-  std::chrono::steady_clock::time_point farSince;
-  bool far = false;
+  std::chrono::steady_clock::time_point insistSince;
+  bool insisting = false;
 };
 
 // Last accepted position and speed budget per actor, owned by ActionListener.

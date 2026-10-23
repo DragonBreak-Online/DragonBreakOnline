@@ -50,16 +50,16 @@ bool HosterHasInsisted(MovementValidation::Tracker* tracker, MpActor* actor,
   }
   auto& st = tracker->states[actor->GetFormId()];
   const auto now = std::chrono::steady_clock::now();
-  if (!st.far) {
-    st.far = true;
-    st.farSince = now;
+  if (!st.insisting) {
+    st.insisting = true;
+    st.insistSince = now;
     st.lastTime = now;
     return false;
   }
-  if (now - st.farSince < std::chrono::milliseconds(insistMs)) {
+  if (now - st.insistSince < std::chrono::milliseconds(insistMs)) {
     return false;
   }
-  st.far = false;
+  st.insisting = false;
   return true;
 }
 
@@ -167,7 +167,7 @@ bool Validate(PartOne& partOne, const NiPoint3& currentPos,
       return false;
     }
   } else if (!isMe && tracker && actor) {
-    tracker->states[actor->GetFormId()].far = false;
+    tracker->states[actor->GetFormId()].insisting = false;
   }
 
   const auto& limits = partOne.worldState.movementLimits;
