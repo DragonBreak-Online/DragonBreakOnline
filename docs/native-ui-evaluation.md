@@ -260,9 +260,22 @@ driven — see "what could not be measured" below.
 
 ### What could not be measured, and why it matters
 
-Synthetic mouse input never reached the overlay: moving the pointer over a character row produced
-neither the hover state (`features/characterSelect/styles.scss:123` - background, border-colour and a
-1px lift, so a null result would have been visible) nor the cursor sprite.
+Synthetic mouse input does not drive the overlay. The controlled observation:
+
+| | |
+|---|---|
+| Game foreground | yes - a synthetic `F2` keypress was accepted without error |
+| Overlay focused | yes - the cursor sprite **was** drawn (a white arrow near "One life at a time") |
+| OS cursor moved | (960, 540) -> (480, 270), confirmed via `Cursor.Position` |
+| Overlay cursor | **did not move** |
+
+So the drawn pointer and the OS pointer are genuinely decoupled, observed in game.
+
+Two earlier readings in this section were wrong and are corrected here: the cursor sprite IS drawn
+(the first attempts missed it because `textinputhost.exe` held foreground, so the moves went to the
+desktop), and hover could not be used as the test for the same reason. The sprite also stops drawing
+the moment the game loses foreground, which matches the `Visible() && focusFlag` gate at
+`DX11RenderHandler.cpp:101`.
 
 The cause is structural, and it is the most useful thing this pass produced. **The overlay does not
 use the OS cursor.** It integrates its own pointer from DirectInput deltas - `ProcessMouseData` reads
@@ -270,6 +283,10 @@ use the OS cursor.** It integrates its own pointer from DirectInput deltas - `Pr
 (`MyRenderHandler.h:20`, drawn at `DX11RenderHandler.cpp:102-108`). Synthetic `SendInput` does not
 produce raw HID deltas, so no automated harness can drive this UI. A human at the keyboard is
 required, and that is a property of the design, not of the harness.
+
+Caveat, stated plainly: this shows the decoupling exists and is observable. It does NOT show that a
+human's physical mouse drifts - real movement does produce DirectInput deltas, so the overlay would
+track. Whether it tracks *accurately* is the one open question, and only a hand on a mouse answers it.
 
 That same code carries a documented bug of exactly this shape - `DInputHook.cpp:159`:
 
