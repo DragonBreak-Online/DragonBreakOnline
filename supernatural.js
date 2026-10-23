@@ -58,6 +58,7 @@ module.exports = (api) => {
     // Game days the fever takes to peak, counted only while the carrier is online and alive (Nate 2026-09-29): at the
     // default time scale a game day is 4 real hours, so 3 days is 12 hours of play
     incubationDays: 3,
+    recentCureMinutes: 60,   // a catch this soon after a cure is told as a new infection, not a cure that failed
     sunPerStage: 0.006, sunFloor: 0.05,
     // A vampire's fire weakness grows with the stage, as vanilla's AbVampire01b-04b (AbWeaknessFireConstant 25/50/75/100%),
     // half for a pure-blood. The server's damage formula reads no resistance (TES5DamageFormula reads DamageResist only),
@@ -1051,17 +1052,25 @@ module.exports = (api) => {
     s.disease = { kind, since: gameDays(), played: 0, by: by ? nameOf(by) : '' };
     saveState(t, s);
     if (kind === 'vampire') addSpell(t, SANGUINARE);
-    personal(t, kind === 'vampire' ? 'A chill settles in your blood. You feel feverish.' : 'The wound burns hot, and you ache for the hunt.');
-    log(`supernatural: ${display(t)} caught ${kind === 'vampire' ? 'Sanguinare Vampiris' : 'Sanies Lupinus'}${by ? ` from ${display(by)}` : ''}`);
+    // Caught again soon after a cure, the chat line alone read as "the potion did not work" (#bugs, 23 Oct: a cure drunk,
+    // the carrier turned a day later; the log showed the cure took and a second bite 8 minutes after it). So the catch
+    // goes on screen like anything else that happens to the body, and a catch within recentCureMinutes of a cure says
+    // plainly that the cure held and this is a new one.
+    const again = Number(s.lastCure) > 0 && Date.now() - Number(s.lastCure) < Math.max(0, Number(C.recentCureMinutes) || 0) * 60000;
+    const caught = kind === 'vampire' ? 'A chill settles in your blood. You feel feverish.' : 'The wound burns hot, and you ache for the hunt.';
+    onScreen(t, again ? `${caught} Your cure held - this is a new infection, caught since.` : caught, 6);
+    log(`supernatural: ${display(t)} caught ${kind === 'vampire' ? 'Sanguinare Vampiris' : 'Sanies Lupinus'}${by ? ` from ${display(by)}` : ''}${again ? ' (again, within the hour of a cure)' : ''}`);
     return true;
   };
   // `told` says what broke it, so a carrier never loses the fever without knowing why
   const cureDisease = (a, how, told) => {
     const s = stateOf(a); if (!s || !s.disease) return false;
-    const kind = s.disease.kind; s.disease = null; saveState(a, s);
+    const kind = s.disease.kind; s.disease = null; s.lastCure = Date.now(); saveState(a, s);
     if (kind === 'vampire') removeSpell(a, SANGUINARE);
     if (typeof globalThis.__dboFeverEnded === 'function') globalThis.__dboFeverEnded(a);
-    personal(a, told || 'The fever breaks.'); log(`supernatural: ${display(a)} cured of the ${kind} disease (${how})`);
+    // On screen as well as in chat: a cure drunk mid-fight was being missed, and a carrier who misses it cannot tell a
+    // cure that failed from a second bite (#bugs, 23 Oct)
+    onScreen(a, told || 'The fever breaks.', 6); log(`supernatural: ${display(a)} cured of the ${kind} disease (${how})`);
     return true;
   };
   const endCurse = (a, why) => {
