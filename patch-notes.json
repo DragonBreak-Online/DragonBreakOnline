@@ -12,6 +12,12 @@
           "Fighting the watch gains you nothing: a guard's body can't be searched, and hitting or killing a guard (or being hit by one) trains no skill.",
           "A guard who brings you down drags you to the hold's jail for 10 minutes instead of the temple. When the city jail is full, you go to the hold's prison."
         ]
+      },
+      {
+        "heading": "Apiaries",
+        "items": [
+          "Apiaries and wild beehives give honey again: tend one for Honeycomb (sometimes a Bee or a Beehive Husk). An apiary is ready again an hour later, a wild hive after two."
+        ]
       }
     ]
   },

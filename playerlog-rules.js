@@ -448,6 +448,8 @@ clean_('FRENZY');
 AUDIT_VERBS.FRENZY.roles = R_BY([[/ killed by $/, 'by'], [/ first on $/, 'target'], [/ for bringing down $/, 'target'], [/ \(GM $/, 'staff'], [/: staff $/, 'staff']]);
 // GUARDS <who> placed|removed guard post <hold> #n, ran a jail test, brought down by the watch of <hold> (guards.js): ids, holds, numbers
 clean_('GUARDS');
+// APIARY <who> harvested <kind> <ref>: <items> (apiaries.js): ids and item names
+clean_('APIARY');
 AUDIT_VERBS.FEED.roles = R_BY([[/ asked $/, 'target'], [/ let $/, 'target'], [/ refused $/, 'target'], [/ feed on $/, 'target']]);
 AUDIT_VERBS.ROPE.roles = R_BY([[/ cut $/, 'target'], [/ of $/, 'captor']]);
 AUDIT_VERBS.STRUGGLE.roles = R_BY([[/ of $/, 'captor']]);
@@ -1432,6 +1434,7 @@ execution.js EXECUTION 10d27374 clean
 execution.js EXECUTION 76ea358d clean
 factiongear.js FACTIONGEAR 79b8dc7c clean
 guards.js GUARDS f67e7ce9 clean
+apiaries.js APIARY c7230e1c clean
 guards.js GUARDS 47d2600f clean
 guards.js GUARDS 393970fa clean
 guards.js GUARDS 64f64081 clean

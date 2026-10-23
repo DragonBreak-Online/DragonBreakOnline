@@ -165,3 +165,5 @@ player-guilds.json
 /rebel-factions.json
 # leadership.js: when each character holding two leadership seats was told to step down
 leadership-doubles.json
+guard-posts.json
+apiaries.json

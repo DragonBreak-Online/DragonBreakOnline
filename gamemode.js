@@ -2060,6 +2060,8 @@ mp.onActivate = (targetId, casterId) => {
   if (globalThis.__dboLeverPuzzle && globalThis.__dboLeverPuzzle(targetId >>> 0, casterId >>> 0)) return false;
   // A dead guard of the hold's watch is never searched (guards.js)
   if (globalThis.__dboWatchActivate && globalThis.__dboWatchActivate(targetId >>> 0, casterId >>> 0)) return false;
+  // An apiary or beehive gives honey on its own timer instead of opening (apiaries.js)
+  if (globalThis.__dboApiaryActivate && globalThis.__dboApiaryActivate(targetId >>> 0, casterId >>> 0)) return false;
   if (globalThis.__dboBankActivate && globalThis.__dboBankActivate(targetId >>> 0, casterId >>> 0)) return false;
   // A rented chest is kept for its renter by business.js alone. The engine takes a thrown activate handler as "allowed",
   // so a hook that throws falls back to the stand-in below instead of opening the chest (review A2-1, fail closed)
@@ -9192,6 +9194,12 @@ try {
   delete require.cache[GUARDS_JS];
   require(GUARDS_JS)({ mp, log, personal, audit, who, display, cfg, registerChatCommand, zoneOfActor, zoneById });
 } catch (e) { log('guards.js failed to load:', e.stack || e.message); globalThis.__dboWatchActivate = null; globalThis.__dboWatchNoSkill = null; globalThis.__dboGuardsOnDeath = null; }
+// ---- apiaries and beehives: honey on a timer (server\apiaries.js, config "apiaries") ----
+try {
+  const APIARIES_JS = path.resolve('apiaries.js');
+  delete require.cache[APIARIES_JS];
+  require(APIARIES_JS)({ mp, log, personal, audit, who, cfg, giveItem });
+} catch (e) { log('apiaries.js failed to load:', e.stack || e.message); globalThis.__dboApiaryActivate = null; }
 // ---- duels between two players, the death duel too (server\duel.js, config "duel"): after downed.js, whose hit, death, cast and eat hooks it wraps ----
 try {
   const DUEL_JS = path.resolve('duel.js');
