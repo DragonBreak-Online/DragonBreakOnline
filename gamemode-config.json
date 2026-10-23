@@ -1883,9 +1883,9 @@
   "jailMinutes": 10,
   "radius": 4000,
   "_radius": "How near (units) a player must come for a post's guard to spawn. 600 was too small: a guard 20 m away never appeared (Nate, 23 Oct).",
-  "patrolsByHold": { "whiterun": ["d314c:Skyrim.esm", "d314f:Skyrim.esm"], "windhelm": ["a24df:Skyrim.esm", "a24e3:Skyrim.esm", "480c9:Skyrim.esm"], "winterhold": ["fcee5:Skyrim.esm", "fcee9:Skyrim.esm"], "riften": ["10d155:Skyrim.esm", "45888:Skyrim.esm"], "morthal": ["604ff:Skyrim.esm"] },
-  "_patrolsByHold": "A hold's first posts (by number) take these patrol guards in order; their own AI walks the base game's routes (GuardWhiterunImperialPatrolDay1/2, GuardWindhelmSonsPatrol6a/6c/1d, GuardWinterholdTownImperialPatrol/2, GuardRiftenImperialTowerGuardRoving and RovingC, GuardMorthalImperialPatrolDay). Whiterun's and Morthal's also sleep at night. Remove a hold to stop its patrols.",
-  "autoHolds": ["bruma", "solitude", "riften", "windhelm", "winterhold", "falkreath", "markarth", "dawnstar", "morthal"],
+  "patrolsByHold": {},
+  "_patrolsByHold": "Empty since 23 Oct: every post now spawns the hold's own base-game guard for that spot, patrols included, so each follows its own vanilla AI. A hold listed here would put these patrol guards on its first posts instead.",
+  "autoHolds": ["bruma", "whiterun", "solitude", "riften", "windhelm", "winterhold", "falkreath", "markarth", "dawnstar", "morthal"],
   "_autoHolds": "Holds whose posts the server pre-places once from guard-post-spots.json (Nate, 23 Oct). Whiterun was placed by hand, then redone from its spots (Nate, 23 Oct); Bruma spawns its own guards at their vanilla markers.",
   "npcByHold": { "bruma": "6daba:BSHeartland.esm", "whiterun": "abe18:Skyrim.esm", "solitude": "853c4:Skyrim.esm", "riften": "45853:Skyrim.esm", "windhelm": "45c31:Skyrim.esm", "winterhold": "24b49:Skyrim.esm", "falkreath": "10107b:Skyrim.esm", "markarth": "ac9ca:Skyrim.esm", "dawnstar": "87578:Skyrim.esm", "morthal": "2c81b:Skyrim.esm" },
   "_npcByHold": "Each hold's own generic guard (23 Oct): GuardWhiterunHoldImperialGeneric, GuardSolitudeImperialBase, GuardRiftenImperialBase, GuardWindhelmSons, GuardWinterholdImperial, GuardFalkreathImperial, GuardMarkarthImperialExterior, GuardDawnstarImperialNoShift, GuardHjaalmarchImperial; Bruma CYRGuardBrumaTemplate. Chosen for no or one AI package, so a guard stays near its post."

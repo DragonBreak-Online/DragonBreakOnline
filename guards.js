@@ -194,15 +194,18 @@ module.exports = (api) => {
   // Pre-placed posts (Nate, 23 Oct: "can you pre place guards? by hand is annoying"): guard-post-spots.json, where the base
   // game's guards stood in each city. Each hold in autoHolds is placed once (autoDone in guard-posts.json), so a post staff
   // remove afterwards stays removed; /guardpost auto <hold> places a hold's spots on demand
-  const SPOTS = (() => { try { return JSON.parse(fs.readFileSync(path.resolve('guard-post-spots.json'), 'utf8')).holds || {}; } catch (e) { return {}; } })();
+  const SPOTS_FILE = (() => { try { return JSON.parse(fs.readFileSync(path.resolve('guard-post-spots.json'), 'utf8')); } catch (e) { return {}; } })();
+  const SPOTS = SPOTS_FILE.holds || {};
+  // A new spots version replaces a hold's earlier pre-placed (auto) posts once; hand-placed ones stay
+  const doneKey = (hold) => (Number(SPOTS_FILE.version) > 1 ? `${hold}@${Number(SPOTS_FILE.version)}` : hold);
   const readDone = () => { try { const v = JSON.parse(fs.readFileSync(POSTS_FILE, 'utf8')); return Array.isArray(v.autoDone) ? v.autoDone : []; } catch (e) { return []; } };
   const placeSpots = (hold, by) => {
     const npc = C.npcByHold[hold]; const spots = SPOTS[hold] || [];
     if (!spots.length || (!npc && spots.some((sp) => !sp.npc))) return 0;
-    const posts = readPosts(); let n = posts.reduce((m, p) => (p.hold === hold ? Math.max(m, Number(p.n) || 0) : m), 0);
+    const posts = readPosts().filter((p) => !(p.hold === hold && p.auto)); let n = posts.reduce((m, p) => (p.hold === hold ? Math.max(m, Number(p.n) || 0) : m), 0);
     // A spot may name its own guard (Bruma's: each original guard, so its own vanilla AI package runs)
     for (const sp of spots) posts.push({ hold, n: ++n, world: sp.world, pos: sp.pos, heading: sp.heading, npc: sp.npc || npc, by, at: Date.now(), auto: true });
-    const done = [...new Set(readDone().concat(hold))];
+    const done = [...new Set(readDone().concat(doneKey(hold)))];
     try { fs.writeFileSync(POSTS_FILE + '.tmp', JSON.stringify({ posts, autoDone: done }, null, 1)); fs.renameSync(POSTS_FILE + '.tmp', POSTS_FILE); } catch (e) { log('guards: guard-posts.json write failed', e.message); return 0; }
     return spots.length;
   };
@@ -210,7 +213,7 @@ module.exports = (api) => {
   if (C.enabled) {
     const done = new Set(readDone());
     for (const hold of C.autoHolds || []) {
-      if (done.has(hold)) continue;
+      if (done.has(doneKey(hold))) continue;
       const k = placeSpots(hold, 'auto');
       if (k) { log(`guards: ${k} post(s) pre-placed in ${hold}`); audit(`GUARDS server pre-placed ${k} guard posts in ${hold}`); }
     }
