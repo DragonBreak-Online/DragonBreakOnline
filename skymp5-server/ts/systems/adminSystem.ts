@@ -31,6 +31,10 @@ type Mp = any;
 // ids), TP to a player or a location, Rename and the Invisible and Ghost modes (TRIAL_GM_ACTIONS / TRIAL_GM_MODES; Ghost
 // from 12 Oct, Nate: "trial gms need to use the ghost form button in the admin panel"); anything else is refused here and logged.
 // Give all spells and Give all shouts are refused for every tier (GIVE_ALL_OFF; Jake, 17 Oct: a give-all character froze the server).
+// The gameplay's staff rules (server\staffguard.js, globalThis.__dboAdminGate) may refuse any panel action after the rank checks:
+// staff powers only on a staff character, never on the staff member's own account, a call or ticket for a rename, a Trial
+// GM's teleports. At each actor assignment it also says whether the profile's modes are cleared (another character, or a
+// character that is not a staff one). Without the gameplay layer nothing is refused here.
 // Bans post to the backend (master key + auth token), which snapshots discordId/hwid/ip into bans.json; connection-check then refuses the player permanently.
 //
 // Wire protocol (CustomPacket JSON):
@@ -58,6 +62,7 @@ type Mp = any;
 //                     { customPacketType: "adminAction", action: "giveDisease", kind: "vampire" | "werewolf", targetName? }
 //                     { customPacketType: "adminAction", action: "giveCurse", kind: "vampire" | "purevampire" | "werewolf" | "blessedwerewolf" | "cure" | "stage", stage?, targetName? }
 //                     { customPacketType: "adminAction", action: "setSchool", school, level, targetName? }  level 0..100 (schools.js)
+//                     { customPacketType: "adminAction", action: "staffChar", target, on }  mark (on: true) or unmark a staff character
 //                     A missing target/targetName means the admin themself; targetName takes a name, a name prefix or #TAG.
 //   Server -> Client: { customPacketType: "adminMastery", targetName, detail }  detail.schools: [{ name, level, role, roleLabel }], or null without magic data
 //                     { customPacketType: "adminItems", categories: [{ id, label, items: [[desc, name, plugin?]] }] }
@@ -91,6 +96,8 @@ const ADMIN_MODES: Array<{ id: string; label: string }> = [
 const SPAWN_ACTIONS = new Set(["kill", "deleteCharacter", "masteryGrant", "masteryReset", "masterySetTier", "masteryDrop",
   "giveItem", "giveWerewolf", "giveVampireLord", "giveDisease", "giveCurse", "setSchool", "beastForm", "npcZoneAdd", "npcZoneDelete", "npcZoneReset"]);
 const SPAWN_MODES = new Set(["smite", "healhit"]);
+// Panel actions whose missing target means the staff member themself (resolveTarget)
+const SELF_TARGETED = new Set(["masterySetTier", "masteryDrop", "giveItem", "giveWerewolf", "giveVampireLord", "giveDisease", "giveCurse", "setSchool", "beastForm"]);
 // Turned off for every tier: each learned-spell read costs the square of the list, and a give-all character froze the server
 const GIVE_ALL_OFF = new Map<string, string>([
   ["giveSpells", "Give all spells is turned off: it froze the server. Give single spell tomes from the Items tab instead."],
@@ -123,6 +130,8 @@ export class AdminSystem implements System {
   private authToken = "";
   private locations: TeleportLocation[] = [];
   private modesByProfile = new Map<number, Record<string, boolean>>();
+  // The character each profile last had in game, so the modes are cleared when another one comes in
+  private lastActorByProfile = new Map<number, number>();
   private pingCache = new Map<number, number>();
   private pingCacheAt = 0;
   private serverName = "";
@@ -163,6 +172,10 @@ export class AdminSystem implements System {
         mp.set(actorId, "consoleCommandsAllowed", tier !== null && TIER_CAPS[tier].spawn);
         if (tier) this.log(`AdminSystem: console granted to actor ${actorId.toString(16)} (${tier})`);
         const trial = tier === null && isTrialGm(mp, actorId, this.roleCfg);
+        const profileId = this.profileOf(mp, actorId);
+        const last = this.lastActorByProfile.get(profileId);
+        if (profileId > 0) this.lastActorByProfile.set(profileId, actorId);
+        if ((tier !== null || trial) && this.gate(actorId, "assign", { changed: last !== undefined && last !== actorId })) this.clearModes(mp, userId, profileId);
         this.resyncModes(mp, userId, actorId, tier !== null || trial, trial);
         // Shouts live only in the client's game, so a character given all shouts is taught them again at every login
         let shouts = false;
@@ -525,6 +538,12 @@ export class AdminSystem implements System {
       this.reply(mp, userId, false, "That is for a Lead GM and above");
       return;
     }
+    const refused = this.gate(myActorId, action, this.gateInfo(mp, myActorId, action, content, trial));
+    if (refused) {
+      this.adminLog(`profile ${adminProfile} (${trial ? "trialgm" : tier}) was refused ${action === "toggleMode" ? `the ${mode} mode` : action}: ${refused}`);
+      this.reply(mp, userId, false, refused);
+      return;
+    }
     if (action === "toggleMode") {
       this.toggleMode(mp, userId, myActorId, adminProfile, mode);
       return;
@@ -644,6 +663,12 @@ export class AdminSystem implements System {
         const ok = this.mastery.resetCharacter(ctx, target.actorId);
         if (ok) this.adminLog(`profile ${adminProfile} reset the craft and hours of ${target.name} (profile ${target.profileId})`);
         this.reply(mp, userId, ok, ok ? `Reset the craft and hours of ${target.name}` : `${target.name} has no craft to reset`);
+      } else if (action === "staffChar") {
+        // Mark or unmark a staff character (gameplay staffguard.js: Lead GM and above, audited there)
+        const set = (globalThis as any).__dboStaffCharSet;
+        if (typeof set !== "function") { this.reply(mp, userId, false, "Staff characters need the gameplay layer (gamemode.js)"); return; }
+        const r = set(myActorId, target.actorId, content["on"] !== false) || {};
+        this.reply(mp, userId, !!r.ok, String(r.text || (r.ok ? "Done" : "That did not work")));
       } else if (action === "rename") {
         // The gameplay's /rename rules (names, the one-name index, the player told), shared through gamemode.js
         const rename = (globalThis as any).__dboAdminRename;
@@ -972,6 +997,34 @@ export class AdminSystem implements System {
       return;
     }
     this.reply(mp, userId, false, `Unknown action '${action}'`);
+  }
+
+  // The gameplay's answer for one panel action: '' lets it through, any other text is the refusal shown to the staff member
+  private gate(actorId: number, action: string, info: Record<string, unknown>): string {
+    const g = (globalThis as any).__dboAdminGate;
+    if (typeof g !== "function") return "";
+    try { return String(g(actorId, action, info) || ""); } catch (e) { this.log(`AdminSystem: __dboAdminGate failed: ${e}`); return ""; }
+  }
+
+  // What the gate is told: the mode, and the online character the action is aimed at (0 when it names none, or a place)
+  private gateInfo(mp: Mp, myActorId: number, action: string, content: Content, trial: boolean): Record<string, unknown> {
+    let target = 0;
+    if (action !== "toggleMode" && action !== "teleportLoc" && action !== "unban" && !action.startsWith("npcZone")) {
+      const hex = parseInt(String(content["target"] ?? ""), 16);
+      const named = String(content["targetName"] ?? "").trim();
+      if (hex || named || SELF_TARGETED.has(action)) target = this.resolveTarget(mp, myActorId, content)?.actorId ?? 0;
+    }
+    return { mode: String(content["mode"] ?? ""), target, trial, location: action === "teleportLoc" ? String(content["target"] ?? "") : "" };
+  }
+
+  // Every mode of the profile off, on the client too (NoClip and Freecam live there alone)
+  private clearModes(mp: Mp, userId: number, profileId: number): void {
+    const state = this.modesByProfile.get(profileId);
+    if (!state) return;
+    const on = Object.keys(state).filter((m) => state[m]);
+    this.modesByProfile.delete(profileId);
+    for (const m of on) this.sendMode(mp, userId, m, false);
+    if (on.length) this.adminLog(`profile ${profileId} had the modes ${on.join(", ")} cleared (another character, or not a staff character)`);
   }
 
   private toggleMode(mp: Mp, userId: number, actorId: number, adminProfile: number, mode: string): void {
