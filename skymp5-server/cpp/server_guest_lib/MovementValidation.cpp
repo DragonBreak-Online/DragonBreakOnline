@@ -39,6 +39,30 @@ uint32_t LocationOf(WorldState& worldState, const FormDesc& cellOrWorld,
   return local ? lookup.ToGlobalId(local) : 0;
 }
 
+// The 4096 u guard has no correction path for a hosted actor, so refusing for ever freezes it and
+// every hit on it is refused. RefuseNpcJump solves the same problem by giving in after 3 s; this is
+// that rule, on this check. Returns true once the hoster has held the same disagreement that long.
+bool HosterHasInsisted(MovementValidation::Tracker* tracker, MpActor* actor,
+                       uint32_t insistMs)
+{
+  if (!tracker || !actor) {
+    return false;
+  }
+  auto& st = tracker->states[actor->GetFormId()];
+  const auto now = std::chrono::steady_clock::now();
+  if (!st.far) {
+    st.far = true;
+    st.farSince = now;
+    st.lastTime = now;
+    return false;
+  }
+  if (now - st.farSince < std::chrono::milliseconds(insistMs)) {
+    return false;
+  }
+  st.far = false;
+  return true;
+}
+
 float HorizontalDistance(const NiPoint3& a, const NiPoint3& b)
 {
   const float dx = a.x - b.x, dy = a.y - b.y;
@@ -122,20 +146,28 @@ bool Validate(PartOne& partOne, const NiPoint3& currentPos,
       return false;
     }
 
-    // A hosted actor has no correction path, so a refusal latches forever
-    // NPCs walk between the cells of one dungeon, which is ordinary
-    // Interior cells each have their own coordinate space, so a cross cell distance measures nothing
-    if (!cellChanged || afterServerTeleport) {
+    if (afterServerTeleport) {
       return false;
     }
 
-    // Only between cells of one location, which is what the parts of a dungeon share
-    const uint32_t fromLocation =
-      LocationOf(partOne.worldState, currentCellOrWorld, espmFiles);
-    if (fromLocation == 0 ||
-        fromLocation != LocationOf(partOne.worldState, newCellOrWorld, espmFiles)) {
+    if (cellChanged) {
+      // A hosted actor has no correction path, so a refusal latches forever
+      // NPCs walk between the cells of one dungeon, which is ordinary
+      // Interior cells each have their own coordinate space, so a cross cell distance measures nothing
+      // Only between cells of one location, which is what the parts of a dungeon share
+      const uint32_t fromLocation =
+        LocationOf(partOne.worldState, currentCellOrWorld, espmFiles);
+      if (fromLocation == 0 ||
+          fromLocation != LocationOf(partOne.worldState, newCellOrWorld, espmFiles)) {
+        return false;
+      }
+    } else if (!HosterHasInsisted(tracker, actor,
+                                  partOne.worldState.movementLimits.npcInsistMs)) {
+      // RefuseNpcJump gives in after 3 s so an NPC that really moved is never frozen
       return false;
     }
+  } else if (!isMe && tracker && actor) {
+    tracker->states[actor->GetFormId()].far = false;
   }
 
   const auto& limits = partOne.worldState.movementLimits;

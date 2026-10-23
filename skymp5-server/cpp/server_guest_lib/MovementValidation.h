@@ -31,9 +31,13 @@ struct ActorState
   uint32_t refusedSinceLog = 0;
   uint32_t serverMovesSinceLog = 0;
   bool seeded = false;
+  // A hosted actor the hoster keeps reporting too far away, and since when
+  std::chrono::steady_clock::time_point farSince;
+  bool far = false;
 };
 
-// Last accepted position and speed budget per actor, owned by ActionListener
+// Last accepted position and speed budget per actor, owned by ActionListener.
+// Hosted actors get an entry too, for the give-in timer
 struct Tracker
 {
   std::unordered_map<uint32_t, ActorState> states;
