@@ -12,6 +12,7 @@
 #include "HasSpell.h"
 #include "IsBlocking.h"
 #include "IsInInterior.h"
+#include "IsPS3.h"
 #include "IsWeaponMagicOut.h"
 #include "IsWeaponOut.h"
 #include "SpellHasKeyword.h"
@@ -60,6 +61,7 @@ ConditionFunctionMap ConditionFunctionFactory::CreateConditionFunctions()
     std::make_shared<ConditionFunctions::GetPCIsRace>());
   res.RegisterConditionFunction(
     std::make_shared<ConditionFunctions::GetInCurrentLoc>());
+  res.RegisterConditionFunction(std::make_shared<ConditionFunctions::IsPS3>());
 
   res.RegisterConditionFunction(
     std::make_shared<ConditionFunctions::SkympGetDamageSourceHasKeyword>());
