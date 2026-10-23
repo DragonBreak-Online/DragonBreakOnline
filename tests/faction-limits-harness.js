@@ -98,7 +98,6 @@ ok('a clan member cannot be invited to the Legion, and the refusal names the cla
 ro = invite(CHIEF, LEG, 'clan-largashbur');
 ok('nor a Legion soldier to a clan', ro.error && /already serves the Imperial Legion/.test(ro.error), ro);
 ok('the Imperial Civil Commission is an allegiance (Nate, 19 Oct); the Penitus Oculatus is secret, like the Blades (Nate, 22 Oct)', L.categories.allegiance.ids.includes('imperial-civil-commission') && !L.categories.allegiance.ids.includes('penitus-oculatus') && L.categories.secret.ids.includes('penitus-oculatus'), L.categories);
-  && !(L.categories.allegiance.officialsOnly || []).includes(c) && !Object.entries(L.categories).some(([k, v]) => k !== 'allegiance' && (v.ids || []).includes(c))));
 // A faith of its own beside a guild, one at a time, and only for a follower of the Eight (Nate, 19 Oct)
 ok('the churches are a faith, not a guild; the Vigil stays a guild', L.categories.faith.ids.join() === 'imperial-cult,great-faiths' && L.categories.guild.ids.includes('vigil-of-stendarr')
   && !L.categories.guild.ids.includes('imperial-cult') && !L.categories.guild.ids.includes('great-faiths'));
