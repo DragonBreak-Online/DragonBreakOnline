@@ -502,6 +502,48 @@ AUDIT_VERBS.STAFF.cut = (text, raw) => {
   if (!e) return `${h[1]} piece`;
   return `${h[1]} piece${/ \(named "…"\)$/.test(rest.slice(0, e.index)) ? ' (named "…")' : ''}: ${e[1]}`;
 };
+// ELECTION STAFF <staff> struck the vote of <voter> in <hold> (round N): <reason> (citizenship.js strikeVote): the reason is
+// everything the Lead GM typed after the voter in /strikevote, their own words, so it goes, and a character it names is
+// never a party; who struck whose vote, where and in which round stay. A strike line the cut cannot read keeps nothing.
+// ELECTION <hold>: the vote of <name> (profile N, round N) <is void|was already counted; staff review it>: left <faction> <t>
+// before voting and joined <faction> <t> after (voidRejoin, the faction guard): a faction's name can be one a player chose (a
+// charter's or a rising's, charters.js checkName; GUILD and REBELLION are excluded for them), so both names go and the two
+// times stay; any other end, or a lost one, keeps the head only. Other ELECTION lines are not cut. The templates are
+// unchanged, so their AUDIT_SITES pins stay
+const ELECTION_STRUCK = new RegExp(`^(ELECTION STAFF ${WHO_RX} struck the vote of (?:(?:[^\\s#()]+ ){0,5}?[^\\s#()]+(?: #[A-Z0-9?]{4})?|profile \\d{1,9}) in [^():]{1,60} \\(round \\d{1,9}\\))(?=: |$)`);
+const ELECTION_VOID = /^(ELECTION [^:]{1,60}: the vote of (?:[^\s#()]+ ){0,5}?[^\s#()]+ \(profile \d{1,9}, round \d{1,9}\) (?:is void|was already counted; staff review it))(?:: ([\s\S]*))?$/;
+const ELECTION_WHY = /^left .{1,64}? (\d{1,6} h \d{1,2} m) before voting and joined .{1,64}? (\d{1,6} h \d{1,2} m) after$/;
+AUDIT_VERBS.ELECTION.cut = (text, raw) => {
+  if (/^ELECTION STAFF [\s\S]* struck the vote of /.test(text)) { const h = text.match(ELECTION_STRUCK); return h ? h[1] : 'ELECTION STAFF'; }
+  if (!/^ELECTION [^:]{1,60}: the vote of /.test(text)) return text;
+  const v = text.match(ELECTION_VOID);
+  if (!v) return 'ELECTION';
+  const w = v[2] !== undefined && !endLost(raw) ? v[2].match(ELECTION_WHY) : null;
+  return w ? `${v[1]}: left a faction ${w[1]} before voting and joined one ${w[2]} after` : v[1];
+};
+// staffguard.js: a staff member's tool used on another player, as APPEARANCE and BOOST (the staff member acts, the character
+// worked on is the target, so it is in both their posts)
+//   STAFFREF <staff> <kind> on <target|profile N> under <ref> (target(), the gate of a rename, faction, office or citizenship
+//   change) and STAFFREF <staff> works on <target> under <ref> for N minutes (/staffref): <ref> is "GM call #n" (an open
+//   call, checked), "GM call #n (held)", or "ticket <id>", and a ticket's id is whatever the staff member typed after
+//   ticket: or as /staffref's first word (parseRef, never checked against a ticket), so it goes and "a ticket" stands for
+//   it. Who, the kind, whom, the call and the minutes stay; any other end, or a lost one, keeps who worked on whom only, and
+//   a line the cut cannot read keeps nothing
+//   STAFFGUARD <staff> used a staff tool (<kind>) on the staff account of <target> and STAFFCHAR <staff> marked|unmarked
+//   <target> as a staff character: identities and the code's own words only (the name or #TAG typed after /staffchar only
+//   finds the character)
+clean_('STAFFREF STAFFGUARD STAFFCHAR');
+const STAFFREF_HEAD = new RegExp(`^(STAFFREF ${WHO_RX} [a-z]{1,20} on (?:${WHO_RX}|profile -?\\d{1,9})) under `);
+const STAFFREF_END = /^(?:(GM call #\d{1,9}(?: \(held\))?)|ticket \S{1,60})( for \d{1,6}(?:\.\d{1,3})? minutes)?$/;
+AUDIT_VERBS.STAFFREF.cut = (text, raw) => {
+  const h = text.match(STAFFREF_HEAD);
+  if (!h) return 'STAFFREF';
+  const e = endLost(raw) ? null : text.slice(h[0].length).match(STAFFREF_END);
+  return e ? `${h[1]} under ${e[1] || 'a ticket'}${e[2] || ''}` : h[1];
+};
+AUDIT_VERBS.STAFFREF.roles = R_BY([[/ on $/, 'target']]);
+AUDIT_VERBS.STAFFGUARD.roles = R_BY([[/ the staff account of $/, 'target']]);
+AUDIT_VERBS.STAFFCHAR.roles = R_BY([[/ (?:marked|unmarked) $/, 'target']]);
 // Duels: display() names in the reasons ("Rowan #PGDB yielded"); the one beaten, killed or challenged is the target
 clean_('DUEL', { display: true, roles: R_BY([[/ (?:against|beat|killed|challenge to) $/, 'target']]) });
 // Record, config and dungeon names, hex refs and numbers only
@@ -536,6 +578,7 @@ excluded('EVENT', 'the event announcement\'s text');
 excluded('GUILD', 'player guild names, a GM\'s reason');
 excluded('BOUNTY', 'the reason a ruler gave for a bounty');
 excluded('EXPOSURE', 'staff only: who was seen changing into a beast, its witnesses and a GM\'s reason');
+excluded('LEADERSHIP', 'staff only: a double still seated days after the step-down notice; its seats are rank titles a faction\'s leader or a Lead GM renames, player-named charters and risings, and office names staff can rename');
 excluded('REBELLION', 'player-named risings and a secret petition\'s code');
 excluded('REFERRAL', 'staff only: profiles by number, staff reasons, PC sharing');
 excluded('SHOP', 'business names and the failure reasons');
@@ -1347,6 +1390,7 @@ citizenship.js ELECTION e9335d9a clean
 citizenship.js ELECTION 51c738f7 clean
 citizenship.js ELECTION a78d4be7 clean
 citizenship.js ELECTION 8ca5a5d0 clean
+citizenship.js ELECTION 3e5d350b clean
 citizenship.js CITIZEN e6f03eeb clean
 citizenship.js ELECTION 9607cadb clean
 commissions.js COMMISSION 49e86f26 parsed
@@ -1546,6 +1590,7 @@ keyring.js KEYRING f333bd5d parsed
 labour.js LABOUR-MISMATCH d7791950 clean
 labour.js MINE 915776d9 clean
 labour.js CHOP 6d22c150 clean
+leadership.js LEADERSHIP 803e7d3b excluded
 ledger.js LEDGER ba4ac58e excluded
 ledger.js LEDGER 77274c80 excluded
 ledgersale.js LEDGERSALE 57e2baf4 parsed
@@ -1788,6 +1833,10 @@ sprstrip.js SPRSTRIP a7b3a299 parsed
 sprstrip.js SPRSTRIP d281443a parsed
 sprstrip.js SPRSTRIP 785ed462 parsed
 staffenchant.js STAFF 9a94a0c4 clean
+staffguard.js STAFFREF 793dd536 clean
+staffguard.js STAFFGUARD 486826c9 clean
+staffguard.js STAFFCHAR 25cceb6f clean
+staffguard.js STAFFREF 44dc317b clean
 stafftools.js EVENT 90e88695 excluded
 struggle.js STRUGGLE-MISMATCH c97bbac2 clean
 struggle.js STRUGGLE 4292b3ed clean
