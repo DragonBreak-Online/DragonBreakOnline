@@ -1,10 +1,10 @@
 // A claim on a reference the load order no longer has (the 21 Oct order moved DragonBreak Online Edits from 48 to 49, and
 // housing.json still lists 48172d19 and 4812ae14; 80d9643 is a door the DLE deleted) throws "doesn't exist" on every read,
 // and the server logs each one: rest.js, business.js and ledgersale.js scan the registry on every login, bed and shop sale,
-// about 2 error lines a minute. housingSystem.ts reads such a reference once (its gone memo); the gameplay modules that
-// read the registry themselves must do the same, and a gone claim must not cost the live ones (worldstats.js summed a
-// profile's stored gold in one try, so a gone claim dropped every claim after it). Loads the real modules with a mock
-// gamemode api; no server and no game:
+// about 2 error lines a minute, and guilds.js on every /faction storage, hallmark and charter seat. housingSystem.ts reads
+// such a reference once (its gone memo); the gameplay modules that read the registry themselves must do the same, and a
+// gone claim must not cost the live ones (worldstats.js summed a profile's stored gold in one try, so a gone claim dropped
+// every claim after it). Loads the real modules with a mock gamemode api; no server and no game:
 //
 //   node tests/housing-gone-reads-harness.js
 'use strict';
@@ -86,6 +86,15 @@ let claim = null, none = null;
 for (let i = 0; i < 5; i++) { claim = ls.claimAt(mp.getIdFromDesc(HOME)); none = ls.claimAt(mp.getIdFromDesc(INN)); }
 ok('ledgersale.js: five lookups read each gone claim at most once', goneReads() <= GONE.length, goneReads());
 ok('ledgersale.js: ...and still find the live claim', !!claim && claim.primary === DOOR && claim.owner === PROFILE && none === null, [claim, none]);
+
+// ---- guilds.js: /faction storage, hallmark and a charter's seat find the claimed property the player stands at --------
+fresh(); put(ME, 'pos', [0, 0, 0]); put(ME, 'worldOrCellDesc', TAMRIEL); put(DOOR, 'pos', [100, 0, 0]);
+load('guilds.js');
+let at = 0;
+for (let i = 0; i < 5; i++) at = globalThis.__dboPropertyAt(ME);
+if (globalThis.__dboHallSyncTimer) clearTimeout(globalThis.__dboHallSyncTimer);
+ok('guilds.js: five look-ups read each gone claim at most once', goneReads() <= GONE.length, goneReads());
+ok('guilds.js: ...and still find the live claim', at === DOOR, at);
 
 // ---- worldstats.js: a gone claim neither throws away the others' gold nor is read every minute -------------------------
 fresh(); load('worldstats.js');

@@ -241,6 +241,8 @@ module.exports = (api) => {
   const STORE_REACH = 400;
   // The claimed property the player is standing at. housing.json is the index of claimed ids the housing
   // system keeps (an array of form ids); a ref that is not loaded simply does not answer and is skipped.
+  // A claim the load order no longer has throws on every read, each one logged: asked once (rest.js, housingSystem.ts gone memo)
+  const GONE = globalThis.__dboGoneRefs instanceof Set ? globalThis.__dboGoneRefs : (globalThis.__dboGoneRefs = new Set());
   const propertyAt = (a) => {
     let pos = null, cell = null;
     try { pos = mp.get(a, 'pos'); cell = mp.get(a, 'worldOrCellDesc'); } catch (e) { return 0; }
@@ -248,13 +250,16 @@ module.exports = (api) => {
     const claimed = readJson(path.resolve('housing.json'), []);
     let best = 0, bestD = Infinity;
     for (const raw of Array.isArray(claimed) ? claimed : []) {
-      const ref = Number(raw) >>> 0; if (!ref) continue;
+      const ref = Number(raw) >>> 0; if (!ref || GONE.has(ref)) continue;
       try {
         if (mp.get(ref, 'worldOrCellDesc') !== cell) continue;
         const p = mp.get(ref, 'pos'); if (!p) continue;
         const d = Math.hypot(p[0] - pos[0], p[1] - pos[1], p[2] - pos[2]);
         if (d <= STORE_REACH && d < bestD) { bestD = d; best = ref; }
-      } catch (e) { /* not loaded right now */ }
+      } catch (e) {
+        // not loaded right now
+        if (ref < 0xff000000 && /doesn't exist/.test(String(e && e.message))) { if (GONE.size >= 4096) GONE.clear(); GONE.add(ref); }
+      }
     }
     return best;
   };
