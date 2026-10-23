@@ -208,6 +208,7 @@ module.exports = (api) => {
   const cleanName = (t) => String(t || '').replace(/[\u0000-\u001f\u007f]+/g, ' ').split('#{').join('# {').replace(/\s+/g, ' ').trim().slice(0, 64);
   // -> '' when done, else why not
   const apply = (a, t, key, enchId, strength, name) => {
+    try { const g = globalThis.__dboStaffGuard; const no = g ? String(g.target(a, t, 'items') || '') : ''; if (no) return no; } catch (e) { /* the staff rules are optional */ }
     if (!allowed(a)) return 'Enchanting items is for staff of a higher rank.';
     if (!onlineActors().some((x) => (x >>> 0) === (t >>> 0))) return 'That player is not in the game.';
     const ench = byId(enchId);

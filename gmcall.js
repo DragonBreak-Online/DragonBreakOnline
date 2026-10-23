@@ -271,6 +271,8 @@ module.exports = (api) => {
   };
   const goto = (a, c) => {
     if (!isAdmin(a) && !canAnswer(a)) return say(a, 'Going to a caller is for staff with a GM tier.');
+    // The staff rules (staffguard.js): a staff character only, and a Trial GM only on a call they hold
+    try { const g = globalThis.__dboStaffGuard; const no = g && typeof g.gotoRefusal === 'function' ? g.gotoRefusal(a, c) : ''; if (no) return say(a, no); } catch (e) { /* the rules are optional */ }
     if (!teleportTo) return say(a, 'Teleport is not available right now. Use /tp <name>.');
     if (creationPending(a)) return say(a, 'Finish your own character first.');
     const p = callerOnline(c);

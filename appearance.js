@@ -725,6 +725,7 @@ module.exports = (api) => {
       if (!q) return personal(a, 'Use /grantappearance <name|#TAG>.');
       const t = Number(api.findByName(q)) >>> 0;
       if (!t) return personal(a, 'No such player online. Use their name or #TAG.');
+      try { const g = globalThis.__dboStaffGuard; const no = g ? String(g.target(a, t, 'appearance') || '') : ''; if (no) return personal(a, no); } catch (e) { /* the staff rules are optional */ }
       unuseFree(t);
       mp.set(t, FREE_TOLD, 1);
       const left = freeLeft(t);

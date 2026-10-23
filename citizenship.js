@@ -175,6 +175,11 @@ module.exports = (api) => {
   // Who runs the hold's citizenship: the ruler, a Steward, or a Lead GM and above (Nate, 15 Oct: any GM could grant,
   // decline and set the policy and fee). A GM or Trial GM who holds the ruler's or Steward's office keeps that office's rights
   const manages = (a, z) => isLeadStaff(a) || rules(a, z) || isSteward(a, z);
+  // The staff rules (staffguard.js) when a Lead GM acts as staff on character t, not through a seat of the hold: '' or why not
+  const staffNo = (by, z, t) => {
+    if (!isLeadStaff(by) || (z && (rules(by, z) || isSteward(by, z)))) return '';
+    try { const g = globalThis.__dboStaffGuard; return g ? String(g.target(by, t, 'citizenship') || '') : ''; } catch (e) { return ''; }
+  };
   const rulerWord = (z) => rankTitle(rulerOffice(z), z.id);
   const hasTreasury = (z) => !!(z && z.treasury);
 
@@ -266,6 +271,7 @@ module.exports = (api) => {
     const z = holdOf(zid); if (!z) return { error: 'This land grants no citizenship.' };
     if (!manages(by, z)) return { error: `Only the ${rulerWord(z)} or the Steward of ${ofPlace(z.name)} grants its citizenship.` };
     const r = requestOf(actor, z.id); if (!r) return { error: 'That character has not asked for citizenship here.' };
+    { const no = staffNo(by, z, actor); if (no) return { error: no }; }
     if (!exists(actor)) { liveRequests(); save(); return { error: 'That character no longer exists.' }; }
     const chk = joinCheck(actor, z);
     if (chk.error) return { error: `${r.name} cannot take it now: ${chk.error.replace(/^You are/, 'they are').replace(/^You /, 'they ')}` };
@@ -278,6 +284,7 @@ module.exports = (api) => {
     const z = holdOf(zid); if (!z) return { error: 'This land grants no citizenship.' };
     if (!manages(by, z)) return { error: `Only the ${rulerWord(z)} or the Steward of ${ofPlace(z.name)} decides on its citizenship.` };
     const r = requestOf(actor, z.id); if (!r) return { error: 'That request has already gone.' };
+    { const no = staffNo(by, z, actor); if (no) return { error: no }; }
     data().requests = data().requests.filter((x) => x !== r); save();
     audit(`CITIZEN ${who(by)} declined ${r.name}'s request for the citizenship of ${z.name}`);
     tell(actor, `Your request for the citizenship of ${ofPlace(z.name)} was declined.`);
@@ -306,6 +313,7 @@ module.exports = (api) => {
   };
   const revoke = (by, zid, actor) => {
     if (!isLeadStaff(by)) return { error: 'Only a Lead GM or above revokes a citizenship.' };
+    { const no = staffNo(by, null, actor); if (no) return { error: no }; }
     const z = holdOf(zid); const e = entryOf(actor);
     if (z && autoHolds(actor).includes(z.id) && !explicit(actor).some((h) => h.zone === z.id)) {
       return { error: `${nameNow(actor, e ? e.name : '')} is a citizen of ${ofPlace(z.name)} through ${autoWhy(actor, z) || 'a faction or court based there'}. It ends when they leave it.` };

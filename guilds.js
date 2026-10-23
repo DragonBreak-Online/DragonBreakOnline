@@ -37,6 +37,8 @@ module.exports = (api) => {
   const rolesOfActor = typeof api.rolesOf === 'function' ? api.rolesOf : () => [];
   const factionManager = (a) => { if (!MANAGER_ROLES.size) return false; try { return (rolesOfActor(a) || []).some((r) => MANAGER_ROLES.has(String(r))); } catch (e) { return false; } };
   const isLeadStaff = (a) => leadStaff(a) || factionManager(a);
+  // The staff rules (staffguard.js) on a staff tool aimed at character t (or { profile }): '' or why not
+  const staffNo = (a, t, kind) => { if (!leadStaff(a)) return ''; try { const g = globalThis.__dboStaffGuard; return g ? String(g.target(a, t, kind || 'faction') || '') : ''; } catch (e) { return ''; } };
 
   const WIDGET_ID = 37;
   const INVITE_MS = 2 * 60000;
@@ -1040,6 +1042,7 @@ module.exports = (api) => {
     const f = FACTIONS.get(fid);
     if (!f || !entryOf(fid, t)) return { error: 'They are not in that faction.' };
     if (!isLeadStaff(a) && !(can(fid, a, 'kick') && outranks(fid, a, t))) return { error: 'You cannot remove someone of equal or higher rank.' };
+    if (!(can(fid, a, 'kick') && outranks(fid, a, t))) { const no = staffNo(a, t); if (no) return { error: no }; }
     const name = rosterOf(fid)[String(t)].name;
     removeMember(fid, t);
     if (isOnline(t)) system(t, `You have been removed from ${f.name}.`);
@@ -1054,6 +1057,7 @@ module.exports = (api) => {
     if (!f || !entryOf(fid, t) || !(rank >= 0 && rank < f.ranks.length)) return { error: 'That rank change is not possible.' };
     const leaderRank = f.ranks.findIndex((r) => r.role === 'leader');
     if (court && (rank === leaderRank || entryOf(fid, t).rank === leaderRank)) return { error: `The ${shownAt(f, leaderRank)} of ${f.name} follows the court's office: appoint or dismiss the office instead.` };
+    if (isLeadStaff(a) && !can(fid, a, 'setRank')) { const no = staffNo(a, t); if (no) return { error: no }; }
     if (!isLeadStaff(a)) {
       if (!can(fid, a, 'setRank')) return { error: 'Your rank does not set ranks.' };
       if (t === (a >>> 0)) return { error: 'Pass leadership by naming someone else leader.' };
@@ -1115,6 +1119,7 @@ module.exports = (api) => {
     const t = findAnyByName(String(query || '').trim());
     if (t < 0) return { error: `${-t} characters have that name. Use their #TAG.` };
     if (!t) return { error: 'No character by that name or #TAG.' };
+    { const no = staffNo(a, t); if (no) return { error: no }; }
     if (entryOf(fid, t)) return { error: `${nameOf(t)} is already in ${f.name}.` };
     if (!fits(t, f)) return { error: `${nameOf(t)} could never belong to ${f.name}.` };
     const lim = limitRefusal(t, fid, lowestRank(fid), a);
@@ -1348,6 +1353,7 @@ module.exports = (api) => {
       const root = ref && H && typeof H.primaryOf === 'function' ? Number(H.primaryOf(ref)) >>> 0 : 0;
       const rec = root && typeof H.recordOf === 'function' ? H.recordOf(root) : null;
       if (!rec || !rec.owner || !Number(rec.partner)) return personal(a, 'Stand at the door of a claimed building and try again.');
+      { const no = staffNo(a, { profile: Number(rec.owner) }, 'hall'); if (no) return personal(a, no); }
       let doors = [];
       try { doors = [root, Number(rec.partner) >>> 0].map((r) => String(mp.getDescFromId(r) || '').toLowerCase()).filter(Boolean); } catch (e) { doors = []; }
       if (!doors.length) return personal(a, 'That door cannot be marked.');
@@ -1403,6 +1409,7 @@ module.exports = (api) => {
       if (!isLeadStaff(a)) return personal(a, 'Only a Lead GM or above names the first leader of a faction.');
       const t = findByName(rest[0] || ''); const fid = rest[1] || ''; const f = FACTIONS.get(fid);
       if (!t || !f) return personal(a, 'Usage: /faction leader <player|#TAG> <faction id>   (/faction list)');
+      { const no = staffNo(a, t); if (no) return personal(a, no); }
       const leaderRank = f.ranks.findIndex((r) => r.role === 'leader');
       const lim = limitRefusal(t, fid, leaderRank, a); if (lim) return personal(a, `${lim.text} (A Lead GM may lift this once: /faction override <player|#TAG> ${fid})`);
       { const no = leadershipNo(t, fid, a); if (no) return personal(a, no); }
@@ -1418,6 +1425,7 @@ module.exports = (api) => {
       if (!isLeadStaff(a)) return personal(a, 'Only a Lead GM or above overrides the faction limits.');
       const t = findAnyByName(rest[0] || ''); const fid = rest[1] || ''; const f = FACTIONS.get(fid);
       if (!(t > 0) || !f) return personal(a, 'Usage: /faction override <player|#TAG> <faction id>   (/faction list)');
+      { const no = staffNo(a, t); if (no) return personal(a, no); }
       armOverride(a, t, fid);
       const lim = limitProblem(t, fid, lowestRank(fid), a);
       return personal(a, `The faction limits are lifted once for ${nameOf(t)} and ${f.name} for the next ten minutes.${lim ? ` They would have been refused: ${lim.text}` : ' Nothing would refuse them now.'}`);
@@ -1425,6 +1433,7 @@ module.exports = (api) => {
     if (s === 'remove') {
       if (!isLeadStaff(a)) return personal(a, 'Use the faction menu (F3) to remove members.');
       const fid = rest[1] || ''; const id = findMember(fid, rest[0]); if (!FACTIONS.get(fid) || !id) return personal(a, 'Usage: /faction remove <name|#TAG> <faction id>');
+      { const no = staffNo(a, id); if (no) return personal(a, no); }
       removeMember(fid, id); try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('faction', 'kick', a, id); } catch (e) { /* the player log is optional */ } return personal(a, 'Removed.');
     }
     personal(a, 'Usage: /faction [menu|list|accept [id]|invite <player> [id]]  admins: /faction leader <player> <id>, /faction remove <name> <id>, /faction override <player> <id> (lifts the limits once), /faction hallmark|hallunmark <id> (at a building\'s door)');

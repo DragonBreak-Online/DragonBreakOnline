@@ -243,6 +243,7 @@ module.exports = (api) => {
     if (verb === 'teach' || verb === 'forget') {
       const fam = famArg(w[w.length - 1]); const t = w.length > 2 ? findByName(w.slice(1, -1).join(' ')) : 0;
       if (!fam || !t) return personal(a, `Usage: /smithing ${verb} <name|#TAG> <family>`);
+      try { const g = globalThis.__dboStaffGuard; const no = g ? String(g.target(a, t, 'skills') || '') : ''; if (no) return personal(a, no); } catch (e) { /* the staff rules are optional */ }
       if (verb === 'teach') { teach(t, techOf(fam), 'staff', who(a)); return personal(a, `${who(t)} now knows ${fam.name}.`); }
       const r = Object.assign({}, known(t)); delete r[fam.id]; set(t, REC, r); audit(`SMITH ${who(a)} made ${who(t)} forget ${fam.name}`);
       return personal(a, `${who(t)} no longer knows ${fam.name}.`);

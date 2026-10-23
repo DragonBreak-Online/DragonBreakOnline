@@ -2191,6 +2191,7 @@ module.exports = (api) => {
   const adminSet = (by, t, school, level) => {
     let staff = false; try { staff = !!by && typeof isAdmin === 'function' && !!isAdmin(by); } catch (e) { staff = false; }
     if (!staff) return { ok: false, text: 'Only staff set a school of magic.' };
+    try { const g = globalThis.__dboStaffGuard; const no = g ? String(g.target(by, t, 'skills') || '') : ''; if (no) return { ok: false, text: no }; } catch (e) { /* the staff rules are optional */ }
     const name = SCHOOLS.find((n) => n.toLowerCase() === String(school || '').toLowerCase());
     if (String(school || '').toLowerCase() === 'restoration') return { ok: false, text: 'Restoration follows the Priest skill: set Priest on the Wheel instead.' };
     if (!name) return { ok: false, text: `${school || 'That'} is not a school of magic. Schools: ${SCHOOLS.join(', ')}.` };

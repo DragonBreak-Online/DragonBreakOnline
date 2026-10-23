@@ -1772,6 +1772,18 @@
   "discordChannelId": "1549181668516954174",
   "discordPingRoleId": ""
  },
+ "staffPowers": {
+  "_comment": "The staff rules from the owner's staff-conduct review, 23 Oct (staffguard.js; fork adminSystem/housingSystem ask it through __dboAdminGate). staffCharOnly: staff powers (invisible, ghost, noclip, freecam, teleports, /realnames, the housing and key-ring staff override, the F7 panel's world-changing actions, item and skill grants) only on a character marked as a staff character (/staffchar set|clear|list|seed, Lead GM and above, never on their own account); GM calls, the admin chat and /bugs work everywhere; the F7 modes are cleared when a profile comes in on another character or on one that is not a staff character. selfTarget: staff tools never act on the acting staff member's own account; only a Lead GM acts on another staff member's account, audited. callRef: faction and rank changes, offices, renames and citizenship changes by staff on another player need an open GM call or a ticket (call:<n> / ticket:<id> in the command, /staffref <n|id> <player> for the panels, or the player's own call taken by the staff member); the reference goes in the audit. trialLimits: a Trial GM goes to no place, reopens no character creation, and goes to a player only while holding that player's open GM call. exemptTiers/exemptProfiles pass every rule (the Owners). ROLLBACK: the part's enabled false (or enabled false for all), hot reload.",
+  "enabled": true,
+  "exemptTiers": ["senior"],
+  "exemptProfiles": [],
+  "seedTags": ["D3EP", "S4PZ", "38XK"],
+  "seedMissing": [{"profile": 51, "name": "Choom"}, {"profile": 97, "name": "Neem"}],
+  "staffCharOnly": { "enabled": true, "clearModes": true },
+  "selfTarget": { "enabled": true, "staffNeedsLead": true },
+  "callRef": { "enabled": true, "bindMinutes": 60 },
+  "trialLimits": { "enabled": true }
+ },
  "staffEnchant": {
   "_comment": "Staff enchanting for events (staffenchant.js): /enchant and the F7 admin panel's Enchant tab put any weapon or apparel enchantment of the load order on one unworn piece, as a player-made enchantment (never disenchantable). minTier: the lowest staff tier allowed (gm, leadgm, developer, senior; Lead GM by default, as the panel's other item grants). maxScale: the strongest allowed, as a multiple of the enchantment's own main effect. weaponCharge: a weapon's full charge (3000 is a grand soul gem).",
   "enabled": true, "minTier": "leadgm", "maxScale": 3, "weaponCharge": 3000
