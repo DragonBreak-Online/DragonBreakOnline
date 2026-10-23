@@ -47,6 +47,8 @@ export interface BusinessLedgerData {
   log?: LedgerEntry[];
   notes?: LedgerEntry[];
   ledgerPlaced?: boolean;
+  // the server can start the F7 Place tool's edit mode on the ledger (business.js placeMode)
+  placeMode?: boolean;
   armSeconds?: number;
   // the shop, for everyone: what is for sale (priced, in stock)
   shopOpen?: boolean;
@@ -354,8 +356,11 @@ const BusinessLedger = ({ data }: { data: BusinessLedgerData }) => {
 
         {owner && tab === 'book' && (
           <div className="bizLedger__section">
-            <p className="bizLedger__note">{data.ledgerPlaced ? 'Set the ledger on the counter. Closer, further and the sides follow where you are looking.' : 'The ledger has not been placed. Stand where it should be and place it.'}</p>
+            <p className="bizLedger__note">{data.ledgerPlaced ? (data.placeMode ? 'Move it like the Place tool: a copy follows your aim; the arrows turn it and set how far, PgUp and PgDn raise it, Enter sets it down, Backspace stops. Or use the buttons below.' : 'Set the ledger on the counter. Closer, further and the sides follow where you are looking.') : 'The ledger has not been placed. Stand where it should be and place it.'}</p>
             <div className="bizLedger__row">
+              {data.ledgerPlaced && data.placeMode && (
+                <button className="bizLedger__button" disabled={busy} onClick={() => act('placeMode')}>Move it like the Place tool</button>
+              )}
               <button className="bizLedger__button" disabled={busy} onClick={() => act('place')}>{data.ledgerPlaced ? 'Move it in front of me' : 'Place the ledger here'}</button>
             </div>
             {data.ledgerPlaced && (
