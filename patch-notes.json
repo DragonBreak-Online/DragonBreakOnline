@@ -1,5 +1,53 @@
 [
   {
+    "title": "The 23 October update",
+    "date": "2026-10-23",
+    "version": "Server update",
+    "tag": "New",
+    "sections": [
+      {
+        "heading": "Before you play",
+        "items": [
+          "Reopen this launcher to get client 0.3.108b: the new Guild and Rebellion tabs and the fixes below need it."
+        ]
+      },
+      {
+        "heading": "Werewolves and vampires",
+        "items": [
+          "Werewolves can no longer change at will (Pack Alphas and those blessed by Hircine still can). The beast lasts longer and won't let go early.",
+          "A forced change now gives two and a half minutes' warning instead of 45 seconds, with the beast making itself known four more times on the way.",
+          "Every cursed werewolf now changes once under each full moon, wherever they are, with the usual warning first.",
+          "Sanguinare Vampiris and Sanies Lupinus now weigh on you as they grow: tiredness, slow wounds, sun or sleep troubles and more by stage. Nobody with a fever wakes Well Rested, and a cure ends it all at once. Your Character Journal's fever tab and /status show what it has done to you.",
+          "Beware of witnesses: if three or more people see a werewolf or Vampire Lord change, the hold knows of a beast for a week and puts a bounty on them (more in a city, doubled if they hurt anyone in that shape). Guards, officials and the hunter orders hear that a beast was seen, never who. The Companions keep their secret in Whiterun Hold.",
+          "You can confess what you are with /confess, with the same consequences as being seen.",
+          "A Jarl, Count or Chieftain who is seen or confesses is deposed, and their court is told.",
+          "Your own eyes and face stay yours after turning into a vampire; vampire eyes are never saved as your own any more.",
+          "With client 0.3.108b, guards attack a known beast on sight while its bounty stands."
+        ]
+      },
+      {
+        "heading": "Factions, guilds and courts",
+        "items": [
+          "Player guilds: informal groups of up to 10. Found one, invite, rename and leave from the new Guild tab in the Faction panel (F3), or with /guild. Guilds are for players in no faction; a faith or a magic college may stand beside one.",
+          "One leadership seat per character: a faction leader, ruler or court officer cannot hold a second seat. Nobody loses a seat they hold today.",
+          "Elections: a citizen who leaves a faction just before voting and rejoins soon after has their vote voided. Staff characters no longer count toward the citizens a hold needs.",
+          "A faction's hall is no longer the hold's to rent or sell (Castle Volkihar belongs to the vampires).",
+          "Chapel faith ledgers serve everyone whatever their faith, and priests can study Restoration and Alteration at the Cathedral of St Martin and the Temple of the Divines.",
+          "House Ravenwatch joins the vampire houses, and the Penitus Oculatus is now a secret order, like the Blades."
+        ]
+      },
+      {
+        "heading": "Fixes",
+        "items": [
+          "Old house and room keys cut before a property changed hands no longer open it. Keys on your key ring are unaffected.",
+          "Invisibility can't be brewed or cast for now: others kept seeing you invisible long after it ended for you. With client 0.3.108b everyone sees you reappear when it ends.",
+          "Bandit camps with ore, like Halted Stream Camp, count as mines and can be rented without using your one home.",
+          "Business owners can move their ledger like the Place tool (/business ledger move, or the Book tab's button with 0.3.108b)."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Bug fixes: books, shops, nobility, faction map, Vampiric Seduction",
     "date": "2026-10-23",
     "version": "Hotfix",
