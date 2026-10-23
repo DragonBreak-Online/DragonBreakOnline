@@ -705,7 +705,7 @@ module.exports = (api) => {
     t = Number(t) >>> 0; by = Number(by) >>> 0;
     if (!S.downed.has(t) || !isDead(t) || mp.get(t, 'private.permaDead') === true) return false;
     try { if (globalThis.__dboStatsAdd && by && by !== t && isPlayer(by)) { globalThis.__dboStatsAdd(t, 'killedByPlayers'); globalThis.__dboStatsAdd(by, 'playerKills'); } } catch (e) { /* stats only */ }
-    audit(`KILLED ${who(t)} by ${who(by)}${why ? ` (${why})` : ''}`);
+    audit(`FINISHED ${who(t)} by ${who(by)} (${why === 'werewolf frenzy' ? 'werewolf frenzy' : 'killed'})`);
     banner(t, `${nameTo(t, by)} killed you. You wake at the temple.`, 5);
     toTemple(t);
     return true;

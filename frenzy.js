@@ -179,7 +179,7 @@ module.exports = (api) => {
       if (t && t === f.target) { f.skip.add(t); retarget(a, f, 'the client could not find the last one'); }
       return;
     }
-    if (phase === 'off') end(a, `client: ${String(content.why || 'failsafe').slice(0, 60)}`);
+    if (phase === 'off') { const why = String(content.why || ''); end(a, `client: ${['failsafe', 'dead'].includes(why) ? why : 'released'}`); }
   };
 
   every('frenzyTick', 1000, () => {
@@ -218,7 +218,7 @@ module.exports = (api) => {
     const reason = C.lethalToPlayers === false ? 'downed someone in a werewolf frenzy' : 'killed someone in a werewolf frenzy';
     if (typeof globalThis.__dboExposureBounty === 'function') {
       let set = false; try { set = !!globalThis.__dboExposureBounty(w, victim, reason); } catch (e) { log('frenzy: exposure bounty failed', e.message); }
-      if (set) audit(`FRENZY bounty: ${who(w)} for downing ${who(victim)} (exposure.js)`);
+      if (set) audit(`FRENZY bounty: ${who(w)} for bringing down ${who(victim)} (exposure.js)`);
       return set;
     }
     if (!C.bountyFallback || typeof globalThis.__dboOutlawDeclare !== 'function') return false;
@@ -227,7 +227,7 @@ module.exports = (api) => {
     let had = 0; try { const o = globalThis.__dboOutlaws; const b = o && o.data && o.data.zones && o.data.zones[zid] && o.data.zones[zid][String(pid)]; had = b ? Math.floor(Number(b.amount) || 0) : 0; } catch (e) { had = 0; }
     let name = ''; try { name = typeof ownNameOf === 'function' ? ownNameOf(w) : display(w); } catch (e) { name = display(w); }
     let set = false; try { set = !!globalThis.__dboOutlawDeclare(zid, pid, had + Math.max(1, Math.floor(Number(C.bountyGold) || 0)), reason, name, 'the hold'); } catch (e) { log('frenzy: bounty failed', e.message); }
-    if (set) audit(`FRENZY bounty: ${who(w)} for downing ${who(victim)} in ${zid} (outlaws.js)`);
+    if (set) audit(`FRENZY bounty: ${who(w)} for bringing down ${who(victim)} in ${zid} (outlaws.js)`);
     return set;
   };
   // The frenzy's kill: an ordinary death unless permadeath says so, and only if they are still down (not raised meanwhile)
