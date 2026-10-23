@@ -1811,6 +1811,7 @@ silvertest.js SILVER 6b1d4eab clean
 smithing.js SMITH 92d9d0d1 clean
 smithing.js SMITH f0ad3f6e clean
 smithing.js SMITH 642eeccc clean
+smithing.js SMITH a36f3d9f clean
 spells.js SPELL 8165ae73 clean
 spells.js SPELL c975df88 clean
 spells.js SPELL 7dd908fc clean

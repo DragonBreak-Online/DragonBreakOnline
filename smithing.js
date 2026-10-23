@@ -66,7 +66,9 @@ module.exports = (api) => {
   };
   const raceEdid = (a) => { const app = get(a, 'appearance', null); const r = app && app.raceId ? lookup(Number(app.raceId) >>> 0) : null; return r ? String(r.record.editorId || '') : ''; };
   const dist = (a, b) => { const p = get(a, 'pos', null), q = get(b, 'pos', null); return Array.isArray(p) && Array.isArray(q) ? Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]) : Infinity; };
-  const tell = (a, text) => { const now = Date.now(); if (now - (S.told.get(a >>> 0) || 0) < 3000) return; S.told.set(a >>> 0, now); personal(a, text); try { sendPacket(a, { customPacketType: 'dboNotice', text }); } catch (e) { /* chat is enough */ } };
+  const tell = (a, text) => { const now = Date.now(); if (now - (S.told.get(a >>> 0) || 0) < 3000) return false; S.told.set(a >>> 0, now); personal(a, text); try { sendPacket(a, { customPacketType: 'dboNotice', text }); } catch (e) { /* chat is enough */ } return true; };
+  // A refused forge craft is audited when the smith is told (as regions.js audits REGION), never with the notice's text
+  const refuse = (a, fam, tier, why, text) => { if (tell(a, text)) audit(`SMITH refused ${who(a)} ${fam.name} (tier ${fam.tier}, crafter tier ${tier || 0}): ${why}`); return false; };
   const bypass = (a) => { try { return isAdmin(a) && !S.test.has(a >>> 0); } catch (e) { return false; } };
 
   // ---- forge recipes ------------------------------------------------------------------------------------------------
@@ -108,13 +110,13 @@ module.exports = (api) => {
     // rule (factiongear.js) already says who may, and regions.js still asks it after this gate
     try { if (typeof globalThis.__dboFactionGearMember === 'function' && globalThis.__dboFactionGearMember(a, itemId)) return true; } catch (e) { /* the usual gate */ }
     const tier = craftTier(a);
-    if (tier < fam.tier) { tell(a, `${fam.name} is craft tier ${fam.tier} (${TIER_NAMES[fam.tier - 1] || ''}) work; you are at tier ${tier || 0}. Your materials come back when you close the menu.`); return false; }
+    if (tier < fam.tier) return refuse(a, fam, tier, 'below its tier', `${fam.name} is craft tier ${fam.tier} (${TIER_NAMES[fam.tier - 1] || ''}) work; you are at tier ${tier || 0}. Your materials come back when you close the menu.`);
     if (knows(a, fam)) return true;
     // A people's own armoury is never apprenticed (regions.js raceCraft refuses other peoples first; this holds a staff grant's gaps)
-    if (techOf(fam).book === 'race') { tell(a, `${hintOf(fam)}. Your materials come back when you close the menu.`); return false; }
+    if (techOf(fam).book === 'race') return refuse(a, fam, tier, 'race only', `${hintOf(fam)}. Your materials come back when you close the menu.`);
     const sup = supervisorFor(a, fam);
     S.pending.delete(a);
-    if (!sup) { tell(a, `You don't know how to work ${fam.name} yet. ${hintOf(fam)}. Your materials come back when you close the menu.`); return false; }
+    if (!sup) return refuse(a, fam, tier, 'technique unknown', `You don't know how to work ${fam.name} yet. ${hintOf(fam)}. Your materials come back when you close the menu.`);
     // Counted once the whole craft chain lets it on (regions.js asks __dboSmithCrafted after the verdict)
     S.pending.set(a, { family: techOf(fam).id, sup, at: Date.now() });
     return true;
