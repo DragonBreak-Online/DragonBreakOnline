@@ -18,6 +18,8 @@ import { wheelWatch, wheelKeyAction } from "./emoteWheelWatch";
 declare const window: any;
 
 const WIDGET_ID = 24;
+// How far an emote's body may travel before the emote is ended (ground poses settle a little; walking is hundreds)
+const EMOTE_DRIFT_UNITS = 96;
 
 interface EmoteDef {
   anim: string;
@@ -174,6 +176,7 @@ export class EmoteService extends ClientListener {
     this.controller.emitter.on("uiHiddenChanged", (e) => { if (e.hidden && this.menuOpen) this.closeMenu("interface hidden"); });
     // A wheel still drawn after the browser lost the cursor is taken down (emoteWheelWatch.ts)
     this.controller.on("update", () => this.watchWheel());
+    this.controller.on("update", () => this.watchEmoteDrift());
 
     this.menuKey = readMenuKeyCode(this.sp, "emoteWheelKeyCode", DxScanCode.B);
     // Gamepad: the modifier (Back) held with the left stick click (Sneak alone)
@@ -471,6 +474,7 @@ export class EmoteService extends ClientListener {
       this.diagSentAt = Date.now();
       emoteNote(`sent ${anim}`);
       this.sp.Debug.sendAnimationEvent(player, anim);
+      this.emoteStartPos = [player.getPositionX(), player.getPositionY(), player.getPositionZ()];
       logTrace(this, `Playing emote`, anim);
     });
   }
@@ -482,6 +486,43 @@ export class EmoteService extends ClientListener {
     if (anim && this.diagSentAt === 0) emoteNote(`stopped ${anim} before sent by ${why}`);
     else if (anim && Date.now() - this.diagSentAt < 2000) emoteNote(`stopped ${anim} after ${Date.now() - this.diagSentAt} ms by ${why}`);
     if (anim) this.exitEmote(anim, undefined, graceful);
+    if (anim) this.restoreCollisionAfter(anim, why);
+  }
+
+  // Players walked through walls after an emote, standing or sitting (Onny and Nate, 22-23 Oct: "any emote can do it").
+  // An emote holds the body in place, so the player's own collision is switched back on (setCollision is a set, not a
+  // toggle) as the exit plays out and twice after it; the note says how far the body went while the emote ran
+  private restoreCollisionAfter(anim: string, why: string): void {
+    const start = this.emoteStartPos;
+    this.emoteStartPos = null;
+    let noted = false;
+    for (const delay of [0.3, 1, 2.5]) {
+      this.sp.Utility.wait(delay).then(() => {
+        this.controller.once("update", () => {
+          if (this.activeEmote) return;
+          const player = this.sp.Game.getPlayer();
+          if (!player || player.getFurnitureReference() || player.isOnMount()) return;
+          // The platform's setCollision (what sync/animation uses for copies), reached through sp: it is not in Sp's typings
+          const setCollision = (this.sp as unknown as { setCollision?: (refrFormId: number, collision: boolean) => void }).setCollision;
+          if (typeof setCollision !== "function") return;
+          try { setCollision(player.getFormID(), true); } catch (e) { return; }
+          if (noted || !start) return;
+          noted = true;
+          const moved = Math.round(Math.hypot(player.getPositionX() - start[0], player.getPositionY() - start[1], player.getPositionZ() - start[2]));
+          emoteNote(`collision restored after ${anim} (${why}), body moved ${moved} u since it began`);
+        });
+      });
+    }
+  }
+
+  // An emote never walks: a body that travels while one runs (a gamepad stick, which no cancel key covers, or a slide)
+  // ends it, which also restores collision
+  private watchEmoteDrift(): void {
+    if (!this.activeEmote || !this.emoteStartPos) return;
+    const player = this.sp.Game.getPlayer();
+    if (!player) return;
+    const s = this.emoteStartPos;
+    if (Math.hypot(player.getPositionX() - s[0], player.getPositionY() - s[1]) > EMOTE_DRIFT_UNITS) this.stopActiveEmote(false, "the body moved");
   }
 
   // IdleForceDefaultState breaks most idles; state idles that reject it get
@@ -619,6 +660,7 @@ export class EmoteService extends ClientListener {
   // The idle a dboIdle began, the only one a dboIdleStop may end
   private serverIdle = "";
   private activeEmote = "";
+  private emoteStartPos: [number, number, number] | null = null;
   private allowedAnims: Set<string>;
   private propAnims: Set<string>;
   private exitEvents = new Map<string, string>();
