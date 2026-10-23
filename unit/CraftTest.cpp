@@ -487,6 +487,45 @@ TEST_CASE("A recipe's own GetInCurrentLoc condition reaches GetInCurrentLoc",
   REQUIRE(Condition::FromCtda(*it).function == "GetInCurrentLoc");
 }
 
+TEST_CASE("IsPS3 (520) is false, as in the player's game on the PC",
+          "[Craft][espm]")
+{
+  // The CTDA index reads as IsPS3 instead of an unknown '#520'
+  const auto functions = ConditionFunctionFactory::CreateConditionFunctions();
+  CHECK(functions.GetConditionFunction(static_cast<uint16_t>(520)) !=
+        nullptr);
+
+  // BSKRecipeIngotBronze (601c4e) is held off the PC by IsPS3 == 1 alone; its AdvancedArmors parameter is a leftover
+  const std::filesystem::path dataDir = GetDataDir();
+  if (!std::filesystem::exists(dataDir / "BSAssets.esm")) {
+    SKIP("BSAssets.esm is not in the data dir");
+  }
+  espm::Loader loader(dataDir, { "Skyrim.esm", "BSAssets.esm" });
+  espm::CompressedFieldsCache cache;
+  auto recipe = loader.GetBrowser().LookupById(0x01601c4e);
+  REQUIRE(recipe.rec);
+  REQUIRE(recipe.rec->GetType() == "COBJ");
+  const auto data =
+    reinterpret_cast<const espm::COBJ*>(recipe.rec)->GetData(cache);
+  REQUIRE(data.conditions.size() == 1);
+  REQUIRE(data.conditions[0].functionIndex == 520);
+  const Condition isPS3 = Condition::FromCtda(data.conditions[0]);
+  CHECK(isPS3.function == "IsPS3");
+
+  // False at the smelter and outside crafting, where an unknown function would pass
+  MpActor actor(LocationalData(), FormCallbacks::DoNothing());
+  CHECK(EvaluateAs(ConditionsEvaluatorCaller::kCraft, { isPS3 }, actor) ==
+        false);
+  CHECK(EvaluateAs(ConditionsEvaluatorCaller::kDamageMultConditionalFormula,
+                   { isPS3 }, actor) == false);
+
+  // The PC is not a PS3, so IsPS3 == 0 passes
+  Condition notPS3 = isPS3;
+  notPS3.value = 0.f;
+  CHECK(EvaluateAs(ConditionsEvaluatorCaller::kCraft, { notPS3 }, actor) ==
+        true);
+}
+
 TEST_CASE("A recipe that needs a vanilla perk is refused", "[Craft][espm]")
 {
   // RecipeWeaponEbonyDagger (db8b9) needs HasPerk(EbonySmithing cb412)
